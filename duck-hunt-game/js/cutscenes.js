@@ -58,7 +58,12 @@ export function playCommercial() {
 let dialogueActive = false;
 export function isDialogueOpen() { return dialogueActive; }
 
+// Bumped on every call so a stale close-timeout (below) can tell it's no longer the
+// most recent dialogue line and skip hiding a box a newer line has since re-shown.
+let dialogueSession = 0;
+
 export function showDialogue(speaker, text) {
+  const mySession = ++dialogueSession;
   return new Promise(resolve => {
     dialogueActive = true;
     const box = document.getElementById('dialogue-box');
@@ -100,7 +105,7 @@ export function showDialogue(speaker, text) {
       window.removeEventListener('keydown', advance);
       box.removeEventListener('click', advance);
       box.classList.remove('show');
-      setTimeout(() => box.classList.add('hidden'), 220);
+      setTimeout(() => { if (dialogueSession === mySession) box.classList.add('hidden'); }, 220);
       dialogueActive = false;
       resolve();
     }

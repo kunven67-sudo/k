@@ -236,7 +236,7 @@ export function createKitchenScene({ camera }) {
 
   return {
     scene, colliders, interactables: [interactMom],
-    spawn: { x: 0.6, y: EYE_HEIGHT, z: 2.3, yaw: 0 },
+    spawn: { x: -1.4, y: EYE_HEIGHT, z: 0.8, yaw: 0 },
     floorSurface: 'tile', update, advance,
     dispose: () => disposeObject3D(scene),
   };
