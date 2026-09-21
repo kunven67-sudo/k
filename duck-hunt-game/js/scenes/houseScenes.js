@@ -2,7 +2,7 @@
 // self-contained scene bundle that main.js drives: { scene, colliders, interactables,
 // spawn, update, advance, dispose }. `advance` is a Promise that resolves once that
 // room's scripted story beat is finished, telling main.js it's safe to transition onward.
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import * as THREE from 'three';
 import {
   addBox, addCylinder, addSphere, buildRoomShell, buildHumanoid, canvasTexture,
   woodTexture, tileTexture, wallpaperTexture, fabricTexture,

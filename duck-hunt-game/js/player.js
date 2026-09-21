@@ -1,7 +1,7 @@
 // First-person controller: WASD movement + mouse look (PointerLockControls) + E-interact
 // raycasting + simple circle-vs-AABB collision against static room/furniture colliders.
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
+import * as THREE from 'three';
+import { PointerLockControls } from './vendor/three/examples/jsm/controls/PointerLockControls.js';
 import { EYE_HEIGHT, PLAYER_RADIUS } from './utils.js';
 import { getSettings, onSettingsChange } from './settings.js';
 import { playFootstep } from './audio.js';

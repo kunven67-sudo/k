@@ -6,7 +6,7 @@
 // somewhere it shouldn't, a real-time TV-reflection that doesn't match reality, distorted
 // growls) rather than any creature redesign, and the resolution is an original stand-your-
 // ground / back-away / shoot choice - not a copy of any specific existing game's mechanic.
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import * as THREE from 'three';
 import {
   addBox, addCylinder, addSphere, boxCollider, buildDog, buildDuck,
   carpetTexture, wallpaperTexture, fabricTexture, skyTexture,
