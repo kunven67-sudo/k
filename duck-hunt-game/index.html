@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Wildfowl</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="scene-root"></div>
+
+  <!-- ===================== MAIN MENU ===================== -->
+  <div id="main-menu">
+    <div class="menu-bg">
+      <div class="menu-duck">
+        <div class="duck-body-shape"></div>
+        <div class="duck-head-shape"></div>
+        <div class="duck-bill-shape"></div>
+      </div>
+    </div>
+
+    <div id="panel-main" class="menu-panel">
+      <h1 class="game-title">WILDFOWL</h1>
+      <p class="game-subtitle">a duck hunt, sort of</p>
+      <button id="btn-play" class="menu-btn primary">Play</button>
+      <button id="btn-settings" class="menu-btn">Settings</button>
+      <button id="btn-achievements" class="menu-btn">Achievements</button>
+      <button id="btn-credits" class="menu-btn">Credits</button>
+    </div>
+
+    <div id="panel-settings" class="menu-panel hidden">
+      <h2>Settings</h2>
+      <label class="setting-row">
+        <span>Graphics Quality</span>
+        <select id="setting-graphics">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="ultra">Ultra</option>
+        </select>
+      </label>
+      <label class="setting-row">
+        <span>Mouse Sensitivity</span>
+        <input type="range" id="setting-sensitivity" min="0.3" max="2.5" step="0.05" />
+      </label>
+      <label class="setting-row">
+        <span>Master Volume</span>
+        <input type="range" id="setting-volume" min="0" max="1" step="0.01" />
+      </label>
+      <label class="setting-row">
+        <span>Field of View</span>
+        <input type="range" id="setting-fov" min="60" max="100" step="1" />
+      </label>
+      <button class="menu-btn btn-back">Back</button>
+    </div>
+
+    <div id="panel-achievements" class="menu-panel hidden">
+      <h2>Achievements</h2>
+      <div id="achievements-list" class="achievements-list"></div>
+      <button class="menu-btn btn-back">Back</button>
+    </div>
+
+    <div id="panel-credits" class="menu-panel hidden">
+      <h2>Credits</h2>
+      <div class="credits-text">
+        <p><strong>Wildfowl</strong> is an original, fan-made homage to backyard hunting-gallery games, built entirely from scratch with Three.js.</p>
+        <p>Design, code, low-poly art and sound: all generated procedurally for this project - no external art, texture or audio files anywhere.</p>
+        <p>Every duck, every wall, every honk and bang you hear was built at runtime out of primitives, canvas textures and oscillators.</p>
+        <p>Made with a cardboard shotgun, a very opinionated dog, and a healthy respect for the trope.</p>
+      </div>
+      <button class="menu-btn btn-back">Back</button>
+    </div>
+  </div>
+
+  <!-- ===================== COMMERCIAL ===================== -->
+  <div id="commercial-overlay" class="fullscreen-overlay hidden">
+    <div class="tv-static"></div>
+    <div class="scanlines"></div>
+    <div id="commercial-text" class="commercial-text"></div>
+    <div id="commercial-skip" class="commercial-skip">Click to continue</div>
+  </div>
+
+  <!-- ===================== POINTER LOCK ===================== -->
+  <div id="pointer-lock-overlay" class="fullscreen-overlay hidden">
+    <div class="lock-box">
+      <div id="pointer-lock-text">Click to Play</div>
+      <div class="lock-sub">WASD to move &middot; Mouse to look &middot; E to interact</div>
+    </div>
+  </div>
+
+  <!-- ===================== IN-WORLD UI ===================== -->
+  <div id="interact-prompt" class="interact-prompt"></div>
+
+  <div id="dialogue-box" class="dialogue-box hidden">
+    <div id="dialogue-name" class="dialogue-name"></div>
+    <div id="dialogue-text" class="dialogue-text"></div>
+    <div id="dialogue-hint" class="dialogue-hint">[E] Continue</div>
+  </div>
+
+  <div id="choice-box" class="choice-box hidden">
+    <div id="choice-prompt" class="choice-prompt"></div>
+    <div id="choice-options" class="choice-options"></div>
+  </div>
+
+  <div id="banner" class="banner"></div>
+  <div id="flavor-text" class="flavor-text"></div>
+
+  <div id="hud" class="hud hidden">
+    <div class="hud-top">
+      <div id="hud-score" class="hud-chip">Score: 0</div>
+      <div id="hud-round" class="hud-chip">Round 1/5</div>
+      <div id="hud-shells" class="hud-chip">Shells: 3/3</div>
+    </div>
+    <div class="crosshair">
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- ===================== ENDING ===================== -->
+  <div id="ending-overlay" class="fullscreen-overlay hidden"></div>
+
+  <!-- ===================== TRANSITIONS ===================== -->
+  <div id="fade-overlay" class="fade-overlay"></div>
+  <div id="glitch-overlay" class="glitch-overlay"></div>
+
+  <script type="importmap">
+    { "imports": { "three": "./js/vendor/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
