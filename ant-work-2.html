@@ -63,7 +63,10 @@ kbd{display:inline-block;min-width:1.6em;text-align:center;background:var(--gold
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 
 /* ---------- story select ---------- */
-#story{z-index:42;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.85));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:16px;overflow:auto;}
+#story{z-index:42;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.85));display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:20px;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
+#story>h2{margin-top:auto!important;}
+#story>#storyBack{margin-bottom:auto;flex-shrink:0;}
+#story .cards{flex-shrink:0;}
 #story h2{font-family:var(--title);font-weight:400;font-size:clamp(22px,3vw,38px);margin:0;color:var(--gold);text-shadow:0 4px 0 #6b4a05;}
 #story .sub{opacity:.8;margin-top:-10px;text-align:center;}
 #story .cards{display:flex;gap:26px;flex-wrap:wrap;justify-content:center;}
@@ -342,6 +345,27 @@ body.touch #touch{display:block;}
 #tShrink{right:calc(36px + env(safe-area-inset-right));bottom:calc(216px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:22px;}
 #tPause{right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));width:46px;height:46px;font-size:14px;}
 body.touch #clock{right:70px;}
+/* ---------- phones: keep the UI clear of the touch buttons, no accidental zoom ---------- */
+html,body{touch-action:none;}
+button,input,select,label,.tb{touch-action:manipulation;}
+.mbox,#setBody,#trophyList,#story,#pcScreen{touch-action:pan-y;}
+body.touch #dialog{left:calc(10px + env(safe-area-inset-left));transform:none;width:calc(100vw - 140px - env(safe-area-inset-left) - env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));}
+body.touch #dialog.show{animation:dlgInT .3s cubic-bezier(.2,1.2,.4,1);}
+@keyframes dlgInT{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+body.touch #dialog .txt{font-size:clamp(14px,3.8vw,18px);}
+body.touch.indlg #touch .tb:not(#tUse):not(#tPause){opacity:0;pointer-events:none;}
+body.touch #caption{top:calc(64px + env(safe-area-inset-top));bottom:auto;width:min(620px,86vw);font-size:clamp(13px,3.6vw,17px);}
+body.touch #itemHint{right:auto;left:calc(12px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));align-items:flex-start;}
+body.touch #cook .panel{right:auto;left:max(3vw,12px);}
+@media (max-height:520px){ #story{gap:10px;padding-top:10px;} #story h2{font-size:20px;} #story .sub{font-size:12px;margin-top:-4px;} #story .cards{gap:14px;flex-wrap:nowrap;} .scard{width:min(360px,44vw);} .scard .pic{height:92px;} .scard .txt{padding:2px 12px 10px;} .scard h3{font-size:19px;} .scard .kick{font-size:13px;margin-bottom:4px;} .scard p{font-size:12px;line-height:1.35;} .scard .from{font-size:10px;} }
+@media (max-width:520px){ .scard .pic{height:120px;} .scard p{font-size:13px;} }
+@media (max-width:560px){ #objective{top:calc(58px + env(safe-area-inset-top));max-width:78vw;} }
+@media (max-aspect-ratio:1/1){ body.touch #itemHint{bottom:calc(104px + env(safe-area-inset-bottom));} body.touch #cook .panel{width:min(300px,64vw);top:calc(120px + env(safe-area-inset-top));transform:none;} body.touch #caption{top:calc(118px + env(safe-area-inset-top));} }
+#payClose{position:sticky;bottom:4px;}
+body.touch #visor .readout{bottom:auto;top:calc(14px + env(safe-area-inset-top));left:calc(14px + env(safe-area-inset-left));font-size:11px;}
+body.touch #visor .readout2{bottom:auto;top:calc(66px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));font-size:11px;}
+@media (max-height:520px){ #payBox .amt{font-size:34px;margin:0;} #payBox h2{font-size:17px!important;margin:0;} #payBox h4{margin:6px 0 2px;} #payBox .memo{margin-bottom:4px;font-size:11px;} #payBox .pl{font-size:12px;padding:2px 0;} #cook .panel{padding:10px 12px;} }
+@media (max-height:520px){ .mbox{padding:14px 16px;max-height:96vh;} #settings .mbox{max-height:98vh;} }
 @media (max-width:900px){ #objective{max-width:44vw;font-size:12.5px;padding:6px 12px 7px;} #clock{font-size:15px;padding:4px 10px;} .pill{font-size:14px;padding:3px 10px 3px 4px;} .pill .ic{width:20px;height:20px;font-size:11px;} #itemHint{font-size:11px;gap:4px;} #itemHint div{padding:3px 9px;} }
 @media (max-height:480px){ #itemHint{font-size:10px;gap:3px;bottom:10px;} #objective{top:8px;} #clock{top:8px;} }
 #rotate{z-index:98;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,.9);text-align:center;font-weight:900;font-size:20px;padding:30px;}
@@ -2750,6 +2774,9 @@ function jump(){
 /* smoothly turn the player's view toward a world point */
 function lookAtPoint(p,dur=.6){ const P=PLAYER, ey=P.pos.y+P.y+P.eye*P.scale; const yaw=Math.atan2(-(p.x-P.pos.x),-(p.z-P.pos.z)); const pitch=Math.atan2(p.y-ey,Math.hypot(p.x-P.pos.x,p.z-P.pos.z)); P.lookTo={t:0,dur,y0:P.yaw,y1:yaw,p0:P.pitch,p1:clamp(pitch,-1.2,1.2)}; }
 
+/* on tall/narrow screens (phones held upright) widen the vertical FOV so the sideways view stays
+   what it would be on a normal screen, instead of everything looking zoomed in */
+function fitFov(v){ const a=camera.aspect; if(!(a<1.3)) return v; const t=Math.tan(v*Math.PI/360)*1.3/a; return Math.min(112,Math.max(v,2*Math.atan(t)*180/Math.PI)); }
 /* ---------- camera: player view blended with a cutscene camera ---------- */
 const CAM={active:false,blend:0,target:0,pos:V3(),quat:new THREE.Quaternion(),fov:70,from:null,tr:null,fn:null,releaseDur:.6,dof:null};
 const _pq=new THREE.Quaternion(), _pp=new THREE.Vector3(), _e=new THREE.Euler(0,0,0,'YXZ'), _m4=new THREE.Matrix4(), _up=V3(0,1,0), _tq=new THREE.Quaternion(), _tp=new THREE.Vector3();
@@ -2792,6 +2819,7 @@ function updateCamera(dt,t){
     camera.position.lerpVectors(_pp,_tp,k); camera.quaternion.copy(_pq).slerp(CAM.quat,k);
     fov=lerp(fov,CAM.fov,k);
   } else { camera.position.copy(_pp); camera.quaternion.copy(_pq); }
+  fov=fitFov(fov);
   if(Math.abs(camera.fov-fov)>.01){ camera.fov=fov; camera.updateProjectionMatrix(); }
   // near plane follows scale so tiny-you never clips through the world
   const near=clamp(.05*Math.min(1,s*1.5),.004,.05)*(LV&&LV.env&&LV.env.nearMul||1);
@@ -3140,6 +3168,7 @@ on('mouse',b=>{
 });
 function doInteract(){ if(interactCd>0) return; const it=findInteract(); if(it){ interactCd=.25; hidePrompt(); try{ it.act(it); }catch(e){ console.error(e); __showErr&&__showErr('Error: '+e.message); } } else if(LV&&LV.onUse) LV.onUse(); }
 function updatePrompt(dt){
+  document.body.classList.toggle('indlg',DLG.active);
   interactCd-=dt;
   if(G.mode!=='play'||G.paused||DLG.active||MODAL.open||CAM.active||!PLAYER.ctl.interact){ hidePrompt(); $('crosshair').classList.remove('hot'); TOUCH_UI.ready(false); return; }
   const it=findInteract();
@@ -3176,6 +3205,9 @@ if(IS_TOUCH){
   },{passive:false});
   const end=e=>{ for(const t of e.changedTouches){ if(t.identifier===joyId){ joyId=null; TOUCH.moveX=0; TOUCH.moveZ=0; $('joy').classList.remove('on'); $('joy').firstElementChild.style.transform=''; } if(t.identifier===lookId){ lookId=null; if(DLG.active && Math.hypot(t.clientX-ll.x0,t.clientY-ll.y0)<12) advanceDialog(); } } };
   document.addEventListener('touchend',end); document.addEventListener('touchcancel',end);
+  // stop iOS pinch / double-tap zoom from zooming the whole page (the view ends up 'too close')
+  document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false}); document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+  let lastTap=0; document.addEventListener('touchend',e=>{ const n=Date.now(); if(n-lastTap<320 && !(e.target.closest&&e.target.closest('input,select,textarea'))) e.preventDefault(); lastTap=n; },{passive:false});
   const tb=(id,down,up)=>{ const b=$(id); b.addEventListener('touchstart',e=>{ e.preventDefault(); e.stopPropagation(); b.classList.add('down'); down&&down(); },{passive:false}); b.addEventListener('touchend',e=>{ e.preventDefault(); b.classList.remove('down'); up&&up(); },{passive:false}); };
   tb('tUse',()=>{ if(DLG.active) advanceDialog(); else if(MODAL.open) return; else doInteract(); });
   tb('tAct',()=>{ TOUCH.actHeld=true; if(DLG.active){ advanceDialog(); return; } if(LV&&LV.onPrimary&&LV.onPrimary()===true) return; emit('primary'); },()=>{ TOUCH.actHeld=false; });
