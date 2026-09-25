@@ -55,6 +55,8 @@ export const Story = {
     G.post.setScene(level.scene, G.camera);
     if (G.player.object.parent) G.player.object.parent.remove(G.player.object);
     level.scene.add(G.player.object);
+    level.scene.userData.post = level.post || null;
+    G.renderer.toneMappingExposure = (level.post && level.post.exposure) || 1;
     level.audioReady = true;
     if (level.onEnter) level.onEnter();
   },
@@ -183,8 +185,8 @@ export const Story = {
     this.objective('Get outside — squeeze under the front door in the living room');
   },
 
-  async goOutside(entry = 'outside') {
-    this.current = entry === 'survival' ? 'survival' : 'outside';
+  async goOutside(entry = 'outside', spawn = null) {
+    this.current = entry === 'survival' || G.flags.bushFled ? 'survival' : 'outside';
     unlockChapter('outside');
     ui.fadeInstant(1);
     ui.showHud(false);
@@ -198,7 +200,7 @@ export const Story = {
       document.getElementById('loading').classList.add('hidden');
     }
     this.setLevel(this.levels.yard);
-    await this.levels.yard.arrive(entry);
+    await this.levels.yard.arrive(entry, spawn);
   },
 
   async goGerm() {
@@ -217,6 +219,97 @@ export const Story = {
     ui.fadeInstant(1);
     this.setLevel(this.levels.yard);
     await this.levels.yard.arrive('return', spawn);
+  },
+
+  // ---------------------------------------------------------------- the ending: full size
+  async finale() {
+    G.inventory.restoreStash();
+    const { createYard } = await import('../scenes/yard.js');
+    if (!this.levels.yard) {
+      document.getElementById('loading').classList.remove('hidden');
+      ui.loading(0.3, 'Growing back...');
+      await nextFrame();
+      this.levels.yard = await createYard(this);
+      document.getElementById('loading').classList.add('hidden');
+    }
+    const Y = this.levels.yard;
+    if (this.levels.micro && this.levels.micro.onExit) this.levels.micro.onExit();
+    this.setLevel(Y);
+    Y.setOvercast(false);
+    Y.startAmbience();
+    const P = G.player;
+    const { Dog } = await import('./houseCreatures.js');
+    const dog = new Dog({ fur: 6 });
+    dog.state = 'ending';
+    dog.pose = 1;
+    Y.scene.add(dog.group);
+    const spot = new THREE.Vector3(860, 0, -200);
+    spot.y = Y.world.ground(spot.x, spot.z);
+    P.spawn(spot, -Math.PI / 2);
+    P.mode = 'locked'; P.lockFreeze = true;
+    P.object.scale.setScalar(96);
+    G.mode = 'cutscene';
+    playMusic('finale');
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+    const dogFrom = V(120, 0, -120), dogTo = V(spot.x - 110, 0, spot.z + 30);
+    dog.body.pos.copy(dogFrom); dog.yaw = Math.atan2(dogTo.x - dogFrom.x, dogTo.z - dogFrom.z);
+    const dogTick = (dt) => { dog.animate(dt, P); dog.sync(dt); };
+    G.endingTick = dogTick;
+    await G.director.play(async (c) => {
+      c.cut(spot.clone().add(V(40, 25, 40)), spot.clone().add(V(0, 5, 0)), 60);
+      await ui.fade(0, 1400);
+      document.getElementById('fade').style.background = '#000';
+      c.move(spot.clone().add(V(260, 190, 180)), spot.clone().add(V(0, 120, 0)), 6, { path: [spot.clone().add(V(120, 60, 120))] });
+      await c.say('I\'m... me. I\'m FULL SIZE again!', { speaker: 'You', pitch: 1.2 });
+      await c.say('The grass is just grass. The bush is just a bush. Everything is... normal.', { speaker: 'You' });
+      sfx('bark', { count: 3 });
+      c.cut(V(spot.x - 260, 90, spot.z + 160), V(spot.x - 60, 40, spot.z), 55);
+      c.tween(4.5, (k) => { dog.body.pos.lerpVectors(dogFrom, dogTo, k); dog.body.vel.set(dogTo.x - dogFrom.x, 0, dogTo.z - dogFrom.z).normalize().multiplyScalar(k < 0.95 ? 14 : 0); dog.pose = 1; }, 'linear');
+      await c.say('BISCUIT! Hey buddy! You were NOT going to eat me. I know that now.', { speaker: 'You', pitch: 1.1 });
+      await c.wait(2.2);
+      dog.body.vel.set(0, 0, 0);
+      P.rig.trigger('wave', 1.4);
+      c.cut(spot.clone().add(V(-90, 150, 120)), spot.clone().add(V(0, 140, 0)), 50);
+      sfx('notify'); sfx('notify', { delay: 0.5 });
+      await c.wait(0.8);
+      await c.say('...Wait. Is that my phone buzzing inside?', { speaker: 'You' });
+      ui.toast('📱 <b>FlickFeed</b>: 5 new videos posted for you', 5000);
+      await c.say('Five new videos. Just five. Five seconds each. What could possibly go wrong?', { speaker: 'You', rate: 0.95 });
+      c.move(spot.clone().add(V(600, 400, 600)), spot.clone().add(V(0, 100, 0)), 6);
+      await c.wait(3);
+      await ui.fade(1, 1800);
+    });
+    G.endingTick = null;
+    Y.scene.remove(dog.group);
+    P.object.scale.setScalar(1);
+    P.lockFreeze = false;
+    unlock('fullsize');
+    this.checkpoint('yard', 'survival');
+    this.showEnding();
+  },
+
+  showEnding() {
+    G.mode = 'ending';
+    input.exitLock();
+    ui.showHud(false);
+    const s = G.stats;
+    const mins = Math.floor(s.playTime / 60), secs = Math.floor(s.playTime % 60);
+    const el = document.getElementById('ending');
+    el.innerHTML = `<div class="end-title">FULL SIZE</div><div class="end-sub">You made it back. For now.</div>
+      <div class="end-stats"><span>Time played</span><span>${mins}m ${secs}s</span><span>Deaths</span><span>${s.deaths}</span><span>Ways to die discovered</span><span>${deathsDiscovered().size}/${DEATHS.length}</span>
+      <span>Bugs defeated</span><span>${s.bugs}</span><span>Grass cut</span><span>${s.grass}</span><span>Items crafted</span><span>${s.crafted}</span></div>
+      <div class="roll"><div class="roll-inner">
+        <h4>POCKET SIZE</h4><p>An original game about being very, very small.</p>
+        <h4>STORY &amp; IDEA</h4><p>The player who dreamed it up</p>
+        <h4>CODE, ART, SOUND &amp; MUSIC</h4><p>Generated entirely from code by Claude</p>
+        <h4>STARRING</h4><p>You, at 1.8 centimetres</p><p>Biscuit the golden retriever</p><p>SuckBot 3000</p><p>The Brood Mother (if you found her)</p><p>A tardigrade who was just minding its business</p>
+        <h4>ENGINE</h4><p>Three.js</p>
+        <h4>NO BUGS WERE HARMED</h4><p>...okay, quite a lot of bugs were harmed.</p>
+        <h4>THANK YOU FOR PLAYING</h4></div></div>
+      <button class="mbtn primary" id="btn-end-menu" style="text-align:center;margin-top:24px">Back to Menu</button>`;
+    el.classList.remove('hidden');
+    ui.fade(0, 1200);
+    document.getElementById('btn-end-menu').onclick = () => { el.classList.add('hidden'); this.quitToMenu(); };
   },
 
   // ---------------------------------------------------------------- death & respawn
@@ -249,8 +342,10 @@ export const Story = {
     const P = G.player;
     P.health = P.maxHealth; P.heat = 0; P.stamina = 1;
     P.carry = null;
+    P.climb = null;
     P.mode = 'walk';
     P.sleeping = false;
+    ui.mash(null); ui.boss(null);
     ui.health(P.health, P.maxHealth);
     G.post.fx.damage = 0;
     if (levelId === 'house') {
@@ -266,7 +361,7 @@ export const Story = {
       await this.enterPhone();
       return;
     } else if (levelId === 'yard') {
-      if (!this.levels.yard || G.level !== this.levels.yard) { await this.goOutside(G.flags.bushFled ? 'survival' : 'outside'); if (G.flags.bushFled) return; }
+      if (!this.levels.yard || G.level !== this.levels.yard) { await this.goOutside('respawn', spawn); return; }
       this.levels.yard.respawn(spawn);
     } else if (levelId === 'micro') {
       if (!this.levels.micro || G.level !== this.levels.micro) { await this.goGerm(); return; }
@@ -316,6 +411,7 @@ export const Story = {
       return;
     }
     if (G.post.dofOverride === true && !G.director.active && G.mode === 'play') G.post.dofOverride = null;
+    if (G.endingTick) G.endingTick(dt);
     if (G.level === this.house) this.houseStory.update(dt);
     else if (G.level && G.level.story) G.level.story(dt);
     // inventory, hotbar, combat & building outside of the house

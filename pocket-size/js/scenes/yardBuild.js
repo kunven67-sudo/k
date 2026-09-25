@@ -208,7 +208,9 @@ export function buildYard(level, preset, renderer) {
   const refs = level.refs = {};
 
   // Sky + sun
+  const dimSky = (sk) => { sk.material.fragmentShader = sk.material.fragmentShader.replace('gl_FragColor = vec4( retColor, 1.0 );', 'gl_FragColor = vec4( retColor * 0.45, 1.0 );'); sk.material.needsUpdate = true; };
   const sky = new Sky();
+  dimSky(sky);
   sky.scale.setScalar(20000);
   scene.add(sky);
   const su = sky.material.uniforms;
@@ -217,15 +219,15 @@ export function buildYard(level, preset, renderer) {
   su.sunPosition.value.copy(sunDir);
   refs.sky = sky; refs.sunDir = sunDir;
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const envScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(1000); envScene.add(sky2);
+  const envScene = new THREE.Scene(); const sky2 = new Sky(); dimSky(sky2); sky2.scale.setScalar(1000); envScene.add(sky2);
   Object.keys(su).forEach((k) => { if (sky2.material.uniforms[k]) sky2.material.uniforms[k].value = su[k].value.clone ? su[k].value.clone() : su[k].value; });
   refs.env = pmrem.fromScene(envScene).texture;
   refs.envOvercast = (() => { sky2.material.uniforms.turbidity.value = 12; sky2.material.uniforms.rayleigh.value = 3.5; sky2.material.uniforms.sunPosition.value.set(0.3, 0.3, 0.2); return pmrem.fromScene(envScene).texture; })();
   pmrem.dispose();
   scene.environment = preset.envMap ? refs.env : null;
-  scene.fog = new THREE.FogExp2(0xcfe0ee, 0.00022);
+  scene.fog = new THREE.FogExp2(0xb8cfe4, 0.00016);
 
-  const sun = new THREE.DirectionalLight(0xfff1dc, 3.2);
+  const sun = new THREE.DirectionalLight(0xfff1dc, 2.6);
   sun.castShadow = preset.shadows;
   sun.shadow.mapSize.set(preset.shadowMap, preset.shadowMap);
   const sr = preset.shadowRadius;

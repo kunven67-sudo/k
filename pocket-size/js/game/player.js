@@ -9,7 +9,6 @@ import { sfx } from '../core/audio.js';
 import { getSettings, difficultyMul } from '../core/settings.js';
 import { G } from './state.js';
 
-const UP = new THREE.Vector3(0, 1, 0);
 const tmpV = new THREE.Vector3();
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
@@ -266,13 +265,15 @@ export class Player {
     const z = c.zone;
     const b = this.body;
     // Mashing E pushes you up; stop and you slowly slide back down.
-    if (input.wasPressed('KeyE')) { c.progress += z.perPress || 0.9; sfx('step', { surface: z.surface || 'fabric', vol: 0.8 }); this.stamina = Math.max(0, this.stamina - 0.004); }
+    const presses = input.pressCount('KeyE');
+    if (presses) { c.progress += (z.perPress || 0.9) * presses; sfx('step', { surface: z.surface || 'fabric', vol: 0.8 }); this.stamina = Math.max(0, this.stamina - 0.004 * presses); }
     const rate = input.mashRate(700);
     c.rate = damp(c.rate, rate > 0 ? 1 : 0, 6, dt);
     if (rate < 1.5) c.progress = Math.max(0, c.progress - dt * (z.slide || 1.8));
     const h = z.topY - z.bottomY;
     const y = z.bottomY + Math.min(h, c.progress);
-    b.pos.set(z.x, y, z.z);
+    const zz = z.zTop !== undefined ? z.z + (z.zTop - z.z) * Math.min(1, c.progress / h) : z.z;
+    b.pos.set(z.x, y, zz);
     b.vel.set(0, 0, 0);
     ui.mash(c.progress / h, z.label || 'MASH E TO CLIMB');
     if (input.wasPressed('KeyQ') || input.wasPressed('Space') && c.progress < 0.5) {
@@ -317,7 +318,7 @@ export class Player {
   }
 
   updateInteraction(dt, level) {
-    if (this.mode !== 'walk' || !level.interactables) { this.interactTarget = null; ui.prompt(null); return; }
+    if ((this.mode !== 'walk' && this.mode !== 'swim') || !level.interactables) { this.interactTarget = null; ui.prompt(null); return; }
     const p = this.body.pos;
     let best = null, bestD = Infinity;
     const fwd = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
@@ -354,8 +355,9 @@ export class Player {
     const cam = G.camera;
     const b = this.body;
     const first = s.cameraMode === 'first' && this.mode !== 'dead';
-    this.camDist = damp(this.camDist, this.camDistTarget, 8, dt);
-    const headY = this.mode === 'swim' ? 0.9 : (this.crouching ? 1.05 : 1.55);
+    const carryCam = this.carry && this.carry.camDist && !this.carry.onBack;
+    this.camDist = damp(this.camDist, carryCam ? Math.max(this.camDistTarget, this.carry.camDist) : this.camDistTarget, 4, dt);
+    const headY = (this.mode === 'swim' ? 0.9 : (this.crouching ? 1.05 : 1.55)) + (carryCam ? this.carry.camLift : 0);
     const target = tmpV.set(b.pos.x, b.pos.y + headY, b.pos.z);
     // smooth follow (critically damped feel) - tighter vertically when landing
     this.camTarget.x = damp(this.camTarget.x, target.x, 22, dt);
@@ -402,7 +404,7 @@ export class Player {
     // focus the lens on the player (macro depth of field)
     if (G.post) {
       G.post.focus = first ? 6 : Math.max(1, this.camActual + 0.3);
-      G.post.aperture = first ? 0.35 : 0.9;
+      G.post.aperture = first ? 0.35 : ((G.level && G.level.post && G.level.post.aperture) || 0.9);
     }
   }
 }

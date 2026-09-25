@@ -270,6 +270,7 @@ export class Dog extends Creature {
       nx += (player.body.pos.y < 10 ? 0.35 : 0);
     }
     r.neck.rotation.x = damp(r.neck.rotation.x, nx, 5, dt);
+    r.head.rotation.x = damp(r.head.rotation.x, sleeping ? -0.75 : 0, 5, dt);
     r.neck.rotation.y = damp(r.neck.rotation.y, hy, 5, dt);
     const biting = this.state === 'bite' || (this.state === 'chase' && this.distTo(player.body.pos) < 60);
     r.jaw.rotation.x = damp(r.jaw.rotation.x, biting ? 0.6 + Math.sin(t * 20) * 0.2 : (sleeping ? 0.02 : 0.15 + breathe * 0.05), 12, dt);

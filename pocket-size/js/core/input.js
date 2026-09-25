@@ -4,6 +4,7 @@ import { getSettings } from './settings.js';
 const down = new Set();
 const pressed = new Set();
 const released = new Set();
+const counts = new Map();
 let mouseDX = 0, mouseDY = 0, wheel = 0;
 let mouseDown = [false, false, false];
 let mousePressed = [false, false, false];
@@ -24,6 +25,7 @@ export const input = {
       const k = norm(e);
       if (['Space', 'Tab', 'ArrowUp', 'ArrowDown'].includes(k) && document.activeElement === document.body) e.preventDefault();
       if (!down.has(k)) pressed.add(k);
+      counts.set(k, (counts.get(k) || 0) + 1);
       down.add(k);
       if (k === 'KeyE') { mashTimes.push(performance.now()); if (mashTimes.length > 20) mashTimes.shift(); }
     });
@@ -57,6 +59,8 @@ export const input = {
 
   isDown(code) { return this.enabled && down.has(code); },
   wasPressed(code) { return this.enabled && pressed.has(code); },
+  // Number of separate key presses since last frame (for button mashing at any frame rate).
+  pressCount(code) { return this.enabled ? (counts.get(code) || 0) : 0; },
   wasReleased(code) { return released.has(code); },
   mouse(btn = 0) { return this.enabled && mouseDown[btn]; },
   mousePressed(btn = 0) { return this.enabled && mousePressed[btn]; },
@@ -89,7 +93,7 @@ export const input = {
   },
 
   endFrame() {
-    pressed.clear(); released.clear();
+    pressed.clear(); released.clear(); counts.clear();
     mouseDX = 0; mouseDY = 0; wheel = 0;
     mousePressed = [false, false, false];
     mouseReleased = [false, false, false];

@@ -21,7 +21,8 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = preset.shadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-function pixelRatio() { return Math.min(window.devicePixelRatio || 1, getPreset().pixelRatioCap) * getSettings().resolutionScale; }
+let autoScale = 1; // lowered automatically when frame rate drops
+function pixelRatio() { return Math.min(window.devicePixelRatio || 1, getPreset().pixelRatioCap) * getSettings().resolutionScale * autoScale; }
 renderer.setPixelRatio(pixelRatio());
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.getElementById('scene-root').appendChild(renderer.domElement);
@@ -144,6 +145,7 @@ function openSub(which) {
       ${row('Macro depth of field', chk('depthOfField'))}
       ${row('Film grain', chk('filmGrain'))}
       ${row('Field of view', rng('fov', 55, 100, 1))}
+      ${row('Auto-lower resolution when slow', chk('autoResolution'))}
       ${row('Show FPS', chk('showFps'))}
       <div class="set-group">Gameplay</div>
       ${row('Difficulty', sel('difficulty', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']]))}
@@ -254,6 +256,27 @@ function frame(now) {
   setListener(camera.position, listenerFwd);
   if (lvl) post.render(dt, G.time);
   input.endFrame();
+  adaptResolution(dt);
+}
+
+// Adaptive resolution: if the game runs slowly during play, quietly render fewer pixels.
+let perfT = 0, perfFrames = 0, perfWarned = false;
+function adaptResolution(dt) {
+  if (G.mode !== 'play' || !getSettings().autoResolution) { perfT = 0; perfFrames = 0; return; }
+  perfT += dt; perfFrames++;
+  if (perfT < 3) return;
+  const fps = perfFrames / perfT;
+  perfT = 0; perfFrames = 0;
+  if (fps < 26 && autoScale > 0.55) {
+    autoScale = Math.max(0.55, autoScale - 0.12);
+    renderer.setPixelRatio(pixelRatio());
+    post.build();
+    if (!perfWarned) { perfWarned = true; ui.toast('⚙️ Lowered render resolution for smoother play (Settings → Quality to change).', 4500); }
+  } else if (fps > 58 && autoScale < 1) {
+    autoScale = Math.min(1, autoScale + 0.06);
+    renderer.setPixelRatio(pixelRatio());
+    post.build();
+  }
 }
 
 // ---------------------------------------------------------------- boot

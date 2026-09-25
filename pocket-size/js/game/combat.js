@@ -13,7 +13,7 @@ const numbers = [];
 
 export function attack(id, inv) {
   const P = G.player;
-  if (cooldown > 0 || !P || P.mode !== 'walk' || P.carry) return;
+  if (cooldown > 0 || !P || (P.mode !== 'walk' && P.mode !== 'swim') || P.carry) return;
   const def = id ? item(id) : null;
   const weapon = def && (def.type === 'weapon' || def.type === 'tool') ? def : null;
   P.facing = P.camYaw;
@@ -42,21 +42,26 @@ function resolveHit(h) {
   const w = h.weapon;
   const reach = w ? w.reach : 1.4;
   const dmg = w ? w.dmg : 5;
-  const fwd = new THREE.Vector3(Math.sin(P.facing), 0, Math.cos(P.facing));
-  const origin = P.body.pos.clone().add(new THREE.Vector3(0, 1, 0));
+  const swim = P.mode === 'swim';
+  const fwd = swim ? G.camera.getWorldDirection(new THREE.Vector3()) : new THREE.Vector3(Math.sin(P.facing), 0, Math.cos(P.facing));
+  const origin = P.body.pos.clone().add(new THREE.Vector3(0, swim ? 0.9 : 1, 0));
   let hitSomething = false;
   for (const c of lvl.creatures || []) {
     if (c.dead || c.invulnerable) continue;
-    const to = new THREE.Vector3(c.body.pos.x - origin.x, 0, c.body.pos.z - origin.z);
+    const center = c.body.pos.clone().add(new THREE.Vector3(0, c.body.height * 0.5, 0));
+    const to = center.clone().sub(origin);
+    if (!swim) {
+      // on the ground: horizontal cone + generous vertical window
+      if (Math.abs(to.y) > c.body.height * 0.5 + 1.5) continue;
+      to.y = 0;
+    }
     const d = to.length() - c.body.radius;
     if (d > reach) continue;
-    const dy = (c.body.pos.y + c.body.height * 0.5) - origin.y;
-    if (Math.abs(dy) > c.body.height * 0.5 + 1.5) continue;
-    if (to.lengthSq() > 0.01 && to.normalize().dot(fwd) < 0.35) continue;
+    if (to.lengthSq() > 0.01 && to.normalize().dot(fwd) < (swim ? 0.5 : 0.35)) continue;
     const crit = Math.random() < 0.12;
     const final = Math.round(dmg * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.2));
     const killed = c.hit(final, P.body.pos);
-    popNumber(c.body.pos.clone().add(new THREE.Vector3(0, c.body.height + 0.4, 0)), final, crit);
+    popNumber(center.add(new THREE.Vector3(0, c.body.height * 0.5 + 0.4, 0)), final, crit);
     sfx(w ? 'hit' : 'punch', { pos: c.body.pos });
     P.shake += 0.08;
     hitSomething = true;

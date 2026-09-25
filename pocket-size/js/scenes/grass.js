@@ -118,7 +118,7 @@ export class Grass {
       e.set(lean, yaw, lean * 0.5);
       q.setFromEuler(e);
       if (cutHere) s.set(kind === 'n' ? 0.7 : 2.4, 0.6 + hr * 0.3, 1); // stubble
-      else s.set(kind === 'n' ? 0.55 + cr * 0.4 : 2.4, h * (kind === 'n' ? 1 : 0.85), 1);
+      else s.set(kind === "n" ? 0.38 + cr * 0.3 : 2, h * (kind === "n" ? 1 : 0.85), 1);
       m.compose(p, q, s);
       mats.push(...m.elements);
       // greens with some dry, yellowed blades

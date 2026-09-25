@@ -333,6 +333,7 @@ export function createPhoneWorld(story) {
     if (G.post) G.post.fx.glitch = Math.max(0, G.post.fx.glitch - dt * 1.5);
   };
   level.onExit = () => { G.post.fx.pixelate = 0; G.post.fx.scanlines = 0; G.post.fx.saturation = 1.05; if (level.hum) level.hum.stop(); };
+  level.post = { bloom: 0.7, threshold: 0.55, aperture: 0.6, exposure: 1.0 };
   level.lineOfSight = () => true;
   level.dispose = () => { if (level.hum) level.hum.stop(); };
   return level;

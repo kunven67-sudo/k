@@ -231,6 +231,8 @@ export class PostFX {
     u.focus.value = this.focus; u.aperture.value = this.aperture;
     u.maxBlur.value = this.maxBlur * this.renderer.getPixelRatio();
     this.bloomPass.enabled = p.bloom;
+    const lp = (this.scene && this.scene.userData.post) || null;
+    if (lp) { this.bloomPass.strength = lp.bloom; this.bloomPass.threshold = lp.threshold; }
     this.fxaaPass.enabled = p.fxaa && this.fx.pixelate < 0.5;
     const f = this.finalPass.uniforms;
     f.time.value = time;

@@ -1,6 +1,6 @@
 // Backpack, hotbar, crafting panel, held-item models, eating/equipping and build mode.
 import * as THREE from 'three';
-import { ITEMS, RECIPES, item } from './items.js';
+import { RECIPES, item } from './items.js';
 import { ui } from '../core/ui.js';
 import { input } from '../core/input.js';
 import { sfx } from '../core/audio.js';
@@ -82,7 +82,7 @@ export class Inventory {
   stashForMicro() {
     const kept = [], stash = [];
     this.slots.forEach((s) => { if (!s) return; const d = item(s.id); if ((d.type === 'weapon' || d.type === 'tool' || d.type === 'armor' || d.type === 'build') && !d.micro) stash.push(s); else if (d.micro || d.type === 'food' || d.type === 'key') kept.push(s); else stash.push(s); });
-    this.stash = stash;
+    this.stash = (this.stash || []).concat(stash);
     this.slots = new Array(SLOTS).fill(null);
     kept.forEach((s, i) => { this.slots[i] = s; });
     if (this.armor && !item(this.armor).micro) this.armor = null;
@@ -288,7 +288,6 @@ export class Inventory {
 }
 
 // Procedural models for held tools/weapons (sized for a 1.8-unit person).
-const heldCache = new Map();
 export function heldMesh(id) {
   const wood = new THREE.MeshStandardMaterial({ color: 0x8a6a44, roughness: 0.9 });
   const stone = new THREE.MeshStandardMaterial({ color: 0x8d8a84, roughness: 0.85 });

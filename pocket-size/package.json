@@ -1,0 +1,14 @@
+{
+  "name": "pocket-size",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pocket Size - a tiny-person 3D adventure built with Three.js",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "npx http-server .. -p 8080 -c-1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

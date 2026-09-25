@@ -44,11 +44,11 @@ export class Director {
 
   update(dt) {
     this.time += dt;
-    if (!this.active) return;
-    if (this.skippable && input.isDown('Space')) {
+    if (this.active && this.skippable && input.isDown('Space')) {
       this.skipHold += dt;
       if (this.skipHold > 0.7 && !this.skipped) { this.skipped = true; ui.clearSubtitle(); }
     } else this.skipHold = 0;
+    if (!this.active) this.skipped = false;
     for (let i = this.tweens.length - 1; i >= 0; i--) {
       const tw = this.tweens[i];
       tw.t += dt / tw.dur;

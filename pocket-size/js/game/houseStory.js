@@ -27,7 +27,7 @@ export class HouseStory {
 
   // ---------------------------------------------------------------- night: doom-scrolling
   async playFeed() {
-    const L = this.level, cam = G.camera, d = G.director;
+    const L = this.level, d = G.director;
     L.setTime('night');
     G.mode = 'feed';
     ui.showHud(false);
@@ -164,12 +164,12 @@ export class HouseStory {
     I.push(this.airplaneIt);
     // 3) The blanket at the foot of the bed: MASH E
     this.climbZone = {
-      x: 100, z: 213.2, bottomY: 0, topY: 60, facing: Math.PI, exit: V(100, 60.5, 196),
+      x: 100, z: 216.5, zTop: 213.5, bottomY: 0, topY: 60, facing: Math.PI, exit: V(100, 60.5, 196),
       label: 'MASH E TO CLIMB', surface: 'fabric', perPress: 1.25, slide: 2.2,
       onTop: () => this.onBedTop(),
     };
     I.push({
-      pos: V(100, 1, 214), radius: 22, height: 4, label: 'Climb the blanket (mash E)',
+      pos: V(100, 1, 217), radius: 22, height: 4, label: 'Climb the blanket (mash E)',
       action: (p) => {
         if (p.carry) { p.carry.onBack = true; this.attachAirplane(true); }
         p.startClimb(this.climbZone);
@@ -220,7 +220,7 @@ export class HouseStory {
     const P = G.player;
     P.object.add(a);
     if (onBack) { a.position.set(0, 1.4, -1.2); a.rotation.set(-1.25, 0, 0); a.scale.setScalar(1); }
-    else { a.position.set(0, 2.45, 0.5); a.rotation.set(0, 0, 0); }
+    else { a.position.set(0, 3.55, 0.3); a.rotation.set(0, 0, Math.PI); }
   }
 
   pickUpAirplane() {
@@ -231,7 +231,7 @@ export class HouseStory {
     L.refs.dog.hear(first ? 0.35 : 0.15, P.body.pos);
     this.attachAirplane(false);
     P.carry = {
-      item: 'airplane', speedMul: 0.62, canJump: false, canSprint: false,
+      item: 'airplane', speedMul: 0.62, canJump: false, canSprint: false, camDist: 17, camLift: 3,
       onDrop: (pl) => this.dropAirplane(pl),
     };
     P.rig.trigger('pickup', 0.6);
@@ -365,6 +365,7 @@ export class HouseStory {
     const a = L.refs.airplane;
     P.carry = null;
     L.group.add(a);
+    ui.mash(null);
     const f = this.flight = {
       pos: V(170, 62.5, P.body.pos.z), yaw: Math.PI / 2 - 0.05, pitch: 0.08, speed: 21, roll: 0, t: 0,
       camPos: V(150, 68, P.body.pos.z),

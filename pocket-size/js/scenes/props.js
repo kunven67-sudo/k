@@ -147,8 +147,8 @@ export function bed(ctx, M, x0, z0, w, len) {
   for (let i = 0; i < hp.count; i++) {
     const hx = hp.getX(i), hy = hp.getY(i);
     const fold = Math.sin(hx * 0.35) * 1.8 + Math.sin(hx * 0.13 + 1) * 1.2;
-    const flare = Math.max(0, (-(hy) / (topY + 4) + 0.5)) * 10;
-    hp.setZ(i, fold * (0.4 + flare * 0.1) + flare * 0.9);
+    const flare = Math.max(0, (-(hy) / (topY + 4) + 0.5));
+    hp.setZ(i, fold * (0.5 + flare * 0.6) + flare * 1.6);
   }
   hang.computeVertexNormals();
   const hangM = mesh(hang, M.duvet, cx, (topY + 4) / 2 - 1, z0 + len + 1.5, g);

@@ -802,6 +802,7 @@ export function createHouse(renderer) {
   };
 
   setEnvIntensity(scene, 0.45);
+  level.post = { bloom: 0.35, threshold: 0.9, aperture: 0.9, exposure: 1.0 };
 
   level.dispose = () => {
     level.creatures.forEach((c) => c.dispose && c.dispose());

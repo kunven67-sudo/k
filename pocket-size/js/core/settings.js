@@ -19,6 +19,7 @@ const DEFAULTS = {
   voice: true,              // text-to-speech for spoken lines
   subtitles: true,
   showFps: false,
+  autoResolution: true,
   difficulty: 'normal',     // easy | normal | hard
   immersion5d: true,        // extra shake, rumble, heartbeat, spatial audio
 };
