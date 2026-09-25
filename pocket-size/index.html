@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Pocket Size</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%A4%8F%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <div id="scene-root"></div>
+
+  <!-- ===================== LOADING ===================== -->
+  <div id="loading" class="screen">
+    <div class="load-inner">
+      <div class="load-title">POCKET<span>SIZE</span></div>
+      <div class="load-bar"><div id="load-fill"></div></div>
+      <div id="load-text" class="load-text">Building the world...</div>
+      <div id="load-tip" class="load-tip"></div>
+    </div>
+  </div>
+
+  <!-- ===================== MAIN MENU ===================== -->
+  <div id="menu" class="screen hidden">
+    <div class="menu-shade"></div>
+    <div class="menu-left">
+      <div class="title-block">
+        <div class="game-title">POCKET<span>SIZE</span></div>
+        <div class="game-sub">everything is bigger than you now</div>
+      </div>
+      <div id="menu-main" class="menu-panel">
+        <button class="mbtn primary" data-act="start">Start</button>
+        <button class="mbtn" data-act="continue" id="btn-continue">Continue</button>
+        <button class="mbtn" data-act="chapters">Chapters</button>
+        <button class="mbtn" data-act="settings">Settings</button>
+        <button class="mbtn" data-act="achievements">Achievements</button>
+        <button class="mbtn" data-act="deaths">Ways to Die</button>
+        <button class="mbtn" data-act="controls">Controls</button>
+        <button class="mbtn" data-act="credits">Credits</button>
+      </div>
+    </div>
+
+    <div id="menu-sub" class="menu-sub hidden">
+      <div class="sub-head"><h2 id="sub-title">Settings</h2><button class="mbtn small" data-act="back">Back</button></div>
+      <div id="sub-body" class="sub-body"></div>
+    </div>
+    <div class="menu-foot">v1.0 &middot; made entirely from code &middot; press <b>Start</b></div>
+  </div>
+
+  <!-- ===================== PHONE FEED (doom-scroll) ===================== -->
+  <div id="feed" class="hidden">
+    <div class="phone" id="phone">
+      <div class="phone-screen" id="phone-screen">
+        <div class="status-bar"><span id="phone-time">11:47</span><span class="island"></span><span class="sb-right">&#9679;&#9679;&#9679; 5G <span class="batt"><i id="batt-fill"></i></span> <span id="batt-pct">14%</span></span></div>
+        <div class="feed-tabs"><span>Following</span><span class="on">For You</span><span class="search">&#9906;</span></div>
+        <div class="feed-track" id="feed-track"></div>
+        <div class="feed-nav"><span class="on">Home</span><span>Friends</span><span class="plus">+</span><span>Inbox</span><span>Me</span></div>
+        <div class="swipe-hint" id="swipe-hint"><div class="chev">&#8963;</div>Swipe up</div>
+        <div class="screen-glare"></div>
+      </div>
+    </div>
+    <div class="feed-help" id="feed-help">Scroll wheel / swipe / &uarr; &darr; to scroll &middot; double-click to like</div>
+    <div class="feed-count" id="feed-count"></div>
+  </div>
+
+  <!-- ===================== HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div class="hud-tl">
+      <div class="obj-label" id="obj-chapter">CHAPTER</div>
+      <div class="obj-text" id="obj-text"></div>
+    </div>
+    <div class="hud-bl">
+      <div class="bar-row"><div class="bar-icon">&#10084;</div><div class="bar health"><i id="hp-fill"></i><b id="hp-ghost"></b></div></div>
+      <div class="bar-row"><div class="bar-icon">&#9889;</div><div class="bar stamina"><i id="st-fill"></i></div></div>
+      <div class="bar-row" id="heat-row"><div class="bar-icon sun">&#9728;</div><div class="bar heat"><i id="heat-fill"></i></div></div>
+    </div>
+    <div class="hud-tr" id="toasts"></div>
+    <div id="boss" class="boss hidden"><div id="boss-name"></div><div class="bar boss-bar"><i id="boss-fill"></i></div></div>
+    <div id="crosshair" class="crosshair"></div>
+    <div id="prompt" class="prompt hidden"></div>
+    <div id="mash" class="mash hidden"><div class="mash-label" id="mash-label">MASH E</div><div class="bar mash-bar"><i id="mash-fill"></i></div></div>
+    <div id="hotbar" class="hotbar"></div>
+    <div id="fps" class="fps hidden"></div>
+    <div id="sun-warning" class="sun-warning hidden">&#9728; DIRECT SUNLIGHT &mdash; GET TO SHADE</div>
+    <div id="compass" class="compass hidden"></div>
+  </div>
+
+  <div id="subtitle" class="subtitle hidden"><span id="sub-speaker"></span><span id="sub-text"></span></div>
+  <div id="letterbox"><div class="lb top"></div><div class="lb bot"></div></div>
+  <div id="eyelids"><div class="lid top"></div><div class="lid bot"></div></div>
+  <div id="chapter-card" class="chapter-card hidden"><div class="cc-num" id="cc-num"></div><div class="cc-title" id="cc-title"></div></div>
+  <div id="skip-hint" class="skip-hint hidden">Hold <b>Space</b> to skip</div>
+
+  <!-- ===================== INVENTORY / CRAFTING ===================== -->
+  <div id="inventory" class="panel-screen hidden">
+    <div class="inv-wrap">
+      <div class="inv-col">
+        <h3>Backpack</h3>
+        <div id="inv-grid" class="inv-grid"></div>
+        <div id="inv-detail" class="inv-detail"></div>
+      </div>
+      <div class="inv-col wide">
+        <h3>Crafting <span id="craft-note" class="craft-note"></span></h3>
+        <div id="craft-tabs" class="craft-tabs"></div>
+        <div id="craft-list" class="craft-list"></div>
+      </div>
+    </div>
+    <div class="inv-foot">Tab / I to close &middot; click a recipe to craft &middot; 1-8 to equip</div>
+  </div>
+
+  <!-- ===================== PAUSE ===================== -->
+  <div id="pause" class="panel-screen hidden">
+    <div class="pause-box">
+      <h2>Paused</h2>
+      <button class="mbtn primary" data-pause="resume">Resume</button>
+      <button class="mbtn" data-pause="checkpoint">Restart Checkpoint</button>
+      <button class="mbtn" data-pause="settings">Settings</button>
+      <button class="mbtn" data-pause="menu">Quit to Menu</button>
+      <div class="pause-stats" id="pause-stats"></div>
+    </div>
+  </div>
+
+  <!-- ===================== DEATH ===================== -->
+  <div id="death" class="panel-screen hidden">
+    <div class="death-box">
+      <div class="death-title">YOU DIED</div>
+      <div class="death-cause" id="death-cause"></div>
+      <div class="death-text" id="death-text"></div>
+      <div class="death-count" id="death-count"></div>
+      <button class="mbtn primary" id="btn-retry">Try Again</button>
+    </div>
+  </div>
+
+  <!-- ===================== ENDING ===================== -->
+  <div id="ending" class="panel-screen hidden"></div>
+
+  <div id="lock" class="lock hidden"><div class="lock-box"><div class="lock-title">Click to play</div><div class="lock-sub">WASD move &middot; Mouse look &middot; Space jump &middot; Shift sprint &middot; E interact &middot; Esc pause</div></div></div>
+  <div id="fade" class="fade"></div>
+  <div id="achv-pop" class="achv-pop"></div>
+
+  <script type="importmap">
+    { "imports": { "three": "./js/vendor/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
