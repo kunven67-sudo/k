@@ -73,6 +73,14 @@ export class Creature {
     return false;
   }
 
+  // Eaten or vacuumed up: gone, but not counted as your kill.
+  vanish(into) {
+    if (this.dead) return;
+    this.dead = true; this.state = 'dead'; this.deathT = 0; this.vanishInto = into;
+    if (this.buzz) { this.buzz.stop(); this.buzz = null; }
+    if (this.whine) { this.whine.stop(); this.whine = null; }
+  }
+
   die() {
     this.dead = true;
     this.state = 'dead';
@@ -145,6 +153,12 @@ export class Creature {
   }
 
   update(dt, level, player) {
+    if (this.dead && this.vanishInto) {
+      this.deathT += dt;
+      this.group.position.lerp(this.vanishInto(), 1 - Math.exp(-12 * dt));
+      this.group.scale.multiplyScalar(Math.exp(-dt * 7));
+      return this.deathT < 0.6;
+    }
     if (this.dead) {
       this.deathT += dt;
       this.group.rotation.z = damp(this.group.rotation.z, Math.PI, 6, dt);

@@ -3,7 +3,7 @@
 // corner, bed bugs and a house centipede under the bed, a moth by the window, a ladybug.
 import * as THREE from 'three';
 import { Creature, hexapod, insectLeg, glossy, angDiff } from './creature.js';
-import { Ant, ellipsoid, makeWeb } from './bugs.js';
+import { Ant, Flea, ellipsoid, makeWeb } from './bugs.js';
 import { sfx, loop } from '../core/audio.js';
 import * as TX from '../core/textures.js';
 import { G } from './state.js';
@@ -239,6 +239,28 @@ export class Ladybug extends Creature {
   animate(dt) { this.legsA(dt, Math.hypot(this.body.vel.x, this.body.vel.z)); }
 }
 
+// Fleas live in the carpet around Biscuit's bed and do everything they can to get onto him.
+export class HouseFlea extends Flea {
+  constructor() {
+    super();
+    this.isFlea = true;
+    this.deathCause = 'housebugs';
+    this.loot = [];
+    this.dogCd = 4 + Math.random() * 8;
+  }
+  brain(dt, level, player) {
+    this.dogCd = Math.max(0, this.dogCd - dt);
+    const dog = level.refs && level.refs.dog;
+    if (dog && this.dogCd <= 0 && !this.aggro && this.distTo(player.body.pos) > 6 && this.distTo(dog.body.pos) < 260) {
+      this.steer(dt, dog.body.pos.x, dog.body.pos.z, this.speed, 6);
+      this.hopT -= dt;
+      if (this.hopT <= 0 && this.body.grounded) { this.hopT = 0.5 + Math.random(); this.body.vel.y = 11 + Math.random() * 5; }
+      return;
+    }
+    super.brain(dt, level, player);
+  }
+}
+
 // Where every house bug lives. Spawned by the house, respawned after you die.
 export const HOUSE_BUGS = [
   // kitchen: a sugar ant trail heading for the cereal crumbs, fruit flies over the fruit bowl, a fly
@@ -248,6 +270,9 @@ export const HOUSE_BUGS = [
   // living room: a fly and a ladybug by the big plant
   { make: () => new HouseFly(), pos: [640, 40, 180] },
   { make: () => new Ladybug(), pos: [985, 0, 92] },
+  // Biscuit's corner: a fly that keeps buzzing round his nose, and fleas in the carpet by his bed
+  { make: () => new HouseFly(), pos: [925, 28, 425] },
+  ...[[885, 360], [1015, 370], [880, 505], [1012, 505], [950, 372]].map(([x, z]) => ({ make: () => new HouseFlea(), pos: [x, 0, z] })),
   // bathroom: silverfish around the tub and vanity, a daddy long-legs in the corner
   { make: () => new Silverfish(), pos: [92, 0, 690] },
   { make: () => new Silverfish(), pos: [110, 0, 820] },
@@ -274,9 +299,11 @@ export function spawnHouseBugs(level) {
 }
 
 // Bring back any house bugs that were squashed (used after you respawn).
-export function respawnHouseBugs(level) {
+export function respawnHouseBugs(level, { awayFrom = null, minDist = 0 } = {}) {
   for (const hb of level.houseBugs || []) {
+    if (hb.c.onDog) continue;
     if (!hb.c.dead && level.creatures.includes(hb.c)) continue;
+    if (awayFrom && Math.hypot(hb.def.pos[0] - awayFrom.x, hb.def.pos[2] - awayFrom.z) < minDist) continue;
     if (hb.c.group.parent) hb.c.group.parent.remove(hb.c.group);
     const i = level.creatures.indexOf(hb.c); if (i >= 0) level.creatures.splice(i, 1);
     hb.c = hb.def.make();

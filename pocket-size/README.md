@@ -27,7 +27,8 @@ Click **Start**. Chrome, Edge or Firefox on a PC or laptop with a mouse and keyb
 1. **Doomscroll**: it's late. Five shorts, five seconds each, then the phone goes on the desk.
 2. **Big Morning**: you wake up tiny. Leap onto the fallen pillow, squeeze under the door,
    dodge the robot vacuum and the house bugs (sugar ants, flies, silverfish, a daddy
-   long-legs, bed bugs and a house centipede under the bed), sneak past Biscuit, haul your paper airplane home (you can sprint with it), mash **E** to
+   long-legs, bed bugs and a house centipede under the bed), sneak past Biscuit (who eats
+   bugs, snaps at flies in his sleep, and has fleas that make him stop and scratch), haul your paper airplane home (you can sprint with it), mash **E** to
    climb the blanket, then fly the airplane to the desk. The plane steers itself toward the
    desk if you let it, and **Shift** gives it a speed boost.
 3. **Inside the Phone**: a pixelated world full of viruses. The Call app has no signal, and

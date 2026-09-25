@@ -213,6 +213,7 @@ export function sfx(name, opts = {}) {
     case 'rumble': tone(o, t, opts.dur || 1.5, { freq: 40, vol: 0.4 * v, attack: 0.2 }); noise(o, t, opts.dur || 1.5, { type: 'lowpass', freq: 200, vol: 0.4 * v, attack: 0.2 }); break;
     case 'yawn': tone(o, t, 1.4, { type: 'sine', freq: 300, freqEnd: 180, vol: 0.08 * v, attack: 0.3 }); noise(o, t, 1.4, { freq: 600, q: 4, vol: 0.05 * v, attack: 0.3 }); break;
     case 'pop': tone(o, t, 0.08, { freq: 600, freqEnd: 1400, vol: 0.2 * v }); break;
+    case 'scratch': noise(o, t, 0.05, { freq: 2600, q: 1.4, vol: 0.28 * v }); noise(o, t + 0.05, 0.04, { freq: 1900, q: 1.2, vol: 0.18 * v }); break;
     case 'sizzle': noise(o, t, 0.4, { type: 'highpass', freq: 5000, vol: 0.12 * v }); break;
     case 'boss': tone(o, t, 3, { type: 'sawtooth', freq: 55, vol: 0.3 * v, attack: 0.5 }); tone(o, t, 3, { type: 'sawtooth', freq: 58, vol: 0.3 * v, attack: 0.5 }); break;
     default: break;

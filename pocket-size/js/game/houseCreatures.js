@@ -48,6 +48,15 @@ export class Dog extends Creature {
     this.snore = null;
     this.furQuality = opts.fur ?? 8;
     this.invulnerable = true;
+    // fleas living in his fur, scratching bouts, snapping at bugs
+    this.fleas = [];
+    this.nextScratch = 6;
+    this.scratchT = 0;
+    this.snapCd = 0;
+    this.snapT = 0;
+    this.snack = null;
+    this.fleaGeo = new THREE.SphereGeometry(0.4, 8, 6);
+    this.fleaMat = new THREE.MeshStandardMaterial({ color: 0x3a1c0a, roughness: 0.4 });
     this.build();
   }
 
@@ -170,8 +179,9 @@ export class Dog extends Creature {
         this.alert = Math.max(0, this.alert - dt * 0.04);
         if (player.mode === 'walk' && !G.flags.dogPeace) {
           const moving = Math.hypot(player.body.vel.x, player.body.vel.z) > 1;
-          if (d < 55) this.alert += dt * 0.45;
-          if (moving && d < 170) this.alert += dt * (player.sprinting ? 0.32 : player.crouching ? 0.015 : 0.07) * (1 - d / 170);
+          const itchy = this.scratchT > 0 ? 0.3 : 1; // busy scratching fleas = less attention on you
+          if (d < 55) this.alert += dt * 0.45 * itchy;
+          if (moving && d < 170) this.alert += dt * (player.sprinting ? 0.32 : player.crouching ? 0.015 : 0.07) * (1 - d / 170) * itchy;
         }
         if (this.snore) this.snore.setVolume(0.9, 1);
         if (this.alert >= 1) this.wake();
@@ -184,6 +194,12 @@ export class Dog extends Creature {
         break;
       case 'chase': {
         this.pose = 1;
+        if (this.scratchT > 0) {
+          // has to stop and scratch - your chance to get away
+          this.body.vel.x = damp(this.body.vel.x, 0, 6, dt); this.body.vel.z = damp(this.body.vel.z, 0, 6, dt);
+          if (canSee) this.lastSeen = pp.clone();
+          break;
+        }
         if (canSee) { this.lastSeen = pp.clone(); this.lostT = 0; } else this.lostT = (this.lostT || 0) + dt;
         const tgt = this.lastSeen;
         const dist = this.steer(dt, tgt.x, tgt.z, this.speed, 2.0);
@@ -200,6 +216,7 @@ export class Dog extends Creature {
       case 'search':
         this.pose = 1;
         if (canSee && d < 260) { this.state = 'chase'; this.stateT = 0; sfx('bark', { pos: this.body.pos, count: 2, ref: 120 }); break; }
+        if (this.snack) { this.steer(dt, this.snack.body.pos.x, this.snack.body.pos.z, 8, 3); break; }
         if (this.lastSeen) this.steer(dt, this.lastSeen.x + Math.sin(t * 1.3) * 30, this.lastSeen.z + Math.cos(t * 1.1) * 30, 5, 2.5);
         if (Math.random() < dt * 0.5) sfx('hiss', { pos: this.headPos(), vol: 0.3, ref: 40 }); // sniff
         if (this.stateT > 7) { this.state = 'return'; this.stateT = 0; }
@@ -207,6 +224,7 @@ export class Dog extends Creature {
       case 'return': {
         this.pose = 1;
         if (canSee && d < 200) { this.state = 'chase'; this.stateT = 0; break; }
+        if (this.snack) { this.steer(dt, this.snack.body.pos.x, this.snack.body.pos.z, 8, 3); break; }
         const dist = this.steer(dt, this.bedPos.x, this.bedPos.z, 7, 2.5);
         if (dist < 8) {
           this.state = 'settle'; this.stateT = 0; this.alert = 0.25;
@@ -222,10 +240,107 @@ export class Dog extends Creature {
       this.body.vel.x = damp(this.body.vel.x, 0, 5, dt); this.body.vel.z = damp(this.body.vel.z, 0, 5, dt);
       if (this.state === 'settle' && this.stateT > 3) this.state = 'sleep';
     }
+    this.updateCritters(dt, level);
     this.physics(dt, level.world);
     this.animate(dt, player);
     this.sync(dt);
     return true;
+  }
+
+  // Bugs near Biscuit: he eats them when awake, snaps at flies in his sleep, and collects fleas.
+  updateCritters(dt, level) {
+    this.snapCd = Math.max(0, this.snapCd - dt);
+    this.snapT = Math.max(0, this.snapT - dt);
+    const head = this.headPos();
+    const sleeping = this.state === 'sleep' || this.state === 'settle';
+    const c0 = this.body.pos;
+    for (const c of [...level.creatures]) {
+      if (!c.isBug || c.dead || c.onDog) continue;
+      const p = c.body.pos;
+      if (c.isFlea) {
+        if (c.dogCd > 0 || this.fleas.length >= 14) continue;
+        // fleas can leap 100 times their body length - straight into his fur
+        if (Math.hypot(p.x - c0.x, p.z - c0.z) < (sleeping ? 60 : 32) && p.y < 50) this.catchFlea(c, level);
+        continue;
+      }
+      if (this.snapCd > 0) continue;
+      const dh = head.distanceTo(p);
+      if (!sleeping && dh < 13 && c.body.radius >= 0.2) this.eatBug(c, level);
+      else if (sleeping && c.flying && dh < 16) {
+        // snaps at a fly buzzing round his nose without waking up
+        this.snapCd = 3; this.snapT = 0.4; this.alert += 0.06;
+        sfx('chomp', { pos: head, vol: 0.5, ref: 60 });
+        if (Math.random() < 0.6) this.eatBug(c, level);
+      }
+    }
+    // awake and wandering: go after the nearest bug
+    if (this.snack && (this.snack.dead || sleeping || this.state === 'chase')) this.snack = null;
+    if (!this.snack && (this.state === 'search' || this.state === 'return')) {
+      let best = null, bd = 80;
+      for (const c of level.creatures) {
+        if (!c.isBug || c.dead || c.onDog || c.isFlea || c.body.radius < 0.2 || c.body.pos.y > 30) continue;
+        const dd = this.distTo(c.body.pos);
+        if (dd < bd) { bd = dd; best = c; }
+      }
+      this.snack = best;
+    }
+    // fleas: scratching bouts get more frequent the more he has; now and then one hops off
+    if (this.fleas.length) {
+      this.hopT = (this.hopT ?? 30) - dt;
+      if (this.hopT <= 0) { this.hopT = 20 + Math.random() * 25; this.releaseFlea(level); }
+      this.nextScratch -= dt;
+      if (this.nextScratch <= 0 && this.scratchT <= 0) {
+        this.scratchT = Math.min(4, 1.6 + this.fleas.length * 0.25);
+        this.nextScratch = Math.max(4, 15 - this.fleas.length * 1.3) + Math.random() * 5;
+        if (level.onDogScratch) level.onDogScratch(this);
+      }
+      // the fleas crawl around in his fur
+      if (Math.random() < dt * 3) { const f = this.fleas[Math.floor(Math.random() * this.fleas.length)]; this.placeFleaDot(f.dot); }
+    }
+    if (this.scratchT > 0) {
+      this.scratchT -= dt;
+      this.scratchSfxT = (this.scratchSfxT || 0) - dt;
+      if (this.scratchSfxT <= 0) { this.scratchSfxT = 0.11; sfx('scratch', { pos: this.body.pos, ref: 70, vol: 0.7 }); }
+    }
+  }
+
+  eatBug(c, level) {
+    c.vanish(() => this.headPos());
+    this.snapT = 0.45; this.snapCd = 1.2; this.snack = null;
+    sfx('chomp', { pos: this.headPos(), ref: 80 });
+    if (level.onBugEaten) level.onBugEaten(c, 'dog', this.headPos());
+  }
+
+  placeFleaDot(dot) {
+    const a = Math.random() * Math.PI * 2;
+    dot.position.set(Math.cos(a) * 15.4, Math.sin(a) * 15.4 + 1, (Math.random() - 0.5) * 56);
+  }
+
+  catchFlea(c, level) {
+    c.onDog = true;
+    c.body.vel.set(0, 0, 0);
+    const i = level.creatures.indexOf(c); if (i >= 0) level.creatures.splice(i, 1);
+    if (c.group.parent) c.group.parent.remove(c.group);
+    const dot = new THREE.Mesh(this.fleaGeo, this.fleaMat);
+    this.placeFleaDot(dot);
+    this.rig.body.add(dot);
+    this.fleas.push({ c, dot });
+    if (level.onDogFlea) level.onDogFlea(this);
+  }
+
+  releaseFlea(level) {
+    const f = this.fleas.pop();
+    if (!f) return;
+    this.rig.body.remove(f.dot);
+    const c = f.c;
+    c.onDog = false; c.dead = false;
+    c.dogCd = 15;
+    const a = Math.random() * Math.PI * 2;
+    c.body.pos.set(this.body.pos.x + Math.cos(a) * 66, 0.3, this.body.pos.z + Math.sin(a) * 66);
+    c.body.vel.set(Math.cos(a) * 4, 9, Math.sin(a) * 4);
+    c.home.copy(c.body.pos);
+    level.scene.add(c.group);
+    level.creatures.push(c);
   }
 
   faceToward(dt, p, rate) {
@@ -250,13 +365,16 @@ export class Dog extends Creature {
     r.body.rotation.z = (1 - p) * 0.25;
     r.torso.scale.set(1 + breathe * 0.03, 1, 1.05 + breathe * 0.02);
     const run = Math.min(1, speed / 12);
+    const scratching = this.scratchT > 0;
+    const sk = Math.sin(t * 34);
     r.legs.forEach((L, i) => {
       const phase = this.gait + (L.front ? 0 : Math.PI * 0.9) + (L.side > 0 ? Math.PI * (run > 0.6 ? 0.15 : 1) : 0);
       const swing = speed > 1 ? Math.sin(phase) * (0.5 + run * 0.5) : 0;
       const lieHip = L.front ? -1.35 : 1.25;
-      L.hip.rotation.x = damp(L.hip.rotation.x, (1 - p) * lieHip + p * swing, 10, dt);
-      const kneeT = (1 - p) * (L.front ? 0.2 : -2.4) + p * (speed > 1 ? Math.max(0, Math.cos(phase)) * (L.front ? 0.9 : -0.9) : 0);
-      L.knee.rotation.x = damp(L.knee.rotation.x, kneeT, 10, dt);
+      const scr = scratching && i === 3; // back leg thumping away at an itch
+      L.hip.rotation.x = damp(L.hip.rotation.x, (1 - p) * lieHip + p * swing + (scr ? -1.1 + sk * 0.5 : 0), scr ? 30 : 10, dt);
+      const kneeT = (1 - p) * (L.front ? 0.2 : -2.4) + p * (speed > 1 ? Math.max(0, Math.cos(phase)) * (L.front ? 0.9 : -0.9) : 0) + (scr ? 0.8 + sk * 0.35 : 0);
+      L.knee.rotation.x = damp(L.knee.rotation.x, kneeT, scr ? 30 : 10, dt);
       L.hip.rotation.z = (1 - p) * L.side * 0.15;
     });
     // head: resting on paws when asleep, alert & tracking the player when awake
@@ -269,15 +387,17 @@ export class Dog extends Creature {
       hy = Math.max(-0.8, Math.min(0.8, angDiff(this.yaw, want)));
       nx += (player.body.pos.y < 10 ? 0.35 : 0);
     }
-    r.neck.rotation.x = damp(r.neck.rotation.x, nx, 5, dt);
+    if (scratching) { hy = 0.95; nx = sleeping ? 0.6 : 0.35; }
+    if (this.snapT > 0) nx -= 0.8;
+    r.neck.rotation.x = damp(r.neck.rotation.x, nx, this.snapT > 0 ? 18 : 5, dt);
     r.head.rotation.x = damp(r.head.rotation.x, sleeping ? -0.75 : 0, 5, dt);
     r.neck.rotation.y = damp(r.neck.rotation.y, hy, 5, dt);
-    const biting = this.state === 'bite' || (this.state === 'chase' && this.distTo(player.body.pos) < 60);
+    const biting = this.state === 'bite' || this.snapT > 0 || (this.state === 'chase' && player && this.distTo(player.body.pos) < 60);
     r.jaw.rotation.x = damp(r.jaw.rotation.x, biting ? 0.6 + Math.sin(t * 20) * 0.2 : (sleeping ? 0.02 : 0.15 + breathe * 0.05), 12, dt);
     // eyes/lids
     r.eyes.forEach((e) => { e.userData.lid.scale.y = damp(e.userData.lid.scale.y, sleeping ? 1.0 : 0.2, 6, dt); e.userData.lid.rotation.x = sleeping ? 0.9 : -0.9; });
     // ears twitch while asleep
-    const tw = sleeping && Math.sin(t * 0.7) > 0.97 ? Math.sin(t * 40) * 0.3 : 0;
+    const tw = scratching ? sk * 0.35 : sleeping && Math.sin(t * 0.7) > 0.97 ? Math.sin(t * 40) * 0.3 : 0;
     r.earL.rotation.x = tw; r.earR.rotation.x = -tw * 0.5;
     // tail: wags when awake (menacing), gentle thump when asleep
     r.tail.forEach((s, i) => {
@@ -352,6 +472,22 @@ export class Vacuum extends Creature {
     }
     this.physics(dt, level.world);
     this.brushes.forEach((b, i) => { b.rotation.y += dt * 14 * (i ? 1 : -1); });
+    // anything bug-sized on the floor in front of the brushes gets sucked in
+    const vp = this.body.pos;
+    for (const c of [...level.creatures]) {
+      if (!c.isBug || c.dead || c.onDog) continue;
+      const bp = c.body.pos;
+      if (bp.y > vp.y + 9.5 || bp.y < vp.y - 1) continue;
+      const d = Math.hypot(bp.x - vp.x, bp.z - vp.z);
+      if (d < 17 + c.body.radius + 1.5) {
+        c.vanish(() => this.body.pos.clone().add(new THREE.Vector3(0, 3, 0)));
+        sfx('whoosh', { pos: vp, dur: 0.3, vol: 0.5, ref: 40 });
+        if (level.onBugEaten) level.onBugEaten(c, 'vacuum', vp);
+      } else if (d < 34 && !c.flying) {
+        // suction drags nearby bugs in
+        c.body.vel.x += ((vp.x - bp.x) / d) * dt * 30; c.body.vel.z += ((vp.z - bp.z) / d) * dt * 30;
+      }
+    }
     this.led.material.emissiveIntensity = 2 + Math.sin(G.time * 4) * 1.5;
     if (this.hum) this.hum.setPos(this.body.pos);
     const pp = player.body.pos;

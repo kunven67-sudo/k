@@ -25,6 +25,7 @@ export class HouseStory {
     this.airplaneRot = level.refs.airplane.rotation.clone();
     this.ambience = [];
     this.setupInteractables();
+    this.setupCritterEvents();
   }
 
   // ---------------------------------------------------------------- night: doom-scrolling
@@ -221,6 +222,29 @@ export class HouseStory {
       can: () => L.refs.dog.state === 'sleep',
       action: () => { L.refs.dog.alert = 5; L.refs.dog.wake(); },
     });
+  }
+
+  // What happens when the vacuum or Biscuit gets a bug, and when Biscuit gets fleas.
+  setupCritterEvents() {
+    const L = this.level;
+    const near = (pos, r = 260) => G.player && G.mode === 'play' && G.level === L && G.player.body.pos.distanceTo(pos) < r;
+    L.onBugEaten = (c, by, pos) => {
+      if (!near(pos)) return;
+      if (by === 'vacuum') { ui.toast(`🤖 SuckBot vacuumed up a <b>${c.name}</b>!`, 2500); unlock('cleansweep'); }
+      else { ui.toast(`🐕 Biscuit ate a <b>${c.name}</b>! Gross.`, 2500); unlock('bugbuffet'); }
+    };
+    L.onDogFlea = (dog) => {
+      if (!G.flags.dogFleas && near(dog.body.pos, 400)) { G.flags.dogFleas = true; ui.toast('🐕 Uh oh... <b>Biscuit has fleas.</b> They keep jumping onto him from the carpet.', 4500); }
+    };
+    L.onDogScratch = (dog) => {
+      if (!near(dog.body.pos, 320)) return;
+      unlock('fleacircus');
+      if (!G.flags.sawScratch) {
+        G.flags.sawScratch = true;
+        ui.toast(`🐾 Biscuit is scratching his fleas (${dog.fleas.length}). While he's itchy he pays less attention to you!`, 5000);
+      }
+      if (dog.state === 'chase') ui.toast('🐾 Biscuit stopped to scratch! <b>RUN!</b>', 2000);
+    };
   }
 
   attachAirplane(onBack) {
@@ -618,6 +642,9 @@ export class HouseStory {
       ui.say('The blanket hanging off the end of the bed. I can climb that!', { speaker: 'You' });
     }
     if (G.flags.phoneDone && !L.refs.draftStopper.moved) L.openFrontDoor();
+    // squashed, eaten and vacuumed bugs come back over time (never right next to you)
+    this.bugT = (this.bugT || 0) + dt;
+    if (this.bugT > 50) { this.bugT = 0; respawnHouseBugs(L, { awayFrom: p, minDist: 90 }); }
     // Leaving the phone: nudge toward the front door
     if (G.flags.phoneDone && !G.flags.tipDoor && p.y < 5) { G.flags.tipDoor = true; this.story.objective('Get outside — squeeze under the front door in the living room'); }
   }
