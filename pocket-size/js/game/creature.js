@@ -125,7 +125,7 @@ export class Creature {
     this.attackCd = Math.max(0, this.attackCd - dt);
     this.stateT += dt;
     if (this.state === 'idle' || this.state === 'wander') {
-      if (playerOk && (d < this.aggroRange || this.aggro) && dy < 12) { this.state = 'chase'; this.stateT = 0; this.onAggro && this.onAggro(); }
+      if (!this.passive && playerOk && (d < this.aggroRange || this.aggro) && dy < 12) { this.state = 'chase'; this.stateT = 0; this.onAggro && this.onAggro(); }
       else {
         this.wanderT -= dt;
         if (this.wanderT <= 0) { this.wanderT = 2 + Math.random() * 4; this.wanderTo = new THREE.Vector3(this.home.x + (Math.random() - 0.5) * 30, this.home.y, this.home.z + (Math.random() - 0.5) * 30); }

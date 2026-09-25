@@ -8,6 +8,7 @@ import { sfx, playMusic, loop, setReverb } from '../core/audio.js';
 import { unlock } from './achievements.js';
 import { G } from './state.js';
 import { Feed } from '../scenes/feed.js';
+import { respawnHouseBugs } from './houseBugs.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const DESK = { x: 345, z: 34 }; // centre of the desk top the airplane has to reach
@@ -192,14 +193,17 @@ export class HouseStory {
       can: () => G.flags.onDesk && !G.flags.phoneDone,
       action: () => this.enterPhone(),
     });
-    // 6) Front door
+    // 6) Front door: blocked by the draft stopper until you've been inside the phone.
+    //    Once it's moved, just walk under the door to go outside.
     I.push({
-      pos: V(1036, 1, 227), radius: 30, height: 6, label: 'Squeeze under the front door',
+      pos: V(1030, 1, 227), radius: 20, height: 8,
+      label: () => (G.flags.phoneDone ? 'Squeeze under the front door (go outside)' : 'A draft stopper is blocking the front door'),
       action: () => {
-        if (!G.flags.phoneDone) { ui.say('Not yet. I need my phone first. Help is one call away... I hope.', { speaker: 'You' }); return; }
-        this.story.goOutside();
+        if (!G.flags.phoneDone) { ui.say('The draft stopper is jammed against the door. I can\'t get under it. Besides... I need my phone first.', { speaker: 'You' }); return; }
+        this.leaveHouse();
       },
     });
+    this.level.world.addTrigger(1041, -1, 175, 1058, 3, 280, { onEnter: () => { if (G.flags.phoneDone) this.leaveHouse(); } });
     // 7) Crumbs heal
     L.crumbs.forEach((c) => I.push({
       pos: V(c.x, 0.5, c.z), radius: 2.5, height: 3, label: 'Eat the cereal crumb (+30 health)',
@@ -528,6 +532,12 @@ export class HouseStory {
     this.story.enterPhone();
   }
 
+  leaveHouse() {
+    if (this.leaving || G.mode !== 'play') return;
+    this.leaving = true;
+    this.story.goOutside().finally(() => { this.leaving = false; });
+  }
+
   // ---------------------------------------------------------------- hazards
   async snapTrap() {
     const T = this.level.refs.trap;
@@ -570,7 +580,7 @@ export class HouseStory {
     // vacuum schedule
     if (G.flags.seenLiving && !L.refs.vacuum.active) {
       this.vacT = (this.vacT || 0) + dt;
-      if (this.vacT > 45) L.refs.vacuum.start();
+      if (this.vacT > 3) L.refs.vacuum.start();
     }
     // coins
     for (const c of L.coins) {
@@ -607,6 +617,7 @@ export class HouseStory {
       this.story.objective('Climb the blanket hanging at the foot of the bed (mash E)');
       ui.say('The blanket hanging off the end of the bed. I can climb that!', { speaker: 'You' });
     }
+    if (G.flags.phoneDone && !L.refs.draftStopper.moved) L.openFrontDoor();
     // Leaving the phone: nudge toward the front door
     if (G.flags.phoneDone && !G.flags.tipDoor && p.y < 5) { G.flags.tipDoor = true; this.story.objective('Get outside — squeeze under the front door in the living room'); }
   }
@@ -646,6 +657,7 @@ export class HouseStory {
     const r = L.refs.roach;
     r.body.pos.copy(r.home); r.state = 'idle'; r.hp = r.maxHp; r.dead = false; r.aggro = false; r.group.scale.setScalar(1); r.group.rotation.set(0, 0, 0);
     if (!L.creatures.includes(r)) { L.creatures.push(r); L.scene.add(r.group); }
+    respawnHouseBugs(L);
     this.flight = null;
     if (this.flightWind) { this.flightWind.stop(); this.flightWind = null; }
     if (opts.carrying === 'airplane') {

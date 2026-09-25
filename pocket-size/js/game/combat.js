@@ -79,6 +79,7 @@ export function onKill(c) {
   G.stats.kills++;
   if (c.isBug) {
     G.stats.bugs++;
+    if (G.level && G.level.id === 'house') { G.stats.houseBugs = (G.stats.houseBugs || 0) + 1; if (G.stats.houseBugs >= 5) unlock('pestcontrol'); }
     if (G.stats.bugs >= 25) unlock('exterminator');
   }
   if (c.isVirus) { G.stats.viruses = (G.stats.viruses || 0) + 1; if (G.stats.viruses >= 5) unlock('antivirus'); }

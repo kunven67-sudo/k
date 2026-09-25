@@ -257,6 +257,7 @@ export function loop(name, opts = {}) {
     case 'room': { noiseSrc('lowpass', 250, 0.5, 0.5); osc('sine', 50, 0.12); break; }
     case 'traffic': { noiseSrc('lowpass', 300, 0.5, 1); break; }
     case 'whine': { const o = osc('sawtooth', 620, 0.2); lfo(o.o.frequency, 7, 25, 620); break; }
+    case 'flybuzz': { const o = osc('sawtooth', 190, 0.22); lfo(o.o.frequency, 11, 18, 190); const o2 = osc('square', 380, 0.04); lfo(o2.o.frequency, 9, 30, 380); break; }
     case 'hum': { osc('sawtooth', 100, 0.15); osc('square', 50, 0.05); noiseSrc('highpass', 6000, 0.5, 0.2); break; }
     case 'micro': { const n = noiseSrc('lowpass', 180, 1, 1); lfo(n.f.frequency, 0.05, 80, 180); const o = osc('sine', 41, 0.4); lfo(o.gg.gain, 0.1, 0.3, 0.3); break; }
     case 'heat': { noiseSrc('highpass', 4000, 0.3, 0.6); break; }

@@ -13,6 +13,7 @@ import {
   frame, paperAirplaneGeometry, coinMesh, phoneMesh,
 } from './props.js';
 import { Dog, Vacuum, Cockroach } from '../game/houseCreatures.js';
+import { spawnHouseBugs } from '../game/houseBugs.js';
 
 const H = 260, T = 12;
 export const ROOMS = {
@@ -185,8 +186,27 @@ export function createHouse(renderer) {
   level.refs.bedDoor = door('z', 426, 335, 90, 205, 1);
   level.refs.bathDoor = door('z', 426, 485, 90, 205, -1);
   level.refs.frontDoor = door('z', 1046, 227.5, 95, 212, 1);
-  // weather strip outside the front door gap: you "exit" via the interaction, not into the void
-  world.addBox(1052, 3, 227.5, 3, 3, 50, { surface: 'wood' });
+  // Floor all the way under the front door, and a solid block just past it: walking under the
+  // door triggers "go outside" instead of dropping you off the edge of the house.
+  world.addBox(1052, -5, 227.5, 14, 5, 60, { surface: 'wood' });
+  world.addBox(1062, 40, 227.5, 5, 40, 60, { surface: 'wood', noCamera: true });
+  const underDoorLight = mesh(new THREE.PlaneGeometry(120, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.1, 1.8) }), 1057, 3, 227.5, group, { ry: -Math.PI / 2, cast: false, receive: false });
+  void underDoorLight;
+  // Draft stopper: the fabric tube lying against the bottom of the door blocks the gap
+  // until you've been inside your phone.
+  const stopperM = TX.pbr(TX.withRepeat(TX.fabric({ color: 0x7a3a2a, color2: 0xd8b060, pattern: 'plaid', weave: 90, seed: 61 }), 6), { roughness: 1, sheen: 0.8, sheenColor: new THREE.Color(0xffc080), sheenRoughness: 0.8 }, true);
+  const stopper = new THREE.Group(); stopper.position.set(1034, 4.2, 227.5); group.add(stopper);
+  mesh(new THREE.CapsuleGeometry(4.2, 92, 8, 24), stopperM, 0, 0, 0, stopper, { rx: Math.PI / 2 });
+  const stopperCol = world.addBox(1034, 5, 227.5, 5, 5, 52, { surface: 'fabric', soft: true });
+  level.refs.draftStopper = { group: stopper, col: stopperCol, moved: false };
+  level.openFrontDoor = () => {
+    const d = level.refs.draftStopper;
+    if (d.moved) return;
+    d.moved = true;
+    world.remove(d.col);
+    d.group.position.set(1012, 4.2, 330);
+    d.group.rotation.y = 0.9;
+  };
   // front-door mat
   const matTex = TX.drawn('doormat', 512, 320, (c, w, h) => {
     c.fillStyle = '#6b4a2e'; c.fillRect(0, 0, w, h);
@@ -716,7 +736,7 @@ export function createHouse(renderer) {
   });
 
   // ------------------------------------------------------------ creatures
-  const vacuum = new Vacuum({ x0: 470, x1: 1000, z0: 330, z1: 800, cx: 735, cz: 560 });
+  const vacuum = new Vacuum({ x0: 460, x1: 1025, z0: 20, z1: 820, cx: 735, cz: 420 });
   vacuum.place(1000, 0, 520);
   vacuum.yaw = -Math.PI / 2;
   scene.add(vacuum.group);
@@ -727,6 +747,7 @@ export function createHouse(renderer) {
   scene.add(roach.group);
   level.creatures.push(roach);
   level.refs.roach = roach;
+  spawnHouseBugs(level);
 
   // ------------------------------------------------------------ helpers for AI & story
   const up = new THREE.Vector3(0, 1, 0);

@@ -174,6 +174,7 @@ export const Story = {
     this.setLevel(this.house);
     this.house.setTime('morning');
     this.placePlayer('deskPhone');
+    this.house.openFrontDoor();
     G.player.mode = 'walk';
     G.player.health = G.player.maxHealth;
     this.checkpoint('house', 'deskPhone');
@@ -182,6 +183,7 @@ export const Story = {
     await ui.fade(0, 900);
     await ui.say('I\'m out! That was NOT a normal phone call.', { speaker: 'You' });
     await ui.say('No signal, fake wires... Forget the phone. Maybe there are answers outside.', { speaker: 'You' });
+    ui.toast('🚪 The draft stopper in front of the front door got knocked aside. <b>You can go outside now.</b>', 6000);
     this.objective('Get outside — squeeze under the front door in the living room');
   },
 

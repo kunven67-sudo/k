@@ -322,19 +322,33 @@ export class Vacuum extends Creature {
 
   update(dt, level, player) {
     if (!this.active || G.aiPaused || !player) { this.sync(dt); return true; }
-    this.turnT -= dt;
-    if (this.body.hitWall || this.turnT < -8 || this.outOfBounds()) {
-      if (this.turnT <= 0) {
-        this.targetYaw = this.yaw + Math.PI * (0.6 + Math.random() * 0.8);
-        if (this.outOfBounds()) this.targetYaw = Math.atan2(this.bounds.cx - this.body.pos.x, this.bounds.cz - this.body.pos.z);
-        this.turnT = 1.2;
-      }
+    // Like a real robot vacuum: drive straight, and on a bump back up, spin to a new heading.
+    // A stuck detector breaks it out of corners it keeps bumping into.
+    this.stuckT = (this.stuckT || 0) + dt;
+    if (this.stuckT > 2.5) {
+      const moved = this.lastCheck ? this.body.pos.distanceTo(this.lastCheck) : 99;
+      if (moved < 6 && this.phase === 'drive') this.bump(true);
+      this.lastCheck = this.body.pos.clone();
+      this.stuckT = 0;
     }
-    if (this.turnT > 0) {
-      this.yaw += angDiff(this.yaw, this.targetYaw) * (1 - Math.exp(-3 * dt));
-      this.body.vel.x = damp(this.body.vel.x, 0, 6, dt); this.body.vel.z = damp(this.body.vel.z, 0, 6, dt);
-    } else {
+    this.phase = this.phase || 'drive';
+    this.phaseT = (this.phaseT || 0) + dt;
+    if (this.phase === 'drive') {
       this.body.vel.x = Math.sin(this.yaw) * this.speed; this.body.vel.z = Math.cos(this.yaw) * this.speed;
+      if (this.body.hitWall && this.phaseT > 0.15) this.bump(false);
+      else if (this.outOfBounds() && this.phaseT > 1) {
+        // head back toward the middle of its area, with a random wobble so it never repeats a blocked path
+        this.targetYaw = Math.atan2(this.bounds.cx - this.body.pos.x, this.bounds.cz - this.body.pos.z) + (Math.random() - 0.5) * 1.6;
+        this.phase = 'turn'; this.phaseT = 0;
+      } else if (this.phaseT > 6 + Math.random() * 6) { this.targetYaw = this.yaw + (Math.random() - 0.5) * 2.4; this.phase = 'turn'; this.phaseT = 0; }
+    } else if (this.phase === 'reverse') {
+      this.body.vel.x = -Math.sin(this.yaw) * this.speed * 0.5; this.body.vel.z = -Math.cos(this.yaw) * this.speed * 0.5;
+      if (this.phaseT > 0.5) { this.phase = 'turn'; this.phaseT = 0; }
+    } else if (this.phase === 'turn') {
+      this.body.vel.x = damp(this.body.vel.x, 0, 8, dt); this.body.vel.z = damp(this.body.vel.z, 0, 8, dt);
+      const d = angDiff(this.yaw, this.targetYaw);
+      this.yaw += Math.sign(d) * Math.min(Math.abs(d), dt * 2.6);
+      if (Math.abs(d) < 0.05 || this.phaseT > 2) { this.phase = 'drive'; this.phaseT = 0; }
     }
     this.physics(dt, level.world);
     this.brushes.forEach((b, i) => { b.rotation.y += dt * 14 * (i ? 1 : -1); });
@@ -349,6 +363,12 @@ export class Vacuum extends Creature {
     if (this.distTo(pp) < 60 && Math.random() < dt * 0.3) player.shake += 0.15;
     this.sync(dt);
     return true;
+  }
+
+  bump(hard) {
+    this.targetYaw = this.yaw + (Math.random() < 0.5 ? 1 : -1) * (Math.PI * (hard ? 0.7 : 0.4) + Math.random() * Math.PI * 0.6);
+    this.phase = 'reverse'; this.phaseT = 0;
+    sfx('place', { pos: this.body.pos, vol: 0.4 });
   }
 
   outOfBounds() {

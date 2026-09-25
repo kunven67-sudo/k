@@ -304,4 +304,4 @@ export function makeWeb(center, radius, normal) {
   return g;
 }
 
-export { damp, angDiff };
+export { damp, angDiff, ellipsoid, spiderRig };
