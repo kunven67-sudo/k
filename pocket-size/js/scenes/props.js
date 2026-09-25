@@ -44,8 +44,8 @@ export function houseMaterials() {
   m.brass = TX.pbr(TX.metal({ color: 0xc9a45c, seed: 15 }), { metalness: 1, roughness: 1 });
   m.blackMetal = new THREE.MeshStandardMaterial({ color: 0x1d1e20, metalness: 0.7, roughness: 0.45 });
   m.duvet = TX.pbr(TX.withRepeat(TX.fabric({ color: 0x3f5f8f, color2: 0xe8e4da, pattern: 'plaid', weave: 120, seed: 16 }), 2), { roughness: 1, sheen: 0.7, sheenColor: new THREE.Color(0x9ab0d8), sheenRoughness: 0.8 }, true);
-  m.sheet = TX.pbr(TX.withRepeat(TX.fabric({ color: 0xf1efe9, weave: 140, seed: 17 }), 4), { roughness: 1, sheen: 0.6, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.8 }, true);
-  m.pillow = TX.pbr(TX.withRepeat(TX.fabric({ color: 0xf4f2ec, weave: 150, seed: 18 }), 3), { roughness: 1, sheen: 0.7, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.7 }, true);
+  m.sheet = TX.pbr(TX.withRepeat(TX.fabric({ color: 0xdedad2, weave: 140, seed: 17 }), 4), { roughness: 1, sheen: 0.6, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.8 }, true);
+  m.pillow = TX.pbr(TX.withRepeat(TX.fabric({ color: 0xe2ded6, weave: 150, seed: 18 }), 3), { roughness: 1, sheen: 0.7, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.7 }, true);
   m.sofa = TX.pbr(TX.withRepeat(TX.fabric({ color: 0x5b6470, weave: 70, seed: 19 }), 5), { roughness: 1, sheen: 0.8, sheenColor: new THREE.Color(0x9aa5b5), sheenRoughness: 0.8 }, true);
   m.cushion = TX.pbr(TX.fabric({ color: 0xc86a3c, color2: 0x9c4a26, pattern: 'stripe', weave: 70, seed: 20 }), { roughness: 1, sheen: 0.7, sheenColor: new THREE.Color(0xffb080), sheenRoughness: 0.8 }, true);
   m.rugBed = TX.pbr(TX.carpet({ color: 0x7a8aa0, seed: 21 }), { roughness: 1 });
@@ -172,7 +172,7 @@ export function pillow(ctx, M, x, y, z, w, d, h, ry = 0, tilt = 0) {
   }
   g.computeVertexNormals();
   const m = mesh(g, M.pillow, x, y + h / 2, z, ctx.group, { ry, rz: tilt });
-  if (ctx.world) ctx.world.addBox(x, y + h * 0.46, z, w / 2 - 5, h * 0.46, d / 2 - 5, { yaw: ry, surface: 'fabric', soft: true });
+  if (ctx.world) ctx.world.addBox(x, y + h * 0.485, z, w / 2 - 6, h * 0.485, d / 2 - 6, { yaw: ry, surface: 'fabric', soft: true });
   return m;
 }
 

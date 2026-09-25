@@ -91,8 +91,11 @@ export class HouseStory {
       await c.wait(1.2);
       await c.say('Okay. School. Up. Let\'s go.', { speaker: 'You' });
       // try to walk: it takes forever
-      P.scriptVel = V(0, 0, 5.5);
-      c.move(P.body.pos.clone().add(V(3.5, 1.4, 5)), P.body.pos.clone().add(V(0, 1, 9)), 4, { e: 'linear' });
+      P.facing = Math.PI / 2;
+      P.scriptVel = V(3.2, 0, 0);
+      const w0 = P.body.pos.clone();
+      c.cut(w0.clone().add(V(2, 1.3, 4.2)), w0.clone().add(V(1, 1, 0)), 50);
+      c.move(w0.clone().add(V(9, 1.6, 4.6)), w0.clone().add(V(10, 1, 0)), 4.5, { e: 'linear' });
       await c.say('Why is this taking so long? The pillow just keeps... going.', { speaker: 'You' });
       P.scriptVel = null;
       await c.wait(0.4);
@@ -579,6 +582,14 @@ export class HouseStory {
     if (Math.hypot(p.x - (tr.x - 2.4), p.z - tr.z) < 2 && p.y > 0.8 && p.y < 2.5) this.snapTrap();
     // drop airplane
     if (input.wasPressed('KeyG') && P.carry && P.mode === 'walk') P.dropCarry();
+    // tilt the airplane flat to squeeze it under a door
+    if (P.carry && P.carry.item === 'airplane' && !P.carry.onBack) {
+      const a = L.refs.airplane;
+      const nearDoor = Math.abs(p.x - 426) < 16 && ((p.z > 280 && p.z < 390) || (p.z > 430 && p.z < 540));
+      const k = 1 - Math.exp(-8 * dt);
+      a.scale.y += ((nearDoor ? 0.12 : 1) - a.scale.y) * k;
+      a.position.y += ((nearDoor ? 2.05 : 3.55) - a.position.y) * k;
+    }
     // tip about climbing when carrying the plane into the bedroom
     if (P.carry && room === 'bedroom' && !G.flags.tipClimb && p.x < 420) {
       G.flags.tipClimb = true;

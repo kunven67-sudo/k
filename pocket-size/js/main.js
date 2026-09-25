@@ -217,6 +217,7 @@ function openSub(which) {
 
 // ---------------------------------------------------------------- loop
 let last = performance.now();
+let lockShown = false;
 let fpsAcc = 0, fpsN = 0, fpsT = 0;
 const listenerFwd = new THREE.Vector3();
 
@@ -251,6 +252,10 @@ function frame(now) {
     }
     if ((G.mode === 'play' || G.mode === 'cutscene' || G.mode === 'dead') && G.player && lvl && G.player.object.parent) G.player.update(dt, lvl);
   }
+
+  // "Click to play" only makes sense during free play.
+  const wantLock = G.mode === 'play' && !input.locked;
+  if (wantLock !== lockShown) { lockShown = wantLock; ui.lock(wantLock, 'Click to play'); }
 
   camera.getWorldDirection(listenerFwd);
   setListener(camera.position, listenerFwd);

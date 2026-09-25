@@ -72,7 +72,7 @@ export const Story = {
     ui.showHud(true);
     ui.health(G.player.health, G.player.maxHealth);
     G.inventory.renderHotbar();
-    if (!input.locked) { ui.lock(true, 'Click to play'); input.requestLock(); }
+    if (!input.locked) input.requestLock();
   },
 
   objective(text) { ui.objective(text, CHAPTERS.find((c) => c.id === this.current)?.name?.toUpperCase() || ''); G.objective = text; },
@@ -223,6 +223,7 @@ export const Story = {
 
   // ---------------------------------------------------------------- the ending: full size
   async finale() {
+    ui.showHud(false);
     G.inventory.restoreStash();
     const { createYard } = await import('../scenes/yard.js');
     if (!this.levels.yard) {

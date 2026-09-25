@@ -435,8 +435,10 @@ export async function createYard(story) {
     let sticky = false;
     for (const w of level.webs) if (!w.cut && w.pos.distanceTo(p.clone().add(V(0, 1, 0))) < w.r * 0.7) sticky = true;
     if (sticky) { P.speedMul *= 0.3; if (!level.webWarned) { level.webWarned = true; ui.toast('🕸️ Stuck in a web! Cut it with an axe.'); } }
-    // bush events
+    // bush events (and it's dim and gloomy under the leaves)
     const inBush = level.inBush(p);
+    const hemiT = inBush ? 0.28 : (G.flags.overcast ? 1.1 : 0.85);
+    refs.hemi.intensity += (hemiT - refs.hemi.intensity) * (1 - Math.exp(-2 * dt));
     if (inBush && !G.flags.bushSeen) { level.bushT = (level.bushT || 0) + dt; if (level.bushT > 1.2) level.bushReveal(); }
     if (G.flags.bushSeen && !G.flags.bushFled && Math.hypot(p.x - B.x, p.z - B.z) > B.r + 10) level.overcast();
     // hidden critters

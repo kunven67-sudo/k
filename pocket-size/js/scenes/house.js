@@ -185,6 +185,8 @@ export function createHouse(renderer) {
   level.refs.bedDoor = door('z', 426, 335, 90, 205, 1);
   level.refs.bathDoor = door('z', 426, 485, 90, 205, -1);
   level.refs.frontDoor = door('z', 1046, 227.5, 95, 212, 1);
+  // weather strip outside the front door gap: you "exit" via the interaction, not into the void
+  world.addBox(1052, 3, 227.5, 3, 3, 50, { surface: 'wood' });
   // front-door mat
   const matTex = TX.drawn('doormat', 512, 320, (c, w, h) => {
     c.fillStyle = '#6b4a2e'; c.fillRect(0, 0, w, h);

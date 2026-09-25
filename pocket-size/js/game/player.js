@@ -8,6 +8,7 @@ import { ui } from '../core/ui.js';
 import { sfx } from '../core/audio.js';
 import { getSettings, difficultyMul } from '../core/settings.js';
 import { G } from './state.js';
+import { softDot } from '../core/textures.js';
 
 const tmpV = new THREE.Vector3();
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
@@ -54,6 +55,10 @@ export class Player {
     this.lastFacing = 0;
     this.attackCooldown = 0;
     this.firstPersonHidden = false;
+    // Soft contact shadow under the feet - grounds the character everywhere.
+    this.blob = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), new THREE.MeshBasicMaterial({ map: softDot('#000000', 'blob'), transparent: true, opacity: 0.55, depthWrite: false }));
+    this.blob.rotation.x = -Math.PI / 2;
+    this.blob.renderOrder = 1;
   }
 
   spawn(pos, yaw = 0) {
@@ -194,6 +199,7 @@ export class Player {
       this.updateInteraction(dt, level);
       this.updateCamera(dt, world, s);
     } else ui.prompt(null);
+    this.updateBlob(level);
     if (level.onPlayerUpdate) level.onPlayerUpdate(dt, this);
   }
 
@@ -349,6 +355,20 @@ export class Player {
       ui.prompt(`<kbd>${best.key || 'E'}</kbd> ${label}`);
       if (input.wasPressed(best.keyCode || 'KeyE')) best.action(this);
     }
+  }
+
+  updateBlob(level) {
+    const bl = this.blob;
+    if (bl.parent !== level.scene) level.scene.add(bl);
+    const p = this.body.pos;
+    const g = this.mode === 'swim' ? -Infinity : level.world.surfaceBelow(p.x, p.y + 0.2, p.z);
+    const h = p.y - g;
+    bl.visible = Number.isFinite(g) && h < 6 && this.object.visible && this.object.scale.x < 2;
+    if (!bl.visible) return;
+    bl.position.set(p.x, g + 0.03, p.z);
+    const k = Math.max(0, 1 - h / 6);
+    bl.material.opacity = 0.5 * k;
+    bl.scale.setScalar(1 + h * 0.15);
   }
 
   updateCamera(dt, world, s) {
