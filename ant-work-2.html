@@ -1431,7 +1431,11 @@ function renderScene(scene,cam){
   const wo=post?0:FX.whiteout, bo=post?0:FX.blackout;
   if(wo!==renderScene.wo){ renderScene.wo=wo; $('fxWhite').style.opacity=wo; }
   if(bo!==renderScene.bo){ renderScene.bo=bo; $('fxBlack').style.opacity=bo; }
-  if(!post){ renderer.setRenderTarget(null); renderer.render(scene,cam); prevVPValid=false; return; }
+  if(!post){
+    if(FX.pixel>1){ const px=FX.pixel*Math.max(1,renderer.domElement.height/720); const w=Math.max(8,Math.floor(renderer.domElement.width/px)), h=Math.max(8,Math.floor(renderer.domElement.height/px)); let L=renderScene.lo;
+      if(!L||L.rt.width!==w||L.rt.height!==h){ if(L) L.rt.dispose(); const rt=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter}); const sc=new THREE.Scene(), oc=new THREE.OrthographicCamera(-1,1,1,-1,0,1); sc.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({map:rt.texture,depthTest:false}))); L=renderScene.lo={rt,sc,oc}; }
+      renderer.setRenderTarget(L.rt); renderer.render(scene,cam); renderer.setRenderTarget(null); renderer.render(L.sc,L.oc); prevVPValid=false; return; }
+    renderer.setRenderTarget(null); renderer.render(scene,cam); prevVPValid=false; return; }
   const u=SH.comp.uniforms, S=SETTINGS;
   renderer.setRenderTarget(RT.scene); renderer.render(scene,cam);
   const depth=RT.scene.depthTexture, w=PP.w, h=PP.h;
@@ -2784,7 +2788,7 @@ function updatePlayer(dt,t){
 function jump(){
   const P=PLAYER; if(!P.ctl.move||!P.ctl.jump||G.mode!=='play'||CAM.active||DLG.active||P.fly) return;
   if(!P.onGround) return;
-  P.vy=(LV.env&&LV.env.jump)||4.6; if(P.scale<1) P.vy*=Math.max(.5,Math.sqrt(P.scale)); P.onGround=false; SFX.jump();
+  P.vy=(LV.env&&LV.env.jump)||4.6; if(P.scale<1) P.vy*=Math.max(.5,Math.sqrt(P.scale)); P.onGround=false; SFX.jump(); if(typeof funnyOn==='function'&&funnyOn()&&trophyStat('fjumps')>=30) unlock('bouncy');
 }
 /* smoothly turn the player's view toward a world point */
 function lookAtPoint(p,dur=.6){ const P=PLAYER, ey=P.pos.y+P.y+P.eye*P.scale; const yaw=Math.atan2(-(p.x-P.pos.x),-(p.z-P.pos.z)); const pitch=Math.atan2(p.y-ey,Math.hypot(p.x-P.pos.x,p.z-P.pos.z)); P.lookTo={t:0,dur,y0:P.yaw,y1:yaw,p0:P.pitch,p1:clamp(pitch,-1.2,1.2)}; }
@@ -3258,7 +3262,7 @@ if(IS_TOUCH){
 const TROPHY_DEFS=[
   ['crumb','Crumb Watcher','Watch the ant eat the whole cookie crumb'],
   ['door',"Who's There?",'Open the door for Jim'],
-  ['nag','Are You Coming or Not?','Make Jim ask you three times',true],
+  ['nag','Are You Coming or Not?','Make Jim ask you three times',true,"Don't open the door for Jim right away."],
   ['hatch','5-6-8-4','See Jim open the secret hatch'],
   ['shrunk','Honey, I Shrunk Me','Get shrunk by the shrink ray'],
   ['paparazzi','Paparazzi','Take 25 photos in the Tinyverse'],
@@ -3269,24 +3273,37 @@ const TROPHY_DEFS=[
   ['roommate','Roommates','Move into Mite Town with Larry'],
   ['miteHero','Mite Hero','Lead the giant tardigrade away from Mite Town'],
   ['deep','Deep Diver','Reach the dark zone of the Tinyverse'],
+  ['ride','Hitchhiker',"Ride on Larry's Paramecium"],
+  ['speedy','Speed Demon','Swim through 15 boost rings in the deep'],
+  ['shopper','Window Shopper','Look at the snack market 5 times',true,'The snack market in Mite Town.'],
+  ['chatter','Chatterbox','Talk to Larry 5 times in Mite Town',true,'Larry likes to talk.'],
   ['tinyEnd','The Tinyverse','Find the shrink-ray crystal shard'],
   ['rocket','Liftoff!','Build the rocket on the moon'],
   ['firstAnt','Exterminator 2','Knock out your first alien bug'],
   ['chef','Master Chef','Cook a perfect batch of bug food'],
-  ['burnt','Well Done. Too Well.','Burn a batch of bug food',true],
+  ['burnt','Well Done. Too Well.','Burn a batch of bug food',true,'Too much heat in the Bug Cooker 3000.'],
   ['house','Homeowner','Buy a house on Mars'],
-  ['computer','Alien Tech','Read your messages on the alien computer',true],
+  ['computer','Alien Tech','Read your messages on the alien computer',true,'Check the computer in your first Mars house.'],
   ['ants10','Ant Stomper','Knock out 10 alien ants in one shift'],
   ['untouchable','Untouchable','Finish a shift without getting bitten'],
   ['dream','Bad Dream','Face Steve in the dream'],
   ['bigHouse','Upgrade','Buy the Dome Sweet Dome'],
   ['ratFriend','Rat Friend','Get the rat to bite you free'],
-  ['idiot','YOU IDIOT','Knock over XXX5',true],
+  ['eavesdrop','Eavesdropper','Listen at the locked door on Steve\'s ship',true,'A locked door in the hallway of the ship.'],
+  ['idiot','YOU IDIOT','Knock over XXX5',true,"It says DON'T TOUCH."],
+  ['miner','Block Puncher','Punch 20 blocks on blocky Earth',true,'Everything is blocks now. Try punching them.'],
+  ['couch','Couch Potato','Watch every channel on the holo-TV',true,'The TV in the Dome Sweet Dome has 3 channels.'],
+  ['emptyTank','Running on Empty','Use up all your jetpack fuel in the air',true,'Keep flying on Pluto until the fuel bar is empty.'],
+  ['skyHigh','Sky High','Fly higher than 40 meters on Pluto',true,'How high can the jetpack go?'],
+  ['goodBoy','Best Boy','Pet Jeff 10 times',true,'Jeff REALLY likes pets.'],
   ['rings','Rocket Person','Fly through every ring on Pluto'],
   ['jeff','Good Boy','Pet Jeff'],
   ['marsEnd','Mars Shift','Finish Mars Shift'],
   ['both','Two Stories','Finish both stories'],
-  ['funny','Is This the Same Game?','Turn on Funny mode',true]
+  ['funny','Is This the Same Game?','Turn on Funny mode',true,'Look in the Settings.'],
+  ['dizzy','Dizzy','Spin around 5 times really fast',true,'Spin! Spin! Spin!'],
+  ['partyAnimal','Party Animal','See 25 things go wrong in Funny mode',true,'Turn on Funny mode and just keep playing.'],
+  ['bouncy','Bounce House','Jump 30 times in Funny mode',true,'Funny mode + the jump button.']
 ];
 const TROPHY=Object.assign({},loadJSON('aw2_ach')||{});
 const TSTAT=Object.assign({photos:0},loadJSON('aw2_ach_stats')||{});
@@ -3308,16 +3325,20 @@ function renderTrophies(){
   const got=TROPHY_DEFS.filter(d=>TROPHY[d[0]]).length;
   $('trophyCount').textContent=got?'('+got+'/'+TROPHY_DEFS.length+')':''; $('trophySum').textContent=got+' / '+TROPHY_DEFS.length;
   const box=$('trophyList'); box.innerHTML='';
-  for(const [id,title,desc,secret] of TROPHY_DEFS){ const g=!!TROPHY[id];
+  for(const [id,title,desc,secret,hint] of TROPHY_DEFS){ const g=!!TROPHY[id];
     const row=document.createElement('div'); row.className='trow'+(g?' got':'');
     row.innerHTML='<span class="ic">'+(g?'🏆':'🔒')+'</span><span><b></b><small></small></span>';
-    row.querySelector('b').textContent=(!g&&secret)?'???':title; row.querySelector('small').textContent=(!g&&secret)?'Secret trophy. Keep playing to find it.':desc;
+    row.querySelector('b').textContent=(!g&&secret)?'???':title; row.querySelector('small').textContent=(!g&&secret)?'Secret trophy. Hint: '+(hint||'Keep playing to find it.'):desc;
     box.appendChild(row); }
 }
 function openTrophies(){ renderTrophies(); $('trophies').classList.add('show'); SFX.uiOpen(); setTimeout(()=>$('trophyClose').focus(),30); }
 function closeTrophies(){ $('trophies').classList.remove('show'); SFX.uiBack(); }
 $('btnTrophies').onclick=openTrophies; $('pTrophies').onclick=openTrophies; $('trophyClose').onclick=closeTrophies;
 renderTrophies();
+
+/* secret trophy watchers */
+const SPIN={acc:0,t:0,last:null};
+on('tick',()=>{ if(G.mode!=='play'||!LV) return; const y=PLAYER.yaw; if(SPIN.last!=null){ let d=y-SPIN.last; SPIN.acc+=d; } SPIN.last=y; SPIN.t+=G.dt||.016; if(SPIN.t>6){ SPIN.t=0; SPIN.acc=0; } if(Math.abs(SPIN.acc)>Math.PI*10) unlock('dizzy'); });
 
 </script>
 <script>
@@ -4792,8 +4813,8 @@ function buildTinyLife(lv,scene){
   lv.naeg=makeNaegleria(); lv.naeg.scale.setScalar(13); lv.naeg.visible=false; scene.add(lv.naeg);
   lv.larry=makeDustMite(); lv.larry.scale.setScalar(12); lv.larry.visible=false; scene.add(lv.larry);
   lv.larryFlake=makeSkinFlake(9,34); lv.larryFlake.visible=false; scene.add(lv.larryFlake);
-  lv.larryLight=new THREE.PointLight(col(0xffe0b0),1.5,120,2); scene.add(lv.larryLight); lv.larryLight.visible=false;
-  lv.naegLight=new THREE.PointLight(col(0xff4a6a),1.8,110,2); scene.add(lv.naegLight); lv.naegLight.visible=false;
+  lv.larryLight=new THREE.PointLight(col(0xffe0b0),1.5,120,2); scene.add(lv.larryLight); lv.larryLight.intensity=0;
+  lv.naegLight=new THREE.PointLight(col(0xff4a6a),1.8,110,2); scene.add(lv.naegLight); lv.naegLight.intensity=0;
   lv.snacks=[]; for(let i=0;i<7;i++){ const s=makeSnack(); s.scale.setScalar(1.1); s.visible=false; scene.add(s); lv.snacks.push(s); }
   lv.subjects.push({pos:V3(),name:'biofilm',label:'Bacterial biofilm colony',r:30,hunt:true,hide:true});
   lv.subjects.push({obj:lv.naeg,name:'naegleria',label:'Naegleria fowleri',r:22,hunt:true});
@@ -4815,12 +4836,12 @@ function placeTinyLife(lv,anc){
   lv.naeg.userData.home=clampHunt(P.clone().addScaledVector(right,135).addScaledVector(up,25).addScaledVector(f,40)); lv.naeg.position.copy(lv.naeg.userData.home); lv.naeg.visible=true; lv.naeg.userData.state='idle';
   const L=clampHunt(P.clone().addScaledVector(right,-150).addScaledVector(f,110).addScaledVector(up,-14)); lv.larry.position.copy(L); lv.larry.visible=true; { const dir=f.clone().negate().add(right); lv.larry.rotation.set(0,Math.atan2(dir.x,dir.z),0); }
   lv.larryFlake.visible=true; lv.larryFlake.position.copy(L).add(V3(0,-.4,0)); lv.larryFlake.rotation.set(-Math.PI/2,0,.6);
-  lv.larryLight.visible=true; lv.larryLight.position.copy(L).add(V3(0,40,20));
-  lv.naegLight.visible=true;
+  lv.larryLight.intensity=1.5; lv.larryLight.position.copy(L).add(V3(0,40,20));
+  lv.naegLight.intensity=1.8;
   lv.snacks.forEach((s,i)=>{ s.visible=false; s.userData.caught=false; const a=i/lv.snacks.length*Math.PI*2; s.userData.home=clampHunt(L.clone().add(V3(Math.cos(a)*rand(28,55),rand(-8,22),Math.sin(a)*rand(28,55)))); s.position.copy(s.userData.home); });
   return {P,f,right,up};
 }
-function hideTinyLife(lv){ for(const o of [lv.demodex,lv.flake,lv.bfFlake,lv.naeg,lv.larry,lv.larryFlake,...lv.biofilms,...lv.snacks]) o.visible=false; lv.larryLight.visible=lv.naegLight.visible=false; const bs=lv.subjects.find(s=>s.name==='biofilm'); if(bs) bs.hide=true; }
+function hideTinyLife(lv){ for(const o of [lv.demodex,lv.flake,lv.bfFlake,lv.naeg,lv.larry,lv.larryFlake,...lv.biofilms,...lv.snacks]) o.visible=false; lv.larryLight.intensity=lv.naegLight.intensity=0; const bs=lv.subjects.find(s=>s.name==='biofilm'); if(bs) bs.hide=true; }
 function updateTinyLife(lv,dt,t){
   if(lv.demodex.visible) animateDemodex(lv.demodex,t,1);
   if(lv.larry.visible) animateDustMite(lv.larry,t,dt);
@@ -5406,7 +5427,7 @@ CHECKPOINTS.B1=async()=>{
   PLAYER.eye=1.64; PLAYER.lock(); crosshair(true); setVM(true);
   const jim=lv.jim; jim.visible=true; jim.position.set(0,0,-4.6); jim.rotation.y=0; setMood(jim,'worried'); jim.userData.A.path=null;
   F.pieces=0; F.installed=0;
-  for(const p of lv.pieces){ p.collected=false; p.installed=false; p.wrap.visible=true; }
+  for(const p of lv.pieces){ p.collected=false; p.installed=false; p.wrap.visible=true; p.wrap.traverse(c=>{ if(c.isLight&&c.userData.k0!=null) c.intensity=c.userData.k0; }); for(const c of p.wrap.children) c.visible=true; }
   for(const k of ROCKET_PARTS){ lv.rocket.userData.parts[k].visible=false; lv.rocket.userData.ghosts[k].visible=true; }
   lv.rocket.position.y=1.5; setRocketFlame(lv.rocket,0);
   if(!lv.interSetup){ lv.interSetup=true;
@@ -5438,9 +5459,11 @@ async function moonTalk(){
   itemHints([IS_TOUCH?'<kbd>USE</kbd> grab a piece':'<kbd>E</kbd> grab a piece','You can only carry one at a time','<kbd>'+(IS_TOUCH?'⤒':'Space')+'</kbd> low-gravity jump!']);
   toast('Follow the yellow beams!','#ffcc33');
 }
+/* hide an object but keep its lights in the scene (turning a light off by hiding it makes every shader recompile = a big lag spike) */
+function hideKeepLights(o){ o.traverse(c=>{ if(c.isLight){ c.userData.k0=c.userData.k0??c.intensity; c.intensity=0; } }); for(const c of o.children) if(!c.isLight) c.visible=false; }
 function grabPiece(p){
   if(PLAYER.carry){ SFX.cantCarry(); bark('You',"I can only carry one at a time.",null,2.4); toast('You can only grab one at a time!','#ff9a7a'); return; }
-  p.collected=true; p.wrap.visible=false; PLAYER.carry=p; vmCarry(p.obj); SFX.pickup(); shake(.05);
+  p.collected=true; hideKeepLights(p.wrap); PLAYER.carry=p; vmCarry(p.obj); SFX.pickup(); shake(.05);
   const lv=LEVELS.moon; lv.glow.burst(p.wrap.position.clone().add(V3(0,.6,0)),{color:0xffcc33,count:24,speed:2,size:.08,life:.8,grav:-2});
   toast('Got: '+PART_NAMES[p.key].toUpperCase(),'#ffcc33');
   objective('Bring the '+PART_NAMES[p.key].toLowerCase()+' to the rocket');
@@ -5997,7 +6020,7 @@ CHECKPOINTS.B6=async()=>{
   hudVisible(true); showCash(false); showCoins(false); objective(null);
   const st=lv.steve; st.visible=true; st.position.set(0,0,-27); st.rotation.y=0; st.userData.A.look=null; setMood(st,'neutral'); clearPose(st,0);
   st.traverse(o=>{ if(o.isMesh&&o.userData.dreamFade){ o.material.opacity=1; } });
-  lv.spot.visible=true; lv.steveLight.visible=true; lv.pool.visible=true;
+  lv.spotOn=true; lv.steveLight.intensity=1.2; lv.pool.visible=true;
   setEcho(.55); setReverb(.7);
   FX.blackout=1; fade(0,.3); SFX.dreamSwell();
   await tweenVal(k=>{ FX.blackout=1-k; },2.6);
@@ -6020,7 +6043,7 @@ async function steveDream(){
   const wp=new THREE.Vector3();
   await tweenVal(k=>{ st.traverse(o=>{ if(o.isMesh) o.material.opacity=1-k; }); lv.steveLight.intensity=1.2*(1-k); lv.spot.intensity=6*(1-k);
     for(let i=0;i<5;i++){ const j=pick(pts); j.getWorldPosition(wp); lv.soft.burst(wp.clone().add(V3(rand(-.14,.14),rand(-.12,.12),rand(-.14,.14))),{color:pick([0x6fe858,0x9aa890,0xc8d0b8]),count:4,speed:.6,size:.09,life:2.6,grav:-.4,drag:.8,alpha:.9}); lv.glow.burst(wp,{color:0x9aff8a,count:1,speed:.4,size:.05,life:1.5,grav:-.6}); } },2.8,x=>x);
-  st.visible=false; lv.pool.visible=false; lv.spot.visible=false;
+  st.visible=false; lv.pool.visible=false; lv.spotOn=false; lv.spot.intensity=0;
   await wait(1.4);
   // wake up to the alarm
   setEcho(0); FX.whiteout=0;
@@ -6756,7 +6779,7 @@ defineLevel('dream',{
     for(const f of lv.floaters){ f.o.rotation.x+=f.spin.x*dt; f.o.rotation.y+=f.spin.y*dt; f.o.rotation.z+=f.spin.z*dt; f.o.position.y=f.base.y+Math.sin(t*.5+f.ph)*.4; }
     for(const a of lv.arches){ a.a.children[1].material.emissiveIntensity=1+Math.sin(t*1.2+a.ph)*.8; }
     lv.floorM.emissiveIntensity=.25+Math.sin(t*.6)*.1;
-    if(lv.spot.visible) lv.spot.intensity=5+Math.sin(t*7)*.6+(Math.random()<.02?-3:0);
+    if(lv.spotOn) lv.spot.intensity=5+Math.sin(t*7)*.6+(Math.random()<.02?-3:0);
     // dust motes drifting up
     lv.moteT-=dt; if(lv.moteT<=0){ lv.moteT=.05; const p=camera.position; lv.glow.spawn(p.x+rand(-12,12),rand(0,1),p.z+rand(-16,4),rand(-.05,.05),rand(.2,.5),rand(-.05,.05),rand(4,7),rand(.03,.07),.7,.6,1,.5,0,-.02,1); }
   }
@@ -6835,7 +6858,7 @@ function grassBlockMats(){ const side=blockMat('grassSide'), top=blockMat('grass
 
 /* ---------- blocky people ---------- */
 const FOLK=[];
-function faceTex(o){ return canvasTex(8,8,(x)=>{ x.fillStyle=o.skinHex; x.fillRect(0,0,8,8); x.fillStyle=o.hairHex; x.fillRect(0,0,8,2); x.fillRect(0,2,1,1); x.fillRect(7,2,1,1);
+function blockFaceTex(o){ return canvasTex(8,8,(x)=>{ x.fillStyle=o.skinHex; x.fillRect(0,0,8,8); x.fillStyle=o.hairHex; x.fillRect(0,0,8,2); x.fillRect(0,2,1,1); x.fillRect(7,2,1,1);
   x.fillStyle='#ffffff'; x.fillRect(1,3,2,1); x.fillRect(5,3,2,1); x.fillStyle=o.eyeHex||'#3a2a8a'; x.fillRect(2,3,1,1); x.fillRect(5,3,1,1);
   x.fillStyle=o.mouthHex||'#7a3a2a'; x.fillRect(3,5,2,1); if(o.beard){ x.fillStyle=o.hairHex; x.fillRect(1,5,1,2); x.fillRect(6,5,1,2); x.fillRect(2,6,4,1); } },null,{nearest:true}); }
 function flatTex(hex,shade=.85,n=40){ return canvasTex(8,8,(x)=>{ x.fillStyle=hex; x.fillRect(0,0,8,8); const c=col(hex); for(let i=0;i<n;i++){ const k=rand(shade,1.1); x.fillStyle=`rgb(${Math.min(255,c.r*255*k)|0},${Math.min(255,c.g*255*k)|0},${Math.min(255,c.b*255*k)|0})`; x.fillRect(Math.random()*8|0,Math.random()*8|0,1,1); } },null,{nearest:true}); }
@@ -6844,7 +6867,7 @@ function makeBlockPerson(o={}){
   const hx=h=>'#'+col(h).getHexString();
   const g=new THREE.Group(); g.name=opt.name;
   const S=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.skin),.92,10),roughness:.85});
-  const F=new THREE.MeshStandardMaterial({map:faceTex({skinHex:hx(opt.skin),hairHex:hx(opt.hair),beard:opt.beard}),roughness:.85});
+  const F=new THREE.MeshStandardMaterial({map:blockFaceTex({skinHex:hx(opt.skin),hairHex:hx(opt.hair),beard:opt.beard}),roughness:.85});
   const Hm=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.hair),.8,24),roughness:.9});
   const T=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.shirt),.8),roughness:.9});
   const P=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.pants),.8),roughness:.9});
@@ -6859,7 +6882,8 @@ function makeBlockPerson(o={}){
   const armL=limb(.32,.62,T,S,.62), armR=limb(-.32,.62,T,S,.62);
   hips.add(armL); hips.add(armR);
   const legL=limb(.11,0,P,Sh,.72), legR=limb(-.11,0,P,Sh,.72); hips.add(legL); hips.add(legR);
-  g.userData={folk:true,name:opt.name,voice:opt.voice,head:headJ,parts:{hips,torso,headJ,armL,armR,legL,legR},
+  const holdR=new THREE.Group(); holdR.position.y=-.66; armR.add(holdR);
+  g.userData={folk:true,holdR,name:opt.name,voice:opt.voice,head:headJ,parts:{hips,torso,headJ,armL,armR,legL,legR},
     A:{talk:false,mood:'neutral',moodK:{},pose:null,phase:Math.random()*10,speed:0,lastPos:new THREE.Vector3(),walkPhase:0,look:null,mode:null,path:null}};
   FOLK.push(g); return g;
 }
@@ -6873,6 +6897,9 @@ function animateBlockPerson(p,dt,t){
   J.hips.position.y=.72+Math.abs(Math.cos(A.walkPhase))*.04*wk;
   if(A.mode==='panic'){ J.armL.rotation.z=2.6+Math.sin(t*14+A.phase)*.4; J.armR.rotation.z=-2.6-Math.cos(t*13+A.phase)*.4; J.armL.rotation.x=J.armR.rotation.x=0; }
   if(A.mode==='lifted'){ J.armL.rotation.z=2.2+Math.sin(t*18+A.phase)*.8; J.armR.rotation.z=-2.2-Math.sin(t*17+A.phase)*.8; J.legL.rotation.x=Math.sin(t*16)*.8; J.legR.rotation.x=-Math.sin(t*16)*.8; }
+  if(A.pose==='point'||A.pose==='holdOut'){ J.armR.rotation.x=-1.45; J.armR.rotation.z=-.05; }
+  if(A.pose==='talk'&&A.talk){ J.armR.rotation.x=-.5+Math.sin(t*3+A.phase)*.25; J.armL.rotation.x=-.3+Math.cos(t*2.6)*.15; }
+  if(A.pose==='hips'){ J.armL.rotation.z=.5; J.armR.rotation.z=-.5; }
   if(A.mode==='wave'){ J.armR.rotation.z=-2.6+Math.sin(t*10)*.4; }
   if(A.mode==='down'){ p.rotation.z=damp(p.rotation.z,Math.PI/2,6,dt); }
   // talking: little head bobs; looking at the player
@@ -6961,6 +6988,8 @@ function animateXXX5(x,t,o={}){
   for(const tn of U.tents){ let p=tn.base.clone(); const step=U.big?1:.45; tn.chain.forEach((c,k)=>{ const a=t*1.6+tn.ph+k*.35; p=p.clone().add(V3(Math.sin(a)*step*.6,-step*.7+Math.cos(a*.7)*step*.3,Math.cos(a*1.1)*step*.6)); c.position.copy(p); c.rotation.set(a*.3,a*.2,0); }); }
 }
 
+function makeBlockJim(suit){ return makeBlockPerson({name:'Jim',voice:'Jim',skin:0xecc0a0,shirt:suit?0xf0f0ec:0xd9a441,pants:suit?0xf0f0ec:0x3a4a6a,hair:0x7a4a22,beard:true,shoes:suit?0x9aa0a8:0x6b4a2a}); }
+
 </script>
 <script>
 /* ===== 51_bighouse.js ===== */
@@ -7006,7 +7035,7 @@ function setupBigHouse(lv){
   if(lv.interSetup) return; lv.interSetup=true;
   const said=(k,lines)=>()=>{ bigSeen(k); bark('You',pick(lines),null,2.8); };
   addInteract(lv,{obj:lv.bed,offset:V3(0,.8,0),label:'Go to sleep',reach:2.8,when:()=>!F_().sleeping,act:()=>runStory(sleepBigBed)});
-  addInteract(lv,{obj:lv.tv,offset:V3(0,1.6,0),label:'Watch the holo-TV',reach:3.4,act:()=>{ lv.tvOn=!lv.tvOn||true; lv.tvCh=(lv.tvCh+1)%3; SFX.holoSign(); said('tv',["Alien cartoons. I don't get them. But they're funny.","It's got like a million channels.","This TV is bigger than my old house."])(); }});
+  addInteract(lv,{obj:lv.tv,offset:V3(0,1.6,0),label:'Watch the holo-TV',reach:3.4,act:()=>{ lv.tvOn=!lv.tvOn||true; lv.tvCh=(lv.tvCh+1)%3; lv.chSeen=lv.chSeen||new Set([0]); lv.chSeen.add(lv.tvCh); if(lv.chSeen.size>=3) unlock('couch'); SFX.holoSign(); said('tv',["Alien cartoons. I don't get them. But they're funny.","It's got like a million channels.","This TV is bigger than my old house."])(); }});
   addInteract(lv,{obj:lv.fridge,offset:V3(0,1.2,0),label:()=>lv.fridgeOpen?'Close the alien fridge':'Open the alien fridge',reach:2.4,act:()=>{ lv.fridgeOpen=!lv.fridgeOpen; SFX.doorOpen&&SFX.doorOpen(); if(lv.fridgeOpen) said('fridge',["Alien snacks. And more alien pizza.","It's full. And it glows."])(); }});
   addInteract(lv,{obj:lv.tank,offset:V3(0,1.2,0),label:'Look at the alien fish',reach:2.8,act:said('fish',["Alien fish. That one is looking at me.","They glow in the dark. Cool."])});
   addInteract(lv,{obj:lv.arcade,offset:V3(0,1.3,0),label:'Play the arcade machine',reach:2.2,act:()=>{ SFX.pcBoot(); lv.arcT=3; said('arcade',["BEEP BOOP. Game over. Already?","High score: ZZXQ. Some alien is really good at this."])(); }});
@@ -7277,7 +7306,15 @@ defineLevel('ship',{
     for(let i=0;i<24;i++){ const sh=box(.02,.006,.012,scrapM,rand(-.6,.6),.005,rand(-.6,.6),false); sh.rotation.y=rand(0,3); scr.add(sh); }
     const hole=mesh(new THREE.CircleGeometry(.16,20,0,Math.PI),mat(0x050505),3.86,0,-2.2,false); hole.rotation.y=-Math.PI/2; scene.add(hole);
     // ---- the corridor (x -1.3..1.3, z -11..-4) ----
-    room(-1.3,1.3,-11,-4,2.8,[{side:'s',at:0,w:1.6,h:2.5},{side:'n',at:0,w:2.2,h:2.6}]);
+    room(-1.3,1.3,-11,-4,2.8,[{side:'s',at:0,w:1.6,h:2.5},{side:'n',at:0,w:2.2,h:2.6},{side:'e',at:-7.5,w:1.4,h:2.4}]);
+    // Steve's control room, off the corridor (locked)
+    room(1.3,6.5,-10,-5,2.8,[{side:'w',at:-7.5,w:1.4,h:2.4}]);
+    lv.sideDoor={m:box(.12,2.4,1.42,dm,1.3,1.2,-7.5),open:0,target:0}; scene.add(lv.sideDoor.m); scene.add(sph(.06,basicGlow(0xff4a3a,3),1.12,2.1,-6.6,8,6,false));
+    colBox(lv.col,1.15,1.45,-8.2,-6.8,()=>lv.sideDoor.open<.8);
+    const holo=new THREE.Group(); holo.position.set(4.6,1.4,-7.5); scene.add(holo); lv.holoEarth=holo;
+    holo.add(sph(.6,new THREE.MeshBasicMaterial({color:col(0x5aff6a),wireframe:true,transparent:true,opacity:.6}),0,0,0,16,12,false)); holo.add(mesh(new THREE.TorusGeometry(.9,.02,6,48),basicGlow(0x5aff6a,2),0,0,0,false));
+    holo.add(cyl(.5,.6,.9,trimM,0,-.95,0,16));
+    lv.alex=makeAlien({name:'Alex'}); lv.alex.userData.level='ship'; lv.alex.position.set(5.3,0,-6.4); lv.alex.rotation.y=-2.2; scene.add(lv.alex);
     for(let z=-5.5;z>-11;z-=2){ const pl=new THREE.PointLight(col(0xa8ffb8),.9,5,2); pl.position.set(0,2.5,z); scene.add(pl); scene.add(box(.6,.03,.2,basicGlow(0xd8ffe0,2),0,2.78,z,false)); }
     // windows: sky and clouds far below (the ship is floating over Earth)
     const skyT=canvasTex(512,256,(x,w,h)=>{ const g=x.createLinearGradient(0,0,0,h); g.addColorStop(0,'#4a8ad8'); g.addColorStop(.6,'#a8d4f4'); g.addColorStop(1,'#e8f4ff'); x.fillStyle=g; x.fillRect(0,0,w,h); for(let i=0;i<40;i++){ x.fillStyle=`rgba(255,255,255,${rand(.5,.9)})`; x.beginPath(); x.ellipse(rand(0,w),rand(h*.55,h),rand(20,60),rand(6,14),0,0,7); x.fill(); } });
@@ -7321,9 +7358,10 @@ defineLevel('ship',{
     const lv=this, F=F_();
     const d=lv.door; d.open=damp(d.open,d.target,5,dt); d.L.position.x=-.4-d.open*.8; d.R.position.x=.4+d.open*.8;
     if(F.freed && !F.knocked){ const near=Math.hypot(PLAYER.pos.x,PLAYER.pos.z+4)<2.4; const t2=near?1:0; if(t2!==d.target){ d.target=t2; sfxAt(V3(0,1.2,-4),()=>SFX.hydraulic(),2); } }
+    const sd=lv.sideDoor; sd.open=damp(sd.open,sd.target,5,dt); sd.m.position.z=-7.5-sd.open*1.35; if(lv.holoEarth){ lv.holoEarth.rotation.y=t*.5; }
     if(!F.knocked){ lv.block.rotation.y=t*.4; lv.block.position.y=.31+Math.sin(t*1.6)*.02; }
     lv.rings.forEach((r,i)=>{ r.visible=!F.knocked; r.rotation.z=t*(i%2?.8:-.6); r.position.y=1.1+i*.28+Math.sin(t*1.3+i)*.05; });
-    lv.blockLight.intensity=F.knocked?0:1.4+Math.sin(t*3)*.3;
+    if(!F.knocked) lv.blockLight.intensity=1.4+Math.sin(t*3)*.3; else if(F.xxxAwake) lv.blockLight.intensity=0;
     if(lv.rat.visible) animateRat(lv.rat,t,!!lv.ratMoving);
     if(lv.xxx.visible){ animateXXX5(lv.xxx,t,{rage:true}); }
     lv.icLight.material.emissiveIntensity=lv.icOn?(Math.sin(t*12)>0?3:0):0;
@@ -7375,7 +7413,7 @@ CHECKPOINTS.B9=async()=>{
   hudVisible(true); showCash(false); showCoins(false); objective(null);
   // reset the ship
   const st=lv.steve; st.visible=true; st.position.set(.1,0,-.55); st.rotation.y=0; st.userData.A.look='player'; setMood(st,'evil'); clearPose(st,0);
-  lv.door.open=lv.door.target=0; lv.ringing=false; lv.icOn=false; lv.cuffs.forEach((c,i)=>{ c.visible=true; c.position.set(i?.34:-.34,.7,.98); c.rotation.set(0,0,0); });
+  lv.door.open=lv.door.target=0; lv.sideDoor.open=lv.sideDoor.target=0; lv.alex.visible=true; lv.ringing=false; lv.icOn=false; lv.cuffs.forEach((c,i)=>{ c.visible=true; c.position.set(i?.34:-.34,.7,.98); c.rotation.set(0,0,0); });
   lv.rat.visible=true; lv.rat.position.set(2.55,0,-2.45); lv.rat.rotation.y=-.6; lv.rat.userData.chew=1;
   lv.block.visible=true; lv.blockPivot.rotation.set(0,0,0); lv.blockPivot.position.set(lv.blockPos.x,.95,lv.blockPos.z); lv.xxx.visible=false; FX.pixel=0;
   for(const e of lv.eatables){ e.o.visible=true; e.o.scale.setScalar(1); e.c.r=Math.abs(e.c.r); }
@@ -7403,8 +7441,10 @@ CHECKPOINTS.B9=async()=>{
   // he opens the door and leaves
   walkTo(st,[V3(0,0,-3.2)],1.3); await wait(1.6);
   lv.door.target=1; sfxAt(V3(0,1.2,-4),()=>SFX.hydraulic(),2); await wait(.8);
-  walkTo(st,[V3(0,0,-6),V3(0,0,-10)],1.4); await wait(2.4);
-  lv.door.target=0; sfxAt(V3(0,1.2,-4),()=>SFX.hydraulic(),2); await wait(.9); st.visible=false;
+  walkTo(st,[V3(0,0,-5.6),V3(0,0,-7.5)],1.4); await wait(1.2);
+  lv.door.target=0; sfxAt(V3(0,1.2,-4),()=>SFX.hydraulic(),2); await wait(1.2);
+  lv.sideDoor.target=1; sfxAt(V3(1.3,1.2,-7.5),()=>SFX.hydraulic(),2); walkTo(st,[V3(3.2,0,-7.5)],1.4); await wait(1.8);
+  lv.sideDoor.target=0; sfxAt(V3(1.3,1.2,-7.5),()=>SFX.hydraulic(),2); await wait(.6);
   await wait(1.2);
   // Jim calls
   lv.ringing=true; runStory(async()=>{ while(lv.ringing){ sfxAt(V3(-.34,.75,.95),()=>SFX.ring(),1.5); await wait(1.1); } });
@@ -7414,6 +7454,7 @@ CHECKPOINTS.B9=async()=>{
   objective("Answer the call");
   if(!lv.callSetup){ lv.callSetup=true;
     addInteract(lv,{obj:lv.armL,offset:V3(0,.05,-.18),label:'Answer Jim',reach:3,aim:false,when:()=>!!lv.ringing,act:()=>runStory(answerJim)});
+    addInteract(lv,{pos:V3(1,1.2,-7.5),label:'Locked door',reach:1.8,when:()=>!!F_().freed&&!F_().knocked,act:()=>{ SFX.cantCarry(); bark('You',"It's locked. I can hear Steve and Alex talking in there.",null,3.4); if(!F_().eaves){ F_().eaves=true; unlock('eavesdrop'); } }});
     addInteract(lv,{obj:lv.rat,offset:V3(0,.2,0),label:'Call the rat',reach:5,when:()=>!!F_().ratCall&&!F_().freed&&!lv.ratMoving,act:()=>runStory(callRat)});
     addTrigger(lv,{pos:V3(0,0,-15.5),r:3.2,once:true,when:()=>!!F_().freed,fn:()=>{ say("You see a purple block. It says DON'T TOUCH. EXTREMELY DANGEROUS.",4.2); later(4.4,()=>{ if(!F_().knocked) say("But you don't think much of it.",3); }); }});
     addTrigger(lv,{pos:V3(0,0,-19.4),r:1.6,box:[2.6,.8],once:true,when:()=>!!F_().freed&&!F_().knocked,fn:()=>runStory(knockOver)});
@@ -7518,29 +7559,41 @@ async function ratFree(){
 }
 async function knockOver(){
   const lv=LEVELS.ship, F=F_(), st=lv.steve; if(F.knocked) return; PLAYER.lock(); objective(null);
+  // the control room door hisses open behind you... footsteps...
+  sfxAt(V3(1.3,1.2,-7.5),()=>SFX.hydraulic(),3); lv.sideDoor.target=1; await wait(.6);
+  const pp=PLAYER.pos.clone();
+  for(let i=0;i<3;i++){ sfxAt(V3(pp.x,0,pp.z+3-i*.5),()=>SFX.step('metal',1.2),2); await wait(.22); }
   // Steve is right behind you
-  st.visible=true; st.userData.A.path=null; const pp=PLAYER.pos.clone();
-  st.position.set(pp.x-.35,0,pp.z+1.6); st.rotation.y=Math.PI; st.userData.A.look='player'; setMood(st,'angry'); clearPose(st,0);
-  await wait(.15);
+  st.visible=true; st.userData.A.path=null;
+  st.position.set(pp.x-.2,0,pp.z+1.3); st.rotation.y=Math.PI; st.userData.A.look='player'; setMood(st,'angry'); setPose(st,'point',0);
   SFX.gasp(); bark('Steve','Hey!',st,1.6);
-  lookAtPoint(V3(st.position.x,1.62,st.position.z),.28); await wait(.3);
-  shake(.5); SFX.heartbeat(1.3); PLAYER.fovKick=-8;
-  // you jump back... right into the pedestal
-  const bp=lv.blockPos; const to=V3(bp.x-.45,0,bp.z-.55);
-  await tweenVal(k=>{ PLAYER.pos.lerpVectors(pp,to,k); PLAYER.roll=Math.sin(k*Math.PI)*.12; },.35);
-  SFX.thud(); shake(.3); F.knocked=true; unlock('idiot');
-  // the block tips over and falls
-  const pv=lv.blockPivot; await tweenVal(k=>{ pv.rotation.z=k*k*1.6; pv.position.x=bp.x+k*.35; pv.position.y=.95-k*k*.64; },.55,x=>x);
-  SFX.clank(); SFX.thud(); shake(.25); lv.glow.burst(V3(bp.x+.4,.2,bp.z),{color:0xc86aff,count:40,speed:2.5,size:.05,life:.8,grav:-3});
-  await wait(1.1);
+  lookAtPoint(V3(st.position.x,1.62,st.position.z),.25); await wait(.28);
+  shake(.6); SFX.heartbeat(1.4); PLAYER.fovKick=-10; VM.handsLook=1;
+  // you stumble back: one, two... right into the pedestal
+  const bp=lv.blockPos; const to=V3(bp.x-.5,0,bp.z-.45);
+  for(let s2=0;s2<2;s2++){ const a=PLAYER.pos.clone(), b=a.clone().lerp(to,s2?1:.5); await tweenVal(k=>{ PLAYER.pos.lerpVectors(a,b,k); PLAYER.roll=Math.sin(k*Math.PI)*(s2?-.1:.1); PLAYER.eye=1.64-Math.sin(k*Math.PI)*.08; },.22); SFX.step('metal',1.3); }
+  VM.handsLook=0;
+  SFX.thud(); shake(.4); PLAYER.pitch=-.1; F.knocked=true; unlock('idiot');
+  // slow motion: the block rocks on the pedestal... and tips
+  letterbox(true); const pv=lv.blockPivot;
+  camShot(V3(bp.x+2.2,.9,bp.z+1.8),V3(bp.x,.9,bp.z),{dur:.3,fov:40});
+  playMusic(null,.3); SFX.heartbeat(1.5);
+  await tweenVal(k=>{ pv.rotation.z=Math.sin(k*Math.PI*3)*.18*(1-k*.3); },1.1,x=>x);
+  await tweenVal(k=>{ pv.rotation.z=k*k*1.7; pv.position.x=bp.x+k*.4; pv.position.y=.95-k*k*.66; },1.1,x=>x);
+  SFX.clank(); SFX.thud(); shake(.35); lv.glow.burst(V3(bp.x+.4,.2,bp.z),{color:0xc86aff,count:60,speed:2.5,size:.05,life:.9,grav:-3});
+  await tweenVal(k=>{ pv.position.y=.29+Math.sin(k*Math.PI)*.12; pv.rotation.z=1.7-Math.sin(k*Math.PI)*.2; },.35);
+  // it cracks... purple light leaks out
+  for(let i=0;i<3;i++){ SFX.metalBite(); lv.blockLight.intensity=3+i*2; lv.blockLight.position.set(bp.x+.4,.4,bp.z); lv.glow.burst(V3(bp.x+.4,.35,bp.z),{color:0xe08aff,count:20,speed:1.5,size:.04,life:.6,grav:-1}); shake(.1); await wait(.45); }
+  camRelease(.4); letterbox(false);
+  { const a=PLAYER.pos.clone(), b=V3(bp.x-1.7,0,bp.z-1.9); await tweenVal(k=>PLAYER.pos.lerpVectors(a,b,k),.3); }
   // intense music, its eyes glow purple
   playMusic('xxx5',.2);
   const X=lv.xxx; X.position.set(bp.x+.55,.5,bp.z); X.rotation.y=Math.atan2(PLAYER.pos.x-X.position.x,PLAYER.pos.z-X.position.z); X.scale.setScalar(.25);
-  lookAtPoint(V3(bp.x+.4,.3,bp.z),.5);
+  lookAtPoint(V3(bp.x+.4,.3,bp.z),.4);
   SFX.xxxRoar(); shake(.6); lv.block.visible=false; X.visible=true; F.xxxAwake=true;
   await tweenVal(k=>{ X.scale.setScalar(lerp(.25,.7,k)); X.position.y=lerp(.5,1.2,k); },1.3);
   // everything starts turning blocky... and then normal. Again and again.
-  runStory(async()=>{ while(F_().xxxAwake && LV===lv){ FX.pixel=rand(7,12); SFX.blockGlitch(); await wait(rand(.18,.4)); FX.pixel=0; await wait(rand(.5,1.3)); } FX.pixel=0; });
+  runStory(async()=>{ while(F_().xxxAwake && LV===lv){ FX.pixel=rand(10,16); SFX.blockGlitch(); shake(.08); await wait(rand(.55,.9)); FX.pixel=0; await wait(rand(.5,1.1)); } FX.pixel=0; });
   // it starts eating stuff
   runStory(async()=>{ for(const e of lv.eatables.slice().sort((a,b)=>a.o.position.distanceTo(X.position)-b.o.position.distanceTo(X.position))){ if(!F_().xxxAwake||LV!==lv) break; await eatThing(lv,X,e); await wait(rand(.3,.8)); } });
   await wait(1.6);
@@ -7634,7 +7687,7 @@ defineLevel('blockearth',{
     for(let i=0;i<40;i++){ const d=box(rand(.6,2),rand(.6,2),rand(.6,2),dM,0,0,0); d.visible=false; scene.add(d); lv.debris.push({o:d,v:V3()}); }
     // Jim's rocket (lands later)
     lv.rocket=makeRocket(); lv.rocket.visible=false; lv.rocket.position.set(12,0,3); scene.add(lv.rocket); lv.rocketCol=colCircle(lv.col,12,3,1.6,()=>lv.rocket.visible);
-    lv.jim=makeJim(); lv.jim.userData.level='blockearth'; lv.jim.visible=false; scene.add(lv.jim);
+    lv.jim=makeBlockJim(); lv.jim.userData.level='blockearth'; lv.jim.visible=false; scene.add(lv.jim);
     // burning Earth (3 years later): fires, smoke, people being lifted
     const fireT=BLOCKTEX.fire(); lv.fires=[];
     const fm=new THREE.SpriteMaterial({map:fireT,color:col(0xffffff).multiplyScalar(2.2),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
@@ -7644,6 +7697,14 @@ defineLevel('blockearth',{
     lv.col.bounds=[-90,90,-40,40];
   },
   enter(){ FX.sunWorld=this.burning?null:this.sunSq.position.clone(); },
+  /* punch blocks out of the houses (like you know what game) */
+  onPrimary(){ const lv=this; if(!PLAYER.ctl.move||DLG.active||CAM.active) return false; VM.punchT=.28; SFX.punch&&SFX.punch();
+    const rc=new THREE.Raycaster(); rc.setFromCamera({x:0,y:0},camera); rc.far=4.5; const targets=['brick','whiteWall','plank','roof','glass','door','log','leaves'].map(k=>lv.vox[k]).filter(Boolean);
+    const hit=rc.intersectObjects(targets,false)[0]; if(!hit||hit.instanceId==null) return true;
+    const im=hit.object, m=new THREE.Matrix4(); im.getMatrixAt(hit.instanceId,m); const p=new THREE.Vector3().setFromMatrixPosition(m);
+    m.makeScale(0,0,0); im.setMatrixAt(hit.instanceId,m); im.instanceMatrix.needsUpdate=true;
+    const c=im.material.map?0xb08060:0xffffff; lv.soft.burst(p,{color:im===lv.vox.leaves?0x3a7a2a:im===lv.vox.glass?0x9ad4ec:im===lv.vox.roof?0x5a3a34:im===lv.vox.brick?0xa8483a:c,count:18,speed:3,size:.12,life:.9,grav:9});
+    SFX.crunch(); shake(.05); const n=trophyStat('blocks'); if(n>=20) unlock('miner'); if(n===1) toast('You punched a block out!','#9aff7a'); return true; },
   setBurning(on){ const lv=this; lv.burning=on; for(const f of lv.fires) f.s.visible=on; lv.fireLight.intensity=on?3:0;
     const u=lv.sky.userData.u; u.top.value.set(on?0x3a1a24:0x3a7ae8); u.mid.value.set(on?0x8a3a2a:0x8ac0f8); u.hor.value.set(on?0xe86a3a:0xd8ecff); u.k.value=on?.8:1;
     lv.scene.fog.color.set(on?0x6a3a2a:0xc8e0f8); lv.scene.fog.near=on?20:60; lv.scene.fog.far=on?180:260; lv.rig.sun.intensity=on?.9:2.4; lv.rig.sun.color.set(on?0xff9a6a:0xfff4e0); lv.sunSq.visible=!on;
@@ -7829,7 +7890,7 @@ defineLevel('cabin',{
     for(const a of [-.9,0,.9]){ const s=new THREE.Group(); s.position.set(Math.sin(a)*2.2,0,-Math.cos(a)*2.2+1.2); s.rotation.y=-a; scene.add(s); s.add(box(.6,.5,.6,mat(0x3a3e44),0,.25,0)); s.add(box(.6,.9,.12,mat(0xc8281c,{roughness:.6}),0,.9,.3)); }
     const cot=new THREE.Group(); cot.position.set(-1.8,0,1.4); cot.rotation.y=.9; scene.add(cot); lv.cot=cot; cot.add(box(.9,.35,2,mat(0x5a6068),0,.18,0)); cot.add(box(.85,.1,1.9,mat(0xe8e0d0,{roughness:.9}),0,.4,0));
     const con=new THREE.Group(); con.position.set(2.2,0,-1.2); con.rotation.y=-.9; scene.add(con); con.add(box(1.2,1,.6,mat(0x5a6068,{metalness:.6}),0,.5,0)); con.add(box(1,.4,.05,emissiveMat(0x39ffb0,1.6),0,1.15,-.1,false));
-    lv.jim=makeJim(); lv.jim.userData.level='cabin'; scene.add(lv.jim);
+    lv.jim=makeBlockJim(); lv.jim.userData.level='cabin'; scene.add(lv.jim);
     lv.bob=makeBlockPerson({name:'Bob',voice:'Bob',skin:0xe0b090,shirt:0xe8872a,pants:0x3a3a4a,hair:0x3a2414,beard:true}); lv.bob.userData.level='cabin'; scene.add(lv.bob);
     lv.suits=[]; for(let i=0;i<3;i++){ const s=new THREE.Group(); s.position.set(1.4-i*.7,0,2.4); scene.add(s); s.add(box(.5,.8,.25,mat(0xf0f0ec,{roughness:.5}),0,1.2,0)); s.add(sph(.2,new THREE.MeshPhysicalMaterial({color:col(0xffd070),roughness:.05,metalness:.3,clearcoat:1}),0,1.8,0)); s.add(box(.35,.5,.2,mat(0x5a6068),0,1.2,.22)); lv.suits.push(s); }
     lv.col.radius=R-.5;
@@ -7872,10 +7933,9 @@ defineLevel('pluto',{
     // Jim's rocket, landed
     lv.rocket=makeRocket(); lv.rocket.position.set(0,lv.ground(0,-6)+1.1,-6); scene.add(lv.rocket); colCircle(lv.col,0,-6,1.6);
     // the humans (and Jeff) out here
-    lv.jim=makeJim(); lv.jim.userData.level='pluto'; scene.add(lv.jim);
+    lv.jim=makeBlockJim(true); lv.jim.userData.level='pluto'; scene.add(lv.jim);
     const helm=()=>mesh(new THREE.SphereGeometry(.2,24,16),new THREE.MeshPhysicalMaterial({color:col(0xffffff),roughness:0,transparent:true,opacity:.18,clearcoat:1,depthWrite:false}),0,.06,.02,false);
-    lv.jim.userData.J.head.add(helm()); lv.helm=helm;
-    lv.jim.traverse(o=>{ if(o.isMesh&&o.material&&o.material.color&&o!==lv.jim.userData.J.head&&/shirt|cloth/i.test(o.name||'')) o.material.color.set(0xf0f0ec); });
+    lv.helm=helm; { const hb=helm(); hb.scale.setScalar(1.7); hb.position.set(0,.22,0); lv.jim.userData.head.add(hb); }
     lv.bob=makeBlockPerson({name:'Bob',voice:'Bob',skin:0xe0b090,shirt:0xf0f0ec,pants:0xf0f0ec,hair:0x3a2414,beard:true}); lv.bob.userData.level='pluto'; scene.add(lv.bob);
     { const hb=lv.helm(); hb.scale.setScalar(1.7); hb.position.set(0,.22,0); lv.bob.userData.head.add(hb); }
     lv.jeff=makeDog(); lv.jeff.userData.level='pluto'; scene.add(lv.jeff);
@@ -7906,7 +7966,7 @@ defineLevel('pluto',{
       const up=canMove&&(keys.Space||TOUCH.up);
       if(up&&lv.fuel>0){ P.onGround=false; P.vy=Math.min(P.vy+15*dt,6); lv.fuel=Math.max(0,lv.fuel-dt*.28); lv.jetT-=dt; if(lv.jetT<=0){ lv.jetT=.12; SFX.jet(); }
         const p=camera.position; lv.glow.spawn(p.x+rand(-.2,.2),p.y-1.3,p.z+rand(-.2,.2),rand(-.3,.3),-rand(3,5),rand(-.3,.3),rand(.3,.6),rand(.15,.3),1,.6,.2,.9,0,0,1); }
-      if(P.onGround) lv.fuel=Math.min(1,lv.fuel+dt*.6);
+      if(P.onGround) lv.fuel=Math.min(1,lv.fuel+dt*.6); else { if(lv.fuel<=0&&up) unlock('emptyTank'); if(P.y>40) unlock('skyHigh'); }
       if(!P.onGround){ const fw=V3(-Math.sin(P.yaw),0,-Math.cos(P.yaw)); P.vel.x+=fw.x*P.inMag*dt*3; P.vel.z+=fw.z*P.inMag*dt*3; }
       jetHUD(true,lv.fuel);
       // rings
@@ -7963,9 +8023,9 @@ CHECKPOINTS.B11=async()=>{
   say('You have a dog now. His name is Jeff.',3.6);
   await tweenVal(k=>{ jeff.position.set(lerp(-16,-9.6,k),0,lerp(8,8.2,k)); jeff.rotation.y=Math.PI/2; },2.2);
   SFX.bark(); await wait(1);
-  if(!pl.petSetup){ pl.petSetup=true; addInteract(pl,{obj:jeff,offset:V3(0,.6,0),label:'Pet Jeff',reach:2.4,when:()=>!!F_().canPet,act:()=>{ SFX.bark(); unlock('jeff'); jeff.userData.happy=true; VM.slapT=.5; bark('You','Good boy, Jeff.',null,2); F_().petted=true; }}); }
+  if(!pl.petSetup){ pl.petSetup=true; addInteract(pl,{obj:jeff,offset:V3(0,.6,0),label:'Pet Jeff',reach:2.4,when:()=>!!F_().canPet,act:()=>{ SFX.bark(); unlock('jeff'); if(trophyStat('pets')>=10) unlock('goodBoy'); jeff.userData.happy=true; VM.slapT=.5; bark('You','Good boy, Jeff.',null,2); F_().petted=true; }}); }
   F.canPet=true; objective('Pet Jeff'); PLAYER.free();
-  await waitUntil(()=>F_().petted,25); F.canPet=false; objective(null); PLAYER.lock(); await wait(1.5);
+  await waitUntil(()=>F_().petted,25); await wait(4); F.canPet=false; objective(null); PLAYER.lock(); await wait(1.5);
   // back on Earth...
   await fade(1,.8);
   const E=await enterLevel('blockearth',{pos:V3(0,0,30),yaw:0});
@@ -8321,7 +8381,7 @@ defineLevel('mitetown',{
     lv.lamp=new THREE.PointLight(col(0xffd070),2,160,2); lv.lamp.position.set(0,20,0); scene.add(lv.lamp);
     // the giant tardigrade (it comes back later) and the lint tangle you lead it into
     lv.tard=makeTardigrade({color:0xc8b098}); lv.tard.scale.setScalar(42); lv.tard.visible=false; scene.add(lv.tard);
-    lv.trap=makeLint(120,60,[0xe8e8f0,0xc8d0e0,0xf0e0e8]); lv.trap.position.set(40,-30,-560); lv.trap.scale.setScalar(1.6); scene.add(lv.trap);
+    lv.trap=makeLint(120,60,[0xe8e8f0,0xc8d0e0,0xf0e0e8]); lv.trap.position.set(-330,-30,-170); lv.trap.scale.setScalar(1.6); scene.add(lv.trap);
     lv.snow=makeSnowFor(scene);
     lv.flyBounds=(p,v)=>{ const lim=[[-320,320],[-200,200],[-700,300]]; ['x','y','z'].forEach((k,i)=>{ if(p[k]<lim[i][0]){ p[k]=lim[i][0]; v[k]=Math.abs(v[k])*.3; } if(p[k]>lim[i][1]){ p[k]=lim[i][1]; v[k]=-Math.abs(v[k])*.3; } }); };
     lv.col.bounds=null;
@@ -8376,9 +8436,9 @@ CHECKPOINTS.A7=async()=>{
   L.userData.talking=false; lv.nervous=false;
   objective('Look around Mite Town'); PLAYER.free();
   if(!lv.setup){ lv.setup=true;
-    addInteract(lv,{obj:lv.marketSign,label:'Snack market',reach:90,d3:true,act:()=>{ F_().sawMarket=true; bark('You','Paramecium snacks. In bubbles.',null,2.6); }});
+    addInteract(lv,{obj:lv.marketSign,label:'Snack market',reach:90,d3:true,act:()=>{ F_().sawMarket=true; if(trophyStat('market')>=5) unlock('shopper'); bark('You','Paramecium snacks. In bubbles.',null,2.6); }});
     addInteract(lv,{obj:lv.beds[0],offset:V3(0,6,0),label:'Lint bed',reach:60,d3:true,act:()=>{ F_().sawBed=true; bark('You','It IS super comfy.',null,2.6); }});
-    addInteract(lv,{obj:lv.larry,offset:V3(0,16,0),label:'Talk to Larry',reach:70,d3:true,when:()=>!F_().tardOn,act:()=>larrySay(pick(["The market has the best snacks. Trust me.","You can sleep on any lint bed you want.","The other mites will get used to you."]))});
+    addInteract(lv,{obj:lv.larry,offset:V3(0,16,0),label:'Talk to Larry',reach:70,d3:true,when:()=>!F_().tardOn,act:()=>(trophyStat('larryTalk')>=5&&unlock('chatter'),larrySay)(pick(["The market has the best snacks. Trust me.","You can sleep on any lint bed you want.","The other mites will get used to you."]))});
   }
   await waitUntil(()=>F_().sawMarket&&F_().sawBed,90);
   await wait(2);
@@ -8387,7 +8447,7 @@ CHECKPOINTS.A7=async()=>{
 async function tardComes(){
   const lv=LEVELS.mitetown, F=F_(), T=lv.tard; F.tardOn=true; PLAYER.lock(); objective(null);
   sfxAt(V3(0,0,-400),()=>SFX.giantRumble&&SFX.giantRumble(),200); shake(.4);
-  T.visible=true; T.position.set(-60,-10,-620); T.lookAt(0,-10,0); lv.tardWalk=1; lv.tardMouth=0;
+  T.visible=true; T.position.set(-330,-10,330); T.lookAt(0,-10,0); lv.tardWalk=1; lv.tardMouth=0;
   playMusic('giant',1);
   lookAtPoint(T.position.clone().add(V3(0,40,0)),1.2); await wait(1.4);
   lv.panic=true;
@@ -8403,7 +8463,7 @@ async function tardComes(){
     const dP=head.distanceTo(PLAYER.pos);
     if(state==='approach'){ const tgt=center; const dir=tgt.clone().sub(T.position); const d=dir.length(); if(d>120) T.position.addScaledVector(dir.normalize(),12*dt); else lv.tardMouth=.5+Math.sin(G.time*3)*.3; T.lookAt(tgt.x,T.position.y,tgt.z);
       if(dP<90){ state='follow'; SFX.giantCall&&SFX.giantCall(); lv.tardMouth=0; objective('Lead the tardigrade to the big lint tangle'); setMarker(()=>trap.clone().add(V3(0,60,0)),'Lint tangle'); toast('It sees you!','#ffcc66'); } }
-    else if(state==='follow'){ const dir=PLAYER.pos.clone().sub(T.position); dir.y*=.5; const d=dir.length(); T.position.addScaledVector(dir.normalize(),Math.min(10,d*.2)*dt); T.lookAt(PLAYER.pos.x,T.position.y,PLAYER.pos.z);
+    else if(state==='follow'){ const dir=PLAYER.pos.clone().sub(T.position); dir.y*=.5; const d=dir.length(); T.position.addScaledVector(dir.normalize(),Math.min(14,d*.22)*dt); T.lookAt(PLAYER.pos.x,T.position.y,PLAYER.pos.z);
       if(dP<30){ SFX.suitHit(); shake(.5); PLAYER.vel.add(PLAYER.pos.clone().sub(head).normalize().multiplyScalar(22)); dmgFlash&&dmgFlash(); }
       if(d>260){ state='approach'; objective("Get the tardigrade's attention"); setMarker(()=>T.position.clone().add(V3(0,50,0)),'Tardigrade'); toast("It lost interest! It's going back to town!",'#ff8a6a'); warned++; }
       if(T.position.distanceTo(trap)<110){ break; } }
@@ -8411,7 +8471,7 @@ async function tardComes(){
   // it gets tangled in the lint and curls up
   PLAYER.lock(); setMarker(null); itemHints(null); objective(null);
   lookAtPoint(T.position.clone().add(V3(0,30,0)),.8);
-  sfxAt(T.position,()=>SFX.squirm(),200); lv.tardWalk=2.5;
+  sfxAt(T.position,()=>SFX.squirm(),200); lv.tardWalk=1.3;
   await tweenVal(k=>{ T.position.lerp(trap.clone().add(V3(0,10,0)),k*.05); },2.5);
   lv.tardWalk=0; await tweenVal(k=>{ T.scale.set(42,42*(1-k*.4),42*(1-k*.3)); },1.8);
   say("It's stuck in the lint. It curls up and goes to sleep.",4); await wait(4.2);
@@ -8479,6 +8539,10 @@ defineLevel('deep',{
     // Larry, riding a Paramecium
     lv.ride=makeSnack(); lv.ride.scale.setScalar(5.5); scene.add(lv.ride);
     lv.larry=makeDustMite(); lv.larry.scale.setScalar(6); lv.larry.position.set(0,6,0); lv.ride.add(lv.larry); lv.larry.scale.setScalar(6/5.5);
+    // boost rings: swim through one and it shoots you forward
+    lv.boosts=[]; const bm=rimify(new THREE.MeshPhysicalMaterial({color:col(0x6dffd8),emissive:col(0x2adfb0),emissiveIntensity:1.6,roughness:.2,transparent:true,opacity:.9}),0xb0fff0,1.5,2);
+    for(let z=-90;z>-2400;z-=115){ if(z<-1440&&z>-1900&&(Math.round(z/115)%2)) continue; const x=Math.sin(z*.004)*45, y=-20+z*.03+Math.sin(z*.011)*18; const g=new THREE.Group(); g.position.set(x,y,z); scene.add(g);
+      g.add(mesh(new THREE.TorusGeometry(12,.9,10,40),bm,0,0,0,false)); for(let i=0;i<3;i++){ const ch=mesh(new THREE.TorusGeometry(4,.5,6,3,Math.PI*.6),bm,0,0,-6-i*5,false); ch.rotation.z=Math.PI*.2; g.add(ch); } lv.boosts.push({g,cd:0}); }
     lv.snow=makeSnowFor(scene);
     lv.flyBounds=(p,v)=>{ const lim=[[-150,150],[-170,110],[-2600,80]]; ['x','y','z'].forEach((k,i)=>{ if(p[k]<lim[i][0]){ p[k]=lim[i][0]; v[k]=Math.abs(v[k])*.3; } if(p[k]>lim[i][1]){ p[k]=lim[i][1]; v[k]=-Math.abs(v[k])*.3; } }); };
     lv.col.bounds=null;
@@ -8507,9 +8571,15 @@ defineLevel('deep',{
       U.legs.forEach((l,i)=>l.rotation.z=Math.sin(t*8+i)*.3);
       if(d<9&&F.deepOn){ PLAYER.vel.add(P.clone().sub(p.position).normalize().multiplyScalar(14)); U.vel.multiplyScalar(-1); if(G.time-(F.phT||0)>.8){ F.phT=G.time; SFX.suitHit(); shake(.3); } } }
     // the shard
-    lv.shard.rotation.y+=dt*.6; lv.shard.position.y=-122+Math.sin(t)*3; lv.shardLight.intensity=3.5+Math.sin(t*3)*.8;
+    lv.shard.rotation.y+=dt*.6; lv.shard.position.y=-122+Math.sin(t)*3; if(!F.shardTaken) lv.shardLight.intensity=3.5+Math.sin(t*3)*.8;
     // Larry follows you on his Paramecium
-    const R=lv.ride; if(R.visible){ const want=P.clone().add(V3(22,6,26)); R.position.lerp(want,Math.min(1,dt*.9)); const dir=want.clone().sub(R.position); if(dir.lengthSq()>1) R.lookAt(R.position.clone().sub(dir)); R.userData.cil.rotation.z=Math.sin(t*14)*.05; animateDustMite(lv.larry,t,dt); }
+    for(const b of lv.boosts){ b.g.rotation.z+=dt*1.5; if(b.cd>0){ b.cd-=dt; continue; } const l=b.g.worldToLocal(P.clone()); if(Math.abs(l.z)<5&&Math.hypot(l.x,l.y)<12.5){ b.cd=1.5; PLAYER.vel.z-=70; PLAYER.vel.y*=.3; PLAYER.fovKick=16; SFX.whoosh(1); SFX.ding2(); shake(.15); F.boosts=(F.boosts||0)+1; if(F.boosts>=15) unlock('speedy'); for(let i=0;i<30;i++) lv.glow.spawn(P.x+rand(-10,10),P.y+rand(-8,8),P.z-rand(0,20),0,0,rand(40,80),rand(.4,.8),rand(.3,.6),.4,1,.9,.8,0,0,1); } }
+    const R=lv.ride;
+    if(F.riding){ const stop=R.position.z>-1400?-1410:R.position.z>-1930?null:R.position.z>-2380?null:-2470; const x=Math.sin(R.position.z*.004)*45, y=-20+R.position.z*.03+Math.sin(R.position.z*.011)*18;
+      if(stop==null||R.position.z<=stop){ runStory(()=>rideOff(stop==null?"I can't go in there! Hop off!":stop===-1410?"Hydras ahead! I can't go in there. Hop off!":"This is as far as I go!")); }
+      else { R.position.z-=dt*48; R.position.x=damp(R.position.x,x,2,dt); R.position.y=damp(R.position.y,y,2,dt); R.rotation.set(0,Math.PI,0); PLAYER.pos.copy(R.position).add(V3(0,9,4)); PLAYER.vel.set(0,0,-48); if(Math.random()<dt*20) lv.glow.spawn(R.position.x+rand(-4,4),R.position.y,R.position.z+20,0,0,20,1,.4,1,.9,.4,.6,0,0,1); }
+      R.userData.cil.rotation.z=Math.sin(t*20)*.08; animateDustMite(lv.larry,t,dt); }
+    else if(R.visible){ const want=P.clone().add(V3(22,6,26)); R.position.lerp(want,Math.min(1,dt*.9)); const dir=want.clone().sub(R.position); if(dir.lengthSq()>1) R.lookAt(R.position.clone().sub(dir)); R.userData.cil.rotation.z=Math.sin(t*14)*.05; animateDustMite(lv.larry,t,dt); }
     if(lv.snow) lv.snow.material.uniforms.px.value=renderer.domElement.height*.5;
   }
 });
@@ -8522,6 +8592,8 @@ async function hydraGrab(h){
   spamHUD(false); SFX.swimStroke(); PLAYER.vel.add(PLAYER.pos.clone().sub(hp).normalize().multiplyScalar(24));
   F.grabbed=false; F.grabT=G.time; PLAYER.ctl.move=true; deepObjective();
 }
+function rideOn(){ const F=F_(), lv=LEVELS.deep; F.riding=true; PLAYER.ctl.move=false; SFX.swimStroke(); SFX.whoosh(.6); bark('Larry','Hold on tight!',null,2); unlock('ride'); }
+async function rideOff(line){ const F=F_(); if(!F.riding) return; F.riding=false; PLAYER.ctl.move=true; PLAYER.vel.set(0,0,-10); if(line) bark('Larry',line,null,3); }
 function deepObjective(){ objective('Find the purple crystal shard, deep down'); }
 
 /* ================= A8: THE DEEP ================= */
@@ -8538,6 +8610,7 @@ CHECKPOINTS.A8=async()=>{
   if(!lv.setup){ lv.setup=true;
     addInteract(lv,{pos:V3(),label:'Break free!',cd:.06,reach:999,d3:false,aim:false,when:()=>!!F_().grabbed,act:()=>{ F_().wiggle=(F_().wiggle||0)+.12; SFX.squirm(); shake(.05); }});
     on('tick',()=>{ if(LV===lv){ const it=lv.inter[0]; it.pos=PLAYER.pos.clone(); } });
+    addInteract(lv,{obj:lv.ride,label:()=>F_().riding?'Hop off':"Ride on Larry's Paramecium",reach:45,d3:true,aim:false,when:()=>F_().deepOn&&(F_().riding||(PLAYER.pos.z>-1380||(PLAYER.pos.z<-2390&&PLAYER.pos.z>-2440))),act:()=>{ if(F_().riding) runStory(()=>rideOff(null)); else rideOn(); }});
     addInteract(lv,{obj:lv.shard,label:'Take the shard',reach:60,d3:true,when:()=>!!F_().deepOn&&!F_().grabbed,act:()=>runStory(takeShard)});
     addTrigger(lv,{pos:V3(0,0,-440),r:1,box:[400,30],once:true,fn:()=>{ bark('Larry',"It's dark down here. Swim near the little guys, they light up!",null,3.6); unlock('deep'); }});
     addTrigger(lv,{pos:V3(0,0,-980),r:1,box:[400,30],once:true,fn:()=>bark('Larry',"Current! Hold on!",null,3)});
@@ -8551,16 +8624,32 @@ CHECKPOINTS.A8=async()=>{
   PLAYER.free();
 };
 async function takeShard(){
-  const lv=LEVELS.deep, F=F_(); if(!F.deepOn) return; F.deepOn=false; PLAYER.lock(); setMarker(null); itemHints(null); objective(null);
+  const lv=LEVELS.deep, F=F_(); if(!F.deepOn) return; F.deepOn=false; F.shardTaken=true; F.riding=false; PLAYER.lock(); setMarker(null); itemHints(null); objective(null);
   lookAtPoint(lv.shard.position,.8); await wait(.8);
-  SFX.sparkle&&SFX.sparkle(); SFX.pickup(); flashWhite(.6,.8); lv.shard.visible=false; lv.shardLight.intensity=0;
+  SFX.pickup(); flashWhite(.6,.8); for(const c of lv.shard.children) if(!c.isLight) c.visible=false; lv.shardLight.intensity=0;
   toast('Got: SHRINK-RAY CRYSTAL SHARD','#c86aff'); unlock('tinyEnd');
-  await talk([{who:'You',text:"I found it!"},{who:'Jim',radio:true,text:"You found it!"}]);
-  await wait(.6);
+  // the shard in your hands, glowing
+  const sh=new THREE.Group(); const m=new THREE.MeshPhysicalMaterial({color:col(0xc86aff),roughness:.05,clearcoat:1,emissive:col(0x9a3aff),emissiveIntensity:2,transparent:true,opacity:.9}); const c1=mesh(new THREE.OctahedronGeometry(.08,0),m,0,0,0,false); c1.scale.set(.7,2.2,.7); sh.add(c1); sh.userData.vmScale=3; vmCarry(sh); PLAYER.carry={shard:true};
+  // everything down here lights up purple for a moment
+  SFX.dreamSwell(); FX.bloomStrength=1.4; lv.shardLight.intensity=12; lv.shardLight.distance=900; lv.shard.position.copy(PLAYER.pos).add(V3(0,-5,-10));
+  for(let i=0;i<8;i++) lv.glow.burst(PLAYER.pos.clone().add(V3(rand(-30,30),rand(-20,20),rand(-40,-10))),{color:pick([0xc86aff,0xff8aff,0x6dffd8]),count:30,speed:15,size:.8,life:2,grav:0});
+  await wait(1.6); FX.bloomStrength=.55;
+  await talk([{who:'You',text:"I found it!"},{who:'Jim',radio:true,text:"You found it!"},{who:'Larry',voice:'Larry',text:"We did it! Let's go home!"}]);
+  // Larry's Paramecium takes you both home, fast
+  await fade(1,.8); vmCarry(null); PLAYER.carry=null; lv.shardLight.intensity=0;
+  const T=await enterLevel('mitetown',{pos:V3(0,40,160),yaw:0});
+  T.tard.visible=false; T.nervous=false; T.panic=false; T.cheer=true; T.larry.position.set(-20,14,110); T.larry.rotation.y=Math.PI*.9;
+  lookAtPoint(V3(0,0,0),0); playMusic('larry',1);
+  await fade(0,.8);
+  say('Back in Mite Town, everybody cheers. The shard glows in your hands.',4.4);
+  for(let i=0;i<6;i++) later(i*.35,()=>SFX.ding2());
+  for(let i=0;i<10;i++) T.glow.burst(V3(rand(-100,100),rand(20,60),rand(-120,60)),{color:pick([0xffe066,0xff7af0,0x6dffd8,0xc86aff]),count:40,speed:12,size:1,life:1.8,grav:4});
+  await wait(4.6); T.cheer=false;
   playMusic(null,2); await tweenVal(k=>{ FX.blackout=k; },1.4);
   $('visor').classList.remove('show');
   showTBC('THE TINYVERSE','B1');
 }
+
 
 </script>
 <script>
@@ -8705,8 +8794,8 @@ function scanHats(){
   const on=funnyOn(); if(!LV) return;
   for(const h of HUMANS){ if(!h.parent) continue; const U=h.userData; if(on) hatOn(h,U.head||U.headJ,1.25,.22); else if(U.partyHat) U.partyHat.visible=false; }
   for(const r of ROBOTS){ if(!r.parent) continue; const U=r.userData; if(on) hatOn(r,U.head,1.1,-.2); else if(U.partyHat) U.partyHat.visible=false; }
-  const critters=[]; if(LV.ant) critters.push(LV.ant); if(LV.bugs) critters.push(...LV.bugs); if(LV.larry) critters.push(LV.larry); if(LV.giant) critters.push(LV.giant); if(LV.tards) critters.push(...LV.tards); if(typeof FOLK!=='undefined') critters.push(...FOLK.filter(f=>f.parent&&f.userData.level===LV.name)); if(LV.mites) critters.push(...LV.mites); if(LV.rat) critters.push(LV.rat); if(LV.jeff) critters.push(LV.jeff);
-  for(const c of critters){ const hd=c.userData.head; if(!hd) continue; if(on) hatOn(c,hd,c.userData.folk?1.3:c===LV.larry||c===LV.giant?.9:.5,c.userData.folk?.46:.3); else if(c.userData.partyHat) c.userData.partyHat.visible=false; }
+  const critters=[]; if(LV.ant) critters.push(LV.ant); if(LV.bugs) critters.push(...LV.bugs); if(LV.larry) critters.push(LV.larry); if(LV.giant) critters.push(LV.giant); if(LV.tards) critters.push(...LV.tards); if(typeof FOLK!=='undefined') critters.push(...FOLK.filter(f=>f.parent&&f.userData.level===LV.name)); if(LV.mites) critters.push(...LV.mites); if(LV.rat) critters.push(LV.rat); if(LV.jeff) critters.push(LV.jeff); for(const k of ['xxx','xFly','xBig','x3']) if(LV[k]) critters.push(LV[k]);
+  for(const c of critters){ const hd=c.userData.head; if(!hd) continue; if(on) hatOn(c,hd,c.userData.heads?1.6:c.userData.folk?1.3:c===LV.larry||c===LV.giant?.9:.5,c.userData.folk?.46:.3); else if(c.userData.partyHat) c.userData.partyHat.visible=false; }
 }
 
 /* ---------- the glitch events ---------- */
@@ -8737,7 +8826,7 @@ const GLITCHES=[
   {w:1,go(){ if(!LV||!LV.bugs||!LV.bugs.length) return false; const b=pick(LV.bugs); const s0=b.scale.x; b.scale.setScalar(s0*3); SFX.boing(); tempRestore(3,()=>b.scale.setScalar(s0)); }},
   {w:1,go(){ if(!LV||LV.name!=='tiny') return false; const L=LV.larry; if(!L||!L.visible) return false; const s0=L.scale.x; L.scale.setScalar(s0*2); tempRestore(2.5,()=>L.scale.setScalar(s0)); }}
 ];
-function runGlitch(){ let tries=6; while(tries-->0){ const tot=GLITCHES.reduce((a,g)=>a+g.w,0); let r=Math.random()*tot, g=GLITCHES[0]; for(const x of GLITCHES){ r-=x.w; if(r<=0){ g=x; break; } } try{ if(g.go()!==false) return; }catch(e){ console.warn('glitch failed',e); } } }
+function runGlitch(){ if(trophyStat('glitches')>=25) unlock('partyAnimal'); let tries=6; while(tries-->0){ const tot=GLITCHES.reduce((a,g)=>a+g.w,0); let r=Math.random()*tot, g=GLITCHES[0]; for(const x of GLITCHES){ r-=x.w; if(r<=0){ g=x; break; } } try{ if(g.go()!==false) return; }catch(e){ console.warn('glitch failed',e); } } }
 function clearFunny(){ for(const a of FUNNY.active){ try{ a.restore(); }catch(e){} } FUNNY.active.length=0; for(const h of HUMANS){ if(h.userData.A) h.userData.A.funny=null; if(h.userData.J&&h.userData.J.head) h.userData.J.head.scale.setScalar(1); } }
 /* per-human glitch poses (called from animateHuman) */
 function funnyHumanHook(h,R,t,A){
