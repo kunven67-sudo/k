@@ -42,8 +42,8 @@ export class Player {
     this.fallStartY = 0;
     this.shake = 0;
     this.speedMul = 1;
-    this.walkSpeed = 6.5;
-    this.runSpeed = 13;
+    this.walkSpeed = 7.5;
+    this.runSpeed = 14;
     this.jumpVel = 9.5;
     this.onDeath = null;
     this.interactTarget = null;

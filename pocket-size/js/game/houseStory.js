@@ -10,6 +10,7 @@ import { G } from './state.js';
 import { Feed } from '../scenes/feed.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const DESK = { x: 345, z: 34 }; // centre of the desk top the airplane has to reach
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
 
 export class HouseStory {
@@ -234,7 +235,7 @@ export class HouseStory {
     L.refs.dog.hear(first ? 0.35 : 0.15, P.body.pos);
     this.attachAirplane(false);
     P.carry = {
-      item: 'airplane', speedMul: 0.62, canJump: false, canSprint: false, camDist: 17, camLift: 3,
+      item: 'airplane', speedMul: 1, canJump: false, canSprint: true, camDist: 17, camLift: 3,
       onDrop: (pl) => this.dropAirplane(pl),
     };
     P.rig.trigger('pickup', 0.6);
@@ -369,9 +370,11 @@ export class HouseStory {
     P.carry = null;
     L.group.add(a);
     ui.mash(null);
+    const start = V(170, 63, P.body.pos.z);
+    const aim = Math.atan2(DESK.x - start.x, DESK.z - start.z);
     const f = this.flight = {
-      pos: V(170, 62.5, P.body.pos.z), yaw: Math.PI / 2 - 0.05, pitch: 0.08, speed: 21, roll: 0, t: 0,
-      camPos: V(150, 68, P.body.pos.z),
+      pos: start, yaw: aim, pitch: 0, speed: 30, roll: 0, t: 0,
+      camPos: start.clone().add(V(-Math.sin(aim) * 20, 7, -Math.cos(aim) * 20)),
     };
     a.position.copy(f.pos); a.rotation.set(0, f.yaw, 0, 'YXZ');
     P.mode = 'external';
@@ -379,7 +382,7 @@ export class HouseStory {
     sfx('whoosh', { dur: 1.2 });
     P.rig.trigger('throw', 0.5);
     playMusic('outdoor');
-    ui.toast('✈️ <b>Mouse / A-D</b> to steer &middot; <b>W / S</b> nose down / up. Land on the <b>desk</b>!', 6000);
+    ui.toast('✈️ <b>Mouse / A-D</b> to steer &middot; <b>W / S</b> nose down / up &middot; <b>Shift</b> boost. The plane helps you aim at the <b>desk</b>!', 6000);
     this.story.objective('Fly to the desk and land on it');
     this.flightWind = loop('wind', { vol: 0.5 });
   }
@@ -391,23 +394,31 @@ export class HouseStory {
     f.t += dt;
     const look = input.locked ? input.look() : { x: 0, y: 0 };
     const ax = input.axis();
-    const yawIn = -look.x * 2.2 - ax.x * 1.4 * dt;
+    const userYaw = -look.x * 2.2 - ax.x * 1.6 * dt;
+    // Aim assist: while the desk is roughly ahead, the plane gently turns toward it.
+    const toDesk = Math.atan2(DESK.x - f.pos.x, DESK.z - f.pos.z);
+    let dYaw = toDesk - f.yaw;
+    while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+    while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+    const assist = Math.abs(dYaw) < 1.3 && Math.abs(userYaw) < 0.02 ? dYaw * (1 - Math.exp(-1.6 * dt)) : 0;
+    const yawIn = userYaw + assist;
     f.yaw += yawIn;
     f.roll += ((-yawIn / Math.max(dt, 1e-3)) * 0.35 - f.roll) * (1 - Math.exp(-4 * dt));
     f.roll = Math.max(-0.9, Math.min(0.9, f.roll));
     f.pitch += (-look.y * 1.2) + (-ax.z * 0.9 * dt);
-    f.pitch = Math.max(-0.7, Math.min(0.45, f.pitch));
-    // arcade glider physics: diving trades height for speed, climbing bleeds it off
-    f.speed += (-Math.sin(f.pitch) * 30 - 0.0035 * f.speed * f.speed) * dt;
-    f.speed = Math.max(7, Math.min(42, f.speed));
-    if (f.speed < 10) f.pitch -= dt * 0.6; // stall: nose drops
-    const sink = 1.6 + Math.max(0, 13 - f.speed) * 0.5;
+    // Level out by itself when you're not pushing the nose.
+    if (Math.abs(look.y) < 0.002 && !ax.z) f.pitch *= Math.exp(-1.5 * dt);
+    f.pitch = Math.max(-0.6, Math.min(0.4, f.pitch));
+    // Fast, forgiving glider: keeps its speed, Shift boosts, diving adds speed. No stalling.
+    const boost = (input.isDown('ShiftLeft') || input.isDown('ShiftRight')) ? 16 : 0;
+    const cruise = 30 + boost - f.pitch * 22;
+    f.speed += (cruise - f.speed) * (1 - Math.exp(-1.5 * dt));
+    const sink = 0.8;
     const fwd = V(Math.sin(f.yaw), 0, Math.cos(f.yaw));
     const vy = f.speed * Math.sin(f.pitch) - sink;
     const step = fwd.clone().multiplyScalar(f.speed * Math.cos(f.pitch) * dt);
-    // wall / object ahead?
-    const dir = V(fwd.x * Math.cos(f.pitch), Math.sin(f.pitch), fwd.z * Math.cos(f.pitch)).normalize();
-    const ahead = world.raycast(f.pos.clone().add(V(0, 1, 0)), dir, 14 + f.speed * dt);
+    // Only walls and big things straight ahead count as a crash (not the desk you're landing on).
+    const ahead = world.raycast(f.pos.clone().add(V(0, 2.5, 0)), fwd, 4 + f.speed * dt);
     f.pos.add(step); f.pos.y += vy * dt;
     a.position.copy(f.pos);
     a.rotation.set(-f.pitch, f.yaw, f.roll, 'YXZ');
@@ -427,13 +438,13 @@ export class HouseStory {
     if (this.flightWind) this.flightWind.setVolume(0.2 + f.speed / 50);
     // landing / crashing
     const ground = world.surfaceBelow(f.pos.x, f.pos.y + 1, f.pos.z);
-    const onDesk = f.pos.x > 286 && f.pos.x < 409 && f.pos.z > 1 && f.pos.z < 62;
+    const onDesk = f.pos.x > 284 && f.pos.x < 411 && f.pos.z > -2 && f.pos.z < 64;
+    if (onDesk && f.pos.y > 56 && f.pos.y - 58 < 9) return this.flightSuccess();
     if (f.pos.y - 3 <= ground) {
-      if (onDesk && Math.abs(ground - 58) < 1.5) return this.flightSuccess();
       if (Math.abs(ground - 60) < 3 && f.pos.x < 172) return this.flightEnd('You landed back on the bed. Walk to the edge and try again!', false);
       return this.flightEnd('The airplane nose-dived into the floor.', true);
     }
-    if (ahead < 12 + f.speed * dt) return this.flightEnd('Crash! You flew straight into something.', true);
+    if (ahead < 3 + f.speed * dt) return this.flightEnd('Crash! You flew straight into something.', true);
     if (f.t > 90) return this.flightEnd('You ran out of air.', true);
   }
 

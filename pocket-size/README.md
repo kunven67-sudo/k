@@ -26,8 +26,9 @@ Click **Start**. Chrome, Edge or Firefox on a PC or laptop with a mouse and keyb
 
 1. **Doomscroll**: it's late. Five shorts, five seconds each, then the phone goes on the desk.
 2. **Big Morning**: you wake up tiny. Leap onto the fallen pillow, squeeze under the door,
-   sneak past Biscuit, haul your paper airplane home, mash **E** to climb the blanket, then
-   fly the airplane to the desk.
+   sneak past Biscuit, haul your paper airplane home (you can sprint with it), mash **E** to
+   climb the blanket, then fly the airplane to the desk. The plane steers itself toward the
+   desk if you let it, and **Shift** gives it a speed boost.
 3. **Inside the Phone**: a pixelated world full of viruses. The Call app has no signal, and
    the "restore size" wires are fakes that blow up the phone.
 4. **The Great Outdoors**: the sun burns at this size. Hide in the bush, where the ants,
