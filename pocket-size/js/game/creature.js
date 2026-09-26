@@ -169,61 +169,15 @@ export class Creature {
     if (!G.aiPaused && player) this.brain(dt, level, player);
     else { this.body.vel.x *= 0.9; this.body.vel.z *= 0.9; }
     this.physics(dt, level.world);
-    this.animate && this.animate(dt);
+    // Bugs are a few pixels across from far away: skip drawing and animating them there.
+    let visible = true;
+    if (this.isBug && G.camera) {
+      const far = this.cullDist ?? 120 + 150 * this.body.radius;
+      visible = G.camera.position.distanceToSquared(this.body.pos) < far * far;
+      this.group.visible = visible;
+    }
+    if (visible && this.animate) this.animate(dt);
     this.sync(dt);
     return true;
   }
-}
-
-// Articulated insect leg: returns a group with .joints for animation.
-export function insectLeg(mat, lengths = [0.6, 0.8, 0.7], radius = 0.07) {
-  const root = new THREE.Group();
-  let parent = root;
-  const joints = [];
-  lengths.forEach((len, i) => {
-    const j = new THREE.Group();
-    parent.add(j);
-    const r = radius * (1 - i * 0.25);
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r, len, 6), mat);
-    m.position.y = -len / 2;
-    m.castShadow = true;
-    j.add(m);
-    joints.push(j);
-    const next = new THREE.Group();
-    next.position.y = -len;
-    j.add(next);
-    parent = next;
-  });
-  root.joints = joints;
-  return root;
-}
-
-// Classic hexapod: builds 6 legs on a body group and returns an animator(dt, speed).
-export function hexapod(bodyGroup, mat, { spread = 0.6, length = 1, y = 0, z0 = -0.4, z1 = 0.4, radius = 0.06 } = {}) {
-  const legs = [];
-  for (let i = 0; i < 3; i++) {
-    for (const side of [-1, 1]) {
-      const leg = insectLeg(mat, [0.45 * length, 0.75 * length, 0.8 * length], radius);
-      leg.position.set(side * spread * 0.35, y, z0 + (z1 - z0) * (i / 2));
-      leg.rotation.set(0, (i - 1) * 0.5 * side, side * 1.35);
-      leg.joints[1].rotation.z = -side * 1.9;
-      leg.joints[2].rotation.z = side * 0.9;
-      bodyGroup.add(leg);
-      legs.push({ leg, side, i, phase: (i % 2 === 0 ? 0 : Math.PI) + (side > 0 ? Math.PI : 0) });
-    }
-  }
-  let t = 0;
-  return (dt, speed) => {
-    t += dt * (4 + speed * 2.2);
-    for (const L of legs) {
-      const s = Math.sin(t + L.phase);
-      const lift = Math.max(0, Math.cos(t + L.phase)) * Math.min(1, speed * 0.4);
-      L.leg.rotation.y = (L.i - 1) * 0.5 * L.side + s * 0.35 * Math.min(1, speed * 0.3);
-      L.leg.rotation.z = L.side * (1.35 - lift * 0.35);
-    }
-  };
-}
-
-export function glossy(color, rough = 0.35) {
-  return new THREE.MeshPhysicalMaterial({ color, roughness: rough, clearcoat: 1, clearcoatRoughness: 0.25, emissive: 0x000000 });
 }

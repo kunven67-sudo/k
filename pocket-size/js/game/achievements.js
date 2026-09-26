@@ -59,7 +59,7 @@ export const DEATHS = [
   { id: 'housebugs', name: 'House Guests', text: 'You found out what really lives in your house. It found you first.' },
   { id: 'fall', name: 'Gravity Always Wins', text: 'Even at pocket size, that was too far to fall onto something hard.' },
   { id: 'virus', name: 'Corrupted', text: 'The viruses rewrote you into a pop-up ad. You now sell car insurance forever.' },
-  { id: 'wires', name: 'Short Circuit', text: 'The wire was fake. The phone exploded. You were inside it. Told you.' },
+  { id: 'wires', name: 'Short Circuit', text: 'The wire was never a way home. The phone exploded with you inside it.' },
   { id: 'sun', name: 'Crispy', text: 'At your size the sun feels like a magnifying glass. You should have stayed in the shade.' },
   { id: 'bugs', name: 'Eaten Alive', text: 'The bugs out here do not care that you used to be big.' },
   { id: 'spider', name: 'Wrapped Up', text: 'Spider silk: stronger than steel, stickier than regret.' },

@@ -152,6 +152,7 @@ function openSub(which) {
       ${row('Camera', sel('cameraMode', [['third', 'Third person'], ['first', 'First person']]))}
       ${row('Mouse sensitivity', rng('sensitivity', 0.2, 3, 0.05))}
       ${row('Invert Y', chk('invertY'))}
+      ${row('Objective marker', chk('waypoints'))}
       ${row('Camera shake & head bob', chk('motionEffects'))}
       ${row('5D Immersion (spatial audio, rumble, heartbeat)', chk('immersion5d'))}
       <div class="set-group">Audio</div>
@@ -257,11 +258,38 @@ function frame(now) {
   const wantLock = G.mode === 'play' && !input.locked;
   if (wantLock !== lockShown) { lockShown = wantLock; ui.lock(wantLock, 'Click to play'); }
 
+  updateWaypoint();
   camera.getWorldDirection(listenerFwd);
   setListener(camera.position, listenerFwd);
   if (lvl) post.render(dt, G.time);
   input.endFrame();
   adaptResolution(dt);
+}
+
+// Objective marker: levels expose waypoint() -> { pos, scale?, unit? } for where to go next.
+const wpCam = new THREE.Vector3(), wpNdc = new THREE.Vector3();
+function updateWaypoint() {
+  const lvl = G.level, P = G.player;
+  const w = G.mode === 'play' && lvl && lvl.waypoint && P && getSettings().waypoints ? lvl.waypoint() : null;
+  if (!w || !w.pos) { ui.waypoint(null); return; }
+  wpCam.copy(w.pos).applyMatrix4(camera.matrixWorldInverse);
+  const behind = wpCam.z > 0;
+  wpNdc.copy(w.pos).project(camera);
+  let nx = wpNdc.x, ny = wpNdc.y;
+  if (behind) { nx = -nx; ny = -ny; if (Math.hypot(nx, ny) < 0.3) ny = -1; }
+  // keep edge arrows clear of the objective text (top) and the hotbar (bottom)
+  const mx = 0.9, top = 0.72, bot = 0.7;
+  const edge = behind || Math.abs(nx) > mx || ny > top || ny < -bot;
+  if (edge) {
+    const k = Math.min(mx / Math.max(Math.abs(nx), 1e-4), ny > 0 ? top / ny : ny < 0 ? bot / -ny : Infinity);
+    nx *= k; ny *= k;
+  }
+  const W = window.innerWidth, H = window.innerHeight;
+  const d = P.body.pos.distanceTo(w.pos) * (w.scale ?? 0.01);
+  ui.waypoint({
+    x: (nx * 0.5 + 0.5) * W, y: (-ny * 0.5 + 0.5) * H, edge, angle: Math.atan2(-ny, nx),
+    text: `${d < 10 ? d.toFixed(1) : Math.round(d)} ${w.unit ?? 'm'}`,
+  });
 }
 
 // Adaptive resolution: if the game runs slowly during play, quietly render fewer pixels.
@@ -291,7 +319,7 @@ const tips = [
   'Tip: at your size, falling is slow. Landing on something soft is still a good idea.',
   'Tip: shade is life outside. The sun hits different when you are pocket sized.',
   'Tip: hold Space to skip cutscenes you have already seen.',
-  'Tip: there is a giant spider in the bush. You will probably never find her. Probably.',
+  'Tip: something big lives deep inside the bush.',
 ];
 ui.setTip(tips[Math.floor(Math.random() * tips.length)]);
 

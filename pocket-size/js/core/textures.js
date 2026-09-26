@@ -364,6 +364,94 @@ export function chitin({ color = 0x2a1a12, seed = 21 } = {}) {
   }, 2);
 }
 
+// Neutral insect cuticle: fine polygonal sculpture and pits, near-white so the material colour tints it.
+export function cuticle({ seed = 31, cells = 16, pits = 0.6 } = {}) {
+  return set(`cuticle${seed}${cells}${pits}`, sz(0.5), (u, v) => {
+    const [a, b] = worley2(u * cells, v * cells, seed, cells);
+    const edge = smoothstep(0.0, 0.07, b - a);
+    const [pa] = worley2(u * cells * 2, v * cells * 2, seed + 7, cells * 2);
+    const pit = smoothstep(0.04, 0.13, pa);
+    const n = fbm2(u * 8, v * 8, { octaves: 3, seed, period: 8 });
+    const k = 212 + edge * 26 + n * 18 - (1 - pit) * pits * 45;
+    return [k, k, k, edge * 0.55 + n * 0.35 + pit * pits * 0.35, 0.3 + (1 - edge) * 0.18 + n * 0.12 + (1 - pit) * 0.15];
+  }, 1.6);
+}
+
+// Short hair lying along the body (v runs head to tail on lathe parts).
+export function setae({ seed = 32, density = 70 } = {}) {
+  return set(`setae${seed}${density}`, sz(0.5), (u, v) => {
+    const strand = perlin2(u * density, v * 5, seed, density) * 0.5 + 0.5;
+    const fine = perlin2(u * density * 3, v * 9, seed + 3, density * 3) * 0.5 + 0.5;
+    const n = fbm2(u * 6, v * 6, { octaves: 3, seed, period: 6 });
+    const h = strand * 0.6 + fine * 0.4;
+    const k = 150 + h * 105 + n * 20;
+    return [k, k, k, h, 0.62 + (1 - h) * 0.3];
+  }, 3);
+}
+
+// Compound eye: a hexagonal lattice of tiny domed lenses.
+export function facets({ color = 0x6a140c, rows = 24, seed = 33 } = {}) {
+  const C = hex(color), rim = [C[0] * 0.25, C[1] * 0.25, C[2] * 0.25];
+  const cols = rows, R3 = Math.sqrt(3) / 2;
+  return set(`facets${color}${rows}${seed}`, sz(0.5), (u, v) => {
+    const px = u * cols, py = v * rows;
+    let d1 = 9, d2 = 9;
+    const j0 = Math.floor(py);
+    for (let j = j0 - 1; j <= j0 + 1; j++) {
+      const off = (((j % 2) + 2) % 2) * 0.5;
+      const i0 = Math.floor(px - off);
+      for (let i = i0 - 1; i <= i0 + 1; i++) {
+        const dx = px - (i + off + 0.5), dy = (py - (j + 0.5)) * R3;
+        const d = Math.hypot(dx, dy);
+        if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+      }
+    }
+    const edge = smoothstep(0.0, 0.12, d2 - d1);
+    const dome = Math.max(0, 1 - (d1 / 0.55) ** 2);
+    const n = fbm2(u * 4, v * 4, { octaves: 2, seed, period: 4 });
+    const c = mix(rim, C, edge * (0.75 + n * 0.5));
+    return [c[0], c[1], c[2], dome * edge, 0.08 + (1 - edge) * 0.35];
+  }, 2.5);
+}
+
+// Membrane wings with veins. kind: 'fly' | 'mosquito' | 'beetle' (hind wing).
+export function wingTexture(kind = 'fly') {
+  return drawn(`wing_${kind}`, 256, 128, (c, w, h) => {
+    c.clearRect(0, 0, w, h);
+    c.save();
+    // wing outline: root at the left, tip at the right
+    c.beginPath();
+    if (kind === 'mosquito') {
+      c.moveTo(4, h * 0.5); c.bezierCurveTo(w * 0.3, h * 0.18, w * 0.85, h * 0.2, w - 4, h * 0.46); c.bezierCurveTo(w * 0.85, h * 0.78, w * 0.3, h * 0.74, 4, h * 0.5);
+    } else {
+      c.moveTo(4, h * 0.46); c.bezierCurveTo(w * 0.25, h * 0.02, w * 0.8, h * 0.04, w - 6, h * 0.42); c.bezierCurveTo(w * 0.9, h * 0.92, w * 0.35, h * 1.0, 4, h * 0.46);
+    }
+    c.closePath();
+    const g = c.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, 'rgba(120,110,95,0.55)'); g.addColorStop(0.25, 'rgba(210,215,225,0.22)'); g.addColorStop(1, 'rgba(225,230,240,0.14)');
+    c.fillStyle = g; c.fill();
+    c.clip();
+    // longitudinal veins fanning from the root, cross veins, thick leading edge
+    c.strokeStyle = 'rgba(40,32,26,0.85)'; c.lineCap = 'round';
+    const veins = kind === 'mosquito' ? 6 : 5;
+    for (let i = 0; i < veins; i++) {
+      const t = i / (veins - 1);
+      c.lineWidth = i === 0 ? 3.2 : 1.6;
+      c.beginPath(); c.moveTo(6, h * 0.46);
+      c.bezierCurveTo(w * 0.35, h * (0.3 + t * 0.2), w * 0.7, h * (0.18 + t * 0.55), w * (0.95 - t * 0.12), h * (0.3 + t * 0.62));
+      c.stroke();
+    }
+    c.lineWidth = 1.1;
+    [[0.38, 0.3, 0.42, 0.62], [0.58, 0.28, 0.6, 0.7], [0.72, 0.36, 0.76, 0.58]].forEach(([x0, y0, x1, y1]) => { c.beginPath(); c.moveTo(w * x0, h * y0); c.lineTo(w * x1, h * y1); c.stroke(); });
+    if (kind === 'mosquito') {
+      // scale fringe along the edge
+      c.strokeStyle = 'rgba(70,60,50,0.5)'; c.lineWidth = 1;
+      for (let x = 20; x < w - 10; x += 4) { const y = h * 0.5 + Math.sin((x / w) * Math.PI) * h * 0.25; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 3, y + 5); c.stroke(); }
+    }
+    c.restore();
+  });
+}
+
 // ---------------------------------------------------------------- alpha cutouts (drawn, not per-pixel)
 export function leafTexture({ color = '#3f7a2c', seed = 22 } = {}) {
   const key = `leaf${color}${seed}`;

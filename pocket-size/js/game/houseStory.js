@@ -26,6 +26,20 @@ export class HouseStory {
     this.ambience = [];
     this.setupInteractables();
     this.setupCritterEvents();
+    level.waypoint = () => this.waypoint();
+  }
+
+  // Where the objective marker points in the house, step by step.
+  waypoint() {
+    const L = this.level, P = G.player, F = G.flags, a = L.refs.airplane;
+    if (this.flight) return { pos: V(DESK.x, 60, DESK.z) };
+    if (F.phoneDone) return { pos: V(1045, 1, 227) };
+    if (F.onDesk) return { pos: V(335, 59, 28) };
+    if (!F.leapt) return { pos: V(166, 61, 96) };
+    if (P.carry && P.carry.item === 'airplane') return F.climbedBed && P.body.pos.y > 50 ? { pos: V(166, 61, 70) } : { pos: V(this.climbZone.x, 2, this.climbZone.z) };
+    if (!F.seenLiving) return { pos: V(426, 1, 335) };
+    if (a.parent === L.group) return { pos: a.position };
+    return null;
   }
 
   // ---------------------------------------------------------------- night: doom-scrolling
@@ -92,14 +106,14 @@ export class HouseStory {
       G.post.focus = 3.2; G.post.aperture = 1.1;
       P.sleeping = false;
       await c.wait(1.2);
-      await c.say('Okay. School. Up. Let\'s go.', { speaker: 'You' });
+      await c.wait(0.6);
       // try to walk: it takes forever
       P.facing = Math.PI / 2;
       P.scriptVel = V(3.2, 0, 0);
       const w0 = P.body.pos.clone();
       c.cut(w0.clone().add(V(2, 1.3, 4.2)), w0.clone().add(V(1, 1, 0)), 50);
       c.move(w0.clone().add(V(9, 1.6, 4.6)), w0.clone().add(V(10, 1, 0)), 4.5, { e: 'linear' });
-      await c.say('Why is this taking so long? The pillow just keeps... going.', { speaker: 'You' });
+      await c.say('Why is the pillow so... far?', { speaker: 'You' });
       P.scriptVel = null;
       await c.wait(0.4);
       // the big reveal: crane back to show how enormous everything is
@@ -111,26 +125,25 @@ export class HouseStory {
       c.tween(9, (k) => { G.post.focus = 3 + k * 240; G.post.aperture = 1.3 - k * 0.9; });
       c.move(craneEnd, p.clone().add(V(0, 12, -10)), 9, { fov: 60, path: [p.clone().add(V(10, 12, 20)), p.clone().add(V(60, 70, 110))] });
       await c.wait(2.2);
-      await c.say('Wait. WAIT. Why is everything so HUGE?', { speaker: 'You', pitch: 1.15, rate: 1.1 });
+      await c.say('What...?', { speaker: 'You', pitch: 1.1 });
       await c.wait(1.5);
-      await c.say('No... everything isn\'t big. I\'m TINY!', { speaker: 'You', pitch: 1.2, rate: 1.1 });
+      await c.say('No. No, no, no... I\'m tiny.', { speaker: 'You', pitch: 1.1 });
       unlock('shrunk');
       await c.wait(0.8);
       // the dog, far away in the living room
       c.cut(V(840, 25, 330), V(955, 25, 440), 42);
       G.post.focus = 150; G.post.aperture = 0.6;
       c.move(V(870, 22, 370), V(955, 22, 440), 7, { e: 'linear' });
-      await c.say('And Biscuit\'s asleep in the living room. Good.', { speaker: 'You' });
-      await c.say('At this size he could swallow me in one bite.', { speaker: 'You' });
+      await c.say('Biscuit... please stay asleep.', { speaker: 'You', rate: 0.9 });
       // the phone on the desk
       c.cut(V(360, 66, 70), V(335, 59, 28), 40);
       G.post.focus = 45; G.post.aperture = 0.9;
       c.move(V(346, 62, 44), V(335, 58.5, 28), 6, { e: 'out' });
-      await c.say('My phone! If I can get to it, I can call for help.', { speaker: 'You' });
+      await c.say('My phone. I have to call someone.', { speaker: 'You' });
       // back to the player looking at the edge of the bed
       c.cut(P.body.pos.clone().add(V(-3, 2.2, -2)), P.body.pos.clone().add(V(10, -2, 10)), 60);
       G.post.focus = 4; G.post.aperture = 0.9;
-      await c.say('First I need to get off this bed. That pillow down on the floor looks soft...', { speaker: 'You' });
+      await c.wait(1.6);
     });
     G.post.dofOverride = null;
     ui.eyelids(1, 10);
@@ -179,7 +192,7 @@ export class HouseStory {
       action: (p) => {
         if (p.carry) { p.carry.onBack = true; this.attachAirplane(true); }
         p.startClimb(this.climbZone);
-        this.story.objective('Keep mashing E! Don\'t stop or you\'ll slide down');
+        this.story.objective('Keep mashing E to climb');
       },
     });
     // 4) Launch the airplane from the bed edge toward the desk
@@ -200,7 +213,7 @@ export class HouseStory {
       pos: V(1030, 1, 227), radius: 20, height: 8,
       label: () => (G.flags.phoneDone ? 'Squeeze under the front door (go outside)' : 'A draft stopper is blocking the front door'),
       action: () => {
-        if (!G.flags.phoneDone) { ui.say('The draft stopper is jammed against the door. I can\'t get under it. Besides... I need my phone first.', { speaker: 'You' }); return; }
+        if (!G.flags.phoneDone) { ui.toast('The draft stopper is wedged tight against the door.', 2500); return; }
         this.leaveHouse();
       },
     });
@@ -209,7 +222,7 @@ export class HouseStory {
     L.crumbs.forEach((c) => I.push({
       pos: V(c.x, 0.5, c.z), radius: 2.5, height: 3, label: 'Eat the cereal crumb (+30 health)',
       can: () => !c.eaten,
-      action: (p) => { c.eaten = true; c.mesh.visible = false; p.heal(30); sfx('eat'); unlock('crumbs'); ui.toast('🥣 Crunchy. The five second rule applies at any size.'); },
+      action: (p) => { c.eaten = true; c.mesh.visible = false; p.heal(30); sfx('eat'); unlock('crumbs'); ui.toast('+30 health', 1500); },
     }));
     // 8) Mousetrap cheese
     I.push({
@@ -230,20 +243,18 @@ export class HouseStory {
     const near = (pos, r = 260) => G.player && G.mode === 'play' && G.level === L && G.player.body.pos.distanceTo(pos) < r;
     L.onBugEaten = (c, by, pos) => {
       if (!near(pos)) return;
-      if (by === 'vacuum') { ui.toast(`🤖 SuckBot vacuumed up a <b>${c.name}</b>!`, 2500); unlock('cleansweep'); }
-      else { ui.toast(`🐕 Biscuit ate a <b>${c.name}</b>! Gross.`, 2500); unlock('bugbuffet'); }
+      unlock(by === 'vacuum' ? 'cleansweep' : 'bugbuffet');
     };
     L.onDogFlea = (dog) => {
-      if (!G.flags.dogFleas && near(dog.body.pos, 400)) { G.flags.dogFleas = true; ui.toast('🐕 Uh oh... <b>Biscuit has fleas.</b> They keep jumping onto him from the carpet.', 4500); }
+      if (!G.flags.dogFleas && near(dog.body.pos, 400)) G.flags.dogFleas = true;
     };
     L.onDogScratch = (dog) => {
       if (!near(dog.body.pos, 320)) return;
       unlock('fleacircus');
       if (!G.flags.sawScratch) {
         G.flags.sawScratch = true;
-        ui.toast(`🐾 Biscuit is scratching his fleas (${dog.fleas.length}). While he's itchy he pays less attention to you!`, 5000);
+        ui.toast('Biscuit notices less while he\'s scratching.', 3500);
       }
-      if (dog.state === 'chase') ui.toast('🐾 Biscuit stopped to scratch! <b>RUN!</b>', 2000);
     };
   }
 
@@ -269,7 +280,7 @@ export class HouseStory {
     P.rig.trigger('pickup', 0.6);
     if (first) {
       unlock('airplane');
-      ui.say('Got it! It weighs a ton... Okay. Back to my room. Quietly.', { speaker: 'You' });
+      ui.say('Oof. Heavy.', { speaker: 'You' });
     }
     this.story.objective(G.flags.climbedBed ? 'Launch the paper airplane from the bed' : 'Carry the airplane back to your bedroom (G to drop)');
   }
@@ -305,12 +316,11 @@ export class HouseStory {
     await d.play(async (c) => {
       c.cut(V(start.x + 6, start.y + 2, start.z + 9), start.clone().add(V(0, 1, 0)), 55);
       G.post.dofOverride = true; G.post.focus = 11; G.post.aperture = 0.8;
-      await c.say('It\'s just a little jump. For a normal person.', { speaker: 'You' });
       P.crouching = true;
       await c.wait(0.8);
       P.crouching = false;
       sfx('jump');
-      await c.say('Three... two... one...', { speaker: 'You', rate: 1.2 });
+      await c.say('Okay... here goes.', { speaker: 'You' });
       playMusic('wonder');
       sfx('whoosh', { dur: 9, vol: 0.5 });
       const wind = loop('wind', { vol: 0.6 });
@@ -341,7 +351,7 @@ export class HouseStory {
       await c.wait(1.0);
       c.cut(P.body.pos.clone().add(V(3, 1.6, 2.8)), P.body.pos.clone().add(V(0, 1.2, 0)), 55);
       G.post.focus = 4;
-      await c.say('...Soft landing. Nailed it.', { speaker: 'You' });
+      await c.say('...I\'m okay.', { speaker: 'You', rate: 0.9 });
     });
     G.post.dofOverride = null;
     P.mode = 'walk'; P.lockFreeze = false;
@@ -352,10 +362,8 @@ export class HouseStory {
     this.story.checkpoint('house', 'pillow');
     this.story.objective('Get to your phone on the desk');
     await wait(4);
-    if (G.mode === 'play') await ui.say('Okay. The desk. My phone is right up there...', { speaker: 'You' });
-    if (G.mode === 'play') await ui.say('There\'s nothing to climb. The legs are way too smooth.', { speaker: 'You' });
+    if (G.mode === 'play') await ui.say('It\'s way too high. There\'s nothing to climb.', { speaker: 'You' });
     if (G.mode === 'play' && !this.visited.has('living')) {
-      await ui.say('Maybe something in the living room can help. I\'m small enough to go under the door now.', { speaker: 'You' });
       this.story.objective('Find a way up to the desk — explore the house (squeeze under the bedroom door)');
     }
   }
@@ -387,7 +395,6 @@ export class HouseStory {
     const P = G.player;
     if (P.carry) { P.carry.onBack = false; this.attachAirplane(false); }
     if (G.flags.airplaneLifted && !G.flags.dogWoke) unlock('sneaky');
-    ui.say(P.carry ? 'Made it! Now... to the edge of the bed. Aim for the desk.' : 'Made it back up. But I still need a way across to the desk...', { speaker: 'You' });
     this.story.objective(P.carry ? 'Walk to the edge of the bed facing the desk and launch the airplane (E)' : 'Get the paper airplane from the living room');
     if (P.carry) this.story.checkpoint('house', 'bedTop', { carrying: 'airplane' });
   }
@@ -410,7 +417,7 @@ export class HouseStory {
     sfx('whoosh', { dur: 1.2 });
     P.rig.trigger('throw', 0.5);
     playMusic('outdoor');
-    ui.toast('✈️ <b>Mouse / A-D</b> to steer &middot; <b>W / S</b> nose down / up &middot; <b>Shift</b> boost. The plane helps you aim at the <b>desk</b>!', 6000);
+    ui.toast('✈️ <b>Mouse / A-D</b> steer &middot; <b>W / S</b> nose down / up &middot; <b>Shift</b> boost', 6000);
     this.story.objective('Fly to the desk and land on it');
     this.flightWind = loop('wind', { vol: 0.5 });
   }
@@ -469,11 +476,11 @@ export class HouseStory {
     const onDesk = f.pos.x > 284 && f.pos.x < 411 && f.pos.z > -2 && f.pos.z < 64;
     if (onDesk && f.pos.y > 56 && f.pos.y - 58 < 9) return this.flightSuccess();
     if (f.pos.y - 3 <= ground) {
-      if (Math.abs(ground - 60) < 3 && f.pos.x < 172) return this.flightEnd('You landed back on the bed. Walk to the edge and try again!', false);
+      if (Math.abs(ground - 60) < 3 && f.pos.x < 172) return this.flightEnd('Landed back on the bed.', false);
       return this.flightEnd('The airplane nose-dived into the floor.', true);
     }
-    if (ahead < 3 + f.speed * dt) return this.flightEnd('Crash! You flew straight into something.', true);
-    if (f.t > 90) return this.flightEnd('You ran out of air.', true);
+    if (ahead < 3 + f.speed * dt) return this.flightEnd('The airplane crashed.', true);
+    if (f.t > 90) return this.flightEnd('The airplane lost its lift.', true);
   }
 
   async flightEnd(msg, crashed) {
@@ -518,7 +525,7 @@ export class HouseStory {
     if ((G.stats.damageTaken || 0) < 0.5) unlock('pacifist');
     this.story.checkpoint('house', 'deskPhone');
     playMusic('wonder');
-    await ui.say('I MADE IT! Tiny pilot, reporting for duty!', { speaker: 'You', pitch: 1.15 });
+    await ui.say('I made it...', { speaker: 'You' });
     this.story.objective('Walk over to your phone and tap the screen');
   }
 
@@ -542,7 +549,7 @@ export class HouseStory {
         L.refs.lights.phoneGlow.intensity = 1000 + k * 6000;
         P.shake = k;
       }, 'in');
-      await c.say('Huh? The screen is... pulling me in?!', { speaker: 'You', pitch: 1.2, rate: 1.15 });
+      await c.say('What— it\'s pulling me in!', { speaker: 'You', pitch: 1.15, rate: 1.1 });
       sfx('shrink');
       c.move(V(336, 60, 30), V(335, 58, 28), 1.5, { fov: 100, e: 'in' });
       await c.wait(1.2);
@@ -596,8 +603,6 @@ export class HouseStory {
       this.visited.add(room);
       if (this.visited.size >= 4) unlock('explorer');
       if (room === 'living' && !G.flags.seenLiving) this.firstLiving();
-      if (room === 'kitchen') ui.toast('🍳 <b>Kitchen</b> — watch your step. Something skitters under the fridge.');
-      if (room === 'bathroom') ui.toast('🛁 <b>Bathroom</b> — tiles are slippery and the toilet is... a lot.');
     }
     if (p.x > 420 && p.x < 432 && p.y < 2.6 && !G.flags.underDoor) { G.flags.underDoor = true; unlock('underdoor'); }
     if (p.x > 1036 && p.z > 180 && p.z < 275 && p.y < 2.6) { /* at the front door gap */ }
@@ -612,7 +617,7 @@ export class HouseStory {
         c.taken = true; c.mesh.visible = false;
         G.flags.coins = (G.flags.coins || 0) + 1;
         sfx('pickup');
-        ui.toast(`🪙 Lost coin found! <b>${G.flags.coins}/8</b>`);
+        ui.toast(`🪙 <b>${G.flags.coins}/8</b>`, 1500);
         if (G.flags.coins >= 8) unlock('coins');
       }
     }
@@ -639,7 +644,6 @@ export class HouseStory {
     if (P.carry && room === 'bedroom' && !G.flags.tipClimb && p.x < 420) {
       G.flags.tipClimb = true;
       this.story.objective('Climb the blanket hanging at the foot of the bed (mash E)');
-      ui.say('The blanket hanging off the end of the bed. I can climb that!', { speaker: 'You' });
     }
     if (G.flags.phoneDone && !L.refs.draftStopper.moved) L.openFrontDoor();
     // squashed, eaten and vacuumed bugs come back over time (never right next to you)
@@ -660,12 +664,12 @@ export class HouseStory {
       c.cut(V(a.x - 30, 8, a.z + 40), a.clone(), 45);
       G.post.dofOverride = true; G.post.focus = 50; G.post.aperture = 0.8;
       c.move(V(a.x - 16, 5, a.z + 22), a.clone().add(V(0, 2, 0)), 5, { e: 'out' });
-      await c.say('My paper airplane! If I haul it back to my room...', { speaker: 'You' });
-      await c.say('...I could fly it from the bed straight to the desk!', { speaker: 'You', pitch: 1.1 });
+      await c.say('My paper airplane...', { speaker: 'You' });
+      await c.say('From the top of the bed, it could glide all the way to the desk.', { speaker: 'You' });
       c.cut(V(900, 16, 380), V(955, 22, 440), 45);
       G.post.focus = 80;
       c.move(V(912, 14, 395), V(955, 22, 440), 4, { e: 'linear' });
-      await c.say('Just have to be quiet. Real quiet.', { speaker: 'You', rate: 0.9, pitch: 0.95 });
+      await c.wait(2);
     });
     G.post.dofOverride = null;
     P.mode = 'walk';

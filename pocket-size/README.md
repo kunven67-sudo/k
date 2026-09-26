@@ -8,6 +8,8 @@ mountain range. Your dog is a sleeping giant. Your phone is on the desk, complet
 
 Everything is generated from code when the game starts: the models, textures, fur, grass,
 animation, sound effects, music and voice. There are no art or audio files to download.
+The bugs are built from segmented bodies, faceted compound eyes, veined wings and hairs. Their
+jointed legs use inverse kinematics, so each foot plants on the ground as they walk.
 
 ## Playing
 
@@ -39,9 +41,17 @@ Click **Start**. Chrome, Edge or Firefox on a PC or laptop with a mouse and keyb
    something much bigger.
 5. **Small World Survival**: gather pebbles and fibre, craft an axe, cut grass, craft a
    pickaxe and weapons, build a workbench, a campfire and a shelter, and find what shrank you.
-6. **Germ Size**: smaller than a germ, the world turns into something like outer space. Your
-   weapons are too big to hold now, so you craft new ones from diatom glass and cellulose,
-   fight bacteria, phages, a tardigrade and a giant amoeba, and collect the three Macro Shards.
+6. **Germ Size**: touching the speck under the rock shrinks you again, past the size of a germ.
+   It looks like outer space. Your tools are too big to hold, so you start over:
+   - hit the long green fibre for **Cellulose** and the glass diatom shells for **Diatom Glass**,
+   - craft a **Diatom Glass Blade** (Tab),
+   - get the three **Macro Shards**: one floats in the diatom field, the water bear (tardigrade)
+     carries one, and one is inside the giant amoeba,
+   - take them to the glowing core in the middle and press **E**. You grow back to full size and
+     the story ends.
+
+A gold diamond marker shows where to go next in every chapter, with the distance to it. When
+the target is off screen, an arrow at the edge points toward it. You can turn it off in Settings.
 
 ## Controls
 

@@ -209,7 +209,7 @@ class Tardigrade extends Microbe {
     this.legs.forEach(({ leg, s, i }) => { leg.rotation.x = Math.sin(G.time * 3 + i * 1.3 + (s > 0 ? Math.PI : 0)) * 0.5; });
     if (this.state === 'chase') ui.boss('TARDIGRADE — THE WATER BEAR', this.hp / this.maxHp);
   }
-  die() { super.die(); ui.boss(null); unlock('waterbear'); ui.toast('🐻 The Water Bear is down! It dropped a <b>Macro Shard</b>!'); }
+  die() { super.die(); ui.boss(null); unlock('waterbear'); ui.toast('The water bear dropped a <b>Macro Shard</b>.'); }
 }
 
 class GiantAmoeba extends Microbe {
@@ -246,7 +246,7 @@ class GiantAmoeba extends Microbe {
       }
     }
   }
-  die() { super.die(); ui.boss(null); G.player.speedMul = 1; ui.toast('🧫 Amoeba Prime burst! A <b>Macro Shard</b> floats free!'); }
+  die() { super.die(); ui.boss(null); G.player.speedMul = 1; ui.toast('The amoeba burst. A <b>Macro Shard</b> floats free.'); }
 }
 
 export function createMicro(story) {
@@ -414,13 +414,37 @@ export function createMicro(story) {
     level.core.lit = n;
     level.checkObjectives();
   };
+  // Objective marker (distances in micrometres): materials, then the nearest shard, then the core.
+  level.waypoint = () => {
+    const n = G.inventory.count('macro_shard');
+    if (n >= 3) return { pos: V(0, 0, -13), scale: 0.05, unit: 'µm' };
+    const inv = (id) => G.inventory.count(id);
+    const armed = ['diatom_blade', 'whip', 'blaster'].some((id) => inv(id) > 0);
+    const P = G.player.body.pos;
+    const near = (list) => list.reduce((b, p) => (!b || p.distanceTo(P) < b.distanceTo(P) ? p : b), null);
+    if (!armed && n === 0) {
+      if (inv('cellulose') < 2) return { pos: near(level.harvestables.filter((h) => h.kind === 'cellulose').map((h) => h.pos)), scale: 0.05, unit: 'µm' };
+      if (inv('diatom_glass') < 2) return { pos: near(level.diatoms.filter((d) => d.mesh.visible).map((d) => d.pos)) || diatomC, scale: 0.05, unit: 'µm' };
+      return null;
+    }
+    const targets = [];
+    if (shard1.visible) targets.push(shard1.position);
+    if (!level.tardigrade.dead) targets.push(level.tardigrade.body.pos);
+    if (!level.amoeba.dead) targets.push(level.amoeba.body.pos);
+    const t = near(targets);
+    return t ? { pos: t, scale: 0.05, unit: 'µm' } : null;
+  };
   level.checkObjectives = () => {
     const n = G.inventory.count('macro_shard');
     const armed = ['diatom_blade', 'whip', 'blaster'].some((id) => G.inventory.count(id) > 0);
     let text;
-    if (!armed && n === 0) text = 'Hit the giant cellulose fibre and the glass diatoms for materials, then craft a germ-size weapon (Tab)';
-    else if (n < 3) text = `Find the 3 Macro Shards (${n}/3): one in the diatom field, one on the Water Bear, one inside the giant amoeba`;
-    else text = 'Bring all 3 shards to the Growth Core in the centre';
+    const inv = (id) => G.inventory.count(id);
+    if (!armed && n === 0) {
+      if (inv('cellulose') < 2) text = 'Hit the long green fibre to collect Cellulose (2)';
+      else if (inv('diatom_glass') < 2) text = 'Hit the glass diatom shells to collect Diatom Glass (2)';
+      else text = 'Open your backpack (Tab) and craft a Diatom Glass Blade';
+    } else if (n < 3) text = `Collect the Macro Shards (${n}/3) — follow the marker`;
+    else text = 'Take the 3 shards to the glowing core in the middle and press E';
     if (text !== level.objText) { level.objText = text; story.objective(text); }
   };
 
@@ -462,18 +486,18 @@ export function createMicro(story) {
       c.cut(p.clone().add(V(3, 1.5, 4)), p.clone().add(V(0, 1, 0)), 50);
       G.post.dofOverride = true; G.post.focus = 5; G.post.aperture = 0.6;
       c.move(p.clone().add(V(-4, 3, -6)), p.clone().add(V(0, 1, 0)), 6);
-      await c.say('Where... am I? It\'s dark. It looks like... space.', { speaker: 'You', pitch: 0.95 });
-      await c.say('No. I\'m so small that I\'m smaller than a GERM. We can\'t see them... so they can\'t see us. Until now.', { speaker: 'You' });
+      await c.say('Where... am I?', { speaker: 'You', pitch: 0.95 });
+      await c.say('Those are germs. I\'m smaller than a germ.', { speaker: 'You' });
       c.cut(p.clone().add(V(0, 4, -8)), V(0, 0, 0), 55);
       G.post.focus = 110; G.post.aperture = 0.25;
-      await c.say('That glowing thing in the middle... it feels like the thing that shrank me. Only bigger. Much bigger.', { speaker: 'You' });
-      if (lost) await c.say('And my weapons... they\'re gone. They\'re way too huge for me to even hold now.', { speaker: 'You' });
+      await c.say('That light in the middle... it\'s the same thing. Only huge.', { speaker: 'You' });
+      if (lost) await c.say('My tools... they\'re too big to hold now.', { speaker: 'You' });
     });
     G.post.dofOverride = null;
     P.mode = 'swim';
     story.beginPlay();
     ui.chapterCard('CHAPTER 6', 'GERM SIZE');
-    ui.toast('🫧 You\'re floating! <b>WASD</b> swim · <b>Space</b> up · <b>C</b> down · <b>Shift</b> fast', 7000);
+    ui.toast('🫧 <b>WASD</b> swim · <b>Space</b> up · <b>C</b> down · <b>Shift</b> fast', 7000);
     level.objText = null;
     level.checkObjectives();
   };
@@ -489,10 +513,10 @@ export function createMicro(story) {
     await d.play(async (c) => {
       c.cut(V(0, 6, -40), V(0, 0, 0), 55);
       G.post.dofOverride = true; G.post.focus = 40; G.post.aperture = 0.3;
-      await c.say('Three shards... here goes EVERYTHING.', { speaker: 'You' });
+      await c.say('Please work...', { speaker: 'You' });
       c.tween(5, (k) => { level.core.lit = 3 + k * 10; core.scale.setScalar(1 + k * 0.6); G.post.fx.aberration = 0.0015 + k * 0.02; }, 'in');
       c.move(V(0, 3, -22), V(0, 0, 0), 5, { e: 'in' });
-      await c.say('It\'s working! Everything is shrinking away — no — I\'m GROWING!', { speaker: 'You', pitch: 1.25, rate: 1.15 });
+      await c.say('I\'m growing!', { speaker: 'You', pitch: 1.2, rate: 1.1 });
       c.tween(3, (k) => { G.camera.fov = 55 + k * 70; G.camera.updateProjectionMatrix(); stars.scale.setScalar(1 - k * 0.95); }, 'in');
       await c.wait(2.4);
       document.getElementById('fade').style.background = '#fff';

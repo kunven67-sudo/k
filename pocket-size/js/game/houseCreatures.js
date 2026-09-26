@@ -1,7 +1,8 @@
 // Biscuit the (enormous) golden retriever, the robot vacuum and the thing under the fridge.
 import * as THREE from 'three';
 import * as TX from '../core/textures.js';
-import { Creature, damp, angDiff, hexapod, glossy } from './creature.js';
+import { Creature, damp, angDiff } from './creature.js';
+import * as A from './anatomy.js';
 import { sfx, loop } from '../core/audio.js';
 import { ui } from '../core/ui.js';
 import { G } from './state.js';
@@ -149,7 +150,7 @@ export class Dog extends Creature {
     this.state = 'waking'; this.stateT = 0;
     if (this.snore) this.snore.setVolume(0, 0.3);
     sfx('growl', { pos: this.body.pos, ref: 80 });
-    ui.toast('🐕 <b>Biscuit</b> woke up! <b>Hide under furniture or get out of sight!</b>', 4000);
+    ui.toast('Biscuit is awake. <b>Hide</b> under furniture or get out of sight.', 4000);
     G.flags.dogWoke = true;
     G.music && G.music('danger');
   }
@@ -437,7 +438,7 @@ export class Vacuum extends Creature {
     if (this.active) return;
     this.active = true;
     this.hum = loop('vacuum', { pos: this.body.pos, ref: 40, vol: 0.8 });
-    ui.toast('🤖 <b>SuckBot 3000</b>: "Starting scheduled cleaning." Stay out of its way.', 4500);
+    ui.toast('<b>SuckBot 3000</b>: "Starting scheduled cleaning."', 3500);
   }
 
   update(dt, level, player) {
@@ -524,33 +525,44 @@ export class Cockroach extends Creature {
     this.attackDelay = 0.9;
     this.knockback = 2;
     this.body.stepHeight = 0.6;
-    const m = glossy(0x5a2c14, 0.3);
-    const dark = glossy(0x2a130a, 0.4);
+    const wing = A.cuticleMat(0x6a3014, { rough: 0.45, coat: 1, coatRough: 0.1, side: THREE.DoubleSide, bump: 0.25 });
+    const dark = A.cuticleMat(0x2a130a, { rough: 0.6, coat: 0.8, coatRough: 0.25 });
+    const pron = A.cuticleMat(0xffffff, { rough: 0.5, coat: 1, coatRough: 0.12, map: A.patternMap('roachpro', (c, w, h) => {
+      c.fillStyle = '#9a6a34'; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#3a1a0a'; c.beginPath(); c.ellipse(w * 0.5, h * 0.5, w * 0.16, h * 0.34, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#5a2c14'; c.beginPath(); c.ellipse(w * 0.5, h * 0.62, w * 0.1, h * 0.2, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#3a1a0a'; c.fillRect(0, 0, w * 0.22, h); c.fillRect(w * 0.78, 0, w * 0.22, h);
+    }) });
     const g = this.group;
-    this.bodyG = new THREE.Group(); this.bodyG.position.y = 3.2; g.add(this.bodyG);
-    const ab = new THREE.Mesh(new THREE.SphereGeometry(4.2, 24, 16), m); ab.scale.set(1, 0.42, 1.8); ab.position.z = -4; ab.castShadow = true; this.bodyG.add(ab);
-    const th = new THREE.Mesh(new THREE.SphereGeometry(3.6, 20, 14), m); th.scale.set(1.15, 0.45, 0.9); th.position.z = 3.2; th.castShadow = true; this.bodyG.add(th);
-    const hd = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 12), dark); hd.scale.set(1.1, 0.7, 0.9); hd.position.set(0, -0.3, 6.3); this.bodyG.add(hd);
-    // wings
-    [-1, 1].forEach((s) => {
-      const w = new THREE.Mesh(new THREE.SphereGeometry(3.4, 16, 10), glossy(0x7a3a18, 0.25)); w.scale.set(0.7, 0.12, 2.1); w.position.set(1.6 * s, 1.5, -3); w.rotation.y = -0.08 * s; this.bodyG.add(w);
-    });
-    // antennae
+    // Modelled at 3x for detail, then scaled to a (still huge) 5cm roach.
+    const b = this.bodyG = new THREE.Group(); b.scale.setScalar(0.34); b.position.y = 3.2 * 0.34; g.add(b);
+    A.part({ len: 10, rad: 3.5, peak: 0.55, p: 0.45, flat: 0.32, ridges: 7, ridgeDepth: 0.05 }, dark, b, 0, -0.2, -3.6);
+    // leathery wing covers overlapping down the back, glossy with faint veins
+    const WG = { len: 11.2, rad: 3.4, peak: 0.6, p: 0.42, flat: 0.28, grooves: 30, grooveDepth: 0.012, radial: 26 };
+    A.part({ ...WG, phi0: 0.9, phiLen: Math.PI - 0.8 }, wing, b, 0, 0.35, -3.5, 0.03);
+    A.part({ ...WG, phi0: Math.PI - 0.1, phiLen: Math.PI - 0.8 }, wing, b, 0, 0.42, -3.5, 0.03);
+    A.part({ len: 4.2, rad: 3.6, peak: 0.4, p: 0.3, flat: 0.24, wide: 1.05 }, pron, b, 0, 0.7, 2.6, -0.06);
+    A.part({ len: 2.0, rad: 1.4, flat: 0.75 }, dark, b, 0, -0.5, 5.0, 0.7);
+    const em = A.eyeMat(0x140a06, 18);
+    [-1, 1].forEach((s) => A.eye(0.6, em, b, 0.95 * s, -0.1, 5.1, 0.6, 1.3, 0.8));
+    // antennae on pivots at their base so they can sweep
     this.antennae = [];
     [-1, 1].forEach((s) => {
-      const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0.6 * s, 0, 7.5), new THREE.Vector3(3 * s, 1.5, 13), new THREE.Vector3(6 * s, 1, 18), new THREE.Vector3(9 * s, -0.5, 21)]);
-      const a = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.12, 5), dark);
-      this.bodyG.add(a); this.antennae.push(a);
+      const piv = new THREE.Group(); piv.position.set(0.6 * s, -0.2, 5.8); b.add(piv);
+      A.tube(A.mirror([[0, 0, 0], [2.4, 1.5, 5.5], [5.4, 1, 10.5], [8.4, -0.5, 13.5]], s), { r0: 0.16, r1: 0.06, segs: 48, beads: 40, beadAmt: 0.18 }, dark, piv);
+      this.antennae.push(piv);
+      A.tube(A.mirror([[0.8, 0, -8.8], [1.6, 0.2, -10.4], [2.0, 0.1, -11.4]], s), { r0: 0.3, r1: 0.08, segs: 10, beads: 6, beadAmt: 0.25 }, dark, b);
     });
-    this.legAnim = hexapod(this.bodyG, dark, { spread: 6, length: 4.2, y: -0.5, z0: -2, z1: 3.5, radius: 0.35 });
-    // Modelled at 3x for detail, then scaled to a (still huge) 5cm roach.
-    this.bodyG.scale.setScalar(0.34);
-    this.bodyG.position.y = 3.2 * 0.34;
+    this.gait = A.legSet(b, [
+      [1.2, -0.8, 3.2, 5.0, 6.5, { femur: 3.0, tibia: 3.2, tarsus: 2.4 }],
+      [1.5, -0.9, 1.2, 6.8, 1.0],
+      [1.5, -0.9, -0.8, 6.0, -6.0, { femur: 4.2, tibia: 4.6, tarsus: 3.4 }],
+    ], { mat: dark, coxa: 0.8, femur: 3.6, tibia: 3.9, tarsus: 3.0, r: 0.32, spines: 8, tarsusAngle: -0.35 }, { stride: 4, lift: 0.9, speedRef: 45, reach: 0.78 });
     this.registerFlash();
   }
   animate(dt) {
     const sp = Math.hypot(this.body.vel.x, this.body.vel.z);
-    this.legAnim(dt, sp * 0.25);
+    this.gait.update(dt, sp, !this.body.grounded && this.body.vel.y < -4);
     this.antennae.forEach((a, i) => { a.rotation.y = Math.sin(G.time * 6 + i * 2) * 0.2; a.rotation.x = Math.sin(G.time * 4 + i) * 0.1; });
     this.bodyG.rotation.z = Math.sin(G.time * 30) * 0.02 * Math.min(1, sp / 5);
   }

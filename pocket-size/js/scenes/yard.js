@@ -128,10 +128,9 @@ export async function createYard(story) {
     playMusic('danger');
     sfx('boss');
     G.player.shake = 1.5;
-    ui.toast('👁️ <b>THE BROOD MOTHER</b> — you were not supposed to find her.', 5000);
-    ui.say('...oh no. Oh no no no. That is the BIGGEST spider I have ever seen.', { speaker: 'You', pitch: 1.2 });
+    ui.say('...oh no.', { speaker: 'You', pitch: 1.1 });
   };
-  brood.onKilledByPlayer = () => { unlock('broodslayer'); playMusic('outdoor'); ui.toast('👑 The Brood Mother has fallen!'); };
+  brood.onKilledByPlayer = () => { unlock('broodslayer'); playMusic('outdoor'); ui.toast('The Brood Mother is dead.'); };
   scene.add(brood.group); level.creatures.push(brood);
   // lawn wildlife
   const A = YARD.anthill;
@@ -185,7 +184,7 @@ export async function createYard(story) {
   });
   level.interactables.push({
     pos: V(4, YARD.porch.y + 1, 0), radius: 10, height: 4, label: 'Go back inside',
-    action: () => ui.say('Not going back in there. Biscuit is definitely awake by now.', { speaker: 'You' }),
+    action: () => ui.toast('The gap under the door is blocked from this side.', 2500),
   });
 
   // ------------------------------------------------------------------ building
@@ -442,11 +441,11 @@ export async function createYard(story) {
     if (inBush && !G.flags.bushSeen) { level.bushT = (level.bushT || 0) + dt; if (level.bushT > 1.2) level.bushReveal(); }
     if (G.flags.bushSeen && !G.flags.bushFled && Math.hypot(p.x - B.x, p.z - B.z) > B.r + 10) level.overcast();
     // hidden critters
-    if (!G.flags.foundFleas && p.distanceTo(fleaSpot) < 12) { G.flags.foundFleas = true; ui.toast('🔎 You found where the <b>fleas</b> hide.'); }
-    if (!G.flags.foundTicks && p.distanceTo(tickSpot) < 12) { G.flags.foundTicks = true; ui.toast('🔎 You found the <b>ticks</b>\' hiding spot.'); }
+    if (!G.flags.foundFleas && p.distanceTo(fleaSpot) < 12) { G.flags.foundFleas = true; ui.toast('🔎 Fleas nest here.', 2500); }
+    if (!G.flags.foundTicks && p.distanceTo(tickSpot) < 12) { G.flags.foundTicks = true; ui.toast('🔎 Ticks wait here.', 2500); }
     if (G.flags.foundFleas && G.flags.foundTicks) unlock('fleatick');
     if (G.flags.bushFled) level.checkObjectives();
-    if (P.body.pos.x > 2300 && !G.flags.crossedRoad) { G.flags.crossedRoad = true; ui.toast('🚗 You crossed the street. Legend. Now get back before a car comes.'); }
+    if (P.body.pos.x > 2300 && !G.flags.crossedRoad) { G.flags.crossedRoad = true; ui.toast('🚗 You crossed the street.'); }
   };
 
   // Objective chain for the survival chapter.
@@ -459,9 +458,17 @@ export async function createYard(story) {
     { text: 'Craft a Pebble Pickaxe', done: () => has('pickaxe') || G.flags.stage4 },
     { text: 'Craft a weapon — a Grass Spear, Pebble Club or Thorn Sword (thorns: cut the rose bush)', done: () => weapon() || G.flags.stage5 },
     { text: 'Craft a Workbench and place it (Build tab, select it, press B)', done: () => level.structures.some((s) => s.id === 'workbench') || G.flags.stage6 },
-    { text: 'The phone\'s log said the source is "under the rock by the puddle". Break it with your pickaxe', done: () => G.flags.coreFound },
+    { text: 'Break the flat rock by the puddle with your pickaxe', done: () => G.flags.coreFound },
     { text: 'Touch the glowing speck', done: () => false },
   ];
+  // Objective marker: the bush first, then the flat rock and the speck under it.
+  level.waypoint = () => {
+    if (!G.flags.bushSeen) return { pos: V(B.x, 4, B.z) };
+    if (!G.flags.bushFled) return null;
+    if (level.stage === 6) return { pos: V(YARD.coreRock.x, gy(YARD.coreRock.x, YARD.coreRock.z) + 6, YARD.coreRock.z) };
+    if (level.stage === 7 && mote.visible) return { pos: mote.position };
+    return null;
+  };
   level.checkObjectives = () => {
     let i = 0;
     while (i < stages.length - 1 && stages[i].done()) i++;
@@ -472,7 +479,6 @@ export async function createYard(story) {
     if (level.stage !== i) {
       level.stage = i;
       story.objective(stages[i].text);
-      if (i === 6) ui.say('Okay. The rock by the puddle. Let\'s see what\'s under there.', { speaker: 'You' });
     }
   };
   level.onCraft = () => { if (G.flags.bushFled) level.checkObjectives(); };
@@ -487,7 +493,7 @@ export async function createYard(story) {
     const bugs = level.bushBugs.filter((c) => c && !c.dead);
     await d.play(async (c) => {
       G.post.dofOverride = true;
-      await c.say('Phew... shade. Okay. That\'s better.', { speaker: 'You' });
+      await c.say('Shade...', { speaker: 'You', rate: 0.9 });
       for (const bug of bugs.slice(0, 4)) {
         const bp = bug.body.pos.clone().add(V(0, bug.body.height * 0.6, 0));
         const from = bp.clone().add(V(4 + bug.body.radius * 3, 2 + bug.body.height, 5 + bug.body.radius * 3));
@@ -499,14 +505,13 @@ export async function createYard(story) {
       }
       c.cut(P.body.pos.clone().add(V(-2, 1.8, 2.4)), P.body.pos.clone().add(V(0, 1.5, 0)), 50);
       G.post.focus = 3;
-      await c.say('A mosquito the size of a car. Ants. A SPIDER.', { speaker: 'You', pitch: 1.15, rate: 1.1 });
-      await c.say('Nope. Nope. NOPE!', { speaker: 'You', pitch: 1.3, rate: 1.25 });
+      await c.say('I have to get out of here.', { speaker: 'You', pitch: 1.15, rate: 1.1 });
     });
     G.post.dofOverride = null;
     P.mode = 'walk';
     story.beginPlay();
     playMusic('danger');
-    story.objective('GET OUT OF THE BUSH!');
+    story.objective('Get out of the bush');
     bugs.forEach((b) => { b.aggro = true; });
   };
 
@@ -523,31 +528,30 @@ export async function createYard(story) {
       const p = P.body.pos.clone();
       c.cut(p.clone().add(V(3, 1.2, 3)), p.clone().add(V(0, 1.6, 0)), 55);
       G.post.focus = 4;
-      await c.say('I made it out... I think they stopped following.', { speaker: 'You' });
+      await c.say('...They stopped following.', { speaker: 'You' });
       c.cut(p.clone().add(V(0, 2, 0)), p.clone().add(refs.sunDir.clone().multiplyScalar(100)), 60);
       G.post.focus = 200; G.post.aperture = 0.3;
       level.setOvercast(true, 5);
-      await c.wait(2.5);
-      await c.say('The sun just went behind the clouds. Finally, I can move around out here.', { speaker: 'You' });
+      await c.wait(3.5);
       // panorama: the street, the cars, the gigantic houses
       level.cars.forEach((car) => { if (!car.active) { launchCar(car, true); } });
       c.cut(p.clone().add(V(-10, 8, 0)), V(2000, 60, p.z), 60);
       G.post.focus = 1500; G.post.aperture = 0.2;
       c.move(V(p.x + 200, 120, p.z - 150), V(2000, 60, p.z), 8, { path: [p.clone().add(V(40, 40, -30))] });
-      await c.wait(2);
-      await c.say('Cars. The street. Everything is enormous.', { speaker: 'You' });
+      await c.wait(5);
       c.move(V(700, 260, 700), V(-200, 200, 0), 7);
-      await c.say('My house looks like a mountain. Every house does.', { speaker: 'You' });
+      await c.wait(2.5);
+      await c.say('My house looks like a mountain.', { speaker: 'You' });
       c.cut(p.clone().add(V(2.5, 1.5, -2)), p.clone().add(V(0, 1.4, 0)), 55);
       G.post.focus = 3.5; G.post.aperture = 0.9;
-      await c.say('If I\'m going to survive out here, I need tools. Pebbles, grass fibre... I can MAKE stuff.', { speaker: 'You' });
+      await c.say('If I\'m going to last out here, I need tools.', { speaker: 'You' });
     });
     G.post.dofOverride = null;
     P.mode = 'walk';
     story.current = 'survival';
     story.beginPlay();
     ui.chapterCard('CHAPTER 5', 'SMALL WORLD SURVIVAL');
-    ui.toast('🎒 <b>Crafting unlocked!</b> Press <b>Tab</b> to open your backpack and crafting.', 6000);
+    ui.toast('🎒 <b>Tab</b> opens your backpack and crafting.', 6000);
     playMusic('outdoor');
     story.checkpoint('yard', 'survival');
     level.stage = -1;
@@ -592,9 +596,8 @@ export async function createYard(story) {
       c.cut(m.clone().add(V(6, 3, 6)), m, 45);
       G.post.dofOverride = true; G.post.focus = 8; G.post.aperture = 1.2;
       c.move(m.clone().add(V(3, 1.5, 3)), m, 5);
-      await c.say('There. Under the rock. A tiny glowing speck... it\'s humming.', { speaker: 'You' });
-      await c.say('This is it. This is what shrank me. It\'s pulling everything smaller around it...', { speaker: 'You' });
-      await c.say('If I touch it, I might get even smaller. But it\'s the only lead I\'ve got.', { speaker: 'You' });
+      await c.say('It\'s humming...', { speaker: 'You' });
+      await c.say('This is what did it. I can feel it pulling.', { speaker: 'You' });
     });
     G.post.dofOverride = null;
     P.mode = 'walk';
@@ -616,7 +619,7 @@ export async function createYard(story) {
       await c.wait(0.8);
       c.tween(4, (k) => { G.post.fx.aberration = 0.0015 + k * 0.03; G.post.fx.glitch = k * 0.5; G.camera.fov = 50 + k * 60; G.camera.updateProjectionMatrix(); halo.scale.setScalar(6 + k * 200); }, 'in');
       c.move(m.clone().add(V(0.5, 0.5, 0.5)), m, 4, { e: 'in' });
-      await c.say('Everything is getting BIGGER again! No — I\'m getting SMALLER!', { speaker: 'You', pitch: 1.3, rate: 1.2 });
+      await c.say('No— not again!', { speaker: 'You', pitch: 1.2, rate: 1.15 });
       await ui.fade(1, 700);
     }, { skippable: false });
     G.post.fx.aberration = 0.0015; G.post.fx.glitch = 0;
@@ -655,21 +658,21 @@ export async function createYard(story) {
         G.post.dofOverride = true; G.post.focus = 2.5;
         await c.wait(1);
         c.move(p.clone().add(V(-6, 3.5, 3)), p.clone().add(V(40, 10, 0)), 6);
-        await c.say('I\'m OUTSIDE! Whoa... the grass is like a jungle.', { speaker: 'You', pitch: 1.1 });
+        await c.say('Whoa...', { speaker: 'You' });
         c.cut(p.clone().add(V(0, 2, 0)), p.clone().add(refs.sunDir.clone().multiplyScalar(80)), 70);
         G.post.focus = 200; G.post.fx.heat = 0.6;
         await c.wait(1.2);
-        await c.say('Ow... ow OW! The sun is BURNING me! It\'s like a magnifying glass!', { speaker: 'You', pitch: 1.25, rate: 1.15 });
+        await c.say('Ow— it\'s burning!', { speaker: 'You', pitch: 1.2, rate: 1.15 });
         c.cut(p.clone().add(V(-4, 3, -4)), V(B.x, 30, B.z), 55);
         G.post.focus = 280; G.post.aperture = 0.4;
-        await c.say('The bush! I have to get into the shade!', { speaker: 'You', pitch: 1.15 });
+        await c.say('Shade. I need shade.', { speaker: 'You', pitch: 1.1 });
       });
       G.post.dofOverride = null;
       P.mode = 'walk';
       level.heat = 0.35;
       story.beginPlay();
       ui.chapterCard('CHAPTER 4', 'THE GREAT OUTDOORS');
-      story.objective('Get out of the sunlight — run to the big bush!');
+      story.objective('Get out of the sun — run to the big bush');
       return;
     }
     if (entry === 'respawn' && !G.flags.bushFled) {
@@ -679,7 +682,7 @@ export async function createYard(story) {
       playMusic('outdoor');
       story.beginPlay();
       await ui.fade(0, 900);
-      story.objective(G.flags.bushSeen ? 'GET OUT OF THE BUSH!' : 'Get out of the sunlight — run to the big bush!');
+      story.objective(G.flags.bushSeen ? 'Get out of the bush' : 'Get out of the sun — run to the big bush');
       return;
     }
     // survival / return / continue

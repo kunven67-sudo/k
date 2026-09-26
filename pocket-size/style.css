@@ -250,3 +250,11 @@ kbd { display: inline-block; min-width: 26px; padding: 3px 7px; border-radius: 4
   .hotbar .slot { width: 42px; height: 42px; font-size: 20px; }
   .hud-bl { width: 160px; }
 }
+
+/* objective marker: a diamond over the target, or an arrow at the screen edge pointing to it */
+.waypoint { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 3; will-change: transform; }
+.waypoint .wp-icon { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; transform: rotate(45deg); border: 2px solid rgba(255, 226, 140, 0.95); background: rgba(255, 210, 90, 0.18); box-shadow: 0 0 10px rgba(255, 200, 80, 0.55); }
+.waypoint .wp-dist { position: absolute; left: -40px; top: 12px; width: 80px; text-align: center; font: 600 11px/1.2 var(--font, system-ui), sans-serif; color: rgba(255, 238, 200, 0.95); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); letter-spacing: 0.04em; }
+.waypoint .wp-arrow { display: none; position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; }
+.waypoint .wp-arrow::after { content: ''; position: absolute; left: 22px; top: 3px; border-left: 11px solid rgba(255, 226, 140, 0.95); border-top: 6px solid transparent; border-bottom: 6px solid transparent; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.7)); }
+.waypoint.edge .wp-arrow { display: block; }

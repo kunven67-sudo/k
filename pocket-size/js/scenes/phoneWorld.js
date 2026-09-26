@@ -223,18 +223,16 @@ export function createPhoneWorld(story) {
     pos: V(36, 2, -3.2), radius: 3, label: 'Read the system log',
     action: async () => {
       sfx('click');
-      ui.toast('<b>SYSTEM LOG</b><br><code>WARN scale_anomaly: user_height = 0.018m</code><br><code>SOURCE: outside // garden sector // under the rock by the puddle</code><br><code>NOTE: SIZE_RESTORE wires are DECOYS. Do NOT connect.</code>', 12000);
+      ui.toast('<b>SYSTEM LOG</b><br><code>WARN magnetometer: field anomaly</code><br><code>bearing: outside // garden // near the puddle, under the flat rock</code><br><code>WARN power: 2 unregistered cables on the charge bus</code>', 12000);
       G.flags.readLog = true;
-      await ui.say('"Source: outside... in the garden." So whatever did this to me is out there.', { speaker: 'You' });
-      await ui.say('And the wires are decoys. Great. Good to know.', { speaker: 'You' });
+      await ui.say('Something out in the garden... under a rock.', { speaker: 'You' });
     },
   });
   wires.forEach((w) => I.push({
-    pos: w.pos.clone(), radius: 3, label: () => (w.armed > 0 ? `<b style="color:#ff6a5a">REALLY connect the ${w.name} wire? Press E again</b>` : `Connect the ${w.name} wire (grow back to normal?)`),
+    pos: w.pos.clone(), radius: 3, label: () => (w.armed > 0 ? `<b style="color:#ff6a5a">Connect the ${w.name} wire? Press E again</b>` : `Connect the ${w.name} wire`),
     action: () => {
       if (w.armed > 0) { level.explode(w); return; }
       w.armed = 3;
-      ui.say(G.flags.readLog ? 'The log said these are decoys... but what if it\'s wrong?' : 'I really, REALLY wouldn\'t try that...', { speaker: 'You' });
     },
   }));
   I.push({
@@ -242,6 +240,8 @@ export function createPhoneWorld(story) {
     can: () => level.portal.open,
     action: () => level.leave(),
   });
+
+  level.waypoint = () => (G.flags.calledHelp ? (level.portal.open ? { pos: V(0, 1, -46) } : null) : { pos: V(0, 1, 7.8) });
 
   level.tryCall = async () => {
     G.flags.calledHelp = true;
@@ -257,11 +257,10 @@ export function createPhoneWorld(story) {
     ui.toast('<b style="color:#ff6a5a">Call Failed</b><br>No Service', 4000);
     G.post.fx.glitch = 0.8;
     P.mode = 'walk';
-    await ui.say('No service?! I\'m literally INSIDE the antenna!', { speaker: 'You', pitch: 1.15 });
-    await ui.say('Okay. Calling is out. There has to be some way back to normal size...', { speaker: 'You' });
+    await ui.say('No service...', { speaker: 'You' });
     level.portal.open = true;
     story.objective('Find a way back to normal size — check the power core (east), or leave through the portal');
-    ui.toast('🌀 The exit portal behind you is now <b>open</b>.');
+    ui.toast('🌀 The exit portal is open.');
   };
 
   level.explode = async (w) => {
@@ -309,11 +308,10 @@ export function createPhoneWorld(story) {
     await d.play(async (c) => {
       c.cut(V(6, 4, -34), V(0, 1.5, -42), 60);
       c.move(V(4, 2.5, -38), V(0, 1.4, -42), 4);
-      await c.say('Whoa... I\'m INSIDE my phone?! Everything\'s made of pixels!', { speaker: 'You', pitch: 1.1 });
+      await c.say('Is this... inside my phone?', { speaker: 'You', pitch: 1.05 });
       c.cut(V(0, 6, -36), V(0, 4, 14), 65);
       c.move(V(0, 8, -20), V(0, 5, 14), 5);
-      await c.say('There\'s the Phone app. If I can make a call from in here...', { speaker: 'You' });
-      await c.say('...what are those spiky things?', { speaker: 'You', pitch: 1.1 });
+      await c.say('The Phone app. Maybe I can call from in here.', { speaker: 'You' });
     });
     G.post.fx.glitch = 0;
     G.player.mode = 'walk';

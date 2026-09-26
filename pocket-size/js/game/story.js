@@ -181,9 +181,8 @@ export const Story = {
     playMusic('wonder');
     this.beginPlay();
     await ui.fade(0, 900);
-    await ui.say('I\'m out! That was NOT a normal phone call.', { speaker: 'You' });
-    await ui.say('No signal, fake wires... Forget the phone. Maybe there are answers outside.', { speaker: 'You' });
-    ui.toast('🚪 The draft stopper in front of the front door got knocked aside. <b>You can go outside now.</b>', 6000);
+    await ui.say('Whatever did this to me is outside.', { speaker: 'You' });
+    ui.toast('SuckBot knocked the draft stopper away from the front door.', 5000);
     this.objective('Get outside — squeeze under the front door in the living room');
   },
 
@@ -263,21 +262,21 @@ export const Story = {
       await ui.fade(0, 1400);
       document.getElementById('fade').style.background = '#000';
       c.move(spot.clone().add(V(260, 190, 180)), spot.clone().add(V(0, 120, 0)), 6, { path: [spot.clone().add(V(120, 60, 120))] });
-      await c.say('I\'m... me. I\'m FULL SIZE again!', { speaker: 'You', pitch: 1.2 });
+      await c.say('I\'m... back. I\'m normal again.', { speaker: 'You', pitch: 1.1 });
       await c.say('The grass is just grass. The bush is just a bush. Everything is... normal.', { speaker: 'You' });
       sfx('bark', { count: 3 });
       c.cut(V(spot.x - 260, 90, spot.z + 160), V(spot.x - 60, 40, spot.z), 55);
       c.tween(4.5, (k) => { dog.body.pos.lerpVectors(dogFrom, dogTo, k); dog.body.vel.set(dogTo.x - dogFrom.x, 0, dogTo.z - dogFrom.z).normalize().multiplyScalar(k < 0.95 ? 14 : 0); dog.pose = 1; }, 'linear');
-      await c.say('BISCUIT! Hey buddy! You were NOT going to eat me. I know that now.', { speaker: 'You', pitch: 1.1 });
+      await c.say('Biscuit! Hey, buddy!', { speaker: 'You', pitch: 1.1 });
       await c.wait(2.2);
       dog.body.vel.set(0, 0, 0);
       P.rig.trigger('wave', 1.4);
       c.cut(spot.clone().add(V(-90, 150, 120)), spot.clone().add(V(0, 140, 0)), 50);
       sfx('notify'); sfx('notify', { delay: 0.5 });
       await c.wait(0.8);
-      await c.say('...Wait. Is that my phone buzzing inside?', { speaker: 'You' });
+      await c.say('...Is that my phone?', { speaker: 'You' });
       ui.toast('📱 <b>FlickFeed</b>: 5 new videos posted for you', 5000);
-      await c.say('Five new videos. Just five. Five seconds each. What could possibly go wrong?', { speaker: 'You', rate: 0.95 });
+      await c.say('...Maybe just one video.', { speaker: 'You', rate: 0.95 });
       c.move(spot.clone().add(V(600, 400, 600)), spot.clone().add(V(0, 100, 0)), 6);
       await c.wait(3);
       await ui.fade(1, 1800);

@@ -18,6 +18,7 @@ const DEFAULTS = {
   sfxVolume: 0.9,
   voice: true,              // text-to-speech for spoken lines
   subtitles: true,
+  waypoints: true,          // objective marker on screen
   showFps: false,
   autoResolution: true,
   difficulty: 'normal',     // easy | normal | hard

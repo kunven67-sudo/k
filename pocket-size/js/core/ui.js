@@ -60,6 +60,18 @@ export const ui = {
     $('mash-fill').style.width = `${Math.max(0, Math.min(1, frac)) * 100}%`;
   },
 
+  // Objective marker. w = null to hide, or { x, y, edge, angle, text } in screen pixels.
+  waypoint(w) {
+    const el = $('waypoint');
+    if (!w) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.style.transform = `translate(${w.x.toFixed(1)}px, ${w.y.toFixed(1)}px)`;
+    el.classList.toggle('edge', !!w.edge);
+    if (w.edge) $('wp-arrow').style.transform = `rotate(${w.angle.toFixed(3)}rad)`;
+    const d = $('wp-dist');
+    if (d.textContent !== w.text) d.textContent = w.text;
+  },
+
   crosshair(on) { $('crosshair').classList.toggle('hidden-soft', !on); },
 
   boss(name, frac) {
