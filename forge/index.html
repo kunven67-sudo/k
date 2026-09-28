@@ -203,6 +203,10 @@ svg{flex:none}
 #editor{flex:1;min-width:0;border:0;resize:none;margin:0;padding:12px 14px;background:transparent;color:var(--text);font:inherit;white-space:pre;overflow:auto;tab-size:2;outline:none}
 #editor[readonly]{color:var(--dim)}
 .live-banner{position:absolute;right:12px;bottom:12px;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--line-strong);box-shadow:var(--shadow);font:600 12.5px var(--ui);color:var(--text)}
+.play-banner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:3;display:flex;align-items:center;gap:10px;max-width:calc(100% - 24px);padding:5px 5px 5px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--accent);box-shadow:var(--shadow);font:600 13px var(--ui);color:var(--text)}
+.play-banner span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seen{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--faint)}
+.seen img{display:block;max-width:100%;max-height:220px;width:auto;border-radius:8px;border:1px solid var(--line-strong);background:var(--sunken)}
 .console{border-top:1px solid var(--line);flex:none}
 .console-bar{display:flex;align-items:center;gap:10px;padding:6px 10px 6px 12px;min-height:40px}
 .console-state{display:flex;align-items:center;gap:7px;border:0;background:none;padding:0;color:var(--dim);font-size:13px;font-weight:600}
@@ -343,6 +347,7 @@ details[open] summary{margin-bottom:8px}
         </div>
         <div class="ws-actions">
           <select id="entrySel" aria-label="Page to preview" hidden></select>
+          <button class="btn btn-quiet btn-sm" id="playBtn" type="button" title="Let the AI play it, find bugs and fix them"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-4 3.6L2 15a3 3 0 0 0 5.4 2l1.1-1.5a2 2 0 0 1 1.6-.8h3.8a2 2 0 0 1 1.6.8l1.1 1.5A3 3 0 0 0 22 15l-.7-6.4a4 4 0 0 0-4-3.6z"/></svg>Playtest</button>
           <button class="icon-btn" id="undoBtn" type="button" aria-label="Undo last change" title="Undo last change" disabled><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
           <button class="icon-btn" id="reloadBtn" type="button" aria-label="Restart preview" title="Restart preview"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg></button>
           <button class="icon-btn" id="openBtn" type="button" aria-label="Open preview in a new tab" title="Open in a new tab"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></button>
@@ -352,6 +357,7 @@ details[open] summary{margin-bottom:8px}
         <div class="view" id="previewView" role="tabpanel" aria-labelledby="tabPreview">
           <iframe id="frame" title="Preview of your project" sandbox="allow-scripts allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads" allow="fullscreen; autoplay; gamepad; accelerometer; gyroscope" allowfullscreen></iframe>
           <div class="preview-empty" id="previewEmpty" hidden></div>
+          <div class="play-banner" id="playBanner" hidden><svg class="spark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.2 6.3L20.5 10l-6.3 2.2L12 18.5l-2.2-6.3L3.5 10l6.3-1.7z"/></svg><span id="playBannerText">Playtesting</span><button class="btn btn-stop btn-sm" id="playStop" type="button">Stop</button></div>
         </div>
         <div class="view" id="codeView" role="tabpanel" aria-labelledby="tabCode" hidden>
           <div class="files-row" id="filesRow"></div>
@@ -402,6 +408,11 @@ details[open] summary{margin-bottom:8px}
           <button type="button" class="engine-opt" id="engClaude" aria-pressed="false"><strong>Claude in this app</strong><span id="engClaudeNote">Uses your Claude plan. Nothing to set up.</span></button>
           <button type="button" class="engine-opt" id="engApi" aria-pressed="false"><strong>Anthropic API key</strong><span>Works anywhere. Billed to your API account.</span></button>
         </div>
+      </div>
+      <div class="field">
+        <span class="flabel">Playtesting</span>
+        <label class="check"><input type="checkbox" id="autoPlay"> <span>After every build, let it play the game, find bugs and fix them</span></label>
+        <div class="row"><label for="playRounds" class="help">Rounds per playtest</label><select id="playRounds" style="width:auto"><option value="3">3</option><option value="5">5</option><option value="8">8</option></select></div>
       </div>
       <div class="field" id="claudeFields">
         <label for="tierSel">Brain power</label>
@@ -542,6 +553,8 @@ var state='title',paused=false,aim=null;
 var score=0,streak=1,timeLeft=60,buzzed=false,shake=0,net=0;
 var particles=[],popups=[];
 var best=0,muted=false;
+// read-only view of the game for playtests
+window.__game={get state(){return paused?'paused':state;},get score(){return score;},get streak(){return streak;},get timeLeft(){return Math.ceil(timeLeft);},get ball(){return {x:Math.round(ball.x),y:Math.round(ball.y)};}};
 try{best=+localStorage.getItem('hoopflick.best')||0;muted=localStorage.getItem('hoopflick.muted')==='1';}catch(e){}
 $('best').textContent=best;
 $('mute').textContent=muted?'Sound: off':'Sound: on';
@@ -948,7 +961,9 @@ The app previews index.html in a sandboxed frame, and people also download the f
 
 Test the code in your head like a QA tester: every getElementById or querySelector matches an element that exists, every function and variable is defined before it's used, listeners are attached once, the game can start, end and restart without errors, and nothing throws on the first frame. Fix anything you find before you write the files.
 
-When a message includes errors from the preview, find the real cause and fix it. Don't just hide the error with try/catch.`;
+When a message includes errors from the preview, find the real cause and fix it. Don't just hide the error with try/catch.
+
+After a build the app may playtest the page: it clicks, presses keys, reads the screen and takes screenshots. Make that easy: give every game a read-only window.__game object with the key state (screen or mode, score, lives, level, time, player position), and make menu actions real <button> elements with clear text.`;
 
 /* The built-in brain card: how the reference games in this repo are built, written down so the AI can build at that level. */
 const STUDIO_CARD = `What the best games in this collection do, learned from six reference projects: ANT WORK 2 (a story-driven 3D adventure with cutscenes, voice acting and two story paths), Portal Gun (1000 procedural dimensions, portals, and any dropped file becomes a world), TIME (a city sandbox where you stop and rewind time, with physics, cars, people and ragdolls), Shrink Resizer (an endless realistic town where you shrink to millimetres or grow to 100 m), Eight Billion (a god simulator that zooms from the solar system to street level on a real Earth), and AItok (a complete short-video app where every video, song and creator is generated in code).
@@ -1017,7 +1032,40 @@ const STUDY_PROMPT = `You write brain cards. A brain card is a dense, practical 
 - The specific techniques behind its quality (rendering, audio, controls, game feel, UI, data, performance, robustness), with short code sketches of the key patterns.
 - The quality bar it sets, written as rules to follow.
 Write plain text with short headings and bullet points, under 1,400 words. Skip the story and content details; focus on what can be reused. Reply with only the card.`;
-const OUTLINE_NOTE = '\n\nSome files are shown as outlines because they are big. Call read_file or search_file to get the exact current text before you edit them, and use <edit> blocks instead of rewriting big files.';
+const PLAYTEST_REQUEST = `Playtest the page in the preview like a real QA tester, fix the bugs you find, and then report back.
+
+You play by ending your reply with an <actions> block, one action per line, for example:
+<actions>
+click "Play"
+wait 500
+hold ArrowRight 800
+press Space
+look
+js return window.__game
+</actions>
+
+Actions:
+- click "TEXT": click the visible element that shows this text (buttons, menu items, links)
+- click X Y: click at X,Y (CSS pixels in the preview; 0,0 is the top-left corner)
+- move X Y: move the mouse to X,Y
+- drag X1 Y1 X2 Y2 MS: press at the first point, move to the second over MS milliseconds, then release
+- press KEY: tap a key (Space, Enter, Escape, Tab, Shift, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, a letter or a digit)
+- hold KEY MS: hold a key down for MS milliseconds
+- type TEXT: type into the focused text field
+- turn DX DY: mouse-look by DX,DY pixels in first-person games
+- wait MS: let the game run
+- look: take a screenshot at this moment (one is always taken after the last action)
+- js CODE: run one line of JavaScript inside the page and get the result back, for example js return window.__game
+- reload: restart the page from the beginning
+
+After your actions run you get screenshots, the visible text with positions, the buttons, console output, errors, and your js results. Screenshots are rebuilt from the page: canvases are exact, while HTML parts are drawn plainly without effects. The input is simulated, so pointer lock, fullscreen and starting audio can be refused; that is not a bug when the page handles it.
+
+How to test: start it, try every control, try to score, win and lose, open the menus, pause and restart. Check that things really work (movement, collisions, scoring, timers, game over, restart), not just that nothing crashes. Use js to read the state when a screenshot isn't clear.
+
+When you find a real bug, fix it right away with <edit> or <file> blocks in the same reply; the page reloads with your fix before your next actions run. Keep each reply short: one sentence on what you're checking, any fixes, then the actions.
+
+When you've tested enough, reply without an <actions> block: a short report of what you tested, what you fixed, and anything still wrong.`;
+const OUTLINE_NOTE ='\n\nSome files are shown as outlines because they are big. Call read_file or search_file to get the exact current text before you edit them, and use <edit> blocks instead of rewriting big files.';
 
 /* ---------------- small helpers ---------------- */
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -1204,7 +1252,50 @@ function parseResponse(raw, streaming) {
     const last = chat[chat.length - 1], lt = last.lastIndexOf('<');
     if (lt !== -1 && last.length - lt < 240 && !last.includes('>', lt) && /^<\/?[a-z]*(\s|$)/i.test(last.slice(lt))) chat[chat.length - 1] = last.slice(0, lt);
   }
-  return { ops, open, chat: cleanChat(chat) };
+  // Playtest moves live in <actions> blocks, outside the file blocks.
+  const actions = [];
+  for (let k = 0; k < chat.length; k++) {
+    chat[k] = chat[k].replace(/<actions>([\s\S]*?)(<\/actions>|$)/g, (m, body, end) => { if (end || !streaming) actions.push(...parseActions(body)); return ''; });
+  }
+  return { ops, open, chat: cleanChat(chat), actions };
+}
+function parseActions(body) {
+  const out = [], num = v => { const n = Number(v); return Number.isFinite(n) ? Math.round(n) : null; };
+  const clampMs = (v, lo, hi, d) => Math.max(lo, Math.min(hi, num(v) == null ? d : num(v)));
+  for (let line of String(body).split('\n')) {
+    line = line.trim().replace(/^(?:[-*•]|\d+[.)])\s*/, '');
+    const m = /^([a-z]+)\b\s*(.*)$/i.exec(line);
+    if (!m) continue;
+    const op = m[1].toLowerCase(), rest = m[2].trim(), parts = rest.split(/[\s,]+/);
+    const quoted = /^["'“](.*)["'”]$/.exec(rest);
+    if (op === 'click' || op === 'tap') {
+      if (!quoted && num(parts[0]) != null && num(parts[1]) != null) out.push({ op: 'click', x: num(parts[0]), y: num(parts[1]) });
+      else if (rest) out.push({ op: 'click', text: quoted ? quoted[1] : rest });
+    } else if (op === 'move' || op === 'hover') {
+      if (num(parts[0]) != null && num(parts[1]) != null) out.push({ op: 'move', x: num(parts[0]), y: num(parts[1]) });
+    } else if (op === 'drag' || op === 'swipe') {
+      if (parts.slice(0, 4).every(v => num(v) != null)) out.push({ op: 'drag', x1: num(parts[0]), y1: num(parts[1]), x2: num(parts[2]), y2: num(parts[3]), ms: clampMs(parts[4], 50, 5000, 400) });
+    } else if (op === 'press' || op === 'key') {
+      if (rest) out.push({ op: 'press', key: quoted ? quoted[1] : parts[0] });
+    } else if (op === 'hold') {
+      if (rest) out.push({ op: 'hold', key: parts[0], ms: clampMs(parts[1], 30, 8000, 500) });
+    } else if (op === 'type') {
+      if (rest) out.push({ op: 'type', text: (quoted ? quoted[1] : rest).slice(0, 200) });
+    } else if (op === 'turn') {
+      if (num(parts[0]) != null && num(parts[1]) != null) out.push({ op: 'turn', dx: num(parts[0]), dy: num(parts[1]) });
+    } else if (op === 'wait' || op === 'sleep') {
+      out.push({ op: 'wait', ms: clampMs(parts[0], 0, 10000, 500) });
+    } else if (op === 'look' || op === 'screenshot') {
+      out.push({ op: 'look' });
+    } else if (op === 'js' || op === 'eval') {
+      if (rest) out.push({ op: 'js', code: rest.slice(0, 2000) });
+    } else if (op === 'reload' || op === 'restart') {
+      out.push({ op: 'reload' });
+    }
+  }
+  // Keep a round short enough to watch: at most 40 actions and about 25 seconds of waiting.
+  let budget = 25000;
+  return out.slice(0, 40).filter(a => { const t = a.ms || 0; if (t > budget) return false; budget -= t; return true; });
 }
 
 /* ---------------- hiding big embedded data from the model ---------------- */
@@ -1322,7 +1413,7 @@ function summarize(before, after, results) {
    State: settings, brain cards, chats, runtime
    ================================================================ */
 const settings = Object.assign(
-  { engine: 'auto', apiKey: '', remember: true, model: MODELS[0].id, effort: 'max', tier: 'complex', baseURL: '', autoFix: true, aiName: 'Forge', instructions: DEFAULT_INSTRUCTIONS, theme: '' },
+  { engine: 'auto', apiKey: '', remember: true, model: MODELS[0].id, effort: 'max', tier: 'complex', baseURL: '', autoFix: true, autoPlaytest: true, playRounds: 5, aiName: 'Forge', instructions: DEFAULT_INSTRUCTIONS, theme: '' },
   store.get(KEY + 'settings', {})
 );
 if (!MODELS.some(m => m.id === settings.model)) settings.model = MODELS[0].id;
@@ -1363,6 +1454,7 @@ const ui = {
   errors: [], lineMap: null, previewStale: false,
   autoFixArm: 0, autoFixRuns: 0, fixDismissed: false, consoleOpen: false,
   pendingImages: [], pendingFiles: [], rec: null, speaking: null, study: null,
+  ready: false, playing: false, playNext: false, roundErrors: [],
 };
 let project = null;
 let storageWarned = false;
@@ -1670,7 +1762,7 @@ function buildContext(engine, { prior, request, files, followup, chatSoFar, resu
   const req = '<request>\n' + request + '\n</request>';
   const lead = followup ? [{ role: 'user', content: req }, { role: 'assistant', content: roundSummary(chatSoFar, results) }] : [];
   const tail = followup ? hideBlobs(followup) : req;
-  const sendImages = !followup && images && images.length ? images : null;
+  const sendImages = images && images.length ? images : null;
   if (engine === 'api') {
     const { text, outlined } = fitProject(vfiles, API_FULL_LIMIT);
     const system = [
@@ -1740,6 +1832,7 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
     stopMic();
   }
   ui.autoFixArm = 0;
+  ui.playNext = false;
   ui.fixDismissed = true;
   const prior = p.messages.slice();
   const userMsg = { role: 'user', text, kind, t: Date.now() };
@@ -1765,7 +1858,7 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
   let warn = null, continues = 0, repairs = 0, followup = null, tier = null;
   try {
     for (;;) {
-      const ctx = buildContext(engine, { prior, request: text, files, followup, chatSoFar: chats.join('\n\n'), results, images });
+      const ctx = buildContext(engine, { prior, request: text, files, followup, chatSoFar: chats.join('\n\n'), results, images: followup ? null : images });
       bubble.prev = { chat: chats.join('\n\n'), results: results.slice() };
       bubble.text = '';
       bubble.tool = '';
@@ -1834,13 +1927,18 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
     ui.live = null;
     setBusyUI();
     if (project === p) { renderChat(); renderFiles(); renderEditor(); updateLayout(); }
+    if (ui.playNext) {
+      ui.playNext = false;
+      if (project === p) setTimeout(() => { if (!ui.busy && project === p) playtest({ auto: true }); }, 600);
+    }
   }
 }
+const engineLabel = (engine, tier) => engine === 'api' ? (MODELS.find(m => m.id === settings.model) || {}).short + ' · ' + settings.effort : 'Claude · ' + (TIER_LABEL[tier || settings.tier] || 'Max');
 function finishTurn({ p, before, files, results, chats, warn, engine, tier, kind }) {
   const changed = results.some(r => r.ok);
   const summary = summarize(before, files, results);
   if (changed) { pushCheckpoint(p, (kind === 'fix' ? 'Fix: ' : '') + (p.messages[p.messages.length - 1].text || '')); p.files = files; }
-  const msg = { role: 'assistant', text: chats.join('\n\n').trim(), ops: summary, t: Date.now(), engine: engine === 'api' ? (MODELS.find(m => m.id === settings.model) || {}).short + ' · ' + settings.effort : 'Claude · ' + (TIER_LABEL[tier || settings.tier] || 'Max') };
+  const msg = { role: 'assistant', text: chats.join('\n\n').trim(), ops: summary, t: Date.now(), engine: engineLabel(engine, tier) };
   if (warn) msg.warn = warn;
   if (!msg.text && !summary.length) msg.text = '(No reply this time.)';
   p.messages.push(msg);
@@ -1848,7 +1946,9 @@ function finishTurn({ p, before, files, results, chats, warn, engine, tier, kind
     if (!ui.file || !has(p.files, ui.file)) ui.file = firstFile(p.files, summary);
     ui.entry = null;
     ui.fixDismissed = false;
-    if (engine === 'api' && settings.autoFix && ui.autoFixRuns < MAX_AUTOFIX) ui.autoFixArm = Date.now();
+    const codeChanged = summary.some(s => /\.(html?|m?js|css)$/i.test(s.path) && s.kind !== 'deleted' && s.kind !== 'failed');
+    if (settings.autoPlaytest && !warn && codeChanged && previewEntry(p.files)) ui.playNext = true;
+    else if (engine === 'api' && settings.autoFix && ui.autoFixRuns < MAX_AUTOFIX) ui.autoFixArm = Date.now();
     if (project === p) { if (ui.wsMode === 'hide' && summary.some(s => s.kind !== 'deleted')) ui.wsMode = 'auto'; renderPreview(); }
   }
   saveProject(p);
@@ -1864,7 +1964,216 @@ function retryTurn(errMsg) {
   const user = msgs[i - 1];
   if (!user || user.role !== 'user') return;
   msgs.splice(i - 1, 2);
+  if (user.kind === 'playtest') { playtest(); return; }
   send(user.text, { kind: user.kind === 'fix' ? 'fix' : 'retry', errors: user.errors });
+}
+
+/* ================================================================
+   Playtesting: the AI looks at the preview and plays it like a tester
+   ================================================================ */
+let cmdSeq = 0;
+const cmdWaiters = new Map();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function abortable(promise, signal) {
+  if (!signal) return promise;
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) { reject(new Cancelled()); return; }
+    const onAbort = () => reject(new Cancelled());
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(v => { signal.removeEventListener('abort', onAbort); resolve(v); }, e => { signal.removeEventListener('abort', onAbort); reject(e); });
+  });
+}
+async function waitReady(ms) { const end = Date.now() + ms; while (!ui.ready && Date.now() < end) await sleep(50); return ui.ready; }
+async function reloadPreviewAndWait(signal) {
+  renderPreview();
+  await abortable(waitReady(10000), signal);
+  await abortable(sleep(700), signal);
+}
+function runInPreview(actions, signal) {
+  const frame = $('#frame'), id = ++cmdSeq;
+  const budget = actions.reduce((n, a) => n + (a.ms || 0), 0) + 10000;
+  return abortable(new Promise(resolve => {
+    const timer = setTimeout(() => { cmdWaiters.delete(id); resolve(null); }, budget);
+    cmdWaiters.set(id, d => { clearTimeout(timer); resolve(d); });
+    try { frame.contentWindow.postMessage({ __forgeCmd: 'run', id, actions }, '*'); }
+    catch (e) { clearTimeout(timer); cmdWaiters.delete(id); resolve(null); }
+  }), signal);
+}
+// Run the actions (the app does the reloads itself) and collect what the AI gets to see.
+async function observe(actions, signal, note) {
+  const out = { log: [], shots: [], js: [], logs: [], summary: { texts: [], buttons: [], canvases: [] }, w: 0, h: 0, note: note || '', errors: [] };
+  const segments = [[]];
+  for (const a of actions) { if (a.op === 'reload') segments.push([]); else segments[segments.length - 1].push(a); }
+  for (let i = 0; i < segments.length; i++) {
+    if (i > 0) { out.log.push('reload'); await reloadPreviewAndWait(signal); }
+    const r = await runInPreview(segments[i], signal);
+    if (!r) { out.log.push("The page stopped answering (it may be stuck in a loop, or it didn't load)."); continue; }
+    out.log.push(...(r.log || []));
+    out.js.push(...(r.js || []));
+    out.logs.push(...(r.logs || []));
+    out.shots.push(...(r.shots || []).filter(x => typeof x === 'string' && x.startsWith('data:image')));
+    if (r.summary) out.summary = r.summary;
+    out.w = r.w; out.h = r.h;
+  }
+  out.errors = ui.roundErrors.slice();
+  out.shots = out.shots.slice(-3);
+  return out;
+}
+function obsText(o, round, rounds, last, withImages) {
+  const L = ['Playtest round ' + round + ' of ' + rounds + '.' + (last ? ' This is the last round: reply with your final report and no <actions> block.' : ''), '<observation>'];
+  L.push('Preview size: ' + o.w + 'x' + o.h + ' CSS pixels.');
+  if (o.note) L.push(o.note);
+  if (o.log.length) L.push('What happened:\n' + o.log.map(x => '- ' + x).join('\n'));
+  if (o.js.length) L.push('js results:\n' + o.js.map((x, i) => (i + 1) + '. ' + x).join('\n'));
+  L.push('Visible text (x,y is the center):\n' + (o.summary.texts.length ? o.summary.texts.map(x => '- ' + x).join('\n') : '- none'));
+  L.push('Buttons and other clickable things:\n' + (o.summary.buttons.length ? o.summary.buttons.map(x => '- ' + x).join('\n') : '- none'));
+  if (o.summary.canvases.length) L.push('Canvases: ' + o.summary.canvases.join('; '));
+  L.push('Console:\n' + (o.logs.length ? o.logs.slice(-25).map(x => '- ' + x).join('\n') : '- nothing new'));
+  L.push('Errors:\n' + (o.errors.length ? o.errors.map(e => '- ' + describeErr(e)).join('\n') : '- none'));
+  L.push(withImages ? 'Screenshots attached: ' + Math.min(o.shots.length, 3) + ' (in order; the last one is after your final action).' : 'No screenshots can be sent from here, so rely on the text, console and js results.');
+  L.push('</observation>');
+  let text = L.join('\n\n');
+  if (text.length > 9000) text = text.slice(0, 8800) + '\n[cut: too much text on screen]\n</observation>';
+  return text;
+}
+function dataUrlToBlob(url) {
+  const i = url.indexOf(','), mime = (/data:([^;,]+)/.exec(url.slice(0, i)) || [])[1] || 'image/jpeg';
+  const bin = atob(url.slice(i + 1)), u8 = new Uint8Array(bin.length);
+  for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+  return new Blob([u8], { type: mime });
+}
+function shotsToImages(shots, engine) {
+  const max = engine === 'claude' ? Math.min(3, (runtime.limits && runtime.limits.images && runtime.limits.images.maxCount) || 0) : 3;
+  if (!max) return [];
+  return shots.slice(-max).map((url, i) => ({ name: 'screenshot-' + (i + 1) + '.jpg', type: 'image/jpeg', data: url.slice(url.indexOf(',') + 1), blob: dataUrlToBlob(url), url }));
+}
+function describeActions(actions) {
+  const say = a => a.op === 'click' ? 'click ' + (a.text != null ? '"' + a.text + '"' : a.x + ',' + a.y) : a.op === 'press' || a.op === 'hold' ? a.op + ' ' + a.key : a.op === 'js' ? 'check the game state' : a.op;
+  return actions.slice(0, 3).map(say).join(', ') + (actions.length > 3 ? '…' : '');
+}
+async function playtest({ auto = false } = {}) {
+  if (ui.busy) return;
+  const p = project;
+  if (!previewEntry(p.files)) { toast('Build something first, then playtest it.'); return; }
+  const engine = await ensureEngine();
+  if (!engine || ui.busy || project !== p) return;
+  const rounds = Math.max(1, Math.min(10, Number(settings.playRounds) || 5));
+  const prior = p.messages.slice();
+  p.messages.push({ role: 'user', kind: 'playtest', text: auto ? 'Playtest it (automatic after the build)' : 'Playtest it', t: Date.now() });
+  ui.busy = true;
+  ui.playing = true;
+  ui.autoFixArm = 0;
+  ui.fixDismissed = true;
+  ui.ctl = new AbortController();
+  const signal = ui.ctl.signal;
+  const bubble = ui.bubble = makeBubble(engine);
+  bubble.mode = 'playtest';
+  bubble.round = 0;
+  bubble.rounds = rounds;
+  setBusyUI();
+  renderChat();
+  // Show the game while the AI plays it.
+  if ($('#main').classList.contains('solo')) { ui.wsMode = 'show'; updateLayout(); }
+  if (window.innerWidth <= 880) setView('preview'); else setWsTab('preview');
+  $('#playBanner').hidden = false;
+  const tick = setInterval(() => updateStatus(bubble), 1000);
+  const before = { ...p.files }, results = [], chats = [];
+  let tier = null, warn = null, checkpointed = false;
+  const callbacks = {
+    signal,
+    onText: t => queueStream(bubble, t),
+    onThinking: d => addThinking(bubble, d),
+    onTool: (name, input) => { bubble.tool = (name === 'search_file' ? 'Searching ' : 'Reading ') + normPath(String(input.path)); updateStatus(bubble); },
+  };
+  const finish = extraWarn => {
+    const summary = summarize(before, p.files, results);
+    const msg = { role: 'assistant', text: chats.join('\n\n').trim() || 'Playtest finished.', ops: summary, t: Date.now(), engine: engineLabel(engine, tier) + ' · playtest' };
+    if (warn || extraWarn) msg.warn = [warn, extraWarn].filter(Boolean).join(' ');
+    p.messages.push(msg);
+    if (results.some(r => r.ok)) { ui.entry = null; if (!ui.file || !has(p.files, ui.file)) ui.file = firstFile(p.files, summary); }
+    saveProject(p);
+  };
+  try {
+    ui.roundErrors = [];
+    bubble.tool = 'Loading the game';
+    updateStatus(bubble);
+    await reloadPreviewAndWait(signal);
+    let obs = await observe([], signal, 'This is the page right after it loaded.');
+    let usedAll = true;
+    for (let round = 1; round <= rounds; round++) {
+      const last = round === rounds;
+      bubble.round = round;
+      bubble.tool = '';
+      const images = shotsToImages(obs.shots, engine);
+      if (obs.shots.length) showSeen(bubble, obs.shots[obs.shots.length - 1]);
+      const report = obsText(obs, round, rounds, last, images.length > 0);
+      const first = round === 1;
+      const ctx = buildContext(engine, { prior, request: first ? PLAYTEST_REQUEST + '\n\n' + report : PLAYTEST_REQUEST, files: p.files, followup: first ? null : report, chatSoFar: chats.join('\n\n'), results, images });
+      bubble.prev = { chat: chats.join('\n\n'), results: results.slice() };
+      bubble.text = '';
+      streamUpdate(bubble);
+      const res = engine === 'api' ? await runApi(ctx, callbacks) : await runClaude(ctx, callbacks);
+      if (res.tier) tier = res.tier;
+      if (res.stop === 'refused') throw new ForgeError('Claude declined to keep playtesting this one.', { refused: true });
+      bubble.text = res.text;
+      bubble.tool = '';
+      streamUpdate(bubble);
+      const parsed = parseResponse(res.text, false);
+      if (parsed.chat) chats.push(parsed.chat);
+      const ops = parsed.ops.slice();
+      if (parsed.open && res.stop !== 'truncated') {
+        const o = parsed.open;
+        if (o.type === 'file') ops.push({ type: 'file', path: o.path, append: o.append, content: o.content });
+        else if (o.pairs.length) ops.push({ type: 'edit', path: o.path, pairs: o.pairs });
+      }
+      let fixed = false, missed = [];
+      if (ops.length) {
+        if (!checkpointed) { pushCheckpoint(p, 'Before the playtest fixes'); checkpointed = true; }
+        const ap = applyOps(p.files, ops);
+        p.files = ap.files;
+        results.push(...ap.results);
+        fixed = ap.results.some(r => r.ok);
+        missed = ap.results.filter(r => !r.ok && r.op.type === 'edit');
+        if (fixed) { saveProject(p); renderFiles(); }
+      }
+      if (parsed.open && res.stop === 'truncated') { warn = 'A fix got cut off halfway. Ask it to "continue".'; usedAll = false; break; }
+      if (!parsed.actions.length) { usedAll = false; break; }
+      if (last) break;
+      ui.roundErrors = [];
+      let note = '';
+      if (fixed) { bubble.tool = 'Reloading with the fixes'; updateStatus(bubble); await reloadPreviewAndWait(signal); note = 'The page was reloaded with your fixes before these actions ran.'; }
+      if (missed.length) note += (note ? '\n' : '') + repairMsg(missed);
+      bubble.tool = 'Playing: ' + describeActions(parsed.actions);
+      updateStatus(bubble);
+      obs = await observe(parsed.actions, signal, note);
+    }
+    finish(usedAll ? 'It used all ' + rounds + ' rounds. Press Playtest again to keep testing.' : '');
+  } catch (e) {
+    if (e instanceof Cancelled) {
+      if (results.some(r => r.ok)) finish('Stopped early. The fixes made before stopping are kept (Undo removes them).');
+      else p.messages.push({ role: 'note', text: 'Playtest stopped.', t: Date.now() });
+    } else {
+      const fe = e instanceof ForgeError ? e : new ForgeError((e && e.message) || String(e), { retry: true });
+      if (results.some(r => r.ok)) finish(fe.message);
+      else p.messages.push({ role: 'assistant', error: fe.message, retry: !!fe.opts.retry, t: Date.now() });
+      if (fe.opts.settings) openSettings(fe.message);
+      if (fe.opts.brain) openBrain();
+    }
+    saveProject(p);
+  } finally {
+    clearInterval(tick);
+    ui.busy = false;
+    ui.playing = false;
+    ui.ctl = null;
+    ui.bubble = null;
+    ui.live = null;
+    $('#playBanner').hidden = true;
+    setBusyUI();
+    if (project === p) {
+      renderChat(); renderFiles(); renderEditor(); updateLayout(); renderPreview();
+      if (window.innerWidth <= 880 && ui.view !== 'chat') toast('Playtest done. The report is in Chat.');
+    }
+  }
 }
 
 /* ---------------- streaming bubble ---------------- */
@@ -1876,10 +2185,16 @@ function makeBubble(engine) {
   const statusText = h('span', null, 'Starting…');
   status.append(statusText);
   const thinking = h('div', { class: 'thinking', hidden: true });
+  const seen = h('div', { class: 'seen', hidden: true });
   const body = h('div', { class: 'md' });
   const ops = h('div', { class: 'ops' });
-  el.append(h('div', { class: 'who' }, aiName()), status, thinking, body, ops);
-  return { el, status, statusText, thinking, body, ops, engine, t0: Date.now(), text: '', tool: '', thinkingText: '', shownChat: null, shownOps: '', prev: { chat: '', results: [] }, mode: 'build', parsed: null };
+  el.append(h('div', { class: 'who' }, aiName()), status, thinking, seen, body, ops);
+  return { el, status, statusText, thinking, seen, body, ops, engine, t0: Date.now(), text: '', tool: '', thinkingText: '', shownChat: null, shownOps: '', prev: { chat: '', results: [] }, mode: 'build', parsed: null };
+}
+function showSeen(b, url) {
+  b.seen.hidden = false;
+  b.seen.replaceChildren(h('img', { src: url, alt: 'Screenshot of the preview that the AI is looking at' }), h('span', null, 'What it sees right now'));
+  scrollChat();
 }
 function addThinking(b, delta) {
   b.thinkingText = (b.thinkingText + delta).slice(-1200);
@@ -1921,7 +2236,7 @@ function opKind(r) { return r.op.type === 'delete' ? 'deleted' : r.op.type === '
 function updateStatus(b) {
   const secs = Math.round((Date.now() - b.t0) / 1000);
   const o = b.parsed && b.parsed.open;
-  const lead = b.mode === 'continue' ? 'Continuing · ' : b.mode === 'repair' ? 'Fixing edits that missed · ' : '';
+  const lead = b.mode === 'continue' ? 'Continuing · ' : b.mode === 'repair' ? 'Fixing edits that missed · ' : b.mode === 'playtest' ? 'Playtest' + (b.round ? ' round ' + b.round + ' of ' + b.rounds : '') + ' · ' : '';
   let s;
   if (b.tool) s = lead + b.tool + ' · ' + secs + 's';
   else if (!b.text) s = lead + (b.engine === 'claude' && secs < 3 ? 'Waiting for Claude' : 'Thinking') + ' · ' + secs + 's';
@@ -1929,6 +2244,7 @@ function updateStatus(b) {
   else if (o) s = lead + 'Editing ' + o.path;
   else s = lead + 'Writing · ' + secs + 's';
   if (b.statusText.textContent !== s) b.statusText.textContent = s;
+  if (b.mode === 'playtest') { const t = $('#playBannerText'); if (t.textContent !== s) t.textContent = s; }
 }
 function followLive() {
   if (!ui.live) { if (ui.wasLive) { ui.wasLive = false; renderEditor(); } return; }
@@ -1985,9 +2301,306 @@ const plainText = s => String(s || '').replace(/```[\s\S]*?```/g, ' (code) ').re
 /* ================================================================
    Preview: turn the project into one document for a sandboxed frame
    ================================================================ */
-// Runs first inside the preview (kept on one line so line numbers stay put):
-// reports errors to the app and routes links between project pages.
-const PREVIEW_HELPER = "(function(){var P=window.parent;if(!P||P===window)return;function s(o){o.__forge=1;try{P.postMessage(o,'*')}catch(e){}}window.addEventListener('error',function(e){var t=e.target;if(t&&t!==window&&t.tagName){s({kind:'resource',msg:'Could not load <'+t.tagName.toLowerCase()+'> '+String(t.src||t.href||'').slice(0,200)});return}s({kind:'error',msg:String(e.message||'Script error'),line:e.lineno||0,col:e.colno||0,stack:e.error&&e.error.stack?String(e.error.stack).slice(0,1200):''})},true);window.addEventListener('unhandledrejection',function(e){var r=e.reason;s({kind:'error',msg:'Unhandled promise rejection: '+(r&&r.message?r.message:String(r)),stack:r&&r.stack?String(r.stack).slice(0,1200):''})});var ce=console.error;console.error=function(){var a=[].slice.call(arguments).map(function(x){try{return x instanceof Error?(x.stack||x.message):(typeof x==='object'?JSON.stringify(x):String(x))}catch(_){return String(x)}}).join(' ');s({kind:'console',msg:a.slice(0,1200)});return ce.apply(console,arguments)};document.addEventListener('click',function(e){var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;if(!a)return;var h=a.getAttribute('href');if(!h||/^(#|[a-z][a-z0-9+.-]*:|\\/\\/)/i.test(h))return;if(/\\.html?([?#].*)?$/i.test(h)){e.preventDefault();s({kind:'nav',href:h})}},true)})();";
+/* Runs inside the preview before the page's own scripts (the app joins it onto one line so line numbers stay put).
+   It reports errors and console output, routes links between project pages, and gives the AI eyes and hands:
+   screenshots, clicks, key presses, drags and one-line JavaScript probes. Every statement ends with a semicolon
+   and there are no line comments, so joining the lines is safe. */
+function previewHelper() {
+  var P = window.parent;
+  if (!P || P === window) return;
+  function send(o) { o.__forge = 1; try { P.postMessage(o, '*'); } catch (e) { /* the app went away */ } }
+  function str(x) { try { return x instanceof Error ? (x.stack || x.message) : (typeof x === 'object' ? JSON.stringify(x) : String(x)); } catch (e) { return String(x); } }
+  window.addEventListener('error', function (e) {
+    var t = e.target;
+    if (t && t !== window && t.tagName) { send({ kind: 'resource', msg: 'Could not load <' + t.tagName.toLowerCase() + '> ' + String(t.src || t.href || '').slice(0, 200) }); return; }
+    send({ kind: 'error', msg: String(e.message || 'Script error'), line: e.lineno || 0, col: e.colno || 0, stack: e.error && e.error.stack ? String(e.error.stack).slice(0, 1200) : '' });
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    send({ kind: 'error', msg: 'Unhandled promise rejection: ' + (r && r.message ? r.message : String(r)), stack: r && r.stack ? String(r.stack).slice(0, 1200) : '' });
+  });
+  var logs = [];
+  function keep(level, args) { var t = [].slice.call(args).map(str).join(' '); logs.push('[' + level + '] ' + t.slice(0, 300)); if (logs.length > 60) logs.shift(); return t; }
+  ['log', 'info', 'warn', 'debug'].forEach(function (lv) {
+    var orig = console[lv];
+    console[lv] = function () { try { keep(lv, arguments); } catch (e) { /* ignore */ } return orig.apply(console, arguments); };
+  });
+  var origError = console.error;
+  console.error = function () { var t = ''; try { t = keep('error', arguments); } catch (e) { /* ignore */ } send({ kind: 'console', msg: t.slice(0, 1200) }); return origError.apply(console, arguments); };
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (!href || /^(#|[a-z][a-z0-9+.-]*:|\/\/)/i.test(href)) return;
+    if (/\.html?([?#].*)?$/i.test(href)) { e.preventDefault(); send({ kind: 'nav', href: href }); }
+  }, true);
+  window.addEventListener('load', function () { send({ kind: 'ready' }); });
+  ['setPointerCapture', 'releasePointerCapture'].forEach(function (m) {
+    var f = Element.prototype[m];
+    if (f) Element.prototype[m] = function (id) { try { return f.call(this, id); } catch (e) { return undefined; } };
+  });
+
+  /* ---- eyes: screenshots are taken right after the page draws, so WebGL canvases aren't blank ---- */
+  var raf = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : null, waiting = [], queued = false;
+  function grab() { var u = null; try { u = compose(false); } catch (e) { try { u = compose(true); } catch (e2) { u = null; } } return u; }
+  function flush() { queued = false; var list = waiting.splice(0), u = grab(); for (var i = 0; i < list.length; i++) list[i](u); }
+  if (raf) {
+    window.requestAnimationFrame = function (cb) {
+      return raf(function (t) { try { cb(t); } finally { if (waiting.length && !queued) { queued = true; raf(flush); } } });
+    };
+  }
+  function shot() {
+    return new Promise(function (resolve) {
+      waiting.push(resolve);
+      setTimeout(function () { var i = waiting.indexOf(resolve); if (i !== -1) { waiting.splice(i, 1); resolve(grab()); } }, 600);
+    });
+  }
+  var SKIP = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|HEAD|META|LINK|TITLE|BR)$/;
+  function all() { return document.body ? document.body.getElementsByTagName('*') : []; }
+  function onScreen(r) { return r.width >= 1 && r.height >= 1 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth; }
+  function clear(c) { return !c || c === 'transparent' || /^rgba\(.*,\s*0\)$/.test(c); }
+  function opacity(el, cache) {
+    if (!el || el.nodeType !== 1) return 1;
+    if (cache.has(el)) return cache.get(el);
+    var v = parseFloat(getComputedStyle(el).opacity), r = (isNaN(v) ? 1 : v) * opacity(el.parentElement, cache);
+    cache.set(el, r);
+    return r;
+  }
+  function box(g, r, rad) {
+    g.beginPath();
+    if (g.roundRect && rad > 0) g.roundRect(r.left, r.top, r.width, r.height, Math.min(rad, r.width / 2, r.height / 2));
+    else g.rect(r.left, r.top, r.width, r.height);
+  }
+  function words(g, text0, rects, cs) {
+    if (!rects || !rects.length) return;
+    var t = String(text0).replace(/\s+/g, ' ').trim();
+    if (cs.textTransform === 'uppercase') t = t.toUpperCase();
+    var list = t.split(' '), wi = 0;
+    g.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    g.fillStyle = cs.color;
+    g.textBaseline = 'middle';
+    for (var k = 0; k < rects.length && wi < list.length; k++) {
+      var rr = rects[k], line = '';
+      while (wi < list.length) { var next = line ? line + ' ' + list[wi] : list[wi]; if (line && g.measureText(next).width > rr.width + 4) break; line = next; wi++; }
+      g.fillText(line, rr.left, rr.top + rr.height / 2);
+    }
+  }
+  function compose(safe) {
+    var W = Math.max(1, innerWidth), H = Math.max(1, innerHeight), sc = Math.min(1, 1000 / W, 1000 / H);
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(W * sc));
+    c.height = Math.max(1, Math.round(H * sc));
+    var g = c.getContext('2d');
+    g.scale(sc, sc);
+    var bg = document.body ? getComputedStyle(document.body).backgroundColor : '';
+    if (clear(bg)) bg = getComputedStyle(document.documentElement).backgroundColor;
+    g.fillStyle = clear(bg) ? '#ffffff' : bg;
+    g.fillRect(0, 0, W, H);
+    var els = all(), cache = new Map();
+    for (var i = 0; i < els.length && i < 3000; i++) {
+      var el = els[i], tag = el.tagName;
+      if (SKIP.test(tag) || el instanceof SVGElement) continue;
+      var r = el.getBoundingClientRect();
+      if (!onScreen(r)) continue;
+      var cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden') continue;
+      var op = opacity(el, cache);
+      if (op < 0.05) continue;
+      g.globalAlpha = Math.min(1, op);
+      if (tag === 'CANVAS' || tag === 'VIDEO' || tag === 'IMG') {
+        if (!safe && (tag !== 'IMG' || /^(data:|blob:)/.test(el.currentSrc || el.src || ''))) { try { g.drawImage(el, r.left, r.top, r.width, r.height); } catch (e) { /* not drawable yet */ } }
+        continue;
+      }
+      var fill = cs.backgroundColor;
+      if (clear(fill) && cs.backgroundImage && cs.backgroundImage.indexOf('gradient') !== -1) { var m = /(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i.exec(cs.backgroundImage); if (m) fill = m[1]; }
+      var rad = parseFloat(cs.borderTopLeftRadius) || 0;
+      if (!clear(fill)) { g.fillStyle = fill; box(g, r, rad); g.fill(); }
+      var bw = parseFloat(cs.borderTopWidth) || 0;
+      if (bw > 0 && cs.borderTopStyle !== 'none' && !clear(cs.borderTopColor)) { g.strokeStyle = cs.borderTopColor; g.lineWidth = bw; box(g, r, rad); g.stroke(); }
+      if ((tag === 'INPUT' || tag === 'TEXTAREA') && el.type !== 'hidden') { words(g, el.value || el.placeholder || '', [r], cs); continue; }
+      for (var n = el.firstChild; n; n = n.nextSibling) {
+        if (n.nodeType === 3 && n.nodeValue.trim()) { var rg = document.createRange(); rg.selectNodeContents(n); words(g, n.nodeValue, rg.getClientRects(), cs); }
+      }
+    }
+    g.globalAlpha = 1;
+    return c.toDataURL('image/jpeg', 0.72);
+  }
+  function summary() {
+    var texts = [], buttons = [], canvases = [], seen = {}, els = all(), cache = new Map();
+    for (var i = 0; i < els.length && i < 3000; i++) {
+      var el = els[i], tag = el.tagName;
+      if (SKIP.test(tag) || el instanceof SVGElement) continue;
+      var r = el.getBoundingClientRect();
+      if (!onScreen(r)) continue;
+      var cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || opacity(el, cache) < 0.05) continue;
+      var cx = Math.round(r.left + r.width / 2), cy = Math.round(r.top + r.height / 2);
+      if (tag === 'CANVAS') { canvases.push(Math.round(r.width) + 'x' + Math.round(r.height) + ' at ' + Math.round(r.left) + ',' + Math.round(r.top)); continue; }
+      var clickable = /^(BUTTON|A|SELECT|SUMMARY)$/.test(tag) || (tag === 'INPUT' && /^(button|submit|checkbox|radio|range|color)$/.test(el.type)) || el.getAttribute('role') === 'button' || typeof el.onclick === 'function' || (cs.cursor === 'pointer' && !(el.parentElement && getComputedStyle(el.parentElement).cursor === 'pointer'));
+      if (clickable) {
+        var label = String(el.innerText || el.value || el.getAttribute('aria-label') || el.title || '').replace(/\s+/g, ' ').trim().slice(0, 50), id = label + '@' + cx + ',' + cy;
+        if (!seen[id]) { seen[id] = 1; buttons.push('"' + label + '" at ' + cx + ',' + cy + (el.disabled ? ' (disabled)' : '')); }
+        continue;
+      }
+      if (tag === 'INPUT' || tag === 'TEXTAREA') { texts.push('[' + (el.type || 'text') + ' field] "' + String(el.value || el.placeholder || '').slice(0, 60) + '" at ' + cx + ',' + cy); continue; }
+      var own = '';
+      for (var n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 3) own += n.nodeValue;
+      own = own.replace(/\s+/g, ' ').trim();
+      if (own) texts.push('"' + own.slice(0, 80) + '" at ' + cx + ',' + cy);
+    }
+    return { texts: texts.slice(0, 70), buttons: buttons.slice(0, 40), canvases: canvases.slice(0, 6) };
+  }
+
+  /* ---- hands: simulated keys, clicks, drags and mouse-look ---- */
+  var KEYS = { ' ': [' ', 'Space', 32], space: [' ', 'Space', 32], spacebar: [' ', 'Space', 32], enter: ['Enter', 'Enter', 13], return: ['Enter', 'Enter', 13], escape: ['Escape', 'Escape', 27], esc: ['Escape', 'Escape', 27], tab: ['Tab', 'Tab', 9], backspace: ['Backspace', 'Backspace', 8], shift: ['Shift', 'ShiftLeft', 16], control: ['Control', 'ControlLeft', 17], ctrl: ['Control', 'ControlLeft', 17], alt: ['Alt', 'AltLeft', 18], arrowup: ['ArrowUp', 'ArrowUp', 38], up: ['ArrowUp', 'ArrowUp', 38], arrowdown: ['ArrowDown', 'ArrowDown', 40], down: ['ArrowDown', 'ArrowDown', 40], arrowleft: ['ArrowLeft', 'ArrowLeft', 37], left: ['ArrowLeft', 'ArrowLeft', 37], arrowright: ['ArrowRight', 'ArrowRight', 39], right: ['ArrowRight', 'ArrowRight', 39] };
+  function keyInfo(name) {
+    var n = String(name), k = KEYS[n.toLowerCase()];
+    if (k) return k;
+    if (n.length === 1) { var u = n.toUpperCase(); if (/[a-z]/i.test(n)) return [n.toLowerCase(), 'Key' + u, u.charCodeAt(0)]; if (/[0-9]/.test(n)) return [n, 'Digit' + n, n.charCodeAt(0)]; return [n, '', n.charCodeAt(0)]; }
+    var f = /^f(\d{1,2})$/i.exec(n);
+    if (f) return ['F' + f[1], 'F' + f[1], 111 + Number(f[1])];
+    return [n, n, 0];
+  }
+  function key(type, name) {
+    var k = keyInfo(name), ev = new KeyboardEvent(type, { key: k[0], code: k[1], bubbles: true, cancelable: true });
+    try { Object.defineProperty(ev, 'keyCode', { get: function () { return k[2]; } }); Object.defineProperty(ev, 'which', { get: function () { return k[2]; } }); } catch (e) { /* read-only */ }
+    var t = document.activeElement && document.activeElement !== document.body ? document.activeElement : (document.body || document);
+    t.dispatchEvent(ev);
+  }
+  function fire(type, x, y, target, buttons) {
+    var el = target || document.elementFromPoint(x, y) || document.body || document.documentElement;
+    var init = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, screenX: x, screenY: y, button: 0, buttons: buttons, view: window };
+    var ev = type.indexOf('pointer') === 0 ? new PointerEvent(type, Object.assign({ pointerId: 1, pointerType: 'mouse', isPrimary: true, width: 1, height: 1, pressure: buttons ? 0.5 : 0 }, init)) : new MouseEvent(type, init);
+    el.dispatchEvent(ev);
+    return el;
+  }
+  function clickAt(x, y) {
+    var el = fire('pointerdown', x, y, null, 1);
+    fire('mousedown', x, y, el, 1);
+    try { if (el.focus) el.focus(); } catch (e) { /* not focusable */ }
+    fire('pointerup', x, y, el, 0);
+    fire('mouseup', x, y, el, 0);
+    fire('click', x, y, el, 0);
+    return el;
+  }
+  function findText(t) {
+    t = String(t).toLowerCase().trim();
+    var best = null, bestScore = Infinity, els = all();
+    for (var i = 0; i < els.length && i < 4000; i++) {
+      var el = els[i];
+      if (SKIP.test(el.tagName) || el instanceof SVGElement) continue;
+      var txt = String(el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!txt || txt.indexOf(t) === -1) continue;
+      var r = el.getBoundingClientRect();
+      if (!onScreen(r) || getComputedStyle(el).visibility === 'hidden') continue;
+      var score = r.width * r.height * (/^(BUTTON|A|INPUT|SELECT|LABEL|SUMMARY)$/.test(el.tagName) || el.getAttribute('role') === 'button' ? 0.05 : 1) * (txt === t ? 0.5 : 1);
+      if (score < bestScore) { best = el; bestScore = score; }
+    }
+    return best;
+  }
+  function desc(el) {
+    if (!el || !el.tagName) return 'nothing';
+    var d = '<' + el.tagName.toLowerCase() + (el.id ? ' id="' + el.id + '"' : (typeof el.className === 'string' && el.className ? ' class="' + el.className.slice(0, 40) + '"' : '')) + '>';
+    var t = String(el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 30);
+    return d + (t ? ' "' + t + '"' : '');
+  }
+  function fmt(v) {
+    if (v === undefined) return 'undefined';
+    if (typeof v === 'function') return '[function ' + (v.name || '') + ']';
+    if (v && v.nodeType === 1) return desc(v);
+    var seenObjs = [];
+    try {
+      var out = JSON.stringify(v, function (k, x) {
+        if (typeof x === 'function') return '[function]';
+        if (typeof x === 'number' && !isFinite(x)) return String(x);
+        if (x && typeof x === 'object') { if (x.nodeType) return '[element]'; if (seenObjs.indexOf(x) !== -1) return '[circular]'; seenObjs.push(x); if (seenObjs.length > 400) return '[more]'; }
+        return x;
+      });
+      return String(out).slice(0, 1500);
+    } catch (e) { return String(v).slice(0, 1500); }
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, Math.max(0, Math.min(Number(ms) || 0, 15000))); }); }
+  async function run(actions) {
+    var log = [], shots = [], js = [], mx = innerWidth / 2, my = innerHeight / 2;
+    for (var i = 0; i < actions.length; i++) {
+      var a = actions[i] || {};
+      try {
+        if (a.op === 'wait') { await wait(a.ms); log.push('wait ' + a.ms + ' ms'); }
+        else if (a.op === 'look') { if (shots.length < 2) shots.push(await shot()); log.push('look (screenshot ' + shots.length + ')'); }
+        else if (a.op === 'press') { key('keydown', a.key); await wait(80); key('keyup', a.key); await wait(40); log.push('press ' + a.key); }
+        else if (a.op === 'hold') { key('keydown', a.key); await wait(a.ms); key('keyup', a.key); log.push('hold ' + a.key + ' for ' + a.ms + ' ms'); }
+        else if (a.op === 'click') {
+          var x = a.x, y = a.y;
+          if (a.text != null) {
+            var found = findText(a.text);
+            if (!found) { log.push('click "' + a.text + '": nothing visible shows that text'); continue; }
+            var fr = found.getBoundingClientRect();
+            x = fr.left + fr.width / 2; y = fr.top + fr.height / 2;
+          }
+          var hit = clickAt(x, y);
+          mx = x; my = y;
+          log.push('click ' + (a.text != null ? '"' + a.text + '" ' : '') + 'at ' + Math.round(x) + ',' + Math.round(y) + ' hit ' + desc(hit));
+          await wait(60);
+        }
+        else if (a.op === 'move') { fire('pointermove', a.x, a.y, null, 0); fire('mousemove', a.x, a.y, null, 0); mx = a.x; my = a.y; log.push('move to ' + a.x + ',' + a.y); }
+        else if (a.op === 'drag') {
+          var tgt = fire('pointerdown', a.x1, a.y1, null, 1);
+          fire('mousedown', a.x1, a.y1, tgt, 1);
+          var steps = Math.max(4, Math.round(a.ms / 16));
+          for (var k = 1; k <= steps; k++) {
+            await wait(a.ms / steps);
+            var px = a.x1 + (a.x2 - a.x1) * k / steps, py = a.y1 + (a.y2 - a.y1) * k / steps;
+            fire('pointermove', px, py, tgt, 1);
+            fire('mousemove', px, py, tgt, 1);
+          }
+          fire('pointerup', a.x2, a.y2, tgt, 0);
+          fire('mouseup', a.x2, a.y2, tgt, 0);
+          mx = a.x2; my = a.y2;
+          log.push('drag ' + a.x1 + ',' + a.y1 + ' to ' + a.x2 + ',' + a.y2 + ' over ' + a.ms + ' ms, starting on ' + desc(tgt));
+        }
+        else if (a.op === 'type') {
+          var chars = String(a.text).split('');
+          for (var c = 0; c < chars.length; c++) {
+            key('keydown', chars[c]);
+            var ae = document.activeElement;
+            if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName)) { ae.value += chars[c]; ae.dispatchEvent(new Event('input', { bubbles: true })); }
+            key('keyup', chars[c]);
+            await wait(15);
+          }
+          log.push('type "' + a.text + '"');
+        }
+        else if (a.op === 'turn') {
+          var tt = document.pointerLockElement || document.elementFromPoint(mx, my) || document.body;
+          for (var q = 0; q < 6; q++) { tt.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: mx, clientY: my, movementX: a.dx / 6, movementY: a.dy / 6, view: window })); await wait(16); }
+          log.push('turn ' + a.dx + ',' + a.dy);
+        }
+        else if (a.op === 'js') {
+          var res;
+          try {
+            var fn;
+            try { fn = new Function('return (' + a.code + '\n)'); } catch (se) { fn = new Function(a.code); }
+            res = fn.call(window);
+            if (res && typeof res.then === 'function') res = await Promise.race([res, wait(3000).then(function () { return '(still waiting after 3 s)'; })]);
+            js.push(fmt(res));
+          } catch (err) { js.push('Error: ' + (err && err.message ? err.message : String(err))); }
+          log.push('js #' + js.length + ': ' + String(a.code).slice(0, 80));
+        }
+        else log.push('skipped an unknown action: ' + a.op);
+      } catch (err) { log.push(a.op + ' failed: ' + (err && err.message ? err.message : String(err))); }
+    }
+    await wait(150);
+    shots.push(await shot());
+    return { log: log, shots: shots, js: js, summary: summary(), logs: logs.splice(0), w: innerWidth, h: innerHeight };
+  }
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (e.source !== P || !d || d.__forgeCmd !== 'run') return;
+    run(Array.isArray(d.actions) ? d.actions : []).then(function (res) { res.kind = 'cmd'; res.id = d.id; send(res); }, function (err) {
+      send({ kind: 'cmd', id: d.id, log: ['The actions failed: ' + (err && err.message)], shots: [], js: [], summary: { texts: [], buttons: [], canvases: [] }, logs: logs.splice(0), w: innerWidth, h: innerHeight });
+    });
+  });
+}
+const PREVIEW_HELPER = '(' + previewHelper.toString().replace(/\s*\n\s*/g, ' ') + ')();';
 const DEFER_RUNNER = "<script>(function(){var l=document.querySelectorAll('script[type=\"text/forge-deferred\"]');for(var i=0;i<l.length;i++){var n=document.createElement('script');n.textContent=l[i].textContent;n.setAttribute('data-forge-src',l[i].getAttribute('data-forge-src'));l[i].parentNode.replaceChild(n,l[i]);}})();<\/script>";
 
 function previewEntry(files) {
@@ -2086,6 +2699,7 @@ function renderPreview() {
   try { built = buildPreviewDoc(files, ui.entry); }
   catch (e) { built = { html: '<!doctype html><pre>Preview failed: ' + escHtml(e.message) + '</pre>', map: [] }; }
   ui.lineMap = built.map;
+  ui.ready = false;
   frame.removeAttribute('srcdoc');
   frame.srcdoc = built.html;
 }
@@ -2111,6 +2725,8 @@ window.addEventListener('message', e => {
   if (!frame || e.source !== frame.contentWindow) return;
   const d = e.data;
   if (!d || d.__forge !== 1 || typeof d.kind !== 'string') return;
+  if (d.kind === 'ready') { ui.ready = true; return; }
+  if (d.kind === 'cmd') { const w = cmdWaiters.get(d.id); if (w) { cmdWaiters.delete(d.id); w(d); } return; }
   if (d.kind === 'nav') {
     const p = resolveRef(String(d.href || ''), dirOf(ui.entry || ''), project.files);
     if (p) { ui.entry = p; renderPreview(); } else toast("That page isn't in this project: " + d.href);
@@ -2123,6 +2739,11 @@ window.addEventListener('message', e => {
   const same = ui.errors.find(x => x.msg === msg && x.line === line);
   if (same) same.count++;
   else if (ui.errors.length < 30) ui.errors.push({ kind: d.kind, msg, line, stack: String(d.stack || '').slice(0, 1200), count: 1, loc: locate(line) });
+  if (ui.playing) {
+    const r = ui.roundErrors.find(x => x.msg === msg && x.line === line);
+    if (r) r.count++;
+    else if (ui.roundErrors.length < 20) ui.roundErrors.push({ kind: d.kind, msg, line, stack: String(d.stack || '').slice(0, 1200), count: 1, loc: locate(line) });
+  }
   renderConsole();
   renderFixBar();
   if (ui.autoFixArm && Date.now() - ui.autoFixArm < 8000 && !ui.busy && ui.autoFixRuns < MAX_AUTOFIX && currentEngine() === 'api') {
@@ -2199,6 +2820,7 @@ function renderMsg(m, isLastAi) {
       return h('div', { class: 'msg user fix' }, 'Fix ' + (n === 1 ? 'the error' : n + ' errors') + ' from the preview',
         h('details', null, h('summary', null, 'Details'), h('pre', null, m.text)));
     }
+    if (m.kind === 'playtest') return h('div', { class: 'msg user' }, '🎮 ' + m.text);
     return h('div', { class: 'msg user' }, (m.images || []).length ? h('div', { class: 'imgs' }, m.images.map(n => h('span', null, '🖼 ' + n))) : null, m.text);
   }
   const speak = h('button', { class: 'speak', type: 'button', 'aria-label': 'Read aloud', title: 'Read aloud', 'aria-pressed': String(ui.speaking === m) });
@@ -2217,7 +2839,9 @@ function renderMsg(m, isLastAi) {
   if (m.ops && m.ops.length) el.append(h('div', { class: 'ops' }, m.ops.map(opChip)));
   if (m.warn) el.append(h('div', { class: 'warn' }, m.warn));
   if (isLastAi && m.ops && m.ops.some(o => o.kind !== 'failed' && o.kind !== 'deleted')) {
-    el.append(h('div', { class: 'msg-actions mobile-only' }, h('button', { class: 'btn btn-accent', type: 'button', onclick: () => setView('preview') }, 'See it')));
+    el.append(h('div', { class: 'msg-actions' },
+      previewEntry(project.files) ? h('button', { class: 'btn btn-quiet btn-sm', type: 'button', disabled: ui.busy, onclick: () => playtest() }, '🎮 Playtest it') : null,
+      h('button', { class: 'btn btn-accent btn-sm mobile-only', type: 'button', onclick: () => setView('preview') }, 'See it')));
   }
   return el;
 }
@@ -2237,6 +2861,7 @@ function setBusyUI() {
   b.textContent = ui.busy ? 'Stop' : 'Send';
   b.className = 'btn ' + (ui.busy ? 'btn-stop' : 'btn-accent');
   $('#editor').readOnly = ui.busy || !ui.file;
+  $('#playBtn').disabled = ui.busy;
   renderConsole();
   renderFixBar();
   updateUndo();
@@ -2698,6 +3323,8 @@ function fillSettings() {
   if (document.activeElement !== $('#aiName')) $('#aiName').value = settings.aiName;
   if (document.activeElement !== $('#instructions')) $('#instructions').value = settings.instructions;
   $('#themeSel').value = settings.theme || '';
+  $('#autoPlay').checked = !!settings.autoPlaytest;
+  $('#playRounds').value = String(settings.playRounds || 5);
 }
 function changeSetting(k, v) { settings[k] = v; saveSettings(); updateEngine(); fillSettings(); }
 
@@ -2938,6 +3565,10 @@ function bindUI() {
   $('#instructions').addEventListener('input', e => { settings.instructions = e.target.value; saveSettings(); });
   $('#themeSel').addEventListener('change', e => { changeSetting('theme', e.target.value); applyTheme(); });
 
+  $('#autoPlay').addEventListener('change', e => changeSetting('autoPlaytest', e.target.checked));
+  $('#playRounds').addEventListener('change', e => changeSetting('playRounds', Number(e.target.value) || 5));
+  $('#playBtn').addEventListener('click', () => playtest());
+  $('#playStop').addEventListener('click', stopTurn);
   $('#brainBtn').addEventListener('click', openBrain);
   $('#brainDone').addEventListener('click', () => $('#brain').close());
   $('#studyBtn').addEventListener('click', () => $('#studyInput').click());
@@ -2960,7 +3591,7 @@ async function init() {
 }
 
 // Handles for automated tests; the page never relies on them.
-window.Forge = { parseResponse, applyOps, buildPreviewDoc, makeZip, summarize, md, hideBlobs, restoreBlobs, buildRules, buildContext, fitProject, get project() { return project; }, settings, runtime, send, ui };
+window.Forge = { parseResponse, parseActions, playtest, observe, applyOps, buildPreviewDoc, makeZip, summarize, md, hideBlobs, restoreBlobs, buildRules, buildContext, fitProject, get project() { return project; }, settings, runtime, send, ui };
 
 init();
 })();

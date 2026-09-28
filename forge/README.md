@@ -7,6 +7,11 @@ Forge is a personal AI you chat with in your browser. It runs on Claude, and it 
 - **Read and edit your files.** Attach files with the clip button (or drag them in) and ask it to change or fix them. Big files, even several megabytes, get read in pieces.
 - **Look at images** you attach.
 - **Fix its own bugs.** When the preview throws an error, press **Fix it**, or turn on auto-fix in Settings when you use an API key.
+- **Playtest what it builds.** After every build (or when you press **Playtest**), it plays the game itself, like a tester:
+  - **Eyes:** it takes screenshots, including 3D and WebGL canvases, and reads the text, buttons, console output and errors on screen.
+  - **Hands:** it clicks, presses and holds keys, drags, types, and does mouse-look.
+  - **Probes:** it runs one-line JavaScript checks, like reading `window.__game` for the score.
+  - It fixes the bugs it finds, reloads, and keeps testing for up to 5 rounds. You can watch it play live, and **Stop** it at any time.
 - **Take voice input.** Press the mic and talk. This needs Chrome or Edge on a computer; the Claude app blocks the microphone.
 - **Read answers out loud** with the speaker button on any reply.
 - **Download what it made**, as one HTML file or a `.zip` of the whole project.
