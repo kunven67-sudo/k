@@ -7,15 +7,17 @@ Forge is a personal AI you chat with in your browser. It runs on Claude, and it 
 - **Build real files**, like games, apps, and pages. It shows them running next to the chat in a live preview.
 - **Read and edit your files.** Attach files with the clip button (or drag them in) and ask it to change or fix them. Big files, even several megabytes, get read in pieces.
 - **Look at images** you attach.
+- **Make pictures and videos.** It draws pictures, posters, logos and animations with code. Press 📸 next to the preview to save a PNG, or 🎬 to record a video (MP4 or WebM, with the game's sound). Press 🎬 again to stop and save. You can record yourself playing, too.
+- **Run code to check its answers.** It has a JavaScript sandbox, like a mini computer. It runs code for math, data in your files, or testing a formula, then answers with the real result. A "⚙️ Ran code" note shows what it ran. The sandbox can't touch your chats or your key, and anything stuck stops after 15 seconds.
 - **Fix its own bugs.** When the preview throws an error, press **Fix it**, or turn on auto-fix in Settings when you use an API key.
 - **Playtest what it builds.** After every build (or when you press **Playtest**), it plays the game itself, like a tester:
-  - **Eyes:** it takes screenshots, including 3D and WebGL canvases, and reads the text, buttons, console output and errors on screen.
+  - **Eyes:** it takes exact screenshots of the real page (gradients, shadows, 3D and WebGL included). It can **zoom** in 3x on small text, and **watch** 4 frames in a row to catch motion and flicker. It also reads the frame rate (to catch lag), the text, the buttons, the console and the errors.
   - **Hands:** it clicks, presses and holds keys, drags, types, and does mouse-look.
   - **Code review first:** round 1 starts with it reading the code like a reviewer and fixing the bugs it can see before it plays.
   - **Probes:** it runs one-line JavaScript checks, like reading `window.__game` for the score.
   - **Test scripts:** it writes small test programs that run inside the game. For example, it can fast-forward 3 seconds and check that the score went up by 3, or that restart really resets everything. It gets back the result, anything the test logged, and any error.
   - It fixes the bugs it finds, reloads, and keeps testing: 8 rounds by default, up to 20 for a deep test (Settings → Playtesting). You can watch it play live, and **Stop** it at any time.
-- **Take voice input.** Press the mic and talk. This needs Chrome or Edge on a computer; the Claude app blocks the microphone.
+- **Take voice input.** Press the mic and talk. Where the browser's speech feature is blocked (like inside the Claude app), Forge switches to your device's own voice typing and tells you how: the 🎤 on your phone's keyboard, Fn twice on a Mac, or Windows + H.
 - **Read answers out loud** with the speaker button on any reply.
 - **Download what it made**, as one HTML file or a `.zip` of the whole project.
 
@@ -42,6 +44,8 @@ Brain cards are knowledge the AI reads before every answer (open them with the b
 
 ## Good to know
 
+- Forge can't search the web inside the Claude app (only in paid API mode), and it has no real terminal: pages in the Claude app can't reach the internet or run programs outside the browser. The code sandbox covers math and data work.
+- Big games are written in pieces: when a reply runs out of room, Forge continues the file up to 8 more times.
 - Forge can't be smarter than the Claude model it runs on. Picking the strongest model and max effort, plus the brain cards, is how it gets its best results.
 - Chats and memory are saved in your browser (IndexedDB, with a backup list in localStorage). If the browser clears only part of that storage, Forge rebuilds your chat list from what's left. Clearing all site data deletes them, so download anything you want to keep.
 - Forge never saves passwords or API keys to memory, even when the AI tries to.

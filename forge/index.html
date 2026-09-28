@@ -167,6 +167,10 @@ svg{flex:none}
 .composer-row{display:flex;align-items:center;gap:8px}
 .hint{font-size:12px;color:var(--faint);margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .icon-btn.rec{background:var(--hot);border-color:var(--hot);color:#fff;animation:pulse 1.2s ease-in-out infinite}
+#recBtn.recording{width:auto;padding:0 10px;gap:6px;display:inline-flex;align-items:center;background:var(--hot);border-color:var(--hot);color:#fff}
+.rec-time{font:700 12.5px var(--ui);font-variant-numeric:tabular-nums}
+.mic-help{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:10px;background:var(--accent-soft);border:1px solid var(--accent);font-size:13.5px;line-height:1.4}
+.mic-help span{flex:1}
 .tray{display:flex;gap:6px;flex-wrap:wrap}
 .att{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:4px 4px 4px 8px;border-radius:9px;border:1px solid var(--line);background:var(--surface-2);font:500 12.5px var(--mono)}
 .att img{width:28px;height:28px;object-fit:cover;border-radius:5px}
@@ -276,6 +280,10 @@ details[open] summary{margin-bottom:8px}
 .mem-item{display:flex;align-items:flex-start;gap:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:7px 8px 7px 11px;font-size:13.5px;line-height:1.4}
 .mem-item span{flex:1;min-width:0;overflow-wrap:anywhere;padding-top:3px}
 .mem-empty{font-size:13px;color:var(--dim);font-style:italic}
+.ran{font-size:13px;color:var(--dim)}
+.ran summary{cursor:pointer;font-weight:600}
+.ran pre{margin:4px 0 8px;max-height:220px;overflow:auto;white-space:pre-wrap;font:12px/1.5 var(--mono);background:var(--sunken);padding:8px 10px;border-radius:8px;color:var(--text)}
+.ran-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-top:6px}
 .mem-note{font-size:12.5px;color:var(--dim);padding:6px 10px;border-radius:9px;border:1px dashed var(--line-strong)}
 .cardrow{border:1px solid var(--line);border-radius:11px;background:var(--surface-2);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .cardrow-top{display:flex;align-items:center;gap:10px}
@@ -358,6 +366,8 @@ details[open] summary{margin-bottom:8px}
         <div class="ws-actions">
           <select id="entrySel" aria-label="Page to preview" hidden></select>
           <button class="btn btn-quiet btn-sm" id="playBtn" type="button" title="Let the AI play it, find bugs and fix them"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-4 3.6L2 15a3 3 0 0 0 5.4 2l1.1-1.5a2 2 0 0 1 1.6-.8h3.8a2 2 0 0 1 1.6.8l1.1 1.5A3 3 0 0 0 22 15l-.7-6.4a4 4 0 0 0-4-3.6z"/></svg>Playtest</button>
+          <button class="icon-btn" id="picBtn" type="button" aria-label="Save the preview as a picture" title="Save as a picture (PNG)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+          <button class="icon-btn" id="recBtn" type="button" aria-label="Record the preview as a video" title="Record a video (press again to stop)" aria-pressed="false"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg><span class="rec-time" hidden></span></button>
           <button class="icon-btn" id="undoBtn" type="button" aria-label="Undo last change" title="Undo last change" disabled><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
           <button class="icon-btn" id="reloadBtn" type="button" aria-label="Restart preview" title="Restart preview"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg></button>
           <button class="icon-btn" id="openBtn" type="button" aria-label="Open preview in a new tab" title="Open in a new tab"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></button>
@@ -915,7 +925,8 @@ const MODELS = [
 // Models that can decline for policy reasons; the API re-runs those requests on a fallback model.
 const FALLBACK_MODELS = new Set(['claude-opus-5', 'claude-fable-5-1']);
 const TIER_LABEL = { complex: 'Max', default: 'Balanced', quick: 'Fast' };
-const MAX_CONTINUES = 3, MAX_REPAIRS = 2, MAX_AUTOFIX = 2, MAX_TOOL_ROUNDS = 14;
+const MAX_RUN_ROUNDS = 3;
+const MAX_CONTINUES = 8, MAX_REPAIRS = 2, MAX_AUTOFIX = 2, MAX_TOOL_ROUNDS = 14;
 const SAMPLE_BUDGET = 60000;      // bytes of prompt text; the Claude app allows 64 KiB
 const API_FULL_LIMIT = 360000;    // above this, big files are sent as outlines Claude reads in pieces
 const STARTERS = [
@@ -981,6 +992,23 @@ The app previews index.html in a sandboxed frame, and people also download the f
 - alert(), confirm() and prompt() can be blocked, so build dialogs into the page.
 - Pointer lock and fullscreen can be refused: catch the error and keep the game playable (for example, drag to look).
 - No network requests: no APIs, no fetch.
+
+## Pictures and videos
+
+You can't output image or video files directly, but you make them with code and the app turns them into real files: the 📸 button next to the preview saves the page as a PNG picture, and the 🎬 button records it as a video (MP4 or WebM, with the page's Web Audio sound). So:
+- For a picture, drawing, poster, logo, wallpaper, meme, thumbnail or card: build an index.html that draws it with SVG, CSS or canvas, filling the window with nothing else in the way, and as detailed and polished as you can make it (lighting, gradients, shadows, texture, real typography). Then tell them to press 📸 to save it. A standalone .svg file is also a picture.
+- For a video, animation, intro, trailer, lyric video, slideshow or meme video: build a page that plays it by itself from the start (a timeline in code: scenes, text, camera moves, transitions, optional Web Audio music), with the length stated on screen for a moment at the start or in your reply. Tell them to press 🎬, let it play, and press it again to stop and save.
+- Photos of real people or places can't be made. Say so, and offer a drawn or stylized version.
+
+## Running code
+
+You have a JavaScript sandbox, like a mini computer. Put code in a <run> block and the app runs it and sends you what it printed and returned; then you finish your answer with the real results:
+<run>
+const rows = files['scores.csv'].trim().split('\\n').slice(1).map(l => l.split(','));
+console.log(rows.length, 'rows');
+return rows.reduce((n, r) => n + Number(r[2]), 0);
+</run>
+The code is the body of an async function. The variable files holds the project's files as text by path. It has no page (no DOM), no network, and stops after 15 seconds. Use it for math, stats, data in attached files, checking an algorithm or formula before you rely on it, and generating data like level layouts. Up to 3 rounds per message. Don't use it for things you already know for sure.
 
 ## Before you send
 
@@ -1082,6 +1110,8 @@ Actions:
 - turn DX DY: mouse-look by DX,DY pixels in first-person games
 - wait MS: let the game run
 - look: take a screenshot at this moment (one is always taken after the last action)
+- zoom X Y W H: a sharp close-up screenshot of that area, up to 3x bigger, for small text, HUD numbers or tiny sprites
+- watch MS: 4 screenshots spread over MS milliseconds, in one picture, to see motion, animation and flicker
 - js CODE: run one line of JavaScript inside the page and get the result back, for example js return window.__game
 - reload: restart the page from the beginning
 
@@ -1094,7 +1124,7 @@ return { before, after: g.score, state: g.state };
 </test>
 Use tests to prove the rules work: scoring adds up, timers end the round, collisions stop the player, restart resets everything, saves load back. If the game has no hooks for a check, add them to window.__game with an <edit> (like reset() or step(seconds)), then test.
 
-After your actions run you get screenshots, the visible text with positions, the buttons, console output, errors, and your js and test results. Screenshots are rebuilt from the page: canvases are exact, while HTML parts are drawn plainly without effects. The input is simulated, so pointer lock, fullscreen and starting audio can be refused; that is not a bug when the page handles it.
+After your actions run you get screenshots (at most 2 from look, zoom or watch, plus one after the last action), the visible text with positions, the buttons, the frame rate, console output, errors, and your js and test results. Screenshots show the real page: layout, colors, gradients, shadows and canvases (3D included), though web fonts can show as a similar fallback font. A frame rate under 50 fps or frames slower than 50 ms mean the game lags: find the cause and fix it. The input is simulated, so pointer lock, fullscreen and starting audio can be refused; that is not a bug when the page handles it.
 
 How to test: start it, try every control, try to score, win and lose, open the menus, pause and restart. Check that things really work (movement, collisions, scoring, timers, game over, restart), not just that nothing crashes. Use js to read the state when a screenshot isn't clear.
 
@@ -1295,21 +1325,22 @@ function parseResponse(raw, streaming) {
     if (lt !== -1 && last.length - lt < 240 && !last.includes('>', lt) && /^<\/?[a-z]*(\s|$)/i.test(last.slice(lt))) chat[chat.length - 1] = last.slice(0, lt);
   }
   // Playtest moves (<actions>, <test>) and saved memories (<remember>) live outside the file blocks.
-  const actions = [], remember = [];
+  const actions = [], remember = [], runs = [];
   for (let k = 0; k < chat.length; k++) {
-    chat[k] = chat[k].replace(/<(actions|test|remember)>([\s\S]*?)(<\/\1>|$)/g, (m, tag, body, end) => {
+    chat[k] = chat[k].replace(/<(actions|test|remember|run)>([\s\S]*?)(<\/\1>|$)/g, (m, tag, body, end) => {
       if (end || !streaming) {
         if (tag === 'actions') actions.push(...parseActions(body));
+        else if (tag === 'run') { if (body.trim() && runs.length < 4) runs.push(body.trim().slice(0, 40000)); }
         else if (tag === 'test') { if (body.trim() && actions.filter(a => a.op === 'test').length < 3) actions.push({ op: 'test', code: body.trim().slice(0, 20000), ms: 10000 }); }
         else if (body.trim()) remember.push(body.trim().replace(/\s+/g, ' ').slice(0, 300));
       }
       return '';
     });
   }
-  return { ops, open, chat: cleanChat(chat), actions, remember };
+  return { ops, open, chat: cleanChat(chat), actions, remember, runs };
 }
 function parseActions(body) {
-  const out = [], num = v => { const n = Number(v); return Number.isFinite(n) ? Math.round(n) : null; };
+  const out = [], num = v => { if (v == null || !String(v).trim()) return null; const n = Number(v); return Number.isFinite(n) ? Math.round(n) : null; };
   const clampMs = (v, lo, hi, d) => Math.max(lo, Math.min(hi, num(v) == null ? d : num(v)));
   for (let line of String(body).split('\n')) {
     line = line.trim().replace(/^(?:[-*•]|\d+[.)])\s*/, '');
@@ -1336,6 +1367,10 @@ function parseActions(body) {
       out.push({ op: 'wait', ms: clampMs(parts[0], 0, 10000, 500) });
     } else if (op === 'look' || op === 'screenshot') {
       out.push({ op: 'look' });
+    } else if (op === 'zoom') {
+      if (parts.slice(0, 4).every(v => num(v) != null)) out.push({ op: 'zoom', x: num(parts[0]), y: num(parts[1]), w: Math.max(8, num(parts[2])), h: Math.max(8, num(parts[3])) });
+    } else if (op === 'watch' || op === 'record') {
+      out.push({ op: 'watch', ms: clampMs(parts[0], 200, 5000, 1000) });
     } else if (op === 'js' || op === 'eval') {
       if (rest) out.push({ op: 'js', code: rest.slice(0, 2000) });
     } else if (op === 'reload' || op === 'restart') {
@@ -1925,6 +1960,51 @@ function continueMsg(pending, files) {
   }
   return 'Your last reply hit the length limit in the middle of the edits for ' + pending.path + '. The edits before that point were applied, and the project shows the current files. Send the remaining edits for ' + pending.path + ', then anything else you still had to write.';
 }
+/* ---------------- the code sandbox: the AI runs JavaScript and reads the results ---------------- */
+// It runs in a Worker inside a sandboxed frame: no access to this app, your chats or your key, and a stuck loop is simply stopped.
+const RUNNER_SRC = "<script>(function(){var P=parent;addEventListener('message',function(e){var d=e.data;if(e.source!==P||!d||d.__forgeRun!==1)return;"
+  + "var src='var out=[];function fmt(v){if(v===undefined)return \\'undefined\\';if(typeof v===\\'string\\')return v;try{return JSON.stringify(v,function(k,x){return typeof x===\\'bigint\\'?String(x):x;},2);}catch(e){return String(v);}}'"
+  + "+'[\\'log\\',\\'info\\',\\'warn\\',\\'error\\',\\'debug\\'].forEach(function(l){console[l]=function(){if(out.length<400)out.push([].slice.call(arguments).map(fmt).join(\\' \\'));};});'"
+  + "+'onmessage=function(m){var files=m.data.files;Promise.resolve().then(function(){return (new Function(\\'files\\',\\'return (async function(){\\\\n\\'+m.data.code+\\'\\\\n})();\\'))(files);}).then(function(v){postMessage({out:out,value:fmt(v)});},function(err){postMessage({out:out,error:String(err&&err.stack||err)});});};';"
+  + "var w;try{w=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));}catch(err){P.postMessage({__forgeRunResult:1,id:d.id,error:'The sandbox could not start: '+err.message},'*');return;}"
+  + "var t=setTimeout(function(){w.terminate();P.postMessage({__forgeRunResult:1,id:d.id,error:'Stopped after 15 s (an endless loop, or too much work).'},'*');},15000);"
+  + "w.onmessage=function(m){clearTimeout(t);w.terminate();var r=m.data;r.__forgeRunResult=1;r.id=d.id;P.postMessage(r,'*');};"
+  + "w.onerror=function(ev){clearTimeout(t);w.terminate();P.postMessage({__forgeRunResult:1,id:d.id,error:String(ev.message||'error')},'*');ev.preventDefault();};"
+  + "w.postMessage({code:d.code,files:d.files});});P.postMessage({__forgeRunReady:1},'*');})();<\/script>";
+let runnerFrame = null, runnerReady = null, runSeq = 0;
+const runWaiters = new Map();
+function ensureRunner() {
+  if (runnerFrame && runnerFrame.isConnected) return runnerReady;
+  runnerFrame = h('iframe', { sandbox: 'allow-scripts', title: 'Code sandbox', 'aria-hidden': 'true', tabindex: '-1', style: 'position:fixed;width:1px;height:1px;left:-10px;top:-10px;border:0;opacity:0' });
+  runnerReady = new Promise(resolve => { runnerFrame._ready = resolve; setTimeout(resolve, 3000); });
+  runnerFrame.srcdoc = '<!doctype html><html><head>' + RUNNER_SRC + '</head><body></body></html>';
+  document.body.append(runnerFrame);
+  return runnerReady;
+}
+window.addEventListener('message', e => {
+  if (!runnerFrame || e.source !== runnerFrame.contentWindow || !e.data) return;
+  if (e.data.__forgeRunReady && runnerFrame._ready) runnerFrame._ready();
+  if (e.data.__forgeRunResult) { const w = runWaiters.get(e.data.id); if (w) { runWaiters.delete(e.data.id); w(e.data); } }
+});
+async function runCode(code, files) {
+  await ensureRunner();
+  const id = ++runSeq;
+  return new Promise(resolve => {
+    const timer = setTimeout(() => { runWaiters.delete(id); resolve({ error: 'The sandbox did not answer.' }); }, 20000);
+    runWaiters.set(id, d => { clearTimeout(timer); resolve(d); });
+    try { runnerFrame.contentWindow.postMessage({ __forgeRun: 1, id, code, files }, '*'); }
+    catch (e) { clearTimeout(timer); runWaiters.delete(id); resolve({ error: e.message }); }
+  });
+}
+function runReport(r) {
+  let s = (r.out && r.out.length ? 'Printed:\n' + r.out.join('\n') + '\n' : '') + (r.error ? 'Error: ' + r.error : 'Returned: ' + r.value);
+  if (s.length > 8000) s = s.slice(0, 7800) + '\n[cut: too much output]';
+  return s;
+}
+function runMsg(done) {
+  return 'Your code ran in the sandbox. Here are the results:\n' + done.map((d, i) => '<run_result n="' + (i + 1) + '">\n' + d.report + '\n</run_result>').join('\n')
+    + '\n\nUse these results to finish your answer. Send another <run> only if you really need more, and never repeat the text you already wrote.';
+}
 function repairMsg(failed) {
   const lines = [];
   for (const r of failed) for (const f of r.failures) {
@@ -1954,6 +2034,8 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
     if (!text) text = images.length ? 'Take a look at this.' : 'I added some files. Take a look.';
     if (files.length) text = '[Attached: ' + files.map(f => f.path + ' (' + fmtBytes(f.bytes) + ')').join(', ') + ']\n' + text;
     $('#prompt').value = '';
+    const mh = $('#micHelp');
+    if (mh) mh.remove();
     autoGrow();
     renderTray();
     ui.autoFixRuns = 0;
@@ -1983,14 +2065,15 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
   const before = p.files;
   let files = { ...p.files };
   const results = [], chats = [], remember = [];
-  let warn = null, continues = 0, repairs = 0, followup = null, tier = null;
+  let warn = null, continues = 0, repairs = 0, runRounds = 0, followup = null, tier = null;
+  const ran = [];
   try {
     for (;;) {
       const ctx = buildContext(engine, { prior, request: text, files, followup, chatSoFar: chats.join('\n\n'), results, images: followup ? null : images });
       bubble.prev = { chat: chats.join('\n\n'), results: results.slice() };
       bubble.text = '';
       bubble.tool = '';
-      bubble.mode = !followup ? 'build' : followup.startsWith('Your last reply hit') ? 'continue' : 'repair';
+      bubble.mode = !followup ? 'build' : followup.startsWith('Your last reply hit') ? 'continue' : followup.startsWith('Your code ran') ? 'run' : 'repair';
       streamUpdate(bubble);
       const callbacks = {
         signal: ui.ctl.signal,
@@ -2027,12 +2110,24 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
       const failed = applied.results.filter(r => !r.ok && r.op.type === 'edit');
       if (pending && continues < MAX_CONTINUES) { continues++; followup = continueMsg(pending, files); continue; }
       if (pending) { warn = 'The reply got cut off before it finished. Send "continue" to finish it.'; break; }
+      if (parsed.runs.length && runRounds < MAX_RUN_ROUNDS) {
+        runRounds++;
+        const done = [];
+        for (let k = 0; k < parsed.runs.length; k++) {
+          setTool(bubble, 'Running code' + (parsed.runs.length > 1 ? ' ' + (k + 1) + ' of ' + parsed.runs.length : ''));
+          const r = await abortable(runCode(parsed.runs[k], { ...files }), ui.ctl.signal);
+          done.push({ code: parsed.runs[k], report: runReport(r) });
+        }
+        ran.push(...done);
+        followup = runMsg(done) + (failed.length && repairs < MAX_REPAIRS ? (repairs++, '\n\n' + repairMsg(failed)) : '');
+        continue;
+      }
       if (failed.length && repairs < MAX_REPAIRS) { repairs++; followup = repairMsg(failed); continue; }
       if (failed.length) warn = "Some changes couldn't be applied. Ask it to try that part again.";
       else if (res.stop === 'truncated') warn = 'The reply hit the length limit.';
       break;
     }
-    finishTurn({ p, before, files, results, chats, warn, engine, tier, kind, remember });
+    finishTurn({ p, before, files, results, chats, warn, engine, tier, kind, remember, ran });
   } catch (e) {
     if (e instanceof Cancelled) {
       p.messages.push({ role: 'note', text: 'Stopped. Nothing was changed.', t: Date.now() });
@@ -2063,14 +2158,15 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
   }
 }
 const engineLabel = (engine, tier) => engine === 'api' ? (MODELS.find(m => m.id === settings.model) || {}).short + ' · ' + settings.effort : 'Claude · ' + (TIER_LABEL[tier || settings.tier] || 'Max');
-function finishTurn({ p, before, files, results, chats, warn, engine, tier, kind, remember }) {
+function finishTurn({ p, before, files, results, chats, warn, engine, tier, kind, remember, ran }) {
   const changed = results.some(r => r.ok);
   const summary = summarize(before, files, results);
   if (changed) { pushCheckpoint(p, (kind === 'fix' ? 'Fix: ' : '') + (p.messages[p.messages.length - 1].text || '')); p.files = files; }
   const msg = { role: 'assistant', text: chats.join('\n\n').trim(), ops: summary, t: Date.now(), engine: engineLabel(engine, tier) };
   if (warn) msg.warn = warn;
+  if (ran && ran.length) msg.ran = ran.map(r => ({ code: r.code.slice(0, 4000), report: r.report.slice(0, 4000) }));
   if (settings.memory && remember && remember.length) { const added = addMemories(remember); if (added.length) msg.remembered = added; }
-  if (!msg.text && !summary.length && !msg.remembered) msg.text = '(No reply this time.)';
+  if (!msg.text && !summary.length && !msg.remembered && !msg.ran) msg.text = '(No reply this time.)';
   p.messages.push(msg);
   if (changed) {
     if (!ui.file || !has(p.files, ui.file)) ui.file = firstFile(p.files, summary);
@@ -2144,6 +2240,7 @@ async function observe(actions, signal, note) {
     out.logs.push(...(r.logs || []));
     out.shots.push(...(r.shots || []).filter(x => typeof x === 'string' && x.startsWith('data:image')));
     if (r.summary) out.summary = r.summary;
+    if (r.perf) out.perf = r.perf;
     out.w = r.w; out.h = r.h;
   }
   out.errors = ui.roundErrors.slice();
@@ -2152,7 +2249,7 @@ async function observe(actions, signal, note) {
 }
 function obsText(o, round, rounds, last, withImages) {
   const L = ['Playtest round ' + round + ' of ' + rounds + '.' + (last ? ' This is the last round: reply with your final report and no <actions> block.' : ''), '<observation>'];
-  L.push('Preview size: ' + o.w + 'x' + o.h + ' CSS pixels.');
+  L.push('Preview size: ' + o.w + 'x' + o.h + ' CSS pixels.' + (o.perf ? ' Frame rate: ' + o.perf + '.' : ''));
   if (o.note) L.push(o.note);
   if (o.log.length) L.push('What happened:\n' + o.log.map(x => '- ' + x).join('\n'));
   if (o.js.length) L.push('js results:\n' + o.js.map((x, i) => (i + 1) + '. ' + x).join('\n'));
@@ -2180,7 +2277,7 @@ function shotsToImages(shots, engine) {
   return shots.slice(-max).map((url, i) => ({ name: 'screenshot-' + (i + 1) + '.jpg', type: 'image/jpeg', data: url.slice(url.indexOf(',') + 1), blob: dataUrlToBlob(url), url }));
 }
 function describeActions(actions) {
-  const say = a => a.op === 'click' ? 'click ' + (a.text != null ? '"' + a.text + '"' : a.x + ',' + a.y) : a.op === 'press' || a.op === 'hold' ? a.op + ' ' + a.key : a.op === 'js' ? 'check the game state' : a.op === 'test' ? 'run a test script' : a.op;
+  const say = a => a.op === 'click' ? 'click ' + (a.text != null ? '"' + a.text + '"' : a.x + ',' + a.y) : a.op === 'press' || a.op === 'hold' ? a.op + ' ' + a.key : a.op === 'js' ? 'check the game state' : a.op === 'test' ? 'run a test script' : a.op === 'watch' ? 'watch it move' : a.op === 'zoom' ? 'zoom in' : a.op;
   return actions.slice(0, 3).map(say).join(', ') + (actions.length > 3 ? '…' : '');
 }
 async function playtest({ auto = false } = {}) {
@@ -2309,6 +2406,63 @@ async function playtest({ auto = false } = {}) {
   }
 }
 
+/* ---------------- pictures and videos of the preview ---------------- */
+function mediaCmd(action, ms) {
+  const frame = $('#frame'), id = ++cmdSeq;
+  return new Promise(resolve => {
+    const timer = setTimeout(() => { cmdWaiters.delete(id); resolve({ ok: false, error: "the preview didn't answer" }); }, ms);
+    cmdWaiters.set(id, d => { clearTimeout(timer); resolve(d); });
+    try { frame.contentWindow.postMessage({ __forgeCmd: 'media', id, action }, '*'); }
+    catch (e) { clearTimeout(timer); cmdWaiters.delete(id); resolve({ ok: false, error: e.message }); }
+  });
+}
+function showPreviewForMedia() {
+  if ($('#main').classList.contains('solo')) { ui.wsMode = 'show'; updateLayout(); }
+  if (window.innerWidth <= 880) setView('preview'); else setWsTab('preview');
+}
+async function savePicture() {
+  if (!previewEntry(project.files)) { toast('Build something first, then save it as a picture.'); return; }
+  showPreviewForMedia();
+  if (!ui.ready) await waitReady(8000);
+  const btn = $('#picBtn');
+  btn.disabled = true;
+  const r = await mediaCmd('picture', 20000);
+  btn.disabled = false;
+  if (!r.ok || !r.blob) { toast("Couldn't make the picture" + (r.error ? ': ' + r.error : '.')); return; }
+  download(slug(project.name) + '.png', r.blob);
+}
+function updateRecBtn() {
+  const btn = $('#recBtn'), t = btn.querySelector('.rec-time'), rec = ui.recording;
+  btn.classList.toggle('recording', !!rec);
+  btn.setAttribute('aria-pressed', String(!!rec));
+  t.hidden = !rec;
+  if (rec) { const s = Math.floor((Date.now() - rec.t0) / 1000); t.textContent = '■ ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  btn.title = rec ? 'Stop recording and save the video' : 'Record a video (press again to stop)';
+}
+async function toggleRecord() {
+  if (ui.recording) { stopRecord(); return; }
+  if (!previewEntry(project.files)) { toast('Build something first, then record it.'); return; }
+  showPreviewForMedia();
+  if (!ui.ready) await waitReady(8000);
+  const r = await mediaCmd('start', 8000);
+  if (!r.ok) { toast("Couldn't start recording" + (r.error ? ': ' + r.error : '.')); return; }
+  const rec = ui.recording = { t0: Date.now() };
+  rec.timer = setInterval(() => { if (ui.recording !== rec) return; updateRecBtn(); if (Date.now() - rec.t0 > 120000) stopRecord(); }, 250);
+  updateRecBtn();
+  toast('Recording 🎬 Play the game, then press the red button to save the video.');
+}
+async function stopRecord() {
+  const rec = ui.recording;
+  if (!rec) return;
+  clearInterval(rec.timer);
+  ui.recording = null;
+  updateRecBtn();
+  toast('Making the video…');
+  const r = await mediaCmd('stop', 60000);
+  if (!r.ok || !r.blob || !r.blob.size) { toast("Couldn't make the video" + (r.error ? ': ' + r.error : '.')); return; }
+  download(slug(project.name) + (/mp4/.test(r.mime) ? '.mp4' : '.webm'), r.blob);
+}
+
 /* ---------------- streaming bubble ---------------- */
 const SPARK = '<svg class="spark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.2 6.3L20.5 10l-6.3 2.2L12 18.5l-2.2-6.3L3.5 10l6.3-1.7z"/></svg>';
 function makeBubble(engine) {
@@ -2369,7 +2523,7 @@ function opKind(r) { return r.op.type === 'delete' ? 'deleted' : r.op.type === '
 function updateStatus(b) {
   const secs = Math.round((Date.now() - b.t0) / 1000);
   const o = b.parsed && b.parsed.open;
-  const lead = b.mode === 'continue' ? 'Continuing · ' : b.mode === 'repair' ? 'Fixing edits that missed · ' : b.mode === 'playtest' ? 'Playtest' + (b.round ? ' round ' + b.round + ' of ' + b.rounds : '') + ' · ' : '';
+  const lead = b.mode === 'continue' ? 'Continuing · ' : b.mode === 'repair' ? 'Fixing edits that missed · ' : b.mode === 'run' ? 'Using the code results · ' : b.mode === 'playtest' ? 'Playtest' + (b.round ? ' round ' + b.round + ' of ' + b.rounds : '') + ' · ' : '';
   let s;
   if (b.tool && (b.text || '').trimEnd().length <= (b.toolAt || 0)) s = lead + b.tool + ' · ' + secs + 's';
   else if (!b.text) s = lead + (b.engine === 'claude' && secs < 3 ? 'Waiting for Claude' : 'Thinking') + ' · ' + secs + 's';
@@ -2480,19 +2634,150 @@ function previewHelper() {
   });
 
   /* ---- eyes: screenshots are taken right after the page draws, so WebGL canvases aren't blank ---- */
-  var raf = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : null, waiting = [], queued = false;
-  function grab() { var u = null; try { u = compose(false); } catch (e) { try { u = compose(true); } catch (e2) { u = null; } } return u; }
-  function flush() { queued = false; var list = waiting.splice(0), u = grab(); for (var i = 0; i < list.length; i++) list[i](u); }
+  var raf = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : null, waiting = [], queued = false, frameTimes = [], lastFrame = -1;
+  function flush() {
+    queued = false;
+    if (recState && recState.big) recBigFrame();
+    var list = waiting.splice(0);
+    if (!list.length) return;
+    var cap = capture();
+    for (var i = 0; i < list.length; i++) list[i](cap);
+  }
   if (raf) {
     window.requestAnimationFrame = function (cb) {
-      return raf(function (t) { try { cb(t); } finally { if (waiting.length && !queued) { queued = true; raf(flush); } } });
+      return raf(function (t) {
+        if (t !== lastFrame) { lastFrame = t; frameTimes.push(t); if (frameTimes.length > 400) frameTimes.shift(); }
+        try { cb(t); } finally { if ((waiting.length || (recState && recState.big)) && !queued) { queued = true; raf(flush); } }
+      });
     };
   }
-  function shot() {
+  function perf() {
+    var now = performance.now(), list = frameTimes.filter(function (t) { return now - t < 3000; });
+    if (list.length < 3) return 'no animation frames in the last 3 s (the page may not animate, or it is frozen)';
+    var worst = 0;
+    for (var i = 1; i < list.length; i++) worst = Math.max(worst, list[i] - list[i - 1]);
+    var fps = Math.round((list.length - 1) * 1000 / Math.max(1, list[list.length - 1] - list[0]));
+    return fps + ' fps over the last ' + ((list[list.length - 1] - list[0]) / 1000).toFixed(1) + ' s, slowest frame ' + Math.round(worst) + ' ms';
+  }
+  function shot(region) {
     return new Promise(function (resolve) {
-      waiting.push(resolve);
-      setTimeout(function () { var i = waiting.indexOf(resolve); if (i !== -1) { waiting.splice(i, 1); resolve(grab()); } }, 600);
+      var done = false;
+      function go(cap) { if (done) return; done = true; render(cap, region).then(resolve, function () { resolve(null); }); }
+      waiting.push(go);
+      setTimeout(function () { var i = waiting.indexOf(go); if (i !== -1) { waiting.splice(i, 1); go(capture()); } }, 600);
     });
+  }
+  /* Exact screenshots: the live page is copied with every computed style into an SVG image and drawn by the browser itself.
+     Browsers that refuse it fall back to the plain redraw in compose(). */
+  var exactOk = null, NOPROP = /^(transition|animation|will-change|cursor|caret|pointer-events|user-select|-webkit-user-select|touch-action|-webkit-tap)/;
+  function styleText(cs) {
+    var t = '';
+    for (var i = 0; i < cs.length; i++) { var p = cs[i]; if (!NOPROP.test(p)) t += p + ':' + cs.getPropertyValue(p) + ';'; }
+    return t;
+  }
+  function cloneTree(el, st) {
+    if (++st.n > 2500) throw new Error('page too big for an exact screenshot');
+    var tag = el.tagName, cs = getComputedStyle(el), c;
+    if (el === st.skip) { c = document.createElement('div'); c.setAttribute('style', styleText(cs) + 'visibility:hidden;'); return c; }
+    if (tag === 'CANVAS' || tag === 'VIDEO') {
+      c = document.createElement('img');
+      var url = '';
+      if (tag === 'CANVAS') url = el.toDataURL();
+      else { var vc = document.createElement('canvas'); vc.width = el.videoWidth || 1; vc.height = el.videoHeight || 1; vc.getContext('2d').drawImage(el, 0, 0, vc.width, vc.height); url = vc.toDataURL(); }
+      c.setAttribute('src', url);
+      c.setAttribute('style', styleText(cs));
+      return c;
+    }
+    if (el instanceof SVGElement) { c = el.cloneNode(true); c.setAttribute('style', styleText(cs)); return c; }
+    c = el.cloneNode(false);
+    c.removeAttribute('id');
+    var style = styleText(cs);
+    if (el === document.body && (scrollX || scrollY)) style += 'margin-top:' + (parseFloat(cs.marginTop) - scrollY) + 'px;margin-left:' + (parseFloat(cs.marginLeft) - scrollX) + 'px;';
+    c.setAttribute('style', style);
+    if (tag === 'INPUT') { if (el.type === 'checkbox' || el.type === 'radio') { if (el.checked) c.setAttribute('checked', ''); else c.removeAttribute('checked'); } else c.setAttribute('value', el.value); }
+    if (tag === 'IMG' && el.currentSrc && !/^(data:|blob:)/.test(el.currentSrc)) c.removeAttribute('src');
+    ['before', 'after'].forEach(function (w) {
+      var ps = getComputedStyle(el, '::' + w), content = ps.getPropertyValue('content');
+      if (!content || content === 'none' || content === 'normal') return;
+      var cls = 'fx' + (++st.k);
+      c.setAttribute('class', ((c.getAttribute('class') || '') + ' ' + cls).trim());
+      st.css += '.' + cls + '::' + w + '{' + styleText(ps) + '}';
+    });
+    if (cs.display === 'none') return c;
+    if (tag === 'TEXTAREA') { c.textContent = el.value; return c; }
+    if (tag === 'SELECT') { var o = el.options[el.selectedIndex]; c.appendChild(document.createTextNode(o ? o.text : '')); return c; }
+    for (var n = el.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType === 3) c.appendChild(document.createTextNode(n.nodeValue));
+      else if (n.nodeType === 1 && !/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|LINK|META)$/.test(n.tagName)) { var k = cloneTree(n, st); if (k) c.appendChild(k); }
+    }
+    return c;
+  }
+  function snapshotSvg(W, H, skip) {
+    if (!document.body) return null;
+    var st = { n: 0, k: 0, css: '', skip: skip || null }, body = cloneTree(document.body, st), clearBg = skip ? 'background:transparent;' : '';
+    if (skip) body.setAttribute('style', body.getAttribute('style') + clearBg);
+    var html = '<html xmlns="http://www.w3.org/1999/xhtml" style="' + styleText(getComputedStyle(document.documentElement)).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + 'overflow:hidden;' + clearBg + '"><head><style>' + st.css.replace(/&/g, '\\26 ').replace(/</g, '\\3c ') + '</style></head>' + new XMLSerializer().serializeToString(body) + '</html>';
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '"><foreignObject x="0" y="0" width="100%" height="100%">' + html + '</foreignObject></svg>';
+  }
+  function capture() {
+    var W = Math.max(1, innerWidth), H = Math.max(1, innerHeight), cap = { W: W, H: H, svg: null, canvas: null, sc: 1, bg: '#ffffff' };
+    try { var bg = document.body ? getComputedStyle(document.body).backgroundColor : ''; if (clear(bg)) bg = getComputedStyle(document.documentElement).backgroundColor; if (!clear(bg)) cap.bg = bg; } catch (e) { cap.bg = '#ffffff'; }
+    if (exactOk !== false) { try { cap.svg = snapshotSvg(W, H); } catch (e) { cap.svg = null; } }
+    if (exactOk !== true || !cap.svg) {
+      try { cap.canvas = compose(false); } catch (e) { try { cap.canvas = compose(true); } catch (e2) { cap.canvas = null; } }
+      if (cap.canvas) cap.sc = cap.canvas.width / W;
+    }
+    return cap;
+  }
+  function svgImage(cap) {
+    return new Promise(function (resolve) {
+      if (!cap.svg) { resolve(null); return; }
+      var img = new Image(), t = setTimeout(function () { exactOk = false; resolve(null); }, 4000);
+      img.onload = function () {
+        clearTimeout(t);
+        try { var tc = document.createElement('canvas'); tc.width = tc.height = 2; tc.getContext('2d').drawImage(img, 0, 0, 2, 2); tc.toDataURL(); exactOk = true; resolve(img); }
+        catch (e) { exactOk = false; resolve(null); }
+      };
+      img.onerror = function () { clearTimeout(t); exactOk = false; resolve(null); };
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(cap.svg);
+    });
+  }
+  function render(cap, region) {
+    return svgImage(cap).then(function (img) {
+      var x = 0, y = 0, w = cap.W, h = cap.H;
+      if (region) {
+        x = Math.max(0, Math.min(cap.W - 1, region.x)); y = Math.max(0, Math.min(cap.H - 1, region.y));
+        w = Math.max(1, Math.min(cap.W - x, region.w)); h = Math.max(1, Math.min(cap.H - y, region.h));
+      }
+      var z = Math.min(region ? 3 : 1, 1000 / w, 1000 / h), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w * z)); c.height = Math.max(1, Math.round(h * z));
+      var g = c.getContext('2d');
+      if (img) { g.fillStyle = cap.bg; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, -x * z, -y * z, cap.W * z, cap.H * z); }
+      else if (cap.canvas) g.drawImage(cap.canvas, x * cap.sc, y * cap.sc, w * cap.sc, h * cap.sc, 0, 0, c.width, c.height);
+      else if (cap.svg && exactOk === false) return shot(region);
+      else return null;
+      try { return c.toDataURL('image/jpeg', 0.75); } catch (e) { return null; }
+    });
+  }
+  function loadImg(url) { return new Promise(function (r) { if (!url) { r(null); return; } var i = new Image(); i.onload = function () { r(i); }; i.onerror = function () { r(null); }; i.src = url; }); }
+  async function watch(ms) {
+    var frames = [];
+    for (var f = 0; f < 4; f++) { if (f) await wait(ms / 3); frames.push(await shot()); }
+    var imgs = await Promise.all(frames.map(loadImg)), first = imgs.filter(Boolean)[0];
+    if (!first) return null;
+    var cw = Math.round(first.width / 2), ch = Math.round(first.height / 2), c = document.createElement('canvas');
+    c.width = cw * 2 + 6; c.height = ch * 2 + 6;
+    var g = c.getContext('2d');
+    g.fillStyle = '#ff00ff'; g.fillRect(0, 0, c.width, c.height);
+    for (var q = 0; q < 4; q++) {
+      var px = (q % 2) * (cw + 6), py = Math.floor(q / 2) * (ch + 6);
+      if (imgs[q]) g.drawImage(imgs[q], px, py, cw, ch);
+      var label = (q + 1) + ' · ' + Math.round(q * ms / 3) + ' ms';
+      g.font = 'bold 16px sans-serif'; g.textBaseline = 'middle';
+      g.fillStyle = 'rgba(0,0,0,.75)'; g.fillRect(px, py, g.measureText(label).width + 12, 26);
+      g.fillStyle = '#fff'; g.fillText(label, px + 6, py + 13);
+    }
+    return c.toDataURL('image/jpeg', 0.75);
   }
   var SKIP = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|HEAD|META|LINK|TITLE|BR)$/;
   function all() { return document.body ? document.body.getElementsByTagName('*') : []; }
@@ -2562,7 +2847,7 @@ function previewHelper() {
       }
     }
     g.globalAlpha = 1;
-    return c.toDataURL('image/jpeg', 0.72);
+    return c;
   }
   function summary() {
     var texts = [], buttons = [], canvases = [], seen = {}, els = all(), cache = new Map();
@@ -2677,6 +2962,8 @@ function previewHelper() {
       try {
         if (a.op === 'wait') { await wait(a.ms); log.push('wait ' + a.ms + ' ms'); }
         else if (a.op === 'look') { if (shots.length < 2) shots.push(await shot()); log.push('look (screenshot ' + shots.length + ')'); }
+        else if (a.op === 'zoom') { if (shots.length < 2) shots.push(await shot({ x: a.x, y: a.y, w: a.w, h: a.h })); log.push('zoom on ' + a.x + ',' + a.y + ' size ' + a.w + 'x' + a.h + ' (screenshot ' + shots.length + ')'); }
+        else if (a.op === 'watch') { if (shots.length < 2) shots.push(await watch(a.ms)); else await wait(a.ms); log.push('watch for ' + a.ms + ' ms (screenshot ' + shots.length + ' holds 4 frames: left to right, then top to bottom)'); }
         else if (a.op === 'press') { key('keydown', a.key); await wait(80); key('keyup', a.key); await wait(40); log.push('press ' + a.key); }
         else if (a.op === 'hold') { key('keydown', a.key); await wait(a.ms); key('keyup', a.key); log.push('hold ' + a.key + ' for ' + a.ms + ' ms'); }
         else if (a.op === 'click') {
@@ -2741,11 +3028,113 @@ function previewHelper() {
     }
     await wait(150);
     shots.push(await shot());
-    return { log: log, shots: shots, js: js, tests: tests, summary: summary(), logs: logs.splice(0), w: innerWidth, h: innerHeight };
+    return { log: log, shots: shots, js: js, tests: tests, summary: summary(), logs: logs.splice(0), w: innerWidth, h: innerHeight, perf: perf() };
+  }
+  /* ---- pictures and videos: the page saved as a PNG, or recorded as a video with its Web Audio sound ---- */
+  var recState = null, audioTap = null;
+  if (window.AudioNode && window.AudioDestinationNode) {
+    var origConnect = AudioNode.prototype.connect;
+    AudioNode.prototype.connect = function (dest) {
+      var r = origConnect.apply(this, arguments);
+      try {
+        if (dest instanceof AudioDestinationNode && this.context && this.context.createMediaStreamDestination) {
+          var ctx = this.context;
+          if (!ctx.__forgeTap) { ctx.__forgeTap = ctx.createMediaStreamDestination(); if (!audioTap) audioTap = ctx.__forgeTap; }
+          origConnect.call(this, ctx.__forgeTap);
+        }
+      } catch (e) { /* recording sound is optional */ }
+      return r;
+    };
+  }
+  function frameCap(cb) {
+    var done = false;
+    function go(cap) { if (done) return; done = true; cb(cap); }
+    waiting.push(go);
+    setTimeout(function () { var i = waiting.indexOf(go); if (i !== -1) { waiting.splice(i, 1); go(capture()); } }, 150);
+  }
+  function drawCap(cap, c, g) {
+    return svgImage(cap).then(function (img) {
+      g.fillStyle = cap.bg; g.fillRect(0, 0, c.width, c.height);
+      if (img) g.drawImage(img, 0, 0, c.width, c.height);
+      else if (cap.canvas) g.drawImage(cap.canvas, 0, 0, c.width, c.height);
+    });
+  }
+  function picture() {
+    return new Promise(function (resolve, reject) {
+      frameCap(function (cap) {
+        var z = Math.min(2, 4096 / cap.W, 4096 / cap.H), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(cap.W * z)); c.height = Math.max(1, Math.round(cap.H * z));
+        drawCap(cap, c, c.getContext('2d')).then(function () { c.toBlob(function (b) { if (b) resolve(b); else reject(new Error('The picture could not be made.')); }, 'image/png'); }, reject);
+      });
+    });
+  }
+  function bigCanvas() {
+    var list = document.getElementsByTagName('canvas'), best = null, area = 0;
+    for (var i = 0; i < list.length; i++) { var r = list[i].getBoundingClientRect(), a = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)); if (a > area) { area = a; best = list[i]; } }
+    return area >= innerWidth * innerHeight * 0.5 ? best : null;
+  }
+  function recBigFrame() {
+    var r = recState, g = r.g, z = r.z, cr = r.big.getBoundingClientRect();
+    g.fillStyle = r.bg; g.fillRect(0, 0, r.c.width, r.c.height);
+    try { g.drawImage(r.big, cr.left * z, cr.top * z, cr.width * z, cr.height * z); } catch (e) { /* not drawable this frame */ }
+    if (r.overlay) g.drawImage(r.overlay, 0, 0, r.c.width, r.c.height);
+    r.frames++; r.last = performance.now();
+    if (!r.busy && r.last - r.overlayAt > 200) {
+      r.busy = true; r.overlayAt = r.last;
+      var W = Math.max(1, innerWidth), H = Math.max(1, innerHeight), svg = null;
+      try { svg = exactOk === false ? null : snapshotSvg(W, H, r.big); } catch (e) { svg = null; }
+      svgImage({ svg: svg }).then(function (img) { if (img) r.overlay = img; r.busy = false; }, function () { r.busy = false; });
+    }
+  }
+  function startVideo() {
+    if (recState) return;
+    if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) throw new Error("This browser can't record video.");
+    var W = Math.max(1, innerWidth), H = Math.max(1, innerHeight), z = Math.min(1, 1280 / W, 1280 / H), c = document.createElement('canvas');
+    c.width = Math.max(2, Math.round(W * z / 2) * 2); c.height = Math.max(2, Math.round(H * z / 2) * 2);
+    var g = c.getContext('2d'), types = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'], mime = '';
+    for (var i = 0; i < types.length; i++) if (MediaRecorder.isTypeSupported(types[i])) { mime = types[i]; break; }
+    var stream = c.captureStream(30), tracks = stream.getVideoTracks();
+    if (audioTap) tracks = tracks.concat(audioTap.stream.getAudioTracks());
+    var mr = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime, videoBitsPerSecond: 6000000 } : {});
+    var bg = '#000000';
+    try { var b = getComputedStyle(document.body).backgroundColor; if (clear(b)) b = getComputedStyle(document.documentElement).backgroundColor; if (!clear(b)) bg = b; } catch (e) { bg = '#000000'; }
+    var r = recState = { mr: mr, chunks: [], c: c, g: g, z: z, bg: bg, mime: (mr.mimeType || mime || 'video/webm').split(';')[0], t0: performance.now(), frames: 0, big: bigCanvas(), overlay: null, overlayAt: 0, busy: false, last: 0, sound: !!audioTap };
+    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+    mr.ondataavailable = function (e) { if (e.data && e.data.size) r.chunks.push(e.data); };
+    mr.start(500);
+    if (r.big) {
+      r.timer = setInterval(function () { if (recState === r && performance.now() - r.last > 120) recBigFrame(); }, 60);
+      if (raf && !queued) { queued = true; raf(flush); }
+    } else {
+      (function loop() { if (recState !== r) return; frameCap(function (cap) { drawCap(cap, c, g).then(function () { r.frames++; setTimeout(loop, 0); }, function () { setTimeout(loop, 50); }); }); })();
+    }
+  }
+  function stopVideo() {
+    return new Promise(function (resolve, reject) {
+      var r = recState;
+      if (!r) { reject(new Error('Nothing is recording.')); return; }
+      recState = null;
+      if (r.timer) clearInterval(r.timer);
+      r.mr.onstop = function () { resolve({ blob: new Blob(r.chunks, { type: r.mime }), mime: r.mime, frames: r.frames, secs: (performance.now() - r.t0) / 1000, sound: r.sound }); };
+      try { r.mr.stop(); } catch (e) { reject(e); }
+    });
+  }
+  function media(d) {
+    if (d.action === 'picture') return picture().then(function (b) { return { blob: b, mime: 'image/png' }; });
+    if (d.action === 'start') { startVideo(); return Promise.resolve({ started: true }); }
+    if (d.action === 'stop') return stopVideo();
+    return Promise.reject(new Error('Unknown media action'));
   }
   window.addEventListener('message', function (e) {
     var d = e.data;
-    if (e.source !== P || !d || d.__forgeCmd !== 'run') return;
+    if (e.source !== P || !d) return;
+    if (d.__forgeCmd === 'media') {
+      var out;
+      try { out = media(d); } catch (err) { out = Promise.reject(err); }
+      out.then(function (res) { res.kind = 'media'; res.id = d.id; res.ok = true; send(res); }, function (err) { send({ kind: 'media', id: d.id, ok: false, error: String(err && err.message || err) }); });
+      return;
+    }
+    if (d.__forgeCmd !== 'run') return;
     run(Array.isArray(d.actions) ? d.actions : []).then(function (res) { res.kind = 'cmd'; res.id = d.id; send(res); }, function (err) {
       send({ kind: 'cmd', id: d.id, log: ['The actions failed: ' + (err && err.message)], shots: [], js: [], tests: [], summary: { texts: [], buttons: [], canvases: [] }, logs: logs.splice(0), w: innerWidth, h: innerHeight });
     });
@@ -2829,6 +3218,7 @@ function locate(line) {
 }
 function renderPreview() {
   ui.previewStale = false;
+  if (ui.recording) { clearInterval(ui.recording.timer); ui.recording = null; updateRecBtn(); toast('The recording stopped because the preview restarted.'); }
   const files = project.files;
   if (!ui.entry || !has(files, ui.entry)) ui.entry = previewEntry(files);
   renderEntrySel();
@@ -2877,7 +3267,7 @@ window.addEventListener('message', e => {
   const d = e.data;
   if (!d || d.__forge !== 1 || typeof d.kind !== 'string') return;
   if (d.kind === 'ready') { ui.ready = true; return; }
-  if (d.kind === 'cmd') { const w = cmdWaiters.get(d.id); if (w) { cmdWaiters.delete(d.id); w(d); } return; }
+  if (d.kind === 'cmd' || d.kind === 'media') { const w = cmdWaiters.get(d.id); if (w) { cmdWaiters.delete(d.id); w(d); } return; }
   if (d.kind === 'nav') {
     const p = resolveRef(String(d.href || ''), dirOf(ui.entry || ''), project.files);
     if (p) { ui.entry = p; renderPreview(); } else toast("That page isn't in this project: " + d.href);
@@ -2988,6 +3378,8 @@ function renderMsg(m, isLastAi) {
   }
   if (m.text) { const body = h('div', { class: 'md' }); body.innerHTML = md(m.text); el.append(body); }
   if (m.ops && m.ops.length) el.append(h('div', { class: 'ops' }, m.ops.map(opChip)));
+  if (m.ran && m.ran.length) el.append(h('details', { class: 'ran' }, h('summary', null, '⚙️ Ran code ' + (m.ran.length === 1 ? 'once' : m.ran.length + ' times') + ' to check its answer'),
+    m.ran.map((r, i) => h('div', null, h('div', { class: 'ran-label' }, 'Code ' + (i + 1)), h('pre', null, r.code), h('div', { class: 'ran-label' }, 'Result'), h('pre', null, r.report)))));
   if (m.remembered && m.remembered.length) el.append(h('div', { class: 'mem-note', title: 'Saved to memory. Edit it in Brain.' }, '🧠 Remembered: ' + m.remembered.join(' · ')));
   if (m.warn) el.append(h('div', { class: 'warn' }, m.warn));
   if (isLastAi && m.ops && m.ops.some(o => o.kind !== 'failed' && o.kind !== 'deleted')) {
@@ -3107,11 +3499,32 @@ function renderTray() {
   tray.replaceChildren(...chips);
   tray.hidden = !chips.length;
 }
+// When the browser's speech API is blocked (like inside the Claude app), the device's own voice typing still works in any text box.
+function voiceTypingHow() {
+  const ua = navigator.userAgent, touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  if (/iPhone|iPad|iPod/.test(ua) || (touch && /Macintosh/.test(ua))) return 'Tap the 🎤 on your keyboard (next to the space bar) and talk. Your iPhone types for you.';
+  if (/Android/.test(ua)) return 'Tap the 🎤 on your keyboard (top right on Gboard) and talk. Your phone types for you.';
+  if (/Mac/.test(ua)) return 'Press the Fn key twice (or the 🎤 key) and talk. Your Mac types for you.';
+  if (/Windows/.test(ua)) return 'Press the Windows key + H and talk. Windows types for you.';
+  if (/CrOS/.test(ua)) return 'Press Search + D and talk. Your Chromebook types for you.';
+  return "Use your device's voice typing (the 🎤 on your keyboard) and talk.";
+}
+function micHelp() {
+  const ta = $('#prompt');
+  let box = $('#micHelp');
+  if (!box) {
+    box = h('div', { class: 'mic-help', id: 'micHelp', role: 'status' });
+    ta.before(box);
+  }
+  const close = h('button', { class: 'icon-btn sm', type: 'button', 'aria-label': 'Close voice typing help', onclick: () => box.remove() }, '×');
+  box.replaceChildren(h('span', null, '🎤 Voice typing: ' + voiceTypingHow()), close);
+  ta.focus();
+}
 function startMic() {
-  if (!SpeechRec) { toast("This browser can't turn speech into text. Try Chrome or Edge on a computer."); return; }
+  if (!SpeechRec) { micHelp(); return; }
   const ta = $('#prompt'), btn = $('#micBtn');
   let rec;
-  try { rec = new SpeechRec(); } catch (e) { toast("The microphone isn't available here."); return; }
+  try { rec = new SpeechRec(); } catch (e) { micHelp(); return; }
   const base = ta.value.replace(/\s+$/, '');
   rec.lang = navigator.language || 'en-US';
   rec.interimResults = true;
@@ -3123,12 +3536,15 @@ function startMic() {
     autoGrow();
   };
   rec.onerror = e => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast(runtime.inViewer ? 'Claude blocks the microphone inside the app. Open this page in Chrome on your computer to talk to it.' : 'The microphone is blocked. Allow it in your browser, then try again.');
-    else if (e.error === 'no-speech') toast("Didn't hear anything. Try again.");
-    else if (e.error !== 'aborted') toast('Voice input stopped: ' + e.error);
+    if (e.error === 'no-speech') toast("Didn't hear anything. Try again.");
+    else if (e.error !== 'aborted') micHelp();
   };
   rec.onend = () => { if (ui.rec === rec) { ui.rec = null; btn.classList.remove('rec'); btn.setAttribute('aria-pressed', 'false'); } };
-  try { rec.start(); } catch (e) { toast("The microphone couldn't start."); return; }
+  let heard = false;
+  rec.onaudiostart = () => { heard = true; };
+  try { rec.start(); } catch (e) { micHelp(); return; }
+  // Some views let it start but never pass any sound through: switch to voice typing then too.
+  setTimeout(() => { if (ui.rec === rec && !heard) { stopMic(); micHelp(); } }, 4000);
   ui.rec = rec;
   btn.classList.add('rec');
   btn.setAttribute('aria-pressed', 'true');
@@ -3655,7 +4071,7 @@ function bindUI() {
   $('#attachBtn').addEventListener('click', () => $('#attachInput').click());
   $('#attachInput').addEventListener('change', e => { const f = [...e.target.files]; e.target.value = ''; addAttachments(f); });
   $('#micBtn').addEventListener('click', () => { if (ui.rec) stopMic(); else startMic(); });
-  if (!SpeechRec) $('#micBtn').title = 'Voice input needs Chrome or Edge on a computer';
+  if (!SpeechRec) $('#micBtn').title = "Talk instead of typing (uses your device's voice typing)";
   const chat = $('#chatPanel');
   let dragDepth = 0;
   const hasFilesDrag = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
@@ -3742,6 +4158,8 @@ function bindUI() {
   $('#playRounds').addEventListener('change', e => changeSetting('playRounds', Number(e.target.value) || 8));
   $('#playBtn').addEventListener('click', () => playtest());
   $('#playStop').addEventListener('click', stopTurn);
+  $('#picBtn').addEventListener('click', savePicture);
+  $('#recBtn').addEventListener('click', toggleRecord);
   $('#brainBtn').addEventListener('click', openBrain);
   $('#brainDone').addEventListener('click', () => $('#brain').close());
   $('#memOn').addEventListener('change', e => { settings.memory = e.target.checked; saveSettings(); });
@@ -3799,7 +4217,7 @@ async function init() {
 }
 
 // Handles for automated tests; the page never relies on them.
-window.Forge = { parseResponse, parseActions, playtest, observe, applyOps, buildPreviewDoc, makeZip, summarize, md, hideBlobs, restoreBlobs, buildRules, buildContext, fitProject, get project() { return project; }, settings, runtime, send, ui };
+window.Forge = { parseResponse, parseActions, playtest, observe, obsText, applyOps, buildPreviewDoc, makeZip, summarize, md, hideBlobs, restoreBlobs, buildRules, buildContext, fitProject, get project() { return project; }, settings, runtime, send, ui };
 
 init();
 })();
