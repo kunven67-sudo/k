@@ -249,6 +249,9 @@ dialog::backdrop{background:var(--scrim)}
 .dlg-body{padding:6px 18px 12px;overflow:auto;display:flex;flex-direction:column;gap:16px}
 .dlg-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px 16px;border-top:1px solid var(--line)}
 .dlg-msg{padding:10px 12px;border-radius:10px;background:var(--accent-soft);font-size:14px}
+.free-box{padding:12px 14px;border-radius:12px;border:1px solid var(--accent);background:var(--accent-soft);font-size:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.free-box strong{font-size:15px}
+.free-box a.btn{text-decoration:none}
 .field{display:flex;flex-direction:column;gap:6px}
 .field>label,.field .flabel{font-size:13px;font-weight:700}
 .help{font-size:12.5px;color:var(--dim);margin:0}
@@ -268,6 +271,12 @@ dialog::backdrop{background:var(--scrim)}
 details summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--dim)}
 details[open] summary{margin-bottom:8px}
 .cards{display:flex;flex-direction:column;gap:8px}
+.dlg-sub{margin:4px 0 -6px;font-size:15px}
+.mem-list{display:flex;flex-direction:column;gap:6px}
+.mem-item{display:flex;align-items:flex-start;gap:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:7px 8px 7px 11px;font-size:13.5px;line-height:1.4}
+.mem-item span{flex:1;min-width:0;overflow-wrap:anywhere;padding-top:3px}
+.mem-empty{font-size:13px;color:var(--dim);font-style:italic}
+.mem-note{font-size:12.5px;color:var(--dim);padding:6px 10px;border-radius:9px;border:1px dashed var(--line-strong)}
 .cardrow{border:1px solid var(--line);border-radius:11px;background:var(--surface-2);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .cardrow-top{display:flex;align-items:center;gap:10px}
 .cardrow-top label{display:flex;align-items:center;gap:9px;flex:1;min-width:0;font-weight:600;font-size:14px}
@@ -276,6 +285,7 @@ details[open] summary{margin-bottom:8px}
 .cardrow small{color:var(--dim);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .cardrow pre{margin:0;max-height:220px;overflow:auto;white-space:pre-wrap;font:12px/1.5 var(--mono);color:var(--dim);background:var(--sunken);padding:8px 10px;border-radius:8px}
 .cardrow textarea{width:100%;min-height:180px;resize:vertical;padding:8px 10px;border-radius:8px;border:1px solid var(--line-strong);background:var(--sunken);font:12px/1.5 var(--mono)}
+#memAdd{flex:1;min-width:0;padding:9px 11px;border-radius:9px;border:1px solid var(--line-strong);background:var(--sunken);font-size:14px}
 .cardrow input[type="text"]{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--line-strong);background:var(--sunken);font-size:14px}
 .meter{font-size:12.5px;color:var(--dim)}
 .study{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:11px;border:1px solid var(--accent);background:var(--accent-soft);font-size:13.5px}
@@ -391,6 +401,11 @@ details[open] summary{margin-bottom:8px}
     <div class="dlg-head"><h2 id="settingsTitle">Settings</h2></div>
     <div class="dlg-body">
       <div class="dlg-msg" id="settingsMsg" hidden></div>
+      <div class="free-box" id="freeBox" hidden>
+        <strong>🆓 Use it for free</strong>
+        <span>Open Forge inside the Claude app or on claude.ai. There it runs on your Claude account, so you don't need an API key and you don't pay for credits. It uses your plan's normal message limits.</span>
+        <a class="btn btn-accent btn-sm" id="freeLink" target="_blank" rel="noopener">Open Forge in Claude</a>
+      </div>
       <div class="two">
         <div class="field"><label for="aiName">Your AI's name</label><input type="text" id="aiName" maxlength="40" spellcheck="false"></div>
         <div class="field"><label for="themeSel">Theme</label>
@@ -405,14 +420,14 @@ details[open] summary{margin-bottom:8px}
       <div class="field">
         <span class="flabel">How it talks to Claude</span>
         <div class="engine-opts">
-          <button type="button" class="engine-opt" id="engClaude" aria-pressed="false"><strong>Claude in this app</strong><span id="engClaudeNote">Uses your Claude plan. Nothing to set up.</span></button>
-          <button type="button" class="engine-opt" id="engApi" aria-pressed="false"><strong>Anthropic API key</strong><span>Works anywhere. Billed to your API account.</span></button>
+          <button type="button" class="engine-opt" id="engClaude" aria-pressed="false"><strong>Claude in this app · free</strong><span id="engClaudeNote">Free with your Claude account. Nothing to set up.</span></button>
+          <button type="button" class="engine-opt" id="engApi" aria-pressed="false"><strong>Anthropic API key · paid</strong><span>Works anywhere, but every message costs API credits.</span></button>
         </div>
       </div>
       <div class="field">
         <span class="flabel">Playtesting</span>
         <label class="check"><input type="checkbox" id="autoPlay"> <span>After every build, let it play the game, find bugs and fix them</span></label>
-        <div class="row"><label for="playRounds" class="help">Rounds per playtest</label><select id="playRounds" style="width:auto"><option value="3">3</option><option value="5">5</option><option value="8">8</option></select></div>
+        <div class="row"><label for="playRounds" class="help">Rounds per playtest</label><select id="playRounds" style="width:auto"><option value="3">3</option><option value="5">5</option><option value="8">8</option><option value="12">12</option><option value="20">20 (deep test)</option></select></div>
       </div>
       <div class="field" id="claudeFields">
         <label for="tierSel">Brain power</label>
@@ -438,6 +453,7 @@ details[open] summary{margin-bottom:8px}
           </div>
         </div>
         <label class="check"><input type="checkbox" id="autoFix"> <span>Fix preview errors automatically (up to 2 tries after each build)</span></label>
+        <label class="check"><input type="checkbox" id="webSearch"> <span>Let it search the web when it needs fresh info (costs extra: about 1 cent per search)</span></label>
         <details>
           <summary>Advanced</summary>
           <div class="field"><label for="baseUrl">API base URL</label><input type="url" id="baseUrl" placeholder="https://api.anthropic.com" spellcheck="false"><p class="help">Leave empty unless you use a proxy.</p></div>
@@ -450,8 +466,15 @@ details[open] summary{margin-bottom:8px}
 
 <dialog id="brain" aria-labelledby="brainTitle">
   <div class="dlg">
-    <div class="dlg-head"><h2 id="brainTitle">Brain cards</h2></div>
+    <div class="dlg-head"><h2 id="brainTitle">Brain</h2></div>
     <div class="dlg-body">
+      <h3 class="dlg-sub">Memory</h3>
+      <p class="help">What your AI has learned about you. It reads this in every chat and saves new things on its own, and you can add or delete anything.</p>
+      <label class="check"><input type="checkbox" id="memOn"> <span>Remember things between chats</span></label>
+      <div class="mem-list" id="memList"></div>
+      <div class="row"><input type="text" id="memAdd" maxlength="300" placeholder="Add something it should know about you" aria-label="New memory"><button type="button" class="btn btn-quiet" id="memAddBtn">Add</button></div>
+      <div class="row"><button type="button" class="btn btn-quiet btn-sm" id="memClear">Forget everything</button></div>
+      <h3 class="dlg-sub">Brain cards</h3>
       <p class="help">Cards are knowledge your AI reads before every answer. Switch them on or off, write your own, or give it a file to study and it writes the card itself.</p>
       <div class="cards" id="cardList"></div>
       <div class="meter" id="brainMeter"></div>
@@ -882,6 +905,8 @@ requestAnimationFrame(frame);
    ================================================================ */
 
 const KEY = 'forge.v1.';
+// The published copy of Forge that runs inside Claude, where it uses the person's Claude account instead of API credits.
+const FREE_URL = 'https://claude.ai/artifact/BMcyKvimfkkXReZvbLa2vL';
 const MODELS = [
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (smartest)', short: 'Fable 5.1' },
   { id: 'claude-opus-5', label: 'Claude Opus 5 (great, cheaper)', short: 'Opus 5' },
@@ -963,7 +988,7 @@ Test the code in your head like a QA tester: every getElementById or querySelect
 
 When a message includes errors from the preview, find the real cause and fix it. Don't just hide the error with try/catch.
 
-After a build the app may playtest the page: it clicks, presses keys, reads the screen and takes screenshots. Make that easy: give every game a read-only window.__game object with the key state (screen or mode, score, lives, level, time, player position), and make menu actions real <button> elements with clear text.`;
+After a build the app may playtest the page: it clicks, presses keys, reads the screen and takes screenshots. Make that easy: give every game a window.__game object with the key state as read-only getters (screen or mode, score, lives, level, time, player position) plus small test hooks where they help, like start(), reset() and step(seconds) to advance the simulation without waiting for real frames. Make menu actions real <button> elements with clear text.`;
 
 /* The built-in brain card: how the reference games in this repo are built, written down so the AI can build at that level. */
 const STUDIO_CARD = `What the best games in this collection do, learned from six reference projects: ANT WORK 2 (a story-driven 3D adventure with cutscenes, voice acting and two story paths), Portal Gun (1000 procedural dimensions, portals, and any dropped file becomes a world), TIME (a city sandbox where you stop and rewind time, with physics, cars, people and ragdolls), Shrink Resizer (an endless realistic town where you shrink to millimetres or grow to 100 m), Eight Billion (a god simulator that zooms from the solar system to street level on a real Earth), and AItok (a complete short-video app where every video, song and creator is generated in code).
@@ -1034,6 +1059,8 @@ const STUDY_PROMPT = `You write brain cards. A brain card is a dense, practical 
 Write plain text with short headings and bullet points, under 1,400 words. Skip the story and content details; focus on what can be reused. Reply with only the card.`;
 const PLAYTEST_REQUEST = `Playtest the page in the preview like a real QA tester, fix the bugs you find, and then report back.
 
+Round 1 starts with a code review: read the code like a senior reviewer hunting bugs (elements that don't exist, variables used before they're set, listeners added twice, state a restart forgets to reset, missing guards for size 0, off-by-one errors, broken touch input). Fix the real bugs you find in that same reply, then start playing.
+
 You play by ending your reply with an <actions> block, one action per line, for example:
 <actions>
 click "Play"
@@ -1058,7 +1085,16 @@ Actions:
 - js CODE: run one line of JavaScript inside the page and get the result back, for example js return window.__game
 - reload: restart the page from the beginning
 
-After your actions run you get screenshots, the visible text with positions, the buttons, console output, errors, and your js results. Screenshots are rebuilt from the page: canvases are exact, while HTML parts are drawn plainly without effects. The input is simulated, so pointer lock, fullscreen and starting audio can be refused; that is not a bug when the page handles it.
+For checks that take more than one line, add <test> blocks (up to 3 per reply). Each one is the body of an async function that runs inside the page. You can await, use console.log, and return a result, which comes back to you with anything it logged. Every loop must be bounded, and each test stops after 10 seconds. Tests run in order with your actions, where you place them. For example:
+<test>
+const g = window.__game;
+const before = g.score;
+for (let i = 0; i < 120 && g.state === 'playing'; i++) g.step(1 / 60);
+return { before, after: g.score, state: g.state };
+</test>
+Use tests to prove the rules work: scoring adds up, timers end the round, collisions stop the player, restart resets everything, saves load back. If the game has no hooks for a check, add them to window.__game with an <edit> (like reset() or step(seconds)), then test.
+
+After your actions run you get screenshots, the visible text with positions, the buttons, console output, errors, and your js and test results. Screenshots are rebuilt from the page: canvases are exact, while HTML parts are drawn plainly without effects. The input is simulated, so pointer lock, fullscreen and starting audio can be refused; that is not a bug when the page handles it.
 
 How to test: start it, try every control, try to score, win and lose, open the menus, pause and restart. Check that things really work (movement, collisions, scoring, timers, game over, restart), not just that nothing crashes. Use js to read the state when a screenshot isn't clear.
 
@@ -1126,6 +1162,12 @@ const kv = (() => {
     async get(k) { try { const v = await run('readonly', s => s.get(k)); return v === undefined ? store.get(KEY + k, undefined) : v; } catch (e) { return store.get(KEY + k, undefined); } },
     async set(k, v) { try { await run('readwrite', s => s.put(v, k)); return true; } catch (e) { return store.set(KEY + k, v); } },
     async del(k) { try { await run('readwrite', s => s.delete(k)); } catch (e) { /* ignore */ } store.del(KEY + k); },
+    async keys() {
+      const out = new Set();
+      try { for (const k of await run('readonly', s => s.getAllKeys())) out.add(String(k)); } catch (e) { /* IndexedDB unavailable */ }
+      try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(KEY)) out.add(k.slice(KEY.length)); } } catch (e) { /* storage blocked */ }
+      return [...out];
+    },
   };
 })();
 class ForgeError extends Error { constructor(msg, opts = {}) { super(msg); this.opts = opts; } }
@@ -1252,12 +1294,19 @@ function parseResponse(raw, streaming) {
     const last = chat[chat.length - 1], lt = last.lastIndexOf('<');
     if (lt !== -1 && last.length - lt < 240 && !last.includes('>', lt) && /^<\/?[a-z]*(\s|$)/i.test(last.slice(lt))) chat[chat.length - 1] = last.slice(0, lt);
   }
-  // Playtest moves live in <actions> blocks, outside the file blocks.
-  const actions = [];
+  // Playtest moves (<actions>, <test>) and saved memories (<remember>) live outside the file blocks.
+  const actions = [], remember = [];
   for (let k = 0; k < chat.length; k++) {
-    chat[k] = chat[k].replace(/<actions>([\s\S]*?)(<\/actions>|$)/g, (m, body, end) => { if (end || !streaming) actions.push(...parseActions(body)); return ''; });
+    chat[k] = chat[k].replace(/<(actions|test|remember)>([\s\S]*?)(<\/\1>|$)/g, (m, tag, body, end) => {
+      if (end || !streaming) {
+        if (tag === 'actions') actions.push(...parseActions(body));
+        else if (tag === 'test') { if (body.trim() && actions.filter(a => a.op === 'test').length < 3) actions.push({ op: 'test', code: body.trim().slice(0, 20000), ms: 10000 }); }
+        else if (body.trim()) remember.push(body.trim().replace(/\s+/g, ' ').slice(0, 300));
+      }
+      return '';
+    });
   }
-  return { ops, open, chat: cleanChat(chat), actions };
+  return { ops, open, chat: cleanChat(chat), actions, remember };
 }
 function parseActions(body) {
   const out = [], num = v => { const n = Number(v); return Number.isFinite(n) ? Math.round(n) : null; };
@@ -1413,7 +1462,7 @@ function summarize(before, after, results) {
    State: settings, brain cards, chats, runtime
    ================================================================ */
 const settings = Object.assign(
-  { engine: 'auto', apiKey: '', remember: true, model: MODELS[0].id, effort: 'max', tier: 'complex', baseURL: '', autoFix: true, autoPlaytest: true, playRounds: 5, aiName: 'Forge', instructions: DEFAULT_INSTRUCTIONS, theme: '' },
+  { engine: 'auto', apiKey: '', remember: true, model: MODELS[0].id, effort: 'max', tier: 'complex', baseURL: '', autoFix: true, autoPlaytest: true, playRounds: 8, memory: true, webSearch: false, aiName: 'Forge', instructions: DEFAULT_INSTRUCTIONS, theme: '' },
   store.get(KEY + 'settings', {})
 );
 if (!MODELS.some(m => m.id === settings.model)) settings.model = MODELS[0].id;
@@ -1429,12 +1478,51 @@ const cardState = Object.assign({ off: {}, custom: [] }, store.get(KEY + 'cards'
 function allCards() { return [...BUILTIN_CARDS, ...cardState.custom].map(c => ({ ...c, enabled: !cardState.off[c.id] })); }
 function saveCards() { if (!store.set(KEY + 'cards', cardState)) toast("Couldn't save your cards in this browser."); }
 
+// Memory: short facts the AI saves with <remember> blocks. They go into every chat.
+const MEMORY_MAX = 80;
+const memory = (() => { const m = store.get(KEY + 'memory', []); return Array.isArray(m) ? m.filter(x => x && typeof x.text === 'string' && x.text.trim()).slice(-MEMORY_MAX) : []; })();
+function saveMemory() {
+  const ok = store.set(KEY + 'memory', memory);
+  kv.set('memory', memory.slice()).then(backedUp => { if (!ok && !backedUp) toast("Couldn't save the memory in this browser."); });
+}
+const SECRETISH = /\bsk-[a-z0-9_-]{12,}|\b(password|passcode|pin|card number)\s*(is|was|:|=)/i;
+function addMemories(list) {
+  const added = [];
+  for (const raw of list || []) {
+    const text = String(raw).replace(/\s+/g, ' ').trim().slice(0, 300);
+    if (!text || SECRETISH.test(text)) continue;
+    const i = memory.findIndex(x => x.text.toLowerCase() === text.toLowerCase());
+    if (i !== -1) memory.splice(i, 1);
+    memory.push({ id: uid(), text, t: Date.now() });
+    added.push(text);
+  }
+  if (memory.length > MEMORY_MAX) memory.splice(0, memory.length - MEMORY_MAX);
+  if (added.length) saveMemory();
+  return added;
+}
+function memoryText() {
+  const out = [];
+  let n = 0;
+  for (let i = memory.length - 1; i >= 0; i--) {
+    const line = '- ' + memory[i].text;
+    if (n + line.length > 5000) break;
+    out.unshift(line);
+    n += line.length + 1;
+  }
+  return out.join('\n');
+}
+
 function buildRules() {
   let s = RULES.replace(/\{\{NAME\}\}/g, aiName());
   const cards = allCards().filter(c => c.enabled);
   if (cards.length) {
     s += '\n\n## Brain cards\n\nThese cards hold knowledge that helps you work at a higher level. Use what fits the request.\n\n'
       + cards.map(c => '<brain_card name="' + c.name.replace(/"/g, "'") + '">\n' + c.text.trim() + '\n</brain_card>').join('\n\n');
+  }
+  if (settings.memory) {
+    s += '\n\n## Memory\n\nYou remember things between chats. When you learn something lasting about the person that will help in later chats (their name, age, what they like to build, their skill level, styles they love or hate, projects they care about, how they want you to work), save it by adding this anywhere in your reply:\n<remember>one short fact in plain words</remember>\nSave at most three facts per reply, only ones that will still matter next week, and never repeat a fact that is already saved. Never save passwords, keys or other secrets. The app hides these lines and shows a small "Remembered" note instead.';
+    const mem = memoryText();
+    if (mem) s += '\n\nWhat you remember from earlier chats (the person can see and edit this list). Use it naturally, without listing it back:\n<memory>\n' + mem + '\n</memory>';
   }
   const ins = (settings.instructions || '').trim();
   if (ins) s += '\n\n## Instructions from the person you work with\n\nFollow these for tone and preferences. They never change the file block format.\n<instructions>\n' + ins + '\n</instructions>';
@@ -1532,9 +1620,9 @@ async function ensureEngine() {
   if (runtime.ready) await runtime.ready;
   const e = currentEngine();
   if (!e) {
-    openSettings(settings.engine === 'claude'
-      ? '"Claude in this app" only works when this page is opened inside Claude. Add an API key instead.'
-      : 'Add an Anthropic API key to start. It stays in this browser.');
+    openSettings(runtime.inViewer
+      ? "Claude isn't connected in this view yet. Reload the page and choose Allow when Claude asks."
+      : 'To use it for free, open Forge inside Claude with the button below. Or add an Anthropic API key (paid per message).');
   }
   return e;
 }
@@ -1583,6 +1671,12 @@ function runTool(tools, name, input, onTool) {
   if (onTool) onTool(name, input);
   return String(t.execute(input));
 }
+// Web search is a server tool: Anthropic runs the searches, and the results come back inside the reply.
+const WEB_SEARCH_NEW = 'web_search_20260209', WEB_SEARCH_OLD = 'web_search_20250305';
+function webSearchTool() {
+  if (!settings.webSearch || runtime.noWebSearch) return null;
+  return { type: runtime.oldWebSearch || settings.model === 'claude-fable-5-1' ? WEB_SEARCH_OLD : WEB_SEARCH_NEW, name: 'web_search', max_uses: 5 };
+}
 async function runApi(ctx, { signal, onText, onThinking, onTool }) {
   const Anthropic = await loadSDK();
   const client = new Anthropic({
@@ -1592,9 +1686,10 @@ async function runApi(ctx, { signal, onText, onThinking, onTool }) {
     maxRetries: 2,
     timeout: 30 * 60 * 1000,
   });
-  const tools = ctx.tools ? ctx.tools.map(t => ({ name: t.name, description: t.description, input_schema: t.inputSchema, eager_input_streaming: true })) : null;
-  let messages = ctx.messages.slice(), text = '';
+  const tools = ctx.tools ? ctx.tools.map(t => ({ name: t.name, description: t.description, input_schema: t.inputSchema, eager_input_streaming: true })) : [];
+  let messages = ctx.messages.slice(), text = '', pauses = 0, afterSearch = false;
   for (let round = 0; ; round++) {
+    const web = ctx.web === false ? null : webSearchTool();
     const params = {
       model: settings.model,
       max_tokens: 128000,
@@ -1604,16 +1699,40 @@ async function runApi(ctx, { signal, onText, onThinking, onTool }) {
       output_config: { effort: settings.effort },
       cache_control: { type: 'ephemeral' },
     };
-    if (tools) params.tools = tools;
+    if (tools.length || web) params.tools = web ? [...tools, web] : tools;
     const stream = FALLBACK_MODELS.has(settings.model)
       ? client.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }, { signal })
       : client.messages.stream(params, { signal });
-    stream.on('text', delta => { text += delta; onText(text); });
+    stream.on('streamEvent', ev => {
+      if (ev.type !== 'content_block_start' || !ev.content_block) return;
+      const t = ev.content_block.type;
+      if (t === 'server_tool_use' || t === 'web_search_tool_result') afterSearch = true;
+      if (t === 'server_tool_use' && onTool) onTool('web_search', {});
+    });
+    stream.on('contentBlock', b => { if (b && b.type === 'server_tool_use' && onTool && b.input && b.input.query) onTool('web_search', b.input); });
+    stream.on('text', delta => {
+      if (afterSearch) { afterSearch = false; if (text && !/\s$/.test(text)) text += '\n\n'; }
+      text += delta;
+      onText(text);
+    });
     stream.on('thinking', delta => { if (onThinking) onThinking(delta); });
     let msg;
-    try { msg = await stream.finalMessage(); } catch (e) { throw mapApiError(e, Anthropic); }
+    try { msg = await stream.finalMessage(); } catch (e) {
+      // Some models or accounts can't use web search: try the older tool version, then go on without it.
+      if (web && !text && e instanceof Anthropic.BadRequestError && /web.?search/i.test(apiErrorMessage(e))) {
+        if (web.type === WEB_SEARCH_NEW) runtime.oldWebSearch = true; else runtime.noWebSearch = true;
+        continue;
+      }
+      throw mapApiError(e, Anthropic);
+    }
     const sr = msg.stop_reason;
-    if (sr === 'tool_use' && ctx.tools && round < MAX_TOOL_ROUNDS) {
+    // A long search can pause the turn; sending the reply back lets it carry on.
+    if (sr === 'pause_turn' && pauses < 5) {
+      pauses++;
+      messages = [...messages, { role: 'assistant', content: echoContent(msg.content) }];
+      continue;
+    }
+    if (sr === 'tool_use' && tools.length && round < MAX_TOOL_ROUNDS) {
       const results = msg.content.filter(b => b.type === 'tool_use').map(u => {
         try { return { type: 'tool_result', tool_use_id: u.id, content: runTool(ctx.tools, u.name, u.input, onTool) }; }
         catch (e) { return { type: 'tool_result', tool_use_id: u.id, content: 'Error: ' + e.message, is_error: true }; }
@@ -1624,6 +1743,15 @@ async function runApi(ctx, { signal, onText, onThinking, onTool }) {
     }
     return { text, stop: sr === 'refusal' ? 'refused' : (sr === 'max_tokens' || sr === 'model_context_window_exceeded') ? 'truncated' : 'end' };
   }
+}
+function toolLabel(name, input) {
+  if (name === 'web_search') return 'Searching the web' + (input && input.query ? ': "' + String(input.query).slice(0, 60) + '"' : '');
+  return (name === 'search_file' ? 'Searching ' : 'Reading ') + normPath(String(input.path)) + (input.from_line ? ' (from line ' + input.from_line + ')' : '');
+}
+function setTool(b, label) {
+  b.tool = label;
+  b.toolAt = (b.text || '').trimEnd().length;
+  updateStatus(b);
 }
 
 const CLAUDE_ERRORS = {
@@ -1854,7 +1982,7 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
 
   const before = p.files;
   let files = { ...p.files };
-  const results = [], chats = [];
+  const results = [], chats = [], remember = [];
   let warn = null, continues = 0, repairs = 0, followup = null, tier = null;
   try {
     for (;;) {
@@ -1868,7 +1996,7 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
         signal: ui.ctl.signal,
         onText: t => queueStream(bubble, t),
         onThinking: d => addThinking(bubble, d),
-        onTool: (name, input) => { bubble.tool = (name === 'search_file' ? 'Searching ' : 'Reading ') + normPath(String(input.path)) + (input.from_line ? ' (from line ' + input.from_line + ')' : ''); updateStatus(bubble); },
+        onTool: (name, input) => setTool(bubble, toolLabel(name, input)),
       };
       const res = engine === 'api' ? await runApi(ctx, callbacks) : await runClaude(ctx, callbacks);
       if (res.tier) tier = res.tier;
@@ -1878,6 +2006,7 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
       streamUpdate(bubble);
       const parsed = parseResponse(res.text, false);
       if (parsed.chat) chats.push(parsed.chat);
+      remember.push(...parsed.remember);
       const ops = parsed.ops.slice();
       let pending = null;
       if (parsed.open) {
@@ -1903,7 +2032,7 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
       else if (res.stop === 'truncated') warn = 'The reply hit the length limit.';
       break;
     }
-    finishTurn({ p, before, files, results, chats, warn, engine, tier, kind });
+    finishTurn({ p, before, files, results, chats, warn, engine, tier, kind, remember });
   } catch (e) {
     if (e instanceof Cancelled) {
       p.messages.push({ role: 'note', text: 'Stopped. Nothing was changed.', t: Date.now() });
@@ -1911,7 +2040,7 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
       const fe = e instanceof ForgeError ? e : new ForgeError((e && e.message) || String(e), { retry: true });
       if (results.some(r => r.ok)) {
         // Keep the work that finished before the failure.
-        finishTurn({ p, before, files, results, chats, warn: fe.message + ' The files may be unfinished: send "continue" to pick up where it stopped.', engine, tier, kind });
+        finishTurn({ p, before, files, results, chats, warn: fe.message + ' The files may be unfinished: send "continue" to pick up where it stopped.', engine, tier, kind, remember });
       } else {
         p.messages.push({ role: 'assistant', error: fe.message, retry: !!fe.opts.retry, t: Date.now() });
       }
@@ -1934,13 +2063,14 @@ async function send(text, { kind = 'user', auto = false, errors = null } = {}) {
   }
 }
 const engineLabel = (engine, tier) => engine === 'api' ? (MODELS.find(m => m.id === settings.model) || {}).short + ' · ' + settings.effort : 'Claude · ' + (TIER_LABEL[tier || settings.tier] || 'Max');
-function finishTurn({ p, before, files, results, chats, warn, engine, tier, kind }) {
+function finishTurn({ p, before, files, results, chats, warn, engine, tier, kind, remember }) {
   const changed = results.some(r => r.ok);
   const summary = summarize(before, files, results);
   if (changed) { pushCheckpoint(p, (kind === 'fix' ? 'Fix: ' : '') + (p.messages[p.messages.length - 1].text || '')); p.files = files; }
   const msg = { role: 'assistant', text: chats.join('\n\n').trim(), ops: summary, t: Date.now(), engine: engineLabel(engine, tier) };
   if (warn) msg.warn = warn;
-  if (!msg.text && !summary.length) msg.text = '(No reply this time.)';
+  if (settings.memory && remember && remember.length) { const added = addMemories(remember); if (added.length) msg.remembered = added; }
+  if (!msg.text && !summary.length && !msg.remembered) msg.text = '(No reply this time.)';
   p.messages.push(msg);
   if (changed) {
     if (!ui.file || !has(p.files, ui.file)) ui.file = firstFile(p.files, summary);
@@ -2001,7 +2131,7 @@ function runInPreview(actions, signal) {
 }
 // Run the actions (the app does the reloads itself) and collect what the AI gets to see.
 async function observe(actions, signal, note) {
-  const out = { log: [], shots: [], js: [], logs: [], summary: { texts: [], buttons: [], canvases: [] }, w: 0, h: 0, note: note || '', errors: [] };
+  const out = { log: [], shots: [], js: [], tests: [], logs: [], summary: { texts: [], buttons: [], canvases: [] }, w: 0, h: 0, note: note || '', errors: [] };
   const segments = [[]];
   for (const a of actions) { if (a.op === 'reload') segments.push([]); else segments[segments.length - 1].push(a); }
   for (let i = 0; i < segments.length; i++) {
@@ -2010,6 +2140,7 @@ async function observe(actions, signal, note) {
     if (!r) { out.log.push("The page stopped answering (it may be stuck in a loop, or it didn't load)."); continue; }
     out.log.push(...(r.log || []));
     out.js.push(...(r.js || []));
+    out.tests.push(...(r.tests || []));
     out.logs.push(...(r.logs || []));
     out.shots.push(...(r.shots || []).filter(x => typeof x === 'string' && x.startsWith('data:image')));
     if (r.summary) out.summary = r.summary;
@@ -2025,6 +2156,7 @@ function obsText(o, round, rounds, last, withImages) {
   if (o.note) L.push(o.note);
   if (o.log.length) L.push('What happened:\n' + o.log.map(x => '- ' + x).join('\n'));
   if (o.js.length) L.push('js results:\n' + o.js.map((x, i) => (i + 1) + '. ' + x).join('\n'));
+  if (o.tests.length) L.push('Test results:\n' + o.tests.map((x, i) => 'Test ' + (i + 1) + ': ' + x.slice(0, 2500)).join('\n'));
   L.push('Visible text (x,y is the center):\n' + (o.summary.texts.length ? o.summary.texts.map(x => '- ' + x).join('\n') : '- none'));
   L.push('Buttons and other clickable things:\n' + (o.summary.buttons.length ? o.summary.buttons.map(x => '- ' + x).join('\n') : '- none'));
   if (o.summary.canvases.length) L.push('Canvases: ' + o.summary.canvases.join('; '));
@@ -2033,7 +2165,7 @@ function obsText(o, round, rounds, last, withImages) {
   L.push(withImages ? 'Screenshots attached: ' + Math.min(o.shots.length, 3) + ' (in order; the last one is after your final action).' : 'No screenshots can be sent from here, so rely on the text, console and js results.');
   L.push('</observation>');
   let text = L.join('\n\n');
-  if (text.length > 9000) text = text.slice(0, 8800) + '\n[cut: too much text on screen]\n</observation>';
+  if (text.length > 12000) text = text.slice(0, 11800) + '\n[cut: too much text on screen]\n</observation>';
   return text;
 }
 function dataUrlToBlob(url) {
@@ -2048,7 +2180,7 @@ function shotsToImages(shots, engine) {
   return shots.slice(-max).map((url, i) => ({ name: 'screenshot-' + (i + 1) + '.jpg', type: 'image/jpeg', data: url.slice(url.indexOf(',') + 1), blob: dataUrlToBlob(url), url }));
 }
 function describeActions(actions) {
-  const say = a => a.op === 'click' ? 'click ' + (a.text != null ? '"' + a.text + '"' : a.x + ',' + a.y) : a.op === 'press' || a.op === 'hold' ? a.op + ' ' + a.key : a.op === 'js' ? 'check the game state' : a.op;
+  const say = a => a.op === 'click' ? 'click ' + (a.text != null ? '"' + a.text + '"' : a.x + ',' + a.y) : a.op === 'press' || a.op === 'hold' ? a.op + ' ' + a.key : a.op === 'js' ? 'check the game state' : a.op === 'test' ? 'run a test script' : a.op;
   return actions.slice(0, 3).map(say).join(', ') + (actions.length > 3 ? '…' : '');
 }
 async function playtest({ auto = false } = {}) {
@@ -2057,7 +2189,7 @@ async function playtest({ auto = false } = {}) {
   if (!previewEntry(p.files)) { toast('Build something first, then playtest it.'); return; }
   const engine = await ensureEngine();
   if (!engine || ui.busy || project !== p) return;
-  const rounds = Math.max(1, Math.min(10, Number(settings.playRounds) || 5));
+  const rounds = Math.max(1, Math.min(20, Number(settings.playRounds) || 8));
   const prior = p.messages.slice();
   p.messages.push({ role: 'user', kind: 'playtest', text: auto ? 'Playtest it (automatic after the build)' : 'Playtest it', t: Date.now() });
   ui.busy = true;
@@ -2077,26 +2209,26 @@ async function playtest({ auto = false } = {}) {
   if (window.innerWidth <= 880) setView('preview'); else setWsTab('preview');
   $('#playBanner').hidden = false;
   const tick = setInterval(() => updateStatus(bubble), 1000);
-  const before = { ...p.files }, results = [], chats = [];
+  const before = { ...p.files }, results = [], chats = [], remember = [];
   let tier = null, warn = null, checkpointed = false;
   const callbacks = {
     signal,
     onText: t => queueStream(bubble, t),
     onThinking: d => addThinking(bubble, d),
-    onTool: (name, input) => { bubble.tool = (name === 'search_file' ? 'Searching ' : 'Reading ') + normPath(String(input.path)); updateStatus(bubble); },
+    onTool: (name, input) => setTool(bubble, toolLabel(name, input)),
   };
   const finish = extraWarn => {
     const summary = summarize(before, p.files, results);
     const msg = { role: 'assistant', text: chats.join('\n\n').trim() || 'Playtest finished.', ops: summary, t: Date.now(), engine: engineLabel(engine, tier) + ' · playtest' };
     if (warn || extraWarn) msg.warn = [warn, extraWarn].filter(Boolean).join(' ');
+    if (settings.memory && remember.length) { const added = addMemories(remember); if (added.length) msg.remembered = added; }
     p.messages.push(msg);
     if (results.some(r => r.ok)) { ui.entry = null; if (!ui.file || !has(p.files, ui.file)) ui.file = firstFile(p.files, summary); }
     saveProject(p);
   };
   try {
     ui.roundErrors = [];
-    bubble.tool = 'Loading the game';
-    updateStatus(bubble);
+    setTool(bubble, 'Loading the game');
     await reloadPreviewAndWait(signal);
     let obs = await observe([], signal, 'This is the page right after it loaded.');
     let usedAll = true;
@@ -2109,6 +2241,7 @@ async function playtest({ auto = false } = {}) {
       const report = obsText(obs, round, rounds, last, images.length > 0);
       const first = round === 1;
       const ctx = buildContext(engine, { prior, request: first ? PLAYTEST_REQUEST + '\n\n' + report : PLAYTEST_REQUEST, files: p.files, followup: first ? null : report, chatSoFar: chats.join('\n\n'), results, images });
+      ctx.web = false;
       bubble.prev = { chat: chats.join('\n\n'), results: results.slice() };
       bubble.text = '';
       streamUpdate(bubble);
@@ -2120,6 +2253,7 @@ async function playtest({ auto = false } = {}) {
       streamUpdate(bubble);
       const parsed = parseResponse(res.text, false);
       if (parsed.chat) chats.push(parsed.chat);
+      remember.push(...parsed.remember);
       const ops = parsed.ops.slice();
       if (parsed.open && res.stop !== 'truncated') {
         const o = parsed.open;
@@ -2141,10 +2275,9 @@ async function playtest({ auto = false } = {}) {
       if (last) break;
       ui.roundErrors = [];
       let note = '';
-      if (fixed) { bubble.tool = 'Reloading with the fixes'; updateStatus(bubble); await reloadPreviewAndWait(signal); note = 'The page was reloaded with your fixes before these actions ran.'; }
+      if (fixed) { setTool(bubble, 'Reloading with the fixes'); await reloadPreviewAndWait(signal); note = 'The page was reloaded with your fixes before these actions ran.'; }
       if (missed.length) note += (note ? '\n' : '') + repairMsg(missed);
-      bubble.tool = 'Playing: ' + describeActions(parsed.actions);
-      updateStatus(bubble);
+      setTool(bubble, 'Playing: ' + describeActions(parsed.actions));
       obs = await observe(parsed.actions, signal, note);
     }
     finish(usedAll ? 'It used all ' + rounds + ' rounds. Press Playtest again to keep testing.' : '');
@@ -2238,7 +2371,7 @@ function updateStatus(b) {
   const o = b.parsed && b.parsed.open;
   const lead = b.mode === 'continue' ? 'Continuing · ' : b.mode === 'repair' ? 'Fixing edits that missed · ' : b.mode === 'playtest' ? 'Playtest' + (b.round ? ' round ' + b.round + ' of ' + b.rounds : '') + ' · ' : '';
   let s;
-  if (b.tool) s = lead + b.tool + ' · ' + secs + 's';
+  if (b.tool && (b.text || '').trimEnd().length <= (b.toolAt || 0)) s = lead + b.tool + ' · ' + secs + 's';
   else if (!b.text) s = lead + (b.engine === 'claude' && secs < 3 ? 'Waiting for Claude' : 'Thinking') + ' · ' + secs + 's';
   else if (o && o.type === 'file') s = lead + 'Writing ' + o.path + ' · ' + fmtBytes(o.content.length);
   else if (o) s = lead + 'Editing ' + o.path;
@@ -2319,8 +2452,14 @@ function previewHelper() {
     var r = e.reason;
     send({ kind: 'error', msg: 'Unhandled promise rejection: ' + (r && r.message ? r.message : String(r)), stack: r && r.stack ? String(r.stack).slice(0, 1200) : '' });
   });
-  var logs = [];
-  function keep(level, args) { var t = [].slice.call(args).map(str).join(' '); logs.push('[' + level + '] ' + t.slice(0, 300)); if (logs.length > 60) logs.shift(); return t; }
+  var logs = [], capturing = null;
+  function keep(level, args) {
+    var t = [].slice.call(args).map(str).join(' ');
+    logs.push('[' + level + '] ' + t.slice(0, 300));
+    if (logs.length > 60) logs.shift();
+    if (capturing && capturing.length < 40) capturing.push('[' + level + '] ' + t.slice(0, 300));
+    return t;
+  }
   ['log', 'info', 'warn', 'debug'].forEach(function (lv) {
     var orig = console[lv];
     console[lv] = function () { try { keep(lv, arguments); } catch (e) { /* ignore */ } return orig.apply(console, arguments); };
@@ -2520,8 +2659,19 @@ function previewHelper() {
     } catch (e) { return String(v).slice(0, 1500); }
   }
   function wait(ms) { return new Promise(function (r) { setTimeout(r, Math.max(0, Math.min(Number(ms) || 0, 15000))); }); }
+  async function runTest(code, ms) {
+    var TIMEOUT = {}, out = [], res;
+    capturing = out;
+    try {
+      var fn = new Function('return (async function () {\n' + code + '\n})();');
+      res = await Promise.race([fn.call(window), wait(ms).then(function () { return TIMEOUT; })]);
+      res = res === TIMEOUT ? 'Error: timed out after ' + Math.round(ms / 1000) + ' s (is a loop waiting forever?)' : 'returned ' + fmt(res);
+    } catch (err) { res = 'Error: ' + (err && err.stack ? String(err.stack).split('\n').slice(0, 3).join(' | ') : String(err)); }
+    capturing = null;
+    return res + (out.length ? '\n  console during the test:\n' + out.map(function (x) { return '  ' + x; }).join('\n') : '');
+  }
   async function run(actions) {
-    var log = [], shots = [], js = [], mx = innerWidth / 2, my = innerHeight / 2;
+    var log = [], shots = [], js = [], tests = [], mx = innerWidth / 2, my = innerHeight / 2;
     for (var i = 0; i < actions.length; i++) {
       var a = actions[i] || {};
       try {
@@ -2585,18 +2735,19 @@ function previewHelper() {
           } catch (err) { js.push('Error: ' + (err && err.message ? err.message : String(err))); }
           log.push('js #' + js.length + ': ' + String(a.code).slice(0, 80));
         }
+        else if (a.op === 'test') { tests.push(await runTest(String(a.code), Math.max(500, Math.min(Number(a.ms) || 10000, 15000)))); log.push('test #' + tests.length + ' ran'); }
         else log.push('skipped an unknown action: ' + a.op);
       } catch (err) { log.push(a.op + ' failed: ' + (err && err.message ? err.message : String(err))); }
     }
     await wait(150);
     shots.push(await shot());
-    return { log: log, shots: shots, js: js, summary: summary(), logs: logs.splice(0), w: innerWidth, h: innerHeight };
+    return { log: log, shots: shots, js: js, tests: tests, summary: summary(), logs: logs.splice(0), w: innerWidth, h: innerHeight };
   }
   window.addEventListener('message', function (e) {
     var d = e.data;
     if (e.source !== P || !d || d.__forgeCmd !== 'run') return;
     run(Array.isArray(d.actions) ? d.actions : []).then(function (res) { res.kind = 'cmd'; res.id = d.id; send(res); }, function (err) {
-      send({ kind: 'cmd', id: d.id, log: ['The actions failed: ' + (err && err.message)], shots: [], js: [], summary: { texts: [], buttons: [], canvases: [] }, logs: logs.splice(0), w: innerWidth, h: innerHeight });
+      send({ kind: 'cmd', id: d.id, log: ['The actions failed: ' + (err && err.message)], shots: [], js: [], tests: [], summary: { texts: [], buttons: [], canvases: [] }, logs: logs.splice(0), w: innerWidth, h: innerHeight });
     });
   });
 }
@@ -2837,6 +2988,7 @@ function renderMsg(m, isLastAi) {
   }
   if (m.text) { const body = h('div', { class: 'md' }); body.innerHTML = md(m.text); el.append(body); }
   if (m.ops && m.ops.length) el.append(h('div', { class: 'ops' }, m.ops.map(opChip)));
+  if (m.remembered && m.remembered.length) el.append(h('div', { class: 'mem-note', title: 'Saved to memory. Edit it in Brain.' }, '🧠 Remembered: ' + m.remembered.join(' · ')));
   if (m.warn) el.append(h('div', { class: 'warn' }, m.warn));
   if (isLastAi && m.ops && m.ops.some(o => o.kind !== 'failed' && o.kind !== 'deleted')) {
     el.append(h('div', { class: 'msg-actions' },
@@ -3300,15 +3452,18 @@ function openSettings(message) {
   fillSettings();
   if (!dlg.open) { try { dlg.showModal(); } catch (e) { dlg.setAttribute('open', ''); } }
   const e = currentEngine() || (runtime.sample ? 'claude' : 'api');
-  setTimeout(() => (e === 'api' && !settings.apiKey ? $('#apiKey') : $('#settingsDone')).focus(), 30);
+  const target = !$('#freeBox').hidden && !settings.apiKey ? $('#freeLink') : e === 'api' && !settings.apiKey ? $('#apiKey') : $('#settingsDone');
+  setTimeout(() => { target.focus(); if (target.id === 'freeLink') $('#settings .dlg-body').scrollTop = 0; }, 30);
 }
 function fillSettings() {
   const active = settings.engine === 'auto' ? (currentEngine() || (runtime.sample ? 'claude' : 'api')) : settings.engine;
   $('#engClaude').setAttribute('aria-pressed', String(active === 'claude'));
   $('#engApi').setAttribute('aria-pressed', String(active === 'api'));
   $('#engClaude').disabled = !runtime.sample;
-  $('#engClaudeNote').textContent = runtime.sample ? 'Uses your Claude plan. Nothing to set up.'
-    : runtime.claude === 'connecting' ? 'Connecting to Claude…' : 'Only works when this page is opened inside Claude.';
+  $('#engClaudeNote').textContent = runtime.sample ? 'Free with your Claude account. Nothing to set up.'
+    : runtime.claude === 'connecting' ? 'Connecting to Claude…' : 'Free, but only when this page is opened inside Claude.';
+  $('#freeBox').hidden = runtime.inViewer || !!runtime.sample;
+  $('#freeLink').href = FREE_URL;
   $('#claudeFields').hidden = active !== 'claude';
   $('#apiFields').hidden = active !== 'api';
   $('#tierSel').value = settings.tier;
@@ -3319,20 +3474,37 @@ function fillSettings() {
   ms.value = settings.model;
   $('#effortSel').value = settings.effort;
   $('#autoFix').checked = settings.autoFix;
+  $('#webSearch').checked = !!settings.webSearch;
   $('#baseUrl').value = settings.baseURL;
   if (document.activeElement !== $('#aiName')) $('#aiName').value = settings.aiName;
   if (document.activeElement !== $('#instructions')) $('#instructions').value = settings.instructions;
   $('#themeSel').value = settings.theme || '';
   $('#autoPlay').checked = !!settings.autoPlaytest;
-  $('#playRounds').value = String(settings.playRounds || 5);
+  $('#playRounds').value = String(settings.playRounds || 8);
 }
 function changeSetting(k, v) { settings[k] = v; saveSettings(); updateEngine(); fillSettings(); }
 
 /* ---------------- brain cards ---------------- */
 function openBrain() {
+  renderMemory();
   renderCards();
   const dlg = $('#brain');
   if (!dlg.open) { try { dlg.showModal(); } catch (e) { dlg.setAttribute('open', ''); } }
+}
+function renderMemory() {
+  $('#memOn').checked = !!settings.memory;
+  const list = $('#memList');
+  if (!memory.length) { list.replaceChildren(h('div', { class: 'mem-empty' }, 'Nothing yet. It saves things as you chat.')); }
+  else list.replaceChildren(...memory.slice().reverse().map(m => {
+    const del = h('button', { class: 'btn btn-quiet btn-sm', type: 'button', 'aria-label': 'Forget: ' + m.text }, 'Forget');
+    del.addEventListener('click', () => { const i = memory.indexOf(m); if (i !== -1) memory.splice(i, 1); saveMemory(); renderMemory(); });
+    return h('div', { class: 'mem-item' }, h('span', null, m.text), del);
+  }));
+  const clear = $('#memClear');
+  clear.hidden = !memory.length;
+  delete clear.dataset.armed;
+  clear.textContent = 'Forget everything';
+  clear.style.color = '';
 }
 function renderCards() {
   const list = $('#cardList');
@@ -3424,7 +3596,7 @@ async function studyFile(file) {
   };
   try {
     const res = engine === 'api'
-      ? await runApi({ system: [{ type: 'text', text: 'You are ' + aiName() + ', an expert game and web developer.' }], messages: [{ role: 'user', content: ask }], tools }, cb)
+      ? await runApi({ system: [{ type: 'text', text: 'You are ' + aiName() + ', an expert game and web developer.' }], messages: [{ role: 'user', content: ask }], tools, web: false }, cb)
       : await runClaude({ turns: [{ role: 'user', content: ask }], tools }, cb);
     if (res.stop === 'refused' || !res.text.trim()) throw new ForgeError("Claude didn't write a card for that file. Try another file.");
     addCard('Studied: ' + name, res.text);
@@ -3560,22 +3732,53 @@ function bindUI() {
   $('#modelSel').addEventListener('change', e => changeSetting('model', e.target.value));
   $('#effortSel').addEventListener('change', e => changeSetting('effort', e.target.value));
   $('#autoFix').addEventListener('change', e => changeSetting('autoFix', e.target.checked));
+  $('#webSearch').addEventListener('change', e => { runtime.noWebSearch = false; runtime.oldWebSearch = false; changeSetting('webSearch', e.target.checked); });
   $('#baseUrl').addEventListener('change', e => changeSetting('baseURL', e.target.value.trim()));
   $('#aiName').addEventListener('input', e => { settings.aiName = e.target.value; saveSettings(); updateEngine(); });
   $('#instructions').addEventListener('input', e => { settings.instructions = e.target.value; saveSettings(); });
   $('#themeSel').addEventListener('change', e => { changeSetting('theme', e.target.value); applyTheme(); });
 
   $('#autoPlay').addEventListener('change', e => changeSetting('autoPlaytest', e.target.checked));
-  $('#playRounds').addEventListener('change', e => changeSetting('playRounds', Number(e.target.value) || 5));
+  $('#playRounds').addEventListener('change', e => changeSetting('playRounds', Number(e.target.value) || 8));
   $('#playBtn').addEventListener('click', () => playtest());
   $('#playStop').addEventListener('click', stopTurn);
   $('#brainBtn').addEventListener('click', openBrain);
   $('#brainDone').addEventListener('click', () => $('#brain').close());
+  $('#memOn').addEventListener('change', e => { settings.memory = e.target.checked; saveSettings(); });
+  const addMem = () => {
+    const inp = $('#memAdd'), text = inp.value.trim();
+    if (!text) return;
+    if (!addMemories([text]).length) { toast("That looks like a secret, so it wasn't saved."); return; }
+    inp.value = '';
+    renderMemory();
+  };
+  $('#memAddBtn').addEventListener('click', addMem);
+  $('#memAdd').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addMem(); } });
+  $('#memClear').addEventListener('click', e => {
+    const b = e.currentTarget;
+    if (b.dataset.armed) { memory.splice(0); saveMemory(); renderMemory(); toast('Memory cleared'); return; }
+    b.dataset.armed = '1';
+    b.textContent = 'Sure? Tap again to forget everything';
+    b.style.color = 'var(--hot)';
+  });
   $('#studyBtn').addEventListener('click', () => $('#studyInput').click());
   $('#studyInput').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) studyFile(f); });
   $('#writeCardBtn').addEventListener('click', writeCard);
 }
 
+// The chat list lives in localStorage. If the browser cleared it but the chats themselves survived in IndexedDB, rebuild the list.
+async function recoverProjects() {
+  const found = [];
+  for (const k of await kv.keys()) {
+    if (!k.startsWith('p.')) continue;
+    const p = await loadProject(k.slice(2));
+    if (p && p.id) found.push(p);
+  }
+  if (!found.length) return null;
+  found.sort((a, b) => (a.updated || 0) - (b.updated || 0));
+  for (const p of found) updateIndex(p);
+  return found[found.length - 1];
+}
 async function init() {
   applyTheme();
   bindUI();
@@ -3585,7 +3788,12 @@ async function init() {
   const cur = store.get(KEY + 'current', null);
   if (cur) p = await loadProject(cur);
   if (!p) for (const x of listProjects()) { p = await loadProject(x.id); if (p) break; }
+  if (!p) p = await recoverProjects();
   if (!p) { p = exampleProject(); await saveProject(p); }
+  if (!memory.length) {
+    const backup = await kv.get('memory');
+    if (Array.isArray(backup)) memory.push(...backup.filter(x => x && typeof x.text === 'string' && x.text.trim()).slice(-MEMORY_MAX));
+  }
   openProject(p);
   setView('chat');
 }
