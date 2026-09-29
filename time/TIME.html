@@ -2243,7 +2243,7 @@ class Item {
     }
     this.ammo = s[15]; this.armed = s[16] >= 0; this.fuse = Math.max(0, s[16]); this.ignited = s[17]; this.hp = s[18]; this.freezeLeft = 0; this.prevP = null;
   }
-  remove() { if (this.holder) this.detachFromHolder(); if (this.inWorld) world.removeBody(this.body); scene.remove(this.mesh); const i = items.indexOf(this); if (i >= 0) items.splice(i, 1); }
+  remove() { if (this.holder) this.detachFromHolder(); if (this.inWorld) world.removeBody(this.body); if (this.mesh.parent) this.mesh.parent.remove(this.mesh); const i = items.indexOf(this); if (i >= 0) items.splice(i, 1); }
 }
 function nearestItem(p, maxD, filter) { let best = null, bd = maxD * maxD; for (const it of items) { if (it.broken || it.holder || !filter(it)) continue; const d = it.body.position; const dd = (d.x - p.x) ** 2 + (d.z - p.z) ** 2 + (d.y - p.y - 0.8) ** 2 * 0.3; if (dd < bd) { bd = dd; best = it; } } return best; }
 
