@@ -5132,7 +5132,7 @@ function finishJob(j) {
 function resetChaosRound() {
   clearNewStuff(); CH.bus = null;
   CH.combo = 1; CH.comboT = 0; CH.event = null; CH.nextEvent = rand(80, 110); CH.airSec = 0;
-  CH.jobs = [newJob(), newJob(), newJob()];
+  CH.jobs = []; for (let i = 0; i < 3; i++) CH.jobs.push(newJob()); // one at a time, so the same job can't come up twice
   show('#news', false); renderChaos();
 }
 // ---------- city events: every few minutes something happens somewhere ----------
