@@ -8,11 +8,20 @@ import { createHash, randomBytes } from 'node:crypto';
 import { RegExpMatcher, englishDataset, englishRecommendedTransformers } from 'obscenity';
 
 const matcher = new RegExpMatcher({ ...englishDataset.build(), ...englishRecommendedTransformers });
+// Pieces of the worst slurs that must never appear anywhere in a name, even cut short or hidden
+// inside other letters. Stored encoded so the words themselves aren't written out in the code.
+const STEMS = ['bmlnZw==', 'bmlncg==', 'bmliYmE=', 'bmlneg=='].map(s => atob(s));
+const LEET = { '0': 'o', '1': 'i', '!': 'i', '|': 'i', '3': 'e', '4': 'a', '@': 'a', '5': 's', '$': 's', '7': 't', '9': 'g', '6': 'g', q: 'g', y: 'i' };
+// A name is checked in several shapes, so sneaky spellings don't slip through:
+// as typed; with spaces and symbols taken out; with digits taken out; each word on its own;
+// with gamer-tag wrapping (xX...Xx, trailing numbers) removed; and with doubled letters squashed.
 export function isRudeName(s) {
   s = String(s || '');
-  const joined = s.replace(/[^a-z0-9]/gi, ''), letters = s.replace(/[^a-z]/gi, '');
-  const shapes = [s, joined, letters, joined.replace(/^x+|x+$/gi, ''), letters.replace(/^x+|x+$/gi, ''), s.replace(/\d+/g, ' '), ...s.split(/[^a-zA-Z0-9]+|(?<=[a-z])(?=[A-Z])/)];
-  return shapes.some(v => v && matcher.hasMatch(v));
+  const joined = s.replace(/[^a-z0-9]/gi, ''), letters = s.replace(/[^a-z]/gi, ''), single = letters.replace(/([a-z])\1+/gi, '$1');
+  const shapes = [s, joined, letters, single, joined.replace(/^x+|x+$/gi, ''), letters.replace(/^x+|x+$/gi, ''), single.replace(/^x+|x+$/gi, ''), s.replace(/\d+/g, ' '), ...s.split(/[^a-zA-Z0-9]+|(?<=[a-z])(?=[A-Z])/)];
+  if (shapes.some(v => v && matcher.hasMatch(v))) return true;
+  const plain = s.toLowerCase().replace(/[^a-z]/g, c => LEET[c] || '').replace(/[a-z]/g, c => LEET[c] || c).replace(/([a-z])\1\1+/g, '$1$1');
+  return STEMS.some(w => plain.includes(w));
 }
 export const cleanName = n => String(n || '').replace(/\s+/g, ' ').trim();
 export const nameKey = n => cleanName(n).toLowerCase().replace(/[\s_.-]+/g, '');
@@ -31,7 +40,7 @@ const json = (o, status = 200) => new Response(JSON.stringify(o), { status, head
 export async function handle(req, store) {
   if (req.method === 'GET') {
     const board = (await store.get('board', { type: 'json' })) || {};
-    const players = Object.values(board).map(p => ({ name: p.name, secs: Math.round(p.secs || 0), stops: p.stops || 0 }));
+    const players = Object.values(board).filter(p => !nameProblem(p.name)).map(p => ({ name: p.name, secs: Math.round(p.secs || 0), stops: p.stops || 0 }));
     players.sort((a, b) => b.secs - a.secs);
     return json({ players: players.slice(0, 300), total: players.length });
   }
@@ -61,6 +70,21 @@ export async function handle(req, store) {
     await store.setJSON('player/' + key, rec);
     await updateBoard(store, key, { name: rec.name, secs: rec.secs, stops: rec.stops });
     return json({ ok: true, secs: Math.round(rec.secs), stops: rec.stops });
+  }
+  if (body.op === 'rename') {
+    const oldKey = nameKey(body.key || ''), rec = oldKey && await store.get('player/' + oldKey, { type: 'json' });
+    if (!rec || rec.tokenHash !== hash(body.token || '')) return json({ error: 'Unknown player', code: 'auth' }, 403);
+    const problem = nameProblem(body.name); if (problem) return json({ error: problem, code: 'bad' }, 400);
+    const name = cleanName(body.name), key = nameKey(name);
+    if (key !== oldKey && await store.get('player/' + key, { type: 'json' })) return json({ error: 'That name is taken, try another one.', code: 'taken' }, 409);
+    const token = randomBytes(24).toString('hex');
+    await store.setJSON('player/' + key, { ...rec, name, key, tokenHash: hash(token), last: now });
+    const saved = await store.get('player/' + key, { type: 'json' });
+    if (!saved || saved.tokenHash !== hash(token)) return json({ error: 'That name is taken, try another one.', code: 'taken' }, 409);
+    const board = (await store.get('board', { type: 'json' })) || {};
+    if (key !== oldKey) { delete board[oldKey]; if (store.delete) await store.delete('player/' + oldKey); }
+    board[key] = { name, secs: rec.secs || 0, stops: rec.stops || 0 }; await store.setJSON('board', board);
+    return json({ ok: true, name, key, token });
   }
   return json({ error: 'Unknown request' }, 400);
 }
