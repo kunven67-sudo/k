@@ -12,3 +12,8 @@ Put this folder on Netlify (the same site as time133.netlify.app):
 - `netlify/functions/time-board.mjs` is the leaderboard. It checks names again on the server (no bad words, 3 to 16 characters, one name per player, and "Bro" and "bro" count as the same name). It also refuses made-up play time.
 
 If TIME is opened as a file, or on a site without the function, the name and stats are saved on that device only.
+
+## The owner tag
+
+The first player to pick a name on the online board is the owner: their name shows up red and glitchy with an OWNER tag, only for them.
+To choose the owner yourself instead, add an environment variable in Netlify (Site settings → Environment variables): `TIME_OWNER` = your name.

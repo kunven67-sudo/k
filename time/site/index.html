@@ -211,6 +211,16 @@ kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line);padding:
 .bd-table td.rk{color:var(--brass2);width:34px}
 .bd-table tr.me td{background:rgba(201,164,92,.14)}
 .bd-table td.empty{text-align:center;color:var(--mute);font-family:var(--body);padding:22px}
+/* the owner's name: red, glitchy, with an OWNER tag */
+.glitch{position:relative;display:inline-block;color:#ff3347;font-weight:800;text-shadow:-1px 0 rgba(0,240,255,.55),1px 0 rgba(255,0,60,.6),0 0 10px rgba(255,30,60,.55);animation:glJit 2.8s infinite steps(1)}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;left:0;top:0;width:100%;overflow:hidden;pointer-events:none;clip-path:inset(0 0 100% 0)}
+.glitch::before{color:#00f0ff;animation:glA 2.3s infinite steps(1)}
+.glitch::after{color:#fff;animation:glB 3.1s infinite steps(1)}
+@keyframes glA{0%,70%,100%{clip-path:inset(0 0 100% 0);transform:none}72%{clip-path:inset(15% 0 60% 0);transform:translate(-3px,0)}75%{clip-path:inset(55% 0 25% 0);transform:translate(3px,0)}78%{clip-path:inset(0 0 100% 0)}}
+@keyframes glB{0%,82%,100%{clip-path:inset(0 0 100% 0);transform:none}84%{clip-path:inset(62% 0 12% 0);transform:translate(2px,0)}87%{clip-path:inset(25% 0 58% 0);transform:translate(-2px,0)}89%{clip-path:inset(0 0 100% 0)}}
+@keyframes glJit{0%,90%,100%{transform:none;opacity:1}91%{transform:translate(2px,0) skewX(-10deg)}93%{transform:translate(-2px,0) skewX(8deg);opacity:.8}95%{transform:none}}
+.owner-tag{position:relative;display:inline-block;margin-left:7px;padding:1px 6px;font:800 9px var(--mono);font-style:normal;letter-spacing:.2em;color:#fff;background:#d4102a;box-shadow:0 0 10px rgba(255,20,50,.7);vertical-align:middle;animation:glJit 3.4s infinite steps(1)}
+@media (prefers-reduced-motion:reduce){.glitch,.glitch::before,.glitch::after,.owner-tag{animation:none}}
 #menuName{margin-top:10px;font:600 11px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--brass2);min-height:14px}
 
 /* ---------- death ---------- */
@@ -5565,7 +5575,7 @@ async function submitName() {
   btn.disabled = true; err.textContent = 'Checking…';
   try {
     const r = await boardApi(profile.token && profile.key ? { op: 'rename', key: profile.key, token: profile.token, name: raw } : { op: 'claim', name: raw });
-    Object.assign(profile, { name: r.name, key: r.key, token: r.token, retake: false, offline: false, needRename: false });
+    Object.assign(profile, { name: r.name, key: r.key, token: r.token, retake: false, offline: false, needRename: false, owner: !!r.owner });
   } catch (e) {
     btn.disabled = false;
     if (e.code !== 'offline') { err.textContent = e.message; return; }
@@ -5576,7 +5586,14 @@ async function submitName() {
   logEvent(profile.offline ? `Hi ${profile.name}! Your name is saved on this device.` : `Hi ${profile.name}! You're on the leaderboard.`, 'good');
   renderMenuName(); const f = afterName; afterName = null; if (f) f();
 }
-function renderMenuName() { const el = $('#menuName'); el.textContent = profile.name ? `Playing as ${profile.name}` : ''; }
+function nameHTML(el, name, owner) { // fills el with a name; the owner's is red, glitchy and tagged
+  el.textContent = '';
+  if (!owner) { el.textContent = name; return; }
+  const g = document.createElement('span'); g.className = 'glitch'; g.textContent = g.dataset.text = name;
+  const t = document.createElement('i'); t.className = 'owner-tag'; t.textContent = 'OWNER'; t.dataset.text = 'OWNER';
+  el.append(g, t);
+}
+function renderMenuName() { const el = $('#menuName'); if (!profile.name) { el.textContent = ''; return; } el.textContent = 'Playing as '; const n = document.createElement('span'); nameHTML(n, profile.name, profile.owner); el.append(n); }
 // ---------- counting: hours played and times you stopped time ----------
 function boardTick(dt) {
   if (mode !== 'play' || paused || !profile.name) return;
@@ -5588,13 +5605,13 @@ async function syncBoard() {
   if (!profile.name || syncBoard.busy) return; syncBoard.busy = true;
   try {
     if (profile.token && profile.needRename) { // renamed while offline
-      const r = await boardApi({ op: 'rename', key: profile.key, token: profile.token, name: profile.name }); Object.assign(profile, { key: r.key, token: r.token, needRename: false, offline: false }); saveProfile();
+      const r = await boardApi({ op: 'rename', key: profile.key, token: profile.token, name: profile.name }); Object.assign(profile, { key: r.key, token: r.token, needRename: false, offline: false, owner: !!r.owner }); saveProfile();
     }
     if (!profile.token) { // named while offline: try to reserve the name now
-      const r = await boardApi({ op: 'claim', name: profile.name }); Object.assign(profile, { key: r.key, token: r.token, offline: false }); saveProfile();
+      const r = await boardApi({ op: 'claim', name: profile.name }); Object.assign(profile, { key: r.key, token: r.token, offline: false, owner: !!r.owner }); saveProfile();
     }
     const s = Math.floor(profile.pendSecs), st = profile.pendStops;
-    if (s >= 5 || st > 0) { await boardApi({ op: 'update', key: profile.key, token: profile.token, addSecs: s, addStops: st }); profile.pendSecs -= s; profile.pendStops -= st; saveProfile(); }
+    if (s >= 5 || st > 0) { const u = await boardApi({ op: 'update', key: profile.key, token: profile.token, addSecs: s, addStops: st }); profile.owner = !!u.owner; profile.pendSecs -= s; profile.pendStops -= st; saveProfile(); }
   } catch (e) {
     if (e.code === 'taken') { profile.retake = true; saveProfile(); }
     else if (e.code === 'auth') { profile.token = null; saveProfile(); }
@@ -5608,21 +5625,21 @@ const fmtHours = s => s >= 3600 ? (s / 3600).toFixed(1) : s >= 60 ? (s / 3600).t
 async function openBoard() {
   renderBoard(); openOverlay('#board');
   await syncBoard();
-  try { const r = await boardApi(); boardRows = r.players; boardNote = `${r.total} player${r.total === 1 ? '' : 's'} online`; }
+  try { const r = await boardApi(); boardRows = r.players; const mine = profile.name && r.players.find(p => nameKey(p.name) === nameKey(profile.name)); if (mine) { profile.owner = !!mine.owner; saveProfile(); renderMenuName(); } boardNote = `${r.total} player${r.total === 1 ? '' : 's'} online`; }
   catch (e) { boardRows = null; boardNote = e.code === 'offline' ? 'The online board opens when you play TIME on its website. Your own numbers are shown here.' : e.message; }
   renderBoard();
 }
 function renderBoard() {
-  let rows = boardRows ? boardRows.slice() : (profile.name ? [{ name: profile.name, secs: profile.secs, stops: profile.stops }] : []);
+  let rows = boardRows ? boardRows.slice() : (profile.name ? [{ name: profile.name, secs: profile.secs, stops: profile.stops, owner: profile.owner }] : []);
   const me = profile.name ? nameKey(profile.name) : null;
   if (boardRows && me) { const mine = rows.find(r => nameKey(r.name) === me); if (mine) { mine.secs = Math.max(mine.secs, profile.secs); mine.stops = Math.max(mine.stops, profile.stops); } }
   rows.sort((a, b) => b[boardSort] - a[boardSort] || b.secs - a.secs);
   $('#bdTabs').querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.sort === boardSort); b.setAttribute('aria-pressed', b.dataset.sort === boardSort); });
   $('#bdNote').textContent = boardNote || 'Loading the leaderboard…';
   $('#bdYou').innerHTML = profile.name ? `You are <b></b> · ${fmtHours(profile.secs)} hours · ${profile.stops.toLocaleString()} time stops` : 'Pick a name to get on the board.';
-  if (profile.name) $('#bdYou b').textContent = profile.name;
+  if (profile.name) nameHTML($('#bdYou b'), profile.name, profile.owner);
   $('#bdRows').innerHTML = rows.length ? rows.slice(0, 100).map((r, i) => `<tr class="${me && nameKey(r.name) === me ? 'me' : ''}"><td class="rk">${i + 1}</td><td class="nm"></td><td>${fmtHours(r.secs)}</td><td>${Math.round(r.stops).toLocaleString()}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">Nobody here yet. Be the first!</td></tr>';
-  $('#bdRows').querySelectorAll('td.nm').forEach((td, i) => td.textContent = rows[i].name);
+  $('#bdRows').querySelectorAll('td.nm').forEach((td, i) => nameHTML(td, rows[i].name, rows[i].owner));
 }
 $('#bdTabs').addEventListener('click', e => { const b = e.target.closest('[data-sort]'); if (!b) return; boardSort = b.dataset.sort; audio.click(); renderBoard(); });
 $('#bdRename').onclick = () => { show('#board', false); audio.click(); openNameDlg(null); };

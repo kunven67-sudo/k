@@ -37,10 +37,21 @@ export function nameProblem(raw) {
 const hash = t => createHash('sha256').update(String(t)).digest('hex');
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
+// The owner gets a red glitchy name and an OWNER tag. It is the first player ever to join the board,
+// unless the site sets TIME_OWNER (a name) in its Netlify environment variables.
+async function ownerKey(store) {
+  const env = typeof process !== 'undefined' && process.env && process.env.TIME_OWNER;
+  if (env) return nameKey(env);
+  const meta = (await store.get('meta', { type: 'json' })) || {};
+  return meta.owner || null;
+}
+async function setOwner(store, key) { const meta = (await store.get('meta', { type: 'json' })) || {}; meta.owner = key; await store.setJSON('meta', meta); }
+
 export async function handle(req, store) {
   if (req.method === 'GET') {
     const board = (await store.get('board', { type: 'json' })) || {};
-    const players = Object.values(board).filter(p => !nameProblem(p.name)).map(p => ({ name: p.name, secs: Math.round(p.secs || 0), stops: p.stops || 0 }));
+    const own = await ownerKey(store);
+    const players = Object.entries(board).filter(([, p]) => !nameProblem(p.name)).map(([k, p]) => ({ name: p.name, secs: Math.round(p.secs || 0), stops: p.stops || 0, ...(k === own ? { owner: true } : {}) }));
     players.sort((a, b) => b.secs - a.secs);
     return json({ players: players.slice(0, 300), total: players.length });
   }
@@ -57,7 +68,8 @@ export async function handle(req, store) {
     const saved = await store.get('player/' + key, { type: 'json' });
     if (!saved || saved.tokenHash !== hash(token)) return json({ error: 'That name is taken, try another one.', code: 'taken' }, 409);
     await updateBoard(store, key, { name, secs: 0, stops: 0 });
-    return json({ ok: true, name, key, token });
+    if (!(await ownerKey(store))) await setOwner(store, key); // the very first player owns the board
+    return json({ ok: true, name, key, token, owner: (await ownerKey(store)) === key });
   }
   if (body.op === 'update') {
     const key = nameKey(body.key || ''), rec = key && await store.get('player/' + key, { type: 'json' });
@@ -69,7 +81,7 @@ export async function handle(req, store) {
     rec.secs = (rec.secs || 0) + addSecs; rec.stops = (rec.stops || 0) + addStops; rec.last = now;
     await store.setJSON('player/' + key, rec);
     await updateBoard(store, key, { name: rec.name, secs: rec.secs, stops: rec.stops });
-    return json({ ok: true, secs: Math.round(rec.secs), stops: rec.stops });
+    return json({ ok: true, secs: Math.round(rec.secs), stops: rec.stops, owner: (await ownerKey(store)) === key });
   }
   if (body.op === 'rename') {
     const oldKey = nameKey(body.key || ''), rec = oldKey && await store.get('player/' + oldKey, { type: 'json' });
@@ -84,7 +96,8 @@ export async function handle(req, store) {
     const board = (await store.get('board', { type: 'json' })) || {};
     if (key !== oldKey) { delete board[oldKey]; if (store.delete) await store.delete('player/' + oldKey); }
     board[key] = { name, secs: rec.secs || 0, stops: rec.stops || 0 }; await store.setJSON('board', board);
-    return json({ ok: true, name, key, token });
+    const meta = (await store.get('meta', { type: 'json' })) || {}; if (meta.owner === oldKey && key !== oldKey) await setOwner(store, key); // the owner keeps the tag after a rename
+    return json({ ok: true, name, key, token, owner: (await ownerKey(store)) === key });
   }
   return json({ error: 'Unknown request' }, 400);
 }
