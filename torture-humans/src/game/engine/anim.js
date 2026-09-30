@@ -237,7 +237,10 @@ export class Character {
     if (!c) {
       // not loaded yet: fetch it, then play (if nothing else was asked for meanwhile)
       const ticket = (this.playTicket = (this.playTicket || 0) + 1);
-      this.lib.require([`${this.gender}_${name}`, name]).then(() => {
+      // gendered clip first ("m_wave_01"); the plain name only if that doesn't exist
+      this.lib.require([`${this.gender}_${name}`])
+        .then(() => (this.lib.get(`${this.gender}_${name}`) ? null : this.lib.require([name])))
+        .then(() => {
         if (ticket === this.playTicket && (this.lib.get(`${this.gender}_${name}`) || this.lib.get(name))) this.play(name, opts);
         else if (ticket === this.playTicket) opts.onDone?.();
       });

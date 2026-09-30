@@ -6,6 +6,8 @@ import { initPhysics, Physics } from './engine/physics.js';
 import { Renderer } from './engine/renderer.js';
 import { AnimLibrary, Character, loadAvatar, baseClips } from './engine/anim.js';
 import { Player } from './player.js';
+import { initNavigation, Navigation } from './engine/navigation.js';
+import { Human } from './humans/human.js';
 import { buildTestLevel } from './levels/test-level.js';
 import { buildLab } from './levels/lab.js';
 
@@ -34,6 +36,28 @@ export async function boot() {
   if (params.get('cam')) player.mode = params.get('cam');
   if (level.ladder) player.setLadder(level.ladder, level.ladderTopFloorY);
 
+  // walkable map + people
+  await initNavigation();
+  const nav = new Navigation();
+  const humans = [];
+  if (level.navRoots) {
+    try {
+      nav.build(level.navRoots);
+      const count = Number(params.get('humans') ?? 0);
+      const looks = ['Business_Female_01', 'Police_Male_01', 'Chef_Female_01', 'Male_Adult_04'];
+      for (let i = 0; i < count; i++) {
+        const look = looks[i % looks.length];
+        const gender = /Female/.test(look) ? 'f' : 'm';
+        await lib.require(baseClips(gender));
+        const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => avatar);
+        const start = nav.randomPoint(level.wanderArea) || level.spawn;
+        humans.push(new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.wanderArea, profile: { name: look } }));
+      }
+    } catch (err) {
+      console.warn('[nav]', err.message);
+    }
+  }
+
   renderer.sunIntensity = level.sunIntensity;
   renderer.setScene(scene, camera, { sunDirection: level.sunDirection });
   addEventListener('resize', () => renderer.resize());
@@ -42,7 +66,7 @@ export async function boot() {
   const fpsEl = document.getElementById('fps');
   const hintEl = document.getElementById('hint');
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, frame: 0 };
   window.game = game; // for tests and debugging
 
   // test hook: drive the player without a real keyboard
@@ -58,6 +82,8 @@ export async function boot() {
     if (look) { input.mouseDX += look[0] / 0.0022; input.mouseDY += look[1] / 0.0022; }
     physics.update(dt, (fixed) => player.fixedUpdate(fixed));
     player.update(dt, physics.alpha);
+    nav.update(dt);
+    for (const h of humans) h.update(dt);
     level.update?.(dt);
     input.endFrame();
     game.frame++;

@@ -281,6 +281,9 @@ export async function buildLab({ scene, physics }) {
   return {
     spawn: new THREE.Vector3(2.5, 0, 2.0),
     sunDirection: null,
+    navRoots: [statics, props],
+    // test visitors stay on the lab floor (the lab's roof is walkable until the house sits on it)
+    wanderArea: (p) => p.y < 1,
     ladder,
     ladderTopFloorY: BEDROOM.floorY,
     hatch: HATCH,
