@@ -71,7 +71,11 @@ function listen(wav, phrases) {
     if (res.error && /no-recognizer|no-speech/.test(res.error)) { console.log(`SKIPPED: ${res.error}`); return; }
     const heard = res.results.map((r) => `${r.text} (${Math.round(r.confidence * 100)}%)`).join(', ') || 'nothing';
     const acted = res.results.some((r) => r.confidence >= 0.6 && c.parseUtterance(r.text, map)?.action);
-    const ok = isCommand ? res.results.some((r) => r.text === expected) : !acted;
+    // compare commands, not spelling: "click aitch" and "click h" are both H
+    const want = c.parseUtterance(expected || '', map)?.action;
+    const ok = isCommand
+      ? res.results.some((r) => JSON.stringify(c.parseUtterance(r.text, map)?.action) === JSON.stringify(want))
+      : !acted;
     if (!ok) failed++;
     console.log(`${ok ? 'PASS' : 'FAIL'} said "${spoken}" -> heard ${heard}${res.ms !== null ? ` after ${res.ms} ms` : ''}${res.error ? ` [${res.error}]` : ''}`);
   }

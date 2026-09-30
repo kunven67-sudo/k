@@ -6,6 +6,7 @@
 # too slow for the dozens of audio-level events per second, so recognition
 # results got stuck behind them and showed up a minute late.
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
 
