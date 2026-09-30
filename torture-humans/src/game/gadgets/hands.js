@@ -12,6 +12,12 @@ const RANGE = 40;          // m
 const TINY = 0.05;         // shrunk people are 1/20 size (about 9 cm)
 const _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
+// item axes expressed in hand space: item X -> hand -Y, item Y -> hand +Z, item Z -> hand -X
+const GRIP = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+  new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(-1, 0, 0),
+));
+const GRIP_INV = GRIP.clone().invert();
+const PALM = new THREE.Vector3(0.075, 0.03, 0.0); // grip center seen from the wrist: out along the palm, a bit in front of it
 
 const smooth = (t) => t * t * (3 - 2 * t);
 
@@ -27,6 +33,7 @@ class Item {
 class ShrinkRay extends Item {
   constructor(ctx) {
     super('Shrink ray', shrinkRayModel(), { hold: new THREE.Vector3(0.17, -0.17, -0.42) });
+    this.gripPoint = new THREE.Vector3(0, -0.03, 0.012);      // middle of the handle
     this.ctx = ctx;
     this.charge = 0;
     this.charging = false;
@@ -102,6 +109,8 @@ class ShrinkRay extends Item {
 class Jar extends Item {
   constructor(ctx) {
     super('Jar', jarModel(), { hold: new THREE.Vector3(0.16, -0.22, -0.4) });
+    this.gripPoint = new THREE.Vector3(0, 0.085, 0);          // hold it around the middle
+    this.palm = new THREE.Vector3(0.06, 0.07, 0);              // palm against the side of a 13 cm jar
     this.ctx = ctx;
     this.swoop = null;      // catching animation state
     this.inside = null;     // the tiny human caught in it
@@ -216,24 +225,44 @@ export class Hands {
       if (item instanceof Jar) item.model.quaternion.multiply(_q.setFromEuler(new THREE.Euler(-0.15, 0, 0)));
     }
     item.model.updateMatrixWorld(true);
-    this.solveArm(item.model.getWorldPosition(_v));
+    this.solveArm();
   }
 
-  // right hand onto the grip
-  solveArm(grip) {
+  // Right hand onto the item's grip, with the hand turned the way a real hand holds it.
+  // Rocketbox hand bone: +X along the fingers, +Z from pinky to index, palm faces +Y.
+  // Holding a pistol: pinky->index runs up the handle (item +Y), the palm presses on the
+  // handle's right side (palm normal = item -X), so the fingers point forward (item -Z).
+  solveArm() {
     const ch = this.ctx.player.character;
     const B = ch.bones;
     const upper = B.Bip01_R_UpperArm;
     const lower = B.Bip01_R_Forearm;
     const hand = B.Bip01_R_Hand;
     if (!upper || !lower || !hand) return;
+    const item = this.current;
+    const s = this.ctx.player.scale;
     ch.root.updateMatrixWorld(true);
+    const qItem = item.model.getWorldQuaternion(new THREE.Quaternion());
+    const qHand = qItem.clone().multiply(GRIP_INV);
+    const grip = item.model.localToWorld((item.gripPoint || new THREE.Vector3()).clone());
+    // wrist = grip point minus the palm offset (in hand space, meters)
+    const palm = (item.palm || PALM).clone().multiplyScalar(s).applyQuaternion(qHand);
+    const wrist = grip.clone().sub(palm);
     const shoulder = upper.getWorldPosition(new THREE.Vector3());
-    // elbow down and out to the right, like holding something in front of you
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.ctx.camera.quaternion);
     const pole = shoulder.clone().addScaledVector(right, 0.4).add(new THREE.Vector3(0, -0.6, 0));
-    // the wrist sits a little behind and below the grip point
-    const wrist = grip.clone().add(new THREE.Vector3(0, -0.02, 0.05).applyQuaternion(this.ctx.camera.quaternion).multiplyScalar(this.ctx.player.scale));
     solveTwoBone(upper, lower, hand, wrist, 1, pole);
+    // turn the hand itself
+    const parentQ = hand.parent.getWorldQuaternion(new THREE.Quaternion());
+    hand.quaternion.copy(parentQ.invert().multiply(qHand));
+    hand.updateMatrixWorld(true);
+    // fingers around the grip: tight on the pistol grip, open wider for the fat jar
+    const it = this.current;
+    ch.grip('R', it instanceof Jar ? 0.55 : 0.95, { thumb: it instanceof Jar ? 0.4 : 0.8 });
+    // the index finger rests on the trigger, and pulls it while charging
+    if (it instanceof ShrinkRay) {
+      const idx = B.Bip01_R_Finger1;
+      if (idx) idx.rotation.z -= 0.55 - (it.charging ? 0.25 : 0);
+    }
   }
 }

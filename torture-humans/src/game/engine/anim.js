@@ -343,6 +343,25 @@ export class Character {
     }
   }
 
+  // Curl the fingers of one hand around something (0 = open, 1 = fist).
+  // Rocketbox fingers curl around their local Z. Call after the mixer update.
+  grip(side = 'R', amount = 1, { thumb = 0.6, spread = 0 } = {}) {
+    const sign = side === 'R' ? 1 : -1;
+    const joints = [1.0, 1.15, 0.8]; // base, middle, tip: the middle joint bends most
+    for (let f = 1; f <= 4; f++) {
+      for (let j = 0; j < 3; j++) {
+        const b = this.bones[`Bip01_${side}_Finger${f}${j === 0 ? '' : j}`];
+        if (!b) continue;
+        b.rotation.z += sign * amount * joints[j] * (1 + (f - 1) * 0.05);
+        if (j === 0 && spread) b.rotation.y += sign * spread * (f - 2.5) * 0.08;
+      }
+    }
+    for (let j = 0; j < 3; j++) {
+      const b = this.bones[`Bip01_${side}_Finger0${j === 0 ? '' : j}`];
+      if (b) b.rotation.z += sign * amount * thumb * (j === 0 ? 0.3 : 0.6);
+    }
+  }
+
   // Feet onto uneven ground (stairs, slopes, rocks). groundAt(x, yFrom, z) -> ground height or null.
   // The animation's own foot lift is kept; each foot is only shifted by how much
   // the ground under it differs from the flat plane the clip was recorded on.
