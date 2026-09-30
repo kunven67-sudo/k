@@ -31,6 +31,7 @@ export class Hazards {
       const local = cage.group.worldToLocal(p.feet.clone());
       if (cage.inLava(local.x, local.z)) {
         this.vitals.damage(45 * dt, 'lava');
+        this.vitals.hurtFlash = Math.max(this.vitals.hurtFlash, 0.9); // the edges of your view burn red
       }
       const depth = cage.waterDepth(local.x, local.z);
       if (depth > 0.004) {
