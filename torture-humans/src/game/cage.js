@@ -38,6 +38,23 @@ export class Cage {
     return Math.hypot(x - f.pond.x, z - f.pond.z) > f.pond.r * 1.05 && Math.hypot(x - f.lava.x, z - f.lava.z) > f.lava.r * 1.15;
   }
 
+  // surface heights of the pond water and the lava (terrarium space)
+  get waterY() { const f = this.tiny?.features?.pond; return f ? this.bounds.max.y - f.depth * 0.45 : -Infinity; }
+  get lavaY() { const f = this.tiny?.features?.lava; return f ? this.bounds.max.y - f.depth * 0.5 : -Infinity; }
+
+  // how deep the pond water is at x,z (0 = dry)
+  waterDepth(x, z) {
+    const f = this.tiny?.features?.pond;
+    if (!f || Math.hypot(x - f.x, z - f.z) > f.r * 1.1) return 0;
+    return Math.max(0, this.waterY - this.surfaceY(x, z));
+  }
+
+  inLava(x, z) {
+    const f = this.tiny?.features?.lava;
+    if (!f || Math.hypot(x - f.x, z - f.z) > f.r * 1.05) return false;
+    return this.surfaceY(x, z) < this.lavaY + 0.002;
+  }
+
   // soil height in terrarium space (hills and pits of the tiny world)
   surfaceY(x, z) {
     return this.tiny ? this.tiny.surfaceY(x, z) : this.bounds.max.y;
@@ -54,12 +71,14 @@ export class Cage {
     return p;
   }
 
-  // drop a human into the terrarium, near the side you're standing on
-  drop(human, from) {
-    const local = this.group.worldToLocal(from.clone());
+  // Drop a human into the terrarium: where you aim if the aim lands inside it
+  // (yes, including the pond or the lava), otherwise near the side you stand on.
+  drop(human, from, aim = null) {
+    const local = this.group.worldToLocal((aim || from).clone());
     const b = this.bounds;
-    const x = THREE.MathUtils.clamp(local.x * 0.5, b.min.x + 0.1, b.max.x - 0.1);
-    const z = THREE.MathUtils.clamp(local.z * 0.5, b.min.z + 0.1, b.max.z - 0.1);
+    const inside = aim && Math.abs(local.x) < b.max.x && Math.abs(local.z) < b.max.z;
+    const x = THREE.MathUtils.clamp(inside ? local.x : local.x * 0.5, b.min.x + 0.03, b.max.x - 0.03);
+    const z = THREE.MathUtils.clamp(inside ? local.z : local.z * 0.5, b.min.z + 0.03, b.max.z - 0.03);
     const world = this.group.localToWorld(new THREE.Vector3(x, this.surfaceY(x, z), z));
     human.releaseInto(this, world);
     this.residents.add(human);

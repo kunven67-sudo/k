@@ -265,13 +265,77 @@ export async function buildTinyWorld(terrarium, { reflections = 'high' } = {}) {
     plant.traverse((o) => { if (o.isMesh) o.userData.noCollide = true; });
   }
 
+  // ---- ripples (someone moving in the pond) and smoke (something burned in the lava)
+  const fx = new THREE.Group();
+  fx.name = 'tiny-fx';
+  world.add(fx);
+  const effects = [];
+  const rippleGeo = new THREE.RingGeometry(0.8, 1, 48);
+  rippleGeo.rotateX(-Math.PI / 2);
+  const lastRipple = new Map();
+  const ripple = (localPos, dt, id = 'x') => {
+    const now = performance.now();
+    if (now - (lastRipple.get(id) || 0) < 280) return;
+    lastRipple.set(id, now);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xdfeff0, transparent: true, opacity: 0.5, depthWrite: false });
+    const m = new THREE.Mesh(rippleGeo, mat);
+    const f = FEATURES.pond;
+    m.position.set(localPos.x, TANK.soilY - f.depth * 0.45 + 0.0006, localPos.z);
+    m.scale.setScalar(0.004);
+    m.userData.noCollide = true;
+    fx.add(m);
+    effects.push({ m, t: 0, life: 1.4, kind: 'ripple' });
+  };
+  const smokeTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(70,66,62,0.8)');
+    grd.addColorStop(1, 'rgba(70,66,62,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  const smoke = (localPos) => {
+    for (let i = 0; i < 14; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, transparent: true, depthWrite: false, opacity: 0.7 }));
+      sp.position.set(localPos.x + (Math.random() - 0.5) * 0.01, localPos.y + 0.01, localPos.z + (Math.random() - 0.5) * 0.01);
+      sp.scale.setScalar(0.01);
+      fx.add(sp);
+      effects.push({ m: sp, t: -i * 0.12, life: 2.4, kind: 'smoke', drift: new THREE.Vector3((Math.random() - 0.5) * 0.01, 0.035 + Math.random() * 0.02, (Math.random() - 0.5) * 0.01) });
+    }
+  };
+  const tickFx = (dt) => {
+    for (let i = effects.length - 1; i >= 0; i--) {
+      const e = effects[i];
+      e.t += dt;
+      if (e.t < 0) { e.m.visible = false; continue; }
+      e.m.visible = true;
+      const k = e.t / e.life;
+      if (e.kind === 'ripple') {
+        e.m.scale.setScalar(0.004 + k * 0.05);
+        e.m.material.opacity = 0.5 * (1 - k);
+      } else {
+        e.m.position.addScaledVector(e.drift, dt);
+        e.m.scale.setScalar(0.01 + k * 0.05);
+        e.m.material.opacity = 0.7 * (1 - k);
+      }
+      if (k >= 1) { fx.remove(e.m); e.m.material.dispose(); effects.splice(i, 1); }
+    }
+  };
+
   // animated bits (pond ripples, lava); collected once, ticked every frame
   const animated = [];
   world.traverse((o) => { if (o !== world && o.userData.update) animated.push(o); });
   const t0 = performance.now();
+  let last = performance.now();
   world.userData.tick = () => {
-    const t = (performance.now() - t0) / 1000;
+    const now = performance.now();
+    const t = (now - t0) / 1000;
     for (const o of animated) o.userData.update(t);
+    tickFx(Math.min(0.1, (now - last) / 1000));
+    last = now;
   };
-  return { world, ground, solid, plants, heightAt, features: FEATURES, surfaceY: y };
+  return { world, ground, solid, plants, heightAt, features: FEATURES, surfaceY: y, ripple, smoke };
 }

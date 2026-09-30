@@ -117,6 +117,7 @@ export class Player {
   // what "E" would do right now (shown as a hint on screen)
   get interactHint() {
     if (this.ladder?.active) return this.ladder.mode === 'climb' ? 'W / S climb · Space let go' : null;
+    if (this.inWater) return 'E  Drink   ·   F  Grow back to normal size';
     if (this.inCage && this.scale < 1) return 'F  Grow back to normal size';
     if (this.scale >= 1 && this.cage?.canDropFrom(this.camera.position)) return 'F  Shrink yourself into the terrarium';
     const where = this.ladder?.prompt();
@@ -159,7 +160,7 @@ export class Player {
     }
 
     // wanted horizontal velocity, relative to where the camera looks
-    const speed = (this.crouching ? CROUCH : sprint && mv.y > 0.3 ? RUN : WALK) * this.scale;
+    const speed = (this.crouching ? CROUCH : sprint && mv.y > 0.3 ? RUN : WALK) * this.scale * (this.speedMul ?? 1);
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
     const wx = (mv.x * cos - mv.y * sin) * speed;

@@ -12,6 +12,8 @@ import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
 import { Squisher } from './squish.js';
 import { bakeEnvironment } from './engine/probe.js';
+import { Vitals } from './vitals.js';
+import { Hazards } from './hazards.js';
 import { buildTestLevel } from './levels/test-level.js';
 import { buildLab } from './levels/lab.js';
 
@@ -94,6 +96,8 @@ export async function boot() {
   const hands = new Hands({ scene, camera, physics, player, input, humans, cage });
   player.cage = cage;
   const squisher = new Squisher({ scene, player, humans, settings });
+  const vitals = new Vitals(settings);
+  const hazards = new Hazards({ player, cage, vitals, input, respawn: level.respawn || level.spawn });
   if (params.get('item') === 'jar') hands.select(1);
 
   renderer.sunIntensity = level.sunIntensity;
@@ -111,7 +115,7 @@ export async function boot() {
   const fpsEl = document.getElementById('fps');
   const hintEl = document.getElementById('hint');
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, vitals, hazards, frame: 0 };
   window.game = game; // for tests and debugging
 
   // test hook: drive the player without a real keyboard
@@ -129,6 +133,8 @@ export async function boot() {
     player.update(dt, physics.alpha);
     hands.update(dt);
     squisher.update();
+    hazards.update(dt);
+    vitals.update(dt);
     nav.update(dt);
     for (const h of humans) h.update(dt);
     level.update?.(dt);

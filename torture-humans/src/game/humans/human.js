@@ -166,6 +166,29 @@ export class Human {
     this.onDeath?.(this, gore);
   }
 
+  // Fell in the lava: gone in a moment, a charred shape and smoke left behind.
+  burn() {
+    if (this.dead) return;
+    this.dead = true;
+    this.state = 'dead';
+    this.character.setEmotion('pain', 1);
+    this.character.update(0.016);
+    this.character.root.traverse((o) => {
+      if (!o.isMesh) return;
+      // charred: own copies of the materials (others wearing the same body stay normal)
+      const charred = [].concat(o.material).map((m) => {
+        const c = m.clone();
+        c.color?.multiplyScalar(0.08);
+        if (c.emissive) { c.emissive.set(0xff3a0a); c.emissiveIntensity = 0.6; }
+        return c;
+      });
+      o.material = Array.isArray(o.material) ? charred : charred[0];
+    });
+    this.burning = 1.5; // glow fades out
+    this.cage?.tiny?.smoke?.(this.character.root.position);
+    this.onDeath?.(this, 'lava');
+  }
+
   // dropped into the terrarium: wander inside its bounds (the full tiny-world AI lives in cage.js)
   releaseInto(cage, point) {
     this.captured = false;
@@ -210,6 +233,11 @@ export class Human {
       }
     }
     root.position.y = this.cage.surfaceY(root.position.x, root.position.z);
+    if (this.cage.inLava(root.position.x, root.position.z)) { this.burn(); return; }
+    if (this.cage.waterDepth(root.position.x, root.position.z) > 0.004) {
+      this.emotion.fear = Math.min(1, this.emotion.fear + dt * 0.2);
+      this.cage.tiny?.ripple?.(root.position, dt, this.id);
+    }
     this.emotion.fear = Math.max(0.3, this.emotion.fear - dt * 0.02);
     this.character.speed = speed / this.scale;
     this.updateFace();
@@ -239,7 +267,14 @@ export class Human {
 
   update(dt) {
     if (!this.alive) return;
-    if (this.state === 'dead') return;
+    if (this.state === 'dead') {
+      if (this.burning > 0) {
+        this.burning -= dt;
+        const k = Math.max(0, this.burning / 1.5);
+        this.character.root.traverse((o) => { if (o.isMesh) for (const m of [].concat(o.material)) if (m.emissive) m.emissiveIntensity = 0.6 * k; });
+      }
+      return;
+    }
     if (this.state === 'jar') { this.updateJar(dt); return; }
     if (this.state === 'caged') { this.updateCaged(dt); return; }
     if (this.shrinking) {

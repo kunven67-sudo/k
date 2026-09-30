@@ -125,7 +125,9 @@ class Jar extends Item {
       if (cage && cage.canDropFrom(camera.position)) {
         const h = this.inside;
         this.inside = null;
-        cage.drop(h, camera.position);
+        // where in the tank are you pointing? (people don't block the aim)
+        const aimHit = physics.raycast(camera.position, camera.getWorldDirection(new THREE.Vector3()), 3, { exclude: player.body.collider, filterGroups: groups(GROUP.PLAYER, GROUP.WORLD | GROUP.PROP) });
+        cage.drop(h, camera.position, aimHit?.point || null);
         return;
       }
       return;

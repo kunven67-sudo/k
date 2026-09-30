@@ -16,6 +16,14 @@
     #loading[hidden] { display: none; }
     #loading .bar { width: min(520px, 80vw); height: 10px; background: #1c2128; border-radius: 6px; overflow: hidden; }
     #loading .bar > div { width: 0; height: 100%; background: linear-gradient(90deg, #2e9bff, #6fe0ff); transition: width .2s; }
+    #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(170, 10, 0, .85)); }
+    #vitals { position: fixed; left: 18px; bottom: 18px; display: grid; gap: 6px; }
+    #vitals > div { display: flex; align-items: center; gap: 8px; width: 190px; font: 13px system-ui; color: #fff; text-shadow: 0 0 3px #000; }
+    #vitals b { width: 18px; text-align: center; }
+    #vitals i { display: block; height: 7px; flex: 1; border-radius: 4px; background: rgba(255,255,255,.18); position: relative; overflow: hidden; }
+    #vitals [data-v] > i { background: linear-gradient(90deg, var(--c), var(--c)) no-repeat, rgba(255,255,255,.15); background-size: 100% 100%; }
+    #vitals [data-v="health"] { --c: #e0443a; } #vitals [data-v="hunger"] { --c: #d9953a; } #vitals [data-v="thirst"] { --c: #3aa0e0; } #vitals [data-v="energy"] { --c: #e0d23a; }
+    #blackout { position: fixed; inset: 0; background: #000; display: grid; place-content: center; color: #ddd; font: 600 20px system-ui; opacity: 0; pointer-events: none; }
     #error { position: fixed; inset: auto 20px 20px 20px; padding: 14px; background: #400; color: #fff; font: 15px sans-serif; border-radius: 8px; }
   </style>
 </head>
@@ -24,6 +32,14 @@
   <div id="fps" hidden></div>
   <div id="hint" hidden></div>
   <div id="flash" hidden></div>
+  <div id="hurt"></div>
+  <div id="vitals">
+    <div data-v="health" title="Health"><b>❤</b><i></i></div>
+    <div data-v="hunger" title="Hunger"><b>🍖</b><i></i></div>
+    <div data-v="thirst" title="Thirst"><b>💧</b><i></i></div>
+    <div data-v="energy" title="Energy (sleep)"><b>⚡</b><i></i></div>
+  </div>
+  <div id="blackout" hidden><span></span></div>
   <div id="error" hidden></div>
   <div id="loading" hidden><div class="label">Getting the game ready…</div><div class="bar"><div></div></div></div>
   <script type="module" src="/src/game/main.js"></script>
