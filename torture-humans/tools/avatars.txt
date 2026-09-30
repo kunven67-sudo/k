@@ -1,0 +1,38 @@
+# Rocketbox avatars used in the game (folder under Assets/Avatars). Adults only.
+# --- townspeople (30): jobs match the town's buildings
+Professions/Police_Female_01
+Professions/Police_Male_01
+Professions/Police_Male_03
+Professions/Fire_Female_01
+Professions/Fire_Male_01
+Professions/Fire_Male_04
+Professions/Medical_Female_01
+Professions/Medical_Male_01
+Professions/Medical_Female_03
+Professions/Chef_Female_01
+Professions/Business_Female_01
+Professions/Business_Female_03
+Professions/Business_Male_01
+Professions/Business_Male_04
+Professions/Construction_Male_01
+Professions/Construction_Female_01
+Professions/Delivery_Male_01
+Professions/Gardener_Male_01
+Professions/Security_Male_01
+Professions/Sports_Female_01
+Professions/Sports_Male_02
+Professions/Wood_Male_01
+Adults/Female_Adult_02
+Adults/Female_Adult_05
+Adults/Female_Adult_08
+Adults/Female_Adult_12
+Adults/Male_Adult_04
+Adults/Male_Adult_07
+Adults/Male_Adult_11
+Adults/Male_Adult_15
+# --- extra looks for the character creator (the mad scientist)
+Adults/Male_Adult_01
+Adults/Male_Adult_02
+Adults/Male_Adult_09
+Adults/Male_Adult_18
+Adults/Male_Adult_20

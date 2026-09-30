@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Torture Humans</title>
+  <!-- only our own files; wasm for the physics engine; blob: for workers and generated textures -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' th: blob: data:; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' th: blob: data:; media-src 'self' th: blob: data:; connect-src 'self' th: blob: data:; worker-src 'self' blob:">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #game { display: block; width: 100vw; height: 100vh; outline: none; }
+    #fps { position: fixed; top: 8px; right: 10px; color: #9f9; font: 13px/1 monospace; text-shadow: 0 0 3px #000; }
+    #toast { position: fixed; left: 50%; top: 12%; transform: translateX(-50%); padding: 8px 18px; background: rgba(0,0,0,.7); color: #fff; font: 600 17px system-ui, sans-serif; border-radius: 6px; }
+    #toast[hidden] { display: none; }
+    #hint { position: fixed; left: 50%; bottom: 14%; transform: translateX(-50%); padding: 8px 16px; background: rgba(0,0,0,.55); color: #fff; font: 600 16px/1.2 system-ui, sans-serif; border-radius: 6px; letter-spacing: .3px; }
+    #flash { position: fixed; inset: 0; background: #e8f7ff; pointer-events: none; opacity: 0; }
+    #loading { position: fixed; inset: 0; display: grid; place-content: center; gap: 14px; background: #07080a; color: #dfe6ee; font: 600 18px system-ui, sans-serif; text-align: center; }
+    #loading[hidden] { display: none; }
+    #loading .bar { width: min(520px, 80vw); height: 10px; background: #1c2128; border-radius: 6px; overflow: hidden; }
+    #loading .bar > div { width: 0; height: 100%; background: linear-gradient(90deg, #2e9bff, #6fe0ff); transition: width .2s; }
+    #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(170, 10, 0, .85)); }
+    #vitals { position: fixed; left: 18px; bottom: 18px; display: grid; gap: 6px; }
+    #vitals > div { display: flex; align-items: center; gap: 8px; width: 190px; font: 13px system-ui; color: #fff; text-shadow: 0 0 3px #000; }
+    #vitals b { width: 18px; text-align: center; }
+    #vitals i { display: block; height: 7px; flex: 1; border-radius: 4px; background: rgba(255,255,255,.18); position: relative; overflow: hidden; }
+    #vitals [data-v] > i { background: linear-gradient(90deg, var(--c), var(--c)) no-repeat, rgba(255,255,255,.15); background-size: 100% 100%; }
+    #vitals [data-v="health"] { --c: #e0443a; } #vitals [data-v="hunger"] { --c: #d9953a; } #vitals [data-v="thirst"] { --c: #3aa0e0; } #vitals [data-v="energy"] { --c: #e0d23a; }
+    #blackout { position: fixed; inset: 0; background: #000; display: grid; place-content: center; color: #ddd; font: 600 20px system-ui; opacity: 0; pointer-events: none; }
+    #controls { position: fixed; right: 18px; top: 40px; max-width: 430px; padding: 12px 16px; background: rgba(8,10,14,.78); color: #e8edf2; font: 14px/1.45 system-ui, sans-serif; border-radius: 8px; }
+    #controls ul { margin: 6px 0 0; padding-left: 18px; }
+    #controls kbd { display: inline-block; padding: 0 5px; border: 1px solid #6b7684; border-bottom-width: 2px; border-radius: 4px; font: 12px/1.5 system-ui; background: #1b2129; }
+    #error { position: fixed; inset: auto 20px 20px 20px; padding: 14px; background: #400; color: #fff; font: 15px sans-serif; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <canvas id="game" tabindex="0"></canvas>
+  <div id="fps" hidden></div>
+  <div id="hint" hidden></div>
+  <div id="toast" hidden></div>
+  <div id="flash" hidden></div>
+  <div id="hurt"></div>
+  <div id="vitals">
+    <div data-v="health" title="Health"><b>❤</b><i></i></div>
+    <div data-v="hunger" title="Hunger"><b>🍖</b><i></i></div>
+    <div data-v="thirst" title="Thirst"><b>💧</b><i></i></div>
+    <div data-v="energy" title="Energy (sleep)"><b>⚡</b><i></i></div>
+  </div>
+  <div id="blackout" hidden><span></span></div>
+  <div id="controls" hidden>
+    <b>Controls</b> <small>(H hides this)</small>
+    <ul>
+      <li><kbd>Click</kbd> the game to look around with the mouse · <kbd>Esc</kbd> frees the mouse</li>
+      <li><kbd>W A S D</kbd> walk · <kbd>Shift</kbd> run · <kbd>Ctrl</kbd>/<kbd>C</kbd> crouch · <kbd>Space</kbd> jump</li>
+      <li><kbd>V</kbd> first / third person · <kbd>F2</kbd> graphics Low/Medium/High/Ultra · <kbd>F3</kbd> FPS</li>
+      <li><kbd>1</kbd> shrink ray: <b>hold</b> left click to charge, <b>let go</b> to fire</li>
+      <li><kbd>2</kbd> jar: click on a tiny person to catch them, click at the terrarium to drop them in</li>
+      <li><kbd>3</kbd> supplies: click at the terrarium to pour poles, stones, bread or tools in · <kbd>R</kbd> changes what</li>
+      <li>Tiny yourself: <kbd>Click</kbd> punches · brave tiny people will fight you, scared ones run</li>
+      <li>Look at a tiny person to see how they're doing (they need food and the pond, and build with what you give them)</li>
+      <li><kbd>F</kbd> at the terrarium: shrink yourself in (F again to grow back)</li>
+      <li><kbd>E</kbd> use: climb the ladder, drink water</li>
+      <li>Step on tiny people to squish them</li>
+    </ul>
+  </div>
+  <div id="error" hidden></div>
+  <div id="loading" hidden><div class="label">Getting the game ready…</div><div class="bar"><div></div></div></div>
+  <script type="module" src="/src/game/main.js"></script>
+</body>
+</html>

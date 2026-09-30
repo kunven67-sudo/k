@@ -1,0 +1,63 @@
+{
+  "name": "torture-humans",
+  "productName": "Torture Humans",
+  "version": "0.2.0",
+  "description": "Mad scientist sandbox: shrink humans, keep them in glass cages with bugs.",
+  "private": true,
+  "type": "module",
+  "author": "kunven67-sudo",
+  "license": "MIT",
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "@recast-navigation/core": "^0.43.1",
+    "@recast-navigation/generators": "^0.43.1",
+    "@recast-navigation/three": "^0.43.1",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "electron": "^44.5.0",
+    "electron-builder": "^26.15.3",
+    "vite": "^8.3.1"
+  },
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "electron .",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "dist": "vite build && electron-builder --win portable --x64 --publish never"
+  },
+  "build": {
+    "appId": "com.kunven67.torturehumans",
+    "productName": "Torture Humans",
+    "copyright": "Torture Humans",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "TortureHumans-${version}-Portable.exe"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kunven67-sudo/k.git"
+  }
+}
