@@ -107,3 +107,14 @@ Graphics settings menu so it never lags. Zero bugs.
 
 ## Cars (round 7)
 - Start with an old car in your garage, buy better ones; humans drive too, traffic, crashes
+
+## Town humans (round 8)
+- Real daily schedules by job, relationships (friends/families/couples; missing-person search + posters),
+  they remember and react to you (fear, like, gossip), random events (fires, crashes, robberies, parties, storms)
+
+## Weather (round 8)
+- Rain + thunderstorms (puddles, wet streets), snow (piles up, coats), fog, four seasons
+
+## Build + delivery (round 8)
+- Player wants it ALL AT ONCE (one big release, not staged public versions)
+- First target: Windows .exe with one-click Update (like CursorVerse); single .html for gamesystem2 later
