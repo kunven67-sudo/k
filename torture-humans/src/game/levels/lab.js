@@ -103,7 +103,7 @@ function surgeryTable() {
   return g;
 }
 
-export async function buildLab({ scene, physics }) {
+export async function buildLab({ scene, physics, settings }) {
   await loadIndex();
   const { w, d, h } = LAB;
   const statics = new THREE.Group();   // becomes one exact triangle-mesh collider
@@ -163,7 +163,7 @@ export async function buildLab({ scene, physics }) {
   terrarium.name = 'terrarium';
   // soil bed (the tiny world's heightfield sits on it) + the tiny world itself
   mesh(box(2.96, 0.1, 1.86), pbr('forest_ground_04', { size: 0.6 }), 0, 0.058, 0, terrarium);
-  const tiny = await buildTinyWorld(terrarium);
+  const tiny = await buildTinyWorld(terrarium, { reflections: settings?.get('graphics.reflections') });
   statics.add(terrarium);
   const cageLight = new THREE.SpotLight(0xfff0d0, 25, 5, 0.55, 0.6, 2);
   cageLight.position.set(0, h - 0.1, 0.3);

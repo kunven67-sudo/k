@@ -4,6 +4,7 @@
 // logs have exact colliders; tiny people get their own navmesh at their scale.
 import * as THREE from 'three';
 import { pbr, place } from './engine/assets.js';
+import { Water } from 'three/addons/objects/Water2.js';
 
 export const TANK = { w: 2.96, d: 1.86, soilY: 0.13 };
 
@@ -81,13 +82,13 @@ function groundMesh(heightAt) {
 }
 
 // procedural ripple normals for the pond (no image files needed)
-function rippleNormal() {
+function rippleNormal(seed = 3) {
   const size = 256;
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
   const img = ctx.createImageData(size, size);
-  const noise = makeNoise(3);
+  const noise = makeNoise(seed);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const h = (u, v) => noise((u / size) * 8, (v / size) * 8);
@@ -122,8 +123,42 @@ function shoreAlpha() {
   return new THREE.CanvasTexture(c);
 }
 
-function pondMesh(heightAt) {
+// Mirror-and-see-through pond water (Water2: planar reflection + refraction),
+// with our own finish: murkier toward the deep middle, see-through at the shore.
+const POND_SHADER = (() => {
+  const base = Water.WaterShader;
+  const frag = base.fragmentShader
+    .replace('uniform vec3 color;', 'uniform vec3 color;\nuniform vec3 deepColor;')
+    .replace('gl_FragColor = vec4( color, 1.0 ) * mix( refractColor, reflectColor, reflectance );', `
+      float d = length( vUv - 0.5 ) * 2.0;                       // 0 middle .. 1 shore
+      float depth = 1.0 - smoothstep( 0.45, 1.0, d );
+      vec3 below = mix( refractColor.rgb, refractColor.rgb * deepColor, depth * 0.9 );
+      vec3 col = mix( below, reflectColor.rgb, reflectance );
+      float alpha = 1.0 - smoothstep( 0.8, 1.0, d );
+      gl_FragColor = vec4( color * col, alpha );`);
+  return { ...base, name: 'PondWater', fragmentShader: frag, uniforms: { ...base.uniforms, deepColor: { value: new THREE.Color(0x2c4a3c) } } };
+})();
+
+const REFLECTION_SIZE = { off: 0, low: 256, medium: 512, high: 1024 };
+
+function pondMesh(heightAt, { reflections = 'high' } = {}) {
   const { pond } = FEATURES;
+  const size = REFLECTION_SIZE[reflections] ?? 512;
+  if (size > 0) {
+    const n0 = rippleNormal();
+    const n1 = rippleNormal(9);
+    const water = new Water(new THREE.CircleGeometry(pond.r * 1.1, 64), {
+      color: 0xdfeee6, scale: 4, flowDirection: new THREE.Vector2(0.6, 0.35), flowSpeed: 0.02,
+      reflectivity: 0.06, textureWidth: size, textureHeight: size, clipBias: 0.0005,
+      normalMap0: n0, normalMap1: n1, shader: POND_SHADER,
+    });
+    water.material.depthWrite = false;
+    water.rotation.x = -Math.PI / 2;
+    water.position.set(pond.x, TANK.soilY - pond.depth * 0.45, pond.z);
+    water.name = 'tiny-pond';
+    water.userData.noCollide = true;
+    return water;
+  }
   const nm = rippleNormal();
   nm.repeat.set(3, 3);
   // pond water: dark and deep in the middle, reflecting the room, faint ripples
@@ -190,14 +225,14 @@ function scatter(count, seed, avoid = 0.06) {
   return out;
 }
 
-export async function buildTinyWorld(terrarium) {
+export async function buildTinyWorld(terrarium, { reflections = 'high' } = {}) {
   const world = new THREE.Group();
   world.name = 'tiny-world';
   terrarium.add(world);
   const heightAt = makeHeight(7);
   const ground = groundMesh(heightAt);
   world.add(ground);
-  world.add(pondMesh(heightAt));
+  world.add(pondMesh(heightAt, { reflections }));
   world.add(lavaMesh());
 
   const solid = new THREE.Group();    // rocks and logs: exact colliders, block tiny people

@@ -58,7 +58,7 @@ export async function boot() {
   const scene = new THREE.Scene();
 
   const levels = { lab: buildLab, test: buildTestLevel };
-  const level = await (levels[params.get('level')] || buildLab)({ scene, physics, renderer: renderer.renderer });
+  const level = await (levels[params.get('level')] || buildLab)({ scene, physics, renderer: renderer.renderer, settings });
 
   const lib = new AnimLibrary('assets/anims/');
   await lib.require(baseClips('m'));
