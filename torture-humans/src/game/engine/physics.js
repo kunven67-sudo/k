@@ -238,7 +238,7 @@ export class Physics {
 
   // Fixed-step update; returns the number of steps taken.
   update(dt, beforeStep) {
-    this.accumulator += Math.min(dt, 0.25); // don't spiral after a long stall
+    this.accumulator += Math.min(Math.max(0, dt), 0.25); // never backwards; don't spiral after a long stall
     let steps = 0;
     while (this.accumulator >= STEP) {
       for (const rec of this.bodies.values()) {

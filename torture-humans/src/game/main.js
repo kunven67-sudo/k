@@ -77,7 +77,7 @@ export async function boot() {
   if (level.navRoots) {
     try {
       nav.build(level.navRoots);
-      const count = Number(params.get('humans') ?? 0);
+      const count = Number(params.get('humans') ?? level.defaultVisitors ?? 0);
       const looks = ['Business_Female_01', 'Police_Male_01', 'Chef_Female_01', 'Male_Adult_04'];
       for (let i = 0; i < count; i++) {
         const look = looks[i % looks.length];
@@ -114,6 +114,13 @@ export async function boot() {
 
   const fpsEl = document.getElementById('fps');
   const hintEl = document.getElementById('hint');
+  // controls help: shown when you start (not in tests), H toggles it
+  const controlsEl = document.getElementById('controls');
+  if (controlsEl && !params.has('paused')) controlsEl.hidden = false;
+  addEventListener('keydown', (e) => {
+    const typing = /INPUT|TEXTAREA/.test(e.target?.tagName || '');
+    if (e.code === 'KeyH' && controlsEl && !typing) controlsEl.hidden = !controlsEl.hidden;
+  });
   let last = performance.now();
   const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, vitals, hazards, frame: 0 };
   window.game = game; // for tests and debugging
@@ -142,9 +149,12 @@ export async function boot() {
     game.frame++;
   }
 
-  function loop(now) {
+  function loop() {
     requestAnimationFrame(loop);
-    const dt = Math.min(0.1, (now - last) / 1000);
+    // one clock for everything: the frame timestamp the browser passes can lag
+    // behind performance.now() (seen: 28 s behind), which made time run backwards
+    const now = performance.now();
+    const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
     if (!params.has('paused')) step(dt);
     const hint = player.interactHint;

@@ -43,6 +43,7 @@ export class Vitals {
   }
 
   update(dt) {
+    dt = Math.max(0, dt);
     const k = this.mult;
     if (!this.dead && k > 0) {
       const perSec = (x) => (x * k) / 60;

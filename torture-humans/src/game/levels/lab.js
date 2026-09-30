@@ -283,6 +283,7 @@ export async function buildLab({ scene, physics, settings }) {
   return {
     spawn: new THREE.Vector3(2.5, 0, 2.0),
     respawn: new THREE.Vector3(0.6, 0, 2.2), // where you wake up after dying in the tiny world
+    defaultVisitors: 3, // people walking around the lab (until the town exists)
     sunDirection: null,
     navRoots: [statics, props],
     probe: new THREE.Vector3(0, 1.6, 0.3),   // reflection snapshot from above the terrarium
