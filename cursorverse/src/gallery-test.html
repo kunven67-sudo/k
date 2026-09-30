@@ -1,0 +1,28 @@
+<!doctype html><meta charset=utf-8><body style="background:#777;margin:0;font:10px sans-serif">
+<div id=g style="display:grid;grid-template-columns:repeat(10,96px);gap:4px;padding:4px"></div>
+<script type=module>
+import { CURSORS } from './shared/cursor-library.mjs';
+import { buildFrames, resolveDef } from './shared/cursor-render.mjs';
+const S = +new URLSearchParams(location.search).get('s') || 64;
+const cfg = JSON.parse(new URLSearchParams(location.search).get('cfg') || '{}');
+const errs = [];
+for (const c of CURSORS) {
+  const cell = document.createElement('div');
+  cell.style.cssText='background:linear-gradient(135deg,#fff 50%,#222 50%);height:92px;position:relative';
+  try {
+    const { frames, hotspot } = buildFrames(c, cfg, S);
+    const f = frames[Math.floor(frames.length/3)];
+    const cv = document.createElement('canvas'); cv.width=S; cv.height=S;
+    cv.getContext('2d').putImageData(new ImageData(f.data, S, S),0,0);
+    cv.style.cssText=`position:absolute;left:4px;top:4px;width:${S}px;image-rendering:pixelated`;
+    cell.append(cv);
+    const dot=document.createElement('div'); dot.style.cssText=`position:absolute;left:${4+hotspot[0]-1}px;top:${4+hotspot[1]-1}px;width:3px;height:3px;background:lime;outline:1px solid #000`;
+    cell.append(dot);
+    let opaque=0; for(let i=3;i<f.data.length;i+=4) if(f.data[i]>0) opaque++;
+    if (opaque < 20) errs.push(c.id+' empty');
+  } catch (e) { errs.push(c.id+': '+e.message); }
+  const lab=document.createElement('span'); lab.textContent=c.id; lab.style.cssText='position:absolute;bottom:0;left:0;background:#000a;color:#fff';
+  cell.append(lab); document.getElementById('g').append(cell);
+}
+window.__errs = errs; document.title='done';
+</script>
