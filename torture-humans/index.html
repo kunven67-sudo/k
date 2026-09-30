@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Torture Humans</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #game { display: block; width: 100vw; height: 100vh; outline: none; }
+    #fps { position: fixed; top: 8px; right: 10px; color: #9f9; font: 13px/1 monospace; text-shadow: 0 0 3px #000; }
+    #error { position: fixed; inset: auto 20px 20px 20px; padding: 14px; background: #400; color: #fff; font: 15px sans-serif; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <canvas id="game" tabindex="0"></canvas>
+  <div id="fps" hidden></div>
+  <div id="error" hidden></div>
+  <script type="module" src="/src/game/main.js"></script>
+</body>
+</html>
