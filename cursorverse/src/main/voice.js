@@ -232,7 +232,7 @@ class VoiceController extends EventEmitter {
       this.history.unshift({ at: Date.now(), phrase, label, ok });
       this.history.length = Math.min(this.history.length, 30);
       this.emit('command', { phrase, label, ok });
-      this.deps.hud?.flash({ kind: ok ? 'done' : 'error', text: ok ? `✅ ${label}` : `⚠️ couldn't do ${label}` });
+      this.deps.hud?.flash({ kind: ok ? 'done' : 'error', text: ok ? label : `couldn't do ${label}` });
     };
     if (delay < 1) setImmediate(run);
     else {
