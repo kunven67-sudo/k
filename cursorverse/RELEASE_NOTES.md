@@ -1,7 +1,5 @@
-## CursorVerse 1.0.3
+## CursorVerse 1.0.4
 
-- 🎤 **Fixed:** "Pause while another app uses the mic" counted CursorVerse's own listener as another app, so voice never worked with that setting on. CursorVerse now recognizes itself 3 ways:
-  - by its exact file paths
-  - by what starts using the mic the moment voice starts listening
-  - by name
-- 🎤 **New:** if voice ever pauses for the wrong app, click **"Ignore <app>"** on the Voice page and that app never pauses voice again.
+- 🔵 **Help mode:** click **❓ Help mode** at the top. Everything you can click gets a blue outline. Click anything and it tells you what it does, without actually doing it. Esc to exit.
+- 🤖 **Help bot:** click **🤖 Ask** at the top (or go to the ❓ Help page) and type a question like "how do I make my cursor bigger?". It works offline.
+- 📖 More "How do I...?" answers on the Help page.

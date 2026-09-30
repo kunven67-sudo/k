@@ -176,6 +176,22 @@ export const HOW_TO = [
   ['How do I turn off typing sounds?', 'Click the 🔊 Sounds pill at the top, or press Ctrl+Alt+S anywhere.'],
   ['How do I add my own music?', '🎵 Music → ⭐ My music → ➕ Add songs.'],
   ['How do I change the background?', '🌌 Backgrounds → pick an animated one, or Choose file for your own picture or video.'],
+  ['Voice does not hear me at all?', 'Check 🎤 Voice → 📡 Status. If it says "Paused" because of another app, turn off "Pause while another app uses the mic" or click "Ignore" on that app. If it says no microphone, check Windows Settings → Privacy → Microphone. Windows also needs English speech: Settings → Time & language → Speech.'],
+  ['How do I make voice faster?', '🎤 Voice → set "How fast it reacts" to 0.1 ms, and lower "Wait after you stop talking" (try 100 ms). Set "Did you say" to "Never ask" if you do not want the yes/no question.'],
+  ['Voice keeps getting letters wrong?', 'Use pilot words: "click papa" for P, "click tango" for T, "click bravo" for B. Set 🎤 Voice → Letters → Pilot words or Both.'],
+  ['How do I use hold-to-talk?', '🎤 Voice → How it listens → 🔘 Hold a key to talk → Change... → press the key (or a side mouse button). Voice only listens while you hold it.'],
+  ['How do I make the cursor bigger?', '🎨 Customize → Cursor size slider.'],
+  ['How do I make my cursor glow or spin?', '🎨 Customize → Glow, and Animation (spin, pulse, bounce...).'],
+  ['How do I delete a cursor I made?', '🖱️ Cursors → ⭐ My Cursors → 🗑️ under the cursor.'],
+  ['How do I turn off the trail or click effects?', 'Click the ✨ Effects pill at the top, or ✨ Effects → turn off Trail or Click effect.'],
+  ['How do I make CursorVerse start with my PC?', '⚙️ Settings → Startup → Start with Windows.'],
+  ['How do I change the theme or colors of the app?', '⚙️ Settings → Theme (Dark Neon, Glassy, Pixel Retro) and Accent color.'],
+  ['How do I change a hotkey?', '⚙️ Settings → Hotkeys → click the box and press your new combo.'],
+  ['How do I save my setup?', '💾 Presets → pick an emoji → 💾 Save current as preset.'],
+  ['How do I block ads in the browser?', '🌐 Browser → ⚙ → Ad & tracker blocker (it is on by default).'],
+  ['How do I see my browser history?', '🌐 Browser → ⚙ → History, or press Ctrl+H in the browser.'],
+  ['How do I find out what a button does?', 'Click ❓ Help mode at the top. Everything clickable gets a blue outline. Click anything and it tells you what it does.'],
+  ['How do I see the tour again?', '❓ Help → 🎓 Take the tour, or ⚙️ Settings → Replay the tour.'],
 ];
 
 // Steps for the guided tour. target = CSS selector to point at.

@@ -19,6 +19,7 @@ import presets from './pages/presets.js';
 import settingsPage from './pages/settings.js';
 import helpPage from './pages/help.js';
 import { helpButton, startTour } from './help-ui.js';
+import { initHelpMode, setHelpMode, isHelpMode, toggleBotPanel } from './help-mode.js';
 
 const PAGES = [home, cursors, customize, editor, effects, sounds, music, browser, backgrounds, appsPage, voice, presets, settingsPage, helpPage];
 const cv = window.cv;
@@ -92,6 +93,8 @@ function buildQuick() {
       h('button', { class: 'qbtn', style: { border: 'none', padding: '0 4px', background: 'none' }, onclick: () => cv.music.cmd({ action: 'next' }), title: 'Next song' }, '⏭'),
       h('span', { class: 'name', onclick: () => go('music') }, m.name || 'Music')),
     h('button', { class: 'qbtn on', onclick: async () => { await cv.presets.random(); toast('🎲 New random combo!', 'good'); }, title: 'Random cursor, trail, click effect and sounds' }, '🎲', 'Random'),
+    h('button', { id: 'help-mode-btn', class: `qbtn ${isHelpMode() ? 'helping' : 'on'}`, onclick: () => setHelpMode(!isHelpMode()), title: 'Help mode: click anything to see what it does' }, '❓', isHelpMode() ? 'Exit help' : 'Help mode'),
+    h('button', { class: 'qbtn on help-exempt', onclick: () => toggleBotPanel(), title: 'Ask the help bot a question' }, '🤖', 'Ask'),
     state.update?.status === 'available' ? h('button', { class: 'qbtn update', onclick: () => go('settings'), title: 'A new version is ready' }, '⬆', `Update ${state.update.latest}`) : null,
   );
 }
@@ -112,6 +115,8 @@ function applyBackground() {
 
 async function start() {
   nav.go = go;
+  initHelpMode(() => buildQuick());
+  document.body.append(h('div', { class: 'help-mode-banner help-exempt' }, '❓ Help mode: click anything with a blue outline to see what it does · Esc to exit'));
   nav.refresh = rerender;
   await initState();
   applyTheme();

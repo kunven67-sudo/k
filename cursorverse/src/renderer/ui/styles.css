@@ -322,3 +322,23 @@ input[type=color] { width: 34px; height: 28px; padding: 0; border: var(--border-
 .tour-bubble { position: fixed; width: 330px; max-width: calc(100vw - 32px); background: var(--bg); z-index: 301; transition: left .2s, top .2s; }
 .update-banner { border: var(--border-w) solid var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .qbtn.update { border-color: var(--good); box-shadow: 0 0 12px color-mix(in srgb, var(--good) 60%, transparent); animation: pulse 1.6s ease-in-out infinite; }
+
+/* ---------- help mode (blue outlines) & help bot ---------- */
+body.help-mode :is(button, a, input, select, textarea, label.toggle, .chip, .cur-card, .bg-card, .dial-tile, .tab, .swatch, .tool, .theme-card, .preset, .frame-thumb, .slider, canvas.ed-canvas, details > summary, .item[style*="cursor"]):not(.help-exempt *) {
+  outline: 2px solid #3da5ff !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 10px rgba(61, 165, 255, 0.55) !important;
+  cursor: help !important;
+}
+body.help-mode .help-picked { outline: 3px solid #ffd166 !important; box-shadow: 0 0 14px rgba(255, 209, 102, 0.8) !important; }
+.help-mode-banner { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 250; background: #3da5ff; color: #04121f; font-weight: 700; padding: 8px 16px; border-radius: 999px; box-shadow: 0 4px 18px rgba(0,0,0,.4); display: none; }
+body.help-mode .help-mode-banner { display: block; }
+.help-bubble { position: fixed; width: 320px; z-index: 260; background: var(--bg); border-color: #3da5ff; }
+.qbtn.helping { background: #3da5ff; color: #04121f; border-color: #3da5ff; }
+.bot-panel { display: flex; flex-direction: column; gap: 8px; }
+.bot-panel.floating { position: fixed; right: 18px; bottom: 18px; width: 380px; max-width: calc(100vw - 36px); height: 460px; z-index: 240; background: var(--bg); }
+.bot-log { flex: 1; min-height: 160px; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px; }
+.bot-panel.floating .bot-log { max-height: none; }
+.bot-msg { max-width: 88%; padding: 8px 12px; border-radius: 14px; white-space: pre-line; line-height: 1.4; }
+.bot-msg.bot { background: var(--panel-2); align-self: flex-start; border-bottom-left-radius: 4px; }
+.bot-msg.me { background: color-mix(in srgb, var(--accent) 30%, var(--panel-2)); align-self: flex-end; border-bottom-right-radius: 4px; }
