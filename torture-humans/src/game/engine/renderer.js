@@ -132,7 +132,7 @@ export class Renderer {
     // bloom only for things far brighter than daylight (lamps, screens, ray beams);
     // the sky is HDR too, so a low threshold would wash the whole picture out like fog
     if (g.bloom) {
-      const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.35, 0.4, 6);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.22, 0.12, 6); // tight glow, like a real lens
       bloom.name = 'bloom';
       composer.addPass(bloom);
     }

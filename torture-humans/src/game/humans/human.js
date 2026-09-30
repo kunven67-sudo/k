@@ -3,6 +3,10 @@
 // the animation speed follows the agent's real velocity, so feet never slide.
 import * as THREE from 'three';
 import { Character } from '../engine/anim.js';
+import { GROUP, groups } from '../engine/physics.js';
+
+// feet find the floor: only the world and furniture count (not people, not you)
+const FLOOR = groups(GROUP.NPC, GROUP.WORLD | GROUP.PROP);
 
 const IDLE_GESTURES = ['idle_look_around_01', 'idle_look_around_02', 'idle_scratch_head_01', 'idle_stretch_arms_01', 'idle_touch_face_01', 'idle_yawn_01', 'cell_phone_textmessage', 'idle_waiting_01'];
 
@@ -92,10 +96,13 @@ export class Human {
     this.scale = s;
     this.character.root.scale.setScalar(s);
     this.physics.resizeCapsule(this.capsule, 1.75 * s, 0.26 * s);
+    this.physics.setCapsuleGroup(this.capsule, s < 0.5 ? GROUP.TINY : GROUP.NPC);
     this.agent?.updateParameters({ radius: Math.max(0.02, 0.3 * s), height: 1.8 * s, maxSpeed: 1.35 * s });
   }
 
-  captureInto(jar) {
+  captureInto(jar, { watcher = null } = {}) {
+    this.watcher = watcher; // the camera: they turn to face you and bang on the glass on your side
+    this.jarTimer = 0.8;
     this.captured = true;
     this.state = 'jar';
     this.nav.removeAgent(this.agent);
@@ -108,6 +115,55 @@ export class Human {
     this.character.root.scale.setScalar(this.scale / (jar.scale.x || 1));
     this.character.speed = 0;
     this.character.play('idle_nervous_01', { loop: true });
+  }
+
+  // Trapped in a jar: face whoever holds it, bang on the glass, wave for help, yell.
+  updateJar(dt) {
+    const root = this.character.root;
+    const jar = root.parent;
+    this.emotion.fear = Math.min(1, this.emotion.fear + dt * 0.05);
+    this.emotion.anger = Math.min(0.8, this.emotion.anger + dt * 0.03);
+    if (this.watcher && jar) {
+      // turn toward the camera (in the jar's space) and stand at the glass on that side
+      const local = jar.worldToLocal(this.watcher.getWorldPosition(new THREE.Vector3()));
+      const want = Math.atan2(local.x, local.z);
+      let d = want - this.yaw;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      this.yaw += d * (1 - Math.exp(-dt * 4));
+      root.rotation.set(0, this.yaw, 0);
+      const r = (jar.userData.r || 0.065) * 0.62;
+      const dir = new THREE.Vector3(local.x, 0, local.z).normalize().multiplyScalar(r);
+      root.position.lerp(new THREE.Vector3(dir.x, 0.004, dir.z), 1 - Math.exp(-dt * 2));
+    }
+    this.jarTimer -= dt;
+    if (this.jarTimer <= 0) {
+      const acts = ['knock_door', 'knock_door', 'wave_01', 'gestic_talk_angry_01', 'gestic_talk_nervous_01', 'idle_nervous_02'];
+      const act = acts[(Math.random() * acts.length) | 0];
+      this.character.play(act, { onDone: () => this.character.play('idle_nervous_01', { loop: true }) });
+      this.jarTimer = 2.5 + Math.random() * 3;
+    }
+    this.updateFace();
+    this.character.update(dt);
+  }
+
+  // Stepped on. gore: 'none' = knocked out cold, 'some' = flattened + blood, 'full' = more of it.
+  squish(gore = 'some', { scene } = {}) {
+    if (this.dead) return;
+    this.dead = true;
+    this.state = 'dead';
+    if (this.agent) { this.nav.removeAgent(this.agent); this.agent = null; }
+    if (this.capsule) { this.physics.removeCapsule(this.capsule); this.capsule = null; }
+    const root = this.character.root;
+    this.character.stopOneShot(0);
+    this.character.setEmotion(gore === 'none' ? 'neutral' : 'pain', 1);
+    this.character.update(0.016);
+    if (gore === 'none') {
+      root.rotation.x = -Math.PI / 2; // lying flat, out cold
+      root.position.y += 0.01 * this.scale;
+    } else {
+      root.scale.set(this.scale * 1.25, this.scale * 0.1, this.scale * 1.25); // flattened
+    }
+    this.onDeath?.(this, gore);
   }
 
   // dropped into the terrarium: wander inside its bounds (the full tiny-world AI lives in cage.js)
@@ -163,7 +219,7 @@ export class Human {
     const v = this.agent.velocity();
     const root = this.character.root;
     // the navmesh floats a few cm above the real floor: stand on the real floor
-    const hit = this.physics.raycast({ x: p.x, y: p.y + 0.6, z: p.z }, { x: 0, y: -1, z: 0 }, 1.2, { exclude: this.capsule?.collider });
+    const hit = this.physics.raycast({ x: p.x, y: p.y + 0.6, z: p.z }, { x: 0, y: -1, z: 0 }, 1.2, { exclude: this.capsule?.collider, filterGroups: FLOOR });
     root.position.set(p.x, hit ? hit.point.y : p.y, p.z);
     if (this.capsule) this.physics.placeCapsule(this.capsule, root.position);
     const speed = Math.hypot(v.x, v.z);
@@ -181,7 +237,8 @@ export class Human {
 
   update(dt) {
     if (!this.alive) return;
-    if (this.state === 'jar') { this.updateFace(); this.character.update(dt); return; }
+    if (this.state === 'dead') return;
+    if (this.state === 'jar') { this.updateJar(dt); return; }
     if (this.state === 'caged') { this.updateCaged(dt); return; }
     if (this.shrinking) {
       const k = this.shrinking;
@@ -203,7 +260,7 @@ export class Human {
     this.updateFace();
     this.character.update(dt, {
       groundAt: (x, y, z) => {
-        const hit = this.physics.raycast({ x, y, z }, { x: 0, y: -1, z: 0 }, 1.2, { exclude: this.capsule.collider });
+        const hit = this.physics.raycast({ x, y, z }, { x: 0, y: -1, z: 0 }, 1.2, { exclude: this.capsule?.collider, filterGroups: FLOOR });
         return hit ? hit.point.y : null;
       },
     });

@@ -157,9 +157,10 @@ class Jar extends Item {
       }
       if (best) {
         this.inside = best.h;
-        best.h.captureInto(this.model);
+        best.h.captureInto(this.model, { watcher: this.ctx.camera });
       }
       s.result = best ? 'caught' : 'missed';
+      if (!best) this.lastMiss = { target: s.target.clone(), near: this.ctx.humans.filter((h) => h.tiny).map((h) => ({ d: Math.hypot(h.position.x - s.target.x, h.position.z - s.target.z), dy: h.position.y - s.target.y, state: h.state })) };
     }
     if (s.t >= down + 0.35) this.swoop = null;
   }
@@ -210,7 +211,17 @@ export class Hands {
     // hold pose: camera space, scaled with you when you're tiny
     const s = player.scale;
     const pose = item.swoopPose?.();
-    const holdWorld = camera.localToWorld(item.hold.clone().multiplyScalar(s));
+    // where the item is held: first person = fixed spot in view; third person =
+    // in front of your own chest, pointing where you aim (the camera is behind you)
+    let holdWorld;
+    let aimQ = camera.quaternion;
+    if (player.mode === 'first') {
+      holdWorld = camera.localToWorld(item.hold.clone().multiplyScalar(s));
+    } else {
+      aimQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
+      const chest = player.character.bones.Bip01_Spine2?.getWorldPosition(new THREE.Vector3()) ?? player.feet.clone().setY(player.feet.y + 1.35 * s);
+      holdWorld = chest.add(new THREE.Vector3(0.14, 0.02, -0.38).multiplyScalar(s).applyQuaternion(aimQ));
+    }
     item.model.scale.setScalar(s);
     if (pose) {
       // jar: flip upside down and slam over the target spot
@@ -221,7 +232,7 @@ export class Hands {
       if (pose.k > 0.5) item.model.position.y = over.y + item.model.userData.h * s;
     } else {
       item.model.position.copy(holdWorld);
-      item.model.quaternion.copy(camera.quaternion);
+      item.model.quaternion.copy(aimQ);
       if (item instanceof Jar) item.model.quaternion.multiply(_q.setFromEuler(new THREE.Euler(-0.15, 0, 0)));
     }
     item.model.updateMatrixWorld(true);
@@ -249,7 +260,7 @@ export class Hands {
     const palm = (item.palm || PALM).clone().multiplyScalar(s).applyQuaternion(qHand);
     const wrist = grip.clone().sub(palm);
     const shoulder = upper.getWorldPosition(new THREE.Vector3());
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.ctx.camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(qItem);
     const pole = shoulder.clone().addScaledVector(right, 0.4).add(new THREE.Vector3(0, -0.6, 0));
     solveTwoBone(upper, lower, hand, wrist, 1, pole);
     // turn the hand itself

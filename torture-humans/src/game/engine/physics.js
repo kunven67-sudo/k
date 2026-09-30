@@ -142,6 +142,10 @@ export class Physics {
     cap.body.setNextKinematicTranslation({ x: p.x, y: p.y + cap.height / 2, z: p.z });
   }
 
+  setCapsuleGroup(cap, group) {
+    cap.collider.setCollisionGroups(groups(group));
+  }
+
   resizeCapsule(cap, height, radius) {
     cap.collider.setHalfHeight(Math.max(0.005, height / 2 - radius));
     cap.collider.setRadius(radius);
@@ -187,8 +191,9 @@ export class Physics {
   }
 
   // Moves a character by a desired offset; returns the real movement + grounded.
-  moveCharacter(ch, desired) {
-    ch.ctrl.computeColliderMovement(ch.collider, desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS);
+  // filter: which groups block you (e.g. full-size you walks through - onto - tiny people)
+  moveCharacter(ch, desired, { filter = GROUP.WORLD | GROUP.PROP | GROUP.NPC } = {}) {
+    ch.ctrl.computeColliderMovement(ch.collider, desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, groups(GROUP.PLAYER, filter));
     const m = ch.ctrl.computedMovement();
     const t = ch.body.translation();
     ch.body.setNextKinematicTranslation({ x: t.x + m.x, y: t.y + m.y, z: t.z + m.z });

@@ -179,7 +179,9 @@ export class Player {
       this.velocity.y = Math.max(this.velocity.y, -50);
     }
 
-    const res = this.physics.moveCharacter(this.body, { x: this.velocity.x * dt, y: this.velocity.y * dt, z: this.velocity.z * dt });
+    // full size: tiny people don't block you (you step on them); tiny: they're solid like you
+    const blockers = GROUP.WORLD | GROUP.PROP | GROUP.NPC | (this.scale < 0.5 ? GROUP.TINY : 0);
+    const res = this.physics.moveCharacter(this.body, { x: this.velocity.x * dt, y: this.velocity.y * dt, z: this.velocity.z * dt }, { filter: blockers });
     const wasGrounded = this.grounded;
     this.grounded = res.grounded;
     // walking into a wall: real speed drops, so the legs slow down too (no running in place)

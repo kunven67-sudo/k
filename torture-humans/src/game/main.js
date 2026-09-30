@@ -10,6 +10,7 @@ import { initNavigation, Navigation } from './engine/navigation.js';
 import { Human } from './humans/human.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
+import { Squisher } from './squish.js';
 import { buildTestLevel } from './levels/test-level.js';
 import { buildLab } from './levels/lab.js';
 
@@ -91,6 +92,7 @@ export async function boot() {
   const cage = level.terrarium ? new Cage(level.terrarium, new THREE.Box3(new THREE.Vector3(-1.45, 0.13, -0.9), new THREE.Vector3(1.45, 0.13, 0.9))) : null;
   const hands = new Hands({ scene, camera, physics, player, input, humans, cage });
   player.cage = cage;
+  const squisher = new Squisher({ scene, player, humans, settings });
   if (params.get('item') === 'jar') hands.select(1);
 
   renderer.sunIntensity = level.sunIntensity;
@@ -118,6 +120,7 @@ export async function boot() {
     physics.update(dt, (fixed) => player.fixedUpdate(fixed));
     player.update(dt, physics.alpha);
     hands.update(dt);
+    squisher.update();
     nav.update(dt);
     for (const h of humans) h.update(dt);
     level.update?.(dt);

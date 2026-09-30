@@ -114,7 +114,7 @@ export async function buildLab({ scene, physics }) {
   const floor = new THREE.Mesh(plane(w, d), pbr('concrete_floor_worn_001', { size: 2.5 }));
   floor.receiveShadow = true;
   statics.add(floor);
-  const wallMat = pbr('brushed_concrete', { size: 3 });   // poured basement concrete
+  const wallMat = pbr('concrete_wall_008', { size: 2.4 });   // poured foundation concrete, form-tie holes and all
   const walls = [
     [w, h, 0.3, 0, h / 2, -d / 2 - 0.15],
     [w, h, 0.3, 0, h / 2, d / 2 + 0.15],
@@ -123,7 +123,7 @@ export async function buildLab({ scene, physics }) {
   ];
   for (const [bw, bh, bd, x, y, z] of walls) mesh(box(bw, bh, bd), wallMat, x, y, z, statics);
   // ceiling slab in pieces around the hatch
-  const ceil = pbr('painted_plaster_wall', { size: 3, color: 0xb9b9b6 });
+  const ceil = pbr('plaster_grey_04', { size: 3 });
   const hx0 = HATCH.x - HATCH.w / 2, hx1 = HATCH.x + HATCH.w / 2, hz0 = HATCH.z - HATCH.d / 2, hz1 = HATCH.z + HATCH.d / 2;
   const slab = (x0, x1, z0, z1) => { if (x1 > x0 && z1 > z0) mesh(box(x1 - x0, 0.3, z1 - z0), ceil, (x0 + x1) / 2, h + 0.15, (z0 + z1) / 2, statics); };
   slab(-w / 2, hx0, -d / 2, d / 2);
