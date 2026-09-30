@@ -75,6 +75,7 @@ function cloneTube() {
   const f = mesh(new THREE.CylinderGeometry(0.46, 0.46, 1.6, 48), fluid, 0, 1.05, 0, g);
   f.castShadow = false;
   const light = new THREE.PointLight(0x46ff9e, 3, 4, 2);
+  light.userData.minor = true;
   light.position.set(0, 1.2, 0);
   g.add(light);
   // hoses up to the ceiling pipes
@@ -169,6 +170,7 @@ export async function buildLab({ scene, physics, settings }) {
   cageLight.position.set(0, h - 0.1, 0.3);
   cageLight.target.position.set(0, 0.9, 0.3);
   cageLight.castShadow = true;
+  cageLight.userData.keyShadow = true; // the one shadow kept on low: the tiny world needs it
   scene.add(cageLight, cageLight.target);
 
   // ---- bug farm: shelves of tanks with heat lamps (west wall)
@@ -186,6 +188,7 @@ export async function buildLab({ scene, physics, settings }) {
       }
     }
     const heat = new THREE.PointLight(0xff8a3c, 1.2, 2.2, 2);
+    heat.userData.minor = true;
     heat.position.set(-6.2, 1.9, -2.2 + i * 2.3);
     scene.add(heat);
   }

@@ -5,36 +5,46 @@ export const GRAPHICS_PRESETS = {
   low: {
     resolutionScale: 0.75, shadows: 'low', shadowDistance: 40, textures: 'low', antialias: 'fxaa',
     ssao: false, bloom: false, sunRays: false, reflections: 'off', grass: 0.25, drawDistance: 250,
-    humansDetail: 'low', particles: 0.4, volumetricFog: false, motionBlur: false, anisotropy: 2,
+    humansDetail: 'low', particles: 0.4, volumetricFog: false, motionBlur: false, anisotropy: 2, glass: 'simple',
   },
   medium: {
     resolutionScale: 1, shadows: 'medium', shadowDistance: 70, textures: 'medium', antialias: 'fxaa',
     ssao: false, bloom: true, sunRays: false, reflections: 'low', grass: 0.5, drawDistance: 450,
-    humansDetail: 'medium', particles: 0.7, volumetricFog: false, motionBlur: false, anisotropy: 4,
+    humansDetail: 'medium', particles: 0.7, volumetricFog: false, motionBlur: false, anisotropy: 4, glass: 'simple',
   },
   high: {
     resolutionScale: 1, shadows: 'high', shadowDistance: 110, textures: 'high', antialias: 'smaa',
     ssao: true, bloom: true, sunRays: true, reflections: 'medium', grass: 0.8, drawDistance: 700,
-    humansDetail: 'high', particles: 1, volumetricFog: true, motionBlur: false, anisotropy: 8,
+    humansDetail: 'high', particles: 1, volumetricFog: true, motionBlur: false, anisotropy: 8, glass: 'real',
   },
   ultra: {
     resolutionScale: 1, shadows: 'ultra', shadowDistance: 160, textures: 'ultra', antialias: 'smaa',
     ssao: true, bloom: true, sunRays: true, reflections: 'high', grass: 1, drawDistance: 1000,
-    humansDetail: 'ultra', particles: 1, volumetricFog: true, motionBlur: true, anisotropy: 16,
+    humansDetail: 'ultra', particles: 1, volumetricFog: true, motionBlur: true, anisotropy: 16, glass: 'real',
   },
   insane: {
     resolutionScale: 1.5, shadows: 'ultra', shadowDistance: 250, textures: 'ultra', antialias: 'msaa',
     ssao: true, bloom: true, sunRays: true, reflections: 'high', grass: 1.5, drawDistance: 1500,
-    humansDetail: 'ultra', particles: 1.5, volumetricFog: true, motionBlur: true, anisotropy: 16,
+    humansDetail: 'ultra', particles: 1.5, volumetricFog: true, motionBlur: true, anisotropy: 16, glass: 'real',
   },
 };
+
+// Pick a starting preset from the graphics card's name (once; F2 changes it any time).
+// Built-in laptop graphics and entry cards (GT 1030, MX, Intel) get Low.
+export function presetForGpu(name = '') {
+  const n = name.toLowerCase();
+  if (/intel|uhd|iris|hd graphics|\bgt \d|\bmx ?\d|radeon\(tm\) graphics|vega \d\b|gtx 7\d0|gtx 9[0-5]0|swiftshader|llvmpipe/.test(n)) return 'low';
+  if (/gtx 10[5-6]0|gtx 9[6-8]0|gtx 16|rx 4\d0|rx 5[5-8]0|rx 6[45]00|rx 5500|quadro p[1-2]/.test(n)) return 'medium';
+  if (/rtx 40[89]0|rtx 50\d0|rx 7[89]00|rx 9070/.test(n)) return 'ultra';
+  return 'high';
+}
 
 export const SHADOW_MAP_SIZE = { off: 0, low: 1024, medium: 2048, high: 4096, ultra: 4096 };
 export const SHADOW_CASCADES = { off: 0, low: 1, medium: 2, high: 3, ultra: 4 };
 export const TEXTURE_SIZE = { low: 512, medium: 1024, high: 2048, ultra: 2048 };
 
 export const DEFAULT_SETTINGS = {
-  graphics: { preset: 'high', ...GRAPHICS_PRESETS.high, fpsLimit: 0, vsync: true, showFps: false, fov: 75, brightness: 1 },
+  graphics: { preset: 'high', ...GRAPHICS_PRESETS.high, fpsLimit: 0, vsync: true, showFps: false, fov: 75, brightness: 1, autoTuned: false },
   controls: {
     mouseSensitivity: 1, invertY: false, gamepadSensitivity: 1, gamepadDeadzone: 0.15,
     toggleCrouch: false, toggleSprint: false, bindings: {},

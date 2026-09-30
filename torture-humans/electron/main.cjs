@@ -10,6 +10,7 @@ const { ensureAssets } = require('./assetpack.cjs');
 app.setName('Torture Humans');
 // the game wants the real GPU and no frame cap from the browser
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('force_high_performance_gpu'); // laptops: the real graphics card, not the built-in one
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 

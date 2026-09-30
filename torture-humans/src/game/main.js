@@ -51,12 +51,13 @@ export async function boot() {
   await ensureAssets();
   const canvas = document.getElementById('game');
   const settings = new Settings();
-  // test hook: ?gfx={"bloom":false} overrides graphics settings
-  if (params.get('gfx')) settings.set({ graphics: JSON.parse(params.get('gfx')) });
   await initPhysics();
   const physics = new Physics();
   const input = new Input(canvas, settings);
   const renderer = new Renderer(canvas, settings);
+  renderer.autoTune();
+  // test hook: ?gfx={"bloom":false} overrides graphics settings
+  if (params.get('gfx')) settings.set({ graphics: JSON.parse(params.get('gfx')) });
   const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.02, 700);
   const scene = new THREE.Scene();
 
@@ -128,6 +129,15 @@ export async function boot() {
   canvas.addEventListener('click', () => input.lockPointer());
 
   const fpsEl = document.getElementById('fps');
+  const toastEl = document.getElementById('toast');
+  let toastTimer = 0;
+  const toast = (text) => {
+    if (!toastEl) return;
+    toastEl.textContent = text;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.hidden = true; }, 2500);
+  };
   const hintEl = document.getElementById('hint');
   // controls help: shown when you start (not in tests), H toggles it
   const controlsEl = document.getElementById('controls');
@@ -135,6 +145,18 @@ export async function boot() {
   addEventListener('keydown', (e) => {
     const typing = /INPUT|TEXTAREA/.test(e.target?.tagName || '');
     if (e.code === 'KeyH' && controlsEl && !typing) controlsEl.hidden = !controlsEl.hidden;
+    // F2: graphics preset, F3: FPS counter
+    if (e.code === 'F2' && !typing) {
+      e.preventDefault();
+      const order = ['low', 'medium', 'high', 'ultra'];
+      const next = order[(order.indexOf(settings.get('graphics.preset')) + 1) % order.length];
+      settings.set({ graphics: { preset: next } });
+      toast(`Graphics: ${next[0].toUpperCase()}${next.slice(1)} (F2 to change)`);
+    }
+    if (e.code === 'F3' && !typing) {
+      e.preventDefault();
+      settings.set('graphics.showFps', !settings.get('graphics.showFps'));
+    }
   });
   let last = performance.now();
   const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, frame: 0 };

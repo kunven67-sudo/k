@@ -10,7 +10,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { FXAAPass } from 'three/addons/postprocessing/FXAAPass.js';
 import { CSM } from 'three/addons/csm/CSM.js';
-import { SHADOW_MAP_SIZE, SHADOW_CASCADES } from './settings.js';
+import { SHADOW_MAP_SIZE, SHADOW_CASCADES, presetForGpu } from './settings.js';
+
+// how often lamp shadows are redrawn (frames): lamps don't move, only people do
+const SHADOW_EVERY = { off: 0, low: 4, medium: 3, high: 2, ultra: 1 };
 
 export class Renderer {
   constructor(canvas, settings) {
@@ -29,6 +32,11 @@ export class Renderer {
     this.fps = 0;
     this.frameTimes = [];
     this.lastRender = 0;
+    this.frame = 0;
+    // the graphics card's real name (e.g. "NVIDIA GeForce GT 1030")
+    const gl = this.renderer.getContext();
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    this.gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
     this.unsub = settings.onChange((data, patch) => { if (patch.graphics) this.apply(); });
   }
 
@@ -38,6 +46,15 @@ export class Renderer {
     this.camera = camera;
     this.sunDirection = sunDirection ? sunDirection.clone().normalize() : null;
     this.apply();
+  }
+
+  // first start: choose the preset that fits this graphics card
+  autoTune() {
+    if (this.settings.get('graphics.autoTuned')) return null;
+    const preset = presetForGpu(this.gpu);
+    this.settings.set({ graphics: { preset, autoTuned: true } });
+    console.log(`[graphics] ${this.gpu} -> ${preset}`);
+    return preset;
   }
 
   get g() {
@@ -65,12 +82,39 @@ export class Renderer {
     this.csm = null;
     const size = SHADOW_MAP_SIZE[g.shadows] || 0;
     r.shadowMap.enabled = size > 0;
-    // indoor lamps with shadows follow the shadow quality too
+    // Indoor lamps with shadows follow the shadow quality: every shadow is the
+    // room drawn again (a lamp bulb 6 times), so low keeps only the key light,
+    // medium only spotlights, high and up all of them.
+    r.shadowMap.autoUpdate = false;
+    r.shadowMap.needsUpdate = true;
     this.scene.traverse((o) => {
-      if (o.isLight && o.castShadow && !o.userData.csm) {
+      if (!o.isLight || o.userData.csm) return;
+      o.userData.shadowDefault ??= o.castShadow;
+      const q = g.shadows;
+      o.castShadow = o.userData.shadowDefault && size > 0
+        && (q === 'low' ? !!o.userData.keyShadow : q === 'medium' ? !o.isPointLight : true);
+      if (o.castShadow) {
         o.shadow.mapSize.setScalar(Math.max(256, size / 4));
         o.shadow.map?.dispose();
         o.shadow.map = null;
+      }
+      // small extra lamps (heat lamps, glowing fluid) are off on low
+      if (o.userData.minor) o.visible = g.preset !== 'low';
+    });
+    // Real glass bends the light behind it, which costs drawing the room once more
+    // every frame. Simple glass is see-through the cheap way.
+    const simple = g.glass === 'simple';
+    this.scene.traverse((o) => {
+      for (const m of [].concat(o.material || [])) {
+        if (!m.isMeshPhysicalMaterial) continue;
+        m.userData.glass ??= m.transmission > 0 ? { transmission: m.transmission, opacity: m.opacity, transparent: m.transparent } : null;
+        const orig = m.userData.glass;
+        if (!orig) continue;
+        m.transmission = simple ? 0 : orig.transmission;
+        m.transparent = simple ? true : orig.transparent;
+        m.opacity = simple ? Math.min(orig.opacity, orig.transmission >= 0.9 ? 0.16 : 0.6) : orig.opacity;
+        m.depthWrite = simple ? false : m.depthWrite;
+        m.needsUpdate = true;
       }
     });
     if (size > 0 && this.sunDirection) {
@@ -155,6 +199,10 @@ export class Renderer {
     this.fps = this.frameTimes.length;
     this.lastRender = now;
     this.csm?.update();
+    // lamp shadows: redrawn every few frames (the sun's cascades follow the camera, so always)
+    const every = SHADOW_EVERY[this.g.shadows] || 0;
+    if (every && (this.csm || this.frame % every === 0)) this.renderer.shadowMap.needsUpdate = true;
+    this.frame++;
     this.composer.render();
     return true;
   }
