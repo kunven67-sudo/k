@@ -1,0 +1,9 @@
+{
+  "res": "1k",
+  "perSearch": 3,
+  "search": {
+    "textures": ["concrete floor", "concrete wall", "brick", "rust", "metal plate", "painted metal", "wood floor", "planks", "plaster", "asphalt", "paving", "grass", "dirt", "forest ground", "rock", "sand", "gravel", "tiles", "fabric", "leather", "roof", "bark", "moss", "mud"],
+    "hdris": ["outdoor sunny", "overcast", "sunset", "night", "indoor"],
+    "models": ["chair", "table", "shelf", "lamp", "sofa", "cabinet", "bottle", "barrel", "crate", "rock", "plant", "fence", "bench", "tool", "book", "jar", "bucket", "tree", "boulder", "stump"]
+  }
+}

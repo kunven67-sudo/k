@@ -29,23 +29,50 @@ export function extractRootMotion(clip) {
   return clip.duration > 0 ? dist / clip.duration : 0;
 }
 
+// Clips live one per file (assets/anims/<name>.glb) and load on demand.
 export class AnimLibrary {
-  constructor() {
-    this.clips = new Map();  // name -> { clip, speed }
+  constructor(baseUrl = 'assets/anims/') {
+    this.baseUrl = baseUrl;
+    this.clips = new Map();    // name -> { clip, speed }
+    this.pending = new Map();  // name -> Promise
+    this.missing = new Set();
     this.loader = new GLTFLoader();
   }
 
+  add(clip) {
+    // Rocketbox exports have end "nub" bones some avatars lack, and scale keys we never want
+    clip.tracks = clip.tracks.filter((t) => !/Nub\.|Footsteps|\.scale$/.test(t.name));
+    const speed = extractRootMotion(clip);
+    clip.optimize();
+    const rec = { clip, speed };
+    this.clips.set(clip.name, rec);
+    return rec;
+  }
+
+  // loads a file holding one or more clips
   async load(url) {
     const gltf = await this.loader.loadAsync(url);
-    const nodeNames = new Set();
-    gltf.scene.traverse((o) => nodeNames.add(o.name));
-    for (const clip of gltf.animations) {
-      // Rocketbox exports have end "nub" bones some avatars lack, and scale keys we never want
-      clip.tracks = clip.tracks.filter((t) => !/Nub\.|Footsteps|\.scale$/.test(t.name));
-      const speed = extractRootMotion(clip);
-      clip.optimize();
-      this.clips.set(clip.name, { clip, speed });
-    }
+    for (const clip of gltf.animations) this.add(clip);
+    return this;
+  }
+
+  // makes sure these clips are loaded (unknown names are remembered as missing, not errors)
+  async require(names) {
+    await Promise.all(names.map((name) => {
+      if (this.clips.has(name) || this.missing.has(name)) return null;
+      if (!this.pending.has(name)) {
+        this.pending.set(name, this.loader.loadAsync(`${this.baseUrl}${name}.glb`)
+          .then((gltf) => {
+            const clip = gltf.animations[0];
+            if (!clip) throw new Error('no animation in file');
+            clip.name = name;
+            this.add(clip);
+          })
+          .catch((err) => { this.missing.add(name); console.warn(`[anim] ${name}: ${err.message}`); })
+          .finally(() => this.pending.delete(name)));
+      }
+      return this.pending.get(name);
+    }));
     return this;
   }
 
@@ -134,6 +161,8 @@ export const EXPRESSIONS = {
   pain: { AK_09_EyeBlinkLeft: 0.6, AK_10_EyeBlinkRight: 0.6, AK_01_BrowDownLeft: 0.7, AK_02_BrowDownRight: 0.7, AK_46_MouthStretchLeft: 0.8, AK_47_MouthStretchRight: 0.8, AK_25_JawOpen: 0.2 },
 };
 
+export const baseClips = (g) => [`${g}_idle_neutral_01`, `${g}_walk_neutral_01`, `${g}_run_neutral_01`, `${g}_crouch_idle`];
+
 export class Character {
   constructor(template, lib, { gender = 'm' } = {}) {
     // each character gets its own skeleton; geometry and textures stay shared
@@ -185,9 +214,19 @@ export class Character {
   }
 
   // Plays a one-shot clip (e.g. "wave_01"), fading back to locomotion after.
-  play(name, { fade = 0.25, loop = false, onDone } = {}) {
+  play(name, opts = {}) {
     const c = this.lib.get(`${this.gender}_${name}`) || this.lib.get(name);
-    if (!c) return false;
+    if (!c) {
+      // not loaded yet: fetch it, then play (if nothing else was asked for meanwhile)
+      const ticket = (this.playTicket = (this.playTicket || 0) + 1);
+      this.lib.require([`${this.gender}_${name}`, name]).then(() => {
+        if (ticket === this.playTicket && (this.lib.get(`${this.gender}_${name}`) || this.lib.get(name))) this.play(name, opts);
+        else if (ticket === this.playTicket) opts.onDone?.();
+      });
+      return 'loading';
+    }
+    this.playTicket = (this.playTicket || 0) + 1;
+    const { fade = 0.25, loop = false, onDone } = opts;
     this.stopOneShot(fade);
     const action = this.mixer.clipAction(c.clip);
     action.reset();

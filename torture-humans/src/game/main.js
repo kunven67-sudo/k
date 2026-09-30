@@ -4,7 +4,7 @@ import { Settings } from './engine/settings.js';
 import { Input } from './engine/input.js';
 import { initPhysics, Physics } from './engine/physics.js';
 import { Renderer } from './engine/renderer.js';
-import { AnimLibrary, Character, loadAvatar } from './engine/anim.js';
+import { AnimLibrary, Character, loadAvatar, baseClips } from './engine/anim.js';
 import { Player } from './player.js';
 import { buildTestLevel } from './levels/test-level.js';
 
@@ -24,8 +24,8 @@ export async function boot() {
 
   const level = await buildTestLevel({ scene, physics, renderer: renderer.renderer });
 
-  const lib = new AnimLibrary();
-  await lib.load(params.get('anims') || 'assets/anims/m.glb');
+  const lib = new AnimLibrary('assets/anims/');
+  await lib.require(baseClips('m'));
   const avatar = await loadAvatar('assets/avatars/Male_Adult_01.glb');
   const character = new Character(avatar, lib, { gender: 'm' });
   const player = new Player({ physics, input, settings, camera, character, scene, position: level.spawn });
