@@ -15,7 +15,8 @@ const built = path.join(__dirname, '..', 'release', `TortureHumans-${version}-Po
 const sha = (f) => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const logFile = path.join(process.env.APPDATA, 'Torture Humans', 'update.log');
-const readLog = () => { try { return fs.readFileSync(logFile, 'utf8'); } catch { return ''; } };
+// only the updater's lines (the game's own asset-download lines aren't what we test here)
+const readLog = () => { try { return fs.readFileSync(logFile, 'utf8').split('\n').filter((l) => !/\] assets[: ]/.test(l)).join('\n'); } catch { return ''; } };
 
 (async () => {
   const newBytes = fs.readFileSync(built);
@@ -55,7 +56,8 @@ const readLog = () => { try { return fs.readFileSync(logFile, 'utf8'); } catch {
   const old = spawn(oldExe, [], {
     detached: true,
     stdio: 'ignore',
-    env: { ...process.env, TH_TEST: '1', TH_FAKE_VERSION: '0.0.1', TH_UPDATE_FEED: feed, TH_AUTO_UPDATE: '1' },
+    // TH_ASSETS: an empty folder, so the game doesn't try to download its asset pack
+    env: { ...process.env, TH_TEST: '1', TH_FAKE_VERSION: '0.0.1', TH_UPDATE_FEED: feed, TH_AUTO_UPDATE: '1', TH_ASSETS: fs.mkdtempSync(path.join(os.tmpdir(), 'th-assets-')) },
   });
   old.unref();
 
