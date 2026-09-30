@@ -11,6 +11,7 @@ import { Human } from './humans/human.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
 import { Squisher } from './squish.js';
+import { bakeEnvironment } from './engine/probe.js';
 import { buildTestLevel } from './levels/test-level.js';
 import { buildLab } from './levels/lab.js';
 
@@ -97,6 +98,13 @@ export async function boot() {
 
   renderer.sunIntensity = level.sunIntensity;
   renderer.setScene(scene, camera, { sunDirection: level.sunDirection });
+  // indoor reflections: snapshot the room once textures have streamed in, and again a bit later
+  if (level.probe) {
+    const bake = () => bakeEnvironment(renderer.renderer, scene, level.probe, { intensity: level.probeIntensity ?? 0.7 });
+    bake();
+    setTimeout(bake, 2500);
+    setTimeout(bake, 8000);
+  }
   addEventListener('resize', () => renderer.resize());
   canvas.addEventListener('click', () => input.lockPointer());
 

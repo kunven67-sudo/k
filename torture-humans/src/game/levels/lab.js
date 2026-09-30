@@ -271,7 +271,7 @@ export async function buildLab({ scene, physics }) {
     scene.add(l);
   }
   await place(props, 'modular_industrial_pipes_01', { x: -1, y: h - 0.35, z: -4.4, width: 6 });
-  scene.add(new THREE.HemisphereLight(0x9fb3c8, 0x3a3228, 0.25));
+  scene.add(new THREE.HemisphereLight(0x9fb3c8, 0x3a3228, 0.12)); // most fill light now comes from the reflection probe
 
   await buildBedroom({ statics, props, scene, hatch: HATCH });
 
@@ -284,6 +284,8 @@ export async function buildLab({ scene, physics }) {
     spawn: new THREE.Vector3(2.5, 0, 2.0),
     sunDirection: null,
     navRoots: [statics, props],
+    probe: new THREE.Vector3(0, 1.6, 0.3),   // reflection snapshot from above the terrarium
+    probeIntensity: 0.6,
     // test visitors stay on the lab floor (the lab's roof is walkable until the house sits on it)
     wanderArea: (p) => p.y < 1,
     ladder,

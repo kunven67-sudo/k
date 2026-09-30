@@ -107,6 +107,21 @@ function rippleNormal() {
   return t;
 }
 
+// soft shoreline: opaque in the deep middle, fading out where the water gets shallow
+function shoreAlpha() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grd.addColorStop(0, '#fff');
+  grd.addColorStop(0.62, '#fff');
+  grd.addColorStop(0.86, '#777');
+  grd.addColorStop(1, '#000');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 256, 256);
+  return new THREE.CanvasTexture(c);
+}
+
 function pondMesh(heightAt) {
   const { pond } = FEATURES;
   const nm = rippleNormal();
@@ -116,7 +131,8 @@ function pondMesh(heightAt) {
     color: 0x1d2f2b, roughness: 0.02, metalness: 0, transmission: 0.35, thickness: 0.05, ior: 1.33,
     attenuationColor: new THREE.Color(0x24463b), attenuationDistance: 0.04,
     specularIntensity: 1, clearcoat: 1, clearcoatRoughness: 0.02,
-    transparent: true, opacity: 0.92, normalMap: nm, normalScale: new THREE.Vector2(0.18, 0.18), envMapIntensity: 2.2,
+    transparent: true, opacity: 0.95, normalMap: nm, normalScale: new THREE.Vector2(0.18, 0.18), envMapIntensity: 2.2,
+    alphaMap: shoreAlpha(), depthWrite: false,
   });
   const water = new THREE.Mesh(new THREE.CircleGeometry(pond.r * 1.1, 64), mat);
   water.rotation.x = -Math.PI / 2;
