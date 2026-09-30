@@ -57,6 +57,59 @@ export class Player {
     this.settings.set('gameplay.camera', this.mode);
   }
 
+  // Resize yourself (1 = normal, 0.05 = tiny) with the feet at `feet`.
+  // Everything the controller does scales with you: steps, snapping, skin offset.
+  setScale(sc, feet) {
+    this.scale = sc;
+    const h = (this.crouching ? CROUCH_H : STAND_H) * sc;
+    this.physics.resizeCharacter(this.body, h, 0.28 * sc);
+    const c = this.body.ctrl;
+    c.setOffset(0.02 * sc);
+    c.enableAutostep(0.35 * sc, 0.14 * sc, false);
+    c.enableSnapToGround(0.35 * sc);
+    c.setCharacterMass(75 * sc * sc * sc);
+    this.camDistance = 2.6;
+    this.camCurrentDist = 2.6 * sc;
+    if (feet) {
+      const center = { x: feet.x, y: feet.y + h / 2 + 0.002 * sc, z: feet.z };
+      this.body.body.setTranslation(center, true);
+      this.body.body.setNextKinematicTranslation(center);
+      this.prevPos.set(center.x, center.y, center.z);
+      this.currPos.copy(this.prevPos);
+    }
+    this.velocity.set(0, 0, 0);
+  }
+
+  // F: shrink into the terrarium, or grow back out of it
+  tryShrinkToggle() {
+    const cage = this.cage;
+    if (!cage || this.ladder?.active || this.shrinkFx) return false;
+    if (this.scale >= 1) {
+      if (!cage.canDropFrom(this.camera.position)) return false;
+      this.shrinkFx = { t: 0, to: 0.05, dest: cage.entryPoint(this.feet) };
+    } else if (this.inCage) {
+      this.shrinkFx = { t: 0, to: 1, dest: cage.exitPoint(this.feet) };
+    } else return false;
+    return true;
+  }
+
+  updateShrinkFx(dt) {
+    const fx = this.shrinkFx;
+    if (!fx) return;
+    fx.t += dt;
+    const flash = document.getElementById('flash');
+    // white flash up (0.25 s), swap size + place at the peak, flash down (0.5 s)
+    const up = 0.25;
+    const k = fx.t < up ? fx.t / up : Math.max(0, 1 - (fx.t - up) / 0.5);
+    if (flash) { flash.style.opacity = String(k); flash.hidden = k <= 0; }
+    if (fx.t >= up && !fx.done) {
+      fx.done = true;
+      this.setScale(fx.to, fx.dest);
+      this.inCage = fx.to < 1;
+    }
+    if (fx.t >= up + 0.5) { this.shrinkFx = null; if (flash) flash.hidden = true; }
+  }
+
   setLadder(ladder, topFloorY) {
     this.ladder = ladder ? new LadderClimb(this, ladder, { topFloorY }) : null;
   }
@@ -64,6 +117,8 @@ export class Player {
   // what "E" would do right now (shown as a hint on screen)
   get interactHint() {
     if (this.ladder?.active) return this.ladder.mode === 'climb' ? 'W / S climb · Space let go' : null;
+    if (this.inCage && this.scale < 1) return 'F  Grow back to normal size';
+    if (this.scale >= 1 && this.cage?.canDropFrom(this.camera.position)) return 'F  Shrink yourself into the terrarium';
     const where = this.ladder?.prompt();
     if (where === 'bottom') return 'E  Climb up the ladder';
     if (where === 'top') return 'E  Climb down to the lab';
@@ -142,6 +197,8 @@ export class Player {
     // frames have no physics step, and a quick tap would otherwise be lost
     if (inp.pressed('jump')) this.queued.jump = true;
     if (inp.pressed('interact')) this.queued.interact = true;
+    if (inp.pressed('shrinkSelf')) this.tryShrinkToggle();
+    this.updateShrinkFx(dt);
     if (inp.pressed('camera')) this.toggleCamera();
     if (this.settings.get('controls.toggleSprint') && inp.pressed('sprint')) this.sprintToggled = !this.sprintToggled;
     if (this.settings.get('controls.toggleCrouch') && inp.pressed('crouch')) this.crouchToggled = !this.crouchToggled;

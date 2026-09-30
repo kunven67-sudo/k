@@ -20,6 +20,26 @@ export class Cage {
     return Math.hypot(p.x - c.x, p.z - c.z) < 2.2 && Math.abs(p.y - c.y) < 1.8;
   }
 
+  // where you land when you shrink yourself in: on the soil, on your side of the tank
+  entryPoint(from) {
+    const local = this.group.worldToLocal(from.clone());
+    const b = this.bounds;
+    const x = THREE.MathUtils.clamp(local.x, b.min.x + 0.15, b.max.x - 0.15);
+    const z = THREE.MathUtils.clamp(local.z, b.min.z + 0.15, b.max.z - 0.15);
+    return this.group.localToWorld(new THREE.Vector3(x, b.max.y + 0.001, z));
+  }
+
+  // where you stand when you grow back: on the lab floor, beside the table on that side
+  exitPoint(from) {
+    const local = this.group.worldToLocal(from.clone());
+    const b = this.bounds;
+    const side = local.z >= 0 ? 1 : -1;
+    const x = THREE.MathUtils.clamp(local.x, b.min.x + 0.3, b.max.x - 0.3);
+    const p = this.group.localToWorld(new THREE.Vector3(x, 0, (b.max.z + 0.75) * side));
+    p.y = this.floorY ?? 0;
+    return p;
+  }
+
   // drop a human into the terrarium, near the side you're standing on
   drop(human, from) {
     const local = this.group.worldToLocal(from.clone());
