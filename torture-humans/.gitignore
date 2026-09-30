@@ -4,3 +4,4 @@ release/
 public/assets
 electron/assets-pack.json
 release-assets/
+__pycache__/
