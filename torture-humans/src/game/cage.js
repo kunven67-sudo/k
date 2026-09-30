@@ -1,6 +1,7 @@
 // The terrarium as a place tiny humans live. (The full tiny world - terrain,
 // water, lava, resources, building - grows on top of this.)
 import * as THREE from 'three';
+import { GROUP, groups } from './engine/physics.js';
 
 export class Cage {
   // group: the terrarium; soil: local-space box of the walkable soil surface
@@ -82,5 +83,35 @@ export class Cage {
     const world = this.group.localToWorld(new THREE.Vector3(x, this.surfaceY(x, z), z));
     human.releaseInto(this, world);
     this.residents.add(human);
+    this.colony?.admit(human);
+  }
+
+  // A ray into the tank that passes through the glass walls (you look in through
+  // them, but they are solid for anything inside). Returns the hit, or null.
+  raycast(physics, origin, dir, maxDist, opts = {}) {
+    let from = origin.clone();
+    let left = maxDist;
+    for (let i = 0; i < 4 && left > 0; i++) {
+      const hit = physics.raycast(from, dir, left, opts);
+      if (!hit) return null;
+      const l = this.group.worldToLocal(hit.point.clone());
+      const onGlass = (Math.abs(l.x) > this.bounds.max.x + 0.02 || Math.abs(l.z) > this.bounds.max.z + 0.02) && l.y > this.bounds.max.y - 0.05
+        && Math.abs(l.x) < this.bounds.max.x + 0.1 && Math.abs(l.z) < this.bounds.max.z + 0.1 && l.y < 1.3;
+      if (!onGlass) return hit;
+      // step through the pane and keep going
+      from = hit.point.clone().addScaledVector(dir, 0.012);
+      left -= hit.distance + 0.012;
+    }
+    return null;
+  }
+
+  // the point in the tank (terrarium space) you're aiming at, or null
+  aimPoint(physics, camera, exclude) {
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const hit = this.raycast(physics, camera.position, dir, 4, { exclude, filterGroups: groups(GROUP.PLAYER, GROUP.WORLD | GROUP.PROP) });
+    if (!hit) return null;
+    const l = this.group.worldToLocal(hit.point.clone());
+    if (Math.abs(l.x) > this.bounds.max.x + 0.01 || Math.abs(l.z) > this.bounds.max.z + 0.01) return null;
+    return { local: l, world: hit.point };
   }
 }

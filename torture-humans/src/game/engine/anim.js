@@ -372,6 +372,7 @@ export class Character {
     if (weight <= 0) return;
     this.root.updateMatrixWorld(true);
     const baseY = this.root.getWorldPosition(_a).y;
+    const sc = this.root.getWorldScale(_b).y; // tiny people: everything 1/20
     const legs = [];
     for (const side of ['L', 'R']) {
       const thigh = this.bones[`Bip01_${side}_Thigh`];
@@ -379,20 +380,20 @@ export class Character {
       const foot = this.bones[`Bip01_${side}_Foot`];
       if (!thigh || !calf || !foot) continue;
       const p = foot.getWorldPosition(new THREE.Vector3());
-      const g = groundAt(p.x, baseY + 0.6, p.z);
-      const delta = g == null ? 0 : THREE.MathUtils.clamp(g - baseY, -0.45, 0.45);
+      const g = groundAt(p.x, baseY + 0.6 * sc, p.z);
+      const delta = g == null ? 0 : THREE.MathUtils.clamp(g - baseY, -0.45 * sc, 0.45 * sc);
       legs.push({ thigh, calf, foot, p, delta });
     }
     if (legs.length !== 2) return;
     const hips = this.bones.Bip01_Pelvis?.parent; // "Bip01" root bone
     const drop = Math.min(0, legs[0].delta, legs[1].delta) * weight;
     this.hipDrop = THREE.MathUtils.lerp(this.hipDrop || 0, drop, 0.3);
-    if (hips && this.hipDrop < -0.001) {
+    if (hips && this.hipDrop < -0.001 * sc) {
       hips.position.y += this.hipDrop / (hips.parent ? hips.parent.getWorldScale(_b).y : 1);
       hips.updateMatrixWorld(true);
     }
     for (const leg of legs) {
-      if (Math.abs(leg.delta) < 0.005) continue;
+      if (Math.abs(leg.delta) < 0.005 * sc) continue;
       leg.p.y += leg.delta;
       solveTwoBone(leg.thigh, leg.calf, leg.foot, leg.p, weight);
     }

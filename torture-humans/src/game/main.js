@@ -10,6 +10,7 @@ import { initNavigation, Navigation } from './engine/navigation.js';
 import { Human } from './humans/human.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
+import { Colony } from './colony/colony.js';
 import { Squisher } from './squish.js';
 import { bakeEnvironment } from './engine/probe.js';
 import { Vitals } from './vitals.js';
@@ -93,12 +94,25 @@ export async function boot() {
   }
 
   const cage = level.terrarium ? new Cage(level.terrarium, new THREE.Box3(new THREE.Vector3(-1.45, 0.13, -0.9), new THREE.Vector3(1.45, 0.13, 0.9)), level.tiny) : null;
-  const hands = new Hands({ scene, camera, physics, player, input, humans, cage });
+  // the tiny people's life in the terrarium (their own navmesh, needs, building)
+  let colony = null;
+  if (cage?.tiny) {
+    colony = new Colony({ cage, physics, settings });
+    try {
+      await colony.init();
+      cage.colony = colony;
+    } catch (err) {
+      console.warn('[colony]', err.message);
+      colony = null;
+    }
+  }
+  const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony });
   player.cage = cage;
   const squisher = new Squisher({ scene, player, humans, settings });
   const vitals = new Vitals(settings);
   const hazards = new Hazards({ player, cage, vitals, input, respawn: level.respawn || level.spawn });
   if (params.get('item') === 'jar') hands.select(1);
+  if (params.get('item') === 'supplies') hands.select(2);
 
   renderer.sunIntensity = level.sunIntensity;
   renderer.setScene(scene, camera, { sunDirection: level.sunDirection });
@@ -122,7 +136,7 @@ export async function boot() {
     if (e.code === 'KeyH' && controlsEl && !typing) controlsEl.hidden = !controlsEl.hidden;
   });
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, vitals, hazards, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, frame: 0 };
   window.game = game; // for tests and debugging
 
   // test hook: drive the player without a real keyboard
@@ -143,6 +157,7 @@ export async function boot() {
     hazards.update(dt);
     vitals.update(dt);
     nav.update(dt);
+    colony?.update(dt);
     for (const h of humans) h.update(dt);
     level.update?.(dt);
     input.endFrame();
@@ -157,7 +172,7 @@ export async function boot() {
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
     if (!params.has('paused')) step(dt);
-    const hint = player.interactHint;
+    const hint = player.interactHint || hands.hint;
     if (hintEl && hintEl.textContent !== (hint || '')) { hintEl.textContent = hint || ''; hintEl.hidden = !hint; }
     if (renderer.render(now) && fpsEl) {
       fpsEl.hidden = !settings.get('graphics.showFps');

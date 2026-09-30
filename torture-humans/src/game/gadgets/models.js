@@ -96,3 +96,29 @@ export function jarModel({ r = 0.065, h = 0.19 } = {}) {
   g.userData = { r, h, neck, lid };
   return g;
 }
+
+// Glass lab beaker with a pouring lip and printed volume marks. Opening at +Y.
+// What's inside (supplies for the tiny people) goes into userData.contents.
+export function beakerModel({ r = 0.042, h = 0.11 } = {}) {
+  const g = new THREE.Group();
+  g.name = 'beaker';
+  const t = 0.0025;
+  const pts = [
+    new THREE.Vector2(0, 0), new THREE.Vector2(r - 0.004, 0), new THREE.Vector2(r, 0.004),
+    new THREE.Vector2(r, h), new THREE.Vector2(r + 0.003, h + 0.002), new THREE.Vector2(r - t, h),
+    new THREE.Vector2(r - t, 0.005), new THREE.Vector2(r - 0.004 - t, t), new THREE.Vector2(0, t),
+  ];
+  m(new THREE.LatheGeometry(pts, 48), glassMat(), 0, 0, 0, g);
+  // white volume marks on the side facing you
+  const markMat = new THREE.MeshBasicMaterial({ color: 0xf2f2f2, transparent: true, opacity: 0.85 });
+  for (let i = 1; i <= 4; i++) {
+    const w = i % 2 ? 0.012 : 0.02;
+    const mark = m(new THREE.PlaneGeometry(w, 0.0012), markMat, 0, (i / 5) * h, r + 0.0004, g);
+    mark.castShadow = false;
+  }
+  const contents = new THREE.Group();
+  contents.position.y = t;
+  g.add(contents);
+  g.userData = { r, h, contents, lip: new THREE.Vector3(0, h, -r) };
+  return g;
+}

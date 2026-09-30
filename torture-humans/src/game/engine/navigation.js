@@ -3,7 +3,7 @@
 // only walk where you can walk; the crowd makes them step around each other
 // instead of bumping or overlapping.
 import { init as initRecast, Crowd, NavMeshQuery } from '@recast-navigation/core';
-import { generateSoloNavMesh } from '@recast-navigation/generators';
+import { generateSoloNavMesh, generateTileCache } from '@recast-navigation/generators';
 import { collectTriangles } from './physics.js';
 
 let ready = null;
@@ -30,28 +30,52 @@ const CONFIG = {
 };
 
 export class Navigation {
-  constructor() {
+  constructor({ halfExtents = { x: 2, y: 4, z: 2 } } = {}) {
     this.navMesh = null;
     this.query = null;
     this.crowd = null;
+    this.tileCache = null;  // set when built with obstacles (things built later block the way)
+    this.halfExtents = halfExtents;
   }
 
-  // bake from any number of object trees (the level's static geometry)
-  build(roots, overrides = {}) {
+  // bake from any number of object trees (the level's static geometry) or
+  // ready-made {vertices, indices} triangle soups (world space)
+  build(roots, overrides = {}, { obstacles = 0, maxAgentRadius = 0.6, tileSize = 48 } = {}) {
     const vs = [];
     const is = [];
     for (const root of [].concat(roots)) {
-      const { vertices, indices } = collectTriangles(root);
+      const { vertices, indices } = root.isObject3D ? collectTriangles(root) : root;
       const base = vs.length / 3;
       for (const v of vertices) vs.push(v);
       for (const i of indices) is.push(i + base);
     }
-    const { success, navMesh, error } = generateSoloNavMesh(vs, is, { ...CONFIG, ...overrides });
-    if (!success) throw new Error(`navmesh build failed: ${error}`);
-    this.navMesh = navMesh;
-    this.query = new NavMeshQuery(navMesh);
-    this.crowd = new Crowd(navMesh, { maxAgents: 128, maxAgentRadius: 0.6 });
+    const config = { ...CONFIG, ...overrides };
+    const r = obstacles
+      ? generateTileCache(vs, is, { ...config, tileSize, expectedLayersPerTile: 4, maxObstacles: obstacles })
+      : generateSoloNavMesh(vs, is, config);
+    if (!r.success) throw new Error(`navmesh build failed: ${r.error}`);
+    this.navMesh = r.navMesh;
+    this.tileCache = r.tileCache || null;
+    this.query = new NavMeshQuery(r.navMesh);
+    this.crowd = new Crowd(r.navMesh, { maxAgents: 128, maxAgentRadius });
     return this;
+  }
+
+  // Something now stands here (a new hut): paths go around it from the next update.
+  // Cylinder: {radius, height}; box: {half: {x,y,z}, angle}. p = bottom center.
+  addObstacle(p, { radius, height = 0.1, half, angle = 0 } = {}) {
+    if (!this.tileCache) return null;
+    const r = half
+      ? this.tileCache.addBoxObstacle({ x: p.x, y: p.y + half.y, z: p.z }, half, angle)
+      : this.tileCache.addCylinderObstacle(p, radius, height);
+    this.dirty = true;
+    return r.success ? r.obstacle : null;
+  }
+
+  removeObstacle(o) {
+    if (!o || !this.tileCache) return;
+    this.tileCache.removeObstacle(o);
+    this.dirty = true;
   }
 
   addAgent(position, { radius = 0.3, height = 1.8, maxSpeed = 1.4, maxAcceleration = 6 } = {}) {
@@ -70,9 +94,9 @@ export class Navigation {
     this.crowd?.removeAgent(agent);
   }
 
-  closest(p) {
-    const r = this.query?.findClosestPoint(p, { halfExtents: { x: 2, y: 4, z: 2 } });
-    return r?.success ? r.point : null;
+  closest(p, halfExtents = this.halfExtents) {
+    const r = this.query?.findClosestPoint(p, { halfExtents });
+    return r?.success && r.polyRef ? r.point : null;
   }
 
   // a random walkable spot; `accept(point)` can limit it (e.g. only inside the lab)
@@ -90,6 +114,13 @@ export class Navigation {
   }
 
   update(dt) {
+    if (this.dirty && this.tileCache) {
+      // rebuild the tiles the new/removed obstacles touch (a few per frame at most)
+      for (let i = 0; i < 4; i++) {
+        const r = this.tileCache.update(this.navMesh);
+        if (r.upToDate) { this.dirty = false; break; }
+      }
+    }
     this.crowd?.update(dt);
   }
 }

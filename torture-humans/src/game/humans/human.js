@@ -101,14 +101,18 @@ export class Human {
   }
 
   captureInto(jar, { watcher = null } = {}) {
+    // scooped out of the terrarium: they leave the colony (dropping what they carry)
+    if (this.state === 'caged') this.cage?.colony?.leave(this);
+    this.cage?.residents?.delete(this);
     this.watcher = watcher; // the camera: they turn to face you and bang on the glass on your side
     this.jarTimer = 0.8;
     this.captured = true;
     this.state = 'jar';
-    this.nav.removeAgent(this.agent);
+    if (this.agent) this.nav.removeAgent(this.agent);
     this.agent = null;
-    this.physics.removeCapsule(this.capsule);
+    if (this.capsule) this.physics.removeCapsule(this.capsule);
     this.capsule = null;
+    this.character.root.rotation.set(0, this.yaw, 0);
     // stand on the jar's floor (jar is 1:1 scale; we are tiny inside it)
     jar.add(this.character.root);
     this.character.root.position.set(0, 0.004, 0);
@@ -189,7 +193,13 @@ export class Human {
     this.onDeath?.(this, 'lava');
   }
 
-  // dropped into the terrarium: wander inside its bounds (the full tiny-world AI lives in cage.js)
+  // Fell over dead (starved, dehydrated): slump onto the back and lie still.
+  // groundY: the ground under them, in their parent's space.
+  collapse(groundY) {
+    this.fall = { t: 0, groundY };
+  }
+
+  // dropped into the terrarium: their life there is run by the colony (colony/colony.js)
   releaseInto(cage, point) {
     this.captured = false;
     this.state = 'caged';
@@ -204,6 +214,7 @@ export class Human {
   }
 
   updateCaged(dt) {
+    if (this.cage.colony) { this.cage.colony.updateResident(this, dt); return; }
     const root = this.character.root;
     const b = this.cage.bounds; // local-space box of the soil surface
     this.timer -= dt;
@@ -268,6 +279,16 @@ export class Human {
   update(dt) {
     if (!this.alive) return;
     if (this.state === 'dead') {
+      if (this.fall && this.fall.t < 1) {
+        const f = this.fall;
+        f.t = Math.min(1, f.t + dt / 0.9);
+        const e = f.t * f.t; // falls slowly at first, then hits the ground
+        const root = this.character.root;
+        root.rotation.set((-Math.PI / 2) * e, this.yaw, 0, 'YXZ');
+        root.position.y = f.groundY + 0.1 * this.scale * e; // lying on the back, not in the ground
+        this.character.update(dt);
+        if (f.t >= 1) this.character.mixer.timeScale = 0;
+      }
       if (this.burning > 0) {
         this.burning -= dt;
         const k = Math.max(0, this.burning / 1.5);

@@ -4,7 +4,8 @@
 // first and third person.
 import * as THREE from 'three';
 import { solveTwoBone } from '../engine/anim.js';
-import { shrinkRayModel, jarModel } from './models.js';
+import { shrinkRayModel, jarModel, beakerModel } from './models.js';
+import { pieceMesh } from '../colony/items.js';
 import { GROUP, groups } from '../engine/physics.js';
 
 const CHARGE_TIME = 1.2;   // s to full charge
@@ -125,9 +126,9 @@ class Jar extends Item {
       if (cage && cage.canDropFrom(camera.position)) {
         const h = this.inside;
         this.inside = null;
-        // where in the tank are you pointing? (people don't block the aim)
-        const aimHit = physics.raycast(camera.position, camera.getWorldDirection(new THREE.Vector3()), 3, { exclude: player.body.collider, filterGroups: groups(GROUP.PLAYER, GROUP.WORLD | GROUP.PROP) });
-        cage.drop(h, camera.position, aimHit?.point || null);
+        // where in the tank are you pointing? (through the glass; people don't block the aim)
+        const aim = cage.aimPoint(physics, camera, player.body.collider);
+        cage.drop(h, camera.position, aim?.world || null);
         return;
       }
       return;
@@ -136,7 +137,11 @@ class Jar extends Item {
     const dir = camera.getWorldDirection(new THREE.Vector3());
     // aim at the floor/table under them: people (even tiny ones) don't block the aim
     const floorOnly = groups(GROUP.PLAYER, GROUP.WORLD | GROUP.PROP);
-    const hit = physics.raycast(camera.position, dir, 1.8 * player.scale + 1.5, { exclude: player.body.collider, filterGroups: floorOnly });
+    const opts = { exclude: player.body.collider, filterGroups: floorOnly };
+    const reach = 1.8 * player.scale + 1.5;
+    // looking into the terrarium: the ray goes through its glass to the soil
+    const cage = this.ctx.cage;
+    const hit = cage && player.scale > 0.5 && cage.canDropFrom(camera.position) ? cage.raycast(physics, camera.position, dir, reach, opts) : physics.raycast(camera.position, dir, reach, opts);
     if (!hit || hit.normal.y < 0.6) return;
     this.swoop = { t: 0, target: hit.point.clone(), start: this.model.position.clone() };
   }
@@ -177,10 +182,108 @@ class Jar extends Item {
   }
 }
 
+// Supplies for the tiny people: a beaker of building poles, stones, bread crumbs,
+// or a tiny axe / pickaxe. Click near the terrarium to pour it where you aim;
+// R changes what's in the beaker.
+const SUPPLIES = [
+  { kind: 'wood', label: 'wooden poles', count: 6 },
+  { kind: 'stone', label: 'building stones', count: 10 },
+  { kind: 'food', label: 'bread crumbs', count: 6 },
+  { kind: 'axe', label: 'a tiny axe', count: 1 },
+  { kind: 'pickaxe', label: 'a tiny pickaxe', count: 1 },
+];
+
+class Supplies extends Item {
+  constructor(ctx) {
+    super('Supplies', beakerModel(), { hold: new THREE.Vector3(0.16, -0.2, -0.4) });
+    this.gripPoint = new THREE.Vector3(0, 0.05, 0);
+    this.palm = new THREE.Vector3(0.055, 0.055, 0);
+    this.curl = { amount: 0.5, thumb: 0.4 };
+    this.ctx = ctx;
+    this.index = 0;
+    this.pour = null;
+    this.fill();
+  }
+
+  get supply() { return SUPPLIES[this.index]; }
+
+  get hint() {
+    const cage = this.ctx.cage;
+    const near = cage?.canDropFrom(this.ctx.camera.position);
+    return `Supplies: ${this.supply.label} — ${near ? 'click to pour it where you aim' : 'go to the terrarium to pour'} · R: change`;
+  }
+
+  // what you see in the beaker
+  fill() {
+    const c = this.model.userData.contents;
+    for (const o of [...c.children]) c.remove(o);
+    const { kind, count } = this.supply;
+    for (let i = 0; i < count; i++) {
+      const p = pieceMesh(kind, (i * 0.37) % 1);
+      const a = (i / count) * Math.PI * 2;
+      if (kind === 'wood') {
+        // poles stand in the beaker like skewers in a cup, leaning on the rim
+        p.rotation.set(0, a, Math.PI / 2 - 0.2);
+        p.position.set(Math.cos(a) * 0.012, 0.05, Math.sin(a) * 0.012);
+      } else if (kind === 'axe' || kind === 'pickaxe') {
+        p.rotation.set(0, 0.6, Math.PI / 2);
+        p.position.set(0, 0.002, 0);
+      } else {
+        const r = kind === 'stone' ? 0.018 : 0.012;
+        p.position.set(Math.cos(a * 1.7) * r * ((i % 3) / 3 + 0.3), 0.004 + Math.floor(i / 6) * 0.007, Math.sin(a * 1.7) * r * ((i % 3) / 3 + 0.3));
+        p.rotation.set(i, i * 2, 0);
+      }
+      c.add(p);
+    }
+  }
+
+  cycle() {
+    if (this.pour) return;
+    this.index = (this.index + 1) % SUPPLIES.length;
+    this.fill();
+  }
+
+  onDown() {
+    const { cage, colony, camera, physics, player } = this.ctx;
+    if (this.pour || !cage || !colony?.ready || !cage.canDropFrom(camera.position)) return;
+    const aim = cage.aimPoint(physics, camera, player.body.collider);
+    if (!aim) return;
+    this.pour = { t: 0, at: aim.local, done: false };
+  }
+
+  update(dt) {
+    if (this.ctx.input.pressed('reload')) this.cycle();
+    const p = this.pour;
+    if (!p) return;
+    p.t += dt;
+    if (!p.done && p.t > 0.3) {
+      p.done = true;
+      const { kind, count } = this.supply;
+      this.ctx.colony.drop(kind, p.at, count);
+      this.model.userData.contents.visible = false;
+    }
+    if (p.t > 1.1) {
+      this.pour = null;
+      this.model.userData.contents.visible = true; // refilled from the lab's supply
+    }
+  }
+
+  // tilt forward to pour, then back
+  tilt() {
+    const p = this.pour;
+    if (!p) return 0;
+    if (p.t < 0.3) return smooth(p.t / 0.3) * 1.9;
+    if (p.t < 0.6) return 1.9;
+    return (1 - smooth(Math.min(1, (p.t - 0.6) / 0.4))) * 1.9;
+  }
+}
+
 export class Hands {
   constructor(ctx) {
     this.ctx = ctx;
-    this.items = [new ShrinkRay(ctx), new Jar(ctx)];
+    this.items = [new ShrinkRay(ctx), new Jar(ctx), new Supplies(ctx)];
+    this.lookTimer = 0;
+    this.lookHint = null;
     this.index = 0;
     for (const it of this.items) { it.model.visible = false; ctx.scene.add(it.model); }
     this.current.model.visible = true;
@@ -236,9 +339,30 @@ export class Hands {
       item.model.position.copy(holdWorld);
       item.model.quaternion.copy(aimQ);
       if (item instanceof Jar) item.model.quaternion.multiply(_q.setFromEuler(new THREE.Euler(-0.15, 0, 0)));
+      if (item instanceof Supplies) item.model.quaternion.multiply(_q.setFromEuler(new THREE.Euler(-0.1 - item.tilt(), 0, 0)));
     }
     item.model.updateMatrixWorld(true);
     this.solveArm();
+    this.updateLook(dt);
+  }
+
+  // Looking at a tiny person in the terrarium: who they are and how they're doing.
+  updateLook(dt) {
+    this.lookTimer -= dt;
+    if (this.lookTimer > 0) return;
+    this.lookTimer = 0.2;
+    this.lookHint = null;
+    const { cage, colony, camera, physics, player } = this.ctx;
+    if (!cage || !colony) return;
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const opts = { exclude: player.body.collider, filterGroups: groups(GROUP.PLAYER, GROUP.WORLD | GROUP.PROP | GROUP.TINY) };
+    const hit = player.scale > 0.5 && cage.canDropFrom(camera.position) ? cage.raycast(physics, camera.position, dir, 4, opts) : physics.raycast(camera.position, dir, 3 * player.scale, opts);
+    if (hit?.owner) this.lookHint = colony.describe(hit.owner);
+  }
+
+  // text for the hint line: what the item in hand does, or who you're looking at
+  get hint() {
+    return this.lookHint || this.current.hint || null;
   }
 
   // Right hand onto the item's grip, with the hand turned the way a real hand holds it.
@@ -271,7 +395,8 @@ export class Hands {
     hand.updateMatrixWorld(true);
     // fingers around the grip: tight on the pistol grip, open wider for the fat jar
     const it = this.current;
-    ch.grip('R', it instanceof Jar ? 0.55 : 0.95, { thumb: it instanceof Jar ? 0.4 : 0.8 });
+    const curl = it.curl || (it instanceof Jar ? { amount: 0.55, thumb: 0.4 } : { amount: 0.95, thumb: 0.8 });
+    ch.grip('R', curl.amount, { thumb: curl.thumb });
     // the index finger rests on the trigger, and pulls it while charging
     if (it instanceof ShrinkRay) {
       const idx = B.Bip01_R_Finger1;
