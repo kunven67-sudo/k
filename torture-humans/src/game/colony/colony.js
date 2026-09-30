@@ -132,6 +132,8 @@ export class Colony {
     this.fx = [];
     this.ready = false;
     this.log = [];                // what happened (for tests and the phone later)
+    this.player = null;           // you (set by the game): when you shrink in, they react
+    this.vitals = null;
   }
 
   toWorld(v) { return this.group.localToWorld(new THREE.Vector3(v.x, v.y, v.z)); }
@@ -462,6 +464,31 @@ export class Colony {
     this.residents.delete(human);
   }
 
+  // you, shrunk into the tank: where you stand (world), or null
+  get giant() {
+    const p = this.player;
+    return p && p.inCage && p.scale < 0.5 && !this.vitals?.dead ? p.feet : null;
+  }
+
+  // You punch (while tiny): the nearest tiny person in front of you, within arm's reach.
+  punch(camera) {
+    const p = this.player;
+    if (!p || p.scale >= 0.5) return null;
+    const eye = camera.position;
+    const dir = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
+    let best = null, bestD = Infinity;
+    for (const r of this.residents.values()) {
+      if (r.dead) continue;
+      const to = r.worldPos().sub(p.feet);
+      to.y = 0;
+      const d = to.length();
+      if (d > 0.9 * p.scale || to.normalize().dot(dir) < 0.5) continue;
+      if (d < bestD) { best = r; bestD = d; }
+    }
+    best?.hurt(34, 'beaten by you', eye);
+    return best;
+  }
+
   describe(human) {
     return this.residents.get(human)?.describe() ?? null;
   }
@@ -555,6 +582,7 @@ class Resident {
     this.crouch = 0;
     this.dead = false;
     this.think = 0.5;
+    this.threatCheck = 0;
     this.agent = null;
     this.wade = null;
     const s = human.scale;
@@ -923,6 +951,82 @@ class Resident {
     }
   }
 
+  // run at the giant (you) and punch
+  *fight() {
+    this.doing = 'fighting you';
+    this.dropCarried();
+    const h = this.h;
+    h.emotion.anger = Math.min(1, h.emotion.anger + 0.6);
+    h.emotion.fear = Math.max(0, h.emotion.fear - 0.3);
+    let t = 0;
+    try {
+      while (t < 25) {
+        const g = this.c.giant;
+        if (!g) return;
+        const d = this.worldPos().distanceTo(g);
+        if (d > 0.35) return;                       // you got away
+        if (d > 0.034) {
+          // chase (re-aim now and then)
+          if (!this.agent) return;
+          this.speedMul = 2.3;
+          this.agent.requestMoveTarget(g);
+          yield* this.wait(0.3);
+          t += 0.3;
+          continue;
+        }
+        this.halt();
+        this.face = g.clone();
+        // a jab at your belly: arm out fast, then back
+        const target = g.clone().add(new THREE.Vector3(0, 1.0 * this.c.player.scale * 0.95, 0));
+        this.pose = { R: target, grip: 1 };
+        yield* this.wait(0.18);
+        if (this.c.giant && this.worldPos().distanceTo(this.c.giant) < 0.042) this.c.vitals?.damage(2 + Math.random() * 3, 'beaten up by tiny people');
+        this.pose = null;
+        yield* this.wait(0.45 + Math.random() * 0.3);
+        t += 0.8;
+      }
+    } finally {
+      this.pose = null;
+      this.face = null;
+      this.halt();
+    }
+  }
+
+  // run from the giant
+  *flee() {
+    this.doing = 'running from you';
+    this.dropCarried();
+    const h = this.h;
+    h.emotion.fear = 1;
+    const g = this.c.giant;
+    if (!g) return;
+    const away = this.worldPos().sub(g).setY(0).normalize();
+    for (let i = 0; i < 6; i++) {
+      const a = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.5;
+      const dir = away.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), a);
+      const spot = this.worldPos().addScaledVector(dir, 0.35);
+      if (yield* this.walkTo(spot, 0.03, { run: true, ext: { x: 0.08, y: 0.08, z: 0.08 } })) break;
+    }
+    this.ch.play('idle_nervous_01');
+    yield* this.wait(2);
+  }
+
+  // hit (by you): hurts, and a hit person is shaken or furious
+  hurt(amount, cause, from) {
+    if (this.dead) return;
+    this.health -= amount;
+    this.h.emotion.fear = Math.min(1, this.h.emotion.fear + 0.4);
+    this.h.emotion.anger = Math.min(1, this.h.emotion.anger + 0.3);
+    this.h.character.setEmotion('pain', 1);
+    // knocked back a little
+    if (this.agent && from) {
+      const back = this.worldPos().sub(from).setY(0).normalize();
+      this.agent.requestMoveTarget(this.worldPos().addScaledVector(back, 0.03));
+    }
+    this.c.note(`${this.h.profile.name} was hit`);
+    if (this.health <= 0) this.die(cause);
+  }
+
   // go and talk to someone nearby (they stop and listen, then answer)
   *chat(other) {
     other.interrupt(other.listen(this));
@@ -1049,6 +1153,22 @@ class Resident {
     if (!this.co && this.think <= 0 && !this.wade && this.agent) {
       this.co = this.choose();
       this.co.next(0);
+    }
+    // you shrank yourself in: fight you or run
+    this.threatCheck -= dt;
+    if (this.threatCheck <= 0 && this.agent) {
+      this.threatCheck = 0.5;
+      const g = this.c.giant;
+      if (g && !this.doing.startsWith('fighting') && !this.doing.startsWith('running')) {
+        const d = this.worldPos().distanceTo(g);
+        if (d < 0.25) {
+          const pers = h.profile.personality;
+          const friends = [...this.c.residents.values()].filter((o) => o !== this && !o.dead && o.worldPos().distanceTo(g) < 0.3).length;
+          const courage = pers.bravery * 0.6 + pers.temper * 0.3 + h.emotion.anger * 0.4 + friends * 0.08 - (this.health < 50 ? 0.3 : 0);
+          if (courage > 0.55) this.interrupt(this.fight());
+          else this.interrupt(this.flee());
+        }
+      }
     }
     // really thirsty/hungry: drop what you're doing
     if (this.co && this.thirst < 15 && !this.doing.includes('drink')) this.interrupt(this.drink());

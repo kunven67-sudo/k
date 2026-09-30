@@ -111,6 +111,7 @@ export async function boot() {
   const squisher = new Squisher({ scene, player, humans, settings });
   const vitals = new Vitals(settings);
   const hazards = new Hazards({ player, cage, vitals, input, respawn: level.respawn || level.spawn });
+  if (colony) { colony.player = player; colony.vitals = vitals; }
   if (params.get('item') === 'jar') hands.select(1);
   if (params.get('item') === 'supplies') hands.select(2);
 

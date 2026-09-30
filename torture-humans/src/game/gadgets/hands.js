@@ -308,8 +308,13 @@ export class Hands {
     for (let i = 0; i < this.items.length; i++) if (input.pressed(`item${i + 1}`)) this.select(i);
     if (input.pressed('nextItem')) this.select((this.index + 1) % this.items.length);
     if (input.pressed('prevItem')) this.select((this.index + this.items.length - 1) % this.items.length);
-    if (input.pressed('primary')) this.current.onDown?.();
-    if (input.released('primary')) this.current.onUp?.();
+    // tiny (inside the terrarium): your fists instead of the gadgets
+    if (player.scale < 0.5 && this.ctx.colony) {
+      if (input.pressed('primary')) this.ctx.colony.punch(camera);
+    } else {
+      if (input.pressed('primary')) this.current.onDown?.();
+      if (input.released('primary')) this.current.onUp?.();
+    }
 
     const item = this.current;
     item.update(dt);

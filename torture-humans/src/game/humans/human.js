@@ -19,7 +19,8 @@ export class Human {
     this.profile = {
       name: profile.name || `Person ${this.id}`,
       job: profile.job || 'none',
-      personality: { bravery: 0.5, friendliness: 0.5, curiosity: 0.5, temper: 0.5, ...(profile.personality || {}) },
+      // everyone is different: some are brave, some hot-headed, some shy
+      personality: { bravery: Math.random(), friendliness: Math.random(), curiosity: Math.random(), temper: Math.random(), ...(profile.personality || {}) },
     };
     this.character = new Character(template, lib, { gender });
     this.nav = nav;
