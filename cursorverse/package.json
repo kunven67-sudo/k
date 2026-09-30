@@ -1,0 +1,27 @@
+{
+  "name": "cursorverse",
+  "productName": "CursorVerse",
+  "version": "1.0.0",
+  "description": "Custom animated cursors, trails, click effects, typing sounds, music and a browser with backgrounds.",
+  "main": "src/main/main.js",
+  "author": "kunven67-sudo",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "dist": "electron-builder --win portable --x64"
+  },
+  "dependencies": {
+    "@fontsource/orbitron": "^5.3.0",
+    "@fontsource/press-start-2p": "^5.3.0",
+    "@ghostery/adblocker-electron": "^2.18.2",
+    "cross-fetch": "^4.1.0",
+    "koffi": "^3.3.2",
+    "uiohook-napi": "^1.5.5"
+  },
+  "devDependencies": {
+    "electron": "^44.5.0",
+    "electron-builder": "^26.15.3"
+  }
+}
