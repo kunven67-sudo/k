@@ -118,3 +118,25 @@ Graphics settings menu so it never lags. Zero bugs.
 ## Build + delivery (round 8)
 - Player wants it ALL AT ONCE (one big release, not staged public versions)
 - First target: Windows .exe with one-click Update (like CursorVerse); single .html for gamesystem2 later
+
+## Cage interactions (round 9)
+- Drop things in (food, water, rocks, toys, a flood, bugs, a candle/fire)
+- Cage weather control (rain, snow, heat wave, earthquake/shake)
+- Pick up + move (tweezers/fingers, jar, flick)
+- (Arena fights not picked)
+
+## Bug AI (round 9)
+- Real food chain (hunt/hide), life cycle (eggs -> young -> adult, metamorphosis, old age)
+- Ant colony (tunnels, queen, carry food home), spiders spin webs you can get stuck in, bees build hives with honey
+
+## Story, you, sounds, map (round 10)
+- Sandbox + optional side goals/achievements
+- Character creator for the mad scientist (face, hair, skin, body, clothes, lab coat, goggles)
+- Sound: real 3D positional audio (lab echo), humans SPEAK answers aloud (AI voice, squeaky when tiny),
+  bug sounds, footsteps per surface + world ambience
+- Map: medium-big (~10 min to walk across) AND detailed, every building enterable
+
+## Quality bar (player, most important)
+- Must NOT look AI-made. Hand-crafted feel: realistic animation (motion-captured humans, blended, IK feet/hands),
+  secondary motion / jiggle physics (hair, clothes, soft bodies, bug abdomens), good touching/grabbing.
+- Colliders follow real shapes: no phasing through things, no invisible square barriers.
