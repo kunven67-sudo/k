@@ -141,7 +141,7 @@ export function buildCommandMap(opts = {}) {
 
   for (const c of (groups.custom === false ? [] : opts.custom || [])) {
     if (!c || !c.phrase || c.enabled === false) continue;
-    const phrase = norm(c.phrase);
+    const phrase = customSayPhrase(c.phrase, opts.customNeedsClick !== false);
     if (!phrase) continue;
     let action = null;
     if (c.type === 'text') action = { kind: 'text', text: String(c.text || ''), enter: !!c.enter, label: c.phrase };
@@ -156,7 +156,14 @@ export function buildCommandMap(opts = {}) {
   return map;
 }
 
-// All phrases the recognizer should listen for (wake word variants included).
+// What the user actually says for a custom command. With "needs click" on,
+// "gg" becomes "click gg" so normal talking can't set it off.
+export function customSayPhrase(phrase, needsClick = true) {
+  const p = norm(phrase);
+  if (!p) return '';
+  return needsClick && p !== 'click' && !p.startsWith('click ') ? `click ${p}` : p;
+}
+
 // Words people say that are NOT commands. The recognizer only picks from the
 // phrases it is given, so without these a plain "H" gets matched to "click h".
 // Listing "h" on its own lets it land there instead, and it is then ignored.
@@ -171,6 +178,7 @@ export function decoyPhrases(map) {
   return [...out].filter(Boolean);
 }
 
+// All phrases the recognizer should listen for (wake word variants included).
 export function grammarPhrases(map, mode) {
   const phrases = [...map.keys(), ...decoyPhrases(map)];
   if (mode === 'wake') {

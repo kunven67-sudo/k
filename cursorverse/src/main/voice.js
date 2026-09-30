@@ -41,6 +41,7 @@ class VoiceController extends EventEmitter {
     this.restartDelay = 1000;
     this.generation = 0;
     this.heldButton = null;
+    this.micApps = [];         // other apps using the microphone right now
   }
 
   now() { return this.deps.now ? this.deps.now() : Date.now(); }
@@ -54,11 +55,11 @@ class VoiceController extends EventEmitter {
     const prev = this.settings;
     this.settings = settings;
     const c = await commands();
-    this.map = c.buildCommandMap({ letters: settings.letters, custom: settings.custom, groups: settings.groups });
+    this.map = c.buildCommandMap({ letters: settings.letters, custom: settings.custom, groups: settings.groups, customNeedsClick: settings.customNeedsClick });
     if (!settings.enabled) { this.stop(); this.setStatus('off'); return; }
     // The phrase list is baked into the host, so a change means a restart.
     const phrases = c.grammarPhrases(this.map, settings.mode);
-    const key = JSON.stringify([phrases, settings.mode, settings.endSilenceMs]);
+    const key = JSON.stringify([phrases, settings.mode, settings.endSilenceMs, settings.ignoreTalk, settings.talkWeight]);
     if (this.proc && this.hostKey === key && prev?.enabled) return;
     this.hostKey = key;
     this.stop();
@@ -103,7 +104,13 @@ class VoiceController extends EventEmitter {
       void code;
     });
     const autostart = this.settings.mode !== 'ptt';
-    proc.stdin.write(`${JSON.stringify({ phrases, autostart, endSilenceMs: this.settings.endSilenceMs ?? 150 })}\n`);
+    proc.stdin.write(`${JSON.stringify({
+      phrases,
+      autostart,
+      endSilenceMs: this.settings.endSilenceMs ?? 150,
+      ignoreTalk: this.settings.ignoreTalk !== false,
+      talkWeight: this.settings.talkWeight ?? 0.5,
+    })}\n`);
   }
 
   stop() {
@@ -133,7 +140,13 @@ class VoiceController extends EventEmitter {
     switch (msg.type) {
       case 'ready':
         this.restartDelay = 1000;
-        this.setStatus(this.settings.mode === 'ptt' ? 'ready' : 'listening', `Using ${msg.recognizer || 'Windows speech'} (${msg.culture})`, { culture: msg.culture });
+        this.talkFilter = !!msg.talkFilter;
+        this.setStatus(this.settings.mode === 'ptt' ? 'ready' : 'listening', `Using ${msg.recognizer || 'Windows speech'} (${msg.culture})`, { culture: msg.culture, talkFilter: this.talkFilter });
+        this.refreshMicStatus();
+        break;
+      case 'mic':
+        this.micApps = Array.isArray(msg.apps) ? msg.apps : [];
+        this.refreshMicStatus();
         break;
       case 'state':
         if (this.settings.mode === 'ptt') this.setStatus(msg.listening ? 'listening' : 'ready', this.status.message);
@@ -151,20 +164,42 @@ class VoiceController extends EventEmitter {
         break;
       }
       case 'result':
-        this.handleResult(msg.text, Number(msg.confidence) || 0);
+        this.handleResult(msg.text, Number(msg.confidence) || 0, msg.grammar || '');
         break;
       default:
         break;
     }
   }
 
-  async handleResult(text, confidence) {
+  // Holding the talk key means "I'm talking to CursorVerse", so never block that.
+  micBlocked() {
+    return this.settings?.pauseWhenMicBusy !== false && this.settings?.mode !== 'ptt' && this.micApps.length > 0;
+  }
+
+  // Shows "paused while Discord uses the mic" (or clears it) on the Voice page.
+  refreshMicStatus() {
+    if (!this.proc || !['listening', 'ready', 'mic-busy'].includes(this.status.state)) return;
+    if (this.micBlocked()) {
+      this.setStatus('mic-busy', `Paused while ${this.micApps.join(', ')} ${this.micApps.length > 1 ? 'are' : 'is'} using your mic`, { micApps: this.micApps });
+    } else if (this.status.state === 'mic-busy') {
+      this.setStatus(this.settings.mode === 'ptt' ? 'ready' : 'listening', '', { talkFilter: this.talkFilter });
+    }
+  }
+
+  // outcome says what happened, so the Voice page can explain why nothing ran.
+  report(text, confidence, outcome, detail = '') {
+    this.emit('heard', { text, confidence, outcome, detail, matched: !['talk', 'not-command'].includes(outcome) });
+  }
+
+  async handleResult(text, confidence, grammar = '') {
     const c = await commands();
+    if (grammar === 'talk') { this.report(text, confidence, 'talk'); return; }
     const parsed = c.parseUtterance(text, this.map);
     const minConf = this.settings.minConfidence ?? 0.6;
-    this.emit('heard', { text, confidence, matched: !!parsed });
-    if (!parsed) return;
+    if (!parsed) { this.report(text, confidence, 'not-command'); return; }
+    if (this.micBlocked()) { this.report(text, confidence, 'mic-busy', this.micApps.join(', ')); return; }
     if (confidence < minConf) {
+      this.report(text, confidence, 'unsure', `${Math.round(minConf * 100)}%`);
       this.deps.hud?.flash({ kind: 'unsure', text: `Didn't catch that (${Math.round(confidence * 100)}%)` });
       return;
     }
@@ -172,28 +207,31 @@ class VoiceController extends EventEmitter {
 
     // yes / no / pause / resume
     if (action?.kind === 'control') {
-      if (action.op === 'pause') { this.paused = true; this.cancelPending(); this.setStatus('paused', 'Say "start listening" to wake me up.'); this.deps.hud?.flash({ kind: 'info', text: 'Voice paused 😴' }); return; }
-      if (action.op === 'resume') { this.paused = false; this.setStatus('listening', ''); this.deps.hud?.flash({ kind: 'info', text: 'Voice on 🎤' }); return; }
-      if (this.paused || !this.pending) return;
+      if (action.op === 'pause') { this.paused = true; this.cancelPending(); this.setStatus('paused', 'Say "start listening" to wake me up.'); this.deps.hud?.flash({ kind: 'info', text: 'Voice paused 😴' }); this.report(text, confidence, 'paused'); return; }
+      if (action.op === 'resume') { this.paused = false; this.setStatus('listening', ''); this.deps.hud?.flash({ kind: 'info', text: 'Voice on 🎤' }); this.report(text, confidence, 'resumed'); return; }
+      if (this.paused) { this.report(text, confidence, 'paused'); return; }
+      if (!this.pending) { this.report(text, confidence, 'no-question'); return; }
       const p = this.pending;
       this.cancelPending(false);
-      if (action.op === 'yes') this.schedule(p.action, p.phrase);
-      else this.deps.hud?.flash({ kind: 'cancel', text: `OK, not pressing ${c.describeAction(p.action)} ❌` });
+      if (action.op === 'yes') { this.report(text, confidence, 'yes', c.describeAction(p.action)); this.schedule(p.action, p.phrase); }
+      else { this.report(text, confidence, 'no', c.describeAction(p.action)); this.deps.hud?.flash({ kind: 'cancel', text: `OK, not pressing ${c.describeAction(p.action)} ❌` }); }
       return;
     }
-    if (this.paused) return;
+    if (this.paused) { this.report(text, confidence, 'paused'); return; }
 
     if (this.settings.mode === 'wake') {
       if (parsed.woke && !action) {
         this.wokeUntil = this.now() + WAKE_WINDOW_MS;
         this.deps.hud?.show({ kind: 'listening', text: 'Yeah? 👂' });
+        this.report(text, confidence, 'woke');
         return;
       }
-      if (!parsed.woke && this.now() > this.wokeUntil) return;
+      if (!parsed.woke && this.now() > this.wokeUntil) { this.report(text, confidence, 'need-wake'); return; }
       this.wokeUntil = 0;
     }
     if (!action) return;
     if (!this.deps.allowedNow()) {
+      this.report(text, confidence, 'other-app');
       this.deps.hud?.flash({ kind: 'info', text: 'Voice is off for this app' });
       return;
     }
@@ -209,9 +247,11 @@ class VoiceController extends EventEmitter {
           this.deps.hud?.flash({ kind: 'cancel', text: 'No answer, skipped it' });
         }, timeoutMs),
       };
+      this.report(text, confidence, 'asked', c.describeAction(action));
       this.deps.hud?.show({ kind: 'confirm', text: `Did you say ${c.describeAction(action)}?`, hint: 'say "yes" or "no"' });
       return;
     }
+    this.report(text, confidence, 'run', c.describeAction(action));
     this.schedule(action, parsed.phrase);
   }
 

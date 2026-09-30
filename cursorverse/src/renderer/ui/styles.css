@@ -315,3 +315,10 @@ input[type=color] { width: 34px; height: 28px; padding: 0; border: var(--border-
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--panel-2); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+
+/* ---------- help & tour ---------- */
+.tour-wrap { position: fixed; inset: 0; z-index: 300; }
+.tour-spot { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.62); border: 2px solid var(--accent); pointer-events: none; transition: all .2s; }
+.tour-bubble { position: fixed; width: 330px; max-width: calc(100vw - 32px); background: var(--bg); z-index: 301; transition: left .2s, top .2s; }
+.update-banner { border: var(--border-w) solid var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.qbtn.update { border-color: var(--good); box-shadow: 0 0 12px color-mix(in srgb, var(--good) 60%, transparent); animation: pulse 1.6s ease-in-out infinite; }

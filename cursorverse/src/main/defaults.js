@@ -81,6 +81,11 @@ const DEFAULTS = {
     delayUnit: 'ms',           // ms | s | min
     minConfidence: 0.6,
     endSilenceMs: 150,
+    ignoreTalk: true,          // listen for normal sentences too, and ignore them
+    talkWeight: 0.5,
+    pauseWhenMicBusy: true,    // stop while Discord, voice typing, etc. use the mic
+    customNeedsClick: true,    // "gg" is said as "click gg"
+
     confirmTimeoutSec: 8,
     showHud: true,
     target: { mode: 'all', apps: [] },
@@ -101,6 +106,8 @@ const DEFAULTS = {
     openApp: 'CommandOrControl+Alt+O',
   },
 
+  autoCheckUpdates: true,
+  tourDone: false,
   startWithWindows: false,
   startHidden: true,
   closeToTray: true,

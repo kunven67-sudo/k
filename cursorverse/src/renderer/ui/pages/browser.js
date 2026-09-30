@@ -3,6 +3,7 @@
 import { h, toast, prompt, button, debounce, select, toggle } from '../lib.js';
 import { state, set } from '../state.js';
 import { backgroundLayer } from '../components.js';
+import { showHelp } from '../help-ui.js';
 import { ENGINES, toUrl } from '../../../shared/url.mjs';
 
 const cv = window.cv;
@@ -265,8 +266,9 @@ export default {
     els.star = h('button', { class: 'nav', title: 'Add to speed dial (Ctrl+D)', onclick: toggleBookmark }, '☆');
     els.shield = h('span', { class: 'shield', title: 'Ads and trackers blocked' }, '🛡️ 0');
     els.menu = h('button', { class: 'nav', title: 'Browser settings', onclick: settingsMenu }, '⚙');
+    els.help = h('button', { class: 'nav', title: 'What does this do?', onclick: () => showHelp('browser') }, '❓');
     els.views = h('div', { class: 'views' });
-    root.append(els.tabbar, h('div', { class: 'navbar' }, els.back, els.fwd, els.reload, els.home, els.address, els.star, els.shield, els.menu), els.views);
+    root.append(els.tabbar, h('div', { class: 'navbar' }, els.back, els.fwd, els.reload, els.home, els.address, els.star, els.shield, els.menu, els.help), els.views);
 
     cv.on.adblockCount((n) => { blockedCount = n; els.shield.textContent = `🛡️ ${n}`; });
     const saved = state.settings.browser.restoreTabs ? state.settings.browser.tabs : [];

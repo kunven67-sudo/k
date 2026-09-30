@@ -1,6 +1,7 @@
 # CursorVerse voice host. Runs Windows' offline speech recognizer with a fixed
 # phrase list (fast + accurate) and prints JSON lines to stdout.
-# stdin: first line = {"phrases":[...],"autostart":true}; later lines: start | stop | quit
+# stdin: first line = config JSON; later lines: start | stop | quit
+#   config: { phrases: [...], autostart, endSilenceMs, ignoreTalk, talkWeight, inputWav }
 #
 # Speech events are handled in a small C# class. PowerShell's own event queue was
 # too slow for the dozens of audio-level events per second, so recognition
@@ -35,16 +36,20 @@ if ($recognizers.Count -eq 0) {
 $info = $recognizers | Where-Object { $_.Culture.Name -like 'en-*' } | Select-Object -First 1
 if (-not $info) { $info = $recognizers[0] }
 
-$speechDll = [System.Speech.Recognition.SpeechRecognitionEngine].Assembly.Location
-Add-Type -ReferencedAssemblies $speechDll -TypeDefinition @'
+$source = @'
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Speech.Recognition;
 using System.Text;
+using System.Threading;
+using Microsoft.Win32;
 
 public static class CvVoice {
   static readonly object Gate = new object();
   static DateTime lastLevel = DateTime.MinValue;
+  static Timer micTimer;
+  static string lastMic = null;
 
   public static void Send(string json) {
     lock (Gate) { Console.Out.WriteLine(json); Console.Out.Flush(); }
@@ -66,7 +71,10 @@ public static class CvVoice {
     e.SpeechRecognized += (s, a) => {
       var r = a.Result;
       var sb = new StringBuilder();
-      sb.Append("{\"type\":\"result\",\"text\":\"").Append(Esc(r.Text)).Append("\",\"confidence\":").Append(Num(r.Confidence)).Append(",\"words\":[");
+      string grammar = r.Grammar != null ? r.Grammar.Name : "";
+      sb.Append("{\"type\":\"result\",\"text\":\"").Append(Esc(r.Text))
+        .Append("\",\"grammar\":\"").Append(Esc(grammar))
+        .Append("\",\"confidence\":").Append(Num(r.Confidence)).Append(",\"words\":[");
       for (int i = 0; i < r.Words.Count; i++) {
         if (i > 0) sb.Append(',');
         sb.Append("{\"t\":\"").Append(Esc(r.Words[i].Text)).Append("\",\"c\":").Append(Num(r.Words[i].Confidence)).Append('}');
@@ -82,8 +90,77 @@ public static class CvVoice {
     };
     e.RecognizeCompleted += (s, a) => Send("{\"type\":\"completed\"}");
   }
+
+  // Windows records which apps are using the microphone right now (that is what
+  // lights up the mic icon in the taskbar). An app is using it while its
+  // LastUsedTimeStop is 0. We skip ourselves (powershell.exe hosts this).
+  public static void WatchMic() {
+    micTimer = new Timer(_ => {
+      try {
+        var apps = new List<string>();
+        const string root = @"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
+        using (var key = Registry.CurrentUser.OpenSubKey(root)) {
+          if (key != null) {
+            Collect(key, apps, false);
+            using (var np = key.OpenSubKey("NonPackaged")) { if (np != null) Collect(np, apps, true); }
+          }
+        }
+        apps.Sort();
+        string now = string.Join("|", apps.ToArray());
+        if (now == lastMic) return;
+        lastMic = now;
+        var sb = new StringBuilder("{\"type\":\"mic\",\"apps\":[");
+        for (int i = 0; i < apps.Count; i++) { if (i > 0) sb.Append(','); sb.Append('"').Append(Esc(apps[i])).Append('"'); }
+        sb.Append("]}");
+        Send(sb.ToString());
+      } catch { }
+    }, null, 0, 1000);
+  }
+
+  static void Collect(RegistryKey parent, List<string> apps, bool nonPackaged) {
+    foreach (var name in parent.GetSubKeyNames()) {
+      if (name == "NonPackaged") continue;
+      string lower = name.ToLowerInvariant();
+      if (lower.Contains("powershell.exe") || lower.Contains("cursorverse")) continue;
+      using (var k = parent.OpenSubKey(name)) {
+        if (k == null) continue;
+        object start = k.GetValue("LastUsedTimeStart");
+        object stop = k.GetValue("LastUsedTimeStop");
+        if (start == null || stop == null) continue;
+        if (Convert.ToInt64(start) == 0 || Convert.ToInt64(stop) != 0) continue;
+        string label = name;
+        if (nonPackaged) {
+          label = name.Substring(name.LastIndexOf('#') + 1);
+          if (label.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) label = label.Substring(0, label.Length - 4);
+        } else {
+          int us = label.IndexOf('_');
+          if (us > 0) label = label.Substring(0, us);
+          int dot = label.LastIndexOf('.');
+          if (dot >= 0) label = label.Substring(dot + 1);
+        }
+        if (!apps.Contains(label)) apps.Add(label);
+      }
+    }
+  }
 }
 '@
+
+# Compiling the C# takes a second or two, so keep the compiled DLL and reuse it.
+$speechDll = [System.Speech.Recognition.SpeechRecognitionEngine].Assembly.Location
+$sha = [System.Security.Cryptography.SHA1]::Create()
+$hash = ([BitConverter]::ToString($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($source)))).Replace('-', '').Substring(0, 12)
+$dll = Join-Path $env:TEMP "cursorverse-voice-$hash.dll"
+$loaded = $false
+try {
+  if (-not (Test-Path $dll)) {
+    Add-Type -ReferencedAssemblies $speechDll -TypeDefinition $source -OutputAssembly $dll -OutputType Library
+  }
+  Add-Type -Path $dll
+  $loaded = $true
+} catch { }
+if (-not $loaded -and -not ('CvVoice' -as [type])) {
+  Add-Type -ReferencedAssemblies $speechDll -TypeDefinition $source
+}
 
 $config = [Console]::In.ReadLine() | ConvertFrom-Json
 $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine($info)
@@ -100,7 +177,24 @@ foreach ($p in $config.phrases) { [void]$choices.Add([string]$p) }
 $builder = New-Object System.Speech.Recognition.GrammarBuilder
 $builder.Culture = $info.Culture
 $builder.Append($choices)
-$engine.LoadGrammar((New-Object System.Speech.Recognition.Grammar($builder)))
+$commands = New-Object System.Speech.Recognition.Grammar($builder)
+$commands.Name = 'commands'
+$engine.LoadGrammar($commands)
+
+# Normal talking: a dictation grammar competes with the commands, so full
+# sentences land there (and get ignored) instead of being squeezed into the
+# closest command.
+$talk = $false
+if ($config.ignoreTalk) {
+  try {
+    $dict = New-Object System.Speech.Recognition.DictationGrammar
+    $dict.Name = 'talk'
+    $w = [double]$config.talkWeight
+    if ($w -gt 0 -and $w -le 1) { $dict.Weight = [float]$w }
+    $engine.LoadGrammar($dict)
+    $talk = $true
+  } catch { }
+}
 
 # Short silence windows = the result arrives right after you stop talking.
 $engine.EndSilenceTimeout = [TimeSpan]::FromMilliseconds([int]$config.endSilenceMs)
@@ -108,16 +202,17 @@ $engine.EndSilenceTimeoutAmbiguous = [TimeSpan]::FromMilliseconds([int]$config.e
 $engine.InitialSilenceTimeout = [TimeSpan]::Zero
 $engine.BabbleTimeout = [TimeSpan]::Zero
 [CvVoice]::Hook($engine)
+if (-not $config.inputWav) { [CvVoice]::WatchMic() }
 
 $running = $false
 function Out($obj) { [CvVoice]::Send(($obj | ConvertTo-Json -Compress)) }
 function StartRec { if (-not $script:running) { $engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple); $script:running = $true; Out @{ type = 'state'; listening = $true } } }
 function StopRec { if ($script:running) { $engine.RecognizeAsyncStop(); $script:running = $false; Out @{ type = 'state'; listening = $false } } }
 
-Out @{ type = 'ready'; culture = $info.Culture.Name; recognizer = $info.Description; phrases = $config.phrases.Count }
+Out @{ type = 'ready'; culture = $info.Culture.Name; recognizer = $info.Description; phrases = $config.phrases.Count; talkFilter = $talk }
 if ($config.autostart) { StartRec }
 
-# Speech events run on their own threads now, so this loop can just wait for stdin.
+# Speech events run on their own threads, so this loop can just wait for stdin.
 while ($true) {
   $line = [Console]::In.ReadLine()
   if ($null -eq $line -or $line -eq 'quit') { break }

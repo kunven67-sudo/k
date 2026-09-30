@@ -11,19 +11,27 @@ A Windows app that changes your cursor everywhere, adds trails and click effects
 | ✏️ **Pixel editor** | Draw your own cursor frame by frame, start from any built-in one, or upload a PNG/GIF (GIFs become animated cursors). |
 | ✨ **Effects** | 16 trails, 12 click effects and 8 "you stopped moving" effects, drawn over every app. |
 | 🔊 **Typing sounds** | 20 packs: mechanical, typewriter, 8-bit and funny (yes, a duck). You can also add your own sounds. |
-| 🎤 **Voice control** | Say "click", "right click", "click P", "click papa", "click enter", "click copy" and more, or make your own commands. You set the delay (ms / seconds / minutes), and it can ask "Did you say P?" and wait for yes or no. It works offline with Windows speech. |
+| 🎤 **Voice control** | Say "click", "right click", "click P", "click papa", "click enter", "click copy" and more, or make your own ("click gg"). You set the delay (ms / seconds / minutes), and it can ask "Did you say P?" and wait for yes or no. Normal talking is ignored, and it pauses while another app (Discord, voice typing) uses the mic. It works offline with Windows speech. |
 | 🎵 **Music** | 12 original songs made live by the app (lofi, 8-bit, synthwave, ambient/rain), plus your own MP3s. |
 | 🌐 **Browser** | Tabs, speed dial, history, an ad blocker, and animated/picture/video backgrounds with blur and dim. |
 | 🎯 **Pick your apps** | Run everything on your whole PC, or only in the apps you choose. |
 | 💾 **Presets** | Gaming, Chill, Fantasy, Retro, Cute and Chaos modes, plus your own saved presets and a 🎲 random button. |
 | ⚙️ **Extras** | Three themes (Dark Neon, Glassy, Pixel Retro), hotkeys, start with Windows, and a tray icon. |
 
+## 🔄 Updating
+
+⚙️ Settings → **Updates** → **Update now**. CursorVerse downloads the new version from this repo's Releases, checks its SHA-256, swaps it in and restarts. All your settings, cursors and files stay. A glowing **⬆ Update** button also shows up at the top when a new version is out.
+
+## ❓ Help
+
+Every page has a **❓ What does this do?** button. The **❓ Help** page has "How do I...?" answers and a search box, and there's a guided tour on first launch (replay it from Help or Settings).
+
 ## 📦 Getting the .exe
 
 Every push builds a portable **`CursorVerse-x.y.z-Portable.exe`** on GitHub:
 
-- **Actions** tab → *CursorVerse Windows build* → latest run → **Artifacts** → `CursorVerse-Portable`
-- After merging to `main`, it also shows up under **Releases**.
+- **Releases** (right side of the repo page) → newest `CursorVerse x.y.z` → download the `.exe`
+- or **Actions** tab → *CursorVerse Windows build* → latest run → **Artifacts** → `CursorVerse-Portable`
 
 Double-click the exe and it runs. There's no installer. The first launch takes a few seconds while it unpacks.
 

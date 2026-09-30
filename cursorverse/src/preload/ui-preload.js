@@ -25,7 +25,8 @@ contextBridge.exposeInMainWorld('cv', {
     status: call('voice:status'), history: call('voice:history'), capturePtt: call('ptt:capture'),
     onStatus: listen('voice:status'), onLevel: listen('voice:level'), onCommand: listen('voice:command'), onHeard: listen('voice:heard'),
   },
-  hotkeys: { status: call('hotkeys:status'), onStatus: listen('hotkeys:status') },
+  hotkeys: { status: call('hotkeys:status'), onStatus: listen('hotkeys:status'), suspend: call('hotkeys:suspend') },
+  update: { state: call('update:state'), check: call('update:check'), install: call('update:install'), onState: listen('update:state') },
   app: { info: call('app:info'), quit: call('app:quit'), openDataFolder: call('app:openDataFolder'), titlebar: call('window:titlebar') },
   on: {
     openTab: listen('browser:open-tab'),

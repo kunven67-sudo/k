@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildCommandMap, decoyPhrases, parseUtterance, needsConfirm, delayToMs, grammarPhrases, WAKE_WORD, describeAction,
+  buildCommandMap, decoyPhrases, customSayPhrase, parseUtterance, needsConfirm, delayToMs, grammarPhrases, WAKE_WORD, describeAction,
 } from '../src/shared/voice-commands.mjs';
 
 test('plain "click" is a left click', () => {
@@ -54,10 +54,12 @@ test('custom commands override and can type text', () => {
     { phrase: 'click', type: 'mouse', op: 'double' },
     { phrase: 'off one', type: 'text', text: 'x', enabled: false },
   ] });
-  assert.deepEqual(parseUtterance('GG', m).action, { kind: 'text', text: 'good game', enter: true, label: 'gg', custom: true });
-  assert.deepEqual(parseUtterance('reload', m).action.vks, [0x74]);
+  // custom commands need "click" first by default
+  assert.equal(parseUtterance('gg', m), null);
+  assert.deepEqual(parseUtterance('Click GG', m).action, { kind: 'text', text: 'good game', enter: true, label: 'gg', custom: true });
+  assert.deepEqual(parseUtterance('click reload', m).action.vks, [0x74]);
   assert.equal(parseUtterance('click', m).action.op, 'double');
-  assert.equal(parseUtterance('off one', m), null);
+  assert.equal(parseUtterance('click off one', m), null);
 });
 
 test('wake word handling', () => {
@@ -101,7 +103,7 @@ test('delay units', () => {
 });
 
 test('command groups can be switched off', () => {
-  const m = buildCommandMap({ groups: { mouse: false, combos: false, keys: true, custom: false }, custom: [{ phrase: 'gg', type: 'text', text: 'x' }] });
+  const m = buildCommandMap({ groups: { mouse: false, combos: false, keys: true, custom: false }, custom: [{ phrase: 'gg', type: 'text', text: 'x' }], customNeedsClick: false });
   assert.equal(parseUtterance('right click', m), null);
   assert.equal(parseUtterance('click copy', m), null);
   assert.ok(parseUtterance('click enter', m));
@@ -130,8 +132,22 @@ test('decoys: bare letters/keys are listened for but never act', () => {
   assert.ok(grammarPhrases(m, 'always').includes('click h'));
 });
 
+test('custom commands can skip "click" when that setting is off', () => {
+  const m = buildCommandMap({ custom: [{ phrase: 'gg', type: 'text', text: 'good game' }], customNeedsClick: false });
+  assert.equal(parseUtterance('gg', m).action.text, 'good game');
+  assert.equal(customSayPhrase('gg', true), 'click gg');
+  assert.equal(customSayPhrase('click gg', true), 'click gg');
+  assert.equal(customSayPhrase('  GG! ', false), 'gg');
+  assert.equal(customSayPhrase('', true), '');
+});
+
+test('custom "click gg" makes plain "gg" a decoy', () => {
+  const m = buildCommandMap({ custom: [{ phrase: 'gg', type: 'text', text: 'x' }] });
+  assert.ok(decoyPhrases(m).includes('gg'));
+});
+
 test('decoys never shadow custom commands', () => {
-  const m = buildCommandMap({ custom: [{ phrase: 'okay', type: 'text', text: 'ok' }] });
+  const m = buildCommandMap({ custom: [{ phrase: 'okay', type: 'text', text: 'ok' }], customNeedsClick: false });
   assert.ok(!decoyPhrases(m).includes('okay'));
   assert.ok(parseUtterance('okay', m));
 });

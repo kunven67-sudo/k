@@ -15,7 +15,8 @@ function fakeHost() {
   proc.written = [];
   proc.stdin.on('data', (d) => proc.written.push(String(d)));
   proc.kill = () => {};
-  proc.say = (text, confidence = 0.95) => proc.stdout.write(`${JSON.stringify({ type: 'result', text, confidence })}\n`);
+  proc.say = (text, confidence = 0.95, grammar = 'commands') => proc.stdout.write(`${JSON.stringify({ type: 'result', text, confidence, grammar })}\n`);
+  proc.send = (msg) => proc.stdout.write(`${JSON.stringify(msg)}\n`);
   return proc;
 }
 
@@ -162,6 +163,9 @@ test('custom text command types and presses enter', async () => {
   await v.configure(settings);
   host.say('gg');
   await tick();
+  assert.equal(calls.length, 0, 'plain "gg" must not fire');
+  host.say('click gg');
+  await tick();
   assert.deepEqual(calls, [['type', 'good game'], ['keys', [0x0d]]]);
 });
 
@@ -188,4 +192,68 @@ test('formatDelay', () => {
   assert.equal(formatDelay(0.1), '0.1 ms');
   assert.equal(formatDelay(1500), '1.5 s');
   assert.equal(formatDelay(90000), '1.5 min');
+});
+
+test('normal talking (dictation grammar) never does anything', async () => {
+  const { v, host, calls, settings } = setup();
+  const heard = [];
+  v.on('heard', (x) => heard.push(x.outcome));
+  await v.configure(settings);
+  assert.equal(JSON.parse(host.written[0]).ignoreTalk, true);
+  host.say('click on that thing over there', 0.9, 'talk');
+  await tick();
+  assert.equal(calls.length, 0);
+  assert.deepEqual(heard, ['talk']);
+});
+
+test('pauses while another app uses the mic, resumes after', async () => {
+  const { v, host, calls, settings } = setup();
+  const heard = [];
+  v.on('heard', (x) => heard.push(x.outcome));
+  await v.configure(settings);
+  host.send({ type: 'ready', recognizer: 'x', culture: 'en-US' });
+  host.send({ type: 'mic', apps: ['Discord'] });
+  await tick();
+  assert.equal(v.status.state, 'mic-busy');
+  assert.match(v.status.message, /Discord/);
+  host.say('click');
+  await tick();
+  assert.equal(calls.length, 0);
+  host.send({ type: 'mic', apps: [] });
+  await tick();
+  assert.equal(v.status.state, 'listening');
+  host.say('click');
+  await tick();
+  assert.equal(calls.length, 1);
+  assert.deepEqual(heard, ['mic-busy', 'run']);
+});
+
+test('mic pause can be turned off, and never blocks hold-to-talk', async () => {
+  let s = setup({ pauseWhenMicBusy: false });
+  await s.v.configure(s.settings);
+  s.host.send({ type: 'mic', apps: ['Discord'] });
+  s.host.say('click');
+  await tick();
+  assert.equal(s.calls.length, 1);
+
+  s = setup({ mode: 'ptt' });
+  await s.v.configure(s.settings);
+  s.host.send({ type: 'mic', apps: ['Discord'] });
+  s.host.say('click');
+  await tick();
+  assert.equal(s.calls.length, 1);
+});
+
+test('every heard phrase says why it did or did not act', async () => {
+  const { v, host, settings } = setup({ minConfidence: 0.7 });
+  const heard = [];
+  v.on('heard', (x) => heard.push(x.outcome));
+  await v.configure(settings);
+  host.say('h');            // decoy
+  host.say('click', 0.5);   // too unsure
+  host.say('click h');      // asks
+  host.say('yes');          // answers
+  host.say('yes');          // nothing to answer
+  await tick(40);
+  assert.deepEqual(heard, ['not-command', 'unsure', 'asked', 'yes', 'no-question']);
 });

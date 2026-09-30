@@ -1,10 +1,31 @@
-import { h, section, slider, toggle, chips, button, row, select, toast } from '../lib.js';
+import { h, section, slider, toggle, chips, button, row, select, toast, debounce } from '../lib.js';
 import { state, set } from '../state.js';
 import { nav } from '../nav.js';
 import { targetEditor } from './target-editor.js';
 import {
-  NATO, DIGIT_WORDS, SPECIAL_KEYS, COMBOS, MOUSE_PHRASES, delayToMs, WAKE_WORD,
+  NATO, DIGIT_WORDS, SPECIAL_KEYS, COMBOS, MOUSE_PHRASES, delayToMs, WAKE_WORD, customSayPhrase,
 } from '../../../shared/voice-commands.mjs';
+
+// Why a heard phrase did (or didn't) do anything, in plain words.
+function outcomeText(x) {
+  switch (x.outcome) {
+    case 'talk': return '🗣️ normal talking, ignored';
+    case 'not-command': return '🤷 not a command';
+    case 'unsure': return `🤔 too unsure (needs ${x.detail}). Say it clearer, or lower "How sure it must be"`;
+    case 'mic-busy': return `🎧 ignored: ${x.detail} is using the mic`;
+    case 'asked': return `❓ asked "Did you say ${x.detail}?" → say yes`;
+    case 'run': return `✅ doing ${x.detail}`;
+    case 'yes': return `✅ yes → ${x.detail}`;
+    case 'no': return `❌ cancelled ${x.detail}`;
+    case 'no-question': return '🤷 nothing was asked';
+    case 'paused': return '😴 paused, say "start listening"';
+    case 'resumed': return '🎤 back on';
+    case 'other-app': return '🎯 voice is off for this app';
+    case 'need-wake': return '👋 say "hey cursor" first';
+    case 'woke': return '👂 listening for your command';
+    default: return x.matched ? '' : 'not a command';
+  }
+}
 
 const cv = window.cv;
 
@@ -30,7 +51,12 @@ function vkFromCode(code) {
 }
 
 function recordKeys(onDone) {
-  const input = h('input', { class: 'text', readOnly: true, placeholder: 'Press the keys now...', style: { maxWidth: '240px' } });
+  const input = h('input', {
+    class: 'text', readOnly: true, placeholder: 'Click here, then press the keys', style: { maxWidth: '240px' },
+    // CursorVerse's own hotkeys (Ctrl+Alt+...) would grab the combo before this box sees it
+    onfocus: () => cv.hotkeys.suspend(true),
+    onblur: () => cv.hotkeys.suspend(false),
+  });
   input.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
@@ -51,11 +77,12 @@ export default {
     const setV = (p) => set({ voice: p });
     const statusBox = h('div', { class: 'row' });
     const meter = h('div', { class: 'meter' }, h('div'));
-    const heardBox = h('div', { class: 'hint' }, 'Last heard: —');
+    const heardBox = h('div', { class: 'list', style: { marginTop: '8px' } }, h('small', {}, 'Say something and it shows up here, with what CursorVerse did about it.'));
+    const heardLines = [];
     const logBox = h('div', { class: 'list' });
 
     const drawStatus = (st) => {
-      const words = { off: 'Voice control is off', starting: 'Starting up...', listening: 'Listening 👂', ready: `Ready: hold ${v.pttKey?.label || 'your talk key'} to talk`, paused: 'Paused (say "start listening")', error: 'Problem' };
+      const words = { off: 'Voice control is off', starting: 'Starting up...', listening: 'Listening 👂', ready: `Ready: hold ${v.pttKey?.label || 'your talk key'} to talk`, paused: 'Paused (say "start listening")', 'mic-busy': 'Paused 🎧', error: 'Problem' };
       statusBox.replaceChildren(h('span', { class: `status-dot ${st.state}` }), h('b', {}, words[st.state] || st.state), st.message ? h('small', {}, ` · ${st.message}`) : null);
     };
     const drawLog = (list) => logBox.replaceChildren(...(list.length ? list.slice(0, 8).map((c) => h('div', { class: 'item' }, h('span', {}, c.ok ? '✅' : '⚠️'), h('span', { class: 'grow' }, `"${c.phrase}" → ${c.label}`), h('small', {}, c.at ? new Date(c.at).toLocaleTimeString() : ''))) : [h('small', {}, 'Nothing yet. Say "click"!')]));
@@ -65,7 +92,13 @@ export default {
     const offs = [
       cv.voice.onStatus(drawStatus),
       cv.voice.onLevel((lv) => { meter.firstChild.style.width = `${Math.min(100, lv)}%`; }),
-      cv.voice.onHeard((hd) => { heardBox.textContent = `Last heard: "${hd.text}" (${Math.round(hd.confidence * 100)}% sure)${hd.matched ? '' : ' - not a command'}`; }),
+      cv.voice.onHeard((hd) => {
+        heardLines.unshift(hd);
+        heardLines.length = Math.min(heardLines.length, 6);
+        heardBox.replaceChildren(...heardLines.map((x) => h('div', { class: 'item' },
+          h('span', { class: 'grow' }, h('b', {}, `"${x.text}"`), h('small', {}, ` ${Math.round(x.confidence * 100)}% sure`)),
+          h('small', {}, outcomeText(x)))));
+      }),
       cv.voice.onCommand(() => cv.voice.history().then(drawLog)),
     ];
 
@@ -85,27 +118,47 @@ export default {
       h('p', { class: 'hint' }, 'Heads up: it still has to hear the whole word first (about 0.2 - 0.4 s), then the delay starts. Lower "wait after you stop talking" below to make that part faster.'));
 
     // ----- custom commands
-    const customRows = v.custom.map((c, i) => {
-      const upd = (p) => { const list = v.custom.slice(); list[i] = { ...c, ...p }; setV({ custom: list }); };
+    // Every edit reads the live list and finds its row by id. (Rows used to copy
+    // the list from when the page opened, so editing one undid another.)
+    const liveCustom = () => state.settings.voice.custom || [];
+    const updCustom = (id, patch) => setV({ custom: liveCustom().map((x) => (x.id === id ? { ...x, ...patch } : x)) });
+    const customBody = h('tbody');
+    const customRow = (c) => {
+      const say = h('small', { class: 'muted' });
+      const showSay = (phrase) => {
+        const p = customSayPhrase(phrase || '', state.settings.voice.customNeedsClick !== false);
+        say.textContent = p ? `You say: "${p}"` : '';
+      };
+      showSay(c.phrase);
       let valueCell;
       if (c.type === 'text') {
         valueCell = h('div', { class: 'row' },
-          h('input', { class: 'text', value: c.text || '', placeholder: 'Text to type', style: { maxWidth: '220px' }, onchange: (e) => upd({ text: e.target.value }) }),
-          toggle({ label: '+ Enter', checked: !!c.enter, onChange: (x) => upd({ enter: x }) }));
+          h('input', { class: 'text', value: c.text || '', placeholder: 'Text to type', style: { maxWidth: '220px' }, oninput: debounce((e) => updCustom(c.id, { text: e.target.value }), 300) }),
+          toggle({ label: '+ Enter', checked: !!c.enter, onChange: (x) => updCustom(c.id, { enter: x }) }));
       } else if (c.type === 'keys') {
-        valueCell = h('div', { class: 'row' }, h('span', { class: 'kbd' }, c.label || 'no keys yet'), recordKeys(({ vks, label }) => { upd({ vks, label }); setTimeout(() => nav.refresh(), 50); }));
+        const kbd = h('span', { class: 'kbd' }, c.label || 'no keys yet');
+        valueCell = h('div', { class: 'row' }, kbd, recordKeys(({ vks, label }) => { updCustom(c.id, { vks, label }); kbd.textContent = label; }));
       } else {
         valueCell = select({ value: `${c.op || 'click'}:${c.button || 'left'}`, options: [
           ['click:left', 'Left click'], ['click:right', 'Right click'], ['click:middle', 'Middle click'], ['double:left', 'Double click'], ['triple:left', 'Triple click'], ['down:left', 'Hold click'], ['up:left', 'Let go'],
-        ].map(([value, label]) => ({ value, label })), onChange: (x) => { const [op, b] = x.split(':'); upd({ op, button: b }); } });
+        ].map(([value, label]) => ({ value, label })), onChange: (x) => { const [op, b] = x.split(':'); updCustom(c.id, { op, button: b }); } });
       }
-      return h('tr', {},
-        h('td', {}, toggle({ label: '', checked: c.enabled !== false, onChange: (x) => upd({ enabled: x }) })),
-        h('td', {}, h('input', { class: 'text', value: c.phrase || '', placeholder: 'what you say', onchange: (e) => upd({ phrase: e.target.value.trim() }) })),
-        h('td', {}, select({ value: c.type, options: [{ value: 'text', label: 'Type text' }, { value: 'keys', label: 'Press keys' }, { value: 'mouse', label: 'Mouse' }], onChange: (x) => { upd({ type: x }); setTimeout(() => nav.refresh(), 50); } })),
+      const tr = h('tr', {},
+        h('td', {}, toggle({ label: '', checked: c.enabled !== false, onChange: (x) => updCustom(c.id, { enabled: x }) })),
+        h('td', {},
+          h('input', { class: 'text', value: c.phrase || '', placeholder: 'word(s) to say', oninput: debounce((e) => { updCustom(c.id, { phrase: e.target.value.trim() }); showSay(e.target.value); }, 300) }),
+          say),
+        h('td', {}, select({ value: c.type, options: [{ value: 'text', label: 'Type text' }, { value: 'keys', label: 'Press keys' }, { value: 'mouse', label: 'Mouse' }], onChange: (x) => {
+          updCustom(c.id, { type: x });
+          tr.replaceWith(customRow(liveCustom().find((y) => y.id === c.id)));
+        } })),
         h('td', {}, valueCell),
-        h('td', {}, button('🗑️', () => { setV({ custom: v.custom.filter((_, k) => k !== i) }); setTimeout(() => nav.refresh(), 50); }, 'small')));
-    });
+        h('td', {}, button('🗑️', () => { setV({ custom: liveCustom().filter((y) => y.id !== c.id) }); tr.remove(); }, 'small')));
+      return tr;
+    };
+    const drawCustom = () => customBody.replaceChildren(...liveCustom().map(customRow));
+    drawCustom();
+    const addCustom = (c) => { setV({ custom: [...liveCustom(), { id: crypto.randomUUID(), enabled: true, ...c }] }); drawCustom(); };
 
     const letters = Object.keys(NATO).map((l) => `click ${l} / click ${NATO[l]} → ${l.toUpperCase()}`);
     main.append(
@@ -139,6 +192,12 @@ export default {
           slider({ label: 'Wait after you stop talking', min: 60, max: 800, step: 10, value: v.endSilenceMs, format: (x) => `${x} ms`, onInput: (x) => setV({ endSilenceMs: x }), live: false }),
           h('p', { class: 'hint' }, 'Lower = faster but it might cut you off. 150 ms is a good start.'),
           toggle({ label: 'Show the bubble by my cursor', checked: v.showHud, onChange: (x) => setV({ showHud: x }) })),
+        section('🛡️ Stop random triggers',
+          h('div', { class: 'stack' },
+            toggle({ label: 'Ignore normal talking', desc: 'Full sentences are recognized as talking and skipped, so chatting on Discord or with voice typing does not press stuff', checked: v.ignoreTalk !== false, onChange: (x) => setV({ ignoreTalk: x }) }),
+            toggle({ label: 'Pause while another app uses the mic', desc: 'Discord calls, Windows voice typing, games with voice chat... Voice waits until they stop. (Hold-a-key mode still works.)', checked: v.pauseWhenMicBusy !== false, onChange: (x) => setV({ pauseWhenMicBusy: x }) }),
+            toggle({ label: 'Say "click" before my own commands', desc: '"click gg" instead of just "gg"', checked: v.customNeedsClick !== false, onChange: async (x) => { await setV({ customNeedsClick: x }); nav.refresh(); } }),
+            h('small', {}, 'Still getting random presses? Switch "How it listens" to 🔘 Hold a key to talk, so it only listens while you hold your key.'))),
         section('🧰 Which commands are on',
           h('div', { class: 'stack' },
             toggle({ label: 'Mouse', desc: 'click, right click, double click, scroll, hold click / let go', checked: v.groups.mouse, onChange: (x) => setV({ groups: { mouse: x } }) }),
@@ -149,13 +208,17 @@ export default {
       ),
       h('div', { style: { height: '16px' } }),
       section('✍️ My own commands',
-        h('p', {}, 'Make any word do anything. Example: say "gg" to type "good game" and press Enter.'),
+        h('p', {}, 'Make any word do anything. Example: "gg" types "good game" and presses Enter.'),
+        h('p', { class: 'hint' }, v.customNeedsClick !== false
+          ? 'You say "click" first, like "click gg", so normal talking never sets them off. Change this under 🛡️ Stop random triggers.'
+          : 'You say them on their own, like "gg". Careful: normal talking can set them off.'),
         h('table', { class: 'cmd-table' },
-          h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Say'), h('th', {}, 'Does'), h('th', {}, 'What'), h('th', {})),
-          customRows),
+          h('thead', {}, h('tr', {}, h('th', {}, 'On'), h('th', {}, 'Say'), h('th', {}, 'Does'), h('th', {}, 'What'), h('th', {}))),
+          customBody),
         h('div', { class: 'row', style: { marginTop: '10px' } },
-          button('➕ Add command', async () => { await setV({ custom: [...v.custom, { phrase: '', type: 'text', text: '', enter: false, enabled: true }] }); nav.refresh(); }, 'primary'),
-          button('➕ Example: gg', async () => { await setV({ custom: [...v.custom, { phrase: 'gg', type: 'text', text: 'good game', enter: true, enabled: true }] }); nav.refresh(); }))),
+          button('➕ Add command', () => addCustom({ phrase: '', type: 'text', text: '', enter: false }), 'primary'),
+          button('➕ Example: gg', () => addCustom({ phrase: 'gg', type: 'text', text: 'good game', enter: true })),
+          button('➕ Example: jump', () => addCustom({ phrase: 'jump', type: 'keys', vks: [0x20], label: 'Space' })))),
       targetEditor('🎯 Where voice works', v.target, (t) => setV({ target: t })),
       section('🕘 Recent commands', logBox),
       section('📖 Everything you can say',

@@ -17,8 +17,10 @@ import appsPage from './pages/apps.js';
 import voice from './pages/voice.js';
 import presets from './pages/presets.js';
 import settingsPage from './pages/settings.js';
+import helpPage from './pages/help.js';
+import { helpButton, startTour } from './help-ui.js';
 
-const PAGES = [home, cursors, customize, editor, effects, sounds, music, browser, backgrounds, appsPage, voice, presets, settingsPage];
+const PAGES = [home, cursors, customize, editor, effects, sounds, music, browser, backgrounds, appsPage, voice, presets, settingsPage, helpPage];
 const cv = window.cv;
 
 let current = null;
@@ -47,6 +49,14 @@ export function go(id, arg) {
   main.replaceChildren();
   main.scrollTop = 0;
   cleanup = page.render(main, arg) || null;
+  addHelpButton(main, page);
+}
+
+// Every page head gets a "❓ What does this do?" button.
+function addHelpButton(main, page) {
+  const head = main.querySelector('.page-head');
+  const btn = page.id !== 'help' && helpButton(page.id);
+  if (head && btn) head.append(btn);
 }
 
 function rerender() {
@@ -56,6 +66,7 @@ function rerender() {
   cleanup?.();
   main.replaceChildren();
   cleanup = current.render(main) || null;
+  addHelpButton(main, current);
   main.scrollTop = scroll;
 }
 
@@ -81,6 +92,7 @@ function buildQuick() {
       h('button', { class: 'qbtn', style: { border: 'none', padding: '0 4px', background: 'none' }, onclick: () => cv.music.cmd({ action: 'next' }), title: 'Next song' }, '⏭'),
       h('span', { class: 'name', onclick: () => go('music') }, m.name || 'Music')),
     h('button', { class: 'qbtn on', onclick: async () => { await cv.presets.random(); toast('🎲 New random combo!', 'good'); }, title: 'Random cursor, trail, click effect and sounds' }, '🎲', 'Random'),
+    state.update?.status === 'available' ? h('button', { class: 'qbtn update', onclick: () => go('settings'), title: 'A new version is ready' }, '⬆', `Update ${state.update.latest}`) : null,
   );
 }
 
@@ -108,10 +120,17 @@ async function start() {
   buildQuick();
   browser.mount($('#browser-page'), go);
   go('home');
-  if (state.settings.firstRun) {
-    set({ firstRun: false });
-    setTimeout(() => toast('Yo! 👋 Pick a cursor in 🖱️ Cursors, or hit 🎲 Random to try a combo.', 'good', 6000), 600);
-  }
+  if (state.settings.firstRun) set({ firstRun: false });
+  // everyone sees the tour once (you can replay it from ❓ Help)
+  if (!state.settings.tourDone) setTimeout(() => startTour(() => set({ tourDone: true })), 900);
+
+  state.update = await cv.update.state();
+  cv.update.onState((u) => {
+    state.update = u;
+    buildQuick();
+    current?.onUpdate?.(u);
+  });
+  buildQuick();
 
   onSettings((s, changed, from) => {
     if (changed.includes('theme') || changed.includes('accent')) applyTheme();

@@ -15,7 +15,15 @@ const CASES = [
   ['click', 'click', true],
   ['yes', 'yes', true],
   ['enter', null, false],
+  ['click seven', 'click 7', true],
+  ['click copy', 'click copy', true],
+  // normal talking must never press anything
+  ['hey what is up bro how are you doing today', null, false],
+  ['I think we should play the game later tonight', null, false],
+  ['the tea is really hot', null, false],
+  ['can you see the picture I sent you', null, false],
 ];
+const DEFAULT_WEIGHT = 0.5;
 
 function synth(dir) {
   const script = `
@@ -29,7 +37,7 @@ $s.SetOutputToNull()
   return execFileSync('powershell.exe', ['-NoProfile', '-Command', script], { encoding: 'utf8' }).trim();
 }
 
-function listen(wav, phrases) {
+function listen(wav, phrases, talkWeight) {
   return new Promise((resolve) => {
     const proc = spawnPowerShellHost();
     const out = { results: [], error: null, ms: null };
@@ -46,14 +54,14 @@ function listen(wav, phrases) {
         if (!line) continue;
         let msg;
         try { msg = JSON.parse(line); } catch { continue; }
-        if (msg.type === 'ready') t0 = Date.now();
+        if (msg.type === 'ready') { t0 = Date.now(); out.talkFilter = msg.talkFilter; }
         if (msg.type === 'result') { out.results.push(msg); if (out.ms === null) out.ms = Date.now() - t0; }
         if (msg.type === 'error') { out.error = `${msg.code}: ${msg.message}`; clearTimeout(timer); done(); }
         if (msg.type === 'completed') { clearTimeout(timer); done(); }
       }
     });
     proc.stderr.on('data', (d) => process.stderr.write(d));
-    proc.stdin.write(`${JSON.stringify({ phrases, autostart: true, endSilenceMs: 150, inputWav: wav })}\n`);
+    proc.stdin.write(`${JSON.stringify({ phrases, autostart: true, endSilenceMs: 150, inputWav: wav, ignoreTalk: talkWeight > 0, talkWeight })}\n`);
   });
 }
 
@@ -66,18 +74,23 @@ function listen(wav, phrases) {
   if (synthResult.includes('NOVOICE')) { console.log('SKIPPED: this machine has no text-to-speech voice'); return; }
 
   let failed = 0;
-  for (const [i, [spoken, expected, isCommand]] of CASES.entries()) {
-    const res = await listen(path.join(dir, `c${i}.wav`), phrases);
-    if (res.error && /no-recognizer|no-speech/.test(res.error)) { console.log(`SKIPPED: ${res.error}`); return; }
-    const heard = res.results.map((r) => `${r.text} (${Math.round(r.confidence * 100)}%)`).join(', ') || 'nothing';
-    const acted = res.results.some((r) => r.confidence >= 0.6 && c.parseUtterance(r.text, map)?.action);
-    // compare commands, not spelling: "click aitch" and "click h" are both H
-    const want = c.parseUtterance(expected || '', map)?.action;
-    const ok = isCommand
-      ? res.results.some((r) => JSON.stringify(c.parseUtterance(r.text, map)?.action) === JSON.stringify(want))
-      : !acted;
-    if (!ok) failed++;
-    console.log(`${ok ? 'PASS' : 'FAIL'} said "${spoken}" -> heard ${heard}${res.ms !== null ? ` after ${res.ms} ms` : ''}${res.error ? ` [${res.error}]` : ''}`);
+  // The default weight must pass; other weights are printed to help tune it.
+  for (const weight of [DEFAULT_WEIGHT, 0.3, 0.8]) {
+    console.log(`--- talk filter weight ${weight}${weight === DEFAULT_WEIGHT ? ' (default, must pass)' : ' (info only)'}`);
+    for (const [i, [spoken, expected, isCommand]] of CASES.entries()) {
+      const res = await listen(path.join(dir, `c${i}.wav`), phrases, weight);
+      if (res.error && /no-recognizer|no-speech/.test(res.error)) { console.log(`SKIPPED: ${res.error}`); return; }
+      const heard = res.results.map((r) => `${r.text} [${r.grammar || '?'}] (${Math.round(r.confidence * 100)}%)`).join(', ') || 'nothing';
+      const acts = (r) => r.grammar !== 'talk' && r.confidence >= 0.6 && c.parseUtterance(r.text, map)?.action;
+      const acted = res.results.some(acts);
+      // compare commands, not spelling: "click aitch" and "click h" are both H
+      const want = c.parseUtterance(expected || '', map)?.action;
+      const ok = isCommand
+        ? res.results.some((r) => acts(r) && JSON.stringify(c.parseUtterance(r.text, map)?.action) === JSON.stringify(want))
+        : !acted;
+      if (!ok && weight === DEFAULT_WEIGHT) failed++;
+      console.log(`${ok ? 'PASS' : 'FAIL'} said "${spoken}" -> heard ${heard}${res.ms !== null ? ` after ${res.ms} ms` : ''}${res.talkFilter === false ? ' [no talk filter]' : ''}${res.error ? ` [${res.error}]` : ''}`);
+    }
   }
   if (failed) { console.error(`${failed} voice case(s) failed`); process.exit(1); }
   console.log('all voice cases passed');

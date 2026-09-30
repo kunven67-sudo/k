@@ -1,6 +1,7 @@
 import { h, section, toggle, button, toast, confirmBox, colorInput, row } from '../lib.js';
 import { state, set } from '../state.js';
 import { nav } from '../nav.js';
+import { startTour } from '../help-ui.js';
 
 const cv = window.cv;
 
@@ -44,8 +45,9 @@ export default {
     const hotkeyRow = (k) => {
       const input = h('input', {
         class: 'text', readOnly: true, value: (s.hotkeys[k] || '').replace('CommandOrControl', 'Ctrl'), placeholder: 'none', style: { maxWidth: '220px' },
-        onfocus: (e) => { e.target.value = 'Press keys...'; },
-        onblur: (e) => { e.target.value = (state.settings.hotkeys[k] || '').replace('CommandOrControl', 'Ctrl'); },
+        // pause the global hotkeys while recording, or pressing the current combo would trigger it
+        onfocus: (e) => { e.target.value = 'Press keys...'; cv.hotkeys.suspend(true); },
+        onblur: (e) => { e.target.value = (state.settings.hotkeys[k] || '').replace('CommandOrControl', 'Ctrl'); cv.hotkeys.suspend(false); },
         onkeydown: (e) => {
           e.preventDefault();
           const acc = accelFromEvent(e);
@@ -60,8 +62,35 @@ export default {
         button('✖', () => { set({ hotkeys: { [k]: '' } }); setTimeout(() => nav.refresh(), 100); }, 'small'));
     };
 
+    // ----- updates
+    const updateBox = h('div');
+    const drawUpdate = (u) => {
+      u = u || { status: 'idle', current: info.version };
+      const pct = Math.round((u.progress || 0) * 100);
+      const line = {
+        idle: 'Click "Check for updates" to see if there is a newer version.',
+        checking: 'Checking... 🔍',
+        'up-to-date': `You have the newest version (${u.current}) ✅`,
+        available: `Version ${u.latest} is ready 🎉 (you have ${u.current})`,
+        downloading: `Downloading ${u.latest}... ${pct}%`,
+        installing: 'Installing and restarting... 🔄 CursorVerse will open again by itself in a few seconds.',
+        error: u.error || 'Something went wrong',
+      }[u.status] || '';
+      updateBox.replaceChildren(
+        h('p', { style: { margin: '0 0 8px' } }, h('b', {}, `You have version ${u.current || info.version}. `), line),
+        u.error && u.status !== 'error' ? h('div', { class: 'bad-box' }, u.error) : null,
+        u.status === 'downloading' ? h('div', { class: 'progress' }, h('div', { style: { width: `${pct}%` } })) : null,
+        h('div', { class: 'row' },
+          button('🔍 Check for updates', () => cv.update.check(), ''),
+          u.status === 'available' ? button(`⬆ Update to ${u.latest} now`, () => cv.update.install(), 'primary') : null),
+        info.portable ? null : h('p', { class: 'hint' }, 'One-click updates work when you run the CursorVerse .exe.'),
+      );
+    };
+    drawUpdate(state.update);
+    this.onUpdate = drawUpdate;
+
     main.append(
-      h('div', { class: 'page-head' }, h('div', {}, h('h2', {}, '⚙️ Settings'))),
+      h('div', { class: 'page-head' }, h('div', {}, h('h2', {}, '⚙️ Settings')), button('🎓 Replay the tour', () => startTour(() => set({ tourDone: true })), 'small')),
       section('🎨 Theme',
         h('div', { class: 'theme-grid' }, THEMES.map((t) => h('div', {
           class: `theme-card${s.theme === t.id ? ' selected' : ''}`, style: t.style,
@@ -73,6 +102,8 @@ export default {
       section('⌨️ Hotkeys (work in every app)', failBox,
         h('p', { class: 'hint' }, 'Click a box and press your combo. Use Ctrl or Alt with it so it does not steal normal typing. Ctrl+Shift+S/R/N are skipped by default because lots of apps already use them.'),
         h('div', { class: 'list' }, Object.keys(HOTKEY_NAMES).map(hotkeyRow))),
+      section('🔄 Updates', updateBox,
+        h('div', { style: { marginTop: '10px' } }, toggle({ label: 'Check for updates automatically', desc: 'When CursorVerse starts, and every few hours', checked: s.autoCheckUpdates, onChange: (v) => set({ autoCheckUpdates: v }) }))),
       section('🚀 Startup',
         h('div', { class: 'stack' },
           toggle({ label: 'Start with Windows', desc: 'Your cursor is ready as soon as your PC turns on', checked: s.startWithWindows, onChange: (v) => set({ startWithWindows: v }) }),

@@ -1,7 +1,7 @@
 // CursorVerse main process: windows, tray, settings, cursor swapping, effects
 // overlay, key sounds, voice control, hotkeys and the browser session.
 const {
-  app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, session, screen, dialog, shell,
+  app, net, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, session, screen, dialog, shell,
   powerMonitor, Notification,
 } = require('electron');
 const fs = require('fs');
@@ -18,6 +18,7 @@ const { InputHook, keyName } = require('./input');
 const { VoiceController } = require('./voice');
 const { AdBlock } = require('./adblock');
 const apps = require('./apps');
+const { Updater } = require('./updater');
 
 app.setName('CursorVerse');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -56,6 +57,7 @@ let hud = null;
 let input = null;
 let voice = null;
 let adblock = null;
+let updater = null;
 let shared = null; // lazily imported ESM data (presets, packs, effects...)
 let quitting = false;
 
@@ -247,14 +249,29 @@ function pttMatches(code, isMouse) {
   return k && ((k.type === 'mouse') === isMouse) && Number(k.keycode) === Number(code);
 }
 
-function configureVoice() {
+// Editing a command phrase restarts the speech engine, so wait until edits
+// settle instead of restarting it for every change.
+let voiceTimer = null;
+function configureVoice(now = false) {
   if (!voice) return;
-  hud.enabled = settings.voice.showHud !== false;
-  if (!win32.IS_WIN && settings.voice.enabled) {
-    voice.setStatus('error', 'Voice control uses Windows speech, so it only works on Windows.');
-    return;
-  }
-  voice.configure(settings.voice).catch((err) => voice.setStatus('error', err.message));
+  clearTimeout(voiceTimer);
+  const run = () => {
+    hud.enabled = settings.voice.showHud !== false;
+    if (!win32.IS_WIN && settings.voice.enabled) {
+      voice.setStatus('error', 'Voice control uses Windows speech, so it only works on Windows.');
+      return;
+    }
+    voice.configure(settings.voice).catch((err) => voice.setStatus('error', err.message));
+  };
+  if (now) run(); else voiceTimer = setTimeout(run, 600);
+}
+
+// Custom voice commands are edited by id (older saves had none).
+function ensureCustomIds() {
+  const list = settings.voice.custom || [];
+  if (list.every((c) => c && c.id)) return;
+  settings.voice.custom = list.filter(Boolean).map((c) => (c.id ? c : { ...c, id: crypto.randomBytes(5).toString('hex') }));
+  settingsFile.save(settings);
 }
 
 // ------------------------------------------------------------------ hotkeys & login item
@@ -431,6 +448,7 @@ async function refreshTray() {
     { label: '⏭ Next song', click: HOTKEY_ACTIONS.nextTrack },
     { label: 'Presets', submenu: presetItems.length ? presetItems : [{ label: 'none yet', enabled: false }] },
     { label: '🎲 Random combo', click: () => randomize() },
+    ...(updater?.state.status === 'available' ? [{ label: `⬆ Update to ${updater.state.latest}`, click: () => showUi('settings') }] : []),
     { type: 'separator' },
     { label: 'Put normal cursor back', click: () => setSettings({ cursor: { enabled: false } }, { from: 'tray' }) },
     { label: 'Quit', click: () => { quitting = true; app.quit(); } },
@@ -538,7 +556,21 @@ function ipc() {
     setTimeout(() => { if (state.pttCapture === resolve) { state.pttCapture = null; updateInputHook(); resolve(null); } }, 10000);
   }));
 
+  handle('update:state', () => updater?.state || null);
+  handle('update:check', () => updater.check());
+  handle('update:install', () => updater.updateNow());
+
   handle('hotkeys:status', () => state.hotkeyFailures);
+  // While the user records a key combo in the app, global hotkeys would steal it.
+  let resumeHotkeys = null;
+  handle('hotkeys:suspend', (on) => {
+    clearTimeout(resumeHotkeys);
+    if (on) {
+      globalShortcut.unregisterAll();
+      resumeHotkeys = setTimeout(registerHotkeys, 30000);
+    } else registerHotkeys();
+    return true;
+  });
 
   handle('app:info', () => ({
     version: app.getVersion(),
@@ -650,6 +682,7 @@ function secureWebContents() {
 
 let lastShown = 0;
 app.on('second-instance', (e, argv, cwd, data) => {
+  if (quitting) return; // closing (maybe for an update): don't pop the window back up
   if (data?.exe && data.exe !== MY_EXE) {
     // a different copy was started: step aside so it can run
     quitting = true;
@@ -671,6 +704,7 @@ app.whenReady().then(async () => {
   myCursorsFile = new JsonFile(path.join(userData, 'my-cursors.json'), []);
   historyFile = new JsonFile(path.join(userData, 'history.json'), []);
   settings = withDefaults(settingsFile.data);
+  ensureCustomIds();
   myCursors = Array.isArray(myCursorsFile.data) ? myCursorsFile.data : [];
   history = Array.isArray(historyFile.data) ? historyFile.data : [];
   if (process.platform === 'win32') app.setAppUserModelId('com.kunven67.cursorverse');
@@ -725,6 +759,29 @@ app.whenReady().then(async () => {
     },
   });
 
+  updater = new Updater({
+    fetch: (url, opts) => net.fetch(url, opts),
+    currentVersion: app.getVersion(),
+    exePath: process.env.PORTABLE_EXECUTABLE_FILE || null,
+    downloadDir: path.join(userData, 'updates'),
+    quit: () => { quitting = true; app.quit(); },
+  });
+  let updateNoticeShown = false;
+  updater.on('state', (st) => {
+    sendUi('update:state', st);
+    if (st.status === 'available' && !updateNoticeShown) {
+      updateNoticeShown = true;
+      refreshTray();
+      if (Notification.isSupported()) {
+        const n = new Notification({ title: `CursorVerse ${st.latest} is out 🎉`, body: 'Click to update. It only takes a few seconds.' });
+        n.on('click', () => showUi('settings'));
+        n.show();
+      }
+    }
+  });
+  // clean up an update download left over from a finished update
+  fs.rm(path.join(userData, 'updates'), { recursive: true, force: true }, () => {});
+
   createEngine();
   createUi();
   createTray();
@@ -732,10 +789,14 @@ app.whenReady().then(async () => {
   applyLoginItem();
   updateOverlay();
   updateInputHook();
-  configureVoice();
+  configureVoice(true);
   loadShared().then(refreshTray).catch((err) => console.error('[shared]', err));
 
   if (win32.IS_WIN) setInterval(tickForeground, 250);
+  if (settings.autoCheckUpdates && updater.supported) {
+    setTimeout(() => updater.check(), 8000);
+    setInterval(() => updater.check(), 6 * 60 * 60 * 1000);
+  }
   powerMonitor.on('resume', () => { state.cursorApplied = false; updateCursorApplied(); });
   powerMonitor.on('shutdown', () => restoreCursorNow());
   screen.on('display-metrics-changed', () => requestCursorBuild());
