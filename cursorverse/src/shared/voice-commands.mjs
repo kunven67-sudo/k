@@ -157,11 +157,25 @@ export function buildCommandMap(opts = {}) {
 }
 
 // All phrases the recognizer should listen for (wake word variants included).
+// Words people say that are NOT commands. The recognizer only picks from the
+// phrases it is given, so without these a plain "H" gets matched to "click h".
+// Listing "h" on its own lets it land there instead, and it is then ignored.
+const FILLER = ['the', 'a', 'and', 'okay', 'what', 'hey', 'uh', 'um', 'hmm', 'so', 'like', 'bro', 'yo', 'wait', 'go', 'oh', 'is', 'it', 'that', 'this'];
+export function decoyPhrases(map) {
+  const out = new Set(FILLER);
+  for (const p of map.keys()) {
+    if (p.startsWith('click ')) out.add(p.slice(6));
+  }
+  for (const w of Object.values(NATO)) out.add(w);
+  for (const k of map.keys()) out.delete(k);
+  return [...out].filter(Boolean);
+}
+
 export function grammarPhrases(map, mode) {
-  const phrases = [...map.keys()];
+  const phrases = [...map.keys(), ...decoyPhrases(map)];
   if (mode === 'wake') {
-    const withWake = phrases.filter((p) => !CONTROL_PHRASES.some(([c]) => c === p)).map((p) => `${WAKE_WORD} ${p}`);
-    return [...phrases, WAKE_WORD, ...withWake];
+    const commands = [...map.keys()].filter((p) => !CONTROL_PHRASES.some(([c]) => c === p));
+    return [...phrases, WAKE_WORD, ...commands.map((p) => `${WAKE_WORD} ${p}`)];
   }
   return phrases;
 }

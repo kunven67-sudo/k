@@ -45,6 +45,9 @@ jobs:
           Add-Type -AssemblyName System.Speech
           "System.Speech available: " + ([System.Speech.Recognition.SpeechRecognitionEngine] -ne $null)
 
+      - name: Voice test (Windows speaks, CursorVerse listens)
+        run: node test/windows-voice.cjs
+
       - name: Build portable exe
         run: npm run dist
 

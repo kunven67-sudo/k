@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildCommandMap, parseUtterance, needsConfirm, delayToMs, grammarPhrases, WAKE_WORD, describeAction,
+  buildCommandMap, decoyPhrases, parseUtterance, needsConfirm, delayToMs, grammarPhrases, WAKE_WORD, describeAction,
 } from '../src/shared/voice-commands.mjs';
 
 test('plain "click" is a left click', () => {
@@ -115,4 +115,23 @@ test('describeAction', () => {
   assert.equal(describeAction(parseUtterance('right click', m).action), 'right click');
   assert.equal(describeAction(parseUtterance('scroll up', m).action), 'scroll up');
   assert.equal(describeAction(parseUtterance('click q', m).action), 'Q');
+});
+
+test('decoys: bare letters/keys are listened for but never act', () => {
+  const m = buildCommandMap();
+  const decoys = decoyPhrases(m);
+  for (const d of ['h', 'p', 'papa', 'enter', 'copy', '7', 'seven', 'okay']) {
+    assert.ok(decoys.includes(d), `missing decoy ${d}`);
+    assert.equal(parseUtterance(d, m), null, `${d} must not do anything`);
+  }
+  // real commands are never decoys
+  for (const d of decoys) assert.ok(!m.has(d), `${d} is a real command`);
+  assert.ok(grammarPhrases(m, 'always').includes('h'));
+  assert.ok(grammarPhrases(m, 'always').includes('click h'));
+});
+
+test('decoys never shadow custom commands', () => {
+  const m = buildCommandMap({ custom: [{ phrase: 'okay', type: 'text', text: 'ok' }] });
+  assert.ok(!decoyPhrases(m).includes('okay'));
+  assert.ok(parseUtterance('okay', m));
 });

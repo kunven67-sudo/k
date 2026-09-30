@@ -271,4 +271,4 @@ function formatDelay(ms) {
   return `${+ms.toFixed(1)} ms`;
 }
 
-module.exports = { VoiceController, formatDelay };
+module.exports = { VoiceController, formatDelay, spawnPowerShellHost };
