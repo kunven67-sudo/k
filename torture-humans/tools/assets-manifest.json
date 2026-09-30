@@ -6,7 +6,8 @@
   "painted_plaster_wall": "2k",
   "old_wooden_floor_02": "2k",
   "forest_ground_04": "2k",
-  "leafy_grass": "2k"
+  "leafy_grass": "2k",
+  "precast_concrete_wall": "2k"
  },
  "perSearch": 3,
  "textures": [
@@ -67,7 +68,12 @@
   "moss_wood",
   "bark_brown_02",
   "brown_leather",
-  "fabric_leather_02"
+  "fabric_leather_02",
+  "concrete_wall_006",
+  "concrete_wall_008",
+  "precast_concrete_wall",
+  "cracked_concrete_wall",
+  "plaster_grey_04"
  ],
  "hdris": [
   "quadrangle_sunny",
@@ -174,6 +180,7 @@
   "coast_rocks_01",
   "coast_rocks_02",
   "namaqualand_boulder_02",
-  "rock_face_01"
+  "rock_face_01",
+  "modern_ceiling_lamp_01"
  ]
 }

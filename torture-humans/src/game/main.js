@@ -8,6 +8,8 @@ import { AnimLibrary, Character, loadAvatar, baseClips } from './engine/anim.js'
 import { Player } from './player.js';
 import { initNavigation, Navigation } from './engine/navigation.js';
 import { Human } from './humans/human.js';
+import { Hands } from './gadgets/hands.js';
+import { Cage } from './cage.js';
 import { buildTestLevel } from './levels/test-level.js';
 import { buildLab } from './levels/lab.js';
 
@@ -58,6 +60,10 @@ export async function boot() {
     }
   }
 
+  const cage = level.terrarium ? new Cage(level.terrarium, new THREE.Box3(new THREE.Vector3(-1.45, 0.13, -0.9), new THREE.Vector3(1.45, 0.13, 0.9))) : null;
+  const hands = new Hands({ scene, camera, physics, player, input, humans, cage });
+  if (params.get('item') === 'jar') hands.select(1);
+
   renderer.sunIntensity = level.sunIntensity;
   renderer.setScene(scene, camera, { sunDirection: level.sunDirection });
   addEventListener('resize', () => renderer.resize());
@@ -66,7 +72,7 @@ export async function boot() {
   const fpsEl = document.getElementById('fps');
   const hintEl = document.getElementById('hint');
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, frame: 0 };
   window.game = game; // for tests and debugging
 
   // test hook: drive the player without a real keyboard
@@ -82,6 +88,7 @@ export async function boot() {
     if (look) { input.mouseDX += look[0] / 0.0022; input.mouseDY += look[1] / 0.0022; }
     physics.update(dt, (fixed) => player.fixedUpdate(fixed));
     player.update(dt, physics.alpha);
+    hands.update(dt);
     nav.update(dt);
     for (const h of humans) h.update(dt);
     level.update?.(dt);

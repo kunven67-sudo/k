@@ -22,6 +22,8 @@ export class Human {
     this.physics = physics;
     scene.add(this.character.root);
     this.agent = nav.addAgent(position, { maxSpeed: 1.35 + (Math.random() - 0.5) * 0.25 });
+    this.capsule = physics.addKinematicCapsule(this, { radius: 0.26, height: 1.75, position });
+    this.scale = 1;
     this.yaw = Math.random() * Math.PI * 2;
     this.emotion = { fear: 0, joy: 0.2, anger: 0, sadness: 0 };
     this.state = 'idle';
@@ -39,7 +41,7 @@ export class Human {
   goTo(p, { run = false } = {}) {
     const q = this.nav.closest(p);
     if (!q) return false;
-    this.agent.updateParameters({ maxSpeed: run ? 3.2 : 1.35 });
+    this.agent.updateParameters({ maxSpeed: (run ? 3.2 : 1.35) * this.scale });
     this.agent.requestMoveTarget(q);
     this.target = new THREE.Vector3(q.x, q.y, q.z);
     this.state = 'walking';
@@ -76,13 +78,94 @@ export class Human {
     }
   }
 
+  // ---- shrinking, jar, cage
+
+  shrink(to = 0.05, { power = 1 } = {}) {
+    if (this.shrinking || this.tiny) return;
+    this.shrinking = { from: this.scale, to, t: 0, d: 1.6 - power * 0.4 };
+    this.emotion.fear = 1;
+    this.character.stopOneShot(0.1);
+    this.agent.resetMoveTarget();
+  }
+
+  applyScale(s) {
+    this.scale = s;
+    this.character.root.scale.setScalar(s);
+    this.physics.resizeCapsule(this.capsule, 1.75 * s, 0.26 * s);
+    this.agent?.updateParameters({ radius: Math.max(0.02, 0.3 * s), height: 1.8 * s, maxSpeed: 1.35 * s });
+  }
+
+  captureInto(jar) {
+    this.captured = true;
+    this.state = 'jar';
+    this.nav.removeAgent(this.agent);
+    this.agent = null;
+    this.physics.removeCapsule(this.capsule);
+    this.capsule = null;
+    // stand on the jar's floor (jar is 1:1 scale; we are tiny inside it)
+    jar.add(this.character.root);
+    this.character.root.position.set(0, 0.004, 0);
+    this.character.root.scale.setScalar(this.scale / (jar.scale.x || 1));
+    this.character.speed = 0;
+    this.character.play('idle_nervous_01', { loop: true });
+  }
+
+  // dropped into the terrarium: wander inside its bounds (the full tiny-world AI lives in cage.js)
+  releaseInto(cage, point) {
+    this.captured = false;
+    this.state = 'caged';
+    this.cage = cage;
+    cage.group.attach(this.character.root);
+    this.character.root.scale.setScalar(this.scale / cage.group.getWorldScale(new THREE.Vector3()).x);
+    const local = cage.group.worldToLocal(point.clone());
+    this.character.root.position.copy(local);
+    this.character.stopOneShot(0.2);
+    this.cageTarget = null;
+    this.timer = 0.5;
+  }
+
+  updateCaged(dt) {
+    const root = this.character.root;
+    const b = this.cage.bounds; // local-space box of the soil surface
+    this.timer -= dt;
+    if (!this.cageTarget && this.timer <= 0) {
+      this.cageTarget = new THREE.Vector3(
+        THREE.MathUtils.lerp(b.min.x + 0.03, b.max.x - 0.03, Math.random()), b.max.y,
+        THREE.MathUtils.lerp(b.min.z + 0.03, b.max.z - 0.03, Math.random()),
+      );
+    }
+    let speed = 0;
+    if (this.cageTarget) {
+      const to = this.cageTarget.clone().sub(root.position);
+      to.y = 0;
+      const d = to.length();
+      const run = this.emotion.fear > 0.6;
+      speed = (run ? 3.0 : 1.3) * this.scale;
+      if (d < 0.01) { this.cageTarget = null; this.timer = 1 + Math.random() * 4; speed = 0; }
+      else {
+        root.position.addScaledVector(to.normalize(), Math.min(d, speed * dt));
+        const want = Math.atan2(to.x, to.z);
+        let dy = want - this.yaw;
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        this.yaw += dy * (1 - Math.exp(-dt * 8));
+        root.rotation.set(0, this.yaw, 0);
+      }
+    }
+    root.position.y = b.max.y;
+    this.emotion.fear = Math.max(0.3, this.emotion.fear - dt * 0.02);
+    this.character.speed = speed / this.scale;
+    this.updateFace();
+    this.character.update(dt);
+  }
+
   syncFromAgent(dt) {
     const p = this.agent.position();
     const v = this.agent.velocity();
     const root = this.character.root;
     // the navmesh floats a few cm above the real floor: stand on the real floor
-    const hit = this.physics.raycast({ x: p.x, y: p.y + 0.6, z: p.z }, { x: 0, y: -1, z: 0 }, 1.2);
+    const hit = this.physics.raycast({ x: p.x, y: p.y + 0.6, z: p.z }, { x: 0, y: -1, z: 0 }, 1.2, { exclude: this.capsule?.collider });
     root.position.set(p.x, hit ? hit.point.y : p.y, p.z);
+    if (this.capsule) this.physics.placeCapsule(this.capsule, root.position);
     const speed = Math.hypot(v.x, v.z);
     if (speed > 0.15) {
       const want = Math.atan2(v.x, v.z); // Rocketbox faces +Z
@@ -91,24 +174,44 @@ export class Human {
       this.yaw += d * (1 - Math.exp(-dt * 8));
     }
     root.rotation.set(0, this.yaw, 0);
-    this.character.speed = speed;
+    // clips are recorded at full size: a tiny person covering 5 cm/s is walking briskly
+    this.character.speed = speed / this.scale;
+    this.character.footIK = this.scale > 0.5;
   }
 
   update(dt) {
     if (!this.alive) return;
+    if (this.state === 'jar') { this.updateFace(); this.character.update(dt); return; }
+    if (this.state === 'caged') { this.updateCaged(dt); return; }
+    if (this.shrinking) {
+      const k = this.shrinking;
+      k.t += dt;
+      const u = Math.min(1, k.t / k.d);
+      // shrink fast at first, then settle (like it's being squeezed down)
+      const e = 1 - Math.pow(1 - u, 3);
+      this.applyScale(THREE.MathUtils.lerp(k.from, k.to, e));
+      if (u >= 1) {
+        this.shrinking = null;
+        this.tiny = true;
+        // run away from whoever did it
+        const away = this.nav.randomPoint((p) => Math.hypot(p.x - this.position.x, p.z - this.position.z) < 4 && Math.abs(p.y - this.position.y) < 0.5);
+        if (away) this.goTo(away, { run: true });
+      }
+    }
     this.think(dt);
     this.syncFromAgent(dt);
     this.updateFace();
     this.character.update(dt, {
       groundAt: (x, y, z) => {
-        const hit = this.physics.raycast({ x, y, z }, { x: 0, y: -1, z: 0 }, 1.2);
+        const hit = this.physics.raycast({ x, y, z }, { x: 0, y: -1, z: 0 }, 1.2, { exclude: this.capsule.collider });
         return hit ? hit.point.y : null;
       },
     });
   }
 
   dispose(scene) {
-    this.nav.removeAgent(this.agent);
+    if (this.capsule) this.physics.removeCapsule(this.capsule);
+    if (this.agent) this.nav.removeAgent(this.agent);
     scene.remove(this.character.root);
     this.alive = false;
   }

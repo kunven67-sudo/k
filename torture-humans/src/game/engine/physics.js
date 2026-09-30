@@ -72,6 +72,7 @@ export class Physics {
     this.accumulator = 0;
     this.bodies = new Map(); // rigid body handle -> { body, object, onContact }
     this.alpha = 0;          // interpolation factor for rendering
+    this.owners = new Map(); // collider handle -> game object (humans, bugs...)
   }
 
   // Static world geometry as an exact triangle mesh (floors, walls, stairs, terrain).
@@ -124,6 +125,37 @@ export class Physics {
     this.bodies.set(body.handle, rec);
     object.userData.body = body;
     return body;
+  }
+
+  // A body that follows something moved by code (a walking human): other things
+  // collide with it, rays hit it, and ownerOf(collider) says who it belongs to.
+  addKinematicCapsule(owner, { radius = 0.28, height = 1.8, position = { x: 0, y: 0, z: 0 }, group = GROUP.NPC } = {}) {
+    const half = Math.max(0.005, height / 2 - radius);
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(position.x, position.y + height / 2, position.z));
+    const collider = this.world.createCollider(RAPIER.ColliderDesc.capsule(half, radius).setCollisionGroups(groups(group)), body);
+    this.owners.set(collider.handle, owner);
+    return { body, collider, radius, height };
+  }
+
+  // move a kinematic capsule so its feet are at p
+  placeCapsule(cap, p) {
+    cap.body.setNextKinematicTranslation({ x: p.x, y: p.y + cap.height / 2, z: p.z });
+  }
+
+  resizeCapsule(cap, height, radius) {
+    cap.collider.setHalfHeight(Math.max(0.005, height / 2 - radius));
+    cap.collider.setRadius(radius);
+    cap.height = height;
+    cap.radius = radius;
+  }
+
+  removeCapsule(cap) {
+    this.owners.delete(cap.collider.handle);
+    this.world.removeRigidBody(cap.body);
+  }
+
+  ownerOf(collider) {
+    return collider ? this.owners.get(collider.handle ?? collider) ?? null : null;
   }
 
   remove(body) {
@@ -196,7 +228,7 @@ export class Physics {
     const hit = this.world.castRayAndGetNormal(ray, maxToi, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, filterGroups, exclude);
     if (!hit) return null;
     const p = ray.pointAt(hit.timeOfImpact);
-    return { point: new THREE.Vector3(p.x, p.y, p.z), normal: new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z), distance: hit.timeOfImpact, collider: hit.collider };
+    return { point: new THREE.Vector3(p.x, p.y, p.z), normal: new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z), distance: hit.timeOfImpact, collider: hit.collider, owner: this.ownerOf(hit.collider) };
   }
 
   // Fixed-step update; returns the number of steps taken.
