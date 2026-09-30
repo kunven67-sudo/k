@@ -79,6 +79,13 @@ class ScaledNav {
     };
   }
   removeAgent(a) { if (a) this.nav.removeAgent(a.raw); }
+  // can you actually walk from a to b? (not onto a boulder top or across the pond)
+  reachable(a, b, tol = 0.02) {
+    const path = this.nav.path(this.toN(a), this.toN(b));
+    if (!path?.length) return false;
+    const end = this.toW(path[path.length - 1]);
+    return Math.hypot(end.x - b.x, end.z - b.z) < tol && Math.abs(end.y - b.y) < 0.03;
+  }
   addObstacle(w, { radius, height, half, angle } = {}) {
     return this.nav.addObstacle(this.toN(w), half ? { half: this.ext(half), angle } : { radius: radius * NS, height: height * NS });
   }
@@ -410,6 +417,7 @@ export class Colony {
     for (const p of this.pieces) {
       if (!kinds.includes(p.kind) || p.claimedBy || !p.reach) continue;
       if (!((p.state === 'ground' && loose) || (p.state === 'stock' && stock))) continue;
+      if (p.failedUntil > performance.now()) continue;
       const d = from.distanceTo(p.reach);
       if (d < bestD) { best = p; bestD = d; }
     }
@@ -428,6 +436,7 @@ export class Colony {
         o.userData.tinySize = Math.max(s.x, s.z);
       }
       if (kind === 'stone' && o.userData.tinySize < 0.025) continue; // too small to break up
+      if (o.userData.failedUntil > performance.now()) continue;
       const bb = new THREE.Box3().setFromObject(o);
       const c = bb.getCenter(new THREE.Vector3());
       const size = bb.getSize(new THREE.Vector3());
@@ -605,7 +614,7 @@ class Resident {
   *walkTo(targetWorld, arrive = 0.01, { run = false, ext = EXT } = {}) {
     if (!this.agent) return false;
     const q = this.c.nav.closest(targetWorld, ext);
-    if (!q) return false;
+    if (!q || !this.c.nav.reachable(this.worldPos(), q)) return false;
     this.speedMul = run ? 2.3 : 1;
     this.agent.requestMoveTarget(q);
     let t = 0, still = 0;
@@ -716,7 +725,7 @@ class Resident {
     p.claimedBy = this;
     try {
       this.doing = 'getting food';
-      if (!(yield* this.walkTo(p.reach, 0.016))) return;
+      if (!(yield* this.walkTo(p.reach, 0.016))) { p.failedUntil = performance.now() + 45000; return; }
       if (p.state !== 'ground' && p.state !== 'stock') return;
       yield* this.pickUp(p);
       this.doing = 'eating';
@@ -741,7 +750,7 @@ class Resident {
     p.claimedBy = this;
     try {
       this.doing = `going to pick up the ${p.kind}`;
-      if (!(yield* this.walkTo(p.reach, 0.016))) return;
+      if (!(yield* this.walkTo(p.reach, 0.016))) { p.failedUntil = performance.now() + 45000; return; }
       if (p.state !== 'ground' && p.state !== 'stock') return;
       yield* this.pickUp(p);
       this.h.emotion.joy = Math.min(1, this.h.emotion.joy + 0.3);
@@ -758,7 +767,7 @@ class Resident {
     try {
       if (this.carry !== p) {
         this.doing = `fetching ${p.kind}`;
-        if (!(yield* this.walkTo(p.reach, 0.016))) return;
+        if (!(yield* this.walkTo(p.reach, 0.016))) { p.failedUntil = performance.now() + 45000; return; }
         if (p.state !== 'ground' && p.state !== 'stock') return;
         yield* this.pickUp(p);
       }
@@ -825,8 +834,13 @@ class Resident {
     let made = null;
     try {
       this.doing = kind === 'wood' ? 'going to chop wood' : 'going to break stone';
+      // stand beside it on our side (not on top of it)
+      const toMe = this.worldPos().sub(src.center).setY(0).normalize();
+      const side = src.center.clone().addScaledVector(toMe, src.size / 2 + 0.015);
+      const sideLocal = this.c.toLocal(side);
+      side.y = this.c.toWorld({ x: sideLocal.x, y: this.c.cage.surfaceY(sideLocal.x, sideLocal.z), z: sideLocal.z }).y;
       const reach = src.size / 2 + 0.04;
-      if (!(yield* this.walkTo(src.center, 0.02, { ext: { x: reach, y: 0.1, z: reach } }))) return;
+      if (!(yield* this.walkTo(side, 0.02)) && !(yield* this.walkTo(src.center, 0.02, { ext: { x: reach, y: 0.02, z: reach } }))) { o.userData.failedUntil = performance.now() + 60000; return; }
       this.doing = kind === 'wood' ? 'chopping wood' : 'breaking stone';
       this.face = src.center.clone();
       yield* this.wait(0.3);
