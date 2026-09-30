@@ -1,11 +1,7 @@
-## CursorVerse 1.0.2
+## CursorVerse 1.0.3
 
-- 🔄 **One-click updates:** Settings → Updates → Update now. It downloads the new version, checks it, and restarts, keeping all your stuff.
-- 🎤 **Voice stops pressing random stuff:**
-  - Normal talking is recognized as talking and ignored.
-  - Voice pauses while another app (Discord, voice typing, calls) is using your mic.
-  - Your own commands now start with "click" too, like "click gg".
-- 🎤 **Voice explains itself:** the Voice page shows everything it heard and why it did or didn't act.
-- ✍️ **Fixed:** "My own commands" rows no longer undo each other, shuffle, or disappear.
-- ⌨️ **Fixed:** recording a key combo no longer gets grabbed by CursorVerse's own hotkeys.
-- ❓ **Help:** a "What does this do?" button on every page, a Help page with "How do I...?" answers, and a guided tour.
+- 🎤 **Fixed:** "Pause while another app uses the mic" counted CursorVerse's own listener as another app, so voice never worked with that setting on. CursorVerse now recognizes itself 3 ways:
+  - by its exact file paths
+  - by what starts using the mic the moment voice starts listening
+  - by name
+- 🎤 **New:** if voice ever pauses for the wrong app, click **"Ignore <app>"** on the Voice page and that app never pauses voice again.

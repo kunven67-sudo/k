@@ -55,6 +55,8 @@ class VoiceController extends EventEmitter {
     const prev = this.settings;
     this.settings = settings;
     const c = await commands();
+    this.micApps = this.filterMic(this.rawMicApps || []);
+    this.refreshMicStatus();
     this.map = c.buildCommandMap({ letters: settings.letters, custom: settings.custom, groups: settings.groups, customNeedsClick: settings.customNeedsClick });
     if (!settings.enabled) { this.stop(); this.setStatus('off'); return; }
     // The phrase list is baked into the host, so a change means a restart.
@@ -110,6 +112,8 @@ class VoiceController extends EventEmitter {
       endSilenceMs: this.settings.endSilenceMs ?? 150,
       ignoreTalk: this.settings.ignoreTalk !== false,
       talkWeight: this.settings.talkWeight ?? 0.5,
+      // so the mic check never counts CursorVerse itself as "another app"
+      selfPaths: [process.execPath, process.env.PORTABLE_EXECUTABLE_FILE].filter(Boolean),
     })}\n`);
   }
 
@@ -145,7 +149,8 @@ class VoiceController extends EventEmitter {
         this.refreshMicStatus();
         break;
       case 'mic':
-        this.micApps = Array.isArray(msg.apps) ? msg.apps : [];
+        this.rawMicApps = Array.isArray(msg.apps) ? msg.apps : [];
+        this.micApps = this.filterMic(this.rawMicApps);
         this.refreshMicStatus();
         break;
       case 'state':
@@ -169,6 +174,12 @@ class VoiceController extends EventEmitter {
       default:
         break;
     }
+  }
+
+  // Apps the user told us not to count ("that's not Discord, that's me").
+  filterMic(apps) {
+    const ignore = (this.settings?.micIgnore || []).map((a) => String(a).toLowerCase());
+    return apps.filter((a) => !ignore.includes(String(a).toLowerCase()));
   }
 
   // Holding the talk key means "I'm talking to CursorVerse", so never block that.

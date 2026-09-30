@@ -83,7 +83,12 @@ export default {
 
     const drawStatus = (st) => {
       const words = { off: 'Voice control is off', starting: 'Starting up...', listening: 'Listening 👂', ready: `Ready: hold ${v.pttKey?.label || 'your talk key'} to talk`, paused: 'Paused (say "start listening")', 'mic-busy': 'Paused 🎧', error: 'Problem' };
-      statusBox.replaceChildren(h('span', { class: `status-dot ${st.state}` }), h('b', {}, words[st.state] || st.state), st.message ? h('small', {}, ` · ${st.message}`) : null);
+      statusBox.replaceChildren(h('span', { class: `status-dot ${st.state}` }), h('b', {}, words[st.state] || st.state), st.message ? h('small', {}, ` · ${st.message}`) : null,
+        // wrong app? let the user say "that one doesn't count"
+        ...(st.state === 'mic-busy' ? (st.micApps || []).map((a) => button(`Not a call? Ignore ${a}`, async () => {
+          await setV({ micIgnore: [...new Set([...(state.settings.voice.micIgnore || []), a])] });
+          toast(`👍 ${a} will not pause voice anymore`, 'good');
+        }, 'small')) : []));
     };
     const drawLog = (list) => logBox.replaceChildren(...(list.length ? list.slice(0, 8).map((c) => h('div', { class: 'item' }, h('span', {}, c.ok ? '✅' : '⚠️'), h('span', { class: 'grow' }, `"${c.phrase}" → ${c.label}`), h('small', {}, c.at ? new Date(c.at).toLocaleTimeString() : ''))) : [h('small', {}, 'Nothing yet. Say "click"!')]));
 
@@ -197,6 +202,8 @@ export default {
             toggle({ label: 'Ignore normal talking', desc: 'Full sentences are recognized as talking and skipped, so chatting on Discord or with voice typing does not press stuff', checked: v.ignoreTalk !== false, onChange: (x) => setV({ ignoreTalk: x }) }),
             toggle({ label: 'Pause while another app uses the mic', desc: 'Discord calls, Windows voice typing, games with voice chat... Voice waits until they stop. (Hold-a-key mode still works.)', checked: v.pauseWhenMicBusy !== false, onChange: (x) => setV({ pauseWhenMicBusy: x }) }),
             toggle({ label: 'Say "click" before my own commands', desc: '"click gg" instead of just "gg"', checked: v.customNeedsClick !== false, onChange: async (x) => { await setV({ customNeedsClick: x }); nav.refresh(); } }),
+            (v.micIgnore || []).length ? h('div', {}, h('small', {}, 'Apps that never pause voice: '),
+              ...(v.micIgnore || []).map((a) => button(`${a} ✖`, async () => { await setV({ micIgnore: (state.settings.voice.micIgnore || []).filter((x) => x !== a) }); nav.refresh(); }, 'small'))) : null,
             h('small', {}, 'Still getting random presses? Switch "How it listens" to 🔘 Hold a key to talk, so it only listens while you hold your key.'))),
         section('🧰 Which commands are on',
           h('div', { class: 'stack' },

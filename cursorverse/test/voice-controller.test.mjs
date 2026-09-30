@@ -257,3 +257,21 @@ test('every heard phrase says why it did or did not act', async () => {
   await tick(40);
   assert.deepEqual(heard, ['not-command', 'unsure', 'asked', 'yes', 'no-question']);
 });
+
+test('ignored apps never pause voice (like CursorVerse itself)', async () => {
+  const { v, host, calls, settings } = setup({ micIgnore: ['SomeRecorder'] });
+  await v.configure(settings);
+  host.send({ type: 'ready', recognizer: 'x', culture: 'en-US' });
+  host.send({ type: 'mic', apps: ['somerecorder'] });
+  await tick();
+  assert.equal(v.status.state, 'listening');
+  host.say('click');
+  await tick();
+  assert.equal(calls.length, 1);
+  // adding an app to the ignore list later un-pauses right away
+  host.send({ type: 'mic', apps: ['Discord'] });
+  await tick();
+  assert.equal(v.status.state, 'mic-busy');
+  await v.configure({ ...settings, micIgnore: ['SomeRecorder', 'Discord'] });
+  assert.equal(v.status.state, 'listening');
+});

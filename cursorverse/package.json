@@ -1,7 +1,7 @@
 {
   "name": "cursorverse",
   "productName": "CursorVerse",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Custom animated cursors, trails, click effects, typing sounds, voice control, music and a browser with backgrounds.",
   "main": "src/main/main.js",
   "author": "kunven67-sudo",

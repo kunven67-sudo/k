@@ -93,18 +93,40 @@ public static class CvVoice {
 
   // Windows records which apps are using the microphone right now (that is what
   // lights up the mic icon in the taskbar). An app is using it while its
-  // LastUsedTimeStop is 0. We skip ourselves (powershell.exe hosts this).
+  // LastUsedTimeStop is 0. Our own listener shows up there too, under a name we
+  // can't rely on, so: remember what was using the mic before we started, and
+  // anything that appears in the first seconds after we start listening is us.
+  static HashSet<string> selfKeys = new HashSet<string>();
+  // Registry keys use the exe path with '#' instead of '\\'.
+  public static void AddSelfPath(string path) {
+    if (!string.IsNullOrEmpty(path)) selfKeys.Add(path.Replace('\\', '#').ToLowerInvariant());
+  }
+  static HashSet<string> before = new HashSet<string>();
+  static HashSet<string> self = new HashSet<string>();
+  static DateTime learnUntil = DateTime.MinValue;
+
+  static List<string> ReadApps() {
+    var apps = new List<string>();
+    const string root = @"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
+    using (var key = Registry.CurrentUser.OpenSubKey(root)) {
+      if (key != null) {
+        Collect(key, apps, false);
+        using (var np = key.OpenSubKey("NonPackaged")) { if (np != null) Collect(np, apps, true); }
+      }
+    }
+    return apps;
+  }
+
   public static void WatchMic() {
+    try { foreach (var a in ReadApps()) before.Add(a); } catch { }
     micTimer = new Timer(_ => {
       try {
-        var apps = new List<string>();
-        const string root = @"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
-        using (var key = Registry.CurrentUser.OpenSubKey(root)) {
-          if (key != null) {
-            Collect(key, apps, false);
-            using (var np = key.OpenSubKey("NonPackaged")) { if (np != null) Collect(np, apps, true); }
-          }
+        var all = ReadApps();
+        if (DateTime.UtcNow < learnUntil) {
+          foreach (var a in all) if (!before.Contains(a)) self.Add(a);
         }
+        var apps = new List<string>();
+        foreach (var a in all) if (!self.Contains(a)) apps.Add(a);
         apps.Sort();
         string now = string.Join("|", apps.ToArray());
         if (now == lastMic) return;
@@ -114,14 +136,17 @@ public static class CvVoice {
         sb.Append("]}");
         Send(sb.ToString());
       } catch { }
-    }, null, 0, 1000);
+    }, null, 500, 1000);
   }
+
+  // Called right when we start listening.
+  public static void LearnSelf(int ms) { learnUntil = DateTime.UtcNow.AddMilliseconds(ms); }
 
   static void Collect(RegistryKey parent, List<string> apps, bool nonPackaged) {
     foreach (var name in parent.GetSubKeyNames()) {
       if (name == "NonPackaged") continue;
       string lower = name.ToLowerInvariant();
-      if (lower.Contains("powershell.exe") || lower.Contains("cursorverse")) continue;
+      if (selfKeys.Contains(lower) || lower.Contains("powershell") || lower.Contains("cursorverse") || lower.Contains("speechruntime")) continue;
       using (var k = parent.OpenSubKey(name)) {
         if (k == null) continue;
         object start = k.GetValue("LastUsedTimeStart");
@@ -202,11 +227,15 @@ $engine.EndSilenceTimeoutAmbiguous = [TimeSpan]::FromMilliseconds([int]$config.e
 $engine.InitialSilenceTimeout = [TimeSpan]::Zero
 $engine.BabbleTimeout = [TimeSpan]::Zero
 [CvVoice]::Hook($engine)
-if (-not $config.inputWav) { [CvVoice]::WatchMic() }
+if (-not $config.inputWav) {
+  [CvVoice]::AddSelfPath([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName)
+  foreach ($p in @($config.selfPaths)) { if ($p) { [CvVoice]::AddSelfPath([string]$p) } }
+  [CvVoice]::WatchMic()
+}
 
 $running = $false
 function Out($obj) { [CvVoice]::Send(($obj | ConvertTo-Json -Compress)) }
-function StartRec { if (-not $script:running) { $engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple); $script:running = $true; Out @{ type = 'state'; listening = $true } } }
+function StartRec { if (-not $script:running) { [CvVoice]::LearnSelf(4000); $engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple); $script:running = $true; Out @{ type = 'state'; listening = $true } } }
 function StopRec { if ($script:running) { $engine.RecognizeAsyncStop(); $script:running = $false; Out @{ type = 'state'; listening = $false } } }
 
 Out @{ type = 'ready'; culture = $info.Culture.Name; recognizer = $info.Description; phrases = $config.phrases.Count; talkFilter = $talk }

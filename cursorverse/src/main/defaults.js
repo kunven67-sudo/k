@@ -84,6 +84,7 @@ const DEFAULTS = {
     ignoreTalk: true,          // listen for normal sentences too, and ignore them
     talkWeight: 0.5,
     pauseWhenMicBusy: true,    // stop while Discord, voice typing, etc. use the mic
+    micIgnore: [],             // apps that never count as "using the mic"
     customNeedsClick: true,    // "gg" is said as "click gg"
 
     confirmTimeoutSec: 8,
