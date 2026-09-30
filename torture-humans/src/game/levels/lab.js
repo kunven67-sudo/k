@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { pbr, box, plane, place, loadIndex } from '../engine/assets.js';
 import { buildBedroom, BEDROOM } from './bedroom.js';
+import { buildTinyWorld } from '../cageworld.js';
 
 export const LAB = { w: 14, d: 10, h: 3.0, floorY: 0 };
 // the hatch to the bedroom: ladder goes up here
@@ -160,8 +161,9 @@ export async function buildLab({ scene, physics }) {
   const terrarium = glassTank(3.0, 1.2, 1.9, { lid: false });
   terrarium.position.set(0, 0.9, 0.3);
   terrarium.name = 'terrarium';
-  // soil bed inside (the tiny world is built by cage.js on top of this)
-  mesh(box(2.96, 0.12, 1.86), pbr('forest_ground_04', { size: 0.6 }), 0, 0.07, 0, terrarium);
+  // soil bed (the tiny world's heightfield sits on it) + the tiny world itself
+  mesh(box(2.96, 0.1, 1.86), pbr('forest_ground_04', { size: 0.6 }), 0, 0.058, 0, terrarium);
+  const tiny = await buildTinyWorld(terrarium);
   statics.add(terrarium);
   const cageLight = new THREE.SpotLight(0xfff0d0, 25, 5, 0.55, 0.6, 2);
   cageLight.position.set(0, h - 0.1, 0.3);
@@ -288,8 +290,9 @@ export async function buildLab({ scene, physics }) {
     ladderTopFloorY: BEDROOM.floorY,
     hatch: HATCH,
     terrarium,
+    tiny,
     monitors,
     jars,
-    update() {},
+    update() { tiny.world.userData.tick?.(); },
   };
 }

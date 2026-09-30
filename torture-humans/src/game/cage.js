@@ -4,9 +4,11 @@ import * as THREE from 'three';
 
 export class Cage {
   // group: the terrarium; soil: local-space box of the walkable soil surface
-  constructor(group, soil) {
+  // tiny: the tiny world (heightAt/surfaceY in terrarium space), optional
+  constructor(group, soil, tiny = null) {
     this.group = group;
     this.bounds = soil;
+    this.tiny = tiny;
     this.residents = new Set();
   }
 
@@ -26,7 +28,19 @@ export class Cage {
     const b = this.bounds;
     const x = THREE.MathUtils.clamp(local.x, b.min.x + 0.15, b.max.x - 0.15);
     const z = THREE.MathUtils.clamp(local.z, b.min.z + 0.15, b.max.z - 0.15);
-    return this.group.localToWorld(new THREE.Vector3(x, b.max.y + 0.001, z));
+    return this.group.localToWorld(new THREE.Vector3(x, this.surfaceY(x, z) + 0.001, z));
+  }
+
+  // dry land (not in the pond or the lava)
+  isWalkable(x, z) {
+    const f = this.tiny?.features;
+    if (!f) return true;
+    return Math.hypot(x - f.pond.x, z - f.pond.z) > f.pond.r * 1.05 && Math.hypot(x - f.lava.x, z - f.lava.z) > f.lava.r * 1.15;
+  }
+
+  // soil height in terrarium space (hills and pits of the tiny world)
+  surfaceY(x, z) {
+    return this.tiny ? this.tiny.surfaceY(x, z) : this.bounds.max.y;
   }
 
   // where you stand when you grow back: on the lab floor, beside the table on that side
@@ -46,7 +60,7 @@ export class Cage {
     const b = this.bounds;
     const x = THREE.MathUtils.clamp(local.x * 0.5, b.min.x + 0.1, b.max.x - 0.1);
     const z = THREE.MathUtils.clamp(local.z * 0.5, b.min.z + 0.1, b.max.z - 0.1);
-    const world = this.group.localToWorld(new THREE.Vector3(x, b.max.y, z));
+    const world = this.group.localToWorld(new THREE.Vector3(x, this.surfaceY(x, z), z));
     human.releaseInto(this, world);
     this.residents.add(human);
   }

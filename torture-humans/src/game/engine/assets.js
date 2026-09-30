@@ -12,6 +12,8 @@ const gltfLoader = new GLTFLoader();
 const texCache = new Map();
 const modelCache = new Map();
 let index = null;
+let optimized = {}; // id -> triangles, for models that have a game-ready (decimated) version
+const OPT = 'assets/cc0opt/';
 
 export async function loadIndex() {
   if (!index) {
@@ -21,6 +23,10 @@ export async function loadIndex() {
       index = { textures: {}, hdris: {}, models: {} };
       console.warn('[assets] no CC0 asset index; using plain materials');
     }
+    try {
+      const r = await fetch(`${OPT}index.json`);
+      if (r.ok) optimized = await r.json();
+    } catch { /* no optimized models: use the originals */ }
   }
   return index;
 }
@@ -120,8 +126,14 @@ export async function model(id) {
   await loadIndex();
   if (!modelCache.has(id)) {
     const entry = index.models?.[id];
-    const url = entry ? BASE + entry.gltf : null;
-    modelCache.set(id, url ? gltfLoader.loadAsync(url).then((g) => {
+    // prefer the game-ready version (photo scans can be 1M+ triangles)
+    const url = optimized[id] ? `${OPT}${id}.glb` : entry ? BASE + entry.gltf : null;
+    // an optimized file that fails to load falls back to the original
+    const load = (u) => gltfLoader.loadAsync(u).catch((e) => {
+      if (u.startsWith(OPT) && entry) { console.warn(`[assets] optimized ${id} broken (${e.message}), using the original`); return gltfLoader.loadAsync(BASE + entry.gltf); }
+      throw e;
+    });
+    modelCache.set(id, url ? load(url).then((g) => {
       g.scene.traverse((o) => {
         if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
       });

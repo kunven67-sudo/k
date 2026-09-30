@@ -185,10 +185,12 @@ export class Human {
     const b = this.cage.bounds; // local-space box of the soil surface
     this.timer -= dt;
     if (!this.cageTarget && this.timer <= 0) {
-      this.cageTarget = new THREE.Vector3(
-        THREE.MathUtils.lerp(b.min.x + 0.03, b.max.x - 0.03, Math.random()), b.max.y,
-        THREE.MathUtils.lerp(b.min.z + 0.03, b.max.z - 0.03, Math.random()),
-      );
+      for (let i = 0; i < 20 && !this.cageTarget; i++) {
+        const x = THREE.MathUtils.lerp(b.min.x + 0.03, b.max.x - 0.03, Math.random());
+        const z = THREE.MathUtils.lerp(b.min.z + 0.03, b.max.z - 0.03, Math.random());
+        if (this.cage.isWalkable(x, z)) this.cageTarget = new THREE.Vector3(x, 0, z);
+      }
+      if (!this.cageTarget) this.timer = 1;
     }
     let speed = 0;
     if (this.cageTarget) {
@@ -207,7 +209,7 @@ export class Human {
         root.rotation.set(0, this.yaw, 0);
       }
     }
-    root.position.y = b.max.y;
+    root.position.y = this.cage.surfaceY(root.position.x, root.position.z);
     this.emotion.fear = Math.max(0.3, this.emotion.fear - dt * 0.02);
     this.character.speed = speed / this.scale;
     this.updateFace();

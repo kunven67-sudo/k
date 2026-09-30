@@ -42,7 +42,6 @@ jobs:
           key: th-assets-${{ steps.key.outputs.hash }}
 
       - uses: actions/setup-python@v5
-        if: steps.cache.outputs.cache-hit != 'true'
         with:
           python-version: '3.11'   # the bpy wheel is built for 3.11
 
@@ -63,6 +62,12 @@ jobs:
             echo "no th-assets branch yet"
           fi
           du -sh torture-humans/public/assets/* || true
+
+      # photo-scanned rocks/trees can have 1M+ triangles: make game-ready versions
+      - name: Optimize heavy models (Blender decimate)
+        run: |
+          python -m pip install --quiet bpy==5.0.1 numpy pillow
+          python torture-humans/tools/optimize_models.py -- torture-humans/public/assets/cc0 torture-humans/public/assets/cc0opt 20000 | grep -E '^(OPT|optimized)' || true
 
       - uses: actions/upload-artifact@v4
         with:

@@ -89,7 +89,7 @@ export async function boot() {
     }
   }
 
-  const cage = level.terrarium ? new Cage(level.terrarium, new THREE.Box3(new THREE.Vector3(-1.45, 0.13, -0.9), new THREE.Vector3(1.45, 0.13, 0.9))) : null;
+  const cage = level.terrarium ? new Cage(level.terrarium, new THREE.Box3(new THREE.Vector3(-1.45, 0.13, -0.9), new THREE.Vector3(1.45, 0.13, 0.9)), level.tiny) : null;
   const hands = new Hands({ scene, camera, physics, player, input, humans, cage });
   player.cage = cage;
   const squisher = new Squisher({ scene, player, humans, settings });
