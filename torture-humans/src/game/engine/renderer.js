@@ -32,10 +32,11 @@ export class Renderer {
     this.unsub = settings.onChange((data, patch) => { if (patch.graphics) this.apply(); });
   }
 
+  // sunDirection: null for indoor levels (no sun, no cascaded shadows)
   setScene(scene, camera, { sunDirection = new THREE.Vector3(-0.4, -1, -0.3) } = {}) {
     this.scene = scene;
     this.camera = camera;
-    this.sunDirection = sunDirection.clone().normalize();
+    this.sunDirection = sunDirection ? sunDirection.clone().normalize() : null;
     this.apply();
   }
 
@@ -64,7 +65,15 @@ export class Renderer {
     this.csm = null;
     const size = SHADOW_MAP_SIZE[g.shadows] || 0;
     r.shadowMap.enabled = size > 0;
-    if (size > 0) {
+    // indoor lamps with shadows follow the shadow quality too
+    this.scene.traverse((o) => {
+      if (o.isLight && o.castShadow && !o.userData.csm) {
+        o.shadow.mapSize.setScalar(Math.max(256, size / 4));
+        o.shadow.map?.dispose();
+        o.shadow.map = null;
+      }
+    });
+    if (size > 0 && this.sunDirection) {
       this.csm = new CSM({
         maxFar: g.shadowDistance || 100,
         cascades: SHADOW_CASCADES[g.shadows] || 2,

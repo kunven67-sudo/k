@@ -7,6 +7,7 @@ import { Renderer } from './engine/renderer.js';
 import { AnimLibrary, Character, loadAvatar, baseClips } from './engine/anim.js';
 import { Player } from './player.js';
 import { buildTestLevel } from './levels/test-level.js';
+import { buildLab } from './levels/lab.js';
 
 const params = new URLSearchParams(location.search);
 
@@ -22,7 +23,8 @@ export async function boot() {
   const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.02, 700);
   const scene = new THREE.Scene();
 
-  const level = await buildTestLevel({ scene, physics, renderer: renderer.renderer });
+  const levels = { lab: buildLab, test: buildTestLevel };
+  const level = await (levels[params.get('level')] || buildLab)({ scene, physics, renderer: renderer.renderer });
 
   const lib = new AnimLibrary('assets/anims/');
   await lib.require(baseClips('m'));
@@ -30,6 +32,7 @@ export async function boot() {
   const character = new Character(avatar, lib, { gender: 'm' });
   const player = new Player({ physics, input, settings, camera, character, scene, position: level.spawn });
   if (params.get('cam')) player.mode = params.get('cam');
+  if (level.ladder) player.setLadder(level.ladder, level.ladderTopFloorY);
 
   renderer.sunIntensity = level.sunIntensity;
   renderer.setScene(scene, camera, { sunDirection: level.sunDirection });
@@ -37,14 +40,15 @@ export async function boot() {
   canvas.addEventListener('click', () => input.lockPointer());
 
   const fpsEl = document.getElementById('fps');
+  const hintEl = document.getElementById('hint');
   let last = performance.now();
   const game = { scene, camera, physics, input, renderer, player, settings, character, level, frame: 0 };
   window.game = game; // for tests and debugging
 
   // test hook: drive the player without a real keyboard
   game.simulate = (seconds, { keys = [], look = [0, 0] } = {}) => {
-    for (const k of keys) input.down.add(k);
-    const n = Math.round(seconds * 60);
+    for (const k of keys) { input.down.add(k); input.pressedCodes.add(k); }
+    const n = Math.max(1, Math.round(seconds * 60));
     for (let i = 0; i < n; i++) step(1 / 60, look.map((v) => v / n));
     for (const k of keys) input.down.delete(k);
   };
@@ -64,6 +68,8 @@ export async function boot() {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     if (!params.has('paused')) step(dt);
+    const hint = player.interactHint;
+    if (hintEl && hintEl.textContent !== (hint || '')) { hintEl.textContent = hint || ''; hintEl.hidden = !hint; }
     if (renderer.render(now) && fpsEl) {
       fpsEl.hidden = !settings.get('graphics.showFps');
       fpsEl.textContent = `${renderer.fps} FPS`;

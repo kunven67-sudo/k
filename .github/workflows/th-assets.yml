@@ -45,6 +45,24 @@ jobs:
           git init -q -b th-assets
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -qm "CC0 assets from Poly Haven (${GITHUB_SHA::7})"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" th-assets
+          git config http.postBuffer 524288000
+          REMOTE="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          push() { for i in 1 2 3 4; do git push -q $1 "$REMOTE" th-assets && return 0; sleep $((i * 10)); done; return 1; }
+          # one big push times out (HTTP 408): commit and push in batches of ~150 MB
+          git add README.md index.json catalog.json
+          git commit -qm "CC0 assets from Poly Haven (${GITHUB_SHA::7}): index"
+          push -f
+          batch=(); size=0
+          flush() {
+            [ ${#batch[@]} -eq 0 ] && return 0
+            git add -- "${batch[@]}"
+            git commit -qm "CC0 assets: ${batch[0]} … (${#batch[@]} items)"
+            push
+            batch=(); size=0
+          }
+          for d in hdri/* textures/* models/*; do
+            [ -e "$d" ] || continue
+            batch+=("$d"); size=$((size + $(du -sk "$d" | cut -f1)))
+            [ $size -gt 150000 ] && flush
+          done
+          flush

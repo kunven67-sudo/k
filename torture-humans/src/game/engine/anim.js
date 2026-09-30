@@ -115,7 +115,9 @@ function rotateWorld(bone, q) {
 
 // Classic analytic two-bone IK (thigh-calf-foot). Moves the chain so the foot
 // reaches `target`, keeping the knee bending the way it already bends.
-export function solveTwoBone(upper, lower, end, target, weight = 1) {
+// pole: optional world point the knee/elbow should point toward (needed when the
+// limb starts out straight, e.g. arms hanging down, reaching for a ladder rung).
+export function solveTwoBone(upper, lower, end, target, weight = 1, pole = null) {
   if (weight <= 0) return;
   upper.updateMatrixWorld(true);
   worldPos(upper, _a);
@@ -130,8 +132,24 @@ export function solveTwoBone(upper, lower, end, target, weight = 1) {
   const ba_bc0 = Math.acos(THREE.MathUtils.clamp(_a.clone().sub(_b).normalize().dot(_c.clone().sub(_b).normalize()), -1, 1));
   const ac_ab1 = Math.acos(THREE.MathUtils.clamp((lcb * lcb - lab * lab - lat * lat) / (-2 * lab * lat), -1, 1));
   const ba_bc1 = Math.acos(THREE.MathUtils.clamp((lat * lat - lab * lab - lcb * lcb) / (-2 * lab * lcb), -1, 1));
-  const axis0 = _c.clone().sub(_a).cross(_b.clone().sub(_a));
-  if (axis0.lengthSq() < 1e-10) return; // leg perfectly straight: no bend direction to keep
+  let axis0 = _c.clone().sub(_a).cross(_b.clone().sub(_a));
+  if (pole) {
+    // bend toward the pole: rotate the middle joint into the plane (root, goal, pole)
+    const polePlane = goal.clone().sub(_a).cross(pole.clone().sub(_a));
+    if (polePlane.lengthSq() > 1e-10) {
+      const midNow = _b.clone().sub(_a);
+      const n = polePlane.normalize();
+      const along = goal.clone().sub(_a).normalize();
+      const wantDir = n.clone().cross(along).normalize(); // points toward the pole side
+      const cur = midNow.clone().sub(along.clone().multiplyScalar(midNow.dot(along)));
+      if (cur.lengthSq() > 1e-10) {
+        rotateWorld(upper, _q1.setFromUnitVectors(cur.normalize(), wantDir));
+        worldPos(lower, _b); worldPos(end, _c);
+      }
+      axis0 = _c.clone().sub(_a).cross(_b.clone().sub(_a));
+    }
+  }
+  if (axis0.lengthSq() < 1e-10) return; // limb perfectly straight and no pole: no bend direction to keep
   axis0.normalize();
   rotateWorld(upper, _q1.setFromAxisAngle(axis0, ac_ab1 - ac_ab0));
   rotateWorld(lower, _q1.setFromAxisAngle(axis0, ba_bc1 - ba_bc0));

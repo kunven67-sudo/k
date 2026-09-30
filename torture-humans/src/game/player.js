@@ -4,6 +4,7 @@
 // that pulls in when a wall is behind you, so it never clips through walls.
 import * as THREE from 'three';
 import { GROUP } from './engine/physics.js';
+import { LadderClimb } from './ladder.js';
 
 const WALK = 1.45;
 const RUN = 3.6;
@@ -37,6 +38,7 @@ export class Player {
     this.scale = 1;         // 1 = normal size (shrinking changes this)
     this.headBone = character.bones.Bip01_Head;
     this.frozen = false;    // cutscene-free scripted moves (ladder) take over when true
+    this.queued = { jump: false, interact: false };
     scene.add(character.root);
     this.renderPos = new THREE.Vector3();
     this.prevPos = new THREE.Vector3();
@@ -55,8 +57,34 @@ export class Player {
     this.settings.set('gameplay.camera', this.mode);
   }
 
+  setLadder(ladder, topFloorY) {
+    this.ladder = ladder ? new LadderClimb(this, ladder, { topFloorY }) : null;
+  }
+
+  // what "E" would do right now (shown as a hint on screen)
+  get interactHint() {
+    if (this.ladder?.active) return this.ladder.mode === 'climb' ? 'W / S climb · Space let go' : null;
+    const where = this.ladder?.prompt();
+    if (where === 'bottom') return 'E  Climb up the ladder';
+    if (where === 'top') return 'E  Climb down to the lab';
+    return null;
+  }
+
   // runs at the fixed physics rate
   fixedUpdate(dt) {
+    const jump = this.queued.jump;
+    const interact = this.queued.interact;
+    this.queued.jump = this.queued.interact = false;
+    if (this.ladder?.active) {
+      this.ladder.fixedUpdate(dt, { jump });
+      this.grounded = !this.ladder.active;
+      this.actualSpeed = 0;
+      return;
+    }
+    if (interact) {
+      const where = this.ladder?.prompt();
+      if (where) { this.ladder.start(where); return; }
+    }
     if (this.frozen) return;
     const t0 = this.body.body.translation();
     this.prevPos.set(t0.x, t0.y, t0.z);
@@ -87,8 +115,10 @@ export class Player {
 
     // gravity and jumping
     if (this.grounded) {
-      this.velocity.y = -2; // keeps you pressed onto slopes and stairs
-      if (inp.pressed('jump') && !this.crouching) this.velocity.y = JUMP_SPEED * Math.sqrt(this.scale);
+      // no downward push while grounded: snap-to-ground keeps you on slopes and
+      // steps going down, and a downward push stops Rapier's auto-step going up
+      this.velocity.y = 0;
+      if (jump && !this.crouching) this.velocity.y = JUMP_SPEED * Math.sqrt(this.scale);
     } else {
       this.velocity.y -= GRAVITY * dt;
       this.velocity.y = Math.max(this.velocity.y, -50);
@@ -108,6 +138,10 @@ export class Player {
   // runs every rendered frame
   update(dt, alpha) {
     const inp = this.input;
+    // taps are latched here and used by the next physics step: at high FPS some
+    // frames have no physics step, and a quick tap would otherwise be lost
+    if (inp.pressed('jump')) this.queued.jump = true;
+    if (inp.pressed('interact')) this.queued.interact = true;
     if (inp.pressed('camera')) this.toggleCamera();
     if (this.settings.get('controls.toggleSprint') && inp.pressed('sprint')) this.sprintToggled = !this.sprintToggled;
     if (this.settings.get('controls.toggleCrouch') && inp.pressed('crouch')) this.crouchToggled = !this.crouchToggled;
@@ -122,7 +156,8 @@ export class Player {
     // body: faces the camera direction in first person, the walking direction in third
     const hs = Math.hypot(this.velocity.x, this.velocity.z);
     let targetYaw = this.bodyYaw;
-    if (this.mode === 'first') targetYaw = this.yaw;
+    if (this.ladder?.active) targetYaw = this.bodyYaw;
+    else if (this.mode === 'first') targetYaw = this.yaw;
     else if (hs > 0.2) targetYaw = Math.atan2(-this.velocity.x, -this.velocity.z);
     let d = targetYaw - this.bodyYaw;
     d = Math.atan2(Math.sin(d), Math.cos(d));
@@ -133,15 +168,17 @@ export class Player {
     root.rotation.set(0, this.bodyYaw + Math.PI, 0); // Rocketbox faces +Z; our forward is -Z
     root.scale.setScalar(this.scale);
 
-    this.character.speed = Math.min(this.actualSpeed ?? 0, hs) / this.scale;
+    this.character.speed = this.ladder?.active ? 0 : Math.min(this.actualSpeed ?? 0, hs) / this.scale;
     this.character.crouch = this.crouching ? 1 : 0;
+    const climbing = !!this.ladder?.active;
     this.character.update(dt, {
-      groundAt: this.grounded ? (x, y, z) => {
+      groundAt: this.grounded && !climbing ? (x, y, z) => {
         const hit = this.physics.raycast({ x, y, z }, { x: 0, y: -1, z: 0 }, 1.2 * this.scale, { exclude: this.body.collider });
         return hit ? hit.point.y : null;
       } : null,
     });
 
+    if (climbing) this.ladder.applyIK();
     this.updateCamera(dt);
   }
 
