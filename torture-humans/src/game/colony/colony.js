@@ -836,11 +836,11 @@ class Resident {
       this.doing = kind === 'wood' ? 'going to chop wood' : 'going to break stone';
       // stand beside it on our side (not on top of it)
       const toMe = this.worldPos().sub(src.center).setY(0).normalize();
-      const side = src.center.clone().addScaledVector(toMe, src.size / 2 + 0.015);
-      const sideLocal = this.c.toLocal(side);
-      side.y = this.c.toWorld({ x: sideLocal.x, y: this.c.cage.surfaceY(sideLocal.x, sideLocal.z), z: sideLocal.z }).y;
+      const beside = src.center.clone().addScaledVector(toMe, src.size / 2 + 0.015);
+      const bl = this.c.toLocal(beside);
+      beside.y = this.c.toWorld({ x: bl.x, y: this.c.cage.surfaceY(bl.x, bl.z), z: bl.z }).y;
       const reach = src.size / 2 + 0.04;
-      if (!(yield* this.walkTo(side, 0.02)) && !(yield* this.walkTo(src.center, 0.02, { ext: { x: reach, y: 0.02, z: reach } }))) { o.userData.failedUntil = performance.now() + 60000; return; }
+      if (!(yield* this.walkTo(beside, 0.02)) && !(yield* this.walkTo(src.center, 0.02, { ext: { x: reach, y: 0.02, z: reach } }))) { o.userData.failedUntil = performance.now() + 60000; return; }
       this.doing = kind === 'wood' ? 'chopping wood' : 'breaking stone';
       this.face = src.center.clone();
       yield* this.wait(0.3);
