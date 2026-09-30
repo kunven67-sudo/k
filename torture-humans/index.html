@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Torture Humans</title>
+  <!-- only our own files; wasm for the physics engine; blob: for workers and generated textures -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' th: blob: data:; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' th: blob: data:; media-src 'self' th: blob: data:; connect-src 'self' th: blob: data:; worker-src 'self' blob:">
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
     #game { display: block; width: 100vw; height: 100vh; outline: none; }

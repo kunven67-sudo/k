@@ -23,5 +23,47 @@
     "start": "electron .",
     "test": "node --test \"test/**/*.test.mjs\"",
     "dist": "vite build && electron-builder --win portable --x64 --publish never"
+  },
+  "build": {
+    "appId": "com.kunven67.torturehumans",
+    "productName": "Torture Humans",
+    "copyright": "Torture Humans",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "public/assets",
+        "to": "assets",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "TortureHumans-${version}-Portable.exe"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kunven67-sudo/k.git"
   }
 }
