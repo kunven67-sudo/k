@@ -1,0 +1,17 @@
+{
+  "name": "torture-humans",
+  "productName": "Torture Humans",
+  "version": "0.1.0",
+  "description": "Mad scientist sandbox: shrink humans, keep them in glass cages with bugs.",
+  "private": true,
+  "type": "module",
+  "author": "kunven67-sudo",
+  "license": "MIT",
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  }
+}
