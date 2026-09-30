@@ -48,11 +48,13 @@ jobs:
       - name: Voice test (Windows speaks, CursorVerse listens)
         run: node test/windows-voice.cjs
 
-      - name: Update swap test (replace a running exe)
-        run: node test/windows-update.cjs
-
       - name: Build portable exe
         run: npm run dist
+
+      # A real update with the built exe: old copy updates itself, new copy replaces the old file.
+      # Runs before the release is published, so a broken updater never ships.
+      - name: Update test (old exe updates itself to the new one)
+        run: node test/windows-update.cjs
 
       - name: Upload exe
         uses: actions/upload-artifact@v4

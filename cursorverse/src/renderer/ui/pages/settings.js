@@ -73,7 +73,8 @@ export default {
         'up-to-date': `You have the newest version (${u.current}) ✅`,
         available: `Version ${u.latest} is ready 🎉 (you have ${u.current})`,
         downloading: `Downloading ${u.latest}... ${pct}%`,
-        installing: 'Installing and restarting... 🔄 CursorVerse will open again by itself in a few seconds.',
+        installing: 'Opening the new version... 🔄 This window closes by itself when it is ready (a few seconds).',
+        updated: `Updated to ${u.current} 🎉 You're on the newest version.`,
         error: u.error || 'Something went wrong',
       }[u.status] || '';
       updateBox.replaceChildren(

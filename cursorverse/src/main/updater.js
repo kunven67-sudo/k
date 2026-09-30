@@ -1,11 +1,10 @@
 // One-click updates for the portable exe.
 // New versions are published as GitHub Releases (tag "cursorverse-vX.Y.Z" with
 // the portable exe attached). We download the exe, check its SHA-256 against
-// the one GitHub reports, then a tiny PowerShell script swaps it in once this
-// copy has exited and starts the new one.
+// the one GitHub reports, then start it. The new version takes over from this
+// copy and copies itself over the old exe once that file is no longer locked.
 const { EventEmitter } = require('events');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
@@ -90,36 +89,63 @@ async function downloadVerified(fetchImpl, info, dest, onProgress) {
   return { file: dest, sha256: digest, bytes: got };
 }
 
-// Replaces dst with src once dst is no longer in use, then starts it.
-const SWAP_SCRIPT = `param([string]$Src, [string]$Dst, [switch]$NoLaunch)
-$ErrorActionPreference = 'SilentlyContinue'
-# The running exe is locked until CursorVerse has fully closed, so keep trying.
-$ok = $false
-for ($i = 0; $i -lt 240 -and -not $ok; $i++) {
-  try { Copy-Item -LiteralPath $Src -Destination $Dst -Force -ErrorAction Stop; $ok = $true }
-  catch { Start-Sleep -Milliseconds 500 }
-}
-if ($ok) { Remove-Item -LiteralPath $Src -Force }
-if (-not $NoLaunch) { Start-Process -FilePath $Dst }
-`;
+const FINISH_FLAG = '--cv-finish-update=';
 
-function writeSwapScript(dir = os.tmpdir()) {
-  const file = path.join(dir, 'cursorverse-update.ps1');
-  fs.writeFileSync(file, SWAP_SCRIPT);
-  return file;
+// The "--cv-finish-update=<old exe>" argument, if this copy was started by an update.
+function finishTarget(argv) {
+  const arg = (argv || []).find((a) => String(a).startsWith(FINISH_FLAG));
+  return arg ? String(arg).slice(FINISH_FLAG.length).replace(/^"|"$/g, '') || null : null;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Run by the NEW version: copies itself over the old exe. The old exe is locked
+// until the old CursorVerse has fully closed, so keep trying for a while.
+// Copies to "<target>.new" first, then renames, so the old file is never half-written.
+async function replaceExe(src, target, { tries = 360, waitMs = 500, log = () => {} } = {}) {
+  const tmp = `${target}.new`;
+  let lastErr = null;
+  for (let i = 0; i < tries; i++) {
+    try {
+      await fs.promises.copyFile(src, tmp);
+      await fs.promises.rename(tmp, target);
+      log(`replaced ${target} (try ${i + 1})`);
+      return { ok: true, tries: i + 1 };
+    } catch (err) {
+      lastErr = err;
+      if (!['EBUSY', 'EPERM', 'EACCES', 'ETXTBSY'].includes(err.code)) break; // not a lock: retrying won't help
+      await sleep(waitMs);
+    }
+  }
+  await fs.promises.rm(tmp, { force: true }).catch(() => {});
+  log(`could not replace ${target}: ${lastErr?.code || ''} ${lastErr?.message || ''}`);
+  return { ok: false, error: lastErr };
+}
+
+// The env for the new copy: never pass on our own portable paths or test-only overrides.
+function childEnv(env) {
+  const out = { ...env };
+  for (const k of ['PORTABLE_EXECUTABLE_FILE', 'PORTABLE_EXECUTABLE_DIR', 'PORTABLE_EXECUTABLE_APP_FILENAME', 'CV_FAKE_VERSION', 'CV_AUTO_UPDATE', 'ELECTRON_RUN_AS_NODE']) delete out[k];
+  return out;
 }
 
 class Updater extends EventEmitter {
-  // deps: { fetch, currentVersion, exePath (portable exe or null), downloadDir, quit() }
+  // deps: { fetch, currentVersion, exePath (the exe to replace, or null), downloadDir,
+  //         spawn?, feedUrl?, log?(line), handoverTimeoutMs?, showFile?(path) }
   constructor(deps) {
     super();
     this.deps = deps;
     this.latest = null;
+    this.handoverTimer = null;
     this.state = { status: 'idle', current: deps.currentVersion, latest: null, progress: 0, error: null };
   }
 
   get supported() {
-    return process.platform === 'win32' && !!this.deps.exePath;
+    return (this.deps.platform || process.platform) === 'win32' && !!this.deps.exePath;
+  }
+
+  log(line) {
+    try { this.deps.log?.(line); } catch { /* ignore */ }
   }
 
   set(patch) {
@@ -131,13 +157,14 @@ class Updater extends EventEmitter {
     if (['downloading', 'installing'].includes(this.state.status)) return this.state;
     this.set({ status: 'checking', error: null });
     try {
-      const res = await this.deps.fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, {
+      const res = await this.deps.fetch(this.deps.feedUrl || `https://api.github.com/repos/${REPO}/releases?per_page=30`, {
         headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'CursorVerse-Updater' },
       });
       if (!res.ok) throw new Error(`GitHub said ${res.status}`);
       const latest = pickLatest(await res.json());
       this.latest = latest;
       const newer = latest && compareVersions(latest.version, this.deps.currentVersion) > 0;
+      this.log(`check: have ${this.deps.currentVersion}, newest ${latest?.version || 'none'}`);
       this.set({
         status: newer ? 'available' : 'up-to-date',
         latest: latest?.version || null,
@@ -145,6 +172,7 @@ class Updater extends EventEmitter {
         checkedAt: Date.now(),
       });
     } catch (err) {
+      this.log(`check failed: ${err.message}`);
       this.set({ status: 'error', error: `Could not check for updates: ${err.message}` });
     }
     return this.state;
@@ -155,34 +183,67 @@ class Updater extends EventEmitter {
       this.set({ status: 'error', error: 'Updating works from the CursorVerse .exe on Windows.' });
       return this.state;
     }
+    if (['downloading', 'installing'].includes(this.state.status)) return this.state;
     if (this.state.status !== 'available') await this.check();
     if (this.state.status !== 'available') return this.state;
     const info = this.latest;
+    const target = this.deps.exePath;
+    // make sure the new version will be able to replace this file later
+    try {
+      await fs.promises.access(path.dirname(target), fs.constants.W_OK);
+    } catch {
+      this.set({ status: 'error', error: `CursorVerse can't write to the folder it's in (${path.dirname(target)}). Move the CursorVerse .exe to your Desktop or Downloads folder, then try again.` });
+      return this.state;
+    }
     this.set({ status: 'downloading', progress: 0, error: null });
     let result;
     try {
       const dest = path.join(this.deps.downloadDir, `CursorVerse-${info.version}-Portable.exe`);
       result = await downloadVerified(this.deps.fetch, info, dest, (p) => this.set({ progress: p }));
+      this.log(`downloaded ${info.version} to ${result.file} (${result.bytes} bytes, sha256 ${result.sha256})`);
     } catch (err) {
+      this.log(`download failed: ${err.message}`);
       this.set({ status: 'available', error: `Update download failed: ${err.message}` });
       return this.state;
     }
-    this.set({ status: 'installing', progress: 1 });
+    this.set({ status: 'installing', progress: 1, file: result.file });
+    // Start the new version. It knocks on this copy (second-instance), which
+    // then closes, and it copies itself over the old exe. No hidden scripts.
     try {
-      const script = writeSwapScript();
-      const child = spawn('powershell.exe', [
-        '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
-        '-File', script, '-Src', result.file, '-Dst', this.deps.exePath,
-      ], { detached: true, stdio: 'ignore', windowsHide: true });
-      child.unref();
+      const child = (this.deps.spawn || spawn)(result.file, [`${FINISH_FLAG}${target}`], {
+        detached: true, stdio: 'ignore', windowsHide: false, cwd: path.dirname(result.file), env: childEnv(process.env),
+      });
+      child.on?.('error', (err) => this.handoverFailed(result.file, err.message));
+      child.unref?.();
+      this.log(`started new version ${result.file}`);
     } catch (err) {
-      this.set({ status: 'error', error: `Could not start the update: ${err.message}` });
+      this.handoverFailed(result.file, err.message);
       return this.state;
     }
-    // give the UI a moment to show "restarting", then get out of the way
-    setTimeout(() => this.deps.quit(), 800);
+    // if the new copy never shows up, say so instead of leaving you guessing
+    clearTimeout(this.handoverTimer);
+    this.handoverTimer = setTimeout(() => this.handoverFailed(result.file, 'it did not start within 90 seconds'), this.deps.handoverTimeoutMs || 90000);
     return this.state;
+  }
+
+  // Called when the new version knocked: it's running, so this copy can go.
+  handedOver() {
+    clearTimeout(this.handoverTimer);
+    this.handoverTimer = null;
+    this.log('new version is running, closing the old one');
+  }
+
+  handoverFailed(file, why) {
+    if (this.state.status !== 'installing') return;
+    clearTimeout(this.handoverTimer);
+    this.handoverTimer = null;
+    this.log(`new version did not start: ${why}`);
+    this.set({
+      status: 'error',
+      error: `The new version downloaded fine, but Windows didn't let it start (${why}). Your antivirus may have blocked it. I opened the folder with it: double-click it to finish the update.`,
+    });
+    try { this.deps.showFile?.(file); } catch { /* ignore */ }
   }
 }
 
-module.exports = { Updater, compareVersions, parseVersion, pickLatest, downloadVerified, SWAP_SCRIPT, writeSwapScript, REPO, TAG_PREFIX };
+module.exports = { Updater, compareVersions, parseVersion, pickLatest, downloadVerified, replaceExe, finishTarget, childEnv, FINISH_FLAG, REPO, TAG_PREFIX };

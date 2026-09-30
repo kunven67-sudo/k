@@ -129,8 +129,11 @@ async function start() {
   // everyone sees the tour once (you can replay it from ❓ Help)
   if (!state.settings.tourDone) setTimeout(() => startTour(() => set({ tourDone: true })), 900);
 
+  const updatedToast = (u) => { if (u?.status === 'updated') toast(`🎉 Updated to ${u.current}!`, 'good', 6000); };
   state.update = await cv.update.state();
+  updatedToast(state.update);
   cv.update.onState((u) => {
+    if (u?.status !== state.update?.status) updatedToast(u);
     state.update = u;
     buildQuick();
     current?.onUpdate?.(u);

@@ -82,3 +82,91 @@ test('a cut-off download is rejected', async () => {
     srv.close();
   }
 });
+
+const { Updater, replaceExe, finishTarget, childEnv } = require('../src/main/updater.js');
+
+test('finish flag is read from the command line', () => {
+  assert.equal(finishTarget(['x.exe', '--cv-finish-update=C:\\Users\\A B\\CursorVerse.exe']), 'C:\\Users\\A B\\CursorVerse.exe');
+  assert.equal(finishTarget(['x.exe', '"--cv-finish-update="C:\\a.exe"']), null);
+  assert.equal(finishTarget(['x.exe', '--hidden']), null);
+  assert.equal(finishTarget(undefined), null);
+});
+
+test('the new copy gets a clean env', () => {
+  const env = childEnv({ PATH: 'p', PORTABLE_EXECUTABLE_FILE: 'old.exe', PORTABLE_EXECUTABLE_DIR: 'd', CV_FAKE_VERSION: '0.0.1', CV_AUTO_UPDATE: '1', ELECTRON_RUN_AS_NODE: '1' });
+  assert.deepEqual(env, { PATH: 'p' });
+});
+
+test('replaceExe swaps the file in and leaves no temp file', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cv-rep-'));
+  const src = path.join(dir, 'new.exe');
+  const dst = path.join(dir, 'CursorVerse.exe');
+  fs.writeFileSync(src, 'NEW');
+  fs.writeFileSync(dst, 'OLD');
+  const lines = [];
+  const r = await replaceExe(src, dst, { log: (l) => lines.push(l) });
+  assert.equal(r.ok, true);
+  assert.equal(fs.readFileSync(dst, 'utf8'), 'NEW');
+  assert.equal(fs.readFileSync(src, 'utf8'), 'NEW', 'the running copy is left alone');
+  assert.ok(!fs.existsSync(`${dst}.new`));
+  assert.match(lines[0], /replaced/);
+  // a missing source is not a lock: give up right away instead of retrying for minutes
+  const t0 = Date.now();
+  const bad = await replaceExe(path.join(dir, 'nope.exe'), dst, { waitMs: 1000 });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.error.code, 'ENOENT');
+  assert.ok(Date.now() - t0 < 500);
+});
+
+function fakeUpdater(body, extra = {}) {
+  const sha = crypto.createHash('sha256').update(body).digest('hex');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cv-flow-'));
+  const exe = path.join(dir, 'CursorVerse.exe');
+  fs.writeFileSync(exe, 'OLD');
+  const spawned = [];
+  const shown = [];
+  const releases = [{ tag_name: 'cursorverse-v2.0.0', assets: [{ name: 'CursorVerse-2.0.0-Portable.exe', browser_download_url: 'mem://exe', size: body.length, digest: `sha256:${sha}` }] }];
+  const fetchImpl = async (url) => (url === 'mem://exe'
+    ? new Response(body, { headers: { 'content-length': String(body.length) } })
+    : new Response(JSON.stringify(releases)));
+  const u = new Updater({
+    fetch: fetchImpl, currentVersion: '1.0.0', exePath: exe, downloadDir: path.join(dir, 'updates'), platform: 'win32',
+    spawn: (file, args, opts) => { spawned.push({ file, args, opts }); return { unref() {}, on() {} }; },
+    showFile: (f) => shown.push(f), handoverTimeoutMs: 80, ...extra,
+  });
+  return { u, exe, spawned, shown, dir };
+}
+
+test('update starts the new exe with the old path, and waits for it to knock', async () => {
+  const body = crypto.randomBytes(5000);
+  const { u, exe, spawned, shown } = fakeUpdater(body);
+  const st = await u.updateNow();
+  assert.equal(st.status, 'installing');
+  assert.equal(spawned.length, 1);
+  assert.deepEqual(fs.readFileSync(spawned[0].file), body);
+  assert.deepEqual(spawned[0].args, [`--cv-finish-update=${exe}`]);
+  assert.equal(spawned[0].opts.detached, true);
+  assert.equal(spawned[0].opts.env.PORTABLE_EXECUTABLE_FILE, undefined);
+  u.handedOver();
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(u.state.status, 'installing', 'no error once the new copy is running');
+  assert.equal(shown.length, 0);
+  assert.equal(fs.readFileSync(exe, 'utf8'), 'OLD', 'the old copy never touches its own exe');
+});
+
+test('if the new exe never starts, you get told and the file is shown', async () => {
+  const { u, spawned, shown } = fakeUpdater(crypto.randomBytes(100));
+  await u.updateNow();
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(u.state.status, 'error');
+  assert.match(u.state.error, /didn't let it start/);
+  assert.deepEqual(shown, [spawned[0].file]);
+});
+
+test('a spawn that throws (blocked by antivirus) is reported, not silent', async () => {
+  const { u, shown } = fakeUpdater(crypto.randomBytes(100), { spawn: () => { throw new Error('EACCES'); } });
+  const st = await u.updateNow();
+  assert.equal(st.status, 'error');
+  assert.match(st.error, /EACCES/);
+  assert.equal(shown.length, 1);
+});

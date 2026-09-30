@@ -18,7 +18,7 @@ const { InputHook, keyName } = require('./input');
 const { VoiceController } = require('./voice');
 const { AdBlock } = require('./adblock');
 const apps = require('./apps');
-const { Updater } = require('./updater');
+const { Updater, finishTarget, replaceExe } = require('./updater');
 
 app.setName('CursorVerse');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -28,6 +28,8 @@ library.registerSchemes();
 // Launching a different exe (like a newly downloaded version) takes over from
 // the running one instead of silently closing itself.
 const MY_EXE = String(process.env.PORTABLE_EXECUTABLE_FILE || process.execPath).toLowerCase();
+// Set when an update started this copy: the old exe it should replace.
+const UPDATE_TARGET = process.env.PORTABLE_EXECUTABLE_FILE ? finishTarget(process.argv) : null;
 let gotLock = app.requestSingleInstanceLock({ exe: MY_EXE });
 
 async function waitForLock(ms) {
@@ -100,7 +102,37 @@ function ownExes() {
 }
 
 function exePathForLogin() {
-  return process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+  return UPDATE_TARGET || process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+}
+
+// update.log in the settings folder: what the updater did, for when something goes wrong
+function updateLog(line) {
+  if (!userData) return;
+  const file = path.join(userData, 'update.log');
+  try {
+    if (fs.statSync(file).size > 200000) fs.rmSync(file, { force: true });
+  } catch { /* no log yet */ }
+  try {
+    fs.appendFileSync(file, `${new Date().toISOString()} [${app.getVersion()} pid ${process.pid}] ${line}\n`);
+  } catch { /* ignore */ }
+}
+
+// This copy was started by an update: copy it over the old exe once the old
+// CursorVerse has closed, so opening the old file gives the new version.
+async function finishUpdate() {
+  const me = process.env.PORTABLE_EXECUTABLE_FILE;
+  updateLog(`finishing update: ${me} -> ${UPDATE_TARGET}`);
+  const res = await replaceExe(me, UPDATE_TARGET, { log: updateLog });
+  if (res.ok) {
+    updater.set({ status: 'updated', error: null });
+    fs.rm(me, { force: true }, () => {}); // still running, so this usually waits for the next start
+  } else {
+    updater.set({
+      status: 'error',
+      error: `You're on the new version now 🎉 but the old file couldn't be replaced (${res.error?.code || res.error?.message || 'unknown'}). Use this new file from now on (I opened its folder): ${me}`,
+    });
+    shell.showItemInFolder(me);
+  }
 }
 
 // ------------------------------------------------------------------ settings
@@ -684,7 +716,8 @@ let lastShown = 0;
 app.on('second-instance', (e, argv, cwd, data) => {
   if (quitting) return; // closing (maybe for an update): don't pop the window back up
   if (data?.exe && data.exe !== MY_EXE) {
-    // a different copy was started: step aside so it can run
+    // a different copy was started (like the new version after an update): step aside so it can run
+    updater?.handedOver();
     quitting = true;
     app.quit();
     return;
@@ -694,7 +727,8 @@ app.on('second-instance', (e, argv, cwd, data) => {
 });
 
 app.whenReady().then(async () => {
-  if (!gotLock && !(await waitForLock(8000))) {
+  // after an update the old copy may need a few seconds to close
+  if (!gotLock && !(await waitForLock(UPDATE_TARGET ? 60000 : 8000))) {
     // same exe started twice: the running one already showed its window
     app.exit(0);
     return;
@@ -759,12 +793,16 @@ app.whenReady().then(async () => {
     },
   });
 
+  const updatesDir = path.join(userData, 'updates');
   updater = new Updater({
     fetch: (url, opts) => net.fetch(url, opts),
-    currentVersion: app.getVersion(),
-    exePath: process.env.PORTABLE_EXECUTABLE_FILE || null,
-    downloadDir: path.join(userData, 'updates'),
-    quit: () => { quitting = true; app.quit(); },
+    // test-only overrides so CI can run a real update end to end
+    currentVersion: (isTest && process.env.CV_FAKE_VERSION) || app.getVersion(),
+    feedUrl: (isTest && process.env.CV_UPDATE_FEED) || null,
+    exePath: UPDATE_TARGET || process.env.PORTABLE_EXECUTABLE_FILE || null,
+    downloadDir: updatesDir,
+    log: updateLog,
+    showFile: (f) => shell.showItemInFolder(f),
   });
   let updateNoticeShown = false;
   updater.on('state', (st) => {
@@ -779,8 +817,11 @@ app.whenReady().then(async () => {
       }
     }
   });
-  // clean up an update download left over from a finished update
-  fs.rm(path.join(userData, 'updates'), { recursive: true, force: true }, () => {});
+  if (UPDATE_TARGET) finishUpdate().catch((err) => updateLog(`finish failed: ${err.stack || err}`));
+  else if (!MY_EXE.startsWith(updatesDir.toLowerCase())) {
+    // clean up an update download left over from a finished update
+    fs.rm(updatesDir, { recursive: true, force: true }, () => {});
+  }
 
   createEngine();
   createUi();
@@ -797,6 +838,7 @@ app.whenReady().then(async () => {
     setTimeout(() => updater.check(), 8000);
     setInterval(() => updater.check(), 6 * 60 * 60 * 1000);
   }
+  if (isTest && process.env.CV_AUTO_UPDATE && updater.supported) setTimeout(() => updater.updateNow(), 3000);
   powerMonitor.on('resume', () => { state.cursorApplied = false; updateCursorApplied(); });
   powerMonitor.on('shutdown', () => restoreCursorNow());
   screen.on('display-metrics-changed', () => requestCursorBuild());

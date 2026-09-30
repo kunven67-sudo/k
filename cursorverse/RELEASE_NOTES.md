@@ -1,5 +1,6 @@
-## CursorVerse 1.0.4
+## CursorVerse 1.0.5
 
-- 🔵 **Help mode:** click **❓ Help mode** at the top. Everything you can click gets a blue outline. Click anything and it tells you what it does, without actually doing it. Esc to exit.
-- 🤖 **Help bot:** click **🤖 Ask** at the top (or go to the ❓ Help page) and type a question like "how do I make my cursor bigger?". It works offline.
-- 📖 More "How do I...?" answers on the Help page.
+- 🔄 **Update button fixed.** Before, clicking Update just closed CursorVerse and nothing happened. Now the new version opens right away, the old one closes, and the new one replaces the old file by itself. If anything goes wrong, CursorVerse tells you why and shows you the file, instead of just disappearing.
+- 🧪 Every new version is now tested on a real Windows PC: an old copy updates itself to the new one before the release goes out.
+
+(If you're on 1.0.4 or older, download this one yourself one last time. From now on the ⬆ Update button does it.)
