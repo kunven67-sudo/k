@@ -15,7 +15,35 @@ import { buildLab } from './levels/lab.js';
 
 const params = new URLSearchParams(location.search);
 
+// Desktop build: the game files come as a separate pack, downloaded once.
+async function ensureAssets() {
+  const th = window.th;
+  if (!th?.assets) return;
+  const box = document.getElementById('loading');
+  const bar = box?.querySelector('.bar > div');
+  const label = box?.querySelector('.label');
+  const off = th.assets.onProgress((p) => {
+    if (!box) return;
+    box.hidden = false;
+    const pct = Math.round(p.progress * 100);
+    label.textContent = p.stage === 'download' ? `Downloading game files… ${pct}%` : `Unpacking… ${pct}%`;
+    bar.style.width = `${pct}%`;
+  });
+  for (;;) {
+    const r = await th.assets.ensure();
+    if (r.ok) break;
+    if (box) {
+      box.hidden = false;
+      label.textContent = `Couldn't download the game files (${r.error}). Retrying in 10 seconds…`;
+    }
+    await new Promise((res) => setTimeout(res, 10000));
+  }
+  off();
+  if (box) box.hidden = true;
+}
+
 export async function boot() {
+  await ensureAssets();
   const canvas = document.getElementById('game');
   const settings = new Settings();
   // test hook: ?gfx={"bloom":false} overrides graphics settings

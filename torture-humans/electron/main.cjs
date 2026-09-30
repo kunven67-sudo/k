@@ -4,7 +4,8 @@ const { app, BrowserWindow, protocol, net, ipcMain, shell, Notification } = requ
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { Updater, finishTarget, replaceExe } = require('./updater.cjs');
+const { Updater, finishTarget, replaceExe, REPO } = require('./updater.cjs');
+const { ensureAssets } = require('./assetpack.cjs');
 
 app.setName('Torture Humans');
 // the game wants the real GPU and no frame cap from the browser
@@ -28,13 +29,30 @@ let userData = null;
 // game files: dist/ (built by vite) inside the app, assets next to it
 const APP_ROOT = path.join(__dirname, '..');
 const DIST = path.join(APP_ROOT, 'dist');
+// which asset pack this build expects (written by CI next to this file)
+let PACK = null;
+try { PACK = JSON.parse(fs.readFileSync(path.join(__dirname, 'assets-pack.json'), 'utf8')); } catch { /* dev build */ }
+let assetsDir = null;   // set once the pack is downloaded/unpacked
+let assetsJob = null;
+
 function assetsRoot() {
-  const candidates = [
-    process.env.TH_ASSETS,
-    process.resourcesPath && path.join(process.resourcesPath, 'assets'),
-    path.join(APP_ROOT, 'public', 'assets'),
-  ].filter(Boolean);
-  return candidates.find((p) => fs.existsSync(p)) || candidates[candidates.length - 1];
+  if (process.env.TH_ASSETS) return process.env.TH_ASSETS;
+  if (assetsDir) return assetsDir;
+  return path.join(APP_ROOT, 'public', 'assets'); // dev: files straight from the repo
+}
+
+function ensureGameAssets() {
+  if (process.env.TH_ASSETS || !PACK) return Promise.resolve({ ok: true, dir: assetsRoot() });
+  assetsJob ??= ensureAssets({
+    fetch: (url, opts) => net.fetch(url, opts),
+    dir: path.join(userData, 'game-assets'),
+    expected: PACK,
+    baseUrl: process.env.TH_ASSETS_URL || `https://github.com/${REPO}/releases/download/torturehumans-v${app.getVersion()}`,
+    onProgress: (p) => win?.webContents.send('assets:progress', p),
+    log: updateLog,
+  }).then((r) => { assetsDir = r.dir; return { ok: true, dir: r.dir, fresh: r.fresh }; })
+    .catch((err) => { assetsJob = null; updateLog(`assets failed: ${err.message}`); return { ok: false, error: err.message }; });
+  return assetsJob;
 }
 
 function safeJoin(root, rel) {
@@ -149,6 +167,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('update:check', () => updater.check());
   ipcMain.handle('update:install', () => updater.updateNow());
   ipcMain.handle('app:info', () => ({ version: app.getVersion(), portable: !!process.env.PORTABLE_EXECUTABLE_FILE, platform: process.platform }));
+  ipcMain.handle('assets:ensure', () => ensureGameAssets());
   ipcMain.handle('app:quit', () => { quitting = true; app.quit(); });
   ipcMain.handle('app:fullscreen', (e, on) => { win?.setFullScreen(!!on); return win?.isFullScreen(); });
 

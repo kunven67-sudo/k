@@ -12,6 +12,10 @@
     #fps { position: fixed; top: 8px; right: 10px; color: #9f9; font: 13px/1 monospace; text-shadow: 0 0 3px #000; }
     #hint { position: fixed; left: 50%; bottom: 14%; transform: translateX(-50%); padding: 8px 16px; background: rgba(0,0,0,.55); color: #fff; font: 600 16px/1.2 system-ui, sans-serif; border-radius: 6px; letter-spacing: .3px; }
     #flash { position: fixed; inset: 0; background: #e8f7ff; pointer-events: none; opacity: 0; }
+    #loading { position: fixed; inset: 0; display: grid; place-content: center; gap: 14px; background: #07080a; color: #dfe6ee; font: 600 18px system-ui, sans-serif; text-align: center; }
+    #loading[hidden] { display: none; }
+    #loading .bar { width: min(520px, 80vw); height: 10px; background: #1c2128; border-radius: 6px; overflow: hidden; }
+    #loading .bar > div { width: 0; height: 100%; background: linear-gradient(90deg, #2e9bff, #6fe0ff); transition: width .2s; }
     #error { position: fixed; inset: auto 20px 20px 20px; padding: 14px; background: #400; color: #fff; font: 15px sans-serif; border-radius: 8px; }
   </style>
 </head>
@@ -21,6 +25,7 @@
   <div id="hint" hidden></div>
   <div id="flash" hidden></div>
   <div id="error" hidden></div>
+  <div id="loading" hidden><div class="label">Getting the game ready…</div><div class="bar"><div></div></div></div>
   <script type="module" src="/src/game/main.js"></script>
 </body>
 </html>

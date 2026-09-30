@@ -6,6 +6,14 @@ contextBridge.exposeInMainWorld('th', {
   info: () => ipcRenderer.invoke('app:info'),
   quit: () => ipcRenderer.invoke('app:quit'),
   fullscreen: (on) => ipcRenderer.invoke('app:fullscreen', on),
+  assets: {
+    ensure: () => ipcRenderer.invoke('assets:ensure'),
+    onProgress: (fn) => {
+      const h = (e, p) => fn(p);
+      ipcRenderer.on('assets:progress', h);
+      return () => ipcRenderer.removeListener('assets:progress', h);
+    },
+  },
   update: {
     state: () => ipcRenderer.invoke('update:state'),
     check: () => ipcRenderer.invoke('update:check'),

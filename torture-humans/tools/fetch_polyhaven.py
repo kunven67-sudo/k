@@ -81,9 +81,15 @@ def fetch_hdri(aid, res, out):
     return {'file': os.path.relpath(dest, out)}
 
 
+MAX_FILE = 90 * 1024 * 1024  # GitHub rejects files over 100 MB
+
+
 def fetch_model(aid, res, out):
     files = get_json(f'{API}/files/{aid}')
     g = pick(files['gltf'], res, ('gltf',))
+    sizes = [g.get('size', 0)] + [inc.get('size', 0) for inc in (g.get('include') or {}).values()]
+    if max(sizes) > MAX_FILE:
+        raise RuntimeError(f'too big for git ({max(sizes) // (1024 * 1024)} MB file); pick a lighter model')
     base = os.path.join(out, 'models', aid)
     download(g['url'], os.path.join(base, os.path.basename(g['url'])))
     for rel, inc in (g.get('include') or {}).items():
