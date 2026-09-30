@@ -10,6 +10,12 @@ function Send($obj) {
   [Console]::Out.Flush()
 }
 
+# Anything unexpected is reported to the app as a readable error, then we stop.
+trap {
+  Send @{ type = 'error'; code = 'crash'; message = $_.Exception.Message }
+  exit 5
+}
+
 try {
   Add-Type -AssemblyName System.Speech
 } catch {
@@ -17,7 +23,12 @@ try {
   exit 2
 }
 
-$recognizers = [System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers()
+try {
+  $recognizers = [System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers()
+} catch {
+  Send @{ type = 'error'; code = 'no-speech'; message = $_.Exception.Message }
+  exit 2
+}
 if ($recognizers.Count -eq 0) {
   Send @{ type = 'error'; code = 'no-recognizer'; message = 'No speech recognizer is installed.' }
   exit 3
@@ -59,9 +70,10 @@ if ($config.autostart) { StartRec }
 
 $lineTask = [Console]::In.ReadLineAsync()
 $lastLevel = [DateTime]::MinValue
+# Wait-Event only takes whole seconds, so poll the event queue with a short sleep
+# instead: results arrive within ~15 ms and the loop stays near 0% CPU.
 while ($true) {
-  $ev = Wait-Event -Timeout 0.03
-  while ($ev) {
+  foreach ($ev in @(Get-Event)) {
     if ($ev.SourceIdentifier -eq 'cvRec') {
       $r = $ev.SourceEventArgs.Result
       Send @{ type = 'result'; text = $r.Text; confidence = [Math]::Round($r.Confidence, 3) }
@@ -73,7 +85,6 @@ while ($true) {
       }
     }
     Remove-Event -EventIdentifier $ev.EventIdentifier
-    $ev = Get-Event | Select-Object -First 1
   }
   if ($lineTask.IsCompleted) {
     $line = $lineTask.Result
@@ -81,6 +92,8 @@ while ($true) {
     if ($line -eq 'start') { StartRec }
     elseif ($line -eq 'stop') { StopRec }
     $lineTask = [Console]::In.ReadLineAsync()
+  } else {
+    Start-Sleep -Milliseconds 15
   }
 }
 try { $engine.RecognizeAsyncCancel() } catch {}

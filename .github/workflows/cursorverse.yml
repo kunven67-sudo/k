@@ -1,0 +1,65 @@
+name: CursorVerse Windows build
+
+on:
+  push:
+    paths:
+      - 'cursorverse/**'
+      - '.github/workflows/cursorverse.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: cursorverse
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cursorverse/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Check the Windows native layer (cursor swap, foreground app)
+        run: |
+          node test/windows-native.cjs
+          node -e "require('uiohook-napi'); console.log('uiohook ok')"
+
+      - name: Check the voice script parses in Windows PowerShell
+        shell: powershell
+        run: |
+          $e = $null; $t = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD\src\main\voice-host.ps1", [ref]$t, [ref]$e)
+          if ($e.Count) { $e | ForEach-Object { Write-Error $_.Message }; exit 1 }
+          Add-Type -AssemblyName System.Speech
+          "System.Speech available: " + ([System.Speech.Recognition.SpeechRecognitionEngine] -ne $null)
+
+      - name: Build portable exe
+        run: npm run dist
+
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: CursorVerse-Portable
+          path: cursorverse/dist/*.exe
+          if-no-files-found: error
+
+      - name: Publish release (main branch only)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cursorverse-build-${{ github.run_number }}
+          name: CursorVerse build ${{ github.run_number }}
+          files: cursorverse/dist/*.exe
+          make_latest: true
