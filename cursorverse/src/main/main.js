@@ -23,9 +23,19 @@ app.setName('CursorVerse');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 library.registerSchemes();
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-  process.exit(0);
+// Only one CursorVerse at a time (two would fight over the system cursor).
+// Launching a different exe (like a newly downloaded version) takes over from
+// the running one instead of silently closing itself.
+const MY_EXE = String(process.env.PORTABLE_EXECUTABLE_FILE || process.execPath).toLowerCase();
+let gotLock = app.requestSingleInstanceLock({ exe: MY_EXE });
+
+async function waitForLock(ms) {
+  const until = Date.now() + ms;
+  while (!gotLock && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 250));
+    gotLock = app.requestSingleInstanceLock({ exe: MY_EXE });
+  }
+  return gotLock;
 }
 
 const SRC = path.join(__dirname, '..');
@@ -638,9 +648,24 @@ function secureWebContents() {
 
 // ------------------------------------------------------------------ startup
 
-app.on('second-instance', () => showUi());
+let lastShown = 0;
+app.on('second-instance', (e, argv, cwd, data) => {
+  if (data?.exe && data.exe !== MY_EXE) {
+    // a different copy was started: step aside so it can run
+    quitting = true;
+    app.quit();
+    return;
+  }
+  // the waiting copy retries for a few seconds; only pop the window once
+  if (Date.now() - lastShown > 10000) { lastShown = Date.now(); showUi(); }
+});
 
 app.whenReady().then(async () => {
+  if (!gotLock && !(await waitForLock(8000))) {
+    // same exe started twice: the running one already showed its window
+    app.exit(0);
+    return;
+  }
   userData = app.getPath('userData');
   settingsFile = new JsonFile(path.join(userData, 'settings.json'), null);
   myCursorsFile = new JsonFile(path.join(userData, 'my-cursors.json'), []);
@@ -729,8 +754,9 @@ function cleanup() {
 app.on('before-quit', () => { quitting = true; });
 app.on('will-quit', cleanup);
 app.on('window-all-closed', () => { /* keep running in the tray */ });
-process.on('exit', () => { try { restoreCursorNow(); } catch { /* ignore */ } });
+// a copy that never got the lock must not reset the running copy's cursor
+process.on('exit', () => { if (gotLock) { try { restoreCursorNow(); } catch { /* ignore */ } } });
 process.on('uncaughtException', (err) => {
   console.error('[main] uncaught', err);
-  try { restoreCursorNow(); } catch { /* ignore */ }
+  if (gotLock) { try { restoreCursorNow(); } catch { /* ignore */ } }
 });
