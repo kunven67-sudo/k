@@ -56,6 +56,27 @@ Footsteps (grass, stone, wood, water), nature (birds, crickets, wind, rain, cave
 - **Secret:** find every note AND beat the secret boss **Shadow You** (a dark copy of your hero that uses your moves) in a hidden dungeon. The ending is a **sequel tease**: something bigger wakes up, leading into the 3D game.
 
 ## 3D first-person version
-Not planned yet. Questions coming next.
+- **Brand new story:** Blood Moon Hunter. You're a monster hunter in a cursed valley. Every 7 nights a blood moon rises and the monsters go crazy. Find out who cursed the valley.
+- **Vibe:** gritty and brutal. Harsh world, hard choices, nobody is fully good.
+- **World:** realistic medieval fantasy (stone towns, forests, castles, dungeons).
+- **Camera:** first person by default, press V to see your hero from behind.
+- **Combat:** melee (click to swing, F to block with a shield, C to dodge), bows (hold right click to aim and draw), magic (fireballs, lightning, ice).
+- **Name:** BLOOD MOON HUNTER
+- **Your hunter:** a rookie on their first real contract, with a lot to prove. You grew up in this valley, left as a kid, and came back to find it cursed.
+- **Endings (your choices decide which one):** kill the lord and break the curse; find and kill the demon he made the deal with; or the dark ending where you take the lord's deal, live forever, and become the new monster.
+- **Allies:** none. Lone wolf, just you and your horse.
+- **Gore:** brutal. Lots of blood, finishing moves, monsters can lose limbs.
+- **Getting stronger:** levels + skill tree, better gear (buy, craft, upgrade), and monster mutations (powers from monster parts that slowly corrupt you).
+- **Hunter look:** full creator (face, skin, hair, scars, body type, clothes), ready-made hunters to pick from, or keep the default hunter.
+- **Music:** changes by place: calm in town, eerie in the wild, intense in fights and during blood moons.
+- **Realism:** day and night, weather (rain, fog, thunderstorms, wind in trees and grass), wildlife to hunt (deer, rabbits, crows, wolves) for meat and hides, survival needs (eat, sleep, cold nights hurt without a fire).
+- **Menu and saves:** same as the pixel game (title, Play, Settings, save slots showing when each save was created and loaded), plus autosave at camps and when you sleep.
+- **Difficulty:** Easy, Normal, Hard, Hardcore (dying deletes your save).
+- **Villain:** the valley's lord traded his people's lives to a demon to live forever.
+- **Blood moon (every 7 nights):** monsters get stronger and drop better loot, and rare blood monsters only appear then.
+- **Monsters:** werewolves (silver hurts them), ghouls and vampires (graveyards, the lord's castle), swamp drowners, trolls under bridges, wyverns in the mountains.
+- **Hunter stuff:** contract board, tracking (footprints, blood trails, clues to a lair), crafting potions and blade oils from monster parts, a trophy wall at home.
+- **Travel:** ride a horse (whistle for it, fight from horseback) and fast travel between signposts you've found.
+- **Map:** one big open valley with no loading screens.
 
 Honest limit: a browser game can't match GTA V's hand-made 3D art. It can have real 3D, lighting, shadows, fog, day and night, music and sound for everything.
