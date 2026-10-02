@@ -5,7 +5,7 @@
 function updatePlayer(dt) {
   const p = G.p; if (G.dead) return;
   const st = PS(), A = G.area, map = A.map;
-  p.atkCd -= dt; p.atkT = Math.max(0, p.atkT - dt); p.dodgeCd -= dt; p.hurtCd -= dt; p.hurtT = Math.max(0, p.hurtT - dt);
+  p.atkCd -= dt; p.atkT = Math.max(0, p.atkT - dt); p.castT = Math.max(0, (p.castT || 0) - dt); p.dodgeCd -= dt; p.hurtCd -= dt; p.hurtT = Math.max(0, p.hurtT - dt);
   p.blockLock -= dt; p.staDelay -= dt; p.webT -= dt; p.slowT -= dt; p.blindT -= dt; p.burnCd -= dt; p.calm += dt;
   for (let i = 0; i < 4; i++) p.cds[i] = Math.max(0, p.cds[i] - dt);
   for (const k in p.buffs) if (p.buffs[k] > 0) { p.buffs[k] -= dt; if (p.buffs[k] <= 0) { p.buffs[k] = 0; statsChanged(); if (k === 'shield') p.shieldHp = 0; } }
@@ -29,7 +29,7 @@ function updatePlayer(dt) {
   if (Input.take('dodge')) {
     if (p.dodgeT <= 0 && p.dodgeCd <= 0 && p.sta >= st.dodgeCost && p.dashT <= 0) {
       const dl = Math.hypot(mx, my); p.dvx = dl > 0.1 ? mx / dl : Math.cos(p.aim); p.dvy = dl > 0.1 ? my / dl : Math.sin(p.aim);
-      p.dodgeT = 0.3; p.dodgeCd = 0.55; p.sta -= st.dodgeCost; p.staDelay = 0.5; p.blocking = false; Sfx.play('dodge'); burst(p.x, p.y, 8, '#b8a888', 40);
+      p.dodgeT = 0.3; p.dodgeCd = 0.55; p.sta -= st.dodgeCost; p.staDelay = 0.5; p.blocking = false; Sfx.play('dodge'); for (let i = 0; i < 7; i++) G.parts.push({ x: p.x + rand(-4, 4), y: p.y - rand(0, 3), vx: -p.dvx * rand(20, 50) + rand(-15, 15), vy: rand(-18, -4), life: rand(0.3, 0.5), max: 0.5, col: '#d8ccb0', size: 2, grav: 0 });
     } else if (p.sta < st.dodgeCost && p.dodgeT <= 0) addText(p.x, p.y - 26, 'TOO TIRED', '#e9d35a');
   }
   const tile = tileAt(map, Math.floor(p.x / 16), Math.floor(p.y / 16));
@@ -42,7 +42,7 @@ function updatePlayer(dt) {
     if (chance(0.7)) G.parts.push({ x: p.x + rand(-3, 3), y: p.y - rand(0, 14), vx: -p.dvx * 30, vy: -p.dvy * 30, life: 0.25, max: 0.25, col: '#f2e6c8', size: 1, grav: 0 });
   } else if (p.dodgeT > 0) {
     p.dodgeT -= dt; moveEntity(p, p.dvx * 215 * dt, p.dvy * 215 * dt, false); p.moving = true; p.walk += dt * 16;
-    if (chance(0.5)) G.parts.push({ x: p.x + rand(-3, 3), y: p.y, vx: 0, vy: -10, life: 0.3, max: 0.3, col: '#b8a888', size: 1, grav: 0 });
+    if (chance(0.6)) G.parts.push({ x: p.x + rand(-4, 4), y: p.y - rand(0, 2), vx: -p.dvx * 25, vy: rand(-12, -3), life: 0.35, max: 0.35, col: '#d8ccb0', size: 2, grav: 0 });
   } else if (tile === T.ICE) { // slippery
     p.vx += (mx * spd - p.vx) * Math.min(1, dt * 1.6); p.vy += (my * spd - p.vy) * Math.min(1, dt * 1.6);
     if (moveEntity(p, p.vx * dt, p.vy * dt, false)) { p.vx *= 0.3; p.vy *= 0.3; }
@@ -56,7 +56,8 @@ function updatePlayer(dt) {
     p.stepT = 0; let surf = SURFACE[tile] || 'stone'; if (A.kind === 'dungeon' && A.def.theme.planks && tile === T.FLOOR) surf = 'wood';
     Sfx.play('st_' + surf, { vol: 0.9 });
     if (surf === 'water') { G.fx.push({ kind: 'ripple', x: p.x, y: p.y, life: 0.6, max: 0.6 }); for (let i = 0; i < 4; i++) G.parts.push({ x: p.x + rand(-4, 4), y: p.y - 2, vx: rand(-30, 30), vy: rand(-60, -30), life: 0.35, max: 0.35, col: tile === T.BOG ? '#6a8a3a' : '#bfe4ff', size: 1, grav: 260 }); }
-    else if (surf === 'snow' || surf === 'sand') for (let i = 0; i < 2; i++) G.parts.push({ x: p.x + rand(-3, 3), y: p.y, vx: rand(-12, 12), vy: rand(-18, -6), life: 0.35, max: 0.35, col: surf === 'snow' ? '#ffffff' : '#e8d4a0', size: 1, grav: 60 });
+    else if (surf !== 'water') { const dc = { grass: '#c8d8a0', stone: '#cfc6b4', wood: '#c8a878', mud: '#8a7a5a' }[surf] || '#d8ccb0'; G.parts.push({ x: p.x + rand(-2, 2), y: p.y - 1, vx: -p.vx * 0.08 + rand(-6, 6), vy: rand(-10, -4), life: 0.32, max: 0.32, col: dc, size: 2, grav: 0 }); }
+    if (surf === 'snow' || surf === 'sand') for (let i = 0; i < 2; i++) G.parts.push({ x: p.x + rand(-3, 3), y: p.y, vx: rand(-12, 12), vy: rand(-18, -6), life: 0.35, max: 0.35, col: surf === 'snow' ? '#ffffff' : '#e8d4a0', size: 1, grav: 60 });
   }
   if (!p.blocking && p.dodgeT <= 0 && p.staDelay <= 0) p.sta = Math.min(p.maxSta, p.sta + 34 * dt);
   if ((Input.mouseDown || Input.tAtk) && p.atkCd <= 0 && p.dodgeT <= 0 && p.dashT <= 0 && !p.blocking) playerAttack();

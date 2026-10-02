@@ -48,7 +48,7 @@ const Story = {
     else if (this.block === 'move') {
       const p = G.p, t = this.moveTo, dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy); this.wait -= dt;
       if (d < 3 || this.wait <= 0) { p.moving = false; this.block = null; this.next(); }
-      else { moveEntity(p, (dx / d) * 60 * dt, (dy / d) * 60 * dt, false); p.moving = true; p.walk += dt * 9; p.face = dx < 0 ? -1 : 1; p.aim = Math.atan2(dy, dx); }
+      else { moveEntity(p, (dx / d) * 60 * dt, (dy / d) * 60 * dt, false); p.moving = true; p.vx = (dx / d) * 60; p.vy = (dy / d) * 60; p.walk += dt * 9; p.face = dx < 0 ? -1 : 1; p.aim = Math.atan2(dy, dx); }
     }
   },
   finish() {

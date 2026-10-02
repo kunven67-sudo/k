@@ -27,7 +27,7 @@ Object.assign(UI, {
     box.innerHTML = '';
     for (const raw of list) {
       const s = raw, P = s.player || {}, card = document.createElement('div'); card.className = 'save-card';
-      const cv = document.createElement('canvas'); cv.width = 16; cv.height = 20;
+      const cv = document.createElement('canvas'); cv.width = 28; cv.height = 28;
       const arm = P.eq && P.eq.armor && ITEMS[P.eq.armor.id || P.eq.armor];
       try { humanPortrait(cv, heroLook(Object.assign({ cls: 'warrior', look: {} }, s)), { armor: arm && arm.color, trim: arm && arm.trim }); } catch (e) {}
       const bosses = Object.keys((s.stats && s.stats.bosses) || {}).length, cls = CLASSES[s.cls] ? CLASSES[s.cls].name : 'Warrior', diff = DIFF[s.diff] ? DIFF[s.diff].name : 'Normal';
@@ -70,13 +70,10 @@ Object.assign(UI, {
   drawCreator() {
     const c = this.cr; if (!c) return; const cv = $('#crCanvas'), x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height);
     const C = CLASSES[c.cls], arm = C.start.armor && ITEMS[C.start.armor];
-    x.save(); x.scale(2, 2);
-    x.fillStyle = 'rgba(0,0,0,.35)'; x.fillRect(7, 26, 10, 2);
-    const wave = c.waveT > 0;
-    drawHuman(x, 12, 27, this.creatorLook(), { face: 1, breathe: Math.floor(c.t / 0.8) % 2 === 1, blink: c.t % 3.7 < 0.12, armor: arm && arm.color, trim: arm && arm.trim, pose: wave ? 'wave' : null, poseT: (c.t * 1.5) % 1 });
-    if (!wave) { const w = itemIcon(C.start.weapon); x.drawImage(w, 13, 14, 9, 9); }
-    if (C.start.shield) x.drawImage(itemIcon(C.start.shield), 2, 15, 8, 8);
-    x.restore();
+    x.fillStyle = 'rgba(0,0,0,.35)'; x.beginPath(); x.ellipse(20, 38, 9, 2.5, 0, 0, TAU); x.fill();
+    const wave = c.waveT > 0, spin = Math.floor(c.t / 2.4) % 4, dir = ['down', 'side', 'up', 'side'][spin];
+    const [hx, hy] = drawChar(x, 20, 39, this.creatorLook(), { dir: wave ? 'down' : dir, flip: !wave && spin === 3, anim: wave ? 'wave' : 'idle', f: wave ? Math.floor(c.t * 4) % 2 : Math.floor(c.t * 2.4) % 4, blink: c.t % 3.7 < 0.12, armor: arm && arm.color, trim: arm && arm.trim });
+    if (!wave) { const w = itemIcon(C.start.weapon); x.drawImage(w, Math.round(hx - 4), Math.round(hy - 9), 10, 10); }
   },
   creatorTick(dt) { const c = this.cr; if (!c) return; c.t += dt; c.waveT = Math.max(0, c.waveT - dt); this.drawCreator(); },
   createHero() {

@@ -78,7 +78,7 @@ function monFrames(type) {
   if (d.art === 'wisp') return (_mf[type] = []);
   return (_mf[type] = CREATURE_T[d.art].map((rows) => spr(rows, Object.assign({ k: OUT }, d.pal))));
 }
-function monBodyH(m) { const d = m.d, sc = d.scale || 1; return d.art === 'human' || d.art === 'hero' ? 18 * sc : d.art === 'slime' || d.art === 'frog' ? 9 * sc : d.art === 'bat' || d.art === 'wisp' ? 8 : d.art === 'wyrm' ? 14 * sc : 9 * sc; }
+function monBodyH(m) { const d = m.d, sc = d.scale || 1; return d.art === 'human' || d.art === 'hero' ? 24 * sc : d.art === 'slime' || d.art === 'frog' ? 9 * sc : d.art === 'bat' || d.art === 'wisp' ? 8 : d.art === 'wyrm' ? 14 * sc : 9 * sc; }
 function monLift(m) { const d = m.d; return d.art === 'bat' ? 10 + Math.sin(m.t * 6) * 2 : d.art === 'wisp' ? 12 + Math.sin(m.t * 3) * 3 : d.art === 'crystal' ? 5 + Math.sin(m.t * 2) * 2 : d.fly && d.art === 'human' ? 4 + Math.sin(m.t * 3) * 2 : 0; }
 function monCenter(m) { return [m.x, m.y - monLift(m) - monBodyH(m) / 2]; }
 function areaTier() { return G.area.def ? G.area.def.tier : REGION_TIER[G.area.id] || 1; }

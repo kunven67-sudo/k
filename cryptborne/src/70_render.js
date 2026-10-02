@@ -25,35 +25,69 @@ const KEY_SPR = spr(ICON_T.key.rows, { k: OUT, y: '#f2c13a' });
 function snapCam() { if (!G.area) return; const [x, y] = camTarget(); G.cam.x = x; G.cam.y = y; }
 
 // ---------- the hero ----------
-function drawWeapon(c, p) {
+// which way the hero looks: the attack direction while fighting, otherwise where they walk
+function heroView(p) {
+  let a;
+  if (p.atkT > 0 || p.blocking || p.dashT > 0 || G.time - (p.lastAtkT || -9) < 0.3) a = p.aim;
+  else if (p.dodgeT > 0) a = Math.atan2(p.dvy, p.dvx);
+  else if (p.moving && Math.abs(p.vx) + Math.abs(p.vy) > 1) a = Math.atan2(p.vy, p.vx);
+  else a = p.dirA == null ? Math.PI / 2 : p.dirA;
+  p.dirA = a; const [dir, flip] = viewOf(a); p.dir = dir; if (dir === 'side') p.face = flip ? -1 : 1;
+  return [dir, flip];
+}
+function heroAnim(p) {
+  const w = weaponDef();
+  if (p.dodgeT > 0) return ['roll', Math.floor((1 - p.dodgeT / 0.3) * 6) % 6];
+  if (p.dashT > 0) return ['atk', 1];
+  if (p.hurtT > 0.1) return ['hurt', 0];
+  if (p.atkT > 0) { if (w.wc === 'melee') { const prog = 1 - p.atkT / 0.2; return ['atk', prog < 0.18 ? 0 : prog < 0.75 ? 1 : 2]; } return [w.wc === 'bow' ? 'bow' : 'cast', 0]; }
+  if (p.castT > 0) return ['cast', 0];
+  if (p.blocking) return ['block', 0];
+  if (p.moving) return ['walk', Math.floor((p.walk / TAU) * 8 + 800) % 8];
+  return ['idle', Math.floor(G.time * 2.4) % 4];
+}
+function drawWeapon(c, p, hx, hy, dir, flip) {
   const w = weaponDef(); if (!w.id) return; const icon = itemIcon(w.id), t = ICON_T[w.icon];
-  const hx = p.x + p.face * 5, hy = p.y - 7;
-  let ang = p.aim;
-  if (w.wc === 'melee') { if (p.atkT > 0) { const prog = 1 - p.atkT / 0.2, arc = (w.arc * Math.PI) / 180; ang = p.aim + p.swing * (-arc / 2 + arc * prog); } else ang = p.aim - p.face * 0.9; }
-  else if (w.wc === 'staff' || w.wc === 'wand') ang = p.aim - p.face * 0.5;
+  let ang;
+  if (w.wc === 'melee') {
+    if (p.atkT > 0) { const prog = smooth(clamp(1 - p.atkT / 0.2, 0, 1)), arc = (w.arc * Math.PI) / 180; ang = p.aim + p.swing * (-arc / 2 + arc * prog); }
+    else if (p.blocking) ang = p.aim + (Math.cos(p.aim) < 0 ? 1.2 : -1.2);
+    else ang = dir === 'side' ? (flip ? -Math.PI + 1.05 : -1.05) : dir === 'down' ? 1.05 : -2.2;
+  } else if (w.wc === 'staff' || w.wc === 'wand') ang = p.atkT > 0 || p.castT > 0 ? p.aim : dir === 'side' ? (flip ? -Math.PI + 1.35 : -1.35) : -1.45;
+  else ang = p.atkT > 0 || G.time - (p.lastAtkT || -9) < 0.3 ? p.aim : dir === 'side' ? (flip ? Math.PI : 0) : dir === 'down' ? 1.2 : -1.9;
   c.save(); c.translate(Math.round(hx), Math.round(hy)); c.rotate(ang - t.a); c.drawImage(icon, -t.g[0], -t.g[1]); c.restore();
 }
+function heroArmorOpts() { const arm = armorDef(); return { armor: arm && arm.color, trim: arm && arm.trim, helm: arm && arm.def >= 22 && arm.id !== 'witch_robes' ? arm.color : null }; }
 function drawPlayer(c) {
   const p = G.p; if (p.hidden) return;
-  if (G.dead) { px(c, p.x - 7, p.y - 4, 14, 4, '#7a1a1e'); return; }
-  const L = heroLook(), arm = armorDef();
-  if (p.lying) { drawHuman(c, p.x, p.y, L, { face: 1, blink: true, breathe: Math.floor(G.time / 1.4) % 2 === 1 }); px(c, p.x - 6, p.y - 12, 13, 13, '#3e6cb8'); px(c, p.x - 6, p.y - 12, 13, 2, '#5a8ad0'); return; }
-  if (p.hurtCd > 0.2 && Math.floor(G.time * 30) % 2) return;
-  shadow(c, p.x, p.y, 6);
-  const sh = shieldDef(), behind = Math.sin(p.aim) < -0.25, b = p.buffs;
-  if (p.dodgeT > 0 || p.dashT > 0 || b.smoke > 0) c.globalAlpha = b.smoke > 0 ? 0.35 : 0.65;
-  if (b.warcry > 0) { c.fillStyle = 'rgba(216,69,74,.25)'; c.beginPath(); c.ellipse(p.x, p.y - 10, 11, 14, 0, 0, TAU); c.fill(); }
-  if (behind) drawWeapon(c, p);
-  if (sh && !p.blocking) c.drawImage(itemIcon(gear('shield').id), Math.round(p.x - p.face * 6 - 6), Math.round(p.y - 16), 12, 12);
-  const idle = !p.moving && p.atkT <= 0;
-  drawHuman(c, p.x, p.y, L, { face: p.face, moving: p.moving, walk: p.walk, armor: arm && arm.color, trim: arm && arm.trim, helm: arm && arm.def >= 22 && arm.id !== 'witch_robes' ? arm.color : null, breathe: idle && Math.sin(G.time * 2.2) > 0.6, blink: (G.time % 4.2) < 0.12 });
-  if (!behind) drawWeapon(c, p);
-  if (sh && p.blocking) { const bx = p.x + Math.cos(p.aim) * 9, by = p.y - 10 + Math.sin(p.aim) * 7, ic = itemIcon(gear('shield').id); c.drawImage(ic, Math.round(bx - 8), Math.round(by - 8), 16, 16); if (G.time - p.blockStart < PS().parry) { c.globalAlpha = 0.5; c.drawImage(whiteOf(ic), Math.round(bx - 8), Math.round(by - 8), 16, 16); } }
+  const L = heroLook(), ao = heroArmorOpts();
+  if (G.dead) { c.save(); c.translate(Math.round(p.x), Math.round(p.y)); c.rotate(-Math.PI / 2); drawChar(c, 10, 6, L, Object.assign({ dir: 'side', anim: 'hurt', blink: true }, ao)); c.restore(); px(c, p.x - 9, p.y - 1, 18, 2, '#7a1a1e'); return; }
+  if (p.lying) { drawChar(c, p.x, p.y + 6, L, { dir: 'down', anim: 'idle', f: Math.floor(G.time / 1.4) % 2, blink: true }); px(c, p.x - 7, p.y - 9, 15, 13, '#3e6cb8'); px(c, p.x - 7, p.y - 9, 15, 2, '#5a8ad0'); px(c, p.x - 7, p.y + 3, 15, 1, '#2c4e88'); return; }
+  const [dir, flip] = heroView(p), [anim, f] = heroAnim(p), b = p.buffs, sh = shieldDef();
+  const rolling = anim === 'roll';
+  shadow(c, p.x, p.y, rolling ? 7 : 8);
+  if (b.smoke > 0) c.globalAlpha = 0.35;
+  if (b.warcry > 0) { c.fillStyle = 'rgba(216,69,74,.22)'; c.beginPath(); c.ellipse(p.x, p.y - 13, 13, 17, 0, 0, TAU); c.fill(); }
+  const o = Object.assign({ dir, flip, anim, f, blink: (G.time % 4.2) < 0.13 && anim === 'idle' }, ao);
+  if (p.hurtCd > 0.28 && p.hurtT > 0) o.tint = 'white'; else if (p.slowT > 0) o.tint = 'ice';
+  // the hand position for this frame (needed before drawing when the weapon goes behind)
+  const fr = charFrame(L, o), hxF = flip ? CHAR_W - 1 - fr.hand[0] : fr.hand[0], hx = Math.round(p.x) + hxF - CHAR_FX, hy = Math.round(p.y) + fr.hand[1] - CHAR_FY;
+  const shIcon = sh ? itemIcon(gear('shield').id) : null;
+  if (!rolling) {
+    if (dir === 'up') drawWeapon(c, p, hx, hy, dir, flip);
+    if (shIcon && !p.blocking && dir === 'side') c.drawImage(shIcon, Math.round(p.x + (flip ? 1 : -13)), Math.round(p.y - 20), 12, 12);
+  }
+  drawChar(c, p.x, p.y, L, o);
+  if (!rolling) {
+    if (shIcon && !p.blocking && dir === 'down') c.drawImage(shIcon, Math.round(p.x - 15), Math.round(p.y - 18), 12, 12);
+    if (shIcon && !p.blocking && dir === 'up') c.drawImage(shIcon, Math.round(p.x + 3), Math.round(p.y - 18), 12, 12);
+    if (dir !== 'up') drawWeapon(c, p, hx, hy, dir, flip);
+    if (shIcon && p.blocking) { const bx = p.x + Math.cos(p.aim) * 10, by = p.y - 13 + Math.sin(p.aim) * 8; c.drawImage(shIcon, Math.round(bx - 8), Math.round(by - 8), 16, 16); if (G.time - p.blockStart < PS().parry) { c.globalAlpha = 0.5; c.drawImage(whiteOf(shIcon), Math.round(bx - 8), Math.round(by - 8), 16, 16); c.globalAlpha = b.smoke > 0 ? 0.35 : 1; } }
+  }
   c.globalAlpha = 1;
-  if (p.shieldHp > 0) { c.strokeStyle = 'rgba(85,168,239,.7)'; c.lineWidth = 1; c.beginPath(); c.ellipse(p.x, p.y - 10, 11 + Math.sin(G.time * 6), 14, 0, 0, TAU); c.stroke(); }
-  if (b.eagle > 0 && chance(0.3)) G.parts.push({ x: p.x + rand(-6, 6), y: p.y - rand(4, 20), vx: 0, vy: -16, life: 0.4, max: 0.4, col: '#f2c13a', size: 1, grav: 0 });
-  if (p.poisonT > 0 && chance(0.2)) G.parts.push({ x: p.x + rand(-5, 5), y: p.y - rand(4, 18), vx: 0, vy: -12, life: 0.5, max: 0.5, col: '#9be04a', size: 1, grav: 0 });
-  if (p.slowT > 0) { c.globalAlpha = 0.35; px(c, p.x - 6, p.y - 20, 12, 20, '#9fe8ff'); c.globalAlpha = 1; }
+  if (p.shieldHp > 0) { c.strokeStyle = 'rgba(85,168,239,.7)'; c.lineWidth = 1; c.beginPath(); c.ellipse(p.x, p.y - 13, 13 + Math.sin(G.time * 6), 17, 0, 0, TAU); c.stroke(); }
+  if (b.eagle > 0 && chance(0.3)) G.parts.push({ x: p.x + rand(-6, 6), y: p.y - rand(4, 24), vx: 0, vy: -16, life: 0.4, max: 0.4, col: '#f2c13a', size: 1, grav: 0 });
+  if (p.poisonT > 0 && chance(0.2)) G.parts.push({ x: p.x + rand(-5, 5), y: p.y - rand(4, 22), vx: 0, vy: -12, life: 0.5, max: 0.5, col: '#9be04a', size: 1, grav: 0 });
 }
 // ---------- monsters ----------
 function wispDraw(c, x, y, t, col) {
@@ -73,13 +107,15 @@ function monImage(m) {
 function drawMon(c, m) {
   const d = m.d, sc = d.scale || 1, lift = monLift(m);
   if (d.art === 'wisp') { shadow(c, m.x, m.y, 4); wispDraw(c, Math.round(m.x), Math.round(m.y - lift - 4), m.t, d.glow); m._top = m.y - lift - 14; return; }
+  if (d.art === 'human' || d.art === 'hero') { drawHumanMon(c, m, sc, lift); return; }
   let img = monImage(m);
   if (m.face < 0) img = flipped(img);
   if (m.flash > 0) img = whiteOf(img); else if (m.wind > 0 && Math.floor(G.time * 14) % 2) img = redOf(img); else if (m.slowT > 0) img = iceOf(img);
   const human = d.art === 'human' || d.art === 'hero';
   let w = img.width * sc, h = img.height * sc;
   if (d.art === 'slime' || d.art === 'frog') { const air = m.hopT > 0.55 && (m.hvx || m.hvy); const s = air ? 1.14 : 1 + Math.sin(m.t * 5) * 0.05; h *= s; w /= s; }
-  if (m.flinch > 0) { w *= 1.1; h *= 0.9; }
+  else if (!d.fly && d.art !== 'crystal') { const br = 1 + Math.sin(m.t * 4 + m.x * 0.1) * 0.035; h *= br; w /= br; }
+  if (m.flinch > 0) { w *= 1.16; h *= 0.84; }
   if (!d.ghost) shadow(c, m.x, m.y, Math.max(5, m.w * 0.7));
   let a = 1; if (d.alpha) a = d.alpha * (0.85 + Math.sin(m.t * 4) * 0.15); if (m.fadeOut) a *= clamp(1 - m.fadeOut / 1.5, 0, 1); if (m.scripted && m.type !== 'lich') a *= 0.85;
   c.globalAlpha = a;
@@ -92,6 +128,38 @@ function drawMon(c, m) {
   if (m.wind > 0 && (m.pending === 'lunge' || (m.pending && m.pending.startsWith('charge')))) { c.strokeStyle = 'rgba(255,60,60,.5)'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(m.x, m.y - 4); c.lineTo(G.p.x, G.p.y - 4); c.stroke(); c.setLineDash([]); }
   if (d.art === 'hero' || m.type === 'hollow_finn' || m.type === 'shade') if (chance(0.3)) G.parts.push({ x: m.x + rand(-6, 6), y: m.y - rand(0, 20), vx: 0, vy: -14, life: 0.5, max: 0.5, col: '#5a2a80', size: 1, grav: 0 });
   m._top = dy;
+}
+function monLook(m) {
+  if (m._L && m._Lk === m.unhooded) return m._L; m._Lk = m.unhooded;
+  const d = m.d;
+  m._L = m.unhooded ? Object.assign({}, MON.lich.look, { hood: null, hair: '#e8e0d8', hairStyle: 1 }) : d.art === 'hero' ? Object.assign({}, heroLook(), { eyes: '#d8454a', weapon: 'sword' }) : d.look;
+  return m._L;
+}
+function drawHumanMon(c, m, sc, lift) {
+  const d = m.d, toP = Math.atan2(G.p.y - m.y, G.p.x - m.x);
+  let a;
+  if (m.wind > 0 || m.strikeT > 0 || (m.aggro && !m.scripted)) a = toP;
+  else { const dx = m.x - (m._lx == null ? m.x : m._lx), dy = m.y - (m._ly == null ? m.y : m._ly); a = Math.abs(dx) + Math.abs(dy) > 0.05 ? Math.atan2(dy, dx) : m.dirA == null ? Math.PI / 2 : m.dirA; }
+  if (m.scripted && m.face) a = m.face < 0 ? Math.PI : 0;
+  m._lx = m.x; m._ly = m.y; m.dirA = a;
+  const [dir, flip] = viewOf(a);
+  let anim = 'idle', f = Math.floor((m.t + m.x * 0.01) * 2.2) % 4;
+  if (m.strikeT > 0) { anim = 'atk'; f = m.strikeT > 0.08 ? 1 : 2; }
+  else if (m.wind > 0 && m.pending && m.pending !== 'lunge') { anim = d.ai === 'caster' || d.ai === 'ranged' ? 'cast' : 'atk'; f = 0; }
+  else if (m.flinch > 0) anim = 'hurt';
+  else if (m.moving) { anim = 'walk'; f = Math.floor(m.walk * 1.25) % 8; }
+  const o = { dir, flip, anim, f, blink: ((m.t + m.x * 0.13) % 3.7) < 0.12, scale: sc, armor: d.look && d.look.armor, trim: d.look && d.look.trim, helm: d.look && d.look.helm };
+  if (m.flash > 0) o.tint = 'white'; else if (m.wind > 0 && Math.floor(G.time * 14) % 2) o.tint = 'red'; else if (m.slowT > 0) o.tint = 'ice'; else if (d.art === 'hero') o.tint = 'dark';
+  if (!d.ghost) shadow(c, m.x, m.y, Math.max(6, m.w * 0.8));
+  let al = 1; if (d.alpha) al = d.alpha * (0.85 + Math.sin(m.t * 4) * 0.15); if (m.fadeOut) al *= clamp(1 - m.fadeOut / 1.5, 0, 1); if (m.scripted && m.type !== 'lich') al *= 0.85;
+  c.globalAlpha = al;
+  const sq = m.flinch > 0 ? 1 : 0;
+  drawChar(c, m.x + (m.strikeT > 0 ? Math.cos(a) * 2 : 0), m.y - lift + sq, monLook(m), o);
+  c.globalAlpha = 1;
+  if (m.burnT > 0 && chance(0.4)) G.parts.push({ x: m.x + rand(-5, 5), y: m.y - rand(2, monBodyH(m)), vx: 0, vy: -20, life: 0.4, max: 0.4, col: chance(0.5) ? '#ff7a2a' : '#ffd27a', size: 1, grav: 0 });
+  if (m.wind > 0 && (m.pending === 'lunge' || (m.pending && m.pending.startsWith('charge')))) { c.strokeStyle = 'rgba(255,60,60,.5)'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(m.x, m.y - 4); c.lineTo(G.p.x, G.p.y - 4); c.stroke(); c.setLineDash([]); }
+  if (d.art === 'hero' || m.type === 'hollow_finn' || m.type === 'shade') if (chance(0.3)) G.parts.push({ x: m.x + rand(-6, 6), y: m.y - rand(0, 26 * sc), vx: 0, vy: -14, life: 0.5, max: 0.5, col: '#5a2a80', size: 1, grav: 0 });
+  m._top = m.y - lift - 30 * sc;
 }
 function drawCorpse(c, k) {
   const d = k.d, t = k.t, sc = d.scale || 1;
@@ -115,13 +183,22 @@ function drawCorpse(c, k) {
 // ---------- people ----------
 function drawNPC(c, n) {
   if (n.hidden) return;
-  shadow(c, n.x, n.y, 6);
-  drawHuman(c, n.x, n.y, n.look, { face: n.face, moving: n.moving, walk: n.walk, blink: n.blink > 0, breathe: !n.moving && Math.sin(n.breatheT * 2.1) > 0.55, pose: n.pose, poseT: n.poseT });
+  shadow(c, n.x, n.y, 8);
+  let dir = 'down', flip = false;
+  if (n.pose === 'hammer' || n.pose === 'work') { dir = 'side'; flip = n.face < 0; }
+  else if (n.pose === 'wave') dir = 'down';
+  else if (n.dirA != null) [dir, flip] = viewOf(n.dirA);
+  let anim = 'idle', f = !n.moving && Math.sin(n.breatheT * 2.1) > 0.55 ? 1 : 0;
+  if (n.pose) { anim = n.pose; f = n.poseT >= (n.pose === 'hammer' ? 0.55 : 0.5) ? 1 : 0; }
+  else if (n.moving) { anim = 'walk'; f = Math.floor((n.walk / TAU) * 8 + 800) % 8; }
+  drawChar(c, n.x, n.y, n.look, { dir, flip, anim, f, blink: n.blink > 0 });
+  if (n.pose === 'hammer') { const up = n.poseT < 0.55, hx = n.x + (n.face < 0 ? -1 : 1) * (up ? 1 : 7), hy = n.y - (up ? 19 : 9); px(c, hx - 1, hy - (up ? 6 : 1), 2, up ? 7 : 2, '#5a3418'); px(c, hx + (n.face < 0 ? -4 : 1) * (up ? 0 : 1) - (up ? 2 : 0), hy - (up ? 9 : 3), 5, 4, '#6a6e78'); }
 }
 function drawFinn(c, f) {
-  shadow(c, f.x, f.y, 6);
-  drawHuman(c, f.x, f.y, f.look, { face: G.p.x < f.x ? -1 : 1, breathe: Math.sin(f.t * 2) > 0.5 });
-  if (f.chained) { c.strokeStyle = '#8a8c92'; c.beginPath(); c.moveTo(f.x - 10, f.y - 30); c.lineTo(f.x - 4, f.y - 10); c.moveTo(f.x + 10, f.y - 30); c.lineTo(f.x + 4, f.y - 10); c.stroke(); if (chance(0.2)) G.parts.push({ x: f.x + rand(-6, 6), y: f.y - rand(0, 20), vx: 0, vy: -12, life: 0.6, max: 0.6, col: '#5a2a80', size: 1, grav: 0 }); }
+  shadow(c, f.x, f.y, 8);
+  const a = Math.atan2(G.p.y - f.y, G.p.x - f.x), [dir, flip] = viewOf(a);
+  drawChar(c, f.x, f.y, f.look, { dir, flip, anim: 'idle', f: Math.sin(f.t * 2) > 0.5 ? 1 : 0, blink: (f.t % 3.3) < 0.12 && !f.look.eyeCol });
+  if (f.chained) { c.strokeStyle = '#8a8c92'; c.beginPath(); c.moveTo(f.x - 12, f.y - 34); c.lineTo(f.x - 5, f.y - 12); c.moveTo(f.x + 12, f.y - 34); c.lineTo(f.x + 5, f.y - 12); c.stroke(); }
 }
 // ---------- trees and grass ----------
 function drawTree(c, tr) {
@@ -188,10 +265,24 @@ function drawProj(c, b) {
   else if (b.kind === 'sand') { px(c, x - 2, y - 1, 4, 3, '#c8a458'); px(c, x - 1, y - 1, 2, 1, '#fff3d2'); }
   else { const col = PROJ_COL[b.kind] || '#ffb03a', r = b.kind === 'bigfire' ? 5 : b.kind === 'pfire' ? 3 : 2; px(c, x - r - 1, y - r - 1, r * 2 + 3, r * 2 + 3, darken(col, 0.6)); px(c, x - r, y - r, r * 2 + 1, r * 2 + 1, col); px(c, x - 1, y - 1, 2, 2, '#ffffff'); }
 }
+// a crescent of light that sweeps the way the weapon swings, thick in the middle and fading at the tail
+function drawSwoosh(c, f, t) {
+  const prog = 1 - t, r = f.range * 0.92, a0 = f.ang - f.arc / 2, a1 = f.ang + f.arc / 2, d = f.swing || 1;
+  const head = d > 0 ? lerp(a0, a1, Math.min(1, prog * 2.2)) : lerp(a1, a0, Math.min(1, prog * 2.2)), tail = f.arc * 0.85, steps = 14, seg = tail / steps + 0.02;
+  for (let i = 0; i < steps; i++) {
+    const k = i / steps, a = head - d * (tail * k); if (d > 0 ? a - seg < a0 - 0.05 : a + seg > a1 + 0.05) break;
+    const th = (1 - k) * (5 + f.range * 0.14) * (0.45 + t * 0.55), ro = r + th * 0.5, ri = Math.max(1, r - th * 0.5);
+    const s0 = d > 0 ? a - seg : a, s1 = d > 0 ? a : a + seg;
+    c.globalAlpha = (1 - k) * Math.min(1, t * 1.7) * 0.92; c.fillStyle = k < 0.22 ? '#ffffff' : f.col;
+    c.beginPath(); c.arc(f.x, f.y, ro, s0, s1, false); c.arc(f.x, f.y, ri, s1, s0, true); c.closePath(); c.fill();
+  }
+  c.globalAlpha = 1;
+}
 function drawFx(c) {
   for (const f of G.fx) {
     const t = f.life / f.max;
-    if (f.kind === 'slash') { c.globalAlpha = t; c.strokeStyle = f.col; c.lineWidth = 2; c.beginPath(); c.arc(f.x, f.y, f.range * (1.05 - t * 0.25), f.ang - f.arc / 2, f.ang + f.arc / 2); c.stroke(); }
+    if (f.kind === 'slash') drawSwoosh(c, f, t);
+    else if (f.kind === 'hit') { const k = 1 - t, r = 3 + k * 9; c.globalAlpha = t; c.fillStyle = '#ffffff'; for (let i = 0; i < 4; i++) { const a = f.ang + i * (Math.PI / 2); c.beginPath(); c.moveTo(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r); c.lineTo(f.x + Math.cos(a + 0.5) * 2, f.y + Math.sin(a + 0.5) * 2); c.lineTo(f.x + Math.cos(a - 0.5) * 2, f.y + Math.sin(a - 0.5) * 2); c.fill(); } c.fillStyle = f.col || '#ffe08a'; c.fillRect(Math.round(f.x) - 1, Math.round(f.y) - 1, 3, 3); }
     else if (f.kind === 'ring') { c.globalAlpha = t; c.strokeStyle = f.col; c.lineWidth = 2; const r = lerp(f.r1, f.r0, t); c.beginPath(); c.ellipse(f.x, f.y, r, r * 0.6, 0, 0, TAU); c.stroke(); }
     else if (f.kind === 'ripple') { c.globalAlpha = t * 0.8; c.strokeStyle = '#d8f0ff'; c.lineWidth = 1; const r = (1 - t) * 10 + 2; c.beginPath(); c.ellipse(f.x, f.y, r, r * 0.45, 0, 0, TAU); c.stroke(); }
     else if (f.kind === 'spin') { c.globalAlpha = t; c.strokeStyle = '#ffffff'; c.lineWidth = 2; const a0 = (1 - t) * TAU * 1.5; c.beginPath(); c.arc(f.x, f.y, f.r * 0.8, a0, a0 + 2.4); c.stroke(); c.beginPath(); c.arc(f.x, f.y, f.r * 0.8, a0 + Math.PI, a0 + Math.PI + 2.4); c.stroke(); }
@@ -251,7 +342,7 @@ function render() {
   for (const d of A.doors || []) { if (d.kind === 'open') continue; const X = d.tx * 16, Y = d.ty * 16; list.push([Y + 16, () => { if (!d.open) ctx.drawImage(d.kind === 'key' ? PROP.keydoor : PROP.gate, X, Y + 16 - 22); else if (d.kind === 'gate') ctx.drawImage(PROP.gate, 0, 16, 16, 6, X, Y - 4, 16, 6); }]); }
   if (A.lever) list.push([A.lever.y, () => ctx.drawImage(A.lever.pulled ? PROP.lever1 : PROP.lever0, A.lever.x - 6, A.lever.y - 13)]);
   if (A.secret && !A.secret.open) { const s = A.secret; list.push([s.ty * 16 + 16, () => { ctx.drawImage(PROP.crack, s.tx * 16, s.ty * 16); if (s.revealed && Math.floor(G.time * 3) % 2) { ctx.strokeStyle = '#f2c13a'; ctx.strokeRect(s.tx * 16 + 0.5, s.ty * 16 + 0.5, 15, 15); } }]); }
-  if (A.captive) { const cp = A.captive; list.push([cp.y, () => { ctx.globalAlpha = cp.freed ? clamp(cp.leaveT / 1.5, 0, 1) : 1; ctx.drawImage(PROP.captive, Math.round(cp.x - 8), Math.round(cp.y - 21)); ctx.globalAlpha = 1; }]); }
+  if (A.captive) { const cp = A.captive; list.push([cp.y, () => { ctx.globalAlpha = cp.freed ? clamp(cp.leaveT / 1.5, 0, 1) : 1; ctx.drawImage(PROP.captive, Math.round(cp.x - 16), Math.round(cp.y - 33)); ctx.globalAlpha = 1; }]); }
   if (A.finn) list.push([A.finn.y, () => drawFinn(ctx, A.finn)]);
   for (const k of G.corpses) list.push([k.y - 1, () => drawCorpse(ctx, k)]);
   for (const n of A.npcs) if (!n.hidden && vis(n.x, n.y)) list.push([n.y, () => drawNPC(ctx, n)]);
@@ -335,13 +426,13 @@ function drawLabels(cx, cy) {
     for (const n of A.npcs) {
       if (n.hidden) continue;
       const mk = G.save ? Quests.marker(n.id) : null, near = dist(n.x, n.y, p.x, p.y) < 90;
-      if (mk) tinyText(ctx, mk, n.x, n.y - 30 + Math.sin(G.time * 4) * 1.5, mk === '?' ? '#7dff8a' : '#f2c13a', 2);
-      if (near) tinyText(ctx, n.name, n.x, n.y - 24, n.shop ? '#f2c13a' : '#efe4cc');
-      if (n.bubbleT > 0) tinyText(ctx, n.bubble, n.x, n.y - (mk ? 40 : 30), '#ffffff');
+      if (mk) tinyText(ctx, mk, n.x, n.y - 42 + Math.sin(G.time * 4) * 1.5, mk === '?' ? '#7dff8a' : '#f2c13a', 2);
+      if (near) tinyText(ctx, n.name, n.x, n.y - 33, n.shop ? '#f2c13a' : '#efe4cc');
+      if (n.bubbleT > 0) tinyText(ctx, n.bubble, n.x, n.y - (mk ? 52 : 41), '#ffffff');
     }
   }
   for (const pt of A.portals) tinyText(ctx, 'EXIT', pt.x, pt.y - 18, '#d8b8ff');
-  if (A.captive && !A.captive.freed) tinyText(ctx, 'HELP!', A.captive.x, A.captive.y - 26 + Math.sin(G.time * 5), '#ffffff');
+  if (A.captive && !A.captive.freed) tinyText(ctx, 'HELP!', A.captive.x, A.captive.y - 37 + Math.sin(G.time * 5), '#ffffff');
   for (const m of G.mons) {
     if (A.kind === 'dungeon' && dist(m.x, m.y, p.x, p.y) > 150) continue;
     if (m.scripted && m.type === 'lich' && Story.active()) continue;

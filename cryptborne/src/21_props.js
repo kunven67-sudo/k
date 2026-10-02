@@ -162,7 +162,7 @@ function bakeProp(kind) {
     case 'lever0': case 'lever1': [c, x] = mkCanvas(12, 14); px(x, 1, 8, 10, 6, '#44464b'); px(x, 1, 8, 10, 1, '#6a6c72');
       if (kind === 'lever0') { for (let i = 0; i < 7; i++) px(x, 4 - Math.round(i * 0.4), 8 - i, 2, 1, '#8a5a2b'); px(x, 0, 0, 4, 3, '#d8454a'); } else { for (let i = 0; i < 7; i++) px(x, 6 + Math.round(i * 0.4), 8 - i, 2, 1, '#8a5a2b'); px(x, 8, 0, 4, 3, '#5cc46e'); }
       break;
-    case 'captive': [c, x] = mkCanvas(16, 22); drawHuman(x, 8, 21, { skin: '#f0c08a', hair: '#7a4a24', hairStyle: 0, shirt: '#8a8f99', pants: '#4a3a2a', shoes: '#2a1a10' }, { face: 1 }); px(x, 2, 11, 12, 2, '#b08a4a'); px(x, 2, 16, 12, 1, '#b08a4a'); break;
+    case 'captive': [c, x] = mkCanvas(32, 36); drawChar(x, 16, 33, { skin: '#f0c08a', hair: '#7a4a24', hairStyle: 0, shirt: '#8a8f99', pants: '#4a3a2a', shoes: '#2a1a10' }, { dir: 'down', anim: 'hurt' }); px(x, 7, 21, 18, 2, '#b08a4a'); px(x, 8, 25, 16, 1, '#b08a4a'); px(x, 10, 29, 12, 1, '#b08a4a'); break;
     case 'crack': [c, x] = mkCanvas(16, 16); for (const [a, b] of [[7, 2], [8, 3], [8, 4], [7, 5], [6, 6], [7, 7], [9, 8], [10, 9], [9, 10], [8, 11], [6, 9], [5, 10]]) px(x, a, b, 1, 1, '#07050a'); break;
     case 'note': [c, x] = mkCanvas(10, 10); px(x, 1, 1, 8, 8, '#efe4cc'); px(x, 0, 0, 10, 2, '#c8b88a'); px(x, 0, 8, 10, 2, '#c8b88a'); px(x, 2, 3, 6, 1, '#5a4a3a'); px(x, 2, 5, 5, 1, '#5a4a3a'); break;
     case 'bed': [c, x] = mkCanvas(14, 24); px(x, 0, 0, 14, 24, '#5a3418'); px(x, 1, 1, 12, 6, '#efe4cc'); px(x, 1, 7, 12, 16, '#3e6cb8'); px(x, 1, 7, 12, 2, '#5a8ad0'); break;

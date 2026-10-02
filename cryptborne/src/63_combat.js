@@ -23,7 +23,7 @@ function hurtMon(m, dmg, o = {}) {
     if (o.poison) m.poisonT = 4; if (o.burn) m.burnT = 3;
     if (o.stun && !m.boss) { m.stun = Math.max(m.stun, o.stun); m.wind = 0; m.act = null; }
     if (o.stun && m.boss) m.stun = Math.max(m.stun, o.stun * 0.25);
-    Sfx.play(o.crit ? 'crit' : 'hit', m);
+    Sfx.play(o.crit ? 'crit' : 'hit', m); G.fx.push({ kind: 'hit', x: cx + rand(-3, 3), y: cy + rand(-3, 3), ang: rand(0, 1.5), life: o.crit ? 0.2 : 0.14, max: o.crit ? 0.2 : 0.14, col: o.crit ? '#ffd23a' : '#ffffff' });
     if (o.crit) { shake(2); G.hitstop = 0.035; }
     if (o.ls) { const st = PS(); if (st.lifesteal) { p.hp = Math.min(st.maxHp, p.hp + Math.max(1, dmg * st.lifesteal)); UI.hudDirty(); } }
   }
@@ -73,12 +73,12 @@ function playerDie() {
 // ---------- the hero's basic attack ----------
 function playerAttack() {
   const p = G.p, w = weaponDef(), st = PS();
-  p.atkCd = w.cd * st.cdMult; p.atkT = 0.2; p.swing = -p.swing || 1;
+  p.atkCd = w.cd * st.cdMult; p.atkT = 0.2; p.swing = -p.swing || 1; p.lastAtkT = G.time;
   const hx = p.x + Math.cos(p.aim) * 6, hy = p.y - 10 + Math.sin(p.aim) * 6;
   if (w.wc === 'melee') {
     Sfx.play(w.cd > 0.55 ? 'heavy' : 'swing');
     const col = { runeblade: '#5ff0ff', soul_scythe: '#b878ea', venom_dagger: '#9be04a', sun_scimitar: '#ffd27a', frost_axe: '#9fe8ff', shadow_blade: '#d8454a' }[w.id] || '#ffffff';
-    G.fx.push({ kind: 'slash', x: p.x, y: p.y - 10, ang: p.aim, range: w.range, arc: (w.arc * Math.PI) / 180, life: 0.16, max: 0.16, col });
+    G.fx.push({ kind: 'slash', x: p.x, y: p.y - 12, ang: p.aim, range: w.range + 4, arc: (w.arc * Math.PI) / 180 + 0.3, life: 0.2, max: 0.2, col, swing: p.swing });
     for (const m of G.mons) {
       if (m.dead) continue; const [cx, cy] = monCenter(m); const dx = cx - p.x, dy = cy - (p.y - 10), dd = Math.hypot(dx, dy), rad = m.w / 2 + 4;
       if (dd > w.range + rad) continue;
@@ -123,7 +123,7 @@ function useSpecial(slot) {
   const p = G.p, id = S().specials[slot]; if (!id || G.dead) return;
   const sp = SPECIALS[id], st = PS();
   if (p.cds[slot] > 0) { addText(p.x, p.y - 28, Math.ceil(p.cds[slot]) + 's', '#cdc4b4'); return; }
-  p.cds[slot] = sp.cd * st.cdr; p.cdMax[slot] = p.cds[slot];
+  p.cds[slot] = sp.cd * st.cdr; p.cdMax[slot] = p.cds[slot]; p.castT = 0.35; p.lastAtkT = G.time;
   const base = st.dmg * (sp.mul || 1) * st.special, aim = p.aim;
   Sfx.play('special');
   const forEach = (fn) => { for (const m of G.mons) if (!m.dead) fn(m); };

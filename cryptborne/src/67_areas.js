@@ -161,13 +161,13 @@ function updateNPCs(dt) {
     n.wait -= dt;
     if (!night || !n.door) if (n.wait <= 0 && n.wander > 0 && !n.chatT) { n.wait = rand(2, 6); for (let k = 0; k < 8; k++) { const tx = n.home[0] + rand(-n.wander, n.wander), ty = n.home[1] + rand(-n.wander * 0.6, n.wander * 0.6); if (!blockedBox({ w: 8, h: 6 }, tx, ty, false) && (!A.safe.length || inTownPx(tx, ty))) { n.tx = tx; n.ty = ty; break; } } }
     const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy);
-    if (d > 2 && !n.chatT && !(n.waveT > 0)) { const e = { x: n.x, y: n.y, w: 8, h: 6 }; if (moveEntity(e, (dx / d) * 28 * dt, (dy / d) * 28 * dt, false) && d < 40) { n.tx = n.x; n.ty = n.y; } n.x = e.x; n.y = e.y; n.moving = true; n.walk += dt * 8; n.face = dx < 0 ? -1 : 1; }
-    else { n.moving = false; if (dist(n.x, n.y, p.x, p.y) < 60 && !n.chatT && n.job !== 'hammer') n.face = p.x < n.x ? -1 : 1; }
+    if (d > 2 && !n.chatT && !(n.waveT > 0)) { const e = { x: n.x, y: n.y, w: 8, h: 6 }; if (moveEntity(e, (dx / d) * 28 * dt, (dy / d) * 28 * dt, false) && d < 40) { n.tx = n.x; n.ty = n.y; } n.x = e.x; n.y = e.y; n.moving = true; n.walk += dt * 8; n.face = dx < 0 ? -1 : 1; n.dirA = Math.atan2(dy, dx); }
+    else { n.moving = false; if (dist(n.x, n.y, p.x, p.y) < 60 && !n.chatT && n.job !== 'hammer') { n.face = p.x < n.x ? -1 : 1; n.dirA = Math.atan2(p.y - n.y, p.x - n.x); } else if (!n.chatT && n.idleT == null) n.dirA = Math.PI / 2; }
     // two idle villagers next to each other start chatting
     if (n.chatT > 0) { n.chatT -= dt; if (n.chatT <= 0) { n.chatT = 0; n.chatWith = null; } }
     else if (n.wander && !n.moving && chance(dt * 0.3)) {
       const o = npcs.find((m) => m !== n && m.wander && !m.hidden && !m.chatT && !m.moving && dist(m.x, m.y, n.x, n.y) < 34);
-      if (o) { n.chatT = o.chatT = rand(4, 7); n.chatWith = o; o.chatWith = n; n.face = o.x < n.x ? -1 : 1; o.face = -n.face; }
+      if (o) { n.chatT = o.chatT = rand(4, 7); n.chatWith = o; o.chatWith = n; n.face = o.x < n.x ? -1 : 1; o.face = -n.face; n.dirA = Math.atan2(o.y - n.y, o.x - n.x); o.dirA = n.dirA + Math.PI; }
     }
     if (n.chatT > 0 && chance(dt * 0.8)) { n.bubble = pick(['...', '!', '?', 'HA HA', '*']); n.bubbleT = 1.2; }
     n.bubbleT = Math.max(0, (n.bubbleT || 0) - dt);

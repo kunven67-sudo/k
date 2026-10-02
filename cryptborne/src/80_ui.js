@@ -27,7 +27,7 @@ function slotHTML(s, key) {
   if (!s) return key ? `<span class="k">${key}</span>` : '';
   return `<img class="px" src="${iconURL(s.id)}" alt="">${s.n > 1 ? `<span class="n">${s.n}</span>` : s.up ? `<span class="n">+${s.up}</span>` : ''}${key ? `<span class="k">${key}</span>` : ''}`;
 }
-function humanPortrait(canvasEl, look, st) { const c = canvasEl.getContext('2d'); c.imageSmoothingEnabled = false; c.clearRect(0, 0, canvasEl.width, canvasEl.height); drawHuman(c, canvasEl.width / 2, canvasEl.height, look, Object.assign({ face: 1 }, st || {})); }
+function humanPortrait(canvasEl, look, st) { const c = canvasEl.getContext('2d'); c.imageSmoothingEnabled = false; c.clearRect(0, 0, canvasEl.width, canvasEl.height); drawChar(c, canvasEl.width / 2, canvasEl.height + 2, look, Object.assign({ dir: 'down', anim: 'idle', f: 0 }, st || {})); }
 function upgradeMats(tier) { // monster parts usable for upgrades, cheapest first
   const want = { common: ['common'], uncommon: ['uncommon', 'rare'], rare: ['rare', 'epic'] }[tier];
   const out = []; inv().forEach((s, i) => { if (s && ITEMS[s.id].type === 'loot' && want.includes(ITEMS[s.id].rarity)) out.push(i); });
@@ -304,7 +304,7 @@ const UI = {
     $('#dlgText').textContent = ''; this.dlgS = { full: text, shown: 0, t: 0, pitch: NPC_BLIP[n.id] || 1 };
     const box = $('#dlgActs'); box.innerHTML = '';
     for (const [l, c, f] of acts) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm ' + c; b.textContent = l; b.addEventListener('click', f); box.appendChild(b); }
-    this.openModal('dialogModal'); Sfx.play('click'); n.face = G.p.x < n.x ? -1 : 1;
+    this.openModal('dialogModal'); Sfx.play('click'); n.face = G.p.x < n.x ? -1 : 1; n.dirA = Math.atan2(G.p.y - n.y, G.p.x - n.x);
   },
   // ----- map -----
   openMap() { if (G.dead || Story.active()) return; this.mapSel = G.area.kind === 'dungeon' ? G.area.def.id : this.mapSel || 'mossy'; this.openModal('mapModal'); this.renderMap(); Sfx.play('click'); },

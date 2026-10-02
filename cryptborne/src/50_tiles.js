@@ -67,6 +67,8 @@ function paintTile(x, m, tx, ty, theme, tOverride) {
       px(x, X, Y, 16, 1, 'rgba(0,0,0,.18)'); px(x, X, Y, 1, 16, 'rgba(0,0,0,.18)');
       if (h < 0.25) { px(x, X + 4, Y + 6, 4, 1, 'rgba(0,0,0,.25)'); px(x, X + 7, Y + 7, 1, 3, 'rgba(0,0,0,.25)'); }
       if (h > 0.85) px(x, X + 10, Y + 10, 2, 2, 'rgba(255,255,255,.06)');
+      if (h > 0.6 && h < 0.66) { px(x, X + 3, Y + 11, 2, 1, 'rgba(0,0,0,.3)'); px(x, X + 9, Y + 4, 1, 1, 'rgba(255,255,255,.08)'); }
+      floorShade(x, m, tx, ty, X, Y);
       break;
     }
     case T.LAVA: px(x, X, Y, 16, 16, '#b8381a'); for (let i = 0; i < 3; i++) px(x, X + Math.floor(hash2(tx, ty, i) * 12), Y + Math.floor(hash2(ty, tx, i) * 12), 4, 3, '#ff8a2a'); break;
@@ -75,13 +77,22 @@ function paintTile(x, m, tx, ty, theme, tOverride) {
       if (!SOLID_T[below] && below !== T.VOID) { // wall face with bricks
         px(x, X, Y, 16, 16, theme.face); px(x, X, Y, 16, 3, theme.top);
         for (let r = 0; r < 3; r++) { const yy = Y + 3 + r * 4 + 3; px(x, X, yy, 16, 1, theme.wall); const off = (r + tx) % 2 ? 4 : 12; px(x, X + off, yy - 3, 1, 3, theme.wall); }
-        px(x, X, Y + 15, 16, 1, 'rgba(0,0,0,.45)');
+        px(x, X, Y + 15, 16, 1, 'rgba(0,0,0,.45)'); px(x, X, Y + 11, 16, 4, 'rgba(0,0,0,.14)'); px(x, X, Y + 3, 16, 1, 'rgba(255,255,255,.08)');
+        if (h < 0.18) { px(x, X + 2 + Math.floor(h * 40), Y + 11, 3, 4, 'rgba(70,110,50,.55)'); px(x, X + 3 + Math.floor(h * 40), Y + 9, 1, 2, 'rgba(70,110,50,.55)'); }
+        else if (h > 0.82) { px(x, X + 7, Y + 5, 1, 3, 'rgba(0,0,0,.35)'); px(x, X + 8, Y + 8, 1, 2, 'rgba(0,0,0,.35)'); }
         if (theme.deco === 'icicle' && h < 0.5) { px(x, X + 4, Y + 16 - 1, 1, 1, '#d8f0ff'); }
       } else {
         let near = false;
         for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) { const n = tileAt(m, tx + dx, ty + dy); if (!SOLID_T[n] && n !== T.VOID) { near = true; break; } }
         px(x, X, Y, 16, 16, near ? theme.wall : '#07050a');
-        if (near) { px(x, X + 2, Y + 3, 3, 1, theme.top); px(x, X + 9, Y + 10, 3, 1, theme.top); }
+        if (near) { // the top of the wall: stone caps with a lit rim along every edge that drops to the floor
+          px(x, X, Y + 7, 16, 1, 'rgba(0,0,0,.22)'); px(x, X + ((tx + ty) % 2 ? 5 : 11), Y, 1, 7, 'rgba(0,0,0,.18)'); px(x, X + ((tx + ty) % 2 ? 11 : 4), Y + 8, 1, 8, 'rgba(0,0,0,.18)');
+          px(x, X + 2, Y + 2, 3, 1, 'rgba(255,255,255,.07)');
+          const open = (dx, dy) => { const n = tileAt(m, tx + dx, ty + dy); return !SOLID_T[n] && n !== T.VOID; };
+          const faceBelow = tileAt(m, tx, ty + 1) === T.WALL && open(0, 2);
+          if (faceBelow || open(0, 1)) px(x, X, Y + 15, 16, 1, theme.top);
+          if (open(-1, 0)) px(x, X, Y, 1, 16, theme.top); if (open(1, 0)) px(x, X + 15, Y, 1, 16, theme.top); if (open(0, -1)) px(x, X, Y, 16, 1, theme.top);
+        }
       }
       break;
     }
@@ -89,6 +100,14 @@ function paintTile(x, m, tx, ty, theme, tOverride) {
       if (TREE_KIND[t]) { paintTile(x, m, tx, ty, theme, groundUnder(m, tx, ty)); break; }
       px(x, X, Y, 16, 16, '#07050a');
   }
+}
+// soft shadow on the floor where it meets a wall (Moonlighter-style depth)
+function floorShade(x, m, tx, ty, X, Y) {
+  const wall = (dx, dy) => { const n = tileAt(m, tx + dx, ty + dy); return n === T.WALL || n === T.VOID || n === T.IWALL; };
+  if (wall(0, -1)) { px(x, X, Y, 16, 3, 'rgba(0,0,0,.32)'); px(x, X, Y + 3, 16, 2, 'rgba(0,0,0,.15)'); }
+  if (wall(-1, 0)) px(x, X, Y, 2, 16, 'rgba(0,0,0,.22)');
+  if (wall(1, 0)) px(x, X + 14, Y, 2, 16, 'rgba(0,0,0,.16)');
+  if (wall(0, 1)) px(x, X, Y + 15, 16, 1, 'rgba(0,0,0,.18)');
 }
 function renderLayer(m, theme) {
   const [c, x] = mkCanvas(m.w * TILE, m.h * TILE);
