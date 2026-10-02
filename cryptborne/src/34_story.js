@@ -36,9 +36,9 @@ const NOTES_NEEDED = Math.ceil(NOTE_IDS.length / 2); // 13 of 25 to reach Finn
 
 // who speaks: portrait look + name colour
 const SPEAKERS = {
-  you: { name: null, col: '#f2e6c8' }, finn: { name: 'Finn', col: '#9be04a' }, hollow: { name: 'Finn', col: '#d8454a' },
-  voice: { name: 'The voice', col: '#b878ea' }, lich: { name: 'The Lich', col: '#7ff8ff' }, dad: { name: 'Aldric', col: '#7ff8ff' },
-  tobin: { name: 'Elder Tobin', col: '#f2c13a' }, narrator: { name: null, col: '#cdc4b4' }, shadow: { name: 'Shadow You', col: '#d8454a' },
+  you: { name: null, col: '#f2e6c8', blip: 1 }, finn: { name: 'Finn', col: '#9be04a', blip: 1.3 }, hollow: { name: 'Finn', col: '#d8454a', blip: 0.8 },
+  voice: { name: 'The voice', col: '#b878ea', blip: 0.62 }, lich: { name: 'The Lich', col: '#7ff8ff', blip: 0.55 }, dad: { name: 'Aldric', col: '#7ff8ff', blip: 0.6 },
+  tobin: { name: 'Elder Tobin', col: '#f2c13a', blip: 0.78 }, narrator: { name: null, col: '#cdc4b4', blip: 0.9 }, shadow: { name: 'Shadow You', col: '#d8454a', blip: 0.7 },
 };
 const FINN_LOOK = (look) => ({ skin: look.skin, hair: look.hair, hairStyle: 0, shirt: '#5a8a3a', shirtDark: '#3d6a2a', pants: '#4a3a2a', shoes: '#2a1a10' });
 const DAD_LOOK = { skin: '#b8b0a8', hair: '#e8e0d8', hairStyle: 2, beard: '#e8e0d8', robe: '#3a1a50', shirt: '#3a1a50', shoes: '#2a1040' };

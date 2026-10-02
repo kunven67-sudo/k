@@ -715,6 +715,13 @@ const Sfx = {
     if (typeof G !== 'undefined' && G.area && G.area.kind === 'dungeon') opt.verb = 0.28;
     const f = SFX[name]; if (f) f(AU.sfx, m, opt);
   },
+  // the soft tick while dialogue text types out (not a voice, just a blip)
+  blip(pitch = 1) {
+    const ac = AU.ctx; if (!ac || SET.sfx <= 0) return;
+    const f = 440 * pitch * (1 + (Math.random() - 0.5) * 0.06);
+    aTone(AU.sfx, f, 0.045, { type: 'square', vol: 0.035, lp: 2400, attack: 0.002 });
+    aTone(AU.sfx, f * 2, 0.03, { type: 'triangle', vol: 0.025, attack: 0.002 });
+  },
   voice(kind, pitch = 1, o) {
     const ac = AU.ctx; if (!ac || SET.sfx <= 0 || !VOICE[kind]) return;
     const opt = {}; let m = 1;
@@ -1745,9 +1752,9 @@ const NOTES_NEEDED = Math.ceil(NOTE_IDS.length / 2); // 13 of 25 to reach Finn
 
 // who speaks: portrait look + name colour
 const SPEAKERS = {
-  you: { name: null, col: '#f2e6c8' }, finn: { name: 'Finn', col: '#9be04a' }, hollow: { name: 'Finn', col: '#d8454a' },
-  voice: { name: 'The voice', col: '#b878ea' }, lich: { name: 'The Lich', col: '#7ff8ff' }, dad: { name: 'Aldric', col: '#7ff8ff' },
-  tobin: { name: 'Elder Tobin', col: '#f2c13a' }, narrator: { name: null, col: '#cdc4b4' }, shadow: { name: 'Shadow You', col: '#d8454a' },
+  you: { name: null, col: '#f2e6c8', blip: 1 }, finn: { name: 'Finn', col: '#9be04a', blip: 1.3 }, hollow: { name: 'Finn', col: '#d8454a', blip: 0.8 },
+  voice: { name: 'The voice', col: '#b878ea', blip: 0.62 }, lich: { name: 'The Lich', col: '#7ff8ff', blip: 0.55 }, dad: { name: 'Aldric', col: '#7ff8ff', blip: 0.6 },
+  tobin: { name: 'Elder Tobin', col: '#f2c13a', blip: 0.78 }, narrator: { name: null, col: '#cdc4b4', blip: 0.9 }, shadow: { name: 'Shadow You', col: '#d8454a', blip: 0.7 },
 };
 const FINN_LOOK = (look) => ({ skin: look.skin, hair: look.hair, hairStyle: 0, shirt: '#5a8a3a', shirtDark: '#3d6a2a', pants: '#4a3a2a', shoes: '#2a1a10' });
 const DAD_LOOK = { skin: '#b8b0a8', hair: '#e8e0d8', hairStyle: 2, beard: '#e8e0d8', robe: '#3a1a50', shirt: '#3a1a50', shoes: '#2a1040' };
@@ -3177,7 +3184,7 @@ function useSpecial(slot) {
       break;
     case 'buff':
       p.buffs[sp.buff] = sp.t; statsChanged();
-      if (sp.buff === 'warcry') { Sfx.voice('roar', 1.4); shake(4); G.fx.push({ kind: 'ring', x: p.x, y: p.y, r0: 6, r1: 60, life: 0.4, max: 0.4, col: '#d8454a' }); forEach((m) => { if (dist(m.x, m.y, p.x, p.y) < 60 && !m.boss) { const a = Math.atan2(m.y - p.y, m.x - p.x); m.kbx += Math.cos(a) * 200; m.kby += Math.sin(a) * 200; } }); }
+      if (sp.buff === 'warcry') { Sfx.play('slam'); Sfx.play('bell'); shake(4); G.fx.push({ kind: 'ring', x: p.x, y: p.y, r0: 6, r1: 60, life: 0.4, max: 0.4, col: '#d8454a' }); forEach((m) => { if (dist(m.x, m.y, p.x, p.y) < 60 && !m.boss) { const a = Math.atan2(m.y - p.y, m.x - p.x); m.kbx += Math.cos(a) * 200; m.kby += Math.sin(a) * 200; } }); }
       if (sp.buff === 'smoke') { burst(p.x, p.y - 8, 40, '#6a6c72', 70); Sfx.play('dodge'); for (const m of G.mons) if (!m.boss) { m.aggro = false; m.wind = 0; } }
       if (sp.buff === 'shield') { p.shieldHp = st.maxHp * 0.5; Sfx.play('heal'); }
       if (sp.buff === 'eagle') Sfx.play('level');
@@ -3766,7 +3773,7 @@ function updateNPCs(dt) {
       const o = npcs.find((m) => m !== n && m.wander && !m.hidden && !m.chatT && !m.moving && dist(m.x, m.y, n.x, n.y) < 34);
       if (o) { n.chatT = o.chatT = rand(4, 7); n.chatWith = o; o.chatWith = n; n.face = o.x < n.x ? -1 : 1; o.face = -n.face; }
     }
-    if (n.chatT > 0 && chance(dt * 0.8)) { n.bubble = pick(['...', '!', '?', 'HA HA', '*']); n.bubbleT = 1.2; if (dist(n.x, n.y, p.x, p.y) < 120) Sfx.voice('cackle', 1.6, { x: n.x, y: n.y }); }
+    if (n.chatT > 0 && chance(dt * 0.8)) { n.bubble = pick(['...', '!', '?', 'HA HA', '*']); n.bubbleT = 1.2; }
     n.bubbleT = Math.max(0, (n.bubbleT || 0) - dt);
   }
 }
@@ -4352,6 +4359,8 @@ function compareHTML(id, g) {
   const d = key === 'block' ? Math.round((a - b) * 100) : a - b; if (!d) return ' <span class="dim">(same as equipped)</span>';
   return ` <span class="${d > 0 ? 'good' : 'bad'}">(${d > 0 ? '+' : ''}${d}${key === 'block' ? '%' : ''} vs equipped)</span>`;
 }
+// how high each villager's text blips sound (kids high, old folks low)
+const NPC_BLIP = { pip: 1.4, wren: 1.35, mara: 1.15, lena: 1.12, nell: 1.12, sigrid: 1.05, hollis: 1, oskar: 0.95, brom: 0.78, tobin: 0.74, morra: 0.82, rashid: 0.86, vey: 0.8, salty: 0.84 };
 const TYPE_NAME = { weapon: 'Weapon', shield: 'Shield', armor: 'Armor', potion: 'Potion', loot: 'Monster part', map: 'Map', gem: 'Gem', quest: 'Quest item' };
 function slotHTML(s, key) {
   if (!s) return key ? `<span class="k">${key}</span>` : '';
@@ -4409,7 +4418,14 @@ const UI = {
     else if (this.screen === 'creator') this.showScreen('saves');
   },
   // ----- HUD -----
+  dlgTick(dt) { // villager text types out with soft blips
+    const s = this.dlgS; if (!s || this.modal !== 'dialogModal' || s.shown >= s.full.length) return;
+    s.t += dt * 52; const n = Math.min(s.full.length, Math.floor(s.t));
+    if (n > s.shown) { if (Math.floor(n / 2) > Math.floor(s.shown / 2) && /\w/.test(s.full[n - 1])) Sfx.blip(s.pitch); s.shown = n; $('#dlgText').textContent = s.full.slice(0, n); }
+  },
+  dlgFinish() { const s = this.dlgS; if (s) { s.shown = s.t = s.full.length; $('#dlgText').textContent = s.full; } },
   tick(dt) {
+    this.dlgTick(dt);
     this.hudT -= dt;
     if (this._hud || this.hudT <= 0) { this.hudT = 0.12; this._hud = false; this.renderHUD(); }
     if (this._inv) { this._inv = false; this.renderHotbar(); if (this.modal === 'bagModal') this.renderBag(); if (this.modal === 'shopModal') this.renderShop(); }
@@ -4624,10 +4640,10 @@ const UI = {
     if (n.shop) acts.unshift([SHOPS[n.shop].pets ? 'PET SHOP' : 'SHOP', 'gold', () => this.openShop(n.shop)]);
     if (n.id === 'tobin') acts.push(['ASK AGAIN', '', () => this.talk(n)]);
     acts.push(['BYE', '', () => this.closeModal()]);
-    $('#dlgText').textContent = text;
+    $('#dlgText').textContent = ''; this.dlgS = { full: text, shown: 0, t: 0, pitch: NPC_BLIP[n.id] || 1 };
     const box = $('#dlgActs'); box.innerHTML = '';
     for (const [l, c, f] of acts) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm ' + c; b.textContent = l; b.addEventListener('click', f); box.appendChild(b); }
-    this.openModal('dialogModal'); Sfx.voice('cackle', 1.5); n.face = G.p.x < n.x ? -1 : 1;
+    this.openModal('dialogModal'); Sfx.play('click'); n.face = G.p.x < n.x ? -1 : 1;
   },
   // ----- map -----
   openMap() { if (G.dead || Story.active()) return; this.mapSel = G.area.kind === 'dungeon' ? G.area.def.id : this.mapSel || 'mossy'; this.openModal('mapModal'); this.renderMap(); Sfx.play('click'); },
@@ -4848,13 +4864,13 @@ Object.assign(UI, {
     $('#sayName').textContent = name; $('#sayName').style.color = sp.col;
     $('#sayText').style.fontStyle = who === 'narrator' || who === 'voice' ? 'italic' : '';
     const L = lookForSpeaker(who), face = $('#sayFace'); face.hidden = !L; if (L) humanPortrait(face, L, { blink: false });
-    this.sayS = { full: text, shown: 0, t: 0, who };
+    this.sayS = { full: text, shown: 0, t: 0, who, pitch: sp.blip || 1 };
     $('#sayText').textContent = '';
   },
   sayTick(dt) {
     const s = this.sayS; if (!s || s.shown >= s.full.length) return;
     s.t += dt * 48; const n = Math.min(s.full.length, Math.floor(s.t));
-    if (n > s.shown) { if (Math.floor(n / 3) > Math.floor(s.shown / 3) && s.full[n - 1] !== ' ') Sfx.play('click', { vol: 0.25 }); s.shown = n; $('#sayText').textContent = s.full.slice(0, n); }
+    if (n > s.shown) { if (Math.floor(n / 2) > Math.floor(s.shown / 2) && /\w/.test(s.full[n - 1])) Sfx.blip(s.pitch || 1); s.shown = n; $('#sayText').textContent = s.full.slice(0, n); }
   },
   sayBusy() { return !!this.sayS && this.sayS.shown < this.sayS.full.length; },
   sayFinish() { if (!this.sayS) return; this.sayS.shown = this.sayS.full.length; $('#sayText').textContent = this.sayS.full; },
@@ -4907,6 +4923,7 @@ Object.assign(UI, {
     click('#pQuit', () => quitToMenu());
     click('#btnRespawn', () => this.deathButton());
     click('#noteClose', () => this.closeModal());
+    $('#dlgText').addEventListener('click', () => this.dlgFinish());
     for (const b of $$('#journalModal [data-jt]')) b.addEventListener('click', () => { this.jTab = b.dataset.jt; Sfx.play('page'); this.renderJournal(); });
     $('#cutscene').addEventListener('pointerdown', (e) => { if (e.target.closest('button')) return; AU.unlock(); Story.advance(); });
     $('#skipScene').addEventListener('click', (e) => { e.stopPropagation(); Story.skip(); });

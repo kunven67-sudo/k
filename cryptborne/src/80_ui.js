@@ -20,6 +20,8 @@ function compareHTML(id, g) {
   const d = key === 'block' ? Math.round((a - b) * 100) : a - b; if (!d) return ' <span class="dim">(same as equipped)</span>';
   return ` <span class="${d > 0 ? 'good' : 'bad'}">(${d > 0 ? '+' : ''}${d}${key === 'block' ? '%' : ''} vs equipped)</span>`;
 }
+// how high each villager's text blips sound (kids high, old folks low)
+const NPC_BLIP = { pip: 1.4, wren: 1.35, mara: 1.15, lena: 1.12, nell: 1.12, sigrid: 1.05, hollis: 1, oskar: 0.95, brom: 0.78, tobin: 0.74, morra: 0.82, rashid: 0.86, vey: 0.8, salty: 0.84 };
 const TYPE_NAME = { weapon: 'Weapon', shield: 'Shield', armor: 'Armor', potion: 'Potion', loot: 'Monster part', map: 'Map', gem: 'Gem', quest: 'Quest item' };
 function slotHTML(s, key) {
   if (!s) return key ? `<span class="k">${key}</span>` : '';
@@ -77,7 +79,14 @@ const UI = {
     else if (this.screen === 'creator') this.showScreen('saves');
   },
   // ----- HUD -----
+  dlgTick(dt) { // villager text types out with soft blips
+    const s = this.dlgS; if (!s || this.modal !== 'dialogModal' || s.shown >= s.full.length) return;
+    s.t += dt * 52; const n = Math.min(s.full.length, Math.floor(s.t));
+    if (n > s.shown) { if (Math.floor(n / 2) > Math.floor(s.shown / 2) && /\w/.test(s.full[n - 1])) Sfx.blip(s.pitch); s.shown = n; $('#dlgText').textContent = s.full.slice(0, n); }
+  },
+  dlgFinish() { const s = this.dlgS; if (s) { s.shown = s.t = s.full.length; $('#dlgText').textContent = s.full; } },
   tick(dt) {
+    this.dlgTick(dt);
     this.hudT -= dt;
     if (this._hud || this.hudT <= 0) { this.hudT = 0.12; this._hud = false; this.renderHUD(); }
     if (this._inv) { this._inv = false; this.renderHotbar(); if (this.modal === 'bagModal') this.renderBag(); if (this.modal === 'shopModal') this.renderShop(); }
@@ -292,10 +301,10 @@ const UI = {
     if (n.shop) acts.unshift([SHOPS[n.shop].pets ? 'PET SHOP' : 'SHOP', 'gold', () => this.openShop(n.shop)]);
     if (n.id === 'tobin') acts.push(['ASK AGAIN', '', () => this.talk(n)]);
     acts.push(['BYE', '', () => this.closeModal()]);
-    $('#dlgText').textContent = text;
+    $('#dlgText').textContent = ''; this.dlgS = { full: text, shown: 0, t: 0, pitch: NPC_BLIP[n.id] || 1 };
     const box = $('#dlgActs'); box.innerHTML = '';
     for (const [l, c, f] of acts) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm ' + c; b.textContent = l; b.addEventListener('click', f); box.appendChild(b); }
-    this.openModal('dialogModal'); Sfx.voice('cackle', 1.5); n.face = G.p.x < n.x ? -1 : 1;
+    this.openModal('dialogModal'); Sfx.play('click'); n.face = G.p.x < n.x ? -1 : 1;
   },
   // ----- map -----
   openMap() { if (G.dead || Story.active()) return; this.mapSel = G.area.kind === 'dungeon' ? G.area.def.id : this.mapSel || 'mossy'; this.openModal('mapModal'); this.renderMap(); Sfx.play('click'); },

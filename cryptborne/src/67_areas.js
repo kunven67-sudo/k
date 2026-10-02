@@ -169,7 +169,7 @@ function updateNPCs(dt) {
       const o = npcs.find((m) => m !== n && m.wander && !m.hidden && !m.chatT && !m.moving && dist(m.x, m.y, n.x, n.y) < 34);
       if (o) { n.chatT = o.chatT = rand(4, 7); n.chatWith = o; o.chatWith = n; n.face = o.x < n.x ? -1 : 1; o.face = -n.face; }
     }
-    if (n.chatT > 0 && chance(dt * 0.8)) { n.bubble = pick(['...', '!', '?', 'HA HA', '*']); n.bubbleT = 1.2; if (dist(n.x, n.y, p.x, p.y) < 120) Sfx.voice('cackle', 1.6, { x: n.x, y: n.y }); }
+    if (n.chatT > 0 && chance(dt * 0.8)) { n.bubble = pick(['...', '!', '?', 'HA HA', '*']); n.bubbleT = 1.2; }
     n.bubbleT = Math.max(0, (n.bubbleT || 0) - dt);
   }
 }

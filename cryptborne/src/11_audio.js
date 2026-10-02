@@ -149,6 +149,13 @@ const Sfx = {
     if (typeof G !== 'undefined' && G.area && G.area.kind === 'dungeon') opt.verb = 0.28;
     const f = SFX[name]; if (f) f(AU.sfx, m, opt);
   },
+  // the soft tick while dialogue text types out (not a voice, just a blip)
+  blip(pitch = 1) {
+    const ac = AU.ctx; if (!ac || SET.sfx <= 0) return;
+    const f = 440 * pitch * (1 + (Math.random() - 0.5) * 0.06);
+    aTone(AU.sfx, f, 0.045, { type: 'square', vol: 0.035, lp: 2400, attack: 0.002 });
+    aTone(AU.sfx, f * 2, 0.03, { type: 'triangle', vol: 0.025, attack: 0.002 });
+  },
   voice(kind, pitch = 1, o) {
     const ac = AU.ctx; if (!ac || SET.sfx <= 0 || !VOICE[kind]) return;
     const opt = {}; let m = 1;

@@ -140,7 +140,7 @@ function useSpecial(slot) {
       break;
     case 'buff':
       p.buffs[sp.buff] = sp.t; statsChanged();
-      if (sp.buff === 'warcry') { Sfx.voice('roar', 1.4); shake(4); G.fx.push({ kind: 'ring', x: p.x, y: p.y, r0: 6, r1: 60, life: 0.4, max: 0.4, col: '#d8454a' }); forEach((m) => { if (dist(m.x, m.y, p.x, p.y) < 60 && !m.boss) { const a = Math.atan2(m.y - p.y, m.x - p.x); m.kbx += Math.cos(a) * 200; m.kby += Math.sin(a) * 200; } }); }
+      if (sp.buff === 'warcry') { Sfx.play('slam'); Sfx.play('bell'); shake(4); G.fx.push({ kind: 'ring', x: p.x, y: p.y, r0: 6, r1: 60, life: 0.4, max: 0.4, col: '#d8454a' }); forEach((m) => { if (dist(m.x, m.y, p.x, p.y) < 60 && !m.boss) { const a = Math.atan2(m.y - p.y, m.x - p.x); m.kbx += Math.cos(a) * 200; m.kby += Math.sin(a) * 200; } }); }
       if (sp.buff === 'smoke') { burst(p.x, p.y - 8, 40, '#6a6c72', 70); Sfx.play('dodge'); for (const m of G.mons) if (!m.boss) { m.aggro = false; m.wind = 0; } }
       if (sp.buff === 'shield') { p.shieldHp = st.maxHp * 0.5; Sfx.play('heal'); }
       if (sp.buff === 'eagle') Sfx.play('level');

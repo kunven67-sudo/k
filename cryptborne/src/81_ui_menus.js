@@ -191,13 +191,13 @@ Object.assign(UI, {
     $('#sayName').textContent = name; $('#sayName').style.color = sp.col;
     $('#sayText').style.fontStyle = who === 'narrator' || who === 'voice' ? 'italic' : '';
     const L = lookForSpeaker(who), face = $('#sayFace'); face.hidden = !L; if (L) humanPortrait(face, L, { blink: false });
-    this.sayS = { full: text, shown: 0, t: 0, who };
+    this.sayS = { full: text, shown: 0, t: 0, who, pitch: sp.blip || 1 };
     $('#sayText').textContent = '';
   },
   sayTick(dt) {
     const s = this.sayS; if (!s || s.shown >= s.full.length) return;
     s.t += dt * 48; const n = Math.min(s.full.length, Math.floor(s.t));
-    if (n > s.shown) { if (Math.floor(n / 3) > Math.floor(s.shown / 3) && s.full[n - 1] !== ' ') Sfx.play('click', { vol: 0.25 }); s.shown = n; $('#sayText').textContent = s.full.slice(0, n); }
+    if (n > s.shown) { if (Math.floor(n / 2) > Math.floor(s.shown / 2) && /\w/.test(s.full[n - 1])) Sfx.blip(s.pitch || 1); s.shown = n; $('#sayText').textContent = s.full.slice(0, n); }
   },
   sayBusy() { return !!this.sayS && this.sayS.shown < this.sayS.full.length; },
   sayFinish() { if (!this.sayS) return; this.sayS.shown = this.sayS.full.length; $('#sayText').textContent = this.sayS.full; },
@@ -250,6 +250,7 @@ Object.assign(UI, {
     click('#pQuit', () => quitToMenu());
     click('#btnRespawn', () => this.deathButton());
     click('#noteClose', () => this.closeModal());
+    $('#dlgText').addEventListener('click', () => this.dlgFinish());
     for (const b of $$('#journalModal [data-jt]')) b.addEventListener('click', () => { this.jTab = b.dataset.jt; Sfx.play('page'); this.renderJournal(); });
     $('#cutscene').addEventListener('pointerdown', (e) => { if (e.target.closest('button')) return; AU.unlock(); Story.advance(); });
     $('#skipScene').addEventListener('click', (e) => { e.stopPropagation(); Story.skip(); });
