@@ -73,17 +73,22 @@ function playerDie() {
 // ---------- the hero's basic attack ----------
 function playerAttack() {
   const p = G.p, w = weaponDef(), st = PS();
-  p.atkCd = w.cd * st.cdMult; p.atkT = 0.2; p.swing = -p.swing || 1; p.lastAtkT = G.time;
+  // melee combo: three swings in a row, the third is a big finisher that steps you forward
+  p.combo = w.wc === 'melee' && G.time - (p.lastAtkT || -9) < w.cd * st.cdMult + 0.45 ? ((p.combo || 0) % 3) + 1 : 1;
+  const fin = w.wc === 'melee' && p.combo === 3;
+  p.atkCd = w.cd * st.cdMult * (fin ? 1.35 : 1); p.atkT = 0.2; p.swing = -p.swing || 1; p.lastAtkT = G.time;
   const hx = p.x + Math.cos(p.aim) * 6, hy = p.y - 10 + Math.sin(p.aim) * 6;
   if (w.wc === 'melee') {
-    Sfx.play(w.cd > 0.55 ? 'heavy' : 'swing');
+    Sfx.play(w.cd > 0.55 || fin ? 'heavy' : 'swing');
     const col = { runeblade: '#5ff0ff', soul_scythe: '#b878ea', venom_dagger: '#9be04a', sun_scimitar: '#ffd27a', frost_axe: '#9fe8ff', shadow_blade: '#d8454a' }[w.id] || '#ffffff';
-    G.fx.push({ kind: 'slash', x: p.x, y: p.y - 12, ang: p.aim, range: w.range + 4, arc: (w.arc * Math.PI) / 180 + 0.3, life: 0.2, max: 0.2, col, swing: p.swing });
+    const range = w.range * (fin ? 1.25 : 1), arc = ((w.arc * Math.PI) / 180) * (fin ? 1.3 : 1);
+    G.fx.push({ kind: 'slash', x: p.x, y: p.y - 12, ang: p.aim, range: range + 4, arc: arc + 0.3, life: fin ? 0.26 : 0.2, max: fin ? 0.26 : 0.2, col, swing: p.swing });
+    if (fin) { moveEntity(p, Math.cos(p.aim) * 7, Math.sin(p.aim) * 7, false); shake(2); }
     for (const m of G.mons) {
       if (m.dead) continue; const [cx, cy] = monCenter(m); const dx = cx - p.x, dy = cy - (p.y - 10), dd = Math.hypot(dx, dy), rad = m.w / 2 + 4;
-      if (dd > w.range + rad) continue;
-      if (dd > rad + 4 && Math.abs(angDiff(p.aim, Math.atan2(dy, dx))) > (w.arc * Math.PI) / 360) continue;
-      const [dmg, crit] = rollDmg(st.dmg); hurtMon(m, dmg, hitEffects({ kb: w.kb || 1, crit, ls: true }));
+      if (dd > range + rad) continue;
+      if (dd > rad + 4 && Math.abs(angDiff(p.aim, Math.atan2(dy, dx))) > arc / 2) continue;
+      const [dmg, crit] = rollDmg(st.dmg * (fin ? 1.5 : 1)); hurtMon(m, dmg, hitEffects({ kb: (w.kb || 1) * (fin ? 1.8 : 1), crit, ls: true }));
     }
     hitCrack(p.x + Math.cos(p.aim) * (w.range * 0.7), p.y - 6 + Math.sin(p.aim) * (w.range * 0.7), 1);
   } else if (w.wc === 'bow') {

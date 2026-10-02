@@ -76,9 +76,11 @@ function monFrames(type) {
   if (d.art === 'human') return (_mf[type] = buildHumanoid(d.look));
   if (d.art === 'hero') return (_mf[type] = buildHumanoid(Object.assign({}, heroLook(), { eyes: '#d8454a', weapon: 'sword' })).map(darkOf));
   if (d.art === 'wisp') return (_mf[type] = []);
+  if (CREATURE_PAINT[d.art]) return (_mf[type] = CREATURE_PAINT[d.art](d.pal));
   return (_mf[type] = CREATURE_T[d.art].map((rows) => spr(rows, Object.assign({ k: OUT }, d.pal))));
 }
-function monBodyH(m) { const d = m.d, sc = d.scale || 1; return d.art === 'human' || d.art === 'hero' ? 24 * sc : d.art === 'slime' || d.art === 'frog' ? 9 * sc : d.art === 'bat' || d.art === 'wisp' ? 8 : d.art === 'wyrm' ? 14 * sc : 9 * sc; }
+const BODY_H = { human: 24, hero: 24, slime: 12, frog: 11, bat: 10, wisp: 8, wyrm: 18, wolf: 13, spider: 12, scorpion: 12, crab: 12, crystal: 22 };
+function monBodyH(m) { const d = m.d, sc = d.art === 'bat' || d.art === 'wisp' ? 1 : d.scale || 1; return (BODY_H[d.art] || 10) * sc; }
 function monLift(m) { const d = m.d; return d.art === 'bat' ? 10 + Math.sin(m.t * 6) * 2 : d.art === 'wisp' ? 12 + Math.sin(m.t * 3) * 3 : d.art === 'crystal' ? 5 + Math.sin(m.t * 2) * 2 : d.fly && d.art === 'human' ? 4 + Math.sin(m.t * 3) * 2 : 0; }
 function monCenter(m) { return [m.x, m.y - monLift(m) - monBodyH(m) / 2]; }
 function areaTier() { return G.area.def ? G.area.def.tier : REGION_TIER[G.area.id] || 1; }
@@ -86,7 +88,7 @@ function spawnMon(type, x, y, o = {}) {
   const d = MON[type], sc = d.scale || 1, [hm, dm] = d.boss || d.mini ? [1, 1] : tierMult(d.t, areaTier());
   const night = G.area.kind === 'overworld' && Clock.isNight() ? 1.2 : 1, df = DF();
   const hp = Math.round(d.hp * hm * night * df.hp * (d.art === 'hero' ? Math.max(1, PS().maxHp / 400) : 1));
-  const m = { type, d, x, y, hp, maxHp: hp, dmg: Math.round(d.dmg * dm * night * df.dmg), w: Math.min(15, (d.w || 9) * sc), h: Math.min(12, (d.h || 6) * sc),
+  const m = { type, d, x, y, hp, maxHp: hp, dmg: Math.round(d.dmg * dm * night * df.dmg), w: Math.min(22, (d.w || 9) * sc * (d.art !== 'human' && d.art !== 'hero' ? 1.3 : 1)), h: Math.min(14, (d.h || 6) * sc),
     kbx: 0, kby: 0, face: 1, t: rand(0, 5), atkCd: rand(0.6, 1.6), wind: 0, act: null, actT: 0, flash: 0, flinch: 0, stun: 0, slowT: 0, poisonT: 0, burnT: 0, dotAcc: 0,
     walk: 0, moving: false, aggro: !!o.aggro, room: o.room || null, zone: o.zone || null, boss: !!d.boss, mini: !!d.mini, mi: 0, hopT: 0, hvx: 0, hvy: 0, contactCd: 0,
     wx: x, wy: y, wanderT: rand(0, 2), summoned: !!o.summoned, dead: false, lungeHit: false, voiced: false, strikeT: 0, scripted: !!o.scripted, summonT: 6 };

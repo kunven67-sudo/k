@@ -108,3 +108,7 @@ Story acts:
 
 The night counter (shown on screen) decides the Eternal Night ending: Easy 80 nights, Normal 60, Hard and Hardcore 45. Sleeping in your bed skips a night.
 The Mirror Crypt opens when you have all 25 notes. The secret ending's sequel tease shows a blood moon rising over a distant valley, leading into Blood Moon Hunter.
+
+## Art direction update (after the pixel upgrade)
+- **Look and feel like Moonlighter** (same Cryptborne story and characters): chunky outlined pixel characters facing 4 ways, smooth walk cycles with a body bob, breathing, blinking, a spinning roll with dust, swoosh trails on swings, hit sparks, white hit flash, squishy creatures, lit dungeon wall edges with soft floor shadows, and a 3-hit sword combo with a big finisher.
+- **No voice lines.** Dialogue text types out with a soft blip sound (no babble), pitched per character, like most pixel games.

@@ -100,7 +100,10 @@ function pcircCtx(c, cx, cy, r, col) { c.fillStyle = col; for (let y = Math.floo
 function monImage(m) {
   const d = m.d, fr = monFrames(m.unhooded ? 'lich_face' : m.type);
   if (d.art === 'human' || d.art === 'hero') return fr[m.strikeT > 0 ? 5 : m.wind > 0 && m.pending && m.pending !== 'lunge' ? 4 : m.moving ? Math.floor(m.walk * 0.7) % 4 : 0];
-  if (d.art === 'bat') return fr[Math.floor(m.t * 10) % 2];
+  if (d.art === 'bat') return fr[Math.floor(m.t * 12) % fr.length];
+  if (fr.atk && (m.strikeT > 0 || m.act === 'lunging' || (m.wind > 0 && m.pending))) return fr.atk;
+  if (d.art === 'slime') return m.moving ? fr[[1, 2, 3, 2][Math.floor(m.walk * 1.2) % 4]] : ((m.t + m.x * 0.1) % 3.5) < 0.14 ? fr[4] : fr[0];
+  if (fr.length >= 5) return m.moving ? fr[1 + (Math.floor(m.walk * 1.2) % 4)] : fr[0];
   if (fr.length > 1) return fr[m.moving ? Math.floor(m.walk * 0.6) % 2 : 0];
   return fr[0];
 }
@@ -123,7 +126,7 @@ function drawMon(c, m) {
   const dx = human ? m.x - (HUM_FX * w) / HUM_W + lean : m.x - w / 2, dy = human ? m.y - (HUM_FY * h) / HUM_H - lift : m.y - h + 1 - lift;
   c.drawImage(img, Math.round(dx), Math.round(dy), Math.round(w), Math.round(h));
   c.globalAlpha = 1;
-  if (d.crown && d.art === 'slime') { const cx = Math.round(m.x - 8), cy = Math.round(dy - 2); px(c, cx, cy + 2, 16, 4, '#f2c13a'); px(c, cx, cy, 2, 2, '#f2c13a'); px(c, cx + 7, cy - 1, 2, 3, '#f2c13a'); px(c, cx + 14, cy, 2, 2, '#f2c13a'); px(c, cx + 7, cy + 3, 2, 2, '#d8454a'); }
+  if (d.crown && d.art === 'slime') { const cx = Math.round(m.x - 12), cy = Math.round(dy + h * 0.12 - 8); px(c, cx - 1, cy + 3, 26, 7, OUT); px(c, cx, cy + 4, 24, 5, '#f2c13a'); px(c, cx, cy + 8, 24, 1, '#b8862a'); for (const sx of [0, 9, 18]) { px(c, cx + sx - 1, cy - 1, 8, 5, OUT); px(c, cx + sx, cy, 6, 4, '#f2c13a'); px(c, cx + sx + 2, cy - 2, 2, 2, '#f2c13a'); } px(c, cx + 10, cy + 5, 4, 3, '#d8454a'); px(c, cx + 10, cy + 5, 1, 1, '#ffffff'); }
   if (m.burnT > 0 && chance(0.4)) G.parts.push({ x: m.x + rand(-5, 5), y: m.y - rand(2, monBodyH(m)), vx: 0, vy: -20, life: 0.4, max: 0.4, col: chance(0.5) ? '#ff7a2a' : '#ffd27a', size: 1, grav: 0 });
   if (m.wind > 0 && (m.pending === 'lunge' || (m.pending && m.pending.startsWith('charge')))) { c.strokeStyle = 'rgba(255,60,60,.5)'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(m.x, m.y - 4); c.lineTo(G.p.x, G.p.y - 4); c.stroke(); c.setLineDash([]); }
   if (d.art === 'hero' || m.type === 'hollow_finn' || m.type === 'shade') if (chance(0.3)) G.parts.push({ x: m.x + rand(-6, 6), y: m.y - rand(0, 20), vx: 0, vy: -14, life: 0.5, max: 0.5, col: '#5a2a80', size: 1, grav: 0 });
