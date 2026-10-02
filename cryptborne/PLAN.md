@@ -80,3 +80,31 @@ Footsteps (grass, stone, wood, water), nature (birds, crickets, wind, rain, cave
 - **Map:** one big open valley with no loading screens.
 
 Honest limit: a browser game can't match GTA V's hand-made 3D art. It can have real 3D, lighting, shadows, fog, day and night, music and sound for everything.
+
+## Build decisions
+- Build the **pixel upgrade first**, then Blood Moon Hunter.
+- Deliver **all at once** when both are done, then make a **trailer**.
+
+## Pixel upgrade: design details (filled in while building)
+Levels and order of places:
+| Place | Level | Boss | Mini-boss (has the boss key) |
+| --- | --- | --- | --- |
+| Mossy Hollow (Vale) | 1 | Slime King | Slime Brute |
+| Goblin Warrens (Vale) | 3 | Goblin Chief | Goblin Brute |
+| Bonecrypt (Vale) | 5 | Skeleton Knight | Bone Warden |
+| Webspire Depths (Vale) | 8 | Spider Queen | Broodmother |
+| Ashen Forge (Vale) | 11 | Magma Golem | Orc Warlord |
+| Witchwood Hollow (Haunted swamp, Mirefen) | 13 | Hag Mother | Mire Brute |
+| Frostfang Caverns (Frozen mountains, Frostpeak) | 16 | Frost Wyrm | Frost Troll |
+| Tomb of the Sun King (Desert ruins, Sunscar) | 19 | Sun King | Tomb Guardian |
+| The Sunken Galleon (Pirate coast, Saltmarrow) | 22 | Captain Blackbones | First Mate |
+| Wraithmoor Tomb (final, Vale) | 25 | The Lich (Dad) | Grave Warden |
+| Mirror Crypt (secret) | 25 | Shadow You | none |
+
+Story acts:
+1. **Act 1 (the Vale):** follow Finn's trail and notes through the first five dungeons. After the Ashen Forge the voice calls to you too, and you recognize Dad's voice.
+2. **Act 2 (the four regions):** Finn is breaking four seals that keep Wraithmoor Tomb shut. Each region boss guards a seal Finn already broke.
+3. **Act 3 (Wraithmoor Tomb):** the Lich reveals he is Dad. He offers the deal (your soul for Finn's). Notes found (25 total, half = 13) decide whether Finn can be reached.
+
+The night counter (shown on screen) decides the Eternal Night ending: Easy 80 nights, Normal 60, Hard and Hardcore 45. Sleeping in your bed skips a night.
+The Mirror Crypt opens when you have all 25 notes. The secret ending's sequel tease shows a blood moon rising over a distant valley, leading into Blood Moon Hunter.

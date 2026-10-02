@@ -1,0 +1,137 @@
+<canvas id="game" aria-label="Game world"></canvas>
+
+<div id="hud" hidden>
+  <div id="stats">
+    <div class="lvrow"><span class="lv">LV <b id="hLvl">1</b></span><span class="coins"><img id="hCoinIco" class="px" width="12" height="12" alt=""><span id="hCoins">0</span></span></div>
+    <div class="bar hp"><i id="hHp"></i><span id="hHpT">100/100</span></div>
+    <div class="bar st"><i id="hSt"></i></div>
+    <div class="bar xp"><i id="hXp"></i></div>
+  </div>
+  <button id="minimap" type="button" aria-label="Open world map"><canvas id="mini" width="120" height="80"></canvas><span class="lbl" id="hLoc">Emberfall</span><span class="hint">CLICK / M</span></button>
+  <button id="pauseBtn" type="button" aria-label="Pause">II</button>
+  <div id="bossbar" hidden><div class="bn" id="hBoss"></div><div class="bar"><i id="hBossHp"></i></div></div>
+  <div id="toasts" aria-live="polite"></div>
+  <div id="prompt" hidden></div>
+  <div id="invbar"><div id="hotbar" style="display:flex;gap:4px"></div><button id="bagBtn" type="button" aria-label="Open inventory">BAG<br>[B]</button></div>
+</div>
+
+<div id="touch" hidden>
+  <div id="stick"><i></i></div>
+  <div class="tbtns">
+    <button id="tE" type="button">USE<br>E</button><button id="tAtk" type="button" class="atk">HIT</button>
+    <button id="tBlk" type="button">BLOCK</button><button id="tDodge" type="button">DODGE</button>
+  </div>
+</div>
+
+<section id="menu" class="screen">
+  <div class="menu-box">
+    <h1 class="logo"><span>CRYPT</span><span>BORNE</span></h1>
+    <p class="tag">Delve the crypts. Loot the dead. Rise.</p>
+    <div class="menu-btns">
+      <button id="btnPlay" class="btn big gold" type="button">&#9654; PLAY</button>
+      <button id="btnSettings" class="btn" type="button">SETTINGS</button>
+    </div>
+    <p class="menu-foot">WASD move &middot; Left click attack &middot; C dodge &middot; F block</p>
+  </div>
+</section>
+
+<section id="saves" class="screen" hidden>
+  <div class="panel wide">
+    <header class="ph"><h2>CHOOSE YOUR SAVE</h2><button class="btn sm" type="button" data-back>BACK</button></header>
+    <p id="storeNote" class="note"></p>
+    <div id="saveList" class="save-list"></div>
+    <form id="newSaveForm" class="new-save">
+      <label for="newName">NEW HERO NAME</label>
+      <div class="row"><input id="newName" maxlength="16" placeholder="Hero" autocomplete="off" spellcheck="false"><button class="btn gold" type="submit">+ NEW SAVE</button></div>
+    </form>
+  </div>
+</section>
+
+<section id="settings" class="screen" hidden>
+  <div class="panel">
+    <header class="ph"><h2>SETTINGS</h2><button class="btn sm" type="button" data-back>BACK</button></header>
+    <div class="set-row"><label for="setVol">Sound volume</label><input type="range" id="setVol" min="0" max="100" step="5"><output id="setVolOut" for="setVol">70</output></div>
+    <div class="set-row"><label for="setZoom">Camera zoom</label><select id="setZoom"><option value="-1">Far</option><option value="0">Normal</option><option value="1">Close</option></select><span></span></div>
+    <div class="set-row"><label for="setShake">Screen shake</label><input type="checkbox" id="setShake"><span></span></div>
+    <div class="set-row"><label for="setDmg">Damage numbers</label><input type="checkbox" id="setDmg"><span></span></div>
+    <div class="set-row"><label for="setNames">Monster names</label><input type="checkbox" id="setNames"><span></span></div>
+    <h3>CONTROLS</h3>
+    <dl class="keys">
+      <dt>WASD</dt><dd>Move (arrow keys work too)</dd>
+      <dt>L-CLICK</dt><dd>Attack toward the mouse (hold to keep swinging)</dd>
+      <dt>C</dt><dd>Dodge roll (you can't be hit mid-roll)</dd>
+      <dt>F</dt><dd>Hold to block (needs a shield). Block right before a hit to PARRY.</dd>
+      <dt>E</dt><dd>Talk, open chests, enter dungeons</dd>
+      <dt>Q</dt><dd>Drink your best health potion</dd>
+      <dt>1-0</dt><dd>Use inventory bar slot</dd>
+      <dt>M</dt><dd>World map (or click the tiny map)</dd>
+      <dt>B / I</dt><dd>Inventory bag</dd>
+      <dt>ESC</dt><dd>Pause, save, quit</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="mapModal" class="modal" hidden>
+  <div class="panel wide">
+    <header class="ph"><h2 id="mapTitle">WORLD MAP</h2><button class="btn sm" type="button" data-close>CLOSE [M]</button></header>
+    <div class="map-wrap"><canvas id="bigMap" width="288" height="216"></canvas></div>
+    <div id="mapInfo" class="map-info"></div>
+    <div id="dgList" class="dg-list"></div>
+  </div>
+</section>
+
+<section id="bagModal" class="modal" hidden>
+  <div class="panel wide">
+    <header class="ph"><h2>INVENTORY</h2><span class="coins-pill" id="bagCoins"></span><button class="btn sm" type="button" data-close>CLOSE [B]</button></header>
+    <div class="bag-body">
+      <div class="equip-col">
+        <button class="eq" type="button" data-eq="weapon"><span class="slot"></span><span class="lab">WEAPON<b></b></span></button>
+        <button class="eq" type="button" data-eq="shield"><span class="slot"></span><span class="lab">SHIELD<b></b></span></button>
+        <button class="eq" type="button" data-eq="armor"><span class="slot"></span><span class="lab">ARMOR<b></b></span></button>
+        <dl id="statList" class="stat-list"></dl>
+      </div>
+      <div>
+        <div id="bagGrid" class="grid"></div>
+        <div id="itemInfo" class="item-info"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="shopModal" class="modal" hidden>
+  <div class="panel wide">
+    <header class="ph"><h2 id="shopTitle">SHOP</h2><span class="coins-pill" id="shopCoins"></span><button class="btn sm" type="button" data-close>CLOSE</button></header>
+    <p id="shopGreet" class="note"></p>
+    <div class="tabs"><button id="tabBuy" class="tab on" type="button">BUY</button><button id="tabSell" class="tab" type="button">SELL</button><button id="sellLoot" class="btn sm gold" type="button">SELL ALL LOOT</button></div>
+    <div id="shopList" class="shop-list"></div>
+  </div>
+</section>
+
+<section id="pauseModal" class="modal" hidden>
+  <div class="panel" style="max-width:380px">
+    <header class="ph"><h2>PAUSED</h2></header>
+    <p id="pauseInfo" class="note"></p>
+    <button id="pResume" class="btn gold" type="button">RESUME</button>
+    <button id="pSave" class="btn" type="button">SAVE GAME</button>
+    <button id="pSettings" class="btn" type="button">SETTINGS</button>
+    <button id="pQuit" class="btn red" type="button">SAVE &amp; QUIT TO MENU</button>
+  </div>
+</section>
+
+<section id="dialogModal" class="modal" hidden>
+  <div class="panel dialog">
+    <div class="who"><canvas id="dlgFace" width="16" height="20"></canvas><b id="dlgName"></b></div>
+    <p id="dlgText"></p>
+    <div class="acts" id="dlgActs"></div>
+  </div>
+</section>
+
+<section id="deathModal" class="modal" hidden>
+  <div class="panel death" style="max-width:420px">
+    <header class="ph"><h2>YOU DIED</h2></header>
+    <p id="deathInfo" class="note" style="text-align:center"></p>
+    <button id="btnRespawn" class="btn gold" type="button">RESPAWN IN EMBERFALL</button>
+  </div>
+</section>
+
+<div id="tooltip" hidden></div>
