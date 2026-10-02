@@ -157,11 +157,15 @@ function buildGrass() {
   GRASS.max = { low: 0, medium: 16000, high: 34000 }[SET.quality]; GRASS.r = { low: 0, medium: 26, high: 36 }[SET.quality];
   if (!GRASS.max) return;
   const g = new THREE.BufferGeometry(), P = [], C = [];
-  const seg = 3, w = 0.07;
-  for (let s = 0; s < seg; s++) { const y0 = s / seg, y1 = (s + 1) / seg, w0 = w * (1 - y0), w1 = w * (1 - y1), b0 = y0 * y0 * 0.25, b1 = y1 * y1 * 0.25; P.push(-w0, y0, b0, w0, y0, b0, -w1, y1, b1, w0, y0, b0, w1, y1, b1, -w1, y1, b1); for (const y of [y0, y0, y1, y0, y1, y1]) { const k = lin(0.55 + y * 0.45); C.push(k, k, k); } }
-  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.computeVertexNormals();
-  // grass faces up so lighting matches the ground
-  const nm = g.attributes.normal; for (let i = 0; i < nm.count; i++) nm.setXYZ(i, 0, 1, 0.2);
+  const seg = 3, w = 0.035;
+  // each blade is two-sided (front and back copies) with normals pointing up, so it is lit like the ground from every side
+  for (const side of [1, -1]) for (let s = 0; s < seg; s++) {
+    const y0 = s / seg, y1 = (s + 1) / seg, w0 = w * (1 - y0), w1 = w * (1 - y1), b0 = y0 * y0 * 0.25, b1 = y1 * y1 * 0.25;
+    const tri = side > 0 ? [-w0, y0, b0, w0, y0, b0, -w1, y1, b1, w0, y0, b0, w1, y1, b1, -w1, y1, b1] : [w0, y0, b0, -w0, y0, b0, -w1, y1, b1, w1, y1, b1, w0, y0, b0, -w1, y1, b1];
+    P.push(...tri); for (let k = 1; k < tri.length; k += 3) { const v = lin(0.5 + tri[k] * 0.5); C.push(v, v, v); }
+  }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  const N = new Float32Array(P.length); for (let i = 0; i < N.length; i += 3) { N[i] = 0; N[i + 1] = 1; N[i + 2] = 0.15; } g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
   GRASS.mesh = new THREE.InstancedMesh(g, MAT.grass, GRASS.max); GRASS.mesh.count = 0; GRASS.mesh.frustumCulled = false; GRASS.mesh.receiveShadow = true;
   GRASS.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(GRASS.max * 3), 3); WORLD.root.add(GRASS.mesh);
 }
@@ -178,7 +182,7 @@ function updateGrass(px, pz, force) {
     const fade = 1 - smoothstep(R * 0.7, R, d), hs = hash2(i, j, 4);
     let hgt = (0.35 + hs * 0.5) * (0.5 + 0.5 * (fbm(x / 14, z / 14, 2, 5) * 0.5 + 0.5)) * fade;
     if (s === SURF.FIELD) hgt *= 1.7; if (s === SURF.MUD) hgt *= 2.4;
-    _q.setFromEuler(_e.set(0, hr * 40, 0)); _m4.compose(_v.set(x, y - 0.03, z), _q, _s.set(1 + hs, hgt, 1)); GRASS.mesh.setMatrixAt(n, _m4);
+    _q.setFromEuler(_e.set(0, hr * 40, 0)); _m4.compose(_v.set(x, y - 0.03, z), _q, _s.set(1 + hs * 0.8, hgt, 1)); GRASS.mesh.setMatrixAt(n, _m4);
     groundColor(clamp(Math.round((x + HALF) / CELL), 0, GN - 1), clamp(Math.round((z + HALF) / CELL), 0, GN - 1), col);
     const flower = hs > 0.985 && s === SURF.GRASS; const fc = Math.floor(hr * 1000) % 3;
     if (flower) _c.setRGB(fc === 0 ? 1 : fc === 1 ? 1 : 0.7, fc === 0 ? 0.95 : fc === 1 ? 0.5 : 0.5, fc === 0 ? 0.3 : fc === 1 ? 0.6 : 1, THREE.SRGBColorSpace);

@@ -671,7 +671,7 @@ function makeMaterials() {
   MAT.bark = S({ map: TEX.bark, roughness: 0.95 });
   MAT.leaf = windify(S({ map: TEX.leaf, roughness: 0.9, side: THREE.DoubleSide }), 1, 2);
   MAT.farTree = windify(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.6, 2);
-  MAT.grass = windify(new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, vertexColors: true }), 7, 0);
+  MAT.grass = windify(new THREE.MeshLambertMaterial({ side: THREE.FrontSide, vertexColors: true }), 7, 0);
   MAT.bush = windify(S({ map: TEX.leaf, roughness: 0.95 }), 3, 0);
   MAT.window = new THREE.MeshStandardMaterial({ color: 0x1a140c, emissive: 0xffb050, emissiveIntensity: 0, roughness: 0.4 });
   MAT.glowRed = new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xff2010, emissiveIntensity: 2, roughness: 0.6 });
@@ -687,7 +687,7 @@ function makeMaterials() {
   MAT.dirt = S({ color: 0x3a2a1c, roughness: 1 });
   MAT.water = new THREE.MeshStandardMaterial({ color: 0x18323c, roughness: 0.06, metalness: 0.2, transparent: true, opacity: 0.86, normalMap: TEX.waterN, normalScale: new THREE.Vector2(0.4, 0.4), depthWrite: false });
   MAT.river = MAT.water.clone(); MAT.river.normalMap = TEX.waterN.clone(); MAT.river.normalMap.needsUpdate = true;
-  MAT.swamp = new THREE.MeshStandardMaterial({ color: 0x1e2414, roughness: 0.2, metalness: 0.05, transparent: true, opacity: 0.93, normalMap: TEX.waterN, normalScale: new THREE.Vector2(0.15, 0.15), depthWrite: false });
+  MAT.swamp = new THREE.MeshStandardMaterial({ color: 0x1a2010, roughness: 0.4, metalness: 0.05, envMapIntensity: 0.35, transparent: true, opacity: 0.93, normalMap: TEX.waterN, normalScale: new THREE.Vector2(0.15, 0.15), depthWrite: false });
   MAT.blood = new THREE.MeshStandardMaterial({ map: TEX.blood, transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -4 });
   MAT.track = new THREE.MeshBasicMaterial({ map: TEX.track, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, opacity: 0.5, fog: true });
   MAT.glow = new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffb060, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
@@ -955,11 +955,15 @@ function buildGrass() {
   GRASS.max = { low: 0, medium: 16000, high: 34000 }[SET.quality]; GRASS.r = { low: 0, medium: 26, high: 36 }[SET.quality];
   if (!GRASS.max) return;
   const g = new THREE.BufferGeometry(), P = [], C = [];
-  const seg = 3, w = 0.07;
-  for (let s = 0; s < seg; s++) { const y0 = s / seg, y1 = (s + 1) / seg, w0 = w * (1 - y0), w1 = w * (1 - y1), b0 = y0 * y0 * 0.25, b1 = y1 * y1 * 0.25; P.push(-w0, y0, b0, w0, y0, b0, -w1, y1, b1, w0, y0, b0, w1, y1, b1, -w1, y1, b1); for (const y of [y0, y0, y1, y0, y1, y1]) { const k = lin(0.55 + y * 0.45); C.push(k, k, k); } }
-  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.computeVertexNormals();
-  // grass faces up so lighting matches the ground
-  const nm = g.attributes.normal; for (let i = 0; i < nm.count; i++) nm.setXYZ(i, 0, 1, 0.2);
+  const seg = 3, w = 0.035;
+  // each blade is two-sided (front and back copies) with normals pointing up, so it is lit like the ground from every side
+  for (const side of [1, -1]) for (let s = 0; s < seg; s++) {
+    const y0 = s / seg, y1 = (s + 1) / seg, w0 = w * (1 - y0), w1 = w * (1 - y1), b0 = y0 * y0 * 0.25, b1 = y1 * y1 * 0.25;
+    const tri = side > 0 ? [-w0, y0, b0, w0, y0, b0, -w1, y1, b1, w0, y0, b0, w1, y1, b1, -w1, y1, b1] : [w0, y0, b0, -w0, y0, b0, -w1, y1, b1, w1, y1, b1, w0, y0, b0, -w1, y1, b1];
+    P.push(...tri); for (let k = 1; k < tri.length; k += 3) { const v = lin(0.5 + tri[k] * 0.5); C.push(v, v, v); }
+  }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  const N = new Float32Array(P.length); for (let i = 0; i < N.length; i += 3) { N[i] = 0; N[i + 1] = 1; N[i + 2] = 0.15; } g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
   GRASS.mesh = new THREE.InstancedMesh(g, MAT.grass, GRASS.max); GRASS.mesh.count = 0; GRASS.mesh.frustumCulled = false; GRASS.mesh.receiveShadow = true;
   GRASS.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(GRASS.max * 3), 3); WORLD.root.add(GRASS.mesh);
 }
@@ -976,7 +980,7 @@ function updateGrass(px, pz, force) {
     const fade = 1 - smoothstep(R * 0.7, R, d), hs = hash2(i, j, 4);
     let hgt = (0.35 + hs * 0.5) * (0.5 + 0.5 * (fbm(x / 14, z / 14, 2, 5) * 0.5 + 0.5)) * fade;
     if (s === SURF.FIELD) hgt *= 1.7; if (s === SURF.MUD) hgt *= 2.4;
-    _q.setFromEuler(_e.set(0, hr * 40, 0)); _m4.compose(_v.set(x, y - 0.03, z), _q, _s.set(1 + hs, hgt, 1)); GRASS.mesh.setMatrixAt(n, _m4);
+    _q.setFromEuler(_e.set(0, hr * 40, 0)); _m4.compose(_v.set(x, y - 0.03, z), _q, _s.set(1 + hs * 0.8, hgt, 1)); GRASS.mesh.setMatrixAt(n, _m4);
     groundColor(clamp(Math.round((x + HALF) / CELL), 0, GN - 1), clamp(Math.round((z + HALF) / CELL), 0, GN - 1), col);
     const flower = hs > 0.985 && s === SURF.GRASS; const fc = Math.floor(hr * 1000) % 3;
     if (flower) _c.setRGB(fc === 0 ? 1 : fc === 1 ? 1 : 0.7, fc === 0 ? 0.95 : fc === 1 ? 0.5 : 0.5, fc === 0 ? 0.3 : fc === 1 ? 0.6 : 1, THREE.SRGBColorSpace);
@@ -1389,8 +1393,867 @@ const LATER = [];
 function later(sec, fn) { LATER.push({ t: G.time + sec, fn }); }
 function runLater() { for (let i = LATER.length - 1; i >= 0; i--) if (G.time >= LATER[i].t) { const f = LATER[i].fn; LATER.splice(i, 1); f(); } }
 
+
+// =====================================================================
+// AUDIO — every sound and every note is synthesized live (no files).
+// Sfx: one-shot effects placed in 3D around the listener. Music: songs
+// per mood. Amb: wind, rain, river, fire, birds, crickets, frogs, town.
+// =====================================================================
+const AU = {
+  ctx: null, master: null, sfx: null, amb: null, music: null, verbIn: null, noise: null, longNoise: null,
+  init() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      const ac = (this.ctx = new AC());
+      this.master = ac.createGain(); this.master.connect(ac.destination);
+      const comp = ac.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 4; comp.connect(this.master);
+      this.sfx = ac.createGain(); this.amb = ac.createGain(); this.music = ac.createGain();
+      for (const b of [this.sfx, this.amb, this.music]) b.connect(comp);
+      const len = Math.floor(ac.sampleRate * 2.8), ir = ac.createBuffer(2, len, ac.sampleRate);
+      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
+      const conv = ac.createConvolver(); conv.buffer = ir; this.verbIn = ac.createGain(); this.verbIn.gain.value = 0.55; this.verbIn.connect(conv); conv.connect(comp);
+      const mk = (sec) => { const n = Math.floor(ac.sampleRate * sec), b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; return b; };
+      this.noise = mk(0.6); this.longNoise = mk(3);
+      this.vols(); Amb.init();
+    } catch (e) { this.ctx = null; }
+  },
+  unlock() { if (!this.ctx) this.init(); else if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); },
+  vols() {
+    if (!this.ctx) return; const t = this.ctx.currentTime;
+    this.sfx.gain.setTargetAtTime((SET.sfx / 100) * 0.7, t, 0.05); this.amb.gain.setTargetAtTime((SET.sfx / 100) * 0.55, t, 0.05); this.music.gain.setTargetAtTime((SET.music / 100) * 0.42, t, 0.05);
+  },
+};
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+function auRoute(node, dest, o) {
+  const ac = AU.ctx;
+  if (o.lp2) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp2; node.connect(f); node = f; }
+  if (o.pan && ac.createStereoPanner) { const p = ac.createStereoPanner(); p.pan.value = clamp(o.pan, -1, 1); node.connect(p); node = p; }
+  node.connect(dest);
+  if (o.verb) { const s = ac.createGain(); s.gain.value = o.verb; node.connect(s); s.connect(AU.verbIn); }
+}
+function aTone(dest, f, dur, o = {}) {
+  const ac = AU.ctx; if (!ac) return; const t = o.at != null ? o.at : ac.currentTime + (o.delay || 0);
+  const os = ac.createOscillator(); os.type = o.type || 'square'; os.frequency.setValueAtTime(Math.max(10, f), t);
+  if (o.slide) os.frequency.exponentialRampToValueAtTime(Math.max(20, f + o.slide), t + (o.slideT || dur));
+  if (o.detune) os.detune.value = o.detune;
+  if (o.vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = o.vib[0]; lg.gain.value = o.vib[1]; l.connect(lg); lg.connect(os.frequency); l.start(t); l.stop(t + dur + 0.1); }
+  let node = os;
+  if (o.lp) { const fl = ac.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = o.lp; fl.Q.value = o.q || 0.7; node.connect(fl); node = fl; }
+  const g = ac.createGain(), v = o.vol == null ? 0.2 : o.vol, a = o.attack || 0.004;
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + a);
+  if (o.hold) g.gain.setValueAtTime(v, t + Math.max(a, dur - (o.release || 0.15)));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  node.connect(g); auRoute(g, dest, o); os.start(t); os.stop(t + dur + 0.05);
+}
+function aNoise(dest, dur, o = {}) {
+  const ac = AU.ctx; if (!ac || !AU.noise) return; const t = o.at != null ? o.at : ac.currentTime + (o.delay || 0);
+  const s = ac.createBufferSource(); s.buffer = dur > 0.5 ? AU.longNoise : AU.noise; s.playbackRate.value = o.rate || 1;
+  const f = ac.createBiquadFilter(); f.type = o.f || 'bandpass'; f.frequency.setValueAtTime(o.freq || 1200, t); f.Q.value = o.q || 1;
+  if (o.fslide) f.frequency.exponentialRampToValueAtTime(Math.max(30, (o.freq || 1200) + o.fslide), t + dur);
+  const g = ac.createGain(), v = o.vol == null ? 0.2 : o.vol;
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + (o.attack || 0.003));
+  if (o.hold) g.gain.setValueAtTime(v, t + Math.max(0.01, dur - (o.release || 0.2)));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); auRoute(g, dest, o); s.start(t, Math.random() * 0.2); s.stop(t + dur + 0.05);
+}
+const A = (o, extra) => Object.assign({}, o, extra);
+// ---------- sound effects: (dest, loudness, options) ----------
+const SFX = {
+  swing: (d, m, o) => aNoise(d, 0.14, A(o, { freq: 2600, fslide: -1700, q: 1.4, vol: 0.22 * m })),
+  swing_heavy: (d, m, o) => { aNoise(d, 0.24, A(o, { freq: 1300, fslide: -900, q: 1.2, vol: 0.3 * m })); aTone(d, 90, 0.2, A(o, { type: 'sine', vol: 0.08 * m, slide: -30 })); },
+  hit_flesh: (d, m, o) => { aNoise(d, 0.12, A(o, { freq: 520, q: 0.9, vol: 0.42 * m })); aTone(d, 120, 0.1, A(o, { type: 'sine', vol: 0.18 * m, slide: -60 })); aNoise(d, 0.18, A(o, { freq: 1400, q: 3, vol: 0.12 * m, delay: 0.03 })); },
+  gore: (d, m, o) => { aNoise(d, 0.25, A(o, { freq: 380, q: 1.2, vol: 0.4 * m })); for (let i = 0; i < 3; i++) aNoise(d, 0.08, A(o, { freq: 900 + i * 300, q: 4, vol: 0.14 * m, delay: 0.05 + i * 0.05 })); },
+  bone: (d, m, o) => { aNoise(d, 0.05, A(o, { freq: 2600, q: 5, vol: 0.4 * m })); aNoise(d, 0.06, A(o, { freq: 1800, q: 6, vol: 0.3 * m, delay: 0.04 })); aTone(d, 220, 0.06, A(o, { type: 'triangle', vol: 0.12 * m })); },
+  dismember: (d, m, o) => { SFX.gore(d, m * 1.2, o); SFX.bone(d, m, o); aNoise(d, 0.6, A(o, { freq: 700, f: 'lowpass', vol: 0.18 * m, delay: 0.1 })); },
+  clang: (d, m, o) => { aTone(d, 1250, 0.4, A(o, { type: 'triangle', vol: 0.12 * m })); aTone(d, 1870, 0.3, A(o, { type: 'sine', vol: 0.08 * m })); aNoise(d, 0.06, A(o, { freq: 4000, vol: 0.25 * m })); },
+  block: (d, m, o) => { aTone(d, 150, 0.1, A(o, { vol: 0.16 * m })); aNoise(d, 0.09, A(o, { freq: 1600, vol: 0.32 * m })); aTone(d, 900, 0.18, A(o, { type: 'triangle', vol: 0.06 * m })); },
+  parry: (d, m, o) => { SFX.clang(d, m * 1.4, o); aTone(d, 2400, 0.6, A(o, { type: 'sine', vol: 0.08 * m, verb: 0.5 })); },
+  crit: (d, m, o) => { SFX.hit_flesh(d, m * 1.2, o); aTone(d, 300, 0.15, A(o, { vol: 0.1 * m, slide: 300 })); },
+  bow_draw: (d, m, o) => { for (let i = 0; i < 4; i++) aNoise(d, 0.08, A(o, { freq: 300 + i * 120, q: 6, vol: 0.06 * m, delay: i * 0.12 })); },
+  bow_release: (d, m, o) => { aTone(d, 180, 0.12, A(o, { type: 'triangle', vol: 0.2 * m, slide: -80 })); aNoise(d, 0.25, A(o, { freq: 3200, fslide: -2400, vol: 0.12 * m })); },
+  arrow_hit: (d, m, o) => { aNoise(d, 0.06, A(o, { freq: 900, q: 1.4, vol: 0.32 * m })); aTone(d, 160, 0.08, A(o, { type: 'triangle', vol: 0.12 * m })); },
+  arrow_wood: (d, m, o) => { aTone(d, 420, 0.12, A(o, { type: 'triangle', vol: 0.12 * m, slide: -150 })); aNoise(d, 0.05, A(o, { freq: 2000, vol: 0.12 * m })); },
+  fire_cast: (d, m, o) => { aNoise(d, 0.5, A(o, { freq: 600, fslide: 1600, q: 0.8, vol: 0.3 * m })); aTone(d, 110, 0.4, A(o, { type: 'sawtooth', vol: 0.08 * m, slide: 120, lp: 800 })); },
+  boom: (d, m, o) => { aNoise(d, 0.9, A(o, { freq: 200, f: 'lowpass', vol: 0.7 * m, verb: 0.3 })); aTone(d, 55, 0.6, A(o, { type: 'sine', vol: 0.35 * m, slide: -25 })); aNoise(d, 0.6, A(o, { freq: 1200, q: 0.6, vol: 0.18 * m, delay: 0.05 })); },
+  lightning: (d, m, o) => { for (let i = 0; i < 7; i++) aNoise(d, 0.05, A(o, { freq: 2500 + Math.random() * 4000, q: 3, vol: 0.28 * m, delay: i * 0.025 })); aTone(d, 1800, 0.25, A(o, { type: 'sawtooth', vol: 0.08 * m, slide: -1500 })); aNoise(d, 0.8, A(o, { freq: 160, f: 'lowpass', vol: 0.3 * m, delay: 0.08 })); },
+  ice_cast: (d, m, o) => { aNoise(d, 0.45, A(o, { freq: 6500, f: 'highpass', vol: 0.18 * m })); aTone(d, 2200, 0.4, A(o, { type: 'sine', vol: 0.07 * m, slide: -1200 })); },
+  ice_shatter: (d, m, o) => { for (let i = 0; i < 6; i++) aTone(d, 2500 + Math.random() * 2500, 0.12, A(o, { type: 'sine', vol: 0.06 * m, delay: i * 0.03 })); aNoise(d, 0.2, A(o, { freq: 5000, f: 'highpass', vol: 0.2 * m })); },
+  hurt: (d, m, o) => { aNoise(d, 0.12, A(o, { freq: 500, vol: 0.3 * m })); aTone(d, 90, 0.18, A(o, { type: 'sine', vol: 0.2 * m, slide: -40 })); },
+  heartbeat: (d, m, o) => { aTone(d, 60, 0.12, A(o, { type: 'sine', vol: 0.3 * m })); aTone(d, 55, 0.12, A(o, { type: 'sine', vol: 0.22 * m, delay: 0.22 })); },
+  death: (d, m, o) => { aTone(d, 110, 1.6, A(o, { type: 'sawtooth', vol: 0.12 * m, slide: -60, lp: 700, verb: 0.6 })); aNoise(d, 1.6, A(o, { freq: 200, f: 'lowpass', vol: 0.2 * m })); },
+  dodge: (d, m, o) => aNoise(d, 0.2, A(o, { freq: 1800, fslide: -1200, vol: 0.18 * m })),
+  jump: (d, m, o) => aNoise(d, 0.1, A(o, { freq: 600, f: 'lowpass', vol: 0.12 * m })),
+  land: (d, m, o) => { aNoise(d, 0.12, A(o, { freq: 300, f: 'lowpass', vol: 0.25 * m })); aTone(d, 70, 0.1, A(o, { type: 'sine', vol: 0.12 * m })); },
+  splash: (d, m, o) => { aNoise(d, 0.4, A(o, { freq: 1400, fslide: -900, q: 0.7, vol: 0.3 * m })); aNoise(d, 0.25, A(o, { freq: 3200, q: 1, vol: 0.1 * m, delay: 0.08 })); },
+  swim: (d, m, o) => aNoise(d, 0.35, A(o, { freq: 900, fslide: -400, q: 0.6, vol: 0.12 * m })),
+  whistle: (d, m, o) => { aTone(d, 2200, 0.25, A(o, { type: 'sine', vol: 0.1 * m, slide: 500, slideT: 0.18 })); aTone(d, 2600, 0.45, A(o, { type: 'sine', vol: 0.1 * m, slide: -700, delay: 0.3, verb: 0.3 })); },
+  neigh: (d, m, o) => { aTone(d, 700, 0.9, A(o, { type: 'sawtooth', vol: 0.06 * m, slide: -350, vib: [18, 60], lp: 2400 })); aNoise(d, 0.6, A(o, { freq: 1200, q: 2, vol: 0.06 * m, delay: 0.1 })); },
+  snort: (d, m, o) => aNoise(d, 0.3, A(o, { freq: 500, q: 0.8, vol: 0.14 * m })),
+  eat: (d, m, o) => { for (let i = 0; i < 3; i++) aNoise(d, 0.07, A(o, { freq: 900 + i * 200, q: 2, vol: 0.12 * m, delay: i * 0.16 })); },
+  drink: (d, m, o) => { for (let i = 0; i < 4; i++) aTone(d, 280 + i * 70, 0.08, A(o, { type: 'sine', vol: 0.12 * m, slide: 180, delay: i * 0.1 })); },
+  coin: (d, m, o) => { aTone(d, 1760, 0.07, A(o, { type: 'triangle', vol: 0.06 * m })); aTone(d, 2350, 0.12, A(o, { type: 'triangle', vol: 0.05 * m, delay: 0.05 })); },
+  pickup: (d, m, o) => { aNoise(d, 0.08, A(o, { freq: 1500, vol: 0.1 * m })); aTone(d, 520, 0.08, A(o, { type: 'triangle', vol: 0.06 * m, delay: 0.04 })); },
+  herb: (d, m, o) => { aNoise(d, 0.15, A(o, { freq: 2500, f: 'highpass', vol: 0.1 * m })); aTone(d, 880, 0.1, A(o, { type: 'sine', vol: 0.05 * m, delay: 0.08 })); },
+  craft: (d, m, o) => { for (let i = 0; i < 3; i++) aTone(d, 400 + i * 160, 0.1, A(o, { type: 'sine', vol: 0.08 * m, delay: i * 0.12 })); aNoise(d, 0.3, A(o, { freq: 1200, q: 3, vol: 0.06 * m })); },
+  hammer: (d, m, o) => { aTone(d, 1650, 0.3, A(o, { type: 'triangle', vol: 0.09 * m })); aNoise(d, 0.05, A(o, { freq: 3500, vol: 0.16 * m })); },
+  page: (d, m, o) => { aNoise(d, 0.12, A(o, { freq: 4000, f: 'highpass', vol: 0.1 * m })); aNoise(d, 0.1, A(o, { freq: 3000, f: 'highpass', vol: 0.08 * m, delay: 0.13 })); },
+  door: (d, m, o) => { aTone(d, 140, 0.5, A(o, { type: 'sawtooth', vol: 0.05 * m, slide: 60, vib: [12, 20], lp: 900 })); aNoise(d, 0.12, A(o, { freq: 300, f: 'lowpass', vol: 0.25 * m, delay: 0.45 })); },
+  level: (d, m, o) => [262, 330, 392, 523].forEach((f, i) => aTone(d, f, 0.9, A(o, { type: 'triangle', vol: 0.07 * m, delay: i * 0.12, verb: 0.5 }))),
+  quest: (d, m, o) => [220, 277, 330, 440].forEach((f, i) => aTone(d, f, 0.5, A(o, { type: 'sawtooth', vol: 0.05 * m, delay: i * 0.1, lp: 1500, verb: 0.4 }))),
+  trophy: (d, m, o) => { SFX.hammer(d, m, o); [330, 440, 554].forEach((f, i) => aTone(d, f, 0.6, A(o, { type: 'triangle', vol: 0.06 * m, delay: 0.2 + i * 0.1, verb: 0.4 }))); },
+  sense: (d, m, o) => { aNoise(d, 1.2, A(o, { freq: 300, fslide: 2400, q: 1.5, vol: 0.18 * m, verb: 0.6 })); aTone(d, 55, 1.2, A(o, { type: 'sine', vol: 0.15 * m })); },
+  mutate: (d, m, o) => { aTone(d, 80, 1.4, A(o, { type: 'sawtooth', vol: 0.1 * m, slide: 40, vib: [7, 15], lp: 600, verb: 0.5 })); SFX.heartbeat(d, m, A(o, { delay: 0.3 })); },
+  finisher: (d, m, o) => { aTone(d, 60, 0.8, A(o, { type: 'sine', vol: 0.3 * m, slide: -20 })); aNoise(d, 0.6, A(o, { freq: 300, f: 'lowpass', vol: 0.25 * m })); },
+  bloodmoon: (d, m, o) => { aTone(d, 73, 4, A(o, { type: 'sawtooth', vol: 0.12 * m, lp: 500, attack: 1, verb: 0.8 })); aTone(d, 77.8, 4, A(o, { type: 'sawtooth', vol: 0.1 * m, lp: 500, attack: 1.2 })); aTone(d, 146, 3, A(o, { type: 'triangle', vol: 0.06 * m, attack: 1.5, verb: 0.8 })); },
+  rooster: (d, m, o) => { aTone(d, 700, 0.18, A(o, { type: 'sawtooth', vol: 0.03 * m, slide: 300, lp: 2500 })); aTone(d, 1000, 0.5, A(o, { type: 'sawtooth', vol: 0.03 * m, slide: -400, lp: 2500, delay: 0.2 })); },
+  bell: (d, m, o) => { aTone(d, 392, 3, A(o, { type: 'sine', vol: 0.1 * m, verb: 0.8 })); aTone(d, 1080, 1.6, A(o, { type: 'sine', vol: 0.04 * m })); },
+  thunder: (d, m, o) => { aNoise(d, 3, A(o, { freq: 110, f: 'lowpass', vol: 0.8 * m, attack: 0.05, verb: 0.7 })); aNoise(d, 0.4, A(o, { freq: 700, vol: 0.25 * m })); },
+  fire_crackle: (d, m, o) => { for (let i = 0; i < 4; i++) aNoise(d, 0.03, A(o, { freq: 2000 + Math.random() * 2000, q: 4, vol: 0.1 * m, delay: Math.random() * 0.4 })); },
+  click: (d, m, o) => aTone(d, 760, 0.03, A(o, { type: 'triangle', vol: 0.05 * m })),
+  error: (d, m, o) => aTone(d, 130, 0.18, A(o, { type: 'sawtooth', vol: 0.06 * m, lp: 800 })),
+  blip: (d, m, o) => aTone(d, 330 * (o.pitch || 1), 0.04, A(o, { type: 'triangle', vol: 0.05 * m })),
+};
+// footsteps per surface, for feet and hooves
+const STEP = {
+  grass: (d, m, o) => aNoise(d, 0.09, A(o, { freq: 700, f: 'lowpass', vol: 0.14 * m })),
+  forest: (d, m, o) => { aNoise(d, 0.1, A(o, { freq: 900, f: 'lowpass', vol: 0.13 * m })); if (chance(0.3)) aNoise(d, 0.03, A(o, { freq: 3000, q: 4, vol: 0.08 * m, delay: 0.03 })); },
+  dirt: (d, m, o) => aNoise(d, 0.08, A(o, { freq: 1100, q: 0.8, vol: 0.13 * m })),
+  stone: (d, m, o) => { aNoise(d, 0.04, A(o, { freq: 2600, q: 2, vol: 0.1 * m })); aTone(d, 240, 0.03, A(o, { type: 'triangle', vol: 0.05 * m })); },
+  wood: (d, m, o) => { aTone(d, 140, 0.08, A(o, { type: 'triangle', vol: 0.12 * m, slide: -40 })); aNoise(d, 0.05, A(o, { freq: 500, f: 'lowpass', vol: 0.08 * m })); },
+  water: (d, m, o) => aNoise(d, 0.2, A(o, { freq: 1500, fslide: -800, q: 0.7, vol: 0.16 * m })),
+  snow: (d, m, o) => { aNoise(d, 0.07, A(o, { freq: 1700, q: 1.5, vol: 0.12 * m })); aNoise(d, 0.06, A(o, { freq: 1200, q: 1.5, vol: 0.09 * m, delay: 0.05 })); },
+  mud: (d, m, o) => { aNoise(d, 0.14, A(o, { freq: 380, f: 'lowpass', vol: 0.16 * m })); aTone(d, 85, 0.1, A(o, { type: 'sine', vol: 0.07 * m, slide: 40 })); },
+  sand: (d, m, o) => aNoise(d, 0.1, A(o, { freq: 2600, f: 'highpass', vol: 0.07 * m })),
+  rock: (d, m, o) => STEP.stone(d, m, o),
+};
+const SURF_STEP = ['grass', 'forest', 'dirt', 'rock', 'snow', 'sand', 'mud', 'dirt', 'stone', 'sand'];
+// creature voices (no human voices anywhere in the game)
+const VOICE = {
+  growl: (d, m, p, o) => { aTone(d, 80 * p, 0.7, A(o, { type: 'sawtooth', vol: 0.16 * m, slide: -15, vib: [26, 14], lp: 650 })); aNoise(d, 0.6, A(o, { freq: 260 * p, f: 'lowpass', vol: 0.14 * m })); },
+  howl: (d, m, p, o) => aTone(d, 380 * p, 2.4, A(o, { type: 'sine', vol: 0.1 * m, slide: 300, slideT: 0.8, vib: [5, 9], attack: 0.3, hold: 1, release: 1, verb: 0.8 })),
+  roar: (d, m, p, o) => { aNoise(d, 1, A(o, { freq: 300 * p, q: 0.7, vol: 0.5 * m, attack: 0.06 })); aTone(d, 62 * p, 1, A(o, { type: 'sawtooth', vol: 0.2 * m, slide: -20, lp: 450, verb: 0.4 })); },
+  screech: (d, m, p, o) => { aTone(d, 1250 * p, 0.45, A(o, { type: 'sawtooth', vol: 0.07 * m, slide: 800, lp: 3800 })); aNoise(d, 0.35, A(o, { freq: 3000 * p, q: 2, vol: 0.12 * m })); },
+  hiss: (d, m, p, o) => aNoise(d, 0.6, A(o, { freq: 4200 * p, f: 'highpass', vol: 0.16 * m, attack: 0.06 })),
+  gurgle: (d, m, p, o) => { for (let i = 0; i < 5; i++) aTone(d, (160 + Math.random() * 120) * p, 0.08, A(o, { type: 'sine', vol: 0.12 * m, slide: 80, delay: i * 0.07 })); aNoise(d, 0.4, A(o, { freq: 500, f: 'lowpass', vol: 0.12 * m })); },
+  snarl: (d, m, p, o) => { aTone(d, 140 * p, 0.35, A(o, { type: 'sawtooth', vol: 0.12 * m, vib: [30, 20], lp: 1200 })); aNoise(d, 0.3, A(o, { freq: 800 * p, q: 1, vol: 0.12 * m })); },
+  bleat: (d, m, p, o) => aTone(d, 520 * p, 0.35, A(o, { type: 'sawtooth', vol: 0.04 * m, vib: [14, 30], lp: 2200 })),
+  caw: (d, m, p, o) => { for (let i = 0; i < 2; i++) aTone(d, 900 * p, 0.18, A(o, { type: 'sawtooth', vol: 0.05 * m, slide: -350, lp: 2600, delay: i * 0.26 })); },
+  demon: (d, m, p, o) => { SFX.bloodmoon(d, m * 0.6, o); VOICE.roar(d, m, 0.6 * p, o); },
+  squeal: (d, m, p, o) => aTone(d, 900 * p, 0.25, A(o, { type: 'sawtooth', vol: 0.05 * m, slide: 400, lp: 3000 })),
+};
+// ---------- playing sounds in 3D ----------
+const _ap = new THREE.Vector3(), _ar = new THREE.Vector3();
+function spatial(o) {
+  const out = {}; let m = 1;
+  if (o && o.x != null && camera) {
+    const dx = o.x - camera.position.x, dy = (o.y || 0) - camera.position.y, dz = o.z - camera.position.z, d = Math.hypot(dx, dy, dz), range = o.range || 60;
+    m = clamp(1 - d / range, 0, 1); if (m < 0.02) return null; m = m * m;
+    _ar.set(1, 0, 0).applyQuaternion(camera.quaternion); out.pan = d > 0.5 ? clamp((dx * _ar.x + dz * _ar.z) / d, -1, 1) * 0.85 : 0;
+    if (d > range * 0.4) out.lp2 = 2400;
+  }
+  if (o && o.vol) m *= o.vol; if (o && o.pitch) out.pitch = o.pitch;
+  if (G.area !== 'outside') out.verb = 0.35;
+  return [m, out];
+}
+const Sfx = {
+  last: {},
+  play(name, o) {
+    if (!AU.ctx || SET.sfx <= 0) return; const now = performance.now(); if (this.last[name] && now - this.last[name] < 30) return; this.last[name] = now;
+    const s = spatial(o); if (!s) return; const f = SFX[name]; if (f) f(AU.sfx, s[0], s[1]);
+  },
+  step(surf, o) { if (!AU.ctx || SET.sfx <= 0) return; const s = spatial(o); if (!s) return; (STEP[surf] || STEP.dirt)(AU.sfx, s[0], s[1]); },
+  voice(kind, pitch = 1, o) { if (!AU.ctx || SET.sfx <= 0 || !VOICE[kind]) return; const s = spatial(Object.assign({ range: 90 }, o)); if (!s) return; VOICE[kind](AU.sfx, s[0], pitch, s[1]); },
+  blip(pitch = 1) { if (!AU.ctx || SET.sfx <= 0) return; SFX.blip(AU.sfx, 1, { pitch }); },
+};
+// ---------- music: a mood = tempo, scale, chords and parts ----------
+const MOODS = {
+  title: { bpm: 60, root: 45, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 3, 4], parts: [{ i: 'choir', chord: 1, v: 0.05 }, { i: 'bass', pat: 'x...............', oct: -1, len: 16, v: 0.12 }, { i: 'bell', rnd: 0.07, oct: 1, v: 0.04 }, { i: 'drum', pat: 'x.......x.......', v: 0.12, every: 2 }] },
+  town: { bpm: 84, root: 50, scale: [0, 2, 3, 5, 7, 9, 10], prog: [0, 3, 4, 0], parts: [{ i: 'pad', chord: 1, v: 0.022 }, { i: 'pluck', pat: 'x.x.x.x.x.x.x.x.', arp: [0, 1, 2, 1, 3, 1, 2, 1], oct: 0, len: 3, v: 0.055 }, { i: 'bass', pat: 'x.......x.......', oct: -1, len: 7, v: 0.12 }, { i: 'flute', mel: 0.3, oct: 1, v: 0.03 }] },
+  wild: { bpm: 58, root: 47, scale: [0, 1, 3, 5, 7, 8, 10], prog: [0, 0, 5, 1], parts: [{ i: 'drone', chord: 1, v: 0.045, wob: 1 }, { i: 'bell', rnd: 0.06, oct: 1, v: 0.035, dis: 1 }, { i: 'pluck', pat: 'x.......x.......', arp: [0, 2], oct: -1, len: 8, v: 0.04, every: 2 }] },
+  night: { bpm: 52, root: 45, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 0, 6], parts: [{ i: 'drone', chord: 1, v: 0.05 }, { i: 'choir', chord: 1, v: 0.02 }, { i: 'bell', rnd: 0.05, oct: 1, v: 0.03, dis: 1 }] },
+  fight: { bpm: 132, root: 45, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 5, 6, 4], parts: [{ i: 'bass', pat: 'x.x.xx.xx.x.xx.x', oct: -1, len: 1, v: 0.13 }, { i: 'brass', pat: 'x.......x.....x.', v: 0.05 }, { i: 'tom', pat: 'x..x..x.x..x..x.', v: 0.22 }, { i: 'kick', pat: 'x...x...x...x...', v: 0.26 }, { i: 'snare', pat: '....x.......x..x', v: 0.11 }, { i: 'strings', mel: 0.5, oct: 1, v: 0.035, fast: 1 }] },
+  blood: { bpm: 146, root: 44, scale: [0, 1, 3, 5, 6, 8, 10], prog: [0, 1, 0, 6], parts: [{ i: 'choir', chord: 1, v: 0.06 }, { i: 'bass', pat: 'xxxxxxxxxxxxxxxx', oct: -1, len: 1, v: 0.11 }, { i: 'tom', pat: 'x.xx.xx.x.xx.x.x', v: 0.24 }, { i: 'kick', pat: 'x..x..x...x..x..', v: 0.3 }, { i: 'brass', pat: 'x...............', v: 0.06 }, { i: 'bell', rnd: 0.14, oct: 1, v: 0.04, dis: 1 }] },
+  castle: { bpm: 70, root: 43, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 5, 3, 4], parts: [{ i: 'organ', chord: 1, v: 0.04 }, { i: 'bass', pat: 'x.......x.......', oct: -1, len: 8, v: 0.12 }, { i: 'choir', chord: 1, v: 0.025 }, { i: 'bell', rnd: 0.05, oct: 1, v: 0.03 }] },
+  shrine: { bpm: 50, root: 38, scale: [0, 1, 3, 4, 6, 8, 10], prog: [0, 1, 0, 1], parts: [{ i: 'drone', chord: 1, v: 0.06, wob: 1 }, { i: 'choir', chord: 1, v: 0.04 }, { i: 'tom', pat: 'x...............', v: 0.25 }, { i: 'bell', rnd: 0.08, oct: 0, v: 0.04, dis: 1 }] },
+  sad: { bpm: 56, root: 50, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 2, 6], parts: [{ i: 'pad', chord: 1, v: 0.035 }, { i: 'pluck', pat: 'x...x...x...x...', arp: [0, 1, 2, 1], oct: 0, len: 6, v: 0.05 }, { i: 'flute', mel: 0.2, oct: 1, v: 0.025 }] },
+  victory: { bpm: 80, root: 50, scale: [0, 2, 4, 5, 7, 9, 11], prog: [0, 5, 3, 4], parts: [{ i: 'choir', chord: 1, v: 0.045 }, { i: 'brass', pat: 'x.......x.......', v: 0.05 }, { i: 'pluck', pat: 'x.x.x.x.x.x.x.x.', arp: [0, 1, 2, 3], oct: 0, len: 3, v: 0.045 }, { i: 'tom', pat: 'x.......x.......', v: 0.15 }] },
+  dark: { bpm: 48, root: 40, scale: [0, 1, 3, 5, 6, 8, 10], prog: [0, 6, 5, 1], parts: [{ i: 'organ', chord: 1, v: 0.045 }, { i: 'drone', chord: 1, v: 0.04 }, { i: 'bell', rnd: 0.06, oct: 0, v: 0.04, dis: 1 }] },
+};
+const Music = {
+  mood: null, playing: null, gain: null, next: 0, step: 0, bar: 0, mel: 7,
+  set(mood) { this.mood = mood; },
+  sting(kind) { if (!AU.ctx) return; if (kind === 'blood') SFX.bloodmoon(AU.music, 1.4, {}); },
+  degToMidi(M, deg, oct) { const n = M.scale.length, o = Math.floor(deg / n); return M.root + (oct + o) * 12 + M.scale[((deg % n) + n) % n]; },
+  tick() {
+    const ac = AU.ctx; if (!ac) return;
+    if (this.playing !== this.mood) {
+      const t = ac.currentTime;
+      if (this.gain) { const old = this.gain; old.gain.setTargetAtTime(0.0001, t, 0.9); setTimeout(() => { try { old.disconnect(); } catch (e) {} }, 6000); }
+      this.playing = this.mood; this.gain = null; if (!this.mood) return;
+      this.gain = ac.createGain(); this.gain.gain.setValueAtTime(0.0001, t); this.gain.gain.setTargetAtTime(1, t + 0.3, 1.2); this.gain.connect(AU.music);
+      const sv = ac.createGain(); sv.gain.value = 0.3; this.gain.connect(sv); sv.connect(AU.verbIn);
+      this.step = 0; this.bar = 0; this.next = t + 0.2;
+    }
+    const M = MOODS[this.playing]; if (!M || !this.gain) return;
+    const sd = 60 / M.bpm / 4, steps = 16;
+    if (this.next < ac.currentTime - 0.2) this.next = ac.currentTime + 0.05;
+    while (this.next < ac.currentTime + 0.3) { this.playStep(M, this.next, sd, steps); this.next += sd; if (++this.step >= steps) { this.step = 0; this.bar++; } }
+  },
+  playStep(M, t, sd, steps) {
+    const d = this.gain, s = this.step, cd = M.prog[this.bar % M.prog.length], chord = [cd, cd + 2, cd + 4, cd + 6];
+    for (const p of M.parts) {
+      if (p.every && this.bar % p.every) continue; const on = p.pat ? p.pat[s] : null;
+      switch (p.i) {
+        case 'pad': case 'drone': case 'choir': case 'organ':
+          if (s === 0) { const notes = p.i === 'drone' ? [this.degToMidi(M, cd, -1), this.degToMidi(M, cd + 4, -1)] : chord.slice(0, 3).map((g) => this.degToMidi(M, g, 0)); for (const n of notes) this.inst(p.i, d, n, t, sd * steps, p.v, p); }
+          break;
+        case 'bass': if (on === 'x') this.inst('bass', d, this.degToMidi(M, cd, p.oct || -1), t, sd * (p.len || 2), p.v); break;
+        case 'pluck': if (on === 'x') { const k = p.arp[(s / 2 | 0) % p.arp.length]; this.inst('pluck', d, this.degToMidi(M, chord[k], p.oct || 0), t, sd * (p.len || 3), p.v); } break;
+        case 'brass': if (on === 'x') for (const g of chord.slice(0, 2)) this.inst('brass', d, this.degToMidi(M, g, -1), t, sd * 6, p.v); break;
+        case 'bell': if (s % 2 === 0 && Math.random() < p.rnd) { const deg = p.dis && Math.random() < 0.4 ? cd + pick([1, 3, 5]) : pick(chord.slice(0, 3)); this.inst('bell', d, this.degToMidi(M, deg, p.oct || 1), t, 2.4, p.v); } break;
+        case 'flute': case 'strings': {
+          const grid = p.fast ? 1 : 2; if (s % grid) break;
+          if (Math.random() < p.mel) { if (s % 4 === 0) { const target = pick(chord.slice(0, 3)) + 7; this.mel += clamp(target - this.mel, -2, 2); } else this.mel += pick([-1, -1, 1, 1, 2, -2, 0]); this.mel = clamp(this.mel, 3, 13); this.inst(p.i, d, this.degToMidi(M, this.mel, (p.oct || 1) - 1), t, sd * grid * pick([1, 2, 2, 3]), p.v); }
+          break;
+        }
+        default: if (on === 'x') this.inst(p.i, d, 0, t, sd, p.v);
+      }
+    }
+  },
+  inst(kind, d, midi, t, dur, v, p = {}) {
+    const f = midi ? mtof(midi) : 0;
+    switch (kind) {
+      case 'pad': aTone(d, f, dur + 0.6, { type: 'sawtooth', vol: v, attack: 0.8, hold: 1, release: 0.8, lp: 800, at: t, detune: -7 }); aTone(d, f, dur + 0.6, { type: 'sawtooth', vol: v * 0.8, attack: 0.8, hold: 1, release: 0.8, lp: 800, at: t, detune: 8 }); break;
+      case 'drone': aTone(d, f, dur + 1, { type: 'sawtooth', vol: v, attack: 1.5, hold: 1, release: 1, lp: 380, at: t, vib: p.wob ? [0.5, 3] : null }); break;
+      case 'choir': aTone(d, f, dur + 0.6, { type: 'triangle', vol: v, attack: 0.7, hold: 1, release: 0.7, vib: [5, 3], at: t }); aTone(d, f * 2, dur + 0.6, { type: 'sine', vol: v * 0.5, attack: 0.8, hold: 1, vib: [5.5, 4], at: t }); break;
+      case 'organ': aTone(d, f, dur + 0.4, { type: 'square', vol: v * 0.6, attack: 0.2, hold: 1, release: 0.4, lp: 1400, at: t }); aTone(d, f * 2, dur + 0.4, { type: 'sine', vol: v * 0.6, attack: 0.2, hold: 1, at: t }); aTone(d, f / 2, dur + 0.4, { type: 'sine', vol: v * 0.8, attack: 0.3, hold: 1, at: t }); break;
+      case 'bass': aTone(d, f, dur, { type: 'triangle', vol: v, attack: 0.01, at: t }); aTone(d, f, dur * 0.6, { type: 'sawtooth', vol: v * 0.25, lp: 400, at: t }); break;
+      case 'pluck': aTone(d, f, dur + 0.3, { type: 'triangle', vol: v, attack: 0.003, at: t, lp: 2200 }); aTone(d, f * 2, dur * 0.5, { type: 'sine', vol: v * 0.3, at: t }); break;
+      case 'flute': aTone(d, f, dur + 0.15, { type: 'sine', vol: v * 1.4, attack: 0.06, vib: [5, 5], hold: 1, release: 0.12, at: t }); break;
+      case 'strings': aTone(d, f, dur + 0.1, { type: 'sawtooth', vol: v, attack: 0.04, lp: 1600, vib: [6, 5], hold: 1, release: 0.1, at: t }); aTone(d, f, dur + 0.1, { type: 'sawtooth', vol: v * 0.7, attack: 0.04, lp: 1600, detune: 9, at: t }); break;
+      case 'brass': aTone(d, f, dur, { type: 'sawtooth', vol: v, attack: 0.08, lp: 900, q: 2, hold: 1, release: 0.3, at: t }); break;
+      case 'bell': aTone(d, f, dur, { type: 'sine', vol: v, attack: 0.002, at: t }); aTone(d, f * 2.76, dur * 0.4, { type: 'sine', vol: v * 0.3, attack: 0.002, at: t }); break;
+      case 'kick': aTone(d, 130, 0.22, { type: 'sine', vol: v, slide: -90, slideT: 0.14, at: t }); break;
+      case 'tom': aTone(d, 95, 0.3, { type: 'sine', vol: v, slide: -40, at: t }); aNoise(d, 0.08, { freq: 400, vol: v * 0.3, at: t }); break;
+      case 'snare': aNoise(d, 0.14, { freq: 1700, q: 0.7, vol: v, at: t }); break;
+      case 'drum': aTone(d, 110, 0.4, { type: 'sine', vol: v, slide: -50, at: t }); break;
+    }
+  },
+};
+// ---------- ambience ----------
+const Amb = {
+  loops: {}, eventT: 1,
+  init() {
+    const ac = AU.ctx; if (!ac) return;
+    const mk = (name, type, freq, q, lfoHz, lfoAmt) => {
+      const src = ac.createBufferSource(); src.buffer = AU.longNoise; src.loop = true;
+      const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+      const mod = ac.createGain(); mod.gain.value = 1; const g = ac.createGain(); g.gain.value = 0.0001;
+      src.connect(f); f.connect(mod); mod.connect(g); g.connect(AU.amb); src.start();
+      if (lfoHz) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = lfoHz; lg.gain.value = lfoAmt; l.connect(lg); lg.connect(mod.gain); l.start(); }
+      this.loops[name] = g;
+    };
+    mk('wind', 'bandpass', 380, 0.6, 0.09, 0.7); mk('leaves', 'highpass', 2500, 0.4, 0.3, 0.6); mk('rain', 'highpass', 1300, 0.4); mk('river', 'bandpass', 1100, 0.9, 0.5, 0.25);
+    mk('fire', 'bandpass', 700, 2.5, 3.1, 0.6); mk('cave', 'lowpass', 110, 0.8, 0.05, 0.4); mk('town', 'bandpass', 600, 0.5, 0.25, 0.5);
+  },
+  set(t0) { const ac = AU.ctx; if (!ac) return; const t = ac.currentTime; for (const k in this.loops) this.loops[k].gain.setTargetAtTime(Math.max(0.0001, (t0[k] || 0) * 0.5), t, 0.8); },
+  tick(dt, env) {
+    if (!AU.ctx || SET.sfx <= 0) return; this.eventT -= dt; if (this.eventT > 0) return; this.eventT = rand(0.4, 1.3);
+    const d = AU.amb, pan = rand(-0.8, 0.8);
+    if (env.inside) { if (env.area === 'shrine' && chance(0.3)) aNoise(d, 2, { freq: 70, f: 'lowpass', vol: 0.2, attack: 0.5, verb: 0.6 }); if (env.area === 'castle' && chance(0.08)) SFX.door(d, 0.3, { pan, verb: 0.6 }); return; }
+    if (env.night) {
+      if (!env.cold && !env.rain && chance(0.75)) for (let i = 0; i < 3; i++) aTone(d, rand(4300, 4900), 0.05, { type: 'sine', vol: 0.022, delay: i * 0.07, pan });
+      if (chance(env.blood ? 0.1 : 0.03)) VOICE.howl(d, 0.45, rand(0.8, 1.1), { pan, verb: 0.7 });
+      if (chance(0.05)) { aTone(d, 410, 0.3, { type: 'sine', vol: 0.04, pan }); aTone(d, 370, 0.45, { type: 'sine', vol: 0.04, delay: 0.38, pan }); }
+    } else if (!env.rain) {
+      if (env.trees > 0.2 && chance(0.6)) { const b = rand(2300, 3700), n = randi(2, 5); for (let i = 0; i < n; i++) aTone(d, b + rand(-200, 500), 0.07, { type: 'sine', vol: 0.028, slide: rand(-700, 900), delay: i * 0.1, pan }); }
+      if (chance(0.06)) VOICE.caw(d, 0.4, rand(0.9, 1.1), { pan });
+      if (env.town && chance(0.05)) SFX.hammer(d, 0.25, { pan, verb: 0.3 });
+    }
+    if (env.swamp && chance(0.5)) { aTone(d, rand(120, 180), 0.12, { vol: 0.08, lp: 900, pan }); aTone(d, rand(110, 160), 0.14, { vol: 0.08, lp: 900, delay: 0.15, pan }); }
+  },
+};
+
+
+// =====================================================================
+// DATA — items, monsters, skills, recipes, hunter looks, difficulty.
+// =====================================================================
+// item types: sword bow arrow shield armor potion oil food mat herb mutagen trophy key
+const I = (o) => Object.assign({ price: 10, stack: 1, desc: '' }, o);
+const ITEMS = {
+  // swords (dmg per hit; silver hurts werewolves, vampires and the demon's spawn)
+  rusty_sword: I({ name: 'Rusty Sword', type: 'sword', dmg: 14, price: 30, col: 0x8a7a6a, desc: 'Your father\'s old blade. It has seen better years.' }),
+  steel_sword: I({ name: 'Steel Sword', type: 'sword', dmg: 24, price: 260, lvl: 3, col: 0xb8bcc4, desc: 'Honest steel from Brann\'s forge.' }),
+  silver_sword: I({ name: 'Silver Sword', type: 'sword', dmg: 19, silver: true, price: 480, lvl: 4, col: 0xe8ecf4, desc: 'Silver burns cursed flesh. Twice the damage against werewolves, vampires and ghouls.' }),
+  knight_sword: I({ name: 'Knight\'s Longsword', type: 'sword', dmg: 34, price: 900, lvl: 7, col: 0xc8ccd4, desc: 'Long, heavy and very sharp.' }),
+  vargrave_blade: I({ name: 'Vargrave Blade', type: 'sword', dmg: 44, steal: 0.06, price: 0, value: 1200, lvl: 9, col: 0x8a1018, desc: 'Taken from the lord\'s armoury. It drinks a little of every wound.' }),
+  moonsilver: I({ name: 'Moonsilver', type: 'sword', dmg: 40, silver: true, price: 0, value: 1800, lvl: 11, col: 0xd8a0a8, desc: 'Silver forged under a blood moon.' }),
+  demonbane: I({ name: 'Demonbane', type: 'sword', dmg: 52, silver: true, demon: true, price: 0, value: 3000, lvl: 12, col: 0xff6030, desc: 'Forged around the Demon\'s Horn. Triple damage to the demon.' }),
+  // bows
+  hunting_bow: I({ name: 'Hunting Bow', type: 'bow', dmg: 18, draw: 0.85, price: 120, col: 0x8a5a2b, desc: 'Hold right click to draw, let go to shoot.' }),
+  yew_longbow: I({ name: 'Yew Longbow', type: 'bow', dmg: 28, draw: 1.05, price: 640, lvl: 5, col: 0x6a3a1a, desc: 'Strong pull, long range.' }),
+  bone_bow: I({ name: 'Wyvernbone Bow', type: 'bow', dmg: 38, draw: 0.95, price: 0, value: 1400, lvl: 9, col: 0xe8dcc0, desc: 'Strung with wyvern sinew.' }),
+  arrow: I({ name: 'Arrows', type: 'arrow', stack: 99, price: 1, desc: 'Plain arrows.' }),
+  silver_arrow: I({ name: 'Silver Arrows', type: 'arrow', stack: 99, price: 6, silver: true, desc: 'Double damage against the cursed.' }),
+  fire_arrow: I({ name: 'Fire Arrows', type: 'arrow', stack: 99, price: 5, fire: true, desc: 'Set your target burning.' }),
+  // shields and armour
+  wood_shield: I({ name: 'Wooden Shield', type: 'shield', block: 0.55, price: 60, col: 0x8a5a2b, desc: 'Hold F to block. Block just before a hit to parry.' }),
+  iron_shield: I({ name: 'Iron Shield', type: 'shield', block: 0.7, price: 340, lvl: 4, col: 0x6a6e78 }),
+  tower_shield: I({ name: 'Tower Shield', type: 'shield', block: 0.85, price: 820, lvl: 8, col: 0x4a4e58, desc: 'Blocks nearly everything. A bit slow.' }),
+  traveler: I({ name: 'Traveller\'s Clothes', type: 'armor', def: 2, warm: 1, price: 20, col: 0x5a4a3a }),
+  leather: I({ name: 'Leather Jerkin', type: 'armor', def: 6, warm: 1, price: 140, col: 0x6a4a2a }),
+  hunter_coat: I({ name: 'Hunter\'s Coat', type: 'armor', def: 10, warm: 2, price: 380, lvl: 3, col: 0x3a3028 }),
+  chainmail: I({ name: 'Chainmail', type: 'armor', def: 16, warm: 0, price: 700, lvl: 5, col: 0x8a8e98 }),
+  wolf_coat: I({ name: 'Wolf-fur Coat', type: 'armor', def: 12, warm: 4, price: 0, value: 600, lvl: 4, col: 0x8a8278, desc: 'Keeps the night cold away.' }),
+  knight_plate: I({ name: 'Knight\'s Plate', type: 'armor', def: 24, warm: 0, price: 1500, lvl: 8, col: 0xb8bcc4 }),
+  blood_plate: I({ name: 'Blood Plate', type: 'armor', def: 32, warm: 3, price: 0, value: 2600, lvl: 11, col: 0x6a0a10, desc: 'Forged from blood moon shards.' }),
+  // potions
+  draught: I({ name: 'Healing Draught', type: 'potion', heal: 55, stack: 20, price: 30, col: 0xc02020 }),
+  greater_draught: I({ name: 'Greater Draught', type: 'potion', heal: 140, stack: 20, price: 110, col: 0xff4040 }),
+  stamina_tonic: I({ name: 'Stamina Tonic', type: 'potion', stam: true, stack: 20, price: 25, col: 0x40c040, desc: 'Refills stamina and speeds it up for a minute.' }),
+  mana_tonic: I({ name: 'Mana Tonic', type: 'potion', mana: true, stack: 20, price: 40, col: 0x4060e0 }),
+  warming_brandy: I({ name: 'Warming Brandy', type: 'potion', warm: true, stack: 20, price: 20, col: 0xd08020, desc: 'Warms you right up and keeps the cold off for a while.' }),
+  antidote: I({ name: 'Antidote', type: 'potion', cure: true, stack: 20, price: 25, col: 0x60d080 }),
+  owl_eye: I({ name: 'Owl\'s Eye', type: 'potion', owl: true, stack: 20, price: 60, col: 0xe0e080, desc: 'See in the dark for five minutes.' }),
+  holy_water: I({ name: 'Holy Water', type: 'potion', holy: true, stack: 20, price: 80, col: 0xc0e0ff, desc: 'Washes away 25 corruption.' }),
+  // blade oils
+  beast_oil: I({ name: 'Beast Oil', type: 'oil', vs: 'beast', stack: 20, price: 45, col: 0x8a6a3a, desc: '+50% damage against wolves and werewolves for 40 hits.' }),
+  cursed_oil: I({ name: 'Cursed Oil', type: 'oil', vs: 'cursed', stack: 20, price: 45, col: 0x6a3a8a, desc: '+50% against ghouls and vampires for 40 hits.' }),
+  draconid_oil: I({ name: 'Draconid Oil', type: 'oil', vs: 'draconid', stack: 20, price: 60, col: 0x3a8a6a, desc: '+50% against wyverns for 40 hits.' }),
+  ogroid_oil: I({ name: 'Ogroid Oil', type: 'oil', vs: 'ogroid', stack: 20, price: 60, col: 0x6a6a3a, desc: '+50% against trolls for 40 hits.' }),
+  drowned_oil: I({ name: 'Drowned Oil', type: 'oil', vs: 'drowned', stack: 20, price: 45, col: 0x2a6a8a, desc: '+50% against drowners for 40 hits.' }),
+  // food
+  bread: I({ name: 'Bread', type: 'food', food: 25, stack: 20, price: 4 }), apple: I({ name: 'Apple', type: 'food', food: 12, stack: 20, price: 2 }), cheese: I({ name: 'Cheese', type: 'food', food: 20, stack: 20, price: 5 }),
+  raw_venison: I({ name: 'Raw Venison', type: 'food', food: 12, raw: true, cook: 'venison_steak', stack: 20, price: 6 }), venison_steak: I({ name: 'Venison Steak', type: 'food', food: 45, heal: 15, stack: 20, price: 14 }),
+  raw_rabbit: I({ name: 'Raw Rabbit', type: 'food', food: 7, raw: true, cook: 'roast_rabbit', stack: 20, price: 3 }), roast_rabbit: I({ name: 'Roast Rabbit', type: 'food', food: 26, heal: 8, stack: 20, price: 8 }),
+  stew: I({ name: 'Hunter\'s Stew', type: 'food', food: 60, heal: 25, warm: 30, stack: 20, price: 16 }), ale: I({ name: 'Ale', type: 'food', food: 5, warm: 15, stack: 20, price: 3 }),
+  // materials
+  deer_hide: I({ name: 'Deer Hide', type: 'mat', stack: 50, price: 12 }), rabbit_pelt: I({ name: 'Rabbit Pelt', type: 'mat', stack: 50, price: 4 }), wolf_pelt: I({ name: 'Wolf Pelt', type: 'mat', stack: 50, price: 16 }),
+  werewolf_claw: I({ name: 'Werewolf Claw', type: 'mat', stack: 50, price: 45 }), ghoul_marrow: I({ name: 'Ghoul Marrow', type: 'mat', stack: 50, price: 18 }), vampire_fang: I({ name: 'Vampire Fang', type: 'mat', stack: 50, price: 60 }),
+  drowner_brain: I({ name: 'Drowner Brain', type: 'mat', stack: 50, price: 15 }), troll_hide: I({ name: 'Troll Hide', type: 'mat', stack: 50, price: 70 }), wyvern_scale: I({ name: 'Wyvern Scale', type: 'mat', stack: 50, price: 55 }),
+  iron_ingot: I({ name: 'Iron Ingot', type: 'mat', stack: 50, price: 25 }), silver_ingot: I({ name: 'Silver Ingot', type: 'mat', stack: 50, price: 70 }), blood_shard: I({ name: 'Blood Moon Shard', type: 'mat', stack: 50, price: 150, desc: 'Only found on the blood moon.' }),
+  firewood: I({ name: 'Firewood', type: 'mat', stack: 50, price: 2, desc: 'Use it to light a campfire anywhere.' }),
+  // herbs
+  bloodroot: I({ name: 'Bloodroot', type: 'herb', stack: 50, price: 4 }), silverleaf: I({ name: 'Silverleaf', type: 'herb', stack: 50, price: 5 }), ghostcap: I({ name: 'Ghostcap', type: 'herb', stack: 50, price: 7 }), frostbloom: I({ name: 'Frostbloom', type: 'herb', stack: 50, price: 9 }),
+  // mutagens: power from monster blood, at a price
+  wolf_mutagen: I({ name: 'Werewolf Mutagen', type: 'mutagen', mut: 'wolf', price: 0, value: 300 }), vampire_mutagen: I({ name: 'Vampire Mutagen', type: 'mutagen', mut: 'vampire', price: 0, value: 300 }),
+  troll_mutagen: I({ name: 'Troll Mutagen', type: 'mutagen', mut: 'troll', price: 0, value: 300 }), wyvern_mutagen: I({ name: 'Wyvern Mutagen', type: 'mutagen', mut: 'wyvern', price: 0, value: 300 }),
+  drowner_mutagen: I({ name: 'Drowner Mutagen', type: 'mutagen', mut: 'drowner', price: 0, value: 200 }), ghoul_mutagen: I({ name: 'Ghoul Mutagen', type: 'mutagen', mut: 'ghoul', price: 0, value: 200 }),
+  // story items
+  jonah_locket: I({ name: 'Jonah\'s Locket', type: 'key', desc: 'A miller\'s son\'s locket. Inside: the Vargrave crest.' }),
+  edrin_journal: I({ name: 'Father Edrin\'s Journal', type: 'key' }), morwen_charm: I({ name: 'Morwen\'s Charm', type: 'key', desc: 'A bundle of bones and hair. It hums near the demon\'s things.' }),
+  iron_key: I({ name: 'Smuggler\'s Iron Key', type: 'key', desc: 'Opens the castle gate.' }), demon_horn: I({ name: 'The Demon\'s Horn', type: 'key', desc: 'Black, warm to the touch. It opens the Hungering Shrine.' }),
+  vargrave_letter: I({ name: 'A Sealed Letter', type: 'key' }),
+};
+for (const k in ITEMS) ITEMS[k].id = k;
+const TROPHY = (name, col) => ({ name, col });
+const TROPHIES = {
+  mill_beast: TROPHY('The Mill Beast', 0x5a4a3a), mire_mother: TROPHY('The Mire Mother', 0x3a5a4a), old_grum: TROPHY('Old Grum', 0x6a6a5a), wyvern_queen: TROPHY('Skarnveil, the Wyvern Queen', 0x3a6a5a),
+  vargrave: TROPHY('Lord Vargrave', 0xd8d0c8), azgoreth: TROPHY('Azgoreth', 0x6a1010),
+  c_werewolf: TROPHY('A named werewolf', 0x4a3a2a), c_ghoul: TROPHY('A ghoul alpha', 0x6a7a5a), c_vampire: TROPHY('A pale vampire', 0xd8d0d8), c_drowner: TROPHY('A drowner matriarch', 0x3a5a5a), c_troll: TROPHY('A bridge troll', 0x7a7a6a), c_wyvern: TROPHY('A red wyvern', 0x8a2a1a), c_fiend: TROPHY('A blood fiend', 0x8a0a0a),
+};
+// ---------- monsters ----------
+// family decides what oils and silver do; model picks the 3D body
+const MON = {
+  wolf: { name: 'Wolf', model: 'wolf', family: 'beast', hp: 45, dmg: 8, speed: 7.2, reach: 1.9, xp: 12, coins: [0, 0], drops: [['wolf_pelt', 0.6], ['raw_venison', 0.3]], pack: [2, 4], col: 0x6a6a68, voice: 'snarl', size: 1 },
+  werewolf: { name: 'Werewolf', model: 'werewolf', family: 'beast', hp: 260, dmg: 22, speed: 8.6, reach: 2.4, xp: 90, coins: [8, 20], silver: 2, regen: 3, drops: [['werewolf_claw', 0.7], ['wolf_mutagen', 0.12]], col: 0x4a3a2c, voice: 'growl', size: 1.25, night: true },
+  ghoul: { name: 'Ghoul', model: 'ghoul', family: 'cursed', hp: 70, dmg: 11, speed: 5.8, reach: 1.9, xp: 22, coins: [1, 5], silver: 1.5, drops: [['ghoul_marrow', 0.6], ['ghoul_mutagen', 0.05]], pack: [3, 6], col: 0x7a8a6a, voice: 'screech', size: 1, night: true },
+  vampire: { name: 'Vampire', model: 'vampire', family: 'cursed', hp: 210, dmg: 20, speed: 8.2, reach: 2.1, xp: 85, coins: [20, 45], silver: 2, fire: 1.5, blink: true, drops: [['vampire_fang', 0.6], ['vampire_mutagen', 0.1]], col: 0xd8d0d8, voice: 'hiss', size: 1, night: true },
+  drowner: { name: 'Drowner', model: 'drowner', family: 'drowned', hp: 80, dmg: 12, speed: 5.2, reach: 1.9, xp: 24, coins: [0, 3], fire: 1.6, drops: [['drowner_brain', 0.6], ['drowner_mutagen', 0.05]], pack: [2, 4], col: 0x4a6a5a, voice: 'gurgle', size: 0.95 },
+  troll: { name: 'Troll', model: 'troll', family: 'ogroid', hp: 680, dmg: 34, speed: 4.2, reach: 3, xp: 180, coins: [30, 70], fire: 1.4, drops: [['troll_hide', 0.8], ['troll_mutagen', 0.15]], col: 0x7a7868, voice: 'roar', size: 1.9 },
+  wyvern: { name: 'Wyvern', model: 'wyvern', family: 'draconid', hp: 320, dmg: 24, speed: 9, reach: 2.6, xp: 140, coins: [10, 30], ice: 1.4, fly: true, drops: [['wyvern_scale', 0.7], ['wyvern_mutagen', 0.12]], col: 0x3a5a4a, voice: 'screech', size: 1.6 },
+  blood_fiend: { name: 'Blood Fiend', model: 'werewolf', family: 'cursed', hp: 950, dmg: 38, speed: 9, reach: 2.8, xp: 400, coins: [60, 120], silver: 1.5, drops: [['blood_shard', 1], ['blood_shard', 0.6]], col: 0x6a0a0a, voice: 'roar', size: 1.6, bloodOnly: true },
+  // wildlife
+  deer: { name: 'Deer', model: 'deer', family: 'animal', hp: 30, dmg: 0, speed: 10, xp: 6, coins: [0, 0], drops: [['raw_venison', 1], ['deer_hide', 0.8]], col: 0x8a6a4a, voice: 'bleat', size: 1, prey: true },
+  rabbit: { name: 'Rabbit', model: 'rabbit', family: 'animal', hp: 6, dmg: 0, speed: 9, xp: 2, coins: [0, 0], drops: [['raw_rabbit', 1], ['rabbit_pelt', 0.7]], col: 0x9a8a78, voice: 'squeal', size: 1, prey: true },
+  crow: { name: 'Crow', model: 'crow', family: 'animal', hp: 3, dmg: 0, speed: 8, xp: 1, coins: [0, 0], drops: [], col: 0x1a1a1e, voice: 'caw', size: 1, prey: true, bird: true },
+  // bosses
+  mill_beast: { name: 'The Mill Beast', model: 'werewolf', family: 'beast', hp: 1100, dmg: 28, speed: 9, reach: 2.8, xp: 600, coins: [80, 80], silver: 2, regen: 4, boss: true, trophy: 'mill_beast', drops: [['werewolf_claw', 1], ['wolf_mutagen', 1]], col: 0x3a2c22, voice: 'roar', size: 1.55 },
+  mire_mother: { name: 'The Mire Mother', model: 'drowner', family: 'drowned', hp: 1500, dmg: 30, speed: 6, reach: 3, xp: 800, coins: [120, 120], fire: 1.6, boss: true, trophy: 'mire_mother', drops: [['drowner_mutagen', 1], ['drowner_brain', 1]], col: 0x2a4a3a, voice: 'gurgle', size: 2 },
+  old_grum: { name: 'Old Grum', model: 'troll', family: 'ogroid', hp: 2200, dmg: 42, speed: 4.6, reach: 3.6, xp: 1000, coins: [200, 200], fire: 1.4, boss: true, trophy: 'old_grum', drops: [['iron_key', 1], ['troll_mutagen', 1], ['troll_hide', 1]], col: 0x6a6858, voice: 'roar', size: 2.4 },
+  wyvern_queen: { name: 'Skarnveil, the Wyvern Queen', model: 'wyvern', family: 'draconid', hp: 2600, dmg: 36, speed: 10, reach: 3.2, xp: 1200, coins: [250, 250], ice: 1.4, fly: true, boss: true, trophy: 'wyvern_queen', drops: [['demon_horn', 1], ['wyvern_scale', 1], ['wyvern_mutagen', 1]], col: 0x2a4a3a, voice: 'screech', size: 2.6 },
+  lord_vargrave: { name: 'Lord Aldous Vargrave', model: 'lord', family: 'cursed', hp: 3600, dmg: 40, speed: 9, reach: 2.6, xp: 2000, coins: [500, 500], silver: 1.6, fire: 1.3, blink: true, boss: true, trophy: 'vargrave', drops: [['vargrave_blade', 1]], col: 0xd8d0c8, voice: 'hiss', size: 1.1 },
+  azgoreth: { name: 'Azgoreth, the Hunger Below', model: 'demon', family: 'demon', hp: 5200, dmg: 48, speed: 6.5, reach: 4, xp: 3000, coins: [0, 0], boss: true, trophy: 'azgoreth', drops: [], col: 0x3a0a0a, voice: 'demon', size: 3.2 },
+};
+for (const k in MON) MON[k].id = k;
+const BLOOD_MUL = 1.5; // blood moon: monsters are this much stronger
+// where things live: [x, z, radius, [[type, weight]...], max, when]
+const ZONES = [
+  { x: 300, z: 60, r: 170, day: [['wolf', 3], ['deer', 2], ['rabbit', 2]], night: [['werewolf', 2], ['wolf', 3]], max: 7 },
+  { x: 420, z: 300, r: 60, day: [['crow', 3]], night: [['ghoul', 4]], max: 6 },
+  { x: -470, z: 60, r: 150, day: [['drowner', 3]], night: [['drowner', 4], ['ghoul', 1]], max: 7 },
+  { x: 135, z: 600, r: 130, day: [['rabbit', 2], ['crow', 1]], night: [['drowner', 3]], max: 5 },
+  { x: 360, z: -340, r: 150, day: [['crow', 2], ['wolf', 1]], night: [['vampire', 2], ['ghoul', 2]], max: 5 },
+  { x: -200, z: -560, r: 140, day: [['wyvern', 1], ['wolf', 2]], night: [['wyvern', 1], ['werewolf', 1]], max: 3 },
+  { x: 120, z: 230, r: 120, day: [['rabbit', 3], ['crow', 3], ['deer', 1]], night: [['wolf', 2]], max: 6 },
+  { x: -230, z: 300, r: 160, day: [['deer', 3], ['rabbit', 3], ['wolf', 1]], night: [['wolf', 3], ['ghoul', 1]], max: 6 },
+  { x: -300, z: -250, r: 180, day: [['deer', 2], ['wolf', 2]], night: [['werewolf', 1], ['wolf', 2]], max: 6 },
+  { x: 220, z: -80, r: 140, day: [['deer', 3], ['rabbit', 2]], night: [['wolf', 2], ['werewolf', 1]], max: 5 },
+  { x: 0, z: 420, r: 140, day: [['deer', 2], ['rabbit', 2], ['crow', 2]], night: [['wolf', 2], ['drowner', 1]], max: 5 },
+];
+// ---------- skills: 4 branches, 4 skills, 3 ranks each ----------
+const SKILLS = [
+  { id: 'edge', br: 'blade', row: 0, name: 'Sharp Edge', per: '+8% sword damage' }, { id: 'heavy', br: 'blade', row: 1, name: 'Heavy Hand', per: '+15% heavy attack damage' },
+  { id: 'riposte', br: 'blade', row: 2, name: 'Riposte', per: 'Wider parry window, parries hurt' }, { id: 'butcher', br: 'blade', row: 3, name: 'Butcher', per: 'Finishers heal 8% and cut off more limbs' },
+  { id: 'aim', br: 'hunt', row: 0, name: 'Steady Aim', per: '+10% bow damage' }, { id: 'draw', br: 'hunt', row: 1, name: 'Quick Draw', per: 'Draw your bow 12% faster' },
+  { id: 'head', br: 'hunt', row: 2, name: 'Headhunter', per: '+25% headshot damage' }, { id: 'eye', br: 'hunt', row: 3, name: 'Hunter\'s Eye', per: 'Hunter sense lasts longer and shows monster health' },
+  { id: 'kindle', br: 'arcana', row: 0, name: 'Kindling', per: '+12% fire damage' }, { id: 'storm', br: 'arcana', row: 1, name: 'Storm Caller', per: 'Lightning jumps to one more enemy' },
+  { id: 'winter', br: 'arcana', row: 2, name: 'Winter\'s Touch', per: 'Ice freezes for longer' }, { id: 'well', br: 'arcana', row: 3, name: 'Deep Well', per: '+15 max mana and faster mana' },
+  { id: 'blood', br: 'survival', row: 0, name: 'Thick Blood', per: '+8% max health' }, { id: 'stomach', br: 'survival', row: 1, name: 'Iron Stomach', per: 'Hunger falls 20% slower, raw meat is safe' },
+  { id: 'cold', br: 'survival', row: 2, name: 'Cold Hardened', per: 'Feel the cold 20% less' }, { id: 'rider', br: 'survival', row: 3, name: 'Rider', per: 'Your horse is 10% faster and tires slower' },
+];
+const SKILL_BY = Object.fromEntries(SKILLS.map((s) => [s.id, s]));
+const BRANCHES = { blade: { name: 'BLADE', col: '#c84040' }, hunt: { name: 'HUNT', col: '#5aa050' }, arcana: { name: 'ARCANA', col: '#5a7ae0' }, survival: { name: 'SURVIVAL', col: '#d8a040' } };
+const SPELLS = {
+  fire: { name: 'Fire', mana: 22, cd: 0.9, dmg: 34, col: 0xff6020, desc: 'A fireball that bursts and sets things burning.' },
+  lightning: { name: 'Lightning', mana: 28, cd: 1.2, dmg: 30, col: 0xa0c8ff, desc: 'Strikes your target and jumps to others nearby. Stuns.' },
+  ice: { name: 'Ice', mana: 20, cd: 0.8, dmg: 18, col: 0xa0e8ff, desc: 'A cone of ice shards that slows and freezes.' },
+};
+const MUTATIONS = {
+  wolf: { name: 'Wolf Blood', desc: 'Heal 2 health a second at night.', corr: 15 }, vampire: { name: 'Thirst', desc: 'Your sword hits heal you a little.', corr: 20 },
+  troll: { name: 'Stone Skin', desc: '+15% max health, +6 armour.', corr: 18 }, wyvern: { name: 'Wyvern Lungs', desc: '+25% stamina, faster stamina.', corr: 15 },
+  drowner: { name: 'Gills', desc: 'Swim fast and never drown.', corr: 10 }, ghoul: { name: 'Carrion Hunger', desc: 'Eat from fresh kills (E) to heal.', corr: 12 },
+};
+// ---------- crafting ----------
+const RECIPES = [
+  // alchemy (camps, home, Maud's)
+  { out: 'draught', n: 1, at: 'alchemy', need: { bloodroot: 2 } }, { out: 'greater_draught', n: 1, at: 'alchemy', need: { bloodroot: 2, ghostcap: 1, drowner_brain: 1 } },
+  { out: 'stamina_tonic', n: 1, at: 'alchemy', need: { silverleaf: 2 } }, { out: 'mana_tonic', n: 1, at: 'alchemy', need: { frostbloom: 1, silverleaf: 1 } },
+  { out: 'warming_brandy', n: 1, at: 'alchemy', need: { ale: 1, bloodroot: 1 } }, { out: 'antidote', n: 1, at: 'alchemy', need: { silverleaf: 1, ghostcap: 1 } },
+  { out: 'owl_eye', n: 1, at: 'alchemy', need: { ghostcap: 2, frostbloom: 1 } },
+  { out: 'beast_oil', n: 1, at: 'alchemy', need: { wolf_pelt: 1, bloodroot: 1 } }, { out: 'cursed_oil', n: 1, at: 'alchemy', need: { ghoul_marrow: 1, silverleaf: 1 } },
+  { out: 'draconid_oil', n: 1, at: 'alchemy', need: { wyvern_scale: 1, frostbloom: 1 } }, { out: 'ogroid_oil', n: 1, at: 'alchemy', need: { troll_hide: 1, bloodroot: 1 } }, { out: 'drowned_oil', n: 1, at: 'alchemy', need: { drowner_brain: 1, ghostcap: 1 } },
+  { out: 'silver_arrow', n: 10, at: 'alchemy', need: { silver_ingot: 1, firewood: 1 } }, { out: 'fire_arrow', n: 10, at: 'alchemy', need: { firewood: 2, bloodroot: 1 } },
+  // smithing (Brann's forge)
+  { out: 'silver_sword', n: 1, at: 'smith', need: { silver_ingot: 3, iron_ingot: 1 } }, { out: 'hunter_coat', n: 1, at: 'smith', need: { deer_hide: 4 } },
+  { out: 'wolf_coat', n: 1, at: 'smith', need: { wolf_pelt: 4, deer_hide: 2 } }, { out: 'bone_bow', n: 1, at: 'smith', need: { wyvern_scale: 3, firewood: 2 } },
+  { out: 'moonsilver', n: 1, at: 'smith', need: { silver_ingot: 4, blood_shard: 3 } }, { out: 'blood_plate', n: 1, at: 'smith', need: { blood_shard: 5, troll_hide: 2, iron_ingot: 3 } },
+  { out: 'demonbane', n: 1, at: 'smith', need: { demon_horn: 1, silver_ingot: 5, blood_shard: 2 }, keepNeed: ['demon_horn'] },
+];
+const SHOPS = {
+  smith: { name: 'Brann\'s Forge', greet: 'Steel, silver and good leather. And if you bring me the makings, I\'ll forge you something special.', items: ['steel_sword', 'knight_sword', 'hunting_bow', 'yew_longbow', 'wood_shield', 'iron_shield', 'tower_shield', 'leather', 'hunter_coat', 'chainmail', 'knight_plate', 'arrow', 'iron_ingot', 'silver_ingot'], craft: 'smith' },
+  alchemist: { name: 'Old Maud\'s Remedies', greet: 'Bloodroot heals, silverleaf steadies the breath. Bring me herbs and I\'ll pay you, or mix your own on my table.', items: ['draught', 'stamina_tonic', 'mana_tonic', 'antidote', 'warming_brandy', 'owl_eye', 'beast_oil', 'cursed_oil', 'drowned_oil', 'bloodroot', 'silverleaf', 'silver_arrow', 'fire_arrow'], craft: 'alchemy' },
+  inn: { name: 'The Drowned Lantern', greet: 'Warm stew, cold ale and a bed that hasn\'t got bugs in it. Mostly.', items: ['bread', 'apple', 'cheese', 'stew', 'ale', 'firewood', 'arrow'], room: 15 },
+  chapel: { name: 'Chapel of the Dawn', greet: 'The light keeps what darkness you carry from taking root. For a donation.', items: ['holy_water', 'draught'], cleanse: 120 },
+};
+// ---------- hunter looks ----------
+const LOOK_OPTS = {
+  body: ['Slim', 'Average', 'Broad'], skin: ['#f2d0b0', '#e0b090', '#c89068', '#a06a48', '#7a4a30', '#4a2c1c'],
+  face: ['Sharp', 'Soft', 'Square', 'Gaunt'], hair: ['Bald', 'Short', 'Long', 'Ponytail', 'Braid', 'Shaved sides'],
+  hairCol: ['#1a1410', '#3a2414', '#6a4024', '#a06a34', '#d8b070', '#e8e0d0', '#8a2a1a', '#2a2a30'], beard: ['None', 'Stubble', 'Short', 'Full'],
+  scar: ['None', 'Eye', 'Cheek', 'Cross', 'Burn'], eyes: ['#3a2a1a', '#3a5a8a', '#4a6a3a', '#7a6a4a', '#8a2020'],
+  coat: ['#3a3028', '#2a2a30', '#4a2a20', '#2a3a2a', '#5a4a3a', '#1a1a1a'], shirt: ['#8a7a6a', '#5a2a24', '#2a3a4a', '#d8d0c0', '#3a4a2a'],
+};
+const LOOK_PRESETS = {
+  rookie: { name: 'The Rookie', body: 1, skin: 1, face: 1, hair: 1, hairCol: 2, beard: 1, scar: 0, eyes: 1, coat: 0, shirt: 0 },
+  wolfborn: { name: 'Wolfborn', body: 2, skin: 2, face: 2, hair: 2, hairCol: 0, beard: 3, scar: 3, eyes: 3, coat: 4, shirt: 1 },
+  ashen: { name: 'Ashen Widow', body: 0, skin: 0, face: 0, hair: 3, hairCol: 5, beard: 0, scar: 1, eyes: 4, coat: 5, shirt: 3 },
+  veteran: { name: 'The Veteran', body: 2, skin: 3, face: 3, hair: 5, hairCol: 1, beard: 2, scar: 2, eyes: 0, coat: 2, shirt: 2 },
+};
+const DIFF = {
+  easy: { name: 'Easy', dmgIn: 0.6, hp: 0.8, loot: 1, desc: 'Monsters hit softer. A good way to enjoy the story.' },
+  normal: { name: 'Normal', dmgIn: 1, hp: 1, loot: 1, desc: 'A harsh valley. Prepare before every hunt.' },
+  hard: { name: 'Hard', dmgIn: 1.45, hp: 1.3, loot: 1.25, desc: 'Brutal. Monsters hit hard and take a beating.' },
+  hardcore: { name: 'Hardcore', dmgIn: 1.45, hp: 1.3, loot: 1.25, perma: true, desc: 'Like Hard, but if you die your save is deleted forever.' },
+};
+const MAX_LVL = 25;
+const xpNeed = (L) => Math.floor(120 * Math.pow(L, 1.45));
+
+
+// =====================================================================
+// STORY — Greywater Vale. You grew up here, left as a child, and came
+// back a rookie hunter to find the valley cursed. Lord Aldous Vargrave
+// traded his people's lives to the demon Azgoreth to live forever, and
+// every seventh night the moon turns red and the demon feeds.
+// No voice acting: everything is text (with soft blips while it types).
+// =====================================================================
+const PEOPLE = {
+  hale: { name: 'Captain Hale', role: 'Captain of the Watch', look: { skin: '#c89068', hair: '#5a5a5a', beard: '#5a5a5a', coat: '#2a3a4a', shirt: '#8a8e98', body: 2, helm: 0 }, at: [12, 132], blip: 0.72 },
+  maud: { name: 'Old Maud', role: 'Alchemist', look: { skin: '#e0b090', hair: '#d8d0c8', coat: '#3a4a2a', shirt: '#6a5a4a', body: 0, hood: 1 }, at: [40, 152], shop: 'alchemist', blip: 0.9 },
+  brann: { name: 'Tomas Brann', role: 'Blacksmith', look: { skin: '#a06a48', hair: '#1a1410', beard: '#1a1410', coat: '#4a3a2a', shirt: '#6a3020', body: 2, apron: 1 }, at: [-30, 116], shop: 'smith', job: 'hammer', blip: 0.68 },
+  elsa: { name: 'Elsa', role: 'Innkeeper', look: { skin: '#f2d0b0', hair: '#8a2a1a', coat: '#5a2a24', shirt: '#d8d0c0', body: 1 }, at: [26, 116], shop: 'inn', blip: 1.1 },
+  edrin: { name: 'Father Edrin', role: 'Priest', look: { skin: '#e0b090', hair: '#3a2414', coat: '#1a1a1a', shirt: '#d8d0c0', body: 1, robe: 1 }, at: [-6, 196], shop: 'chapel', blip: 0.82 },
+  pella: { name: 'Pella', role: 'Farmer', look: { skin: '#c89068', hair: '#d8b070', coat: '#4a5a2a', shirt: '#d8d0c0', body: 1 }, at: [118, 214], blip: 1.05 },
+  morwen: { name: 'Morwen', role: 'The witch of Blackmire', look: { skin: '#b8c0a0', hair: '#2a2a30', coat: '#2a2a1a', shirt: '#4a3a4a', body: 0, robe: 1, hood: 1 }, at: [-540, 10], blip: 0.86 },
+  vargrave: { name: 'Lord Aldous Vargrave', role: 'Lord of Greywater', look: { skin: '#e8e0d8', hair: '#e8e8e8', coat: '#3a0a10', shirt: '#1a1a1a', body: 1, cape: 1 }, blip: 0.6 },
+};
+// townsfolk who wander, work and go home at night
+const TOWNSFOLK = [
+  { name: 'Willem', look: { skin: '#e0b090', hair: '#6a4024', coat: '#5a4a3a', shirt: '#8a7a6a', body: 1 } },
+  { name: 'Agnes', look: { skin: '#f2d0b0', hair: '#a06a34', coat: '#4a2a30', shirt: '#d8d0c0', body: 0 } },
+  { name: 'Bram', look: { skin: '#a06a48', hair: '#1a1410', beard: '#1a1410', coat: '#3a3028', shirt: '#5a2a24', body: 2 } },
+  { name: 'Ilse', look: { skin: '#e0b090', hair: '#d8b070', coat: '#2a3a4a', shirt: '#d8d0c0', body: 0 } },
+  { name: 'Odo', look: { skin: '#c89068', hair: '#3a2414', coat: '#4a3a2a', shirt: '#8a7a6a', body: 1 } },
+  { name: 'Greta', look: { skin: '#f2d0b0', hair: '#e8e0d0', coat: '#3a2a20', shirt: '#6a5a4a', body: 1 } },
+];
+const SPEAKER_COL = { you: '#e8d8b0', hale: '#a0b8d8', maud: '#a0c890', brann: '#d8a070', elsa: '#e89080', edrin: '#d8d0c0', pella: '#d8c070', morwen: '#9fd0a0', vargrave: '#ff6060', narrator: '#b8b0a0', azgoreth: '#ff4020' };
+// the main story: each step has an objective, a marker and what finishes it
+const MAIN = [
+  { id: 'arrive', title: 'Homecoming', goal: 'Talk to Captain Hale at the contract board in Ashford.', marker: 'hale' },
+  { id: 'mill', title: 'The Mill Beast', goal: 'Investigate the Old Mill. Use hunter sense (R) to find clues.', marker: [-78, 296] },
+  { id: 'trail', title: 'The Mill Beast', goal: 'Follow the blood trail into Wolfwood.', marker: 'trail' },
+  { id: 'beast', title: 'The Mill Beast', goal: 'Kill the Mill Beast at the Wolf Den.', marker: [372, -20] },
+  { id: 'locket', title: 'The Mill Beast', goal: 'Bring Jonah\'s locket to Captain Hale.', marker: 'hale' },
+  { id: 'edrin', title: 'Silver Tongues', goal: 'Ask Father Edrin at the Chapel of the Dawn about the curse.', marker: 'edrin' },
+  { id: 'journal', title: 'Silver Tongues', goal: 'Find the old records at the ruined chapel in St. Aldric\'s Graveyard.', marker: [448, 268] },
+  { id: 'witch', title: 'The Witch of Blackmire', goal: 'Find Morwen in the Blackmire swamp.', marker: 'morwen' },
+  { id: 'mire', title: 'The Witch of Blackmire', goal: 'Kill the Mire Mother at the Drowned Nest.', marker: [-430, 140] },
+  { id: 'pact', title: 'The Witch of Blackmire', goal: 'Return to Morwen.', marker: 'morwen' },
+  { id: 'key', title: 'Keys and Horns', goal: 'Take the Iron Key from Old Grum under the Old Stone Bridge. (Optional: hunt the Wyvern Queen for the Demon\'s Horn.)', marker: [-58, -168] },
+  { id: 'castle', title: 'Castle Vargrave', goal: 'Open the castle gate and enter the great hall.', marker: [360, -356] },
+  { id: 'choice', title: 'The Lord of Greywater', goal: 'Decide the fate of the valley.', marker: [360, -356] },
+  { id: 'shrine', title: 'The Hunger Below', goal: 'Enter the Hungering Shrine in the western mountains and kill Azgoreth.', marker: [-650, -390] },
+  { id: 'done', title: 'Free Roam', goal: 'The story is over. Hunt, explore and chase the other endings.', marker: null },
+];
+const MAIN_IDX = Object.fromEntries(MAIN.map((m, i) => [m.id, i]));
+// conversations: lists of [speaker, text]; 'you' lines are your hunter's
+const TALKS = {
+  opening: [['narrator', 'Greywater Vale. You were nine when your mother died and the carts took you south. Fifteen years later, you ride back in the rain.'], ['narrator', 'The letters said the valley was cursed. The letters stopped coming. Nobody sends for a rookie hunter unless every real hunter is already dead.'], ['narrator', 'Ashford is ahead. The moon over it is a thin pale sliver. It won\'t stay that colour.']],
+  hale_first: [['hale', 'You\'re the hunter? Gods. You\'re a child.'], ['you', 'I\'m twenty-four. And I was born here.'], ['hale', 'Then you know what this place used to be. Now look at it. Every seventh night the moon goes red and something takes a family.'], ['hale', 'Last week it was the Old Mill. Something came through the door. Took the miller in pieces. His boy Jonah is missing.'], ['hale', 'The board\'s yours. Start with the mill. Look closely. Things leave tracks if you know how to see them.'], ['narrator', 'Press R to use your hunter sense. Clues, tracks and blood glow red.']],
+  mill_found: [['you', 'Claw marks. Too big for a wolf. And the blood leads east, into Wolfwood.']],
+  beast_dies: [['narrator', 'The beast falls. Its body twists, shrinks, and the fur falls away.'], ['narrator', 'It is a boy. Sixteen at most. A locket hangs from his neck.'], ['you', '...Jonah.']],
+  hale_locket: [['hale', 'Jonah. Damn it.'], ['hale', 'His family was taken to the castle last winter. "Service to the Lord," the guards said. Nobody comes back from service.'], ['hale', 'The locket has the Vargrave crest. If anyone knows what\'s happening up there, it\'s Father Edrin. When he\'s sober.']],
+  edrin: [['edrin', 'The hunter. Sit. Drink with me. No? Then listen.'], ['edrin', 'Forty years ago Lord Vargrave caught the plague. He was dying. And then he wasn\'t. That same autumn, the first blood moon.'], ['edrin', 'Father Aldric kept records of everything. He hid them in the old chapel at the graveyard before the ghouls took it.'], ['edrin', 'Go at day if you have any sense. At night, the dead walk there.']],
+  journal: [['narrator', 'Under the altar: a waxed bundle of pages. Father Aldric\'s hand, shaking.'], ['narrator', '"The Lord did not recover. He bargained. A voice under the western mountain. A hunger that wants a valley to eat, one family at a time."'], ['narrator', '"The witch of Blackmire knows its name. God forgive me, I never had the courage to ask her."']],
+  morwen_first: [['morwen', 'A hunter with a dead priest\'s pages. You want a name. Names cost.'], ['morwen', 'There\'s a mother in my swamp. She lays her drowners in the reeds by my door and they steal my herbs. Kill her.'], ['you', 'And then you\'ll talk?'], ['morwen', 'And then I\'ll talk.']],
+  morwen_pact: [['morwen', 'She\'s dead? Good. You may live long enough to be useful.'], ['morwen', 'The thing under the mountain is Azgoreth. The Hunger Below. Aldous Vargrave fed it his people for forty years, and it gave him forever.'], ['morwen', 'Kill the lord and his half of the pact breaks. The curse dies with him. Most of it.'], ['morwen', 'Or kill the demon itself. For that you need its horn. The Wyvern Queen swallowed it, in the north. And a blade that can cut it.'], ['morwen', 'Either way, the castle gate is barred. A troll under the Old Stone Bridge robbed the smugglers who used to open it. Old Grum has their key.'], ['morwen', 'Take this charm. It will hum near the demon\'s things.']],
+  castle_hall: [['narrator', 'The great hall is warm. There are candles everywhere, and a long table set for a feast nobody has eaten.'], ['vargrave', 'Ah. The hunter. Welcome home.'], ['vargrave', 'Your mother died in my valley, did she not? A fever. So many fevers.'], ['vargrave', 'Let me save you some trouble. You can kill me. Azgoreth will still be hungry, and it will find another lord.'], ['vargrave', 'Or... you could take my place. Live forever. Feed it a little, and keep the rest safe. Someone has to.']],
+  vargrave_dies: [['narrator', 'Lord Vargrave crumbles like old paper. Forty stolen years catch up with him in a breath.'], ['narrator', 'Outside, the moon pales. The pact is broken.']],
+  azgoreth_meet: [['azgoreth', 'A LITTLE HUNTER. CARRYING MY HORN.'], ['azgoreth', 'I HAVE EATEN KINGS. I WILL EAT YOUR VALLEY, AND THEN THE NEXT.'], ['you', 'Not this one.']],
+  azgoreth_dies: [['narrator', 'The demon screams, and the mountain screams with it. Far to the east, in his castle, Lord Vargrave crumbles to dust mid-sentence.'], ['narrator', 'The Hunger Below is dead. The valley will never see a blood moon again.']],
+  deal: [['narrator', 'You take the lord\'s hand. It is cold, and then you are cold.'], ['vargrave', 'There. Was that so hard?'], ['narrator', 'He crumbles. You don\'t. The hall\'s candles lean toward you now. Somewhere under the mountain, something smiles.']],
+};
+const ENDINGS = {
+  lord: { title: 'THE LORD\'S END', sub: 'You killed Lord Vargrave and broke his pact.', text: 'The blood moons stop. Ashford buries its dead and starts to plant again. But on quiet nights, far under the western mountain, something is still hungry, and waiting for the next fool with a bargain.', good: true },
+  demon: { title: 'DEMONSLAYER', sub: 'You killed Azgoreth, the Hunger Below.', text: 'The pact dies with the demon, and the lord dies with the pact. Greywater Vale wakes to a white moon. The children of Ashford will tell your story until they are old.', good: true },
+  dark: { title: 'THE NEW LORD', sub: 'You took the deal.', text: 'You live forever. Every seventh night you choose a family. You tell yourself it keeps the rest safe. After a while, you stop telling yourself anything at all. (A dark ending. Your save goes back to before you met the lord.)', good: false },
+};
+// side contracts on the board
+const CONTRACT_KINDS = [
+  { kind: 'kill', mon: 'wolf', n: [5, 8], text: (n) => `Wolves are killing sheep at the farms. Kill ${n} wolves.`, coins: 22, xp: 14 },
+  { kind: 'kill', mon: 'drowner', n: [5, 8], text: (n) => `Drowners pulled a fisherman under at the lake. Kill ${n} drowners.`, coins: 26, xp: 18 },
+  { kind: 'kill', mon: 'ghoul', n: [6, 9], text: (n) => `Ghouls are digging up St. Aldric's graves at night. Kill ${n} ghouls.`, coins: 28, xp: 20 },
+  { kind: 'kill', mon: 'deer', n: [3, 5], text: (n) => `The inn needs venison. Hunt ${n} deer.`, coins: 14, xp: 8 },
+  { kind: 'lair', mon: 'werewolf', name: 'The Butcher of Wolfwood', trophy: 'c_werewolf', text: 'Something tears sheep apart in Wolfwood and leaves the wool. Find its lair and kill it.', coins: 260, xp: 300, lvl: 4 },
+  { kind: 'lair', mon: 'ghoul', name: 'Gravecaller', trophy: 'c_ghoul', big: 1.6, text: 'A huge ghoul leads the pack at night. Track it to its nest.', coins: 180, xp: 220, lvl: 3 },
+  { kind: 'lair', mon: 'vampire', name: 'The Pale Widow', trophy: 'c_vampire', text: 'Travellers on the castle road are found bloodless. Find who is feeding.', coins: 320, xp: 380, lvl: 6 },
+  { kind: 'lair', mon: 'drowner', name: 'Old Bog-Maw', trophy: 'c_drowner', big: 1.8, text: 'Something huge lives under the water near the mill. Find it.', coins: 200, xp: 240, lvl: 3 },
+  { kind: 'lair', mon: 'troll', name: 'Stonebelly', trophy: 'c_troll', text: 'A troll has taken a bridge and eats whoever won\'t pay. Teach it a lesson.', coins: 380, xp: 420, lvl: 7 },
+  { kind: 'lair', mon: 'wyvern', name: 'Redwing', trophy: 'c_wyvern', text: 'A red wyvern takes cattle from the high pastures. Hunt it.', coins: 420, xp: 460, lvl: 8 },
+  { kind: 'lair', mon: 'blood_fiend', name: 'The Blood Fiend', trophy: 'c_fiend', text: 'Only seen under the blood moon. Bring its heart.', coins: 600, xp: 700, lvl: 9, blood: true },
+];
+// where named monsters hide (by monster type)
+const LAIRS = {
+  werewolf: [[372, -20], [250, 150], [-320, -260], [180, -60]], ghoul: [[430, 330], [470, 280], [-480, 160]], vampire: [[300, -280], [420, -260], [250, -350]],
+  drowner: [[-120, 260], [180, 640], [-520, 90], [-60, 470]], troll: [[-30, -40], [40, 482], [-125, 125]], wyvern: [[-180, -620], [-320, -560], [-80, -650]], blood_fiend: [[200, 0], [-250, 200], [100, -300]],
+};
+
+
+// =====================================================================
+// MODELS — people, beasts and the horse, built from shapes with joints so
+// they can walk, run, fight, die, and lose limbs.
+// =====================================================================
+const _matCache = new Map();
+function mat(col, o = {}) { const k = col + JSON.stringify(o); let m = _matCache.get(k); if (!m) { m = new THREE.MeshStandardMaterial(Object.assign({ color: col, roughness: 0.8, envMapIntensity: 0.3 }, o)); _matCache.set(k, m); } return m; }
+function part(geo, m, x = 0, y = 0, z = 0, parent, name) { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = true; me.receiveShadow = true; if (name) me.name = name; if (parent) parent.add(me); return me; }
+function joint(x, y, z, parent, name) { const g = new THREE.Group(); g.position.set(x, y, z); g.name = name || ''; if (parent) parent.add(g); return g; }
+const cap = (r, len, rs = 8) => new THREE.CapsuleGeometry(r, len, 3, rs);
+const col3 = (c) => (typeof c === 'string' ? new THREE.Color(c).getHex() : c);
+// ---------- people ----------
+// look: { skin, hair, hairCol, beard, scar, eyes, coat, shirt, body (0..2), face (0..3), helm, hood, robe, cape, apron }
+function buildHuman(look, o = {}) {
+  const L = look || {}, root = new THREE.Group(), rig = { root, kind: 'human', parts: {} };
+  const bw = [0.88, 1, 1.15][L.body == null ? 1 : L.body], skin = mat(col3(L.skin || '#e0b090'), { roughness: 0.65 }), coat = mat(col3(L.coat || '#3a3028'), { roughness: 0.9 }), shirt = mat(col3(L.shirt || '#8a7a6a'), { roughness: 0.95 });
+  const pants = mat(o.pants || 0x2a2420, { roughness: 0.95 }), boots = mat(0x1e1610, { roughness: 0.7 }), hairM = mat(col3(L.hairCol || L.hair || '#3a2414'), { roughness: 0.9 });
+  const S = o.scale || 1; root.scale.setScalar(S);
+  const hips = joint(0, 0.98, 0, root, 'hips'); rig.hips = hips;
+  part(new THREE.CylinderGeometry(0.17 * bw, 0.16 * bw, 0.22, 10), pants, 0, 0, 0, hips);
+  // legs
+  for (const s of [-1, 1]) {
+    const th = joint(s * 0.1 * bw, -0.05, 0, hips, s < 0 ? 'thighL' : 'thighR'); part(cap(0.075 * bw, 0.34), pants, 0, -0.22, 0, th);
+    const sh = joint(0, -0.44, 0, th, s < 0 ? 'shinL' : 'shinR'); part(cap(0.065 * bw, 0.32), pants, 0, -0.2, 0, sh);
+    const ft = part(new THREE.BoxGeometry(0.11 * bw, 0.09, 0.24), boots, 0, -0.42, 0.04, sh); part(cap(0.072 * bw, 0.14), boots, 0, -0.3, 0, sh);
+    rig[s < 0 ? 'thighL' : 'thighR'] = th; rig[s < 0 ? 'shinL' : 'shinR'] = sh;
+  }
+  // torso
+  const spine = joint(0, 0.1, 0, hips, 'spine'); rig.spine = spine;
+  part(new THREE.CylinderGeometry(0.2 * bw, 0.17 * bw, 0.5, 10), shirt, 0, 0.27, 0, spine);
+  const chest = part(new THREE.CylinderGeometry(0.235 * bw, 0.205 * bw, 0.32, 10), coat, 0, 0.42, 0, spine); chest.scale.z = 0.78;
+  part(new THREE.CylinderGeometry(0.205 * bw, 0.215 * bw, 0.26, 10, 1, true), coat, 0, 0.17, 0, spine).scale.z = 0.8;
+  // coat skirt flaps
+  const skirt = part(new THREE.CylinderGeometry(0.21 * bw, L.robe ? 0.34 * bw : 0.27 * bw, L.robe ? 0.9 : 0.42, 10, 1, true), coat, 0, L.robe ? -0.4 : -0.14, 0, hips); skirt.scale.z = 0.85; skirt.material = mat(col3(L.coat || '#3a3028'), { roughness: 0.9, side: THREE.DoubleSide });
+  part(new THREE.TorusGeometry(0.19 * bw, 0.03, 4, 12), mat(0x3a2414), 0, 0.03, 0, spine).rotation.x = Math.PI / 2;
+  if (L.apron) part(new THREE.BoxGeometry(0.3 * bw, 0.6, 0.02), mat(0x5a4a3a), 0, 0.05, 0.19 * bw, spine);
+  // neck and head
+  const neck = joint(0, 0.62, 0, spine, 'neck'); part(new THREE.CylinderGeometry(0.06, 0.07, 0.12, 8), skin, 0, 0.04, 0, neck);
+  const head = joint(0, 0.14, 0, neck, 'head'); rig.head = head; rig.neck = neck;
+  const fw = [0.98, 1.04, 1.1, 0.92][L.face || 0], skull = part(new THREE.SphereGeometry(0.115, 14, 12), skin, 0, 0.06, 0, head); skull.scale.set(fw, 1.12, 1.02);
+  const jaw = part(new THREE.BoxGeometry(0.15 * fw, 0.07, 0.12), skin, 0, -0.02, 0.03, head); jaw.scale.set(1, 1, L.face === 2 ? 1.1 : 1);
+  part(new THREE.BoxGeometry(0.03, 0.05, 0.05), skin, 0, 0.04, 0.115, head); // nose
+  const eyeM = mat(col3(L.eyes || '#2a2010'), { roughness: 0.2 }), white = mat(0xe8e4dc, { roughness: 0.3 });
+  for (const s of [-1, 1]) { part(new THREE.SphereGeometry(0.019, 8, 6), white, s * 0.042, 0.075, 0.098, head); part(new THREE.SphereGeometry(0.011, 6, 5), eyeM, s * 0.042, 0.075, 0.112, head); part(new THREE.BoxGeometry(0.045, 0.012, 0.02), hairM, s * 0.044, 0.105, 0.105, head); part(new THREE.SphereGeometry(0.025, 6, 6), skin, s * 0.115, 0.06, 0, head); }
+  rig.eyes = [];
+  // hair styles: 0 bald, 1 short, 2 long, 3 ponytail, 4 braid, 5 shaved sides
+  const hs = L.hair == null ? 1 : L.hair;
+  if (!L.hood && !L.helm && hs > 0) {
+    const capG = new THREE.SphereGeometry(0.125, 14, 10, 0, TAU, 0, hs === 5 ? 0.9 : 1.75); const hc = part(capG, hairM, 0, 0.07, -0.005, head); hc.scale.set(fw * 1.03, 1.15, 1.08);
+    if (hs === 2) part(new THREE.BoxGeometry(0.24 * fw, 0.3, 0.12), hairM, 0, -0.06, -0.07, head);
+    if (hs === 3) { part(new THREE.SphereGeometry(0.04, 8, 6), hairM, 0, 0.08, -0.13, head); part(cap(0.035, 0.18), hairM, 0, -0.05, -0.15, head); }
+    if (hs === 4) for (let i = 0; i < 4; i++) part(new THREE.SphereGeometry(0.035 - i * 0.004, 8, 6), hairM, 0, 0.02 - i * 0.07, -0.135 - i * 0.012, head);
+    if (hs === 5) part(new THREE.BoxGeometry(0.05, 0.05, 0.22), hairM, 0, 0.19, 0, head);
+  }
+  if (L.beard) { const bh = L.beard === 1 ? 0.03 : L.beard === 2 ? 0.06 : 0.12; part(new THREE.BoxGeometry(0.17 * fw, bh, 0.1), mat(col3(L.hairCol || L.hair || '#3a2414'), { roughness: 1 }), 0, -0.04 - bh / 2 + 0.02, 0.06, head); if (L.beard > 1) part(new THREE.BoxGeometry(0.15 * fw, 0.025, 0.02), hairM, 0, 0.01, 0.11, head); }
+  if (L.scar) { const sm = mat(0x8a3a30, { roughness: 0.5 }); if (L.scar === 1) part(new THREE.BoxGeometry(0.008, 0.09, 0.01), sm, 0.042, 0.07, 0.112, head); if (L.scar === 2) part(new THREE.BoxGeometry(0.07, 0.008, 0.01), sm, -0.06, 0.02, 0.1, head).rotation.z = 0.4; if (L.scar === 3) { part(new THREE.BoxGeometry(0.1, 0.008, 0.01), sm, 0, 0.03, 0.115, head).rotation.z = 0.7; part(new THREE.BoxGeometry(0.1, 0.008, 0.01), sm, 0, 0.03, 0.115, head).rotation.z = -0.7; } if (L.scar === 4) part(new THREE.SphereGeometry(0.05, 8, 6), mat(0xa05040, { roughness: 0.9 }), -0.07, 0.03, 0.07, head).scale.z = 0.4; }
+  if (L.hood) { const hd = part(new THREE.SphereGeometry(0.15, 12, 10, 0, TAU, 0, 2.1), coat, 0, 0.06, -0.02, head); hd.scale.set(1.05, 1.15, 1.15); hd.rotation.x = -0.25; hd.material = mat(col3(L.coat || '#3a3028'), { roughness: 0.95, side: THREE.DoubleSide }); }
+  if (L.helm) { part(new THREE.SphereGeometry(0.135, 12, 8, 0, TAU, 0, 1.6), mat(0x8a8e98, { metalness: 0.8, roughness: 0.35 }), 0, 0.08, 0, head).scale.y = 1.1; part(new THREE.BoxGeometry(0.02, 0.1, 0.03), mat(0x8a8e98, { metalness: 0.8, roughness: 0.35 }), 0, 0.03, 0.125, head); }
+  if (L.cape) { const cp = part(new THREE.PlaneGeometry(0.55 * bw, 1.2, 1, 4), mat(col3(L.coat || '#3a0a10'), { side: THREE.DoubleSide, roughness: 0.9 }), 0, -0.05, -0.2 * bw, spine); cp.rotation.x = 0.12; rig.cape = cp; }
+  // arms
+  for (const s of [-1, 1]) {
+    const sh = joint(s * 0.27 * bw, 0.5, 0, spine, s < 0 ? 'shoulderL' : 'shoulderR'); part(new THREE.SphereGeometry(0.075 * bw, 8, 6), coat, 0, 0, 0, sh);
+    part(cap(0.062 * bw, 0.22), coat, 0, -0.16, 0, sh);
+    const el = joint(0, -0.32, 0, sh, s < 0 ? 'elbowL' : 'elbowR'); part(cap(0.054 * bw, 0.2), coat, 0, -0.13, 0, el);
+    const hand = joint(0, -0.28, 0, el, s < 0 ? 'handL' : 'handR'); part(new THREE.BoxGeometry(0.07, 0.1, 0.045), skin, 0, -0.03, 0, hand);
+    rig[s < 0 ? 'shoulderL' : 'shoulderR'] = sh; rig[s < 0 ? 'elbowL' : 'elbowR'] = el; rig[s < 0 ? 'handL' : 'handR'] = hand;
+  }
+  rig.height = 1.8 * S; rig.limbs = ['head', 'shoulderL', 'shoulderR', 'thighL', 'thighR'];
+  return rig;
+}
+// beasts that stand like people but are built differently
+function buildBeastMan(kind, colr, size) {
+  const rig = buildHuman({ skin: '#000', coat: '#000', shirt: '#000', body: 2, hair: 0 }, {});
+  const fur = mat(colr, { roughness: 1 }), dark = mat(new THREE.Color(colr).multiplyScalar(0.6).getHex(), { roughness: 1 });
+  const glow = { werewolf: 0xffc030, ghoul: 0xd8ff5a, vampire: 0xff2020, drowner: 0x9fe8ff, troll: 0xffa040, lord: 0xff2020, demon: 0xff5010 }[kind] || 0xffffff;
+  const eyeM = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: glow, emissiveIntensity: 2.5 });
+  rig.root.traverse((o) => { if (o.isMesh) o.material = fur; });
+  const head = rig.head; head.clear();
+  if (kind === 'werewolf') {
+    part(new THREE.SphereGeometry(0.16, 12, 10), fur, 0, 0.06, -0.02, head).scale.set(1, 0.95, 1.05);
+    const snout = part(new THREE.BoxGeometry(0.13, 0.11, 0.22), fur, 0, 0.0, 0.17, head); part(new THREE.BoxGeometry(0.05, 0.04, 0.04), mat(0x101010), 0, 0.04, 0.28, head);
+    part(new THREE.BoxGeometry(0.12, 0.04, 0.18), dark, 0, -0.07, 0.15, head); // jaw
+    for (const s of [-1, 1]) { part(new THREE.ConeGeometry(0.05, 0.16, 5), fur, s * 0.09, 0.22, -0.03, head).rotation.z = -s * 0.25; part(new THREE.SphereGeometry(0.02, 6, 5), eyeM, s * 0.06, 0.08, 0.13, head); for (let i = 0; i < 2; i++) part(new THREE.ConeGeometry(0.008, 0.04, 4), mat(0xf0e8d8), s * 0.04, -0.04, 0.22 - i * 0.05, head).rotation.x = Math.PI; }
+    rig.spine.rotation.x = 0.35; rig.neck.rotation.x = -0.3; // hunched
+    for (const h of [rig.handL, rig.handR]) for (let i = 0; i < 3; i++) part(new THREE.ConeGeometry(0.012, 0.09, 4), mat(0xe8e0d0), (i - 1) * 0.025, -0.11, 0.02, h).rotation.x = Math.PI;
+    for (const s of [rig.shinL, rig.shinR]) s.rotation.x = 0.25;
+    part(new THREE.SphereGeometry(0.28, 10, 8), fur, 0, 0.5, -0.06, rig.spine).scale.set(1.15, 0.8, 0.9);
+  } else if (kind === 'ghoul') {
+    part(new THREE.SphereGeometry(0.12, 12, 10), fur, 0, 0.05, 0, head).scale.set(0.85, 1.15, 1); part(new THREE.BoxGeometry(0.09, 0.05, 0.08), dark, 0, -0.05, 0.06, head);
+    for (const s of [-1, 1]) part(new THREE.SphereGeometry(0.018, 6, 5), eyeM, s * 0.038, 0.07, 0.095, head);
+    for (let i = -2; i <= 2; i++) part(new THREE.ConeGeometry(0.007, 0.03, 4), mat(0xd8d0b0), i * 0.016, -0.06, 0.1, head).rotation.x = Math.PI;
+    rig.spine.rotation.x = 0.55; rig.neck.rotation.x = -0.5; rig.root.scale.set(0.95, 0.9, 0.95);
+    for (const h of [rig.handL, rig.handR]) for (let i = 0; i < 3; i++) part(new THREE.ConeGeometry(0.01, 0.1, 4), mat(0x2a2a20), (i - 1) * 0.022, -0.12, 0.02, h).rotation.x = Math.PI;
+    for (const e of [rig.elbowL, rig.elbowR]) e.position.y = -0.38;
+  } else if (kind === 'drowner') {
+    part(new THREE.SphereGeometry(0.13, 12, 10), fur, 0, 0.04, 0.02, head).scale.set(1.1, 0.9, 1.25); part(new THREE.BoxGeometry(0.16, 0.05, 0.12), dark, 0, -0.05, 0.08, head);
+    for (const s of [-1, 1]) { part(new THREE.SphereGeometry(0.03, 8, 6), eyeM, s * 0.07, 0.06, 0.1, head); part(new THREE.ConeGeometry(0.04, 0.14, 4), dark, s * 0.13, 0.04, -0.02, head).rotation.z = -s * 1.2; }
+    for (let i = 0; i < 4; i++) part(new THREE.ConeGeometry(0.03, 0.12, 4), dark, 0, 0.45 - i * 0.12, -0.2, rig.spine).rotation.x = -0.6; // fins on the back
+    rig.spine.rotation.x = 0.4; rig.neck.rotation.x = -0.25;
+    for (const h of [rig.handL, rig.handR]) for (let i = 0; i < 3; i++) part(new THREE.ConeGeometry(0.01, 0.08, 4), dark, (i - 1) * 0.022, -0.1, 0.02, h).rotation.x = Math.PI;
+  } else if (kind === 'troll') {
+    part(new THREE.SphereGeometry(0.13, 10, 8), fur, 0, 0.02, 0.06, head).scale.set(1.2, 0.9, 1);
+    for (const s of [-1, 1]) { part(new THREE.SphereGeometry(0.018, 6, 5), eyeM, s * 0.05, 0.04, 0.17, head); part(new THREE.ConeGeometry(0.02, 0.08, 5), mat(0xe8e0c8), s * 0.06, -0.05, 0.15, head); }
+    part(new THREE.SphereGeometry(0.42, 12, 10), fur, 0, 0.28, 0.08, rig.spine).scale.set(1, 0.95, 0.95); // belly
+    part(new THREE.SphereGeometry(0.33, 10, 8), dark, 0, 0.58, -0.08, rig.spine).scale.set(1.3, 0.7, 0.8); // hump
+    for (let i = 0; i < 6; i++) part(new THREE.SphereGeometry(rand(0.05, 0.09), 6, 5), mat(0x4a6a2a, { roughness: 1 }), rand(-0.25, 0.25), 0.5 + rand(0, 0.2), rand(-0.3, -0.1), rig.spine);
+    rig.spine.rotation.x = 0.3; rig.neck.position.y = 0.55;
+    const club = joint(0, -0.1, 0.05, rig.handR, 'weapon'); part(new THREE.CylinderGeometry(0.06, 0.13, 1.2, 7), mat(0x4a3420), 0, -0.4, 0, club).rotation.x = 0.2; rig.weapon = club;
+    for (const e of [rig.elbowL, rig.elbowR]) e.scale.setScalar(1.3);
+  } else if (kind === 'vampire' || kind === 'lord') {
+    const skinV = mat(0xe8e0e4, { roughness: 0.5 }), cl = mat(kind === 'lord' ? 0x3a0a10 : 0x1a1418, { roughness: 0.8 }), cl2 = mat(0x0a0a0c, { roughness: 0.8 });
+    rig.root.traverse((o) => { if (o.isMesh) o.material = cl; });
+    part(new THREE.SphereGeometry(0.115, 14, 12), skinV, 0, 0.06, 0, head).scale.set(0.95, 1.18, 1);
+    for (const s of [-1, 1]) { part(new THREE.SphereGeometry(0.016, 6, 5), eyeM, s * 0.04, 0.075, 0.1, head); part(new THREE.ConeGeometry(0.006, 0.03, 4), mat(0xffffff), s * 0.015, -0.04, 0.105, head).rotation.x = Math.PI; part(new THREE.ConeGeometry(0.03, 0.07, 4), skinV, s * 0.115, 0.08, 0, head).rotation.z = -s * 1.1; }
+    part(new THREE.SphereGeometry(0.125, 12, 8, 0, TAU, 0, 1.5), mat(kind === 'lord' ? 0xe8e8e8 : 0x0a0a0a), 0, 0.08, -0.01, head).scale.set(1.02, 1.1, 1.08);
+    const cape = part(new THREE.PlaneGeometry(0.75, 1.5, 2, 6), mat(kind === 'lord' ? 0x6a0a10 : 0x1a0a10, { side: THREE.DoubleSide, roughness: 0.85 }), 0, -0.15, -0.22, rig.spine); cape.rotation.x = 0.15; rig.cape = cape;
+    part(new THREE.BoxGeometry(0.42, 0.22, 0.05), cl2, 0, 0.62, -0.12, rig.spine).rotation.x = -0.4; // high collar
+    if (kind === 'lord') { const crownM = mat(0xd8a840, { metalness: 1, roughness: 0.3, envMapIntensity: 1 }); for (let i = 0; i < 7; i++) { const a = (i / 7) * TAU; part(new THREE.ConeGeometry(0.015, 0.06, 4), crownM, Math.cos(a) * 0.1, 0.2, Math.sin(a) * 0.1, head); } part(new THREE.TorusGeometry(0.1, 0.012, 4, 14), crownM, 0, 0.18, 0, head).rotation.x = Math.PI / 2; }
+    for (const h of [rig.handL, rig.handR]) { h.children[0].material = skinV; for (let i = 0; i < 3; i++) part(new THREE.ConeGeometry(0.007, 0.07, 4), skinV, (i - 1) * 0.02, -0.1, 0.02, h).rotation.x = Math.PI; }
+  } else if (kind === 'demon') {
+    const crack = new THREE.MeshStandardMaterial({ color: 0x200000, emissive: 0xff3000, emissiveIntensity: 1.6 });
+    part(new THREE.SphereGeometry(0.16, 12, 10), fur, 0, 0.06, 0.02, head).scale.set(1.1, 1, 1.1); part(new THREE.BoxGeometry(0.18, 0.08, 0.16), dark, 0, -0.06, 0.08, head);
+    for (const s of [-1, 1]) { part(new THREE.SphereGeometry(0.025, 8, 6), eyeM, s * 0.06, 0.07, 0.14, head); const horn = joint(s * 0.1, 0.15, 0, head); for (let i = 0; i < 5; i++) part(new THREE.CylinderGeometry(0.04 - i * 0.007, 0.045 - i * 0.007, 0.1, 6), mat(0x1a1410), s * i * 0.04, i * 0.08, -i * i * 0.012, horn).rotation.z = -s * (0.3 + i * 0.15); }
+    part(new THREE.SphereGeometry(0.4, 12, 10), fur, 0, 0.45, 0, rig.spine).scale.set(1.25, 0.9, 0.85);
+    for (let i = 0; i < 8; i++) part(new THREE.BoxGeometry(0.02, rand(0.15, 0.35), 0.02), crack, rand(-0.3, 0.3), 0.4 + rand(-0.15, 0.2), 0.32, rig.spine).rotation.z = rand(-0.6, 0.6);
+    for (const h of [rig.handL, rig.handR]) for (let i = 0; i < 3; i++) part(new THREE.ConeGeometry(0.02, 0.16, 4), mat(0x1a1410), (i - 1) * 0.035, -0.16, 0.02, h).rotation.x = Math.PI;
+    for (const s of [rig.shoulderL, rig.shoulderR]) s.scale.setScalar(1.35);
+    rig.spine.rotation.x = 0.2;
+  }
+  rig.root.scale.multiplyScalar(size || 1); rig.height = 1.9 * (size || 1); rig.kind = kind; rig.beastMan = true;
+  return rig;
+}
+// ---------- four-legged animals ----------
+function buildQuad(kind, colr, size = 1) {
+  const root = new THREE.Group(), rig = { root, kind, quad: true }, fur = mat(colr, { roughness: 1 }), dark = mat(new THREE.Color(colr).multiplyScalar(0.55).getHex(), { roughness: 1 }), light = mat(new THREE.Color(colr).lerp(new THREE.Color(0xffffff), 0.35).getHex(), { roughness: 1 });
+  const P = { wolf: { len: 0.95, h: 0.72, leg: 0.36, w: 0.22, neck: 0.25, head: 0.16 }, deer: { len: 1.05, h: 1.0, leg: 0.52, w: 0.22, neck: 0.42, head: 0.14 }, horse: { len: 1.5, h: 1.45, leg: 0.72, w: 0.32, neck: 0.62, head: 0.2 }, rabbit: { len: 0.32, h: 0.2, leg: 0.1, w: 0.12, neck: 0.06, head: 0.08 } }[kind];
+  const body = joint(0, P.h, 0, root, 'body'); rig.body = body;
+  const torso = part(cap(P.w, P.len, 10), fur, 0, 0, 0, body); torso.rotation.x = Math.PI / 2; if (kind !== 'rabbit') torso.scale.set(1, 1, 1.15);
+  if (kind === 'horse' || kind === 'deer') part(cap(P.w * 0.92, P.len * 0.8, 8), light, 0, -P.w * 0.35, 0, body).rotation.x = Math.PI / 2; // belly
+  const neck = joint(0, P.w * 0.6, P.len / 2 + P.w * 0.5, body, 'neck'); rig.neck = neck;
+  const nk = part(cap(P.w * 0.55, P.neck, 8), fur, 0, P.neck * 0.45, 0, neck); nk.rotation.x = 0.55;
+  const head = joint(0, P.neck * 0.9, P.neck * 0.4, neck, 'head'); rig.head = head;
+  part(new THREE.SphereGeometry(P.head, 10, 8), fur, 0, 0, 0, head).scale.set(0.9, 0.95, 1.2);
+  const snout = part(cap(P.head * 0.55, P.head * 1.1, 8), kind === 'horse' ? fur : dark, 0, -P.head * 0.25, P.head * 1.15, head); snout.rotation.x = Math.PI / 2 - (kind === 'horse' ? 0.35 : 0);
+  const eyeM = mat(0x0a0806, { roughness: 0.2 });
+  for (const s of [-1, 1]) {
+    part(new THREE.SphereGeometry(P.head * 0.14, 6, 5), eyeM, s * P.head * 0.65, P.head * 0.25, P.head * 0.5, head);
+    const ear = part(new THREE.ConeGeometry(P.head * (kind === 'rabbit' ? 0.25 : 0.32), P.head * (kind === 'rabbit' ? 2.6 : 1.1), 5), fur, s * P.head * 0.45, P.head * (kind === 'rabbit' ? 1.6 : 0.95), -P.head * 0.2, head); ear.rotation.z = -s * 0.25;
+  }
+  if (kind === 'deer' && size >= 1) { const ant = mat(0xc8b898, { roughness: 0.8 }); for (const s of [-1, 1]) { const a = joint(s * 0.06, 0.12, -0.02, head); part(new THREE.CylinderGeometry(0.012, 0.02, 0.4, 5), ant, s * 0.08, 0.18, 0, a).rotation.z = -s * 0.5; part(new THREE.CylinderGeometry(0.01, 0.014, 0.22, 5), ant, s * 0.12, 0.32, 0.08, a).rotation.x = -0.6; part(new THREE.CylinderGeometry(0.01, 0.014, 0.2, 5), ant, s * 0.2, 0.38, -0.02, a).rotation.z = -s * 0.9; } }
+  if (kind === 'horse') { const mane = mat(0x1a1410, { roughness: 1 }); for (let i = 0; i < 7; i++) part(new THREE.BoxGeometry(0.06, 0.14, 0.12), mane, 0, 0.12 + i * 0.08, -0.08 + i * 0.05, neck).rotation.x = 0.55; }
+  // legs: [x, z, front]
+  rig.legs = [];
+  for (const [lx, lz, front] of [[-1, 1, 1], [1, 1, 1], [-1, -1, 0], [1, -1, 0]]) {
+    const hip = joint(lx * P.w * 0.62, -P.w * 0.2, lz * P.len * 0.48, body); const up = part(cap(P.w * (front ? 0.3 : 0.38), P.leg * 0.45, 6), fur, 0, -P.leg * 0.28, 0, hip);
+    const knee = joint(0, -P.leg * 0.55, 0, hip); part(cap(P.w * 0.18, P.leg * 0.45, 6), kind === 'horse' || kind === 'deer' ? dark : fur, 0, -P.leg * 0.26, 0, knee);
+    part(new THREE.CylinderGeometry(P.w * 0.2, P.w * 0.23, P.leg * 0.1, 6), mat(kind === 'horse' ? 0x1a1410 : 0x2a2018), 0, -P.leg * 0.5, 0, knee);
+    rig.legs.push({ hip, knee, front, side: lx });
+  }
+  // tail
+  const tail = joint(0, P.w * 0.3, -P.len / 2 - P.w * 0.6, body, 'tail'); rig.tail = tail;
+  if (kind === 'horse') { const tm = mat(0x1a1410, { roughness: 1 }); part(cap(0.07, 0.6, 6), tm, 0, -0.35, -0.05, tail).rotation.x = 0.3; }
+  else if (kind === 'wolf') part(cap(0.07, 0.42, 6), fur, 0, -0.1, -0.2, tail).rotation.x = -1.0;
+  else part(new THREE.SphereGeometry(kind === 'rabbit' ? 0.05 : 0.07, 6, 5), light, 0, 0, -0.02, tail);
+  if (kind === 'horse') { // saddle and bridle
+    const leather = mat(0x4a2a14, { roughness: 0.7 });
+    part(new THREE.BoxGeometry(0.5, 0.08, 0.55), leather, 0, P.w * 0.95, 0.05, body); part(new THREE.BoxGeometry(0.56, 0.3, 0.42), mat(0x6a1a14, { roughness: 1 }), 0, P.w * 0.6, 0.05, body);
+    for (const s of [-1, 1]) part(new THREE.BoxGeometry(0.02, 0.4, 0.04), leather, s * 0.3, P.w * 0.4, 0.05, body);
+    part(new THREE.TorusGeometry(P.head * 0.6, 0.012, 4, 10), leather, 0, -P.head * 0.2, P.head * 0.9, head).rotation.y = Math.PI / 2;
+    rig.seat = new THREE.Vector3(0, P.h + P.w * 1.0, 0.05);
+  }
+  root.scale.setScalar(size); rig.height = (P.h + P.w + P.neck) * size; rig.len = P.len * size; rig.P = P;
+  return rig;
+}
+function buildCrow() {
+  const root = new THREE.Group(), rig = { root, kind: 'crow', bird: true }, m = mat(0x141418, { roughness: 0.6 });
+  const body = joint(0, 0.12, 0, root); rig.body = body;
+  part(new THREE.SphereGeometry(0.09, 8, 6), m, 0, 0, 0, body).scale.set(0.8, 0.8, 1.4);
+  const head = joint(0, 0.06, 0.1, body); part(new THREE.SphereGeometry(0.055, 8, 6), m, 0, 0, 0, head); part(new THREE.ConeGeometry(0.018, 0.07, 4), mat(0x2a2a2a), 0, -0.01, 0.07, head).rotation.x = Math.PI / 2; rig.head = head;
+  rig.wings = [];
+  for (const s of [-1, 1]) { const w = joint(s * 0.06, 0.02, 0, body); part(new THREE.BoxGeometry(0.22, 0.015, 0.12), m, s * 0.11, 0, -0.02, w); rig.wings.push(w); }
+  part(new THREE.BoxGeometry(0.08, 0.01, 0.12), m, 0, 0, -0.15, body);
+  rig.height = 0.25; return rig;
+}
+function buildWyvern(colr, size) {
+  const root = new THREE.Group(), rig = { root, kind: 'wyvern', flyer: true }, skin = mat(colr, { roughness: 0.7 }), belly = mat(new THREE.Color(colr).lerp(new THREE.Color(0xd8c8a0), 0.5).getHex(), { roughness: 0.8 }), memb = mat(new THREE.Color(colr).multiplyScalar(0.7).getHex(), { roughness: 0.9, side: THREE.DoubleSide });
+  const body = joint(0, 1.3, 0, root); rig.body = body;
+  part(cap(0.4, 1.2, 10), skin, 0, 0, 0, body).rotation.x = Math.PI / 2; part(cap(0.34, 0.9, 8), belly, 0, -0.14, 0.05, body).rotation.x = Math.PI / 2;
+  const neck = joint(0, 0.15, 0.9, body); rig.neck = neck; for (let i = 0; i < 4; i++) part(new THREE.SphereGeometry(0.22 - i * 0.025, 8, 6), skin, 0, i * 0.18, i * 0.2, neck);
+  const head = joint(0, 0.78, 0.86, neck); rig.head = head; part(new THREE.BoxGeometry(0.26, 0.2, 0.45), skin, 0, 0, 0.1, head); part(new THREE.BoxGeometry(0.2, 0.08, 0.38), belly, 0, -0.12, 0.12, head);
+  const horn = mat(0xd8d0b8); for (const s of [-1, 1]) { part(new THREE.ConeGeometry(0.04, 0.35, 5), horn, s * 0.1, 0.12, -0.15, head).rotation.x = -1.1; part(new THREE.SphereGeometry(0.03, 6, 5), new THREE.MeshStandardMaterial({ color: 0x000, emissive: 0xffd040, emissiveIntensity: 2 }), s * 0.12, 0.05, 0.18, head); }
+  for (let i = 0; i < 4; i++) part(new THREE.ConeGeometry(0.02, 0.06, 4), mat(0xf0e8d8), (i - 1.5) * 0.05, -0.12, 0.3, head).rotation.x = Math.PI;
+  const tail = joint(0, 0, -0.8, body); rig.tail = tail; let t = tail; rig.tailSegs = [];
+  for (let i = 0; i < 6; i++) { part(new THREE.SphereGeometry(0.2 - i * 0.03, 8, 6), skin, 0, 0, -0.18, t); const n = joint(0, 0, -0.3, t); rig.tailSegs.push(n); t = n; }
+  part(new THREE.ConeGeometry(0.12, 0.3, 4), skin, 0, 0, -0.1, t).rotation.x = -Math.PI / 2;
+  rig.wings = [];
+  for (const s of [-1, 1]) {
+    const w = joint(s * 0.3, 0.25, 0.3, body); const arm = part(cap(0.05, 1.3, 6), skin, s * 0.7, 0.1, 0, w); arm.rotation.z = Math.PI / 2;
+    const wt = joint(s * 1.4, 0.15, 0, w); part(cap(0.035, 1.1, 6), skin, s * 0.55, 0, -0.1, wt).rotation.z = Math.PI / 2;
+    const shape = new THREE.Shape(); shape.moveTo(0, 0); shape.lineTo(s * 2.5, 0.25); shape.lineTo(s * 2.4, -0.9); shape.lineTo(s * 1.6, -1.3); shape.lineTo(s * 0.8, -1.4); shape.lineTo(0, -1.0);
+    const mm = new THREE.Mesh(new THREE.ShapeGeometry(shape), memb); mm.rotation.x = Math.PI / 2; mm.position.y = 0.12; mm.castShadow = true; w.add(mm);
+    rig.wings.push({ w, wt, s });
+  }
+  for (const s of [-1, 1]) { const leg = joint(s * 0.25, -0.3, -0.2, body); part(cap(0.08, 0.5, 6), skin, 0, -0.35, 0, leg); part(new THREE.BoxGeometry(0.16, 0.06, 0.24), horn, 0, -0.7, 0.08, leg); }
+  root.scale.setScalar(size); rig.height = 2 * size; return rig;
+}
+function buildMonsterModel(type) {
+  const d = MON[type];
+  switch (d.model) {
+    case 'wolf': case 'deer': case 'rabbit': return buildQuad(d.model, d.col, d.size);
+    case 'crow': return buildCrow();
+    case 'wyvern': return buildWyvern(d.col, d.size);
+    default: return buildBeastMan(d.model, d.col, d.size);
+  }
+}
+// ---------- animation ----------
+// a: { speed (m/s), phase, attack (0..1 or -1), atkKind, block, draw, cast, dead (0..1), air }
+function animHuman(rig, a, dt) {
+  const run = clamp(a.speed / 6, 0, 1), walkAmt = clamp(a.speed / 1.5, 0, 1), ph = a.phase || 0, s = Math.sin(ph), c = Math.cos(ph);
+  const swing = (0.45 + run * 0.45) * walkAmt;
+  rig.thighL.rotation.x = s * swing; rig.thighR.rotation.x = -s * swing;
+  rig.shinL.rotation.x = Math.max(0, -c) * swing * 1.3 + (rig.beastMan && rig.kind === 'werewolf' ? 0.25 : 0); rig.shinR.rotation.x = Math.max(0, c) * swing * 1.3 + (rig.beastMan && rig.kind === 'werewolf' ? 0.25 : 0);
+  rig.hips.position.y = 0.98 - Math.abs(s) * 0.04 * walkAmt - run * 0.03 + (a.air ? 0.05 : 0);
+  const breath = Math.sin((a.t || 0) * 1.8) * 0.02 * (1 - walkAmt);
+  const lean = run * 0.18;
+  const baseLean = rig.beastMan ? { werewolf: 0.35, ghoul: 0.55, drowner: 0.4, troll: 0.3, demon: 0.2 }[rig.kind] || 0 : 0;
+  rig.spine.rotation.x = baseLean + lean + breath;
+  rig.spine.rotation.y = -s * 0.08 * walkAmt;
+  // arms
+  let aL = -s * swing * 0.8, aR = s * swing * 0.8, eL = 0.25 + run * 0.6, eR = 0.25 + run * 0.6, sideL = 0.08, sideR = -0.08;
+  if (a.attack >= 0) { // overhead/diagonal slash with the right arm
+    const t = a.attack, wind = smoothstep(0, 0.3, t), strike = smoothstep(0.3, 0.6, t), back = smoothstep(0.6, 1, t);
+    aR = lerp(lerp(0, -2.6, wind), 0.6, strike); aR = lerp(aR, 0, back); eR = lerp(0.3, 1.2, wind) * (1 - strike) + 0.15; sideR = lerp(-0.3, 0.4, strike);
+    rig.spine.rotation.y = lerp(0.5 * wind, -0.6, strike) * (1 - back);
+    if (a.atkKind === 'claw') { aL = lerp(-2.2, 0.5, strike) * (1 - back); eL = 0.4; }
+  }
+  if (a.block) { aL = -1.3; eL = 1.5; sideL = 0.6; }
+  if (a.draw != null && a.draw >= 0) { aL = -1.5; eL = 0.05; sideL = 0.1; aR = -1.45; eR = 1.6 + a.draw * 0.5; sideR = -0.3 - a.draw * 0.2; rig.spine.rotation.y = 0.5; }
+  if (a.cast > 0) { aR = -1.5; eR = 0.1; sideR = -0.1; aL = -0.9 * a.cast; eL = 0.6; }
+  rig.shoulderL.rotation.set(aL, 0, sideL); rig.shoulderR.rotation.set(aR, 0, sideR);
+  rig.elbowL.rotation.x = -eL; rig.elbowR.rotation.x = -eR;
+  if (rig.head) rig.head.rotation.y = a.look || 0;
+  if (rig.cape) rig.cape.rotation.x = 0.12 + run * 0.6 + Math.sin((a.t || 0) * 3) * 0.04;
+  // death: fall backwards
+  if (a.dead > 0) { const k = smooth(clamp(a.dead, 0, 1)); rig.root.rotation.x = -k * Math.PI / 2 * (a.fallDir || 1); rig.root.position.y = k * 0.12; }
+}
+function animQuad(rig, a, dt) {
+  const ph = a.phase || 0, spd = a.speed, gallop = clamp((spd - 4) / 6, 0, 1), amt = clamp(spd / 2, 0, 1);
+  for (const L of rig.legs) {
+    const off = gallop > 0.5 ? (L.front ? 0 : Math.PI * 0.6) + (L.side > 0 ? 0.3 : 0) : (L.front ? 0 : Math.PI) + (L.side > 0 ? Math.PI : 0);
+    const s = Math.sin(ph + off); L.hip.rotation.x = s * (0.5 + gallop * 0.3) * amt; L.knee.rotation.x = (L.front ? -1 : 1) * Math.max(0, Math.cos(ph + off)) * 0.7 * amt;
+  }
+  rig.body.position.y = rig.P.h + Math.abs(Math.sin(ph)) * 0.04 * amt + gallop * Math.sin(ph * 2) * 0.05 + (a.hop ? Math.max(0, Math.sin(ph)) * 0.25 : 0);
+  rig.body.rotation.x = gallop * Math.sin(ph) * 0.08 - (a.graze ? 0 : 0);
+  if (rig.neck) rig.neck.rotation.x = a.graze ? 1.1 : -0.1 * gallop + (a.attack >= 0 ? -0.4 * Math.sin(a.attack * Math.PI) : 0);
+  if (rig.tail) rig.tail.rotation.y = Math.sin((a.t || 0) * 3) * 0.3;
+  if (a.dead > 0) { const k = smooth(clamp(a.dead, 0, 1)); rig.root.rotation.z = k * Math.PI / 2; rig.root.position.y = k * rig.P.w * 0.8; }
+}
+function animBird(rig, a, dt) {
+  const fly = a.air ? 1 : 0, f = Math.sin((a.t || 0) * (fly ? 22 : 3));
+  rig.wings[0].rotation.z = fly ? f * 0.9 : 0.1; rig.wings[1].rotation.z = fly ? -f * 0.9 : -0.1;
+  if (!fly) rig.head.rotation.x = Math.max(0, Math.sin((a.t || 0) * 2.5)) * 0.8;
+  if (a.dead > 0) rig.root.rotation.z = Math.PI / 2;
+}
+function animWyvern(rig, a, dt) {
+  const t = a.t || 0, flap = a.air ? Math.sin(t * (a.speed > 4 ? 6 : 3.5)) : Math.sin(t * 1.2) * 0.15;
+  for (const W of rig.wings) { W.w.rotation.z = W.s * (a.air ? flap * 0.8 : -0.9); W.wt.rotation.z = W.s * (a.air ? flap * 0.4 - 0.1 : -1.2); W.w.rotation.y = a.air ? 0 : W.s * 0.6; }
+  rig.tailSegs.forEach((s, i) => (s.rotation.y = Math.sin(t * 2 - i * 0.6) * 0.18));
+  rig.neck.rotation.x = a.attack >= 0 ? -0.5 * Math.sin(a.attack * Math.PI) : Math.sin(t * 0.8) * 0.1;
+  if (a.dead > 0) { rig.root.rotation.z = smooth(clamp(a.dead, 0, 1)) * Math.PI / 2; }
+}
+function animate(rig, a, dt) { if (rig.quad) animQuad(rig, a, dt); else if (rig.bird) animBird(rig, a, dt); else if (rig.flyer) animWyvern(rig, a, dt); else animHuman(rig, a, dt); }
+// ---------- weapons ----------
+function buildSword(item) {
+  const g = new THREE.Group(), it = ITEMS[item] || ITEMS.rusty_sword, blade = new THREE.MeshStandardMaterial({ color: it.col || 0xb8bcc4, metalness: 1, roughness: it.id === 'rusty_sword' ? 0.6 : 0.22, envMapIntensity: 1.2, emissive: it.id === 'demonbane' ? 0x401000 : 0x000000 });
+  const len = it.dmg > 30 ? 1.05 : 0.9;
+  const bg = new THREE.BoxGeometry(0.05, len, 0.012); const p = bg.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y > len / 2 - 0.12) p.setX(i, p.getX(i) * (1 - (y - (len / 2 - 0.12)) / 0.13)); } bg.computeVertexNormals();
+  part(bg, blade, 0, len / 2 + 0.1, 0, g); part(new THREE.BoxGeometry(0.008, len * 0.8, 0.014), new THREE.MeshStandardMaterial({ color: 0x6a6e78, metalness: 1, roughness: 0.4 }), 0, len * 0.42 + 0.1, 0, g);
+  part(new THREE.BoxGeometry(0.22, 0.03, 0.035), MAT.iron, 0, 0.09, 0, g); part(new THREE.CylinderGeometry(0.018, 0.02, 0.16, 6), mat(0x3a2414, { roughness: 0.9 }), 0, 0, 0, g); part(new THREE.SphereGeometry(0.028, 6, 5), MAT.iron, 0, -0.09, 0, g);
+  g.userData.len = len + 0.1; return g;
+}
+function buildBow(item) {
+  const g = new THREE.Group(), it = ITEMS[item] || ITEMS.hunting_bow, wood = mat(it.col || 0x6a3a1a, { roughness: 0.7 });
+  const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, -0.65, 0), new THREE.Vector3(0, 0, 0.22), new THREE.Vector3(0, 0.65, 0));
+  part(new THREE.TubeGeometry(curve, 16, 0.017, 6), wood, 0, 0, 0, g); part(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 6), mat(0x2a1a10), 0, 0, 0.11, g);
+  const sg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -0.65, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.65, 0)]); const string = new THREE.Line(sg, new THREE.LineBasicMaterial({ color: 0xd8d0c0 })); g.add(string); g.userData.string = string;
+  return g;
+}
+function buildArrow(kind) {
+  const g = new THREE.Group(); part(new THREE.CylinderGeometry(0.006, 0.006, 0.72, 4), mat(0x8a6a3a), 0, 0, 0, g).rotation.x = Math.PI / 2;
+  part(new THREE.ConeGeometry(0.014, 0.06, 4), kind === 'silver_arrow' ? MAT.silver : MAT.iron, 0, 0, 0.38, g).rotation.x = Math.PI / 2;
+  for (const r of [0, 2.1, 4.2]) { const f = part(new THREE.PlaneGeometry(0.03, 0.09), mat(kind === 'fire_arrow' ? 0xc04010 : 0xd8d0c0, { side: THREE.DoubleSide }), 0, 0, -0.32, g); f.rotation.set(Math.PI / 2, 0, r); }
+  if (kind === 'fire_arrow') part(new THREE.SphereGeometry(0.03, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff8020 }), 0, 0, 0.36, g);
+  return g;
+}
+function buildShield(item) {
+  const g = new THREE.Group(), it = ITEMS[item]; if (!it) return g;
+  const face = mat(it.col || 0x8a5a2b, { roughness: 0.7, metalness: it.id === 'wood_shield' ? 0 : 0.6 });
+  if (it.id === 'tower_shield') part(new THREE.BoxGeometry(0.62, 0.95, 0.05), face, 0, 0, 0, g);
+  else { part(new THREE.CylinderGeometry(0.32, 0.32, 0.04, 16), face, 0, 0, 0, g).rotation.x = Math.PI / 2; part(new THREE.TorusGeometry(0.32, 0.02, 4, 18), MAT.iron, 0, 0, 0, g); }
+  part(new THREE.SphereGeometry(0.07, 8, 6, 0, TAU, 0, Math.PI / 2), MAT.iron, 0, 0, 0.02, g).rotation.x = Math.PI / 2;
+  return g;
+}
+
 // temporary preview boot (replaced by the real main loop)
-const UI = { toast() {} }, Sfx = { play() {} }, Music = { sting() {} }, Monsters = { nightChange() {} };
+const UI = { toast() {} }, Monsters = { nightChange() {} };
 const DEV = { cam: { x: 0, y: 40, z: 260, yaw: 0, pitch: -0.15 } };
 function devBoot() {
   makeTextures(); makeMaterials(); genTerrain(); initRenderer();
@@ -1405,6 +2268,13 @@ function devFrame(dt) {
   renderer.clear(); renderer.render(scene, camera);
 }
 window.addEventListener('load', () => { try { devBoot(); } catch (e) { console.error(e); } });
+DEV.gallery = function () {
+  const list = [['hero', () => buildHuman(LOOK_PRESETS.wolfborn && lookFromPreset('wolfborn'))], ['hale', () => buildHuman(PEOPLE.hale.look)], ['maud', () => buildHuman(PEOPLE.maud.look)], ['werewolf', () => buildMonsterModel('werewolf')], ['ghoul', () => buildMonsterModel('ghoul')], ['vampire', () => buildMonsterModel('vampire')], ['drowner', () => buildMonsterModel('drowner')], ['troll', () => buildMonsterModel('troll')], ['lord', () => buildMonsterModel('lord_vargrave')], ['demon', () => buildMonsterModel('azgoreth')], ['wolf', () => buildMonsterModel('wolf')], ['deer', () => buildMonsterModel('deer')], ['rabbit', () => buildMonsterModel('rabbit')], ['crow', () => buildMonsterModel('crow')], ['horse', () => buildQuad('horse', 0x5a3a24, 1)], ['wyvern', () => buildMonsterModel('wyvern')]];
+  DEV.rigs = [];
+  list.forEach(([n, f], i) => { const r = f(); const x = 3 + (i % 8) * 3.4, z = 172 - Math.floor(i / 8) * 6; r.root.position.set(x, heightAt(x, z), z); r.root.rotation.y = 0.25; scene.add(r.root); DEV.rigs.push(r); });
+};
+function lookFromPreset(k) { const p = LOOK_PRESETS[k], O = LOOK_OPTS; return { body: p.body, skin: O.skin[p.skin], face: p.face, hair: p.hair, hairCol: O.hairCol[p.hairCol], beard: p.beard, scar: p.scar, eyes: O.eyes[p.eyes], coat: O.coat[p.coat], shirt: O.shirt[p.shirt] }; }
+DEV.animate = function (t, mode) { for (const r of DEV.rigs) animate(r, { t, speed: mode === 'run' ? 6 : mode === 'walk' ? 1.6 : 0, phase: t * 8, attack: mode === 'attack' ? (t % 1) : -1, air: false }, 0.016); };
 
 </script>
 </body>

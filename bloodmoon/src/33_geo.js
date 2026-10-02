@@ -37,7 +37,7 @@ function makeMaterials() {
   MAT.bark = S({ map: TEX.bark, roughness: 0.95 });
   MAT.leaf = windify(S({ map: TEX.leaf, roughness: 0.9, side: THREE.DoubleSide }), 1, 2);
   MAT.farTree = windify(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.6, 2);
-  MAT.grass = windify(new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, vertexColors: true }), 7, 0);
+  MAT.grass = windify(new THREE.MeshLambertMaterial({ side: THREE.FrontSide, vertexColors: true }), 7, 0);
   MAT.bush = windify(S({ map: TEX.leaf, roughness: 0.95 }), 3, 0);
   MAT.window = new THREE.MeshStandardMaterial({ color: 0x1a140c, emissive: 0xffb050, emissiveIntensity: 0, roughness: 0.4 });
   MAT.glowRed = new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xff2010, emissiveIntensity: 2, roughness: 0.6 });
