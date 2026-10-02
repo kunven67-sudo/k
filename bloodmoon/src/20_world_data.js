@@ -35,7 +35,7 @@ const CAMPS = [
   { id: 'lake', name: 'Lake Shore', x: 40, z: 532 },
 ];
 // the river runs from the northern mountains, under the Old Bridge, past the mill and into the lake
-const RIVER_RAW = [[-30, -800], [-36, -640], [-80, -470], [-92, -330], [-58, -168], [-30, -40], [-110, 60], [-128, 200], [-100, 302], [-30, 420], [60, 500], [135, 600]];
+const RIVER_RAW = [[-42, -575], [-56, -525], [-80, -470], [-92, -330], [-58, -168], [-30, -40], [-110, 60], [-128, 200], [-100, 302], [-30, 420], [60, 500], [135, 600]];
 const RIVER = smoothPath(RIVER_RAW, 8);
 const RIVER_TOP = 46, RIVER_BOTTOM = 5.2; // water height at the source and at the lake
 const LAKE_LEVEL = 5.2, SWAMP_LEVEL = 7.4;

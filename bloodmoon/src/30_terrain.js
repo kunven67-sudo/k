@@ -175,6 +175,8 @@ function groundColor(i, j, out) {
   if (s === SURF.ROCK) { const h = TER.h[k]; if (h > 110) { const sn = smoothstep(110, 135, h) * 0.6; r = lerp(r, 0.85, sn); g = lerp(g, 0.87, sn); b = lerp(b, 0.92, sn); } }
   out[0] = clamp(r, 0, 1); out[1] = clamp(g, 0, 1); out[2] = clamp(b, 0, 1); return out;
 }
+function groundColorLin(i, j, out) { groundColor(i, j, out); out[0] = Math.pow(out[0], 2.2); out[1] = Math.pow(out[1], 2.2); out[2] = Math.pow(out[2], 2.2); return out;
+}
 // ---------- the ground mesh ----------
 const CHUNK = 100, CHN = WORLD_SIZE / CHUNK; // 16 x 16 chunks
 function buildChunkGeo(ci, cj, step) {
@@ -188,7 +190,7 @@ function buildChunkGeo(ci, cj, step) {
     pos[v * 3] = x; pos[v * 3 + 1] = H[k] - dy; pos[v * 3 + 2] = z;
     const l = H[Math.max(0, gi - 1) + gj * GN], r = H[Math.min(GN - 1, gi + 1) + gj * GN], u = H[gi + Math.max(0, gj - 1) * GN], d = H[gi + Math.min(GN - 1, gj + 1) * GN];
     let nx = l - r, ny = 2 * CELL, nz = u - d; const L = Math.hypot(nx, ny, nz); nor[v * 3] = nx / L; nor[v * 3 + 1] = ny / L; nor[v * 3 + 2] = nz / L;
-    groundColor(gi, gj, c); col[v * 3] = c[0]; col[v * 3 + 1] = c[1]; col[v * 3 + 2] = c[2];
+    groundColorLin(gi, gj, c); col[v * 3] = c[0]; col[v * 3 + 1] = c[1]; col[v * 3 + 2] = c[2];
     uv[v * 2] = x / 7; uv[v * 2 + 1] = z / 7; v++;
   };
   for (let b = 0; b < n; b++) for (let a = 0; a < n; a++) put(i0 + a * step, j0 + b * step, 0);

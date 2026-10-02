@@ -7,7 +7,7 @@ const Q = () => ({ low: 0, medium: 1, high: 2 }[SET.quality]);
 // ---------- ground ----------
 function buildGround() {
   for (let cj = 0; cj < CHN; cj++) for (let ci = 0; ci < CHN; ci++) {
-    const hi = new THREE.Mesh(buildChunkGeo(ci, cj, Q() === 2 ? 1 : 2), MAT.ground), lo = new THREE.Mesh(buildChunkGeo(ci, cj, 4), MAT.ground);
+    const hi = new THREE.Mesh(buildChunkGeo(ci, cj, Q() === 2 ? 1 : 2), MAT.ground), lo = new THREE.Mesh(buildChunkGeo(ci, cj, 5), MAT.ground); // steps must divide 50 cells
     hi.receiveShadow = true; lo.receiveShadow = true; hi.castShadow = false; lo.castShadow = false;
     const c = { hi, lo, cx: -HALF + (ci + 0.5) * CHUNK, cz: -HALF + (cj + 0.5) * CHUNK }; lo.visible = false;
     WORLD.root.add(hi); WORLD.root.add(lo); WORLD.chunks.push(c);
@@ -43,6 +43,7 @@ function updateWater(dt) {
 }
 // ---------- trees ----------
 function jitterGeo(g, amt, seed) { const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const n = vnoise(x * 1.7 + seed, z * 1.7 + y, seed) * amt; p.setXYZ(i, x + n, y + n * 0.4, z - n); } g.computeVertexNormals(); return g; }
+const lin = (v) => Math.pow(v, 2.2);
 function colorGeo(g, col) { const n = g.attributes.position.count, c = new Float32Array(n * 3); for (let i = 0; i < n; i++) { c[i * 3] = col[0]; c[i * 3 + 1] = col[1]; c[i * 3 + 2] = col[2]; } g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g; }
 function tGeo(g, x, y, z, rx = 0, rz = 0, s = 1) { g.applyMatrix4(M4(x, y, z, 0, s, s, s, rx, rz)); return g; }
 function mergeSimple(geos) { return mergeGeos(geos.map((g) => [g, new THREE.Matrix4(), g.userData.col]), true); }
@@ -53,9 +54,11 @@ function buildTreeTypes() {
   for (const [x, y, z, r] of [[0, 6.4, 0, 2.7], [1.4, 5.4, 0.6, 2.0], [-1.2, 5.6, -0.8, 2.1], [0.2, 7.6, -0.3, 1.8]]) oakCrown.push(jitterGeo(tGeo(new THREE.IcosahedronGeometry(r, 1), x, y, z), 0.45, x * 3 + z));
   const oakTrunk = [tGeo(new THREE.CylinderGeometry(0.28, 0.48, 5.4, 7), 0, 2.7, 0), tGeo(new THREE.CylinderGeometry(0.1, 0.2, 2.6, 5), 0.8, 4.6, 0.2, 0, -0.7), tGeo(new THREE.CylinderGeometry(0.1, 0.18, 2.4, 5), -0.7, 4.8, -0.3, 0.3, 0.6)];
   const deadTrunk = [tGeo(new THREE.CylinderGeometry(0.12, 0.38, 7, 6), 0, 3.5, 0), tGeo(new THREE.CylinderGeometry(0.04, 0.12, 3, 4), 0.9, 5.2, 0, 0, -0.9), tGeo(new THREE.CylinderGeometry(0.04, 0.11, 2.6, 4), -0.8, 5.8, 0.3, 0.2, 0.8), tGeo(new THREE.CylinderGeometry(0.03, 0.09, 2.2, 4), 0.2, 6.4, -0.8, -0.8, 0.1), tGeo(new THREE.CylinderGeometry(0.03, 0.08, 1.8, 4), 0.5, 3.6, 0.6, 0.8, -0.6)];
-  const willowCrown = [jitterGeo(tGeo(new THREE.IcosahedronGeometry(3.2, 1), 0, 5.8, 0), 0.5, 7)]; { const p = willowCrown[0].attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setY(i, y < 5.8 ? 5.8 - (5.8 - y) * 1.6 : 5.8 + (y - 5.8) * 0.55); } willowCrown[0].computeVertexNormals(); }
+  // weeping willow: a low dome with long hanging curtains of leaves
+  const willowCrown = [jitterGeo(tGeo(new THREE.SphereGeometry(3, 10, 6, 0, TAU, 0, Math.PI / 2), 0, 5.4, 0, 0, 0, 1), 0.35, 7)];
+  for (let i = 0; i < 11; i++) { const a = (i / 11) * TAU, r = 2.3 + (i % 3) * 0.35, len = 3.6 + (i % 4) * 0.6; const g = new THREE.CylinderGeometry(0.75, 0.15, len, 5, 2, true); g.translate(0, -len / 2, 0); g.applyMatrix4(M4(Math.cos(a) * r, 6.0, Math.sin(a) * r, a, 1, 1, 0.35, 0.18 * Math.sin(a), -0.18 * Math.cos(a))); willowCrown.push(jitterGeo(g, 0.2, i)); }
   const mergeT = (list) => mergeGeos(list.map((g) => [g, new THREE.Matrix4()]), false);
-  const far = (trunkGeo, crownGeo, tc, cc) => mergeGeos([[trunkGeo, new THREE.Matrix4(), tc], [crownGeo, new THREE.Matrix4(), cc]], true);
+  const far = (trunkGeo, crownGeo, tc, cc) => mergeGeos([[trunkGeo, new THREE.Matrix4(), tc.map(lin)], [crownGeo, new THREE.Matrix4(), cc.map(lin)]], true);
   TREE_TYPES.pine = { trunk: tGeo(new THREE.CylinderGeometry(0.14, 0.3, 9.5, 6), 0, 4.75, 0), crown: mergeT(pineCrown), far: far(tGeo(new THREE.CylinderGeometry(0.15, 0.3, 4, 4), 0, 2, 0), tGeo(new THREE.ConeGeometry(2.6, 8, 6), 0, 6.5, 0), [0.25, 0.18, 0.12], [0.12, 0.2, 0.12]), col: [0.36, 0.48, 0.3], r: 0.35 };
   TREE_TYPES.oak = { trunk: mergeT(oakTrunk), crown: mergeT(oakCrown), far: far(tGeo(new THREE.CylinderGeometry(0.3, 0.45, 5, 4), 0, 2.5, 0), tGeo(new THREE.IcosahedronGeometry(3.2, 0), 0, 6.5, 0), [0.25, 0.18, 0.12], [0.22, 0.3, 0.13]), col: [0.5, 0.6, 0.3], r: 0.5 };
   TREE_TYPES.birch = { trunk: tGeo(new THREE.CylinderGeometry(0.1, 0.18, 8, 6), 0, 4, 0), crown: mergeT([jitterGeo(tGeo(new THREE.IcosahedronGeometry(1.8, 1), 0, 7, 0), 0.35, 3), jitterGeo(tGeo(new THREE.IcosahedronGeometry(1.4, 1), 0.6, 5.6, 0.4), 0.3, 4)]), far: far(tGeo(new THREE.CylinderGeometry(0.12, 0.18, 5, 4), 0, 2.5, 0), tGeo(new THREE.IcosahedronGeometry(2, 0), 0, 6.5, 0), [0.8, 0.78, 0.74], [0.42, 0.5, 0.2]), col: [0.62, 0.66, 0.32], r: 0.25, birch: true };
@@ -108,7 +111,7 @@ function updateTrees(px, pz, force) {
       const d = Math.hypot(t.x - px, t.z - pz); if (d > farR) continue; const T = TREE_TYPES[t.type];
       _q.setFromEuler(_e.set(0, t.rot, 0)); _m4.compose(_v.set(t.x, t.y, t.z), _q, _s.set(t.s, t.s * (0.9 + t.tint * 0.15), t.s));
       const autumn = t.au < 0.18 && t.type === 'oak' ? 1 : t.au < 0.3 && t.type === 'birch' ? 1 : 0;
-      _c.setRGB(T.col[0] * t.tint * (autumn ? 1.7 : 1), T.col[1] * t.tint * (autumn ? 0.95 : 1), T.col[2] * t.tint * (autumn ? 0.5 : 1));
+      _c.setRGB(Math.min(1, T.col[0] * t.tint * (autumn ? 1.7 : 1)), Math.min(1, T.col[1] * t.tint * (autumn ? 0.95 : 1)), Math.min(1, T.col[2] * t.tint * (autumn ? 0.5 : 1)), THREE.SRGBColorSpace);
       if (d < nearR && T.n < T.maxN) { T.trunkMesh.setMatrixAt(T.n, _m4); if (T.crownMesh) T.crownMesh.setColorAt(T.n, _c); if (T.crownMesh) T.crownMesh.setMatrixAt(T.n, _m4); T.n++; }
       else if (T.nf < T.maxFar) { T.farMesh.setMatrixAt(T.nf, _m4); _c.multiplyScalar(autumn ? 1.6 : 1); T.farMesh.setColorAt(T.nf, autumn ? _c.setRGB(1.5, 1, 0.5) : _c.setRGB(t.tint, t.tint, t.tint)); T.nf++; }
     }
@@ -123,7 +126,7 @@ function updateTrees(px, pz, force) {
 const ROCKS = { mesh: null, list: [] }, BUSH = { mesh: null, list: [] };
 function buildRocksAndBushes() {
   const rnd = mulberry32(7);
-  const rg = jitterGeo(new THREE.DodecahedronGeometry(1, 1), 0.28, 2); { const p = rg.attributes.position, n = rg.attributes.normal, c = new Float32Array(p.count * 3); for (let i = 0; i < p.count; i++) { const moss = smoothstep(0.55, 0.9, n.getY(i)) * 0.7, v = 0.85 + vnoise(p.getX(i) * 3, p.getZ(i) * 3, 4) * 0.12; c[i * 3] = lerp(v, 0.42, moss); c[i * 3 + 1] = lerp(v, 0.55, moss); c[i * 3 + 2] = lerp(v, 0.28, moss); } rg.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
+  const rg = jitterGeo(new THREE.DodecahedronGeometry(1, 1), 0.28, 2); { const p = rg.attributes.position, n = rg.attributes.normal, c = new Float32Array(p.count * 3); for (let i = 0; i < p.count; i++) { const moss = smoothstep(0.55, 0.9, n.getY(i)) * 0.7, v = 0.85 + vnoise(p.getX(i) * 3, p.getZ(i) * 3, 4) * 0.12; c[i * 3] = lin(lerp(v, 0.42, moss)); c[i * 3 + 1] = lin(lerp(v, 0.55, moss)); c[i * 3 + 2] = lin(lerp(v, 0.28, moss)); } rg.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
   const P = PLACES;
   for (let i = 0; i < 9000 && ROCKS.list.length < { low: 900, medium: 1600, high: 2400 }[SET.quality]; i++) {
     const x = rand(-HALF + 20, HALF - 20), z = rand(-HALF + 20, HALF - 20), s = surfaceAt(x, z), sl = slopeAt(x, z), h = heightAt(x, z);
@@ -145,7 +148,7 @@ function buildRocksAndBushes() {
     BUSH.list.push({ x, z, y: heightAt(x, z), s: rand(0.6, 1.5), rot: rand(0, TAU), c: rand(0.7, 1.1), mud: s === SURF.MUD });
   }
   BUSH.mesh = new THREE.InstancedMesh(bg, MAT.bush, BUSH.list.length); BUSH.mesh.castShadow = SET.quality === 'high'; BUSH.mesh.receiveShadow = true;
-  BUSH.list.forEach((b, i) => { BUSH.mesh.setMatrixAt(i, M4(b.x, b.y, b.z, b.rot, b.s, b.s * 0.8, b.s)); BUSH.mesh.setColorAt(i, _c.setRGB(0.3 * b.c * (b.mud ? 0.8 : 1), 0.42 * b.c, 0.2 * b.c)); });
+  BUSH.list.forEach((b, i) => { BUSH.mesh.setMatrixAt(i, M4(b.x, b.y, b.z, b.rot, b.s, b.s * 0.8, b.s)); BUSH.mesh.setColorAt(i, _c.setRGB(0.3 * b.c * (b.mud ? 0.8 : 1), 0.42 * b.c, 0.2 * b.c, THREE.SRGBColorSpace)); });
   WORLD.root.add(BUSH.mesh);
 }
 // ---------- grass that follows you around ----------
@@ -155,7 +158,7 @@ function buildGrass() {
   if (!GRASS.max) return;
   const g = new THREE.BufferGeometry(), P = [], C = [];
   const seg = 3, w = 0.07;
-  for (let s = 0; s < seg; s++) { const y0 = s / seg, y1 = (s + 1) / seg, w0 = w * (1 - y0), w1 = w * (1 - y1), b0 = y0 * y0 * 0.25, b1 = y1 * y1 * 0.25; P.push(-w0, y0, b0, w0, y0, b0, -w1, y1, b1, w0, y0, b0, w1, y1, b1, -w1, y1, b1); for (const y of [y0, y0, y1, y0, y1, y1]) { const k = 0.55 + y * 0.6; C.push(k, k, k); } }
+  for (let s = 0; s < seg; s++) { const y0 = s / seg, y1 = (s + 1) / seg, w0 = w * (1 - y0), w1 = w * (1 - y1), b0 = y0 * y0 * 0.25, b1 = y1 * y1 * 0.25; P.push(-w0, y0, b0, w0, y0, b0, -w1, y1, b1, w0, y0, b0, w1, y1, b1, -w1, y1, b1); for (const y of [y0, y0, y1, y0, y1, y1]) { const k = lin(0.55 + y * 0.45); C.push(k, k, k); } }
   g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.computeVertexNormals();
   // grass faces up so lighting matches the ground
   const nm = g.attributes.normal; for (let i = 0; i < nm.count; i++) nm.setXYZ(i, 0, 1, 0.2);
@@ -178,8 +181,8 @@ function updateGrass(px, pz, force) {
     _q.setFromEuler(_e.set(0, hr * 40, 0)); _m4.compose(_v.set(x, y - 0.03, z), _q, _s.set(1 + hs, hgt, 1)); GRASS.mesh.setMatrixAt(n, _m4);
     groundColor(clamp(Math.round((x + HALF) / CELL), 0, GN - 1), clamp(Math.round((z + HALF) / CELL), 0, GN - 1), col);
     const flower = hs > 0.985 && s === SURF.GRASS; const fc = Math.floor(hr * 1000) % 3;
-    if (flower) _c.setRGB(fc === 0 ? 1.2 : fc === 1 ? 1.1 : 0.7, fc === 0 ? 1.1 : fc === 1 ? 0.5 : 0.5, fc === 0 ? 0.3 : fc === 1 ? 0.6 : 1.2);
-    else _c.setRGB(col[0] * 1.25 + 0.03, col[1] * 1.3 + 0.04, col[2] * 1.1);
+    if (flower) _c.setRGB(fc === 0 ? 1 : fc === 1 ? 1 : 0.7, fc === 0 ? 0.95 : fc === 1 ? 0.5 : 0.5, fc === 0 ? 0.3 : fc === 1 ? 0.6 : 1, THREE.SRGBColorSpace);
+    else _c.setRGB(Math.min(1, col[0] * 1.25 + 0.03), Math.min(1, col[1] * 1.3 + 0.04), Math.min(1, col[2] * 1.1), THREE.SRGBColorSpace);
     GRASS.mesh.setColorAt(n, _c); n++;
   }
   GRASS.mesh.count = n; GRASS.mesh.instanceMatrix.needsUpdate = true; GRASS.mesh.instanceColor.needsUpdate = true; GRASS.mesh.visible = true;

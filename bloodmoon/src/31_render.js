@@ -117,12 +117,12 @@ function updateSkyAndLight(dt, focus) {
   // sun by day, moon by night
   const useSun = Sky.sunDir.y > -0.05, dir = useSun ? Sky.sunDir : Sky.moonDir;
   _tmpV.copy(dir).multiplyScalar(300); sunLight.position.copy(focus).add(_tmpV); sunLight.target.position.copy(focus);
-  if (useSun) { const warm = 1 - smoothstep(0.05, 0.35, Sky.sunDir.y); sunLight.color.setRGB(1, lerp(0.95, 0.62, warm), lerp(0.88, 0.4, warm)); sunLight.intensity = 3.0 * smoothstep(-0.05, 0.12, Sky.sunDir.y) * (1 - storm * 0.75); }
+  if (useSun) { const warm = 1 - smoothstep(0.05, 0.35, Sky.sunDir.y); sunLight.color.setRGB(1, lerp(0.95, 0.62, warm), lerp(0.88, 0.4, warm)); sunLight.intensity = 2.4 * smoothstep(-0.05, 0.12, Sky.sunDir.y) * (1 - storm * 0.75); }
   else { sunLight.color.setRGB(lerp(0.55, 1.0, bl), lerp(0.62, 0.2, bl), lerp(0.85, 0.16, bl)); sunLight.intensity = (0.32 + bl * 0.25) * (1 - storm * 0.6); }
   sunLight.intensity += W.flash * 3;
   hemiLight.color.setRGB(lerp(0.12, 0.72, day) + bl * 0.15, lerp(0.14, 0.8, day) * (1 - bl * 0.6), lerp(0.24, 0.95, day) * (1 - bl * 0.6));
   hemiLight.groundColor.setRGB(lerp(0.04, 0.32, day), lerp(0.035, 0.27, day), lerp(0.03, 0.2, day));
-  hemiLight.intensity = lerp(0.55, 1.05, day) * (1 - storm * 0.35) + W.flash;
+  hemiLight.intensity = lerp(0.45, 0.75, day) * (1 - storm * 0.35) + W.flash;
   ambLight.intensity = 0.05 + night * 0.08;
   // fog: thicker at night, in rain and in the swamp
   Sky.horizon(_hc); scene.fog.color.copy(_hc);

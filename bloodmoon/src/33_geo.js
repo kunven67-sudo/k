@@ -23,7 +23,7 @@ function windify(mat, strength = 1, base = 1.5) {
   return mat;
 }
 function makeMaterials() {
-  const S = (o) => new THREE.MeshStandardMaterial(o);
+  const S = (o) => new THREE.MeshStandardMaterial(Object.assign({ envMapIntensity: 0.3 }, o));
   MAT.ground = S({ vertexColors: true, map: TEX.ground, roughness: 0.96, metalness: 0 });
   MAT.stone = S({ map: TEX.stone, roughness: 0.92 });
   MAT.darkStone = S({ map: TEX.stone, color: 0x8a8590, roughness: 0.92 });
@@ -42,10 +42,10 @@ function makeMaterials() {
   MAT.window = new THREE.MeshStandardMaterial({ color: 0x1a140c, emissive: 0xffb050, emissiveIntensity: 0, roughness: 0.4 });
   MAT.glowRed = new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xff2010, emissiveIntensity: 2, roughness: 0.6 });
   MAT.glowGreen = new THREE.MeshStandardMaterial({ color: 0x103000, emissive: 0x6aff40, emissiveIntensity: 1.6, roughness: 0.6 });
-  MAT.iron = S({ color: 0x3a3c40, roughness: 0.45, metalness: 0.85 });
-  MAT.steel = S({ color: 0xb8bcc4, roughness: 0.25, metalness: 1 });
-  MAT.silver = S({ color: 0xe8ecf4, roughness: 0.15, metalness: 1 });
-  MAT.gold = S({ color: 0xd8a840, roughness: 0.3, metalness: 1 });
+  MAT.iron = S({ color: 0x3a3c40, roughness: 0.45, metalness: 0.85, envMapIntensity: 1 });
+  MAT.steel = S({ color: 0xb8bcc4, roughness: 0.25, metalness: 1, envMapIntensity: 1 });
+  MAT.silver = S({ color: 0xe8ecf4, roughness: 0.15, metalness: 1, envMapIntensity: 1.1 });
+  MAT.gold = S({ color: 0xd8a840, roughness: 0.3, metalness: 1, envMapIntensity: 1 });
   MAT.cloth = S({ color: 0x7a2420, roughness: 1, side: THREE.DoubleSide });
   MAT.canvas = S({ color: 0xb8a888, roughness: 1, side: THREE.DoubleSide });
   MAT.bone = S({ color: 0xd8cfb8, roughness: 0.7 });
@@ -53,7 +53,7 @@ function makeMaterials() {
   MAT.dirt = S({ color: 0x3a2a1c, roughness: 1 });
   MAT.water = new THREE.MeshStandardMaterial({ color: 0x18323c, roughness: 0.06, metalness: 0.2, transparent: true, opacity: 0.86, normalMap: TEX.waterN, normalScale: new THREE.Vector2(0.4, 0.4), depthWrite: false });
   MAT.river = MAT.water.clone(); MAT.river.normalMap = TEX.waterN.clone(); MAT.river.normalMap.needsUpdate = true;
-  MAT.swamp = new THREE.MeshStandardMaterial({ color: 0x1e2414, roughness: 0.2, metalness: 0.05, transparent: true, opacity: 0.93, normalMap: TEX.waterN, normalScale: new THREE.Vector2(0.15, 0.15), depthWrite: false });
+  MAT.swamp = new THREE.MeshStandardMaterial({ color: 0x1a2010, roughness: 0.4, metalness: 0.05, envMapIntensity: 0.35, transparent: true, opacity: 0.93, normalMap: TEX.waterN, normalScale: new THREE.Vector2(0.15, 0.15), depthWrite: false });
   MAT.blood = new THREE.MeshStandardMaterial({ map: TEX.blood, transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -4 });
   MAT.track = new THREE.MeshBasicMaterial({ map: TEX.track, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, opacity: 0.5, fog: true });
   MAT.glow = new THREE.SpriteMaterial({ map: TEX.glow, color: 0xffb060, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
