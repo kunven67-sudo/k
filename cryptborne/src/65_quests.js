@@ -38,7 +38,7 @@ const Quests = {
   offer(giver) { const Q = this.Q(); if (!Q.offers[giver] || !Q.offers[giver].type) Q.offers[giver] = this.make(giver); return Q.offers[giver]; },
   text(q) {
     switch (q.type) {
-      case 'hunt': return `${MON[q.mon].name}s have been getting too close. Kill ${q.need} of them and I'll pay you ${q.reward.coins} coins.`;
+      case 'hunt': return `${plural(MON[q.mon].name)} have been getting too close. Kill ${q.need} of them and I'll pay you ${q.reward.coins} coins.`;
       case 'collect': return `I need ${q.need} ${ITEMS[q.item].name}. Bring them to me and I'll pay you ${q.reward.coins} coins.`;
       case 'rescue': return `My ${q.rel} ${q.name} went into ${DUNGEON_BY_ID[q.dungeon].name} and never came back. Please find them! ${q.reward.coins} coins if you do.`;
       case 'deliver': return `Can you take this parcel to ${NPC_NAMES[q.to]} in ${REGIONS[NPC_PLACES[q.to]].name}? You'll get ${q.reward.coins} coins.`;
@@ -47,7 +47,7 @@ const Quests = {
   },
   goal(q) {
     switch (q.type) {
-      case 'hunt': return `Kill ${MON[q.mon].name}s: ${Math.min(q.have, q.need)} / ${q.need}`;
+      case 'hunt': return `Kill ${plural(MON[q.mon].name)}: ${Math.min(q.have, q.need)} / ${q.need}`;
       case 'collect': return `Bring ${ITEMS[q.item].name}: ${Math.min(invCount(q.item), q.need)} / ${q.need}`;
       case 'rescue': return q.freed ? `${q.name} is safe. Tell ${NPC_NAMES[q.giver]}.` : `Find ${q.name} in ${DUNGEON_BY_ID[q.dungeon].name}`;
       case 'deliver': return `Bring the parcel to ${NPC_NAMES[q.to]} (${REGIONS[NPC_PLACES[q.to]].name})`;

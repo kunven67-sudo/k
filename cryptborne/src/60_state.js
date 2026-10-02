@@ -3,7 +3,7 @@
 // RUN STATE — the save being played, inventory, gear, and the stats that
 // come from class, level, skills, gems and buffs.
 // =====================================================================
-const G = { later: [], on: false, save: null, p: null, area: null, mons: [], projs: [], picks: [], parts: [], texts: [], fx: [], corpses: [], zonesT: 0,
+const G = { later: [], on: false, save: null, p: null, area: null, mons: [], projs: [], picks: [], parts: [], texts: [], fx: [], corpses: [], stains: [], traps2: [], clouds: [], run: { key: false }, zonesT: 0,
   time: 0, shake: 0, cam: { x: 0, y: 0 }, bossMon: null, autosaveT: 0, zoneT: 0, dead: false, invFullT: 0, dodgeTxtT: 0, cutscene: null, pet: null, statsV: 0, hitstop: 0, flash: 0 };
 const FISTS = { id: null, name: 'Fists', wc: 'melee', dmg: 3, cd: 0.4, range: 17, arc: 90, icon: 'sword' };
 const S = () => G.save.player;

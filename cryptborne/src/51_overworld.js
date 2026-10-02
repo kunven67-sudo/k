@@ -88,7 +88,7 @@ function carvePath(m, from, to, opts = {}) {
   }
 }
 function wNpc(Wd, o) {
-  const n = Object.assign({ wander: 0, face: 1, walk: 0, moving: false, wait: Math.random() * 3, blinkT: Math.random() * 4, breatheT: Math.random() * 3, pose: null, poseT: 0 }, o);
+  const n = Object.assign({ wander: 0, face: 1, walk: 0, moving: false, wait: Math.random() * 3, blinkT: Math.random() * 4, breatheT: Math.random() * 3, pose: null, poseT: 0, waveT: 0, chatT: 0 }, o);
   n.home = n.home || [n.x, n.y]; n.tx = n.x; n.ty = n.y; Wd.npcs.push(n); return n;
 }
 function wFinish(Wd) {

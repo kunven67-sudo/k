@@ -2,17 +2,21 @@
 
 <div id="hud" hidden>
   <div id="stats">
-    <div class="lvrow"><span class="lv">LV <b id="hLvl">1</b></span><span class="coins"><img id="hCoinIco" class="px" width="12" height="12" alt=""><span id="hCoins">0</span></span></div>
-    <div class="bar hp"><i id="hHp"></i><span id="hHpT">100/100</span></div>
+    <div class="lvrow"><span class="lv">LV <b id="hLvl">1</b> <span id="hCls" class="cls"></span></span><span class="coins"><img id="hCoinIco" class="px" width="12" height="12" alt=""><span id="hCoins">0</span></span></div>
+    <div class="bar hp"><i id="hHp"></i><em id="hShield"></em><span id="hHpT">100/100</span></div>
     <div class="bar st"><i id="hSt"></i></div>
     <div class="bar xp"><i id="hXp"></i></div>
+    <div id="hBuffs" class="buffs"></div>
   </div>
-  <button id="minimap" type="button" aria-label="Open world map"><canvas id="mini" width="120" height="80"></canvas><span class="lbl" id="hLoc">Emberfall</span><span class="hint">CLICK / M</span></button>
+  <div id="questTrack"></div>
+  <button id="minimap" type="button" aria-label="Open world map"><canvas id="mini" width="120" height="80"></canvas><span class="lbl" id="hLoc">Emberfall</span><span class="clock" id="hClock"></span><span class="night" id="hNight"></span><span class="hint">CLICK / M</span></button>
+  <div id="hKey" hidden><img class="px" id="hKeyIco" width="24" height="24" alt="">BOSS KEY</div>
   <button id="pauseBtn" type="button" aria-label="Pause">II</button>
   <div id="bossbar" hidden><div class="bn" id="hBoss"></div><div class="bar"><i id="hBossHp"></i></div></div>
   <div id="toasts" aria-live="polite"></div>
   <div id="prompt" hidden></div>
-  <div id="invbar"><div id="hotbar" style="display:flex;gap:4px"></div><button id="bagBtn" type="button" aria-label="Open inventory">BAG<br>[B]</button></div>
+  <div id="specials"></div>
+  <div id="invbar"><div id="hotbar"></div><button id="bagBtn" type="button" aria-label="Open inventory">BAG<br>[B]</button></div>
 </div>
 
 <div id="touch" hidden>
@@ -21,17 +25,19 @@
     <button id="tE" type="button">USE<br>E</button><button id="tAtk" type="button" class="atk">HIT</button>
     <button id="tBlk" type="button">BLOCK</button><button id="tDodge" type="button">DODGE</button>
   </div>
+  <div class="tspecials"><button type="button" data-sp="0">1</button><button type="button" data-sp="1">2</button><button type="button" data-sp="2">3</button><button type="button" data-sp="3">4</button></div>
+  <div class="tmenu"><button id="tJournal" type="button">J</button><button id="tSkills" type="button">K</button></div>
 </div>
 
 <section id="menu" class="screen">
   <div class="menu-box">
     <h1 class="logo"><span>CRYPT</span><span>BORNE</span></h1>
-    <p class="tag">Delve the crypts. Loot the dead. Rise.</p>
+    <p class="tag">Your brother went into the crypts. Bring him home.</p>
     <div class="menu-btns">
       <button id="btnPlay" class="btn big gold" type="button">&#9654; PLAY</button>
       <button id="btnSettings" class="btn" type="button">SETTINGS</button>
     </div>
-    <p class="menu-foot">WASD move &middot; Left click attack &middot; C dodge &middot; F block</p>
+    <p class="menu-foot">WASD move &middot; Left click attack &middot; C dodge &middot; F block &middot; R T G V specials</p>
   </div>
 </section>
 
@@ -40,32 +46,58 @@
     <header class="ph"><h2>CHOOSE YOUR SAVE</h2><button class="btn sm" type="button" data-back>BACK</button></header>
     <p id="storeNote" class="note"></p>
     <div id="saveList" class="save-list"></div>
-    <form id="newSaveForm" class="new-save">
-      <label for="newName">NEW HERO NAME</label>
-      <div class="row"><input id="newName" maxlength="16" placeholder="Hero" autocomplete="off" spellcheck="false"><button class="btn gold" type="submit">+ NEW SAVE</button></div>
-    </form>
+    <button id="btnNewHero" class="btn gold" type="button">+ NEW HERO</button>
+  </div>
+</section>
+
+<section id="creator" class="screen" hidden>
+  <div class="panel wide creator">
+    <header class="ph"><h2>CREATE YOUR HERO</h2><button class="btn sm" type="button" data-back>BACK</button></header>
+    <div class="cr-body">
+      <div class="cr-preview">
+        <canvas id="crCanvas" width="48" height="56"></canvas>
+        <label for="crName">NAME</label>
+        <input id="crName" maxlength="16" placeholder="Hero" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="cr-opts">
+        <h3>CLASS</h3><div id="crClass" class="cr-classes"></div>
+        <h3>LOOKS</h3>
+        <div class="cr-row"><span>Skin</span><div id="crSkin" class="sw"></div></div>
+        <div class="cr-row"><span>Hair</span><div id="crHairStyle" class="seg"></div></div>
+        <div class="cr-row"><span>Hair color</span><div id="crHair" class="sw"></div></div>
+        <div class="cr-row"><span>Shirt</span><div id="crShirt" class="sw"></div></div>
+        <div class="cr-row"><span>Pants</span><div id="crPants" class="sw"></div></div>
+        <h3>DIFFICULTY</h3><div id="crDiff" class="cr-diff"></div>
+      </div>
+    </div>
+    <button id="crGo" class="btn big gold" type="button">BEGIN</button>
   </div>
 </section>
 
 <section id="settings" class="screen" hidden>
   <div class="panel">
     <header class="ph"><h2>SETTINGS</h2><button class="btn sm" type="button" data-back>BACK</button></header>
-    <div class="set-row"><label for="setVol">Sound volume</label><input type="range" id="setVol" min="0" max="100" step="5"><output id="setVolOut" for="setVol">70</output></div>
+    <div class="set-row"><label for="setMusic">Music volume</label><input type="range" id="setMusic" min="0" max="100" step="5"><output id="setMusicOut" for="setMusic">55</output></div>
+    <div class="set-row"><label for="setSfx">Sound volume</label><input type="range" id="setSfx" min="0" max="100" step="5"><output id="setSfxOut" for="setSfx">70</output></div>
     <div class="set-row"><label for="setZoom">Camera zoom</label><select id="setZoom"><option value="-1">Far</option><option value="0">Normal</option><option value="1">Close</option></select><span></span></div>
+    <div class="set-row"><label for="setWeather">Weather effects</label><input type="checkbox" id="setWeather"><span></span></div>
     <div class="set-row"><label for="setShake">Screen shake</label><input type="checkbox" id="setShake"><span></span></div>
     <div class="set-row"><label for="setDmg">Damage numbers</label><input type="checkbox" id="setDmg"><span></span></div>
     <div class="set-row"><label for="setNames">Monster names</label><input type="checkbox" id="setNames"><span></span></div>
     <h3>CONTROLS</h3>
     <dl class="keys">
       <dt>WASD</dt><dd>Move (arrow keys work too)</dd>
-      <dt>L-CLICK</dt><dd>Attack toward the mouse (hold to keep swinging)</dd>
-      <dt>C</dt><dd>Dodge roll (you can't be hit mid-roll)</dd>
+      <dt>L-CLICK</dt><dd>Attack toward the mouse (hold to keep attacking)</dd>
+      <dt>C / SPACE</dt><dd>Dodge roll (you can't be hit mid-roll)</dd>
       <dt>F</dt><dd>Hold to block (needs a shield). Block right before a hit to PARRY.</dd>
-      <dt>E</dt><dd>Talk, open chests, enter dungeons</dd>
+      <dt>R T G V</dt><dd>Your 4 special attacks</dd>
+      <dt>E</dt><dd>Talk, open chests and doors, pull levers, enter places</dd>
       <dt>Q</dt><dd>Drink your best health potion</dd>
       <dt>1-0</dt><dd>Use inventory bar slot</dd>
       <dt>M</dt><dd>World map (or click the tiny map)</dd>
       <dt>B / I</dt><dd>Inventory bag</dd>
+      <dt>K</dt><dd>Skill tree and special attacks</dd>
+      <dt>J</dt><dd>Journal: quests and Finn's notes</dd>
       <dt>ESC</dt><dd>Pause, save, quit</dd>
     </dl>
   </div>
@@ -74,7 +106,7 @@
 <section id="mapModal" class="modal" hidden>
   <div class="panel wide">
     <header class="ph"><h2 id="mapTitle">WORLD MAP</h2><button class="btn sm" type="button" data-close>CLOSE [M]</button></header>
-    <div class="map-wrap"><canvas id="bigMap" width="288" height="216"></canvas></div>
+    <div class="map-wrap"><canvas id="bigMap" width="320" height="240"></canvas></div>
     <div id="mapInfo" class="map-info"></div>
     <div id="dgList" class="dg-list"></div>
   </div>
@@ -88,6 +120,7 @@
         <button class="eq" type="button" data-eq="weapon"><span class="slot"></span><span class="lab">WEAPON<b></b></span></button>
         <button class="eq" type="button" data-eq="shield"><span class="slot"></span><span class="lab">SHIELD<b></b></span></button>
         <button class="eq" type="button" data-eq="armor"><span class="slot"></span><span class="lab">ARMOR<b></b></span></button>
+        <div id="bagPet" class="bag-pet"></div>
         <dl id="statList" class="stat-list"></dl>
       </div>
       <div>
@@ -102,8 +135,35 @@
   <div class="panel wide">
     <header class="ph"><h2 id="shopTitle">SHOP</h2><span class="coins-pill" id="shopCoins"></span><button class="btn sm" type="button" data-close>CLOSE</button></header>
     <p id="shopGreet" class="note"></p>
-    <div class="tabs"><button id="tabBuy" class="tab on" type="button">BUY</button><button id="tabSell" class="tab" type="button">SELL</button><button id="sellLoot" class="btn sm gold" type="button">SELL ALL LOOT</button></div>
+    <div class="tabs" id="shopTabs"></div>
     <div id="shopList" class="shop-list"></div>
+  </div>
+</section>
+
+<section id="skillsModal" class="modal" hidden>
+  <div class="panel wide">
+    <header class="ph"><h2>SKILLS</h2><span class="coins-pill" id="spLeft"></span><button class="btn sm" type="button" data-close>CLOSE [K]</button></header>
+    <h3>SPECIAL ATTACKS <span class="dim">(pick 4 for R, T, G, V)</span></h3>
+    <div id="spSlots" class="sp-slots"></div>
+    <div id="spList" class="sp-list"></div>
+    <h3>SKILL TREE <span class="dim">(1 point every level)</span></h3>
+    <div id="skillTree" class="tree"></div>
+  </div>
+</section>
+
+<section id="journalModal" class="modal" hidden>
+  <div class="panel wide">
+    <header class="ph"><h2>JOURNAL</h2><button class="btn sm" type="button" data-close>CLOSE [J]</button></header>
+    <div class="tabs"><button class="tab on" type="button" data-jt="quests">QUESTS</button><button class="tab" type="button" data-jt="notes">FINN'S NOTES</button><button class="tab" type="button" data-jt="story">STORY</button></div>
+    <div id="journalBody" class="journal"></div>
+  </div>
+</section>
+
+<section id="noteModal" class="modal" hidden>
+  <div class="panel note-paper">
+    <h2 id="noteTitle"></h2>
+    <p id="noteText"></p>
+    <button id="noteClose" class="btn sm" type="button">CLOSE</button>
   </div>
 </section>
 
@@ -113,6 +173,7 @@
     <p id="pauseInfo" class="note"></p>
     <button id="pResume" class="btn gold" type="button">RESUME</button>
     <button id="pSave" class="btn" type="button">SAVE GAME</button>
+    <button id="pJournal" class="btn" type="button">JOURNAL</button>
     <button id="pSettings" class="btn" type="button">SETTINGS</button>
     <button id="pQuit" class="btn red" type="button">SAVE &amp; QUIT TO MENU</button>
   </div>
@@ -128,9 +189,30 @@
 
 <section id="deathModal" class="modal" hidden>
   <div class="panel death" style="max-width:420px">
-    <header class="ph"><h2>YOU DIED</h2></header>
+    <header class="ph"><h2 id="deathTitle">YOU DIED</h2></header>
     <p id="deathInfo" class="note" style="text-align:center"></p>
     <button id="btnRespawn" class="btn gold" type="button">RESPAWN IN EMBERFALL</button>
+  </div>
+</section>
+
+<div id="cutscene" hidden>
+  <div class="bars top"></div><div class="bars bottom"></div>
+  <div id="titleCard" hidden><b id="titleMain"></b><span id="titleSub"></span></div>
+  <div id="sayBox" hidden>
+    <canvas id="sayFace" width="16" height="20"></canvas>
+    <div class="say-body"><b id="sayName"></b><p id="sayText"></p><div id="sayChoices" class="acts"></div><span class="say-next" id="sayNext">CLICK / E</span></div>
+  </div>
+  <button id="skipScene" type="button">SKIP &#9654;&#9654;</button>
+</div>
+
+<section id="credits" class="screen" hidden>
+  <div class="panel credits">
+    <p class="end-kind" id="endKind"></p>
+    <h2 id="endTitle"></h2>
+    <p id="endSub" class="note"></p>
+    <dl id="endStats" class="stat-list"></dl>
+    <p class="note">CRYPTBORNE &middot; made for you, with pixels, synth music and a lot of bugs squashed.</p>
+    <button id="endBack" class="btn gold" type="button">BACK TO MENU</button>
   </div>
 </section>
 

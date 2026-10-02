@@ -30,6 +30,7 @@ const fmtDate = (ts) => {
   const d = new Date(ts);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ', ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 };
+const plural = (s) => (/wolf$/i.test(s) ? s.slice(0, -1) + 'ves' : /[^aeiou]y$/i.test(s) ? s.slice(0, -1) + 'ies' : /(s|x|ch|sh)$/i.test(s) ? s + 'es' : s + 's');
 const fmtNum = (n) => Math.floor(n).toLocaleString();
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const LS = {

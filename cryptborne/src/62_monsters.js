@@ -70,7 +70,9 @@ function chaseDir(m, tx0, ty0) {
 // ---------- spawning ----------
 const _mf = {};
 function monFrames(type) {
-  if (_mf[type]) return _mf[type]; const d = MON[type];
+  if (_mf[type]) return _mf[type];
+  if (type === 'lich_face') return (_mf[type] = buildHumanoid(Object.assign({}, MON.lich.look, { hood: null, hair: '#e8e0d8', hairStyle: 1 })));
+  const d = MON[type];
   if (d.art === 'human') return (_mf[type] = buildHumanoid(d.look));
   if (d.art === 'hero') return (_mf[type] = buildHumanoid(Object.assign({}, heroLook(), { eyes: '#d8454a', weapon: 'sword' })).map(darkOf));
   if (d.art === 'wisp') return (_mf[type] = []);

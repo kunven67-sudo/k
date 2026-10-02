@@ -49,6 +49,6 @@ const Pets = {
     else if (pt.id === 'wolf') { const fr = monFrames('wolf'), img = fr[pt.moving ? Math.floor(pt.walk * 0.6) % 2 : 0], s = 0.55 + pt.lvl * 0.05; shadow(c, x, y, 6); c.drawImage(pt.face < 0 ? flipped(img) : img, x - (20 * s) / 2, y - 12 * s - (pt.bite ? 2 : 0), 20 * s, 12 * s); }
     else if (pt.id === 'raven') { const img = PET_SPR.raven[Math.floor(pt.t * 8) % 2], yy = y - 16 + Math.sin(pt.t * 4) * 2; shadow(c, x, y, 3); c.drawImage(pt.face < 0 ? flipped(img) : img, x - 5, yy - 8); }
     else if (pt.id === 'sprite') { const yy = y - 16 + Math.sin(pt.t * 3) * 2, f = Math.floor(pt.t * 12) % 3; shadow(c, x, y, 3); px(c, x - 3, yy - 3, 6, 6, '#ff7a2a'); px(c, x - 2, yy - 5 - f % 2, 4, 4, '#ffd27a'); px(c, x - 1, yy - 2, 1, 1, '#1a1020'); px(c, x + 1, yy - 2, 1, 1, '#1a1020'); if (chance(0.4)) G.parts.push({ x: x + rand(-2, 2), y: yy - 3, vx: rand(-5, 5), vy: -20, life: 0.4, max: 0.4, col: '#ffb03a', size: 1, grav: 0 }); }
-    if (SET.names) tinyText(c, PETS[pt.id].name + ' ' + pt.lvl, x, y - 22, '#9fd0f0');
+    if (SET.names) tinyText(c, PETS[pt.id].name + ' LV' + pt.lvl, x, y - 22, '#9fd0f0');
   },
 };
