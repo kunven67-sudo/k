@@ -13,7 +13,7 @@ const Clock = {
   dark() { const s = Sky.sunDir.y; return 1 - smoothstep(-0.1, 0.15, s); },
   // which night it is: night N runs from 20:00 on day N to 05:00 on day N+1
   nightNum() { const W = this.W(); return this.hour() < 5 ? W.day - 1 : W.day; },
-  bloodMoon() { const n = this.nightNum(); return this.isNight() && n > 0 && n % 7 === 0; },
+  bloodMoon() { if (G.save && G.save.story.flags.free) return false; const n = this.nightNum(); return this.isNight() && n > 0 && n % 7 === 0; },
   nextBloodIn() { const n = this.nightNum() + (this.isNight() ? 1 : this.hour() >= 20 ? 1 : 0); return (7 - (n % 7)) % 7; },
   label() { const m = Math.floor(this.W().min), h = Math.floor(m / 60), mm = m % 60; return `Day ${this.W().day} · ${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; },
   advance(mins) {
@@ -28,11 +28,12 @@ const Clock = {
   tick(dt) { this.advance(dt * this.rate); },
   nightFalls() {
     if (!G.save) return; const n = this.nightNum();
+    if (G.save.story.flags.free) { UI.toast('Night falls. The moon stays white now.'); Monsters.nightChange(); return; }
     if (n % 7 === 0) { UI.toast('THE BLOOD MOON RISES', 'blood big'); Sfx.play('bloodmoon'); Music.sting('blood'); }
     else { const left = 7 - (n % 7); UI.toast(left === 1 ? 'Night falls. The blood moon rises tomorrow night.' : 'Night falls.', left === 1 ? 'bad' : ''); }
     Monsters.nightChange();
   },
-  dawn() { if (!G.save) return; Sfx.play('rooster'); Monsters.nightChange(); if (this.W().day % 7 === 1 && this.W().day > 1) UI.toast('The blood moon sets. The valley breathes again.', 'good'); },
+  dawn() { if (!G.save) return; Sfx.play('rooster'); Monsters.nightChange(); if (this.W().day % 7 === 1 && this.W().day > 1 && !G.save.story.flags.free) UI.toast('The blood moon sets. The valley breathes again.', 'good'); },
 };
 const WEATHER_T = { clear: [0.15, 0, 0, 0.25], cloudy: [0.6, 0, 0, 0.4], rain: [0.85, 0.7, 0, 0.55], storm: [1, 1, 1, 0.9], fog: [0.5, 0, 0, 0.1] };
 const Weather = {

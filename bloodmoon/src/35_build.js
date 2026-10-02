@@ -289,6 +289,7 @@ function updateAnims(dt, t) {
   for (const a of ANIM) {
     if (a.kind === 'wheel') a.obj.rotation.x -= dt * a.speed;
     else if (a.kind === 'sails') a.obj.rotation.z += dt * a.speed * (0.6 + Weather.wind);
+    else if (a.kind === 'lift') { if (a.obj.position.y < a.to) a.obj.position.y = Math.min(a.to, a.obj.position.y + dt * 1.6); }
     else if (a.kind === 'flag') { const p = a.mesh.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = a.base[i * 3], k = (x + 1.5) / 3; p.setZ(i, Math.sin(t * 4 + x * 2) * 0.35 * k * (0.4 + Weather.wind)); } p.needsUpdate = true; }
   }
 }

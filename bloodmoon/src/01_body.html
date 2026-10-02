@@ -1,2 +1,35 @@
 <canvas id="gl"></canvas>
-<div id="loading"><div>BLOOD MOON HUNTER</div><div class="bar"><i id="loadBar"></i></div><div id="loadText" style="font-size:14px;color:#9a9080;letter-spacing:.1em">Shaping the valley...</div></div>
+<div id="loading"><div class="lt">BLOOD MOON HUNTER</div><div class="bar"><i id="loadBar"></i></div><div id="loadText">Shaping the valley...</div></div>
+<div id="hud" hidden>
+  <div id="compass"><div id="compassIn"></div><i class="tick"></i></div>
+  <div id="goal"></div>
+  <div id="bossBar" hidden><div id="bossName"></div><div class="bb"><i id="bossFill"></i></div></div>
+  <div id="clock"><div id="clockT"></div><div id="moonT"></div></div>
+  <div id="bars">
+    <div class="row"><div class="bar hp"><i id="hpFill"></i><b id="hpTxt"></b></div></div>
+    <div class="row"><div class="bar st"><i id="stFill"></i></div></div>
+    <div class="row"><div class="bar mp"><i id="mpFill"></i></div></div>
+    <div class="row" id="horseRow" hidden><div class="bar hs"><i id="hsFill"></i></div></div>
+    <div id="surv"></div>
+  </div>
+  <div id="hotbar"></div>
+  <div id="cross"><i></i></div><div id="hitMark"></div>
+  <div id="prompt" hidden></div>
+  <div id="saveIcon" hidden>Saving…</div>
+</div>
+<div id="toasts"></div>
+<div id="fx"><div id="hurtV"></div><div id="lowV"></div><div id="coldV"></div><div id="senseV"></div><div id="flashV"></div></div>
+<div id="letterbox" hidden><i></i><i></i></div>
+<div id="dialog" hidden><div id="dName"></div><div id="dText"></div><div id="dMore">▶</div><div id="dChoices"></div></div>
+<div id="screen" hidden></div>
+<div id="modal" hidden><div id="mPanel"><button id="mClose" aria-label="Close">✕</button><div id="mTitle"></div><div id="mTabs"></div><div id="mBody"></div></div></div>
+<div id="touch" hidden>
+  <div id="stick"><i></i></div>
+  <div id="tBtns">
+    <button data-t="atk" class="big">⚔</button><button data-t="block">🛡</button><button data-t="dodge">↯</button><button data-t="jump">⤒</button>
+    <button data-t="bow">🏹</button><button data-t="use">E</button><button data-t="potion">Q</button><button data-t="sprint">⇧</button>
+    <button data-t="fire">🔥</button><button data-t="lightning">⚡</button><button data-t="ice">❄</button><button data-t="sense">R</button>
+  </div>
+  <div id="tTop"><button data-t="menu">☰</button><button data-t="map">🗺</button><button data-t="cam">V</button><button data-t="horse">🐴</button><button data-t="eat">🍖</button><button data-t="crouch">⤓</button></div>
+</div>
+<div id="fade"></div>

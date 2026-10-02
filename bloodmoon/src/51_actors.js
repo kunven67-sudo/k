@@ -10,7 +10,7 @@ function inTown(x, z) { return Math.hypot(x - PLACES.ashford.x, z - PLACES.ashfo
 function makeActor(kind, type, x, z, o = {}) {
   const d = kind === 'monster' ? MON[type] : null;
   const rig = o.rig || (kind === 'monster' ? buildMonsterModel(type) : null);
-  const a = Object.assign({ id: actorId++, kind, type, d, rig, x, z, y: groundAt(x, z), yaw: rand(0, TAU), vx: 0, vz: 0, vy: 0, hp: 1, maxHp: 1, t: rand(0, 10), state: 'idle', stateT: rand(1, 4), anim: { speed: 0, phase: 0, attack: -1, t: 0 }, r: 0.45, h: 1.8, dead: false, deadT: 0, atkCd: rand(0.5, 1.5), burn: 0, slow: 0, stun: 0, fly: 0 }, o);
+  const a = Object.assign({ id: actorId++, kind, type, d, rig, x, z, y: floorAt(x, z), yaw: rand(0, TAU), vx: 0, vz: 0, vy: 0, hp: 1, maxHp: 1, t: rand(0, 10), state: 'idle', stateT: rand(1, 4), anim: { speed: 0, phase: 0, attack: -1, t: 0 }, r: 0.45, h: 1.8, dead: false, deadT: 0, atkCd: rand(0.5, 1.5), burn: 0, slow: 0, stun: 0, fly: 0 }, o);
   if (d) {
     const blood = Clock.bloodMoon() && !d.boss && d.family !== 'animal' ? BLOOD_MUL : 1, df = G.save ? DIFF[G.save.diff] : DIFF.normal, lv = G.save ? 1 + (G.save.player.level - 1) * 0.04 : 1;
     a.maxHp = a.hp = Math.round(d.hp * blood * (d.family === 'animal' ? 1 : df.hp * lv) * (o.big || 1)); a.dmg = d.dmg * blood * (o.big ? 1.3 : 1) * lv; a.speed = d.speed;
@@ -75,7 +75,7 @@ function updateActors(dt) {
   const p = G.p;
   for (let i = ACTORS.length - 1; i >= 0; i--) {
     const a = ACTORS[i]; a.t += dt; a.anim.t = a.t;
-    if (a.dead) { a.deadT += dt; a.anim.dead = a.deadT * 1.6; animate(a.rig, a.anim, dt); if (a.fly && a.y > groundAt(a.x, a.z)) { a.vy -= 20 * dt; a.y = Math.max(groundAt(a.x, a.z), a.y + a.vy * dt); a.rig.root.position.y = a.y; } if (a.deadT > (a.d && a.d.boss ? 600 : 90)) removeActor(a); continue; }
+    if (a.dead) { a.deadT += dt; a.anim.dead = a.deadT * 1.6; animate(a.rig, a.anim, dt); if (a.fly && a.y > floorAt(a.x, a.z)) { a.vy -= 20 * dt; a.y = Math.max(floorAt(a.x, a.z), a.y + a.vy * dt); a.rig.root.position.y = a.y; } if (a.deadT > (a.d && a.d.boss ? 600 : 90)) removeActor(a); continue; }
     if (a.fadeOut) { a.fadeOut -= dt; if (a.fadeOut <= 0) { Gore.smoke(a.x, a.y + 1, a.z); removeActor(a); continue; } }
     if (a.burn > 0) { a.burn -= dt; a.burnAcc = (a.burnAcc || 0) + dt; if (a.burnAcc > 0.5) { a.burnAcc = 0; damageActor(a, 5 + a.maxHp * 0.01, { dot: true, fire: true }); } if (chance(0.5)) Gore.ember(a.x, a.y + a.h * rand(0.3, 0.9), a.z); }
     a.slow = Math.max(0, a.slow - dt); a.stun = Math.max(0, a.stun - dt); a.atkCd -= dt; a.hitT = Math.max(0, (a.hitT || 0) - dt);
@@ -85,13 +85,14 @@ function updateActors(dt) {
     if (a.kind === 'monster') { if (a.d.family === 'animal') thinkAnimal(a, dt); else if (a.fly) thinkFlyer(a, dt); else thinkMonster(a, dt); }
     else if (a.kind === 'npc') thinkNPC(a, dt);
     else if (a.kind === 'horse') thinkHorse(a, dt);
-    if (!a.fly) a.y = damp(a.y, groundAt(a.x, a.z, a.y + 1) - (a.swim ? 1.1 : 0), 18, dt);
+    if (!a.fly && !(G.p && G.p.mounted === a)) a.y = damp(a.y, floorAt(a.x, a.z, a.y + 1) - (a.swim ? 1.1 : 0), 18, dt);
     if (a.rig) { a.rig.root.position.set(a.x, a.y + (a.fly ? a.alt || 0 : 0), a.z); a.rig.root.rotation.y = a.yaw; animate(a.rig, a.anim, dt); if (a.hitT > 0) a.rig.root.position.x += Math.sin(a.t * 70) * 0.03; }
   }
 }
 // ---------- hostile monsters ----------
 function thinkMonster(a, dt) {
   const p = G.p, d = a.d, dx = p.x - a.x, dz = p.z - a.z, dist = Math.hypot(dx, dz), blood = Clock.bloodMoon();
+  if (a.passive) { a.anim.speed = 0; a.anim.attack = -1; faceTo(a, p.x, p.z, dt, 2); return; }
   const sight = (Clock.isNight() ? 28 : 36) * (blood ? 1.6 : 1) * (p.crouch ? 0.6 : 1) * (d.boss ? 2 : 1);
   const spd = a.speed * (a.slow > 0 ? 0.45 : 1) * (a.stun > 0 ? 0 : 1);
   a.anim.speed = 0; a.anim.attack = a.atkT > 0 ? 1 - a.atkT / a.atkDur : -1;
