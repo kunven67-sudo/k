@@ -51,6 +51,7 @@
             <button class="btn sm" id="btnMode" title="Pause the AI">⏸️ Pause</button>
             <button class="btn sm" id="btnWatch" title="You play, the AI watches and copies you">🎮 You play</button>
             <button class="btn sm" id="btnReload" title="Restart the game file">🔁</button>
+            <button class="btn sm" id="btnReport" title="Report card">📋</button>
             <button class="btn sm" id="btnLayout" title="Switch layout">⇆ Layout</button>
           </div>
         </div>
@@ -61,6 +62,8 @@
             <div class="facecam-name" id="facecamName"></div>
           </div>
           <div class="bubble" id="bubble"></div>
+          <div class="coach-target" id="coachTarget" hidden><span>🎯</span><b></b></div>
+          <div class="coach-plan" id="coachPlan" hidden></div>
           <div class="watch-banner" id="watchBanner">🎮 You're playing. Click the game, then use your keyboard + mouse. <b id="watchName"></b> is watching and taking notes 👀</div>
           <div class="dream-veil" id="dreamVeil"><span>💤</span><b id="dreamText">dreaming…</b></div>
         </div>
@@ -75,6 +78,7 @@
             <div class="who-mood" id="whoMood"></div>
             <div class="painbar" id="painBar" hidden><span>🤕 Pain</span><div class="pain-track"><i id="painFill"></i></div></div>
             <div class="who-stats" id="whoStats"></div>
+            <div class="coach-chip" id="coachChip" hidden></div>
           </div>
         </div>
         <div class="tabs" role="tablist">
@@ -84,6 +88,7 @@
           <button data-tab="graph">📈 Progress</button>
           <button data-tab="think">👁️ Thinking</button>
           <button data-tab="keys">⌨️ Keys</button>
+          <button data-tab="coach">🧠 Coach</button>
         </div>
         <div class="tabbody">
           <div class="tab on" data-tab="chat"><div class="chatlog" id="chatlog" aria-live="polite"></div></div>
@@ -110,11 +115,13 @@
             <div class="keylist" id="keylist"></div>
             <form class="addkey" id="addKeyForm"><input id="addKeyInput" placeholder="add a key (like z, space, shift)" maxlength="12"><button class="btn sm">⭐ Add</button></form>
           </div>
+          <div class="tab" data-tab="coach"><div id="coachTab"></div></div>
         </div>
         <form class="chatbox" id="chatForm">
           <button type="button" class="thumb" id="thumbUp" title="That was good">👍</button>
           <button type="button" class="thumb" id="thumbDown" title="That was bad">👎</button>
-          <input id="chatInput" autocomplete="off" placeholder='tip it: "space = jump", "avoid red", "go right"…' maxlength="140">
+          <button type="button" class="thumb mic" id="micBtn" title="Hold to talk (or hold the ` key)">🎤</button>
+          <input id="chatInput" autocomplete="off" placeholder='tip it: "space = jump", "avoid red", "go right"…' maxlength="200">
           <button class="btn sm primary">Send</button>
         </form>
       </aside>
@@ -158,6 +165,18 @@
         <div><b>🔊 Voice volume</b></div>
         <input type="range" id="setVolume" min="0" max="1" step="0.05">
       </label>
+      <div class="set-row set-col" id="geminiBox">
+        <div class="set-head"><div><b>🧠 Gemini coach</b> <span class="tag">needs internet</span><small>A smart coach for the baby brain: it looks at the screen every few seconds, makes plans, talks smarter, reads stories, and understands your tips in normal sentences. Get a free API key at <b>aistudio.google.com/apikey</b> and paste it here.</small></div>
+          <input type="checkbox" id="setCoach" class="toggle" aria-label="Use the Gemini coach"></div>
+        <div class="key-row">
+          <input id="gemKey" type="password" placeholder="paste your Gemini API key here" autocomplete="off" spellcheck="false" aria-label="Gemini API key">
+          <button class="btn sm" id="gemShow" type="button" title="Show / hide">👁️</button>
+          <button class="btn sm primary" id="gemSave" type="button">💾 Save + test</button>
+          <button class="btn sm danger" id="gemForget" type="button">🗑️ Forget key</button>
+        </div>
+        <div class="key-row"><label class="note">Model <input id="gemModel" placeholder="auto-picked when you save" aria-label="Gemini model"></label><span id="gemStatus" class="gem-status"></span></div>
+        <small>🔒 Your key is saved ONLY in this browser on this computer, and it's only ever sent to Google. It's never in the code or on GitHub. "Forget key" deletes it. (A game file you add could technically peek at it, so only add games you trust.)</small>
+      </div>
       <div class="set-row">
         <div><b>🖥️ Layout</b><small>Side panel, or game full screen with a streamer-style facecam. You can also flip it with ⇆ while playing.</small></div>
         <div class="seg" id="setLayout"><button data-v="side">Side panel</button><button data-v="overlay">Full + facecam</button></div>
@@ -181,6 +200,8 @@
 <script src="js/voice.js"></script>
 <script src="js/avatar.js"></script>
 <script src="js/squad.js"></script>
+<script src="js/gemini.js"></script>
+<script src="js/coach.js"></script>
 <script src="js/session.js"></script>
 <script src="js/practice.js"></script>
 <script src="js/app.js"></script>

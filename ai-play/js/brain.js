@@ -823,12 +823,13 @@ AIP.Brain = (function () {
         for (const s of slots) copyLog[s] = (c[s] - mx) - Math.log(z);
       }
       const inst = this.instinct(obs, slots, mods.fear);
+      const coachV = this.coachValues(slots, now);
       const menuish = obs.menuish != null ? obs.menuish : !!(obs.buttons && obs.buttons.length && (obs.staticTime > 0.6 || obs.motionAmt < 0.004));
       const parts = {};
       const vals = [];
       for (const s of slots) {
         const a = this.actions[s];
-        const p = { brain: (q[s] - mean) / sd * 0.9 * trust, memory: 0, copy: 0, instinct: inst[s] * mods.instinct, tip: 0, curious: 0, stick: 0, menu: 0 };
+        const p = { brain: (q[s] - mean) / sd * 0.9 * trust, memory: 0, copy: 0, instinct: inst[s] * mods.instinct, tip: 0, curious: 0, stick: 0, menu: 0, coach: coachV[s] };
         if (epiE && eN >= 2 && !isNaN(epiE[s])) p.memory = U.clamp((epiE[s] - eMean) * 1.5, -0.8, 0.8);
         if (copyLog) p.copy = copyW * (copyLog[s] + Math.log(slots.length)) * 0.5;
         // curiosity: try stuff I haven't figured out yet
@@ -880,6 +881,37 @@ AIP.Brain = (function () {
       }
       return d;
     }
+    // 🧠 the coach's plan: head for its 🎯 target (2D: move toward it; 3D: turn to face it, then go forward)
+    coachValues(slots, now) {
+      const out = new Float32Array(MAXA);
+      const C = this.coach;
+      if (!C || now > C.until) return out;
+      const cam = this.self.camera > 0.5;
+      const sx = cam ? 0.5 : this.self.x, sy = cam ? 0.5 : this.self.y;
+      let vx = 0, vy = 0, dist = 0;
+      if (C.target) {
+        vx = C.target.x - sx; vy = (C.target.y - sy) * 0.8; dist = Math.hypot(vx, vy);
+        if (!cam && dist < 0.05) { C.reached = true; C.target = null; } // made it!
+      }
+      for (const s of slots) {
+        const a = this.actions[s];
+        const ids = a.mouse ? [a.id] : a.keys;
+        if (C.avoid && ids.some((k) => C.avoid.has(k))) { out[s] -= 2; continue; }
+        if (!C.target || dist < 0.03) continue;
+        let ux = 0, uy = 0;
+        for (const code of ids) {
+          const c = this.controls[code];
+          if (!c) continue;
+          if (Math.hypot(c.gx, c.gy) > 0.4) { ux -= c.gx; uy -= c.gy; } else if ((c.dirZ || 0) > 2.5 || (c.tip && /coach/.test(c.tip))) { const d = dirOf(c); ux += d[0]; uy += d[1]; }
+        }
+        const m = Math.hypot(ux, uy);
+        if (m > 0.2) out[s] += 1.6 * (ux * vx + uy * vy) / (m * dist);
+        // 3D: facing the target already? walk forward
+        if (cam && Math.abs(vx) < 0.12 && C.forward && ids.some((k) => C.forward.indexOf(k) >= 0)) out[s] += 1.4;
+      }
+      return out;
+    }
+
     explain(slot, p, obs) {
       const a = this.actions[slot];
       const what = a.label;
@@ -895,6 +927,7 @@ AIP.Brain = (function () {
           return this.assoc.val[c] > 0 ? what + ' - going for the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] : what + ' - getting AWAY from the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] + ' 😨';
         }
         case 'tip': return what + ' - you told me to ✍️';
+        case 'coach': return what + ' - coach plan: ' + ((this.coach && (this.coach.target && this.coach.target.what || this.coach.goal)) || 'go there') + ' 🧠🎯';
         case 'curious': return what + ' - never really tried this... what does it do? 🤔';
         case 'menu': return what + ' - looks like a menu, gotta start the game ▶️';
         default: return p.brain > 0.3 ? what + ' - my brain says this is the best move 🧠' : what + ' - just feeling it out 🤷';

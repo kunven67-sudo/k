@@ -240,6 +240,9 @@
     st.classList.toggle('dreaming', s.phase === 'dreaming');
     if (s.phase === 'dreaming') $('#dreamText').textContent = s.reason;
     st.classList.toggle('watching', s.mode === 'watch');
+    renderCoachOverlay(s, performance.now());
+    if (heavy) coachStatus();
+    if (heavy && app.tab === 'coach') renderCoachTab(s);
     if (app.tab === 'feel') renderMeters(h, pm);
     if (app.tab === 'think') renderThinking(s);
     if (heavy && app.tab === 'learn') renderLearned(s);
@@ -463,9 +466,9 @@
     const rows = AIP.squad.leaderboard(app.ais, gid);
     if (!rows.length) { $('#board').innerHTML = '<div class="empty">Nobody has played this one yet.</div>'; return; }
     const medal = ['🥇', '🥈', '🥉'];
-    $('#board').innerHTML = '<table class="board-table"><tr><th>#</th><th>AI</th><th style="text-align:right">Best</th><th style="text-align:right">Tries</th><th style="text-align:right">Wins</th><th style="text-align:right">Time played</th></tr>' +
+    $('#board').innerHTML = '<table class="board-table"><tr><th>#</th><th>AI</th><th style="text-align:right">Best</th><th style="text-align:right">Tries</th><th style="text-align:right">Wins</th><th style="text-align:right">🏆 Trophies</th><th style="text-align:right">Time played</th></tr>' +
       rows.map((r, i) => `<tr><td>${medal[i] || i + 1}</td><td><div class="bwho"><div class="mini">${AIP.avatar.svg(r.ai.look, calmFace(r.ai))}</div>${esc(r.ai.name)}</div></td>
-        <td class="num">${U.fmt(r.s.best)}${esc(kindWord(r.s.scoreKind))}</td><td class="num">${r.s.tries}</td><td class="num">${r.s.wins || 0}</td><td class="num">${Math.round((r.s.timeMs || 0) / 60000)} min</td></tr>`).join('') + '</table>';
+        <td class="num">${U.fmt(r.s.best)}${esc(kindWord(r.s.scoreKind))}</td><td class="num">${r.s.tries}</td><td class="num">${r.s.wins || 0}</td><td class="num">${r.s.trophies || 0}${r.s.trophyTotal ? ' / ' + r.s.trophyTotal : ''}</td><td class="num">${Math.round((r.s.timeMs || 0) / 60000)} min</td></tr>`).join('') + '</table>';
   }
 
   /* ================= diary ================= */
@@ -483,6 +486,12 @@
 
   /* ================= settings ================= */
   function renderSettings() {
+    const g = AIP.gemini.get();
+    $('#setCoach').checked = !!(g.on && g.hasKey);
+    $('#gemKey').value = '';
+    $('#gemKey').placeholder = g.hasKey ? 'key saved (' + g.masked + ') - paste a new one to replace it' : 'paste your Gemini API key here';
+    $('#gemModel').value = g.model || '';
+    coachStatus();
     const st = AIP.settings.get();
     $('#setPain').checked = !!st.painMode;
     $('#setVoice').checked = !!st.voice;
@@ -518,6 +527,146 @@
       app.dreamingIdle = false;
       renderTopAi();
     }
+  }
+
+  /* ================= 🧠 Gemini coach UI ================= */
+  const COACH_TXT = {
+    nokey: '🧠 coach: add a Gemini key in Settings', off: '🧠 coach is off', ready: '🧠 coach ready', thinking: '🧠 coach is looking…',
+    offline: '📡 coach offline - baby brain only', limit: '⏳ coach resting (free limit)', badkey: '🔑 coach: key not working', error: '⚠️ coach had a problem',
+  };
+  function coachStatus() {
+    const st = AIP.gemini.state(), g = AIP.gemini.get();
+    const el = $('#gemStatus');
+    if (el) {
+      el.className = 'gem-status ' + (st.status === 'ready' ? 'ok' : /badkey|error/.test(st.status) ? 'bad' : 'wait');
+      el.textContent = (COACH_TXT[st.status] || st.status) + (st.msg ? ' - ' + st.msg : '') + (g.model && st.status === 'ready' ? '' : '');
+    }
+    const chip = $('#coachChip');
+    if (chip) {
+      chip.hidden = !g.hasKey;
+      chip.className = 'coach-chip ' + st.status;
+      const s = app.session;
+      const goal = s && s.coach.plan && s.coach.plan.goal;
+      chip.textContent = st.status === 'ready' && goal ? '🧠 coach: ' + goal : (COACH_TXT[st.status] || st.status);
+      chip.title = st.msg || '';
+    }
+  }
+  AIP.gemini.on(() => coachStatus());
+  app.coachUpdated = (s) => { if (app.session === s) { coachStatus(); if (app.tab === 'coach') renderCoachTab(s); } };
+  app.coachMark = (x, y, what, isClick) => {
+    const t = $('#coachTarget');
+    t.hidden = false; t.classList.toggle('click', !!isClick);
+    t.style.left = x * 100 + '%'; t.style.top = y * 100 + '%';
+    t.querySelector('b').textContent = (isClick ? '🖱️ ' : '') + (what || '');
+    app.markUntil = performance.now() + 1600;
+  };
+  function renderCoachOverlay(s, now) {
+    const C = s.brain.coach, t = $('#coachTarget'), box = $('#coachPlan');
+    if (now > (app.markUntil || 0)) {
+      if (C && C.target && now < C.until) { t.hidden = false; t.classList.remove('click'); t.style.left = C.target.x * 100 + '%'; t.style.top = C.target.y * 100 + '%'; t.querySelector('b').textContent = C.target.what || 'go here'; }
+      else t.hidden = true;
+    }
+    const P = s.coach.plan;
+    if (AIP.gemini.ready() && P && P.goal) {
+      box.hidden = false;
+      box.innerHTML = '🧠 <b>Goal:</b> ' + esc(P.goal) + (P.plan && P.plan.length ? '<ol>' + P.plan.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' : '');
+    } else box.hidden = true;
+  }
+  function renderCoachTab(s) {
+    const st = AIP.gemini.state(), g = AIP.gemini.get(), P = s.coach.plan || {}, B = s.brain.stats;
+    const tro = B.trophies || { list: [], got: {} };
+    const got = Object.keys(tro.got).length;
+    const story = (B.story || []).slice(-5), raw = (B.storyLines || []).slice(-3), notes = s.game.notes || [];
+    $('#coachTab').innerHTML =
+      '<div class="coach-sec"><h4>Status</h4><p>' + esc(COACH_TXT[st.status] || st.status) + (st.msg ? ' <span class="note">(' + esc(st.msg) + ')</span>' : '') + (!g.hasKey ? '<br><span class="note">Add a free Gemini key in ⚙️ Settings to turn on the smart coach.</span>' : '') + '</p></div>' +
+      (P.see ? '<div class="coach-sec"><h4>👀 What it sees</h4><p>' + esc(P.see) + '</p></div>' : '') +
+      (P.goal ? '<div class="coach-sec"><h4>🎯 Plan</h4><p><b>' + esc(P.goal) + '</b></p>' + (P.plan && P.plan.length ? '<ol>' + P.plan.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' : '') + '</div>' : '') +
+      (s.coach.lastLesson ? '<div class="coach-sec"><h4>🎬 Last death review</h4><p>' + esc(s.coach.lastLesson) + '</p></div>' : '') +
+      '<div class="coach-sec"><h4>🏆 Trophies ' + got + (tro.list.length ? ' / ' + tro.list.length : '') + '</h4>' + (tro.list.length ? '<ul class="trophy-list">' + tro.list.map((t) => '<li>' + (tro.got[t.name] || t.got ? '✅ ' : '⬜ ') + esc(t.name) + '</li>').join('') + '</ul>' : '<p class="note">No trophy list found yet.</p>') + '</div>' +
+      (story.length || raw.length ? '<div class="coach-sec"><h4>📖 Story so far</h4><ul>' + story.map((x) => '<li>' + esc(x) + '</li>').join('') + raw.map((x) => '<li class="note">"' + esc(x.slice(0, 140)) + '"</li>').join('') + '</ul></div>' : '') +
+      '<div class="coach-sec"><h4>📝 Game notes</h4>' + (notes.length ? '<ul>' + notes.slice(-12).map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>' : '<p class="note">No notes yet.</p>') + '</div>' +
+      '<button class="btn sm" id="coachReportBtn">📋 Report card</button>';
+  }
+  app.showReport = (ai, game, text) => {
+    if (app.session) { app.chat('ai', '📋 REPORT CARD\n' + text, 'proud', ai); return; }
+    modal('<div class="bot-big">' + AIP.avatar.svg(ai.look, { mouth: 0.6, sparkle: true, anim: 'bounce' }) + '</div><h2>📋 ' + esc(ai.name) + "'s report card</h2><p class=\"note\">" + esc(game.name) + '</p><div class="report-text">' + esc(text) + '</div><div class="row" style="margin-top:12px"><button class="btn primary" data-v="ok">Nice! 👍</button></div>');
+  };
+
+  /* ================= 🎤 push-to-talk ================= */
+  const mic = { on: false, rec: null, media: null, chunks: [], useRecorder: false, text: '', failed: null };
+  const typingNow = () => { const a = document.activeElement; return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); };
+  function micStart() {
+    if (mic.on || !app.session) return;
+    mic.on = true; mic.text = ''; mic.failed = null;
+    $('#micBtn').classList.add('on');
+    const inp = $('#chatInput');
+    mic.before = inp.value.trim();
+    inp.placeholder = '🎤 listening… let go to send';
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR && !mic.useRecorder) {
+      try {
+        const r = new SR();
+        mic.rec = r;
+        r.lang = navigator.language || 'en-US'; r.interimResults = true; r.continuous = true;
+        r.onresult = (e) => { let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; mic.text = t; inp.value = (mic.before ? mic.before + ' ' : '') + t; };
+        r.onerror = (e) => { mic.failed = e.error || 'error'; };
+        r.onend = () => { if (mic.waitEnd) { const f = mic.waitEnd; mic.waitEnd = null; f(); } };
+        r.start();
+        return;
+      } catch (e) { mic.rec = null; }
+    }
+    startRecorder();
+  }
+  async function startRecorder() {
+    if (!AIP.gemini.usable()) { mic.on = false; $('#micBtn').classList.remove('on'); toast("🎤 Your browser can't listen here. Add a Gemini key (Settings) and Gemini will listen instead!"); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      mic.media = rec; mic.chunks = [];
+      rec.ondataavailable = (e) => { if (e.data.size) mic.chunks.push(e.data); };
+      rec.start();
+      if (!mic.on) micStop();
+    } catch (e) { mic.on = false; $('#micBtn').classList.remove('on'); toast('🎤 Could not use the mic (' + (e.message || e.name) + '). Check the mic permission.'); }
+  }
+  async function micStop() {
+    if (!mic.on) return;
+    mic.on = false;
+    $('#micBtn').classList.remove('on');
+    const inp = $('#chatInput');
+    inp.placeholder = 'tip it: "space = jump", "avoid red", "go right"…';
+    if (mic.rec) {
+      const r = mic.rec; mic.rec = null;
+      await new Promise((res) => { mic.waitEnd = res; try { r.stop(); } catch (e) { res(); } setTimeout(res, 1500); });
+      if (mic.failed && !mic.text) {
+        if (AIP.gemini.usable()) { mic.useRecorder = true; toast('🎤 Browser listening didn\'t work here (' + mic.failed + '). Next time Gemini will listen. Hold 🎤 again!'); }
+        else toast('🎤 The mic didn\'t work (' + mic.failed + '). Check the mic permission, or add a Gemini key so Gemini can listen.');
+        return;
+      }
+      if (mic.text.trim()) sendChat();
+      return;
+    }
+    if (mic.media) {
+      const rec = mic.media; mic.media = null;
+      const blob = await new Promise((res) => { rec.onstop = () => res(new Blob(mic.chunks, { type: rec.mimeType || 'audio/webm' })); try { rec.stop(); } catch (e) { res(new Blob([])); } });
+      rec.stream.getTracks().forEach((t) => t.stop());
+      if (blob.size < 2000) return;
+      const b64 = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.readAsDataURL(blob); });
+      inp.placeholder = '🎤 Gemini is listening…';
+      try {
+        const text = await AIP.gemini.generate({ parts: [{ text: 'Transcribe exactly what the person says (they are talking to an AI that plays video games). Reply with ONLY their words, nothing else.' }, { inlineData: { mimeType: (blob.type || 'audio/webm').split(';')[0], data: b64 } }], temperature: 0, maxTokens: 200, label: 'listening' });
+        inp.value = (mic.before ? mic.before + ' ' : '') + String(text).trim();
+        if (inp.value.trim()) sendChat();
+      } catch (e) { toast("🎤 Couldn't understand that (" + (e.message || 'error') + ')'); }
+      inp.placeholder = 'tip it: "space = jump", "avoid red", "go right"…';
+    }
+  }
+  function sendChat() {
+    const i = $('#chatInput');
+    const t = i.value.trim();
+    if (!t) return;
+    app.chat('you', t);
+    i.value = '';
+    if (app.session) app.session.tip(t);
   }
 
   /* ================= small UI helpers ================= */
@@ -626,15 +775,31 @@
       AIP.settings.set('layout', cur === 'side' ? 'overlay' : cur === 'overlay' ? 'cam' : 'side');
       applyLayout(); setTimeout(drawGraph, 50);
     });
-    $('#chatForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const i = $('#chatInput');
-      const t = i.value.trim();
-      if (!t) return;
-      app.chat('you', t);
-      i.value = '';
-      if (app.session) app.session.tip(t);
+    $('#chatForm').addEventListener('submit', (e) => { e.preventDefault(); sendChat(); });
+    // 🎤 push to talk: hold the button (or hold the ` key when you're not typing)
+    const mb = $('#micBtn');
+    mb.addEventListener('pointerdown', (e) => { e.preventDefault(); micStart(); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => mb.addEventListener(ev, () => micStop()));
+    window.addEventListener('keydown', (e) => { if (e.key === '`' && !e.repeat && !typingNow() && app.view === 'play') { e.preventDefault(); micStart(); } });
+    window.addEventListener('keyup', (e) => { if (e.key === '`' && mic.on) micStop(); });
+    $('#btnReport').addEventListener('click', () => { if (app.session) app.session.reportNow(); });
+    document.addEventListener('click', (e) => { if (e.target && e.target.id === 'coachReportBtn' && app.session) app.session.reportNow(); });
+    // 🧠 Gemini settings (the key is saved only in this browser)
+    $('#gemShow').addEventListener('click', () => { const k = $('#gemKey'); k.type = k.type === 'password' ? 'text' : 'password'; });
+    $('#gemSave').addEventListener('click', async () => {
+      const key = $('#gemKey').value.trim();
+      if (!key && !AIP.gemini.get().hasKey) { toast('🔑 Paste your Gemini API key first'); return; }
+      const res = key ? await AIP.gemini.test(key) : { ok: true, model: AIP.gemini.get().model };
+      if (res.ok) {
+        const m = $('#gemModel').value.trim();
+        if (m && key === '') AIP.gemini.setModel(m);
+        toast('🧠 Coach is ready! Using ' + AIP.gemini.get().model);
+      } else toast('😢 That key didn\'t work: ' + res.error);
+      renderSettings();
     });
+    $('#gemForget').addEventListener('click', async () => { if (await confirmBox('Delete your Gemini key from this browser?')) { AIP.gemini.forget(); renderSettings(); toast('🗑️ Key deleted from this browser.'); } });
+    $('#setCoach').addEventListener('change', (e) => { if (!AIP.gemini.get().hasKey) { e.target.checked = false; toast('🔑 Paste your Gemini key first'); return; } AIP.gemini.setOn(e.target.checked); toast(e.target.checked ? '🧠 Coach ON' : 'Coach OFF - baby brain only'); });
+    $('#gemModel').addEventListener('change', (e) => { AIP.gemini.setModel(e.target.value); toast('🧠 Model: ' + (e.target.value || 'auto')); });
     const thumb = (v, el) => { if (!app.session) return; app.session.feedback(v); app.chat('you', v > 0 ? '👍' : '👎'); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); };
     $('#thumbUp').addEventListener('click', (e) => thumb(1, e.currentTarget));
     $('#thumbDown').addEventListener('click', (e) => thumb(-1, e.currentTarget));

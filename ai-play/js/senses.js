@@ -84,6 +84,9 @@ AIP.Senses = (function () {
   const kindOf = (label) => { for (const [k, rx] of KIND_RX) if (rx.test(label)) return k; return 'unknown'; };
   const GAMEOVER_RX = /game\s*over|you\s*(died|lose|lost|are\s+dead|crashed|failed)|wasted|\bdefeat(ed)?\b|out\s+of\s+lives|no\s+lives\s+left|mission\s+failed|level\s+failed|\bbusted\b|try\s+again|play\s+again|\bretry\b|\bcaught\b/i;
   const WIN_RX = /you\s*(win|won|beat|escaped|survived)|\bvictory\b|level\s*(complete|cleared)|stage\s*clear|congratulations|\bcongrats\b|mission\s*complete|\bwinner\b|\bthe\s+end\b|you\s+did\s+it/i;
+  const TROPHY_RX = /(achievement|trophy|trophies|badge|medal|award)s?\b[^.!]{0,30}\b(unlocked|earned|get|got|awarded|completed|won)\b|\b(unlocked|earned)\s*[:!]\s*\S|🏆\s*\S/i;
+  const CONTINUE_RX = /(press|hit|tap)\s+(any\s+key|space(?:bar)?|enter|return|e|z|x|f)\b|(click|tap)\s+(to\s+continue|anywhere)|\bcontinue\s*[▶►>]|[▼▶►]\s*$/i;
+  const CHOICE_SKIP_RX = /^(play|start|begin|settings|options|credits|shop|store|back|quit|exit|menu|resume|retry|try again|play again|restart|achievements?|help|ok|okay|close|x|×)$/i;
   const GOOD_BTN_RX = /\b(play|start|begin|go|continue|retry|try again|again|restart|next|ok|okay|resume|new game|tap|click|press|enter|let'?s|ready|yes|launch)\b/i;
   const MEH_BTN_RX = /\b(settings|options|credits|quit|exit|reset|erase|delete|back|menu|about|help|share|privacy|shop|store|achievements?)\b/i;
   const NUM_ONLY = /^\s*[x×]?\s*(-?\d{1,3}(?:,\d{3})+|-?\d+(?:\.\d+)?)\s*(?:\/\s*(\d+))?\s*(%|pts|m)?\s*$/i;
@@ -126,6 +129,8 @@ AIP.Senses = (function () {
       this.lastFrames = 0; this.noFramesTime = 0;
       this.bodyBg = '#000';
       this.tick = 0;
+      this.textFirst = new Map(); // text -> when first seen (for "new story text appeared")
+      this.textByEl = new Map();  // element -> {s, changedAt} (typewriter effect)
     }
 
     attach(frameEl) {
@@ -161,7 +166,7 @@ AIP.Senses = (function () {
         for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
         text = text.replace(/\s+/g, ' ').trim();
         const fill = isSolid(cs.backgroundColor) ? cs.backgroundColor : null;
-        if (media || fill || text) out.push({ el, media, fill, text, color: cs.color, op });
+        if (media || fill || text) out.push({ el, media, fill, text, color: cs.color, op, fs: parseFloat(cs.fontSize) || 14, fw: cs.fontWeight, ta: cs.textAlign });
       }
       this.items = out;
     }
@@ -439,7 +444,11 @@ AIP.Senses = (function () {
         this.readNumbers(bits, now);
         this.choosePrimary(now);
         this.checkPhrases(bits, now, obs);
+        this.checkStory(bits, now, obs);
       }
+      obs.textAnimating = this.textAnimAt && now - this.textAnimAt < 550;
+      obs.choices = (this.buttons || []).filter((b) => b.text.split(/\s+/).length >= 2 && b.text.length >= 6 && !CHOICE_SKIP_RX.test(b.text.trim()) && !GOOD_BTN_RX.test(b.text) && !MEH_BTN_RX.test(b.text));
+      if (obs.choices.length < 2) obs.choices = [];
       this.numberEvents(obs, now);
 
       obs.buttons = this.buttons;
@@ -473,6 +482,85 @@ AIP.Senses = (function () {
       if (over && !P.over) { P.overSince = now; obs.events.push({ type: 'gameOver', text: overText }); }
       if (win && !P.win) { P.winSince = now; obs.events.push({ type: 'win', text: winText }); }
       P.over = over; P.win = win;
+    }
+
+    // Story stuff: long new text (dialogue / instructions), "press X to continue" hints, trophy pop-ups.
+    checkStory(bits, now, obs) {
+      const fresh = [];
+      for (const b of bits) {
+        const s = b.s.replace(/\s+/g, ' ').trim();
+        if (!s) continue;
+        // typewriter text that keeps growing = still being "typed" on screen
+        if (b.src === 'dom') {
+          const prev = this.textByEl.get(b.id);
+          if (prev && prev.s !== s && (s.startsWith(prev.s) || prev.s.startsWith(s))) this.textAnimAt = now;
+          this.textByEl.set(b.id, { s, at: now });
+        }
+        if (!this.textFirst.has(s)) {
+          this.textFirst.set(s, now);
+          if (this.textFirst.size > 600) this.textFirst.delete(this.textFirst.keys().next().value);
+          if (TROPHY_RX.test(s) && s.length < 90) {
+            const m = /(?:unlocked|earned|awarded|get|got)\s*[:!-]?\s*(.+)$/i.exec(s);
+            obs.events.push({ type: 'trophy', name: ((m && m[1]) || s).replace(/^[\s:!-]+/, '').slice(0, 50), text: s });
+          }
+          const words = s.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length;
+          if (words >= 5 && s.length >= 25 && !NUM_ONLY.test(s)) fresh.push({ s, words, id: b.id });
+        }
+        const h = CONTINUE_RX.exec(s);
+        if (h) {
+          const k = (h[2] || '').toLowerCase();
+          obs.continueHint = k === 'any key' ? 'any' : /space/.test(k) ? 'Space' : /enter|return/.test(k) ? 'Enter' : k ? 'Key' + k.toUpperCase() : 'click';
+        }
+      }
+      if (fresh.length) {
+        // a dialogue line that grew out of the last one isn't new - it's the same line finishing
+        obs.newText = fresh.sort((a, b) => b.words - a.words);
+      }
+    }
+
+    // A clearer screenshot for the Gemini coach (with the page's text actually written in).
+    snapshot(w, h) {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      const win = this.win;
+      if (!win) return null;
+      const vw = Math.max(1, win.innerWidth), vh = Math.max(1, win.innerHeight);
+      const sx = w / vw, sy = h / vh;
+      ctx.fillStyle = this.bodyBg; ctx.fillRect(0, 0, w, h);
+      for (const it of this.items) {
+        const el = it.el;
+        if (!el.isConnected) continue;
+        const r = el.getBoundingClientRect();
+        if (r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh || r.width < 1) continue;
+        ctx.globalAlpha = it.op;
+        if (it.media) {
+          if (this.tainted.has(el)) continue;
+          try { ctx.drawImage(el, r.left * sx, r.top * sy, r.width * sx, r.height * sy); } catch (e) { /* skip */ }
+        } else {
+          if (it.fill) { ctx.fillStyle = it.fill; ctx.fillRect(r.left * sx, r.top * sy, r.width * sx, r.height * sy); }
+          if (it.text) {
+            const fs = Math.max(7, Math.min(40, it.fs * sy));
+            ctx.font = (Number(it.fw) >= 600 ? 'bold ' : '') + fs + 'px sans-serif';
+            ctx.fillStyle = it.color;
+            ctx.textBaseline = 'middle';
+            const tx = it.ta === 'center' ? (r.left + r.width / 2) * sx : r.left * sx;
+            ctx.textAlign = it.ta === 'center' ? 'center' : 'left';
+            const maxW = Math.max(20, r.width * sx);
+            // simple word wrap inside the element's box
+            const words = it.text.split(' ');
+            let line = '', y = r.top * sy + fs * 0.7;
+            for (const wd of words) {
+              const t = line ? line + ' ' + wd : wd;
+              if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, tx, y); line = wd; y += fs * 1.2; if (y > (r.bottom * sy) + fs) break; } else line = t;
+            }
+            if (line) ctx.fillText(line, tx, y);
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+      try { c.getContext('2d').getImageData(0, 0, 1, 1); } catch (e) { return null; }
+      return c;
     }
 
     numberEvents(obs, now) {
