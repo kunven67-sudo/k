@@ -82,7 +82,7 @@
     if (!app.games.length) { grid.innerHTML = '<div class="empty">No games yet. Add an HTML game file or folder above ☝️</div>'; return; }
     grid.innerHTML = app.games.map((g) => {
       const s = app.ai && app.ai.stats && app.ai.stats.games ? app.ai.stats.games[g.id] : null;
-      const meta = s && s.tries ? 'Best ' + U.fmt(s.best) + kindWord(s.scoreKind) + ' · ' + s.tries + ' tries' : 'Never played yet';
+      const meta = s && s.tries ? 'Best ' + U.fmt(s.best) + kindWord(s.scoreKind) + ' · ' + s.tries + (s.tries === 1 ? ' try' : ' tries') : 'Never played yet';
       const thumb = g.thumb ? `style="background-image:url('${g.thumb}')"` : '';
       return `<div class="card game-card" data-id="${g.id}" tabindex="0" role="button" aria-label="Play ${esc(g.name)}">
         <div class="thumb-img" ${thumb}>${g.thumb ? '' : (g.practice ? '🎯' : '🎮')}</div>
@@ -180,8 +180,11 @@
   }
   function applyLayout() {
     const lay = AIP.settings.get().layout;
-    $('#playWrap').classList.toggle('overlay', lay === 'overlay');
-    $('#playWrap').classList.toggle('side', lay !== 'overlay');
+    const full = lay === 'overlay' || lay === 'cam';
+    $('#playWrap').classList.toggle('overlay', full);
+    $('#playWrap').classList.toggle('camonly', lay === 'cam');
+    $('#playWrap').classList.toggle('side', !full);
+    $('#btnLayout').textContent = lay === 'side' ? '⇆ Full screen' : lay === 'overlay' ? '🙈 Hide panel' : '⇆ Side panel';
   }
 
   app.chat = function (who, text, mood, ai) {
@@ -392,7 +395,7 @@
         <div class="bot-big">${AIP.avatar.svg(ai.look, calmFace(ai))}</div>
         <div class="card-title">${esc(ai.name)}</div>
         <div class="traits">${words.map((w) => '<span class="tag">' + esc(w) + '</span>').join('')}</div>
-        <div class="card-meta">Born ${U.timeAgo(ai.born)} · ${games.length} games · ${tries} tries${ai.stats && ai.stats.playMs ? ' · ' + Math.round(ai.stats.playMs / 60000) + ' min played' : ''}</div>
+        <div class="card-meta">Born ${U.timeAgo(ai.born)} · ${games.length} game${games.length === 1 ? '' : 's'} · ${tries} ${tries === 1 ? 'try' : 'tries'}${ai.stats && ai.stats.playMs ? ' · ' + Math.round(ai.stats.playMs / 60000) + ' min played' : ''}</div>
         <div class="card-meta">Says "${esc(ai.catchphrase)}" a lot</div>
         <div class="card-actions">
           ${app.ai && app.ai.id === ai.id ? '<span class="tag" style="border-color:var(--lime)">✅ current AI</span>' : `<button class="btn sm primary" data-use="${ai.id}">Use ${esc(ai.name)}</button>`}
@@ -484,7 +487,7 @@
     $('#setPain').checked = !!st.painMode;
     $('#setVoice').checked = !!st.voice;
     $('#setVolume').value = st.volume;
-    $$('#setLayout button').forEach((b) => b.classList.toggle('on', b.dataset.v === st.layout));
+    $$('#setLayout button').forEach((b) => b.classList.toggle('on', b.dataset.v === st.layout || (b.dataset.v === 'overlay' && st.layout === 'cam')));
   }
 
   /* ================= idle dreaming ================= */
@@ -617,7 +620,12 @@
       if (m === 'watch') try { s.frame.focus(); } catch (e) { /* ignore */ }
     });
     $('#btnReload').addEventListener('click', () => { if (app.session) { app.chat('sys', '🔁 restarting the game file'); app.session.reloadGame(false); } });
-    $('#btnLayout').addEventListener('click', () => { AIP.settings.set('layout', AIP.settings.get().layout === 'overlay' ? 'side' : 'overlay'); applyLayout(); setTimeout(drawGraph, 50); });
+    // side panel -> full screen + panel -> full screen with just the facecam -> back
+    $('#btnLayout').addEventListener('click', () => {
+      const cur = AIP.settings.get().layout;
+      AIP.settings.set('layout', cur === 'side' ? 'overlay' : cur === 'overlay' ? 'cam' : 'side');
+      applyLayout(); setTimeout(drawGraph, 50);
+    });
     $('#chatForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const i = $('#chatInput');

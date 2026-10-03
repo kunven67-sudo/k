@@ -115,7 +115,8 @@ select { background: var(--panel); border: 1px solid var(--line); border-radius:
 .squad .bot-big { width: 120px; height: 120px; margin: 0 auto; }
 .squad .card-title { white-space: normal; }
 .traits { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 6px 0; }
-.card-actions { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+.card-actions { display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.card-actions .tag { padding: 5px 10px; font-size: 12px; }
 
 /* ---------- play ---------- */
 .play-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; height: calc(100vh - 92px); min-height: 520px; }
@@ -224,11 +225,10 @@ kbd, .kbd { display: inline-block; min-width: 26px; text-align: center; padding:
 .overlay .facecam { display: block; }
 .overlay .panel { position: absolute; z-index: 8; right: 12px; top: 52px; bottom: 12px; width: 350px; background: rgba(18, 15, 38, .86); backdrop-filter: blur(8px); }
 .overlay .panel .who { display: none; }
-.overlay .panel.mini .tabbody, .overlay .panel.mini .tabs { display: none; }
-.overlay .panel.mini { bottom: auto; }
+.camonly .panel { display: none; }
 @media (max-width: 980px) {
   .play-wrap, .play-wrap.overlay { grid-template-columns: 1fr; height: auto; }
-  .stage { min-height: 56vw; }
+  .stage { min-height: 72vw; }
   .panel, .overlay .panel { position: static; width: auto; height: 520px; }
 }
 
@@ -1090,9 +1090,10 @@ AIP.loader = (function () {
 
     // 5) No popups / alerts freezing everything / fullscreen grabs.
     try {
-      W.alert = function (m) { aip.alerts.push(String(m)); };
-      W.confirm = function (m) { aip.alerts.push(String(m)); return true; };
-      W.prompt = function (m, d) { aip.alerts.push(String(m)); return d == null ? '' : String(d); };
+      var note = function (m) { if (aip.alerts.length > 200) aip.alerts.splice(0, 100); aip.alerts.push(String(m)); };
+      W.alert = function (m) { note(m); };
+      W.confirm = function (m) { note(m); return true; };
+      W.prompt = function (m, d) { note(m); return d == null ? '' : String(d); };
       W.open = function () { return null; };
       W.Element.prototype.requestFullscreen = function () { return Promise.resolve(); };
       W.Element.prototype.webkitRequestFullscreen = function () {};
@@ -1390,6 +1391,7 @@ AIP.Senses = (function () {
           if (s) bits.push({ s, ctx: '', src: 'cv', id: key });
         });
       }
+      if (aip && aip.alerts.length < this.alertsSeen) this.alertsSeen = 0;
       if (aip && aip.alerts.length > this.alertsSeen) {
         for (let i = this.alertsSeen; i < aip.alerts.length; i++) bits.push({ s: aip.alerts[i].slice(0, 80), ctx: 'alert', src: 'alert', id: 'alert' });
         this.alertsSeen = aip.alerts.length;
@@ -2245,10 +2247,11 @@ AIP.Brain = (function () {
         // pause check: everything stopped right after pressing it?
         // everything froze right after pressing it? Maybe it's a pause key... or maybe I just died.
         // Wait a moment before blaming the key (the "GAME OVER" text can show up a bit later).
-        if (isFresh && this.baseAmt > 0.0025 && amt < this.baseAmt * 0.08 && !obs.gameOverVisible && now - (this.lastBadAt || -1e9) > 2500) this.pauseSuspect = { code, t: now };
+        if (isFresh && this.baseAmt > 0.0025 && amt < this.baseAmt * 0.08 && (this.prevAmt || 0) > this.baseAmt * 0.3 && !obs.gameOverVisible && now - (this.lastBadAt || -1e9) > 2500) this.pauseSuspect = { code, t: now };
         this.analyze(c);
         this.judge(code, c);
       }
+      this.prevAmt = amt;
       const ps = this.pauseSuspect;
       if (ps && now - ps.t > 1500) {
         this.pauseSuspect = null;
@@ -2304,7 +2307,7 @@ AIP.Brain = (function () {
     judge(code, c) {
       if (c.status === 'banned' || c.status === 'starred') return;
       const old = c.status;
-      if (c.tries >= 3 && c.pause >= 3 && c.pause / c.tries > 0.6) c.status = 'pause';
+      if (c.pauseConfirmed || (c.tries >= 3 && c.pause >= 3 && c.pause / c.tries > 0.6)) c.status = 'pause';
       else if (c.tries >= 3 && (c.n || 0) >= 6) {
         const localized = (c.peakZ || 0) > 5 && c.peak > 0.04;
         const moves = (c.dirZ || 0) > 3.5 && Math.hypot(c.dx, c.dy) > 0.3;
@@ -2330,6 +2333,7 @@ AIP.Brain = (function () {
       if (c.status === 'banned') return "banned (you said so) 🚫";
       if (c.tip) return c.tip;
       if (c.status === 'useless') return 'does nothing 😐';
+      if (c.status === 'starred' && !(c.tries >= 4 && ((c.peakZ || 0) > 5 || (c.dirZ || 0) > 3.5))) return 'you said it matters ⭐ (still figuring out what it does)';
       if (c.status === 'new') return 'testing... 🔬';
       if (Math.hypot(c.gx, c.gy) > 0.4) return 'turns the camera ' + arrowOf(-c.gx, -c.gy);
       if (code.indexOf('m:') !== 0 && Math.hypot(...dirOf(c)) > 0.3) return 'moves me ' + arrowOf(...dirOf(c));
@@ -3177,7 +3181,9 @@ AIP.Heart = (function () {
     react(events, ctx) {
       const t = this.t;
       const out = []; // feelings worth saying out loud
+      const hasDamage = events.some((e) => e.type === 'damage');
       for (const ev of events) {
+        if (ev.type === 'flash' && hasDamage) continue; // the red flash IS the hit - don't hurt twice
         switch (ev.type) {
           case 'score': {
             const s = U.clamp(ev.size == null ? 0.4 : ev.size, 0.05, 1);
@@ -3354,7 +3360,7 @@ AIP.Voice = (function () {
     ctrlMove: ['Oh! {key} {what}!', 'Wait, {key} {what}. Noted 📝', 'Got it: {key} {what}.', 'Ooh {key} {what}. I\'m learning!'],
     ctrlAction: ['{key} {what}! Not sure what yet tho 🤔', 'Something happened when I pressed {key}!', '{key} {what}. Interesting...'],
     ctrlNothing: ['{key} does nothing. Bye {key} 👋', 'Pressed {key} like 5 times. Nothing. Useless.', '{key}? Useless button.'],
-    ctrlPause: ['{key} pauses the game?! Not touching that again 🙅', 'Oops, {key} pauses it. Unpausing...', 'Note to self: {key} = pause. Avoid.'],
+    ctrlPause: ['{key} pauses the game?! Not touching that again 🙅', 'Oops, {key} pauses it. Good to know.', 'Note to self: {key} = pause. Avoid.'],
     foundButton: ['Clicking \'{btn}\' does something! Remembering that.', '\'{btn}\' button works 👍'],
     foundScore: ['I found the score! It\'s the \'{label}\' number 📊', 'That \'{label}\' number goes up when stuff happens. That\'s my score!'],
     foundHealth: ['That \'{label}\' thing must be my health ❤️', 'Found my \'{label}\'. Gotta keep that up.'],
@@ -3385,7 +3391,7 @@ AIP.Voice = (function () {
     memory: ['Remember when {mem}? Good times.', 'Still thinking about when {mem}.', 'I\'ll never forget when {mem}.'],
     tipThanks: ['Ooh ok, {tip}. Got it!', 'Noted: {tip} 📝', 'Thanks, I\'ll try that: {tip}', 'Oh that makes sense. {tip}.'],
     tipUnknown: ['Huh? I only get simple tips like "space = jump", "avoid red", "go right" 🤔', 'I\'m a simple robot, try something like "press space to jump" or "get the yellow stuff"', 'Didn\'t get that. Try "avoid red" or "z = shoot".'],
-    tipThing: ['What color is a {thing}? Tell me like "avoid red" and I\'ll get it 🤔', 'I don\'t know what a {thing} looks like... what color is it?'],
+    tipThing: ['What color are the {thing}? Tell me like "avoid red" and I\'ll get it 🤔', 'I don\'t know what "{thing}" looks like... what color is it?'],
     thumbUp: ['Oh that was good? Nice 😊', 'Doing that more then!', 'Ayy 👍', 'Got it, that was right.'],
     thumbDown: ['Oops, my bad.', 'Ok ok, not that.', 'Fine, I\'ll stop doing that.', 'Noted. That was bad.'],
     watchStart: ['Ooh you\'re playing? I\'ll watch and learn 👀', 'Show me how it\'s done!', 'Watching closely... 📝'],
@@ -3822,6 +3828,7 @@ AIP.Session = (function () {
       this.lastLearnUI = 0;
       this.thumbDone = !!game.thumb;
       this.pendingFb = 0;
+      this.freshLog = []; this.pauseKeys = new Set(); this.aliveAt = 0;
       this.errorsShown = 0;
       this.gameStore = {};
       this.newEpisode();
@@ -3966,13 +3973,14 @@ AIP.Session = (function () {
         else if (!end && ev.type === 'scoreReset' && this.ep.maxScore > 0 && now - this.ep.t0 > 3000) end = 'death';
       }
       if (!end && now - this.ep.t0 > 150000) end = 'segment';
+      // testing whether a key paused the game? hands off until the test is done
+      if (this.mode === 'ai' && this.checkPause(obs, now)) { this.ui(now, obs); return; }
       const reward = this.reward(obs, events, mods, st.painMode);
       const userNow = this.mode === 'watch' ? this.userSnapshot() : null;
       const decision = this.brain.step(obs, reward, !!end, mods, { mx: this.hands.mx, my: this.hands.my, user: userNow });
       this.reason = decision.reason;
       this.lastObs = obs;
       if (this.mode === 'ai' && !end) {
-        this.checkPause(obs, decision, now);
         this.apply(decision);
         this.maybeHaveFun(obs, mods, dt, now);
       }
@@ -4040,6 +4048,8 @@ AIP.Session = (function () {
 
     apply(d) {
       const h = this.hands;
+      const now = performance.now(), prevKeys = this.lastKeys || [];
+      (d.keys || []).filter((k) => prevKeys.indexOf(k) < 0).forEach((k) => this.freshLog.push({ code: k, t: now }));
       h.setKeys(d.keys);
       const m = d.mouse;
       if (this.holding && !(m && m.t === 'hold')) { h.mouseUp(); this.holding = false; }
@@ -4053,30 +4063,54 @@ AIP.Session = (function () {
       this.lastKeys = d.keys;
     }
 
-    // Did that key just PAUSE the game? Press it again to unpause, and remember to avoid it.
-    checkPause(obs, d, now) {
+    // Did that key just PAUSE the game? Only a key pressed right before everything froze is a
+    // suspect. Test it (hands off everything else!): press it again - if the game wakes up, that's
+    // the pause key, so avoid it from now on. Returns true while a test is running.
+    checkPause(obs, now) {
+      const amt = obs.motionAmt || 0;
+      const died = obs.gameOverVisible || obs.menuish || obs.events.some((e) => /gameOver|healthZero|damage|death|scoreReset|win/.test(e.type)) || now - this.ep.lastDamageAt < 2500;
+      const alive = amt > Math.max(0.002, this.motionEMA * 0.3);
+      if (alive) this.aliveAt = now;
+      this.freshLog = this.freshLog.filter((f) => now - f.t < 2500);
       const pc = this.pauseCheck;
       if (pc) {
+        if (died) pc.over = true;
         if (now - pc.t > 1300) {
-          if ((obs.motionAmt || 0) > 0.0015 && !obs.gameOverVisible && !pc.over && this.phase === 'play' && now - this.ep.t0 > now - pc.t) {
-            const c = this.brain.keyCtl(pc.code);
-            c.pause += 2; c.tries = Math.max(c.tries, 2);
-            this.brain.judge(pc.code, c);
-          }
           this.pauseCheck = null;
+          if (alive && !pc.over && this.phase === 'play') {
+            const c = this.brain.keyCtl(pc.code);
+            c.pauseConfirmed = true; c.pause += 3; c.tries = Math.max(c.tries, 3);
+            this.brain.judge(pc.code, c);
+            this.pauseKeys.add(pc.code);
+          } else if (!alive && !pc.over && pc.rest.length) {
+            const next = pc.rest.shift(); // that wasn't it - try the next suspect
+            this.pauseCheck = { code: next, t: now, rest: pc.rest };
+            this.hands.tap(next);
+            return true;
+          }
+          return false;
         }
-        if (obs.gameOverVisible || obs.events.some((e) => /gameOver|healthZero|death|scoreReset/.test(e.type))) pc.over = true;
-        return;
+        return true;
       }
-      const f = this.freshKey;
-      const died = obs.gameOverVisible || obs.events.some((e) => /gameOver|healthZero|damage|death/.test(e.type)) || now - this.ep.lastDamageAt < 2500;
-      if (f && !died && this.motionEMA > 0.004 && (obs.motionAmt || 0) < 0.0006 && now - f.t < 600) {
-        this.pauseCheck = { code: f.code, t: now };
-        this.hands.tap(f.code);
+      if (died || amt > 0.0006 || this.motionEMA < 0.004) return false;
+      if (this.aliveAt && now - this.aliveAt < 450) {
+        // just froze: who was pressed right before?
+        const sus = [...new Set(this.freshLog.filter((f) => f.t < now && f.t >= this.aliveAt - 400).map((f) => f.code).reverse())];
+        if (sus.length) {
+          this.hands.releaseAll();
+          this.pauseCheck = { code: sus[0], t: now, rest: sus.slice(1, 3) };
+          this.hands.tap(sus[0]);
+          this.reason = 'did ' + AIP.KEYS.label(sus[0]) + ' just pause the game? 🤔';
+          return true;
+        }
+      } else if (obs.staticTime > 2.5 && this.pauseKeys.size && now - (this.unpauseAt || 0) > 3000) {
+        // stuck frozen and I know a pause key? press it to wake the game up
+        this.unpauseAt = now;
+        const k = [...this.pauseKeys][0];
+        this.hands.tap(k);
+        this.reason = 'unpausing the game with ' + AIP.KEYS.label(k) + ' ⏯️';
       }
-      const prevKeys = this.lastKeys || [];
-      const fresh = (d.keys || []).filter((k) => prevKeys.indexOf(k) < 0);
-      this.freshKey = fresh.length === 1 ? { code: fresh[0], t: now } : null;
+      return false;
     }
 
     maybeHaveFun(obs, mods, dt, now) {
@@ -4194,8 +4228,9 @@ AIP.Session = (function () {
           f.ctrlDiary = (f.ctrlDiary || 0) + 1;
           if (f.ctrlDiary <= 3) this.diary('control', 'Figured out that ' + vars.key + ' ' + n.label + ' in ' + this.game.name + '.');
         } else if (n.status === 'pause') {
+          // (the pause test already pressed it again to un-pause - don't press it a third time)
           this.voice.say('ctrlPause', vars, 2);
-          this.hands.tap(n.code);
+          this.pauseKeys.add(n.code);
         } else if (n.status === 'useless') { this.heart.react([{ type: 'uselessKey' }], { painMode }); this.voice.say('ctrlNothing', vars, 0); }
       } else if (n.type === 'button') this.voice.say('foundButton', { btn: n.text }, 1);
     }
@@ -4640,7 +4675,7 @@ AIP.practice = [
     if (!app.games.length) { grid.innerHTML = '<div class="empty">No games yet. Add an HTML game file or folder above ☝️</div>'; return; }
     grid.innerHTML = app.games.map((g) => {
       const s = app.ai && app.ai.stats && app.ai.stats.games ? app.ai.stats.games[g.id] : null;
-      const meta = s && s.tries ? 'Best ' + U.fmt(s.best) + kindWord(s.scoreKind) + ' · ' + s.tries + ' tries' : 'Never played yet';
+      const meta = s && s.tries ? 'Best ' + U.fmt(s.best) + kindWord(s.scoreKind) + ' · ' + s.tries + (s.tries === 1 ? ' try' : ' tries') : 'Never played yet';
       const thumb = g.thumb ? `style="background-image:url('${g.thumb}')"` : '';
       return `<div class="card game-card" data-id="${g.id}" tabindex="0" role="button" aria-label="Play ${esc(g.name)}">
         <div class="thumb-img" ${thumb}>${g.thumb ? '' : (g.practice ? '🎯' : '🎮')}</div>
@@ -4738,8 +4773,11 @@ AIP.practice = [
   }
   function applyLayout() {
     const lay = AIP.settings.get().layout;
-    $('#playWrap').classList.toggle('overlay', lay === 'overlay');
-    $('#playWrap').classList.toggle('side', lay !== 'overlay');
+    const full = lay === 'overlay' || lay === 'cam';
+    $('#playWrap').classList.toggle('overlay', full);
+    $('#playWrap').classList.toggle('camonly', lay === 'cam');
+    $('#playWrap').classList.toggle('side', !full);
+    $('#btnLayout').textContent = lay === 'side' ? '⇆ Full screen' : lay === 'overlay' ? '🙈 Hide panel' : '⇆ Side panel';
   }
 
   app.chat = function (who, text, mood, ai) {
@@ -4950,7 +4988,7 @@ AIP.practice = [
         <div class="bot-big">${AIP.avatar.svg(ai.look, calmFace(ai))}</div>
         <div class="card-title">${esc(ai.name)}</div>
         <div class="traits">${words.map((w) => '<span class="tag">' + esc(w) + '</span>').join('')}</div>
-        <div class="card-meta">Born ${U.timeAgo(ai.born)} · ${games.length} games · ${tries} tries${ai.stats && ai.stats.playMs ? ' · ' + Math.round(ai.stats.playMs / 60000) + ' min played' : ''}</div>
+        <div class="card-meta">Born ${U.timeAgo(ai.born)} · ${games.length} game${games.length === 1 ? '' : 's'} · ${tries} ${tries === 1 ? 'try' : 'tries'}${ai.stats && ai.stats.playMs ? ' · ' + Math.round(ai.stats.playMs / 60000) + ' min played' : ''}</div>
         <div class="card-meta">Says "${esc(ai.catchphrase)}" a lot</div>
         <div class="card-actions">
           ${app.ai && app.ai.id === ai.id ? '<span class="tag" style="border-color:var(--lime)">✅ current AI</span>' : `<button class="btn sm primary" data-use="${ai.id}">Use ${esc(ai.name)}</button>`}
@@ -5042,7 +5080,7 @@ AIP.practice = [
     $('#setPain').checked = !!st.painMode;
     $('#setVoice').checked = !!st.voice;
     $('#setVolume').value = st.volume;
-    $$('#setLayout button').forEach((b) => b.classList.toggle('on', b.dataset.v === st.layout));
+    $$('#setLayout button').forEach((b) => b.classList.toggle('on', b.dataset.v === st.layout || (b.dataset.v === 'overlay' && st.layout === 'cam')));
   }
 
   /* ================= idle dreaming ================= */
@@ -5175,7 +5213,12 @@ AIP.practice = [
       if (m === 'watch') try { s.frame.focus(); } catch (e) { /* ignore */ }
     });
     $('#btnReload').addEventListener('click', () => { if (app.session) { app.chat('sys', '🔁 restarting the game file'); app.session.reloadGame(false); } });
-    $('#btnLayout').addEventListener('click', () => { AIP.settings.set('layout', AIP.settings.get().layout === 'overlay' ? 'side' : 'overlay'); applyLayout(); setTimeout(drawGraph, 50); });
+    // side panel -> full screen + panel -> full screen with just the facecam -> back
+    $('#btnLayout').addEventListener('click', () => {
+      const cur = AIP.settings.get().layout;
+      AIP.settings.set('layout', cur === 'side' ? 'overlay' : cur === 'overlay' ? 'cam' : 'side');
+      applyLayout(); setTimeout(drawGraph, 50);
+    });
     $('#chatForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const i = $('#chatInput');

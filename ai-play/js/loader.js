@@ -501,9 +501,10 @@ AIP.loader = (function () {
 
     // 5) No popups / alerts freezing everything / fullscreen grabs.
     try {
-      W.alert = function (m) { aip.alerts.push(String(m)); };
-      W.confirm = function (m) { aip.alerts.push(String(m)); return true; };
-      W.prompt = function (m, d) { aip.alerts.push(String(m)); return d == null ? '' : String(d); };
+      var note = function (m) { if (aip.alerts.length > 200) aip.alerts.splice(0, 100); aip.alerts.push(String(m)); };
+      W.alert = function (m) { note(m); };
+      W.confirm = function (m) { note(m); return true; };
+      W.prompt = function (m, d) { note(m); return d == null ? '' : String(d); };
       W.open = function () { return null; };
       W.Element.prototype.requestFullscreen = function () { return Promise.resolve(); };
       W.Element.prototype.webkitRequestFullscreen = function () {};

@@ -270,6 +270,7 @@ AIP.Senses = (function () {
           if (s) bits.push({ s, ctx: '', src: 'cv', id: key });
         });
       }
+      if (aip && aip.alerts.length < this.alertsSeen) this.alertsSeen = 0;
       if (aip && aip.alerts.length > this.alertsSeen) {
         for (let i = this.alertsSeen; i < aip.alerts.length; i++) bits.push({ s: aip.alerts[i].slice(0, 80), ctx: 'alert', src: 'alert', id: 'alert' });
         this.alertsSeen = aip.alerts.length;

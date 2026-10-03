@@ -399,10 +399,11 @@ AIP.Brain = (function () {
         // pause check: everything stopped right after pressing it?
         // everything froze right after pressing it? Maybe it's a pause key... or maybe I just died.
         // Wait a moment before blaming the key (the "GAME OVER" text can show up a bit later).
-        if (isFresh && this.baseAmt > 0.0025 && amt < this.baseAmt * 0.08 && !obs.gameOverVisible && now - (this.lastBadAt || -1e9) > 2500) this.pauseSuspect = { code, t: now };
+        if (isFresh && this.baseAmt > 0.0025 && amt < this.baseAmt * 0.08 && (this.prevAmt || 0) > this.baseAmt * 0.3 && !obs.gameOverVisible && now - (this.lastBadAt || -1e9) > 2500) this.pauseSuspect = { code, t: now };
         this.analyze(c);
         this.judge(code, c);
       }
+      this.prevAmt = amt;
       const ps = this.pauseSuspect;
       if (ps && now - ps.t > 1500) {
         this.pauseSuspect = null;
@@ -458,7 +459,7 @@ AIP.Brain = (function () {
     judge(code, c) {
       if (c.status === 'banned' || c.status === 'starred') return;
       const old = c.status;
-      if (c.tries >= 3 && c.pause >= 3 && c.pause / c.tries > 0.6) c.status = 'pause';
+      if (c.pauseConfirmed || (c.tries >= 3 && c.pause >= 3 && c.pause / c.tries > 0.6)) c.status = 'pause';
       else if (c.tries >= 3 && (c.n || 0) >= 6) {
         const localized = (c.peakZ || 0) > 5 && c.peak > 0.04;
         const moves = (c.dirZ || 0) > 3.5 && Math.hypot(c.dx, c.dy) > 0.3;
@@ -484,6 +485,7 @@ AIP.Brain = (function () {
       if (c.status === 'banned') return "banned (you said so) 🚫";
       if (c.tip) return c.tip;
       if (c.status === 'useless') return 'does nothing 😐';
+      if (c.status === 'starred' && !(c.tries >= 4 && ((c.peakZ || 0) > 5 || (c.dirZ || 0) > 3.5))) return 'you said it matters ⭐ (still figuring out what it does)';
       if (c.status === 'new') return 'testing... 🔬';
       if (Math.hypot(c.gx, c.gy) > 0.4) return 'turns the camera ' + arrowOf(-c.gx, -c.gy);
       if (code.indexOf('m:') !== 0 && Math.hypot(...dirOf(c)) > 0.3) return 'moves me ' + arrowOf(...dirOf(c));

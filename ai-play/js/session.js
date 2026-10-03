@@ -28,6 +28,7 @@ AIP.Session = (function () {
       this.lastLearnUI = 0;
       this.thumbDone = !!game.thumb;
       this.pendingFb = 0;
+      this.freshLog = []; this.pauseKeys = new Set(); this.aliveAt = 0;
       this.errorsShown = 0;
       this.gameStore = {};
       this.newEpisode();
@@ -172,13 +173,14 @@ AIP.Session = (function () {
         else if (!end && ev.type === 'scoreReset' && this.ep.maxScore > 0 && now - this.ep.t0 > 3000) end = 'death';
       }
       if (!end && now - this.ep.t0 > 150000) end = 'segment';
+      // testing whether a key paused the game? hands off until the test is done
+      if (this.mode === 'ai' && this.checkPause(obs, now)) { this.ui(now, obs); return; }
       const reward = this.reward(obs, events, mods, st.painMode);
       const userNow = this.mode === 'watch' ? this.userSnapshot() : null;
       const decision = this.brain.step(obs, reward, !!end, mods, { mx: this.hands.mx, my: this.hands.my, user: userNow });
       this.reason = decision.reason;
       this.lastObs = obs;
       if (this.mode === 'ai' && !end) {
-        this.checkPause(obs, decision, now);
         this.apply(decision);
         this.maybeHaveFun(obs, mods, dt, now);
       }
@@ -246,6 +248,8 @@ AIP.Session = (function () {
 
     apply(d) {
       const h = this.hands;
+      const now = performance.now(), prevKeys = this.lastKeys || [];
+      (d.keys || []).filter((k) => prevKeys.indexOf(k) < 0).forEach((k) => this.freshLog.push({ code: k, t: now }));
       h.setKeys(d.keys);
       const m = d.mouse;
       if (this.holding && !(m && m.t === 'hold')) { h.mouseUp(); this.holding = false; }
@@ -259,30 +263,54 @@ AIP.Session = (function () {
       this.lastKeys = d.keys;
     }
 
-    // Did that key just PAUSE the game? Press it again to unpause, and remember to avoid it.
-    checkPause(obs, d, now) {
+    // Did that key just PAUSE the game? Only a key pressed right before everything froze is a
+    // suspect. Test it (hands off everything else!): press it again - if the game wakes up, that's
+    // the pause key, so avoid it from now on. Returns true while a test is running.
+    checkPause(obs, now) {
+      const amt = obs.motionAmt || 0;
+      const died = obs.gameOverVisible || obs.menuish || obs.events.some((e) => /gameOver|healthZero|damage|death|scoreReset|win/.test(e.type)) || now - this.ep.lastDamageAt < 2500;
+      const alive = amt > Math.max(0.002, this.motionEMA * 0.3);
+      if (alive) this.aliveAt = now;
+      this.freshLog = this.freshLog.filter((f) => now - f.t < 2500);
       const pc = this.pauseCheck;
       if (pc) {
+        if (died) pc.over = true;
         if (now - pc.t > 1300) {
-          if ((obs.motionAmt || 0) > 0.0015 && !obs.gameOverVisible && !pc.over && this.phase === 'play' && now - this.ep.t0 > now - pc.t) {
-            const c = this.brain.keyCtl(pc.code);
-            c.pause += 2; c.tries = Math.max(c.tries, 2);
-            this.brain.judge(pc.code, c);
-          }
           this.pauseCheck = null;
+          if (alive && !pc.over && this.phase === 'play') {
+            const c = this.brain.keyCtl(pc.code);
+            c.pauseConfirmed = true; c.pause += 3; c.tries = Math.max(c.tries, 3);
+            this.brain.judge(pc.code, c);
+            this.pauseKeys.add(pc.code);
+          } else if (!alive && !pc.over && pc.rest.length) {
+            const next = pc.rest.shift(); // that wasn't it - try the next suspect
+            this.pauseCheck = { code: next, t: now, rest: pc.rest };
+            this.hands.tap(next);
+            return true;
+          }
+          return false;
         }
-        if (obs.gameOverVisible || obs.events.some((e) => /gameOver|healthZero|death|scoreReset/.test(e.type))) pc.over = true;
-        return;
+        return true;
       }
-      const f = this.freshKey;
-      const died = obs.gameOverVisible || obs.events.some((e) => /gameOver|healthZero|damage|death/.test(e.type)) || now - this.ep.lastDamageAt < 2500;
-      if (f && !died && this.motionEMA > 0.004 && (obs.motionAmt || 0) < 0.0006 && now - f.t < 600) {
-        this.pauseCheck = { code: f.code, t: now };
-        this.hands.tap(f.code);
+      if (died || amt > 0.0006 || this.motionEMA < 0.004) return false;
+      if (this.aliveAt && now - this.aliveAt < 450) {
+        // just froze: who was pressed right before?
+        const sus = [...new Set(this.freshLog.filter((f) => f.t < now && f.t >= this.aliveAt - 400).map((f) => f.code).reverse())];
+        if (sus.length) {
+          this.hands.releaseAll();
+          this.pauseCheck = { code: sus[0], t: now, rest: sus.slice(1, 3) };
+          this.hands.tap(sus[0]);
+          this.reason = 'did ' + AIP.KEYS.label(sus[0]) + ' just pause the game? 🤔';
+          return true;
+        }
+      } else if (obs.staticTime > 2.5 && this.pauseKeys.size && now - (this.unpauseAt || 0) > 3000) {
+        // stuck frozen and I know a pause key? press it to wake the game up
+        this.unpauseAt = now;
+        const k = [...this.pauseKeys][0];
+        this.hands.tap(k);
+        this.reason = 'unpausing the game with ' + AIP.KEYS.label(k) + ' ⏯️';
       }
-      const prevKeys = this.lastKeys || [];
-      const fresh = (d.keys || []).filter((k) => prevKeys.indexOf(k) < 0);
-      this.freshKey = fresh.length === 1 ? { code: fresh[0], t: now } : null;
+      return false;
     }
 
     maybeHaveFun(obs, mods, dt, now) {
@@ -400,8 +428,9 @@ AIP.Session = (function () {
           f.ctrlDiary = (f.ctrlDiary || 0) + 1;
           if (f.ctrlDiary <= 3) this.diary('control', 'Figured out that ' + vars.key + ' ' + n.label + ' in ' + this.game.name + '.');
         } else if (n.status === 'pause') {
+          // (the pause test already pressed it again to un-pause - don't press it a third time)
           this.voice.say('ctrlPause', vars, 2);
-          this.hands.tap(n.code);
+          this.pauseKeys.add(n.code);
         } else if (n.status === 'useless') { this.heart.react([{ type: 'uselessKey' }], { painMode }); this.voice.say('ctrlNothing', vars, 0); }
       } else if (n.type === 'button') this.voice.say('foundButton', { btn: n.text }, 1);
     }

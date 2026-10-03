@@ -63,7 +63,9 @@ AIP.Heart = (function () {
     react(events, ctx) {
       const t = this.t;
       const out = []; // feelings worth saying out loud
+      const hasDamage = events.some((e) => e.type === 'damage');
       for (const ev of events) {
+        if (ev.type === 'flash' && hasDamage) continue; // the red flash IS the hit - don't hurt twice
         switch (ev.type) {
           case 'score': {
             const s = U.clamp(ev.size == null ? 0.4 : ev.size, 0.05, 1);
