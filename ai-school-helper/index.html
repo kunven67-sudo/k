@@ -1,0 +1,2133 @@
+<title>AI School Helper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Patrick+Hand&display=swap">
+<style>
+/* Layout: one ruled notebook page (max 760px) with a red margin rule down the left.
+   Bolt the robot is a ballpoint doodle; the top bar sticks up top, the chat composer sticks to the bottom. */
+:root{
+  --paper:#FCFCFA; --paper-2:#F1F4F9; --card:#FFFFFF; --rule:#DFE8F4; --margin:#F2B8B8;
+  --ink:#1E2A47; --ink-2:#596381; --pen:#2F5BD3; --pen-2:#E7EEFD; --on-pen:#FFFFFF;
+  --hl:#FFE680; --hl-ink:#33290A; --mark:#FFE680; --ok:#1C8448; --ok-bg:#E1F4E8; --bad:#C0392F; --bad-bg:#FCE9E7;
+  --line:#D9E0EA; --shadow:0 1px 0 rgb(30 42 71 / .05),0 10px 24px -16px rgb(30 42 71 / .4);
+  --f-hand:'Patrick Hand','Comic Neue','Segoe Print','Bradley Hand',cursive;
+  --f-body:'Lexend','Atkinson Hyperlegible','Segoe UI',system-ui,-apple-system,sans-serif;
+  --radius:14px; --gap-rule:31px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111827; --paper-2:#192338; --card:#1A253F; --rule:#1B2640; --margin:#5E2D3A;
+    --ink:#E8EDF8; --ink-2:#A4AFCA; --pen:#8DB0FF; --pen-2:#21315A; --on-pen:#0C1322;
+    --hl:#E8C95E; --hl-ink:#241C02; --mark:rgb(232 201 94 / .38); --ok:#5DD08F; --ok-bg:#15301F; --bad:#FF948C; --bad-bg:#3B1D22;
+    --line:#2B3756; --shadow:0 1px 0 rgb(0 0 0 / .25),0 12px 28px -16px rgb(0 0 0 / .7);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111827; --paper-2:#192338; --card:#1A253F; --rule:#1B2640; --margin:#5E2D3A;
+  --ink:#E8EDF8; --ink-2:#A4AFCA; --pen:#8DB0FF; --pen-2:#21315A; --on-pen:#0C1322;
+  --hl:#E8C95E; --hl-ink:#241C02; --mark:rgb(232 201 94 / .38); --ok:#5DD08F; --ok-bg:#15301F; --bad:#FF948C; --bad-bg:#3B1D22;
+  --line:#2B3756; --shadow:0 1px 0 rgb(0 0 0 / .25),0 12px 28px -16px rgb(0 0 0 / .7);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; min-height:100%; color:var(--ink); background-color:var(--paper);
+  background-image:repeating-linear-gradient(to bottom,transparent 0 calc(var(--gap-rule) - 1px),var(--rule) calc(var(--gap-rule) - 1px) var(--gap-rule));
+  font:400 16px/1.6 var(--f-body); -webkit-font-smoothing:antialiased;
+}
+html.young body{font-size:18px}
+body::before{content:"";position:fixed;top:0;bottom:0;left:max(6px,calc(50% - 404px));width:2px;background:var(--margin);pointer-events:none;z-index:0}
+h1,h2,h3{font-family:var(--f-hand);font-weight:400;line-height:1.1;margin:0;text-wrap:balance}
+h1{font-size:clamp(30px,6vw,40px)}
+h2{font-size:28px}
+p{margin:0}
+a{color:var(--pen)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed}
+:focus-visible{outline:3px solid var(--pen);outline-offset:2px}
+#view:focus{outline:none}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.muted{color:var(--ink-2)}
+.tiny{font-size:13px;line-height:1.45}
+.hl{background:linear-gradient(transparent 58%,var(--mark) 58%,var(--mark) 92%,transparent 92%);padding:0 .1em}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.spacer{flex:1}
+.stack{display:flex;flex-direction:column;gap:14px}
+.page{display:flex;flex-direction:column;gap:30px}
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--paper);border-bottom:1.5px solid var(--line);box-shadow:0 6px 14px -12px rgb(0 0 0 / .35)}
+.top-in{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:8px 16px;display:flex;align-items:center;gap:8px}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--f-hand);font-size:25px;line-height:1;color:var(--ink);background:none;border:0;padding:4px 2px;border-radius:10px}
+.brand .bolt{width:34px;height:34px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:var(--card);border:1.5px solid var(--line);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill.hot{border-color:#F08A3C}
+.pill.bump{animation:bump .5s ease}
+.who{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 4px;border-radius:999px;background:var(--card);border:1.5px solid var(--line);color:var(--ink);font-weight:600;max-width:42vw}
+.who .face{font-size:22px;line-height:1}
+.who .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:560px){ .brand span{display:none} .who .nm{display:none} .who{padding:3px 6px} }
+
+/* ---------- page shell ---------- */
+.wrap{position:relative;z-index:1;max-width:760px;margin:0 auto;padding-inline:16px;padding-block:20px 48px}
+.hello{display:flex;gap:14px;align-items:center}
+.hello > .bolt{flex:0 0 66px;width:66px;height:66px}
+.hello > div{min-width:0;display:flex;flex-direction:column;gap:4px}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.sec-head{display:flex;align-items:baseline;gap:6px 12px;flex-wrap:wrap}
+.empty{padding:14px 16px;border:1.5px dashed var(--line);border-radius:12px;color:var(--ink-2);background:var(--card)}
+.note{padding:10px 14px;border-radius:12px;background:var(--pen-2)}
+.banner{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:12px 14px;border-radius:12px;background:var(--bad-bg);border:1.5px dashed var(--bad)}
+.banner span{flex:1 1 240px}
+
+/* ---------- controls ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:10px 18px;border-radius:12px;border:2px solid var(--ink);background:var(--card);color:var(--ink);font-weight:600;line-height:1.2;box-shadow:0 3px 0 var(--ink);transition:transform .08s ease,box-shadow .08s ease;text-align:center}
+.btn:hover{background:var(--paper-2)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.btn.primary{background:var(--pen);border-color:var(--pen);color:var(--on-pen);box-shadow:0 3px 0 var(--ink)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{border-color:transparent;background:transparent;box-shadow:none}
+.btn.ghost:hover{background:var(--paper-2)}
+.btn.danger{border-color:var(--bad);color:var(--bad);box-shadow:0 3px 0 var(--bad)}
+.btn.danger.solid{background:var(--bad);color:var(--card)}
+.btn.sm{min-height:38px;padding:6px 12px;font-size:15px;box-shadow:0 2px 0 var(--ink)}
+.btn.ghost.sm,.btn.ghost.danger{box-shadow:none}
+.btn:disabled{opacity:.5;transform:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:7px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font-weight:500;line-height:1.2}
+.chip:hover{border-color:var(--pen)}
+.chip[aria-pressed="true"]{background:var(--pen);border-color:var(--pen);color:var(--on-pen)}
+.chip:disabled{opacity:.45}
+.chip.av{font-size:24px;padding:5px 10px;min-width:48px;justify-content:center}
+.chip.big{border:2px solid var(--pen);color:var(--pen);font-weight:600}
+.iconbtn{flex:0 0 auto;display:inline-grid;place-items:center;width:46px;height:46px;border-radius:12px;border:0;background:var(--paper-2);color:var(--ink);font-size:20px;line-height:1}
+.iconbtn:hover{filter:brightness(.97)}
+.iconbtn.sm{width:38px;height:38px;font-size:15px;background:transparent}
+.iconbtn.send{background:var(--pen);color:var(--on-pen)}
+.iconbtn.stop{background:var(--bad);color:var(--card);font-size:16px}
+.field{display:flex;flex-direction:column;gap:8px}
+.label{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+input[type="text"],input:not([type]),textarea{width:100%;font:inherit;color:var(--ink);background:var(--paper-2);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px}
+input:focus,textarea:focus{outline:none;border-color:var(--pen)}
+textarea{resize:none;line-height:1.5}
+.check{display:flex;gap:10px;align-items:center;font-weight:500;cursor:pointer}
+.check input{width:22px;height:22px;accent-color:var(--pen)}
+.err{color:var(--bad);font-weight:600}
+
+/* ---------- Bolt doodle ---------- */
+.bolt{display:block;color:var(--pen);overflow:visible}
+.bolt .eyes{transform-box:fill-box;transform-origin:center;animation:blink 5s infinite}
+.bolt.busy .zap{animation:zap .45s steps(2) infinite}
+.bolt.busy .eyes{animation:look 1.4s ease-in-out infinite}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes look{0%,100%{transform:translateX(-2px)}50%{transform:translateX(2px)}}
+@keyframes zap{from{opacity:.25}to{opacity:1}}
+@keyframes bump{40%{transform:scale(1.25)}}
+@keyframes shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+@keyframes pop{from{transform:scale(.6) rotate(-8deg);opacity:0}to{transform:scale(1) rotate(-3deg);opacity:1}}
+.shake{animation:shake .35s ease}
+
+/* ---------- boot + profiles + onboarding ---------- */
+.boot{min-height:60vh;display:grid;place-content:center;justify-items:center;gap:12px;text-align:center}
+.boot .bolt{width:96px;height:96px}
+.hand{font-family:var(--f-hand);font-size:24px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.pcard{display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 12px;border-radius:16px;border:2px solid var(--ink);background:var(--card);box-shadow:0 3px 0 var(--ink);text-align:center}
+.pcard:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.pcard.add{border-style:dashed;box-shadow:none}
+.pav{font-size:46px;line-height:1.1}
+.pname{font-weight:600;font-size:18px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- home ---------- */
+.ask{display:flex;flex-direction:column;gap:14px}
+@media (max-width:560px){
+  .ask .row .btn{flex:1 1 100%}
+  .ask .row .btn.primary{order:-1}
+  .ask .row .spacer{display:none}
+  .hello > .bolt{flex-basis:52px;width:52px;height:52px}
+}
+.ask textarea{min-height:76px;font-size:17px}
+.how ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px}
+.topics{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.topic{display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;padding:11px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font-weight:500;min-height:50px;line-height:1.3}
+.topic:hover{border-color:var(--pen);color:var(--pen)}
+.topic span{color:var(--pen);font-weight:700}
+.practice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pcard2{display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:center;text-align:left;padding:16px;border-radius:16px;border:2px solid var(--ink);background:var(--card);color:var(--ink);box-shadow:0 3px 0 var(--ink)}
+.pcard2:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.pcard2 .em{grid-row:span 2;font-size:34px;line-height:1}
+.pcard2 b{font-family:var(--f-hand);font-weight:400;font-size:26px;line-height:1.1}
+.pcard2 span{color:var(--ink-2);font-size:14px}
+@media (max-width:540px){ .practice{grid-template-columns:1fr} }
+.chatlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.chatrow{display:flex;gap:4px;align-items:center}
+.chatopen{flex:1;min-width:0;display:flex;gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink)}
+.chatopen:hover{border-color:var(--pen)}
+.ci{flex:0 0 auto;font-size:22px;line-height:1}
+.ct{min-width:0;display:flex;flex-direction:column}
+.ct b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ct .tiny{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.memory summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px}
+.memory summary::-webkit-details-marker{display:none}
+.memory summary::after{content:"▾";color:var(--ink-2);font-size:18px}
+.memory[open] summary::after{content:"▴"}
+.memory[open] > :not(summary){margin-top:12px}
+.notes{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.notes li{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border-radius:10px;background:var(--card);border:1.5px solid var(--line)}
+.notes li span{flex:1;min-width:0}
+
+/* ---------- chat ---------- */
+.chat{display:flex;flex-direction:column;gap:12px}
+.chat-head{display:flex;align-items:center;gap:8px}
+.chat-title{display:flex;align-items:center;gap:8px;min-width:0;font-family:var(--f-hand);font-size:24px;line-height:1.15}
+.chat-title b{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msgs{display:flex;flex-direction:column;gap:16px;padding-block:6px 4px;min-height:40vh}
+.msg{display:flex;gap:10px;align-items:flex-start}
+.msg .av{flex:0 0 40px;width:40px;height:40px;margin-top:2px}
+.msg .av .bolt{width:40px;height:40px}
+.bwrap{min-width:0;flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.bubble{min-width:0;max-width:100%;padding:12px 15px;border-radius:4px 16px 16px 16px;background:var(--card);border:1.5px solid var(--line);box-shadow:var(--shadow);overflow-wrap:anywhere}
+.msg.me{justify-content:flex-end}
+.msg.me .bubble{max-width:min(560px,88%);background:var(--hl);color:var(--hl-ink);border-color:transparent;border-radius:16px 4px 16px 16px;transform:rotate(-.4deg)}
+.bubble p{margin:0 0 .6em}
+.bubble > :last-child{margin-bottom:0}
+.bubble ul,.bubble ol{margin:.1em 0 .6em;padding-left:1.35em}
+.bubble li{margin:.15em 0}
+.bubble code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--paper-2);padding:1px 5px;border-radius:5px}
+.msg.me .bubble code{background:rgb(255 255 255 / .45)}
+.bubble blockquote{margin:.2em 0 .6em;padding:.4em .8em;border-left:3px solid var(--pen);background:var(--pen-2);border-radius:0 8px 8px 0}
+.bubble .thumb{display:block;max-width:180px;max-height:180px;border-radius:10px;margin-bottom:8px;border:2px solid rgb(0 0 0 / .1)}
+.bubble.oops{border:1.5px dashed var(--bad);background:var(--bad-bg)}
+.bubble.oops .row{margin-top:10px}
+.tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tool{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:500;padding:5px 11px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink-2)}
+.tool:hover{border-color:var(--pen);color:var(--pen)}
+.tool[aria-pressed="true"]{border-color:var(--pen);color:var(--pen)}
+.sticker{display:inline-flex;align-items:center;gap:4px;padding:3px 11px;border-radius:999px;background:var(--hl);color:var(--hl-ink);font-weight:600;font-size:13px;transform:rotate(-3deg);animation:pop .4s ease}
+.thinking{display:flex;align-items:center;gap:10px;color:var(--ink-2)}
+.dots{display:inline-flex;gap:4px}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--pen);animation:dot 1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}
+.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,80%,100%{transform:translateY(0);opacity:.35}40%{transform:translateY(-5px);opacity:1}}
+.quick{display:flex;flex-wrap:wrap;gap:8px;padding-left:50px}
+@media (max-width:480px){ .quick{padding-left:0;display:grid;grid-template-columns:repeat(3,1fr)} .quick .chip{justify-content:center;padding-inline:6px;gap:4px;font-size:14px;white-space:nowrap} .quick .chip.big{grid-column:1 / -1;font-size:16px} }
+.composer{position:sticky;bottom:0;z-index:10;display:flex;flex-direction:column;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--paper) 78%,transparent)}
+.composer-in{display:flex;gap:6px;align-items:flex-end;background:var(--card);border:2px solid var(--ink);border-radius:16px;padding:6px;box-shadow:0 3px 0 var(--ink)}
+.composer-in:focus-within{border-color:var(--pen)}
+.composer-in textarea{flex:1;min-width:0;border:0;background:transparent;padding:10px 8px;max-height:10em;font-size:16px}
+.photo-prev{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 8px;border-radius:12px;background:var(--pen-2)}
+.photo-prev img{width:52px;height:52px;object-fit:cover;border-radius:8px}
+.photo-prev span{flex:1;min-width:0}
+
+/* ---------- quiz ---------- */
+.progress{display:flex;gap:6px}
+.progress i{flex:1;height:9px;border-radius:99px;background:var(--line)}
+.progress i.done{background:var(--pen)}
+.progress i.now{background:var(--hl);outline:1.5px solid var(--hl-ink);outline-offset:-1.5px}
+.qcard{display:flex;flex-direction:column;gap:14px}
+.qtext{font-family:var(--f-body);font-size:22px;font-weight:600;line-height:1.35}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:560px){ .choices{grid-template-columns:1fr} }
+.choice{display:flex;gap:12px;align-items:center;text-align:left;padding:12px 14px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink);min-height:56px;font-weight:500;line-height:1.3}
+.choice:hover:not(:disabled){border-color:var(--pen)}
+.choice .key{flex:0 0 30px;height:30px;border-radius:50%;border:1.5px solid currentColor;display:grid;place-items:center;font-weight:700;font-size:14px}
+.choice > span:last-child{min-width:0;overflow-wrap:anywhere}
+.choice.right{border-color:var(--ok);background:var(--ok-bg);color:var(--ink)}
+.choice.wrong{border-color:var(--bad);background:var(--bad-bg);color:var(--ink-2);text-decoration:line-through}
+.choice:disabled{cursor:default}
+.choice.dim{opacity:.55}
+.feedback:empty{display:none}
+.fb{padding:12px 14px;border-radius:12px;display:flex;flex-direction:column;gap:6px}
+.fb.good{background:var(--ok-bg);border:1.5px solid var(--ok)}
+.fb.hint{background:var(--pen-2);border:1.5px solid var(--pen)}
+.fb.bad{background:var(--bad-bg);border:1.5px solid var(--bad)}
+.spell-row{display:flex;gap:10px;flex-wrap:wrap}
+.spell-row input{flex:1 1 220px;min-width:0;font-size:24px;letter-spacing:.06em;padding:12px 14px}
+.letters{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:22px;letter-spacing:.12em;font-weight:700}
+.big-score{font-family:var(--f-hand);font-size:76px;line-height:1}
+.big-score span{font-size:40px;color:var(--ink-2)}
+.missed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.missed li{padding:10px 14px;border-left:3px solid var(--bad);background:var(--card);border-radius:0 12px 12px 0;display:flex;flex-direction:column;gap:2px}
+.level .bar{height:12px;border-radius:99px;background:var(--paper-2);border:1.5px solid var(--line);overflow:hidden;margin:8px 0 4px}
+.level .bar i{display:block;height:100%;background:var(--hl)}
+.loading{min-height:50vh;display:grid;place-content:center;justify-items:center;gap:14px;text-align:center}
+.loading .bolt{width:90px;height:90px}
+
+/* ---------- toasts, modal, star fx ---------- */
+.toasts{position:fixed;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top,0px));z-index:50;display:flex;flex-direction:column;gap:8px;align-items:center;width:min(calc(100vw - 32px),440px);pointer-events:none}
+.toast{background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:12px;box-shadow:var(--shadow);font-weight:500;text-align:center;animation:toastIn .25s ease}
+@keyframes toastIn{from{transform:translateY(-8px);opacity:0}}
+.toast.good{background:var(--ok);color:var(--card)}
+.toast.bad{background:var(--bad);color:var(--card)}
+.modal-bg{position:fixed;inset:0;z-index:60;background:rgb(8 12 24 / .5);display:grid;place-items:center;padding:16px}
+.modal{width:100%;max-width:420px;background:var(--card);border:2px solid var(--ink);border-radius:16px;padding:20px;box-shadow:0 4px 0 var(--ink);display:flex;flex-direction:column;gap:12px}
+.flystar{position:fixed;z-index:70;font-size:30px;line-height:1;pointer-events:none;will-change:transform}
+@media (prefers-reduced-motion: reduce){ *,*::before,*::after{animation:none!important;transition:none!important} }
+</style>
+
+<header class="top" id="top" hidden></header>
+<main class="wrap" id="view" tabindex="-1"></main>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<div id="modal-root"></div>
+<input type="file" id="photo-input" accept="image/*" hidden>
+
+<script>
+(() => {
+'use strict';
+/* AI School Helper: Bolt the robot tutor.
+   Inside claude.ai it uses three Artifact capabilities: `sample` (asks Claude),
+   `db` + `user` (each viewer's learners and chats live in their own private
+   data/users/<id>/ subtree). Anywhere else it falls back to localStorage and
+   offline practice (math quizzes, spelling tests with your own words). */
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const RAW = Symbol('raw');
+const raw = s => ({ [RAW]: String(s) });
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const esc = s => String(s).replace(/[&<>"']/g, c => ESC[c]);
+const fmt = v => v == null || v === false ? '' : Array.isArray(v) ? v.map(fmt).join('') : typeof v === 'object' && RAW in v ? v[RAW] : esc(v);
+const html = (strs, ...vals) => { let o = strs[0]; vals.forEach((v, i) => { o += fmt(v) + strs[i + 1]; }); return raw(o); };
+const setHTML = (el, t) => { if (el) el.innerHTML = t[RAW]; };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const clone = o => o == null ? o : JSON.parse(JSON.stringify(o));
+const str = (v, max) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim().slice(0, max);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const withTimeout = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
+const coarse = () => { try { return matchMedia('(pointer: coarse)').matches; } catch { return false; } };
+const reduceMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
+
+/* ---------- school data ---------- */
+const GRADES = ['K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'C'];
+const gradeNum = g => g === 'K' ? 0 : g === 'C' ? 13 : +g;
+const ordinal = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
+const gradeName = g => g === 'K' ? 'Kindergarten' : g === 'C' ? 'College' : ordinal(+g) + ' grade';
+const gradeShort = g => g === 'K' ? 'K' : g === 'C' ? 'College' : ordinal(+g);
+const SUBJECTS = [
+  { id: 'math', name: 'Math', icon: '➗' },
+  { id: 'reading', name: 'Reading', icon: '📖' },
+  { id: 'spelling', name: 'Spelling', icon: '🔤' },
+  { id: 'writing', name: 'Writing & Grammar', icon: '✏️' },
+  { id: 'science', name: 'Science', icon: '🔬' },
+  { id: 'social', name: 'Social Studies', icon: '🌎' },
+];
+const SUBJ = Object.fromEntries(SUBJECTS.map(s => [s.id, s]));
+const subjIcon = id => SUBJ[id] ? SUBJ[id].icon : '💬';
+const TOPICS = {
+  math: {
+    K: 'Counting to 100|Writing numbers 0–20|Which number is bigger?|Adding within 10|Taking away within 10|Flat & solid shapes',
+    1: 'Adding within 20|Subtracting within 20|Tens and ones|Comparing numbers (>, <, =)|Telling time to the hour|Measuring length',
+    2: 'Adding within 100|Subtracting within 100|Place value to 1,000|Skip counting|Money: coins & dollars|Telling time to 5 minutes|Even & odd numbers',
+    3: 'Multiplication facts|Division facts|Fractions on a number line|Area & perimeter|Rounding to 10 & 100|Two-step word problems',
+    4: 'Multi-digit multiplication|Long division|Equivalent fractions|Adding fractions|Decimals: tenths & hundredths|Angles & lines|Factors & multiples',
+    5: 'Adding & subtracting decimals|Multiplying & dividing decimals|Fractions with unlike denominators|Multiplying fractions|Volume|Order of operations|Coordinate plane',
+    6: 'Ratios & rates|Dividing fractions|Negative numbers|Expressions with variables|One-step equations|Area of triangles|Mean, median & mode',
+    7: 'Proportions|Percents: tax, tips & sales|Adding & subtracting integers|Two-step equations|Inequalities|Circles: area & circumference|Probability',
+    8: 'Slope & linear equations|Systems of equations|Functions|Pythagorean theorem|Exponents & scientific notation|Transformations|Volume of cylinders, cones & spheres',
+    9: 'Multi-step equations|Graphing lines (y = mx + b)|Systems of equations|Exponent rules|Polynomials|Factoring|Quadratic equations',
+    10: 'Geometry proofs|Similar & congruent triangles|Special right triangles|Trigonometry (SOH CAH TOA)|Circles: arcs & angles|Surface area & volume',
+    11: 'Quadratic functions|Complex numbers|Polynomial functions|Exponential & log functions|Rational expressions|Sequences & series',
+    12: 'Functions & transformations|Unit circle & trig|Limits|Derivatives|Statistics & probability|Vectors',
+    C: 'Derivatives|Integrals|Statistics|Linear algebra basics|College algebra|Logic & proofs',
+  },
+  reading: {
+    K: 'Letter sounds|Rhyming words|Sight words|Retelling a story|Characters & setting',
+    1: 'Short vowel sounds|Blends & digraphs (bl, sh, ch)|Sight words|Main idea|Beginning, middle & end',
+    2: 'Vowel teams (ai, ee, oa)|Reading smoothly|Main idea & details|Fiction vs. nonfiction|Asking questions while reading',
+    3: 'Main idea & key details|Character traits|Context clues|Text features|Comparing two stories',
+    4: 'Theme|Summarizing|Making inferences|Point of view|Text structure',
+    5: 'Theme & summary|Inferences with evidence|Similes & metaphors|Author\'s purpose|Comparing texts',
+    6: 'Citing text evidence|Central idea|Point of view|Figurative language|Claims & arguments',
+    7: 'Theme analysis|Character development|Author\'s purpose & bias|Comparing texts|Evaluating arguments',
+    8: 'Objective summary|Dialogue & character|Dramatic irony|Conflicting viewpoints|Evaluating evidence',
+    9: 'Literary analysis|Symbolism|Rhetorical devices|Reading Shakespeare|Analyzing arguments',
+    10: 'Theme across texts|Tone & mood|Satire & irony|Rhetoric & persuasion|World literature',
+    11: 'American literature|Rhetorical analysis|Synthesizing sources|Close reading|Complex texts',
+    12: 'British & world literature|Literary criticism|Analyzing arguments|Close reading|Research reading',
+    C: 'Reading academic articles|Annotating texts|Critical analysis|Reading faster|Evaluating sources',
+  },
+  spelling: {
+    K: 'Letter names & sounds|CVC words (cat, dog)|Beginning sounds|Rhyming words|Sight words (the, and, is)',
+    1: 'Short vowels|Consonant blends|sh, ch & th|Silent e (cake, bike)|Sight words',
+    2: 'Long vowel teams|Bossy R (ar, or, er)|Plurals (-s, -es)|Compound words|Contractions',
+    3: 'Prefixes (un-, re-)|Suffixes (-ful, -less)|Homophones|Doubling consonants|Irregular plurals',
+    4: 'Tricky vowel patterns|-tion & -sion|Homophones|Greek & Latin roots|Commonly misspelled words',
+    5: 'Prefixes & suffixes|Greek & Latin roots|i before e|Unstressed vowels|Commonly confused words',
+    6: 'Greek & Latin roots|Adding suffixes|Commonly misspelled words|Homophones|Vocabulary words',
+    7: 'Greek & Latin roots|Commonly misspelled words|Adding suffixes|Confusing word pairs|Vocabulary words',
+    8: 'Greek & Latin roots|Commonly misspelled words|Confusing word pairs|Vocabulary words|Silent letters',
+    9: 'Commonly misspelled words|Word roots|Affect vs. effect|Academic vocabulary|Silent letters',
+    10: 'Commonly misspelled words|SAT & ACT vocabulary|Word roots|Confusing word pairs|Academic vocabulary',
+    11: 'Commonly misspelled words|SAT & ACT vocabulary|Word roots|Confusing word pairs|Academic vocabulary',
+    12: 'Commonly misspelled words|SAT & ACT vocabulary|Word roots|Confusing word pairs|Academic vocabulary',
+    C: 'Commonly misspelled words|Academic vocabulary|Word roots|Confusing word pairs|Proofreading',
+  },
+  writing: {
+    K: 'Writing letters|Writing your name|Capital letters|Labeling pictures|Simple sentences',
+    1: 'Complete sentences|Capitals & periods|Nouns & verbs|Writing a story|Question marks & exclamation points',
+    2: 'Adjectives|Past tense verbs|Writing a paragraph|Commas in lists|Opinion writing',
+    3: 'Topic sentences|Pronouns|Subject-verb agreement|Quotation marks|Narrative writing',
+    4: 'Run-ons & fragments|Adverbs|Using commas|Writing an essay intro|Adding details to stories',
+    5: 'Compound sentences|Verb tenses|Prepositions|Informational writing|Transition words',
+    6: 'Thesis statements|Pronoun cases|Argument writing|Citing sources|Sentence variety',
+    7: 'Phrases & clauses|Complex sentences|Argument with evidence|Cutting wordiness|Research writing',
+    8: 'Active vs. passive voice|Gerunds & participles|Argumentative essays|Counterclaims|Narrative techniques',
+    9: 'Essay structure & thesis|Semicolons & colons|Parallel structure|Literary analysis essays|MLA citations',
+    10: 'Argumentative essays|Rhetorical analysis writing|Using evidence|Style & tone|Research papers',
+    11: 'Personal statements|Synthesis essays|AP-style essays|Grammar review|Citations',
+    12: 'College application essay|Research papers|Writing concisely|Advanced punctuation|Persuasive writing',
+    C: 'Thesis statements|Academic writing|APA & MLA citations|Editing & revising|Avoiding plagiarism',
+  },
+  science: {
+    K: 'Weather & seasons|Living vs. nonliving|What plants & animals need|Pushes & pulls|The five senses',
+    1: 'Light & sound|Sun, moon & stars|Animal babies & parents|Plant parts|Day & night',
+    2: 'Solids, liquids & gases|Habitats|Plant life cycles|Land & water on Earth|Erosion',
+    3: 'Life cycles|Forces & motion|Weather & climate|Magnets|Fossils & traits',
+    4: 'Energy|Waves: sound & light|Rocks & erosion|Animal & plant structures|How senses work',
+    5: 'Matter & particles|Food webs & ecosystems|Earth\'s spheres|Stars & the solar system|Mixtures & solutions',
+    6: 'Cells|Water cycle & weather|Plate tectonics|Energy transfer|Body systems',
+    7: 'Chemical reactions|Ecosystems|Genetics basics|Photosynthesis|Earth\'s resources',
+    8: 'Newton\'s laws|Waves|Natural selection|Gravity & space|Atoms & the periodic table',
+    9: 'Cells & DNA|Ecology|Scientific method|Earth science|Physical science',
+    10: 'Atoms & bonding|Balancing chemical equations|Genetics|Stoichiometry|Lab skills',
+    11: 'Motion & forces|Energy & momentum|Chemical reactions|Electricity|AP Biology topics',
+    12: 'Physics|Anatomy & physiology|Environmental science|AP science review|Writing lab reports',
+    C: 'Biology|Chemistry|Physics|Lab reports|Studying for science exams',
+  },
+  social: {
+    K: 'Families & communities|Rules & why we have them|Holidays & traditions|Maps of places|Community helpers',
+    1: 'Maps & globes|Past & present|Needs & wants|Being a good citizen|American symbols',
+    2: 'City, suburb & country|Producers & consumers|Map skills|Famous Americans|How government works',
+    3: 'Local government|Native Americans|Landforms|Communities over time|Money & economics',
+    4: 'Your state\'s history|U.S. regions|Explorers|Native American cultures|Map skills',
+    5: 'Colonial America|The American Revolution|The Constitution|Westward expansion|Early explorers',
+    6: 'Ancient Egypt & Mesopotamia|Ancient Greece & Rome|World geography|Early humans|World religions',
+    7: 'The Middle Ages|The Renaissance|Civics & government|Age of Exploration|World geography',
+    8: 'American Revolution|Constitution & Bill of Rights|Civil War|Reconstruction|Westward expansion',
+    9: 'World history|World geography|Civics|Primary sources|Ancient to modern times',
+    10: 'Industrial Revolution|World War I|World War II|The Cold War|Economics',
+    11: 'U.S. history|Civil rights movement|Great Depression & New Deal|U.S. government|AP U.S. History',
+    12: 'Government & civics|Economics|Elections & voting|Current events|Personal finance',
+    C: 'History essays|Political science|Economics|Psychology basics|Sociology basics',
+  },
+};
+const topicsFor = (s, g) => { const t = TOPICS[s] || TOPICS.math; return (t[g] || t['5']).split('|'); };
+const AVATARS = ['🦊', '🐼', '🐯', '🐸', '🦄', '🐙', '🦖', '🐧', '🐱', '🐶', '🐵', '🦁', '🐨', '🚀', '⚽', '🎨'];
+const LEVELS = [[0, 'Rookie'], [10, 'Explorer'], [25, 'Thinker'], [50, 'Brainiac'], [100, 'Genius'], [200, 'Legend'], [400, 'Mastermind']];
+const THINK = ['Beep boop… thinking', 'Bolt is thinking…', 'Whirr… warming up my brain', 'Crunching it in my circuits…'];
+const PLACEHOLDERS = [
+  'Like “I need help reading” or “How do I do 7 × 8?”',
+  'Like “I don\'t get fractions” or “Help me spell necessary”',
+  'Like “What\'s a noun?” or “Help me start my essay”',
+];
+const MAX_PROFILES = 8, MAX_CHATS = 100, MAX_NOTES = 10, MAX_QUIZZES = 15, HISTORY = 40, CHAT_MAX_BYTES = 200 * 1024;
+const HIDE = new Set(['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed']);
+const BOLT = cls => `<svg class="bolt ${cls || ''}" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="zap" d="M36 1 L28 9 L32 9 L27 15 L37 6 L33 6 Z" fill="var(--hl)" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><line x1="32" y1="14" x2="32" y2="19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="9" y="19" width="46" height="34" rx="12" fill="var(--card)" stroke="currentColor" stroke-width="3"/><rect x="3" y="30" width="6" height="12" rx="3" fill="currentColor"/><rect x="55" y="30" width="6" height="12" rx="3" fill="currentColor"/><g class="eyes"><circle cx="24" cy="33" r="4.2" fill="currentColor"/><circle cx="40" cy="33" r="4.2" fill="currentColor"/></g><circle cx="16.5" cy="41" r="2.6" fill="var(--margin)"/><circle cx="47.5" cy="41" r="2.6" fill="var(--margin)"/><path d="M24 43 Q32 49.5 40 43" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="24" y="53" width="16" height="7" rx="3" fill="currentColor"/></svg>`;
+
+/* ---------- dates, streaks, levels ---------- */
+const dayKey = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const prevDayKey = (d = new Date()) => { const x = new Date(d.getTime()); x.setDate(x.getDate() - 1); return dayKey(x); };
+function bumpStreak(p, now = new Date()) {
+  const s = p.streak, today = dayKey(now);
+  if (s.last === today) return false;
+  s.n = s.last === prevDayKey(now) ? s.n + 1 : 1;
+  s.last = today;
+  s.best = Math.max(s.best || 0, s.n);
+  return true;
+}
+const streakNow = (p, now = new Date()) => p && p.streak.last && (p.streak.last === dayKey(now) || p.streak.last === prevDayKey(now)) ? p.streak.n : 0;
+function levelOf(stars) {
+  let i = 0;
+  while (i + 1 < LEVELS.length && stars >= LEVELS[i + 1][0]) i++;
+  const [at, name] = LEVELS[i], nxt = LEVELS[i + 1];
+  return { n: i + 1, name, next: nxt ? nxt[1] : null, toNext: nxt ? nxt[0] - stars : 0, pct: nxt ? Math.round((stars - at) / (nxt[0] - at) * 100) : 100 };
+}
+function when(ts) {
+  if (!ts) return '';
+  const d = new Date(ts), now = new Date();
+  if (dayKey(d) === dayKey(now)) return 'Today ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (dayKey(d) === prevDayKey(now)) return 'Yesterday';
+  if (now - d < 6 * 864e5) return d.toLocaleDateString([], { weekday: 'long' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+const shortDate = ts => ts ? new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+
+/* ---------- tiny, safe markdown (escape first, then add known tags) ---------- */
+function inl(s) {
+  return esc(s)
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(?=\S)([^*]*?\S)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(?=\S)([^_]*?\S)__/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(])\*(?=\S)([^*]*?\S)\*(?=[\s).,!?:;]|$)/g, '$1<em>$2</em>')
+    .replace(/(^|[\s(])_(?=\S)([^_]*?\S)_(?=[\s).,!?:;]|$)/g, '$1<em>$2</em>');
+}
+function md(src) {
+  const out = []; let para = [], list = null;
+  const endPara = () => { if (para.length) { out.push('<p>' + para.map(inl).join('<br>') + '</p>'); para = []; } };
+  const endList = () => {
+    if (!list) return;
+    const start = list.type === 'ol' && list.start !== 1 ? ` start="${list.start}"` : '';
+    out.push(`<${list.type}${start}>` + list.items.map(i => '<li>' + inl(i) + '</li>').join('') + `</${list.type}>`);
+    list = null;
+  };
+  for (const line of String(src || '').replace(/\r\n?/g, '\n').split('\n')) {
+    let m;
+    if (!line.trim()) { endPara(); endList(); continue; }
+    if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) { endPara(); if (!list || list.type !== 'ul') { endList(); list = { type: 'ul', items: [] }; } list.items.push(m[1]); continue; }
+    if ((m = line.match(/^\s*(\d{1,3})[.)]\s+(.*)$/))) { endPara(); if (!list || list.type !== 'ol') { endList(); list = { type: 'ol', start: +m[1], items: [] }; } list.items.push(m[2]); continue; }
+    if ((m = line.match(/^\s*#{1,6}\s+(.*)$/))) { endPara(); endList(); out.push('<p><strong>' + inl(m[1]) + '</strong></p>'); continue; }
+    if ((m = line.match(/^\s*>\s?(.*)$/))) { endPara(); endList(); out.push('<blockquote>' + inl(m[1]) + '</blockquote>'); continue; }
+    if (list && /^\s{2,}\S/.test(line)) { list.items[list.items.length - 1] += ' ' + line.trim(); continue; }
+    endList();
+    para.push(line.trim());
+  }
+  endPara(); endList();
+  return out.join('');
+}
+const STAR_RE = /\[\[\s*star\s*\]\]/i;
+const cleanStar = t => String(t || '').replace(/\s*\[\[\s*star\s*\]\]/gi, '').replace(/\[(\[(s(t(a(r(\])?)?)?)?)?)?$/i, '').trimEnd();
+const isDataImg = s => typeof s === 'string' && s.length < 120000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s);
+
+/* ---------- state ---------- */
+const S = {
+  view: 'boot', store: null, mode: 'local', perms: null,
+  ai: { sample: null, ok: false, why: null, images: null, perm: null, used: false },
+  meta: { v: 1, activeId: null, profiles: [] },
+  pid: null, indexes: {}, idxBad: new Set(), idxRepairing: new Set(), chatCache: new Map(), deleted: new Set(), sumPending: new Set(), sumTried: new Set(),
+  chat: null, draft: '', askDraft: '', photo: {},
+  busy: false, busyChat: null, ctl: null, streamText: '', thinkLine: THINK[0], lastErr: null,
+  starFx: null, autoSpeak: null, speaking: null,
+  tab: 'math', memOpen: false, form: null, qform: null, sform: null, quiz: null, qctl: null,
+  ph: pick(PLACEHOLDERS), greet: pick(['👋', '✌️', '😎', '🙌']),
+};
+const prof = () => S.meta.profiles.find(p => p.id === S.pid) || null;
+const profById = id => S.meta.profiles.find(p => p.id === id) || null;
+const curIndex = () => S.indexes[S.pid] || (S.indexes[S.pid] = []);
+const isOpen = c => S.view === 'chat' && S.chat === c;
+const canPhoto = () => S.ai.ok && !!S.ai.images;
+
+/* ---------- storage: claude.ai db (private per viewer) or this browser ---------- */
+const DEL = Symbol('del');
+function localStore() {
+  const P = 'ash1:';
+  return {
+    kind: 'local',
+    async get(k) { try { const s = localStorage.getItem(P + k); return s ? JSON.parse(s) : null; } catch { return null; } },
+    async set(k, v) { localStorage.setItem(P + k, JSON.stringify(v)); },
+    async del(k) { try { localStorage.removeItem(P + k); } catch {} },
+  };
+}
+function cloudStore(db, id) {
+  const base = 'data/users/' + id + '/';
+  return {
+    kind: 'cloud',
+    async get(k) { const snap = await withTimeout(db.doc(base + k).get(), 9000); return snap.exists ? clone(snap.data()) : null; },
+    async set(k, v) { await withTimeout(db.doc(base + k).set(v), 20000); },
+    async del(k) { await withTimeout(db.doc(base + k).delete(), 20000); },
+  };
+}
+// One write at a time per document; rapid saves collapse into the latest value.
+const pendingWrites = new Map(), runningWrites = new Set();
+function save(key, val) {
+  pendingWrites.set(key, val === DEL ? DEL : JSON.stringify(val));
+  if (!runningWrites.has(key)) flushKey(key);
+}
+async function flushKey(key) {
+  runningWrites.add(key);
+  try {
+    while (pendingWrites.has(key)) {
+      const v = pendingWrites.get(key);
+      pendingWrites.delete(key);
+      await writeOnce(key, v, 0);
+    }
+  } finally { runningWrites.delete(key); }
+}
+async function writeOnce(key, v, attempt) {
+  const store = S.store;
+  try {
+    if (v === DEL) await store.del(key); else await store.set(key, JSON.parse(v));
+  } catch (e) {
+    const code = e && e.code;
+    if (store.kind === 'cloud') {
+      if ((code === 'unavailable' || code === 'resource_exhausted') && attempt < 2) {
+        await sleep(400 + Math.random() * 800 * (attempt + 1));
+        return writeOnce(key, v, attempt + 1);
+      }
+      if (code === 'quota_exceeded') { toastOnce('quota', 'Bolt\'s notebook is full! 📒 Delete some old chats to make room.', 'bad'); return; }
+      if (code === 'timeout') { if (attempt < 1) return writeOnce(key, v, attempt + 1); toastOnce('slow-save', 'Saving is super slow right now 🐢 Bolt will keep trying.', 'bad'); return; }
+      switchToLocal();
+      if (S.store.kind === 'local') return writeOnce(key, v, 0);
+    } else {
+      toastOnce('local-save', 'This browser won\'t let Bolt save right now, so your chats might not stick around 😢', 'bad');
+    }
+  }
+}
+function switchToLocal() {
+  if (!S.store || S.store.kind === 'local') return;
+  S.store = localStore(); S.mode = 'local';
+  toastOnce('to-local', 'Can\'t save to your Claude account right now, so Bolt is saving on this device instead.', 'bad');
+  save('meta', S.meta);
+  for (const [pid, list] of Object.entries(S.indexes)) save('idx-' + pid, { chats: list });
+  for (const c of S.chatCache.values()) save('chat-' + c.id, c);
+}
+const saveMeta = () => save('meta', S.meta);
+function saveIndex(pid) {
+  if (S.idxBad.has(pid)) { repairIndex(pid); return; }
+  save('idx-' + pid, { chats: S.indexes[pid] || [] });
+}
+async function loadIndex(pid) {
+  for (let i = 0; i < 2; i++) {
+    try { return normalizeIndex(await S.store.get('idx-' + pid)); } catch { await sleep(500 + i * 700); }
+  }
+  return null;
+}
+// The saved chat list couldn't be read: hold off saving it (that would wipe the old
+// entries) and keep retrying in the background; once it loads, merge and save.
+async function repairIndex(pid, attempt = 0) {
+  if (S.idxRepairing.has(pid) || !S.idxBad.has(pid)) return;
+  S.idxRepairing.add(pid);
+  let remote = null;
+  try { remote = await loadIndex(pid); } finally { S.idxRepairing.delete(pid); }
+  if (!S.idxBad.has(pid)) return;
+  if (!remote) {
+    if (attempt < 8) setTimeout(() => repairIndex(pid, attempt + 1), 2500 * (attempt + 1));
+    return;
+  }
+  const list = S.indexes[pid] || (S.indexes[pid] = []);
+  for (const e of remote) if (!S.deleted.has(e.id) && !list.some(x => x.id === e.id)) list.push(e);
+  list.sort((a, b) => b.updatedAt - a.updatedAt);
+  S.idxBad.delete(pid);
+  save('idx-' + pid, { chats: list });
+  if (pid === S.pid) refreshHomeLists();
+}
+
+function normalizeMeta(m) {
+  const o = m && typeof m === 'object' ? m : {};
+  const profiles = Array.isArray(o.profiles) ? o.profiles.map(normalizeProfile).filter(Boolean).slice(0, MAX_PROFILES) : [];
+  return { v: 1, activeId: typeof o.activeId === 'string' ? o.activeId : null, profiles };
+}
+function normalizeProfile(p) {
+  if (!p || typeof p !== 'object' || typeof p.id !== 'string') return null;
+  const st = p.settings || {}, sk = p.streak || {};
+  return {
+    id: p.id,
+    name: str(p.name, 20) || 'Learner',
+    grade: GRADES.includes(p.grade) ? p.grade : '3',
+    avatar: typeof p.avatar === 'string' && p.avatar && p.avatar.length <= 8 ? p.avatar : '🙂',
+    stars: Number.isFinite(p.stars) && p.stars > 0 ? Math.floor(p.stars) : 0,
+    streak: { n: Math.max(0, +sk.n || 0), last: typeof sk.last === 'string' ? sk.last : null, best: Math.max(0, +sk.best || 0) },
+    memory: Array.isArray(p.memory) ? p.memory.filter(x => typeof x === 'string' && x.trim()).map(x => x.slice(0, 160)).slice(0, MAX_NOTES) : [],
+    quizzes: Array.isArray(p.quizzes) ? p.quizzes.filter(q => q && typeof q === 'object' && typeof q.title === 'string').slice(0, MAX_QUIZZES) : [],
+    settings: { autoRead: !!st.autoRead, rate: [0.8, 1, 1.2].includes(st.rate) ? st.rate : 1, brain: st.brain === 'careful' ? 'careful' : 'fast' },
+    createdAt: +p.createdAt || Date.now(),
+  };
+}
+function normalizeIndex(d) {
+  const a = d && Array.isArray(d.chats) ? d.chats : [];
+  return a.filter(x => x && typeof x.id === 'string').map(x => ({
+    id: x.id, title: str(x.title, 60) || 'Chat', subj: SUBJ[x.subj] ? x.subj : null,
+    updatedAt: +x.updatedAt || 0, n: +x.n || 0, s: +x.s || 0, summary: str(x.summary, 240),
+  })).sort((a, b) => b.updatedAt - a.updatedAt);
+}
+function normalizeChat(d, id) {
+  if (!d || typeof d !== 'object') return null;
+  const msgs = (Array.isArray(d.msgs) ? d.msgs : []).filter(m => m && (m.r === 'u' || m.r === 'a') && typeof m.t === 'string').map(m => {
+    const o = { r: m.r, t: m.t.slice(0, 8000), at: +m.at || 0 };
+    if (typeof m.x === 'string') o.x = m.x.slice(0, 1200);
+    if (m.r === 'u' && isDataImg(m.img)) o.img = m.img;
+    for (const k of ['star', 'cut', 'stop', 'partial']) if (m[k]) o[k] = true;
+    return o;
+  });
+  return {
+    id: typeof d.id === 'string' ? d.id : id, pid: typeof d.pid === 'string' ? d.pid : S.pid,
+    subj: SUBJ[d.subj] ? d.subj : null, title: str(d.title, 60) || 'Chat',
+    createdAt: +d.createdAt || Date.now(), updatedAt: +d.updatedAt || Date.now(),
+    msgs, sumN: +d.sumN || 0, summary: str(d.summary, 240),
+  };
+}
+function fitChat(c) {
+  let s = JSON.stringify(c);
+  if (s.length < 60000) return; // even all-emoji text stays far below the db's 256 KiB document cap
+  const bytes = () => new Blob([JSON.stringify(c)]).size;
+  let b = bytes();
+  for (let i = 0; b > CHAT_MAX_BYTES && i < c.msgs.length; i++) if (c.msgs[i].img) { delete c.msgs[i].img; b = bytes(); }
+  while (b > CHAT_MAX_BYTES && c.msgs.length > 2) { c.msgs.splice(1, 1); c.sumN = Math.max(0, c.sumN - 1); b = bytes(); }
+}
+function persistChat(c, { touch = true } = {}) {
+  if (S.deleted.has(c.id)) return;
+  if (touch) c.updatedAt = Date.now();
+  fitChat(c);
+  S.chatCache.set(c.id, c);
+  save('chat-' + c.id, c);
+  const list = S.indexes[c.pid] || (S.indexes[c.pid] = []);
+  const entry = { id: c.id, title: c.title, subj: c.subj, updatedAt: c.updatedAt, n: c.msgs.length, s: c.sumN || 0, summary: c.summary || '' };
+  const i = list.findIndex(x => x.id === c.id);
+  if (i >= 0) list[i] = entry; else list.unshift(entry);
+  list.sort((a, b) => b.updatedAt - a.updatedAt);
+  while (list.length > MAX_CHATS) { const old = list.pop(); save('chat-' + old.id, DEL); S.chatCache.delete(old.id); }
+  saveIndex(c.pid);
+}
+
+/* ---------- read aloud ---------- */
+function speakable(t) {
+  return cleanStar(t)
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/(\d)\s*[×*]\s*(?=\d)/g, '$1 times ')
+    .replace(/÷/g, ' divided by ')
+    .replace(/(\d)\s*−\s*(?=\d)/g, '$1 minus ')
+    .replace(/(\d)\s+-\s+(?=\d)/g, '$1 minus ')
+    .replace(/(\d)\s*\+\s*(?=\d)/g, '$1 plus ')
+    .replace(/\s=\s/g, ' equals ')
+    .replace(/[*_`#>|~]/g, '')
+    .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}\u{20E3}]/gu, '')
+    .replace(/\s+/g, ' ').trim();
+}
+function chunkText(t, max = 180) {
+  const out = []; let cur = '';
+  for (let p of t.match(/[^.!?;:\n]+[.!?;:]*/g) || []) {
+    p = p.trim();
+    if (!p) continue;
+    if (cur && (cur + ' ' + p).length > max) { out.push(cur); cur = ''; }
+    while (p.length > max) {
+      let cut = p.lastIndexOf(' ', max);
+      if (cut < 40) cut = max;
+      out.push(p.slice(0, cut).trim());
+      p = p.slice(cut).trim();
+    }
+    cur = cur ? cur + ' ' + p : p;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+const speech = (() => {
+  const ok = typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance === 'function';
+  let voice = null, token = 0;
+  const pickVoice = () => {
+    try {
+      const vs = speechSynthesis.getVoices() || [];
+      voice = vs.find(v => /^en[-_]US/i.test(v.lang) && /Google US English|Samantha|Aria|Jenny|Natural/i.test(v.name))
+        || vs.find(v => /^en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+    } catch { voice = null; }
+  };
+  if (ok) { pickVoice(); try { speechSynthesis.addEventListener('voiceschanged', pickVoice); } catch {} }
+  function stop() { token++; if (ok) try { speechSynthesis.cancel(); } catch {} }
+  function say(text, { rate = 1, onend } = {}) {
+    const done = err => { if (onend) onend(err); };
+    if (!ok) return done(true);
+    stop();
+    const my = token, parts = chunkText(speakable(text));
+    if (!parts.length) return done(false);
+    let i = 0;
+    const next = () => {
+      if (my !== token) return;
+      if (i >= parts.length) return done(false);
+      const u = new SpeechSynthesisUtterance(parts[i++]);
+      if (voice) u.voice = voice;
+      u.lang = voice ? voice.lang : 'en-US';
+      u.rate = rate; u.pitch = 1.05;
+      let started = false;
+      u.onstart = () => { started = true; };
+      u.onend = () => { started = true; next(); };
+      u.onerror = ev => { started = true; if (my !== token || ev.error === 'interrupted' || ev.error === 'canceled') return; token++; done(true); };
+      try { speechSynthesis.speak(u); } catch { token++; done(true); return; }
+      if (i === 1) setTimeout(() => { if (!started && my === token) { stop(); done(true); } }, 7000);
+    };
+    setTimeout(next, 60); // Chrome drops speak() calls made right after cancel()
+  }
+  return { ok, say, stop };
+})();
+function stopSpeech() { if (S.speaking) { S.speaking = null; refreshSpeak(); } speech.stop(); }
+function refreshSpeak() {
+  document.querySelectorAll('[data-speak-key]').forEach(b => {
+    const on = b.dataset.speakKey === S.speaking;
+    b.setAttribute('aria-pressed', on);
+    b.textContent = on ? '⏹ Stop' : b.dataset.label;
+  });
+}
+function speakKeyed(key, text, rate) {
+  if (S.speaking === key) { stopSpeech(); return; }
+  S.speaking = key; refreshSpeak();
+  speech.say(text, {
+    rate: rate || (prof() ? prof().settings.rate : 1),
+    onend: err => {
+      if (S.speaking === key) { S.speaking = null; refreshSpeak(); }
+      if (err) toastOnce('speech', 'Bolt couldn\'t play the sound 🔇 Check your volume, or try another browser.', 'bad');
+    },
+  });
+}
+const speakBtn = (key, label, act, extra = '', cls = 'tool') => html`<button type="button" class="${cls}" data-act="${act}" data-speak-key="${key}" data-label="${label}" aria-pressed="${S.speaking === key}"${raw(extra)}>${S.speaking === key ? '⏹ Stop' : label}</button>`;
+
+/* ---------- toasts, confirm box, star fx ---------- */
+const shownOnce = new Set();
+function toast(text, kind = '') {
+  const box = $('#toasts'), el = document.createElement('div');
+  el.className = 'toast ' + kind; el.textContent = text;
+  box.appendChild(el);
+  while (box.children.length > 3) box.firstChild.remove();
+  setTimeout(() => el.remove(), kind === 'bad' ? 5200 : 3200);
+}
+function toastOnce(key, text, kind) { if (!shownOnce.has(key)) { shownOnce.add(key); toast(text, kind); } }
+function confirmBox({ title, body = '', yes = 'Yes', no = 'Cancel', danger = false }) {
+  return new Promise(resolve => {
+    const root = $('#modal-root'), prev = document.activeElement;
+    setHTML(root, html`<div class="modal-bg" data-bg><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">${title}</h2>${body ? html`<p>${body}</p>` : ''}
+      <div class="row"><span class="spacer"></span><button type="button" class="btn ghost" data-m="no">${no}</button><button type="button" class="btn ${danger ? 'danger solid' : 'primary'}" data-m="yes">${yes}</button></div>
+    </div></div>`);
+    const done = v => {
+      root.innerHTML = '';
+      root.removeEventListener('click', onClick);
+      document.removeEventListener('keydown', onKey, true);
+      try { if (prev && prev.isConnected) prev.focus({ preventScroll: true }); } catch {}
+      resolve(v);
+    };
+    const onClick = e => { const b = e.target.closest('[data-m]'); if (b) done(b.dataset.m === 'yes'); else if (e.target.hasAttribute('data-bg')) done(false); };
+    const onKey = e => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+      else if (e.key === 'Tab') { const bs = [...root.querySelectorAll('button')], i = bs.indexOf(document.activeElement); e.preventDefault(); bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus(); }
+    };
+    root.addEventListener('click', onClick);
+    document.addEventListener('keydown', onKey, true);
+    root.querySelector('[data-m="no"]').focus();
+  });
+}
+function bumpStarPill() {
+  const p = prof(), n = $('#star-count'), pill = $('#star-pill');
+  if (n && p) n.textContent = p.stars;
+  if (pill) { pill.classList.remove('bump'); void pill.offsetWidth; pill.classList.add('bump'); }
+}
+function flyStar(from) {
+  const to = $('#star-pill');
+  if (!from || !to || reduceMotion() || typeof document.body.animate !== 'function') { bumpStarPill(); return; }
+  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+  const s = document.createElement('div');
+  s.className = 'flystar'; s.textContent = '⭐';
+  s.style.left = (a.left + a.width / 2 - 15) + 'px'; s.style.top = (a.top + a.height / 2 - 15) + 'px';
+  document.body.appendChild(s);
+  const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
+  const anim = s.animate([
+    { transform: 'translate(0,0) scale(1)' },
+    { transform: `translate(${dx * .5}px,${dy * .5 - 60}px) scale(1.6) rotate(140deg)`, offset: .5 },
+    { transform: `translate(${dx}px,${dy}px) scale(.6) rotate(300deg)` },
+  ], { duration: 850, easing: 'ease-in-out' });
+  const end = () => { s.remove(); bumpStarPill(); };
+  anim.onfinish = end; anim.oncancel = end;
+}
+function awardStars(n, pid, fromEl) {
+  const p = profById(pid || S.pid);
+  if (!p || n <= 0) return;
+  const before = levelOf(p.stars).n;
+  p.stars += n;
+  saveMeta();
+  if (p.id === S.pid) { if (fromEl) flyStar(fromEl); else bumpStarPill(); }
+  const lv = levelOf(p.stars);
+  if (lv.n > before && p.id === S.pid) toast(`🎉 Level up! You're now a ${lv.name}!`, 'good');
+}
+function markActivity(pid) {
+  const p = profById(pid || S.pid);
+  if (!p || !bumpStreak(p)) return;
+  saveMeta();
+  if (p.id !== S.pid) return;
+  renderTop();
+  toast(p.streak.n > 1 ? `🔥 ${p.streak.n}-day streak! Keep it going!` : '🔥 Streak started! Come back tomorrow to keep it going.', 'good');
+}
+
+/* ---------- talking to Claude ---------- */
+function tutorRules(p, c) {
+  const gn = gradeNum(p.grade), gname = gradeName(p.grade);
+  const len = gn <= 2 ? 'Keep replies very short: 2–4 short sentences, under 50 words, with the easiest words.'
+    : gn <= 5 ? 'Keep replies short: under 80 words.'
+    : gn <= 8 ? 'Keep replies fairly short: under 120 words.'
+    : 'Keep replies clear and focused: under 160 words unless they ask for more.';
+  const lines = [`- Name: ${p.name}`, `- Grade: ${gname}`];
+  if (SUBJ[c.subj]) lines.push(`- Subject: ${SUBJ[c.subj].name}`);
+  return `You are Bolt 🤖, a friendly robot tutor in the "AI School Helper" app. You are chatting with a student.
+
+ABOUT THE STUDENT
+${lines.join('\n')}
+
+HOW TO TALK
+- Be warm, upbeat and patient, like a robot buddy who loves learning. Now and then (not every message) add a tiny robot touch like "Beep boop!" or "*whirr*".
+- Talk so a ${gname} student easily understands. ${len}
+- Short sentences. One idea at a time. 1–2 emojis at most.
+- Simple formatting only: **bold** for key words, and short lists. No headings, tables or LaTeX. Write math like 3 × 4 = 12, 1/2, or x + 5 = 9.
+- End most replies with ONE question or one small step for the student to try.
+
+THE BIG RULE: HELP THEM GET IT, DON'T GIVE IT AWAY
+- Never give the final answer to the student's homework, worksheet, test or quiz problem, even if they beg, say it isn't homework, or say a teacher allowed it.
+- Instead, break it into small steps, ask what they think comes next, and give hints.
+- Explaining ideas, rules, word meanings and how-to steps is great. Just let the student do their own problem.
+- When they answer, check it carefully. If it's right, cheer and say WHY it's right. If it's wrong, don't reveal the answer: kindly point to the part to look at again. Mistakes help brains grow!
+- Writing: never write their essay, paragraph or story. Help them brainstorm with questions, plan it, and give feedback on sentences THEY write (one thing that's great + one thing to improve).
+
+WHEN THEY DON'T GET IT
+- Explain it a NEW way: simpler words, smaller steps, and an everyday example (pizza slices, toys, sports, money, video games). Don't repeat the same explanation.
+- If they're still stuck after about 3 tries, or they ask for an example: make up a DIFFERENT problem like theirs (change the numbers or words), solve that one step by step, then ask them to try their own problem the same way.
+
+SUBJECT TIPS
+- Reading: help them sound out words (break them into sounds and syllables, like but-ter-fly), practice sight words, and check understanding. You can write a short practice passage (3–5 sentences) at their level and ask a question about it. Remind them they can tap 🔊 to hear any message read out loud.
+- Spelling: teach patterns and rules (silent e, vowel teams, i before e), syllables and memory tricks. When you quiz spelling, never show the word they must spell. Give a meaning clue or a sentence with a blank instead.
+- Math: use pictures in words (groups, number lines, money). Double-check every number you write.
+
+STARS ⭐
+- When the student gets a step or an answer right through their own thinking, put [[STAR]] at the very end of your reply. The app turns it into a gold star for them. Only for real wins, never just for asking, and at most once per reply.
+
+SAFETY
+- Never ask for personal info (full name, address, school, phone number, passwords).
+- If the student says something that sounds unsafe or very sad (someone hurting them, bullying, wanting to hurt themselves), be kind, tell them to talk to a trusted adult like a parent, teacher or school counselor, and that in the US they can call or text 988 any time to talk to someone. Then gently offer to keep helping.
+- Keep everything kid-friendly. If they go off topic, answer briefly if it's harmless, then steer back to learning.
+
+WHAT YOU REMEMBER ABOUT ${p.name.toUpperCase()}
+${memoryBlock(p, c)}
+Use this naturally (like "Last time we worked on fractions!"). Don't list it all out.`;
+}
+function memoryBlock(p, c) {
+  const out = [];
+  if (p.memory.length) out.push('Notes from past sessions:', ...p.memory.map(n => '- ' + n));
+  const recent = (S.indexes[p.id] || []).filter(e => e.id !== c.id).slice(0, 5);
+  if (recent.length) out.push('Recent chats:', ...recent.map(e => `- "${e.title}"${SUBJ[e.subj] ? ' (' + SUBJ[e.subj].name + ')' : ''}, ${shortDate(e.updatedAt)}${e.summary ? ': ' + e.summary : ''}`));
+  const qz = p.quizzes.slice(0, 3);
+  if (qz.length) out.push('Recent quizzes:', ...qz.map(q => `- ${q.title}: ${q.score}/${q.total}${q.missed && q.missed.length ? ' (missed: ' + q.missed.join('; ') + ')' : ''}`));
+  return out.length ? out.join('\n') : 'Nothing yet. This is a brand-new student, so give them a friendly hello.';
+}
+const LESSON_NOTE = t => `The student tapped the "${t}" topic. Give a super simple mini-lesson for their grade: explain the idea in 2–3 short sentences, show one tiny example, then give ONE easy practice question for them to try. Don't answer the practice question.`;
+const PHOTO_NOTE = 'The student attached a photo of their homework. Start your reply with one line that begins with "📸 I see:" and briefly says what the problem in the photo is, so you can remember it later. If there are many problems, ask which one to start with. If you can\'t read it, say so and ask them to type it. Then help in the usual way: guide them, don\'t give answers.';
+const QUICK = {
+  again: { t: 'I still don\'t get it 😕', x: 'The student tapped "I still don\'t get it". Explain the same idea a totally NEW way: simpler words, smaller steps, and an everyday example. Don\'t repeat your last explanation. Then check with one tiny question.' },
+  hint: { t: 'Can I get a hint? 💡', x: 'The student asked for a hint. Give ONE small hint for the step they are on. Don\'t solve it.' },
+  example: { t: 'Can you show me an example? 🧩', x: 'The student asked for an example. Make up a DIFFERENT problem like theirs (change the numbers or words), solve that one step by step, then ask them to try their own problem the same way. Do NOT solve their actual problem.' },
+  got: { t: 'I think I got it! ✅', x: 'The student thinks they understand now. Check with one quick question, or ask them to explain it back in their own words.' },
+};
+function buildTurns(c, p) {
+  const msgs = c.msgs, hist = msgs.slice(-HISTORY);
+  let rules = tutorRules(p, c);
+  if (msgs.length > hist.length && msgs[0]) rules += `\n\nThis chat is long, so older messages are hidden. It started with the student saying: "${msgs[0].t.slice(0, 600)}"`;
+  const turns = [{ role: 'user', content: rules }];
+  for (const m of hist) {
+    let content = m.r === 'u'
+      ? m.t + (m.x ? `\n\n[App note, not typed by the student: ${m.x}]` : '')
+      : m.t + (m.star ? '\n\n[[STAR]]' : '');
+    content = content.slice(0, 6000).trim() || '…';
+    turns.push({ role: m.r === 'u' ? 'user' : 'assistant', content });
+  }
+  while (turns.length > 1 && turns[turns.length - 1].role !== 'user') turns.pop();
+  let total = turns.reduce((n, t) => n + t.content.length, 0);
+  while (total > 100000 && turns.length > 2) total -= turns.splice(1, 1)[0].content.length;
+  return turns;
+}
+function parseLooseJSON(t) {
+  t = String(t || '');
+  try { return JSON.parse(t); } catch {}
+  const f = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (f) { try { return JSON.parse(f[1]); } catch {} }
+  const a = t.search(/[[{]/), b = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
+  return undefined;
+}
+async function askJSON(prompt, opts) {
+  const s = S.ai.sample;
+  if (typeof s.json === 'function') {
+    try { return await s.json(prompt, opts); } catch (e) { if (!e || e.code !== 'capability_removed') throw e; }
+  }
+  const { text } = await s(prompt, opts);
+  const v = parseLooseJSON(text);
+  if (v === undefined) throw { code: 'invalid_json', text };
+  return v;
+}
+function noteAIError(e) {
+  const code = e && e.code;
+  if (HIDE.has(code)) { S.ai.ok = false; S.ai.why = 'blocked'; }
+  if (code === 'images_unavailable') S.ai.images = null;
+}
+function requireAI() {
+  if (S.ai.ok) return true;
+  toast(S.ai.why === 'blocked' ? 'Bolt needs your OK to think. Tap “Let Bolt think” 🔓'
+    : S.ai.why === 'nohost' ? 'Bolt\'s brain only works inside Claude. Open this app on claude.ai to chat 🔌'
+    : 'Bolt can\'t reach his brain from here right now 🔌', 'bad');
+  if (S.view !== 'chat') window.scrollTo({ top: 0, behavior: 'smooth' });
+  return false;
+}
+async function fixPermission() {
+  if (!S.perms) { toast('Open this app\'s Permissions menu and turn on Claude for it.', 'bad'); return; }
+  try { await S.perms.manage(); } catch { toast('Couldn\'t open permissions. Use this app\'s Permissions menu instead.', 'bad'); return; }
+  let st = 'unavailable';
+  try { st = await S.perms.state('sample'); } catch {}
+  if ((st === 'granted' || st === 'prompt') && S.ai.sample) {
+    S.ai.ok = true; S.ai.why = null; S.ai.perm = st; S.lastErr = null;
+    toast('Bolt is back online! 🤖⚡', 'good');
+  } else toast('Bolt still needs permission to think. Try reloading the page after you turn it on.', 'bad');
+  renderView();
+}
+
+/* ---------- chats ---------- */
+function newChat(subj, title) {
+  const c = { id: uid(), pid: S.pid, subj: SUBJ[subj] ? subj : null, title: str(title, 48) || 'New chat', createdAt: Date.now(), updatedAt: Date.now(), msgs: [], sumN: 0, summary: '' };
+  S.chatCache.set(c.id, c);
+  return c;
+}
+const titleFrom = t => { const s = String(t).replace(/\s+/g, ' ').trim(); return s.length > 42 ? s.slice(0, 40).trimEnd() + '…' : s; };
+function guessSubject(t) {
+  const s = String(t).toLowerCase();
+  if (/spell/.test(s)) return 'spelling';
+  if (/\bread(ing)?\b|sound out|phonics|sight word/.test(s)) return 'reading';
+  if (/essay|\bwrit(e|ing)\b|grammar|sentence|paragraph|punctuation|noun|verb|adjective/.test(s)) return 'writing';
+  if (/math|fraction|multipl|divi(de|sion)|equation|algebra|geometry|decimal|percent|\d\s*[-+×x*÷/=]\s*\d/.test(s)) return 'math';
+  if (/science|cell|atom|planet|energy|force|animal|plant|weather|chemi|physic|biolog/.test(s)) return 'science';
+  if (/history|war|president|government|geograph|map|country|constitution|civics/.test(s)) return 'social';
+  return null;
+}
+function openNewChat(c) { S.chat = c; S.draft = ''; S.lastErr = null; S.photo.chat = null; go('chat'); }
+function startLesson(subj, topic) {
+  if (!requireAI()) return;
+  if (S.busy) { toast('Hang on, Bolt is still finishing another answer ⏳'); return; }
+  const c = newChat(subj, topic);
+  openNewChat(c);
+  sendMsg(c, `Teach me about ${topic}! 🙂`, { x: LESSON_NOTE(topic) });
+  catchUpSummary();
+}
+function askFromHome() {
+  const ta = $('#ask-text'), text = str(ta ? ta.value : S.askDraft, 2000), photo = S.photo.home;
+  if (!text && !photo) { if (ta) { ta.focus(); ta.classList.remove('shake'); void ta.offsetWidth; ta.classList.add('shake'); } toast('Type what you need help with first ✏️'); return; }
+  if (!requireAI()) return;
+  if (S.busy) { toast('Hang on, Bolt is still finishing another answer ⏳'); return; }
+  const c = newChat(guessSubject(text), text ? titleFrom(text) : 'Homework photo');
+  S.askDraft = ''; S.photo.home = null;
+  openNewChat(c);
+  sendMsg(c, text || 'Can you help me with this? 📸', { photo });
+  catchUpSummary();
+}
+function sendFromComposer() {
+  const c = S.chat, ta = $('#chat-text');
+  if (!c || !ta) return;
+  if (S.busy) { toast('Hang on, Bolt is still answering ⏳ (or tap ■ to stop him)'); return; }
+  const text = str(ta.value, 2000), photo = S.photo.chat;
+  if (!text && !photo) { ta.focus(); return; }
+  ta.value = ''; S.draft = ''; autoGrow(ta);
+  S.photo.chat = null;
+  sendMsg(c, text || 'Here\'s my homework 📸', { photo });
+}
+function quickReply(kind) {
+  const q = QUICK[kind], c = S.chat;
+  if (q && c && !S.busy) sendMsg(c, q.t, { x: q.x });
+}
+async function sendMsg(c, text, { x, photo } = {}) {
+  if (!requireAI() || S.busy) return;
+  const m = { r: 'u', t: text, at: Date.now() };
+  if (x) m.x = x;
+  if (photo) { m.img = photo.thumb; m.x = (m.x ? m.x + ' ' : '') + PHOTO_NOTE; }
+  c.msgs.push(m);
+  if (S.lastErr && S.lastErr.chatId === c.id) S.lastErr = null;
+  markActivity(c.pid);
+  persistChat(c);
+  await runBolt(c, photo ? photo.blob : null);
+}
+async function runBolt(c, images) {
+  const p = profById(c.pid) || prof();
+  if (!p) return;
+  const ctl = new AbortController();
+  Object.assign(S, { busy: true, busyChat: c.id, ctl, streamText: '', thinkLine: pick(THINK) });
+  if (isOpen(c)) { updateMsgs(true); updateComposer(); }
+  let raf = 0;
+  const paint = () => { raf = 0; paintLive(c); };
+  try {
+    const res = await S.ai.sample(buildTurns(c, p), {
+      cache: false,
+      signal: ctl.signal,
+      modelTier: images || p.settings.brain === 'careful' ? 'default' : 'quick',
+      ...(images ? { images } : {}),
+      onText: ({ text }) => { S.streamText = text; if (!raf) raf = requestAnimationFrame(paint); },
+    });
+    S.ai.used = true;
+    finishReply(c, res.text, res.truncated);
+  } catch (e) {
+    onBoltError(c, e, images);
+  } finally {
+    if (raf) cancelAnimationFrame(raf);
+    Object.assign(S, { busy: false, busyChat: null, ctl: null, streamText: '' });
+    if (S.view === 'chat') {
+      if (!S.ai.ok) renderView(); else { updateMsgs(isOpen(c)); updateComposer(); }
+    } else refreshHomeLists();
+    if (!isOpen(c)) maybeSummarize(c);
+  }
+}
+function finishReply(c, text, truncated) {
+  const star = STAR_RE.test(text);
+  const m = { r: 'a', t: cleanStar(text).trim() || (star ? 'You got it! 🎉' : '…'), at: Date.now() };
+  if (star) m.star = true;
+  if (truncated) m.cut = true;
+  c.msgs.push(m);
+  persistChat(c);
+  const i = c.msgs.length - 1;
+  if (star) { if (isOpen(c)) S.starFx = { pid: c.pid, i }; else awardStars(1, c.pid); }
+  const p = profById(c.pid);
+  if (isOpen(c) && p && p.settings.autoRead && speech.ok) S.autoSpeak = i;
+}
+function onBoltError(c, e, images) {
+  const code = e && typeof e.code === 'string' ? e.code : 'upstream_error';
+  const partial = e && typeof e.text === 'string' && code !== 'refused' ? cleanStar(e.text).trim() : '';
+  if (code === 'cancelled') {
+    if (partial) { c.msgs.push({ r: 'a', t: partial, at: Date.now(), stop: true }); persistChat(c); }
+    return;
+  }
+  if (partial) { c.msgs.push({ r: 'a', t: partial, at: Date.now(), cut: true, partial: true }); persistChat(c); }
+  noteAIError(e);
+  S.lastErr = { code: HIDE.has(code) ? 'blocked' : code, chatId: c.id, images: images || null };
+  if (!isOpen(c) && !HIDE.has(code)) toast('Bolt glitched while answering in another chat 🤖💥', 'bad');
+}
+function retry() {
+  const c = S.chat, err = S.lastErr;
+  if (!c || S.busy || !err || err.chatId !== c.id) return;
+  if (!requireAI()) return;
+  const last = c.msgs[c.msgs.length - 1];
+  if (last && last.r === 'a' && last.partial) { c.msgs.pop(); persistChat(c, { touch: false }); }
+  S.lastErr = null;
+  if (!c.msgs.length || c.msgs[c.msgs.length - 1].r !== 'u') { updateMsgs(); return; }
+  runBolt(c, canPhoto() ? err.images : null);
+}
+async function openChat(id) {
+  stopSpeech();
+  let c = S.chatCache.get(id) || null;
+  if (!c) {
+    try { c = normalizeChat(await S.store.get('chat-' + id), id); }
+    catch { toast('Couldn\'t open that chat right now 📡 Try again in a moment.', 'bad'); return; }
+    if (c) S.chatCache.set(id, c);
+  }
+  if (!c) {
+    toast('Couldn\'t open that chat 😢 It might have been deleted.', 'bad');
+    S.indexes[S.pid] = curIndex().filter(x => x.id !== id); saveIndex(S.pid);
+    renderView(); return;
+  }
+  S.chat = c; S.draft = ''; S.photo.chat = null;
+  if (S.lastErr && S.lastErr.chatId !== id) S.lastErr = null;
+  go('chat');
+}
+function leaveChat() {
+  const c = S.chat;
+  stopSpeech();
+  S.photo.chat = null;
+  go('home');
+  if (c) maybeSummarize(c);
+}
+async function deleteChat(id) {
+  const e = curIndex().find(x => x.id === id);
+  if (!await confirmBox({ title: 'Delete this chat?', body: `“${e ? e.title : 'This chat'}” will be gone for good.`, yes: 'Delete', danger: true })) return;
+  S.deleted.add(id);
+  if (S.busy && S.busyChat === id && S.ctl) S.ctl.abort();
+  S.indexes[S.pid] = curIndex().filter(x => x.id !== id); saveIndex(S.pid);
+  save('chat-' + id, DEL); S.chatCache.delete(id);
+  if (S.chat && S.chat.id === id) S.chat = null;
+  renderView(); toast('Chat deleted 🗑️');
+}
+
+/* ---------- memory: Bolt writes short notes after chats ---------- */
+const needsSummary = c => c.msgs.filter(m => m.r === 'u').length >= 2 && c.msgs.length >= (c.sumN || 0) + 2;
+let sumChain = Promise.resolve();
+function maybeSummarize(c) {
+  if (!c || !S.ai.ok || S.deleted.has(c.id) || S.sumPending.has(c.id) || (S.busy && S.busyChat === c.id) || !needsSummary(c)) return;
+  S.sumPending.add(c.id);
+  sumChain = sumChain.then(() => summarize(c)).catch(() => {}).then(() => { S.sumPending.delete(c.id); });
+}
+async function catchUpSummary() {
+  // A chat whose tab was closed before Bolt took notes: pick one up on the next explicit action.
+  const e = curIndex().find(x => x.n >= x.s + 2 && (!S.chat || x.id !== S.chat.id) && !S.sumPending.has(x.id) && !S.sumTried.has(x.id));
+  if (!e || !S.ai.ok) return;
+  S.sumTried.add(e.id);
+  let c = S.chatCache.get(e.id);
+  if (!c) { try { c = normalizeChat(await S.store.get('chat-' + e.id), e.id); } catch { c = null; } }
+  if (!c) return;
+  S.chatCache.set(c.id, c);
+  if (needsSummary(c)) maybeSummarize(c); else { c.sumN = c.msgs.length; persistChat(c, { touch: false }); }
+}
+function summaryPrompt(p, c) {
+  const transcript = c.msgs.slice(-24).map(m => (m.r === 'u' ? 'Student: ' : 'Bolt: ') + m.t.replace(/\s+/g, ' ').slice(0, 600)).join('\n');
+  return `You keep short memory notes for Bolt, a robot tutor app, about one student: ${p.name}, ${gradeName(p.grade)}.
+
+CURRENT NOTES
+${p.memory.length ? p.memory.map((n, i) => `${i + 1}. ${n}`).join('\n') : '(none yet)'}
+
+LATEST CHAT
+${transcript}
+
+Reply with only JSON like:
+{"title":"Adding fractions","subject":"math","summary":"Practiced adding fractions with the same bottom number. Got two right alone; still mixes up the bottom numbers.","notes":["Learning to add fractions with different bottom numbers","Likes soccer examples"]}
+
+Rules:
+- "title": 2–5 words naming what the chat was about.
+- "subject": one of math, reading, spelling, writing, science, social, other.
+- "summary": 1–2 short sentences on what they worked on and how it went.
+- "notes": the full, updated list of up to ${MAX_NOTES} short notes (under 100 characters each) that will help Bolt next time: what they're learning, what's hard for them, what helps them, their interests. Keep old notes that still matter, update ones that changed, and drop ones that are no longer true.
+- Never include private info like addresses, phone numbers, passwords or last names.`;
+}
+async function summarize(c) {
+  const p = profById(c.pid);
+  if (!p || !S.ai.ok || S.deleted.has(c.id) || !needsSummary(c)) return;
+  const n = c.msgs.length;
+  let out;
+  try { out = await askJSON(summaryPrompt(p, c), { modelTier: 'quick', cache: false }); }
+  catch (e) { noteAIError(e); return; }
+  if (S.deleted.has(c.id) || !profById(c.pid) || !out || typeof out !== 'object') return;
+  const title = str(out.title, 48);
+  if (title.length >= 2) c.title = title;
+  const summary = str(out.summary, 240);
+  if (summary) c.summary = summary;
+  if (SUBJ[out.subject]) c.subj = out.subject;
+  if (Array.isArray(out.notes)) {
+    const notes = out.notes.map(x => str(x, 140)).filter(x => x.length > 2).slice(0, MAX_NOTES);
+    if (notes.length || !p.memory.length) { p.memory = notes; saveMeta(); }
+  }
+  c.sumN = Math.min(n, c.msgs.length);
+  persistChat(c, { touch: false });
+  if (c.pid === S.pid) refreshHomeLists();
+}
+function forgetNote(i) {
+  const p = prof();
+  if (!p || !p.memory[i]) return;
+  p.memory.splice(i, 1); saveMeta();
+  S.memOpen = true; refreshHomeLists(); toast('Bolt forgot that one 🧽');
+}
+
+/* ---------- photos ---------- */
+let photoTarget = 'home';
+function pickPhoto(where) {
+  if (!canPhoto()) return;
+  photoTarget = where;
+  const inp = $('#photo-input');
+  inp.value = ''; inp.click();
+}
+function loadImg(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => res({ img, url });
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('decode')); };
+    img.src = url;
+  });
+}
+function scaled(img, max) {
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (!w || !h) throw new Error('empty image');
+  const k = Math.min(1, max / Math.max(w, h)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+async function prepImage(file) {
+  const { img, url } = await loadImg(file);
+  try {
+    const big = scaled(img, 1600);
+    const blob = await new Promise((res, rej) => big.toBlob(b => b ? res(b) : rej(new Error('encode')), 'image/jpeg', 0.86));
+    const thumb = scaled(img, 240).toDataURL('image/jpeg', 0.6);
+    return { blob, thumb };
+  } finally { URL.revokeObjectURL(url); }
+}
+$('#photo-input').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  if (f.size > 40e6) { toast('That picture is too big. Try a smaller one 📏', 'bad'); return; }
+  try {
+    S.photo[photoTarget] = await prepImage(f);
+    refreshPhoto(photoTarget);
+  } catch { toast('Bolt couldn\'t open that picture. Try a JPG or PNG photo 📸', 'bad'); }
+});
+function photoInner(where) {
+  const ph = S.photo[where];
+  if (!ph) return html``;
+  return html`<div class="photo-prev"><img src="${ph.thumb}" alt="Your homework photo"><span class="tiny">Photo ready! Bolt will look at it when you send.</span><button type="button" class="iconbtn sm" data-act="photo-x" data-where="${where}" aria-label="Remove photo">✕</button></div>`;
+}
+function refreshPhoto(where) { setHTML($('#' + where + '-photo'), photoInner(where)); }
+
+/* ---------- quizzes ---------- */
+function quizPrompt(p, subj, topic, n) {
+  const gname = gradeName(p.grade), sname = SUBJ[subj].name;
+  return `You write fun practice quizzes for a ${gname} student in the "AI School Helper" app.
+Subject: ${sname}
+Topic: ${topic || `a mix of things ${gname} students learn in ${sname}`}
+
+Write exactly ${n} multiple-choice questions at a ${gname} level, using simple, clear words.
+Rules:
+- Exactly 4 short answer choices per question, and exactly one is correct.
+- No "all of the above" or "none of the above".
+- "answer" is the index (0 to 3) of the correct choice.
+- "hint": one sentence that helps without giving the answer away.
+- "explain": 1–2 simple sentences saying why the right answer is right.
+- Write math like 3 × 4 or 1/2, never LaTeX.
+- Double-check that every answer is really correct.
+
+Reply with only JSON in this shape:
+{"title":"Short quiz title","questions":[{"q":"What is 6 × 7?","choices":["36","42","48","13"],"answer":1,"hint":"Think of 6 groups of 7.","explain":"6 × 7 = 42, because 6 groups of 7 make 42."}]}`;
+}
+function spellPrompt(p, topic, n, words) {
+  const gname = gradeName(p.grade);
+  const which = words.length
+    ? `Use exactly these ${words.length} words, in this order: ${words.join(', ')}.`
+    : `Pick ${n} good spelling words for a ${gname} student${topic ? ` that practice: ${topic}` : ''}. Use real words a ${gname} student should learn to spell.`;
+  return `You help make a spelling test for a ${gname} student in the "AI School Helper" app. The app reads each word out loud, then the student types it.
+${which}
+For each word give:
+- "word": the word, spelled correctly (lowercase unless it's a name).
+- "sentence": a short, kid-friendly sentence that uses the exact word.
+- "clue": a simple meaning clue that does NOT contain the word.
+- "tip": one spelling tip, like a rule, a tricky part, or a memory trick. Don't write the whole word in the tip.
+
+Reply with only JSON in this shape:
+{"title":"Short test title","words":[{"word":"because","sentence":"I smiled because I won the game.","clue":"The reason why something happens.","tip":"The middle sounds like 'cuz' but it's spelled with 'au'."}]}`;
+}
+function fixChoices(list) {
+  let ch = list.map(c => str(c, 200));
+  if (ch.length && ch.every((c, i) => new RegExp('^\\(?' + 'ABCDEF'[i] + '[).:]\\s+').test(c))) ch = ch.map(c => c.replace(/^\(?[A-F][).:]\s+/, ''));
+  return ch;
+}
+function validateQuiz(d, n) {
+  const qs = [];
+  for (const q of d && Array.isArray(d.questions) ? d.questions : []) {
+    if (!q || typeof q !== 'object') continue;
+    const text = str(q.q || q.question, 500);
+    const ch = Array.isArray(q.choices) ? fixChoices(q.choices) : [];
+    const a = Number.isInteger(q.answer) ? q.answer : parseInt(q.answer, 10);
+    if (!text || ch.length < 2 || ch.length > 6 || ch.some(c => !c) || !(a >= 0 && a < ch.length)) continue;
+    const right = ch[a];
+    const uniq = [...new Map(ch.map(c => [c.toLowerCase(), c])).values()];
+    if (uniq.length < 2) continue;
+    const order = shuffle(uniq.slice());
+    qs.push({ q: text, choices: order, answer: order.findIndex(c => c.toLowerCase() === right.toLowerCase()), hint: str(q.hint, 300), explain: str(q.explain, 500) });
+    if (qs.length >= n) break;
+  }
+  if (qs.length < Math.min(3, n)) throw { code: 'bad_quiz' };
+  return { title: str(d.title, 50) || 'Practice quiz', items: qs };
+}
+const WORD_RE = /^[A-Za-z][A-Za-z' -]{0,29}$/;
+const maskWord = (s, w) => String(s || '').replace(new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(s|es|ed|ing|er|ly)?\\b', 'gi'), '_____');
+function validateSpelling(d, n, words) {
+  const got = d && Array.isArray(d.words) ? d.words.filter(x => x && typeof x === 'object') : [];
+  const mk = (word, x) => {
+    const sentence = x ? str(x.sentence, 220) : '';
+    let clue = x ? str(x.clue, 200) : '', tip = x ? str(x.tip, 200) : '';
+    clue = maskWord(clue, word);
+    if (tip.toLowerCase().includes(word.toLowerCase())) tip = '';
+    return { word, sentence, clue, tip };
+  };
+  let items;
+  if (words.length) {
+    const byWord = new Map(got.filter(x => typeof x.word === 'string').map(x => [x.word.trim().toLowerCase(), x]));
+    items = words.map((w, i) => mk(w, byWord.get(w.toLowerCase()) || (got[i] && str(got[i].word, 30).toLowerCase() === w.toLowerCase() ? got[i] : null)));
+  } else {
+    const seen = new Set();
+    items = got.map(x => ({ x, w: str(x.word, 30) })).filter(({ w }) => WORD_RE.test(w) && !seen.has(w.toLowerCase()) && seen.add(w.toLowerCase())).slice(0, n).map(({ x, w }) => mk(w, x));
+    if (items.length < Math.min(3, n)) throw { code: 'bad_quiz' };
+  }
+  return { title: str(d && d.title, 50) || 'Spelling test', items };
+}
+function parseWordList(t) {
+  const seen = new Set(), out = [];
+  for (let w of String(t || '').split(/[\n,;]+/)) {
+    w = w.replace(/^\s*\d+[.)]?\s*/, '').replace(/[“”"]/g, '').replace(/’/g, '\'').trim().replace(/\s+/g, ' ');
+    if (WORD_RE.test(w) && !seen.has(w.toLowerCase())) { seen.add(w.toLowerCase()); out.push(w); }
+  }
+  return out.slice(0, 25);
+}
+const R = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const fmtNum = (v, dec) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(dec);
+function mathItem(gn) {
+  let q, a, hint, explain, dec = 0;
+  const one = Math.random() < 0.5;
+  if (gn <= 0) {
+    const x = R(0, 5), y = R(0, 5); a = x + y;
+    q = `What is ${x} + ${y}?`; hint = 'Hold up fingers for each number, then count them all.'; explain = `${x} + ${y} = ${a}. Count ${x}, then count ${y} more.`;
+  } else if (gn === 1) {
+    if (one) { const x = R(2, 10), y = R(1, 10); a = x + y; q = `What is ${x} + ${y}?`; hint = `Start at ${Math.max(x, y)} and count up ${Math.min(x, y)} more.`; explain = `${x} + ${y} = ${a}.`; }
+    else { const x = R(6, 20), y = R(1, Math.min(10, x)); a = x - y; q = `What is ${x} − ${y}?`; hint = `Start at ${x} and count back ${y}.`; explain = `${x} − ${y} = ${a}.`; }
+  } else if (gn === 2) {
+    if (one) { const x = R(12, 68), y = R(11, 99 - x); a = x + y; q = `What is ${x} + ${y}?`; hint = 'Add the tens first, then add the ones.'; explain = `${x} + ${y} = ${a}.`; }
+    else { const x = R(30, 99), y = R(11, x - 1); a = x - y; q = `What is ${x} − ${y}?`; hint = 'Take away the tens first, then the ones.'; explain = `${x} − ${y} = ${a}.`; }
+  } else if (gn === 3) {
+    if (one) { const x = R(2, 10), y = R(2, 10); a = x * y; q = `What is ${x} × ${y}?`; hint = `${x} × ${y} means ${x} groups of ${y}. Try skip counting by ${y}.`; explain = `${x} × ${y} = ${a}.`; }
+    else { const y = R(2, 10); a = R(2, 10); const x = y * a; q = `What is ${x} ÷ ${y}?`; hint = `Think: ${y} times what number makes ${x}?`; explain = `${x} ÷ ${y} = ${a}, because ${y} × ${a} = ${x}.`; }
+  } else if (gn === 4) {
+    if (one) { const x = R(12, 99), y = R(3, 9); a = x * y; q = `What is ${x} × ${y}?`; hint = `Split ${x} into ${x - x % 10} + ${x % 10}. Multiply each part by ${y}, then add.`; explain = `${x - x % 10} × ${y} = ${(x - x % 10) * y} and ${x % 10} × ${y} = ${(x % 10) * y}, so ${x} × ${y} = ${a}.`; }
+    else { const y = R(3, 9); a = R(12, 40); const x = y * a; q = `What is ${x} ÷ ${y}?`; hint = `How many groups of ${y} fit in ${x}? Try ${y} × 10 first.`; explain = `${x} ÷ ${y} = ${a}, because ${y} × ${a} = ${x}.`; }
+  } else if (gn === 5) {
+    if (one) { const x = R(11, 89), y = R(11, 89); dec = 1; a = (x + y) / 10; q = `What is ${(x / 10).toFixed(1)} + ${(y / 10).toFixed(1)}?`; hint = 'Line up the decimal points, then add like whole numbers.'; explain = `${(x / 10).toFixed(1)} + ${(y / 10).toFixed(1)} = ${a.toFixed(1)}.`; }
+    else { const d = pick([2, 3, 4, 5]); a = R(2, 12); const n = d * a; q = `What is 1/${d} of ${n}?`; hint = `Split ${n} into ${d} equal groups. How many are in one group?`; explain = `${n} ÷ ${d} = ${a}, so 1/${d} of ${n} is ${a}.`; }
+  } else if (gn <= 8) {
+    if (one) { const x = R(-12, 12), y = R(-12, -1); a = x + y; q = `What is ${fmtNum(x, 0)} + (${fmtNum(y, 0)})?`; hint = 'Adding a negative number means moving left on the number line.'; explain = `Start at ${fmtNum(x, 0)} and move ${-y} to the left: you land on ${fmtNum(a, 0)}.`; }
+    else { const pct = pick([10, 20, 25, 50]), base = pick([20, 40, 60, 80, 120, 200]); a = base * pct / 100; q = `What is ${pct}% of ${base}?`; hint = `${pct}% means ${pct} out of every 100. Try finding 10% first.`; explain = `${pct}% of ${base} = ${pct}/100 × ${base} = ${a}.`; }
+  } else if (one) {
+    const x = R(-9, 9), m = R(2, 9), b = R(1, 15) * (Math.random() < 0.5 ? -1 : 1), c = m * x + b; a = x;
+    q = `Solve for x: ${m}x ${b < 0 ? '−' : '+'} ${Math.abs(b)} = ${fmtNum(c, 0)}`;
+    hint = `First ${b < 0 ? 'add' : 'subtract'} ${Math.abs(b)} on both sides, then divide by ${m}.`;
+    explain = `${m}x = ${fmtNum(c - b, 0)}, so x = ${fmtNum(c - b, 0)} ÷ ${m} = ${fmtNum(x, 0)}.`;
+  } else {
+    const base = R(2, 5), e = R(2, base === 2 ? 6 : 3); a = base ** e;
+    q = `What is ${base}^${e}?`; hint = `${base}^${e} means ${base} multiplied by itself ${e} times.`; explain = `${Array(e).fill(base).join(' × ')} = ${a}.`;
+  }
+  const rnd = v => dec ? Math.round(v * 10) / 10 : Math.round(v);
+  const offs = shuffle(dec ? [0.1, -0.1, 1, -1, 0.2, -0.2] : [1, -1, 2, -2, 10, -10, 3, -3]);
+  const wrong = new Set();
+  for (const o of offs) { const v = rnd(a + o); if (v !== a && (gn >= 6 || v >= 0)) wrong.add(v); if (wrong.size === 3) break; }
+  for (let k = 4; wrong.size < 3 && k < 60; k++) { const v = rnd(a + k * (dec ? 0.1 : 1)); if (v !== a) wrong.add(v); }
+  const vals = shuffle([a, ...wrong]);
+  return { q, choices: vals.map(v => fmtNum(v, dec)), answer: vals.indexOf(a), hint, explain };
+}
+function offlineMathQuiz(p, n) {
+  return { kind: 'mc', subj: 'math', title: 'Math practice', offline: true, items: Array.from({ length: n }, () => mathItem(gradeNum(p.grade))) };
+}
+function beginQuiz(q) {
+  S.quiz = Object.assign({ i: 0, tries: 0, wrong: [], answered: false, result: null, copy: false, score: 0, stars: 0, missed: [], lastTry: '' }, q);
+  go(q.kind === 'spell' ? 'spell' : 'quiz');
+  autoSpeakQuestion();
+}
+async function makeQuiz(kind) {
+  const p = prof();
+  if (kind === 'mc') {
+    const f = S.qform;
+    if (!S.ai.ok) { if (f.subj === 'math') beginQuiz(offlineMathQuiz(p, f.n)); else requireAI(); return; }
+    await generate(async signal => {
+      const d = await askJSON(quizPrompt(p, f.subj, str(f.topic, 80), f.n), { modelTier: 'default', cache: false, signal });
+      return Object.assign({ kind: 'mc', subj: f.subj }, validateQuiz(d, f.n));
+    }, f.subj === 'math' ? () => offlineMathQuiz(p, f.n) : null, 'quizSetup');
+  } else {
+    const f = S.sform, mine = f.mode === 'mine' || !S.ai.ok, words = mine ? parseWordList(f.words) : [];
+    if (mine && !words.length) { toast('Type some spelling words first (one per line) ✏️', 'bad'); return; }
+    if (!S.ai.ok) {
+      if (speech.ok) beginQuiz({ kind: 'spell', subj: 'spelling', title: 'My spelling list', items: words.map(w => ({ word: w, sentence: '', clue: '', tip: '' })) });
+      else requireAI();
+      return;
+    }
+    await generate(async signal => {
+      const d = await askJSON(spellPrompt(p, str(f.topic, 80), f.n, words), { modelTier: 'default', cache: false, signal });
+      return Object.assign({ kind: 'spell', subj: 'spelling' }, validateSpelling(d, f.n, words));
+    }, words.length && speech.ok ? () => ({ kind: 'spell', subj: 'spelling', title: 'My spelling list', items: words.map(w => ({ word: w, sentence: '', clue: '', tip: '' })) }) : null, 'spellSetup');
+  }
+}
+async function generate(job, fallback, backView) {
+  const ctl = S.qctl = new AbortController();
+  go('quizLoading');
+  try {
+    const q = await job(ctl.signal);
+    S.ai.used = true;
+    if (S.qctl === ctl && S.view === 'quizLoading') beginQuiz(q);
+  } catch (e) {
+    if (S.qctl !== ctl || S.view !== 'quizLoading' || (e && e.code === 'cancelled')) return;
+    noteAIError(e);
+    const code = e && e.code;
+    if (fallback && !HIDE.has(code) && code !== 'rate_limited') {
+      toast('Bolt\'s quiz machine glitched 🤖💥 so here\'s a practice round he can run without his brain.', 'bad');
+      beginQuiz(fallback()); return;
+    }
+    go(backView);
+    toast(code === 'rate_limited' ? 'Bolt\'s brain is overheating 🥵 Wait a minute and try again.'
+      : HIDE.has(code) ? 'Bolt needs your OK to think 🔓 Tap “Let Bolt think”.'
+      : 'Bolt\'s quiz machine glitched 🤖💥 Try again!', 'bad');
+  } finally { if (S.qctl === ctl) S.qctl = null; }
+}
+const missEntry = (q, it) => q.kind === 'spell' ? { word: it.word, short: it.word } : { q: it.q, a: it.choices[it.answer], explain: it.explain, short: it.q.slice(0, 60) };
+function chooseAnswer(k, btn) {
+  const q = S.quiz;
+  if (!q || q.kind !== 'mc' || q.answered) return;
+  const it = q.items[q.i];
+  if (!(k >= 0 && k < it.choices.length) || q.wrong.includes(k)) return;
+  markActivity();
+  let fx = null;
+  if (k === it.answer) {
+    q.answered = true; q.result = q.tries === 0 ? 'first' : 'second';
+    if (q.tries === 0) { q.score++; q.stars++; fx = 'star'; } else q.missed.push(missEntry(q, it));
+  } else {
+    q.wrong.push(k); q.tries++;
+    if (q.tries >= 2) { q.answered = true; q.result = 'reveal'; q.missed.push(missEntry(q, it)); }
+  }
+  stopSpeech();
+  renderView();
+  if (fx) awardStars(1, S.pid, document.querySelector(`.choice[data-k="${k}"]`) || btn);
+  else if (k !== it.answer) { const b = document.querySelector(`.choice[data-k="${k}"]`); if (b) b.classList.add('shake'); }
+  const nb = $('#next-btn'); if (nb) nb.focus({ preventScroll: true });
+}
+const norm = s => String(s || '').toLowerCase().replace(/[’‘`]/g, '\'').replace(/\s+/g, ' ').trim();
+function checkSpelling() {
+  const q = S.quiz, inp = $('#spell-in');
+  if (!q || q.kind !== 'spell' || q.answered || !inp) return;
+  const it = q.items[q.i], v = norm(inp.value);
+  if (!v) { inp.focus(); return; }
+  markActivity();
+  const right = v === norm(it.word);
+  let fx = false;
+  if (q.copy) { if (right) { q.answered = true; q.result = 'copied'; } else q.result = 'copywrong'; }
+  else if (right) {
+    q.answered = true; q.result = q.tries === 0 ? 'first' : 'second';
+    if (q.tries === 0) { q.score++; q.stars++; fx = true; } else q.missed.push(missEntry(q, it));
+  } else {
+    q.tries++; q.lastTry = inp.value.trim();
+    if (q.tries >= 2) { q.copy = true; q.result = 'reveal'; q.missed.push(missEntry(q, it)); } else q.result = 'hint';
+  }
+  renderView();
+  if (fx) awardStars(1, S.pid, $('.fb.good') || $('#spell-form'));
+  if (!right && !q.answered) { const i = $('#spell-in'); if (i) { i.classList.add('shake'); i.focus(); } }
+  else { const nb = $('#next-btn'); if (nb) nb.focus({ preventScroll: true }); }
+}
+function nextQuestion() {
+  const q = S.quiz;
+  if (!q || !q.answered) return;
+  stopSpeech();
+  if (q.i + 1 >= q.items.length) { finishQuiz(); return; }
+  Object.assign(q, { i: q.i + 1, tries: 0, wrong: [], answered: false, result: null, copy: false, lastTry: '' });
+  renderView(); window.scrollTo(0, 0);
+  const inp = $('#spell-in'); if (inp && !coarse()) inp.focus();
+  autoSpeakQuestion();
+}
+function finishQuiz() {
+  const q = S.quiz, p = prof();
+  if (!q || !p || q.done) return;
+  q.done = true;
+  if (q.score === q.items.length && q.items.length >= 3) { q.bonus = 2; q.stars += 2; awardStars(2); }
+  p.quizzes.unshift({ at: Date.now(), subj: q.subj, title: q.title, score: q.score, total: q.items.length, missed: q.missed.map(m => m.short).slice(0, 5) });
+  p.quizzes = p.quizzes.slice(0, MAX_QUIZZES);
+  saveMeta();
+  go('results');
+}
+async function quitQuiz(to = 'home') {
+  const q = S.quiz;
+  if (q && !q.done && (q.i > 0 || q.answered || q.tries > 0) && !await confirmBox({ title: 'Quit this quiz?', body: 'Your stars so far stay, but this quiz won\'t be saved.', yes: 'Quit', no: 'Keep going' })) return;
+  stopSpeech();
+  S.quiz = null; go(to);
+}
+function autoSpeakQuestion() {
+  const p = prof(), q = S.quiz;
+  if (!p || !q || !speech.ok) return;
+  if (q.kind === 'spell') sayWord(false);
+  else if (p.settings.autoRead) speakQuestion();
+}
+function speakQuestion() {
+  const q = S.quiz; if (!q) return;
+  const it = q.items[q.i];
+  speakKeyed('q' + q.i, it.q + '. ' + it.choices.map((c, k) => `${'ABCDEF'[k]}: ${c}.`).join(' '));
+}
+function sayWord(slow) {
+  const q = S.quiz; if (!q) return;
+  const it = q.items[q.i];
+  const text = slow ? `${it.word}. ${it.word}.` : `${it.word}. ${it.sentence ? it.sentence + ' ' : ''}${it.word}.`;
+  speakKeyed(slow ? 'slow' + q.i : 'word' + q.i, text, slow ? 0.55 : null);
+}
+function askAboutMissed() {
+  const q = S.quiz;
+  if (!q || !q.missed.length || !requireAI()) return;
+  if (S.busy) { toast('Hang on, Bolt is still finishing another answer ⏳'); return; }
+  let text, x;
+  if (q.kind === 'spell') {
+    text = `I had trouble spelling these words: ${q.missed.map(m => m.word).join(', ')}. Can you help me remember them? 🔤`;
+    x = 'The spelling test already showed the correct spellings, so you may write them. Teach one memory trick or pattern per word, then quiz the student on one word using a clue (without showing that word).';
+  } else {
+    text = `I just did a quiz called "${q.title}" and missed these:\n` + q.missed.map(m => `- ${m.q} (the answer was: ${m.a})`).join('\n') + '\nCan you help me understand them? 🤔';
+    x = 'The quiz already showed the correct answers, so you may talk about them. Explain the idea behind each one simply, one at a time, then give a NEW similar practice question so the student can try it.';
+  }
+  const c = newChat(q.subj, 'Quiz help: ' + q.title);
+  openNewChat(c);
+  sendMsg(c, text, { x });
+}
+
+/* ---------- profiles ---------- */
+const blankForm = () => ({ name: '', grade: null, avatar: pick(AVATARS), editId: null });
+async function selectProfile(id) {
+  const p = profById(id);
+  if (!p) return;
+  stopSpeech();
+  S.pid = id; S.chat = null; S.lastErr = null; S.photo = {}; S.quiz = null; S.memOpen = false; S.tab = 'math';
+  if (S.meta.activeId !== id) { S.meta.activeId = id; saveMeta(); }
+  if (!S.indexes[id]) {
+    const list = await loadIndex(id);
+    S.indexes[id] = list || [];
+    if (!list) { S.idxBad.add(id); repairIndex(id); toastOnce('idx-' + id, 'Couldn\'t load your old chats right now 📡 They\'re safe, and they\'ll pop back in when the connection does.', 'bad'); }
+  }
+  go('home');
+}
+function saveProfileForm() {
+  const f = S.form, name = str($('#pf-name') ? $('#pf-name').value : f.name, 20), err = $('#pf-err');
+  const fail = t => { if (err) { err.textContent = t; err.hidden = false; } };
+  if (!name) return fail('Type a name or nickname so Bolt knows what to call you!');
+  if (!f.grade) return fail('Pick your grade so Bolt can explain things at your level!');
+  if (f.editId) {
+    const p = profById(f.editId);
+    if (!p) return go('profiles');
+    Object.assign(p, { name, grade: f.grade, avatar: f.avatar });
+    saveMeta(); go('settings'); toast('Saved! ✅', 'good');
+    return;
+  }
+  if (S.meta.profiles.length >= MAX_PROFILES) return fail(`Bolt can only remember ${MAX_PROFILES} learners. Delete one in Settings first.`);
+  const p = normalizeProfile({ id: uid(), name, grade: f.grade, avatar: f.avatar, createdAt: Date.now() });
+  S.meta.profiles.push(p);
+  S.indexes[p.id] = [];
+  saveMeta();
+  selectProfile(p.id);
+}
+async function deleteProfile(id) {
+  const p = profById(id);
+  if (!p || !await confirmBox({ title: `Delete ${p.name}?`, body: 'Their chats, stars and Bolt\'s notes about them will be gone for good.', yes: 'Delete', danger: true })) return;
+  if (S.busy && S.ctl) S.ctl.abort();
+  let list = S.indexes[id];
+  if (!list) { try { list = normalizeIndex(await S.store.get('idx-' + id)); } catch { list = []; } }
+  for (const e of list) { S.deleted.add(e.id); save('chat-' + e.id, DEL); S.chatCache.delete(e.id); }
+  save('idx-' + id, DEL); delete S.indexes[id];
+  S.meta.profiles = S.meta.profiles.filter(x => x.id !== id);
+  if (S.meta.activeId === id) S.meta.activeId = null;
+  saveMeta();
+  S.pid = null; S.chat = null;
+  if (!S.meta.profiles.length) { S.form = blankForm(); go('onboard'); } else go('profiles');
+  toast('Learner deleted 🗑️');
+}
+function setSetting(k, v) {
+  const p = prof(); if (!p) return;
+  p.settings[k] = v; saveMeta();
+  if (k === 'autoRead' && !v) stopSpeech();
+  renderView();
+}
+
+/* ---------- views ---------- */
+function renderTop() {
+  const top = $('#top'), p = prof();
+  top.hidden = S.view === 'boot';
+  const sk = streakNow(p);
+  setHTML(top, html`<div class="top-in">
+    <button type="button" class="brand" data-act="${p ? 'home' : 'noop'}" aria-label="AI School Helper home">${raw(BOLT())}<span>AI School Helper</span></button>
+    <span class="spacer"></span>
+    ${p && !['profiles', 'onboard'].includes(S.view) ? html`
+      <span class="pill" id="star-pill" title="Your stars"><span aria-hidden="true">⭐</span><b id="star-count">${p.stars}</b><span class="sr"> stars</span></span>
+      <span class="pill ${sk ? 'hot' : ''}" title="Days in a row"><span aria-hidden="true">🔥</span><b>${sk}</b><span class="sr">-day streak</span></span>
+      <button type="button" class="who" data-act="settings" aria-label="Settings for ${p.name}"><span class="face" aria-hidden="true">${p.avatar}</span><span class="nm">${p.name}</span></button>` : ''}
+  </div>`);
+}
+function aiBanner() {
+  if (S.ai.ok) return '';
+  if (S.ai.why === 'blocked') return html`<div class="banner"><b>🔌 Bolt needs your OK to think.</b><span>He uses Claude to help you. Turn Claude on for this app and you're set!</span><button type="button" class="btn sm" data-act="perm">🔓 Let Bolt think</button></div>`;
+  return html`<div class="banner"><b>🔌 Bolt's brain is offline here.</b><span>${S.ai.why === 'nohost' ? 'Bolt only thinks inside Claude, so open this app on claude.ai to chat. ' : ''}You can still do math practice${speech.ok ? ' and spelling tests with your own words' : ''}!</span></div>`;
+}
+const vBoot = () => html`<div class="boot">${raw(BOLT('busy'))}<p class="hand">Booting up… beep boop</p></div>`;
+function vProfiles() {
+  const ps = S.meta.profiles;
+  return html`<div class="page">
+    <div class="hello">${raw(BOLT())}<div><h1>Who's learning today?</h1><p class="muted">Pick your name, or add a new learner.</p></div></div>
+    <div class="pgrid">
+      ${ps.map(p => html`<button type="button" class="pcard" data-act="pick-profile" data-id="${p.id}"><span class="pav" aria-hidden="true">${p.avatar}</span><span class="pname">${p.name}</span><span class="muted tiny">${gradeName(p.grade)} · ⭐ ${p.stars}</span></button>`)}
+      ${ps.length < MAX_PROFILES ? html`<button type="button" class="pcard add" data-act="new-profile"><span class="pav" aria-hidden="true">➕</span><span class="pname">Add a learner</span><span class="muted tiny">Like a brother or sister</span></button>` : ''}
+    </div>
+  </div>`;
+}
+function vOnboard() {
+  const f = S.form, editing = !!f.editId;
+  return html`<div class="page">
+    <div class="hello">${raw(BOLT())}<div>
+      <h1>${editing ? 'Edit learner' : 'Hi! I\'m Bolt 🤖'}</h1>
+      <p class="muted">${editing ? 'Change your name, grade or avatar.' : 'I\'m your homework buddy. I won\'t just tell you answers. I\'ll help you figure them out, so it sticks in your brain!'}</p>
+    </div></div>
+    <form id="profile-form" class="card stack" autocomplete="off" novalidate>
+      <label class="field"><span class="label">What should I call you?</span>
+        <input id="pf-name" type="text" maxlength="20" placeholder="Your first name or a nickname" value="${f.name}"></label>
+      <div class="field"><span class="label" id="pf-grade-l">What grade are you in?</span>
+        <div class="chips" role="group" aria-labelledby="pf-grade-l">${GRADES.map(g => html`<button type="button" class="chip" data-act="pf-grade" data-g="${g}" aria-pressed="${f.grade === g}" title="${gradeName(g)}">${gradeShort(g)}</button>`)}</div></div>
+      <div class="field"><span class="label" id="pf-av-l">Pick your avatar</span>
+        <div class="chips" role="group" aria-labelledby="pf-av-l">${AVATARS.map(a => html`<button type="button" class="chip av" data-act="pf-avatar" data-a="${a}" aria-pressed="${f.avatar === a}" aria-label="Avatar ${a}">${a}</button>`)}</div></div>
+      <p class="err" id="pf-err" role="alert" hidden></p>
+      <div class="row">
+        <button type="submit" class="btn primary">${editing ? 'Save' : 'Let\'s go! 🚀'}</button>
+        ${editing || S.meta.profiles.length ? html`<button type="button" class="btn ghost" data-act="pf-cancel">Cancel</button>` : ''}
+        ${editing ? html`<span class="spacer"></span><button type="button" class="btn ghost danger" data-act="pf-delete">Delete learner</button>` : ''}
+      </div>
+    </form>
+  </div>`;
+}
+function vHome() {
+  const p = prof(), list = curIndex(), tab = SUBJ[S.tab] ? S.tab : 'math';
+  return html`<div class="page">
+    ${aiBanner()}
+    <section class="card ask">
+      <div class="hello">${raw(BOLT())}<div>
+        <h1>Hey <span class="hl">${p.name}</span>! ${S.greet}</h1>
+        <p class="muted">${gradeName(p.grade)} brain mode: ON. What are we working on?</p></div></div>
+      <form id="ask-form" class="stack">
+        <label class="sr" for="ask-text">Tell Bolt what you need help with</label>
+        <textarea id="ask-text" rows="2" maxlength="2000" placeholder="${S.ph}">${S.askDraft}</textarea>
+        <div id="home-photo">${photoInner('home')}</div>
+        <div class="row">
+          ${canPhoto() ? html`<button type="button" class="btn" data-act="photo" data-where="home">📸 Homework photo</button>` : ''}
+          <span class="spacer"></span>
+          <button type="submit" class="btn primary">Ask Bolt ➜</button>
+        </div>
+      </form>
+      <p class="tiny muted">💪 Bolt won't just give you the answer. He helps you get it yourself.</p>
+    </section>
+    ${list.length ? '' : html`<section class="card how stack"><h2>How Bolt helps 🤖</h2><ol>
+      <li><b>Tell Bolt what you're stuck on.</b> Type it, or snap a photo of your homework.</li>
+      <li><b>Bolt explains it super simple</b> and asks you questions so you figure it out.</li>
+      <li><b>Still confused?</b> Tap “😕 I still don't get it” and he explains it a new way.</li></ol></section>`}
+    <section class="stack">
+      <div class="sec-head"><h2>Learn something new</h2><span class="muted">Stuff kids learn in ${gradeName(p.grade)}</span></div>
+      <div class="chips" role="group" aria-label="Subjects">${SUBJECTS.map(s => html`<button type="button" class="chip" data-act="tab" data-s="${s.id}" aria-pressed="${s.id === tab}">${s.icon} ${s.name}</button>`)}</div>
+      <div class="topics">${topicsFor(tab, p.grade).map(t => html`<button type="button" class="topic" data-act="lesson" data-s="${tab}" data-t="${t}">${t}<span aria-hidden="true">→</span></button>`)}</div>
+    </section>
+    <section class="stack">
+      <div class="sec-head"><h2>Practice</h2><span class="muted">Earn ⭐ for every right answer</span></div>
+      <div class="practice">
+        <button type="button" class="pcard2" data-act="quiz-setup"><span class="em" aria-hidden="true">📝</span><b>Quiz me!</b><span>Quick questions at your level</span></button>
+        <button type="button" class="pcard2" data-act="spell-setup"><span class="em" aria-hidden="true">🔤</span><b>Spelling test</b><span>Bolt says the word, you spell it</span></button>
+      </div>
+    </section>
+    <section class="stack" id="home-chats">${chatsInner(list)}</section>
+    <details class="memory" id="memory"${S.memOpen ? raw(' open') : ''}>${memoryInner(p)}</details>
+  </div>`;
+}
+const chatsInner = list => html`<div class="sec-head"><h2>Your chats</h2>${list.length ? html`<span class="muted">${list.length} saved</span>` : ''}</div>
+  ${list.length ? html`<ul class="chatlist">${list.map(c => html`<li class="chatrow">
+      <button type="button" class="chatopen" data-act="open-chat" data-id="${c.id}"><span class="ci" aria-hidden="true">${subjIcon(c.subj)}</span>
+        <span class="ct"><b>${c.title}</b><span class="tiny muted">${when(c.updatedAt)}${c.summary ? ' · ' + c.summary : ''}</span></span></button>
+      <button type="button" class="iconbtn sm" data-act="del-chat" data-id="${c.id}" aria-label="Delete chat: ${c.title}">🗑️</button></li>`)}</ul>`
+    : html`<p class="empty">No chats yet. Ask Bolt something up top and it gets saved here, so you can come back to it later 📒</p>`}`;
+const memoryInner = p => html`<summary><h2>🧠 What Bolt remembers</h2></summary>
+  <p class="muted">After your chats, Bolt writes short notes so he can help you better next time.</p>
+  ${p.memory.length ? html`<ul class="notes">${p.memory.map((n, i) => html`<li><span>${n}</span><button type="button" class="iconbtn sm" data-act="forget" data-i="${i}" aria-label="Forget: ${n}">✕</button></li>`)}</ul>`
+    : html`<p class="empty">Nothing yet! Chat with Bolt and he'll start remembering what you're learning.</p>`}`;
+function refreshHomeLists() {
+  const p = prof();
+  if (S.view !== 'home' || !p) return;
+  setHTML($('#home-chats'), chatsInner(curIndex()));
+  setHTML($('#memory'), memoryInner(p));
+}
+function vChat() {
+  const c = S.chat;
+  return html`<div class="chat">
+    <div class="chat-head"><button type="button" class="btn ghost sm" data-act="back">← Back</button>
+      <div class="chat-title"><span class="ci" aria-hidden="true">${subjIcon(c.subj)}</span><b>${c.title}</b></div></div>
+    ${aiBanner()}
+    <div class="msgs" id="msgs" role="log">${msgsHTML(c)}</div>
+    ${S.ai.ok ? html`<form id="chat-form" class="composer">
+      <div id="chat-photo">${photoInner('chat')}</div>
+      <p class="tiny muted" id="consent-note"${S.ai.perm === 'prompt' && !S.ai.used ? '' : raw(' hidden')}>👋 First time? Claude will ask if Bolt can think using your account. Tap <b>Allow</b>!</p>
+      <div class="composer-in">
+        ${canPhoto() ? html`<button type="button" class="iconbtn" data-act="photo" data-where="chat" aria-label="Add a homework photo">📸</button>` : ''}
+        <label class="sr" for="chat-text">Message Bolt</label>
+        <textarea id="chat-text" rows="1" maxlength="2000" placeholder="Type your answer here…">${S.draft}</textarea>
+        <span id="composer-act">${actBtn()}</span>
+      </div>
+    </form>` : ''}
+  </div>`;
+}
+const actBtn = () => S.busy
+  ? html`<button type="button" class="iconbtn stop" data-act="stop" aria-label="Stop Bolt">■</button>`
+  : html`<button type="submit" class="iconbtn send" aria-label="Send">➤</button>`;
+const ERR = {
+  rate_limited: ['Whoa, Bolt\'s brain is overheating! 🥵', 'Too many questions too fast. Wait a minute, then try again.', true],
+  session_expired: ['You got signed out 🔑', 'Sign in to Claude again, then come back and tap Try again.', true],
+  refused: ['Bolt can\'t help with that one 🙅', 'Try asking a different way, or ask about something for school.', false],
+  empty_completion: ['Bolt blanked out 😵', 'Try asking again in a different way.', true],
+  prompt_too_large: ['That\'s a LOT for Bolt 📚', 'Try a shorter message, or start a new chat.', false],
+  image_rejected: ['Bolt couldn\'t read that picture 📸', 'Try a different photo (JPG or PNG), or type the problem instead.', false],
+  images_unavailable: ['Photos don\'t work here 📸', 'Tap Try again and Bolt will answer without the photo, or type the problem in.', true],
+  blocked: ['Bolt needs your OK to think 🔌', 'He uses Claude to help you. Turn Claude on for this app, then try again.', false],
+  upstream_error: ['Bolt glitched! 🤖💥', 'Something went wrong in his circuits. Tap Try again.', true],
+};
+function msgsHTML(c) {
+  const out = c.msgs.map((m, i) => m.r === 'u'
+    ? html`<div class="msg me"><div class="bubble">${isDataImg(m.img) ? html`<img class="thumb" src="${m.img}" alt="Homework photo">` : ''}${raw(md(m.t))}</div></div>`
+    : html`<div class="msg tutor" data-i="${i}"><div class="av">${raw(BOLT())}</div><div class="bwrap">
+        <div class="bubble">${raw(md(m.t))}${m.cut ? html`<p class="tiny muted">(Bolt got cut off)</p>` : ''}${m.stop ? html`<p class="tiny muted">(you stopped Bolt)</p>` : ''}</div>
+        <div class="tools">${speech.ok ? speakBtn(c.id + ':' + i, '🔊 Read it to me', 'speak', ` data-i="${i}"`) : ''}${m.star ? html`<span class="sticker">⭐ You earned a star!</span>` : ''}</div>
+      </div></div>`);
+  if (S.busy && S.busyChat === c.id) {
+    out.push(html`<div class="msg tutor"><div class="av">${raw(BOLT('busy'))}</div><div class="bwrap"><div class="bubble" id="live-bubble">${S.streamText
+      ? raw(md(cleanStar(S.streamText)))
+      : html`<div class="thinking"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>${S.thinkLine}</div>`}</div></div></div>`);
+  } else if (S.lastErr && S.lastErr.chatId === c.id) {
+    const [title, body, canRetry] = ERR[S.lastErr.code] || ERR.upstream_error;
+    out.push(html`<div class="msg tutor"><div class="av">${raw(BOLT())}</div><div class="bwrap"><div class="bubble oops" role="alert">
+      <p><b>${title}</b></p><p>${body}</p>
+      <div class="row">${canRetry ? html`<button type="button" class="btn sm" data-act="retry">↻ Try again</button>` : ''}${S.lastErr.code === 'blocked' ? html`<button type="button" class="btn sm" data-act="perm">🔓 Let Bolt think</button>` : ''}</div>
+    </div></div></div>`);
+  } else if (S.ai.ok && c.msgs.length && c.msgs[c.msgs.length - 1].r === 'a') {
+    out.push(html`<div class="quick" role="group" aria-label="Quick replies">
+      <button type="button" class="chip big" data-act="quick" data-k="again">😕 I still don't get it</button>
+      <button type="button" class="chip" data-act="quick" data-k="hint" title="Give me a hint">💡 Hint</button>
+      <button type="button" class="chip" data-act="quick" data-k="example" title="Show me an example like mine">🧩 Example</button>
+      <button type="button" class="chip" data-act="quick" data-k="got" title="I think I got it!">✅ Got it!</button></div>`);
+  }
+  return out;
+}
+function vQuizSetup() {
+  const p = prof(), f = S.qform, off = !S.ai.ok, topics = topicsFor(f.subj, p.grade);
+  return html`<div class="page">
+    <div class="row"><button type="button" class="btn ghost sm" data-act="home">← Back</button></div>
+    <div class="hello">${raw(BOLT())}<div><h1>Quiz time! 📝</h1><p class="muted">Bolt makes a quick quiz just for ${gradeName(p.grade)}.</p></div></div>
+    ${off ? html`<p class="note">🔌 Bolt's brain is offline, so right now you can only do <b>math practice</b>.</p>` : ''}
+    <form id="quiz-form" class="card stack">
+      <div class="field"><span class="label" id="qf-s">Subject</span>
+        <div class="chips" role="group" aria-labelledby="qf-s">${SUBJECTS.filter(s => s.id !== 'spelling').map(s => html`<button type="button" class="chip" data-act="qf-subj" data-s="${s.id}" aria-pressed="${f.subj === s.id}"${off && s.id !== 'math' ? raw(' disabled') : ''}>${s.icon} ${s.name}</button>`)}</div></div>
+      ${off ? '' : html`<div class="field"><label class="label" for="qf-topic">Topic (optional)</label>
+        <input id="qf-topic" type="text" maxlength="80" placeholder="Anything! Or leave it blank for a mix" value="${f.topic}">
+        <div class="chips">${topics.map(t => html`<button type="button" class="chip" data-act="qf-topic" data-t="${t}" aria-pressed="${f.topic === t}">${t}</button>`)}</div></div>`}
+      <div class="field"><span class="label" id="qf-n">How many questions?</span>
+        <div class="chips" role="group" aria-labelledby="qf-n">${[5, 10].map(n => html`<button type="button" class="chip" data-act="qf-n" data-n="${n}" aria-pressed="${f.n === n}">${n} questions</button>`)}</div></div>
+      <div class="row"><button type="submit" class="btn primary">${off ? 'Start math practice ✨' : 'Make my quiz ✨'}</button></div>
+    </form>
+  </div>`;
+}
+function vSpellSetup() {
+  const p = prof(), f = S.sform, ai = S.ai.ok, mine = f.mode === 'mine' || !ai;
+  return html`<div class="page">
+    <div class="row"><button type="button" class="btn ghost sm" data-act="home">← Back</button></div>
+    <div class="hello">${raw(BOLT())}<div><h1>Spelling test 🔤</h1><p class="muted">${speech.ok ? 'Turn your sound on! Bolt says each word, then you type it.' : 'Bolt gives you a clue, then you type the word.'}</p></div></div>
+    ${!ai && !speech.ok ? html`<p class="note">😢 Spelling tests need sound or Bolt's brain, and neither works here right now.</p>` : ''}
+    <form id="spell-setup-form" class="card stack">
+      <div class="field"><span class="label" id="sf-m">Which words?</span>
+        <div class="chips" role="group" aria-labelledby="sf-m">
+          <button type="button" class="chip" data-act="sf-mode" data-m="bolt" aria-pressed="${!mine}"${ai ? '' : raw(' disabled')}>🤖 Bolt picks words</button>
+          <button type="button" class="chip" data-act="sf-mode" data-m="mine" aria-pressed="${mine}">📋 Use my spelling list</button>
+        </div></div>
+      ${mine ? html`<div class="field"><label class="label" for="sf-words">Your words (one per line, or split with commas)</label>
+          <textarea id="sf-words" rows="5" maxlength="1200" placeholder="because&#10;friend&#10;necessary" autocomplete="off" autocapitalize="off" spellcheck="false">${f.words}</textarea>
+          <p class="tiny muted">Got a list from school? Type it in here! Up to 25 words.</p></div>`
+        : html`<div class="field"><label class="label" for="sf-topic">Practice something specific? (optional)</label>
+          <input id="sf-topic" type="text" maxlength="80" placeholder="Leave blank for a mix" value="${f.topic}">
+          <div class="chips">${topicsFor('spelling', p.grade).map(t => html`<button type="button" class="chip" data-act="sf-topic" data-t="${t}" aria-pressed="${f.topic === t}">${t}</button>`)}</div></div>
+          <div class="field"><span class="label" id="sf-n">How many words?</span>
+          <div class="chips" role="group" aria-labelledby="sf-n">${[5, 10].map(n => html`<button type="button" class="chip" data-act="sf-n" data-n="${n}" aria-pressed="${f.n === n}">${n} words</button>`)}</div></div>`}
+      <div class="row"><button type="submit" class="btn primary"${!ai && !speech.ok ? raw(' disabled') : ''}>Start the test ✨</button></div>
+    </form>
+  </div>`;
+}
+const vLoading = () => html`<div class="loading">${raw(BOLT('busy'))}<p class="hand">Bolt is building your quiz… 🔧</p><p class="muted tiny">This can take a little bit. He's double-checking the answers!</p><button type="button" class="btn ghost" data-act="gen-cancel">Cancel</button></div>`;
+function quizTop(q, label) {
+  return html`<div class="row"><button type="button" class="btn ghost sm" data-act="quiz-quit">✕ Quit</button><span class="spacer"></span><span class="pill">⭐ ${q.stars}</span></div>
+    <div class="progress" role="img" aria-label="${label} ${q.i + 1} of ${q.items.length}">${q.items.map((_, k) => html`<i class="${k < q.i ? 'done' : k === q.i ? 'now' : ''}"></i>`)}</div>`;
+}
+function vQuiz() {
+  const q = S.quiz, it = q.items[q.i];
+  const cls = k => q.answered && k === it.answer ? 'right' : q.wrong.includes(k) ? 'wrong' : q.answered ? 'dim' : '';
+  let fb = '';
+  if (q.result === 'first') fb = html`<div class="fb good"><b>✅ Yes! +1 ⭐</b>${it.explain ? html`<span>${it.explain}</span>` : ''}</div>`;
+  else if (q.result === 'second') fb = html`<div class="fb good"><b>✅ You got it on try 2!</b>${it.explain ? html`<span>${it.explain}</span>` : ''}</div>`;
+  else if (q.result === 'reveal') fb = html`<div class="fb bad"><b>The answer is ${'ABCDEF'[it.answer]}: ${it.choices[it.answer]}</b>${it.explain ? html`<span>${it.explain}</span>` : ''}<span>No worries, now you know it! 🧠</span></div>`;
+  else if (q.tries === 1) fb = html`<div class="fb hint"><b>Not quite! Try again 💪</b>${it.hint ? html`<span>💡 Hint: ${it.hint}</span>` : ''}</div>`;
+  return html`<div class="page stack">
+    ${quizTop(q, 'Question')}
+    <section class="card qcard">
+      <p class="label">${q.title}${q.offline ? ' (offline)' : ''} · Question ${q.i + 1} of ${q.items.length}</p>
+      <h2 class="qtext">${raw(inl(it.q))}</h2>
+      ${speech.ok ? html`<div>${speakBtn('q' + q.i, '🔊 Read it to me', 'speak-q')}</div>` : ''}
+      <div class="choices">${it.choices.map((c, k) => html`<button type="button" class="choice ${cls(k)}" data-act="choose" data-k="${k}"${q.answered || q.wrong.includes(k) ? raw(' disabled') : ''}><span class="key">${'ABCDEF'[k]}</span><span>${raw(inl(c))}</span></button>`)}</div>
+      <div class="feedback" aria-live="polite">${fb}</div>
+      ${q.answered ? html`<div class="row"><span class="spacer"></span><button type="button" class="btn primary" id="next-btn" data-act="quiz-next">${q.i + 1 < q.items.length ? 'Next ➜' : 'See my score 🎉'}</button></div>` : ''}
+    </section>
+  </div>`;
+}
+function vSpell() {
+  const q = S.quiz, it = q.items[q.i], letters = it.word.split('').join('-');
+  let fb = '';
+  if (q.result === 'first') fb = html`<div class="fb good"><b>✅ Nailed it! +1 ⭐</b><span>You spelled <b>${it.word}</b> right!</span></div>`;
+  else if (q.result === 'second') fb = html`<div class="fb good"><b>✅ You got it on try 2!</b><span><b>${it.word}</b> is right!</span></div>`;
+  else if (q.result === 'copied') fb = html`<div class="fb good"><b>🔒 Locked in!</b><span>Now your brain knows how to spell <b>${it.word}</b>.</span></div>`;
+  else if (q.result === 'hint') fb = html`<div class="fb hint"><b>Close! Try again 💪</b><span>💡 ${it.tip || `It has ${it.word.replace(/[^A-Za-z]/g, '').length} letters and starts with “${it.word[0]}”.`}</span></div>`;
+  else if (q.result === 'reveal' || q.result === 'copywrong') fb = html`<div class="fb bad"><b>${q.result === 'copywrong' ? 'Almost! Look closely and copy it:' : 'Here\'s how to spell it:'}</b><span class="letters">${letters}</span><span>Type it once to lock it into your brain 🔒</span></div>`;
+  return html`<div class="page stack">
+    ${quizTop(q, 'Word')}
+    <section class="card qcard">
+      <p class="label">${q.title} · Word ${q.i + 1} of ${q.items.length}</p>
+      ${speech.ok ? html`<div class="row">${speakBtn('word' + q.i, '🔊 Hear the word', 'say-word', '', 'btn primary')}${speakBtn('slow' + q.i, '🐢 Say it slowly', 'say-slow', '', 'btn')}</div>`
+        : html`<p class="note">🔇 Sound isn't working here, so use the clue!</p>`}
+      ${it.clue ? html`<p><b>💬 Clue:</b> ${it.clue}</p>` : ''}
+      ${it.sentence ? html`<p><b>📄 Sentence:</b> ${maskWord(it.sentence, it.word)}</p>` : ''}
+      <form id="spell-form" class="spell-row" autocomplete="off">
+        <label class="sr" for="spell-in">Type the word</label>
+        <input id="spell-in" type="text" maxlength="40" placeholder="Type the word here" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"${q.answered ? raw(' disabled') : ''}>
+        <button type="submit" class="btn primary"${q.answered ? raw(' disabled') : ''}>Check ✓</button>
+      </form>
+      <div class="feedback" aria-live="polite">${fb}</div>
+      ${q.answered ? html`<div class="row"><span class="spacer"></span><button type="button" class="btn primary" id="next-btn" data-act="quiz-next">${q.i + 1 < q.items.length ? 'Next word ➜' : 'See my score 🎉'}</button></div>` : ''}
+    </section>
+  </div>`;
+}
+function vResults() {
+  const q = S.quiz, total = q.items.length, pct = q.score / total;
+  const msg = pct === 1 ? 'PERFECT SCORE! Beep beep boop! 🤖🎉' : pct >= 0.8 ? 'Awesome job! 🔥' : pct >= 0.5 ? 'Nice work! Keep practicing 💪' : 'Good try! Every try makes your brain stronger 🧠';
+  return html`<div class="page">
+    <div class="hello">${raw(BOLT())}<div><h1>Quiz done!</h1><p class="muted">${msg}</p></div></div>
+    <section class="card stack">
+      <div class="big-score" aria-label="${q.score} out of ${total}">${q.score}<span>/${total}</span></div>
+      <p>You earned <b>${q.stars} ⭐</b>${q.bonus ? html` (including a +${q.bonus} perfect-score bonus!)` : ''}.</p>
+    </section>
+    ${q.missed.length ? html`<section class="stack"><h2>Let's look at these again</h2><ul class="missed">${q.missed.map(m => q.kind === 'spell'
+      ? html`<li><b class="letters">${m.word}</b></li>`
+      : html`<li><b>${raw(inl(m.q))}</b><span>Answer: ${raw(inl(m.a))}</span>${m.explain ? html`<span class="muted tiny">${m.explain}</span>` : ''}</li>`)}</ul></section>` : ''}
+    <div class="row">
+      ${q.missed.length && S.ai.ok ? html`<button type="button" class="btn primary" data-act="ask-missed">❓ Ask Bolt about these</button>` : ''}
+      <button type="button" class="btn" data-act="${q.kind === 'spell' ? 'spell-setup' : 'quiz-setup'}">🔁 Another one</button>
+      <button type="button" class="btn ghost" data-act="home">🏠 Home</button>
+    </div>
+  </div>`;
+}
+function vSettings() {
+  const p = prof(), st = p.settings, lv = levelOf(p.stars);
+  return html`<div class="page">
+    <div class="row"><button type="button" class="btn ghost sm" data-act="home">← Back</button></div>
+    <h1>Settings ⚙️</h1>
+    <section class="card stack">
+      <div class="row"><span class="pav" aria-hidden="true">${p.avatar}</span><div><b>${p.name}</b><div class="muted">${gradeName(p.grade)}</div></div><span class="spacer"></span><button type="button" class="btn sm" data-act="edit-profile">✏️ Edit</button></div>
+      <div class="level"><div class="row"><b>Level ${lv.n}: ${lv.name}</b><span class="spacer"></span><span class="muted">⭐ ${p.stars}</span></div>
+        <div class="bar" role="img" aria-label="${lv.pct}% of the way to the next level"><i style="width:${lv.pct}%"></i></div>
+        <p class="tiny muted">${lv.next ? `${lv.toNext} more ⭐ to reach ${lv.next}` : 'Max level! You\'re a legend 👑'} · 🔥 Streak: ${streakNow(p)} · Best: ${p.streak.best}</p></div>
+    </section>
+    <section class="card stack">
+      <h2>🔊 Read it to me</h2>
+      ${speech.ok ? html`<label class="check"><input type="checkbox" id="set-auto" data-act="set-auto"${st.autoRead ? raw(' checked') : ''}> Read Bolt's answers and quiz questions out loud automatically</label>
+        <div class="field"><span class="label" id="set-r">Voice speed</span><div class="chips" role="group" aria-labelledby="set-r">${[[0.8, '🐢 Slow'], [1, 'Normal'], [1.2, '🐇 Fast']].map(([v, l]) => html`<button type="button" class="chip" data-act="set-rate" data-v="${v}" aria-pressed="${st.rate === v}">${l}</button>`)}</div></div>
+        <div>${speakBtn('test', '▶ Test the voice', 'test-voice')}</div>`
+        : html`<p class="muted">Read-aloud doesn't work in this browser 😢 Try Chrome, Edge or Safari.</p>`}
+    </section>
+    <section class="card stack">
+      <h2>🧠 Bolt's brain</h2>
+      <div class="chips" role="group" aria-label="Bolt's brain">
+        <button type="button" class="chip" data-act="set-brain" data-v="fast" aria-pressed="${st.brain === 'fast'}">⚡ Fast</button>
+        <button type="button" class="chip" data-act="set-brain" data-v="careful" aria-pressed="${st.brain === 'careful'}">🧠 Careful</button></div>
+      <p class="tiny muted">Fast answers right away. Careful thinks longer first, which helps with hard math and big-kid stuff. Photos always use Careful.</p>
+    </section>
+    <section class="card stack">
+      <h2>💾 Your stuff</h2>
+      <p>${S.mode === 'cloud' ? 'Your chats are saved to your Claude account. Only you can see them.' : 'Your chats are saved in this browser, on this device.'}</p>
+      <div class="row">
+        <button type="button" class="btn sm" data-act="switch-profile">👥 Switch learner</button>
+        <button type="button" class="btn sm danger" data-act="clear-memory">🧽 Clear Bolt's memory</button>
+        <button type="button" class="btn sm danger" data-act="delete-chats">🗑️ Delete all chats</button>
+      </div>
+    </section>
+  </div>`;
+}
+const VIEWS = { boot: vBoot, profiles: vProfiles, onboard: vOnboard, home: vHome, chat: vChat, quizSetup: vQuizSetup, spellSetup: vSpellSetup, quizLoading: vLoading, quiz: vQuiz, spell: vSpell, results: vResults, settings: vSettings };
+const NEEDS_PROFILE = new Set(['home', 'chat', 'quizSetup', 'spellSetup', 'quizLoading', 'quiz', 'spell', 'results', 'settings']);
+function renderView() {
+  if (NEEDS_PROFILE.has(S.view) && !prof()) S.view = S.meta.profiles.length ? 'profiles' : 'onboard';
+  if (S.view === 'onboard' && !S.form) S.form = blankForm();
+  if (S.view === 'chat' && !S.chat) S.view = 'home';
+  if (['quiz', 'spell', 'results'].includes(S.view) && !S.quiz) S.view = 'home';
+  const p = prof();
+  document.documentElement.classList.toggle('young', !!p && gradeNum(p.grade) <= 2);
+  setHTML($('#view'), html`${(VIEWS[S.view] || vHome)()}`);
+  if (S.view === 'chat') afterChatRender();
+}
+function render() { renderTop(); renderView(); }
+function go(view) {
+  if (view !== S.view) stopSpeech();
+  if (S.view === 'quizLoading' && view !== 'quizLoading' && S.qctl) { const c = S.qctl; S.qctl = null; c.abort(); }
+  S.view = view;
+  render();
+  if (view === 'chat') { scrollBottom(); const ta = $('#chat-text'); if (ta && !coarse()) ta.focus({ preventScroll: true }); }
+  else { window.scrollTo(0, 0); $('#view').focus({ preventScroll: true }); }
+}
+const nearBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160;
+const scrollBottom = () => window.scrollTo(0, document.documentElement.scrollHeight);
+function afterChatRender() {
+  const ta = $('#chat-text'); if (ta) autoGrow(ta);
+  if (S.starFx) {
+    const { pid, i } = S.starFx; S.starFx = null;
+    awardStars(1, pid, document.querySelector(`.msg[data-i="${i}"] .sticker`));
+  }
+  if (S.autoSpeak != null) {
+    const i = S.autoSpeak; S.autoSpeak = null;
+    const c = S.chat, m = c && c.msgs[i];
+    if (m) speakKeyed(c.id + ':' + i, m.t);
+  }
+}
+function updateMsgs(force) {
+  const box = $('#msgs');
+  if (!box || !S.chat) return;
+  const near = nearBottom();
+  setHTML(box, html`${msgsHTML(S.chat)}`);
+  if (force || near) scrollBottom();
+  afterChatRender();
+}
+function paintLive(c) {
+  if (!isOpen(c)) return;
+  const b = $('#live-bubble');
+  if (!b || !S.streamText) return;
+  const near = nearBottom();
+  b.innerHTML = md(cleanStar(S.streamText));
+  if (near) scrollBottom();
+}
+function updateComposer() {
+  setHTML($('#composer-act'), actBtn());
+  const cn = $('#consent-note');
+  if (cn) cn.hidden = !(S.ai.perm === 'prompt' && !S.ai.used);
+  const ta = $('#chat-text');
+  if (ta) ta.placeholder = S.busy ? (S.busyChat === (S.chat && S.chat.id) ? 'Bolt is answering…' : 'Bolt is busy…') : 'Type your answer here…';
+}
+function autoGrow(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, 240) + 'px'; }
+function pressOnly(btn) { btn.parentElement.querySelectorAll('[aria-pressed]').forEach(b => b.setAttribute('aria-pressed', b === btn)); }
+
+/* ---------- events ---------- */
+const ACTIONS = {
+  noop() {},
+  home() { if (S.view === 'chat') leaveChat(); else if (['quiz', 'spell'].includes(S.view)) quitQuiz(); else go('home'); },
+  settings() {
+    if (S.view === 'chat') { const c = S.chat; go('settings'); if (c) maybeSummarize(c); }
+    else if (['quiz', 'spell'].includes(S.view)) quitQuiz('settings');
+    else go('settings');
+  },
+  'pick-profile': el => selectProfile(el.dataset.id),
+  'new-profile'() { S.form = blankForm(); go('onboard'); },
+  'pf-grade'(el) { S.form.grade = el.dataset.g; pressOnly(el); },
+  'pf-avatar'(el) { S.form.avatar = el.dataset.a; pressOnly(el); },
+  'pf-cancel'() { go(S.form && S.form.editId ? 'settings' : prof() ? 'home' : 'profiles'); },
+  'pf-delete'() { if (S.form) deleteProfile(S.form.editId); },
+  'edit-profile'() { const p = prof(); S.form = { name: p.name, grade: p.grade, avatar: p.avatar, editId: p.id }; go('onboard'); },
+  'switch-profile'() { stopSpeech(); go('profiles'); },
+  tab(el) { S.tab = el.dataset.s; renderView(); const b = document.querySelector(`[data-act="tab"][data-s="${S.tab}"]`); if (b) b.focus({ preventScroll: true }); },
+  lesson: el => startLesson(el.dataset.s, el.dataset.t),
+  photo: el => pickPhoto(el.dataset.where),
+  'photo-x'(el) { S.photo[el.dataset.where] = null; refreshPhoto(el.dataset.where); },
+  'open-chat': el => openChat(el.dataset.id),
+  'del-chat': el => deleteChat(el.dataset.id),
+  back: () => leaveChat(),
+  stop() { if (S.ctl) S.ctl.abort(); },
+  retry: () => retry(),
+  perm: () => fixPermission(),
+  quick: el => quickReply(el.dataset.k),
+  speak(el) { const c = S.chat, i = +el.dataset.i, m = c && c.msgs[i]; if (m) speakKeyed(c.id + ':' + i, m.t); },
+  'quiz-setup'() { if (!S.qform) S.qform = { subj: 'math', topic: '', n: 5 }; if (!S.ai.ok) S.qform.subj = 'math'; go('quizSetup'); },
+  'qf-subj'(el) { S.qform.subj = el.dataset.s; S.qform.topic = ''; renderView(); },
+  'qf-topic'(el) { S.qform.topic = S.qform.topic === el.dataset.t ? '' : el.dataset.t; renderView(); },
+  'qf-n'(el) { S.qform.n = +el.dataset.n; pressOnly(el); },
+  'spell-setup'() { if (!S.sform) S.sform = { mode: S.ai.ok ? 'bolt' : 'mine', topic: '', words: '', n: 5 }; go('spellSetup'); },
+  'sf-mode'(el) { S.sform.mode = el.dataset.m; renderView(); },
+  'sf-topic'(el) { S.sform.topic = S.sform.topic === el.dataset.t ? '' : el.dataset.t; renderView(); },
+  'sf-n'(el) { S.sform.n = +el.dataset.n; pressOnly(el); },
+  'gen-cancel'() { go(S.lastGen === 'spell' ? 'spellSetup' : 'quizSetup'); },
+  choose: el => chooseAnswer(+el.dataset.k, el),
+  'quiz-next': () => nextQuestion(),
+  'quiz-quit': () => quitQuiz(),
+  'speak-q': () => speakQuestion(),
+  'say-word': () => sayWord(false),
+  'say-slow': () => sayWord(true),
+  'ask-missed': () => askAboutMissed(),
+  forget: el => forgetNote(+el.dataset.i),
+  'set-auto': el => setSetting('autoRead', el.checked),
+  'set-rate': el => setSetting('rate', +el.dataset.v),
+  'set-brain': el => setSetting('brain', el.dataset.v),
+  'test-voice': () => speakKeyed('test', 'Beep boop! Hi, I\'m Bolt. This is how I sound when I read to you!'),
+  async 'clear-memory'() {
+    const p = prof();
+    if (!await confirmBox({ title: 'Clear Bolt\'s memory?', body: `Bolt will forget his notes about ${p.name}. Your chats stay.`, yes: 'Clear it', danger: true })) return;
+    p.memory = []; saveMeta(); toast('Bolt\'s memory is squeaky clean 🧽');
+  },
+  async 'delete-chats'() {
+    const list = curIndex();
+    if (!list.length) { toast('There are no chats to delete.'); return; }
+    if (!await confirmBox({ title: 'Delete ALL chats?', body: `All ${list.length} saved chats for ${prof().name} will be gone for good.`, yes: 'Delete them all', danger: true })) return;
+    if (S.busy && S.ctl) S.ctl.abort();
+    for (const e of list) { S.deleted.add(e.id); save('chat-' + e.id, DEL); S.chatCache.delete(e.id); }
+    S.indexes[S.pid] = []; saveIndex(S.pid); S.chat = null;
+    toast('All chats deleted 🗑️');
+  },
+};
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]');
+  if (!t || t.disabled || !t.isConnected) return;
+  const f = ACTIONS[t.dataset.act];
+  if (!f) return;
+  if (t.tagName === 'BUTTON' && t.type !== 'submit') e.preventDefault();
+  f(t, e);
+});
+document.addEventListener('submit', e => {
+  e.preventDefault();
+  const id = e.target.id;
+  if (id === 'profile-form') saveProfileForm();
+  else if (id === 'ask-form') askFromHome();
+  else if (id === 'chat-form') sendFromComposer();
+  else if (id === 'quiz-form') { S.lastGen = 'quiz'; makeQuiz('mc'); }
+  else if (id === 'spell-setup-form') { S.lastGen = 'spell'; makeQuiz('spell'); }
+  else if (id === 'spell-form') checkSpelling();
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'chat-text') { S.draft = t.value; autoGrow(t); }
+  else if (t.id === 'ask-text') { S.askDraft = t.value; autoGrow(t); }
+  else if (t.id === 'pf-name' && S.form) { S.form.name = t.value; const er = $('#pf-err'); if (er) er.hidden = true; }
+  else if (t.id === 'qf-topic' && S.qform) {
+    S.qform.topic = t.value;
+    document.querySelectorAll('[data-act="qf-topic"]').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === t.value));
+  } else if (t.id === 'sf-topic' && S.sform) {
+    S.sform.topic = t.value;
+    document.querySelectorAll('[data-act="sf-topic"]').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === t.value));
+  } else if (t.id === 'sf-words' && S.sform) S.sform.words = t.value;
+});
+document.addEventListener('toggle', e => { if (e.target.id === 'memory') S.memOpen = e.target.open; }, true);
+document.addEventListener('keydown', e => {
+  if ($('#modal-root').firstChild) return;
+  const t = e.target;
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && (t.id === 'chat-text' || t.id === 'ask-text') && !coarse()) {
+    e.preventDefault();
+    const f = t.form; if (f) { if (f.requestSubmit) f.requestSubmit(); else f.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })); }
+    return;
+  }
+  if (S.view === 'quiz' && S.quiz && !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const k = '1234'.indexOf(e.key) >= 0 ? '1234'.indexOf(e.key) : 'abcd'.indexOf(e.key.toLowerCase());
+    if (k >= 0 && e.key.length === 1 && !S.quiz.answered) { e.preventDefault(); chooseAnswer(k); }
+  }
+});
+let errShown = 0;
+const oops = err => { console.error(err); if (Date.now() - errShown > 8000) { errShown = Date.now(); toast('Oops, something glitched in Bolt 🤖💥 If it keeps happening, reload the page.', 'bad'); } };
+window.addEventListener('error', e => oops(e.error || e.message));
+window.addEventListener('unhandledrejection', e => {
+  const r = e.reason;
+  if (r && typeof r === 'object' && typeof r.code === 'string') { console.warn('Unhandled capability rejection', r); return; }
+  oops(r);
+});
+
+/* ---------- boot ---------- */
+async function boot(hot) {
+  S.view = 'boot'; render();
+  const C = window.claude;
+  let db = null, user = null;
+  if (C && typeof C.use === 'function') {
+    const use = n => { try { return Promise.resolve(C.use(n)).catch(() => null); } catch { return Promise.resolve(null); } };
+    const [d, u, sample, perms] = await Promise.all([use('db'), use('user'), use('sample'), use('permissions')]);
+    db = d; user = u; S.perms = perms;
+    if (typeof sample === 'function') {
+      S.ai.sample = sample; S.ai.ok = true;
+      try { const lim = await sample.limits(); S.ai.images = lim && lim.images && lim.images.maxCount > 0 ? lim.images : null; } catch { S.ai.images = null; }
+      if (perms) { try { S.ai.perm = await perms.state('sample'); } catch {} }
+      if (S.ai.perm === 'denied') { S.ai.ok = false; S.ai.why = 'blocked'; }
+    } else S.ai.why = 'offline';
+  } else S.ai.why = 'nohost';
+  let id = null;
+  if (db && user) { try { id = await user.id(); } catch {} }
+  S.store = db && id ? cloudStore(db, id) : localStore();
+  S.mode = S.store.kind;
+  let meta = null;
+  try { meta = await S.store.get('meta'); }
+  catch {
+    await sleep(600);
+    try { meta = await S.store.get('meta'); }
+    catch { S.store = localStore(); S.mode = 'local'; meta = await S.store.get('meta'); toastOnce('to-local', 'Can\'t reach your Claude account right now, so Bolt is saving on this device.', 'bad'); }
+  }
+  S.meta = normalizeMeta(meta);
+  const h = hot && typeof hot === 'object' ? hot : {};
+  if (!S.meta.profiles.length) { S.form = blankForm(); go('onboard'); return; }
+  const pid = profById(h.pid) ? h.pid : profById(S.meta.activeId) ? S.meta.activeId : S.meta.profiles.length === 1 ? S.meta.profiles[0].id : null;
+  if (!pid) { go('profiles'); return; }
+  await selectProfile(pid);
+  if (h.view === 'chat' && typeof h.chatId === 'string') {
+    await openChat(h.chatId);
+    const ta = $('#chat-text');
+    if (ta && typeof h.draft === 'string') { ta.value = S.draft = h.draft; autoGrow(ta); }
+  } else if (h.view === 'settings') go('settings');
+}
+// Test hook for dev/test.mjs: only present when the page sets window.__ASH_TEST__ first.
+if (window.__ASH_TEST__ === true) window.__ASH_TEST__ = { S, pending: () => pendingWrites.size + runningWrites.size, md, inl, cleanStar, bumpStreak, streakNow, levelOf, validateQuiz, validateSpelling, parseWordList, mathItem, chunkText, speakable, maskWord, parseLooseJSON, fixChoices, dayKey, prevDayKey, normalizeProfile, normalizeChat, fitChat, buildTurns, guessSubject };
+let started = false;
+const start = data => { if (started) return; started = true; boot(data || {}).catch(oops); };
+const hot = (() => { try { return window.claude && window.claude.hot; } catch { return null; } })();
+try { if (hot && typeof hot.snapshot === 'function') hot.snapshot(() => ({ view: S.view, pid: S.pid, chatId: S.chat && S.chat.id, draft: S.draft })); } catch {}
+try { if (hot && typeof hot.ready === 'function') hot.ready(start); else start(hot && hot.data); } catch { start({}); }
+})();
+</script>
