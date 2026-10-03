@@ -584,6 +584,7 @@
       (s.coach.lastLesson ? '<div class="coach-sec"><h4>🎬 Last death review</h4><p>' + esc(s.coach.lastLesson) + '</p></div>' : '') +
       '<div class="coach-sec"><h4>🏆 Trophies ' + got + (tro.list.length ? ' / ' + tro.list.length : '') + '</h4>' + (tro.list.length ? '<ul class="trophy-list">' + tro.list.map((t) => '<li>' + (tro.got[t.name] || t.got ? '✅ ' : '⬜ ') + esc(t.name) + '</li>').join('') + '</ul>' : '<p class="note">No trophy list found yet.</p>') + '</div>' +
       (story.length || raw.length ? '<div class="coach-sec"><h4>📖 Story so far</h4><ul>' + story.map((x) => '<li>' + esc(x) + '</li>').join('') + raw.map((x) => '<li class="note">"' + esc(x.slice(0, 140)) + '"</li>').join('') + '</ul></div>' : '') +
+      (s.typist.history.length ? '<div class="coach-sec"><h4>⌨️ What it typed</h4><ul>' + s.typist.history.slice(-6).map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '') +
       '<div class="coach-sec"><h4>📝 Game notes</h4>' + (notes.length ? '<ul>' + notes.slice(-12).map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>' : '<p class="note">No notes yet.</p>') + '</div>' +
       '<button class="btn sm" id="coachReportBtn">📋 Report card</button>';
   }

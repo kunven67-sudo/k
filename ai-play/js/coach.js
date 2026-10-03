@@ -34,6 +34,7 @@ AIP.Coach = (function () {
       story: { type: 'string', description: 'if there is story/dialogue: a one-line summary of what happened, else empty' },
       trophies: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, got: { type: 'boolean' } }, required: ['name'] } },
       stuck: { type: 'boolean', description: 'true if the reflex brain looks stuck and you should take over briefly' },
+      type: { type: 'object', description: 'ONLY when a TEXT BOX needs text (name, answer, riddle, guess, password, command) or a typing game shows words to type: what to type', properties: { box: { type: 'integer', description: 'number of the TEXT BOX, or -1 to just type on the keyboard (typing games)' }, text: { type: 'string' }, enter: { type: 'boolean', description: 'press Enter after (default true)' } }, required: ['text'] },
       lesson: { type: 'string', description: 'for a death review: what went wrong and what to do next time, else empty' },
     },
     required: ['see', 'goal', 'say'],
@@ -105,6 +106,7 @@ AIP.Coach = (function () {
       const tro = B.stats.trophies || { list: [], got: {} };
       const trophies = tro.list.length ? tro.list.map((t) => (tro.got[t.name] || t.got ? '[x] ' : '[ ] ') + t.name).join('; ') : (Object.keys(tro.got).length ? 'got: ' + Object.keys(tro.got).join(', ') : 'unknown');
       const recent = (s.recentEvents || []).slice(-8).join('; ');
+      const fieldsLine = s.typist.describeFields(o);
       const salty = ai.traits.salty > 0.6 ? ' It cusses sometimes when mad (its own choice) - only ever at the game, never at people.' : ' It does not cuss.';
       const me = B.self.camera > 0.5 ? 'first-person/3D camera (it sees through its own eyes)' : 'around (' + B.self.x.toFixed(2) + ', ' + B.self.y.toFixed(2) + ') on screen' + (B.self.cat != null ? ', it is the ' + COLORS[B.self.cat] + ' thing' : '');
       const lines = [
@@ -114,6 +116,8 @@ AIP.Coach = (function () {
         'SCORE: ' + (o.score != null ? o.score + ' (' + (o.scoreLabel || 'score') + ')' : 'none found') + '. HEALTH: ' + (o.hp ? o.hp.value + '/' + o.hp.max : '-') + '. LIVES: ' + (o.lives ? o.lives.value : '-') + '. Best ever: ' + (B.stats.best == null ? '-' : B.stats.best) + '. Try #' + (B.stats.episodes + 1) + '.',
         'TEXT ON SCREEN: ' + (texts.length ? texts.map((t) => '"' + t + '"').join(' | ') : '(none)'),
         'BUTTONS: ' + (btns.length ? btns.join(', ') : '(none)'),
+        fieldsLine ? 'TEXT BOXES: ' + fieldsLine : '',
+        s.typist.history.length ? 'WHAT IT TYPED + WHAT HAPPENED: ' + s.typist.history.slice(-5).join('; ') : '',
         o.choices && o.choices.length ? 'STORY CHOICES: ' + o.choices.map((c) => '"' + c.text + '"').join(', ') : '',
         'WHERE IT IS: ' + me + '.',
         'KEYS IT CAN PRESS: ' + (keys.length ? keys.join(', ') : 'still testing') + '. Other keys exist too (letters, digits, Enter, Space, Shift, arrows).' + (pauseKeys.length ? ' PAUSE keys (avoid): ' + pauseKeys.join(', ') + '.' : ''),
@@ -139,6 +143,7 @@ AIP.Coach = (function () {
         'Story games: READ the dialogue, react to it, summarize it in "story", and pick choices on purpose (explain why). Don\'t skip story.',
         'Trophies are a separate bonus goal from winning. If you can see a trophy/achievement list, fill "trophies". If you don\'t know what trophies exist and haven\'t asked yet, you may ask the player once via "ask".',
         'Write a "note" only for genuinely new, useful facts about this game.',
+        'It can TYPE real text: fill "type" when a text box needs something (name boxes: its own name; riddles/questions/passwords: solve them, look for clues; guess-the-number: binary search from the feedback; text adventures: one good command like "open door" or "go north") or when a typing game shows words (box -1). Leave "type" empty otherwise.',
       ].join('\n');
     }
 
@@ -206,15 +211,16 @@ AIP.Coach = (function () {
       if (p.note && p.note.length > 4) this.addNote(p.note);
       if (p.story && p.story.length > 4) { B.stats.story = B.stats.story || []; if (B.stats.story[B.stats.story.length - 1] !== p.story) { B.stats.story.push(p.story.slice(0, 160)); if (B.stats.story.length > 60) B.stats.story.shift(); } }
       if (p.trophies && p.trophies.length) s.mergeTrophies(p.trophies);
+      if (p.type || reason === 'type') s.typist.fromCoach(p.type, reason);
       if (p.lesson) { this.lastLesson = p.lesson; B.addMemory('lesson', p.lesson.slice(0, 80), 0.6); }
       // 🗣️ talking (the coach's smart lines) - replies to you always get said
       if (p.reply && extra && (extra.text || reason === 'player')) { s.voice.raw(p.reply, 3, 'coach'); this.chatLog.push(s.ai.name + ': ' + p.reply); }
-      else if (p.say && now - this.lastSay > 4000 && p.say !== this.lastSaid) { this.lastSay = now; this.lastSaid = p.say; s.voice.raw(p.say, reason === 'death' || reason === 'story' ? 3 : 2, 'coach'); }
+      else if (p.say && (now - this.lastSay > 4000 || reason === 'type') && p.say !== this.lastSaid) { this.lastSay = now; this.lastSaid = p.say; s.voice.raw(p.say, reason === 'death' || reason === 'story' ? 3 : 2, 'coach'); }
       if (p.ask && !this.pendingAsk) { this.pendingAsk = p.ask; s.voice.raw(p.ask, 3, 'coach'); this.chatLog.push(s.ai.name + ' asked: ' + p.ask); if (/trophi|achievement/i.test(p.ask)) B.stats.flags.askedTrophies = true; }
       if (reason === 'death' && p.lesson) s.diary('review', 'Death review in ' + s.game.name + ': ' + p.lesson);
       // 🖐️ takeover - only when stuck / menu / story choice / you asked / studying
       const o = s.lastObs || {};
-      const allowed = p.stuck || o.menuish || o.staticTime > 4 || reason === 'study' || reason === 'player' || reason === 'story' || (o.choices && o.choices.length) || s.stuckFor > 8;
+      const allowed = p.stuck || o.menuish || o.staticTime > 4 || reason === 'study' || reason === 'player' || reason === 'story' || reason === 'type' || (o.choices && o.choices.length) || s.stuckFor > 8;
       if (allowed && (okPt(p.click) || (p.press && p.press.length))) s.takeover(okPt(p.click) ? { x: clamp01(p.click.x), y: clamp01(p.click.y), what: p.click.what } : null, (p.press || []).slice(0, 4));
       s.app.coachUpdated && s.app.coachUpdated(s);
     }

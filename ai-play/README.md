@@ -14,6 +14,7 @@ It opens in your browser (Chrome or Edge on Windows works best) and runs 100% of
 
 ## Helping it (optional)
 - Type tips in the chat: `space = jump`, `avoid red`, `get the yellow stuff`, `go right`, `don't press escape`.
+- Tell it what to type: `type hello`, `type "open door"`, `type your name`, or give it a clue: `the password is cheese`.
 - 👍 / 👎 buttons while it plays.
 - **🎮 You play**: you play for a bit, it watches and copies you.
 - **⌨️ Keys** tab: ⭐ keys that matter, 🚫 keys it shouldn't use.
@@ -24,6 +25,17 @@ It opens in your browser (Chrome or Edge on Windows works best) and runs 100% of
 - It dreams between tries (replays memories to learn more), keeps a diary, and can watch a rival AI's best run.
 - **Pain mode** (Settings, OFF by default): getting hit hurts. You get a pain meter, yelling, and it gets scared. It *acts* hurt; it's still code.
 
+## ⌨️ It can type
+If a game has a text box or wants you to type, the AI types real text, letter by letter (sometimes with a typo it fixes 😅):
+- **Name boxes**: it types its own name.
+- **Guess the number**: it guesses, reads "too high / too low", and narrows it down.
+- **Math questions**: it works out the answer.
+- **Passwords / codes**: it looks for clues it read in the story ("the password is BANANA").
+- **Text adventures**: it types commands like `look`, `take key`, `open door`, `go north`, `read note`.
+- **Typing games**: it types the words on screen (falling words get typed first).
+- Then it watches what happens (right? wrong? nothing?) and remembers what worked for next time.
+- With the Gemini coach on, the coach picks what to type, so it can solve riddles and play adventures much smarter.
+
 ## 🧠 Gemini coach (optional, needs internet)
 The baby brain still presses the keys. Gemini is its **coach**: it looks at the screen, makes plans, and talks smarter.
 1. Get a free API key at **aistudio.google.com/apikey**.
@@ -33,6 +45,7 @@ The baby brain still presses the keys. Gemini is its **coach**: it looks at the 
    - puts a 🎯 target on screen and a 📋 plan box, and teaches the baby brain keys,
    - understands normal sentences ("go to the door"), answers questions, and just talks (you can also hold 🎤 or the `` ` `` key to talk),
    - reads story text out loud (📖) and picks story choices on purpose,
+   - decides what to type in text boxes (riddles, passwords, adventure commands),
    - looks at deaths to figure out what went wrong,
    - hunts trophies / achievements (a separate goal from winning),
    - writes a **📋 report card** when you stop (it's also saved in the diary).

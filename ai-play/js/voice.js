@@ -46,6 +46,24 @@ AIP.Voice = (function () {
     dreamNone: ['Dreamed about pixels. Lots of pixels.', 'Weird dream. Woke up smarter tho 🧠'],
     memory: ['Remember when {mem}? Good times.', 'Still thinking about when {mem}.', 'I\'ll never forget when {mem}.'],
     story: ['Ooh, story time 📖', 'Wait... what?! 👀', 'Hmm, interesting...', 'Okay okay, I\'m reading!', 'Plot twist?? 😮', 'I need to know what happens next.'],
+    typeName: ['Name? Easy. I\'m {text} ✍️', 'Typing my name: {text}', 'They want my name! It\'s {text} 😎'],
+    typeGuess: ['Hmm... {text}?', 'I guess {text}!', '{text}. Final answer.', 'Let\'s try {text} 🤔'],
+    typeHigh: ['{text} is too high? Going lower ⬇️', 'Too high. Lower then...', 'Okay okay, lower.'],
+    typeLow: ['{text} is too low? Going higher ⬆️', 'Too low. Higher then...', 'Higher! Got it.'],
+    typeMath: ['Math! {q} = {text} 🤓', 'Ez. {q} is {text}.', '{q}? That\'s {text} 🧮'],
+    typeCmd: ['> {text}', 'Let me try "{text}"', 'Typing "{text}"...'],
+    typeAnswer: ['I think it\'s "{text}"!', 'Answer: {text}', 'Is it... "{text}"? 🤔'],
+    typePassword: ['Trying password "{text}" 🔐', 'Is the password "{text}"? 🔐', 'Hacker mode: "{text}" 💻'],
+    typeClue: ['I saw a clue earlier! "{text}" 🕵️', 'Wait, the story said "{text}"... trying it 🔐'],
+    typeRemember: ['I remember this one! "{text}" 🧠', 'Last time it was "{text}" 😎'],
+    typeChat: ['Saying hi in the chat box 👋', 'Typing a message: "{text}"'],
+    typePlayer: ['Typing "{text}" like you said ✍️', 'On it, typing "{text}"'],
+    typeNoBox: ['No text box right now, so I\'ll just type "{text}" on the keyboard ⌨️'],
+    typeGood: ['It worked! ✍️🎉', 'YES that was right!', 'Typed it right 😎', 'Nailed it ✅'],
+    typeBad: ['Wrong?? Ugh.', 'Nope. Okay, something else.', 'It didn\'t like that 😤', 'Not that one...'],
+    typeNothing: ['I typed it but nothing happened 🤔', 'Hello? I typed something!', 'Typing does nothing here I guess.'],
+    typeTypo: ['oops typo', 'fat fingers lol', 'typo, fixed it 😅'],
+    typingGame: ['A typing game?! My fingers are ready ⌨️🔥', 'Typing race, let\'s gooo ⌨️', 'I can type these words! ⌨️'],
     trophy: ['TROPHY!! "{trophy}" 🏆', 'Got the "{trophy}" trophy! 🏆 Collecting them all.', 'Achievement unlocked: {trophy}! Let\'s gooo 🏆'],
     coachResting: ['Gimme a sec, my coach brain is catching its breath (free limit) ⏳ I\'ll answer when it\'s back!', 'My coach brain is resting for a moment ⏳ Hold that thought!'],
     coachOfflineTip: ['No internet, so my coach brain is offline 📡 I only get simple tips right now, like "go right" or "avoid red".'],
@@ -209,9 +227,17 @@ AIP.tips = (function () {
     const s = raw.toLowerCase().replace(/[!.?]+$/g, '').trim();
     const out = { tips: [], feedback: 0, unknownThing: null };
     if (!s) return out;
+    let m;
+    // ✍️ "type hello", "type 'open door'", "write my name", "the password is cheese"
+    if ((m = /^(?:type|write|enter|put in|input)\s+(?:in\s+)?["“'‘](.+?)["”'’]\s*(?:in(?:to)? (?:the )?(?:box|field|text ?box|chat|input))?$/i.exec(raw)) ||
+        (m = /^(?:type|write)\s+(?!.*\b(?:key|button)\b)(.+?)\s*(?:in(?:to)? (?:the )?(?:box|field|text ?box|chat|input))?[.!]?$/i.exec(raw))) {
+      out.tips.push({ type: 'typeText', text: m[1].trim(), text0: raw }); return out;
+    }
+    if ((m = /\b(?:the\s+)?(?:password|pass ?code|code|pin|answer|secret word|magic word)\s+(?:is|=|:)\s*["“'‘]?([^"”'’]{1,40}?)["”'’]?[.!]?$/i.exec(raw))) {
+      out.tips.push({ type: 'typeText', text: m[1].trim(), clue: true, text0: raw }); return out;
+    }
     if (/^(good( job)?|nice|yes+|yay|great|awesome|well done|gg|w|that'?s it|keep going|perfect|👍)$/.test(s)) { out.feedback = 1; return out; }
     if (/^(no+|bad|stop( that)?|nope|wrong|l|don'?t do that|ew|👎)$/.test(s)) { out.feedback = -1; return out; }
-    let m;
     // "space = jump", "press space to jump", "z is shoot", "use x to attack", "space jumps"
     const r1 = new RegExp('^(?:press |use |hit |hold |tap )?' + KEYNAME + '\\s*(?:=|is|to|for|makes you|will|key|button|-|:)?\\s*(?:to\\s+)?(' + VERBS + ')s?\\b', 'i');
     const r2 = new RegExp('^(' + VERBS + ')\\s*(?:with|using|is|=|:|by pressing|on|-)\\s*(?:the\\s+)?' + KEYNAME + '(?:\\s+key)?$', 'i');

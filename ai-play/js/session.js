@@ -30,6 +30,7 @@ AIP.Session = (function () {
       this.pendingFb = 0;
       this.freshLog = []; this.pauseKeys = new Set(); this.aliveAt = 0;
       this.coach = new AIP.Coach(this);
+      this.typist = new AIP.Typist(this);
       this.recentEvents = []; this.lastScoreAt = 0; this.stuckFor = 0;
       this.reading = null; this.take = null;
       this.errorsShown = 0;
@@ -105,6 +106,7 @@ AIP.Session = (function () {
       try { win = f.contentWindow; void win.document; } catch (e) { this.voice.say('loadFail', { err: "the game is blocking me 😢" }, 3); this.phase = 'broken'; return; }
       this.senses.attach(f);
       this.hands.attach(win);
+      if (this.typist) { this.typist.cancel(); this.typist.state.clear(); this.typist.ctxFields = []; }
       this.listenToPlayer(win);
       try { if (win.__aip) win.__aip.realLock = this.mode === 'watch'; } catch (e) { /* ignore */ }
       this.phase = 'play';
@@ -181,10 +183,10 @@ AIP.Session = (function () {
       let end = null;
       for (const ev of events) {
         if (ev.type === 'win') end = 'win';
-        else if (!end && (ev.type === 'gameOver' || ev.type === 'healthZero')) end = 'death';
+        else if (!end && ((ev.type === 'gameOver' && !this.typist.feedbackOver()) || ev.type === 'healthZero')) end = 'death';
         else if (!end && ev.type === 'scoreReset' && this.ep.maxScore > 0 && now - this.ep.t0 > 3000) end = 'death';
       }
-      if (end && this.phase !== 'restart') { this.reading = null; this.take = null; if (this.phase === 'studying') this.phase = 'play'; }
+      if (end && this.phase !== 'restart') { this.reading = null; this.take = null; this.typist.onEnd(end); if (this.phase === 'studying') this.phase = 'play'; }
       if (!end) {
       // 🖐️ the coach is pressing/clicking something itself (only when stuck/menus/story)
       if (this.mode === 'ai' && this.take && this.runTakeover(now)) { this.ui(now, obs); return; }
@@ -192,6 +194,8 @@ AIP.Session = (function () {
       if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
       // 📖 story / instructions on screen: actually READ it (don't mash through)
       if (this.mode === 'ai' && this.readStory(obs, now)) { this.ui(now, obs); return; }
+      // ✍️ a text box wants typing (name, guess, answer, command...) or a typing game shows words
+      if (this.mode === 'ai' && this.typist.step(obs, now)) { this.ui(now, obs); return; }
       }
       else if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
 
@@ -396,6 +400,7 @@ AIP.Session = (function () {
     /* ---------- 📖 reading story / instructions ---------- */
     readStory(obs, now) {
       if (obs.gameOverVisible || this.phase !== 'play') { this.reading = null; return false; }
+      if (this.typist.active || (!(obs.fields && obs.fields.length) && this.typist.strongCue())) { this.reading = null; return false; } // (typing, or a typing test)
       // text still being "typed out" on screen? wait for it to finish before reading
       if (obs.textAnimating && !this.reading) { this.hands.releaseAll(); this.reason = '📖 waiting for the text to finish…'; return true; }
       // any long text on screen it hasn't read yet? (dialogue, story, instructions)
@@ -454,6 +459,7 @@ AIP.Session = (function () {
       const stillThere = (this.senses.textBits || []).some((b) => b.s.replace(/\s+/g, ' ').trim() === R.text);
       if (!stillThere || R.tries >= 6) { this.reading = null; return false; }
       if (obs.menuish && !R.hint) { this.reading = null; return false; } // a menu: the normal brain clicks Play etc.
+      if (obs.fields && obs.fields.length && !R.hint) { this.reading = null; return false; } // it wants me to TYPE something, not press Enter
       if (now < R.next) return true;
       const seq = R.hint === 'click' ? ['click', 'Enter', 'Space'] : R.hint && R.hint !== 'any' ? [R.hint, 'Enter', 'Space'] : ['Enter', 'Space', 'click', 'KeyE', 'KeyZ', 'ArrowRight'];
       const k = seq[R.tries % seq.length];
@@ -510,7 +516,7 @@ AIP.Session = (function () {
     }
 
     stuckCheck(obs, now) {
-      if (this.mode !== 'ai' || this.phase !== 'play' || this.reading || this.take) return;
+      if (this.mode !== 'ai' || this.phase !== 'play' || this.reading || this.take || this.typist.active) return;
       if (obs.staticTime < 1) { this.stuckSaid = false; return; }
       if (obs.staticTime > 12 && !this.stuckSaid) {
         this.stuckSaid = true;
@@ -824,6 +830,10 @@ AIP.Session = (function () {
     tip(text) {
       const p = AIP.tips.parse(text);
       if (p.feedback) { this.feedback(p.feedback); return; }
+      // ✍️ "type hello" / "the password is cheese" - it types it (works offline too)
+      const tt = p.tips.find((t) => t.type === 'typeText');
+      if (tt && /^(your|ur|ya|yo) name$/i.test(tt.text)) tt.text = this.ai.name;
+      if (tt) { this.typist.playerText(tt.text); if (tt.clue) this.typist.addClue(tt.text); if (AIP.gemini.usable()) this.coach.chatLog.push('Player: ' + text); return; }
       // the quick stuff the baby brain understands by itself ("space = jump") - works offline too
       if (p.tips.length) { p.tips.forEach((t) => this.brain.applyTip(t)); this.heart.react([{ type: 'tip' }], { painMode: AIP.settings.get().painMode }); }
       // the coach understands normal sentences ("go to the door"), answers questions, chats

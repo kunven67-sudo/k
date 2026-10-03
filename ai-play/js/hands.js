@@ -33,6 +33,25 @@ AIP.Hands = (function () {
   const { clamp } = AIP.util;
   const KEYS = AIP.KEYS.map;
 
+  // which physical key makes this character (so typed text looks like real key presses)
+  const PUNCT = { '-': ['Minus', 189], '_': ['Minus', 189, 1], '=': ['Equal', 187], '+': ['Equal', 187, 1], '.': ['Period', 190], ',': ['Comma', 188], '/': ['Slash', 191], '?': ['Slash', 191, 1],
+    "'": ['Quote', 222], '"': ['Quote', 222, 1], ';': ['Semicolon', 186], ':': ['Semicolon', 186, 1], '!': ['Digit1', 49, 1], '@': ['Digit2', 50, 1], '#': ['Digit3', 51, 1], '$': ['Digit4', 52, 1],
+    '%': ['Digit5', 53, 1], '&': ['Digit7', 55, 1], '*': ['Digit8', 56, 1], '(': ['Digit9', 57, 1], ')': ['Digit0', 48, 1], '<': ['Comma', 188, 1], '>': ['Period', 190, 1] };
+  function charKey(ch) {
+    if (ch === ' ') return { code: 'Space', keyCode: 32 };
+    if (/^[a-z]$/i.test(ch)) { const up = ch.toUpperCase(); return { code: 'Key' + up, keyCode: up.charCodeAt(0), shift: ch !== ch.toLowerCase() }; }
+    if (/^[0-9]$/.test(ch)) return { code: 'Digit' + ch, keyCode: 48 + Number(ch) };
+    const p = PUNCT[ch];
+    return p ? { code: p[0], keyCode: p[1], shift: !!p[2] } : { code: '', keyCode: 0 };
+  }
+  // fat-finger typos hit a key right next to the right one
+  const ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+  function neighbor(ch) {
+    const lo = ch.toLowerCase();
+    for (const r of ROWS) { const i = r.indexOf(lo); if (i >= 0) { const n = r[i + (i === 0 ? 1 : i === r.length - 1 ? -1 : Math.random() < 0.5 ? -1 : 1)]; return ch === lo ? n : n.toUpperCase(); } }
+    return ch;
+  }
+
   class Hands {
     constructor(cursorEl) {
       this.cursorEl = cursorEl;
@@ -42,7 +61,7 @@ AIP.Hands = (function () {
       this.mouseDown = false;
       this.win = null;
     }
-    attach(win) { this.win = win; this.held.clear(); this.mouseDown = false; this.mx = 0.5; this.my = 0.5; this.drawCursor(); }
+    attach(win) { this.stopTyping(); this.win = win; this.held.clear(); this.mouseDown = false; this.mx = 0.5; this.my = 0.5; this.drawCursor(); }
     get doc() { try { return this.win && this.win.document; } catch (e) { return null; } }
 
     keyTarget() {
@@ -85,6 +104,116 @@ AIP.Hands = (function () {
     releaseAll() {
       this.setKeys([]);
       if (this.mouseDown) this.mouseUp();
+    }
+
+    /* ---------- ⌨️ typing real text ---------- */
+    // Types text letter by letter like a person. el = the text box (null = just the keyboard, for typing games).
+    // opts: { delay: ms per letter, typo: chance of a typo (it fixes it with Backspace), clear: empty the box first }
+    typeText(text, el, opts) {
+      opts = opts || {};
+      this.stopTyping();
+      const job = this.typeJob = { cancelled: false, i: 0, typos: 0 };
+      const chars = [...String(text)];
+      return new Promise((resolve) => {
+        const finish = (ok) => { if (this.typeJob === job) this.typeJob = null; resolve(ok ? job : null); };
+        if (!this.win) { finish(false); return; }
+        if (el) { this.clickElement(el); if (opts.clear) this.clearField(el); }
+        let fixTypo = false;
+        const later = (mul) => setTimeout(step, (opts.delay || 110) * (mul || 1) * (0.6 + Math.random() * 0.8));
+        const step = () => {
+          if (job.cancelled || !this.win || (el && !el.isConnected)) { finish(false); return; }
+          if (fixTypo) { fixTypo = false; this.typeKey('Backspace', el); later(1.2); return; }
+          if (job.i >= chars.length) { finish(true); return; }
+          const ch = chars[job.i];
+          if (el && opts.typo && /[a-z]/i.test(ch) && Math.random() < opts.typo) { this.typeChar(neighbor(ch), el); job.typos++; fixTypo = true; later(2.2); return; }
+          this.typeChar(ch, el);
+          job.i++;
+          later();
+        };
+        later(2.5);
+      });
+    }
+    stopTyping() { if (this.typeJob) this.typeJob.cancelled = true; this.typeJob = null; }
+    get typing() { return !!this.typeJob; }
+
+    keyEvent(type, ch, k, t, extra) {
+      const w = this.win;
+      const ev = new w.KeyboardEvent(type, Object.assign({ key: ch, code: k.code, keyCode: k.keyCode, which: k.keyCode, bubbles: true, cancelable: true, composed: true, view: w, shiftKey: !!k.shift }, extra || {}));
+      t.dispatchEvent(ev);
+      return !ev.defaultPrevented;
+    }
+    // one letter: keydown -> keypress -> (the letter shows up in the box) -> keyup.
+    // If the game blocks the key (preventDefault), the letter doesn't go in - just like a real browser.
+    typeChar(ch, el) {
+      const k = charKey(ch), t = el || this.keyTarget();
+      if (!this.win || !t) return;
+      try {
+        let ok = this.keyEvent('keydown', ch, k, t);
+        const cc = ch.charCodeAt(0);
+        if (ok) ok = this.keyEvent('keypress', ch, k, t, { keyCode: cc, which: cc, charCode: cc });
+        if (ok && el) this.insertText(el, ch);
+        this.keyEvent('keyup', ch, k, t);
+      } catch (e) { /* game gone */ }
+    }
+    // special keys while typing (Backspace / Enter / Tab) aimed at the text box
+    typeKey(code, el) {
+      const K = KEYS[code], t = el || this.keyTarget();
+      if (!K || !this.win || !t) return false;
+      let ok = false;
+      try {
+        ok = this.keyEvent('keydown', K.key, K, t);
+        if (ok && code === 'Enter') ok = this.keyEvent('keypress', 'Enter', K, t, { charCode: 13 });
+        if (ok && el && code === 'Backspace') this.deleteBack(el);
+        this.keyEvent('keyup', K.key, K, t);
+      } catch (e) { /* ignore */ }
+      return ok;
+    }
+    // press Enter in the box. A box inside a <form> gets "submitted" like a real browser does
+    // (as an event only - the page never actually navigates away).
+    submit(el) {
+      const ok = this.typeKey('Enter', el);
+      if (ok && el && el.form && el.tagName === 'INPUT') {
+        try { const w = this.win; const ev = w.SubmitEvent ? new w.SubmitEvent('submit', { bubbles: true, cancelable: true }) : new w.Event('submit', { bubbles: true, cancelable: true }); el.form.dispatchEvent(ev); } catch (e) { /* ignore */ }
+      }
+      return ok;
+    }
+    setValue(el, v) {
+      const w = this.win;
+      const proto = el.tagName === 'TEXTAREA' ? w.HTMLTextAreaElement.prototype : w.HTMLInputElement.prototype;
+      const d = Object.getOwnPropertyDescriptor(proto, 'value');
+      if (d && d.set) d.set.call(el, v); else el.value = v; // (the real setter, so React-style games notice too)
+    }
+    insertText(el, str) {
+      const w = this.win;
+      try {
+        if (!el.dispatchEvent(new w.InputEvent('beforeinput', { inputType: 'insertText', data: str, bubbles: true, cancelable: true, composed: true }))) return;
+        if (el.isContentEditable && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.appendChild(el.ownerDocument.createTextNode(str));
+        else {
+          const cur = String(el.value || '');
+          if (el.maxLength > 0 && cur.length >= el.maxLength) return;
+          this.setValue(el, cur + str);
+        }
+        el.dispatchEvent(new w.InputEvent('input', { inputType: 'insertText', data: str, bubbles: true, composed: true }));
+      } catch (e) { /* ignore */ }
+    }
+    deleteBack(el) {
+      const w = this.win;
+      try {
+        if (!el.dispatchEvent(new w.InputEvent('beforeinput', { inputType: 'deleteContentBackward', bubbles: true, cancelable: true, composed: true }))) return;
+        if (el.isContentEditable && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = (el.textContent || '').slice(0, -1);
+        else this.setValue(el, String(el.value || '').slice(0, -1));
+        el.dispatchEvent(new w.InputEvent('input', { inputType: 'deleteContentBackward', bubbles: true, composed: true }));
+      } catch (e) { /* ignore */ }
+    }
+    clearField(el) {
+      const w = this.win;
+      try {
+        const has = el.isContentEditable && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' ? (el.textContent || '') : String(el.value || '');
+        if (!has) return;
+        if (el.isContentEditable && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = '';
+        else this.setValue(el, '');
+        el.dispatchEvent(new w.InputEvent('input', { inputType: 'deleteContentBackward', bubbles: true, composed: true }));
+      } catch (e) { /* ignore */ }
     }
 
     /* ---------- mouse ---------- */

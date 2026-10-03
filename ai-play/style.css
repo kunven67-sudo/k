@@ -308,6 +308,8 @@ input[type="range"] { accent-color: var(--pink); width: 180px; }
 .trophy-list li { list-style: none; margin-left: -18px; }
 .msg.read { align-self: stretch; max-width: 100%; background: rgba(255, 196, 61, .07); border: 1px dashed rgba(255, 196, 61, .45); font-style: italic; color: #ffe7b0; }
 .msg.read::before { content: '📖 '; font-style: normal; }
+.msg.typed { align-self: flex-start; background: rgba(0, 240, 255, .06); border: 1px solid rgba(0, 240, 255, .4); font-family: ui-monospace, Consolas, monospace; color: #b8fbff; font-size: 13px; }
+.msg.typed::before { content: '⌨️ typed: '; font-family: inherit; color: var(--dim); }
 .msg { white-space: pre-wrap; }
 .mic.on { border-color: var(--red); background: rgba(255, 59, 92, .2); box-shadow: 0 0 12px rgba(255, 59, 92, .6); animation: twinkle .8s infinite; }
 .report-text { text-align: left; white-space: pre-wrap; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 14px; max-height: 50vh; overflow: auto; }

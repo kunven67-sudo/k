@@ -317,6 +317,8 @@ input[type="range"] { accent-color: var(--pink); width: 180px; }
 .trophy-list li { list-style: none; margin-left: -18px; }
 .msg.read { align-self: stretch; max-width: 100%; background: rgba(255, 196, 61, .07); border: 1px dashed rgba(255, 196, 61, .45); font-style: italic; color: #ffe7b0; }
 .msg.read::before { content: '📖 '; font-style: normal; }
+.msg.typed { align-self: flex-start; background: rgba(0, 240, 255, .06); border: 1px solid rgba(0, 240, 255, .4); font-family: ui-monospace, Consolas, monospace; color: #b8fbff; font-size: 13px; }
+.msg.typed::before { content: '⌨️ typed: '; font-family: inherit; color: var(--dim); }
 .msg { white-space: pre-wrap; }
 .mic.on { border-color: var(--red); background: rgba(255, 59, 92, .2); box-shadow: 0 0 12px rgba(255, 59, 92, .6); animation: twinkle .8s infinite; }
 .report-text { text-align: left; white-space: pre-wrap; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 14px; max-height: 50vh; overflow: auto; }
@@ -1286,6 +1288,37 @@ AIP.Senses = (function () {
   const CHOICE_SKIP_RX = /^(play|start|begin|settings|options|credits|shop|store|back|quit|exit|menu|resume|retry|try again|play again|restart|achievements?|help|ok|okay|close|x|×)$/i;
   const GOOD_BTN_RX = /\b(play|start|begin|go|continue|retry|try again|again|restart|next|ok|okay|resume|new game|tap|click|press|enter|let'?s|ready|yes|launch)\b/i;
   const MEH_BTN_RX = /\b(settings|options|credits|quit|exit|reset|erase|delete|back|menu|about|help|share|privacy|shop|store|achievements?)\b/i;
+  // ✍️ text boxes + typing games
+  const TEXT_TYPES = /^(text|search|email|number|tel|password|url)?$/;
+  const TYPE_CUE_RX = /\b(type|typing|typed|wpm|words? per minute|spell(?:ing)?|keyboard)\b/i;
+  const UI_WORD_RX = /^(score|scores|lives|life|health|hp|time|timer|level|lvl|wpm|best|high ?score|accuracy|combo|points?|pause|paused|menu|start|play|restart|settings|sound|music|on|off|ok|go|ready|next|back|help|type|typing|words?)$/i;
+  function fieldKind(el, type, label) {
+    const L = label.toLowerCase();
+    if (type === 'url') return 'skip';
+    if (type === 'email') return 'email';
+    if (type === 'search') return 'search';
+    if (type === 'password' || /pass ?word|passcode|pass ?code|secret|\bpin\b|\bcode\b|key ?word|unlock/.test(L)) return 'password';
+    if (/\bname\b|nick|player|user ?name|call you|initials|who are you|gamertag|tag\b/.test(L)) return 'name';
+    if (/command|action|what (do|will|should|would) you do|what now|instruction|^\s*>|>\s*$|\bcmd\b|adventure/.test(L)) return 'command';
+    if (type === 'number' || type === 'tel' || /guess|number|\bnum\b|pick a|how many|amount/.test(L)) return 'number';
+    if (/answer|solve|riddle|question|spell|translate|what is|reply|word|letter|unscramble/.test(L)) return 'answer';
+    if (/chat|message|say|talk|send|comment/.test(L)) return 'chat';
+    return 'text';
+  }
+  function fieldLabel(el) {
+    const bits = [];
+    try { if (el.labels && el.labels.length) bits.push(el.labels[0].innerText || ''); } catch (e) { /* ignore */ }
+    bits.push(el.getAttribute('aria-label') || '', el.getAttribute('placeholder') || '', el.title || '', el.name || '');
+    // nothing? the words right before the box (like "Your name: [_____]") - short, steady text only
+    // (not a chat log above it that keeps changing)
+    if (!bits.join('').trim()) {
+      let prev = el.previousSibling, n = 0;
+      while (prev && n++ < 3) { const t = ((prev.nodeType === 3 ? prev.nodeValue : prev.nodeType === 1 && !/^(INPUT|TEXTAREA|BUTTON|SELECT)$/.test(prev.tagName) ? prev.innerText : '') || '').trim(); if (t) { if (t.length <= 60) bits.push(t); break; } prev = prev.previousSibling; }
+    }
+    if (!bits.join('').trim()) bits.push(el.id || '');
+    if (!bits.join('').trim() && el.parentElement) bits.push((el.parentElement.innerText || '').slice(0, 60));
+    return bits.map((b) => String(b).replace(/\s+/g, ' ').trim()).filter(Boolean).join(' | ').slice(0, 120);
+  }
   const NUM_ONLY = /^\s*[x×]?\s*(-?\d{1,3}(?:,\d{3})+|-?\d+(?:\.\d+)?)\s*(?:\/\s*(\d+))?\s*(%|pts|m)?\s*$/i;
   const LABELLED = /([A-Za-z][A-Za-z _'.]{0,16}?|❤️|❤|♥|💖|⭐|🪙|💰|💎|🏆|⚡|🔥|\$)\s*[:=]?\s*[x×]?\s*(-?\d{1,3}(?:,\d{3})+|-?\d+(?:\.\d+)?)(?:\s*\/\s*(\d+))?/gu;
   const NUM_FIRST = /(-?\d{1,3}(?:,\d{3})+|-?\d+(?:\.\d+)?)\s*(pts|points|coins?|lives|hp|meters|kills|gems|stars|xp)\b/gi;
@@ -1315,7 +1348,7 @@ AIP.Senses = (function () {
       this.readouts = new Map();
       this.primary = { score: null, hp: null, lives: null };
       this.items = []; this.itemsAt = 0;
-      this.buttons = []; this.textBits = [];
+      this.buttons = []; this.textBits = []; this.fields = []; this.cvLines = [];
       this.tainted = new WeakSet();
       this.taintCheckAt = 0;
       this.redBase = 0; this.lastFlashAt = -1e9;
@@ -1360,10 +1393,12 @@ AIP.Senses = (function () {
         if (op < 0.05) continue;
         const media = tag === 'CANVAS' || tag === 'IMG' || tag === 'VIDEO' || (tag === 'image');
         let text = '';
-        for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
+        const field = tag === 'INPUT' || tag === 'TEXTAREA';
+        if (field) text = String(el.type === 'password' ? '•'.repeat((el.value || '').length) : el.value || '').slice(0, 80);
+        else for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
         text = text.replace(/\s+/g, ' ').trim();
         const fill = isSolid(cs.backgroundColor) ? cs.backgroundColor : null;
-        if (media || fill || text) out.push({ el, media, fill, text, color: cs.color, op, fs: parseFloat(cs.fontSize) || 14, fw: cs.fontWeight, ta: cs.textAlign });
+        if (media || fill || text) out.push({ el, media, fill, text, field, color: cs.color, op, fs: parseFloat(cs.fontSize) || 14, fw: cs.fontWeight, ta: cs.textAlign });
       }
       this.items = out;
     }
@@ -1393,6 +1428,69 @@ AIP.Senses = (function () {
       }
       this.buttons = out;
     }
+
+    /* ---- ✍️ text boxes the game wants you to type in (name, guess, answer, command...) ---- */
+    findFields() {
+      const doc = this.doc, win = this.win;
+      const out = [];
+      if (!doc || !doc.body) { this.fields = out; return; }
+      const vw = win.innerWidth, vh = win.innerHeight;
+      let list;
+      try { list = doc.querySelectorAll('input,textarea,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"]'); } catch (e) { list = []; }
+      for (let i = 0; i < list.length && out.length < 8; i++) {
+        const el = list[i];
+        const tag = el.tagName;
+        const type = tag === 'INPUT' ? String(el.getAttribute('type') || 'text').toLowerCase() : tag === 'TEXTAREA' ? 'textarea' : 'editable';
+        if (tag === 'INPUT' && !TEXT_TYPES.test(type)) continue;
+        if (el.disabled || el.readOnly) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 8 || r.height < 8 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
+        let cs;
+        try { cs = win.getComputedStyle(el); } catch (e) { continue; }
+        if (cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.05) continue;
+        const cx = clamp(r.left + r.width / 2, 1, vw - 1), cy = clamp(r.top + r.height / 2, 1, vh - 1);
+        const top = doc.elementFromPoint(cx, cy);
+        if (!top || !(top === el || el.contains(top) || top.contains(el))) continue; // hidden behind something
+        const label = fieldLabel(el);
+        const value = tag === 'INPUT' || tag === 'TEXTAREA' ? String(el.value || '') : String(el.innerText || '').trim();
+        out.push({
+          el, type, label, value, kind: fieldKind(el, type, label),
+          x: cx / vw, y: cy / vh, w: r.width / vw, h: r.height / vh,
+          max: el.maxLength > 0 ? el.maxLength : 0, focused: doc.activeElement === el,
+        });
+      }
+      this.fields = out;
+    }
+
+    /* ---- ⌨️ typing games: the word(s) on screen you're supposed to type ---- */
+    typingWords(long) {
+      const out = [], win = this.win, doc = this.doc;
+      if (!win || !doc) return out;
+      const vw = win.innerWidth || 1, vh = win.innerHeight || 1;
+      const seen = new Set();
+      const add = (s, x, y, size, el) => {
+        s = String(s || '').replace(/\s+/g, ' ').trim();
+        if (!s || s.length > (long ? 160 : 30) || seen.has(s + '@' + Math.round(x * 20) + ',' + Math.round(y * 20))) return;
+        if (long && s.length > 30) { if (!/^[A-Za-z0-9][A-Za-z0-9'",.;:!?\- ]*$/.test(s)) return; } // (a typing test sentence)
+        else if (!/^[A-Za-z][A-Za-z'\- ]*$/.test(s) || s.split(' ').length > 4 || UI_WORD_RX.test(s)) return;
+        if (s.length === 1 && size < 36) return; // single letters only when BIG ("press K!")
+        seen.add(s + '@' + Math.round(x * 20) + ',' + Math.round(y * 20));
+        out.push({ s, x, y, size, el });
+      };
+      for (const it of this.items) {
+        if (it.media || it.field || !it.text) continue;
+        const el = it.el;
+        if (el.closest && el.closest('button,a,label,[role="button"]')) continue;
+        let s = it.text, host = el;
+        // letter-by-letter spans (<span>c</span><span>a</span><span>t</span>) -> read the whole word from the parent
+        if (s.length <= 2 && el.parentElement) { const ps = (el.parentElement.textContent || '').replace(/\s+/g, ' ').trim(); if (ps.length > s.length && ps.length <= (long ? 160 : 30)) { s = ps; host = el.parentElement; } }
+        const r = host.getBoundingClientRect();
+        add(s, (r.left + r.width / 2) / vw, (r.top + r.height / 2) / vh, it.fs, host);
+      }
+      for (const l of this.cvLines || []) add(l.s, l.x, l.y, l.size, null);
+      return out;
+    }
+    get typingCue() { return (this.textBits || []).some((b) => b.s.length < 120 && TYPE_CUE_RX.test(b.s)); }
 
     /* ---- draw what the game looks like into a tiny 40x30 picture ---- */
     paint() {
@@ -1450,8 +1548,9 @@ AIP.Senses = (function () {
     /* ---- reading numbers ---- */
     gatherText(now) {
       const bits = [];
+      this.cvLines = [];
       for (const it of this.items) {
-        if (!it.text || it.text.length > 600) continue; // (long text = story / instructions - it reads those too)
+        if (!it.text || it.field || it.text.length > 600) continue; // (long text = story / instructions - it reads those too)
         bits.push({ s: it.text, ctx: it.text.length <= 80 ? ctxLabel(it.el) : '', src: 'dom', id: elId(it.el) });
       }
       const aip = this.aip;
@@ -1460,17 +1559,35 @@ AIP.Senses = (function () {
         let fnow = now;
         try { fnow = this.win.performance.now(); } catch (e) { /* ignore */ }
         const recent = aip.texts.splice(0, aip.texts.length).filter((t) => fnow - t.t < 500 && t.s && t.s.length < 80);
+        // where things are NOW = only the newest drawing of each canvas (not words that were there half a second ago)
+        const newest = new Map();
+        for (const t of recent) if (!(newest.get(t.c) >= t.t)) newest.set(t.c, t.t);
         // canvas text often comes in pieces ("Score:" then "120") - glue pieces on the same line
         const lines = new Map();
         for (const t of recent) {
           const key = (t.c.id || 'cv') + ':' + Math.round(t.y / 8);
-          if (!lines.has(key)) lines.set(key, new Map());
-          lines.get(key).set(Math.round(t.x), t.s);
+          if (!lines.has(key)) lines.set(key, { m: new Map(), t, fresh: false });
+          const L = lines.get(key);
+          L.m.set(Math.round(t.x), t.s);
+          if (t.t >= newest.get(t.c) - 40) { L.fresh = true; L.t = t; }
         }
-        lines.forEach((m, key) => {
-          const s = [...m.entries()].sort((a, b) => a[0] - b[0]).map((e) => e[1]).join(' ').trim();
-          if (s) bits.push({ s, ctx: '', src: 'cv', id: key });
+        const cvLines = [];
+        lines.forEach((L, key) => {
+          const s = [...L.m.entries()].sort((a, b) => a[0] - b[0]).map((e) => e[1]).join(' ').trim();
+          if (!s) return;
+          bits.push({ s, ctx: '', src: 'cv', id: key });
+          if (!L.fresh) return;
+          // where it is on screen + how big (typing games need that)
+          try {
+            const c = L.t.c, r = c.getBoundingClientRect(), vw = this.win.innerWidth || 1, vh = this.win.innerHeight || 1;
+            const fx = r.width / (c.width || 1), fy = r.height / (c.height || 1);
+            const px = parseFloat((/(\d+(?:\.\d+)?)px/.exec(L.t.f || '') || [0, 12])[1]);
+            const xs = [...L.m.keys()];
+            const mid = (Math.min(...xs) + Math.max(...xs)) / 2;
+            cvLines.push({ s, x: (r.left + mid * fx) / vw, y: (r.top + L.t.y * fy) / vh, size: px * fy });
+          } catch (e) { /* canvas gone */ }
         });
+        this.cvLines = cvLines;
       }
       if (aip && aip.alerts.length < this.alertsSeen) this.alertsSeen = 0;
       if (aip && aip.alerts.length > this.alertsSeen) {
@@ -1554,7 +1671,7 @@ AIP.Senses = (function () {
       const win = this.win;
       obs.vw = win.innerWidth; obs.vh = win.innerHeight;
 
-      if (now - this.itemsAt > 450 || !this.items.length) { this.itemsAt = now; this.collect(); this.findButtons(); }
+      if (now - this.itemsAt > 450 || !this.items.length) { this.itemsAt = now; this.collect(); this.findButtons(); this.findFields(); }
 
       const px = this.paint();
       if (!px) return obs;
@@ -1650,6 +1767,7 @@ AIP.Senses = (function () {
       this.numberEvents(obs, now);
 
       obs.buttons = this.buttons;
+      obs.fields = (this.fields || []).filter((f) => f.el.isConnected && f.kind !== 'skip');
       const aip = this.aip;
       obs.lockActive = !!(aip && aip.lockEl);
       obs.frames = aip ? aip.frames : 0;
@@ -1879,6 +1997,25 @@ AIP.Hands = (function () {
   const { clamp } = AIP.util;
   const KEYS = AIP.KEYS.map;
 
+  // which physical key makes this character (so typed text looks like real key presses)
+  const PUNCT = { '-': ['Minus', 189], '_': ['Minus', 189, 1], '=': ['Equal', 187], '+': ['Equal', 187, 1], '.': ['Period', 190], ',': ['Comma', 188], '/': ['Slash', 191], '?': ['Slash', 191, 1],
+    "'": ['Quote', 222], '"': ['Quote', 222, 1], ';': ['Semicolon', 186], ':': ['Semicolon', 186, 1], '!': ['Digit1', 49, 1], '@': ['Digit2', 50, 1], '#': ['Digit3', 51, 1], '$': ['Digit4', 52, 1],
+    '%': ['Digit5', 53, 1], '&': ['Digit7', 55, 1], '*': ['Digit8', 56, 1], '(': ['Digit9', 57, 1], ')': ['Digit0', 48, 1], '<': ['Comma', 188, 1], '>': ['Period', 190, 1] };
+  function charKey(ch) {
+    if (ch === ' ') return { code: 'Space', keyCode: 32 };
+    if (/^[a-z]$/i.test(ch)) { const up = ch.toUpperCase(); return { code: 'Key' + up, keyCode: up.charCodeAt(0), shift: ch !== ch.toLowerCase() }; }
+    if (/^[0-9]$/.test(ch)) return { code: 'Digit' + ch, keyCode: 48 + Number(ch) };
+    const p = PUNCT[ch];
+    return p ? { code: p[0], keyCode: p[1], shift: !!p[2] } : { code: '', keyCode: 0 };
+  }
+  // fat-finger typos hit a key right next to the right one
+  const ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+  function neighbor(ch) {
+    const lo = ch.toLowerCase();
+    for (const r of ROWS) { const i = r.indexOf(lo); if (i >= 0) { const n = r[i + (i === 0 ? 1 : i === r.length - 1 ? -1 : Math.random() < 0.5 ? -1 : 1)]; return ch === lo ? n : n.toUpperCase(); } }
+    return ch;
+  }
+
   class Hands {
     constructor(cursorEl) {
       this.cursorEl = cursorEl;
@@ -1888,7 +2025,7 @@ AIP.Hands = (function () {
       this.mouseDown = false;
       this.win = null;
     }
-    attach(win) { this.win = win; this.held.clear(); this.mouseDown = false; this.mx = 0.5; this.my = 0.5; this.drawCursor(); }
+    attach(win) { this.stopTyping(); this.win = win; this.held.clear(); this.mouseDown = false; this.mx = 0.5; this.my = 0.5; this.drawCursor(); }
     get doc() { try { return this.win && this.win.document; } catch (e) { return null; } }
 
     keyTarget() {
@@ -1931,6 +2068,116 @@ AIP.Hands = (function () {
     releaseAll() {
       this.setKeys([]);
       if (this.mouseDown) this.mouseUp();
+    }
+
+    /* ---------- ⌨️ typing real text ---------- */
+    // Types text letter by letter like a person. el = the text box (null = just the keyboard, for typing games).
+    // opts: { delay: ms per letter, typo: chance of a typo (it fixes it with Backspace), clear: empty the box first }
+    typeText(text, el, opts) {
+      opts = opts || {};
+      this.stopTyping();
+      const job = this.typeJob = { cancelled: false, i: 0, typos: 0 };
+      const chars = [...String(text)];
+      return new Promise((resolve) => {
+        const finish = (ok) => { if (this.typeJob === job) this.typeJob = null; resolve(ok ? job : null); };
+        if (!this.win) { finish(false); return; }
+        if (el) { this.clickElement(el); if (opts.clear) this.clearField(el); }
+        let fixTypo = false;
+        const later = (mul) => setTimeout(step, (opts.delay || 110) * (mul || 1) * (0.6 + Math.random() * 0.8));
+        const step = () => {
+          if (job.cancelled || !this.win || (el && !el.isConnected)) { finish(false); return; }
+          if (fixTypo) { fixTypo = false; this.typeKey('Backspace', el); later(1.2); return; }
+          if (job.i >= chars.length) { finish(true); return; }
+          const ch = chars[job.i];
+          if (el && opts.typo && /[a-z]/i.test(ch) && Math.random() < opts.typo) { this.typeChar(neighbor(ch), el); job.typos++; fixTypo = true; later(2.2); return; }
+          this.typeChar(ch, el);
+          job.i++;
+          later();
+        };
+        later(2.5);
+      });
+    }
+    stopTyping() { if (this.typeJob) this.typeJob.cancelled = true; this.typeJob = null; }
+    get typing() { return !!this.typeJob; }
+
+    keyEvent(type, ch, k, t, extra) {
+      const w = this.win;
+      const ev = new w.KeyboardEvent(type, Object.assign({ key: ch, code: k.code, keyCode: k.keyCode, which: k.keyCode, bubbles: true, cancelable: true, composed: true, view: w, shiftKey: !!k.shift }, extra || {}));
+      t.dispatchEvent(ev);
+      return !ev.defaultPrevented;
+    }
+    // one letter: keydown -> keypress -> (the letter shows up in the box) -> keyup.
+    // If the game blocks the key (preventDefault), the letter doesn't go in - just like a real browser.
+    typeChar(ch, el) {
+      const k = charKey(ch), t = el || this.keyTarget();
+      if (!this.win || !t) return;
+      try {
+        let ok = this.keyEvent('keydown', ch, k, t);
+        const cc = ch.charCodeAt(0);
+        if (ok) ok = this.keyEvent('keypress', ch, k, t, { keyCode: cc, which: cc, charCode: cc });
+        if (ok && el) this.insertText(el, ch);
+        this.keyEvent('keyup', ch, k, t);
+      } catch (e) { /* game gone */ }
+    }
+    // special keys while typing (Backspace / Enter / Tab) aimed at the text box
+    typeKey(code, el) {
+      const K = KEYS[code], t = el || this.keyTarget();
+      if (!K || !this.win || !t) return false;
+      let ok = false;
+      try {
+        ok = this.keyEvent('keydown', K.key, K, t);
+        if (ok && code === 'Enter') ok = this.keyEvent('keypress', 'Enter', K, t, { charCode: 13 });
+        if (ok && el && code === 'Backspace') this.deleteBack(el);
+        this.keyEvent('keyup', K.key, K, t);
+      } catch (e) { /* ignore */ }
+      return ok;
+    }
+    // press Enter in the box. A box inside a <form> gets "submitted" like a real browser does
+    // (as an event only - the page never actually navigates away).
+    submit(el) {
+      const ok = this.typeKey('Enter', el);
+      if (ok && el && el.form && el.tagName === 'INPUT') {
+        try { const w = this.win; const ev = w.SubmitEvent ? new w.SubmitEvent('submit', { bubbles: true, cancelable: true }) : new w.Event('submit', { bubbles: true, cancelable: true }); el.form.dispatchEvent(ev); } catch (e) { /* ignore */ }
+      }
+      return ok;
+    }
+    setValue(el, v) {
+      const w = this.win;
+      const proto = el.tagName === 'TEXTAREA' ? w.HTMLTextAreaElement.prototype : w.HTMLInputElement.prototype;
+      const d = Object.getOwnPropertyDescriptor(proto, 'value');
+      if (d && d.set) d.set.call(el, v); else el.value = v; // (the real setter, so React-style games notice too)
+    }
+    insertText(el, str) {
+      const w = this.win;
+      try {
+        if (!el.dispatchEvent(new w.InputEvent('beforeinput', { inputType: 'insertText', data: str, bubbles: true, cancelable: true, composed: true }))) return;
+        if (el.isContentEditable && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.appendChild(el.ownerDocument.createTextNode(str));
+        else {
+          const cur = String(el.value || '');
+          if (el.maxLength > 0 && cur.length >= el.maxLength) return;
+          this.setValue(el, cur + str);
+        }
+        el.dispatchEvent(new w.InputEvent('input', { inputType: 'insertText', data: str, bubbles: true, composed: true }));
+      } catch (e) { /* ignore */ }
+    }
+    deleteBack(el) {
+      const w = this.win;
+      try {
+        if (!el.dispatchEvent(new w.InputEvent('beforeinput', { inputType: 'deleteContentBackward', bubbles: true, cancelable: true, composed: true }))) return;
+        if (el.isContentEditable && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = (el.textContent || '').slice(0, -1);
+        else this.setValue(el, String(el.value || '').slice(0, -1));
+        el.dispatchEvent(new w.InputEvent('input', { inputType: 'deleteContentBackward', bubbles: true, composed: true }));
+      } catch (e) { /* ignore */ }
+    }
+    clearField(el) {
+      const w = this.win;
+      try {
+        const has = el.isContentEditable && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' ? (el.textContent || '') : String(el.value || '');
+        if (!has) return;
+        if (el.isContentEditable && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = '';
+        else this.setValue(el, '');
+        el.dispatchEvent(new w.InputEvent('input', { inputType: 'deleteContentBackward', bubbles: true, composed: true }));
+      } catch (e) { /* ignore */ }
     }
 
     /* ---------- mouse ---------- */
@@ -3249,6 +3496,14 @@ AIP.Brain = (function () {
       if (this.self.cat != null && this.self.camera < 0.5) out.push({ kind: 'self', icon: AIP.COLORS.emoji[this.self.cat], text: "I'm " + AIP.COLORS.names[this.self.cat] + (this.self.tracked ? " (and I'm keeping an eye on myself 👀)" : ''), good: true, sort: -1.4 });
       if (this.self.camera > 0.5) out.push({ kind: 'self', icon: '🎥', text: "I see through my own eyes (it's 3D!)", good: true, sort: -1.5 });
       this.tips.slice(-4).forEach((t) => out.push({ kind: 'tip', icon: '✍️', text: 'you said: "' + t.text + '"', good: true, sort: 5 }));
+      // ⌨️ what it learned from typing
+      const T = this.stats.typing;
+      if (T) {
+        if (T.tg && T.tg.works) out.push({ kind: 'type', icon: '⌨️', text: 'typing the words on screen works here' + (T.tg.submit ? ' (then ' + KEYS.label(T.tg.submit) + ')' : ''), good: true, sort: 0.5 });
+        Object.keys(T.worked || {}).slice(-4).forEach((k) => out.push({ kind: 'type', icon: /^password/.test(k) ? '🔐' : '⌨️', text: (k.split(':')[1] || k.split(':')[0]).split('|')[0].trim().slice(0, 24) + ' → "' + T.worked[k] + '" works', good: true, sort: 0.6 }));
+        if (T.namedOnce) out.push({ kind: 'type', icon: '✍️', text: 'I typed my name in here', good: true, sort: 0.7 });
+        if (T.cmds && T.cmds.__bareDirs) out.push({ kind: 'type', icon: '🧭', text: 'just type "north" (not "go north")', good: true, sort: 0.7 });
+      }
       out.sort((a, b) => a.sort - b.sort);
       return out;
     }
@@ -3590,6 +3845,24 @@ AIP.Voice = (function () {
     dreamNone: ['Dreamed about pixels. Lots of pixels.', 'Weird dream. Woke up smarter tho 🧠'],
     memory: ['Remember when {mem}? Good times.', 'Still thinking about when {mem}.', 'I\'ll never forget when {mem}.'],
     story: ['Ooh, story time 📖', 'Wait... what?! 👀', 'Hmm, interesting...', 'Okay okay, I\'m reading!', 'Plot twist?? 😮', 'I need to know what happens next.'],
+    typeName: ['Name? Easy. I\'m {text} ✍️', 'Typing my name: {text}', 'They want my name! It\'s {text} 😎'],
+    typeGuess: ['Hmm... {text}?', 'I guess {text}!', '{text}. Final answer.', 'Let\'s try {text} 🤔'],
+    typeHigh: ['{text} is too high? Going lower ⬇️', 'Too high. Lower then...', 'Okay okay, lower.'],
+    typeLow: ['{text} is too low? Going higher ⬆️', 'Too low. Higher then...', 'Higher! Got it.'],
+    typeMath: ['Math! {q} = {text} 🤓', 'Ez. {q} is {text}.', '{q}? That\'s {text} 🧮'],
+    typeCmd: ['> {text}', 'Let me try "{text}"', 'Typing "{text}"...'],
+    typeAnswer: ['I think it\'s "{text}"!', 'Answer: {text}', 'Is it... "{text}"? 🤔'],
+    typePassword: ['Trying password "{text}" 🔐', 'Is the password "{text}"? 🔐', 'Hacker mode: "{text}" 💻'],
+    typeClue: ['I saw a clue earlier! "{text}" 🕵️', 'Wait, the story said "{text}"... trying it 🔐'],
+    typeRemember: ['I remember this one! "{text}" 🧠', 'Last time it was "{text}" 😎'],
+    typeChat: ['Saying hi in the chat box 👋', 'Typing a message: "{text}"'],
+    typePlayer: ['Typing "{text}" like you said ✍️', 'On it, typing "{text}"'],
+    typeNoBox: ['No text box right now, so I\'ll just type "{text}" on the keyboard ⌨️'],
+    typeGood: ['It worked! ✍️🎉', 'YES that was right!', 'Typed it right 😎', 'Nailed it ✅'],
+    typeBad: ['Wrong?? Ugh.', 'Nope. Okay, something else.', 'It didn\'t like that 😤', 'Not that one...'],
+    typeNothing: ['I typed it but nothing happened 🤔', 'Hello? I typed something!', 'Typing does nothing here I guess.'],
+    typeTypo: ['oops typo', 'fat fingers lol', 'typo, fixed it 😅'],
+    typingGame: ['A typing game?! My fingers are ready ⌨️🔥', 'Typing race, let\'s gooo ⌨️', 'I can type these words! ⌨️'],
     trophy: ['TROPHY!! "{trophy}" 🏆', 'Got the "{trophy}" trophy! 🏆 Collecting them all.', 'Achievement unlocked: {trophy}! Let\'s gooo 🏆'],
     coachResting: ['Gimme a sec, my coach brain is catching its breath (free limit) ⏳ I\'ll answer when it\'s back!', 'My coach brain is resting for a moment ⏳ Hold that thought!'],
     coachOfflineTip: ['No internet, so my coach brain is offline 📡 I only get simple tips right now, like "go right" or "avoid red".'],
@@ -3753,9 +4026,17 @@ AIP.tips = (function () {
     const s = raw.toLowerCase().replace(/[!.?]+$/g, '').trim();
     const out = { tips: [], feedback: 0, unknownThing: null };
     if (!s) return out;
+    let m;
+    // ✍️ "type hello", "type 'open door'", "write my name", "the password is cheese"
+    if ((m = /^(?:type|write|enter|put in|input)\s+(?:in\s+)?["“'‘](.+?)["”'’]\s*(?:in(?:to)? (?:the )?(?:box|field|text ?box|chat|input))?$/i.exec(raw)) ||
+        (m = /^(?:type|write)\s+(?!.*\b(?:key|button)\b)(.+?)\s*(?:in(?:to)? (?:the )?(?:box|field|text ?box|chat|input))?[.!]?$/i.exec(raw))) {
+      out.tips.push({ type: 'typeText', text: m[1].trim(), text0: raw }); return out;
+    }
+    if ((m = /\b(?:the\s+)?(?:password|pass ?code|code|pin|answer|secret word|magic word)\s+(?:is|=|:)\s*["“'‘]?([^"”'’]{1,40}?)["”'’]?[.!]?$/i.exec(raw))) {
+      out.tips.push({ type: 'typeText', text: m[1].trim(), clue: true, text0: raw }); return out;
+    }
     if (/^(good( job)?|nice|yes+|yay|great|awesome|well done|gg|w|that'?s it|keep going|perfect|👍)$/.test(s)) { out.feedback = 1; return out; }
     if (/^(no+|bad|stop( that)?|nope|wrong|l|don'?t do that|ew|👎)$/.test(s)) { out.feedback = -1; return out; }
-    let m;
     // "space = jump", "press space to jump", "z is shoot", "use x to attack", "space jumps"
     const r1 = new RegExp('^(?:press |use |hit |hold |tap )?' + KEYNAME + '\\s*(?:=|is|to|for|makes you|will|key|button|-|:)?\\s*(?:to\\s+)?(' + VERBS + ')s?\\b', 'i');
     const r2 = new RegExp('^(' + VERBS + ')\\s*(?:with|using|is|=|:|by pressing|on|-)\\s*(?:the\\s+)?' + KEYNAME + '(?:\\s+key)?$', 'i');
@@ -4220,6 +4501,7 @@ AIP.Coach = (function () {
       story: { type: 'string', description: 'if there is story/dialogue: a one-line summary of what happened, else empty' },
       trophies: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, got: { type: 'boolean' } }, required: ['name'] } },
       stuck: { type: 'boolean', description: 'true if the reflex brain looks stuck and you should take over briefly' },
+      type: { type: 'object', description: 'ONLY when a TEXT BOX needs text (name, answer, riddle, guess, password, command) or a typing game shows words to type: what to type', properties: { box: { type: 'integer', description: 'number of the TEXT BOX, or -1 to just type on the keyboard (typing games)' }, text: { type: 'string' }, enter: { type: 'boolean', description: 'press Enter after (default true)' } }, required: ['text'] },
       lesson: { type: 'string', description: 'for a death review: what went wrong and what to do next time, else empty' },
     },
     required: ['see', 'goal', 'say'],
@@ -4291,6 +4573,7 @@ AIP.Coach = (function () {
       const tro = B.stats.trophies || { list: [], got: {} };
       const trophies = tro.list.length ? tro.list.map((t) => (tro.got[t.name] || t.got ? '[x] ' : '[ ] ') + t.name).join('; ') : (Object.keys(tro.got).length ? 'got: ' + Object.keys(tro.got).join(', ') : 'unknown');
       const recent = (s.recentEvents || []).slice(-8).join('; ');
+      const fieldsLine = s.typist.describeFields(o);
       const salty = ai.traits.salty > 0.6 ? ' It cusses sometimes when mad (its own choice) - only ever at the game, never at people.' : ' It does not cuss.';
       const me = B.self.camera > 0.5 ? 'first-person/3D camera (it sees through its own eyes)' : 'around (' + B.self.x.toFixed(2) + ', ' + B.self.y.toFixed(2) + ') on screen' + (B.self.cat != null ? ', it is the ' + COLORS[B.self.cat] + ' thing' : '');
       const lines = [
@@ -4300,6 +4583,8 @@ AIP.Coach = (function () {
         'SCORE: ' + (o.score != null ? o.score + ' (' + (o.scoreLabel || 'score') + ')' : 'none found') + '. HEALTH: ' + (o.hp ? o.hp.value + '/' + o.hp.max : '-') + '. LIVES: ' + (o.lives ? o.lives.value : '-') + '. Best ever: ' + (B.stats.best == null ? '-' : B.stats.best) + '. Try #' + (B.stats.episodes + 1) + '.',
         'TEXT ON SCREEN: ' + (texts.length ? texts.map((t) => '"' + t + '"').join(' | ') : '(none)'),
         'BUTTONS: ' + (btns.length ? btns.join(', ') : '(none)'),
+        fieldsLine ? 'TEXT BOXES: ' + fieldsLine : '',
+        s.typist.history.length ? 'WHAT IT TYPED + WHAT HAPPENED: ' + s.typist.history.slice(-5).join('; ') : '',
         o.choices && o.choices.length ? 'STORY CHOICES: ' + o.choices.map((c) => '"' + c.text + '"').join(', ') : '',
         'WHERE IT IS: ' + me + '.',
         'KEYS IT CAN PRESS: ' + (keys.length ? keys.join(', ') : 'still testing') + '. Other keys exist too (letters, digits, Enter, Space, Shift, arrows).' + (pauseKeys.length ? ' PAUSE keys (avoid): ' + pauseKeys.join(', ') + '.' : ''),
@@ -4325,6 +4610,7 @@ AIP.Coach = (function () {
         'Story games: READ the dialogue, react to it, summarize it in "story", and pick choices on purpose (explain why). Don\'t skip story.',
         'Trophies are a separate bonus goal from winning. If you can see a trophy/achievement list, fill "trophies". If you don\'t know what trophies exist and haven\'t asked yet, you may ask the player once via "ask".',
         'Write a "note" only for genuinely new, useful facts about this game.',
+        'It can TYPE real text: fill "type" when a text box needs something (name boxes: its own name; riddles/questions/passwords: solve them, look for clues; guess-the-number: binary search from the feedback; text adventures: one good command like "open door" or "go north") or when a typing game shows words (box -1). Leave "type" empty otherwise.',
       ].join('\n');
     }
 
@@ -4392,15 +4678,16 @@ AIP.Coach = (function () {
       if (p.note && p.note.length > 4) this.addNote(p.note);
       if (p.story && p.story.length > 4) { B.stats.story = B.stats.story || []; if (B.stats.story[B.stats.story.length - 1] !== p.story) { B.stats.story.push(p.story.slice(0, 160)); if (B.stats.story.length > 60) B.stats.story.shift(); } }
       if (p.trophies && p.trophies.length) s.mergeTrophies(p.trophies);
+      if (p.type || reason === 'type') s.typist.fromCoach(p.type, reason);
       if (p.lesson) { this.lastLesson = p.lesson; B.addMemory('lesson', p.lesson.slice(0, 80), 0.6); }
       // 🗣️ talking (the coach's smart lines) - replies to you always get said
       if (p.reply && extra && (extra.text || reason === 'player')) { s.voice.raw(p.reply, 3, 'coach'); this.chatLog.push(s.ai.name + ': ' + p.reply); }
-      else if (p.say && now - this.lastSay > 4000 && p.say !== this.lastSaid) { this.lastSay = now; this.lastSaid = p.say; s.voice.raw(p.say, reason === 'death' || reason === 'story' ? 3 : 2, 'coach'); }
+      else if (p.say && (now - this.lastSay > 4000 || reason === 'type') && p.say !== this.lastSaid) { this.lastSay = now; this.lastSaid = p.say; s.voice.raw(p.say, reason === 'death' || reason === 'story' ? 3 : 2, 'coach'); }
       if (p.ask && !this.pendingAsk) { this.pendingAsk = p.ask; s.voice.raw(p.ask, 3, 'coach'); this.chatLog.push(s.ai.name + ' asked: ' + p.ask); if (/trophi|achievement/i.test(p.ask)) B.stats.flags.askedTrophies = true; }
       if (reason === 'death' && p.lesson) s.diary('review', 'Death review in ' + s.game.name + ': ' + p.lesson);
       // 🖐️ takeover - only when stuck / menu / story choice / you asked / studying
       const o = s.lastObs || {};
-      const allowed = p.stuck || o.menuish || o.staticTime > 4 || reason === 'study' || reason === 'player' || reason === 'story' || (o.choices && o.choices.length) || s.stuckFor > 8;
+      const allowed = p.stuck || o.menuish || o.staticTime > 4 || reason === 'study' || reason === 'player' || reason === 'story' || reason === 'type' || (o.choices && o.choices.length) || s.stuckFor > 8;
       if (allowed && (okPt(p.click) || (p.press && p.press.length))) s.takeover(okPt(p.click) ? { x: clamp01(p.click.x), y: clamp01(p.click.y), what: p.click.what } : null, (p.press || []).slice(0, 4));
       s.app.coachUpdated && s.app.coachUpdated(s);
     }
@@ -4474,6 +4761,533 @@ AIP.Coach = (function () {
 
 </script>
 <script>
+/* ---- js/typist.js ---- */
+/* AI Play - TYPING ✍️: the AI types real text into the game, letter by letter.
+ *   - text boxes: its own name, number guesses (it narrows them down from "too high / too low"),
+ *     math answers, passwords it spotted in the story, text-adventure commands, answers...
+ *   - typing games: it types the words it sees on screen
+ *   - the coach (Gemini) picks what to type when it's on (riddles, smart commands), and you can
+ *     tell it too: type hello
+ * After it types, it watches what happens (right? wrong? nothing?) and remembers what worked.
+ */
+'use strict';
+
+AIP.Typist = (function () {
+  const U = AIP.util;
+  const G = AIP.gemini;
+  const GOOD_RX = /\b(correct|right!|that'?s right|yes!|well done|good job|great job|nice|awesome|welcome|nice to meet|unlocked|access granted|you got it|you guessed|got it|success|solved|bingo|perfect|level up|you win|you won)\b/i;
+  const BAD_RX = /\b(wrong|incorrect|invalid|nope|not (it|right|correct|quite)|try again|unknown|don'?t (understand|know)|can'?t|cannot|error|denied|huh|not a (valid|command|word|number)|i don'?t see|no such|nothing happens|you can'?t|not allowed)\b|^\s*no\b/i;
+  const NUM_HIGH_RX = /too (high|big|large)|go lower|guess lower|lower than|smaller than|less than|it'?s below|\blower\b|\bsmaller\b/i;
+  const NUM_LOW_RX = /too (low|small)|go higher|guess higher|higher than|bigger than|greater than|more than|it'?s above|\bhigher\b|\bbigger\b/i;
+  const CLUE_RX = /\b(?:password|pass ?code|secret code|code|pin|secret word|passphrase|key ?word|magic word|the answer)\s*(?:is|was|=|:)\s*["'“‘]?([A-Za-z0-9][\w-]{0,23})["'”’]?/i;
+  const DIRS = ['north', 'south', 'east', 'west', 'up', 'down', 'northeast', 'northwest', 'southeast', 'southwest'];
+  const W = (s) => new RegExp('\\b(' + s + ')\\b', 'ig');
+  const TAKE_RX = W('key|sword|lamp|lantern|torch|coin|coins|gold|gem|jewel|map|book|note|letter|food|apple|bread|potion|rope|knife|dagger|shield|ring|scroll|bottle|stick|axe|flashlight|card|crystal|treasure|wand|staff|matches|candle|feather|shell|bone|flower|mushroom|orb|amulet|crown|compass');
+  const OPEN_RX = W('door|chest|box|gate|drawer|cabinet|hatch|trapdoor|window|locker|safe|cupboard|crate|bag|sack');
+  const READ_RX = W('note|letter|sign|book|scroll|map|plaque|inscription|poster|diary|journal');
+  const TALK_RX = W('owl|guard|wizard|witch|merchant|king|queen|girl|boy|robot|stranger|knight|troll|goblin|dragon|elf|dwarf|ghost|shopkeeper|villager|old man|old woman|man|woman');
+  const LOOK_RX = W('table|desk|painting|statue|bed|mirror|fountain|tree|altar|rug|carpet|fireplace|shelf|bookshelf|well|lever|button|switch|hole|footprints|machine|computer|panel|chest');
+  const SUBMIT_BTN_RX = /\b(submit|go|ok|okay|enter|guess|send|check|answer|done|confirm|next|save|continue|login|log in|unlock|try|start|play|run|say)\b/i;
+  const KIND_WORD = { name: 'name box', number: 'guess box', answer: 'answer box', password: 'password box', command: 'command box', chat: 'chat box', text: 'text box', email: 'email box', search: 'search box' };
+
+  // "what is 7 x 5?" -> 35 (only + - x / with 2-3 numbers)
+  function solveMath(text) {
+    const t = String(text).toLowerCase().replace(/plus/g, '+').replace(/minus/g, '-').replace(/times|multiplied by/g, 'x').replace(/divided by/g, '/').replace(/[×*]/g, 'x').replace(/÷/g, '/');
+    const m = /(-?\d+(?:\.\d+)?)\s*([+\-x/])\s*(-?\d+(?:\.\d+)?)(?:\s*([+\-x/])\s*(-?\d+(?:\.\d+)?))?\s*(?:=|\?|$)/.exec(t);
+    if (!m) return null;
+    const op = (a, o, b) => (o === '+' ? a + b : o === '-' ? a - b : o === 'x' ? a * b : b === 0 ? NaN : a / b);
+    let a = +m[1], b = +m[3], r;
+    if (m[4]) { const c = +m[5]; r = (m[4] === 'x' || m[4] === '/') && (m[2] === '+' || m[2] === '-') ? op(a, m[2], op(b, m[4], c)) : op(op(a, m[2], b), m[4], c); } else r = op(a, m[2], b);
+    if (!isFinite(r)) return null;
+    return { q: m[0].replace(/\s*[=?]\s*$/, '').trim(), a: String(Math.round(r * 100) / 100) };
+  }
+
+  class Typist {
+    constructor(session) {
+      this.s = session;
+      this.job = null;
+      this.state = new Map();  // field "signature" -> what it tried there
+      this.playerQueue = [];
+      this.coachPlan = null;   // {box, text, enter, at}
+      this.ctxFields = [];     // the text boxes the coach was told about (by number)
+      this.history = [];       // 'typed "50" in "Your guess" -> "Too high!"'
+      this.tgWords = new Map(); this.tgOffUntil = 0;
+    }
+    get mem() {
+      const st = this.s.brain.stats;
+      return st.typing || (st.typing = { worked: {}, failed: {}, clues: [], submit: {}, tg: { works: false, submit: null, fails: 0 }, cmds: {}, typed: 0 });
+    }
+    get active() { return !!this.job; }
+    // a "try again" that showed up right after it typed is the game answering, not a game over
+    feedbackOver() { const P = this.s.senses.phrase; return !!(this.lastTypedAt && P && P.over && P.overSince >= this.lastTypedAt - 50 && P.overSince - this.lastTypedAt < 8000); }
+    cancel() { if (this.job) this.endJob(); this.s.hands && this.s.hands.stopTyping(); }
+    // the game ended (won / died) while it was waiting to see what its typing did
+    onEnd(end) {
+      const J = this.job;
+      if (J && J.phase === 'judge') this.finish(end === 'win' ? 'good' : 'changed', end === 'win' ? 'WON' : '');
+      else this.cancel();
+    }
+    sig(f) { return f.kind + ':' + (f.label || '').toLowerCase().replace(/\d+/g, '#').slice(0, 40); }
+    fieldState(f) {
+      const k = this.sig(f);
+      if (!this.state.has(k)) this.state.set(k, { sig: k, tries: 0, neutral: 0, bad: 0, until: 0, done: false, tried: [], guess: null, askedAt: 0, waitUntil: 0, lastTyped: '' });
+      return this.state.get(k);
+    }
+
+    /* ---------- the player said: type hello ---------- */
+    playerText(text) {
+      const t = String(text).trim().slice(0, 120);
+      if (!t) return;
+      this.playerQueue.push(t);
+      const c = CLUE_RX.exec('password is ' + t);
+      if (c) this.addClue(c[1]);
+    }
+    addClue(word) {
+      const m = this.mem;
+      if (word && m.clues.indexOf(word) < 0) { m.clues.push(word); if (m.clues.length > 20) m.clues.shift(); }
+    }
+    /* ---------- the coach said what to type ---------- */
+    fromCoach(t, reason) {
+      if (!t || !t.text || typeof t.text !== 'string' || !t.text.trim()) { if (reason === 'type') this.coachDeclinedAt = performance.now(); return; }
+      const box = Number.isInteger(t.box) ? t.box : (t.box == null ? 0 : parseInt(t.box, 10));
+      this.coachPlan = { box: isFinite(box) ? box : 0, text: t.text.slice(0, 120), enter: t.enter !== false, at: performance.now() };
+      if (box < 0) this.coachTyping = true;
+    }
+    // the list of boxes the coach sees (numbered)
+    describeFields(obs) {
+      const fields = (obs && obs.fields) || [];
+      this.ctxFields = fields.slice();
+      if (!fields.length) return '';
+      return fields.map((f, i) => '[' + i + '] ' + (KIND_WORD[f.kind] || 'text box') + ' "' + (f.label || '').slice(0, 50) + '"' + (f.value ? ' (has "' + f.value.slice(0, 30) + '")' : ' (empty)') + ' at (' + f.x.toFixed(2) + ', ' + f.y.toFixed(2) + ')').join('; ');
+    }
+
+    /* ---------- every tick: should I type something? ---------- */
+    step(obs, now) {
+      const s = this.s;
+      if (s.phase !== 'play') return false;
+      if (this.job) return this.runJob(obs, now);
+      const fields = obs.fields || [];
+      // 1) you told it what to type
+      if (this.playerQueue.length) {
+        const text = this.playerQueue.shift();
+        const f = fields.find((x) => x.focused) || fields.find((x) => !/email|search/.test(x.kind)) || fields[0] || null;
+        s.voice.say(f ? 'typePlayer' : 'typeNoBox', { text }, 3);
+        this.start({ f, text, why: 'you told me to', from: 'player', submit: true }, obs, now);
+        return true;
+      }
+      // 2) the coach picked something (a box, or just the keyboard for typing games)
+      const cp = this.coachPlan;
+      if (cp && now - cp.at < 9000) {
+        this.coachPlan = null;
+        let f = cp.box >= 0 ? this.ctxFields[cp.box] || fields[cp.box] || null : null;
+        if (f && !f.el.isConnected) f = fields.find((x) => x.kind === f.kind) || null;
+        if (f || cp.box < 0) {
+          const fs = f && this.fieldState(f);
+          if (!fs || !(fs.tried.slice(-3).indexOf(cp.text) >= 0 && fs.bad)) {
+            this.start({ f, text: cp.text, why: 'coach 🧠', from: 'coach', submit: cp.enter }, obs, now);
+            return true;
+          }
+        }
+      }
+      // 3) a text box is waiting for something
+      const f = this.pickField(obs, now);
+      if (f) {
+        const plan = this.decide(f, obs, now);
+        if (plan && plan.wait) { s.hands.releaseAll(); s.reason = '⌨️ thinking what to type in the ' + (KIND_WORD[f.kind] || 'text box') + '…'; return true; }
+        if (plan && plan.text) { this.start(Object.assign({ f, submit: true }, plan), obs, now); return true; }
+      }
+      // 4) a typing game: type the words on screen
+      return this.typingGame(obs, now);
+    }
+
+    pickField(obs, now) {
+      const s = this.s, fields = obs.fields || [];
+      if (!fields.length || obs.winVisible || (obs.gameOverVisible && !this.feedbackOver())) return null;
+      const order = { command: 0, number: 1, answer: 2, password: 3, name: 4, text: 5, chat: 6, email: 9, search: 9 };
+      const busy = (obs.motionAmt || 0) > Math.max(0.004, s.motionEMA * 1.5) && !obs.menuish;
+      let best = null, bs = Infinity;
+      for (const f of fields) {
+        if (f.kind === 'email' || f.kind === 'search') continue;
+        const st = this.fieldState(f);
+        if (now < st.until || st.done) continue;
+        // a box that's already filled in (not by me) - leave it, except a default name like "Player1"
+        if (f.value && f.value !== st.lastTyped && !(f.kind === 'name' && !st.tries)) continue;
+        // chat-ish boxes in a busy action game: only now and then, for fun
+        if ((f.kind === 'chat' || f.kind === 'text') && busy && !U.chance(0.02)) continue;
+        let score = (order[f.kind] != null ? order[f.kind] : 5) - (f.focused ? 3 : 0) + f.y;
+        if (f.kind === 'password' && (this.mem.clues.length || this.findClue((s.senses.textBits || []).map((b) => b.s).concat((s.brain.stats.storyLines || []).slice(-15))))) score -= 4;
+        if (score < bs) { bs = score; best = f; }
+      }
+      return best;
+    }
+
+    /* ---------- deciding WHAT to type ---------- */
+    decide(f, obs, now) {
+      const s = this.s, st = this.fieldState(f), mem = this.mem, ai = s.ai;
+      const texts = (s.senses.textBits || []).map((b) => b.s);
+      const all = texts.concat((s.brain.stats.storyLines || []).slice(-15), s.game.notes || []);
+      const question = texts.filter((t) => /\?\s*$|=\s*\??\s*$/.test(t) && t.length < 200).pop() || '';
+      // 🧠 the coach decides (it can solve riddles, write smart commands...)
+      if (G.usable() && f.kind !== 'name') {
+        const situation = U.hashStr(this.sig(f) + '|' + texts.slice(-6).join('|'));
+        if (st.askedFor !== situation) {
+          st.askedFor = situation; st.waitUntil = now + 8000; st.askedAt = now;
+          s.coach.queue.unshift({ reason: 'type', text: 'A text box needs typing: ' + this.describeFields(obs) + '. Decide exactly what to type and fill "type" (box number + text).' + (this.history.length ? ' What it typed before: ' + this.history.slice(-4).join('; ') : '') });
+          return { wait: true };
+        }
+        if (now < st.waitUntil && !(this.coachDeclinedAt > st.askedAt)) return { wait: true };
+      }
+      // 🧠 remembered from last time (answers: for this exact question)
+      const memKey = this.memKeyFor(f);
+      const known = mem.worked[memKey];
+      if (known && f.kind !== 'number' && !solveMath(question) && st.tried.slice(-3).indexOf(known) < 0) return { text: known, why: 'I remember this one', line: 'typeRemember', memKey };
+      const failed = new Set((mem.failed[memKey] || []).concat(st.tried.slice(-12)));
+      const fresh = (list) => list.find((x) => x && !failed.has(x));
+      switch (f.kind) {
+        case 'name': {
+          const short = f.max && f.max <= 3 || /initial/i.test(f.label);
+          let n = short ? ai.name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() : ai.name;
+          if (f.max) n = n.slice(0, f.max);
+          return { text: n, why: 'that\'s my name', line: 'typeName' };
+        }
+        case 'number': {
+          const math = solveMath(question) || texts.map(solveMath).find(Boolean);
+          if (math && st.tried.indexOf(math.a) < 0) return { text: math.a, why: 'math! ' + math.q + ' = ' + math.a, line: 'typeMath', vars: { q: math.q } };
+          const g = st.guess || (st.guess = this.range(f, all));
+          if (g.lo > g.hi) { st.guess = this.range(f, all); return this.decide(f, obs, now); }
+          const n = Math.floor((g.lo + g.hi) / 2);
+          g.last = n;
+          return { text: String(n), why: 'guessing between ' + g.lo + ' and ' + g.hi, line: 'typeGuess' };
+        }
+        case 'password': {
+          const clue = this.findClue(all);
+          const pick = fresh([clue].concat(mem.clues.slice().reverse(), ['password', '1234', 'open sesame', '0000', 'letmein', ai.name.toLowerCase()]));
+          if (!pick) { st.until = now + 60000; return null; }
+          return { text: pick, why: pick === clue ? 'I saw a clue: "' + clue + '"' : 'guessing passwords', line: pick === clue ? 'typeClue' : 'typePassword' };
+        }
+        case 'command': {
+          const cmd = this.adventure(st, texts, now);
+          return cmd ? { text: cmd, why: 'exploring', line: 'typeCmd' } : null;
+        }
+        case 'answer': case 'text': case 'chat': {
+          const math = solveMath(question) || texts.map(solveMath).find(Boolean);
+          if (math) return { text: math.a, why: 'math! ' + math.q + ' = ' + math.a, line: 'typeMath', vars: { q: math.q }, math: true };
+          const quoted = texts.map((t) => /(?:type|spell|write|enter)\s+(?:the\s+word\s+|this:?\s+)?["'“‘]([^"'”’]{1,30})["'”’]/i.exec(t) || /(?:type|spell)\s*:\s*([A-Za-z][A-Za-z ]{0,29})$/i.exec(t)).find(Boolean);
+          if (quoted && !failed.has(quoted[1])) return { text: quoted[1], why: 'the game said to type it', line: 'typeAnswer', memKey };
+          const clue = this.findClue(all);
+          if (clue && !failed.has(clue) && /answer|code|password|secret/i.test(f.label + ' ' + question)) return { text: clue, why: 'I saw a clue: "' + clue + '"', line: 'typeClue', memKey };
+          if (f.kind === 'chat' || (f.kind === 'text' && !question)) {
+            if (st.tries >= 1) { st.done = true; return null; }
+            const hi = f.kind === 'chat' ? U.pick(['hi! im ' + ai.name, 'hello from ' + ai.name + ' :)', ai.catchphrase || 'hi!']) : ai.name;
+            return { text: hi, why: f.kind === 'chat' ? 'saying hi' : 'filling it in', line: f.kind === 'chat' ? 'typeChat' : 'typeName' };
+          }
+          // a question it can't really answer without the coach -> a baby-brain guess
+          const yesNo = /^\s*(is|are|do|does|did|can|will|would|should|have|has|was|were)\b/i.test(question);
+          const color = /colou?r/i.test(question) ? U.pick(['blue', 'red', 'green']) : null;
+          const pick = fresh([yesNo ? 'yes' : null, color, yesNo ? 'no' : null, U.pick(['42', 'banana']), 'idk', 'robot', ai.name.toLowerCase()]);
+          if (!pick || st.tries >= 5) { st.until = now + 45000; st.tries = 0; return null; }
+          return { text: pick, why: 'best guess (my baby brain doesn\'t know this one)', line: 'typeAnswer', memKey };
+        }
+        default: return null;
+      }
+    }
+    question() { return (this.s.senses.textBits || []).map((b) => b.s).filter((t) => /\?\s*$|=\s*\??\s*$/.test(t) && t.length < 200).pop() || ''; }
+    memKeyFor(f) { const q = this.question(), sig = this.sig(f); return /answer|text/.test(f.kind) && q ? sig + '|' + U.hashStr(q) : sig; }
+    range(f, texts) {
+      let lo = 1, hi = 100;
+      try { if (f.el.min !== '' && isFinite(+f.el.min)) lo = +f.el.min; if (f.el.max !== '' && isFinite(+f.el.max)) hi = +f.el.max; } catch (e) { /* ignore */ }
+      for (const t of texts.slice().reverse()) {
+        const m = /between\s+(-?\d+)\s+and\s+(-?\d+)/i.exec(t) || /from\s+(-?\d+)\s+to\s+(-?\d+)/i.exec(t) || (/number|guess|pick/i.test(t) && /(-?\d+)\s*(?:-|–|to)\s*(-?\d+)/.exec(t));
+        if (m && +m[2] > +m[1]) { lo = +m[1]; hi = +m[2]; break; }
+      }
+      return { lo, hi, last: null, lo0: lo, hi0: hi };
+    }
+    findClue(texts) {
+      for (const t of texts.slice().reverse()) { const m = CLUE_RX.exec(t); if (m && !/^(is|was|the|a|an|to)$/i.test(m[1])) return m[1]; }
+      return null;
+    }
+    // 🗺️ text adventures: look around, go places, grab stuff
+    adventure(st, texts, now) {
+      const mem = this.mem, t = this.s.ai.traits;
+      const desc = texts.filter((x) => x.length >= 35 && !/^\s*>/.test(x) && !BAD_RX.test(x)).pop();
+      if (desc) this.room = desc;
+      const room = this.room || texts.join(' ');
+      const rk = U.hashStr(room.slice(0, 200));
+      st.rooms = st.rooms || {};
+      const tried = st.rooms[rk] || (st.rooms[rk] = []);
+      const cands = [];
+      const add = (cmd, v) => { if (!cands.some((c) => c.cmd === cmd)) cands.push({ cmd, v }); };
+      if (!st.tried.length) add('look', 3);
+      if (st.tried.indexOf('help') < 0 && st.tries >= 1) add('help', 1.2);
+      const low = room.toLowerCase();
+      const bareDirs = mem.cmds.__bareDirs;
+      DIRS.forEach((d) => { if (new RegExp('\\b' + d + '\\b').test(low)) add(bareDirs ? d : 'go ' + d, 1.5 + t.bravery); });
+      const each = (rx, f) => { rx.lastIndex = 0; let m; while ((m = rx.exec(low))) f(m[1].toLowerCase()); };
+      each(TAKE_RX, (n) => add('take ' + n, 1.6 + t.curiosity * 0.5));
+      each(OPEN_RX, (n) => add('open ' + n, 1.5 + t.curiosity * 0.5));
+      each(READ_RX, (n) => add('read ' + n, 1.2 + t.curiosity));
+      each(TALK_RX, (n) => add('talk to ' + n, 1.1 + t.chattiness));
+      each(LOOK_RX, (n) => add('examine ' + n, 0.9 + t.curiosity));
+      add('inventory', 0.4);
+      DIRS.slice(0, 4).forEach((d) => add(bareDirs ? d : 'go ' + d, 0.3 * t.bravery));
+      let best = null, bv = -Infinity;
+      for (const c of cands) {
+        let v = c.v + Math.random() * 0.6 * (0.5 + t.silliness);
+        v -= 2.5 * tried.filter((x) => x === c.cmd).length;
+        v -= 0.9 * st.tried.slice(-12).filter((x) => x === c.cmd).length; // (not the same thing over and over)
+        const verb = c.cmd.split(' ')[0];
+        const rec = mem.cmds[c.cmd] || 0, vrec = mem.cmds['verb:' + verb] || 0;
+        v += 0.4 * rec + 0.3 * vrec;
+        if (v > bv) { bv = v; best = c.cmd; }
+      }
+      if (best) tried.push(best);
+      return best;
+    }
+
+    /* ---------- doing the typing ---------- */
+    start(plan, obs, now) {
+      const s = this.s, f = plan.f || null, h = s.hands;
+      let el = f ? f.el : null;
+      // typing games sometimes hide a text box that catches the keys - type into that one
+      if (!el) { try { const ae = h.doc && h.doc.activeElement; if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName)) el = ae; } catch (e) { /* ignore */ } }
+      const st = f ? this.fieldState(f) : null;
+      const text = String(plan.text);
+      if (f) this.lastTypedAt = now; // (only text boxes - in a typing game a GAME OVER is a real game over)
+      const e = s.heart.e, t = s.ai.traits;
+      const delay = (f ? 105 : 80) * (1 + 0.35 * e.scared - 0.25 * Math.max(e.mad, e.excited)) * (1.15 - 0.3 * t.competitive);
+      const typo = f && plan.from !== 'player' && f.kind !== 'number' ? 0.01 + 0.035 * t.silliness : 0;
+      h.releaseAll();
+      if (st) { st.tries++; st.lastTyped = text; st.tried.push(text); if (st.tried.length > 30) st.tried.shift(); }
+      this.job = { f, el, st, text, word: plan.word || text, wordSize: plan.wordSize || 0, memKey: plan.memKey || (f ? this.memKeyFor(f) : null), from: plan.from, plan, phase: 'typing', t0: now, kind: f ? f.kind : 'keys', before: this.snapshot(obs, el), submitTries: 0 };
+      const J = this.job;
+      if (plan.line) s.voice.say(plan.line, Object.assign({ text, name: s.ai.name }, plan.vars || {}), 2);
+      if (f || plan.from !== 'game') s.app.chat('typed', text + (f ? '  → ' + (KIND_WORD[f.kind] || 'text box') : '  → keyboard'));
+      s.reason = '⌨️ typing "' + text.slice(0, 30) + '"' + (f ? ' into the ' + (KIND_WORD[f.kind] || 'text box') : '') + ' - ' + (plan.why || 'let\'s see');
+      h.typeText(text, el, { delay, typo, clear: !!(f && f.value) }).then((res) => {
+        if (this.job !== J) return;
+        J.typed = !!res;
+        if (res && res.typos && U.chance(0.6)) s.voice.say('typeTypo', {}, 1);
+        J.phase = 'typed'; J.at = performance.now();
+      });
+      this.mem.typed = (this.mem.typed || 0) + 1;
+    }
+    snapshot(obs, el) {
+      const s = this.s;
+      return { texts: this.countTexts(), score: obs.score, fields: (obs.fields || []).length, wins: s.brain.stats.wins || 0 };
+    }
+    countTexts() { const m = new Map(); for (const b of this.s.senses.textBits || []) m.set(b.s, (m.get(b.s) || 0) + 1); return m; }
+    watchDom() {
+      const J = this.job, h = this.s.hands;
+      J.muts = 0;
+      try {
+        const w = h.win, d = h.doc;
+        J.mo = new w.MutationObserver((list) => { for (const m of list) if (!(J.el && (m.target === J.el || J.el.contains(m.target)))) J.muts++; });
+        J.mo.observe(d.body, { subtree: true, childList: true, characterData: true, attributes: true });
+      } catch (e) { /* ignore */ }
+    }
+    endJob() { const J = this.job; if (J && J.mo) try { J.mo.disconnect(); } catch (e) { /* ignore */ } this.job = null; }
+
+    runJob(obs, now) {
+      const J = this.job, s = this.s, h = s.hands;
+      if (J.phase === 'typing') {
+        if (now - J.t0 > 25000) { h.stopTyping(); this.endJob(); return false; }
+        return true;
+      }
+      if (J.phase === 'typed') {
+        if (!J.typed) { this.endJob(); return false; } // the box went away while typing
+        if (!J.f) { J.phase = 'judge'; J.at = now; this.watchDom(); return true; } // typing game: maybe it counts right away
+        if (J.plan.submit === false) { this.finish('changed', ''); return true; }
+        this.watchDom();
+        this.submit(J, obs);
+        J.phase = 'judge'; J.at = now;
+        return true;
+      }
+      // judging what happened
+      const res = this.judge(J, obs, now);
+      if (!res) return true; // still watching
+      if (res === 'retry') return true;
+      this.finish(res.kind, res.reply);
+      return true;
+    }
+    submit(J, obs) {
+      const s = this.s, h = s.hands, mem = this.mem;
+      J.submitTries++;
+      const how = mem.submit[J.st.sig];
+      const viaButton = J.submitTries > 1 || how === 'button' || (J.el && J.el.tagName === 'TEXTAREA' && how !== 'enter');
+      if (viaButton) {
+        const b = this.submitButton(J, obs);
+        if (b) { h.clickElement(b.el); J.how = 'button'; s.reason = '⌨️ clicking "' + b.text + '" to send it'; return; }
+      }
+      h.submit(J.el); J.how = 'enter';
+      s.reason = '⌨️ pressing Enter to send it';
+    }
+    submitButton(J, obs) {
+      const btns = (obs.buttons || []).filter((b) => b.el.isConnected);
+      if (!btns.length || !J.f) return null;
+      const vw = obs.vw || 1, vh = obs.vh || 1;
+      let best = null, bs = Infinity;
+      for (const b of btns) {
+        const d = Math.hypot(b.x / vw - J.f.x, (b.y / vh - J.f.y) * 1.5);
+        const v = d - (SUBMIT_BTN_RX.test(b.text) ? 0.25 : 0) + (b.prio < 0.3 ? 0.4 : 0);
+        if (v < bs) { bs = v; best = b; }
+      }
+      return bs < 0.6 ? best : null;
+    }
+    judge(J, obs, now) {
+      const s = this.s, wait = now - J.at;
+      const now2 = this.countTexts(), echo = J.text.toLowerCase();
+      const newTexts = [...now2.keys()].filter((t) => now2.get(t) > (J.before.texts.get(t) || 0) && t.length < 300 && !(t.toLowerCase().indexOf(echo) >= 0 && t.length <= echo.length + 4));
+      const scoreUp = obs.score != null && J.before.score != null && obs.score > J.before.score;
+      const won = (s.brain.stats.wins || 0) > J.before.wins || obs.winVisible;
+      if (!J.f) {
+        // ⌨️ typing game: did the word go away / points?
+        const still = (s.senses.typingWords(this.strongCue()) || []).some((w) => w.s === J.word && w.size >= (J.wordSize || 0) * 0.8);
+        if (scoreUp || won || (!still && wait > 150)) return { kind: 'good', reply: '' };
+        if (wait < 380) return null;
+        const seq = this.mem.tg.submit ? [this.mem.tg.submit] : ['Space', 'Enter'];
+        if (J.submitTries < seq.length) { s.hands.tap(seq[J.submitTries]); J.lastSubmit = seq[J.submitTries]; J.submitTries++; J.at = now; return 'retry'; }
+        return { kind: 'nothing', reply: '' };
+      }
+      const fieldGone = !J.el.isConnected || !(obs.fields || []).some((f) => f.el === J.el);
+      let valueNow = '';
+      try { valueNow = String(J.el.value != null ? J.el.value : J.el.textContent || ''); } catch (e) { /* ignore */ }
+      const cleared = valueNow !== J.text;
+      const reacted = J.muts > 0 || newTexts.length || cleared || fieldGone || scoreUp || won || (obs.changedFrac || 0) > 0.3;
+      if (wait < 700 || (!reacted && wait < 1600) || (reacted && !newTexts.length && wait < 1100)) return null;
+      if (!reacted) {
+        // Enter did nothing? try the button next to it once
+        if (J.submitTries < 2 && this.submitButton(J, obs)) { this.submit(J, obs); J.at = now; return 'retry'; }
+        return { kind: 'nothing', reply: '' };
+      }
+      // what did the game say back? (new text first; if it reused the same text box, read that)
+      let reply = newTexts.join(' | ');
+      if (!reply && J.muts) reply = (s.senses.textBits || []).map((b) => b.s).filter((t) => t.length < 160 && (GOOD_RX.test(t) || BAD_RX.test(t) || NUM_HIGH_RX.test(t) || NUM_LOW_RX.test(t))).join(' | ');
+      if (won || scoreUp) return { kind: 'good', reply };
+      if (J.kind === 'number' && J.st.guess && J.st.guess.last != null) {
+        if (/too (high|big|large)/i.test(reply)) return { kind: 'high', reply };
+        if (/too (low|small)/i.test(reply)) return { kind: 'low', reply };
+        if (NUM_HIGH_RX.test(reply) && !NUM_LOW_RX.test(reply)) return { kind: 'high', reply };
+        if (NUM_LOW_RX.test(reply) && !NUM_HIGH_RX.test(reply)) return { kind: 'low', reply };
+      }
+      if (BAD_RX.test(reply) && !GOOD_RX.test(reply)) return { kind: 'bad', reply };
+      if (GOOD_RX.test(reply) || (fieldGone && (obs.changedFrac || 0) > 0.2)) return { kind: 'good', reply };
+      return { kind: 'changed', reply };
+    }
+
+    // 🧠 learn from it + feel something + say something
+    finish(kind, reply) {
+      const J = this.job, s = this.s, mem = this.mem, now = performance.now();
+      this.endJob();
+      const st = J.st;
+      const short = (reply || '').replace(/\s+/g, ' ').slice(0, 90);
+      this.history.push('typed "' + J.text.slice(0, 40) + '"' + (J.f ? ' in the ' + (KIND_WORD[J.kind] || 'box') : '') + ' -> ' + (short ? '"' + short + '"' : kind));
+      if (this.history.length > 10) this.history.shift();
+      s.recentEvents.push(Math.round((now - (s.sessT0 || now)) / 1000) + 's typed "' + J.text.slice(0, 30) + '" -> ' + (short || kind));
+      if (s.recentEvents.length > 14) s.recentEvents.shift();
+      if (!J.f) { if (J.from === 'game' || J.from === 'coach') this.finishTypingGame(J, kind, now); return; }
+      if (J.how && (kind !== 'nothing')) mem.submit[st.sig] = J.how;
+      const isCmd = J.kind === 'command';
+      if (isCmd) {
+        const verb = J.text.split(' ')[0];
+        const v = kind === 'bad' ? -1 : kind === 'nothing' ? -0.3 : 1;
+        mem.cmds[J.text] = U.clamp((mem.cmds[J.text] || 0) + v, -3, 3);
+        mem.cmds['verb:' + verb] = U.clamp((mem.cmds['verb:' + verb] || 0) + v * 0.5, -3, 3);
+        // "go north" not understood? some games only want "north"
+        if (kind === 'bad' && /^go /.test(J.text) && (mem.cmds['verb:go'] || 0) <= -1) mem.cmds.__bareDirs = true;
+      }
+      switch (kind) {
+        case 'high': case 'low': {
+          const g = st.guess;
+          if (kind === 'high') g.hi = g.last - 1; else g.lo = g.last + 1;
+          s.heart.feel('curious', 0.08, 'guessing game');
+          s.voice.say(kind === 'high' ? 'typeHigh' : 'typeLow', { text: J.text }, 1);
+          st.until = now + 500;
+          break;
+        }
+        case 'good': {
+          st.neutral = 0; st.bad = 0; st.until = now + 900;
+          if (J.kind === 'number') st.guess = null; // next round starts fresh
+          if (J.kind === 'name' || J.kind === 'chat') st.done = true;
+          if ((/password|answer|text/.test(J.kind) || J.from === 'player') && !J.plan.math) mem.worked[J.memKey] = J.text;
+          if (J.kind === 'password' && !mem.cracked) { mem.cracked = true; s.diary('typing', 'Cracked the password in ' + s.game.name + ': "' + J.text + '" 🔐'); }
+          s.heart.feel('proud', 0.25, 'typed the right thing'); s.heart.feel('happy', 0.2, 'typed the right thing'); s.heart.feel('bored', -0.2);
+          s.pendingFb = Math.max(s.pendingFb || 0, 0.6);
+          if (!isCmd || U.chance(0.3)) s.voice.say('typeGood', { text: J.text }, 2);
+          break;
+        }
+        case 'bad': {
+          st.bad++; st.until = now + 1200;
+          if (!J.plan.math && J.kind !== 'command') { (mem.failed[J.memKey] = mem.failed[J.memKey] || []).push(J.text); if (mem.failed[J.memKey].length > 30) mem.failed[J.memKey].shift(); }
+          if (mem.worked[J.memKey] === J.text) delete mem.worked[J.memKey];
+          s.heart.feel('mad', 0.06 + 0.06 * s.ai.traits.temper, 'typed the wrong thing'); s.heart.feel('determined', 0.1, 'gonna get it');
+          if (!isCmd || U.chance(0.3)) s.voice.say('typeBad', { text: J.text }, 1);
+          if (st.bad >= 8) { st.until = now + 40000; st.bad = 0; }
+          break;
+        }
+        case 'changed': {
+          st.neutral = 0; st.until = now + 900;
+          s.heart.feel('bored', -0.12); s.heart.feel('curious', 0.06, 'seeing what happens');
+          if (J.kind === 'name') { st.done = true; if (!mem.namedOnce) { mem.namedOnce = true; s.diary('typing', 'Typed my name into ' + s.game.name + ' ✍️'); } }
+          if (isCmd && short && U.chance(0.25)) s.voice.say('story', {}, 0);
+          break;
+        }
+        default: { // nothing happened
+          st.neutral++;
+          st.until = now + Math.min(120000, 4000 * Math.pow(2, st.neutral));
+          if (J.kind === 'name') st.done = true; // (the game probably wants the Start button next)
+          if (st.neutral === 2) s.voice.say('typeNothing', {}, 1);
+        }
+      }
+      s.app.coachUpdated && s.app.coachUpdated(s);
+    }
+    finishTypingGame(J, kind, now) {
+      const s = this.s, tg = this.mem.tg;
+      const w = this.tgWords.get(J.text) || { tries: 0, at: 0 };
+      w.tries++; w.at = now; this.tgWords.set(J.text, w);
+      if (kind === 'good') {
+        if (!tg.works) { tg.works = true; s.voice.say('typingGame', {}, 2); }
+        tg.fails = 0;
+        tg.submit = J.lastSubmit || null;
+        s.heart.feel('excited', 0.06, 'typing game'); s.heart.feel('proud', 0.04, 'typed it');
+        this.tgWords.delete(J.text);
+      } else {
+        tg.fails = (tg.fails || 0) + 1;
+        if (tg.fails >= 3) { tg.fails = 0; tg.works = false; this.tgOffUntil = now + 45000; s.voice.say('typeNothing', {}, 1); }
+      }
+    }
+
+    // ⌨️ typing games (no text box): type the word on screen
+    typingGame(obs, now) {
+      const s = this.s;
+      if (now < this.tgOffUntil || obs.menuish || obs.gameOverVisible || obs.winVisible || this.s.reading) return false;
+      const cue = this.mem.tg.works || this.coachTyping || s.senses.typingCue || /typ(e|ing)|wpm|keyboard|spell/i.test(s.game.name);
+      if (!cue) return false;
+      const all = s.senses.typingWords(this.strongCue()) || [];
+      const big = Math.max(0, ...all.map((w) => w.size));
+      const words = all.filter((w) => { const r = this.tgWords.get(w.s); return (!r || r.tries < 2 || now - r.at > 15000) && w.size >= big * 0.6; });
+      if (!words.length) return false;
+      // falling words: the lowest one first (it's about to hit the ground!) - otherwise the biggest one
+      const ys = words.map((w) => w.y);
+      const falling = words.length >= 3 && Math.max(...ys) - Math.min(...ys) > 0.15;
+      words.sort((a, b) => (falling ? b.y - a.y : b.size - a.size || Math.abs(a.x - 0.5) - Math.abs(b.x - 0.5)));
+      const w = words[0];
+      const r = this.tgWords.get(w.s);
+      const text = r && r.tries >= 1 ? w.s.toLowerCase() : w.s; // 2nd try: lowercase
+      this.start({ f: null, text, word: w.s, wordSize: w.size, why: falling ? 'that word is about to land!' : 'typing game!', from: 'game', submit: true }, obs, now);
+      return true;
+    }
+    // a typing TEST (type the whole sentence)? then it types sentences too, and doesn't "read and skip" them
+    strongCue() {
+      const s = this.s;
+      return !!(this.mem.tg.works || /wpm|typing (test|speed|race|game)|type ?racer/i.test(s.game.name) || (s.senses.textBits || []).some((b) => b.s.length < 80 && /\bwpm\b|words? per minute|typing (test|speed|race)|start typing|type the (text|sentence|words?)/i.test(b.s)));
+    }
+  }
+  Typist.solveMath = solveMath;
+  return Typist;
+})();
+
+</script>
+<script>
 /* ---- js/session.js ---- */
 /* AI Play - a PLAY SESSION: one AI playing one game. This is the loop that ties it all together:
  *   eyes (senses) -> feelings (heart) -> brain picks a move -> hands press it -> voice talks
@@ -4507,6 +5321,7 @@ AIP.Session = (function () {
       this.pendingFb = 0;
       this.freshLog = []; this.pauseKeys = new Set(); this.aliveAt = 0;
       this.coach = new AIP.Coach(this);
+      this.typist = new AIP.Typist(this);
       this.recentEvents = []; this.lastScoreAt = 0; this.stuckFor = 0;
       this.reading = null; this.take = null;
       this.errorsShown = 0;
@@ -4582,6 +5397,7 @@ AIP.Session = (function () {
       try { win = f.contentWindow; void win.document; } catch (e) { this.voice.say('loadFail', { err: "the game is blocking me 😢" }, 3); this.phase = 'broken'; return; }
       this.senses.attach(f);
       this.hands.attach(win);
+      if (this.typist) { this.typist.cancel(); this.typist.state.clear(); this.typist.ctxFields = []; }
       this.listenToPlayer(win);
       try { if (win.__aip) win.__aip.realLock = this.mode === 'watch'; } catch (e) { /* ignore */ }
       this.phase = 'play';
@@ -4658,10 +5474,10 @@ AIP.Session = (function () {
       let end = null;
       for (const ev of events) {
         if (ev.type === 'win') end = 'win';
-        else if (!end && (ev.type === 'gameOver' || ev.type === 'healthZero')) end = 'death';
+        else if (!end && ((ev.type === 'gameOver' && !this.typist.feedbackOver()) || ev.type === 'healthZero')) end = 'death';
         else if (!end && ev.type === 'scoreReset' && this.ep.maxScore > 0 && now - this.ep.t0 > 3000) end = 'death';
       }
-      if (end && this.phase !== 'restart') { this.reading = null; this.take = null; if (this.phase === 'studying') this.phase = 'play'; }
+      if (end && this.phase !== 'restart') { this.reading = null; this.take = null; this.typist.onEnd(end); if (this.phase === 'studying') this.phase = 'play'; }
       if (!end) {
       // 🖐️ the coach is pressing/clicking something itself (only when stuck/menus/story)
       if (this.mode === 'ai' && this.take && this.runTakeover(now)) { this.ui(now, obs); return; }
@@ -4669,6 +5485,8 @@ AIP.Session = (function () {
       if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
       // 📖 story / instructions on screen: actually READ it (don't mash through)
       if (this.mode === 'ai' && this.readStory(obs, now)) { this.ui(now, obs); return; }
+      // ✍️ a text box wants typing (name, guess, answer, command...) or a typing game shows words
+      if (this.mode === 'ai' && this.typist.step(obs, now)) { this.ui(now, obs); return; }
       }
       else if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
 
@@ -4873,6 +5691,7 @@ AIP.Session = (function () {
     /* ---------- 📖 reading story / instructions ---------- */
     readStory(obs, now) {
       if (obs.gameOverVisible || this.phase !== 'play') { this.reading = null; return false; }
+      if (this.typist.active || (!(obs.fields && obs.fields.length) && this.typist.strongCue())) { this.reading = null; return false; } // (typing, or a typing test)
       // text still being "typed out" on screen? wait for it to finish before reading
       if (obs.textAnimating && !this.reading) { this.hands.releaseAll(); this.reason = '📖 waiting for the text to finish…'; return true; }
       // any long text on screen it hasn't read yet? (dialogue, story, instructions)
@@ -4931,6 +5750,7 @@ AIP.Session = (function () {
       const stillThere = (this.senses.textBits || []).some((b) => b.s.replace(/\s+/g, ' ').trim() === R.text);
       if (!stillThere || R.tries >= 6) { this.reading = null; return false; }
       if (obs.menuish && !R.hint) { this.reading = null; return false; } // a menu: the normal brain clicks Play etc.
+      if (obs.fields && obs.fields.length && !R.hint) { this.reading = null; return false; } // it wants me to TYPE something, not press Enter
       if (now < R.next) return true;
       const seq = R.hint === 'click' ? ['click', 'Enter', 'Space'] : R.hint && R.hint !== 'any' ? [R.hint, 'Enter', 'Space'] : ['Enter', 'Space', 'click', 'KeyE', 'KeyZ', 'ArrowRight'];
       const k = seq[R.tries % seq.length];
@@ -4987,7 +5807,7 @@ AIP.Session = (function () {
     }
 
     stuckCheck(obs, now) {
-      if (this.mode !== 'ai' || this.phase !== 'play' || this.reading || this.take) return;
+      if (this.mode !== 'ai' || this.phase !== 'play' || this.reading || this.take || this.typist.active) return;
       if (obs.staticTime < 1) { this.stuckSaid = false; return; }
       if (obs.staticTime > 12 && !this.stuckSaid) {
         this.stuckSaid = true;
@@ -5301,6 +6121,10 @@ AIP.Session = (function () {
     tip(text) {
       const p = AIP.tips.parse(text);
       if (p.feedback) { this.feedback(p.feedback); return; }
+      // ✍️ "type hello" / "the password is cheese" - it types it (works offline too)
+      const tt = p.tips.find((t) => t.type === 'typeText');
+      if (tt && /^(your|ur|ya|yo) name$/i.test(tt.text)) tt.text = this.ai.name;
+      if (tt) { this.typist.playerText(tt.text); if (tt.clue) this.typist.addClue(tt.text); if (AIP.gemini.usable()) this.coach.chatLog.push('Player: ' + text); return; }
       // the quick stuff the baby brain understands by itself ("space = jump") - works offline too
       if (p.tips.length) { p.tips.forEach((t) => this.brain.applyTip(t)); this.heart.react([{ type: 'tip' }], { painMode: AIP.settings.get().painMode }); }
       // the coach understands normal sentences ("go to the door"), answers questions, chats
@@ -6105,6 +6929,7 @@ AIP.practice = [
       (s.coach.lastLesson ? '<div class="coach-sec"><h4>🎬 Last death review</h4><p>' + esc(s.coach.lastLesson) + '</p></div>' : '') +
       '<div class="coach-sec"><h4>🏆 Trophies ' + got + (tro.list.length ? ' / ' + tro.list.length : '') + '</h4>' + (tro.list.length ? '<ul class="trophy-list">' + tro.list.map((t) => '<li>' + (tro.got[t.name] || t.got ? '✅ ' : '⬜ ') + esc(t.name) + '</li>').join('') + '</ul>' : '<p class="note">No trophy list found yet.</p>') + '</div>' +
       (story.length || raw.length ? '<div class="coach-sec"><h4>📖 Story so far</h4><ul>' + story.map((x) => '<li>' + esc(x) + '</li>').join('') + raw.map((x) => '<li class="note">"' + esc(x.slice(0, 140)) + '"</li>').join('') + '</ul></div>' : '') +
+      (s.typist.history.length ? '<div class="coach-sec"><h4>⌨️ What it typed</h4><ul>' + s.typist.history.slice(-6).map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '') +
       '<div class="coach-sec"><h4>📝 Game notes</h4>' + (notes.length ? '<ul>' + notes.slice(-12).map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>' : '<p class="note">No notes yet.</p>') + '</div>' +
       '<button class="btn sm" id="coachReportBtn">📋 Report card</button>';
   }

@@ -1235,6 +1235,14 @@ AIP.Brain = (function () {
       if (this.self.cat != null && this.self.camera < 0.5) out.push({ kind: 'self', icon: AIP.COLORS.emoji[this.self.cat], text: "I'm " + AIP.COLORS.names[this.self.cat] + (this.self.tracked ? " (and I'm keeping an eye on myself 👀)" : ''), good: true, sort: -1.4 });
       if (this.self.camera > 0.5) out.push({ kind: 'self', icon: '🎥', text: "I see through my own eyes (it's 3D!)", good: true, sort: -1.5 });
       this.tips.slice(-4).forEach((t) => out.push({ kind: 'tip', icon: '✍️', text: 'you said: "' + t.text + '"', good: true, sort: 5 }));
+      // ⌨️ what it learned from typing
+      const T = this.stats.typing;
+      if (T) {
+        if (T.tg && T.tg.works) out.push({ kind: 'type', icon: '⌨️', text: 'typing the words on screen works here' + (T.tg.submit ? ' (then ' + KEYS.label(T.tg.submit) + ')' : ''), good: true, sort: 0.5 });
+        Object.keys(T.worked || {}).slice(-4).forEach((k) => out.push({ kind: 'type', icon: /^password/.test(k) ? '🔐' : '⌨️', text: (k.split(':')[1] || k.split(':')[0]).split('|')[0].trim().slice(0, 24) + ' → "' + T.worked[k] + '" works', good: true, sort: 0.6 }));
+        if (T.namedOnce) out.push({ kind: 'type', icon: '✍️', text: 'I typed my name in here', good: true, sort: 0.7 });
+        if (T.cmds && T.cmds.__bareDirs) out.push({ kind: 'type', icon: '🧭', text: 'just type "north" (not "go north")', good: true, sort: 0.7 });
+      }
       out.sort((a, b) => a.sort - b.sort);
       return out;
     }

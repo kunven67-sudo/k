@@ -89,6 +89,37 @@ AIP.Senses = (function () {
   const CHOICE_SKIP_RX = /^(play|start|begin|settings|options|credits|shop|store|back|quit|exit|menu|resume|retry|try again|play again|restart|achievements?|help|ok|okay|close|x|×)$/i;
   const GOOD_BTN_RX = /\b(play|start|begin|go|continue|retry|try again|again|restart|next|ok|okay|resume|new game|tap|click|press|enter|let'?s|ready|yes|launch)\b/i;
   const MEH_BTN_RX = /\b(settings|options|credits|quit|exit|reset|erase|delete|back|menu|about|help|share|privacy|shop|store|achievements?)\b/i;
+  // ✍️ text boxes + typing games
+  const TEXT_TYPES = /^(text|search|email|number|tel|password|url)?$/;
+  const TYPE_CUE_RX = /\b(type|typing|typed|wpm|words? per minute|spell(?:ing)?|keyboard)\b/i;
+  const UI_WORD_RX = /^(score|scores|lives|life|health|hp|time|timer|level|lvl|wpm|best|high ?score|accuracy|combo|points?|pause|paused|menu|start|play|restart|settings|sound|music|on|off|ok|go|ready|next|back|help|type|typing|words?)$/i;
+  function fieldKind(el, type, label) {
+    const L = label.toLowerCase();
+    if (type === 'url') return 'skip';
+    if (type === 'email') return 'email';
+    if (type === 'search') return 'search';
+    if (type === 'password' || /pass ?word|passcode|pass ?code|secret|\bpin\b|\bcode\b|key ?word|unlock/.test(L)) return 'password';
+    if (/\bname\b|nick|player|user ?name|call you|initials|who are you|gamertag|tag\b/.test(L)) return 'name';
+    if (/command|action|what (do|will|should|would) you do|what now|instruction|^\s*>|>\s*$|\bcmd\b|adventure/.test(L)) return 'command';
+    if (type === 'number' || type === 'tel' || /guess|number|\bnum\b|pick a|how many|amount/.test(L)) return 'number';
+    if (/answer|solve|riddle|question|spell|translate|what is|reply|word|letter|unscramble/.test(L)) return 'answer';
+    if (/chat|message|say|talk|send|comment/.test(L)) return 'chat';
+    return 'text';
+  }
+  function fieldLabel(el) {
+    const bits = [];
+    try { if (el.labels && el.labels.length) bits.push(el.labels[0].innerText || ''); } catch (e) { /* ignore */ }
+    bits.push(el.getAttribute('aria-label') || '', el.getAttribute('placeholder') || '', el.title || '', el.name || '');
+    // nothing? the words right before the box (like "Your name: [_____]") - short, steady text only
+    // (not a chat log above it that keeps changing)
+    if (!bits.join('').trim()) {
+      let prev = el.previousSibling, n = 0;
+      while (prev && n++ < 3) { const t = ((prev.nodeType === 3 ? prev.nodeValue : prev.nodeType === 1 && !/^(INPUT|TEXTAREA|BUTTON|SELECT)$/.test(prev.tagName) ? prev.innerText : '') || '').trim(); if (t) { if (t.length <= 60) bits.push(t); break; } prev = prev.previousSibling; }
+    }
+    if (!bits.join('').trim()) bits.push(el.id || '');
+    if (!bits.join('').trim() && el.parentElement) bits.push((el.parentElement.innerText || '').slice(0, 60));
+    return bits.map((b) => String(b).replace(/\s+/g, ' ').trim()).filter(Boolean).join(' | ').slice(0, 120);
+  }
   const NUM_ONLY = /^\s*[x×]?\s*(-?\d{1,3}(?:,\d{3})+|-?\d+(?:\.\d+)?)\s*(?:\/\s*(\d+))?\s*(%|pts|m)?\s*$/i;
   const LABELLED = /([A-Za-z][A-Za-z _'.]{0,16}?|❤️|❤|♥|💖|⭐|🪙|💰|💎|🏆|⚡|🔥|\$)\s*[:=]?\s*[x×]?\s*(-?\d{1,3}(?:,\d{3})+|-?\d+(?:\.\d+)?)(?:\s*\/\s*(\d+))?/gu;
   const NUM_FIRST = /(-?\d{1,3}(?:,\d{3})+|-?\d+(?:\.\d+)?)\s*(pts|points|coins?|lives|hp|meters|kills|gems|stars|xp)\b/gi;
@@ -118,7 +149,7 @@ AIP.Senses = (function () {
       this.readouts = new Map();
       this.primary = { score: null, hp: null, lives: null };
       this.items = []; this.itemsAt = 0;
-      this.buttons = []; this.textBits = [];
+      this.buttons = []; this.textBits = []; this.fields = []; this.cvLines = [];
       this.tainted = new WeakSet();
       this.taintCheckAt = 0;
       this.redBase = 0; this.lastFlashAt = -1e9;
@@ -163,10 +194,12 @@ AIP.Senses = (function () {
         if (op < 0.05) continue;
         const media = tag === 'CANVAS' || tag === 'IMG' || tag === 'VIDEO' || (tag === 'image');
         let text = '';
-        for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
+        const field = tag === 'INPUT' || tag === 'TEXTAREA';
+        if (field) text = String(el.type === 'password' ? '•'.repeat((el.value || '').length) : el.value || '').slice(0, 80);
+        else for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
         text = text.replace(/\s+/g, ' ').trim();
         const fill = isSolid(cs.backgroundColor) ? cs.backgroundColor : null;
-        if (media || fill || text) out.push({ el, media, fill, text, color: cs.color, op, fs: parseFloat(cs.fontSize) || 14, fw: cs.fontWeight, ta: cs.textAlign });
+        if (media || fill || text) out.push({ el, media, fill, text, field, color: cs.color, op, fs: parseFloat(cs.fontSize) || 14, fw: cs.fontWeight, ta: cs.textAlign });
       }
       this.items = out;
     }
@@ -196,6 +229,69 @@ AIP.Senses = (function () {
       }
       this.buttons = out;
     }
+
+    /* ---- ✍️ text boxes the game wants you to type in (name, guess, answer, command...) ---- */
+    findFields() {
+      const doc = this.doc, win = this.win;
+      const out = [];
+      if (!doc || !doc.body) { this.fields = out; return; }
+      const vw = win.innerWidth, vh = win.innerHeight;
+      let list;
+      try { list = doc.querySelectorAll('input,textarea,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"]'); } catch (e) { list = []; }
+      for (let i = 0; i < list.length && out.length < 8; i++) {
+        const el = list[i];
+        const tag = el.tagName;
+        const type = tag === 'INPUT' ? String(el.getAttribute('type') || 'text').toLowerCase() : tag === 'TEXTAREA' ? 'textarea' : 'editable';
+        if (tag === 'INPUT' && !TEXT_TYPES.test(type)) continue;
+        if (el.disabled || el.readOnly) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 8 || r.height < 8 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
+        let cs;
+        try { cs = win.getComputedStyle(el); } catch (e) { continue; }
+        if (cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.05) continue;
+        const cx = clamp(r.left + r.width / 2, 1, vw - 1), cy = clamp(r.top + r.height / 2, 1, vh - 1);
+        const top = doc.elementFromPoint(cx, cy);
+        if (!top || !(top === el || el.contains(top) || top.contains(el))) continue; // hidden behind something
+        const label = fieldLabel(el);
+        const value = tag === 'INPUT' || tag === 'TEXTAREA' ? String(el.value || '') : String(el.innerText || '').trim();
+        out.push({
+          el, type, label, value, kind: fieldKind(el, type, label),
+          x: cx / vw, y: cy / vh, w: r.width / vw, h: r.height / vh,
+          max: el.maxLength > 0 ? el.maxLength : 0, focused: doc.activeElement === el,
+        });
+      }
+      this.fields = out;
+    }
+
+    /* ---- ⌨️ typing games: the word(s) on screen you're supposed to type ---- */
+    typingWords(long) {
+      const out = [], win = this.win, doc = this.doc;
+      if (!win || !doc) return out;
+      const vw = win.innerWidth || 1, vh = win.innerHeight || 1;
+      const seen = new Set();
+      const add = (s, x, y, size, el) => {
+        s = String(s || '').replace(/\s+/g, ' ').trim();
+        if (!s || s.length > (long ? 160 : 30) || seen.has(s + '@' + Math.round(x * 20) + ',' + Math.round(y * 20))) return;
+        if (long && s.length > 30) { if (!/^[A-Za-z0-9][A-Za-z0-9'",.;:!?\- ]*$/.test(s)) return; } // (a typing test sentence)
+        else if (!/^[A-Za-z][A-Za-z'\- ]*$/.test(s) || s.split(' ').length > 4 || UI_WORD_RX.test(s)) return;
+        if (s.length === 1 && size < 36) return; // single letters only when BIG ("press K!")
+        seen.add(s + '@' + Math.round(x * 20) + ',' + Math.round(y * 20));
+        out.push({ s, x, y, size, el });
+      };
+      for (const it of this.items) {
+        if (it.media || it.field || !it.text) continue;
+        const el = it.el;
+        if (el.closest && el.closest('button,a,label,[role="button"]')) continue;
+        let s = it.text, host = el;
+        // letter-by-letter spans (<span>c</span><span>a</span><span>t</span>) -> read the whole word from the parent
+        if (s.length <= 2 && el.parentElement) { const ps = (el.parentElement.textContent || '').replace(/\s+/g, ' ').trim(); if (ps.length > s.length && ps.length <= (long ? 160 : 30)) { s = ps; host = el.parentElement; } }
+        const r = host.getBoundingClientRect();
+        add(s, (r.left + r.width / 2) / vw, (r.top + r.height / 2) / vh, it.fs, host);
+      }
+      for (const l of this.cvLines || []) add(l.s, l.x, l.y, l.size, null);
+      return out;
+    }
+    get typingCue() { return (this.textBits || []).some((b) => b.s.length < 120 && TYPE_CUE_RX.test(b.s)); }
 
     /* ---- draw what the game looks like into a tiny 40x30 picture ---- */
     paint() {
@@ -253,8 +349,9 @@ AIP.Senses = (function () {
     /* ---- reading numbers ---- */
     gatherText(now) {
       const bits = [];
+      this.cvLines = [];
       for (const it of this.items) {
-        if (!it.text || it.text.length > 600) continue; // (long text = story / instructions - it reads those too)
+        if (!it.text || it.field || it.text.length > 600) continue; // (long text = story / instructions - it reads those too)
         bits.push({ s: it.text, ctx: it.text.length <= 80 ? ctxLabel(it.el) : '', src: 'dom', id: elId(it.el) });
       }
       const aip = this.aip;
@@ -263,17 +360,35 @@ AIP.Senses = (function () {
         let fnow = now;
         try { fnow = this.win.performance.now(); } catch (e) { /* ignore */ }
         const recent = aip.texts.splice(0, aip.texts.length).filter((t) => fnow - t.t < 500 && t.s && t.s.length < 80);
+        // where things are NOW = only the newest drawing of each canvas (not words that were there half a second ago)
+        const newest = new Map();
+        for (const t of recent) if (!(newest.get(t.c) >= t.t)) newest.set(t.c, t.t);
         // canvas text often comes in pieces ("Score:" then "120") - glue pieces on the same line
         const lines = new Map();
         for (const t of recent) {
           const key = (t.c.id || 'cv') + ':' + Math.round(t.y / 8);
-          if (!lines.has(key)) lines.set(key, new Map());
-          lines.get(key).set(Math.round(t.x), t.s);
+          if (!lines.has(key)) lines.set(key, { m: new Map(), t, fresh: false });
+          const L = lines.get(key);
+          L.m.set(Math.round(t.x), t.s);
+          if (t.t >= newest.get(t.c) - 40) { L.fresh = true; L.t = t; }
         }
-        lines.forEach((m, key) => {
-          const s = [...m.entries()].sort((a, b) => a[0] - b[0]).map((e) => e[1]).join(' ').trim();
-          if (s) bits.push({ s, ctx: '', src: 'cv', id: key });
+        const cvLines = [];
+        lines.forEach((L, key) => {
+          const s = [...L.m.entries()].sort((a, b) => a[0] - b[0]).map((e) => e[1]).join(' ').trim();
+          if (!s) return;
+          bits.push({ s, ctx: '', src: 'cv', id: key });
+          if (!L.fresh) return;
+          // where it is on screen + how big (typing games need that)
+          try {
+            const c = L.t.c, r = c.getBoundingClientRect(), vw = this.win.innerWidth || 1, vh = this.win.innerHeight || 1;
+            const fx = r.width / (c.width || 1), fy = r.height / (c.height || 1);
+            const px = parseFloat((/(\d+(?:\.\d+)?)px/.exec(L.t.f || '') || [0, 12])[1]);
+            const xs = [...L.m.keys()];
+            const mid = (Math.min(...xs) + Math.max(...xs)) / 2;
+            cvLines.push({ s, x: (r.left + mid * fx) / vw, y: (r.top + L.t.y * fy) / vh, size: px * fy });
+          } catch (e) { /* canvas gone */ }
         });
+        this.cvLines = cvLines;
       }
       if (aip && aip.alerts.length < this.alertsSeen) this.alertsSeen = 0;
       if (aip && aip.alerts.length > this.alertsSeen) {
@@ -357,7 +472,7 @@ AIP.Senses = (function () {
       const win = this.win;
       obs.vw = win.innerWidth; obs.vh = win.innerHeight;
 
-      if (now - this.itemsAt > 450 || !this.items.length) { this.itemsAt = now; this.collect(); this.findButtons(); }
+      if (now - this.itemsAt > 450 || !this.items.length) { this.itemsAt = now; this.collect(); this.findButtons(); this.findFields(); }
 
       const px = this.paint();
       if (!px) return obs;
@@ -453,6 +568,7 @@ AIP.Senses = (function () {
       this.numberEvents(obs, now);
 
       obs.buttons = this.buttons;
+      obs.fields = (this.fields || []).filter((f) => f.el.isConnected && f.kind !== 'skip');
       const aip = this.aip;
       obs.lockActive = !!(aip && aip.lockEl);
       obs.frames = aip ? aip.frames : 0;
