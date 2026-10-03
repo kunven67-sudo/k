@@ -79,6 +79,7 @@
             <div class="painbar" id="painBar" hidden><span>🤕 Pain</span><div class="pain-track"><i id="painFill"></i></div></div>
             <div class="who-stats" id="whoStats"></div>
             <div class="coach-chip" id="coachChip" hidden></div>
+            <div class="goal-chip" id="goalChip" hidden></div>
           </div>
         </div>
         <div class="tabs" role="tablist">
@@ -92,7 +93,7 @@
         </div>
         <div class="tabbody">
           <div class="tab on" data-tab="chat"><div class="chatlog" id="chatlog" aria-live="polite"></div></div>
-          <div class="tab" data-tab="feel"><div class="meters" id="meters"></div><p class="note" id="personality"></p></div>
+          <div class="tab" data-tab="feel"><div class="meters" id="meters"></div><p class="note" id="personality"></p><div id="mind" class="mind"></div></div>
           <div class="tab" data-tab="learn"><ul class="learned" id="learned"></ul></div>
           <div class="tab" data-tab="graph">
             <div class="graph-head"><span class="legend"><i class="sw s1"></i>score each try</span><span class="legend"><i class="sw s2"></i>best so far</span><button class="linkbtn" id="graphTable">table</button></div>
@@ -203,6 +204,7 @@
 <script src="js/gemini.js"></script>
 <script src="js/coach.js"></script>
 <script src="js/typist.js"></script>
+<script src="js/mind.js"></script>
 <script src="js/session.js"></script>
 <script src="js/practice.js"></script>
 <script src="js/app.js"></script>

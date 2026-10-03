@@ -244,9 +244,43 @@
     if (heavy) coachStatus();
     if (heavy && app.tab === 'coach') renderCoachTab(s);
     if (app.tab === 'feel') renderMeters(h, pm);
+    if (heavy) renderMind(s);
     if (app.tab === 'think') renderThinking(s);
     if (heavy && app.tab === 'learn') renderLearned(s);
     if (heavy && app.tab === 'keys') renderKeys(s);
+  };
+  // 💖🎯💡 the AI's own mind - read-only (nobody sets it, not even you)
+  function renderMind(s) {
+    if (!s.mind || !s.brain.stats.goals) return;
+    const M = s.mind, S = s.brain.stats;
+    const chip = $('#goalChip'), gl = M.goalLabel();
+    chip.hidden = !gl;
+    if (gl) chip.textContent = '🎯 ' + gl;
+    if (app.tab !== 'feel') return;
+    const g = S.goals.cur;
+    const likes = M.topLikes(6, 1), dis = M.topLikes(3, -1);
+    const bar = (v) => '<div class="like-track"><i style="width:' + Math.round(Math.min(1, Math.abs(v)) * 100) + '%;background:' + (v > 0 ? '#ff4fd8' : '#5aa9ff') + '"></i></div>';
+    const row = (k) => '<div class="like-row"><span>' + esc(M.wordsFor(k)) + '</span>' + bar(S.likes[k].v) + '</div>';
+    const ideas = (S.ideas || []).filter((i) => i.kind !== 'fun' && i.tries > 0).sort((a, b) => (b.status === 'keeper') - (a.status === 'keeper') || b.score - a.score).slice(0, 8);
+    $('#mind').innerHTML =
+      '<h4>🎯 My goal <span class="note">(I picked it myself)</span></h4>' +
+      (g ? '<p><b>' + esc(gl) + '</b><br><span class="note">because ' + esc(g.why) + '</span></p><div class="like-track goal"><i style="width:' + Math.round(M.progress(g) * 100) + '%"></i></div>' : '<p class="note">Still figuring this game out before I decide what I want.</p>') +
+      (S.goals.done.length ? '<p class="note">✅ Done: ' + S.goals.done.map((k) => esc(AIP.Mind.GOAL_WORD[k])).join(', ') + '</p>' : '') +
+      '<h4>💖 What I like here</h4>' + (likes.length ? likes.map(row).join('') : '<p class="note">Still finding out…</p>') +
+      (dis.length ? '<h4>💔 Not my thing</h4>' + dis.map(row).join('') : '') +
+      '<h4>💡 My ideas notebook</h4>' + (ideas.length ? '<ul class="ideas">' + ideas.map((i) => '<li class="' + i.status + '">' + (i.status === 'keeper' ? '✅' : i.status === 'dropped' ? '❌' : '🤔') + ' <b>' + esc(i.name) + '</b>' + (i.from === 'coach' ? ' <span class="tag">coach idea</span>' : '') + '<br><span class="note">' + esc(i.desc) + ' · tried ' + i.tries + 'x</span></li>').join('') + '</ul>' : '<p class="note">No inventions yet. Give me a minute 😏</p>');
+  }
+  app.mindUpdated = (s) => { if (app.session === s) renderMind(s); };
+  // 🏁 it decided it's done with this game - you can ask it to keep going (it decides)
+  app.showDone = (s) => {
+    const log = $('#chatlog');
+    const el = document.createElement('div');
+    el.className = 'msg sys done';
+    el.innerHTML = '🏁 ' + esc(s.ai.name) + ' decided it\'s done with this game. <button class="btn sm" type="button">Ask ' + esc(s.ai.name) + ' to keep going</button>';
+    log.appendChild(el);
+    const box = log.parentElement.parentElement; box.scrollTop = box.scrollHeight;
+    const b = el.querySelector('button');
+    b.onclick = () => { if (app.session !== s) return; const yes = s.keepGoing(); b.disabled = true; b.textContent = yes ? 'It said yes! 🔥' : 'It said no 😌'; };
   };
   function renderMeters(h, pm) {
     const rows = H.EMOS.map((k) => ({ k, v: h.e[k] }));
@@ -468,7 +502,7 @@
     const medal = ['🥇', '🥈', '🥉'];
     $('#board').innerHTML = '<table class="board-table"><tr><th>#</th><th>AI</th><th style="text-align:right">Best</th><th style="text-align:right">Tries</th><th style="text-align:right">Wins</th><th style="text-align:right">🏆 Trophies</th><th style="text-align:right">Time played</th></tr>' +
       rows.map((r, i) => `<tr><td>${medal[i] || i + 1}</td><td><div class="bwho"><div class="mini">${AIP.avatar.svg(r.ai.look, calmFace(r.ai))}</div>${esc(r.ai.name)}</div></td>
-        <td class="num">${U.fmt(r.s.best)}${esc(kindWord(r.s.scoreKind))}</td><td class="num">${r.s.tries}</td><td class="num">${r.s.wins || 0}</td><td class="num">${r.s.trophies || 0}${r.s.trophyTotal ? ' / ' + r.s.trophyTotal : ''}</td><td class="num">${Math.round((r.s.timeMs || 0) / 60000)} min</td></tr>`).join('') + '</table>';
+        <td class="num">${U.fmt(r.s.best)}${esc(kindWord(r.s.scoreKind))}</td><td class="num">${r.s.tries}</td><td class="num">${r.s.wins || 0}${r.s.beaten ? ' ✅' : ''}</td><td class="num">${r.s.trophies || 0}${r.s.trophyTotal ? ' / ' + r.s.trophyTotal : ''}</td><td class="num">${Math.round((r.s.timeMs || 0) / 60000)} min</td></tr>`).join('') + '</table>';
   }
 
   /* ================= diary ================= */
@@ -569,7 +603,7 @@
     const P = s.coach.plan;
     if (AIP.gemini.ready() && P && P.goal) {
       box.hidden = false;
-      box.innerHTML = '🧠 <b>Goal:</b> ' + esc(P.goal) + (P.plan && P.plan.length ? '<ol>' + P.plan.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' : '');
+      box.innerHTML = '🧠 <b>Coach plan:</b> ' + esc(P.goal) + (P.plan && P.plan.length ? '<ol>' + P.plan.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' : '');
     } else box.hidden = true;
   }
   function renderCoachTab(s) {

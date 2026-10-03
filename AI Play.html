@@ -323,6 +323,23 @@ input[type="range"] { accent-color: var(--pink); width: 180px; }
 .mic.on { border-color: var(--red); background: rgba(255, 59, 92, .2); box-shadow: 0 0 12px rgba(255, 59, 92, .6); animation: twinkle .8s infinite; }
 .report-text { text-align: left; white-space: pre-wrap; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 14px; max-height: 50vh; overflow: auto; }
 
+/* 🎯💖💡 the AI's own mind */
+.goal-chip { display: inline-flex; align-items: center; margin-top: 5px; margin-left: 4px; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 20px; border: 1px solid rgba(255, 79, 216, .5); background: rgba(255, 79, 216, .08); color: #ffc7f2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mind h4 { margin: 14px 0 6px; font-size: 13px; }
+.mind p { margin: 4px 0; font-size: 13px; }
+.like-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px; gap: 8px; align-items: center; font-size: 12.5px; margin: 3px 0; }
+.like-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.like-track { height: 8px; border-radius: 6px; background: var(--panel2); overflow: hidden; border: 1px solid var(--line); }
+.like-track i { display: block; height: 100%; border-radius: 6px; }
+.like-track.goal { margin: 4px 0 8px; height: 10px; }
+.like-track.goal i { background: linear-gradient(90deg, #ff4fd8, #19f6ff); }
+.ideas { list-style: none; margin: 0; padding: 0; }
+.ideas li { padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 12.5px; }
+.ideas li.dropped b { text-decoration: line-through; opacity: .6; }
+.ideas .tag { font-size: 10px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--line); color: var(--dim); }
+.msg.sys.done { color: var(--text); background: rgba(255, 79, 216, .08); border: 1px dashed rgba(255, 79, 216, .45); border-radius: 10px; padding: 8px; }
+.msg.sys.done .btn { margin-left: 6px; }
+
 </style>
 </head>
 <body>
@@ -396,6 +413,7 @@ input[type="range"] { accent-color: var(--pink); width: 180px; }
             <div class="painbar" id="painBar" hidden><span>🤕 Pain</span><div class="pain-track"><i id="painFill"></i></div></div>
             <div class="who-stats" id="whoStats"></div>
             <div class="coach-chip" id="coachChip" hidden></div>
+            <div class="goal-chip" id="goalChip" hidden></div>
           </div>
         </div>
         <div class="tabs" role="tablist">
@@ -409,7 +427,7 @@ input[type="range"] { accent-color: var(--pink); width: 180px; }
         </div>
         <div class="tabbody">
           <div class="tab on" data-tab="chat"><div class="chatlog" id="chatlog" aria-live="polite"></div></div>
-          <div class="tab" data-tab="feel"><div class="meters" id="meters"></div><p class="note" id="personality"></p></div>
+          <div class="tab" data-tab="feel"><div class="meters" id="meters"></div><p class="note" id="personality"></p><div id="mind" class="mind"></div></div>
           <div class="tab" data-tab="learn"><ul class="learned" id="learned"></ul></div>
           <div class="tab" data-tab="graph">
             <div class="graph-head"><span class="legend"><i class="sw s1"></i>score each try</span><span class="legend"><i class="sw s2"></i>best so far</span><button class="linkbtn" id="graphTable">table</button></div>
@@ -1145,7 +1163,8 @@ AIP.loader = (function () {
     try {
       var note = function (m) { if (aip.alerts.length > 200) aip.alerts.splice(0, 100); aip.alerts.push(String(m)); };
       W.alert = function (m) { note(m); };
-      W.confirm = function (m) { note(m); return true; };
+      // "Erase everything?" / "Restart the day?" -> no thanks (it never throws away its own progress by accident)
+      W.confirm = function (m) { note(m); return !/erase|restart|start over|reset|delete|replace|overwrite|lose (your|all)|wipe|quit/i.test(String(m || '')); };
       W.prompt = function (m, d) { note(m); return d == null ? '' : String(d); };
       W.open = function () { return null; };
       W.Element.prototype.requestFullscreen = function () { return Promise.resolve(); };
@@ -1281,16 +1300,28 @@ AIP.Senses = (function () {
     ['combo', /(combo|streak|multi)/i],
   ];
   const kindOf = (label) => { for (const [k, rx] of KIND_RX) if (rx.test(label)) return k; return 'unknown'; };
-  const GAMEOVER_RX = /game\s*over|you\s*(died|lose|lost|are\s+dead|crashed|failed)|wasted|\bdefeat(ed)?\b|out\s+of\s+lives|no\s+lives\s+left|mission\s+failed|level\s+failed|\bbusted\b|try\s+again|play\s+again|\bretry\b|\bcaught\b/i;
-  const WIN_RX = /you\s*(win|won|beat|escaped|survived)|\bvictory\b|level\s*(complete|cleared)|stage\s*clear|congratulations|\bcongrats\b|mission\s*complete|\bwinner\b|\bthe\s+end\b|you\s+did\s+it/i;
-  const TROPHY_RX = /(achievement|trophy|trophies|badge|medal|award)s?\b[^.!]{0,30}\b(unlocked|earned|get|got|awarded|completed|won)\b|\b(unlocked|earned)\s*[:!]\s*\S|🏆\s*\S/i;
-  const CONTINUE_RX = /(press|hit|tap)\s+(any\s+key|space(?:bar)?|enter|return|e|z|x|f)\b|(click|tap)\s+(to\s+continue|anywhere)|\bcontinue\s*[▶►>]|[▼▶►]\s*$/i;
+  const GAMEOVER_RX = /game\s*over|you\s*(died|lose|lost|are\s+dead|crashed|failed|dissolved|fell)\b|you\s+got\s+(swarmed|knocked\s+out)|get\s+back\s+up|shrunk\s+into\s+nothing|wasted|\bdefeat(ed)?\b|out\s+of\s+lives|no\s+lives\s+left|mission\s+failed|level\s+failed|\bbusted\b|try\s+again|play\s+again|\bretry\b|^\W*(you\s+(got\s+|were\s+|are\s+)?)?caught\b\W*$/i;
+  const WIN_RX = /you\s*(win|won|beat|escaped|survived)\b(?!')|\bvictory\b|level\s*(complete|cleared)|stage\s*clear|congratulations|\bcongrats\b|mission\s*complete|\bwinner\b|^\W*the\s+end\W*$|you\s+did\s+it|thank\s+you\s+for\s+playing|to\s+be\s+continued|^\W*ending\s+[a-e]\b/i;
+  // "Mission complete: buy 3 monsters" = a little goal done, not the end of the game
+  const MILESTONE_RX = /^\W*(mission|quest|objective|task|challenge|goal|daily)\s*(complete|completed|done|cleared)\s*[:!-]?\s*\S|^\W*(day|shift|chapter|part)\s*\d*\s*(complete|completed|cleared|done)\b/i;
+  const TROPHY_RX = /(achievement|trophy|trophies|badge|medal|award)s?\b[^.!]{0,30}\b(unlocked|earned|get|got|awarded|completed|won)\b|\b(unlocked|earned)\s*[:!]\s*\S|🏆\s*\S|^\W*(achievement|trophy|badge|medal)s?\s*(unlocked|earned|get|got)?\s*[:!-]\s*\S/i;
+  // rows in a trophy list: "🏆 First Blood" (got) / "🔒 Ankle Legend" (not yet)
+  const TROPHY_ROW_RX = /^\s*(🏆|🔒|✅|⬜|🔓|☑️|✔️?|❌)\s*(.{2,48})$/u;
+  // "SPAM E!" / "Mash space to break free" -> tap it super fast
+  const MASH_RX = /\b(spam|mash|smash|rapidly|repeatedly|as fast as you can|break free)\b/i;
+  const MASH_KEY_RX = /\b(?:spam|mash|smash|tap|press|hit)\s+\[?(space(?:bar)?|enter|[a-z])\]?(?=\W|$)/i;
+  const INLINE_TAGS = /^(KBD|B|STRONG|I|EM|SPAN|SMALL|CODE|U|MARK|SUP|SUB|A|LABEL|FONT)$/;
+  const BAR_RX = /(hp|health|life|stam|energy|fuel|mana|shield|oxygen|\bair\b|power|boost|heat|xp)/i;
+  const MARKER_RX = /marker|waypoint|objective-?dot|\bpoi\b|target-?icon/i;
+  // never click these (they erase saves)
+  const DANGER_BTN_RX = /\b(reset|erase|delete|wipe|clear\s+(all|data|save|progress)|press again to confirm|are you sure|factory)\b/i;
+  const CONTINUE_RX = /(press|hit|tap)\s+(any\s+key|space(?:bar)?|enter|return|e|z|x|f)\b|(click|tap)\s+(to\s+(?:continue|start|begin)|anywhere)|\bcontinue\s*[▶►>]|[▼▶►]\s*$/i;
   const CHOICE_SKIP_RX = /^(play|start|begin|settings|options|credits|shop|store|back|quit|exit|menu|resume|retry|try again|play again|restart|achievements?|help|ok|okay|close|x|×)$/i;
   const GOOD_BTN_RX = /\b(play|start|begin|go|continue|retry|try again|again|restart|next|ok|okay|resume|new game|tap|click|press|enter|let'?s|ready|yes|launch)\b/i;
   const MEH_BTN_RX = /\b(settings|options|credits|quit|exit|reset|erase|delete|back|menu|about|help|share|privacy|shop|store|achievements?)\b/i;
   // ✍️ text boxes + typing games
   const TEXT_TYPES = /^(text|search|email|number|tel|password|url)?$/;
-  const TYPE_CUE_RX = /\b(type|typing|typed|wpm|words? per minute|spell(?:ing)?|keyboard)\b/i;
+  const TYPE_CUE_RX = /\bwpm\b|words? per minute|typing\s+(game|test|race|speed|practice|challenge|master|tutor)|\btype\s+(the|this|these|each|every|it|them|fast|quickly|as fast|words?|letters?)\b|start typing|keep typing|\bspell\s+(the|it|this|each)\b|^\s*type\s*:\s*\S/i;
   const UI_WORD_RX = /^(score|scores|lives|life|health|hp|time|timer|level|lvl|wpm|best|high ?score|accuracy|combo|points?|pause|paused|menu|start|play|restart|settings|sound|music|on|off|ok|go|ready|next|back|help|type|typing|words?)$/i;
   function fieldKind(el, type, label) {
     const L = label.toLowerCase();
@@ -1360,6 +1391,8 @@ AIP.Senses = (function () {
       this.bodyBg = '#000';
       this.tick = 0;
       this.textFirst = new Map(); // text -> when first seen (for "new story text appeared")
+      this.trophyShown = new Map(); // trophy pop-up element -> its text (so the NEXT pop-up in the same box counts too)
+      this.milestones = new Set();
       this.textByEl = new Map();  // element -> {s, changedAt} (typewriter effect)
     }
 
@@ -1380,27 +1413,76 @@ AIP.Senses = (function () {
       const all = doc.body.getElementsByTagName('*');
       const out = [];
       const n = Math.min(all.length, 1600);
+      const vw = win.innerWidth, vh = win.innerHeight;
+      const skipText = new Set(), kbds = [], bars = [], marks = [];
+      const opMap = new Map();
+      const effOp = (el) => {
+        if (!el || el === doc.body || el === doc.documentElement) return 1;
+        if (opMap.has(el)) return opMap.get(el);
+        let o = 1;
+        try { o = parseFloat(win.getComputedStyle(el).opacity); } catch (e) { /* ignore */ }
+        o = (isNaN(o) ? 1 : o) * effOp(el.parentElement);
+        opMap.set(el, o);
+        return o;
+      };
       for (let i = 0; i < n; i++) {
         const el = all[i];
         const tag = el.tagName;
         if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'LINK' || tag === 'META' || tag === 'BR' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
         const r = el.getBoundingClientRect();
         if (r.width < 2 || r.height < 2) continue;
+        if (r.bottom <= 0 || r.right <= 0 || r.top >= vh || r.left >= vw) continue; // off screen (like a hidden pop-up parked above the top)
         let cs;
         try { cs = win.getComputedStyle(el); } catch (e) { continue; }
         if (cs.visibility === 'hidden' || cs.display === 'none') continue;
-        const op = parseFloat(cs.opacity);
+        const op = effOp(el);
         if (op < 0.05) continue;
         const media = tag === 'CANVAS' || tag === 'IMG' || tag === 'VIDEO' || (tag === 'image');
         let text = '';
         const field = tag === 'INPUT' || tag === 'TEXTAREA';
         if (field) text = String(el.type === 'password' ? '•'.repeat((el.value || '').length) : el.value || '').slice(0, 80);
-        else for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
+        else if (!skipText.has(el)) {
+          // "<kbd>E</kbd> Open the door" / "Press <b>F</b> to shrink" = ONE line of text (not 3 pieces)
+          const kids = el.children;
+          let inline = kids.length > 0 && kids.length <= 12;
+          for (let k = 0; inline && k < kids.length; k++) if (!INLINE_TAGS.test(kids[k].tagName) || kids[k].children.length > 1) inline = false;
+          if (inline && (el.textContent || '').length <= 300) {
+            for (let c = el.firstChild; c; c = c.nextSibling) {
+              if (c.nodeType === 3) text += c.nodeValue;
+              else if (c.nodeType === 1) { text += c.tagName === 'KBD' ? ' ' + c.textContent.trim() + ' ' : c.textContent; skipText.add(c); for (const g of c.querySelectorAll('*')) skipText.add(g); }
+            }
+          } else for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
+        }
         text = text.replace(/\s+/g, ' ').trim();
+        // a trophy row with the 🏆/🔒 in its own box: glue it to the name next to it
+        if (/^(🏆|🔒|✅|⬜|🔓)$/u.test(text) && el.nextElementSibling) {
+          const nx = el.nextElementSibling, t2 = (nx.querySelector('b,strong,h3,h4,[class*="title"]') || nx).textContent.replace(/\s+/g, ' ').trim();
+          if (t2) text = text + ' ' + t2.slice(0, 48);
+        }
+        if (tag === 'KBD') kbds.push(el);
+        // health / stamina bars with no number: the bar's width IS the number
+        if (el.style && /%\s*$/.test(el.style.width || '') && BAR_RX.test((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '') + ' ' + ((el.parentElement && el.parentElement.id) || ''))) {
+          const m = BAR_RX.exec((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '') + ' ' + ((el.parentElement && el.parentElement.id) || ''));
+          bars.push({ label: { hp: 'health', stam: 'stamina', air: 'air' }[m[1].toLowerCase()] || m[1].toLowerCase(), value: parseFloat(el.style.width), id: elId(el) });
+        }
+        if (MARKER_RX.test((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '')) && r.width < vw * 0.3 && r.height < vh * 0.3) marks.push({ x: (r.left + r.width / 2) / vw, y: (r.top + r.height / 2) / vh, el });
         const fill = isSolid(cs.backgroundColor) ? cs.backgroundColor : null;
-        if (media || fill || text) out.push({ el, media, fill, text, field, color: cs.color, op, fs: parseFloat(cs.fontSize) || 14, fw: cs.fontWeight, ta: cs.textAlign });
+        if (media || fill || text) out.push({ el, media, fill, text, field, color: cs.color, op, fs: parseFloat(cs.fontSize) || 14, fw: cs.fontWeight, ta: cs.textAlign, ptr: cs.cursor === 'pointer' });
       }
       this.items = out;
+      this.bars = bars;
+      // key prompts: "[E] Open the door" (not the big controls list on the title screen)
+      this.keyHints = [];
+      if (kbds.length && kbds.length <= 2) {
+        for (const k of kbds) {
+          const code = AIP.KEYS.fromName(k.textContent.trim());
+          if (!code) continue;
+          const host = k.parentElement;
+          const label = host ? host.textContent.replace(k.textContent, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+          this.keyHints.push({ code, label, el: k });
+        }
+      }
+      this.markers = marks.slice(0, 3);
     }
 
     findButtons() {
@@ -1408,23 +1490,33 @@ AIP.Senses = (function () {
       const out = [];
       if (!doc || !doc.body) { this.buttons = out; return; }
       const vw = win.innerWidth, vh = win.innerHeight;
-      const sel = 'button,a[href],[role="button"],input[type="button"],input[type="submit"],[onclick],.btn,.button,[data-go],[data-action]';
+      const sel = 'button,a[href],[role="button"],[role="tab"],input[type="button"],input[type="submit"],[onclick],.btn,.button,[data-go],[data-action],[data-act],[data-tab],.card';
       let list;
-      try { list = doc.querySelectorAll(sel); } catch (e) { list = []; }
+      try { list = [...doc.querySelectorAll(sel)]; } catch (e) { list = []; }
+      // things that LOOK clickable (pointer cursor), outermost only - shop cards, map tiles...
+      const inList = new Set(list);
+      for (const it of this.items) if (it.ptr && !it.media && !inList.has(it.el) && !(it.el.parentElement && it.el.parentElement.closest && it.el.parentElement.closest(sel)) && !(it.el.parentElement && win.getComputedStyle(it.el.parentElement).cursor === 'pointer')) { list.push(it.el); inList.add(it.el); }
       for (let i = 0; i < list.length && out.length < 24; i++) {
         const el = list[i];
-        if (el.disabled) continue;
+        if (el.disabled || /^(CANVAS|VIDEO|IFRAME|BODY|HTML)$/.test(el.tagName)) continue;
         const r = el.getBoundingClientRect();
         if (r.width < 6 || r.height < 6 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
         const cx = clamp(r.left + r.width / 2, 1, vw - 1), cy = clamp(r.top + r.height / 2, 1, vh - 1);
         const top = doc.elementFromPoint(cx, cy);
         if (!top || !(top === el || el.contains(top) || top.contains(el))) continue;
+        if (r.width * r.height > vw * vh * 0.5) continue; // (a whole-screen layer isn't a button)
         const text = ((el.innerText || el.value || el.getAttribute('aria-label') || el.title || '') + '').replace(/\s+/g, ' ').trim().slice(0, 32);
+        if (DANGER_BTN_RX.test(text)) continue;
         let prio = 0.5;
         if (GOOD_BTN_RX.test(text)) prio = 1;
         if (MEH_BTN_RX.test(text)) prio = 0.15;
         if (!text) prio = 0.3;
         out.push({ el, text: text || '(no label)', x: cx, y: cy, prio });
+      }
+      // "Continue" / "Resume" on screen? then DON'T pick "Restart" / "New game" (that throws away progress)
+      if (out.some((b) => /\b(continue|resume)\b/i.test(b.text))) for (const b of out) {
+        if (/\b(continue|resume)\b/i.test(b.text)) b.prio = Math.max(b.prio, 1.2);
+        else if (/restart|checkpoint|new game|start over|main menu|title|quit/i.test(b.text)) b.prio = 0.15;
       }
       this.buttons = out;
     }
@@ -1551,7 +1643,7 @@ AIP.Senses = (function () {
       this.cvLines = [];
       for (const it of this.items) {
         if (!it.text || it.field || it.text.length > 600) continue; // (long text = story / instructions - it reads those too)
-        bits.push({ s: it.text, ctx: it.text.length <= 80 ? ctxLabel(it.el) : '', src: 'dom', id: elId(it.el) });
+        bits.push({ s: it.text, ctx: it.text.length <= 80 ? ctxLabel(it.el) : '', src: 'dom', id: elId(it.el), el: it.el });
       }
       const aip = this.aip;
       if (aip && aip.texts.length) {
@@ -1618,6 +1710,7 @@ AIP.Senses = (function () {
         if (value > r.maxSeen) r.maxSeen = value;
         if (value !== r.prev) { r.changedAt = now; if (value > r.prev) r.ups++; else r.downs++; }
       };
+      for (const b of this.bars || []) put(b.label, b.value, 100, 'bar', b.id);
       for (const b of bits) {
         const s = b.s;
         if (s.length > 120) continue; // a story sentence, not a score
@@ -1767,6 +1860,15 @@ AIP.Senses = (function () {
       this.numberEvents(obs, now);
 
       obs.buttons = this.buttons;
+      obs.keyHints = (this.keyHints || []).filter((h) => h.el.isConnected);
+      obs.marker = (this.markers || []).find((m) => m.el.isConnected) || null;
+      obs.mash = null;
+      for (const b of this.textBits || []) {
+        if (b.s.length > 80 || !MASH_RX.test(b.s)) continue;
+        const m = MASH_KEY_RX.exec(b.s);
+        const code = m ? AIP.KEYS.fromName(m[1].toLowerCase().replace('spacebar', 'space')) : (obs.keyHints[0] && obs.keyHints[0].code);
+        if (code) { obs.mash = code; break; }
+      }
       obs.fields = (this.fields || []).filter((f) => f.el.isConnected && f.kind !== 'skip');
       const aip = this.aip;
       obs.lockActive = !!(aip && aip.lockEl);
@@ -1791,7 +1893,13 @@ AIP.Senses = (function () {
       let over = false, win = false, overText = '', winText = '';
       for (const b of bits) {
         if (b.s.length > 60) continue;
-        if (!over && GAMEOVER_RX.test(b.s)) { over = true; overText = b.s; }
+        if (/\b(times|without getting|best|record)\b/i.test(b.s)) continue; // stats like "Times caught: 3"
+        const gm = GAMEOVER_RX.exec(b.s);
+        if (!over && gm && (gm.index <= 3 || b.s.length <= 24)) { over = true; overText = b.s; }
+        if (MILESTONE_RX.test(b.s)) {
+          if (!this.milestones.has(b.s)) { this.milestones.add(b.s); obs.events.push({ type: 'milestone', text: b.s }); }
+          continue;
+        }
         if (!win && WIN_RX.test(b.s)) { win = true; winText = b.s; }
       }
       const P = this.phrase;
@@ -1816,10 +1924,6 @@ AIP.Senses = (function () {
         if (!this.textFirst.has(s)) {
           this.textFirst.set(s, now);
           if (this.textFirst.size > 600) this.textFirst.delete(this.textFirst.keys().next().value);
-          if (TROPHY_RX.test(s) && s.length < 90) {
-            const m = /(?:unlocked|earned|awarded|get|got)\s*[:!-]?\s*(.+)$/i.exec(s);
-            obs.events.push({ type: 'trophy', name: ((m && m[1]) || s).replace(/^[\s:!-]+/, '').slice(0, 50), text: s });
-          }
           const words = s.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length;
           if (words >= 5 && s.length >= 25 && !NUM_ONLY.test(s)) fresh.push({ s, words, id: b.id });
         }
@@ -1833,6 +1937,33 @@ AIP.Senses = (function () {
         // a dialogue line that grew out of the last one isn't new - it's the same line finishing
         obs.newText = fresh.sort((a, b) => b.words - a.words);
       }
+      this.checkTrophies(bits, obs);
+    }
+
+    // 🏆 A trophy pop-up = a trophy-ish line that just APPEARED (per element, so the same pop-up box
+    // showing a 2nd trophy counts again). A list of 🏆/🔒 rows = the trophy list (read quietly).
+    checkTrophies(bits, obs) {
+      const rows = [];
+      for (const b of bits) { const m = TROPHY_ROW_RX.exec(b.s); if (m) rows.push({ b, got: /🏆|✅|🔓|☑|✔/u.test(m[1]), name: m[2].replace(/\s+(unlocked|locked)\s*$/i, '').trim() }); }
+      const isList = rows.length >= 3;
+      if (isList) obs.events.push({ type: 'trophyList', items: rows.map((r) => ({ name: r.name.slice(0, 50), got: r.got })) });
+      const listed = new Set(isList ? rows.map((r) => r.b) : []);
+      const now = new Set();
+      for (const b of bits) {
+        const s = b.s.replace(/\s+/g, ' ').trim();
+        if (s.length >= 90 || listed.has(b) || !TROPHY_RX.test(s)) continue;
+        if (/^\s*🔒/u.test(s)) continue;
+        const key = b.src === 'dom' ? 'el:' + b.id : 's:' + s;
+        now.add(key);
+        if (this.trophyShown.get(key) === s) continue;
+        const first = !this.trophyShown.has(key);
+        this.trophyShown.set(key, s);
+        if (!first && b.src !== 'dom') continue;
+        let name = trophyName(s);
+        if (!name && b.el) name = siblingName(b.el);
+        obs.events.push({ type: 'trophy', name: (name || '').slice(0, 50), text: s });
+      }
+      for (const k of [...this.trophyShown.keys()]) if (!now.has(k)) this.trophyShown.delete(k);
     }
 
     // A clearer screenshot for the Gemini coach (with the page's text actually written in).
@@ -1921,6 +2052,24 @@ AIP.Senses = (function () {
     if (!m) return true;
     const p = m[1].split(',');
     return p.length < 4 || parseFloat(p[3]) > 0.15;
+  }
+  // "Achievement: First Blood" / "Trophy unlocked: Pet Jeff" / "🏆 Gold Rush" -> the name ('' if it's only the label)
+  function trophyName(s) {
+    const m = /^\W*(?:achievement|trophy|badge|medal)s?\s*(?:unlocked|earned|get|got)?\s*[:!-]\s*(.+)$/i.exec(s) || /(?:unlocked|earned|awarded|\bgot\b|\bget\b)\s*[:!-]?\s*(.+)$/i.exec(s) || /🏆\s*(.+)$/u.exec(s);
+    let n = m ? m[1] : '';
+    n = n.replace(/^[\s:!.\-–—🏆]+|[\s:!.\-–—]+$/gu, '').replace(/^(achievement|trophy|badge|medal)s?\s*(unlocked|earned)?$/i, '').trim();
+    return /[a-z0-9]/i.test(n) ? n : '';
+  }
+  // the pop-up says "Trophy unlocked" and the name sits next to it (<b id="achTitle">Pet Jeff</b>)
+  function siblingName(el) {
+    for (let p = el.parentElement, depth = 0; p && depth < 2; p = p.parentElement, depth++) {
+      const cands = [...p.querySelectorAll('b,strong,h1,h2,h3,h4,[class*="title"],[id*="title"],[class*="name"],[id*="name"],span,div')].filter((c) => c !== el && !c.contains(el) && !el.contains(c));
+      for (const c of cands) {
+        const t = (c.textContent || '').replace(/\s+/g, ' ').trim();
+        if (t.length >= 2 && t.length <= 50 && /[a-z]/i.test(t) && !TROPHY_RX.test(t) && !/^\+?\d/.test(t)) return t;
+      }
+    }
+    return '';
   }
   function elId(el) {
     if (el.id) return '#' + el.id;
@@ -2031,7 +2180,13 @@ AIP.Hands = (function () {
     keyTarget() {
       const d = this.doc;
       if (!d) return null;
-      const ae = d.activeElement;
+      let ae = d.activeElement;
+      // a hidden text box still holding the keyboard would swallow every key - let go of it
+      if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && !this.typeJob) {
+        let hidden = false;
+        try { const r = ae.getBoundingClientRect(); hidden = !ae.getClientRects().length || r.width < 2 || r.bottom <= 0 || r.top >= this.win.innerHeight || r.right <= 0 || r.left >= this.win.innerWidth || this.win.getComputedStyle(ae).visibility === 'hidden'; } catch (e) { /* ignore */ }
+        if (hidden) { try { ae.blur(); } catch (e) { /* ignore */ } ae = d.activeElement; }
+      }
       if (ae && ae !== d.body && ae !== d.documentElement && ae.tagName !== 'IFRAME') return ae;
       return d.body || d.documentElement;
     }
@@ -2186,8 +2341,13 @@ AIP.Hands = (function () {
       const d = this.doc;
       if (!d) return null;
       const lock = this.win.__aip && this.win.__aip.lockEl;
-      if (lock && lock.isConnected) return lock;
-      return d.elementFromPoint(clamp(x, 0, this.win.innerWidth - 1), clamp(y, 0, this.win.innerHeight - 1)) || d.body;
+      const at = d.elementFromPoint(clamp(x, 0, this.win.innerWidth - 1), clamp(y, 0, this.win.innerHeight - 1)) || d.body;
+      if (lock && lock.isConnected) {
+        // mouse "captured" by the 3D view - but a real menu button on top still gets the click
+        const ui = at && at !== lock && !lock.contains(at) && at.closest && at.closest('button,a[href],[role="button"],input,select,textarea,label,[onclick],.btn,.button,[data-act],[data-go],[data-tab],[data-action]');
+        return ui || lock;
+      }
+      return at;
     }
     fireMouse(type, x, y, extra) {
       const w = this.win, t = this.mouseTarget(x, y);
@@ -2203,7 +2363,9 @@ AIP.Hands = (function () {
       const before = this.px();
       this.mx = clamp(fx, 0, 1); this.my = clamp(fy, 0, 1);
       const p = this.px();
-      const extra = { movementX: Math.round(p.x - before.x), movementY: Math.round(p.y - before.y) };
+      // (moving the pointer to a spot shouldn't spin a 3D camera - turning is look()'s job)
+      const locked = !!(this.win && this.win.__aip && this.win.__aip.lockEl);
+      const extra = locked ? { movementX: 0, movementY: 0 } : { movementX: Math.round(p.x - before.x), movementY: Math.round(p.y - before.y) };
       this.fireMouse('pointermove', p.x, p.y, extra);
       this.fireMouse('mousemove', p.x, p.y, extra);
       this.drawCursor();
@@ -2555,7 +2717,7 @@ AIP.Brain = (function () {
       dirKeys.sort((a, b) => b[1] - a[1]); actKeys.sort((a, b) => b[1] - a[1]);
       const wantCombos = new Set();
       dirKeys.slice(0, 2).forEach(([d]) => actKeys.slice(0, 1).forEach(([a]) => wantCombos.add('k:' + d + '+' + a)));
-      this.actions.forEach((a) => { if (a.keys.length > 1 && a.id.indexOf('k:') === 0 && !wantCombos.has(a.id) && !a.fromUser) a.active = false; });
+      this.actions.forEach((a) => { if (a.keys.length > 1 && a.id.indexOf('k:') === 0 && !wantCombos.has(a.id) && !a.fromUser && !a.fromIdea) a.active = false; });
       wantCombos.forEach((id) => this.ensureAction(id, { keys: id.slice(2).split('+') }));
     }
 
@@ -2999,8 +3161,11 @@ AIP.Brain = (function () {
       if (this.routine) {
         const r = this.routine;
         const st = r.steps[r.i++];
-        if (r.i >= r.steps.length) this.routine = null;
-        const slot = Math.max(0, this.slotOf(st.id || 'noop'));
+        if (r.i >= r.steps.length) { this.routine = null; this.routineDone = { ideaId: r.ideaId || null, name: r.name, at: now }; }
+        // credit the REAL move (so the brain learns from fun moves + ideas too, not "wait")
+        let slot = st.id ? this.slotOf(st.id) : 0;
+        if (slot < 0 && st.id) slot = this.ensureAction(st.id, { keys: st.keys || [], mouse: st.mouse || null }, false);
+        slot = Math.max(0, slot);
         const d = { keys: st.keys || [], mouse: st.mouse || null, slot, reason: r.why };
         this.remember(slot, key, ctx, st.keys || [], st.mouse ? (st.id || null) : null);
         this.lastReason = d.reason;
@@ -3090,7 +3255,7 @@ AIP.Brain = (function () {
       const vals = [];
       for (const s of slots) {
         const a = this.actions[s];
-        const p = { brain: (q[s] - mean) / sd * 0.9 * trust, memory: 0, copy: 0, instinct: inst[s] * mods.instinct, tip: 0, curious: 0, stick: 0, menu: 0, coach: coachV[s] };
+        const p = { brain: (q[s] - mean) / sd * 0.9 * trust, memory: 0, copy: 0, instinct: inst[s] * mods.instinct, tip: 0, curious: 0, stick: 0, menu: 0, coach: coachV[s], like: this.likeOf ? this.likeOf(a) : 0 };
         if (epiE && eN >= 2 && !isNaN(epiE[s])) p.memory = U.clamp((epiE[s] - eMean) * 1.5, -0.8, 0.8);
         if (copyLog) p.copy = copyW * (copyLog[s] + Math.log(slots.length)) * 0.5;
         // curiosity: try stuff I haven't figured out yet
@@ -3187,8 +3352,10 @@ AIP.Brain = (function () {
           if (c == null || c < 0) return what + ' - gut feeling 🫃';
           return this.assoc.val[c] > 0 ? what + ' - going for the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] : what + ' - getting AWAY from the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] + ' 😨';
         }
+        case 'like': return what + ' - I just like doing this ❤️';
         case 'tip': return what + (a.keys.some((k) => this.controls[k] && /coach/.test(this.controls[k].tip || '')) ? ' - my coach taught me this 🧠' : ' - you told me to ✍️');
-        case 'coach': return what + ' - coach plan: ' + ((this.coach && (this.coach.target && this.coach.target.what || this.coach.goal)) || 'go there') + ' 🧠🎯';
+        case 'coach': if (this.coach && this.coach.auto) return what + ' - following the marker 🧭';
+          return what + ' - coach plan: ' + ((this.coach && (this.coach.target && this.coach.target.what || this.coach.goal)) || 'go there') + ' 🧠🎯';
         case 'curious': return what + ' - never really tried this... what does it do? 🤔';
         case 'menu': return what + ' - looks like a menu, gotta start the game ▶️';
         default: return p.brain > 0.3 ? what + ' - my brain says this is the best move 🧠' : what + ' - just feeling it out 🤷';
@@ -3199,7 +3366,7 @@ AIP.Brain = (function () {
       let best = null, bs = -Infinity;
       for (const b of buttons) {
         const learned = this.buttonValue[b.text.toLowerCase()] || 0;
-        const s = b.prio * 2 + learned + Math.random() * 0.8;
+        const s = b.prio * 2 + learned + Math.random() * 0.8 + (this.btnBias ? this.btnBias(b.text) : 0);
         if (s > bs) { bs = s; best = b; }
       }
       return best;
@@ -3464,6 +3631,41 @@ AIP.Brain = (function () {
       return { name, why };
     }
 
+    /* ---------------- 💖 what an action IS (the mind can like or dislike it) ---------------- */
+    tagsOf(a) {
+      if (!a) return [];
+      if (a.id === 'noop' || (!a.mouse && !a.keys.length)) return ['wait'];
+      if (a.mouse) return [{ look: 'look', btn: 'btn', click: 'click', hold: 'click', goto: 'aim' }[a.mouse.t] || 'mouse'];
+      const out = [];
+      for (const code of a.keys) {
+        const c = this.controls[code];
+        if (!c || c.status === 'new') continue;
+        if (Math.hypot(c.gx, c.gy) > 0.4) { out.push('look'); continue; }
+        const d = dirOf(c);
+        if (/jump/i.test(c.tip || '')) { out.push('jump'); continue; }
+        if (isDirLabel(c)) { out.push('move', 'move:' + (Math.abs(d[0]) >= Math.abs(d[1]) ? (d[0] > 0 ? 'r' : 'l') : (d[1] > 0 ? 'd' : 'u'))); continue; }
+        out.push('act', 'act:' + code);
+      }
+      if (a.keys.length > 1) out.push('combo');
+      return [...new Set(out)];
+    }
+    isMoveKey(code) { const c = this.controls[code]; return !!(c && isDirLabel(c) && Math.hypot(c.gx, c.gy) <= 0.4); }
+    moveDir(code) { const c = this.controls[code]; return c ? dirOf(c) : [0, 0]; }
+    // 💡 do an idea: a little plan of steps ({keys, n: ticks to hold, gap: let go after, mouse})
+    runIdea(idea, why) {
+      const steps = [];
+      for (const st of idea.steps || []) {
+        const keys = (st.keys || []).filter((k) => KEYS.map[k]);
+        const id = st.mouse ? (st.id || null) : keys.length ? 'k:' + keys.join('+') : 'noop';
+        for (let i = 0, n = U.clamp(st.n || 1, 1, 40); i < n; i++) steps.push({ keys, id, mouse: st.mouse || null });
+        if (st.gap) steps.push({ keys: [], id: 'noop' });
+      }
+      if (!steps.length || steps.length > 160) return false;
+      this.lab = null;
+      this.routine = { name: idea.name, steps, i: 0, why: why || "💡 trying my idea '" + idea.name + "'", ideaId: idea.id };
+      return true;
+    }
+
     /* ---------------- what it knows (for the "What it learned" list) ---------------- */
     learned(readouts, primary) {
       const out = [];
@@ -3496,6 +3698,8 @@ AIP.Brain = (function () {
       if (this.self.cat != null && this.self.camera < 0.5) out.push({ kind: 'self', icon: AIP.COLORS.emoji[this.self.cat], text: "I'm " + AIP.COLORS.names[this.self.cat] + (this.self.tracked ? " (and I'm keeping an eye on myself 👀)" : ''), good: true, sort: -1.4 });
       if (this.self.camera > 0.5) out.push({ kind: 'self', icon: '🎥', text: "I see through my own eyes (it's 3D!)", good: true, sort: -1.5 });
       this.tips.slice(-4).forEach((t) => out.push({ kind: 'tip', icon: '✍️', text: 'you said: "' + t.text + '"', good: true, sort: 5 }));
+      // 💡 moves it invented itself (and that work)
+      (this.stats.ideas || []).filter((i) => i.status === 'keeper' && i.kind !== 'fun').slice(-5).forEach((i) => out.push({ kind: 'idea', icon: '💡', text: 'I invented ' + i.name + ': ' + i.desc, good: true, sort: 0.4 }));
       // ⌨️ what it learned from typing
       const T = this.stats.typing;
       if (T) {
@@ -3550,7 +3754,10 @@ AIP.Brain = (function () {
         for (let i = 0; i < nov.length; i += 2) this.novel.set(nov[i], nov[i + 1]);
         this.replay.load(d.replay);
         this.epStartSeq = this.replay.seq;
+        // (re-adding saved demos must not look like "you just showed me" - keep the real date)
+        const ldEp = this.stats.lastDemoEp;
         if (d.demos && d.demos.ids) d.demos.ids.forEach((id, i) => this.pushDemo(d.demos.S.subarray(i * IN, i * IN + IN), id, d.demos.from || 'you'));
+        this.stats.lastDemoEp = ldEp;
         // re-check actions point at valid things
         this.actions.forEach((a) => { if (a && !a.label) a.label = this.labelOfSpec(a.id, a); });
         return true;
@@ -3614,7 +3821,10 @@ AIP.Heart = (function () {
       this.deaths = [];
       this.sinceNovel = 0;
       this.dreaming = false;
+      this.imp = {};
     }
+    // feelings that just changed (since the last time the mind asked)
+    takeImpulses() { const i = this.imp; this.imp = {}; return i; }
     base(k) {
       const t = this.t;
       return {
@@ -3626,7 +3836,10 @@ AIP.Heart = (function () {
     feel(k, amt, why) {
       if (!amt) return;
       const k2 = (0.55 + 0.9 * this.t.drama) * (amt > 0 ? 1 : 0.8);
+      const before = this.e[k];
       this.e[k] = U.clamp(this.e[k] + amt * k2, 0, 1);
+      // remember the jolt (the mind uses these to learn what it LIKES doing)
+      if (this.e[k] !== before) this.imp[k] = (this.imp[k] || 0) + (this.e[k] - before);
       if (amt > 0 && why) this.why[k] = { text: why, at: Date.now() };
     }
     drift(trait, amt) { this.t[trait] = U.clamp(this.t[trait] + amt, 0.02, 0.98); }
@@ -3705,6 +3918,13 @@ AIP.Heart = (function () {
           case 'goodDream': this.feel('happy', 0.08, 'a good dream'); this.feel('relieved', 0.1); break;
           case 'stuck': this.feel('mad', 0.08 * t.temper, 'being stuck'); this.feel('bored', 0.12, 'being stuck'); this.feel('confused', 0.12, 'being stuck'); break;
           case 'gameStart': this.feel('excited', 0.2, 'a new game'); this.feel('curious', 0.25, 'a new game'); break;
+          case 'ideaWorked': this.feel('proud', 0.3, 'my idea worked'); this.feel('happy', 0.2, 'my idea worked'); this.feel('bored', -0.2); break;
+          case 'ideaFailed': if (t.silliness > 0.55) this.feel('happy', 0.08, 'a silly idea'); else { this.feel('confused', 0.06); this.feel('mad', 0.04 * t.temper); } break;
+          case 'likedThing': this.feel('happy', 0.12, 'doing what I like'); break;
+          case 'goalPicked': this.feel('determined', 0.25, 'my new goal'); this.feel('excited', 0.12, 'my new goal'); break;
+          case 'goalDone': this.feel('proud', 0.5, 'reaching my goal'); this.feel('relieved', 0.35); this.feel('happy', 0.3, 'reaching my goal'); this.drift('pride', 0.005); this.drift('optimism', 0.004); break;
+          case 'goalGiveUp': this.feel('sad', 0.1, 'giving up for now'); this.feel('relieved', 0.2); this.feel('mad', -0.2); break;
+          case 'milestone': this.feel('proud', 0.2, 'finishing a mission'); this.feel('happy', 0.12); break;
           default: break;
         }
       }
@@ -3764,6 +3984,9 @@ AIP.Heart = (function () {
         // "reaction time" - sad/scared/bored = slower, mad/excited/determined = faster
         reaction: U.clamp(115 * (1 + 0.6 * e.sad + 0.4 * e.scared * (1 - t.bravery) + 0.35 * e.bored - 0.35 * e.mad - 0.3 * e.excited - 0.2 * e.determined), 55, 260),
         fun: U.clamp((e.happy * 0.5 + e.bored * 0.9 + e.proud * 0.4 + e.excited * 0.2) * (0.25 + t.silliness) - e.scared * 0.6 - this.pain, 0, 1.5),
+        // how much "I like doing this" steers it, and how much it wants to invent something new
+        whim: U.clamp(0.3 + 0.5 * e.bored + 0.4 * e.happy + 0.3 * t.silliness - 0.4 * e.scared - 0.25 * e.determined, 0, 1.5),
+        create: U.clamp(0.1 + 0.6 * e.bored + 0.35 * t.curiosity * (0.5 + e.curious) + 0.3 * t.silliness * e.happy + 0.3 * e.confused - 0.5 * e.scared - this.pain, 0, 1.5),
       };
     }
 
@@ -3863,6 +4086,33 @@ AIP.Voice = (function () {
     typeNothing: ['I typed it but nothing happened 🤔', 'Hello? I typed something!', 'Typing does nothing here I guess.'],
     typeTypo: ['oops typo', 'fat fingers lol', 'typo, fixed it 😅'],
     typingGame: ['A typing game?! My fingers are ready ⌨️🔥', 'Typing race, let\'s gooo ⌨️', 'I can type these words! ⌨️'],
+    mindIdle: ['Honestly my favorite thing here is {act} 💖', 'Current goal: {goal}. I picked it myself 😤', 'Still working on my goal: {goal}', 'You know what I like here? {act}.'],
+    mash: ['MASHING {key}!!! 👊👊👊', '{key}{key}{key}{key}{key} 😤', 'Spam {key}? Say less 👊'],
+    hintPress: ['It says {key} to {what}. Okay!', 'Pressing {key}: {what} 👆', '{key} = {what}. Got it.'],
+    likeFound: ['I LOVE {act}! 😍', 'Okay {act} is my favorite thing here 💖', '{act} is SO fun, doing more of that 🥰', 'Not gonna lie, I really like {act}.'],
+    dislikeFound: ["I don't like {act}. At all 😒", '{act}? Not my thing.', 'Ugh, {act}. Nope.'],
+    ideaStart: ['Ooh I have an idea 💡 {idea}!', 'What if I... {idea}? 🤔💡', 'Trying something creative: {idea} 🎨', 'New idea: {idea}. Trust me.'],
+    ideaReuse: ['Time for my move: {idea} 😎', 'Busting out {idea}!', '{idea}, my signature move ✨'],
+    ideaMutate: ['What if {idea}, but different... 🔧', 'Remixing {idea} 🎛️', '{idea} 2.0 incoming.'],
+    ideaWorked: ['{idea} WORKS!! I\'m a genius 💡😎', 'Keeping {idea}. That\'s my move now ✨', 'I invented {idea} and it actually works lol'],
+    ideaMeh: ['{idea} kinda works... needs tweaking 🔧', 'Hmm, {idea} is okay I guess.'],
+    ideaFailed: ['Okay {idea} was a terrible idea lol', 'Scrapping {idea} 😅', '{idea}? Yeah no. Never again.'],
+    coachIdeaYes: ['Coach says {idea}... I like that, trying it! 💡', 'Ooh, {idea}? Okay coach, let\'s see.'],
+    coachIdeaNo: ['Nah, {idea} isn\'t my style 😏', 'I\'ve got my own plan, coach.', 'Hmm, {idea}? Nope. Doing my own thing.'],
+    goal_beat: ['I\'ve decided: I\'m gonna BEAT {game} 🎯', 'Goal: beat this game. No matter what. 🏁', 'I wanna see the ending of {game}. Let\'s do this 🏁'],
+    goal_trophies: ['Trophy hunting time! I want {n} more 🏆', 'I\'m gonna get trophies. Lots of them 🏆✨', 'Goal: trophies 🏆 Because I deserve them.'],
+    goal_highscore: ['Goal: beat my best ({best}) 📈', 'My score can be WAY higher. Watch 📈'],
+    goal_explore: ['I wanna see EVERYTHING in this game 🗺️', 'Explorer mode: on 🗺️', 'What else is out there? Gonna find out 🧭'],
+    goal_story: ['I need to know how this story ends 📖', 'Story mode: I\'m invested now 📖'],
+    goal_fun: ['Honestly? No goals, just vibes 😜', 'I\'m just here to have fun 😜', 'Goal: mess around and enjoy it 🎉'],
+    goalNoWin: ['I don\'t think this game has an ending. Just playing for fun then 🤷', 'No way to "win" here I think. I\'ll just enjoy it 😜'],
+    goalSwitch: ['Changed my mind: {goal} instead.', 'New plan: {goal}. Because {why}.', 'Actually... I wanna {goal}.'],
+    goalGiveUp: ['Taking a break from "{goal}"... too hard right now 😮‍💨', 'Okay {goal} is NOT happening right now. Later.', 'I\'ll come back to {goal}. Need a breather.'],
+    goalBack: ['I\'m back for {goal}. Round 2 🔥', 'Okay, ready for {goal} again 😤'],
+    goalDone: ['GOAL DONE: {goal} ✅ What\'s next...', 'I DID IT! {goal} ✅🎉', 'Checked off: {goal} ✅ Feeling good.'],
+    wantStop: ['I think I\'m done with {game}. I got what I wanted. GG 🏁', 'Okay, I\'m good. That was fun! Done with {game} for now 😌', 'I\'m gonna stop here. Did what I came to do 🏁'],
+    keepGoingYes: ['Okay fine, one more round 😄', 'You want more? Sure, I like {act} anyway!', 'Alright, let\'s keep going 🔥'],
+    keepGoingNo: ['Nah, I\'m good. That was fun though!', 'I\'m done with this one for real 😌 Maybe another game?', 'No thanks, I\'m tired of it lol'],
     trophy: ['TROPHY!! "{trophy}" 🏆', 'Got the "{trophy}" trophy! 🏆 Collecting them all.', 'Achievement unlocked: {trophy}! Let\'s gooo 🏆'],
     coachResting: ['Gimme a sec, my coach brain is catching its breath (free limit) ⏳ I\'ll answer when it\'s back!', 'My coach brain is resting for a moment ⏳ Hold that thought!'],
     coachOfflineTip: ['No internet, so my coach brain is offline 📡 I only get simple tips right now, like "go right" or "avoid red".'],
@@ -4503,6 +4753,8 @@ AIP.Coach = (function () {
       stuck: { type: 'boolean', description: 'true if the reflex brain looks stuck and you should take over briefly' },
       type: { type: 'object', description: 'ONLY when a TEXT BOX needs text (name, answer, riddle, guess, password, command) or a typing game shows words to type: what to type', properties: { box: { type: 'integer', description: 'number of the TEXT BOX, or -1 to just type on the keyboard (typing games)' }, text: { type: 'string' }, enter: { type: 'boolean', description: 'press Enter after (default true)' } }, required: ['text'] },
       lesson: { type: 'string', description: 'for a death review: what went wrong and what to do next time, else empty' },
+      idea: { type: 'object', description: 'ONLY when it is stuck or bored: ONE creative move idea that fits its likes (it may refuse)', properties: { name: { type: 'string' }, why: { type: 'string' }, steps: { type: 'array', items: { type: 'object', properties: { keys: { type: 'array', items: { type: 'string' } }, ms: { type: 'integer' } }, required: ['keys', 'ms'] } } }, required: ['name', 'steps'] },
+      game_facts: { type: 'object', description: 'facts about the game if you can tell', properties: { can_win: { type: 'boolean', description: 'does this game have an ending / win?' }, trophy_total: { type: 'integer', description: 'how many trophies/achievements exist, if shown' } } },
     },
     required: ['see', 'goal', 'say'],
   };
@@ -4595,6 +4847,7 @@ AIP.Coach = (function () {
         story.length ? 'STORY SO FAR:\n' + story.join('\n') : '',
         'TROPHIES/ACHIEVEMENTS: ' + trophies + (B.stats.flags && B.stats.flags.askedTrophies ? ' (already asked the player about trophies)' : ''),
         this.chatLog.length ? 'RECENT CHAT:\n' + this.chatLog.slice(-6).join('\n') : '',
+        s.mind ? s.mind.forCoach() : '',
       ];
       return lines.filter(Boolean).join('\n');
     }
@@ -4610,6 +4863,7 @@ AIP.Coach = (function () {
         'Story games: READ the dialogue, react to it, summarize it in "story", and pick choices on purpose (explain why). Don\'t skip story.',
         'Trophies are a separate bonus goal from winning. If you can see a trophy/achievement list, fill "trophies". If you don\'t know what trophies exist and haven\'t asked yet, you may ask the player once via "ask".',
         'Write a "note" only for genuinely new, useful facts about this game.',
+        'The AI chose its OWN goal and has its own likes - help it get what IT wants (its goal), never boss it around. If it is stuck or bored you may suggest ONE creative "idea" (a short key sequence, ms per step) that fits what it likes; it decides itself whether to try it. Fill "game_facts" when you can tell if the game can be won or how many trophies exist.',
         'It can TYPE real text: fill "type" when a text box needs something (name boxes: its own name; riddles/questions/passwords: solve them, look for clues; guess-the-number: binary search from the feedback; text adventures: one good command like "open door" or "go north") or when a typing game shows words (box -1). Leave "type" empty otherwise.',
       ].join('\n');
     }
@@ -4679,6 +4933,7 @@ AIP.Coach = (function () {
       if (p.story && p.story.length > 4) { B.stats.story = B.stats.story || []; if (B.stats.story[B.stats.story.length - 1] !== p.story) { B.stats.story.push(p.story.slice(0, 160)); if (B.stats.story.length > 60) B.stats.story.shift(); } }
       if (p.trophies && p.trophies.length) s.mergeTrophies(p.trophies);
       if (p.type || reason === 'type') s.typist.fromCoach(p.type, reason);
+      if (s.mind) { if (p.idea) s.mind.coachIdea(p.idea); if (p.game_facts) s.mind.gameFacts(p.game_facts); }
       if (p.lesson) { this.lastLesson = p.lesson; B.addMemory('lesson', p.lesson.slice(0, 80), 0.6); }
       // 🗣️ talking (the coach's smart lines) - replies to you always get said
       if (p.reply && extra && (extra.text || reason === 'player')) { s.voice.raw(p.reply, 3, 'coach'); this.chatLog.push(s.ai.name + ': ' + p.reply); }
@@ -4953,6 +5208,8 @@ AIP.Typist = (function () {
         case 'number': {
           const math = solveMath(question) || texts.map(solveMath).find(Boolean);
           if (math && st.tried.indexOf(math.a) < 0) return { text: math.a, why: 'math! ' + math.q + ' = ' + math.a, line: 'typeMath', vars: { q: math.q } };
+          // "how much to convert / pay?" with a max -> all of it
+          if (/amount|convert|how much|deposit|withdraw|spend|pay|buy|bet/i.test(f.label + ' ' + texts.slice(-4).join(' ')) && f.el.max !== '' && isFinite(+f.el.max) && +f.el.max > 0 && st.tried.indexOf(String(+f.el.max)) < 0) return { text: String(+f.el.max), why: 'all of it!', line: 'typeGuess' };
           const g = st.guess || (st.guess = this.range(f, all));
           if (g.lo > g.hi) { st.guess = this.range(f, all); return this.decide(f, obs, now); }
           const n = Math.floor((g.lo + g.hi) / 2);
@@ -5085,7 +5342,13 @@ AIP.Typist = (function () {
         J.mo.observe(d.body, { subtree: true, childList: true, characterData: true, attributes: true });
       } catch (e) { /* ignore */ }
     }
-    endJob() { const J = this.job; if (J && J.mo) try { J.mo.disconnect(); } catch (e) { /* ignore */ } this.job = null; }
+    endJob() {
+      const J = this.job;
+      if (J && J.mo) try { J.mo.disconnect(); } catch (e) { /* ignore */ }
+      // done typing: let go of the box (like clicking back on the game) so game keys work again
+      if (J && J.el && J.f && J.f.kind !== 'command' && J.f.kind !== 'number' && J.f.kind !== 'answer') try { if (J.el.ownerDocument.activeElement === J.el) J.el.blur(); } catch (e) { /* ignore */ }
+      this.job = null;
+    }
 
     runJob(obs, now) {
       const J = this.job, s = this.s, h = s.hands;
@@ -5288,6 +5551,695 @@ AIP.Typist = (function () {
 
 </script>
 <script>
+/* ---- js/mind.js ---- */
+/* AI Play - the MIND 💖💡🎯: what it LIKES, its own creative IDEAS, and the GOALS it picks itself.
+ *
+ * Nobody sets any of this - not you, not a setting:
+ *  💖 LIKES: whatever it was doing when it felt good (jumping, exploring, clicking 'Like', reading the
+ *     story...) it starts to like, and it does more of what it likes. It gets a bit tired of doing
+ *     the same thing forever, so it mixes it up. Its taste carries over between games.
+ *  💡 IDEAS: when it's bored, stuck, or just feeling creative, it invents a move (a combo, a dash,
+ *     a timed pounce, a detour to somewhere new...), tries it, and keeps the ones that work - and
+ *     names them. The coach can suggest ideas too; it decides itself whether it likes them.
+ *  🎯 GOALS: from its personality + what it learned about the game it picks what IT wants: beat
+ *     the game, hunt trophies, beat its best, explore, see the story, or just have fun. It sticks
+ *     with a goal until it gets it, takes a break when it's too hard, and when it's done what it
+ *     wanted (and it's getting bored) it can decide it's done with the game.
+ */
+'use strict';
+
+AIP.Mind = (function () {
+  const U = AIP.util;
+  const KEYS = AIP.KEYS;
+  const ADJ = ['Zoom', 'Sneaky', 'Turbo', 'Wobbly', 'Patient', 'Mega', 'Spicy', 'Ninja', 'Cosmic', 'Lazy', 'Chaos', 'Smooth', 'Bouncy', 'Sideways', 'Gremlin', 'Galaxy', 'Rocket', 'Noodle'];
+  const NOUN = { combo: ['Combo', 'Mash', 'Chord'], seq: ['Dash', 'Shuffle', 'Run'], hold: ['Charge', 'Hold', 'Power-Up'], rhythm: ['Beat', 'Tap Dance', 'Drumroll'], waitgo: ['Pounce', 'Ambush', 'Wait-and-Go'], mirror: ['Flip', 'Reverse'], route: ['Adventure', 'Scout', 'Detour'], turn: ['Spin-and-Go', 'U-Turn', 'Look-Around'], button: ['Poke', 'Click'], weird: ['Experiment', 'Mystery Key'], fun: ['Dance', 'Party'], coach: ['Plan'] };
+  const GOAL_ICON = { beat: '🏁', trophies: '🏆', highscore: '📈', explore: '🗺️', story: '📖', fun: '😜' };
+  const GOAL_WORD = { beat: 'beat the game', trophies: 'get trophies', highscore: 'beat my best', explore: 'explore everything', story: 'see how the story ends', fun: 'just have fun' };
+  const SIT_TAGS = ['points', 'explore', 'story', 'typing', 'menu', 'idea', 'fun', 'trophy', 'win', 'hurt'];
+  const generic = (tag) => tag.split(':')[0];
+
+  class Mind {
+    constructor(session) {
+      this.s = session;
+      this.tr = {};            // eligibility trace: what it was just doing
+      this.joyBase = 0;
+      this.exp = null;         // the idea it's trying right now (an experiment)
+      this.nextCreate = 0;
+      this.goalCheckAt = 0;
+      this.rEMA = 0;           // normal reward per second (to judge ideas against)
+      this.tagCache = new Map(); this.tagCacheAt = 0;
+      this.mods = null;
+      this.sessT0 = performance.now();
+      this.boredSince = 0;
+      this.coachIdeaPending = null;
+    }
+    get B() { return this.s.brain; }
+    get S() { return this.s.brain.stats; }
+    get t() { return this.s.ai.traits; }
+
+    /* ---------- start: load what it remembers + hook into the brain ---------- */
+    load() {
+      const S = this.S;
+      S.likes = S.likes || {};
+      S.ideas = S.ideas || [];
+      S.goals = S.goals || { cur: null, done: [], resting: {}, log: [] };
+      S.goals.resting = S.goals.resting || {}; S.goals.done = S.goals.done || []; S.goals.log = S.goals.log || [];
+      S.facts = S.facts || { canWinHint: 0, won: false, trophyTotal: 0, hasScore: false, seenProgress: false, playMs: 0 };
+      S.visits = S.visits || new Array(16).fill(0);
+      this.s.ai.likes = this.s.ai.likes || {};
+      this.B.likeOf = (a) => this.likeOfAction(a);
+      this.B.btnBias = (text) => this.btnBias(text);
+      this.goalsDoneHere = 0;
+    }
+
+    /* ======================= 💖 LIKES ======================= */
+    prior(tag) {
+      const t = this.t, g = generic(tag);
+      const p = { explore: (t.curiosity - 0.5) * 0.5, points: (t.competitive - 0.5) * 0.4, story: (t.patience - 0.5) * 0.3 + (t.drama - 0.5) * 0.2,
+        jump: (t.silliness - 0.5) * 0.2 + 0.05, combo: (t.silliness - 0.5) * 0.2 + (t.curiosity - 0.5) * 0.15, fun: (t.silliness - 0.5) * 0.4, typing: (t.chattiness - 0.5) * 0.3,
+        menu: -0.1, wait: -0.12 + (t.patience - 0.5) * 0.2, trophy: (t.pride - 0.5) * 0.4 + 0.1, idea: (t.curiosity - 0.5) * 0.25 + (t.silliness - 0.5) * 0.15,
+        hurt: -0.3 + (t.bravery - 0.5) * 0.2, win: 0.3, look: (t.curiosity - 0.5) * 0.15 }[g] || 0;
+      const cross = this.s.ai.likes[g];
+      return U.clamp(p + (cross ? 0.4 * cross.v : 0), -0.6, 0.6);
+    }
+    like(tag) {
+      const L = this.S.likes[tag];
+      if (!L) return this.prior(tag) * 0.5;
+      return L.v - (L.v > 0 ? L.fat || 0 : 0);
+    }
+    likeOfAction(a) {
+      if (!a || !this.mods) return 0;
+      const now = performance.now();
+      if (now - this.tagCacheAt > 2000) { this.tagCache.clear(); this.tagCacheAt = now; }
+      let tags = this.tagCache.get(a.id);
+      if (!tags) { tags = this.B.tagsOf(a); this.tagCache.set(a.id, tags); }
+      if (!tags.length) return 0;
+      let sum = 0;
+      for (const tg of tags) sum += this.like(tg);
+      const g = this.S.goals.cur;
+      const goalWhim = !g ? 1 : { fun: 1.5, explore: 1.2, trophies: 0.9, story: 1, beat: 0.55, highscore: 0.55 }[g.kind] || 1;
+      return U.clamp(sum / Math.sqrt(tags.length) * this.mods.whim * goalWhim * 0.7, -0.8, 0.8);
+    }
+    btnBias(text) {
+      const tx = String(text || '').toLowerCase().slice(0, 20);
+      let b = 0.8 * this.like('btn:' + tx);
+      const g = this.S.goals.cur;
+      // hunting trophies? peek at the trophy list once in a while
+      if (g && g.kind === 'trophies' && /troph|achiev|goals|badges|awards/.test(tx) && performance.now() - (this.peekedAt || -1e9) > 120000) b += 1.5;
+      return b;
+    }
+    wordsFor(tag) {
+      const B = this.B;
+      if (/^move:/.test(tag)) return 'going ' + { l: 'left', r: 'right', u: 'up', d: 'down' }[tag.slice(5)];
+      if (/^act:/.test(tag)) { const code = tag.slice(4), c = B.controls[code]; return 'pressing ' + KEYS.label(code) + (c && c.tip ? ' (' + c.tip.replace(/\s*\(coach.*$/, '') + ')' : ''); }
+      if (/^btn:/.test(tag)) return "clicking '" + tag.slice(4) + "'";
+      if (/^idea:/.test(tag)) { const i = this.S.ideas.find((x) => x.id === tag.slice(5)); return i ? 'my move ' + i.name : 'my own ideas'; }
+      return { move: 'running around', jump: 'jumping', act: 'pressing buttons', look: 'looking around', click: 'clicking', btn: 'clicking buttons', aim: 'moving the mouse',
+        combo: 'doing combos', wait: 'chilling', points: 'getting points', explore: 'exploring new places', story: 'reading the story', typing: 'typing stuff', menu: 'menus',
+        idea: 'trying my own ideas', fun: 'goofing around', trophy: 'trophy hunting', win: 'winning', hurt: 'getting hurt' }[tag] || tag;
+    }
+    // what it's doing right now, as tags
+    tagsNow(events, obs) {
+      const s = this.s, B = this.B, out = [];
+      const d = s.lastDecision;
+      if (s.mode === 'ai' && d && B.actions[d.slot]) out.push(...this.B.tagsOf(B.actions[d.slot]).slice(0, 3));
+      if (d && d.mouse && d.mouse.t === 'btn' && d.mouse.text) out.push('btn:' + String(d.mouse.text).toLowerCase().slice(0, 20));
+      if (events.some((e) => e.type === 'score')) out.push('points');
+      if ((B.noveltyNow || 0) >= 0.7 && !obs.menuish) out.push('explore');
+      if (s.reading) out.push('story');
+      if (s.typist && s.typist.active) out.push('typing');
+      if (obs.menuish) out.push('menu');
+      if (events.some((e) => e.type === 'damage')) out.push('hurt');
+      if (B.routine) out.push(B.routine.ideaId ? 'idea:' + B.routine.ideaId : 'fun', B.routine.ideaId ? 'idea' : 'fun');
+      return [...new Set(out)].slice(0, 7);
+    }
+
+    /* ---------- every tick ---------- */
+    tick(dt, events, obs, now) {
+      const s = this.s, S = this.S, t = this.t;
+      if (!obs || !obs.ok || s.mode !== 'ai') { s.heart.takeImpulses(); return; }
+      S.facts.playMs = (S.facts.playMs || 0) + dt * 1000;
+      // 1) how good did that feel? (the jolts in its feelings)
+      const imp = s.heart.takeImpulses();
+      const I = (k) => imp[k] || 0;
+      let joy = I('happy') + I('excited') + 0.6 * I('proud') + 0.5 * I('relieved') + 0.3 * I('curious') + 0.2 * I('surprised')
+        - 0.8 * Math.max(0, I('bored')) + 0.4 * Math.max(0, -I('bored')) - I('sad') - 0.6 * Math.max(0, I('mad')) * (1 - 0.5 * t.silliness) - Math.max(0, I('scared')) * (1 - 0.5 * t.bravery);
+      if (s.heart.e.bored > 0.5) joy -= 0.02 * dt * (s.heart.e.bored - 0.5);
+      for (const e of events) if (e.type === 'trophy' || e.type === 'win') joy += 0.5; else if (e.type === 'milestone' || e.type === 'highscore') joy += 0.3;
+      this.joyBase += (joy - this.joyBase) * 0.01;
+      const rel = joy - this.joyBase;
+      if (this.exp) this.exp.joy += rel;
+      // 2) what was it doing? (recent things get the credit)
+      const cur = this.tagsNow(events, obs);
+      for (const k in this.tr) { this.tr[k] *= Math.exp(-dt / 1.5); if (this.tr[k] < 0.05) delete this.tr[k]; }
+      for (const tg of cur) this.tr[tg] = 1;
+      for (const tg in this.tr) {
+        const tr = this.tr[tg];
+        const L = S.likes[tg] || (S.likes[tg] = { v: this.prior(tg), n: 0, fat: 0, said: 0 });
+        const lr = tr * Math.max(0.03, 1 / (L.n + 8));
+        L.v = U.clamp(L.v + lr * 4 * rel, -1, 1);
+        L.n += tr * dt;
+        // doing the same liked thing nonstop gets a little old (so it mixes things up)
+        if (cur.indexOf(tg) >= 0) { if (L.v > 0) L.fat = Math.min(0.6, (L.fat || 0) + dt * 0.012 * (1.25 - t.patience)); } else L.fat = (L.fat || 0) * Math.exp(-dt / 40);
+        if (!L.said && L.n > 8 && L.v > 0.45 && this.sayOk(now)) { L.said = 1; s.voice.say('likeFound', { act: this.wordsFor(tg) }, 2); s.heart.react([{ type: 'likedThing' }], {}); this.noteLike(tg, true); }
+        else if (!L.said && L.n > 8 && L.v < -0.4 && this.sayOk(now)) { L.said = -1; s.voice.say('dislikeFound', { act: this.wordsFor(tg) }, 1); this.noteLike(tg, false); }
+      }
+      // keep the likes list small (forget the weakest unimportant ones)
+      const keys = Object.keys(S.likes);
+      if (keys.length > 60) { keys.sort((a, b) => Math.abs(S.likes[a].v) * S.likes[a].n - Math.abs(S.likes[b].v) * S.likes[b].n); for (const k of keys.slice(0, keys.length - 50)) delete S.likes[k]; }
+      // 3) where it goes on screen (so "route" ideas can go somewhere new)
+      const me = this.B.self;
+      if (me.conf > 0.4 && me.camera < 0.5) { const cell = Math.min(3, Math.floor(me.x * 4)) + 4 * Math.min(3, Math.floor(me.y * 4)); S.visits[cell] = (S.visits[cell] || 0) + dt; }
+      // 4) the idea it's trying: is it over? how did it go?
+      this.checkExperiment(obs, events, now);
+      // 5) goals: facts + progress every ~2 s
+      if (now >= this.goalCheckAt) { this.goalCheckAt = now + 2000; this.updateFacts(obs); this.goalTick(now); }
+      if (s.heart.e.bored > 0.7) { if (!this.boredSince) this.boredSince = now; } else this.boredSince = 0;
+    }
+    sayOk(now) { if (now - (this.saidAt || 0) < 9000) return false; this.saidAt = now; return true; }
+    noteLike(tag, good) {
+      const f = this.S.flags || (this.S.flags = {});
+      f.likeDiary = (f.likeDiary || 0) + 1;
+      if (f.likeDiary <= 4) this.s.diary('like', (good ? 'I really like ' : "I don't like ") + this.wordsFor(tag) + ' in ' + this.s.game.name + (good ? ' 💖' : ' 😒'));
+    }
+    // its taste carries over to other games (a little)
+    saveTaste() {
+      const ai = this.s.ai;
+      for (const k in this.S.likes) {
+        const L = this.S.likes[k];
+        if (L.n < 5) continue;
+        const g = generic(k);
+        const X = ai.likes[g] || (ai.likes[g] = { v: 0, n: 0 });
+        X.v = U.clamp(X.v + 0.05 * (L.v - X.v), -1, 1); X.n += 1;
+      }
+      // who it enjoys being slowly shapes who it is
+      const lk = (g) => (ai.likes[g] ? ai.likes[g].v : 0);
+      if (lk('explore') > 0.4) this.s.heart.drift('curiosity', 0.002);
+      if (lk('fun') > 0.4 || lk('idea') > 0.4) this.s.heart.drift('silliness', 0.002);
+      if (lk('points') > 0.4) this.s.heart.drift('competitive', 0.002);
+    }
+    favorite() {
+      let best = null, bv = 0.3;
+      for (const k in this.S.likes) { const L = this.S.likes[k]; if (L.n > 6 && L.v > bv && k !== 'win') { bv = L.v; best = k; } }
+      return best;
+    }
+
+    /* ======================= reward + mood shaping ======================= */
+    intrinsic(events, obs) {
+      if (!this.mods) return 0;
+      let r = 0;
+      const sit = this.tagsNow(events, obs).filter((x) => SIT_TAGS.indexOf(generic(x)) >= 0);
+      for (const tg of sit) r += 0.12 * this.mods.whim * this.like(tg);
+      const g = this.S.goals.cur, B = this.B;
+      if (g) {
+        if (g.kind === 'explore') r += 0.12 * (B.noveltyNow || 0);
+        for (const e of events) {
+          if (e.type === 'trophy' && g.kind === 'trophies') r += 1.5;
+          if ((e.type === 'progress' || e.type === 'milestone') && (g.kind === 'beat' || g.kind === 'story')) r += 0.6;
+          if (e.type === 'score' && g.kind === 'highscore') r += 0.15;
+        }
+      }
+      return U.clamp(r, -0.3, 2);
+    }
+    noteReward(r, dt) { this.rEMA += ((r / Math.max(0.02, dt)) - this.rEMA) * Math.min(1, dt / 10); if (this.exp) { this.exp.r += r; this.exp.dt += dt; } }
+    adjustMods(m) {
+      this.mods = m;
+      const g = this.S.goals.cur;
+      if (!g) return m;
+      if (g.kind === 'beat' || g.kind === 'highscore') { m.temp *= 0.85; m.explore *= 0.7; }
+      if (g.kind === 'explore') { m.curiosity *= 1.3; m.create *= 1.3; }
+      if (g.kind === 'trophies') m.create *= 1.4;
+      if (g.kind === 'fun') { m.whim *= 1.4; m.create *= 1.5; }
+      return m;
+    }
+
+    /* ======================= 💡 IDEAS ======================= */
+    keysByKind() {
+      const B = this.B;
+      const ok = Object.keys(B.controls).filter((c) => c.indexOf('m:') !== 0 && KEYS.map[c] && (B.controls[c].status === 'useful' || B.controls[c].status === 'starred') && !this.s.pauseKeys.has(c));
+      const look = Object.keys(B.controls).filter((c) => /^m:look-[lr]$/.test(c) && B.controls[c].status === 'useful');
+      return { all: ok, dirs: ok.filter((c) => B.isMoveKey(c)), acts: ok.filter((c) => !B.isMoveKey(c) && Math.hypot(B.controls[c].gx, B.controls[c].gy) <= 0.4), look };
+    }
+    situation(obs, now) {
+      const s = this.s;
+      if ((obs.staticTime || 0) > 4 || s.stuckFor > 4) return 'stuck';
+      if (now - s.ep.lastDamageAt < 3000) return 'danger';
+      if (s.heart.e.bored > 0.45) return 'bored';
+      return 'open';
+    }
+    // when it feels like it, it tries an idea (reuse a good one / tweak one / invent a new one)
+    maybeCreate(obs, mods, dt, now, force) {
+      const s = this.s, B = this.B;
+      if (s.mode !== 'ai' || s.phase !== 'play' || B.routine || B.lab || this.exp || s.reading || s.take || (s.typist && s.typist.active)) return false;
+      if (obs.menuish || obs.gameOverVisible || (obs.choices && obs.choices.length) || now < this.nextCreate) return false;
+      if (now - (s.loadedAt || now) < 6000) return false;
+      const sit = this.situation(obs, now);
+      const g = this.S.goals.cur;
+      const goalCreate = !g ? 1 : { fun: 1.5, trophies: 1.4, explore: 1.3, beat: sit === 'stuck' ? 1.6 : 0.8, highscore: 0.8, story: 0.7 }[g.kind] || 1;
+      const fresh = this.S.ideas.filter((i) => i.kind !== 'fun').length < 3 ? 2 : 1; // new game = lots of ideas to try
+      const urge = (0.15 + mods.create) * goalCreate * fresh * (sit === 'stuck' ? 3 : sit === 'bored' ? 1.6 : 1) * (1 + 0.6 * Math.max(0, this.like('idea')));
+      if (!force && !U.chance(urge * dt * 0.05)) return false;
+      if (this.coachIdeaPending) { const ci = this.coachIdeaPending; this.coachIdeaPending = null; return this.tryIdea(ci, obs, now, 'coach'); }
+      const ks = this.keysByKind();
+      const ideas = this.S.ideas;
+      const t = this.t;
+      // a move I already know works here?
+      const keepers = ideas.filter((i) => i.status === 'keeper' && (i.situ === sit || sit === 'open' || i.situ === 'open'));
+      if (keepers.length && U.chance(0.45 + 0.3 * t.patience - 0.25 * t.curiosity)) {
+        const pick = this.softPick(keepers, (i) => i.score + this.like('idea:' + i.id));
+        if (pick) { if (this.sayOk(now)) s.voice.say('ideaReuse', { idea: pick.name }, 1); return this.tryIdea(pick, obs, now); }
+      }
+      // tweak one that sort of worked?
+      const tweakable = ideas.filter((i) => (i.status === 'keeper' || i.status === 'meh') && i.kind !== 'fun' && i.kind !== 'button');
+      if (tweakable.length && U.chance(0.35)) {
+        const parent = U.pick(tweakable);
+        const child = this.mutate(parent, ks);
+        if (child) { if (this.sayOk(now)) s.voice.say('ideaMutate', { idea: parent.name }, 1); return this.tryIdea(child, obs, now); }
+      }
+      const idea = this.invent(sit, ks, obs);
+      if (!idea) { this.nextCreate = now + 4000; return false; }
+      return this.tryIdea(idea, obs, now);
+    }
+    softPick(list, score) {
+      let z = 0;
+      const w = list.map((x) => { const v = Math.exp(U.clamp(score(x), -3, 3) * 1.5); z += v; return v; });
+      let r = Math.random() * z;
+      for (let i = 0; i < list.length; i++) { r -= w[i]; if (r <= 0) return list[i]; }
+      return list[list.length - 1];
+    }
+    name(kind) {
+      const used = new Set(this.S.ideas.map((i) => i.name));
+      for (let i = 0; i < 8; i++) { const n = 'the ' + U.pick(ADJ) + ' ' + U.pick(NOUN[kind] || ['Move']); if (!used.has(n)) return n; }
+      return 'the ' + U.pick(ADJ) + ' ' + U.pick(NOUN[kind] || ['Move']) + ' ' + (this.S.ideas.length + 1);
+    }
+    describe(steps) {
+      return steps.map((st) => st.mouse ? (st.mouse.t === 'look' ? 'look ' + (st.mouse.dx < 0 ? 'left' : st.mouse.dx > 0 ? 'right' : st.mouse.dy < 0 ? 'up' : 'down') : st.mouse.t === 'btn' ? "click '" + (st.mouse.text || 'a button') + "'" : 'click') + (st.n > 1 ? ' x' + st.n : '')
+        : st.keys && st.keys.length ? st.keys.map(KEYS.label).join('+') + (st.n > 1 ? ' (hold ' + st.n + ')' : '') : 'wait' + (st.n > 1 ? ' ' + st.n : '')).join(' → ').slice(0, 90);
+    }
+    // 🎨 make up something new (what kind depends on its personality + mood + the moment)
+    invent(sit, ks, obs) {
+      const t = this.t, B = this.B, s = this.s, e = s.heart.e;
+      const cam = B.self.camera > 0.5;
+      const opp = (code) => { const d = B.moveDir(code); return ks.dirs.find((k) => { const d2 = B.moveDir(k); return d2[0] * d[0] + d2[1] * d[1] < -0.3; }); };
+      const unclicked = (obs.buttons || []).filter((b) => b.el.isConnected && b.prio >= 0.3 && !(b.text.toLowerCase() in B.buttonValue));
+      const untested = KEYS.order.filter((c) => (!B.controls[c] || B.controls[c].status === 'new') && !/Escape|Tab|ControlLeft/.test(c) && !s.pauseKeys.has(c));
+      const W = {
+        combo: ks.all.length >= 2 ? 0.5 + t.curiosity : 0,
+        seq: ks.all.length >= 2 ? 0.4 + t.patience * 0.6 : 0,
+        hold: ks.acts.length ? 0.25 + t.patience * 0.5 : 0,
+        rhythm: ks.acts.length ? 0.25 + t.silliness * 0.8 : 0,
+        waitgo: ks.all.length ? (0.2 + t.patience * 0.4 + t.bravery * 0.3) * (sit === 'danger' ? 2 : 1) : 0,
+        route: (cam ? ks.look.length && ks.dirs.length : ks.dirs.length && B.self.conf > 0.3) ? (0.4 + t.curiosity * 0.8) * (sit === 'stuck' ? 2.2 : 1) : 0,
+        button: unclicked.length ? (0.2 + t.curiosity * 0.6) * (sit === 'stuck' ? 2 : 1) : 0,
+        weird: untested.length ? (0.12 + t.curiosity * 0.3) * (sit === 'stuck' ? 2.5 : 1) : 0,
+        fun: (0.2 + t.silliness * 0.8) * (sit === 'bored' ? 1.5 : 1) * (sit === 'danger' ? 0.2 : 1) * (obs.healthFrac != null && obs.healthFrac < 0.5 ? 0.1 : 1),
+      };
+      for (const k in W) W[k] *= 1 + 0.5 * Math.max(-0.8, this.like('ideakind:' + k));
+      let z = 0; for (const k in W) z += W[k];
+      if (z <= 0) return null;
+      let r = Math.random() * z, kind = 'fun';
+      for (const k in W) { r -= W[k]; if (r <= 0) { kind = k; break; } }
+      const R = (a, b) => U.randi(a, b);
+      let steps = [];
+      const two = () => { const a = U.pick(ks.all); const rest = ks.all.filter((x) => x !== a && !(B.isMoveKey(x) && B.isMoveKey(a) && opp(a) === x)); return rest.length ? [a, U.pick(rest)] : null; };
+      switch (kind) {
+        case 'combo': { const k = two(); if (!k) return null; if (ks.all.length > 2 && U.chance(0.25 * t.silliness)) { const third = ks.all.find((x) => k.indexOf(x) < 0 && opp(k[0]) !== x); if (third) k.push(third); } steps = [{ keys: k, n: R(5, 12) }]; break; }
+        case 'seq': for (let i = 0, n = R(3, 5); i < n; i++) steps.push({ keys: [U.pick(ks.all)], n: R(2, 8) }); break;
+        case 'hold': steps = [{ keys: [U.pick(ks.acts)], n: R(10, 22) }, { keys: [], n: 2 }]; break;
+        case 'rhythm': { const a = U.pick(ks.acts); for (let i = 0, n = R(5, 9); i < n; i++) steps.push({ keys: [a], n: 1, gap: true }); break; }
+        case 'waitgo': steps = [{ keys: [], n: R(3, 9) }, { keys: [U.pick(ks.acts.length && U.chance(0.6) ? ks.acts : ks.all)], n: R(2, 4) }, { keys: ks.dirs.length ? [U.pick(ks.dirs)] : [], n: R(3, 6) }]; break;
+        case 'route': {
+          if (cam) {
+            const lk = U.pick(ks.look);
+            const fwd = ks.dirs.find((c) => /forward|walk|run/i.test((B.controls[c].tip || ''))) || ks.dirs.find((c) => c === 'KeyW' || c === 'ArrowUp') || U.pick(ks.dirs);
+            steps = [{ id: lk, mouse: { t: 'look', dx: (lk === 'm:look-l' ? -1 : 1) * 80, dy: 0 }, n: R(3, 7) }, { keys: [fwd], n: R(14, 26) }];
+            kind = 'turn';
+          } else {
+            // go to the part of the screen it's been to the LEAST
+            const V = this.S.visits;
+            let bc = 0; for (let i = 1; i < 16; i++) if ((V[i] || 0) < (V[bc] || 0) || ((V[i] || 0) === (V[bc] || 0) && Math.random() < 0.3)) bc = i;
+            const tx = (bc % 4 + 0.5) / 4, ty = (Math.floor(bc / 4) + 0.5) / 4;
+            const want = [tx - B.self.x, ty - B.self.y];
+            const ranked = ks.dirs.map((c) => { const d = B.moveDir(c); return [c, d[0] * want[0] + d[1] * want[1]]; }).filter((x) => x[1] > 0.02).sort((a, b) => b[1] - a[1]);
+            if (!ranked.length) return null;
+            const keys = ranked.length > 1 && ranked[1][1] > ranked[0][1] * 0.5 ? [ranked[0][0], ranked[1][0]] : [ranked[0][0]];
+            steps = [{ keys, n: R(14, 28) }];
+          }
+          break;
+        }
+        case 'button': { const b = U.pick(unclicked); steps = [{ id: 'm:btn', mouse: { t: 'btn', text: b.text }, n: 1 }, { keys: [], n: 6 }]; break; } // (the button is found again by its text - never save page elements)
+        case 'weird': { const k = U.pick(untested.slice(0, 12)); if (!k) return null; steps = [{ keys: [k], n: R(3, 6) }, { keys: [], n: 3 }, { keys: [k], n: 2 }]; break; }
+        default: { // a built-in fun move (dance / spin / spam), judged like any idea
+          const kindF = U.pick(ks.dirs.length >= 2 ? ['dance', 'spam', 'spin'] : ks.acts.length ? ['spam'] : ks.look.length ? ['spin'] : []);
+          if (!kindF) return null;
+          let idea = this.S.ideas.find((i) => i.kind === 'fun' && i.fun === kindF);
+          if (!idea) { idea = this.newIdea('fun', [], sit, 'me'); idea.fun = kindF; idea.name = 'the ' + U.pick(ADJ) + ' ' + { dance: 'Dance', spam: 'Button Party', spin: 'Spin' }[kindF]; idea.desc = kindF; }
+          return idea;
+        }
+      }
+      if (!steps.length) return null;
+      const idea = this.newIdea(kind, steps, sit, 'me');
+      return idea;
+    }
+    newIdea(kind, steps, situ, from) {
+      return { id: U.uid().slice(0, 8), name: this.name(kind), kind, steps, situ, from, desc: this.describe(steps), tries: 0, score: 0, joy: 0, status: 'new', t: Date.now() };
+    }
+    mutate(p, ks) {
+      const steps = JSON.parse(JSON.stringify((p.steps || []).map((st) => Object.assign({}, st, { mouse: st.mouse && st.mouse.t === 'btn' ? null : st.mouse }))));
+      if (!steps.length) return null;
+      const B = this.B, how = U.pick(['time', 'time', 'swap', 'mirror', 'add']);
+      if (how === 'time') steps.forEach((st) => { st.n = U.clamp(Math.round((st.n || 1) * U.rand(0.5, 1.7)), 1, 30); });
+      else if (how === 'swap' && ks.all.length) { const st = U.pick(steps.filter((x) => x.keys && x.keys.length) || []); if (st) st.keys[U.randi(0, st.keys.length - 1)] = U.pick(ks.all); }
+      else if (how === 'mirror') {
+        let changed = false;
+        steps.forEach((st) => { (st.keys || []).forEach((k, i) => { if (!B.isMoveKey(k)) return; const d = B.moveDir(k); const o = ks.dirs.find((c) => { const d2 = B.moveDir(c); return d2[0] * d[0] + d2[1] * d[1] < -0.3; }); if (o) { st.keys[i] = o; changed = true; } }); if (st.mouse && st.mouse.t === 'look') { st.mouse.dx = -st.mouse.dx; st.id = st.id === 'm:look-l' ? 'm:look-r' : st.id === 'm:look-r' ? 'm:look-l' : st.id; changed = true; } });
+        if (!changed) return null;
+      } else if (how === 'add' && ks.all.length) steps.push({ keys: [U.pick(ks.all)], n: U.randi(2, 6) });
+      const c = this.newIdea(p.kind, steps, p.situ, 'mutation');
+      c.parent = p.id;
+      c.name = p.name.replace(/\s+(2\.0|Turbo|Reverse|Remix|Deluxe)$/, '') + ' ' + U.pick(how === 'mirror' ? ['Reverse'] : ['2.0', 'Turbo', 'Remix', 'Deluxe']);
+      return c;
+    }
+    tryIdea(idea, obs, now, from) {
+      const s = this.s, B = this.B;
+      let ok;
+      if (idea.kind === 'fun' && idea.fun) { const r = B.startRoutine(idea.fun); ok = !!B.routine; if (ok) { B.routine.ideaId = idea.id; B.routine.why = r.why; B.routine.name = idea.name; } }
+      else {
+        // buttons are remembered by their text: find the real one on screen right now
+        const live = Object.assign({}, idea, { steps: (idea.steps || []).map((st) => {
+          if (!st.mouse || st.mouse.t !== 'btn') return st;
+          const b = (obs.buttons || []).find((x) => x.el.isConnected && x.text === st.mouse.text);
+          return b ? Object.assign({}, st, { mouse: { t: 'btn', el: b.el, text: b.text } }) : { keys: [], n: 1 };
+        }) });
+        ok = B.runIdea(live);
+      }
+      if (!ok) { this.nextCreate = now + 3000; return false; }
+      s.hands.releaseAll();
+      if (this.S.ideas.indexOf(idea) < 0) {
+        this.S.ideas.push(idea);
+        if (this.S.ideas.length > 40) { const i = this.S.ideas.findIndex((x) => x.status === 'dropped') >= 0 ? this.S.ideas.findIndex((x) => x.status === 'dropped') : this.S.ideas.findIndex((x) => x.status !== 'keeper'); if (i >= 0) this.S.ideas.splice(i, 1); }
+      }
+      this.exp = { idea, t0: now, until: 0, r: 0, dt: 0, joy: 0, big: 0, dmg: 0, died: 0, nov0: s.ep.novel, static0: obs.staticTime || 0, hash0: B.hashState(obs), rate0: this.rEMA };
+      if (idea.kind === 'fun' && this.sayOk(now)) s.voice.say('fun', {}, 1);
+      else if (idea.status === 'new' && this.sayOk(now)) s.voice.say(from === 'coach' ? 'coachIdeaYes' : 'ideaStart', { idea: idea.name, desc: idea.desc }, 1);
+      s.reason = (idea.kind === 'fun' ? '😜 ' : '💡 ') + "trying " + (idea.status === 'keeper' ? 'my move ' : 'my idea ') + idea.name + (idea.desc && idea.kind !== 'fun' ? ' (' + idea.desc + ')' : '');
+      this.nextCreate = now + U.rand(5000, 12000) * (1.4 - this.t.curiosity * 0.6);
+      return true;
+    }
+    // did the idea work? (more points than usual, something new, got unstuck, a trophy, felt good...)
+    checkExperiment(obs, events, now) {
+      const X = this.exp;
+      if (!X) return;
+      const s = this.s, B = this.B;
+      for (const e of events) {
+        if (e.type === 'trophy' || e.type === 'win') X.big += 3;
+        else if (e.type === 'milestone' || e.type === 'progress' || e.type === 'highscore') X.big += 1;
+        else if (e.type === 'damage') X.dmg += 1;
+        else if (e.type === 'gameOver' || e.type === 'healthZero' || (e.type === 'death' && e.soft)) X.died += 1;
+      }
+      const running = B.routine && B.routine.ideaId === X.idea.id;
+      if (running) return;
+      if (!X.until) { X.until = now + 1500; return; }
+      if (now < X.until) return;
+      this.exp = null;
+      const I = X.idea;
+      const sec = Math.max(0.5, X.dt);
+      const unstuck = X.static0 > 4 && ((obs.staticTime || 0) < 1 || B.hashState(obs) !== X.hash0) ? 1 : 0;
+      const outcome = U.clamp(2 * (X.r / sec - X.rate0) + 0.05 * (s.ep.novel - X.nov0) + 1.5 * X.joy + X.big + unstuck - 0.5 * X.dmg - 1.5 * X.died, -3, 4);
+      I.score = I.tries ? 0.7 * I.score + 0.3 * outcome : outcome;
+      I.joy = (I.joy || 0) * 0.7 + X.joy * 0.3;
+      I.tries++;
+      if (unstuck) I.unstuck = (I.unstuck || 0) + 1;
+      const was = I.status;
+      if (I.tries >= 2 && I.score > 0.35) I.status = 'keeper';
+      else if (I.tries >= 3 && I.score < -0.1) I.status = 'dropped';
+      else if (I.status === 'new' || (I.status === 'keeper' && I.score < 0.1)) I.status = 'meh';
+      // likes: inventing itself can become something it enjoys
+      const tg = 'ideakind:' + I.kind, L = this.S.likes[tg] || (this.S.likes[tg] = { v: 0, n: 0, fat: 0, said: 1 });
+      L.v = U.clamp(L.v + 0.15 * U.clamp(outcome, -1, 1.5), -1, 1); L.n += 1;
+      if (I.status === 'keeper' && was !== 'keeper') {
+        s.heart.react([{ type: 'ideaWorked' }], {});
+        if (I.kind !== 'fun') s.voice.say('ideaWorked', { idea: I.name, desc: I.desc }, 2);
+        const f = this.S.flags || (this.S.flags = {});
+        f.ideaDiary = (f.ideaDiary || 0) + 1;
+        if (I.kind !== 'fun' && f.ideaDiary <= 6) s.diary('idea', 'Invented ' + I.name + ' in ' + s.game.name + ': ' + I.desc + '. It works! 💡');
+        B.addMemory('idea', 'inventing ' + I.name, 0.7);
+        // a mutation that beats its parent replaces it
+        if (I.parent) { const P = this.S.ideas.find((x) => x.id === I.parent); if (P && I.score > P.score + 0.2 && P.status === 'keeper') P.status = 'meh'; }
+        // one-chord moves become a real move the brain can pick any time
+        if (I.steps.length === 1 && I.steps[0].keys && I.steps[0].keys.length >= 2) {
+          const id = 'k:' + I.steps[0].keys.join('+');
+          const slot = B.ensureAction(id, { keys: I.steps[0].keys.slice(), label: I.name.replace(/^the /, '') }, true);
+          if (slot >= 0) { B.actions[slot].fromIdea = true; B.actions[slot].label = I.name.replace(/^the /, ''); }
+        }
+      } else if (I.status === 'dropped' && was !== 'dropped') {
+        s.heart.react([{ type: 'ideaFailed' }], {});
+        if (I.kind !== 'fun' && this.sayOk(now)) s.voice.say('ideaFailed', { idea: I.name }, 1);
+      } else if (I.status === 'meh' && was === 'new' && I.kind !== 'fun' && U.chance(0.3) && this.sayOk(now)) s.voice.say('ideaMeh', { idea: I.name }, 0);
+      // the coach's idea worked? then it trusts the coach's ideas a bit more (or less)
+      if (this.coachIdeaFrom === I.id) { this.coachIdeaFrom = null; const S = this.S; S.coachTrust = U.clamp((S.coachTrust == null ? 0.5 : S.coachTrust) + 0.1 * Math.sign(outcome), 0, 1); }
+    }
+    // stuck for a while? try something creative before the old "click the middle + press Enter"
+    unstick(obs, now) { return this.maybeCreate(obs, this.mods || this.s.heart.mods(false), 0.1, now, true); }
+    // the coach suggests an idea - it decides itself if it likes it
+    coachIdea(p) {
+      if (!p || !p.steps || !p.steps.length) return;
+      const s = this.s, t = this.t, e = s.heart.e, S = this.S;
+      const B = this.B;
+      const steps = p.steps.slice(0, 6).map((st) => {
+        const keys = (st.keys || []).map((k) => (KEYS.map[k] ? k : KEYS.fromName(k))).filter(Boolean).slice(0, 3);
+        return { keys, n: U.clamp(Math.round((Number(st.ms) || 300) / ((this.mods && this.mods.reaction) || 120)), 1, 30) };
+      }).filter((st) => st.keys.length || st.n);
+      if (!steps.length) return;
+      const idea = this.newIdea('coach', steps, 'open', 'coach');
+      if (p.name) idea.name = 'the ' + String(p.name).replace(/^the\s+/i, '').slice(0, 30);
+      let match = 0;
+      for (const st of steps) for (const k of st.keys) { const a = B.actions[B.slotOf('k:' + k)]; if (a) for (const tg of B.tagsOf(a)) match += this.like(tg); }
+      const trust = S.coachTrust == null ? 0.5 : S.coachTrust;
+      const stuck = (s.lastObs && s.lastObs.staticTime > 4) ? 1 : 0;
+      const yes = 1.2 * match + 0.8 * (t.curiosity - 0.5) + 1.0 * (trust - 0.5) - 0.9 * (t.pride - 0.5) - 0.6 * e.mad * t.temper + 0.5 * stuck + U.rand(-0.3, 0.3) > -0.1;
+      if (yes) { this.coachIdeaPending = idea; this.coachIdeaFrom = idea.id; this.nextCreate = 0; }
+      else { s.voice.say('coachIdeaNo', { idea: idea.name }, 1); if (U.chance(0.5)) this.nextCreate = 0; }
+      (S.coachIdeas = S.coachIdeas || []).push({ name: idea.name, desc: idea.desc, yes, t: Date.now() });
+      if (S.coachIdeas.length > 12) S.coachIdeas.shift();
+    }
+    gameFacts(f) {
+      if (!f) return;
+      const F = this.S.facts;
+      if (typeof f.can_win === 'boolean') F.canWinHint = f.can_win ? 1 : -1;
+      if (Number.isFinite(f.trophy_total) && f.trophy_total > 0) F.trophyTotal = Math.max(F.trophyTotal || 0, Math.min(500, f.trophy_total));
+    }
+
+    /* ======================= 🎯 GOALS ======================= */
+    updateFacts(obs) {
+      const F = this.S.facts, B = this.B, s = this.s;
+      if (obs.score != null) F.hasScore = true;
+      if ((obs.readouts || []).some((r) => r.kind === 'progress')) F.seenProgress = true;
+      if ((B.stats.wins || 0) > 0) F.won = true;
+      const tro = B.stats.trophies;
+      if (tro) F.trophyTotal = Math.max(F.trophyTotal || 0, tro.list.length);
+      const tr = (obs.readouts || []).find((r) => /troph|achiev|badge/i.test(r.label) && r.max);
+      if (tr) F.trophyTotal = Math.max(F.trophyTotal || 0, tr.max);
+      if ((obs.buttons || []).some((b) => /troph|achiev/i.test(b.text))) F.trophyBtn = true;
+      F.storyN = (B.stats.storyLines || []).length;
+      void s;
+    }
+    canWin() {
+      const F = this.S.facts;
+      if (F.won) return 1;
+      let c = 0.5 + (F.seenProgress ? 0.2 : 0) + 0.3 * (F.canWinHint || 0);
+      // a score, game overs, no levels, never won = probably an endless arcade game
+      if (F.hasScore && !F.seenProgress && this.B.stats.episodes >= 2) c -= 0.2;
+      if (!F.hasScore && !F.seenProgress && (F.storyN || 0) < 3 && (F.playMs || 0) > 300000) c -= 0.35; // 5 min and nothing to "win" (like AItok)
+      return U.clamp(c, 0, 1);
+    }
+    trophyCount() { const t = this.B.stats.trophies; return t ? Object.keys(t.got || {}).length : 0; }
+    wants() {
+      const t = this.t, e = this.s.heart.e, F = this.S.facts, B = this.B;
+      const L = (g) => this.like(g);
+      const cw = this.canWin();
+      const troTotal = F.trophyTotal || 0, got = this.trophyCount();
+      const trophiesExist = troTotal > 0 || got > 0 || F.trophyBtn;
+      const left = troTotal ? Math.max(0, troTotal - got) / troTotal : 0.5;
+      const whim = () => U.rand(-0.08, 0.08) * (0.5 + t.silliness);
+      const playTags = ['move', 'jump', 'act', 'combo', 'idea', 'fun'].map(L);
+      return {
+        beat: (F.won ? 0.12 * t.pride : cw * (0.35 + 0.3 * t.competitive + 0.25 * t.patience + 0.15 * t.optimism) + 0.2 * e.determined + 0.2 * L('win')) + whim(),
+        trophies: trophiesExist && !(troTotal && got >= troTotal) ? 0.2 + 0.35 * t.pride + 0.2 * t.curiosity + 0.25 * left + (F.won ? 0.2 : 0) + 0.3 * L('trophy') + whim() : -1,
+        highscore: F.hasScore ? 0.15 + 0.4 * t.competitive + 0.3 * L('points') + whim() : -1,
+        explore: 0.15 + 0.4 * t.curiosity + 0.3 * e.curious + 0.4 * L('explore') - 0.4 * (this.noveltyDone ? 1 : 0) + whim(),
+        story: (F.storyN || 0) >= 3 ? 0.15 + 0.35 * t.patience + 0.4 * L('story') + whim() : -1,
+        fun: 0.15 + 0.45 * t.silliness + 0.3 * e.bored + 0.2 * e.happy + 0.35 * (1 - cw) + 0.4 * Math.max(...playTags) + whim(),
+      };
+    }
+    // it picks what it wants (and sticks with it unless something else REALLY calls to it)
+    chooseGoal(reason) {
+      const s = this.s, G = this.S.goals, t = this.t, B = this.B;
+      const ep = B.stats.episodes;
+      const W = this.wants();
+      for (const k in G.resting) { if (ep < G.resting[k]) W[k] = -1; else { delete G.resting[k]; W[k] += 0.15 * s.heart.e.determined; this.comeback = k; } }
+      for (const k of G.done) if (k !== 'trophies' && k !== 'highscore') W[k] = Math.min(W[k], k === 'fun' ? 0.2 : 0.1);
+      let best = 'fun', bv = -Infinity;
+      for (const k in W) if (W[k] > bv) { bv = W[k]; best = k; }
+      const cur = G.cur;
+      if (cur && cur.status === 'active') {
+        if (best === cur.kind) { cur.want = bv; return; }
+        if (bv < (W[cur.kind] == null ? -1 : W[cur.kind]) + 0.15 + 0.25 * t.patience) return; // keep my goal
+      }
+      const prev = cur && cur.status === 'active' ? cur.kind : null;
+      G.cur = this.newGoal(best, bv, reason);
+      G.log.push({ t: Date.now(), kind: best, what: prev ? 'switched from ' + prev : 'picked' });
+      if (G.log.length > 30) G.log.shift();
+      const vars = this.goalVars(G.cur);
+      if (this.comeback === best) { s.voice.say('goalBack', vars, 2); this.comeback = null; }
+      else if (prev) s.voice.say('goalSwitch', vars, 2);
+      else s.voice.say(best === 'fun' && this.canWin() < 0.35 ? 'goalNoWin' : 'goal_' + best, vars, 2);
+      s.heart.react([{ type: 'goalPicked' }], {});
+      const f = this.S.flags || (this.S.flags = {});
+      f.goalDiary = (f.goalDiary || 0) + 1;
+      if (f.goalDiary <= 8) s.diary('goal', 'My goal in ' + s.game.name + ': ' + GOAL_WORD[best] + ' ' + GOAL_ICON[best] + ' (' + G.cur.why + ')');
+      s.app.mindUpdated && s.app.mindUpdated(s);
+    }
+    newGoal(kind, want, reason) {
+      const t = this.t, B = this.B, F = this.S.facts;
+      const g = { kind, want, status: 'active', since: Date.now(), ep0: B.stats.episodes, frust: 0, why: this.whyGoal(kind), wins0: B.stats.wins || 0, got0: this.trophyCount(), best0: B.stats.best, story0: (B.stats.storyLines || []).length, joy: 0, playMs0: F.playMs || 0, reason };
+      if (kind === 'trophies') {
+        const total = F.trophyTotal || 0, got = g.got0;
+        g.target = total ? Math.min(total, Math.max(got + 1, Math.round(total * (0.15 + 0.55 * t.pride * t.patience)))) : got + 1 + Math.round(2 * t.pride);
+      }
+      if (kind === 'highscore') g.target = B.stats.best ? Math.ceil(B.stats.best * (1.1 + 0.3 * t.competitive)) : 1;
+      return g;
+    }
+    whyGoal(kind) {
+      const t = this.t, F = this.S.facts, top = (k) => t[k] > 0.6;
+      switch (kind) {
+        case 'beat': return top('competitive') ? "I'm competitive and this game can be beaten" : top('patience') ? "I'm patient, I'll get there" : 'I wanna see the ending';
+        case 'trophies': return F.won ? 'I beat it, so now: trophies' : top('pride') ? 'I like showing off my trophies' : 'there are trophies to get';
+        case 'highscore': return top('competitive') ? 'I always want a higher score' : 'I can do better than ' + U.fmt(this.B.stats.best);
+        case 'explore': return top('curiosity') ? "I'm curious about everything" : 'I want to see what else is here';
+        case 'story': return 'I want to know how the story ends';
+        default: return this.canWin() < 0.35 ? "this game doesn't really have an ending" : top('silliness') ? "I'm silly, I just wanna mess around" : 'just vibing';
+      }
+    }
+    goalVars(g) {
+      return { goal: GOAL_WORD[g.kind] + ' ' + GOAL_ICON[g.kind], game: this.s.game.name, n: g.target ? g.target - g.got0 : 3, best: U.fmt(this.B.stats.best), why: g.why };
+    }
+    progress(g) {
+      const B = this.B;
+      switch (g.kind) {
+        case 'beat': return (B.stats.wins || 0) > g.wins0 ? 1 : this.S.facts.seenProgress ? 0.3 : 0;
+        case 'trophies': return g.target ? U.clamp((this.trophyCount() - g.got0) / Math.max(1, g.target - g.got0), 0, 1) : 0;
+        case 'highscore': return g.target ? U.clamp((B.stats.best || 0) / g.target, 0, 1) : 0;
+        case 'explore': return U.clamp((B.stats.episodes - g.ep0) / 4 + (this.noveltyDone ? 1 : 0), 0, 1);
+        case 'story': return U.clamp(((B.stats.storyLines || []).length - g.story0) / 20, 0, 1) * 0.9 + ((B.stats.wins || 0) > g.wins0 ? 0.1 : 0);
+        case 'fun': return U.clamp(((this.S.facts.playMs || 0) - g.playMs0) / 300000, 0, 1);
+        default: return 0;
+      }
+    }
+    goalTick(now) {
+      const G = this.S.goals, s = this.s;
+      if (!G.cur || G.cur.status !== 'active') {
+        // first time in a game: figure it out a bit before deciding what it wants
+        if ((this.S.facts.playMs || 0) > (this.B.stats.episodes ? 5000 : 45000) || this.B.stats.episodes > 0) this.chooseGoal('start');
+        return;
+      }
+      const g = G.cur;
+      g.joy = (g.joy || 0) * 0.98 + this.joyBase * 0.02;
+      const p = this.progress(g);
+      const done = g.kind === 'beat' ? p >= 1 : g.kind === 'story' ? p >= 0.99 : g.kind === 'fun' ? p >= 1 && g.joy > -0.001 : p >= 1;
+      if (done) return this.goalDone(g);
+      if (now - (this.lastChoose || 0) > 90000) { this.lastChoose = now; this.chooseGoal('check'); }
+    }
+    goalDone(g) {
+      const s = this.s, G = this.S.goals;
+      g.status = 'done'; g.doneAt = Date.now();
+      if (G.done.indexOf(g.kind) < 0) G.done.push(g.kind);
+      G.log.push({ t: Date.now(), kind: g.kind, what: 'done' }); if (G.log.length > 30) G.log.shift();
+      this.goalsDoneHere++;
+      s.heart.react([{ type: 'goalDone' }], {});
+      s.voice.say('goalDone', this.goalVars(g), 3);
+      s.diary('goal', 'GOAL DONE in ' + s.game.name + ': ' + GOAL_WORD[g.kind] + ' ' + GOAL_ICON[g.kind] + ' ✅');
+      this.B.addMemory('goal', 'reaching my goal: ' + GOAL_WORD[g.kind], 0.9);
+      const gs = AIP.squad.gameStats(s.ai, s.game.id);
+      gs.goalsDone = (gs.goalsDone || 0) + 1;
+      if (g.kind === 'beat') gs.beaten = true;
+      G.cur = null;
+      this.chooseGoal('after');
+      s.app.mindUpdated && s.app.mindUpdated(s);
+    }
+    // after every try: frustration, giving up for a while, or deciding it's done with the game
+    onEpisodeEnd(kind, info) {
+      const G = this.S.goals, t = this.t, s = this.s, e = s.heart.e;
+      this.saveTaste();
+      const g = G.cur;
+      if (g && g.status === 'active') {
+        if (info.newBest || kind === 'win') g.frust *= 0.4;
+        else if (kind === 'death') g.frust += 0.08 * (1.3 - t.optimism) * (1 + 0.3 * Math.max(0, (s.heart.deaths || []).length - 1));
+        else g.frust += 0.03;
+        if (g.kind === 'explore' && info.novel != null) { this.novelHist = (this.novelHist || []).concat(info.novel).slice(-4); if (this.novelHist.length >= 3 && this.novelHist.every((n) => n < 4)) this.noveltyDone = true; }
+        const limit = 0.45 + 0.6 * t.patience + 0.3 * e.determined;
+        if (g.frust > limit && g.kind !== 'fun') {
+          g.status = 'resting';
+          G.resting[g.kind] = this.B.stats.episodes + U.randi(3, 10);
+          G.log.push({ t: Date.now(), kind: g.kind, what: 'taking a break' }); if (G.log.length > 30) G.log.shift();
+          s.heart.react([{ type: 'goalGiveUp' }], {});
+          s.voice.say('goalGiveUp', this.goalVars(g), 2);
+          s.diary('goal', 'Taking a break from "' + GOAL_WORD[g.kind] + '" in ' + s.game.name + '. Too hard right now 😮‍💨');
+          G.cur = null;
+          this.chooseGoal('gave up');
+        } else this.chooseGoal('episode');
+      } else this.chooseGoal('episode');
+      // done with this game? (its own choice: it did what it wanted and now it's bored of it)
+      const W = this.wants();
+      const maxWant = Math.max(...Object.values(W));
+      const playedMin = (performance.now() - this.sessT0) / 60000;
+      const boredLong = this.boredSince && performance.now() - this.boredSince > 120000;
+      if (this.goalsDoneHere > 0 && playedMin > 3 && (maxWant < 0.25 + 0.2 * (1 - e.bored) || boredLong) && e.bored > 0.45 && !s.keepGoingAt) return 'stop';
+      return null;
+    }
+    // you asked it to keep going - it decides
+    askContinue() {
+      const s = this.s, e = s.heart.e;
+      const fav = this.favorite();
+      const yes = e.happy + (fav ? this.like(fav) : 0) + 0.3 * this.t.patience - 0.5 * e.bored + U.rand(-0.2, 0.3) > 0.35;
+      s.voice.say(yes ? 'keepGoingYes' : 'keepGoingNo', { act: fav ? this.wordsFor(fav) : 'it' }, 3);
+      return yes;
+    }
+
+    /* ======================= words for the UI / chat / coach ======================= */
+    topLikes(n, sign) {
+      return Object.keys(this.S.likes).filter((k) => this.S.likes[k].n > 4 && !/^ideakind:/.test(k) && (sign > 0 ? this.S.likes[k].v > 0.15 : this.S.likes[k].v < -0.15))
+        .sort((a, b) => sign * (this.S.likes[b].v - this.S.likes[a].v)).slice(0, n);
+    }
+    goalLabel() { const g = this.S.goals.cur; if (!g) return null; return GOAL_ICON[g.kind] + ' ' + GOAL_WORD[g.kind] + (g.kind === 'trophies' && g.target ? ' ' + (this.trophyCount()) + '/' + g.target : ''); }
+    describeLikes() {
+      const yes = this.topLikes(3, 1).map((k) => this.wordsFor(k)), no = this.topLikes(2, -1).map((k) => this.wordsFor(k));
+      if (!yes.length && !no.length) return "I'm still figuring out what I like here 🤔";
+      return (yes.length ? 'I like ' + yes.join(', ') + ' 💖' : '') + (no.length ? (yes.length ? '. ' : '') + "I don't like " + no.join(', ') + ' 😒' : '');
+    }
+    describeGoal() {
+      const g = this.S.goals.cur;
+      if (!g) return "I haven't picked a goal yet. Still figuring this game out 🤔";
+      return 'My goal: ' + GOAL_WORD[g.kind] + ' ' + GOAL_ICON[g.kind] + ', because ' + g.why + '. ' + Math.round(this.progress(g) * 100) + '% there.';
+    }
+    keepers() { return this.S.ideas.filter((i) => i.status === 'keeper' && i.kind !== 'fun'); }
+    forCoach() {
+      const g = this.S.goals.cur;
+      const lines = [];
+      lines.push('ITS OWN GOAL (it chose it, respect it): ' + (g ? GOAL_WORD[g.kind] + ' - because ' + g.why + (g.kind === 'trophies' && g.target ? ' (wants ' + g.target + ', has ' + this.trophyCount() + ')' : '') : 'not picked yet'));
+      const yes = this.topLikes(4, 1).map((k) => this.wordsFor(k)), no = this.topLikes(3, -1).map((k) => this.wordsFor(k));
+      lines.push('IT LIKES: ' + (yes.join(', ') || '?') + '. DISLIKES: ' + (no.join(', ') || '?'));
+      const k = this.keepers().slice(-4).map((i) => i.name + ' = ' + i.desc);
+      if (k.length) lines.push('MOVES IT INVENTED (they work): ' + k.join('; '));
+      return lines.join('\n');
+    }
+  }
+  Mind.GOAL_ICON = GOAL_ICON; Mind.GOAL_WORD = GOAL_WORD;
+  return Mind;
+})();
+
+</script>
+<script>
 /* ---- js/session.js ---- */
 /* AI Play - a PLAY SESSION: one AI playing one game. This is the loop that ties it all together:
  *   eyes (senses) -> feelings (heart) -> brain picks a move -> hands press it -> voice talks
@@ -5322,6 +6274,8 @@ AIP.Session = (function () {
       this.freshLog = []; this.pauseKeys = new Set(); this.aliveAt = 0;
       this.coach = new AIP.Coach(this);
       this.typist = new AIP.Typist(this);
+      this.mind = new AIP.Mind(this);
+      this.bonus = 0; // extra reward from big moments (trophies, missions) - not the same as YOUR 👍
       this.recentEvents = []; this.lastScoreAt = 0; this.stuckFor = 0;
       this.reading = null; this.take = null;
       this.errorsShown = 0;
@@ -5341,6 +6295,7 @@ AIP.Session = (function () {
       try { rec = await AIP.db.get('brains', this.ai.id + '|' + this.game.id); } catch (e) { /* first time */ }
       if (rec) { this.brain.load(rec); this.gameStore = rec.gameSave || {}; }
       this.brain.stats.flags = this.brain.stats.flags || {};
+      this.mind.load();
       const gs = AIP.squad.gameStats(this.ai, this.game.id);
       // missing some internet parts from when it was added? try to grab them now (so next time works offline)
       try {
@@ -5439,7 +6394,7 @@ AIP.Session = (function () {
 
     step() {
       const now = performance.now();
-      if (this.phase === 'loading' || this.phase === 'broken' || this.phase === 'dreaming') { this.ui(now, null); return; }
+      if (this.phase === 'loading' || this.phase === 'broken' || this.phase === 'dreaming' || this.phase === 'done') { this.ui(now, null); return; }
       const st = AIP.settings.get();
       const obs = this.senses.sense();
       this.hands.tick();
@@ -5467,6 +6422,7 @@ AIP.Session = (function () {
       };
       const feels = this.heart.react(events, ctx);
       this.heart.update(dt, ctx);
+      this.mind.tick(dt, events, obs, now); // 💖 likes / 💡 ideas / 🎯 goals
       this.talkAbout(events, feels, obs, ctx);
 
       if (this.mode === 'pause') { this.hands.releaseAll(); this.ui(now, obs); return; }
@@ -5487,20 +6443,27 @@ AIP.Session = (function () {
       if (this.mode === 'ai' && this.readStory(obs, now)) { this.ui(now, obs); return; }
       // ✍️ a text box wants typing (name, guess, answer, command...) or a typing game shows words
       if (this.mode === 'ai' && this.typist.step(obs, now)) { this.ui(now, obs); return; }
+      // 👊 "SPAM E!" -> mash it / 💬 "[E] Open the door" -> press it
+      if (this.mode === 'ai' && (this.mash(obs, now) || this.keyHint(obs, now))) { this.ui(now, obs); return; }
       }
       else if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
 
-      const mods = this.heart.mods(st.painMode);
+      const mods = this.mind.adjustMods(this.heart.mods(st.painMode));
+      // 🧭 a waypoint marker on screen (3D games)? head for it (unless the coach has its own plan)
+      const BC = this.brain.coach;
+      if (obs.marker && this.mode === 'ai' && (!BC || BC.auto || now > BC.until)) this.brain.coach = { target: { x: obs.marker.x, y: obs.marker.y, what: 'the marker' }, goal: 'follow the marker', until: now + 1200, avoid: new Set(), forward: this.coach.forwardKeys(), auto: true };
       if (!end && now - this.ep.t0 > 150000) end = 'segment';
       // testing whether a key paused the game? hands off until the test is done
       if (this.mode === 'ai' && this.checkPause(obs, now)) { this.ui(now, obs); return; }
       const reward = this.reward(obs, events, mods, st.painMode);
+      this.mind.noteReward(reward, dt);
       const userNow = this.mode === 'watch' ? this.userSnapshot() : null;
-      const decision = this.brain.step(obs, reward, !!end, mods, { mx: this.hands.mx, my: this.hands.my, user: userNow });
+      // (a "segment" is just a save point - the game didn't really end, so don't teach the brain it did)
+      const decision = this.brain.step(obs, reward, !!end && end !== 'segment', mods, { mx: this.hands.mx, my: this.hands.my, user: userNow });
       this.reason = decision.reason;
       if (this.mode === 'ai' && !end) {
         this.apply(decision);
-        this.maybeHaveFun(obs, mods, dt, now);
+        this.mind.maybeCreate(obs, mods, dt, now); // 💡 its own ideas (and fun moves) when it feels like it
       }
       if (this.mode === 'watch' && userNow && userNow.keys.size && U.chance(0.02)) {
         const k = [...userNow.keys][0];
@@ -5555,16 +6518,20 @@ AIP.Session = (function () {
           case 'flash': if (!obs.hp && !obs.lives) r -= 0.25; break;
           case 'gameOver': case 'healthZero': r -= 1; break;
           case 'win': r += 2; break;
+          case 'milestone': r += 1; break;
           default: break;
         }
       }
       r += 0.07 * mods.curiosity * (this.brain.noveltyNow || 0);
+      r += this.mind.intrinsic(events, obs); // doing what it likes + its own goal
+      if (this.bonus) { r += this.bonus; this.bonus = 0; }
       if (obs.staticTime > 3) r -= 0.02;
       if (this.pendingFb) { r += this.pendingFb; this.brain.retroReward(this.pendingFb * 0.6); this.pendingFb = 0; }
       return U.clamp(r, -2, 2.5);
     }
 
     apply(d) {
+      this.lastDecision = d;
       const h = this.hands;
       const now = performance.now(), prevKeys = this.lastKeys || [];
       (d.keys || []).filter((k) => prevKeys.indexOf(k) < 0).forEach((k) => this.freshLog.push({ code: k, t: now }));
@@ -5631,14 +6598,6 @@ AIP.Session = (function () {
       return false;
     }
 
-    maybeHaveFun(obs, mods, dt, now) {
-      if (this.brain.routine || mods.fun < 0.35) return;
-      if (now - this.ep.lastDamageAt < 4000 || (obs.healthFrac != null && obs.healthFrac < 0.5)) return;
-      if (!U.chance(mods.fun * dt * 0.035)) return;
-      const r = this.brain.startRoutine(U.pick(['dance', 'spam', 'spin', 'wiggle']));
-      this.voice.say('fun', {}, 1);
-      this.reason = r.why;
-    }
 
     // keep a short list of what just happened (the coach reads this)
     noteEvents(events, now) {
@@ -5650,10 +6609,19 @@ AIP.Session = (function () {
         else if (e.type === 'death' && e.soft) line = 'lost a life';
         else if (e.type === 'gameOver') line = 'GAME OVER';
         else if (e.type === 'win') line = 'WON';
-        else if (e.type === 'trophy') line = 'trophy: ' + e.name;
+        else if (e.type === 'trophy') line = 'trophy: ' + (e.name || '?');
+        else if (e.type === 'milestone') line = 'mission done: ' + e.text;
         else if (e.type === 'progress') line = e.label + ' ' + e.value;
         if (line) { this.recentEvents.push(t + ' ' + line); if (this.recentEvents.length > 14) this.recentEvents.shift(); }
         if (e.type === 'trophy') this.gotTrophy(e);
+        if (e.type === 'trophyList') { this.mergeTrophies(e.items); this.mind.peekedAt = now; }
+        if (e.type === 'milestone') {
+          this.bonus += 0.5;
+          this.heart.react([{ type: 'milestone' }], {});
+          const f = this.brain.stats.flags; f.missions = (f.missions || 0) + 1;
+          if (f.missions <= 5) this.diary('mission', 'Finished a mission in ' + this.game.name + ': "' + e.text.slice(0, 80) + '" ✅');
+          this.voice.raw('Mission done ✅ ' + e.text.slice(0, 60), 2, 'mission');
+        }
       }
     }
 
@@ -5675,6 +6643,44 @@ AIP.Session = (function () {
       if (!st) { this.take = null; this.hands.setKeys([]); return false; }
       if (st.t === 'click') { this.hands.clickAt(st.x, st.y); T.next = now + 700; }
       else { this.hands.setKeys([st.code]); setTimeout(() => { if (!this.dead && !(this.take && this.take.steps[this.take.i] && this.take.steps[this.take.i].code === st.code)) this.hands.setKeys([]); }, 300); T.next = now + 450; }
+      return true;
+    }
+
+    /* ---------- 👊 mash prompts ("SPAM E to break free!") ---------- */
+    mash(obs, now) {
+      if (!obs.mash || obs.menuish || this.pauseKeys.has(obs.mash)) { this.mashing = null; return false; }
+      const M = this.mashing && this.mashing.code === obs.mash ? this.mashing : (this.mashing = { code: obs.mash, t0: now, n: 0 });
+      if (now - M.t0 > 9000) return false; // (it's not working - let the brain try something else)
+      const h = this.hands;
+      h.setKeys([]);
+      h.tap(M.code);
+      setTimeout(() => { if (!this.dead && this.mashing === M) h.tap(M.code); }, 55); // ~2 taps per tick = fast!
+      M.n += 2;
+      if (M.n === 2) this.voice.say('mash', { key: AIP.KEYS.label(M.code) }, 2);
+      this.reason = '👊 mashing ' + AIP.KEYS.label(M.code) + '!!';
+      const c = this.brain.keyCtl(M.code);
+      if (c.status === 'new' || c.status === 'useless') { c.status = 'starred'; c.tip = c.tip || 'mash it!'; this.brain.ensureAction('k:' + M.code, { keys: [M.code] }); }
+      return true;
+    }
+    /* ---------- 💬 key prompts ("[E] Open the door") ---------- */
+    keyHint(obs, now) {
+      const hints = (obs.keyHints || []).filter((hh) => hh.label && !this.pauseKeys.has(hh.code) && !/^(esc|escape|tab|p)$/i.test(AIP.KEYS.label(hh.code)));
+      if (!hints.length || obs.menuish || this.phase !== 'play') return false;
+      const H = hints[0];
+      const key = H.code + '|' + H.label;
+      const mem = this.hintMem || (this.hintMem = new Map());
+      const m = mem.get(key) || { n: 0, at: 0 };
+      if (m.n >= 3 || now - m.at < 2200) return false; // pressed it already - give it a moment
+      m.n++; m.at = now; mem.set(key, m);
+      if (mem.size > 80) mem.delete(mem.keys().next().value);
+      this.hands.setKeys([]);
+      this.hands.tap(H.code);
+      // it learns what the key does from the prompt itself
+      const c = this.brain.keyCtl(H.code);
+      if (!c.tip || /mash/.test(c.tip)) c.tip = H.label.slice(0, 30).toLowerCase();
+      if (c.status === 'new' || c.status === 'useless') { c.status = 'starred'; this.brain.ensureAction('k:' + H.code, { keys: [H.code] }); }
+      this.reason = '💬 the game says: ' + AIP.KEYS.label(H.code) + ' = "' + H.label + '" - pressing it!';
+      if (m.n === 1 && U.chance(0.35)) this.voice.say('hintPress', { key: AIP.KEYS.label(H.code), what: H.label.toLowerCase() }, 1);
       return true;
     }
 
@@ -5704,7 +6710,9 @@ AIP.Session = (function () {
         if (words >= 5 && (!nt || words > nt.words)) nt = { s: t, words };
       }
       // short lines only count as "reading" when the game is waiting (dialogue box, menu, "press X")
-      const worth = nt && (nt.words >= 12 || obs.staticTime > 0.3 || obs.menuish || obs.continueHint || (obs.choices && obs.choices.length));
+      // a FEED (captions that scroll by on their own, like AItok) isn't a story - then it only stops for big texts
+      const feed = this.feedUntil && now < this.feedUntil;
+      const worth = nt && (feed ? nt.words >= 22 && obs.staticTime > 1.5 : (nt.words >= 12 || obs.staticTime > 0.3 || obs.menuish || obs.continueHint || (obs.choices && obs.choices.length)));
       if (worth && (!this.reading || this.reading.text !== nt.s)) {
         handled.add(nt.s);
         if (handled.size > 500) handled.delete(handled.values().next().value);
@@ -5748,6 +6756,11 @@ AIP.Session = (function () {
         return false;
       }
       const stillThere = (this.senses.textBits || []).some((b) => b.s.replace(/\s+/g, ' ').trim() === R.text);
+      if (!stillThere && !R.tries) {
+        // it went away by itself (nobody pressed anything): lots of that = a feed, so skim for a while
+        this.vanished = (this.vanished || []).filter((t) => now - t < 60000); this.vanished.push(now);
+        if (this.vanished.length >= 4 && !(this.feedUntil > now)) { this.feedUntil = now + 180000; this.vanished = []; this.voice.raw('So much text flying by 😵 I\'ll just skim.', 1, 'feed'); }
+      }
       if (!stillThere || R.tries >= 6) { this.reading = null; return false; }
       if (obs.menuish && !R.hint) { this.reading = null; return false; } // a menu: the normal brain clicks Play etc.
       if (obs.fields && obs.fields.length && !R.hint) { this.reading = null; return false; } // it wants me to TYPE something, not press Enter
@@ -5767,6 +6780,9 @@ AIP.Session = (function () {
         let v = Math.random() * (0.5 + t.silliness);
         if (/\b(fight|attack|go|yes|open|enter|explore|take|help|accept|investigate|answer|jump|touch)\b/i.test(c.text)) v += (t.bravery - 0.5) * 2;
         if (/\b(run|hide|leave|no|wait|ignore|refuse|back|stay|flee)\b/i.test(c.text)) v += (0.5 - t.bravery) * 2;
+        // its own goal + taste: explorers/story fans open doors and ask questions
+        const g = this.mind.S.goals && this.mind.S.goals.cur;
+        if (g && (g.kind === 'explore' || g.kind === 'story') && /\b(open|explore|look|enter|investigate|ask|follow|read|yes)\b/i.test(c.text)) v += 0.8 + this.mind.like('story');
         if (v > bs) { bs = v; best = c; }
       }
       return best;
@@ -5779,14 +6795,14 @@ AIP.Session = (function () {
       const have = B.trophies.list.find((x) => x.name.toLowerCase() === e.name.toLowerCase());
       const name = have ? have.name : e.name;
       if (Object.keys(B.trophies.got).some((k) => k.toLowerCase() === name.toLowerCase())) return;
-      B.trophies.got[name] = Date.now();
+      B.trophies.got[name || ('trophy #' + (Object.keys(B.trophies.got).length + 1))] = Date.now();
       if (have) have.got = true; else B.trophies.list.push({ name, got: true });
       const gs = AIP.squad.gameStats(this.ai, this.game.id);
       gs.trophies = Object.keys(B.trophies.got).length;
       gs.trophyTotal = B.trophies.list.length;
       this.heart.feel('proud', 0.5, 'got a trophy'); this.heart.feel('happy', 0.3, 'got a trophy'); this.heart.feel('excited', 0.4, 'got a trophy');
-      this.pendingFb = Math.max(this.pendingFb || 0, 1.5);
-      this.voice.say('trophy', { trophy: name }, 3);
+      this.bonus += 1.5;
+      this.voice.say('trophy', { trophy: name || 'a trophy' }, 3);
       this.diary('trophy', 'Got a trophy in ' + this.game.name + ': "' + name + '" 🏆');
       this.brain.addMemory('trophy', 'getting the "' + name + '" trophy', 0.9);
     }
@@ -5808,7 +6824,8 @@ AIP.Session = (function () {
 
     stuckCheck(obs, now) {
       if (this.mode !== 'ai' || this.phase !== 'play' || this.reading || this.take || this.typist.active) return;
-      if (obs.staticTime < 1) { this.stuckSaid = false; return; }
+      if (obs.staticTime < 1) { this.stuckSaid = false; this.unstuckTried = false; return; }
+      if (obs.staticTime > 5 && !this.unstuckTried && !obs.menuish) { this.unstuckTried = true; if (this.mind.unstick(obs, now)) return; }
       if (obs.staticTime > 12 && !this.stuckSaid) {
         this.stuckSaid = true;
         this.heart.react([{ type: 'stuck' }], { painMode: AIP.settings.get().painMode });
@@ -5867,6 +6884,8 @@ AIP.Session = (function () {
       const dom = this.heart.dominant().name;
       const map = { bored: 'bored', curious: 'curious', confused: 'confused', scared: 'scared', proud: 'proud' };
       if (map[dom]) { this.voice.say(map[dom], vars, 0); return; }
+      // sometimes it talks about what it wants / what it loves here
+      if (U.chance(0.25)) { const fav = this.mind.favorite(); const g = this.mind.goalLabel(); if (fav || g) { this.voice.say('mindIdle', { act: fav ? this.mind.wordsFor(fav) : 'figuring stuff out', goal: g || 'figuring this game out' }, 0); return; } }
       const mems = (this.app.diaryCache || []).filter((d) => d.aiId === this.ai.id && d.gameId === this.game.id && /best|points|win/.test(d.kind));
       if (mems.length && U.chance(0.25)) {
         const m = U.pick(mems);
@@ -5958,7 +6977,7 @@ AIP.Session = (function () {
       const vars = Object.assign(this.vars(obs), { score: U.fmt(score), tries: gs.tries });
       const evs = [];
       if (kind === 'death') evs.push({ type: 'death' });
-      if (kind === 'win') evs.push({ type: 'win' });
+      // (a win already made it happy in the step loop - don't count the same win twice)
       if (newBest && !ep.beatBest && oldBest != null) evs.push({ type: 'highscore' });
       const feels = this.heart.react(evs, { painMode, healthFrac: obs.healthFrac });
       if (kind === 'win') {
@@ -5976,9 +6995,11 @@ AIP.Session = (function () {
         this.diary('best', 'New high score in ' + this.game.name + ': ' + U.fmt(score) + '! (try #' + gs.tries + ')');
       }
       if (newBest) this.checkRivalsBeaten(score, oldBest);
+      const verdict = this.mind.onEpisodeEnd(kind, { score, newBest, novel: ep.novel });
       this.app.episodeDone(this);
       await this.persist();
       if (this.dead) return;
+      if (verdict === 'stop') { this.stopByChoice(); return; }
       // 💤 dream
       this.phase = 'dreaming';
       this.heart.dreaming = true;
@@ -6140,6 +7161,8 @@ AIP.Session = (function () {
     // no coach (offline / no key / out of free limit): the old simple way
     localTip(text, parsed) {
       const p = parsed || AIP.tips.parse(text);
+      if (/what.*(do you|u) (like|love|enjoy)|favou?rite|what.*fun\b/i.test(text)) { this.voice.raw(this.mind.describeLikes(), 3, 'answer'); return; }
+      if (/\bgoal\b|what.*(you|u).*(want|trying to)/i.test(text)) { this.voice.raw(this.mind.describeGoal(), 3, 'answer'); return; }
       const ans = this.voice.answer(text, { reason: this.reason, learned: this.brain.learned(null, this.primaryLabels()), game: this.game.name, best: AIP.squad.gameStats(this.ai, this.game.id).best, tries: AIP.squad.gameStats(this.ai, this.game.id).tries, scoreLabel: this.lastObs && this.lastObs.scoreLabel });
       if (!p.tips.length && ans) { this.voice.raw(ans, 2, 'answer'); return; }
       if (p.tips.length) { this.voice.say('tipThanks', { tip: p.tips[0].text }, 3); return; }
@@ -6163,6 +7186,9 @@ AIP.Session = (function () {
         trophies: Object.keys(tro.got).length + (tro.list.length ? '/' + tro.list.length : ''),
         learned: B.learned(null, this.primaryLabels()).filter((l) => l.good).slice(0, 8).map((l) => l.text),
         notes: (this.game.notes || []).slice(-5), story: (st.story || []).slice(-3), mood: this.heart.dominant().name, lastLesson: this.coach.lastLesson || '',
+        myGoal: this.mind.goalLabel() || 'none yet', goalsDone: (st.goals && st.goals.done || []).map((k) => AIP.Mind.GOAL_WORD[k]),
+        favorite: this.mind.favorite() ? this.mind.wordsFor(this.mind.favorite()) : null,
+        myInventions: this.mind.keepers().slice(-3).map((i) => i.name + ' (' + i.desc + ')'),
       };
     }
     localReport(sum) {
@@ -6170,7 +7196,25 @@ AIP.Session = (function () {
       const grade = sum.wins ? 'A' : up ? 'B' : sum.tries >= 3 ? 'C' : 'D';
       return 'Grade: ' + grade + '\nWhat I learned: ' + (sum.learned.slice(0, 3).join('; ') || 'not much yet') +
         '\nBest moment: ' + (sum.bestThisTime != null ? 'scoring ' + sum.bestThisTime : 'just getting started') +
-        '\nStill hard: ' + (sum.deaths ? 'not dying so much' : 'figuring out the goal') + '\nNext goal: ' + (sum.bestEver != null ? 'beat ' + sum.bestEver : 'get my first points');
+        '\nStill hard: ' + (sum.deaths ? 'not dying so much' : 'figuring out the goal') + '\nNext goal: ' + (sum.myGoal !== 'none yet' ? sum.myGoal : sum.bestEver != null ? 'beat ' + sum.bestEver : 'get my first points') +
+        (sum.favorite ? '\nFavorite thing: ' + sum.favorite : '') + (sum.myInventions.length ? '\nMy inventions: ' + sum.myInventions.join(', ') : '');
+    }
+    // 🏁 it decided it's done with this game (it got what it wanted and it's bored of it)
+    stopByChoice() {
+      this.phase = 'done';
+      this.hands.releaseAll();
+      this.reason = '🏁 done with this game (my choice)';
+      this.voice.say('wantStop', { game: this.game.name }, 3);
+      this.diary('done', 'Decided I was done with ' + this.game.name + '. ' + (this.mind.describeGoal ? 'Goals done: ' + ((this.brain.stats.goals.done || []).map((k) => AIP.Mind.GOAL_WORD[k]).join(', ') || 'none') : '') + ' 🏁');
+      this.reportNow();
+      this.app.showDone && this.app.showDone(this);
+    }
+    // you asked it to keep going - it decides
+    keepGoing() {
+      if (this.phase !== 'done') return false;
+      const yes = this.mind.askContinue();
+      if (yes) { this.keepGoingAt = performance.now(); this.mind.boredSince = 0; this.newEpisode(); this.phase = 'restart'; this.restart = { t0: performance.now(), next: 0, i: 0 }; }
+      return yes;
     }
     async reportNow() {
       const sum = this.summary();
@@ -6589,9 +7633,43 @@ AIP.practice = [
     if (heavy) coachStatus();
     if (heavy && app.tab === 'coach') renderCoachTab(s);
     if (app.tab === 'feel') renderMeters(h, pm);
+    if (heavy) renderMind(s);
     if (app.tab === 'think') renderThinking(s);
     if (heavy && app.tab === 'learn') renderLearned(s);
     if (heavy && app.tab === 'keys') renderKeys(s);
+  };
+  // 💖🎯💡 the AI's own mind - read-only (nobody sets it, not even you)
+  function renderMind(s) {
+    if (!s.mind || !s.brain.stats.goals) return;
+    const M = s.mind, S = s.brain.stats;
+    const chip = $('#goalChip'), gl = M.goalLabel();
+    chip.hidden = !gl;
+    if (gl) chip.textContent = '🎯 ' + gl;
+    if (app.tab !== 'feel') return;
+    const g = S.goals.cur;
+    const likes = M.topLikes(6, 1), dis = M.topLikes(3, -1);
+    const bar = (v) => '<div class="like-track"><i style="width:' + Math.round(Math.min(1, Math.abs(v)) * 100) + '%;background:' + (v > 0 ? '#ff4fd8' : '#5aa9ff') + '"></i></div>';
+    const row = (k) => '<div class="like-row"><span>' + esc(M.wordsFor(k)) + '</span>' + bar(S.likes[k].v) + '</div>';
+    const ideas = (S.ideas || []).filter((i) => i.kind !== 'fun' && i.tries > 0).sort((a, b) => (b.status === 'keeper') - (a.status === 'keeper') || b.score - a.score).slice(0, 8);
+    $('#mind').innerHTML =
+      '<h4>🎯 My goal <span class="note">(I picked it myself)</span></h4>' +
+      (g ? '<p><b>' + esc(gl) + '</b><br><span class="note">because ' + esc(g.why) + '</span></p><div class="like-track goal"><i style="width:' + Math.round(M.progress(g) * 100) + '%"></i></div>' : '<p class="note">Still figuring this game out before I decide what I want.</p>') +
+      (S.goals.done.length ? '<p class="note">✅ Done: ' + S.goals.done.map((k) => esc(AIP.Mind.GOAL_WORD[k])).join(', ') + '</p>' : '') +
+      '<h4>💖 What I like here</h4>' + (likes.length ? likes.map(row).join('') : '<p class="note">Still finding out…</p>') +
+      (dis.length ? '<h4>💔 Not my thing</h4>' + dis.map(row).join('') : '') +
+      '<h4>💡 My ideas notebook</h4>' + (ideas.length ? '<ul class="ideas">' + ideas.map((i) => '<li class="' + i.status + '">' + (i.status === 'keeper' ? '✅' : i.status === 'dropped' ? '❌' : '🤔') + ' <b>' + esc(i.name) + '</b>' + (i.from === 'coach' ? ' <span class="tag">coach idea</span>' : '') + '<br><span class="note">' + esc(i.desc) + ' · tried ' + i.tries + 'x</span></li>').join('') + '</ul>' : '<p class="note">No inventions yet. Give me a minute 😏</p>');
+  }
+  app.mindUpdated = (s) => { if (app.session === s) renderMind(s); };
+  // 🏁 it decided it's done with this game - you can ask it to keep going (it decides)
+  app.showDone = (s) => {
+    const log = $('#chatlog');
+    const el = document.createElement('div');
+    el.className = 'msg sys done';
+    el.innerHTML = '🏁 ' + esc(s.ai.name) + ' decided it\'s done with this game. <button class="btn sm" type="button">Ask ' + esc(s.ai.name) + ' to keep going</button>';
+    log.appendChild(el);
+    const box = log.parentElement.parentElement; box.scrollTop = box.scrollHeight;
+    const b = el.querySelector('button');
+    b.onclick = () => { if (app.session !== s) return; const yes = s.keepGoing(); b.disabled = true; b.textContent = yes ? 'It said yes! 🔥' : 'It said no 😌'; };
   };
   function renderMeters(h, pm) {
     const rows = H.EMOS.map((k) => ({ k, v: h.e[k] }));
@@ -6813,7 +7891,7 @@ AIP.practice = [
     const medal = ['🥇', '🥈', '🥉'];
     $('#board').innerHTML = '<table class="board-table"><tr><th>#</th><th>AI</th><th style="text-align:right">Best</th><th style="text-align:right">Tries</th><th style="text-align:right">Wins</th><th style="text-align:right">🏆 Trophies</th><th style="text-align:right">Time played</th></tr>' +
       rows.map((r, i) => `<tr><td>${medal[i] || i + 1}</td><td><div class="bwho"><div class="mini">${AIP.avatar.svg(r.ai.look, calmFace(r.ai))}</div>${esc(r.ai.name)}</div></td>
-        <td class="num">${U.fmt(r.s.best)}${esc(kindWord(r.s.scoreKind))}</td><td class="num">${r.s.tries}</td><td class="num">${r.s.wins || 0}</td><td class="num">${r.s.trophies || 0}${r.s.trophyTotal ? ' / ' + r.s.trophyTotal : ''}</td><td class="num">${Math.round((r.s.timeMs || 0) / 60000)} min</td></tr>`).join('') + '</table>';
+        <td class="num">${U.fmt(r.s.best)}${esc(kindWord(r.s.scoreKind))}</td><td class="num">${r.s.tries}</td><td class="num">${r.s.wins || 0}${r.s.beaten ? ' ✅' : ''}</td><td class="num">${r.s.trophies || 0}${r.s.trophyTotal ? ' / ' + r.s.trophyTotal : ''}</td><td class="num">${Math.round((r.s.timeMs || 0) / 60000)} min</td></tr>`).join('') + '</table>';
   }
 
   /* ================= diary ================= */
@@ -6914,7 +7992,7 @@ AIP.practice = [
     const P = s.coach.plan;
     if (AIP.gemini.ready() && P && P.goal) {
       box.hidden = false;
-      box.innerHTML = '🧠 <b>Goal:</b> ' + esc(P.goal) + (P.plan && P.plan.length ? '<ol>' + P.plan.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' : '');
+      box.innerHTML = '🧠 <b>Coach plan:</b> ' + esc(P.goal) + (P.plan && P.plan.length ? '<ol>' + P.plan.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' : '');
     } else box.hidden = true;
   }
   function renderCoachTab(s) {

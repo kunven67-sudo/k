@@ -36,6 +36,8 @@ AIP.Coach = (function () {
       stuck: { type: 'boolean', description: 'true if the reflex brain looks stuck and you should take over briefly' },
       type: { type: 'object', description: 'ONLY when a TEXT BOX needs text (name, answer, riddle, guess, password, command) or a typing game shows words to type: what to type', properties: { box: { type: 'integer', description: 'number of the TEXT BOX, or -1 to just type on the keyboard (typing games)' }, text: { type: 'string' }, enter: { type: 'boolean', description: 'press Enter after (default true)' } }, required: ['text'] },
       lesson: { type: 'string', description: 'for a death review: what went wrong and what to do next time, else empty' },
+      idea: { type: 'object', description: 'ONLY when it is stuck or bored: ONE creative move idea that fits its likes (it may refuse)', properties: { name: { type: 'string' }, why: { type: 'string' }, steps: { type: 'array', items: { type: 'object', properties: { keys: { type: 'array', items: { type: 'string' } }, ms: { type: 'integer' } }, required: ['keys', 'ms'] } } }, required: ['name', 'steps'] },
+      game_facts: { type: 'object', description: 'facts about the game if you can tell', properties: { can_win: { type: 'boolean', description: 'does this game have an ending / win?' }, trophy_total: { type: 'integer', description: 'how many trophies/achievements exist, if shown' } } },
     },
     required: ['see', 'goal', 'say'],
   };
@@ -128,6 +130,7 @@ AIP.Coach = (function () {
         story.length ? 'STORY SO FAR:\n' + story.join('\n') : '',
         'TROPHIES/ACHIEVEMENTS: ' + trophies + (B.stats.flags && B.stats.flags.askedTrophies ? ' (already asked the player about trophies)' : ''),
         this.chatLog.length ? 'RECENT CHAT:\n' + this.chatLog.slice(-6).join('\n') : '',
+        s.mind ? s.mind.forCoach() : '',
       ];
       return lines.filter(Boolean).join('\n');
     }
@@ -143,6 +146,7 @@ AIP.Coach = (function () {
         'Story games: READ the dialogue, react to it, summarize it in "story", and pick choices on purpose (explain why). Don\'t skip story.',
         'Trophies are a separate bonus goal from winning. If you can see a trophy/achievement list, fill "trophies". If you don\'t know what trophies exist and haven\'t asked yet, you may ask the player once via "ask".',
         'Write a "note" only for genuinely new, useful facts about this game.',
+        'The AI chose its OWN goal and has its own likes - help it get what IT wants (its goal), never boss it around. If it is stuck or bored you may suggest ONE creative "idea" (a short key sequence, ms per step) that fits what it likes; it decides itself whether to try it. Fill "game_facts" when you can tell if the game can be won or how many trophies exist.',
         'It can TYPE real text: fill "type" when a text box needs something (name boxes: its own name; riddles/questions/passwords: solve them, look for clues; guess-the-number: binary search from the feedback; text adventures: one good command like "open door" or "go north") or when a typing game shows words (box -1). Leave "type" empty otherwise.',
       ].join('\n');
     }
@@ -212,6 +216,7 @@ AIP.Coach = (function () {
       if (p.story && p.story.length > 4) { B.stats.story = B.stats.story || []; if (B.stats.story[B.stats.story.length - 1] !== p.story) { B.stats.story.push(p.story.slice(0, 160)); if (B.stats.story.length > 60) B.stats.story.shift(); } }
       if (p.trophies && p.trophies.length) s.mergeTrophies(p.trophies);
       if (p.type || reason === 'type') s.typist.fromCoach(p.type, reason);
+      if (s.mind) { if (p.idea) s.mind.coachIdea(p.idea); if (p.game_facts) s.mind.gameFacts(p.game_facts); }
       if (p.lesson) { this.lastLesson = p.lesson; B.addMemory('lesson', p.lesson.slice(0, 80), 0.6); }
       // 🗣️ talking (the coach's smart lines) - replies to you always get said
       if (p.reply && extra && (extra.text || reason === 'player')) { s.voice.raw(p.reply, 3, 'coach'); this.chatLog.push(s.ai.name + ': ' + p.reply); }

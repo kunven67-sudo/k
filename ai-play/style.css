@@ -313,3 +313,20 @@ input[type="range"] { accent-color: var(--pink); width: 180px; }
 .msg { white-space: pre-wrap; }
 .mic.on { border-color: var(--red); background: rgba(255, 59, 92, .2); box-shadow: 0 0 12px rgba(255, 59, 92, .6); animation: twinkle .8s infinite; }
 .report-text { text-align: left; white-space: pre-wrap; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 14px; max-height: 50vh; overflow: auto; }
+
+/* 🎯💖💡 the AI's own mind */
+.goal-chip { display: inline-flex; align-items: center; margin-top: 5px; margin-left: 4px; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 20px; border: 1px solid rgba(255, 79, 216, .5); background: rgba(255, 79, 216, .08); color: #ffc7f2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mind h4 { margin: 14px 0 6px; font-size: 13px; }
+.mind p { margin: 4px 0; font-size: 13px; }
+.like-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px; gap: 8px; align-items: center; font-size: 12.5px; margin: 3px 0; }
+.like-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.like-track { height: 8px; border-radius: 6px; background: var(--panel2); overflow: hidden; border: 1px solid var(--line); }
+.like-track i { display: block; height: 100%; border-radius: 6px; }
+.like-track.goal { margin: 4px 0 8px; height: 10px; }
+.like-track.goal i { background: linear-gradient(90deg, #ff4fd8, #19f6ff); }
+.ideas { list-style: none; margin: 0; padding: 0; }
+.ideas li { padding: 5px 0; border-bottom: 1px dashed var(--line); font-size: 12.5px; }
+.ideas li.dropped b { text-decoration: line-through; opacity: .6; }
+.ideas .tag { font-size: 10px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--line); color: var(--dim); }
+.msg.sys.done { color: var(--text); background: rgba(255, 79, 216, .08); border: 1px dashed rgba(255, 79, 216, .45); border-radius: 10px; padding: 8px; }
+.msg.sys.done .btn { margin-left: 6px; }

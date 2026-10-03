@@ -294,7 +294,7 @@ AIP.Brain = (function () {
       dirKeys.sort((a, b) => b[1] - a[1]); actKeys.sort((a, b) => b[1] - a[1]);
       const wantCombos = new Set();
       dirKeys.slice(0, 2).forEach(([d]) => actKeys.slice(0, 1).forEach(([a]) => wantCombos.add('k:' + d + '+' + a)));
-      this.actions.forEach((a) => { if (a.keys.length > 1 && a.id.indexOf('k:') === 0 && !wantCombos.has(a.id) && !a.fromUser) a.active = false; });
+      this.actions.forEach((a) => { if (a.keys.length > 1 && a.id.indexOf('k:') === 0 && !wantCombos.has(a.id) && !a.fromUser && !a.fromIdea) a.active = false; });
       wantCombos.forEach((id) => this.ensureAction(id, { keys: id.slice(2).split('+') }));
     }
 
@@ -738,8 +738,11 @@ AIP.Brain = (function () {
       if (this.routine) {
         const r = this.routine;
         const st = r.steps[r.i++];
-        if (r.i >= r.steps.length) this.routine = null;
-        const slot = Math.max(0, this.slotOf(st.id || 'noop'));
+        if (r.i >= r.steps.length) { this.routine = null; this.routineDone = { ideaId: r.ideaId || null, name: r.name, at: now }; }
+        // credit the REAL move (so the brain learns from fun moves + ideas too, not "wait")
+        let slot = st.id ? this.slotOf(st.id) : 0;
+        if (slot < 0 && st.id) slot = this.ensureAction(st.id, { keys: st.keys || [], mouse: st.mouse || null }, false);
+        slot = Math.max(0, slot);
         const d = { keys: st.keys || [], mouse: st.mouse || null, slot, reason: r.why };
         this.remember(slot, key, ctx, st.keys || [], st.mouse ? (st.id || null) : null);
         this.lastReason = d.reason;
@@ -829,7 +832,7 @@ AIP.Brain = (function () {
       const vals = [];
       for (const s of slots) {
         const a = this.actions[s];
-        const p = { brain: (q[s] - mean) / sd * 0.9 * trust, memory: 0, copy: 0, instinct: inst[s] * mods.instinct, tip: 0, curious: 0, stick: 0, menu: 0, coach: coachV[s] };
+        const p = { brain: (q[s] - mean) / sd * 0.9 * trust, memory: 0, copy: 0, instinct: inst[s] * mods.instinct, tip: 0, curious: 0, stick: 0, menu: 0, coach: coachV[s], like: this.likeOf ? this.likeOf(a) : 0 };
         if (epiE && eN >= 2 && !isNaN(epiE[s])) p.memory = U.clamp((epiE[s] - eMean) * 1.5, -0.8, 0.8);
         if (copyLog) p.copy = copyW * (copyLog[s] + Math.log(slots.length)) * 0.5;
         // curiosity: try stuff I haven't figured out yet
@@ -926,8 +929,10 @@ AIP.Brain = (function () {
           if (c == null || c < 0) return what + ' - gut feeling 🫃';
           return this.assoc.val[c] > 0 ? what + ' - going for the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] : what + ' - getting AWAY from the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] + ' 😨';
         }
+        case 'like': return what + ' - I just like doing this ❤️';
         case 'tip': return what + (a.keys.some((k) => this.controls[k] && /coach/.test(this.controls[k].tip || '')) ? ' - my coach taught me this 🧠' : ' - you told me to ✍️');
-        case 'coach': return what + ' - coach plan: ' + ((this.coach && (this.coach.target && this.coach.target.what || this.coach.goal)) || 'go there') + ' 🧠🎯';
+        case 'coach': if (this.coach && this.coach.auto) return what + ' - following the marker 🧭';
+          return what + ' - coach plan: ' + ((this.coach && (this.coach.target && this.coach.target.what || this.coach.goal)) || 'go there') + ' 🧠🎯';
         case 'curious': return what + ' - never really tried this... what does it do? 🤔';
         case 'menu': return what + ' - looks like a menu, gotta start the game ▶️';
         default: return p.brain > 0.3 ? what + ' - my brain says this is the best move 🧠' : what + ' - just feeling it out 🤷';
@@ -938,7 +943,7 @@ AIP.Brain = (function () {
       let best = null, bs = -Infinity;
       for (const b of buttons) {
         const learned = this.buttonValue[b.text.toLowerCase()] || 0;
-        const s = b.prio * 2 + learned + Math.random() * 0.8;
+        const s = b.prio * 2 + learned + Math.random() * 0.8 + (this.btnBias ? this.btnBias(b.text) : 0);
         if (s > bs) { bs = s; best = b; }
       }
       return best;
@@ -1203,6 +1208,41 @@ AIP.Brain = (function () {
       return { name, why };
     }
 
+    /* ---------------- 💖 what an action IS (the mind can like or dislike it) ---------------- */
+    tagsOf(a) {
+      if (!a) return [];
+      if (a.id === 'noop' || (!a.mouse && !a.keys.length)) return ['wait'];
+      if (a.mouse) return [{ look: 'look', btn: 'btn', click: 'click', hold: 'click', goto: 'aim' }[a.mouse.t] || 'mouse'];
+      const out = [];
+      for (const code of a.keys) {
+        const c = this.controls[code];
+        if (!c || c.status === 'new') continue;
+        if (Math.hypot(c.gx, c.gy) > 0.4) { out.push('look'); continue; }
+        const d = dirOf(c);
+        if (/jump/i.test(c.tip || '')) { out.push('jump'); continue; }
+        if (isDirLabel(c)) { out.push('move', 'move:' + (Math.abs(d[0]) >= Math.abs(d[1]) ? (d[0] > 0 ? 'r' : 'l') : (d[1] > 0 ? 'd' : 'u'))); continue; }
+        out.push('act', 'act:' + code);
+      }
+      if (a.keys.length > 1) out.push('combo');
+      return [...new Set(out)];
+    }
+    isMoveKey(code) { const c = this.controls[code]; return !!(c && isDirLabel(c) && Math.hypot(c.gx, c.gy) <= 0.4); }
+    moveDir(code) { const c = this.controls[code]; return c ? dirOf(c) : [0, 0]; }
+    // 💡 do an idea: a little plan of steps ({keys, n: ticks to hold, gap: let go after, mouse})
+    runIdea(idea, why) {
+      const steps = [];
+      for (const st of idea.steps || []) {
+        const keys = (st.keys || []).filter((k) => KEYS.map[k]);
+        const id = st.mouse ? (st.id || null) : keys.length ? 'k:' + keys.join('+') : 'noop';
+        for (let i = 0, n = U.clamp(st.n || 1, 1, 40); i < n; i++) steps.push({ keys, id, mouse: st.mouse || null });
+        if (st.gap) steps.push({ keys: [], id: 'noop' });
+      }
+      if (!steps.length || steps.length > 160) return false;
+      this.lab = null;
+      this.routine = { name: idea.name, steps, i: 0, why: why || "💡 trying my idea '" + idea.name + "'", ideaId: idea.id };
+      return true;
+    }
+
     /* ---------------- what it knows (for the "What it learned" list) ---------------- */
     learned(readouts, primary) {
       const out = [];
@@ -1235,6 +1275,8 @@ AIP.Brain = (function () {
       if (this.self.cat != null && this.self.camera < 0.5) out.push({ kind: 'self', icon: AIP.COLORS.emoji[this.self.cat], text: "I'm " + AIP.COLORS.names[this.self.cat] + (this.self.tracked ? " (and I'm keeping an eye on myself 👀)" : ''), good: true, sort: -1.4 });
       if (this.self.camera > 0.5) out.push({ kind: 'self', icon: '🎥', text: "I see through my own eyes (it's 3D!)", good: true, sort: -1.5 });
       this.tips.slice(-4).forEach((t) => out.push({ kind: 'tip', icon: '✍️', text: 'you said: "' + t.text + '"', good: true, sort: 5 }));
+      // 💡 moves it invented itself (and that work)
+      (this.stats.ideas || []).filter((i) => i.status === 'keeper' && i.kind !== 'fun').slice(-5).forEach((i) => out.push({ kind: 'idea', icon: '💡', text: 'I invented ' + i.name + ': ' + i.desc, good: true, sort: 0.4 }));
       // ⌨️ what it learned from typing
       const T = this.stats.typing;
       if (T) {
@@ -1289,7 +1331,10 @@ AIP.Brain = (function () {
         for (let i = 0; i < nov.length; i += 2) this.novel.set(nov[i], nov[i + 1]);
         this.replay.load(d.replay);
         this.epStartSeq = this.replay.seq;
+        // (re-adding saved demos must not look like "you just showed me" - keep the real date)
+        const ldEp = this.stats.lastDemoEp;
         if (d.demos && d.demos.ids) d.demos.ids.forEach((id, i) => this.pushDemo(d.demos.S.subarray(i * IN, i * IN + IN), id, d.demos.from || 'you'));
+        this.stats.lastDemoEp = ldEp;
         // re-check actions point at valid things
         this.actions.forEach((a) => { if (a && !a.label) a.label = this.labelOfSpec(a.id, a); });
         return true;

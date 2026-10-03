@@ -42,7 +42,10 @@ AIP.Heart = (function () {
       this.deaths = [];
       this.sinceNovel = 0;
       this.dreaming = false;
+      this.imp = {};
     }
+    // feelings that just changed (since the last time the mind asked)
+    takeImpulses() { const i = this.imp; this.imp = {}; return i; }
     base(k) {
       const t = this.t;
       return {
@@ -54,7 +57,10 @@ AIP.Heart = (function () {
     feel(k, amt, why) {
       if (!amt) return;
       const k2 = (0.55 + 0.9 * this.t.drama) * (amt > 0 ? 1 : 0.8);
+      const before = this.e[k];
       this.e[k] = U.clamp(this.e[k] + amt * k2, 0, 1);
+      // remember the jolt (the mind uses these to learn what it LIKES doing)
+      if (this.e[k] !== before) this.imp[k] = (this.imp[k] || 0) + (this.e[k] - before);
       if (amt > 0 && why) this.why[k] = { text: why, at: Date.now() };
     }
     drift(trait, amt) { this.t[trait] = U.clamp(this.t[trait] + amt, 0.02, 0.98); }
@@ -133,6 +139,13 @@ AIP.Heart = (function () {
           case 'goodDream': this.feel('happy', 0.08, 'a good dream'); this.feel('relieved', 0.1); break;
           case 'stuck': this.feel('mad', 0.08 * t.temper, 'being stuck'); this.feel('bored', 0.12, 'being stuck'); this.feel('confused', 0.12, 'being stuck'); break;
           case 'gameStart': this.feel('excited', 0.2, 'a new game'); this.feel('curious', 0.25, 'a new game'); break;
+          case 'ideaWorked': this.feel('proud', 0.3, 'my idea worked'); this.feel('happy', 0.2, 'my idea worked'); this.feel('bored', -0.2); break;
+          case 'ideaFailed': if (t.silliness > 0.55) this.feel('happy', 0.08, 'a silly idea'); else { this.feel('confused', 0.06); this.feel('mad', 0.04 * t.temper); } break;
+          case 'likedThing': this.feel('happy', 0.12, 'doing what I like'); break;
+          case 'goalPicked': this.feel('determined', 0.25, 'my new goal'); this.feel('excited', 0.12, 'my new goal'); break;
+          case 'goalDone': this.feel('proud', 0.5, 'reaching my goal'); this.feel('relieved', 0.35); this.feel('happy', 0.3, 'reaching my goal'); this.drift('pride', 0.005); this.drift('optimism', 0.004); break;
+          case 'goalGiveUp': this.feel('sad', 0.1, 'giving up for now'); this.feel('relieved', 0.2); this.feel('mad', -0.2); break;
+          case 'milestone': this.feel('proud', 0.2, 'finishing a mission'); this.feel('happy', 0.12); break;
           default: break;
         }
       }
@@ -192,6 +205,9 @@ AIP.Heart = (function () {
         // "reaction time" - sad/scared/bored = slower, mad/excited/determined = faster
         reaction: U.clamp(115 * (1 + 0.6 * e.sad + 0.4 * e.scared * (1 - t.bravery) + 0.35 * e.bored - 0.35 * e.mad - 0.3 * e.excited - 0.2 * e.determined), 55, 260),
         fun: U.clamp((e.happy * 0.5 + e.bored * 0.9 + e.proud * 0.4 + e.excited * 0.2) * (0.25 + t.silliness) - e.scared * 0.6 - this.pain, 0, 1.5),
+        // how much "I like doing this" steers it, and how much it wants to invent something new
+        whim: U.clamp(0.3 + 0.5 * e.bored + 0.4 * e.happy + 0.3 * t.silliness - 0.4 * e.scared - 0.25 * e.determined, 0, 1.5),
+        create: U.clamp(0.1 + 0.6 * e.bored + 0.35 * t.curiosity * (0.5 + e.curious) + 0.3 * t.silliness * e.happy + 0.3 * e.confused - 0.5 * e.scared - this.pain, 0, 1.5),
       };
     }
 

@@ -504,7 +504,8 @@ AIP.loader = (function () {
     try {
       var note = function (m) { if (aip.alerts.length > 200) aip.alerts.splice(0, 100); aip.alerts.push(String(m)); };
       W.alert = function (m) { note(m); };
-      W.confirm = function (m) { note(m); return true; };
+      // "Erase everything?" / "Restart the day?" -> no thanks (it never throws away its own progress by accident)
+      W.confirm = function (m) { note(m); return !/erase|restart|start over|reset|delete|replace|overwrite|lose (your|all)|wipe|quit/i.test(String(m || '')); };
       W.prompt = function (m, d) { note(m); return d == null ? '' : String(d); };
       W.open = function () { return null; };
       W.Element.prototype.requestFullscreen = function () { return Promise.resolve(); };

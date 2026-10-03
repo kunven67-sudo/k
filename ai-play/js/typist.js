@@ -189,6 +189,8 @@ AIP.Typist = (function () {
         case 'number': {
           const math = solveMath(question) || texts.map(solveMath).find(Boolean);
           if (math && st.tried.indexOf(math.a) < 0) return { text: math.a, why: 'math! ' + math.q + ' = ' + math.a, line: 'typeMath', vars: { q: math.q } };
+          // "how much to convert / pay?" with a max -> all of it
+          if (/amount|convert|how much|deposit|withdraw|spend|pay|buy|bet/i.test(f.label + ' ' + texts.slice(-4).join(' ')) && f.el.max !== '' && isFinite(+f.el.max) && +f.el.max > 0 && st.tried.indexOf(String(+f.el.max)) < 0) return { text: String(+f.el.max), why: 'all of it!', line: 'typeGuess' };
           const g = st.guess || (st.guess = this.range(f, all));
           if (g.lo > g.hi) { st.guess = this.range(f, all); return this.decide(f, obs, now); }
           const n = Math.floor((g.lo + g.hi) / 2);
@@ -321,7 +323,13 @@ AIP.Typist = (function () {
         J.mo.observe(d.body, { subtree: true, childList: true, characterData: true, attributes: true });
       } catch (e) { /* ignore */ }
     }
-    endJob() { const J = this.job; if (J && J.mo) try { J.mo.disconnect(); } catch (e) { /* ignore */ } this.job = null; }
+    endJob() {
+      const J = this.job;
+      if (J && J.mo) try { J.mo.disconnect(); } catch (e) { /* ignore */ }
+      // done typing: let go of the box (like clicking back on the game) so game keys work again
+      if (J && J.el && J.f && J.f.kind !== 'command' && J.f.kind !== 'number' && J.f.kind !== 'answer') try { if (J.el.ownerDocument.activeElement === J.el) J.el.blur(); } catch (e) { /* ignore */ }
+      this.job = null;
+    }
 
     runJob(obs, now) {
       const J = this.job, s = this.s, h = s.hands;

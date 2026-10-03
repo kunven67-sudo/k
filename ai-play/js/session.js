@@ -31,6 +31,8 @@ AIP.Session = (function () {
       this.freshLog = []; this.pauseKeys = new Set(); this.aliveAt = 0;
       this.coach = new AIP.Coach(this);
       this.typist = new AIP.Typist(this);
+      this.mind = new AIP.Mind(this);
+      this.bonus = 0; // extra reward from big moments (trophies, missions) - not the same as YOUR 👍
       this.recentEvents = []; this.lastScoreAt = 0; this.stuckFor = 0;
       this.reading = null; this.take = null;
       this.errorsShown = 0;
@@ -50,6 +52,7 @@ AIP.Session = (function () {
       try { rec = await AIP.db.get('brains', this.ai.id + '|' + this.game.id); } catch (e) { /* first time */ }
       if (rec) { this.brain.load(rec); this.gameStore = rec.gameSave || {}; }
       this.brain.stats.flags = this.brain.stats.flags || {};
+      this.mind.load();
       const gs = AIP.squad.gameStats(this.ai, this.game.id);
       // missing some internet parts from when it was added? try to grab them now (so next time works offline)
       try {
@@ -148,7 +151,7 @@ AIP.Session = (function () {
 
     step() {
       const now = performance.now();
-      if (this.phase === 'loading' || this.phase === 'broken' || this.phase === 'dreaming') { this.ui(now, null); return; }
+      if (this.phase === 'loading' || this.phase === 'broken' || this.phase === 'dreaming' || this.phase === 'done') { this.ui(now, null); return; }
       const st = AIP.settings.get();
       const obs = this.senses.sense();
       this.hands.tick();
@@ -176,6 +179,7 @@ AIP.Session = (function () {
       };
       const feels = this.heart.react(events, ctx);
       this.heart.update(dt, ctx);
+      this.mind.tick(dt, events, obs, now); // 💖 likes / 💡 ideas / 🎯 goals
       this.talkAbout(events, feels, obs, ctx);
 
       if (this.mode === 'pause') { this.hands.releaseAll(); this.ui(now, obs); return; }
@@ -196,20 +200,27 @@ AIP.Session = (function () {
       if (this.mode === 'ai' && this.readStory(obs, now)) { this.ui(now, obs); return; }
       // ✍️ a text box wants typing (name, guess, answer, command...) or a typing game shows words
       if (this.mode === 'ai' && this.typist.step(obs, now)) { this.ui(now, obs); return; }
+      // 👊 "SPAM E!" -> mash it / 💬 "[E] Open the door" -> press it
+      if (this.mode === 'ai' && (this.mash(obs, now) || this.keyHint(obs, now))) { this.ui(now, obs); return; }
       }
       else if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
 
-      const mods = this.heart.mods(st.painMode);
+      const mods = this.mind.adjustMods(this.heart.mods(st.painMode));
+      // 🧭 a waypoint marker on screen (3D games)? head for it (unless the coach has its own plan)
+      const BC = this.brain.coach;
+      if (obs.marker && this.mode === 'ai' && (!BC || BC.auto || now > BC.until)) this.brain.coach = { target: { x: obs.marker.x, y: obs.marker.y, what: 'the marker' }, goal: 'follow the marker', until: now + 1200, avoid: new Set(), forward: this.coach.forwardKeys(), auto: true };
       if (!end && now - this.ep.t0 > 150000) end = 'segment';
       // testing whether a key paused the game? hands off until the test is done
       if (this.mode === 'ai' && this.checkPause(obs, now)) { this.ui(now, obs); return; }
       const reward = this.reward(obs, events, mods, st.painMode);
+      this.mind.noteReward(reward, dt);
       const userNow = this.mode === 'watch' ? this.userSnapshot() : null;
-      const decision = this.brain.step(obs, reward, !!end, mods, { mx: this.hands.mx, my: this.hands.my, user: userNow });
+      // (a "segment" is just a save point - the game didn't really end, so don't teach the brain it did)
+      const decision = this.brain.step(obs, reward, !!end && end !== 'segment', mods, { mx: this.hands.mx, my: this.hands.my, user: userNow });
       this.reason = decision.reason;
       if (this.mode === 'ai' && !end) {
         this.apply(decision);
-        this.maybeHaveFun(obs, mods, dt, now);
+        this.mind.maybeCreate(obs, mods, dt, now); // 💡 its own ideas (and fun moves) when it feels like it
       }
       if (this.mode === 'watch' && userNow && userNow.keys.size && U.chance(0.02)) {
         const k = [...userNow.keys][0];
@@ -264,16 +275,20 @@ AIP.Session = (function () {
           case 'flash': if (!obs.hp && !obs.lives) r -= 0.25; break;
           case 'gameOver': case 'healthZero': r -= 1; break;
           case 'win': r += 2; break;
+          case 'milestone': r += 1; break;
           default: break;
         }
       }
       r += 0.07 * mods.curiosity * (this.brain.noveltyNow || 0);
+      r += this.mind.intrinsic(events, obs); // doing what it likes + its own goal
+      if (this.bonus) { r += this.bonus; this.bonus = 0; }
       if (obs.staticTime > 3) r -= 0.02;
       if (this.pendingFb) { r += this.pendingFb; this.brain.retroReward(this.pendingFb * 0.6); this.pendingFb = 0; }
       return U.clamp(r, -2, 2.5);
     }
 
     apply(d) {
+      this.lastDecision = d;
       const h = this.hands;
       const now = performance.now(), prevKeys = this.lastKeys || [];
       (d.keys || []).filter((k) => prevKeys.indexOf(k) < 0).forEach((k) => this.freshLog.push({ code: k, t: now }));
@@ -340,14 +355,6 @@ AIP.Session = (function () {
       return false;
     }
 
-    maybeHaveFun(obs, mods, dt, now) {
-      if (this.brain.routine || mods.fun < 0.35) return;
-      if (now - this.ep.lastDamageAt < 4000 || (obs.healthFrac != null && obs.healthFrac < 0.5)) return;
-      if (!U.chance(mods.fun * dt * 0.035)) return;
-      const r = this.brain.startRoutine(U.pick(['dance', 'spam', 'spin', 'wiggle']));
-      this.voice.say('fun', {}, 1);
-      this.reason = r.why;
-    }
 
     // keep a short list of what just happened (the coach reads this)
     noteEvents(events, now) {
@@ -359,10 +366,19 @@ AIP.Session = (function () {
         else if (e.type === 'death' && e.soft) line = 'lost a life';
         else if (e.type === 'gameOver') line = 'GAME OVER';
         else if (e.type === 'win') line = 'WON';
-        else if (e.type === 'trophy') line = 'trophy: ' + e.name;
+        else if (e.type === 'trophy') line = 'trophy: ' + (e.name || '?');
+        else if (e.type === 'milestone') line = 'mission done: ' + e.text;
         else if (e.type === 'progress') line = e.label + ' ' + e.value;
         if (line) { this.recentEvents.push(t + ' ' + line); if (this.recentEvents.length > 14) this.recentEvents.shift(); }
         if (e.type === 'trophy') this.gotTrophy(e);
+        if (e.type === 'trophyList') { this.mergeTrophies(e.items); this.mind.peekedAt = now; }
+        if (e.type === 'milestone') {
+          this.bonus += 0.5;
+          this.heart.react([{ type: 'milestone' }], {});
+          const f = this.brain.stats.flags; f.missions = (f.missions || 0) + 1;
+          if (f.missions <= 5) this.diary('mission', 'Finished a mission in ' + this.game.name + ': "' + e.text.slice(0, 80) + '" ✅');
+          this.voice.raw('Mission done ✅ ' + e.text.slice(0, 60), 2, 'mission');
+        }
       }
     }
 
@@ -384,6 +400,44 @@ AIP.Session = (function () {
       if (!st) { this.take = null; this.hands.setKeys([]); return false; }
       if (st.t === 'click') { this.hands.clickAt(st.x, st.y); T.next = now + 700; }
       else { this.hands.setKeys([st.code]); setTimeout(() => { if (!this.dead && !(this.take && this.take.steps[this.take.i] && this.take.steps[this.take.i].code === st.code)) this.hands.setKeys([]); }, 300); T.next = now + 450; }
+      return true;
+    }
+
+    /* ---------- 👊 mash prompts ("SPAM E to break free!") ---------- */
+    mash(obs, now) {
+      if (!obs.mash || obs.menuish || this.pauseKeys.has(obs.mash)) { this.mashing = null; return false; }
+      const M = this.mashing && this.mashing.code === obs.mash ? this.mashing : (this.mashing = { code: obs.mash, t0: now, n: 0 });
+      if (now - M.t0 > 9000) return false; // (it's not working - let the brain try something else)
+      const h = this.hands;
+      h.setKeys([]);
+      h.tap(M.code);
+      setTimeout(() => { if (!this.dead && this.mashing === M) h.tap(M.code); }, 55); // ~2 taps per tick = fast!
+      M.n += 2;
+      if (M.n === 2) this.voice.say('mash', { key: AIP.KEYS.label(M.code) }, 2);
+      this.reason = '👊 mashing ' + AIP.KEYS.label(M.code) + '!!';
+      const c = this.brain.keyCtl(M.code);
+      if (c.status === 'new' || c.status === 'useless') { c.status = 'starred'; c.tip = c.tip || 'mash it!'; this.brain.ensureAction('k:' + M.code, { keys: [M.code] }); }
+      return true;
+    }
+    /* ---------- 💬 key prompts ("[E] Open the door") ---------- */
+    keyHint(obs, now) {
+      const hints = (obs.keyHints || []).filter((hh) => hh.label && !this.pauseKeys.has(hh.code) && !/^(esc|escape|tab|p)$/i.test(AIP.KEYS.label(hh.code)));
+      if (!hints.length || obs.menuish || this.phase !== 'play') return false;
+      const H = hints[0];
+      const key = H.code + '|' + H.label;
+      const mem = this.hintMem || (this.hintMem = new Map());
+      const m = mem.get(key) || { n: 0, at: 0 };
+      if (m.n >= 3 || now - m.at < 2200) return false; // pressed it already - give it a moment
+      m.n++; m.at = now; mem.set(key, m);
+      if (mem.size > 80) mem.delete(mem.keys().next().value);
+      this.hands.setKeys([]);
+      this.hands.tap(H.code);
+      // it learns what the key does from the prompt itself
+      const c = this.brain.keyCtl(H.code);
+      if (!c.tip || /mash/.test(c.tip)) c.tip = H.label.slice(0, 30).toLowerCase();
+      if (c.status === 'new' || c.status === 'useless') { c.status = 'starred'; this.brain.ensureAction('k:' + H.code, { keys: [H.code] }); }
+      this.reason = '💬 the game says: ' + AIP.KEYS.label(H.code) + ' = "' + H.label + '" - pressing it!';
+      if (m.n === 1 && U.chance(0.35)) this.voice.say('hintPress', { key: AIP.KEYS.label(H.code), what: H.label.toLowerCase() }, 1);
       return true;
     }
 
@@ -413,7 +467,9 @@ AIP.Session = (function () {
         if (words >= 5 && (!nt || words > nt.words)) nt = { s: t, words };
       }
       // short lines only count as "reading" when the game is waiting (dialogue box, menu, "press X")
-      const worth = nt && (nt.words >= 12 || obs.staticTime > 0.3 || obs.menuish || obs.continueHint || (obs.choices && obs.choices.length));
+      // a FEED (captions that scroll by on their own, like AItok) isn't a story - then it only stops for big texts
+      const feed = this.feedUntil && now < this.feedUntil;
+      const worth = nt && (feed ? nt.words >= 22 && obs.staticTime > 1.5 : (nt.words >= 12 || obs.staticTime > 0.3 || obs.menuish || obs.continueHint || (obs.choices && obs.choices.length)));
       if (worth && (!this.reading || this.reading.text !== nt.s)) {
         handled.add(nt.s);
         if (handled.size > 500) handled.delete(handled.values().next().value);
@@ -457,6 +513,11 @@ AIP.Session = (function () {
         return false;
       }
       const stillThere = (this.senses.textBits || []).some((b) => b.s.replace(/\s+/g, ' ').trim() === R.text);
+      if (!stillThere && !R.tries) {
+        // it went away by itself (nobody pressed anything): lots of that = a feed, so skim for a while
+        this.vanished = (this.vanished || []).filter((t) => now - t < 60000); this.vanished.push(now);
+        if (this.vanished.length >= 4 && !(this.feedUntil > now)) { this.feedUntil = now + 180000; this.vanished = []; this.voice.raw('So much text flying by 😵 I\'ll just skim.', 1, 'feed'); }
+      }
       if (!stillThere || R.tries >= 6) { this.reading = null; return false; }
       if (obs.menuish && !R.hint) { this.reading = null; return false; } // a menu: the normal brain clicks Play etc.
       if (obs.fields && obs.fields.length && !R.hint) { this.reading = null; return false; } // it wants me to TYPE something, not press Enter
@@ -476,6 +537,9 @@ AIP.Session = (function () {
         let v = Math.random() * (0.5 + t.silliness);
         if (/\b(fight|attack|go|yes|open|enter|explore|take|help|accept|investigate|answer|jump|touch)\b/i.test(c.text)) v += (t.bravery - 0.5) * 2;
         if (/\b(run|hide|leave|no|wait|ignore|refuse|back|stay|flee)\b/i.test(c.text)) v += (0.5 - t.bravery) * 2;
+        // its own goal + taste: explorers/story fans open doors and ask questions
+        const g = this.mind.S.goals && this.mind.S.goals.cur;
+        if (g && (g.kind === 'explore' || g.kind === 'story') && /\b(open|explore|look|enter|investigate|ask|follow|read|yes)\b/i.test(c.text)) v += 0.8 + this.mind.like('story');
         if (v > bs) { bs = v; best = c; }
       }
       return best;
@@ -488,14 +552,14 @@ AIP.Session = (function () {
       const have = B.trophies.list.find((x) => x.name.toLowerCase() === e.name.toLowerCase());
       const name = have ? have.name : e.name;
       if (Object.keys(B.trophies.got).some((k) => k.toLowerCase() === name.toLowerCase())) return;
-      B.trophies.got[name] = Date.now();
+      B.trophies.got[name || ('trophy #' + (Object.keys(B.trophies.got).length + 1))] = Date.now();
       if (have) have.got = true; else B.trophies.list.push({ name, got: true });
       const gs = AIP.squad.gameStats(this.ai, this.game.id);
       gs.trophies = Object.keys(B.trophies.got).length;
       gs.trophyTotal = B.trophies.list.length;
       this.heart.feel('proud', 0.5, 'got a trophy'); this.heart.feel('happy', 0.3, 'got a trophy'); this.heart.feel('excited', 0.4, 'got a trophy');
-      this.pendingFb = Math.max(this.pendingFb || 0, 1.5);
-      this.voice.say('trophy', { trophy: name }, 3);
+      this.bonus += 1.5;
+      this.voice.say('trophy', { trophy: name || 'a trophy' }, 3);
       this.diary('trophy', 'Got a trophy in ' + this.game.name + ': "' + name + '" 🏆');
       this.brain.addMemory('trophy', 'getting the "' + name + '" trophy', 0.9);
     }
@@ -517,7 +581,8 @@ AIP.Session = (function () {
 
     stuckCheck(obs, now) {
       if (this.mode !== 'ai' || this.phase !== 'play' || this.reading || this.take || this.typist.active) return;
-      if (obs.staticTime < 1) { this.stuckSaid = false; return; }
+      if (obs.staticTime < 1) { this.stuckSaid = false; this.unstuckTried = false; return; }
+      if (obs.staticTime > 5 && !this.unstuckTried && !obs.menuish) { this.unstuckTried = true; if (this.mind.unstick(obs, now)) return; }
       if (obs.staticTime > 12 && !this.stuckSaid) {
         this.stuckSaid = true;
         this.heart.react([{ type: 'stuck' }], { painMode: AIP.settings.get().painMode });
@@ -576,6 +641,8 @@ AIP.Session = (function () {
       const dom = this.heart.dominant().name;
       const map = { bored: 'bored', curious: 'curious', confused: 'confused', scared: 'scared', proud: 'proud' };
       if (map[dom]) { this.voice.say(map[dom], vars, 0); return; }
+      // sometimes it talks about what it wants / what it loves here
+      if (U.chance(0.25)) { const fav = this.mind.favorite(); const g = this.mind.goalLabel(); if (fav || g) { this.voice.say('mindIdle', { act: fav ? this.mind.wordsFor(fav) : 'figuring stuff out', goal: g || 'figuring this game out' }, 0); return; } }
       const mems = (this.app.diaryCache || []).filter((d) => d.aiId === this.ai.id && d.gameId === this.game.id && /best|points|win/.test(d.kind));
       if (mems.length && U.chance(0.25)) {
         const m = U.pick(mems);
@@ -667,7 +734,7 @@ AIP.Session = (function () {
       const vars = Object.assign(this.vars(obs), { score: U.fmt(score), tries: gs.tries });
       const evs = [];
       if (kind === 'death') evs.push({ type: 'death' });
-      if (kind === 'win') evs.push({ type: 'win' });
+      // (a win already made it happy in the step loop - don't count the same win twice)
       if (newBest && !ep.beatBest && oldBest != null) evs.push({ type: 'highscore' });
       const feels = this.heart.react(evs, { painMode, healthFrac: obs.healthFrac });
       if (kind === 'win') {
@@ -685,9 +752,11 @@ AIP.Session = (function () {
         this.diary('best', 'New high score in ' + this.game.name + ': ' + U.fmt(score) + '! (try #' + gs.tries + ')');
       }
       if (newBest) this.checkRivalsBeaten(score, oldBest);
+      const verdict = this.mind.onEpisodeEnd(kind, { score, newBest, novel: ep.novel });
       this.app.episodeDone(this);
       await this.persist();
       if (this.dead) return;
+      if (verdict === 'stop') { this.stopByChoice(); return; }
       // 💤 dream
       this.phase = 'dreaming';
       this.heart.dreaming = true;
@@ -849,6 +918,8 @@ AIP.Session = (function () {
     // no coach (offline / no key / out of free limit): the old simple way
     localTip(text, parsed) {
       const p = parsed || AIP.tips.parse(text);
+      if (/what.*(do you|u) (like|love|enjoy)|favou?rite|what.*fun\b/i.test(text)) { this.voice.raw(this.mind.describeLikes(), 3, 'answer'); return; }
+      if (/\bgoal\b|what.*(you|u).*(want|trying to)/i.test(text)) { this.voice.raw(this.mind.describeGoal(), 3, 'answer'); return; }
       const ans = this.voice.answer(text, { reason: this.reason, learned: this.brain.learned(null, this.primaryLabels()), game: this.game.name, best: AIP.squad.gameStats(this.ai, this.game.id).best, tries: AIP.squad.gameStats(this.ai, this.game.id).tries, scoreLabel: this.lastObs && this.lastObs.scoreLabel });
       if (!p.tips.length && ans) { this.voice.raw(ans, 2, 'answer'); return; }
       if (p.tips.length) { this.voice.say('tipThanks', { tip: p.tips[0].text }, 3); return; }
@@ -872,6 +943,9 @@ AIP.Session = (function () {
         trophies: Object.keys(tro.got).length + (tro.list.length ? '/' + tro.list.length : ''),
         learned: B.learned(null, this.primaryLabels()).filter((l) => l.good).slice(0, 8).map((l) => l.text),
         notes: (this.game.notes || []).slice(-5), story: (st.story || []).slice(-3), mood: this.heart.dominant().name, lastLesson: this.coach.lastLesson || '',
+        myGoal: this.mind.goalLabel() || 'none yet', goalsDone: (st.goals && st.goals.done || []).map((k) => AIP.Mind.GOAL_WORD[k]),
+        favorite: this.mind.favorite() ? this.mind.wordsFor(this.mind.favorite()) : null,
+        myInventions: this.mind.keepers().slice(-3).map((i) => i.name + ' (' + i.desc + ')'),
       };
     }
     localReport(sum) {
@@ -879,7 +953,25 @@ AIP.Session = (function () {
       const grade = sum.wins ? 'A' : up ? 'B' : sum.tries >= 3 ? 'C' : 'D';
       return 'Grade: ' + grade + '\nWhat I learned: ' + (sum.learned.slice(0, 3).join('; ') || 'not much yet') +
         '\nBest moment: ' + (sum.bestThisTime != null ? 'scoring ' + sum.bestThisTime : 'just getting started') +
-        '\nStill hard: ' + (sum.deaths ? 'not dying so much' : 'figuring out the goal') + '\nNext goal: ' + (sum.bestEver != null ? 'beat ' + sum.bestEver : 'get my first points');
+        '\nStill hard: ' + (sum.deaths ? 'not dying so much' : 'figuring out the goal') + '\nNext goal: ' + (sum.myGoal !== 'none yet' ? sum.myGoal : sum.bestEver != null ? 'beat ' + sum.bestEver : 'get my first points') +
+        (sum.favorite ? '\nFavorite thing: ' + sum.favorite : '') + (sum.myInventions.length ? '\nMy inventions: ' + sum.myInventions.join(', ') : '');
+    }
+    // 🏁 it decided it's done with this game (it got what it wanted and it's bored of it)
+    stopByChoice() {
+      this.phase = 'done';
+      this.hands.releaseAll();
+      this.reason = '🏁 done with this game (my choice)';
+      this.voice.say('wantStop', { game: this.game.name }, 3);
+      this.diary('done', 'Decided I was done with ' + this.game.name + '. ' + (this.mind.describeGoal ? 'Goals done: ' + ((this.brain.stats.goals.done || []).map((k) => AIP.Mind.GOAL_WORD[k]).join(', ') || 'none') : '') + ' 🏁');
+      this.reportNow();
+      this.app.showDone && this.app.showDone(this);
+    }
+    // you asked it to keep going - it decides
+    keepGoing() {
+      if (this.phase !== 'done') return false;
+      const yes = this.mind.askContinue();
+      if (yes) { this.keepGoingAt = performance.now(); this.mind.boredSince = 0; this.newEpisode(); this.phase = 'restart'; this.restart = { t0: performance.now(), next: 0, i: 0 }; }
+      return yes;
     }
     async reportNow() {
       const sum = this.summary();

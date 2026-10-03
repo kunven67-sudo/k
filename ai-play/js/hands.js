@@ -67,7 +67,13 @@ AIP.Hands = (function () {
     keyTarget() {
       const d = this.doc;
       if (!d) return null;
-      const ae = d.activeElement;
+      let ae = d.activeElement;
+      // a hidden text box still holding the keyboard would swallow every key - let go of it
+      if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && !this.typeJob) {
+        let hidden = false;
+        try { const r = ae.getBoundingClientRect(); hidden = !ae.getClientRects().length || r.width < 2 || r.bottom <= 0 || r.top >= this.win.innerHeight || r.right <= 0 || r.left >= this.win.innerWidth || this.win.getComputedStyle(ae).visibility === 'hidden'; } catch (e) { /* ignore */ }
+        if (hidden) { try { ae.blur(); } catch (e) { /* ignore */ } ae = d.activeElement; }
+      }
       if (ae && ae !== d.body && ae !== d.documentElement && ae.tagName !== 'IFRAME') return ae;
       return d.body || d.documentElement;
     }
@@ -222,8 +228,13 @@ AIP.Hands = (function () {
       const d = this.doc;
       if (!d) return null;
       const lock = this.win.__aip && this.win.__aip.lockEl;
-      if (lock && lock.isConnected) return lock;
-      return d.elementFromPoint(clamp(x, 0, this.win.innerWidth - 1), clamp(y, 0, this.win.innerHeight - 1)) || d.body;
+      const at = d.elementFromPoint(clamp(x, 0, this.win.innerWidth - 1), clamp(y, 0, this.win.innerHeight - 1)) || d.body;
+      if (lock && lock.isConnected) {
+        // mouse "captured" by the 3D view - but a real menu button on top still gets the click
+        const ui = at && at !== lock && !lock.contains(at) && at.closest && at.closest('button,a[href],[role="button"],input,select,textarea,label,[onclick],.btn,.button,[data-act],[data-go],[data-tab],[data-action]');
+        return ui || lock;
+      }
+      return at;
     }
     fireMouse(type, x, y, extra) {
       const w = this.win, t = this.mouseTarget(x, y);
@@ -239,7 +250,9 @@ AIP.Hands = (function () {
       const before = this.px();
       this.mx = clamp(fx, 0, 1); this.my = clamp(fy, 0, 1);
       const p = this.px();
-      const extra = { movementX: Math.round(p.x - before.x), movementY: Math.round(p.y - before.y) };
+      // (moving the pointer to a spot shouldn't spin a 3D camera - turning is look()'s job)
+      const locked = !!(this.win && this.win.__aip && this.win.__aip.lockEl);
+      const extra = locked ? { movementX: 0, movementY: 0 } : { movementX: Math.round(p.x - before.x), movementY: Math.round(p.y - before.y) };
       this.fireMouse('pointermove', p.x, p.y, extra);
       this.fireMouse('mousemove', p.x, p.y, extra);
       this.drawCursor();

@@ -82,16 +82,28 @@ AIP.Senses = (function () {
     ['combo', /(combo|streak|multi)/i],
   ];
   const kindOf = (label) => { for (const [k, rx] of KIND_RX) if (rx.test(label)) return k; return 'unknown'; };
-  const GAMEOVER_RX = /game\s*over|you\s*(died|lose|lost|are\s+dead|crashed|failed)|wasted|\bdefeat(ed)?\b|out\s+of\s+lives|no\s+lives\s+left|mission\s+failed|level\s+failed|\bbusted\b|try\s+again|play\s+again|\bretry\b|\bcaught\b/i;
-  const WIN_RX = /you\s*(win|won|beat|escaped|survived)|\bvictory\b|level\s*(complete|cleared)|stage\s*clear|congratulations|\bcongrats\b|mission\s*complete|\bwinner\b|\bthe\s+end\b|you\s+did\s+it/i;
-  const TROPHY_RX = /(achievement|trophy|trophies|badge|medal|award)s?\b[^.!]{0,30}\b(unlocked|earned|get|got|awarded|completed|won)\b|\b(unlocked|earned)\s*[:!]\s*\S|🏆\s*\S/i;
-  const CONTINUE_RX = /(press|hit|tap)\s+(any\s+key|space(?:bar)?|enter|return|e|z|x|f)\b|(click|tap)\s+(to\s+continue|anywhere)|\bcontinue\s*[▶►>]|[▼▶►]\s*$/i;
+  const GAMEOVER_RX = /game\s*over|you\s*(died|lose|lost|are\s+dead|crashed|failed|dissolved|fell)\b|you\s+got\s+(swarmed|knocked\s+out)|get\s+back\s+up|shrunk\s+into\s+nothing|wasted|\bdefeat(ed)?\b|out\s+of\s+lives|no\s+lives\s+left|mission\s+failed|level\s+failed|\bbusted\b|try\s+again|play\s+again|\bretry\b|^\W*(you\s+(got\s+|were\s+|are\s+)?)?caught\b\W*$/i;
+  const WIN_RX = /you\s*(win|won|beat|escaped|survived)\b(?!')|\bvictory\b|level\s*(complete|cleared)|stage\s*clear|congratulations|\bcongrats\b|mission\s*complete|\bwinner\b|^\W*the\s+end\W*$|you\s+did\s+it|thank\s+you\s+for\s+playing|to\s+be\s+continued|^\W*ending\s+[a-e]\b/i;
+  // "Mission complete: buy 3 monsters" = a little goal done, not the end of the game
+  const MILESTONE_RX = /^\W*(mission|quest|objective|task|challenge|goal|daily)\s*(complete|completed|done|cleared)\s*[:!-]?\s*\S|^\W*(day|shift|chapter|part)\s*\d*\s*(complete|completed|cleared|done)\b/i;
+  const TROPHY_RX = /(achievement|trophy|trophies|badge|medal|award)s?\b[^.!]{0,30}\b(unlocked|earned|get|got|awarded|completed|won)\b|\b(unlocked|earned)\s*[:!]\s*\S|🏆\s*\S|^\W*(achievement|trophy|badge|medal)s?\s*(unlocked|earned|get|got)?\s*[:!-]\s*\S/i;
+  // rows in a trophy list: "🏆 First Blood" (got) / "🔒 Ankle Legend" (not yet)
+  const TROPHY_ROW_RX = /^\s*(🏆|🔒|✅|⬜|🔓|☑️|✔️?|❌)\s*(.{2,48})$/u;
+  // "SPAM E!" / "Mash space to break free" -> tap it super fast
+  const MASH_RX = /\b(spam|mash|smash|rapidly|repeatedly|as fast as you can|break free)\b/i;
+  const MASH_KEY_RX = /\b(?:spam|mash|smash|tap|press|hit)\s+\[?(space(?:bar)?|enter|[a-z])\]?(?=\W|$)/i;
+  const INLINE_TAGS = /^(KBD|B|STRONG|I|EM|SPAN|SMALL|CODE|U|MARK|SUP|SUB|A|LABEL|FONT)$/;
+  const BAR_RX = /(hp|health|life|stam|energy|fuel|mana|shield|oxygen|\bair\b|power|boost|heat|xp)/i;
+  const MARKER_RX = /marker|waypoint|objective-?dot|\bpoi\b|target-?icon/i;
+  // never click these (they erase saves)
+  const DANGER_BTN_RX = /\b(reset|erase|delete|wipe|clear\s+(all|data|save|progress)|press again to confirm|are you sure|factory)\b/i;
+  const CONTINUE_RX = /(press|hit|tap)\s+(any\s+key|space(?:bar)?|enter|return|e|z|x|f)\b|(click|tap)\s+(to\s+(?:continue|start|begin)|anywhere)|\bcontinue\s*[▶►>]|[▼▶►]\s*$/i;
   const CHOICE_SKIP_RX = /^(play|start|begin|settings|options|credits|shop|store|back|quit|exit|menu|resume|retry|try again|play again|restart|achievements?|help|ok|okay|close|x|×)$/i;
   const GOOD_BTN_RX = /\b(play|start|begin|go|continue|retry|try again|again|restart|next|ok|okay|resume|new game|tap|click|press|enter|let'?s|ready|yes|launch)\b/i;
   const MEH_BTN_RX = /\b(settings|options|credits|quit|exit|reset|erase|delete|back|menu|about|help|share|privacy|shop|store|achievements?)\b/i;
   // ✍️ text boxes + typing games
   const TEXT_TYPES = /^(text|search|email|number|tel|password|url)?$/;
-  const TYPE_CUE_RX = /\b(type|typing|typed|wpm|words? per minute|spell(?:ing)?|keyboard)\b/i;
+  const TYPE_CUE_RX = /\bwpm\b|words? per minute|typing\s+(game|test|race|speed|practice|challenge|master|tutor)|\btype\s+(the|this|these|each|every|it|them|fast|quickly|as fast|words?|letters?)\b|start typing|keep typing|\bspell\s+(the|it|this|each)\b|^\s*type\s*:\s*\S/i;
   const UI_WORD_RX = /^(score|scores|lives|life|health|hp|time|timer|level|lvl|wpm|best|high ?score|accuracy|combo|points?|pause|paused|menu|start|play|restart|settings|sound|music|on|off|ok|go|ready|next|back|help|type|typing|words?)$/i;
   function fieldKind(el, type, label) {
     const L = label.toLowerCase();
@@ -161,6 +173,8 @@ AIP.Senses = (function () {
       this.bodyBg = '#000';
       this.tick = 0;
       this.textFirst = new Map(); // text -> when first seen (for "new story text appeared")
+      this.trophyShown = new Map(); // trophy pop-up element -> its text (so the NEXT pop-up in the same box counts too)
+      this.milestones = new Set();
       this.textByEl = new Map();  // element -> {s, changedAt} (typewriter effect)
     }
 
@@ -181,27 +195,76 @@ AIP.Senses = (function () {
       const all = doc.body.getElementsByTagName('*');
       const out = [];
       const n = Math.min(all.length, 1600);
+      const vw = win.innerWidth, vh = win.innerHeight;
+      const skipText = new Set(), kbds = [], bars = [], marks = [];
+      const opMap = new Map();
+      const effOp = (el) => {
+        if (!el || el === doc.body || el === doc.documentElement) return 1;
+        if (opMap.has(el)) return opMap.get(el);
+        let o = 1;
+        try { o = parseFloat(win.getComputedStyle(el).opacity); } catch (e) { /* ignore */ }
+        o = (isNaN(o) ? 1 : o) * effOp(el.parentElement);
+        opMap.set(el, o);
+        return o;
+      };
       for (let i = 0; i < n; i++) {
         const el = all[i];
         const tag = el.tagName;
         if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'LINK' || tag === 'META' || tag === 'BR' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
         const r = el.getBoundingClientRect();
         if (r.width < 2 || r.height < 2) continue;
+        if (r.bottom <= 0 || r.right <= 0 || r.top >= vh || r.left >= vw) continue; // off screen (like a hidden pop-up parked above the top)
         let cs;
         try { cs = win.getComputedStyle(el); } catch (e) { continue; }
         if (cs.visibility === 'hidden' || cs.display === 'none') continue;
-        const op = parseFloat(cs.opacity);
+        const op = effOp(el);
         if (op < 0.05) continue;
         const media = tag === 'CANVAS' || tag === 'IMG' || tag === 'VIDEO' || (tag === 'image');
         let text = '';
         const field = tag === 'INPUT' || tag === 'TEXTAREA';
         if (field) text = String(el.type === 'password' ? '•'.repeat((el.value || '').length) : el.value || '').slice(0, 80);
-        else for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
+        else if (!skipText.has(el)) {
+          // "<kbd>E</kbd> Open the door" / "Press <b>F</b> to shrink" = ONE line of text (not 3 pieces)
+          const kids = el.children;
+          let inline = kids.length > 0 && kids.length <= 12;
+          for (let k = 0; inline && k < kids.length; k++) if (!INLINE_TAGS.test(kids[k].tagName) || kids[k].children.length > 1) inline = false;
+          if (inline && (el.textContent || '').length <= 300) {
+            for (let c = el.firstChild; c; c = c.nextSibling) {
+              if (c.nodeType === 3) text += c.nodeValue;
+              else if (c.nodeType === 1) { text += c.tagName === 'KBD' ? ' ' + c.textContent.trim() + ' ' : c.textContent; skipText.add(c); for (const g of c.querySelectorAll('*')) skipText.add(g); }
+            }
+          } else for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
+        }
         text = text.replace(/\s+/g, ' ').trim();
+        // a trophy row with the 🏆/🔒 in its own box: glue it to the name next to it
+        if (/^(🏆|🔒|✅|⬜|🔓)$/u.test(text) && el.nextElementSibling) {
+          const nx = el.nextElementSibling, t2 = (nx.querySelector('b,strong,h3,h4,[class*="title"]') || nx).textContent.replace(/\s+/g, ' ').trim();
+          if (t2) text = text + ' ' + t2.slice(0, 48);
+        }
+        if (tag === 'KBD') kbds.push(el);
+        // health / stamina bars with no number: the bar's width IS the number
+        if (el.style && /%\s*$/.test(el.style.width || '') && BAR_RX.test((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '') + ' ' + ((el.parentElement && el.parentElement.id) || ''))) {
+          const m = BAR_RX.exec((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '') + ' ' + ((el.parentElement && el.parentElement.id) || ''));
+          bars.push({ label: { hp: 'health', stam: 'stamina', air: 'air' }[m[1].toLowerCase()] || m[1].toLowerCase(), value: parseFloat(el.style.width), id: elId(el) });
+        }
+        if (MARKER_RX.test((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '')) && r.width < vw * 0.3 && r.height < vh * 0.3) marks.push({ x: (r.left + r.width / 2) / vw, y: (r.top + r.height / 2) / vh, el });
         const fill = isSolid(cs.backgroundColor) ? cs.backgroundColor : null;
-        if (media || fill || text) out.push({ el, media, fill, text, field, color: cs.color, op, fs: parseFloat(cs.fontSize) || 14, fw: cs.fontWeight, ta: cs.textAlign });
+        if (media || fill || text) out.push({ el, media, fill, text, field, color: cs.color, op, fs: parseFloat(cs.fontSize) || 14, fw: cs.fontWeight, ta: cs.textAlign, ptr: cs.cursor === 'pointer' });
       }
       this.items = out;
+      this.bars = bars;
+      // key prompts: "[E] Open the door" (not the big controls list on the title screen)
+      this.keyHints = [];
+      if (kbds.length && kbds.length <= 2) {
+        for (const k of kbds) {
+          const code = AIP.KEYS.fromName(k.textContent.trim());
+          if (!code) continue;
+          const host = k.parentElement;
+          const label = host ? host.textContent.replace(k.textContent, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+          this.keyHints.push({ code, label, el: k });
+        }
+      }
+      this.markers = marks.slice(0, 3);
     }
 
     findButtons() {
@@ -209,23 +272,33 @@ AIP.Senses = (function () {
       const out = [];
       if (!doc || !doc.body) { this.buttons = out; return; }
       const vw = win.innerWidth, vh = win.innerHeight;
-      const sel = 'button,a[href],[role="button"],input[type="button"],input[type="submit"],[onclick],.btn,.button,[data-go],[data-action]';
+      const sel = 'button,a[href],[role="button"],[role="tab"],input[type="button"],input[type="submit"],[onclick],.btn,.button,[data-go],[data-action],[data-act],[data-tab],.card';
       let list;
-      try { list = doc.querySelectorAll(sel); } catch (e) { list = []; }
+      try { list = [...doc.querySelectorAll(sel)]; } catch (e) { list = []; }
+      // things that LOOK clickable (pointer cursor), outermost only - shop cards, map tiles...
+      const inList = new Set(list);
+      for (const it of this.items) if (it.ptr && !it.media && !inList.has(it.el) && !(it.el.parentElement && it.el.parentElement.closest && it.el.parentElement.closest(sel)) && !(it.el.parentElement && win.getComputedStyle(it.el.parentElement).cursor === 'pointer')) { list.push(it.el); inList.add(it.el); }
       for (let i = 0; i < list.length && out.length < 24; i++) {
         const el = list[i];
-        if (el.disabled) continue;
+        if (el.disabled || /^(CANVAS|VIDEO|IFRAME|BODY|HTML)$/.test(el.tagName)) continue;
         const r = el.getBoundingClientRect();
         if (r.width < 6 || r.height < 6 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
         const cx = clamp(r.left + r.width / 2, 1, vw - 1), cy = clamp(r.top + r.height / 2, 1, vh - 1);
         const top = doc.elementFromPoint(cx, cy);
         if (!top || !(top === el || el.contains(top) || top.contains(el))) continue;
+        if (r.width * r.height > vw * vh * 0.5) continue; // (a whole-screen layer isn't a button)
         const text = ((el.innerText || el.value || el.getAttribute('aria-label') || el.title || '') + '').replace(/\s+/g, ' ').trim().slice(0, 32);
+        if (DANGER_BTN_RX.test(text)) continue;
         let prio = 0.5;
         if (GOOD_BTN_RX.test(text)) prio = 1;
         if (MEH_BTN_RX.test(text)) prio = 0.15;
         if (!text) prio = 0.3;
         out.push({ el, text: text || '(no label)', x: cx, y: cy, prio });
+      }
+      // "Continue" / "Resume" on screen? then DON'T pick "Restart" / "New game" (that throws away progress)
+      if (out.some((b) => /\b(continue|resume)\b/i.test(b.text))) for (const b of out) {
+        if (/\b(continue|resume)\b/i.test(b.text)) b.prio = Math.max(b.prio, 1.2);
+        else if (/restart|checkpoint|new game|start over|main menu|title|quit/i.test(b.text)) b.prio = 0.15;
       }
       this.buttons = out;
     }
@@ -352,7 +425,7 @@ AIP.Senses = (function () {
       this.cvLines = [];
       for (const it of this.items) {
         if (!it.text || it.field || it.text.length > 600) continue; // (long text = story / instructions - it reads those too)
-        bits.push({ s: it.text, ctx: it.text.length <= 80 ? ctxLabel(it.el) : '', src: 'dom', id: elId(it.el) });
+        bits.push({ s: it.text, ctx: it.text.length <= 80 ? ctxLabel(it.el) : '', src: 'dom', id: elId(it.el), el: it.el });
       }
       const aip = this.aip;
       if (aip && aip.texts.length) {
@@ -419,6 +492,7 @@ AIP.Senses = (function () {
         if (value > r.maxSeen) r.maxSeen = value;
         if (value !== r.prev) { r.changedAt = now; if (value > r.prev) r.ups++; else r.downs++; }
       };
+      for (const b of this.bars || []) put(b.label, b.value, 100, 'bar', b.id);
       for (const b of bits) {
         const s = b.s;
         if (s.length > 120) continue; // a story sentence, not a score
@@ -568,6 +642,15 @@ AIP.Senses = (function () {
       this.numberEvents(obs, now);
 
       obs.buttons = this.buttons;
+      obs.keyHints = (this.keyHints || []).filter((h) => h.el.isConnected);
+      obs.marker = (this.markers || []).find((m) => m.el.isConnected) || null;
+      obs.mash = null;
+      for (const b of this.textBits || []) {
+        if (b.s.length > 80 || !MASH_RX.test(b.s)) continue;
+        const m = MASH_KEY_RX.exec(b.s);
+        const code = m ? AIP.KEYS.fromName(m[1].toLowerCase().replace('spacebar', 'space')) : (obs.keyHints[0] && obs.keyHints[0].code);
+        if (code) { obs.mash = code; break; }
+      }
       obs.fields = (this.fields || []).filter((f) => f.el.isConnected && f.kind !== 'skip');
       const aip = this.aip;
       obs.lockActive = !!(aip && aip.lockEl);
@@ -592,7 +675,13 @@ AIP.Senses = (function () {
       let over = false, win = false, overText = '', winText = '';
       for (const b of bits) {
         if (b.s.length > 60) continue;
-        if (!over && GAMEOVER_RX.test(b.s)) { over = true; overText = b.s; }
+        if (/\b(times|without getting|best|record)\b/i.test(b.s)) continue; // stats like "Times caught: 3"
+        const gm = GAMEOVER_RX.exec(b.s);
+        if (!over && gm && (gm.index <= 3 || b.s.length <= 24)) { over = true; overText = b.s; }
+        if (MILESTONE_RX.test(b.s)) {
+          if (!this.milestones.has(b.s)) { this.milestones.add(b.s); obs.events.push({ type: 'milestone', text: b.s }); }
+          continue;
+        }
         if (!win && WIN_RX.test(b.s)) { win = true; winText = b.s; }
       }
       const P = this.phrase;
@@ -617,10 +706,6 @@ AIP.Senses = (function () {
         if (!this.textFirst.has(s)) {
           this.textFirst.set(s, now);
           if (this.textFirst.size > 600) this.textFirst.delete(this.textFirst.keys().next().value);
-          if (TROPHY_RX.test(s) && s.length < 90) {
-            const m = /(?:unlocked|earned|awarded|get|got)\s*[:!-]?\s*(.+)$/i.exec(s);
-            obs.events.push({ type: 'trophy', name: ((m && m[1]) || s).replace(/^[\s:!-]+/, '').slice(0, 50), text: s });
-          }
           const words = s.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length;
           if (words >= 5 && s.length >= 25 && !NUM_ONLY.test(s)) fresh.push({ s, words, id: b.id });
         }
@@ -634,6 +719,33 @@ AIP.Senses = (function () {
         // a dialogue line that grew out of the last one isn't new - it's the same line finishing
         obs.newText = fresh.sort((a, b) => b.words - a.words);
       }
+      this.checkTrophies(bits, obs);
+    }
+
+    // 🏆 A trophy pop-up = a trophy-ish line that just APPEARED (per element, so the same pop-up box
+    // showing a 2nd trophy counts again). A list of 🏆/🔒 rows = the trophy list (read quietly).
+    checkTrophies(bits, obs) {
+      const rows = [];
+      for (const b of bits) { const m = TROPHY_ROW_RX.exec(b.s); if (m) rows.push({ b, got: /🏆|✅|🔓|☑|✔/u.test(m[1]), name: m[2].replace(/\s+(unlocked|locked)\s*$/i, '').trim() }); }
+      const isList = rows.length >= 3;
+      if (isList) obs.events.push({ type: 'trophyList', items: rows.map((r) => ({ name: r.name.slice(0, 50), got: r.got })) });
+      const listed = new Set(isList ? rows.map((r) => r.b) : []);
+      const now = new Set();
+      for (const b of bits) {
+        const s = b.s.replace(/\s+/g, ' ').trim();
+        if (s.length >= 90 || listed.has(b) || !TROPHY_RX.test(s)) continue;
+        if (/^\s*🔒/u.test(s)) continue;
+        const key = b.src === 'dom' ? 'el:' + b.id : 's:' + s;
+        now.add(key);
+        if (this.trophyShown.get(key) === s) continue;
+        const first = !this.trophyShown.has(key);
+        this.trophyShown.set(key, s);
+        if (!first && b.src !== 'dom') continue;
+        let name = trophyName(s);
+        if (!name && b.el) name = siblingName(b.el);
+        obs.events.push({ type: 'trophy', name: (name || '').slice(0, 50), text: s });
+      }
+      for (const k of [...this.trophyShown.keys()]) if (!now.has(k)) this.trophyShown.delete(k);
     }
 
     // A clearer screenshot for the Gemini coach (with the page's text actually written in).
@@ -722,6 +834,24 @@ AIP.Senses = (function () {
     if (!m) return true;
     const p = m[1].split(',');
     return p.length < 4 || parseFloat(p[3]) > 0.15;
+  }
+  // "Achievement: First Blood" / "Trophy unlocked: Pet Jeff" / "🏆 Gold Rush" -> the name ('' if it's only the label)
+  function trophyName(s) {
+    const m = /^\W*(?:achievement|trophy|badge|medal)s?\s*(?:unlocked|earned|get|got)?\s*[:!-]\s*(.+)$/i.exec(s) || /(?:unlocked|earned|awarded|\bgot\b|\bget\b)\s*[:!-]?\s*(.+)$/i.exec(s) || /🏆\s*(.+)$/u.exec(s);
+    let n = m ? m[1] : '';
+    n = n.replace(/^[\s:!.\-–—🏆]+|[\s:!.\-–—]+$/gu, '').replace(/^(achievement|trophy|badge|medal)s?\s*(unlocked|earned)?$/i, '').trim();
+    return /[a-z0-9]/i.test(n) ? n : '';
+  }
+  // the pop-up says "Trophy unlocked" and the name sits next to it (<b id="achTitle">Pet Jeff</b>)
+  function siblingName(el) {
+    for (let p = el.parentElement, depth = 0; p && depth < 2; p = p.parentElement, depth++) {
+      const cands = [...p.querySelectorAll('b,strong,h1,h2,h3,h4,[class*="title"],[id*="title"],[class*="name"],[id*="name"],span,div')].filter((c) => c !== el && !c.contains(el) && !el.contains(c));
+      for (const c of cands) {
+        const t = (c.textContent || '').replace(/\s+/g, ' ').trim();
+        if (t.length >= 2 && t.length <= 50 && /[a-z]/i.test(t) && !TROPHY_RX.test(t) && !/^\+?\d/.test(t)) return t;
+      }
+    }
+    return '';
   }
   function elId(el) {
     if (el.id) return '#' + el.id;
