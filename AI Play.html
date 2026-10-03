@@ -902,6 +902,7 @@ AIP.loader = (function () {
     };
     doc.querySelectorAll('meta[http-equiv]').forEach((m) => { if (/content-security-policy/i.test(m.getAttribute('http-equiv'))) m.remove(); });
     doc.querySelectorAll('base').forEach((b) => b.remove());
+    doc.querySelectorAll('[autofocus]').forEach((e) => e.removeAttribute('autofocus')); // don't grab the keyboard on load
     doc.querySelectorAll('script[src]').forEach((s) => fixAttr(s, 'src'));
     doc.querySelectorAll('script[type="module"]:not([src])').forEach((s) => { s.textContent = rewriteSpecifiers(s.textContent, htmlBase); });
     doc.querySelectorAll('link[href]').forEach((l) => fixAttr(l, 'href'));
@@ -1099,7 +1100,32 @@ AIP.loader = (function () {
       W.Element.prototype.webkitRequestFullscreen = function () {};
     } catch (e) { /* ignore */ }
 
-    // 6) Health check: count frames + catch crashes.
+    // 6) Never steal the keyboard while the player is typing in AI Play's chat box, and keep the
+    //    AI Play page (where your settings live) a bit more hidden from the game.
+    try {
+      var PARENT = W.parent;
+      var typing = function () {
+        try {
+          if (!PARENT || PARENT === W) return false;
+          var a = PARENT.document.activeElement;
+          return !!a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable);
+        } catch (e) { return false; }
+      };
+      aip.userTyping = typing;
+      var guard = function (proto) {
+        if (!proto || !proto.focus) return;
+        var of = proto.focus;
+        proto.focus = function () { if (typing()) return; return of.apply(this, arguments); };
+      };
+      guard(W.HTMLElement && W.HTMLElement.prototype);
+      guard(W.SVGElement && W.SVGElement.prototype);
+      var oWF = W.focus;
+      W.focus = function () { if (typing()) return; return oWF.apply(W, arguments); };
+      try { Object.defineProperty(W, 'parent', { configurable: true, get: function () { return W; } }); } catch (e) { /* ignore */ }
+      try { Object.defineProperty(W, 'frameElement', { configurable: true, get: function () { return null; } }); } catch (e) { /* ignore */ }
+    } catch (e) { /* ignore */ }
+
+    // 7) Health check: count frames + catch crashes.
     try {
       var oRAF = W.requestAnimationFrame;
       W.requestAnimationFrame = function (cb) { return oRAF.call(W, function (t) { aip.frames++; cb(t); }); };
