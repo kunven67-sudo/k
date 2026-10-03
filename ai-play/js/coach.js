@@ -75,15 +75,20 @@ AIP.Coach = (function () {
       if (now - this.lastLook > this.interval(obs, now)) this.look('routine', {});
     }
     // "It decides itself": look faster when something's going on, slower when it's chill.
+    // (Gemini's free limit is around 10-15 looks a minute, so it stays well under that)
     interval(obs, now) {
-      if (!obs || !obs.ok) return 8000;
+      if (!obs || !obs.ok) return 9000;
       const s = this.s;
-      if (s.brain.coach && s.brain.coach.reached) { s.brain.coach.reached = false; return 1500; } // got there - what's next?
-      if (s.phase === 'studying') return 2500;
-      if (obs.menuish || obs.staticTime > 3 || (obs.choices && obs.choices.length)) return 3500;
-      if ((obs.healthFrac != null && obs.healthFrac < 0.4) || now - s.ep.lastDamageAt < 4000) return 4000;
-      const calm = now - (s.lastScoreAt || 0) < 5000 && s.heart.e.scared < 0.3;
-      return calm ? 10000 : 6500;
+      if (s.brain.coach && s.brain.coach.reached) { s.brain.coach.reached = false; return 3500; } // got there - what's next?
+      let ms;
+      if (s.phase === 'studying') ms = 4000;
+      else if ((obs.healthFrac != null && obs.healthFrac < 0.4) || now - s.ep.lastDamageAt < 4000) ms = 5000;
+      else if (obs.menuish || obs.staticTime > 3 || (obs.choices && obs.choices.length)) ms = 6000;
+      else ms = now - (s.lastScoreAt || 0) < 5000 && s.heart.e.scared < 0.3 ? 12000 : 8000;
+      // nothing changed since last time? no need to look again so soon
+      const h = s.brain.hashState(obs);
+      if (h === this.lastLookHash && !(s.recentEvents.length && s.recentEvents.length !== this.lastEventsN)) ms *= 2;
+      return ms;
     }
 
     /* ---------- building what Gemini sees ---------- */
@@ -143,6 +148,8 @@ AIP.Coach = (function () {
       this.busy = true;
       this.lastLook = performance.now();
       const s = this.s;
+      if (s.lastObs && s.lastObs.ok) this.lastLookHash = s.brain.hashState(s.lastObs);
+      this.lastEventsN = s.recentEvents.length;
       try {
         const parts = [{ text: this.context(reason, extra) }];
         if (extra && extra.images) extra.images.forEach((d, i) => { parts.push({ text: i === 0 ? 'Screenshot a moment BEFORE it died:' : 'Screenshot right AFTER:' }); parts.push({ inlineData: { mimeType: 'image/jpeg', data: d } }); });

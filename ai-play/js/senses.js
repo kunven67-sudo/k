@@ -254,8 +254,8 @@ AIP.Senses = (function () {
     gatherText(now) {
       const bits = [];
       for (const it of this.items) {
-        if (!it.text || it.text.length > 80) continue;
-        bits.push({ s: it.text, ctx: ctxLabel(it.el), src: 'dom', id: elId(it.el) });
+        if (!it.text || it.text.length > 600) continue; // (long text = story / instructions - it reads those too)
+        bits.push({ s: it.text, ctx: it.text.length <= 80 ? ctxLabel(it.el) : '', src: 'dom', id: elId(it.el) });
       }
       const aip = this.aip;
       if (aip && aip.texts.length) {
@@ -306,6 +306,7 @@ AIP.Senses = (function () {
       };
       for (const b of bits) {
         const s = b.s;
+        if (s.length > 120) continue; // a story sentence, not a score
         const hearts = s.match(HEART_RX);
         if (hearts && s.replace(HEART_RX, '').replace(/[\s\u200d\ufe0f]/g, '').length === 0) { put('hearts', hearts.length, null, b.src, b.id); continue; }
         const only = NUM_ONLY.exec(s);
@@ -493,7 +494,8 @@ AIP.Senses = (function () {
         // typewriter text that keeps growing = still being "typed" on screen
         if (b.src === 'dom') {
           const prev = this.textByEl.get(b.id);
-          if (prev && prev.s !== s && (s.startsWith(prev.s) || prev.s.startsWith(s))) this.textAnimAt = now;
+          // (only real sentences growing letter by letter - not a score counter going 9 -> 10)
+          if (prev && prev.s !== s && s.length >= 20 && s.startsWith(prev.s) && /[a-z]/i.test(s.slice(prev.s.length))) this.textAnimAt = now;
           this.textByEl.set(b.id, { s, at: now });
         }
         if (!this.textFirst.has(s)) {

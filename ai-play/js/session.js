@@ -177,20 +177,25 @@ AIP.Session = (function () {
       this.talkAbout(events, feels, obs, ctx);
 
       if (this.mode === 'pause') { this.hands.releaseAll(); this.ui(now, obs); return; }
-      // 🖐️ the coach is pressing/clicking something itself (only when stuck/menus/story)
-      if (this.mode === 'ai' && this.take && this.runTakeover(now)) { this.ui(now, obs); return; }
-      if (this.phase === 'studying') { this.study(obs, now); this.ui(now, obs); return; }
-      if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
-      // 📖 story / instructions on screen: actually READ it (don't mash through)
-      if (this.mode === 'ai' && this.readStory(obs, now)) { this.ui(now, obs); return; }
-
-      const mods = this.heart.mods(st.painMode);
+      // a win / game over always counts - even if it happens while reading, studying or the coach is driving
       let end = null;
       for (const ev of events) {
         if (ev.type === 'win') end = 'win';
         else if (!end && (ev.type === 'gameOver' || ev.type === 'healthZero')) end = 'death';
         else if (!end && ev.type === 'scoreReset' && this.ep.maxScore > 0 && now - this.ep.t0 > 3000) end = 'death';
       }
+      if (end && this.phase !== 'restart') { this.reading = null; this.take = null; if (this.phase === 'studying') this.phase = 'play'; }
+      if (!end) {
+      // 🖐️ the coach is pressing/clicking something itself (only when stuck/menus/story)
+      if (this.mode === 'ai' && this.take && this.runTakeover(now)) { this.ui(now, obs); return; }
+      if (this.phase === 'studying') { this.study(obs, now); this.ui(now, obs); return; }
+      if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
+      // 📖 story / instructions on screen: actually READ it (don't mash through)
+      if (this.mode === 'ai' && this.readStory(obs, now)) { this.ui(now, obs); return; }
+      }
+      else if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
+
+      const mods = this.heart.mods(st.painMode);
       if (!end && now - this.ep.t0 > 150000) end = 'segment';
       // testing whether a key paused the game? hands off until the test is done
       if (this.mode === 'ai' && this.checkPause(obs, now)) { this.ui(now, obs); return; }
@@ -391,10 +396,22 @@ AIP.Session = (function () {
     /* ---------- 📖 reading story / instructions ---------- */
     readStory(obs, now) {
       if (obs.gameOverVisible || this.phase !== 'play') { this.reading = null; return false; }
-      const nt = obs.newText && obs.newText[0];
+      // text still being "typed out" on screen? wait for it to finish before reading
+      if (obs.textAnimating && !this.reading) { this.hands.releaseAll(); this.reason = '📖 waiting for the text to finish…'; return true; }
+      // any long text on screen it hasn't read yet? (dialogue, story, instructions)
+      const handled = this.readSet || (this.readSet = new Set());
+      let nt = null;
+      for (const b of this.senses.textBits || []) {
+        const t = b.s.replace(/\s+/g, ' ').trim();
+        if (handled.has(t) || t.length < 25) continue;
+        const words = t.split(' ').filter((w) => /[a-z]/i.test(w)).length;
+        if (words >= 5 && (!nt || words > nt.words)) nt = { s: t, words };
+      }
       // short lines only count as "reading" when the game is waiting (dialogue box, menu, "press X")
       const worth = nt && (nt.words >= 12 || obs.staticTime > 0.3 || obs.menuish || obs.continueHint || (obs.choices && obs.choices.length));
       if (worth && (!this.reading || this.reading.text !== nt.s)) {
+        handled.add(nt.s);
+        if (handled.size > 500) handled.delete(handled.values().next().value);
         const B = this.brain.stats;
         B.readHashes = B.readHashes || [];
         const h = U.hashStr(nt.s);
@@ -418,7 +435,8 @@ AIP.Session = (function () {
       if (!R) return false;
       if (obs.textAnimating) R.until = Math.max(R.until, now + 700); // still typing out
       if (now < R.until) return true;
-      if (!R.again && this.coach.busy && now - R.t0 < 10000) return true; // let the coach react / choose
+      // let the coach read it too (react / pick a choice) before moving on
+      if (!R.again && (this.coach.busy || this.coach.queue.some((q) => q.reason === 'story')) && now - R.t0 < 12000) return true;
       if (obs.choices && obs.choices.length) {
         if (!R.chose) {
           R.chose = true;
@@ -461,17 +479,19 @@ AIP.Session = (function () {
     gotTrophy(e) {
       const B = this.brain.stats;
       B.trophies = B.trophies || { list: [], got: {} };
-      if (B.trophies.got[e.name]) return;
-      B.trophies.got[e.name] = Date.now();
-      if (!B.trophies.list.some((x) => x.name.toLowerCase() === e.name.toLowerCase())) B.trophies.list.push({ name: e.name, got: true });
+      const have = B.trophies.list.find((x) => x.name.toLowerCase() === e.name.toLowerCase());
+      const name = have ? have.name : e.name;
+      if (Object.keys(B.trophies.got).some((k) => k.toLowerCase() === name.toLowerCase())) return;
+      B.trophies.got[name] = Date.now();
+      if (have) have.got = true; else B.trophies.list.push({ name, got: true });
       const gs = AIP.squad.gameStats(this.ai, this.game.id);
       gs.trophies = Object.keys(B.trophies.got).length;
       gs.trophyTotal = B.trophies.list.length;
       this.heart.feel('proud', 0.5, 'got a trophy'); this.heart.feel('happy', 0.3, 'got a trophy'); this.heart.feel('excited', 0.4, 'got a trophy');
       this.pendingFb = Math.max(this.pendingFb || 0, 1.5);
-      this.voice.say('trophy', { trophy: e.name }, 3);
-      this.diary('trophy', 'Got a trophy in ' + this.game.name + ': "' + e.name + '" 🏆');
-      this.brain.addMemory('trophy', 'getting the "' + e.name + '" trophy', 0.9);
+      this.voice.say('trophy', { trophy: name }, 3);
+      this.diary('trophy', 'Got a trophy in ' + this.game.name + ': "' + name + '" 🏆');
+      this.brain.addMemory('trophy', 'getting the "' + name + '" trophy', 0.9);
     }
     mergeTrophies(list) {
       const B = this.brain.stats;
@@ -480,8 +500,9 @@ AIP.Session = (function () {
         if (!t || !t.name) continue;
         const name = String(t.name).slice(0, 60);
         const have = B.trophies.list.find((x) => x.name.toLowerCase() === name.toLowerCase());
-        if (have) { if (t.got) have.got = true; } else B.trophies.list.push({ name, got: !!t.got });
-        if (t.got && !B.trophies.got[name]) B.trophies.got[name] = Date.now();
+        const already = Object.keys(B.trophies.got).some((k) => k.toLowerCase() === name.toLowerCase());
+        if (have) { if (t.got || already) have.got = true; } else B.trophies.list.push({ name, got: !!t.got || already });
+        if (t.got && !already) B.trophies.got[have ? have.name : name] = Date.now();
       }
       const gs = AIP.squad.gameStats(this.ai, this.game.id);
       gs.trophies = Object.keys(B.trophies.got).length;
@@ -598,7 +619,7 @@ AIP.Session = (function () {
           // (the pause test already pressed it again to un-pause - don't press it a third time)
           this.voice.say('ctrlPause', vars, 2);
           this.pauseKeys.add(n.code);
-        } else if (n.status === 'useless') { this.heart.react([{ type: 'uselessKey' }], { painMode }); this.voice.say('ctrlNothing', vars, 0); }
+        } else if (n.status === 'useless') { this.heart.react([{ type: 'uselessKey' }], { painMode }); this.voice.say(n.code.indexOf('m:') === 0 ? 'mouseNothing' : 'ctrlNothing', vars, 0); }
       } else if (n.type === 'button') this.voice.say('foundButton', { btn: n.text }, 1);
     }
     onErrors(errs, now) {
@@ -807,6 +828,12 @@ AIP.Session = (function () {
       if (p.tips.length) { p.tips.forEach((t) => this.brain.applyTip(t)); this.heart.react([{ type: 'tip' }], { painMode: AIP.settings.get().painMode }); }
       // the coach understands normal sentences ("go to the door"), answers questions, chats
       if (AIP.gemini.usable()) { this.coach.playerSaid(text); this.app.chat('sys', '🧠 ' + this.ai.name + ' is thinking…'); return; }
+      if (AIP.gemini.ready() && AIP.gemini.state().status === 'limit') {
+        // resting (free limit) - it'll answer properly as soon as the coach is back
+        this.coach.playerSaid(text);
+        this.voice.say('coachResting', {}, 3);
+        return;
+      }
       this.localTip(text, p);
     }
     // no coach (offline / no key / out of free limit): the old simple way
@@ -816,7 +843,9 @@ AIP.Session = (function () {
       if (!p.tips.length && ans) { this.voice.raw(ans, 2, 'answer'); return; }
       if (p.tips.length) { this.voice.say('tipThanks', { tip: p.tips[0].text }, 3); return; }
       if (p.unknownThing) { this.voice.say('tipThing', { thing: p.unknownThing }, 3); return; }
-      this.voice.say(AIP.gemini.get().hasKey ? 'tipUnknownCoachOff' : 'tipUnknown', {}, 3);
+      if (/what.*(see|happening|going on)|where are you/i.test(text)) { const v = this.vars(this.lastObs); this.voice.raw('I see a lot of ' + v.color + ' stuff. My score is ' + v.score + '. ' + v.learnedLine, 3, 'answer'); return; }
+      const gs = AIP.gemini.state().status;
+      this.voice.say(!AIP.gemini.get().hasKey ? 'tipUnknown' : gs === 'limit' ? 'coachResting' : gs === 'offline' ? 'coachOfflineTip' : 'tipUnknownCoachOff', {}, 3);
     }
 
     /* ---------- 📋 report card ---------- */

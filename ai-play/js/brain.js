@@ -926,7 +926,7 @@ AIP.Brain = (function () {
           if (c == null || c < 0) return what + ' - gut feeling 🫃';
           return this.assoc.val[c] > 0 ? what + ' - going for the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] : what + ' - getting AWAY from the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] + ' 😨';
         }
-        case 'tip': return what + ' - you told me to ✍️';
+        case 'tip': return what + (a.keys.some((k) => this.controls[k] && /coach/.test(this.controls[k].tip || '')) ? ' - my coach taught me this 🧠' : ' - you told me to ✍️');
         case 'coach': return what + ' - coach plan: ' + ((this.coach && (this.coach.target && this.coach.target.what || this.coach.goal)) || 'go there') + ' 🧠🎯';
         case 'curious': return what + ' - never really tried this... what does it do? 🤔';
         case 'menu': return what + ' - looks like a menu, gotta start the game ▶️';

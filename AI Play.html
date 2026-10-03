@@ -1451,8 +1451,8 @@ AIP.Senses = (function () {
     gatherText(now) {
       const bits = [];
       for (const it of this.items) {
-        if (!it.text || it.text.length > 80) continue;
-        bits.push({ s: it.text, ctx: ctxLabel(it.el), src: 'dom', id: elId(it.el) });
+        if (!it.text || it.text.length > 600) continue; // (long text = story / instructions - it reads those too)
+        bits.push({ s: it.text, ctx: it.text.length <= 80 ? ctxLabel(it.el) : '', src: 'dom', id: elId(it.el) });
       }
       const aip = this.aip;
       if (aip && aip.texts.length) {
@@ -1503,6 +1503,7 @@ AIP.Senses = (function () {
       };
       for (const b of bits) {
         const s = b.s;
+        if (s.length > 120) continue; // a story sentence, not a score
         const hearts = s.match(HEART_RX);
         if (hearts && s.replace(HEART_RX, '').replace(/[\s\u200d\ufe0f]/g, '').length === 0) { put('hearts', hearts.length, null, b.src, b.id); continue; }
         const only = NUM_ONLY.exec(s);
@@ -1690,7 +1691,8 @@ AIP.Senses = (function () {
         // typewriter text that keeps growing = still being "typed" on screen
         if (b.src === 'dom') {
           const prev = this.textByEl.get(b.id);
-          if (prev && prev.s !== s && (s.startsWith(prev.s) || prev.s.startsWith(s))) this.textAnimAt = now;
+          // (only real sentences growing letter by letter - not a score counter going 9 -> 10)
+          if (prev && prev.s !== s && s.length >= 20 && s.startsWith(prev.s) && /[a-z]/i.test(s.slice(prev.s.length))) this.textAnimAt = now;
           this.textByEl.set(b.id, { s, at: now });
         }
         if (!this.textFirst.has(s)) {
@@ -2938,7 +2940,7 @@ AIP.Brain = (function () {
           if (c == null || c < 0) return what + ' - gut feeling 🫃';
           return this.assoc.val[c] > 0 ? what + ' - going for the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] : what + ' - getting AWAY from the ' + AIP.COLORS.names[c] + ' stuff ' + AIP.COLORS.emoji[c] + ' 😨';
         }
-        case 'tip': return what + ' - you told me to ✍️';
+        case 'tip': return what + (a.keys.some((k) => this.controls[k] && /coach/.test(this.controls[k].tip || '')) ? ' - my coach taught me this 🧠' : ' - you told me to ✍️');
         case 'coach': return what + ' - coach plan: ' + ((this.coach && (this.coach.target && this.coach.target.what || this.coach.goal)) || 'go there') + ' 🧠🎯';
         case 'curious': return what + ' - never really tried this... what does it do? 🤔';
         case 'menu': return what + ' - looks like a menu, gotta start the game ▶️';
@@ -3557,6 +3559,7 @@ AIP.Voice = (function () {
     ctrlMove: ['Oh! {key} {what}!', 'Wait, {key} {what}. Noted 📝', 'Got it: {key} {what}.', 'Ooh {key} {what}. I\'m learning!'],
     ctrlAction: ['{key} {what}! Not sure what yet tho 🤔', 'Something happened when I pressed {key}!', '{key} {what}. Interesting...'],
     ctrlNothing: ['{key} does nothing. Bye {key} 👋', 'Pressed {key} like 5 times. Nothing. Useless.', '{key}? Useless button.'],
+    mouseNothing: ['{key} does nothing here. No mouse in this game I guess 🖱️', 'Tried {key} a bunch. Nothing happens. Useless.', '{key}? Nope, does nothing 🤷'],
     ctrlPause: ['{key} pauses the game?! Not touching that again 🙅', 'Oops, {key} pauses it. Good to know.', 'Note to self: {key} = pause. Avoid.'],
     foundButton: ['Clicking \'{btn}\' does something! Remembering that.', '\'{btn}\' button works 👍'],
     foundScore: ['I found the score! It\'s the \'{label}\' number 📊', 'That \'{label}\' number goes up when stuff happens. That\'s my score!'],
@@ -3572,7 +3575,7 @@ AIP.Voice = (function () {
     deathMad: ['ARE YOU KIDDING ME', 'That was SO rigged!', 'I HATE that thing!', 'Come ON!', 'No way that hit me!', 'Ugh! Again!'],
     deathChill: ['Eh, died. We go again.', 'Oops. Whatever.', 'Died. It happens.', 'Ok that one\'s on me.'],
     deathDetermined: ['Ok. Not dying to that again.', 'Learned something. Next try.', 'I see the pattern now. Again.', 'One more. I got this.'],
-    streak: ['Died {n} times in a minute...', 'That\'s {n} deaths. This game is hard 😓', '{n} deaths. I need a new plan.'],
+    streak: ['Died {n} times in a minute...', '{n} deaths in one minute. This game is hard 😓', '{n} deaths in a minute. I need a new plan.'],
     rage: ['THAT\'S IT. I\'M MAD NOW.', '{n} TIMES?! THIS GAME IS BROKEN', 'I am going to DESTROY this game 😡', 'RAGE MODE ACTIVATED'],
     win: ['I WON!!! I ACTUALLY WON!!', 'YESSSS I BEAT IT 🏆', 'WE DID IT!!! {game} = BEATEN', 'Victory!! Took me {tries} tries but I did it!'],
     bored: ['This is kinda boring...', 'Nothing\'s happening 🥱', 'Can something happen please', 'Hellooo? Game?', 'I\'m bored. Let\'s try something new.'],
@@ -3588,6 +3591,8 @@ AIP.Voice = (function () {
     memory: ['Remember when {mem}? Good times.', 'Still thinking about when {mem}.', 'I\'ll never forget when {mem}.'],
     story: ['Ooh, story time 📖', 'Wait... what?! 👀', 'Hmm, interesting...', 'Okay okay, I\'m reading!', 'Plot twist?? 😮', 'I need to know what happens next.'],
     trophy: ['TROPHY!! "{trophy}" 🏆', 'Got the "{trophy}" trophy! 🏆 Collecting them all.', 'Achievement unlocked: {trophy}! Let\'s gooo 🏆'],
+    coachResting: ['Gimme a sec, my coach brain is catching its breath (free limit) ⏳ I\'ll answer when it\'s back!', 'My coach brain is resting for a moment ⏳ Hold that thought!'],
+    coachOfflineTip: ['No internet, so my coach brain is offline 📡 I only get simple tips right now, like "go right" or "avoid red".'],
     tipUnknownCoachOff: ['My coach brain is off right now, so I only get simple tips like "space = jump" or "avoid red" 🤔', 'Can\'t think that hard without my coach (offline?). Try "go right" or "avoid red".'],
     tipThanks: ['Ooh ok, {tip}. Got it!', 'Noted: {tip} 📝', 'Thanks, I\'ll try that: {tip}', 'Oh that makes sense. {tip}.'],
     tipUnknown: ['Huh? I only get simple tips like "space = jump", "avoid red", "go right" 🤔', 'I\'m a simple robot, try something like "press space to jump" or "get the yellow stuff"', 'Didn\'t get that. Try "avoid red" or "z = shoot".'],
@@ -4256,15 +4261,20 @@ AIP.Coach = (function () {
       if (now - this.lastLook > this.interval(obs, now)) this.look('routine', {});
     }
     // "It decides itself": look faster when something's going on, slower when it's chill.
+    // (Gemini's free limit is around 10-15 looks a minute, so it stays well under that)
     interval(obs, now) {
-      if (!obs || !obs.ok) return 8000;
+      if (!obs || !obs.ok) return 9000;
       const s = this.s;
-      if (s.brain.coach && s.brain.coach.reached) { s.brain.coach.reached = false; return 1500; } // got there - what's next?
-      if (s.phase === 'studying') return 2500;
-      if (obs.menuish || obs.staticTime > 3 || (obs.choices && obs.choices.length)) return 3500;
-      if ((obs.healthFrac != null && obs.healthFrac < 0.4) || now - s.ep.lastDamageAt < 4000) return 4000;
-      const calm = now - (s.lastScoreAt || 0) < 5000 && s.heart.e.scared < 0.3;
-      return calm ? 10000 : 6500;
+      if (s.brain.coach && s.brain.coach.reached) { s.brain.coach.reached = false; return 3500; } // got there - what's next?
+      let ms;
+      if (s.phase === 'studying') ms = 4000;
+      else if ((obs.healthFrac != null && obs.healthFrac < 0.4) || now - s.ep.lastDamageAt < 4000) ms = 5000;
+      else if (obs.menuish || obs.staticTime > 3 || (obs.choices && obs.choices.length)) ms = 6000;
+      else ms = now - (s.lastScoreAt || 0) < 5000 && s.heart.e.scared < 0.3 ? 12000 : 8000;
+      // nothing changed since last time? no need to look again so soon
+      const h = s.brain.hashState(obs);
+      if (h === this.lastLookHash && !(s.recentEvents.length && s.recentEvents.length !== this.lastEventsN)) ms *= 2;
+      return ms;
     }
 
     /* ---------- building what Gemini sees ---------- */
@@ -4324,6 +4334,8 @@ AIP.Coach = (function () {
       this.busy = true;
       this.lastLook = performance.now();
       const s = this.s;
+      if (s.lastObs && s.lastObs.ok) this.lastLookHash = s.brain.hashState(s.lastObs);
+      this.lastEventsN = s.recentEvents.length;
       try {
         const parts = [{ text: this.context(reason, extra) }];
         if (extra && extra.images) extra.images.forEach((d, i) => { parts.push({ text: i === 0 ? 'Screenshot a moment BEFORE it died:' : 'Screenshot right AFTER:' }); parts.push({ inlineData: { mimeType: 'image/jpeg', data: d } }); });
@@ -4642,20 +4654,25 @@ AIP.Session = (function () {
       this.talkAbout(events, feels, obs, ctx);
 
       if (this.mode === 'pause') { this.hands.releaseAll(); this.ui(now, obs); return; }
-      // 🖐️ the coach is pressing/clicking something itself (only when stuck/menus/story)
-      if (this.mode === 'ai' && this.take && this.runTakeover(now)) { this.ui(now, obs); return; }
-      if (this.phase === 'studying') { this.study(obs, now); this.ui(now, obs); return; }
-      if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
-      // 📖 story / instructions on screen: actually READ it (don't mash through)
-      if (this.mode === 'ai' && this.readStory(obs, now)) { this.ui(now, obs); return; }
-
-      const mods = this.heart.mods(st.painMode);
+      // a win / game over always counts - even if it happens while reading, studying or the coach is driving
       let end = null;
       for (const ev of events) {
         if (ev.type === 'win') end = 'win';
         else if (!end && (ev.type === 'gameOver' || ev.type === 'healthZero')) end = 'death';
         else if (!end && ev.type === 'scoreReset' && this.ep.maxScore > 0 && now - this.ep.t0 > 3000) end = 'death';
       }
+      if (end && this.phase !== 'restart') { this.reading = null; this.take = null; if (this.phase === 'studying') this.phase = 'play'; }
+      if (!end) {
+      // 🖐️ the coach is pressing/clicking something itself (only when stuck/menus/story)
+      if (this.mode === 'ai' && this.take && this.runTakeover(now)) { this.ui(now, obs); return; }
+      if (this.phase === 'studying') { this.study(obs, now); this.ui(now, obs); return; }
+      if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
+      // 📖 story / instructions on screen: actually READ it (don't mash through)
+      if (this.mode === 'ai' && this.readStory(obs, now)) { this.ui(now, obs); return; }
+      }
+      else if (this.phase === 'restart') { this.doRestart(obs, now); this.ui(now, obs); return; }
+
+      const mods = this.heart.mods(st.painMode);
       if (!end && now - this.ep.t0 > 150000) end = 'segment';
       // testing whether a key paused the game? hands off until the test is done
       if (this.mode === 'ai' && this.checkPause(obs, now)) { this.ui(now, obs); return; }
@@ -4856,10 +4873,22 @@ AIP.Session = (function () {
     /* ---------- 📖 reading story / instructions ---------- */
     readStory(obs, now) {
       if (obs.gameOverVisible || this.phase !== 'play') { this.reading = null; return false; }
-      const nt = obs.newText && obs.newText[0];
+      // text still being "typed out" on screen? wait for it to finish before reading
+      if (obs.textAnimating && !this.reading) { this.hands.releaseAll(); this.reason = '📖 waiting for the text to finish…'; return true; }
+      // any long text on screen it hasn't read yet? (dialogue, story, instructions)
+      const handled = this.readSet || (this.readSet = new Set());
+      let nt = null;
+      for (const b of this.senses.textBits || []) {
+        const t = b.s.replace(/\s+/g, ' ').trim();
+        if (handled.has(t) || t.length < 25) continue;
+        const words = t.split(' ').filter((w) => /[a-z]/i.test(w)).length;
+        if (words >= 5 && (!nt || words > nt.words)) nt = { s: t, words };
+      }
       // short lines only count as "reading" when the game is waiting (dialogue box, menu, "press X")
       const worth = nt && (nt.words >= 12 || obs.staticTime > 0.3 || obs.menuish || obs.continueHint || (obs.choices && obs.choices.length));
       if (worth && (!this.reading || this.reading.text !== nt.s)) {
+        handled.add(nt.s);
+        if (handled.size > 500) handled.delete(handled.values().next().value);
         const B = this.brain.stats;
         B.readHashes = B.readHashes || [];
         const h = U.hashStr(nt.s);
@@ -4883,7 +4912,8 @@ AIP.Session = (function () {
       if (!R) return false;
       if (obs.textAnimating) R.until = Math.max(R.until, now + 700); // still typing out
       if (now < R.until) return true;
-      if (!R.again && this.coach.busy && now - R.t0 < 10000) return true; // let the coach react / choose
+      // let the coach read it too (react / pick a choice) before moving on
+      if (!R.again && (this.coach.busy || this.coach.queue.some((q) => q.reason === 'story')) && now - R.t0 < 12000) return true;
       if (obs.choices && obs.choices.length) {
         if (!R.chose) {
           R.chose = true;
@@ -4926,17 +4956,19 @@ AIP.Session = (function () {
     gotTrophy(e) {
       const B = this.brain.stats;
       B.trophies = B.trophies || { list: [], got: {} };
-      if (B.trophies.got[e.name]) return;
-      B.trophies.got[e.name] = Date.now();
-      if (!B.trophies.list.some((x) => x.name.toLowerCase() === e.name.toLowerCase())) B.trophies.list.push({ name: e.name, got: true });
+      const have = B.trophies.list.find((x) => x.name.toLowerCase() === e.name.toLowerCase());
+      const name = have ? have.name : e.name;
+      if (Object.keys(B.trophies.got).some((k) => k.toLowerCase() === name.toLowerCase())) return;
+      B.trophies.got[name] = Date.now();
+      if (have) have.got = true; else B.trophies.list.push({ name, got: true });
       const gs = AIP.squad.gameStats(this.ai, this.game.id);
       gs.trophies = Object.keys(B.trophies.got).length;
       gs.trophyTotal = B.trophies.list.length;
       this.heart.feel('proud', 0.5, 'got a trophy'); this.heart.feel('happy', 0.3, 'got a trophy'); this.heart.feel('excited', 0.4, 'got a trophy');
       this.pendingFb = Math.max(this.pendingFb || 0, 1.5);
-      this.voice.say('trophy', { trophy: e.name }, 3);
-      this.diary('trophy', 'Got a trophy in ' + this.game.name + ': "' + e.name + '" 🏆');
-      this.brain.addMemory('trophy', 'getting the "' + e.name + '" trophy', 0.9);
+      this.voice.say('trophy', { trophy: name }, 3);
+      this.diary('trophy', 'Got a trophy in ' + this.game.name + ': "' + name + '" 🏆');
+      this.brain.addMemory('trophy', 'getting the "' + name + '" trophy', 0.9);
     }
     mergeTrophies(list) {
       const B = this.brain.stats;
@@ -4945,8 +4977,9 @@ AIP.Session = (function () {
         if (!t || !t.name) continue;
         const name = String(t.name).slice(0, 60);
         const have = B.trophies.list.find((x) => x.name.toLowerCase() === name.toLowerCase());
-        if (have) { if (t.got) have.got = true; } else B.trophies.list.push({ name, got: !!t.got });
-        if (t.got && !B.trophies.got[name]) B.trophies.got[name] = Date.now();
+        const already = Object.keys(B.trophies.got).some((k) => k.toLowerCase() === name.toLowerCase());
+        if (have) { if (t.got || already) have.got = true; } else B.trophies.list.push({ name, got: !!t.got || already });
+        if (t.got && !already) B.trophies.got[have ? have.name : name] = Date.now();
       }
       const gs = AIP.squad.gameStats(this.ai, this.game.id);
       gs.trophies = Object.keys(B.trophies.got).length;
@@ -5063,7 +5096,7 @@ AIP.Session = (function () {
           // (the pause test already pressed it again to un-pause - don't press it a third time)
           this.voice.say('ctrlPause', vars, 2);
           this.pauseKeys.add(n.code);
-        } else if (n.status === 'useless') { this.heart.react([{ type: 'uselessKey' }], { painMode }); this.voice.say('ctrlNothing', vars, 0); }
+        } else if (n.status === 'useless') { this.heart.react([{ type: 'uselessKey' }], { painMode }); this.voice.say(n.code.indexOf('m:') === 0 ? 'mouseNothing' : 'ctrlNothing', vars, 0); }
       } else if (n.type === 'button') this.voice.say('foundButton', { btn: n.text }, 1);
     }
     onErrors(errs, now) {
@@ -5272,6 +5305,12 @@ AIP.Session = (function () {
       if (p.tips.length) { p.tips.forEach((t) => this.brain.applyTip(t)); this.heart.react([{ type: 'tip' }], { painMode: AIP.settings.get().painMode }); }
       // the coach understands normal sentences ("go to the door"), answers questions, chats
       if (AIP.gemini.usable()) { this.coach.playerSaid(text); this.app.chat('sys', '🧠 ' + this.ai.name + ' is thinking…'); return; }
+      if (AIP.gemini.ready() && AIP.gemini.state().status === 'limit') {
+        // resting (free limit) - it'll answer properly as soon as the coach is back
+        this.coach.playerSaid(text);
+        this.voice.say('coachResting', {}, 3);
+        return;
+      }
       this.localTip(text, p);
     }
     // no coach (offline / no key / out of free limit): the old simple way
@@ -5281,7 +5320,9 @@ AIP.Session = (function () {
       if (!p.tips.length && ans) { this.voice.raw(ans, 2, 'answer'); return; }
       if (p.tips.length) { this.voice.say('tipThanks', { tip: p.tips[0].text }, 3); return; }
       if (p.unknownThing) { this.voice.say('tipThing', { thing: p.unknownThing }, 3); return; }
-      this.voice.say(AIP.gemini.get().hasKey ? 'tipUnknownCoachOff' : 'tipUnknown', {}, 3);
+      if (/what.*(see|happening|going on)|where are you/i.test(text)) { const v = this.vars(this.lastObs); this.voice.raw('I see a lot of ' + v.color + ' stuff. My score is ' + v.score + '. ' + v.learnedLine, 3, 'answer'); return; }
+      const gs = AIP.gemini.state().status;
+      this.voice.say(!AIP.gemini.get().hasKey ? 'tipUnknown' : gs === 'limit' ? 'coachResting' : gs === 'offline' ? 'coachOfflineTip' : 'tipUnknownCoachOff', {}, 3);
     }
 
     /* ---------- 📋 report card ---------- */
