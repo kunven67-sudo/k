@@ -95,10 +95,16 @@
   const kindWord = (k) => (k === 'time' ? 's survived' : k === 'explore' ? ' explored' : '');
 
   async function addGame(g) {
+    // grab copies of anything the game loads from the internet, so it works offline later ✈️
+    let off = { saved: 0, failed: [] };
+    try { off = await AIP.loader.cacheExternals(g); } catch (e) { /* offline right now - try again when it's played */ }
     app.games.unshift(g);
     try { await AIP.db.put('games', g); } catch (e) { toast('⚠️ Could not save the game (too big?)'); }
     renderLibrary();
-    toast('Added "' + g.name + '"! Click it and ' + (app.ai ? app.ai.name : 'the AI') + ' will play it 🎮');
+    let msg = 'Added "' + g.name + '"! Click it and ' + (app.ai ? app.ai.name : 'the AI') + ' will play it 🎮';
+    if (off.saved) msg += ' (saved ' + off.saved + ' internet part' + (off.saved > 1 ? 's' : '') + ' so it works offline ✈️)';
+    else if (off.failed.length) msg += " (it needs the internet for some parts - I'll grab them next time you're online 📡)";
+    toast(msg);
   }
   async function gameMenu(id) {
     const g = app.games.find((x) => x.id === id);

@@ -525,19 +525,26 @@ AIP.Senses = (function () {
   }
   // For a lonely number like <b id="coinN">12</b>, guess what it means from nearby names/words.
   function ctxLabel(el) {
-    const words = [];
-    const addName = (e) => {
-      if (!e) return;
-      const s = ((e.id || '') + ' ' + (typeof e.className === 'string' ? e.className : '')).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ');
-      if (s.trim()) words.push(s.trim());
-    };
-    addName(el); addName(el.parentElement);
-    const sib = el.previousElementSibling || el.nextElementSibling;
-    if (sib && sib.textContent && sib.textContent.length < 30) words.push(sib.textContent.trim());
+    const clean = (t) => String(t || '').replace(/[\d:/=]+/g, ' ').replace(/\s+/g, ' ').trim();
     const p = el.parentElement;
-    if (p) { let t = ''; for (let c = p.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) t += c.nodeValue; t = t.replace(/[\d\s:/]+/g, ' ').trim(); if (t && t.length < 25) words.push(t); }
-    if (!words.length && p) addName(p.parentElement);
-    return words.join(' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+    // 1) words the player can SEE next to the number, like "Score: <b>12</b>" or "<b>12</b> <small>Coins</small>"
+    if (p) {
+      let t = '';
+      for (let c = p.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) t += c.nodeValue;
+      t = clean(t);
+      if (t && t.length < 25 && /[a-z]/i.test(t)) return t;
+    }
+    const sib = el.previousElementSibling || el.nextElementSibling;
+    if (sib && sib.textContent) { const t = clean(sib.textContent); if (t && t.length < 30 && /[a-z]/i.test(t)) return t; }
+    // 2) the names the game's code gave it, like id="coinCount" -> "coin Count"
+    const words = [];
+    const names = (e) => (e ? ((e.id || '') + ' ' + (typeof e.className === 'string' ? e.className : '')).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ') : '');
+    [el, p, p && p.parentElement].forEach((e) => names(e).split(/\s+/).forEach((w) => {
+      if (w.length > 2 && !words.some((x) => x.toLowerCase() === w.toLowerCase())) words.push(w);
+    }));
+    // if one of the words says what it is ("coins", "score", "hp"), that word alone is the best name
+    const meaningful = words.find((w) => kindOf(w) !== 'unknown');
+    return meaningful || words.slice(0, 2).join(' ');
   }
 
   Senses.GW = GW; Senses.GH = GH; Senses.SW = SW; Senses.SH = SH; Senses.N = NSMALL;

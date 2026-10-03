@@ -58,6 +58,7 @@ AIP.Voice = (function () {
     watchRivalDone: ['Ohh, I see how {rival} did it now.', 'Learned some stuff from {rival}. Don\'t tell them.'],
     stuck: ['I\'m stuck. Trying something else...', 'Nothing works?! Restarting the game 🔄', 'Hello? Is this thing frozen?'],
     restart: ['Restarting! 🔄', 'Again!', 'Let\'s try that again.'],
+    loadNet: ['This game needs the internet for some parts (from {host}) and I can\'t reach it 😢 Play it once while online and I\'ll save a copy!', 'Uh oh, part of this game lives on {host} and there\'s no internet 📡 Get online once and I\'ll keep a copy.'],
     loadFail: ['This game won\'t load... 😢 {err}', 'Something\'s broken in this game: {err}'],
     idle: ['My score: {score}. Best: {best}.', 'Try #{tries}. Let\'s see.', 'I wonder what the goal is here.', 'This game has a lot of {color} stuff.', '{learnedLine}'],
   };
@@ -103,7 +104,7 @@ AIP.Voice = (function () {
         if (!/[!?]$/.test(s)) s += '!!';
       }
       if (t.drama < 0.35 && t.temper < 0.45 && !/pain|rage|win/.test(kind)) {
-        s = s.toLowerCase().replace(/!+/g, '.').replace(/\.\.+$/, '.');
+        s = s.toLowerCase().replace(/\?!+/g, '?').replace(/!+/g, '.').replace(/\.\.+$/, '.');
       }
       // cussing: its own choice - only when it's actually mad and has a salty personality
       const madness = (MAD_KINDS[kind] || 0) * h.e.mad;

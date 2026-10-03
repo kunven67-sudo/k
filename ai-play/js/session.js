@@ -46,6 +46,13 @@ AIP.Session = (function () {
       if (rec) { this.brain.load(rec); this.gameStore = rec.gameSave || {}; }
       this.brain.stats.flags = this.brain.stats.flags || {};
       const gs = AIP.squad.gameStats(this.ai, this.game.id);
+      // missing some internet parts from when it was added? try to grab them now (so next time works offline)
+      try {
+        const off = await AIP.loader.cacheExternals(this.game);
+        if (off.changed) await AIP.db.put('games', this.game);
+        this.netMissing = off.failed;
+      } catch (e) { /* ignore */ }
+      if (this.dead) return;
       await this.loadFrame();
       if (this.dead) return;
       const first = !this.brain.stats.episodes && !this.brain.stats.flags.started;
@@ -138,7 +145,10 @@ AIP.Session = (function () {
       if (!obs.ok) { this.ui(now, obs); return; }
       if (this.mode === 'ai') { this.ai.stats.playMs = (this.ai.stats.playMs || 0) + dt * 1000; AIP.squad.gameStats(this.ai, this.game.id).timeMs += dt * 1000; }
       this.motionEMA += ((obs.motionAmt || 0) - this.motionEMA) * 0.05;
-      obs.menuish = !!(obs.buttons && obs.buttons.some((b) => b.prio >= 1) && (obs.staticTime > 0.6 || !(obs.readouts && obs.readouts.some((r) => r.kind === 'score' || r.kind === 'health'))));
+      // a menu = a big "Play"/"Start" button is showing (even if the background is animated),
+      // or start-ish buttons on a frozen screen / with no score or health on screen
+      const startBtn = obs.buttons && obs.buttons.some((b) => b.prio >= 1 && /\b(play|start|begin|new game|continue|resume|retry|try again|play again|restart)\b/i.test(b.text));
+      obs.menuish = !!(startBtn || (obs.buttons && obs.buttons.some((b) => b.prio >= 1) && (obs.staticTime > 0.6 || !(obs.readouts && obs.readouts.some((r) => r.kind === 'score' || r.kind === 'health')))));
 
       this.announceReadouts(obs);
       const events = this.digest(obs);
@@ -253,18 +263,20 @@ AIP.Session = (function () {
     checkPause(obs, d, now) {
       const pc = this.pauseCheck;
       if (pc) {
-        if (now - pc.t > 600) {
-          if ((obs.motionAmt || 0) > 0.0015) {
+        if (now - pc.t > 1300) {
+          if ((obs.motionAmt || 0) > 0.0015 && !obs.gameOverVisible && !pc.over && this.phase === 'play' && now - this.ep.t0 > now - pc.t) {
             const c = this.brain.keyCtl(pc.code);
             c.pause += 2; c.tries = Math.max(c.tries, 2);
             this.brain.judge(pc.code, c);
           }
           this.pauseCheck = null;
         }
+        if (obs.gameOverVisible || obs.events.some((e) => /gameOver|healthZero|death|scoreReset/.test(e.type))) pc.over = true;
         return;
       }
       const f = this.freshKey;
-      if (f && this.motionEMA > 0.004 && (obs.motionAmt || 0) < 0.0006 && now - f.t < 600) {
+      const died = obs.gameOverVisible || obs.events.some((e) => /gameOver|healthZero|damage|death/.test(e.type)) || now - this.ep.lastDamageAt < 2500;
+      if (f && !died && this.motionEMA > 0.004 && (obs.motionAmt || 0) < 0.0006 && now - f.t < 600) {
         this.pauseCheck = { code: f.code, t: now };
         this.hands.tap(f.code);
       }
@@ -398,7 +410,13 @@ AIP.Session = (function () {
       const real = errs.filter((e) => !/favicon|ResizeObserver/i.test(e));
       if (!real.length) return;
       this.app.gameErrors(real);
-      if (now - (this.loadedAt || now) < 8000 && this.errorsShown === 0) this.voice.say('loadFail', { err: '(' + real[0].slice(0, 70) + ')' }, 2);
+      const net = real.find((e) => /couldn't load https?:/.test(e));
+      if (net && !this.saidNet) {
+        this.saidNet = true;
+        let host = '';
+        try { host = new URL(net.replace(/^couldn't load /, '')).host; } catch (e) { /* ignore */ }
+        this.voice.say('loadNet', { host: host || 'the internet' }, 3);
+      } else if (now - (this.loadedAt || now) < 8000 && this.errorsShown === 0) this.voice.say('loadFail', { err: '(' + real[0].slice(0, 70) + ')' }, 3);
       this.errorsShown++;
     }
 

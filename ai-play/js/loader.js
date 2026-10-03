@@ -95,6 +95,62 @@ AIP.loader = (function () {
     };
   }
 
+  /* ---------- saving a game's internet parts so it works OFFLINE ---------- */
+  // Lots of games load stuff from the internet (like Three.js from a CDN, or Google Fonts).
+  // When we're online, grab a copy of those and keep it with the game, so next time no internet is needed.
+  async function fetchWithTimeout(url, ms) {
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const t = setTimeout(() => ac && ac.abort(), ms);
+    try { return await fetch(url, ac ? { signal: ac.signal, mode: 'cors' } : { mode: 'cors' }); } finally { clearTimeout(t); }
+  }
+  function offlinePath(url, type) {
+    const u = new URL(url);
+    let p = '_offline/' + u.host + u.pathname.replace(/\/+$/, '/index');
+    if (u.search) p += '_' + AIP.util.hashStr(u.search).toString(36);
+    if (!/\.[a-z0-9]{1,5}$/i.test(p)) p += /css/.test(type) ? '.css' : /javascript/.test(type) ? '.js' : '';
+    return p.replace(/[^\w./-]/g, '_');
+  }
+  async function cacheExternals(game) {
+    game.offline = game.offline || {};
+    const out = { changed: false, failed: [], saved: 0 };
+    let html = '';
+    try { html = await game.files[game.entry].text(); } catch (e) { return out; }
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const want = [];
+    doc.querySelectorAll('script[src]').forEach((e) => want.push(e.getAttribute('src')));
+    doc.querySelectorAll('link[href]').forEach((e) => { if (/stylesheet|preload|modulepreload/i.test(e.getAttribute('rel') || '')) want.push(e.getAttribute('href')); });
+    const ext = [...new Set(want.filter((u) => /^https?:\/\//i.test(u || '') && !game.offline[u]))];
+    for (const url of ext) {
+      try {
+        const r = await fetchWithTimeout(url, 10000);
+        if (!r.ok) { out.failed.push(url); continue; }
+        const type = (r.headers.get('content-type') || '').split(';')[0] || mimeOf(url);
+        const path = offlinePath(url, type);
+        let blob = await r.blob();
+        if (/css/.test(type)) {
+          // a stylesheet from the internet can point at more internet stuff (fonts) - grab those too
+          let css = await blob.text();
+          const inner = [...new Set([...css.matchAll(/url\(\s*['"]?(https?:\/\/[^'")\s]+)['"]?\s*\)/g)].map((m) => m[1]))].slice(0, 40);
+          for (const fu of inner) {
+            try {
+              const fr = await fetchWithTimeout(fu, 10000);
+              if (!fr.ok) continue;
+              const ft = (fr.headers.get('content-type') || '').split(';')[0] || mimeOf(fu);
+              const fp = offlinePath(fu, ft);
+              game.files[fp] = new Blob([await fr.arrayBuffer()], { type: ft });
+              // point the stylesheet at our copy (written relative to where the stylesheet lives)
+              css = css.split(fu).join('../'.repeat(path.split('/').length - 1) + fp);
+            } catch (e) { /* that font stays online-only */ }
+          }
+          blob = new Blob([css], { type: 'text/css' });
+        } else blob = new Blob([await blob.arrayBuffer()], { type });
+        game.files[path] = blob;
+        game.offline[url] = path;
+        out.changed = true; out.saved++;
+      } catch (e) { out.failed.push(url); }
+    }
+    return out;
+  }
   /* ---------- building the sandboxed game page ---------- */
 
   // Finds every import specifier in a JS module and lets us swap it out.
@@ -247,8 +303,10 @@ AIP.loader = (function () {
     });
 
     // --- rewrite the HTML ---
+    const offline = game.offline || {};
     const fixAttr = (el, attr, baseUrl) => {
       const v = el.getAttribute(attr);
+      if (v && offline[v] && made[offline[v]]) { el.setAttribute(attr, made[offline[v]]); el.removeAttribute('integrity'); el.removeAttribute('crossorigin'); return; }
       if (!v || /^(data:|blob:|https?:|javascript:|#|mailto:)/i.test(v)) return;
       const p = fakePath(new URL(v, baseUrl || htmlBase).href);
       if (p != null && made[p]) el.setAttribute(attr, made[p]);
@@ -465,5 +523,5 @@ AIP.loader = (function () {
     });
   }
 
-  return { fromFileList, fromDataTransfer, makeGame, build, FAKE };
+  return { fromFileList, fromDataTransfer, makeGame, build, cacheExternals, FAKE };
 })();

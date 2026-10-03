@@ -355,7 +355,14 @@ AIP.Brain = (function () {
       const ids = keys.slice();
       if (mid) ids.push(mid);
       // best: "where was I -> where am I now" (if I'm tracking myself). Else: how stuff shifted at the key's spot.
-      const selfMove = this.self.tracked && this.lastSelfPos ? [(this.self.x - this.lastSelfPos.x) * GW, (this.self.y - this.lastSelfPos.y) * GH] : null;
+      // (use the CHANGE in my motion: falling after a jump isn't the key's doing, a sudden push up is)
+      // Clean experiment: only judge a key when I was STANDING STILL before pressing it
+      // (jump pressed mid-air does nothing; a move key pressed while already moving tells little).
+      const vel = this.self.tracked && this.lastSelfPos ? [(this.self.x - this.lastSelfPos.x) * GW, (this.self.y - this.lastSelfPos.y) * GH] : null;
+      const atRest = vel && this.lastVel && Math.hypot(this.lastVel[0], this.lastVel[1]) < 0.35;
+      const selfMove = atRest ? vel : null;
+      const skipDir = !!vel && !atRest;
+      this.lastVel = vel;
       const shiftAt = (c) => {
         if (selfMove) return selfMove;
         const cx = Math.round(c.hot.x * GW), cy = Math.round(c.hot.y * GH);
@@ -367,7 +374,7 @@ AIP.Brain = (function () {
       if (this.prevG40 && obs.g40) {
         for (const code in this.controls) {
           const c = this.controls[code];
-          if ((!c.hot && !selfMove) || ids.indexOf(code) >= 0 || code.indexOf('m:') === 0 || c.status === 'useless' || Math.random() > 0.4) continue;
+          if (skipDir || (!c.hot && !selfMove) || ids.indexOf(code) >= 0 || code.indexOf('m:') === 0 || c.status === 'useless' || Math.random() > 0.4) continue;
           acc(c.off, shiftAt(c));
         }
       }
@@ -385,13 +392,21 @@ AIP.Brain = (function () {
           c.amt += (Math.max(0, amt - this.baseAmt) - c.amt) * rate;
         }
         const rate = Math.max(w / Math.max(1, c.n), 0.04 * w);
-        if ((c.hot || selfMove) && this.prevG40 && obs.g40 && code.indexOf('m:') !== 0) acc(c.on, shiftAt(c));
+        // direction = what happens right after pressing (a jump goes UP first, then falls back down)
+        if (isFresh && !skipDir && (c.hot || selfMove) && this.prevG40 && obs.g40 && code.indexOf('m:') !== 0) acc(c.on, shiftAt(c));
         if (glob.gain > 0.2 && obs.changedFrac > 0.25) { const r = Math.max(0.1, rate); c.gx += (glob.dx * glob.gain * 1.6 - c.gx) * r; c.gy += (glob.dy * glob.gain * 1.6 - c.gy) * r; c.gn++; }
         else { c.gx *= 0.97; c.gy *= 0.97; }
         // pause check: everything stopped right after pressing it?
-        if (isFresh && this.baseAmt > 0.0025 && amt < this.baseAmt * 0.08) c.pause++;
+        // everything froze right after pressing it? Maybe it's a pause key... or maybe I just died.
+        // Wait a moment before blaming the key (the "GAME OVER" text can show up a bit later).
+        if (isFresh && this.baseAmt > 0.0025 && amt < this.baseAmt * 0.08 && !obs.gameOverVisible && now - (this.lastBadAt || -1e9) > 2500) this.pauseSuspect = { code, t: now };
         this.analyze(c);
         this.judge(code, c);
+      }
+      const ps = this.pauseSuspect;
+      if (ps && now - ps.t > 1500) {
+        this.pauseSuspect = null;
+        if (now - (this.lastBadAt || -1e9) > now - ps.t + 300 && !obs.gameOverVisible && !obs.menuish) { const c = this.keyCtl(ps.code); c.pause++; this.judge(ps.code, c); }
       }
       // camera games: the whole screen slides when you move
       if (glob.gain > 0.2 && obs.changedFrac > 0.3 && ids.length) this.self.camera = Math.min(1, this.self.camera + 0.02); else this.self.camera *= 0.999;
@@ -443,7 +458,7 @@ AIP.Brain = (function () {
     judge(code, c) {
       if (c.status === 'banned' || c.status === 'starred') return;
       const old = c.status;
-      if (c.tries >= 2 && c.pause >= 2 && c.pause / c.tries > 0.5) c.status = 'pause';
+      if (c.tries >= 3 && c.pause >= 3 && c.pause / c.tries > 0.6) c.status = 'pause';
       else if (c.tries >= 3 && (c.n || 0) >= 6) {
         const localized = (c.peakZ || 0) > 5 && c.peak > 0.04;
         const moves = (c.dirZ || 0) > 3.5 && Math.hypot(c.dx, c.dy) > 0.3;
@@ -478,7 +493,7 @@ AIP.Brain = (function () {
     // What color am I? (the color that shows up where things move when I press a move key)
     learnSelfColor(obs) {
       if (!this.prev || this.self.camera > 0.5) return;
-      const moving = this.prev.keys.some((k) => { const c = this.controls[k]; return c && c.hot && isDirLabel(c); });
+      const moving = this.prev.keys.some((k) => { const c = this.controls[k]; return c && c.hot && (isDirLabel(c) || (c.peakZ || 0) > 5); });
       if (!moving || (obs.changedFrac || 0) > 0.4) return;
       const hist = this.selfHist || (this.selfHist = new Float32Array(NC));
       const band = 0.16;
@@ -492,7 +507,9 @@ AIP.Brain = (function () {
       }
       let best = -1, bv = 0, tot = 0;
       for (let c = 0; c < NC; c++) { if (c === obs.bgCat) continue; tot += hist[c]; if (hist[c] > bv) { bv = hist[c]; best = c; } }
-      if (tot > 12 && bv / tot > 0.45) this.self.cat = best;
+      // need real proof before deciding "that's my color" (a coin touching me once doesn't count)
+      if (tot > 30 && bv / tot > 0.55) this.self.cat = best;
+      else if (this.self.cat != null && tot > 30 && hist[this.self.cat] / tot < 0.25) this.self.cat = null;
       for (let c = 0; c < NC; c++) hist[c] *= 0.995;
     }
     // Follow myself around the screen: find the blob of "my color" closest to where I was.
@@ -554,7 +571,8 @@ AIP.Brain = (function () {
         glob[c]++;
         const dx = ((i % SW) + 0.5) / SW - sx, dy = ((Math.floor(i / SW) + 0.5) / SH - sy) * 0.75;
         const d2 = dx * dx + dy * dy;
-        if (d2 < 0.035) { const w = 1 - d2 / 0.035; near[c] += w; wn += w; }
+        // what's TOUCHING me counts the most (the spike I hit, the coin I grabbed)
+        if (d2 < 0.02) { const w = (1 - d2 / 0.02) * (1 - d2 / 0.02); near[c] += w; wn += w; }
       }
       for (let c = 0; c < NC; c++) near[c] = (wn ? near[c] / wn : 0) - glob[c] / N;
       if (obs.bgCat != null) near[obs.bgCat] = 0;
@@ -563,14 +581,19 @@ AIP.Brain = (function () {
     }
     updateAssoc(obs) {
       if (!obs.ok || !obs.cat) return;
-      this.nearHist.push(this.nearColors(obs));
+      const near = this.nearColors(obs);
+      const nb = this.nearBase || (this.nearBase = new Float32Array(NC));
+      const rel = new Float32Array(NC);
+      for (let c = 0; c < NC; c++) { rel[c] = near[c] - nb[c]; nb[c] += (near[c] - nb[c]) * 0.02; }
+      this.nearHist.push(rel);
       if (this.nearHist.length > 6) this.nearHist.shift();
       const A = this.assoc;
       const credit = (arr, scale) => {
         for (let c = 0; c < NC; c++) { let m = 0; for (const h of this.nearHist) if (h[c] > m) m = h[c]; arr[c] += m * scale; }
       };
       for (const ev of obs.events) {
-        if (ev.type === 'score') { credit(A.good, 1); A.nGood++; }
+        // big points teach more than the tiny "+1 for staying alive" kind
+        if (ev.type === 'score') { const w = U.clamp(ev.size == null ? 0.5 : ev.size, 0.05, 1); credit(A.good, w); A.nGood += w; }
         if (ev.type === 'damage' || ev.type === 'healthZero' || ev.type === 'gameOver' || (ev.type === 'flash' && !obs.hp && !obs.lives)) { credit(A.bad, ev.type === 'flash' ? 0.5 : 1); A.nBad++; }
       }
       // raw = how much more of this color was near me when good/bad stuff happened (vs. normal)
@@ -667,7 +690,10 @@ AIP.Brain = (function () {
       this.stats.steps++;
       this._curG40 = obs.g40 || null;
       this.recentScore *= 0.9;
-      if (obs.events) for (const ev of obs.events) if (ev.type === 'score') this.recentScore = 1;
+      if (obs.events) for (const ev of obs.events) {
+        if (ev.type === 'score') this.recentScore = 1;
+        if (ev.type === 'gameOver' || ev.type === 'healthZero' || ev.type === 'damage' || ev.type === 'death') this.lastBadAt = now;
+      }
       // 1) learn
       if (obs.ok) {
         this.lastSelfPos = this.self.tracked ? { x: this.self.x, y: this.self.y } : null;
