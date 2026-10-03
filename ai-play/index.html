@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Play</title>
+<meta name="description" content="Pick a game file and watch an AI learn to play it - with feelings.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <button class="logo" data-view="library" aria-label="AI Play home"><span class="logo-ai">AI</span><span class="logo-play">Play</span></button>
+    <nav class="nav" aria-label="Main">
+      <button data-view="library" class="on">🎮 <span>Games</span></button>
+      <button data-view="squad">👥 <span>Squad</span></button>
+      <button data-view="board">🏆 <span>Leaderboard</span></button>
+      <button data-view="diary">📖 <span>Diary</span></button>
+      <button data-view="settings">⚙️ <span>Settings</span></button>
+    </nav>
+    <button class="cur-ai" id="curAi" data-view="squad" title="Your current AI - click to switch"></button>
+  </header>
+
+  <!-- ================= LIBRARY ================= -->
+  <main>
+  <section id="view-library" class="view on">
+    <div class="hero">
+      <div class="hero-bot" id="heroBot"></div>
+      <div>
+        <h1>Pick a game. <span id="heroName">Your AI</span> plays it.</h1>
+        <p class="sub">Add any HTML game file (or a whole game folder). Click it and the AI looks at the screen, figures out the controls, and tries to beat it, and it gets smarter every try. It runs on its own private copy of the game, so your real saves are never touched 🔒</p>
+        <div class="add-row">
+          <label class="btn primary"><input type="file" id="pickFile" accept=".html,.htm,text/html" hidden>➕ Add game file</label>
+          <label class="btn"><input type="file" id="pickFolder" webkitdirectory directory multiple hidden>📂 Add game folder</label>
+          <span class="drop-hint">…or drag a file / folder anywhere here</span>
+        </div>
+      </div>
+    </div>
+    <div class="grid" id="gameGrid"></div>
+  </section>
+
+  <!-- ================= PLAY ================= -->
+  <section id="view-play" class="view">
+    <div class="play-wrap side" id="playWrap">
+      <div class="stage-col">
+        <div class="stage-top">
+          <button class="btn sm" id="btnBack">← Games</button>
+          <h2 id="playTitle">Game</h2>
+          <div class="stage-btns">
+            <button class="btn sm" id="btnMode" title="Pause the AI">⏸️ Pause</button>
+            <button class="btn sm" id="btnWatch" title="You play, the AI watches and copies you">🎮 You play</button>
+            <button class="btn sm" id="btnReload" title="Restart the game file">🔁</button>
+            <button class="btn sm" id="btnLayout" title="Switch layout">⇆ Layout</button>
+          </div>
+        </div>
+        <div class="stage" id="stage">
+          <div class="vcursor" id="vcursor"></div>
+          <div class="facecam" id="facecam">
+            <div class="facecam-bot" id="facecamBot"></div>
+            <div class="facecam-name" id="facecamName"></div>
+          </div>
+          <div class="bubble" id="bubble"></div>
+          <div class="watch-banner" id="watchBanner">🎮 You're playing. Click the game, then use your keyboard + mouse. <b id="watchName"></b> is watching and taking notes 👀</div>
+          <div class="dream-veil" id="dreamVeil"><span>💤</span><b id="dreamText">dreaming…</b></div>
+        </div>
+        <div class="errors" id="gameErrors" hidden></div>
+      </div>
+
+      <aside class="panel" id="panel">
+        <div class="who">
+          <div class="who-bot" id="whoBot"></div>
+          <div class="who-info">
+            <div class="who-name" id="whoName"></div>
+            <div class="who-mood" id="whoMood"></div>
+            <div class="painbar" id="painBar" hidden><span>🤕 Pain</span><div class="pain-track"><i id="painFill"></i></div></div>
+            <div class="who-stats" id="whoStats"></div>
+          </div>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="on" data-tab="chat">💬 Chat</button>
+          <button data-tab="feel">💓 Feelings</button>
+          <button data-tab="learn">🧠 Learned</button>
+          <button data-tab="graph">📈 Progress</button>
+          <button data-tab="think">👁️ Thinking</button>
+          <button data-tab="keys">⌨️ Keys</button>
+        </div>
+        <div class="tabbody">
+          <div class="tab on" data-tab="chat"><div class="chatlog" id="chatlog" aria-live="polite"></div></div>
+          <div class="tab" data-tab="feel"><div class="meters" id="meters"></div><p class="note" id="personality"></p></div>
+          <div class="tab" data-tab="learn"><ul class="learned" id="learned"></ul></div>
+          <div class="tab" data-tab="graph">
+            <div class="graph-head"><span class="legend"><i class="sw s1"></i>score each try</span><span class="legend"><i class="sw s2"></i>best so far</span><button class="linkbtn" id="graphTable">table</button></div>
+            <div class="graph-box"><canvas id="graph"></canvas><div class="gtip" id="gtip" hidden></div></div>
+            <div class="graph-table" id="graphTableBox" hidden></div>
+            <p class="note" id="graphNote"></p>
+          </div>
+          <div class="tab" data-tab="think">
+            <div class="think">
+              <div class="eye-box"><canvas id="eye" width="160" height="120"></canvas><span class="eye-label">what it sees</span></div>
+              <div class="think-side">
+                <div class="reason" id="reason"></div>
+                <div class="held" id="held"></div>
+              </div>
+            </div>
+            <div class="opinions" id="opinions"></div>
+          </div>
+          <div class="tab" data-tab="keys">
+            <p class="note">Help it out: ⭐ = "this key matters", 🚫 = "don't use this key". It still decides what to do with them.</p>
+            <div class="keylist" id="keylist"></div>
+            <form class="addkey" id="addKeyForm"><input id="addKeyInput" placeholder="add a key (like z, space, shift)" maxlength="12"><button class="btn sm">⭐ Add</button></form>
+          </div>
+        </div>
+        <form class="chatbox" id="chatForm">
+          <button type="button" class="thumb" id="thumbUp" title="That was good">👍</button>
+          <button type="button" class="thumb" id="thumbDown" title="That was bad">👎</button>
+          <input id="chatInput" autocomplete="off" placeholder='tip it: "space = jump", "avoid red", "go right"…' maxlength="140">
+          <button class="btn sm primary">Send</button>
+        </form>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ================= SQUAD ================= -->
+  <section id="view-squad" class="view">
+    <div class="view-head"><h1>👥 Your Squad</h1><button class="btn primary" id="btnNewAi">🐣 New AI</button></div>
+    <p class="sub">Every AI picks its own name, look and personality when it's born, and its personality keeps changing from what happens to it. Each one has its own brain for every game.</p>
+    <div class="grid squad" id="squadGrid"></div>
+  </section>
+
+  <!-- ================= LEADERBOARD ================= -->
+  <section id="view-board" class="view">
+    <div class="view-head"><h1>🏆 Leaderboard</h1><select id="boardGame" aria-label="Game"></select></div>
+    <div id="board"></div>
+  </section>
+
+  <!-- ================= DIARY ================= -->
+  <section id="view-diary" class="view">
+    <div class="view-head"><h1>📖 Diary</h1><select id="diaryAi" aria-label="Whose diary"></select></div>
+    <p class="sub">The AI writes down its big moments by itself.</p>
+    <div id="diaryList" class="diary"></div>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section id="view-settings" class="view">
+    <div class="view-head"><h1>⚙️ Settings</h1></div>
+    <p class="sub">These are YOUR settings. Nothing here controls the AI's mind. Its feelings and choices are its own.</p>
+    <div class="settings">
+      <label class="set-row">
+        <div><b>🤕 Pain mode</b><small>When it takes damage it gets hurt: a pain meter, yelling, mood drops, and it gets scared and careful around whatever hurt it. (It acts hurt. It's still code, so it can't truly feel pain the way you do.)</small></div>
+        <input type="checkbox" id="setPain" class="toggle">
+      </label>
+      <label class="set-row">
+        <div><b>🗣️ Robot voice</b><small>Read what it says out loud with your computer's built-in voice.</small></div>
+        <input type="checkbox" id="setVoice" class="toggle">
+      </label>
+      <label class="set-row">
+        <div><b>🔊 Voice volume</b></div>
+        <input type="range" id="setVolume" min="0" max="1" step="0.05">
+      </label>
+      <div class="set-row">
+        <div><b>🖥️ Layout</b><small>Side panel, or game full screen with a streamer-style facecam. You can also flip it with ⇆ while playing.</small></div>
+        <div class="seg" id="setLayout"><button data-v="side">Side panel</button><button data-v="overlay">Full + facecam</button></div>
+      </div>
+    </div>
+    <p class="note">AI Play runs 100% offline in your browser. Your games, AIs and their brains are saved inside this browser on this computer.</p>
+  </section>
+  </main>
+
+  <div class="drop-veil" id="dropVeil">📂 Drop the game file or folder!</div>
+  <div class="modal" id="modal" hidden><div class="modal-card" id="modalCard"></div></div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/loader.js"></script>
+<script src="js/senses.js"></script>
+<script src="js/hands.js"></script>
+<script src="js/brain.js"></script>
+<script src="js/heart.js"></script>
+<script src="js/voice.js"></script>
+<script src="js/avatar.js"></script>
+<script src="js/squad.js"></script>
+<script src="js/session.js"></script>
+<script src="js/practice.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
