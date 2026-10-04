@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Keyboard AI</title>
+<style>
+  :root {
+    --bg: #f4f5f9;
+    --card: #ffffff;
+    --text: #141826;
+    --muted: #5d6475;
+    --line: #dfe2ea;
+    --accent: #4f46e5;
+    --accent-text: #ffffff;
+    --danger: #dc2626;
+    --paper: #fffdf7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a;
+      --card: #172036;
+      --text: #e8ebf3;
+      --muted: #9aa3b8;
+      --line: #2a3550;
+      --accent: #818cf8;
+      --accent-text: #0f172a;
+      --danger: #f87171;
+      --paper: #111a2e;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  }
+  main { max-width: 760px; margin: 0 auto; display: grid; gap: 14px; }
+  h1 { margin: 4px 0 0; font-size: 1.6rem; }
+  .sub { margin: 0; color: var(--muted); }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 14px;
+    display: grid;
+    gap: 12px;
+  }
+  label { font-weight: 600; font-size: .95rem; }
+  textarea, select {
+    width: 100%;
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
+  .field { display: grid; gap: 6px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 10px 16px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); flex: 1; }
+  button.stop { background: var(--danger); color: #fff; border-color: var(--danger); flex: 1; }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { color: var(--muted); font-size: .92rem; min-height: 1.4em; }
+  progress { width: 100%; height: 8px; accent-color: var(--accent); }
+  #paper {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px;
+    min-height: 40vh;
+    max-height: 70vh;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .95rem;
+  }
+  #paper:empty::before { content: "Your writing will be typed out here..."; color: var(--muted); }
+  .cursor { display: inline-block; width: .55em; height: 1.1em; background: var(--accent); vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .note { font-size: .85rem; color: var(--muted); margin: 0; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>⌨️ Keyboard AI</h1>
+    <p class="sub">Free AI that types for you. Runs right on your phone or computer, with no account and no key.</p>
+  </header>
+
+  <section class="card">
+    <div class="field">
+      <label for="topic">What should I write about?</label>
+      <textarea id="topic" rows="2">Tell me everything about Earth</textarea>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="model">AI brain</label>
+        <select id="model">
+          <option value="Qwen2.5-0.5B-Instruct">⚡ Quick (smallest, ~0.4 GB)</option>
+          <option value="Llama-3.2-1B-Instruct" selected>🙂 Balanced (~0.9 GB)</option>
+          <option value="Qwen2.5-1.5B-Instruct">🧠 Smart (~1.2 GB)</option>
+          <option value="Qwen2.5-3B-Instruct">🚀 Genius (~2 GB, newer phones/computers)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="length">How long?</label>
+        <select id="length">
+          <option value="1">1 round (about 8 sections)</option>
+          <option value="3">3 rounds (goes deeper)</option>
+          <option value="0" selected>♾️ No limit (until you press Stop)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="speed">Typing speed: <span id="speedLabel"></span></label>
+      <input id="speed" type="range" min="1" max="10" value="5">
+    </div>
+    <div class="buttons">
+      <button id="go" class="primary">▶️ Start typing</button>
+      <button id="stop" class="stop hidden">⏹ Stop</button>
+    </div>
+    <progress id="bar" class="hidden" max="1" value="0"></progress>
+    <div id="status"></div>
+  </section>
+
+  <div id="paper" aria-live="polite"></div>
+
+  <div class="buttons">
+    <button id="copy">📋 Copy</button>
+    <button id="share">📤 Share</button>
+    <button id="save">💾 Save .txt</button>
+    <button id="clear">🗑️ Clear</button>
+  </div>
+
+  <p class="note">The first time you pick a brain it downloads once (use Wi-Fi), then it's saved and works offline. Needs a browser with WebGPU: Chrome on Android, Safari on iPhone with iOS 26 or newer, or Chrome/Edge on a computer.</p>
+</main>
+
+<script type="module">
+const WEBLLM_URL = "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm";
+const SECTIONS_PER_ROUND = 8;
+const CONTEXT = 4096;
+
+const $ = (id) => document.getElementById(id);
+const paper = $("paper"), statusEl = $("status"), bar = $("bar");
+const goBtn = $("go"), stopBtn = $("stop");
+
+let webllm = null;
+let engine = null;
+let loadedModel = null;
+let running = false;
+let stopRequested = false;
+let wakeLock = null;
+
+// ---------- typewriter ----------
+const textNode = document.createTextNode("");
+const cursor = document.createElement("span");
+cursor.className = "cursor";
+let queue = "";
+let typed = "";
+
+const speeds = [8, 14, 22, 32, 45, 65, 90, 130, 200, 400]; // characters per second
+function cps() { return speeds[$("speed").value - 1]; }
+function updateSpeedLabel() {
+  const v = Number($("speed").value);
+  $("speedLabel").textContent = v <= 3 ? "🐢 slow" : v <= 7 ? "🙂 normal" : "⚡ fast";
+}
+$("speed").addEventListener("input", () => { updateSpeedLabel(); saveSettings(); });
+updateSpeedLabel();
+
+function showPaper() {
+  paper.replaceChildren(textNode);
+  if (running) paper.appendChild(cursor);
+}
+
+let lastTick = performance.now();
+let carry = 0;
+function tick(now) {
+  const dt = (now - lastTick) / 1000;
+  lastTick = now;
+  if (queue.length) {
+    carry += dt * cps();
+    const n = Math.min(queue.length, Math.floor(carry));
+    if (n > 0) {
+      carry -= n;
+      const nearBottom = paper.scrollHeight - paper.scrollTop - paper.clientHeight < 60;
+      typed += queue.slice(0, n);
+      queue = queue.slice(n);
+      textNode.data = typed;
+      if (nearBottom) paper.scrollTop = paper.scrollHeight;
+      saveText();
+    }
+  } else {
+    carry = 0;
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function type(text) { queue += text; }
+function waitForTyping() {
+  return new Promise((resolve) => {
+    const check = () => (queue.length === 0 || stopRequested) ? resolve() : setTimeout(check, 100);
+    check();
+  });
+}
+
+// ---------- saving between visits ----------
+function saveText() { try { localStorage.setItem("kai-text", typed); } catch {} }
+function saveSettings() {
+  try {
+    localStorage.setItem("kai-settings", JSON.stringify({
+      topic: $("topic").value, model: $("model").value, length: $("length").value, speed: $("speed").value,
+    }));
+  } catch {}
+}
+try {
+  const s = JSON.parse(localStorage.getItem("kai-settings") || "null");
+  if (s) {
+    $("topic").value = s.topic ?? $("topic").value;
+    $("model").value = s.model ?? $("model").value;
+    $("length").value = s.length ?? $("length").value;
+    $("speed").value = s.speed ?? $("speed").value;
+    updateSpeedLabel();
+  }
+  typed = localStorage.getItem("kai-text") || "";
+  textNode.data = typed;
+} catch {}
+if (typed) showPaper();
+["topic", "model", "length"].forEach((id) => $(id).addEventListener("change", saveSettings));
+
+// ---------- AI ----------
+function setStatus(msg) { statusEl.textContent = msg; }
+
+async function pickModelId(base) {
+  if (!navigator.gpu) {
+    throw new Error("NO_WEBGPU");
+  }
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) throw new Error("NO_WEBGPU");
+  const f16 = adapter.features.has("shader-f16");
+  return `${base}-${f16 ? "q4f16_1" : "q4f32_1"}-MLC`;
+}
+
+async function loadEngine() {
+  const modelId = await pickModelId($("model").value);
+  if (engine && loadedModel === modelId) return;
+  if (!webllm) {
+    setStatus("Getting the AI engine...");
+    webllm = await import(WEBLLM_URL);
+  }
+  bar.classList.remove("hidden");
+  const onProgress = (r) => {
+    bar.value = r.progress;
+    setStatus(`🧠 Loading brain: ${Math.round(r.progress * 100)}% (first time downloads, then it's saved)`);
+  };
+  if (engine) {
+    engine.setInitProgressCallback(onProgress);
+    await engine.reload(modelId, { context_window_size: CONTEXT });
+  } else {
+    engine = await webllm.CreateMLCEngine(modelId, { initProgressCallback: onProgress }, { context_window_size: CONTEXT });
+  }
+  loadedModel = modelId;
+  bar.classList.add("hidden");
+}
+
+async function ask(messages, maxTokens, onText) {
+  const chunks = await engine.chat.completions.create({
+    messages, stream: true, temperature: 0.7, max_tokens: maxTokens,
+  });
+  let out = "";
+  for await (const chunk of chunks) {
+    if (stopRequested) { engine.interruptGenerate(); break; }
+    const t = chunk.choices[0]?.delta?.content || "";
+    out += t;
+    if (onText && t) onText(t);
+  }
+  return out;
+}
+
+const SYSTEM = "You are an expert writer. Write clear, accurate, interesting plain text. " +
+  "Never use markdown symbols like #, * or **. Use short paragraphs and simple dashes for lists.";
+
+function parseOutline(text, covered) {
+  const seen = new Set(covered.map((c) => c.toLowerCase()));
+  const items = [];
+  for (const line of text.split("\n")) {
+    const m = line.match(/^\s*(?:\d+[.)]|[-•*])\s*(.+?)\s*$/);
+    if (!m) continue;
+    const title = m[1].replace(/[*#_`]/g, "").replace(/[:.]$/, "").trim();
+    if (title.length < 3 || title.length > 90 || seen.has(title.toLowerCase())) continue;
+    seen.add(title.toLowerCase());
+    items.push(title);
+  }
+  return items.slice(0, SECTIONS_PER_ROUND);
+}
+
+async function makeOutline(topic, covered, round) {
+  const prompt = round === 1
+    ? `The user asked: "${topic}". List ${SECTIONS_PER_ROUND} subtopics to cover, from the basics to more advanced. ` +
+      `Reply with only a numbered list of short titles, one per line.`
+    : `The user asked: "${topic}". These subtopics are already covered: ${covered.join("; ")}. ` +
+      `List ${SECTIONS_PER_ROUND} NEW, deeper and more advanced subtopics that are not covered yet. ` +
+      `Reply with only a numbered list of short titles, one per line.`;
+  const text = await ask([{ role: "system", content: SYSTEM }, { role: "user", content: prompt }], 300);
+  return parseOutline(text, covered);
+}
+
+async function writeSection(topic, title, prevTitle) {
+  const prompt =
+    `The user asked: "${topic}". Write the section titled "${title}". ` +
+    (prevTitle ? `The previous section was "${prevTitle}", so don't repeat it. ` : "") +
+    `Write 3 to 5 informative paragraphs with real facts. Don't write the title, start straight with the content.`;
+  return ask([{ role: "system", content: SYSTEM }, { role: "user", content: prompt }], 700, type);
+}
+
+async function run() {
+  const topic = $("topic").value.trim();
+  if (!topic) { setStatus("✏️ Type a topic first."); return; }
+  running = true;
+  stopRequested = false;
+  goBtn.classList.add("hidden");
+  stopBtn.classList.remove("hidden");
+  $("model").disabled = true;
+  try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
+
+  try {
+    await loadEngine();
+    if (typed && !typed.endsWith("\n\n")) type("\n\n");
+    type(topic.toUpperCase() + "\n\n");
+    showPaper();
+
+    const maxRounds = Number($("length").value);
+    const covered = [];
+    let prevTitle = "";
+    for (let round = 1; !stopRequested && (maxRounds === 0 || round <= maxRounds); round++) {
+      setStatus(round === 1 ? "📝 Planning what to write..." : `🔎 Round ${round}: finding deeper things to write about...`);
+      const outline = await makeOutline(topic, covered, round);
+      if (!outline.length) { setStatus("✅ I've covered everything I know about this!"); break; }
+      for (let i = 0; i < outline.length && !stopRequested; i++) {
+        const title = outline[i];
+        setStatus(`⌨️ Round ${round}, section ${i + 1} of ${outline.length}: ${title}`);
+        type(`${covered.length + 1}. ${title}\n\n`);
+        await writeSection(topic, title, prevTitle);
+        type("\n\n");
+        covered.push(title);
+        prevTitle = title;
+        await waitForTyping();
+      }
+    }
+    await waitForTyping();
+    if (stopRequested) setStatus("⏹ Stopped.");
+    else if (!statusEl.textContent.startsWith("✅")) setStatus(`✅ Done! Wrote ${covered.length} sections.`);
+  } catch (err) {
+    console.error(err);
+    bar.classList.add("hidden");
+    if (err.message === "NO_WEBGPU") {
+      setStatus("😕 This browser can't run the AI on-device. Try Chrome on Android, Safari on iOS 26+, or Chrome/Edge on a computer.");
+    } else {
+      setStatus("⚠️ Something went wrong: " + (err.message || err) + ". Try the ⚡ Quick brain or check your internet for the first download.");
+    }
+  } finally {
+    running = false;
+    goBtn.classList.remove("hidden");
+    stopBtn.classList.add("hidden");
+    $("model").disabled = false;
+    cursor.remove();
+    try { await wakeLock?.release(); } catch {}
+    wakeLock = null;
+  }
+}
+
+goBtn.addEventListener("click", run);
+stopBtn.addEventListener("click", () => {
+  stopRequested = true;
+  queue = "";
+  try { engine?.interruptGenerate(); } catch {}
+  setStatus("Stopping...");
+});
+
+// ---------- output buttons ----------
+const allText = () => typed + queue;
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(allText()); setStatus("📋 Copied! Paste it anywhere."); }
+  catch { setStatus("Couldn't copy. Long-press the text to select it instead."); }
+});
+$("share").addEventListener("click", async () => {
+  if (!navigator.share) { setStatus("Sharing isn't supported here. Use 📋 Copy instead."); return; }
+  try { await navigator.share({ title: "Keyboard AI", text: allText() }); } catch {}
+});
+$("save").addEventListener("click", () => {
+  const blob = new Blob([allText()], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "keyboard-ai.txt";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("clear").addEventListener("click", () => {
+  if (running) return;
+  typed = ""; queue = ""; textNode.data = ""; paper.replaceChildren(); saveText(); setStatus("");
+});
+</script>
+</body>
+</html>

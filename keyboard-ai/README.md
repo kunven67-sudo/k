@@ -1,40 +1,14 @@
-# ⌨️ Keyboard AI
+# ⌨️ Keyboard AI (free)
 
-Claude types for you, right into whatever window you click: Notepad, Google Docs, Word, a chat box, anything.
+One file, `keyboard-ai.html`, that types out everything about any topic. It's free, with no account and no API key. The AI runs right on your phone or computer.
 
-Tell it *"tell me everything about Earth"* and it writes a section, then keeps going deeper and deeper, section after section, until it has covered everything (or you stop it).
+## How to use it 📱
 
-## Setup (one time)
+1. Open `keyboard-ai.html` in your browser (Chrome on Android, Safari on iPhone with iOS 26+, or Chrome/Edge on a computer).
+2. Type a topic, like "Tell me everything about Earth".
+3. Pick an AI brain and press **Start typing**.
+4. Use 📋 Copy, 📤 Share or 💾 Save to send the text to any app.
 
-1. Install Python 3.10+ from https://python.org
-2. Get an API key at https://console.anthropic.com and set it:
-   - Windows: `setx ANTHROPIC_API_KEY "your-key-here"` (then open a new terminal)
-   - Mac/Linux: `export ANTHROPIC_API_KEY="your-key-here"`
-3. Install the libraries:
-   ```
-   pip install -r requirements.txt
-   ```
+The first time you pick a brain it downloads (0.4–2 GB, so use Wi-Fi). After that it's saved and works offline.
 
-## Use it
-
-```
-python keyboard_ai.py "tell me everything about Earth"
-```
-
-You get 5 seconds to click into the window you want it to type in. Then it starts typing.
-
-**Press ESC any time to stop it.** 🛑
-
-## Options
-
-| Option | What it does |
-| --- | --- |
-| `--rounds 10` | Stop after 10 sections (default: no limit, it keeps going until it's done) |
-| `--delay 0.03` | Type slower (seconds between keys) |
-| `--countdown 10` | More time to click into the window |
-| `--newline shift-enter` | For chat apps where Enter would send the message |
-
-## Notes
-
-- Mac: allow your terminal under System Settings → Privacy & Security → **Accessibility** and **Input Monitoring**, or it can't type.
-- Each section costs a little API money, and "no limit" mode can write a lot. Use `--rounds` if you want a cap.
+**No limit mode** plans topics, writes them, then finds deeper ones and keeps going until you press ⏹ Stop.
