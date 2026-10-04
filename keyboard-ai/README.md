@@ -1,14 +1,9 @@
-# ⌨️ Keyboard AI (free)
+# ⌨️ Keyboard AI
 
-One file, `keyboard-ai.html`, that types out everything about any topic. It's free, with no account and no API key. The AI runs right on your phone or computer.
+Type a topic and Claude types out everything about it, section after section, until you press Stop.
 
-## How to use it 📱
+**Open it here (works on phones):** https://claude.ai/artifact/SkSA6PwxuByhb1Sgb8nKfc
 
-1. Open `keyboard-ai.html` in your browser (Chrome on Android, Safari on iPhone with iOS 26+, or Chrome/Edge on a computer).
-2. Type a topic, like "Tell me everything about Earth".
-3. Pick an AI brain and press **Start typing**.
-4. Use 📋 Copy, 📤 Share or 💾 Save to send the text to any app.
+It runs on your own Claude account, so there's no API key and nothing to download. The first time you press Start, tap **Allow** so the page can use Claude.
 
-The first time you pick a brain it downloads (0.4–2 GB, so use Wi-Fi). After that it's saved and works offline.
-
-**No limit mode** plans topics, writes them, then finds deeper ones and keeps going until you press ⏹ Stop.
+`keyboard-ai.html` is the page's source. It needs to be opened through the claude.ai link above, because it gets its AI from the Claude app.
