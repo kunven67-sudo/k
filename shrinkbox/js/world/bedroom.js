@@ -13,7 +13,7 @@ export function buildBedroom(game) {
 
   // ---------- shell ----------
   const room = new Thing({ name: 'room', surface: 'carpet' });
-  room.box([x1 - x0 + 2 * W, 0.2, z1 - z0 + 2 * W], [0, -0.1, 0], 'carpet', { friction: 0.9 });
+  room.box([x1 - x0 + 2 * W, 0.3, z1 - z0 + 2 * W], [0, -0.15, 0], 'carpet', { friction: 0.9 });
   room.box([x1 - x0 + 2 * W, 0.2, z1 - z0 + 2 * W], [0, h + 0.1, 0], 'ceiling');
   // north wall: hollow on the left (real studs + drywall - someone lives in there...), solid behind the bed
   buildWallShell(room);
@@ -61,9 +61,8 @@ export function buildBedroom(game) {
   light.castShadow = game.engine.q.shadows;
   light.shadow.mapSize.set(game.engine.q.shadowRes / 2, game.engine.q.shadowRes / 2);
   light.shadow.bias = -0.0005; light.shadow.camera.near = 0.05;
-  const fill = new THREE.PointLight(0xfff0d8, 0, 8, 1.5);
-  fill.position.set(0, h - 0.25, 0);
-  scene.add(light, light.target, fill);
+  const fill = game.lightPool.add({ kind: 'point', pos: new THREE.Vector3(0, h - 0.25, 0), distance: 8, decay: 1.5 });
+  scene.add(light, light.target);
   game.roomLight = { on: false, spot: light, fill, dome: scene.getObjectByName('room') };
   game.setRoomLight = (on) => {
     game.roomLight.on = on;
@@ -83,7 +82,7 @@ export function buildBedroom(game) {
   buildDecor(game, scene);
 }
 
-function windowFrame(room, axis, at, a0, a1, y0, y1) {
+export function windowFrame(room, axis, at, a0, a1, y0, y1) {
   const d = 0.12, fw = 0.05;
   const put = (size, pos) => {
     if (axis === 'z') room.box(size, pos, 'trim');
@@ -177,9 +176,8 @@ function buildNightstand(game, scene) {
   ns.geo(lathe([[0.1, 0], [0.075, 0.17]], 32), [0.1, 0.8, -0.07], defMat('shade', () => new THREE.MeshStandardMaterial({ color: 0xece4d4, roughness: 0.9, side: THREE.DoubleSide, emissive: 0xffd9a0, emissiveIntensity: 0 })), { collide: false });
   ns.ball(0.03, [0.1, 0.86, -0.07], 'bulb', { collide: false });
   ns.build(scene);
-  const lamp = new THREE.PointLight(0xffc98a, 0, 5, 1.8);
-  lamp.position.set(-0.06 + 0.1, 0.86, -1.55 - 0.07);
-  scene.add(lamp);
+  const lamp = game.lightPool.add({ kind: 'point', color: 0xffc98a, pos: new THREE.Vector3(-0.06 + 0.1, 0.86, -1.55 - 0.07), distance: 5, decay: 1.8 });
+  lamp.position = lamp.pos;
   game.lamp = { on: false, light: lamp };
   const setLamp = (on) => { game.lamp.on = on; lamp.intensity = on ? 2.5 : 0; defMat('shade').emissiveIntensity = on ? 0.7 : 0; };
   game.setLamp = setLamp;

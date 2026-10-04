@@ -28,6 +28,9 @@ const DEFS = {
   pillow: () => std({ ...withTile(surface('fabric', { color: 0xe8e6e0 }), 0.2), roughness: 0.95 }),
   mattress: () => std({ ...withTile(surface('fabric', { color: 0xdfe3e8 }), 0.2), roughness: 0.95 }),
   chairFabric: () => std({ ...withTile(surface('fabric', { color: 0x1d1f24 }), 0.15), roughness: 0.9 }),
+  concrete: () => std({ ...withTile(surface('concrete'), 1.5), roughness: 0.95 }),
+  granite: () => std({ color: 0x3b3936, roughness: 0.25, metalness: 0.1 }),
+  porcelain: () => phys({ color: 0xf6f6f2, roughness: 0.12, clearcoat: 0.8, side: THREE.DoubleSide }),
   // plastics & metals
   xboxBlack: () => std({ ...withTile(surface('plastic', { color: 0x141518 }), 0.12), roughness: 0.62 }),
   plasticBlack: () => std({ ...withTile(surface('plastic', { color: 0x1b1c1f }), 0.1), roughness: 0.5 }),

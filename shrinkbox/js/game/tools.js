@@ -205,6 +205,15 @@ export class Tools {
     const to = hit ? hit.point : cam.position.clone().add(new THREE.Vector3(0, 0, -30 * s).applyQuaternion(cam.quaternion));
     this.beam(from, to, this.mode);
     sfx.zap(0.35); sfx.whoosh(this.mode > 0, 0.25, 0.4);
+    const person = hit && hit.collider && hit.collider.person;
+    if (person) {
+      const f = this.mode < 0 ? 1 / (1 + 3 * charge) : 1 + 3 * charge;
+      const h = Math.max(0.002, Math.min(person.height * f, person.fullHeight || 2.0));
+      person.setHeight(h);
+      person.fear = Math.min(1, person.fear + 0.5);
+      person.say(this.mode < 0 ? (person.isParent ? 'WHAT IS HAPPENING?!' : 'Whoa whoa WHOA!') : 'I... I\'m bigger!');
+      return;
+    }
     if (!hit || !hit.thing) return;
     const t = hit.thing;
     if (t.name === 'room' || t.tags.has('noShrink')) { g.ui.toast('🧱 The shrinker can\'t shrink the house itself.'); return; }

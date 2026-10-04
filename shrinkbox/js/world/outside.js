@@ -41,12 +41,21 @@ export function buildOutside(game) {
   const gm = std(0x6a8f45, 1, { map: grassTex.map.clone() }); gm.map.repeat.set(200, 200); gm.map.needsUpdate = true;
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), gm); ground.rotation.x = -Math.PI / 2; ground.position.y = GROUND; ground.receiveShadow = true; ground.userData.keep = true; grp.add(ground);
   // our yard: lawn, path, driveway; our house walls (the outside of the house)
-  const houseMat = std(0xb9b2a3, 0.85);
+  const houseMat = std(0xb9b2a3, 0.85, { side: THREE.DoubleSide });
   const house = new THREE.Mesh(new THREE.BoxGeometry(12.3, 6.1, 9.3), houseMat); house.position.set(-2.5, GROUND + 3.05 - 0.01, -1.6);
   house.geometry.translate(0, 0, 0); house.material.side = THREE.BackSide; // only seen from outside... BackSide trick avoids covering the room
   void house;
   const roofMat = std(0x4a3b36, 0.8);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(9.2, 2.6, 4, 1), roofMat); roof.rotation.y = Math.PI / 4; roof.scale.set(1, 1, 0.75); roof.position.set(-2.5, 2.5 + 0.3 + 1.3 + 0.12, -1.6); roof.castShadow = true; roof.userData.keep = true;
+  // gable roof over the house (ridge east-west) + a lower roof on the garage
+  const roof = new THREE.Group(); roof.userData.keep = true;
+  const span = 6.52 + 0.6, rise = 2.2, slope = Math.hypot(span / 2, rise);
+  for (const side of [-1, 1]) {
+    const pl = new THREE.Mesh(new THREE.BoxGeometry(11.3, 0.12, slope), roofMat);
+    pl.position.set(-3.14, 2.7 + rise / 2, -1.34 + side * span / 4); pl.rotation.x = side * Math.atan2(rise, span / 2); pl.castShadow = true; roof.add(pl);
+  }
+  const gableShape = new THREE.Shape(); gableShape.moveTo(-span / 2 + 0.3, 0); gableShape.lineTo(span / 2 - 0.3, 0); gableShape.lineTo(0, rise - 0.1); gableShape.lineTo(-span / 2 + 0.3, 0);
+  for (const x of [-8.4, 2.12]) { const gm2 = new THREE.Mesh(new THREE.ShapeGeometry(gableShape), houseMat); gm2.material.side = THREE.DoubleSide; gm2.rotation.y = Math.PI / 2; gm2.position.set(x, 2.7, -1.34); roof.add(gm2); }
+  const gr = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.12, 6.9), roofMat); gr.position.set(5.31, 0.6, -1.34); gr.rotation.z = -0.08; gr.castShadow = true; roof.add(gr);
   grp.add(roof);
   game.roofMesh = roof;
   // street

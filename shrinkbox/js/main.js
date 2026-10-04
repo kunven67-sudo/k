@@ -14,8 +14,11 @@ import { Avatar, ViewModel, LOOK_DEFAULT } from './player/avatar.js';
 import { Watch } from './player/watch.js';
 import { things } from './world/thing.js';
 import { buildBedroom } from './world/bedroom.js';
+import { buildHouse } from './world/house.js';
+import { furnishHouse } from './world/furniture.js';
 import { buildVillage } from './world/village.js';
 import { Person, reply } from './world/people.js';
+import { buildParents, parentReply } from './world/parents.js';
 import { buildOutside, updateOutside } from './world/outside.js';
 import { buildXbox } from './world/objects/xbox.js';
 import { buildSodaCan } from './world/objects/sodacan.js';
@@ -23,6 +26,9 @@ import { buildController } from './world/objects/controller.js';
 import { buildPhone } from './world/objects/phone.js';
 import { buildTV } from './world/objects/tv.js';
 import { Saves } from './game/saves.js';
+import { LightPool } from './core/lightpool.js';
+import { Economy } from './game/economy.js';
+import { PhoneUI } from './ui/phoneui.js';
 import { Tools } from './game/tools.js';
 import { Spawner, catalog, CATEGORIES } from './game/spawner.js';
 
@@ -52,9 +58,13 @@ class Game {
     this.ui.setBoot('building your room...');
     await new Promise((r) => setTimeout(r, 30));
     this.spawn = { pos: [-0.45, 0.02, -0.25], yaw: -2.4 };
+    this.lightPool = new LightPool(this.engine.scene, 3, 6);
     buildBedroom(this);
+    buildHouse(this);
+    furnishHouse(this);
     this.people = [];
     this.village = buildVillage(this);
+    buildParents(this);
     buildOutside(this);
     this.tv = buildTV(this, [1.15, 0.5, 1.66], Math.PI);
     this.xbox = buildXbox(this, [0.47, 0.5, 1.6], Math.PI);
@@ -70,6 +80,9 @@ class Game {
     this.saves = new Saves(this);
     this.tools = new Tools(this);
     this.spawner = new Spawner(this);
+    this.economy = new Economy(this);
+    this.phoneUI = new PhoneUI(this);
+    this.quakeT = 600 + Math.random() * 1800;
     // night? turn the light on so you're not in the dark
     if (this.engine.updateDaylight(new THREE.Vector3(), 1) < 0.3) this.setRoomLight(true);
     // settle physics so things rest naturally
@@ -129,6 +142,18 @@ class Game {
 
   realS() { return this.player.s / this.unit; }
 
+  // west coast: small earthquakes happen now and then (most are tiny)
+  updateQuake(dt) {
+    this.quakeT -= dt;
+    if (this.quakeT > 0 && !this.quake) return;
+    if (!this.quake) { this.quake = { t: 0, len: 4 + Math.random() * 6, mag: 2.3 + Math.random() * 1.6 }; this.ui.toast(`🌎 Earthquake! Magnitude ${this.quake.mag.toFixed(1)}`, 4); }
+    const q = this.quake; q.t += dt;
+    const k = Math.sin(Math.min(1, q.t / q.len) * Math.PI) * (q.mag - 2) * 0.5;
+    this.player.shake = Math.max(this.player.shake, k * 0.7);
+    if (Math.random() < 0.5) for (const t of things) if (t.type === 'dynamic' && t.body && Math.random() < 0.15) { const m = t.mass * k * 0.15; t.body.applyImpulse({ x: (Math.random() - 0.5) * m, y: 0, z: (Math.random() - 0.5) * m }, true); }
+    if (q.t > q.len) { this.quake = null; this.quakeT = 1800 + Math.random() * 3600; setTimeout(() => this.economy.text('Weather', `Earthquake M${q.mag.toFixed(1)} detected near you. No damage expected.`), 3000); }
+  }
+
   // ---- talking to people ----
   personInView() {
     if (this.tools.heldPerson) return this.tools.heldPerson;
@@ -153,7 +178,8 @@ class Game {
       this.ui.toast(`🗨️ You: ${text}`, 3);
       pp.talking = 8; pp.wave = text.match(/\b(hi|hello|hey|yo|wsp)\b/i) ? 2 : 0;
       const ratio = this.player.height / pp.height;
-      setTimeout(() => pp.say(reply(pp, text, { ratio, held: pp.held, sameSize: ratio < 3 && this.time - (this.watch.lastChange ?? -99) < 30 })), 500 + Math.random() * 500);
+      const ctx = { ratio, held: pp.held, sameSize: ratio < 3 && this.time - (this.watch.lastChange ?? -99) < 30 };
+      setTimeout(() => pp.say(pp.isParent ? parentReply(pp, text, ctx) : reply(pp, text, ctx)), 500 + Math.random() * 500);
     });
   }
   speak(text, person) {
@@ -281,6 +307,9 @@ class Game {
       if (it && input.pressed('use')) { it.use(); this.usedInteractThisFrame = true; }
       if (input.pressed('spawn')) this.ui.openSpawnMenu(CATEGORIES, catalog(), this.spawner);
       if (input.pressed('talk')) this.startTalk();
+      if (input.pressed('phone')) this.phoneUI.toggle();
+      this.economy.update(dt);
+      this.updateQuake(dt);
       this.watch.update(dt);
       this.tools.update(dt);
       this.acc += dt;
@@ -309,9 +338,11 @@ class Game {
     // light & sky
     const day = this.engine.updateDaylight(this.micro ? this.microAnchor.point : p.center(new THREE.Vector3()), this.realS());
     updateOutside(this, day);
+    this.lightPool.update(this.micro ? this.microAnchor.point : p.head(new THREE.Vector3()));
     // inside something (Xbox, wall, phone...) the sky/room bounce light can't reach you: much darker
     if (this.inside && !this.micro) { this.engine.sky.intensity *= 0.12; this.engine.scene.environmentIntensity *= 0.12; }
     this.engine.render();
+    if (this.takePhoto) { try { this.takePhoto(this.engine.renderer.domElement.toDataURL('image/png')); } catch { /* blocked */ } this.takePhoto = null; }
     input.endFrame();
   }
 }

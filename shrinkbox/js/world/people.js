@@ -84,7 +84,8 @@ export class PersonModel {
     A[0].sh.rotation.z = -0.08; A[1].sh.rotation.z = 0.08;
     if (state === 'wave') { A[1].sh.rotation.z = 2.6; A[1].sh.rotation.x = 0; A[1].el.rotation.z = Math.sin(t * 8) * 0.5; }
     else A[1].el.rotation.z = 0;
-    if (state === 'cower') { L[0].knee.rotation.x = 1.6; L[1].knee.rotation.x = 1.6; L[0].hip.rotation.x = -1.4; L[1].hip.rotation.x = -1.4; this.body.position.y = -0.45; A[0].sh.rotation.x = -2.2; A[1].sh.rotation.x = -2.2; }
+    if (state === 'sit') { L[0].hip.rotation.x = -1.5; L[1].hip.rotation.x = -1.5; L[0].knee.rotation.x = 1.5; L[1].knee.rotation.x = 1.5; this.body.position.y = -0.45; A[0].sh.rotation.x = -0.4; A[1].sh.rotation.x = -0.4; }
+    else if (state === 'cower') { L[0].knee.rotation.x = 1.6; L[1].knee.rotation.x = 1.6; L[0].hip.rotation.x = -1.4; L[1].hip.rotation.x = -1.4; this.body.position.y = -0.45; A[0].sh.rotation.x = -2.2; A[1].sh.rotation.x = -2.2; }
     else this.body.position.y = Math.abs(Math.cos(this.walk)) * 0.02 * sw;
   }
 }
@@ -207,6 +208,18 @@ export class Person {
     // mouth moves while talking
     this.sayT = Math.max(0, (this.sayT || 0) - dt);
     this.model.mouth.scale.y = this.sayT > 0 ? 1 + Math.abs(Math.sin(t * 18)) * 3 : 1;
+  }
+
+  // the shrinker works on people too
+  setHeight(h) {
+    this.height = h; this.s = h / 1.75;
+    this.model.root.scale.setScalar(this.s);
+    const groupsBits = this.collider.collisionGroups();
+    world.removeCollider(this.collider, false);
+    this.collider = world.createCollider(R.ColliderDesc.cylinder(h / 2, 0.2 * this.s).setCollisionGroups(groupsBits), this.body);
+    this.collider.person = this;
+    this.mover.self = this.collider;
+    this.noticed = false;
   }
 
   // picked up by the player

@@ -62,7 +62,8 @@ export class Watch {
       if (want) { sfx.beep(want < 0 ? 1500 : 900, 0.07, 0.2); sfx.zap(0.25); g.ui.flash(0.25); sfx.whoosh(want > 0, 0.3, 0.9); }
       this.mode = want; this.hold = 0;
     }
-    if (this.battery <= 0 && want) { if (!this._battTip) { this._battTip = 1; g.ui.toast('🔋 Watch battery is dead. Charge it (sleep in bed or wait).'); } this.mode = 0; }
+    if (this.confiscated && want) { if (!this._confTip || g.time > this._confTip) { this._confTip = g.time + 5; g.ui.toast('⌚ No watch! Your parents took it. It\'s in their dresser...'); } this.mode = 0; }
+    else if (this.battery <= 0 && want) { if (!this._battTip) { this._battTip = 1; g.ui.toast('🔋 Watch battery is dead. Charge it (sleep in bed or wait).'); } this.mode = 0; }
     let changing = false;
     if (this.mode && this.battery > 0) {
       this.hold += dt;

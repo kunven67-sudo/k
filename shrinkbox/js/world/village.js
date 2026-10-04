@@ -79,9 +79,7 @@ export function buildVillage(game) {
   const cavBox = new THREE.Box3(new THREE.Vector3(ROOM.x0 - 0.12, 0, z0 - dw - cav), new THREE.Vector3(-0.05, ROOM.h, z0 - dw));
   v.behaviors.push({ update(t, dt, gm) { if (!gm.micro && cavBox.containsPoint(gm.player.center(new THREE.Vector3()))) { gm.inside = v; gm.insideEcho = 0.5; } } });
   for (const x of [-1.04, -0.85]) {
-    const l = new THREE.PointLight(0xffc98a, 0.05, 0.35, 2);
-    l.position.set(x, 0.09, zC - 0.02);
-    game.engine.scene.add(l);
+    game.lightPool.add({ kind: 'point', color: 0xffc98a, intensity: 0.05, distance: 0.35, decay: 2, pos: new THREE.Vector3(x, 0.09, zC - 0.02) });
   }
   // the villagers
   game.people = game.people || [];

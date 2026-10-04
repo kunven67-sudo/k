@@ -26,8 +26,9 @@ export class Saves {
     }
     return {
       v: 1, time: Date.now(), sizeText: `${(p.height * 100).toFixed(p.height < 0.01 ? 2 : 0)} cm`,
-      player: { feet: p.feet.toArray(), yaw: p.yaw, pitch: p.pitch, s: p.s, health: p.health, view: p.view },
-      watch: { battery: g.watch.battery }, look: g.look, money: g.money,
+      player: { feet: g.micro ? g.microAnchor.point.toArray() : p.feet.toArray(), yaw: p.yaw, pitch: p.pitch, s: p.s / (g.unit || 1), health: p.health, view: p.view },
+      watch: { battery: g.watch.battery, confiscated: !!g.watch.confiscated }, look: g.look, money: g.economy.money, grounded: !!g.grounded,
+      eco: { log: g.economy.log.slice(0, 50), messages: g.economy.messages.slice(0, 50), choresDone: g.economy.choresDone, lastAllowance: g.economy.lastAllowance },
       room: { light: g.roomLight?.on, lamp: g.lamp?.on, door: g.door?.target, tv: g.tv?.on, xbox: g.xbox?.on },
       objs,
     };
@@ -49,11 +50,14 @@ export class Saves {
 
   apply(d) {
     const g = this.game, p = g.player;
+    if (g.micro) g.exitMicro();
     g.look = { ...g.look, ...(d.look || {}) }; g.applyLook();
     p.setScale(d.player.s); p.feet.fromArray(d.player.feet); p.yaw = d.player.yaw; p.pitch = d.player.pitch; p.health = d.player.health; p.view = d.player.view || 'first';
     p.vel.set(0, 0, 0); p.setScale(d.player.s);
     g.watch.battery = d.watch?.battery ?? 1;
-    g.money = d.money ?? g.money;
+    if (d.money !== undefined) g.economy.money = d.money;
+    g.grounded = !!d.grounded; g.watch.confiscated = !!d.watch?.confiscated;
+    if (d.eco) Object.assign(g.economy, d.eco);
     if (d.room) {
       g.setRoomLight?.(!!d.room.light); g.setLamp?.(!!d.room.lamp);
       if (g.door) { g.door.target = d.room.door || 0; g.door.open = g.door.target; }
