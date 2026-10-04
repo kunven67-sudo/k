@@ -197,6 +197,7 @@ AIP.Senses = (function () {
       const n = Math.min(all.length, 1600);
       const vw = win.innerWidth, vh = win.innerHeight;
       const skipText = new Set(), kbds = [], bars = [], marks = [];
+      let scrollable = !!(doc.scrollingElement && doc.scrollingElement.scrollHeight > vh + 40 && win.getComputedStyle(doc.body).overflowY !== 'hidden');
       const opMap = new Map();
       const effOp = (el) => {
         if (!el || el === doc.body || el === doc.documentElement) return 1;
@@ -229,19 +230,23 @@ AIP.Senses = (function () {
           let inline = kids.length > 0 && kids.length <= 12;
           for (let k = 0; inline && k < kids.length; k++) if (!INLINE_TAGS.test(kids[k].tagName) || kids[k].children.length > 1) inline = false;
           if (inline && (el.textContent || '').length <= 300) {
+            // "<b>120M</b><small>Likes</small>" -> "120M Likes" ... but "<span>c</span><span>a</span><span>t</span>" -> "cat"
+            const letters = kids.length > 1 && [...kids].every((k) => k.tagName !== 'KBD' && (k.textContent || '').trim().length <= 1);
+            const gap = letters ? '' : ' ';
             for (let c = el.firstChild; c; c = c.nextSibling) {
               if (c.nodeType === 3) text += c.nodeValue;
-              else if (c.nodeType === 1) { text += c.tagName === 'KBD' ? ' ' + c.textContent.trim() + ' ' : c.textContent; skipText.add(c); for (const g of c.querySelectorAll('*')) skipText.add(g); }
+              else if (c.nodeType === 1) { text += (c.tagName === 'KBD' ? ' ' : gap) + c.textContent.trim() + (c.tagName === 'KBD' ? ' ' : gap); skipText.add(c); for (const g of c.querySelectorAll('*')) skipText.add(g); }
             }
           } else for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
         }
         text = text.replace(/\s+/g, ' ').trim();
         // a trophy row with the 🏆/🔒 in its own box: glue it to the name next to it
-        if (/^(🏆|🔒|✅|⬜|🔓)$/u.test(text) && el.nextElementSibling) {
+        if (/^(🏆|🔒|✅|⬜|🔓)$/u.test(text) && !el.children.length && el.nextElementSibling) {
           const nx = el.nextElementSibling, t2 = (nx.querySelector('b,strong,h3,h4,[class*="title"]') || nx).textContent.replace(/\s+/g, ' ').trim();
           if (t2) text = text + ' ' + t2.slice(0, 48);
         }
         if (tag === 'KBD') kbds.push(el);
+        if (!scrollable && r.height > vh * 0.3 && /(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 20) scrollable = true;
         // health / stamina bars with no number: the bar's width IS the number
         if (el.style && /%\s*$/.test(el.style.width || '') && BAR_RX.test((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '') + ' ' + ((el.parentElement && el.parentElement.id) || ''))) {
           const m = BAR_RX.exec((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '') + ' ' + ((el.parentElement && el.parentElement.id) || ''));
@@ -265,6 +270,7 @@ AIP.Senses = (function () {
         }
       }
       this.markers = marks.slice(0, 3);
+      this.scrollable = scrollable;
     }
 
     findButtons() {
@@ -287,8 +293,12 @@ AIP.Senses = (function () {
         const top = doc.elementFromPoint(cx, cy);
         if (!top || !(top === el || el.contains(top) || top.contains(el))) continue;
         if (r.width * r.height > vw * vh * 0.5) continue; // (a whole-screen layer isn't a button)
-        const text = ((el.innerText || el.value || el.getAttribute('aria-label') || el.title || '') + '').replace(/\s+/g, ' ').trim().slice(0, 32);
+        let text = ((el.innerText || el.value || el.getAttribute('aria-label') || el.title || '') + '').replace(/\s+/g, ' ').trim().slice(0, 32);
         if (DANGER_BTN_RX.test(text)) continue;
+        if (!text || /^[\d.,]+\s*[KMB]?$/i.test(text) || /^\p{Extended_Pictographic}[\p{Extended_Pictographic}\u200d\ufe0f\s]*$/u.test(text)) {
+          const al = (el.getAttribute('aria-label') || el.title || '').trim();
+          if (al) text = (al + ' ' + text).trim().slice(0, 32);
+        }
         let prio = 0.5;
         if (GOOD_BTN_RX.test(text)) prio = 1;
         if (MEH_BTN_RX.test(text)) prio = 0.15;
@@ -644,6 +654,7 @@ AIP.Senses = (function () {
       obs.buttons = this.buttons;
       obs.keyHints = (this.keyHints || []).filter((h) => h.el.isConnected);
       obs.marker = (this.markers || []).find((m) => m.el.isConnected) || null;
+      obs.scrollable = !!this.scrollable;
       obs.mash = null;
       for (const b of this.textBits || []) {
         if (b.s.length > 80 || !MASH_RX.test(b.s)) continue;
@@ -726,7 +737,14 @@ AIP.Senses = (function () {
     // showing a 2nd trophy counts again). A list of 🏆/🔒 rows = the trophy list (read quietly).
     checkTrophies(bits, obs) {
       const rows = [];
-      for (const b of bits) { const m = TROPHY_ROW_RX.exec(b.s); if (m) rows.push({ b, got: /🏆|✅|🔓|☑|✔/u.test(m[1]), name: m[2].replace(/\s+(unlocked|locked)\s*$/i, '').trim() }); }
+      for (const b of bits) {
+        const m = TROPHY_ROW_RX.exec(b.s);
+        if (!m) continue;
+        // the bold part is the trophy's NAME (the rest is its description)
+        const bold = b.el && b.el.querySelector ? b.el.querySelector('b,strong,h3,h4,[class*="title"]') : null;
+        const nm = bold && bold.textContent.trim().length >= 2 ? bold.textContent.trim() : m[2].replace(/\s+(unlocked|locked)\s*$/i, '').trim();
+        rows.push({ b, got: /🏆|✅|🔓|☑|✔/u.test(m[1]), name: nm });
+      }
       const isList = rows.length >= 3;
       if (isList) obs.events.push({ type: 'trophyList', items: rows.map((r) => ({ name: r.name.slice(0, 50), got: r.got })) });
       const listed = new Set(isList ? rows.map((r) => r.b) : []);

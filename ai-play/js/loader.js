@@ -508,6 +508,18 @@ AIP.loader = (function () {
       W.confirm = function (m) { note(m); return !/erase|restart|start over|reset|delete|replace|overwrite|lose (your|all)|wipe|quit/i.test(String(m || '')); };
       W.prompt = function (m, d) { note(m); return d == null ? '' : String(d); };
       W.open = function () { return null; };
+      // the game's back/forward history stays INSIDE the game (its "back" can never leave AI Play)
+      try {
+        var hs = [null], hi = 0, H = W.history;
+        var pop = function () { setTimeout(function () { try { W.dispatchEvent(new W.PopStateEvent('popstate', { state: hs[hi] })); } catch (e) { /* ignore */ } }, 0); };
+        H.pushState = function (st) { hs = hs.slice(0, hi + 1); hs.push(st == null ? null : st); hi = hs.length - 1; };
+        H.replaceState = function (st) { hs[hi] = st == null ? null : st; };
+        H.go = function (n) { n = n | 0; var j = Math.max(0, Math.min(hs.length - 1, hi + n)); if (!n || j === hi) return; hi = j; pop(); };
+        H.back = function () { H.go(-1); };
+        H.forward = function () { H.go(1); };
+        Object.defineProperty(H, 'state', { get: function () { return hs[hi]; }, configurable: true });
+        Object.defineProperty(H, 'length', { get: function () { return hs.length; }, configurable: true });
+      } catch (e) { aip.errors.push('history shim: ' + e.message); }
       W.Element.prototype.requestFullscreen = function () { return Promise.resolve(); };
       W.Element.prototype.webkitRequestFullscreen = function () {};
     } catch (e) { /* ignore */ }

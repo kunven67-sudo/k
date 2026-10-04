@@ -300,6 +300,7 @@ AIP.Session = (function () {
         else if (m.t === 'hold') { h.mouseDownNow(); this.holding = true; }
         else if (m.t === 'look') h.look(m.dx * U.rand(0.7, 1.3), m.dy * U.rand(0.7, 1.3));
         else if (m.t === 'goto') h.moveTo(m.x, m.y);
+        else if (m.t === 'scroll') h.scroll(m.dy);
         else if (m.t === 'btn' && m.el) h.clickElement(m.el);
       }
       this.lastKeys = d.keys;

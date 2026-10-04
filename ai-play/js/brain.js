@@ -215,7 +215,7 @@ AIP.Brain = (function () {
     }
     labelOfSpec(id, spec) {
       if (id === 'noop') return 'wait';
-      if (spec.mouse) return { click: 'click', hold: 'hold click', btn: 'click a button', look: 'look ' + (spec.mouse.dx < 0 ? '⬅️' : spec.mouse.dx > 0 ? '➡️' : spec.mouse.dy < 0 ? '⬆️' : '⬇️'), goto: 'move mouse' }[spec.mouse.t] || id;
+      if (spec.mouse) return { click: 'click', hold: 'hold click', btn: 'click a button', look: 'look ' + (spec.mouse.dx < 0 ? '⬅️' : spec.mouse.dx > 0 ? '➡️' : spec.mouse.dy < 0 ? '⬆️' : '⬇️'), goto: 'move mouse', scroll: spec.mouse.dy > 0 ? 'scroll ⬇️' : 'scroll ⬆️' }[spec.mouse.t] || id;
       return (spec.keys || []).map(KEYS.label).join(' + ');
     }
     activeSlots() { const out = []; this.actions.forEach((a, i) => { if (a && a.active) out.push(i); }); return out; }
@@ -266,6 +266,7 @@ AIP.Brain = (function () {
       if (obs) {
         if (obs.buttons && obs.buttons.length) this.ensureAction('m:btn', { mouse: { t: 'btn' } });
         this.ensureAction('m:click', { mouse: { t: 'click' } });
+        if (obs.scrollable) { this.ensureAction('m:scroll-d', { mouse: { t: 'scroll', dy: 1 } }); this.ensureAction('m:scroll-u', { mouse: { t: 'scroll', dy: -1 } }); }
         if (obs.lockActive || this.self.camera > 0.3) {
           const L = 70;
           this.ensureAction('m:look-l', { mouse: { t: 'look', dx: -L, dy: 0 } });
@@ -467,6 +468,9 @@ AIP.Brain = (function () {
         if (localized || moves || global || c.user > 3) c.status = 'useful';
         // once it worked, it takes a LOT of nothing to give up on a key (maybe I was stuck at a wall)
         else if ((c.maxZ || 0) > 6.5 && old === 'useful') { /* it clearly worked before - keep believing in it */ }
+        // gamer common sense: in a first-person game (mouse captured), WASD / arrows walk - walking forward
+        // barely changes the picture, so "nothing happened" doesn't prove they're useless
+        else if (this.lockSeen && /^(KeyW|KeyA|KeyS|KeyD|Arrow(Up|Down|Left|Right))$/.test(code)) { /* keep trying them */ }
         else if (old === 'useful' ? c.tries >= 30 && (c.peakZ || 0) < 2 && (c.dirZ || 0) < 1.5 : c.tries >= 8 && c.n >= 14 && this.quietN >= 8 && (c.peakZ || 0) < 3 && (c.dirZ || 0) < 2.5) c.status = 'useless';
       }
       if (old !== c.status) {
@@ -696,6 +700,7 @@ AIP.Brain = (function () {
         if (ev.type === 'score') this.recentScore = 1;
         if (ev.type === 'gameOver' || ev.type === 'healthZero' || ev.type === 'damage' || ev.type === 'death') this.lastBadAt = now;
       }
+      if (obs.lockActive) this.lockSeen = true;
       // 1) learn
       if (obs.ok) {
         this.lastSelfPos = this.self.tracked ? { x: this.self.x, y: this.self.y } : null;
@@ -1212,7 +1217,7 @@ AIP.Brain = (function () {
     tagsOf(a) {
       if (!a) return [];
       if (a.id === 'noop' || (!a.mouse && !a.keys.length)) return ['wait'];
-      if (a.mouse) return [{ look: 'look', btn: 'btn', click: 'click', hold: 'click', goto: 'aim' }[a.mouse.t] || 'mouse'];
+      if (a.mouse) return [{ look: 'look', btn: 'btn', click: 'click', hold: 'click', goto: 'aim', scroll: 'scroll' }[a.mouse.t] || 'mouse'];
       const out = [];
       for (const code of a.keys) {
         const c = this.controls[code];

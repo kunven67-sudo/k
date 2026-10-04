@@ -284,6 +284,20 @@ AIP.Hands = (function () {
       this.drawCursor(false);
     }
     click() { this.mouseDownNow(); setTimeout(() => this.mouseUp(), 60); }
+    // 📜 scroll the page / the list under the cursor (dy: +1 = down, -1 = up)
+    scroll(dy) {
+      const w = this.win, d = this.doc;
+      if (!w || !d) return;
+      const p = this.px();
+      const at = d.elementFromPoint(clamp(p.x, 0, w.innerWidth - 1), clamp(p.y, 0, w.innerHeight - 1)) || d.body;
+      let box = null;
+      for (let e = at; e && e !== d.body && e !== d.documentElement; e = e.parentElement) {
+        try { if (/(auto|scroll)/.test(w.getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 10) { box = e; break; } } catch (err) { break; }
+      }
+      const amount = dy * w.innerHeight * 0.6;
+      try { at.dispatchEvent(new w.WheelEvent('wheel', { deltaY: amount, deltaMode: 0, bubbles: true, cancelable: true, clientX: p.x, clientY: p.y, view: w })); } catch (e) { /* ignore */ }
+      try { (box || d.scrollingElement || d.documentElement).scrollBy({ top: amount, behavior: 'smooth' }); } catch (e) { /* ignore */ }
+    }
     clickAt(fx, fy) { this.moveTo(fx, fy); this.click(); }
     clickElement(el) {
       try {

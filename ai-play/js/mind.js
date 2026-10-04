@@ -100,7 +100,7 @@ AIP.Mind = (function () {
       if (/^act:/.test(tag)) { const code = tag.slice(4), c = B.controls[code]; return 'pressing ' + KEYS.label(code) + (c && c.tip ? ' (' + c.tip.replace(/\s*\(coach.*$/, '') + ')' : ''); }
       if (/^btn:/.test(tag)) return "clicking '" + tag.slice(4) + "'";
       if (/^idea:/.test(tag)) { const i = this.S.ideas.find((x) => x.id === tag.slice(5)); return i ? 'my move ' + i.name : 'my own ideas'; }
-      return { move: 'running around', jump: 'jumping', act: 'pressing buttons', look: 'looking around', click: 'clicking', btn: 'clicking buttons', aim: 'moving the mouse',
+      return { move: 'running around', jump: 'jumping', act: 'pressing buttons', look: 'looking around', click: 'clicking', scroll: 'scrolling', btn: 'clicking buttons', aim: 'moving the mouse',
         combo: 'doing combos', wait: 'chilling', points: 'getting points', explore: 'exploring new places', story: 'reading the story', typing: 'typing stuff', menu: 'menus',
         idea: 'trying my own ideas', fun: 'goofing around', trophy: 'trophy hunting', win: 'winning', hurt: 'getting hurt' }[tag] || tag;
     }
@@ -487,6 +487,11 @@ AIP.Mind = (function () {
       const tr = (obs.readouts || []).find((r) => /troph|achiev|badge/i.test(r.label) && r.max);
       if (tr) F.trophyTotal = Math.max(F.trophyTotal || 0, tr.max);
       if ((obs.buttons || []).some((b) => /troph|achiev/i.test(b.text))) F.trophyBtn = true;
+      // "Trophies (3/31)" / "Achievements 4 / 12" -> how many exist
+      for (const t of (this.s.senses.textBits || []).map((b) => b.s).concat((obs.buttons || []).map((b) => b.text))) {
+        const m = /(troph|achiev|badge)\w*\s*\(?\s*(\d+)\s*\/\s*(\d+)/i.exec(t);
+        if (m && +m[3] > 0 && +m[3] < 500) F.trophyTotal = Math.max(F.trophyTotal || 0, +m[3]);
+      }
       F.storyN = (B.stats.storyLines || []).length;
       void s;
     }

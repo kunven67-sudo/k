@@ -1167,6 +1167,18 @@ AIP.loader = (function () {
       W.confirm = function (m) { note(m); return !/erase|restart|start over|reset|delete|replace|overwrite|lose (your|all)|wipe|quit/i.test(String(m || '')); };
       W.prompt = function (m, d) { note(m); return d == null ? '' : String(d); };
       W.open = function () { return null; };
+      // the game's back/forward history stays INSIDE the game (its "back" can never leave AI Play)
+      try {
+        var hs = [null], hi = 0, H = W.history;
+        var pop = function () { setTimeout(function () { try { W.dispatchEvent(new W.PopStateEvent('popstate', { state: hs[hi] })); } catch (e) { /* ignore */ } }, 0); };
+        H.pushState = function (st) { hs = hs.slice(0, hi + 1); hs.push(st == null ? null : st); hi = hs.length - 1; };
+        H.replaceState = function (st) { hs[hi] = st == null ? null : st; };
+        H.go = function (n) { n = n | 0; var j = Math.max(0, Math.min(hs.length - 1, hi + n)); if (!n || j === hi) return; hi = j; pop(); };
+        H.back = function () { H.go(-1); };
+        H.forward = function () { H.go(1); };
+        Object.defineProperty(H, 'state', { get: function () { return hs[hi]; }, configurable: true });
+        Object.defineProperty(H, 'length', { get: function () { return hs.length; }, configurable: true });
+      } catch (e) { aip.errors.push('history shim: ' + e.message); }
       W.Element.prototype.requestFullscreen = function () { return Promise.resolve(); };
       W.Element.prototype.webkitRequestFullscreen = function () {};
     } catch (e) { /* ignore */ }
@@ -1415,6 +1427,7 @@ AIP.Senses = (function () {
       const n = Math.min(all.length, 1600);
       const vw = win.innerWidth, vh = win.innerHeight;
       const skipText = new Set(), kbds = [], bars = [], marks = [];
+      let scrollable = !!(doc.scrollingElement && doc.scrollingElement.scrollHeight > vh + 40 && win.getComputedStyle(doc.body).overflowY !== 'hidden');
       const opMap = new Map();
       const effOp = (el) => {
         if (!el || el === doc.body || el === doc.documentElement) return 1;
@@ -1447,19 +1460,23 @@ AIP.Senses = (function () {
           let inline = kids.length > 0 && kids.length <= 12;
           for (let k = 0; inline && k < kids.length; k++) if (!INLINE_TAGS.test(kids[k].tagName) || kids[k].children.length > 1) inline = false;
           if (inline && (el.textContent || '').length <= 300) {
+            // "<b>120M</b><small>Likes</small>" -> "120M Likes" ... but "<span>c</span><span>a</span><span>t</span>" -> "cat"
+            const letters = kids.length > 1 && [...kids].every((k) => k.tagName !== 'KBD' && (k.textContent || '').trim().length <= 1);
+            const gap = letters ? '' : ' ';
             for (let c = el.firstChild; c; c = c.nextSibling) {
               if (c.nodeType === 3) text += c.nodeValue;
-              else if (c.nodeType === 1) { text += c.tagName === 'KBD' ? ' ' + c.textContent.trim() + ' ' : c.textContent; skipText.add(c); for (const g of c.querySelectorAll('*')) skipText.add(g); }
+              else if (c.nodeType === 1) { text += (c.tagName === 'KBD' ? ' ' : gap) + c.textContent.trim() + (c.tagName === 'KBD' ? ' ' : gap); skipText.add(c); for (const g of c.querySelectorAll('*')) skipText.add(g); }
             }
           } else for (let c = el.firstChild; c; c = c.nextSibling) if (c.nodeType === 3) text += c.nodeValue;
         }
         text = text.replace(/\s+/g, ' ').trim();
         // a trophy row with the 🏆/🔒 in its own box: glue it to the name next to it
-        if (/^(🏆|🔒|✅|⬜|🔓)$/u.test(text) && el.nextElementSibling) {
+        if (/^(🏆|🔒|✅|⬜|🔓)$/u.test(text) && !el.children.length && el.nextElementSibling) {
           const nx = el.nextElementSibling, t2 = (nx.querySelector('b,strong,h3,h4,[class*="title"]') || nx).textContent.replace(/\s+/g, ' ').trim();
           if (t2) text = text + ' ' + t2.slice(0, 48);
         }
         if (tag === 'KBD') kbds.push(el);
+        if (!scrollable && r.height > vh * 0.3 && /(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 20) scrollable = true;
         // health / stamina bars with no number: the bar's width IS the number
         if (el.style && /%\s*$/.test(el.style.width || '') && BAR_RX.test((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '') + ' ' + ((el.parentElement && el.parentElement.id) || ''))) {
           const m = BAR_RX.exec((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '') + ' ' + ((el.parentElement && el.parentElement.id) || ''));
@@ -1483,6 +1500,7 @@ AIP.Senses = (function () {
         }
       }
       this.markers = marks.slice(0, 3);
+      this.scrollable = scrollable;
     }
 
     findButtons() {
@@ -1505,8 +1523,12 @@ AIP.Senses = (function () {
         const top = doc.elementFromPoint(cx, cy);
         if (!top || !(top === el || el.contains(top) || top.contains(el))) continue;
         if (r.width * r.height > vw * vh * 0.5) continue; // (a whole-screen layer isn't a button)
-        const text = ((el.innerText || el.value || el.getAttribute('aria-label') || el.title || '') + '').replace(/\s+/g, ' ').trim().slice(0, 32);
+        let text = ((el.innerText || el.value || el.getAttribute('aria-label') || el.title || '') + '').replace(/\s+/g, ' ').trim().slice(0, 32);
         if (DANGER_BTN_RX.test(text)) continue;
+        if (!text || /^[\d.,]+\s*[KMB]?$/i.test(text) || /^\p{Extended_Pictographic}[\p{Extended_Pictographic}\u200d\ufe0f\s]*$/u.test(text)) {
+          const al = (el.getAttribute('aria-label') || el.title || '').trim();
+          if (al) text = (al + ' ' + text).trim().slice(0, 32);
+        }
         let prio = 0.5;
         if (GOOD_BTN_RX.test(text)) prio = 1;
         if (MEH_BTN_RX.test(text)) prio = 0.15;
@@ -1862,6 +1884,7 @@ AIP.Senses = (function () {
       obs.buttons = this.buttons;
       obs.keyHints = (this.keyHints || []).filter((h) => h.el.isConnected);
       obs.marker = (this.markers || []).find((m) => m.el.isConnected) || null;
+      obs.scrollable = !!this.scrollable;
       obs.mash = null;
       for (const b of this.textBits || []) {
         if (b.s.length > 80 || !MASH_RX.test(b.s)) continue;
@@ -1944,7 +1967,14 @@ AIP.Senses = (function () {
     // showing a 2nd trophy counts again). A list of 🏆/🔒 rows = the trophy list (read quietly).
     checkTrophies(bits, obs) {
       const rows = [];
-      for (const b of bits) { const m = TROPHY_ROW_RX.exec(b.s); if (m) rows.push({ b, got: /🏆|✅|🔓|☑|✔/u.test(m[1]), name: m[2].replace(/\s+(unlocked|locked)\s*$/i, '').trim() }); }
+      for (const b of bits) {
+        const m = TROPHY_ROW_RX.exec(b.s);
+        if (!m) continue;
+        // the bold part is the trophy's NAME (the rest is its description)
+        const bold = b.el && b.el.querySelector ? b.el.querySelector('b,strong,h3,h4,[class*="title"]') : null;
+        const nm = bold && bold.textContent.trim().length >= 2 ? bold.textContent.trim() : m[2].replace(/\s+(unlocked|locked)\s*$/i, '').trim();
+        rows.push({ b, got: /🏆|✅|🔓|☑|✔/u.test(m[1]), name: nm });
+      }
       const isList = rows.length >= 3;
       if (isList) obs.events.push({ type: 'trophyList', items: rows.map((r) => ({ name: r.name.slice(0, 50), got: r.got })) });
       const listed = new Set(isList ? rows.map((r) => r.b) : []);
@@ -2397,6 +2427,20 @@ AIP.Hands = (function () {
       this.drawCursor(false);
     }
     click() { this.mouseDownNow(); setTimeout(() => this.mouseUp(), 60); }
+    // 📜 scroll the page / the list under the cursor (dy: +1 = down, -1 = up)
+    scroll(dy) {
+      const w = this.win, d = this.doc;
+      if (!w || !d) return;
+      const p = this.px();
+      const at = d.elementFromPoint(clamp(p.x, 0, w.innerWidth - 1), clamp(p.y, 0, w.innerHeight - 1)) || d.body;
+      let box = null;
+      for (let e = at; e && e !== d.body && e !== d.documentElement; e = e.parentElement) {
+        try { if (/(auto|scroll)/.test(w.getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 10) { box = e; break; } } catch (err) { break; }
+      }
+      const amount = dy * w.innerHeight * 0.6;
+      try { at.dispatchEvent(new w.WheelEvent('wheel', { deltaY: amount, deltaMode: 0, bubbles: true, cancelable: true, clientX: p.x, clientY: p.y, view: w })); } catch (e) { /* ignore */ }
+      try { (box || d.scrollingElement || d.documentElement).scrollBy({ top: amount, behavior: 'smooth' }); } catch (e) { /* ignore */ }
+    }
     clickAt(fx, fy) { this.moveTo(fx, fy); this.click(); }
     clickElement(el) {
       try {
@@ -2638,7 +2682,7 @@ AIP.Brain = (function () {
     }
     labelOfSpec(id, spec) {
       if (id === 'noop') return 'wait';
-      if (spec.mouse) return { click: 'click', hold: 'hold click', btn: 'click a button', look: 'look ' + (spec.mouse.dx < 0 ? '⬅️' : spec.mouse.dx > 0 ? '➡️' : spec.mouse.dy < 0 ? '⬆️' : '⬇️'), goto: 'move mouse' }[spec.mouse.t] || id;
+      if (spec.mouse) return { click: 'click', hold: 'hold click', btn: 'click a button', look: 'look ' + (spec.mouse.dx < 0 ? '⬅️' : spec.mouse.dx > 0 ? '➡️' : spec.mouse.dy < 0 ? '⬆️' : '⬇️'), goto: 'move mouse', scroll: spec.mouse.dy > 0 ? 'scroll ⬇️' : 'scroll ⬆️' }[spec.mouse.t] || id;
       return (spec.keys || []).map(KEYS.label).join(' + ');
     }
     activeSlots() { const out = []; this.actions.forEach((a, i) => { if (a && a.active) out.push(i); }); return out; }
@@ -2689,6 +2733,7 @@ AIP.Brain = (function () {
       if (obs) {
         if (obs.buttons && obs.buttons.length) this.ensureAction('m:btn', { mouse: { t: 'btn' } });
         this.ensureAction('m:click', { mouse: { t: 'click' } });
+        if (obs.scrollable) { this.ensureAction('m:scroll-d', { mouse: { t: 'scroll', dy: 1 } }); this.ensureAction('m:scroll-u', { mouse: { t: 'scroll', dy: -1 } }); }
         if (obs.lockActive || this.self.camera > 0.3) {
           const L = 70;
           this.ensureAction('m:look-l', { mouse: { t: 'look', dx: -L, dy: 0 } });
@@ -2890,6 +2935,9 @@ AIP.Brain = (function () {
         if (localized || moves || global || c.user > 3) c.status = 'useful';
         // once it worked, it takes a LOT of nothing to give up on a key (maybe I was stuck at a wall)
         else if ((c.maxZ || 0) > 6.5 && old === 'useful') { /* it clearly worked before - keep believing in it */ }
+        // gamer common sense: in a first-person game (mouse captured), WASD / arrows walk - walking forward
+        // barely changes the picture, so "nothing happened" doesn't prove they're useless
+        else if (this.lockSeen && /^(KeyW|KeyA|KeyS|KeyD|Arrow(Up|Down|Left|Right))$/.test(code)) { /* keep trying them */ }
         else if (old === 'useful' ? c.tries >= 30 && (c.peakZ || 0) < 2 && (c.dirZ || 0) < 1.5 : c.tries >= 8 && c.n >= 14 && this.quietN >= 8 && (c.peakZ || 0) < 3 && (c.dirZ || 0) < 2.5) c.status = 'useless';
       }
       if (old !== c.status) {
@@ -3119,6 +3167,7 @@ AIP.Brain = (function () {
         if (ev.type === 'score') this.recentScore = 1;
         if (ev.type === 'gameOver' || ev.type === 'healthZero' || ev.type === 'damage' || ev.type === 'death') this.lastBadAt = now;
       }
+      if (obs.lockActive) this.lockSeen = true;
       // 1) learn
       if (obs.ok) {
         this.lastSelfPos = this.self.tracked ? { x: this.self.x, y: this.self.y } : null;
@@ -3635,7 +3684,7 @@ AIP.Brain = (function () {
     tagsOf(a) {
       if (!a) return [];
       if (a.id === 'noop' || (!a.mouse && !a.keys.length)) return ['wait'];
-      if (a.mouse) return [{ look: 'look', btn: 'btn', click: 'click', hold: 'click', goto: 'aim' }[a.mouse.t] || 'mouse'];
+      if (a.mouse) return [{ look: 'look', btn: 'btn', click: 'click', hold: 'click', goto: 'aim', scroll: 'scroll' }[a.mouse.t] || 'mouse'];
       const out = [];
       for (const code of a.keys) {
         const c = this.controls[code];
@@ -5654,7 +5703,7 @@ AIP.Mind = (function () {
       if (/^act:/.test(tag)) { const code = tag.slice(4), c = B.controls[code]; return 'pressing ' + KEYS.label(code) + (c && c.tip ? ' (' + c.tip.replace(/\s*\(coach.*$/, '') + ')' : ''); }
       if (/^btn:/.test(tag)) return "clicking '" + tag.slice(4) + "'";
       if (/^idea:/.test(tag)) { const i = this.S.ideas.find((x) => x.id === tag.slice(5)); return i ? 'my move ' + i.name : 'my own ideas'; }
-      return { move: 'running around', jump: 'jumping', act: 'pressing buttons', look: 'looking around', click: 'clicking', btn: 'clicking buttons', aim: 'moving the mouse',
+      return { move: 'running around', jump: 'jumping', act: 'pressing buttons', look: 'looking around', click: 'clicking', scroll: 'scrolling', btn: 'clicking buttons', aim: 'moving the mouse',
         combo: 'doing combos', wait: 'chilling', points: 'getting points', explore: 'exploring new places', story: 'reading the story', typing: 'typing stuff', menu: 'menus',
         idea: 'trying my own ideas', fun: 'goofing around', trophy: 'trophy hunting', win: 'winning', hurt: 'getting hurt' }[tag] || tag;
     }
@@ -6041,6 +6090,11 @@ AIP.Mind = (function () {
       const tr = (obs.readouts || []).find((r) => /troph|achiev|badge/i.test(r.label) && r.max);
       if (tr) F.trophyTotal = Math.max(F.trophyTotal || 0, tr.max);
       if ((obs.buttons || []).some((b) => /troph|achiev/i.test(b.text))) F.trophyBtn = true;
+      // "Trophies (3/31)" / "Achievements 4 / 12" -> how many exist
+      for (const t of (this.s.senses.textBits || []).map((b) => b.s).concat((obs.buttons || []).map((b) => b.text))) {
+        const m = /(troph|achiev|badge)\w*\s*\(?\s*(\d+)\s*\/\s*(\d+)/i.exec(t);
+        if (m && +m[3] > 0 && +m[3] < 500) F.trophyTotal = Math.max(F.trophyTotal || 0, +m[3]);
+      }
       F.storyN = (B.stats.storyLines || []).length;
       void s;
     }
@@ -6543,6 +6597,7 @@ AIP.Session = (function () {
         else if (m.t === 'hold') { h.mouseDownNow(); this.holding = true; }
         else if (m.t === 'look') h.look(m.dx * U.rand(0.7, 1.3), m.dy * U.rand(0.7, 1.3));
         else if (m.t === 'goto') h.moveTo(m.x, m.y);
+        else if (m.t === 'scroll') h.scroll(m.dy);
         else if (m.t === 'btn' && m.el) h.clickElement(m.el);
       }
       this.lastKeys = d.keys;
