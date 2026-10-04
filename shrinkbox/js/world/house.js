@@ -55,8 +55,11 @@ export function buildHouse(game) {
   panel(s, { axis: 'y', at: -0.15, rect: [x0, z0, x1, z1], thick: 0.3, m: 'carpet', holes: [[-3.94, -3.58, -2.94, -0.08], [-2.12, -1.92, 2.12, 1.92]] });
   // painted ceiling under the upstairs floor (what you see from the living room)
   panel(s, { axis: 'y', at: -0.306, rect: [x0, z0, x1, z1], thick: 0.008, m: 'ceiling', holes: [[-3.94, -3.58, -2.94, -0.08]], o: { collide: false } });
-  // attic floor = upstairs ceiling
-  panel(s, { axis: 'y', at: 2.6, rect: [x0, z0, x1, z1], thick: 0.2, m: 'ceiling', holes: [[-2.12, -1.92, 2.12, 1.92]] });
+  // attic floor = upstairs ceiling (its own piece, so a giant can smash through it)
+  const attic = new Thing({ name: 'attic floor', surface: 'paint', tags: ['noShrink'] });
+  panel(attic, { axis: 'y', at: 2.6, rect: [x0, z0, x1, z1], thick: 0.2, m: 'ceiling', holes: [[-2.12, -1.92, 2.12, 1.92]] });
+  attic.build(scene);
+  game.attic = attic;
   // ground floor (wood planks) with the basement stair opening
   panel(s, { axis: 'y', at: G - 0.15, rect: [x0, z0, x1, z1], thick: 0.3, m: 'floorWood', holes: [[-7.3, -0.9, -4.1, 0.1]] });
   // basement: concrete slab

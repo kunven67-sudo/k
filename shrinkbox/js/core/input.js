@@ -7,7 +7,7 @@ const KEYMAP = {
   Space: 'jump', ShiftLeft: 'sprint', ShiftRight: 'sprint', ControlLeft: 'crouch', KeyC: 'crouch',
   KeyF: 'shrink', KeyG: 'grow', KeyE: 'use', KeyV: 'camera', KeyQ: 'spawn', KeyL: 'light',
   KeyR: 'rotate', KeyX: 'drop', KeyZ: 'undo', KeyP: 'phone', Tab: 'phone', Escape: 'pause',
-  Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5',
+  Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', Digit6: 'slot6',
   F3: 'debug', KeyT: 'talk', Enter: 'talk',
 };
 

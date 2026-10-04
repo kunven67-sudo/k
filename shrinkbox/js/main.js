@@ -9,10 +9,12 @@ import { settings } from './core/settings.js';
 import { UI } from './ui/ui.js';
 import { Player, BASE_H } from './player/player.js';
 import { MicroWorld, MU, ENTER_H, EXIT_H, MICRO_MIN_H, microKind } from './world/micro.js';
+import { BodyWorld } from './world/body.js';
+import { NanoWorld, NU, NANO_MIN_H, NANO_EXIT_H } from './world/nano.js';
 import { MAX_S } from './player/watch.js';
 import { Avatar, ViewModel, LOOK_DEFAULT } from './player/avatar.js';
 import { Watch } from './player/watch.js';
-import { things } from './world/thing.js';
+import { things, Thing } from './world/thing.js';
 import { buildBedroom } from './world/bedroom.js';
 import { buildHouse } from './world/house.js';
 import { furnishHouse } from './world/furniture.js';
@@ -29,6 +31,7 @@ import { Saves } from './game/saves.js';
 import { LightPool } from './core/lightpool.js';
 import { Economy } from './game/economy.js';
 import { PhoneUI } from './ui/phoneui.js';
+import { Pets } from './world/pets.js';
 import { Tools } from './game/tools.js';
 import { Spawner, catalog, CATEGORIES } from './game/spawner.js';
 
@@ -82,6 +85,7 @@ class Game {
     this.spawner = new Spawner(this);
     this.economy = new Economy(this);
     this.phoneUI = new PhoneUI(this);
+    this.pets = new Pets(this);
     this.quakeT = 600 + Math.random() * 1800;
     // night? turn the light on so you're not in the dark
     if (this.engine.updateDaylight(new THREE.Vector3(), 1) < 0.3) this.setRoomLight(true);
@@ -100,7 +104,10 @@ class Game {
   startGame(slot, load) {
     this.slot = slot;
     if (load) this.saves.load(slot);
-    else if (!this.started) this.ui.toast('🕹️ WASD to move · hold <kbd>F</kbd> to shrink · hold <kbd>G</kbd> to grow', 7);
+    else if (!this.started) {
+      this.ui.toast('⌚ Yesterday you found this strange watch in an old crate in the basement...', 6);
+      setTimeout(() => this.ui.toast('🕹️ WASD to move · hold <kbd>F</kbd> to shrink · hold <kbd>G</kbd> to grow', 7), 2500);
+    }
     this.started = true;
   }
 
@@ -110,15 +117,51 @@ class Game {
     try { localStorage.setItem(LOOK_KEY, JSON.stringify(this.look)); } catch { /* ignore */ }
   }
 
+  // holding F at the watch's limit in the germ world: break the rule and go to the ATOMS
+  onMinHold(t) {
+    if (!this.micro || this.nano) return;
+    if (t > 1.5 && !this._nanoWarn) { this._nanoWarn = true; this.ui.toast('⚠️ The watch flashes RED: "Prototype 7 - DO NOT use below 1.5 µm". Keep holding F...', 5); sfx.beep(400, 0.3, 0.3); }
+    if (t > 4.5) this.enterNano();
+  }
+  enterNano() {
+    const p = this.player;
+    this.nanoAnchor = { feet: p.feet.clone() };
+    this.nano = new NanoWorld(this, this.micro.kind);
+    const k = NU / MU, sp = this.nano.spawnPoint();
+    p.vel.set(0, 0, 0);
+    p.useWorld(this.nano.world, sp, p.s * k);
+    this.unit = NU;
+    this.nano.rebuildGround(sp.x, sp.z, p.height);
+    this.engine.setScene(this.nano.scene, this.rig());
+    this.ui.flash(0.9); sfx.zap(0.6);
+    this.ui.toast('⚛️ THE MOLECULE WORLD. The blue + red things zooming past are air molecules (N₂ and O₂) - for real they fly at 500 m/s. Keep shrinking to see atoms.', 8);
+  }
+  exitNano() {
+    const p = this.player, k = NU / MU;
+    p.vel.set(0, 0, 0);
+    p.useWorld(this.micro.world, this.nanoAnchor.feet.clone(), p.s / k);
+    this.unit = MU;
+    this.engine.setScene(this.micro.scene, this.rig());
+    this.nano.dispose(); this.nano = null; this._nanoWarn = false;
+    this.ui.flash(0.4);
+  }
+
+  leaveElsewhere() {
+    if (this.nano) this.exitNano();
+    if (this.body) { const b = this.body; this.body = null; this.player.useWorld(world, this.bodyAnchor.point.clone(), this.player.s); this.engine.setScene(this.engine.scene, this.rig()); b.dispose(); }
+    if (this.micro) this.exitMicro();
+  }
+
   knockedOut(why) {
     if (this.dead) return;
     this.dead = true;
+    this.leaveElsewhere();
     const bill = { fall: 1850, fan: 640, burn: 920, 'electric shock': 2400 }[why] || 1200;
     this.ui.fade(true);
     setTimeout(() => {
       const p = this.player;
       p.setScale(1); p.feet.set(...this.spawn.pos); p.vel.set(0, 0, 0); p.health = 100;
-      this.money -= bill;
+      this.economy.add(-bill, `Hospital bill (${why})`);
       this.ui.fade(false);
       this.ui.toast(`🏥 You woke up in the hospital (${why}). The bill: $${bill.toLocaleString()}. Mom drove you home.`, 7);
       this.dead = false;
@@ -132,15 +175,22 @@ class Game {
     p.inLiquid = null;
     for (const t of things) t.update(STEP, this);
     for (const pp of this.people) pp.update(STEP);
-    if (this.micro) this.micro.preStep(p);
+    this.pets.update(STEP);
+    if (this.micro && !this.nano) this.micro.preStep(p);
+    if (this.body) this.body.preStep(p);
     p.update(STEP);
-    if (this.micro) this.micro.update(STEP, p);
+    if (this.nano) this.nano.update(STEP, p);
+    else if (this.micro) this.micro.update(STEP, p);
+    if (this.body) this.body.update(STEP, p);
+    else if (!this.micro) this.checkBodyEntry();
     setLengthUnit(Math.max(0.0005, Math.min(1, this.realS())));
     physicsStep();
     this.checkMicro();
   }
 
   realS() { return this.player.s / this.unit; }
+  get elsewhere() { return !!(this.micro || this.body); } // the player is in the germ world or inside a body
+  allThings() { return things; }
 
   // west coast: small earthquakes happen now and then (most are tiny)
   updateQuake(dt) {
@@ -195,20 +245,98 @@ class Game {
       speechSynthesis.speak(u);
     } catch { /* no voice */ }
   }
-  macroFeet() { return this.micro ? this.microAnchor.point : this.player.feet; }
+  macroFeet() { return this.micro ? this.microAnchor.point : this.body ? this.bodyAnchor.point : this.player.feet; }
 
   sizeLimits() {
-    if (this.micro) return { min: MICRO_MIN_H * MU / BASE_H, max: 1e9, msg: '🦠 You are as small as a bacterium now! (molecules + atoms come in a later update)' };
+    if (this.body) return { min: ENTER_H * 0.97 / BASE_H, max: 0.006 / BASE_H, msg: '🛑 Growing inside a person would seriously hurt them. The watch won\'t allow it.' };
+    if (this.nano) return { min: NANO_MIN_H * NU / BASE_H, max: 1e15, msg: '⚛️ You are ONE ATOM tall. This is as small as anything gets.' };
+    if (this.micro) return { min: MICRO_MIN_H * MU / BASE_H, max: 1e9, msg: '🦠 You are as small as a bacterium! The watch beeps a warning... keep holding F to go below its limit?' };
     return { min: ENTER_H * 0.97 / BASE_H, max: MAX_S, msg: '🔬 Stand on something solid to shrink into the germ world' };
   }
 
   checkMicro() {
     const p = this.player, real = p.height / this.unit;
+    if (this.body) return;
+    if (this.nano) { if (real > NANO_EXIT_H) this.exitNano(); return; }
     if (!this.micro && real < ENTER_H && p.grounded) this.enterMicro();
     else if (this.micro && real > EXIT_H) this.exitMicro();
   }
 
   rig() { return [this.watch.light, this.watch.sparks, this.avatar.root]; }
+
+  // growing into the ceiling as a giant: CRASH through the roof
+  onGrowBlocked(p, t) {
+    if (this.elsewhere || this.roofBroken) return;
+    if (this.realS() > 1.25 && t > 1.0 && p.feet.y + p.height > 2.3 && p.feet.y > -0.5) this.breakRoof();
+  }
+  breakRoof() {
+    this.roofBroken = true;
+    const scene = this.engine.scene;
+    // the bedroom ceiling + the attic floor + the roof come apart
+    for (const c of this.room.colliders) if (c.part && c.part.pos[1] > 2.45) c.setEnabled(false);
+    for (const m of this.room.group.children) if (m.material && m.material.name === 'ceiling') m.visible = false;
+    if (this.attic) this.attic.remove(scene);
+    if (this.roofMesh) this.roofMesh.visible = false;
+    // flying debris: drywall chunks, boards and shingles
+    const at = this.player.head(new THREE.Vector3());
+    for (let i = 0; i < 18; i++) {
+      const d = new Thing({ name: i % 3 ? 'drywall chunk' : 'roof board', type: 'dynamic', density: 600, pos: [at.x + (Math.random() - 0.5) * 2, 2.9 + Math.random() * 0.8, at.z + (Math.random() - 0.5) * 2], rot: [Math.random(), Math.random(), Math.random()], surface: 'paint' });
+      d.box(i % 3 ? [0.3 + Math.random() * 0.4, 0.013, 0.2 + Math.random() * 0.3] : [1.2, 0.025, 0.14], [0, 0, 0], i % 3 ? 'ceiling' : 'lightWood');
+      d.build(scene); d.spawned = true;
+      d.body.setLinvel({ x: (Math.random() - 0.5) * 4, y: 2 + Math.random() * 3, z: (Math.random() - 0.5) * 4 }, true);
+    }
+    sfx.thud(1, 0.5); setTimeout(() => sfx.thud(1, 0.7), 120); sfx.whoosh(true, 0.8, 1.2);
+    this.player.shake = 1; this.ui.flash(0.4);
+    this.ui.toast('💥 CRASH! You broke through the roof! Keep growing - the whole neighborhood is out there.', 6);
+    for (const pa of this.parents || []) if (!pa.away) pa.say('WHAT WAS THAT?!');
+    setTimeout(() => this.economy.text('Mom', 'WHY IS THERE A HOLE IN THE ROOF?!?!'), 6000);
+  }
+
+  // ---- the body journey ----
+  // breathed in through the nose, or crawling into a sleeping parent's ear (mouth = eating/drinking, see parents.js)
+  checkBodyEntry() {
+    const p = this.player;
+    if (p.height > 0.004 || !this.parents) return;
+    const c = p.center(new THREE.Vector3());
+    for (const pa of this.parents) {
+      if (pa.away || pa.shrunk) continue;
+      const f = pa.faceSpots();
+      if (c.distanceTo(f.nose) < 0.035) { this.enterBody(pa, 'nose'); return; }
+      if (c.distanceTo(f.ear) < 0.02) { this.enterBody(pa, 'ear'); return; }
+    }
+  }
+  enterBody(parent, entry) {
+    const p = this.player;
+    this.bodyAnchor = { point: p.feet.clone(), parent };
+    this.body = new BodyWorld(this, parent, entry);
+    const sp = this.body.spawnPoint();
+    p.vel.set(0, 0, 0);
+    p.useWorld(this.body.world, sp, p.s);
+    p.yaw = entry === 'ear' ? Math.PI / 2 : entry === 'nose' ? Math.PI : Math.PI;
+    this.engine.setScene(this.body.scene, this.rig());
+    this.watch.lightOn = true;
+    this.ui.flash(0.6);
+    const msg = { mouth: `😮 ${parent.name} put you in their MOUTH!`, nose: `🌬️ ${parent.name} breathed you in! You\'re in their nose.`, ear: `👂 You crawled into ${parent.name}\'s ear canal.` }[entry];
+    this.ui.toast(msg, 5);
+    parent.say(entry === 'nose' ? '*sniff* ...weird.' : entry === 'ear' ? '*scratches ear in sleep*' : 'Mm.');
+  }
+  exitBody(how) {
+    const p = this.player, pa = this.bodyAnchor.parent, f = pa.faceSpots();
+    const s = p.s;
+    let feet, vel = new THREE.Vector3(), msg;
+    if (how === 'poop') {
+      const tl = this.toilet; feet = tl ? tl.group.localToWorld(new THREE.Vector3(0, 0.205, 0.08)) : p.feet.clone();
+      msg = '🚽 ...and out the other end. You\'re in the TOILET. Gross! Climb out before someone flushes!';
+      p.sticky = 0.8;
+    } else if (how === 'cough') { feet = f.mouth.clone(); vel = f.fwd.clone().multiplyScalar(1.5).add(new THREE.Vector3(0, 0.5, 0)); msg = `😷 ${pa.name} COUGHED you out!`; pa.say('*COUGH COUGH* ...went down the wrong pipe.'); }
+    else if (how === 'sneeze') { feet = f.nose.clone(); vel = f.fwd.clone().multiplyScalar(4).add(new THREE.Vector3(0, 1, 0)); msg = `🤧 AH-CHOO! ${pa.name} sneezed you out at 160 km/h!`; pa.say('AH... AH... CHOO!'); sfx.whoosh(false, 0.8, 0.4); }
+    else { feet = f.ear.clone(); msg = '👂 You crawled back out of the ear.'; }
+    p.useWorld(world, feet, s);
+    p.vel.copy(vel);
+    this.engine.setScene(this.engine.scene, this.rig());
+    this.body.dispose(); this.body = null;
+    this.ui.flash(0.5); this.ui.toast(msg, 5);
+  }
 
   enterMicro() {
     const p = this.player;

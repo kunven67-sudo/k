@@ -13,6 +13,7 @@ export const TOOLS = [
   { id: 'glue', icon: '🧴', name: 'Glue gun' },
   { id: 'tape', icon: '🩹', name: 'Duct tape' },
   { id: 'cutter', icon: '✂️', name: 'Cutter' },
+  { id: 'clean', icon: '🧽', name: 'Clean' },
 ];
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -76,7 +77,7 @@ export class Tools {
 
   update(dt) {
     const g = this.game, p = g.player, s = p.s;
-    for (let i = 1; i <= 5; i++) if (input.pressed('slot' + i)) this.select(i - 1);
+    for (let i = 1; i <= 6; i++) if (input.pressed('slot' + i)) this.select(i - 1);
     if (input.pressed('slotNext')) this.select(this.sel + 1);
     if (input.pressed('slotPrev')) this.select(this.sel - 1);
     this.updateAnims(dt);
@@ -120,6 +121,19 @@ export class Tools {
       if (input.pressed('undo')) this.undoJoint();
     } else if (id === 'cutter') {
       if (input.pressed('fire')) this.cut(reach);
+    } else if (id === 'clean') {
+      const inv = g.cleaning = g.cleaning || {};
+      if (input.pressed('fire')) {
+        const hit = g.player.aim(reach);
+        if (hit && hit.thing) {
+          if (!(inv.wipes > 0)) g.ui.toast('🧻 No wipes left. Buy some on your phone (Shop → Cleaning).', 3);
+          else { inv.wipes--; hit.thing.dirt = 0; sfx.whoosh(false, 0.15, 0.4); g.ui.toast(`🧽 Wiped the ${hit.thing.name}: 99.9% of germs gone. (${inv.wipes} wipes left)`, 3); }
+        }
+      }
+      if (input.pressed('use') && !g.usedInteractThisFrame) {
+        if (!(inv.sanitizer > 0)) g.ui.toast('🧴 No hand sanitizer. Buy some on your phone.', 3);
+        else { inv.sanitizer = Math.max(0, inv.sanitizer - 0.2); g.player.handDirt = 0; g.ui.toast('🧴 Clean hands! (realistic: sanitizer kills most germs on contact)', 3); }
+      }
     }
     if (id !== 'shrinker') g.ui.setCharge(0, 0);
   }
@@ -140,6 +154,10 @@ export class Tools {
     const m = t.mass;
     if (m > this.strength()) { g.ui.toast(`🏋️ Too heavy: ${fmtMass(m)}. At your size you can lift about ${fmtMass(this.strength())}.`); return; }
     this.held = t;
+    // germs travel: dirty hands make things dirty and dirty things make your hands dirty
+    const p = this.game.player, td = t.dirt ?? 0.4;
+    p.handDirt = Math.max(p.handDirt || 0, td * 0.7);
+    t.dirt = Math.max(td, (p.handDirt || 0) * 0.7);
     t.body.wakeUp();
     t.body.setAngularDamping(4);
     const bb = new THREE.Box3().setFromObject(t.group);

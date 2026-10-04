@@ -128,7 +128,7 @@ const ctrlBehavior = {
     }
     if (!c.snd) c.snd = loop('rumble');
     const p = game.player;
-    if (game.micro) { c.snd.set(0); return; }
+    if (game.elsewhere) { c.snd.set(0); return; }
     const local = c.group.worldToLocal(p.center(_v.clone()));
     const inside = c.enclosure.containsPoint(local);
     if (inside) { game.inside = c; game.insideEcho = 0.3; if (c.rumble > 0.1) p.shake = Math.max(p.shake, c.rumble); }

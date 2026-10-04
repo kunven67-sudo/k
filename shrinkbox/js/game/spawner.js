@@ -44,7 +44,7 @@ export class Spawner {
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const hit = p.aim(3 * s);
     if (SPECIAL[id] && SPECIAL[id].person) {
-      if (g.micro) { g.ui.toast('Grow back out of the germ world first'); return null; }
+      if (g.elsewhere) { g.ui.toast('Grow back out of the germ world first'); return null; }
       const at = hit ? hit.point.clone() : p.feet.clone().addScaledVector(new THREE.Vector3(fwd.x, 0, fwd.z).normalize(), 0.6 * s);
       const pp = new Person(g, { pos: [at.x, at.y + 0.001, at.z], height: SPECIAL[id].person * (0.9 + Math.random() * 0.2), yaw: p.yaw + Math.PI });
       pp.spawned = true; g.people.push(pp);

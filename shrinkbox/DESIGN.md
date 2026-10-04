@@ -101,3 +101,22 @@ Build plan: player chose ALL AT ONCE (was warned about the limit).
    They react like real people (scared, curious, friendly, etc).
 3. **Pick up shrunk people** in your hand (gently).
 4. **Cutting tool - objects only**: cut open soda cans, the Xbox, the phone, boxes, food.
+
+
+## Build status (what's in the game now)
+- [x] Bedroom + whole house (2 floors + basement + garage), real doors/windows/stairs
+- [x] Watch: hold F/G, effects, HUD, battery (lie in bed to charge), confiscation by parents
+- [x] Real-shape collisions everywhere; ray-based player mover exact at any size
+- [x] Inside: Xbox, controller, phone, soda can, TV, toilet tank, fridge, pot, microwave, car
+- [x] Tools: hands, shrinker (people too), glue gun, duct tape, cutter (objects only), clean
+- [x] Spawn menu: food, electronics, furniture, toys, tiny people
+- [x] Germ world (< 0.45 mm) per surface + dirt that spreads/regrows; atom world (< 1.5 µm)
+- [x] Wall village with tiny people (talk by typing or mic, real voices, pick up gently)
+- [x] Mom + Dad on the real clock: work, cooking, dinner call, TV, sleep; texts; bug swats; feet
+- [x] Body journey: mouth/stomach/intestines/toilet, nose->sneeze, wrong pipe->cough, ear
+- [x] Phone: messages, bank, shop + deliveries, sell, chores, camera/photos, weather
+- [x] Pets: cat (hunts tiny you), dog (licks), hamster wheel, goldfish tank, gecko, ant farm
+- [x] Real sun/time, west-coast weather + small earthquakes, Halloween in October
+- [x] Giant: break through the roof, solid neighborhood outside
+- [ ] Multiplayer (later)
+- [ ] Cooking game (separate file, talk about it first)

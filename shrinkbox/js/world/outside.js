@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { rng } from '../core/noise.js';
 import { surface } from '../core/textures.js';
+import { Thing, panel } from './thing.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // Merge every plain mesh in a group into one mesh per material (hundreds of draw calls -> a few)
@@ -30,8 +31,19 @@ function mergeStatic(grp) {
 
 const GROUND = -3.05; // ground level (your room is upstairs)
 
+export function buildOutsideColliders(game, houses) {
+  const t = new Thing({ name: 'outside', surface: 'carpet', tags: ['noShrink'] });
+  // the ground (with a hole where the house + basement are)
+  panel(t, { axis: 'y', at: GROUND - 0.5, rect: [-1000, -1000, 1000, 1000], thick: 1, m: 'concrete', holes: [[-8.4, -4.6, 8.5, 1.92]], o: { visual: false } });
+  for (const h of houses) t.box(h.size, h.pos, 'wall', { visual: false, rot: [0, h.rot, 0] });
+  t.build(game.engine.scene);
+  t.material = 'carpet';
+  return t;
+}
+
 export function buildOutside(game) {
   const scene = game.engine.scene;
+  const solidHouses = [];
   const R = rng(42);
   const grp = new THREE.Group(); grp.name = 'outside'; scene.add(grp);
   const std = (c, r = 0.9, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: r, ...extra });
@@ -81,6 +93,7 @@ export function buildOutside(game) {
     const door = new THREE.Mesh(new THREE.PlaneGeometry(1, 2.1), std(0x5b3a25, 0.6)); door.position.set(0.5, 1.05, d / 2 + 0.01); g.add(door);
     const garage = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 2.3), std(0xe8e6e0, 0.6)); garage.position.set(w / 2 - 2, 1.15, d / 2 + 0.01); g.add(garage);
     g.position.set(x, GROUND, z); g.rotation.y = facing; grp.add(g);
+    solidHouses.push({ size: [w, h + 1.5, d], pos: [x, GROUND + (h + 1.5) / 2, z], rot: facing });
   };
   for (let i = -6; i <= 6; i++) addHouse(i * 15 + (R() - 0.5) * 3, 30, Math.PI);
   for (const i of [-3, -2, -1, 1, 2]) addHouse(-2.5 + i * 16, -1.6, 0);
@@ -156,6 +169,7 @@ export function buildOutside(game) {
   mergeStatic(grp);
   const sky = new THREE.Mesh(skyGeo, skyMat); sky.frustumCulled = false; scene.add(sky);
   game.skyDome = sky;
+  buildOutsideColliders(game, solidHouses);
   return grp;
 }
 

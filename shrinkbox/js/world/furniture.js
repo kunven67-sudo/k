@@ -131,7 +131,7 @@ function fridge(game, x, y, z, rotY) {
   door.behaviors.push({ update(d, dt) { d.open += (d.target - d.open) * Math.min(1, dt * 4); const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotY + d.open * 1.7); d.body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w }); } });
   game.interactables.push({ name: () => (door.target ? 'Close fridge' : 'Open fridge'), thing: door, local: new THREE.Vector3(-0.84, 1.1, 0.07), radius: 0.25, use: () => { door.target = door.target ? 0 : 1; sfx.thud(0.2, 2.5); } });
   t.behaviors.push({ update(f, dt, gm) {
-    const p = gm.player; if (gm.micro) return;
+    const p = gm.player; if (gm.elsewhere) return;
     const local = f.group.worldToLocal(p.center(new THREE.Vector3()));
     if (Math.abs(local.x) < 0.41 && local.y > 0.12 && local.y < 1.74 && local.z > -0.33 && local.z < 0.33) {
       gm.inside = f;
@@ -160,7 +160,7 @@ function stove(game, x, y, z, rotY) {
   t.behaviors.push({ update(s, dt, gm) {
     s.temp += ((s.on ? 400 : 22) - s.temp) * Math.min(1, dt / (s.on ? 25 : 60));
     glow.emissiveIntensity = Math.max(0, (s.temp - 250) / 150) * 2.5;
-    if (gm.micro || !s.on) return;
+    if (gm.elsewhere || !s.on) return;
     const local = s.group.worldToLocal(gm.player.feet.clone());
     if (local.y > 0.9 && local.y < 0.95 && Math.abs(local.x + 0.19) < 0.1 && Math.abs(local.z + 0.14) < 0.1 && s.temp > 80 && gm.time > (s._cd || 0)) {
       s._cd = gm.time + 0.4; gm.player.hurt(14, 'burn'); gm.player.vel.y += 9.81 * gm.player.s * 0.5;
@@ -189,7 +189,7 @@ function pot(game, x, y, z) {
     if (!p2.snd) p2.snd = loop('fizz');
     p2.snd.set(p2.temp > 90 ? vol3d(p2.position(new THREE.Vector3()).distanceTo(gm.macroFeet()), 0.3, gm.realS()) * 0.4 : 0, 0.5);
     water.position.y = 0.049 + (p2.temp > 95 ? Math.sin(gm.time * 20) * 0.001 : 0);
-    if (gm.micro) return;
+    if (gm.elsewhere) return;
     const pl = gm.player, local = p2.group.worldToLocal(pl.feet.clone());
     if (Math.hypot(local.x, local.z) < R2 && local.y < p2.level && local.y > 0) {
       pl.inLiquid = { swimMul: pl.height < 0.01 ? 0.3 : 0.6, drag: 3, sink: 0.1, name: 'water' };
@@ -221,7 +221,7 @@ function microwave(game, x, y, z, rotY) {
     t.on = 30; sfx.beep(1200, 0.1, 0.25); } });
   t.behaviors.push({ update(m, dt, gm) {
     if (m.on > 0) { m.on -= dt; for (const mm of m.meshes?.turntable || []) mm.rotation.y += dt * 0.8; if (m.on <= 0) { for (let i = 0; i < 3; i++) setTimeout(() => sfx.beep(1600, 0.12, 0.25), i * 300); } }
-    if (gm.micro || m.on <= 0) return;
+    if (gm.elsewhere || m.on <= 0) return;
     const local = m.group.worldToLocal(gm.player.center(new THREE.Vector3()));
     if (local.x > -0.24 && local.x < 0.11 && local.y > 0 && local.y < 0.29 && Math.abs(local.z) < 0.19 && gm.time > (m._cd || 0)) {
       m._cd = gm.time + 0.5; gm.player.hurt(12, 'microwave'); gm.ui.toast('⚠️ Microwaves heat the water in your body. GET OUT!', 2);
@@ -297,7 +297,7 @@ function mysteryBox(game, x, y, z) {
 export function furnishHouse(game) {
   const up = FLOORS.up;
   // bathroom
-  toilet(game, -5.72, up, 0.62, Math.PI / 2);
+  game.toilet = toilet(game, -5.72, up, 0.62, Math.PI / 2);
   mk(game, 'vanity', [-4.8, up, 0.6], Math.PI / 2, (t) => {
     cabinet(t, 0.6, 0.82, 0.5, C(0xf3f1ec, 0.5));
     t.box([0.62, 0.03, 0.52], [0, 0.835, 0], 'granite');

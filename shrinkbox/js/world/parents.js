@@ -98,6 +98,8 @@ export class Parent extends Person {
     if (pl.dinner && !this._dinnerCalled) { this._dinnerCalled = true; phoneNotify(g, this.name, 'Dinner\'s ready! Come down 🍝'); this.say('DINNER!'); }
     if (!pl.dinner) this._dinnerCalled = false;
     if (g.stoveThing) { if (pl.cook && this.node === 'stove' && !this.route.length) g.stoveThing.on = true; else if (this.name === 'Mom' && !pl.cook && g.stoveThing.on && !g.stoveThing._byPlayer) g.stoveThing.on = false; }
+    // snack while watching TV / at dinner
+    if ((pl.pose === 'sit' || pl.dinner) && !this.route.length && g.time > (this._snackCd || 0)) { this._snackCd = g.time + 40 + Math.random() * 60; this.snack(); }
     // react to what you do
     if (this.state !== 'confiscate') this.watchPlayer(dt);
     // go where the plan says (or chase you to take the watch)
@@ -131,10 +133,39 @@ export class Parent extends Person {
     // confiscation: reach you while you're normal-ish size
     if (this.state === 'confiscate') {
       const d = this.feet.distanceTo(g.macroFeet());
-      if (d < 1.2 && g.realS() > 0.5 && !g.micro) this.takeWatch();
+      if (d < 1.2 && g.realS() > 0.5 && !g.elsewhere) this.takeWatch();
       if (g.realS() < 0.2 && g.time > (this._searchCd || 0)) { this._searchCd = g.time + 6; this.say(pick(LINES.search)); }
       if (g.time > this.confiscateUntil) { this.state = 'idle'; this.say('...I must be losing my mind.'); }
     }
+  }
+
+  // where their nose / mouth / ear are right now (standing, sitting or asleep)
+  faceSpots() {
+    const fwd = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw)), side = new THREE.Vector3(fwd.z, 0, -fwd.x);
+    let head = this.feet.clone(); head.y += this.height * (this.planNow?.pose === 'sit' ? 0.7 : 0.94);
+    if (this.sleeping && this.headPos) { head = this.headPos.clone(); fwd.set(0, 1, 0); side.set(0, 0, 1); }
+    return { head, fwd, nose: head.clone().addScaledVector(fwd, 0.1).add(new THREE.Vector3(0, -0.01, 0)), mouth: head.clone().addScaledVector(fwd, 0.09).add(new THREE.Vector3(0, -0.06, 0)), ear: head.clone().addScaledVector(side, this.sleeping ? 0.0 : 0.085).add(new THREE.Vector3(0, this.sleeping ? 0.09 : 0, 0)) };
+  }
+
+  // snacking: grab food / a drink within reach and eat it (if you're on it... you're going in)
+  snack() {
+    const g = this.game, f = this.faceSpots();
+    let best = null, bd = 1.3;
+    for (const t of g.allThings()) {
+      if (!t.body || t.type !== 'dynamic') continue;
+      const food = t.material === 'food' || t.spawnId === 'soda' || t.spawnId === 'sodaClosed' || t.name === 'Soda can';
+      if (!food) continue;
+      const d = t.position(new THREE.Vector3()).distanceTo(this.feet);
+      if (d < bd) { bd = d; best = t; }
+    }
+    if (!best) return;
+    const p = g.player;
+    const onIt = !g.elsewhere && p.height < 0.01 && (p.groundBody === best.body || (best.enclosure && best.enclosure.containsPoint(best.group.worldToLocal(p.center(new THREE.Vector3())))));
+    const drink = best.name === 'Soda can';
+    this.say(drink ? '*sip*' : '*munch*');
+    if (onIt) { g.enterBody(this, 'mouth'); }
+    if (drink) { best.fill = Math.max(0, (best.fill ?? 0.5) - 0.15); }
+    else if (!onIt || true) best.remove(g.engine.scene);
   }
 
   setAway(a) {
@@ -156,7 +187,7 @@ export class Parent extends Person {
 
   watchPlayer(dt) {
     const g = this.game, p = g.player;
-    if (g.micro) return;
+    if (g.elsewhere) return;
     const real = p.height;
     // 1) seeing the watch in action
     if (g.watch.changing && real > 0.02 && !this.caughtOnce && this.canSee(p.center(new THREE.Vector3()))) {

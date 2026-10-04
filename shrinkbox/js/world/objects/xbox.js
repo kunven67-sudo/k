@@ -175,7 +175,7 @@ const xboxBehavior = {
     const p = game.player;
     const d = x.position(_v).distanceTo(game.macroFeet()), rs = game.realS();
     x.snd.set(x.fanSpeed * vol3d(d, 0.5 * Math.min(1, 0.02 / Math.max(rs, 0.0005)) + 0.04, rs) * 0.6, 0.6 + x.fanSpeed * 0.6);
-    if (game.micro) return;
+    if (game.elsewhere) return;
 
     // effects on a tiny player inside
     const local = x.group.worldToLocal(p.center(_v.clone())).divideScalar(1); // group has scale applied

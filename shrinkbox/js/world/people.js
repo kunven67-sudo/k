@@ -164,7 +164,7 @@ export class Person {
     const g = this.game, p = g.player, t = g.time;
     this.stateT -= dt;
     if (this.held) { this.model.animate(dt, 0, 'held', t); return; }
-    if (g.micro) { this.model.root.visible = false; return; } this.model.root.visible = true;
+    if (g.elsewhere) { this.model.root.visible = false; return; } this.model.root.visible = true;
     // how do I see the player?
     const toP = p.feet.clone().sub(this.feet); const dist = toP.length();
     const ratio = p.height / this.height;

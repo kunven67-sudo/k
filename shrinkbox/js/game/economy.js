@@ -67,7 +67,7 @@ export class Economy {
     for (const o of this.orders) {
       if (o.stage === 0 && g.time > o.eta) {
         o.stage = 1;
-        sfx.knock();
+        sfx.knock(); this._lastKnock = g.time;
         this.text('ShopNow', `✅ Delivered: ${o.item.name}. Left at your bedroom door.`);
         g.ui.toast('🚪 *knock knock* Your package is at your door!', 4);
         this.spawnPackage(o.item);
@@ -75,6 +75,9 @@ export class Economy {
     }
     this.orders = this.orders.filter((o) => o.stage === 0);
     if (this.timer < 2) return; this.timer = 0;
+    // germs slowly come back on everything (realistic: bacteria re-colonize surfaces within hours)
+    this.germT = (this.germT || 0) + 2;
+    if (this.germT > 30) { this.germT = 0; for (const t of things) if (t.dirt !== null && t.dirt !== undefined && t.dirt < 1) t.dirt = Math.min(1, t.dirt + 0.004); }
     // weekly allowance on Saturday (real date)
     const now = new Date(), key = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
     if (now.getDay() === 6 && this.lastAllowance !== key) {
@@ -136,7 +139,7 @@ export class Economy {
     sfx.tick(0.4, 0.7);
     if (item.pet) { g.pets?.adopt(item.pet, p); g.ui.toast(`${item.icon} Your new ${item.name.split(' (')[0].split(' +')[0]}!`, 4); }
     else if (item.spawn) { for (let i = 0; i < (item.count || 1); i++) g.spawner.spawn(item.spawn, [p.x + (Math.random() - 0.5) * 0.15, p.y + 0.35 + i * 0.03, p.z + (Math.random() - 0.5) * 0.15]); }
-    else if (item.clean) { g.cleaning = g.cleaning || {}; g.cleaning[item.clean] = (g.cleaning[item.clean] || 0) + 1; g.ui.toast(item.clean === 'wipes' ? '🧻 Wipes! Look at something and press C... er, E with hands to wipe it clean.' : '🧴 Sanitizer: press E on yourself... (use it from the phone menu)', 4); }
+    else if (item.clean) { g.cleaning = g.cleaning || {}; g.cleaning[item.clean] = (g.cleaning[item.clean] || 0) + (item.clean === 'wipes' ? 20 : 1); g.ui.toast(item.clean === 'wipes' ? '🧻 20 wipes! Tool 6 (🧽): click something to wipe the germs off it.' : '🧴 Sanitizer! Tool 6 (🧽): press E to clean your hands.', 5); }
   }
 
   sell(t) {

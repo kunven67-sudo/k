@@ -35,7 +35,7 @@ export class PhoneUI {
   toggle() { if (this.el) this.close(); else this.show(); }
   show(app = 'home') {
     const g = this.game;
-    if (g.watch && g.micro) { g.ui.toast('📱 Your phone is huge right now... grow back first.'); return; }
+    if (g.watch && g.elsewhere) { g.ui.toast('📱 Your phone is huge right now... grow back first.'); return; }
     g.panelOpen = true; input.enabled = false; input.exitLock();
     this.el = $(`<div class="phone-wrap click"><div class="phone"><div class="pscreen"><div class="pbar"><span class="pt"></span><span>📶 🔋 ${Math.round((g.phone?.battery ?? 0.6) * 100)}%</span></div><div class="pview" style="flex:1;display:flex;flex-direction:column;min-height:0"></div></div></div></div>`);
     this.el.addEventListener('pointerdown', (e) => { if (e.target === this.el) this.close(); });

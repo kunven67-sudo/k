@@ -81,7 +81,7 @@ export class Watch {
           g.onGrowBlocked?.(p, this.blockT);
         } else this.blockT = 0;
       }
-      if (ns === lim.min && this.mode < 0 && lim.msg && !this['_tip' + lim.msg.length]) { this['_tip' + lim.msg.length] = 1; g.ui.toast(lim.msg); }
+      if (ns === lim.min && this.mode < 0) { this.minHold = (this.minHold || 0) + dt; g.onMinHold?.(this.minHold); if (lim.msg && !this['_tip' + lim.msg.length]) { this['_tip' + lim.msg.length] = 1; g.ui.toast(lim.msg); } } else this.minHold = 0;
       if (ns !== p.s) {
         const ratio = ns / p.s;
         p.setScale(ns);

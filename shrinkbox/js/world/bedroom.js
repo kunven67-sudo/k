@@ -153,6 +153,10 @@ function buildBed(game, scene) {
   bed.build(scene);
   bed.material = 'fabric';
   bed.dirt = 0.5;
+  game.interactables.push({ name: () => (game.player.lying ? 'Get up' : 'Lie down (charges your watch)'), pos: new THREE.Vector3(bx, 0.62, bz), radius: 0.9, use: () => {
+    const p = game.player; p.lying = !p.lying;
+    if (p.lying) { p.feet.set(bx, 0.6, bz - L / 2 + 0.6); p.vel.set(0, 0, 0); game.ui.toast('😴 Resting... the watch charges while you lie here.', 3); }
+  } });
   // pillows you can throw around
   for (const sx of [-0.33, 0.33]) {
     const p = new Thing({ name: 'pillow', type: 'dynamic', density: 60, pos: [bx + sx, 0.64, bz - L / 2 + 0.28], surface: 'fabric', icon: '🛏️', spawnId: 'pillow' });

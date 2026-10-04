@@ -26,9 +26,10 @@ export class Saves {
     }
     return {
       v: 1, time: Date.now(), sizeText: `${(p.height * 100).toFixed(p.height < 0.01 ? 2 : 0)} cm`,
-      player: { feet: g.micro ? g.microAnchor.point.toArray() : p.feet.toArray(), yaw: p.yaw, pitch: p.pitch, s: p.s / (g.unit || 1), health: p.health, view: p.view },
+      player: { feet: g.macroFeet().toArray(), yaw: p.yaw, pitch: p.pitch, s: p.s / (g.unit || 1), health: p.health, view: p.view },
       watch: { battery: g.watch.battery, confiscated: !!g.watch.confiscated }, look: g.look, money: g.economy.money, grounded: !!g.grounded,
       eco: { log: g.economy.log.slice(0, 50), messages: g.economy.messages.slice(0, 50), choresDone: g.economy.choresDone, lastAllowance: g.economy.lastAllowance },
+      pets: g.pets.list.map((p) => p.kind),
       room: { light: g.roomLight?.on, lamp: g.lamp?.on, door: g.door?.target, tv: g.tv?.on, xbox: g.xbox?.on },
       objs,
     };
@@ -50,7 +51,7 @@ export class Saves {
 
   apply(d) {
     const g = this.game, p = g.player;
-    if (g.micro) g.exitMicro();
+    g.leaveElsewhere();
     g.look = { ...g.look, ...(d.look || {}) }; g.applyLook();
     p.setScale(d.player.s); p.feet.fromArray(d.player.feet); p.yaw = d.player.yaw; p.pitch = d.player.pitch; p.health = d.player.health; p.view = d.player.view || 'first';
     p.vel.set(0, 0, 0); p.setScale(d.player.s);
@@ -64,6 +65,8 @@ export class Saves {
       if (g.tv) { g.tv.on = !!d.room.tv; g.tv.refresh(); }
       if (g.xbox) g.xbox.on = !!d.room.xbox;
     }
+    // pets (re-adopt the ones from the save if they're not here yet)
+    if (d.pets && !g.pets.list.length) for (const k of d.pets) g.pets.adopt(k, new g.player.feet.constructor(-0.6, 0.02, 0.6));
     // remove things spawned in this session, then restore everything from the save
     for (const t of [...things]) if (t.spawned) t.remove(g.engine.scene);
     const byKey = new Map(); let idx = 0;

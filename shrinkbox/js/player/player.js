@@ -112,6 +112,11 @@ export class Player {
   update(dt) {
     const s = this.s;
     this.look(dt);
+    if (this.lying) {
+      // lying in bed: look around, any movement gets you up
+      this.game.watch.battery = Math.min(1, this.game.watch.battery + dt * 0.0017);
+      if (input.move.x || input.move.y || input.pressed('jump')) this.lying = false; else { this.vel.set(0, 0, 0); return; }
+    }
     if (input.pressed('camera')) this.view = this.view === 'first' ? 'third' : 'first';
 
     // crouch (needs room to stand back up)
@@ -120,6 +125,7 @@ export class Player {
     if (this.crouchT !== this._lastCrouch) { this._lastCrouch = this.crouchT; this.applyScaleToController(); }
 
     // ---- movement (all speeds scale with size) ----
+    this.inputMoving = !!(input.move.x || input.move.y);
     const sprint = input.held('sprint') && !this.crouchT;
     const stickyMul = 1 - Math.min(0.75, this.sticky);
     let speed = (sprint ? 5.2 : 2.4) * s * (1 - 0.55 * this.crouchT) * stickyMul;
@@ -243,6 +249,7 @@ export class Player {
   updateCamera(cam, dt) {
     const s = this.s;
     const eye = this.head(new THREE.Vector3());
+    if (this.lying) eye.y = this.feet.y + 0.12;
     const bob = this.view === 'first' ? Math.sin(this.headBob) * 0.025 * s * (this.grounded ? 1 : 0) : 0;
     eye.y += bob;
     const sh = this.shake * this.shake;
