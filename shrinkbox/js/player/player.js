@@ -6,6 +6,7 @@ import { R, world, groups, G, handleToThing } from '../core/physics.js';
 import { input } from '../core/input.js';
 import { settings } from '../core/settings.js';
 import { sfx } from '../core/audio.js';
+import { Mover } from './mover.js';
 
 export const BASE_H = 1.75;     // meters at size 1
 const BASE_R = 0.24;
@@ -38,56 +39,41 @@ export class Player {
     this.camDist = 0;
 
     const { r, half } = this.dims(this.s);
-    const bd = R.RigidBodyDesc.kinematicPositionBased().setTranslation(this.feet.x, this.feet.y + half + r, this.feet.z);
+    const bd = R.RigidBodyDesc.kinematicPositionBased().setTranslation(this.feet.x, this.feet.y + half, this.feet.z);
     this.body = world.createRigidBody(bd);
-    const cd = R.ColliderDesc.capsule(half, r).setCollisionGroups(groups(G.PLAYER, G.WORLD | G.PROP | G.SENSOR | G.CREATURE)).setFriction(0.5);
-    cd.setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);
+    // the player's own collider only touches sensors; movement is done by the Mover with casts
+    const cd = R.ColliderDesc.cylinder(half, r).setCollisionGroups(groups(G.PLAYER, G.SENSOR));
     this.collider = world.createCollider(cd, this.body);
-    this.kcc = world.createCharacterController(0.01);
-    this.kcc.setUp({ x: 0, y: 1, z: 0 });
-    this.kcc.setMaxSlopeClimbAngle(50 * Math.PI / 180);
-    this.kcc.setMinSlopeSlideAngle(55 * Math.PI / 180);
-    this.kcc.setApplyImpulsesToDynamicBodies(true);
-    this.kcc.setSlideEnabled(true);
+    this.moveGroups = groups(G.PLAYER, G.WORLD | G.PROP | G.CREATURE | G.SKIN);
+    this.mover = new Mover(this.collider, this.moveGroups);
+    this.touching = [];
     this.applyScaleToController();
   }
 
-  // capsule radius + half-height of the straight part, for a given size (crouch-aware)
+  // body cylinder: radius + half-height, for a given size (crouch-aware)
   dims(s, crouchAmt = this.crouchT) {
     const h = BASE_H * s * (1 - 0.38 * crouchAmt);
-    const r = Math.min(BASE_R * s, h / 2 - 1e-7);
-    return { r, half: Math.max(1e-7, h / 2 - r), h };
+    return { r: BASE_R * s, half: h / 2, h };
   }
   get height() { return this.dims(this.s).h; }
   get eyeHeight() { return this.dims(this.s).h * 0.93; }
 
   applyScaleToController() {
-    const s = this.s;
-    this.kcc.setOffset(Math.max(1e-6, 0.006 * s));
-    this.kcc.enableAutostep(0.32 * s, 0.04 * s, true);
-    this.kcc.enableSnapToGround(0.25 * s);
-    this.kcc.setCharacterMass(75 * s * s * s);
-    const { r, half } = this.dims(s);
+    const { r, half } = this.dims(this.s);
     this.collider.setRadius(r);
     this.collider.setHalfHeight(half);
   }
 
-  center(out = new THREE.Vector3()) { const { r, half } = this.dims(this.s); return out.set(this.feet.x, this.feet.y + half + r, this.feet.z); }
+  center(out = new THREE.Vector3()) { const { half } = this.dims(this.s); return out.set(this.feet.x, this.feet.y + half, this.feet.z); }
   head(out = new THREE.Vector3()) { return out.set(this.feet.x, this.feet.y + this.eyeHeight, this.feet.z); }
 
-  // Does a capsule of size s (feet at current feet) fit without hitting anything solid?
+  // Does a body of size s (feet at current feet) fit without hitting anything solid?
   fits(s, feet = this.feet, crouchAmt = this.crouchT) {
     const { r, half } = this.dims(s, crouchAmt);
-    const shape = new R.Capsule(half * 0.98, r * 0.98);
-    const pos = { x: feet.x, y: feet.y + half + r + 0.004 * s, z: feet.z };
-    let hit = null;
-    world.intersectionsWithShape(pos, { x: 0, y: 0, z: 0, w: 1 }, shape, (c) => {
-      if (c.handle === this.collider.handle || c.isSensor()) return true;
-      const body = c.parent();
-      if (body && body.isDynamic()) return true; // dynamic stuff gets pushed instead
-      hit = c; return false;
-    }, undefined, groups(G.PLAYER, G.WORLD | G.PROP));
-    return !hit ? true : (this.lastBlock = hit, false);
+    const pos = { x: feet.x, y: feet.y + half + 0.01 * half, z: feet.z };
+    const hit = this.mover.overlaps(pos, half, r, true);
+    if (hit) this.lastBlock = hit;
+    return !hit;
   }
 
   setScale(s) {
@@ -156,21 +142,27 @@ export class Player {
       const lv = this.groundBody.linvel();
       desired.x += lv.x * dt; desired.y += Math.min(0, lv.y) * dt; desired.z += lv.z * dt;
     }
-    this.kcc.computeColliderMovement(this.collider, desired, R.QueryFilterFlags.EXCLUDE_SENSORS, groups(G.PLAYER, G.WORLD | G.PROP | G.CREATURE | G.SKIN));
-    const mv = this.kcc.computedMovement();
+    const { r, h } = this.dims(s);
+    const before = this.feet.clone();
+    const res = this.mover.move(this.feet, desired, {
+      r, h, grounded: this.grounded, snap: this.grounded && this.vel.y <= 0.01 * s,
+      stepH: 0.22 * BASE_H * s, maxSlopeCos: Math.cos(50 * Math.PI / 180),
+    });
+    const mv = this.feet.clone().sub(before);
+    const pos = this.center(new THREE.Vector3());
     const wasGrounded = this.grounded;
-    this.grounded = this.kcc.computedGrounded();
-    this.feet.x += mv.x; this.feet.y += mv.y; this.feet.z += mv.z;
-    // hit something while moving? kill velocity into it
-    this.groundBody = null;
-    this.touching = [];
-    for (let i = 0; i < this.kcc.numComputedCollisions(); i++) {
-      const c = this.kcc.computedCollision(i);
-      if (!c || !c.normal1) continue;
-      if (c.collider) this.touching.push(c.collider);
-      const n = c.normal1;
-      if (n.y > 0.6 && c.collider) this.groundBody = c.collider.parent();
-      if (n.y < -0.6 && this.vel.y > 0) this.vel.y = 0; // bonk head
+    this.grounded = res.grounded;
+    // what did we touch? (for heat, zaps, pushing things)
+    this.groundBody = res.groundCollider ? res.groundCollider.parent() : null;
+    this.touching = this.mover.hits.map((h) => h.collider);
+    if (res.hitCeiling && this.vel.y > 0) this.vel.y = 0; // bonk head
+    // push light things you walk into (a tiny you can't move a soda can, a normal you can)
+    for (const h of this.mover.hits) {
+      const b = h.collider.parent();
+      if (!b || !b.isDynamic() || h.normal.y > 0.7) continue;
+      const myMass = 70 * s * s * s;
+      const push = Math.max(0, -this.vel.dot(h.normal)) * myMass * 0.6;
+      if (push > 0) b.applyImpulseAtPoint({ x: -h.normal.x * push, y: 0, z: -h.normal.z * push }, pos, true);
     }
     if (dt > 0) {
       // actual achieved horizontal speed (stops sliding into walls building up speed)

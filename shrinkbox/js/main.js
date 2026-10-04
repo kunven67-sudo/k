@@ -99,6 +99,24 @@ class Game {
     }, 1600);
   }
 
+  // one fixed physics step of the whole world
+  tick() {
+    const p = this.player;
+    this.inside = null; this.insideEcho = 0;
+    p.inLiquid = null;
+    for (const t of things) t.update(STEP, this);
+    p.update(STEP);
+    setLengthUnit(Math.max(0.0005, Math.min(1, p.s)));
+    physicsStep();
+  }
+
+  // fast-forward without rendering (used by tests / debugging)
+  simulate(seconds) {
+    const n = Math.round(seconds / STEP);
+    for (let i = 0; i < n; i++) { this.time += STEP; this.tick(); }
+    for (const t of things) t.sync();
+  }
+
   // Look at something + press E to use it (light switch, door, power buttons...)
   findInteractable() {
     const p = this.player, s = p.s;
@@ -143,15 +161,7 @@ class Game {
       this.watch.update(dt);
       this.acc += dt;
       let n = 0;
-      while (this.acc >= STEP && n < 4) {
-        this.inside = null; this.insideEcho = 0;
-        p.inLiquid = null;
-        for (const t of things) t.update(STEP, this);
-        p.update(STEP);
-        setLengthUnit(Math.max(0.0005, Math.min(1, p.s)));
-        physicsStep();
-        this.acc -= STEP; n++;
-      }
+      while (this.acc >= STEP && n < 4) { this.tick(); this.acc -= STEP; n++; }
       if (n === 4) this.acc = 0;
       for (const t of things) t.sync();
       setEnclosure(!!this.inside, this.insideEcho || (this.inside ? 0.4 : 0));
@@ -181,6 +191,9 @@ class Game {
 
 const game = new Game();
 window.__game = game; // handy for debugging in the console
+import * as PHYS from './core/physics.js';
+window.__phys = PHYS;
+window.__input = input;
 game.boot().catch((e) => {
   console.error(e);
   const b = document.getElementById('boot-sub'); if (b) b.textContent = 'Error: ' + e.message;

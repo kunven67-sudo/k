@@ -4,6 +4,29 @@
 import * as THREE from 'three';
 import { rng } from '../core/noise.js';
 import { surface } from '../core/textures.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+// Merge every plain mesh in a group into one mesh per material (hundreds of draw calls -> a few)
+function mergeStatic(grp) {
+  grp.updateMatrixWorld(true);
+  const byMat = new Map(), remove = [];
+  grp.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.userData.keep) return;
+    const g = o.geometry.clone().applyMatrix4(o.matrixWorld);
+    const ng = g.index ? g.toNonIndexed() : g;
+    for (const k of Object.keys(ng.attributes)) if (!['position', 'normal', 'uv'].includes(k)) ng.deleteAttribute(k);
+    if (!ng.attributes.uv) ng.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(ng.attributes.position.count * 2), 2));
+    if (!byMat.has(o.material)) byMat.set(o.material, { list: [], shadow: false });
+    const e = byMat.get(o.material); e.list.push(ng); e.shadow = e.shadow || o.castShadow;
+    remove.push(o);
+  });
+  for (const o of remove) o.parent.remove(o);
+  for (const [m, e] of byMat) {
+    const mesh = new THREE.Mesh(mergeGeometries(e.list, false), m);
+    mesh.castShadow = e.shadow; mesh.receiveShadow = true; mesh.matrixAutoUpdate = false;
+    grp.add(mesh);
+  }
+}
 
 const GROUND = -3.05; // ground level (your room is upstairs)
 
@@ -16,14 +39,14 @@ export function buildOutside(game) {
   // ground: grass + fields
   const grassTex = surface('carpet', { color: 0x4d7a32, size: 256 });
   const gm = std(0x6a8f45, 1, { map: grassTex.map.clone() }); gm.map.repeat.set(200, 200); gm.map.needsUpdate = true;
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), gm); ground.rotation.x = -Math.PI / 2; ground.position.y = GROUND; ground.receiveShadow = true; grp.add(ground);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), gm); ground.rotation.x = -Math.PI / 2; ground.position.y = GROUND; ground.receiveShadow = true; ground.userData.keep = true; grp.add(ground);
   // our yard: lawn, path, driveway; our house walls (the outside of the house)
   const houseMat = std(0xb9b2a3, 0.85);
   const house = new THREE.Mesh(new THREE.BoxGeometry(12.3, 6.1, 9.3), houseMat); house.position.set(-2.5, GROUND + 3.05 - 0.01, -1.6);
   house.geometry.translate(0, 0, 0); house.material.side = THREE.BackSide; // only seen from outside... BackSide trick avoids covering the room
   void house;
   const roofMat = std(0x4a3b36, 0.8);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(9.2, 2.6, 4, 1), roofMat); roof.rotation.y = Math.PI / 4; roof.scale.set(1, 1, 0.75); roof.position.set(-2.5, 2.5 + 0.3 + 1.3 + 0.12, -1.6); roof.castShadow = true;
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(9.2, 2.6, 4, 1), roofMat); roof.rotation.y = Math.PI / 4; roof.scale.set(1, 1, 0.75); roof.position.set(-2.5, 2.5 + 0.3 + 1.3 + 0.12, -1.6); roof.castShadow = true; roof.userData.keep = true;
   grp.add(roof);
   game.roofMesh = roof;
   // street
@@ -119,7 +142,10 @@ export function buildOutside(game) {
         #include <colorspace_fragment>
       }`,
   });
-  const sky = new THREE.Mesh(skyGeo, skyMat); sky.frustumCulled = false; grp.add(sky);
+  // (sky is added after merging so it can follow the camera)
+  grp.position.set(0, 0, 0);
+  mergeStatic(grp);
+  const sky = new THREE.Mesh(skyGeo, skyMat); sky.frustumCulled = false; scene.add(sky);
   game.skyDome = sky;
   return grp;
 }
