@@ -76,8 +76,8 @@ export function buildVillage(game) {
   v.box([0.0105, 0.0145, 0.0145], [-1.12, floorY + 0.007, zC - 0.02], colorMat(0x222222, 0.5)); // coin battery pack
   v.build(game.engine.scene);
   // the wall cavity counts as "inside" (dark, muffled, echoey)
-  const cav = new THREE.Box3(new THREE.Vector3(ROOM.x0 - 0.12, 0, z0 - dw - cav), new THREE.Vector3(-0.05, ROOM.h, z0 - dw));
-  v.behaviors.push({ update(t, dt, gm) { if (!gm.micro && cav.containsPoint(gm.player.center(new THREE.Vector3()))) { gm.inside = v; gm.insideEcho = 0.5; } } });
+  const cavBox = new THREE.Box3(new THREE.Vector3(ROOM.x0 - 0.12, 0, z0 - dw - cav), new THREE.Vector3(-0.05, ROOM.h, z0 - dw));
+  v.behaviors.push({ update(t, dt, gm) { if (!gm.micro && cavBox.containsPoint(gm.player.center(new THREE.Vector3()))) { gm.inside = v; gm.insideEcho = 0.5; } } });
   for (const x of [-1.04, -0.85]) {
     const l = new THREE.PointLight(0xffc98a, 0.05, 0.35, 2);
     l.position.set(x, 0.09, zC - 0.02);
