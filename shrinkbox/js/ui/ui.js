@@ -184,6 +184,55 @@ export class UI {
     tools.forEach((t, i) => bar.append($(`<div class="tool ${i === sel ? 'sel' : ''}"><span class="k">${i + 1}</span>${t.icon}<small>${t.name}</small></div>`)));
   }
 
+  // ---------------- speech bubbles ----------------
+  bubble(person, text) {
+    if (!this.bubbles) this.bubbles = new Map();
+    let b = this.bubbles.get(person);
+    if (!b) { b = $('<div class="bubble"></div>'); this.hud.append(b); this.bubbles.set(person, b); }
+    b.innerHTML = `<b>${person.name}</b>${text}`;
+    b.dataset.until = performance.now() + 3500 + text.length * 60;
+  }
+  updateBubbles(camera) {
+    if (!this.bubbles) return;
+    const v = this._bv || (this._bv = new camera.position.constructor());
+    for (const [p, b] of this.bubbles) {
+      if (performance.now() > +b.dataset.until || !p.model || p.model.root.visible === false) { b.style.display = 'none'; continue; }
+      v.copy(p.feet); v.y += p.height * 1.25;
+      const dist = v.distanceTo(camera.position);
+      v.project(camera);
+      if (v.z > 1 || Math.abs(v.x) > 1.2 || Math.abs(v.y) > 1.2 || dist > p.height * 400) { b.style.display = 'none'; continue; }
+      b.style.display = ''; b.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; b.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
+    }
+  }
+
+  // ---------------- chat box (T to talk, or the mic) ----------------
+  openChat(onSend) {
+    if (this.chatEl) return;
+    const g = this.game;
+    g.panelOpen = true; input.enabled = false; input.exitLock();
+    const el = $(`<div class="chat"><input placeholder="Say something... (Enter to send, Esc to close)" maxlength="160"><button class="mic" title="talk with your microphone">🎤</button><button class="send">Send</button></div>`);
+    this.hud.append(el); this.chatEl = el;
+    const inp = el.querySelector('input');
+    setTimeout(() => inp.focus(), 30);
+    const close = () => { el.remove(); this.chatEl = null; g.panelOpen = false; if (g.playing) { input.enabled = true; input.requestLock(); } };
+    const send = () => { const t = inp.value.trim(); if (t) onSend(t); inp.value = ''; close(); };
+    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') send(); if (e.key === 'Escape') close(); });
+    el.querySelector('.send').onclick = send;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const mic = el.querySelector('.mic');
+    if (!SR) mic.style.display = 'none';
+    mic.onclick = () => {
+      try {
+        const rec = new SR(); rec.lang = 'en-US'; rec.interimResults = true;
+        mic.classList.add('on');
+        rec.onresult = (e) => { inp.value = Array.from(e.results).map((r) => r[0].transcript).join(''); if (e.results[e.results.length - 1].isFinal) send(); };
+        rec.onend = () => mic.classList.remove('on');
+        rec.start();
+      } catch { this.toast('🎤 Microphone not available'); }
+    };
+    this.closePanel = close;
+  }
+
   // ---------------- spawn menu (Q) ----------------
   openSpawnMenu(cats, items, spawner) {
     const g = this.game;

@@ -14,6 +14,8 @@ import { Avatar, ViewModel, LOOK_DEFAULT } from './player/avatar.js';
 import { Watch } from './player/watch.js';
 import { things } from './world/thing.js';
 import { buildBedroom } from './world/bedroom.js';
+import { buildVillage } from './world/village.js';
+import { Person, reply } from './world/people.js';
 import { buildOutside, updateOutside } from './world/outside.js';
 import { buildXbox } from './world/objects/xbox.js';
 import { buildSodaCan } from './world/objects/sodacan.js';
@@ -51,6 +53,8 @@ class Game {
     await new Promise((r) => setTimeout(r, 30));
     this.spawn = { pos: [-0.45, 0.02, -0.25], yaw: -2.4 };
     buildBedroom(this);
+    this.people = [];
+    this.village = buildVillage(this);
     buildOutside(this);
     this.tv = buildTV(this, [1.15, 0.5, 1.66], Math.PI);
     this.xbox = buildXbox(this, [0.47, 0.5, 1.6], Math.PI);
@@ -114,6 +118,7 @@ class Game {
     this.inside = this.micro ? this.microInside : null; this.insideEcho = 0;
     p.inLiquid = null;
     for (const t of things) t.update(STEP, this);
+    for (const pp of this.people) pp.update(STEP);
     if (this.micro) this.micro.preStep(p);
     p.update(STEP);
     if (this.micro) this.micro.update(STEP, p);
@@ -123,6 +128,47 @@ class Game {
   }
 
   realS() { return this.player.s / this.unit; }
+
+  // ---- talking to people ----
+  personInView() {
+    if (this.tools.heldPerson) return this.tools.heldPerson;
+    const p = this.player, cam = this.engine.camera;
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    let best = null, bestScore = Infinity;
+    for (const pp of this.people) {
+      const d = pp.feet.clone().add(new THREE.Vector3(0, pp.height * 0.8, 0)).sub(cam.position);
+      const dist = d.length();
+      if (dist > pp.height * 40 + p.height * 3) continue;
+      const ang = fwd.angleTo(d.normalize());
+      if (ang > 0.6) continue;
+      const score = dist * (1 + ang * 3);
+      if (score < bestScore) { bestScore = score; best = pp; }
+    }
+    return best;
+  }
+  startTalk() {
+    const pp = this.personInView();
+    if (!pp) { this.ui.toast('💬 Get closer to someone and look at them to talk', 2); return; }
+    this.ui.openChat((text) => {
+      this.ui.toast(`🗨️ You: ${text}`, 3);
+      pp.talking = 8; pp.wave = text.match(/\b(hi|hello|hey|yo|wsp)\b/i) ? 2 : 0;
+      const ratio = this.player.height / pp.height;
+      setTimeout(() => pp.say(reply(pp, text, { ratio, held: pp.held, sameSize: ratio < 3 && this.time - (this.watch.lastChange ?? -99) < 30 })), 500 + Math.random() * 500);
+    });
+  }
+  speak(text, person) {
+    if (!window.speechSynthesis) return;
+    const d = person.feet.distanceTo(this.macroFeet());
+    const hear = person.height * 60 + this.player.height / this.unit * 0.6;
+    if (d > hear || this.micro) return;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.pitch = Math.min(2, person.voicePitch); u.rate = 1.12; u.volume = settings.volume * Math.max(0.2, 1 - d / hear);
+      const voices = speechSynthesis.getVoices().filter((v) => v.lang && v.lang.startsWith('en'));
+      if (voices.length) u.voice = voices[Math.floor(person.voicePitch * 97) % voices.length];
+      speechSynthesis.speak(u);
+    } catch { /* no voice */ }
+  }
   macroFeet() { return this.micro ? this.microAnchor.point : this.player.feet; }
 
   sizeLimits() {
@@ -234,6 +280,7 @@ class Game {
       this.usedInteractThisFrame = false;
       if (it && input.pressed('use')) { it.use(); this.usedInteractThisFrame = true; }
       if (input.pressed('spawn')) this.ui.openSpawnMenu(CATEGORIES, catalog(), this.spawner);
+      if (input.pressed('talk')) this.startTalk();
       this.watch.update(dt);
       this.tools.update(dt);
       this.acc += dt;
@@ -244,6 +291,7 @@ class Game {
       setEnclosure(!!this.inside, this.insideEcho || (this.inside ? 0.4 : 0));
       this.ui.update(dt);
     }
+    this.ui.updateBubbles(this.engine.camera);
     // camera + bodies
     p.updateCamera(this.engine.camera, dt);
     const cam = this.engine.camera;
@@ -261,6 +309,8 @@ class Game {
     // light & sky
     const day = this.engine.updateDaylight(this.micro ? this.microAnchor.point : p.center(new THREE.Vector3()), this.realS());
     updateOutside(this, day);
+    // inside something (Xbox, wall, phone...) the sky/room bounce light can't reach you: much darker
+    if (this.inside && !this.micro) { this.engine.sky.intensity *= 0.12; this.engine.scene.environmentIntensity *= 0.12; }
     this.engine.render();
     input.endFrame();
   }

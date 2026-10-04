@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { Thing, panel, lathe, cylUV } from './thing.js';
 import { colorMat, drawTexture, defMat } from '../core/materials.js';
+import { buildWallShell, DOOR } from './village.js';
 
 export const ROOM = { x0: -2, x1: 2, z0: -1.8, z1: 1.8, h: 2.5, wall: 0.12 };
 
@@ -14,8 +15,8 @@ export function buildBedroom(game) {
   const room = new Thing({ name: 'room', surface: 'carpet' });
   room.box([x1 - x0 + 2 * W, 0.2, z1 - z0 + 2 * W], [0, -0.1, 0], 'carpet', { friction: 0.9 });
   room.box([x1 - x0 + 2 * W, 0.2, z1 - z0 + 2 * W], [0, h + 0.1, 0], 'ceiling');
-  // north wall (behind the bed)
-  panel(room, { axis: 'z', at: z0 - W / 2, rect: [x0 - W, -0.2, x1 + W, h + 0.2], thick: W, m: 'wall' });
+  // north wall: hollow on the left (real studs + drywall - someone lives in there...), solid behind the bed
+  buildWallShell(room);
   // south wall with the front window (street view)
   panel(room, { axis: 'z', at: z1 + W / 2, rect: [x0 - W, -0.2, x1 + W, h + 0.2], holes: [[-1.35, 0.9, -0.15, 2.1]], thick: W, m: 'wall' });
   // west wall with the door to the hallway
@@ -24,7 +25,10 @@ export function buildBedroom(game) {
   panel(room, { axis: 'x', at: x1 + W / 2, rect: [z0, -0.2, z1, h + 0.2], holes: [[-0.6, 0.9, 0.6, 2.1]], thick: W, m: 'wall' });
   // baseboards (skip the doorway)
   const bb = (size, pos) => room.box(size, pos, 'trim');
-  bb([x1 - x0, 0.09, 0.012], [0, 0.045, z0 + 0.006]);
+  bb([DOOR.x0 - x0, 0.09, 0.012], [(x0 + DOOR.x0) / 2, 0.045, z0 + 0.006]);
+  bb([x1 - DOOR.x1, 0.09, 0.012], [(DOOR.x1 + x1) / 2, 0.045, z0 + 0.006]);
+  bb([DOOR.x1 - DOOR.x0, 0.09 - DOOR.y1, 0.012], [(DOOR.x0 + DOOR.x1) / 2, (0.09 + DOOR.y1) / 2, z0 + 0.006]);
+  bb([DOOR.x1 - DOOR.x0, DOOR.y0, 0.012], [(DOOR.x0 + DOOR.x1) / 2, DOOR.y0 / 2, z0 + 0.006]);
   bb([x1 - x0, 0.09, 0.012], [0, 0.045, z1 - 0.006]);
   bb([0.012, 0.09, z1 - z0], [x1 - 0.006, 0.045, 0]);
   bb([0.012, 0.09, z1 - -0.76], [x0 + 0.006, 0.045, (z1 + -0.76) / 2]);

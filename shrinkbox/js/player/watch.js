@@ -86,6 +86,7 @@ export class Watch {
         p.setScale(ns);
         p.vel.multiplyScalar(ratio);
         changing = true;
+        this.lastChange = g.time;
         this.battery = Math.max(0, this.battery - Math.abs(Math.log(ratio)) * 0.0045);
       }
     } else this.blockT = 0;

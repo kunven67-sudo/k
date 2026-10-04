@@ -107,6 +107,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .cell .ic { font-size: 34px; line-height: 1; }
 .cell small { color: var(--dim); font-weight: 500; }
 
+/* ===== speech bubbles + chat ===== */
+.bubble { position: absolute; transform: translate(-50%, -100%); max-width: 240px; padding: 7px 11px; border-radius: 14px; background: #fff; color: #111; font: 600 13px var(--sans); box-shadow: 0 4px 14px rgba(0,0,0,.35); pointer-events: none; white-space: normal; text-align: center; }
+.bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: #fff; }
+.bubble b { display: block; font: 800 10px var(--mono); color: #6a7a88; margin-bottom: 2px; }
+.chat { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); display: flex; gap: 6px; width: min(520px, 92vw); pointer-events: auto; }
+.chat input { flex: 1; padding: 11px 14px; border-radius: 14px; border: 2px solid var(--glow); background: var(--glass2); color: var(--text); font: 600 15px var(--sans); outline: none; }
+.chat button { padding: 0 14px; border-radius: 14px; border: 0; background: var(--glow); color: #001; font: 800 14px var(--sans); }
+.chat button.mic.on { background: var(--bad); color: #fff; }
+
 /* ===== touch controls ===== */
 .touch { position: absolute; inset: 0; pointer-events: none; }
 .stick { position: absolute; left: 26px; bottom: 120px; width: 130px; height: 130px; border-radius: 50%; background: rgba(255,255,255,.07); border: 2px solid rgba(255,255,255,.18); pointer-events: auto; }

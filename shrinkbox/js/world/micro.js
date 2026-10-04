@@ -176,7 +176,7 @@ export class MicroWorld {
     this.fixed = this.world.createRigidBody(R.RigidBodyDesc.fixed());
     // light: matches the room (dark inside things - use your watch light!)
     const bright = anchor.brightness;
-    this.hemi = new THREE.HemisphereLight(0xffffff, 0x404040, 0.25 + bright * 0.9);
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x404040, 0.35 + bright * 1.2);
     this.key = new THREE.DirectionalLight(0xfff2e0, bright * 2.2);
     this.key.castShadow = game.engine.q.shadows;
     this.key.shadow.mapSize.set(1024, 1024);
@@ -201,8 +201,12 @@ export class MicroWorld {
     const dirt = this.dirt;
     if (k === 'carpet') {
       // fibre tufts: twisted bundles 8 mm tall, ~3 mm apart (a cut-pile carpet)
-      const fiberGeo = new THREE.CylinderGeometry(0.11, 0.13, 1, 6, 8); fiberGeo.translate(0, 0.5, 0);
-      const fm = new THREE.MeshStandardMaterial({ color: 0x5d6570, roughness: 0.75 });
+      const fiberGeo = new THREE.CylinderGeometry(0.11, 0.13, 1, 10, 8); fiberGeo.translate(0, 0.5, 0);
+      // nylon fibres: slightly shiny, with fine lengthwise striations
+      const stri = document.createElement('canvas'); stri.width = 64; stri.height = 8; const sc = stri.getContext('2d');
+      for (let x = 0; x < 64; x++) { const v = 128 + Math.sin(x * 0.9) * 40 + (Math.random() - 0.5) * 30; sc.fillStyle = `rgb(${v},${v},${v})`; sc.fillRect(x, 0, 1, 8); }
+      const st = new THREE.CanvasTexture(stri); st.wrapS = st.wrapT = THREE.RepeatWrapping;
+      const fm = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.45, bumpMap: st, bumpScale: 0.02 });
       const tufts = [], SC = 33;
       for (let x = -SC; x <= SC; x += 3) for (let z = -SC; z <= SC; z += 3) tufts.push([x + (R0() - 0.5) * 1.6, z + (R0() - 0.5) * 1.6]);
       const perTuft = 10, count = tufts.length * perTuft;
@@ -217,7 +221,8 @@ export class MicroWorld {
           e.set(Math.cos(dir) * lean + (R0() - 0.5) * 0.08, 0, Math.sin(dir) * lean + (R0() - 0.5) * 0.08);
           q.setFromEuler(e);
           m4.compose(new THREE.Vector3(bx, -80, bz), q, new THREE.Vector3(1, h, 1));
-          inst.setMatrixAt(i++, m4);
+          inst.setMatrixAt(i, m4);
+          const shade = 0.75 + R0() * 0.3; inst.setColorAt(i++, new THREE.Color(0x5d6570).multiplyScalar(shade));
           // collider: each fibre is a long thin capsule along its axis
           if (f % 2 === 0) {
             const top = new THREE.Vector3(0, h, 0).applyQuaternion(q);

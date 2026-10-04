@@ -6,6 +6,7 @@ import { buildController } from '../world/objects/controller.js';
 import { buildPhone } from '../world/objects/phone.js';
 import { buildXbox } from '../world/objects/xbox.js';
 import { sfx } from '../core/audio.js';
+import { Person } from '../world/people.js';
 
 export const SPECIAL = {
   soda: { cat: 'food', icon: '🥤', name: 'Soda (open)', build: (g, p, r) => buildSodaCan(g, p, { rot: [0, r, 0] }) },
@@ -13,6 +14,8 @@ export const SPECIAL = {
   controller: { cat: 'electronics', icon: '🕹️', name: 'Controller', build: (g, p, r) => buildController(g, p, r) },
   phone: { cat: 'electronics', icon: '📱', name: 'Phone', build: (g, p, r) => buildPhone(g, p, r) },
   xbox: { cat: 'electronics', icon: '🎮', name: 'Xbox', build: (g, p, r) => buildXbox(g, p, r) },
+  tinyPerson: { cat: 'people', icon: '🧍', name: 'Tiny person (1.4 cm)', person: 0.014 },
+  pocketPerson: { cat: 'people', icon: '🧍‍♀️', name: 'Pocket person (5 cm)', person: 0.05 },
 };
 
 export function catalog() {
@@ -22,6 +25,7 @@ export function catalog() {
   return list;
 }
 export { CATEGORIES };
+CATEGORIES.push(['people', '🧍 Tiny people']);
 
 export class Spawner {
   constructor(game) { this.game = game; this.mySize = false; }
@@ -39,6 +43,14 @@ export class Spawner {
     const cam = g.engine.camera;
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const hit = p.aim(3 * s);
+    if (SPECIAL[id] && SPECIAL[id].person) {
+      if (g.micro) { g.ui.toast('Grow back out of the germ world first'); return null; }
+      const at = hit ? hit.point.clone() : p.feet.clone().addScaledVector(new THREE.Vector3(fwd.x, 0, fwd.z).normalize(), 0.6 * s);
+      const pp = new Person(g, { pos: [at.x, at.y + 0.001, at.z], height: SPECIAL[id].person * (0.9 + Math.random() * 0.2), yaw: p.yaw + Math.PI });
+      pp.spawned = true; g.people.push(pp);
+      sfx.pop(0.25);
+      return pp;
+    }
     const at = hit ? hit.point.clone().addScaledVector(hit.normal, 0.02 * s) : cam.position.clone().addScaledVector(fwd, 1.2 * s);
     const t = this.spawn(id, [at.x, at.y + 2, at.z], false, p.yaw);
     if (this.mySize) t.setScale(s);

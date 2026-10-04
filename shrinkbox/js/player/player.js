@@ -97,6 +97,7 @@ export class Player {
       this.collider = w.createCollider(R.ColliderDesc.cylinder(half, r).setCollisionGroups(groups(G.PLAYER, G.SENSOR)), this.body);
     }
     this.mover = new Mover(this.collider, this.moveGroups, w);
+    this.groundBody = null; this.touching = []; this.grounded = false;
     this.feet.copy(feet);
     this.setScale(s);
   }

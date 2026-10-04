@@ -82,12 +82,14 @@ export class Tools {
     this.updateAnims(dt);
     this.updateBeams(dt);
     if (this.held) this.updateHeld(dt);
+    if (this.heldPerson) this.updateHeldPerson(dt);
     const id = this.tool;
     const reach = 2.2 * s;
     if (id === 'hands') {
-      if (input.pressed('use') && !g.usedInteractThisFrame) { if (this.held) this.drop(); else this.tryGrab(reach); }
+      if (input.pressed('use') && !g.usedInteractThisFrame) { if (this.heldPerson) this.setPersonDown(); else if (this.held) this.drop(); else this.tryGrab(reach); }
       if (input.pressed('grab')) { if (this.held) this.drop(); else this.tryGrab(reach); }
-      if (this.held && input.pressed('fire')) this.throwHeld();
+      if (this.heldPerson && input.pressed('fire')) { g.ui.toast('🙂 You\'d never throw a person. Gently setting them down.', 2.5); this.setPersonDown(); }
+      else if (this.held && input.pressed('fire')) this.throwHeld();
       if (this.held && input.held('rotate')) { const b = this.held.body; b.setAngvel({ x: 0, y: 2.5, z: 0 }, true); }
       if (!this.held && input.pressed('fire')) {
         // push / poke whatever you're looking at
@@ -126,6 +128,12 @@ export class Tools {
   strength() { return 30 * this.game.player.s ** 3; } // kg you can lift at your size (a normal person: ~30 kg)
   tryGrab(reach) {
     const g = this.game, hit = g.player.aim(reach);
+    const person = hit && hit.collider && hit.collider.person;
+    if (person) {
+      const ratio = g.player.height / person.height;
+      if (ratio < 4) { g.ui.toast(`🧍 ${person.name} is about your size - you can't pick them up. Press T to talk.`, 3); return; }
+      this.heldPerson = person; person.pickUp(); sfx.click(0.2); return;
+    }
     if (!hit || !hit.thing) return;
     const t = hit.thing;
     if (t.type !== 'dynamic') { if (t.name !== 'room') g.ui.toast(`🧱 ${t.name} is fixed in place. Shrink it first to move it.`); return; }
@@ -151,6 +159,29 @@ export class Tools {
     const max = 15 * p.s + 0.5; if (v.length() > max) v.setLength(max);
     t.body.setLinvel({ x: v.x, y: v.y, z: v.z }, true);
     t.body.setGravityScale(0, true);
+  }
+  updateHeldPerson() {
+    const g = this.game, p = g.player, cam = g.engine.camera, pp = this.heldPerson;
+    // they stand on your palm, in front of you at chest height
+    const fwd = _v.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    const pos = _w.copy(cam.position).addScaledVector(fwd, 0.42 * p.s);
+    pos.y -= 0.12 * p.s;
+    pp.feet.copy(pos); pp.feet.y -= pp.height * 0.15;
+    pp.model.root.position.copy(pp.feet);
+    pp.model.root.rotation.y = Math.atan2(cam.position.x - pos.x, cam.position.z - pos.z);
+    pp.yaw = pp.model.root.rotation.y;
+    pp.body.setNextKinematicTranslation({ x: pp.feet.x, y: pp.feet.y + pp.height / 2, z: pp.feet.z });
+  }
+  setPersonDown() {
+    const g = this.game, p = g.player, pp = this.heldPerson; if (!pp) return;
+    // find the ground under your hand (or at your feet)
+    const from = pp.feet.clone(); from.y += pp.height;
+    const ray = new R.Ray(from, { x: 0, y: -1, z: 0 });
+    const hit = world.castRay(ray, p.height * 3, true, R.QueryFilterFlags.EXCLUDE_SENSORS, undefined, p.collider);
+    const at = hit ? from.clone().add(new THREE.Vector3(0, -hit.timeOfImpact + pp.height * 0.02, 0)) : p.feet.clone();
+    this.heldPerson = null;
+    pp.setDown(at);
+    sfx.click(0.15);
   }
   drop() {
     const t = this.held; this.held = null;
