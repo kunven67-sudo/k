@@ -89,3 +89,15 @@ Build plan: player chose ALL AT ONCE (was warned about the limit).
   toilet tank, keyboard switches, mouse laser sensor, headphones, wall outlets (danger), bulbs.
 - Ants come in from outside, spiders in basement corners.
 - Cooking game: talk about it after Shrinkbox.
+
+## Added later (player's message)
+1. **Inside the body** (a person's body): get in by riding on food, hiding in a drink,
+   getting breathed in, or walking into an ear.
+   Path: mouth -> throat -> stomach (acid hurts) -> intestines -> pooped out into the toilet.
+   Other ways out: sneeze, cough, crawl out the ear.
+   (No cutting people open - entry is only through real openings.)
+2. **Tiny humans** (not the parents): a hidden tiny village inside the walls, plus tiny
+   humans in the spawn menu. Pick them up, carry them, set them down, talk to them.
+   They react like real people (scared, curious, friendly, etc).
+3. **Pick up shrunk people** in your hand (gently).
+4. **Cutting tool - objects only**: cut open soda cans, the Xbox, the phone, boxes, food.
