@@ -14,7 +14,8 @@ const LAT = [-0.85, -0.45, 0, 0.45, 0.85];
 const FOOT = [[0, 0], [0.75, 0], [-0.75, 0], [0, 0.75], [0, -0.75], [0.53, 0.53], [-0.53, 0.53], [0.53, -0.53], [-0.53, -0.53]];
 
 export class Mover {
-  constructor(collider, filterGroups) {
+  constructor(collider, filterGroups, w = world) {
+    this.w = w;
     this.self = collider;
     this.groups = filterGroups;
     this.flags = R.QueryFilterFlags.EXCLUDE_SENSORS;
@@ -25,7 +26,7 @@ export class Mover {
   cast(ox, oy, oz, dx, dy, dz, len) {
     this.ray.origin = { x: ox, y: oy, z: oz };
     this.ray.dir = { x: dx, y: dy, z: dz };
-    const h = world.castRayAndGetNormal(this.ray, len, false, this.flags, this.groups, this.self);
+    const h = this.w.castRayAndGetNormal(this.ray, len, false, this.flags, this.groups, this.self);
     if (!h) return null;
     // ignore hits from INSIDE a shape (the normal points the same way we're going)
     if (h.normal.x * dx + h.normal.y * dy + h.normal.z * dz > 0.05) return null;
@@ -118,7 +119,7 @@ export class Mover {
   overlaps(pos, half, r, ignoreDynamic = true) {
     const shape = new R.Cylinder(half * 0.97, r * 0.97);
     let hit = false;
-    world.intersectionsWithShape(pos, ID, shape, (c) => {
+    this.w.intersectionsWithShape(pos, ID, shape, (c) => {
       const b = c.parent();
       if (ignoreDynamic && b && b.isDynamic()) return true;
       hit = c; return false;

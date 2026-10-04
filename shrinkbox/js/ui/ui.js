@@ -183,6 +183,35 @@ export class UI {
     tools.forEach((t, i) => bar.append($(`<div class="tool ${i === sel ? 'sel' : ''}"><span class="k">${i + 1}</span>${t.icon}<small>${t.name}</small></div>`)));
   }
 
+  // ---------------- spawn menu (Q) ----------------
+  openSpawnMenu(cats, items, spawner) {
+    const g = this.game;
+    g.panelOpen = true; input.enabled = false; input.exitLock();
+    let cat = this._spawnCat || cats[0][0];
+    const wrap = $(`<div class="panel-wrap"><div class="panel">
+      <div class="panel-head"><span>📦 Spawn</span><span style="display:flex;gap:10px;align-items:center">
+        <button class="ws-btn click size-tog" style="width:auto;padding:6px 12px"></button><button class="click x">✕</button></span></div>
+      <div class="tabs"></div><div class="grid"></div></div></div>`);
+    const tabs = wrap.querySelector('.tabs'), grid = wrap.querySelector('.grid'), tog = wrap.querySelector('.size-tog');
+    const close = () => { wrap.remove(); g.panelOpen = false; if (g.playing) { input.enabled = true; input.requestLock(); } };
+    const setTog = () => { tog.textContent = spawner.mySize ? '🔍 Your size' : '📏 Real size'; };
+    tog.onclick = () => { spawner.mySize = !spawner.mySize; setTog(); }; setTog();
+    const draw = () => {
+      tabs.innerHTML = ''; grid.innerHTML = '';
+      for (const [id, label] of cats) { const b = $(`<button class="tab click ${id === cat ? 'sel' : ''}">${label}</button>`); b.onclick = () => { cat = this._spawnCat = id; draw(); }; tabs.append(b); }
+      for (const it of items.filter((i) => i.cat === cat)) {
+        const c = $(`<button class="cell click"><span class="ic">${it.icon}</span>${it.name}</button>`);
+        c.onclick = () => { close(); setTimeout(() => spawner.spawnInFront(it.id), 30); };
+        grid.append(c);
+      }
+    };
+    draw();
+    wrap.querySelector('.x').onclick = close;
+    wrap.addEventListener('pointerdown', (e) => { if (e.target === wrap) close(); });
+    this.root.append(wrap);
+    this.closePanel = close;
+  }
+
   // ---------------- touch ----------------
   buildTouch() {
     const t = $(`<div class="touch"><div class="stick"><i></i></div>

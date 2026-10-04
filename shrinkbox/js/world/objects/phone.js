@@ -16,7 +16,7 @@ export function buildPhone(game, pos, rotY = 0) {
   const frameMat = defMat('phoneFrame', () => new THREE.MeshStandardMaterial({ color: 0x3b4048, metalness: 1, roughness: 0.3 }));
   const backMat = defMat('phoneBack', () => new THREE.MeshPhysicalMaterial({ color: 0x1d2a3a, roughness: 0.25, metalness: 0.2, clearcoat: 1, side: THREE.DoubleSide }));
   // back glass + front glass/screen
-  ph.rbox([PW, 0.0008, PL], [0, 0.0004, 0], backMat, 0.0003, { density: 2500 });
+  ph.rbox([PW, 0.0008, PL], [0, 0.0004, 0], backMat, 0.0003, { density: 2500, cut: 'back glass' });
   ph.rbox([PW, 0.0008, PL], [0, PH - 0.0004, 0], defMat('phoneGlass', () => new THREE.MeshPhysicalMaterial({ color: 0x050608, roughness: 0.05, clearcoat: 1, side: THREE.DoubleSide })), 0.0003, { density: 2500 });
   // the live screen (a texture drawn every few seconds)
   const screenCanvas = document.createElement('canvas'); screenCanvas.width = 256; screenCanvas.height = 540;
@@ -39,10 +39,10 @@ export function buildPhone(game, pos, rotY = 0) {
   ph.box([0.0008, 0.002, 0.011], [PW / 2 + 0.0003, PH / 2, -0.03], frameMat, { collide: false });
   ph.box([0.0008, 0.002, 0.011], [PW / 2 + 0.0003, PH / 2, -0.016], frameMat, { collide: false });
   // camera bump on the back (outside) + lenses
-  ph.rbox([0.03, 0.0015, 0.03], [-0.0175, -0.0006, -0.052], backMat, 0.004, { density: 2500 });
+  ph.rbox([0.03, 0.0015, 0.03], [-0.0175, -0.0006, -0.052], backMat, 0.004, { density: 2500, cut: 'back glass' });
   for (const [x, z] of [[-0.0245, -0.0445], [-0.0245, -0.0595], [-0.0105, -0.052]]) {
-    ph.cyl(0.0058, 0.0018, [x, -0.0012, z], 'chrome', { density: 2500 });
-    ph.cyl(0.0046, 0.0002, [x, -0.0022, z], 'lens', { collide: false });
+    ph.cyl(0.0058, 0.0018, [x, -0.0012, z], 'chrome', { density: 2500, cut: 'back glass' });
+    ph.cyl(0.0046, 0.0002, [x, -0.0022, z], 'lens', { collide: false, cut: 'back glass' });
   }
 
   // ---------- inside ----------
@@ -78,7 +78,7 @@ export function buildPhone(game, pos, rotY = 0) {
   ph.screen = { canvas: screenCanvas, tex: screenTex, mat: screenMat, t: 0 };
   ph.battery = 0.64; ph.charging = false; ph.ringT = 0; ph.wake = 0;
   ph.behaviors.push(phoneBehavior);
-  game.phone = ph;
+  if (!game.phone) game.phone = ph;
   drawScreen(ph);
   return ph;
 }

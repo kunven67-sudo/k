@@ -18,6 +18,8 @@ import { buildController } from './world/objects/controller.js';
 import { buildPhone } from './world/objects/phone.js';
 import { buildTV } from './world/objects/tv.js';
 import { Saves } from './game/saves.js';
+import { Tools } from './game/tools.js';
+import { Spawner, catalog, CATEGORIES } from './game/spawner.js';
 
 const STEP = 1 / 60;
 const LOOK_KEY = 'shrinkbox.look';
@@ -57,6 +59,8 @@ class Game {
     this.engine.camera.add(this.viewModel.root);
     this.watch = new Watch(this);
     this.saves = new Saves(this);
+    this.tools = new Tools(this);
+    this.spawner = new Spawner(this);
     // night? turn the light on so you're not in the dark
     if (this.engine.updateDaylight(new THREE.Vector3(), 1) < 0.3) this.setRoomLight(true);
     // settle physics so things rest naturally
@@ -150,15 +154,24 @@ class Game {
     input.poll(dt);
     const p = this.player;
     if (input.pressedAny('pause') && this.started) {
-      if (this.playing) this.ui.openMenu('pause'); else if (this.ui.menuEl) this.ui.closeMenu();
+      if (this.panelOpen) this.ui.closePanel?.();
+      else if (this.playing) this.ui.openMenu('pause'); else if (this.ui.menuEl) this.ui.closeMenu();
     }
     if (this.playing) {
       this.time += dt;
       // interact
-      const it = this.findInteractable();
-      this.ui.prompt(it ? `<kbd>E</kbd>${typeof it.name === 'function' ? it.name() : it.name}` : null);
-      if (it && input.pressed('use')) it.use();
+      const it = this.tools.held ? null : this.findInteractable();
+      let prompt = it ? `<kbd>E</kbd>${typeof it.name === 'function' ? it.name() : it.name}` : null;
+      if (!prompt && this.tools.tool === 'hands') {
+        if (this.tools.held) prompt = `<kbd>E</kbd>drop · <kbd>Click</kbd>throw · <kbd>R</kbd>spin`;
+        else { const h = p.aim(2.2 * p.s); if (h && h.thing && h.thing.type === 'dynamic') prompt = `<kbd>E</kbd>pick up ${h.thing.name}`; }
+      }
+      this.ui.prompt(prompt);
+      this.usedInteractThisFrame = false;
+      if (it && input.pressed('use')) { it.use(); this.usedInteractThisFrame = true; }
+      if (input.pressed('spawn')) this.ui.openSpawnMenu(CATEGORIES, catalog(), this.spawner);
       this.watch.update(dt);
+      this.tools.update(dt);
       this.acc += dt;
       let n = 0;
       while (this.acc >= STEP && n < 4) { this.tick(); this.acc -= STEP; n++; }

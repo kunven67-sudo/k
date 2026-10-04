@@ -15,8 +15,8 @@ export function buildController(game, pos, rotY = 0) {
   const BX = 0.05, BY = 0.03, Z0 = -0.035, Z1 = 0.02; // body box
   const cz = (Z0 + Z1) / 2, dz = Z1 - Z0;
   // ---------- body ----------
-  c.geo(shellGeo([BX * 2, BY, dz], 0.009, ['+y', '+z', '-z']), [0, BY / 2, cz], shellMat, { collide: false });
-  c.box([BX * 2, T, dz], [0, T / 2, cz], shellMat, { visual: false, density: 1100 });
+  c.geo(shellGeo([BX * 2, BY, dz], 0.009, ['+y', '+z', '-z', '-y']), [0, BY / 2, cz], shellMat, { collide: false });
+  c.box([BX * 2, T, dz], [0, T / 2, cz], shellMat, { density: 1100, cut: 'back shell' });
   c.box([T, BY, dz], [-BX + T / 2, BY / 2, cz], shellMat, { visual: false, density: 1100 });
   c.box([T, BY, dz], [BX - T / 2, BY / 2, cz], shellMat, { visual: false, density: 1100 });
   const sticks = { L: [-0.033, -0.014], R: [0.017, 0.007] };

@@ -18,7 +18,7 @@ export function buildXbox(game, pos, rotY = 0) {
   // --- shell ---
   x.cyl(0.062, B, [0, B / 2, 0], 'rubber', { density: 1200 });
   x.box([W, T, D], [0, B + T / 2, 0], 'xboxBlack', { density: 1200 });
-  x.box([T, H, D], [-W / 2 + T / 2, B + H / 2, 0], 'xboxBlack', { density: 1200 });
+  x.box([T, H, D], [-W / 2 + T / 2, B + H / 2, 0], 'xboxBlack', { density: 1200, cut: 'side panel' });
   x.box([T, H, D], [W / 2 - T / 2, B + H / 2, 0], 'xboxBlack', { density: 1200 });
   // front: vertical disc slot + USB port + power button
   panel(x, { axis: 'z', at: D / 2 - T / 2, rect: [-xin, B + T, xin, TOP], thick: T, m: 'xboxBlack',

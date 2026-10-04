@@ -115,6 +115,20 @@ export class Thing {
 
   // Build visuals (merged per material for speed) and physics.
   build(scene) {
+    this._buildVisuals();
+    this.group.position.set(...this.startPos);
+    this.group.quaternion.set(...this.startQuat);
+    this.group.scale.setScalar(this.scale);
+    this.group.userData.thing = this;
+    scene.add(this.group);
+    this._buildBody();
+    things.add(this);
+    return this;
+  }
+
+  _buildVisuals() {
+    for (const m of [...this.group.children]) if (m.userData.thing === this && m.isMesh) { this.group.remove(m); m.geometry.dispose(); }
+    this.meshes = {};
     const byMat = new Map();
     for (const p of this.parts) {
       if (p.visual === false) continue;
@@ -146,14 +160,6 @@ export class Thing {
       mesh.userData.thing = this;
       this.group.add(mesh);
     }
-    this.group.position.set(...this.startPos);
-    this.group.quaternion.set(...this.startQuat);
-    this.group.scale.setScalar(this.scale);
-    this.group.userData.thing = this;
-    scene.add(this.group);
-    this._buildBody();
-    things.add(this);
-    return this;
   }
 
   _buildBody() {
@@ -196,6 +202,23 @@ export class Thing {
     this._buildColliders();
     if (this.body && this.type === 'dynamic') this.body.wakeUp();
     for (const b of this.behaviors) if (b.onScale) b.onScale(this, ratio);
+  }
+
+  // Cut a piece off (cutter tool): parts tagged {cut: key} become their own loose object.
+  detach(key, scene) {
+    const parts = this.parts.filter((p) => p.cut === key);
+    if (!parts.length) return null;
+    this.parts = this.parts.filter((p) => p.cut !== key);
+    this._buildVisuals();
+    this._buildColliders();
+    this.cuts = [...(this.cuts || []), key];
+    const t = this.body.translation(), r = this.body.rotation();
+    const piece = new Thing({ name: `${this.name} (${key})`, type: 'dynamic', density: this.density, scale: this.scale, pos: [t.x, t.y, t.z], rot: [r.x, r.y, r.z, r.w], surface: this.material, icon: this.icon });
+    for (const p of parts) { const q = { ...p }; delete q.collider; delete q.meshRef; delete q.cut; piece.parts.push(q); }
+    piece.build(scene);
+    piece.pieceOf = this; piece.pieceKey = key; piece.spawned = true;
+    if (this.body) this.body.wakeUp();
+    return piece;
   }
 
   get mass() { return this.body ? this.body.mass() : 0; }
@@ -242,9 +265,8 @@ export function tubeWall(t, { r, h, thick, y = 0, seg = 24, m, gap = null, x = 0
   t.geo(inner, [x, y, z], m, { collide: false });
 }
 
-export function lathe(points, seg = 48) {
-  const g = new THREE.LatheGeometry(points.map(([x, y]) => new THREE.Vector2(x, y)), seg);
-  return g;
+export function lathe(points, seg = 48, phiStart = 0, phiLength = Math.PI * 2) {
+  return new THREE.LatheGeometry(points.map(([x, y]) => new THREE.Vector2(x, y)), seg, phiStart, phiLength);
 }
 
 // A flat panel (wall, console side) with rectangular HOLES cut in it (windows, doors, ports,

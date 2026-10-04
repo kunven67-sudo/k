@@ -17,7 +17,11 @@ Chrome / Edge / Firefox. Works with mouse + keyboard, an Xbox controller, or tou
 | **Hold F / Hold G** | **shrink / grow** |
 | V | first / third person |
 | L | watch light (for dark places like inside the Xbox) |
-| E | use (light switch, door, power buttons) |
+| E | use (light switch, door, power buttons) / pick up |
+| Q | spawn menu (food, electronics, furniture, toys) |
+| 1-5 | tools: hands, shrinker, glue gun, duct tape, cutter |
+| Click | use tool (shrinker: hold to charge, scroll = shrink/grow) |
+| R / Z | spin held thing / undo last glue or tape |
 | Esc | pause (save slots, character, settings) |
 
 ## What's realistic

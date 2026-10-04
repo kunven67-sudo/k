@@ -50,11 +50,11 @@ export function buildSodaCan(game, pos, { open = true, fill = 0.55, rot = [0, 0,
     }
     lid.setIndex(keep);
   }
-  can.geo(lid, [0, lidY, 0], defMat('canLid', () => new THREE.MeshStandardMaterial({ color: 0xd4d7dc, metalness: 1, roughness: 0.25, side: THREE.DoubleSide })), { collide: false });
+  can.geo(lid, [0, lidY, 0], defMat('canLid', () => new THREE.MeshStandardMaterial({ color: 0xd4d7dc, metalness: 1, roughness: 0.25, side: THREE.DoubleSide })), { collide: false, cut: 'lid' });
   const rim = new THREE.TorusGeometry(0.0272, 0.0011, 8, 64); rim.rotateX(Math.PI / 2);
   can.geo(rim, [0, HC - 0.001, 0], 'alu', { collide: false });
-  can.box([0.012, 0.0008, 0.021], [0, lidY + 0.0012, -0.004], 'alu', { collide: false, rot: [open ? -0.25 : 0, 0, 0] }); // tab
-  can.cyl(0.0018, 0.001, [0, lidY + 0.0008, 0.002], 'alu', { collide: false });
+  can.box([0.012, 0.0008, 0.021], [0, lidY + 0.0012, -0.004], 'alu', { collide: false, rot: [open ? -0.25 : 0, 0, 0], cut: 'lid' }); // tab
+  can.cyl(0.0018, 0.001, [0, lidY + 0.0008, 0.002], 'alu', { collide: false, cut: 'lid' });
 
   // ---- collision: real hollow shape ----
   coneWall(can, { r0: 0.024, y0: 0, r1: 0.029, y1: 0.004, thick: wallT * 2 });
@@ -63,7 +63,7 @@ export function buildSodaCan(game, pos, { open = true, fill = 0.55, rot = [0, 0,
   coneWall(can, { r0: RC, y0: 0.108, r1: 0.0285, y1: 0.118, thick: wallT * 2 });
   coneWall(can, { r0: 0.0285, y0: 0.118, r1: 0.0272, y1: HC, thick: wallT * 2 });
   diskStrips(can, { r: 0.0245, y: 0.0025, thick: 0.001, strip: 0.004 }); // bottom (dome is simplified flat inside)
-  diskStrips(can, { r: 0.027, y: lidY, thick: 0.0008, strip: 0.0025, hole: open ? hole : null });
+  diskStrips(can, { r: 0.027, y: lidY, thick: 0.0008, strip: 0.0025, hole: open ? hole : null, o: { cut: 'lid' } });
   can.build(game.engine.scene);
 
   // ---- the soda ----
@@ -87,6 +87,15 @@ export function buildSodaCan(game, pos, { open = true, fill = 0.55, rot = [0, 0,
   can.skin = world.createCollider(R.ColliderDesc.cylinder(0.0004, RC - wallT * 2).setTranslation(0, can.liquidTop(), 0)
     .setCollisionGroups(groups(G.SKIN, G.PLAYER)).setFriction(0.2), can.body);
   can.skin.isSkin = true;
+  // the soda itself weighs ~370 g when full (realistic) and sits low -> the can stands steady
+  can.setLiquidMass = () => {
+    const top = can.liquidTop(), h = Math.max(0, top - 0.004), k = can.scale;
+    const vol = Math.PI * (RC - 0.001) ** 2 * h * k ** 3, m = vol * 1040;
+    const I = m * (RC * k) ** 2 / 2;
+    can.body.setAdditionalMassProperties(m, { x: 0, y: (0.004 + h / 2) * k, z: 0 }, { x: I, y: I, z: I }, { x: 0, y: 0, z: 0, w: 1 }, true);
+    can._massFill = can.fill;
+  };
+  can.setLiquidMass();
   can.behaviors.push(canBehavior);
   can.enclosure = new THREE.Box3(new THREE.Vector3(-RC, 0.002, -RC), new THREE.Vector3(RC, HC, RC));
   return can;
@@ -94,6 +103,7 @@ export function buildSodaCan(game, pos, { open = true, fill = 0.55, rot = [0, 0,
 
 const _v = new THREE.Vector3(), _up = new THREE.Vector3();
 const canBehavior = {
+  onScale(can) { can.setLiquidMass(); can.skin.setRadius((RC - 0.0012) * can.scale); },
   update(can, dt, game) {
     const p = game.player, s = p.s;
     // spill when tipped over (realistic: open cans pour out)
@@ -102,6 +112,7 @@ const canBehavior = {
       can.fill = Math.max(0, can.fill - dt * 0.35);
       if (!can._spilled) { can._spilled = true; sfx.splash(0.4); game.spill?.(can.position(_v.clone())); }
     }
+    if (Math.abs(can.fill - can._massFill) > 0.02) can.setLiquidMass();
     const top = can.liquidTop();
     can.liquidMesh.scale.y = Math.max(0.0001, top - 0.004);
     can.liquidMesh.visible = can.fill > 0.01;
