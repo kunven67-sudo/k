@@ -144,15 +144,16 @@ export class UI {
     if (this._t <= 0) {
       this._t = 0.1;
       this.el('.hw-clock').textContent = clock();
-      this.el('.hw-size').textContent = formatSize(p.height);
-      this.el('.hw-cmp').textContent = compareSize(p.height);
+      const real = p.height / (g.unit || 1);
+      this.el('.hw-size').textContent = formatSize(real);
+      this.el('.hw-cmp').textContent = compareSize(real);
       this.el('.hw-bar > i').style.width = p.health + '%';
       this.el('.hw-hp').textContent = Math.ceil(p.health);
       this.el('.hw-bt').textContent = Math.round(g.watch.battery * 100) + '%';
       this.el('.hw-temp').textContent = g.inside && g.inside.temp ? Math.round(g.inside.temp) + '°C' : '';
       if (settings.showFps) this.el('.stats').textContent = `${Math.round(1 / Math.max(1e-3, g.dtAvg))} fps\n${g.engine.renderer.info.render.calls} draws`;
       else this.el('.stats').textContent = '';
-      if (g.viewModel) g.viewModel.drawWatch(formatSize(p.height), new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), g.watch.mode > 0 ? '#ffc46b' : '#4ef2ff');
+      if (g.viewModel) g.viewModel.drawWatch(formatSize(real), new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), g.watch.mode > 0 ? '#ffc46b' : '#4ef2ff');
     }
     const w = this.el('.hud-watch');
     w.classList.toggle('glow', g.watch.changing);

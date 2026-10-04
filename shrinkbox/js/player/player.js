@@ -45,7 +45,9 @@ export class Player {
     const cd = R.ColliderDesc.cylinder(half, r).setCollisionGroups(groups(G.PLAYER, G.SENSOR));
     this.collider = world.createCollider(cd, this.body);
     this.moveGroups = groups(G.PLAYER, G.WORLD | G.PROP | G.CREATURE | G.SKIN);
-    this.mover = new Mover(this.collider, this.moveGroups);
+    this.world = world;
+    this.mover = new Mover(this.collider, this.moveGroups, world);
+    this.macro = { body: this.body, collider: this.collider };
     this.touching = [];
     this.applyScaleToController();
   }
@@ -82,6 +84,21 @@ export class Player {
     const c = this.center();
     this.body.setTranslation({ x: c.x, y: c.y, z: c.z }, true);
     this.body.setNextKinematicTranslation({ x: c.x, y: c.y, z: c.z });
+  }
+
+  // move the player's body into another physics world (the germ world) or back
+  useWorld(w, feet, s) {
+    if (this.world !== world && this.body !== this.macro.body) this.world.removeRigidBody(this.body);
+    this.world = w;
+    if (w === world) { this.body = this.macro.body; this.collider = this.macro.collider; }
+    else {
+      const { half, r } = this.dims(s);
+      this.body = w.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(feet.x, feet.y + half, feet.z));
+      this.collider = w.createCollider(R.ColliderDesc.cylinder(half, r).setCollisionGroups(groups(G.PLAYER, G.SENSOR)), this.body);
+    }
+    this.mover = new Mover(this.collider, this.moveGroups, w);
+    this.feet.copy(feet);
+    this.setScale(s);
   }
 
   look(dt) {
@@ -192,7 +209,8 @@ export class Player {
     this.extForce.set(0, 0, 0);
     this.minVy = this.grounded ? 0 : this.minVy;
     this.shake = Math.max(0, this.shake - dt * 2.5);
-    if (this.feet.y < -60) this.respawnFall();
+    if (!this.game.micro && this.feet.y < -60) this.respawnFall();
+    else if (this.game.micro && this.feet.y < -500) this.feet.copy(this.game.micro.spawnPoint());
   }
 
   land() {
@@ -200,7 +218,7 @@ export class Player {
     const v = -this.minVy / this.s; // impact speed in "body sizes per second"
     const loud = Math.min(1, v / 10);
     sfx.thud(0.15 + loud * 0.5, 1 / Math.max(0.5, Math.min(2, this.s ** 0.15)));
-    if (this.s >= 0.8 && v > 7.5) {
+    if (this.s / (this.game.unit || 1) >= 0.8 && v > 7.5) {
       const dmg = (v - 7.5) * 11;
       this.hurt(dmg, 'fall');
       this.shake = Math.min(1, dmg / 40);
@@ -240,7 +258,7 @@ export class Player {
       const pivot = eye.clone().addScaledVector(right, 0.32 * s).add(new THREE.Vector3(0, 0.08 * s, 0));
       let want = 2.3 * s;
       const ray = new R.Ray(pivot, back);
-      const hit = world.castRay(ray, want + 0.2 * s, true, R.QueryFilterFlags.EXCLUDE_SENSORS, groups(G.PLAYER, G.WORLD | G.PROP), this.collider);
+      const hit = this.world.castRay(ray, want + 0.2 * s, true, R.QueryFilterFlags.EXCLUDE_SENSORS, groups(G.PLAYER, G.WORLD | G.PROP), this.collider);
       if (hit) want = Math.max(0.15 * s, hit.timeOfImpact - 0.18 * s);
       this.camDist += (want - this.camDist) * Math.min(1, dt * (want < this.camDist ? 30 : 5));
       cam.position.copy(pivot).addScaledVector(back, this.camDist).add(shakeV);
@@ -258,7 +276,7 @@ export class Player {
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const from = cam.position.clone();
     const ray = new R.Ray(from, dir);
-    const hit = world.castRayAndGetNormal(ray, maxDist, true, R.QueryFilterFlags.EXCLUDE_SENSORS, groups(G.PLAYER, G.WORLD | G.PROP | G.CREATURE), this.collider);
+    const hit = this.world.castRayAndGetNormal(ray, maxDist, true, R.QueryFilterFlags.EXCLUDE_SENSORS, groups(G.PLAYER, G.WORLD | G.PROP | G.CREATURE), this.collider);
     if (!hit) return null;
     const point = from.clone().addScaledVector(dir, hit.timeOfImpact);
     return { point, normal: new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z), dist: hit.timeOfImpact, collider: hit.collider, thing: handleToThing.get(hit.collider.handle), dir };

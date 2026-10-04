@@ -77,7 +77,7 @@ export class Thing {
     this.material = opts.surface || 'plastic'; // what the micro world looks like on it
     this.enclosure = opts.enclosure || null;  // interior volume (box in local space) -> inside effects
     this.behaviors = [];
-    this.dirt = 0;      // 0 clean .. 1 filthy (germs)
+    this.dirt = opts.dirt ?? null; // 0 clean .. 1 filthy (germs); null = typical for its surface
     this.on = false;
   }
 

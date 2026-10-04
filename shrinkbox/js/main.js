@@ -1,12 +1,15 @@
 // SHRINKBOX - a realistic shrinking sandbox. Boot + the main game loop.
 import * as THREE from 'three';
 import { Engine } from './core/engine.js';
-import { initPhysics, world, step as physicsStep, setLengthUnit } from './core/physics.js';
+import { initPhysics, world, step as physicsStep, setLengthUnit, R as RAPIER_NS, handleToThing } from './core/physics.js';
+import * as PH from './core/physics.js';
 import { input } from './core/input.js';
 import { initAudio, resumeAudio, setEnclosure, sfx } from './core/audio.js';
 import { settings } from './core/settings.js';
 import { UI } from './ui/ui.js';
-import { Player } from './player/player.js';
+import { Player, BASE_H } from './player/player.js';
+import { MicroWorld, MU, ENTER_H, EXIT_H, MICRO_MIN_H, microKind } from './world/micro.js';
+import { MAX_S } from './player/watch.js';
 import { Avatar, ViewModel, LOOK_DEFAULT } from './player/avatar.js';
 import { Watch } from './player/watch.js';
 import { things } from './world/thing.js';
@@ -33,6 +36,8 @@ class Game {
     this.playing = false;
     this.started = false;
     this.dtAvg = 1 / 60;
+    this.unit = 1;      // world units per meter (1 in the room, 10000 in the germ world)
+    this.micro = null;
     try { this.look = { ...LOOK_DEFAULT, ...JSON.parse(localStorage.getItem(LOOK_KEY) || '{}') }; } catch { this.look = { ...LOOK_DEFAULT }; }
   }
 
@@ -106,12 +111,71 @@ class Game {
   // one fixed physics step of the whole world
   tick() {
     const p = this.player;
-    this.inside = null; this.insideEcho = 0;
+    this.inside = this.micro ? this.microInside : null; this.insideEcho = 0;
     p.inLiquid = null;
     for (const t of things) t.update(STEP, this);
+    if (this.micro) this.micro.preStep(p);
     p.update(STEP);
-    setLengthUnit(Math.max(0.0005, Math.min(1, p.s)));
+    if (this.micro) this.micro.update(STEP, p);
+    setLengthUnit(Math.max(0.0005, Math.min(1, this.realS())));
     physicsStep();
+    this.checkMicro();
+  }
+
+  realS() { return this.player.s / this.unit; }
+  macroFeet() { return this.micro ? this.microAnchor.point : this.player.feet; }
+
+  sizeLimits() {
+    if (this.micro) return { min: MICRO_MIN_H * MU / BASE_H, max: 1e9, msg: '🦠 You are as small as a bacterium now! (molecules + atoms come in a later update)' };
+    return { min: ENTER_H * 0.97 / BASE_H, max: MAX_S, msg: '🔬 Stand on something solid to shrink into the germ world' };
+  }
+
+  checkMicro() {
+    const p = this.player, real = p.height / this.unit;
+    if (!this.micro && real < ENTER_H && p.grounded) this.enterMicro();
+    else if (this.micro && real > EXIT_H) this.exitMicro();
+  }
+
+  rig() { return [this.watch.light, this.watch.sparks, this.avatar.root]; }
+
+  enterMicro() {
+    const p = this.player;
+    const c = p.center(new THREE.Vector3());
+    const ray = new RAPIER_NS.Ray(c, { x: 0, y: -1, z: 0 });
+    const hit = world.castRayAndGetNormal(ray, p.height * 2, true, RAPIER_NS.QueryFilterFlags.EXCLUDE_SENSORS, p.moveGroups, p.collider);
+    if (!hit) return;
+    const thing = handleToThing.get(hit.collider.handle);
+    const kind = microKind(hit.collider, thing);
+    const point = c.clone(); point.y -= hit.timeOfImpact;
+    const DIRT = { carpet: 0.6, fabric: 0.85, plastic: 0.6, glass: 0.8, metal: 0.45, pcb: 0.35, wood: 0.3, paint: 0.2, paper: 0.4, food: 0.6, liquid: 0 };
+    const dirt = thing && thing.dirt !== null && thing.dirt !== undefined ? thing.dirt : DIRT[kind] ?? 0.4;
+    const lit = this.roomLight.on || this.lamp.on;
+    const brightness = this.inside ? 0.03 : lit ? 0.9 : Math.max(0.1, this.engine.daylight || 0);
+    this.microInside = this.inside;
+    this.micro = new MicroWorld(this, { point, kind, dirt, thing, brightness });
+    const sp = this.micro.spawnPoint();
+    this.microAnchor = { point: point.clone(), spawn: sp.clone() };
+    p.vel.multiplyScalar(MU);
+    this.unit = MU;
+    p.useWorld(this.micro.world, sp, p.s * MU);
+    p.grounded = false;
+    this.micro.terrain.rebuild(sp.x, sp.z, p.height);
+    this.engine.setScene(this.micro.scene, this.rig());
+    this.ui.flash(0.5);
+    const names = { carpet: 'carpet fibres', fabric: 'bed sheet threads', plastic: 'plastic', glass: 'glass', metal: 'metal', pcb: 'circuit board', wood: 'wood', paint: 'wall paint', paper: 'cardboard', food: 'food', liquid: 'soda surface' };
+    this.ui.toast(`🔬 Germ world: you're on the ${names[kind]} at ${(ENTER_H * 1000).toFixed(2)} mm tall` + (dirt > 0.3 ? ' · it\'s dirty here 🦠' : ''), 5);
+  }
+
+  exitMicro() {
+    const p = this.player, a = this.microAnchor;
+    const disp = p.feet.clone().sub(a.spawn).divideScalar(MU);
+    const feet = new THREE.Vector3(a.point.x + disp.x, a.point.y + 0.00002, a.point.z + disp.z);
+    p.vel.divideScalar(MU);
+    this.unit = 1;
+    p.useWorld(world, feet, p.s / MU);
+    this.engine.setScene(this.engine.scene, this.rig());
+    this.micro.dispose(); this.micro = null;
+    this.ui.flash(0.4);
   }
 
   // fast-forward without rendering (used by tests / debugging)
@@ -195,7 +259,7 @@ class Game {
     this.viewModel.root.scale.setScalar(s);
     this.viewModel.update(dt, this.watch.mode !== 0 || input.held('use') === 'watch', p.headBob, this.time);
     // light & sky
-    const day = this.engine.updateDaylight(p.center(new THREE.Vector3()), s);
+    const day = this.engine.updateDaylight(this.micro ? this.microAnchor.point : p.center(new THREE.Vector3()), this.realS());
     updateOutside(this, day);
     this.engine.render();
     input.endFrame();
@@ -211,4 +275,4 @@ game.boot().catch((e) => {
   console.error(e);
   const b = document.getElementById('boot-sub'); if (b) b.textContent = 'Error: ' + e.message;
 });
-void settings;
+void settings; void PH;

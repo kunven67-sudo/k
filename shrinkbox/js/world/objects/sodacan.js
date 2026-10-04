@@ -117,7 +117,7 @@ const canBehavior = {
     can.liquidMesh.scale.y = Math.max(0.0001, top - 0.004);
     can.liquidMesh.visible = can.fill > 0.01;
     // the skin follows the soda level; only on when you're tiny (surface tension wins over weight)
-    const tinyEnough = p.height < 0.006;
+    const tinyEnough = !game.micro && p.height < 0.006;
     can.skin.setTranslationWrtParent({ x: 0, y: top * can.scale, z: 0 });
     can.skin.setEnabled(tinyEnough && can.fill > 0.02 && !can._broke && _up.y > 0.8);
     // bubbles drift up
@@ -128,7 +128,8 @@ const canBehavior = {
       bp.setY(i, y);
     }
     bp.needsUpdate = true;
-    can.bubbles.visible = can.fill > 0.02 && p.feet.distanceTo(can.position(_v)) < 0.6;
+    can.bubbles.visible = can.fill > 0.02 && game.macroFeet().distanceTo(can.position(_v)) < 0.6;
+    if (game.micro) { if (can.fizz) can.fizz.set(0); return; }
 
     // player in the soda?
     const local = can.group.worldToLocal(p.center(_v.clone()));

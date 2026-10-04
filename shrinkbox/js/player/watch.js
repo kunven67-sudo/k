@@ -68,7 +68,8 @@ export class Watch {
       this.hold += dt;
       const rate = Math.min(2.4, 0.45 + this.hold * 0.55); // e-folds per second
       let ns = p.s * Math.exp(this.mode * rate * dt);
-      ns = Math.max(MIN_S, Math.min(MAX_S, ns));
+      const lim = g.sizeLimits();
+      ns = Math.max(lim.min, Math.min(lim.max, ns));
       if (this.mode > 0 && ns > p.s) {
         // growing needs room. Push light stuff away, but walls/ceiling stop you (for now)
         if (!p.fits(ns)) {
@@ -79,7 +80,7 @@ export class Watch {
           g.onGrowBlocked?.(p, this.blockT);
         } else this.blockT = 0;
       }
-      if (ns === MIN_S && this.mode < 0 && !this._minTip) { this._minTip = 1; g.ui.toast('🔬 Smallest the watch goes for now (~0.4 mm). Germ world coming!'); }
+      if (ns === lim.min && this.mode < 0 && lim.msg && !this['_tip' + lim.msg.length]) { this['_tip' + lim.msg.length] = 1; g.ui.toast(lim.msg); }
       if (ns !== p.s) {
         const ratio = ns / p.s;
         p.setScale(ns);
@@ -99,6 +100,7 @@ export class Watch {
 
     // sparks around your body
     const n = this.sparkLife.length, s = p.s, c = p.center(new THREE.Vector3());
+    this.sparks.frustumCulled = false;
     for (let i = 0; i < n; i++) {
       if (this.sparkLife[i] <= 0 && changing && Math.random() < 0.5) {
         const a = Math.random() * Math.PI * 2, h = Math.random();

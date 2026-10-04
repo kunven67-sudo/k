@@ -31,6 +31,7 @@ export class Engine {
     container.appendChild(r.domElement);
 
     this.scene = new THREE.Scene();
+    this.active = this.scene; // the scene being drawn (the room, or the germ world)
     this.scene.background = new THREE.Color(0x87a8c8);
     this.camera = new THREE.PerspectiveCamera(settings.fov, innerWidth / innerHeight, 0.02, 400);
     this.scene.add(this.camera);
@@ -62,7 +63,8 @@ export class Engine {
     this.composer = null;
     if (!this.q.bloom) return;
     this.composer = new EffectComposer(this.renderer);
-    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(this.renderPass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.4, 0.92);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
@@ -114,6 +116,12 @@ export class Engine {
     return day;
   }
 
+  setScene(scene, rig = []) {
+    this.active = scene;
+    if (this.renderPass) this.renderPass.scene = scene;
+    for (const o of [this.camera, ...rig]) scene.add(o);
+  }
+
   resize() {
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
@@ -122,6 +130,6 @@ export class Engine {
   }
 
   render() {
-    if (this.composer) this.composer.render(); else this.renderer.render(this.scene, this.camera);
+    if (this.composer) this.composer.render(); else this.renderer.render(this.active, this.camera);
   }
 }

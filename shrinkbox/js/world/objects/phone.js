@@ -126,6 +126,7 @@ const phoneBehavior = {
     for (const m of ph.meshes?.taptic || []) m.position.x = -0.018 + (ring && Math.sin(game.time * 6) > 0 ? k * 0.0003 : 0);
     if (ring && ph.body && Math.sin(game.time * 6) > 0) ph.body.applyImpulse({ x: (Math.random() - 0.5) * 0.0004, y: 0.0002, z: (Math.random() - 0.5) * 0.0004 }, true);
     const p = game.player;
+    if (game.micro) return;
     const local = ph.group.worldToLocal(p.center(_v.clone()));
     if (ph.enclosure.containsPoint(local)) {
       game.inside = ph; game.insideEcho = 0.2;
