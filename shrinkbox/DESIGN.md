@@ -68,3 +68,24 @@ Build plan: player chose ALL AT ONCE (was warned about the limit).
 
 ## Other game (separate file, later)
 - Cooking game: put ingredients together and make food.
+
+## Rounds 16-19
+- House in the **USA**: 2 floors + basement. Kitchen, living room, bathroom, parents' room,
+  garage/basement, your bedroom. No siblings.
+- Parents can see you down to ~hand size; ant size only if close + moving on a surface they're
+  looking at (they think you're a bug: mostly ignore, swat on counters, vacuum while cleaning);
+  smaller than a dust mite = invisible. On the floor they might step on you.
+- Watch is a SECRET. Glimpse = they think they're tired. See a full shrink = they freak out,
+  take the watch and hide it in their room; you sneak it back.
+- Routine: both parents work weekday daytime, home evenings/weekends, sleep ~11pm.
+- Main menu shows on the sci-fi watch screen.
+- Real date: holiday decorations (October = Halloween).
+- Player HATED in other shrink games: invisible walls, fake insides, lag/ugly, too little to shrink into.
+- Rideable / explorable (realistic): RC car (electric motor coils+magnets, gears, battery,
+  receiver, antenna), real car in garage (engine: pistons, spark plugs, radiator fan, belts, hot),
+  drone (4 motors, prop wind, battery, camera), paper airplane glides,
+  pets: grab fur and get carried (can't steer).
+- More insides: fridge (cold, compressor, coils), microwave (danger), washing machine,
+  toilet tank, keyboard switches, mouse laser sensor, headphones, wall outlets (danger), bulbs.
+- Ants come in from outside, spiders in basement corners.
+- Cooking game: talk about it after Shrinkbox.
