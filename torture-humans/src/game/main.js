@@ -14,6 +14,7 @@ import { Police } from './police.js';
 import { Family } from './family.js';
 import { Interactables } from './world/interact.js';
 import { Shops } from './shops.js';
+import { Germs } from './germs.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
@@ -301,7 +302,9 @@ export async function boot() {
   let last = performance.now();
   // the shops across the street (and your backpack)
   const shops = new Shops({ spots: level.town?.spots, interact, input, player, family, vitals, police, speech, humans, toast, canvas: input.target });
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, frame: 0 };
+  // the germ world: what's on the floor when you're smaller than 2 cm
+  const germs = new Germs({ scene, player, physics });
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, frame: 0 };
   hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
 
@@ -324,6 +327,7 @@ export async function boot() {
     interact.update();
     family?.update(dt);
     shops.update();
+    germs.update(dt);
     vitals.update(dt);
     nav.update(dt);
     colony?.update(dt);

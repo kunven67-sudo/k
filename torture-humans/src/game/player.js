@@ -311,6 +311,9 @@ export class Player {
       cam.position.copy(pivot).addScaledVector(back, this.camCurrentDist);
       cam.near = 0.05 * this.scale;
     }
+    // very small: shorten the view distance too, or the depth buffer runs out of precision
+    const baseFar = cam.userData.baseFar ?? cam.far;
+    cam.far = Math.min(baseFar, Math.max(40, cam.near * 3e6));
     cam.lookAt(cam.position.clone().add(dir));
     cam.updateProjectionMatrix();
   }

@@ -1,7 +1,7 @@
 // Size science: how a body of any size moves, jumps, falls and gets hurt, and
 // what you're about the size of. H = your height in metres (1.8 = normal).
 export const BASE_H = 1.8;
-export const MIN_SCALE = 0.0025;   // ~4.5 mm (an ant)
+export const MIN_SCALE = 0.001;    // ~1.8 mm (a flea: dust mites are as big as dogs to you)
 export const MAX_SCALE = 20;       // ~36 m (bigger than most buildings in town)
 
 const k = (s) => s; // scale = H / BASE_H
@@ -39,7 +39,7 @@ export function fmtLen(m) {
 
 // real things, and how big they look to you at your size
 const THINGS = [
-  [0.00008, 'A human hair', 'wide'], [0.007, 'A grain of rice', 'long'], [0.025, 'A coin', 'wide'],
+  [0.00003, 'A pollen grain', 'wide'], [0.0003, 'A dust mite', 'long'], [0.00008, 'A human hair', 'wide'], [0.007, 'A grain of rice', 'long'], [0.025, 'A coin', 'wide'],
   [0.15, 'A phone', 'tall'], [0.9, 'A table', 'high'], [2.0, 'A door', 'tall'], [9, 'A house', 'tall'],
   [25, 'A blue whale', 'long'], [60, 'A 20-story building', 'tall'],
 ];

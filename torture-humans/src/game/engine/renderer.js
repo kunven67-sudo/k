@@ -73,6 +73,7 @@ export class Renderer {
     this.camera.aspect = w / h;
     this.camera.fov = g.fov || 75;
     this.camera.far = g.drawDistance || 700;
+    this.camera.userData.baseFar = this.camera.far;
     this.camera.updateProjectionMatrix();
     if (this.scene.fog?.isFog) this.scene.fog.far = (g.drawDistance || 700) * 0.95;
 

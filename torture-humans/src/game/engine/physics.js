@@ -130,7 +130,7 @@ export class Physics {
   // A body that follows something moved by code (a walking human): other things
   // collide with it, rays hit it, and ownerOf(collider) says who it belongs to.
   addKinematicCapsule(owner, { radius = 0.28, height = 1.8, position = { x: 0, y: 0, z: 0 }, group = GROUP.NPC } = {}) {
-    const half = Math.max(0.005, height / 2 - radius);
+    const half = Math.max(1e-6, height / 2 - radius);
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(position.x, position.y + height / 2, position.z));
     const collider = this.world.createCollider(RAPIER.ColliderDesc.capsule(half, radius).setCollisionGroups(groups(group)), body);
     this.owners.set(collider.handle, owner);
@@ -147,7 +147,7 @@ export class Physics {
   }
 
   resizeCapsule(cap, height, radius) {
-    cap.collider.setHalfHeight(Math.max(0.005, height / 2 - radius));
+    cap.collider.setHalfHeight(Math.max(1e-6, height / 2 - radius));
     cap.collider.setRadius(radius);
     cap.height = height;
     cap.radius = radius;
@@ -170,7 +170,7 @@ export class Physics {
 
   // Capsule character controller: walks up steps, slides on walls, snaps to ground.
   createCharacter({ radius = 0.3, height = 1.8, position = { x: 0, y: 1, z: 0 }, group = GROUP.PLAYER, stepHeight = 0.35, maxSlope = 50 } = {}) {
-    const half = Math.max(0.01, height / 2 - radius);
+    const half = Math.max(1e-6, height / 2 - radius);
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(position.x, position.y + height / 2, position.z),
     );
@@ -204,7 +204,7 @@ export class Physics {
   resizeCharacter(ch, height, radius = ch.radius) {
     const t = ch.body.translation();
     const feet = t.y - ch.height / 2;
-    const half = Math.max(0.01, height / 2 - radius);
+    const half = Math.max(1e-6, height / 2 - radius);
     ch.collider.setHalfHeight(half);
     ch.collider.setRadius(radius);
     ch.height = height;
@@ -218,7 +218,7 @@ export class Physics {
   fitsCapsule(ch, height, radius) {
     const t = ch.body.translation();
     const feet = t.y - ch.height / 2;
-    const half = Math.max(0.0005, height / 2 - radius);
+    const half = Math.max(1e-6, height / 2 - radius);
     const shape = new RAPIER.Capsule(half, radius * 0.95);
     let hit = false;
     this.world.intersectionsWithShape(

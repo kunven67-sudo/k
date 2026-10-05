@@ -229,6 +229,10 @@ export class Family {
 
   canSeePlayer(h) {
     if (!h || h.state === 'away' || h.tiny || h.dead || h.state === 'held') return false;
+    // they have to be looking your way (the watch is quiet)
+    const f = this.player.feet;
+    const to = new THREE.Vector3(f.x - h.position.x, 0, f.z - h.position.z).normalize();
+    if (to.dot(new THREE.Vector3(Math.sin(h.yaw), 0, Math.cos(h.yaw))) < 0.3) return false;
     return this.police?.canSee(h, this.player.feet.clone().setY(this.player.feet.y + 1.2 * this.player.scale), 14) ?? false;
   }
 
