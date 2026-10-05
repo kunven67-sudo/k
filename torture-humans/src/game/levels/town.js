@@ -3,8 +3,54 @@
 // Built for weak graphics cards: buildings are simple solid shapes with scanned
 // facade textures, and all windows in town are 2 instanced draws (frames + glass).
 import * as THREE from 'three';
-import { pbr, box, plane, place } from '../engine/assets.js';
+import { pbr as pbrNew, box, plane, place } from '../engine/assets.js';
+
+const matCache = new Map();
+const pbr = (id, opts = {}) => {
+  const key = `${id}|${JSON.stringify(opts)}`;
+  if (!matCache.has(key)) matCache.set(key, pbrNew(id, opts));
+  return matCache.get(key);
+};
 import { BEDROOM } from './bedroom.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// Glue every town piece that shares a material into one mesh: a few hundred
+// small boxes become a few dozen draws (that's what weak graphics cards need).
+function mergeByMaterial(root) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const groups = new Map();
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material)) return;
+    const key = `${o.material.uuid}|${o.castShadow}|${!!o.userData.noCollide}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(o);
+  });
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const geos = list.map((o) => {
+      let g = o.geometry.clone();
+      g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+      if (!g.index) g.setIndex([...Array(g.attributes.position.count).keys()]);
+      for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'uv1'].includes(k)) g.deleteAttribute(k);
+      if (!g.attributes.uv1 && g.attributes.uv) g.setAttribute('uv1', g.attributes.uv.clone());
+      return g;
+    });
+    const merged = mergeGeometries(geos, false);
+    if (!merged) continue;
+    const first = list[0];
+    const m = new THREE.Mesh(merged, first.material);
+    m.castShadow = first.castShadow;
+    m.receiveShadow = true;
+    m.userData.noCollide = !!first.userData.noCollide;
+    m.name = 'town-merged';
+    for (const o of list) o.removeFromParent();
+    root.add(m);
+    for (const g of geos) g.dispose();
+  }
+  // empty groups left behind
+  for (const c of [...root.children]) if (c.isGroup && !c.children.length) c.removeFromParent();
+}
 
 export const GROUND_Y = 3.28;           // yard / sidewalk height (the bedroom floor is 3.30)
 export const ROAD = { z0: 9, z1: 16, y: 3.13 };
@@ -323,6 +369,7 @@ export async function buildTown({ statics, props, scene }) {
   const barrier = pbr('concrete_pavement', { size: 1, color: 0xd8d2c6 });
   for (const bx of [TOWN.x0 + 0.6, TOWN.x1 - 0.6]) mesh(box(0.6, 1.0, ROAD.z1 - ROAD.z0), barrier, bx, ROAD.y + 0.5, zc, town);
 
+  mergeByMaterial(town);
   return town;
 }
 
