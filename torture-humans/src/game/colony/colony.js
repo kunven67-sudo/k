@@ -717,6 +717,25 @@ class Resident {
     const { pond } = this.c.tiny.features;
     this.doing = 'going to drink';
     const me = this.c.toLocal(this.worldPos());
+    // a dew drop nearby in the morning beats walking to the pond
+    const drop = this.c.details?.dewNear(me, 0.25);
+    if (drop) {
+      drop.drunk = true;
+      const at = this.c.toWorld(drop.p);
+      if (yield* this.walkTo(at, 0.014)) {
+        this.doing = 'drinking dew';
+        this.face = at;
+        this.crouch = 1;
+        try {
+          this.pose = { R: at, L: at, grip: 0.3 };
+          yield* this.wait(0.8);
+          this.pose = { R: 'mouth', grip: 0.3 };
+          yield* this.wait(1.0);
+          this.thirst = Math.min(100, this.thirst + WATER * 0.6);
+        } finally { this.pose = null; this.crouch = 0; this.face = null; }
+        return;
+      }
+    }
     const a = Math.atan2(me.z - pond.z, me.x - pond.x) + (Math.random() - 0.5) * 0.6;
     const shore = new THREE.Vector3(pond.x + Math.cos(a) * pond.r * 0.72, 0, pond.z + Math.sin(a) * pond.r * 0.72);
     shore.y = this.c.cage.surfaceY(shore.x, shore.z);
