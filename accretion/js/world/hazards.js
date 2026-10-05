@@ -184,17 +184,20 @@ export class Hazards {
   spawnRogue(fromDeep = false) {
     const w = this.world;
     const p = w.player, rng = w.rng;
-    const R = p.rEff;
+    // rogue planets are planets: they only matter once you're at least moon-sized
+    if (p.mass < 5e22 || p.isStar || p.compact) return;
     const mass = Math.max(p.mass * rng.logRange(0.3, 4), 0.05 * M_EARTH);
+    const R = Math.max(p.rEff, 1);
     const gas = mass > 20 * M_EARTH;
     const dir = rng.unitVector();
     const side = rng.unitVector();
     const frame = w.referenceFrame(p.x, p.y, p.z, p);
     const speed = escapeVelocity(p.mass, p.rEff) * rng.range(2, 5);
+    const far = R * 80 + Math.cbrt(mass / p.mass) * R * 6;
     const b = new Body({
       role: 'field', name: `PSO J${rng.range(0, 359).toFixed(1)}${rng.sign() > 0 ? '+' : '-'}${rng.int(10, 89)}`,
       mass, comp: gas ? { rock: 0.04, iron: 0.01, ice: 0.08, gas: 0.87 } : { rock: 0.55, iron: 0.25, ice: 0.18, carbon: 0.02 },
-      x: p.x + dir.x * R * 80 + side.x * R * 8, y: p.y + dir.y * R * 80 + side.y * R * 8, z: p.z + dir.z * R * 80 + side.z * R * 8,
+      x: p.x + dir.x * far + side.x * R * 8, y: p.y + dir.y * far + side.y * R * 8, z: p.z + dir.z * far + side.z * R * 8,
       vx: frame.vx - dir.x * speed, vy: frame.vy - dir.y * speed, vz: frame.vz - dir.z * speed,
       temp: 40, seed: rng.int(1, 1e9), fadeIn: 0, kind: gas ? 'gasgiant' : 'icy',
     });

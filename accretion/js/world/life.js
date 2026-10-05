@@ -121,7 +121,7 @@ export class LifeModel {
       if (E > 1e21) this.impactExtinction(E, e.name);
     } else if (type === 'grb') {
       const d = e.dist ?? 5000;
-      const k = 0.1 + 0.5 * clamp((8000 - d) / 6000, 0, 1);
+      const k = 0.05 + 0.35 * clamp((8000 - d) / 6000, 0, 1);
       this.extinction(k, `A gamma-ray burst ${Math.round(d).toLocaleString('en-US')} light-years away stripped your ozone layer`, { landOnly: true });
     } else if (type === 'distant-supernova' && e.ly < 50) {
       const k = 0.1 + 0.4 * clamp(1 - e.ly / 50, 0, 1);
@@ -134,14 +134,14 @@ export class LifeModel {
       if (this.planet.field < 0.15) this.extinction(0.08, 'A superflare from your star', { landOnly: true });
     } else if (type === 'bombard') {
       // in deep time: now and then a big asteroid strikes (about every 100 million years on Earth)
-      const big = w.rng.chance(1 - Math.exp(-e.years / 1e8));
+      const big = w.rng.chance(1 - Math.exp(-e.years / 1.5e8));
       if (big) {
         if (this.stage >= LIFE.space && w.rng.chance(this.defendChance())) {
           this.deflected++;
           this.log('Your civilisation spotted a 10 km asteroid and pushed it off course', 'civ');
           w.emit('deflect', { name: 'an asteroid', deep: true });
         } else {
-          const E = w.rng.logRange(5e22, 2e24);
+          const E = w.rng.logRange(2e22, 6e23);
           this.impactExtinction(E, 'a 10 km asteroid');
         }
       }
@@ -250,7 +250,7 @@ export class LifeModel {
     }
     // hard limits: a magma ocean, boiled or vanished oceans
     if (this.stage > 0) {
-      if (p.heat > 0.55) this.endLife('impacts melted your surface into a magma ocean');
+      if (p.heat > 0.55 || pl.magma > 0.5) this.endLife('impacts melted your surface into a magma ocean');
       else if (pl.oceanState === 'steam' || pl.Ts > 400) this.endLife('your oceans boiled away');
       else if (pl.oceanState === 'none' || p.comp.ice < 0.0003) this.endLife('your water was lost to space');
     }

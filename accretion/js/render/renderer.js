@@ -688,6 +688,7 @@ export class Renderer {
       this.syncCutaway(v, cut, rU, b);
       u.uDetail.value = px > 40 ? 1 : 0;
       u.uOutbreak.value = isPlayer ? world.stages?.outbreak || 0 : 0;
+      u.uSeason.value = isPlayer && world.planet ? clamp(world.planet.season * 2, -1, 1) : 0;
       u.uHeat.value = Math.max(v.look.heat, b.heat || 0);
       u.uDamage.value = isPlayer ? clamp(state.damage * 1.2, 0, 1) : clamp(b.disrupt * 0.6, 0, 1);
       const lights = this.lightsFor(world, b.x, b.y, b.z, b);

@@ -147,7 +147,7 @@ function applyModel(L, b, pm, life) {
   // ice sheets: from polar caps to a fully frozen snowball
   L.iceCap = water > 0.0005 || P > 0.01 ? 0.05 + pm.iceCover * 1.75 : 0;
   if (pm.oceanState === 'none' && water < 0.0005) L.iceCap = 0;
-  L.heat = Math.max(L.heat, smoothstep(0.85, 1.05, pm.H) * 0.85 * (pm.meltable ?? 1));
+  L.heat = Math.max(L.heat, smoothstep(0.15, 0.7, pm.magma || 0) * 0.85 * (pm.meltable ?? 1));
   if (L.heat > 0.5) { L.ocean = 0; L.clouds = Math.max(L.clouds, 0.4); L.cloudTint = [0.5, 0.45, 0.42]; }
   L.craters = clamp(L.craters - (pm.tectonics ? 0.25 : 0) - (L.green || 0) * 0.2, 0.05, 1);
   L.green = life ? life.green || 0 : 0;

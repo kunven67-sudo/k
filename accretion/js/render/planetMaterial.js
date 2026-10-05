@@ -74,6 +74,7 @@ uniform vec4 uOcc[2];      // eclipsing bodies: view-space centre, radius
 uniform float uCut;        // 1 = cutaway: a wedge is removed
 uniform float uClose;      // >0 in close-up views: planet radius in view units
 uniform float uOutbreak;   // a giant storm boiling up on a gas giant
+uniform float uSeason;     // -1..1: which hemisphere is having summer
 uniform float uHeat;       // 0..1 molten glow
 uniform float uDamage;     // 0..1 glowing cracks
 uniform float uCraters;    // crater visibility
@@ -197,7 +198,9 @@ vec3 rockyAlbedo(vec4 s, vec3 p, float elev, out float spec, out vec3 emit) {
     col *= 1.0 + dn * 0.22 * near;
   }
   // polar caps and snow on high ground
-  float capEdge = 1.0 - uIceCap * 0.55;
+  // the winter hemisphere's cap grows, the summer one shrinks
+  float seasonK = 1.0 + 0.4 * uSeason * (p.y > 0.0 ? -1.0 : 1.0);
+  float capEdge = 1.0 - uIceCap * 0.55 * seasonK;
   float n2 = snoise(p * 7.0 + uSeed) * 0.05;
   float ice = smoothstep(capEdge - 0.04, capEdge + 0.04, lat + n2);
   if (uOcean > 0.001) ice = max(ice, smoothstep(0.55, 0.75, s.r) * uIceCap * 1.5);
@@ -446,6 +449,7 @@ export function makePlanetMaterial(sharedUniforms) {
       uCut: { value: 0 },
       uClose: { value: 0 },
       uOutbreak: { value: 0 },
+      uSeason: { value: 0 },
       uHeat: { value: 0 },
       uDamage: { value: 0 },
       uCraters: { value: 1 },

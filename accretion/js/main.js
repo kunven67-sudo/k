@@ -33,7 +33,11 @@ const DEFAULT_SETTINGS = {
 class Game {
   constructor() {
     this.saves = new Saves();
-    this.settings = { ...DEFAULT_SETTINGS, ...(this.saves.getSettings() || {}) };
+    const savedSettings = this.saves.getSettings();
+    this.settings = { ...DEFAULT_SETTINGS, ...(savedSettings || {}) };
+    // first run: start on high (a gaming PC), but watch the frame rate and step down if needed
+    this.autoQuality = !savedSettings || !savedSettings.quality;
+    if (this.autoQuality) this.settings.quality = guessQuality();
     this.profile = this.saves.getProfile();
     this.applyComfort();
     this.canvas = $('view');
@@ -80,7 +84,7 @@ class Game {
     installSheets(this, { goals: this.goals, book: this.book, scope: this.scope, map: this.map, sandbox: this.sandbox });
     this.onEvent = (e) => { this.goals.onEvent(e); this.tips.onEvent(e); this.book.onEvent(e); };
     const ef = this.everyFrame;
-    this.everyFrame = (dt) => { ef?.(dt); this.goals.update(dt); this.tips.update(dt); this.book.update(dt); };
+    this.everyFrame = (dt) => { ef?.(dt); this.goals.update(dt); this.tips.update(dt); this.book.update(dt); this.watchFps(dt); };
     this.onPlayStart = (fresh) => { if (fresh && this.tutorialOn) this.tips.startTutorial(); };
     window.addEventListener('resize', () => { this.renderer.resize(); this.hud.resize(); });
     window.addEventListener('beforeunload', () => this.autosave());
@@ -1063,6 +1067,28 @@ class Game {
     this.saves.remove('auto');
   }
 
+  // if the first minute of play runs slowly, drop the graphics a level
+  watchFps(dt) {
+    if (!this.autoQuality || this.state !== 'playing' || this.sheet) return;
+    this.fpsT = (this.fpsT || 0) + dt;
+    this.fpsN = (this.fpsN || 0) + 1;
+    if (this.fpsT < 12) return;
+    const fps = this.fpsN / this.fpsT;
+    this.autoQuality = false;
+    if (fps < 26 && this.settings.quality !== 'low') {
+      const next = this.settings.quality === 'high' ? 'medium' : 'low';
+      this.settings.quality = next;
+      this.saveSettings();
+      $('set-quality').value = next;
+      // lighten the load now; the rest applies next time you start
+      this.renderer.pixelRatio = 1;
+      this.renderer.gl.setPixelRatio(1);
+      this.renderer.resize();
+      if (next === 'low') this.renderer.bloom.enabled = false;
+      this.hud.log(`Running at ${Math.round(fps)} fps: graphics set to ${next} (change it in Settings)`, 'info');
+    } else this.saveSettings();
+  }
+
   // V: chase, free orbit, low orbit, surface (only where they make sense)
   cycleView() {
     const p = this.world.player;
@@ -1136,6 +1162,24 @@ class Game {
 
   viewLabel() {
     return this.viewName ? `View: ${this.viewName}${this.visionName && this.visionName !== 'Visible' ? ` · ${this.visionName}` : ''}` : '';
+  }
+}
+
+// a first guess at how strong the graphics card is
+function guessQuality() {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    if (!gl) return 'low';
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    if (/swiftshader|llvmpipe|software/i.test(name)) return 'low';
+    if (/intel|mali|adreno|powervr/i.test(name) && !/arc/i.test(name)) return 'medium';
+    if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) return 'medium';
+    return 'high';
+  } catch {
+    return 'medium';
   }
 }
 

@@ -19,6 +19,7 @@ export class PlanetModel {
   reset(saved) {
     const s = saved || {};
     this.H = s.H ?? null;                 // interior heat, 1 = freshly formed (set from your size on first update)
+    this.magma = s.magma ?? 0;            // surface melted by recent impacts (cools in a few million years)
     this.differentiated = s.differentiated ?? false;
     this.atm = s.atm || { n2: 0, o2: 0, co2: 0, h2o: 0, ch4: 0, h2: 0 };
     this.day = s.day ?? 14;               // hours per rotation
@@ -42,7 +43,7 @@ export class PlanetModel {
   }
 
   serialize() {
-    return { H: this.H, differentiated: this.differentiated, atm: this.atm, day: this.day, drift: this.drift, locked: this.locked, ring: this.ring, debrisDisk: this.debrisDisk, history: this.history.slice(-80), flags: this.flags };
+    return { H: this.H, magma: this.magma, differentiated: this.differentiated, atm: this.atm, day: this.day, drift: this.drift, locked: this.locked, ring: this.ring, debrisDisk: this.debrisDisk, history: this.history.slice(-80), flags: this.flags };
   }
 
   log(text, kind = 'geo') {
@@ -73,7 +74,11 @@ export class PlanetModel {
         this.debrisDisk = { mass: e.mass * 0.25 + p.mass * 0.01, t: 0, seed: (Math.random() * 1e9) | 0 };
         this.log(`Giant impact with ${e.name}. A ring of molten debris now circles you`, 'impact');
       }
-      this.H = Math.min(1.2, this.H + e.rel * 2);
+      const melt = this.meltable ?? 1;
+      this.H = Math.min(1.1, (this.H ?? 0.1) + e.rel * 0.6 * melt);
+      this.magma = Math.min(1, this.magma + e.rel * 4 * melt * Math.min(1, e.vrel / Math.max(e.vesc, 1e-6) + 0.5));
+      // comets and icy rocks bring gas: carbon dioxide and nitrogen join your air
+      if (!e.fragment || e.rel > 0.002) this.deliver(e.body?.comp || {}, e.gain || e.mass);
     }
     if (type === 'magnetar-flare' || type === 'grb') {
       // radiation strips the upper air and ozone (shielded by a magnetic field)
@@ -94,7 +99,11 @@ export class PlanetModel {
       p.comp.ice = Math.min(0.9, p.comp.ice + 1e-7 * e.n);
     }
     if (type === 'flyby' && e.deep) {
-      this.log(`A passing star (${e.dist.toFixed(2)} ly) sent a shower of comets inward`, 'impact');
+      const w = this.world;
+      if (e.dist < 0.3 && w.years - (this.lastFlyLog ?? -1e12) > 4e8) {
+        this.lastFlyLog = w.years;
+        this.log(`A star passed only ${e.dist.toFixed(2)} light-years away and sent a shower of comets inward`, 'impact');
+      }
       p.comp.ice = Math.min(0.9, p.comp.ice + 2e-5);
     }
   }
@@ -131,10 +140,14 @@ export class PlanetModel {
         this.log(`Tidally locked: one side always faces ${star.name}`, 'geo');
       }
       if (this.locked) {
-        const period = 2 * Math.PI * Math.sqrt(Math.pow(Math.hypot(rx, ry, rz), 3) / (G * star.mass));
+        const aReal = Math.hypot(rx, ry, rz) * DIST_COMPRESS;
+        const period = 2 * Math.PI * Math.sqrt(Math.pow(aReal, 3) / (G * star.mass));
         this.day = period / 3600;
+        p.spin = Math.sign(p.spin || 1) * 0.02;
       }
     } else this.season = 0;
+    // a day lasts as long as your spin says (impacts speed it up or slow it down)
+    if (!this.locked) this.day = 11.2 / Math.max(Math.abs(p.spin || 0), 0.02);
     if (giant) {
       this.Ts = Math.max(p.temp, p.starTemp || 0);
       this.P = 0;
@@ -175,16 +188,28 @@ export class PlanetModel {
     // giant eruptions throw up ash and sulfur that cool the planet for a while
     if (years > 0 && w.rng.chance(1 - Math.exp(-years * 2e-8 * this.volcanism))) {
       this.coolEvent = 8 + w.rng.next() * 10;
-      if (years > 1e4) this.log('A supervolcano erupted and plunged you into a volcanic winter', 'geo');
+      // (only the first in a long while makes it into your history)
+      if (years > 1e4 && w.years - (this.lastVolcLog ?? -1e12) > 3e8) {
+        this.lastVolcLog = w.years;
+        this.log('A supervolcano erupted and plunged you into a volcanic winter', 'geo');
+      }
     }
     this.coolEvent *= Math.exp(-years / 2e4) * Math.exp(-rs * 0.02);
 
     // ---- atmosphere: sources
     const holds = smoothstep(1.5, 4.5, vesc);
-    const outgas = 4e-10 * this.volcanism * Math.sqrt(me) * years * holds;
-    this.atm.co2 += outgas * 0.65;
-    this.atm.n2 += outgas * 0.3;
-    this.atm.h2o += outgas * 0.05;
+    // volcanoes breathe out carbon dioxide (Earth's rate is about 1e-7 bar a year)...
+    const S = 1e-7 * this.volcanism * Math.sqrt(me) * holds;
+    this.atm.n2 += 2e-10 * this.volcanism * Math.sqrt(me) * holds * years;
+    this.atm.h2o += 1e-11 * this.volcanism * years * holds;
+    // ...and rain on rock pulls it back out, faster when it's warm: the carbon-silicate
+    // thermostat that has kept Earth's oceans liquid for 4 billion years
+    const liquidNow = this.oceanState === 'liquid';
+    const kW = liquidNow ? (this.tectonics ? 2.5e-6 : 2.5e-7) * clamp(Math.exp((this.Ts - 288) / 15), 0.01, 40) : 0;
+    if (kW > 0) {
+      const eq = S / kW;
+      this.atm.co2 = eq + (this.atm.co2 - eq) * Math.exp(-kW * years);
+    } else this.atm.co2 += S * years;
     // a gas envelope from what you ate
     this.atm.h2 = p.comp.gas * 400 * Math.pow(me, 0.8) * holds;
     // ---- sinks
@@ -207,8 +232,10 @@ export class PlanetModel {
     const liquid = this.oceanState === 'liquid';
     const vapor = this.oceanState === 'steam' ? Math.min(p.comp.ice * 300, 300) : 0;
     const tauG = 0.5 * Math.sqrt(Math.min(this.P, 1e3)) + 1.6 * Math.pow(this.atm.co2, 0.6) + (liquid ? 0.25 : 0) + 3 * Math.sqrt(vapor) + 2 * Math.sqrt(this.atm.ch4);
-    const internal = this.H > 0.85 ? (this.H - 0.85) * 4000 * meltable : 0;
-    this.Ts = Teq * Math.pow(1 + 0.75 * tauG, 0.25) + internal + p.heat * 1400 * meltable - this.coolEvent;
+    // a magma ocean from recent giant impacts cools within a few million years (or a minute or two of play)
+    this.magma *= Math.exp(-years / 2e6 - rs / 120);
+    const internal = this.magma * 2600 * meltable;
+    this.Ts = Teq * Math.pow(1 + 0.75 * tauG, 0.25) + internal + p.heat * 900 * meltable - this.coolEvent;
     // ice ages: slow wobbles of your orbit and tilt (Milankovitch cycles)
     if (ice0 > 0.05) this.Ts += 3 * Math.sin((w.years / 1e5) * 2 * Math.PI) * Math.sin(p.tilt + 0.2);
     // ---- water
@@ -219,17 +246,15 @@ export class PlanetModel {
     else if (water > 0.0005) state = 'frozen';
     if (state !== this.oceanState) {
       if (state === 'liquid') this.once('ocean', 'Liquid water pooled into your first oceans', 'geo');
-      if (state === 'frozen' && this.oceanState === 'liquid') this.log('Your oceans froze over: a snowball world', 'bad');
+      const quiet = w.years - (this.lastClimLog ?? -1e12) < 3e8;
+      if (state === 'frozen' && this.oceanState === 'liquid' && !quiet) { this.lastClimLog = w.years; this.log('Your oceans froze over: a snowball world', 'bad'); }
+      if (state === 'liquid' && this.oceanState === 'frozen' && this.flags.ocean && !quiet) { this.lastClimLog = w.years; this.log('Volcanic carbon dioxide warmed you up: your oceans thawed', 'geo'); }
       if (state === 'steam' && this.oceanState === 'liquid') this.log('Runaway greenhouse: your oceans boiled into a thick steam sky', 'bad');
       this.oceanState = state;
     }
     // iron and carbon worlds have little surface water to begin with
     this.iceCover = clamp(1 - (this.Ts - 230) / 45, 0, 1) * (water > 0.0005 ? 1 : 0.3);
-    if (liquid && this.tectonics) {
-      // silicate weathering: warmer means faster CO2 removal
-      const rate = 1e-7 * Math.exp((this.Ts - 288) / 15);
-      this.atm.co2 *= Math.exp(-years * clamp(rate, 0, 1e-4));
-    }
+
     // water vapour high up is split by starlight; without a field the hydrogen escapes
     if (state === 'steam' || (this.P > 0 && this.field < 0.1 && liquid)) {
       const lossRate = (state === 'steam' ? 3e-9 : 2e-11) * F * (1 - shield * 0.8);
@@ -243,6 +268,22 @@ export class PlanetModel {
     this.gSurf = gSurf;
     this.updateMoonFormation(rs, years);
     this.updateRing(rs, years);
+  }
+
+  // volatiles from a meal that stay as air (needs enough gravity to hold them)
+  deliver(comp, m) {
+    const p = this.world.player;
+    if (!p || p.comp.gas >= 0.3 || p.isStar || p.compact) return;
+    const vesc = escapeVelocity(p.mass, p.radius);
+    const holds = smoothstep(1.5, 4.5, vesc);
+    if (holds <= 0 || !(m > 0)) return;
+    const Rm = p.radius * 1000;
+    const gS = (G * p.mass) / (p.radius * p.radius) * 1000;
+    const barPerKg = gS / (4 * Math.PI * Rm * Rm) / 1e5;
+    const ice = (comp.ice || 0) * m, carbon = (comp.carbon || 0) * m, gas = (comp.gas || 0) * m;
+    // most of it is lost in the impact or locked in rock: only a trace stays in the air
+    this.atm.co2 += (ice * 3e-5 + carbon * 6e-5) * barPerKg * holds;
+    this.atm.n2 += (ice * 1e-5 + gas * 2e-4) * barPerKg * holds;
   }
 
   // starlight at your position relative to what Earth gets
@@ -392,7 +433,7 @@ export function structureOf(p, model) {
   }
   // rocky (and icy, iron, carbon) worlds
   const coreR = clamp(Math.sqrt(Math.max(c.iron, 0.01)) * (model?.differentiated ? 1 : 0.4), 0.05, 0.85);
-  const molten = ((model?.H ?? 0.5) > 0.85 || p.heat > 0.5) && (model?.meltable ?? 1) > 0.3;
+  const molten = ((model?.magma ?? 0) > 0.35 || p.heat > 0.5) && (model?.meltable ?? 1) > 0.3;
   if (model?.differentiated) {
     add('innerCore', 'Solid inner core', coreR * ((model?.H ?? 0.5) < 0.6 ? 0.38 : 0.12), 'Solid iron, squeezed solid despite the heat');
     add('outerCore', model?.field > 0.15 ? 'Liquid outer core (dynamo)' : 'Iron outer core', coreR, model?.field > 0.15 ? 'Swirling liquid iron makes your magnetic field' : '');
