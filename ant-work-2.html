@@ -2437,6 +2437,8 @@ function updateNPCPath(h,dt){
   const step=P.speed*dt;
   if(d<=step+.001){ h.position.x=tgt.x; h.position.z=tgt.z; P.i++; if(P.i>=P.pts.length){ A.path=null; if(P.faceEnd!=null) A.faceYaw=P.faceEnd; P.res(); return; } return; }
   h.position.x+=dx/d*step; h.position.z+=dz/d*step;
+  // don't walk through the player: slide around them
+  { const px=h.position.x-PLAYER.pos.x, pz=h.position.z-PLAYER.pos.z, pd=Math.hypot(px,pz), R=.8*h.scale.x; if(pd<R&&pd>1e-4&&!P.noAvoid){ h.position.x=PLAYER.pos.x+px/pd*R; h.position.z=PLAYER.pos.z+pz/pd*R; } }
   if(tgt.y!==undefined && P.useY) h.position.y+=(tgt.y-h.position.y)*Math.min(1,step/d);
   const want=Math.atan2(dx,dz); h.rotation.y=angLerp(h.rotation.y,want,Math.min(1,dt*8));
   A.faceYaw=null;
@@ -3729,7 +3731,7 @@ function envFromSky(sky,extra){
   const rt=pmrem.fromScene(s,.03); return rt.texture;
 }
 /* planes whose texture tiles every `tile` metres */
-function tiledPlane(w,d,m,tile,x=0,y=0,z=0){ const set={}; for(const k of ['map','normalMap','roughnessMap']) if(m[k]){ m[k]=m[k].clone(); m[k].needsUpdate=true; m[k].repeat.set(w/tile,d/tile); } const p=mesh(new THREE.PlaneGeometry(w,d),m,x,y,z,false); p.rotation.x=-Math.PI/2; p.receiveShadow=true; return p; }
+function tiledPlane(w,d,m,tile,x=0,y=0,z=0){ const set={}; for(const k of ['map','normalMap','roughnessMap']) if(m[k]){ m[k]=m[k].clone(); m[k].needsUpdate=true; m[k].repeat.set(w/tile,d/tile); } const p=mesh(new THREE.PlaneGeometry(w,d),m,x,y,z,false); p.rotation.x=-Math.PI/2; p.receiveShadow=true; m.polygonOffset=true; m.polygonOffsetFactor=2; m.polygonOffsetUnits=6; return p; }  // pushed back a hair so floors laid on top never flicker
 function texMat(set,rx,ry,o={}){ const r=repeatSet(set,rx,ry); const base={roughness:1}; for(const k of ['map','normalMap','roughnessMap']) if(r[k]) base[k]=r[k]; return new (o.physical?THREE.MeshPhysicalMaterial:THREE.MeshStandardMaterial)(Object.assign(base,o.opts||{})); }
 /* ---------- common surface textures ---------- */
 const TX={
@@ -3997,7 +3999,7 @@ defineLevel('home',{
     const trimM=mat(0xf5f0e6,{roughness:.55});
     const X0=-5,X1=5,Z0=-6,Z1=3,H=2.9,T=.2;
     lv.floorBounds=[X0,X1,Z0,Z1];
-    const fl=mesh(new THREE.PlaneGeometry(X1-X0,Z1-Z0),floorM,0,.005,(Z0+Z1)/2,false); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; scene.add(fl);
+    const fl=mesh(new THREE.PlaneGeometry(X1-X0,Z1-Z0),floorM,0,.012,(Z0+Z1)/2,false); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; scene.add(fl);
     const ceil=mesh(new THREE.BoxGeometry(X1-X0+.4,.2,Z1-Z0+.4),mat(0xf2ece2,{roughness:.95}),0,H+.1,(Z0+Z1)/2); scene.add(ceil);
     // wall builder with rectangular openings (windows/doors): segments along one wall
     const wallSeg=(axis,fixed,from,to,holes,outside)=>{ // axis 'x' => wall runs along x at z=fixed
@@ -4052,7 +4054,7 @@ defineLevel('home',{
     couch.add(rbox(.5,.4,.14,.08,new THREE.MeshPhysicalMaterial({color:col(0xd8a040),roughness:.9,sheen:col(0x553311)}),-.95,.85,.14)); couch.children[couch.children.length-1].rotation.z=.25;
     for(const [lx,lz] of [[-1.2,-.4],[1.2,-.4],[-1.2,.4],[1.2,.4]]) couch.add(cyl(.03,.02,.12,mat(0x2a1a10),lx,.06,lz,8));
     colBox(col_,-1.45,1.45,-2.35,-1.25);
-    const rug=mesh(new THREE.PlaneGeometry(3.4,2.4),new THREE.MeshStandardMaterial({map:canvasTex(256,256,(x,w,h)=>{ x.fillStyle='#8a3a2a'; x.fillRect(0,0,w,h); x.strokeStyle='#e8c890'; x.lineWidth=6; x.strokeRect(10,10,w-20,h-20); x.lineWidth=2; x.strokeRect(24,24,w-48,h-48); for(let i=0;i<6;i++){ x.fillStyle=i%2?'#c8783a':'#3a5a6a'; x.beginPath(); x.arc(w/2,h/2,90-i*14,0,7); x.fill(); } for(let i=0;i<9000;i++){ x.fillStyle=`rgba(0,0,0,${Math.random()*.08})`; x.fillRect(Math.random()*w,Math.random()*h,1,1); } }),roughness:1}),0,.012,-3.3,false); rug.rotation.x=-Math.PI/2; rug.receiveShadow=true; scene.add(rug);
+    const rug=mesh(new THREE.PlaneGeometry(3.4,2.4),new THREE.MeshStandardMaterial({map:canvasTex(256,256,(x,w,h)=>{ x.fillStyle='#8a3a2a'; x.fillRect(0,0,w,h); x.strokeStyle='#e8c890'; x.lineWidth=6; x.strokeRect(10,10,w-20,h-20); x.lineWidth=2; x.strokeRect(24,24,w-48,h-48); for(let i=0;i<6;i++){ x.fillStyle=i%2?'#c8783a':'#3a5a6a'; x.beginPath(); x.arc(w/2,h/2,90-i*14,0,7); x.fill(); } for(let i=0;i<9000;i++){ x.fillStyle=`rgba(0,0,0,${Math.random()*.08})`; x.fillRect(Math.random()*w,Math.random()*h,1,1); } }),roughness:1}),0,.024,-3.3,false); rug.rotation.x=-Math.PI/2; rug.receiveShadow=true; scene.add(rug);
     const woodM=texMat(woodTex('furnWood',512,{planks:3,base:[110,70,42]}),1,1,{physical:true,opts:{roughness:1,clearcoat:.5,clearcoatRoughness:.2}});
     const ct=new THREE.Group(); ct.position.set(0,0,-3.3); scene.add(ct);
     ct.add(rbox(1.3,.06,.65,.02,woodM,0,.44,0)); for(const [lx,lz] of [[-.58,-.26],[.58,-.26],[-.58,.26],[.58,.26]]) ct.add(box(.05,.42,.05,woodM,lx,.21,lz));
@@ -4091,7 +4093,7 @@ defineLevel('home',{
     for(const [p,x,y,z,ry] of pics){ p.position.set(x,y,z); p.rotation.y=ry; scene.add(p); }
     // kitchen glimpse through the doorway (dim, warm)
     const kit=new THREE.Group(); kit.position.set(X1+1.8,0,-3); scene.add(kit);
-    kit.add(mesh(new THREE.PlaneGeometry(3.6,3.6),mat(0xd8d4cc,{roughness:.9}),0,.006,0,false)); kit.children[0].rotation.x=-Math.PI/2;
+    kit.add(mesh(new THREE.PlaneGeometry(3.6,3.6),mat(0xd8d4cc,{roughness:.9}),0,.02,0,false)); kit.children[0].rotation.x=-Math.PI/2;
     kit.add(box(.1,H,3.6,wallIn,1.8,H/2,0)); kit.add(rbox(.7,1.9,.8,.04,new THREE.MeshPhysicalMaterial({color:col(0xe8e8ec),roughness:.25,clearcoat:.8}),1.3,.95,.8)); kit.add(box(.6,.9,2,woodM,1.4,.45,-.8));
     const kl=new THREE.PointLight(col(0xffd8a0),.5,5,2); kl.position.set(X1+1.8,2.4,-3); scene.add(kl);
     // ---------------- porch, exterior details ----------------
@@ -4602,7 +4604,7 @@ function rimify(m,rimCol,k=1.2,p=2.5){
   m.customProgramCacheKey=()=>pk+'rim'+rimCol+k+p; return m;
 }
 function iridescent(m){ m.onBeforeCompile=sh=>{ sh.uniforms.uT=WIND.time; sh.fragmentShader='uniform float uT;\n'+sh.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
-  { vec3 vd=normalize(vViewPosition); float f=1.0-abs(dot(normal,vd)); vec3 ir=0.5+0.5*cos(6.2831*(f*1.3+vec3(0.0,0.33,0.67))+uT*0.3); totalEmissiveRadiance+=ir*pow(f,1.5)*1.2; }`); }; m.customProgramCacheKey=()=>'irid'; return m; }
+  { vec3 vd=normalize(vViewPosition); float f=1.0-abs(dot(normal,vd)); vec3 ir=0.5+0.5*cos(6.2831*(f*1.3+vec3(0.0,0.33,0.67))+uT*0.3); totalEmissiveRadiance+=ir*pow(f,1.8)*.7; }`); }; m.customProgramCacheKey=()=>'irid'; return m; }
 function wobble(m,amt=.12,speed=1){ const prev=m.onBeforeCompile; m.onBeforeCompile=sh=>{ if(prev) prev(sh); sh.uniforms.uT=WIND.time; sh.vertexShader='uniform float uT;\n'+sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
   float wb=sin(position.x*3.1+uT*${speed.toFixed(2)}*1.3)*cos(position.y*2.7+uT*${speed.toFixed(2)}*1.1)*sin(position.z*2.3+uT*${speed.toFixed(2)}*.9); transformed+=normal*wb*${amt.toFixed(3)};`); }; m.customProgramCacheKey=()=>'wob'+amt+speed; return m; }
 function wrinkleTex(){ return texSet('wrinkle',512,(x,w,h)=>{ x.fillStyle='#909090'; x.fillRect(0,0,w,h); for(let i=0;i<70;i++){ const y=rand(0,h); x.strokeStyle=`rgba(${Math.random()<.5?40:200},${Math.random()<.5?40:200},${Math.random()<.5?40:200},${rand(.15,.4)})`; x.lineWidth=rand(2,7); x.beginPath(); x.moveTo(0,y); for(let k=0;k<=16;k++) x.lineTo(k*w/16,y+Math.sin(k*1.3+i)*rand(2,8)); x.stroke(); } for(let i=0;i<1500;i++){ x.fillStyle=`rgba(255,255,255,${Math.random()*.12})`; x.beginPath(); x.arc(rand(0,w),rand(0,h),rand(1,4),0,7); x.fill(); } },{strength:3.2}); }
@@ -4687,8 +4689,9 @@ defineLevel('tiny',{
     // --- diatoms (iridescent glass discs) ---
     const diaT=canvasTex(256,256,(x,w,h)=>{ x.fillStyle='#223'; x.fillRect(0,0,w,h); x.strokeStyle='#dff'; x.lineWidth=2; for(let i=1;i<9;i++){ x.beginPath(); x.arc(128,128,i*14,0,7); x.stroke(); } for(let i=0;i<48;i++){ const a=i/48*Math.PI*2; x.beginPath(); x.moveTo(128,128); x.lineTo(128+Math.cos(a)*124,128+Math.sin(a)*124); x.stroke(); } for(let r=1;r<9;r++) for(let i=0;i<r*8;i++){ const a=i/(r*8)*Math.PI*2+r; x.fillStyle='#9ff'; x.beginPath(); x.arc(128+Math.cos(a)*r*14+7,128+Math.sin(a)*r*14,2.5,0,7); x.fill(); } });
     const diaM=iridescent(new THREE.MeshPhysicalMaterial({color:col(0xc8f8ff),map:diaT,roughness:.1,clearcoat:1,transparent:true,opacity:.85,side:THREE.DoubleSide}));
+    const diaSideM=iridescent(new THREE.MeshPhysicalMaterial({color:col(0xa8e0f0),roughness:.15,clearcoat:1,transparent:true,opacity:.8}));  // plain glass rim: the ring texture on the side made a moire grid
     lv.diatoms=[];
-    for(let i=0;i<12;i++){ const d=new THREE.Group(); const s=rand(5,11); d.add(mesh(GC('diaDisc',()=>new THREE.CylinderGeometry(1,1,.25,48)),diaM,0,0,0)); d.children[0].scale.set(s,s,s); const rim=mesh(GC('diaRim',()=>new THREE.TorusGeometry(1,.08,8,48)),diaM,0,0,0,false); rim.rotation.x=Math.PI/2; rim.scale.setScalar(s); d.add(rim);
+    for(let i=0;i<12;i++){ const d=new THREE.Group(); const s=rand(5,11); d.add(mesh(GC('diaDisc',()=>new THREE.CylinderGeometry(1,1,.25,48)),[diaSideM,diaM,diaM],0,0,0)); d.children[0].scale.set(s,s,s); const rim=mesh(GC('diaRim',()=>new THREE.TorusGeometry(1,.08,8,48)),diaM,0,0,0,false); rim.rotation.x=Math.PI/2; rim.scale.setScalar(s); d.add(rim);
       d.position.set(rand(-220,220),rand(-90,120),rand(-450,40)); d.rotation.set(rand(0,3),rand(0,3),rand(0,3)); scene.add(d); lv.diatoms.push({obj:d,spin:rand(-.3,.3)}); lv.subjects.push({obj:d,name:'diatom',r:s}); solidAuto(lv,d,{k:.92}); }
     // --- paramecia (slipper-shaped swimmers with beating cilia) ---
     const parM=rimify(new THREE.MeshPhysicalMaterial({color:col(0x9ad8ff),roughness:.2,transparent:true,opacity:.55,clearcoat:1,depthWrite:false,emissive:col(0x0a2a4a),emissiveIntensity:.6}),0xc8f0ff,1.8,2.2);
@@ -5245,7 +5248,7 @@ async function labTalk(){
   await walkTo(jim,[V3(-1.95,0,.2)],1.2); setPose(jim,'press'); await wait(.5);
   lv.camProp.visible=false; const cp=lv.camProp.clone(); cp.visible=true; holdProp(jim,cp,'R',V3(0,-.02,.05)); clearPose(jim);
   const toPlayer=PLAYER.pos.clone(); toPlayer.y=0; const dir=toPlayer.clone().sub(jim.position).normalize();
-  await walkTo(jim,[PLAYER.pos.clone().sub(dir.multiplyScalar(.95)).setY(0)],1.2); facePoint(jim,PLAYER.pos);
+  await walkTo(jim,[PLAYER.pos.clone().sub(dir.multiplyScalar(1.4)).setY(0)],1.2); facePoint(jim,PLAYER.pos);
   setPose(jim,'holdOut'); jim.userData.A.look='player'; await wait(.7);
   cp.parent.remove(cp); clearPose(jim);
   PLAYER.item='camera'; setVM(true); SFX.pickup(); toast('Got: CAMERA','#9fe8ff');
@@ -5827,9 +5830,11 @@ $('payClose').onclick=()=>{ closeModal('payOverlay'); SFX.uiClick();
   if(F.day===2){ F.day2Convert=true; objective('Convert your paycheck into alien coins'); PLAYER.free(); const jim=LEVELS.mars.jim; jim.userData.A.look=null; clearPose(jim); return; }
   setCheckpoint('B3');
   runStory(async()=>{ const jim=LEVELS.mars.jim; jim.userData.A.look=null; walkTo(jim,[V3(-6,0,-12),V3(-20,0,-30)],1.3).then(()=>{ jim.visible=false; });
-    await wait(.6); objective('Find a house to buy'); say('Objective: find a house to buy. You only have fifty dollars. Which is very broke.',4.4); F_().houseHunt=true; PLAYER.free(); });
+    await wait(.6); objective('Find a house to buy'); say('Objective: find a house to buy. You only have fifty dollars. Which is very broke.',4.4); F_().houseHunt=true; PLAYER.free(); laneMarker(); });
 };
 
+/* point the way to Crater Lane (the houses for sale) until you get there */
+function laneMarker(){ const L=V3(12,3,33); setMarker(()=>L,'Houses for sale','m'); runStory(async()=>{ await waitUntil(()=>Math.hypot(PLAYER.pos.x-L.x,PLAYER.pos.z-L.z)<12||!F_().houseHunt); setMarker(null); }); }
 /* ================= B3: HOUSE HUNTING ================= */
 CHECKPOINTS.B3=async()=>{
   const lv=await enterLevel('mars',{pos:V3(2,0,2),yaw:Math.PI});
@@ -5841,7 +5846,7 @@ CHECKPOINTS.B3=async()=>{
   F.paid=true; F.cooked=true; F.shiftOver=true; F.watchGiven=true; F.houseHunt=true;
   HUD.cash=50; setCash(50,false); showCash(true); HUD.coins=0; setCoins(0,false); showCoins(false);
   hudVisible(true); await fade(0,1);
-  objective('Find a house to buy'); PLAYER.free();
+  objective('Find a house to buy'); PLAYER.free(); laneMarker();
 };
 async function sellerTalk(h){
   const F=F_(), s=h.seller, S={h:s,who:'Seller',voice:'Seller'}; PLAYER.lock(); s.userData.A.look='player'; lookAtPoint(V3(s.position.x,s.position.y+1.6,s.position.z),.5);
@@ -6049,10 +6054,10 @@ CHECKPOINTS.B5=async()=>{
   SFX.yawn(); await tweenVal(k=>{ FX.blackout=1-k; },1.6);
   await tweenVal(k=>{ PLAYER.eye=lerp(.9,1.64,k); PLAYER.pitch=lerp(.55,-.05,k); },1.3);
   F.canLeave=true; F.noSleep=true;
-  objective("Go to Jim's stand"); PLAYER.free();
+  objective("Go to Jim's stand"); PLAYER.free(); setMarker(()=>V3(0,1.2,5.9),'Door','m');
 };
 async function goOutsideDay2(){
-  const F=F_(); if(F.outside) return; F.outside=true; F.canLeave=false; PLAYER.lock(); objective(null);
+  const F=F_(); if(F.outside) return; F.outside=true; setMarker(null); F.canLeave=false; PLAYER.lock(); objective(null);
   sfxAt(PLAYER.pos,()=>SFX.alienDoor(),2); await fade(1,.7);
   const lv=await enterLevel('mars',{pos:V3(30,0,33),yaw:0});
   if(!lv.interSetup){ lv.interSetup=true; setupMarsInteractions(lv); }
@@ -6064,10 +6069,10 @@ async function goOutsideDay2(){
   lv.stewU.heat.value=0; for(const b of lv.potBugs) b.visible=false;
   PLAYER.eye=1.64; setVM(true); PLAYER.hasWatch=true; PLAYER.stitched=true; showCoins(true);
   playMusic('mars',1.5); await fade(0,.9);
-  objective("Go to Jim's stand"); PLAYER.free();
+  objective("Go to Jim's stand"); PLAYER.free(); setMarker(()=>V3(0,1.8,-5.75),"Jim's stand",'m');
   addTrigger(lv,{pos:V3(0,0,-1.5),r:3.4,once:true,when:()=>F_().day===2&&!F_().jimTalked,fn:()=>runStory(jimTired)});
 }
-async function jimTired(){
+async function jimTired(){ setMarker(null);
   const lv=LEVELS.mars, jim=lv.jim, F=F_(); if(F.jimTalked) return; F.jimTalked=true;
   PLAYER.lock(); objective(null); jim.userData.A.look='player';
   const p0=PLAYER.pos.clone(), p1=V3(0,0,-2.35); lookAtPoint(V3(jim.position.x,1.5,jim.position.z),.9);
@@ -6202,10 +6207,10 @@ async function slapAlarm(){
   await talk([{who:'You',text:"Bad dream..."}]);
   await tweenVal(k=>{ PLAYER.eye=lerp(.9,1.64,k); PLAYER.pitch=lerp(PLAYER.pitch,-.05,k); },1.3);
   F.canLeave=true; F.noSleep=true;
-  objective('Go outside'); PLAYER.free();
+  objective('Go outside'); PLAYER.free(); setMarker(()=>V3(0,1.2,5.9),'Door','m');
 }
 async function openDoorDay3(){
-  const F=F_(); if(F.opened3) return; F.opened3=true; F.canLeave=false; PLAYER.lock(); objective(null);
+  const F=F_(); if(F.opened3) return; F.opened3=true; F.canLeave=false; PLAYER.lock(); objective(null); setMarker(null);
   sfxAt(PLAYER.pos,()=>SFX.alienDoor(),2); await fade(1,.5);
   const lv=await enterLevel('mars',{pos:V3(30,0,33),yaw:0});
   if(!lv.interSetup){ lv.interSetup=true; setupMarsInteractions(lv); }
@@ -6887,6 +6892,8 @@ defineLevel('dream',{
     const spot=new THREE.SpotLight(col(0x9aff8a),6,16,.45,.6,1.5); spot.position.set(0,9,-26); spot.target.position.set(0,0,-27); scene.add(spot); scene.add(spot.target); lv.spot=spot;
     lv.steveLight=new THREE.PointLight(col(0x9aff8a),1.2,6,2); lv.steveLight.position.set(0,1.8,-25.6); scene.add(lv.steveLight);
     const pool=mesh(new THREE.CircleGeometry(2.4,40),basicGlow(0x5aff6a,.35),0,.02,-27,false); pool.rotation.x=-Math.PI/2; pool.material.transparent=true; pool.material.opacity=.35; scene.add(pool); lv.pool=pool;
+    // a faint shaft of green light that shows through the dark from far away (it ignores the fog)
+    { const g=new THREE.CylinderGeometry(.5,2.6,10,32,1,true); g.translate(0,5,0); const sh=mesh(g,new THREE.MeshBasicMaterial({color:col(0x6aff7a),transparent:true,opacity:.07,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,fog:false}),0,0,-27,false); scene.add(sh); lv.shaft=sh; }
     lv.col.radius=34; lv.col.cx=0; lv.col.cz=-10;
     lv.moteT=0;
   },
@@ -6897,6 +6904,9 @@ defineLevel('dream',{
     for(const a of lv.arches){ a.a.children[1].material.emissiveIntensity=1+Math.sin(t*1.2+a.ph)*.8; }
     lv.floorM.emissiveIntensity=.25+Math.sin(t*.6)*.1;
     if(lv.spotOn) lv.spot.intensity=5+Math.sin(t*7)*.6+(Math.random()<.02?-3:0);
+    if(lv.shaft){ lv.shaft.visible=!!lv.spotOn; lv.shaft.material.opacity=.06+Math.sin(t*1.3)*.015; }
+    // the fog thins as you walk toward him, so he comes out of the dark
+    if(lv.spotOn&&lv.steve.visible){ const d=Math.hypot(camera.position.x,camera.position.z+27); lv.scene.fog.density=lerp(.022,lv.fogBase,clamp((d-8)/30,0,1)); }
     // dust motes drifting up
     lv.moteT-=dt; if(lv.moteT<=0){ lv.moteT=.05; const p=camera.position; lv.glow.spawn(p.x+rand(-12,12),rand(0,1),p.z+rand(-16,4),rand(-.05,.05),rand(.2,.5),rand(-.05,.05),rand(4,7),rand(.03,.07),.7,.6,1,.5,0,-.02,1); }
   }
@@ -7033,7 +7043,8 @@ function animateBlockPerson(p,dt,t){
   J.headJ.rotation.y=damp(J.headJ.rotation.y,yaw,6,dt); J.headJ.rotation.x=talk+Math.sin(t*1.3+A.phase)*.02;
   // simple waypoint walking
   if(A.path){ const P=A.path; const tg=P.pts[P.i]; const dx=tg.x-p.position.x, dz=tg.z-p.position.z, d=Math.hypot(dx,dz), st=P.speed*dt;
-    if(d<=st){ p.position.x=tg.x; p.position.z=tg.z; P.i++; if(P.i>=P.pts.length){ A.path=null; P.res&&P.res(); } } else { p.position.x+=dx/d*st; p.position.z+=dz/d*st; p.rotation.y=angLerp(p.rotation.y,Math.atan2(dx,dz),Math.min(1,dt*8)); } }
+    if(d<=st){ p.position.x=tg.x; p.position.z=tg.z; P.i++; if(P.i>=P.pts.length){ A.path=null; P.res&&P.res(); } } else { p.position.x+=dx/d*st; p.position.z+=dz/d*st; p.rotation.y=angLerp(p.rotation.y,Math.atan2(dx,dz),Math.min(1,dt*8));
+      const px=p.position.x-PLAYER.pos.x, pz=p.position.z-PLAYER.pos.z, pd=Math.hypot(px,pz); if(pd<.75&&pd>1e-4&&A.mode!=='lifted'){ p.position.x=PLAYER.pos.x+px/pd*.75; p.position.z=PLAYER.pos.z+pz/pd*.75; } } }
 }
 function folkWalk(p,pts,speed=1.6){ return new Promise(res=>{ p.userData.A.path={pts,i:0,speed,res}; }); }
 function updateFolk(dt,t){ for(const p of FOLK){ if(!p.parent||!p.visible) continue; if(LV&&p.userData.level&&p.userData.level!==LV.name) continue; animateBlockPerson(p,dt,t); } }
@@ -8577,12 +8588,19 @@ async function growFails(){
   say("You're stuck like this.",3.6); await wait(3.8);
   await larryRoommate();
 }
+function clearSpotNear(lv,p,dist){
+  const objs=(lv.solids||[]).map(S=>S.obj).filter(o=>o&&worldVisible(o)), rc=new THREE.Raycaster();
+  const f=new THREE.Vector3(); camera.getWorldDirection(f); f.y=0; f.normalize();
+  for(const a of [0,.6,-.6,1.2,-1.2,1.8,-1.8,Math.PI]){ const d=f.clone().applyAxisAngle(V3(0,1,0),a); d.y=-.12; d.normalize(); rc.set(p,d); rc.far=dist+20; if(!rc.intersectObjects(objs,true).length) return p.clone().addScaledVector(d,dist); }
+  return p.clone().add(V3(0,dist,0));
+}
 async function larryRoommate(){
   const lv=LEVELS.tiny, L=lv.larry, F=F_();
   // Larry swims over
-  const to=PLAYER.pos.clone().add(V3(25,-14,-80)); const from=L.position.clone(); L.visible=true;
-  lookAtPoint(to.clone().add(V3(0,12,0)),1);
-  await tweenVal(k=>{ L.position.lerpVectors(from,to,k); },2.4);
+  // he stops where you can actually see him: the first direction around you with nothing (a flake, a blob) in the way
+  const to=clearSpotNear(lv,PLAYER.pos,42); const from=L.position.clone(); L.visible=true;
+  lookAtPoint(to.clone().add(V3(0,8,0)),1);
+  await tweenVal(k=>{ L.position.lerpVectors(from,to,k); const d=PLAYER.pos.clone().sub(L.position); L.rotation.y=Math.atan2(d.x,d.z); },2.4);
   L.userData.talking=true;
   await talk([{who:'Larry',voice:'Larry',text:"Guess you're my roommate now."}]);
   L.userData.talking=false;
@@ -8658,7 +8676,7 @@ CHECKPOINTS.A6=async()=>{
   $('visor').classList.add('show'); $('scaleRead').textContent='1 : 10,000,000'; $('photoRead').textContent='PHOTOS: 5';
   PLAYER.lock(); crosshair(true); lv.giant.visible=false; lv.fleeing=0; lv.giantMouth=0; lv.demodex.visible=false;
   const A=placeTinyLife(lv,{pos:V3(20,0,-40),f:V3(0,0,-1)}); ensureP3Creatures(lv); lv.rotifer.visible=lv.volvox.visible=true;
-  PLAYER.pos.copy(A.P).addScaledVector(A.f,-16).addScaledVector(A.right,-30); lookAtPoint(A.P,0);
+  PLAYER.pos.copy(A.P).addScaledVector(A.f,-16).addScaledVector(A.right,-30); lookAtPoint(lv.larry.position,0);
   FX.whiteout=1; fade(0,.4); playMusic('tiny',1);
   await tweenVal(k=>FX.whiteout=1-k,1.2);
   await growFails();
