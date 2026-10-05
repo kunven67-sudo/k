@@ -899,3 +899,9 @@ manual everything and broken gauges).
   school), retirement parties.
 - **Tattoos & piercings fully real**: pain flinches, days of healing, regret, expensive laser
   removal; piercings can get infected without cleaning.
+- **Parking**: downtown meters (tickets), hourly garages (lost ticket = max fee), towing from
+  private lots/red zones, circling for spots on busy weekends.
+- **Gas stations**: pay at pump or prepay inside, wrong-fuel engine disasters, drive-off theft
+  (cameras catch plates), per-station prices (Costco cheapest, casino-area priciest).
+- **Elevators can rarely break** and trap you between floors (emergency button, awkward NPC
+  chat, bladder pressure).
