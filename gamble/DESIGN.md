@@ -821,3 +821,10 @@ manual everything and broken gauges).
   iPhone requires the home-screen app.
   - Delivery: **free hourly GitHub Actions cron** reads the cloud save and sends web push
     (may arrive up to ~1 hour late).
+
+## 42. Round 97
+
+- **Local elections**: vote for made-up Reno mayor candidates and local measures (casino tax,
+  stadium…); results change taxes, police presence, road work.
+- **Lost & found**: casino security, bus station, police; honest NPCs may turn items in (or not).
+- **Forecasts can be wrong** (real live forecasts vs actual weather).
