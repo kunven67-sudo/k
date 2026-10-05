@@ -693,3 +693,14 @@ expectations and habits vary per individual — never one fixed rule for everyon
   - ⏳ **PENDING — do NOT build yet:** calling the number plays the owner's own recorded
     voice line and awards a "You got pranked" trophy. Wait for the owner's voice file.
 - **Installable app (PWA)**: Add to Home Screen on iPhone → own icon, full screen.
+
+## 35. Round 78
+
+- Day 1: you wake up **hurt** — black eye, sore knuckles, ripped shirt (hint you were in the
+  brawl). You CAN change clothes (a duffel bag in the motel room has a couple of outfits) and
+  heal (bruises fade over a few days; ice packs/bandages from the gas station speed it up).
+- **Online hosting is free peer-to-peer**: the host's computer runs the room; when the host
+  quits, everyone returns to their own world with their progress saved.
+- A joining friend **spawns at their own home** inside the host's Reno (their own motel
+  room/house) and must travel to meet up.
+- **Name tags above players' heads** online.
