@@ -16,6 +16,7 @@ import { Interactables } from './world/interact.js';
 import { Shops } from './shops.js';
 import { Germs } from './germs.js';
 import { Village } from './village.js';
+import { Pets } from './pets.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
@@ -324,9 +325,13 @@ export async function boot() {
       made++;
     }
   }
+  // pets from the pet shop
+  const pets = new Pets({ scene, player, nav, physics, interact, speech, shops, toast, home: level.house });
+  shops.pets = pets;
+  if (params.get('pet')) pets.adopt(params.get('pet'));
   // the germ world: what's on the floor when you're smaller than 2 cm
   const germs = new Germs({ scene, player, physics });
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, frame: 0 };
   hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
 
@@ -350,6 +355,7 @@ export async function boot() {
     family?.update(dt);
     shops.update();
     germs.update(dt);
+    pets.update(dt);
     vitals.update(dt);
     nav.update(dt);
     colony?.update(dt);

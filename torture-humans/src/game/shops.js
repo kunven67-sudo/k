@@ -32,6 +32,8 @@ const CATALOG = {
     { id: 'seedpack', name: 'Seed packet', price: 2, use: null, note: 'For the tiny people\'s farm' },
   ],
   'Pet Shop': [
+    { id: 'pet-rat', name: 'Pet rat 🐀', price: 15, pet: 'rat', note: 'Follows you around the house' },
+    { id: 'pet-gecko', name: 'Leopard gecko 🦎 (with tank)', price: 25, pet: 'gecko', note: 'Lives on your dresser' },
     { id: 'treats', name: 'Dog treats', price: 2, use: null, note: 'Good boy!' },
     { id: 'crickets', name: 'Box of crickets', price: 3, use: null, note: 'Gecko food' },
   ],
@@ -119,6 +121,12 @@ export class Shops {
     if (b.dataset.buy) {
       const it = this.find(b.dataset.buy);
       if (!it || this.money < it.price) return;
+      if (it.pet) {
+        if (this.pets?.has(it.pet)) { this.toast?.('You already have one!'); return; }
+        this.pay(it.price);
+        this.pets?.adopt(it.pet);
+        return this.close();
+      }
       this.pay(it.price);
       this.addToBag(it);
       this.toast?.(`Bought: ${it.name} (in your backpack — Tab)`);
@@ -141,6 +149,7 @@ export class Shops {
     const tiny = this.player.scale < 0.3;
     const caught = Math.random() < (tiny ? 0.1 : sev > 1 ? 0.95 : 0.55);
     if (it.id === 'cash') { if (!caught || Math.random() < 0.5) this.family?.addMoney(200); }
+    else if (it.pet) { if (!this.pets?.has(it.pet)) this.pets?.adopt(it.pet); }
     else this.addToBag(it);
     const where = this.open.at.clone();
     this.close();
