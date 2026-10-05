@@ -310,3 +310,46 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 3. Life: chat brains, dating, phone, pets, moods & emotes.
 4. Stuff: computer/store/viruses/stocks, GPUs & consoles, furniture, houses, car life.
 5. Online friends: room codes, voice chat.
+
+---
+
+## 17. Later additions (rounds 39–43)
+
+- **Smoking**: Nevada casinos allow it → smoky haze, NPC smokers; player can buy
+  cigarettes/vapes with real downsides (addiction, cough, smelly clothes, cost, health).
+- **Real disasters**: summer wildfire smoke (orange sky, coughing, road closures),
+  earthquakes (stuff falls, slots rattle, cracked walls), Truckee River floods,
+  blizzards (Tahoe highway closures, tire chains).
+- **Wildlife**: wild mustangs near Reno (roads at night), Tahoe black bears (break into
+  cars/trash), coyotes, jackrabbits, quail, rattlesnakes, bayou alligators.
+- **Macau languages**: Cantonese/Portuguese NPCs and signs; translator app or gestures;
+  casino staff speak English.
+- **Health extras**: teeth & dentist (cavities, toothache), sunburn & sunscreen, pollen
+  allergies, eyesight & glasses (break in fights).
+- **Chores**: laundry (laundromat coins or own washer), dishes (roaches, smell, partner
+  mad), trash day (stink, bugs, bears), cleaning (mood) or hire a maid.
+- **Mail**: paper bills & FINAL NOTICEs, junk mail, credit-card offers, casino promo
+  mailers with free play, jury duty summons (fine if skipped), letters (NPCs, love
+  notes, loan-shark threats, court).
+- **Neighbors**: noise complaints, HOA fines in fancy areas, friendly neighbors (food,
+  pet-sitting, loans), nosy neighbors (police witnesses).
+- **Hobbies**: fishing (license, game warden, cook your catch), skiing & snowboarding at
+  Tahoe, golf (bet on holes), hiking & camping.
+- **Fitness**: gym membership (sore muscles), boxing gym (sparring, amateur fights you
+  can bet on), pickup basketball, swimming (pools, icy Tahoe, Truckee River tubing).
+- **School**: University of Nevada, Reno and trade school (tuition, student loans) unlock
+  better jobs (nurse, electrician, accountant…).
+- **Court sentences**: community service (orange vest), probation (alcohol tests),
+  ankle monitor (house arrest), fines & court fees (unpaid → warrants).
+- **Realism relocations**: live horse racing at the New Orleans Fair Grounds; Reno uses a
+  race book with TV simulcasts; plinko & crash only in online casinos (PC/phone); coin
+  pushers in the arcade (prizes); keno in Reno casinos.
+- **Tokyo, Japan** added (passport, flight) for real pachinko parlors.
+- **Tournaments/events**: World Series of Poker (Vegas, summer), Macau high-roller
+  rooms, weekly local Reno tournaments, March Madness sportsbook frenzy.
+- **City events**: Mardi Gras (New Orleans), Chinese New Year (Macau, red envelopes),
+  Macau Grand Prix (November street race, bettable), Vegas New Year's rooftop fireworks.
+- **Second homes** in other cities (Tahoe cabin, Vegas condo, Macau penthouse…) with
+  their own bills, break-ins and property taxes.
+- Radio also has hip-hop, rock, Latin and oldies stations.
+- Real sports teams can be named, but players are made-up people.
