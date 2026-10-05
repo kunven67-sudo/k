@@ -18,17 +18,21 @@ export class Interactables {
   update() {
     const p = this.player;
     this.current = null;
-    if (p.scale < 0.5 || p.scale > 3 || p.ladder?.active || p.ladder?.prompt?.()) return;
+    if (p.scale > 3 || p.ladder?.active || p.ladder?.prompt?.()) return;
+    const small = p.scale < 0.5; // tiny you: only big things (shop doors) and by distance, not aim
     const eye = this.camera.position;
     const dir = this.camera.getWorldDirection(new THREE.Vector3());
     let best = null, bestScore = Infinity;
     for (const it of this.list) {
       if (it.when && !it.when()) continue;
+      if (small && !it.anyScale) continue;
       const at = typeof it.at === 'function' ? it.at() : it.at;
       if (!at) continue;
       const to = at.clone().sub(eye);
+      if (small) to.y = 0;
       const d = to.length();
       if (d > (it.radius ?? 1.6)) continue;
+      if (small) { if (d < bestScore) { best = it; bestScore = d; } continue; }
       const ang = Math.acos(THREE.MathUtils.clamp(to.normalize().dot(dir), -1, 1));
       if (ang > 0.6) continue;
       const score = ang + d * 0.2;

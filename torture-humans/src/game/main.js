@@ -13,6 +13,7 @@ import { Talk } from './humans/talk.js';
 import { Police } from './police.js';
 import { Family } from './family.js';
 import { Interactables } from './world/interact.js';
+import { Shops } from './shops.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
@@ -298,7 +299,9 @@ export async function boot() {
     }
   });
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, frame: 0 };
+  // the shops across the street (and your backpack)
+  const shops = new Shops({ spots: level.town?.spots, interact, input, player, family, vitals, police, speech, humans, toast, canvas: input.target });
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, frame: 0 };
   hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
 
@@ -320,6 +323,7 @@ export async function boot() {
     hazards.update(dt);
     interact.update();
     family?.update(dt);
+    shops.update();
     vitals.update(dt);
     nav.update(dt);
     colony?.update(dt);
