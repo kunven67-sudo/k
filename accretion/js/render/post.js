@@ -90,6 +90,8 @@ export const FinalShader = {
     uGrain: { value: 0.025 },
     uAberration: { value: 0.0012 },
     uSaturation: { value: 1.0 },
+    uVision: { value: 0 },
+    uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -105,7 +107,23 @@ export const FinalShader = {
     uniform float uGrain;
     uniform float uAberration;
     uniform float uSaturation;
+    uniform int uVision;
+    uniform vec2 uTexel;
     varying vec2 vUv;
+
+    // false-colour palettes for the invisible kinds of light
+    vec3 thermal(float t) {
+      vec3 a = vec3(0.0), b = vec3(0.32, 0.02, 0.45), c = vec3(0.95, 0.35, 0.05), d = vec3(1.0, 0.95, 0.75);
+      return t < 0.33 ? mix(a, b, t / 0.33) : t < 0.7 ? mix(b, c, (t - 0.33) / 0.37) : mix(c, d, (t - 0.7) / 0.3);
+    }
+    vec3 xray(float t) {
+      vec3 a = vec3(0.0), b = vec3(0.1, 0.05, 0.45), c = vec3(0.35, 0.75, 1.0), d = vec3(1.0);
+      return t < 0.4 ? mix(a, b, t / 0.4) : t < 0.8 ? mix(b, c, (t - 0.4) / 0.4) : mix(c, d, (t - 0.8) / 0.2);
+    }
+    vec3 radio(float t) {
+      vec3 a = vec3(0.0), b = vec3(0.45, 0.05, 0.05), c = vec3(1.0, 0.55, 0.1), d = vec3(1.0, 1.0, 0.6);
+      return t < 0.35 ? mix(a, b, t / 0.35) : t < 0.75 ? mix(b, c, (t - 0.35) / 0.4) : mix(c, d, (t - 0.75) / 0.25);
+    }
 
     // ACES filmic (Narkowicz fit)
     vec3 aces(vec3 x) {
@@ -128,7 +146,24 @@ export const FinalShader = {
       col.g = texture2D(tDiffuse, uv).g;
       col.b = texture2D(tDiffuse, uv - off).b;
       col += uFlashColor * uFlash;
-      col = aces(col);
+      if (uVision == 1) {
+        // infrared: warm things glow, dust turns see-through
+        float heat = dot(col, vec3(0.62, 0.28, 0.1));
+        col = thermal(1.0 - exp(-heat * 2.2));
+      } else if (uVision == 2) {
+        // X-rays: only the very hottest things show: star coronae, neutron stars, black-hole disks
+        float l = dot(col, vec3(0.1, 0.3, 0.6));
+        col = xray(smoothstep(1.2, 7.0, l));
+      } else if (uVision == 3) {
+        // radio: broad, blurry glows
+        vec3 acc = vec3(0.0);
+        for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) acc += texture2D(tDiffuse, uv + vec2(float(i), float(j)) * uTexel * 6.0).rgb;
+        acc /= 25.0;
+        float r = dot(acc, vec3(0.4, 0.35, 0.25));
+        col = radio(1.0 - exp(-r * 3.0));
+      } else {
+        col = aces(col);
+      }
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(l), col, uSaturation);
       // damage: red pulse around the edges

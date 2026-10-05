@@ -12,6 +12,7 @@ import { Sky } from './sky.js';
 import { DiskCloud, Motes, Effects, Rocks, Orbiters } from './particles.js';
 import { LensShader, FinalShader, ClampShader } from './post.js';
 import { computeLook } from './look.js';
+import { Cutaway } from './cutaway.js';
 import { blackbody, clamp, lerp } from '../core/phys.js';
 import { DIST_COMPRESS, AU_REAL, M_JUP, TIME_BASE } from '../core/constants.js';
 
@@ -143,6 +144,7 @@ export class Renderer {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.width = w; this.height = h;
+    this.finalPass?.uniforms.uTexel.value.set(1 / (w * this.pixelRatio), 1 / (h * this.pixelRatio));
     this.updateFocal();
     const bs = this.quality === 'high' ? 0.6 : 0.5;
     this.bloom.setSize(Math.round(w * this.pixelRatio * bs), Math.round(h * this.pixelRatio * bs));
@@ -366,7 +368,9 @@ export class Renderer {
     const camW = cam.pos;
     // camera orientation
     this.camera.quaternion.copy(cam.quat);
+    if (this.camera.near !== cam.near) { this.camera.near = cam.near; this.camera.updateProjectionMatrix(); }
     this.setFov(cam.fov);
+    this.close = cam.mode === 'low' || cam.mode === 'surface';
     this.camera.updateMatrixWorld();
     const view = this.camera.matrixWorldInverse;
 
@@ -375,6 +379,14 @@ export class Renderer {
     const pl = this.lightsFor(world, p.x, p.y, p.z, p);
     let target = clamp((1.0 / Math.sqrt(Math.max(pl.f0 + pl.f1, 1e-6))) * 0.9, 0.012, 260);
     if (p.isStar) target = Math.min(0.55, target * 3);
+    // down on the night side your eyes adjust to the dark
+    let dayK = 1;
+    if (cam.ground && pl.l0) {
+      const sx = pl.l0.x - p.x, sy = pl.l0.y - p.y, sz = pl.l0.z - p.z;
+      const sl = Math.hypot(sx, sy, sz) || 1;
+      dayK = clamp(((sx * cam.ground.x + sy * cam.ground.y + sz * cam.ground.z) / sl + 0.15) / 0.3, 0, 1);
+      target *= 1 + (1 - dayK) * 9;
+    }
     else if (p.compact) target = Math.min(target * 1.5, 2.5);
     target *= state.flashDim || 1;
     if (state.snap || !isFinite(this.exposure)) this.exposure = target;
@@ -384,6 +396,11 @@ export class Renderer {
     this.shared.uExposure.value = this.exposure;
     // the sky is compressed like a camera with good dynamic range
     this.scene.backgroundIntensity = clamp(Math.pow(this.exposure, 0.55) * 0.7, 0.04, 12);
+    // a daytime sky hides the stars
+    let skyDim = 1;
+    if (cam.ground && world.planet && !world.planet.giant) skyDim = 1 - 0.97 * dayK * clamp(Math.log10(1 + (world.planet.P || 0) * 30) / 1.5, 0, 1);
+    this.scene.backgroundIntensity *= skyDim;
+    this.sky.nearMat.uniforms.uFluxK.value = 0.5 * skyDim * skyDim;
 
     // sky
     const camLy = world.toLy(camW.x, camW.y, camW.z);
@@ -552,6 +569,26 @@ export class Renderer {
     } else this.dyson.set(0, this.tmpV.set(0, 0, 0), 1, 0, sunDir, 0, 1);
   }
 
+  // the cutaway wedge: layers set by the game (setCut), drawn on the player's view
+  syncCutaway(v, on, rU, b) {
+    if (!on) { if (v.cutaway) v.cutaway.group.visible = false; return; }
+    if (!v.cutaway) {
+      v.cutaway = new Cutaway(this.shared);
+      v.group.add(v.cutaway.group);
+    }
+    const c = v.cutaway;
+    if (this.cut.dirty || c.ver !== this.cut.ver) { c.setLayers(this.cut.struct, this.cut.temps, b.seed); c.ver = this.cut.ver; }
+    c.group.visible = true;
+    c.group.scale.setScalar(rU * 0.999);
+    c.group.rotation.copy(v.mesh.rotation);
+    const cu = c.mat.uniforms;
+    cu.uProbe.value = this.cut.probe ?? -1;
+    if (v.mat.uniforms.uL0dir) {
+      cu.uL0dir.value.copy(v.mat.uniforms.uL0dir.value);
+      cu.uL0col.value.copy(v.mat.uniforms.uL0col.value);
+    }
+  }
+
   // an impact on a body leaves a glowing crater (and a shock ring if it's big)
   addHit(b, dir, rel, energy) {
     const v = this.views.get(b.id);
@@ -625,7 +662,7 @@ export class Renderer {
     if (v.kind === 'planet') {
       // LOD
       const det = px < 5 ? 3 : px < 25 ? 8 : px < 110 ? 18 : px < 380 ? 40 : 72;
-      const want = b.mass < 8e20 && isPlayer ? Math.max(det, 48) : det;
+      const want = isPlayer && this.close ? 160 : b.mass < 8e20 && isPlayer ? Math.max(det, 48) : det;
       if (v.mesh.geometry !== this.geometry(want)) v.mesh.geometry = this.geometry(want);
       v.mesh.scale.setScalar(rU);
       // spin around a tilted axis
@@ -639,6 +676,12 @@ export class Renderer {
         v.mass0 = b.mass;
       }
       const u = v.mat.uniforms;
+      const cut = isPlayer && !!this.cut;
+      u.uCut.value = cut ? 1 : 0;
+      u.uClose.value = isPlayer && this.close ? rU : 0;
+      v.cloudMat.uniforms.uCut.value = cut ? 1 : 0;
+      if (cut) v.atmo.visible = false;
+      this.syncCutaway(v, cut, rU, b);
       u.uDetail.value = px > 40 ? 1 : 0;
       u.uHeat.value = Math.max(v.look.heat, b.heat || 0);
       u.uDamage.value = isPlayer ? clamp(state.damage * 1.2, 0, 1) : clamp(b.disrupt * 0.6, 0, 1);
@@ -649,7 +692,7 @@ export class Renderer {
       u.uAmbient.value = 0.0015 + (world.field.env.kind === 'nebula' ? 0.004 : 0);
       if (fade < 1) { u.uL0col.value.multiplyScalar(fade); u.uL1col.value.multiplyScalar(fade); }
       // atmosphere
-      if (v.atmo.visible) {
+      if (v.atmo.visible && !cut) {
         const s = rU * v.atmoScale;
         v.atmo.scale.setScalar(s);
         const au = v.atmoMat.uniforms;
@@ -662,6 +705,7 @@ export class Renderer {
       }
       if (v.clouds.visible || (v.look.clouds > 0.02 && px > 3)) {
         v.clouds.visible = v.look.clouds > 0.02 && px > 3;
+        v.cloudMat.side = isPlayer && this.close ? THREE.DoubleSide : THREE.FrontSide;
         v.clouds.scale.setScalar(rU * 1.008);
         v.clouds.rotation.set(b.tilt, b.rot * 1.05, 0, 'XYZ');
         v.cloudMat.uniforms.uL0dir.value.copy(u.uL0dir.value);
@@ -696,6 +740,9 @@ export class Renderer {
       v.mesh.scale.setScalar(rU);
       v.mesh.rotation.set(b.tilt * 0.2, b.rot * 0.2, 0);
       const u = v.mat.uniforms;
+      const cut = isPlayer && !!this.cut;
+      u.uCut.value = cut ? 1 : 0;
+      this.syncCutaway(v, cut, rU, b);
       u.uTempK.value = b.starTemp;
       u.uIntensity.value = (isPlayer ? 1.15 : 1.8) / Math.max(this.exposure, 1e-4);
       u.uDetail.value = px > 30 ? 1 : 0;
@@ -715,6 +762,7 @@ export class Renderer {
       gu.uCore.value = rU / sizeU;
       gu.uIntensity.value = isPlayer ? 0.9 / Math.max(this.exposure, 1e-4) : Math.min(clamp(Math.pow(flux, 0.5), 0.05, 400), 3 / Math.max(this.exposure, 1e-4));
       gu.uSpikes.value = isPlayer ? 0 : clamp(0.6 - px / 300, 0, 0.6);
+      if (cut) gu.uIntensity.value *= 0.15;
       gu.uCorona.value = isPlayer ? 0.35 : 0.25;
       gu.uSeed.value = (b.seed % 50) + 0.2;
     } else if (v.kind === 'bh') {

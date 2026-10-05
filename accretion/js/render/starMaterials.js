@@ -27,6 +27,7 @@ uniform float uSeed;
 uniform float uExposure;
 uniform float uDetail;
 uniform float uActivity;  // flares & spots (red dwarfs are very active)
+uniform float uCut;
 varying vec3 vObj;
 varying vec3 vNormalV;
 varying vec3 vViewPos;
@@ -35,6 +36,7 @@ ${NOISE}
 ${COLOR}
 void main() {
   ${LOGDEPTH_FRAG}
+  if (uCut > 0.5 && vObj.x > 0.0 && vObj.z > 0.0) discard;
   vec3 p = normalize(vObj);
   vec3 N = normalize(vNormalV);
   vec3 V = normalize(-vViewPos);
@@ -80,7 +82,9 @@ export function makeStarMaterial(shared) {
       uExposure: shared.uExposure,
       uDetail: { value: 1 },
       uActivity: { value: 0 },
+      uCut: { value: 0 },
     },
+    side: THREE.DoubleSide,
   });
 }
 

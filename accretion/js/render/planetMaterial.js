@@ -71,6 +71,8 @@ uniform float uVolcano;    // 0..1 active volcanoes glowing on the night side
 uniform vec4 uHits[6];     // impact sites: object-space direction, age in seconds (<0 unused)
 uniform vec2 uHitSize[6];  // angular size (rad), strength
 uniform vec4 uOcc[2];      // eclipsing bodies: view-space centre, radius
+uniform float uCut;        // 1 = cutaway: a wedge is removed
+uniform float uClose;      // >0 in close-up views: planet radius in view units
 uniform float uHeat;       // 0..1 molten glow
 uniform float uDamage;     // 0..1 glowing cracks
 uniform float uCraters;    // crater visibility
@@ -99,6 +101,7 @@ vec3 drifted(vec3 p) {
   return vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z);
 }
 vec4 surf(vec3 p) { return textureCube(uSurf, drifted(p)); }
+float gFw = 1.0; // screen footprint of a fragment on the unit sphere (small = close up)
 
 // how much of light 0 reaches this point past any eclipsing moon
 float eclipse(vec3 posV, vec3 L) {
@@ -185,6 +188,12 @@ vec3 rockyAlbedo(vec4 s, vec3 p, float elev, out float spec, out vec3 emit) {
       }
       col = land;
     }
+  }
+  // fine detail up close, where the baked map runs out of pixels
+  float near = 1.0 - smoothstep(0.0003, 0.003, gFw);
+  if (near > 0.0) {
+    float dn = snoise(p * 900.0 + uSeed) * 0.5 + snoise(p * 2700.0 - uSeed) * 0.3 + snoise(p * 8100.0) * 0.2;
+    col *= 1.0 + dn * 0.22 * near;
   }
   // polar caps and snow on high ground
   float capEdge = 1.0 - uIceCap * 0.55;
@@ -273,7 +282,9 @@ vec3 gasColor(vec3 p, out float emissive) {
 
 void main() {
   ${LOGDEPTH_FRAG}
+  if (uCut > 0.5 && vObj.x > 0.0 && vObj.z > 0.0) discard;
   vec3 p = normalize(vObj);
+  gFw = length(fwidth(p));
   vec3 N = normalize(vNormalV);
   vec3 V = normalize(-vViewPos);
   bool gas = uType >= 4;
@@ -339,6 +350,7 @@ void main() {
   if (uAtmo.a > 0.001) {
     float sunF = clamp(dot(normalize(vNormalV), uL0dir) * 0.6 + 0.4, 0.0, 1.0);
     float haze = pow(1.0 - nv, 3.0) * uAtmo.a;
+    if (uClose > 0.0) haze = (1.0 - exp(-length(vViewPos) / (uClose * 0.12))) * uAtmo.a * 1.2;
     col = mix(col, uAtmo.rgb * uL0col * sunF, clamp(haze, 0.0, 0.9));
   }
 
@@ -353,10 +365,12 @@ void main() {
     vec3 ac = mix(vec3(0.1, 1.0, 0.45), vec3(0.9, 0.2, 0.35), smoothstep(0.88, 0.95, lat + curtain * 0.02));
     emit += ac * oval * curtain * fine * uAurora * (0.25 + 0.75 * nightSide) * 0.6;
   }
+  // how big a surface feature looks on screen: lets small things stay small up close
+  float fw = length(fwidth(p));
   // volcanoes: hot specks on the dark side
   if (uVolcano > 0.001 && !gas) {
-    float v = snoise(p * 26.0 + uSeed * 0.7) * 0.5 + 0.5;
-    float spots = smoothstep(0.86, 0.95, v) * (0.6 + 0.4 * sin(uTime * 2.0 + v * 30.0));
+    float v = snoise(p * 70.0 + uSeed * 0.7) * 0.5 + 0.5;
+    float spots = smoothstep(0.9, 0.97, v) * (0.6 + 0.4 * sin(uTime * 2.0 + v * 30.0));
     emit += blackbody(1300.0) * spots * uVolcano * (0.3 + 0.7 * nightSide) * 0.8;
   }
   // city lights on the night side
@@ -376,8 +390,13 @@ void main() {
     float region2 = smoothstep(1.0 - cityK * 0.7, 1.08 - cityK * 0.7, snoise(p * 9.0 + uSeed) * 0.5 + 0.5 + coast * 0.25);
     // clusters of towns glow softly from afar; up close they break into specks
     float n0 = snoise(p * 38.0 + uSeed * 0.3) * 0.5 + 0.5;
-    float sprawl = smoothstep(0.58, 0.9, n0) * 0.3 * (0.4 + 0.6 * coast);
-    float cities = region2 * (sprawl + specks) * land * (1.0 - smoothstep(0.62, 0.85, abs(p.y)));
+    // from afar, towns blur into a glow; up close they break into streets of light
+    float far = smoothstep(0.0004, 0.004, fw);
+    float sprawl = smoothstep(0.58, 0.9, n0) * 0.3 * (0.4 + 0.6 * coast) * far;
+    float n3 = snoise(p * 1400.0 + uSeed * 2.3) * 0.5 + 0.5;
+    float n4 = snoise(p * 4200.0 + uSeed * 3.1) * 0.5 + 0.5;
+    float streets = smoothstep(0.62, 0.8, n3 * 0.6 + n4 * 0.4) * smoothstep(0.45, 0.8, n0) * (1.0 - far);
+    float cities = region2 * (sprawl + specks * mix(0.4, 1.0, far) + streets) * land * (1.0 - smoothstep(0.62, 0.85, abs(p.y)));
     emit += vec3(1.0, 0.6, 0.26) * cities * night * (0.5 + cityK * 0.6);
   }
 
@@ -413,6 +432,8 @@ export function makePlanetMaterial(sharedUniforms) {
       uHits: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 1, 0, -1)) },
       uHitSize: { value: Array.from({ length: 6 }, () => new THREE.Vector2(0.1, 0)) },
       uOcc: { value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] },
+      uCut: { value: 0 },
+      uClose: { value: 0 },
       uHeat: { value: 0 },
       uDamage: { value: 0 },
       uCraters: { value: 1 },
@@ -552,6 +573,7 @@ uniform float uExposure;
 uniform float uStorm;      // hurricanes over warm oceans
 uniform float uLightning;  // flashes on the night side
 uniform vec4 uOcc[2];
+uniform float uCut;
 varying vec3 vObj;
 varying vec3 vNormalV;
 varying vec3 vViewPos;
@@ -559,6 +581,7 @@ ${LOGDEPTH_FRAG_PARS}
 ${NOISE}
 void main() {
   ${LOGDEPTH_FRAG}
+  if (uCut > 0.5 && vObj.x > 0.0 && vObj.z > 0.0) discard;
   vec3 p = normalize(vObj);
   float lat = p.y;
   float t = uTime * 0.004;
@@ -653,6 +676,7 @@ export function makeCloudMaterial(sharedUniforms) {
       uCover: { value: 0.1 },
       uStorm: { value: 0 },
       uLightning: { value: 0 },
+      uCut: { value: 0 },
       uOcc: { value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] },
       uTint: { value: new THREE.Color(0.95, 0.95, 0.95) },
       uL0dir: { value: new THREE.Vector3(1, 0, 0) },

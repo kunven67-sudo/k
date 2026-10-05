@@ -161,6 +161,68 @@ export class FXSpawner {
     }
   }
 
+  // close-up views: shooting stars burning up in your air, and volcanic plumes
+  closeUp(dt) {
+    const g = this.game, w = this.world, p = w.player, cam = g.cam;
+    if (!cam.ground || !p.alive || p.isStar || p.compact) return;
+    const pm = w.planet;
+    const R = p.radius;
+    const fx = this.renderer.fx;
+    const air = pm && pm.P > 0.005;
+    const env = w.field.env.kind;
+    const rate = (env === 'disk' ? 3 : env === 'belt' ? 2 : 0.6) * (cam.mode === 'surface' ? 1 : 1.6);
+    this.meteorT = (this.meteorT || 0) - dt * rate;
+    if (air && this.meteorT <= 0) {
+      this.meteorT = Math.random() * 2;
+      const up = cam.ground;
+      // a random point in the sky near you, about 100 km up
+      const t1 = randUnit();
+      let tx = t1.x - up.x * (t1.x * up.x + t1.y * up.y + t1.z * up.z), ty = t1.y - up.y * (t1.x * up.x + t1.y * up.y + t1.z * up.z), tz = t1.z - up.z * (t1.x * up.x + t1.y * up.y + t1.z * up.z);
+      const tl = Math.hypot(tx, ty, tz) || 1;
+      tx /= tl; ty /= tl; tz /= tl;
+      const spread = cam.mode === 'surface' ? R * 0.03 : R * 0.12;
+      const off = (Math.random() - 0.5) * spread;
+      const t2 = randUnit();
+      const h = R * (1 + Math.max(0.012, Math.min(0.02, 100 / R)));
+      const cx = p.x + up.x * h + tx * off + t2.x * spread * 0.3, cy = p.y + up.y * h + ty * off + t2.y * spread * 0.3, cz = p.z + up.z * h + tz * off + t2.z * spread * 0.3;
+      const len = R * (cam.mode === 'surface' ? 0.004 : 0.012) * (0.5 + Math.random());
+      const dir = randUnit();
+      const n = 18;
+      const hot = Math.random() < 0.2;
+      for (let i = 0; i < n; i++) {
+        const f = i / n;
+        const c = hot ? [0.6, 1.4, 0.8] : [1.6, 1.3, 1.0];
+        fx.spawn({
+          x: cx + dir.x * len * f, y: cy + dir.y * len * f, z: cz + dir.z * len * f,
+          vx: p.vx, vy: p.vy, vz: p.vz,
+          life: 0.15 + f * 0.5, size: len * 0.02 * (0.4 + f), grow: 0.2,
+          r: c[0], g: c[1], b: c[2], a: 0.9 * f, glow: true,
+        });
+      }
+    }
+    // volcano plumes rise along your ground track
+    if (pm && pm.volcanism > 0.45 && cam.mode === 'low' && Math.random() < dt * pm.volcanism * 0.8) {
+      const up = cam.ground;
+      const fw = cam.forward;
+      const a = 0.08 + Math.random() * 0.25;
+      let gx = up.x + fw.x * a, gy = up.y + fw.y * a, gz = up.z + fw.z * a;
+      const j = randUnit();
+      gx += j.x * 0.08; gy += j.y * 0.08; gz += j.z * 0.08;
+      const gl = Math.hypot(gx, gy, gz);
+      gx /= gl; gy /= gl; gz /= gl;
+      const vs = (R * 0.004) / TIME_BASE;
+      for (let i = 0; i < 26; i++) {
+        const k = randUnit();
+        fx.spawn({
+          x: p.x + gx * R * 1.001, y: p.y + gy * R * 1.001, z: p.z + gz * R * 1.001,
+          vx: p.vx + (gx + k.x * 0.25) * vs * (0.5 + Math.random()), vy: p.vy + (gy + k.y * 0.25) * vs * (0.5 + Math.random()), vz: p.vz + (gz + k.z * 0.25) * vs * (0.5 + Math.random()),
+          life: 4 + Math.random() * 4, size: R * 0.003, grow: 4, r: 0.35, g: 0.32, b: 0.3, a: 0.6, glow: false, drag: 0.4,
+        });
+      }
+      fx.spawn({ x: p.x + gx * R * 1.0005, y: p.y + gy * R * 1.0005, z: p.z + gz * R * 1.0005, vx: p.vx, vy: p.vy, vz: p.vz, life: 3, size: R * 0.0025, grow: 0.5, r: 2.2, g: 0.8, b: 0.2, a: 1, glow: true });
+    }
+  }
+
   spawnShell(x, y, z, scale = 1) {
     const fx = this.renderer.fx;
     const sp = 9000 * scale;

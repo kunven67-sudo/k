@@ -12,6 +12,7 @@ import * as F from './core/format.js';
 import { FORM, M_SUN, M_EARTH, WARP_LEVELS, DEEP_LEVELS } from './core/constants.js';
 import { clamp, tierOf } from './core/phys.js';
 import { LIFE_STAGES } from './world/life.js';
+import { probe as probeAt } from './world/planet.js';
 import { installSheets } from './ui/sheets.js';
 import { Goals } from './ui/goals.js';
 import { Tips } from './ui/tips.js';
@@ -462,6 +463,7 @@ class Game {
         this.handleInput(dt);
         w.update(dt);
         this.processEvents();
+        this.fx.closeUp(dt);
         this.saveTimer -= dt;
         if (this.saveTimer <= 0) { this.saveTimer = 30; this.autosave(); }
       } else {
@@ -474,6 +476,8 @@ class Game {
     this.everyFrame?.(dt);
     const p = w.player;
     if (p.alive) this.frame = w.referenceFrame(p.x, p.y, p.z, p);
+    if (this.cam.mode !== 'chase') this.checkView();
+    this.updateCutaway(dt);
     this.cam.update(p, this.renderer.cameraScale(p), dt, { boost: w.input.boost && w.input.level > 0, warp: w.deep ? 1 : w.warp });
     this.damage = Math.max(this.damage - dt * 0.8, w.tidalStress * 1.2, 0);
     this.stormWarn -= dt;
@@ -554,11 +558,11 @@ class Game {
     const inp = this.input, w = this.world, cam = this.cam;
     if (this.photoOn) { this.photoInput?.(dt); w.input.level = 0; return; }
     cam.look(inp.mouseDX, inp.mouseDY, this.settings.sens, this.settings.invert);
-    const ak = 1.6 * dt;
-    if (inp.down('ArrowLeft')) cam.yaw += ak;
-    if (inp.down('ArrowRight')) cam.yaw -= ak;
-    if (inp.down('ArrowUp')) cam.pitch = clamp(cam.pitch + ak, -1.5, 1.5);
-    if (inp.down('ArrowDown')) cam.pitch = clamp(cam.pitch - ak, -1.5, 1.5);
+    const ak = (1.6 * dt) / 0.0022;
+    if (inp.down('ArrowLeft')) cam.look(-ak, 0, 1, false);
+    if (inp.down('ArrowRight')) cam.look(ak, 0, 1, false);
+    if (inp.down('ArrowUp')) cam.look(0, -ak, 1, false);
+    if (inp.down('ArrowDown')) cam.look(0, ak, 1, false);
     if (inp.wheel) cam.zoomBy(inp.wheel);
     if (inp.hit('Equal') || inp.hit('NumpadAdd')) cam.zoomBy(-2);
     if (inp.hit('Minus') || inp.hit('NumpadSubtract')) cam.zoomBy(2);
@@ -986,6 +990,77 @@ class Game {
     this.onEvent?.({ type: 'universe-end' });
     setTimeout(() => { $('death').hidden = false; }, 2500);
     this.saves.remove('auto');
+  }
+
+  // V: chase, free orbit, low orbit, surface (only where they make sense)
+  cycleView() {
+    const p = this.world.player;
+    const solid = !p.isStar && !p.compact && p.comp.gas < 0.3;
+    const modes = ['chase', 'orbit'];
+    if (!p.compact) modes.push('low');
+    if (solid) modes.push('surface');
+    const i = modes.indexOf(this.cam.mode);
+    const next = modes[(i + 1) % modes.length];
+    const star = this.world.renderer ? null : this.renderer.lightsFor(this.world, p.x, p.y, p.z, p).l0;
+    this.cam.setMode(next, p, star ? { x: star.x - p.x, y: star.y - p.y, z: star.z - p.z } : null);
+    this.viewName = { chase: 'Chase', orbit: 'Free orbit', low: 'Low orbit', surface: 'Surface' }[next];
+    this.hud.log(`View: ${this.viewName}${next === 'low' ? ' (scroll to change height)' : next === 'surface' ? ' (look up)' : next === 'orbit' ? ' (scroll far out to see your system)' : ''}`, 'info');
+  }
+
+  // N: see in other kinds of light
+  cycleVision() {
+    const names = ['Visible', 'Infrared', 'X-ray', 'Radio'];
+    this.vision = ((this.vision || 0) + 1) % 4;
+    this.visionName = names[this.vision];
+    this.renderer.finalPass.uniforms.uVision.value = this.vision;
+    const what = ['', 'warm things glow, cold dust turns see-through', 'only the hottest things show: coronae, neutron stars, black-hole disks', 'pulsars, jets and the glow of the galaxy'][this.vision];
+    this.hud.log(`Vision: ${this.visionName}${what ? ` (${what})` : ''}`, 'info');
+    if (!this.viewName) this.viewName = 'Chase';
+  }
+
+  // K: see inside yourself
+  toggleCutaway() {
+    const p = this.world.player;
+    if (!this.cutOn && p.compact === 'bh') { this.hud.log('Nothing inside an event horizon can ever be seen, not even by you', 'info'); return; }
+    this.cutOn = !this.cutOn;
+    $('probe').hidden = !this.cutOn;
+    if (this.cutOn) {
+      this.cutTimer = 0;
+      if (!this.probeBound) {
+        this.probeBound = true;
+        $('probe-depth').addEventListener('input', () => { this.cutTimer = 0; });
+        $('probe-depth').addEventListener('keydown', (e) => e.stopPropagation());
+      }
+      this.hud.log('Cutaway: a wedge of you is drawn removed. Drag the probe to read the temperature and pressure inside.', 'info');
+    } else this.renderer.cut = null;
+  }
+
+  updateCutaway(dt) {
+    if (!this.cutOn) return;
+    const p = this.world.player;
+    if (p.compact === 'bh' || !p.alive) { this.toggleCutaway(); return; }
+    this.cutTimer -= dt;
+    if (this.cutTimer > 0) return;
+    this.cutTimer = 0.5;
+    const pm = this.world.planet;
+    const struct = pm.structure();
+    const temps = struct.layers.map((L, i) => probeAt(p, pm, ((i > 0 ? struct.layers[i - 1].r1 : 0) + L.r1) / 2).T);
+    const f = 1 - +$('probe-depth').value;
+    const q = probeAt(p, pm, f);
+    const key = struct.layers.map((L) => `${L.name}${L.r1.toFixed(3)}`).join('|') + temps.map((t) => Math.round(t / 50)).join(',');
+    const prev = this.renderer.cut;
+    this.renderer.cut = { struct, temps, probe: f, ver: prev && prev.key === key ? prev.ver : (prev?.ver || 0) + 1, key };
+    $('probe-out').innerHTML = `<dt>Depth</dt><dd>${F.distance(q.depthKm)}</dd><dt>Layer</dt><dd>${q.layer.name}</dd><dt>Temperature</dt><dd>${F.temperature(q.T)}</dd><dt>Pressure</dt><dd>${q.P > 1e4 ? `${F.sci(q.P, 1)} bar` : `${F.nice(q.P)} bar`}</dd>`;
+  }
+
+  // forms change: drop views that no longer make sense
+  checkView() {
+    const p = this.world.player;
+    const m = this.cam.mode;
+    if ((m === 'surface' && (p.isStar || p.compact || p.comp.gas >= 0.3)) || (m === 'low' && p.compact)) {
+      this.cam.setMode('chase', p);
+      this.viewName = 'Chase';
+    }
   }
 
   viewLabel() {
