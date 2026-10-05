@@ -1106,6 +1106,21 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Headphones/AirPods**: music while walking; reduced awareness of cars, people and danger;
   noise-canceling depends on the model.
 
+## 53. SITTING (owner focus)
+
+- **Sit on anything sittable** (right height & flat enough): chairs, couches, benches, stools, beds,
+  curbs, stairs, ledges, fences, car hoods, tables (rude in restaurants), floors and ground (cold in
+  snow, hot in summer).
+- **Seat physics**: lean back too far → tip over (ragdoll), cheap/old chairs crack or collapse
+  (depends on chair & weight), bar stools/office chairs spin, rocking chairs rock, wheeled chairs
+  roll, soft cushions squish & jiggle (hard benches don't).
+- **Seat social**: "that's my seat!" when you take a temporarily vacated slot/stool (seat-saving
+  with cups/jackets; reactions depend on the person), personal space on benches, laps (partner,
+  kids), sharing couches/booths and scooting over.
+- **Sitting/standing depends on your body**: drunk stumbles, slow grunting with age, injuries need
+  crutches/help, post-meal groans, sore muscles after the gym. Sitting poses vary with personality
+  and mood.
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
