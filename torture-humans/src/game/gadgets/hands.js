@@ -496,7 +496,7 @@ export class Hands {
 
   update(dt) {
     const { input, camera, player } = this.ctx;
-    if (player.ladder?.active) { this.current.model.visible = false; return; } // both hands on the ladder
+    if (player.ladder?.active) { this.current.release?.(); this.current.model.visible = false; return; } // both hands on the ladder (set down whoever you hold first)
     this.current.model.visible = true;
     for (let i = 0; i < this.items.length; i++) if (input.pressed(`item${i + 1}`)) this.select(i);
     if (input.pressed('nextItem')) this.select((this.index + 1) % this.items.length);

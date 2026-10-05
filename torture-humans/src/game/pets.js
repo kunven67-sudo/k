@@ -62,7 +62,7 @@ export class Pets {
 
   has(kind) { return this.list.some((p) => p.kind === kind); }
 
-  async adopt(kind) {
+  async adopt(kind, { quiet = false } = {}) {
     if (this.has(kind)) return false;
     const pet = { kind, alive: true, profile: { name: kind === 'rat' ? pick(['Squeaky', 'Nibbles', 'Remy', 'Cheddar']) : pick(['Gizmo', 'Mango', 'Spot', 'Leo']) }, love: 0.5, t: 0 };
     const holder = new THREE.Group();
@@ -106,7 +106,7 @@ export class Pets {
       label: () => (this.food(kind) ? `Feed ${pet.profile.name}` : `Pet ${pet.profile.name}`),
       use: () => this.touch(pet),
     });
-    this.toast?.(`${pet.profile.name} the ${kind === 'rat' ? 'pet rat' : 'leopard gecko'} is yours! ${kind === 'rat' ? 'They\'ll follow you around the house.' : 'Their tank is on your dresser.'}`);
+    if (!quiet) this.toast?.(`${pet.profile.name} the ${kind === 'rat' ? 'pet rat' : 'leopard gecko'} is yours! ${kind === 'rat' ? 'They\'ll follow you around the house.' : 'Their tank is on your dresser.'}`);
     return true;
   }
 

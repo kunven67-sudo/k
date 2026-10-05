@@ -3,6 +3,7 @@
 // threat, compliment, question...), who they are and how they feel right now,
 // and they remember how you treated them.
 import * as THREE from 'three';
+import { parseCommand, decide, startOrder } from './orders.js';
 
 const pick = (a) => a[(Math.random() * a.length) | 0];
 const has = (t, re) => re.test(t);
@@ -142,8 +143,8 @@ export function replyTo(h, text, { player, colony } = {}) {
 }
 
 export class Talk {
-  constructor({ input, camera, humans, speech, player, colony = null, getHeld = () => null, canvas = null }) {
-    Object.assign(this, { input, camera, humans, speech, player, colony, getHeld, canvas });
+  constructor({ input, camera, humans, speech, player, colony = null, getHeld = () => null, canvas = null, places = [] }) {
+    Object.assign(this, { input, camera, humans, speech, player, colony, getHeld, canvas, places });
     this.box = document.getElementById('chatbox');
     this.field = document.getElementById('chatin');
     this.logEl = document.getElementById('chatlog');
@@ -229,6 +230,14 @@ export class Talk {
         return { to: h, ...r };
       }
     }
+    // a command ("follow me", "stop", "go to the bakery"): they decide honestly, and if yes, they do it
+    const cmd = parseCommand(text);
+    if (cmd) {
+      const d = decide(h, cmd, { player: this.player });
+      const r = { text: d.text, intent: `order:${cmd.kind}`, mood: d.ok ? 'neutral' : 'angry', order: d.ok ? cmd : null };
+      this.pending.push({ h, r, t: 0.5 + Math.random() * 0.4 });
+      return { to: h, ...r };
+    }
     const r = replyTo(h, text, { player: this.player, colony: this.colony });
     // a moment to think, then answer
     this.pending.push({ h, r, t: 0.6 + Math.random() * 0.6 });
@@ -244,6 +253,7 @@ export class Talk {
       this.pending.splice(i, 1);
       if (p.h.dead) continue;
       this.speech.say(p.h, p.r.text, { secs: 4.5 });
+      if (p.r.order) { startOrder(p.h, p.r.order, { player: this.player, places: this.places }); continue; }
       this.addLog(p.h.profile.name, p.r.text);
       // say it with the body too (when standing around or in your hand)
       if (['idle', 'held', 'stranded'].includes(p.h.state)) p.h.character.play(pick(TALK_ANIMS[p.r.mood] || TALK_ANIMS.neutral), { onDone: () => p.h.state === 'held' && p.h.character.play('idle_nervous_01', { loop: true }) });

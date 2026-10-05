@@ -121,7 +121,7 @@ export class TinyReality {
     if (this.colony && this.player.inCage) {
       for (const p of this.colony.pieces) if (p.kind === 'food' && p.state === 'ground' && p.mesh?.parent) consider(p.mesh.getWorldPosition(new THREE.Vector3()), 'Eat (the tiny people\'s food!)', 'piece', p);
       const w = this.cage?.tiny?.world;
-      for (const d of this.details?.dewSpots || []) if (!d.drunk) consider(w.localToWorld(d.p.clone()), 'Drink the dew drop', 'dew', d);
+      if (this.details?.dewVisible) for (const d of this.details.dewSpots || []) if (!d.drunk) consider(w.localToWorld(d.p.clone()), 'Drink the dew drop', 'dew', d);
     }
     return best;
   }
@@ -136,7 +136,7 @@ export class TinyReality {
       v.hunger = Math.min(100, v.hunger + amount);
       this.toast?.(amount >= 100 ? 'You ate the whole crumb. You\'re stuffed!' : 'Crunch. Tastes like bread (because it is).');
       if (n.kind === 'crumb') { n.ref.mesh.visible = false; n.ref.back = 240; }
-      else { n.ref.state = 'gone'; n.ref.mesh.parent?.remove(n.ref.mesh); }
+      else this.colony.removePiece(n.ref); // gone from the tiny people's world too
     } else {
       v.thirst = Math.min(100, v.thirst + amount);
       this.toast?.(amount >= 100 ? 'You drank the whole droplet. So much water!' : 'Slurp.');
@@ -374,7 +374,7 @@ export class TinyReality {
   updateVacuum(dt) {
     const mom = this.family?.parents.find((h) => h.role === 'mom');
     const vac = this.family?.vacuum;
-    const on = !!(mom && vac && mom.vacuuming && mom.state !== 'away' && !mom.tiny);
+    const on = !!(mom && vac && mom.vacuuming && (mom.state === 'idle' || mom.state === 'walking') && !mom.tiny && !mom.dead);
     if (vac) vac.visible = on;
     this.audio?.vacuum?.(on ? vac.position : null);
     if (!on) return;
@@ -397,6 +397,8 @@ export class TinyReality {
     const r = this.riding;
     if (!r) return;
     const p = this.player;
+    // knocked out / teleported: just let go (don't pull you back to the rat)
+    if (this.hazards?.fading || this.vitals.dead) { this.riding = null; p.frozen = false; return; }
     if (!this.pets?.list.includes(r) || p.scale > 0.12 || this.input.pressed('jump') || this.input.pressed('interact') && this.rideT > 0.3) {
       this.riding = null;
       p.frozen = false;

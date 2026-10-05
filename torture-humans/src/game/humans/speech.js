@@ -99,7 +99,7 @@ export class Speech {
     const v = new THREE.Vector3();
     for (const [h, b] of this.list) {
       b.t -= dt;
-      if (b.t <= 0 || h.dead || !h.alive) { b.el.remove(); this.list.delete(h); continue; }
+      if (b.t <= 0 || h.dead || !h.alive || h.state === 'away') { b.el.remove(); this.list.delete(h); continue; }
       const head = h.character?.bones?.Bip01_Head;
       const s = h.character?.root?.getWorldScale(v).x ?? 1;
       if (head) head.getWorldPosition(v); else h.character.root.getWorldPosition(v);

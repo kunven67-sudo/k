@@ -135,22 +135,40 @@ export function hasSave() {
 export async function loadGame(g) {
   let d;
   try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { d = null; }
-  if (!d || d.v !== 1) return false;
+  if (!d || d.v !== 1 || !Array.isArray(d.player?.feet) || d.player.feet.length !== 3 || !d.player.feet.every(Number.isFinite)) return false;
+  try {
+    return await applySave(g, d);
+  } catch (e) {
+    console.warn('[save] could not load', e);
+    return false;
+  }
+}
+
+async function applySave(g, d) {
   if (g.env && d.hour !== undefined) { g.env.hour = d.hour; g.env.day = d.day ?? 1; }
   if (g.env?.setWeather && d.weather) g.env.setWeather(d.weather);
   const p = g.player;
   p.inCage = false;
-  p.setScale(d.player.scale ?? 1, new THREE.Vector3().fromArray(d.player.feet));
+  const sc = Number.isFinite(d.player.scale) ? THREE.MathUtils.clamp(d.player.scale, 0.001, 20) : 1;
+  p.setScale(sc, new THREE.Vector3().fromArray(d.player.feet));
   p.yaw = d.player.yaw ?? p.yaw;
-  Object.assign(g.vitals, d.vitals || {});
+  for (const k of ['health', 'hunger', 'thirst', 'energy']) if (Number.isFinite(d.vitals?.[k])) g.vitals[k] = THREE.MathUtils.clamp(d.vitals[k], k === 'health' ? 1 : 0, 100);
+  g.vitals.dead = false;
   const f = g.family;
+  // a fresh start for anything that's going on right now
+  if (g.police) { g.police.wanted = 0; g.police.lastSeen = null; g.police.calls.length = 0; }
   if (f) {
-    f.money = 0; f.addMoney(d.money ?? 0);
+    f.chores.clear();
+    for (const m of f.clothes || []) m.visible = false;
+    if (f.plate) f.plate.visible = false;
+    f.carrying = null;
+    f.money = 0; f.addMoney(Number.isFinite(d.money) ? d.money : 0);
     f.given = new Set(d.given || []);
-    for (const k of d.chores || []) { f.chores.delete(k); f.give(k, null); }
+    for (const k of d.chores || []) { f.chores.delete(k); f.give(k, null, { quiet: true }); }
     f.watchBackAt = d.watchBackAt ?? null;
     p.watchTaken = f.watchTaken;
     f.lastAllowanceDay = d.lastAllowanceDay ?? 0;
+    f.drawChores();
   }
   if (g.shops) {
     g.shops.bag.clear();

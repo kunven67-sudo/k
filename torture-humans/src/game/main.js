@@ -154,7 +154,7 @@ export async function boot() {
   for (const h of humans) { h.speech = speech; h.player = player; }
   const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony, speech, audio });
   // T / Enter: type something to whoever you're looking at (or holding)
-  const talk = new Talk({ input, camera, humans, speech, player, colony, canvas: input.target, getHeld: () => hands.items.find((i) => i.held)?.held ?? null });
+  const talk = new Talk({ input, camera, humans, speech, player, colony, canvas: input.target, places: level.town?.spots || [], getHeld: () => hands.items.find((i) => i.held)?.held ?? null });
   player.cage = cage;
   const squisher = new Squisher({ scene, player, humans, settings });
   const vitals = new Vitals(settings);

@@ -2,6 +2,7 @@
 // grocery to a neighbor, find a neighbor's lost ring somewhere in their lawn
 // (tiny! shrink down to search the grass), or work a shift at the grocery till.
 import * as THREE from 'three';
+import { GROUND_Y } from './levels/town.js';
 
 const pick = (a) => a[(Math.random() * a.length) | 0];
 
@@ -51,8 +52,9 @@ export class Jobs {
     const door = pick(this.doors);
     const name = pick(['Mrs. Ellis', 'Mr. Romano', 'Grandma Joy', 'Mr. Chen']);
     // somewhere in the lawn in front of their house
-    const p = door.p.clone().add(new THREE.Vector3((Math.random() - 0.5) * 5, 0, 1 + Math.random() * 2.5));
-    p.y = door.p.y + 0.004;
+    // on the lawn between their door and the sidewalk (the lawn is 2 cm lower than the path)
+    const p = door.p.clone().add(new THREE.Vector3((Math.random() < 0.5 ? -1 : 1) * (1 + Math.random() * 2), 0, 0.8 + Math.random() * 1.8));
+    p.y = GROUND_Y + 0.003;
     this.ring.position.copy(p);
     this.ring.visible = true;
     this.active = { kind: 'ring', door, name, pay: 15, found: false };

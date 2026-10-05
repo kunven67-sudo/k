@@ -219,6 +219,7 @@ export function addTinyDetails({ tiny, cage, settings, glass, getHour, player, c
   return {
     dewSpots,
     // tiny people can drink morning dew instead of walking to the pond
+    get dewVisible() { return dew.visible; }, // morning only
     dewNear(local, maxD) {
       if (!dew.visible) return null;
       let best = null, bd = maxD;

@@ -204,7 +204,7 @@ export class Family {
 
   // ---- chores and money
 
-  give(key, from) {
+  give(key, from, { quiet = false } = {}) {
     if (this.chores.has(key)) return;
     const c = { ...CHORES[key] };
     this.chores.set(key, c);
@@ -212,7 +212,7 @@ export class Family {
     if (key === 'dishes') this.plate.visible = true;
     if (key === 'trash') { this.trashOut = false; this.setTrashVisible(true); }
     const line = { trash: 'Can you take the trash out, please?', tidy: 'Your room is a mess. Clean it up!', dishes: 'Bring your plate down, it\'s been up there all day!', lights: 'Lights off, bedtime!' }[key];
-    if (from && this.near(from)) this.speech?.say(from, line, { secs: 5 });
+    if (quiet) { /* restored from a save: no new message */ } else if (from && this.near(from)) this.speech?.say(from, line, { secs: 5 });
     else { this.toast?.(`📱 ${from?.profile.name ?? 'Mom'}: ${line}`); this.phone?.text(from?.profile.name ?? 'Mom', line); }
     this.drawChores();
   }

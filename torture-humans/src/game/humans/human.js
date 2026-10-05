@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { Character } from '../engine/anim.js';
 import { GROUP, groups } from '../engine/physics.js';
 import { Life } from './life.js';
+import { runOrder } from './orders.js';
 
 // feet find the floor: only the world and furniture count (not people, not you)
 const FLOOR = groups(GROUP.NPC, GROUP.WORLD | GROUP.PROP);
@@ -48,6 +49,7 @@ export class Human {
   }
 
   goTo(p, { run = false } = {}) {
+    if (!this.agent) return false; // not on the walkable map right now (stuck on a roof, in a hand...)
     const q = this.nav.closest(p);
     if (!q) return false;
     this.agent.updateParameters({ maxSpeed: (run ? 3.2 : 1.35) * this.scale });
@@ -140,7 +142,7 @@ export class Human {
     this.shrinking = { from: this.scale, to, t: 0, d: 1.6 - power * 0.4 };
     this.emotion.fear = 1;
     this.character.stopOneShot(0.1);
-    this.agent.resetMoveTarget();
+    this.agent?.resetMoveTarget();
   }
 
   // the grow beam (shrink ray, right click): back to normal size
@@ -152,11 +154,34 @@ export class Human {
     return true;
   }
 
+  // being shrunk (or grown back): the scale eases to the target, then they react
+  updateShrinking(dt) {
+    if (!this.shrinking) return;
+    const k = this.shrinking;
+    k.t += dt;
+    const u = Math.min(1, k.t / k.d);
+    // shrink fast at first, then settle (like it's being squeezed down)
+    const e = 1 - Math.pow(1 - u, 3);
+    this.applyScale(THREE.MathUtils.lerp(k.from, k.to, e));
+    if (u < 1) return;
+    const grown = k.to >= 0.5;
+    this.shrinking = null;
+    this.tiny = !grown;
+    this.speech?.react(this, grown ? 'grown' : 'shrunk', { shout: true });
+    if (grown) { this.emotion.fear = 0.5; this.emotion.anger = Math.min(1, this.emotion.anger + 0.4); return; }
+    // run away from whoever did it
+    if (!this.agent) return;
+    const away = this.nav.randomPoint((p) => Math.hypot(p.x - this.position.x, p.z - this.position.z) < 4 && Math.abs(p.y - this.position.y) < 0.5);
+    if (away) this.goTo(away, { run: true });
+  }
+
   applyScale(s) {
     this.scale = s;
     this.character.root.scale.setScalar(s);
-    this.physics.resizeCapsule(this.capsule, 1.75 * s, 0.26 * s);
-    this.physics.setCapsuleGroup(this.capsule, s < 0.5 ? GROUP.TINY : GROUP.NPC);
+    if (this.capsule) {
+      this.physics.resizeCapsule(this.capsule, 1.75 * s, 0.26 * s);
+      this.physics.setCapsuleGroup(this.capsule, s < 0.5 ? GROUP.TINY : GROUP.NPC);
+    }
     this.agent?.updateParameters({ radius: Math.max(0.02, 0.3 * s), height: 1.8 * s, maxSpeed: 1.35 * s });
   }
 
@@ -508,6 +533,7 @@ export class Human {
     }
     if (this.state === 'stranded') {
       // stuck somewhere they can't walk off (a table, a roof): look around, wave for help
+      this.updateShrinking(dt);
       this.timer -= dt;
       if (this.timer <= 0) { this.character.play(['wave_01', 'idle_look_around_01', 'idle_nervous_02', 'wave_02'][(Math.random() * 4) | 0]); this.timer = 3 + Math.random() * 4; }
       this.updateFace();
@@ -515,26 +541,10 @@ export class Human {
       return;
     }
     if (this.state === 'caged') { this.updateCaged(dt); return; }
-    if (this.shrinking) {
-      const k = this.shrinking;
-      k.t += dt;
-      const u = Math.min(1, k.t / k.d);
-      // shrink fast at first, then settle (like it's being squeezed down)
-      const e = 1 - Math.pow(1 - u, 3);
-      this.applyScale(THREE.MathUtils.lerp(k.from, k.to, e));
-      if (u >= 1) {
-        const grown = k.to >= 0.5;
-        this.shrinking = null;
-        this.tiny = !grown;
-        this.speech?.react(this, grown ? 'grown' : 'shrunk', { shout: true });
-        if (grown) { this.emotion.fear = 0.5; this.emotion.anger = Math.min(1, this.emotion.anger + 0.4); return; }
-        // run away from whoever did it
-        const away = this.nav.randomPoint((p) => Math.hypot(p.x - this.position.x, p.z - this.position.z) < 4 && Math.abs(p.y - this.position.y) < 0.5);
-        if (away) this.goTo(away, { run: true });
-      }
-    }
-    // a special mind (police on duty...) can take over from the everyday one
-    if (!this.brain?.(dt)) {
+    this.updateShrinking(dt);
+    // something you told them to do (follow you, wait, go somewhere) comes first,
+    // then a special mind (police on duty...), then the everyday one
+    if (runOrder(this, dt)) { /* doing what you asked */ } else if (!this.brain?.(dt)) {
       this.watchForGiant(dt);
       this.think(dt);
     }
