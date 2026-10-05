@@ -339,6 +339,27 @@ export async function boot() {
   if (params.get('pet')) pets.adopt(params.get('pet'));
   // the germ world: what's on the floor when you're smaller than 2 cm
   const germs = new Germs({ scene, player, physics });
+  // your bed: sleep until morning (or a nap in the daytime)
+  if (level.house && env) {
+    interact.add({
+      at: new THREE.Vector3(3.6, 3.85, -3.9), radius: 2.2,
+      label: () => (env.hour >= 20 || env.hour < 5 ? 'Sleep until morning' : 'Take a nap (1 hour)'),
+      when: () => player.scale > 0.5 && player.scale < 2,
+      use: () => {
+        const night = env.hour >= 20 || env.hour < 5;
+        hazards.blackout(night ? 'Zzz… you sleep through the night.' : 'Zzz… a quick nap.', player.feet.clone(), { revive: false });
+        hazards.onMoved = () => {
+          hazards.onMoved = null;
+          const wake = night ? 7 : (env.hour + 1) % 24;
+          if (night && env.hour >= 20) env.day = (env.day ?? 1) + 1;
+          env.hour = wake;
+          vitals.energy = Math.min(100, vitals.energy + (night ? 100 : 25));
+          vitals.hunger = Math.max(5, vitals.hunger - (night ? 15 : 3));
+          vitals.thirst = Math.max(5, vitals.thirst - (night ? 20 : 4));
+        };
+      },
+    });
+  }
   // your phone (P): messages, map, weather, bank, wanted
   const phone = new Phone({ input, player, env, family, police, humans, level, canvas: input.target });
   if (family) family.phone = phone;
