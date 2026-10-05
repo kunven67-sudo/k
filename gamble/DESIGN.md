@@ -451,3 +451,25 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
   dog park (meet dates; dog fights), pet social-media fame.
 - **Sports-betting app** requires in-person sign-up with ID at a casino sportsbook, then
   works only inside Nevada.
+
+## 22. Later additions (rounds 55–56)
+
+- **Broke-life money**: plasma donation (~$40–70, twice a week, dizzy after), gig apps
+  (DoorDash, Uber, Instacart — your car, gas & wear, ratings, non-tippers), paid medical
+  studies (side effects), panhandling (pennies, judgement, mood hit).
+- **Free help**: weekly food bank (long line), public library (free computers, Wi-Fi,
+  charging, warm seat; closes at night), free clinic (hours of waiting), downtown soup
+  kitchen (evening hot meal).
+- **Payday loans & car title loans** (300%+ APR; title loan → they take your car).
+- **Transit**: real Amtrak California Zephyr stop in downtown Reno, Greyhound buses, RTC
+  city buses.
+- **Dating realism**: ghosting, your partner can cheat on you (find texts on their phone),
+  jealousy & exes, long-distance strain (video calls).
+- **Original PC/console games**: retro drift racer, FPS arena shooter (online with
+  friends), platformer & falling-block puzzle, short horror game (makes your character
+  jumpy if played at night).
+- **Weddings**: Vegas Elvis-impersonator chapel, courthouse, big planned wedding (venue,
+  food, DJ, outfits, guests, reception drama), Tahoe lakeside.
+- **Vacations** (resort areas, not full cities): Hawaii beach resort (surf, luau, sunburn),
+  Cancun all-inclusive (passport, included drinks, street-seller scams), Yosemite
+  national park (camping, bears, waterfalls).
