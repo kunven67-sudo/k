@@ -780,3 +780,14 @@ manual everything and broken gauges).
 - **Studio splash: dice roll** — two physics dice tumble and land on 6-6, "Loaded Dice
   Studios" fades in with a clack.
 - **Credits: studio only** ("Loaded Dice Studios").
+
+## 41. Round 88
+
+- Newspapers, TV news and radio stations use **made-up names** (they report fictional stories
+  about people); all other brands stay real.
+- **Character creator happens in a DMV photo booth** — the camera flash at the end takes the
+  photo that becomes your ID card in your wallet.
+- **NPC nicknames** for you based on your actions ("Lucky", "Broke Boy", "the Hand",
+  "Card Shark"), spreading around town.
+- **Self radio**: load your own songs (from computer/phone) into a personal car/home station.
+- **Vanity license plates** at the DMV (rude ones rejected; memorable to cops & witnesses).
