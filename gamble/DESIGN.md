@@ -704,3 +704,15 @@ expectations and habits vary per individual — never one fixed rule for everyon
 - A joining friend **spawns at their own home** inside the host's Reno (their own motel
   room/house) and must travel to meet up.
 - **Name tags above players' heads** online.
+
+## 36. Round 79 — never boring
+
+- **Rich life**: buy a whole casino (set odds within Nevada law, staff, gaming regulators,
+  robberies), Tahoe yacht, helicopter, supercar collection, mansion & pool, donations that put
+  your name on UNR buildings / hospital wings, rich-people problems (paparazzi, gold diggers,
+  fake friends, lawsuits, kidnapping risk & bodyguards, huge taxes).
+- **Reno places**: Reno Aces minor-league baseball (bet on games), UNR Wolf Pack football &
+  basketball (tailgating), National Automobile Museum, movie theater with the made-up movies
+  (crowd behavior depends on the person).
+- **Rival gambler NPC** who keeps showing up, trash talks, bets against you, competes for
+  partners/jobs, remembers every result — can become an enemy or best friend over years.
