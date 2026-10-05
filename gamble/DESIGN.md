@@ -796,3 +796,8 @@ manual everything and broken gauges).
   downtown casinos; rough at night.
 - **Gambling music: only the casino's own soft background music and machine jingles** (no
   cinematic tension score).
+- **All real Reno casinos get equal, maximum detail** — The Row (Eldorado, Silver Legacy, Circus
+  Circus with its carnival midway & circus acts, linked by skyways), Grand Sierra Resort,
+  Peppermill, Atlantis, etc.
+- **Day 1 starts at the 11 AM knock**: the Starlite clerk bangs on the door demanding the $45
+  or checkout.
