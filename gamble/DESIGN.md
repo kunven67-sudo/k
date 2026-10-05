@@ -751,3 +751,10 @@ expectations and habits vary per individual — never one fixed rule for everyon
 - **Car entry**: full animation every time (unlock, open, sit, close, seatbelt, keys, start).
 - **Phone in hand**: held up in the 3D world filling most of the view; world keeps going —
   walking while texting can bump into things/people.
+- **Chips are dragged physically** onto felt/roulette numbers (clack & stack physics; ALL IN
+  pushes the whole stack).
+- **Poker cards are peeked by lifting the corners** — careless peeks can be seen by neighbors.
+- **Slots**: SPIN button (modern) or physical lever pull where machines have one; old machines
+  are lever-only.
+- **Carry drinks/food while walking**; bumps, running, tripping and drunkenness cause spills
+  (stains, angry NPCs).
