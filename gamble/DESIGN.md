@@ -933,3 +933,17 @@ have a Ring cam; a witness only matters if someone actually saw it).
   elections, awards); Nevada regulators may shut them down in-game.
 - **Poker staking**: get staked by rich NPCs (split winnings, owe makeup) or stake others.
 - **Racehorse syndicate shares**: pay feed/trainer/vet, watch races, win purses or suffer injuries.
+
+## 48. FOOD, DRINKS & FRIDGES (owner focus, rounds 115+)
+
+- **Fridges/freezers** (features depend on the model): motel mini-fridge you start with (tiny, loud
+  hum, barely cold, fits a six-pack + leftovers), old used fridges (cheap, noisy, leaky, can die
+  in summer), modern side-by-side/French-door with ice & water dispensers (Samsung, LG,
+  Whirlpool), chest freezers (bulk Costco meat, hunting/fishing catches, months of storage).
+- **Fridge realism**: every item sits physically on shelves/door bins (stacking; items fall out
+  if yanked open), interior light, cold fog in summer, door left open warms food and raises the
+  bill, forgotten food molds and stinks (bugs), power outages spoil food within hours.
+- **Spoilage**: printed expiration dates, visible rot (brown bananas, green bread mold, gray meat,
+  wilted lettuce), sniff test (sour milk → gag), freezer burn (safe but tastes bad).
+- **Drink temperature**: drinks chill slowly in the fridge, warm beer/soda taste bad (mood hit),
+  ice cools fast, hot coffee cools off, drinks forgotten in the freezer explode.
