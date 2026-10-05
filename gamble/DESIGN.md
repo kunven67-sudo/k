@@ -819,3 +819,5 @@ manual everything and broken gauges).
   server-authoritative).
 - **Real push notifications** about autopilot life while away (rent due, evicted, partner texted…);
   iPhone requires the home-screen app.
+  - Delivery: **free hourly GitHub Actions cron** reads the cloud save and sends web push
+    (may arrive up to ~1 hour late).
