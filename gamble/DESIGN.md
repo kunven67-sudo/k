@@ -947,3 +947,15 @@ have a Ring cam; a witness only matters if someone actually saw it).
   wilted lettuce), sniff test (sour milk → gag), freezer burn (safe but tastes bad).
 - **Drink temperature**: drinks chill slowly in the fridge, warm beer/soda taste bad (mood hit),
   ice cools fast, hot coffee cools off, drinks forgotten in the freezer explode.
+- **Kitchen appliances** (depend on the home): microwave (metal/eggs explode, sparks, fires), stove
+  & oven (boil-overs, smoke alarm; gas or electric), air fryer, blender, toaster, coffee maker,
+  outdoor grill (propane/charcoal, flare-ups, neighbors drop by).
+- **Grocery stores**: carts (wobbly wheel), physical shelf picking, cashier lines & self-checkout
+  ("unexpected item in bagging area"), bagging & carrying, weekly sales, mailed coupons, store
+  brands vs name brands, real 2026 prices that inflate over time.
+- **Drinks**: real brands (Coca-Cola, Pepsi, Dr Pepper, Red Bull, Monster, Gatorade, Starbucks, Bud
+  Light, Coors, Modelo, Jack Daniel's…), cocktail mixing at home or bartending (pour amounts
+  matter), free and genuinely good Reno tap water (Sierra snowmelt) vs paid bottled water, home
+  coffee (drip, Keurig, espresso) and Starbucks/Dutch Bros drive-thrus.
+- **Diets depend on the person**: allergies (peanuts, shellfish), intolerances (lactose),
+  vegetarian/vegan/keto, favorite foods — for NPCs and for you (set in creator or discovered).
