@@ -124,15 +124,19 @@ if (uSway > 0.5) {
       if (!/body|head/i.test(m.name)) return m;
       const c = m.clone();
       const isBody = /body/i.test(m.name);
+      // made-from-scratch people (toon.js) carry their own map of what's soft
+      const toon = !!o.geometry.attributes.soft;
+      if (toon) u.uSoft.value = 1;
       c.onBeforeCompile = c.userData.extraCompile = (sh) => {
         Object.assign(sh.uniforms, u);
         // where on the body (bind pose, meters: y = height, arms out sideways)
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', '#include <common>\nvarying vec3 vBind;')
-          .replace('#include <common>', '#include <common>\nuniform vec3 uJiggle; uniform float uSoft;')
+          .replace('#include <common>', `#include <common>\nuniform vec3 uJiggle; uniform float uSoft;${toon ? '\nattribute float soft;' : ''}`)
           .replace('#include <begin_vertex>', `#include <begin_vertex>
 vBind = position;
-${isBody ? `if (uSoft > 0.5) {
+${toon ? `transformed += uJiggle * soft * 1.6;` : ''}
+${isBody && !toon ? `if (uSoft > 0.5) {
   // chest and belly: soft tissue in front of the torso lags and wobbles
   float front = smoothstep(0.0, 0.08, position.z);
   float chest = smoothstep(1.05, 1.18, position.y) * smoothstep(1.42, 1.3, position.y) * smoothstep(0.2, 0.08, abs(position.x));
@@ -251,7 +255,7 @@ if (uGlow > 0.5) {
   totalEmissiveRadiance += diffuseColor.rgb * vec3(0.9, 0.25, 0.15) * edge * 0.18 * (1.0 - uPale * 0.7);
 }`);
       };
-      c.customProgramCacheKey = () => `skin-life-${level}-${isBody ? 'body' : 'head'}`;
+      c.customProgramCacheKey = () => `skin-life-${level}-${isBody ? 'body' : 'head'}${toon ? '-toon' : ''}`;
       return c;
     });
     o.material = Array.isArray(o.material) ? mats : mats[0];

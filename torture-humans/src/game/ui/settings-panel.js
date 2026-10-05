@@ -74,7 +74,8 @@ export class SettingsPanel {
       body = `
         <div class="row"><span>Difficulty</span>${sel('gameplay.difficulty', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard'], ['creative', 'Creative (can\'t get hurt)']])}</div>
         <div class="row"><span>Gore</span>${sel('gameplay.gore', [['none', 'None'], ['some', 'Some'], ['full', 'Full']])}</div>
-        <div class="row"><span>Camera</span>${sel('gameplay.camera', [['first', 'First person'], ['third', 'Third person']])}</div>`;
+        <div class="row"><span>Camera</span>${sel('gameplay.camera', [['first', 'First person'], ['third', 'Third person']])}</div>
+        <div class="row"><span>People look <i>after a restart · realistic is slower on weak PCs</i></span>${sel('gameplay.characters', [['jiggly', 'Jiggly (default)'], ['cartoony', 'Cartoony'], ['simple', 'Simple'], ['realistic', 'Realistic']])}</div>`;
     } else if (this.tab === 'controls') {
       const rows = Object.entries(ACTIONS).map(([id, a]) => {
         const keys = this.input.keysFor(id);
@@ -129,6 +130,7 @@ export class SettingsPanel {
     const [a, b] = path.split('.');
     this.settings.set({ [a]: { [b]: value } });
     if (path === 'tiny.moreTinyCities') this.toast?.('More tiny cities: restart the game to build them');
+    if (path === 'gameplay.characters') this.toast?.('People look: restart the game to see it');
     // live value labels next to sliders
     const val = t.parentElement?.querySelector('.val');
     if (val && t.type === 'range') val.textContent = path === 'graphics.fov' ? `${value}°` : path === 'controls.mouseSensitivity' ? value.toFixed(1) : `${Math.round(value * 100)}%`;

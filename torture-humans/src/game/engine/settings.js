@@ -55,6 +55,7 @@ export const DEFAULT_SETTINGS = {
     gore: 'some',               // none | some | full
     money: true,                // tiny humans can have money, bank, houses
     camera: 'first',            // first | third
+    characters: 'jiggly',       // jiggly | cartoony | simple (made by the game) | realistic (scanned)
     subtitles: true,
   },
   audio: { master: 1, music: 0.6, effects: 1, voices: 1, ambience: 0.8, musicStyle: 'goofy' },

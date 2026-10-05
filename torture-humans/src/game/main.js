@@ -27,6 +27,7 @@ import { SettingsPanel } from './ui/settings-panel.js';
 import { PauseMenu } from './ui/pause-menu.js';
 import { Phone, saveGame, loadGame, hasSave } from './phone.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
+import { buildToon } from './humans/toon.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
 import { Colony } from './colony/colony.js';
@@ -92,7 +93,19 @@ export async function boot() {
 
   const lib = new AnimLibrary('assets/anims/');
   await lib.require(baseClips('m'));
-  const avatar = await loadAvatar('assets/avatars/Male_Adult_01.glb');
+  // people: made by the game (jiggly / cartoony / simple, fast) or the scanned realistic ones
+  const charStyle = params.get('people') || settings.get('gameplay.characters') || 'jiggly';
+  const skeletons = {};
+  const skeletonFor = async (g) => (skeletons[g] ??= g === 'f'
+    ? await loadAvatar('assets/avatars/Business_Female_01.glb').catch(() => null) || await loadAvatar('assets/avatars/Male_Adult_01.glb')
+    : await loadAvatar('assets/avatars/Male_Adult_01.glb'));
+  let toonCount = 0;
+  const avatarFor = async (look, { job } = {}) => {
+    if (charStyle === 'realistic') return loadAvatar(`assets/avatars/${look}.glb`);
+    const g = isFemale(look) ? 'f' : 'm';
+    return buildToon(await skeletonFor(g), { seed: `${look}#${toonCount++}`, gender: g, job: job ?? jobOf(look), style: charStyle });
+  };
+  const avatar = charStyle === 'realistic' ? await loadAvatar('assets/avatars/Male_Adult_01.glb') : await avatarFor('Male_Adult_01', { job: 'none' });
   const character = new Character(avatar, lib, { gender: 'm' });
   const player = new Player({ physics, input, settings, camera, character, scene, position: level.spawn });
   if (params.get('cam')) player.mode = params.get('cam');
@@ -111,7 +124,7 @@ export async function boot() {
         const look = looks[i % looks.length];
         const gender = /Female/.test(look) ? 'f' : 'm';
         await lib.require(baseClips(gender));
-        const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => avatar);
+        const tpl = await avatarFor(look).catch(() => avatar);
         const start = nav.randomPoint(level.wanderArea) || level.spawn;
         humans.push(new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.wanderArea, profile: { look, name: nameFor(look), job: jobOf(look) }, settings }));
       }
@@ -122,7 +135,7 @@ export async function boot() {
         const look = order[i % order.length];
         const gender = isFemale(look) ? 'f' : 'm';
         await lib.require(baseClips(gender));
-        const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => null);
+        const tpl = await avatarFor(look).catch(() => null);
         if (!tpl) continue; // that look isn't in this build
         const start = nav.randomPoint(level.town.area) || null;
         if (!start) break;
@@ -174,8 +187,8 @@ export async function boot() {
       const look = Math.random() < 0.5 ? 'Police_Male_01' : 'Police_Female_01';
       const gender = isFemale(look) ? 'f' : 'm';
       await lib.require(baseClips(gender));
-      const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => null)
-        || await loadAvatar('assets/avatars/Police_Male_01.glb').catch(() => null);
+      const tpl = await avatarFor(look, { job: 'police officer' }).catch(() => null)
+        || await avatarFor('Police_Male_01', { job: 'police officer' }).catch(() => null);
       if (!tpl) return null;
       const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: at, area: level.town?.area, settings, profile: { look, name: `Officer ${nameFor(look).split(' ')[1]}`, job: 'police officer', personality: { bravery: 0.9 } } });
       h.townie = true;
@@ -238,7 +251,7 @@ export async function boot() {
   let family = null;
   if (level.house && params.get('family') !== '0') {
     family = new Family({ player, env, speech, toast: (t) => toast(t), interact, scene, physics, home: level.house, police });
-    const parentLook = async (looks) => { for (const l of looks) { const t = await loadAvatar(`assets/avatars/${l}.glb`).catch(() => null); if (t) return [l, t]; } return [null, null]; };
+    const parentLook = async (looks) => { for (const l of looks) { const t = await avatarFor(l, { job: l.startsWith('F') || l.startsWith('B') ? 'nurse' : 'office worker' }).catch(() => null); if (t) return [l, t]; } return [null, null]; };
     for (const [role, looks] of [['mom', ['Female_Adult_05', 'Female_Adult_02', 'Business_Female_01']], ['dad', ['Male_Adult_07', 'Male_Adult_01', 'Male_Adult_04']]]) {
       const [look, tpl] = await parentLook(looks);
       if (!tpl) continue;
@@ -328,11 +341,13 @@ export async function boot() {
     let made = 0;
     for (const look of order) {
       if (made >= 5) break;
-      const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => null);
+      // (tiny villagers wear their own clothes, not the uniform that came with the look)
+      const job = pick(['matchbox builder', 'crumb farmer', 'thread spinner', 'water carrier', 'mayor of Wallton']);
+      const tpl = await avatarFor(look, { job }).catch(() => null);
       if (!tpl) continue;
       const gender = isFemale(look) ? 'f' : 'm';
       await lib.require(baseClips(gender));
-      const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: level.village.houses[made % 3], settings, profile: { look, name: nameFor(look), job: pick(['matchbox builder', 'crumb farmer', 'thread spinner', 'water carrier', 'mayor of Wallton']) } });
+      const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: level.village.houses[made % 3], settings, profile: { look, name: nameFor(look), job } });
       h.speech = speech;
       h.player = player;
       humans.push(h);
@@ -350,10 +365,12 @@ export async function boot() {
     let made = 0;
     for (const look of [...TOWN_LOOKS].sort(() => Math.random() - 0.5)) {
       if (made >= 4) break;
-      const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => null);
+      const job = pick(['leaf weaver', 'seed collector', 'acorn carver']);
+      const tpl = await avatarFor(look, { job }).catch(() => null);
       if (!tpl) continue;
       const gender = isFemale(look) ? 'f' : 'm';
-      const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: burrow.layout.houses[made % 4], settings, profile: { look, name: nameFor(look), job: pick(['leaf weaver', 'seed collector', 'acorn carver']) } });
+      await lib.require(baseClips(gender));
+      const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: burrow.layout.houses[made % 4], settings, profile: { look, name: nameFor(look), job } });
       h.speech = speech; h.player = player;
       humans.push(h);
       burrow.add(h);
