@@ -22,6 +22,7 @@ import { TownLife } from './humans/town-life.js';
 import { Jobs } from './jobs.js';
 import { TinyReality } from './tiny-reality.js';
 import { SettingsPanel } from './ui/settings-panel.js';
+import { PauseMenu } from './ui/pause-menu.js';
 import { Phone, saveGame, loadGame, hasSave } from './phone.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
@@ -296,7 +297,6 @@ export async function boot() {
   const hintEl = document.getElementById('hint');
   // controls help: shown when you start (not in tests), H toggles it
   const controlsEl = document.getElementById('controls');
-  if (controlsEl && !params.has('paused')) controlsEl.hidden = false;
   addEventListener('keydown', (e) => {
     const typing = /INPUT|TEXTAREA/.test(e.target?.tagName || '');
     if (e.code === 'KeyH' && controlsEl && !typing) controlsEl.hidden = !controlsEl.hidden;
@@ -391,6 +391,10 @@ export async function boot() {
   const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, audio, phone, jobs, tiny, settingsPanel, frame: 0 };
   // saving: F5 / F9, every 2 minutes, and when you close the game; picks up where you left off
   Object.defineProperty(game, 'zone', { get: () => zone });
+  // Esc: the pause menu (and the start screen)
+  const pauseMenu = new PauseMenu({ input, canvas: input.target, settingsPanel, save: () => saveGame(game), load: () => loadGame(game), toast, isBusy: () => !input.enabled, start: !params.has('paused') });
+  game.pauseMenu = pauseMenu;
+  settings.onChange((d, patch) => { if (patch.gameplay?.camera && patch.gameplay.camera !== player.mode) player.toggleCamera(); });
   game.save = () => saveGame(game);
   game.load = () => loadGame(game);
   if (hasSave() && !params.has('paused') && !params.has('fresh')) loadGame(game).then((ok) => ok && toast('Welcome back! (F5 saves, F9 loads)')).catch((e) => console.warn('[save]', e.message));
@@ -452,10 +456,10 @@ export async function boot() {
     const now = performance.now();
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
-    if (!params.has('paused')) step(dt);
+    if (!params.has('paused') && !pauseMenu.paused) step(dt);
     game_applyZone?.();
     updateSizeHud(dt);
-    const hint = player.interactHint || interact.hint || hands.hint;
+    const hint = pauseMenu.paused || settingsPanel.isOpen ? null : player.interactHint || interact.hint || hands.hint;
     if (hintEl && hintEl.textContent !== (hint || '')) { hintEl.textContent = hint || ''; hintEl.hidden = !hint; }
     if (renderer.render(now) && fpsEl) {
       fpsEl.hidden = !settings.get('graphics.showFps');

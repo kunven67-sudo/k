@@ -57,7 +57,7 @@ export const DEFAULT_SETTINGS = {
     camera: 'first',            // first | third
     subtitles: true,
   },
-  audio: { master: 1, music: 0.7, effects: 1, voices: 1, ambience: 0.8 },
+  audio: { master: 1, music: 0.6, effects: 1, voices: 1, ambience: 0.8, musicStyle: 'goofy' },
   // being tiny: the realistic stuff is always on; these are just for fun (not realistic)
   tiny: { superJump: false, talkingBugs: false, moreTinyCities: false, rideCritters: false, labels: false },
 };
