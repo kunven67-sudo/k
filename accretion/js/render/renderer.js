@@ -43,7 +43,7 @@ export class Renderer {
     this.sky = new Sky(this.gl, galaxy, this.shared, quality);
     this.scene.background = this.sky.texture;
     this.sky.onSwap = (tex) => { this.scene.background = tex; };
-    this.scene.add(this.sky.systemPoints);
+    this.scene.add(this.sky.systemPoints, this.sky.andromeda);
 
     this.motes = new Motes(this.shared, quality === 'low' ? 500 : 900);
     this.scene.add(this.motes.lines);
@@ -87,6 +87,20 @@ export class Renderer {
     this.tmpQ = new THREE.Quaternion();
     this.frame = 0;
     this.resize();
+  }
+
+  // a new galaxy needs a new sky
+  setGalaxy(galaxy) {
+    this.scene.remove(this.sky.systemPoints, this.sky.andromeda);
+    this.sky.dispose();
+    this.sky = new Sky(this.gl, galaxy, this.shared, this.quality);
+    this.sky.onSwap = (tex) => { this.scene.background = tex; };
+    this.scene.add(this.sky.systemPoints, this.sky.andromeda);
+    for (const v of this.views.values()) this.disposeView(v);
+    this.views.clear();
+    for (const d of this.disks.values()) d.dispose();
+    this.disks.clear();
+    this.fx.clear();
   }
 
   makeDots(max) {
@@ -356,13 +370,12 @@ export class Renderer {
     const rate = target < this.exposure ? 3.5 : 1.2;
     this.exposure += (target - this.exposure) * Math.min(1, dtReal * rate);
     this.shared.uExposure.value = this.exposure;
-    this.scene.backgroundIntensity = clamp(this.exposure * 0.6, 0, 40);
+    // the sky is compressed like a camera with good dynamic range
+    this.scene.backgroundIntensity = clamp(Math.pow(this.exposure, 0.55) * 0.7, 0.04, 12);
 
     // sky
-    this.sky.setCamera(camW.x, camW.y, camW.z);
-    this.sky.sysMat.uniforms.uHideNear.value = 9e9;
-    this.sky.update(camW, this.focal, state.forceSky);
-    if (this.frame % 60 === 0) this.sky.refreshSystemLum();
+    const camLy = world.toLy(camW.x, camW.y, camW.z);
+    this.sky.update(world, camW, camLy, this.focal, dtReal, state.forceSky);
 
     // bodies
     const seen = new Set();

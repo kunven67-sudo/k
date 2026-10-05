@@ -132,12 +132,14 @@ export class PlanetModel {
       this.oceanState = 'none';
       this.esi = 0;
       this.updateMoonFormation(rs, years);
+      this.updateRing(rs, years);
       return;
     }
 
     // ---- interior heat: radioactive decay and leftover heat, slower for big worlds
     const tau = (p.mass < 1e21 ? 2e7 : 3e9 * Math.max(0.05, p.radius / R_EARTH));
     const tidalHeat = this.tidalHeating();
+    this.tidalHeat = tidalHeat;
     this.H = Math.max(0.03 + tidalHeat, this.H * Math.exp(-years / tau) + p.heat * 0.002 * rs);
     if (!this.differentiated && p.mass > 1e22 && (p.heat > 0.5 || this.H > 0.9)) {
       this.differentiated = true;
@@ -298,13 +300,19 @@ export class PlanetModel {
 
   updateRing(rs, years) {
     const r = this.ring;
-    if (!r) return;
     const p = this.world.player;
+    if (!r) {
+      if (p.rings && p.rings.fromModel) p.rings = null;
+      return;
+    }
     // rings rain down over a few hundred million years (Saturn's are doing this now)
     const fall = r.mass * (1 - Math.exp(-years / 3e8 - rs / 3000));
     r.mass -= fall;
     p.mass += fall;
-    if (r.mass < p.mass * 1e-7) this.ring = null;
+    if (r.mass < p.mass * 1e-10 || p.isStar || p.compact) this.ring = null;
+    // what the renderer draws: thin rings are faint, massive ones opaque like Saturn's
+    const op = clamp((Math.log10(Math.max(r.mass / p.mass, 1e-12)) + 9.5) / 3, 0.05, 0.95);
+    p.rings = this.ring ? { inner: r.inner, outer: r.outer, opacity: op, seed: r.seed, fromModel: true } : null;
   }
 
   // what's inside you, for the cutaway view: layers from the centre out

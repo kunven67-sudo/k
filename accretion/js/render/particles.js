@@ -139,7 +139,7 @@ export class DiskCloud {
   }
 
   update(cam, S, focal, simTime, starColor) {
-    const s = this.entry.sys;
+    const s = this.entry.star && this.entry.star.alive ? this.entry.star : this.entry.pos;
     for (const o of this.objects) {
       const u = o.material.uniforms;
       u.uCenterRel.value.set((s.x - cam.x) / S, (s.y - cam.y) / S, (s.z - cam.z) / S);

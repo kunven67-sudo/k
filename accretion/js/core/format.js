@@ -62,7 +62,38 @@ export function distance(km) {
   if (a < 1e6) return `${nice(km)} km`;
   if (a < C * 120) return `${nice(km / C)} light-seconds`;
   if (a < C * 3600 * 2) return `${nice(km / (C * 60))} light-minutes`;
-  return `${nice(km / (C * 3600))} light-hours`;
+  if (a < C * 3600 * 24 * 3) return `${nice(km / (C * 3600))} light-hours`;
+  if (a < C * 86400 * 200) return `${nice(km / (C * 86400))} light-days`;
+  return `${nice(km / 9.4607e12)} light-years`;
+}
+
+// a span of years in words: "4.2 million years"
+export function years(y) {
+  const a = Math.abs(y);
+  if (!isFinite(a)) return 'forever';
+  if (a < 1) return `${(a * 365.25).toFixed(0)} days`;
+  if (a < 1e4) return `${a < 10 ? a.toFixed(1) : Math.round(a).toLocaleString('en-US')} years`;
+  if (a < 1e6) return `${trim((a / 1e3).toFixed(a < 1e5 ? 1 : 0))} thousand years`;
+  if (a < 1e9) return `${trim((a / 1e6).toFixed(a < 1e8 ? 1 : 0))} million years`;
+  if (a < 1e12) return `${trim((a / 1e9).toFixed(2))} billion years`;
+  if (a < 1e15) return `${trim((a / 1e12).toFixed(1))} trillion years`;
+  return `10${String(Math.floor(Math.log10(a))).split('').map((ch) => SUP[ch]).join('')} years`;
+}
+
+// short form for the HUD: "4.2 Myr"
+export function yearsShort(y) {
+  const a = Math.abs(y);
+  if (a < 1e3) return `${a < 10 ? a.toFixed(2) : Math.round(a)} yr`;
+  if (a < 1e6) return `${trim((a / 1e3).toFixed(1))} kyr`;
+  if (a < 1e9) return `${trim((a / 1e6).toFixed(1))} Myr`;
+  if (a < 1e12) return `${trim((a / 1e9).toFixed(2))} Gyr`;
+  return `10${String(Math.floor(Math.log10(a))).split('').map((ch) => SUP[ch]).join('')} yr`;
+}
+
+// real playing time: "1:02:33"
+export function clock(sec) {
+  const s = Math.floor(sec % 60), m = Math.floor((sec / 60) % 60), h = Math.floor(sec / 3600);
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
 export function radius(km) {
@@ -85,6 +116,7 @@ export function temperature(k) {
 
 export function duration(sec) {
   const s = Math.abs(sec);
+  if (s >= 86400 * 365.25 * 1000) return years(s / (86400 * 365.25));
   if (s < 120) return `${s.toFixed(0)} s`;
   if (s < 7200) return `${(s / 60).toFixed(0)} min`;
   if (s < 86400 * 2) return `${(s / 3600).toFixed(1)} hours`;

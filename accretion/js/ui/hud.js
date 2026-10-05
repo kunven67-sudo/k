@@ -1,7 +1,9 @@
 // Heads-up display: telemetry in real units, target brackets, warnings, fact cards.
 import * as F from '../core/format.js';
-import { STAGES, COMP_COLORS, TIME_BASE, M_SUN, CORE_BURN_STAGES } from '../core/constants.js';
-import { nextStageMass, stageFloorMass, escapeVelocity, clamp, rocheLimit } from '../core/phys.js';
+import { FORM, COMP_COLORS, COMP_KEYS, TIME_BASE, M_SUN, CORE_BURN_STAGES, NS_MAX_MASS, WD_MAX_MASS } from '../core/constants.js';
+import { forecast, escapeVelocity, clamp, rocheLimit } from '../core/phys.js';
+import { msLifetimeYears } from '../world/stellar.js';
+import { LIFE_STAGES } from '../world/life.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -9,6 +11,12 @@ export class HUD {
   constructor() {
     this.el = {
       hud: $('hud'),
+      eyebrow: $('stage-eyebrow'),
+      forecast: $('forecast'),
+      lifeline: $('lifeline'),
+      age: $('r-age'),
+      play: $('r-play'),
+      view: $('r-view'),
       stage: $('stage-name'),
       blurb: $('stage-blurb'),
       bar: $('stage-bar-fill'),
@@ -42,7 +50,22 @@ export class HUD {
     this.timer = 0;
     this.cardTimer = 0;
     this.aim = null;
+    this.mode = 'full';
+    this.readColors();
     this.resize();
+  }
+
+  readColors() {
+    const cs = getComputedStyle(document.body);
+    const get = (k, d) => (cs.getPropertyValue(k) || d).trim() || d;
+    this.col = { food: get('--food', '#7fe0b0'), danger: get('--danger', '#ff5a4e'), amber: get('--amber', '#ffb24a'), life: get('--life', '#9be37a') };
+  }
+
+  // full, minimal or off
+  setMode(mode) {
+    this.mode = mode;
+    this.el.hud.classList.toggle('minimal', mode === 'minimal');
+    this.show(mode !== 'off');
   }
 
   resize() {
@@ -69,12 +92,24 @@ export class HUD {
     while (this.el.feed.children.length > 6) this.el.feed.lastChild.remove();
   }
 
-  showCard(stageIdx, extraTitle) {
-    const s = STAGES[stageIdx];
-    this.el.cardStage.textContent = extraTitle || 'New stage';
-    this.el.cardTitle.textContent = s.name;
+  showCard(formId, extraTitle) {
+    const s = FORM[formId];
+    if (!s) return;
+    this.cardRaw(extraTitle || 'New stage', s.name, s.facts, false);
+  }
+
+  showLifeCard(stage) {
+    const s = LIFE_STAGES[stage];
+    if (!s || !s.fact) return;
+    this.cardRaw('Life on your world', s.name, [s.fact], true);
+  }
+
+  cardRaw(eyebrow, title, facts, life) {
+    this.el.card.classList.toggle('life', !!life);
+    this.el.cardStage.textContent = eyebrow;
+    this.el.cardTitle.textContent = title;
     this.el.cardFacts.innerHTML = '';
-    for (const f of s.facts) {
+    for (const f of facts) {
       const li = document.createElement('li');
       li.textContent = f;
       this.el.cardFacts.appendChild(li);
@@ -106,21 +141,13 @@ export class HUD {
     const p = world.player;
     if (!p) return;
     const e = this.el;
-    const st = STAGES[p.stage];
+    const formId = p.form;
+    const st = FORM[formId] || { name: p.typeLabel, blurb: '' };
     e.stage.textContent = st.name;
-    e.blurb.textContent = p.life === 2 ? 'Home to a civilisation' : p.life === 1 ? 'Life has taken hold' : st.blurb;
-    // progress through this stage on a log scale
-    const nxt = nextStageMass(p.mass, p.compact);
-    const floor = stageFloorMass(p.mass, p.compact);
-    if (nxt) {
-      const t = clamp(Math.log(p.mass / floor) / Math.log(nxt / floor), 0, 1);
-      e.bar.style.width = `${(t * 100).toFixed(1)}%`;
-      const nextName = p.compact === 'ns' ? 'Black hole' : p.compact === 'bh' ? (p.mass < 100 * M_SUN ? 'Intermediate black hole' : p.mass < 1e5 * M_SUN ? 'Supermassive black hole' : 'Mass of Sagittarius A*') : STAGES[p.stage + 1]?.name;
-      e.next.textContent = `${nextName} at ${F.sci(nxt, 1)} kg`;
-    } else {
-      e.bar.style.width = '100%';
-      e.next.textContent = world.core ? 'Core collapse ahead' : 'Keep growing';
-    }
+    e.eyebrow.textContent = p.name ? p.name : 'You are';
+    const life = world.life;
+    e.blurb.textContent = life && life.stage >= 7 ? 'Home to a civilisation' : life && life.stage > 0 ? `Home to ${life.name.toLowerCase()}` : st.blurb;
+    this.progress(world, game, p, formId);
     e.mass.textContent = F.massKg(p.mass);
     e.massF.textContent = F.massFriendly(p.mass);
     if (p.compact === 'bh') e.radius.textContent = `${F.radius(p.radius)} event horizon`;
@@ -139,13 +166,23 @@ export class HUD {
     e.where.textContent = world.field.env.label + peb;
     // composition
     const c = p.comp;
-    const parts = [['rock', c.rock], ['iron', c.iron], ['ice', c.ice], ['gas', c.gas]];
+    const parts = COMP_KEYS.map((k) => [k, c[k] || 0]).filter(([k, f]) => f > 0.0005 || k !== 'carbon');
     e.comp.innerHTML = parts.map(([k, f]) => `<span style="width:${(f * 100).toFixed(2)}%;background:${COMP_COLORS[k]}"></span>`).join('');
     e.compLegend.innerHTML = parts.map(([k, f]) => `<span><i style="background:${COMP_COLORS[k]}"></i>${k} ${(f * 100).toFixed(f < 0.1 ? 1 : 0)}%</span>`).join('');
     // right side
-    const rate = TIME_BASE * world.warp;
-    e.time.textContent = world.warp > 1 ? `Time warp ×${world.warp} (1 s = ${F.duration(rate)})` : `1 s = ${F.duration(rate)}`;
-    e.time.classList.toggle('hot', world.warp > 1);
+    const age = world.years - (p.born || 0);
+    e.age.textContent = `Age ${F.yearsShort(Math.max(age, 0))} · universe ${F.yearsShort(13.8e9 + world.years)}`;
+    if (world.deep) {
+      e.time.textContent = `Deep time · 1 s = ${F.years(world.deepRate())}`;
+    } else {
+      const rate = TIME_BASE * world.warp;
+      e.time.textContent = world.warp > 1 ? `Warp ×${world.warp} · 1 s = ${F.duration(rate)}` : `1 s = ${F.duration(rate)}`;
+    }
+    e.time.classList.toggle('hot', world.warp > 1 && !world.deep);
+    e.time.classList.toggle('deep', !!world.deep);
+    e.play.textContent = `Played ${F.clock(world.stats.timePlayed)}`;
+    e.view.textContent = game.viewLabel ? game.viewLabel() : '';
+    this.lifeLine(world, p);
     const jet = world.thrustLoss;
     const jetName = p.compact ? 'Relativistic jets' : p.isStar ? 'Plasma jets' : p.comp.gas > 0.4 ? 'Gas vents' : 'Volcanic jets';
     e.jets.textContent = jet > 0 ? `${jetName}: losing ${F.percent(jet, 2)} mass/s` : `${jetName}: idle`;
@@ -162,6 +199,7 @@ export class HUD {
     if (world.heatLoss > 0.003) warns.push(`${world.heatLoss > 0.02 ? 'Boiling away' : 'Evaporating'}: losing ${F.percent(world.heatLoss, 1)}/s to starlight`);
     if (game.stormWarn > 0) warns.push(game.stormText);
     if (game.snWarn > 0) warns.push(game.snText);
+    if (world.hazards?.pending && world.hazards.pending.reason) warns.push(world.hazards.pending.reason);
     e.warn.innerHTML = warns.map((w) => `<div>${w}</div>`).join('');
     e.warn.hidden = !warns.length;
 
@@ -173,6 +211,79 @@ export class HUD {
       e.core.hidden = false;
       e.core.innerHTML = `<b>Core: ${s.el} burning</b><span>Collapse in ${left.toFixed(0)} s · ${p.mass >= 22 * M_SUN ? 'heavy enough for a black hole' : `reach 22 M☉ for a black hole (now ${F.nice(p.mass / M_SUN)})`}</span>`;
     } else e.core.hidden = true;
+  }
+
+  // the bar under your name and the forecast of what you'll become
+  progress(world, game, p, formId) {
+    const e = this.el;
+    let t = 0, next = '', fc = '';
+    if (p.isStar && !p.compact) {
+      const ms = p.mass / M_SUN;
+      if (!p.phase) {
+        t = clamp(p.fuel || 0, 0, 1);
+        const left = Math.max(0, (1 - (p.fuel || 0)) * msLifetimeYears(ms));
+        next = `Core hydrogen ${F.percent(t, 0)} burned`;
+        fc = `Hydrogen runs out in <b>${F.years(left)}</b> \u2192 ${ms >= 8 ? 'red supergiant' : 'red giant'}`;
+      } else {
+        t = clamp(p.giantT || 0, 0, 1);
+        next = p.phase === 'rg' ? 'Swelling, shedding your outer layers' : 'Burning heavier elements';
+        fc = p.phase === 'rg' ? '\u2192 <b>white dwarf</b> and a planetary nebula' : `\u2192 <b>supernova</b>, leaving a ${p.mass >= 22 * M_SUN ? 'black hole' : 'neutron star'}`;
+      }
+    } else if (p.compact === 'wd') {
+      t = clamp(p.mass / WD_MAX_MASS, 0, 1);
+      next = `${F.nice(p.mass / M_SUN)} of 1.38 M\u2609 (Chandrasekhar limit)`;
+      fc = 'Past the limit \u2192 <b>Type Ia supernova</b>, nothing left';
+    } else if (p.compact === 'ns') {
+      t = clamp(p.mass / NS_MAX_MASS, 0, 1);
+      next = `${F.nice(p.mass / M_SUN)} of 2.3 M\u2609 \u00b7 spinning ${F.nice(p.nsSpin || 1)} times a second`;
+      fc = 'Past 2.3 M\u2609 \u2192 <b>black hole</b>';
+    } else {
+      const f = forecast(p.mass, p.comp, p.diet, p.compact, { phase: p.phase, temp: p.temp });
+      const m0 = game.formStart && game.formStart.form === formId ? game.formStart.mass : p.mass * 0.5;
+      if (f && f.mass > m0) {
+        t = clamp(Math.log(p.mass / m0) / Math.log(f.mass / m0), 0, 1);
+        next = `${FORM[f.form]?.name || f.form} at ${F.massShort(f.mass)}`;
+      } else if (f) {
+        t = 1;
+        next = FORM[f.form]?.name || f.form;
+      } else {
+        t = 1;
+        next = world.core ? 'Core collapse ahead' : 'Keep growing';
+      }
+      fc = this.dietText(p, f);
+    }
+    e.bar.style.width = `${(t * 100).toFixed(1)}%`;
+    e.next.textContent = next;
+    e.forecast.innerHTML = fc;
+  }
+
+  dietText(p, f) {
+    const d = p.diet || p.comp;
+    const ranked = COMP_KEYS.map((k) => [k, d[k] || 0]).sort((a, b) => b[1] - a[1]).filter(([, v]) => v > 0.12).slice(0, 2);
+    const words = { rock: 'rock', iron: 'iron', ice: 'ice', carbon: 'carbon', gas: 'gas' };
+    const eat = ranked.map(([k]) => words[k]).join(' & ') || 'a bit of everything';
+    if (!f) return `Eating mostly ${eat}`;
+    return `Eating mostly ${eat} \u2192 <b>${FORM[f.form]?.name || f.form}</b>`;
+  }
+
+  lifeLine(world, p) {
+    const e = this.el;
+    const pm = world.planet, life = world.life;
+    if (!pm || pm.giant) {
+      if (life && life.ended && life.ended.years > 0) {
+        e.lifeline.hidden = false;
+        e.lifeline.textContent = `Life once reached: ${life.ended.peak}`;
+      } else e.lifeline.hidden = true;
+      return;
+    }
+    const parts = [];
+    if (life && life.stage > 0) parts.push(`Life: ${life.name}`);
+    else if (pm.habitable) parts.push('Habitable');
+    if (pm.esi > 0.05) parts.push(`ESI ${pm.esi.toFixed(2)}`);
+    if (pm.P > 0.001) parts.push(`air ${F.nice(pm.P)} bar`);
+    if (life && life.sats > 10) parts.push(`${Math.round(life.sats).toLocaleString('en-US')} satellites`);
+    e.lifeline.hidden = !parts.length;
+    e.lifeline.textContent = parts.join(' \u00b7 ');
   }
 
   // brackets on targets, edge arrows for threats
@@ -197,11 +308,11 @@ export class HUD {
       const s = project(b.x, b.y, b.z);
       if (!s) continue;
       const big = b.mass > p.mass || (b.compact && !p.compact);
-      const col = big ? '#ff5a4e' : '#7fe0b0';
+      const col = big ? this.col.danger : this.col.food;
       const r = Math.max(8, Math.min((m.r || 0) + 6, 160));
       if (s.on) {
         if (m.kind === 'aim' || m.kind === 'lock') {
-          drawBracket(ctx, s.x, s.y, r, m.kind === 'lock' ? '#ffb547' : col, m.kind === 'lock' ? 9 : 7);
+          drawBracket(ctx, s.x, s.y, r, m.kind === 'lock' ? this.col.amber : col, m.kind === 'lock' ? 9 : 7);
           const ratio = b.mass / p.mass;
           const d = p.distTo(b) - p.rEff - b.rEff;
           const vrel = Math.hypot(b.vx - p.vx, b.vy - p.vy, b.vz - p.vz);
@@ -213,7 +324,8 @@ export class HUD {
             `${ratio >= 1 ? F.nice(ratio) + '× your mass' : F.percent(ratio, ratio < 0.01 ? 2 : 0) + ' of your mass'}`,
             `${F.distance(Math.max(d, 0))} · closing ${F.speed(vrel)}${!big ? (vrel > vesc * 2 ? ' — too fast, will hurt' : ' — safe') : ''}`,
           ];
-          if (b.life) lines.push(b.life === 2 ? 'Signs of a civilisation' : 'Signs of life');
+          if (b.colony) lines.push('Your colony');
+          else if (b.life) lines.push(b.life === 2 ? 'Signs of a civilisation' : 'Signs of life');
           let tx = s.x + r + 10, ty = s.y - r;
           if (tx > w - 260) tx = s.x - r - 250;
           ctx.fillStyle = col;
@@ -240,7 +352,7 @@ export class HUD {
         }
       } else if (m.kind !== 'tick' || big) {
         // off-screen arrow
-        edgeArrow(ctx, s, w, h, m.kind === 'lock' ? '#ffb547' : big ? '#ff5a4e' : '#7fe0b0', m.label);
+        edgeArrow(ctx, s, w, h, m.kind === 'lock' ? this.col.amber : big ? this.col.danger : this.col.food, m.label);
       }
     }
     // the reticle

@@ -9,6 +9,8 @@ import { generateSystemDetail } from './system.js';
 import { Galaxy, GU, LY } from './galaxy.js';
 import { stellarState, msLifetimeYears, whiteDwarfMass, hawkingYears } from './stellar.js';
 import { Hazards } from './hazards.js';
+import { PlanetModel } from './planet.js';
+import { LifeModel } from './life.js';
 import { RNG, hash32 } from '../core/rng.js';
 import {
   G, C, M_SUN, M_EARTH, AU, TIME_BASE, WARP_LEVELS, DEEP_LEVELS, DIST_COMPRESS, YEAR,
@@ -71,7 +73,16 @@ export class World {
   }
 
   emit(type, data = {}) {
-    this.events.push({ type, ...data });
+    const e = { type, ...data };
+    this.events.push(e);
+    for (const m of this.modules) m.onEvent?.(type, e);
+  }
+
+  // the planet and life models that run on your world
+  initModules(saved = null) {
+    this.planet = new PlanetModel(this, saved?.planet);
+    this.life = new LifeModel(this, this.planet, saved?.life);
+    this.modules = [this.planet, this.life];
   }
 
   get years() {
@@ -107,8 +118,10 @@ export class World {
     p.nsSpin = state?.nsSpin;
     p.bhSpin = state?.bhSpin ?? 0;
     p.giantT = state?.giantT ?? 0;
+    p.magnetar = state?.magnetar || false;
     p.updateRadius();
     this.player = p;
+    this.initModules(state?.modules);
     this.addBody(p);
     if (state?.O) {
       this.O = { ...state.O };
@@ -965,6 +978,12 @@ export class World {
           fragCount++;
         }
         if (b.mass < m0 * 0.18 || depth > 0.72) {
+          // part of a shredded moon stays behind as a ring around you
+          if (!p.isStar && !p.compact && this.planet && b.mass < p.mass * 0.3 && b.mass > p.mass * 1e-5) {
+            const toRing = b.mass * 0.35;
+            this.planet.addRing(toRing);
+            b.mass -= toRing;
+          }
           const k = Math.min(Math.ceil(b.mass / chunk), Math.max(4, MAX_FRAGMENTS - fragCount));
           const each = b.mass / k;
           for (let i = 0; i < k; i++) this.spawnFragment(b, each, p, 1.0);
@@ -1431,7 +1450,7 @@ export class World {
       player: {
         mass: p.mass, comp: { ...p.comp }, compact: p.compact, name: p.name, seed: p.seed, phase: p.phase,
         fuel: p.fuel, diet: p.diet, born: p.born, spin: p.spin, tilt: p.tilt, heat: p.heat,
-        wdTemp: p.wdTemp, nsSpin: p.nsSpin, bhSpin: p.bhSpin, giantT: p.giantT,
+        wdTemp: p.wdTemp, nsSpin: p.nsSpin, bhSpin: p.bhSpin, giantT: p.giantT, magnetar: p.magnetar,
         pos: { x: p.x, y: p.y, z: p.z, vx: p.vx, vy: p.vy, vz: p.vz },
       },
       modules: Object.fromEntries(this.modules.filter((m) => m.serialize).map((m) => [m.key, m.serialize()])),
