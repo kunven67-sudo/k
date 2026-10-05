@@ -967,3 +967,11 @@ have a Ring cam; a witness only matters if someone actually saw it).
   spoils.
 - **Overeating effects**: food coma after buffets, spicy food (sweat, red face, milk grab,
   heartburn — depends on tolerance), overeating → sick/vomit, sugar rush then crash.
+- **Fast food**: drive-thru speaker you talk into (real mic or typing; crackly "repeat that?"),
+  the broken McDonald's ice cream machine, app deals & points, wrong/missing items (depends on
+  the worker and rush).
+- **Graveyard specials**: cheap 2 AM steak & eggs at casino coffee shops (night-shift crowd).
+- **Vending machines with physics**: stuck snacks, shaking can tip the machine onto you, eaten
+  dollars.
+- **Bar tabs**: open with your card; forgetting to close while drunk leaves your card at the bar
+  and a shocking bill next morning.
