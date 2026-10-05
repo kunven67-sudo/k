@@ -828,3 +828,12 @@ manual everything and broken gauges).
   stadium…); results change taxes, police presence, road work.
 - **Lost & found**: casino security, bus station, police; honest NPCs may turn items in (or not).
 - **Forecasts can be wrong** (real live forecasts vs actual weather).
+
+## 43. Round 98
+
+- **Betting events**: Kentucky Derby (May; packed race book, crazy hats; fly to Louisville to watch
+  live — event area only), Vegas boxing/UFC mega-fights (live tickets or sportsbook), World
+  Series & NBA Finals, college bowl season (Wolf Pack).
+- **Keno runners** in some Reno casinos (play keno from the restaurant/bar).
+- **Pharmacies** (CVS, Walgreens): prescriptions (antibiotics, pain meds after injuries;
+  insurance helps) and over-the-counter cold meds & bandages.
