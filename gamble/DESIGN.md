@@ -801,3 +801,6 @@ manual everything and broken gauges).
   Peppermill, Atlantis, etc.
 - **Day 1 starts at the 11 AM knock**: the Starlite clerk bangs on the door demanding the $45
   or checkout.
+- **Cloud save** (same life on PC and phone): free Firebase (Google) project + sign-in; the owner
+  must create the free Firebase project when we reach that phase (walkthrough provided).
+  Server timestamps drive the "time keeps going while away" catch-up.
