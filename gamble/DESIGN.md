@@ -540,3 +540,26 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 - **Grooming**: makeup for anyone (smears in tears/rain), hair dye (roots grow out), nails
   (chip over days), cologne/perfume (too much → people cough).
 - **Phone gacha games** with in-app purchases and loot boxes that drain in-game cash.
+
+## 26. Later additions (rounds 63–64)
+
+- **Guns+**: shooting range (ammo & lane fees), Nevada concealed-carry permit (class,
+  fingerprints, wait; carrying without it is a crime; casinos often ban guns), hunting
+  season (license, tags, game warden, cook your catch), gun safe (unlocked guns get stolen;
+  danger with kids).
+- **Daylight saving time** (March/November): phone auto-updates, wristwatch doesn't.
+- **Car crashes**: airbags (stun), totaled cars (insurance payout only if insured), info
+  swap & at-fault claims (premiums rise), whiplash (injury-lawyer calls), hit-and-run is a
+  crime (witnesses/cameras catch plates).
+- **Kids+**: expensive daycare, school (homework, parent-teacher meetings, calls),
+  babysitters (good or glued to their phone), kids copy your habits (swearing, drinking,
+  gambling, kindness), kid sick days (miss work).
+- **Winter**: shovel the driveway, scrape iced windshields, black ice (ragdoll slips, sliding
+  cars), stuck in snow (push, dig, tow).
+- **Summer**: scorching car seats/wheel, leaving pets/kids in hot cars is deadly and a crime
+  (bystanders break windows, call cops), heat stroke, A/C breakdowns during heat waves.
+- **PC annoyances**: forced Windows updates, blue screens (lose unsaved PC-game progress),
+  slow Wi-Fi & router restarts, printer jams.
+- **Jail life**: collect calls (cost the receiver; some don't answer), commissary funded by
+  others, visits through glass (incl. online friends), cellmates with personalities you can
+  type-chat with.
