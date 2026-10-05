@@ -874,3 +874,5 @@ manual everything and broken gauges).
 - **Fonts/signage mixed by place** (fancy casinos, retro motels, modern stores); menus use a
   classic casino style on the card-table UI.
 - **Strand-like hair** that sways in wind (simplified on phones).
+- **Mic speech uses your real voice** coming from your character (others hear it too).
+- **Real lip sync** for everyone (NPC TTS, your mic, friends' mics).
