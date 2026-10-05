@@ -1010,6 +1010,17 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Flat-pack assembly**: picture instructions, Allen keys, missing screws; built wrong → wobbles
   or collapses. (Reno has no IKEA — nearest is a drive to Sacramento.)
 
+- **Functional furniture**: curtains/blinds (morning sun wakes you; open at night → neighbors &
+  burglars see in), couches (naps/pass-outs with worse sleep; coins & lost items under cushions),
+  bookshelves (skill books; impress or embarrass dates), rugs (hide stains, damage, items).
+- **Hiding cash**: under the mattress (burglars check first), freezer, home safes (bolted or
+  carried off whole), secret spots (fake outlets, hollow books, floorboards — partners may find
+  them).
+- **Garage workshops**: indoor parking (safe from hail/thieves), door openers, tool bench for DIY
+  car repair, clutter storage.
+- **Pet damage depends on the pet & training**: cats scratch couches, puppies chew shoes/cords,
+  parrots chew wood.
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
