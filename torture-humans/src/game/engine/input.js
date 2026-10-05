@@ -11,6 +11,8 @@ export const ACTIONS = {
   jump: { label: 'Jump', keys: ['Space'], pad: ['A'] },
   interact: { label: 'Use / grab', keys: ['KeyE'], pad: ['X'] },
   shrinkSelf: { label: 'Shrink into cage', keys: ['KeyF'], pad: ['Y'] },
+  sizeDown: { label: 'Size watch: shrink (hold)', keys: ['KeyZ'] },
+  sizeUp: { label: 'Size watch: grow (hold)', keys: ['KeyX'] },
   camera: { label: 'Switch 1st/3rd person', keys: ['KeyV'], pad: ['Back'] },
   primary: { label: 'Use gadget (hold to charge)', keys: ['Mouse0'], pad: ['RT'] },
   secondary: { label: 'Aim / alt fire', keys: ['Mouse2'], pad: ['LT'] },

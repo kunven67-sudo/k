@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { GROUP } from './engine/physics.js';
 import { LadderClimb } from './ladder.js';
 
+import { moveScale, jumpScale, terminalVel, fallDamage, MIN_SCALE, MAX_SCALE } from './size.js';
 const WALK = 1.45;
 const RUN = 3.6;
 const CROUCH = 0.8;
@@ -59,7 +60,7 @@ export class Player {
 
   // Resize yourself (1 = normal, 0.05 = tiny) with the feet at `feet`.
   // Everything the controller does scales with you: steps, snapping, skin offset.
-  setScale(sc, feet) {
+  setScale(sc, feet, { keepVelocity = false } = {}) {
     this.scale = sc;
     const h = (this.crouching ? CROUCH_H : STAND_H) * sc;
     this.physics.resizeCharacter(this.body, h, 0.28 * sc);
@@ -71,13 +72,34 @@ export class Player {
     this.camDistance = 2.6;
     this.camCurrentDist = 2.6 * sc;
     if (feet) {
-      const center = { x: feet.x, y: feet.y + h / 2 + 0.002 * sc, z: feet.z };
+      const center = { x: feet.x, y: feet.y + h / 2 + (keepVelocity ? 0 : 0.002 * sc), z: feet.z };
       this.body.body.setTranslation(center, true);
       this.body.body.setNextKinematicTranslation(center);
       this.prevPos.set(center.x, center.y, center.z);
       this.currPos.copy(this.prevPos);
     }
-    this.velocity.set(0, 0, 0);
+    if (!keepVelocity) this.velocity.set(0, 0, 0);
+  }
+
+  // The size watch: hold Z to shrink, X to grow, to any size (if there's room to grow)
+  updateSizeWatch(dt) {
+    const inp = this.input;
+    const dir = (inp.isDown('sizeUp') ? 1 : 0) - (inp.isDown('sizeDown') ? 1 : 0);
+    this.sizeChanging = dir !== 0;
+    if (!dir || this.shrinkFx || this.ladder?.active || this.inCage) return;
+    const rate = 1.1; // about x3 per second
+    const want = THREE.MathUtils.clamp(this.scale * Math.exp(dir * rate * dt), MIN_SCALE, MAX_SCALE);
+    if (want === this.scale) return;
+    if (dir > 0 && !this.physics.fitsCapsule(this.body, (this.crouching ? CROUCH_H : STAND_H) * want, 0.28 * want)) {
+      this.noRoom = 1; // shown as a hint
+      return;
+    }
+    // feet from the physics body now (not the smoothed render position, which lags
+    // a step behind and would lift you a little on every resize)
+    const t = this.body.body.translation();
+    const feet = new THREE.Vector3(t.x, t.y - this.body.height / 2, t.z);
+    this.setScale(want, feet, { keepVelocity: true });
+    this.renderPos.copy(this.currPos);
   }
 
   // F: shrink into the terrarium, or grow back out of it
@@ -117,6 +139,7 @@ export class Player {
   // what "E" would do right now (shown as a hint on screen)
   get interactHint() {
     if (this.ladder?.active) return this.ladder.mode === 'climb' ? 'W / S climb · Space let go' : null;
+    if (this.noRoom > 0) return 'No room to grow here: go somewhere with more space';
     if (this.inWater) return 'E  Drink   ·   F  Grow back to normal size';
     if (this.inCage && this.scale < 1) return 'F  Grow back to normal size';
     if (this.scale >= 1 && this.cage?.canDropFrom(this.camera.position)) return 'F  Shrink yourself into the terrarium';
@@ -160,7 +183,7 @@ export class Player {
     }
 
     // wanted horizontal velocity, relative to where the camera looks
-    const speed = (this.crouching ? CROUCH : sprint && mv.y > 0.3 ? RUN : WALK) * this.scale * (this.speedMul ?? 1);
+    const speed = (this.crouching ? CROUCH : sprint && mv.y > 0.3 ? RUN : WALK) * moveScale(this.scale) * (this.speedMul ?? 1);
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
     const wx = (mv.x * cos - mv.y * sin) * speed;
@@ -174,10 +197,10 @@ export class Player {
       // no downward push while grounded: snap-to-ground keeps you on slopes and
       // steps going down, and a downward push stops Rapier's auto-step going up
       this.velocity.y = 0;
-      if (jump && !this.crouching) this.velocity.y = JUMP_SPEED * Math.sqrt(this.scale);
+      if (jump && !this.crouching) this.velocity.y = JUMP_SPEED * Math.sqrt(jumpScale(this.scale));
     } else {
       this.velocity.y -= GRAVITY * dt;
-      this.velocity.y = Math.max(this.velocity.y, -50);
+      this.velocity.y = Math.max(this.velocity.y, -terminalVel(this.scale));
     }
 
     // full size: tiny people don't block you (you step on them); tiny: they're solid like you
@@ -189,6 +212,16 @@ export class Player {
     this.actualSpeed = Math.hypot(res.x, res.z) / dt;
     if (!this.grounded && res.y > this.velocity.y * dt + 1e-4 && this.velocity.y > 0) this.velocity.y = 0; // bonked head
     if (this.grounded && !wasGrounded) this.landSpeed = -this.velocity.y;
+    // falls hurt by how far you fell compared to your size (tiny you can drop many body heights)
+    const feetY = t0.y + res.y - this.body.height / 2;
+    if (!this.grounded) this.fallTop = Math.max(this.fallTop ?? feetY, feetY);
+    else {
+      if (!wasGrounded && this.fallTop !== undefined && !this.ladder?.active) {
+        const dmg = fallDamage(this.scale, this.fallTop - feetY);
+        if (dmg > 0.5) this.vitals?.damage(dmg, 'fell');
+      }
+      this.fallTop = undefined;
+    }
     // the body only moves on the next world step; keep our own copy for smooth interpolation
     this.currPos.set(t0.x + res.x, t0.y + res.y, t0.z + res.z);
   }
@@ -201,6 +234,8 @@ export class Player {
     if (inp.pressed('jump')) this.queued.jump = true;
     if (inp.pressed('interact')) this.queued.interact = true;
     if (inp.pressed('shrinkSelf')) this.tryShrinkToggle();
+    this.updateSizeWatch(dt);
+    this.noRoom = Math.max(0, (this.noRoom || 0) - dt);
     this.updateShrinkFx(dt);
     if (inp.pressed('camera')) this.toggleCamera();
     if (this.settings.get('controls.toggleSprint') && inp.pressed('sprint')) this.sprintToggled = !this.sprintToggled;

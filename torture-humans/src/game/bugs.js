@@ -25,7 +25,7 @@ function legMesh(len, thick, mat) {
 function insect({ kind, size }) {
   const g = new THREE.Group();
   const shell = kind === 'beetle'
-    ? new THREE.MeshPhysicalMaterial({ color: 0x1b2a1e, roughness: 0.25, metalness: 0.3, clearcoat: 1, clearcoatRoughness: 0.15, iridescence: 0.6, iridescenceIOR: 1.6 })
+    ? new THREE.MeshPhysicalMaterial({ color: 0x1b2a1e, roughness: 0.25, metalness: 0.3, clearcoat: 1, clearcoatRoughness: 0.15 }) // (no iridescence: the shadow-cascade shader chunk does not support it)
     : kind === 'spider' ? new THREE.MeshStandardMaterial({ color: 0x2a211a, roughness: 0.8 })
       : new THREE.MeshStandardMaterial({ color: 0x2a0f08, roughness: 0.45 });
   const parts = kind === 'spider'

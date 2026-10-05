@@ -10,6 +10,9 @@
     html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
     #game { display: block; width: 100vw; height: 100vh; outline: none; }
     #fps { position: fixed; top: 8px; right: 10px; color: #9f9; font: 13px/1 monospace; text-shadow: 0 0 3px #000; }
+    #size { position: fixed; top: 34px; left: 50%; transform: translateX(-50%); color: #fff; font: 14px system-ui, sans-serif; text-shadow: 0 0 4px #000; text-align: center; }
+    #size small { display: block; opacity: 0.8; font-size: 12px; margin-top: 2px; }
+    #size[hidden] { display: none; }
     #clock { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); color: #fff; font: 600 14px system-ui, sans-serif; text-shadow: 0 0 4px #000; }
     #toast { position: fixed; left: 50%; top: 12%; transform: translateX(-50%); padding: 8px 18px; background: rgba(0,0,0,.7); color: #fff; font: 600 17px system-ui, sans-serif; border-radius: 6px; }
     #toast[hidden] { display: none; }
@@ -39,6 +42,7 @@
   <div id="hint" hidden></div>
   <div id="toast" hidden></div>
   <div id="clock"></div>
+  <div id="size" hidden></div>
   <div id="flash" hidden></div>
   <div id="hurt"></div>
   <div id="vitals">
@@ -60,6 +64,7 @@
       <li>Tiny yourself: <kbd>Click</kbd> punches · brave tiny people will fight you, scared ones run</li>
       <li>Look at a tiny person to see how they're doing (they need food and the pond, and build with what you give them)</li>
       <li><kbd>F</kbd> at the terrarium: shrink yourself in (F again to grow back)</li>
+      <li>Size watch: hold <kbd>Z</kbd> to shrink, <kbd>X</kbd> to grow (anywhere there's room)</li>
       <li><kbd>E</kbd> use: climb the ladder, drink water</li>
       <li>Step on tiny people to squish them</li>
     </ul>

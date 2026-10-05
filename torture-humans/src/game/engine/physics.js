@@ -214,6 +214,21 @@ export class Physics {
   }
 
   // would a capsule of this height fit here (standing up under a table)?
+  // would a capsule of this height and radius fit where the character stands (feet stay put)?
+  fitsCapsule(ch, height, radius) {
+    const t = ch.body.translation();
+    const feet = t.y - ch.height / 2;
+    const half = Math.max(0.0005, height / 2 - radius);
+    const shape = new RAPIER.Capsule(half, radius * 0.95);
+    let hit = false;
+    this.world.intersectionsWithShape(
+      { x: t.x, y: feet + height / 2 + radius * 0.1, z: t.z }, { x: 0, y: 0, z: 0, w: 1 }, shape,
+      () => { hit = true; return false; },
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, groups(GROUP.PLAYER, GROUP.WORLD | GROUP.PROP), ch.collider,
+    );
+    return !hit;
+  }
+
   fits(ch, height) {
     const t = ch.body.translation();
     const feet = t.y - ch.height / 2;

@@ -140,3 +140,52 @@ Graphics settings menu so it never lags. Zero bugs.
 - Must NOT look AI-made. Hand-crafted feel: realistic animation (motion-captured humans, blended, IK feet/hands),
   secondary motion / jiggle physics (hair, clothes, soft bodies, bug abdomens), good touching/grabbing.
 - Colliders follow real shapes: no phasing through things, no invisible square barriers.
+
+## Ideas from the user's prototypes (SHRINKBOX play_5.html, Shrink Resizer)
+Taken as ideas only (those files have bugs; nothing copied as-is).
+
+### Size
+- A size watch: any size from about 1 mm to 100 m, smooth (hold to grow/shrink), not just two sizes
+- Size science: speed follows size (Froude rule for big, k^0.75 for small), jump height nearly the same in
+  metres for every size (tiny you jumps many times its height), terminal velocity and fall damage relative
+  to your size, footsteps deeper the bigger you are
+- HUD: your height ("1.75 m", "4.2 mm"), "about the size of: Ant / Ladybug / Mouse / Cat / Dog / Kid /
+  Person / Elephant / Giraffe / House / Apartment block / Skyscraper", comparisons ("a human hair is
+  wide", "a white blood cell", "a 20-story building", "a blue whale is long")
+- The germ world: shrinking far enough reaches a microscopic world (dust mites, cells)
+- Stomping people when you're a giant; size-aware shadows and camera
+
+### People
+- Pick people up (when you're much bigger), carry them, put them down, throw; they react
+  ("Wheee! This is so high up!", "Put me down, you overgrown kid!", "Please don't drop me!",
+  "I'm 40 times smaller than you, be careful!", "Thanks for being gentle.")
+- Talk to anyone: a chat box, or your microphone; speech bubbles over heads; keyword replies with
+  personality (scared of a giant, friendly at the same size), names, ages, small talk, jokes
+- People notice you (giant, shrinking someone, stealing) and react; witnesses call the police
+- Each townsperson has a day: home, work, shops, park, evenings on the couch
+- Crowd bodies far away, full bodies near you
+
+### Home and family (SHRINKBOX)
+- Mom and Dad live in the house; chores ("Clean your room", "Bring your dishes down", "Turn off lights")
+  and a weekly allowance; if they see you shrink they take the watch ("Give me that watch. NOW.");
+  shrink them and they're furious ("You are SO grounded when I'm big again!")
+- Pets (a beagle puppy, a leopard gecko in a terrarium) bought with your own money; petting, purring
+
+### Tiny people (SHRINKBOX)
+- A village inside the wall, between the studs, behind a hole in the baseboard: matchbox houses,
+  bottle-cap tables, they collect crumbs from under the bed, "a grain of rice is a loaf of bread"
+- They're scared of spiders, ants steal their lunch; they talk to you differently at their size vs giant
+
+### Town (Shrink Resizer)
+- More town: blocks of houses, downtown shops with flats above, apartments, parks with ponds and
+  fountains, parking lots, signals, stop signs, utility poles and wires, mailboxes, news boxes
+- Insides of houses (rooms, furniture, lamps that turn on, TVs) and shops (shelves, stock, counter)
+- Money: buy things, the till, walking out without paying is stealing
+- Jobs and odd jobs: a shift at the till, mowing lawns, delivering parcels, finding lost things
+- Police: officers sent to you, chase, arrest screen
+- Backpack: pick things up, carry, throw, store
+
+### Other (SHRINKBOX)
+- Phone apps: weather, a shop
+- Spawn menu (Q) with categories; physics tools (grab, push, cut, weld)
+- Touch controls for phones/tablets; a character look editor; lie down to sleep

@@ -18,6 +18,7 @@ import { hdri } from './engine/assets.js';
 import { Environment } from './world/environment.js';
 import { addTinyDetails } from './cageworld-details.js';
 import { Bugs } from './bugs.js';
+import { BASE_H, fmtLen, sizeName, comparison } from './size.js';
 import { Vitals } from './vitals.js';
 import { Hazards } from './hazards.js';
 import { buildTestLevel } from './levels/test-level.js';
@@ -135,6 +136,7 @@ export async function boot() {
   const vitals = new Vitals(settings);
   const hazards = new Hazards({ player, cage, vitals, input, respawn: level.respawn || level.spawn });
   if (colony) { colony.player = player; colony.vitals = vitals; }
+  player.vitals = vitals;
   if (params.get('item') === 'jar') hands.select(1);
   if (params.get('item') === 'supplies') hands.select(2);
 
@@ -194,6 +196,21 @@ export async function boot() {
   canvas.addEventListener('click', () => input.lockPointer());
 
   const fpsEl = document.getElementById('fps');
+  // the size watch readout: how tall you are, what you're about the size of, how things look to you
+  const sizeEl = document.getElementById('size');
+  let sizeTip = '', sizeTipT = 0, lastScale = 1;
+  const updateSizeHud = (dt) => {
+    if (!sizeEl) return;
+    const s = player.scale;
+    const show = Math.abs(Math.log(s)) > 0.02 || player.sizeChanging;
+    sizeEl.hidden = !show;
+    if (!show) return;
+    sizeTipT -= dt;
+    if (sizeTipT <= 0 || Math.abs(Math.log(s / lastScale)) > 0.7) { sizeTip = comparison(s); sizeTipT = 7; lastScale = s; }
+    const H = BASE_H * s;
+    const html = `<b>${fmtLen(H)}</b> · about the size of ${sizeName(H)}<small>${sizeTip}</small>`;
+    if (sizeEl.innerHTML !== html) sizeEl.innerHTML = html;
+  };
   const toastEl = document.getElementById('toast');
   let toastTimer = 0;
   const toast = (text) => {
@@ -264,6 +281,7 @@ export async function boot() {
     last = now;
     if (!params.has('paused')) step(dt);
     game_applyZone?.();
+    updateSizeHud(dt);
     const hint = player.interactHint || hands.hint;
     if (hintEl && hintEl.textContent !== (hint || '')) { hintEl.textContent = hint || ''; hintEl.hidden = !hint; }
     if (renderer.render(now) && fpsEl) {
