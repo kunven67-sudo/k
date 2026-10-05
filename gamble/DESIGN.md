@@ -473,3 +473,25 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 - **Vacations** (resort areas, not full cities): Hawaii beach resort (surf, luau, sunburn),
   Cancun all-inclusive (passport, included drinks, street-seller scams), Yosemite
   national park (camping, bears, waterfalls).
+
+## 23. Later additions (rounds 57–58)
+
+- **More real Reno events**: Reno Rodeo (June; bet on riders, ride a bull), Burning Man
+  (late August; Reno fills with campers, stores sell out; you can go — tickets, dust storms,
+  art cars), Artown (July free outdoor shows), mechanical bulls in country bars year-round.
+- **Spanish-speaking NPCs** (some bilingual, bilingual signs; type Spanish → reply in Spanish).
+- **Good citizen**: call 911 (cops/ambulance/fire respond), testify in court (day off work;
+  criminal's friends may retaliate), CPR timing mini-game & helping people (push stuck cars),
+  donating & volunteering (mood + reputation).
+- **Real sky**: real Reno sunrise/sunset times per date, real moon phases, real
+  constellations (far more stars in the desert).
+- **Web**: Google search (hours, locations, guides, NPC news), YouTube (original clips,
+  tutorials like card counting/recipes, your uploaded replays), Reddit (gossip, wrong tips,
+  complaints about you), news sites.
+- **Pay apps**: Venmo, Cash App, Zelle — send/request with NPCs and friends; irreversible;
+  "sent too much" scams.
+- **Grief**: days/weeks of low mood, funerals, memories, their belongings remain; therapy &
+  friends help.
+- **Retirement**: Social Security from 62+ (more with work history), 401k with company match
+  (early withdrawal penalty), visible aging (slower, cane, gray hair, eyesight, shaky hands at
+  the table), retirement homes (weekly bingo).
