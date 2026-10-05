@@ -304,7 +304,11 @@ export async function buildLab({ scene, physics, settings }) {
     sunIntensity: 3,
     sky: 'quadrangle_sunny',
     inLab,
-    outdoor: { lamps, litWindows, materials: outdoor, ground: 3.28 },
+    outdoor: {
+      lamps, litWindows, materials: outdoor, ground: 3.28,
+      // bedroom window (east wall): where sunlight can come in
+      window: { center: new THREE.Vector3(BEDROOM.x1 + 0.075, BEDROOM.floorY + 1.5, -2.6), normal: new THREE.Vector3(1, 0, 0), side: new THREE.Vector3(0, 0, 1), w: 1.4, h: 1.2 },
+    },
     // people living in town: they walk the sidewalks, look in shop windows, wait at doors
     town: { people: 8, spots: townSpots, area: (p) => p.y > 3.2 && p.y < 3.6 && Math.abs(p.x) < 44 && p.z > 2 && p.z < 19 },
     zones: { lab: labObjs, house: houseObjs, town: townObjs, inHouse: (p) => p.y > 3.1 && p.x > BEDROOM.x0 - 0.2 && p.x < BEDROOM.x1 + 0.2 && p.z > BEDROOM.z0 - 0.2 && p.z < BEDROOM.z1 + 0.2 },

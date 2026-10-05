@@ -34,13 +34,18 @@ export class Environment {
     this.hour = Number(params.get('time') ?? 9.5);
     this.weather = { state: params.get('weather') || 'clear', rain: 0, cloud: 0, next: 30 + Math.random() * 60 };
     if (this.weather.state === 'rain') { this.weather.rain = 1; this.weather.cloud = 1; }
+    if (this.weather.state === 'snow') { this.weather.snow = 1; this.weather.cloud = 1; }
+    this.weather.snow ??= 0;
     this.wet = this.weather.rain;
     this.temperature = 15;
     const out = level.outdoor;
     this.wetU = { value: this.wet };
+    this.snowU = { value: this.weather.state === 'snow' ? 1 : 0 };
     if (out) this.makeWettable(out.materials);
     this.buildLamps(out?.lamps || []);
     this.buildRain();
+    this.buildSnow();
+    this.buildShaft();
     this.buildPuddles(out?.ground ?? 3.28);
     this.buildDust();
     this.buildBreath();
@@ -70,12 +75,18 @@ export class Environment {
       if (!m || m.userData.wettable) continue;
       m.userData.wettable = true;
       const prev = m.onBeforeCompile;
+      const snowU = this.snowU;
       const wet = (sh) => {
         sh.uniforms.uWet = u;
+        sh.uniforms.uSnow = snowU;
         sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform float uWet;')
-          .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 1.0 - 0.38 * uWet;')
-          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.12, uWet * 0.85);');
+          .replace('#include <common>', '#include <common>\nuniform float uWet, uSnow;')
+          .replace('#include <color_fragment>', `#include <color_fragment>
+diffuseColor.rgb *= 1.0 - 0.38 * uWet;
+// snow settles on whatever faces up (roofs, ground, ledges)
+float snowUp = smoothstep(0.55, 0.9, inverseTransformDirection(normalize(vNormal), viewMatrix).y);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.95, 0.98), uSnow * snowUp);`)
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.12, uWet * 0.85);\nroughnessFactor = mix(roughnessFactor, 0.75, uSnow * smoothstep(0.55, 0.9, inverseTransformDirection(normalize(vNormal), viewMatrix).y));');
       };
       m.userData.extraCompile = wet;
       m.onBeforeCompile = (sh, r) => { prev?.call(m, sh, r); wet(sh, r); };
@@ -152,6 +163,44 @@ export class Environment {
     this.scene.add(this.rain);
   }
 
+  // ---- snowflakes drifting around you
+  buildSnow() {
+    const N = 4000;
+    const pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) pos.set([(Math.random() - 0.5) * 30, Math.random() * 16, (Math.random() - 0.5) * 30], i * 3);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.snow = new THREE.Points(g, new THREE.PointsMaterial({ map: softDot(32), size: 0.06, transparent: true, depthWrite: false, opacity: 0.9, color: 0xffffff }));
+    this.snow.frustumCulled = false;
+    this.snow.visible = false;
+    this.snowN = N;
+    this.scene.add(this.snow);
+  }
+
+  // ---- sunlight shafts through the bedroom window (High+): a soft glowing volume
+  buildShaft() {
+    const win = this.level.outdoor?.window;
+    if (!win) return;
+    const g = new THREE.BoxGeometry(1, 1, 1).translate(0.5, 0, 0);
+    this.shaftMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      uniforms: { uOpacity: { value: 0 } },
+      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform float uOpacity; varying vec3 vP;
+        void main(){
+          float along = 1.0 - smoothstep(0.0, 1.0, vP.x);
+          float edge = smoothstep(0.5, 0.25, abs(vP.y)) * smoothstep(0.5, 0.25, abs(vP.z));
+          gl_FragColor = vec4(vec3(1.0, 0.93, 0.8), uOpacity * along * edge * 0.16);
+        }`,
+    });
+    this.shaft = new THREE.Mesh(g, this.shaftMat);
+    this.shaft.matrixAutoUpdate = false;
+    this.shaft.userData.noCollide = true;
+    this.shaft.frustumCulled = false;
+    this.window = win;
+    this.scene.add(this.shaft);
+  }
+
   // ---- dust floating in the basement air
   buildDust() {
     const N = 500;
@@ -202,7 +251,7 @@ export class Environment {
     const day = smooth(-0.05, 0.25, elev);
     const night = this.night;
     // temperature: cool nights and mornings, colder in the rain
-    this.temperature = 6 + 13 * day - this.weather.rain * 4;
+    this.temperature = 6 + 13 * day - this.weather.rain * 4 - this.weather.snow * 7 + (this.tempOffset ?? 0);
 
     // sun / moon (the same light: low and blue at night)
     const csm = this.r.csm;
@@ -273,6 +322,43 @@ export class Environment {
       this.rain.position.set(this.camera.position.x, this.camera.position.y - 4, this.camera.position.z);
       this.rainMat.opacity = 0.18 + 0.2 * day;
     }
+    // snow: flakes drifting down, white roofs and ground; it melts once it's above ~3 °C
+    const snowing = this.weather.snow > 0.05 && zone === 'outside';
+    this.snow.visible = snowing;
+    if (snowing) {
+      const n = Math.floor(this.snowN * Math.min(1, this.particles) * this.weather.snow);
+      this.snow.geometry.setDrawRange(0, n);
+      const p = this.snow.geometry.attributes.position.array;
+      const t = performance.now() / 1000;
+      for (let i = 0; i < n; i++) {
+        const k = i * 3;
+        p[k + 1] -= dt * (0.8 + (i % 7) * 0.08);
+        p[k] += Math.sin(t * 0.8 + i) * dt * 0.3 + (this.wind?.x ?? 0) * dt * 0.5;
+        p[k + 2] += Math.cos(t * 0.6 + i * 1.3) * dt * 0.3;
+        if (p[k + 1] < -2) { p[k] = (Math.random() - 0.5) * 30; p[k + 1] = 14; p[k + 2] = (Math.random() - 0.5) * 30; }
+      }
+      this.snow.geometry.attributes.position.needsUpdate = true;
+      this.snow.position.set(this.camera.position.x, this.camera.position.y - 4, this.camera.position.z);
+    }
+    if (this.weather.snow > 0.1) this.snowU.value = Math.min(1, this.snowU.value + dt * 0.01 * this.weather.snow);
+    else if (this.temperature > 3) this.snowU.value = Math.max(0, this.snowU.value - dt * 0.004 * (this.temperature - 2));
+    // sun shafts through the bedroom window (when the sun is on that side)
+    if (this.shaft) {
+      const high = ['high', 'ultra', 'insane'].includes(this.settings.get('graphics.preset'));
+      const dir = this.sunDir();
+      const into = -dir.dot(this.window.normal); // >0: sunlight comes in through the window
+      const strength = high ? Math.max(0, into) * day * (1 - this.weather.cloud * 0.8) : 0;
+      this.shaft.visible = strength > 0.02 && zone !== 'lab';
+      if (this.shaft.visible) {
+        const w = this.window;
+        const along = dir.clone().multiplyScalar(5);
+        const m = new THREE.Matrix4().makeBasis(along, new THREE.Vector3(0, w.h, 0), w.side.clone().multiplyScalar(w.w));
+        m.setPosition(w.center);
+        this.shaft.matrix.copy(m);
+        this.shaft.matrixWorldNeedsUpdate = true;
+        this.shaftMat.uniforms.uOpacity.value = strength;
+      }
+    }
     const wetTarget = this.weather.rain > 0.1 ? 1 : 0;
     this.wet += (wetTarget - this.wet) * dt * (wetTarget ? 0.08 : 0.004 * (0.3 + day)); // gets wet fast, dries slowly (faster in the sun)
     this.wetU.value = this.wet;
@@ -334,7 +420,7 @@ export class Environment {
 
     if (this.clockEl) {
       const h = Math.floor(this.hour), m = Math.floor((this.hour % 1) * 60);
-      const icon = { clear: day > 0.5 ? '☀️' : '🌙', cloudy: '☁️', rain: '🌧️' }[this.weather.state];
+      const icon = { clear: day > 0.5 ? '☀️' : '🌙', cloudy: '☁️', rain: '🌧️', snow: '🌨️' }[this.weather.state];
       const text = `${icon} ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} · ${Math.round(this.temperature)}°C`;
       if (this.clockEl.textContent !== text) this.clockEl.textContent = text;
     }
@@ -349,6 +435,10 @@ export class Environment {
       w.state = r < 0.55 ? 'clear' : r < 0.8 ? 'cloudy' : 'rain';
       w.next = 120 + Math.random() * 300; // 2-7 game hours
     }
+    // precipitation falls as snow when it's freezing
+    if (w.state === 'rain' && this.temperature < 1) w.state = 'snow';
+    if (w.state === 'snow' && this.temperature > 3) w.state = 'rain';
+    w.snow += ((w.state === 'snow' ? 1 : 0) - w.snow) * dt * 0.05;
     const rainT = w.state === 'rain' ? 1 : 0;
     const cloudT = w.state === 'clear' ? 0 : 1;
     w.rain += (rainT - w.rain) * dt * 0.05;
