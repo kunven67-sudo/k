@@ -170,17 +170,22 @@ speakers), routed through the `music` bus with room reverb.
 
 ## 6. Module contracts
 
-### gfx (`src/gfx/`)
-- `textures.js`: canvas/DataTexture procedural generators with caching:
-  `noiseTexture`, `makePBR(kind, opts) → {map, roughnessMap, normalMap, aoMap?}`.
-- `materials.js`: `mat(kind, opts)` returns a shared `MeshStandardMaterial`/`MeshPhysicalMaterial`
-  for kinds like `asphalt, sidewalk, curb, stucco, brick, painted-wood, wood-floor, carpet-casino,
-  carpet-motel, tile-bathroom, felt-green, felt-red, chrome, brass, gold, glass, mirror, neon(color),
-  fabric(color), leather(color), plastic-worn(color), metal-painted(color), paper, cardboard`.
-  Options: `{ color, scale, wear, dirt, seed }`. Materials are cached by kind+options.
-- `sky.js`: `createSky(scene, renderer, {tier})` → `{ update(clock, weather), sunLight, hemi }`
-  real sun/moon/stars, day/night colors, fog. `weather.js` later.
-- `decals.js`: grime, stains, cracks, gum, posters — `addDecal(mesh, kind, transform)`.
+### gfx (`src/gfx/`) — foundation already exists, extend it
+- `noise.js`: `TileNoise(seed)` periodic `perlin`, `fbm`, `ridged`, `worley`; `hash2`.
+- `textures.js`: `bakePBR(key, size, fn)` → `{map, normalMap, ormMap}` (AO/rough/metal packed),
+  `canvasTexture(key, w, h, draw)` for signs/labels/posters, `textureSize(base)` (tier-scaled),
+  `setMaxAnisotropy(n)` (call once with `renderer.capabilities.getMaxAnisotropy()`).
+- `materials.js`: `mat(kind, {color, wear, dirt, seed, ...})` → cached PBR material with
+  `userData.tileMeters`. Kinds: `asphalt sidewalk concrete curb dirt gravel grass stucco brick
+  painted-wood wallpaper drywall tile-bathroom linoleum wood-floor carpet-casino carpet-motel felt
+  fabric leather chrome steel brass gold aluminum metal-painted plastic rubber car-paint glass
+  mirror neon emissive paper cardboard wood`. Add kinds with `registerKind(name, def)` in YOUR
+  module's own file (e.g. `src/world/materials-extra.js`) — never edit materials.js itself.
+  Preview every kind at `dev/materials.html`.
+- `geom.js`: `worldUV(geometry, tileMeters)`, `meshWithWorldUV(geo, mat)`, `bevelBox(w,h,d,mat)`,
+  `mergeStatic(meshes, mat)`, re-exports `mergeGeometries`, `mergeVertices`.
+- To be built by the world module: `sky.js` (`createSky(scene, renderer, {tier})` → `{update(clock,
+  weather), sunLight, hemi}`: real sun/moon/stars, day/night, fog) and `decals.js`.
 
 ### character (`src/character/`)
 - `index.js` exports `createHuman(params, {tier}) → Human` and `randomHumanParams(rng, overrides)`,

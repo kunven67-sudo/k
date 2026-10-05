@@ -33,7 +33,7 @@ const FilmShader = {
     tDiffuse: { value: null },
     uTime: { value: 0 },
     uGrain: { value: 0.035 },
-    uVignette: { value: 0.32 },
+    uVignette: { value: 0.2 },
     uAberration: { value: 0.0012 },
     uBlur: { value: 0.0 }, // 0..1 hungover / drunk / concussion blur
     uTunnel: { value: 0.0 }, // 0..1 death tunnel vision
@@ -73,7 +73,7 @@ const FilmShader = {
       col = mix(col, vec3(lum), uDesat);
       col *= uTint;
       float vig = smoothstep(0.85, 0.2, dist * (1.0 + uVignette));
-      col *= mix(1.0, vig, 0.55 + uVignette * 0.4);
+      col *= mix(1.0, vig, 0.35 + uVignette * 0.5);
       float tunnel = smoothstep(0.62 - uTunnel * 0.55, 0.15 - uTunnel * 0.15, dist);
       col *= mix(1.0, tunnel, uTunnel);
       float n = hash(uv * vec2(1920.0, 1080.0) + fract(uTime) * 97.0) - 0.5;
@@ -102,6 +102,7 @@ export class Engine {
     this.tier = currentTier();
     this.effects = FilmShader.uniforms; // states tweak uBlur / uTunnel / uTint etc.
     this.bloomStrength = 0.6;
+    this.bloomThreshold = 1.6; // linear HDR — only emissives/neon and hot highlights bloom
     this._createRenderer();
     this._devEl = null;
     bus.on('quality:changed', (tier) => {
@@ -140,7 +141,7 @@ export class Engine {
     this.composer = new EffectComposer(r);
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), this.bloomStrength, 0.55, 0.82);
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), this.bloomStrength, 0.55, this.bloomThreshold);
     this.composer.addPass(this.bloomPass);
     this.outputPass = new OutputPass();
     this.composer.addPass(this.outputPass);
@@ -272,6 +273,7 @@ export class Engine {
     audio.setListener(this.camera);
     FilmShader.uniforms.uTime.value = this.time;
     this.bloomPass.strength = this.bloomStrength;
+    this.bloomPass.threshold = this.bloomThreshold;
     if (this.tier.postFx) this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
     input.endFrame();
