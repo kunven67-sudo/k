@@ -630,3 +630,21 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
   interest = illegal loan sharking.
 - **Card-counting teams** with online friends (MIT-style spotter signals the big player via
   gesture/emote); legal but casinos ban caught teams.
+
+## 31. Later additions (rounds 72–73)
+
+- Downtown Reno **casino skyways** (Eldorado ↔ Silver Legacy ↔ Circus Circus).
+- **Co-ownership with online friends**: houses (split mortgage/bills), businesses (split
+  profit/loss), shared bank accounts (can be drained), shared cars (crasher pays).
+- **Friends can betray** each other: steal from houses, drain accounts, scam, snitch.
+- **Facial recognition & disguises**: wigs/glasses/fake mustaches to sneak in after a ban;
+  cameras may still match you → trespassing charges.
+- **Crime Stoppers**: news shows blurry suspect photos with cash rewards; NPCs who know you
+  may call it in; you can tip off police about others for money.
+- **Relationship dates depend on the person**: each NPC has their own expectations about
+  Valentine's Day, anniversaries, Mother's/Father's Day, birthdays.
+- **Prevention**: yearly flu shots (sore arm), checkups (blood pressure, liver), dental
+  cleanings every 6 months, vitamins (tiny boost).
+- **Emergency phone alerts** (flash flood, wildfire, blizzard, Amber) blast even on silent.
+- **Long-term health**: years of stress, smoking, drinking and junk food raise later-life
+  risk of heart attacks, liver and lung problems; healthy living lowers it.
