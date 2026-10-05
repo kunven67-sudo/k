@@ -918,3 +918,8 @@ have a Ring cam; a witness only matters if someone actually saw it).
   → paid gigs.
 - **Black Friday chaos**: 5 AM lines, doorbuster deals, crowd rushes, fights over the last item
   (ragdoll pile-ups).
+- **Betting-system scams**: Martingale books, $500 guru courses — feel like they work, then wipe
+  you out; card counting is the only real edge.
+- **Comp living**: enough play earns free hotel nights continuously; drops off when play drops.
+- **Fraud crimes**: insurance fraud (investigators), check fraud, counterfeit chips (RFID chips →
+  likely caught), return fraud (stores flag you).
