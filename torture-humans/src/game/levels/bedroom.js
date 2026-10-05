@@ -67,11 +67,7 @@ export async function buildBedroom({ statics, props, scene, hatch }) {
   const pane = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.02, transmission: 1, thickness: 0.004, ior: 1.52, transparent: true });
   const win = mesh(new THREE.BoxGeometry(0.01, 1.2, 1.4), pane, x1 + 0.075, fy + 1.5, -2.6, room);
   win.castShadow = false;
-  const sun = new THREE.SpotLight(0xfff1dc, 60, 12, 0.7, 0.8, 1.5);
-  sun.position.set(x1 + 2.5, fy + 3.2, -2.6);
-  sun.target.position.set(x0 + 1, fy, -2.4);
-  sun.castShadow = true;
-  scene.add(sun, sun.target);
+  // (daylight through the window now comes from the real sun outside)
   // ceiling
   mesh(box(x1 - x0 + 0.3, 0.15, z1 - z0 + 0.3), pbr('plastered_wall_02', { size: 2, color: 0xeeeae2 }), (x0 + x1) / 2, fy + h + 0.075, (z0 + z1) / 2, room);
   const lamp = new THREE.PointLight(0xffe2b8, 5, 8, 2);

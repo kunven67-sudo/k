@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { pbr, box, plane, place, loadIndex } from '../engine/assets.js';
 import { buildBedroom, BEDROOM } from './bedroom.js';
 import { buildTinyWorld } from '../cageworld.js';
+import { buildTown, inLab } from './town.js';
 
 export const LAB = { w: 14, d: 10, h: 3.0, floorY: 0 };
 // the hatch to the bedroom: ladder goes up here
@@ -273,10 +274,21 @@ export async function buildLab({ scene, physics, settings }) {
     l.shadow.bias = -0.0005;
     scene.add(l);
   }
-  await place(props, 'modular_industrial_pipes_01', { x: -1, y: h - 0.35, z: -4.4, width: 6 });
+  // pipes along the ceiling: as long as the wall, but kept under the ceiling (they used to poke up into the yard)
+  const pipes = await place(props, 'modular_industrial_pipes_01', { x: -1, y: h - 0.35, z: -4.4, width: 6 });
+  {
+    const bb = new THREE.Box3().setFromObject(pipes);
+    const tall = bb.max.y - bb.min.y;
+    if (tall > 0.32) { pipes.scale.y *= 0.32 / tall; pipes.updateMatrixWorld(true); pipes.position.y += (h - 0.36) - new THREE.Box3().setFromObject(pipes).min.y; }
+  }
   scene.add(new THREE.HemisphereLight(0x9fb3c8, 0x3a3228, 0.12)); // most fill light now comes from the reflection probe
 
+  // what belongs where, so each part can be hidden when you can't see it (big speed win)
+  const labObjs = [...statics.children, ...props.children];
   await buildBedroom({ statics, props, scene, hatch: HATCH });
+  const houseObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o));
+  await buildTown({ statics, props, scene });
+  const townObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o) && !houseObjs.includes(o));
 
   scene.add(statics, props);
   physics.addStaticMesh(statics);
@@ -287,7 +299,13 @@ export async function buildLab({ scene, physics, settings }) {
     spawn: new THREE.Vector3(2.5, 0, 2.0),
     respawn: new THREE.Vector3(0.6, 0, 2.2), // where you wake up after dying in the tiny world
     defaultVisitors: 3, // people walking around the lab (until the town exists)
-    sunDirection: null,
+    // outside: real sun and sky; the basement has none (see main.js)
+    sunDirection: new THREE.Vector3(-0.45, -0.8, -0.4).normalize(),
+    sunIntensity: 3,
+    sky: 'quadrangle_sunny',
+    inLab,
+    zones: { lab: labObjs, house: houseObjs, town: townObjs, inHouse: (p) => p.y > 3.1 && p.x > BEDROOM.x0 - 0.2 && p.x < BEDROOM.x1 + 0.2 && p.z > BEDROOM.z0 - 0.2 && p.z < BEDROOM.z1 + 0.2 },
+    fog: { color: 0xc4d0dc, near: 80, far: 260 },
     navRoots: [statics, props],
     probe: new THREE.Vector3(0, 1.6, 0.3),   // reflection snapshot from above the terrarium
     probeIntensity: 0.6,

@@ -13,12 +13,14 @@ import { Cage } from './cage.js';
 import { Colony } from './colony/colony.js';
 import { Squisher } from './squish.js';
 import { bakeEnvironment } from './engine/probe.js';
+import { hdri } from './engine/assets.js';
 import { Vitals } from './vitals.js';
 import { Hazards } from './hazards.js';
 import { buildTestLevel } from './levels/test-level.js';
 import { buildLab } from './levels/lab.js';
 
 const params = new URLSearchParams(location.search);
+let game_applyZone = null;
 
 // Desktop build: the game files come as a separate pack, downloaded once.
 async function ensureAssets() {
@@ -118,9 +120,44 @@ export async function boot() {
 
   renderer.sunIntensity = level.sunIntensity;
   renderer.setScene(scene, camera, { sunDirection: level.sunDirection });
+  // Inside vs outside: the basement has no sky or sun (only its own lamps and a
+  // reflection snapshot of the room); outside you get the sky, the sun and haze.
+  let labEnv = null;
+  let sky = null;
+  let zone = null;
+  const sunLights = () => renderer.csm?.lights || [];
+  const fog = level.fog ? new THREE.Fog(level.fog.color, level.fog.near, level.fog.far) : null;
+  if (fog) scene.fog = fog;
+  const applyZone = (force = false) => {
+    const z = level.inLab?.(camera.position) ? 'lab' : level.zones?.inHouse(camera.position) ? 'house' : 'outside';
+    if (z === zone && !force) return;
+    zone = z;
+    const lab = z === 'lab' || !level.sunDirection;
+    // hide what you can't see from here: the town from the basement, the basement from outside
+    if (level.zones) {
+      for (const o of level.zones.town) o.visible = z !== 'lab';
+      for (const o of level.zones.lab) o.visible = z !== 'outside';
+    }
+    for (const l of sunLights()) {
+      l.intensity = lab ? 0 : renderer.sunIntensity ?? 3;
+      l.shadow.autoUpdate = !lab; // no sun shadows to draw underground
+      l.shadow.needsUpdate = true;
+    }
+    scene.background = lab ? null : sky?.background ?? new THREE.Color(0x9fb6cc);
+    scene.environment = lab ? labEnv : sky?.environment ?? labEnv;
+    scene.environmentIntensity = lab ? level.probeIntensity ?? 0.7 : 0.9;
+    if (fog) { fog.near = lab ? 1e4 : level.fog.near; fog.far = lab ? 2e4 : level.fog.far; }
+  };
+  game_applyZone = applyZone;
+  if (level.sky) hdri(renderer.renderer, level.sky).then((s) => { sky = s; applyZone(true); }).catch(() => {});
+  settings.onChange((d, patch) => { if (patch.graphics) applyZone(true); });
   // indoor reflections: snapshot the room once textures have streamed in, and again a bit later
   if (level.probe) {
-    const bake = () => bakeEnvironment(renderer.renderer, scene, level.probe, { intensity: level.probeIntensity ?? 0.7 });
+    const bake = () => {
+      for (const l of sunLights()) l.intensity = 0; // the snapshot is of the basement: no sun
+      labEnv = bakeEnvironment(renderer.renderer, scene, level.probe, { intensity: level.probeIntensity ?? 0.7, assign: false, previous: labEnv });
+      applyZone(true);
+    };
     bake();
     setTimeout(bake, 2500);
     setTimeout(bake, 8000);
@@ -195,6 +232,7 @@ export async function boot() {
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
     if (!params.has('paused')) step(dt);
+    game_applyZone?.();
     const hint = player.interactHint || hands.hint;
     if (hintEl && hintEl.textContent !== (hint || '')) { hintEl.textContent = hint || ''; hintEl.hidden = !hint; }
     if (renderer.render(now) && fpsEl) {
