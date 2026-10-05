@@ -997,6 +997,19 @@ have a Ring cam; a witness only matters if someone actually saw it).
   unemployment (layoffs only, not firing for cause; job-search logs), Medicaid (free coverage at
   low income; lost when income rises), housing assistance (months-to-years waitlists).
 
+## 50. HOUSES & FURNITURE (owner focus)
+
+- **Real Reno neighborhoods per tier**: motel on 4th Street, trailers in Sun Valley, apartments in
+  Midtown, family houses in the suburbs/Sparks, penthouses in downtown high-rises, mansions in
+  south Reno gated golf communities — each with its own crime, noise, neighbors and views.
+- **Home buying**: mortgage pre-approval (credit score, income, debts), open houses with a
+  commission-hungry realtor and competing NPC buyers, paid home inspections (skip → hidden mold,
+  bad roof), down payment, closing costs, paperwork, keys.
+- **Full remodels**: knock down walls, add rooms, redo kitchens/bathrooms; contractors (delays,
+  overruns, scams) and city permits, or DIY with risk.
+- **Flat-pack assembly**: picture instructions, Allen keys, missing screws; built wrong → wobbles
+  or collapses. (Reno has no IKEA — nearest is a drive to Sacramento.)
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
