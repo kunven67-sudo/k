@@ -771,3 +771,12 @@ manual everything and broken gauges).
   in beaters), auto vs manual headlights/wipers, built-in navigation/CarPlay with voice
   directions in newer cars; the phone's Google Maps works anywhere (dies with the battery).
 - **Pedestrian laws**: crosswalk signals; jaywalking near cops → ticket; cars may not stop.
+
+## 40. Round 87 — style
+
+- **Color mood: natural** real-world colors that change with weather/time (golden sunsets,
+  gray rain, orange wildfire smoke).
+- **Settings & secondary menus: card-table style** (green felt, chip-shaped buttons).
+- **Studio splash: dice roll** — two physics dice tumble and land on 6-6, "Loaded Dice
+  Studios" fades in with a clack.
+- **Credits: studio only** ("Loaded Dice Studios").
