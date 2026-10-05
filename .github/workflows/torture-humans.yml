@@ -21,8 +21,9 @@ permissions:
   contents: write
 
 # queue instead of cancel: the first asset build takes a while and must finish to be cached
+# (releases get their own queue: a push while a release waits must not cancel it)
 concurrency:
-  group: torture-humans-${{ github.ref }}
+  group: torture-humans-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:

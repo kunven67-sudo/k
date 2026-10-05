@@ -3,16 +3,27 @@
 Not the finished game yet: this is what's built so far.
 
 ### The town (first street)
-- Walk out of your bedroom door: your house now has a brick outside, a tiled roof and a front path
-- One street with sidewalks, curbs, street lamps, hydrants, benches, a parked car and trees
-- 8 shops across the street: Bakery, Pharmacy, Hardware, Pet Shop, Diner, Bank, Police, Grocery (inside comes later)
-- Neighbors' houses on your side, a fence around the edge of town
-- Real sky and sun outside; the basement lab stays dark
-- Built to run on weak graphics cards: what you can't see isn't drawn
+- Walk out of your bedroom door: brick house, tiled roof, front path, sidewalks with curbs
+- 8 shops across the street (Bakery, Pharmacy, Hardware, Pet Shop, Diner, Bank, Police, Grocery), neighbors' houses, lamps, trees, a parked car
+- Townspeople walk the street, look in shop windows, knock on doors, text on their phones
 
-### Still here from 0.2.0
-- F2 graphics (Low / Medium / High / Ultra), F3 FPS
-- Tiny people in the terrarium: needs, tools, building, fighting
-- 3 = Supplies (R changes what's in it)
+### Day, night and weather
+- A clock on screen (1 game hour = 1 minute): the sun moves, sunsets, moonlit nights
+- Street lamps and house windows light up after dark
+- Rain: wet shiny streets, puddles, drying in the sun; fog in the morning
+- Breath clouds when it's cold, dust floating in the basement
 
-First start downloads the game files once (about 1.4 GB), then it starts in seconds.
+### People look alive
+- Breathing (faster when scared or after running), real blinking, eyes that dart around, jiggle
+- Faces flush when angry, go pale when terrified, shine with sweat; pores on High/Ultra
+- Clothes get muddy, soaked by rain, sweaty, and bloody where people get hurt (gore setting)
+
+### The terrarium
+- Morning dew (tiny people drink it), mushrooms, moss, fallen leaves, algae, floating leaves, lava embers
+- Fogged glass with drops running down (Medium+), grass bends when tiny people push through, footprints
+- Dust and hairs drift down when you lean over the tank
+
+### Fixes
+- Custom effects (skin, wet streets, lava) were being wiped by the sun-shadow system: now kept
+
+F2 graphics (heavy stuff is only on High/Ultra), F3 FPS. First start downloads the game files once (about 1.4 GB).
