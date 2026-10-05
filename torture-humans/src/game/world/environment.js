@@ -193,6 +193,9 @@ export class Environment {
     dt = Math.max(0, Math.min(0.1, dt));
     this.hour = (this.hour + (dt * 24) / DAY_SECONDS) % 24;
     this.updateWeather(dt);
+    // gusty wind, stronger with clouds and rain
+    const gust = 0.5 + 0.5 * Math.sin(performance.now() / 2300) * Math.sin(performance.now() / 870);
+    this.wind = (this.wind || new THREE.Vector3()).set(1, 0, 0.4).normalize().multiplyScalar((0.4 + this.weather.cloud * 0.8 + this.weather.rain) * gust);
     const zone = this.zone();
     const outside = zone !== 'lab';
     const elev = this.sunElevation;
@@ -299,6 +302,7 @@ export class Environment {
       const outdoorsNow = !h.tiny && h.position.y > 3.1 && !this.level.zones?.inHouse(h.position);
       h.life.outdoors = outdoorsNow;
       h.life.rain = outdoorsNow ? this.weather.rain : 0;
+      h.life.wind = this.wind;
     }
     // breath you can see: a puff on every breath out when it's below ~8 °C
     const cold = smooth(9, 4, this.temperature);

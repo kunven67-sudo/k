@@ -37,6 +37,7 @@ export class Human {
     this.target = null;
     this.alive = true;
     this.character.root.userData.human = this;
+    this.character.look = profile.look || profile.name || '';
     this.life = new Life(this.character, settings);
     this.syncFromAgent(1);
   }

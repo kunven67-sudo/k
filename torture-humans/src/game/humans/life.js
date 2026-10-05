@@ -52,7 +52,7 @@ function pores() {
 }
 
 // Gives this character its own skin materials with the life uniforms.
-function upgradeSkin(character, level) {
+function upgradeSkin(character, level, look = '') {
   const u = {
     uFlush: { value: 0 },     // anger / embarrassment / exertion: redder
     uPale: { value: 0 },      // fear / sick / dying: whiter, less blood
@@ -73,6 +73,15 @@ function upgradeSkin(character, level) {
     uWrinkles: { value: level >= LEVEL.medium ? 1 : 0 },
     uBruises: { value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, -9, 0, 0)) },
     uBruiseAge: { value: [0, 0, 0, 0] },
+    // sun: people who work outside are tanned; old clothes are faded at the knees and elbows
+    uTan: { value: /Construction|Gardener|Sports|Wood|Delivery/.test(look) ? 0.6 + Math.random() * 0.4 : Math.random() * 0.35 },
+    uWear: { value: Math.random() },
+    // hair: sways with the wind and with sudden moves (Medium+)
+    uWind: { value: new THREE.Vector3() },
+    uSway: { value: level >= LEVEL.medium ? 1 : 0 },
+    // soft body: belly and chest follow the torso's wobble (Ultra)
+    uJiggle: { value: new THREE.Vector3() },
+    uSoft: { value: level >= LEVEL.ultra ? 1 : 0 },
   };
   // where the eyes and brows are on this face (bind pose, from the skeleton)
   character.root.traverse((o) => {
@@ -89,7 +98,30 @@ function upgradeSkin(character, level) {
   character.root.traverse((o) => {
     if (!o.isSkinnedMesh) return;
     const mats = [].concat(o.material).map((m) => {
-      if (!/body|head/i.test(m.name) || /opacity/i.test(m.name)) return m;
+      const isHair = /opacity/i.test(m.name);
+      if (isHair) {
+        // hair cards: sway (vertex) and wet look (darker, shinier)
+        const h = m.clone();
+        h.onBeforeCompile = h.userData.extraCompile = (sh) => {
+          sh.uniforms.uWind = u.uWind; sh.uniforms.uSway = u.uSway; sh.uniforms.uSoak = u.uSoak; sh.uniforms.uTime = u.uTime;
+          sh.vertexShader = sh.vertexShader
+            .replace('#include <common>', '#include <common>\nuniform vec3 uWind; uniform float uSway, uTime;')
+            .replace('#include <begin_vertex>', `#include <begin_vertex>
+if (uSway > 0.5) {
+  // the further from the scalp (lower hair tips, longer strands), the more it moves
+  float free = smoothstep(1.72, 1.55, position.y) + smoothstep(0.0, -0.12, position.z) * 0.5;
+  float flutter = sin(uTime * 6.0 + position.x * 60.0 + position.y * 40.0) * 0.0015 * length(uWind);
+  transformed += (uWind * 0.006 + vec3(flutter, 0.0, flutter * 0.6)) * free;
+}`);
+          sh.fragmentShader = sh.fragmentShader
+            .replace('#include <common>', '#include <common>\nuniform float uSoak;')
+            .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 1.0 - 0.35 * uSoak;')
+            .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.25, uSoak);');
+        };
+        h.customProgramCacheKey = () => `hair-life-${level}`;
+        return h;
+      }
+      if (!/body|head/i.test(m.name)) return m;
       const c = m.clone();
       const isBody = /body/i.test(m.name);
       c.onBeforeCompile = c.userData.extraCompile = (sh) => {
@@ -97,12 +129,21 @@ function upgradeSkin(character, level) {
         // where on the body (bind pose, meters: y = height, arms out sideways)
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', '#include <common>\nvarying vec3 vBind;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBind = position;');
+          .replace('#include <common>', '#include <common>\nuniform vec3 uJiggle; uniform float uSoft;')
+          .replace('#include <begin_vertex>', `#include <begin_vertex>
+vBind = position;
+${isBody ? `if (uSoft > 0.5) {
+  // chest and belly: soft tissue in front of the torso lags and wobbles
+  float front = smoothstep(0.0, 0.08, position.z);
+  float chest = smoothstep(1.05, 1.18, position.y) * smoothstep(1.42, 1.3, position.y) * smoothstep(0.2, 0.08, abs(position.x));
+  float belly = smoothstep(0.85, 0.95, position.y) * smoothstep(1.15, 1.05, position.y) * smoothstep(0.18, 0.05, abs(position.x));
+  transformed += uJiggle * (chest * 0.9 + belly * 0.6) * front;
+}` : ''}`);
         sh.fragmentShader = sh.fragmentShader
           .replace('#include <common>', `#include <common>
 uniform float uFlush, uPale, uWet, uGlow, uPores, uDirt, uSoak, uSweat, uWeave; uniform sampler2D uPoreMap;
 uniform vec4 uStains[4];
-uniform float uBrowUp, uFrown, uSquint, uTear, uWrinkles; uniform vec3 uEyeL, uEyeR, uBrowC;
+uniform float uBrowUp, uFrown, uSquint, uTear, uWrinkles, uTan, uWear; uniform vec3 uEyeL, uEyeR, uBrowC;
 uniform vec4 uBruises[4]; uniform float uBruiseAge[4];
 varying vec3 vBind;
 // expression wrinkles as a height field (grooves are negative), in meters of bind pose
@@ -150,6 +191,11 @@ float gauss3(vec3 d, float r) { return exp(-dot(d, d) / (r * r)); }`)
   // sweat: armpits and the middle of the back go dark first
   float sw = uSweat * (gauss3(vBind - vec3(0.17, 1.27, 0.0), 0.07) + gauss3(vBind - vec3(-0.17, 1.27, 0.0), 0.07) + gauss3((vBind - vec3(0.0, 1.12, -0.13)) * vec3(1.0, 0.7, 1.0), 0.11));
   diffuseColor.rgb *= 1.0 - 0.32 * clamp(sw, 0.0, 1.0);` : ''}
+  ${isBody ? `// worn clothes: faded at the knees and elbows (bind pose: T-pose, arms out)
+  float knee = gauss3((vBind - vec3(sign(vBind.x) * 0.1, 0.5, 0.06)) * vec3(1.0, 0.8, 1.0), 0.06);
+  float elbow = gauss3(vBind - vec3(sign(vBind.x) * 0.42, 1.4, -0.02), 0.05);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.25 + 0.04, clamp((knee + elbow) * uWear * (0.6 + n * 0.6), 0.0, 1.0) * 0.5);` : `// a tan from working outside
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.86, 0.78, 0.7), uTan * 0.5);`}
   // soaked by rain: darker everywhere
   diffuseColor.rgb *= 1.0 - 0.3 * uSoak;
   // blood: dark red, ragged edges
@@ -229,7 +275,8 @@ export class Life {
     this.ch = character;
     this.settings = settings;
     this.level = LEVEL[settings?.get?.('graphics.humansDetail')] ?? 1;
-    this.skin = upgradeSkin(character, this.level);
+    this.skin = upgradeSkin(character, this.level, character.look || '');
+    this.skin.uTime = { value: 0 };
     this.t = Math.random() * 100;
     this.breath = Math.random();
     this.eye = { yaw: 0, pitch: 0, toYaw: 0, toPitch: 0, timer: 0.5 };
@@ -353,6 +400,12 @@ export class Life {
     const crying = this.sad > 0.65 || this.fear > 0.9;
     u.uTear.value = crying ? Math.min(1, u.uTear.value + dt * 0.3) : Math.max(0, u.uTear.value - dt * 0.015);
     for (let i = 0; i < 4; i++) u.uBruiseAge.value[i] = Math.min(1, u.uBruiseAge.value[i] + dt / 600);
+    // hair: the wind (outside) plus the opposite of how the head is moving; soft body follows the torso spring
+    u.uTime.value = this.t;
+    const rootQ = root.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const wind = (this.wind || new THREE.Vector3()).clone().multiplyScalar(this.outdoors ? 1 : 0);
+    u.uWind.value.copy(wind.sub(vel.clone().multiplyScalar(0.25)).applyQuaternion(rootQ)).clampLength(0, 3);
+    u.uJiggle.value.copy(this.torso.x).applyQuaternion(rootQ).multiplyScalar(-0.25).clampLength(0, 0.012);
     // clothes: dirt builds up while walking outside (slowly), rain soaks, sweat from effort or fear
     if (speed > 0.3 && this.outdoors) this.dirty = Math.min(1, this.dirty + dt * 0.002 * speed);
     u.uDirt.value = 0.15 + this.dirty * 0.7;

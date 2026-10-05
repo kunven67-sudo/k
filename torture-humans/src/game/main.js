@@ -105,7 +105,7 @@ export async function boot() {
         if (!tpl) continue; // that look isn't in this build
         const start = nav.randomPoint(level.town.area) || null;
         if (!start) break;
-        const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.town.area, settings, profile: { name: look.replace(/_0?(\d+)$/, ' $1').replace(/_/g, ' ') } });
+        const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.town.area, settings, profile: { look, name: look.replace(/_0?(\d+)$/, ' $1').replace(/_/g, ' ') } });
         h.spots = level.town.spots;
         h.townie = true;
         humans.push(h);
