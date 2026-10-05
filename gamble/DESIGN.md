@@ -563,3 +563,24 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 - **Jail life**: collect calls (cost the receiver; some don't answer), commissary funded by
   others, visits through glass (incl. online friends), cellmates with personalities you can
   type-chat with.
+
+## 27. Later additions (rounds 65–66)
+
+- **Body stuff**: yawns (contagious to NPCs) & stretches, hiccups & sneezes, occasional
+  burps/farts after big meals or beer (NOT constant) plus an on-purpose button, nervous
+  sweating & shaky voice before big bets or lying to cops.
+- **Clothes wear out**: fade, rip in fights, holes, stains, shoes wear down; cheap clothes
+  wear faster.
+- **Dealer mistakes**: occasional over/underpays — point it out (dealer likes you) or keep it
+  (cameras may notice).
+- **Forgotten slot tickets/credits** left in machines: keeping them is theft in Nevada (camera
+  risk) or turn them in to security.
+- **CHANGE — casinos & bars are open 24/7** (real Nevada). Supersedes the earlier "venue
+  closing times" for big casinos: nobody kicks you out; exhaustion, hunger, bladder, money
+  and your job force you to leave. Small venues (slot parlors, back-alley den, bingo hall,
+  stores) keep real hours.
+- **Casino promos**: hot-seat drawings, slot tournaments, birthday free play, car giveaway
+  drawings.
+- **Claw machines** grab strongly only 1 in X tries (real payout settings).
+- **Hotel stays**: room service (service charge), minibar ($12 water, auto-charged),
+  housekeeping (Do Not Disturb; valuables risk), 11 AM checkout, late fees, hidden resort fees.
