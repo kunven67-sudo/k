@@ -432,3 +432,22 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
   a car wash/detailing.
 - **Yard sales** (sell & buy, early haggling NPCs, thieves, rare finds).
 - **Facebook Marketplace / Craigslist** (deals, scams, no-shows, dangerous meetups).
+
+## 21. Later additions (rounds 53–54)
+
+- **Storage-unit auctions** (Storage Wars style): peek, bid against NPCs, haul it out yourself.
+- **Auctions**: police auctions of seized goods, as-is car auctions, house foreclosures
+  (maybe NPCs you know), art & antiques (fakes exist).
+- **Metal detecting** in the desert and old mining towns (bottle caps, old coins, silver
+  nuggets, vault clues; no digging on private land).
+- **More table games**: sic bo (Macau), pai gow poker, three card poker, bingo hall nights.
+- **Real Reno casino names** (Peppermill, Atlantis, Eldorado, Circus Circus, Grand Sierra
+  Resort…) on the buildings, with original interior designs. The planned "Golden Sierra"
+  becomes the **Grand Sierra Resort**. (Real industry practices like comps and no clocks
+  are fine; never depict a real casino as rigging games.)
+- **Housing extras**: RV / van life (RV parks or free desert camping), homeless shelter
+  (curfew, theft, noise), couch-surfing at friends', Airbnb hosting.
+- **Pet extras**: tricks (practice with treats), pet clothes (winter sweaters, costumes),
+  dog park (meet dates; dog fights), pet social-media fame.
+- **Sports-betting app** requires in-person sign-up with ID at a casino sportsbook, then
+  works only inside Nevada.
