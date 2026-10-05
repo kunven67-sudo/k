@@ -12,6 +12,13 @@ import * as F from './core/format.js';
 import { FORM, M_SUN, M_EARTH, WARP_LEVELS, DEEP_LEVELS } from './core/constants.js';
 import { clamp, tierOf } from './core/phys.js';
 import { LIFE_STAGES } from './world/life.js';
+import { installSheets } from './ui/sheets.js';
+import { Goals } from './ui/goals.js';
+import { Tips } from './ui/tips.js';
+import { Book } from './ui/book.js';
+import { Scope } from './ui/scope.js';
+import { GalaxyMap } from './ui/map.js';
+import { Galaxy as GalaxyClass } from './world/galaxy.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -57,6 +64,17 @@ class Game {
     this.feedMass = 0;
     this.newMode = 'survival';
     this.bindUI();
+    this.goals = new Goals(this);
+    this.tips = new Tips(this);
+    this.book = new Book(this);
+    this.scope = new Scope(this);
+    this.map = new GalaxyMap(this);
+    this.renderMap = (dt) => this.map.render(dt);
+    installSheets(this, { goals: this.goals, book: this.book, scope: this.scope, map: this.map });
+    this.onEvent = (e) => { this.goals.onEvent(e); this.tips.onEvent(e); this.book.onEvent(e); };
+    const ef = this.everyFrame;
+    this.everyFrame = (dt) => { ef?.(dt); this.goals.update(dt); this.tips.update(dt); this.book.update(dt); };
+    this.onPlayStart = (fresh) => { if (fresh && this.tutorialOn) this.tips.startTutorial(); };
     window.addEventListener('resize', () => { this.renderer.resize(); this.hud.resize(); });
     window.addEventListener('beforeunload', () => this.autosave());
     document.addEventListener('pointerlockchange', () => {
@@ -83,10 +101,16 @@ class Game {
       this.world.spawnPlayer({ ...save.player, modules: save.modules });
       if (save.sandbox) Object.assign(this.world, save.sandbox);
     } else {
-      this.world.spawnPlayer(opts.start || null);
+      const start = typeof opts.start === 'function' ? opts.start(this.galaxy) : opts.start;
+      this.world.spawnPlayer(start || null);
       if (opts.name) this.world.player.name = opts.name;
     }
+    this.challengeDone = !!save?.challengeDone;
+    this.challengeFailed = false;
     this.formStart = { form: this.world.player.form, mass: save?.formStart?.mass ?? this.world.player.mass };
+    this.waypoint = save?.waypoint && this.map ? this.map.findRec(save.waypoint) : null;
+    this.markedNear = null;
+    this.markTimer = 0;
     this.world.lastForm = this.world.player.form;
   }
 
@@ -119,6 +143,8 @@ class Game {
     d.mode = this.mode;
     d.challenge = this.challenge;
     d.formStart = this.formStart;
+    d.challengeDone = !!this.challengeDone;
+    if (this.waypoint) d.waypoint = this.waypoint.id;
     if (this.mode === 'sandbox') d.sandbox = { invincible: this.world.invincible, sandboxTime: this.world.sandboxTime, sandboxHazards: this.world.sandboxHazards };
     return d;
   }
@@ -295,7 +321,7 @@ class Game {
     const name = $('new-name').value.trim();
     const chal = mode === 'challenge' ? this.selectedChallenge : null;
     if (mode === 'challenge' && !chal) { $('new-note').textContent = 'Pick a challenge first.'; return; }
-    const opts = { mode, name: name || null, challenge: chal ? chal.id : null, start: chal?.start ? chal.start(this) : null };
+    const opts = { mode, name: name || null, challenge: chal ? chal.id : null, start: chal?.start || null };
     this.switchWorld(null, opts);
     if (mode === 'sandbox') { this.world.invincible = true; this.world.sandboxTime = true; this.world.sandboxHazards = false; }
     chal?.setup?.(this);
@@ -471,7 +497,7 @@ class Game {
       this.updateMarkers(dt);
       this.hud.update(dt, w, this);
       if (this.hud.mode !== 'off' && !this.sheet) this.hud.draw(w, this, (x, y, z) => this.project(x, y, z));
-      else this.hud.ctx.clearRect(0, 0, this.hud.el.overlay.width, this.hud.el.overlay.height);
+      else if (!this.mapOpen) this.hud.ctx.clearRect(0, 0, this.hud.el.overlay.width, this.hud.el.overlay.height);
     }
     this.audio.update({
       stage: tierOf(p.form),
@@ -642,6 +668,29 @@ class Game {
       if (best && best !== this.target) m.push({ body: best, kind: 'aim' });
       for (const [, b] of danger.slice(0, 4)) if (b !== best && b !== this.target) m.push({ body: b, kind: 'tick', label: 'BIGGER' });
       for (const [, b] of food.slice(0, 6)) if (b !== best && b !== this.target) m.push({ body: b, kind: 'tick' });
+      // your course and the systems you marked
+      const g = this.galaxy;
+      if (this.waypoint) {
+        const q = GalaxyClass.localOf(this.waypoint, w.O);
+        const d = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z);
+        if (d < 2e12) { this.hud.log(`You've reached ${g.nameOf(this.waypoint)}`, 'info'); this.waypoint = null; }
+        else m.push({ body: { ...q, alive: true, mass: 0, rEff: 0, radius: 0, name: g.nameOf(this.waypoint) }, kind: 'course', label: `${g.nameOf(this.waypoint)} \u00b7 ${F.distance(d)}` });
+      }
+      this.markTimer = (this.markTimer || 0) - 1;
+      if (this.markTimer <= 0) {
+        this.markTimer = 30;
+        this.markedNear = [];
+        for (const [id, st] of g.state) {
+          if (!st.marked || (this.waypoint && this.waypoint.id === id)) continue;
+          const rec = this.map.findRec(id);
+          if (rec) this.markedNear.push(rec);
+        }
+      }
+      for (const rec of this.markedNear || []) {
+        const q = GalaxyClass.localOf(rec, w.O);
+        const d = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z);
+        if (d > 2e12 && d < 200 * 9.4607e12) m.push({ body: { ...q, alive: true, mass: 0, rEff: 0, radius: 0, name: g.nameOf(rec) }, kind: 'mark', label: `${g.nameOf(rec)} \u00b7 ${F.distance(d)}` });
+      }
       this.markers = m;
     }
     for (const mk of this.markers) {
@@ -672,6 +721,7 @@ class Game {
       switch (e.type) {
         case 'impact': {
           const rel = e.rel;
+          if (!p.isStar && !p.compact && (rel > 0.002 || (!e.fragment && rel > 0.0004))) this.renderer.addHit(p, e.dir, rel, e.energy);
           if (e.fragment) {
             this.eatAcc.n++;
             this.eatAcc.m += e.gain;

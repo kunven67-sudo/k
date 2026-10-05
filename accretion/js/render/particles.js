@@ -506,3 +506,128 @@ export class Rocks {
 }
 
 export { NOISE };
+
+// ---------------------------------------------------------------- orbiters
+// Small things on circular orbits drawn entirely on the GPU: your civilisation's
+// satellites and stations, and the collectors of a Dyson swarm.
+const ORB_VERT = /* glsl */ `
+${LOGDEPTH_VERT_PARS}
+attribute float aR;
+attribute float aInc;
+attribute float aNode;
+attribute float aPh;
+attribute float aSz;
+attribute float aGlint;
+uniform vec3 uCenter;
+uniform float uScale;
+uniform float uTime;      // in units of the orbit period at radius 1
+uniform vec3 uSun;        // direction to the star (scene space)
+uniform float uShadowR;   // radius of the body casting a shadow (in units of uScale)
+uniform float uFocal;
+varying float vB;
+varying float vGlint;
+void main() {
+  float a = aPh + 6.2831853 * uTime / pow(aR, 1.5);
+  vec3 n1 = vec3(cos(aNode), 0.0, sin(aNode));
+  vec3 n2 = vec3(-sin(aNode) * cos(aInc), sin(aInc), cos(aNode) * cos(aInc));
+  vec3 loc = aR * (cos(a) * n1 + sin(a) * n2);
+  // in the shadow of the planet (or behind the star)?
+  float along = dot(loc, uSun);
+  float perp = length(loc - uSun * along);
+  float lit = along > 0.0 || perp > uShadowR ? 1.0 : 0.0;
+  vec3 pos = uCenter + loc * uScale;
+  vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+  // a solar panel catches the light now and then
+  float g = pow(max(0.0, sin(a * 3.0 + aGlint * 40.0)), 24.0);
+  vB = lit * (0.35 + 0.65 * g);
+  vGlint = g;
+  gl_PointSize = clamp(aSz * (1.0 + g * 2.0), 1.0, 6.0);
+  gl_Position = projectionMatrix * mv;
+  if (vB < 0.01) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+  ${LOGDEPTH_VERT}
+}
+`;
+const ORB_FRAG = /* glsl */ `
+${LOGDEPTH_FRAG_PARS}
+uniform vec3 uColor;
+uniform float uBright;
+varying float vB;
+varying float vGlint;
+void main() {
+  ${LOGDEPTH_FRAG}
+  vec2 c = gl_PointCoord - 0.5;
+  float r = length(c) * 2.0;
+  if (r > 1.0) discard;
+  float a = (exp(-r * r * 3.0) - 0.0498) / 0.9502;
+  gl_FragColor = vec4(mix(uColor, vec3(1.0, 0.97, 0.9), vGlint) * a * vB * uBright, 1.0);
+}
+`;
+
+export class Orbiters {
+  constructor(max, seed, kind) {
+    this.max = max;
+    this.kind = kind;
+    const rng = new RNG(hash32(seed, kind === 'dyson' ? 77 : 78));
+    const aR = new Float32Array(max), aInc = new Float32Array(max), aNode = new Float32Array(max);
+    const aPh = new Float32Array(max), aSz = new Float32Array(max), aGl = new Float32Array(max);
+    for (let i = 0; i < max; i++) {
+      if (kind === 'dyson') {
+        aR[i] = rng.range(17, 27);
+        aInc[i] = rng.normal() * 0.5;
+        aSz[i] = rng.range(1, 1.8);
+      } else if (i < 4) {
+        // stations
+        aR[i] = 1.06 + i * 0.01;
+        aInc[i] = rng.range(0.4, 0.9);
+        aSz[i] = 3.2;
+      } else {
+        const u = rng.next();
+        aR[i] = u < 0.72 ? rng.range(1.03, 1.3) : u < 0.9 ? rng.range(2.5, 4.2) : 6.6 + rng.normal() * 0.02;
+        aInc[i] = u > 0.9 ? 0.0 : rng.range(0, Math.PI);
+        aSz[i] = rng.range(1, 1.6);
+      }
+      aNode[i] = rng.range(0, Math.PI * 2);
+      aPh[i] = rng.range(0, Math.PI * 2);
+      aGl[i] = rng.next();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(max * 3), 3));
+    geo.setAttribute('aR', new THREE.BufferAttribute(aR, 1));
+    geo.setAttribute('aInc', new THREE.BufferAttribute(aInc, 1));
+    geo.setAttribute('aNode', new THREE.BufferAttribute(aNode, 1));
+    geo.setAttribute('aPh', new THREE.BufferAttribute(aPh, 1));
+    geo.setAttribute('aSz', new THREE.BufferAttribute(aSz, 1));
+    geo.setAttribute('aGlint', new THREE.BufferAttribute(aGl, 1));
+    geo.setDrawRange(0, 0);
+    this.mat = new THREE.ShaderMaterial({
+      vertexShader: ORB_VERT, fragmentShader: ORB_FRAG,
+      uniforms: {
+        uCenter: { value: new THREE.Vector3() }, uScale: { value: 1 }, uTime: { value: 0 },
+        uSun: { value: new THREE.Vector3(1, 0, 0) }, uShadowR: { value: 1 }, uFocal: { value: 800 },
+        uColor: { value: kind === 'dyson' ? new THREE.Color(0.55, 0.5, 0.42) : new THREE.Color(0.85, 0.88, 0.95) },
+        uBright: { value: 1 },
+      },
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this.points = new THREE.Points(geo, this.mat);
+    this.points.frustumCulled = false;
+  }
+
+  set(count, center, scale, tUnits, sunDir, shadowR, bright) {
+    this.points.geometry.setDrawRange(0, Math.min(this.max, Math.round(count)));
+    this.points.visible = count >= 1;
+    const u = this.mat.uniforms;
+    u.uCenter.value.copy(center);
+    u.uScale.value = scale;
+    u.uTime.value = tUnits;
+    u.uSun.value.copy(sunDir);
+    u.uShadowR.value = shadowR;
+    u.uBright.value = bright;
+  }
+
+  dispose() {
+    this.points.geometry.dispose();
+    this.mat.dispose();
+    this.points.removeFromParent();
+  }
+}

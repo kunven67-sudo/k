@@ -62,7 +62,15 @@ uniform vec3 uColB;
 uniform vec3 uColC;
 uniform float uOcean;      // 0..1 how much of the surface is under water
 uniform float uIceCap;     // 0..1 polar ice
-uniform float uLife;       // 0, 1 living, 2 cities
+uniform float uLife;       // 0, 1 living, 2 cities (other worlds)
+uniform float uGreen;      // 0..1 plant cover on land
+uniform float uCity;       // 0..1 city lights
+uniform float uDrift;      // continental drift phase (supercontinent cycle)
+uniform float uAurora;     // 0..1 aurora strength
+uniform float uVolcano;    // 0..1 active volcanoes glowing on the night side
+uniform vec4 uHits[6];     // impact sites: object-space direction, age in seconds (<0 unused)
+uniform vec2 uHitSize[6];  // angular size (rad), strength
+uniform vec4 uOcc[2];      // eclipsing bodies: view-space centre, radius
 uniform float uHeat;       // 0..1 molten glow
 uniform float uDamage;     // 0..1 glowing cracks
 uniform float uCraters;    // crater visibility
@@ -82,7 +90,32 @@ ${LOGDEPTH_FRAG_PARS}
 ${NOISE}
 ${COLOR}
 
-vec4 surf(vec3 p) { return textureCube(uSurf, p); }
+// plates move back and forth over hundreds of millions of years (the supercontinent cycle)
+vec3 drifted(vec3 p) {
+  if (uDrift == 0.0) return p;
+  float n = snoise(p * 1.1 + vec3(uSeed * 0.013));
+  float a = sin(uDrift + n * 2.2) * 0.32 * smoothstep(-0.6, 0.4, n);
+  float c = cos(a), s = sin(a);
+  return vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z);
+}
+vec4 surf(vec3 p) { return textureCube(uSurf, drifted(p)); }
+
+// how much of light 0 reaches this point past any eclipsing moon
+float eclipse(vec3 posV, vec3 L) {
+  float sh = 1.0;
+  for (int i = 0; i < 2; i++) {
+    vec4 o = uOcc[i];
+    if (o.w <= 0.0) continue;
+    vec3 oc = o.xyz - posV;
+    float t = dot(oc, L);
+    if (t <= 0.0) continue;
+    float d = length(oc - L * t);
+    // penumbra widens with distance from the eclipsing body (the star is not a point)
+    float pen = o.w * 0.12 + t * 0.006;
+    sh *= mix(0.04, 1.0, smoothstep(o.w - pen, o.w + pen, d));
+  }
+  return sh;
+}
 
 float elevation(vec4 s) {
   float t = s.r * 2.0 - 1.0;
@@ -134,16 +167,21 @@ vec3 rockyAlbedo(vec4 s, vec3 p, float elev, out float spec, out vec3 emit) {
       float moist = region;
       float h = clamp((e - sea) * 2.2, 0.0, 1.0);
       vec3 land;
-      if (uLife > 0.5) {
-        vec3 forest = vec3(0.025, 0.06, 0.018);
-        vec3 grass = vec3(0.07, 0.1, 0.035);
+      float green = max(uGreen, uLife > 0.5 ? 0.85 : 0.0);
+      vec3 bare = mix(uColA, uColB, smoothstep(0.35, 0.7, moist));
+      bare = mix(bare, uColC, smoothstep(0.4, 0.9, h) * 0.5);
+      if (green > 0.01) {
+        vec3 forest = vec3(0.03, 0.075, 0.022);
+        vec3 grass = vec3(0.085, 0.12, 0.04);
         vec3 desert = vec3(0.32, 0.24, 0.14);
         float dry = smoothstep(0.42, 0.62, 1.0 - moist + (0.35 - abs(lat - 0.3)) * 0.4);
         land = mix(mix(forest, grass, smoothstep(0.4, 0.6, moist)), desert, dry);
         land = mix(land, vec3(0.16, 0.14, 0.12), smoothstep(0.35, 0.75, h));
+        // plants spread from the wettest lowlands as cover grows
+        float spread = smoothstep(1.0 - green, 1.0 - green + 0.25, moist * 0.7 + (1.0 - h) * 0.3 + 0.15);
+        land = mix(bare, land, spread);
       } else {
-        land = mix(uColA, uColB, smoothstep(0.35, 0.7, moist));
-        land = mix(land, uColC, smoothstep(0.4, 0.9, h) * 0.5);
+        land = bare;
       }
       col = land;
     }
@@ -165,6 +203,22 @@ vec3 rockyAlbedo(vec4 s, vec3 p, float elev, out float spec, out vec3 emit) {
     float T = mix(950.0, 1550.0, molten * (0.6 + 0.4 * flowN));
     emit += blackbody(T) * molten * (0.6 + heat) * 1.1;
     col = mix(col, vec3(0.03, 0.026, 0.022), heat * 0.7);
+  }
+  // fresh impact sites glow and cool; giant impacts send a shock ring around the world
+  for (int i = 0; i < 6; i++) {
+    vec4 hit = uHits[i];
+    if (hit.w < 0.0) continue;
+    float ang = acos(clamp(dot(p, hit.xyz), -1.0, 1.0));
+    float size = uHitSize[i].x, k = uHitSize[i].y;
+    float cool = exp(-hit.w / (6.0 + 10.0 * k));
+    float n = snoise(p * 40.0 + hit.xyz * 7.0) * 0.5 + 0.5;
+    float crater = exp(-pow(ang / size, 2.0) * 2.0) * (0.55 + 0.45 * n);
+    float T = mix(900.0, 2200.0, cool * crater);
+    emit += blackbody(T) * crater * cool * (1.5 + 2.5 * k);
+    col = mix(col, vec3(0.03, 0.025, 0.02), crater * 0.6);
+    float rr = size + hit.w * (0.25 + 0.35 * k);
+    float ring = exp(-pow((ang - rr) / (0.03 + 0.02 * k), 2.0)) * exp(-hit.w / 2.5) * k;
+    emit += vec3(1.0, 0.55, 0.25) * ring * 2.0;
   }
   // damage: cracks glowing where the crust has been broken
   if (uDamage > 0.001) {
@@ -255,6 +309,7 @@ void main() {
   vec3 col = vec3(0.0);
   vec3 Ld[2]; Ld[0] = uL0dir; Ld[1] = uL1dir;
   vec3 Lc[2]; Lc[0] = uL0col; Lc[1] = uL1col;
+  float ecl = eclipse(vViewPos, uL0dir);
   for (int i = 0; i < 2; i++) {
     vec3 L = Ld[i];
     float nl = dot(N, L);
@@ -273,7 +328,7 @@ void main() {
       float fres = 0.02 + 0.98 * pow(1.0 - nv, 5.0);
       c += vec3(sp) * spec * (0.25 + fres) * (spec > 0.9 ? 1.6 : 0.4);
     }
-    col += c * Lc[i];
+    col += c * Lc[i] * (i == 0 ? ecl : 1.0);
   }
   col += albedo * uAmbient;
 
@@ -287,8 +342,26 @@ void main() {
     col = mix(col, uAtmo.rgb * uL0col * sunF, clamp(haze, 0.0, 0.9));
   }
 
+  float nightSide = 1.0 - smoothstep(-0.15, 0.05, dot(normalize(vNormalV), uL0dir));
+  // auroras: glowing curtains around the magnetic poles, best seen at night
+  if (uAurora > 0.001) {
+    float lat = abs(p.y);
+    float lon = atan(p.z, p.x);
+    float oval = exp(-pow((lat - 0.9) / 0.035, 2.0));
+    float curtain = 0.5 + 0.5 * snoise(vec3(lon * 6.0, uTime * 0.15, uSeed));
+    float fine = 0.6 + 0.4 * snoise(vec3(lon * 40.0, uTime * 0.6, uSeed));
+    vec3 ac = mix(vec3(0.1, 1.0, 0.45), vec3(0.9, 0.2, 0.35), smoothstep(0.88, 0.95, lat + curtain * 0.02));
+    emit += ac * oval * curtain * fine * uAurora * (0.25 + 0.75 * nightSide) * 0.6;
+  }
+  // volcanoes: hot specks on the dark side
+  if (uVolcano > 0.001 && !gas) {
+    float v = snoise(p * 26.0 + uSeed * 0.7) * 0.5 + 0.5;
+    float spots = smoothstep(0.86, 0.95, v) * (0.6 + 0.4 * sin(uTime * 2.0 + v * 30.0));
+    emit += blackbody(1300.0) * spots * uVolcano * (0.3 + 0.7 * nightSide) * 0.8;
+  }
   // city lights on the night side
-  if (uLife > 1.5 && !gas) {
+  float cityK = max(uCity, uLife > 1.5 ? 0.85 : 0.0);
+  if (cityK > 0.001 && !gas) {
     float night = (1.0 - smoothstep(-0.15, 0.05, dot(normalize(vNormalV), uL0dir)));
     vec4 s = surf(p);
     float sea = mix(-0.35, 0.25, uOcean);
@@ -300,8 +373,12 @@ void main() {
     float n1 = snoise(p * 140.0 + uSeed) * 0.5 + 0.5;
     float n2 = snoise(p * 420.0 + uSeed * 1.7) * 0.5 + 0.5;
     float specks = smoothstep(0.7, 0.92, n1 * 0.55 + n2 * 0.45);
-    float cities = region * specks * land * (1.0 - smoothstep(0.62, 0.85, abs(p.y)));
-    emit += vec3(1.0, 0.6, 0.26) * cities * night * 0.85;
+    float region2 = smoothstep(1.0 - cityK * 0.7, 1.08 - cityK * 0.7, snoise(p * 9.0 + uSeed) * 0.5 + 0.5 + coast * 0.25);
+    // clusters of towns glow softly from afar; up close they break into specks
+    float n0 = snoise(p * 38.0 + uSeed * 0.3) * 0.5 + 0.5;
+    float sprawl = smoothstep(0.58, 0.9, n0) * 0.3 * (0.4 + 0.6 * coast);
+    float cities = region2 * (sprawl + specks) * land * (1.0 - smoothstep(0.62, 0.85, abs(p.y)));
+    emit += vec3(1.0, 0.6, 0.26) * cities * night * (0.5 + cityK * 0.6);
   }
 
   // self-luminous: brown dwarfs and hot Jupiters glow by their own heat
@@ -328,6 +405,14 @@ export function makePlanetMaterial(sharedUniforms) {
       uOcean: { value: 0 },
       uIceCap: { value: 0 },
       uLife: { value: 0 },
+      uGreen: { value: 0 },
+      uCity: { value: 0 },
+      uDrift: { value: 0 },
+      uAurora: { value: 0 },
+      uVolcano: { value: 0 },
+      uHits: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 1, 0, -1)) },
+      uHitSize: { value: Array.from({ length: 6 }, () => new THREE.Vector2(0.1, 0)) },
+      uOcc: { value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] },
       uHeat: { value: 0 },
       uDamage: { value: 0 },
       uCraters: { value: 1 },
@@ -464,6 +549,9 @@ uniform float uCover;
 uniform vec3 uTint;
 uniform vec3 uL0dir; uniform vec3 uL0col;
 uniform float uExposure;
+uniform float uStorm;      // hurricanes over warm oceans
+uniform float uLightning;  // flashes on the night side
+uniform vec4 uOcc[2];
 varying vec3 vObj;
 varying vec3 vNormalV;
 varying vec3 vViewPos;
@@ -490,6 +578,25 @@ void main() {
   float th = 0.5 + (0.5 - uCover) * 0.34;
   float d = clamp((c * belt - th) / 0.22, 0.0, 1.0);
   float cover = pow(d, 1.3);
+  // hurricanes: spiral storms with a clear eye, turning the other way south of the equator
+  if (uStorm > 0.0) {
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float la = (0.22 + 0.12 * fract(sin(uSeed * 3.1 + fi * 7.7) * 91.7)) * (fi == 1.0 ? -1.0 : 1.0);
+      float lo = uSeed * 1.3 + fi * 2.1 - uTime * 0.0025 * (1.0 + fi * 0.3);
+      vec3 c0 = vec3(cos(lo) * sqrt(1.0 - la * la), la, sin(lo) * sqrt(1.0 - la * la));
+      vec3 e1 = normalize(cross(vec3(0.0, 1.0, 0.0), c0));
+      vec3 e2 = cross(c0, e1);
+      vec2 uv = vec2(dot(p, e1), dot(p, e2));
+      if (dot(p, c0) < 0.0) continue;
+      float r = length(uv);
+      float th2 = atan(uv.y, uv.x) * sign(la);
+      float arms = 0.5 + 0.5 * sin(2.0 * th2 + log(r + 0.003) * 7.0 + uTime * 0.05);
+      float body = 1.0 - smoothstep(0.03, 0.13 + 0.03 * fi, r);
+      float eye = smoothstep(0.004, 0.012, r);
+      cover = max(cover, body * eye * mix(0.55, 1.0, arms) * uStorm);
+    }
+  }
   vec3 N = normalize(vNormalV);
   vec3 V = normalize(-vViewPos);
   float nl = dot(N, uL0dir);
@@ -497,6 +604,25 @@ void main() {
   vec3 col = uTint * diff * uL0col;
   // reddened light near the terminator
   col *= mix(vec3(1.0, 0.55, 0.35), vec3(1.0), smoothstep(-0.05, 0.25, nl));
+  // moons' shadows
+  for (int i = 0; i < 2; i++) {
+    vec4 o = uOcc[i];
+    if (o.w <= 0.0) continue;
+    vec3 oc = o.xyz - vViewPos;
+    float t = dot(oc, uL0dir);
+    if (t <= 0.0) continue;
+    float dd = length(oc - uL0dir * t);
+    float pen = o.w * 0.12 + t * 0.006;
+    col *= mix(0.04, 1.0, smoothstep(o.w - pen, o.w + pen, dd));
+  }
+  // lightning in thick cloud on the night side
+  if (uLightning > 0.0) {
+    float night = 1.0 - smoothstep(-0.1, 0.05, nl);
+    vec3 cell = floor(p * 34.0);
+    float h = fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719)) + floor(uTime * 9.0) * 1.7) * 43758.5453);
+    float flash = step(0.993, h) * smoothstep(0.4, 0.9, cover) * night * uLightning;
+    col += vec3(0.75, 0.82, 1.0) * flash * 2.5;
+  }
   float edge = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 2.0);
   gl_FragColor = vec4(col * uExposure, cover * 0.92 * (1.0 - edge * 0.4));
 }
@@ -525,6 +651,9 @@ export function makeCloudMaterial(sharedUniforms) {
       uSeed: { value: 1 },
       uTime: sharedUniforms.uTime,
       uCover: { value: 0.1 },
+      uStorm: { value: 0 },
+      uLightning: { value: 0 },
+      uOcc: { value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] },
       uTint: { value: new THREE.Color(0.95, 0.95, 0.95) },
       uL0dir: { value: new THREE.Vector3(1, 0, 0) },
       uL0col: { value: new THREE.Color(1, 1, 1) },

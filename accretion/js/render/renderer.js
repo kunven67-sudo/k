@@ -9,7 +9,7 @@ import { SurfaceBaker } from './bake.js';
 import { makePlanetMaterial, makeAtmosphereMaterial, makeCloudMaterial, makeRingMaterial, PTYPE } from './planetMaterial.js';
 import { makeStarMaterial, makeGlowMaterial, makeDiskMaterial, makeBeamMaterial, makeNeutronMaterial } from './starMaterials.js';
 import { Sky } from './sky.js';
-import { DiskCloud, Motes, Effects, Rocks } from './particles.js';
+import { DiskCloud, Motes, Effects, Rocks, Orbiters } from './particles.js';
 import { LensShader, FinalShader, ClampShader } from './post.js';
 import { computeLook } from './look.js';
 import { blackbody, clamp, lerp } from '../core/phys.js';
@@ -53,6 +53,9 @@ export class Renderer {
     this.scene.add(this.rocks.mesh);
     this.dots = this.makeDots(2000);
     this.scene.add(this.dots);
+    this.sats = new Orbiters(quality === 'low' ? 1500 : 4000, 11, 'sats');
+    this.dyson = new Orbiters(quality === 'low' ? 6000 : 20000, 12, 'dyson');
+    this.scene.add(this.sats.points, this.dyson.points);
 
     this.views = new Map();
     this.disks = new Map();
@@ -249,7 +252,7 @@ export class Renderer {
 
   applyLook(v, initial = false) {
     const b = v.body;
-    const L = computeLook(b);
+    const L = computeLook(b, this.models);
     v.look = L;
     const u = v.mat.uniforms;
     u.uType.value = L.type;
@@ -259,7 +262,12 @@ export class Renderer {
     u.uColC.value.setRGB(...L.pal[2]);
     u.uOcean.value = L.ocean;
     u.uIceCap.value = L.iceCap;
-    u.uLife.value = b.life || 0;
+    u.uLife.value = 0;
+    u.uGreen.value = L.green || 0;
+    u.uCity.value = L.city || 0;
+    u.uAurora.value = L.aurora || 0;
+    u.uVolcano.value = L.volcano || 0;
+    u.uDrift.value = L.drift || 0;
     u.uHeat.value = L.heat;
     u.uCraters.value = L.craters;
     u.uRelief.value = L.relief;
@@ -291,6 +299,8 @@ export class Renderer {
       v.cloudMat.uniforms.uSeed.value = (b.seed % 131) + 0.3;
       v.cloudMat.uniforms.uCover.value = L.clouds;
       v.cloudMat.uniforms.uTint.value.setRGB(...L.cloudTint);
+      v.cloudMat.uniforms.uStorm.value = L.storm || 0;
+      v.cloudMat.uniforms.uLightning.value = L.lightning || 0;
     }
     v.ring.visible = !!L.rings;
     if (L.rings) {
@@ -350,6 +360,8 @@ export class Renderer {
     const S = cam.S;
     this.S = S;
     this.frame++;
+    this.models = { planet: world.planet, life: world.life };
+    this.world = world;
     this.shared.uTime.value += dtReal;
     const camW = cam.pos;
     // camera orientation
@@ -485,6 +497,7 @@ export class Renderer {
 
     // effects
     this.fx.update(dtReal, dtReal * TIME_BASE * world.warp, camW, S, this.focal);
+    this.updateCiv(world, camW, S, view, pl);
 
     // lensing: the four biggest black holes on screen bend light; the lens pass
     // also draws their shadows, so their black spheres are hidden
@@ -512,6 +525,84 @@ export class Renderer {
     fu.uFlash.value = this.flash;
     fu.uGrain.value = this.quality === 'low' ? 0.0 : 0.022;
     this.bloom.strength = 0.5 + this.flash * 0.8;
+  }
+
+  // satellites around you and a Dyson swarm around your star
+  updateCiv(world, camW, S, view, pl) {
+    const p = world.player, life = world.life;
+    const sats = life && p.alive ? life.sats : 0;
+    const G = 6.674e-20;
+    const sunDir = new THREE.Vector3(1, 0, 0);
+    if (pl.l0) sunDir.set(pl.l0.x - p.x, pl.l0.y - p.y, pl.l0.z - p.z).normalize();
+    if (sats >= 1) {
+      const R = p.radius;
+      const T1 = 2 * Math.PI * Math.sqrt((R * R * R) / (G * p.mass));
+      const c = this.tmpV.set((p.x - camW.x) / S, (p.y - camW.y) / S, (p.z - camW.z) / S);
+      this.sats.set(sats * 0.6 + 4, c, R / S, (world.time / T1) % 1e4, sunDir, 1, 1.2);
+    } else this.sats.set(0, this.tmpV.set(0, 0, 0), 1, 0, sunDir, 1, 1);
+    const dy = life && life.dyson > 0 ? life.dyson : 0;
+    const host = dy > 0 ? world.hostSystem() : null;
+    const star = host?.star;
+    if (dy > 0 && star && star.alive) {
+      const R = star.radius;
+      const T1 = 2 * Math.PI * Math.sqrt((R * R * R) / (G * star.mass));
+      const c = this.tmpV.set((star.x - camW.x) / S, (star.y - camW.y) / S, (star.z - camW.z) / S);
+      const toCam = new THREE.Vector3(camW.x - star.x, camW.y - star.y, camW.z - star.z).normalize();
+      this.dyson.set(this.dyson.max * dy, c, R / S, (world.time / T1) % 1e4, toCam, 0, 0.9);
+    } else this.dyson.set(0, this.tmpV.set(0, 0, 0), 1, 0, sunDir, 0, 1);
+  }
+
+  // an impact on a body leaves a glowing crater (and a shock ring if it's big)
+  addHit(b, dir, rel, energy) {
+    const v = this.views.get(b.id);
+    if (!v || v.kind !== 'planet') return;
+    const q = new THREE.Quaternion().setFromEuler(v.mesh.rotation).invert();
+    const d = new THREE.Vector3(dir.x, dir.y, dir.z).normalize().applyQuaternion(q);
+    v.hits = v.hits || [];
+    const size = clamp(Math.sqrt(rel) * 1.1, 0.025, 0.9);
+    const k = clamp(Math.sqrt(rel) * 3 + Math.min(energy, 4) * 0.05, 0.05, 1);
+    v.hits.push({ d, t0: this.shared.uTime.value, size, k });
+    if (v.hits.length > 6) v.hits.sort((a, c) => (c.k * Math.exp(-(this.shared.uTime.value - c.t0) / 20)) - (a.k * Math.exp(-(this.shared.uTime.value - a.t0) / 20))).length = 6;
+  }
+
+  updateHits(v, u) {
+    const now = this.shared.uTime.value;
+    const hits = (v.hits || []).filter((h) => now - h.t0 < 30 + 40 * h.k);
+    v.hits = hits;
+    for (let i = 0; i < 6; i++) {
+      const h = hits[i];
+      if (!h) { u.uHits.value[i].w = -1; continue; }
+      u.uHits.value[i].set(h.d.x, h.d.y, h.d.z, now - h.t0);
+      u.uHitSize.value[i].set(h.size, h.k);
+    }
+  }
+
+  // up to two bodies whose shadows can fall on this one (eclipses)
+  setOccluders(v, world, u, view, cam) {
+    const b = v.body;
+    const occ = u.uOcc.value;
+    occ[0].w = 0; occ[1].w = 0;
+    const p = world.player;
+    const cands = [];
+    const consider = (o) => {
+      if (!o || !o.alive || o === b || o.isStar || o.compact) return;
+      const d = Math.hypot(o.x - b.x, o.y - b.y, o.z - b.z);
+      if (d > b.radius * 80 + o.radius * 4) return;
+      cands.push([o.radius / d, o]);
+    };
+    if (b === p) { for (const o of world.bodies) if (o.moonOf === p || (o.role === 'rails' && o.rails?.parent === p)) consider(o); }
+    else {
+      consider(p);
+      if (b.rails && b.rails.parent && !b.rails.parent.isStar) consider(b.rails.parent);
+      if (b.moonOf) consider(b.moonOf);
+    }
+    cands.sort((a, c) => c[0] - a[0]);
+    const S = this.S;
+    for (let i = 0; i < Math.min(2, cands.length); i++) {
+      const o = cands[i][1];
+      this.tmpV.set((o.x - cam.pos.x) / S, (o.y - cam.pos.y) / S, (o.z - cam.pos.z) / S).applyMatrix4(view);
+      occ[i].set(this.tmpV.x, this.tmpV.y, this.tmpV.z, this.visualRadius(o) / S);
+    }
   }
 
   visualRadius(b) {
@@ -553,6 +644,8 @@ export class Renderer {
       u.uDamage.value = isPlayer ? clamp(state.damage * 1.2, 0, 1) : clamp(b.disrupt * 0.6, 0, 1);
       const lights = this.lightsFor(world, b.x, b.y, b.z, b);
       this.setLightUniforms(u, lights, b.x, b.y, b.z, view);
+      this.updateHits(v, u);
+      this.setOccluders(v, world, u, view, cam);
       u.uAmbient.value = 0.0015 + (world.field.env.kind === 'nebula' ? 0.004 : 0);
       if (fade < 1) { u.uL0col.value.multiplyScalar(fade); u.uL1col.value.multiplyScalar(fade); }
       // atmosphere
@@ -573,6 +666,8 @@ export class Renderer {
         v.clouds.rotation.set(b.tilt, b.rot * 1.05, 0, 'XYZ');
         v.cloudMat.uniforms.uL0dir.value.copy(u.uL0dir.value);
         v.cloudMat.uniforms.uL0col.value.copy(u.uL0col.value);
+        const oc = v.cloudMat.uniforms.uOcc.value;
+        oc[0].copy(u.uOcc.value[0]); oc[1].copy(u.uOcc.value[1]);
       }
       if (v.ring.visible) {
         v.ring.scale.setScalar(rU);

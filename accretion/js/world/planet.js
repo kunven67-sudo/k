@@ -18,7 +18,7 @@ export class PlanetModel {
 
   reset(saved) {
     const s = saved || {};
-    this.H = s.H ?? 1;                    // interior heat, 1 = freshly formed
+    this.H = s.H ?? null;                 // interior heat, 1 = freshly formed (set from your size on first update)
     this.differentiated = s.differentiated ?? false;
     this.atm = s.atm || { n2: 0, o2: 0, co2: 0, h2o: 0, ch4: 0, h2: 0 };
     this.day = s.day ?? 14;               // hours per rotation
@@ -101,6 +101,10 @@ export class PlanetModel {
     this.giant = giant;
     const vesc = escapeVelocity(p.mass, p.radius);
     const gSurf = (G * p.mass) / (p.radius * p.radius) * 1000; // m/s^2
+    // only big bodies are heated much by their own formation (heat per kg goes as escape speed squared)
+    const meltable = clamp(Math.pow(vesc / 4.5, 2), 0, 1);
+    this.meltable = meltable;
+    if (this.H == null) this.H = 0.08 + 0.92 * meltable;
 
     // ---- seasons and the day
     const host = w.hostSystem();
@@ -196,8 +200,8 @@ export class PlanetModel {
     const liquid = this.oceanState === 'liquid';
     const vapor = this.oceanState === 'steam' ? Math.min(p.comp.ice * 300, 300) : 0;
     const tauG = 0.5 * Math.sqrt(Math.min(this.P, 1e3)) + 1.6 * Math.pow(this.atm.co2, 0.6) + (liquid ? 0.25 : 0) + 3 * Math.sqrt(vapor) + 2 * Math.sqrt(this.atm.ch4);
-    const internal = this.H > 0.85 ? (this.H - 0.85) * 4000 : 0;
-    this.Ts = Teq * Math.pow(1 + 0.75 * tauG, 0.25) + internal + p.heat * 1400 - this.coolEvent;
+    const internal = this.H > 0.85 ? (this.H - 0.85) * 4000 * meltable : 0;
+    this.Ts = Teq * Math.pow(1 + 0.75 * tauG, 0.25) + internal + p.heat * 1400 * meltable - this.coolEvent;
     // ice ages: slow wobbles of your orbit and tilt (Milankovitch cycles)
     if (ice0 > 0.05) this.Ts += 3 * Math.sin((w.years / 1e5) * 2 * Math.PI) * Math.sin(p.tilt + 0.2);
     // ---- water
@@ -381,7 +385,7 @@ export function structureOf(p, model) {
   }
   // rocky (and icy, iron, carbon) worlds
   const coreR = clamp(Math.sqrt(Math.max(c.iron, 0.01)) * (model?.differentiated ? 1 : 0.4), 0.05, 0.85);
-  const molten = (model?.H ?? 0.5) > 0.85 || p.heat > 0.5;
+  const molten = ((model?.H ?? 0.5) > 0.85 || p.heat > 0.5) && (model?.meltable ?? 1) > 0.3;
   if (model?.differentiated) {
     add('innerCore', 'Solid inner core', coreR * ((model?.H ?? 0.5) < 0.6 ? 0.38 : 0.12), 'Solid iron, squeezed solid despite the heat');
     add('outerCore', model?.field > 0.15 ? 'Liquid outer core (dynamo)' : 'Iron outer core', coreR, model?.field > 0.15 ? 'Swirling liquid iron makes your magnetic field' : '');
@@ -399,7 +403,7 @@ export function structureOf(p, model) {
   }
   if (L[L.length - 1].r1 < 1) L[L.length - 1].r1 = 1;
   // centre conditions: rough scaling from Earth (about 5,500 K and 3.6 million bar)
-  return { kind: 'rocky', layers: L, center: { T: 5500 * Math.pow(Math.max(me, 1e-6), 0.3), P: 3.6e6 * Math.pow(Math.max(me, 1e-9), 1.5) * Math.pow(R_EARTH / Math.max(R, 1), 2) } };
+  return { kind: 'rocky', layers: L, center: { T: Math.max(model?.Ts || p.temp, 5500 * Math.pow(Math.max(me, 1e-6), 0.3)), P: 3.6e6 * Math.pow(Math.max(me, 1e-9), 1.5) * Math.pow(R_EARTH / Math.max(R, 1), 2) } };
 }
 
 // temperature (K) and pressure (bar) at a fraction f of the radius (0 = centre)

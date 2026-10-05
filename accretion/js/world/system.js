@@ -61,7 +61,7 @@ export function generateSystemDetail(sys) {
   const tempAt = (aR) => equilibriumTemp(star.temp, star.radius, aR * AU * DIST_COMPRESS, 0.3);
 
   for (let i = 0; i < nPlanets && aReal < 45; i++) {
-    const p = makePlanet(rng, sys, i, aReal, snowReal, hzIn, hzOut, young, tempAt(aReal));
+    const p = makePlanet(rng, sys, i, aReal, snowReal, hzIn, hzOut, young, tempAt(aReal), sys.st?.age ?? 4e9);
     detail.planets.push(p);
     aReal *= rng.range(1.45, 2.3);
   }
@@ -148,7 +148,7 @@ export function generateSystemDetail(sys) {
   return detail;
 }
 
-function makePlanet(rng, sys, index, aReal, snowReal, hzIn, hzOut, young, temp) {
+function makePlanet(rng, sys, index, aReal, snowReal, hzIn, hzOut, young, temp, ageYears) {
   const name = `${sys.name} ${GREEK[index] || 'z'}`;
   const beyondSnow = aReal > snowReal;
   let mass, comp, giant = false, kind;
@@ -191,10 +191,11 @@ function makePlanet(rng, sys, index, aReal, snowReal, hzIn, hzOut, young, temp) 
 
   const radius = bodyRadius(mass, normalize(comp));
   const inHZ = aReal > hzIn && aReal < hzOut;
+  // life takes time: microbes after a billion years or so, minds after billions more (and rarely)
   let life = 0;
   if (kind === 'rocky' && inHZ && comp.ice > 0.03 && mass > 0.3 * M_EARTH && mass < 6 * M_EARTH) {
-    const r = rng.next();
-    if (r < 0.1) life = rng.chance(0.3) ? 2 : 1;
+    const r = rng.next(), tLife = 3e8 + rng.next() * 1.2e9, tCiv = 3.5e9 + rng.next() * 3e9, civ = rng.next() < 0.12;
+    if (r < 0.12 && ageYears > tLife) life = civ && ageYears > tCiv ? 2 : 1;
   }
 
   const moons = [];

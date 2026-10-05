@@ -14,6 +14,7 @@ export class HUD {
       eyebrow: $('stage-eyebrow'),
       forecast: $('forecast'),
       lifeline: $('lifeline'),
+      goal: $('goal'),
       age: $('r-age'),
       play: $('r-play'),
       view: $('r-view'),
@@ -183,6 +184,9 @@ export class HUD {
     e.play.textContent = `Played ${F.clock(world.stats.timePlayed)}`;
     e.view.textContent = game.viewLabel ? game.viewLabel() : '';
     this.lifeLine(world, p);
+    const gl = game.goals?.goalLine() || '';
+    e.goal.hidden = !gl;
+    e.goal.textContent = gl;
     const jet = world.thrustLoss;
     const jetName = p.compact ? 'Relativistic jets' : p.isStar ? 'Plasma jets' : p.comp.gas > 0.4 ? 'Gas vents' : 'Volcanic jets';
     e.jets.textContent = jet > 0 ? `${jetName}: losing ${F.percent(jet, 2)} mass/s` : `${jetName}: idle`;
@@ -307,6 +311,18 @@ export class HUD {
       if (!b.alive) continue;
       const s = project(b.x, b.y, b.z);
       if (!s) continue;
+      if (m.kind === 'course' || m.kind === 'mark') {
+        const col = m.kind === 'course' ? this.col.amber : 'rgba(255,216,77,0.75)';
+        if (s.on) {
+          ctx.strokeStyle = col;
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y - 7); ctx.lineTo(s.x + 7, s.y); ctx.lineTo(s.x, s.y + 7); ctx.lineTo(s.x - 7, s.y); ctx.closePath();
+          ctx.stroke();
+          ctx.fillStyle = col;
+          ctx.fillText(m.label, s.x + 12, s.y - 6);
+        } else edgeArrow(ctx, s, w, h, col, m.kind === 'course' ? m.label : '');
+        continue;
+      }
       const big = b.mass > p.mass || (b.compact && !p.compact);
       const col = big ? this.col.danger : this.col.food;
       const r = Math.max(8, Math.min((m.r || 0) + 6, 160));
