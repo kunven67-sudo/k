@@ -332,8 +332,13 @@ export async function buildTown({ statics, props, scene }) {
     { name: 'Police', awning: 0x1d3c78, bg: '#0f2147', fg: '#ffffff' },
     { name: 'Grocery', awning: 0x5c8a2e, bg: '#2a4314', fg: '#f4f7d6' },
   ];
+  // places where townspeople go and what they do there
+  const spots = [];
+  const V = (x, z) => new THREE.Vector3(x, GROUND_Y + 0.02, z);
+  north.forEach((x) => spots.push({ p: V(x, 3.6), face: new THREE.Vector3(0, 0, -1), act: 'door' }));
   shops.forEach((shop, i) => {
     const x = -42 + i * 12;
+    spots.push({ p: V(x - 0.9, 17.5), face: new THREE.Vector3(0, 0, 1), act: 'shop', name: shop.name });
     const w = 10, d = 9;
     building(town, windows, {
       x, z: 18.6 + d / 2, w, d, floors: 2 + (i % 2), front: -1,
@@ -350,6 +355,8 @@ export async function buildTown({ statics, props, scene }) {
   await place(props, 'fire_hydrant', { x: -6, y: GROUND_Y + 0.02, z: 8.5, height: 0.8 });
   await place(props, 'fire_hydrant', { x: 20, y: GROUND_Y + 0.02, z: 16.5, height: 0.8 });
   await place(props, 'modular_street_seating', { x: -18, y: GROUND_Y + 0.02, z: 17.3, height: 0.9 });
+  spots.push({ p: V(-18, 16.6), face: new THREE.Vector3(0, 0, -1), act: 'phone' }, { p: V(6, 16.6), face: new THREE.Vector3(0, 0, -1), act: 'phone' });
+  for (let x = -38; x <= 38; x += 19) spots.push({ p: V(x, 8), act: 'look' }, { p: V(x + 9, 17), act: 'look' });
   await place(props, 'modular_street_seating', { x: 6, y: GROUND_Y + 0.02, z: 17.3, height: 0.9 });
   await place(props, 'covered_car', { x: 12, y: ROAD.y, z: ROAD.z1 - 1.3, rotY: Math.PI / 2, width: 4.4 });
   await place(props, 'water_manhole_cover', { x: -3, y: ROAD.y + 0.005, z: 12.5, width: 0.8 });
@@ -370,7 +377,7 @@ export async function buildTown({ statics, props, scene }) {
   for (const bx of [TOWN.x0 + 0.6, TOWN.x1 - 0.6]) mesh(box(0.6, 1.0, ROAD.z1 - ROAD.z0), barrier, bx, ROAD.y + 0.5, zc, town);
 
   mergeByMaterial(town);
-  return town;
+  return { town, spots };
 }
 
 // Is a point inside the basement lab (no sky there)?

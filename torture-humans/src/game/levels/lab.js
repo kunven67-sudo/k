@@ -287,7 +287,7 @@ export async function buildLab({ scene, physics, settings }) {
   const labObjs = [...statics.children, ...props.children];
   await buildBedroom({ statics, props, scene, hatch: HATCH });
   const houseObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o));
-  await buildTown({ statics, props, scene });
+  const { spots: townSpots } = await buildTown({ statics, props, scene });
   const townObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o) && !houseObjs.includes(o));
 
   scene.add(statics, props);
@@ -304,6 +304,8 @@ export async function buildLab({ scene, physics, settings }) {
     sunIntensity: 3,
     sky: 'quadrangle_sunny',
     inLab,
+    // people living in town: they walk the sidewalks, look in shop windows, wait at doors
+    town: { people: 8, spots: townSpots, area: (p) => p.y > 3.2 && p.y < 3.6 && Math.abs(p.x) < 44 && p.z > 2 && p.z < 19 },
     zones: { lab: labObjs, house: houseObjs, town: townObjs, inHouse: (p) => p.y > 3.1 && p.x > BEDROOM.x0 - 0.2 && p.x < BEDROOM.x1 + 0.2 && p.z > BEDROOM.z0 - 0.2 && p.z < BEDROOM.z1 + 0.2 },
     fog: { color: 0xc4d0dc, near: 80, far: 260 },
     navRoots: [statics, props],

@@ -8,6 +8,7 @@ import { AnimLibrary, Character, loadAvatar, baseClips } from './engine/anim.js'
 import { Player } from './player.js';
 import { initNavigation, Navigation } from './engine/navigation.js';
 import { Human } from './humans/human.js';
+import { TOWN_LOOKS, isFemale } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
 import { Colony } from './colony/colony.js';
@@ -91,6 +92,22 @@ export async function boot() {
         const start = nav.randomPoint(level.wanderArea) || level.spawn;
         humans.push(new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.wanderArea, profile: { name: look } }));
       }
+      // townspeople: different looks, each starts somewhere on the street
+      const townCount = Number(params.get('townPeople') ?? level.town?.people ?? 0);
+      const order = [...TOWN_LOOKS].sort(() => Math.random() - 0.5);
+      for (let i = 0; i < townCount; i++) {
+        const look = order[i % order.length];
+        const gender = isFemale(look) ? 'f' : 'm';
+        await lib.require(baseClips(gender));
+        const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => null);
+        if (!tpl) continue; // that look isn't in this build
+        const start = nav.randomPoint(level.town.area) || null;
+        if (!start) break;
+        const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.town.area, profile: { name: look.replace(/_0?(\d+)$/, ' $1').replace(/_/g, ' ') } });
+        h.spots = level.town.spots;
+        h.townie = true;
+        humans.push(h);
+      }
     } catch (err) {
       console.warn('[nav]', err.message);
     }
@@ -136,6 +153,7 @@ export async function boot() {
     // hide what you can't see from here: the town from the basement, the basement from outside
     if (level.zones) {
       for (const o of level.zones.town) o.visible = z !== 'lab';
+      for (const h of humans) if (h.townie && !h.tiny) h.character.root.visible = z !== 'lab';
       for (const o of level.zones.lab) o.visible = z !== 'outside';
     }
     for (const l of sunLights()) {

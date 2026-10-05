@@ -71,14 +71,38 @@ export class Human {
         this.agent.resetMoveTarget();
         this.state = 'idle';
         this.timer = 2 + Math.random() * 5;
-        // sometimes do a little something while standing around
-        if (Math.random() < 0.6) this.character.play(IDLE_GESTURES[(Math.random() * IDLE_GESTURES.length) | 0]);
+        const spot = this.spot;
+        this.spot = null;
+        if (spot) {
+          // at a place: face it and do what people do there
+          if (spot.face) this.faceYaw = Math.atan2(spot.face.x, spot.face.z);
+          const acts = {
+            shop: ['idle_waiting_01', 'idle_look_around_01', 'gestic_thoughtful_01', 'idle_touch_face_01'],
+            door: ['knock_door', 'idle_waiting_02', 'try_door_outwards'],
+            phone: ['cell_phone_textmessage', 'cell_phone_talk_01', 'cell_phone_listen_01'],
+            look: ['idle_look_around_02', 'idle_stretch_arms_01', 'idle_neutral_02'],
+          }[spot.act] || IDLE_GESTURES;
+          this.character.play(acts[(Math.random() * acts.length) | 0]);
+          this.timer = 4 + Math.random() * 8;
+        } else if (Math.random() < 0.6) {
+          // sometimes do a little something while standing around
+          this.character.play(IDLE_GESTURES[(Math.random() * IDLE_GESTURES.length) | 0]);
+        }
       }
       return;
     }
-    if (this.state === 'idle' && this.timer <= 0) {
-      const p = this.nav.randomPoint(this.area);
-      if (p) this.goTo(p);
+    if (this.state === 'idle') {
+      if (this.faceYaw !== undefined) {
+        let d = this.faceYaw - this.yaw;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        this.yaw += d * (1 - Math.exp(-dt * 4));
+      }
+      if (this.timer > 0) return;
+      this.faceYaw = undefined;
+      // most of the time somewhere with a reason (a shop, a door, a bench), sometimes just a stroll
+      const spot = this.spots?.length && Math.random() < 0.65 ? this.spots[(Math.random() * this.spots.length) | 0] : null;
+      const p = spot ? spot.p : this.nav.randomPoint(this.area);
+      if (p && this.goTo(p)) this.spot = spot;
       else this.timer = 2;
     }
   }
