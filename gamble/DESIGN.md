@@ -6,6 +6,9 @@ This file records every design decision agreed with the game's owner during the
 question rounds. It is the source of truth when building. **Golden rule: when a
 choice is about realism, pick the MOST realistic option.** Any new option shown
 to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most realistic.
+**Second golden rule: how people behave ALWAYS depends on the person.** Every NPC
+(coworkers, bosses, partners, family, strangers) has their own personality, so reactions,
+expectations and habits vary per individual — never one fixed rule for everyone.
 
 ---
 
@@ -648,3 +651,15 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 - **Emergency phone alerts** (flash flood, wildfire, blizzard, Amber) blast even on silent.
 - **Long-term health**: years of stress, smoking, drinking and junk food raise later-life
   risk of heart attacks, liver and lung problems; healthy living lowers it.
+
+## 32. Later additions (round 74)
+
+- **Work life** (all behavior depends on the person): coworkers (friends, gossips, lunch
+  thieves, crushes), bosses (good, terrible, micromanagers; control promotions), limited
+  sick days & PTO, verbal → written → final warnings, two weeks' notice.
+- **Job interviews** by typing or voice; outfit, smell and answers matter; background checks
+  (criminal records block some jobs).
+- **Casino worker unions** (real Culinary Union): dues, better pay/protection, strikes and
+  picket lines (coworkers remember who crossed).
+- **Nevada gaming work card**: fingerprints + fee from the sheriff before casino jobs; serious
+  records can block it; gambling at your own casino gets you fired.
