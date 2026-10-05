@@ -9,6 +9,10 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 **Second golden rule: how people behave ALWAYS depends on the person.** Every NPC
 (coworkers, bosses, partners, family, strangers) has their own personality, so reactions,
 expectations and habits vary per individual — never one fixed rule for everyone.
+**Third golden rule: features depend on the specific thing.** Cars, phones, houses,
+appliances and other items each have their own real features (e.g. newer cars have
+auto headlights/wipers, built-in navigation/CarPlay and digital dashboards; old beaters have
+manual everything and broken gauges).
 
 ---
 
@@ -763,3 +767,7 @@ expectations and habits vary per individual — never one fixed rule for everyon
 - **Eavesdropping**: NPCs talk to each other (gossip, machine tips, drama, secrets); get too
   close and they notice.
 - **Light switches** in homes (power bill; pitch dark without them).
+- **Car features depend on the car**: dashboards (needles, fuel, warning lights, broken gauges
+  in beaters), auto vs manual headlights/wipers, built-in navigation/CarPlay with voice
+  directions in newer cars; the phone's Google Maps works anywhere (dies with the battery).
+- **Pedestrian laws**: crosswalk signals; jaywalking near cops → ticket; cars may not stop.
