@@ -241,9 +241,11 @@ export class PlanetModel {
     // ---- water
     const water = p.comp.ice;
     const boil = 373 + 30 * Math.log10(Math.max(this.P, 0.01) + 1);
+    // small bodies never melted enough for their ice to rise: it stays mixed into the rock under a dark crust
+    this.iceExposed = smoothstep(19.5, 21.5, Math.log10(Math.max(p.mass, 1)));
     let state = 'none';
     if (water > 0.0005 && this.P > 0.006) state = this.Ts < 273 ? 'frozen' : this.Ts < boil ? 'liquid' : 'steam';
-    else if (water > 0.0005) state = 'frozen';
+    else if (water > 0.0005 && this.iceExposed > 0.5) state = 'frozen';
     if (state !== this.oceanState) {
       if (state === 'liquid') this.once('ocean', 'Liquid water pooled into your first oceans', 'geo');
       const quiet = w.years - (this.lastClimLog ?? -1e12) < 3e8;
@@ -253,7 +255,7 @@ export class PlanetModel {
       this.oceanState = state;
     }
     // iron and carbon worlds have little surface water to begin with
-    this.iceCover = clamp(1 - (this.Ts - 230) / 45, 0, 1) * (water > 0.0005 ? 1 : 0.3);
+    this.iceCover = clamp(1 - (this.Ts - 230) / 45, 0, 1) * (water > 0.0005 ? 1 : 0.3) * this.iceExposed;
 
     // water vapour high up is split by starlight; without a field the hydrogen escapes
     if (state === 'steam' || (this.P > 0 && this.field < 0.1 && liquid)) {

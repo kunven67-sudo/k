@@ -253,6 +253,46 @@ canvas.chart { width: 100%; height: 180px; display: block; background: rgba(255,
   .split { grid-template-columns: minmax(0, 1fr); }
   .hist li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
+/* touch: a thumbstick for the jets, buttons for the keys */
+.touch-only { display: none; }
+body.touch .touch-only { display: inline; }
+body.touch .no-touch, body.touch .keys { display: none; }
+body.touch .controls-list.touch-only { display: grid; }
+#touch { position: fixed; inset: 0; z-index: 3; pointer-events: none; --t-bottom: max(18px, env(safe-area-inset-bottom)); }
+#touch > * { pointer-events: auto; }
+.t-stick { position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: var(--t-bottom); width: 124px; height: 124px; border-radius: 50%; border: 1px solid rgba(255, 178, 74, 0.45); background: radial-gradient(circle, rgba(255, 178, 74, 0.1), rgba(4, 6, 10, 0.4) 70%); display: grid; place-items: center; touch-action: none; }
+.t-knob { width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 178, 74, 0.3); border: 1px solid var(--amber); pointer-events: none; }
+.t-pad { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: var(--t-bottom); display: grid; grid-template-columns: repeat(4, 58px); gap: 8px; }
+.t-btn { min-width: 0; height: 44px; padding: 0 6px; border-radius: 10px; border: 1px solid rgba(232, 236, 242, 0.2); background: rgba(4, 6, 10, 0.6); color: var(--ink); font: 500 10.5px/1 var(--font-data); letter-spacing: 0.06em; text-transform: uppercase; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.t-btn.on, .t-btn:active { background: rgba(255, 178, 74, 0.32); border-color: var(--amber); }
+.t-side { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); display: grid; gap: 8px; }
+.t-side .t-btn { width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 17px; letter-spacing: 0; }
+.t-more { position: absolute; right: calc(max(14px, env(safe-area-inset-right)) + 58px); top: 50%; transform: translateY(-50%); display: grid; grid-template-columns: repeat(3, minmax(74px, auto)); gap: 8px; padding: 10px; background: rgba(3, 4, 7, 0.9); border-right: 2px solid var(--amber); }
+.t-rotate { display: none; }
+body.touch .bl { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 140px); }
+body.touch .br { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 112px); }
+body.touch #tip { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 150px); }
+body.touch #card { cursor: pointer; }
+body.touch #photo { bottom: max(10px, env(safe-area-inset-bottom)); }
+@media (max-height: 520px) {
+  .t-side { top: max(10px, env(safe-area-inset-top)); transform: none; grid-auto-flow: column; }
+  .t-side .t-btn { width: 42px; height: 42px; }
+  .t-more { top: calc(max(10px, env(safe-area-inset-top)) + 52px); transform: none; right: max(14px, env(safe-area-inset-right)); }
+  .t-stick { width: 108px; height: 108px; }
+  .t-pad { grid-template-columns: repeat(4, 54px); gap: 6px; }
+  .t-btn { height: 40px; }
+  body.touch .bl { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 118px); }
+  body.touch #tip { top: max(10px, env(safe-area-inset-top)); bottom: auto; width: min(380px, calc(100vw - 500px)); font-size: 14px; }
+}
+@media (max-width: 520px) {
+  .t-stick { width: 112px; height: 112px; }
+  .t-pad { grid-template-columns: repeat(3, 54px); }
+  body.touch .bl { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 160px); width: calc(100vw - 110px); }
+  body.touch .bl .full, body.touch .bl .minor { display: none; }
+  body.touch #tip { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 160px); }
+  body.touch .t-rotate { display: block; position: absolute; left: 50%; top: 42%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); padding: 8px 12px; background: rgba(3, 4, 7, 0.8); font: 400 11px/1.3 var(--font-data); color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; pointer-events: none; animation: tFade 7s ease forwards; }
+}
+@keyframes tFade { 0%, 75% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) {
   #warn div { animation: none; }
   #card, #stage-bar-fill, #feed li { transition: none; }
@@ -357,7 +397,21 @@ canvas.chart { width: 100%; height: 180px; display: block; background: rgba(255,
     </div>
     <div class="panel" id="panel-controls" hidden>
       <h2>Controls</h2>
-      <div class="controls-list">
+      <div class="controls-list touch-only">
+        <span class="sep">Touch</span>
+        <kbd>Stick</kbd><span>Fire your jets the way you push. Each burst costs a little of your mass.</span>
+        <kbd>Drag</kbd><span>Look around (anywhere on the view)</span>
+        <kbd>Pinch</kbd><span>Zoom the camera</span>
+        <kbd>Tap</kbd><span>Lock onto the body you tapped. Tap it again to unlock.</span>
+        <kbd>Brake</kbd><span>Match the local orbit (or your locked target)</span>
+        <kbd>Boost</kbd><span>Stronger jets, much more mass lost</span>
+        <kbd>Up / Down</kbd><span>Jets up and down</span>
+        <kbd>Pull</kbd><span>Pull captured moons and debris in faster</span>
+        <kbd>Food</kbd><span>Lock the nearest thing you can eat</span>
+        <kbd>« »</kbd><span>Slow down / speed up time, all the way into deep time</span>
+        <kbd>☰</kbd><span>Info, map, telescope, encyclopedia, goals, views, cutaway, vision, photo mode</span>
+      </div>
+      <div class="controls-list no-touch">
         <span class="sep">Moving</span>
         <kbd>Mouse</kbd><span>Look around (click the view to capture the mouse)</span>
         <kbd>W A S D</kbd><span>Fire your jets: forward, left, back, right. Each burst costs a little of your mass.</span>
@@ -497,7 +551,8 @@ canvas.chart { width: 100%; height: 180px; display: block; background: rgba(255,
   <label>Bloom <input type="range" id="ph-bloom" min="0" max="2" step="0.05" value="0.5"></label>
   <label>Grain <input type="checkbox" id="ph-grain" checked></label>
   <button class="btn small" id="ph-snap">Capture</button>
-  <span>F to leave · mouse to frame</span>
+  <button class="btn small" id="ph-leave">Leave</button>
+  <span class="no-touch">F to leave · mouse to frame</span><span class="touch-only">Drag to frame · pinch to zoom</span>
 </div>
 <div id="photo-shot" hidden><img id="photo-img" alt="Captured photo of your world"><p class="note">Right-click (or long-press) the picture and choose Save image.</p><button class="btn" id="photo-close">Close</button></div>
 

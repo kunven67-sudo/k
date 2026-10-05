@@ -1,4 +1,6 @@
 // The tutorial at the start, and a short tip the first time something new happens.
+import { touchText } from '../game/touch.js';
+
 const $ = (id) => document.getElementById(id);
 
 const STEPS = [
@@ -59,7 +61,7 @@ export class Tips {
 
   show(head, html, secs = 8) {
     $('tip-head').textContent = head;
-    $('tip-text').innerHTML = html;
+    $('tip-text').innerHTML = this.game.touch?.on ? touchText(html) : html;
     $('tip').hidden = false;
     this.showing = secs;
   }

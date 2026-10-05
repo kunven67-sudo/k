@@ -16,6 +16,7 @@ export class Photo {
     bind('ph-bloom', 'bloom');
     $('ph-grain').addEventListener('change', (e) => { this.state.grain = e.target.checked; this.push(); });
     $('ph-snap').addEventListener('click', () => this.capture());
+    $('ph-leave').addEventListener('click', () => { if (this.game.photoOn) this.toggle(); });
     $('photo-close').addEventListener('click', () => { $('photo-shot').hidden = true; });
   }
 

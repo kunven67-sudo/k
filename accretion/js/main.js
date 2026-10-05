@@ -4,6 +4,7 @@ import { Galaxy } from './world/galaxy.js';
 import { World } from './world/world.js';
 import { Renderer } from './render/renderer.js';
 import { Input, ChaseCamera } from './game/controls.js';
+import { TouchControls } from './game/touch.js';
 import { HUD } from './ui/hud.js';
 import { Rumble } from './audio/audio.js';
 import { Saves, makeCode, readCode } from './game/saves.js';
@@ -81,10 +82,11 @@ class Game {
     this.photo = new Photo(this);
     this.togglePhoto = () => this.photo.toggle();
     this.photoInput = (dt) => this.photo.input(dt);
+    this.touch = new TouchControls(this);
     installSheets(this, { goals: this.goals, book: this.book, scope: this.scope, map: this.map, sandbox: this.sandbox });
     this.onEvent = (e) => { this.goals.onEvent(e); this.tips.onEvent(e); this.book.onEvent(e); };
     const ef = this.everyFrame;
-    this.everyFrame = (dt) => { ef?.(dt); this.goals.update(dt); this.tips.update(dt); this.book.update(dt); this.watchFps(dt); };
+    this.everyFrame = (dt) => { ef?.(dt); this.goals.update(dt); this.tips.update(dt); this.book.update(dt); this.watchFps(dt); this.touch.update(); };
     this.onPlayStart = (fresh) => { if (fresh && this.tutorialOn) this.tips.startTutorial(); };
     window.addEventListener('resize', () => { this.renderer.resize(); this.hud.resize(); });
     window.addEventListener('beforeunload', () => this.autosave());
@@ -357,7 +359,7 @@ class Game {
       this.hud.showCard(p.form, fresh ? 'You begin as' : 'Welcome back');
       const host = this.world.hostSystem();
       this.hud.log(host ? `In the ${this.world.field.env.label.toLowerCase()} of ${host.name}` : this.world.field.env.label, 'info');
-      this.hud.log('Click the view to steer with the mouse', 'info');
+      this.hud.log(this.touch.on ? 'Drag the view to look around; the thumbstick fires your jets' : 'Click the view to steer with the mouse', 'info');
       this.onPlayStart?.(fresh);
     }
     this.autosave();
@@ -549,24 +551,26 @@ class Game {
     }
     if (inp.hit('KeyP') && !this.sheet) { this.pause(); return; }
     const sheetKeys = { KeyI: 'info', KeyM: 'map', KeyL: 'scope', KeyJ: 'book', KeyG: 'goals', KeyZ: 'sandbox' };
-    for (const [k, name] of Object.entries(sheetKeys)) {
-      if (inp.hit(k)) {
-        if (this.sheet === name) this.closeSheet();
-        else this.openSheet?.(name);
-      }
-    }
+    for (const [k, name] of Object.entries(sheetKeys)) if (inp.hit(k)) this.toggleSheet(name);
     if (this.sheet) return;
     if (inp.hit('KeyF')) this.togglePhoto?.();
-    if (inp.hit('KeyH')) {
-      const order = ['full', 'minimal', 'off'];
-      this.settings.hud = order[(order.indexOf(this.hud.mode) + 1) % 3];
-      this.hud.setMode(this.settings.hud);
-      this.saveSettings();
-    }
+    if (inp.hit('KeyH')) this.cycleHud();
     if (inp.hit('KeyV')) this.cycleView?.();
     if (inp.hit('KeyK')) this.toggleCutaway?.();
     if (inp.hit('KeyN')) this.cycleVision?.();
     if (inp.hit('Enter')) this.hud.hideCard();
+  }
+
+  toggleSheet(name) {
+    if (this.sheet === name) this.closeSheet();
+    else this.openSheet?.(name);
+  }
+
+  cycleHud() {
+    const order = ['full', 'minimal', 'off'];
+    this.settings.hud = order[(order.indexOf(this.hud.mode) + 1) % 3];
+    this.hud.setMode(this.settings.hud);
+    this.saveSettings();
   }
 
   handleInput(dt) {
@@ -589,6 +593,8 @@ class Game {
     if (inp.down('KeyA')) { tx -= r.x; ty -= r.y; tz -= r.z; }
     if (inp.down('Space')) { tx += u.x; ty += u.y; tz += u.z; }
     if (inp.down('KeyC') || inp.down('ControlLeft')) { tx -= u.x; ty -= u.y; tz -= u.z; }
+    const ts = this.touch.thrust();
+    if (ts) { tx += f.x * ts.forward + r.x * ts.right; ty += f.y * ts.forward + r.y * ts.right; tz += f.z * ts.forward + r.z * ts.right; }
     const l = Math.hypot(tx, ty, tz);
     w.input.thrust = l > 0 ? { x: tx / l, y: ty / l, z: tz / l } : { x: 0, y: 0, z: 0 };
     w.input.level = l > 0 ? 1 : 0;
