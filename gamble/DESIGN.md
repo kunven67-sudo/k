@@ -876,3 +876,12 @@ manual everything and broken gauges).
 - **Strand-like hair** that sways in wind (simplified on phones).
 - **Mic speech uses your real voice** coming from your character (others hear it too).
 - **Real lip sync** for everyone (NPC TTS, your mic, friends' mics).
+
+## 47. Round 105
+
+- **Reno landmarks**: National Bowling Stadium (silver dome, 78 lanes, bowling bets), Truckee
+  River Walk & whitewater park (kayak rapids, Wingfield Park concerts, summer tubing), the
+  downtown **train trench** (freight trains, night horns), Midtown murals district (bars, thrift
+  stores, food).
+- **Alcohol poisoning**: too many shots too fast → pass out, vomit, ambulance; can be deadly
+  if nobody helps.
