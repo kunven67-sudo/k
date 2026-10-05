@@ -983,6 +983,12 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Thanksgiving deep-fried turkey**: frozen turkey in hot oil → physics fire; done right → best
   turkey ever.
 
+- **Fridge door**: souvenir magnets from visited cities, printed in-game photos, kids' school
+  drawings, sticky notes from partner/roommates ("BUY MILK", "we need to talk").
+- **Car snacks with physics**: cup-holder drinks slosh/spill on turns, fries fall between seats,
+  eating while driving distracts.
+- **Pocket food gets squished**: sandwiches squish, chocolate melts in heat, shaken soda explodes.
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
