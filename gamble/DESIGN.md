@@ -1028,6 +1028,13 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Rich-home features**: pool & hot tub (parties, chemicals, winter covers), home theater (movie &
   Super Bowl nights), home gym, wine cellar & home bar (bottles appreciate over years).
 
+- **Trailer life**: own the trailer but pay lot rent (rising; park rules), wind rocks the trailer
+  at night, propane refills & rooftop swamp cooler, close-knit park neighbors (dogs, BBQs, gossip —
+  depends on the people).
+- **Apartment life**: upstairs footsteps/music/arguments (or you get complaints if upstairs),
+  shared coin laundry (wet clothes dumped on the dryer), mailroom & package lockers (theft still
+  possible), assigned parking (squatters → notes or tows).
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
