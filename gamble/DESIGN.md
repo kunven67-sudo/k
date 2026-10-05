@@ -837,3 +837,14 @@ manual everything and broken gauges).
 - **Keno runners** in some Reno casinos (play keno from the restaurant/bar).
 - **Pharmacies** (CVS, Walgreens): prescriptions (antibiotics, pain meds after injuries;
   insurance helps) and over-the-counter cold meds & bandages.
+
+## 44. Round 99 — real places near Reno
+
+- **Drivable nearby towns**: Virginia City (historic silver-mining town — saloons, mine & ghost
+  tours; ties into the hidden silver vault), Carson City (state capital, small casinos, state
+  courts), Sparks (Nugget casino, Victorian Square), Truckee CA (just over the border — where
+  you buy lottery tickets & scratchers).
+- **Local events**: Virginia City camel & ostrich races (September, bettable), Sparks Rib
+  Cook-off (Labor Day, eating contests), Street Vibrations motorcycle rally (September),
+  Virginia City ghost tours around Halloween (maybe linked to motel room 13).
+- **Natural hot springs** near Reno (lower stress, heal sore muscles, date spot).
