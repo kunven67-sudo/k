@@ -895,3 +895,7 @@ manual everything and broken gauges).
 - **Home games**: board games (Monopoly etc.; arguments, board flips with physics), card games
   (UNO, Go Fish with kids, gin rummy with grandma), jigsaw puzzles (stress relief), home bar games
   (dartboard, pool table, beer pong table).
+- **Life events**: bachelor/bachelorette weekends in Vegas, baby showers, graduations (UNR / trade
+  school), retirement parties.
+- **Tattoos & piercings fully real**: pain flinches, days of healing, regret, expensive laser
+  removal; piercings can get infected without cleaning.
