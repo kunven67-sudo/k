@@ -457,6 +457,7 @@ export async function boot() {
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
     if (!params.has('paused') && !pauseMenu.paused) step(dt);
+    audio.tickMusic(pauseMenu.paused ? 'night' : police.wanted > 0 && police.unseen < 15 ? 'chase' : (env?.night ?? 0) > 0.6 ? 'night' : 'day');
     game_applyZone?.();
     updateSizeHud(dt);
     const hint = pauseMenu.paused || settingsPanel.isOpen ? null : player.interactHint || interact.hint || hands.hint;

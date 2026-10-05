@@ -3,6 +3,7 @@
 // tiny), the shrink ray, squishes, glass, and the world around you (birds by
 // day, crickets at night, rain, the hum of the lab).
 import * as THREE from 'three';
+import { Music } from './music.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -31,7 +32,7 @@ export class Audio {
     this.master = ctx.createGain();
     this.master.connect(ctx.destination);
     this.bus = {};
-    for (const k of ['effects', 'voices', 'ambience']) { this.bus[k] = ctx.createGain(); this.bus[k].connect(this.master); }
+    for (const k of ['effects', 'voices', 'ambience', 'music']) { this.bus[k] = ctx.createGain(); this.bus[k].connect(this.master); }
     this.applyVolumes();
     // one second of white noise, reused by everything noisy
     const len = ctx.sampleRate;
@@ -39,6 +40,7 @@ export class Audio {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.startAmbience();
+    this.music = new Music(this);
   }
 
   applyVolumes() {
@@ -219,6 +221,12 @@ export class Audio {
       l.setPosition(c.position.x, c.position.y, c.position.z);
       l.setOrientation(f.x, f.y, f.z, 0, 1, 0);
     }
+  }
+
+  // music keeps going in menus too (called every frame, paused or not)
+  tickMusic(mood = 'day') {
+    if (!this.ctx) return;
+    this.music?.update({ style: this.settings.get('audio.musicStyle') || 'goofy', mood });
   }
 
   update(dt, { env, zone, player }) {
