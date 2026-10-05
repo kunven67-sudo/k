@@ -857,3 +857,15 @@ manual everything and broken gauges).
   asking directions (help or misdirect), sharing a cab, invitations to parties/bachelor
   parties/poker games (fun or a setup).
 - **Hitchhiking** both ways (mostly nice people, some robbers, wild stories).
+
+## 46. Quality bar (round 102)
+
+- **Signature WOW moments to polish first-time**: the first jackpot (sirens, lights, crowd rush,
+  character losing it), the first night walk down Virginia Street under the Reno Arch (neon on
+  wet streets), the first big fight (punch, stagger, ragdoll KO, security drag-out), the 11 AM
+  knock (blurry hungover wake-up, pounding headache, BANG BANG).
+- **Anti-"AI look" checklist** (all four are dealbreakers):
+  1. No plastic/generic surfaces — every material gets texture, wear, variation.
+  2. Never too clean — dirt, trash, cracks, scuffs, stains, clutter everywhere appropriate.
+  3. No stiff animation — weight, foot planting, no sliding, secondary motion/jiggle.
+  4. No default menus — custom fonts, card-table/slot-machine/phone UIs with personality.
