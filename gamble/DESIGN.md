@@ -353,3 +353,31 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
   their own bills, break-ins and property taxes.
 - Radio also has hip-hop, rock, Latin and oldies stations.
 - Real sports teams can be named, but players are made-up people.
+
+## 18. Later additions (rounds 44–46)
+
+- **More crimes**: burglary (lock picking, windows; alarms, dogs, Ring cams, owners wake),
+  mugging (victims fight back / armed), bank robbery (dye packs, FBI), carjacking.
+- **Tax day (April 15)**: file on the PC (TurboTax) or pay an accountant; report gambling,
+  job and business income; lying risks audits and fines.
+- **Insurance**: health (~$400/mo), car (required by Nevada law; uninsured → fines,
+  impound), renters/home (burglary, fire, flood), pet and phone insurance.
+- **Bills**: phone plan (no plan = no data off Wi-Fi), home internet, slow motel Wi-Fi,
+  free casino Wi-Fi; unpaid → shut off.
+- **Real family**: parents call/text, siblings in other states, borrow money (they get
+  disappointed), holiday visits, they age and can pass away.
+- **Traffic**: rush hour, road construction & detours, NPC crashes & road rage, city
+  buses, school zones.
+- **Driving details**: seatbelts (tickets; ejection in big crashes), signals & traffic
+  laws, maintenance (oil, tire pressure, winter battery, warning lights), manual cars
+  (stalling).
+- **Police extras**: weekend DUI checkpoints, car searches, speed traps, off-duty cops in
+  casinos.
+- **Skills by real practice** (no XP bars): cards, driving, cooking, fighting, talking
+  get visibly better with practice and rusty without.
+- **Rev or Dead hosts**: **Big Mike** (trucks & muscle cars) and **Danny** (only likes
+  Japanese cars) — they hate each other's taste.
+- Starting motel: **The Starlite Motel** — old neon sign with burnt-out letters
+  ("STA LITE MO EL" at night).
+- **Real friendships**: hanging out builds best friends who help move, lend money, cover
+  for you — or betray you, steal, drift away, fall out over money.
