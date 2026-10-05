@@ -151,7 +151,7 @@ export class ViewModel {
     const sway = new THREE.Vector3(Math.cos(bob * 0.5) * 0.004, Math.sin(bob) * 0.006, 0);
     // right wrist: out in front holding the tool, or hanging out of view; left wrist: the watch in front of your eyes
     if (palm) this.ik('R', lerp3([0.24, -0.8, 0.05], [palm.x + 0.02, palm.y - 0.035, palm.z + 0.07], k).add(sway).applyMatrix4(toSkel), new THREE.Vector3(-0.7, -1, -0.2), new THREE.Vector3(0, -1, 0));
-    else this.ik('R', lerp3([0.24, -0.8, 0.05], [0.16, -0.2, -0.3], k).add(sway).applyMatrix4(toSkel), new THREE.Vector3(-0.7, -1, -0.2), new THREE.Vector3(-0.75, 0.65, 0.1));
+    else this.ik('R', lerp3([0.24, -0.8, 0.05], [0.15, -0.17, -0.3], k).add(sway).applyMatrix4(toSkel), new THREE.Vector3(-0.7, -1, -0.2), new THREE.Vector3(-0.75, 0.65, 0.1));
     this.ik('L', lerp3([-0.24, -0.8, 0.05], [-0.04, -0.105, -0.27], r).applyMatrix4(toSkel), new THREE.Vector3(1, -0.45, -0.25), r > 0.01 ? eye : null);
     // fingers: wrapped around the tool / relaxed
     for (const b of h.sk.skeleton.bones) {
