@@ -1089,6 +1089,13 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Gender expression depends on the person**: any NPC (and you) can act more feminine, masculine,
   or in between regardless of gender — mannerisms, style, interests vary per individual.
 
+- **Social realism**: friends-of-friends introductions & group drama, regulars who learn your name
+  and usual order (barista, bartender, dealer), separate reputations per group (casino regulars,
+  coworkers, neighbors, gangs, family), a real diverse Reno crowd (locals, tourists, retirees at
+  the slots, college students, all ages & backgrounds).
+- **Discord** on phone/PC: NPC community servers ("Reno Poker Night", "Car Meet Reno"), DMs, voice
+  channels with online friends.
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
