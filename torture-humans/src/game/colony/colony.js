@@ -1011,6 +1011,20 @@ class Resident {
     }
   }
 
+  // run from something scary (a spider, ...) at a world position
+  *fleeFrom(danger) {
+    this.doing = 'running from a spider';
+    this.dropCarried();
+    this.h.emotion.fear = 1;
+    const away = this.worldPos().sub(danger).setY(0).normalize();
+    for (let i = 0; i < 5; i++) {
+      const dir = away.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.6);
+      if (yield* this.walkTo(this.worldPos().addScaledVector(dir, 0.3), 0.03, { run: true, ext: { x: 0.08, y: 0.08, z: 0.08 } })) break;
+    }
+    this.ch.play('idle_nervous_01');
+    yield* this.wait(1.5);
+  }
+
   // run from the giant
   *flee() {
     this.doing = 'running from you';

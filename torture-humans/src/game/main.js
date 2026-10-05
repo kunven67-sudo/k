@@ -17,6 +17,7 @@ import { bakeEnvironment } from './engine/probe.js';
 import { hdri } from './engine/assets.js';
 import { Environment } from './world/environment.js';
 import { addTinyDetails } from './cageworld-details.js';
+import { Bugs } from './bugs.js';
 import { Vitals } from './vitals.js';
 import { Hazards } from './hazards.js';
 import { buildTestLevel } from './levels/test-level.js';
@@ -174,6 +175,8 @@ export async function boot() {
   // the little things in the terrarium: dew, mushrooms, moss, leaves, fogged glass, embers, footprints...
   const tinyDetails = cage?.tiny ? addTinyDetails({ tiny: cage.tiny, cage, settings, glass: { w: 3.0, h: 1.2, d: 1.9 }, getHour: () => env?.hour ?? 9, player, camera }) : null;
   if (colony) colony.details = tinyDetails;
+  // bugs in the terrarium: ants, beetles, a spider
+  const bugs = cage?.tiny ? new Bugs({ cage, settings }) : null;
   if (level.sky) hdri(renderer.renderer, level.sky).then((s) => { sky = s; applyZone(true); }).catch(() => {});
   settings.onChange((d, patch) => { if (patch.graphics) applyZone(true); });
   // indoor reflections: snapshot the room once textures have streamed in, and again a bit later
@@ -221,7 +224,7 @@ export async function boot() {
     }
   });
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, frame: 0 };
   window.game = game; // for tests and debugging
 
   // test hook: drive the player without a real keyboard
@@ -245,6 +248,7 @@ export async function boot() {
     colony?.update(dt);
     env?.update(dt);
     tinyDetails?.update(dt);
+    if (zone !== 'outside') bugs?.update(dt);
     for (const h of humans) h.update(dt);
     level.update?.(dt);
     input.endFrame();
