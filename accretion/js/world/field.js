@@ -104,7 +104,7 @@ export class Field {
     const base = w.quality === 'low' ? 150 : w.quality === 'high' ? 300 : 230;
     // stars are huge and blinding: at stellar sizes space holds far fewer of them
     const p = w.player;
-    const stellar = p && p.compact ? 0.16 : p && (p.isStar || p.mass > 1e28) ? 0.26 : 1;
+    const stellar = p && p.compact ? 0.16 : p && p.isStar ? 0.14 : p && p.mass > 1e28 ? 0.26 : 1;
     return Math.round(clamp(base * this.env.density * stellar, 24, 420));
   }
 

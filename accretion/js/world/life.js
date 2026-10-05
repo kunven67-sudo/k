@@ -354,7 +354,7 @@ export class LifeModel {
   }
 
   updateCiv(rs, years) {
-    const w = this.world, p = w.player;
+    const w = this.world;
     const prog = clamp(this.progress / Math.max(this.need, 0.05), 0, 1);
     // satellites and stations
     if (this.stage >= LIFE.space) {

@@ -397,7 +397,8 @@ export class Renderer {
     this.exposure += (target - this.exposure) * Math.min(1, dtReal * rate);
     this.shared.uExposure.value = this.exposure * (ph ? Math.pow(2, ph.ev) : 1);
     // the sky is compressed like a camera with good dynamic range
-    this.scene.backgroundIntensity = clamp(Math.pow(this.exposure, 0.55) * 0.7, 0.04, 2.6);
+    // a camera set for a bright star barely shows the sky; dark-adapted in deep space it fills with stars
+    this.scene.backgroundIntensity = clamp(0.22 * Math.pow(this.exposure, 0.8), 0.015, 2.6);
     // a daytime sky hides the stars
     let skyDim = 1;
     if (cam.ground && world.planet && !world.planet.giant) skyDim = 1 - 0.97 * dayK * clamp(Math.log10(1 + (world.planet.P || 0) * 30) / 1.5, 0, 1);
@@ -501,7 +502,8 @@ export class Renderer {
       if (!world.active.has(id)) { dc.dispose(); this.disks.delete(id); continue; }
       const st = dc.entry.star;
       const gap = world.stages?.gap && world.stages.gap.entry === dc.entry ? world.stages.gap : null;
-      dc.update(camW, S, this.focal, world.time, st && st.alive ? blackbody(st.starTemp || 5000) : [1, 1, 1], gap);
+      // a camera set for your own blazing surface barely registers the dust around you
+      dc.update(camW, S, this.focal, world.time, st && st.alive ? blackbody(st.starTemp || 5000) : [1, 1, 1], gap, p.isStar ? 0.18 : 1);
     }
 
     // dust motes give a sense of speed
@@ -538,14 +540,18 @@ export class Renderer {
     }
 
     // final look
-    this.flash *= Math.exp(-dtReal * 1.3);
+    // flashes fade on the wall clock, so a slow frame rate can't leave the screen washed out
+    const now = performance.now();
+    const wall = Math.min(Math.max(((now - (this.flashClock || now)) / 1000), 0), 1);
+    this.flashClock = now;
+    this.flash *= Math.exp(-wall * 1.3);
     if (this.flash < 0.01) this.flash = 0;
     const fu = this.finalPass.uniforms;
     fu.uTime.value = this.shared.uTime.value;
     fu.uDamage.value = clamp(state.damage || 0, 0, 1);
     fu.uFlash.value = this.flash;
     fu.uGrain.value = this.quality === 'low' || (ph && !ph.grain) ? 0.0 : 0.022;
-    this.bloom.strength = (ph ? ph.bloom : 0.5) + this.flash * 0.8;
+    this.bloom.strength = (ph ? ph.bloom : p.isStar ? 0.32 : 0.5) + this.flash * 0.8;
   }
 
   // satellites around you and a Dyson swarm around your star
@@ -759,7 +765,7 @@ export class Renderer {
         const f = Math.min(1, fl.t * 3) * Math.exp(-fl.t * 0.8) * (fl.strong ? 2.5 : 1.2);
         u.uFlare.value.set(fl.obj.x, fl.obj.y, fl.obj.z, f);
       } else u.uFlare.value.w = 0;
-      u.uIntensity.value = (isPlayer ? 1.15 : 1.8) / Math.max(this.exposure, 1e-4);
+      u.uIntensity.value = (isPlayer ? 1.15 : world.player.isStar ? 1.1 : 1.8) / Math.max(this.exposure, 1e-4);
       u.uDetail.value = px > 30 ? 1 : 0;
       u.uActivity.value = px < 120 ? -2 : b.starTemp < 4000 ? 1 : 0.3;
       const c = blackbody(b.starTemp);
@@ -775,7 +781,8 @@ export class Renderer {
       gu.uHalo.value = clamp(1 - px / 25, 0, 1);
       gu.uSize.value = sizeU;
       gu.uCore.value = rU / sizeU;
-      gu.uIntensity.value = isPlayer ? 0.9 / Math.max(this.exposure, 1e-4) : Math.min(clamp(Math.pow(flux, 0.5), 0.05, 400), 3 / Math.max(this.exposure, 1e-4)) * clamp(30 / Math.max(px, 1), 0.12, 1);
+      // glare: bright when a star is a point of light, modest once its disk is resolved
+      gu.uIntensity.value = isPlayer ? 0.9 / Math.max(this.exposure, 1e-4) : Math.min(clamp(Math.pow(flux, 0.5), 0.05, 400), 1.4 / Math.max(this.exposure, 1e-4)) * clamp(30 / Math.max(px, 1), 0.12, 1) * (world.player.isStar ? 0.35 : 1);
       gu.uSpikes.value = isPlayer ? 0 : clamp(0.6 - px / 300, 0, 0.6);
       if (cut) gu.uIntensity.value *= 0.15;
       gu.uCorona.value = isPlayer ? 0.35 : 0.25;

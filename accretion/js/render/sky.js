@@ -7,7 +7,7 @@
 //  - Andromeda is drawn live too: it grows as it falls toward us.
 import * as THREE from 'three';
 import { RNG, hash32 } from '../core/rng.js';
-import { GALAXY, LY, armDensity, stellarDensity } from '../world/galaxy.js';
+import { GALAXY, LY, stellarDensity } from '../world/galaxy.js';
 import { stellarState, imfInverse, imfCDF, msLifetimeYears } from '../world/stellar.js';
 import { blackbody, clamp } from '../core/phys.js';
 import { NOISE, LOGDEPTH_VERT_PARS, LOGDEPTH_VERT, LOGDEPTH_FRAG_PARS, LOGDEPTH_FRAG } from './glsl.js';

@@ -145,7 +145,7 @@ export class DiskCloud {
     return pts;
   }
 
-  update(cam, S, focal, simTime, starColor, gap = null) {
+  update(cam, S, focal, simTime, starColor, gap = null, dim = 1) {
     const s = this.entry.star && this.entry.star.alive ? this.entry.star : this.entry.pos;
     for (const o of this.objects) {
       const u = o.material.uniforms;
@@ -157,7 +157,7 @@ export class DiskCloud {
       if (starColor) u.uStarCol.value.setRGB(starColor[0], starColor[1], starColor[2]);
       if (gap) u.uGap.value.set(gap.r, gap.w); else u.uGap.value.set(0, 0);
       // seen from a star's size, the disk is a faint glow rather than a blizzard of grains
-      u.uDim.value = Math.min(1, Math.max(0.12, Math.sqrt(6e4 / Math.max(S, 1))));
+      u.uDim.value = Math.min(1, Math.max(0.08, Math.pow(6e4 / Math.max(S, 1), 0.8))) * dim;
       const star = this.entry.star;
       if (star && star.alive) u.uGM.value = G * star.mass;
     }

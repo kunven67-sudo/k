@@ -22,7 +22,7 @@ export class FXSpawner {
     const p = this.world.player, fx = this.renderer.fx;
     const R = this.renderer.visualRadius(p);
     const d = e.dir;
-    const n = Math.round(clamp(4 + 70 * Math.sqrt(e.rel), 3, 80) * scale);
+    const n = Math.round(clamp(4 + 70 * Math.sqrt(e.rel), 3, 80) * scale * (p.isStar || p.compact ? 0.3 : 1));
     const col = this.compColor(e.body.comp || p.comp);
     const hot = clamp(e.energy * 0.8, 0, 1);
     const vScale = R / TIME_BASE;

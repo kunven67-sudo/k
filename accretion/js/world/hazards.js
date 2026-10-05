@@ -3,7 +3,7 @@
 import { Body } from './body.js';
 import { LY } from './galaxy.js';
 import { escapeVelocity } from '../core/phys.js';
-import { M_SUN, M_EARTH, M_JUP, TIME_BASE } from '../core/constants.js';
+import { M_SUN, M_EARTH, TIME_BASE } from '../core/constants.js';
 
 const SN_RANGE = 50 * LY;
 
