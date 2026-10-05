@@ -36,7 +36,7 @@ void main() {
   b *= smoothstep(uNearR, uNearR * 1.35, d) * (1.0 - smoothstep(uFarR * 0.8, uFarR, d));
   vCol = color;
   vA = clamp(b, 0.0, 1.6);
-  gl_PointSize = clamp(1.0 + sqrt(max(b, 0.0)) * 1.6, 1.0, 6.0);
+  gl_PointSize = clamp(1.0 + sqrt(max(b, 0.0)) * 1.2, 1.0, 5.0);
   gl_Position = projectionMatrix * viewMatrix * vec4(normalize(rel) * 1000.0, 1.0);
   if (b < 0.004) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }
@@ -53,52 +53,6 @@ void main() {
 }
 `;
 
-const HAZE_VERT = /* glsl */ `
-attribute vec3 color;
-attribute float wsize;
-attribute float bright;
-uniform vec3 uCam;
-uniform float uFocal;
-uniform float uFadeNear;
-uniform float uFadeFar;
-uniform float uFade;
-varying vec3 vCol;
-varying float vA;
-void main() {
-  vec3 rel = position - uCam;
-  float d = max(length(rel), 1.0);
-  float px = wsize / d * uFocal;
-  // near puffs would be resolved into separate stars, so they fade out
-  float fade = (1.0 - smoothstep(uFadeNear, uFadeFar, px)) * smoothstep(0.4, 1.5, px);
-  vCol = color;
-  vA = bright * fade * uFade;
-  gl_PointSize = clamp(px, 1.0, uFadeFar);
-  gl_Position = projectionMatrix * viewMatrix * vec4(normalize(rel) * 1000.0, 1.0);
-  if (vA < 0.0005) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-}
-`;
-const HAZE_FRAG = /* glsl */ `
-varying vec3 vCol;
-varying float vA;
-void main() {
-  vec2 c = gl_PointCoord - 0.5;
-  float r = length(c) * 2.0;
-  if (r > 1.0) discard;
-  float a = (exp(-r * r * 2.5) - 0.0821) / 0.9179 * vA;
-  gl_FragColor = vec4(vCol * a, 1.0);
-}
-`;
-const DUST_FRAG = /* glsl */ `
-varying vec3 vCol;
-varying float vA;
-void main() {
-  vec2 c = gl_PointCoord - 0.5;
-  float r = length(c) * 2.0;
-  if (r > 1.0) discard;
-  float a = (exp(-r * r * 2.2) - 0.1108) / 0.8892 * vA;
-  gl_FragColor = vec4(vCol, clamp(a, 0.0, 1.0));
-}
-`;
 
 const NEB_VERT = /* glsl */ `
 attribute vec3 color;
@@ -153,6 +107,89 @@ void main() {
   float n = fbm(vec3(c * 3.0, vSeed), 4) * 0.5 + 0.5;
   float base = (exp(-r * r * 2.2) - 0.1108) / 0.8892;
   gl_FragColor = vec4(vCol, clamp(base * vA * smoothstep(0.35, 0.75, n), 0.0, 1.0));
+}
+`;
+
+// The Milky Way's glow, ray-marched through the galaxy's real shape from wherever
+// you are: starlight from the disk, bar and bulge, dimmed by dust lanes along the arms.
+const GLOW_VERT = /* glsl */ `
+varying vec3 vDir;
+void main() {
+  vDir = position;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const GLOW_FRAG = /* glsl */ `
+precision highp float;
+uniform vec3 uCam;
+uniform float uMerged;
+uniform float uK;
+uniform float uDustK;
+uniform float uFade;
+uniform float uSeed;
+varying vec3 vDir;
+${NOISE}
+const float PI = 3.14159265;
+float armD(vec2 xz) {
+  float r = length(xz);
+  if (r < 1.0) return 0.0;
+  float th = atan(xz.y, xz.x);
+  float r0 = ${GALAXY.armStart.toFixed(1)};
+  float best = 0.0;
+  for (int k = 0; k < 4; k++) {
+    bool major = k < 2;
+    float off = float(k - (k / 2) * 2) * PI + (major ? 0.0 : PI * 0.5);
+    float tArm = log(max(r, r0) / r0) / tan(${GALAXY.pitch}) + off;
+    float d = mod(th - tArm + PI, 2.0 * PI) - PI;
+    float w = (major ? 0.3 : 0.2) * (0.6 + 0.4 * (r / ${GALAXY.radius.toFixed(1)}));
+    float v = exp(-(d * d) / (2.0 * w * w)) * (major ? 1.0 : 0.55);
+    best = max(best, v);
+  }
+  float fade = clamp((r - r0 * 0.8) / (r0 * 0.6), 0.0, 1.0) * clamp((${GALAXY.radius.toFixed(1)} * 1.05 - r) / (${GALAXY.radius.toFixed(1)} * 0.3), 0.0, 1.0);
+  return best * fade;
+}
+void main() {
+  vec3 d = normalize(vDir);
+  vec3 col = vec3(0.0);
+  float tau = 0.0;
+  const float s0 = 220.0;
+  const float s1 = 110000.0;
+  const int N = 60;
+  float prev = s0;
+  float cb = cos(0.45), sb = sin(0.45);
+  for (int i = 1; i <= N; i++) {
+    float s = s0 * pow(s1 / s0, float(i) / float(N));
+    float ds = s - prev;
+    float sm = 0.5 * (s + prev);
+    prev = s;
+    vec3 x = uCam + d * sm;
+    float r = length(x.xz);
+    float ay = abs(x.y);
+    if (r > 80000.0 && ay > 15000.0) break;
+    float a = ay < 4000.0 ? armD(x.xz) * (1.0 - uMerged) : 0.0;
+    float thin = exp(-(r - ${GALAXY.sunR.toFixed(1)}) / ${GALAXY.Rd.toFixed(1)}) * exp(-ay / ${GALAXY.zd.toFixed(1)});
+    float thick = 0.12 * exp(-(r - ${GALAXY.sunR.toFixed(1)}) / ${(GALAXY.Rd * 1.2).toFixed(1)}) * exp(-ay / ${GALAXY.zThick.toFixed(1)});
+    // star clouds: the disk's light is clumpy, not smooth
+    float clump = sm < 30000.0 && ay < 2500.0 ? 0.65 + 0.55 * snoise(x * 0.0016 + uSeed) : 1.0;
+    float disk = ((0.55 + 0.9 * a) * thin + thick) * (1.0 - uMerged * 0.5) * clump;
+    float rs = length(vec3(x.x, x.y * 1.4, x.z));
+    float bulge = 350.0 * exp(-pow(rs / ${GALAXY.Rb.toFixed(1)}, 1.1)) * (1.0 + uMerged * 2.0);
+    float bx = x.x * cb + x.z * sb, bz = -x.x * sb + x.z * cb;
+    float bar = 15.0 * exp(-pow(bx / ${GALAXY.barLen.toFixed(1)}, 2.0) - pow(bz / ${GALAXY.barWid.toFixed(1)}, 2.0) - pow(x.y / 1200.0, 2.0)) * (1.0 - uMerged);
+    float ell = uMerged * 5.0 * pow(1.0 + rs / 9000.0, -3.0);
+    vec3 e = disk * mix(vec3(0.95, 0.87, 0.76), vec3(0.62, 0.74, 1.0), a) + (bulge + bar + ell) * vec3(1.0, 0.78, 0.52);
+    col += e * exp(-tau) * ds;
+    // dust: a thin layer, thickest along the inner edges of the spiral arms
+    if (ay < 1500.0) {
+      float th = atan(x.z, x.x);
+      float lead = armD(vec2(r * cos(th - 0.07), r * sin(th - 0.07))) * (1.0 - uMerged);
+      float dust = exp(-(r - ${GALAXY.sunR.toFixed(1)}) / 9000.0) * exp(-ay / 230.0) * (0.25 + 1.8 * max(lead - a * 0.4, 0.0)) * (1.0 - uMerged * 0.8);
+      dust *= sm < 30000.0 ? 0.6 + 0.8 * (snoise(x * 0.0022 + uSeed * 2.0) * 0.5 + 0.5) : 1.0;
+      tau += dust * ds * uDustK;
+    }
+    if (tau > 12.0) break;
+  }
+  gl_FragColor = vec4(col * uK * uFade, 1.0);
 }
 `;
 
@@ -262,25 +299,6 @@ void main() {
 }
 `;
 
-// colour of the diffuse glow: yellow bulge, bluish arms, dust reddens it
-function glowColor(x, z, rng) {
-  const r = Math.hypot(x, z);
-  const bulge = Math.exp(-r / (GALAXY.Rb * 2.2));
-  const arm = armDensity(x, z);
-  const base = [
-    0.95 * (1 - arm * 0.25) + 0.05,
-    0.84 * (1 - arm * 0.12) + 0.06,
-    0.68 + arm * 0.32,
-  ];
-  const warm = [1.0, 0.8, 0.55];
-  const c = base.map((v, i) => v * (1 - bulge) + warm[i] * bulge);
-  // dust lanes sit along the inner edges of the arms
-  const t = Math.atan2(z, x);
-  const lead = armDensity(r * Math.cos(t - 0.07), r * Math.sin(t - 0.07));
-  const dust = clamp(lead * 1.3 - arm * 0.6, 0, 1) * (0.5 + rng.next() * 0.5) * clamp(r / 4000, 0, 1);
-  return { color: c, dust, bulge, arm };
-}
-
 export class Sky {
   constructor(renderer, galaxy, shared, quality) {
     this.renderer = renderer;
@@ -303,7 +321,7 @@ export class Sky {
     this.face = -1;
     this.counts = {
       faint: quality === 'high' ? 170000 : quality === 'low' ? 60000 : 120000,
-      haze: quality === 'high' ? 46000 : quality === 'low' ? 16000 : 32000,
+      haze: quality === 'high' ? 90000 : quality === 'low' ? 30000 : 60000,
     };
     this.layers = {};
     this.builtMerged = -1;
@@ -354,43 +372,18 @@ export class Sky {
   buildGlow() {
     const g = this.galaxy;
     const rng = new RNG(hash32(g.seed, 502));
-    const n = this.counts.haze;
-    const P = new Float32Array(n * 3), C = new Float32Array(n * 3), S = new Float32Array(n), B = new Float32Array(n);
-    const dP = [], dC = [], dS = [], dB = [];
-    for (let i = 0; i < n; i++) {
-      const p = g.samplePoint(rng);
-      P.set(p, i * 3);
-      const hc = glowColor(p[0], p[2], rng);
-      const dim = 1 - hc.dust * 0.7;
-      C[i * 3] = hc.color[0] * dim; C[i * 3 + 1] = hc.color[1] * dim * (1 - hc.dust * 0.1); C[i * 3 + 2] = hc.color[2] * dim * (1 - hc.dust * 0.3);
-      S[i] = rng.range(260, 700) * (1 + hc.bulge * 1.8);
-      B[i] = 0.05 * (0.55 + hc.bulge * 1.6 + hc.arm * 0.3) * rng.range(0.6, 1.2);
-      if (hc.dust > 0.2 && rng.chance(0.4)) {
-        dP.push(p[0] + rng.normal() * 120, p[1] * 0.35, p[2] + rng.normal() * 120);
-        dC.push(0.018, 0.011, 0.007);
-        dS.push(rng.range(380, 900));
-        dB.push(0.22 * hc.dust);
-      }
+    if (!this.glowMesh) {
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG,
+        uniforms: { uCam: this.uCam, uMerged: { value: 0 }, uK: { value: 4.5e-6 }, uDustK: { value: 4.5e-4 }, uFade: this.uFade, uSeed: { value: (g.seed % 997) * 0.37 } },
+        side: THREE.BackSide, depthWrite: false, depthTest: false, transparent: true, blending: THREE.AdditiveBlending,
+      });
+      this.glowMesh = new THREE.Mesh(new THREE.SphereGeometry(900, 96, 48), mat);
+      this.glowMesh.frustumCulled = false;
+      this.glowMesh.renderOrder = 1;
+      this.cubeScene.add(this.glowMesh);
     }
-    // the merger leaves a big round glow of stars (an elliptical galaxy)
-    const nm = Math.round(n * 0.25 * g.merged);
-    const mP = [], mC = [], mS = [], mB = [];
-    for (let i = 0; i < nm; i++) {
-      const v = rng.unitVector();
-      const r = 9000 * Math.pow(rng.next(), 1.6) * 2.5;
-      mP.push(v.x * r, v.y * r * 0.7, v.z * r);
-      mC.push(1.0, 0.82, 0.62);
-      mS.push(rng.range(500, 1400));
-      mB.push(0.045 * g.merged);
-    }
-    const u = () => ({ uCam: this.uCam, uFocal: { value: this.focalCube }, uFadeNear: { value: 45 }, uFadeFar: { value: 110 } });
-    this.replace('haze', this.points(P, { color: [C, 3], wsize: [S, 1], bright: [B, 1] }, HAZE_VERT, HAZE_FRAG, u(), THREE.AdditiveBlending, 1));
-    if (nm) {
-      this.replace('ellip', this.points(new Float32Array(mP), { color: [new Float32Array(mC), 3], wsize: [new Float32Array(mS), 1], bright: [new Float32Array(mB), 1] }, HAZE_VERT, HAZE_FRAG, u(), THREE.AdditiveBlending, 1));
-    } else this.replace('ellip', null);
-    if (dP.length) {
-      this.replace('dust', this.points(new Float32Array(dP), { color: [new Float32Array(dC), 3], wsize: [new Float32Array(dS), 1], bright: [new Float32Array(dB), 1] }, HAZE_VERT, DUST_FRAG, u(), THREE.NormalBlending, 2));
-    }
+    this.glowMesh.material.uniforms.uMerged.value = g.merged;
     this.buildFaint(rng);
     this.builtMerged = g.merged;
   }
@@ -409,7 +402,7 @@ export class Sky {
       L[i] = u < 0.55 ? rng.logRange(20, 600) : u < 0.88 ? rng.logRange(2, 60) : rng.logRange(50, 8000);
     }
     this.replace('faint', this.points(P, { color: [C, 3], lum: [L, 1] }, STAR_VERT, STAR_FRAG,
-      { uCam: this.uCam, uFluxK: { value: 1.3e4 }, uNearR: { value: BRIGHT_MAX }, uFarR: { value: 1e7 } }, THREE.AdditiveBlending, 3));
+      { uCam: this.uCam, uFluxK: { value: 700 }, uNearR: { value: BRIGHT_MAX }, uFarR: { value: 1e7 } }, THREE.AdditiveBlending, 3));
   }
 
   // bright stars between the live near stars and the glow, drawn statistically
@@ -419,7 +412,7 @@ export class Sky {
     const nr = Math.ceil(BRIGHT_MAX / SC);
     const bi = Math.floor(camLy[0] / SC), bj = Math.floor(camLy[1] / SC), bk = Math.floor(camLy[2] / SC);
     const P = [], C = [], L = [];
-    const cap = this.quality === 'low' ? 25000 : 60000;
+    const cap = this.quality === 'low' ? 15000 : 32000;
     const ny = Math.min(nr, 6);
     for (let a = -nr; a <= nr; a++) for (let b = -ny; b <= ny; b++) for (let c = -nr; c <= nr; c++) {
       const cx = (bi + a + 0.5) * SC, cy = (bj + b + 0.5) * SC, cz = (bk + c + 0.5) * SC;
@@ -434,7 +427,7 @@ export class Sky {
       if (lam < 0.02) continue;
       const rng = new RNG(hash32(hash32(g.seed, 7001 + bi + a), bj + b, bk + c));
       let k = lam < 30 ? poisson(rng, lam) : Math.round(lam + Math.sqrt(lam) * rng.normal());
-      k = Math.min(k, 400);
+      k = Math.min(k, 160);
       const c0 = imfCDF(mMin);
       for (let q = 0; q < k; q++) {
         const m = imfInverse(c0 + rng.next() * (1 - c0));
@@ -444,12 +437,13 @@ export class Sky {
         const x = cx + rng.range(-0.5, 0.5) * SC, y = cy + rng.range(-0.5, 0.5) * SC, z = cz + rng.range(-0.5, 0.5) * SC;
         P.push(x, y, z);
         C.push(...blackbody(st.temp));
-        L.push(st.lum);
+        // the brightest giants are rare and short-lived: soften them so the sky isn't overcrowded
+        L.push(Math.min(st.lum, 60 + Math.pow(st.lum, 0.55)));
       }
       if (L.length > cap) break;
     }
     this.replace('bright', this.points(new Float32Array(P), { color: [new Float32Array(C), 3], lum: [new Float32Array(L), 1] }, STAR_VERT, STAR_FRAG,
-      { uCam: this.uCam, uFluxK: { value: 1.5e4 }, uNearR: this.uNearR, uFarR: { value: BRIGHT_MAX } }, THREE.AdditiveBlending, 3));
+      { uCam: this.uCam, uFluxK: { value: 320 }, uNearR: this.uNearR, uFarR: { value: BRIGHT_MAX } }, THREE.AdditiveBlending, 3));
     this.brightAt = [...camLy];
     this.brightMerged = g.merged;
   }
@@ -708,6 +702,7 @@ export class Sky {
 
   dispose() {
     for (const k of Object.keys(this.layers)) this.replace(k, null);
+    if (this.glowMesh) { this.glowMesh.geometry.dispose(); this.glowMesh.material.dispose(); }
     for (const t of this.targets) t.dispose();
     this.nearPoints.geometry.dispose();
     this.nearMat.dispose();

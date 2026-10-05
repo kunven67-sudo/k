@@ -379,7 +379,7 @@ export class Renderer {
     // exposure: adapt to the light falling on you
     const p = world.player;
     const pl = this.lightsFor(world, p.x, p.y, p.z, p);
-    let target = clamp((1.0 / Math.sqrt(Math.max(pl.f0 + pl.f1, 1e-6))) * 0.9, 0.012, 260);
+    let target = clamp((1.0 / Math.sqrt(Math.max(pl.f0 + pl.f1, 1e-6))) * 0.9, 0.012, 40);
     if (p.isStar) target = Math.min(0.55, target * 3);
     // down on the night side your eyes adjust to the dark
     let dayK = 1;
@@ -397,7 +397,7 @@ export class Renderer {
     this.exposure += (target - this.exposure) * Math.min(1, dtReal * rate);
     this.shared.uExposure.value = this.exposure * (ph ? Math.pow(2, ph.ev) : 1);
     // the sky is compressed like a camera with good dynamic range
-    this.scene.backgroundIntensity = clamp(Math.pow(this.exposure, 0.55) * 0.7, 0.04, 12);
+    this.scene.backgroundIntensity = clamp(Math.pow(this.exposure, 0.55) * 0.7, 0.04, 2.6);
     // a daytime sky hides the stars
     let skyDim = 1;
     if (cam.ground && world.planet && !world.planet.giant) skyDim = 1 - 0.97 * dayK * clamp(Math.log10(1 + (world.planet.P || 0) * 30) / 1.5, 0, 1);
@@ -775,7 +775,7 @@ export class Renderer {
       gu.uHalo.value = clamp(1 - px / 25, 0, 1);
       gu.uSize.value = sizeU;
       gu.uCore.value = rU / sizeU;
-      gu.uIntensity.value = isPlayer ? 0.9 / Math.max(this.exposure, 1e-4) : Math.min(clamp(Math.pow(flux, 0.5), 0.05, 400), 3 / Math.max(this.exposure, 1e-4));
+      gu.uIntensity.value = isPlayer ? 0.9 / Math.max(this.exposure, 1e-4) : Math.min(clamp(Math.pow(flux, 0.5), 0.05, 400), 3 / Math.max(this.exposure, 1e-4)) * clamp(30 / Math.max(px, 1), 0.12, 1);
       gu.uSpikes.value = isPlayer ? 0 : clamp(0.6 - px / 300, 0, 0.6);
       if (cut) gu.uIntensity.value *= 0.15;
       gu.uCorona.value = isPlayer ? 0.35 : 0.25;

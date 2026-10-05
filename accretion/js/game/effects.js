@@ -240,7 +240,7 @@ export class FXSpawner {
       fx.spawn({
         x: p.x + dx * R * 1.02, y: p.y + dy * R * 1.02, z: p.z + dz * R * 1.02,
         vx: p.vx + dx * sp, vy: p.vy + dy * sp, vz: p.vz + dz * sp,
-        life: 2 + Math.random() * 3, size: R * 0.04, grow: 3, r: 1.8, g: 1.1, b: 0.6, a: 0.8, glow: true, drag: 0.1,
+        life: 2 + Math.random() * 3, size: R * 0.02, grow: 2, r: 1.5, g: 0.9, b: 0.5, a: 0.6, glow: true, drag: 0.1,
       });
     }
   }

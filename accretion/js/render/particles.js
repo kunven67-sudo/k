@@ -24,6 +24,7 @@ uniform float uCompress;
 uniform float uKind;     // 0 dust disk, 1 rocky belt, 2 icy belt
 uniform vec3 uStarCol;
 uniform vec2 uGap;       // a gap cleared by your own gravity: radius, half-width (km)
+uniform float uDim;      // fewer grains are noticed when you're huge
 varying vec3 vCol;
 varying float vA;
 void main() {
@@ -45,13 +46,15 @@ void main() {
   float hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cosS, 1.5);
   float sizeKm = aSz * (uKind < 0.5 ? aA * 0.05 : aA * 0.012);
   float px = sizeKm / distKm * uFocal;
-  float fade = (1.0 - smoothstep(60.0, 260.0, px));
+  // very close grains would be screen-sized blurs: fade them out (dust much sooner than rocks)
+  float fade = uKind < 0.5 ? (1.0 - smoothstep(22.0, 80.0, px)) : (1.0 - smoothstep(60.0, 260.0, px));
   vec3 base = uKind < 0.5 ? mix(vec3(0.95, 0.62, 0.38), vec3(1.0, 0.85, 0.7), aV) : uKind < 1.5 ? mix(vec3(0.55, 0.5, 0.46), vec3(0.75, 0.68, 0.6), aV) : mix(vec3(0.7, 0.8, 0.9), vec3(0.9, 0.95, 1.0), aV);
   // near the star the dust is hot enough to glow
   float hot = (1.0 - smoothstep(0.04, 0.25, aReal)) * (uKind < 0.5 ? 1.0 : 0.0);
   vCol = base * uStarCol * (uKind < 0.5 ? 0.035 : 0.25) * min(light, 20.0) * min(hg, 5.0) + vec3(1.0, 0.4, 0.15) * hot * 0.4;
   vA = fade * (uKind < 0.5 ? 0.6 : 0.9);
   if (uGap.y > 0.0 && uKind < 0.5) vA *= mix(0.05, 1.0, smoothstep(uGap.y * 0.55, uGap.y, abs(aA - uGap.x)));
+  vA *= uDim;
   gl_PointSize = clamp(px, uKind < 0.5 ? 1.0 : 1.0, 260.0);
   gl_Position = projectionMatrix * mv;
   ${LOGDEPTH_VERT}
@@ -132,6 +135,7 @@ export class DiskCloud {
         uKind: { value: kind },
         uStarCol: { value: new THREE.Color(1, 1, 1) },
         uGap: { value: new THREE.Vector2(0, 0) },
+        uDim: { value: 1 },
         uExposure: shared.uExposure,
       },
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -152,6 +156,8 @@ export class DiskCloud {
       u.uTime.value = simTime % 3.0e7;
       if (starColor) u.uStarCol.value.setRGB(starColor[0], starColor[1], starColor[2]);
       if (gap) u.uGap.value.set(gap.r, gap.w); else u.uGap.value.set(0, 0);
+      // seen from a star's size, the disk is a faint glow rather than a blizzard of grains
+      u.uDim.value = Math.min(1, Math.max(0.12, Math.sqrt(6e4 / Math.max(S, 1))));
       const star = this.entry.star;
       if (star && star.alive) u.uGM.value = G * star.mass;
     }
