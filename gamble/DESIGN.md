@@ -1067,6 +1067,9 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Rental cars** (Enterprise, Hertz) at destination airports: under-25 fees, damage/fuel/cleaning
   charges.
 
+- **Middle finger emote** on foot (and in cars): NPC reactions depend on the person (laugh,
+  ignore, confront).
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
