@@ -1059,6 +1059,14 @@ have a Ring cam; a witness only matters if someone actually saw it).
   Extraterrestrial Highway detour (NV-375 near Area 51 with the alien-themed diner/inn — ties to
   the UFO easter egg), big truck stops (gas, jerky, showers, slot machines).
 
+- **Owner's dream cars (extra detail)**: Ferrari, Lamborghini, Tesla Cybertruck, lifted pickup
+  (F-150 / RAM / Silverado).
+- **Full traffic stops**: pull over, lights behind you, window down, hands on the wheel, talk by
+  voice/typing, hand over license/registration/insurance; outcome depends on your attitude, the
+  cop's personality and what's in the car.
+- **Rental cars** (Enterprise, Hertz) at destination airports: under-25 fees, damage/fuel/cleaning
+  charges.
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
