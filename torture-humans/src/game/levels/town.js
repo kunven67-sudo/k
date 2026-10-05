@@ -401,10 +401,127 @@ export async function buildTown({ statics, props, scene }) {
   const barrier = pbr('concrete_pavement', { size: 1, color: 0xd8d2c6 });
   for (const bx of [TOWN.x0 + 0.6, TOWN.x1 - 0.6]) mesh(box(0.6, 1.0, ROAD.z1 - ROAD.z0), barrier, bx, ROAD.y + 0.5, zc, town);
 
+  // ---- the park behind the houses: paths, a pond, a fountain, benches, flower beds
+  const P = { x: 0, z: -18 };
+  const pathMat = pbr('grey_stone_path', { size: 1.5 });
+  ground(town, pathMat, -14, 14, P.z - 0.9, P.z + 0.9, GROUND_Y + 0.008);       // east-west path
+  ground(town, pathMat, P.x - 0.9, P.x + 0.9, -25, -9, GROUND_Y + 0.009);       // the path in from the houses
+  const stone = pbr('rocks_ground_02', { size: 0.8, color: 0xb9b2a6 });
+  // pond (west): water in a ring of stones
+  const pond = { x: -8, z: -18.5, r: 3.2 };
+  const water = new THREE.MeshPhysicalMaterial({ color: 0x2f4a42, roughness: 0.05, metalness: 0, transmission: 0, clearcoat: 1, transparent: true, opacity: 0.88 });
+  const wmesh = mesh(new THREE.CircleGeometry(pond.r, 40).rotateX(-Math.PI / 2), water, pond.x, GROUND_Y + 0.02, pond.z, town, { shadow: false });
+  wmesh.userData.noCollide = true;
+  for (let i = 0; i < 28; i++) {
+    const a = (i / 28) * Math.PI * 2;
+    const r = mesh(new THREE.IcosahedronGeometry(0.28 + (i % 3) * 0.06, 1), stone, pond.x + Math.cos(a) * (pond.r + 0.15), GROUND_Y + 0.08, pond.z + Math.sin(a) * (pond.r + 0.15), town);
+    r.scale.set(1.2, 0.55, 1);
+    r.rotation.y = a * 3;
+  }
+  for (const [lx, lz] of [[-9, -19.5], [-7.2, -17.6], [-8.6, -17.2]]) {
+    const pad = mesh(new THREE.CircleGeometry(0.35, 12, 0.3, Math.PI * 1.85).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3f7a2c, roughness: 0.6 }), lx, GROUND_Y + 0.025, lz, town, { shadow: false });
+    pad.userData.noCollide = true;
+  }
+  // fountain (east): a round stone basin with a column in the middle
+  const F = { x: 7, z: -18 };
+  const basinMat = pbr('concrete_pavement', { size: 1, color: 0xd6d0c4 });
+  const ring = new THREE.LatheGeometry([new THREE.Vector2(2.1, 0), new THREE.Vector2(2.2, 0.05), new THREE.Vector2(2.2, 0.5), new THREE.Vector2(1.95, 0.55), new THREE.Vector2(1.9, 0.1), new THREE.Vector2(0.01, 0.1)], 48);
+  mesh(ring, basinMat, F.x, GROUND_Y, F.z, town);
+  const fw = mesh(new THREE.CircleGeometry(1.9, 40).rotateX(-Math.PI / 2), water, F.x, GROUND_Y + 0.42, F.z, town, { shadow: false });
+  fw.userData.noCollide = true;
+  mesh(new THREE.CylinderGeometry(0.18, 0.28, 1.4, 16), basinMat, F.x, GROUND_Y + 0.7, F.z, town);
+  mesh(new THREE.LatheGeometry([new THREE.Vector2(0.01, 0), new THREE.Vector2(0.75, 0.05), new THREE.Vector2(0.8, 0.22), new THREE.Vector2(0.7, 0.2), new THREE.Vector2(0.01, 0.12)], 32), basinMat, F.x, GROUND_Y + 1.4, F.z, town);
+  // flower beds along the path
+  const soil = new THREE.MeshStandardMaterial({ color: 0x3b2a1c, roughness: 1 });
+  for (const fx of [-12, -3, 3, 12]) {
+    for (const fz of [P.z - 1.8, P.z + 1.8]) {
+      const bed = mesh(box(2.2, 0.08, 0.8), soil, fx, GROUND_Y + 0.03, fz, town, { shadow: false });
+      bed.userData.noCollide = true;
+      for (let k = 0; k < 6; k++) {
+        const col = [0xd23b3b, 0xf2c94c, 0xf4f0ea, 0x9b59d0][(k + fx) & 3];
+        const fl = mesh(new THREE.SphereGeometry(0.05, 6, 4), new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 }), fx - 0.9 + k * 0.36, GROUND_Y + 0.3, fz + ((k % 2) - 0.5) * 0.3, town, { shadow: false });
+        fl.userData.noCollide = true;
+        const st = mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.25, 4), new THREE.MeshStandardMaterial({ color: 0x3f7a2c }), fl.position.x, GROUND_Y + 0.16, fl.position.z, town, { shadow: false });
+        st.userData.noCollide = true;
+      }
+    }
+  }
+  for (const [bx, bz, ry] of [[-4, P.z - 1.4, 0], [4, P.z - 1.4, 0], [-4, P.z + 1.4, Math.PI], [4, P.z + 1.4, Math.PI], [10.5, -20.5, Math.PI / 2]]) {
+    await place(props, 'modular_street_seating', { x: bx, y: GROUND_Y, z: bz, rotY: ry, height: 0.9 });
+  }
+  await place(props, 'street_lamp_02', { x: 1.6, y: GROUND_Y, z: P.z - 1.2, height: 4 }).catch(() => null);
+  await place(props, 'street_lamp_02', { x: -12, y: GROUND_Y, z: P.z + 1.2, height: 4 }).catch(() => null);
+  for (const [tx, tz] of [[-13, -22], [13, -23], [-2, -23.5], [-13, -13.5], [12.5, -13.5]]) await place(props, 'fir_sapling', { x: tx, y: GROUND_Y, z: tz, height: 3.5 + Math.abs(tx % 2) }).catch(() => null);
+  spots.push(
+    { p: new THREE.Vector3(-4, GROUND_Y + 0.02, P.z - 0.6), face: new THREE.Vector3(0, 0, -1), act: 'look', name: 'park' },
+    { p: new THREE.Vector3(4, GROUND_Y + 0.02, P.z + 0.6), face: new THREE.Vector3(0, 0, 1), act: 'look', name: 'park' },
+    { p: new THREE.Vector3(pond.x + pond.r + 0.8, GROUND_Y + 0.02, pond.z), face: new THREE.Vector3(-1, 0, 0), act: 'look', name: 'pond' },
+    { p: new THREE.Vector3(F.x - 2.8, GROUND_Y + 0.02, F.z), face: new THREE.Vector3(1, 0, 0), act: 'phone', name: 'fountain' },
+  );
+  // fountain spray (animated, not merged)
+  const N = 260;
+  const spray = new Float32Array(N * 3);
+  const sprayGeo = new THREE.BufferGeometry();
+  sprayGeo.setAttribute('position', new THREE.BufferAttribute(spray, 3));
+  const sprayPts = new THREE.Points(sprayGeo, new THREE.PointsMaterial({ color: 0xdfeef5, size: 0.05, transparent: true, opacity: 0.75, depthWrite: false }));
+  sprayPts.userData.noCollide = true;
+  sprayPts.frustumCulled = false;
+  scene.add(sprayPts);
+  const life = Float32Array.from({ length: N }, () => Math.random());
+  const dirs = Array.from({ length: N }, () => { const a = Math.random() * Math.PI * 2, r = 0.55 + Math.random() * 0.4; return [Math.cos(a) * r, Math.sin(a) * r]; });
+  const tick = (dt) => {
+    for (let i = 0; i < N; i++) {
+      life[i] = (life[i] + dt * 0.9) % 1;
+      const t = life[i] * 1.05; // seconds in the air
+      const [dx, dz] = dirs[i];
+      spray[i * 3] = F.x + dx * t;
+      spray[i * 3 + 1] = GROUND_Y + 1.6 + 2.2 * t - 4.9 * t * t;
+      spray[i * 3 + 2] = F.z + dz * t;
+    }
+    sprayGeo.attributes.position.needsUpdate = true;
+  };
+
+  // ---- along the street: power poles and wires, mailboxes, a crosswalk with signs
+  const poleXs = [-42, -28, -14, 0, 14, 28, 42];
+  const tops = [];
+  for (const x of poleXs) {
+    const pole = mesh(new THREE.CylinderGeometry(0.11, 0.15, 9, 10), pbr('bark_brown_02', { size: 1, color: 0x7a6650 }), x + 3, GROUND_Y + 4.5, 7.6, town);
+    pole.name = 'power-pole';
+    mesh(box(0.12, 0.12, 2.0), pbr('fine_grained_wood', { size: 1, color: 0x6a5845 }), x + 3, GROUND_Y + 8.4, 7.6, town);
+    tops.push(new THREE.Vector3(x + 3, GROUND_Y + 8.45, 7.6));
+  }
+  const wireMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 });
+  for (let i = 0; i < tops.length - 1; i++) {
+    for (const dz of [-0.85, 0, 0.85]) {
+      const a = tops[i].clone().setZ(7.6 + dz), b = tops[i + 1].clone().setZ(7.6 + dz);
+      const mid = a.clone().lerp(b, 0.5); mid.y -= 0.55; // they sag
+      const w = mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, mid, b), 20, 0.012, 4), wireMat, 0, 0, 0, town, { shadow: false });
+      w.userData.noCollide = true;
+    }
+  }
+  const mailMat = new THREE.MeshStandardMaterial({ color: 0x2c4f8a, roughness: 0.5, metalness: 0.3 });
+  for (const x of north) {
+    mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.05, 8), pbr('fine_grained_wood', { size: 1, color: 0x6b5a48 }), x + 2.2, GROUND_Y + 0.52, 6.6, town);
+    const mb = mesh(box(0.22, 0.24, 0.48), mailMat, x + 2.2, GROUND_Y + 1.15, 6.6, town);
+    mb.name = 'mailbox';
+  }
+  // zebra crossing in front of your house, with signs on both sides
+  const white = new THREE.MeshStandardMaterial({ color: 0xeeeeea, roughness: 0.7 });
+  for (let k = 0; k < 7; k++) {
+    const st = mesh(plane(0.5, ROAD.z1 - ROAD.z0 - 0.8), white, 1 + k * 0.9, ROAD.y + 0.005, (ROAD.z0 + ROAD.z1) / 2, town, { shadow: false });
+    st.userData.noCollide = true;
+  }
+  const signFace = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#1e5bb8'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(64, 14); g.lineTo(118, 112); g.lineTo(10, 112); g.closePath(); g.fill(); g.fillStyle = '#111'; g.fillRect(56, 50, 16, 40); g.beginPath(); g.arc(64, 42, 8, 0, 7); g.fill(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  for (const [sx, sz, ry] of [[0.4, 8.4, 0], [6.8, 16.6, Math.PI]]) {
+    mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.6, 8), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.8, roughness: 0.4 }), sx, GROUND_Y + 1.3, sz, town);
+    const sign = mesh(box(0.6, 0.6, 0.03), [white, white, white, white, new THREE.MeshStandardMaterial({ map: signFace }), white], sx, GROUND_Y + 2.45, sz, town);
+    sign.rotation.y = ry;
+  }
+
   mergeByMaterial(town);
   // outdoor surfaces that get wet in the rain
   const outdoor = [...matCache.values()];
-  return { town, spots, lamps, litWindows: windows.litMat, outdoor };
+  return { town, spots, lamps, litWindows: windows.litMat, outdoor, tick };
 }
 
 // Is a point inside the basement lab (no sky there)?

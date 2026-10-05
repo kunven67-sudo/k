@@ -291,7 +291,7 @@ export async function buildLab({ scene, physics, settings }) {
   const house = await buildLivingRoom({ statics, props, scene });
   const village = buildVillage(statics, scene);
   const houseObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o));
-  const { spots: townSpots, lamps, litWindows, outdoor } = await buildTown({ statics, props, scene });
+  const { spots: townSpots, lamps, litWindows, outdoor, tick: townTick } = await buildTown({ statics, props, scene });
   const townObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o) && !houseObjs.includes(o));
 
   scene.add(statics, props);
@@ -332,6 +332,6 @@ export async function buildLab({ scene, physics, settings }) {
     tiny,
     monitors,
     jars,
-    update() { tiny.world.userData.tick?.(); },
+    update(dt = 1 / 60) { tiny.world.userData.tick?.(); townTick?.(dt); },
   };
 }
