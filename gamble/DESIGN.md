@@ -807,3 +807,7 @@ manual everything and broken gauges).
 - **Sign-in**: Google or email/password, or **guest** play (device-only) with account linking
   later.
 - **Friends list**: add by username, see who's online, one-tap join (room codes still work).
+- **Public lobbies** with strangers are allowed (lobby list via the cloud backend) — with report,
+  block and mute buttons, and host kick.
+- **Leaderboards**: global (all players) + friends tab.
+- **Profile picture**: DMV ID photo by default, changeable to any in-game photo.
