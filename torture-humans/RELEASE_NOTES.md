@@ -1,33 +1,27 @@
-## Torture Humans 0.5.0 (early test version)
+## Torture Humans 0.6.0 (early test version)
 
-Not the finished game yet: this is what's built so far. New since 0.4.0 (ideas from SHRINKBOX and Shrink Resizer):
+Not the finished game yet: this is what's built so far. New since 0.5.0:
 
-### Size watch
-- Hold Z to shrink and X to grow, from 1.8 mm (a flea) up to a 36 m giant (only where there's room)
-- Walking, jumping, falling speed and fall damage all follow your size; a meter shows how tall you are and what things look like to you
-- The germ world: under 2 cm, the floor is full of dust mites, hairs, fibers, skin flakes and pollen
+### Being tiny is real now (always on)
+- A crumb is a meal and a droplet is a drink (crumbs on the kitchen floor, dew on the grass in the morning). Small bodies get hungry and thirsty faster
+- Dangers: the terrarium spider hunts you, ants bite, your pet rat thinks you're food, the gecko's tongue, and big people can't see you, so watch their feet. Mom vacuums twice a day 😱
+- Wind pushes you around outside, raindrops hit like buckets, and water's surface traps you. Below ~2 cm you can creep up walls
+- Tiny bodies get cold fast. Your voice is too quiet for big people to hear, and their voices rumble
+- Tiny eyes are blurry, breathing gets hard, the world looks slow-motion, and light goes rainbow at germ size
+- Below ~2 cm your body slowly gives out: grow back in time!
 
-### People
-- 4: your hand. Pick up anyone a fifth of your size or smaller (tiny people, or normal people when you're a giant), put them down, or hold right-click to throw them
-- Speech bubbles with lines that fit each person's personality; T / Enter to talk to whoever you look at
-- People scream and run from giants; giant feet squish normal people
-- Witnesses call the police: wanted stars, officers chase you, BUSTED sends you home
-- Townspeople have real names and jobs
+### Settings (F10)
+- Graphics, volume, difficulty (Creative = can't get hurt), gore, mouse
+- Just for fun (not realistic, off by default): super jump, talking bugs, a second tiny village in the park, riding your pet rat, labels on tiny things
 
-### Home
-- The rest of the house: living room and kitchen
-- Mom and Dad: daily routine, chores for money, allowance on Sundays, and they take your size watch if they catch you
-- Shrink ray right click: grow beam (back to normal size)
-- The wall village: a mouse hole under your bed leads to tiny people living in matchbox houses inside the wall
-- Pets: a pet rat and a leopard gecko from the pet shop
+### Town life
+- Townspeople have days: home, work (the chef at the diner, the cop at the station...), evenings out, and home at night
+- Odd jobs for money: deliver parcels, work shifts at the Grocery, find lost rings in lawns (shrink to search!)
+- Sleep in your bed (E)
+- The park: pond, fountain, flower beds, benches. Power poles, mailboxes and a crosswalk
 
-### Town
-- Shops: buy food, drinks, medicine and more; or steal (careful); rob the bank; turn yourself in
-- Backpack (Tab), phone (P: messages, map, weather, bank, wanted)
+### Fixes
+- Tiny you could fall through the ground when teleported or when someone walked over you
+- Game crash when eating before the sound had started
 
-### Also
-- Sound: footsteps by size, voices, gadgets, birds, crickets, rain
-- Saving: F5, automatic every 2 minutes and on exit; F9 loads
-- Fixes: floating 1 cm above the floor when very small; the beetle shader crash
-
-Everything from 0.4.0 is still here. F2 graphics, F3 FPS, H for all the controls.
+Everything from 0.5.0 is still here. H shows all the controls.
