@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { pbr, box, plane, place } from '../engine/assets.js';
 
 export const BEDROOM = { x0: 2.5, x1: 7.0, z0: -5.0, z1: 0.0, floorY: 3.3, h: 2.6 };
+// the hollow at the bottom of the north wall (behind the bed) where tiny people live
+export const VILLAGE = { x0: 2.6, x1: 4.3, h: 0.35, hole: 4.1, z0: -5.138, z1: -5.012 };
 
 function mesh(geo, mat, x, y, z, parent) {
   const m = new THREE.Mesh(geo, mat);
@@ -59,7 +61,22 @@ export async function buildBedroom({ statics, props, scene, hatch }) {
 
   // walls: window on the east wall, door opening on the south wall
   const wallMat = pbr('painted_plaster_wall', { size: 2, color: 0xd9cfbf });
-  wallWithOpening(room, wallMat, { axis: 'x', at: z0 - 0.075, from: x0 - 0.15, to: x1 + 0.15, y0: fy, h });
+  // north wall: hollow at the bottom behind the bed, where the wall village is (village.js)
+  const V = VILLAGE;
+  wallWithOpening(room, wallMat, { axis: 'x', at: z0 - 0.075, from: x0 - 0.15, to: V.x0, y0: fy, h });
+  wallWithOpening(room, wallMat, { axis: 'x', at: z0 - 0.075, from: V.x1, to: x1 + 0.15, y0: fy, h });
+  wallWithOpening(room, wallMat, { axis: 'x', at: z0 - 0.075, from: V.x0, to: V.x1, y0: fy + V.h, h: h - V.h });
+  // the inner skin (plaster, 1.2 cm) with the mouse hole in the baseboard, and the back of the cavity
+  wallWithOpening(room, wallMat, { axis: 'x', at: z0 - 0.006, from: V.x0, to: V.x1, y0: fy, h: V.h, t: 0.012, open: { a0: V.hole - 0.02, a1: V.hole + 0.02, b0: 0, b1: 0.045 } });
+  wallWithOpening(room, pbr('fine_grained_wood', { size: 0.5, color: 0x8a6a48 }), { axis: 'x', at: z0 - 0.144, from: V.x0, to: V.x1, y0: fy, h: V.h, t: 0.012 });
+  // cavity floor (the sill plate) and ceiling (a beam)
+  const plate = pbr('fine_grained_wood', { size: 0.4, color: 0xb08a5e });
+  mesh(box(V.x1 - V.x0, 0.01, 0.15), plate, (V.x0 + V.x1) / 2, fy - 0.004, z0 - 0.075, room);
+  mesh(box(V.x1 - V.x0, 0.02, 0.15), plate, (V.x0 + V.x1) / 2, fy + V.h + 0.01, z0 - 0.075, room);
+  // baseboard along the wall, arched hole and all
+  const base = pbr('fine_grained_wood', { size: 1, color: 0xf1ece2 });
+  for (const [a, b] of [[x0, V.hole - 0.02], [V.hole + 0.02, x1]]) mesh(box(b - a, 0.08, 0.015), base, (a + b) / 2, fy + 0.04, z0 + 0.0075, room);
+  mesh(box(0.04, 0.035, 0.015), base, V.hole, fy + 0.0625, z0 + 0.0075, room);
   wallWithOpening(room, wallMat, { axis: 'x', at: z1 + 0.075, from: x0 - 0.15, to: x1 + 0.15, y0: fy, h, open: { a0: 3.0, a1: 3.9, b0: 0, b1: 2.05 } });
   // west wall: doorway to the living room (z -1.6..-0.7)
   wallWithOpening(room, wallMat, { axis: 'z', at: x0 - 0.075, from: z0, to: z1, y0: fy, h, open: { a0: -1.6, a1: -0.7, b0: 0, b1: 2.05 } });

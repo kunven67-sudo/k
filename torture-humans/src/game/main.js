@@ -15,6 +15,7 @@ import { Family } from './family.js';
 import { Interactables } from './world/interact.js';
 import { Shops } from './shops.js';
 import { Germs } from './germs.js';
+import { Village } from './village.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
@@ -33,6 +34,7 @@ import { buildLab } from './levels/lab.js';
 
 const params = new URLSearchParams(location.search);
 let game_applyZone = null;
+const pick = (a) => a[(Math.random() * a.length) | 0];
 
 // Desktop build: the game files come as a separate pack, downloaded once.
 async function ensureAssets() {
@@ -302,9 +304,29 @@ export async function boot() {
   let last = performance.now();
   // the shops across the street (and your backpack)
   const shops = new Shops({ spots: level.town?.spots, interact, input, player, family, vitals, police, speech, humans, toast, canvas: input.target });
+  // the wall village: tiny people living behind the mouse hole under your bed
+  let village = null;
+  if (level.village && params.get('village') !== '0') {
+    village = new Village({ layout: level.village, player, camera, speech });
+    const order = [...TOWN_LOOKS].sort(() => Math.random() - 0.5);
+    let made = 0;
+    for (const look of order) {
+      if (made >= 5) break;
+      const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => null);
+      if (!tpl) continue;
+      const gender = isFemale(look) ? 'f' : 'm';
+      await lib.require(baseClips(gender));
+      const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: level.village.houses[made % 3], settings, profile: { look, name: nameFor(look), job: pick(['matchbox builder', 'crumb farmer', 'thread spinner', 'water carrier', 'mayor of Wallton']) } });
+      h.speech = speech;
+      h.player = player;
+      humans.push(h);
+      village.add(h);
+      made++;
+    }
+  }
   // the germ world: what's on the floor when you're smaller than 2 cm
   const germs = new Germs({ scene, player, physics });
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, frame: 0 };
   hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
 

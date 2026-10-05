@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { pbr, box, plane, place, loadIndex } from '../engine/assets.js';
 import { buildBedroom, BEDROOM } from './bedroom.js';
 import { buildLivingRoom, inHouse } from './house.js';
+import { buildVillage } from '../village.js';
 import { buildTinyWorld } from '../cageworld.js';
 import { buildTown, inLab } from './town.js';
 
@@ -288,6 +289,7 @@ export async function buildLab({ scene, physics, settings }) {
   const labObjs = [...statics.children, ...props.children];
   await buildBedroom({ statics, props, scene, hatch: HATCH });
   const house = await buildLivingRoom({ statics, props, scene });
+  const village = buildVillage(statics, scene);
   const houseObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o));
   const { spots: townSpots, lamps, litWindows, outdoor } = await buildTown({ statics, props, scene });
   const townObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o) && !houseObjs.includes(o));
@@ -316,6 +318,7 @@ export async function buildLab({ scene, physics, settings }) {
     town: { people: 8, spots: townSpots, area: (p) => p.y > 3.2 && p.y < 3.6 && Math.abs(p.x) < 44 && p.z > 2 && p.z < 19 },
     zones: { lab: labObjs, house: houseObjs, town: townObjs, inHouse },
     house: { spots: house.spots, lamps: house.lamps, inHouse },
+    village,
     fog: { color: 0xc4d0dc, near: 80, far: 260 },
     navRoots: [statics, props],
     probe: new THREE.Vector3(0, 1.6, 0.3),   // reflection snapshot from above the terrarium

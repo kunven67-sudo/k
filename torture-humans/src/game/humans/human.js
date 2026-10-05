@@ -497,6 +497,7 @@ export class Human {
     }
     if (this.state === 'jar') { this.updateJar(dt); return; }
     if (this.state === 'held') { this.updateHeld(dt); return; }
+    if (this.state === 'village' && this.custom) { this.custom(dt); return; } // the wall village runs their day
     if (this.state === 'away') { this.brain?.(dt); return; } // out of the house / asleep (not in the world)
     if (this.state === 'flying') { this.updateFlying(dt); return; }
     if (this.state === 'hurt') {
