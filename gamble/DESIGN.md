@@ -1035,6 +1035,17 @@ have a Ring cam; a witness only matters if someone actually saw it).
   shared coin laundry (wet clothes dumped on the dryer), mailroom & package lockers (theft still
   possible), assigned parking (squatters → notes or tows).
 
+## 51. CARS & DRIVING (owner focus)
+
+- **Classic car restoration**: find rusty 60s muscle cars in barns/Marketplace, restore piece by
+  piece in the garage (hard-to-find parts), value rises; show at Hot August Nights.
+- **Interior accessories**: fuzzy dice on the mirror (physics swing), tree air fresheners (fading),
+  jiggling dashboard bobbleheads, seat covers & floor mats.
+- **Anti-theft**: car alarms (scare thieves or false 3 AM alarms), steering wheel lock, hidden
+  AirTag/GPS tracker to recover stolen cars, dashcams (prove fault, record break-ins).
+- **AAA roadside membership**: tows, jump starts, flat tires, lockouts; without it a desert tow
+  costs a fortune.
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
