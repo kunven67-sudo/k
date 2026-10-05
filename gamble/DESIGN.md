@@ -381,3 +381,30 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
   ("STA LITE MO EL" at night).
 - **Real friendships**: hanging out builds best friends who help move, lend money, cover
   for you — or betray you, steal, drift away, fall out over money.
+
+## 19. Later additions (rounds 47–49)
+
+- **Radio**: songs **with singing** (royalty-free vocal tracks; more repeats) and **ad
+  breaks** for in-game local businesses (used-car lot, injury lawyer, pawn shop, Golden
+  Sierra buffet) that mention current deals.
+- **Marriage money**: joint bank account (partner sees every bet), prenups, divorce court
+  (Nevada splits everything in half, alimony, custody of kids & pets), partner has their
+  own job and income.
+- **Holidays & parties**: decorating (neighbors judge), trick-or-treaters (no candy → house
+  egged), birthday parties (NPC or online guests; nobody showing up hurts), gift giving.
+- **Casino credit**: markers (unpaid = bad check = felony in Nevada), credit-card cash
+  advances at the cage (~5% fee + instant interest), casino ATMs ($8 fee).
+- **Self-exclusion**: ban yourself from casinos (recovery); sneaking back in → removed,
+  winnings confiscated.
+- **Slots pay in TITO tickets** (physical pocket items, cash at kiosks, can be lost/stolen).
+- **Sportsbook**: straight bets, point spreads, parlays, live in-game betting, prop bets.
+- **Time keeps going while the game is closed** (1 real hour = 1.25 game days). Your
+  character **lives on autopilot**: sleeps, eats from the fridge, goes to work, pays rent
+  if they have cash, may even gamble if addicted. On return, the phone is full of
+  notifications about what happened. (Implementation: catch-up simulation on load.)
+- **Therapy**: weekly paid sessions (insurance helps) slowly reduce stress, depression and
+  cravings; type-chat with the therapist.
+- **Influencer fame**: Instagram/TikTok posts, slow follower growth, viral moments, brand
+  deals, haters, drama, getting canceled.
+- **Memberships**: Costco (cheap bulk; needs car & fridge space), Amazon Prime, country
+  club, streaming subscriptions (keep charging if you forget to cancel).
