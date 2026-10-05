@@ -22,6 +22,12 @@ export class Hazards {
     this.fading = { t: 0, msg };
   }
 
+  // fade to black with a message, move you somewhere (full size), fade back in
+  blackout(msg, to, { revive = false, busted = false } = {}) {
+    if (this.fading) return;
+    this.fading = { t: 0, msg, to, revive, busted };
+  }
+
   update(dt) {
     const p = this.player;
     const cage = this.cage;
@@ -51,12 +57,14 @@ export class Hazards {
         box.hidden = false;
         box.style.opacity = String(f.t < 1 ? f.t : f.t < 3 ? 1 : Math.max(0, 4 - f.t));
         box.querySelector('span').textContent = f.msg;
+        box.classList.toggle('busted', !!f.busted);
       }
       if (f.t >= 1 && !f.moved) {
         f.moved = true;
         p.inCage = false;
-        p.setScale(1, this.respawn);
-        this.vitals.revive(60);
+        p.setScale(1, f.to || this.respawn);
+        if (!f.to || f.revive) this.vitals.revive(60);
+        this.onMoved?.(f);
       }
       if (f.t >= 4) { this.fading = null; if (box) box.hidden = true; }
     }

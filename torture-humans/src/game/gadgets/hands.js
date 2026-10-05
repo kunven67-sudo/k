@@ -83,7 +83,10 @@ class ShrinkRay extends Item {
     b.scale.set(0.6 + power, len, 0.6 + power);
     this.model.userData.light.intensity = 25;
     const target = hit?.owner;
-    if (target?.shrink && !target.tiny) target.shrink(TINY, { power });
+    if (target?.shrink && !target.tiny && !target.dead) {
+      target.shrink(TINY, { power });
+      this.ctx.crime?.('shrink', target.position.clone(), target);
+    }
     this.ctx.events?.emit?.('shrink-ray-fired', { hit: !!target });
   }
 
@@ -163,6 +166,7 @@ class Jar extends Item {
         if (d < r * 0.95 && Math.abs(h.position.y - s.target.y) < 0.2 && (!best || d < best.d)) best = { h, d };
       }
       if (best) {
+        if (best.h.state !== 'caged') this.ctx.crime?.('kidnap', best.h.position.clone(), best.h);
         this.inside = best.h;
         best.h.captureInto(this.model, { watcher: this.ctx.camera });
       }
@@ -335,8 +339,11 @@ class Hand extends Item {
     if (!this.held) {
       const h = this.findTarget();
       if (!h) return;
+      const wasFree = h.state !== 'caged';
+      const at = h.character.root.getWorldPosition(new THREE.Vector3());
       h.grabbed();
       this.held = h;
+      if (wasFree) this.ctx.crime?.('grab', at, h);
       this.talkT = 5 + Math.random() * 4;
       speech?.react(h, 'pickedUp', { shout: true });
       return;
@@ -377,9 +384,13 @@ class Hand extends Item {
     const power = 1 + Math.min(2, this.charge || 0) ; // hold right-click longer: throw harder
     this.charge = 0;
     const vel = dir.multiplyScalar(7 * power * Math.sqrt(s)).add(new THREE.Vector3(0, 1.5 * Math.sqrt(s), 0));
-    h.onLand = (who, harm) => { if (harm <= 1.4) setTimeout(() => speech?.react(who, 'landed'), 600); };
+    h.onLand = (who, harm, hit) => {
+      if (harm <= 1.4) setTimeout(() => speech?.react(who, 'landed'), 600);
+      else this.ctx.crime?.('kill', hit.point.clone(), who);
+    };
     h.throwFrom(h.character.root.getWorldPosition(new THREE.Vector3()), vel, scene);
     speech?.react(h, 'thrown', { shout: true, secs: 2 });
+    this.ctx.crime?.('throw', h.character.root.getWorldPosition(new THREE.Vector3()), h);
   }
 
   // set them down gently right below your hand (switching items, getting small)

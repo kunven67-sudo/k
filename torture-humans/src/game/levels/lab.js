@@ -297,6 +297,7 @@ export async function buildLab({ scene, physics, settings }) {
 
   return {
     spawn: new THREE.Vector3(2.5, 0, 2.0),
+    home: new THREE.Vector3(3.6, 3.3, -1.6), // your bedroom (where the police drop you off)
     respawn: new THREE.Vector3(0.6, 0, 2.2), // where you wake up after dying in the tiny world
     defaultVisitors: 3, // people walking around the lab (until the town exists)
     // outside: real sun and sky; the basement has none (see main.js)

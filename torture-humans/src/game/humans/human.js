@@ -517,8 +517,11 @@ export class Human {
         if (away) this.goTo(away, { run: true });
       }
     }
-    this.watchForGiant(dt);
-    this.think(dt);
+    // a special mind (police on duty...) can take over from the everyday one
+    if (!this.brain?.(dt)) {
+      this.watchForGiant(dt);
+      this.think(dt);
+    }
     this.syncFromAgent(dt);
     this.updateFace();
     this.character.update(dt, {

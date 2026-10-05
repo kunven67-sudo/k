@@ -86,6 +86,7 @@ export class Squisher {
         if (under && low) {
           const gore = this.settings.get('gameplay.gore');
           h.squish(gore);
+          this.onSquish?.(h, hp.clone());
           if (gore !== 'none') bloodSplat(this.scene, hp, (gore === 'full' ? 0.22 : 0.12) * Math.max(1, h.scale * 20));
           if (gore === 'full') bloodSplat(this.scene, fp.clone().setY(hp.y), 0.08);
         }

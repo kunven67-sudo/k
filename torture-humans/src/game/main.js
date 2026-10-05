@@ -10,6 +10,7 @@ import { initNavigation, Navigation } from './engine/navigation.js';
 import { Human } from './humans/human.js';
 import { Speech } from './humans/speech.js';
 import { Talk } from './humans/talk.js';
+import { Police } from './police.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
@@ -144,6 +145,33 @@ export async function boot() {
   const hazards = new Hazards({ player, cage, vitals, input, respawn: level.respawn || level.spawn });
   if (colony) { colony.player = player; colony.vitals = vitals; }
   player.vitals = vitals;
+  // witnesses and the police: officers come when someone reports you
+  const police = new Police({
+    humans, player, physics, nav, speech, area: level.town?.area,
+    toast: (t) => toast(t),
+    spawnOfficer: async (at) => {
+      const look = Math.random() < 0.5 ? 'Police_Male_01' : 'Police_Female_01';
+      const gender = isFemale(look) ? 'f' : 'm';
+      await lib.require(baseClips(gender));
+      const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => null)
+        || await loadAvatar('assets/avatars/Police_Male_01.glb').catch(() => null);
+      if (!tpl) return null;
+      const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: at, area: level.town?.area, settings, profile: { look, name: `Officer ${nameFor(look).split(' ')[1]}`, job: 'police officer', personality: { bravery: 0.9 } } });
+      h.townie = true;
+      h.speech = speech;
+      h.player = player;
+      if (zone === 'lab') h.character.root.visible = false;
+      humans.push(h);
+      return h;
+    },
+    onArrest: () => {
+      for (const it of hands.items) it.release?.();
+      hazards.blackout('BUSTED! The police caught you and took you home.', level.home || level.spawn, { busted: true });
+    },
+  });
+  const crime = (kind, pos, victim) => police.crime(kind, pos, victim);
+  hands.ctx.crime = crime;
+  squisher.onSquish = (h, p) => crime('kill', p, h);
   if (params.get('item') === 'jar') hands.select(1);
   if (params.get('item') === 'supplies') hands.select(2);
 
@@ -248,7 +276,7 @@ export async function boot() {
     }
   });
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, frame: 0 };
   hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
 
@@ -276,6 +304,7 @@ export async function boot() {
     if (zone !== 'outside') bugs?.update(dt);
     for (const h of humans) h.update(dt);
     talk.update(dt);
+    police.update(dt);
     speech.update(dt);
     level.update?.(dt);
     input.endFrame();
