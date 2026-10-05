@@ -663,3 +663,21 @@ expectations and habits vary per individual — never one fixed rule for everyon
   picket lines (coworkers remember who crossed).
 - **Nevada gaming work card**: fingerprints + fee from the sheriff before casino jobs; serious
   records can block it; gambling at your own casino gets you fired.
+
+## 33. Owner's taste & mobile (rounds 75–76)
+
+- **Feel references**: GTA 5 (open city, driving, crime, talking radio), The Sims 4 (needs,
+  homes, relationships), Schedule I (build up from nothing with friends), Gang Beasts / Fall
+  Guys (floppy jiggle chaos). From the Steam gambling-with-friends game they love: playing
+  with friends, the gambling rush, funny chaos.
+- **Target feelings — all of them**: "one more spin", "this feels like real life",
+  "BRO did you see that?!", "I lost EVERYTHING".
+- **Dealbreakers to avoid**: lag, looking AI-made/cheap, bad collisions (walking through
+  things / invisible walls), getting boring.
+- **MOBILE SUPPORT (new requirement)**: the owner's friend plays on a **newer iPhone
+  (13+)**, so GAMBLE must run in mobile Safari and **cross-play with PC** in online rooms.
+  - Touch controls: **twin virtual joysticks** (left = move, right = camera) + buttons by
+    default; **tap-to-move** as a Settings option.
+  - **Smooth first on phones**: adaptive quality (fewer shadows/effects, shorter view
+    distance) while PC keeps max graphics.
+  - **No controller support yet** (maybe later).
