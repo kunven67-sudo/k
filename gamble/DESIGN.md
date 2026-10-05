@@ -885,3 +885,8 @@ manual everything and broken gauges).
   stores, food).
 - **Alcohol poisoning**: too many shots too fast → pass out, vomit, ambulance; can be deadly
   if nobody helps.
+- **Police departments use made-up names** (cops can take bribes in the game).
+- **Shopping**: Meadowood Mall, Scheels in Sparks (Ferris wheel & aquarium inside; outdoor gear),
+  The Summit outdoor center, Walmart (3 AM vibe) & Target.
+- **Activities**: pickleball, climbing/bouldering gym, disc golf (bet per hole), weekly bowling
+  league with NPC teammates & trophies.
