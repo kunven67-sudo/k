@@ -741,3 +741,13 @@ expectations and habits vary per individual — never one fixed rule for everyon
 - **Part-by-part car repair** (My Summer Car / Car Mechanic Simulator style): replace tires,
   brakes, windshield, battery, bumpers, headlights, engine parts, etc. — yourself (DIY, can
   go wrong) or at a shop; parts wear and get damaged individually.
+
+## 39. Round 83 — physical interaction
+
+- **Doors, drawers, fridges open physically**: grab & drag with the mouse / swipe on phones
+  (Amnesia/Phasmophobia style); doors also swing when walked into.
+- **Pockets**: physical view — character pats pockets, camera shows hands holding the contents;
+  pick an item to pull it out.
+- **Car entry**: full animation every time (unlock, open, sit, close, seatbelt, keys, start).
+- **Phone in hand**: held up in the 3D world filling most of the view; world keeps going —
+  walking while texting can bump into things/people.
