@@ -959,3 +959,11 @@ have a Ring cam; a witness only matters if someone actually saw it).
   coffee (drip, Keurig, espresso) and Starbucks/Dutch Bros drive-thrus.
 - **Diets depend on the person**: allergies (peanuts, shellfish), intolerances (lactose),
   vegetarian/vegan/keto, favorite foods — for NPCs and for you (set in creator or discovered).
+- **Cooking every step**: knife chopping (can cut yourself), cracking eggs (shells fall in),
+  seasoning, stirring, flipping; doneness matters (undercooked chicken → food poisoning, overdone
+  → burnt).
+- **Pantry & cabinets**: dry/canned food lasts months; opened bags go stale; pantry moths & mice.
+- **Meal prep**: batch-cook into containers, save money; same food all week bores you; old prep
+  spoils.
+- **Overeating effects**: food coma after buffets, spicy food (sweat, red face, milk grab,
+  heartburn — depends on tolerance), overeating → sick/vomit, sugar rush then crash.
