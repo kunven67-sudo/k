@@ -28,6 +28,7 @@ uniform float uExposure;
 uniform float uDetail;
 uniform float uActivity;  // flares & spots (red dwarfs are very active)
 uniform float uCut;
+uniform vec4 uFlare;      // a flare: object-space direction, strength
 varying vec3 vObj;
 varying vec3 vNormalV;
 varying vec3 vViewPos;
@@ -66,6 +67,12 @@ void main() {
   vec3 col = blackbody(T);
   col = max(mix(vec3(luma(col)), col, 1.55), 0.0);
   float I = uIntensity * limb * (0.7 + 0.5 * g + 0.1 * sg + fac * 0.5) * (1.0 - spots * 0.55 - umbra * 0.35);
+  if (uFlare.w > 0.0) {
+    float ang = acos(clamp(dot(p, normalize(uFlare.xyz)), -1.0, 1.0));
+    float fl = exp(-pow(ang / 0.09, 2.0)) * (0.7 + 0.3 * snoise(p * 80.0 + vec3(uTime)));
+    I *= 1.0 + fl * uFlare.w * 3.0;
+    col = mix(col, vec3(1.0), fl * min(uFlare.w, 1.0) * 0.6);
+  }
   gl_FragColor = vec4(col * min(I * uExposure, 600.0), 1.0);
 }
 `;
@@ -83,6 +90,7 @@ export function makeStarMaterial(shared) {
       uDetail: { value: 1 },
       uActivity: { value: 0 },
       uCut: { value: 0 },
+      uFlare: { value: new THREE.Vector4(0, 1, 0, 0) },
     },
     side: THREE.DoubleSide,
   });

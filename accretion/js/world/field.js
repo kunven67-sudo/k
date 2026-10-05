@@ -58,6 +58,9 @@ export class Field {
       if (det.disk && rr > det.disk.inner && rr < det.disk.outer && Math.abs(h) < rr * det.disk.thickness * 3) {
         let gap = 1;
         for (const g of det.disk.gaps) if (Math.abs(rr - g.r) < g.w) gap = 0.35;
+        // a giant clears its own gap and starves itself of gas
+        const own = w.stages?.gap;
+        if (own && own.entry === e && p.mass > 30 * M_EARTH) gap = Math.min(gap, 0.45);
         env.kind = 'disk';
         env.density = 1.75 * gap * (1 - 0.5 * clamp(rr / det.disk.outer, 0, 1));
         env.label = gap < 1 ? 'Gap in the dust disk' : 'Protoplanetary disk';
@@ -177,6 +180,26 @@ export class Field {
     if (allowDanger && roll < 0.06 && dist > R * 34) mRel = rng.logRange(1.3, 5);
     else if (roll < 0.26) mRel = rng.powerLaw(0.15, 0.8, 1.2);
     else mRel = rng.powerLaw(0.003, 0.15, 1.35);
+    // around a star, rogue planets and comets drift by: things it can keep as planets
+    if (p.isStar && !p.compact && rng.chance(0.4)) mRel = rng.logRange(1e-7, 4e-3);
+    // compact objects meet other compact objects now and then
+    if (p.compact && rng.chance(0.05) && dist > R * 30) {
+      const bh = p.compact === 'bh' ? rng.chance(0.6) : rng.chance(0.3);
+      const m = bh ? Math.min(p.mass * rng.logRange(0.05, 0.8), Math.max(p.mass * 0.05, rng.range(5, 30) * M_SUN)) : rng.range(1.2, 2.0) * M_SUN;
+      const frame0 = w.referenceFrame(x, y, z);
+      const vesc0 = escapeVelocity(p.mass, p.rEff);
+      const dv0 = rng.unitVector();
+      const cb = new Body({
+        role: 'field', compact: bh ? 'bh' : 'ns', mass: m, comp: { iron: 0.1, gas: 0.9 }, x, y, z,
+        vx: frame0.vx + dv0.x * vesc0 * 0.2, vy: frame0.vy + dv0.y * vesc0 * 0.2, vz: frame0.vz + dv0.z * vesc0 * 0.2,
+        name: bh ? `XTE J${rng.int(1000, 2359)}${rng.sign() > 0 ? '+' : '-'}${rng.int(100, 899)}` : `PSR J${rng.int(1000, 2359)}${rng.sign() > 0 ? '+' : '-'}${rng.int(10, 89)}`,
+        seed: rng.int(1, 1e9), fadeIn: 0,
+      });
+      cb.nsSpin = rng.range(1, 400);
+      cb.bhSpin = rng.next() * 0.9;
+      w.addBody(cb);
+      return cb;
+    }
     let mass = p.mass * mRel;
     // among stars, small dim red dwarfs vastly outnumber big bright ones (the initial mass function)
     if (mass > 0.08 * M_SUN && !(allowDanger && mRel > 1)) {

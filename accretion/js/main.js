@@ -19,6 +19,8 @@ import { Tips } from './ui/tips.js';
 import { Book } from './ui/book.js';
 import { Scope } from './ui/scope.js';
 import { GalaxyMap } from './ui/map.js';
+import { Sandbox } from './ui/sandbox.js';
+import { Photo } from './ui/photo.js';
 import { Galaxy as GalaxyClass } from './world/galaxy.js';
 
 const $ = (id) => document.getElementById(id);
@@ -71,7 +73,11 @@ class Game {
     this.scope = new Scope(this);
     this.map = new GalaxyMap(this);
     this.renderMap = (dt) => this.map.render(dt);
-    installSheets(this, { goals: this.goals, book: this.book, scope: this.scope, map: this.map });
+    this.sandbox = new Sandbox(this);
+    this.photo = new Photo(this);
+    this.togglePhoto = () => this.photo.toggle();
+    this.photoInput = (dt) => this.photo.input(dt);
+    installSheets(this, { goals: this.goals, book: this.book, scope: this.scope, map: this.map, sandbox: this.sandbox });
     this.onEvent = (e) => { this.goals.onEvent(e); this.tips.onEvent(e); this.book.onEvent(e); };
     const ef = this.everyFrame;
     this.everyFrame = (dt) => { ef?.(dt); this.goals.update(dt); this.tips.update(dt); this.book.update(dt); };
@@ -459,11 +465,16 @@ class Game {
     const inp = this.input;
     if (this.state === 'playing') {
       this.handleKeys(dt);
+      if (this.photoOn && !this.sheet) this.photoInput(dt);
       if (this.simRunning) {
         this.handleInput(dt);
         w.update(dt);
         this.processEvents();
         this.fx.closeUp(dt);
+        const stg = w.stages;
+        if (stg?.stream) this.fx.spawnStream(stg.stream.from, stg.stream.to, dt);
+        if (stg?.quasar > 0.3 && w.player.compact === 'bh') this.fx.spawnQuasarJets(w.player, stg.quasar, dt);
+        for (const s of w.stars) if (s.flareFx) { s.flareFx.t += dt; if (s.flareFx.t > 5) s.flareFx = null; }
         this.saveTimer -= dt;
         if (this.saveTimer <= 0) { this.saveTimer = 30; this.autosave(); }
       } else {
@@ -913,7 +924,65 @@ class Game {
           this.eatAcc.m += e.gain;
           break;
         case 'evaporated':
-          this.onEnd();
+          this.onEnd(e);
+          break;
+        case 'migration':
+          hud.log('The disk\u2019s gas is dragging you inward: you are migrating toward your star', 'info');
+          break;
+        case 'hot-jupiter':
+          hud.log('You migrated right up to your star: you are a hot Jupiter now', 'big');
+          break;
+        case 'giant-storm':
+          hud.log('A great storm is boiling up through your clouds', 'info');
+          break;
+        case 'self-flare':
+          fx.spawnCME(p, e.dir, e.strong);
+          if (e.strong) { this.flash(0.35, 1, 0.9, 0.75); hud.log('A superflare erupted from your surface', 'info'); }
+          break;
+        case 'stellar-flare':
+          if (e.star) e.star.flareFx = { dir: { x: p.x - e.star.x, y: p.y - e.star.y, z: p.z - e.star.z }, t: 0, strong: e.strong };
+          if (e.strong) { hud.log(`Superflare from ${e.name}`, 'bad'); this.flash(0.3, 1, 0.9, 0.8); }
+          break;
+        case 'mass-transfer':
+          hud.log(e.gaining ? `${e.name} overflowed: you're pulling its gas onto yourself` : `You overflowed: ${e.name} is pulling your gas away`, e.gaining ? 'food' : 'bad');
+          break;
+        case 'magnetar-self':
+          this.flash(1.1, 0.75, 0.85, 1);
+          this.shake(0.8);
+          fx.spawnRipples(p);
+          hud.log('A starquake: your magnetic field snapped and released a giant flare', 'big');
+          break;
+        case 'kilonova':
+          this.flash(1.6, 1, 0.8, 0.45);
+          this.audio.cataclysm();
+          this.shake(1.2);
+          fx.spawnGold(p);
+          hud.log(`Kilonova! The merger forged about ${F.nice(e.gold)} Earth masses of gold`, 'big');
+          break;
+        case 'bh-merger':
+          this.flash(0.9, 0.7, 0.8, 1);
+          this.shake(1.5);
+          fx.spawnRipples(p);
+          this.audio.chirp?.();
+          hud.log(`Black holes merged: ${F.massShort(e.lost)} turned into gravitational waves`, 'big');
+          break;
+        case 'tde':
+          if (e.body) fx.spawnSpaghetti(p, e.body);
+          hud.log(e.star ? `Tidal disruption: ${e.name} is being spaghettified` : `${e.name} is being stretched into spaghetti`, 'big');
+          break;
+        case 'quasar':
+          hud.log('You are feeding so fast you outshine a whole galaxy: a quasar', 'big');
+          break;
+        case 'andromeda':
+          if (e.stage === 'arrive') hud.log('Andromeda is tearing into the Milky Way: the two galaxies are colliding', 'big');
+          else hud.log(e.ate ? 'The galaxies merged, and Andromeda\u2019s black hole spiralled into you. You swallowed a galaxy\u2019s heart.' : 'The Milky Way and Andromeda have merged into one giant round galaxy', 'big');
+          break;
+        case 'star-birth':
+          hud.log(`Your passage squeezed the cloud: ${e.names.length > 1 ? `${e.names.length} new stars are` : 'a new star is'} being born nearby`, 'big');
+          break;
+        case 'wanderer':
+          hud.log(`${e.bh ? 'A wandering black hole' : 'A neutron star'} is passing by: ${e.name}`, e.bigger ? 'bad' : 'info');
+          if (e.bigger) { this.stormWarn = 6; this.stormText = `${e.bh ? 'Black hole' : 'Neutron star'} incoming: keep away from it`; }
           break;
         case 'death':
           this.onDeath(e);
@@ -973,7 +1042,7 @@ class Game {
   }
 
   // the end of time: your black hole evaporated
-  onEnd() {
+  onEnd(ev = {}) {
     const p = this.world.player;
     this.state = 'dead';
     this.ended = true;
@@ -983,7 +1052,9 @@ class Game {
     this.flash(1, 1, 1, 1);
     $('death-eyebrow').textContent = `${F.years(13.8e9 + this.world.years)} after the Big Bang`;
     $('death-title').textContent = 'The last light';
-    $('death-cause').textContent = 'You evaporated in a final flash of Hawking radiation. No stars are left, and no black holes. The universe is dark and cold, and will stay that way forever.';
+    $('death-cause').textContent = ev.decay
+      ? 'The stars burned out long ago, and the last white dwarfs have cooled into black cinders. If protons decay, as many physicists suspect, by now every atom of you has fallen apart. Only black holes remain, slowly evaporating.'
+      : 'You evaporated in a final flash of Hawking radiation. No stars are left, and no black holes. The universe is dark and cold, and will stay that way forever.';
     $('death-lede').textContent = 'You watched the universe end.';
     $('btn-reform').textContent = 'Begin again';
     $('death-stats').innerHTML = this.deathStats(p.mass);

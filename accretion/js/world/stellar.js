@@ -55,7 +55,8 @@ export function stellarState(mSun, ageYears) {
   const since = ageYears - tMS - giantSpan;
   if (rem.kind === 'wd') {
     // white dwarfs start ~100,000 K and cool for trillions of years
-    const T = Math.max(3000, 100000 * Math.pow(1 + since / 1e7, -0.4));
+    // ...and after about a thousand trillion years they fade into black dwarfs
+    const T = Math.max(30, 100000 * Math.pow(1 + since / 1e7, -0.4));
     const R = 0.012 * R_SUN * Math.pow(rem.mass / 0.6, -1 / 3);
     return { phase: 'wd', mass: rem.mass, radius: R, temp: T, lum: lumOf(R, T), since, tMS };
   }

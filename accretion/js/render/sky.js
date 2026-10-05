@@ -25,12 +25,13 @@ uniform vec3 uCam;
 uniform float uFluxK;
 uniform float uNearR;
 uniform float uFarR;
+uniform float uFade;
 varying vec3 vCol;
 varying float vA;
 void main() {
   vec3 rel = position - uCam;
   float d = max(length(rel), 1e-3);
-  float flux = lum / (d * d) * uFluxK;
+  float flux = lum / (d * d) * uFluxK * uFade;
   float b = pow(flux, 0.45);
   b *= smoothstep(uNearR, uNearR * 1.35, d) * (1.0 - smoothstep(uFarR * 0.8, uFarR, d));
   vCol = color;
@@ -60,6 +61,7 @@ uniform vec3 uCam;
 uniform float uFocal;
 uniform float uFadeNear;
 uniform float uFadeFar;
+uniform float uFade;
 varying vec3 vCol;
 varying float vA;
 void main() {
@@ -69,7 +71,7 @@ void main() {
   // near puffs would be resolved into separate stars, so they fade out
   float fade = (1.0 - smoothstep(uFadeNear, uFadeFar, px)) * smoothstep(0.4, 1.5, px);
   vCol = color;
-  vA = bright * fade;
+  vA = bright * fade * uFade;
   gl_PointSize = clamp(px, 1.0, uFadeFar);
   gl_Position = projectionMatrix * viewMatrix * vec4(normalize(rel) * 1000.0, 1.0);
   if (vA < 0.0005) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -105,6 +107,7 @@ attribute float bright;
 attribute float aSeed;
 uniform vec3 uCam;
 uniform float uFocal;
+uniform float uFade;
 varying vec3 vCol;
 varying float vA;
 varying float vSeed;
@@ -114,7 +117,7 @@ void main() {
   float px = wsize / d * uFocal;
   float fade = (1.0 - smoothstep(220.0, 420.0, px)) * smoothstep(0.5, 3.0, px);
   vCol = color;
-  vA = bright * fade;
+  vA = bright * fade * uFade;
   vSeed = aSeed;
   gl_PointSize = clamp(px, 1.0, 420.0);
   gl_Position = projectionMatrix * viewMatrix * vec4(normalize(rel) * 1000.0, 1.0);
@@ -294,6 +297,7 @@ export class Sky {
     this.focalCube = size / 2;
     this.uCam = { value: new THREE.Vector3() };
     this.uNearR = { value: 200 };
+    this.uFade = { value: 1 };
     this.lastCube = null;
     this.lastCubeTime = -1;
     this.face = -1;
@@ -332,6 +336,7 @@ export class Sky {
   }
 
   points(P, attrs, vert, frag, uniforms, blending, order) {
+    uniforms.uFade = this.uFade;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(P, 3));
     for (const [k, [arr, n]] of Object.entries(attrs)) g.setAttribute(k, new THREE.BufferAttribute(arr, n));
@@ -510,6 +515,7 @@ export class Sky {
       const s = rng.range(14, 40);
       mesh.scale.set(s, s, s);
       mesh.renderOrder = 0;
+      mesh.userData.galaxy = true;
       this.cubeScene.add(mesh);
     }
   }
@@ -647,7 +653,16 @@ export class Sky {
     const movedN = this.nebAt ? Math.hypot(camLy[0] - this.nebAt[0], camLy[1] - this.nebAt[1], camLy[2] - this.nebAt[2]) : Infinity;
     if (movedN > 800 || Math.abs(g.time - this.nebTime) > 2e7) { this.buildNebulae(camLy); force = force || movedN > 800; }
     const movedC = this.lastCube ? Math.hypot(camLy[0] - this.lastCube[0], camLy[1] - this.lastCube[1], camLy[2] - this.lastCube[2]) : Infinity;
-    const aged = Math.abs(g.time - this.lastCubeTime) > 5e6;
+    const aged = Math.abs(g.time - this.lastCubeTime) > Math.max(5e6, Math.abs(g.time) * 0.08);
+    // the far future: star formation stops, stars burn out, other galaxies slip over the horizon
+    const T = 13.8e9 + g.time;
+    const fade = T < 1e11 ? 1 : Math.max(0, 1 - Math.log10(T / 1e11) / 3);
+    if (Math.abs(fade - this.uFade.value) > 0.01 || (fade === 0 && this.uFade.value !== 0)) {
+      this.uFade.value = fade;
+      const gk = T < 1e11 ? 1 : Math.max(0, 1 - Math.log10(T / 1e11));
+      for (const o of this.cubeScene.children) if (o.userData.galaxy) o.material.uniforms.uBright.value = 0.5 * gk;
+      force = true;
+    }
     if (this.face < 0 && (movedC > 25 || force || aged)) {
       this.face = 0;
       this.pendingPos = [...camLy];

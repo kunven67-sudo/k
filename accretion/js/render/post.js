@@ -9,6 +9,7 @@ export const LensShader = {
     uCount: { value: 0 },
     uLens: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
     uGlow: { value: [0, 0, 0, 0] },
+    uSpin: { value: [0, 0, 0, 0] },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -20,6 +21,7 @@ export const LensShader = {
     uniform int uCount;
     uniform vec4 uLens[4];   // xy: screen uv, z: Einstein radius, w: shadow radius (in screen-height units)
     uniform float uGlow[4];  // how brightly hot gas lights up the photon ring
+    uniform float uSpin[4];  // spin makes the shadow lopsided (flattened on the side spinning toward you)
     varying vec2 vUv;
     void main() {
       vec2 uv = vUv;
@@ -37,8 +39,12 @@ export const LensShader = {
         float defl = thE * thE / max(r, 1e-5);
         vec2 dir = d / max(r, 1e-5);
         src -= dir * defl / vec2(uAspect, 1.0);
-        shadow *= smoothstep(L.w * 0.97, L.w * 1.02, r);
-        float rg = exp(-pow((r - L.w * 1.04) / (L.w * 0.035), 2.0));
+        // a spinning (Kerr) black hole's shadow shifts and flattens on one side
+        vec2 ds = d + vec2(uSpin[i] * 0.2 * L.w, 0.0);
+        ds.x *= ds.x < 0.0 ? 1.0 + 0.35 * uSpin[i] : 1.0;
+        float rs = length(ds);
+        shadow *= smoothstep(L.w * 0.97, L.w * 1.02, rs);
+        float rg = exp(-pow((rs - L.w * 1.04) / (L.w * 0.035), 2.0));
         ring += rg * 0.6;
         // light that has looped around the hole: a thin glowing ring (as in the EHT images)
         float ang = atan(d.y, d.x);

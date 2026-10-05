@@ -368,8 +368,10 @@ export class Renderer {
     const camW = cam.pos;
     // camera orientation
     this.camera.quaternion.copy(cam.quat);
+    const ph = this.photo;
+    if (ph && ph.roll) this.camera.quaternion.multiply(this.tmpQ.setFromAxisAngle(this.zAxis || (this.zAxis = new THREE.Vector3(0, 0, 1)), ph.roll));
     if (this.camera.near !== cam.near) { this.camera.near = cam.near; this.camera.updateProjectionMatrix(); }
-    this.setFov(cam.fov);
+    this.setFov(ph ? ph.fov : cam.fov);
     this.close = cam.mode === 'low' || cam.mode === 'surface';
     this.camera.updateMatrixWorld();
     const view = this.camera.matrixWorldInverse;
@@ -393,7 +395,7 @@ export class Renderer {
     // eyes adapt faster to brighter light than to darkness
     const rate = target < this.exposure ? 3.5 : 1.2;
     this.exposure += (target - this.exposure) * Math.min(1, dtReal * rate);
-    this.shared.uExposure.value = this.exposure;
+    this.shared.uExposure.value = this.exposure * (ph ? Math.pow(2, ph.ev) : 1);
     // the sky is compressed like a camera with good dynamic range
     this.scene.backgroundIntensity = clamp(Math.pow(this.exposure, 0.55) * 0.7, 0.04, 12);
     // a daytime sky hides the stars
@@ -498,7 +500,8 @@ export class Renderer {
     for (const [id, dc] of this.disks) {
       if (!world.active.has(id)) { dc.dispose(); this.disks.delete(id); continue; }
       const st = dc.entry.star;
-      dc.update(camW, S, this.focal, world.time, st && st.alive ? blackbody(st.starTemp || 5000) : [1, 1, 1]);
+      const gap = world.stages?.gap && world.stages.gap.entry === dc.entry ? world.stages.gap : null;
+      dc.update(camW, S, this.focal, world.time, st && st.alive ? blackbody(st.starTemp || 5000) : [1, 1, 1], gap);
     }
 
     // dust motes give a sense of speed
@@ -529,6 +532,7 @@ export class Renderer {
         if (!L) continue;
         u.uLens.value[i].set(L.x, L.y, L.z, L.w);
         u.uGlow.value[i] = L.glow;
+        u.uSpin.value[i] = L.spin || 0;
         L.view.mesh.visible = false;
       }
     }
@@ -540,8 +544,8 @@ export class Renderer {
     fu.uTime.value = this.shared.uTime.value;
     fu.uDamage.value = clamp(state.damage || 0, 0, 1);
     fu.uFlash.value = this.flash;
-    fu.uGrain.value = this.quality === 'low' ? 0.0 : 0.022;
-    this.bloom.strength = 0.5 + this.flash * 0.8;
+    fu.uGrain.value = this.quality === 'low' || (ph && !ph.grain) ? 0.0 : 0.022;
+    this.bloom.strength = (ph ? ph.bloom : 0.5) + this.flash * 0.8;
   }
 
   // satellites around you and a Dyson swarm around your star
@@ -683,6 +687,7 @@ export class Renderer {
       if (cut) v.atmo.visible = false;
       this.syncCutaway(v, cut, rU, b);
       u.uDetail.value = px > 40 ? 1 : 0;
+      u.uOutbreak.value = isPlayer ? world.stages?.outbreak || 0 : 0;
       u.uHeat.value = Math.max(v.look.heat, b.heat || 0);
       u.uDamage.value = isPlayer ? clamp(state.damage * 1.2, 0, 1) : clamp(b.disrupt * 0.6, 0, 1);
       const lights = this.lightsFor(world, b.x, b.y, b.z, b);
@@ -744,6 +749,15 @@ export class Renderer {
       u.uCut.value = cut ? 1 : 0;
       this.syncCutaway(v, cut, rU, b);
       u.uTempK.value = b.starTemp;
+      const fl = isPlayer ? world.stages?.flare : b.flareFx;
+      if (fl && fl.t < 5) {
+        if (!fl.obj) {
+          const q = new THREE.Quaternion().setFromEuler(v.mesh.rotation).invert();
+          fl.obj = new THREE.Vector3(fl.dir.x, fl.dir.y, fl.dir.z).normalize().applyQuaternion(q);
+        }
+        const f = Math.min(1, fl.t * 3) * Math.exp(-fl.t * 0.8) * (fl.strong ? 2.5 : 1.2);
+        u.uFlare.value.set(fl.obj.x, fl.obj.y, fl.obj.z, f);
+      } else u.uFlare.value.w = 0;
       u.uIntensity.value = (isPlayer ? 1.15 : 1.8) / Math.max(this.exposure, 1e-4);
       u.uDetail.value = px > 30 ? 1 : 0;
       u.uActivity.value = px < 120 ? -2 : b.starTemp < 4000 ? 1 : 0.3;
@@ -774,7 +788,7 @@ export class Renderer {
       du.uOuter.value = 5.5;
       du.uTempIn.value = 6600 + 900 * Math.sin(b.seed);
       // brighter while feeding
-      const feed = isPlayer ? clamp(state.feed || 0, 0, 1) : 0.15;
+      const feed = isPlayer ? clamp(Math.max(state.feed || 0, world.stages?.quasar || 0), 0, 1) : 0.15;
       du.uFeed.value = feed;
       du.uIntensity.value = (isPlayer ? 2.0 : 1.3) * (0.55 + feed) / Math.max(this.exposure, 1e-4);
       v.disk.rotation.set(b.tilt + Math.PI / 2, 0, 0.3);
@@ -786,7 +800,7 @@ export class Renderer {
         const angR = rU / Math.max(-this.tmpV.z, 1e-9);           // radians
         const toScreen = 1 / (2 * Math.tan((this.camera.fov * Math.PI) / 360)); // screen-height units per radian
         const shadow = angR * toScreen;
-        lenses.push({ x: sx, y: sy, z: shadow * 2.0, w: shadow, view: v, glow: 0.25 + feed });
+        lenses.push({ x: sx, y: sy, z: shadow * 2.0, w: shadow, view: v, glow: 0.25 + feed, spin: b.bhSpin || 0 });
       }
     } else if (v.kind === 'ns') {
       v.mesh.scale.setScalar(rU);
@@ -802,8 +816,13 @@ export class Renderer {
       // lighthouse: beams sweep around the spin axis
       const t = this.shared.uTime.value;
       v.beams.scale.set(rU * 6, rU * 70, rU * 6);
-      v.beams.rotation.set(0.5, t * 2.2, 0.35, 'YXZ');
-      v.beams.rotation.set(Math.sin(t * 2.2) * 0.9, t * 2.2, Math.cos(t * 2.2) * 0.5);
+      if (isPlayer && world.stages) {
+        const ax = world.stages.beamAxis(b);
+        v.beams.quaternion.setFromUnitVectors(this.yAxis || (this.yAxis = new THREE.Vector3(0, 1, 0)), this.tmpV.set(ax.x, ax.y, ax.z));
+      } else {
+        const sp = Math.min(b.nsSpin || 2, 6);
+        v.beams.rotation.set(Math.sin(t * sp) * 0.9, t * sp, Math.cos(t * sp) * 0.5);
+      }
       v.beamMat.uniforms.uIntensity.value = 1.6 / Math.max(this.exposure, 0.02) * 0.3;
     }
     void cam;

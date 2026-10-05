@@ -82,6 +82,13 @@ export class PlanetModel {
       for (const k of Object.keys(this.atm)) this.atm[k] *= 1 - hit * 0.3;
       this.atm.o2 *= 1 - hit * 0.15;
     }
+    if (type === 'stellar-flare' && e.strong) {
+      // a superflare: without a magnetic field it strips away some of the air and water
+      const shield = clamp(this.field / 0.4, 0, 1);
+      const hit = 0.04 * (1 - shield);
+      for (const k of Object.keys(this.atm)) this.atm[k] *= 1 - hit;
+      if (hit > 0.01) this.log(`A superflare from ${e.name} stripped some of your air`, 'bad');
+    }
     if (type === 'bombard') {
       // in deep time, the steady rain of comets brings water and buries craters
       p.comp.ice = Math.min(0.9, p.comp.ice + 1e-7 * e.n);

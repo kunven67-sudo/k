@@ -223,6 +223,109 @@ export class FXSpawner {
     }
   }
 
+  // ---------------------------------------------------------------- stage effects
+
+  // a coronal mass ejection: a burst of plasma from a flare
+  spawnCME(p, dir, strong) {
+    const fx = this.renderer.fx;
+    const R = p.radius;
+    const vs = (R * (strong ? 3 : 1.8)) / TIME_BASE;
+    const n = strong ? 90 : 40;
+    for (let i = 0; i < n; i++) {
+      const j = randUnit();
+      let dx = dir.x + j.x * 0.35, dy = dir.y + j.y * 0.35, dz = dir.z + j.z * 0.35;
+      const l = Math.hypot(dx, dy, dz) || 1;
+      dx /= l; dy /= l; dz /= l;
+      const sp = vs * (0.4 + Math.random());
+      fx.spawn({
+        x: p.x + dx * R * 1.02, y: p.y + dy * R * 1.02, z: p.z + dz * R * 1.02,
+        vx: p.vx + dx * sp, vy: p.vy + dy * sp, vz: p.vz + dz * sp,
+        life: 2 + Math.random() * 3, size: R * 0.04, grow: 3, r: 1.8, g: 1.1, b: 0.6, a: 0.8, glow: true, drag: 0.1,
+      });
+    }
+  }
+
+  // gas pulled from one star to another through the inner Lagrange point
+  spawnStream(from, to, dt) {
+    const fx = this.renderer.fx;
+    const n = Math.ceil(dt * 60);
+    const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+    const d = Math.hypot(dx, dy, dz) || 1;
+    const ux = dx / d, uy = dy / d, uz = dz / d;
+    // the stream curves because both stars are orbiting
+    const sx = -uz, sz = ux;
+    for (let i = 0; i < n; i++) {
+      const f = Math.random();
+      const bend = Math.sin(f * Math.PI) * d * 0.12;
+      const x = from.x + ux * (from.radius + f * (d - from.radius - to.radius * 0.8)) + sx * bend;
+      const y = from.y + uy * (from.radius + f * (d - from.radius - to.radius * 0.8));
+      const z = from.z + uz * (from.radius + f * (d - from.radius - to.radius * 0.8)) + sz * bend;
+      fx.spawn({ x, y, z, vx: to.vx, vy: to.vy, vz: to.vz, life: 0.5 + Math.random() * 0.5, size: to.radius * 0.06, grow: 1.5, r: 1.6, g: 0.75, b: 0.4, a: 0.7, glow: true });
+    }
+  }
+
+  // a black hole's quasar jets, along its spin axis
+  spawnQuasarJets(p, k, dt) {
+    const fx = this.renderer.fx;
+    const R = this.renderer.visualRadius(p);
+    const ax = Math.sin(p.tilt), ay = Math.cos(p.tilt);
+    const n = Math.ceil(dt * 120 * k);
+    const vs = (p.rEff * (10 + 25 * (p.bhSpin || 0))) / TIME_BASE;
+    for (let i = 0; i < n; i++) {
+      const s = i % 2 ? 1 : -1;
+      const j = randUnit();
+      fx.spawn({
+        x: p.x + ax * s * R * 1.4, y: p.y + ay * s * R * 1.4, z: p.z,
+        vx: p.vx + (ax * s + j.x * 0.02) * vs, vy: p.vy + (ay * s + j.y * 0.02) * vs, vz: p.vz + j.z * 0.02 * vs,
+        life: 2.5, size: p.rEff * 0.035 * k, grow: 2.5, r: 0.55, g: 0.7, b: 1.7, a: 0.9, glow: true,
+      });
+    }
+  }
+
+  // a star torn into a long thin stream that spirals in (a tidal disruption event)
+  spawnSpaghetti(p, b) {
+    const fx = this.renderer.fx;
+    const d = Math.max(p.distTo(b), p.rEff * 2);
+    const ux = (b.x - p.x) / d, uy = (b.y - p.y) / d, uz = (b.z - p.z) / d;
+    const n = 260;
+    for (let i = 0; i < n; i++) {
+      const f = i / n;
+      const ang = f * 5.5;
+      const r = d * (1 - f * 0.92);
+      // spiral in the plane of the disk
+      const c = Math.cos(ang), s = Math.sin(ang);
+      const x = p.x + (ux * c - uz * s) * r, y = p.y + uy * r * (1 - f), z = p.z + (uz * c + ux * s) * r;
+      const T = 3000 + f * 9000;
+      const col = blackbody(T);
+      fx.spawn({ x, y, z, vx: p.vx, vy: p.vy, vz: p.vz, life: 3 + f * 4, size: b.radius * 0.18 * (1 - f * 0.6), grow: 0.8, r: col[0] * 2.2, g: col[1] * 2.2, b: col[2] * 2.2, a: 0.9, glow: true });
+    }
+  }
+
+  // ripples of spacetime from merging black holes (drawn as expanding rings)
+  spawnRipples(p) {
+    const fx = this.renderer.fx;
+    const R = p.rEff;
+    for (let ring = 0; ring < 4; ring++) {
+      const sp = (R * (6 + ring * 2)) / TIME_BASE;
+      for (let i = 0; i < 120; i++) {
+        const a = (i / 120) * Math.PI * 2;
+        const dx = Math.cos(a), dz = Math.sin(a);
+        fx.spawn({ x: p.x + dx * R * 2, y: p.y, z: p.z + dz * R * 2, vx: p.vx + dx * sp, vy: p.vy, vz: p.vz + dz * sp, life: 4 + ring, size: R * 0.15, grow: 2, r: 0.5, g: 0.65, b: 1.4, a: 0.5, glow: true });
+      }
+    }
+  }
+
+  // gold and platinum flung out of a kilonova
+  spawnGold(p) {
+    const fx = this.renderer.fx;
+    const R = Math.max(p.rEff, 1000);
+    for (let i = 0; i < 300; i++) {
+      const j = randUnit();
+      const sp = (R * (2 + Math.random() * 6)) / TIME_BASE;
+      fx.spawn({ x: p.x, y: p.y, z: p.z, vx: p.vx + j.x * sp, vy: p.vy + j.y * sp, vz: p.vz + j.z * sp, life: 4 + Math.random() * 4, size: R * 0.08, grow: 3, r: 2.2, g: 1.5, b: 0.35, a: 0.9, glow: true });
+    }
+  }
+
   spawnShell(x, y, z, scale = 1) {
     const fx = this.renderer.fx;
     const sp = 9000 * scale;

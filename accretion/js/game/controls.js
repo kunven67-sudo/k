@@ -28,7 +28,7 @@ export class Input {
     });
     canvas.addEventListener('mousedown', (e) => {
       if (!this.enabled) return;
-      if (!this.locked) {
+      if (!this.locked && !this.noLock) {
         try {
           const r = canvas.requestPointerLock?.();
           if (r && r.catch) r.catch(() => {});

@@ -173,6 +173,7 @@ export class HUD {
     // right side
     const age = world.years - (p.born || 0);
     e.age.textContent = `Age ${F.yearsShort(Math.max(age, 0))} · universe ${F.yearsShort(13.8e9 + world.years)}`;
+    if (world.years > 8e10) e.age.textContent += ` · ${world.era().split(':')[0]}`;
     if (world.deep) {
       e.time.textContent = `Deep time · 1 s = ${F.years(world.deepRate())}`;
     } else {

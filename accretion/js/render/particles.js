@@ -23,6 +23,7 @@ uniform float uLum;
 uniform float uCompress;
 uniform float uKind;     // 0 dust disk, 1 rocky belt, 2 icy belt
 uniform vec3 uStarCol;
+uniform vec2 uGap;       // a gap cleared by your own gravity: radius, half-width (km)
 varying vec3 vCol;
 varying float vA;
 void main() {
@@ -50,6 +51,7 @@ void main() {
   float hot = (1.0 - smoothstep(0.04, 0.25, aReal)) * (uKind < 0.5 ? 1.0 : 0.0);
   vCol = base * uStarCol * (uKind < 0.5 ? 0.035 : 0.25) * min(light, 20.0) * min(hg, 5.0) + vec3(1.0, 0.4, 0.15) * hot * 0.4;
   vA = fade * (uKind < 0.5 ? 0.6 : 0.9);
+  if (uGap.y > 0.0 && uKind < 0.5) vA *= mix(0.05, 1.0, smoothstep(uGap.y * 0.55, uGap.y, abs(aA - uGap.x)));
   gl_PointSize = clamp(px, uKind < 0.5 ? 1.0 : 1.0, 260.0);
   gl_Position = projectionMatrix * mv;
   ${LOGDEPTH_VERT}
@@ -129,6 +131,7 @@ export class DiskCloud {
         uCompress: { value: 10 },
         uKind: { value: kind },
         uStarCol: { value: new THREE.Color(1, 1, 1) },
+        uGap: { value: new THREE.Vector2(0, 0) },
         uExposure: shared.uExposure,
       },
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -138,7 +141,7 @@ export class DiskCloud {
     return pts;
   }
 
-  update(cam, S, focal, simTime, starColor) {
+  update(cam, S, focal, simTime, starColor, gap = null) {
     const s = this.entry.star && this.entry.star.alive ? this.entry.star : this.entry.pos;
     for (const o of this.objects) {
       const u = o.material.uniforms;
@@ -148,6 +151,7 @@ export class DiskCloud {
       // orbits use time modulo a long period to keep float precision
       u.uTime.value = simTime % 3.0e7;
       if (starColor) u.uStarCol.value.setRGB(starColor[0], starColor[1], starColor[2]);
+      if (gap) u.uGap.value.set(gap.r, gap.w); else u.uGap.value.set(0, 0);
       const star = this.entry.star;
       if (star && star.alive) u.uGM.value = G * star.mass;
     }

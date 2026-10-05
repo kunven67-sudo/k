@@ -11,6 +11,7 @@ import { stellarState, msLifetimeYears, whiteDwarfMass, hawkingYears } from './s
 import { Hazards } from './hazards.js';
 import { PlanetModel } from './planet.js';
 import { LifeModel } from './life.js';
+import { StageFX } from './stages.js';
 import { RNG, hash32 } from '../core/rng.js';
 import {
   G, C, M_SUN, M_EARTH, AU, TIME_BASE, WARP_LEVELS, DEEP_LEVELS, DIST_COMPRESS, YEAR,
@@ -82,7 +83,8 @@ export class World {
   initModules(saved = null) {
     this.planet = new PlanetModel(this, saved?.planet);
     this.life = new LifeModel(this, this.planet, saved?.life);
-    this.modules = [this.planet, this.life];
+    this.stages = new StageFX(this, saved?.stages);
+    this.modules = [this.planet, this.life, this.stages];
   }
 
   get years() {
@@ -553,6 +555,7 @@ export class World {
   }
 
   deepRate() {
+    if (this.rateOverride) return this.rateOverride;
     if (!this.deep) return 0;
     if (this.deep > DEEP_LEVELS.length) return Math.max(1e9, this.years * 0.6); // cosmic: time grows exponentially
     return DEEP_LEVELS[this.deep - 1];
@@ -634,8 +637,10 @@ export class World {
       if (!p.alive) break;
     }
     this.galaxy.advance(dtSim / YEAR);
+    this.checkCosmic();
     if (!p.alive) { this.flushDead(); return; }
 
+    this.recentFeed = (this.recentFeed || 0) * Math.exp(-rs / 3);
     this.tidal(rs);
     this.accretionDisk(rs);
     this.thermal(rs);
@@ -678,6 +683,12 @@ export class World {
         return;
       }
     }
+    // if protons decay, all ordinary matter is gone by about 10^40 years
+    if (p.compact !== 'bh' && this.years + years >= 1e40) {
+      this.galaxy.advance(Math.max(0, 1e40 - this.years));
+      this.emit('evaporated', { decay: true });
+      return;
+    }
     const secs = years * YEAR;
     const o = this.deepOrbit;
     if (o && o.host) {
@@ -704,13 +715,17 @@ export class World {
         return;
       }
     } else {
-      // coasting between the stars in straight lines while the galaxy changes
+      // coasting between the stars while the galaxy changes (you drift along with
+      // the stars around you, so over millions of years you only creep a little)
       const ox = p.x, oy = p.y, oz = p.z;
-      p.x += p.vx * secs; p.y += p.vy * secs; p.z += p.vz * secs;
+      const sp = Math.hypot(p.vx, p.vy, p.vz);
+      const want = sp * secs;
+      const k = want > 0 ? Math.min(1, (0.05 * LY) / want) : 0;
+      p.x += p.vx * secs * k; p.y += p.vy * secs * k; p.z += p.vz * secs * k;
       for (const b of this.bodies) if (b.moonOf === p) { b.x += p.x - ox; b.y += p.y - oy; b.z += p.z - oz; }
-      const step = Math.hypot(p.vx, p.vy, p.vz) * secs;
+      const step = want * k;
       if (step > 0) {
-        const near = this.galaxy.starsNear(p, this.O, Math.max(STAR_ACTIVATE * 1.5, step * 2));
+        const near = this.galaxy.starsNear(p, this.O, Math.min(Math.max(STAR_ACTIVATE * 1.5, step * 2), 2 * LY));
         for (const s of near) {
           if (s.d < STAR_ACTIVATE * 1.2 && this.galaxy.starNow(s.rec)) {
             this.setDeep(0);
@@ -722,6 +737,7 @@ export class World {
     }
     this.time += secs;
     this.galaxy.advance(years);
+    this.checkCosmic();
     this.evolve(dtReal, years);
     for (const m of this.modules) m.update?.(dtReal, years);
     this.hazards.update(dtReal, years);
@@ -735,6 +751,54 @@ export class World {
     for (const b of this.bodies) if (b.heat > 0) b.heat = Math.max(0, b.heat * Math.exp(-years / 2e5));
     this.rebaseIfNeeded();
     this.flushDead();
+  }
+
+  // the collision with Andromeda, and the far future
+  checkCosmic() {
+    const g = this.galaxy, p = this.player;
+    if (g.merged > 0.005 && !this.cosmic?.arrived) {
+      (this.cosmic ||= {}).arrived = true;
+      this.emit('andromeda', { stage: 'arrive' });
+    }
+    if (g.merged >= 1 && g.andromeda.alive) {
+      g.andromeda.alive = false;
+      const [lx, ly, lz] = this.toLy(p.x, p.y, p.z);
+      const near = Math.hypot(lx, ly, lz) < 5000;
+      if (p.compact === 'bh' && near) {
+        p.mass += g.andromeda.mass;
+        p.updateRadius();
+        this.emit('bh-merger', { mass: g.andromeda.mass, lost: g.andromeda.mass * 0.05, x: p.x, y: p.y, z: p.z, andromeda: true });
+      } else g.core.mass += g.andromeda.mass;
+      if (this.coreBody) this.coreBody.mass = g.core.mass;
+      this.emit('andromeda', { stage: 'merged', ate: p.compact === 'bh' && near });
+    }
+  }
+
+  // sandbox: jump ahead in time, letting everything happen on the way
+  skipYears(years) {
+    const p = this.player;
+    if (!p || !p.alive) return;
+    const was = this.deep;
+    if (!was) this.enterDeep();
+    this.deep = this.deep || 1;
+    const steps = 60;
+    this.rateOverride = years / steps / 0.05;
+    for (let i = 0; i < steps && p.alive; i++) {
+      if (!this.deep) { this.enterDeep(); this.deep = 1; }
+      this.deepStep(0.05);
+    }
+    this.rateOverride = 0;
+    this.deep = was;
+    if (!was) { this.deep = 0; this.exitDeep(); }
+  }
+
+  // which age of the universe it is (for the endgame)
+  era() {
+    const t = 13.8e9 + this.years;
+    if (t < 1e14) return 'Stelliferous era: stars still shine';
+    if (t < 1e40) return 'Degenerate era: only stellar corpses remain';
+    if (t < 1e100) return 'Black hole era: nothing but black holes';
+    return 'Dark era';
   }
 
   flushDead() {
@@ -894,6 +958,7 @@ export class World {
     let radiated = 0;
     if (p.compact === 'bh') radiated = m * (0.057 + 0.25 * Math.pow(p.bhSpin || 0, 3));
     const M0 = p.mass;
+    this.recentFeed = (this.recentFeed || 0) + m / M0;
     p.absorbComp(b, m);
     p.mass = Math.max(p.mass + m - ejecta - radiated, 1e12);
     // what you eat steers what you become
@@ -1085,13 +1150,16 @@ export class World {
         // capture as a moon: bound, inside your Hill sphere, outside Roche
         if (b.moonOf !== p) {
           const bound = 0.5 * (vx * vx + vy * vy + vz * vz) - (G * p.mass) / d < 0;
-          if (bound && d < hill * 0.5 && b.mass < p.mass * 0.3 && b.mass > p.mass * 0.003 && moons < 6) {
+          // a star gathers planets; a planet gathers moons
+          const star = p.isStar && !p.compact;
+          const okMass = star ? b.mass < p.mass * 0.012 && b.mass > p.mass * 1e-8 : b.mass < p.mass * 0.3 && b.mass > p.mass * 0.003;
+          if (bound && d < hill * 0.5 && okMass && moons < (star ? 9 : 6)) {
             b.capt = (b.capt || 0) + rs;
             if (b.capt > 1.5) {
               b.moonOf = p;
-              b.moonName = b.moonName || `${p.name} ${['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][moons] || 'M'}`;
+              b.moonName = b.moonName || (star ? `${p.name} ${'bcdefghij'[moons] || 'z'}` : `${p.name} ${['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][moons] || 'M'}`);
               b.name = b.moonName;
-              this.emit('moon', { body: b });
+              this.emit('moon', { body: b, planet: star });
             }
           } else b.capt = 0;
           continue;

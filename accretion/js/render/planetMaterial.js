@@ -73,6 +73,7 @@ uniform vec2 uHitSize[6];  // angular size (rad), strength
 uniform vec4 uOcc[2];      // eclipsing bodies: view-space centre, radius
 uniform float uCut;        // 1 = cutaway: a wedge is removed
 uniform float uClose;      // >0 in close-up views: planet radius in view units
+uniform float uOutbreak;   // a giant storm boiling up on a gas giant
 uniform float uHeat;       // 0..1 molten glow
 uniform float uDamage;     // 0..1 glowing cracks
 uniform float uCraters;    // crater visibility
@@ -267,6 +268,16 @@ vec3 gasColor(vec3 p, out float emissive) {
   float swirl = snoise(vec3(d * 22.0, uSeed) + vec3(0.0, 0.0, atan(d.y, d.x) * 0.6));
   vec3 stormCol = uType == 5 ? vec3(0.02, 0.04, 0.1) : mix(vec3(0.42, 0.12, 0.05), vec3(0.6, 0.35, 0.22), swirl * 0.5 + 0.5);
   col = mix(col, stormCol, storm * 0.85);
+  // a great white storm wrapping around a band of latitude
+  if (uOutbreak > 0.0) {
+    float bandLat = 0.5 * sin(uSeed * 2.3);
+    float bandW = 0.08 + 0.1 * (1.0 - uOutbreak);
+    float inBand = exp(-pow((lat - bandLat) / bandW, 2.0));
+    float head = fract((lon + 3.1416) / 6.2832 - (1.0 - uOutbreak) * 0.9);
+    float reach = smoothstep(0.0, 0.15, head) * (1.0 - smoothstep(1.0 - uOutbreak * 0.9, 1.0, head));
+    float puff = fbm(q * vec3(6.0, 14.0, 6.0) + so * 5.0, 4) * 0.5 + 0.5;
+    col = mix(col, vec3(0.97, 0.95, 0.9), inBand * puff * uOutbreak * (0.4 + 0.6 * reach));
+  }
   // poles: darker, hazy
   col *= mix(1.0, 0.7, smoothstep(0.6, 1.3, abs(lat)));
   if (uType == 7) {
@@ -434,6 +445,7 @@ export function makePlanetMaterial(sharedUniforms) {
       uOcc: { value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] },
       uCut: { value: 0 },
       uClose: { value: 0 },
+      uOutbreak: { value: 0 },
       uHeat: { value: 0 },
       uDamage: { value: 0 },
       uCraters: { value: 1 },
