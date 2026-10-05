@@ -923,3 +923,7 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Comp living**: enough play earns free hotel nights continuously; drops off when play drops.
 - **Fraud crimes**: insurance fraud (investigators), check fraud, counterfeit chips (RFID chips →
   likely caught), return fraud (stores flag you).
+- **Caffeine addiction**: daily coffee/energy drinks hook you; skipping → headache & crankiness.
+- **Drive-in theater** in Sparks (sound via car radio; date spot).
+- **Language learning app** (Duolingo): daily practice slowly unlocks understanding of Spanish,
+  Cantonese and Japanese NPCs without the translator; skipping days → forgetting.
