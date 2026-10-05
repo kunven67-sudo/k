@@ -989,6 +989,14 @@ have a Ring cam; a witness only matters if someone actually saw it).
   eating while driving distracts.
 - **Pocket food gets squished**: sandwiches squish, chocolate melts in heat, shaken soda explodes.
 
+- **Smart fridges** exist as specific models (e.g. a Samsung Family Hub screen showing contents and
+  expiration dates) — features depend on the fridge.
+- **Deli & bakery counters**: take a number, order by voice/typing ("half a pound of turkey,
+  thin"), custom birthday cakes ordered days ahead.
+- **Government help**: SNAP/EBT (groceries only — no beer or hot food; weeks to approve),
+  unemployment (layoffs only, not firing for cause; job-search logs), Medicaid (free coverage at
+  low income; lost when income rises), housing assistance (months-to-years waitlists).
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
