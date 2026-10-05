@@ -116,7 +116,7 @@ body.nohud #hud{opacity:0;}
 #clock.show{display:block;}
 #clock small{display:block;font-family:var(--body);font-size:10px;letter-spacing:.2em;color:var(--gold);font-weight:900;}
 #prompt{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);display:none;background:var(--panel);border:1px solid var(--line);border-radius:30px;padding:8px 18px 8px 10px;font-weight:900;font-size:16px;white-space:nowrap;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
-#prompt.show{display:block;animation:fadeUp .2s;}
+#prompt.show{display:block;animation:fadeUp .2s;} body.spamming #prompt{display:none !important;}
 #prompt kbd{margin-right:9px;}
 #itemHint{position:absolute;right:18px;bottom:18px;display:none;flex-direction:column;align-items:flex-end;gap:6px;font-weight:800;font-size:13px;}
 #itemHint.show{display:flex;}
@@ -132,8 +132,8 @@ body.nohud #hud{opacity:0;}
 #fuel{position:absolute;left:50%;bottom:110px;transform:translateX(-50%);display:none;text-align:center;font:bold 12px var(--ui,sans-serif);letter-spacing:.2em;color:#ffcc66;text-shadow:0 2px 4px #000;}
 #fuel.show,#spam.show{display:block;} #fuel .bar,#spam .bar{width:220px;height:12px;border-radius:8px;background:rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.3);overflow:hidden;margin-top:4px;}
 #fuel .bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff7a2a,#ffd24a);} #fuel.low .bar i{background:#ff3a3a;}
-#spam{position:absolute;left:50%;top:58%;transform:translateX(-50%);display:none;text-align:center;font:900 26px var(--title,sans-serif);color:#fff;text-shadow:0 3px 0 #000;} #spam .bar i{display:block;height:100%;width:0;background:#6dffd8;}
-#count{position:absolute;left:50%;top:14%;transform:translateX(-50%);display:none;font:900 88px var(--title,sans-serif);color:#ff4a3a;text-shadow:0 0 30px rgba(255,60,40,.8),0 4px 0 #000;} #count.show{display:block;}
+#spam{position:absolute;left:50%;bottom:9%;transform:translateX(-50%);display:none;text-align:center;font:900 26px var(--title,sans-serif);color:#fff;text-shadow:0 3px 0 #000;} #spam .bar i{display:block;height:100%;width:0;background:#6dffd8;}
+#count{position:absolute;right:5%;top:8%;display:none;font:900 72px var(--title,sans-serif);color:#ff4a3a;text-shadow:0 0 30px rgba(255,60,40,.8),0 4px 0 #000;} #count.show{display:block;}
 #visor.show{display:block;}
 #visor .rim{position:absolute;inset:-4%;border-radius:48%;box-shadow:inset 0 0 0 3px rgba(160,230,255,.25),inset 0 0 120px 40px rgba(0,0,0,.85);}
 #visor .glare{position:absolute;left:8%;top:6%;width:30%;height:14%;border-radius:50%;background:radial-gradient(ellipse,rgba(255,255,255,.08),rgba(255,255,255,0) 70%);transform:rotate(-12deg);}
@@ -359,6 +359,7 @@ body.touch #dialog{left:calc(10px + env(safe-area-inset-left));transform:none;wi
 body.touch #dialog.show{animation:dlgInT .3s cubic-bezier(.2,1.2,.4,1);}
 @keyframes dlgInT{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 body.touch #dialog .txt{font-size:clamp(14px,3.8vw,18px);}
+body.cine #crosshair,body.indlg #crosshair{opacity:0 !important;}
 body.touch.indlg #touch .tb:not(#tUse):not(#tPause){opacity:0;pointer-events:none;}
 body.touch #caption{top:calc(64px + env(safe-area-inset-top));bottom:auto;width:min(620px,86vw);font-size:clamp(13px,3.6vw,17px);}
 body.touch #itemHint{right:auto;left:calc(12px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));align-items:flex-start;}
@@ -782,9 +783,11 @@ function initAudio(){
     voiceBus=ACtx.createGain(); voiceBus.connect(master); voiceBus.connect(revIn);
     // echo send (the dream): a long feedback delay everything can bleed into
     echoIn=ACtx.createGain(); echoIn.gain.value=0;
-    const eDl=ACtx.createDelay(2); eDl.delayTime.value=.46; const eFb=ACtx.createGain(); eFb.gain.value=.52; const eLp=ACtx.createBiquadFilter(); eLp.type='lowpass'; eLp.frequency.value=2400;
-    echoIn.connect(eDl); eDl.connect(eLp); eLp.connect(eFb); eFb.connect(eDl); eLp.connect(master); eLp.connect(revIn);
-    for(const b of [sfxBus,ambBus,voiceBus,musicBus]) b.connect(echoIn);
+    // a big dark hall: a soft, darkened slap-back that fades fast, then lots of reverb (no ping-pong robot repeats)
+    const eDl=ACtx.createDelay(2); eDl.delayTime.value=.27; const eFb=ACtx.createGain(); eFb.gain.value=.28; const eLp=ACtx.createBiquadFilter(); eLp.type='lowpass'; eLp.frequency.value=1500; const eHp=ACtx.createBiquadFilter(); eHp.type='highpass'; eHp.frequency.value=180;
+    const eOut=ACtx.createGain(); eOut.gain.value=.45;
+    echoIn.connect(eDl); eDl.connect(eLp); eLp.connect(eHp); eHp.connect(eFb); eFb.connect(eDl); eHp.connect(eOut); eOut.connect(revIn); eOut.connect(master);
+    for(const b of [sfxBus,ambBus]) b.connect(echoIn);
     const sr=ACtx.sampleRate;
     NOISE_BUF=(()=>{ const b=ACtx.createBuffer(1,sr*3,sr), d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; return b; })();
     BROWN_BUF=(()=>{ const b=ACtx.createBuffer(1,sr*3,sr), d=b.getChannelData(0); let l=0; for(let i=0;i<d.length;i++){ l=(l+.02*(Math.random()*2-1))/1.02; d[i]=l*3.5; } return b; })();
@@ -1156,13 +1159,11 @@ function speakLine(who,text,onEnd){
   if(SETTINGS.funny && typeof speakFunny==='function') return speakFunny(who,text,onEnd);
   try{
     const u=new SpeechSynthesisUtterance(clean), v=voiceFor(prof); if(v) u.voice=v;
-    u.rate=prof.rate; u.pitch=prof.pitch; u.volume=Math.min(1,.35+SETTINGS.sfx*.65*SETTINGS.master);
+    u.rate=prof.rate*(VOICE.echo?.94:1); u.pitch=prof.pitch; u.volume=Math.min(1,.35+SETTINGS.sfx*.65*SETTINGS.master);
     const tok=++VOICE.token; let done=false;
     const fin=()=>{ if(done) return; done=true; if(tok===VOICE.token){ VOICE.speaking=false; VOICE.lastEnd=performance.now(); } if(onEnd) onEnd(); };
     u.onend=fin; u.onerror=fin; u.onboundary=()=>{ VOICE.boundary=performance.now(); };
     speechSynthesis.cancel(); VOICE.speaking=true; speechSynthesis.speak(u);
-    if(VOICE.echo){ const words=clean.split(' '); const tail=words.slice(-Math.min(3,words.length)).join(' ');
-      [.38,.16].forEach(k=>{ const e=new SpeechSynthesisUtterance(tail); if(v) e.voice=v; e.rate=prof.rate*.92; e.pitch=prof.pitch*.96; e.volume=u.volume*k; speechSynthesis.speak(e); }); }
     setTimeout(fin,Math.max(2500,clean.length*95)+1500);   // safety: some browsers never fire onend
     return true;
   }catch(e){ if(onEnd) onEnd(); return false; }
@@ -2992,7 +2993,7 @@ function buildViewModel(){
 }
 function setVM(on){ VM.visible=on; }
 /* swap the first-person arms between your hoodie and the white shrink suit (gloves) */
-function setVMSuit(on){ if(!VM.mats) return; VM.mats.sleeve.color.copy(on?col(0xeeece6):VM.mats.sleeveCol); VM.mats.skin.color.copy(on?col(0xff8a3a):VM.mats.skinCol); }
+function setVMSuit(on){ if(!VM.mats) return; VM.suit=on; VM.mats.sleeve.color.copy(on?col(0xeeece6):VM.mats.sleeveCol); VM.mats.skin.color.copy(on?col(0xff8a3a):VM.mats.skinCol); if(VM.blockMats){ VM.blockMats.shirt.color.set(on?0xf4f2ee:0xffffff).multiplyScalar(.85); VM.blockMats.skin.color.set(on?0xff9a4a:0xffffff).multiplyScalar(.85); VM.blockMats.shirt.map=on?null:VM.blockMats.shirtMap; VM.blockMats.skin.map=on?null:VM.blockMats.skinMap; VM.blockMats.shirt.needsUpdate=VM.blockMats.skin.needsUpdate=true; } }
 /* carried object (rocket piece): pass a mesh, or null */
 function vmCarry(obj){
   if(VM.carryMesh){ VM.grp.remove(VM.carryMesh); VM.carryMesh=null; }
@@ -3051,6 +3052,7 @@ function updateViewModel(dt,t){
     if(k>.05){ const hr=[hold[0]+.1,hold[1]-.12,hold[2]+.22], hl=[hold[0]-.1,hold[1]-.12,hold[2]+.22];
       rp=rp.map((v,j)=>lerp(v,hr[j],k)); lp=lp.map((v,j)=>lerp(v,hl[j],k)); rr=[.35,-.25,-1.35]; lr=[.35,.25,1.35]; rf=lf=.8; }
   }
+  if(VM.reach>0){ onL=onR=true; const k=smooth(Math.min(1,VM.reach)), pull=(VM.pull||0); lp=lp.map((v,j)=>lerp(v,[-.2,-.4+pull*.08,-.56+pull*.14][j],k)); rp=rp.map((v,j)=>lerp(v,[.2,-.4+pull*.08,-.56+pull*.14][j],k)); lr=[lerp(lr[0],-.55,k),lerp(lr[1],.2,k),lerp(lr[2],.4,k)]; rr=[lerp(rr[0],-.55,k),lerp(rr[1],-.2,k),lerp(rr[2],-.4,k)]; lf=rf=lerp(.3,1,pull); }
   if(VM.handsLook>0){ onL=onR=true; const k=smooth(Math.min(1,VM.handsLook)); lp=lp.map((v,j)=>lerp(v,[-.16,-.28,-.5][j],k)); rp=rp.map((v,j)=>lerp(v,[.16,-.28,-.5][j],k)); lr=[lerp(lr[0],1.1,k),lerp(lr[1],.35,k),lerp(lr[2],.9,k)]; rr=[lerp(rr[0],1.1,k),lerp(rr[1],-.35,k),lerp(rr[2],-.9,k)]; lf=rf=.15; }
   if(VM.hurtT>0){ VM.hurtT-=dt; }
   // arms only appear when they are doing something (idle hands in the view just look odd)
@@ -3065,11 +3067,13 @@ function updateViewModel(dt,t){
 function setVMBlocky(on){
   if(!VM.arms) return; VM.blocky=on;
   if(on && !VM.blockArms){ const hx=h=>'#'+col(h).getHexString();
-    const skin=new THREE.MeshBasicMaterial({map:flatTex(hx(0xd8a880),.9,14)}), shirt=new THREE.MeshBasicMaterial({map:flatTex(hx(0x2f4d6e),.8,30)});
+    const skin=new THREE.MeshBasicMaterial({map:flatTex(hx(0xd8a880),.97,6)}), shirt=new THREE.MeshBasicMaterial({map:flatTex(hx(0x2f4d6e),.94,12)});
     skin.color.setScalar(.85); shirt.color.setScalar(.85);
+    VM.blockMats={skin,shirt,skinMap:skin.map,shirtMap:shirt.map};
     VM.blockArms=[]; for(const A of [VM.arms.L,VM.arms.R]){ const g=new THREE.Group(); const sl=new THREE.Mesh(new THREE.BoxGeometry(.11,.11,.56),shirt); g.add(sl); const hd=new THREE.Mesh(new THREE.BoxGeometry(.11,.11,.16),skin); hd.position.z=-.36; g.add(hd); g.traverse(o=>{ if(o.isMesh) o.renderOrder=10; }); A.add(g); VM.blockArms.push(g); } }
   for(const A of [VM.arms.L,VM.arms.R]) for(const c of A.children){ if(c===VM.watch||c===VM.net) continue; if(VM.blockArms&&VM.blockArms.includes(c)) c.visible=on; else c.visible=!on; }
   if(!on&&VM.stitch) VM.stitch.visible=!!PLAYER.stitched;
+  if(on) setVMSuit(!!VM.suit);
 }
 
 </script>
@@ -3106,6 +3110,7 @@ function showLine(){
   if(L.radio){ $('radio').classList.add('show'); SFX.radioOn(); }
   DLG.speaking=true;
   const voiceName=L.voice||L.who;
+  if(L.silent){ DLG.tts=true; DLG.speaking=false; DLG.babblePitch=0; return; }
   const used=speakLine(voiceName,L.text,()=>{ DLG.speaking=false; if(DLG.cur===L && L.h && !DLG.typing) L.h.userData.A.talk=false; if(DLG.cur===L && L.auto!=null) later(L.auto,()=>{ if(DLG.cur===L && DLG.active) advanceDialog(true); }); });
   DLG.tts=used;
   DLG.babbleT=0; DLG.babblePitch=(VOICE_PROFILES[voiceName]||{babble:170}).babble;
@@ -3292,7 +3297,7 @@ on('mouse',b=>{
 });
 function doInteract(){ if(interactCd>0) return; const it=findInteract(); if(it){ interactCd=it.cd!=null?it.cd:.25; hidePrompt(); try{ it.act(it); }catch(e){ console.error(e); __showErr&&__showErr('Error: '+e.message); } } else if(LV&&LV.onUse) LV.onUse(); }
 function updatePrompt(dt){
-  document.body.classList.toggle('indlg',DLG.active);
+  document.body.classList.toggle('indlg',DLG.active); document.body.classList.toggle('cine',!!(CAM.active||$('letterbox').classList.contains('on')));
   interactCd-=dt;
   if(G.mode!=='play'||G.paused||DLG.active||MODAL.open||CAM.active||!PLAYER.ctl.interact){ hidePrompt(); $('crosshair').classList.remove('hot'); TOUCH_UI.ready(false); return; }
   const it=findInteract();
@@ -6921,6 +6926,12 @@ Object.assign(SFX,{
   scream:()=>{ const d=D(); const f=700+Math.random()*500; tone(f,1.1,'sawtooth',.04,0,f*1.4,d,.05,['bandpass',1400]); noise(1,.04,0,1800,'bandpass',d,2); },
   beam:()=>{ tone(160,2.5,'sine',.08,0,320,sfxBus,.5); fm(320,2.5,1.5,3,.03,0); noise(2.5,.05,0,2600,'bandpass',sfxBus,4,null,5200,1); },
   suitOn:()=>{ noise(.4,.2,0,1600,'bandpass',sfxBus,1,null,600,.05); tone(300,.3,'square',.04,.3,600,sfxBus,.01,['lowpass',1200]); noise(.6,.15,.5,4000,'highpass',sfxBus,.7,null,1500,.3); },
+  // a real, wet, sick cough: a sharp burst of breath shaped by the throat, then a raspy pull of air back in
+  cough:(n=2)=>{ const d=D(); let t=0; for(let i=0;i<n;i++){ const f=520+Math.random()*180;
+      noise(.17,.34,t,f,'bandpass',d,1.2,PINK_BUF,f*.6,.005); noise(.13,.15,t,f*2.6,'bandpass',d,2,PINK_BUF,f*1.5,.005); noise(.07,.22,t,240,'lowpass',d,.7,BROWN_BUF);
+      tone(110+Math.random()*25,.07,'sawtooth',.035,t+.005,80,d,.004,['bandpass',f,1.5]); t+=.24+Math.random()*.12; }
+    noise(.55,.045,t+.12,1700,'bandpass',d,3,PINK_BUF,2300,.22); },
+  gooSuck:()=>{ const d=D(); noise(.6,.22,0,420,'lowpass',d,4,BROWN_BUF,160,.05); tone(150,.4,'sine',.08,.05,70,d,.03); },
   thud:()=>{ tone(70,.4,'sine',.5,0,40); noise(.25,.35,0,300,'lowpass',sfxBus,.7,BROWN_BUF); },
   ding2:()=>{ fm(1568,.5,3.01,1.2,.06); fm(2093,.6,3.01,1.2,.05,.1); }
 });
@@ -6978,11 +6989,11 @@ function makeBlockPerson(o={}){
   const opt=Object.assign({skin:0xd8a880,shirt:0x3a7ad8,pants:0x2a3a6a,hair:0x4a2e1a,shoes:0x2a2a2a,name:'?',voice:'Jim',beard:false},o);
   const hx=h=>'#'+col(h).getHexString();
   const g=new THREE.Group(); g.name=opt.name;
-  const S=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.skin),.92,10),roughness:.85});
+  const S=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.skin),.97,6),roughness:.85});
   const F=new THREE.MeshStandardMaterial({map:blockFaceTex({skinHex:hx(opt.skin),hairHex:hx(opt.hair),beard:opt.beard}),roughness:.85});
-  const Hm=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.hair),.8,24),roughness:.9});
-  const T=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.shirt),.8),roughness:.9});
-  const P=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.pants),.8),roughness:.9});
+  const Hm=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.hair),.9,14),roughness:.9});
+  const T=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.shirt),.94,12),roughness:.9});
+  const P=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.pants),.94,12),roughness:.9});
   const Sh=mat(opt.shoes,{roughness:.8});
   const box=(w,h,d,m)=>{ const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); b.castShadow=true; b.receiveShadow=true; return b; };
   const hips=new THREE.Group(); hips.position.y=.72; g.add(hips);
@@ -7014,6 +7025,8 @@ function animateBlockPerson(p,dt,t){
   if(A.pose==='hips'){ J.armL.rotation.z=.5; J.armR.rotation.z=-.5; }
   if(A.mode==='wave'){ J.armR.rotation.z=-2.6+Math.sin(t*10)*.4; }
   if(A.mode==='down'){ p.rotation.z=damp(p.rotation.z,Math.PI/2,6,dt); }
+  if(A.mode==='kneel'){ J.hips.position.y=.38; J.legL.rotation.x=-1.45; J.legR.rotation.x=.2; J.armL.rotation.x=-.35; J.armR.rotation.x=-.6-(A.talk?Math.sin(t*3)*.15:0); }
+  if(A.mode==='lie'){ J.hips.position.y=.72; J.legL.rotation.x=J.legR.rotation.x=0; J.armL.rotation.x=J.armR.rotation.x=0; J.armL.rotation.z=.12; J.armR.rotation.z=-.12; J.torso.scale.y=1+Math.sin(t*1.6)*.015; }
   // talking: little head bobs; looking at the player
   const talk=A.talk?Math.sin(t*14)*.06:0;
   let yaw=0; if(A.look==='player'){ const d=camera.position.clone().sub(_hw); yaw=clamp(angDiff(p.rotation.y,Math.atan2(d.x,d.z)),-.9,.9); }
@@ -7738,7 +7751,7 @@ async function shipEscape(){
    ================================================================ */
 function jetHUD(on,k){ const el=$('fuel'); el.classList.toggle('show',!!on); if(on&&k!=null){ el.querySelector('i').style.width=(k*100)+'%'; el.classList.toggle('low',k<.25); } }
 function countHUD(n){ const el=$('count'); if(n==null){ el.classList.remove('show'); return; } el.textContent=n; el.classList.add('show'); }
-function spamHUD(on,k,label){ const el=$('spam'); el.classList.toggle('show',!!on); if(on){ el.querySelector('i').style.width=(k*100)+'%'; if(label) $('spamT').textContent=label; } }
+function spamHUD(on,k,label){ const el=$('spam'); el.classList.toggle('show',!!on); document.body.classList.toggle('spamming',!!on); if(on){ el.querySelector('i').style.width=(k*100)+'%'; if(label) $('spamT').textContent=label; } }
 
 /* a blocky house: walls, windows, door, stepped roof */
 function blockHouse(B,x,z,o){ const w=o.w||7, d=o.d||7, h=o.h||4, face=o.face||1; // face: +1 door on +z side, -1 on -z
@@ -7828,7 +7841,7 @@ defineLevel('blockearth',{
     for(const f of lv.folk){ if(!f.visible||f.userData.lifted) continue; const A=f.userData.A; if(!A.path){ f.userData.li=(f.userData.li+1)%f.userData.loop.length; folkWalk(f,[f.userData.loop[f.userData.li]],A.mode==='panic'?3.4:1.4); } }
     updateFolk(dt,t); if(lv.jeff&&lv.jeff.visible) animateDog(lv.jeff,dt,t);
     if(lv.xFly.visible) animateXXX5(lv.xFly,t,{});
-    if(lv.xBig.visible) animateXXX5(lv.xBig,t,{beam:lv.burning,beamLen:8,rage:true});
+    if(lv.xBig.visible) animateXXX5(lv.xBig,t,{beam:lv.burning&&!lv.headBeamsOff,beamLen:11.5,rage:true});
     for(const d of lv.debris){ if(!d.o.visible) continue; d.v.y-=18*dt; d.o.position.addScaledVector(d.v,dt); d.o.rotation.x+=dt*2; d.o.rotation.y+=dt*1.5; if(d.o.position.y<-5) d.o.visible=false; }
     if(lv.burning){ for(const f of lv.fires){ f.s.position.y=f.y+Math.sin(t*6+f.ph)*.2; f.s.scale.x=f.sx*(1+Math.sin(t*9+f.ph)*.1); }
       lv.fireLight.intensity=2.6+Math.sin(t*11)*.5;
@@ -7988,20 +8001,42 @@ defineLevel('cabin',{
     lv.envMap=makeEnv({top:0xd8dce8,horizon:0x8a909a,bottom:0x2a2c30,lights:[{x:0,y:10,z:0,w:8,h:8,c:0xffffff,k:3}]});
     makeRig(scene,{sun:.4,hemi:.6,sky:0xd8e0f0,ground:0x3a3c40,dir:V3(.2,1,.3),span:6,dist:12,far:30});
     const R=3.2, H=3;
-    const wallM=new THREE.MeshStandardMaterial({color:col(0xe8ecf0),roughness:.4,metalness:.3,side:THREE.BackSide});
-    scene.add(mesh(new THREE.CylinderGeometry(R,R,H,40,1,true),wallM,0,H/2,0,false));
-    const fl=mesh(new THREE.CircleGeometry(R,40),new THREE.MeshStandardMaterial({map:repeatSet(shipTex().floor,2,2).map,roughness:.5,metalness:.6,color:col(0xb8c0c8)}),0,0,0,false); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; scene.add(fl);
-    const ce=mesh(new THREE.CircleGeometry(R,40),mat(0xd8dce0),0,H,0,false); ce.rotation.x=Math.PI/2; scene.add(ce);
-    for(const y of [.05,H-.05]){ const r=mesh(new THREE.TorusGeometry(R-.02,.05,8,64),mat(0xc8281c,{roughness:.4}),0,y,0,false); r.rotation.x=Math.PI/2; scene.add(r); }
-    const pl=new THREE.PointLight(col(0xfff4e8),2.4,12,2); pl.position.set(0,2.6,0); scene.add(pl);
-    // porthole with a view that can change
+    // padded white wall panels with seams and rivets
+    const panT=texSet('cabinWall',512,(x,w,h)=>{ x.fillStyle='#d8dce2'; x.fillRect(0,0,w,h); for(let j=0;j<4;j++) for(let i=0;i<4;i++){ const px=i*128, py=j*128; const g=x.createLinearGradient(px,py,px,py+128); g.addColorStop(0,'#e6e9ee'); g.addColorStop(1,'#c8ccd4'); x.fillStyle=g; x.fillRect(px+5,py+5,118,118); x.strokeStyle='#9aa0aa'; x.lineWidth=3; x.strokeRect(px+5,py+5,118,118); x.fillStyle='#8a909a'; for(const [a,b] of [[14,14],[114,14],[14,114],[114,114]]){ x.beginPath(); x.arc(px+a,py+b,3.5,0,7); x.fill(); } } },{strength:2.2});
+    const pw=repeatSet(panT,6,1.5);
+    const wallM=new THREE.MeshStandardMaterial({map:pw.map,normalMap:pw.normalMap,roughness:.55,metalness:.15,side:THREE.BackSide});
+    scene.add(mesh(new THREE.CylinderGeometry(R,R,H,48,1,true),wallM,0,H/2,0,false));
+    const fl=mesh(new THREE.CircleGeometry(R,48),new THREE.MeshStandardMaterial({map:repeatSet(shipTex().floor,2,2).map,normalMap:repeatSet(shipTex().floor,2,2).normalMap,roughness:.5,metalness:.6,color:col(0x9aa2aa)}),0,0,0,false); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; scene.add(fl);
+    const ce=mesh(new THREE.CircleGeometry(R,48),mat(0xc8ccd2,{roughness:.6}),0,H,0,false); ce.rotation.x=Math.PI/2; scene.add(ce);
+    const ribM=mat(0x8a9098,{metalness:.7,roughness:.35}), redM=mat(0xc8281c,{roughness:.45});
+    for(const y of [.05,H-.05]){ const r=mesh(new THREE.TorusGeometry(R-.02,.05,8,64),redM,0,y,0,false); r.rotation.x=Math.PI/2; scene.add(r); }
+    for(let i=0;i<12;i++){ const a=i/12*Math.PI*2; const rib=box(.08,H,.08,ribM,Math.cos(a)*(R-.05),H/2,Math.sin(a)*(R-.05)); rib.rotation.y=-a; scene.add(rib); }
+    // a ladder up to the nose hatch, cable bundles, ceiling lights
+    for(const sd of [-1,1]) scene.add(cyl(.025,.025,H,ribM,sd*.22,H/2,R-.35,8));
+    for(let y=.3;y<H;y+=.32) scene.add(box(.46,.03,.03,ribM,0,y,R-.35));
+    scene.add(cyl(.45,.45,.06,mat(0x2a2c30,{metalness:.8}),0,H-.02,R-.55,24));
+    for(let i=0;i<5;i++){ const c=cyl(.025,.025,H,mat(pick([0x2a2a2a,0xc8281c,0x2a5ad8,0xd8b02a]),{roughness:.6}),-1.5+i*.06,H/2,-R+.12,6,false); scene.add(c); }
+    lv.lamps=[]; for(const [x,z] of [[-1,0],[1,0],[0,1.4]]){ scene.add(box(.7,.04,.2,emissiveMat(0xfff4e0,3),x,H-.03,z,false)); }
+    const pl=new THREE.PointLight(col(0xfff0dc),2.2,12,2); pl.position.set(0,2.6,0); scene.add(pl);
+    const pl2=new THREE.PointLight(col(0x8ab8ff),.8,6,2); pl2.position.set(2,1.6,-1.6); scene.add(pl2);
+    // portholes (the front one shows where you are)
     lv.viewC=document.createElement('canvas'); lv.viewC.width=256; lv.viewC.height=256; lv.viewTex=new THREE.CanvasTexture(lv.viewC); lv.viewTex.encoding=THREE.sRGBEncoding;
-    const port=mesh(new THREE.CircleGeometry(.6,40),new THREE.MeshBasicMaterial({map:lv.viewTex}),0,1.6,-R+.05,false); port.material.color.setScalar(1.4); scene.add(port);
-    const pr=mesh(new THREE.TorusGeometry(.62,.08,10,40),mat(0x2a2c30,{metalness:.9,roughness:.3}),0,1.6,-R+.06,false); scene.add(pr);
-    // seats, a console, a cot
-    for(const a of [-.9,0,.9]){ const s=new THREE.Group(); s.position.set(Math.sin(a)*2.2,0,-Math.cos(a)*2.2+1.2); s.rotation.y=-a; scene.add(s); s.add(box(.6,.5,.6,mat(0x3a3e44),0,.25,0)); s.add(box(.6,.9,.12,mat(0xc8281c,{roughness:.6}),0,.9,.3));  (lv.scene_solids=lv.scene_solids||[]).push({obj:s,o:{pad:.03}}); }
-    const cot=new THREE.Group(); cot.position.set(-1.8,0,1.4); cot.rotation.y=.9; scene.add(cot); lv.cot=cot; (lv.scene_solids=lv.scene_solids||[]).push({obj:cot,o:{pad:.03}}); cot.add(box(.9,.35,2,mat(0x5a6068),0,.18,0)); cot.add(box(.85,.1,1.9,mat(0xe8e0d0,{roughness:.9}),0,.4,0));
-    const con=new THREE.Group(); con.position.set(2.2,0,-1.2); con.rotation.y=-.9; scene.add(con); (lv.scene_solids=lv.scene_solids||[]).push({obj:con,o:{pad:.03}}); con.add(box(1.2,1,.6,mat(0x5a6068,{metalness:.6}),0,.5,0)); con.add(box(1,.4,.05,emissiveMat(0x39ffb0,1.6),0,1.15,-.1,false));
+    const glassM=new THREE.MeshPhysicalMaterial({color:col(0x9ab8d8),roughness:.05,transparent:true,opacity:.18,clearcoat:1});
+    for(const a of [0,Math.PI*.62,-Math.PI*.62]){ const hold=new THREE.Group(); hold.rotation.y=a; scene.add(hold);
+      const port=mesh(new THREE.CircleGeometry(.5,40),new THREE.MeshBasicMaterial({map:lv.viewTex}),0,1.6,-R+.05,false); port.material.color.setScalar(1.3); hold.add(port);
+      hold.add(mesh(new THREE.CircleGeometry(.5,40),glassM,0,1.6,-R+.07,false)); hold.add(mesh(new THREE.TorusGeometry(.53,.07,10,40),mat(0x2a2c30,{metalness:.9,roughness:.3}),0,1.6,-R+.06,false));
+      for(let k=0;k<8;k++){ const b=k/8*Math.PI*2; hold.add(sph(.02,ribM,Math.cos(b)*.62,1.6+Math.sin(b)*.62,-R+.07,6,4,false)); } }
+    // seats, a console, two bunks
+    for(const a of [-.9,0,.9]){ const s=new THREE.Group(); s.position.set(Math.sin(a)*2.2,0,-Math.cos(a)*2.2+1.2); s.rotation.y=-a; scene.add(s); s.add(box(.6,.5,.6,mat(0x3a3e44),0,.25,0)); s.add(rbox(.6,.12,.6,.04,mat(0x2a2c30,{roughness:.8}),0,.56,0)); s.add(rbox(.6,.9,.12,.05,redM,0,.95,.3)); for(const sd of [-1,1]) s.add(box(.05,.6,.02,mat(0x1a1a1a),sd*.2,.95,.24)); (lv.scene_solids=lv.scene_solids||[]).push({obj:s,o:{pad:.03}}); }
+    const blanketM=[new THREE.MeshStandardMaterial({color:col(0x3a5a8a),roughness:.95}),new THREE.MeshStandardMaterial({color:col(0x6a8a3a),roughness:.95})];
+    const mkCot=(x,z,ry,i)=>{ const cot=new THREE.Group(); cot.position.set(x,0,z); cot.rotation.y=ry; scene.add(cot); (lv.scene_solids=lv.scene_solids||[]).push({obj:cot,o:{pad:.03,cond:()=>PLAYER.ctl.move}});
+      cot.add(box(.9,.3,2,mat(0x5a6068,{metalness:.5}),0,.15,0)); cot.add(rbox(.86,.12,1.94,.05,mat(0xe8e2d4,{roughness:.95}),0,.36,0)); cot.add(rbox(.5,.1,.3,.05,mat(0xf4f0e8,{roughness:.95}),0,.46,-.75)); cot.add(rbox(.88,.06,1.2,.03,blanketM[i],0,.44,.35)); return cot; };
+    lv.cot=mkCot(-1.8,1.4,.9,0); lv.cot2=mkCot(1.95,1.2,-.9,1);
+    const con=new THREE.Group(); con.position.set(2.2,0,-1.2); con.rotation.y=-.9; scene.add(con); (lv.scene_solids=lv.scene_solids||[]).push({obj:con,o:{pad:.03}});
+    con.add(rbox(1.3,.95,.6,.06,mat(0x4a5058,{metalness:.6,roughness:.4}),0,.48,0)); const tilt=box(1.2,.05,.5,mat(0x2a2e34,{metalness:.5}),0,.98,.02); tilt.rotation.x=.4; con.add(tilt);
+    lv.scrC=document.createElement('canvas'); lv.scrC.width=256; lv.scrC.height=128; lv.scrTex=new THREE.CanvasTexture(lv.scrC); lv.scrTex.encoding=THREE.sRGBEncoding;
+    const scr=mesh(new THREE.PlaneGeometry(1.1,.5),new THREE.MeshBasicMaterial({map:lv.scrTex,toneMapped:false}),0,1.42,-.24,false); scr.rotation.x=-.15; con.add(scr); con.add(box(1.16,.56,.04,mat(0x1a1c20),0,1.42,-.27));
+    lv.leds=[]; for(let i=0;i<10;i++){ const l=sph(.018,emissiveMat(pick([0x39ff6a,0xffcc33,0xff3a3a,0x5ab8ff]),2.5),-.5+i*.11,1.02,.12,6,4,false); con.add(l); lv.leds.push(l); }
     lv.jim=makeBlockJim(); lv.jim.userData.level='cabin'; scene.add(lv.jim);
     lv.bob=makeBlockPerson({name:'Bob',voice:'Bob',skin:0xe0b090,shirt:0xe8872a,pants:0x3a3a4a,hair:0x3a2414,beard:true}); lv.bob.userData.level='cabin'; scene.add(lv.bob);
     lv.suits=[]; for(let i=0;i<3;i++){ const s=new THREE.Group(); s.position.set(1.4-i*.7,0,2.4); scene.add(s); (lv.scene_solids=lv.scene_solids||[]).push({obj:s,o:{circle:true,cond:()=>s.visible}}); s.add(box(.5,.8,.25,mat(0xf0f0ec,{roughness:.5}),0,1.2,0)); s.add(sph(.2,new THREE.MeshPhysicalMaterial({color:col(0xffd070),roughness:.05,metalness:.3,clearcoat:1}),0,1.8,0)); s.add(box(.35,.5,.2,mat(0x5a6068),0,1.2,.22)); lv.suits.push(s); }
@@ -8015,7 +8050,8 @@ defineLevel('cabin',{
     if(k==='earth'){ x.fillStyle='#2a5ad8'; x.fillRect(40,120,180,140); x.fillStyle='#4a9a3a'; for(let i=0;i<14;i++) x.fillRect(40+(Math.random()*9|0)*20,120+(Math.random()*7|0)*20,20,20); }
     lv.viewTex.needsUpdate=true; },
   enter(){ FX.sunWorld=null; },
-  update(dt,t){ updateFolk(dt,t); }
+  update(dt,t){ updateFolk(dt,t); const lv=this; lv.leds.forEach((l,i)=>l.visible=Math.sin(t*(1.3+i*.37)+i)>-.3);
+    lv.scrT=(lv.scrT||0)+dt; if(lv.scrT>.15){ lv.scrT=0; const x=lv.scrC.getContext('2d'); x.fillStyle='#04120a'; x.fillRect(0,0,256,128); x.strokeStyle='#39ff6a'; x.lineWidth=2; x.beginPath(); for(let i=0;i<=64;i++){ const yy=64+Math.sin(i*.3+t*3)*20*Math.sin(t*.7+i*.05); i?x.lineTo(i*4,yy):x.moveTo(0,yy); } x.stroke(); x.fillStyle='#39ff6a'; x.font='bold 14px monospace'; x.fillText('FUEL 62%   O2 OK   HULL OK',8,18); lv.scrTex.needsUpdate=true; } }
 });
 
 function plutoHeight(x,z){ let h=fbm2(x*.012,z*.012,4)*6+fbm2(x*.05,z*.05,3)*1.2; const d=Math.hypot(x,z); h*=smooth(invLerp(30,90,d)); h+=smooth(invLerp(150,260,d))*40*(.5+fbm2(x*.01+5,z*.01,3)); return h; }
@@ -8187,19 +8223,21 @@ defineLevel('insidex',{
     for(let x=-7;x<=7;x++) for(let z=-20;z<=10;z++) B.add(x,-.5,z);
     for(let x=-7;x<=7;x++) for(let y=0;y<8;y++) B.add(x,y,-21);
     B.build(scene,true);
-    // purple goo pools + glowing veins
-    const goo=new THREE.MeshPhysicalMaterial({color:col(0x9a2aff),roughness:.05,clearcoat:1,emissive:col(0x5a0a9a),emissiveIntensity:.8});
-    for(const [x,z,s] of [[-2,-14,2.2],[3,-8,1.6],[-1.5,-2,1.4],[2,4,1.2],[-3.4,-17,1.4]]){ const p=mesh(new THREE.CircleGeometry(s,24),goo,x,.02,z,false); p.rotation.x=-Math.PI/2; scene.add(p); }
+    // purple goo pools (the one at -1.5,-2 is deep: Jeff gets stuck in it)
+    const goo=new THREE.MeshPhysicalMaterial({color:col(0x5a1490),roughness:.08,clearcoat:1,clearcoatRoughness:.05,emissive:col(0x3a0870),emissiveIntensity:.45});
+    for(const [x,z,s] of [[-2,-14,2.2],[3,-8,1.6],[-.3,-2.5,1.6],[2,4,1.2],[-3.4,-17,1.4]]){ const p=mesh(new THREE.CircleGeometry(s,32),goo,x,.02,z,false); p.rotation.x=-Math.PI/2; scene.add(p); }
+    lv.trap=V3(-.3,0,-2.5); lv.trapLight=new THREE.PointLight(col(0xe0b8ff),1.3,5,2); lv.trapLight.position.set(-.3,1.8,-2.5); scene.add(lv.trapLight);
     lv.lights=[]; for(const z of [-16,-8,0,7]){ const l=new THREE.PointLight(col(0xc86aff),1.8,10,2); l.position.set(0,3.5,z); scene.add(l); lv.lights.push(l); }
     // the core, where the nuke goes
     lv.core=new THREE.Group(); lv.core.position.set(0,0,-17.5); scene.add(lv.core);
-    lv.coreM=basicGlow(0xff6aff,3); const cb=box(1.4,1.4,1.4,lv.coreM,0,1.6,0,false); lv.core.add(cb); lv.coreBox=cb;
+    lv.coreM=new THREE.MeshStandardMaterial({map:BLOCKTEX.purple(),emissive:col(0xff4aff),emissiveMap:BLOCKTEX.purple(),emissiveIntensity:1,roughness:.4}); const cb=box(1.4,1.4,1.4,lv.coreM,0,1.6,0,false); lv.core.add(cb); lv.coreBox=cb;
+    lv.coreIn=box(.62,.62,.62,basicGlow(0xff6aff,2.2),0,1.6,0,false); lv.core.add(lv.coreIn);
     lv.core.add(pointLightAt(0xff6aff,3,8,0,1.6,1));
     lv.nuke=new THREE.Group(); lv.nuke.add(cyl(.18,.18,.6,mat(0x3a4a3a,{metalness:.6}),0,.3,0,16)); lv.nuke.add(mesh(new THREE.ConeGeometry(.18,.25,16),mat(0xd8c020),0,.72,0)); lv.nukeScr=box(.2,.1,.02,emissiveMat(0xff3a3a,2),0,.3,.18,false); lv.nuke.add(lv.nukeScr); lv.nuke.position.set(0,0,-16.2); lv.nuke.visible=false; scene.add(lv.nuke);
-    // Steve, sick and pale, covered in purple goo
-    lv.steve=makeSteve({skin:0xc8d8c0,skinGlow:0,sss:[.3,.3,.3]}); lv.steve.userData.level='insidex'; scene.add(lv.steve);
-    lv.steve.traverse(o=>{ if(o.isMesh&&o.material&&o.material.color&&Math.random()<.35){ o.material=o.material.clone(); o.material.color.lerp(col(0x9a2aff),.6); } });
-    const drips=new THREE.Group(); lv.steve.add(drips); for(let i=0;i<14;i++) drips.add(sph(rand(.04,.08),goo,rand(-.25,.25),rand(.3,1.6),rand(-.15,.2),8,6,false));
+    lv.nuke.userData.vmScale=1.5;
+    // Steve: pale and sick, his clothes soaked dark purple
+    lv.steveLight=new THREE.PointLight(col(0xe8d8ff),1.1,4,2); lv.steveLight.position.set(-.6,2.3,-7.2); scene.add(lv.steveLight);
+    lv.steve=makeSteve({skin:0xc4cdbc,skinGlow:0,sss:[.3,.3,.3],shirt:0x3a1452,pants:0x2a0c3c}); lv.steve.userData.level='insidex'; scene.add(lv.steve);
     lv.bob=makeBlockPerson({name:'Bob',voice:'Bob',skin:0xe0b090,shirt:0xf0f0ec,pants:0xf0f0ec,hair:0x3a2414,beard:true}); lv.bob.userData.level='insidex'; scene.add(lv.bob);
     lv.jeff=makeDog(); scene.add(lv.jeff);
     lv.mouthLight=new THREE.PointLight(col(0xffb070),2.5,14,2); lv.mouthLight.position.set(0,2.5,10); scene.add(lv.mouthLight);
@@ -8207,145 +8245,237 @@ defineLevel('insidex',{
   },
   enter(){ FX.sunWorld=null; },
   update(dt,t){ const lv=this; updateFolk(dt,t); if(lv.jeff.visible) animateDog(lv.jeff,dt,t);
-    lv.coreBox.rotation.y=t*.6; lv.coreBox.rotation.x=t*.3; lv.coreM.color.setRGB(1,.4,1).multiplyScalar(2.5+Math.sin(t*4)*.8);
+    lv.coreBox.rotation.y=t*.6; lv.coreBox.rotation.x=t*.3; const beat=Math.pow(Math.max(0,Math.sin(t*3.4)),6); lv.coreM.emissiveIntensity=.7+beat*1.1; lv.coreBox.scale.setScalar(1+beat*.06); lv.coreIn.rotation.y=-t*.9; lv.coreIn.rotation.z=t*.5;
     lv.lights.forEach((l,i)=>l.intensity=1.6+Math.sin(t*2+i)*.4);
     if(lv.nuke.visible) lv.nukeScr.material.emissiveIntensity=Math.sin(t*12)>0?3:.5;
+    // goo drips off Steve's chin and hands
+    if(lv.steve.visible&&Math.random()<dt*3){ const j=pick(['head','hdL','hdR'].map(k=>lv.steve.userData.J&&lv.steve.userData.J[k]).filter(Boolean)); if(j){ const p=j.getWorldPosition(new THREE.Vector3()); lv.glow.burst(p.add(V3(rand(-.04,.04),-.08,rand(-.04,.04))),{color:0x9a2aff,count:1,speed:.05,size:.025,life:.9,grav:5}); } }
+    // bubbles in Jeff's goo
+    if(lv.jeff.userData.stuck&&Math.random()<dt*5) lv.glow.burst(lv.trap.clone().add(V3(rand(-.6,.6),.05,rand(-.6,.6))),{color:0xc86aff,count:1,speed:.3,size:.05,life:.5,grav:-1});
     if(Math.random()<dt*6) lv.glow.spawn(rand(-3,3),rand(4,6),rand(-18,8),0,-rand(.5,1.2),0,rand(2,3),rand(.05,.1),.7,.2,1,.8,2,0,0); }
 });
 
+/* Jeff runs to a spot, always facing the way he is running */
+function dogRun(d,to,speed=4.5){ return new Promise(res=>{ const tok=STORY.token; (function step(){ if(tok!==STORY.token) return res(); const dt=G.dt||.016, dx=to.x-d.position.x, dz=to.z-d.position.z, L=Math.hypot(dx,dz), st=speed*dt;
+  if(L<=st){ d.position.x=to.x; d.position.z=to.z; return res(); } d.position.x+=dx/L*st; d.position.z+=dz/L*st; d.rotation.y=angLerp(d.rotation.y,Math.atan2(dx,dz),Math.min(1,dt*12)); later(0,step); })(); }); }
+/* a beam of purple light from one point to another */
+function beamBetween(a,b,r0,r1){ const dir=b.clone().sub(a), L=dir.length(); const g=new THREE.CylinderGeometry(r1,r0,1,32,1,true); g.translate(0,.5,0);
+  const m=mesh(g,new THREE.MeshBasicMaterial({color:col(0xc86aff),transparent:true,opacity:.2,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,fog:false}),a.x,a.y,a.z,false);
+  m.scale.set(1,L,1); m.quaternion.setFromUnitVectors(V3(0,1,0),dir.normalize()); return m; }
+
 /* ================= B12: BACK TO EARTH ================= */
 CHECKPOINTS.B12=async()=>{
-  const E=await enterLevel('blockearth',{pos:V3(12,0,8),yaw:Math.PI});
+  const E=await enterLevel('blockearth',{pos:V3(12,0,6.4),yaw:0});
   setCheckpoint('B12'); const F=F_(); F.day=3;
   PLAYER.lock(); crosshair(true); setVM(true); setVMBlocky(true); setVMSuit(true); PLAYER.hasWatch=true; PLAYER.stitched=true; PLAYER.eye=1.64;
   hudVisible(true); showCash(false); showCoins(false); objective(null);
-  E.setBurning(true); E.ship.visible=false; E.xFly.visible=false; E.lifted.length=0;
+  E.setBurning(true); E.headBeamsOff=false; E.ship.visible=false; E.xFly.visible=false; E.lifted.length=0;
   for(const f of E.folk){ f.visible=true; f.userData.lifted=false; f.userData.A.mode='panic'; f.rotation.z=0; }
-  const R=E.rocket; R.visible=true; R.position.set(12,60,3); setRocketFlame(R,1);
-  E.jim.visible=false; E.bob.visible=false;
+  const R=E.rocket; R.visible=true; R.position.set(12,70,3); setRocketFlame(R,1);
+  const jim=E.jim, bob=E.bob; jim.visible=false; bob.visible=false;
+  if(!E.jeff){ E.jeff=makeDog(); scene_add(E,E.jeff); } const jeff=E.jeff; jeff.visible=false; jeff.userData.happy=false; jeff.userData.stuck=false;
   playMusic('burning',1); setAmbience([['rocket',.3],['crowd',.06]]); letterbox(true);
-  camShot(V3(-4,2.2,26),V3(12,14,3),{dur:0,fov:55});
-  FX.blackout=0; await fade(0,1);
-  await tweenVal(k=>{ R.position.y=lerp(60,0,smooth(k)); },4,x=>x);
-  setRocketFlame(R,0); SFX.thud(); shake(.3); setAmbience([['crowd',.06],['wind',.04]]);
-  // everyone gets out
-  const jim=E.jim, bob=E.bob; jim.visible=true; jim.position.set(11,0,5.2); jim.rotation.y=Math.PI*.9; setMood(jim,'worried'); jim.userData.A.look=null;
-  bob.visible=true; bob.position.set(13.4,0,5.6); bob.rotation.y=Math.PI; bob.userData.A.mode=null; bob.userData.A.path=null;
-  if(!E.jeff){ E.jeff=makeDog(); scene_add(E,E.jeff); } E.jeff.visible=true; E.jeff.position.set(14.6,0,6.4); E.jeff.rotation.y=Math.PI;
-  PLAYER.pos.set(12,0,7); PLAYER.yaw=Math.PI;
-  camRelease(.6); letterbox(false); await wait(.6);
-  lookAtPoint(V3(6,30,-50),1); await wait(1.2);
-  for(let i=3;i<8;i++){ liftPerson(E,E.folk[i],5); later(i*.2,()=>bark('Person',pick(['Help! Help!!','HELP!','Somebody help!!']),null,1.6)); await wait(.5); }
-  await wait(2);
-  lookAtPoint(jim.position.clone().add(V3(0,1.6,0)),.6); jim.userData.A.look='player';
+  // 1) the town burning, XXX5 over it; Jim's rocket comes down on the road
+  camFollow(t=>({pos:V3(-34+t*1.2,5+t*.15,10),look:V3(lerp(6,12,Math.min(1,t/4)),lerp(40,8,Math.min(1,t/4.5)),lerp(-50,3,Math.min(1,t/4.5)))}),50);
+  FX.blackout=0; await fade(0,1.2);
+  await wait(1.2);
+  await tweenVal(k=>{ R.position.y=lerp(70,0,1-Math.pow(1-k,2)); },3.6,x=>x);
+  setRocketFlame(R,0); SFX.thud(); shake(.25); setAmbience([['crowd',.06],['wind',.04]]);
+  for(let i=0;i<14;i++) E.glow.burst(V3(12+rand(-2,2),.3,3+rand(-2,2)),{color:0xb8a890,count:2,speed:2.5,size:.5,life:1.4,grav:-.3});
+  camShot(V3(4,1.3,9),V3(12,2.2,3),{dur:0,fov:46}); await wait(1.4);
+  // 2) everyone gets out
+  jim.visible=true; jim.position.set(8.2,0,5.4); jim.rotation.y=0; setMood(jim,'worried'); jim.userData.A.look=null; jim.userData.A.path=null; clearPose(jim,0);
+  bob.visible=true; bob.position.set(13.8,0,5.8); bob.rotation.y=0; bob.userData.A.mode=null; bob.userData.A.path=null; bob.rotation.set(0,0,0);
+  jeff.visible=true; jeff.position.set(10.4,0,8.2); jeff.rotation.y=-.6;
+  PLAYER.pos.set(9.2,0,7.6); PLAYER.yaw=0; PLAYER.pitch=.18; carryNuke(true);
+  camRelease(.8); letterbox(false); await wait(.8);
+  lookAtPoint(V3(6,62,-56),1.6); await wait(1.8);
+  // people around town get pulled up into it, one after another
+  const cries=['Help!','Somebody help!','HELP!','No, no, no!','Help me!'];
+  for(let i=3;i<8;i++){ const f=E.folk[i]; liftPerson(E,f,5); bark('Person',cries[i-3],null,1.4); await wait(1.3); }
+  await wait(.6);
+  lookAtPoint(jim.position.clone().add(V3(0,1.55,0)),.7); jim.userData.A.look='player'; jim.rotation.y=Math.atan2(PLAYER.pos.x-jim.position.x,PLAYER.pos.z-jim.position.z);
+  await wait(.7);
   await talk([{h:jim,who:'Jim',text:"Dang it. Worse than I thought.",mood:'worried'},{h:jim,who:'Jim',text:"Ok. You know what to do, guys.",pose:'point'}]);
   clearPose(jim);
-  // the purple light from its eyes, shining down on the road
-  const spot=V3(4,0,-2); E.beamSpot=spot;
-  const bm=mesh(new THREE.CylinderGeometry(2.2,2.2,60,24,1,true),new THREE.MeshBasicMaterial({color:col(0xc86aff),transparent:true,opacity:.18,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}),spot.x,30,spot.z,false); E.scene.add(bm); E.beamMesh=bm;
+  // 3) XXX5 looks down at the road and shines its purple light on it
+  E.headBeamsOff=true;
+  E.xBig.updateMatrixWorld(true); const H=E.xBig.userData.heads[0].H, mouth=H.localToWorld(V3(0,-.15,1.6)), spot=V3(2,0,2.6); E.beamSpot=spot;
+  const bm=beamBetween(spot,mouth,2.4,1.4); E.scene.add(bm); E.beamMesh=bm; SFX.beam(); shake(.15);
+  lookAtPoint(V3(spot.x,3,spot.z),.8);
   objective('Walk into the purple light'); setMarker(()=>spot.clone().add(V3(0,2,0)),'The purple light','m');
   PLAYER.free();
-  await waitUntil(()=>Math.hypot(PLAYER.pos.x-spot.x,PLAYER.pos.z-spot.z)<2);
+  folkWalk(bob,[V3(4,0,3.6)],2.2);
+  await waitUntil(()=>Math.hypot(PLAYER.pos.x-spot.x,PLAYER.pos.z-spot.z)<2.1);
   setMarker(null); objective(null); PLAYER.lock();
-  bob.position.set(spot.x+1.2,0,spot.z+.8); E.jeff.visible=false;
-  SFX.beam(); lookAtPoint(V3(spot.x,40,spot.z-20),1.2);
-  await tweenVal(k=>{ PLAYER.eye=1.64+k*k*30; bob.position.y=k*k*28; FX.whiteout=Math.max(0,(k-.7)/.3); },4,x=>x);
-  E.scene.remove(bm); PLAYER.eye=1.64; bob.position.y=0;
+  bob.userData.A.path=null; bob.position.set(spot.x+1.1,0,spot.z+.6); bob.userData.A.mode='lifted';
+  SFX.beam(); lookAtPoint(mouth,1.6);
+  const p0=PLAYER.pos.clone(), b0=bob.position.clone(), up=mouth.clone().sub(spot);
+  await tweenVal(k=>{ const e=k*k*.32; PLAYER.pos.x=p0.x+up.x*e; PLAYER.pos.z=p0.z+up.z*e; PLAYER.eye=1.64+up.y*e; bob.position.set(b0.x+up.x*e,up.y*e,b0.z+up.z*e); bob.rotation.y+=G.dt*.8; FX.whiteout=Math.max(0,(k-.72)/.28); },4.4,x=>x);
+  E.scene.remove(bm); E.headBeamsOff=false; PLAYER.eye=1.64; bob.position.y=0; bob.userData.A.mode=null;
   startInsideX();
 };
 function scene_add(lv,o){ lv.scene.add(o); }
+/* you carry the nuke (Jim gave it to you on Pluto) */
+function carryNuke(on){ if(!on){ vmCarry(null); PLAYER.carry=null; return; }
+  const n=new THREE.Group(), inner=new THREE.Group(); inner.rotation.set(0,0,Math.PI/2); inner.position.set(.12,-.1,0); n.add(inner);
+  inner.add(cyl(.18,.18,.6,mat(0x3a4a3a,{metalness:.6}),0,.3,0,16)); inner.add(mesh(new THREE.ConeGeometry(.18,.25,16),mat(0xd8c020),0,.72,0)); inner.add(box(.2,.1,.02,emissiveMat(0xff3a3a,2),0,.3,.18,false));
+  n.userData.vmScale=.62; vmCarry(n); PLAYER.carry='nuke'; if(VM.carryMesh){ VM.carryMesh.position.set(0,-.36,-.62); VM.carryMesh.rotation.set(.25,.35,0); } }
 async function startInsideX(){
   const F=F_(); PLAYER.lock();
-  const lv=await enterLevel('insidex',{pos:V3(0,0,6),yaw:0});
+  const lv=await enterLevel('insidex',{pos:V3(0,0,7.4),yaw:0});
   const st=lv.steve, bob=lv.bob, jeff=lv.jeff;
-  st.visible=true; st.position.set(-2.2,0,-11); st.rotation.y=.8; setMood(st,'sad'); setPose(st,'sitGround',0); st.userData.A.look='player';
-  bob.visible=true; bob.position.set(1.2,0,5.6); bob.rotation.y=Math.PI; bob.userData.A.mode=null; bob.userData.A.path=null; bob.rotation.z=0;
-  jeff.visible=false; lv.nuke.visible=false;
-  await tweenVal(k=>{ FX.whiteout=1-k; },1.2);
-  // straight to the nuke
+  st.visible=true; st.position.set(-1.3,0,-8.4); st.rotation.y=.12; setMood(st,'sad'); clearPose(st,0); setPose(st,'droop',0); st.userData.A.look=null;
+  bob.visible=true; bob.position.set(1.3,0,7.6); bob.rotation.set(0,Math.PI,0); bob.userData.A.mode=null; bob.userData.A.path=null;
+  jeff.visible=false; jeff.userData.stuck=false; jeff.position.y=0; lv.nuke.visible=false; carryNuke(true);
+  // you drop down out of the light
+  PLAYER.eye=2.3; PLAYER.pitch=-.15;
+  await tweenVal(k=>{ FX.whiteout=1-k; },1.4);
+  await tweenVal(k=>{ PLAYER.eye=lerp(2.3,1.64,k*k); },.35,x=>x); SFX.thud(); shake(.2);
+  await wait(.8);
+  lookAtPoint(V3(-1.3,1.5,-8.4),1.4); await wait(1.6);
+  // Steve
   letterbox(true);
-  camShot(V3(0,2.4,2),V3(-2.2,.8,-11),{dur:0,fov:44});
-  await wait(1.2);
-  camShot(V3(-.8,1.4,-8.8),V3(-2.2,.8,-11),{dur:2,fov:38}); await wait(2);
-  say('You see Steve. He is covered in purple liquid. He looks sick. His body is pale.',4.6); await wait(4.4);
-  const S={h:st,who:'Steve',mood:'sad'};
-  await talk([{who:'You',text:"Steve, what is this?"},{...S,text:"*cough* It's XXX5. It's a dangerous thing... that will destroy the universe. *cough*"},{h:bob,who:'Bob',text:"Who is this guy?"},{who:'You',text:"It doesn't matter. What does is I got to put the nuke in here."}]);
+  camShot(V3(-.75,1.6,-6.5),V3(-1.3,1.52,-8.4),{dur:0,fov:40});
+  st.userData.A.look='player';
+  await wait(.6); SFX.cough(3);
+  say('You see Steve. He is covered in purple liquid. He looks sick. His body is pale.',4.6); await wait(4.6);
+  const S={h:st,who:'Steve',mood:'sad',pose:'droop'};
+  camShot(V3(.2,1.62,-6.1),V3(-1.1,1.4,-8.4),{dur:.8,fov:44});
+  await talk([{who:'You',text:"Steve, what is this?"},{...S,text:"*cough* It's XXX5. It's a dangerous thing... that will destroy the universe. *cough*",fx:()=>{ SFX.cough(2); later(4.2,()=>SFX.cough(1)); }},{h:bob,who:'Bob',text:"Who is this guy?"},{who:'You',text:"It doesn't matter. What does is I got to put the nuke in here."}]);
   camRelease(.6); letterbox(false);
-  PLAYER.pos.set(0,0,-11.5); PLAYER.yaw=0; lookAtPoint(V3(0,1.2,-17.5),0);
-  bob.position.set(1.4,0,-10.5);
+  st.userData.A.look='player';
+  PLAYER.pos.set(0,0,-4.6); PLAYER.yaw=0; lookAtPoint(V3(0,1.2,-17.5),0);
+  bob.position.set(1.6,0,-4.2); bob.rotation.y=Math.PI;
   if(!lv.setup){ lv.setup=true;
     addInteract(lv,{obj:lv.core,offset:V3(0,1,1.2),label:'Place the nuke',reach:3.2,aim:false,when:()=>!!F_().placeNuke,act:()=>runStory(placeNuke)});
-    addInteract(lv,{pos:V3(),label:'Help Jeff!',cd:.06,reach:4,aim:false,when:()=>!!F_().jeffStuck,act:()=>{ F_().helpK=(F_().helpK||0)+.09; SFX.squirm(); shake(.05); }});
+    addInteract(lv,{pos:V3(),label:'Pull Jeff out!',cd:.06,reach:4,aim:false,when:()=>!!F_().jeffStuck,act:()=>{ F_().helpK=(F_().helpK||0)+.09; VM.pull=1; SFX.squirm(); shake(.04); }});
   }
   F.placeNuke=true; objective('Place the nuke'); PLAYER.free();
 }
 async function placeNuke(){
   const lv=LEVELS.insidex, F=F_(); if(!F.placeNuke) return; F.placeNuke=false; PLAYER.lock(); objective(null);
-  lookAtPoint(V3(0,.3,-16.2),.5); await wait(.5);
-  lv.nuke.visible=true; SFX.nukeArm(); await wait(.8);
-  let n=10; countHUD(n); SFX.countBeep(true);
+  carryNuke(false);
+  lv.nuke.visible=true; lv.nuke.position.set(0,0,-16.25);
+  letterbox(true); camShot(V3(1.25,.55,-13.9),V3(0,.45,-16.25),{dur:0,fov:42});
+  SFX.clank(); await wait(.7); SFX.nukeArm(); await wait(.9);
+  let n=10; countHUD(n); SFX.countBeep(false);
   say('Nuke going off in...',2);
-  const tick=async()=>{ await wait(1.2); n--; countHUD(n); SFX.countBeep(n<=3); };
-  await tick();
+  await wait(1.2); n--; countHUD(n); SFX.countBeep(false);
+  camRelease(.4); letterbox(false);
   // Jeff?!
-  const jeff=lv.jeff; jeff.visible=true; jeff.position.set(.8,0,-9); jeff.rotation.y=Math.PI; SFX.bark();
-  lookAtPoint(V3(.8,.5,-9),.5); await wait(.6);
+  const jeff=lv.jeff; jeff.visible=true; jeff.userData.happy=true; jeff.position.set(.4,0,4); jeff.rotation.y=Math.PI;
+  sfxAt(V3(.4,.5,4),()=>SFX.bark(),3);
+  PLAYER.yaw=0; lookAtPoint(V3(.4,.5,-6),.6);
+  await dogRun(jeff,V3(.5,0,-12.6),6);
+  lookAtPoint(V3(.5,.5,-12.6),.3); SFX.bark();
   await talk([{who:'You',text:"Jeff, what are you doing here? Ok, we got to get out of here!"}]);
   objective('Get out!'); PLAYER.free();
   // the countdown keeps going while you run
-  let stuck=false; F.helpK=0;
   runStory(async()=>{ while(n>0&&!F.boomed){ await wait(1.2); if(F.boomed) break; n--; countHUD(n); SFX.countBeep(n<=3); } });
-  // Jeff and Bob run too
-  const bob=lv.bob; folkWalk(bob,[V3(1.4,0,4),V3(1,0,9.4)],4.2).then(()=>{ bob.visible=false; });
-  runStory(async()=>{ const p0=jeff.position.clone(), p1=V3(.4,0,1.5); await tweenVal(k=>{ jeff.position.lerpVectors(p0,p1,k); },2.2,x=>x); stuck=true; jeff.userData.stuck=true; SFX.whine(); });
-  await waitUntil(()=>(stuck&&PLAYER.pos.z>-1)||n<=2);
-  // Jeff is stuck
-  F.jeffStuck=true; lookAtPoint(V3(.4,.3,1.5),.4); objective(IS_TOUCH?'Spam USE to help Jeff!':'Spam E to help Jeff!');
-  const it=lv.inter.find(i=>i.label==='Help Jeff!'); it.pos=V3(.4,0,1.5);
-  while(n>1){ if(F.helpK>=1){ return savedJeff(); } spamHUD(true,Math.min(1,F.helpK),'HELP JEFF!'); F.helpK=Math.max(0,F.helpK-(G.dt||.016)*.6); jeff.position.x=.4+Math.sin(G.time*20)*.04*(F.helpK>.1?1:0); if(Math.random()<.02) SFX.whine(); await wait(0); }
-  // you fall
-  F.jeffStuck=false; spamHUD(false); PLAYER.lock(); objective(null);
-  SFX.thud(); shake(.6);
-  const p0=PLAYER.pos.clone(); await tweenVal(k=>{ PLAYER.pos.z=lerp(p0.z,9.4,k); PLAYER.eye=1.64-k*k*1.2; PLAYER.pitch=lerp(PLAYER.pitch,.6,k); PLAYER.roll=k*.5; },.9,x=>x);
-  F.boomed=true; countHUD(null);
-  // it explodes... with Jeff
-  SFX.shipBoom(); SFX.boom(); FX.whiteout=1; flashWhite(1,2); shake(1.2);
-  await wait(1.6);
+  // Bob runs out; Jeff runs ahead of you... right into the deep goo
+  const bob=lv.bob; folkWalk(bob,[V3(1.6,0,4),V3(1,0,9.8)],4.6).then(()=>{ bob.visible=false; });
+  let stuck=false; F.helpK=0;
+  runStory(async()=>{ await wait(.25); await dogRun(jeff,V3(.3,0,-5.6),5.2); await dogRun(jeff,lv.trap,3.2);
+    stuck=true; jeff.userData.stuck=true; jeff.userData.happy=false; SFX.gooSuck(); SFX.whine();
+    await tweenVal(k=>{ jeff.position.y=-.3*k; },.6); });
+  await waitUntil(()=>stuck);
+  objective('Help Jeff!'); setMarker(()=>lv.trap.clone().add(V3(0,.8,0)),'Jeff','m');
+  await waitUntil(()=>Math.hypot(PLAYER.pos.x-lv.trap.x,PLAYER.pos.z-lv.trap.z)<2.6||PLAYER.pos.z>lv.trap.z+1.2||n<=2);
+  setMarker(null);
+  if(n<=2){ F.jeffStuck=false; objective(null); PLAYER.lock(); SFX.xxxRoar(); shake(1); const s0=PLAYER.pos.clone(); lookAtPoint(V3(lv.trap.x,.2,lv.trap.z),.4);
+    await tweenVal(k=>{ PLAYER.pos.z=lerp(s0.z,10.6,k*k); PLAYER.pos.x=lerp(s0.x,0,k); PLAYER.eye=lerp(1.64,.9,Math.min(1,k*2)); PLAYER.roll=Math.sin(k*Math.PI)*.35; lookAtPoint(V3(jeff.position.x,.2,jeff.position.z),0); },2.2,x=>x);
+    return finalFall(n); }
+  // you grab him
+  F.jeffStuck=true; PLAYER.ctl.move=false; PLAYER.ctl.look=false; PLAYER.ctl.interact=true; PLAYER.vel.set(0,0,0);
+  const tp=lv.trap, fromDir=V3(PLAYER.pos.x-tp.x,0,PLAYER.pos.z-tp.z); if(fromDir.length()<.1) fromDir.set(0,0,1); fromDir.normalize();
+  const kneelAt=tp.clone().add(fromDir.multiplyScalar(1.5)), pk=PLAYER.pos.clone();
+  runStory(()=>tweenVal(k=>{ PLAYER.pos.x=lerp(pk.x,kneelAt.x,k); PLAYER.pos.z=lerp(pk.z,kneelAt.z,k); PLAYER.eye=lerp(1.64,1.1,k); },.45));
+  lookAtPoint(V3(tp.x,.3,tp.z),.45); jeff.rotation.y=Math.atan2(kneelAt.x-tp.x,kneelAt.z-tp.z);
+  objective(IS_TOUCH?'Spam USE to pull Jeff out!':'Spam E to pull Jeff out!');
+  const it=lv.inter.find(i=>i.label==='Pull Jeff out!'); it.pos=V3(tp.x,0,tp.z);
+  VM.forceShow=true;
+  while(n>2){ if(F.helpK>=1){ VM.forceShow=false; return savedJeff(); }
+    const dt=G.dt||.016; VM.reach=Math.min(1,(VM.reach||0)+dt*4); VM.pull=Math.max(0,(VM.pull||0)-dt*5);
+    spamHUD(true,Math.min(1,F.helpK),'PULL JEFF OUT!'); F.helpK=Math.max(0,F.helpK-dt*.6);
+    jeff.position.y=-.3+F.helpK*.24+(VM.pull||0)*.03; jeff.position.x=tp.x+Math.sin(G.time*18)*.025;
+    if(Math.random()<dt*.8) SFX.whine(); await wait(0); }
+  // XXX5 lurches... you lose your grip and slide out of its mouth
+  F.jeffStuck=false; spamHUD(false); objective(null); PLAYER.lock();
+  SFX.xxxRoar(); shake(1); SFX.gooSuck();
+  const jy=jeff.position.y; runStory(()=>tweenVal(k=>{ jeff.position.y=lerp(jy,-.36,k); VM.reach=1-k; },.5));
+  const s0=PLAYER.pos.clone(), e0=PLAYER.eye;
+  await tweenVal(k=>{ PLAYER.pos.z=lerp(s0.z,10.6,k*k); PLAYER.pos.x=lerp(s0.x,0,k); PLAYER.eye=lerp(e0,.9,Math.min(1,k*2)); PLAYER.roll=Math.sin(k*Math.PI)*.35; lookAtPoint(V3(jeff.position.x,.2,jeff.position.z),0); },2.2,x=>x);
+  VM.forceShow=false; VM.reach=0; VM.pull=0; spamHUD(false);
+  await finalFall(n);
+}
+/* falling out of XXX5's mouth; it blows up above you */
+async function finalFall(n){
+  const F=F_();
+  const E=await enterLevel('blockearth',{pos:V3(4,0,-40),yaw:Math.PI});
+  E.setBurning(true); E.headBeamsOff=true; E.xBig.visible=true; for(const f of E.folk) f.visible=false; E.jim.visible=false; E.bob.visible=false; if(E.jeff) E.jeff.visible=false; E.rocket.visible=true; E.rocket.position.set(12,0,3);
+  setVM(false); PLAYER.lock(); PLAYER.roll=.3; playMusic(null,.4); setAmbience([['wind',.25]]);
+  E.xBig.updateMatrixWorld(true); const H=E.xBig.userData.heads[0].H, mouth=H.localToWorld(V3(0,-.15,1.6));
+  PLAYER.pos.set(mouth.x-2,0,mouth.z+4); PLAYER.eye=mouth.y-4; lookAtPoint(mouth,0);
+  SFX.whoosh(1.4);
+  let boomed=false;
+  await tweenVal(k=>{ PLAYER.eye=lerp(mouth.y-4,1.2,k*k); PLAYER.pos.z=mouth.z+4+k*10; PLAYER.roll=.3-k*.5; lookAtPoint(mouth,0);
+    if(!boomed&&k>.3){ boomed=true; xxxBoom(E); countHUD(null); F.boomed=true; } },3.4,x=>x);
+  SFX.thud(); shake(1); FX.blackout=1;
+  await wait(1.2);
   await finalAftermath();
 }
+function xxxBoom(E){
+  const U=E.xBig.userData, pts=U.heads.map(h=>h.H.getWorldPosition(new THREE.Vector3())); pts.push(E.xBig.getWorldPosition(new THREE.Vector3()));
+  SFX.shipBoom(); SFX.boom(); flashWhite(1,2.2); shake(1.4); E.xBig.visible=false;
+  for(const p of pts) for(let i=0;i<4;i++) E.glow.burst(p.clone().add(V3(rand(-8,8),rand(-8,8),rand(-8,8))),{color:pick([0xc86aff,0xff6aff,0xffa040]),count:40,speed:18,size:2,life:2.4,grav:6});
+  // chunks of purple block rain down
+  if(!E.chunks){ E.chunks=[]; for(let i=0;i<36;i++){ const c=box(1,1,1,U.skin,0,0,0); c.visible=false; E.scene.add(c); E.chunks.push({o:c,v:V3(),w:V3()}); } }
+  for(const c of E.chunks){ const p=pick(pts); c.o.visible=true; c.o.position.copy(p).add(V3(rand(-6,6),rand(-6,6),rand(-6,6))); c.o.scale.setScalar(rand(1.2,4)); c.v.set(rand(-14,14),rand(-2,14),rand(-14,14)); c.w.set(rand(-3,3),rand(-3,3),rand(-3,3)); }
+  runStory(async()=>{ const t0=G.time; while(G.time-t0<7){ const dt=G.dt||.016; for(const c of E.chunks){ if(!c.o.visible) continue; c.v.y-=18*dt; c.o.position.addScaledVector(c.v,dt); c.o.rotation.x+=c.w.x*dt; c.o.rotation.y+=c.w.y*dt; if(c.o.position.y<c.o.scale.y*.5){ c.o.position.y=c.o.scale.y*.5; c.v.set(0,0,0); c.w.set(0,0,0); } } await wait(0); } });
+}
 async function finalAftermath(){
-  const E=await enterLevel('blockearth',{pos:V3(4,0,-1),yaw:Math.PI*.5});
-  E.xBig.visible=false; for(const f of E.fires) f.s.visible=true; E.rocket.visible=true; E.jim.visible=false; if(E.jeff) E.jeff.visible=false;
+  const E=LEVELS.blockearth;
+  E.xBig.visible=false; E.headBeamsOff=false; for(const f of E.fires) f.s.visible=true; E.jim.visible=false; if(E.jeff) E.jeff.visible=false;
   for(const f of E.folk) f.visible=false;
-  const bob=E.bob; bob.visible=true; bob.position.set(1.4,0,-2.4); bob.userData.A.mode=null; bob.rotation.set(0,.4,Math.PI/2); bob.position.y=.25;
-  PLAYER.lock(); setVM(false); PLAYER.eye=.3; PLAYER.roll=.25; PLAYER.pitch=-.05; lookAtPoint(V3(1.4,.3,-2.4),0);
+  const lp=PLAYER.pos.clone();
+  const bob=E.bob; bob.visible=true; bob.userData.A.mode=null; bob.userData.A.path=null; bob.position.set(lp.x+1.2,.22,lp.z-2.5); bob.rotation.set(0,0,Math.PI/2);
+  if(E.chunks) for(const c of E.chunks){ if(Math.hypot(c.o.position.x-lp.x,c.o.position.z-lp.z)<9) c.o.visible=false; }
+  PLAYER.lock(); setVM(false); PLAYER.eye=.3; PLAYER.roll=.25; PLAYER.pitch=-.05; lookAtPoint(V3(bob.position.x-.8,.3,bob.position.z),0);
   playMusic(null); setAmbience([['wind',.04]]); SFX.tinnitus(9);
-  for(let i=0;i<6;i++) E.glow.burst(V3(6+rand(-20,20),rand(30,60),-60+rand(-20,20)),{color:pick([0xc86aff,0xffa040]),count:30,speed:10,size:1.4,life:2,grav:4});
-  await tweenVal(k=>{ FX.whiteout=1-k; FX.dof=1; FX.dofFocus=.4; },2);
+  await tweenVal(k=>{ FX.blackout=1-k; FX.dof=1; FX.dofFocus=.4; },2);
   say('Bob is passed out, lying on the ground.',4); await wait(4);
   say('Your vision blacks out. You hear a ring in your ear.',4);
   await tweenVal(k=>{ FX.blackout=k; },3.2);
   await wait(2); FX.dof=0;
-  // you wake up to Jim
-  const C=await enterLevel('cabin',{pos:V3(-1.8,0,1.4),yaw:.9});
-  C.setView('earth'); for(const s of C.suits) s.visible=false; C.bob.visible=false;
-  const jim=C.jim; jim.visible=true; jim.position.set(-1.1,0,.5); jim.rotation.y=Math.atan2(-1.8+1.1,1.4-.5); jim.userData.A.look='player'; setMood(jim,'sad'); clearPose(jim,0);
-  PLAYER.pos.set(-1.8,0,1.4); PLAYER.eye=.62; PLAYER.roll=0; lookAtPoint(V3(-1.2,1.55,.6),0);
-  SFX.blink(); await tweenVal(k=>{ FX.blackout=1-k*.5; },.5); await tweenVal(k=>{ FX.blackout=.5+k*.5; },.3); await wait(.4);
-  await tweenVal(k=>{ FX.blackout=1-k; },1.4);
-  playMusic('sad',2);
+  // you wake up in Jim's rocket
+  const C=await enterLevel('cabin',{pos:V3(-2.3,0,1.0),yaw:.9});
+  C.setView('earth'); for(const s of C.suits) s.visible=false;
+  const bob2=C.bob; bob2.visible=true; bob2.userData.A.mode='lie'; bob2.userData.A.look=null; bob2.userData.A.path=null; bob2.rotation.order='YXZ'; bob2.rotation.set(-Math.PI/2,-.9,0); bob2.position.set(1.25,.56,1.76);
+  const jim=C.jim; jim.visible=true; jim.position.set(-.85,0,.45); jim.rotation.set(0,-1.05,0); jim.userData.A.mode='kneel'; jim.userData.A.look='player'; setMood(jim,'sad'); clearPose(jim,0);
+  PLAYER.pos.set(-2.3,0,1.0); PLAYER.eye=.74; PLAYER.roll=0; PLAYER.yaw=.9; PLAYER.pitch=1.15; setVM(false);
+  SFX.blink(); await tweenVal(k=>{ FX.blackout=1-k*.5; },.5); await tweenVal(k=>{ FX.blackout=.5+k*.5; },.3); await wait(.5);
+  await tweenVal(k=>{ FX.blackout=1-k; },1.6);
+  await wait(.8);
+  lookAtPoint(V3(-.85,1.1,.45),1.4); await wait(1.6);
+  playMusic('sad',3);
   const J={h:jim,who:'Jim',mood:'sad'};
-  await talk([{...J,text:"Are you ok?"},{who:'You',text:"Yes... but is Bob ok? And Jeff?"},{...J,text:"...",auto:1.4},{...J,text:"Jeff is gone."},{who:'You',text:"No... no..."}]);
-  // you cry
-  say('You cry.',3); runStory(async()=>{ for(let i=0;i<5;i++){ SFX.gasp(); await wait(.9); } });
-  await tweenVal(k=>{ FX.dof=k; FX.dofFocus=.3; PLAYER.pitch=lerp(PLAYER.pitch,.5,k); FX.desat=k*.4; },2);
-  await wait(1.5);
-  lookAtPoint(V3(-1.2,1.55,.6),1.2); await tweenVal(k=>{ FX.dof=1-k; },1.2);
+  await talk([{...J,text:"Are you ok?"}]);
+  // you sit up
+  { const p0=PLAYER.pos.clone(); await tweenVal(k=>{ PLAYER.eye=lerp(.74,1.06,k); PLAYER.pos.x=lerp(p0.x,-2.05,k); PLAYER.pos.z=lerp(p0.z,1.2,k); lookAtPoint(V3(-.85,1.05,.45),0); },1.2); }
+  await talk([{who:'You',text:"Yes... but is Bob ok? And Jeff?"}]);
+  lookAtPoint(V3(1.6,.75,1.5),1); await wait(1.8); lookAtPoint(V3(-.85,1.05,.45),.9); await wait(.9);
+  await talk([{...J,text:"...",silent:true,auto:1.6},{...J,text:"Jeff is gone."},{who:'You',text:"No... no...",silent:true}]);
+  // you cry (quietly: the picture blurs, you look down, your breath shakes)
+  say('You cry.',3);
+    lookAtPoint(V3(-2.05+.62,.42,1.2+.5),2.2); await tweenVal(k=>{ FX.dof=k; FX.dofFocus=.25; FX.desat=k*.4; },2.2);
+  await tweenVal(k=>{ const s=Math.max(0,Math.sin(k*Math.PI*7))*Math.sin(k*Math.PI); PLAYER.eye=1.06-s*.03; },4.4,x=>x);
+  lookAtPoint(V3(-.85,1.05,.45),1.6); await tweenVal(k=>{ FX.dof=1-k*.7; },1.6);
   await talk([{...J,text:"I'm sorry, bud. At least you have me.",pose:'talk'},{...J,text:"And we beat this."}]);
   clearPose(jim);
-  await wait(1);
-  await tweenVal(k=>{ FX.blackout=k; },2.2);
-  FX.desat=0;
+  await wait(1.2);
+  await tweenVal(k=>{ FX.blackout=k; },2.4);
+  FX.desat=0; FX.dof=0; jim.userData.A.mode=null; bob2.userData.A.mode=null; bob2.rotation.order='XYZ'; bob2.rotation.set(0,0,0);
   showTBC('MARS SHIFT','A1'); unlock('marsEnd');
 }
 
@@ -8808,9 +8938,12 @@ async function steveWins(){
 /* ---------- Mars Shift secret: free Jeff in time (you have to be REALLY fast) ---------- */
 async function savedJeff(){
   const lv=LEVELS.insidex, F=F_(), jeff=lv.jeff; F.jeffStuck=false; F.boomed=true; spamHUD(false); PLAYER.lock(); objective(null);
-  jeff.userData.stuck=false; jeff.userData.happy=true; SFX.bark(); shake(.2);
+  jeff.userData.stuck=false; jeff.userData.happy=true; SFX.gooSuck(); SFX.bark(); shake(.2);
+  // you yank him out of the goo... and run
+  const jy=jeff.position.y; await tweenVal(k=>{ jeff.position.y=lerp(jy,.05,k); VM.pull=1-k; },.35);
+  VM.reach=0; VM.forceShow=false; jeff.position.y=0; PLAYER.eye=1.64; jeff.rotation.y=0; lookAtPoint(V3(0,1.4,12),.4);
   const j0=jeff.position.clone(), p0=PLAYER.pos.clone();
-  await tweenVal(k=>{ jeff.position.lerpVectors(j0,V3(.4,0,9.4),k); PLAYER.pos.z=lerp(p0.z,9.4,k); },1.2,x=>x);
+  await tweenVal(k=>{ jeff.position.lerpVectors(j0,V3(.4,0,10.4),k); PLAYER.pos.x=lerp(p0.x,0,k); PLAYER.pos.z=lerp(p0.z,9.4,k); lookAtPoint(V3(jeff.position.x,.6,jeff.position.z+3),0); },2.4,x=>x);
   countHUD(null); SFX.shipBoom(); SFX.boom(); flashWhite(1,2); shake(1.2); FX.whiteout=1; await wait(1.4);
   const E=await enterLevel('blockearth',{pos:V3(4,0,-1),yaw:Math.PI*.5});
   E.xBig.visible=false; E.rocket.visible=true; E.jim.visible=false; for(const f of E.folk) f.visible=false; E.bob.visible=true; E.bob.position.set(1.6,0,-3); E.bob.rotation.set(0,.6,0); E.bob.userData.A.mode=null;
