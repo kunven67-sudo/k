@@ -6994,7 +6994,8 @@ const FOLK=[];
 function blockFaceTex(o){ return canvasTex(8,8,(x)=>{ x.fillStyle=o.skinHex; x.fillRect(0,0,8,8); x.fillStyle=o.hairHex; x.fillRect(0,0,8,2); x.fillRect(0,2,1,1); x.fillRect(7,2,1,1);
   x.fillStyle='#ffffff'; x.fillRect(1,3,2,1); x.fillRect(5,3,2,1); x.fillStyle=o.eyeHex||'#3a2a8a'; x.fillRect(2,3,1,1); x.fillRect(5,3,1,1);
   x.fillStyle=o.mouthHex||'#7a3a2a'; x.fillRect(3,5,2,1); if(o.beard){ x.fillStyle=o.hairHex; x.fillRect(1,5,1,2); x.fillRect(6,5,1,2); x.fillRect(2,6,4,1); } },null,{nearest:true}); }
-function flatTex(hex,shade=.85,n=40){ return canvasTex(8,8,(x)=>{ x.fillStyle=hex; x.fillRect(0,0,8,8); const c=col(hex); for(let i=0;i<n;i++){ const k=rand(shade,1.1); x.fillStyle=`rgb(${Math.min(255,c.r*255*k)|0},${Math.min(255,c.g*255*k)|0},${Math.min(255,c.b*255*k)|0})`; x.fillRect(Math.random()*8|0,Math.random()*8|0,1,1); } },null,{nearest:true}); }
+function flatTex(hex,shade=.85,n=40){ return canvasTex(8,8,(x)=>{ x.fillStyle=hex; x.fillRect(0,0,8,8); const c=new THREE.Color().setHex(parseInt(hex.slice(1),16));  // plain sRGB numbers (col() is linear and made the speckles dark blotches)
+ for(let i=0;i<n;i++){ const k=rand(shade,1.1); x.fillStyle=`rgb(${Math.min(255,c.r*255*k)|0},${Math.min(255,c.g*255*k)|0},${Math.min(255,c.b*255*k)|0})`; x.fillRect(Math.random()*8|0,Math.random()*8|0,1,1); } },null,{nearest:true}); }
 function makeBlockPerson(o={}){
   const opt=Object.assign({skin:0xd8a880,shirt:0x3a7ad8,pants:0x2a3a6a,hair:0x4a2e1a,shoes:0x2a2a2a,name:'?',voice:'Jim',beard:false},o);
   const hx=h=>'#'+col(h).getHexString();
@@ -7357,6 +7358,8 @@ function makeWorldArm(side){
   const H=makeHand(side,skinM); handG.add(H.grp); H.grp.rotation.y=side>0?-.3:.3;
   for(const fg of H.fingers){ fg.a.rotation.x=-.25; fg.b.rotation.x=-.3; }
   g.userData={H};
+  // the upper arm, going back up to your shoulder (so the forearm isn't a cut-off tube)
+  { const el=V3(0,0,.2), sh=V3(side*.24,.5,.55), d=sh.clone().sub(el), L=d.length(); const up=mesh(new THREE.CylinderGeometry(.06,.05,L,14),sleeveM,0,0,0); up.position.copy(el).addScaledVector(d,.5); up.quaternion.setFromUnitVectors(V3(0,1,0),d.normalize()); g.add(up); g.add(mesh(new THREE.SphereGeometry(.055,14,10),sleeveM,el.x,el.y,el.z)); }
   if(side>0){ // the watch + stitches on the left wrist
     const w=new THREE.Group(); w.position.set(0,.034,-.29); g.add(w);
     w.add(mesh(GC('wBand',()=>new THREE.TorusGeometry(.037,.008,8,24)),mat(0x1a1c22,{roughness:.4,metalness:.6}),0,-.034,0));
@@ -7584,7 +7587,7 @@ CHECKPOINTS.B9=async()=>{
   await wait(1.2);
   // Jim calls
   lv.ringing=true; runStory(async()=>{ while(lv.ringing){ sfxAt(V3(-.34,.75,.95),()=>SFX.ring(),1.5); await wait(1.1); } });
-  lookAtPoint(V3(-.34,.72,.97),.7);
+  lookAtPoint(V3(-.3,.72,.92),.7);
   say("Jim calls you on your watch. Yes, he put a calling thing on it.",4.4);
   await wait(1.4);
   objective("Answer the call");
@@ -8143,9 +8146,9 @@ CHECKPOINTS.B11=async()=>{
   PLAYER.lock(); crosshair(true); setVM(true); setVMBlocky(true); setVMSuit(false); PLAYER.hasWatch=true; PLAYER.stitched=true; PLAYER.eye=1.64;
   hudVisible(true); showCash(false); showCoins(false); objective(null);
   lv.setView('pluto'); for(const s of lv.suits) s.visible=true;
-  const jim=lv.jim, bob=lv.bob; jim.visible=true; jim.position.set(.3,0,-1.2); jim.rotation.y=0; jim.userData.A.look='player'; setMood(jim,'neutral');
+  const jim=lv.jim, bob=lv.bob; jim.visible=true; jim.position.set(.25,0,-.55); jim.rotation.y=0; jim.userData.A.look='player'; setMood(jim,'neutral');
   bob.visible=true; bob.position.set(-1.1,0,.6); bob.rotation.y=Math.PI*.6; bob.userData.A.look='player';
-  lookAtPoint(V3(.3,1.6,-1.2),0);
+  lookAtPoint(V3(.25,1.45,-.55),0);
   playMusic('pluto',2); await fade(0,1);
   say('You land on Pluto.',2.8); await wait(2.6);
   const J={h:jim,who:'Jim'};
@@ -8155,9 +8158,11 @@ CHECKPOINTS.B11=async()=>{
   await fade(1,.5); SFX.suitOn(); for(const s of lv.suits) s.visible=false; setVMSuit(true); await wait(1); SFX.helmetSeal&&SFX.helmetSeal();
   
   // outside
-  const pl=await enterLevel('pluto',{pos:V3(2,0,0),yaw:Math.PI*.85});
-  pl.jim.visible=true; pl.jim.position.set(-1.5,0,-2); pl.jim.userData.A.look='player'; pl.bob.visible=true; pl.bob.position.set(-3,0,1); pl.bob.userData.A.look='player'; pl.base.visible=false; pl.jeff.visible=false;
+  const pl=await enterLevel('pluto',{pos:V3(4.5,0,-1),yaw:Math.PI*.85});
+  pl.jim.visible=true; pl.jim.position.set(-2.6,0,1.8); pl.jim.userData.A.look='player'; pl.bob.visible=true; pl.bob.position.set(-3,0,1); pl.bob.userData.A.look='player'; pl.base.visible=false; pl.jeff.visible=false;
   for(const r of pl.rings){ r.done=false; r.g.visible=true; } pl.ringsLeft=-1; pl.fuel=1; pl.jetOn=true; pl.ringsOn=true;
+  lookAtPoint(pl.rings[0].g.position,0);
+  setMarker(()=>{ const r=pl.rings.find(q=>!q.done); return r?r.g.position:null; },'Ring','m');
   playMusic('fly',1.5); await fade(0,.8);
   itemHints([IS_TOUCH?'Hold <kbd>⤒</kbd> to fly':'Hold <kbd>Space</kbd> to fly','Land to refuel']);
   TOUCH_UI.show({jump:true});
@@ -8287,7 +8292,7 @@ CHECKPOINTS.B12=async()=>{
   if(!E.jeff){ E.jeff=makeDog(); scene_add(E,E.jeff); } const jeff=E.jeff; jeff.visible=false; jeff.userData.happy=false; jeff.userData.stuck=false;
   playMusic('burning',1); setAmbience([['rocket',.3],['crowd',.06]]); letterbox(true);
   // 1) the town burning, XXX5 over it; Jim's rocket comes down on the road
-  camFollow(t=>({pos:V3(-34+t*1.2,5+t*.15,10),look:V3(lerp(6,12,Math.min(1,t/4)),lerp(40,8,Math.min(1,t/4.5)),lerp(-50,3,Math.min(1,t/4.5)))}),50);
+  camFollow(t=>({pos:V3(-1+t*.4,2.4+t*.1,27),look:V3(lerp(6,12,Math.min(1,t/4)),lerp(48,8,Math.min(1,t/4.5)),lerp(-58,3,Math.min(1,t/4.5)))}),52);
   FX.blackout=0; await fade(0,1.2);
   await wait(1.2);
   await tweenVal(k=>{ R.position.y=lerp(70,0,1-Math.pow(1-k,2)); },3.6,x=>x);
@@ -8475,7 +8480,10 @@ async function finalAftermath(){
   // you sit up
   { const p0=PLAYER.pos.clone(); await tweenVal(k=>{ PLAYER.eye=lerp(.74,1.06,k); PLAYER.pos.x=lerp(p0.x,-2.05,k); PLAYER.pos.z=lerp(p0.z,1.2,k); lookAtPoint(V3(-.85,1.05,.45),0); },1.2); }
   await talk([{who:'You',text:"Yes... but is Bob ok? And Jeff?"}]);
-  lookAtPoint(V3(1.6,.75,1.5),1); await wait(1.8); lookAtPoint(V3(-.85,1.05,.45),.9); await wait(.9);
+  lookAtPoint(V3(1.6,.75,1.5),1); await wait(1.1);
+  // Bob, asleep on the other cot
+  camShot(V3(.55,1.25,1.0),V3(2.1,.62,1.1),{dur:.9,fov:46}); await wait(2.6); camRelease(.8); await wait(.8);
+  lookAtPoint(V3(-.85,1.05,.45),.9); await wait(.9);
   await talk([{...J,text:"...",silent:true,auto:1.6},{...J,text:"Jeff is gone."},{who:'You',text:"No... no...",silent:true}]);
   // you cry (quietly: the picture blurs, you look down, your breath shakes)
   say('You cry.',3);
@@ -8809,7 +8817,8 @@ defineLevel('deep',{
     // Larry, riding a Paramecium
     lv.ride=makeSnack(); lv.ride.scale.setScalar(5.5); scene.add(lv.ride);
     solidAuto(lv,lv.ride,{k:.8,cond:()=>!F_().riding});
-    lv.larry=makeDustMite(); lv.larry.scale.setScalar(6); lv.larry.position.set(0,6,0); lv.ride.add(lv.larry); lv.larry.scale.setScalar(6/5.5);
+    lv.larry=makeDustMite(); lv.larry.scale.setScalar(6); lv.larry.position.set(0,1.2,0); lv.ride.add(lv.larry); lv.larry.scale.setScalar(6/5.5);
+    { const l=new THREE.PointLight(col(0xbfe8ff),1.6,60,1.6); l.position.set(0,9,4); lv.ride.add(l); }
     // boost rings: swim through one and it shoots you forward
     lv.boosts=[]; const bm=rimify(new THREE.MeshPhysicalMaterial({color:col(0x6dffd8),emissive:col(0x2adfb0),emissiveIntensity:1.6,roughness:.2,transparent:true,opacity:.9}),0xb0fff0,1.5,2);
     for(let z=-90;z>-2400;z-=115){ if(z<-1440&&z>-1900&&(Math.round(z/115)%2)) continue; const x=Math.sin(z*.004)*45, y=-20+z*.03+Math.sin(z*.011)*18; const g=new THREE.Group(); g.position.set(x,y,z); scene.add(g);
@@ -8848,9 +8857,10 @@ defineLevel('deep',{
     const R=lv.ride;
     if(F.riding){ const stop=R.position.z>-1400?-1410:R.position.z>-1930?null:R.position.z>-2380?null:-2470; const x=Math.sin(R.position.z*.004)*45, y=-20+R.position.z*.03+Math.sin(R.position.z*.011)*18;
       if(stop==null||R.position.z<=stop){ runStory(()=>rideOff(stop==null?"I can't go in there! Hop off!":stop===-1410?"Hydras ahead! I can't go in there. Hop off!":"This is as far as I go!")); }
-      else { R.position.z-=dt*48; R.position.x=damp(R.position.x,x,2,dt); R.position.y=damp(R.position.y,y,2,dt); R.rotation.set(0,Math.PI,0); PLAYER.pos.copy(R.position).add(V3(0,9,4)); PLAYER.vel.set(0,0,-48); if(Math.random()<dt*20) lv.glow.spawn(R.position.x+rand(-4,4),R.position.y,R.position.z+20,0,0,20,1,.4,1,.9,.4,.6,0,0,1); }
+      else { R.position.z-=dt*48; R.position.x=damp(R.position.x,x,2,dt); R.position.y=damp(R.position.y,y,2,dt); R.rotation.set(0,Math.PI,0); PLAYER.pos.copy(R.position).add(V3(0,24,34)); PLAYER.vel.set(0,0,-48); if(Math.random()<dt*20) lv.glow.spawn(R.position.x+rand(-4,4),R.position.y,R.position.z+20,0,0,20,1,.4,1,.9,.4,.6,0,0,1); }
       R.userData.cil.rotation.z=Math.sin(t*20)*.08; animateDustMite(lv.larry,t,dt); }
-    else if(R.visible){ const want=P.clone().add(V3(22,6,26)); R.position.lerp(want,Math.min(1,dt*.9)); const dir=want.clone().sub(R.position); if(dir.lengthSq()>1) R.lookAt(R.position.clone().sub(dir)); R.userData.cil.rotation.z=Math.sin(t*14)*.05; animateDustMite(lv.larry,t,dt); }
+    else if(R.visible){ const fw=new THREE.Vector3(); camera.getWorldDirection(fw); fw.y=0; if(fw.lengthSq()<1e-4) fw.set(0,0,-1); fw.normalize(); const rt=V3(-fw.z,0,fw.x); const want=P.clone().addScaledVector(fw,30).addScaledVector(rt,20).add(V3(0,-6,0));  // swims beside you, a little ahead, where you can see him
+      R.position.lerp(want,Math.min(1,dt*.9)); const dir=want.clone().sub(R.position); if(dir.lengthSq()>1) R.lookAt(R.position.clone().sub(dir)); R.userData.cil.rotation.z=Math.sin(t*14)*.05; animateDustMite(lv.larry,t,dt); }
     if(lv.snow) lv.snow.material.uniforms.px.value=renderer.domElement.height*.5;
   }
 });
@@ -8874,8 +8884,8 @@ CHECKPOINTS.A8=async()=>{
   PLAYER.fly=true; PLAYER.eye=0; PLAYER.scale=PLAYER.targetScale=1; PLAYER.item=null; setVM(true); setVMSuit(true);
   $('visor').classList.add('show'); $('scaleRead').textContent='1 : 10,000,000'; $('photoRead').textContent='PHOTOS: 5';
   PLAYER.lock(); crosshair(true); hudVisible(true); objective(null);
-  lv.ride.visible=true; lv.ride.position.set(22,6,66); if(lv.piece) lv.piece.children[0].visible=true;
-  lookAtPoint(V3(0,-40,-200),0);
+  lv.ride.visible=true; lv.ride.position.set(9,-2,16); lv.ride.rotation.set(0,-.5,0); if(lv.piece) lv.piece.children[0].visible=true;
+  lookAtPoint(V3(9,2,16),0);
   await fade(0,1);
   await talk([{who:'Jim',radio:true,text:"The shard should be deep down. It glows purple."},{who:'Larry',voice:'Larry',text:"I'll ride my Paramecium. Stay close!"}]);
   if(!lv.setup){ lv.setup=true;
