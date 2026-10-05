@@ -1046,6 +1046,14 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **AAA roadside membership**: tows, jump starts, flat tires, lockouts; without it a desert tow
   costs a fortune.
 
+- **Car aging**: sun-faded paint & cracked dashboards (garages/sunshades help), underbody rust from
+  winter roads, hail dents when parked outside, depreciation (off-the-lot drop, mileage).
+- **License reinstatement**: after suspension, written test + strict road test at the DMV (full
+  stops, signals, parallel parking); fail → retry later.
+- **Driver communication**: horn taps/long honks, flashing high beams, thank-you waves, rude
+  gestures (reactions depend on the person — some follow you).
+- Child car seats are required by law when driving kids (real).
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
