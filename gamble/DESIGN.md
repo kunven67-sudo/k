@@ -791,3 +791,8 @@ manual everything and broken gauges).
   "Card Shark"), spreading around town.
 - **Self radio**: load your own songs (from computer/phone) into a personal car/home station.
 - **Vanity license plates** at the DMV (rude ones rejected; memorable to cops & witnesses).
+- **Motel room number is random each life** (never 9 or 13).
+- **The Starlite is on 4th Street** — Reno's real gritty old motel strip, a short walk from the
+  downtown casinos; rough at night.
+- **Gambling music: only the casino's own soft background music and machine jingles** (no
+  cinematic tension score).
