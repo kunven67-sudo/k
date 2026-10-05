@@ -1040,6 +1040,8 @@ class Resident {
     // a bloody nose / split lip where the punch landed (gore setting decides)
     const gore = this.c.settings?.get?.('gameplay.gore') ?? 'some';
     this.h.life?.addStain(this.bonePos('Bip01_Head') ?? this.worldPos(), 0.05, gore === 'full' ? 1.5 : gore === 'some' ? 1 : 0);
+    const eye = this.bonePos(Math.random() < 0.5 ? 'Bip01_LEye' : 'Bip01_REye');
+    if (eye) this.h.life?.addBruise(eye.add(new THREE.Vector3(0, -0.02 * this.s, 0.02 * this.s)), 0.028);
     // knocked back a little
     if (this.agent && from) {
       const back = this.worldPos().sub(from).setY(0).normalize();

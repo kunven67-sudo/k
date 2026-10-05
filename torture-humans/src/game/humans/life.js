@@ -66,7 +66,26 @@ function upgradeSkin(character, level) {
     uSweat: { value: 0 },
     uStains: { value: [new THREE.Vector4(0, -9, 0, 0), new THREE.Vector4(0, -9, 0, 0), new THREE.Vector4(0, -9, 0, 0), new THREE.Vector4(0, -9, 0, 0)] },
     uWeave: { value: level >= LEVEL.high ? 1 : 0 },
+    // face: wrinkles that only appear with the expression, tears, bruises
+    uBrowUp: { value: 0 }, uFrown: { value: 0 }, uSquint: { value: 0 }, uTear: { value: 0 },
+    uEyeL: { value: new THREE.Vector3(0.032, 1.62, 0.06) }, uEyeR: { value: new THREE.Vector3(-0.032, 1.62, 0.06) },
+    uBrowC: { value: new THREE.Vector3(0, 1.645, 0.07) },
+    uWrinkles: { value: level >= LEVEL.medium ? 1 : 0 },
+    uBruises: { value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, -9, 0, 0)) },
+    uBruiseAge: { value: [0, 0, 0, 0] },
   };
+  // where the eyes and brows are on this face (bind pose, from the skeleton)
+  character.root.traverse((o) => {
+    if (!o.isSkinnedMesh || u.landmarks) return;
+    const sk = o.skeleton;
+    const at = (name) => {
+      const i = sk.bones.findIndex((b) => b.name === name);
+      return i < 0 ? null : new THREE.Vector3().setFromMatrixPosition(sk.boneInverses[i].clone().invert());
+    };
+    const l = at('Bip01_LEye'), r = at('Bip01_REye'), b = at('Bip01_MMiddleEyebrow');
+    if (l && r) { u.uEyeL.value.copy(l); u.uEyeR.value.copy(r); u.landmarks = true; }
+    if (b) u.uBrowC.value.copy(b);
+  });
   character.root.traverse((o) => {
     if (!o.isSkinnedMesh) return;
     const mats = [].concat(o.material).map((m) => {
@@ -83,7 +102,43 @@ function upgradeSkin(character, level) {
           .replace('#include <common>', `#include <common>
 uniform float uFlush, uPale, uWet, uGlow, uPores, uDirt, uSoak, uSweat, uWeave; uniform sampler2D uPoreMap;
 uniform vec4 uStains[4];
+uniform float uBrowUp, uFrown, uSquint, uTear, uWrinkles; uniform vec3 uEyeL, uEyeR, uBrowC;
+uniform vec4 uBruises[4]; uniform float uBruiseAge[4];
 varying vec3 vBind;
+// expression wrinkles as a height field (grooves are negative), in meters of bind pose
+float wrinkles(vec3 p) {
+  float h = 0.0;
+  float front = smoothstep(0.0, 0.03, p.z - (uBrowC.z - 0.06));
+  // forehead lines when the brows go up
+  float fy = p.y - uBrowC.y;
+  float fore = smoothstep(0.008, 0.02, fy) * smoothstep(0.06, 0.035, fy) * smoothstep(0.05, 0.025, abs(p.x - uBrowC.x));
+  h -= uBrowUp * fore * (0.5 + 0.5 * sin(fy * 880.0 + sin(p.x * 120.0) * 1.5));
+  // the "11" lines between the brows when frowning
+  float gx = abs(p.x - uBrowC.x);
+  float glab = smoothstep(0.02, 0.0, abs(p.y - uBrowC.y + 0.004)) * smoothstep(0.012, 0.004, gx);
+  h -= uFrown * glab * (0.5 + 0.5 * cos(gx * 1100.0));
+  // crow's feet fanning out from the outer eye corners when squinting or smiling
+  for (int s = 0; s < 2; s++) {
+    vec3 e = s == 0 ? uEyeL : uEyeR;
+    float side = sign(e.x - uBrowC.x);
+    vec2 d = vec2((p.x - e.x) * side - 0.016, p.y - e.y);
+    float r = length(d);
+    float fan = smoothstep(0.0, 0.004, d.x) * smoothstep(0.022, 0.012, r);
+    h -= uSquint * fan * (0.5 + 0.5 * sin(atan(d.y, d.x) * 22.0));
+  }
+  return h * front * uWrinkles;
+}
+// tear tracks: from each eye straight down the cheek
+float tears(vec3 p) {
+  float t = 0.0;
+  for (int s = 0; s < 2; s++) {
+    vec3 e = s == 0 ? uEyeL : uEyeR;
+    float dy = e.y - 0.006 - p.y;
+    float wob = sin(p.y * 300.0 + float(s) * 2.0) * 0.0015;
+    t += smoothstep(0.004, 0.0, abs(p.x - e.x - wob)) * step(0.0, dy) * smoothstep(0.065 * uTear, 0.0, dy) * step(0.0, p.z - e.z + 0.02);
+  }
+  return clamp(t * uTear, 0.0, 1.0);
+}
 float gauss3(vec3 d, float r) { return exp(-dot(d, d) / (r * r)); }`)
           // clothes and grime (after the skin tint)
           .replace('#include <color_fragment>', `#include <color_fragment>
@@ -102,6 +157,15 @@ float gauss3(vec3 d, float r) { return exp(-dot(d, d) / (r * r)); }`)
   for (int i = 0; i < 4; i++) blood += 1.0 - smoothstep(uStains[i].w * 0.35, uStains[i].w + 1e-4, length(vBind - uStains[i].xyz) + (n - 0.5) * uStains[i].w * 0.8);
   blood = clamp(blood, 0.0, 1.0);
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.015, 0.01), blood * 0.9);
+  // bruises: purple-blue when fresh, green then yellow as they heal
+  for (int i = 0; i < 4; i++) {
+    float b = 1.0 - smoothstep(uBruises[i].w * 0.3, uBruises[i].w + 1e-4, length(vBind - uBruises[i].xyz) + (n - 0.5) * uBruises[i].w * 0.6);
+    float age = uBruiseAge[i];
+    vec3 col = mix(vec3(0.33, 0.12, 0.30), vec3(0.42, 0.45, 0.22), smoothstep(0.3, 0.7, age));
+    col = mix(col, vec3(0.62, 0.56, 0.30), smoothstep(0.7, 1.0, age));
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * col * 1.6, b * (1.0 - smoothstep(0.85, 1.0, age)) * 0.7);
+  }
+  ${isBody ? '' : 'diffuseColor.rgb *= 1.0 - 0.22 * tears(vBind);'}
 }`)
           // blood in the skin: flush toward red, pale toward grey-white
           .replace('#include <color_fragment>', `#include <color_fragment>
@@ -109,10 +173,19 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.18, 0.86, 0.8
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15))) * vec3(1.02, 1.0, 1.02), uPale * 0.45);`)
           // sweat: shinier skin
           .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.45, max(uWet, uSoak * 0.8));`)
+roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.45, max(uWet, uSoak * 0.8));
+${isBody ? '' : 'roughnessFactor = mix(roughnessFactor, 0.08, tears(vBind));'}`)
           // pores: a fine bump from the tiling pore map (screen-space derivatives, cheap)
           .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
 #ifdef USE_UV
+${isBody ? '' : `if (uWrinkles > 0.5 && uBrowUp + uFrown + uSquint > 0.02) {
+  float wh = wrinkles(vBind);
+  vec2 dw = vec2(dFdx(wh), dFdy(wh)) * 1.2;
+  vec3 qx = dFdx(-vViewPosition), qy = dFdy(-vViewPosition);
+  vec3 s1 = cross(qy, normal), s2 = cross(normal, qx);
+  float dt0 = dot(qx, s1);
+  normal = normalize(abs(dt0) * normal - sign(dt0) * (dw.x * s1 + dw.y * s2) * 1.5);
+}`}
 if (uPores > 0.5 || uWeave > 0.5) {
   // skin pores on the head; on the body: the weave of the fabric
   vec2 puv = ${isBody ? 'vUv * 140.0' : 'vUv * 38.0'};
@@ -173,6 +246,14 @@ export class Life {
     this.rain = 0;        // how hard it's raining on them right now (set by the weather)
     this.dirty = 0;
     this.nextStain = 0;
+  }
+
+  // A bruise where they got hit (heals over ~10 minutes: purple, green, yellow, gone)
+  addBruise(worldPoint, radius = 0.03) {
+    const l = this.ch.root.worldToLocal(worldPoint.clone());
+    const i = (this.nextBruise = ((this.nextBruise ?? -1) + 1) % 4);
+    this.skin.uBruises.value[i].set(l.x, l.y, l.z, radius);
+    this.skin.uBruiseAge.value[i] = 0;
   }
 
   // Blood where they got hurt (world point); goreScale 0 = none.
@@ -261,6 +342,17 @@ export class Life {
     }
 
     const u = this.skin;
+    // wrinkles follow the face: brows up, frowning, squinting/smiling
+    const ex = this.ch.expression || {};
+    const e = (k) => ex[k] || 0;
+    const k3 = 1 - Math.exp(-dt * 10);
+    u.uBrowUp.value += (Math.min(1, e('AK_03_BrowInnerUp') * 0.6 + (e('AK_04_BrowOuterUpLeft') + e('AK_05_BrowOuterUpRight')) * 0.4) - u.uBrowUp.value) * k3;
+    u.uFrown.value += (Math.min(1, (e('AK_01_BrowDownLeft') + e('AK_02_BrowDownRight')) * 0.6) - u.uFrown.value) * k3;
+    u.uSquint.value += (Math.min(1, (e('AK_07_CheekSquintLeft') + e('AK_08_CheekSquintRight') + e('AK_19_EyeSquintLeft') + e('AK_20_EyeSquintRight')) * 0.5 + (e('AK_44_MouthSmileLeft') + e('AK_45_MouthSmileRight')) * 0.25) - u.uSquint.value) * k3;
+    // tears: crying when very sad or terrified; they dry over a minute or so
+    const crying = this.sad > 0.65 || this.fear > 0.9;
+    u.uTear.value = crying ? Math.min(1, u.uTear.value + dt * 0.3) : Math.max(0, u.uTear.value - dt * 0.015);
+    for (let i = 0; i < 4; i++) u.uBruiseAge.value[i] = Math.min(1, u.uBruiseAge.value[i] + dt / 600);
     // clothes: dirt builds up while walking outside (slowly), rain soaks, sweat from effort or fear
     if (speed > 0.3 && this.outdoors) this.dirty = Math.min(1, this.dirty + dt * 0.002 * speed);
     u.uDirt.value = 0.15 + this.dirty * 0.7;
