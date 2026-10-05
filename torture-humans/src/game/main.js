@@ -18,6 +18,7 @@ import { Germs } from './germs.js';
 import { Village, buildBurrow } from './village.js';
 import { Pets } from './pets.js';
 import { Audio } from './audio.js';
+import { Footsteps } from './footsteps.js';
 import { TownLife } from './humans/town-life.js';
 import { Jobs } from './jobs.js';
 import { TinyReality } from './tiny-reality.js';
@@ -385,6 +386,8 @@ export async function boot() {
   // odd jobs: parcels, lost rings, shifts at the till
   const jobs = new Jobs({ scene, interact, family, env, hazards, player, toast, phone, spots: level.town?.spots });
   // what being small really does to you (and the not-realistic extras from settings)
+  // everyone's footsteps (people, tiny people, the rat, bugs)
+  const footsteps = new Footsteps({ audio, humans, pets, bugs, camera, inHouse: level.house?.inHouse, inLab: level.inLab });
   const tiny = new TinyReality({ player, vitals, env, camera, canvas: renderer.renderer.domElement, audio, humans, pets, bugs, cage, colony, details: tinyDetails, family, hazards, settings, speech, interact, input, scene, toast, germs, getZone: () => zone });
   // F10: settings
   const settingsPanel = new SettingsPanel({ settings, input, canvas: input.target, toast });
@@ -429,6 +432,7 @@ export async function boot() {
     germs.update(wdt);
     pets.update(wdt);
     audio.update(dt, { env, zone, player });
+    footsteps.update(wdt);
     phone.update(dt);
     jobs.update(dt, camera);
     if (input.pressed('quickSave')) toast(saveGame(game) ? 'Game saved' : 'Could not save');

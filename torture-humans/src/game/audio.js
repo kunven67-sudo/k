@@ -110,6 +110,17 @@ export class Audio {
     if (s > 1.5) this.tone({ freq: 70 / Math.sqrt(s / 1.5), to: 30, dur: 0.25 + s * 0.03, gain: Math.min(0.9, 0.1 * s), type: 'sine' });
   }
 
+  // someone else's footstep at a spot in the world (footsteps.js)
+  footstep(at, scale, surface = 'floor', loud = 1) {
+    if (!this.ctx) return;
+    const s = THREE.MathUtils.clamp(scale, 0.0005, 30);
+    const base = surface === 'grass' ? 520 : surface === 'wood' ? 950 : 1400;
+    const ref = Math.max(0.15, 2.2 * s);
+    this.noiseBurst({ at, ref, freq: THREE.MathUtils.clamp(base * Math.pow(s, -0.45) * (0.9 + Math.random() * 0.2), 60, 9000), q: 0.9, dur: 0.05 + 0.04 * Math.min(4, Math.sqrt(s)), gain: THREE.MathUtils.clamp(0.06 * Math.pow(s, 0.3) * loud, 0.004, 0.5) });
+    if (surface === 'wood' && s > 0.5) this.tone({ at, ref, freq: 140 / Math.sqrt(s), to: 90 / Math.sqrt(s), dur: 0.06, gain: 0.02 * loud }); // a little floorboard knock
+    if (s > 1.5) this.tone({ at, ref: ref * 2, freq: 70 / Math.sqrt(s / 1.5), to: 30, dur: 0.25 + s * 0.03, gain: Math.min(0.8, 0.08 * s) });
+  }
+
   land(scale, hard) {
     if (!this.ctx) return;
     this.noiseBurst({ freq: 300 / Math.sqrt(Math.max(scale, 0.01)), q: 0.6, dur: 0.15, gain: Math.min(0.7, 0.15 + hard * 0.3) });
