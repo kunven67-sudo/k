@@ -914,3 +914,7 @@ have a Ring cam; a witness only matters if someone actually saw it).
   fines, possible brush fires; the official 4th of July show is legal.
 - **Wind physics**: hats blow away, umbrellas flip inside out, trash cans tip and scatter, tall
   trucks/RVs sway in highway wind warnings.
+- **Stand-up open mic** with your real microphone; crowd laughs/crickets/heckles/boos; good sets
+  → paid gigs.
+- **Black Friday chaos**: 5 AM lines, doorbuster deals, crowd rushes, fights over the last item
+  (ragdoll pile-ups).
