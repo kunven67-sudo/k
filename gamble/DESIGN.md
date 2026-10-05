@@ -1082,6 +1082,13 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Relationship stages**: talking → dating → "what are we?" → exclusive → moving in → engaged →
   married; pacing preferences depend on the person (some never want marriage).
 
+- **Computers (each works differently)**: Windows gaming PC (all PC games, viruses, forced updates),
+  MacBook (pricey, fewer viruses, fewer games), Chromebook (web/school/streaming only), old pawn-shop
+  laptop (slow, dying battery, previous owner's files).
+- **Video calls** (FaceTime-style) on phone/PC — they see your face and surroundings.
+- **Gender expression depends on the person**: any NPC (and you) can act more feminine, masculine,
+  or in between regardless of gender — mannerisms, style, interests vary per individual.
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
