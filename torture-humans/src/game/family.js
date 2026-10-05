@@ -176,7 +176,7 @@ export class Family {
     if (key === 'trash') { this.trashOut = false; this.setTrashVisible(true); }
     const line = { trash: 'Can you take the trash out, please?', tidy: 'Your room is a mess. Clean it up!', dishes: 'Bring your plate down, it\'s been up there all day!', lights: 'Lights off, bedtime!' }[key];
     if (from && this.near(from)) this.speech?.say(from, line, { secs: 5 });
-    else this.toast?.(`📱 ${from?.profile.name ?? 'Mom'}: ${line}`);
+    else { this.toast?.(`📱 ${from?.profile.name ?? 'Mom'}: ${line}`); this.phone?.text(from?.profile.name ?? 'Mom', line); }
     this.drawChores();
   }
 
@@ -264,6 +264,7 @@ export class Family {
       this.lastAllowanceDay = day;
       this.addMoney(10);
       this.toast?.(`📱 ${mom?.profile.name ?? 'Mom'}: Here's your allowance, $10. Spend it wisely!`);
+      this.phone?.text(mom?.profile.name ?? 'Mom', 'Here\'s your allowance, $10. Spend it wisely! ❤️');
     }
     // a chore not done by bedtime is gone (and Mom is disappointed)
     if (t >= 23 && this.chores.size) {

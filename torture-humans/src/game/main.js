@@ -18,6 +18,7 @@ import { Germs } from './germs.js';
 import { Village } from './village.js';
 import { Pets } from './pets.js';
 import { Audio } from './audio.js';
+import { Phone, saveGame, loadGame, hasSave } from './phone.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
@@ -335,7 +336,16 @@ export async function boot() {
   if (params.get('pet')) pets.adopt(params.get('pet'));
   // the germ world: what's on the floor when you're smaller than 2 cm
   const germs = new Germs({ scene, player, physics });
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, audio, frame: 0 };
+  // your phone (P): messages, map, weather, bank, wanted
+  const phone = new Phone({ input, player, env, family, police, humans, level, canvas: input.target });
+  if (family) family.phone = phone;
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, audio, phone, frame: 0 };
+  // saving: F5 / F9, every 2 minutes, and when you close the game; picks up where you left off
+  game.save = () => saveGame(game);
+  game.load = () => loadGame(game);
+  if (hasSave() && !params.has('paused') && !params.has('fresh')) loadGame(game).then((ok) => ok && toast('Welcome back! (F5 saves, F9 loads)')).catch((e) => console.warn('[save]', e.message));
+  addEventListener('beforeunload', () => { if (!params.has('paused')) saveGame(game); });
+  let autosave = 120;
   hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
 
@@ -361,6 +371,10 @@ export async function boot() {
     germs.update(dt);
     pets.update(dt);
     audio.update(dt, { env, zone, player });
+    phone.update(dt);
+    if (input.pressed('quickSave')) toast(saveGame(game) ? 'Game saved' : 'Could not save');
+    if (input.pressed('quickLoad')) loadGame(game).then((ok) => toast(ok ? 'Game loaded' : 'No saved game yet'));
+    if (!params.has('paused') && (autosave -= dt) <= 0) { autosave = 120; saveGame(game); }
     vitals.update(dt);
     nav.update(dt);
     colony?.update(dt);
