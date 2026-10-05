@@ -890,3 +890,8 @@ manual everything and broken gauges).
   The Summit outdoor center, Walmart (3 AM vibe) & Target.
 - **Activities**: pickleball, climbing/bouldering gym, disc golf (bet per hole), weekly bowling
   league with NPC teammates & trophies.
+- **Racing**: legal drag strip outside Reno (bet or race), illegal night street racing (money &
+  pink slips; cops, crashes, impound), go-karts, county-fair demolition derby (soft-body).
+- **Home games**: board games (Monopoly etc.; arguments, board flips with physics), card games
+  (UNO, Go Fish with kids, gin rummy with grandma), jigsaw puzzles (stress relief), home bar games
+  (dartboard, pool table, beer pong table).
