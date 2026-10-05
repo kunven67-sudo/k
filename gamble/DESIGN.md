@@ -1096,6 +1096,16 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Discord** on phone/PC: NPC community servers ("Reno Poker Night", "Car Meet Reno"), DMs, voice
   channels with online friends.
 
+- **Phone camera**: video recording (evidence, TikToks, fights that can be used against you), zoom
+  (blurry on cheap phones) & flash, front-camera selfies with expressions/group crowding, filters &
+  edits.
+- **Nevada hands-free law**: holding/texting while driving → tickets if seen, distraction & crash
+  risk; hands-free calling and CarPlay depend on the car.
+- **Smartwatches** (Apple Watch, Galaxy Watch): time (counts as a watch), notifications, heart rate
+  (stress), fall detection auto-calls 911 when you're knocked out, daily charging.
+- **Headphones/AirPods**: music while walking; reduced awareness of cars, people and danger;
+  noise-canceling depends on the model.
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
