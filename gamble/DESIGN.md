@@ -850,3 +850,10 @@ manual everything and broken gauges).
 - **Natural hot springs** near Reno (lower stress, heal sore muscles, date spot).
 - Newspaper: **The Truckee Times**. TV news: **KSLV 8 News**. Slot machine names: invented by
   the developer. Radio station names: invented by the developer.
+
+## 45. Round 101
+
+- **Random stranger moments**: tourists asking you to take their photo (phone-theft either way),
+  asking directions (help or misdirect), sharing a cab, invitations to parties/bachelor
+  parties/poker games (fun or a setup).
+- **Hitchhiking** both ways (mostly nice people, some robbers, wild stories).
