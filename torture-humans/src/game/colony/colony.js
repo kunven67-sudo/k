@@ -1018,6 +1018,9 @@ class Resident {
     this.h.emotion.fear = Math.min(1, this.h.emotion.fear + 0.4);
     this.h.emotion.anger = Math.min(1, this.h.emotion.anger + 0.3);
     this.h.character.setEmotion('pain', 1);
+    // a bloody nose / split lip where the punch landed (gore setting decides)
+    const gore = this.c.settings?.get?.('gameplay.gore') ?? 'some';
+    this.h.life?.addStain(this.bonePos('Bip01_Head') ?? this.worldPos(), 0.05, gore === 'full' ? 1.5 : gore === 'some' ? 1 : 0);
     // knocked back a little
     if (this.agent && from) {
       const back = this.worldPos().sub(from).setY(0).normalize();

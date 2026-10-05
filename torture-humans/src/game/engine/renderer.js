@@ -135,7 +135,7 @@ export class Renderer {
         l.shadow.normalBias = 0.02;
         l.shadow.radius = 2;
       }
-      this.scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) this.csm.setupMaterial(m); });
+      this.scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) this.setupMaterial(m); });
     }
     this.buildComposer();
     // anisotropic filtering on every texture
@@ -150,8 +150,18 @@ export class Renderer {
   }
 
   // new materials added later (spawned objects) need the CSM shader hook too
+  // CSM replaces a material's onBeforeCompile; our own shader additions (skin,
+  // clothes, wet streets...) live in userData.extraCompile and are chained after it.
   setupMaterial(material) {
-    if (this.csm) for (const m of [].concat(material)) this.csm.setupMaterial(m);
+    if (!this.csm) return;
+    for (const m of [].concat(material)) {
+      this.csm.setupMaterial(m);
+      const extra = m.userData.extraCompile;
+      if (extra) {
+        const csmCompile = m.onBeforeCompile;
+        m.onBeforeCompile = (sh, r) => { csmCompile.call(m, sh, r); extra(sh, r); };
+      }
+    }
   }
 
   buildComposer() {

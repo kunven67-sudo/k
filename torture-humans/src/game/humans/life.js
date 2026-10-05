@@ -60,29 +60,62 @@ function upgradeSkin(character, level) {
     uGlow: { value: level >= LEVEL.high ? 1 : 0 },   // light seeping through thin skin (ears, nose, fingers)
     uPores: { value: level >= LEVEL.high ? 1 : 0 },
     uPoreMap: { value: pores() },
+    // clothes: dirt on shoes and trouser legs, rain-soaked, sweat patches, blood stains
+    uDirt: { value: 0 },
+    uSoak: { value: 0 },
+    uSweat: { value: 0 },
+    uStains: { value: [new THREE.Vector4(0, -9, 0, 0), new THREE.Vector4(0, -9, 0, 0), new THREE.Vector4(0, -9, 0, 0), new THREE.Vector4(0, -9, 0, 0)] },
+    uWeave: { value: level >= LEVEL.high ? 1 : 0 },
   };
   character.root.traverse((o) => {
     if (!o.isSkinnedMesh) return;
     const mats = [].concat(o.material).map((m) => {
       if (!/body|head/i.test(m.name) || /opacity/i.test(m.name)) return m;
       const c = m.clone();
-      c.onBeforeCompile = (sh) => {
+      const isBody = /body/i.test(m.name);
+      c.onBeforeCompile = c.userData.extraCompile = (sh) => {
         Object.assign(sh.uniforms, u);
+        // where on the body (bind pose, meters: y = height, arms out sideways)
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying vec3 vBind;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBind = position;');
         sh.fragmentShader = sh.fragmentShader
           .replace('#include <common>', `#include <common>
-uniform float uFlush, uPale, uWet, uGlow, uPores; uniform sampler2D uPoreMap;`)
+uniform float uFlush, uPale, uWet, uGlow, uPores, uDirt, uSoak, uSweat, uWeave; uniform sampler2D uPoreMap;
+uniform vec4 uStains[4];
+varying vec3 vBind;
+float gauss3(vec3 d, float r) { return exp(-dot(d, d) / (r * r)); }`)
+          // clothes and grime (after the skin tint)
+          .replace('#include <color_fragment>', `#include <color_fragment>
+{
+  float n = texture2D(uPoreMap, vBind.xy * 2.7 + vBind.z).r;
+  ${isBody ? `// mud and dust climb up from the shoes
+  float dirt = uDirt * (1.0 - smoothstep(0.03, 0.6, vBind.y + n * 0.12));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.23, 0.15) * (0.7 + n * 0.5), clamp(dirt, 0.0, 1.0) * 0.85);
+  // sweat: armpits and the middle of the back go dark first
+  float sw = uSweat * (gauss3(vBind - vec3(0.17, 1.27, 0.0), 0.07) + gauss3(vBind - vec3(-0.17, 1.27, 0.0), 0.07) + gauss3((vBind - vec3(0.0, 1.12, -0.13)) * vec3(1.0, 0.7, 1.0), 0.11));
+  diffuseColor.rgb *= 1.0 - 0.32 * clamp(sw, 0.0, 1.0);` : ''}
+  // soaked by rain: darker everywhere
+  diffuseColor.rgb *= 1.0 - 0.3 * uSoak;
+  // blood: dark red, ragged edges
+  float blood = 0.0;
+  for (int i = 0; i < 4; i++) blood += 1.0 - smoothstep(uStains[i].w * 0.35, uStains[i].w + 1e-4, length(vBind - uStains[i].xyz) + (n - 0.5) * uStains[i].w * 0.8);
+  blood = clamp(blood, 0.0, 1.0);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.015, 0.01), blood * 0.9);
+}`)
           // blood in the skin: flush toward red, pale toward grey-white
           .replace('#include <color_fragment>', `#include <color_fragment>
 diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.18, 0.86, 0.84), uFlush * 0.6);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15))) * vec3(1.02, 1.0, 1.02), uPale * 0.45);`)
           // sweat: shinier skin
           .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.45, uWet);`)
+roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.45, max(uWet, uSoak * 0.8));`)
           // pores: a fine bump from the tiling pore map (screen-space derivatives, cheap)
           .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
 #ifdef USE_UV
-if (uPores > 0.5) {
-  vec2 puv = vUv * 38.0;
+if (uPores > 0.5 || uWeave > 0.5) {
+  // skin pores on the head; on the body: the weave of the fabric
+  vec2 puv = ${isBody ? 'vUv * 140.0' : 'vUv * 38.0'};
   float ph = texture2D(uPoreMap, puv).r;
   vec2 dh = vec2(dFdx(ph), dFdy(ph)) * 0.6;
   vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition);
@@ -99,7 +132,7 @@ if (uGlow > 0.5) {
   totalEmissiveRadiance += diffuseColor.rgb * vec3(0.9, 0.25, 0.15) * edge * 0.18 * (1.0 - uPale * 0.7);
 }`);
       };
-      c.customProgramCacheKey = () => `skin-life-${level}`;
+      c.customProgramCacheKey = () => `skin-life-${level}-${isBody ? 'body' : 'head'}`;
       return c;
     });
     o.material = Array.isArray(o.material) ? mats : mats[0];
@@ -137,6 +170,17 @@ export class Life {
       .map((b) => ({ b, q: b.quaternion.clone(), p: b.position.clone() }));
     // how they feel right now (set by the owner each frame)
     this.fear = 0; this.anger = 0; this.effort = 0; this.sad = 0;
+    this.rain = 0;        // how hard it's raining on them right now (set by the weather)
+    this.dirty = 0;
+    this.nextStain = 0;
+  }
+
+  // Blood where they got hurt (world point); goreScale 0 = none.
+  addStain(worldPoint, radius = 0.09, goreScale = 1) {
+    if (goreScale <= 0) return;
+    const l = this.ch.root.worldToLocal(worldPoint.clone());
+    const s = this.skin.uStains.value[this.nextStain++ % 4];
+    s.set(l.x, l.y, l.z, radius * goreScale);
   }
 
   update(dt) {
@@ -216,8 +260,13 @@ export class Life {
       if (B.Bip01_RCheek) B.Bip01_RCheek.position.addScaledVector(up, ch.y * 0.5);
     }
 
-    // skin: blood rushes to the face when angry or working hard, drains when terrified
     const u = this.skin;
+    // clothes: dirt builds up while walking outside (slowly), rain soaks, sweat from effort or fear
+    if (speed > 0.3 && this.outdoors) this.dirty = Math.min(1, this.dirty + dt * 0.002 * speed);
+    u.uDirt.value = 0.15 + this.dirty * 0.7;
+    u.uSoak.value += ((this.rain > 0.1 ? 1 : 0) - u.uSoak.value) * dt * (this.rain > 0.1 ? 0.05 * this.rain : 0.003);
+    u.uSweat.value += (Math.min(1, this.effort * 1.2 + Math.max(0, this.fear - 0.5)) - u.uSweat.value) * dt * 0.02;
+    // skin: blood rushes to the face when angry or working hard, drains when terrified
     const k2 = 1 - Math.exp(-dt * 1.5);
     u.uFlush.value += (Math.min(1, this.anger * 0.9 + this.effort * 0.5) - u.uFlush.value) * k2;
     u.uPale.value += (Math.max(0, this.fear - 0.5) * 1.6 - u.uPale.value) * k2;

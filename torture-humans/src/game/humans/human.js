@@ -188,6 +188,7 @@ export class Human {
     this.character.stopOneShot(0);
     this.character.setEmotion(gore === 'none' ? 'neutral' : 'pain', 1);
     this.character.update(0.016);
+    this.life?.addStain(root.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 1.1 * this.scale, 0)), 0.35, gore === 'full' ? 1.6 : gore === 'some' ? 1 : 0);
     if (gore === 'none') {
       root.rotation.x = -Math.PI / 2; // lying flat, out cold
       root.position.y += 0.01 * this.scale;

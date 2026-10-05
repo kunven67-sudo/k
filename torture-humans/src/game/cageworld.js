@@ -182,7 +182,8 @@ function pondMesh(heightAt, { reflections = 'high' } = {}) {
 function lavaMesh() {
   const { lava } = FEATURES;
   const mat = new THREE.MeshStandardMaterial({ color: 0x1a0500, emissive: 0xff4a0a, emissiveIntensity: 2.2, roughness: 0.9 });
-  mat.onBeforeCompile = (sh) => {
+  // (also kept when the sun-shadow system sets the material up: see renderer.setupMaterial)
+  mat.onBeforeCompile = mat.userData.extraCompile = (sh) => {
     sh.uniforms.uTime = { value: 0 };
     mat.userData.shader = sh;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vPosW;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvPosW = (modelMatrix * vec4(transformed, 1.0)).xyz;');

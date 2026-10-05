@@ -70,14 +70,15 @@ export class Environment {
       if (!m || m.userData.wettable) continue;
       m.userData.wettable = true;
       const prev = m.onBeforeCompile;
-      m.onBeforeCompile = (sh, r) => {
-        prev?.(sh, r);
+      const wet = (sh) => {
         sh.uniforms.uWet = u;
         sh.fragmentShader = sh.fragmentShader
           .replace('#include <common>', '#include <common>\nuniform float uWet;')
           .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 1.0 - 0.38 * uWet;')
           .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.12, uWet * 0.85);');
       };
+      m.userData.extraCompile = wet;
+      m.onBeforeCompile = (sh, r) => { prev?.call(m, sh, r); wet(sh, r); };
       m.customProgramCacheKey = () => `wet-${m.uuid.slice(0, 4)}`;
       m.needsUpdate = true;
     }
@@ -292,6 +293,13 @@ export class Environment {
       this.dust.geometry.attributes.position.needsUpdate = true;
     }
 
+    // people outside get rained on (and their shoes get dirty out here)
+    for (const h of this.humans) {
+      if (!h.life) continue;
+      const outdoorsNow = !h.tiny && h.position.y > 3.1 && !this.level.zones?.inHouse(h.position);
+      h.life.outdoors = outdoorsNow;
+      h.life.rain = outdoorsNow ? this.weather.rain : 0;
+    }
     // breath you can see: a puff on every breath out when it's below ~8 °C
     const cold = smooth(9, 4, this.temperature);
     if (cold > 0.05 && outside) {
