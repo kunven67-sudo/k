@@ -848,3 +848,5 @@ manual everything and broken gauges).
   Cook-off (Labor Day, eating contests), Street Vibrations motorcycle rally (September),
   Virginia City ghost tours around Halloween (maybe linked to motel room 13).
 - **Natural hot springs** near Reno (lower stress, heal sore muscles, date spot).
+- Newspaper: **The Truckee Times**. TV news: **KSLV 8 News**. Slot machine names: invented by
+  the developer. Radio station names: invented by the developer.
