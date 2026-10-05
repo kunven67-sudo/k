@@ -619,3 +619,14 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 - **Uber/Lyft surge pricing** (late night, bad weather, after events).
 - **Motorcycle laws**: license endorsement test at the DMV; Nevada helmet law (tickets, worse
   crash injuries without one).
+
+## 30. Later additions (round 71) — being the house
+
+- **Home poker games**: invite NPCs/online friends; friendly games legal, taking a rake is
+  illegal in Nevada (neighbors snitch, police raids).
+- **Illegal bookie**: take off-the-books sports bets; you pay when everyone wins; collecting
+  is dangerous; FBI investigates big operations.
+- **Lend money to NPCs** with interest: some repay, some vanish, some get angry; excessive
+  interest = illegal loan sharking.
+- **Card-counting teams** with online friends (MIT-style spotter signals the big player via
+  gesture/emote); legal but casinos ban caught teams.
