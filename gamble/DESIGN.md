@@ -516,3 +516,27 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 - **Thermostat**: heating/AC cost a lot on the power bill; turning them off → freeze/sweat.
 - **Moving**: U-Haul DIY (carry boxes with physics, friends help for pizza), hired movers
   (fast, pricey, may break/"lose" stuff), many small car trips.
+
+## 25. Later additions (rounds 61–62)
+
+- **NPC brains**: they can lie (some badly), you haggle by typing (politeness changes prices),
+  gossip spreads around town, long memory of promises/favors — and **realistic forgetting**
+  (small details fade, older NPCs forget more, drunk NPCs forget the night).
+- **Texting**: per-NPC style (typos, slang, emojis, lowercase; grandma in ALL CAPS), read
+  receipts & left-on-read, typing bubbles that vanish, slow replies, voice messages in
+  their voices, group chats (family, friends, online friends).
+- **US customs**: cash over $10,000 must be declared when re-entering the US; hidden and
+  caught → seized + fines.
+- **Travel problems**: weather delays/cancellations (sleep at the airport), overbooked
+  flights (bumped → voucher, or volunteer for cash), random TSA bag checks (forgotten knife
+  = trouble), lost passport abroad → US embassy emergency passport (days).
+- Japan pachinko uses the real prize-exchange system (win balls → prizes → sold at a
+  separate window); Tokyo has Japanese language/signs and yen like Macau's setup.
+- **Instruments**: guitar, piano (casino lounge piano if allowed), drums (noise complaints,
+  cops at night), DJ decks (party/club gigs).
+- **Hobbies 2**: skill books (poker strategy, cooking, car repair), painting (sell at Artown /
+  online), esports tournaments for prize money, collecting & reselling (sneakers, trading
+  cards, coins, limited drops).
+- **Grooming**: makeup for anyone (smears in tears/rain), hair dye (roots grow out), nails
+  (chip over days), cologne/perfume (too much → people cough).
+- **Phone gacha games** with in-app purchases and loot boxes that drain in-game cash.
