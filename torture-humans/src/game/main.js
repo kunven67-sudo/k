@@ -18,6 +18,7 @@ import { Germs } from './germs.js';
 import { Village } from './village.js';
 import { Pets } from './pets.js';
 import { Audio } from './audio.js';
+import { TownLife } from './humans/town-life.js';
 import { Phone, saveGame, loadGame, hasSave } from './phone.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
@@ -205,7 +206,7 @@ export async function boot() {
     // hide what you can't see from here: the town from the basement, the basement from outside
     if (level.zones) {
       for (const o of level.zones.town) o.visible = z !== 'lab';
-      for (const h of humans) if (h.townie && !h.tiny) h.character.root.visible = z !== 'lab';
+      for (const h of humans) if (h.townie && !h.tiny && h.state !== 'away') h.character.root.visible = z !== 'lab';
       for (const o of level.zones.lab) o.visible = z !== 'outside';
     }
     for (const l of sunLights()) {
@@ -221,6 +222,8 @@ export async function boot() {
   game_applyZone = applyZone;
   // time of day, weather, lamps at night, rain, breath in the cold, basement dust
   const env = level.sunDirection ? new Environment({ scene, renderer, settings, camera, level, humans, zone: () => zone || 'lab' }) : null;
+  // townspeople's days: home, work, out, home again
+  if (level.town?.spots && env && params.get('routines') !== '0') new TownLife({ humans, env, spots: level.town.spots, scene });
   // things you use with E (light switch, chores...)
   const interact = new Interactables({ camera, player, input });
   // Mom and Dad: routines, chores, allowance (and they take the watch if they catch you)

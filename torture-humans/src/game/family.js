@@ -83,7 +83,9 @@ export class Family {
     if (h.state === 'away') {
       if (want === 'home') {
         // back: in through the door they left by
-        h.placeAt((h.awayAt || exit).p.clone(), this.scene);
+        const back = (h.awayAt || exit).p;
+        const q = h.nav.closest(back);
+        h.placeAt(q ? back.clone().set(q.x, q.y, q.z) : back.clone(), this.scene);
         h.character.root.visible = true;
         h.speech?.say(h, h.role === 'dad' && h.awayAt === S.frontDoor ? 'I\'m home!' : 'Good morning!');
       }

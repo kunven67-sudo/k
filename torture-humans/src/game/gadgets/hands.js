@@ -328,7 +328,7 @@ class Hand extends Item {
 
   // small enough to hold: a fifth of your size or less
   canHold(h) {
-    return h && h.grabbed && !h.dead && h.alive && !h.captured && h.state !== 'flying' && h.scale <= 0.22 * this.ctx.player.scale;
+    return h && h.grabbed && !h.dead && h.alive && !h.captured && h.state !== 'flying' && h.state !== 'away' && h.scale <= 0.22 * this.ctx.player.scale;
   }
 
   reach() { return 1.8 * this.ctx.player.scale + 1.5; }

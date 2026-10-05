@@ -185,7 +185,7 @@ export class Talk {
     let best = null, bestScore = Infinity;
     const v = new THREE.Vector3();
     for (const h of this.humans) {
-      if (h.dead || !h.alive || h.state === 'flying') continue;
+      if (h.dead || !h.alive || h.state === 'flying' || h.state === 'away') continue;
       const head = h.character.bones.Bip01_Head;
       (head || h.character.root).getWorldPosition(v);
       const to = v.clone().sub(eye);

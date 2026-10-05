@@ -129,7 +129,9 @@ export class Police {
 
   // an officer's mind (returns true when it takes over from the normal townsperson brain)
   copBrain(h, dt) {
+    h.copBusy = this.wanted > 0 || h.dispatched;
     if (this.wanted <= 0 && !h.dispatched) return false; // a normal day on the beat
+    if (h.state === 'away') { h.placeAt(h.awaySpot?.p?.clone() ?? h.position.clone(), h.character.root.parent); h.character.root.visible = true; } // called out of the station
     const p = this.player;
     h.copT = (h.copT ?? 0) - dt;
     if (h.copT > 0) return true;

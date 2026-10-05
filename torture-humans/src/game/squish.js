@@ -76,7 +76,7 @@ export class Squisher {
       const heel = fp.clone().addScaledVector(fwd, -0.06 * ps);
       const soleLen = 0.26 * ps;
       for (const h of this.humans) {
-        if (h.dead || h.captured || h.state === 'caged' || !(h.tiny || h.scale < 0.15 * ps)) continue;
+        if (h.dead || h.captured || h.state === 'caged' || h.state === 'away' || !(h.tiny || h.scale < 0.15 * ps)) continue;
         const hp = h.position;
         const rel = new THREE.Vector3(hp.x - heel.x, 0, hp.z - heel.z);
         const along = rel.dot(fwd);
