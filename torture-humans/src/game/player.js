@@ -91,6 +91,28 @@ export class Player {
     this.velocity.set(0, 0, 0);
   }
 
+  // resized by something (your own shrink ray): eases to the new size over a second
+  resizeTo(goal) {
+    if (this.inCage || this.ladder?.active) return;
+    this.resizeFx = { from: this.scale, to: THREE.MathUtils.clamp(goal, MIN_SCALE, MAX_SCALE), t: 0 };
+  }
+
+  updateResizeFx(dt) {
+    const fx = this.resizeFx;
+    if (!fx) return;
+    fx.t = Math.min(1, fx.t + dt / 1.1);
+    const e = 1 - Math.pow(1 - fx.t, 3);
+    const want = Math.exp(THREE.MathUtils.lerp(Math.log(fx.from), Math.log(fx.to), e));
+    if (want > this.scale && !this.physics.fitsCapsule(this.body, (this.crouching ? CROUCH_H : STAND_H) * want, 0.28 * want)) {
+      this.noRoom = 1;
+      this.resizeFx = null;
+      return;
+    }
+    const t = this.body.body.translation();
+    this.setScale(want, new THREE.Vector3(t.x, t.y - this.body.height / 2, t.z), { keepVelocity: true });
+    if (fx.t >= 1) this.resizeFx = null;
+  }
+
   // The size watch: hold Z to shrink, X to grow, to any size (if there's room to grow)
   updateSizeWatch(dt) {
     const inp = this.input;
@@ -275,6 +297,7 @@ export class Player {
     if (inp.pressed('interact')) this.queued.interact = true;
     if (inp.pressed('shrinkSelf')) this.tryShrinkToggle();
     this.updateSizeWatch(dt);
+    this.updateResizeFx(dt);
     this.noRoom = Math.max(0, (this.noRoom || 0) - dt);
     this.noWatch = Math.max(0, (this.noWatch || 0) - dt);
     this.updateShrinkFx(dt);

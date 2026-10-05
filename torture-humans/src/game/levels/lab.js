@@ -297,9 +297,16 @@ export async function buildLab({ scene, physics, settings }) {
   scene.add(statics, props);
   physics.addStaticMesh(statics);
   // props: exact mesh colliders too (static); ones you can knock over get dynamic bodies later
-  physics.addStaticMesh(props, { filter: (o) => !o.userData.noCollide });
+  // (one big collider; things the shrink ray resizes get their own, see gadgets/resize.js)
+  const ownsCollider = (o) => { for (let p = o; p && p !== props; p = p.parent) if (p.userData.ownCollider) return true; return false; };
+  let propsCollider = physics.addStaticMesh(props, { filter: (o) => !o.userData.noCollide });
+  const rebuildProps = () => {
+    if (propsCollider) physics.world.removeRigidBody(propsCollider.body);
+    propsCollider = physics.addStaticMesh(props, { filter: (o) => !o.userData.noCollide && !ownsCollider(o) });
+  };
 
   return {
+    props, rebuildProps,
     spawn: new THREE.Vector3(2.5, 0, 2.0),
     home: new THREE.Vector3(3.6, 3.3, -1.6), // your bedroom (where the police drop you off)
     respawn: new THREE.Vector3(0.6, 0, 2.2), // where you wake up after dying in the tiny world

@@ -129,6 +129,7 @@ export class Village {
     h.state = 'village';
     h.vt = { target: null, wait: Math.random() * 4, speed: 1.2 * 0.05 * (0.85 + Math.random() * 0.3) };
     h.custom = (dt) => this.live(h, dt);
+    h.villageExit = this.layout.bounds ? home.clone() : new THREE.Vector3(VILLAGE.hole, FY, -4.75);
     this.people.push(h);
   }
 

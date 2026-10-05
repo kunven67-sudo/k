@@ -59,26 +59,10 @@ class ShrinkRay extends Item {
     if (this.cooldown <= 0) this.charging = true;
   }
 
-  // right click: the grow beam (a tiny person you aim at goes back to normal size)
+  // right click: the grow beam (tiny people back to normal, normal people into giants, things bigger)
   onAlt() {
     if (this.cooldown > 0) return;
-    const { camera, physics, player } = this.ctx;
-    this.cooldown = 0.6;
-    const dir = camera.getWorldDirection(new THREE.Vector3());
-    const hit = physics.raycast(camera.position, dir, RANGE, { exclude: player.body.collider });
-    const from = this.model.localToWorld(this.model.userData.muzzle.clone());
-    const to = hit ? hit.point : camera.position.clone().addScaledVector(dir, RANGE);
-    const b = this.beam;
-    b.visible = true;
-    b.userData.life = 0.28;
-    b.position.copy(from).lerp(to, 0.5);
-    b.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
-    b.scale.set(1, from.distanceTo(to), 1);
-    for (const m of b.userData.mats) m.color.set(0xffb347); // warm orange: growing
-    b.userData.grow = true;
-    this.ctx.audio?.zap(true);
-    const target = hit?.owner;
-    if (target?.grow && target.tiny) target.grow(1);
+    this.zap(true, 1);
   }
 
   onUp() {
@@ -89,29 +73,69 @@ class ShrinkRay extends Item {
   }
 
   fire(power) {
-    const { camera, physics, player } = this.ctx;
+    this.zap(false, power);
+  }
+
+  // One beam, two directions. What it hits, it resizes: people (any size, even
+  // the ones in the terrarium), furniture and other things, or you (aim at your feet).
+  zap(grow, power) {
+    const { camera, physics, player, cage, resizer } = this.ctx;
     this.cooldown = 0.6;
     const from = this.model.localToWorld(this.model.userData.muzzle.clone());
     const dir = camera.getWorldDirection(new THREE.Vector3());
-    // aim from the eye (what you see is what you hit), draw the beam from the muzzle
-    const hit = physics.raycast(camera.position, dir, RANGE, { exclude: player.body.collider });
-    const to = hit ? hit.point : camera.position.clone().addScaledVector(dir, RANGE);
+    // aim from the eye (what you see is what you hit); into the terrarium the beam passes the glass
+    const reach = RANGE * Math.max(1, player.scale);
+    const intoCage = cage && player.scale > 0.5 && player.scale < 3 && cage.canDropFrom(camera.position);
+    const hit = intoCage ? cage.raycast(physics, camera.position, dir, reach, { exclude: player.body.collider }) : physics.raycast(camera.position, dir, reach, { exclude: player.body.collider });
+    const to = hit ? hit.point : camera.position.clone().addScaledVector(dir, reach);
+    // the beam
     const b = this.beam;
     b.visible = true;
     b.userData.life = 0.28;
-    const len = from.distanceTo(to);
     b.position.copy(from).lerp(to, 0.5);
     b.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
-    b.scale.set(0.6 + power, len, 0.6 + power);
-    for (const m of b.userData.mats) m.color.set(0x7fd6ff);
+    b.scale.set((0.6 + power) * player.scale, from.distanceTo(to), (0.6 + power) * player.scale);
+    for (const m of b.userData.mats) m.color.set(grow ? 0xffb347 : 0x7fd6ff); // orange grows, blue shrinks
     this.model.userData.light.intensity = 25;
-    this.ctx.audio?.zap(false);
-    const target = hit?.owner;
-    if (target?.shrink && !target.tiny && !target.dead) {
-      target.shrink(TINY, { power });
-      this.ctx.crime?.('shrink', target.position.clone(), target);
+    this.ctx.audio?.zap(grow);
+    // 1. a person (small people are hard to hit exactly: anyone tiny right where the beam lands counts)
+    let target = hit?.owner;
+    if (hit && !target?.shrink) {
+      let bd = Infinity;
+      for (const h of this.ctx.humans) {
+        if (h.dead || !h.alive || h.state === 'away' || h.state === 'held' || h.scale > 0.3 * player.scale) continue;
+        const hp = h.character.root.getWorldPosition(new THREE.Vector3());
+        const d = Math.hypot(hp.x - hit.point.x, hp.z - hit.point.z);
+        const tol = Math.max(0.025 * player.scale, 0.6 * h.scale);
+        if (d < tol && Math.abs(hp.y - hit.point.y) < Math.max(0.05, 2 * h.scale) && d < bd) { bd = d; target = h; }
+      }
     }
-    this.ctx.events?.emit?.('shrink-ray-fired', { hit: !!target });
+    if (target?.shrink && !target.dead) {
+      const was = target.state;
+      if (grow) {
+        const goal = target.scale < 0.5 ? 1 : Math.min(4, target.scale * 2);
+        if (target.grow(goal) && goal > 1) this.ctx.speech?.say(target, 'WHOA! What is happening to me?!', { shout: true });
+      } else {
+        const goal = target.scale >= 0.5 ? TINY : Math.max(0.001, target.scale * 0.25);
+        target.shrink(goal, { power });
+        if (was !== 'caged') this.ctx.crime?.('shrink', target.position.clone(), target);
+      }
+      this.ctx.events?.emit?.('shrink-ray-fired', { hit: true });
+      return;
+    }
+    // 2. you: shooting at your own feet
+    const f = player.feet;
+    const atFeet = hit && Math.hypot(hit.point.x - f.x, hit.point.z - f.z) < 0.5 * player.scale && Math.abs(hit.point.y - f.y) < 0.3 * player.scale;
+    if (atFeet || (!hit && camera.rotation && dir.y < -0.95)) {
+      const s = player.scale;
+      const goal = grow ? (s < 1 ? Math.min(1, s * 4) : Math.min(4, s * 2)) : (s >= 0.5 ? TINY : Math.max(0.001, s * 0.25));
+      player.resizeTo?.(goal);
+      this.ctx.toast?.(grow ? 'You zapped your own feet: growing!' : 'You zapped your own feet: shrinking!');
+      return;
+    }
+    // 3. a thing (furniture, a car, a tree, a trash can...)
+    const obj = hit?.owner?.isProp ? { obj: hit.owner.obj } : resizer?.objectAt(camera.position, dir, hit ? hit.distance + 0.05 : reach);
+    if (obj?.obj && (!hit || !hit.owner || hit.owner.isProp)) resizer.zap(obj.obj, grow ? 1.8 : 0.4);
   }
 
   update(dt) {

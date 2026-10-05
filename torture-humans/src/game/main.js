@@ -19,6 +19,7 @@ import { Village, buildBurrow } from './village.js';
 import { Pets } from './pets.js';
 import { Audio } from './audio.js';
 import { Footsteps } from './footsteps.js';
+import { Resizer } from './gadgets/resize.js';
 import { TownLife } from './humans/town-life.js';
 import { Jobs } from './jobs.js';
 import { TinyReality } from './tiny-reality.js';
@@ -154,7 +155,9 @@ export async function boot() {
   const audio = new Audio({ settings, camera });
   speech.audio = audio;
   for (const h of humans) { h.speech = speech; h.player = player; }
-  const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony, speech, audio });
+  // the shrink ray works on things too
+  const resizer = new Resizer({ physics, props: level.props, rebuildProps: level.rebuildProps, player });
+  const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony, speech, audio, resizer });
   // T / Enter: type something to whoever you're looking at (or holding)
   const talk = new Talk({ input, camera, humans, speech, player, colony, canvas: input.target, places: level.town?.spots || [], getHeld: () => hands.items.find((i) => i.held)?.held ?? null });
   player.cage = cage;
@@ -420,6 +423,7 @@ export async function boot() {
     physics.update(dt, (fixed) => player.fixedUpdate(fixed));
     player.update(dt, physics.alpha);
     hands.update(dt);
+    resizer.update(dt);
     squisher.update();
     hazards.update(dt);
     tiny.update(dt);

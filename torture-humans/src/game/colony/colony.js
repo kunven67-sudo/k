@@ -495,6 +495,14 @@ export class Colony {
     return this.residents.get(human)?.describe() ?? null;
   }
 
+  // a resident got shrunk (or grown) by the ray: their body and walking match the new size
+  rescale(human) {
+    const r = this.residents.get(human);
+    if (!r) return;
+    const s = human.scale;
+    if (r.capsule) this.physics.resizeCapsule(r.capsule, 1.75 * s, 0.26 * s); // (walking speed follows size every frame already)
+  }
+
   updateResident(human, dt) {
     const r = this.residents.get(human);
     if (r) r.update(dt);

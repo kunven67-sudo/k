@@ -138,7 +138,7 @@ export class Human {
   // ---- shrinking, jar, cage
 
   shrink(to = 0.05, { power = 1 } = {}) {
-    if (this.shrinking || this.tiny) return;
+    if (this.shrinking || this.dead || to >= this.scale) return;
     this.shrinking = { from: this.scale, to, t: 0, d: 1.6 - power * 0.4 };
     this.emotion.fear = 1;
     this.character.stopOneShot(0.1);
@@ -146,11 +146,26 @@ export class Human {
   }
 
   // the grow beam (shrink ray, right click): back to normal size
+  // grown (the grow beam): tiny people back toward normal, normal people into giants.
+  // Someone in the terrarium who grows to full size breaks out onto the lab floor.
   grow(to = 1) {
-    if (this.shrinking || !this.tiny || this.dead || !this.agent) return false;
+    if (this.shrinking || this.dead || to <= this.scale) return false;
+    if (!['idle', 'walking', 'stranded', 'caged', 'village'].includes(this.state)) return false;
+    if (this.state === 'caged' && to >= 0.5) {
+      const cage = this.cage;
+      cage?.colony?.leave(this);
+      cage?.residents?.delete(this);
+      const out = cage ? cage.exitPoint(this.character.root.getWorldPosition(new THREE.Vector3())) : this.position.clone();
+      this.cage = null;
+      this.placeAt(out, this.character.root.parent?.parent ?? this.character.root.parent);
+    } else if (this.state === 'village') {
+      // too big for the wall: they squeeze out through the mouse hole
+      this.custom = null;
+      this.placeAt(this.villageExit?.clone() ?? this.character.root.getWorldPosition(new THREE.Vector3()), this.character.root.parent);
+    }
     this.shrinking = { from: this.scale, to, t: 0, d: 1.4 };
     this.character.stopOneShot(0.1);
-    this.agent.resetMoveTarget();
+    this.agent?.resetMoveTarget();
     return true;
   }
 
@@ -177,7 +192,10 @@ export class Human {
 
   applyScale(s) {
     this.scale = s;
-    this.character.root.scale.setScalar(s);
+    const parent = this.character.root.parent;
+    const ps = parent && !parent.isScene ? parent.getWorldScale(new THREE.Vector3()).x : 1;
+    this.character.root.scale.setScalar(s / ps);
+    if (this.state === 'caged') this.cage?.colony?.rescale?.(this);
     if (this.capsule) {
       this.physics.resizeCapsule(this.capsule, 1.75 * s, 0.26 * s);
       this.physics.setCapsuleGroup(this.capsule, s < 0.5 ? GROUP.TINY : GROUP.NPC);
@@ -540,7 +558,7 @@ export class Human {
       this.character.update(dt);
       return;
     }
-    if (this.state === 'caged') { this.updateCaged(dt); return; }
+    if (this.state === 'caged') { this.updateShrinking(dt); this.updateCaged(dt); return; }
     this.updateShrinking(dt);
     // something you told them to do (follow you, wait, go somewhere) comes first,
     // then a special mind (police on duty...), then the everyday one
