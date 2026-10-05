@@ -584,3 +584,22 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 - **Claw machines** grab strongly only 1 in X tries (real payout settings).
 - **Hotel stays**: room service (service charge), minibar ($12 water, auto-charged),
   housekeeping (Do Not Disturb; valuables risk), 11 AM checkout, late fees, hidden resort fees.
+
+## 28. Later additions (rounds 67–68)
+
+- Real Nevada slot machines also in **grocery stores, gas stations, laundromats and the Reno
+  airport**.
+- **Talk to NPCs with your real voice** (mic → speech recognition, best in Chrome) in addition
+  to typing.
+- **Mic loudness matters**: yelling turns/scares NPCs, whispering keeps sneaking quiet, noise
+  wakes a sleeping partner.
+- **Restaurants**: wait lists & phone reservations, dine & dash (crime; waiter chases,
+  cameras), splitting checks (Venmo IOUs), sending food back (polite → fixed, rude → 🤢).
+- **Date bills**: each NPC has their own expectation (you pay / split / offended if you pay).
+- **Your personality grows from your actions** (kinder, sneakier…), changing NPC views and
+  your character's small habits.
+- **Phobias** (per character): flying, heights, spiders & bugs, dogs.
+- **Side bets on anything**: eating contests, dares, foot/car/bike races, handshake bets
+  (people may not pay up).
+- **Quitting habits**: AA meetings with a sponsor, nicotine patches/gum (cranky days), sober
+  streak app, relapse from stress or temptation.
