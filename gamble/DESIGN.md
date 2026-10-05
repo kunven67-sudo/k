@@ -681,3 +681,15 @@ expectations and habits vary per individual — never one fixed rule for everyon
   - **Smooth first on phones**: adaptive quality (fewer shadows/effects, shorter view
     distance) while PC keeps max graphics.
   - **No controller support yet** (maybe later).
+
+## 34. First morning (round 77)
+
+- The cracked-phone video shows a **parking-garage brawl** at a casino — someone gets badly
+  hurt, and you might be IN the video.
+- With the video you can: give it to police (reward; may testify; they ask what you were
+  doing at 3 AM), sell it to local TV news (quick cash), post it online (viral or trouble),
+  or delete it.
+- Day-1 pocket clue: **a napkin with a name and phone number** (the only clue).
+  - ⏳ **PENDING — do NOT build yet:** calling the number plays the owner's own recorded
+    voice line and awards a "You got pranked" trophy. Wait for the owner's voice file.
+- **Installable app (PWA)**: Add to Home Screen on iPhone → own icon, full screen.
