@@ -603,3 +603,19 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
   (people may not pay up).
 - **Quitting habits**: AA meetings with a sponsor, nicotine patches/gum (cranky days), sober
   streak app, relapse from stress or temptation.
+
+## 29. Later additions (rounds 69–70)
+
+- **Economy**: ~3%/year inflation (cash under the mattress loses value), booms & recessions
+  (layoffs, fewer tourists, quieter casinos, stock crashes, cheaper houses), changing home
+  values (buy low/sell high, underwater mortgages).
+- **Real wages**: Nevada minimum wage ($12/hr), paycheck tax withholding, tip-based jobs
+  (dealers/servers) whose income varies nightly — big winners tip big. (The player still
+  doesn't have a tipping mechanic as a customer.)
+- **Car buying**: test drives (talkative salesman), haggle by typing/voice ("let me check with
+  my manager"), credit-score-based financing, extended-warranty upsells & hidden fees.
+- **Electric cars** (Tesla etc.): charging stations / home charger, slow charging, big range
+  loss in freezing Reno winters.
+- **Uber/Lyft surge pricing** (late night, bad weather, after events).
+- **Motorcycle laws**: license endorsement test at the DMV; Nevada helmet law (tickets, worse
+  crash injuries without one).
