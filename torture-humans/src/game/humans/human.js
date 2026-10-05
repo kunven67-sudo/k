@@ -38,6 +38,7 @@ export class Human {
     this.alive = true;
     this.character.root.userData.human = this;
     this.character.look = profile.look || profile.name || '';
+    this.settings = settings;
     this.life = new Life(this.character, settings);
     this.syncFromAgent(1);
   }
@@ -110,6 +111,25 @@ export class Human {
     }
   }
 
+  // a giant (you, grown with the size watch) close by: scream and run
+  watchForGiant(dt) {
+    const p = this.player;
+    this.giantT = Math.max(0, (this.giantT || 0) - dt);
+    if (!p || this.giantT > 0 || p.scale < 3 * this.scale) return;
+    const f = p.feet;
+    const d = Math.hypot(f.x - this.position.x, f.z - this.position.z);
+    if (d > 4 * p.scale) return;
+    this.giantT = 6 + Math.random() * 4;
+    this.emotion.fear = 1;
+    if (Math.random() < 0.7) this.speech?.react(this, 'giantSeen', { shout: true });
+    const here = this.position;
+    const away = this.nav.randomPoint((q) => {
+      const dq = Math.hypot(q.x - f.x, q.z - f.z);
+      return dq > d + 3 && Math.hypot(q.x - here.x, q.z - here.z) < 25 && Math.abs(q.y - here.y) < 0.6;
+    });
+    if (away) { this.spot = null; this.goTo(away, { run: true }); }
+  }
+
   // ---- shrinking, jar, cage
 
   shrink(to = 0.05, { power = 1 } = {}) {
@@ -147,6 +167,7 @@ export class Human {
     this.character.root.scale.setScalar(this.scale / (jar.scale.x || 1));
     this.character.speed = 0;
     this.character.play('idle_nervous_01', { loop: true });
+    this.speech?.react(this, 'jar', { shout: true });
   }
 
   // Trapped in a jar: face whoever holds it, bang on the glass, wave for help, yell.
@@ -173,9 +194,136 @@ export class Human {
       const act = acts[(Math.random() * acts.length) | 0];
       this.character.play(act, { onDone: () => this.character.play('idle_nervous_01', { loop: true }) });
       this.jarTimer = 2.5 + Math.random() * 3;
+      if (Math.random() < 0.4) this.speech?.react(this, 'jar');
     }
     this.updateFace();
     this.character.update(dt);
+  }
+
+  // ---- picked up, put down, thrown (the empty hand, gadgets/hands.js)
+
+  // Lifted off the ground into someone's hand: out of the crowd and physics
+  grabbed() {
+    if (this.state === 'caged') { this.cage?.colony?.leave(this); this.cage?.residents?.delete(this); this.cage = null; }
+    if (this.agent) { this.nav.removeAgent(this.agent); this.agent = null; }
+    if (this.capsule) { this.physics.removeCapsule(this.capsule); this.capsule = null; }
+    this.state = 'held';
+    this.captured = true;
+    this.heldT = 0;
+    this.shaken = 0;
+    this.emotion.fear = Math.max(this.emotion.fear, 0.7);
+    this.character.root.rotation.order = 'YXZ';
+    this.character.root.rotation.set(0, this.yaw, 0);
+    this.character.speed = 0;
+    this.character.play('idle_nervous_01', { loop: true });
+  }
+
+  // In your hand: face you, fidget, struggle and plead now and then
+  updateHeld(dt) {
+    this.heldT += dt;
+    this.emotion.fear = Math.min(1, this.emotion.fear + dt * 0.03 + this.shaken * dt * 0.5);
+    if (this.shaken > 0.5) this.emotion.anger = Math.min(1, this.emotion.anger + dt * 0.1);
+    this.jarTimer = (this.jarTimer ?? 1) - dt;
+    if (this.jarTimer <= 0) {
+      const acts = this.emotion.anger > 0.5 ? ['gestic_talk_angry_01', 'gestic_talk_angry_02', 'idle_angry_01', 'idle_shake_arms_01'] : ['idle_nervous_02', 'gestic_talk_nervous_01', 'wave_01', 'idle_look_around_02', 'gestic_listen_nervous_01'];
+      this.character.play(acts[(Math.random() * acts.length) | 0], { onDone: () => this.state === 'held' && this.character.play('idle_nervous_01', { loop: true }) });
+      this.jarTimer = 2 + Math.random() * 3;
+    }
+    this.updateFace();
+    this.character.update(dt);
+  }
+
+  // Set down at a world point: back on the navmesh if there is one there,
+  // otherwise stuck where they are (on a table, a roof...) until picked up again
+  placeAt(point, scene) {
+    const root = this.character.root;
+    if (root.parent !== scene) scene.attach(root);
+    root.scale.setScalar(this.scale);
+    root.rotation.set(0, this.yaw, 0);
+    root.position.copy(point);
+    this.captured = false;
+    this.fall = null;
+    const q = this.nav.closest(point);
+    const onNav = q && Math.hypot(q.x - point.x, q.z - point.z) < Math.max(0.05, 0.4 * this.scale) && Math.abs(q.y - point.y) < Math.max(0.12, 0.5 * this.scale);
+    this.capsule = this.physics.addKinematicCapsule(this, { radius: 0.26 * this.scale, height: 1.75 * this.scale, position: point, group: this.scale < 0.5 ? GROUP.TINY : GROUP.NPC });
+    if (onNav) {
+      this.agent = this.nav.addAgent(q, { radius: Math.max(0.02, 0.3 * this.scale), height: 1.8 * this.scale, maxSpeed: 1.35 * this.scale });
+      this.state = 'idle';
+      this.timer = 0.5;
+      // scared people get away from you
+      if (this.emotion.fear > 0.6) {
+        const away = this.nav.randomPoint((p) => Math.hypot(p.x - point.x, p.z - point.z) > 2 * this.scale && Math.hypot(p.x - point.x, p.z - point.z) < 12 * this.scale + 2 && Math.abs(p.y - point.y) < 0.6);
+        if (away) this.goTo(away, { run: true });
+      }
+    } else {
+      this.state = 'stranded';
+    }
+    this.character.stopOneShot(0.2);
+  }
+
+  // Thrown: flies (tumbling) until it hits something
+  throwFrom(pos, vel, scene) {
+    const root = this.character.root;
+    if (root.parent !== scene) scene.attach(root);
+    root.scale.setScalar(this.scale);
+    root.position.copy(pos);
+    this.state = 'flying';
+    this.flight = { vel: vel.clone(), spin: new THREE.Vector3((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 8), scene };
+    this.character.play('idle_shake_arms_01', { loop: true });
+    this.emotion.fear = 1;
+  }
+
+  updateFlying(dt) {
+    const f = this.flight;
+    const root = this.character.root;
+    f.vel.y -= 9.81 * dt;
+    // air drag: small things fall slowly (a 9 cm person tops out around 3 m/s, not 55)
+    const vt = 55 * Math.sqrt(this.scale);
+    const sp = f.vel.length();
+    if (sp > vt) f.vel.multiplyScalar(Math.max(vt / sp, 1 - dt * 4));
+    const step = f.vel.clone().multiplyScalar(dt);
+    const len = step.length();
+    const hit = len > 1e-6 && this.physics.raycast(root.position, step.clone().normalize(), len + 0.02 * this.scale, { filterGroups: FLOOR });
+    root.rotation.x += f.spin.x * dt; root.rotation.z += f.spin.z * dt; this.yaw += f.spin.y * dt; root.rotation.y = this.yaw;
+    this.character.update(dt);
+    if (!hit) { root.position.add(step); if (root.position.y < -50) this.squish('none'); return; }
+    root.position.copy(hit.point);
+    this.flight = null;
+    // how hard they hit, compared to what their size can take (square-cube law: small = tough)
+    const impact = Math.max(sp, 0) * (hit.normal?.y > 0.5 ? 1 : 0.8);
+    const harm = impact / (10 * Math.pow(this.scale, -0.1));
+    this.onLand?.(this, harm, hit);
+    if (hit.normal && hit.normal.y < 0.5) {
+      // hit a wall: drop straight down from there
+      root.position.addScaledVector(new THREE.Vector3(hit.normal.x, 0, hit.normal.z), 0.1 * this.scale);
+      this.flight = { vel: new THREE.Vector3(0, -0.5, 0), spin: new THREE.Vector3(), scene: f.scene };
+      this.state = 'flying';
+      if (harm > 1.4) { this.flight = null; this.dieFromFall(f.scene); }
+      return;
+    }
+    root.rotation.set(0, this.yaw, 0);
+    if (harm > 1.4) { this.dieFromFall(f.scene); return; }
+    if (harm > 0.6) {
+      // hurt: lies there a while, then gets up
+      this.state = 'hurt';
+      this.captured = false;
+      this.hurtT = 3 + harm * 3;
+      root.rotation.set(-Math.PI / 2, this.yaw, 0, 'YXZ');
+      root.position.y += 0.1 * this.scale;
+      this.character.stopOneShot(0);
+      this.character.setEmotion('pain', 1);
+      this.landScene = f.scene;
+      return;
+    }
+    this.placeAt(root.position.clone(), f.scene);
+  }
+
+  dieFromFall(scene) {
+    const root = this.character.root;
+    this.squish(this.settings?.get('gameplay.gore') ?? 'some', { scene });
+    root.scale.setScalar(this.scale);
+    root.rotation.set(-Math.PI / 2, this.yaw, (Math.random() - 0.5) * 0.6, 'YXZ');
+    root.position.y += 0.1 * this.scale;
   }
 
   // Stepped on. gore: 'none' = knocked out cold, 'some' = flattened + blood, 'full' = more of it.
@@ -336,6 +484,22 @@ export class Human {
       return;
     }
     if (this.state === 'jar') { this.updateJar(dt); return; }
+    if (this.state === 'held') { this.updateHeld(dt); return; }
+    if (this.state === 'flying') { this.updateFlying(dt); return; }
+    if (this.state === 'hurt') {
+      this.hurtT -= dt;
+      this.character.update(dt);
+      if (this.hurtT <= 0) { this.emotion.anger = Math.min(1, this.emotion.anger + 0.4); this.placeAt(this.character.root.position.clone().setY(this.character.root.position.y - 0.1 * this.scale), this.landScene); }
+      return;
+    }
+    if (this.state === 'stranded') {
+      // stuck somewhere they can't walk off (a table, a roof): look around, wave for help
+      this.timer -= dt;
+      if (this.timer <= 0) { this.character.play(['wave_01', 'idle_look_around_01', 'idle_nervous_02', 'wave_02'][(Math.random() * 4) | 0]); this.timer = 3 + Math.random() * 4; }
+      this.updateFace();
+      this.character.update(dt);
+      return;
+    }
     if (this.state === 'caged') { this.updateCaged(dt); return; }
     if (this.shrinking) {
       const k = this.shrinking;
@@ -347,11 +511,13 @@ export class Human {
       if (u >= 1) {
         this.shrinking = null;
         this.tiny = true;
+        this.speech?.react(this, 'shrunk', { shout: true });
         // run away from whoever did it
         const away = this.nav.randomPoint((p) => Math.hypot(p.x - this.position.x, p.z - this.position.z) < 4 && Math.abs(p.y - this.position.y) < 0.5);
         if (away) this.goTo(away, { run: true });
       }
     }
+    this.watchForGiant(dt);
     this.think(dt);
     this.syncFromAgent(dt);
     this.updateFace();

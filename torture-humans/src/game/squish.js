@@ -72,20 +72,21 @@ export class Squisher {
       const fwd = toe ? toe.clone().sub(fp).setY(0) : new THREE.Vector3(0, 0, 0);
       if (fwd.lengthSq() < 1e-6) fwd.set(-Math.sin(p.bodyYaw), 0, -Math.cos(p.bodyYaw));
       fwd.normalize();
-      const heel = fp.clone().addScaledVector(fwd, -0.06);
-      const soleLen = 0.26;
+      const ps = p.scale;
+      const heel = fp.clone().addScaledVector(fwd, -0.06 * ps);
+      const soleLen = 0.26 * ps;
       for (const h of this.humans) {
-        if (!h.tiny || h.dead || h.captured || h.state === 'caged') continue;
+        if (h.dead || h.captured || h.state === 'caged' || !(h.tiny || h.scale < 0.15 * ps)) continue;
         const hp = h.position;
         const rel = new THREE.Vector3(hp.x - heel.x, 0, hp.z - heel.z);
         const along = rel.dot(fwd);
         const across = Math.abs(rel.x * fwd.z - rel.z * fwd.x);
-        const under = along > -0.01 && along < soleLen && across < 0.055;
-        const low = fp.y - hp.y < 0.13; // ankle height over the floor they stand on
+        const under = along > -0.01 * ps && along < soleLen && across < 0.055 * ps + 0.2 * h.scale;
+        const low = fp.y - hp.y < 0.13 * ps; // ankle height over the floor they stand on
         if (under && low) {
           const gore = this.settings.get('gameplay.gore');
           h.squish(gore);
-          if (gore !== 'none') bloodSplat(this.scene, hp, gore === 'full' ? 0.22 : 0.12);
+          if (gore !== 'none') bloodSplat(this.scene, hp, (gore === 'full' ? 0.22 : 0.12) * Math.max(1, h.scale * 20));
           if (gore === 'full') bloodSplat(this.scene, fp.clone().setY(hp.y), 0.08);
         }
       }

@@ -8,7 +8,9 @@ import { AnimLibrary, Character, loadAvatar, baseClips } from './engine/anim.js'
 import { Player } from './player.js';
 import { initNavigation, Navigation } from './engine/navigation.js';
 import { Human } from './humans/human.js';
-import { TOWN_LOOKS, isFemale } from './humans/looks.js';
+import { Speech } from './humans/speech.js';
+import { Talk } from './humans/talk.js';
+import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
 import { Colony } from './colony/colony.js';
@@ -94,7 +96,7 @@ export async function boot() {
         await lib.require(baseClips(gender));
         const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => avatar);
         const start = nav.randomPoint(level.wanderArea) || level.spawn;
-        humans.push(new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.wanderArea, profile: { name: look }, settings }));
+        humans.push(new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.wanderArea, profile: { look, name: nameFor(look), job: jobOf(look) }, settings }));
       }
       // townspeople: different looks, each starts somewhere on the street
       const townCount = Number(params.get('townPeople') ?? level.town?.people ?? 0);
@@ -107,7 +109,7 @@ export async function boot() {
         if (!tpl) continue; // that look isn't in this build
         const start = nav.randomPoint(level.town.area) || null;
         if (!start) break;
-        const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.town.area, settings, profile: { look, name: look.replace(/_0?(\d+)$/, ' $1').replace(/_/g, ' ') } });
+        const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.town.area, settings, profile: { look, name: nameFor(look), job: jobOf(look) } });
         h.spots = level.town.spots;
         h.townie = true;
         humans.push(h);
@@ -130,7 +132,12 @@ export async function boot() {
       colony = null;
     }
   }
-  const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony });
+  // what people say: speech bubbles over their heads
+  const speech = new Speech({ camera });
+  for (const h of humans) { h.speech = speech; h.player = player; }
+  const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony, speech });
+  // T / Enter: type something to whoever you're looking at (or holding)
+  const talk = new Talk({ input, camera, humans, speech, player, colony, canvas: input.target, getHeld: () => hands.items.find((i) => i.held)?.held ?? null });
   player.cage = cage;
   const squisher = new Squisher({ scene, player, humans, settings });
   const vitals = new Vitals(settings);
@@ -241,7 +248,8 @@ export async function boot() {
     }
   });
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, frame: 0 };
+  hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
 
   // test hook: drive the player without a real keyboard
@@ -267,6 +275,8 @@ export async function boot() {
     tinyDetails?.update(dt);
     if (zone !== 'outside') bugs?.update(dt);
     for (const h of humans) h.update(dt);
+    talk.update(dt);
+    speech.update(dt);
     level.update?.(dt);
     input.endFrame();
     game.frame++;

@@ -279,10 +279,164 @@ class Supplies extends Item {
   }
 }
 
+// Your empty hand: pick up anyone small enough (tiny people, or normal people
+// when you're a giant), hold them on your palm, put them down or throw them.
+const PALM_UP = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -Math.PI / 2));
+class Hand extends Item {
+  constructor(ctx) {
+    super('Hand', new THREE.Group(), { hold: new THREE.Vector3(0.07, -0.14, -0.34) });
+    this.gripPoint = new THREE.Vector3(0, 0, 0);
+    this.palm = new THREE.Vector3(0.07, 0.0, 0.0); // the palm's middle, seen from the wrist
+    this.ctx = ctx;
+    this.held = null;
+    this.target = null;   // who you'd grab if you clicked now
+    this.lastQ = new THREE.Quaternion();
+    this.talkT = 4;
+  }
+
+  get curl() { return this.held ? { amount: 0.3, thumb: 0.2 } : { amount: 0.12, thumb: 0.1 }; }
+
+  // small enough to hold: a fifth of your size or less
+  canHold(h) {
+    return h && h.grabbed && !h.dead && h.alive && !h.captured && h.state !== 'flying' && h.scale <= 0.22 * this.ctx.player.scale;
+  }
+
+  reach() { return 1.8 * this.ctx.player.scale + 1.5; }
+
+  // what's under the crosshair: a person you could pick up (forgiving: near the spot you aim at)
+  findTarget() {
+    const { camera, physics, player, cage, humans } = this.ctx;
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const opts = { exclude: player.body.collider, filterGroups: groups(GROUP.PLAYER, GROUP.WORLD | GROUP.PROP | GROUP.TINY | GROUP.NPC) };
+    const nearCage = cage && player.scale > 0.5 && player.scale < 3 && cage.canDropFrom(camera.position);
+    const hit = nearCage ? cage.raycast(physics, camera.position, dir, this.reach(), opts) : physics.raycast(camera.position, dir, this.reach(), opts);
+    if (!hit) return null;
+    if (this.canHold(hit.owner)) return hit.owner;
+    let best = null, bd = Infinity;
+    for (const h of humans) {
+      if (!this.canHold(h)) continue;
+      const p = h.character.root.getWorldPosition(_v);
+      const d = Math.hypot(p.x - hit.point.x, p.z - hit.point.z);
+      const tol = Math.max(0.03 * player.scale, 0.45 * h.scale);
+      if (d < tol && Math.abs(p.y - hit.point.y) < Math.max(0.1, h.scale) && d < bd) { best = h; bd = d; }
+    }
+    return best;
+  }
+
+  get hint() {
+    if (this.charging) return `Throw power ${'█'.repeat(Math.round(this.charge * 5))}${'░'.repeat(10 - Math.round(this.charge * 5))}`;
+    if (this.held) return `Holding ${this.held.profile.name} — click: put down where you aim · hold right-click: throw`;
+    if (this.target) return `Click to pick up ${this.target.profile.name}`;
+    return 'Hand: click someone small to pick them up (grow with X to pick up normal people)';
+  }
+
+  onDown() {
+    const { camera, physics, player, cage, scene, speech } = this.ctx;
+    if (!this.held) {
+      const h = this.findTarget();
+      if (!h) return;
+      h.grabbed();
+      this.held = h;
+      this.talkT = 5 + Math.random() * 4;
+      speech?.react(h, 'pickedUp', { shout: true });
+      return;
+    }
+    const h = this.held;
+    // into the terrarium if you're at it and aiming inside
+    if (cage && player.scale > 0.5 && player.scale < 3 && cage.canDropFrom(camera.position) && h.scale < 0.2) {
+      const aim = cage.aimPoint(physics, camera, player.body.collider);
+      if (aim) {
+        this.held = null;
+        h.captured = false;
+        cage.drop(h, camera.position, aim.world);
+        speech?.react(h, 'putDown');
+        return;
+      }
+    }
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const hit = physics.raycast(camera.position, dir, this.reach(), { exclude: player.body.collider, filterGroups: groups(GROUP.PLAYER, GROUP.WORLD | GROUP.PROP) });
+    if (!hit || hit.normal.y < 0.6) { this.ctx.toast?.('Aim at the ground (or a table) to put them down'); return; }
+    this.held = null;
+    h.placeAt(hit.point.clone(), scene);
+    speech?.react(h, 'putDown');
+  }
+
+  // right-click: hold to wind up, let go to throw
+  onAlt() {
+    if (this.held) { this.charging = true; this.charge = 0; }
+  }
+
+  throwNow() {
+    const h = this.held;
+    this.charging = false;
+    if (!h) return;
+    const { camera, player, scene, speech } = this.ctx;
+    this.held = null;
+    const s = player.scale;
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const power = 1 + Math.min(2, this.charge || 0) ; // hold right-click longer: throw harder
+    this.charge = 0;
+    const vel = dir.multiplyScalar(7 * power * Math.sqrt(s)).add(new THREE.Vector3(0, 1.5 * Math.sqrt(s), 0));
+    h.onLand = (who, harm) => { if (harm <= 1.4) setTimeout(() => speech?.react(who, 'landed'), 600); };
+    h.throwFrom(h.character.root.getWorldPosition(new THREE.Vector3()), vel, scene);
+    speech?.react(h, 'thrown', { shout: true, secs: 2 });
+  }
+
+  // set them down gently right below your hand (switching items, getting small)
+  release() {
+    const h = this.held;
+    if (!h) return;
+    this.held = null;
+    const { physics, scene } = this.ctx;
+    const p = h.character.root.getWorldPosition(new THREE.Vector3());
+    const hit = physics.raycast(p, { x: 0, y: -1, z: 0 }, 60, { filterGroups: groups(GROUP.PLAYER, GROUP.WORLD | GROUP.PROP) });
+    if (hit) h.placeAt(hit.point.clone(), scene);
+    else h.throwFrom(p, new THREE.Vector3(), scene);
+  }
+
+  update(dt) {
+    const { player, camera, speech } = this.ctx;
+    if (this.held && (this.held.dead || this.held.state !== 'held' || this.held.scale > 0.3 * player.scale)) {
+      // grew too big to hold (you shrank), or something else happened to them
+      if (this.held.state === 'held') this.release(); else this.held = null;
+    }
+    if (this.charging) {
+      this.charge = Math.min(2, this.charge + dt * 1.5);
+      if (!this.ctx.input.isDown('secondary')) this.throwNow();
+    }
+    this.target = this.held ? null : this.findTarget();
+    const h = this.held;
+    if (!h) return;
+    // shaking them around: how fast the view turns
+    const turn = 2 * Math.acos(Math.min(1, Math.abs(this.lastQ.dot(camera.quaternion)))) / Math.max(dt, 1e-3);
+    this.lastQ.copy(camera.quaternion);
+    h.shaken = turn > 5 ? Math.min(2, h.shaken + dt * 2) : Math.max(0, h.shaken - dt);
+    if (h.shaken > 0.5) speech?.react(h, 'shaken', { cooldown: 2.5, shout: true, secs: 2 });
+    this.talkT -= dt;
+    if (this.talkT <= 0) { speech?.react(h, 'held', { cooldown: 2 }); this.talkT = 6 + Math.random() * 6; }
+  }
+
+  // after the arm is posed: the held person stands on the palm, facing you
+  afterArm() {
+    const h = this.held;
+    if (!h) return;
+    const { camera, player } = this.ctx;
+    const s = player.scale;
+    const root = h.character.root;
+    const p = this.model.localToWorld(new THREE.Vector3(0, 0, 0));
+    p.y += 0.012 * s;
+    if (root.parent !== this.ctx.scene) this.ctx.scene.attach(root);
+    root.position.copy(p);
+    root.scale.setScalar(h.scale);
+    h.yaw = Math.atan2(camera.position.x - p.x, camera.position.z - p.z);
+    root.rotation.set(0, h.yaw, 0);
+  }
+}
+
 export class Hands {
   constructor(ctx) {
     this.ctx = ctx;
-    this.items = [new ShrinkRay(ctx), new Jar(ctx), new Supplies(ctx)];
+    this.items = [new ShrinkRay(ctx), new Jar(ctx), new Supplies(ctx), new Hand(ctx)];
     this.lookTimer = 0;
     this.lookHint = null;
     this.index = 0;
@@ -297,6 +451,7 @@ export class Hands {
   select(i) {
     if (i === this.index || !this.items[i]) return;
     this.current.onUp?.();
+    this.current.release?.();
     this.current.model.visible = false;
     this.index = i;
     this.current.model.visible = true;
@@ -315,6 +470,7 @@ export class Hands {
     } else {
       if (input.pressed('primary')) this.current.onDown?.();
       if (input.released('primary')) this.current.onUp?.();
+      if (input.pressed('secondary')) this.current.onAlt?.();
     }
 
     const item = this.current;
@@ -346,9 +502,11 @@ export class Hands {
       item.model.quaternion.copy(aimQ);
       if (item instanceof Jar) item.model.quaternion.multiply(_q.setFromEuler(new THREE.Euler(-0.15, 0, 0)));
       if (item instanceof Supplies) item.model.quaternion.multiply(_q.setFromEuler(new THREE.Euler(-0.1 - item.tilt(), 0, 0)));
+      if (item instanceof Hand) item.model.quaternion.multiply(PALM_UP);
     }
     item.model.updateMatrixWorld(true);
     this.solveArm();
+    item.afterArm?.(dt);
     this.updateLook(dt);
   }
 
