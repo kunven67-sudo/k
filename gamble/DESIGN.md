@@ -1121,6 +1121,27 @@ have a Ring cam; a witness only matters if someone actually saw it).
   crutches/help, post-meal groans, sore muscles after the gym. Sitting poses vary with personality
   and mood.
 
+- **Sitting too long**: legs fall asleep (funny walk), back pain from bad chairs, stretching on
+  standing.
+- **Lie down anywhere** (beds, couches, park grass, beach, floor, car hoods under the stars;
+  passing out counts).
+- **Casino seat rules**: dealers ask non-players to play or move; slot hogging annoys staff and
+  waiting players during busy times (depends on the person).
+- **Dozing off while sitting** when tired: miss your bus stop, get robbed at slots, nod off in
+  class — or while DRIVING (crash); warning signs are head bobs & slow blinks.
+
+## 54. Owner's standing instructions (end of question phase, round 139)
+
+- The question phase is over — **build the game now, and take time to make it perfect** (never
+  rush, never ship something shallow).
+- **Add realistic things on my own** even if the owner never mentioned them.
+- **Space travel** (designed by me, realistic): real-world commercial space tourism for the very
+  rich — apply, pass a medical check, train for days (g-force centrifuge, emergency drills), fly to
+  the launch site in West Texas (suborbital capsule, ~11-minute flight, a few minutes of real
+  weightlessness with floating physics & jiggle, view of the curved Earth, parachute landing) or pay
+  far more for a private orbital mission. Bring a deck of cards and play a hand in zero-g with
+  floating cards. Motion sickness depends on the person.
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
