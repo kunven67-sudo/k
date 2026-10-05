@@ -13,6 +13,9 @@ expectations and habits vary per individual — never one fixed rule for everyon
 appliances and other items each have their own real features (e.g. newer cars have
 auto headlights/wipers, built-in navigation/CarPlay and digital dashboards; old beaters have
 manual everything and broken gauges).
+**Fourth golden rule: EVERYTHING depends on the situation.** Outcomes are never fixed — they
+come from the simulation's circumstances (e.g. porch pirates are deterred or caught only if you
+have a Ring cam; a witness only matters if someone actually saw it).
 
 ---
 
@@ -905,3 +908,9 @@ manual everything and broken gauges).
   (cameras catch plates), per-station prices (Costco cheapest, casino-area priciest).
 - **Elevators can rarely break** and trap you between floors (emergency button, awkward NPC
   chat, bladder pressure).
+- **Porch pirates** steal delivered packages — depends on circumstances (Ring cam deters/records);
+  you can steal packages too.
+- **Fireworks are banned around Reno** (wildfire risk): buy outside the county, light at home →
+  fines, possible brush fires; the official 4th of July show is legal.
+- **Wind physics**: hats blow away, umbrellas flip inside out, trash cans tip and scatter, tall
+  trucks/RVs sway in highway wind warnings.
