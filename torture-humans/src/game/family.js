@@ -106,11 +106,46 @@ export class Family {
       return true;
     }
     h.leaving = false;
-    h.spots = this.dailySpots(h.role);
+    // Mom vacuums the house twice a day (dangerous if you're tiny on the floor!)
+    const t = this.hour;
+    h.vacuuming = h.role === 'mom' && ((t >= 10 && t < 10.75) || (t >= 15.5 && t < 16));
+    h.spots = h.vacuuming ? [] : this.dailySpots(h.role); // no spots: she roams every room
+    if (h.vacuuming) this.placeVacuum(h);
     return false; // the normal brain walks between the spots
   }
 
   // ---- props for chores
+
+  // an upright vacuum cleaner, pushed in front of Mom
+  makeVacuum() {
+    const g = new THREE.Group();
+    const red = new THREE.MeshStandardMaterial({ color: 0xb3252b, roughness: 0.35, metalness: 0.2 });
+    const grey = new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.5, 0.16), red);
+    body.position.set(0, 0.42, -0.06);
+    body.rotation.x = -0.35;
+    g.add(body);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.65, 8), grey);
+    handle.position.set(0, 0.92, -0.2);
+    handle.rotation.x = -0.35;
+    g.add(handle);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.07, 0.2), grey);
+    head.position.set(0, 0.04, 0.08);
+    g.add(head);
+    for (const x of [-0.13, 0.13]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 12).rotateZ(Math.PI / 2), grey); w.position.set(x, 0.035, -0.08); g.add(w); }
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.userData.noCollide = true; } });
+    g.userData.head = head;
+    g.visible = false;
+    this.scene.add(g);
+    return g;
+  }
+
+  placeVacuum(h) {
+    this.vacuum ??= this.makeVacuum();
+    const fwd = new THREE.Vector3(Math.sin(h.yaw), 0, Math.cos(h.yaw));
+    this.vacuum.position.copy(h.position).addScaledVector(fwd, 0.5);
+    this.vacuum.rotation.y = h.yaw;
+  }
 
   setupProps() {
     const fy = 3.3;

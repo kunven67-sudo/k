@@ -47,9 +47,11 @@ export class Vitals {
     const k = this.mult;
     if (!this.dead && k > 0) {
       const perSec = (x) => (x * k) / 60;
-      this.hunger = Math.max(0, this.hunger - perSec(DRAIN.hunger) * dt);
-      this.thirst = Math.max(0, this.thirst - perSec(DRAIN.thirst) * dt);
-      this.energy = Math.max(0, this.energy - perSec(DRAIN.energy) * dt);
+      // small bodies burn through food, water and energy faster (set by tiny-reality.js)
+      const m = this.drainMul ?? 1;
+      this.hunger = Math.max(0, this.hunger - perSec(DRAIN.hunger) * m * dt);
+      this.thirst = Math.max(0, this.thirst - perSec(DRAIN.thirst) * m * dt);
+      this.energy = Math.max(0, this.energy - perSec(DRAIN.energy) * (this.energyMul ?? m) * dt);
       if (this.hunger <= 0) this.damage(0.8 * dt, 'starved');
       if (this.thirst <= 0) this.damage(1.2 * dt, 'dehydrated');
       // slowly heal when fed and watered

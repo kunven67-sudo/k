@@ -72,13 +72,23 @@ export class Player {
     this.camDistance = 2.6;
     this.camCurrentDist = 2.6 * sc;
     if (feet) {
-      const center = { x: feet.x, y: feet.y + h / 2 + (keepVelocity ? 0 : 0.002 * sc), z: feet.z };
+      const center = { x: feet.x, y: feet.y + h / 2 + (keepVelocity ? 0 : 0.03 * sc), z: feet.z }; // start just above the floor (more than the skin width), never in it
       this.body.body.setTranslation(center, true);
       this.body.body.setNextKinematicTranslation(center);
       this.prevPos.set(center.x, center.y, center.z);
       this.currPos.copy(this.prevPos);
     }
     if (!keepVelocity) this.velocity.set(0, 0, 0);
+  }
+
+  // put your feet somewhere without changing size (riding something)
+  placeFeet(feet) {
+    const c = { x: feet.x, y: feet.y + this.body.height / 2 + 0.03 * this.scale, z: feet.z };
+    this.body.body.setTranslation(c, true);
+    this.body.body.setNextKinematicTranslation(c);
+    this.prevPos.set(c.x, c.y, c.z);
+    this.currPos.copy(this.prevPos);
+    this.velocity.set(0, 0, 0);
   }
 
   // The size watch: hold Z to shrink, X to grow, to any size (if there's room to grow)
@@ -199,15 +209,41 @@ export class Player {
       // no downward push while grounded: snap-to-ground keeps you on slopes and
       // steps going down, and a downward push stops Rapier's auto-step going up
       this.velocity.y = 0;
-      if (jump && !this.crouching) this.velocity.y = JUMP_SPEED * Math.sqrt(jumpScale(this.scale));
+      if (jump && !this.crouching) {
+        this.velocity.y = JUMP_SPEED * Math.sqrt(jumpScale(this.scale));
+        // settings (not realistic): tiny you jumps like a flea, ~20x your own height
+        if (this.settings.get('tiny.superJump') && this.scale < 1) this.velocity.y = Math.max(this.velocity.y, Math.sqrt(2 * GRAVITY * 20 * 1.8 * this.scale));
+      }
+    } else if (this.clinging) {
+      this.velocity.y = 0; // stuck to the wall (tiny things are sticky)
     } else {
       this.velocity.y -= GRAVITY * dt;
       this.velocity.y = Math.max(this.velocity.y, -terminalVel(this.scale));
     }
+    // pushed around by the world (wind, raindrops, a vacuum cleaner...)
+    const push = this.push;
+    if (push && push.lengthSq() > 0) {
+      this.velocity.y += push.y * dt;
+      push.y = 0;
+    }
+    // very small: you can creep up walls (like an insect) by walking into them
+    this.clinging = false;
+    if (this.canCling && mv.y > 0.3) {
+      const fwd = { x: -Math.sin(this.yaw), y: 0, z: -Math.cos(this.yaw) };
+      const chest = { x: t0.x, y: t0.y, z: t0.z };
+      const wall = this.physics.raycast(chest, fwd, this.body.height * 0.8, { exclude: this.body.collider });
+      if (wall && Math.abs(wall.normal.y) < 0.5) {
+        this.clinging = true;
+        this.velocity.y = 0.6 * moveScale(this.scale) * WALK;
+      }
+    }
 
     // full size: tiny people don't block you (you step on them); tiny: they're solid like you
-    const blockers = GROUP.WORLD | GROUP.PROP | GROUP.NPC | (this.scale < 0.5 ? GROUP.TINY : 0);
-    const res = this.physics.moveCharacter(this.body, { x: this.velocity.x * dt, y: this.velocity.y * dt, z: this.velocity.z * dt }, { filter: blockers });
+    // tiny: big people's body capsules aren't solid walls to you (you'd be between their legs;
+    // their real feet are what get you, see tiny-reality.js), and their capsules would shove you into the floor
+    const blockers = GROUP.WORLD | GROUP.PROP | (this.scale < 0.3 ? GROUP.TINY : GROUP.NPC | (this.scale < 0.5 ? GROUP.TINY : 0));
+    const px = push ? push.x * dt : 0, pz = push ? push.z * dt : 0;
+    const res = this.physics.moveCharacter(this.body, { x: this.velocity.x * dt + px, y: this.velocity.y * dt, z: this.velocity.z * dt + pz }, { filter: blockers });
     const wasGrounded = this.grounded;
     this.grounded = res.grounded;
     // walking into a wall: real speed drops, so the legs slow down too (no running in place)
@@ -219,7 +255,9 @@ export class Player {
     if (!this.grounded) this.fallTop = Math.max(this.fallTop ?? feetY, feetY);
     else {
       if (!wasGrounded && this.fallTop !== undefined && !this.ladder?.active) {
-        const dmg = fallDamage(this.scale, this.fallTop - feetY);
+        // super jump (settings): you land like a flea too, only really long falls hurt
+        const drop = this.fallTop - feetY;
+        const dmg = this.settings.get('tiny.superJump') && this.scale < 1 ? fallDamage(this.scale, drop - 25 * 1.8 * this.scale) : fallDamage(this.scale, drop);
         if (dmg > 0.5) this.vitals?.damage(dmg, 'fell');
       }
       this.fallTop = undefined;
@@ -315,6 +353,7 @@ export class Player {
     const baseFar = cam.userData.baseFar ?? cam.far;
     cam.far = Math.min(baseFar, Math.max(40, cam.near * 3e6));
     cam.lookAt(cam.position.clone().add(dir));
+    if (this.sway) cam.rotateZ(this.sway); // dizzy (can't breathe right at this size)
     cam.updateProjectionMatrix();
   }
 }

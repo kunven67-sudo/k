@@ -219,6 +219,16 @@ export class Talk {
     this.addLog('You', text);
     const h = this.listener();
     if (!h) { this.addLog('', '(nobody close enough to hear you)'); return null; }
+    // a tiny voice is very quiet: big people only hear you right next to their ear
+    const tinyVoice = this.player.scale < h.scale * 0.2;
+    if (tinyVoice) {
+      const head = (h.character.bones.Bip01_Head || h.character.root).getWorldPosition(new THREE.Vector3());
+      if (head.distanceTo(this.camera.position) > 0.35 * h.scale) {
+        const r = { text: pick(['Huh? Did someone say something?', '...hello? Is somebody there?', '*looks around, confused*', 'Must be the wind.']), intent: 'unheard', mood: 'neutral' };
+        this.pending.push({ h, r, t: 0.8 });
+        return { to: h, ...r };
+      }
+    }
     const r = replyTo(h, text, { player: this.player, colony: this.colony });
     // a moment to think, then answer
     this.pending.push({ h, r, t: 0.6 + Math.random() * 0.6 });

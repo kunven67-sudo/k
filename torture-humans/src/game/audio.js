@@ -65,6 +65,7 @@ export class Audio {
 
   noiseBurst({ at = null, ref = 2, dur = 0.08, freq = 800, q = 1, gain = 0.3, type = 'bandpass', bus = 'effects', when = 0 }) {
     const ctx = this.ctx;
+    if (!ctx) return; // sound starts after your first click/key
     const t = ctx.currentTime + when;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
@@ -81,6 +82,7 @@ export class Audio {
 
   tone({ at = null, ref = 2, freq = 440, to = null, dur = 0.2, gain = 0.2, type = 'sine', bus = 'effects', when = 0, attack = 0.01 }) {
     const ctx = this.ctx;
+    if (!ctx) return;
     const t = ctx.currentTime + when;
     const o = ctx.createOscillator();
     o.type = type;
@@ -119,12 +121,15 @@ export class Audio {
     const female = h.character?.gender === 'f';
     const scale = Math.max(0.002, h.scale ?? 1);
     const base = (female ? 220 : 130) * Math.pow(scale, -0.35) * (h.pitch ??= rand(0.9, 1.12)) * (shout ? 1.25 : 1);
+    // you're tiny and they're big: their voice is a deep, slow rumble to you
+    const rumble = this.playerScale && this.playerScale < 0.2 && scale > this.playerScale * 5;
+    const slow = rumble ? 1.6 : 1;
     const syl = Math.min(14, Math.max(2, Math.round(text.replace(/[^a-z]/gi, '').length / 3)));
     const ref = Math.max(0.4, 3 * Math.sqrt(scale));
     for (let i = 0; i < syl; i++) {
-      const when = i * 0.085 + rand(0, 0.02);
-      const f = base * rand(0.85, 1.25);
-      this.tone({ at, ref, freq: f, to: f * rand(0.8, 1.1), dur: 0.07, gain: shout ? 0.11 : 0.06, type: 'triangle', bus: 'voices', when, attack: 0.008 });
+      const when = i * 0.085 * slow + rand(0, 0.02);
+      const f = base * rand(0.85, 1.25) * (rumble ? 0.55 : 1);
+      this.tone({ at, ref: rumble ? ref * 3 : ref, freq: f, to: f * rand(0.8, 1.1), dur: 0.07 * slow, gain: (shout ? 0.11 : 0.06) * (rumble ? 1.6 : 1), type: rumble ? 'sine' : 'triangle', bus: 'voices', when, attack: 0.008 });
       this.tone({ at, ref, freq: f * 2.7, dur: 0.05, gain: 0.015, type: 'sine', bus: 'voices', when });
     }
   }
@@ -157,6 +162,26 @@ export class Audio {
   clink(at) {
     if (!this.ctx) return;
     for (const [f, g] of [[2100, 0.08], [3900, 0.05], [6200, 0.03]]) this.tone({ at, freq: f, dur: 0.6, gain: g, type: 'sine', attack: 0.002 });
+  }
+
+  // Mom's vacuum cleaner: a loud whine + rushing air while it's on (pos = where it is, null = off)
+  vacuum(pos) {
+    if (!this.ctx) return;
+    if (!this.vac && pos) {
+      const ctx = this.ctx;
+      const src = ctx.createBufferSource(); src.buffer = this.noise; src.loop = true;
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 0.7;
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 220;
+      const og = ctx.createGain(); og.gain.value = 0.04;
+      const g = ctx.createGain(); g.gain.value = 0;
+      const pan = ctx.createPanner(); pan.panningModel = 'equalpower'; pan.refDistance = 1.5; pan.rolloffFactor = 1.3;
+      src.connect(f); f.connect(g); o.connect(og); og.connect(g); g.connect(pan); pan.connect(this.bus.effects);
+      src.start(); o.start();
+      this.vac = { g, pan };
+    }
+    if (!this.vac) return;
+    if (pos) { this.vac.pan.positionX.value = pos.x; this.vac.pan.positionY.value = pos.y; this.vac.pan.positionZ.value = pos.z; }
+    this.vac.g.gain.setTargetAtTime(pos ? 0.35 : 0, this.ctx.currentTime, 0.2);
   }
 
   click() { if (this.ctx) this.tone({ freq: 1200, dur: 0.04, gain: 0.05, type: 'square' }); }
@@ -197,6 +222,7 @@ export class Audio {
   }
 
   update(dt, { env, zone, player }) {
+    this.playerScale = player?.scale ?? 1;
     if (!this.ctx) return;
     this.updateListener();
     const t = this.ctx.currentTime;

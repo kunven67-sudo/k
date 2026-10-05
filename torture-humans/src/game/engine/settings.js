@@ -58,6 +58,8 @@ export const DEFAULT_SETTINGS = {
     subtitles: true,
   },
   audio: { master: 1, music: 0.7, effects: 1, voices: 1, ambience: 0.8 },
+  // being tiny: the realistic stuff is always on; these are just for fun (not realistic)
+  tiny: { superJump: false, talkingBugs: false, moreTinyCities: false, rideCritters: false, labels: false },
 };
 
 const KEY = 'th.settings.v1';

@@ -151,8 +151,9 @@ export class Village {
         to.normalize();
         root.position.addScaledVector(to, Math.min(d, v.speed * dt));
         // stay inside the cavity
-        root.position.z = THREE.MathUtils.clamp(root.position.z, VILLAGE.z0 + 0.008, VILLAGE.z1 - 0.008);
-        root.position.x = THREE.MathUtils.clamp(root.position.x, VILLAGE.x0 + 0.01, VILLAGE.x1 - 0.01);
+        const B = this.layout.bounds || { x0: VILLAGE.x0 + 0.01, x1: VILLAGE.x1 - 0.01, z0: VILLAGE.z0 + 0.008, z1: VILLAGE.z1 - 0.008 };
+        root.position.z = THREE.MathUtils.clamp(root.position.z, B.z0, B.z1);
+        root.position.x = THREE.MathUtils.clamp(root.position.x, B.x0, B.x1);
         h.faceYaw = Math.atan2(to.x, to.z);
         h.character.speed = v.speed / h.scale;
       }
@@ -162,7 +163,8 @@ export class Village {
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       h.yaw += dy * (1 - Math.exp(-dt * 6));
     }
-    root.position.y = FY + 0.001;
+    const Y = this.layout.y ?? FY;
+    root.position.y = Y + 0.001;
     root.rotation.set(0, h.yaw, 0);
     if (h.capsule) h.physics.placeCapsule(h.capsule, root.position);
     // you: tiny and close = a visitor; giant face at the hole = panic
@@ -170,14 +172,47 @@ export class Village {
     const f = p.feet;
     const d = Math.hypot(f.x - root.position.x, f.z - root.position.z);
     h.metYou ??= false;
-    if (p.scale < 0.06 && d < 0.12 && Math.abs(f.y - FY) < 0.05) {
+    if (p.scale < 0.06 && d < 0.12 && Math.abs(f.y - Y) < 0.05) {
       if (!h.metYou) { h.metYou = true; this.speech?.say(h, pick(LINES.meet)); }
       else if (Math.random() < dt * 0.04) this.speech?.say(h, pick(LINES.life));
     } else if (p.scale > 0.5) {
       const eye = this.camera.position;
-      if (Math.abs(eye.x - VILLAGE.hole) < 0.25 && eye.z > -5.0 && eye.z < -4.6 && eye.y < FY + 0.25 && Math.random() < dt * 0.3) this.speech?.say(h, pick(LINES.giant), { shout: true });
+      const peek = this.layout.bounds ? eye.distanceTo(root.position) < 1.2 : Math.abs(eye.x - VILLAGE.hole) < 0.25 && eye.z > -5.0 && eye.z < -4.6 && eye.y < FY + 0.25;
+      if (peek && Math.random() < dt * 0.3) this.speech?.say(h, pick(LINES.giant), { shout: true });
     }
     h.updateFace();
     h.character.update(dt);
   }
+}
+
+// settings (not realistic): another tiny town, out in the open under a fir tree in the
+// park: matchbox houses in a ring, a bottle-cap table, a leaf awning, a crumb store
+export function buildBurrow(scene, at) {
+  const g = new THREE.Group();
+  g.name = 'park-burrow';
+  scene.add(g);
+  const y = at.y;
+  const card = new THREE.MeshStandardMaterial({ color: 0xc9a77a, roughness: 0.9 });
+  const labels = [['FOX', '#a34a1d', '#f5e6c0'], ['OWL', '#4a3a7a', '#f2efe6'], ['ELK', '#2c6b34', '#f7e9a8'], ['BEE', '#b88a1d', '#2a2010']];
+  const houses = [];
+  labels.forEach(([t, bg, fg], i) => {
+    const a = (i / labels.length) * Math.PI * 2;
+    const x = at.x + Math.cos(a) * 0.09, z = at.z + Math.sin(a) * 0.09;
+    const side = new THREE.MeshStandardMaterial({ map: labelTexture(t, bg, fg), roughness: 0.8 });
+    const m = mesh(new THREE.BoxGeometry(0.053, 0.036, 0.03), [card, card, card, card, side, card], x, y + 0.018, z, g);
+    m.rotation.y = -a - Math.PI / 2;
+    houses.push(new THREE.Vector3(at.x + Math.cos(a) * 0.065, y, at.z + Math.sin(a) * 0.065));
+  });
+  const cap = mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.006, 21), new THREE.MeshStandardMaterial({ color: 0x1f6fb2, metalness: 0.7, roughness: 0.35 }), at.x, y + 0.006, at.z, g);
+  cap.name = 'cap-table';
+  const leaf = mesh(new THREE.CircleGeometry(0.05, 10).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x4f8a2c, roughness: 0.6, side: THREE.DoubleSide }), at.x + 0.03, y + 0.07, at.z - 0.02, g);
+  leaf.rotation.z = 0.2;
+  mesh(new THREE.BoxGeometry(0.012, 0.012, 0.012), new THREE.MeshStandardMaterial({ color: 0xfbfaf6, roughness: 0.9 }), at.x - 0.03, y + 0.006, at.z + 0.03, g);
+  g.traverse((o) => { o.userData.noCollide = true; });
+  const R = 0.11;
+  return {
+    houses, y,
+    bounds: { x0: at.x - R, x1: at.x + R, z0: at.z - R, z1: at.z + R },
+    stations: [{ p: new THREE.Vector3(at.x + 0.02, y, at.z), act: 'table' }, { p: new THREE.Vector3(at.x - 0.03, y, at.z + 0.02), act: 'store' }, ...houses.map((p) => ({ p, act: 'home' }))],
+  };
 }

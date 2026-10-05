@@ -15,11 +15,13 @@ import { Family } from './family.js';
 import { Interactables } from './world/interact.js';
 import { Shops } from './shops.js';
 import { Germs } from './germs.js';
-import { Village } from './village.js';
+import { Village, buildBurrow } from './village.js';
 import { Pets } from './pets.js';
 import { Audio } from './audio.js';
 import { TownLife } from './humans/town-life.js';
 import { Jobs } from './jobs.js';
+import { TinyReality } from './tiny-reality.js';
+import { SettingsPanel } from './ui/settings-panel.js';
 import { Phone, saveGame, loadGame, hasSave } from './phone.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
@@ -338,6 +340,22 @@ export async function boot() {
   const pets = new Pets({ scene, player, nav, physics, interact, speech, shops, toast, home: level.house });
   shops.pets = pets;
   if (params.get('pet')) pets.adopt(params.get('pet'));
+  // settings (not realistic): a second tiny village, under a fir in the park
+  if (settings.get('tiny.moreTinyCities') && level.village && params.get('village') !== '0') {
+    const burrow = new Village({ layout: buildBurrow(scene, new THREE.Vector3(-13, 3.281, -13.5 + 0.9)), player, camera, speech });
+    let made = 0;
+    for (const look of [...TOWN_LOOKS].sort(() => Math.random() - 0.5)) {
+      if (made >= 4) break;
+      const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => null);
+      if (!tpl) continue;
+      const gender = isFemale(look) ? 'f' : 'm';
+      const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: burrow.layout.houses[made % 4], settings, profile: { look, name: nameFor(look), job: pick(['leaf weaver', 'seed collector', 'acorn carver']) } });
+      h.speech = speech; h.player = player;
+      humans.push(h);
+      burrow.add(h);
+      made++;
+    }
+  }
   // the germ world: what's on the floor when you're smaller than 2 cm
   const germs = new Germs({ scene, player, physics });
   // your bed: sleep until morning (or a nap in the daytime)
@@ -366,8 +384,13 @@ export async function boot() {
   if (family) family.phone = phone;
   // odd jobs: parcels, lost rings, shifts at the till
   const jobs = new Jobs({ scene, interact, family, env, hazards, player, toast, phone, spots: level.town?.spots });
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, audio, phone, jobs, frame: 0 };
+  // what being small really does to you (and the not-realistic extras from settings)
+  const tiny = new TinyReality({ player, vitals, env, camera, canvas: renderer.renderer.domElement, audio, humans, pets, bugs, cage, colony, details: tinyDetails, family, hazards, settings, speech, interact, input, scene, toast, germs, getZone: () => zone });
+  // F10: settings
+  const settingsPanel = new SettingsPanel({ settings, input, canvas: input.target, toast });
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, audio, phone, jobs, tiny, settingsPanel, frame: 0 };
   // saving: F5 / F9, every 2 minutes, and when you close the game; picks up where you left off
+  Object.defineProperty(game, 'zone', { get: () => zone });
   game.save = () => saveGame(game);
   game.load = () => loadGame(game);
   if (hasSave() && !params.has('paused') && !params.has('fresh')) loadGame(game).then((ok) => ok && toast('Welcome back! (F5 saves, F9 loads)')).catch((e) => console.warn('[save]', e.message));
@@ -392,11 +415,15 @@ export async function boot() {
     hands.update(dt);
     squisher.update();
     hazards.update(dt);
+    tiny.update(dt);
+    settingsPanel.update();
+    // the world around you (not you) runs slower when you're tiny: small animals see in slow motion
+    const wdt = dt * tiny.timeScale;
     interact.update();
-    family?.update(dt);
+    family?.update(wdt);
     shops.update();
-    germs.update(dt);
-    pets.update(dt);
+    germs.update(wdt);
+    pets.update(wdt);
     audio.update(dt, { env, zone, player });
     phone.update(dt);
     jobs.update(dt, camera);
@@ -404,16 +431,16 @@ export async function boot() {
     if (input.pressed('quickLoad')) loadGame(game).then((ok) => toast(ok ? 'Game loaded' : 'No saved game yet'));
     if (!params.has('paused') && (autosave -= dt) <= 0) { autosave = 120; saveGame(game); }
     vitals.update(dt);
-    nav.update(dt);
-    colony?.update(dt);
-    env?.update(dt);
-    tinyDetails?.update(dt);
-    if (zone !== 'outside') bugs?.update(dt);
-    for (const h of humans) h.update(dt);
+    nav.update(wdt);
+    colony?.update(wdt);
+    env?.update(wdt);
+    tinyDetails?.update(wdt);
+    if (zone !== 'outside') bugs?.update(wdt);
+    for (const h of humans) h.update(wdt);
     talk.update(dt);
-    police.update(dt);
+    police.update(wdt);
     speech.update(dt);
-    level.update?.(dt);
+    level.update?.(wdt);
     input.endFrame();
     game.frame++;
   }

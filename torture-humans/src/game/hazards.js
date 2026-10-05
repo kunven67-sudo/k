@@ -18,6 +18,15 @@ export class Hazards {
       lava: 'You fell in the lava… and woke up in the lab, dizzy.',
       starved: 'You starved… and woke up in the lab. Eat something!',
       dehydrated: 'You passed out from thirst… and woke up in the lab.',
+      stepped: 'SQUISH. Someone stepped on you without even noticing… You woke up in the lab.',
+      spider: 'The spider got you… You woke up in the lab, covered in web.',
+      ant: 'The ants swarmed you… You woke up in the lab, itchy all over.',
+      rat: 'Your own pet rat thought you were food… You woke up in the lab.',
+      gecko: 'The gecko ate you. Gulp. You woke up in the lab, slimy.',
+      cold: 'Your tiny body froze… You woke up in the lab, shivering.',
+      tiny: 'Your body couldn\'t survive being that small… You woke up in the lab at normal size.',
+      vacuum: 'The vacuum got you… You woke up in the lab, dusty.',
+      raindrop: 'The raindrops pounded you flat… You woke up in the lab, soaked.',
     }[cause] || 'You blacked out… and woke up in the lab.';
     this.fading = { t: 0, msg };
   }

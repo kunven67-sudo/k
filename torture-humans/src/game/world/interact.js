@@ -31,7 +31,7 @@ export class Interactables {
       const to = at.clone().sub(eye);
       if (small) to.y = 0;
       const d = to.length();
-      if (d > (it.radius ?? 1.6)) continue;
+      if (d > (typeof it.radius === 'function' ? it.radius() : it.radius ?? 1.6)) continue;
       if (small) { if (d < bestScore) { best = it; bestScore = d; } continue; }
       const ang = Math.acos(THREE.MathUtils.clamp(to.normalize().dot(dir), -1, 1));
       if (ang > 0.6) continue;
