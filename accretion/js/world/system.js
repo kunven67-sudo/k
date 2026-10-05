@@ -36,7 +36,9 @@ function norm(a) {
 export function generateSystemDetail(sys) {
   const rng = new RNG(hash32(sys.seed, 101));
   const star = sys.star;
-  const L = star.lum;
+  // planets formed around the star when it was young, so place them by its original brightness
+  const prog = sys.progenitor || star;
+  const L = prog.lum;
   const Ms = star.mass;
   const snowReal = 2.7 * Math.sqrt(L);              // real AU
   const hzIn = 0.95 * Math.sqrt(L), hzOut = 1.67 * Math.sqrt(L);
@@ -54,14 +56,49 @@ export function generateSystemDetail(sys) {
   };
 
   // planets sit from just outside the star out to ~45 AU (real)
-  let aReal = Math.max(rng.logRange(0.04, 0.4) * Math.sqrt(Ms / M_SUN + 0.1), (star.radius * 3.5) / AU);
-  const nPlanets = star.mass > 15 * M_SUN ? rng.int(0, 2) : rng.int(young ? 3 : 1, young ? 7 : 8);
+  let aReal = Math.max(rng.logRange(0.04, 0.4) * Math.sqrt(prog.mass / M_SUN + 0.1), (prog.radius * 3.5) / AU);
+  const nPlanets = prog.mass > 15 * M_SUN ? rng.int(0, 2) : rng.int(young ? 3 : 1, young ? 7 : 8);
   const tempAt = (aR) => equilibriumTemp(star.temp, star.radius, aR * AU * DIST_COMPRESS, 0.3);
 
   for (let i = 0; i < nPlanets && aReal < 45; i++) {
     const p = makePlanet(rng, sys, i, aReal, snowReal, hzIn, hzOut, young, tempAt(aReal));
     detail.planets.push(p);
     aReal *= rng.range(1.45, 2.3);
+  }
+
+  // what the star's life has done to its planets
+  const phase = sys.phase || 'ms';
+  if (phase === 'rg' || phase === 'sg') {
+    // a swollen giant has swallowed everything close in
+    detail.planets = detail.planets.filter((p) => p.aReal * AU > star.radius * 2.5);
+  } else if (phase === 'wd') {
+    // the red giant phase engulfed the inner system; outer planets drifted outward
+    detail.planets = detail.planets.filter((p) => p.aReal > 2.5);
+    for (const p of detail.planets) p.aReal *= 1.7;
+  } else if (phase === 'ns' || phase === 'bh') {
+    // the supernova blew the system apart; a few 'pulsar planets' can re-form from debris
+    detail.planets = rng.chance(0.15) ? detail.planets.slice(0, rng.int(1, 2)).map((p) => ({ ...p, aReal: rng.range(0.2, 0.6), moons: [], rings: null, life: 0 })) : [];
+  }
+  // a binary companion clears out orbits near its own
+  if (sys.binary) {
+    const sep = sys.binary.sepAU;
+    detail.planets = detail.planets.filter((p) => p.aReal < sep / 3.2 || p.aReal > sep * 3.2);
+    const m2 = sys.binary.mass;
+    const a2 = sep * AU;
+    detail.companion = {
+      mass: m2, a: a2,
+      omega: circularVelocity(Ms + m2, a2) / a2,
+      phase: rng.range(0, Math.PI * 2),
+    };
+  }
+  // carbon-rich systems make carbon worlds
+  if (sys.carbonRich) {
+    for (const p of detail.planets) {
+      if (p.giant) continue;
+      p.comp = { ...p.comp, carbon: 0.35, ice: p.comp.ice * 0.5 };
+      const s = p.comp.rock + p.comp.iron + p.comp.ice + p.comp.carbon + (p.comp.gas || 0);
+      for (const k of Object.keys(p.comp)) p.comp[k] /= s;
+    }
   }
 
   // planet orbits (compressed distances)

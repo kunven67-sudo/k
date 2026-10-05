@@ -2,6 +2,7 @@
 // Real disks and belts have objects at every size (a power law), so whatever
 // size you are, there are things a bit smaller (food) and a few bigger (danger).
 import { Body } from './body.js';
+import { stellarDensity, LY } from './galaxy.js';
 import { RNG } from '../core/rng.js';
 import { M_SUN, M_EARTH, M_JUP, DIST_COMPRESS, TIME_BASE } from '../core/constants.js';
 import { clamp, equilibriumTemp, escapeVelocity } from '../core/phys.js';
@@ -24,7 +25,18 @@ export class Field {
 
   updateEnv() {
     const w = this.world, p = w.player;
-    const env = { kind: 'interstellar', density: 0.25 + 0.3 * w.galaxy.environment(p.x, p.y, p.z), sys: null, snow: 1, normal: null, label: 'Interstellar space' };
+    const [lx, ly, lz] = w.toLy(p.x, p.y, p.z);
+    const starDens = stellarDensity(lx, ly, lz, w.galaxy.merged);
+    const env = { kind: 'interstellar', density: 0.18 + 0.25 * Math.min(1, starDens / 0.01), sys: null, snow: 3, normal: null, label: 'Interstellar space' };
+    // the Oort cloud: a huge shell of icy comets around every star, out to about a light-year
+    for (const e of w.active.values()) {
+      const d = Math.hypot(e.pos.x - p.x, e.pos.y - p.y, e.pos.z - p.z);
+      if (d < 1.2 * LY && d > e.extent * 3) {
+        env.kind = 'oort';
+        env.density = 0.45;
+        env.label = `Oort cloud of ${e.name}`;
+      }
+    }
     let bestEntry = null, bestD = Infinity;
     for (const e of w.active.values()) {
       if (!e.star || !e.star.alive) continue;
@@ -66,16 +78,16 @@ export class Field {
         }
       }
     }
-    for (const nb of w.galaxy.nebulae) {
+    for (const nb of w.galaxy.nebulaeNear(lx, ly, lz, 400)) {
       if (nb.massLeft <= 0.02) continue;
-      if (Math.hypot(p.x - nb.x, p.y - nb.y, p.z - nb.z) < nb.r) {
+      if (Math.hypot(lx - nb.x, ly - nb.y, lz - nb.z) < nb.r) {
         env.kind = 'nebula';
         env.density = Math.max(env.density, 1.2);
         env.label = 'Inside a molecular cloud';
         env.nebula = nb;
       }
     }
-    if (Math.hypot(p.x, p.y, p.z) < 3e10) {
+    if (Math.hypot(lx, ly, lz) < 1500) {
       env.kind = 'core';
       env.density = Math.max(env.density, 1.5);
       env.label = 'Galactic core';
@@ -219,6 +231,10 @@ export class Field {
     if (mass >= 30 * M_EARTH) return { rock: 0.04, iron: 0.015, ice: 0.08, gas: rng.range(0.7, 0.9) };
     if (mass >= 8 * M_EARTH && rng.chance(0.6)) return { rock: 0.2, iron: 0.06, ice: 0.54, gas: rng.range(0.12, 0.3) };
     if (env.kind === 'nebula' && rng.chance(0.5)) return { rock: 0.1, iron: 0.03, ice: 0.3, gas: 0.57 };
+    if (env.kind === 'oort') return { rock: 0.28, iron: 0.06, ice: 0.6, carbon: 0.06 };
+    // carbon-rich systems make carbon-rich rubble
+    if (env.sys?.sys?.carbonRich && rng.chance(0.7)) return { rock: 0.35, iron: 0.15, ice: 0.1, carbon: rng.range(0.3, 0.5) };
+    if (rng.chance(0.06)) return { rock: 0.45, iron: 0.15, ice: 0.12, carbon: rng.range(0.25, 0.4) }; // carbonaceous
     const cold = env.snow > 1 || env.kind === 'interstellar' && rng.chance(0.6);
     const r = rng.next();
     if (r < 0.08) return { rock: 0.25, iron: 0.72, ice: 0.0, gas: 0 };          // metallic

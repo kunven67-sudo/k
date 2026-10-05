@@ -1,7 +1,8 @@
-// Real-world physics relations: mass to radius, star properties, Roche limits.
+// Real-world physics relations: mass to radius, star properties, Roche limits,
+// and what a body *is* given its mass and what it is made of.
 import {
-  G, C, M_SUN, R_SUN, M_EARTH, R_EARTH, M_JUP, RHO, T_SUN,
-  NS_MAX_MASS, IMBH_MIN, SMBH_MIN, STAGES, STAGE_INDEX,
+  G, C, M_SUN, R_SUN, M_EARTH, R_EARTH, M_JUP, RHO, T_SUN, NS_MAX_MASS, WD_MAX_MASS,
+  IMBH_MIN, SMBH_MIN, FORM, COMP_KEYS,
 } from './constants.js';
 
 export const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
@@ -17,7 +18,6 @@ export function interpLog(table, x) {
   if (x <= table[0][0]) return table[0][1];
   const n = table.length;
   if (x >= table[n - 1][0]) {
-    // extrapolate with the last segment's slope
     const [x0, y0] = table[n - 2], [x1, y1] = table[n - 1];
     const k = Math.log(y1 / y0) / Math.log(x1 / x0);
     return y1 * Math.pow(x / x1, k);
@@ -32,8 +32,8 @@ export function interpLog(table, x) {
   return table[n - 1][1];
 }
 
-// Radius (Earth radii) of a gas-rich body versus mass (Earth masses).
-// Based on Neptune, Saturn, Jupiter, brown dwarfs and main-sequence stars.
+// Radius (Earth radii) of a gas-rich body versus mass (Earth masses):
+// Neptune, Saturn, Jupiter, brown dwarfs and main-sequence stars.
 const GAS_RADIUS = [
   [2, 1.9], [5, 2.4], [10, 3.0], [17, 3.88], [50, 6.6], [95, 9.45], [318, 11.2],
   [1000, 11.6], [4130, 11.0], [25400, 10.3], [33300, 13.1], [66600, 23.9],
@@ -49,14 +49,32 @@ const STAR_TEMP = [
   [25, 36000], [40, 42000], [60, 45000],
 ];
 
+export function compOf(c) {
+  return { rock: c.rock || 0, iron: c.iron || 0, ice: c.ice || 0, carbon: c.carbon || 0, gas: c.gas || 0 };
+}
+
+export function normalizeComp(c) {
+  for (const k of COMP_KEYS) if (!(c[k] >= 0)) c[k] = 0;
+  const s = c.rock + c.iron + c.ice + c.carbon + c.gas || 1;
+  for (const k of COMP_KEYS) c[k] /= s;
+  return c;
+}
+
+export function mixComp(a, ma, b, mb) {
+  const t = ma + mb;
+  const out = {};
+  for (const k of COMP_KEYS) out[k] = ((a[k] || 0) * ma + (b[k] || 0) * mb) / t;
+  return out;
+}
+
 export function solidDensity(comp, mass) {
-  const solid = comp.rock + comp.iron + comp.ice + 1e-9;
-  const inv = (comp.rock / RHO.rock + comp.iron / RHO.iron + comp.ice / RHO.ice) / solid;
+  const solid = comp.rock + comp.iron + comp.ice + (comp.carbon || 0) + 1e-9;
+  const inv = (comp.rock / RHO.rock + comp.iron / RHO.iron + comp.ice / RHO.ice + (comp.carbon || 0) / RHO.carbon) / solid;
   let rho = 1 / inv;
   // small bodies are porous rubble piles
   rho *= lerp(0.55, 1.0, logStep(1e14, 1e21, mass));
   // big rocky planets are squeezed by their own gravity
-  rho *= 1 + 0.47 * Math.pow(Math.max(mass, 0) / M_EARTH, 0.4) * logStep(1e21, 1e23, mass);
+  rho *= 1 + 0.47 * Math.pow(Math.min(Math.max(mass, 0) / M_EARTH, 300), 0.4) * logStep(1e21, 1e23, mass);
   return rho;
 }
 
@@ -68,14 +86,34 @@ export function starTemp(mass) {
   return interpLog(STAR_TEMP, mass / M_SUN);
 }
 
+// how hydrogen-rich you must be to burn as a star
+export const STAR_GAS_MIN = 0.5;
+
+export function canFuse(mass, comp) {
+  return mass >= 0.075 * M_SUN && comp.gas >= STAR_GAS_MIN;
+}
+
+export function whiteDwarfRadius(mass) {
+  // Earth-sized at 0.6 Msun, shrinking toward the Chandrasekhar limit
+  const m = mass / M_SUN;
+  return 0.0126 * R_SUN * Math.pow(m / 0.6, -1 / 3) * Math.sqrt(Math.max(0.05, 1 - Math.pow(m / 1.44, 4 / 3))) / Math.sqrt(1 - Math.pow(0.6 / 1.44, 4 / 3));
+}
+
 export function bodyRadius(mass, comp, compact = null) {
   if (compact === 'bh') return schwarzschild(mass);
   if (compact === 'ns') return 12 - 1.6 * (mass / M_SUN - 1.4);
+  if (compact === 'wd') return whiteDwarfRadius(mass);
   const rhoS = solidDensity(comp, mass);
-  const rSolid = Math.cbrt((3 * mass) / (4 * Math.PI * rhoS));
+  let rSolid = Math.cbrt((3 * mass) / (4 * Math.PI * rhoS));
+  // past a few hundred Earth masses solid matter turns degenerate and shrinks as it grows
+  const deg = 300 * M_EARTH;
+  if (mass > deg) {
+    const r0 = Math.cbrt((3 * deg) / (4 * Math.PI * solidDensity(comp, deg)));
+    rSolid = r0 * Math.pow(mass / deg, -1 / 3);
+    rSolid = Math.max(rSolid, whiteDwarfRadius(Math.min(mass, 1.37 * M_SUN)) * 0.6);
+  }
   const me = mass / M_EARTH;
-  // above 13 Jupiter masses a body is basically all gas whatever it ate
-  const gasW = Math.max(smoothstep(0.03, 0.5, comp.gas), logStep(30, 300, me));
+  const gasW = smoothstep(0.03, 0.5, comp.gas);
   if (gasW <= 0 || me < 1) return rSolid;
   const rGas = interpLog(GAS_RADIUS, Math.max(me, 2)) * R_EARTH;
   return Math.exp(lerp(Math.log(rSolid), Math.log(Math.max(rGas, rSolid)), gasW));
@@ -145,50 +183,79 @@ export function blackbody(T) {
   return [out[0] / m, out[1] / m, out[2] / m];
 }
 
-// Which stage a body of this mass is at (non-compact branch)
-export function stageForMass(mass, compact = null) {
-  if (compact === 'ns') return STAGE_INDEX.neutron;
+// ---------------------------------------------------------------- what am I?
+
+// The form a body takes from its mass, makeup, temperature and life stage.
+// opts.phase: 'rg' | 'sg' for evolved stars
+export function classify(mass, comp, compact = null, opts = {}) {
+  if (compact === 'bh') return mass >= SMBH_MIN ? 'smbh' : mass >= IMBH_MIN ? 'imbh' : 'stellarbh';
+  if (compact === 'ns') return 'neutron';
+  if (compact === 'wd') return 'whitedwarf';
+  if (opts.phase === 'rg') return 'redgiant';
+  if (opts.phase === 'sg') return 'massive';
+  const me = mass / M_EARTH;
+  const gasRich = comp.gas >= 0.3;
+  if (mass >= 0.075 * M_SUN && comp.gas >= STAR_GAS_MIN) {
+    const ms = mass / M_SUN;
+    return ms < 0.5 ? 'reddwarf' : ms < 1.5 ? 'sunlike' : ms < 8 ? 'bluestar' : 'massive';
+  }
+  if (mass >= 13 * M_JUP && comp.gas >= STAR_GAS_MIN) return 'browndwarf';
+  if (gasRich && me >= 6) return comp.gas < 0.6 && me < 60 ? 'icegiant' : 'gasgiant';
+  if (comp.gas >= 0.12 && me >= 8) return 'icegiant';
+  if (mass < 1e17) return 'planetesimal';
+  if (mass < 1e20) return 'asteroid';
+  if (mass < 3e22) return 'dwarf';
+  if (mass < 3e23) return 'protoplanet';
+  if (me >= 1.5 * 318) return 'degenerate';
+  const T = opts.temp ?? 280;
+  if ((comp.carbon || 0) >= 0.25) return me >= 3 ? 'diamondworld' : 'carbonworld';
+  if (comp.iron >= 0.55) return 'ironworld';
+  if (comp.ice >= 0.25 && me >= 0.3) return T < 235 ? 'iceworld' : 'oceanworld';
+  if (me < 2) return 'terrestrial';
+  if (me < 10) return 'superearth';
+  return 'megaearth';
+}
+
+export function tierOf(form) {
+  return FORM[form]?.tier ?? 0;
+}
+
+// mass thresholds that matter, used for the progress bar
+const STEPS = [1e17, 1e20, 3e22, 3e23, 2 * M_EARTH, 10 * M_EARTH, 60 * M_EARTH, 13 * M_JUP, 0.075 * M_SUN, 0.5 * M_SUN, 1.5 * M_SUN, 8 * M_SUN];
+
+// What will I turn into if I keep eating like this?
+// diet: average makeup of recent meals. Returns { form, mass } or null.
+export function forecast(mass, comp, diet, compact, opts = {}) {
+  const now = classify(mass, comp, compact, opts);
+  if (compact === 'ns') return { form: 'stellarbh', mass: NS_MAX_MASS };
+  if (compact === 'wd') return { form: 'supernova', mass: WD_MAX_MASS };
   if (compact === 'bh') {
-    if (mass >= SMBH_MIN) return STAGE_INDEX.smbh;
-    if (mass >= IMBH_MIN) return STAGE_INDEX.imbh;
-    return STAGE_INDEX.stellarbh;
+    const next = mass < IMBH_MIN ? IMBH_MIN : mass < SMBH_MIN ? SMBH_MIN : null;
+    return next ? { form: classify(next * 1.01, comp, 'bh'), mass: next } : null;
   }
-  let idx = 0;
-  for (let i = 0; i < STAGES.length; i++) {
-    if (!STAGES[i].compact && mass >= STAGES[i].min) idx = i;
+  const d = diet || comp;
+  for (const f of [1.25, 1.6, 2, 3, 5, 8, 13, 20, 35, 60, 100, 200, 500, 1000, 3000, 1e4, 3e4, 1e5]) {
+    const m = mass * f;
+    const c = mixComp(comp, mass, d, m - mass);
+    const form = classify(m, c, null, opts);
+    if (form !== now) {
+      // refine to the threshold
+      let lo = mass, hi = m;
+      for (let i = 0; i < 24; i++) {
+        const mid = Math.sqrt(lo * hi);
+        if (classify(mid, mixComp(comp, mass, d, mid - mass), null, opts) === now) lo = mid; else hi = mid;
+      }
+      return { form, mass: hi };
+    }
   }
-  return idx;
+  return null;
 }
 
-export function nextStageMass(mass, compact) {
-  if (compact === 'ns') return NS_MAX_MASS;
-  if (compact === 'bh') return mass < IMBH_MIN ? IMBH_MIN : mass < SMBH_MIN ? SMBH_MIN : 4.1e6 * M_SUN;
-  const i = stageForMass(mass);
-  const next = STAGES[i + 1];
-  return next && !next.compact ? next.min : null;
+// floor of the current form, for the progress bar
+export function formFloor(mass) {
+  let f = 1e13;
+  for (const s of STEPS) if (mass >= s) f = s;
+  return f;
 }
 
-export function stageFloorMass(mass, compact) {
-  if (compact === 'ns') return 1.2 * M_SUN;
-  if (compact === 'bh') return mass < IMBH_MIN ? 3 * M_SUN : mass < SMBH_MIN ? IMBH_MIN : SMBH_MIN;
-  const i = stageForMass(mass);
-  return Math.max(STAGES[i].min, 1e13);
-}
-
-export function normalizeComp(c) {
-  const s = c.rock + c.iron + c.ice + c.gas || 1;
-  c.rock /= s; c.iron /= s; c.ice /= s; c.gas /= s;
-  return c;
-}
-
-export function mixComp(a, ma, b, mb) {
-  const t = ma + mb;
-  return {
-    rock: (a.rock * ma + b.rock * mb) / t,
-    iron: (a.iron * ma + b.iron * mb) / t,
-    ice: (a.ice * ma + b.ice * mb) / t,
-    gas: (a.gas * ma + b.gas * mb) / t,
-  };
-}
-
-export { M_JUP };
+export { M_JUP, M_EARTH, M_SUN, R_EARTH, WD_MAX_MASS };
