@@ -804,3 +804,6 @@ manual everything and broken gauges).
 - **Cloud save** (same life on PC and phone): free Firebase (Google) project + sign-in; the owner
   must create the free Firebase project when we reach that phase (walkthrough provided).
   Server timestamps drive the "time keeps going while away" catch-up.
+- **Sign-in**: Google or email/password, or **guest** play (device-only) with account linking
+  later.
+- **Friends list**: add by username, see who's online, one-tap join (room codes still work).
