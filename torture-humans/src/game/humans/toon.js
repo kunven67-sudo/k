@@ -296,10 +296,21 @@ export function buildToon(template, { seed = 'x', gender = 'm', job = '', style 
     return [['Bip01_Neck', 1]];
   };
   {
-    const seg = 24;
+    const seg = 32;
     const rows = [];
     const waist = 0.97;
-    for (const [y, rx0, rz0, bel, chest] of torsoRings) {
+    // 4 smooth in-between rings per ring (Catmull-Rom), so stripes, belts and the
+    // collar come out sharp instead of smeared across a big band
+    const fine = [];
+    for (let i = 0; i < torsoRings.length - 1; i++) {
+      const p0 = torsoRings[Math.max(0, i - 1)], p1 = torsoRings[i], p2 = torsoRings[i + 1], p3 = torsoRings[Math.min(torsoRings.length - 1, i + 2)];
+      for (let k = 0; k < 4; k++) {
+        const t = k / 4, t2 = t * t, t3 = t2 * t;
+        fine.push(p1.map((_, n) => 0.5 * (2 * p1[n] + (-p0[n] + p2[n]) * t + (2 * p0[n] - 5 * p1[n] + 4 * p2[n] - p3[n]) * t2 + (-p0[n] + 3 * p1[n] - 3 * p2[n] + p3[n]) * t3)));
+      }
+    }
+    fine.push(torsoRings[torsoRings.length - 1]);
+    for (const [y, rx0, rz0, bel, chest] of fine) {
       const rx = rx0 * girth, rz = rz0 * girth;
       const row = [];
       for (let j = 0; j <= seg; j++) {
