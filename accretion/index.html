@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Accretion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Barlow+Semi+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a camera viewfinder. Telemetry hugs the four corners; menus sit low-left over the live view. */
+:root {
+  --space: #030407;
+  --ink: #e8ecf2;
+  --dim: #8a93a5;
+  --faint: rgba(232, 236, 242, 0.14);
+  --panel: rgba(4, 6, 10, 0.55);
+  --amber: #ffb24a;
+  --food: #7fe0b0;
+  --danger: #ff5a4e;
+  --info: #8cc8ff;
+  --font-display: "Michroma", "Eurostile", "Microgramma", "Arial Black", sans-serif;
+  --font-body: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--space); color: var(--ink); overflow: hidden; }
+body { font: 15px/1.4 var(--font-body); -webkit-font-smoothing: antialiased; }
+canvas#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+canvas#overlay { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+/* ------------------------------------------------ HUD */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 3; padding: max(18px, env(safe-area-inset-top)) 22px max(18px, env(safe-area-inset-bottom)); }
+.corner { position: absolute; display: grid; gap: 6px; }
+.tl { top: 18px; left: 22px; max-width: min(420px, 60vw); }
+.tr { top: 18px; right: 22px; width: min(360px, 40vw); text-align: right; }
+.bl { bottom: 18px; left: 22px; width: min(370px, 48vw); }
+.br { bottom: 18px; right: 22px; text-align: right; width: min(330px, 40vw); }
+.corner::before { content: ""; position: absolute; width: 14px; height: 14px; border-color: var(--faint); border-style: solid; }
+.tl::before { top: -8px; left: -10px; border-width: 1px 0 0 1px; }
+.tr::before { top: -8px; right: -10px; border-width: 1px 1px 0 0; }
+.bl::before { bottom: -8px; left: -10px; border-width: 0 0 1px 1px; }
+.br::before { bottom: -8px; right: -10px; border-width: 0 1px 1px 0; }
+
+.eyebrow { font: 500 10.5px/1 var(--font-data); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+#stage-name { font: 400 clamp(20px, 2.4vw, 30px)/1.1 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; text-wrap: balance; text-shadow: 0 1px 12px rgba(0,0,0,0.7); }
+#stage-blurb { color: var(--dim); font-size: 15px; }
+.stage-bar { height: 3px; background: var(--faint); width: 100%; margin-top: 4px; }
+#stage-bar-fill { height: 100%; background: var(--amber); width: 0; transition: width 0.4s ease; box-shadow: 0 0 10px rgba(255,178,74,0.6); }
+#stage-next { font: 400 11.5px/1.3 var(--font-data); color: var(--dim); font-variant-numeric: tabular-nums; }
+
+.tele { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font: 400 12.5px/1.35 var(--font-data); font-variant-numeric: tabular-nums; text-shadow: 0 1px 6px rgba(0,0,0,0.8); }
+.tele dt { color: var(--dim); text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.1em; padding-top: 2px; }
+.tele dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+#t-mass { font-size: 15px; color: var(--ink); }
+#t-mass-f { color: var(--amber); }
+#comp-bar { display: flex; height: 5px; width: 100%; background: var(--faint); margin-top: 6px; }
+#comp-bar span { display: block; height: 100%; }
+#comp-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 400 11px/1.3 var(--font-data); color: var(--dim); }
+#comp-legend i { display: inline-block; width: 7px; height: 7px; margin-right: 5px; vertical-align: 0; }
+
+.rline { font: 400 12px/1.5 var(--font-data); color: var(--dim); text-shadow: 0 1px 6px rgba(0,0,0,0.8); }
+.rline.hot { color: var(--info); }
+.keys { font: 400 11px/1.55 var(--font-data); color: rgba(138,147,165,0.75); margin-top: 6px; }
+.keys b { color: var(--ink); font-weight: 500; }
+
+#feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font: 400 12.5px/1.35 var(--font-data); text-shadow: 0 1px 6px rgba(0,0,0,0.9); }
+#feed li { transition: opacity 1.5s ease; }
+#feed li.old { opacity: 0.35; }
+#feed li.food { color: var(--food); }
+#feed li.bad { color: var(--danger); }
+#feed li.big { color: var(--amber); }
+#feed li.info { color: var(--info); }
+
+#warn { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); text-align: center; display: grid; gap: 6px; width: min(640px, 90vw); }
+#warn div { font: 500 13px/1.3 var(--font-data); letter-spacing: 0.06em; text-transform: uppercase; color: var(--danger); text-shadow: 0 0 14px rgba(255,90,78,0.6), 0 1px 4px #000; animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.55; } }
+#core { position: absolute; top: calc(18% + 70px); left: 50%; transform: translateX(-50%); text-align: center; display: grid; gap: 4px; font: 400 12.5px/1.3 var(--font-data); color: var(--info); text-shadow: 0 1px 6px #000; }
+#core b { font: 400 15px/1.2 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
+
+#card { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); width: min(380px, 44vw); padding: 20px 22px 18px; background: linear-gradient(90deg, rgba(4,6,10,0.25), rgba(4,6,10,0.78)); border-right: 2px solid var(--amber); transition: opacity 0.6s ease, transform 0.6s ease; }
+#card.out { opacity: 0; transform: translate(30px, -50%); }
+#card-title { font: 400 22px/1.15 var(--font-display); text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 0 12px; text-wrap: balance; }
+#card-facts { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+#card-facts li { padding-top: 10px; border-top: 1px solid var(--faint); font-size: 15.5px; line-height: 1.45; color: #cfd6e0; }
+#card-hint { margin-top: 12px; font: 400 10.5px/1 var(--font-data); color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* ------------------------------------------------ screens */
+.screen { position: fixed; inset: 0; z-index: 5; display: flex; align-items: flex-end; padding: max(28px, env(safe-area-inset-top)) clamp(18px, 5vw, 72px) max(42px, env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(3,4,7,0) 30%, rgba(3,4,7,0.82) 100%), linear-gradient(90deg, rgba(3,4,7,0.65), rgba(3,4,7,0) 60%); }
+.screen-inner { display: grid; gap: 18px; max-width: 640px; width: 100%; min-width: 0; }
+.big-title { font: 400 clamp(34px, 7vw, 86px)/0.95 var(--font-display); letter-spacing: 0.08em; margin: 0; text-transform: uppercase; }
+.lede { font-size: clamp(16px, 1.6vw, 19px); color: #c9d0db; max-width: 34em; margin: 0; text-wrap: pretty; }
+.facts-row { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 11px/1.4 var(--font-data); color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; }
+.facts-row span::before { content: "\25B8 "; color: var(--amber); }
+.menu { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn { pointer-events: auto; cursor: pointer; background: none; border: 1px solid var(--faint); padding: 10px 18px; font: 500 13px/1 var(--font-data); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); transition: border-color 0.2s, background 0.2s, color 0.2s; }
+.btn:hover { border-color: var(--ink); background: rgba(232,236,242,0.06); }
+.btn.primary { border-color: var(--amber); color: var(--amber); }
+.btn.primary:hover { background: rgba(255,178,74,0.12); }
+.btn.danger { border-color: rgba(255,90,78,0.5); color: var(--danger); }
+.panel { display: grid; gap: 12px; padding: 16px 18px; border-left: 1px solid var(--faint); background: var(--panel); max-width: 520px; }
+.panel h2 { margin: 0; font: 400 14px/1.2 var(--font-display); letter-spacing: 0.08em; text-transform: uppercase; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; font-size: 15px; }
+.row label { color: #c9d0db; }
+.row input[type=range] { width: 160px; accent-color: var(--amber); }
+.row select { background: #0b0e14; color: var(--ink); border: 1px solid var(--faint); padding: 5px 8px; font: inherit; }
+.row input[type=checkbox] { accent-color: var(--amber); width: 18px; height: 18px; }
+.controls-list { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 16px; font-size: 14.5px; }
+.controls-list kbd { font: 500 11.5px/1.5 var(--font-data); color: var(--amber); white-space: nowrap; }
+.note { font: 400 12px/1.5 var(--font-data); color: var(--dim); }
+#death-cause { font-size: clamp(17px, 1.8vw, 21px); color: var(--danger); margin: 0; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 22px; font: 400 12.5px/1.4 var(--font-data); font-variant-numeric: tabular-nums; }
+.stats div span { display: block; color: var(--dim); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+#loading { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; background: var(--space); font: 400 12px/1 var(--font-data); letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); transition: opacity 0.8s ease; }
+#loading.done { opacity: 0; pointer-events: none; }
+#error { position: fixed; left: 18px; right: 18px; bottom: 18px; z-index: 10; padding: 14px 16px; background: #1a0b0b; border-left: 2px solid var(--danger); font: 400 13px/1.5 var(--font-data); white-space: pre-wrap; overflow-wrap: anywhere; }
+#confirm-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+@media (max-height: 760px) {
+  .minor, #comp-legend, #stage-blurb { display: none; }
+  .keys { display: none; }
+  #card { top: 46%; }
+  #card-facts li { font-size: 14px; }
+}
+@media (max-height: 520px) {
+  .tl #stage-next, .tr { display: none; }
+  .bl .tele dt:nth-of-type(n+6), .bl .tele dd:nth-of-type(n+6) { display: none; }
+  #card { display: none; }
+}
+@media (max-width: 760px) {
+  .tr, #card { display: none; }
+  .bl { width: calc(100vw - 44px); }
+  .br { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #warn div { animation: none; }
+  #card, #stage-bar-fill, #feed li { transition: none; }
+}
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Space view"></canvas>
+<canvas id="overlay" hidden></canvas>
+
+<div id="hud" hidden>
+  <div class="corner tl">
+    <div class="eyebrow">Current stage</div>
+    <div id="stage-name">Planetesimal</div>
+    <div id="stage-blurb">A loose clump of dust and rock</div>
+    <div class="stage-bar"><div id="stage-bar-fill"></div></div>
+    <div id="stage-next"></div>
+  </div>
+  <div class="corner tr">
+    <ul id="feed"></ul>
+  </div>
+  <div class="corner bl">
+    <dl class="tele">
+      <dt>Mass</dt><dd><div id="t-mass"></div><div id="t-mass-f"></div></dd>
+      <dt>Radius</dt><dd id="t-radius"></dd>
+      <dt class="minor">Density</dt><dd class="minor" id="t-density"></dd>
+      <dt class="minor">Gravity</dt><dd class="minor" id="t-gravity"></dd>
+      <dt class="minor">Escape</dt><dd class="minor" id="t-vesc"></dd>
+      <dt>Surface</dt><dd id="t-temp"></dd>
+      <dt>Speed</dt><dd id="t-speed"></dd>
+      <dt>Where</dt><dd id="t-where"></dd>
+    </dl>
+    <div id="comp-bar"></div>
+    <div id="comp-legend"></div>
+  </div>
+  <div class="corner br">
+    <div class="rline" id="r-time"></div>
+    <div class="rline" id="r-jets"></div>
+    <div class="rline" id="r-moons"></div>
+    <div class="rline" id="r-target"></div>
+    <div class="keys"><b>WASD</b> jets &middot; <b>Space/C</b> up/down &middot; <b>Shift</b> boost<br><b>X</b> brake &middot; <b>T</b> lock &middot; <b>E</b> pull moons &middot; <b>, .</b> time warp<br><b>Scroll</b> zoom &middot; <b>H</b> hide HUD &middot; <b>Esc</b> pause</div>
+  </div>
+  <div id="warn" hidden></div>
+  <div id="core" hidden></div>
+  <aside id="card" hidden>
+    <div class="eyebrow" id="card-stage">New stage</div>
+    <div id="card-title"></div>
+    <ul id="card-facts"></ul>
+    <div id="card-hint">Enter to dismiss</div>
+  </aside>
+</div>
+
+<section id="title" class="screen">
+  <div class="screen-inner">
+    <div class="eyebrow">A game of gravity</div>
+    <h1 class="big-title">Accretion</h1>
+    <p class="lede">You are a 6 km clump of rock in the dusty disk around a newborn star. Pull in what's smaller than you, and avoid anything bigger. Grow into a planet, then a star, and maybe one day the black hole at the heart of the galaxy.</p>
+    <div class="facts-row"><span>Real masses &amp; sizes</span><span>Roche limits</span><span>Newtonian gravity</span><span>Stellar evolution</span></div>
+    <div class="menu" id="title-menu">
+      <button class="btn primary" id="btn-begin">Begin</button>
+      <button class="btn" id="btn-continue" hidden>Continue</button>
+      <button class="btn" id="btn-controls">Controls</button>
+      <button class="btn" id="btn-settings">Settings</button>
+    </div>
+    <div class="panel" id="panel-controls" hidden>
+      <h2>Controls</h2>
+      <div class="controls-list">
+        <kbd>Mouse</kbd><span>Look around (click the view to capture the mouse)</span>
+        <kbd>W A S D</kbd><span>Fire volcanic jets: forward, left, back, right. Each burst costs a little of your mass.</span>
+        <kbd>Space / C</kbd><span>Jets up / down</span>
+        <kbd>Shift</kbd><span>Boost: stronger jets, much more mass lost</span>
+        <kbd>X</kbd><span>Brake: match the local orbit (or your locked target)</span>
+        <kbd>T</kbd><span>Lock the body under the crosshair. Press again to unlock.</span>
+        <kbd>Tab</kbd><span>Lock the nearest thing you can eat</span>
+        <kbd>E</kbd><span>Pull captured moons and debris in faster</span>
+        <kbd>, and .</kbd><span>Slow down / speed up time (only far from big objects)</span>
+        <kbd>Scroll</kbd><span>Zoom the camera</span>
+        <kbd>H</kbd><span>Hide or show the HUD</span>
+        <kbd>Esc</kbd><span>Pause</span>
+      </div>
+      <p class="note">Hit things gently. Slow impacts stick; fast ones blast rock back off you. Get close and gravity tears smaller bodies apart, and the pieces spiral in.</p>
+    </div>
+    <div class="panel" id="panel-settings" hidden>
+      <h2>Settings</h2>
+      <div class="row"><label for="set-quality">Graphics quality (reloads)</label>
+        <select id="set-quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+      <div class="row"><label for="set-sens">Mouse sensitivity</label><input type="range" id="set-sens" min="0.3" max="2.5" step="0.05"></div>
+      <div class="row"><label for="set-invert">Invert mouse Y</label><input type="checkbox" id="set-invert"></div>
+      <div class="row"><label for="set-volume">Rumble volume</label><input type="range" id="set-volume" min="0" max="1" step="0.01"></div>
+      <div class="row"><label for="set-hints">Show key hints</label><input type="checkbox" id="set-hints"></div>
+    </div>
+  </div>
+</section>
+
+<section id="pause" class="screen" hidden>
+  <div class="screen-inner">
+    <div class="eyebrow">Paused</div>
+    <h2 class="big-title" style="font-size:clamp(28px,4.5vw,52px)">Holding orbit</h2>
+    <div class="menu">
+      <button class="btn primary" id="btn-resume">Resume</button>
+      <button class="btn" id="btn-p-controls">Controls</button>
+      <button class="btn" id="btn-p-settings">Settings</button>
+      <button class="btn danger" id="btn-restart">New galaxy</button>
+    </div>
+    <div id="confirm-row" hidden>
+      <span class="note">This deletes your saved progress and starts over in a new galaxy.</span>
+      <button class="btn danger" id="btn-restart-yes">Start over</button>
+      <button class="btn" id="btn-restart-no">Keep playing</button>
+    </div>
+    <div id="pause-panels"></div>
+  </div>
+</section>
+
+<section id="death" class="screen" hidden>
+  <div class="screen-inner">
+    <div class="eyebrow">Your world came apart</div>
+    <h2 class="big-title" style="font-size:clamp(28px,4.5vw,52px)">Shattered</h2>
+    <p id="death-cause"></p>
+    <div class="stats" id="death-stats"></div>
+    <p class="lede">A chunk of what you were is still out there. The galaxy remembers everything you ate.</p>
+    <div class="menu"><button class="btn primary" id="btn-reform">Re-form from the debris</button></div>
+  </div>
+</section>
+
+<div id="loading">Generating galaxy</div>
+
+<script type="importmap">{ "imports": { "three": "./js/vendor/three/build/three.module.js" } }</script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
