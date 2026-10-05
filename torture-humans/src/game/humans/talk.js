@@ -49,6 +49,23 @@ export function replyTo(h, text, { player, colony } = {}) {
   const held = h.state === 'held';
   const name = h.profile.name.split(' ')[0];
   const res = (() => {
+    if (h.isParent && !tiny && !held) {
+      const mom = h.role === 'mom';
+      const p2 = {
+        greet: [mom ? 'Hi sweetie!' : 'Hey, kiddo.', 'Hi honey. Did you do your chores?'],
+        how: ['Busy day. How was yours?', mom ? 'Tired, but fine. Did you eat?' : 'Work was long. Fine though.'],
+        needs: ['There\'s food in the kitchen.', 'Dinner\'s at six.'],
+        place: ['It\'s our house, silly.', 'Why were you in the basement so long?'],
+        job: [mom ? 'I\'m a nurse, you know that.' : 'Accounting. Numbers all day.'],
+        name: ['It\'s Mom!', 'Very funny.'],
+        size: ['Size? Are you feeling okay?', 'What\'s that watch you keep fiddling with?'],
+        threat: ['Excuse me?! Go to your room!', 'Don\'t you talk to me like that!'],
+        insult: ['Watch your mouth!', 'One more word and there\'s no allowance.'],
+        compliment: ['Aww, love you too!', 'Okay, what do you want?'],
+        sorry: ['Thank you for saying that.', 'Apology accepted.'],
+      }[intent];
+      if (p2) return pick(p2);
+    }
     switch (intent) {
       case 'threat':
         m.mean += 1;

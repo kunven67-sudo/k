@@ -11,6 +11,8 @@ import { Human } from './humans/human.js';
 import { Speech } from './humans/speech.js';
 import { Talk } from './humans/talk.js';
 import { Police } from './police.js';
+import { Family } from './family.js';
+import { Interactables } from './world/interact.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
@@ -209,6 +211,26 @@ export async function boot() {
   game_applyZone = applyZone;
   // time of day, weather, lamps at night, rain, breath in the cold, basement dust
   const env = level.sunDirection ? new Environment({ scene, renderer, settings, camera, level, humans, zone: () => zone || 'lab' }) : null;
+  // things you use with E (light switch, chores...)
+  const interact = new Interactables({ camera, player, input });
+  // Mom and Dad: routines, chores, allowance (and they take the watch if they catch you)
+  let family = null;
+  if (level.house && params.get('family') !== '0') {
+    family = new Family({ player, env, speech, toast: (t) => toast(t), interact, scene, physics, home: level.house, police });
+    const parentLook = async (looks) => { for (const l of looks) { const t = await loadAvatar(`assets/avatars/${l}.glb`).catch(() => null); if (t) return [l, t]; } return [null, null]; };
+    for (const [role, looks] of [['mom', ['Female_Adult_05', 'Female_Adult_02', 'Business_Female_01']], ['dad', ['Male_Adult_07', 'Male_Adult_01', 'Male_Adult_04']]]) {
+      const [look, tpl] = await parentLook(looks);
+      if (!tpl) continue;
+      const gender = role === 'mom' ? 'f' : 'm';
+      await lib.require(baseClips(gender));
+      const start = nav.closest(level.house.spots[role === 'mom' ? 'counter' : 'tv'].p) || level.house.spots.tv.p;
+      const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.house.inHouse, settings, profile: { look, name: role === 'mom' ? 'Mom' : 'Dad', personality: { bravery: 0.7, temper: role === 'dad' ? 0.6 : 0.4, friendliness: 0.8 } } });
+      h.speech = speech;
+      h.player = player;
+      humans.push(h);
+      family.add(h, role);
+    }
+  }
   // the little things in the terrarium: dew, mushrooms, moss, leaves, fogged glass, embers, footprints...
   const tinyDetails = cage?.tiny ? addTinyDetails({ tiny: cage.tiny, cage, settings, glass: { w: 3.0, h: 1.2, d: 1.9 }, getHour: () => env?.hour ?? 9, player, camera }) : null;
   if (colony) colony.details = tinyDetails;
@@ -276,7 +298,7 @@ export async function boot() {
     }
   });
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, frame: 0 };
   hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
 
@@ -296,6 +318,8 @@ export async function boot() {
     hands.update(dt);
     squisher.update();
     hazards.update(dt);
+    interact.update();
+    family?.update(dt);
     vitals.update(dt);
     nav.update(dt);
     colony?.update(dt);
@@ -321,7 +345,7 @@ export async function boot() {
     if (!params.has('paused')) step(dt);
     game_applyZone?.();
     updateSizeHud(dt);
-    const hint = player.interactHint || hands.hint;
+    const hint = player.interactHint || interact.hint || hands.hint;
     if (hintEl && hintEl.textContent !== (hint || '')) { hintEl.textContent = hint || ''; hintEl.hidden = !hint; }
     if (renderer.render(now) && fpsEl) {
       fpsEl.hidden = !settings.get('graphics.showFps');

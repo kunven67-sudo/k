@@ -34,6 +34,7 @@ const LINES = {
   giantSeen: ['Is that... a giant?!', 'RUN!', 'Oh my god, look at the size of that!', 'Everybody run!', 'Mommy!'],
   stomped: ['NO—', 'Watch your feet!', 'AAH!'],
   greet: ['Hi!', 'Hey there', 'Hello!', 'Morning!', 'Oh, hi'],
+  grown: ['I\'m... normal again?!', 'Oh thank god', 'Never. Do that. Again.', 'Finally! Now YOU are in trouble'],
 };
 
 export function moodOf(h) {
@@ -48,7 +49,7 @@ export function moodOf(h) {
 
 // a line for a situation, fitting this person
 export function lineFor(h, situation) {
-  const set = LINES[situation];
+  const set = h.lines?.[situation] || LINES[situation]; // some people have their own (Mom, Dad)
   if (!set) return null;
   if (Array.isArray(set)) return pick(set);
   return pick(set[moodOf(h)] || set.scared);

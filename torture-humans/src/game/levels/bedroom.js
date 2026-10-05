@@ -61,7 +61,8 @@ export async function buildBedroom({ statics, props, scene, hatch }) {
   const wallMat = pbr('painted_plaster_wall', { size: 2, color: 0xd9cfbf });
   wallWithOpening(room, wallMat, { axis: 'x', at: z0 - 0.075, from: x0 - 0.15, to: x1 + 0.15, y0: fy, h });
   wallWithOpening(room, wallMat, { axis: 'x', at: z1 + 0.075, from: x0 - 0.15, to: x1 + 0.15, y0: fy, h, open: { a0: 3.0, a1: 3.9, b0: 0, b1: 2.05 } });
-  wallWithOpening(room, wallMat, { axis: 'z', at: x0 - 0.075, from: z0, to: z1, y0: fy, h });
+  // west wall: doorway to the living room (z -1.6..-0.7)
+  wallWithOpening(room, wallMat, { axis: 'z', at: x0 - 0.075, from: z0, to: z1, y0: fy, h, open: { a0: -1.6, a1: -0.7, b0: 0, b1: 2.05 } });
   wallWithOpening(room, wallMat, { axis: 'z', at: x1 + 0.075, from: z0, to: z1, y0: fy, h, open: { a0: -3.3, a1: -1.9, b0: 0.9, b1: 2.1 } });
   // window glass + daylight coming in
   const pane = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.02, transmission: 1, thickness: 0.004, ior: 1.52, transparent: true });
@@ -79,7 +80,7 @@ export async function buildBedroom({ statics, props, scene, hatch }) {
   await place(props, 'old_bed_frame', { x: 3.6, y: fy, z: -3.9, rotY: 0, width: 2.1 });
   await place(props, 'side_table_01', { x: 2.85, y: fy, z: -2.6, height: 0.55 });
   await place(props, 'alarm_clock_01', { x: 2.85, y: fy + 0.55, z: -2.6, width: 0.12 });
-  await place(props, 'wooden_bookshelf_worn', { x: 2.75, y: fy, z: -1.0, rotY: Math.PI / 2, height: 1.9 });
+  await place(props, 'wooden_bookshelf_worn', { x: 5.6, y: fy, z: -4.75, rotY: 0, height: 1.9 });
   await place(props, 'WoodenTable_01', { x: 6.3, y: fy, z: -0.8, rotY: -Math.PI / 2, width: 1.3 });
   await place(props, 'television_02', { x: 6.6, y: fy + 0.76, z: -0.8, rotY: -Math.PI / 2, width: 0.7 });
   await place(props, 'gamepad', { x: 6.2, y: fy + 0.76, z: -0.5, width: 0.16 });

@@ -67,6 +67,7 @@ export class Police {
       if (!['idle', 'walking'].includes(h.state)) continue;
       if (!this.canSee(h, pos)) continue;
       seen++;
+      if (h.isParent) { this.onParentSaw?.(h, kind); continue; } // Mom and Dad don't call the cops on you
       this.witness(h, sev, pos);
     }
     return seen;

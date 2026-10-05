@@ -12,6 +12,7 @@ const pbr = (id, opts = {}) => {
   return matCache.get(key);
 };
 import { BEDROOM } from './bedroom.js';
+import { HOUSE, FRONT_WINDOW } from './house.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Glue every town piece that shares a material into one mesh: a few hundred
@@ -244,7 +245,7 @@ export async function buildTown({ statics, props, scene }) {
   town.name = 'town';
   statics.add(town);
   const windows = new Windows();
-  const H = BEDROOM;
+  const H = HOUSE;
   const hx0 = H.x0 - 0.15, hx1 = H.x1 + 0.15, hz0 = H.z0 - 0.15, hz1 = H.z1 + 0.15; // house footprint
 
   // ---- ground: lawns (with a hole where the house stands), sidewalks with curbs, the road
@@ -292,7 +293,12 @@ export async function buildTown({ statics, props, scene }) {
   // south wall with the doorway (x 3.0-3.9, 2.05 m tall above the bedroom floor)
   const dy1 = H.floorY + 2.05;
   const sz = hz1 + skin / 2;
-  mesh(box(3.0 - hx0, wallH, skin), brick, (hx0 + 3.0) / 2, GROUND_Y + wallH / 2, sz, town);
+  // (west part has the living room window)
+  const FW = FRONT_WINDOW, fwy0 = H.floorY + FW.y0, fwy1 = H.floorY + FW.y1;
+  mesh(box(FW.x0 - hx0, wallH, skin), brick, (hx0 + FW.x0) / 2, GROUND_Y + wallH / 2, sz, town);
+  mesh(box(3.0 - FW.x1, wallH, skin), brick, (FW.x1 + 3.0) / 2, GROUND_Y + wallH / 2, sz, town);
+  mesh(box(FW.x1 - FW.x0, fwy0 - GROUND_Y, skin), brick, (FW.x0 + FW.x1) / 2, (GROUND_Y + fwy0) / 2, sz, town);
+  mesh(box(FW.x1 - FW.x0, top - fwy1, skin), brick, (FW.x0 + FW.x1) / 2, (fwy1 + top) / 2, sz, town);
   mesh(box(hx1 - 3.9, wallH, skin), brick, (3.9 + hx1) / 2, GROUND_Y + wallH / 2, sz, town);
   mesh(box(0.9, top - dy1, skin), brick, 3.45, (dy1 + top) / 2, sz, town);
   // east wall with the window (z -3.3..-1.9, 0.9..2.1 above the floor)
@@ -307,6 +313,15 @@ export async function buildTown({ statics, props, scene }) {
   mesh(box(0.08, 2.1, 0.12), trim, 2.98, H.floorY + 1.05, sz + 0.02, town);
   mesh(box(0.08, 2.1, 0.12), trim, 3.92, H.floorY + 1.05, sz + 0.02, town);
   mesh(box(1.02, 0.08, 0.12), trim, 3.45, dy1 + 0.04, sz + 0.02, town);
+  // living room window frame and sill
+  {
+    const FW = FRONT_WINDOW, wy0 = H.floorY + FW.y0, wy1 = H.floorY + FW.y1, cxw = (FW.x0 + FW.x1) / 2, ww = FW.x1 - FW.x0;
+    mesh(box(ww + 0.16, 0.08, 0.12), trim, cxw, wy1 + 0.04, sz + 0.02, town);
+    mesh(box(ww + 0.24, 0.06, 0.2), trim, cxw, wy0 - 0.03, sz + 0.06, town);
+    mesh(box(0.08, wy1 - wy0, 0.12), trim, FW.x0 - 0.04, (wy0 + wy1) / 2, sz + 0.02, town);
+    mesh(box(0.08, wy1 - wy0, 0.12), trim, FW.x1 + 0.04, (wy0 + wy1) / 2, sz + 0.02, town);
+    mesh(box(0.05, wy1 - wy0, 0.06), trim, cxw, (wy0 + wy1) / 2, sz + 0.0, town);
+  }
   // roof (ridge along X)
   const roofW = hx1 - hx0 + skin * 2, roofD = hz1 - hz0 + skin * 2;
   const rise = 1.7;

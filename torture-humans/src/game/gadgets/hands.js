@@ -59,6 +59,27 @@ class ShrinkRay extends Item {
     if (this.cooldown <= 0) this.charging = true;
   }
 
+  // right click: the grow beam (a tiny person you aim at goes back to normal size)
+  onAlt() {
+    if (this.cooldown > 0) return;
+    const { camera, physics, player } = this.ctx;
+    this.cooldown = 0.6;
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const hit = physics.raycast(camera.position, dir, RANGE, { exclude: player.body.collider });
+    const from = this.model.localToWorld(this.model.userData.muzzle.clone());
+    const to = hit ? hit.point : camera.position.clone().addScaledVector(dir, RANGE);
+    const b = this.beam;
+    b.visible = true;
+    b.userData.life = 0.28;
+    b.position.copy(from).lerp(to, 0.5);
+    b.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+    b.scale.set(1, from.distanceTo(to), 1);
+    for (const m of b.userData.mats) m.color.set(0xffb347); // warm orange: growing
+    b.userData.grow = true;
+    const target = hit?.owner;
+    if (target?.grow && target.tiny) target.grow(1);
+  }
+
   onUp() {
     if (!this.charging) return;
     this.charging = false;
@@ -81,6 +102,7 @@ class ShrinkRay extends Item {
     b.position.copy(from).lerp(to, 0.5);
     b.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
     b.scale.set(0.6 + power, len, 0.6 + power);
+    for (const m of b.userData.mats) m.color.set(0x7fd6ff);
     this.model.userData.light.intensity = 25;
     const target = hit?.owner;
     if (target?.shrink && !target.tiny && !target.dead) {

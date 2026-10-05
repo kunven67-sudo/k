@@ -85,6 +85,7 @@ export class Player {
   updateSizeWatch(dt) {
     const inp = this.input;
     const dir = (inp.isDown('sizeUp') ? 1 : 0) - (inp.isDown('sizeDown') ? 1 : 0);
+    if (dir && this.watchTaken) { this.noWatch = 1; this.sizeChanging = false; return; }
     this.sizeChanging = dir !== 0;
     if (!dir || this.shrinkFx || this.ladder?.active || this.inCage) return;
     const rate = 1.1; // about x3 per second
@@ -140,6 +141,7 @@ export class Player {
   get interactHint() {
     if (this.ladder?.active) return this.ladder.mode === 'climb' ? 'W / S climb · Space let go' : null;
     if (this.noRoom > 0) return 'No room to grow here: go somewhere with more space';
+    if (this.noWatch > 0) return 'Your parents took your size watch (you get it back tomorrow)';
     if (this.inWater) return 'E  Drink   ·   F  Grow back to normal size';
     if (this.inCage && this.scale < 1) return 'F  Grow back to normal size';
     if (this.scale >= 1 && this.cage?.canDropFrom(this.camera.position)) return 'F  Shrink yourself into the terrarium';
@@ -236,6 +238,7 @@ export class Player {
     if (inp.pressed('shrinkSelf')) this.tryShrinkToggle();
     this.updateSizeWatch(dt);
     this.noRoom = Math.max(0, (this.noRoom || 0) - dt);
+    this.noWatch = Math.max(0, (this.noWatch || 0) - dt);
     this.updateShrinkFx(dt);
     if (inp.pressed('camera')) this.toggleCamera();
     if (this.settings.get('controls.toggleSprint') && inp.pressed('sprint')) this.sprintToggled = !this.sprintToggled;

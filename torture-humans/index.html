@@ -31,6 +31,10 @@
     #wanted.seen { animation: wantedblink 0.6s infinite alternate; }
     @keyframes wantedblink { to { color: #ff5b4a; } }
     #wanted[hidden] { display: none; }
+    #money { position: fixed; top: 44px; right: 16px; color: #8ef08a; font: 700 18px system-ui, sans-serif; text-shadow: 0 0 4px #000; }
+    #chores { position: fixed; top: 74px; right: 16px; max-width: 280px; padding: 8px 10px; border-radius: 8px; background: rgba(0,0,0,0.45); color: #fff; font: 13px system-ui, sans-serif; }
+    #chores div { margin-top: 4px; } #chores i { color: #8ef08a; font-style: normal; }
+    #chores[hidden] { display: none; }
     #blackout.busted span { color: #ff4a3a; font-size: 30px; }
     #clock { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); color: #fff; font: 600 14px system-ui, sans-serif; text-shadow: 0 0 4px #000; }
     #toast { position: fixed; left: 50%; top: 12%; transform: translateX(-50%); padding: 8px 18px; background: rgba(0,0,0,.7); color: #fff; font: 600 17px system-ui, sans-serif; border-radius: 6px; }
@@ -86,12 +90,16 @@
       <li>Size watch: hold <kbd>Z</kbd> to shrink, <kbd>X</kbd> to grow (anywhere there's room)</li>
       <li><kbd>4</kbd> hand: click someone small to pick them up · click to put down · <b>right-click</b> throws</li>
       <li><kbd>T</kbd> / <kbd>Enter</kbd> talk: type something to whoever you're looking at (or holding)</li>
+      <li>Shrink ray <b>right click</b>: grow beam (puts a tiny person back to normal size)</li>
+      <li>Mom and Dad give you chores (top right) for money · don't let them see you use the size watch!</li>
       <li><kbd>E</kbd> use: climb the ladder, drink water</li>
       <li>Step on tiny people to squish them (as a giant, normal people too)</li>
       <li>People who see you do bad things call the police ★ — get out of sight (or shrink!) until it cools down</li>
     </ul>
   </div>
   <div id="wanted" hidden></div>
+  <div id="money">$0</div>
+  <div id="chores" hidden></div>
   <div id="chatlog" hidden></div>
   <div id="chatbox" hidden><input id="chatin" maxlength="200" autocomplete="off" placeholder="Say something… (Enter to send, Esc to cancel)"></div>
   <div id="error" hidden></div>

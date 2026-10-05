@@ -32,6 +32,7 @@ export class Environment {
     this.zone = zone;          // () => 'lab' | 'house' | 'outside'
     const params = new URLSearchParams(location.search);
     this.hour = Number(params.get('time') ?? 9.5);
+    this.day = 1;
     this.weather = { state: params.get('weather') || 'clear', rain: 0, cloud: 0, next: 30 + Math.random() * 60 };
     if (this.weather.state === 'rain') { this.weather.rain = 1; this.weather.cloud = 1; }
     if (this.weather.state === 'snow') { this.weather.snow = 1; this.weather.cloud = 1; }
@@ -240,7 +241,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.95, 0.98), uSnow * snowUp)
   // ---- every frame
   update(dt) {
     dt = Math.max(0, Math.min(0.1, dt));
-    this.hour = (this.hour + (dt * 24) / DAY_SECONDS) % 24;
+    const h = this.hour + (dt * 24) / DAY_SECONDS;
+    if (h >= 24) this.day = (this.day ?? 1) + 1; // day 1 = Monday
+    this.hour = h % 24;
     this.updateWeather(dt);
     // gusty wind, stronger with clouds and rain
     const gust = 0.5 + 0.5 * Math.sin(performance.now() / 2300) * Math.sin(performance.now() / 870);

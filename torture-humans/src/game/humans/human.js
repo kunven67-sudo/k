@@ -85,6 +85,9 @@ export class Human {
             door: ['knock_door', 'idle_waiting_02', 'try_door_outwards'],
             phone: ['cell_phone_textmessage', 'cell_phone_talk_01', 'cell_phone_listen_01'],
             look: ['idle_look_around_02', 'idle_stretch_arms_01', 'idle_neutral_02'],
+            cook: ['work_table', 'work_mid', 'idle_scratch_head_01', 'work_table'],
+            eat: ['drink_drinking', 'idle_neutral_03', 'gestic_talk_relaxed_01'],
+            tv: ['gestic_laugh_low', 'idle_yawn_01', 'idle_neutral_04', 'gestic_laugh_loud', 'idle_touch_face_02'],
           }[spot.act] || IDLE_GESTURES;
           this.character.play(acts[(Math.random() * acts.length) | 0]);
           this.timer = 4 + Math.random() * 8;
@@ -138,6 +141,15 @@ export class Human {
     this.emotion.fear = 1;
     this.character.stopOneShot(0.1);
     this.agent.resetMoveTarget();
+  }
+
+  // the grow beam (shrink ray, right click): back to normal size
+  grow(to = 1) {
+    if (this.shrinking || !this.tiny || this.dead || !this.agent) return false;
+    this.shrinking = { from: this.scale, to, t: 0, d: 1.4 };
+    this.character.stopOneShot(0.1);
+    this.agent.resetMoveTarget();
+    return true;
   }
 
   applyScale(s) {
@@ -485,6 +497,7 @@ export class Human {
     }
     if (this.state === 'jar') { this.updateJar(dt); return; }
     if (this.state === 'held') { this.updateHeld(dt); return; }
+    if (this.state === 'away') { this.brain?.(dt); return; } // out of the house / asleep (not in the world)
     if (this.state === 'flying') { this.updateFlying(dt); return; }
     if (this.state === 'hurt') {
       this.hurtT -= dt;
@@ -509,9 +522,11 @@ export class Human {
       const e = 1 - Math.pow(1 - u, 3);
       this.applyScale(THREE.MathUtils.lerp(k.from, k.to, e));
       if (u >= 1) {
+        const grown = k.to >= 0.5;
         this.shrinking = null;
-        this.tiny = true;
-        this.speech?.react(this, 'shrunk', { shout: true });
+        this.tiny = !grown;
+        this.speech?.react(this, grown ? 'grown' : 'shrunk', { shout: true });
+        if (grown) { this.emotion.fear = 0.5; this.emotion.anger = Math.min(1, this.emotion.anger + 0.4); return; }
         // run away from whoever did it
         const away = this.nav.randomPoint((p) => Math.hypot(p.x - this.position.x, p.z - this.position.z) < 4 && Math.abs(p.y - this.position.y) < 0.5);
         if (away) this.goTo(away, { run: true });
@@ -522,6 +537,7 @@ export class Human {
       this.watchForGiant(dt);
       this.think(dt);
     }
+    if (!this.agent) return; // left the world just now (out the door, to bed)
     this.syncFromAgent(dt);
     this.updateFace();
     this.character.update(dt, {
