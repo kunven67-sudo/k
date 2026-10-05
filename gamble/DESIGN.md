@@ -869,3 +869,8 @@ manual everything and broken gauges).
   2. Never too clean — dirt, trash, cracks, scuffs, stains, clutter everywhere appropriate.
   3. No stiff animation — weight, foot planting, no sliding, secondary motion/jiggle.
   4. No default menus — custom fonts, card-table/slot-machine/phone UIs with personality.
+- **Shading: Fortnite-like** — chunky cartoon shapes with physically based materials (real fabric,
+  metal, glass, soft skin), real lighting & shadows.
+- **Fonts/signage mixed by place** (fancy casinos, retro motels, modern stores); menus use a
+  classic casino style on the card-table UI.
+- **Strand-like hair** that sways in wind (simplified on phones).
