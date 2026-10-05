@@ -814,3 +814,8 @@ manual everything and broken gauges).
 - Strangers' mics are **open by default** in public lobbies (proximity), mutable per person.
 - **Host controls**: death rule (permadeath/hospital), player-vs-player fighting & robbing on/off,
   private/invite-only lock, max players (2–8).
+- **Player text chat = nearby speech bubbles only** (far away → text them on the in-game phone).
+- **Leaderboard anti-cheat: free best-effort** (sanity checks on impossible values; not
+  server-authoritative).
+- **Real push notifications** about autopilot life while away (rent due, evicted, partner texted…);
+  iPhone requires the home-screen app.
