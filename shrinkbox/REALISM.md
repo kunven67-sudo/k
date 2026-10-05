@@ -2,13 +2,15 @@
 
 Your graphics-director list, rewritten as commands that actually run in Shrinkbox (one browser file, phones + PC, 60 fps). The part you pasted (skin, eyes, teeth, hands) is folded in as browser-ready commands. It cut off at "Move beyond the face", so I picked up there and added clothes, light, wetness, dust, air, and the Earth.
 
-**How to use:** send me the numbers, like `do #4 #5 #8`. Stick to 3–5 per message so one request doesn't eat your $20 limit.
+**How to use:** send me the numbers, like `do #4 #5 #8`. Stick to 3–5 per message so one request doesn't eat your $20 limit. ✅ = already in the game.
 
 **Legend:** ⚡ cheap (phones too) · 🔶 medium (High/Ultra quality) · 🔴 heavy (Ultra only, good PC) · 🔬 only shows up when you shrink (Shrinkbox's superpower: every surface has another level of detail underneath)
 
 **Scope:** healthy, living, clothed people, everything around them, and the planet. No wound or injury layers; the cutter stays objects-only.
 
-**Reality check:** no game is truly "indistinguishable from real life", and Shrinkbox is a single file running in a browser. Film-pipeline stuff (100,000 separate hair strands, 8K scanned pore maps, thread-by-thread cloth sim) would lag phones and break the build, so every command below is the version that looks close *and* runs here.
+**Quality:** you said lag is fine, so Shrinkbox now defaults to **Ultra** everywhere and every feature is built at its best version (you can still lower it in Settings). No game is truly "indistinguishable from real life", but the ceiling here is now what a browser GPU can do, not what a phone can do.
+
+**The people are real now (✅ #1):** every human (you, Mom, Dad, the wall villagers) is built from MakeHuman's free CC0 human (real anatomy, face, hands, skeleton), shaped by real body-shape data for gender, age, muscle, weight and ancestry, with a random unique face for everyone.
 
 ## ⭐ Start here
 
@@ -25,27 +27,27 @@ Biggest realism jump per message, in order (one line = one message):
 
 ## 0. Foundation (unlocks everything else)
 
-- **#1** 🔶 **Real human body.** Right now people are capsules and spheres (box hands, cone nose), and no skin shader can look real on that. ➜ *Replace the primitive Avatar in avatar.js with one skinned human mesh (eyelids, lips, nostrils, ear folds, 5-finger hands, ~25 bones), built procedurally at load and shared by you, Mom, Dad, and every villager.*
+- **#1** ✅ 🔶 **Real human body.** Done with MakeHuman's free CC0 human: real anatomy, eyelids, lips, nostrils, ear folds, 5-finger hands with nails, an 84-bone skeleton, 34 face-expression shapes and ~400 face/body shape controls (assets/human.bin, built by tools/human-convert.mjs). ➜ *Next level: subdivide the mesh on Ultra for even smoother close-ups.*
 - **#2** ⚡ **Joints that keep their volume.** Basic skinning twists wrists like a candy wrapper and collapses elbows. ➜ *Add forearm/upper-arm twist bones plus elbow, knee, and shoulder corrective shapes so joints keep their volume when bent.*
 - **#3** 🔬 **Detail that appears as you shrink.** Real surfaces have detail at every scale. ➜ *Add a detail-layer system: each material gets extra normal/roughness layers that fade in as player.s drops (cm → mm → 0.1 mm), so everything gets more detailed the smaller you get, all the way down to the germ world.*
 - **#4** ⚡ **One "surface state" layer for everything.** ➜ *Inject one shader chunk (onBeforeCompile) into every material that adds wetness, dust, grime, fingerprints, and condensation from per-Thing values (t.wet, t.dust, t.dirt), so every environment command below works on every object.*
 - **#5** ⚡ **Real brightness range.** Direct sun is about 100,000 lux; a lamp-lit bedroom is about 100–500. ➜ *Switch to AgX tone mapping with physical light units so sunlight through the window is hundreds of times brighter than the lamps, like real life.*
 - **#6** ⚡ **Eye adaptation.** Eyes adjust to bright light in seconds but take 20–30 min to fully adjust to the dark. ➜ *Add auto-exposure: fast when it gets brighter (~1 s), slow when it gets darker (~10 s), so the sunny yard blinds you for a moment and a dark room slowly appears.*
-- **#7** ⚡ **No lag, ever.** ➜ *Tag every realism feature with a minimum quality (low/medium/high/ultra) in settings.js, and auto-drop the heaviest ones if FPS stays under 50 for 3 s.*
+- **#7** ✅ ⚡ **Max quality by default.** ➜ *Default to Ultra (you said lag is fine); keep the Settings menu so it can be lowered by hand.*
 
 ## 1. Skin
 
-- **#8** 🔶 **Subsurface scattering.** Light enters skin and comes out somewhere else. Red travels farthest (millimeters) and blue barely goes in, which gives shadows a soft red edge. ➜ *Implement pre-integrated skin: bake a scattering lookup (N·L × curvature) to a canvas texture at startup, compute mesh curvature, and use both in the skin shader (wide red falloff, tight blue).*
-- **#9** ⚡ **Backlit glow.** Thin parts (ears, nostril edges, fingers, eyelids) glow red when light is behind them. ➜ *Add a thickness map to skin (thin at ears, nostrils, finger webbing, eyelids) and a deep-red back-light transmission term.*
+- **#8** ✅ 🔶 **Subsurface scattering.** Light enters skin and comes out somewhere else. Red travels farthest (millimeters) and blue barely goes in, which gives shadows a soft red edge. ➜ *Implement pre-integrated skin: bake a scattering lookup (N·L × curvature) to a canvas texture at startup, compute mesh curvature, and use both in the skin shader (wide red falloff, tight blue).*
+- **#9** ✅ ⚡ **Backlit glow.** Thin parts (ears, nostril edges, fingers, eyelids) glow red when light is behind them. ➜ *Add a thickness map to skin (thin at ears, nostrils, finger webbing, eyelids) and a deep-red back-light transmission term.*
 - **#10** 🔴 **Screen-space scattering (Ultra).** ➜ *On Ultra, add a separable screen-space scattering blur pass masked to skin pixels only.*
-- **#11** ⚡ **Pores by region.** Oil glands are densest on the nose, forehead, and chin (up to ~400–900 per cm²), sparse on the cheeks, and absent on the lips. ➜ *Generate pore normal maps procedurally (Worley noise) weighted by a face-region mask: dense T-zone, medium cheeks, none on lips/eyelids; pores stretch along the skin's tension.*
-- **#12** ⚡ **Skin crosshatch.** The back of the hand, forearms, and neck have a fine net of crisscrossing furrows. ➜ *Add a polygon-furrow micro-normal layer on hands, forearms, and neck.*
-- **#13** ⚡ **Pigment + blood color.** Real skin color is melanin plus blood showing through. ➜ *Split skin color into melanin (the customizer tone) × a hemoglobin map: redder cheeks, nose tip, ears, lips, knuckles, elbows, knees; faint blue-green over near-surface veins (wrists, temples, under the eyes); palms and soles lighter on every skin tone.*
-- **#14** ⚡ **Blood flow reacts.** Fear and cold pull blood away from the skin (pale); heat, running, and embarrassment bring it back (flush). ➜ *Drive a per-person blood multiplier: scared villagers go pale, parents flush after running or near the hot Xbox, cold makes noses and ears pink and lips slightly bluish.*
+- **#11** ✅ ⚡ **Pores by region.** Oil glands are densest on the nose, forehead, and chin (up to ~400–900 per cm²), sparse on the cheeks, and absent on the lips. ➜ *Generate pore normal maps procedurally (Worley noise) weighted by a face-region mask: dense T-zone, medium cheeks, none on lips/eyelids; pores stretch along the skin's tension.*
+- **#12** ✅ ⚡ **Skin crosshatch.** The back of the hand, forearms, and neck have a fine net of crisscrossing furrows. ➜ *Add a polygon-furrow micro-normal layer on hands, forearms, and neck.*
+- **#13** ✅ ⚡ **Pigment + blood color.** Real skin color is melanin plus blood showing through. ➜ *Split skin color into melanin (the customizer tone) × a hemoglobin map: redder cheeks, nose tip, ears, lips, knuckles, elbows, knees; faint blue-green over near-surface veins (wrists, temples, under the eyes); palms and soles lighter on every skin tone.*
+- **#14** ✅ ⚡ **Blood flow reacts.** Fear and cold pull blood away from the skin (pale); heat, running, and embarrassment bring it back (flush). ➜ *Drive a per-person blood multiplier: scared villagers go pale, parents flush after running or near the hot Xbox, cold makes noses and ears pink and lips slightly bluish.*
 - **#15** ⚡ **Goosebumps.** Tiny muscles lift each hair when you're cold or scared. ➜ *Blend in a goosebump bump map on arms and legs when it's cold or fear spikes, with the fine hairs standing up.*
 - **#16** ⚡ **Oil and sweat.** The T-zone gets shinier through the day; heat and exercise bring out sweat beads. ➜ *Add an oil/sweat specular mask: T-zone shine rises over the real day; forehead and upper-lip sweat beads after running or in a hot room.*
-- **#17** ⚡ **Nobody's skin is perfect.** Freckles, moles, birthmarks, small old healed marks, uneven tone. ➜ *Seed 15–40 freckles/moles/marks per person from their seed so everyone looks unique and stays the same between saves.*
-- **#18** ⚡ **Peach fuzz.** Almost-invisible hairs cover most skin and glow at the edges in rim light. ➜ *Fake the fuzz with a sheen lobe + fresnel rim on skin; on Ultra add short alpha hair shells on cheeks and forearms.*
+- **#17** ✅ ⚡ **Nobody's skin is perfect.** Freckles, moles, birthmarks, small old healed marks, uneven tone. ➜ *Seed 15–40 freckles/moles/marks per person from their seed so everyone looks unique and stays the same between saves.*
+- **#18** ✅ ⚡ **Peach fuzz.** Almost-invisible hairs cover most skin and glow at the edges in rim light. ➜ *Fake the fuzz with a sheen lobe + fresnel rim on skin; on Ultra add short alpha hair shells on cheeks and forearms.*
 - **#19** ⚡ **Age.** ➜ *Add an age value that controls wrinkle depth, skin roughness, and spots: parents get faint crow's feet and forehead lines, kids stay smooth.*
 - **#20** ⚡ **Expression wrinkles.** Wrinkles appear only when muscles squeeze the skin. ➜ *Blend wrinkle normal maps by expression: frown → lines between the brows, smile → crow's feet + deeper smile lines; a neutral face stays smooth.*
 - **#21** 🔬 **Skin when you're tiny.** The outer layer is stacks of flat dead cells (~30–40 µm wide) that flake off all day. ➜ *When you're tiny on someone's hand or arm, make skin a walkable landscape: a furrow grid, pore craters with hairs growing out, an oily sheen, and flat skin-cell plates lifting at the edges.*
@@ -57,42 +59,42 @@ Biggest realism jump per message, in order (one line = one message):
 - **#24** ⚡ **Arms that flex.** ➜ *Add a flex shape: biceps bulge and forearms tighten when someone lifts or carries something.*
 - **#25** ⚡ **Tendons & veins.** Wrist tendons pop out when gripping; back-of-hand veins show more when warm and less when cold. ➜ *Add wrist tendon ridges that sharpen on grip, and a hand/forearm vein map whose strength rises with warmth and exercise.*
 - **#26** ⚡ **Elbows & knees.** Loose wrinkly skin when straight, smooth when bent, a bit darker and rougher. ➜ *Drive elbow/knee wrinkles by joint angle (wrinkled straight, smooth bent) with slightly darker, rougher skin.*
-- **#27** ⚡ **Real hands.** 3 segments per finger, knuckle creases, 3 main palm lines. ➜ *Build hands with 3-segment fingers, knuckle creases on the back, the 3 main palm creases plus finger-joint creases, and lighter palms.*
-- **#28** ⚡ **Nails.** A ~0.5 mm see-through plate over a pink bed, a white half-moon at the base, growing ~3.5 mm a month. ➜ *Make nails their own clearcoat material: translucent plate over a pink bed, white half-moon and tip, cuticle line, fine lengthwise ridges.*
+- **#27** ✅ ⚡ **Real hands.** 3 segments per finger, knuckle creases, 3 main palm lines. ➜ *Build hands with 3-segment fingers, knuckle creases on the back, the 3 main palm creases plus finger-joint creases, and lighter palms.*
+- **#28** ✅ ⚡ **Nails.** A ~0.5 mm see-through plate over a pink bed, a white half-moon at the base, growing ~3.5 mm a month. ➜ *Make nails their own clearcoat material: translucent plate over a pink bed, white half-moon and tip, cuticle line, fine lengthwise ridges.*
 - **#29** 🔬 **Fingerprints.** Ridges ~0.5 mm apart; about 60–65% of prints are loops, 30–35% whorls, 5% arches. ➜ *Generate a fingerprint per finger (loop/whorl/arch from the person's seed); when you're tiny it's a ridged landscape with sweat-pore holes along each ridge.*
 - **#30** ⚡ **Smudges.** Touching glass leaves skin-oil prints you only notice in reflections. ➜ *When anyone touches a glossy surface (phone, TV, window, mirror, can), stamp an oily print that shows in reflections or on a dark screen; wipes remove it.*
 - **#31** ⚡ **Feet.** At night parents go barefoot or in socks; soles have the thickest skin on the body, with calluses. ➜ *Give parents socks or bare feet in the evening: a real arch, 5 toes, toenails, thicker yellowish heel and ball calluses, lighter soles.*
 - **#32** ⚡ **Body hair.** ➜ *Add body-hair density maps (forearms, shins, finger backs on adults; none on palms, soles, lips) as hair cards on High+, a subtle tint on Low.*
-- **#33** ⚡ **Breathing.** Adults breathe 12–20 times a minute, kids a bit faster. ➜ *Animate chest and shoulders breathing at real rates: faster when running or scared, slow and deep when asleep.*
-- **#34** ⚡ **Never frozen.** ➜ *Add idle life: weight shifts every 4–10 s, a tiny balance sway, random fidgets (scratch an arm, rub eyes, check the phone).*
+- **#33** ✅ ⚡ **Breathing.** Adults breathe 12–20 times a minute, kids a bit faster. ➜ *Animate chest and shoulders breathing at real rates: faster when running or scared, slow and deep when asleep.*
+- **#34** ✅ ⚡ **Never frozen.** ➜ *Add idle life: weight shifts every 4–10 s, a tiny balance sway, random fidgets (scratch an arm, rub eyes, check the phone).*
 - **#35** ⚡ **Follow-through.** ➜ *Add spring-based secondary motion to hair, hoodie strings, and loose clothes so they lag behind and settle.*
-- **#36** ⚡ **Real body sizes.** The average US man is about 175 cm and the average woman about 161 cm; adults are ~7.5 heads tall and their arm span ≈ their height. ➜ *Randomize parents and villagers around real averages and spread, with kids having bigger heads for their body.*
-- **#37** ⚡ **Body types.** ➜ *Replace the single build slider with muscle + body-fat sliders that reshape shoulders, waist, and limbs instead of stretching everything.*
-- **#38** ⚡ **Every skin tone looks right.** ➜ *Tune the skin shader per tone: deep skin keeps rich warm undertones and a visible sheen (never gray or ashy); light skin shows more red scattering and veins.*
+- **#36** ✅ ⚡ **Real body sizes.** The average US man is about 175 cm and the average woman about 161 cm; adults are ~7.5 heads tall and their arm span ≈ their height. ➜ *Randomize parents and villagers around real averages and spread, with kids having bigger heads for their body.*
+- **#37** ✅ ⚡ **Body types.** ➜ *Replace the single build slider with muscle + body-fat sliders that reshape shoulders, waist, and limbs instead of stretching everything.*
+- **#38** ✅ ⚡ **Every skin tone looks right.** ➜ *Tune the skin shader per tone: deep skin keeps rich warm undertones and a visible sheen (never gray or ashy); light skin shows more red scattering and veins.*
 
 ## 3. Face & eyes
 
-- **#39** ⚡ **Eyelids.** ➜ *Give eyes real lids that wrap the eyeball, shadow its top, and follow the gaze (lift when looking up, drop when looking down).*
-- **#40** ⚡ **Blinks.** About 15–20 a minute, and a lot fewer while staring at a screen. ➜ *Blink every 3–6 s (fast close, slower open), less while watching TV or a phone, more when it's dusty or they're tired.*
-- **#41** ⚡ **Eye jumps.** Eyes jump about 3 times a second when looking around. ➜ *Add saccades, look-at targets (parents glance at movement, villagers look at you when you talk), and both eyes turning in for close objects.*
-- **#42** 🔶 **Cornea.** A clear dome (IOR 1.376) that bends your view of the iris and carries the shine. ➜ *Make each eye a sclera ball + a separate clear cornea (IOR 1.376, clearcoat) over a refracted iris, so the iris shifts and the shine slides as the head turns.*
-- **#43** ⚡ **Iris & pupil.** The pupil goes from ~2 mm in bright light to ~8 mm in the dark. ➜ *Paint a procedural iris per person (radial fibers, crypts, darker outer ring) and size the pupil 2–8 mm from the light reaching their face.*
-- **#44** ⚡ **Whites of the eyes.** Not pure white: faint vessels, pinker corners, a wet line. ➜ *Add faint branching vessels, a pink bump in the inner corner, and a glossy tear line along the lower lid.*
-- **#45** ⚡ **Reflections in eyes.** ➜ *Use the room's environment map for eye reflections so the window, lamp, or TV glints in people's eyes.*
-- **#46** ⚡ **Brows & lashes.** ➜ *Replace the box eyebrows with hair-card brows (growing up at the inner end, flatter outward) and add curled upper lashes and shorter lower lashes.*
+- **#39** ✅ ⚡ **Eyelids.** ➜ *Give eyes real lids that wrap the eyeball, shadow its top, and follow the gaze (lift when looking up, drop when looking down).*
+- **#40** ✅ ⚡ **Blinks.** About 15–20 a minute, and a lot fewer while staring at a screen. ➜ *Blink every 3–6 s (fast close, slower open), less while watching TV or a phone, more when it's dusty or they're tired.*
+- **#41** ✅ ⚡ **Eye jumps.** Eyes jump about 3 times a second when looking around. ➜ *Add saccades, look-at targets (parents glance at movement, villagers look at you when you talk), and both eyes turning in for close objects.*
+- **#42** ✅ 🔶 **Cornea.** A clear dome (IOR 1.376) that bends your view of the iris and carries the shine. ➜ *Make each eye a sclera ball + a separate clear cornea (IOR 1.376, clearcoat) over a refracted iris, so the iris shifts and the shine slides as the head turns.*
+- **#43** ✅ ⚡ **Iris & pupil.** The pupil goes from ~2 mm in bright light to ~8 mm in the dark. ➜ *Paint a procedural iris per person (radial fibers, crypts, darker outer ring) and size the pupil 2–8 mm from the light reaching their face.*
+- **#44** ✅ ⚡ **Whites of the eyes.** Not pure white: faint vessels, pinker corners, a wet line. ➜ *Add faint branching vessels, a pink bump in the inner corner, and a glossy tear line along the lower lid.*
+- **#45** ✅ ⚡ **Reflections in eyes.** ➜ *Use the room's environment map for eye reflections so the window, lamp, or TV glints in people's eyes.*
+- **#46** ✅ ⚡ **Brows & lashes.** ➜ *Replace the box eyebrows with hair-card brows (growing up at the inner end, flatter outward) and add curled upper lashes and shorter lower lashes.*
 - **#47** 🔬 **Eyelash mites.** Most adults have tiny Demodex mites (~0.3 mm) living in their lash and face follicles. ➜ *In the germ world near a person's eyelashes, add Demodex mites around the lash roots.*
-- **#48** ⚡ **Lips.** Thinner skin, so more blood shows through; vertical micro-lines; chapped when the air is dry. ➜ *Give lips their own material: redder scattering, vertical crease normals, soft gloss, a sharp lip border; a bit chapped on dry or cold days.*
+- **#48** ✅ ⚡ **Lips.** Thinner skin, so more blood shows through; vertical micro-lines; chapped when the air is dry. ➜ *Give lips their own material: redder scattering, vertical crease normals, soft gloss, a sharp lip border; a bit chapped on dry or cold days.*
 - **#49** ⚡ **Nose.** ➜ *Rebuild the nose with real nostril openings (lined up with the body-journey nose entrance), creases at the sides, and a slightly shinier tip.*
 - **#50** ⚡ **Ears.** ➜ *Model real ear folds (helix, antihelix, tragus, bowl, lobe) with an opening that lines up with the ear-canal entrance, plus red back-light glow.*
-- **#51** 🔶 **Real expressions.** Faces move in separate muscle "action units" (FACS), and a real smile lifts the cheeks too, not just the mouth. ➜ *Drive faces with ~14 FACS-style action units (brow raise/lower, cheek raise, nose wrinkle, lip corner pull/drop, jaw drop, lip press, pucker...) mixed slightly asymmetrically.*
+- **#51** ✅ 🔶 **Real expressions.** Faces move in separate muscle "action units" (FACS), and a real smile lifts the cheeks too, not just the mouth. ➜ *Drive faces with ~14 FACS-style action units (brow raise/lower, cheek raise, nose wrinkle, lip corner pull/drop, jaw drop, lip press, pucker...) mixed slightly asymmetrically.*
 - **#52** ⚡ **Talking mouths.** ➜ *Animate mouth shapes from the speech-synthesis word-boundary events (or timed from the text when a voice doesn't report them) so lips move with their real voices.*
-- **#53** ⚡ **Feelings on faces.** ➜ *Map villager fear/trust and parent moods to faces: wide eyes + raised brows when scared, real smiles when they trust you, a frown when Mom's annoyed.*
+- **#53** ✅ ⚡ **Feelings on faces.** ➜ *Map villager fear/trust and parent moods to faces: wide eyes + raised brows when scared, real smiles when they trust you, a frown when Mom's annoyed.*
 
 ## 4. Hair
 
-- **#54** 🔶 **Real hair.** A head has about 100,000 hairs, and hair shows two highlights: a white one and a colored one shifted toward the tips. ➜ *Replace the solid hair caps with layered alpha hair cards using anisotropic shading with two shifted highlights.*
+- **#54** ✅ 🔶 **Real hair.** A head has about 100,000 hairs, and hair shows two highlights: a white one and a colored one shifted toward the tips. ➜ *Replace the solid hair caps with layered alpha hair cards using anisotropic shading with two shifted highlights.*
 - **#55** ⚡ **Backlit hair.** Blond and red hair glow when backlit; black hair barely does. ➜ *Add hair back-light transmission that's strong for light hair and weak for dark hair.*
-- **#56** ⚡ **Hairline & part.** ➜ *Add a visible part, a soft fading hairline (no hard edge), and a few flyaway hairs catching the light.*
+- **#56** ✅ ⚡ **Hairline & part.** ➜ *Add a visible part, a soft fading hairline (no hard edge), and a few flyaway hairs catching the light.*
 - **#57** ⚡ **Hair movement.** ➜ *Spring-chain physics for ponytails and long hair: swings with the head, blows in fans and wind.*
 - **#58** ⚡ **Wet hair.** ➜ *Wet hair (shower, rain, spilled soda) goes darker, clumps, gets shinier, and dries slowly.*
 - **#59** ⚡ **Scalp.** ➜ *For buzz cuts and thin hair, show the scalp with tiny stubble dots.*
@@ -112,15 +114,15 @@ Biggest realism jump per message, in order (one line = one message):
 
 ## 6. Clothes & fabric
 
-- **#70** ⚡ **Real fabric structure.** T-shirts are knit (tiny V-shaped loops), not woven. Jeans are 3×1 twill with blue threads one way and white the other, which is why the inside is lighter. Hoodies are fleece. Sheets are woven at 200–800 threads per square inch. ➜ *Generate fabric maps by type: jersey knit for tees, 3×1 indigo/white twill for jeans (lighter inside), brushed fleece for hoodies, rib knit for socks and cuffs, plain/sateen weave for sheets.*
-- **#71** ⚡ **Fabric shine.** Cotton glows softly at the edges, satin and nylon have stretched highlights, leather is glossy. ➜ *Use physical sheen for cotton/fleece, anisotropic highlights for satin and nylon jackets, clearcoat for leather shoes.*
+- **#70** ✅ ⚡ **Real fabric structure.** T-shirts are knit (tiny V-shaped loops), not woven. Jeans are 3×1 twill with blue threads one way and white the other, which is why the inside is lighter. Hoodies are fleece. Sheets are woven at 200–800 threads per square inch. ➜ *Generate fabric maps by type: jersey knit for tees, 3×1 indigo/white twill for jeans (lighter inside), brushed fleece for hoodies, rib knit for socks and cuffs, plain/sateen weave for sheets.*
+- **#71** ✅ ⚡ **Fabric shine.** Cotton glows softly at the edges, satin and nylon have stretched highlights, leather is glossy. ➜ *Use physical sheen for cotton/fleece, anisotropic highlights for satin and nylon jackets, clearcoat for leather shoes.*
 - **#72** ⚡ **How clothes are made.** About 8–12 stitches per inch. ➜ *Add stitch lines, folded hems, orange topstitching and copper rivets on jeans, zipper teeth, drawstring tips, and a care tag in the collar.*
 - **#73** ⚡ **Wrinkles from poses.** ➜ *Blend wrinkle maps by joint angle: folds inside bent elbows and knees, tension folds when reaching, stacked folds at the jeans' hem.*
 - **#74** 🔶 **Real cloth physics.** ➜ *Add a lightweight cloth solver (≈20×20 points, collides with physics shapes) for curtains, the bed blanket, towels, and flags; tiny-you can climb a blanket and make it sag.*
 - **#75** 🔴 **Simulated clothes (Ultra).** ➜ *On Ultra, simulate hoodie hems and long shirts with a coarse cloth proxy that follows the body.*
 - **#76** ⚡ **Wear & tear.** ➜ *Give each piece of clothing a wear value: faded knees, seat, and elbows, denim fade lines at the hips and behind the knees, fleece pilling under the arms, stretched tee collars, the odd sock hole.*
 - **#77** ⚡ **Dirt & stains.** ➜ *Build up dirt on hems, cuffs, knees, and soles; food-drip stains after eating; grass stains after being outside; add a laundry chore that cleans it all.*
-- **#78** ⚡ **Shoes.** ➜ *Rebuild shoes: a rounded toe box with flex creases, tread with dirt stuck in it, real laces, scuffed toes.*
+- **#78** ✅ ⚡ **Shoes.** ➜ *Rebuild shoes: a rounded toe box with flex creases, tread with dirt stuck in it, real laces, scuffed toes.*
 - **#79** 🔬 **Clothes when you're tiny.** Yarn is ~0.2–0.3 mm thick; cotton fibers are flat twisted ribbons ~15 µm wide; polyester fibers are smooth round rods. ➜ *When you shrink onto clothes or bedding, make knit-loop/twill terrain at mm scale, then twisted yarn bundles of ribbon-like cotton fibers or smooth polyester rods in the germ world.*
 - **#80** ⚡ **Lint & pet hair.** ➜ *Collect lint and your pets' hair on dark clothes and the couch over time; sell a lint roller in the shop.*
 - **#81** ⚡ **Clothes on a schedule.** ➜ *Dress parents by the real clock and weather: work clothes on weekdays, pajamas at night, jackets outside when it's cold.*

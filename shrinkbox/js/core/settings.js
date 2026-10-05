@@ -2,7 +2,7 @@
 const KEY = 'shrinkbox.settings.v1';
 
 const defaults = {
-  quality: 'auto',      // low | medium | high | ultra | auto
+  quality: 'ultra',     // low | medium | high | ultra | auto
   sensitivity: 1,
   invertY: false,
   fov: 75,
@@ -25,12 +25,8 @@ export function saveSettings() {
 }
 export function onSettings(fn) { listeners.add(fn); }
 
-// Picks a starting quality from the device so weak laptops / phones don't lag.
+// Max realism by default (lag is OK). Lower it in Settings if a device can't keep up.
 export function resolveQuality() {
   if (settings.quality !== 'auto') return settings.quality;
-  const touch = matchMedia('(pointer: coarse)').matches;
-  const cores = navigator.hardwareConcurrency || 4;
-  if (touch) return 'low';
-  if (cores <= 4) return 'medium';
-  return 'high';
+  return 'ultra';
 }

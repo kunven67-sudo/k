@@ -6,88 +6,28 @@ import * as THREE from 'three';
 import { R, world, groups, G } from '../core/physics.js';
 import { Mover } from '../player/mover.js';
 import { rng } from '../core/noise.js';
+import { HumanModel } from '../human/model.js';
 
 const NAMES = ['Pip', 'Wren', 'Milo', 'Tansy', 'Bram', 'Juniper', 'Odo', 'Fern', 'Clove', 'Rook', 'Hazel', 'Tobin', 'Sorrel', 'Nim', 'Ivy', 'Barnaby', 'Poppy', 'Quill', 'Moss', 'Lark'];
 const PERSONALITIES = ['friendly', 'shy', 'grumpy', 'curious', 'brave'];
 const SKINS = ['#f3d2b8', '#e8b892', '#c68a64', '#a0663f', '#7a4a2a', '#4f2f1c'];
 const HAIRS = ['#2b1d14', '#5a3a1e', '#a8743a', '#d9b26a', '#1a1a1a', '#8a8a8a', '#7a2a1a'];
 const CLOTHES = ['#6b8f4e', '#8a5a3c', '#b5651d', '#4e6b8f', '#7a4f7a', '#a63d3d', '#c9b06b', '#3f5f5a'];
+const EYES = ['#4a3121', '#3a2416', '#2c1c12', '#3d6a8a', '#557a55', '#6b5a3a'];
 
-// ---------- a light-weight human model (few meshes, so dozens of people stay fast) ----------
-const geoCache = {};
-function g(key, make) { return geoCache[key] || (geoCache[key] = make()); }
-function limbGeo(r0, r1, len) {
-  const c = new THREE.CylinderGeometry(r1, r0, len, 10, 1); c.translate(0, -len / 2, 0);
-  const a = new THREE.SphereGeometry(r0, 10, 6), b = new THREE.SphereGeometry(r1, 10, 6); b.translate(0, -len, 0);
-  return mergeSimple([c, a, b]);
-}
-function mergeSimple(list) {
-  const out = new THREE.BufferGeometry(), pos = [], nor = [];
-  for (const geo of list) { const gg = geo.index ? geo.toNonIndexed() : geo; pos.push(...gg.attributes.position.array); nor.push(...gg.attributes.normal.array); }
-  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  return out;
-}
-export class PersonModel {
-  constructor(look) {
-    const M = (c, r = 0.75) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
-    const skin = M(look.skin, 0.6), top = M(look.top, 0.9), pants = M(look.pants, 0.9), hair = M(look.hair, 0.8), shoes = M(look.shoes, 0.6);
-    this.root = new THREE.Group();
-    const body = new THREE.Group(); this.root.add(body); this.body = body;
-    const torsoGeo = g('torso', () => { const t = new THREE.CylinderGeometry(0.18, 0.15, 0.52, 14); t.scale(1, 1, 0.62); t.translate(0, 0.26, 0); const ch = new THREE.SphereGeometry(0.18, 14, 8); ch.scale(1, 0.5, 0.62); ch.translate(0, 0.52, 0); return mergeSimple([t, ch]); });
-    const torso = new THREE.Mesh(torsoGeo, top); torso.position.y = 0.92; body.add(torso);
-    const headGeo = g('head', () => { const h = new THREE.SphereGeometry(0.105, 18, 12); h.scale(1, 1.12, 1.05); const n = new THREE.CylinderGeometry(0.05, 0.055, 0.12, 10); n.translate(0, -0.13, 0); const nose = new THREE.ConeGeometry(0.016, 0.04, 6); nose.rotateX(Math.PI / 2.2); nose.translate(0, -0.005, 0.11); return mergeSimple([h, n, nose]); });
-    const head = new THREE.Group(); head.position.y = 1.71; body.add(head); this.head = head;
-    head.add(new THREE.Mesh(headGeo, skin));
-    const eyesGeo = g('eyes', () => { const l = new THREE.SphereGeometry(0.014, 8, 6); l.translate(-0.037, 0.025, 0.095); const r = new THREE.SphereGeometry(0.014, 8, 6); r.translate(0.037, 0.025, 0.095); return mergeSimple([l, r]); });
-    head.add(new THREE.Mesh(eyesGeo, M('#111', 0.2)));
-    const hairGeo = g('hair' + look.hairStyle, () => {
-      const cap = new THREE.SphereGeometry(0.113, 16, 10, 0, Math.PI * 2, 0, look.hairStyle === 'long' ? 1.75 : 1.4); cap.scale(1, 1.12, 1.08); cap.rotateX(-0.25); cap.translate(0, 0.012, 0);
-      if (look.hairStyle === 'long') { const b = new THREE.CapsuleGeometry(0.09, 0.16, 4, 10); b.scale(1.15, 1, 0.6); b.translate(0, -0.1, -0.06); return mergeSimple([cap, b]); }
-      return cap;
-    });
-    if (look.hairStyle !== 'bald') head.add(new THREE.Mesh(hairGeo, hair));
-    const mouth = new THREE.Mesh(g('mouth', () => new THREE.BoxGeometry(0.03, 0.006, 0.01)), M('#7a3a34')); mouth.position.set(0, -0.05, 0.095); head.add(mouth); this.mouth = mouth;
-    this.legs = []; this.arms = [];
-    for (const sx of [-1, 1]) {
-      const hip = new THREE.Group(); hip.position.set(sx * 0.095, 0.93, 0); body.add(hip);
-      hip.add(new THREE.Mesh(g('thigh', () => limbGeo(0.075, 0.058, 0.42)), pants));
-      const knee = new THREE.Group(); knee.position.y = -0.42; hip.add(knee);
-      knee.add(new THREE.Mesh(g('shin', () => limbGeo(0.056, 0.045, 0.4)), pants));
-      const shoe = new THREE.Mesh(g('shoe', () => { const b = new THREE.BoxGeometry(0.1, 0.08, 0.26); b.translate(0, -0.44, 0.05); return b; }), shoes); knee.add(shoe);
-      this.legs.push({ hip, knee });
-      const sh = new THREE.Group(); sh.position.set(sx * 0.22, 1.45, 0); body.add(sh);
-      sh.add(new THREE.Mesh(g('upper', () => limbGeo(0.055, 0.045, 0.29)), top));
-      const el = new THREE.Group(); el.position.y = -0.29; sh.add(el);
-      el.add(new THREE.Mesh(g('fore', () => limbGeo(0.044, 0.034, 0.25)), top));
-      el.add(new THREE.Mesh(g('hand', () => { const b = new THREE.BoxGeometry(0.055, 0.09, 0.03); b.translate(0, -0.3, 0); return b; }), skin));
-      sh.rotation.z = sx * 0.08;
-      this.arms.push({ sh, el, sx });
-    }
-    this.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    this.walk = 0;
-  }
-  animate(dt, speed, state, t) {
-    this.walk += dt * Math.min(10, speed * 3.4);
-    const sw = Math.min(1, speed / 1.2);
-    const a = Math.sin(this.walk) * 0.6 * sw;
-    const L = this.legs, A = this.arms;
-    if (state === 'held') {
-      // dangling + kicking in your hand
-      L[0].hip.rotation.x = Math.sin(t * 7) * 0.4; L[1].hip.rotation.x = -Math.sin(t * 7) * 0.4;
-      L[0].knee.rotation.x = 0.6; L[1].knee.rotation.x = 0.6;
-      A[0].sh.rotation.z = -1.2 + Math.sin(t * 5) * 0.3; A[1].sh.rotation.z = 1.2 - Math.sin(t * 5) * 0.3;
-      return;
-    }
-    L[0].hip.rotation.x = a; L[1].hip.rotation.x = -a;
-    L[0].knee.rotation.x = Math.max(0, -Math.sin(this.walk + 1.2)) * 0.9 * sw; L[1].knee.rotation.x = Math.max(0, Math.sin(this.walk + 1.2)) * 0.9 * sw;
-    A[0].sh.rotation.x = -a * 0.8; A[1].sh.rotation.x = a * 0.8;
-    A[0].sh.rotation.z = -0.08; A[1].sh.rotation.z = 0.08;
-    if (state === 'wave') { A[1].sh.rotation.z = 2.6; A[1].sh.rotation.x = 0; A[1].el.rotation.z = Math.sin(t * 8) * 0.5; }
-    else A[1].el.rotation.z = 0;
-    if (state === 'sit') { L[0].hip.rotation.x = -1.5; L[1].hip.rotation.x = -1.5; L[0].knee.rotation.x = 1.5; L[1].knee.rotation.x = 1.5; this.body.position.y = -0.45; A[0].sh.rotation.x = -0.4; A[1].sh.rotation.x = -0.4; }
-    else if (state === 'cower') { L[0].knee.rotation.x = 1.6; L[1].knee.rotation.x = 1.6; L[0].hip.rotation.x = -1.4; L[1].hip.rotation.x = -1.4; this.body.position.y = -0.45; A[0].sh.rotation.x = -2.2; A[1].sh.rotation.x = -2.2; }
-    else this.body.position.y = Math.abs(Math.cos(this.walk)) * 0.02 * sw;
-  }
+// a random but believable person: men, women, kids and elders, every face different
+function randomLook(r) {
+  const age = r() < 0.18 ? 7 + r() * 6 : r() < 0.82 ? 19 + r() * 45 : 66 + r() * 20;
+  const gender = r() < 0.5 ? 0 : 1;
+  const skin = pick(r, SKINS);
+  const old = age > 65;
+  const hairStyle = gender ? pick(r, ['short', 'short', 'buzz', 'curly', old ? 'bald' : 'short']) : pick(r, ['long', 'ponytail', 'curly', 'short', 'long']);
+  return {
+    age, gender, skin, eyes: pick(r, EYES), hair: old && r() < 0.7 ? pick(r, ['#8a8a8a', '#bdbdbd', '#d8d8d8']) : pick(r, HAIRS), hairStyle,
+    top: pick(r, CLOTHES), topStyle: pick(r, ['tee', 'tee', 'longsleeve', 'hoodie']), pants: pick(r, ['#2b3a55', '#3b3a36', '#1f2a44', '#4a3b2a', pick(r, CLOTHES)]),
+    pantsStyle: age < 13 && r() < 0.5 ? 'shorts' : pick(r, ['jeans', 'jeans', 'sweats', 'shorts']), shoes: pick(r, ['#3b2a1e', '#e9e9e9', '#222222', '#c94040', '#4e6b8f']),
+    build: 0.85 + r() * 0.4, seed: Math.floor(r() * 1e6),
+  };
 }
 
 // ---------- dialogue: rule-based, personality + mood aware ----------
@@ -130,12 +70,12 @@ export class Person {
     this.game = game;
     this.name = o.name || pick(r, NAMES);
     this.personality = o.personality || pick(r, PERSONALITIES);
-    this.look = o.look || { skin: pick(r, SKINS), hair: pick(r, HAIRS), hairStyle: pick(r, ['short', 'long', 'bald', 'short']), top: pick(r, CLOTHES), pants: pick(r, CLOTHES), shoes: '#3b2a1e' };
-    this.height = o.height || 0.014; // 1.4 cm tall
+    this.look = { ...randomLook(r), ...(o.look || {}) };
+    this.height = (o.height || 0.014) * (this.look.age < 13 ? 0.62 + this.look.age * 0.022 : 1); // 1.4 cm tall (kids are smaller)
     this.s = this.height / 1.75;
     this.fear = this.personality === 'brave' ? 0.1 : this.personality === 'shy' ? 0.5 : 0.25;
     this.trust = this.personality === 'friendly' ? 0.4 : 0.15;
-    this.model = new PersonModel(this.look);
+    this.model = new HumanModel(this.look);
     this.model.root.scale.setScalar(this.s);
     game.engine.scene.add(this.model.root);
     this.feet = new THREE.Vector3(...o.pos);
@@ -204,6 +144,8 @@ export class Person {
     this.body.setNextKinematicTranslation({ x: this.feet.x, y: this.feet.y + this.height / 2, z: this.feet.z });
     this.model.root.position.copy(this.feet);
     this.model.root.rotation.y = this.yaw;
+    this.model.mood = this.fear > 0.55 ? 'fear' : this.trust > 0.55 && this.sayT > 0 ? 'smile' : 'neutral';
+    this.model.lookAt = sees && dist < this.height * 60 + p.height * 3 ? p.head(this._lookV || (this._lookV = new THREE.Vector3())) : null;
     this.model.animate(dt, speed, this.state, t);
     // mouth moves while talking
     this.sayT = Math.max(0, (this.sayT || 0) - dt);
@@ -236,5 +178,5 @@ export class Person {
     this.fear = Math.max(0, this.fear - 0.15); this.trust = Math.min(1, this.trust + 0.1);
     this.say(pick(this.rand, ['Phew. Thank you.', 'Solid ground!', 'That was... actually kind of fun.', 'Thanks for being gentle.']));
   }
-  remove() { this.game.engine.scene.remove(this.model.root); world.removeRigidBody(this.body); }
+  remove() { this.game.engine.scene.remove(this.model.root); this.model.dispose?.(); world.removeRigidBody(this.body); }
 }

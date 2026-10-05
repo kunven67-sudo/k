@@ -189,6 +189,8 @@ export class Tools {
     pp.model.root.rotation.y = Math.atan2(cam.position.x - pos.x, cam.position.z - pos.z);
     pp.yaw = pp.model.root.rotation.y;
     pp.body.setNextKinematicTranslation({ x: pp.feet.x, y: pp.feet.y + pp.height / 2, z: pp.feet.z });
+    // your real hand is under them, palm up
+    if (g.viewModel) g.viewModel.palm = g.viewModel.root.worldToLocal(pp.feet.clone());
   }
   setPersonDown() {
     const g = this.game, p = g.player, pp = this.heldPerson; if (!pp) return;
@@ -198,6 +200,7 @@ export class Tools {
     const hit = world.castRay(ray, p.height * 3, true, R.QueryFilterFlags.EXCLUDE_SENSORS, undefined, p.collider);
     const at = hit ? from.clone().add(new THREE.Vector3(0, -hit.timeOfImpact + pp.height * 0.02, 0)) : p.feet.clone();
     this.heldPerson = null;
+    if (g.viewModel) g.viewModel.palm = null;
     pp.setDown(at);
     sfx.click(0.15);
   }

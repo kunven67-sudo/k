@@ -2,7 +2,7 @@
 import { input } from '../core/input.js';
 import { settings, saveSettings } from '../core/settings.js';
 import { sfx, resumeAudio } from '../core/audio.js';
-import { SKIN_TONES, HAIR_STYLES } from '../player/avatar.js';
+import { SKIN_TONES, HAIR_STYLES, BODY_TYPES } from '../player/avatar.js';
 import { formatSize, compareSize } from '../player/watch.js';
 
 const $ = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
@@ -113,17 +113,22 @@ export class UI {
       const sel = (opts, val, fn) => { const s = $(`<select class="click">${opts.map((o) => `<option ${o === val ? 'selected' : ''}>${o}</option>`).join('')}</select>`); s.onchange = () => fn(s.value); return s; };
       const range = (min, max, step, val, fn) => { const r = $(`<input type="range" class="click" min="${min}" max="${max}" step="${step}" value="${val}">`); r.onchange = () => fn(parseFloat(r.value)); return r; };
       const set = (k) => (v) => { L[k] = v; g.applyLook(); };
+      const bodyName = Object.keys(BODY_TYPES).find((k) => BODY_TYPES[k] === (L.gender ?? 0.5)) || 'in-between';
+      row('Body', sel(Object.keys(BODY_TYPES), bodyName, (v) => { L.gender = BODY_TYPES[v]; g.applyLook(); }));
+      row('Age', range(9, 18, 1, L.age ?? 14, set('age')));
       row('Skin', swatches(SKIN_TONES, L.skin, set('skin')));
+      row('New face', (() => { const b = $('<button class="click ws-mini">🎲 roll</button>'); b.onclick = () => { L.seed = Math.floor(Math.random() * 1e6); g.applyLook(); }; return b; })());
       row('Face', sel(['round', 'long', 'square'], L.face, set('face')));
       row('Eyes', color(L.eyes, set('eyes')));
       row('Hair style', sel(HAIR_STYLES, L.hairStyle, set('hairStyle')));
       row('Hair color', color(L.hair, set('hair')));
-      row('Top', sel(['hoodie', 'shirt'], L.topStyle, set('topStyle')));
+      row('Top', sel(['hoodie', 'shirt', 'longsleeve'], L.topStyle, set('topStyle')));
       row('Top color', color(L.top, set('top')));
-      row('Pants', color(L.pants, set('pants')));
+      row('Pants', sel(['jeans', 'shorts', 'sweats'], L.pantsStyle || 'jeans', set('pantsStyle')));
+      row('Pants color', color(L.pants, set('pants')));
       row('Shoes', color(L.shoes, set('shoes')));
       row('Height', range(0.85, 1.12, 0.01, L.height, set('height')));
-      row('Body', range(0.85, 1.25, 0.01, L.build, set('build')));
+      row('Build', range(0.85, 1.25, 0.01, L.build, set('build')));
       back(g.started ? 'pause' : 'home');
     }
   }

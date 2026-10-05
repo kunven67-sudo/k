@@ -52,6 +52,11 @@ Chrome / Edge / Firefox. Works with mouse + keyboard, an Xbox controller, or tou
 - Soda: surface tension makes it a trampoline when you're tiny (hold crouch to
   push through), it's thick like honey, bubbles push you up, you come out sticky.
 - Real sun position and real clock (west coast), real date (Halloween in October).
+- Real humans: everyone (you, Mom, Dad, the wall villagers) is a real human body (MakeHuman, CC0) with a
+  unique face, skin that light glows through (subsurface scattering), pores, freckles, real nails, eyes
+  with a refracting cornea and a pupil that reacts to light, hair-by-hair brows and lashes, real hair,
+  fabric you can see the weave of (jersey knit, denim twill, fleece) and sneakers. Faces blink, glance
+  around, follow you, talk, smile and get scared.
 
 ## Build from source
 

@@ -13,6 +13,7 @@ import { BodyWorld } from './world/body.js';
 import { NanoWorld, NU, NANO_MIN_H, NANO_EXIT_H } from './world/nano.js';
 import { MAX_S } from './player/watch.js';
 import { Avatar, ViewModel, LOOK_DEFAULT } from './player/avatar.js';
+import { initHumans } from './human/model.js';
 import { Watch } from './player/watch.js';
 import { things, Thing } from './world/thing.js';
 import { buildBedroom } from './world/bedroom.js';
@@ -58,6 +59,8 @@ class Game {
     this.ui.setBoot('starting physics...');
     await initPhysics();
     input.attach(this.engine.renderer.domElement);
+    this.ui.setBoot('growing people (skin, eyes, hair)...');
+    await initHumans();
     this.ui.setBoot('building your room...');
     await new Promise((r) => setTimeout(r, 30));
     this.spawn = { pos: [-0.45, 0.02, -0.25], yaw: -2.4 };
@@ -459,12 +462,17 @@ class Game {
     this.avatar.root.scale.setScalar(s);
     this.avatar.root.rotation.y = p.yaw + Math.PI;
     const hs = Math.hypot(p.vel.x, p.vel.z) / s;
+    // your character looks where the camera looks; everyone's pupils follow the light
+    if (p.view === 'third') this.avatar.human.lookAt = p.head(this._lookAt || (this._lookAt = new THREE.Vector3())).addScaledVector(cam.getWorldDirection(this._lookDir || (this._lookDir = new THREE.Vector3())), 3 * s);
+    const bright = THREE.MathUtils.clamp((this._day ?? 0.5) * 0.8 + (this.roomLight?.on || this.lamp?.on ? 0.35 : 0), 0.05, 1);
+    this.avatar.human.brightness = bright; for (const q of this.people) if (q.model) q.model.brightness = bright;
     this.avatar.animate(dt, hs, p.grounded, p.crouchT);
     this.viewModel.root.visible = p.view === 'first' && this.playing;
     this.viewModel.root.scale.setScalar(s);
     this.viewModel.update(dt, this.watch.mode !== 0 || input.held('use') === 'watch', p.headBob, this.time);
     // light & sky
     const day = this.engine.updateDaylight(this.micro ? this.microAnchor.point : p.center(new THREE.Vector3()), this.realS());
+    this._day = day;
     updateOutside(this, day);
     this.lightPool.update(this.micro ? this.microAnchor.point : p.head(new THREE.Vector3()));
     // inside something (Xbox, wall, phone...) the sky/room bounce light can't reach you: much darker

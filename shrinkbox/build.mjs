@@ -29,6 +29,7 @@ const opts = {
   write: false,
   target: ['es2020'],
   legalComments: 'none',
+  loader: { '.bin': 'binary' },
   plugins: [{
     name: 'html',
     setup(b) { b.onEnd((r) => { if (!r.errors.length) writeHtml(r.outputFiles[0].text); }); },

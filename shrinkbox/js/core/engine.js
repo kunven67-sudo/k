@@ -62,7 +62,8 @@ export class Engine {
   _setupPost() {
     this.composer = null;
     if (!this.q.bloom) return;
-    this.composer = new EffectComposer(this.renderer);
+    const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: this.q.aa ? 4 : 0 });
+    this.composer = new EffectComposer(this.renderer, rt);
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.4, 0.92);

@@ -50,6 +50,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ws-row label { color: var(--dim); }
 .ws-row select, .ws-row input[type=range], .ws-row input[type=text] { pointer-events: auto; background: #071422; color: var(--text); border: 1px solid rgba(78,242,255,.3); border-radius: 8px; padding: 4px 6px; font: 13px var(--sans); max-width: 55%; }
 .ws-row input[type=color] { width: 44px; height: 28px; border: 0; background: none; padding: 0; }
+.ws-row .ws-mini { pointer-events: auto; background: #071422; color: var(--text); border: 1px solid rgba(78,242,255,.3); border-radius: 8px; padding: 4px 10px; font: 13px var(--sans); cursor: pointer; }
 .ws-back { margin-top: 8px; }
 .ws-keys { font: 12px/1.75 var(--mono); color: var(--text); }
 .ws-keys b { display: inline-block; min-width: 74px; color: var(--glow); }

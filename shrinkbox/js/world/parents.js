@@ -127,7 +127,8 @@ export class Parent extends Person {
       this.headPos = new THREE.Vector3(-8.15, 0.72, -2.6 + off);
     } else { this.model.root.rotation.set(0, this.yaw, 0); this.headPos = null; }
     this.body.setNextKinematicTranslation({ x: this.feet.x, y: this.feet.y + this.height / 2, z: this.feet.z });
-    this.model.animate(dt, speed, pl.pose === 'sit' && !speed ? 'sit' : 'walk', g.time);
+    this.model.lookAt = this.canSee?.(p.head(this._lookV || (this._lookV = new THREE.Vector3()))) && p.height > this.height * 0.3 ? this._lookV : null;
+    this.model.animate(dt, speed, sleeping ? 'sleep' : pl.pose === 'sit' && !speed ? 'sit' : 'walk', g.time);
     this.sayT = Math.max(0, (this.sayT || 0) - dt);
     this.model.mouth.scale.y = this.sayT > 0 ? 1 + Math.abs(Math.sin(g.time * 18)) * 3 : 1;
     // confiscation: reach you while you're normal-ish size
@@ -242,8 +243,8 @@ export class Parent extends Person {
 
 export function buildParents(game) {
   game.parents = [
-    new Parent(game, { name: 'Mom', height: 1.66, pos: N.kitchen, seed: 5, look: { skin: '#e8b892', hair: '#5a3a1e', hairStyle: 'long', top: '#7a4f7a', pants: '#2b3a55', shoes: '#ddd' } }),
-    new Parent(game, { name: 'Dad', height: 1.8, pos: N.couch, seed: 9, look: { skin: '#e8b892', hair: '#2b1d14', hairStyle: 'short', top: '#3f5f5a', pants: '#3b3a36', shoes: '#3b2a1e' } }),
+    new Parent(game, { name: 'Mom', height: 1.66, pos: N.kitchen, seed: 5, look: { gender: 0, age: 41, skin: '#e8b892', eyes: '#557a55', hair: '#5a3a1e', hairStyle: 'long', top: '#7a4f7a', topStyle: 'longsleeve', pants: '#2b3a55', pantsStyle: 'jeans', shoes: '#dddddd', build: 1.0, seed: 4105 } }),
+    new Parent(game, { name: 'Dad', height: 1.8, pos: N.couch, seed: 9, look: { gender: 1, age: 44, skin: '#e8b892', eyes: '#3d6a8a', hair: '#2b1d14', hairStyle: 'short', top: '#3f5f5a', topStyle: 'tee', pants: '#3b3a36', pantsStyle: 'jeans', shoes: '#3b2a1e', build: 1.12, seed: 4409 } }),
   ];
   for (const p of game.parents) game.people.push(p);
   return game.parents;
