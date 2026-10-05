@@ -1054,6 +1054,11 @@ have a Ring cam; a witness only matters if someone actually saw it).
   gestures (reactions depend on the person — some follow you).
 - Child car seats are required by law when driving kids (real).
 
+- **Reno → Las Vegas road trip on US-95** (real stops): the Clown Motel in Tonopah (next to an old
+  cemetery; overnight stays), ghost towns like Goldfield & Rhyolite (explore, metal-detect), the
+  Extraterrestrial Highway detour (NV-375 near Area 51 with the alien-themed diner/inn — ties to
+  the UFO easter egg), big truck stops (gas, jerky, showers, slot machines).
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
