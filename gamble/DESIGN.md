@@ -1,0 +1,312 @@
+# GAMBLE — Design Bible
+
+*A Loaded Dice Studios game.* Virtual money only — no real money can be won or lost.
+
+This file records every design decision agreed with the game's owner during the
+question rounds. It is the source of truth when building. **Golden rule: when a
+choice is about realism, pick the MOST realistic option.** Any new option shown
+to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most realistic.
+
+---
+
+## 1. Platform & presentation
+
+- 3D browser game (Three.js), hosted on **GitHub Pages** (website link friends can open).
+- Target: **gaming PC**, Chrome/Edge, high graphics (auto-detect + Settings override).
+- Controls: **keyboard + mouse**.
+- Camera: **third-person, over-the-shoulder** (GTA 5 / Uncharted style).
+- Art: **chunky cartoon 3D**, **chunky human** proportions (big heads/hands, thick
+  arms, round bellies), **semi-real eyes** (Fortnite-like), **MAX jiggle physics**
+  (characters, hair, bellies, cars, furniture, food on plates).
+- Tone: **real-life mix** — funny and sad moments depending on what happens.
+- Boot sequence: **content warning screen** ("Contains violence, blood, alcohol,
+  strong language and gambling with VIRTUAL money only…") → studio splash
+  (Loaded Dice Studios) → logo → main menu.
+- Logo: each launch randomly picks one of: neon cursive (one letter half-broken),
+  chunky gold 3D with coins spilling, playing-card letters flipping in, slot reels
+  landing on G-A-M-B-L-E.
+- Main menu: **a giant slot machine**. Clickable buttons on the machine choose
+  Play / Multiplayer / Settings / Credits / Quit; the lever spins randomly just for
+  fun (sometimes a tiny fake "jackpot" animation). Music: **smooth lounge jazz**
+  with soft slot sounds.
+- Loading screens: random mix of (a) town-newspaper headlines from YOUR game,
+  (b) funny useless tips, (c) a tiny free slot machine to spin.
+- **No HUD.** Needs are shown through the body (stomach growl, sweat, shiver,
+  yawn, stink lines). Cash is counted in the wallet. Time on the phone or a
+  wristwatch. Map is the phone GPS. **No interaction hints/outlines** — press E on
+  things. Achievements are **silent** (checked in the stats book / phone).
+- **No pause** in single player — Esc opens the menu but the world keeps going.
+- Photo mode **without freezing the world**, instant replay (last ~10 s), slow-mo
+  on big moments (roulette ball landing, last card, car flips).
+- Interiors are **seamless** — no loading screens; doors swing open, you can see
+  through windows.
+
+## 2. Save & death
+
+- **One life.** Constant autosave, no reloading, **no backups**. Clearing the
+  browser = life gone.
+- Death deletes the save → **newspaper obituary** with the whole life story
+  (days survived, biggest win/loss, cause of death e.g. "shot in the left hand,
+  bled out") → fresh start.
+- Multiplayer death rule is a **host lobby setting** (permadeath or hospital).
+
+## 3. Character
+
+- Full creator: body, skin, hair, face, eyes, clothes, name, **age 21+**, voice
+  (used to speak whatever you type). Any gender.
+- Style life: clothing stores, barber, tattoos, jewelry. Hair/beard grows over
+  days, you smell without showers. Looks change how NPCs and dates treat you.
+- Natural walking style; mood, injuries, drunkenness and weight change it.
+- Body changes: weight & muscle from diet/exercise, depending on each person's
+  **metabolism**. Strength affects fights and carrying.
+- **Real aging**: birthdays every 365 days, ID checked at casino doors (lose your
+  wallet → no entry), can die of old age after decades.
+- Movement: sprint (stamina), jump (squash & stretch), climb/vault, crouch/sneak,
+  grab & throw almost anything (including people), FLOP button (ragdoll).
+- Emote wheel, automatic facial expressions, mood system (happy, stressed,
+  depressed, lucky, tilted) affecting walk/talk/NPC reactions.
+- **No backstory.** Opening = **hungover mystery**: wake on the motel floor with
+  $100 crumpled in your hand and no memory. The cracked phone has a blurry video
+  of a crime you witnessed. **Nobody is after you** — you decide what to do with it.
+- Inventory: **real pockets & hands** — small things in pockets, big things carried
+  in your hands (slower), heavy stuff needs a car. Pickpockets can take pocket items.
+
+## 4. Needs & health
+
+- Needs: hunger, thirst, energy, hygiene, bladder, fun/boredom, body temperature.
+- At zero **you can die**. Bladder → public accident. Temperature → shivering/sick
+  or sweating/thirst.
+- Exhaustion: staying up makes you dizzy, worse at mini-games, you can fall asleep
+  at the table and get robbed.
+- Sleep: time-lapse of the room through the night, alarm clock, **bed quality**
+  (cheap mattress → back pain), oversleeping → groggy, **nightmares** from stress/debt.
+- **Real injuries** by hit location (head, hands, arms, legs, torso): stab and gunshot
+  wounds, bleeding, blood trails/pools, broken arm (cast, slower at cards), broken
+  leg (crutches, can't drive), concussion (blur). **Headshots can kill instantly.**
+  Blood as realistic as possible, with a Settings toggle.
+- **Real sickness**: colds, flu, food poisoning; spreads to partner/kids/friends;
+  gets worse if ignored.
+- **Real US medical prices** (ambulance ~$1,200, ER ~$3,000, broken arm ~$7,500),
+  health insurance ~$400/month; unpaid bills → debt.
+- Drunk (fully realistic): buy drinks (casino comp drinks are free, like real life),
+  tipsy → wasted levels, blurry/double vision, delayed controls, slurred bubbles,
+  falling, hangovers; drunk driving → pulled over, DUI fine, license, impound;
+  blackouts → wake up somewhere random missing money. **Tolerance builds up.**
+- **Real addiction**: tilt after losses (shaking hands, red pulse, urge to chase),
+  cravings when away, partner/family notice; support-group meetings help recover.
+
+## 5. Time, calendar, weather, world
+
+- **1 game day = 48 real minutes** (1 game hour = 2 real minutes).
+- **Real calendar** (365 days, real holiday dates), seasons of real length; a new
+  life starts on **today's real date**.
+- **Live real weather** from a free API (Open-Meteo) for Reno and each other city.
+  Rain puddles, thunderstorms (power outages), fog, wind blowing trash, snow & icy
+  roads, desert heat.
+- **Real-dark nights**: headlights/streetlights needed, starry desert sky.
+- Home city: **Reno, Nevada**, **real street layout** shrunk to fit (Virginia St,
+  the Reno Arch, Truckee River, Midtown, airport…). **Big city**, **every building
+  enterable**.
+- Other real cities: **Las Vegas** (desert strip, chapels, heat), **New Orleans /
+  bayou** (riverboat casinos, jazz bars, gator tours), **Macau** (passport from the
+  post office, international flight, pataca currency with exchange fees, jet lag,
+  baccarat VIP rooms), **Lake Tahoe** (snowy ski-resort casinos).
+- Travel: highway driving (~15+ real minutes, gas, rest stops, highway patrol,
+  breakdowns, sleepy night driving), airplanes (tickets, airport security — no guns,
+  lost luggage, in-flight drinks), bus/train (cheap, slow, pickpockets), private jet,
+  **fly your own plane** (pilot license). Also motorcycles, bicycles & skateboards,
+  boats/jet skis (Tahoe, bayou).
+- **Real brand names everywhere** (names only — no copied logos/artwork).
+- **Nevada has no lottery** → drive to the California border for lottery tickets and
+  scratch cards; nightly draw on TV.
+- Real Reno events: Great Reno Balloon Race (Sept), Hot August Nights (Aug),
+  Super Bowl Sunday at the sportsbook, holidays (4th of July fireworks, Halloween
+  costumes, Thanksgiving buffets, Christmas lights, New Year's Eve).
+- Random events: nightly lottery draw, whales & celebrities, chaos (power outages
+  mid-spin, robberies, raids on the back-alley den, car chases), happy hours
+  (double payouts, free buffet day, cheap beer night, poker tournaments).
+- Easter eggs: desert UFO at 3:33 AM, haunted motel room 13, hidden silver-mining
+  money vault found through clues.
+
+## 6. Home life
+
+- Start in a **cheap motel room**, **$45 every night** at the front desk. Can't pay →
+  sleep in your car or on a park bench (robbery risk). Motel life: cockroaches,
+  bed bugs, neighbors yelling through thin walls, weird guy in room 9.
+- Ladder: motel → trailer → apartment → house → penthouse → mansion. Rent/
+  mortgage, electric/water/heating bills, eviction, burglars (locks, alarm).
+- Furniture arrives in boxes; **carry it in yourself** (physics, can tip/break);
+  build mode once inside. Styles: cozy cabin, gamer setup, luxury, cheap & used.
+- Smart home (real brands): Ring doorbell, Alexa, ADT alarm, Roomba (cat rides it).
+- Roommates (NPCs or online friends) split rent; each has a personality.
+- TV: local news (reports your crimes), sports, 3 AM infomercials (order by phone),
+  shows (soap, cooking show that teaches recipes, cartoons, game show), streaming
+  apps (Netflix etc.) with **made-up movies/shows** (fake posters, short clips).
+- Pirate movie apps on TV/phone: can get deleted, give viruses, steal data; buy a
+  security app for protection.
+- Electronics & cords (HDMI, chargers…) wear out and break; bugs/mice chew cords.
+- Cooking: groceries are cheapest, cooking mini-game, burnt food, smoke alarm,
+  **kitchen fires** (extinguisher/fire dept), spoilage, food poisoning, energy-drink
+  crash. Messy eating (stains), leftovers, taste & mood. **No tipping system.**
+
+### Food & drink catalogue
+- Gas station: chips, candy, jerky, roller hot dogs (poisoning risk), microwave
+  burritos, soda, energy drinks, beer six-packs, cheap whiskey.
+- Grocery: eggs, bread, milk, pasta, rice, ramen, chicken, steak, veggies, fruit,
+  cheese, frozen pizza, cereal (spoils in days). Free samples.
+- Fast food & drive-thru: burgers, fries, fried chicken, tacos, pizza slices, shakes.
+- Casino buffet (all-you-can-eat; overeat → slow/sick). 24-hour diner (pancakes,
+  bacon & eggs, bottomless coffee, pie). Basque family-style restaurant (Reno
+  classic). Steakhouse & sushi (dates). Night food trucks. Delivery via phone/PC.
+- Bar: beer on tap, cocktails, whiskey shots, peanuts. Casino comp drinks.
+- Dumpster food (risky). Other cities: Macau egg tarts & pork chop buns, New Orleans
+  beignets & gumbo, Tahoe hot cocoa.
+- Drinks: tap water (free at home), coffee (energy + bladder), energy drinks,
+  soda, juice, milk, wine, beer, liquor.
+
+## 7. Phone & computer
+
+- Start with a **cracked old budget Android** (laggy, battery dies fast — charge at
+  home or in the car; dead phone = no map/time/taxi). Buy: Samsung Galaxy, **iPhone**
+  (iOS-style UI), flip phone (week-long battery, no apps). Real phone UI look.
+- Apps: texts & calls (partner, NPCs, loan shark; call taxi/ambulance/pizza), bank &
+  bills, map & GPS, camera & social app (NPCs comment), **dating app** (catfish,
+  scammers), streaming, stocks, Ring cam, security app, dark-web app.
+- No watch at start — pull out the phone to check time. Wristwatches (plastic →
+  gold → diamond) show a realistic watch face. **Casinos have no clocks.**
+- PC (buy one): GPU upgrades (better PC games, crypto mining → big power bill),
+  game store (Steam-like, downloads take time, original playable mini-games),
+  online shopping (delivery truck, physics boxes), viruses & scams (FREE_MONEY.exe,
+  ransomware, stolen bank money; antivirus or repair shop), **real live stock prices**
+  (simulated fallback if the data breaks) + meme crypto, online casinos (some scams),
+  **stream your gambling** (webcam + GPU, viewers grow slowly, viral moments),
+  **hacking** (dark-web tools, phishing NPCs; traceable, FBI).
+- Consoles: PlayStation 5, Xbox Series X, Nintendo Switch 2, retro consoles from the
+  pawn shop (sometimes broken). Games on them are original mini-games.
+
+## 8. Money
+
+- Start with **$100** cash. No car.
+- Earning (all hard): gambling; scavenging (cans/bottles, couch & vending coins,
+  lost wallets — return or keep); pawn shop (haggling, **30-day pawn loans**); odd-job
+  mini-games (pizza delivery, mowing, dishwashing); **real jobs** with shifts, paychecks
+  every 2 weeks, **promotions** (e.g. casino janitor → cocktail server → dealer → pit
+  boss → manager), fired for being late/drunk/smelly; loan shark (huge interest,
+  goons); businesses (hot dog stand → laundromat → bar → casino; staff steal,
+  robberies, bankruptcy); landlord (bad tenants); own slot machines in bars;
+  streaming; busking (guitar rhythm game); scams; crime.
+- Banking: account (safe from robbers), ATM fees, savings interest, **credit card
+  with interest, credit score** (bad score → no nice rentals / bank loans → loan shark).
+- Taxes on big wins (form over $1,200, ~24%), audits weeks later if dodged.
+- Debt from fines, hospital, lawyers, loans.
+- Bribes: bouncers, cops (may arrest you for bribery), dealers (snitch if caught),
+  motel clerk / landlords.
+
+## 9. Gambling
+
+- Games: slots (Classic Fruit, Wild West Gold, Space & Aliens, Dragon & Fortune),
+  roulette (physics ball), blackjack (card counting), Texas Hold'em vs NPCs/friends,
+  craps, **baccarat** (Macau VIP, card squeeze), video poker at bars, coin flip (true
+  50/50), dice duel, high-low, big wheel, scratch cards & lottery (CA border), horse
+  racing, rubber-duck races, betting on NPC fights, plinko, crash rocket, pachinko,
+  coin pusher, keno, **sportsbook** (simulated games on TV walls), bar bets (pool,
+  darts, arm wrestling, beer pong), back-alley dice & illegal card games (raids).
+  **All games get max polish.**
+- Odds: **real house edges** + real casino tricks (near misses, free drinks, no
+  clocks or windows).
+- Betting: **real chips** — buy at the cashier cage, chips are physical pocket items
+  (can be stolen/dropped), click chip stacks or ALL IN, cash out at the cage. Any
+  amount or everything.
+- Playing zooms the camera into a **cinematic close-up** (hands visible).
+- Heat & cheating: count cards, loaded dice, slot-hacking gadget; caught → back room,
+  banned, arrested.
+- Big jackpots: sirens/lights/crowd/hand-pay, taxes, robbers may follow you out,
+  fame (DJ, NPCs ask for money, your ex texts). NPCs decide their own actions.
+- Players club card & comps (buffet, room, shows, personal host for whales), valet
+  parking (secret joyrides), fortune teller (mostly a scam), superstitions (boost
+  mood/confidence only, never odds).
+- Venue hours differ (e.g. slot parlor 8 AM–10 PM, big casino 2 PM–4 AM, back-alley
+  den 11 PM–5 AM). Main Reno casino: **the Golden Sierra** (mountain-lodge glam:
+  stone, gold, waterfall lobby, blacked-out windows at night). Dress codes in VIP.
+- NPCs occupy machines — wait, queue, ask, or bribe them to leave.
+
+## 10. NPCs & relationships
+
+- **Living town, full lives**: names, routines, homes, memories, gossip; they date,
+  marry, break up, get rich/broke, get evicted, go to jail, move, die; new people
+  move in; radio/news report it. Some cheat, beg, or lend money.
+- **Type-chat with every NPC** (offline "brain", as smart as possible). Every person
+  has their own personality and feelings — some love you, some hate you.
+- Voices (Settings): most-human free browser TTS by default with per-NPC pitch/speed,
+  or cute gibberish, or text only. Your character says what you type in their voice.
+  The owner will supply recorded voice files for some lines later.
+- Swearing: bleeped by default, Settings toggle to uncensor.
+- Relationships (any gender, gay couples included): dating & gifts, dating app,
+  move in, drama & breakups (they can take half), marriage (chapel incl. drive-thru),
+  lucky kiss / dice blowing, partner joins you gambling.
+- Kids/adoption: costs money, child services if neglected, **real-speed aging**.
+
+## 11. Crime & law
+
+- Fights: punch/shove/grab; security tosses you out & bans you for the day; cops;
+  injuries & hospital bills; debt. **Jail only if you kill someone.**
+- Weapons: legal gun store (license, waiting period, background check — fails with a
+  record) and black market; knives; stabbings & shootings with body-part damage.
+- Crimes: pickpocketing (timing mini-game), car theft (hot-wire, sell at junkyard),
+  shoplifting (cameras, clerks), casino heist (solo or with friends), scams (shell
+  game / three-card monte, fake goods, borrow & vanish), hacking, vandalism.
+  You also get scammed (fake tickets, rigged games, warranty calls, phishing).
+- Breaking stuff: everything shatters with physics; vandalism charges, damage bills;
+  janitor NPCs sweep up.
+- Police: **investigations** — witnesses, cameras, evidence; arrest at home days later;
+  masks/hoodies help.
+- Jail: trial (lawyer → debt), **playable jail** (ramen/soap currency gambling, yard
+  fights), life falls apart while inside (eviction, partner leaves, pets to shelter).
+- Gangs with territory; you **can join** (protection, discounts, backup; hard to
+  leave; rivals and cops target you).
+
+## 12. Cars & radio
+
+- Start with no car: walk, bus, taxi, then a sketchy used-car lot.
+- Full car life: gas, dents/smoke, repairs, upgrades, breakdowns, parking tickets,
+  speed cameras, police chases, insurance, theft, impound, **repo man** on missed
+  payments.
+- Real brands. Types: used beaters, pickups & SUVs, muscle & sports, luxury &
+  supercars. Mods: paint & wraps, engine & tires, neon & rims, sound system (bass
+  shakes the mirrors).
+- Radio (real royalty-free recordings, each station its own DJ): jazz & lounge,
+  country, synthwave, talk radio (call-ins, town news, your story), hip-hop, rock,
+  Latin, oldies. Plus **"Rev or Dead"** — two guys arguing about cars and cussing at
+  each other (AI voices for now, owner's voice lines later).
+
+## 13. Pets
+
+- Dogs (many breeds), cats (many breeds), parrot, exotics (snake, mini pig, lizard,
+  golden fish), shelter adoption, street strays.
+- Full pet life: food, water, walks, love, vet bills, aging, running away, death,
+  shelter if you're jailed.
+
+## 14. Social, nightlife, progress
+
+- Endless sandbox. Achievements (100+, funny), life stats book, friend leaderboard.
+- Morning newspaper on the doorstep, nightly auto-diary, busking.
+- Nightlife: karaoke, dance club, bowling & arcade, casino shows.
+
+## 15. Multiplayer
+
+- Online **room codes** (peer-to-peer), **up to 8 players**.
+- Friends **bring their own character** (counts in their save).
+- Play each other (poker/blackjack/coin flips), lend & owe money, visit houses,
+  fight & race, **cheat each other** (caught via visible animations).
+- **Proximity voice chat** (muffled through walls, echo in bathrooms, radio-ish in cars).
+
+## 16. Build order (each layer fully polished before the next)
+
+1. Core: menu & settings, character creator, motel room, Reno you walk/drive,
+   casino & games, betting/chips, clock/hours, needs, sleep, music & sound,
+   collisions, jiggle, breakables.
+2. Living town: NPC routines, fights/security/cops, drinking, stores, pawn shop,
+   scavenging, loan shark.
+3. Life: chat brains, dating, phone, pets, moods & emotes.
+4. Stuff: computer/store/viruses/stocks, GPUs & consoles, furniture, houses, car life.
+5. Online friends: room codes, voice chat.
