@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { Character } from '../engine/anim.js';
 import { GROUP, groups } from '../engine/physics.js';
+import { Life } from './life.js';
 
 // feet find the floor: only the world and furniture count (not people, not you)
 const FLOOR = groups(GROUP.NPC, GROUP.WORLD | GROUP.PROP);
@@ -13,7 +14,7 @@ const IDLE_GESTURES = ['idle_look_around_01', 'idle_look_around_02', 'idle_scrat
 let nextId = 1;
 
 export class Human {
-  constructor({ template, lib, nav, physics, scene, gender = 'm', profile = {}, position, area = null }) {
+  constructor({ template, lib, nav, physics, scene, gender = 'm', profile = {}, position, area = null, settings = null }) {
     this.area = area; // optional limit for wandering: (point) => boolean
     this.id = nextId++;
     this.profile = {
@@ -36,6 +37,7 @@ export class Human {
     this.target = null;
     this.alive = true;
     this.character.root.userData.human = this;
+    this.life = new Life(this.character, settings);
     this.syncFromAgent(1);
   }
 
@@ -303,6 +305,16 @@ export class Human {
 
   update(dt) {
     if (!this.alive) return;
+    this.updateMain(dt);
+    // breathing, eye darts, face micro-movement, jiggle, flushing/paling/sweat (after the animation)
+    if (this.state !== 'dead' && this.life) {
+      const e = this.emotion;
+      this.life.fear = e.fear; this.life.anger = e.anger; this.life.sad = e.sadness;
+      this.life.update(dt);
+    }
+  }
+
+  updateMain(dt) {
     if (this.state === 'dead') {
       if (this.fall && this.fall.t < 1) {
         const f = this.fall;

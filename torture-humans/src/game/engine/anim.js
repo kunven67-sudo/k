@@ -311,12 +311,16 @@ export class Character {
   updateFace(dt) {
     if (!this.faceMeshes.length) return;
     // natural blinking every 2-6 s (quick close, slower open)
+    // blinking like people do: 15-20 a minute, the lid snaps shut (~60 ms) and
+    // opens slower (~110 ms); the two eyes are a few milliseconds apart
     this.blinkTimer -= dt;
     if (this.blinkTimer <= 0) {
-      this.blink += dt / 0.08;
-      if (this.blink >= 2) { this.blink = 0; this.blinkTimer = 2 + Math.random() * 4; }
+      this.blink += dt;
+      if (this.blink > 0.2) { this.blink = 0; this.blinkTimer = 1.5 + Math.random() * 4.5; this.blinkLag = Math.random() * 0.012; }
     }
-    const blinkW = this.blink <= 0 ? 0 : this.blink < 1 ? this.blink : 2 - this.blink;
+    const lid = (t) => (t <= 0 ? 0 : t < 0.06 ? (t / 0.06) ** 0.7 : t < 0.08 ? 1 : t < 0.19 ? 1 - ((t - 0.08) / 0.11) ** 1.6 : 0);
+    const blinkL = this.blinkTimer > 0 ? 0 : lid(this.blink);
+    const blinkR = this.blinkTimer > 0 ? 0 : lid(this.blink - (this.blinkLag || 0));
     const k = 1 - Math.exp(-dt * 6);
     const keys = new Set([...Object.keys(this.expression), ...Object.keys(this.targetExpression)]);
     for (const key of keys) {
@@ -330,9 +334,9 @@ export class Character {
         const i = dict[key];
         if (i !== undefined) inf[i] = w;
       }
-      for (const side of ['AK_09_EyeBlinkLeft', 'AK_10_EyeBlinkRight']) {
+      for (const [side, w] of [['AK_09_EyeBlinkLeft', blinkL], ['AK_10_EyeBlinkRight', blinkR]]) {
         const i = dict[side];
-        if (i !== undefined) inf[i] = Math.max(this.expression[side] || 0, blinkW);
+        if (i !== undefined) inf[i] = Math.max(this.expression[side] || 0, w);
       }
       VISEMES.forEach((v, n) => {
         const i = dict[v];

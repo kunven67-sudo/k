@@ -90,7 +90,7 @@ export async function boot() {
         await lib.require(baseClips(gender));
         const tpl = await loadAvatar(`assets/avatars/${look}.glb`).catch(() => avatar);
         const start = nav.randomPoint(level.wanderArea) || level.spawn;
-        humans.push(new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.wanderArea, profile: { name: look } }));
+        humans.push(new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.wanderArea, profile: { name: look }, settings }));
       }
       // townspeople: different looks, each starts somewhere on the street
       const townCount = Number(params.get('townPeople') ?? level.town?.people ?? 0);
@@ -103,7 +103,7 @@ export async function boot() {
         if (!tpl) continue; // that look isn't in this build
         const start = nav.randomPoint(level.town.area) || null;
         if (!start) break;
-        const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.town.area, profile: { name: look.replace(/_0?(\d+)$/, ' $1').replace(/_/g, ' ') } });
+        const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: start, area: level.town.area, settings, profile: { name: look.replace(/_0?(\d+)$/, ' $1').replace(/_/g, ' ') } });
         h.spots = level.town.spots;
         h.townie = true;
         humans.push(h);
