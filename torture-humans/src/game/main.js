@@ -19,6 +19,7 @@ import { Village } from './village.js';
 import { Pets } from './pets.js';
 import { Audio } from './audio.js';
 import { TownLife } from './humans/town-life.js';
+import { Jobs } from './jobs.js';
 import { Phone, saveGame, loadGame, hasSave } from './phone.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
@@ -363,7 +364,9 @@ export async function boot() {
   // your phone (P): messages, map, weather, bank, wanted
   const phone = new Phone({ input, player, env, family, police, humans, level, canvas: input.target });
   if (family) family.phone = phone;
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, audio, phone, frame: 0 };
+  // odd jobs: parcels, lost rings, shifts at the till
+  const jobs = new Jobs({ scene, interact, family, env, hazards, player, toast, phone, spots: level.town?.spots });
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, audio, phone, jobs, frame: 0 };
   // saving: F5 / F9, every 2 minutes, and when you close the game; picks up where you left off
   game.save = () => saveGame(game);
   game.load = () => loadGame(game);
@@ -396,6 +399,7 @@ export async function boot() {
     pets.update(dt);
     audio.update(dt, { env, zone, player });
     phone.update(dt);
+    jobs.update(dt, camera);
     if (input.pressed('quickSave')) toast(saveGame(game) ? 'Game saved' : 'Could not save');
     if (input.pressed('quickLoad')) loadGame(game).then((ok) => toast(ok ? 'Game loaded' : 'No saved game yet'));
     if (!params.has('paused') && (autosave -= dt) <= 0) { autosave = 120; saveGame(game); }
