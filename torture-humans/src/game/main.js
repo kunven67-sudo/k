@@ -15,6 +15,7 @@ import { Colony } from './colony/colony.js';
 import { Squisher } from './squish.js';
 import { bakeEnvironment } from './engine/probe.js';
 import { hdri } from './engine/assets.js';
+import { Environment } from './world/environment.js';
 import { Vitals } from './vitals.js';
 import { Hazards } from './hazards.js';
 import { buildTestLevel } from './levels/test-level.js';
@@ -167,6 +168,8 @@ export async function boot() {
     if (fog) { fog.near = lab ? 1e4 : level.fog.near; fog.far = lab ? 2e4 : level.fog.far; }
   };
   game_applyZone = applyZone;
+  // time of day, weather, lamps at night, rain, breath in the cold, basement dust
+  const env = level.sunDirection ? new Environment({ scene, renderer, settings, camera, level, humans, zone: () => zone || 'lab' }) : null;
   if (level.sky) hdri(renderer.renderer, level.sky).then((s) => { sky = s; applyZone(true); }).catch(() => {});
   settings.onChange((d, patch) => { if (patch.graphics) applyZone(true); });
   // indoor reflections: snapshot the room once textures have streamed in, and again a bit later
@@ -214,7 +217,7 @@ export async function boot() {
     }
   });
   let last = performance.now();
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, frame: 0 };
   window.game = game; // for tests and debugging
 
   // test hook: drive the player without a real keyboard
@@ -236,6 +239,7 @@ export async function boot() {
     vitals.update(dt);
     nav.update(dt);
     colony?.update(dt);
+    env?.update(dt);
     for (const h of humans) h.update(dt);
     level.update?.(dt);
     input.endFrame();

@@ -153,11 +153,19 @@ class Windows {
     const frameMat = new THREE.MeshStandardMaterial({ color: 0xe9e4da, roughness: 0.6 });
     // dark glass reflecting the sky (no transmission: cheap)
     const glassMat = new THREE.MeshStandardMaterial({ color: 0x0e141b, roughness: 0.05, metalness: 0.85, envMapIntensity: 1.1 });
+    // about a third of the windows have a room light on at night (warm glow; off by day)
+    this.litMat = new THREE.MeshStandardMaterial({ color: 0x0e141b, roughness: 0.05, metalness: 0.85, envMapIntensity: 1.1, emissive: 0xffc787, emissiveIntensity: 0 });
+    let seed = 3;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const lit = [], dark = [];
+    for (const m of this.panes) (rnd() < 0.35 ? lit : dark).push(m);
     const frames = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), frameMat, this.frames.length);
-    const panes = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), glassMat, this.panes.length);
+    const panes = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), glassMat, dark.length);
+    const litPanes = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), this.litMat, lit.length);
     this.frames.forEach((m, i) => frames.setMatrixAt(i, m));
-    this.panes.forEach((m, i) => panes.setMatrixAt(i, m));
-    for (const im of [frames, panes]) {
+    dark.forEach((m, i) => panes.setMatrixAt(i, m));
+    lit.forEach((m, i) => litPanes.setMatrixAt(i, m));
+    for (const im of [frames, panes, litPanes]) {
       im.userData.noCollide = true;
       im.receiveShadow = true;
       im.computeBoundingSphere();
@@ -348,9 +356,11 @@ export async function buildTown({ statics, props, scene }) {
   windows.build(town);
 
   // ---- street furniture: lamps, hydrants, benches, a parked car, trees
+  const lamps = [];
   for (let x = -40; x <= 40; x += 13) {
     await place(props, 'street_lamp_01', { x: x + 2, y: GROUND_Y + 0.02, z: 8.6, rotY: Math.PI, height: 5.5 });
     await place(props, 'street_lamp_01', { x: x - 4, y: GROUND_Y + 0.02, z: 16.4, height: 5.5 });
+    lamps.push(new THREE.Vector3(x + 2, GROUND_Y + 5.1, 8.6), new THREE.Vector3(x - 4, GROUND_Y + 5.1, 16.4));
   }
   await place(props, 'fire_hydrant', { x: -6, y: GROUND_Y + 0.02, z: 8.5, height: 0.8 });
   await place(props, 'fire_hydrant', { x: 20, y: GROUND_Y + 0.02, z: 16.5, height: 0.8 });
@@ -377,7 +387,9 @@ export async function buildTown({ statics, props, scene }) {
   for (const bx of [TOWN.x0 + 0.6, TOWN.x1 - 0.6]) mesh(box(0.6, 1.0, ROAD.z1 - ROAD.z0), barrier, bx, ROAD.y + 0.5, zc, town);
 
   mergeByMaterial(town);
-  return { town, spots };
+  // outdoor surfaces that get wet in the rain
+  const outdoor = [...matCache.values()];
+  return { town, spots, lamps, litWindows: windows.litMat, outdoor };
 }
 
 // Is a point inside the basement lab (no sky there)?
