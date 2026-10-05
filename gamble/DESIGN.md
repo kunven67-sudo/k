@@ -408,3 +408,27 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
   deals, haters, drama, getting canceled.
 - **Memberships**: Costco (cheap bulk; needs car & fridge space), Amazon Prime, country
   club, streaming subscriptions (keep charging if you forget to cancel).
+
+## 20. Later additions (rounds 50–52)
+
+- **Screen effects**: rain/snow on the lens, film grain & vignette, motion blur, lens flare
+  & neon bloom.
+- **Driving camera**: inside the car (driver's-seat view with dashboard, wheel, mirrors).
+- **Death moment**: heartbeat slows, sound muffles, vision blurs and tunnels to black →
+  obituary.
+- **Sound**: room echo/reverb by space, muffled through walls/doors (neighbors' TV), surface
+  footsteps (carpet, tile, wood, gravel, snow, puddles), full 3D positional audio.
+- **Table realism**: real hand signals at blackjack (tap = hit, wave = stand), throw craps
+  dice with a mouse flick (must hit the back wall), hourly dealer rotation with
+  personalities, pit boss tracking bets and watching winners.
+- In-game phone **photos also download to the player's real computer**.
+- **Subtitles off by default** (Settings toggle).
+- **Creator details**: freckles, moles, birthmarks, acne, wrinkles; scars (chosen + earned
+  permanently where real injuries happen); body hair & daily stubble; glasses, contacts,
+  hearing aids, heterochromia.
+- **Plants**: house plants (mood, die without water), vegetable garden (save money; rabbits,
+  frost, heat), lawn care (HOA fines, summer drought).
+- **Messy car interior**: wrappers, cups, smell, drunk passengers vomit; clean it or pay for
+  a car wash/detailing.
+- **Yard sales** (sell & buy, early haggling NPCs, thieves, rare finds).
+- **Facebook Marketplace / Craigslist** (deals, scams, no-shows, dangerous meetups).
