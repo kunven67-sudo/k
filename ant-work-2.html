@@ -584,9 +584,12 @@ body.touch #visor .readout2{bottom:auto;top:calc(66px + env(safe-area-inset-top)
   <div class="chap" id="tbcChap"></div>
   <div class="big">TO BE CONTINUED...</div>
   <div class="gal" id="tbcGal"></div>
-  <div class="btns"><button class="gbtn" id="tbcOther">Play the other story</button><button class="lbtn" id="tbcTitle">Back to title</button></div>
+  <div id="tbcSecret" style="font-family:var(--mono);font-size:13px;opacity:.75;letter-spacing:.08em"></div>
+  <div class="btns"><button class="gbtn" id="tbcTeaser">▶ Coming soon</button><button class="gbtn" id="tbcOther">Play the other story</button><button class="lbtn" id="tbcTitle">Back to title</button></div>
 </div>
 
+<button id="teaserSkip" class="lbtn" style="position:fixed;right:18px;bottom:18px;z-index:80;display:none">Skip ▶▶</button>
+<div id="comingSoon" style="position:fixed;inset:0;z-index:79;display:none;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at center,rgba(20,10,30,.55),rgba(0,0,0,.92));pointer-events:none"><div id="csChap" style="font-family:var(--title);color:var(--gold);font-size:clamp(18px,2.4vw,28px);letter-spacing:.08em"></div><div style="font-family:var(--title);font-size:clamp(40px,7vw,96px);text-shadow:0 0 30px #b86aff,0 6px 0 #2a1040">COMING SOON</div></div>
 <div id="touch" class="layer off">
   <div id="joy"><i></i></div>
   <button class="tb" id="tUse">USE</button>
@@ -1795,10 +1798,22 @@ class Particles{
 function fxBurst(pos,o){ if(!LV) return; (o.add?LV.glow:LV.soft).burst(pos,o); }
 
 /* ---------- collision (2D footprint + height fn) ---------- */
-function makeCol(){ return {boxes:[],circles:[],bounds:null,radius:null,ground:null}; }
+function makeCol(){ return {boxes:[],circles:[],obbs:[],bounds:null,radius:null,ground:null}; }
+let BUILDING_LV=null;
 function colBox(c,x0,x1,z0,z1,cond){ const b={x0:Math.min(x0,x1),x1:Math.max(x0,x1),z0:Math.min(z0,z1),z1:Math.max(z0,z1),cond}; c.boxes.push(b); return b; }
 function colBoxC(c,cx,cz,w,d,cond){ return colBox(c,cx-w/2,cx+w/2,cz-d/2,cz+d/2,cond); }
 function colCircle(c,x,z,r,cond){ const o={x,z,r,cond}; c.circles.push(o); return o; }
+/* a real rotated box footprint: w along the object's local x, d along local z, rotated by ang (= rotation.y) */
+function colOBox(c,cx,cz,w,d,ang,cond){ const o={cx,cz,hx:w/2,hz:d/2,c:Math.cos(ang),s:Math.sin(ang),cond}; (c.obbs||(c.obbs=[])).push(o); return o; }
+/* footprint of an object (its own rotation.y is respected), as a rotated box or a circle */
+function colFromObj(c,obj,o={}){
+  const ry=obj.rotation.y; obj.rotation.y=0; obj.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(obj); obj.rotation.y=ry; obj.updateMatrixWorld(true);
+  if(b.isEmpty()) return null; const pad=o.pad||0, k=o.k||1;
+  const cxl=(b.min.x+b.max.x)/2-obj.position.x, czl=(b.min.z+b.max.z)/2-obj.position.z; const w=(b.max.x-b.min.x)*k+pad*2, d=(b.max.z-b.min.z)*k+pad*2;
+  const wx=obj.position.x+Math.cos(ry)*cxl+Math.sin(ry)*czl, wz=obj.position.z-Math.sin(ry)*cxl+Math.cos(ry)*czl;
+  if(o.circle) return colCircle(c,wx,wz,Math.max(w,d)/2,o.cond);
+  return colOBox(c,wx,wz,w,d,ry,o.cond);
+}
 /* rotated box footprint -> approximated by a few circles along its long axis */
 function colOBB(c,cx,cz,w,d,ang,cond){ const L=Math.max(w,d), S=Math.min(w,d), n=Math.max(1,Math.ceil(L/S)); const ax=w>=d?[Math.cos(ang),-Math.sin(ang)]:[Math.sin(ang),Math.cos(ang)]; for(let i=0;i<n;i++){ const t=(i+.5)/n-.5; colCircle(c,cx+ax[0]*t*L,cz+ax[1]*t*L,S/2*1.05,cond); } }
 function resolveCol(c,pos,r){
@@ -1813,6 +1828,12 @@ function resolveCol(c,pos,r){
       if(d2>1e-10){ const d=Math.sqrt(d2); pos.x=cx+dx/d*r; pos.z=cz+dz/d*r; }
       else { const l=pos.x-b.x0, rr=b.x1-pos.x, t=pos.z-b.z0, bb=b.z1-pos.z, m=Math.min(l,rr,t,bb); if(m===l) pos.x=b.x0-r; else if(m===rr) pos.x=b.x1+r; else if(m===t) pos.z=b.z0-r; else pos.z=b.z1+r; }
     }
+    if(c.obbs) for(const o of c.obbs){ if(o.cond && !o.cond()) continue;
+      const dx=pos.x-o.cx, dz=pos.z-o.cz; let lx=dx*o.c-dz*o.s, lz=dx*o.s+dz*o.c;
+      const qx=clamp(lx,-o.hx,o.hx), qz=clamp(lz,-o.hz,o.hz); const ex=lx-qx, ez=lz-qz, e2=ex*ex+ez*ez; if(e2>=r*r) continue;
+      if(e2>1e-10){ const e=Math.sqrt(e2); lx=qx+ex/e*r; lz=qz+ez/e*r; }
+      else { const px=o.hx-Math.abs(lx), pz=o.hz-Math.abs(lz); if(px<pz) lx=(lx<0?-1:1)*(o.hx+r); else lz=(lz<0?-1:1)*(o.hz+r); }
+      pos.x=o.cx+o.c*lx+o.s*lz; pos.z=o.cz-o.s*lx+o.c*lz; }
     for(const o of c.circles){ if(o.cond && !o.cond()) continue; const dx=pos.x-o.x, dz=pos.z-o.z, d=Math.hypot(dx,dz), m=r+o.r; if(d<m){ if(d<1e-6){ pos.x=o.x+m; continue; } pos.x=o.x+dx/d*m; pos.z=o.z+dz/d*m; } }
   }
 }
@@ -1870,7 +1891,7 @@ async function buildLevel(name){
   const def=LEVELS[name]; if(def.built) return def;
   const scene=new THREE.Scene(); def.scene=scene; def.col=makeCol(); def.inter=[]; def.triggers=[]; def.updaters=[];
   def.soft=new Particles(scene,dq(600,1200,2500,3500,5000),false); def.glow=new Particles(scene,dq(400,800,1500,2500,3500),true);
-  await def.build(scene,def);
+  BUILDING_LV=def; try{ await def.build(scene,def); } finally{ BUILDING_LV=null; }
   scene.traverse(o=>{ if(o.isMesh && o.material && o.material.map && o.material.map.anisotropy<MAX_ANISO){ o.material.map.anisotropy=MAX_ANISO; } });
   LEVEL_SCENES.push(scene);
   def.built=true;
@@ -2684,6 +2705,65 @@ function makeMarsBug(aggr=false,seed=1){
 
 </script>
 <script>
+/* ===== 05c_solids.js ===== */
+/* ================================================================
+   3D SOLIDS for the swimming levels (the Tinyverse, Mite Town, the deep).
+   Each solid is attached to an object and lives in that object's LOCAL
+   space, so moving / spinning / scaled creatures stay solid too.
+   shapes: 'ell' (ellipsoid), 'sphere', 'box', 'cyl' (long cylinder along y),
+           'sheet' (a curved skin flake), 'fn' (custom world-space test)
+   ================================================================ */
+const _sm=new THREE.Matrix4(), _sq=new THREE.Vector3(), _sp=new THREE.Vector3(), _sq0=new THREE.Vector3();
+/* bounding box of an object in its own local space */
+function localBounds(obj,filter){
+  obj.updateMatrixWorld(true); const inv=new THREE.Matrix4().copy(obj.matrixWorld).invert(); const box=new THREE.Box3(), tmp=new THREE.Box3(), m=new THREE.Matrix4();
+  obj.traverse(o=>{ if(!o.isMesh||(filter&&!filter(o))) return; const m0=Array.isArray(o.material)?o.material[0]:o.material; if(m0&&m0.blending===THREE.AdditiveBlending) return;
+    const g=o.geometry; if(!g.boundingBox) g.computeBoundingBox(); m.multiplyMatrices(inv,o.matrixWorld); tmp.copy(g.boundingBox).applyMatrix4(m); box.union(tmp); });
+  return box;
+}
+function addSolid(lv,obj,shape,o={}){
+  const S=Object.assign({obj,shape},o);
+  if(shape==='ell'||shape==='sphere'||shape==='box'){ if(!S.c) S.c=V3(); }
+  // radius (local units) for a quick distance reject
+  S.rad=S.rad||(shape==='sphere'?S.r:shape==='ell'?Math.max(S.a.x,S.a.y,S.a.z):shape==='box'?S.max.clone().sub(S.min).length()/2:shape==='cyl'?Math.hypot(S.r,S.h):shape==='sheet'?1.2:1e9);
+  if(shape==='box'&&!o.c) S.c=S.min.clone().add(S.max).multiplyScalar(.5);
+  (lv.solids||(lv.solids=[])).push(S); return S;
+}
+/* fit an ellipsoid / sphere / box to an object's own geometry */
+function solidAuto(lv,obj,o={}){
+  const b=localBounds(obj,o.filter); if(b.isEmpty()) return null; const k=o.k||.85; const c=b.getCenter(new THREE.Vector3()), hs=b.getSize(new THREE.Vector3()).multiplyScalar(.5);
+  if(o.shape==='box') return addSolid(lv,obj,'box',{min:c.clone().sub(hs.clone().multiplyScalar(k)),max:c.clone().add(hs.clone().multiplyScalar(k)),cond:o.cond});
+  if(o.shape==='sphere') return addSolid(lv,obj,'sphere',{c,r:Math.max(hs.x,hs.y,hs.z)*k,cond:o.cond});
+  return addSolid(lv,obj,'ell',{c,a:hs.multiplyScalar(k),cond:o.cond});
+}
+function worldVisible(o){ while(o){ if(!o.visible) return false; o=o.parent; } return true; }
+/* push the swimmer out of every solid; slide along surfaces */
+function resolveSolids3(lv,pos,vel,R){
+  if(!lv.solids) return;
+  for(const S of lv.solids){
+    if(S.cond&&!S.cond()) continue;
+    if(S.shape==='fn'){ S.fn(pos,vel,R); continue; }
+    const o=S.obj; if(!worldVisible(o)) continue;
+    const me=o.matrixWorld.elements; const sc=Math.hypot(me[0],me[1],me[2])||1;
+    _sp.copy(S.c||_sp.set(0,0,0)).applyMatrix4(o.matrixWorld);
+    if(S.shape!=='cyl'&&pos.distanceTo(_sp)>S.rad*sc+R+1) continue;
+    _sm.copy(o.matrixWorld).invert(); _sq.copy(pos).applyMatrix4(_sm); _sq0.copy(_sq); const rl=R/sc; let hit=false;
+    if(S.shape==='sphere'){ const d=_sq.distanceTo(S.c), m=S.r+rl; if(d<m){ hit=true; if(d<1e-6) _sq.y+=m; else _sq.sub(S.c).multiplyScalar(m/d).add(S.c); } }
+    else if(S.shape==='ell'){ const ax=S.a.x+rl, ay=S.a.y+rl, az=S.a.z+rl; const x=(_sq.x-S.c.x)/ax, y=(_sq.y-S.c.y)/ay, z=(_sq.z-S.c.z)/az; const d=Math.hypot(x,y,z); if(d<1){ hit=true; if(d<1e-6) _sq.y=S.c.y+ay; else _sq.set(S.c.x+x/d*ax,S.c.y+y/d*ay,S.c.z+z/d*az); } }
+    else if(S.shape==='box'){ const x0=S.min.x-rl,x1=S.max.x+rl,y0=S.min.y-rl,y1=S.max.y+rl,z0=S.min.z-rl,z1=S.max.z+rl; const q=_sq;
+      if(q.x>x0&&q.x<x1&&q.y>y0&&q.y<y1&&q.z>z0&&q.z<z1){ hit=true; const pen=[q.x-x0,x1-q.x,q.y-y0,y1-q.y,q.z-z0,z1-q.z]; let mi=0; for(let i=1;i<6;i++) if(pen[i]<pen[mi]) mi=i; [()=>q.x=x0,()=>q.x=x1,()=>q.y=y0,()=>q.y=y1,()=>q.z=z0,()=>q.z=z1][mi](); } }
+    else if(S.shape==='cyl'){ const dy=_sq.y-(S.cy||0); if(Math.abs(dy)<S.h){ const dx=_sq.x, dz=_sq.z, d=Math.hypot(dx,dz), m=S.r+rl; if(d<m){ hit=true; if(d<1e-6) _sq.x=m; else { _sq.x=dx/d*m; _sq.z=dz/d*m; } } } }
+    else if(S.shape==='sheet'){ const x=_sq.x, y=_sq.y; if((x/S.rx)*(x/S.rx)+(y/S.ry)*(y/S.ry)<1){ const f=S.f(x,y), dz=_sq.z-f, m=S.h+rl; if(Math.abs(dz)<m){ hit=true; _sq.z=f+(dz>=0?m:-m); } } }
+    if(hit){ _sq.applyMatrix4(o.matrixWorld); const nx=_sq.x-pos.x, ny=_sq.y-pos.y, nz=_sq.z-pos.z, L=Math.hypot(nx,ny,nz); pos.copy(_sq);
+      if(L>1e-6&&vel){ const vn=(vel.x*nx+vel.y*ny+vel.z*nz)/L; if(vn<0){ vel.x-=nx/L*vn*1.2; vel.y-=ny/L*vn*1.2; vel.z-=nz/L*vn*1.2; } }
+      if(S.onHit) S.onHit(); }
+  }
+}
+/* a skin flake: a curved sheet; f() matches makeSkinFlake's shape */
+function flakeSolid(lv,flake,cond){ const sh=flake.userData.sheet, sd=flake.userData.seed||1; return addSolid(lv,sh,'sheet',{rx:.86,ry:.73,h:.022,f:(x,y)=>.28*x*x-.12*y*y+noise2(x*2+sd,y*2)*.08,cond}); }
+
+</script>
+<script>
 /* ===== 06_player.js ===== */
 /* ================================================================
    PLAYER — first-person controller, flying, shrinking, camera feel,
@@ -2752,6 +2832,7 @@ function updatePlayer(dt,t){
     P.vel.addScaledVector(_mv,sp*2.2*dt*surge);
     P.vel.multiplyScalar(Math.exp(-1.6*dt));
     P.pos.addScaledVector(P.vel,dt);
+    if(lv.solids&&(P.ctl.move||P.vel.lengthSq()>.25)) resolveSolids3(lv,P.pos,P.vel,lv.swimR||1.6);
     P.pos.y+=Math.sin(t*.8)*.02*dt;
     if(lv.flyBounds) lv.flyBounds(P.pos,P.vel);
     P.roll=damp(P.roll,-ix*.08,4,dt);
@@ -2761,7 +2842,8 @@ function updatePlayer(dt,t){
     const accel=P.onGround?14:(lv.env&&lv.env.gravity<5?2.5:4);
     P.vel.x=damp(P.vel.x,wx,accel,dt); P.vel.z=damp(P.vel.z,wz,accel,dt);
     P.pos.x+=P.vel.x*dt; P.pos.z+=P.vel.z*dt;
-    resolveCol(lv.col,P.pos,P.radius*Math.max(.12,P.scale));
+    // (while a cutscene holds you in place, nothing shoves you around)
+    if(P.ctl.move||Math.abs(P.vel.x)+Math.abs(P.vel.z)>.05){ resolveCol(lv.col,P.pos,P.radius*Math.max(.12,P.scale)); pushOutNPCs(P.pos,P.radius*Math.max(.12,P.scale)); }
     if(lv.onMove) lv.onMove(P.pos);
     // ground + jumping
     const gy=lv.ground?lv.ground(P.pos.x,P.pos.z):0;
@@ -2785,6 +2867,17 @@ function updatePlayer(dt,t){
   P.trauma=Math.max(0,P.trauma-dt*.9);
   P.fovKick=damp(P.fovKick,0,3,dt);
 }
+/* people, aliens, robots, blocky people and dogs are solid too */
+function sceneOf(o){ while(o.parent) o=o.parent; return o; }
+function pushOutNPCs(pos,r){
+  if(!LV) return; const sc=LV.scene;
+  const test=(n,rad)=>{ if(!n||!n.visible||!n.parent||n.userData.noPush) return; if(sceneOf(n)!==sc) return; const w=n.getWorldPosition(_npw); const dx=pos.x-w.x, dz=pos.z-w.z, d=Math.hypot(dx,dz), m=r+rad; if(d<m&&d>1e-4){ pos.x=w.x+dx/d*m; pos.z=w.z+dz/d*m; } };
+  for(const h of HUMANS) test(h,.28*h.scale.x);
+  for(const h of ROBOTS) test(h,.38*h.scale.x);
+  if(typeof FOLK!=='undefined') for(const h of FOLK) test(h,.3*h.scale.x);
+  if(LV.jeff) test(LV.jeff,.32);
+}
+const _npw=new THREE.Vector3();
 function jump(){
   const P=PLAYER; if(!P.ctl.move||!P.ctl.jump||G.mode!=='play'||CAM.active||DLG.active||P.fly) return;
   if(!P.onGround) return;
@@ -3278,6 +3371,7 @@ const TROPHY_DEFS=[
   ['shopper','Window Shopper','Look at the snack market 5 times',true,'The snack market in Mite Town.'],
   ['chatter','Chatterbox','Talk to Larry 5 times in Mite Town',true,'Larry likes to talk.'],
   ['tinyEnd','The Tinyverse','Find the shrink-ray crystal shard'],
+  ['secretLarry','Big Larry','Find the secret ending where Larry gets big',true,'NOHINT'],
   ['rocket','Liftoff!','Build the rocket on the moon'],
   ['firstAnt','Exterminator 2','Knock out your first alien bug'],
   ['chef','Master Chef','Cook a perfect batch of bug food'],
@@ -3299,6 +3393,8 @@ const TROPHY_DEFS=[
   ['rings','Rocket Person','Fly through every ring on Pluto'],
   ['jeff','Good Boy','Pet Jeff'],
   ['marsEnd','Mars Shift','Finish Mars Shift'],
+  ['secretSteve','Steve Wins','Find the secret ending where Steve wins',true,'NOHINT'],
+  ['secretJeff','Good Boy Forever','Find the secret ending where you save Jeff',true,'NOHINT'],
   ['both','Two Stories','Finish both stories'],
   ['funny','Is This the Same Game?','Turn on Funny mode',true,'Look in the Settings.'],
   ['dizzy','Dizzy','Spin around 5 times really fast',true,'Spin! Spin! Spin!'],
@@ -3328,7 +3424,7 @@ function renderTrophies(){
   for(const [id,title,desc,secret,hint] of TROPHY_DEFS){ const g=!!TROPHY[id];
     const row=document.createElement('div'); row.className='trow'+(g?' got':'');
     row.innerHTML='<span class="ic">'+(g?'🏆':'🔒')+'</span><span><b></b><small></small></span>';
-    row.querySelector('b').textContent=(!g&&secret)?'???':title; row.querySelector('small').textContent=(!g&&secret)?'Secret trophy. Hint: '+(hint||'Keep playing to find it.'):desc;
+    row.querySelector('b').textContent=(!g&&secret)?'???':title; row.querySelector('small').textContent=(!g&&secret)?(hint==='NOHINT'?'Secret ending. No hints.':'Secret trophy. Hint: '+(hint||'Keep playing to find it.')):desc;
     box.appendChild(row); }
 }
 function openTrophies(){ renderTrophies(); $('trophies').classList.add('show'); SFX.uiOpen(); setTimeout(()=>$('trophyClose').focus(),30); }
@@ -3598,14 +3694,17 @@ async function quitToTitle(){
   fade(0,.8);
 }
 /* end-of-chapter screen */
-function showTBC(chapter,other){
-  resetStory(); G.mode='menu'; unlockPointer(); hudVisible(false); TOUCH_UI.on(false);
-  $('tbcChap').textContent=chapter;
+function showTBC(chapter,other,opts={}){
+  resetStory(); G.mode='menu'; unlockPointer(); hudVisible(false); TOUCH_UI.on(false); letterbox(false); $('visor').classList.remove('show'); setMarker(null); countHUD(null); spamHUD(false);
+  $('tbcChap').textContent=(opts.secret?'SECRET ENDING · ':'')+chapter;
+  const nSec=SECRET_ENDINGS.filter(id=>TROPHY[id]).length; $('tbcSecret').textContent='Secret endings found: '+nSec+' / '+SECRET_ENDINGS.length;
+  const tz=!opts.secret&&TEASERS[WORLD.path]; $('tbcTeaser').style.display=tz?'':'none'; $('tbcTeaser').onclick=()=>{ $('tbc').classList.remove('show'); playTeaser(chapter,other); };
+  clearTimeout(showTBC.auto); if(tz&&!opts.noTeaser) showTBC.auto=setTimeout(()=>{ if($('tbc').classList.contains('show')&&G.mode==='menu'){ $('tbc').classList.remove('show'); playTeaser(chapter,other); } },4500);
   const gal=$('tbcGal'); gal.innerHTML='';
   if(WORLD.path==='A') WORLD.photos.slice(-4).forEach((p,i)=>{ const d=document.createElement('div'); d.className='polaroid'; d.style.transform=`rotate(${[-4,3,-2,5][i]}deg)`; d.innerHTML='<img src="'+p+'"><span>for Jim</span>'; gal.appendChild(d); });
   $('tbc').classList.add('show'); playMusic(null); SFX.titleSlam();
-  $('tbcOther').onclick=()=>{ $('tbc').classList.remove('show'); startFromCheckpoint(other); };
-  $('tbcTitle').onclick=()=>{ $('tbc').classList.remove('show'); quitToTitle(); };
+  $('tbcOther').onclick=()=>{ clearTimeout(showTBC.auto); $('tbc').classList.remove('show'); startFromCheckpoint(other); };
+  $('tbcTitle').onclick=()=>{ clearTimeout(showTBC.auto); $('tbc').classList.remove('show'); quitToTitle(); };
   writeSave({cp:WORLD.cp,finished:(getSave()||{}).finished?Array.from(new Set([...(getSave().finished),WORLD.path])):[WORLD.path]});
 }
 
@@ -3748,6 +3847,9 @@ function makeTrees(scene,spots,o={}){
       cards.push({p,sz,rot:[r()*6.28,r()*6.28,r()*6.28],shade:.6+.4*((dy+1)/2)});
     }
   }
+  // trees: you bump into the trunk; bushes (and low crowns): you bump into the whole bush
+  if(BUILDING_LV&&!o.noCol){ const lv=BUILDING_LV; let toW=null; if(!scene.isScene){ scene.updateMatrixWorld(true); toW=scene; }
+    for(const s of spots){ const h=s.h||6, cr=s.cr||h*.36, rr=s.r||h*.07; const low=h*.72-cr*.8<1.7; const p=toW?toW.localToWorld(V3(s.x,0,s.z)):V3(s.x,0,s.z); colCircle(lv.col,p.x,p.z,low?cr*.8:rr+.1); } }
   const trunks=B.build(true,true); scene.add(trunks);
   const geo=new THREE.PlaneGeometry(1,1);
   const im=new THREE.InstancedMesh(geo,leafM,cards.length); im.castShadow=true; im.receiveShadow=true;
@@ -4383,6 +4485,7 @@ defineLevel('lab',{
     for(const [x,z,w,ry] of [[0,Z0,X1-X0,0],[0,Z1,X1-X0,Math.PI],[X0,0,Z1-Z0,Math.PI/2],[X1,0,Z1-Z0,-Math.PI/2]]){ const m=wallM.clone(); m.map=wallM.map.clone(); m.map.repeat.set(w/3,H/3); m.map.needsUpdate=true; m.normalMap=wallM.normalMap.clone(); m.normalMap.repeat.set(w/3,H/3); m.normalMap.needsUpdate=true; const wl=mesh(new THREE.PlaneGeometry(w,H),m,x,H/2,z,false); wl.rotation.y=ry; wl.receiveShadow=true; scene.add(wl); }
     const ceil=mesh(new THREE.PlaneGeometry(X1-X0,Z1-Z0),mat(0x2a2e30,{roughness:.8}),0,H,0,false); ceil.rotation.x=Math.PI/2; scene.add(ceil);
     lv.col.bounds=[X0+.3,X1-.3,Z0+.3,Z1-.3];
+    lv.ground=(x,z)=>Math.hypot(x,z+1.8)<.92?.24:0; // you step up onto the shrink-ray platform
     // ceiling: LED strips, pipes, cable trays
     const pipeM=mat(0x6a7278,{metalness:.8,roughness:.35}), redPipe=mat(0x9a2a1a,{metalness:.4,roughness:.5});
     for(let i=0;i<4;i++){ const z=-4.5+i*3; scene.add(box(8,.06,.18,emissiveMat(0xeef6ff,5),0,H-.04,z,false)); scene.add(box(8.2,.1,.3,mat(0x3a3e40,{metalness:.7}),0,H-.08,z)); const pl=new THREE.PointLight(col(0xe8f2ff),1.1,9,2); pl.position.set(0,H-.4,z); scene.add(pl); }
@@ -4556,16 +4659,17 @@ defineLevel('tiny',{
     const fiberM=rimify(new THREE.MeshPhysicalMaterial({color:col(0xc8b8e0),roughness:.45,map:fr.map,normalMap:fr.normalMap,normalScale:new THREE.Vector2(2,2),clearcoat:.6,transparent:true,opacity:.92}),0x7af0ff,.5,3);
     const fiber=mesh(new THREE.CylinderGeometry(14,14,1400,40,1,true),fiberM,0,0,0); fiber.rotation.set(Math.PI/2,0,.5); fiber.position.set(-40,-30,-120); scene.add(fiber); lv.fiber=fiber;
     const fiber2=mesh(new THREE.CylinderGeometry(9,9,1400,32,1,true),fiberM,0,0,0); fiber2.rotation.set(.4,0,1.2); fiber2.position.set(120,60,-300); scene.add(fiber2);
+    addSolid(lv,fiber,'cyl',{r:14.6,h:700}); addSolid(lv,fiber2,'cyl',{r:9.6,h:700});
     for(let i=0;i<30;i++){ const f=cyl(.6,.3,rand(20,60),fiberM,0,0,0,8); const along=rand(-400,300); const a=rand(0,6.28); f.position.set(Math.cos(a)*14,along,Math.sin(a)*14); f.lookAt(f.position.clone().multiplyScalar(2)); f.rotateX(Math.PI/2); fiber.add(f); }
     // --- salt crystals ---
     const crys=new THREE.MeshPhysicalMaterial({color:col(0xe8f8ff),roughness:.04,metalness:0,transmission:.0,transparent:true,opacity:.35,clearcoat:1,envMapIntensity:2,depthWrite:false,side:THREE.DoubleSide});
     lv.subjects=[];
-    for(const [x,y,z,s] of [[90,-40,-160,38],[-160,50,-260,55],[60,110,-420,70],[-90,-110,-90,30]]){ const c=mesh(new THREE.BoxGeometry(s,s,s),crys,x,y,z,false); c.rotation.set(rand(0,1),rand(0,1),rand(0,1)); scene.add(c); const e=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s,s,s)),new THREE.LineBasicMaterial({color:col(0xbff8ff),transparent:true,opacity:.5})); c.add(e); lv.subjects.push({obj:c,name:'crystal',r:s*.7}); }
+    for(const [x,y,z,s] of [[90,-40,-160,38],[-160,50,-260,55],[60,110,-420,70],[-90,-110,-90,30]]){ const c=mesh(new THREE.BoxGeometry(s,s,s),crys,x,y,z,false); c.rotation.set(rand(0,1),rand(0,1),rand(0,1)); scene.add(c); const e=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s,s,s)),new THREE.LineBasicMaterial({color:col(0xbff8ff),transparent:true,opacity:.5})); c.add(e); lv.subjects.push({obj:c,name:'crystal',r:s*.7}); addSolid(lv,c,'box',{min:V3(-s/2,-s/2,-s/2),max:V3(s/2,s/2,s/2)}); }
     // --- dust grains + pollen ---
     const dustM=new THREE.MeshStandardMaterial({color:col(0x8a7a6a),roughness:.95,normalMap:TX.concrete().normalMap});
-    for(let i=0;i<14;i++){ const s=rand(8,26); const d=mesh(crumbGeo(200+i,s),dustM,rand(-300,300),rand(-150,150),rand(-600,100)); scene.add(d); lv.subjects.push({obj:d,name:'dust',r:s,spin:V3(rand(-.05,.05),rand(-.05,.05),rand(-.05,.05))}); }
+    for(let i=0;i<14;i++){ const s=rand(8,26); const d=mesh(crumbGeo(200+i,s),dustM,rand(-300,300),rand(-150,150),rand(-600,100)); scene.add(d); lv.subjects.push({obj:d,name:'dust',r:s,spin:V3(rand(-.05,.05),rand(-.05,.05),rand(-.05,.05))}); solidAuto(lv,d,{k:.8}); }
     const pollenM=rimify(new THREE.MeshStandardMaterial({color:col(0xf0b830),roughness:.6}),0xffe066,.6);
-    for(let i=0;i<9;i++){ const p=new THREE.Group(); const R=rand(6,11); p.add(sph(R,pollenM,0,0,0,32,24)); for(let k=0;k<60;k++){ const d=V3(rand(-1,1),rand(-1,1),rand(-1,1)).normalize(); const sp=mesh(GC('pSpike',()=>{ const c=new THREE.ConeGeometry(.5,3,6); c.translate(0,1.5,0); return c; }),pollenM,d.x*R,d.y*R,d.z*R,false); sp.quaternion.setFromUnitVectors(V3(0,1,0),d); sp.scale.setScalar(R/8); p.add(sp); } p.position.set(rand(-250,250),rand(-100,140),rand(-500,60)); scene.add(p); lv.subjects.push({obj:p,name:'pollen',r:R*1.3,spin:V3(rand(-.1,.1),rand(-.1,.1),0)}); }
+    for(let i=0;i<9;i++){ const p=new THREE.Group(); const R=rand(6,11); p.add(sph(R,pollenM,0,0,0,32,24)); for(let k=0;k<60;k++){ const d=V3(rand(-1,1),rand(-1,1),rand(-1,1)).normalize(); const sp=mesh(GC('pSpike',()=>{ const c=new THREE.ConeGeometry(.5,3,6); c.translate(0,1.5,0); return c; }),pollenM,d.x*R,d.y*R,d.z*R,false); sp.quaternion.setFromUnitVectors(V3(0,1,0),d); sp.scale.setScalar(R/8); p.add(sp); } p.position.set(rand(-250,250),rand(-100,140),rand(-500,60)); scene.add(p); lv.subjects.push({obj:p,name:'pollen',r:R*1.3,spin:V3(rand(-.1,.1),rand(-.1,.1),0)}); addSolid(lv,p,'sphere',{r:R+1.2}); }
     await nextFrame();
     // --- bacteria colonies (instanced glowing rods) ---
     const bacM=rimify(new THREE.MeshPhysicalMaterial({color:col(0x7aff9a),roughness:.25,transparent:true,opacity:.82,clearcoat:1,emissive:col(0x1a6a2a),emissiveIntensity:.8}),0xbaffc8,1.6);
@@ -4580,7 +4684,7 @@ defineLevel('tiny',{
     const diaM=iridescent(new THREE.MeshPhysicalMaterial({color:col(0xc8f8ff),map:diaT,roughness:.1,clearcoat:1,transparent:true,opacity:.85,side:THREE.DoubleSide}));
     lv.diatoms=[];
     for(let i=0;i<12;i++){ const d=new THREE.Group(); const s=rand(5,11); d.add(mesh(GC('diaDisc',()=>new THREE.CylinderGeometry(1,1,.25,48)),diaM,0,0,0)); d.children[0].scale.set(s,s,s); const rim=mesh(GC('diaRim',()=>new THREE.TorusGeometry(1,.08,8,48)),diaM,0,0,0,false); rim.rotation.x=Math.PI/2; rim.scale.setScalar(s); d.add(rim);
-      d.position.set(rand(-220,220),rand(-90,120),rand(-450,40)); d.rotation.set(rand(0,3),rand(0,3),rand(0,3)); scene.add(d); lv.diatoms.push({obj:d,spin:rand(-.3,.3)}); lv.subjects.push({obj:d,name:'diatom',r:s}); }
+      d.position.set(rand(-220,220),rand(-90,120),rand(-450,40)); d.rotation.set(rand(0,3),rand(0,3),rand(0,3)); scene.add(d); lv.diatoms.push({obj:d,spin:rand(-.3,.3)}); lv.subjects.push({obj:d,name:'diatom',r:s}); solidAuto(lv,d,{k:.92}); }
     // --- paramecia (slipper-shaped swimmers with beating cilia) ---
     const parM=rimify(new THREE.MeshPhysicalMaterial({color:col(0x9ad8ff),roughness:.2,transparent:true,opacity:.55,clearcoat:1,depthWrite:false,emissive:col(0x0a2a4a),emissiveIntensity:.6}),0xc8f0ff,1.8,2.2);
     const nucM=new THREE.MeshStandardMaterial({color:col(0x6a4ab8),emissive:col(0x3a1a8a),emissiveIntensity:.8,roughness:.5});
@@ -4591,7 +4695,7 @@ defineLevel('tiny',{
       const ciliaPos=[]; for(let k=0;k<dq(80,120,200,260,320);k++){ const a=rand(0,6.28), z=rand(-1,1); const x0=Math.cos(a)*1.72*Math.sqrt(1-z*z*.9), y0=Math.sin(a)*1.42*Math.sqrt(1-z*z*.9), zz=z*4.8; ciliaPos.push(x0,y0,zz,x0*1.25,y0*1.25,zz-.3); }
       const cg=new THREE.BufferGeometry(); cg.setAttribute('position',new THREE.Float32BufferAttribute(ciliaPos,3)); const cil=new THREE.LineSegments(cg,new THREE.LineBasicMaterial({color:col(0xc8f0ff),transparent:true,opacity:.5})); g.add(cil);
       const path={c:V3(rand(-150,150),rand(-60,80),rand(-380,-20)),r:rand(40,90),sp:rand(.05,.12)*(Math.random()<.5?-1:1),ph:rand(0,6.28),tilt:rand(-.4,.4)};
-      g.userData={path,cil,t:0}; scene.add(g); lv.paras.push(g); lv.subjects.push({obj:g,name:'paramecium',r:s*5});
+      g.userData={path,cil,t:0}; scene.add(g); lv.paras.push(g); lv.subjects.push({obj:g,name:'paramecium',r:s*5}); solidAuto(lv,g,{k:.85});
     }
     // --- amoebas (wobbling blobs) ---
     lv.amoebas=[];
@@ -4600,7 +4704,7 @@ defineLevel('tiny',{
       am.add(mesh(new THREE.SphereGeometry(1,48,32),amM,0,0,0,false)); am.children[0].scale.set(s,s*.7,s*1.2);
       for(let k=0;k<4;k++){ const pd=mesh(new THREE.SphereGeometry(1,24,16),amM,0,0,0,false); const d=V3(rand(-1,1),rand(-.5,.5),rand(-1,1)).normalize(); pd.position.copy(d.multiplyScalar(s*.9)); pd.scale.setScalar(s*rand(.35,.5)); am.add(pd); }
       am.add(sph(s*.28,new THREE.MeshStandardMaterial({color:col(0x5a2a6a),emissive:col(0x2a0a3a),roughness:.5}),s*.1,0,0,20,14,false));
-      am.position.set(rand(-200,200),rand(-80,80),rand(-400,-60)); scene.add(am); lv.amoebas.push(am); lv.subjects.push({obj:am,name:'amoeba',r:s*1.3}); }
+      am.position.set(rand(-200,200),rand(-80,80),rand(-400,-60)); scene.add(am); lv.amoebas.push(am); lv.subjects.push({obj:am,name:'amoeba',r:s*1.3}); solidAuto(lv,am,{k:.72}); }
     // --- bacteriophages clinging to colonies ---
     const phM=new THREE.MeshPhysicalMaterial({color:col(0xd8d8e8),metalness:.3,roughness:.3,clearcoat:1});
     const phG=mergeGeos([new THREE.IcosahedronGeometry(1,0).translate(0,2.6,0),new THREE.CylinderGeometry(.22,.22,2,8).translate(0,1,0),...[0,1,2,3,4,5].map(k=>{ const l=new THREE.CylinderGeometry(.06,.06,1.6,5); l.translate(0,-.8,0); l.rotateZ(.9); l.rotateY(k*Math.PI/3); return l; })]);
@@ -4609,9 +4713,9 @@ defineLevel('tiny',{
     scene.add(lv.phages);
     // --- small tardigrades walking the fiber ---
     lv.tards=[];
-    for(let i=0;i<3;i++){ const td=makeTardigrade(); td.scale.setScalar(rand(7,11)); fiber.add(td); td.userData.along=rand(-300,100); td.userData.ang=rand(0,6.28); td.userData.sp=rand(1.5,3); lv.tards.push(td); lv.subjects.push({obj:td,name:'tardigrade',r:18}); }
+    for(let i=0;i<3;i++){ const td=makeTardigrade(); td.scale.setScalar(rand(7,11)); fiber.add(td); solidAuto(lv,td,{k:.8}); td.userData.along=rand(-300,100); td.userData.ang=rand(0,6.28); td.userData.sp=rand(1.5,3); lv.tards.push(td); lv.subjects.push({obj:td,name:'tardigrade',r:18}); }
     // --- THE GIANT (hidden in the fog until the end) ---
-    lv.giant=makeTardigrade({color:0xc8b098}); lv.giant.scale.setScalar(260); lv.giant.position.set(0,-200,-2600); lv.giant.visible=false; scene.add(lv.giant);
+    lv.giant=makeTardigrade({color:0xc8b098}); lv.giant.scale.setScalar(260); lv.giant.position.set(0,-200,-2600); lv.giant.visible=false; scene.add(lv.giant); solidAuto(lv,lv.giant,{k:.7});
     lv.giant.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=false; } });
     buildTinyLife(lv,scene);
     // --- marine snow ---
@@ -4773,7 +4877,7 @@ function makeSkinFlake(seed=1,size=75){
   for(let i=0;i<p.count;i++){ const x=p.getX(i), y=p.getY(i); p.setZ(i,.28*x*x-.12*y*y+noise2(x*2+seed,y*2)*.08); } geo.computeVertexNormals();
   const m=rimify(new THREE.MeshPhysicalMaterial({color:col(0xf4ead8),map:cr.map,normalMap:cr.normalMap,alphaMap:alpha,alphaTest:.4,transparent:true,opacity:.86,roughness:.65,clearcoat:.3,side:THREE.DoubleSide,depthWrite:true}),0xfff4e0,.35,2.5);
   const sheet=mesh(geo,m,0,0,0,false); sheet.scale.setScalar(size); g.add(sheet);
-  g.userData={sheet,size}; return g;
+  g.userData={sheet,size,seed}; return g;
 }
 /* ---------- bacterial biofilm colony: slimy mounds and mushroom towers packed with rod bacteria ---------- */
 function makeBiofilm(seed=1){
@@ -4790,7 +4894,7 @@ function makeBiofilm(seed=1){
   for(let i=0;i<N;i++){ const tp=tops[i%tops.length]; const a=r()*6.28, y=r()*tp.h; const rad=tp.w*(.3+r()*.6); o.position.set(tp.x+Math.cos(a)*rad,y,tp.z+Math.sin(a)*rad); o.rotation.set(r()*3,r()*3,r()*3); o.scale.setScalar(.7+r()*.8); o.updateMatrix(); rods.setMatrixAt(i,o.matrix); }
   g.add(rods);
   // a few free bacteria drifting just above
-  g.userData={slimeM,phase:r()*6}; return g;
+  g.userData={slimeM,phase:r()*6,tops}; return g;
 }
 /* ---------- Paramecium snacks (little golden ones Larry likes) ---------- */
 function makeSnack(){
@@ -4819,6 +4923,10 @@ function buildTinyLife(lv,scene){
   lv.subjects.push({pos:V3(),name:'biofilm',label:'Bacterial biofilm colony',r:30,hunt:true,hide:true});
   lv.subjects.push({obj:lv.naeg,name:'naegleria',label:'Naegleria fowleri',r:22,hunt:true});
   lv.subjects.push({obj:lv.larry,name:'larry',label:'Dust mite (Larry)',r:26,hunt:true});
+  // everything here is solid: you swim around it, not through it
+  for(const f of [lv.flake,lv.bfFlake,lv.larryFlake]) flakeSolid(lv,f);
+  for(const b of lv.biofilms) for(const tp of b.userData.tops) addSolid(lv,b,'ell',{c:V3(tp.x,tp.h*.5,tp.z),a:V3(tp.w*.85,tp.h*.52,tp.w*.85)});
+  solidAuto(lv,lv.naeg,{k:.7}); solidAuto(lv,lv.larry,{k:.72}); solidAuto(lv,lv.demodex,{k:.8});
 }
 const HUNT_LIM=[[-260,260],[-150,150],[-590,90]];
 function clampHunt(v){ v.x=clamp(v.x,HUNT_LIM[0][0],HUNT_LIM[0][1]); v.y=clamp(v.y,HUNT_LIM[1][0],HUNT_LIM[1][1]); v.z=clamp(v.z,HUNT_LIM[2][0],HUNT_LIM[2][1]); return v; }
@@ -6316,7 +6424,7 @@ defineLevel('moon',{
       lv.domes=lv.domes||[]; lv.domes.push({x,z,r});
     });
     // tubes between domes
-    for(const [a,b] of [[0,3],[1,4],[2,4]]){ const A=domes[a], B=domes[b]; const dx=B[0]-A[0], dz=B[1]-A[1]; const len=Math.hypot(dx,dz); const t=cyl(1.2,1.2,len,hull,(A[0]+B[0])/2,1.2,(A[1]+B[1])/2,24); t.rotation.set(Math.PI/2,0,-Math.atan2(dx,dz)); t.rotation.order='YXZ'; t.rotation.set(Math.PI/2,Math.atan2(dx,dz),0); scene.add(t); }
+    for(const [a,b] of [[0,3],[1,4],[2,4]]){ const A=domes[a], B=domes[b]; const dx=B[0]-A[0], dz=B[1]-A[1]; const len=Math.hypot(dx,dz); const t=cyl(1.2,1.2,len,hull,(A[0]+B[0])/2,1.2,(A[1]+B[1])/2,24); t.rotation.set(Math.PI/2,0,-Math.atan2(dx,dz)); t.rotation.order='YXZ'; t.rotation.set(Math.PI/2,Math.atan2(dx,dz),0); scene.add(t); colOBox(lv.col,(A[0]+B[0])/2,(A[1]+B[1])/2,2.5,len,Math.atan2(dx,dz)); }
     // antenna tower
     const ant=new THREE.Group(); ant.position.set(34,moonHeight(34,-2),-2); scene.add(ant);
     const aM=mat(0xb8bcc0,{metalness:.8,roughness:.3});
@@ -6328,7 +6436,7 @@ defineLevel('moon',{
     // solar arrays
     const panelT=canvasTex(128,256,(x,w,h)=>{ x.fillStyle='#0a1a3a'; x.fillRect(0,0,w,h); x.strokeStyle='#8aa0c8'; x.lineWidth=2; for(let i=0;i<=w;i+=32){ x.beginPath(); x.moveTo(i,0); x.lineTo(i,h); x.stroke(); } for(let j=0;j<=h;j+=32){ x.beginPath(); x.moveTo(0,j); x.lineTo(w,j); x.stroke(); } });
     const pM=new THREE.MeshPhysicalMaterial({map:panelT,metalness:.6,roughness:.2,clearcoat:1});
-    for(let i=0;i<6;i++){ const p=new THREE.Group(); const px=-48+i*4.5, pz=-34; p.position.set(px,moonHeight(px,pz),pz); scene.add(p); p.add(cyl(.08,.08,1.6,aM,0,.8,0,6)); const pn=box(3.2,.06,6,pM,0,1.7,0); pn.rotation.x=-.5; p.add(pn); colBoxC(lv.col,px,pz,3.4,3); }
+    for(let i=0;i<6;i++){ const p=new THREE.Group(); const px=-48+i*4.5, pz=-34; p.position.set(px,moonHeight(px,pz),pz); scene.add(p); p.add(cyl(.08,.08,1.6,aM,0,.8,0,6)); const pn=box(3.2,.06,6,pM,0,1.7,0); pn.rotation.x=-.5; p.add(pn); colBoxC(lv.col,px,pz,3.4,5.4); }
     // rover
     const rov=new THREE.Group(); rov.position.set(-16,moonHeight(-16,-34),-34); rov.rotation.y=.6; scene.add(rov);
     rov.add(rbox(2.4,.5,1.4,.1,hull,0,.9,0)); rov.add(rbox(1,.6,1,.1,glass,.4,1.4,0)); for(const [x,z] of [[-.9,-.8],[.9,-.8],[-.9,.8],[.9,.8]]){ const w=mesh(new THREE.CylinderGeometry(.38,.38,.3,20),mat(0x3a3a3a,{roughness:.9}),x,.4,z); w.rotation.x=Math.PI/2; rov.add(w); }
@@ -6486,8 +6594,11 @@ defineLevel('mars',{
     scene.add(RB.build(true,true));
     // ---------------- plaza + robot town ----------------
     const plazaT=texSet('hexTiles',512,(x,w,h)=>{ x.fillStyle='#8a5a48'; x.fillRect(0,0,w,h); const r=32; for(let j=-1;j<h/(r*1.5)+1;j++) for(let i=-1;i<w/(r*1.73)+1;i++){ const cx=i*r*1.73+(j%2)*r*.86, cy=j*r*1.5; const k=rand(.85,1.05); x.fillStyle=`rgb(${196*k|0},${150*k|0},${126*k|0})`; x.beginPath(); for(let q=0;q<6;q++){ const a=q/6*Math.PI*2+Math.PI/6; x.lineTo(cx+Math.cos(a)*r*.94,cy+Math.sin(a)*r*.94); } x.fill(); } },{strength:2.5});
-    const plaza=mesh(new THREE.CircleGeometry(26,64),texMat(plazaT,8,8,{opts:{roughness:.85}}),4,.05,4,false); plaza.rotation.x=-Math.PI/2; plaza.receiveShadow=true; scene.add(plaza);
-    lv.plazaAt=(x,z)=>Math.hypot(x-4,z-4)<26;
+    // the plaza has a hole where the bug pit is (it used to float over the pit, so you walked under the floor)
+    const pzPts=[]; { const C=[-19,2], R=9, cc=C[0]*C[0]+C[1]*C[1]-R*R; for(let i=0;i<180;i++){ const a=i/180*Math.PI*2, ux=Math.cos(a), uy=Math.sin(a); const b=ux*C[0]+uy*C[1], disc=b*b-cc; let t=26; if(disc>=0){ const t1=b-Math.sqrt(disc); if(t1>0&&t1<26) t=t1; } pzPts.push(new THREE.Vector2(ux*t,uy*t)); } }
+    const pzShape=new THREE.Shape(pzPts);
+    const plaza=mesh(new THREE.ShapeGeometry(pzShape,64),texMat(plazaT,8/52,8/52,{opts:{roughness:.85}}),4,.05,4,false); plaza.rotation.x=-Math.PI/2; plaza.receiveShadow=true; scene.add(plaza);
+    lv.plazaAt=(x,z)=>Math.hypot(x-4,z-4)<26&&Math.hypot(x+15,z-2)>9;
     const lane=tiledPlane(60,8,texMat(plazaT,1,1,{opts:{roughness:.85}}),6,14,.06,30); scene.add(lane);
     lv.surfaceAt=(x,z)=>(lv.plazaAt(x,z)||(z>26&&z<34&&x>-16&&x<44))?'tile':'mars';
     const bldM=new THREE.MeshPhysicalMaterial({color:col(0xe2d4c6),roughness:.45,clearcoat:.5}), orangeM=mat(0xe86a2a,{roughness:.5}), glassB=new THREE.MeshPhysicalMaterial({color:col(0x6ac8e8),roughness:.05,metalness:.3,clearcoat:1,transparent:true,opacity:.7});
@@ -6567,7 +6678,7 @@ defineLevel('mars',{
     const lanes=[['mid',V3(-8,0,38),100,'Dome Sweet Dome'],['big',V3(12,0,42),2000,'The Mega-Dome'],['tiny',V3(30,0,37),50,'Tiny Shack']];
     lv.houses=lanes.map(([kind,p,price,name],i)=>{
       const g=alienHouse(kind); g.position.set(p.x,marsHeight(p.x,p.z),p.z); g.rotation.y=Math.PI; scene.add(g);
-      const w=g.userData.w, d=g.userData.d; colBoxC(lv.col,p.x,p.z,w,d);
+      const w=g.userData.w, d=g.userData.d; for(const [cx,cz,r] of ({big:[[0,0,6.05],[6.5,1,3.65]],mid:[[0,0,4.05]],tiny:[[0,0,2.25]]}[kind]||[[0,0,3.8]])) colCircle(lv.col,p.x-cx,p.z-cz,r);
       const signT=holoSignTex([{text:'FOR SALE',font:'bold 58px Arial Black, sans-serif',y:.3},{text:'Ѫ '+price.toLocaleString(),font:'bold 80px monospace',y:.63},{text:'ALIEN COINS',font:'bold 30px monospace',y:.85}]);
       const sign=mesh(new THREE.PlaneGeometry(2.4,1.2),new THREE.MeshBasicMaterial({map:signT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}),p.x+(i%2?2.5:-2.5),marsHeight(p.x,p.z-d/2-1)+2.2,p.z-d/2-1.2,false); scene.add(sign);
       const post=cyl(.05,.05,1.6,mat(0x3a3e44,{metalness:.8}),sign.position.x,sign.position.y-1.4,sign.position.z,8); scene.add(post);
@@ -6655,15 +6766,16 @@ defineLevel('alienhouse',{
     // round windows looking out at Mars (one in front, one on each side)
     for(const a of [0,Math.PI*.55,-Math.PI*.55]){ const hold=new THREE.Group(); hold.rotation.y=a; scene.add(hold);
       const win=mesh(new THREE.CircleGeometry(a?.85:1.2,48),new THREE.MeshBasicMaterial({map:winT}),0,a?1.75:2,-R+(a?.75:.9),false); win.material.color.setScalar(1.5); hold.add(win); (lv.wins=lv.wins||[]).push(win);
-      hold.add(mesh(new THREE.TorusGeometry(a?.9:1.25,.14,12,48),ribM,0,a?1.75:2,-R+(a?.77:.92),false)); }
+      hold.add(mesh(new THREE.TorusGeometry(a?.9:1.25,.14,12,48),ribM,0,a?1.75:2,-R+(a?.77:.92),false)); colFromObj(lv.col,hold,{pad:.05}); }
     // glowing baseboard where the walls meet the floor + glowing veins along each rib
     const base=mesh(new THREE.TorusGeometry(R-.12,.05,8,96),emissiveMat(0x6dffd8,2.2),0,.12,0,false); base.rotation.x=Math.PI/2; scene.add(base);
     const veinM=emissiveMat(0xff7af0,1.6);
     for(let i=0;i<10;i++){ const holder=new THREE.Group(); holder.rotation.y=i/10*Math.PI*2+Math.PI/10; const v=mesh(GC('veinArc'+R,()=>new THREE.TorusGeometry(R-.08,.018,6,48,Math.PI/2)),veinM,0,0,0,false); v.scale.set(1,.62,1); holder.add(v); scene.add(holder); }
     // shelf of glowing alien jars on the wall
     const shelfG=new THREE.Group(); shelfG.rotation.y=-Math.PI*.8; scene.add(shelfG);
-    for(const y of [1.1,1.8]){ const sh=mesh(new THREE.CylinderGeometry(1.1,1.1,.06,32,1,false,-.7,1.4),ribM,0,y,-R+1.05,false); shelfG.add(sh);
+    for(const y of [1.1,1.8]){ const sh=box(1.7,.06,.62,ribM,0,y,-R+.74,false); shelfG.add(sh); shelfG.add(box(.06,.4,.6,ribM,-.86,y-.2,-R+.74,false)); shelfG.add(box(.06,.4,.6,ribM,.86,y-.2,-R+.74,false));
       for(let k=0;k<4;k++){ const jx=-.6+k*.4; const jar=mesh(GC('ajar',()=>{ const g=new THREE.SphereGeometry(.1,14,10); g.scale(1,1.5,1); return g; }),new THREE.MeshPhysicalMaterial({color:col(0xffffff),roughness:.05,transparent:true,opacity:.4,clearcoat:1}),jx,y+.16,-R+.72,false); shelfG.add(jar); shelfG.add(sph(.055,emissiveMat(pick([0x6dffd8,0xff7af0,0xffcc33,0x9aff7a]),2.5),jx,y+.15,-R+.72,10,8,false)); } }
+    colFromObj(lv.col,shelfG,{pad:.02});
     // wardrobe pod beside the bed
     const wd=new THREE.Group(); wd.position.set(-4.6,0,.9); wd.rotation.y=1.4; scene.add(wd);
     const wdBody=mesh(new THREE.SphereGeometry(1,32,20),new THREE.MeshPhysicalMaterial({color:col(0xb8a0d8),roughness:.3,clearcoat:1}),0,1.1,0); wdBody.scale.set(.55,1.1,.45); wd.add(wdBody);
@@ -6753,7 +6865,7 @@ defineLevel('dream',{
     lv.arches=[];
     for(let i=0;i<7;i++){ const z=4-i*4.6; const a=new THREE.Group(); a.position.set(Math.sin(i*1.3)*.4,0,z); a.rotation.z=Math.sin(i*2.1)*.08; scene.add(a);
       a.add(mesh(GC('dArch',()=>new THREE.TorusGeometry(2.1,.16,10,40,Math.PI)),archM,0,0,0)); a.add(mesh(GC('dArchG',()=>new THREE.TorusGeometry(2.1,.035,6,40,Math.PI)),glowM,0,0,.17,false));
-      lv.arches.push({a,ph:i*.7}); }
+      lv.arches.push({a,ph:i*.7}); for(const sd of [-1,1]) for(const dx of [2.1,1.75,1.42]) colCircle(lv.col,a.position.x+sd*dx,z,.22); }
     // pieces of your house, floating: the bed, the table, stools, hex floor tiles, a window
     const shellM=new THREE.MeshPhysicalMaterial({color:col(0xd8d0e8),roughness:.3,clearcoat:1}), purM=new THREE.MeshPhysicalMaterial({color:col(0x6a4ab8),roughness:.8});
     const hexM=new THREE.MeshPhysicalMaterial({color:col(0x2a1a40),roughness:.35,clearcoat:.6,emissive:col(0x1a0a3a)});
@@ -7100,8 +7212,8 @@ defineLevel('bighouse',{
     { const hold=new THREE.Group(); scene.add(hold); const win=mesh(new THREE.PlaneGeometry(5.2,2.1),new THREE.MeshBasicMaterial({map:winT}),0,2.2,-R+1.45,false); win.material.color.setScalar(1.5); hold.add(win); lv.wins.push(win);
       const fr=new THREE.Group(); fr.position.set(0,2.2,-R+1.47); hold.add(fr); for(const [w,h,x,y] of [[5.5,.16,0,1.1],[5.5,.16,0,-1.1],[.16,2.3,-2.7,0],[.16,2.3,2.7,0],[.08,2.1,-.9,0],[.08,2.1,.9,0]]) fr.add(box(w,h,.12,ribM,x,y,0,false)); colBox(lv.col,-2.8,2.8,-R,-R+1.6); }
     for(const a of [Math.PI*.5,-Math.PI*.5]){ const hold=new THREE.Group(); hold.rotation.y=a; scene.add(hold);
-      const win=mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({map:winT}),0,2,-R+.95,false); win.material.color.setScalar(1.5); hold.add(win); lv.wins.push(win);
-      hold.add(mesh(new THREE.TorusGeometry(1.05,.15,12,48),ribM,0,2,-R+.97,false)); }
+      const win=mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({map:winT}),0,2,-R+.5,false); win.material.color.setScalar(1.5); hold.add(win); lv.wins.push(win);
+      hold.add(mesh(new THREE.TorusGeometry(1.05,.15,12,48),ribM,0,2,-R+.52,false)); colFromObj(lv.col,hold,{pad:.05}); }
     const shellM=new THREE.MeshPhysicalMaterial({color:col(0xe8e0f0),roughness:.22,clearcoat:1});
     const softM=new THREE.MeshPhysicalMaterial({color:col(0x6a4ab8),roughness:.9,sheen:col(0xb08aff)});
     // ---- the king-size pod bed with a glowing canopy ----
@@ -7126,7 +7238,7 @@ defineLevel('bighouse',{
     const cm=new THREE.MeshPhysicalMaterial({color:col(0xff7ab8),roughness:.85,sheen:col(0xffc8e8)});
     const seat=mesh(new THREE.TorusGeometry(1.3,.38,16,40,Math.PI),cm,0,.38,0); seat.rotation.x=Math.PI/2; seat.scale.set(1,1,.6); couch.add(seat);
     const back=mesh(new THREE.TorusGeometry(1.55,.22,12,40,Math.PI),cm,0,.8,0); back.rotation.x=Math.PI/2+.25; back.scale.set(1,1,1.2); couch.add(back);
-    couch.rotation.y=-.9+Math.PI*.5; colCircle(lv.col,2.6,-.9,1.2);
+    couch.rotation.y=-.9+Math.PI*.5; colFromObj(lv.col,couch,{pad:.05});
     // ---- kitchen: counter + tall alien fridge ----
     const kit=new THREE.Group(); kit.position.set(6.6,0,2.8); kit.rotation.y=-2.2; scene.add(kit);
     kit.add(rbox(3,.95,.8,.08,shellM,0,.48,0)); kit.add(box(3.02,.06,.82,new THREE.MeshPhysicalMaterial({color:col(0x2a1a40),roughness:.1,clearcoat:1}),0,.98,0));
@@ -7172,7 +7284,7 @@ defineLevel('bighouse',{
     const dRing=mesh(new THREE.RingGeometry(1.2,1.34,40,1,0,Math.PI),emissiveMat(0x6dffd8,2.2),0,0,R-.36,false); dRing.rotation.y=Math.PI; scene.add(dRing);
     // robot vacuum doing laps
     const rv=new THREE.Group(); scene.add(rv); lv.vac=rv; rv.add(cyl(.22,.24,.08,shellM,0,.05,0,24)); rv.add(sph(.04,emissiveMat(0x6dffd8,3),0,.1,.12,8,6,false));
-    lv.col.radius=R-.7; lv.col.cx=0; lv.col.cz=0;
+    lv.col.radius=R-.45; lv.col.cx=0; lv.col.cz=0;
   },
   enter(){ FX.sunWorld=null; this.setNight(false); },
   setNight(on){ for(const w of this.wins) w.material.color.set(on?0x2a2450:0xffffff).multiplyScalar(on?1:1.5); for(const pl of this.pls) pl.intensity=on?.7:1.7; if(this.rig&&this.rig.hemi) this.rig.hemi.intensity=on?.28:.6; },
@@ -7454,7 +7566,7 @@ CHECKPOINTS.B9=async()=>{
   objective("Answer the call");
   if(!lv.callSetup){ lv.callSetup=true;
     addInteract(lv,{obj:lv.armL,offset:V3(0,.05,-.18),label:'Answer Jim',reach:3,aim:false,when:()=>!!lv.ringing,act:()=>runStory(answerJim)});
-    addInteract(lv,{pos:V3(1,1.2,-7.5),label:'Locked door',reach:1.8,when:()=>!!F_().freed&&!F_().knocked,act:()=>{ SFX.cantCarry(); bark('You',"It's locked. I can hear Steve and Alex talking in there.",null,3.4); if(!F_().eaves){ F_().eaves=true; unlock('eavesdrop'); } }});
+    addInteract(lv,{pos:V3(1,1.2,-7.5),label:'Locked door',reach:1.8,when:()=>!!F_().freed&&!F_().knocked,act:()=>{ const F=F_(); if(!F.eaves){ SFX.cantCarry(); bark('You',"It's locked. I can hear Steve and Alex talking in there.",null,3.4); F.eaves=true; unlock('eavesdrop'); return; } F.knocks=(F.knocks||0)+1; SFX.knock&&SFX.knock(); shake(.05); if(F.knocks>=5) runStory(steveWins); }});
     addInteract(lv,{obj:lv.rat,offset:V3(0,.2,0),label:'Call the rat',reach:5,when:()=>!!F_().ratCall&&!F_().freed&&!lv.ratMoving,act:()=>runStory(callRat)});
     addTrigger(lv,{pos:V3(0,0,-15.5),r:3.2,once:true,when:()=>!!F_().freed,fn:()=>{ say("You see a purple block. It says DON'T TOUCH. EXTREMELY DANGEROUS.",4.2); later(4.4,()=>{ if(!F_().knocked) say("But you don't think much of it.",3); }); }});
     addTrigger(lv,{pos:V3(0,0,-19.4),r:1.6,box:[2.6,.8],once:true,when:()=>!!F_().freed&&!F_().knocked,fn:()=>runStory(knockOver)});
@@ -7663,7 +7775,7 @@ defineLevel('blockearth',{
     for(let i=0;i<6;i++){ const x=-50+i*20; for(const side of [-1,1]){ const z=side<0?-9:15; const wall=walls[(i+(side>0?1:0))%3]; blockHouse(B,x,z,{wall,face:side<0?1:-1}); colBoxC(lv.col,x,z,7,7); lv.houses.push({x,z,door:V3(x,0,side<0?z+4:z-4)}); } }
     for(const [x,z] of [[-60,-22],[-35,-24],[-10,-26],[18,-23],[42,-25],[64,-20],[-58,30],[-28,31],[4,32],[30,30],[58,31],[-72,4],[76,-2]]){ blockTree(B,x,z,rand(4,6)|0); colCircle(lv.col,x,z,.7); }
     // hills around the town
-    const r=RNG(9); for(let n=0;n<420;n++){ const a=r()*6.28, d=70+r()*70; const x=Math.round(Math.cos(a)*d), z=Math.round(Math.sin(a)*d); const hh=1+Math.floor(r()*r()*8); for(let j=0;j<hh;j++) (j===hh-1?B.grass:B.dirt).add(x,j+.5,z,2,1,2); }
+    const r=RNG(9); for(let n=0;n<420;n++){ const a=r()*6.28, d=70+r()*70; const x=Math.round(Math.cos(a)*d), z=Math.round(Math.sin(a)*d); const hh=1+Math.floor(r()*r()*8); colBoxC(lv.col,x,z,2,2); for(let j=0;j<hh;j++) (j===hh-1?B.grass:B.dirt).add(x,j+.5,z,2,1,2); }
     lv.vox={}; for(const k in B) lv.vox[k]=B[k].build(scene,k!=='glass');
     lines.build(scene,false);
     // square blocky clouds + a square sun
@@ -7887,13 +7999,14 @@ defineLevel('cabin',{
     const port=mesh(new THREE.CircleGeometry(.6,40),new THREE.MeshBasicMaterial({map:lv.viewTex}),0,1.6,-R+.05,false); port.material.color.setScalar(1.4); scene.add(port);
     const pr=mesh(new THREE.TorusGeometry(.62,.08,10,40),mat(0x2a2c30,{metalness:.9,roughness:.3}),0,1.6,-R+.06,false); scene.add(pr);
     // seats, a console, a cot
-    for(const a of [-.9,0,.9]){ const s=new THREE.Group(); s.position.set(Math.sin(a)*2.2,0,-Math.cos(a)*2.2+1.2); s.rotation.y=-a; scene.add(s); s.add(box(.6,.5,.6,mat(0x3a3e44),0,.25,0)); s.add(box(.6,.9,.12,mat(0xc8281c,{roughness:.6}),0,.9,.3)); }
-    const cot=new THREE.Group(); cot.position.set(-1.8,0,1.4); cot.rotation.y=.9; scene.add(cot); lv.cot=cot; cot.add(box(.9,.35,2,mat(0x5a6068),0,.18,0)); cot.add(box(.85,.1,1.9,mat(0xe8e0d0,{roughness:.9}),0,.4,0));
-    const con=new THREE.Group(); con.position.set(2.2,0,-1.2); con.rotation.y=-.9; scene.add(con); con.add(box(1.2,1,.6,mat(0x5a6068,{metalness:.6}),0,.5,0)); con.add(box(1,.4,.05,emissiveMat(0x39ffb0,1.6),0,1.15,-.1,false));
+    for(const a of [-.9,0,.9]){ const s=new THREE.Group(); s.position.set(Math.sin(a)*2.2,0,-Math.cos(a)*2.2+1.2); s.rotation.y=-a; scene.add(s); s.add(box(.6,.5,.6,mat(0x3a3e44),0,.25,0)); s.add(box(.6,.9,.12,mat(0xc8281c,{roughness:.6}),0,.9,.3));  (lv.scene_solids=lv.scene_solids||[]).push({obj:s,o:{pad:.03}}); }
+    const cot=new THREE.Group(); cot.position.set(-1.8,0,1.4); cot.rotation.y=.9; scene.add(cot); lv.cot=cot; (lv.scene_solids=lv.scene_solids||[]).push({obj:cot,o:{pad:.03}}); cot.add(box(.9,.35,2,mat(0x5a6068),0,.18,0)); cot.add(box(.85,.1,1.9,mat(0xe8e0d0,{roughness:.9}),0,.4,0));
+    const con=new THREE.Group(); con.position.set(2.2,0,-1.2); con.rotation.y=-.9; scene.add(con); (lv.scene_solids=lv.scene_solids||[]).push({obj:con,o:{pad:.03}}); con.add(box(1.2,1,.6,mat(0x5a6068,{metalness:.6}),0,.5,0)); con.add(box(1,.4,.05,emissiveMat(0x39ffb0,1.6),0,1.15,-.1,false));
     lv.jim=makeBlockJim(); lv.jim.userData.level='cabin'; scene.add(lv.jim);
     lv.bob=makeBlockPerson({name:'Bob',voice:'Bob',skin:0xe0b090,shirt:0xe8872a,pants:0x3a3a4a,hair:0x3a2414,beard:true}); lv.bob.userData.level='cabin'; scene.add(lv.bob);
-    lv.suits=[]; for(let i=0;i<3;i++){ const s=new THREE.Group(); s.position.set(1.4-i*.7,0,2.4); scene.add(s); s.add(box(.5,.8,.25,mat(0xf0f0ec,{roughness:.5}),0,1.2,0)); s.add(sph(.2,new THREE.MeshPhysicalMaterial({color:col(0xffd070),roughness:.05,metalness:.3,clearcoat:1}),0,1.8,0)); s.add(box(.35,.5,.2,mat(0x5a6068),0,1.2,.22)); lv.suits.push(s); }
-    lv.col.radius=R-.5;
+    lv.suits=[]; for(let i=0;i<3;i++){ const s=new THREE.Group(); s.position.set(1.4-i*.7,0,2.4); scene.add(s); (lv.scene_solids=lv.scene_solids||[]).push({obj:s,o:{circle:true,cond:()=>s.visible}}); s.add(box(.5,.8,.25,mat(0xf0f0ec,{roughness:.5}),0,1.2,0)); s.add(sph(.2,new THREE.MeshPhysicalMaterial({color:col(0xffd070),roughness:.05,metalness:.3,clearcoat:1}),0,1.8,0)); s.add(box(.35,.5,.2,mat(0x5a6068),0,1.2,.22)); lv.suits.push(s); }
+    for(const o of lv.scene_solids||[]) colFromObj(lv.col,o.obj,o.o);
+    lv.col.radius=R-.15;
     lv.setView('space');
   },
   setView(k){ const lv=this, x=lv.viewC.getContext('2d'); x.fillStyle='#000'; x.fillRect(0,0,256,256);
@@ -7929,7 +8042,7 @@ defineLevel('pluto',{
     lv.hf=heightField(700,S,plutoHeight); lv.ground=(x,z)=>lv.hf.at(x,z);
     // ice boulders
     const bm=new THREE.MeshStandardMaterial({color:col(0xc8d4e0),roughness:.3,metalness:.1});
-    for(let i=0;i<60;i++){ const x=rand(-120,120), z=rand(-120,120); if(Math.hypot(x,z)<14) continue; const r=rand(.4,2.2); const b=mesh(new THREE.IcosahedronGeometry(r,1),bm,x,lv.ground(x,z)+r*.3,z); b.scale.y=rand(.5,.9); scene.add(b); if(r>.8) colCircle(lv.col,x,z,r*.8); }
+    for(let i=0;i<60;i++){ const x=rand(-120,120), z=rand(-120,120); if(Math.hypot(x,z)<14) continue; const r=rand(.4,2.2); const b=mesh(new THREE.IcosahedronGeometry(r,1),bm,x,lv.ground(x,z)+r*.3,z); b.scale.y=rand(.5,.9); scene.add(b); if(r>.45) colCircle(lv.col,x,z,r*.85); }
     // Jim's rocket, landed
     lv.rocket=makeRocket(); lv.rocket.position.set(0,lv.ground(0,-6)+1.1,-6); scene.add(lv.rocket); colCircle(lv.col,0,-6,1.6);
     // the humans (and Jeff) out here
@@ -8070,7 +8183,7 @@ defineLevel('insidex',{
     const skin=new THREE.MeshStandardMaterial({map:BLOCKTEX.purple(),roughness:.6,emissive:col(0x9a3aff),emissiveMap:BLOCKTEX.purple(),emissiveIntensity:.5});
     const B=new VoxBatch(skin); const r=RNG(71);
     // a blocky tunnel: from the core (z=-16) to the mouth (z=+10)
-    for(let z=-20;z<=10;z++) for(let a=0;a<28;a++){ const ang=a/28*Math.PI*2; const rad=(z<-12?6:4.2)+Math.sin(z*.4+a)*.4; const x=Math.round(Math.cos(ang)*rad), y=Math.round(Math.sin(ang)*rad*.8+3); if(y<-1) continue; if(z>8&&y>0&&y<5&&Math.abs(x)<3) continue; B.add(x,y,z,1+r()*.3,1+r()*.3,1+r()*.3); }
+    for(let z=-20;z<=10;z++) for(let a=0;a<28;a++){ const ang=a/28*Math.PI*2; const rad=(z<-12?6:4.2)+Math.sin(z*.4+a)*.4; const x=Math.round(Math.cos(ang)*rad), y=Math.round(Math.sin(ang)*rad*.8+3); if(y<1) continue; if(z>8&&y>0&&y<5&&Math.abs(x)<3) continue; const sc=1+r()*.3; B.add(x,y,z,sc,sc,sc); if(y<=2) colBoxC(lv.col,x,z,sc,sc); }
     for(let x=-7;x<=7;x++) for(let z=-20;z<=10;z++) B.add(x,-.5,z);
     for(let x=-7;x<=7;x++) for(let y=0;y<8;y++) B.add(x,y,-21);
     B.build(scene,true);
@@ -8090,7 +8203,7 @@ defineLevel('insidex',{
     lv.bob=makeBlockPerson({name:'Bob',voice:'Bob',skin:0xe0b090,shirt:0xf0f0ec,pants:0xf0f0ec,hair:0x3a2414,beard:true}); lv.bob.userData.level='insidex'; scene.add(lv.bob);
     lv.jeff=makeDog(); scene.add(lv.jeff);
     lv.mouthLight=new THREE.PointLight(col(0xffb070),2.5,14,2); lv.mouthLight.position.set(0,2.5,10); scene.add(lv.mouthLight);
-    lv.col.bounds=[-3.2,3.2,-18.8,9.6];
+    lv.col.bounds=[-6,6,-20.2,9.6]; colCircle(lv.col,0,-17.5,1.05);
   },
   enter(){ FX.sunWorld=null; },
   update(dt,t){ const lv=this; updateFolk(dt,t); if(lv.jeff.visible) animateDog(lv.jeff,dt,t);
@@ -8189,7 +8302,7 @@ async function placeNuke(){
   // Jeff is stuck
   F.jeffStuck=true; lookAtPoint(V3(.4,.3,1.5),.4); objective(IS_TOUCH?'Spam USE to help Jeff!':'Spam E to help Jeff!');
   const it=lv.inter.find(i=>i.label==='Help Jeff!'); it.pos=V3(.4,0,1.5);
-  while(n>1){ spamHUD(true,Math.min(.92,F.helpK),'HELP JEFF!'); F.helpK=Math.max(0,F.helpK-.004); jeff.position.x=.4+Math.sin(G.time*20)*.04*(F.helpK>.1?1:0); if(Math.random()<.02) SFX.whine(); await wait(0); }
+  while(n>1){ if(F.helpK>=1){ return savedJeff(); } spamHUD(true,Math.min(1,F.helpK),'HELP JEFF!'); F.helpK=Math.max(0,F.helpK-(G.dt||.016)*.6); jeff.position.x=.4+Math.sin(G.time*20)*.04*(F.helpK>.1?1:0); if(Math.random()<.02) SFX.whine(); await wait(0); }
   // you fall
   F.jeffStuck=false; spamHUD(false); PLAYER.lock(); objective(null);
   SFX.thud(); shake(.6);
@@ -8279,6 +8392,7 @@ function ensureP3Creatures(lv){
   if(lv.rotifer) return;
   lv.rotifer=makeRotifer(); lv.rotifer.scale.setScalar(1.6); lv.rotifer.visible=false; lv.scene.add(lv.rotifer);
   lv.volvox=makeVolvox(30); lv.volvox.visible=false; lv.scene.add(lv.volvox);
+  solidAuto(lv,lv.rotifer,{k:.7}); addSolid(lv,lv.volvox,'sphere',{r:31});
   lv.subjects.push({obj:lv.rotifer,name:'rotifer',label:'Rotifer',r:34,hunt:true});
   lv.subjects.push({obj:lv.volvox,name:'volvox',label:'Volvox',r:32,hunt:true});
   const a=HUNT.anc||{pos:V3(20,0,-40),f:V3(0,0,-1),right:V3(1,0,0)};
@@ -8370,18 +8484,21 @@ defineLevel('mitetown',{
     lv.beds=[]; for(const [x,y,z] of [[-20,-18,20],[25,-18,-15],[-118,12,-30],[112,-3,-50],[-108,-38,95]]){ const b=makeLint(34,20); b.position.set(x,y,z); scene.add(b); lv.beds.push(b); }
     // snack market: bubbles with Paramecium snacks in them, under lint awnings
     lv.market=[]; const mc=V3(-40,42,-150);
-    for(let i=0;i<5;i++){ const a=i/5*Math.PI*2; const p=mc.clone().add(V3(Math.cos(a)*30,4,Math.sin(a)*30)); const bub=sph(7,new THREE.MeshPhysicalMaterial({color:col(0xffffff),roughness:0,transparent:true,opacity:.2,clearcoat:1,depthWrite:false}),p.x,p.y+6,p.z,24,16,false); scene.add(bub); const s=makeSnack(); s.position.copy(p).add(V3(0,6,0)); s.scale.setScalar(.8); scene.add(s); lv.market.push(s); const aw=makeLint(8,10,[0xff9ab8,0x9ad8ff,0xffe08a]); aw.position.copy(p).add(V3(0,12,0)); scene.add(aw); }
+    for(let i=0;i<5;i++){ const a=i/5*Math.PI*2; const p=mc.clone().add(V3(Math.cos(a)*30,4,Math.sin(a)*30)); const bub=sph(7,new THREE.MeshPhysicalMaterial({color:col(0xffffff),roughness:0,transparent:true,opacity:.2,clearcoat:1,depthWrite:false}),p.x,p.y+6,p.z,24,16,false); scene.add(bub); solidAuto(lv,bub,{shape:'sphere',k:1}); const s=makeSnack(); s.position.copy(p).add(V3(0,6,0)); s.scale.setScalar(.8); scene.add(s); lv.market.push(s); const aw=makeLint(8,10,[0xff9ab8,0x9ad8ff,0xffe08a]); aw.position.copy(p).add(V3(0,12,0)); scene.add(aw); }
     const signT=canvasTex(512,160,(x,w,h)=>{ x.fillStyle='rgba(40,20,10,.7)'; x.fillRect(0,0,w,h); x.fillStyle='#ffe08a'; x.font='bold 64px Arial Black, sans-serif'; x.textAlign='center'; x.fillText('SNACKS',w/2,105); });
     const sign=mesh(new THREE.PlaneGeometry(40,12.5),new THREE.MeshBasicMaterial({map:signT,transparent:true,side:THREE.DoubleSide}),mc.x,mc.y+34,mc.z,false); scene.add(sign); lv.marketSign=sign;
     // the mites of Mite Town
     lv.mites=[]; for(let i=0;i<14;i++){ const m=makeDustMite(); m.scale.setScalar(rand(8,12)); const f=pick(lv.flakes); m.position.copy(f.position).add(V3(rand(-25,25),2,rand(-25,25))); m.rotation.y=rand(0,6.28); scene.add(m); m.userData.home=m.position.clone(); m.userData.ph=rand(0,6); lv.mites.push(m); }
     lv.larry=makeDustMite(); lv.larry.scale.setScalar(12); scene.add(lv.larry);
+    // solid stuff in Mite Town
+    for(const f of lv.flakes) flakeSolid(lv,f); for(const b of lv.beds) solidAuto(lv,b,{k:.72}); for(const m of lv.mites) solidAuto(lv,m,{k:.72}); solidAuto(lv,lv.larry,{k:.72});
     // Larry's home flake has his own lint bed and a lamp (a glowing snack)
     lv.home=lv.flakes[0];
     lv.lamp=new THREE.PointLight(col(0xffd070),2,160,2); lv.lamp.position.set(0,20,0); scene.add(lv.lamp);
     // the giant tardigrade (it comes back later) and the lint tangle you lead it into
     lv.tard=makeTardigrade({color:0xc8b098}); lv.tard.scale.setScalar(42); lv.tard.visible=false; scene.add(lv.tard);
     lv.trap=makeLint(120,60,[0xe8e8f0,0xc8d0e0,0xf0e0e8]); lv.trap.position.set(-330,-30,-170); lv.trap.scale.setScalar(1.6); scene.add(lv.trap);
+    solidAuto(lv,lv.tard,{k:.68}); solidAuto(lv,lv.trap,{k:.6});
     lv.snow=makeSnowFor(scene);
     lv.flyBounds=(p,v)=>{ const lim=[[-320,320],[-200,200],[-700,300]]; ['x','y','z'].forEach((k,i)=>{ if(p[k]<lim[i][0]){ p[k]=lim[i][0]; v[k]=Math.abs(v[k])*.3; } if(p[k]>lim[i][1]){ p[k]=lim[i][1]; v[k]=-Math.abs(v[k])*.3; } }); };
     lv.col.bounds=null;
@@ -8514,7 +8631,8 @@ defineLevel('deep',{
     // a sediment floor that slopes down the whole way
     const fl=new THREE.PlaneGeometry(400,3000,40,200); fl.rotateX(-Math.PI/2); const fp=fl.attributes.position; for(let i=0;i<fp.count;i++){ const x=fp.getX(i), z=fp.getZ(i); fp.setY(i,lv.floorY?0:(-120+z*.02)+fbm2(x*.02,z*.02,3)*14+Math.abs(x)*.25); } fl.computeVertexNormals(); fl.translate(0,0,-1250);
     scene.add(mesh(fl,new THREE.MeshStandardMaterial({color:col(0x3a3448),roughness:.9}),0,0,0,false));
-    lv.floor=(x,z)=>(-120+(z+1250)*0+z*.02);
+    lv.floorY=(x,z)=>-120+(z+1250)*.02+fbm2(x*.02,(z+1250)*.02,3)*14+Math.abs(x)*.25;
+    addSolid(lv,null,'fn',{fn:(pos,vel,R)=>{ const fy=lv.floorY(pos.x,pos.z)+R+3; if(pos.y<fy){ pos.y=fy; if(vel&&vel.y<0) vel.y*=-.2; } }});
     // 1) the dark zone: dinoflagellates that light up blue when you swim by
     const N=1400, pos=new Float32Array(N*3), glow=new Float32Array(N);
     for(let i=0;i<N;i++){ pos[i*3]=rand(-150,150); pos[i*3+1]=rand(-130,100); pos[i*3+2]=rand(-950,-420); }
@@ -8525,9 +8643,9 @@ defineLevel('deep',{
     lv.dino=new THREE.Points(dg,dm); lv.dino.frustumCulled=false; scene.add(lv.dino); lv.dinoPos=pos; lv.dinoGlow=glow;
     // 2) the current: a river of fast water with sediment grains in it
     lv.grains=[]; const gm=new THREE.MeshStandardMaterial({color:col(0x8a7a6a),roughness:.8});
-    for(let i=0;i<26;i++){ const r=rand(8,18); const g=mesh(new THREE.DodecahedronGeometry(r,0),gm,rand(-90,90),rand(-100,60),rand(-1400,-980)); g.rotation.set(rand(0,3),rand(0,3),0); scene.add(g); lv.grains.push({g,r}); }
+    for(let i=0;i<26;i++){ const r=rand(8,18); const g=mesh(new THREE.DodecahedronGeometry(r,0),gm,rand(-90,90),rand(-100,60),rand(-1400,-980)); g.rotation.set(rand(0,3),rand(0,3),0); scene.add(g); addSolid(lv,g,'sphere',{r:r*.92,onHit:()=>{ if(G.time-(lv.grainT||0)>.6){ lv.grainT=G.time; SFX.suitHit(); shake(.25); } }}); lv.grains.push({g,r}); }
     // 3) the hydra forest
-    lv.hydras=[]; for(let i=0;i<16;i++){ const h=makeHydra(rand(70,120)); const x=rand(-110,110), z=-1450-i*30+rand(-10,10); h.position.set(x,-140+(z*.02+25),z); scene.add(h); lv.hydras.push(h); }
+    lv.hydras=[]; for(let i=0;i<16;i++){ const h=makeHydra(rand(70,120)); const x=rand(-110,110), z=-1450-i*30+rand(-10,10); h.position.set(x,-140+(z*.02+25),z); scene.add(h); lv.hydras.push(h); { const U=h.userData; addSolid(lv,h,'cyl',{r:3.8,h:U.h/2,cy:U.h/2}); addSolid(lv,U.head,'sphere',{r:5.5}); } }
     // 4) the virus swarm
     lv.phages=[]; for(let i=0;i<34;i++){ const p=makePhage(); p.scale.setScalar(2.2); p.position.set(rand(-120,120),rand(-100,80),rand(-2350,-1950)); p.userData.home=p.position.clone(); scene.add(p); lv.phages.push(p); }
     // 5) the shard
@@ -8535,9 +8653,14 @@ defineLevel('deep',{
     const cm=new THREE.MeshPhysicalMaterial({color:col(0xc86aff),roughness:.05,metalness:.1,clearcoat:1,emissive:col(0x9a3aff),emissiveIntensity:1.8,transparent:true,opacity:.9});
     const c1=mesh(new THREE.OctahedronGeometry(8,0),cm,0,0,0,false); c1.scale.set(.7,2.2,.7); sh.add(c1); const c2=mesh(new THREE.OctahedronGeometry(4,0),cm,5,-6,2,false); c2.scale.set(.6,1.6,.6); c2.rotation.z=-.5; sh.add(c2);
     lv.shardLight=new THREE.PointLight(col(0xc86aff),4,260,1.6); sh.add(lv.shardLight);
-    const mound=mesh(new THREE.SphereGeometry(30,24,12,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:col(0x3a3448),roughness:.9}),0,-146,-2520,false); mound.scale.y=.4; scene.add(mound);
+    addSolid(lv,sh,'sphere',{r:9,cond:()=>!F_().shardTaken});
+    // (a second, tiny piece of the crystal, hidden way up in the dark)
+    const pc=new THREE.Group(); pc.position.set(141,97,-728); scene.add(pc); lv.piece=pc;
+    const pm=new THREE.MeshPhysicalMaterial({color:col(0xc86aff),roughness:.05,clearcoat:1,emissive:col(0x9a3aff),emissiveIntensity:.5,transparent:true,opacity:.9}); const p1=mesh(new THREE.OctahedronGeometry(1.4,0),pm,0,0,0,false); p1.scale.set(.7,2,.7); pc.add(p1);
+    const mound=mesh(new THREE.SphereGeometry(30,24,12,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:col(0x3a3448),roughness:.9}),0,-146,-2520,false); mound.scale.y=.4; scene.add(mound); addSolid(lv,mound,'sphere',{r:30});
     // Larry, riding a Paramecium
     lv.ride=makeSnack(); lv.ride.scale.setScalar(5.5); scene.add(lv.ride);
+    solidAuto(lv,lv.ride,{k:.8,cond:()=>!F_().riding});
     lv.larry=makeDustMite(); lv.larry.scale.setScalar(6); lv.larry.position.set(0,6,0); lv.ride.add(lv.larry); lv.larry.scale.setScalar(6/5.5);
     // boost rings: swim through one and it shoots you forward
     lv.boosts=[]; const bm=rimify(new THREE.MeshPhysicalMaterial({color:col(0x6dffd8),emissive:col(0x2adfb0),emissiveIntensity:1.6,roughness:.2,transparent:true,opacity:.9}),0xb0fff0,1.5,2);
@@ -8603,7 +8726,7 @@ CHECKPOINTS.A8=async()=>{
   PLAYER.fly=true; PLAYER.eye=0; PLAYER.scale=PLAYER.targetScale=1; PLAYER.item=null; setVM(true); setVMSuit(true);
   $('visor').classList.add('show'); $('scaleRead').textContent='1 : 10,000,000'; $('photoRead').textContent='PHOTOS: 5';
   PLAYER.lock(); crosshair(true); hudVisible(true); objective(null);
-  lv.ride.visible=true; lv.ride.position.set(22,6,66);
+  lv.ride.visible=true; lv.ride.position.set(22,6,66); if(lv.piece) lv.piece.children[0].visible=true;
   lookAtPoint(V3(0,-40,-200),0);
   await fade(0,1);
   await talk([{who:'Jim',radio:true,text:"The shard should be deep down. It glows purple."},{who:'Larry',voice:'Larry',text:"I'll ride my Paramecium. Stay close!"}]);
@@ -8611,6 +8734,7 @@ CHECKPOINTS.A8=async()=>{
     addInteract(lv,{pos:V3(),label:'Break free!',cd:.06,reach:999,d3:false,aim:false,when:()=>!!F_().grabbed,act:()=>{ F_().wiggle=(F_().wiggle||0)+.12; SFX.squirm(); shake(.05); }});
     on('tick',()=>{ if(LV===lv){ const it=lv.inter[0]; it.pos=PLAYER.pos.clone(); } });
     addInteract(lv,{obj:lv.ride,label:()=>F_().riding?'Hop off':"Ride on Larry's Paramecium",reach:45,d3:true,aim:false,when:()=>F_().deepOn&&(F_().riding||(PLAYER.pos.z>-1380||(PLAYER.pos.z<-2390&&PLAYER.pos.z>-2440))),act:()=>{ if(F_().riding) runStory(()=>rideOff(null)); else rideOn(); }});
+    addInteract(lv,{obj:lv.piece,label:'Take it',reach:24,d3:true,when:()=>!F_().piece2&&lv.piece.children[0].visible,act:()=>{ F_().piece2=true; lv.piece.children[0].visible=false; SFX.pickup(); flashWhite(.3,.5); toast('Got: A TINY PURPLE PIECE','#c86aff'); }});
     addInteract(lv,{obj:lv.shard,label:'Take the shard',reach:60,d3:true,when:()=>!!F_().deepOn&&!F_().grabbed,act:()=>runStory(takeShard)});
     addTrigger(lv,{pos:V3(0,0,-440),r:1,box:[400,30],once:true,fn:()=>{ bark('Larry',"It's dark down here. Swim near the little guys, they light up!",null,3.6); unlock('deep'); }});
     addTrigger(lv,{pos:V3(0,0,-980),r:1,box:[400,30],once:true,fn:()=>bark('Larry',"Current! Hold on!",null,3)});
@@ -8634,6 +8758,7 @@ async function takeShard(){
   SFX.dreamSwell(); FX.bloomStrength=1.4; lv.shardLight.intensity=12; lv.shardLight.distance=900; lv.shard.position.copy(PLAYER.pos).add(V3(0,-5,-10));
   for(let i=0;i<8;i++) lv.glow.burst(PLAYER.pos.clone().add(V3(rand(-30,30),rand(-20,20),rand(-40,-10))),{color:pick([0xc86aff,0xff8aff,0x6dffd8]),count:30,speed:15,size:.8,life:2,grav:0});
   await wait(1.6); FX.bloomStrength=.55;
+  if(F.piece2){ await talk([{who:'You',text:"I found it!"},{who:'Jim',radio:true,text:"You found it!"}]); return bigLarryEnding(); }
   await talk([{who:'You',text:"I found it!"},{who:'Jim',radio:true,text:"You found it!"},{who:'Larry',voice:'Larry',text:"We did it! Let's go home!"}]);
   // Larry's Paramecium takes you both home, fast
   await fade(1,.8); vmCarry(null); PLAYER.carry=null; lv.shardLight.intensity=0;
@@ -8650,6 +8775,143 @@ async function takeShard(){
   showTBC('THE TINYVERSE','B1');
 }
 
+
+</script>
+<script>
+/* ===== 57_extra.js ===== */
+/* ================================================================
+   SECRET ENDINGS (no hints!) and the COMING SOON teasers.
+   ================================================================ */
+const SECRET_ENDINGS=['secretSteve','secretJeff','secretLarry'];
+
+/* ---------- Mars Shift secret: knock on Steve's door too many times ---------- */
+async function steveWins(){
+  const lv=LEVELS.ship, F=F_(), st=lv.steve; if(F.caught) return; F.caught=true; PLAYER.lock(); objective(null);
+  lv.sideDoor.target=1; sfxAt(V3(1.3,1.2,-7.5),()=>SFX.hydraulic(),2); await wait(.5);
+  st.visible=true; st.userData.A.path=null; st.position.set(2.1,0,-7.5); st.rotation.y=-Math.PI/2; st.userData.A.look='player'; setMood(st,'evil'); clearPose(st,0);
+  lookAtPoint(V3(2.1,1.62,-7.5),.3); SFX.heartbeat(1.4); shake(.3);
+  await talk([{h:st,who:'Steve',text:"Got you.",mood:'evil'}]);
+  SFX.whoosh(1); await tweenVal(k=>{ FX.blackout=k; },.25); SFX.clank(); await wait(.8);
+  say("Steve got the watch.",3.2); await wait(3.2);
+  // and then he uses it
+  const sp=await enterLevel('space',{pos:V3(0,0,40)}); sp.rocket.visible=false; playMusic('xxx5',.5);
+  const E=sp.earth; const s0=E.scale.x; letterbox(true);
+  camShot(E.position.clone().add(V3(260,120,520)),E.position,{dur:0,fov:40});
+  await tweenVal(k=>{ FX.blackout=1-k; },1);
+  say("He shrinks the Earth.",3.6); await wait(1.4);
+  SFX.shrink(); flashWhite(.6,.8);
+  await tweenVal(k=>{ E.scale.setScalar(s0*(1-k*.995)); },2.6);
+  SFX.sparkle&&SFX.sparkle(); await wait(1.6);
+  await tweenVal(k=>{ FX.blackout=k; },1.2); letterbox(false); camRelease(0); E.scale.setScalar(s0); sp.rocket.visible=true;
+  unlock('secretSteve'); showTBC('MARS SHIFT','A1',{secret:'steve'});
+}
+/* ---------- Mars Shift secret: free Jeff in time (you have to be REALLY fast) ---------- */
+async function savedJeff(){
+  const lv=LEVELS.insidex, F=F_(), jeff=lv.jeff; F.jeffStuck=false; F.boomed=true; spamHUD(false); PLAYER.lock(); objective(null);
+  jeff.userData.stuck=false; jeff.userData.happy=true; SFX.bark(); shake(.2);
+  const j0=jeff.position.clone(), p0=PLAYER.pos.clone();
+  await tweenVal(k=>{ jeff.position.lerpVectors(j0,V3(.4,0,9.4),k); PLAYER.pos.z=lerp(p0.z,9.4,k); },1.2,x=>x);
+  countHUD(null); SFX.shipBoom(); SFX.boom(); flashWhite(1,2); shake(1.2); FX.whiteout=1; await wait(1.4);
+  const E=await enterLevel('blockearth',{pos:V3(4,0,-1),yaw:Math.PI*.5});
+  E.xBig.visible=false; E.rocket.visible=true; E.jim.visible=false; for(const f of E.folk) f.visible=false; E.bob.visible=true; E.bob.position.set(1.6,0,-3); E.bob.rotation.set(0,.6,0); E.bob.userData.A.mode=null;
+  if(!E.jeff){ E.jeff=makeDog(); E.scene.add(E.jeff); } const J=E.jeff; J.visible=true; J.position.set(5,0,-2.2); J.rotation.y=Math.PI; J.userData.happy=true; J.userData.stuck=false;
+  PLAYER.lock(); setVM(true); PLAYER.eye=1.64; lookAtPoint(V3(5,.4,-2.2),0); playMusic('pluto',2);
+  for(let i=0;i<8;i++) E.glow.burst(V3(6+rand(-20,20),rand(30,60),-60+rand(-20,20)),{color:pick([0xc86aff,0xffa040]),count:30,speed:10,size:1.4,life:2,grav:4});
+  await tweenVal(k=>{ FX.whiteout=1-k; },1.6);
+  SFX.bark(); await wait(.6); SFX.bark();
+  say('You made it out. Both of you.',3.6); await wait(3.6);
+  await talk([{who:'You',text:"Good boy, Jeff."},{h:J,who:'Jeff',text:"Bark!"}]);
+  await wait(.8); await tweenVal(k=>{ FX.blackout=k; },1.6);
+  unlock('secretJeff'); showTBC('MARS SHIFT','A1',{secret:'jeff'});
+}
+/* ---------- Tinyverse secret: the second tiny piece of crystal ---------- */
+async function bigLarryEnding(){
+  const F=F_(); PLAYER.lock(); objective(null);
+  await talk([{who:'Jim',radio:true,text:"Wait... you found TWO pieces? That's enough crystal for two!"},{who:'Larry',voice:'Larry',text:"Two? Who's the other one for?"}]);
+  await fade(1,.8); $('visor').classList.remove('show'); vmCarry(null); PLAYER.carry=null;
+  const L=await enterLevel('lab',{pos:V3(0,0,-1.8),yaw:Math.PI});
+  PLAYER.fly=false; PLAYER.swim=false; setVMSuit(true); setVM(true); PLAYER.eye=.06; PLAYER.pitch=.1;
+  const jim=L.jim; jim.visible=true; jim.position.set(.3,0,1.6); jim.rotation.y=Math.PI; jim.userData.A.look='player'; setMood(jim,'shock');
+  if(!L.bigLarry){ L.bigLarry=makeDustMite(); L.scene.add(L.bigLarry); } const BL=L.bigLarry; BL.visible=true; BL.position.set(-1.7,0,-.6); BL.rotation.y=Math.PI*.7; BL.scale.setScalar(.01);
+  lookAtPoint(V3(.3,1.4,1.6),0); playMusic('lab',1);
+  FX.whiteout=1; await fade(0,.3);
+  // the ray fires... and you grow
+  SFX.rayFire&&SFX.rayFire(); SFX.grow(); shake(.6);
+  await tweenVal(k=>{ FX.whiteout=1-k; PLAYER.eye=lerp(.06,1.64,k*k); },2.6);
+  say("You're big again!",2.6); await wait(2.4);
+  // ...and so is Larry
+  SFX.grow(); flashWhite(.8,.9); shake(.4);
+  lookAtPoint(V3(-1.7,.6,-.6),.8);
+  await tweenVal(k=>{ BL.scale.setScalar(lerp(.01,.62,k)); },2.4);
+  BL.userData.talking=true;
+  await talk([{h:jim,who:'Jim',text:"...Uh oh.",mood:'shock'},{who:'Larry',voice:'Larry',text:"Guess I'm big now."}]);
+  BL.userData.talking=false;
+  await wait(.6); await tweenVal(k=>{ FX.blackout=k; },1.6);
+  unlock('secretLarry'); showTBC('THE TINYVERSE','B1',{secret:'larry'});
+}
+on('tick',()=>{ const L=LEVELS.lab; if(LV===L&&L.bigLarry&&L.bigLarry.visible) animateDustMite(L.bigLarry,G.time,G.dt||.016); });
+
+/* ================= COMING SOON teasers ================= */
+const TEASERS={
+  B:async()=>{
+    // 1) a pale green hand out of purple goo... Steve survived
+    const E=await enterLevel('blockearth',{pos:V3(0,0,30)}); E.setBurning(true); E.xBig.visible=false; for(const f of E.folk) f.visible=false; E.bob.visible=false; E.jim.visible=false; E.rocket.visible=false; if(E.jeff) E.jeff.visible=false;
+    if(!E.teaseSteve){ E.teaseSteve=makeSteve({skin:0xc8d8c0,skinGlow:0,sss:[.3,.3,.3]}); E.teaseSteve.userData.level='blockearth'; E.scene.add(E.teaseSteve); const goo=mesh(new THREE.CircleGeometry(2.2,32),new THREE.MeshPhysicalMaterial({color:col(0x9a2aff),roughness:.05,clearcoat:1,emissive:col(0x5a0a9a),emissiveIntensity:1}),0,.03,0,false); goo.rotation.x=-Math.PI/2; E.scene.add(goo); E.teaseGoo=goo; }
+    const S=E.teaseSteve; S.visible=true; S.position.set(2,-1.9,2); S.rotation.y=.3; setMood(S,'evil'); S.userData.A.look=null; E.teaseGoo.visible=true; E.teaseGoo.position.set(2,.03,2);
+    letterbox(true); camShot(V3(3.4,1,5.6),V3(2,.8,2),{dur:0,fov:38}); playMusic('xxx5',.5);
+    await fade(0,.6);
+    await tweenVal(k=>{ S.position.y=lerp(-1.9,0,k); if(Math.random()<.3) E.glow.burst(V3(2,.2,2),{color:0xc86aff,count:4,speed:1.5,size:.06,life:.8,grav:-2}); },2.2);
+    say('Steve survived.',2.6); await wait(2.2);
+    // 2) Alex, at the hologram of Earth
+    await fade(1,.35); E.teaseSteve.visible=false; E.teaseGoo.visible=false;
+    const Sh=await enterLevel('ship',{pos:V3(0,0,-6)}); Sh.alex.visible=true; Sh.steve.visible=false; Sh.alex.userData.A.look=null; setMood(Sh.alex,'smirk');
+    camShot(V3(3.2,1.5,-6.4),V3(4.8,1.4,-7.4),{dur:0,fov:40}); await fade(0,.35);
+    say('Alex takes over.',2.6); await wait(2.8);
+    // 3) the blocky Earth, still blocky
+    await fade(1,.35);
+    const E2=await enterLevel('blockearth',{pos:V3(0,0,30)}); E2.setBurning(false); E2.ship.visible=false; for(const f of E2.folk){ f.visible=true; f.userData.A.mode=null; }
+    E2.jim.visible=true; E2.jim.position.set(-1.5,0,8); E2.jim.rotation.y=Math.PI; E2.bob.visible=true; E2.bob.position.set(1.5,0,8); E2.bob.rotation.y=Math.PI;
+    camFollow(t=>({pos:V3(-6+t*1.2,3+t*.5,16),look:V3(0,2,-6)}),50); await fade(0,.35); playMusic('blocky',.5);
+    say('Earth is still all blocks. Time to fix it.',3.2); await wait(3.4);
+    // 4) a bark, somewhere far away...
+    await fade(1,.35); E2.jim.visible=false; E2.bob.visible=false;
+    const X=await enterLevel('insidex',{pos:V3(0,0,6)}); X.steve.visible=false; X.bob.visible=false; X.nuke.visible=false; X.jeff.visible=true; X.jeff.position.set(0,0,-8); X.jeff.rotation.y=Math.PI; X.jeff.userData.happy=false;
+    camShot(V3(.4,.9,-2),V3(0,.4,-8),{dur:0,fov:36}); playMusic(null,.3); await fade(0,.5);
+    await tweenVal(k=>{ X.jeff.position.z=lerp(-8,-14,k); },2.4);
+    SFX.bark(); say('And Jeff...?',2.6); await wait(2.4);
+  },
+  A:async()=>{
+    // 1) the shrink ray, with a purple shard in it
+    const L=await enterLevel('lab',{pos:V3(0,0,3)}); L.jim.visible=true; L.jim.position.set(1.4,0,-1.2); L.jim.rotation.y=-1.2; setMood(L.jim,'happy'); setPose(L.jim,'type',0);
+    if(!L.teaseShard){ const m=new THREE.MeshPhysicalMaterial({color:col(0xc86aff),roughness:.05,clearcoat:1,emissive:col(0x9a3aff),emissiveIntensity:2.2,transparent:true,opacity:.9}); L.teaseShard=mesh(new THREE.OctahedronGeometry(.12,0),m,0,1.6,-1.8,false); L.teaseShard.scale.set(.7,2.2,.7); L.scene.add(L.teaseShard); }
+    L.teaseShard.visible=true; if(L.bigLarry) L.bigLarry.visible=false;
+    letterbox(true); camFollow(t=>({pos:V3(Math.sin(t*.3)*3,1.7,-1.8+Math.cos(t*.3)*3),look:V3(0,1.6,-1.8)}),44); playMusic('lab',.5);
+    await fade(0,.6); say('Jim fixes the shrink ray.',2.8);
+    for(let i=0;i<10;i++){ L.teaseShard.rotation.y+=.6; await wait(.28); } clearPose(L.jim);
+    // 2) Mite Town: Larry waves
+    await fade(1,.35); L.teaseShard.visible=false;
+    const M=await enterLevel('mitetown',{pos:V3(0,40,160)}); M.tard.visible=false; M.nervous=M.panic=M.cheer=false; M.larry.position.set(0,12,110); M.larry.rotation.y=Math.PI;
+    camShot(V3(30,34,200),V3(0,16,110),{dur:0,fov:40}); playMusic('larry',.5); await fade(0,.35);
+    say('Goodbye, Larry?',2.6); M.larry.userData.talking=true; await wait(2.8); M.larry.userData.talking=false;
+    // 3) going home: white light, up and up
+    await fade(1,.35);
+    const L2=await enterLevel('lab',{pos:V3(0,0,3)}); L2.jim.visible=true; L2.jim.position.set(.3,0,1.4); L2.jim.rotation.y=Math.PI;
+    camFollow(t=>({pos:V3(0,.1+t*.5,-1.8),look:V3(.3,1.4+t*.1,1.4)}),55); await fade(0,.35);
+    SFX.grow(); flashWhite(.8,1.2); say('Going home.',2.6); await wait(2.8);
+  }
+};
+async function playTeaser(chapter,other){
+  const fn=TEASERS[WORLD.path]; if(!fn){ showTBC(chapter,other,{noTeaser:true}); return; }
+  const end=()=>{ $('teaserSkip').style.display='none'; $('comingSoon').style.display='none'; cardHide(); letterbox(false); camRelease(0); hideSay(); FX.whiteout=0; FX.blackout=0; showTBC(chapter,other,{noTeaser:true}); };
+  $('teaserSkip').style.display=''; $('teaserSkip').onclick=()=>{ resetStory(); fade(0,.1); end(); };
+  G.mode='menu'; hudVisible(false); await fade(1,.4);
+  runStory(async()=>{
+    await fn();
+    // COMING SOON
+    await fade(1,.4); playMusic(null,1); SFX.titleSlam(); $('csChap').textContent=chapter; $('comingSoon').style.display='flex'; await fade(0,.3);
+    await wait(3.4); end();
+  });
+}
 
 </script>
 <script>
