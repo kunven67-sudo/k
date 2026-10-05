@@ -729,3 +729,15 @@ expectations and habits vary per individual — never one fixed rule for everyon
   things through chat/voice ("come with me", "leave", "buy me a beer", "stop") and they decide
   based on their personality, mood and relationship with you. You can talk with your kids
   like any NPC, and punch people (fights as already designed).
+
+## 38. Round 82 — game feel
+
+- **Fighting**: real boxing feel — fast-draining stamina, blocking & dodging, aimed hits (head
+  / body), staggers and true ragdoll knockouts; boxing-gym training helps.
+- **Driving**: **simulation** (BeamNG-like weight, braking, terrifying ice) — still needs to be
+  controllable on keyboard and touch.
+- **Crash damage**: **soft-body crumple** where you hit (simplified on phones).
+- **Walking**: **weighty** (RDR2-like momentum, slower turns, planted feet).
+- **Part-by-part car repair** (My Summer Car / Car Mechanic Simulator style): replace tires,
+  brakes, windshield, battery, bumpers, headlights, engine parts, etc. — yourself (DIY, can
+  go wrong) or at a shop; parts wear and get damaged individually.
