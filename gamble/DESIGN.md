@@ -927,3 +927,9 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Drive-in theater** in Sparks (sound via car radio; date spot).
 - **Language learning app** (Duolingo): daily practice slowly unlocks understanding of Spanish,
   Cantonese and Japanese NPCs without the translator; skipping days → forgetting.
+- **Betting pools**: office lottery pools (winner drama), March Madness brackets, Super Bowl
+  squares, season-long fantasy football (online friends too).
+- **Prediction markets** (Kalshi-style) on real-life events (snow tomorrow via live weather,
+  elections, awards); Nevada regulators may shut them down in-game.
+- **Poker staking**: get staked by rich NPCs (split winnings, owe makeup) or stake others.
+- **Racehorse syndicate shares**: pay feed/trainer/vet, watch races, win purses or suffer injuries.
