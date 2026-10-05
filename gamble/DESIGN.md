@@ -975,3 +975,16 @@ have a Ring cam; a witness only matters if someone actually saw it).
   dollars.
 - **Bar tabs**: open with your card; forgetting to close while drunk leaves your card at the bar
   and a shocking bill next morning.
+- **Drinking extras**: hangover cures (water, greasy breakfast, electrolytes, sleep; "hair of the
+  dog" helps briefly then worsens it), drinking games (flip cup, quarters, beer pong), Reno
+  brewery tours & tasting flights, homebrewing (weeks; may taste awful; sell at parties).
+- **Food truck business**: used truck, health permit & inspections, cook real orders, park at
+  events (Rib Cook-off, Burning Man, bar close-outs), breakdowns, slow rainy days.
+- **Thanksgiving deep-fried turkey**: frozen turkey in hot oil → physics fire; done right → best
+  turkey ever.
+
+## 49. Content limits (hard rules)
+
+- **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
+  can still be rude, trash talk, swear (per the swear-filter setting) and fight — depending on
+  the person — but never target race.
