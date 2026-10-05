@@ -716,3 +716,16 @@ expectations and habits vary per individual — never one fixed rule for everyon
   (crowd behavior depends on the person).
 - **Rival gambler NPC** who keeps showing up, trash talks, bets against you, competes for
   partners/jobs, remembers every result — can become an enemy or best friend over years.
+
+## 37. Rounds 80–81
+
+- **No cheat codes.** **One life / one character only.** Menus in **English + Spanish**.
+- **Physics toys**: ridable shopping carts, wind-blown tumbleweeds bouncing off cars, cones &
+  trash cans, downtown pigeons (feed → swarm, run → scatter).
+- **Lucky-streak moments**: rare hype build-ups (camera, music, crowd) on hot streaks.
+- **Life highlight reel**: the obituary comes with a montage of your best/worst moments.
+- **Retro slot museum**: 1950s–1990s-style machines playable at an old casino.
+- **NPCs act on what you say — if they want to**: ask anyone (including your kids) to do
+  things through chat/voice ("come with me", "leave", "buy me a beer", "stop") and they decide
+  based on their personality, mood and relationship with you. You can talk with your kids
+  like any NPC, and punch people (fights as already designed).
