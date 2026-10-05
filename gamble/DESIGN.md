@@ -1070,6 +1070,18 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Middle finger emote** on foot (and in cars): NPC reactions depend on the person (laugh,
   ignore, confront).
 
+## 52. PHONE, COMPUTER & PEOPLE (owner focus)
+
+- **Phone details**: passcode & Face ID (depends on phone; shoulder-surfers can learn it), storage
+  full (delete or pay for cloud), customization (wallpapers from your photos, ringtones, app layout,
+  cases), Do Not Disturb (miss important calls).
+- **Call any NPC** by mic or typing; if they don't pick up (depends on the person) leave a real
+  voicemail in your voice that they listen to later.
+- **PC building**: buy parts online/in store and assemble in 3D (no thermal paste → overheating), or
+  buy pre-built/laptops; better parts → smoother PC games & more mining.
+- **Relationship stages**: talking → dating → "what are we?" → exclusive → moving in → engaged →
+  married; pacing preferences depend on the person (some never want marriage).
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
