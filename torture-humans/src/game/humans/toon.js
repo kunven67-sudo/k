@@ -404,7 +404,7 @@ export function buildToon(template, { seed = 'x', gender = 'm', job = '', style 
   const faceFront = (l) => l.z;
   // (the whole face is on the head bone: the small face bones aren't posed the same in the
   // file as in the bind pose, so anything weighted to them gets dragged out of place)
-  const blush = skin.clone().lerp(new THREE.Color(0xe8746a), 0.35);
+  const blush = skin.clone().lerp(new THREE.Color(0xe8746a), 0.35 * Math.min(1, skin.getHSL({}).l * 1.6) ** 2); // (faint on darker skin)
   const head = B.ellipsoid(hc, hr, (l) => (l.z > 0.55 && Math.abs(l.x) > 0.38 && Math.abs(l.x) < 0.7 && l.y < -0.05 && l.y > -0.42 ? blush : skin), one('Bip01_Head'), { seg: 24, rings: 18, soft: (l) => Math.max(0, l.z) * THREE.MathUtils.clamp(-l.y, 0, 1) * 0.6 * S.soft });
   // ears
   for (const sx of [-1, 1]) B.ellipsoid(new THREE.Vector3(sx * hr.x * 0.98, hc.y - 0.005, hc.z - 0.01), new THREE.Vector3(0.012, 0.028, 0.02).multiplyScalar(H), skin, one('Bip01_Head'), { seg: 8, rings: 6 });
