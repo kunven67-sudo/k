@@ -811,3 +811,6 @@ manual everything and broken gauges).
   block and mute buttons, and host kick.
 - **Leaderboards**: global (all players) + friends tab.
 - **Profile picture**: DMV ID photo by default, changeable to any in-game photo.
+- Strangers' mics are **open by default** in public lobbies (proximity), mutable per person.
+- **Host controls**: death rule (permadeath/hospital), player-vs-player fighting & robbing on/off,
+  private/invite-only lock, max players (2–8).
