@@ -81,6 +81,7 @@ export class Speech {
     b.el.textContent = text;
     b.el.classList.toggle('shout', shout || /!{1}$|[A-Z]{4,}/.test(text));
     this.log.push({ who: h.profile?.name, text });
+    this.audio?.voice(h, text, { shout: shout || /!$/.test(text) });
     if (this.log.length > 50) this.log.shift();
     h.lastSaid = performance.now();
   }

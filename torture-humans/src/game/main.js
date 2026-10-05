@@ -17,6 +17,7 @@ import { Shops } from './shops.js';
 import { Germs } from './germs.js';
 import { Village } from './village.js';
 import { Pets } from './pets.js';
+import { Audio } from './audio.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { Hands } from './gadgets/hands.js';
 import { Cage } from './cage.js';
@@ -142,8 +143,11 @@ export async function boot() {
   }
   // what people say: speech bubbles over their heads
   const speech = new Speech({ camera });
+  // sound (made in code): footsteps by size, voices, gadgets, the world around you
+  const audio = new Audio({ settings, camera });
+  speech.audio = audio;
   for (const h of humans) { h.speech = speech; h.player = player; }
-  const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony, speech });
+  const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony, speech, audio });
   // T / Enter: type something to whoever you're looking at (or holding)
   const talk = new Talk({ input, camera, humans, speech, player, colony, canvas: input.target, getHeld: () => hands.items.find((i) => i.held)?.held ?? null });
   player.cage = cage;
@@ -178,7 +182,7 @@ export async function boot() {
   });
   const crime = (kind, pos, victim) => police.crime(kind, pos, victim);
   hands.ctx.crime = crime;
-  squisher.onSquish = (h, p) => crime('kill', p, h);
+  squisher.onSquish = (h, p) => { audio.squish(p); crime('kill', p, h); };
   if (params.get('item') === 'jar') hands.select(1);
   if (params.get('item') === 'supplies') hands.select(2);
 
@@ -331,7 +335,7 @@ export async function boot() {
   if (params.get('pet')) pets.adopt(params.get('pet'));
   // the germ world: what's on the floor when you're smaller than 2 cm
   const germs = new Germs({ scene, player, physics });
-  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, frame: 0 };
+  const game = { scene, camera, physics, input, renderer, player, settings, character, level, nav, humans, hands, cage, colony, vitals, hazards, env, bugs, speech, talk, police, family, interact, shops, germs, village, pets, audio, frame: 0 };
   hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
 
@@ -356,6 +360,7 @@ export async function boot() {
     shops.update();
     germs.update(dt);
     pets.update(dt);
+    audio.update(dt, { env, zone, player });
     vitals.update(dt);
     nav.update(dt);
     colony?.update(dt);

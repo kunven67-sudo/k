@@ -76,6 +76,7 @@ class ShrinkRay extends Item {
     b.scale.set(1, from.distanceTo(to), 1);
     for (const m of b.userData.mats) m.color.set(0xffb347); // warm orange: growing
     b.userData.grow = true;
+    this.ctx.audio?.zap(true);
     const target = hit?.owner;
     if (target?.grow && target.tiny) target.grow(1);
   }
@@ -104,6 +105,7 @@ class ShrinkRay extends Item {
     b.scale.set(0.6 + power, len, 0.6 + power);
     for (const m of b.userData.mats) m.color.set(0x7fd6ff);
     this.model.userData.light.intensity = 25;
+    this.ctx.audio?.zap(false);
     const target = hit?.owner;
     if (target?.shrink && !target.tiny && !target.dead) {
       target.shrink(TINY, { power });
@@ -115,6 +117,7 @@ class ShrinkRay extends Item {
   update(dt) {
     this.cooldown = Math.max(0, this.cooldown - dt);
     if (this.charging) this.charge = Math.min(1, this.charge + dt / CHARGE_TIME);
+    this.ctx.audio?.chargeHum(this.charging ? this.charge : 0);
     const u = this.model.userData;
     const hum = this.charging ? this.charge : 0;
     u.coreMat.emissiveIntensity = 0.4 + hum * 9 + Math.sin(performance.now() / 40) * hum * 0.8;
@@ -190,6 +193,7 @@ class Jar extends Item {
       if (best) {
         if (best.h.state !== 'caged') this.ctx.crime?.('kidnap', best.h.position.clone(), best.h);
         this.inside = best.h;
+        this.ctx.audio?.clink(s.target);
         best.h.captureInto(this.model, { watcher: this.ctx.camera });
       }
       s.result = best ? 'caught' : 'missed';
