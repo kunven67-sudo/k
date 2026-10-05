@@ -495,3 +495,24 @@ to the owner must be tagged 🟢 least realistic / 🟡 realistic / 🔴 most re
 - **Retirement**: Social Security from 62+ (more with work history), 401k with company match
   (early withdrawal penalty), visible aging (slower, cane, gray hair, eyesight, shaky hands at
   the table), retirement homes (weekly bingo).
+
+## 24. Later additions (rounds 59–60)
+
+- **Debt consequences**: collection calls/texts (even at work), wage garnishment, small
+  claims court (sue or be sued, argue your case), bankruptcy (most debt wiped, lose stuff,
+  credit wrecked ~10 years).
+- **Identity theft** after a stolen wallet: cards opened in your name, credit score tanks;
+  freeze credit + police report, takes weeks.
+- **Phone damage depends on the model** (water resistance, toughness): water damage (rain,
+  puddles, toilet → rice), spreading cracks/dead touch zones, battery aging, street theft
+  (Find My Phone).
+- **Car paperwork**: yearly DMV registration, Nevada smog checks, license renewal; expired →
+  tickets, possible impound.
+- **Home problems**: frozen/burst pipes in winter, roof leaks & mold (sickness), appliance
+  breakdowns (fridge → spoiled food, washer floods, water heater → cold showers), DIY fixes
+  via YouTube tutorials (may make it worse) or pricey pros.
+- **Renting**: lazy landlords (slow repairs), security deposits (kept for damage), yearly
+  rent increases, real eviction process (notice → court → sheriff lockout → stuff on curb).
+- **Thermostat**: heating/AC cost a lot on the power bill; turning them off → freeze/sweat.
+- **Moving**: U-Haul DIY (carry boxes with physics, friends help for pizza), hired movers
+  (fast, pricey, may break/"lose" stuff), many small car trips.
