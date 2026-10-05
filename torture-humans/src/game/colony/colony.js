@@ -12,6 +12,7 @@ import { collectTriangles, GROUP, groups } from '../engine/physics.js';
 import { solveTwoBone } from '../engine/anim.js';
 import { pieceMesh, K, POLE } from './items.js';
 import { Site, Fire, nextBlueprint, BLUEPRINTS } from './buildings.js';
+import { Farm, berryMesh } from './farm.js';
 
 // The tiny navmesh is built 20x bigger than the tank, so to Recast/Detour the
 // tiny people are full size: its built-in distances (e.g. it drops path corners
@@ -172,6 +173,7 @@ export class Colony {
     this.chooseCamp();
     this.fire = new Fire(this.world, this.center.clone().add(new THREE.Vector3(0, 0.001, 0)));
     this.fireBuilt = false;
+    this.farm = new Farm(this);
     this.ready = true;
   }
 
@@ -282,8 +284,8 @@ export class Colony {
   }
 
   // lying on the ground at a spot (made by chopping/mining, or dropped by someone)
-  spawnOnGround(kind, local) {
-    const p = new Piece(kind, pieceMesh(kind));
+  spawnOnGround(kind, local, mesh = null) {
+    const p = new Piece(kind, mesh || pieceMesh(kind));
     this.world.add(p.mesh);
     p.mesh.position.copy(local);
     this.pieces.push(p);
@@ -505,6 +507,7 @@ export class Colony {
     this.updatePieces(dt);
     for (const s of this.sites) s.update(dt);
     this.fire?.update(dt);
+    this.farm?.update(dt);
     // anyone in the tank without a life here yet (dropped in before the camp was ready)
     for (const h of this.cage.residents) if (!h.dead && h.state === 'caged' && !this.residents.has(h)) this.admit(h);
     // the plan: what to build next
@@ -1011,6 +1014,64 @@ class Resident {
     }
   }
 
+  // plant a seed in the field
+  *sow(p, spot) {
+    p.claimedBy = this;
+    spot.claimedBy = this;
+    try {
+      this.doing = 'fetching seeds';
+      if (!(yield* this.walkTo(p.reach, 0.016))) { p.failedUntil = performance.now() + 45000; return; }
+      if (p.state !== 'ground' && p.state !== 'stock') return;
+      yield* this.pickUp(p);
+      this.doing = 'planting seeds';
+      const at = this.c.toWorld(spot.p);
+      if (!(yield* this.walkTo(at, 0.02, { ext: { x: 0.05, y: 0.05, z: 0.05 } }))) return;
+      this.face = at;
+      this.crouch = 1;
+      yield* this.wait(0.5);
+      this.pose = { R: at, grip: 0.4 };   // press it into the soil
+      yield* this.wait(0.9);
+      this.carry = null;
+      this.c.removePiece(p);
+      if (!spot.crop) this.c.farm.plant(spot);
+      this.c.note(`${this.h.profile.name} planted seeds`);
+      yield* this.wait(0.3);
+    } finally {
+      this.pose = null; this.crouch = 0; this.face = null;
+      spot.claimedBy = null;
+      if (p.claimedBy === this) p.claimedBy = null;
+      if (this.carry === p) this.dropCarried();
+    }
+  }
+
+  // pick the ripe berries off a plant (they land beside it; someone takes them to the pile or eats them)
+  *pickBerries(crop) {
+    crop.claimedBy = this;
+    try {
+      this.doing = 'picking berries';
+      const at = crop.group.getWorldPosition(new THREE.Vector3());
+      if (!(yield* this.walkTo(at, 0.022, { ext: { x: 0.05, y: 0.05, z: 0.05 } }))) return;
+      this.face = at;
+      for (const b of crop.berries) {
+        if (!crop.ripe) break;
+        this.pose = { R: b.getWorldPosition(new THREE.Vector3()), grip: 0.7 };
+        yield* this.wait(0.7);
+        b.userData.picked = true;
+        b.visible = false;
+        const l = this.c.toLocal(this.worldPos().add(new THREE.Vector3((Math.random() - 0.5) * 0.01, 0, (Math.random() - 0.5) * 0.01)));
+        l.y = this.c.cage.surfaceY(l.x, l.z);
+        this.c.spawnOnGround('food', l, berryMesh());
+        this.pose = null;
+        yield* this.wait(0.3);
+      }
+      crop.pick();
+      this.h.emotion.joy = Math.min(1, this.h.emotion.joy + 0.2);
+    } finally {
+      this.pose = null; this.face = null;
+      crop.claimedBy = null;
+    }
+  }
+
   // run from something scary (a spider, ...) at a world position
   *fleeFrom(danger) {
     this.doing = 'running from a spider';
@@ -1140,6 +1201,15 @@ class Resident {
           });
         }
       }
+    }
+    // the field: pick ripe berries, plant the seeds you gave them
+    const farm = c.farm;
+    if (farm) {
+      const crop = farm.ripeCrop();
+      if (crop && (this.hunger < 90 || c.stockCount.food < 6)) return this.pickBerries(crop);
+      const seed = c.findPiece('seeds', this);
+      const spot = seed && farm.freeSpot();
+      if (seed && spot) return this.sow(seed, spot);
     }
     // tidy up: loose things go to the pile
     const loose = c.findPiece(['wood', 'stone', 'food'], this, { stock: false });

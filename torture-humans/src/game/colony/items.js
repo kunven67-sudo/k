@@ -160,6 +160,19 @@ export function pieceMesh(kind, variant = Math.random()) {
     m.scale.setScalar(size);
     m.userData.rest = size * 0.65;
     m.userData.size = size * 2;
+  } else if (kind === 'seeds') {
+    // a pinch of seeds: a few striped grains (to them, like small loaves)
+    m = new THREE.Group();
+    const seedMat = new THREE.MeshStandardMaterial({ color: 0x2f261c, roughness: 0.6 });
+    for (let i = 0; i < 3; i++) {
+      const s = new THREE.Mesh(L.crumbs[i % L.crumbs.length], seedMat);
+      s.scale.set(0.0022, 0.0009, 0.0011);
+      s.position.set((i - 1) * 0.0018, 0, (i % 2) * 0.001);
+      s.rotation.y = i * 1.3;
+      m.add(s);
+    }
+    m.userData.rest = 0.0009;
+    m.userData.size = 0.006;
   } else {
     m = toolMesh(kind);
     m.userData.rest = 0.02 * K;

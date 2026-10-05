@@ -189,6 +189,7 @@ const SUPPLIES = [
   { kind: 'wood', label: 'wooden poles', count: 6 },
   { kind: 'stone', label: 'building stones', count: 10 },
   { kind: 'food', label: 'bread crumbs', count: 6 },
+  { kind: 'seeds', label: 'seeds (they plant them)', count: 6 },
   { kind: 'axe', label: 'a tiny axe', count: 1 },
   { kind: 'pickaxe', label: 'a tiny pickaxe', count: 1 },
 ];
