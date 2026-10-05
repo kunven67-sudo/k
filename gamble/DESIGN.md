@@ -1021,6 +1021,13 @@ have a Ring cam; a witness only matters if someone actually saw it).
 - **Pet damage depends on the pet & training**: cats scratch couches, puppies chew shoes/cords,
   parrots chew wood.
 
+- **Bathrooms**: clogged toilets (plunger or overflow), hot water running out (long showers,
+  roommates), mirrors fog after hot showers (wipe to see), running out of toilet paper.
+- **Home casino room**: owning slot machines at home is legal in Nevada — used slots + poker table
+  for friends/guests; you set the odds; charging money would be illegal gambling.
+- **Rich-home features**: pool & hot tub (parties, chemicals, winter covers), home theater (movie &
+  Super Bowl nights), home gym, wine cellar & home bar (bottles appreciate over years).
+
 ## 49. Content limits (hard rules)
 
 - **No racial slurs and no racist insults** in any NPC, radio, TV, or generated dialogue. NPCs
