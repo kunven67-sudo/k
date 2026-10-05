@@ -758,3 +758,8 @@ expectations and habits vary per individual — never one fixed rule for everyon
   are lever-only.
 - **Carry drinks/food while walking**; bumps, running, tripping and drunkenness cause spills
   (stains, angry NPCs).
+- **Open mic** (always listening when enabled — NPCs hear everything).
+- **Real mirror reflections** (bathrooms, mirrored casino walls; simpler on phones).
+- **Eavesdropping**: NPCs talk to each other (gossip, machine tips, drama, secrets); get too
+  close and they notice.
+- **Light switches** in homes (power bill; pitch dark without them).
