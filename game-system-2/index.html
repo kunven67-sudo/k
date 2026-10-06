@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game System 2.0</title>
+  <meta name="description" content="Your games. One badass system.">
+  <meta name="theme-color" content="#05060a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preload" href="fonts/orbitron-latin-900-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/chakra-petch-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <canvas id="bg" aria-hidden="true"></canvas>
+  <div class="fx-overlay" aria-hidden="true"></div>
+
+  <!-- Title screen ("press any key") -->
+  <div id="title-screen" class="title-screen" role="dialog" aria-label="Game System 2.0">
+    <div class="ts-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="ts-logo">
+      <div class="ts-word glitch" data-text="GAME SYSTEM">GAME SYSTEM</div>
+      <div class="ts-ver"><span>2</span><span class="dot">.</span><span>0</span></div>
+    </div>
+    <div class="ts-press">PRESS ANY KEY</div>
+    <div class="ts-sub" id="ts-sub">or click anywhere</div>
+  </div>
+
+  <div id="app" class="app" hidden>
+    <header class="topbar">
+      <button class="brand" id="brand" title="Home" data-nav>
+        <svg viewBox="0 0 64 64" aria-hidden="true"><use href="#logo-mark"/></svg>
+        <span class="brand-name">GAME SYSTEM</span><span class="brand-ver">2.0</span>
+      </button>
+      <nav class="tabs" id="tabs" aria-label="Main">
+        <button class="tab" data-view="home" data-nav>Home</button>
+        <button class="tab" data-view="library" data-nav>Library</button>
+        <button class="tab" data-view="saves" data-nav>Saves</button>
+        <button class="tab" data-view="stats" data-nav>Stats</button>
+        <button class="tab tab-editor" data-view="editor" data-nav hidden>Editor</button>
+        <span class="tab-glow" aria-hidden="true"></span>
+      </nav>
+      <div class="top-right">
+        <button class="icon-btn" id="btn-search" title="Search (/)" data-nav aria-label="Search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        </button>
+        <button class="btn primary sm" id="btn-add" title="Add games" data-nav>
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Add</span>
+        </button>
+        <button class="icon-btn" id="btn-settings" title="Settings" data-nav aria-label="Settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+        <div class="clock" id="clock" aria-live="off">--:--</div>
+        <button class="profile" id="btn-profile" title="Profile" data-nav>
+          <span class="avatar" id="avatar">B</span><span class="pname" id="pname">bro</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="views" id="views">
+      <section class="view" id="view-home" data-view="home"></section>
+      <section class="view" id="view-library" data-view="library"></section>
+      <section class="view" id="view-saves" data-view="saves"></section>
+      <section class="view" id="view-stats" data-view="stats"></section>
+      <section class="view" id="view-settings" data-view="settings"></section>
+      <section class="view view-editor" id="view-editor" data-view="editor"></section>
+    </main>
+  </div>
+
+  <!-- The game player -->
+  <div id="player" class="player" hidden>
+    <div class="player-stage" id="player-stage"></div>
+    <div class="player-loading" id="player-loading">
+      <div class="pl-art" id="pl-art"></div>
+      <div class="pl-name" id="pl-name"></div>
+      <div class="pl-bar"><i></i></div>
+      <div class="pl-tip" id="pl-tip"></div>
+    </div>
+    <button class="edge-pill" id="edge-pill" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg> MENU <kbd id="edge-key">F2</kbd></button>
+    <button class="err-badge" id="err-badge" hidden title="Game errors"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5L2.5 20h19z"/><path d="M12 10v4.5M12 17.2v.3"/></svg> <b id="err-count">0</b></button>
+    <div class="player-toasts" id="player-toasts"></div>
+    <div class="quick-menu" id="quick-menu" hidden></div>
+    <div class="console-drawer" id="console-drawer" hidden></div>
+  </div>
+
+  <div id="modals"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <div class="drop-overlay" id="drop-overlay" hidden>
+    <div class="drop-box">
+      <div class="drop-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1.5 3h5L16 13h5"/></svg></div>
+      <div class="drop-title">DROP IT LIKE IT'S HOT</div>
+      <div class="drop-sub">.html files, .zip files, whole folders, or a Game System backup</div>
+    </div>
+  </div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="lg-a" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#00e5ff"/><stop offset="1" stop-color="#ff2bd6"/>
+      </linearGradient>
+      <symbol id="logo-mark" viewBox="0 0 64 64">
+        <path d="M32 3 58 18v28L32 61 6 46V18z" fill="none" stroke="url(#lg-a)" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M41 24.5c-2.2-2.6-5.4-4-9-4-6.6 0-11.5 5-11.5 11.5S25.4 43.5 32 43.5c5.6 0 10-3.6 11.2-8.8H32.5" fill="none" stroke="url(#lg-a)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <noscript><div class="noscript">Game System 2.0 needs JavaScript turned on, bro.</div></noscript>
+
+  <script src="kit/gs2-kit.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/zip.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/bg.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/importer.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/backup.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
