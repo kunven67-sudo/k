@@ -4,6 +4,7 @@
 // logs have exact colliders; tiny people get their own navmesh at their scale.
 import * as THREE from 'three';
 import { pbr, place } from './engine/assets.js';
+import { DetailSwitch } from './engine/lod.js';
 import { Water } from 'three/addons/objects/Water2.js';
 
 export const TANK = { w: 2.96, d: 1.86, soilY: 0.13 };
@@ -141,9 +142,9 @@ const POND_SHADER = (() => {
 
 const REFLECTION_SIZE = { off: 0, low: 256, medium: 512, high: 1024 };
 
-function pondMesh(heightAt, { reflections = 'high' } = {}) {
+function pondMesh(heightAt, { reflections = 'high', simple = false } = {}) {
   const { pond } = FEATURES;
-  const size = REFLECTION_SIZE[reflections] ?? 512;
+  const size = simple ? 0 : REFLECTION_SIZE[reflections] ?? 512;
   if (size > 0) {
     const n0 = rippleNormal();
     const n1 = rippleNormal(9);
@@ -162,11 +163,11 @@ function pondMesh(heightAt, { reflections = 'high' } = {}) {
   const nm = rippleNormal();
   nm.repeat.set(3, 3);
   // pond water: dark and deep in the middle, reflecting the room, faint ripples
+  // (no "transmission": that makes three.js draw the whole scene again every frame)
   const mat = new THREE.MeshPhysicalMaterial({
-    color: 0x1d2f2b, roughness: 0.02, metalness: 0, transmission: 0.35, thickness: 0.05, ior: 1.33,
-    attenuationColor: new THREE.Color(0x24463b), attenuationDistance: 0.04,
+    color: 0x1d2f2b, roughness: 0.02, metalness: 0,
     specularIntensity: 1, clearcoat: 1, clearcoatRoughness: 0.02,
-    transparent: true, opacity: 0.95, normalMap: nm, normalScale: new THREE.Vector2(0.18, 0.18), envMapIntensity: 2.2,
+    transparent: true, opacity: 0.86, normalMap: nm, normalScale: new THREE.Vector2(0.18, 0.18), envMapIntensity: 2.2,
     alphaMap: shoreAlpha(), depthWrite: false,
   });
   const water = new THREE.Mesh(new THREE.CircleGeometry(pond.r * 1.1, 64), mat);
@@ -233,7 +234,12 @@ export async function buildTinyWorld(terrarium, { reflections = 'high' } = {}) {
   const heightAt = makeHeight(7);
   const ground = groundMesh(heightAt);
   world.add(ground);
-  world.add(pondMesh(heightAt, { reflections }));
+  // the pond: a simple shiny surface from full size; the real reflecting/refracting
+  // water (which draws the whole room twice more each frame) only when you're tiny
+  const pondSimple = pondMesh(heightAt, { simple: true });
+  const pondFancy = (REFLECTION_SIZE[reflections] ?? 512) > 0 ? pondMesh(heightAt, { reflections }) : null;
+  world.add(pondSimple);
+  if (pondFancy) { pondFancy.visible = false; world.add(pondFancy); }
   world.add(lavaMesh());
 
   const solid = new THREE.Group();    // rocks and logs: exact colliders, block tiny people
@@ -338,5 +344,31 @@ export async function buildTinyWorld(terrarium, { reflections = 'high' } = {}) {
     tickFx(Math.min(0.1, (now - last) / 1000));
     last = now;
   };
-  return { world, ground, solid, plants, heightAt, features: FEATURES, surfaceY: y, ripple, smoke };
+  // light versions of the scanned rocks, logs and plants for when you're not right
+  // up close (they're photo scans: a pebble can have 25,000 triangles)
+  const lods = await Promise.all([
+    DetailSwitch.create(solid.children, { ratio: 0.06, error: 0.05 }),
+    DetailSwitch.create(plants.children, { ratio: 0.3, error: 0.02 }),
+  ]).catch((e) => { console.warn('[tiny] no light versions', e.message); return []; });
+  // shadows of things in the tank: only when you're tiny (from full size they're
+  // a few millimeters, but each one cost 2 extra draws per frame, one per lab spotlight).
+  // Checked every 2 s, so pieces the tiny people make later follow along.
+  let shadowsOn = null, shadowT = 0;
+  const shadows = (on, dt) => {
+    shadowT -= dt;
+    if (on === shadowsOn && shadowT > 0) return;
+    shadowT = 2;
+    shadowsOn = on;
+    world.traverse((o) => {
+      if (!o.isMesh || o === ground) return;
+      if (o.userData.tinyShadow === undefined) o.userData.tinyShadow = o.castShadow;
+      o.castShadow = on && o.userData.tinyShadow;
+    });
+  };
+  const lod = (eye, dt, tinyYou = false) => {
+    for (const l of lods) l.update(eye, dt);
+    shadows(tinyYou, dt);
+    if (pondFancy && pondFancy.visible !== tinyYou) { pondFancy.visible = tinyYou; pondSimple.visible = !tinyYou; }
+  };
+  return { world, ground, solid, plants, heightAt, features: FEATURES, surfaceY: y, ripple, smoke, lod, lods };
 }

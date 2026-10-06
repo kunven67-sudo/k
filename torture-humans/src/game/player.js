@@ -67,7 +67,11 @@ export class Player {
     const c = this.body.ctrl;
     c.setOffset(0.02 * sc);
     c.enableAutostep(0.35 * sc, 0.14 * sc, false);
-    c.enableSnapToGround(0.35 * sc);
+    // (when you're tiny the soil's little bumps are big to you, and snapping down
+    // onto them wedged you in place, like invisible walls; small bodies don't
+    // need it: you never leave the ground walking downhill at that size)
+    if (sc < 0.3) c.disableSnapToGround();
+    else c.enableSnapToGround(0.35 * sc);
     c.setCharacterMass(75 * sc * sc * sc);
     this.camDistance = 2.6;
     this.camCurrentDist = 2.6 * sc;

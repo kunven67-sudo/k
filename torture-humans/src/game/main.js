@@ -230,19 +230,25 @@ export async function boot() {
   let labEnv = null;
   let sky = null;
   let zone = null;
+  let labShown = null;
   const sunLights = () => renderer.csm?.lights || [];
   const fog = level.fog ? new THREE.Fog(level.fog.color, level.fog.near, level.fog.far) : null;
   if (fog) scene.fog = fog;
   const applyZone = (force = false) => {
     const z = level.inLab?.(camera.position) ? 'lab' : level.zones?.inHouse(camera.position) ? 'house' : 'outside';
-    if (z === zone && !force) return;
+    // the lab (and its terrarium) can only be seen from the house down through the hatch
+    const h = level.hatch;
+    const labSeen = z === 'lab' || (z === 'house' && (!h || Math.hypot(camera.position.x - h.x, camera.position.z - h.z) < 3.5));
+    if (z === zone && labSeen === labShown && !force) return;
+    labShown = labSeen;
+    if (z === zone && !force) { for (const o of level.zones?.lab || []) o.visible = labSeen; return; }
     zone = z;
     const lab = z === 'lab' || !level.sunDirection;
     // hide what you can't see from here: the town from the basement, the basement from outside
     if (level.zones) {
       for (const o of level.zones.town) o.visible = z !== 'lab';
       for (const h of humans) if (h.townie && !h.tiny && h.state !== 'away') h.character.root.visible = z !== 'lab';
-      for (const o of level.zones.lab) o.visible = z !== 'outside';
+      for (const o of level.zones.lab) o.visible = labSeen;
     }
     for (const l of sunLights()) {
       l.intensity = lab ? 0 : renderer.sunIntensity ?? 3;
@@ -480,6 +486,7 @@ export async function boot() {
     squisher.update();
     hazards.update(dt);
     tiny.update(dt);
+    level.tiny?.lod?.(camera.position, dt, player.scale < 0.3); // detailed tank plants/rocks (and their shadows) only up close / when you're tiny
     settingsPanel.update();
     // the world around you (not you) runs slower when you're tiny: small animals see in slow motion
     const wdt = dt * tiny.timeScale;
