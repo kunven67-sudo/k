@@ -167,7 +167,7 @@ distance, and restored when the player returns. Parked things in orbit move on r
 
 ## UI and input
 - New key layout (player choice), all rebindable in Settings → Controls. Defaults:
-  `WASD` move · `Space` jump/up · `Ctrl` crouch/down · `Shift` sprint/boost · `F` use/enter/exit ·
+  `WASD` move · `Space` jump/up · `C` crouch/down (not Ctrl: Ctrl+W closes the browser tab) · `Shift` sprint/boost · `F` use/enter/exit ·
   `Tab` spawn menu · `X` context menu (properties, wiring) · `Q` quick weapon/tool wheel · `1–9` hotbar ·
   `Z` undo · `N` noclip · `J` jetpack · `P` parachute/wingsuit · `B` superpowers · `V` camera mode ·
   `G` orders to NPCs · `M` globe map/teleport · `O` orbit map · `,` `.` time warp · `T` slow motion ·
