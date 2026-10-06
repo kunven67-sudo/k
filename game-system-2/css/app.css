@@ -1017,3 +1017,79 @@ ul.checks .ico { color: var(--good); width: 16px; height: 16px; }
 .cut-banner > span .ico { width: 17px; height: 17px; vertical-align: -.25em; }
 .avatar { font-family: var(--display); font-weight: 900; font-size: 15px; color: #fff; }
 .pl-tip b { color: var(--accent); font-family: var(--display); letter-spacing: .12em; font-size: 12px; margin-right: 6px; }
+ol.steps { margin: 14px 0; padding-left: 24px; display: grid; gap: 16px; }
+ol.steps li { padding-left: 6px; line-height: 1.5; }
+ol.steps li::marker { color: var(--accent); font-family: var(--display); font-weight: 700; }
+
+/* ---------- letter placeholder (games without a picture) ---------- */
+.proc { container-type: size; }
+.proc .pl {
+  position: relative; z-index: 1; font-family: var(--display); font-weight: 900; line-height: 1;
+  font-size: 42cqmin; letter-spacing: .02em;
+  background: linear-gradient(180deg, #fff 10%, color-mix(in srgb, var(--c) 80%, white) 55%, color-mix(in srgb, var(--c) 50%, var(--accent2)) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--c) 80%, transparent)) drop-shadow(0 4px 18px rgba(0,0,0,.5));
+}
+
+/* ---------- picture maker ---------- */
+.pic-tabs { margin-bottom: 16px; }
+.pic-tabs button .ico { width: 16px; height: 16px; }
+.pic-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.pic-preview {
+  aspect-ratio: 16 / 10; border-radius: 16px; overflow: hidden; position: relative; background: #06070d;
+  box-shadow: 0 0 0 1px var(--line2), 0 20px 50px rgba(0,0,0,.5), 0 0 40px rgba(var(--accent-rgb), .15);
+}
+.pic-preview canvas, .pic-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pic-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; color: var(--dim); text-align: center; padding: 20px; }
+.pic-opts { display: grid; gap: 10px; align-content: start; }
+.pic-opts .label { margin-top: 6px; }
+.pic-opts p { margin: 0; }
+.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; max-height: 200px; overflow: auto; padding: 2px; }
+.icon-grid button { height: 44px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.04); display: grid; place-items: center; color: var(--text); }
+.icon-grid button .ico { width: 22px; height: 22px; }
+.icon-grid button:hover { border-color: rgba(var(--accent-rgb), .6); }
+.icon-grid button.on { border-color: var(--accent); background: rgba(var(--accent-rgb), .16); color: var(--accent); }
+.ai-note { min-height: 20px; }
+@media (max-width: 760px) { .pic-grid { grid-template-columns: 1fr; } }
+
+/* ---------- phones ---------- */
+.touch-menu {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 7;
+  width: 52px; height: 34px; border-radius: 18px; display: grid; place-items: center;
+  background: rgba(8, 10, 18, .55); border: 1px solid rgba(255,255,255,.28); color: #fff;
+  opacity: .6; backdrop-filter: blur(6px); -webkit-tap-highlight-color: transparent;
+}
+.touch-menu:active { opacity: 1; transform: translateX(-50%) scale(.94); }
+.touch-menu .ico { width: 20px; height: 20px; }
+.tile, .card, .tile img, .card img { -webkit-touch-callout: none; }
+@media (max-width: 620px) {
+  /* the header's blur would trap the fixed bottom bar inside the header */
+  .topbar { backdrop-filter: none; background: rgba(5, 6, 10, .94); }
+  /* phones: tabs become a bottom bar like a normal phone app */
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; margin: 0;
+    display: flex; justify-content: space-around; gap: 0; overflow: visible;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: rgba(5, 6, 10, .92); border-top: 1px solid var(--line); backdrop-filter: blur(14px);
+  }
+  .tabs .tab { flex: 1; padding: 10px 2px; font-size: 10.5px; letter-spacing: .08em; text-align: center; }
+  .tab-glow { bottom: auto; top: -1px; }
+  .view { padding-bottom: 90px; }
+  .view-editor { padding-bottom: 64px; }
+  .toasts { bottom: 76px; right: 12px; left: 12px; align-items: stretch; }
+  .toast { max-width: none; }
+  .quick-menu { background: rgba(4, 5, 10, .95); }
+  .qm-side { padding: 28px 20px; }
+  .hero { padding: 24px 18px 12px; min-height: 0; }
+  .rail-head, .home-strip { padding-left: 18px; padding-right: 18px; }
+  .rail { padding-left: 18px; padding-right: 18px; }
+  .modal-back { padding: 10px; }
+  .modal-head { padding: 16px 16px 4px; }
+  .modal-body { padding: 10px 16px 14px; }
+  .modal-foot { padding: 12px 16px 16px; }
+}
+@media (pointer: coarse) {
+  .qm-item kbd, .rail-hint { display: none; }
+}
+.check-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-top: 6px; }
+.check-row input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); }

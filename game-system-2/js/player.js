@@ -150,6 +150,24 @@
   /* ---------------- the current game ---------------- */
   var cur = null;
   var pillTimer = null;
+  var isTouch = (navigator.maxTouchPoints || 0) > 0 || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+
+  /* The phone/browser Back button: first press opens the game menu, second press goes back to Game System. */
+  var ignorePop = false;
+  function pushGameState() {
+    if (!(history.state && history.state.gs2 === 'game')) { try { history.pushState({ gs2: 'game' }, ''); } catch (e) { /* ignore */ } }
+  }
+  function popGameState() {
+    if (history.state && history.state.gs2 === 'game') { ignorePop = true; history.back(); }
+  }
+  window.addEventListener('popstate', function () {
+    if (ignorePop) { ignorePop = false; return; }
+    if (!cur) return;
+    if (!el('console-drawer').hidden) { Player.closeConsole(); pushGameState(); return; }
+    if (cur.menuOpen) { close(); return; }
+    openMenu();
+    pushGameState();
+  });
   var toastGate = 0;
 
   function ptoast(msg, type, action, ic) {
@@ -262,7 +280,7 @@
     opts = opts || {};
     var g = D.get(id);
     if (!g) { UI.toast('That game is gone.', { type: 'warn' }); return; }
-    if (cur) await close({ quiet: true });
+    if (cur) await close({ quiet: true, keepHistory: true });
     if (UI.modalCount()) document.querySelectorAll('.modal-back').forEach(function (b) { b.remove(); });
     UI.closeMenu();
     Sound.launch();
@@ -321,6 +339,8 @@
     el('console-drawer').hidden = true;
     el('player-toasts').replaceChildren();
     player.hidden = false;
+    el('touch-menu').hidden = !isTouch;
+    pushGameState();
     BG.pause();
     document.getElementById('app').classList.add('behind');
 
@@ -431,8 +451,10 @@
     el('quick-menu').hidden = true;
     el('console-drawer').hidden = true;
     el('edge-pill').hidden = true;
+    el('touch-menu').hidden = true;
     el('err-badge').hidden = true;
     el('player').hidden = true;
+    if (!opts.keepHistory) popGameState();
     document.getElementById('app').classList.remove('behind');
     if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
     BG.resume();
@@ -459,7 +481,10 @@
       box.replaceChildren(I('save'), h('span', cur.lastSaveT ? 'Progress saved ' + U.timeAgo(cur.lastSaveT) + '. You can turn off your PC and continue later.' : 'This game saves your progress automatically.'));
     } else {
       box.classList.add('no');
-      box.replaceChildren(I('warn'), h('span', 'This game doesn\'t use the Save Kit, so it might start over next time (unless it saves by itself).'));
+      var gid = cur.id;
+      box.replaceChildren(I('warn'), h('div',
+        h('span', 'This game doesn\'t use the Save Kit, so next time it starts at its own title screen.'),
+        h('button.btn.sm', { style: { marginTop: '8px', display: 'flex' }, onclick: function () { close({ quiet: true }).then(function () { App.go('home', { noSound: true }); Upgrade.open(gid); }); } }, I('resume'), 'Fix this')));
     }
   }
 
@@ -472,6 +497,7 @@
   function openMenu() {
     if (!cur || cur.menuOpen) return;
     cur.menuOpen = true;
+    el('touch-menu').hidden = true;
     var k = kit();
     if (k) { try { k._pause(); } catch (e) { /* ignore */ } }
     flushSave().then(refreshMenuSave);
@@ -508,6 +534,7 @@
     cur.menuOpen = false;
     cur.lastTick = performance.now();
     el('quick-menu').hidden = true;
+    el('touch-menu').hidden = !isTouch;
     if (keepPaused !== true) {
       var k = kit();
       if (k) { try { k._resume(); } catch (e) { /* ignore */ } }
@@ -639,13 +666,18 @@
     if (mode === 'menu') { D.ui.playing = null; D.saveUI(); return; }
     if (mode === 'auto') { launch(id, { resumed: true }); return; }
     var art = h('div.det-art', { style: { width: '100%', marginBottom: '14px' } }, UI.art(g));
+    var always = h('input', { type: 'checkbox', onchange: function () {
+      D.settings.resume = always.checked ? 'auto' : 'popup';
+      D.saveSettings();
+    } });
     UI.modal({
       title: 'Continue?',
       icon: 'resume',
       body: h('div', art,
         h('p', 'You were playing ', h('b', g.name), ' ' + U.timeAgo(g.lastPlayed) + '.'),
         save ? h('p.small.muted', I('save'), ' Your progress was saved ' + U.timeAgo(save.t) + '. You\'ll be right back where you were.') :
-          h('p.small.muted', 'Jump back in?')),
+          h('p.small.muted', 'Jump back in?'),
+        h('label.check-row.small', always, h('span', 'Always jump straight in next time (you can change this in Settings)'))),
       actions: [
         { label: 'Not now', kind: 'ghost', onClick: function () { D.ui.playing = null; D.saveUI(); } },
         { label: 'CONTINUE', icon: 'play', kind: 'primary', autofocus: true, onClick: function () { launch(id, { resumed: true }); } }

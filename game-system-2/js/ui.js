@@ -78,7 +78,30 @@
     js: '<path d="M10 7v8a2 2 0 0 1-4 0M18 8.5a2.5 2.5 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 2 0 2.8 5 1.6 5 4.5 0 1.2-1.1 2-2.5 2A2.6 2.6 0 0 1 13 14"/>',
     css: '<path d="M8 7H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2M14 7h-2a1.5 1.5 0 0 0 0 3h1a1.5 1.5 0 0 1 0 3h-2M20 7h-2a1.5 1.5 0 0 0 0 3h1a1.5 1.5 0 0 1 0 3h-2"/>',
     braces: '<path d="M8 4H7a2 2 0 0 0-2 2v4l-2 2 2 2v4a2 2 0 0 0 2 2h1M16 4h1a2 2 0 0 1 2 2v4l2 2-2 2v4a2 2 0 0 1-2 2h-1"/>',
-    dot: '<circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>'
+    dot: '<circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>',
+    car: '<path d="M5 15l1.5-5.2A2 2 0 0 1 8.4 8.4h7.2a2 2 0 0 1 1.9 1.4L19 15"/><rect x="3" y="15" width="18" height="4" rx="1.5"/><circle cx="7.5" cy="19.5" r="1.5"/><circle cx="16.5" cy="19.5" r="1.5"/>',
+    sword: '<path d="M14.5 3.5H20.5v6L10 20l-6-6z"/><path d="M8 11.5l4.5 4.5M3 21l3.5-3.5"/>',
+    rocket: '<path d="M12 2.5c3.2 2.2 5 5.8 5 10.5l-2 3H9l-2-3c0-4.7 1.8-8.3 5-10.5z"/><circle cx="12" cy="10" r="1.8"/><path d="M9 16l-2.5 4.5M15 16l2.5 4.5M12 17v4.5"/>',
+    skull: '<path d="M12 3a8 8 0 0 0-8 8c0 2.8 1.4 4.5 3 5.5V20h10v-3.5c1.6-1 3-2.7 3-5.5a8 8 0 0 0-8-8z"/><circle cx="9" cy="11.5" r="1.7"/><circle cx="15" cy="11.5" r="1.7"/><path d="M10 20v-2.2M14 20v-2.2"/>',
+    crown: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/>',
+    ghost: '<path d="M5 21V11a7 7 0 0 1 14 0v10l-2.5-2-2.3 2-2.2-2-2.2 2-2.3-2z"/><circle cx="9.5" cy="11" r="1.1"/><circle cx="14.5" cy="11" r="1.1"/>',
+    target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
+    dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor"/>',
+    cards: '<rect x="3.5" y="6.5" width="10" height="14" rx="2" transform="rotate(-12 8.5 13.5)"/><rect x="10.5" y="3.5" width="10" height="14" rx="2"/><path d="M15.5 8l1.8 2.5-1.8 2.5-1.8-2.5z"/>',
+    castle: '<path d="M4 21V9h2.5v2.5h2V9h2.5v2.5h2V9h2.5v2.5h2V9H20v12z"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/>',
+    tree: '<path d="M12 3l6 8h-3l4 6H5l4-6H6z"/><path d="M12 17v4"/>',
+    planet: '<circle cx="12" cy="12" r="6"/><path d="M3.2 15.2c-.9-2 4.1-5.3 9-6.8s9.6-1.6 10.4.4-3.9 5-8.9 6.6-9.6 1.8-10.5-.2z"/>',
+    heart: '<path d="M12 20s-7.5-4.5-7.5-10.2A4.2 4.2 0 0 1 12 7.2a4.2 4.2 0 0 1 7.5 2.6C19.5 15.5 12 20 12 20z"/>',
+    bomb: '<circle cx="10.5" cy="14" r="6.5"/><path d="M15 9.5l2.5-2.5M18 3.5l.6 1.8M21 6l-1.8.4M19.8 2.8l-.9 1.6"/>',
+    gem: '<path d="M6 4h12l3 5-9 11L3 9z"/><path d="M3 9h18M12 20L8.5 9 10 4M12 20l3.5-11L14 4"/>',
+    coin: '<circle cx="12" cy="12" r="9"/><path d="M14.6 9.2a3 3 0 0 0-2.6-1.2c-1.4 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.9 2.5 2.1-1.1 1.9-2.5 1.9a3 3 0 0 1-2.6-1.2M12 6.5v11"/>',
+    ball: '<circle cx="12" cy="12" r="9"/><path d="M3.6 9.6c3 1 6 4 7 10M20.4 9.6c-3 1-6 4-7 10M7 4.6c1.5 2 3 3 5 3s3.5-1 5-3"/>',
+    plane: '<path d="M21 3.5L3 11l7 2.5 2.5 7z"/><path d="M10 13.5L21 3.5"/>',
+    fish: '<path d="M3 12c3-4 7-6 11-6 3 0 5 2.5 7 6-2 3.5-4 6-7 6-4 0-8-2-11-6z"/><path d="M3 12L1.5 8.5M3 12l-1.5 3.5"/><circle cx="16" cy="11" r="1" fill="currentColor"/>',
+    paw: '<circle cx="6.5" cy="9.5" r="2"/><circle cx="12" cy="6.5" r="2"/><circle cx="17.5" cy="9.5" r="2"/><path d="M12 12c-3 0-6 3.5-6 6 0 2 2 2.5 3 2 1.5-.8 4.5-.8 6 0 1 .5 3 0 3-2 0-2.5-3-6-6-6z"/>',
+    spiral: '<path d="M12 12a1 1 0 1 1 1-1 2.5 2.5 0 1 1-3.5-2.3 4.5 4.5 0 1 1-1.6 7.8 6.8 6.8 0 1 1 11.6-4.5"/>',
+    slots: '<rect x="3" y="5" width="15" height="15" rx="2"/><path d="M6.5 9v7M10.5 9v7M14.5 9v7M18 10.5h2.5v5"/><circle cx="20.5" cy="8.2" r="1.4"/>',
+    brick: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 12h18M9 5v7M15 12v7"/>'
   };
   function icon(name, cls) {
     var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -302,10 +325,49 @@
     var url = game && game.cover ? D.coverUrl(game) : null;
     if (url) return h('img', { src: url, alt: '', draggable: false, loading: opts.lazy ? 'lazy' : null, decoding: 'async' });
     var c = (game && game.color) || U.colorFor(game ? game.name : '?');
-    var p = h('div.proc', h('span.pe', (game && game.emoji) || '🎮'), opts.noName ? null : h('span.pn', game ? game.name : ''));
+    /* no picture yet: neon letters (or the emoji, if the player picked one) */
+    var face = game && game.art === 'emoji' && game.emoji
+      ? h('span.pe', game.emoji)
+      : h('span.pl', initials(game ? game.name : '?'));
+    var p = h('div.proc', face, opts.noName ? null : h('span.pn', game ? game.name : ''));
     p.style.setProperty('--c', c);
     if (opts.emojiSize) p.style.setProperty('--es', opts.emojiSize + 'px');
     return p;
+  }
+
+  /* "Space Blaster" -> "SB", "snake" -> "S" */
+  function initials(name) {
+    var words = String(name || '?').split(/[\s_\-:]+/).map(function (w) { return w.replace(/[^\p{L}\p{N}]/gu, ''); }).filter(Boolean);
+    if (!words.length) return '?';
+    return (words[0].charAt(0) + (words[1] ? words[1].charAt(0) : '')).toUpperCase();
+  }
+  function iconMarkup(name) { return ICONS[name] || ''; }
+
+  /* Hold a finger on something (phones have no right-click). Android also fires
+     contextmenu on long-press, so skip ours when that already happened. */
+  var lastCtx = 0;
+  document.addEventListener('contextmenu', function () { lastCtx = Date.now(); }, true);
+  function longPress(el, fn) {
+    var timer = null, sx = 0, sy = 0, fired = false;
+    el.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) return;
+      fired = false;
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        if (Date.now() - lastCtx < 800) return;
+        fired = true;
+        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) { /* ignore */ } }
+        fn(sx, sy);
+      }, 600);
+    }, { passive: true });
+    el.addEventListener('touchmove', function (e) {
+      var p = e.touches[0];
+      if (Math.abs(p.clientX - sx) > 10 || Math.abs(p.clientY - sy) > 10) clearTimeout(timer);
+    }, { passive: true });
+    el.addEventListener('touchend', function (e) { clearTimeout(timer); if (fired) e.preventDefault(); });
+    el.addEventListener('touchcancel', function () { clearTimeout(timer); });
   }
 
   /* 3D tilt that follows the mouse */
@@ -424,8 +486,8 @@
   }
 
   window.UI = {
-    icon: icon, hasIcon: function (n) { return !!ICONS[n]; }, modal: modal, topModal: topModal, confirm: confirmBox, prompt: promptBox, alert: alertBox,
-    toast: toast, contextMenu: contextMenu, closeMenu: closeMenu, art: art, tilt: tilt, pickEmoji: pickEmoji,
+    icon: icon, hasIcon: function (n) { return !!ICONS[n]; }, iconMarkup: iconMarkup, initials: initials, modal: modal, topModal: topModal, confirm: confirmBox, prompt: promptBox, alert: alertBox,
+    toast: toast, contextMenu: contextMenu, longPress: longPress, closeMenu: closeMenu, art: art, tilt: tilt, pickEmoji: pickEmoji,
     moveFocus: moveFocus, focusables: focusables, isTyping: isTyping, modalCount: function () { return stack.length; }
   };
 })();

@@ -400,10 +400,6 @@
       var artBox = h('div.ri-art', UI.art({ name: g.name, emoji: g.emoji, color: U.colorFor(g.name) }, { noName: true }));
       var name = h('input.input', { value: g.name, maxlength: 80, 'aria-label': 'Game name' });
       name.value = g.name;
-      var emo = h('button.emoji-btn', { title: 'Change icon', onclick: async function () {
-        var e = await UI.pickEmoji(g.emoji);
-        if (e) { g.emoji = e; emo.textContent = e; artBox.replaceChildren(UI.art({ name: g.name, emoji: g.emoji, color: U.colorFor(g.name) }, { noName: true })); }
-      } }, g.emoji);
       var modeSel = null;
       if (g.existingId) {
         modeSel = h('select.select', { style: { width: 'auto' }, onchange: function () { g.mode = modeSel.value; } },
@@ -417,9 +413,12 @@
           h('div.ri-sub', I('file'), ' ' + g.entry + ' · ' + g.files.length + ' file' + (g.files.length === 1 ? '' : 's') + ' · ' + U.fmtBytes(g.size), g.coverFile ? [' · ', I('image'), ' cover found'] : null),
           g.launcher ? h('div.ri-warn', I('info'), ' This looks like your OLD game menu page, not a game. Leave it unchecked unless you want it.') : null,
           g.existingId ? h('div.ri-warn', I('warn'), ' You already have a game called "' + D.get(g.existingId).name + '"') : null),
-        h('div.row', emo, modeSel));
+        modeSel ? h('div.row', modeSel) : h('div'));
       cb.addEventListener('change', function () { g.checked = cb.checked; el.classList.toggle('off', !g.checked); refreshCount(); });
-      name.addEventListener('input', function () { g.name = name.value; });
+      name.addEventListener('input', function () {
+        g.name = name.value;
+        artBox.replaceChildren(UI.art({ name: g.name, color: U.colorFor(g.name) }, { noName: true }));
+      });
       return el;
     }
     games.forEach(function (g) { list.appendChild(row(g)); });
@@ -513,7 +512,6 @@
   async function pasteDialog(prefill) {
     var nameIn = h('input.input', { placeholder: 'Name your game', maxlength: 80 });
     var emoji = '🎮';
-    var emoBtn = h('button.emoji-btn', { title: 'Pick an icon', onclick: async function () { var e = await UI.pickEmoji(emoji); if (e) { emoji = e; emoBtn.textContent = e; } } }, emoji);
     var host = h('div', { style: { height: '46vh', minHeight: '260px', position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--line2)' } });
     var status = h('div.small.muted', { style: { minHeight: '22px', marginTop: '8px' } }, 'Paste the code the AI gave you (the whole thing).');
     var banner = h('div');
@@ -525,7 +523,7 @@
       icon: 'code',
       xwide: true,
       body: h('div',
-        h('div.row', { style: { marginBottom: '12px' } }, emoBtn, h('div.grow', nameIn),
+        h('div.row', { style: { marginBottom: '12px' } }, h('div.grow', nameIn),
           h('button.btn.sm', { onclick: function () { appendDialog(); }, title: 'The AI got cut off and sent the rest in another message? Glue it on here.' }, I('fileAdd'), 'Glue on more code')),
         banner, host, status),
       actions: [
@@ -552,7 +550,7 @@
       }
       if (!nameTouched) {
         var t = titleOf(code);
-        if (t) { nameIn.value = t; emoji = U.guessEmoji(t); emoBtn.textContent = emoji; }
+        if (t) { nameIn.value = t; emoji = U.guessEmoji(t); }
       }
       if (!code.trim()) { banner.replaceChildren(); status.textContent = 'Paste the code the AI gave you (the whole thing).'; return; }
       var isMarkup = /<\s*(html|body|head|script|div|canvas|style|!doctype)\b/i.test(code);

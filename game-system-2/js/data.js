@@ -31,12 +31,19 @@
     t: 0
   };
 
+  /* first time on a phone: calmer background to save battery */
+  function firstRunDefaults() {
+    if (U.lsGet('gs2:settings', null)) return {};
+    var phone = window.matchMedia && window.matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 820;
+    return phone ? { bg: 'chill' } : {};
+  }
+
   var listeners = [];
   var coverCache = new Map();
 
   var D = {
     games: new Map(),
-    settings: Object.assign({}, DEFAULT_SETTINGS, U.lsGet('gs2:settings', {})),
+    settings: Object.assign({}, DEFAULT_SETTINGS, firstRunDefaults(), U.lsGet('gs2:settings', {})),
     ui: Object.assign({}, DEFAULT_UI, U.lsGet('gs2:ui', {})),
     days: {},
     pendingPlay: {},

@@ -36,6 +36,38 @@ Every computer that opens your site now gets those games. Saves stay in each bro
 
 **Settings** or **Saves** → **Back up everything** downloads one `.zip` with all your games, saves and stats. Keep it on Google Drive or a USB stick. To restore, use **Restore a backup** and pick that zip (no need to unzip it).
 
+## A game starts at its title screen instead of where I was
+
+That game doesn't use the Save Kit. It may remember your progress, but it can't remember which screen you were on, so it always opens at its own title screen. Game System can't change that from the outside, but an AI can fix the game's code:
+
+1. Open the game's details (the **...** button) and press **Make it continue where I left off**. While playing, the quick menu also has a **Fix this** button.
+2. Press **Copy the message**. It holds the instructions and your game's code.
+3. Paste it into ChatGPT, Claude or any AI chat.
+4. Copy all the code the AI sends back, press **Paste the new code**, paste it, and press **Save upgrade**.
+
+Your saves stay. If the new code breaks something, open the upgrade window again and press **Undo last upgrade**.
+
+To always skip the "Continue?" popup: **Settings → Start-up & resume → When I come back to a game → Jump right in**, or tick the box on the popup.
+
+## Game pictures
+
+Tap a game's big picture on Home (or **Change picture** in its options) to open the picture maker:
+
+- **AI picture:** describe it and pick a style (Game cover art, Pixel art, 3D cartoon, Realistic). Uses the free Pollinations picture AI: no account, about one picture every 15 seconds. 18+ pictures are blocked. What you type is sent to their website.
+- **Neon letters**, **Icon** and **Pattern:** drawn right on your device, pick a color.
+- **My picture:** any picture from your PC or phone.
+- **Emoji:** if you want one.
+
+While playing, the quick menu also has **Use screenshot as cover**.
+
+## On a phone
+
+- The tabs are at the bottom of the screen.
+- While playing, the small button at the top opens the quick menu. The phone's **Back** button opens it too, and pressing Back again goes back to Game System.
+- Hold your finger on a game for its options.
+- On iPhone, use **Share → Add to Home Screen**. Otherwise Safari can delete saved games you haven't opened in about a week.
+- Games made only for keyboard and mouse won't have touch controls. The **Rules for AI games** ask the AI to add them.
+
 ## Making games with AI
 
 Click **Rules for AI games** (on Home or in Settings) and copy the rules into the AI chat **before** you describe your game. That makes the AI:

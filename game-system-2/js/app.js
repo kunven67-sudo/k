@@ -344,6 +344,8 @@
   }
 
   async function boot() {
+    /* reloaded while a game was open: forget the extra Back-button step */
+    if (history.state && history.state.gs2 === 'game') { try { history.replaceState(null, ''); } catch (e) { /* ignore */ } }
     applyEarly();
     BG.init($('bg'), D.settings.bg);
     registerSW();
@@ -412,6 +414,7 @@
     $('btn-settings').addEventListener('click', function () { go('settings'); });
     $('btn-profile').addEventListener('click', function () { go('settings'); });
     $('err-badge').addEventListener('click', function () { Player.toggleMenu(); });
+    $('touch-menu').addEventListener('click', function () { Player.toggleMenu(); });
     $('edge-pill').addEventListener('click', function () { Player.toggleMenu(); });
     document.addEventListener('mouseover', function (e) {
       var b = e.target.closest && e.target.closest('.tile, .card, .btn, .tab, .qm-item, .chip, .mini-card');

@@ -58,6 +58,7 @@
     }, h('div.tile-in', UI.art(g, { noName: true })),
       g.fav ? h('span.fav-dot', { title: 'Favorite' }, I('starFill')) : null,
       g.source === 'site' ? h('span.site-dot', { title: 'Comes with the website' }, I('globe')) : null);
+    UI.longPress(t, function (x, y) { gameMenu(g.id, x, y); });
     return t;
   }
 
@@ -98,7 +99,7 @@
     } }, UI.icon('star'));
     var editBtn = g.source !== 'link' ? h('button.icon-btn', { title: 'Edit code', 'aria-label': 'Edit code', onclick: function () { Editor.open(g.id); } }, UI.icon('edit')) : null;
     var moreBtn = h('button.icon-btn', { title: 'More options', 'aria-label': 'More options', onclick: function () { gameDetails(g.id); } }, UI.icon('more'));
-    var artCard = h('div.art-card', UI.art(g), h('div.glare'));
+    var artCard = h('div.art-card', { title: 'Change picture', style: { cursor: 'pointer' }, onclick: function () { Pics.open(g.id); } }, UI.art(g), h('div.glare'));
     UI.tilt(artCard, 8);
     hero.replaceChildren(bg,
       h('div.hero-info',
@@ -163,6 +164,7 @@
       { icon: g.fav ? 'star' : 'starFill', label: g.fav ? 'Unfavorite' : 'Favorite', onClick: function () { D.updateGame(id, { fav: !g.fav }); } },
       { icon: 'tag', label: 'Rename', onClick: function () { renameGame(id); } },
       { icon: 'folder', label: 'Move to folder', onClick: function () { moveToFolder([id]); } },
+      { icon: 'image', label: 'Change picture', onClick: function () { Pics.open(id); } },
       { icon: 'more', label: 'Details & more', onClick: function () { gameDetails(id); } },
       'sep',
       { icon: 'trash', label: 'Delete', danger: true, onClick: function () { deleteGames([id]); } }
@@ -242,15 +244,15 @@
           h('button.btn.primary', { onclick: function () { m.close(); Player.launch(id); } }, UI.icon('play'), 'Play'),
           g.source !== 'link' ? h('button.btn', { onclick: function () { m.close(); Editor.open(id); } }, UI.icon('code'), 'Edit code') : null,
           h('button.btn', { onclick: function () { m.close(); renameGame(id); } }, I('tag'), 'Rename'),
-          h('button.btn', { onclick: async function () { var e = await UI.pickEmoji(g.emoji); if (e) { await D.updateGame(id, { emoji: e }); m.close(); gameDetails(id); } } }, I('smile'), 'Change icon'),
-          h('button.btn', { onclick: function () { pickCover(id, m); } }, UI.icon('image'), 'Change cover'),
-          g.cover ? h('button.btn', { onclick: async function () { await D.setCover(id, null); m.close(); gameDetails(id); } }, I('x'), 'Remove cover') : null,
+          h('button.btn', { onclick: function () { m.close(); Pics.open(id); } }, I('image'), 'Change picture'),
+          g.cover ? h('button.btn', { onclick: async function () { await D.setCover(id, null); m.close(); gameDetails(id); } }, I('x'), 'Remove picture') : null,
           h('button.btn', { onclick: async function () {
             var d = await UI.prompt('Description', 'What is this game about?', g.desc || '', { ok: 'Save', max: 600 });
             if (d !== null) { await D.updateGame(id, { desc: d }); m.close(); gameDetails(id); }
           } }, I('text'), 'Description'),
           h('button.btn', { onclick: function () { m.close(); moveToFolder([id]); } }, UI.icon('folder'), 'Folder'),
           h('button.btn' + (g.fav ? '.fav-on' : ''), { onclick: async function () { await D.updateGame(id, { fav: !g.fav }); m.close(); gameDetails(id); } }, I(g.fav ? 'starFill' : 'star'), g.fav ? 'Unfavorite' : 'Favorite'),
+          g.source !== 'link' && !g.kitAutosave ? h('button.btn.good', { onclick: function () { m.close(); Upgrade.open(id); } }, I('resume'), 'Make it continue where I left off') : null,
           g.source !== 'link' ? h('button.btn', { onclick: function () { m.close(); updateFiles(id); } }, UI.icon('upload'), 'Update game files') : null,
           g.source !== 'link' ? h('button.btn', { onclick: function () { downloadGame(id); } }, UI.icon('download'), 'Download game') : null,
           h('button.btn', { onclick: async function () { m.close(); var c = await D.duplicateGame(id); if (c) { D.ui.sel = c.id; App.refresh(); UI.toast('Made a copy', { icon: 'copy' }); } } }, UI.icon('copy'), 'Duplicate'),
@@ -262,23 +264,6 @@
     });
   }
   function stat(v, l) { return h('div.stat-box', h('div.sv', v), h('div.sl', l)); }
-
-  function pickCover(id, m) {
-    var input = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
-    document.body.appendChild(input);
-    input.addEventListener('change', async function () {
-      var f = input.files[0];
-      input.remove();
-      if (!f) return;
-      try {
-        await D.setCover(id, f);
-        Sound.good();
-        UI.toast('New cover set!', { type: 'good', icon: 'image', sound: false });
-        if (m) { m.close(); gameDetails(id); }
-      } catch (e) { UI.toast(e.message, { type: 'bad' }); }
-    });
-    input.click();
-  }
 
   function updateFiles(id) {
     var g = D.get(id);
@@ -417,6 +402,7 @@
           h('div.card-name', g.name),
           h('div.card-meta', h('span', I('clock'), ' ' + U.fmtDuration((g.playTime || 0) + (D.pendingPlay[g.id] || 0))), h('span', g.lastPlayed ? U.timeAgo(g.lastPlayed) : 'new'))));
       UI.tilt(c, 6);
+      UI.longPress(c, function (x, y) { gameMenu(g.id, x, y); });
       c.addEventListener('mouseleave', function () { c.style.transform = ''; });
       return c;
     }
@@ -444,7 +430,7 @@
 
     view.replaceChildren(h('div.page',
       h('h1.page-title', 'Library'),
-      h('p.page-sub', all.length + ' game' + (all.length === 1 ? '' : 's') + ' · right-click a game for options'),
+      h('p.page-sub', all.length + ' game' + (all.length === 1 ? '' : 's') + ' · ' + (window.matchMedia && window.matchMedia('(pointer: coarse)').matches ? 'hold' : 'right-click') + ' a game for options'),
       h('div.lib-toolbar',
         h('div.search', UI.icon('search'), search),
         sortSel,
@@ -857,32 +843,21 @@
      AI RULES
      ===================================================================== */
   async function aiRules() {
-    var kitText = '';
-    try { kitText = (await (await fetch('kit/save-kit.js')).text()).trim(); } catch (e) { kitText = '(could not load the Save Kit, are you offline?)'; }
+    var kitText = await Upgrade.kitSnippet();
     var hk = D.settings.hotkey || 'F2';
     var rules = [
       'I\'m making a game for my Game System 2.0. Follow these rules exactly:',
       '',
       '1. Put EVERYTHING in ONE single .html file (HTML + CSS + JavaScript together). No other files.',
-      '2. Don\'t use image or sound files. Draw graphics with code (canvas, WebGL or CSS) and make sounds with the Web Audio API. If you need a library like three.js, load it from https://cdn.jsdelivr.net/npm/...',
-      '3. SAVE & RESUME. Paste this Save Kit at the very top of the first <script>, exactly as written:',
-      '',
-      kitText,
-      '',
-      '4. When the game starts, load the save and put EVERYTHING back exactly how it was:',
-      '     const saved = GameSystem.load();',
-      '     if (saved) { /* restore player position, health, money, level, inventory, the world, time... */ }',
-      '   Then turn on auto-save with a function that returns everything needed to continue exactly where the player was:',
-      '     GameSystem.autoSave(() => ({ /* player position, health, money, level, inventory, world, time... */ }));',
-      '   Only save plain data (numbers, text, true/false, arrays, objects). No functions, images or DOM elements.',
-      '   When the player starts a brand new game, call GameSystem.clear().',
-      '5. It must work with keyboard + mouse on a PC, fill the whole window, and handle the window being resized.',
-      '6. Don\'t use alert(), confirm() or prompt(). Show messages inside the game instead.',
-      '7. Don\'t use the ' + hk + ' key in the game (Game System uses it for its menu).',
-      '8. Send the COMPLETE file every time. Never write "rest of the code stays the same". If it\'s too long for one message, stop at a clean spot and I\'ll say "continue".',
+      '2. Don\'t use image or sound files. Draw graphics with code (canvas, WebGL or CSS) and make sounds with the Web Audio API. If you need a library like three.js, load it from https://cdn.jsdelivr.net/npm/...'
+    ].concat(Upgrade.saveRules(kitText, 3)).concat([
+      '7. It must work with keyboard + mouse on a PC AND with touch on a phone (add on-screen buttons when the device has a touch screen). Fill the whole window and handle the window being resized.',
+      '8. Don\'t use alert(), confirm() or prompt(). Show messages inside the game instead.',
+      '9. Don\'t use the ' + hk + ' key in the game (Game System uses it for its menu).',
+      '10. Send the COMPLETE file every time. Never write "rest of the code stays the same". If it\'s too long for one message, stop at a clean spot and I\'ll say "continue".',
       '',
       'Now make this game: '
-    ].join('\n');
+    ]).join('\n');
     UI.modal({
       title: 'Rules for AI games',
       icon: 'sparkle',

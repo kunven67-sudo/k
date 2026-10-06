@@ -5,7 +5,7 @@
    - Keeps the app working offline */
 importScripts('js/db.js', 'js/shared.js');
 
-var VERSION = GS2Shared.APP_VERSION + '-1';
+var VERSION = GS2Shared.APP_VERSION + '-2';
 var CACHE = 'gs2-shell-' + VERSION;
 var SHELL = ['./'].concat(GS2Shared.APP_FILES.filter(function (f) { return f !== 'sw.js' && f !== '_headers'; }));
 
