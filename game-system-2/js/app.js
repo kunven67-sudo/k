@@ -37,7 +37,7 @@
 
   var lastAccent = null;
   function setAccent(a, b) {
-    if (!D.settings.accentAuto || !a) { a = D.settings.accent || '#00e5ff'; b = D.settings.accent2 || '#ff2bd6'; }
+    if (!D.settings.accentAuto || !a) { var th = Themes.current(); a = th.accent; b = th.accent2; }
     else { a = neon(a); b = b ? neon(b) : partner(a); }
     var key = a + b;
     if (key === lastAccent) return;
@@ -55,6 +55,8 @@
     var st = D.settings;
     Sound.setEnabled(st.sounds);
     Sound.setVolume(st.volume);
+    Themes.apply();
+    Sound.setMusic(!!st.menuMusic);
     BG.setMode(st.bg);
     document.body.classList.toggle('no-scanlines', !st.scanlines);
     document.body.classList.toggle('reduce-motion', !!st.reduceMotion);
@@ -373,6 +375,7 @@
     if (history.state && history.state.gs2) { try { history.replaceState(null, ''); } catch (e) { /* ignore */ } }
     applyEarly();
     BG.init($('bg'), D.settings.bg);
+    Themes.apply();
     registerSW();
     try {
       await D.init();

@@ -18,7 +18,12 @@
       for (var k in props) {
         var v = props[k];
         if (v == null || v === false) continue;
-        if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+        if (k === 'style' && typeof v === 'object') {
+          Object.keys(v).forEach(function (sk) {
+            if (sk.indexOf('--') === 0) el.style.setProperty(sk, v[sk]); /* CSS variables need setProperty */
+            else el.style[sk] = v[sk];
+          });
+        }
         else if (k === 'dataset') Object.assign(el.dataset, v);
         else if (k === 'class') el.className += (el.className ? ' ' : '') + v;
         else if (k === 'html') el.innerHTML = v;

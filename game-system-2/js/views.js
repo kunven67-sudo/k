@@ -1041,7 +1041,6 @@
   function setRow(title, sub, control, advanced) { return h('div.set-row' + (advanced ? '.adv' : ''), h('div.st', h('b', title), sub ? h('span', sub) : null), control); }
   function set(key, val) { D.settings[key] = val; D.saveSettings(); App.applySettings(); }
 
-  var ACCENTS = [['#00e5ff', '#ff2bd6'], ['#3dffa0', '#00b3ff'], ['#ffcc00', '#ff3d6e'], ['#b26bff', '#00e5ff'], ['#ff6a00', '#ff2bd6'], ['#ff3d6e', '#7a5cff'], ['#ffffff', '#8d93b5']];
 
   var SET_SECTIONS = [
     ['profile', 'user', 'Profile'],
@@ -1075,11 +1074,6 @@
     autoSel.value = String(st.autosaveSec || 5);
     var meter = h('div');
     storageMeter(meter);
-    var swatches = h('div.swatches', ACCENTS.map(function (pair) {
-      return h('button.swatch' + (!st.accentAuto && st.accent === pair[0] ? '.on' : ''), { title: pair[0], 'aria-label': 'Colors ' + pair[0], style: { background: 'linear-gradient(135deg,' + pair[0] + ',' + pair[1] + ')' }, onclick: function () {
-        D.settings.accentAuto = false; D.settings.accent = pair[0]; D.settings.accent2 = pair[1]; D.saveSettings(); App.applySettings(); renderSettings();
-      } });
-    }));
 
     function panel(id, rows) {
       var meta = SET_SECTIONS.find(function (x) { return x[0] === id; });
@@ -1090,9 +1084,9 @@
         setRow('Your name', 'What Game System (and VEX) calls you', nameIn)
       ]),
       panel('look', [
-        setRow('Background', 'Insane = full neon. Chill = calmer. Off = fastest for slow PCs.', seg([['insane', [I('bolt'), 'Insane']], ['chill', [I('moon'), 'Chill']], ['off', [I('power'), 'Off']]], st.bg, function (v) { set('bg', v); })),
-        setRow('Colors follow the game', 'The menu colors change to match the selected game\'s picture', sw(st.accentAuto, function (v) { set('accentAuto', v); renderSettings(); })),
-        !st.accentAuto ? setRow('Pick colors', null, swatches) : null,
+        themePicker(),
+        setRow('Moving background', 'Full = everything moves. Calm = slower, saves battery. Off = fastest for slow PCs.', seg([['insane', [I('bolt'), 'Full']], ['chill', [I('moon'), 'Calm']], ['off', [I('power'), 'Off']]], st.bg, function (v) { set('bg', v); })),
+        setRow('Colors follow the game', 'On Home, the colors change to match the selected game\'s picture (on top of your theme)', sw(st.accentAuto, function (v) { set('accentAuto', v); })),
         setRow('Scanlines', 'Retro TV lines over everything', sw(st.scanlines, function (v) { set('scanlines', v); })),
         setRow('Less motion', 'Turns off most animations', sw(st.reduceMotion, function (v) { set('reduceMotion', v); }))
       ]),
@@ -1115,7 +1109,8 @@
         setRow('Auto-save games', 'How often games with the Save Kit save', autoSel, true)
       ]),
       panel('sound', [
-        setRow('Menu sounds', null, sw(st.sounds, function (v) { set('sounds', v); })),
+        setRow('Menu sounds', 'The clicks and swooshes (they change with your theme)', sw(st.sounds, function (v) { set('sounds', v); })),
+        setRow('Menu music', 'Chill background music in the menus, made to match your theme. It stops while you play a game or use the Music app.', sw(st.menuMusic, function (v) { set('menuMusic', v); })),
         setRow('Volume', null, vol)
       ]),
       panel('notices', [
@@ -1185,6 +1180,130 @@
       h('p.page-sub', 'Make it yours, ' + (st.name || 'bro') + '.'),
       h('div.set-layout', nav, h('div', sections, empty))));
     if (setQuery) filter();
+  }
+
+  /* ---------------- themes ---------------- */
+  function themeCard(th) {
+    var on = (D.settings.theme || 'neon') === th.id;
+    var card = h('button.th-card' + (on ? '.on' : ''), {
+      'aria-pressed': on ? 'true' : 'false', title: th.desc,
+      onclick: function () {
+        D.settings.theme = th.id;
+        D.saveSettings();
+        App.applySettings();
+        Sound.sample();
+        renderSettings();
+      }
+    },
+      h('span.th-pic.th-' + th.scene, { style: { '--a': th.accent, '--b': th.accent2, '--base': th.base } }, h('i'), h('i'), h('i')),
+      h('b', th.name),
+      h('span', th.desc || ''),
+      th.custom ? h('span.th-del', { role: 'button', tabindex: 0, title: 'Delete this theme', 'aria-label': 'Delete ' + th.name, onclick: async function (e) {
+        e.stopPropagation();
+        if (await UI.confirm('Delete "' + th.name + '"?', 'This removes the theme you made.', { ok: 'Delete', danger: true })) { Themes.remove(th.id); App.applySettings(); renderSettings(); }
+      } }, I('x')) : null);
+    return card;
+  }
+  function themePicker() {
+    return h('div.th-wrap', { 'data-text': 'theme themes hacker lava ice neon colors' },
+      h('div.th-head', h('b', 'Theme'), h('span', 'Changes the colors, the moving background, the letters, the sounds and the title screen.')),
+      h('div.th-grid',
+        Themes.list().map(themeCard),
+        h('button.th-card.th-new', { onclick: function () { themeMaker(); } },
+          h('span.th-pic', I('sparkle')), h('b', 'Make your own'), h('span', 'Describe it, or use a picture'))));
+  }
+  /* make a theme from words or a picture */
+  function themeMaker() {
+    var tab = 'words';
+    var result = null;
+    var before = D.settings.theme || 'neon';
+    var desc = h('input.input', { placeholder: 'Like "purple galaxy with pink stars" or "toxic green hacker"', maxlength: 200, 'aria-label': 'Describe your theme' });
+    var note = h('p.small.muted', { style: { minHeight: '20px', margin: '8px 0 0' } });
+    var preview = h('div.tm-preview');
+    var nameIn = h('input.input', { placeholder: 'Theme name', maxlength: 24, 'aria-label': 'Theme name' });
+    var useAI = h('input', { type: 'checkbox', checked: true });
+    var body = h('div');
+    function show(t) {
+      result = t;
+      nameIn.value = t.name;
+      var th = Themes.fromCustom(Object.assign({ id: 'preview' }, t));
+      preview.replaceChildren(
+        h('span.th-pic.th-' + th.scene, { style: { '--a': th.accent, '--b': th.accent2, '--base': th.base } }, h('i'), h('i'), h('i')),
+        h('div.tm-info',
+          h('div.tm-sw', [th.accent, th.accent2, th.base].map(function (c) { return h('span', { style: { background: c }, title: c }); })),
+          h('span', 'Background: ' + ({ synth: 'retro sun', matrix: 'falling code', embers: 'lava + embers', snow: 'snow', stars: 'galaxy', waves: 'ocean waves' }[th.scene]) + ' · Letters: ' + ({ neon: 'neon', mono: 'terminal', soft: 'soft' }[th.font]))));
+      /* try it on for real while the window is open */
+      var root = document.documentElement;
+      Object.keys(th.vars).forEach(function (k) { root.style.setProperty('--' + k, th.vars[k]); });
+      BG.setScene(th.scene, th.base);
+      App.setAccent(th.accent, th.accent2);
+      saveBtn.disabled = false;
+    }
+    async function makeFromWords() {
+      var d = desc.value.trim();
+      if (!d) { UI.toast('Describe your theme first', { type: 'warn' }); return false; }
+      note.style.color = '';
+      note.textContent = useAI.checked ? 'The AI is thinking…' : '';
+      makeBtn.disabled = true;
+      var t = Themes.fromWords(d);
+      if (useAI.checked) {
+        try { t = await Themes.fromAI(d); note.textContent = 'Made by the AI. Like it? Save it. Not quite? Make another.'; }
+        catch (e) { note.textContent = 'The AI didn\'t answer, so I made it myself from your words.'; }
+      } else note.textContent = 'Made from your words.';
+      makeBtn.disabled = false;
+      show(t);
+      return false;
+    }
+    function pickPicture(file) {
+      if (!file) return;
+      Themes.fromPicture(file, 'From a picture').then(function (t) { note.textContent = 'Made from your picture\'s colors.'; show(t); }, function (e) { note.textContent = e.message; });
+    }
+    function render() {
+      body.replaceChildren(
+        h('div.seg', { style: { marginBottom: '12px' } },
+          h('button' + (tab === 'words' ? '.on' : ''), { onclick: function () { tab = 'words'; render(); } }, I('text'), ' Describe it'),
+          h('button' + (tab === 'pic' ? '.on' : ''), { onclick: function () { tab = 'pic'; render(); } }, I('image'), ' From a picture')),
+        tab === 'words'
+          ? h('div', h('div.row', h('div.grow', desc), makeBtn), h('label.check-row.small', useAI, h('span', 'Let the free AI help (what you type is sent to Pollinations). Off = made right here, offline.')))
+          : h('div', h('div.row',
+              h('button.btn', { onclick: function () {
+                var input = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+                document.body.appendChild(input);
+                input.addEventListener('change', function () { var f = input.files[0]; input.remove(); pickPicture(f); });
+                input.click();
+              } }, I('upload'), 'Pick a picture'),
+              D.ui.sel && D.get(D.ui.sel) && D.get(D.ui.sel).cover ? h('button.btn', { onclick: function () { pickPicture(D.get(D.ui.sel).cover); } }, I('image'), 'Use "' + D.get(D.ui.sel).name + '" picture') : null)),
+        note, preview, h('div.field', { style: { marginTop: '12px' } }, h('label', 'Name'), nameIn));
+    }
+    var makeBtn = h('button.btn.primary', { onclick: makeFromWords }, I('sparkle'), 'Make it');
+    desc.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); makeFromWords(); } });
+    var saved = false;
+    var m = UI.modal({
+      title: 'Make your own theme',
+      icon: 'sparkle',
+      wide: true,
+      body: body,
+      actions: [
+        { label: 'Cancel', kind: 'ghost' },
+        { label: 'Save theme', icon: 'check', kind: 'primary', id: 'btn-save-theme', onClick: function () {
+          if (!result) return false;
+          result.name = nameIn.value.trim() || result.name;
+          Themes.save(result);
+          saved = true;
+          App.applySettings();
+          Sound.good();
+          UI.toast('Theme "' + result.name + '" is on!', { type: 'good', icon: 'palette', sound: false });
+          renderSettings();
+        } }
+      ],
+      onClose: function () {
+        if (!saved) { D.settings.theme = before; App.applySettings(); }
+      }
+    });
+    var saveBtn = m.el.querySelector('#btn-save-theme');
+    saveBtn.disabled = true;
+    render();
+    setTimeout(function () { desc.focus(); }, 60);
   }
 
   function layoutPreview(id, name, text) {

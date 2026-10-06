@@ -58,6 +58,18 @@ To always skip the "Continue?" popup: **Settings → Start-up & resume → When 
 - **Library** has every game AND app, in your own order. **Home** shows what you played last.
 - **Home layouts** (Settings → Home & Library): **Console** (big showcase + rows you can drag into any order), **All games**, or **List + details**.
 
+### Themes
+
+**Settings → Look → Theme** changes everything: colors and glow, the moving background, the letters, the menu sounds and the title screen.
+
+- **Neon synthwave**: retro sun and grid
+- **Hacker**: falling green code, terminal letters, 8-bit blips
+- **Lava**: embers flying up from a glowing bottom, deep warm sounds
+- **Ice**: snow and a soft aurora, frosty glass, bell sounds
+- **Make your own**: describe it ("purple galaxy with pink stars") or pick a picture. The free AI can help (what you type is sent to Pollinations); with it off, Game System makes it right on your device.
+
+**Settings → Sound → Menu music** plays chill music that matches your theme. It stops while you play a game or use the Music app. **Colors follow the game** tints the menu with the selected game's colors.
+
 ### Continue or start over
 
 Every game says what it does: **Continues where you left off** (it saves, with "Saved 2 min ago") or **Starts at its title screen**. Games with a save show **CONTINUE** and a small **New game** button. Games that can't continue show **Make it continue** (see below).
