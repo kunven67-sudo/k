@@ -1,0 +1,147 @@
+name: Torture Humans build
+
+# 1) assets (Linux): converts the Rocketbox humans + mocap with Blender (bpy),
+#    adds the CC0 textures/models from the th-assets branch. Cached by tool hash.
+# 2) build (Windows): unit tests, game build, portable .exe, then a REAL update
+#    test with that exe (old copy updates itself to the new one).
+# Releases are only published when run by hand with "release" ticked.
+on:
+  push:
+    paths:
+      - 'torture-humans/**'
+      - '.github/workflows/torture-humans.yml'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish a GitHub release (the in-game Update button installs it)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# queue instead of cancel: the first asset build takes a while and must finish to be cached
+# (releases get their own queue: a push while a release waits must not cancel it)
+concurrency:
+  group: torture-humans-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Asset cache key
+        id: key
+        run: echo "hash=${{ hashFiles('torture-humans/tools/convert_avatar.py', 'torture-humans/tools/convert_anims.py', 'torture-humans/tools/build_assets.sh', 'torture-humans/tools/avatars.txt') }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: torture-humans/public/assets
+          key: th-assets-${{ steps.key.outputs.hash }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'   # the bpy wheel is built for 3.11
+
+      - name: Convert humans and animations (Blender)
+        if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: torture-humans
+        run: |
+          python -m pip install --quiet bpy==5.0.1 numpy pillow
+          BLENDER_PY=python JOBS=4 bash tools/build_assets.sh public/assets
+
+      - name: Add CC0 textures and models (th-assets branch)
+        run: |
+          if git ls-remote --exit-code origin th-assets >/dev/null; then
+            git fetch --depth 1 origin th-assets
+            mkdir -p torture-humans/public/assets/cc0
+            git --work-tree=torture-humans/public/assets/cc0 checkout FETCH_HEAD -- .
+          else
+            echo "no th-assets branch yet"
+          fi
+          du -sh torture-humans/public/assets/* || true
+
+      # photo-scanned rocks/trees can have 1M+ triangles: make game-ready versions
+      - name: Optimize heavy models (Blender decimate)
+        run: |
+          python -m pip install --quiet bpy==5.0.1 numpy pillow
+          python torture-humans/tools/optimize_models.py -- torture-humans/public/assets/cc0 torture-humans/public/assets/cc0opt 20000 | grep -E '^(OPT|optimized)' || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: th-assets
+          path: torture-humans/public/assets
+          if-no-files-found: error
+          retention-days: 3
+
+  build:
+    needs: assets
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: torture-humans
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: torture-humans/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: th-assets
+          path: torture-humans/public/assets
+
+      # the game files ship as one .pak next to the exe (downloaded once on first start)
+      - name: Pack game assets
+        shell: bash
+        run: |
+          node tools/pack_assets.mjs public/assets release-assets
+          cp release-assets/assets-pack.json electron/assets-pack.json
+          cat electron/assets-pack.json
+
+      - name: Build game + portable exe
+        run: npm run dist
+
+      - name: Update test (old exe updates itself to the new one)
+        run: node test/windows-update.cjs
+
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: TortureHumans-Portable
+          path: |
+            torture-humans/release/*.exe
+            torture-humans/release-assets/*.pak
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Read version
+        id: ver
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        if: github.event_name == 'workflow_dispatch' && inputs.release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: torturehumans-v${{ steps.ver.outputs.version }}
+          name: Torture Humans ${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          body_path: torture-humans/RELEASE_NOTES.md
+          files: |
+            torture-humans/release/*.exe
+            torture-humans/release-assets/*.pak
+          make_latest: false
+          overwrite_files: true
