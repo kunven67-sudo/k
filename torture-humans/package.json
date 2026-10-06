@@ -1,7 +1,7 @@
 {
   "name": "torture-humans",
   "productName": "Torture Humans",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Mad scientist sandbox: shrink humans, keep them in glass cages with bugs.",
   "private": true,
   "type": "module",
