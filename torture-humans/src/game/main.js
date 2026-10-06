@@ -27,6 +27,7 @@ import { SettingsPanel } from './ui/settings-panel.js';
 import { PauseMenu } from './ui/pause-menu.js';
 import { Phone, saveGame, loadGame, hasSave } from './phone.js';
 import { Story } from './story.js';
+import { DetailSwitch } from './engine/lod.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { buildToon } from './humans/toon.js';
 import { Hands } from './gadgets/hands.js';
@@ -182,6 +183,19 @@ export async function boot() {
     humans.push(h);
     return h;
   };
+  // light versions of the detailed scanned models in town and in the house (a street
+  // lamp is ~7,000 triangles, a potted plant ~44,000): full detail only up close
+  const placedModels = (roots) => {
+    const out = [];
+    const walk = (o) => { if (o.userData.asset) { out.push(o); return; } for (const c of o.children) walk(c); };
+    for (const r of roots || []) walk(r);
+    return out;
+  };
+  const detail = [];
+  Promise.all([
+    DetailSwitch.create(placedModels(level.zones?.town), { ratio: 0.12, error: 0.03, near: 14, shadowNear: 35 }),
+    DetailSwitch.create(placedModels(level.zones?.house), { ratio: 0.15, error: 0.02, near: 3 }),
+  ]).then((list) => detail.push(...list)).catch((e) => console.warn('[lod]', e.message));
   // the shrink ray works on things too
   const resizer = new Resizer({ physics, props: level.props, rebuildProps: level.rebuildProps, player });
   const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony, speech, audio, resizer });
@@ -486,6 +500,7 @@ export async function boot() {
     squisher.update();
     hazards.update(dt);
     tiny.update(dt);
+    for (const d of detail) d.update(camera.position, dt);
     level.tiny?.lod?.(camera.position, dt, player.scale < 0.3); // detailed tank plants/rocks (and their shadows) only up close / when you're tiny
     settingsPanel.update();
     // the world around you (not you) runs slower when you're tiny: small animals see in slow motion

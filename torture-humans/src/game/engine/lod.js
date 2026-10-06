@@ -50,16 +50,19 @@ export class DetailSwitch {
     return new DetailSwitch(objects, opts);
   }
 
-  constructor(objects, { ratio, error, near = 0.3 } = {}) {
+  // shadowNear: beyond this they don't cast shadows either (tiny far-off shadows nobody sees)
+  constructor(objects, { ratio, error, near = 0.3, shadowNear = Infinity } = {}) {
     this.near = near;
+    this.shadowNear = shadowNear;
     this.items = [];
     for (const o of objects) {
       const meshes = [];
       o.traverse((m) => { if (m.isMesh && !m.isInstancedMesh && m.geometry?.index) meshes.push({ m, hi: m.geometry, lo: simplified(m.geometry, { ratio, error }) }); });
-      if (!meshes.length || meshes.every((x) => x.lo === x.hi)) continue;
+      if (!meshes.length || (meshes.every((x) => x.lo === x.hi) && shadowNear === Infinity)) continue;
+      for (const x of meshes) x.cast = x.m.castShadow;
       const box = new THREE.Box3().setFromObject(o);
       const sphere = box.getBoundingSphere(new THREE.Sphere());
-      this.items.push({ o, meshes, center: o.parent.worldToLocal(sphere.center.clone()), radius: sphere.radius, detailed: true });
+      this.items.push({ o, meshes, center: o.parent.worldToLocal(sphere.center.clone()), radius: sphere.radius, detailed: true, shadow: true });
     }
     this.t = 0;
   }
@@ -81,6 +84,8 @@ export class DetailSwitch {
       it.o.parent.localToWorld(w);
       const d = w.distanceTo(eye) - it.radius;
       // (a little hysteresis so nothing flickers at the edge)
+      const shadow = it.shadow ? d < this.shadowNear * 1.1 : d < this.shadowNear;
+      if (shadow !== it.shadow) { it.shadow = shadow; for (const x of it.meshes) x.m.castShadow = shadow && x.cast; }
       const want = it.detailed ? d < this.near * 1.25 : d < this.near;
       if (want === it.detailed) continue;
       it.detailed = want;
