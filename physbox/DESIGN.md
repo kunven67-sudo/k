@@ -107,3 +107,32 @@ in the question rounds.
 - **Weapons** (all): real guns (real ballistics), melee (bats, crowbars, swords, hammers), launchers
   (rockets, grenades, mortars, artillery), sci-fi (lasers, gravity gun, freeze gun, black-hole gun).
 - **Cockpits**: real 3D cockpits with working gauges (speed, altitude, fuel, artificial horizon, orbit navball) — most realistic.
+
+## Round 12
+- **Animals**: real ecosystem — predators hunt prey, herds migrate, birds flock, fish school, animals eat and sleep — most realistic.
+- **Spawn menu**: big Q menu with categories, thumbnails and search, plus a favourites hotbar and recent items.
+- **Resources** (setting): infinite fuel / ammo / oxygen toggles.
+- **Help**: tips only (small hints the first time you do something), no tutorial.
+
+## PERFORMANCE FIRST (player's PC has an NVIDIA GeForce GT 130)
+- Player: "the game does not need to be that realistic so I don't lag — I have a GT 130."
+- The GT 130 is a 2009 low-end card: every feature must have a cheap path that keeps 30+ fps at ~720p.
+- Default to LOW settings on weak GPUs (auto-detect + FPS watchdog); higher tiers only when the GPU can take it.
+- Realism is achieved with cheap tricks wherever possible:
+  - crumple = deforming the visual mesh at impact points (no soft-body solver) + parts breaking off
+  - flowing water = small local heightfield/shallow-water grid, not particles
+  - destruction = pre-split pieces with a cap on live debris; old debris sleeps then fades
+  - Earth = low-poly LOD terrain, simple fog-based atmosphere, no real-time shadows on low
+  - NPCs/animals capped by setting; distant ones are simulated cheaply or frozen
+
+## Round 13
+- **Calibration**: Accretion runs smooth on the player's GT 130 → Physbox may use a similar budget
+  (Accretion-level shaders at auto quality are fine), but heavy simulations still need cheap paths.
+- **Keep most**: all four — physics & destruction, big world & space, lots of NPCs, nice graphics.
+  So nothing is cut; everything scales with the quality setting and smart level-of-detail.
+- Player: "2 more questions then we start building."
+
+## Round 14 (last)
+- **Controls**: a NEW layout designed for Physbox (rockets, cockpits, powers), every key rebindable.
+- **Home build site**: grassy plains of the American Midwest with a small town and roads nearby.
+- Building starts now.
