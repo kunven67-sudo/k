@@ -29,8 +29,12 @@ export function signsUpdate(night, time, wet = 0) {
   for (const f of flickerables) f.update(night, time);
 }
 
-export function resetSigns() {
+/** Start a fresh build. `tier` (optional) picks bulb tessellation. */
+export function resetSigns(tier) {
   flickerables.length = 0;
+  const detail = tier?.name === 'low' ? 0 : 1;
+  if (detail !== bulbGeoCache.detail) bulbGeoCache.g = null;
+  bulbGeoCache.detail = detail;
 }
 
 // ---- Canvas helpers -----------------------------------------------------------------------
@@ -335,9 +339,11 @@ export function neonSign(key, lines, o = {}) {
 
 // ---- Marquee bulbs ------------------------------------------------------------------------
 
-const bulbGeoCache = { g: null };
+// A 5 cm glowing bulb never needs a smooth sphere: an icosphere (80 tris) on desktop tiers and a
+// plain icosahedron (20 tris) on tier low — there are several thousand of them downtown.
+const bulbGeoCache = { g: null, detail: 1 };
 function bulbGeometry() {
-  if (!bulbGeoCache.g) bulbGeoCache.g = new THREE.SphereGeometry(1, 10, 8);
+  if (!bulbGeoCache.g) bulbGeoCache.g = new THREE.IcosahedronGeometry(1, bulbGeoCache.detail);
   return bulbGeoCache.g;
 }
 
@@ -366,7 +372,9 @@ export class BulbSet {
     const seqAttr = new Float32Array(n);
     const pattern = { chase: 0, twinkle: 1, steady: 2, wave: 3 }[this.pattern] ?? 0;
     const speed = this.speed;
-    const k = this.intensity;
+    // Hundreds of HDR bulbs sum into one wide bloom veil; 0.5 keeps each bulb hot (above the
+    // bloom threshold) while the marquee reads as crisp points instead of milky haze.
+    const k = this.intensity * 0.5;
     const steps = this.steps;
     const dayI = this.dayIntensity;
     mat.onBeforeCompile = (sh) => {

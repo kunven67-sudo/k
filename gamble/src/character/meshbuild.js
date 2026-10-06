@@ -151,6 +151,7 @@ function build(p, rig, tier) {
     for (const q of knees) fl = Math.max(fl, g(P.distanceTo(q), 0.065 * dims.s) * (P.z > q.z ? 0.8 : 0.3));
     let hz = hairZone[top] ?? 0;
     if (top === 'chest' || top === 'belly' || top === 'spine') hz *= P.z > 0 ? 1 : 0.35;
+    fdat[v * 4 + 3] = 1;
     mask[v * 4] = fl;
     mask[v * 4 + 1] = hz;
     mask[v * 4 + 2] = kn;
@@ -181,6 +182,7 @@ function build(p, rig, tier) {
     const inner = sstep(0.005, 0.0, Math.abs(y - L.mouthY)) * sstep(L.mouthZ - 0.003, L.mouthZ - 0.01, z) * (Math.abs(x) < L.mouthHalfW ? 1 : 0);
     fdat[o * 4] = 1;
     fdat[o * 4 + 1] = inner * 0.2;
+    fdat[o * 4 + 3] = headAO(sdf, x, y, z, head.nrm, v);
     mask[o * 4] = g(Math.hypot(x, y - L.noseTipY, z - L.noseTipZ), 0.012) * 0.35;
   }
   for (let v = 0; v < ne; v++) {
@@ -192,6 +194,7 @@ function build(p, rig, tier) {
     si[o * 4] = boneIndex.get('head');
     sw[o * 4] = 1;
     fdat[o * 4 + 2] = 1;
+    fdat[o * 4 + 3] = 0.82 + 0.18 * Math.min(1, Math.abs(ears.pos[v * 3]) * 8 - 0.7);
     mask[o * 4] = 0.55;
   }
   const index = new Uint32Array(bIdx.length + head.index.length + ears.idx.length);
@@ -237,6 +240,27 @@ function build(p, rig, tier) {
   const T4 = performance.now();
   const timing = { cage: T1 - T0, subdiv: T2 - T1, head: T3 - T2, rest: T4 - T3 };
   return { skin, eyes, mouth, triTags, bodyCage: cage, level, L, mapper, seam, bodyVerts: nb, timing };
+}
+
+/**
+ * Ambient occlusion of a head vertex from the sculpt SDF (classic "distance along the normal"
+ * estimate): eye sockets, lash line, nostrils, mouth corners, under the nose and jaw darken,
+ * which gives the face its definition under flat light. 1 = open.
+ */
+function headAO(sdf, x, y, z, nrm, v) {
+  const nx = nrm[v * 3];
+  const ny = nrm[v * 3 + 1];
+  const nz = nrm[v * 3 + 2];
+  let occ = 0;
+  let wsum = 0;
+  for (let i = 1; i <= 5; i++) {
+    const h = 0.0035 * i;
+    const d = sdf(x + nx * h, y + ny * h, z + nz * h);
+    const w = 1 / (1 << i);
+    occ += w * Math.max(0, h - d) / h;
+    wsum += w;
+  }
+  return Math.max(0.45, 1 - 1.0 * (occ / wsum));
 }
 
 function partGeometry(part, hc, hsc, boneIndex, colors = false) {

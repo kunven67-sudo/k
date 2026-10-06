@@ -22,6 +22,7 @@ import { StaticBatch, Colliders } from '../shared/batch.js';
 import { Props } from '../shared/props.js';
 import { signalUpdate } from '../shared/props.js';
 import { signsUpdate, resetSigns } from '../shared/signs.js';
+import { setVehicleDetail } from '../shared/vehicles.js';
 import { updateFacades } from '../shared/facade.js';
 import { NightLights } from '../shared/nightlights.js';
 import { WET, Rain, wetBatch } from '../shared/wet.js';
@@ -51,9 +52,11 @@ export async function buildReno(engine, physics, { tier, month, eldorado = {} } 
     '400 64px "Bebas Neue"', '400 64px "Inter"', '600 64px "Inter"', '700 64px "Playfair Display"',
     'italic 400 64px "Playfair Display"', '400 64px "Rye"', '400 64px "Monoton"', '400 64px "Special Elite"',
   ]);
-  resetSigns();
+  resetSigns(tier);
+  setVehicleDetail(tier?.name === 'low' ? 0 : 1);
   const group = new THREE.Group();
   group.name = 'reno';
+  // 64 m chunks: tried 128 m on tier low — only -20% draw calls for +65% triangles, not worth it.
   const batch = new StaticBatch({ chunkSize: 64, name: 'reno-static' });
   const colliders = new Colliders(physics);
   const ctx = {
@@ -76,6 +79,14 @@ export async function buildReno(engine, physics, { tier, month, eldorado = {} } 
   const built = batch.build();
   group.add(built.group);
   for (const m of ctx.extraMeshes) group.add(m);
+  // Small stand-alone meshes (signs, bulb strings, blades) are hidden past the tier draw distance
+  // like the static chunks; big ones (tower crowns, skyline signs) stay as landmarks.
+  const smallMeshes = [];
+  group.updateMatrixWorld(true);
+  for (const m of ctx.extraMeshes) {
+    const s = new THREE.Box3().setFromObject(m).getBoundingSphere(new THREE.Sphere());
+    if (Number.isFinite(s.radius) && s.radius < 12) smallMeshes.push({ m, c: s.center, r: s.radius });
+  }
 
   placeDecals(ctx);
   wetBatch(group, (m) => WET_KINDS.some((k) => m.name.startsWith(k)) && { puddles: m.name.startsWith('asphalt') || m.name.startsWith('decals') || m.name.startsWith('road-paint') ? 1 : 0.6, porous: m.name.startsWith('asphalt') ? 0.5 : 0.7 });
@@ -158,6 +169,7 @@ export async function buildReno(engine, physics, { tier, month, eldorado = {} } 
       night.update(dt, { night: nf, wet: Math.max(state.wet, w.wetOverride ?? 0), viewer, time });
       if (o.camera) rain.update(dt, o.camera, rainAmt, o.sky?.hemi ? o.sky.hemi.color.clone().multiplyScalar(0.55 + nf * 0.3) : null);
       batch.cull(viewer, tier.drawDistance);
+      for (const o of smallMeshes) o.m.visible = o.c.distanceTo(viewer) - o.r < tier.drawDistance;
       buzz.update(dt, viewer, nf);
       for (const u of ctx.updaters) u(dt, clock, o, viewer);
     },

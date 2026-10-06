@@ -88,41 +88,29 @@ export function buildLidPatch(L, e, sdf, segs = 48, castRay = null) {
       let t;
       if (k === 0) t = L.eyeR - 0.0005;
       else if (k === 1) t = L.eyeR + L.lidT * 0.8;
-      else if (k === 2 || !castRay) {
-        // March outward from the eye centre to the first exit of the field.
-        t = L.eyeR * 0.5;
+      else {
+        // Outer rings: march INWARD from outside along the eye-centre ray and take the first
+        // (outermost) surface. Marching outward from the eyeball would stop in hidden air
+        // pockets of the socket and fold the patch over itself.
+        t = 0.075;
         let f = sdf(c[0] + d[0] * t, c[1] + d[1] * t, c[2] + d[2] * t);
         let prev = t;
-        for (let it = 0; it < 120 && f < 0; it++) {
+        for (let it = 0; it < 160 && f > 1e-5; it++) {
           prev = t;
-          t += max(-f * 0.7, 1.5e-4);
+          t -= max(f * 0.7, 1.5e-4);
+          if (t < L.eyeR) break;
           f = sdf(c[0] + d[0] * t, c[1] + d[1] * t, c[2] + d[2] * t);
         }
-        let a = prev;
-        let b = t;
+        let a = max(t, L.eyeR);
+        let b = prev;
         for (let it = 0; it < 14; it++) {
           const m = (a + b) * 0.5;
           if (sdf(c[0] + d[0] * m, c[1] + d[1] * m, c[2] + d[2] * m) < 0) a = m;
           else b = m;
         }
-        t = (a + b) * 0.5 - 0.0002;
-      } else {
-        // Outer rings: sample exactly like the head grid (ray from PROJ), tucked under it.
-        const r0 = L.eyeR + L.lidT;
-        const tx = c[0] + d[0] * r0 - PROJ[0];
-        const ty = c[1] + d[1] * r0 - PROJ[1];
-        const tz = c[2] + d[2] * r0 - PROJ[2];
-        const l = hypot(tx, ty, tz);
-        const tt = castRay(sdf, tx / l, ty / l, tz / l) - 0.00025;
-        const v3o = (k * segs + j) * 3;
-        pos[v3o] = PROJ[0] + (tx / l) * tt;
-        pos[v3o + 1] = PROJ[1] + (ty / l) * tt;
-        pos[v3o + 2] = PROJ[2] + (tz / l) * tt;
-        const up2 = sin(psi) >= 0;
-        const corner2 = sstep(0.0, 0.55, abs(sin(psi)));
-        lidW[k * segs + j] = (up2 ? LID_W_UP[k] : -LID_W_DN[k]) * (0.35 + 0.65 * corner2);
-        ringOf[k * segs + j] = k;
-        continue;
+        // The outermost ring tucks just under the head grid it overlaps.
+        t = (a + b) * 0.5 - (k === K - 1 ? 0.00035 : 0.00005);
+        void castRay;
       }
       const v3 = (k * segs + j) * 3;
       pos[v3] = c[0] + d[0] * t;

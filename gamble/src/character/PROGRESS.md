@@ -68,3 +68,25 @@ A1.
 - facecards.js: brows/lashes/beard merged into the hair mesh (aTint, cover>=9.5 = card mode).
 - NEXT: accessories.js (hats w/ hair clip, glasses, bowtie, hearing aid, belt garment), perf,
   animation screenshots, face sculpt polish, low tier check.
+
+## Session 4 (2026-10-06, converge & finish)
+Baseline review (busts view, lineup): heads too narrow/egg, hair ragged shell + spikes, tank-top
+strap spikes, glasses lens bloom, flat card mustache/brows, A-pose arms, build 1.3-6 s/human.
+- DONE: head widened (cranium rx .115, jaw wider, neck thicker), SDF bounding-sphere early-outs +
+  warm-started grid rays (head build faster), tank strap select fixed, curved lens normals +
+  temple arms follow skull, dev page `view=busts&i=N` (4 head-and-shoulders portraits).
+- NEXT: hair (locks), brows/facial hair painted + volume, lids lower, idle arm pose, perf, walk.
+- DONE: head SDF rewritten: skull + **superellipse face loft** (LOFT_KEYS, Catmull-Rom, params
+  scale W/F per height) instead of blob primitives (lumpy); lids thicken away from the margin
+  (no socket ring gap); lid patch rings now marched inward from outside (fixed folded gray
+  flaps); SDF-baked head AO in faceData.w (skin shader); lashes = gapped strands (cover 12);
+  brows = 2 layers of short hair cards; hair.js rewritten (flow-aligned UV clumps, rounded locks,
+  fixed mohawk, curtain locks hang past the edge); beard shell uses flow UVs + fuzzy edge.
+- Tool: scratchpad sculpt.mjs = CPU raymarch of headSDF (front/3-4/profile PNG in ~6 s) — not in
+  repo; recreate if needed (raymarch headSDF from node, write PNG with zlib).
+- DONE: locomotion cadence from leg reach (no lunges/kneeling), start-off phase alignment,
+  emergency step; idle arms hang closer, palms face the thighs (forearm/hand twist).
+  schema: overrides now apply while drawing (age override drives grey hair etc.).
+  Hat brims are closed felt profiles (no sun glint line).
+- Tool: scratchpad/sim (node --import ./reg.mjs walk.mjs|pose.mjs): runs Human in node with
+  browser shims + 'three' loader → numeric gait/pose checks without the browser.

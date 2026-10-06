@@ -119,22 +119,33 @@ function hatGeometry(kind, sdf) {
       { y: yb + h * 0.9, rx: rx * 0.88, rz: rz * 0.9, cz, dip: big ? 0.02 : 0.015, pinch: 0.25 },
       { y: yb + h, rx: rx * 0.55, rz: rz * 0.65, cz, dip: 0.025, top: -0.012 },
     ];
-    parts.push({ g: ringStack(rings, 40), fabric: big ? 'leather' : 'wool' });
+    parts.push({ g: ringStack(rings, 40), fabric: 'wool' });
+    // Brim: a closed felt profile (top surface out, rolled edge, underside back in) so it has
+    // real thickness and a soft edge instead of a razor sheet catching the sun.
     const W = big ? 0.085 : 0.05;
+    const th = 0.0045;
+    const cA = big ? 0.015 : 0.004;
+    const cB = big ? 0.04 : 0.01;
+    const dB = big ? 0.0 : 0.012;
     const brim = [
       { y: yb - 0.004, rx: rx + 0.004, rz: rz + 0.004, cz },
-      { y: yb - 0.006, rx: rx + W * 0.5, rz: rz + W * 0.5, cz, curl: big ? 0.015 : 0.004 },
-      { y: yb - 0.004, rx: rx + W, rz: rz + W, cz, curl: big ? 0.04 : 0.01, dip: big ? 0.0 : 0.012 },
+      { y: yb - 0.006, rx: rx + W * 0.5, rz: rz + W * 0.5, cz, curl: cA },
+      { y: yb - 0.004, rx: rx + W - 0.004, rz: rz + W - 0.004, cz, curl: cB, dip: dB },
+      { y: yb - 0.004 - th * 0.5, rx: rx + W + 0.001, rz: rz + W + 0.001, cz, curl: cB, dip: dB },
+      { y: yb - 0.004 - th, rx: rx + W - 0.004, rz: rz + W - 0.004, cz, curl: cB, dip: dB },
+      { y: yb - 0.006 - th, rx: rx + W * 0.5, rz: rz + W * 0.5, cz, curl: cA },
+      { y: yb - 0.004 - th, rx: rx + 0.003, rz: rz + 0.003, cz },
     ];
-    parts.push({ g: ringStack(brim, 48, false), fabric: big ? 'leather' : 'wool', double: true });
+    parts.push({ g: ringStack(brim, 48, false), fabric: 'wool' });
     // Band.
     parts.push({ g: ringStack([{ y: yb, rx: rx + 0.007, rz: rz + 0.007, cz }, { y: yb + 0.016, rx: rx + 0.006, rz: rz + 0.006, cz }], 40, false), fabric: 'satin', band: true, double: true });
   }
   return { parts, clip: { cy: yb + 0.06, rx: rx + 0.004, ry: 0.11, rz: rz + 0.004, cz, below: yb - 0.01 } };
 }
 
-function glassesGeometry(kind, L) {
-  const lens = kind === 'aviator' ? [0.024, 0.021] : kind === 'square' || kind === 'reading' ? [0.023, 0.015] : kind === 'sunglasses' ? [0.025, 0.019] : [0.019, 0.019];
+function glassesGeometry(kind, L, sdf) {
+  const ls = L.eyeR / 0.0202; // lenses scale with the eyes
+  const lens = (kind === 'aviator' ? [0.024, 0.021] : kind === 'square' || kind === 'reading' ? [0.023, 0.015] : kind === 'sunglasses' ? [0.025, 0.019] : [0.019, 0.019]).map((v) => v * ls);
   const z = L.eyes[0].c[2] + L.eyeR + 0.017;
   const y = L.eyeY + (kind === 'reading' ? -0.012 : 0.0);
   const frame = [];
@@ -207,11 +218,35 @@ function glassesGeometry(kind, L) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setIndex(idx);
-    g.computeVertexNormals();
+    // Curved-lens normals (centre of curvature 8 cm behind) so the sun glint is a small
+    // highlight instead of the whole flat lens flashing into bloom.
+    const nr = new Float32Array(pos.length);
+    for (let v = 0; v < pos.length; v += 3) {
+      const nx = pos[v] - cx;
+      const ny = pos[v + 1] - y;
+      const nz = 0.08;
+      const l = Math.hypot(nx, ny, nz);
+      nr[v] = nx / l;
+      nr[v + 1] = ny / l;
+      nr[v + 2] = nz / l;
+    }
+    g.setAttribute('normal', new THREE.BufferAttribute(nr, 3));
     lenses.push(g);
     // Temple arm back to the ear.
     const ex = e.side * (L.eyeSep + lens[0] + 0.002);
-    frame.push(tube([[ex, y + 0.004, z - 0.002], [e.side * 0.098 * L.fw, y + 0.006, -0.005], [e.side * 0.096 * L.fw, y - 0.01, -0.03]], thick * 0.9, false));
+    // Temple arm hugs the skull side back to the ear.
+    const sideX = (yy, zz) => {
+      let x = 0.2;
+      for (let i = 0; i < 60; i++) {
+        const d = sdf(x, yy, zz);
+        if (d < 1e-4) break;
+        x -= Math.max(d * 0.8, 2e-4);
+      }
+      return x;
+    };
+    const t1 = sideX(y + 0.006, -0.005) + 0.004;
+    const t2 = sideX(y - 0.01, -0.03) + 0.003;
+    frame.push(tube([[ex, y + 0.004, z - 0.002], [e.side * t1, y + 0.006, -0.005], [e.side * t2, y - 0.01, -0.03]], thick * 0.9, false));
   }
   // Bridge.
   frame.push(tube([[L.eyeSep - lens[0], y + 0.004, z], [0, y + 0.008, z + 0.004], [-L.eyeSep + lens[0], y + 0.004, z]], thick * 0.9, false));
@@ -240,10 +275,11 @@ export function buildAccessories(human) {
     }
   }
   if (p.glasses && p.glasses !== 'none') {
-    const gg = glassesGeometry(p.glasses, L);
+    const gg = glassesGeometry(p.glasses, L, sdf);
     const metal = p.glasses === 'aviator' || p.glasses === 'round';
     const fm = new THREE.MeshPhysicalMaterial({ color: metal ? 0xc9a75a : p.glasses === 'reading' ? 0x5a3a26 : 0x151515, metalness: metal ? 1 : 0, roughness: metal ? 0.3 : 0.35, clearcoat: metal ? 0 : 0.8 });
-    const lm = new THREE.MeshPhysicalMaterial({ color: p.glasses === 'sunglasses' || p.glasses === 'aviator' ? 0x1a2420 : 0xffffff, metalness: 0, roughness: 0.05, transparent: true, opacity: p.glasses === 'sunglasses' || p.glasses === 'aviator' ? 0.82 : 0.12, side: THREE.DoubleSide, depthWrite: false });
+    const dark = p.glasses === 'sunglasses' || p.glasses === 'aviator';
+    const lm = new THREE.MeshPhysicalMaterial({ color: dark ? 0x1a2420 : 0xdfe8ee, metalness: 0, roughness: 0.22, specularIntensity: 0.3, envMapIntensity: 0.6, transparent: true, opacity: dark ? 0.82 : 0.1, side: THREE.DoubleSide, depthWrite: false });
     for (const g of gg.frame) out.push({ geometry: toWorld(g), material: fm, bone: 'head' });
     for (const g of gg.lenses) out.push({ geometry: toWorld(g), material: lm, bone: 'head', noShadow: true });
   }
@@ -266,7 +302,7 @@ export function buildAccessories(human) {
   }
   if (p.hearingAid) {
     const g = new THREE.CapsuleGeometry(0.004, 0.012, 4, 8).rotateX(0.5);
-    const ex = (0.098 * L.fw + 0.004) * k;
+    const ex = (0.113 * L.fw + 0.004) * k;
     g.translate(hc.x + ex, hc.y + 0.0 * k, hc.z - 0.03 * k);
     out.push({ geometry: g, material: new THREE.MeshPhysicalMaterial({ color: 0xd8bfa4, roughness: 0.4, clearcoat: 0.5 }), bone: 'head' });
   }

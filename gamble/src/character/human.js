@@ -242,7 +242,7 @@ export class Human {
     // Buzz cuts and the hairline density come from the skin's scalp mask.
     this.skinMat.userData.u.uScalp.value = p.hairStyle === 'bald' ? 0 : p.hairStyle === 'buzz' ? 0.9 : 0.55;
     const hd = buildHair(p, this.geo.L, this.tierName);
-    const fc = buildFaceCards(p, this.geo.L, this.tierName);
+    const fc = buildFaceCards(p, this.geo.L, this.tierName, { hair: hairColor(p, 'hair'), brow: hairColor(p, 'brow'), beard: hairColor(p, 'beard') });
     const nh = hd ? hd.pos.length / 3 : 0;
     const n = nh + fc.nv;
     const hc = this.rig.dims.j.headCenter;
@@ -304,7 +304,7 @@ export class Human {
     g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
     g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
     g.setIndex(index);
-    const mat = createHairMaterial(hairColor(p, 'hair'), { tierName: this.tierName, gloss: hd ? hd.gloss : 0.4, brow: hairColor(p, 'brow'), beard: hairColor(p, 'beard') });
+    const mat = createHairMaterial(hairColor(p, 'hair'), { tierName: this.tierName, gloss: hd ? hd.gloss : 0.4, curl: hd ? hd.curl : 0 });
     this.hair = this._mesh(g, mat, this.tier.shadows !== false);
     this.hair.name = 'hair';
     this._applyHatClip();

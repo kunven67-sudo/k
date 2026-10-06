@@ -129,7 +129,7 @@ export function buildBodyCage(p, dims) {
 
   // ---------------- torso rings ----------------
   // y, half width W, front depth F, back depth Bk, center z, squareness n (2 = ellipse).
-  const neckR = (0.058 + 0.012 * f + 0.008 * m + 0.004 * sh) * s;
+  const neckR = (0.064 + 0.014 * f + 0.01 * m + 0.004 * sh) * s;
   const R = [
     { y: hipY - 0.07 * s, W: 0.132 + 0.03 * h + 0.05 * f, F: 0.068 + 0.03 * f, Bk: 0.085 + 0.02 * h + 0.03 * f, n: 2.3 },
     { y: hipY + 0.045 * s, W: 0.17 + 0.035 * h + 0.06 * f, F: 0.083 + 0.04 * f + 0.02 * b, Bk: 0.105 + 0.03 * h + 0.045 * f, n: 2.4 },

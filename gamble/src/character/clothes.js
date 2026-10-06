@@ -34,7 +34,9 @@ export const GARMENTS = {
   },
   tank: {
     fabric: 'jersey', layer: 1,
-    select: (pt, r, c) => pt === P.torso && r >= 1 && !(r >= 6 && r <= 7 && ((c >= 2 && c <= 5) || (c >= 10 && c <= 13))) && !(r === 8 && (front3(c) || c === 7 || c === 8)),
+    // Straps: the r=8 band over each shoulder must connect to the front (c 1/14) and back
+    // (c 6/9) panels, otherwise it is a loose flap and subdivision throws spikes.
+    select: (pt, r, c) => pt === P.torso && r >= 1 && !(r >= 6 && r <= 7 && ((c >= 2 && c <= 5) || (c >= 10 && c <= 13))) && !(r === 8 && (frontMid(c) || c === 7 || c === 8)),
     off: (pt, r) => (r <= 2 ? 0.012 : 0.007),
   },
   button: {

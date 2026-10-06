@@ -81,45 +81,16 @@ function frontPoint(sdf, x, y) {
   return [x, y, z];
 }
 
-export function buildFaceCards(p, L, tier = 'high') {
+export function buildFaceCards(p, L, tier = 'high', colors = null) {
   const cs = new CardSet();
   const sdf = headSDF(L);
   const rng = new Rng(p.seed * 7 + 11);
   const FB = faceBonePositions(L);
-  const browTint = [1, 1, 1];
-  // ---- eyebrows
-  const thick = 0.55 + 0.9 * p.browThickness;
-  const arch = 0.003 + 0.007 * p.browArch;
-  const layers = tier === 'low' ? 1 : 3;
-  for (const e of L.eyes) {
-    const s = e.side;
-    const S = s > 0 ? 'L' : 'R';
-    const segs = tier === 'low' ? 6 : 10;
-    for (let layer = 0; layer < layers; layer++) {
-      const base = cs.nv;
-      const jitter = (layer - 1) * 0.0012;
-      for (let i = 0; i <= segs; i++) {
-        const t = i / segs;
-        const x = s * (0.014 + t * (0.05 * L.fw - 0.012));
-        const y = L.browY + 0.002 + sin(t * PI * 0.85) * arch - t * 0.006 + jitter;
-        const c = frontPoint(sdf, x, y);
-        const n = gradient(sdf, c[0], c[1], c[2]);
-        // Width: full at the head of the brow, tapering to the tail.
-        const w = (0.0068 - 0.0042 * t) * thick * (layer === 1 ? 1 : 0.8);
-        const lift = 0.0009 + layer * 0.0004;
-        const along = [s * 1, sin(t * PI * 0.85) > 0.5 ? -0.15 : 0.25, 0];
-        const wBrow = [[`brow.in.${S}`, 1 - t], [`brow.out.${S}`, t]];
-        for (const k of [-1, 1]) {
-          const q = [c[0] + n[0] * lift, c[1] + n[1] * lift + k * w * 0.5, c[2] + n[2] * lift];
-          cs.v(q, n, along, [t * 2.2 + layer * 0.31, 0.15 + (k + 1) * 0.1], 10 + (1 - abs(t - 0.4) * 0.6) * (0.75 + 0.25 * layer / 2), browTint, wBrow);
-        }
-      }
-      for (let i = 0; i < segs; i++) {
-        const a = base + i * 2;
-        cs.index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-      }
-    }
-  }
+  // Brow/beard colours are tints relative to the hair colour (one shared material).
+  const ratio = (c) => (colors && c ? ['r', 'g', 'b'].map((k) => min(4, max(0.15, c[k] / max(0.01, colors.hair[k])))) : [1, 1, 1]);
+  const browTint = ratio(colors && colors.brow);
+  const beardTint = ratio(colors && colors.beard);
+  addBrows(cs, p, L, sdf, tier, rng, browTint);
   // ---- eyelashes (upper: long, curled; lower: short)
   for (const e of L.eyes) {
     const S = e.side > 0 ? 'L' : 'R';
@@ -127,7 +98,7 @@ export function buildFaceCards(p, L, tier = 'high') {
     for (const upper of [true, false]) {
       const segs = tier === 'low' ? 8 : 16;
       const base = cs.nv;
-      const len = (upper ? 0.0085 : 0.0045) * (0.85 + 0.3 * (p.eyeSize ?? 0.5));
+      const len = (upper ? 0.0065 : 0.0032) * (0.85 + 0.3 * (p.eyeSize ?? 0.5));
       for (let i = 0; i <= segs; i++) {
         const t = i / segs;
         // Margin angle psi: upper arc 15..165 deg, lower 195..345 deg.
@@ -141,16 +112,18 @@ export function buildFaceCards(p, L, tier = 'high') {
         const r0 = L.eyeR + L.lidT * 0.55;
         const root = [e.c[0] + d[0] * r0, e.c[1] + d[1] * r0, e.c[2] + d[2] * r0];
         // Lashes sweep outward from the margin and curl up (down for the lower lid).
-        const out = [d[0], d[1] + (upper ? 0.9 : -0.6), d[2] + 0.25];
+        const out = [d[0], d[1] + (upper ? 1.1 : -0.7), d[2] + 0.35];
         const ol = hypot(out[0], out[1], out[2]);
         const edge = sstep(0, 0.2, t) * sstep(1, 0.75, t);
         const L2 = len * (0.35 + 0.65 * edge) * (upper ? 1 + 0.25 * t * (e.side > 0 ? 1 : 1) : 1);
         const tip = [root[0] + (out[0] / ol) * L2, root[1] + (out[1] / ol) * L2, root[2] + (out[2] / ol) * L2];
         const n = [d[0], d[1], d[2]];
         const bone = [[upper ? `lidU.${S}` : `lidD.${S}`, 1]];
-        const dark = [0.45, 0.45, 0.45];
-        cs.v(root, n, out, [t * 0.4 + (upper ? 0 : 0.5), 0.02], 10.9, dark, bone);
-        cs.v(tip, n, out, [t * 0.4 + (upper ? 0 : 0.5), 0.78], 10.9, dark, bone);
+        const dark = [0.3 * browTint[0], 0.3 * browTint[1], 0.3 * browTint[2]];
+        // Card mode: strands along the lid (u), root -> tip (v); no side fade (cover 10.5).
+        // Lash mode (cover 12): separate strands, ~45 per lid.
+        cs.v(root, n, out, [t * 0.18 + (upper ? 0 : 0.5), 0.0], 12, dark, bone);
+        cs.v(tip, n, out, [t * 0.18 + (upper ? 0 : 0.5), 0.97], 12, dark, bone);
       }
       for (let i = 0; i < segs; i++) {
         const a = base + i * 2;
@@ -160,7 +133,7 @@ export function buildFaceCards(p, L, tier = 'high') {
   }
   // ---- facial hair shell
   const style = p.facialHair;
-  if (style && style !== 'none' && style !== 'stubble') addBeard(cs, p, L, sdf, FB, style, tier, rng);
+  if (style && style !== 'none' && style !== 'stubble') addBeard(cs, p, L, sdf, FB, style, tier, rng, beardTint);
   return cs;
 }
 
@@ -191,7 +164,7 @@ function beardMask(style, L, x, y, z) {
   return Math.min(1, m) * (1 - lips * (style === 'soul-patch' ? 0 : 0.95));
 }
 
-function addBeard(cs, p, L, sdf, FB, style, tier, rng) {
+function addBeard(cs, p, L, sdf, FB, style, tier, rng, tint = [1, 1, 1]) {
   const C = tier === 'low' ? 26 : 44;
   const R = tier === 'low' ? 18 : 30;
   const azMax = 105 * D2R;
@@ -232,7 +205,10 @@ function addBeard(cs, p, L, sdf, FB, style, tier, rng) {
       // Skinning: below the mouth -> jaw, mustache -> upper lip, else head.
       const below = sstep(my + 0.004, my - 0.01, y);
       const bones = y > my ? [['lip.U', 0.5 * exp(-((x / 0.02) ** 2)) + 0.0], ['head', 1 - 0.5 * exp(-((x / 0.02) ** 2))]] : [['jaw', below], ['head', 1 - below]];
-      ids[k] = cs.v(q, n, [0, -1, 0.2], [c / C * 5 + rng.next() * 0.01, r / R * 1.6], m * 0.98, [0.92, 0.92, 0.92], bones);
+      // Shell mode: flow-aligned UVs (clumps around the jaw, strands falling down), coverage
+      // pushed past 1 inside the mask so only the edge is fuzzy.
+      const flow = [0, -1 + n[1] * n[1], -n[1] * n[2]];
+      ids[k] = cs.v(q, n, flow, [(atan2(x, z) * 0.12) / 0.0055, -y * (1 + long)], m * 1.9 - 0.25, tint, bones);
     }
   }
   for (let r = 0; r < R; r++) {
@@ -248,4 +224,71 @@ function addBeard(cs, p, L, sdf, FB, style, tier, rng) {
   void base;
   void eyeOpening;
   void atan2;
+}
+
+/**
+ * Eyebrows as many short hair cards lying on the brow: medial hairs point up, the body sweeps
+ * outward and the tail outward/down, two staggered layers — reads as a solid brow from afar and
+ * as individual hairs up close. Card mode: u = strand texture coordinate, v = root -> tip.
+ */
+function addBrows(cs, p, L, sdf, tier, rng, tint) {
+  const thick = 0.55 + 0.9 * p.browThickness;
+  const arch = 0.003 + 0.007 * p.browArch;
+  const layers = tier === 'low' ? 1 : 2;
+  const count = tier === 'low' ? 11 : 24;
+  const x0 = 0.013;
+  const x1 = L.eyeSep + L.eyeR * 1.05;
+  const pathY = (t) => L.browY + 0.002 + sin(t * PI * 0.85) * arch - t * 0.006;
+  const snap = (q) => {
+    const f = sdf(q[0], q[1], q[2]);
+    const g = gradient(sdf, q[0], q[1], q[2]);
+    return { p: [q[0] - g[0] * f, q[1] - g[1] * f, q[2] - g[2] * f], n: g };
+  };
+  for (const e of L.eyes) {
+    const s = e.side;
+    const S = s > 0 ? 'L' : 'R';
+    for (let layer = 0; layer < layers; layer++) {
+      for (let i = 0; i < count; i++) {
+        const t = min(1, max(0, (i + 0.15 + rng.next() * 0.7) / count));
+        const band = (0.0072 - 0.0042 * t) * thick;
+        const x = s * (x0 + t * (x1 - x0));
+        const y = pathY(t) - band * 0.5 + rng.next() * band * (layer ? 0.55 : 0.75);
+        const ang = (82 - 62 * sstep(0.04, 0.32, t) - 26 * sstep(0.62, 1, t) + (rng.next() - 0.5) * 14) * D2R;
+        const dir2 = [s * cos(ang), sin(ang)];
+        const len = (0.0058 + 0.0038 * rng.next()) * (t < 0.15 ? 0.75 : 1) * Math.sqrt(thick) * (1 - 0.25 * t);
+        const w = (0.0032 + 0.0016 * rng.next()) * (1 - 0.3 * t);
+        const tex = rng.next() * 7;
+        const wb = [[`brow.in.${S}`, 1 - t], [`brow.out.${S}`, t]];
+        const rows = tier === 'low' ? 2 : 3;
+        const base = cs.nv;
+        const root = frontPoint(sdf, x, y);
+        for (let r = 0; r < rows; r++) {
+          const tt = r / (rows - 1);
+          const q = snap([root[0] + dir2[0] * len * tt, root[1] + dir2[1] * len * tt, root[2] + 0.004]);
+          const n = q.n;
+          // In-surface direction and the card's side vector.
+          let fx = dir2[0];
+          let fy = dir2[1];
+          let fz = 0;
+          const dn = fx * n[0] + fy * n[1];
+          fx -= dn * n[0];
+          fy -= dn * n[1];
+          fz -= dn * n[2];
+          const fl = hypot(fx, fy, fz) || 1;
+          const f = [fx / fl, fy / fl, fz / fl];
+          const sd = [f[1] * n[2] - f[2] * n[1], f[2] * n[0] - f[0] * n[2], f[0] * n[1] - f[1] * n[0]];
+          const lift = 0.0004 + layer * 0.0003 + tt * tt * 0.0005;
+          const ww = w * (1 - 0.55 * tt);
+          for (const k of [0, 1]) {
+            const o = (k - 0.5) * ww;
+            cs.v([q.p[0] + n[0] * lift + sd[0] * o, q.p[1] + n[1] * lift + sd[1] * o, q.p[2] + n[2] * lift + sd[2] * o], n, f, [tex + k * 0.03, tt * 0.97], 10 + k, tint, wb);
+          }
+        }
+        for (let r = 0; r < rows - 1; r++) {
+          const a = base + r * 2;
+          cs.index.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+        }
+      }
+    }
+  }
 }

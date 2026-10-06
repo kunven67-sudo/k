@@ -720,7 +720,15 @@ vec4 gDetS;`);
   col = mix( col, col * vec3( 0.58, 0.5, 0.43 ), uDirt * gN * 0.75 );
   // Mouth interior / nostrils: wet, dark, red.
   col = mix( col, mix( vec3( 0.34, 0.09, 0.09 ), vec3( 0.06, 0.015, 0.015 ), vFaceData.y ), smoothstep( 0.0, 0.25, vFaceData.y ) );
+  // Baked sculpt occlusion (head/ears): warm, blood-tinted darkening in creases.
+  col *= mix( vec3( 0.5, 0.36, 0.34 ), vec3( 1.0 ), smoothstep( 0.2, 1.0, vFaceData.w ) );
   diffuseColor.rgb = col;
+}`);
+    fs = patch(fs, 'aomap_fragment', `
+{
+  float aoS = clamp( vFaceData.w, 0.0, 1.0 );
+  reflectedLight.indirectDiffuse *= aoS;
+  reflectedLight.indirectSpecular *= aoS * aoS;
 }`);
     fs = patch(fs, 'roughnessmap_fragment', `
 roughnessFactor = 0.6 - ( gFaceP.a - 0.5 ) * 0.9 + gDetS.g * 0.08;
@@ -738,6 +746,6 @@ roughnessFactor = clamp( roughnessFactor, 0.12, 1.0 );`);
 }`);
     sh.fragmentShader = fs;
   };
-  M.customProgramCacheKey = () => `gamble-skin-${physical ? 'p' : 's'}-1`;
+  M.customProgramCacheKey = () => `gamble-skin-${physical ? 'p' : 's'}-2`;
   return M;
 }

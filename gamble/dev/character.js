@@ -3,6 +3,8 @@
 //   view=lineup (default)  8 diverse people on a street corner: four idle on the sidewalk,
 //                          four walk back and forth over a 0.15 m curb (foot IK, planting).
 //   view=face&i=N          close-up of person N cycling expressions, then visemes.
+//   view=busts&i=N         head-and-shoulders of people N..N+3 side by side (face/hair review).
+//   view=heads&i=N         person N three times: front, three-quarter, profile (&bald=1 for sculpt).
 //
 // Keys:  1-9 0 - =  one-shots (wave, cheer, shrug, facepalm, knock, drink, phone-up/down,
 //        sit/stand, stretch, yawn, pat-pockets …; see panel)   E next expression   V visemes
@@ -94,7 +96,7 @@ class CharacterDev {
     this.visOn = false;
     this.dirty = false;
     this.seed = +(q.seed || 7);
-    this.n = this.view === 'face' ? 1 : +(q.n || 8);
+    this.n = this.view === 'face' ? 1 : this.view === 'busts' ? 4 : this.view === 'heads' ? 3 : +(q.n || 8);
     this.humans = [];
     this._spawn();
 
@@ -103,6 +105,10 @@ class CharacterDev {
     this.cam = cam;
     if (this.view === 'face') {
       this.orbit = { yaw: +(q.yaw || 0.25), pitch: +(q.pitch || 0.02), dist: +(q.dist || 0.75), target: new THREE.Vector3() };
+    } else if (this.view === 'heads') {
+      this.orbit = { yaw: 0.0001, pitch: 0.0, dist: +(q.dist || 1.25), target: new THREE.Vector3(0, 1.62, 0) };
+    } else if (this.view === 'busts') {
+      this.orbit = { yaw: +(q.yaw || 0.0001), pitch: +(q.pitch || 0.02), dist: +(q.dist || 2.7), target: new THREE.Vector3(0, +(q.ty || 1.5), 0) };
     } else {
       this.orbit = { yaw: +(q.yaw || 0.55), pitch: +(q.pitch || 0.12), dist: +(q.dist || 9.5), target: new THREE.Vector3(0, 0.95, 0.4) };
     }
@@ -147,16 +153,21 @@ class CharacterDev {
     this.humans = [];
     const tier = this.q.tier || this.engine.tier;
     for (let i = 0; i < this.n; i++) {
-      const idx = this.view === 'face' ? this.focus : i;
+      const idx = this.view === 'face' || this.view === 'heads' ? this.focus : this.view === 'busts' ? this.focus + i : i;
       const cast = CAST[idx % CAST.length];
       const { uniform, sex, ...rest } = cast;
       const p = randomHumanParams(this.seed * 101 + idx * 7, { sex, uniform, ...rest });
+      // ?bald=1: sculpt review (no hair, beard, hat or glasses).
+      if (this.q.bald === '1') Object.assign(p, { hairStyle: 'bald', facialHair: 'none', hat: 'none', glasses: 'none', stubble: 0 });
       const human = createHuman(p, { tier, hero: this.view === 'face' });
       const walker = this.view !== 'face' && i >= 4;
-      const x = walker ? (i - 5.5) * 1.4 : (i - 1.5) * 1.05;
-      const z = walker ? -2 + (i % 2) * 3.5 : 1.3;
+      const busts = this.view === 'busts';
+      const heads = this.view === 'heads';
+      const x = walker ? (i - 5.5) * 1.4 : (i - 1.5) * (busts ? 0.56 : 1.05);
+      const z = walker ? -2 + (i % 2) * 3.5 : busts ? 0 : 1.3;
       human.root.position.set(x, this.ground(x, z), z);
-      human.root.rotation.y = walker ? (i % 2 ? Math.PI : 0) : 0;
+      human.root.rotation.y = walker ? (i % 2 ? Math.PI : 0) : heads ? [0, 0.7, 1.5708][i] : 0;
+      if (heads) human.root.position.set((i - 1) * 0.36, 0, 0);
       human.setFootIK((fx, fy, fz) => ({ y: this.ground(fx, fz), normal: new THREE.Vector3(0, 1, 0) }));
       this.scene.add(human.root);
       this.humans.push({ human, walker, dir: i % 2 ? -1 : 1, x, turn: 0, speed: 1.15 + (i % 3) * 0.2 });
@@ -255,6 +266,7 @@ class CharacterDev {
         }
         r.position.y = damp(r.position.y, this.ground(r.position.x, r.position.z), 0.06, dt);
       } else h.human.setLocomotion({ speed: 0, turnRate: 0 });
+      if (this.view === 'busts') h.human.lookAt(this.cam.position);
       if (this.view === 'face') {
         // Cycle expressions every 1.8 s, visemes when V is on; look at the camera.
         h.human.lookAt(this.cam.position);
@@ -279,6 +291,8 @@ class CharacterDev {
       const hb = this.humans[0].human.bones;
       hb['eye.L'].getWorldPosition(o.target).add(hb['eye.R'].getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5);
       o.target.y -= 0.035;
+    } else if (this.view === 'heads') {
+      o.target.set(0, this.humans[0].human.bones['eye.L'].getWorldPosition(new THREE.Vector3()).y - 0.03, 0);
     }
     this.cam.position.set(
       o.target.x + Math.sin(o.yaw) * Math.cos(o.pitch) * o.dist,

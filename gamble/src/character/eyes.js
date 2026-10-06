@@ -21,7 +21,7 @@ function hexRgb(hex) {
 const rgb = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-/** Draw one eye (sclera + iris) into ctx at [ox, 0, S, S]. Iris radius = 0.27·S. */
+/** Draw one eye (sclera + iris) into ctx at [ox, 0, S, S]. Iris radius = 0.3·S. */
 function drawEye(ctx, ox, S, colorName, seed, age) {
   const rng = new Rng(seed);
   const cx = ox + S / 2;
@@ -62,7 +62,7 @@ function drawEye(ctx, ox, S, colorName, seed, age) {
   }
   // Iris.
   const base = hexRgb(EYE_COLOR_HEX[colorName] ?? 0x51290f);
-  const RI = S * 0.27;
+  const RI = S * 0.3;
   const RP = RI * 0.38;
   const dark = mixc(base, [10, 8, 6], 0.55);
   const light = mixc(base, [235, 215, 170], colorName.includes('blue') || colorName === 'gray' ? 0.45 : 0.35);

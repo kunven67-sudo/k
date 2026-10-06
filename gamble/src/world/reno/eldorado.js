@@ -356,7 +356,7 @@ export function buildEldorado(ctx, { clearGlass = false, openDoors = false } = {
   const entrance = { x: X1 + 1.6, y: Y0, z: 50, yaw: -Math.PI / 2 };
   return {
     entrance,
-    zone: { id: 'eldorado-entrance', box: { min: new THREE.Vector3(X1 - 0.3, 0, 44.6), max: new THREE.Vector3(X1 + 4.4, 4.5, 55.4) }, audioRoom: 'street', venue: 'eldorado', indoor: false, trigger: true },
+    zone: { id: 'eldorado-entrance', box: new THREE.Box3(new THREE.Vector3(X1 - 0.3, 0, 44.6), new THREE.Vector3(X1 + 4.4, 4.5, 55.4)), audioRoom: 'street', venue: 'eldorado', indoor: false, trigger: true },
   };
 }
 

@@ -62,10 +62,15 @@ export function makeWarp(L) {
 }
 
 /** March from outside along -dir towards PROJ; returns distance from PROJ to the surface. */
-function castRay(sdf, dx, dy, dz) {
-  let t = 0.3;
-  let prevT = t;
+function castRay(sdf, dx, dy, dz, t0 = 0.3) {
+  // Warm start (t0 from a neighbouring ray) must begin outside the surface.
+  let t = t0;
   let f = sdf(PROJ[0] + dx * t, PROJ[1] + dy * t, PROJ[2] + dz * t);
+  while (f <= 0 && t < 0.3) {
+    t = Math.min(0.3, t + 0.04);
+    f = sdf(PROJ[0] + dx * t, PROJ[1] + dy * t, PROJ[2] + dz * t);
+  }
+  let prevT = t;
   for (let i = 0; i < 160 && f > 1e-5; i++) {
     prevT = t;
     t -= max(f * 0.7, 2e-4);
@@ -133,7 +138,7 @@ export function buildHeadGrid(L, tier = 'high') {
     let lo = -88 * D2R;
     let hi = -35 * D2R;
     const seamY = neckSeamY(L.neck, az);
-    for (let it = 0; it < 18; it++) {
+    for (let it = 0; it < 13; it++) {
       const m = (lo + hi) * 0.5;
       const dx = cos(m) * sa;
       const dy = sin(m);
@@ -161,7 +166,10 @@ export function buildHeadGrid(L, tier = 'high') {
   const vid = (r, c) => r * NC + c;
   const warp = makeWarp(L);
   const azOf = new Float32Array(nv);
+  let tPrev = new Float32Array(NC).fill(0.3);
+  let tRow = new Float32Array(NC);
   for (let r = 0; r < nRows; r++) {
+    if (r > 0) [tPrev, tRow] = [tRow, tPrev];
     for (let c = 0; c < NC; c++) {
       const cc = cols[c];
       const e0 = r <= nTop ? rowsTop[r] : rowsBotByCol[c][r - nTop - 1];
@@ -170,7 +178,11 @@ export function buildHeadGrid(L, tier = 'high') {
       const dy = sin(e);
       const dz = cos(e) * cos(az);
       azOf[vid(r, c)] = az;
-      let t = castRay(sdf, dx, dy, dz);
+      // Warm start from the row above / column to the left (+5 cm so protrusions are not missed).
+      const tl = c > 0 ? tRow[c - 1] : 0.3;
+      const tu = r > 0 ? tPrev[c] : 0.3;
+      let t = castRay(sdf, dx, dy, dz, Math.min(0.3, Math.max(tl, tu) + 0.05));
+      tRow[c] = t;
       const v = vid(r, c);
       if (r === nRows - 1) t *= 0.996; // tuck the seam inside the body ring
       pos[v * 3] = PROJ[0] + dx * t;

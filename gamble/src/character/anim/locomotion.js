@@ -172,9 +172,21 @@ export class Locomotion {
     this.moveBlend = damp(this.moveBlend, moving ? 1 : 0, 0.12, dt);
     this.runBlend = damp(this.runBlend, smoothstep(2.4, 3.8, speed), 0.15, dt);
     const run = this.runBlend;
-    const legK = this.legLen / 0.75;
-    const cadence = clamp((0.6 + 0.26 * speed / legK) * (st.cadence || 1) * (1 + mood.nervous * 0.12 - mood.tired * 0.1), 0.55, 1.75);
     const duty = lerp(0.6, 0.36, run);
+    // Cadence (gait cycles/s): fast enough that a stance foot never travels more than ~one
+    // leg length under the hip (chunky short-legged people take quicker steps), with a
+    // relaxed floor for strolling. Style/mood scale it.
+    const reach = this.legLen * (0.92 + 0.1 * run);
+    const cadence = clamp(Math.max(0.72 + 0.12 * speed, (duty * speed) / reach) * (st.cadence || 1) * (1 + mood.nervous * 0.12 - mood.tired * 0.1), 0.55, 2.4);
+    // Starting off: begin the cycle with the rear foot (relative to travel) lifting first.
+    if (moving && !this.wasMoving) {
+      const hd0 = speed > 0.05 ? Math.atan2(this.vel.x, this.vel.z) : yaw;
+      const along = (f) => (f.plant.x - this.rootPos.x) * Math.sin(hd0) + (f.plant.z - this.rootPos.z) * Math.cos(hd0);
+      const rearL = along(this.feet.L) <= along(this.feet.R);
+      // The front foot starts at mid-stance (under the hips), the rear one mid-swing-window.
+      this.phase = rearL ? duty * 0.5 + 0.5 : duty * 0.5;
+    }
+    this.wasMoving = moving;
     if (moving) this.phase = (this.phase + cadence * dt) % 1;
 
     // --- feet.
@@ -185,7 +197,13 @@ export class Locomotion {
       const other = name === 'L' ? this.feet.R : this.feet.L;
       if (moving) {
         // Lift when the cycle says so (and the other foot is down, so we never fly when walking).
-        if (!f.swing && local >= duty && local < duty + 0.25 && (run > 0.5 || !other.swing)) this._startSwing(f, (1 - duty) / cadence, speed);
+        if (!f.swing && local >= duty && local < duty + 0.25 && (run > 0.5 || !other.swing)) this._startSwing(f, (1 - local) / cadence, speed);
+        // Safety: a stance foot left far behind (sudden start, sharp turn, low frame rate)
+        // steps at once instead of dragging the hips down.
+        else if (!f.swing && !other.swing) {
+          const behind = (this.rootPos.x - f.plant.x) * Math.sin(heading) + (this.rootPos.z - f.plant.z) * Math.cos(heading);
+          if (behind > this.legLen * 0.62) this._startSwing(f, (1 - duty) / cadence, speed);
+        }
       } else if (!f.swing && !other.swing) {
         // Idle: correct posture with a small step when the foot drifted / body turned.
         const ideal = this._ideal(f, _tmpA);
@@ -279,7 +297,7 @@ export class Locomotion {
     pose.add('head', -lean * 0.3 - slouch * 0.25 + mood.sad * 0.1 + mood.tired * 0.06, Math.sin(ph) * twist * 0.4 + this.yawRate * 0.05, -this.sideSpring.x * 0.3 + mood.drunk * 0.1 * Math.sin(this.time * 0.8));
     // Arms: relax from the bind A-pose to hanging, then swing opposite to the legs.
     const fat = this.h.params.fat;
-    const hang = 0.5 - fat * 0.12 - (st.armOut || 0) - this.crouch * 0.05;
+    const hang = 0.62 - fat * 0.16 - (st.armOut || 0) - this.crouch * 0.05;
     const elbow0 = 0.22 + (st.elbow || 0) + run * 0.9 + mood.angry * 0.2;
     for (const [side, sgn] of [['L', 1], ['R', -1]]) {
       const sw = Math.sin(ph) * swingA * sgn; // left arm forward when the right leg is forward
@@ -288,8 +306,8 @@ export class Locomotion {
       const fwdSw = Math.max(0, sw);
       const zSign = side === 'L' ? 1 : -1;
       pose.add(name, sw + run * 0.15, 0, -hang * zSign);
-      pose.add(`forearm.${side}`, elbow0 + fwdSw * 0.6 + breath * 0.01, -0.35 * zSign, 0);
-      pose.add(`hand.${side}`, 0.05, 0, 0.1 * zSign);
+      pose.add(`forearm.${side}`, elbow0 + fwdSw * 0.6 + breath * 0.01, -1.0 * zSign, 0);
+      pose.add(`hand.${side}`, 0.12, -0.35 * zSign, -0.12 * zSign);
       pose.add(`clavicle.${side}`, 0, sw * 0.08, (breath * 0.012 - slouch * 0.12) * zSign);
     }
     // Legs: crouch flexion (IK does the rest).

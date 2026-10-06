@@ -236,96 +236,99 @@ export function randomHumanParams(rng = new Rng((Math.random() * 2 ** 31) | 0), 
   if (typeof rng === 'number' || typeof rng === 'string') rng = new Rng(rng);
   const g = (m, sd, lo = 0, hi = 1) => clamp(rng.gaussian(m, sd), lo, hi);
   const p = defaultParams();
+  // Overrides apply as each value is drawn, so derived values (grey from age, brows from
+  // sex, beard from fem…) follow them. The rng stream is consumed either way (stable casts).
+  const pick = (k, v) => (overrides[k] !== undefined ? overrides[k] : v);
   p.seed = rng.int(1, 2 ** 30);
   const sex = overrides.sex ?? rng.pick(['m', 'm', 'f', 'f', 'x']);
   const fem = sex === 'f' ? 1 : sex === 'm' ? 0 : rng.range(0.3, 0.7);
 
   // Ages skew towards casino/motel demographics: plenty of 25-45 but many retirees too.
-  p.age = Math.round(rng.weighted([[rng.range(21, 30), 3], [rng.range(30, 45), 4], [rng.range(45, 62), 3], [rng.range(62, 90), 2.5]]));
+  p.age = pick('age', Math.round(rng.weighted([[rng.range(21, 30), 3], [rng.range(30, 45), 4], [rng.range(45, 62), 3], [rng.range(62, 90), 2.5]])));
   const old = clamp((p.age - 40) / 45, 0, 1);
-  p.height = clamp(rng.gaussian(1.76 - fem * 0.13, 0.075), 1.5, 2.05);
-  p.fat = clamp(rng.weighted([[g(0.15, 0.08), 3], [g(0.4, 0.12), 4], [g(0.72, 0.15), 3]]) + old * 0.08, 0, 1);
-  p.muscle = g(0.45 - fem * 0.2 - old * 0.15, 0.2);
-  p.shoulders = g(0.62 - fem * 0.35, 0.15);
-  p.chest = g(0.12 + fem * 0.55 + p.fat * 0.15, 0.15);
-  p.waist = g(0.55 - fem * 0.25 + p.fat * 0.2, 0.12);
-  p.hips = g(0.35 + fem * 0.35, 0.13);
-  p.belly = g(p.fat * 0.7 + old * 0.2 + (1 - fem) * 0.05, 0.15);
-  p.legs = g(0.5 + fem * 0.05, 0.15);
-  p.handSize = g(0.55 - fem * 0.2, 0.15);
+  p.height = pick('height', clamp(rng.gaussian(1.76 - fem * 0.13, 0.075), 1.5, 2.05));
+  p.fat = pick('fat', clamp(rng.weighted([[g(0.15, 0.08), 3], [g(0.4, 0.12), 4], [g(0.72, 0.15), 3]]) + old * 0.08, 0, 1));
+  p.muscle = pick('muscle', g(0.45 - fem * 0.2 - old * 0.15, 0.2));
+  p.shoulders = pick('shoulders', g(0.62 - fem * 0.35, 0.15));
+  p.chest = pick('chest', g(0.12 + fem * 0.55 + p.fat * 0.15, 0.15));
+  p.waist = pick('waist', g(0.55 - fem * 0.25 + p.fat * 0.2, 0.12));
+  p.hips = pick('hips', g(0.35 + fem * 0.35, 0.13));
+  p.belly = pick('belly', g(p.fat * 0.7 + old * 0.2 + (1 - fem) * 0.05, 0.15));
+  p.legs = pick('legs', g(0.5 + fem * 0.05, 0.15));
+  p.handSize = pick('handSize', g(0.55 - fem * 0.2, 0.15));
 
-  p.skinTone = clamp(rng.weighted([[rng.range(0, 0.25), 3], [rng.range(0.2, 0.5), 3], [rng.range(0.45, 0.75), 2.5], [rng.range(0.7, 1), 2]]), 0, 1);
-  p.undertone = clamp(rng.gaussian(0.1, 0.45), -1, 1);
-  p.freckles = p.skinTone < 0.3 && rng.chance(0.35) ? rng.range(0.25, 1) : rng.chance(0.08) ? rng.range(0.1, 0.4) : 0;
-  p.moles = g(0.25 + old * 0.3, 0.2);
-  p.birthmark = rng.chance(0.1) ? rng.pick(['cheek', 'forehead', 'neck', 'temple']) : 'none';
-  p.acne = p.age < 30 && rng.chance(0.3) ? rng.range(0.15, 0.7) : 0;
-  p.wrinkles = g(old * 0.4, 0.15);
-  p.scar = rng.chance(0.12) ? rng.pick(['brow', 'cheek', 'lip', 'chin', 'nose']) : 'none';
-  p.blush = g(0.3 + (p.skinTone < 0.35 ? 0.15 : 0), 0.15);
-  p.bodyHair = g(0.45 - fem * 0.35, 0.2);
+  p.skinTone = pick('skinTone', clamp(rng.weighted([[rng.range(0, 0.25), 3], [rng.range(0.2, 0.5), 3], [rng.range(0.45, 0.75), 2.5], [rng.range(0.7, 1), 2]]), 0, 1));
+  p.undertone = pick('undertone', clamp(rng.gaussian(0.1, 0.45), -1, 1));
+  p.freckles = pick('freckles', p.skinTone < 0.3 && rng.chance(0.35) ? rng.range(0.25, 1) : rng.chance(0.08) ? rng.range(0.1, 0.4) : 0);
+  p.moles = pick('moles', g(0.25 + old * 0.3, 0.2));
+  p.birthmark = pick('birthmark', rng.chance(0.1) ? rng.pick(['cheek', 'forehead', 'neck', 'temple']) : 'none');
+  p.acne = pick('acne', p.age < 30 && rng.chance(0.3) ? rng.range(0.15, 0.7) : 0);
+  p.wrinkles = pick('wrinkles', g(old * 0.4, 0.15));
+  p.scar = pick('scar', rng.chance(0.12) ? rng.pick(['brow', 'cheek', 'lip', 'chin', 'nose']) : 'none');
+  p.blush = pick('blush', g(0.3 + (p.skinTone < 0.35 ? 0.15 : 0), 0.15));
+  p.bodyHair = pick('bodyHair', g(0.45 - fem * 0.35, 0.2));
 
-  p.faceWidth = g(0.45 + p.fat * 0.3, 0.15);
-  p.jaw = g(0.6 - fem * 0.3 + p.fat * 0.1, 0.17);
-  p.chin = g(0.5, 0.18);
-  p.cheeks = g(0.25 + p.fat * 0.55 + (p.age < 28 ? 0.1 : 0), 0.12);
-  p.cheekbones = g(0.5, 0.2);
-  p.noseSize = g(0.45 + old * 0.2, 0.2);
-  p.noseWidth = g(0.45 + p.skinTone * 0.2, 0.2);
-  p.noseBridge = g(0.45, 0.22);
-  p.noseTip = g(0.5, 0.2);
-  p.ears = g(0.45 + old * 0.25, 0.18);
-  p.earsOut = g(0.3, 0.2);
-  p.browRidge = g(0.55 - fem * 0.3, 0.17);
-  p.lips = g(0.45 + fem * 0.2 + p.skinTone * 0.15 - old * 0.15, 0.18);
-  p.mouthWidth = g(0.5, 0.17);
+  p.faceWidth = pick('faceWidth', g(0.45 + p.fat * 0.3, 0.15));
+  p.jaw = pick('jaw', g(0.6 - fem * 0.3 + p.fat * 0.1, 0.17));
+  p.chin = pick('chin', g(0.5, 0.18));
+  p.cheeks = pick('cheeks', g(0.25 + p.fat * 0.55 + (p.age < 28 ? 0.1 : 0), 0.12));
+  p.cheekbones = pick('cheekbones', g(0.5, 0.2));
+  p.noseSize = pick('noseSize', g(0.45 + old * 0.2, 0.2));
+  p.noseWidth = pick('noseWidth', g(0.45 + p.skinTone * 0.2, 0.2));
+  p.noseBridge = pick('noseBridge', g(0.45, 0.22));
+  p.noseTip = pick('noseTip', g(0.5, 0.2));
+  p.ears = pick('ears', g(0.45 + old * 0.25, 0.18));
+  p.earsOut = pick('earsOut', g(0.3, 0.2));
+  p.browRidge = pick('browRidge', g(0.55 - fem * 0.3, 0.17));
+  p.lips = pick('lips', g(0.45 + fem * 0.2 + p.skinTone * 0.15 - old * 0.15, 0.18));
+  p.mouthWidth = pick('mouthWidth', g(0.5, 0.17));
 
-  p.eyeSize = g(0.5 + fem * 0.1, 0.15);
-  p.eyeSpacing = g(0.5, 0.17);
-  p.eyeTilt = g(0.5, 0.18);
-  p.lids = g(0.25 + old * 0.45, 0.17);
-  p.eyeColor = p.skinTone > 0.5 ? rng.weighted([['dark-brown', 6], ['brown', 3], ['hazel', 1], ['amber', 0.5]]) : rng.weighted([['dark-brown', 2], ['brown', 3], ['hazel', 2], ['amber', 0.6], ['green', 1.5], ['blue', 2.5], ['light-blue', 1.2], ['gray', 0.8]]);
-  p.heterochromia = rng.chance(0.03);
-  p.eyeColor2 = rng.pick(EYE_COLORS);
-  p.browThickness = g(0.55 - fem * 0.2, 0.2);
-  p.browArch = g(0.35 + fem * 0.25, 0.2);
+  p.eyeSize = pick('eyeSize', g(0.5 + fem * 0.1, 0.15));
+  p.eyeSpacing = pick('eyeSpacing', g(0.5, 0.17));
+  p.eyeTilt = pick('eyeTilt', g(0.5, 0.18));
+  p.lids = pick('lids', g(0.25 + old * 0.45, 0.17));
+  p.eyeColor = pick('eyeColor', p.skinTone > 0.5 ? rng.weighted([['dark-brown', 6], ['brown', 3], ['hazel', 1], ['amber', 0.5]]) : rng.weighted([['dark-brown', 2], ['brown', 3], ['hazel', 2], ['amber', 0.6], ['green', 1.5], ['blue', 2.5], ['light-blue', 1.2], ['gray', 0.8]]));
+  p.heterochromia = pick('heterochromia', rng.chance(0.03));
+  p.eyeColor2 = pick('eyeColor2', rng.pick(EYE_COLORS));
+  p.browThickness = pick('browThickness', g(0.55 - fem * 0.2, 0.2));
+  p.browArch = pick('browArch', g(0.35 + fem * 0.25, 0.2));
 
   // Hair: natural colours follow skin tone; age greys and recedes.
   const natural = p.skinTone > 0.55
     ? rng.weighted([['black', 6], ['dark-brown', 3], ['brown', 1]])
     : rng.weighted([['black', 2], ['dark-brown', 3], ['brown', 3], ['light-brown', 2], ['auburn', 1], ['ginger', p.freckles > 0 ? 2 : 0.4], ['strawberry', 0.6], ['blonde', 2], ['platinum', 0.4]]);
-  p.hairColor = rng.chance(0.07) ? rng.pick(['dyed-red', 'dyed-blue', 'dyed-pink', 'dyed-green']) : natural;
-  p.gray = clamp((p.age - 38) / 40 + rng.gaussian(0, 0.15), 0, 1);
+  p.hairColor = pick('hairColor', rng.chance(0.07) ? rng.pick(['dyed-red', 'dyed-blue', 'dyed-pink', 'dyed-green']) : natural);
+  p.gray = pick('gray', clamp((p.age - 38) / 40 + rng.gaussian(0, 0.15), 0, 1));
   const mascStyles = [['buzz', 3], ['crew', 4], ['side-part', 3], ['messy', 3], ['slick-back', 2], ['curly-short', 2], ['receding', 2 + old * 4], ['bald', 1 + old * 4], ['comb-over', old * 2], ['mullet', 1], ['mohawk', 0.3], ['afro', p.skinTone > 0.55 ? 2 : 0.2], ['shag', 1], ['ponytail', 0.4], ['long-straight', 0.4]];
   const femStyles = [['bob', 3], ['long-straight', 4], ['long-wavy', 4], ['ponytail', 3], ['bun', 3], ['shag', 2], ['curly-short', 1.5], ['afro', p.skinTone > 0.55 ? 2.5 : 0.2], ['messy', 1.5], ['side-part', 1], ['buzz', 0.4], ['mullet', 0.3]];
-  p.hairStyle = rng.weighted(fem > 0.6 ? femStyles : fem < 0.4 ? mascStyles : [...mascStyles, ...femStyles]);
-  p.hairVolume = g(0.5, 0.2);
-  p.facialHair = fem < 0.4 && rng.chance(0.6)
+  p.hairStyle = pick('hairStyle', rng.weighted(fem > 0.6 ? femStyles : fem < 0.4 ? mascStyles : [...mascStyles, ...femStyles]));
+  p.hairVolume = pick('hairVolume', g(0.5, 0.2));
+  p.facialHair = pick('facialHair', fem < 0.4 && rng.chance(0.6)
     ? rng.weighted([['stubble', 5], ['mustache', 1.5], ['horseshoe', 0.7], ['goatee', 1.5], ['soul-patch', 0.4], ['chin-strap', 0.6], ['full', 3], ['long', 0.6 + old], ['mutton-chops', 0.3]])
-    : 'none';
-  p.stubble = fem < 0.4 ? g(0.4, 0.25) : fem > 0.6 ? 0 : g(0.1, 0.1);
+    : 'none');
+  p.stubble = pick('stubble', fem < 0.4 ? g(0.4, 0.25) : fem > 0.6 ? 0 : g(0.1, 0.1));
 
   // Clothes.
   const colors = Object.keys(CLOTH_COLORS);
-  p.top = rng.weighted([['tshirt', 5], ['tank', 1], ['button', 3], ['hoodie', 3], ['polo', 2], ['dress', fem > 0.6 ? 2 : 0]]);
-  p.topColor = rng.pick(colors);
-  p.print = p.top === 'tshirt' || p.top === 'tank' ? rng.weighted([['none', 4], ['dice', 1], ['stripe', 1], ['reno', 1], ['cherries', 1], ['pocket', 1]]) : 'none';
-  p.bottom = rng.weighted([['jeans', 6], ['slacks', 2], ['shorts', 2], ['skirt', fem > 0.6 ? 2 : 0], ['cargo', 2]]);
-  p.bottomColor = p.bottom === 'jeans' ? rng.pick(['denim', 'denim', 'navy', 'black', 'charcoal', 'sky']) : rng.pick(['khaki', 'black', 'charcoal', 'navy', 'tan', 'olive', 'gray', 'brown']);
-  p.shoes = rng.weighted([['sneakers', 6], ['boots', 2], ['dress', 1.5], ['cowboy', 1], ['slides', 0.5]]);
-  p.shoesColor = rng.pick(['white', 'black', 'brown', 'gray', 'tan', 'red', 'navy']);
-  p.outer = rng.weighted([['none', 7], ['jacket', 1], ['denim-jacket', 1], ['leather-jacket', 1], ['blazer', 0.6], ['vest', 0.4]]);
-  p.outerColor = rng.pick(['brown', 'black', 'denim', 'olive', 'navy', 'tan', 'charcoal', 'maroon']);
-  p.hat = rng.weighted([['none', 8], ['cap', 2], ['cowboy', 0.8], ['beanie', 0.8], ['fedora', 0.3]]);
-  p.hatColor = rng.pick(colors);
+  p.top = pick('top', rng.weighted([['tshirt', 5], ['tank', 1], ['button', 3], ['hoodie', 3], ['polo', 2], ['dress', fem > 0.6 ? 2 : 0]]));
+  p.topColor = pick('topColor', rng.pick(colors));
+  p.print = pick('print', p.top === 'tshirt' || p.top === 'tank' ? rng.weighted([['none', 4], ['dice', 1], ['stripe', 1], ['reno', 1], ['cherries', 1], ['pocket', 1]]) : 'none');
+  p.bottom = pick('bottom', rng.weighted([['jeans', 6], ['slacks', 2], ['shorts', 2], ['skirt', fem > 0.6 ? 2 : 0], ['cargo', 2]]));
+  p.bottomColor = pick('bottomColor', p.bottom === 'jeans' ? rng.pick(['denim', 'denim', 'navy', 'black', 'charcoal', 'sky']) : rng.pick(['khaki', 'black', 'charcoal', 'navy', 'tan', 'olive', 'gray', 'brown']));
+  p.shoes = pick('shoes', rng.weighted([['sneakers', 6], ['boots', 2], ['dress', 1.5], ['cowboy', 1], ['slides', 0.5]]));
+  p.shoesColor = pick('shoesColor', rng.pick(['white', 'black', 'brown', 'gray', 'tan', 'red', 'navy']));
+  p.outer = pick('outer', rng.weighted([['none', 7], ['jacket', 1], ['denim-jacket', 1], ['leather-jacket', 1], ['blazer', 0.6], ['vest', 0.4]]));
+  p.outerColor = pick('outerColor', rng.pick(['brown', 'black', 'denim', 'olive', 'navy', 'tan', 'charcoal', 'maroon']));
+  p.hat = pick('hat', rng.weighted([['none', 8], ['cap', 2], ['cowboy', 0.8], ['beanie', 0.8], ['fedora', 0.3]]));
+  p.hatColor = pick('hatColor', rng.pick(colors));
 
-  p.glasses = rng.chance(0.2 + old * 0.4) ? rng.pick(['round', 'square', 'aviator', 'reading', 'sunglasses']) : 'none';
-  p.hearingAid = p.age > 65 && rng.chance(0.3);
-  p.dirtiness = g(0.12, 0.12);
-  p.wear = g(0.25, 0.15);
-  p.voicePitch = g(0.35 + fem * 0.35, 0.12);
-  p.voiceRate = g(0.5 - old * 0.15, 0.12);
-  p.walkStyle = rng.weighted([['natural', 6], ['swagger', 1.2], ['bouncy', 1], ['slouchy', 1.2 + old], ['stiff', 0.8 + old]]);
+  p.glasses = pick('glasses', rng.chance(0.2 + old * 0.4) ? rng.pick(['round', 'square', 'aviator', 'reading', 'sunglasses']) : 'none');
+  p.hearingAid = pick('hearingAid', p.age > 65 && rng.chance(0.3));
+  p.dirtiness = pick('dirtiness', g(0.12, 0.12));
+  p.wear = pick('wear', g(0.25, 0.15));
+  p.voicePitch = pick('voicePitch', g(0.35 + fem * 0.35, 0.12));
+  p.voiceRate = pick('voiceRate', g(0.5 - old * 0.15, 0.12));
+  p.walkStyle = pick('walkStyle', rng.weighted([['natural', 6], ['swagger', 1.2], ['bouncy', 1], ['slouchy', 1.2 + old], ['stiff', 0.8 + old]]));
 
   if (overrides.uniform && UNIFORMS[overrides.uniform]) Object.assign(p, UNIFORMS[overrides.uniform]);
   const { uniform, sex: _s, ...rest } = overrides;

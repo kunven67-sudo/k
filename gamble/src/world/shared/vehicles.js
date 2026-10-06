@@ -27,6 +27,15 @@ export const CAR_COLORS = [0x8a1c1c, 0x1d2f4d, 0xd9d6cf, 0x2b2b2d, 0x6f7377, 0x4
 
 const geoCache = new Map();
 
+// Wheel tessellation: 1 = full (desktop tiers), 0 = reduced (tier low — hundreds of parked cars).
+let DETAIL = 1;
+/** Set wheel detail before building (0 = low tier). Clears the per-type geometry cache. */
+export function setVehicleDetail(d) {
+  if (d === DETAIL) return;
+  DETAIL = d;
+  geoCache.clear();
+}
+
 function bodyShape(T) {
   const h = T.L / 2;
   const ax = T.wb / 2;
@@ -134,9 +143,9 @@ function carParts(type) {
   // Wheels: tyre (lathe ring) + rim + hub.
   const tyre = new THREE.LatheGeometry([
     [T.wr * 0.62, -0.11], [T.wr * 0.92, -0.115], [T.wr, -0.09], [T.wr, 0.09], [T.wr * 0.92, 0.115], [T.wr * 0.62, 0.11],
-  ].map(([r, y]) => new THREE.Vector2(r, y)), 20).rotateX(Math.PI / 2);
-  const rim = new THREE.CylinderGeometry(T.wr * 0.64, T.wr * 0.64, 0.2, 18).rotateX(Math.PI / 2);
-  const hub = new THREE.CylinderGeometry(T.wr * 0.42, T.wr * 0.5, 0.05, 14).rotateX(Math.PI / 2);
+  ].map(([r, y]) => new THREE.Vector2(r, y)), DETAIL ? 20 : 11).rotateX(Math.PI / 2);
+  const rim = new THREE.CylinderGeometry(T.wr * 0.64, T.wr * 0.64, 0.2, DETAIL ? 18 : 10).rotateX(Math.PI / 2);
+  const hub = new THREE.CylinderGeometry(T.wr * 0.42, T.wr * 0.5, 0.05, DETAIL ? 14 : 7).rotateX(Math.PI / 2);
   for (const ax of [-T.wb / 2, T.wb / 2]) {
     for (const s of [-1, 1]) {
       const z = s * (W / 2 - 0.16);
