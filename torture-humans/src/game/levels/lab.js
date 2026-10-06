@@ -291,6 +291,8 @@ export async function buildLab({ scene, physics, settings }) {
   const house = await buildLivingRoom({ statics, props, scene });
   const village = buildVillage(statics, scene);
   const houseObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o));
+  // what's inside the house (furniture, the wall village): not its walls and roof, which you see from town
+  const houseInside = houseObjs.filter((o) => props.children.includes(o) || o.name === 'wall-village');
   const { spots: townSpots, lamps, litWindows, outdoor, tick: townTick } = await buildTown({ statics, props, scene });
   const townObjs = [...statics.children, ...props.children].filter((o) => !labObjs.includes(o) && !houseObjs.includes(o));
 
@@ -323,7 +325,7 @@ export async function buildLab({ scene, physics, settings }) {
     },
     // people living in town: they walk the sidewalks, look in shop windows, wait at doors
     town: { people: 8, spots: townSpots, area: (p) => p.y > 3.2 && p.y < 3.6 && Math.abs(p.x) < 44 && p.z > 2 && p.z < 19 },
-    zones: { lab: labObjs, house: houseObjs, town: townObjs, inHouse },
+    zones: { lab: labObjs, house: houseObjs, houseInside, town: townObjs, inHouse },
     house: { spots: house.spots, lamps: house.lamps, inHouse },
     village,
     fog: { color: 0xc4d0dc, near: 80, far: 260 },

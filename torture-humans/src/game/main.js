@@ -245,6 +245,7 @@ export async function boot() {
   let sky = null;
   let zone = null;
   let labShown = null;
+  let houseShown = true, houseBox = null;
   const sunLights = () => renderer.csm?.lights || [];
   const fog = level.fog ? new THREE.Fog(level.fog.color, level.fog.near, level.fog.far) : null;
   if (fog) scene.fog = fog;
@@ -253,6 +254,10 @@ export async function boot() {
     // the lab (and its terrarium) can only be seen from the house down through the hatch
     const h = level.hatch;
     const labSeen = z === 'lab' || (z === 'house' && (!h || Math.hypot(camera.position.x - h.x, camera.position.z - h.z) < 3.5));
+    // the inside of the house from out in town: only near enough to see in the windows (12 m)
+    if (!houseBox && level.zones?.houseInside?.length) { houseBox = new THREE.Box3(); for (const o of level.zones.houseInside) houseBox.expandByObject(o); }
+    const houseSeen = z !== 'outside' || !houseBox || houseBox.distanceToPoint(camera.position) < 12;
+    if (houseSeen !== houseShown) { houseShown = houseSeen; for (const o of level.zones?.houseInside || []) o.visible = houseSeen; }
     if (z === zone && labSeen === labShown && !force) return;
     labShown = labSeen;
     if (z === zone && !force) { for (const o of level.zones?.lab || []) o.visible = labSeen; return; }
