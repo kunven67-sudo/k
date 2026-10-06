@@ -291,6 +291,32 @@
     });
   }
 
+  /* Center-crop an image blob to a square of size×size → JPEG blob (profile pictures). null if it can't be read. */
+  function squareImage(blob, size) {
+    return new Promise(function (resolve) {
+      if (!blob) return resolve(null);
+      var url = URL.createObjectURL(blob);
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var w = img.naturalWidth, hh = img.naturalHeight;
+          if (!w || !hh) { URL.revokeObjectURL(url); return resolve(null); }
+          var side = Math.min(w, hh);
+          var c = document.createElement('canvas');
+          c.width = c.height = size;
+          var ctx = c.getContext('2d');
+          ctx.fillStyle = '#10131c';
+          ctx.fillRect(0, 0, size, size);
+          ctx.drawImage(img, (w - side) / 2, (hh - side) / 2, side, side, 0, 0, size, size);
+          URL.revokeObjectURL(url);
+          c.toBlob(function (b) { resolve(b || null); }, 'image/jpeg', 0.9);
+        } catch (e) { URL.revokeObjectURL(url); resolve(null); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  }
+
   function dataUrlToBlob(dataUrl) {
     var m = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(dataUrl || '');
     if (!m) return null;
@@ -311,6 +337,6 @@
     hslToHex: hslToHex, hexToRgb: hexToRgb, guessEmoji: guessEmoji, prettyName: prettyName, mimeOf: mimeOf,
     isHtml: isHtml, isTextPath: isTextPath, isImagePath: isImagePath, isAudioPath: isAudioPath,
     downloadBlob: downloadBlob, copyText: copyText, sleep: sleep, lsGet: lsGet, lsSet: lsSet,
-    avgColor: avgColor, resizeImage: resizeImage, dataUrlToBlob: dataUrlToBlob
+    avgColor: avgColor, resizeImage: resizeImage, squareImage: squareImage, dataUrlToBlob: dataUrlToBlob
   };
 })();

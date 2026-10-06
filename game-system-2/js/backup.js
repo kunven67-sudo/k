@@ -66,6 +66,9 @@
         var lay = Layout.exportData();
         manifest.layout = lay.data;
         lay.covers.forEach(function (c) { files.push(c); });
+        /* your trophies + profile picture */
+        manifest.trophies = Trophies.exportData();
+        if (D.avatar) { manifest.avatarFile = 'profile/avatar.jpg'; files.push({ path: manifest.avatarFile, data: D.avatar }); }
       }
       files.unshift({ path: 'gs2-backup.json', data: JSON.stringify(manifest) });
       files.push({ path: 'README.txt', data: 'This is a Game System 2.0 backup (' + countText(games) + ', made ' + new Date().toLocaleString() + ').\r\n\r\nTo restore it: open Game System 2.0 -> Settings -> "Restore a backup" -> pick this .zip file.\r\nYou don\'t need to unzip it.\r\n' });
@@ -74,6 +77,7 @@
       var name = 'game-system-backup-' + U.dayKey() + (full ? '' : '-' + games.length + '-games') + '.zip';
       U.downloadBlob(zip, name);
       if (full) { D.settings.lastBackup = Date.now(); D.saveSettings(); }
+      Trophies.event('backup');
       Sound.good();
       UI.toast(h('span', 'Saved ', h('b', name), ' (' + U.fmtBytes(zip.size) + ') to your Downloads. Keep it somewhere safe!'), { type: 'good', title: 'Backup done', icon: 'lifebuoy', timeout: 9000, sound: false });
       if (skipped.length) UI.toast('Couldn\'t download these website games, so their files aren\'t in the backup: ' + skipped.join(', '), { type: 'warn' });
@@ -161,6 +165,10 @@
             Object.keys(src).forEach(function (id) { dst[id] = Math.max(dst[id] || 0, Number(src[id]) || 0); });
           });
           await GS2DB.kvSet('days', D.days);
+        }
+        if (manifest.trophies) Trophies.importData(manifest.trophies);
+        if (manifest.avatarFile && byPath.get(prefix + manifest.avatarFile) && (withSettings || !D.avatar)) {
+          try { await D.setAvatar(new Blob([byPath.get(prefix + manifest.avatarFile)], { type: 'image/jpeg' })); } catch (e) { /* keep going */ }
         }
         if (withSettings && manifest.settings) {
           var keep = D.settings.lastBackup;

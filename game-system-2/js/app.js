@@ -61,11 +61,57 @@
     document.body.classList.toggle('no-scanlines', !st.scanlines);
     document.body.classList.toggle('reduce-motion', !!st.reduceMotion);
     document.body.classList.toggle('simple', D.simple());
-    $('pname').textContent = st.name || 'bro';
-    $('avatar').textContent = ((st.name || 'bro').trim().charAt(0) || 'B').toUpperCase();
+    paintProfile();
     lastAccent = null;
     var g = D.get(D.ui.sel);
     setAccentFor(D.ui.view === 'home' ? g : null);
+  }
+
+  /* your name, picture and level in the top bar */
+  function paintProfile() {
+    var st = D.settings;
+    var av = $('avatar');
+    $('pname').textContent = st.name || 'bro';
+    if (D.avatarUrl) av.replaceChildren(U.h('img', { src: D.avatarUrl, alt: '' }));
+    else av.textContent = ((st.name || 'bro').trim().charAt(0) || 'B').toUpperCase();
+    var inf = Trophies.info();
+    av.className = 'avatar tier-' + Trophies.tier(inf.level) + (D.avatarUrl ? ' has-img' : '');
+    var lv = $('plv');
+    if (lv) lv.textContent = 'Lv ' + inf.level;
+    $('btn-profile').title = 'Your profile · Level ' + inf.level + ' · ' + inf.title;
+  }
+
+  /* secret stuff: the old-school code and the logo button masher */
+  var KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
+  var konamiAt = 0;
+  function konamiKey(e) {
+    if (!started || !$('player').hidden || UI.isTyping()) { konamiAt = 0; return; }
+    var k = (e.key || '').toLowerCase();
+    if (k === KONAMI[konamiAt]) {
+      konamiAt++;
+      if (konamiAt === KONAMI.length) {
+        konamiAt = 0;
+        Trophies.event('konami');
+        document.body.classList.add('konami');
+        Sound.good();
+        setTimeout(function () { document.body.classList.remove('konami'); }, 2600);
+      }
+    } else konamiAt = k === KONAMI[0] ? 1 : 0;
+  }
+  var logoHits = [];
+  function logoHit() {
+    var now = Date.now();
+    logoHits = logoHits.filter(function (t) { return now - t < 3000; });
+    logoHits.push(now);
+    if (logoHits.length >= 10) {
+      logoHits = [];
+      Trophies.event('logo');
+      var b = $('brand');
+      b.classList.remove('spin');
+      void b.offsetWidth;
+      b.classList.add('spin');
+      setTimeout(function () { b.classList.remove('spin'); }, 900);
+    }
   }
 
   /* ---------------- switching screens ---------------- */
@@ -385,17 +431,23 @@
       return;
     }
     await Layout.init();
+    Trophies.init();
     applySettings();
 
     D.on(function (type) {
       if (type === 'games' || type === 'game' || type === 'layout') refreshSoon();
       else if (type === 'stats' && D.ui.view === 'stats') refreshSoon();
+      else if (type === 'trophies') {
+        paintProfile();
+        if (D.ui.view === 'stats' || (D.ui.view === 'home' && (D.settings.homeLayout || 'console') === 'console')) refreshSoon();
+      } else if (type === 'settings') paintProfile();
     });
 
     Importer.setupDrop();
     wireTopbar();
     Notify.init();
     window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', konamiKey, true);
     window.addEventListener('resize', U.debounce(moveGlow, 100));
     VIEWS.forEach(function (v) {
       var el = $('view-' + v);
@@ -443,7 +495,7 @@
   }
 
   function wireTopbar() {
-    $('brand').addEventListener('click', function () { go('home'); });
+    $('brand').addEventListener('click', function () { logoHit(); go('home'); });
     document.querySelectorAll('.tab').forEach(function (t) {
       t.addEventListener('click', function () {
         /* clicking the tab you're already on tucks the app windows away */
@@ -454,7 +506,7 @@
     $('btn-search').addEventListener('click', openSearch);
     $('btn-add').addEventListener('click', function () { Importer.addDialog(D.ui.view === 'apps' ? { kind: 'app' } : null); });
     $('btn-settings').addEventListener('click', function () { go('settings'); });
-    $('btn-profile').addEventListener('click', function () { go('settings'); });
+    $('btn-profile').addEventListener('click', function () { Trophies.profile(); });
     $('err-badge').addEventListener('click', function () { if (D.simple()) Player.problemDialog(); else Player.toggleMenu(); });
     $('touch-menu').addEventListener('click', function () { Player.toggleMenu(); });
     $('edge-pill').addEventListener('click', function () { Player.toggleMenu(); });

@@ -17,9 +17,10 @@
     favorites: { title: 'Favorites', icon: 'star' },
     new: { title: 'New', icon: 'sparkle' },
     apps: { title: 'Apps', icon: 'apps' },
-    folders: { title: 'Folders', icon: 'folder' }
+    folders: { title: 'Folders', icon: 'folder' },
+    trophies: { title: 'Trophies', icon: 'trophy' }
   };
-  var ROW_ORDER = ['recent', 'favorites', 'new', 'apps', 'folders'];
+  var ROW_ORDER = ['recent', 'favorites', 'new', 'apps', 'folders', 'trophies'];
   function homeRows() {
     var saved = Array.isArray(D.ui.homeRows) ? D.ui.homeRows.filter(function (r) { return ROWS[r]; }) : [];
     ROW_ORDER.forEach(function (r) { if (saved.indexOf(r) < 0) saved.push(r); });
@@ -110,7 +111,12 @@
     var rail = h('div.hrow-rail.mode-' + v.mode, { role: 'list', 'aria-label': meta.title });
     rail.style.setProperty('--gs', v.size);
     var count = 0;
-    if (key === 'folders') {
+    if (key === 'trophies') {
+      var ti = Trophies.info();
+      count = ti.got + ' / ' + ti.total;
+      rail.className = 'hrow-rail tr-rail';
+      Trophies.homeCards().forEach(function (c) { rail.appendChild(c); });
+    } else if (key === 'folders') {
       var folders = Layout.tree('library').filter(function (n) { return n.kind === 'folder'; });
       if (!folders.length) return null;
       count = folders.length;
@@ -144,19 +150,19 @@
         rail.appendChild(add);
       }
     }
-    if (v.mode !== 'list') {
+    if (v.mode !== 'list' || key === 'trophies') {
       rail.addEventListener('wheel', function (e) {
         if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && rail.scrollWidth > rail.clientWidth) { rail.scrollLeft += e.deltaY; e.preventDefault(); }
       }, { passive: false });
     }
-    var seeAll = key === 'apps' ? function () { App.go('apps'); } : function () { App.go('library'); };
+    var seeAll = key === 'apps' ? function () { App.go('apps'); } : key === 'trophies' ? function () { Trophies.open(); } : function () { App.go('library'); };
     return h('section.hrow', { 'data-row': key },
       h('header.hrow-head',
         h('button.hrow-grip', { title: 'Drag to move this row', 'aria-label': 'Move the ' + meta.title + ' row' }, I('grip')),
         h('h2', I(meta.icon), meta.title),
         h('span.count', String(count)),
         h('div.grow'),
-        h('button.hrow-all', { onclick: seeAll }, key === 'apps' ? 'All apps' : 'See all', I('next'))),
+        h('button.hrow-all', { onclick: seeAll }, key === 'apps' ? 'All apps' : key === 'trophies' ? 'Trophy room' : 'See all', I('next'))),
       rail);
   }
   function folderMini(n) {
@@ -1001,6 +1007,7 @@
             h('div.dc' + (x.ms ? '' : '.zero'), { style: { height: (x.ms ? pct : 1.5) + '%' }, 'data-tip': x.d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + U.fmtDuration(x.ms, true), tabindex: 0, 'aria-label': x.key + ': ' + U.fmtDuration(x.ms, true) }),
             h('div.dl', x.today ? 'Today' : x.d.toLocaleDateString(undefined, { weekday: 'narrow' }) + ' ' + x.d.getDate()));
         }))),
+      Trophies.room(),
       h('div.panel',
         h('h3', I('trophy'), 'Most played games'),
         top.length ? h('div.bars', top.map(function (g, idx) {
@@ -1063,7 +1070,7 @@
     var st = D.settings;
     var nameIn = h('input.input', { value: st.name || '', maxlength: 24, style: { maxWidth: '200px' }, 'aria-label': 'Your name' });
     nameIn.value = st.name || '';
-    nameIn.addEventListener('change', function () { set('name', nameIn.value.trim() || 'bro'); });
+    nameIn.addEventListener('change', function () { set('name', nameIn.value.trim() || 'bro'); Trophies.event('name', { name: D.settings.name }); });
     var hotBtn = h('button.btn.sm', { onclick: function () { recordHotkey(hotBtn); } }, h('kbd', st.hotkey || 'F2'), ' change');
     var vol = h('input', { type: 'range', min: 0, max: 1, step: 0.05, value: st.volume, style: { maxWidth: '180px' }, 'aria-label': 'Volume' });
     vol.value = st.volume;
@@ -1081,7 +1088,11 @@
     }
     var sections = h('div.set-main',
       panel('profile', [
-        setRow('Your name', 'What Game System (and VEX) calls you', nameIn)
+        setRow('Your name', 'What Game System (and VEX) calls you', nameIn),
+        setRow('Picture and level', 'Upload a picture, make one with the AI or draw it. Your level and trophies are here too.',
+          h('button.btn.sm.pf-open', { onclick: function () { Trophies.profile(); } }, Trophies.profileBadge(26), 'Open profile')),
+        setRow('Trophies', Trophies.info().got + ' of ' + Trophies.info().total + ' unlocked · Level ' + Trophies.info().level,
+          h('button.btn.sm', { onclick: function () { Trophies.open(); } }, I('trophy'), 'Trophy room'))
       ]),
       panel('look', [
         themePicker(),
@@ -1185,17 +1196,25 @@
   /* ---------------- themes ---------------- */
   function themeCard(th) {
     var on = (D.settings.theme || 'neon') === th.id;
-    var card = h('button.th-card' + (on ? '.on' : ''), {
-      'aria-pressed': on ? 'true' : 'false', title: th.desc,
+    if (th.locked) on = false;
+    var card = h('button.th-card' + (on ? '.on' : '') + (th.locked ? '.locked' : '') + (th.rainbow ? '.th-rainbow' : ''), {
+      'aria-pressed': on ? 'true' : 'false', title: th.locked ? 'Unlocks at level ' + th.level : th.desc,
       onclick: function () {
+        if (th.locked && !Trophies.hasLevel(th.level)) {
+          Sound.error();
+          UI.toast('Reach level ' + th.level + ' to unlock ' + th.name + '. You\'re level ' + Trophies.info().level + '. Get trophies to level up!', { icon: 'lock', type: 'warn', sound: false, actions: [{ label: 'Trophies', onClick: function () { Trophies.open(); } }] });
+          return;
+        }
         D.settings.theme = th.id;
         D.saveSettings();
         App.applySettings();
         Sound.sample();
+        Trophies.event('theme', { id: th.id });
         renderSettings();
       }
     },
-      h('span.th-pic.th-' + th.scene, { style: { '--a': th.accent, '--b': th.accent2, '--base': th.base } }, h('i'), h('i'), h('i')),
+      h('span.th-pic.th-' + th.scene, { style: { '--a': th.accent, '--b': th.accent2, '--base': th.base } }, h('i'), h('i'), h('i'),
+        th.locked ? h('span.th-lock', I('lock'), 'Level ' + th.level) : null),
       h('b', th.name),
       h('span', th.desc || ''),
       th.custom ? h('span.th-del', { role: 'button', tabindex: 0, title: 'Delete this theme', 'aria-label': 'Delete ' + th.name, onclick: async function (e) {
@@ -1290,6 +1309,7 @@
           result.name = nameIn.value.trim() || result.name;
           Themes.save(result);
           saved = true;
+          Trophies.event('theme-make');
           App.applySettings();
           Sound.good();
           UI.toast('Theme "' + result.name + '" is on!', { type: 'good', icon: 'palette', sound: false });

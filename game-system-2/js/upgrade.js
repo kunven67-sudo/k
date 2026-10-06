@@ -184,6 +184,7 @@
         source: cur.source === 'site' ? 'local' : cur.source,
         siteFiles: cur.source === 'site' ? undefined : cur.siteFiles
       }, { touch: true });
+      Trophies.event('upgrade');
       Sound.good();
       UI.toast('Upgraded! Play it and it should continue where you left off from now on.', {
         type: 'good', timeout: 9000, sound: false,

@@ -26,6 +26,24 @@
       vars: { bg: '#0b1a28', bg2: '#102638', panel: 'rgba(205, 232, 255, 0.10)', 'panel-solid': '#132a3d', 'panel-hi': 'rgba(205, 232, 255, 0.16)', line: 'rgba(205, 232, 255, 0.15)', line2: 'rgba(205, 232, 255, 0.28)', text: '#f3fbff', muted: '#aac8de', dim: '#7090a8', good: '#7fffd4' }
     }
   };
+  /* bonus themes unlock at higher levels */
+  var BONUS = {
+    gold: {
+      name: 'Gold', level: 5, accent: '#ffcc33', accent2: '#ff8a00', base: '#0a0703', scene: 'synth', font: 'neon', sound: 'neon',
+      desc: 'Shiny gold everything. Level 5 reward',
+      vars: { bg: '#0a0703', bg2: '#140e05', panel: 'rgba(28, 20, 6, 0.74)', 'panel-solid': '#1b1406', 'panel-hi': 'rgba(44, 32, 10, 0.84)', line: 'rgba(255, 210, 120, 0.12)', line2: 'rgba(255, 210, 120, 0.24)', text: '#fff8e6', muted: '#d6bd8a', dim: '#8f7a52' }
+    },
+    galaxy: {
+      name: 'Galaxy', level: 8, accent: '#b26bff', accent2: '#00e5ff', base: '#05030c', scene: 'stars', font: 'neon', sound: 'ice',
+      desc: 'A spinning galaxy behind everything. Level 8 reward',
+      vars: { bg: '#05030c', bg2: '#0b0718', panel: 'rgba(16, 10, 34, 0.72)', 'panel-solid': '#120b24', 'panel-hi': 'rgba(28, 18, 56, 0.82)', line: 'rgba(200, 170, 255, 0.12)', line2: 'rgba(200, 170, 255, 0.24)', text: '#f3eeff', muted: '#b3a6d6', dim: '#73689a' }
+    },
+    prism: {
+      name: 'Prism', level: 12, accent: '#ff3df0', accent2: '#3dfff0', base: '#04040a', scene: 'waves', font: 'neon', sound: 'neon',
+      desc: 'Rainbow waves. Level 12 reward',
+      rainbow: true
+    }
+  };
   var FONTS = {
     neon: { font: "'Chakra Petch', system-ui, -apple-system, 'Segoe UI', sans-serif", display: "'Orbitron', 'Chakra Petch', system-ui, sans-serif" },
     mono: { font: "ui-monospace, 'Cascadia Code', 'JetBrains Mono', Consolas, 'Courier New', monospace", display: "ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace" },
@@ -38,14 +56,19 @@
     var list = D.settings.customThemes;
     return Array.isArray(list) ? list.filter(function (t) { return t && t.id && /^#[0-9a-f]{6}$/i.test(t.accent || ''); }) : [];
   }
+  function locked(th) { return !!(th.level && !(window.Trophies && Trophies.hasLevel(th.level))); }
   function get(id) {
     if (BUILTIN[id]) return Object.assign({ id: id }, BUILTIN[id]);
+    if (BONUS[id]) { var b = Object.assign({ id: id, bonus: true }, BONUS[id]); b.locked = locked(b); return b; }
     var c = customs().find(function (t) { return t.id === id; });
     return c ? fromCustom(c) : Object.assign({ id: 'neon' }, BUILTIN.neon);
   }
-  function current() { return get(D.settings.theme || 'neon'); }
+  function current() {
+    var th = get(D.settings.theme || 'neon');
+    return th.locked ? get('neon') : th;
+  }
   function list() {
-    return Object.keys(BUILTIN).map(get).concat(customs().map(fromCustom));
+    return Object.keys(BUILTIN).map(get).concat(Object.keys(BONUS).map(get), customs().map(fromCustom));
   }
 
   /* a theme you made only stores colors + background + letters; the rest is worked out here */
@@ -75,6 +98,7 @@
   var lastId = null;
   function apply(id) {
     var th = id ? get(id) : current();
+    if (th.locked) th = get('neon');
     var root = document.documentElement;
     VAR_KEYS.forEach(function (k) { root.style.removeProperty('--' + k); });
     if (th.vars) Object.keys(th.vars).forEach(function (k) { root.style.setProperty('--' + k, th.vars[k]); });
@@ -83,6 +107,7 @@
     root.style.setProperty('--display', f.display);
     root.dataset.theme = th.custom ? 'custom' : th.id;
     root.dataset.font = th.font;
+    root.classList.toggle('rainbow', !!th.rainbow);
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', (th.vars && th.vars.bg) || '#05060a');
     BG.setScene(th.scene, th.base);

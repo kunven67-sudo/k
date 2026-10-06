@@ -65,6 +65,11 @@
     var all = await GS2DB.getAll('games');
     all.forEach(function (g) { D.games.set(g.id, normalize(g)); });
     D.days = (await GS2DB.kvGet('days')) || {};
+    /* your profile picture */
+    try {
+      var av = await GS2DB.kvGet('avatar');
+      if (av instanceof Blob) { D.avatar = av; D.avatarUrl = URL.createObjectURL(av); }
+    } catch (e) { /* ignore */ }
     /* when each game was last saved (for the "saved 2 min ago" tags) */
     try {
       var saves = await GS2DB.getAll('saves');
@@ -173,7 +178,27 @@
     await GS2DB.saveGame(g, files || []);
     D.games.set(g.id, g);
     D.emit('games');
+    if (window.Trophies) Trophies.event('added', { name: g.name });
     return g;
+  };
+
+  /* profile picture (square, small) */
+  D.setAvatar = async function (blob) {
+    /* make the new one first, so a broken picture doesn't wipe the old one */
+    var sq = null;
+    if (blob) {
+      sq = await U.squareImage(blob, 256);
+      if (!sq) throw new Error('That picture could not be opened.');
+      await GS2DB.kvSet('avatar', sq);
+    } else {
+      await GS2DB.kvDel('avatar');
+    }
+    var oldUrl = D.avatarUrl;
+    D.avatar = sq;
+    D.avatarUrl = sq ? URL.createObjectURL(sq) : null;
+    D.emit('settings');
+    if (oldUrl) setTimeout(function () { URL.revokeObjectURL(oldUrl); }, 1000);
+    if (sq && window.Trophies) Trophies.event('avatar');
   };
 
   D.updateGame = async function (id, patch, opts) {
@@ -218,6 +243,7 @@
     var c = coverCache.get(id);
     if (c) { URL.revokeObjectURL(c.url); coverCache.delete(id); }
     D.games.delete(id);
+    if (window.Trophies) Trophies.event('deleted', { name: g.name });
     if (D.ui.sel === id) D.ui.sel = null;
     if (D.ui.playing === id) D.ui.playing = null;
     D.saveUI();

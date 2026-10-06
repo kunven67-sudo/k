@@ -339,7 +339,10 @@
     D.ui.sel = id;
     D.saveUI();
     var launches = (g.launches || 0) + 1;
+    var continuing = !opts.fresh && D.resumeKind(g) === 'save' && !!D.saveIndex[id];
     D.updateGame(id, { lastPlayed: Date.now(), launches: launches });
+    if (D.isApp(g)) Trophies.event('app', { id: id, open: Win.count() + 1 });
+    else Trophies.event('launch', { resumed: continuing || !!opts.resumed });
 
     App.setAccentFor(g);
     var plArt = el('pl-art');
@@ -398,6 +401,7 @@
       if (document.visibilityState === 'visible' && !c.menuOpen) {
         c.activeMs += dt;
         D.addPlayTime(id, dt);
+        if (c.activeMs >= 3600000 && !c.hourDone) { c.hourDone = true; Trophies.event('session', { active: c.activeMs }); }
       }
     }, 1000);
 
@@ -458,6 +462,7 @@
     var now = performance.now();
     if (document.visibilityState === 'visible' && !c.menuOpen) D.addPlayTime(c.id, Math.min(now - c.lastTick, 2500), true);
     cur = null;
+    if (!D.isApp(c.game)) Trophies.event('session', { ms: Date.now() - c.start, active: c.activeMs });
     if (c.unsink) c.unsink();
     blankFrame(c.frame);
     if (c.frame) c.frame.remove();
@@ -578,6 +583,7 @@
     App.setAccentFor(cur.game);
     Sound.good();
     ptoast('New cover set!', null, null, 'image');
+    Trophies.event('picture');
     openMenu();
   }
   function isBlank(blob) {

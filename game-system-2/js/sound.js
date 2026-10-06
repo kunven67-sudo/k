@@ -243,6 +243,11 @@
         tone(f, 1.8, { type: 'sine', gain: 0.045, delay: 0.12 + i * 0.07, attack: 0.08 });
       });
     },
+    /* a trophy unlocked */
+    trophy: function () {
+      [784, 988, 1175, 1568].forEach(function (f, i) { tone(f, 0.22, { type: 'triangle', gain: 0.08, delay: i * 0.07 }); });
+      tone(2093, 0.5, { type: 'sine', gain: 0.05, delay: 0.3 });
+    },
     /* a short sample of the theme's sound (for the theme picker) */
     sample: function () {
       [523, 659, 784].forEach(function (f, i) { tone(f, 0.16, { type: 'triangle', gain: 0.09, delay: i * 0.07 }); });

@@ -66,6 +66,7 @@ To always skip the "Continue?" popup: **Settings → Start-up & resume → When 
 - **Hacker**: falling green code, terminal letters, 8-bit blips
 - **Lava**: embers flying up from a glowing bottom, deep warm sounds
 - **Ice**: snow and a soft aurora, frosty glass, bell sounds
+- **Gold, Galaxy, Prism**: bonus themes you unlock by leveling up (see Trophies below)
 - **Make your own**: describe it ("purple galaxy with pink stars") or pick a picture. The free AI can help (what you type is sent to Pollinations); with it off, Game System makes it right on your device.
 
 **Settings → Sound → Menu music** plays chill music that matches your theme. It stops while you play a game or use the Music app. **Colors follow the game** tints the menu with the selected game's colors.
@@ -81,6 +82,25 @@ The first time you open Game System it asks **Simple or Pro**. Simple hides the 
 ### Settings and the bell
 
 Settings has sections on the left and a search box. The **bell** at the top shows reminders (like "time for a backup") and news (like new games from your website).
+
+## Trophies and your level
+
+Game System gives you **trophies** for stuff you do: playing, collecting games, making folders, trying themes, and some **secret** ones (no spoilers). Each trophy gives points, and points level you up.
+
+- A popup with a sound shows up when you unlock one. While you're in a game it's a small one in the corner so it doesn't get in the way.
+- **Stats** has the **trophy room**: every trophy, how close you are (like "3 / 10"), and filters for Unlocked, Locked and Secret.
+- Home has a **Trophies** row with your level and the trophies you're closest to.
+- Levels unlock rewards: badge frames for your picture (bronze, silver, gold, diamond) and bonus themes: **Gold** (level 5), **Galaxy** (level 8) and **Prism** (level 12, rainbow everything). Check **Level rewards** to see them all.
+- The first time, trophies you already earned (games you already have, time you already played) unlock quietly with one popup.
+- Your trophies and picture are in your backups.
+
+### Your profile
+
+Click your name at the top right:
+
+- **Your name** (what Game System calls you)
+- **Profile picture**: upload one, make one with the **AI avatar** maker (describe it and pick a style; 18+ stuff is blocked and the free AI's safe filter is on), or **Draw one** in the Drawing app and hit **Use as picture** → **My profile picture**
+- Your level, points, the next reward, and a button to the trophy room
 
 ## Apps
 

@@ -198,6 +198,7 @@
   async function applyOrder(screen, container, keys, movedKey) {
     var list = L[screen];
     if (!list) return;
+    var was = JSON.stringify(snapshotKeys());
     if (container === 'top') {
       var byKey = {};
       list.forEach(function (e) { byKey[typeof e === 'string' ? e : 'f:' + e.f] = e; });
@@ -223,6 +224,7 @@
       folder.items = ids.filter(function (id, i) { return D.get(id) && ids.indexOf(id) === i; });
       L[screen] = L[screen].filter(function (e) { return typeof e === 'string' || e.items.length; });
     }
+    if (JSON.stringify(snapshotKeys()) !== was) Trophies.event('moved');
     saveSoon();
     emit();
   }
@@ -255,6 +257,7 @@
     await setFolderName(screen, id, folder.name);
     cleanup(screen);
     saveSoon(); emit();
+    Trophies.event('folder');
     return folder;
   }
   function cleanup(screen) { L[screen] = L[screen].filter(function (e) { return typeof e === 'string' || e.items.length; }); }
@@ -348,6 +351,7 @@
       if (ni === i) return false;
       list.splice(ni, 0, list.splice(i, 1)[0]);
     }
+    Trophies.event('moved');
     saveSoon(); emit();
     return true;
   }

@@ -396,6 +396,7 @@
         if (await UI.confirm('Set as cover?', 'Use this picture as the cover for "' + g.name + '"?', { ok: 'Yes, set cover' })) {
           await D.setCover(g.id, all[0].file);
           UI.toast('Cover updated', { type: 'good', icon: 'image' });
+          Trophies.event('picture');
         }
         return;
       }

@@ -401,6 +401,25 @@
     }
   }
 
+  /* AI profile picture (square). Throws Error('empty' | 'blocked' | 'wait' | 'busy' | …). */
+  var AV_STYLES = {
+    cartoon: '3D cartoon character portrait, animated movie style, colorful, soft lighting, cute and polished',
+    pixel: 'pixel art character portrait, 16-bit retro game style, crisp pixels, vibrant palette',
+    neon: 'neon cyberpunk character portrait, glowing outlines, dark background with neon lights',
+    comic: 'comic book style character portrait, bold ink lines, bright flat colors, action hero vibe'
+  };
+  async function avatarAi(prompt, style) {
+    prompt = String(prompt || '').trim();
+    if (!prompt) throw new Error('empty');
+    if (BLOCK.test(prompt)) throw new Error('blocked');
+    var wait = COOLDOWN - (Date.now() - lastAi);
+    if (wait > 0) { var e = new Error('wait'); e.wait = Math.ceil(wait / 1000); throw e; }
+    lastAi = Date.now();
+    var full = (AV_STYLES[style] || AV_STYLES.cartoon) + ', ' + prompt + ', head and shoulders, centered, simple background, fully clothed, no text, no words, family friendly';
+    return fetchImage('https://image.pollinations.ai/prompt/' + encodeURIComponent(full) +
+      '?width=512&height=512&seed=' + ((Math.random() * 1e9) | 0) + '&nologo=true&safe=true&model=flux');
+  }
+
   /* ---------------- the picture maker window ---------------- */
   async function open(id, startTab) {
     var g = D.get(id);
@@ -596,6 +615,7 @@
         await D.updateGame(id, { art: 'picture' });
         Sound.good();
         UI.toast('New picture set!', { type: 'good', icon: 'image', sound: false });
+        Trophies.event('picture', { ai: !!res.ai });
         return true;
       } catch (e) {
         UI.toast('Couldn\'t use that picture: ' + (e.message || e), { type: 'bad' });
@@ -634,6 +654,21 @@
         await D.updateGame(g.id, { art: 'picture' });
         Sound.good();
         UI.toast('New picture for "' + g.name + '"!', { type: 'good', icon: 'image', sound: false });
+        Trophies.event('picture', { drawing: fromId === 'gs2-drawing' });
+        m.close();
+      } catch (e) {
+        busy = false;
+        UI.toast('Couldn\'t use that picture: ' + (e.message || e), { type: 'bad' });
+      }
+    }
+    async function pickMe() {
+      if (busy) return;
+      busy = true;
+      try {
+        await D.setAvatar(blob);
+        if (fromId === 'gs2-drawing') Trophies.event('picture', { drawing: true });
+        Sound.good();
+        UI.toast('New profile picture!', { type: 'good', icon: 'user', sound: false });
         m.close();
       } catch (e) {
         busy = false;
@@ -641,11 +676,15 @@
       }
     }
     search.addEventListener('input', render);
+    var meBtn = h('button.pick-item.pick-me', { onclick: pickMe },
+      h('span.pk-art.pk-me', D.avatarUrl ? h('img', { src: D.avatarUrl, alt: '' }) : I('user')),
+      h('span.pk-name', 'My profile picture'),
+      h('span.pk-kind', 'You'));
     var m = UI.modal({
       title: 'Use this picture for…',
       icon: 'image',
       wide: true,
-      body: h('div', h('div.pick-preview', h('img', { src: url, alt: 'Your picture' })), search, list),
+      body: h('div', h('div.pick-preview', h('img', { src: url, alt: 'Your picture' })), meBtn, search, list),
       actions: [{ label: 'Cancel', kind: 'ghost' }],
       onClose: function () { offerOpen = false; setTimeout(function () { URL.revokeObjectURL(url); }, 1000); }
     });
@@ -653,5 +692,5 @@
     setTimeout(function () { var b = list.querySelector('.pick-item'); if (b) b.focus(); }, 60);
   }
 
-  window.Pics = { open: open, useFor: useFor, guessIcon: guessIcon, letterArt: letterArt, iconArt: iconArt, patternArt: patternArt, BLOCK: BLOCK, aiUrl: aiUrl };
+  window.Pics = { open: open, useFor: useFor, avatarAi: avatarAi, guessIcon: guessIcon, letterArt: letterArt, iconArt: iconArt, patternArt: patternArt, BLOCK: BLOCK, aiUrl: aiUrl };
 })();

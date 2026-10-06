@@ -217,7 +217,7 @@
       return ex;
     }
     if (wantsPopup(g)) {
-      if (!opts.restore) openPopup(g);
+      if (!opts.restore) { openPopup(g); Trophies.event('app', { id: id, open: wins.size + 1 }); }
       return null;
     }
     ensureLayer();
@@ -233,6 +233,7 @@
     };
     var n = ordered().filter(function (o) { return !o.min; }).length;
     wins.set(id, W);
+    if (!opts.restore) Trophies.event('app', { id: id, open: wins.size });
     var A = area();
     if (geo && isFinite(geo.x) && isFinite(geo.y)) { W.x = Number(geo.x); W.y = Number(geo.y); }
     else {
