@@ -1,27 +1,38 @@
-## Torture Humans 0.6.0 (early test version)
+## Torture Humans 0.7.0 (early test version)
 
-Not the finished game yet: this is what's built so far. New since 0.5.0:
+Not the finished game yet: this is what's built so far. New since 0.6.0:
 
-### Being tiny is real now (always on)
-- A crumb is a meal and a droplet is a drink (crumbs on the kitchen floor, dew on the grass in the morning). Small bodies get hungry and thirsty faster
-- Dangers: the terrarium spider hunts you, ants bite, your pet rat thinks you're food, the gecko's tongue, and big people can't see you, so watch their feet. Mom vacuums twice a day 😱
-- Wind pushes you around outside, raindrops hit like buckets, and water's surface traps you. Below ~2 cm you can creep up walls
-- Tiny bodies get cold fast. Your voice is too quiet for big people to hear, and their voices rumble
-- Tiny eyes are blurry, breathing gets hard, the world looks slow-motion, and light goes rainbow at germ size
-- Below ~2 cm your body slowly gives out: grow back in time!
+### New people, made for this game
+- Everyone is now a goofy, jiggly person made from scratch (no scanned models): big friendly heads, faces that blink, smile, frown and talk, bellies and cheeks that wobble. Way less laggy
+- Outfits match jobs: police caps and badges, chef hats, builder and firefighter helmets, nurse scrubs, ties, aprons
+- Settings → Gameplay → People look: Jiggly (default), Cartoony, Simple, or Realistic (the old scanned people; slower on weak PCs). Takes effect after a restart
 
-### Settings (F10)
-- Graphics, volume, difficulty (Creative = can't get hurt), gore, mouse
-- Just for fun (not realistic, off by default): super jump, talking bugs, a second tiny village in the park, riding your pet rat, labels on tiny things
+### Pause menu (Esc)
+- Resume, Settings, Save, Load, Controls, Quit
+- Settings have tabs: Graphics, Sound, Gameplay, Controls (click any key to change it) and Tiny fun
 
-### Town life
-- Townspeople have days: home, work (the chef at the diner, the cop at the station...), evenings out, and home at night
-- Odd jobs for money: deliver parcels, work shifts at the Grocery, find lost rings in lawns (shrink to search!)
-- Sleep in your bed (E)
-- The park: pond, fountain, flower beds, benches. Power poles, mailboxes and a crosswalk
+### Music and sounds
+- Music made by the game while you play, in 4 styles: Goofy, Chill lo-fi, Retro chiptune, Epic (or off). It changes for chases and at night
+- Footsteps for everyone: people (grass, wood, floor; louder and deeper the bigger they are), tiny people, your pet rat, bugs
+
+### Shrink ray on everything
+- Shrink tiny people even tinier, or grow people into giants
+- Shrink and grow people in the cage (grow them and they break out!)
+- Shrink or grow things: furniture, the TV, trash cans... you can climb a giant one
+- Shrink yourself: aim at your feet
+
+### Orders that work
+- Tell people to follow you, come here, stop, leave, dance, wave, clap, cheer, laugh, sit, or go to a place. They do it, or say honestly why they won't
 
 ### Fixes
-- Tiny you could fall through the ground when teleported or when someone walked over you
-- Game crash when eating before the sound had started
+- Shrinking someone who was stranded crashed the game
+- Holding someone while climbing the ladder left them floating
+- Dew could be drunk all day
+- The vacuum kept going while you held Mom
+- Dying while riding your rat pulled you back to it
+- Eaten crumbs stayed in the tiny colony's food list
+- Loading didn't reset chores and police; a broken save could crash the game
+- The lost ring floated above the lawn
+- Speech bubbles stayed after people left town
 
-Everything from 0.5.0 is still here. H shows all the controls.
+Everything from 0.6.0 is still here. H shows all the controls.
