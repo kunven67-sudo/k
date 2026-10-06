@@ -9,6 +9,7 @@
 // toe-up, jaw open (chin down/back) and eyes looking down are all `+X` rotations.
 
 import * as THREE from 'three';
+import { faceLayout, findEyes, faceBonePositions, HEAD_UNIT, JAW_BIND_OPEN } from './headsculpt.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -19,12 +20,12 @@ export const FINGERS = ['index', 'middle', 'ring', 'pinky'];
 export const HAND = {
   palm: { cy: 0.05, half: [0.021, 0.05, 0.046] },
   fingers: {
-    index: { base: [-0.001, 0.097, 0.031], len: [0.043, 0.027, 0.022], r: 0.0118, spread: 7 },
-    middle: { base: [-0.002, 0.1, 0.0105], len: [0.047, 0.03, 0.023], r: 0.0122, spread: 1.5 },
-    ring: { base: [-0.002, 0.097, -0.0095], len: [0.044, 0.028, 0.022], r: 0.0114, spread: -4 },
-    pinky: { base: [0.0, 0.089, -0.028], len: [0.035, 0.022, 0.019], r: 0.01, spread: -11 },
+    index: { base: [-0.001, 0.094, 0.03], len: [0.04, 0.025, 0.02], r: 0.0114, spread: 6 },
+    middle: { base: [-0.002, 0.097, 0.0102], len: [0.044, 0.028, 0.021], r: 0.0118, spread: 1.5 },
+    ring: { base: [-0.002, 0.094, -0.0094], len: [0.041, 0.026, 0.02], r: 0.011, spread: -4 },
+    pinky: { base: [0.0, 0.086, -0.0275], len: [0.032, 0.02, 0.017], r: 0.0099, spread: -10 },
   },
-  thumb: { base: [0.012, 0.018, 0.03], dir: [0.42, 0.55, 0.72], len: [0.046, 0.033, 0.027], r: 0.0138 },
+  thumb: { base: [0.012, 0.018, 0.03], dir: [0.42, 0.55, 0.72], len: [0.044, 0.032, 0.026], r: 0.0128 },
   curl: 9,
 };
 
@@ -37,7 +38,7 @@ export function computeJoints(p) {
   const fat = p.fat;
   const mus = p.muscle;
   const old = Math.max(0, (p.age - 45) / 45);
-  const headH = H / 5.4;
+  const headH = H / 5.5;
   const chinY = H - headH;
   const hipY = (0.462 + 0.05 * (p.legs - 0.5)) * H;
   const ankleY = 0.085 * s;
@@ -75,7 +76,7 @@ export function computeJoints(p) {
     j[`toeTip.${side}`] = V(sx * hipHalf * 0.97, 0.03 * s, 0.205 * s);
     j[`heel.${side}`] = V(sx * hipHalf * 0.9, 0.03 * s, -0.06 * s);
   }
-  return { j, s, H, headH, chinY, hipY, kneeY, ankleY, shoulderY, shoulderHalf, hipHalf, handScale: s * (0.88 + 0.26 * p.handSize) };
+  return { j, s, H, headH, chinY, hipY, kneeY, ankleY, shoulderY, shoulderHalf, hipHalf, handScale: s * (1.1 + 0.28 * p.handSize) };
 }
 
 // Orthonormal basis quaternion from a bone direction (Y) and a front reference (Z).
@@ -159,17 +160,32 @@ export function buildRig(params) {
   add('chest', 'spine', j.chest, j.neck);
   add('neck', 'chest', j.neck, j.head);
   add('head', 'neck', j.head, j.headTop);
-  // Face/jiggle bones share the head basis.
-  const hb = j.head;
-  const ys = dims.s;
-  const headUp = j.headTop.clone();
-  defs.push(['jaw', 'head', V(0, j.headCenter.y - 0.035 * ys, j.headCenter.z - 0.03 * ys), basisQuat(headUp.clone().sub(hb), fwd)]);
-  for (const [side, sx] of [['L', 1], ['R', -1]]) {
-    // Eye centres are refined by head.js; placeholder here, moved before binding.
-    defs.push([`eye.${side}`, 'head', V(sx * 0.04, j.headCenter.y + 0.02, 0.07), basisQuat(up, fwd)]);
-    defs.push([`cheek.${side}`, 'head', V(sx * 0.055 * ys, j.headCenter.y - 0.04 * ys, j.headCenter.z + 0.06 * ys), basisQuat(up, fwd)]);
+  // Face bones: placed from the facial layout (head space → world bind space). They all use the
+  // world-aligned basis, so their local axes are x = left, y = up, z = forward.
+  const L = faceLayout(params);
+  findEyes(params, L);
+  const hsc = dims.headH / HEAD_UNIT;
+  const toW = (h) => V(j.headCenter.x + h[0] * hsc, j.headCenter.y + h[1] * hsc, j.headCenter.z + h[2] * hsc);
+  const ID = new THREE.Quaternion();
+  const FB = faceBonePositions(L);
+  defs.push(['jaw', 'head', toW(FB.jaw), ID.clone()]);
+  defs.push(['tongue', 'jaw', toW([0, L.mouthY - 0.012, 0.06]), ID.clone()]);
+  defs.push(['lip.U', 'head', toW(FB['lip.U']), ID.clone()]);
+  defs.push(['lip.D', 'jaw', toW(FB['lip.D']), ID.clone()]);
+  defs.push(['nose', 'head', toW(FB.nose), ID.clone()]);
+  for (const side of ['L', 'R']) {
+    const e = L.eyes[side === 'L' ? 0 : 1];
+    const ec = toW([e.c.x, e.c.y, e.c.z]);
+    defs.push([`eye.${side}`, 'head', ec, ID.clone()]);
+    defs.push([`lidU.${side}`, 'head', ec.clone(), ID.clone()]);
+    defs.push([`lidD.${side}`, 'head', ec.clone(), ID.clone()]);
+    for (const n of ['corner', 'cheek', 'brow.in', 'brow.out']) defs.push([`${n}.${side}`, 'head', toW(FB[`${n}.${side}`]), ID.clone()]);
   }
-  // Soft-tissue jiggle bones.
+  dims.L = L;
+  dims.hsc = hsc;
+  dims.headToWorld = toW;
+  // Soft-tissue jiggle bones (translation springs; see anim/jiggle.js).
+  const ys = dims.s;
   defs.push(['belly', 'spine', V(0, j.spine.y - 0.03 * ys, 0.09 * ys), basisQuat(up, fwd)]);
   defs.push(['breast.L', 'chest', V(0.075 * ys, j.chest.y - 0.02 * ys, 0.1 * ys), basisQuat(up, fwd)]);
   defs.push(['breast.R', 'chest', V(-0.075 * ys, j.chest.y - 0.02 * ys, 0.1 * ys), basisQuat(up, fwd)]);
@@ -227,6 +243,8 @@ export function buildRig(params) {
     bones.push(b);
   }
   const boneIndex = new Map(bones.map((b, i) => [b.name, i]));
+  // The mouth is sculpted slightly open; the jaw's rest pose closes it.
+  rest.jaw.q.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -JAW_BIND_OPEN));
   return { bones, byName, boneIndex, dims, rest, worldQ, worldP };
 }
 

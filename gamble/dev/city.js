@@ -124,6 +124,7 @@ class CityDev {
     this.sky.update(clock, this.weather, this.camPos);
     this.world.update(0, clock, { weather: this.weather, camera, viewer: this.camPos });
 
+    this.ready = true;
     window.__city = {
       setHour: (h, mi = 0) => this._setHour(h, mi),
       preset: (n) => this._setPreset(n),
@@ -230,6 +231,7 @@ class CityDev {
   }
 
   update(dt, realDt) {
+    if (!this.ready) return; // the engine ticks states while enter() is still building
     const rdt = Math.min(realDt || dt, 0.1);
     this.yaw -= input.look.x * 0.0022;
     this.pitch = clamp(this.pitch - input.look.y * 0.0022, -1.45, 1.45);

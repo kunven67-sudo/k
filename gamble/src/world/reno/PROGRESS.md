@@ -1,0 +1,32 @@
+# Reno downtown slice + sky — progress log
+
+Owner of: src/gfx/sky.js, src/gfx/decals.js, src/world/reno/**, src/world/shared/**, dev/city.html + dev/city.js
+
+View: http://127.0.0.1:8765/gamble/dev/city.html?hour=21&cam=arch  (params: hour, min, date, cam, rain, run, walk, panel)
+Cam presets: virginia, arch, strip, eldo, walk, overview (keys 1-6). F = walk mode, [ ] hour, ; ' day, R rain.
+
+## Status
+- [x] sky.js — atmosphere LUT, sun/moon/stars, mountains, clouds, lights, fog, PMREM (attempt 1)
+- [x] shared/batch.js (StaticBatch + Colliders), shared/kinds.js (extra materials), shared/facade.js (interior-mapped windows)
+- [x] reno/layout.js (coordinate contract), reno/ground.js (streets, curbs, corners, markings, trench, drains)
+- [x] verify all of the above renders (attempt 2) — dev page guard added (engine ticks update during async enter)
+- [x] gfx/decals.js — canvas atlas (32 cells), instanced DecalLayer per target, projectDecal, scatterDecals
+- [x] shared/text3d.js (canvas→marching squares→ExtrudeGeometry letters), shared/signs.js (painted/lit signs, neon, BulbSet, LED screen)
+- [x] shared/props.js (lamps, cobra lights, signal masts w/ cycling SIGNAL uniforms, blades, hydrant, newsboxes, meter, cans, bench, bus shelter, power poles + wires, chain fence, cabinet, bollard, planter, litter)
+- [x] shared/vehicles.js (parked cars: sedan/coupe/wagon/pickup/van), shared/flora.js (trees w/ seasonal cards, weeds)
+- [x] shared/buildings.js (facade with recessed openings, storefronts, awnings, sign panels, roofs, HVAC)
+- [ ] buildings: 4th St strip (motels, pawn, liquor, bail bonds, diner, vacant lot), east side Virginia, Eldorado shell + tower, Silver Legacy + dome, Circus Circus, skyways
+- [ ] Reno Arch (signature)
+- [ ] night lighting (point lights pool near player, emissive), neon buzz audio, wet streets
+- [ ] zones, spawn, interactables
+- [ ] dev page walk mode polish, screenshots
+
+## Key decisions
+- Arch at z=106 (layout ARCH_Z), Commercial Row centre z=114 (hw 6). Close to the brief's ≈108/≈112 and keeps
+  the arch legs on the north corner sidewalks.
+- Static geometry → StaticBatch merged per (64 m chunk, material), culled by tier.drawDistance.
+
+## Notes / perf
+- SwiftShader headless: ~2.7 s/frame at tier high, page ready after ~30 s. Use waits >= 35 s before first shot.
+- Avoid mat('glass') (transmission pass). Use propMats().glass / darkGlass.
+- Material variants bake textures on the CPU: prefer one base material + batch `tint` over new mat() colors.

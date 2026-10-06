@@ -48,6 +48,25 @@ export function box(c, half, r, opts = {}) {
   return { type: 'box', cx: c[0], cy: c[1], cz: c[2], hx: half[0] - r, hy: half[1] - r, hz: half[2] - r, r, rot: null, k: 0.01, ...opts };
 }
 
+/**
+ * Eye socket carved in the shape of the lid opening: the intersection of a sphere (radius Rs
+ * around the eye centre) with an angular "almond" cone bounded by the upper/lower lid curves
+ * (plus margins). `rot` = world→eye rows (z forward, y up, x toward the outer corner on the left
+ * eye: the side flips az). Use with sub:true.
+ */
+export function almond(c, rot, side, Rs, lid, opts = {}) {
+  return { type: 'almond', cx: c[0], cy: c[1], cz: c[2], rot, side, Rs, ...lid, k: 0.006, ...opts };
+}
+
+function almondUpper(p, az) {
+  const u = Math.max(-1, Math.min(1, az / p.halfW));
+  return p.up * Math.pow(1 - u * u, 0.55) * (1 - 0.12 * u);
+}
+function almondLower(p, az) {
+  const u = Math.max(-1, Math.min(1, az / p.halfW));
+  return -p.lo * Math.pow(1 - u * u, 0.8) * (1 + 0.16 * u);
+}
+
 // Rotation matrix (row-major, world→local) from orthonormal local axes expressed in world.
 export function basisRot(xAxis, yAxis, zAxis) {
   return [xAxis[0], xAxis[1], xAxis[2], yAxis[0], yAxis[1], yAxis[2], zAxis[0], zAxis[1], zAxis[2]];
@@ -110,6 +129,24 @@ export function primDist(p, x, y, z) {
       if (Math.sign(yv) * p.a2 * y2 < k) return sqrt(x2 + y2) * p.il2 - p.r1;
       return (sqrt(x2 * p.a2 * p.il2) + yv * p.rr) * p.il2 - p.r1;
     }
+    case 'almond': {
+      const dx = x - p.cx;
+      const dy = y - p.cy;
+      const dz = z - p.cz;
+      const m = p.rot;
+      const lx = m[0] * dx + m[1] * dy + m[2] * dz;
+      const ly = m[3] * dx + m[4] * dy + m[5] * dz;
+      const lz = m[6] * dx + m[7] * dy + m[8] * dz;
+      const r = sqrt(lx * lx + ly * ly + lz * lz);
+      primT[0] = 0;
+      if (r < 1e-9) return -p.Rs;
+      const az = Math.atan2(lx * p.side, lz);
+      const el = Math.asin(Math.max(-1, Math.min(1, ly / r)));
+      const elU = almondUpper(p, az) + p.mU;
+      const elL = almondLower(p, az) - p.mL;
+      const da = max(el - elU, elL - el, abs(az) - (p.halfW + p.mA));
+      return max(r - p.Rs, da * max(r, p.Rs * 0.5));
+    }
     case 'box': {
       let dx = x - p.cx;
       let dy = y - p.cy;
@@ -152,23 +189,76 @@ export function smax(a, b, k) {
   return -smin(-a, -b, k);
 }
 
+/** Bounding sphere of a primitive (center xyz + radius), used for spatial culling. */
+export function primBound(p) {
+  switch (p.type) {
+    case 'sphere':
+      return [p.cx, p.cy, p.cz, p.r];
+    case 'ellipsoid':
+      return [p.cx, p.cy, p.cz, max(p.rx, p.ry, p.rz)];
+    case 'cone': {
+      const l = sqrt(p.l2) * 0.5;
+      return [(p.ax + p.bx) * 0.5, (p.ay + p.by) * 0.5, (p.az + p.bz) * 0.5, l + max(p.r1, p.r2)];
+    }
+    case 'box':
+      return [p.cx, p.cy, p.cz, sqrt(p.hx * p.hx + p.hy * p.hy + p.hz * p.hz) + p.r];
+    case 'almond':
+      return [p.cx, p.cy, p.cz, p.Rs];
+    default:
+      return [0, 0, 0, 1e9];
+  }
+}
+
+function evalPrims(prims, n, kScale, x, y, z) {
+  let d = 1e9;
+  for (let i = 0; i < n; i++) {
+    const p = prims[i];
+    const di = primDist(p, x, y, z);
+    if (p.sub) d = smax(d, -di, p.k * kScale);
+    else d = smin(d, di, p.k * kScale);
+  }
+  return d;
+}
+
 /**
  * Build a field function from a primitive list. `extra(x,y,z,d)` may post-process the value
  * (garment thickness ramps, wrinkles…). kScale multiplies every blend radius (looser garments).
+ *
+ * The returned function has `.sub(cx, cy, cz, radius, reach)`: a field restricted to the
+ * primitives that can influence the surface inside that sphere. It is exact wherever the true
+ * field is below `reach` (i.e. near the surface), because a primitive further away than
+ * reach + its blend radius contributes nothing to the smooth union there.
  */
 export function makeField(prims, { kScale = 1, offset = 0, extra = null } = {}) {
   const n = prims.length;
-  return (x, y, z) => {
-    let d = 1e9;
-    for (let i = 0; i < n; i++) {
-      const p = prims[i];
-      const di = primDist(p, x, y, z);
-      if (p.sub) d = smax(d, -di, p.k * kScale);
-      else d = smin(d, di, p.k * kScale);
-    }
-    d -= offset;
-    return extra ? extra(x, y, z, d) : d;
+  const bounds = prims.map(primBound);
+  const make = (list) => {
+    const m = list.length;
+    const f = extra
+      ? (x, y, z) => extra(x, y, z, evalPrims(list, m, kScale, x, y, z) - offset)
+      : offset
+        ? (x, y, z) => evalPrims(list, m, kScale, x, y, z) - offset
+        : (x, y, z) => evalPrims(list, m, kScale, x, y, z);
+    return f;
   };
+  const field = make(prims);
+  field.prims = prims;
+  field.sub = (cx, cy, cz, radius, reach) => {
+    const list = [];
+    for (let i = 0; i < n; i++) {
+      const b = bounds[i];
+      const dist = sqrt((b[0] - cx) ** 2 + (b[1] - cy) ** 2 + (b[2] - cz) ** 2) - radius - b[3];
+      if (dist <= reach + prims[i].k * kScale + abs(offset)) list.push(prims[i]);
+    }
+    if (list.length === n) return field;
+    if (!list.length) {
+      // Nothing nearby: return a conservative positive distance (outside everything).
+      const far = reach * 4 + 1;
+      return () => far;
+    }
+    return make(list);
+  };
+  return field;
 }
 
 // ---- skin weights -----------------------------------------------------------------------------
@@ -237,7 +327,7 @@ export function primitiveWeights(prims, x, y, z, tau = 0.018, filter = null) {
 
 /**
  * Naive Surface Nets over a narrow band.
- * @param field (x,y,z) => signed distance
+ * @param field (x,y,z) => signed distance (a makeField() result enables per-block culling)
  * @param bounds {min:[x,y,z], max:[x,y,z]}
  * @param h voxel size (m)
  * @returns {positions: Float32Array, normals: Float32Array, indices: Uint32Array}
@@ -260,6 +350,10 @@ export function polygonize(field, bounds, h, { project = 2 } = {}) {
   const cnx = bx + 1;
   const cny = by + 1;
   const coarse = new Float32Array(cnx * cny * (bz + 1));
+  // Coarse lattice through culled fields of super-blocks (16 voxels) for speed.
+  const SB = 16;
+  const reach = B * h * 1.9 + h * 2; // block diagonal + slack (ellipsoid/smin values are only bounds)
+  const canSub = typeof field.sub === 'function';
   for (let k = 0; k <= bz; k++) {
     for (let j = 0; j <= by; j++) {
       for (let i = 0; i <= bx; i++) {
@@ -267,7 +361,9 @@ export function polygonize(field, bounds, h, { project = 2 } = {}) {
       }
     }
   }
-  const reach = B * h * 1.9 + h * 2; // block diagonal + slack (ellipsoid/smin values are only bounds)
+  void SB;
+  const blockR = B * h * 0.87;
+  const blockField = new Map();
   for (let k = 0; k < bz; k++) {
     for (let j = 0; j < by; j++) {
       for (let i = 0; i < bx; i++) {
@@ -288,11 +384,16 @@ export function polygonize(field, bounds, h, { project = 2 } = {}) {
           const fill = sgn < 0 ? -mn : mn;
           for (let kk = k0; kk <= k1; kk++) for (let jj = j0; jj <= j1; jj++) for (let ii = i0; ii <= i1; ii++) vals[ii + jj * nx + kk * sxy] = fill;
         } else {
+          const cx = ox + (i0 + B * 0.5) * h;
+          const cy = oy + (j0 + B * 0.5) * h;
+          const cz = oz + (k0 + B * 0.5) * h;
+          const f = canSub ? field.sub(cx, cy, cz, blockR, reach + h) : field;
+          blockField.set(i + j * bx + k * bx * by, f);
           for (let kk = k0; kk <= k1; kk++) {
             const z = oz + kk * h;
             for (let jj = j0; jj <= j1; jj++) {
               const yy = oy + jj * h;
-              for (let ii = i0; ii <= i1; ii++) vals[ii + jj * nx + kk * sxy] = field(ox + ii * h, yy, z);
+              for (let ii = i0; ii <= i1; ii++) vals[ii + jj * nx + kk * sxy] = f(ox + ii * h, yy, z);
             }
           }
         }
@@ -304,6 +405,7 @@ export function polygonize(field, bounds, h, { project = 2 } = {}) {
   const cellIndex = new Int32Array((nx - 1) * (ny - 1) * (nz - 1)).fill(-1);
   const cxy = (nx - 1) * (ny - 1);
   const pos = [];
+  const vblock = [];
   const EDGES = [
     [0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7],
   ];
@@ -334,6 +436,7 @@ export function polygonize(field, bounds, h, { project = 2 } = {}) {
         }
         cellIndex[i + j * (nx - 1) + k * cxy] = pos.length / 3;
         pos.push(ox + (i + sx / cnt) * h, oy + (j + sy / cnt) * h, oz + (k + sz / cnt) * h);
+        vblock.push(Math.min(bx - 1, (i / B) | 0) + Math.min(by - 1, (j / B) | 0) * bx + Math.min(bz - 1, (k / B) | 0) * bx * by);
       }
     }
   }
@@ -346,77 +449,69 @@ export function polygonize(field, bounds, h, { project = 2 } = {}) {
       for (let i = 1; i < nx - 1; i++) {
         const v0 = vals[i + j * nx + k * sxy];
         const in0 = v0 < 0;
-        // +x edge
         if (i < nx - 1) {
           const v1 = vals[i + 1 + j * nx + k * sxy];
-          if (in0 !== v1 < 0) {
-            const a = cell(i, j - 1, k - 1);
-            const b = cell(i, j, k - 1);
-            const c = cell(i, j, k);
-            const d = cell(i, j - 1, k);
-            quad(idx, a, b, c, d, in0);
-          }
+          if (in0 !== v1 < 0) quad(idx, cell(i, j - 1, k - 1), cell(i, j, k - 1), cell(i, j, k), cell(i, j - 1, k), in0);
         }
         if (j < ny - 1) {
           const v1 = vals[i + (j + 1) * nx + k * sxy];
-          if (in0 !== v1 < 0) {
-            const a = cell(i - 1, j, k - 1);
-            const b = cell(i - 1, j, k);
-            const c = cell(i, j, k);
-            const d = cell(i, j, k - 1);
-            quad(idx, a, b, c, d, in0);
-          }
+          if (in0 !== v1 < 0) quad(idx, cell(i - 1, j, k - 1), cell(i - 1, j, k), cell(i, j, k), cell(i, j, k - 1), in0);
         }
         if (k < nz - 1) {
           const v1 = vals[i + j * nx + (k + 1) * sxy];
-          if (in0 !== v1 < 0) {
-            const a = cell(i - 1, j - 1, k);
-            const b = cell(i, j - 1, k);
-            const c = cell(i, j, k);
-            const d = cell(i - 1, j, k);
-            quad(idx, a, b, c, d, in0);
-          }
+          if (in0 !== v1 < 0) quad(idx, cell(i - 1, j - 1, k), cell(i, j - 1, k), cell(i, j, k), cell(i - 1, j, k), in0);
         }
       }
     }
   }
 
-  // Project onto the iso-surface; analytic normals from the gradient.
-  const n = pos.length / 3;
   const positions = new Float32Array(pos);
-  const normals = new Float32Array(n * 3);
-  const e = h * 0.05;
+  const normals = new Float32Array(positions.length);
+  const n = positions.length / 3;
   for (let v = 0; v < n; v++) {
-    let x = positions[v * 3];
-    let y = positions[v * 3 + 1];
-    let z = positions[v * 3 + 2];
-    let gx = 0;
-    let gy = 1;
-    let gz = 0;
-    for (let it = 0; it <= project; it++) {
-      const d = field(x, y, z);
-      gx = field(x + e, y, z) - field(x - e, y, z);
-      gy = field(x, y + e, z) - field(x, y - e, z);
-      gz = field(x, y, z + e) - field(x, y, z - e);
-      const gl = sqrt(gx * gx + gy * gy + gz * gz) || 1;
-      gx /= gl;
-      gy /= gl;
-      gz /= gl;
-      if (it === project) break;
-      // Bounded Newton step keeps vertices inside their cell neighbourhood.
-      const step = Math.max(-h * 0.6, Math.min(h * 0.6, d));
-      x -= gx * step;
-      y -= gy * step;
-      z -= gz * step;
-    }
-    positions[v * 3] = x;
-    positions[v * 3 + 1] = y;
-    positions[v * 3 + 2] = z;
+    const f = blockField.get(vblock[v]) || field;
+    projectVertex(f, positions, normals, v, h * 0.6, project, h * 0.05);
+  }
+  return { positions, normals, indices: new Uint32Array(idx) };
+}
+
+/**
+ * Newton-project vertex v of `positions` onto the iso-surface of `f` (bounded steps), writing the
+ * normalised gradient into `normals`. Returns the final |distance|.
+ */
+export function projectVertex(f, positions, normals, v, maxStep, iters = 2, e = 0.0005) {
+  let x = positions[v * 3];
+  let y = positions[v * 3 + 1];
+  let z = positions[v * 3 + 2];
+  let gx = 0;
+  let gy = 1;
+  let gz = 0;
+  let d = 0;
+  for (let it = 0; it <= iters; it++) {
+    // Forward differences: 4 evaluations per step instead of 7.
+    d = f(x, y, z);
+    gx = f(x + e, y, z) - d;
+    gy = f(x, y + e, z) - d;
+    gz = f(x, y, z + e) - d;
+    const gl = sqrt(gx * gx + gy * gy + gz * gz) || 1;
+    gx /= gl;
+    gy /= gl;
+    gz /= gl;
+    if (it === iters || abs(d) < e * 0.05) break;
+    const step = Math.max(-maxStep, Math.min(maxStep, d));
+    x -= gx * step;
+    y -= gy * step;
+    z -= gz * step;
+  }
+  positions[v * 3] = x;
+  positions[v * 3 + 1] = y;
+  positions[v * 3 + 2] = z;
+  if (normals) {
     normals[v * 3] = gx;
     normals[v * 3 + 1] = gy;
     normals[v * 3 + 2] = gz;
   }
-  return { positions, normals, indices: new Uint32Array(idx) };
+  return abs(d);
 }
 
 function quad(idx, a, b, c, d, flip) {

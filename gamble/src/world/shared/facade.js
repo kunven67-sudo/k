@@ -26,10 +26,50 @@ export const FACADE = {
 const INTERIOR_GLSL = /* glsl */ `
   float ih1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
   float ih2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  // Casino floor seen through entrance glass: patterned carpet, a ceiling of warm downlights,
+  // rows of slot machines with flickering screens, always lit (casinos never close).
+  vec4 interiorCasino(vec2 p, vec2 sz, vec3 rd, float seed, float time) {
+    float depth = 16.0;
+    vec3 lo = vec3(-6.0, -0.15, -depth);
+    vec3 hi = vec3(sz.x + 6.0, 4.6, 0.0);
+    vec3 ro = vec3(p, 0.0);
+    rd.z = min(rd.z, -1e-3);
+    vec3 ird = 1.0 / rd;
+    vec3 tf = max((lo - ro) * ird, (hi - ro) * ird);
+    float t = min(min(tf.x, tf.y), tf.z);
+    vec3 h = ro + rd * t;
+    vec3 col;
+    float fog = clamp(t / 22.0, 0.0, 1.0);
+    if (abs(tf.y - t) < 1e-4 && h.y < 0.0) {
+      vec2 q = h.xz / 0.9;
+      vec2 c = fract(q) - 0.5;
+      float motif = smoothstep(0.32, 0.28, length(c)) * 0.6 + step(0.45, abs(c.x)) * 0.4;
+      col = mix(vec3(0.18, 0.05, 0.06), vec3(0.55, 0.38, 0.12), motif) * 0.9;
+      // Slot machine bases cast pools of screen light onto the carpet.
+      col += vec3(0.5, 0.3, 0.6) * 0.15 * (0.5 + 0.5 * sin(h.x * 2.0 + time));
+    } else if (abs(tf.y - t) < 1e-4) {
+      vec2 q = fract(h.xz / vec2(1.6, 1.6)) - 0.5;
+      col = vec3(0.08, 0.06, 0.05) + vec3(2.6, 2.0, 1.3) * smoothstep(0.12, 0.0, length(q));
+      col += vec3(1.2, 0.9, 0.5) * 0.3;
+    } else {
+      // Walls: rows of machines (screens + button decks), signage glow above.
+      float bank = floor((abs(tf.x - t) < 1e-4 ? h.z : h.x) / 0.75);
+      float r = ih1(bank + seed * 7.0);
+      vec3 scr = vec3(0.5 + 0.5 * sin(r * 20.0 + time * (1.0 + r)), 0.5 + 0.5 * sin(r * 13.0 + 2.0), 0.6 + 0.4 * sin(r * 7.0 + time * 0.7));
+      float y = h.y;
+      col = vec3(0.05, 0.04, 0.05);
+      col = mix(col, scr * 2.2, step(0.9, y) * step(y, 1.55) * step(0.08, fract((abs(tf.x - t) < 1e-4 ? h.z : h.x) / 0.75)));
+      col = mix(col, vec3(1.6, 1.0, 0.35), step(1.9, y) * step(y, 2.2));
+      col = mix(col, vec3(0.25, 0.08, 0.06), step(2.2, y));
+    }
+    col = mix(col, vec3(0.35, 0.22, 0.12), fog * 0.6);
+    return vec4(col, 1.0);
+  }
   // style: 0 hotel/motel room, 1 shop, 2 office, 3 dark/abandoned
   // p: point on the pane (m, from bottom-left), sz: pane size (m), rd: ray in pane space
   // (x right, y up, z out of the glass toward the viewer). Returns rgb radiance, a = lit amount.
   vec4 interiorRoom(vec2 p, vec2 sz, vec3 rd, float seed, float style, float night, float litFrac, float time) {
+    if (style > 3.5) return interiorCasino(p, sz, rd, seed, time);
     float depth = style > 0.5 && style < 1.5 ? 7.0 : (style > 1.5 && style < 2.5 ? 5.0 : 3.6);
     float sill = style > 0.5 && style < 1.5 ? 0.35 : 0.9;
     vec3 lo = vec3(-0.7, -sill, -depth);
@@ -82,7 +122,8 @@ const INTERIOR_GLSL = /* glsl */ `
         float shelf = step(0.82, fract((h.y + sill) / 0.42));
         float slot = floor(-h.z / 0.16) + floor((h.y + sill) / 0.42) * 17.0;
         vec3 prod = vec3(ih1(slot + seed), ih1(slot * 1.7 + seed), ih1(slot * 2.3 + seed));
-        col = mix(prod * 0.8 + 0.1, vec3(0.75), shelf);
+        prod = mix(vec3(dot(prod, vec3(0.33))), prod, 0.45) * 0.55 + 0.12;
+        col = mix(prod, vec3(0.62), shelf);
         col *= step(h.y + sill, 2.0) * 0.85 + 0.15;
       }
     } else {
@@ -98,7 +139,8 @@ const INTERIOR_GLSL = /* glsl */ `
         float shelf = step(0.8, fract((h.y + sill) / 0.42));
         float slot = floor(h.x / 0.13) + floor((h.y + sill) / 0.42) * 31.0;
         vec3 prod = vec3(ih1(slot + seed * 3.0), ih1(slot * 1.3 + seed), ih1(slot * 0.7 + seed * 2.0));
-        col = mix(prod * 0.85 + 0.08, vec3(0.8), shelf);
+        prod = mix(vec3(dot(prod, vec3(0.33))), prod, 0.45) * 0.55 + 0.12;
+        col = mix(prod, vec3(0.66), shelf);
         col = mix(col, wallC, step(2.1, h.y + sill));
       } else if (style < 2.5) {
         float cab = step(h.y, -sill + 1.0);
@@ -166,7 +208,7 @@ const glassCache = new Map();
 export function glassMat({ style = 'room', tint = 0x9aa7ad, reflect = 1.0 } = {}) {
   const key = `${style}|${tint}|${reflect}`;
   if (glassCache.has(key)) return glassCache.get(key);
-  const styleId = { room: 0, shop: 1, office: 2, dark: 3 }[style] ?? 0;
+  const styleId = { room: 0, shop: 1, office: 2, dark: 3, casino: 4 }[style] ?? 0;
   const m = new THREE.MeshStandardMaterial({
     color: new THREE.Color(tint).multiplyScalar(0.06),
     roughness: 0.06,
@@ -247,7 +289,7 @@ export function towerFacadeMat(o) {
   const m = wall.clone();
   m.userData = { ...wall.userData };
   m.name = `${wall.name}-facade`;
-  const styleId = { room: 0, shop: 1, office: 2, dark: 3 }[o.style || 'room'] ?? 0;
+  const styleId = { room: 0, shop: 1, office: 2, dark: 3, casino: 4 }[o.style || 'room'] ?? 0;
   const U = {
     uCell: { value: new THREE.Vector2(...o.cell) },
     uWin: { value: new THREE.Vector2(...o.win) },
