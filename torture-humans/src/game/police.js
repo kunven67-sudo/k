@@ -29,6 +29,7 @@ export class Police {
     this.unseen = 0;        // seconds since an officer saw you
     this.calls = [];        // witnesses on the phone: { h, t, sev, pos }
     this.cops = new Set();
+    this.gone = [];         // officers who went back to the station (off the list next update)
     this.dispatching = 0;   // officers on the way
     this.el = document.getElementById('wanted');
     for (const h of humans) if (/^Police_/.test(h.profile.look || '')) this.enlist(h);
@@ -185,13 +186,16 @@ export class Police {
   retire(h) {
     this.cops.delete(h);
     if (h.dispatched) {
+      // (this runs in the middle of their own update: dispose clears their body and
+      // nav agent, and they're taken off the list after everyone has updated)
       h.dispose(h.character.root.parent);
-      const i = this.humans.indexOf(h);
-      if (i >= 0) this.humans.splice(i, 1);
+      this.gone.push(h);
     }
   }
 
   update(dt) {
+    for (const h of this.gone) { const i = this.humans.indexOf(h); if (i >= 0) this.humans.splice(i, 1); }
+    this.gone.length = 0;
     // calls in progress
     for (let i = this.calls.length - 1; i >= 0; i--) {
       const c = this.calls[i];

@@ -566,7 +566,8 @@ export class Human {
       this.watchForGiant(dt);
       this.think(dt);
     }
-    if (!this.agent) return; // left the world just now (out the door, to bed)
+    // left the world just now (out the door, to bed, an officer going back to the station)
+    if (!this.agent || !this.alive) return;
     this.syncFromAgent(dt);
     this.updateFace();
     this.character.update(dt, {
@@ -580,7 +581,9 @@ export class Human {
   dispose(scene) {
     if (this.capsule) this.physics.removeCapsule(this.capsule);
     if (this.agent) this.nav.removeAgent(this.agent);
-    scene.remove(this.character.root);
+    this.capsule = null;
+    this.agent = null;
+    scene?.remove(this.character.root);
     this.alive = false;
   }
 }
