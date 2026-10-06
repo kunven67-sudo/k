@@ -30,8 +30,14 @@ Kept from attempt 2: `schema.js` (params, i18n), rig bone convention (`rig.js`),
 material ideas, eyes.js eye atlas, anim/* skeleton (to be finished).
 
 ## Status
-- [ ] A1 subdiv.js + bodycage.js + clay screenshot of nude body lineup
-- [ ] A2 headgen.js (SDF sculpt, grid, eyes, mouth cut) + face close-up
+- [x] A1 subdiv.js + bodycage.js + bodymesh.js; clay lineup OK (dev/character-shape.html).
+      Lessons: orientFaces() needed (BFS winding), crotch ring = thigh tops (figure-8), ring
+      angles of first limb rings blend from root-loop angles (else twisted tubes), soft cage fit.
+- [~] A2 head: headsdf.js (layout+SDF) + headmesh.js (grid, magnifier warp for eyes/nose/mouth,
+      mouth split row, seam matching body ring R[9] which is tilted: front lower).
+      Integrated lid shell in the grid looked bad (coarse, creases) -> doing per-eye LID PATCH
+      meshes (rings around the almond, rays from eye centre) overlapping the grid; grid tris
+      under the patch dropped; both use SDF normals so the overlap is invisible.
 - [ ] A3 materials: skin (paint in head UV), eyes, mouth/teeth
 - [ ] A4 rig wiring, skinning, face bones, jiggle; deformation test
 - [ ] A5 clothes (tops/bottoms/shoes/outer/uniforms), hats, glasses
@@ -41,3 +47,24 @@ material ideas, eyes.js eye atlas, anim/* skeleton (to be finished).
 
 ## Next
 A1.
+
+### Session log (attempt 3, cont.)
+- Assembled Human works end-to-end (rig.js now uses headsdf layout; meshbuild.js merges body +
+  head grid + lid patches + ears into one skin geometry; facefeatures.js: eyes/mouth/ears;
+  skin.js face paint now maps via `mapper.uvOf(x,y[,z])`; eyes.js material simplified).
+- dev/character.html shows animated (idle) naked humans. Perf: geometry ~0.5-0.9 s/human in
+  headless (needs optimisation: fewer castRay steps, cache SDF), paint 0.3-0.5 s.
+- DONE since: clothes.js + clothmat.js + outfit.js (garments from cage, prints, uniforms, shoes),
+  hair.js (SDF hair volume grid + clumps, spring bones hair.B/L/R/T), anim/actions.js (all 24
+  one-shots + seated/phone holds), dev/character.js rewritten (lineup on a curb, face view, keys).
+- OLD NEXT (done): clothes.js (garments from cage tags: tag = part<<16|ring<<8|col; arm tube i: 0 root->
+  deltoid ... 7 wrist; leg tube i: 0 crotch->thigh ... 8 ankle; foot 0..3 + cap 9; torso r 0..8),
+  cloth material (triplanar weave, sheen), shoes from foot cage, then hair.js, brows/lashes.
+- NEXT: face cards (brows, lashes, beard/mustache), accessories (hats, glasses, bowtie, belt),
+  perf (head grid castRay cost), visual polish (hair shading, face sculpt, cloth folds).
+- Hair fixes: coverage is a linear field from the SCALP point under each hair point (smooth
+  edges), shell thins to 0 at the hairline, noise scales with thickness, afro mass cut by a
+  plane behind the hairline (hollow-shell bug), skin weights must be normalised over the 4 kept.
+- facecards.js: brows/lashes/beard merged into the hair mesh (aTint, cover>=9.5 = card mode).
+- NEXT: accessories.js (hats w/ hair clip, glasses, bowtie, hearing aid, belt garment), perf,
+  animation screenshots, face sculpt polish, low tier check.

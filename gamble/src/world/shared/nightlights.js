@@ -97,6 +97,11 @@ export class NightLights {
         .replace('#include <opaque_fragment>', `
           // Wet pavement scatters less light diffusely (more goes into the reflection streaks).
           outgoingLight *= uNight * uPoolK * (1.0 - uWet * 0.35);
+          // Near the viewer the pooled real PointLights light the pavement properly; the fake
+          // pools only carry the distant streets (they overlap a lot, so keep them faint).
+          #ifdef USE_FOG
+            outgoingLight *= mix(0.2, 1.0, smoothstep(10.0, 45.0, vFogDepth));
+          #endif
           #include <opaque_fragment>`)
         .replace('#include <fog_fragment>', ADDITIVE_FOG);
     };
@@ -113,7 +118,7 @@ export class NightLights {
       mesh.setMatrixAt(i, m4);
       // Pool brightness ∝ source intensity / height² (inverse square to the ground), clamped.
       const hgt = Math.max(1.5, l.pos.y - gy);
-      const k = Math.min(0.85, ((l.intensity ?? 10) / (hgt * hgt)) * 1.15) * (l.poolK ?? 1);
+      const k = Math.min(0.45, ((l.intensity ?? 10) / (hgt * hgt)) * 0.55) * (l.poolK ?? 1);
       c.set(l.color).multiplyScalar(k);
       mesh.setColorAt(i, c);
       void col;

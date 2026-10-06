@@ -225,7 +225,7 @@ export function buildArch(ctx) {
 
 // Red enamel channel-letter faces: glossy by day, internally lit (pink-red) at night.
 function letterFaceMat() {
-  const m = new THREE.MeshStandardMaterial({ color: 0xb3121c, roughness: 0.32, metalness: 0.05, emissive: 0xff2a3a });
+  const m = new THREE.MeshStandardMaterial({ color: 0xb3121c, roughness: 0.32, metalness: 0.05, emissive: 0xff1426 });
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uNight = SIGNS.uNight;
     sh.uniforms.uTime = SIGNS.uTime;
@@ -233,7 +233,7 @@ function letterFaceMat() {
       .replace('#include <common>', '#include <common>\nuniform float uNight; uniform float uTime;')
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         // Letters pulse very gently, like old neon transformers under load.
-        totalEmissiveRadiance *= uNight * (3.2 + 0.25 * sin(uTime * 1.3));`);
+        totalEmissiveRadiance *= uNight * (1.55 + 0.12 * sin(uTime * 1.3));`);
   };
   m.customProgramCacheKey = () => 'arch-letter-face';
   m.name = 'arch-letters';

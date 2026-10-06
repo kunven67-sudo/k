@@ -92,7 +92,7 @@ export function buildGround(ctx, opts = {}) {
     curbRed: mat('curb', { seed: 2, color: 0xa3352b }),
     gutter: offsetMat(mat('concrete', { seed: 11, dirt: 0.65 }), -1),
     lot: mat('concrete', { seed: 4, dirt: 0.6, wear: 0.6 }),
-    parking: mat('asphalt', { seed: 9, wear: 0.75, dirt: 0.6 }),
+    parking: bleached(mat('asphalt', { seed: 9, wear: 0.45, dirt: 0.6 }), 1.45), // sun-bleached old lots
     dirt: mat('dirt', { seed: 6 }),
     gravel: mat('gravel', { seed: 3 }),
     wall: mat('board-concrete', { seed: 2 }),
@@ -627,6 +627,15 @@ function buildTrench(ctx, cells, cell, M, rng) {
   pk.receiveShadow = true;
   pk.name = 'trench-pickets';
   ctx.extraMeshes.push(pk);
+}
+
+// Old desert parking lots fade to a pale grey; a tinted clone keeps the shared maps.
+function bleached(m, k) {
+  const c = m.clone();
+  c.color.multiplyScalar(k);
+  c.name = m.name;
+  c.userData = { ...m.userData };
+  return c;
 }
 
 // ---- Drains, manholes, lids -------------------------------------------------------------------

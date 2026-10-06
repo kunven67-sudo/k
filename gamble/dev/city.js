@@ -5,7 +5,7 @@
 //   mouse (click to lock) look · WASD move · Shift fast · Q / E down / up (fly)
 //   F       toggle walk mode (Rapier character capsule + third-person camera) / fly mode
 //   [ / ]   hour -1 / +1          ; / '   day -1 / +1          T   run / freeze time
-//   R       toggle rain           1..6    camera presets       H   hide this panel
+//   R       toggle rain           1..7    camera presets       H   hide this panel
 // URL params: ?hour=21&min=30&date=2026-10-05&cam=arch&rain=1&run=1&walk=1&panel=0
 
 import * as THREE from 'three';
@@ -29,7 +29,7 @@ i18n.register('devcity', {
     dry: 'Dry',
     running: 'Time running',
     frozen: 'Time frozen',
-    help: 'Click to look · WASD move · Shift fast · Q/E down/up · F walk/fly · [ ] hour · ; \' day · T time · R rain · 1–6 views · H hide',
+    help: 'Click to look · WASD move · Shift fast · Q/E down/up · F walk/fly · [ ] hour · ; \' day · T time · R rain · 1–7 views · H hide',
     loading: 'Laying asphalt…',
   },
   es: {
@@ -40,7 +40,7 @@ i18n.register('devcity', {
     dry: 'Seco',
     running: 'Tiempo corriendo',
     frozen: 'Tiempo congelado',
-    help: 'Clic para mirar · WASD mover · Shift rápido · Q/E bajar/subir · F caminar/volar · [ ] hora · ; \' día · T tiempo · R lluvia · 1–6 vistas · H ocultar',
+    help: 'Clic para mirar · WASD mover · Shift rápido · Q/E bajar/subir · F caminar/volar · [ ] hora · ; \' día · T tiempo · R lluvia · 1–7 vistas · H ocultar',
     loading: 'Echando asfalto…',
   },
 });
@@ -70,8 +70,10 @@ const PRESETS = {
   eldo: [7.5, 1.7, 38, -13, 4.5, 50],
   walk: [9.2, 1.8, 30, 9.2, 1.6, 60],
   overview: [80, 70, 160, -10, 0, 20],
+  // Looking west down the 4th St strip into the low sun (golden hour).
+  sunset: [188, 1.6, -8.7, 100, 6, -16],
 };
-const PRESET_KEYS = ['virginia', 'arch', 'strip', 'eldo', 'walk', 'overview'];
+const PRESET_KEYS = ['virginia', 'arch', 'strip', 'eldo', 'walk', 'overview', 'sunset'];
 
 class CityDev {
   constructor(engine) {
@@ -177,7 +179,7 @@ class CityDev {
       case 'KeyT': this.timeRunning = !this.timeRunning; clock.paused = !this.timeRunning; break;
       case 'KeyH': this.panel.style.display = this.panel.style.display === 'none' ? '' : 'none'; break;
       default:
-        if (/^Digit[1-6]$/.test(ev.code)) this._setPreset(PRESET_KEYS[+ev.code.slice(5) - 1]);
+        if (/^Digit[1-7]$/.test(ev.code)) this._setPreset(PRESET_KEYS[+ev.code.slice(5) - 1]);
     }
   }
 

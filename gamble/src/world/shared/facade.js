@@ -26,6 +26,34 @@ export const FACADE = {
 const INTERIOR_GLSL = /* glsl */ `
   float ih1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
   float ih2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  // Merchandise on a shelf run: x = metres along the run, y = height above the floor. Items have
+  // their own widths/heights, gaps show the dark shelf back, packaging has label bands and a
+  // muted shop palette (lots of dark/neutral boxes, a few loud brand colours) — no colour grid.
+  vec3 shelfGoods(float x, float y, float seed) {
+    float row = floor(y / 0.42);
+    float yy = fract(y / 0.42) * 0.42;
+    vec3 back = vec3(0.16, 0.15, 0.14);
+    if (yy > 0.39) return vec3(0.62, 0.61, 0.58); // shelf lip
+    float cw = 0.09 + 0.14 * ih1(row * 13.1 + seed * 7.0); // item width varies per shelf
+    float cell = floor(x / cw);
+    float fx = fract(x / cw);
+    float r1 = ih1(cell * 1.31 + row * 17.0 + seed);
+    float r2 = ih1(cell * 2.17 + row * 5.3 + seed * 3.0);
+    float r3 = ih1(cell * 0.73 + row * 11.0 + seed * 5.0);
+    float hItem = 0.16 + 0.2 * r2;
+    if (fx < 0.06 || fx > 0.94 || yy > hItem || r3 < 0.08) return back * (0.7 + 0.3 * yy / 0.42);
+    // Palette: neutrals, dark, cardboard, and a few saturated packs.
+    vec3 c;
+    if (r1 < 0.3) c = vec3(0.12 + r2 * 0.1);
+    else if (r1 < 0.5) c = vec3(0.55, 0.42, 0.28) * (0.7 + r3 * 0.4);
+    else if (r1 < 0.68) c = vec3(0.78, 0.76, 0.72) * (0.7 + r2 * 0.3);
+    else c = mix(vec3(0.35), vec3(ih1(r1 * 9.0), ih1(r1 * 13.0), ih1(r1 * 17.0)), 0.75) * 0.75;
+    // Label band + top highlight + slight shading toward the sides.
+    float band = step(abs(yy - hItem * 0.55), hItem * 0.14);
+    c = mix(c, vec3(0.85, 0.83, 0.78) * (0.6 + r3 * 0.4), band * step(0.4, r2) * 0.8);
+    c *= 0.82 + 0.18 * smoothstep(0.0, 0.3, min(fx, 1.0 - fx)) + 0.1 * step(hItem - 0.015, yy);
+    return c;
+  }
   // Casino floor seen through entrance glass: patterned carpet, a ceiling of warm downlights,
   // rows of slot machines with flickering screens, always lit (casinos never close).
   vec4 interiorCasino(vec2 p, vec2 sz, vec3 rd, float seed, float time) {
@@ -119,12 +147,8 @@ const INTERIOR_GLSL = /* glsl */ `
       col = wallC * 0.82;
       if (style > 0.5 && style < 1.5) {
         // Side shelving with merchandise.
-        float shelf = step(0.82, fract((h.y + sill) / 0.42));
-        float slot = floor(-h.z / 0.16) + floor((h.y + sill) / 0.42) * 17.0;
-        vec3 prod = vec3(ih1(slot + seed), ih1(slot * 1.7 + seed), ih1(slot * 2.3 + seed));
-        prod = mix(vec3(dot(prod, vec3(0.33))), prod, 0.45) * 0.55 + 0.12;
-        col = mix(prod, vec3(0.62), shelf);
-        col *= step(h.y + sill, 2.0) * 0.85 + 0.15;
+        col = shelfGoods(-h.z, h.y + sill, seed + 3.0);
+        col = mix(col, wallC * 0.82, step(2.0, h.y + sill));
       }
     } else {
       col = wallC;
@@ -136,11 +160,7 @@ const INTERIOR_GLSL = /* glsl */ `
         float bed = step(h.y, -sill + 0.75) * step(abs(h.x - sz.x * 0.5), 1.1);
         col = mix(col, vec3(0.35, 0.3, 0.28) * (0.8 + r3 * 0.4), bed);
       } else if (style < 1.5) {
-        float shelf = step(0.8, fract((h.y + sill) / 0.42));
-        float slot = floor(h.x / 0.13) + floor((h.y + sill) / 0.42) * 31.0;
-        vec3 prod = vec3(ih1(slot + seed * 3.0), ih1(slot * 1.3 + seed), ih1(slot * 0.7 + seed * 2.0));
-        prod = mix(vec3(dot(prod, vec3(0.33))), prod, 0.45) * 0.55 + 0.12;
-        col = mix(prod, vec3(0.66), shelf);
+        col = shelfGoods(h.x, h.y + sill, seed);
         col = mix(col, wallC, step(2.1, h.y + sill));
       } else if (style < 2.5) {
         float cab = step(h.y, -sill + 1.0);
@@ -159,7 +179,8 @@ const INTERIOR_GLSL = /* glsl */ `
     // Daylight in the room is dim compared to outside; lit rooms glow at night.
     vec3 dayLight = vec3(0.16, 0.17, 0.18) * (1.0 - night);
     vec3 nightLight = lightC * on * falloff * (style > 0.5 && style < 1.5 ? 1.25 : 0.95);
-    vec3 radiance = col * (dayLight + nightLight * mix(0.35, 1.0, night)) + col * 0.006;
+    // By day a lit shop reads darker than the sunlit street outside (eyes adapt to outdoors).
+    vec3 radiance = col * (dayLight + nightLight * mix(style > 0.5 && style < 1.5 ? 0.2 : 0.35, 1.0, night)) + col * 0.006;
     // Curtains / blinds in the glass plane (rooms and offices only).
     if (style < 0.5 || (style > 1.5 && style < 2.5)) {
       float cur = ih1(seed * 3.3 + 11.0);

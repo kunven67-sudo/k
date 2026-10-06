@@ -104,21 +104,24 @@ export class Rain {
     const count = { low: 2500, medium: 5000, high: 9000, ultra: 14000 }[tier?.name] ?? 6000;
     const geo = new THREE.BufferGeometry();
     // Each drop is a thin quad (2 triangles) built in the vertex shader from a seed.
-    const seeds = new Float32Array(count * 6 * 4);
+    // ShaderMaterial declares `position` as vec3, so the corner/jitter goes in its own attribute.
+    const seeds = new Float32Array(count * 6 * 3);
+    const corners = new Float32Array(count * 6);
     for (let i = 0; i < count; i++) {
       const sx = Math.random();
       const sy = Math.random();
       const sz = Math.random();
       const s = Math.random();
       for (let k = 0; k < 6; k++) {
-        const o = (i * 6 + k) * 4;
+        const o = (i * 6 + k) * 3;
         seeds[o] = sx;
         seeds[o + 1] = sy;
         seeds[o + 2] = sz;
-        seeds[o + 3] = k + s * 0.5; // corner index + per-drop speed jitter in the fraction
+        corners[i * 6 + k] = k + s * 0.5; // corner index + per-drop speed jitter in the fraction
       }
     }
-    geo.setAttribute('position', new THREE.BufferAttribute(seeds, 4));
+    geo.setAttribute('position', new THREE.BufferAttribute(seeds, 3));
+    geo.setAttribute('aCorner', new THREE.BufferAttribute(corners, 1));
     this.uniforms = {
       uTime: { value: 0 },
       uAmount: { value: 0 },
@@ -130,11 +133,12 @@ export class Rain {
       uniforms: this.uniforms,
       vertexShader: /* glsl */ `
         uniform float uTime; uniform float uAmount; uniform vec2 uWind; uniform vec3 uCenter;
+        attribute float aCorner;
         varying float vA; varying float vV;
         void main() {
           vec3 seed = position.xyz;
-          float corner = floor(position.w);
-          float jitter = fract(position.w) * 2.0;
+          float corner = floor(aCorner);
+          float jitter = fract(aCorner) * 2.0;
           const vec3 box = vec3(36.0, 22.0, 36.0);
           float speed = 9.0 + jitter * 3.0;
           vec3 p;

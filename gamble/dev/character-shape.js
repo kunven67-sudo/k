@@ -5,9 +5,11 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { runState } from './harness.js';
 import { randomHumanParams, normalizeParams } from '../src/character/schema.js';
 import { computeJoints } from '../src/character/rig.js';
-import { buildBodyCage } from '../src/character/bodycage.js';
+import { buildBodyCage, DEBUG } from '../src/character/bodycage.js';
 import { refine } from '../src/character/bodymesh.js';
 import { triangulate, topology } from '../src/character/subdiv.js';
+import { faceLayout, setNeck, HEAD_UNIT } from '../src/character/headsdf.js';
+import { buildHeadGrid } from '../src/character/headmesh.js';
 
 class ShapeLab {
   constructor(e) { this.engine = e; }
@@ -24,7 +26,7 @@ class ShapeLab {
     const n = +(q.n || 6);
     const level = q.level != null ? +q.level : 1;
     const clay = new THREE.MeshStandardMaterial({ color: 0xc9a58c, roughness: 0.55 });
-    const wire = new THREE.MeshBasicMaterial({ color: 0x1a1a1a, wireframe: true, transparent: true, opacity: 0.35 });
+    const wire = new THREE.MeshBasicMaterial({ color: q.cage === "2" ? 0xffffff : 0x1a1a1a, wireframe: true, transparent: true, opacity: q.cage === '2' ? 1 : 0.35 });
     const info = [];
     const presets = [
       { sex: 'm', fat: 0.15, muscle: 0.5 }, { sex: 'f', fat: 0.3 }, { sex: 'm', fat: 0.85, belly: 0.9 },
@@ -36,7 +38,7 @@ class ShapeLab {
       const p = normalizeParams({ ...randomHumanParams(+(q.seed || 11) + i * 7, { sex: pr.sex }), ...pr });
       const t0 = performance.now();
       const dims = computeJoints(p);
-      const { cage } = buildBodyCage(p, dims);
+      const { cage, seam } = buildBodyCage(p, dims);
       const t1 = performance.now();
       const c = refine(cage, level);
       const t2 = performance.now();
@@ -50,7 +52,7 @@ class ShapeLab {
       const x = (i - (n - 1) / 2) * 0.75;
       mesh.position.x = x;
       mesh.rotation.y = THREE.MathUtils.degToRad(+(q.rot || 0));
-      scene.add(mesh);
+      if (q.cage !== '2') scene.add(mesh);
       if (q.cage) {
         const cg = new THREE.BufferGeometry();
         const cp = new Float32Array(cage.nv * 3);
@@ -82,9 +84,50 @@ class ShapeLab {
       window.__nm = [...und].filter(([, c2]) => c2 > 2).map(([k2, c2]) => [k2, c2]);
       window.__sd = sd;
       info.push({ bnd, sameDir, bpts: bverts.slice(0, 40).map((v) => [cage.data[v * cage.D], cage.data[v * cage.D + 1], cage.data[v * cage.D + 2]].map((x) => +x.toFixed(3))) });
+      if (q.head !== '0') {
+        const th0 = performance.now();
+        const hc = dims.j.headCenter;
+        const hsc = dims.headH / HEAD_UNIT;
+        const L = faceLayout(p);
+        setNeck(L, { y: (seam.y - hc.y) / hsc, W: seam.W / hsc, F: seam.F / hsc, B: seam.B / hsc, cz: (seam.cz - hc.z) / hsc, ty: seam.ty / hsc });
+        const hg = buildHeadGrid(L, q.tier || 'high');
+        const hpos = new Float32Array(hg.nv * 3);
+        for (let v = 0; v < hg.nv; v++) {
+          hpos[v * 3] = hc.x + hg.pos[v * 3] * hsc;
+          hpos[v * 3 + 1] = hc.y + hg.pos[v * 3 + 1] * hsc;
+          hpos[v * 3 + 2] = hc.z + hg.pos[v * 3 + 2] * hsc;
+        }
+        const hgeo = new THREE.BufferGeometry();
+        hgeo.setAttribute('position', new THREE.BufferAttribute(hpos, 3));
+        hgeo.setAttribute('normal', new THREE.BufferAttribute(hg.nrm, 3));
+        hgeo.setIndex(hg.index);
+        const hm = new THREE.Mesh(hgeo, q.wire ? new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }) : clay);
+        hm.position.x = x;
+        hm.rotation.y = mesh.rotation.y;
+        scene.add(hm);
+        if (q.wire === '2') {
+          const wm = new THREE.Mesh(hgeo, new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, transparent: true, opacity: 0.25 }));
+          hm.add(wm);
+          hm.material = clay;
+        }
+        for (const e of L.eyes) {
+          const eb = new THREE.Mesh(new THREE.SphereGeometry(L.eyeR * hsc, 32, 24), new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.2 }));
+          eb.position.set(hc.x + e.c[0] * hsc, hc.y + e.c[1] * hsc, hc.z + e.c[2] * hsc);
+          const ir = new THREE.Mesh(new THREE.CircleGeometry(L.eyeR * hsc * 0.48, 24), new THREE.MeshBasicMaterial({ color: 0x3a2a1a }));
+          ir.position.z = L.eyeR * hsc * 0.97;
+          eb.add(ir);
+          const g2 = new THREE.Group();
+          g2.position.x = x;
+          g2.rotation.y = mesh.rotation.y;
+          g2.add(eb);
+          scene.add(g2);
+        }
+        info.push({ headMs: +(performance.now() - th0).toFixed(1), headTris: hg.index.length / 3 });
+      }
       info.push({ cageMs: +(t1 - t0).toFixed(1), subMs: +(t2 - t1).toFixed(1), tris: g.index.count / 3, cageV: cage.nv });
     }
     window.__info = info;
+    window.__dbgcage = DEBUG;
     const cam = new THREE.PerspectiveCamera(+(q.fov || 30), 1, 0.01, 100);
     let ty = +(q.ty || 0.95);
     let tx = +(q.tx || 0);
@@ -93,8 +136,8 @@ class ShapeLab {
       // Focus on a joint of the first figure, e.g. focus=hand.L
       const p0 = normalizeParams({ ...randomHumanParams(+(q.seed || 11), { sex: presets[0].sex }), ...presets[0] });
       const fj = computeJoints(p0).j[q.focus];
-      tx = fj.x + (0 - (n - 1) / 2) * 0.75;
-      ty = fj.y;
+      tx = fj.x + (0 - (n - 1) / 2) * 0.75 + +(q.ox || 0);
+      ty = fj.y + +(q.oy || 0);
       tz = fj.z;
     }
     cam.position.set(tx + +(q.cx || 0), ty + +(q.cy || 0.1), tz + +(q.dist || 6.5));

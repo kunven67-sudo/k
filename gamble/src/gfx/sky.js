@@ -31,6 +31,7 @@ import { TileNoise } from './noise.js';
 import { Rng } from '../core/rng.js';
 import { clamp, lerp, smoothstep } from '../core/util.js';
 
+const GOLD_HOUR = new THREE.Color(1.0, 0.66, 0.36);
 const DEG = Math.PI / 180;
 const DOME_R = 900;
 
@@ -1150,6 +1151,10 @@ class Sky {
     } else {
       const mx = Math.max(sunT[0], sunT[1], sunT[2], 1e-4);
       L.color.setRGB(sunT[0] / mx, sunT[1] / mx, sunT[2] / mx);
+      // Golden hour grade: the single-scattering model under-reddens a low desert sun (no dust
+      // or smoke layer); push the key light toward amber in the last ~15 degrees.
+      const gold = smoothstep(16, 3, el) * sunAbove * (1 - cloud * 0.6);
+      L.color.lerp(GOLD_HOUR, gold * 0.5);
       // Physical irradiance falls with transmittance; ev keeps golden hour bright.
       const t = (sunT[0] * 0.2126 + sunT[1] * 0.7152 + sunT[2] * 0.0722);
       L.intensity = 3.4 * Math.min(1.25, t * lerp(1, 2.2, smoothstep(25, 2, el))) * sunAbove * cloudDim;
@@ -1172,6 +1177,9 @@ class Sky {
     const hemiI = Math.max(hemiSky.r, hemiSky.g, hemiSky.b, 1e-4);
     this.hemi.color.setRGB(hemiSky.r / hemiI, hemiSky.g / hemiI, hemiSky.b / hemiI);
     this.hemi.intensity = clamp(hemiI * 1.25, 0.06, 1.6) * lerp(1, 1.25, cloud);
+    // Low sun: the whole bright western sky (not just the zenith sample) fills the shadows, so
+    // flat ground doesn't sink to black at golden hour.
+    this.hemi.intensity *= 1 + 0.7 * smoothstep(22, 3, el) * sunAbove;
     const bounce = sunAbove * 0.22;
     this.hemi.groundColor.setRGB(0.36 * (bounce + 0.15) + glow * 0.6, 0.31 * (bounce + 0.15) + glow * 0.4, 0.25 * (bounce + 0.15) + glow * 0.25);
 

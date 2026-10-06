@@ -126,7 +126,7 @@ export class Face {
         }
       }
     }
-    for (const [k, v] of Object.entries(this.extra)) c[k] = (c[k] || 0) + v;
+    this._accum(c, this.extra, 1);
     this.extra = {};
     // Blinking: random intervals, occasional double blinks, more when nervous/tired.
     this.blinkT -= dt;

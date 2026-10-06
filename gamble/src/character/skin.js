@@ -17,7 +17,6 @@ import { TileNoise } from '../gfx/noise.js';
 import { Rng, hashString } from '../core/rng.js';
 import { clamp, smoothstep, lerp } from '../core/util.js';
 import { SKIN_RAMP, HAIR_COLOR_HEX } from './schema.js';
-import { dirToUV } from './headsculpt.js';
 import { TRI_VERT_DECL, TRI_VERT_AXES, TRI_VERT_POS, TRI_FRAG_DECL, lightsWithSSS, patch } from './shaderlib.js';
 
 // ---- colours ----------------------------------------------------------------------------------
@@ -177,97 +176,23 @@ function heightToNormal(height, S, strength, wrap) {
 
 // ---- face paint -------------------------------------------------------------------------------
 
-/**
- * Front-surface depth lookup for the head template: z-buffer of the template mesh on a 2 mm
- * grid in head space (x,y). Built once per template.
- */
-function templateZ(tpl) {
-  if (tpl._zbuf) return tpl._zbuf;
-  const x0 = -0.14;
-  const y0 = -0.24;
-  const step = 0.002;
-  const nx = 141;
-  const ny = 211;
-  const zb = new Float32Array(nx * ny).fill(-1);
-  const P = tpl.positions;
-  const I = tpl.index;
-  const inner = (v) => {
-    const g = tpl.group[v];
-    return g === 'bag' || g === 'slit' || g === 'nostril';
-  };
-  for (let t = 0; t < I.length; t += 3) {
-    // Only the outer skin: the mouth bag would otherwise "win" inside the slit gap.
-    if (inner(I[t]) || inner(I[t + 1]) || inner(I[t + 2])) continue;
-    const a = I[t] * 3;
-    const b = I[t + 1] * 3;
-    const c = I[t + 2] * 3;
-    const minX = Math.min(P[a], P[b], P[c]);
-    const maxX = Math.max(P[a], P[b], P[c]);
-    const minY = Math.min(P[a + 1], P[b + 1], P[c + 1]);
-    const maxY = Math.max(P[a + 1], P[b + 1], P[c + 1]);
-    const i0 = Math.max(0, Math.floor((minX - x0) / step));
-    const i1 = Math.min(nx - 1, Math.ceil((maxX - x0) / step));
-    const j0 = Math.max(0, Math.floor((minY - y0) / step));
-    const j1 = Math.min(ny - 1, Math.ceil((maxY - y0) / step));
-    const ax = P[a];
-    const ay = P[a + 1];
-    const v0x = P[b] - ax;
-    const v0y = P[b + 1] - ay;
-    const v1x = P[c] - ax;
-    const v1y = P[c + 1] - ay;
-    const den = v0x * v1y - v1x * v0y;
-    if (Math.abs(den) < 1e-12) continue;
-    for (let j = j0; j <= j1; j++) {
-      for (let i = i0; i <= i1; i++) {
-        const px = x0 + i * step - ax;
-        const py = y0 + j * step - ay;
-        const s = (px * v1y - v1x * py) / den;
-        const r = (v0x * py - px * v0y) / den;
-        if (s < -0.02 || r < -0.02 || s + r > 1.02) continue;
-        const z = P[a + 2] + s * (P[b + 2] - P[a + 2]) + r * (P[c + 2] - P[a + 2]);
-        if (z > zb[j * nx + i]) zb[j * nx + i] = z;
-      }
-    }
-  }
-  // Fill holes (the slit gap, nostrils) from neighbours.
-  for (let pass = 0; pass < 6; pass++) {
-    const src = zb.slice();
-    for (let j = 1; j < ny - 1; j++) {
-      for (let i = 1; i < nx - 1; i++) {
-        if (src[j * nx + i] > -1) continue;
-        let m = -1;
-        for (const o of [-1, 1, -nx, nx]) m = Math.max(m, src[j * nx + i + o]);
-        zb[j * nx + i] = m;
-      }
-    }
-  }
-  tpl._zbuf = (x, y) => {
-    const fi = clamp((x - x0) / step, 0, nx - 1.001);
-    const fj = clamp((y - y0) / step, 0, ny - 1.001);
-    const i = Math.floor(fi);
-    const j = Math.floor(fj);
-    return zb[j * nx + i];
-  };
-  return tpl._zbuf;
-}
-
 const paintCache = new Map();
 
 /** Keys that affect the face paint. */
-const PAINT_KEYS = ['skinTone', 'undertone', 'freckles', 'moles', 'birthmark', 'acne', 'wrinkles', 'scar', 'blush', 'age', 'lips', 'facialHair', 'stubble', 'hairStyle', 'gray', 'hairColor', 'browThickness', 'seed'];
+const PAINT_KEYS = ['faceWidth', 'jaw', 'chin', 'cheeks', 'cheekbones', 'noseSize', 'noseWidth', 'noseTip', 'noseBridge', 'mouthWidth', 'eyeSize', 'eyeSpacing', 'eyeTilt', 'lids', 'browRidge', 'browArch', 'fat', 'height', 'skinTone', 'undertone', 'freckles', 'moles', 'birthmark', 'acne', 'wrinkles', 'scar', 'blush', 'age', 'lips', 'facialHair', 'stubble', 'hairStyle', 'gray', 'hairColor', 'browThickness', 'seed'];
 
 /**
  * Paint a person's face textures. Returns { paint, facen } (THREE.DataTexture each).
  * `size`: 256 (crowd), 512 (default), 1024 (hero close-ups).
  */
-export function paintFace(p, headTpl, size = 512) {
+export function paintFace(p, mapper, size = 512) {
   const key = `${size}|${PAINT_KEYS.map((k) => (typeof p[k] === 'number' ? p[k].toFixed(2) : p[k])).join('|')}`;
   const hit = paintCache.get(key);
   if (hit) {
     hit.refs++;
     return hit;
   }
-  const res = drawFace(p, headTpl, size);
+  const res = drawFace(p, mapper, size);
   res.key = key;
   res.refs = 1;
   paintCache.set(key, res);
@@ -281,11 +206,9 @@ export function releaseFace(res) {
   res.facen.dispose();
 }
 
-function drawFace(p, tpl, S) {
-  const L = tpl.L;
-  const zAt = templateZ(tpl);
+function drawFace(p, mapper, S) {
+  const L = mapper.L;
   const rng = new Rng(hashString(`face${p.seed}`));
-  const uvT = [0, 0];
   const mk = () => {
     const c = document.createElement('canvas');
     c.width = c.height = S;
@@ -308,9 +231,8 @@ function drawFace(p, tpl, S) {
   }
   // Head-space (x, y) on the front surface → canvas px.
   const px = (x, y, zOverride) => {
-    const z = zOverride ?? zAt(x, y);
-    dirToUV(x, y + 0.02, z, uvT);
-    return [uvT[0] * S, (1 - uvT[1]) * S];
+    const uv = mapper.uvOf(x, y, zOverride);
+    return [uv[0] * S, (1 - uv[1]) * S];
   };
   // Soft elliptical blob of colour (radii in head-space metres).
   const blob = (ctx, x, y, rx, ry, rgba, hard = 0) => {
@@ -551,32 +473,22 @@ function drawFace(p, tpl, S) {
     const style = p.hairStyle;
     const recede = style === 'receding' ? 0.6 : style === 'comb-over' ? 0.8 : style === 'bald' ? 1 : clamp((p.age - 45) / 50, 0, 0.35);
     const hl = 0.098 + recede * 0.035; // hairline height at the front
-    const ring = [];
-    for (let i = 0; i <= 40; i++) {
-      const a = (i / 40) * Math.PI * 2;
-      // Closed loop around the scalp in head space, front edge = hairline.
-      const x = Math.sin(a) * 0.115;
-      const zf = Math.cos(a);
-      const y = zf > 0 ? hl - (1 - zf) * 0.07 - Math.abs(Math.sin(a)) * 0.02 * (1 - recede) : -0.04 - (1 + zf) * 0.02;
-      ring.push([x, y, zf]);
-    }
+    // Hairline sampled around the head (u runs with azimuth), filled up to the crown (v = 1).
     Sc.beginPath();
-    ring.forEach(([x, y, zf], i) => {
-      dirToUV(x, y + 0.02, zf * 0.12, uvT);
-      const q = [uvT[0] * S, (1 - uvT[1]) * S];
-      if (i) Sc.lineTo(q[0], q[1]);
-      else Sc.moveTo(q[0], q[1]);
-    });
+    Sc.moveTo(0, 0);
+    for (let i = 0; i <= 64; i++) {
+      const az = -Math.PI + (i / 64) * Math.PI * 2;
+      const x = Math.sin(az) * 0.115;
+      const zf = Math.cos(az);
+      const y = zf > 0 ? hl - (1 - zf) * 0.07 - Math.abs(Math.sin(az)) * 0.02 * (1 - recede) : -0.04 - (1 + zf) * 0.02;
+      const uv = mapper.uvOf(x, y, zf * 0.12);
+      Sc.lineTo(i === 0 ? 0 : i === 64 ? S : uv[0] * S, (1 - uv[1]) * S);
+    }
+    Sc.lineTo(S, 0);
     Sc.closePath();
     if (style !== 'bald') {
       Sc.fillStyle = '#fff';
-      Sc.fillRect(0, 0, S, (1 - 0.62) * S * 0.0 + 0);
-      // Everything above the ring.
-      Sc.save();
-      Sc.clip();
-      Sc.fillStyle = '#fff';
-      Sc.fillRect(0, 0, S, S);
-      Sc.restore();
+      Sc.fill();
     }
     // Bald / receding: a horseshoe fringe remains at the sides and back.
     if (recede > 0.5) {

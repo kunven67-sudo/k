@@ -9,7 +9,7 @@
 // toe-up, jaw open (chin down/back) and eyes looking down are all `+X` rotations.
 
 import * as THREE from 'three';
-import { faceLayout, findEyes, faceBonePositions, HEAD_UNIT, JAW_BIND_OPEN } from './headsculpt.js';
+import { faceLayout, faceBonePositions, HEAD_UNIT, JAW_BIND_OPEN } from './headsdf.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -163,29 +163,33 @@ export function buildRig(params) {
   // Face bones: placed from the facial layout (head space → world bind space). They all use the
   // world-aligned basis, so their local axes are x = left, y = up, z = forward.
   const L = faceLayout(params);
-  findEyes(params, L);
   const hsc = dims.headH / HEAD_UNIT;
   const toW = (h) => V(j.headCenter.x + h[0] * hsc, j.headCenter.y + h[1] * hsc, j.headCenter.z + h[2] * hsc);
   const ID = new THREE.Quaternion();
   const FB = faceBonePositions(L);
   defs.push(['jaw', 'head', toW(FB.jaw), ID.clone()]);
-  defs.push(['tongue', 'jaw', toW([0, L.mouthY - 0.012, 0.06]), ID.clone()]);
+  defs.push(['tongue', 'jaw', toW(FB.tongue), ID.clone()]);
   defs.push(['lip.U', 'head', toW(FB['lip.U']), ID.clone()]);
   defs.push(['lip.D', 'jaw', toW(FB['lip.D']), ID.clone()]);
   defs.push(['nose', 'head', toW(FB.nose), ID.clone()]);
   for (const side of ['L', 'R']) {
-    const e = L.eyes[side === 'L' ? 0 : 1];
-    const ec = toW([e.c.x, e.c.y, e.c.z]);
+    const ec = toW(FB[`eye.${side}`]);
     defs.push([`eye.${side}`, 'head', ec, ID.clone()]);
     defs.push([`lidU.${side}`, 'head', ec.clone(), ID.clone()]);
     defs.push([`lidD.${side}`, 'head', ec.clone(), ID.clone()]);
-    for (const n of ['corner', 'cheek', 'brow.in', 'brow.out']) defs.push([`${n}.${side}`, 'head', toW(FB[`${n}.${side}`]), ID.clone()]);
+    defs.push([`corner.${side}`, 'head', toW(FB[`corner.${side}`]), ID.clone()]);
+    for (const n of ['cheek', 'brow.in', 'brow.out']) defs.push([`${n}.${side}`, 'head', toW(FB[`${n}.${side}`]), ID.clone()]);
   }
   dims.L = L;
   dims.hsc = hsc;
   dims.headToWorld = toW;
   // Soft-tissue jiggle bones (translation springs; see anim/jiggle.js).
   const ys = dims.s;
+  // Hair sway bones (springs, see anim/jiggle.js): back and both sides of the head.
+  defs.push(['hair.B', 'head', toW([0, -0.06, -0.1]), ID.clone()]);
+  defs.push(['hair.L', 'head', toW([0.085, -0.07, -0.02]), ID.clone()]);
+  defs.push(['hair.R', 'head', toW([-0.085, -0.07, -0.02]), ID.clone()]);
+  defs.push(['hair.T', 'head', toW([0, 0.1, 0.02]), ID.clone()]);
   defs.push(['belly', 'spine', V(0, j.spine.y - 0.03 * ys, 0.09 * ys), basisQuat(up, fwd)]);
   defs.push(['breast.L', 'chest', V(0.075 * ys, j.chest.y - 0.02 * ys, 0.1 * ys), basisQuat(up, fwd)]);
   defs.push(['breast.R', 'chest', V(-0.075 * ys, j.chest.y - 0.02 * ys, 0.1 * ys), basisQuat(up, fwd)]);

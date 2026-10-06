@@ -148,22 +148,22 @@ export function eyeAtlas(colorL, colorR, { size = 256, seed = 1, age = 35 } = {}
 }
 
 /**
- * Eye material. `u` uniforms (updated by the Human every frame): eye centres (world), head up
- * and right vectors (world), current lid margin heights (sine of elevation in eye space).
+ * Eye material: wet cornea (clearcoat) over the painted atlas. A soft occlusion term darkens
+ * the eyeball toward the lids and corners (uniform uOcc: per-eye world centre + radius), which
+ * keeps eyes from looking pasted on.
  */
 export function createEyeMaterial(map, tierName = 'high') {
   const physical = tierName !== 'low';
   const M = physical
-    ? new THREE.MeshPhysicalMaterial({ map, roughness: 0.18, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.025, ior: 1.376, specularIntensity: 0.6 })
-    : new THREE.MeshStandardMaterial({ map, roughness: 0.15, metalness: 0 });
+    ? new THREE.MeshPhysicalMaterial({ map, roughness: 0.22, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.03, ior: 1.376, specularIntensity: 0.55 })
+    : new THREE.MeshStandardMaterial({ map, roughness: 0.18, metalness: 0 });
   M.name = 'eyes';
   const U = {
     uEyeC: { value: [new THREE.Vector3(), new THREE.Vector3()] },
     uHeadUp: { value: new THREE.Vector3(0, 1, 0) },
-    uHeadRight: { value: new THREE.Vector3(1, 0, 0) },
-    uLidU: { value: new THREE.Vector2(0.55, 0.55) },
-    uLidD: { value: new THREE.Vector2(-0.4, -0.4) },
-    uEyeR: { value: 0.0186 },
+    uHeadFwd: { value: new THREE.Vector3(0, 0, 1) },
+    uEyeR: { value: 0.02 },
+    uLidU: { value: new THREE.Vector2(0.5, 0.5) },
   };
   M.userData.u = U;
   M.onBeforeCompile = (sh) => {
@@ -176,26 +176,24 @@ export function createEyeMaterial(map, tierName = 'high') {
 varying vec3 vEyeW;
 uniform vec3 uEyeC[ 2 ];
 uniform vec3 uHeadUp;
-uniform vec3 uHeadRight;
-uniform vec2 uLidU;
-uniform vec2 uLidD;
-uniform float uEyeR;`)
+uniform vec3 uHeadFwd;
+uniform float uEyeR;
+uniform vec2 uLidU;`)
       .replace('#include <map_fragment>', `#include <map_fragment>
 {
   float d0 = distance( vEyeW, uEyeC[ 0 ] );
   float d1 = distance( vEyeW, uEyeC[ 1 ] );
   vec3 rel = ( vEyeW - ( d0 < d1 ? uEyeC[ 0 ] : uEyeC[ 1 ] ) ) / uEyeR;
   float lu = d0 < d1 ? uLidU.x : uLidU.y;
-  float ld = d0 < d1 ? uLidD.x : uLidD.y;
   float up = dot( rel, uHeadUp );
-  float side = abs( dot( rel, uHeadRight ) );
-  float occ = smoothstep( lu - 0.5, lu + 0.02, up ) * 0.7;
-  occ = max( occ, smoothstep( ld + 0.3, ld - 0.02, up ) * 0.35 );
-  occ = max( occ, smoothstep( 0.45, 0.95, side ) * 0.5 );
+  float fwd = dot( rel, uHeadFwd );
+  // Upper lid shadow + socket occlusion toward the edges of the visible cap.
+  float occ = smoothstep( lu - 0.45, lu + 0.05, up ) * 0.55;
+  occ = max( occ, ( 1.0 - smoothstep( 0.45, 0.9, fwd ) ) * 0.45 );
   diffuseColor.rgb *= 1.0 - occ;
 }`);
   };
-  M.customProgramCacheKey = () => `gamble-eye-${physical ? 'p' : 's'}-1`;
+  M.customProgramCacheKey = () => `gamble-eye2-${physical ? 'p' : 's'}`;
   return M;
 }
 

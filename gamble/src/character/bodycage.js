@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import { HAND, FINGERS, handFrame, handToWorld, fingerChains } from './rig.js';
 import { fitCageToSurface, compact, orientFaces } from './subdiv.js';
 
+export const DEBUG = {};
 export const PART = { torso: 1, armL: 2, armR: 3, handL: 4, handR: 5, legL: 6, legR: 7, footL: 8, footR: 9, crotch: 10 };
 export const tagPart = (t) => t >> 16;
 export const tagRing = (t) => (t >> 8) & 255;
@@ -100,7 +101,7 @@ class CageBuilder {
     const { cage: c, remap } = compact(cage, () => true);
     const S2 = new Float32Array(c.nv * 3);
     for (let v = 0; v < nv; v++) if (remap[v] >= 0) S2.set(S.subarray(v * 3, v * 3 + 3), remap[v] * 3);
-    cage = fitCageToSurface(orientFaces(c), S2, 7);
+    cage = fitCageToSurface(orientFaces(c), S2, 3, 0.6);
     return { cage, remap };
   }
 }
@@ -131,8 +132,8 @@ export function buildBodyCage(p, dims) {
   const neckR = (0.058 + 0.012 * f + 0.008 * m + 0.004 * sh) * s;
   const R = [
     { y: hipY - 0.07 * s, W: 0.132 + 0.03 * h + 0.05 * f, F: 0.068 + 0.03 * f, Bk: 0.085 + 0.02 * h + 0.03 * f, n: 2.3 },
-    { y: hipY + 0.0 * s, W: 0.17 + 0.035 * h + 0.06 * f, F: 0.083 + 0.04 * f + 0.02 * b, Bk: 0.105 + 0.03 * h + 0.045 * f, n: 2.4 },
-    { y: hipY + 0.075 * s, W: 0.162 + 0.022 * h + 0.07 * f + 0.02 * b, F: 0.088 + 0.05 * f + 0.075 * b, Bk: 0.09 + 0.015 * h + 0.03 * f, n: 2.3 },
+    { y: hipY + 0.045 * s, W: 0.17 + 0.035 * h + 0.06 * f, F: 0.083 + 0.04 * f + 0.02 * b, Bk: 0.105 + 0.03 * h + 0.045 * f, n: 2.4 },
+    { y: hipY + 0.1 * s, W: 0.162 + 0.022 * h + 0.07 * f + 0.02 * b, F: 0.088 + 0.05 * f + 0.075 * b, Bk: 0.09 + 0.015 * h + 0.03 * f, n: 2.3 },
     { y: hipY + 0.15 * s, W: 0.148 + 0.02 * w + 0.075 * f + 0.025 * b, F: 0.092 + 0.05 * f + 0.085 * b, Bk: 0.083 + 0.03 * f, n: 2.25 },
     { y: hipY + 0.225 * s, W: 0.14 + 0.035 * w + 0.065 * f + 0.012 * m, F: 0.09 + 0.045 * f + 0.055 * b, Bk: 0.08 + 0.028 * f, n: 2.3 },
     { y: hipY + 0.3 * s, W: 0.152 + 0.02 * c + 0.055 * f + 0.025 * m + 0.012 * sh, F: 0.095 + 0.03 * f + 0.02 * b + 0.01 * m, Bk: 0.083 + 0.025 * f + 0.012 * m, n: 2.4 },
@@ -143,7 +144,7 @@ export function buildBodyCage(p, dims) {
     // a+2: top of the shoulder (acromion line)
     { y: shY + 0.04 * s, W: 0.13 + 0.025 * sh + 0.02 * f + 0.02 * m, F: 0.066 + 0.01 * f, Bk: 0.07 + 0.012 * f + 0.012 * m, n: 2.5 },
     // neck seam
-    { y: shY + 0.072 * s - old * 0.01 * s, W: neckR / s + 0.006, F: neckR / s - 0.004, Bk: neckR / s + 0.004, n: 2.0 },
+    { y: shY + 0.07 * s - old * 0.01 * s, W: neckR / s + 0.006, F: neckR / s - 0.004, Bk: neckR / s + 0.004, n: 2.0, ty: -0.03 },
   ];
   // The crotch ring must reach the outside of the thighs or the hips get a ledge.
   R[0].W = Math.max(R[0].W, dims.hipHalf / s + 0.088 + 0.035 * f + 0.018 * m + 0.012 * h - 0.004);
@@ -212,7 +213,7 @@ export function buildBodyCage(p, dims) {
       const e = 2 / Rr.n;
       let x = Rr.W * Math.sign(sn) * Math.abs(sn) ** e;
       let z = Rr.cz + (cs >= 0 ? Rr.F : Rr.Bk) * Math.sign(cs) * Math.abs(cs) ** e;
-      let y = Rr.y;
+      let y = Rr.y + (Rr.ty ? Rr.ty * s * (cs > 0 ? cs : cs * 0.35) : 0);
       if (cs > 0 && r >= 4 && r <= 7) {
         // Bust/pecs: forward bumps (with a little sag that grows with size and age).
         const gb = gauss(((Math.abs(x) - bustX) / s) ** 2 + ((y - bustY) / s) ** 2, 0.085);
@@ -242,8 +243,13 @@ export function buildBodyCage(p, dims) {
         const al = THREE.MathUtils.degToRad(-58 + kk2 * (296 / 7));
         const hc = j[`thigh.${sd}`];
         const tr = thighR0;
-        x = sx2 * (hc.x - 0.004 * s) + sx2 * Math.sin(al) * tr * 1.04;
-        z = 0.004 * s + Math.cos(al) * tr * (Math.cos(al) > 0 ? 0.98 : 1.06);
+        x = sx2 * (Math.abs(hc.x) - 0.004 * s) + sx2 * Math.sin(al) * tr * 1.04;
+        z = 0.004 * s + Math.cos(al) * tr * (Math.cos(al) > 0 ? 0.9 : 1.08);
+        // Pubic front fills the notch between the thighs; the leg line rises diagonally to
+        // the outer hip (inguinal crease), so there is no horizontal "shorts hem".
+        if (kk2 === 0) z = Math.max(z, R[1].F * 0.82 + R[1].cz);
+        if (kk2 === 1) z = Math.max(z, R[1].F * 0.9 + R[1].cz);
+        y += Math.max(0, Math.sin(al)) * (R[1].y - y) * 0.3 + (Math.cos(al) < 0 ? Math.max(0, Math.sin(al)) * 0.0 : 0);
         if (Math.cos(al) < 0) z -= buttA * 0.5 * gauss(((Math.abs(x) - 0.075 * s) / s) ** 2, 0.08) * -Math.cos(al);
       }
       const pos = V3(x, y, z);
@@ -443,12 +449,12 @@ export function buildBodyCage(p, dims) {
     const rootIds = alignLoop(B, loopIds, lc, V3(0, -1, 0), Fdown, Xo, NL, 0.5);
     const legRootAng = loopAngles(B, rootIds, lc, V3(0, -1, 0), Fdown, Xo);
     legAngles = blendAngles(legRootAng, NL, 0.5, 0.35);
-    const t0 = (crotchY - 0.075 * s - hipJ.y) / (knee.y - hipJ.y);
-    L.push(legRing(atT(t0).add(V3(-sx * 0.004 * s, 0, 0)), tDir, thighR * 1.0, thighR * 1.02, { [T]: 0.85, hips: 0.15 }, { rB: thighR * 1.06 }));
+    const t0 = (crotchY - 0.05 * s - hipJ.y) / (knee.y - hipJ.y);
+    L.push(legRing(atT(t0).add(V3(-sx * 0.004 * s, 0, 0)), tDir, thighR * 0.98, thighR * 1.04, { [T]: 0.85, hips: 0.15 }, { rB: thighR * 1.1, rIn: thighR * 0.95 }));
     legAngles = blendAngles(legRootAng, NL, 0.5, 0.75);
-    L.push(legRing(atT(0.4), tDir, thighR * 0.9, thighR * 0.88, { [T]: 1 }, { rB: thighR * 0.92 }));
+    L.push(legRing(atT(t0 + (1 - t0) * 0.36), tDir, thighR * 0.9, thighR * 0.88, { [T]: 1 }, { rB: thighR * 0.92 }));
     legAngles = null;
-    L.push(legRing(atT(0.72), tDir, (0.064 + 0.024 * f + 0.012 * m) * s, (0.064 + 0.022 * f + 0.01 * m) * s, { [T]: 1 }));
+    L.push(legRing(atT(t0 + (1 - t0) * 0.72), tDir, (0.064 + 0.024 * f + 0.012 * m) * s, (0.064 + 0.022 * f + 0.01 * m) * s, { [T]: 1 }));
     L.push(legRing(atT(0.93), tDir, (0.056 + 0.013 * f) * s, (0.055 + 0.014 * f) * s, { [T]: 0.8, [S]: 0.2 }, { rB: (0.05 + 0.01 * f) * s }));
     L.push(legRing(knee.clone().add(V3(0, 0, 0.006 * s)), tDir.clone().add(sDir).normalize(), (0.056 + 0.01 * f) * s, (0.054 + 0.012 * f) * s, { [T]: 0.5, [S]: 0.5 }, { rB: (0.046 + 0.008 * f) * s }));
     L.push(legRing(atS(0.17), sDir, (0.047 + 0.008 * f) * s, (0.054 + 0.012 * f + 0.006 * m) * s, { [S]: 0.85, [T]: 0.15 }, { rB: (0.06 + 0.014 * f + 0.012 * m) * s }));
@@ -467,6 +473,7 @@ export function buildBodyCage(p, dims) {
     L.push(legRing(V3(fx + sx * 0.003 * s, 0.038 * s, 0.065 * s), V3(0, -0.12, 1).normalize(), 0.031 * s, fw * 1.02, { [Fo]: 1 }, { rB: 0.03 * s, rIn: fw * 0.95 }));
     L.push(legRing(V3(fx + sx * 0.004 * s, 0.028 * s, 0.132 * s), V3(0, -0.05, 1).normalize(), 0.022 * s, fw * 1.1, { [Fo]: 0.5, [To]: 0.5 }, { rB: 0.024 * s }));
     L.push(legRing(V3(fx + sx * 0.002 * s, 0.022 * s, 0.185 * s), V3(0, 0, 1), 0.016 * s, fw * 0.98, { [To]: 1 }, { rB: 0.019 * s, rIn: fw * 0.92 }));
+    if (sd === 'L') DEBUG.leg = { root: rootIds.map((id) => B.P[id].toArray().map((v) => +v.toFixed(3))), ring1: L[0].ids.map((id) => B.P[id].toArray().map((v) => +v.toFixed(3))), ring2: L[1].ids.map((id) => B.P[id].toArray().map((v) => +v.toFixed(3))) };
     let prev = { ids: rootIds, center: lc, dir: tDir };
     L.forEach((rg, i) => {
       const part = i >= 9 ? footPart : legPart;
@@ -484,7 +491,8 @@ export function buildBodyCage(p, dims) {
 
   const { cage, remap } = B.build();
   const neckRing = rings[R.length - 1].map((id) => remap[id]);
-  return { cage, neckRing, rings: R, neckR, neckY: R[R.length - 1].y, neckCZ: R[R.length - 1].cz };
+  const top = R[R.length - 1];
+  return { cage, neckRing, rings: R, seam: { y: top.y, W: top.W, F: top.F, B: top.Bk, cz: top.cz, ty: top.ty * s } };
 }
 
 /**

@@ -19,7 +19,13 @@ Cam presets: virginia, arch, strip, eldo, walk, overview (keys 1-6). F = walk mo
       eldorado.js (shell + tower), legacy.js (Silver Legacy + dome, Circus Circus, skyways), arch.js, streets.js (props),
       filler.js (skyline), shared/nightlights.js (pooled lights), shared/wet.js (wet streets + rain), index.js zones/spawn/interactables/NeonBuzz
 - [x] attempt 4: page boots (ready ~60 s, ~6 s/frame headless high). Noon Virginia + 9 PM arch shots look good overall.
-- [ ] attempt 4 fixes: night ground too white under arch; street-name signs mirrored from behind; dry-noon blue blobs on road
+- [x] attempt 4 fixes: night ground washed white = additive light pools mixing toward fog colour + far too bright
+      (ADDITIVE_FOG fade-to-black, k lowered, pools fade near viewer where real PointLights take over);
+      street blades mirrored (setBoxFaceUV no longer flips the back face); oil decals were mirror-glossy (now satin);
+      arch letter emissive toned down (was blooming to pale pink).
+- [x] rain fixed (Rain shader: `position` was vec4 → invalid program; corner moved to aCorner attribute)
+- [x] golden hour: sky.js key light amber grade below 16 deg + hemi fill boost at low sun; parking lots bleached
+- [x] dev page: preset 7 'sunset' (4th St looking west into the low sun)
 - [ ] remaining shots: strip golden hour, eldo night, walk mode, rain, 3 AM; final report
 
 ## Key decisions
