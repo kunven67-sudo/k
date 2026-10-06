@@ -9,7 +9,7 @@
    "builtin": true,
    "icon": "music",
    "color": "#ff2bd6",
-   "rev": 1,
+   "rev": 2,
    "entry": "index.html",
    "files": [
     "index.html"
@@ -19,7 +19,8 @@
    "win": {
     "w": 760,
     "h": 580
-   }
+   },
+   "saveKit": true
   },
   {
    "id": "gs2-notes",
@@ -29,7 +30,7 @@
    "builtin": true,
    "icon": "note",
    "color": "#ffcc00",
-   "rev": 1,
+   "rev": 2,
    "entry": "index.html",
    "files": [
     "index.html"
@@ -39,7 +40,8 @@
    "win": {
     "w": 860,
     "h": 580
-   }
+   },
+   "saveKit": true
   },
   {
    "id": "gs2-calculator",
@@ -49,7 +51,7 @@
    "builtin": true,
    "icon": "calc",
    "color": "#00e5ff",
-   "rev": 1,
+   "rev": 2,
    "entry": "index.html",
    "files": [
     "index.html"
@@ -59,7 +61,8 @@
    "win": {
     "w": 400,
     "h": 620
-   }
+   },
+   "saveKit": true
   },
   {
    "id": "gs2-drawing",
@@ -69,7 +72,7 @@
    "builtin": true,
    "icon": "brush",
    "color": "#3dffa0",
-   "rev": 1,
+   "rev": 2,
    "entry": "index.html",
    "files": [
     "index.html"
@@ -79,7 +82,8 @@
    "win": {
     "w": 1020,
     "h": 680
-   }
+   },
+   "saveKit": true
   }
  ]
 }

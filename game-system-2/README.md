@@ -49,6 +49,27 @@ Your saves stay. If the new code breaks something, open the upgrade window again
 
 To always skip the "Continue?" popup: **Settings → Start-up & resume → When I come back to a game → Jump right in**, or tick the box on the popup.
 
+## Make it look how you want
+
+- **Three looks on every screen** (Home, Library, Apps): small icons, big cards, or a list. Use the buttons at the top, and the slider to make things bigger or smaller. Each screen remembers its own look.
+- **Move things around:** on PC, just drag a game to a new spot. On a phone, hold your finger on it, then drag. Hold and let go without moving = options.
+- **Folders like a phone:** drop a game right on top of another one (wait for the green glow) to make a folder. Click a folder to open it right where it is. Drag things out to take them out. Folders can hold games and apps, and can have their own picture.
+- **Keyboard / controller:** open a game's options (right-click, hold, or the X button) → **Move**, then use the arrows or d-pad. Enter / A when done.
+- **Library** has every game AND app, in your own order. **Home** shows what you played last.
+- **Home layouts** (Settings → Home & Library): **Console** (big showcase + rows you can drag into any order), **All games**, or **List + details**.
+
+### Continue or start over
+
+Every game says what it does: **Continues where you left off** (it saves, with "Saved 2 min ago") or **Starts at its title screen**. Games with a save show **CONTINUE** and a small **New game** button. Games that can't continue show **Make it continue** (see below).
+
+### Simple or Pro
+
+The first time you open Game System it asks **Simple or Pro**. Simple hides the code editor, the error console, raw save data and advanced settings. Switch anytime in **Settings → Simple or Pro**.
+
+### Settings and the bell
+
+Settings has sections on the left and a search box. The **bell** at the top shows reminders (like "time for a backup") and news (like new games from your website).
+
 ## Apps
 
 The **Apps** tab is like a phone home screen. Apps open in a **window** instead of full screen, so you can use a few at once:

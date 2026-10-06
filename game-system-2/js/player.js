@@ -292,7 +292,8 @@
     var g = D.get(id);
     if (!g) { UI.toast('That game is gone.', { type: 'warn' }); return; }
     /* apps open in a window instead */
-    if (D.isApp(g) && !opts.fullscreen) { await Win.open(id, { fresh: opts.fresh }); return; }
+    /* apps open in a window (unless you picked full screen for this app) */
+    if (D.isApp(g) && !opts.fullscreen && (opts.window || g.openMode !== 'full' || Win.wantsPopup(g))) { await Win.open(id, { fresh: opts.fresh }); return; }
     if (cur) await close({ quiet: true, keepHistory: true });
     if (UI.modalCount()) document.querySelectorAll('.modal-back').forEach(function (b) { b.remove(); });
     UI.closeMenu();
@@ -527,8 +528,9 @@
       !isLink && (cur.autosave || g.kitAutosave) ? menuItem('save', 'Save now', async function () { var ok = await flushSave(); ptoast(ok ? 'Progress saved' : 'Nothing new to save', null, null, 'save'); refreshMenuSave(); }) : null,
       menuItem('full', document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen', function () { toggleFullscreen(); closeMenu(); }, { key: 'F11' }),
       !isLink ? menuItem('camera', 'Use screenshot as cover', screenshotCover) : null,
-      menuItem('bug', 'Errors & console' + (cur.logs.errors ? ' (' + cur.logs.errors + ')' : ''), function () { closeMenu(true); openConsole(); }),
-      !isLink ? menuItem('code', 'Edit code', function () { var id = cur.id; close({ quiet: true }).then(function () { Editor.open(id); }); }) : null,
+      D.simple() ? (cur.logs.errors ? menuItem('bug', 'This game had a problem', function () { closeMenu(true); problemDialog(); }) : null)
+        : menuItem('bug', 'Errors & console' + (cur.logs.errors ? ' (' + cur.logs.errors + ')' : ''), function () { closeMenu(true); openConsole(); }),
+      !isLink && !D.simple() ? menuItem('code', 'Edit code', function () { var id = cur.id; close({ quiet: true }).then(function () { Editor.open(id); }); }) : null,
       h('div.qm-sep'),
       menuItem('reload', 'Reload game', reload),
       !isLink && (cur.autosave || g.kitAutosave) ? menuItem('restart', 'Start over (deletes progress)', startOver, { danger: true }) : null,
@@ -670,6 +672,29 @@
     render();
   }
 
+  /* Simple mode: a friendly "something broke" box instead of the console */
+  function problemDialog() {
+    if (!cur) return;
+    var c = cur;
+    var k = kit();
+    if (k) { try { k._pause(); } catch (e) { /* ignore */ } }
+    UI.modal({
+      title: 'This game had a problem',
+      icon: 'bug',
+      body: h('div',
+        h('p', D.get(c.id).name + ' ran into ' + (c.logs.errors === 1 ? 'an error' : c.logs.errors + ' errors') + '. It might still work, or parts of it might be broken.'),
+        h('p.small.muted', 'To fix it: copy the errors, paste them to ChatGPT or Claude, and ask for the fixed game. Then use "Update game files" in the game\'s options.')),
+      actions: [
+        { label: 'Keep playing', kind: 'ghost' },
+        { label: 'Copy errors for AI', icon: 'clipboard', kind: 'primary', onClick: async function () {
+          var txt = await aiReport(D.get(c.id), c.logs.rows);
+          if (txt) { await U.copyText(txt); ptoast('Copied! Paste it to the AI.', null, null, 'clipboard'); }
+        } }
+      ],
+      onClose: function () { if (cur === c) { focusGame(); var kk = kit(); if (kk) kk._resume(); } }
+    });
+  }
+
   /* ---------------- resume after the PC/browser was closed ---------------- */
   async function offerResume(id) {
     var g = D.get(id);
@@ -737,6 +762,7 @@
     onPageHide: onPageHide,
     onSwMessage: onSwMessage,
     toggleFullscreen: toggleFullscreen,
+    problemDialog: problemDialog,
     addSink: addSink,
     LogStore: LogStore,
     renderConsole: renderConsole,

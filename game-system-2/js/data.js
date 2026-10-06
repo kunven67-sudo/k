@@ -33,7 +33,8 @@
 
   /* first time on a phone: calmer background to save battery */
   function firstRunDefaults() {
-    if (U.lsGet('gs2:settings', null)) return {};
+    var saved = U.lsGet('gs2:settings', null);
+    if (saved && 'bg' in saved) return {};
     var phone = window.matchMedia && window.matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 820;
     return phone ? { bg: 'chill' } : {};
   }
@@ -47,6 +48,7 @@
     ui: Object.assign({}, DEFAULT_UI, U.lsGet('gs2:ui', {})),
     days: {},
     pendingPlay: {},
+    saveIndex: {},
     DEFAULT_SETTINGS: DEFAULT_SETTINGS
   };
   D.ui.lib = Object.assign({}, DEFAULT_UI.lib, D.ui.lib || {});
@@ -63,6 +65,21 @@
     var all = await GS2DB.getAll('games');
     all.forEach(function (g) { D.games.set(g.id, normalize(g)); });
     D.days = (await GS2DB.kvGet('days')) || {};
+    /* when each game was last saved (for the "saved 2 min ago" tags) */
+    try {
+      var saves = await GS2DB.getAll('saves');
+      saves.forEach(function (s) { if (s && s.g) D.saveIndex[s.g] = s.t || 0; });
+    } catch (e) { /* ignore */ }
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('gs2:emerg:') === 0) {
+          var em = JSON.parse(localStorage.getItem(k) || 'null');
+          var gid = k.slice(10);
+          if (em && em.t && em.t > (D.saveIndex[gid] || 0)) D.saveIndex[gid] = em.t;
+        }
+      }
+    } catch (e) { /* ignore */ }
 
     /* play time that was still in memory when the browser closed last time */
     var pending = U.lsGet('gs2:ptPending', null);
@@ -85,6 +102,23 @@
 
   /* games open full screen, apps open in a window */
   D.isApp = function (g) { return !!g && g.kind === 'app'; };
+  /* Simple mode hides the advanced stuff (code editor, raw saves, console, advanced settings) */
+  D.simple = function () { return D.settings.mode === 'simple'; };
+  /* Does it come back to the same spot? 'save' = continues where you left off, 'title' = starts at its own title screen, 'web' = a website */
+  D.resumeKind = function (g) {
+    if (!g) return 'title';
+    if (g.source === 'link') return 'web';
+    if (g.kitAutosave) return 'save';
+    return D.isApp(g) ? 'app' : 'title';
+  };
+  D.statusText = function (g) {
+    var k = D.resumeKind(g);
+    if (k === 'web') return 'Website';
+    if (k === 'app') return 'App';
+    if (k === 'save' && D.isApp(g)) return 'Opens where you left off';
+    if (k === 'save') return D.saveIndex[g.id] ? 'Continues where you left off' : 'Saves your progress';
+    return 'Starts at its title screen';
+  };
   D.cleanWin = function (w) {
     if (!w || typeof w !== 'object') return undefined;
     var ww = Math.round(Number(w.w)), hh = Math.round(Number(w.h));
@@ -102,10 +136,10 @@
       return (b.lastPlayed || 0) - (a.lastPlayed || 0) || (b.created || 0) - (a.created || 0);
     });
   };
-  /* folders are for games (apps live in the Apps tab) */
+  /* Library folders (they can hold games and apps) */
   D.folders = function () {
     var set = {};
-    D.games.forEach(function (g) { if (g.folder && !D.isApp(g)) set[g.folder] = (set[g.folder] || 0) + 1; });
+    D.games.forEach(function (g) { if (g.folder) set[g.folder] = (set[g.folder] || 0) + 1; });
     return Object.keys(set).sort(function (a, b) { return a.localeCompare(b); }).map(function (f) { return { name: f, count: set[f] }; });
   };
   D.findByName = function (name) {
@@ -223,6 +257,9 @@
   D.getSave = function (id) { return GS2DB.get('saves', id); };
   D.putSave = async function (id, json, t) {
     await GS2DB.put('saves', { g: id, data: json, t: t || Date.now(), size: json ? json.length : 0 });
+    var first = !D.saveIndex[id];
+    D.saveIndex[id] = t || Date.now();
+    if (first) D.emit('game', id);
     /* the emergency copy (written when the tab closed) is now older than the real save */
     try {
       var k = 'gs2:emerg:' + id;
@@ -233,6 +270,7 @@
   D.deleteSave = async function (id) {
     await GS2DB.del('saves', id);
     try { localStorage.removeItem('gs2:emerg:' + id); } catch (e) { /* ignore */ }
+    if (D.saveIndex[id]) { delete D.saveIndex[id]; D.emit('game', id); }
   };
   /* newest resume point (database or the emergency copy) */
   D.latestSave = async function (id) {
@@ -401,6 +439,7 @@
         size: Number(sg.size) || 0,
         fileCount: files.length,
         isolate: sg.isolate !== false,
+        kitAutosave: (cur && cur.kitAutosave) || sg.saveKit === true,
         kind: cur && cur.kindSet ? cur.kind : (sg.kind === 'app' ? 'app' : 'game'),
         win: D.cleanWin(sg.win),
         linkMode: cur && cur.linkMode ? cur.linkMode : (sg.linkMode === 'popup' || sg.linkMode === 'inside' ? sg.linkMode : undefined),

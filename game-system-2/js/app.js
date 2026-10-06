@@ -58,6 +58,7 @@
     BG.setMode(st.bg);
     document.body.classList.toggle('no-scanlines', !st.scanlines);
     document.body.classList.toggle('reduce-motion', !!st.reduceMotion);
+    document.body.classList.toggle('simple', D.simple());
     $('pname').textContent = st.name || 'bro';
     $('avatar').textContent = ((st.name || 'bro').trim().charAt(0) || 'B').toUpperCase();
     lastAccent = null;
@@ -104,7 +105,7 @@
     if (name === 'home' && !opts.noFocus) {
       requestAnimationFrame(function () {
         if (UI.modalCount() || !$('player').hidden) return;
-        var t = document.querySelector('#view-home .tile.sel') || document.querySelector('#view-home [data-autofocus]');
+        var t = document.querySelector('#view-home .gi.sel') || document.querySelector('#view-home [data-autofocus]');
         if (t) { try { t.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
       });
     }
@@ -144,6 +145,7 @@
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (!hadController) { hadController = true; return; }
       if (Player.isPlaying()) return;
+      Notify.add({ key: 'update', icon: 'sparkle', title: 'Update ready', text: 'Game System got an update. Reload to use it.', action: { label: 'Reload now', run: 'reload' } });
       UI.toast('Game System just got an update. Reload to use the new version.', {
         icon: 'sparkle', timeout: 0, title: 'Update ready',
         actions: [{ label: 'Reload now', kind: 'primary', onClick: function () { location.reload(); } }]
@@ -220,6 +222,10 @@
       }
       return;
     }
+    if (Grid.isMoving() && !UI.modalCount()) {
+      var mk = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'ok', ' ': 'ok', Escape: 'cancel' }[e.key];
+      if (mk) { e.preventDefault(); Grid.handleMoveKey(mk); return; }
+    }
     if (UI.isTyping()) {
       if (e.key === 'Escape' && !UI.modalCount() && document.activeElement && !document.activeElement.closest('.CodeMirror')) document.activeElement.blur();
       return;
@@ -285,6 +291,10 @@
   }
   function fire(k) {
     if (!started) { if (k === 'a') enterFromTitle(); return; }
+    if (Grid.isMoving() && !UI.modalCount()) {
+      var mv = { up: 'up', down: 'down', left: 'left', right: 'right', a: 'ok', b: 'cancel' }[k];
+      if (mv) { Grid.handleMoveKey(mv); return; }
+    }
     if (k === 'up' || k === 'down' || k === 'left' || k === 'right') { UI.moveFocus(k); return; }
     if (k === 'a') {
       var a = document.activeElement;
@@ -293,7 +303,15 @@
       return;
     }
     if (k === 'b') { back(); return; }
-    if (k === 'x' && D.ui.view === 'home' && D.ui.sel) { Views.gameDetails(D.ui.sel); return; }
+    if (k === 'x') {
+      var f = document.activeElement;
+      if (f && f.classList && f.classList.contains('gi')) {
+        var r = f.getBoundingClientRect();
+        f.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+        return;
+      }
+      if (D.ui.view === 'home' && D.ui.sel) { Views.gameDetails(D.ui.sel); return; }
+    }
     if (k === 'lb') cycleTab(-1);
     if (k === 'rb') cycleTab(1);
   }
@@ -334,7 +352,10 @@
     requestAnimationFrame(moveGlow);
     /* the app windows that were open last time */
     Win.restoreAll();
-    if (D.ui.playing) setTimeout(function () { Player.offerResume(D.ui.playing); }, 450);
+    /* first start: Simple or Pro? (then the "continue?" popup) */
+    var resume = function () { if (D.ui.playing) setTimeout(function () { Player.offerResume(D.ui.playing); }, 300); };
+    if (!D.settings.mode) setTimeout(function () { Views.askMode().then(resume); }, 500);
+    else resume();
   }
 
   /* ---------------- boot ---------------- */
@@ -360,15 +381,17 @@
       fatal('Your browser blocked Game System from saving stuff (' + (err && err.message || err) + ').');
       return;
     }
+    await Layout.init();
     applySettings();
 
     D.on(function (type) {
-      if (type === 'games' || type === 'game') refreshSoon();
+      if (type === 'games' || type === 'game' || type === 'layout') refreshSoon();
       else if (type === 'stats' && D.ui.view === 'stats') refreshSoon();
     });
 
     Importer.setupDrop();
     wireTopbar();
+    Notify.init();
     window.addEventListener('keydown', onKey);
     window.addEventListener('resize', U.debounce(moveGlow, 100));
     VIEWS.forEach(function (v) {
@@ -397,7 +420,11 @@
       var parts = [];
       if (ns.games) parts.push(ns.games + ' game' + (ns.games === 1 ? '' : 's'));
       if (ns.apps) parts.push(ns.apps + ' app' + (ns.apps === 1 ? '' : 's'));
-      if (parts.length && started) UI.toast(parts.join(' and ') + ' from your website ' + (ns.games + ns.apps === 1 ? 'is' : 'are') + ' ready', { icon: 'globe', sound: false });
+      if (parts.length) {
+        var msg = parts.join(' and ') + ' from your website ' + (ns.games + ns.apps === 1 ? 'is' : 'are') + ' ready';
+        if (started) UI.toast(msg, { icon: 'globe', sound: false });
+        Notify.add({ key: 'site-' + Date.now(), icon: 'globe', title: 'New from your website', text: msg, action: { label: 'See them', run: 'go:library' } });
+      }
       setTimeout(function () { D.prefetchSiteGames(); }, 5000);
     });
   }
@@ -425,11 +452,11 @@
     $('btn-add').addEventListener('click', function () { Importer.addDialog(D.ui.view === 'apps' ? { kind: 'app' } : null); });
     $('btn-settings').addEventListener('click', function () { go('settings'); });
     $('btn-profile').addEventListener('click', function () { go('settings'); });
-    $('err-badge').addEventListener('click', function () { Player.toggleMenu(); });
+    $('err-badge').addEventListener('click', function () { if (D.simple()) Player.problemDialog(); else Player.toggleMenu(); });
     $('touch-menu').addEventListener('click', function () { Player.toggleMenu(); });
     $('edge-pill').addEventListener('click', function () { Player.toggleMenu(); });
     document.addEventListener('mouseover', function (e) {
-      var b = e.target.closest && e.target.closest('.tile, .card, .btn, .tab, .qm-item, .chip, .mini-card');
+      var b = e.target.closest && e.target.closest('.gi, .btn, .tab, .qm-item, .chip, .mini-card');
       if (b && !b.contains(e.relatedTarget)) Sound.hover();
     });
   }

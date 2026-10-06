@@ -31,6 +31,7 @@
         full: full,
         settings: full ? D.settings : null,
         days: full ? D.days : null,
+        layout: null,
         games: [],
         saves: [],
         storage: {}
@@ -60,6 +61,11 @@
           keys.forEach(function (k) { ls[k.key] = localStorage.getItem(k.real); });
           manifest.storage[g.id] = ls;
         }
+      }
+      if (full) {
+        var lay = Layout.exportData();
+        manifest.layout = lay.data;
+        lay.covers.forEach(function (c) { files.push(c); });
       }
       files.unshift({ path: 'gs2-backup.json', data: JSON.stringify(manifest) });
       files.push({ path: 'README.txt', data: 'This is a Game System 2.0 backup (' + countText(games) + ', made ' + new Date().toLocaleString() + ').\r\n\r\nTo restore it: open Game System 2.0 -> Settings -> "Restore a backup" -> pick this .zip file.\r\nYou don\'t need to unzip it.\r\n' });
@@ -144,6 +150,10 @@
           if (ls) Object.keys(ls).forEach(function (k) { try { localStorage.setItem('gs2:ls:' + meta.id + ':' + k, String(ls[k])); } catch (e) { /* full */ } });
           restoredList.push(rec);
         }
+        /* your order and folders */
+        if (manifest.layout) {
+          try { await Layout.importData(manifest.layout, function (path) { return byPath.get(prefix + path) || null; }); } catch (e) { /* keep going */ }
+        }
         if (manifest.days && typeof manifest.days === 'object') {
           Object.keys(manifest.days).forEach(function (day) {
             var src = manifest.days[day] || {};
@@ -213,6 +223,7 @@
         if (g.linkMode) item.linkMode = g.linkMode;
         if (g.builtin) item.builtin = true;
         if (g.icon) item.icon = g.icon;
+        if (g.kitAutosave) item.saveKit = true;
         if (g.source === 'link') {
           item.url = g.url;
         } else {
