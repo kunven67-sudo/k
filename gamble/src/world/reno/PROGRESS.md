@@ -15,11 +15,12 @@ Cam presets: virginia, arch, strip, eldo, walk, overview (keys 1-6). F = walk mo
 - [x] shared/props.js (lamps, cobra lights, signal masts w/ cycling SIGNAL uniforms, blades, hydrant, newsboxes, meter, cans, bench, bus shelter, power poles + wires, chain fence, cabinet, bollard, planter, litter)
 - [x] shared/vehicles.js (parked cars: sedan/coupe/wagon/pickup/van), shared/flora.js (trees w/ seasonal cards, weeds)
 - [x] shared/buildings.js (facade with recessed openings, storefronts, awnings, sign panels, roofs, HVAC)
-- [ ] buildings: 4th St strip (motels, pawn, liquor, bail bonds, diner, vacant lot), east side Virginia, Eldorado shell + tower, Silver Legacy + dome, Circus Circus, skyways
-- [ ] Reno Arch (signature)
-- [ ] night lighting (point lights pool near player, emissive), neon buzz audio, wet streets
-- [ ] zones, spawn, interactables
-- [ ] dev page walk mode polish, screenshots
+- [x] (attempt 3, code written; verified rendering in attempt 4) strip.js (4th St strip), downtown.js (east side Virginia),
+      eldorado.js (shell + tower), legacy.js (Silver Legacy + dome, Circus Circus, skyways), arch.js, streets.js (props),
+      filler.js (skyline), shared/nightlights.js (pooled lights), shared/wet.js (wet streets + rain), index.js zones/spawn/interactables/NeonBuzz
+- [x] attempt 4: page boots (ready ~60 s, ~6 s/frame headless high). Noon Virginia + 9 PM arch shots look good overall.
+- [ ] attempt 4 fixes: night ground too white under arch; street-name signs mirrored from behind; dry-noon blue blobs on road
+- [ ] remaining shots: strip golden hour, eldo night, walk mode, rain, 3 AM; final report
 
 ## Key decisions
 - Arch at z=106 (layout ARCH_Z), Commercial Row centre z=114 (hw 6). Close to the brief's ≈108/≈112 and keeps
@@ -27,6 +28,7 @@ Cam presets: virginia, arch, strip, eldo, walk, overview (keys 1-6). F = walk mo
 - Static geometry → StaticBatch merged per (64 m chunk, material), culled by tier.drawDistance.
 
 ## Notes / perf
-- SwiftShader headless: ~2.7 s/frame at tier high, page ready after ~30 s. Use waits >= 35 s before first shot.
+- Screenshot helper: scratchpad/cshot.sh name 'query' [waitMs] (uses shot2.mjs with 240 s screenshot timeout).
+- SwiftShader headless: ~2.7-6 s/frame at tier high, page ready after ~30 s. Use waits >= 35 s before first shot.
 - Avoid mat('glass') (transmission pass). Use propMats().glass / darkGlass.
 - Material variants bake textures on the CPU: prefer one base material + batch `tint` over new mat() colors.

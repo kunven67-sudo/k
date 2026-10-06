@@ -1,148 +1,107 @@
-// Shape-iteration page for the character module: raw sculpt in clay (no materials, no rig
-// animation). ?n=count ?tier=high ?wire=1 ?side=1 ?seed=base ?dist=m
+// Character shape lab: clay renders of the raw body cage / subdivided body (no materials, no
+// animation) for judging proportions. ?n=6&seed=..&level=1&cage=1&ty=..&dist=..&rot=deg
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { runState } from './harness.js';
-import { buildRig } from '../src/character/rig.js';
-import { bodyTemplate, handTemplate, shapeBody, shapeHand, TEMPLATE_PARAMS } from '../src/character/template.js';
-import { randomHumanParams } from '../src/character/schema.js';
-import { headTemplate, shapeHead, shapeEar, faceLayout, findEyes, lidShell, teethArch, tongueGeometry, JAW_BIND_OPEN, FACE_BONES } from '../src/character/head.js';
+import { randomHumanParams, normalizeParams } from '../src/character/schema.js';
+import { computeJoints } from '../src/character/rig.js';
+import { buildBodyCage } from '../src/character/bodycage.js';
+import { refine } from '../src/character/bodymesh.js';
+import { triangulate, topology } from '../src/character/subdiv.js';
 
-class ShapeDev {
+class ShapeLab {
   constructor(e) { this.engine = e; }
   async enter(q) {
     const e = this.engine;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x2a2a30);
+    scene.background = new THREE.Color(0x2a2d33);
     const pmrem = new THREE.PMREMGenerator(e.renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environmentIntensity = 0.45;
-    const sun = new THREE.DirectionalLight(0xfff0dc, 2.6);
+    scene.environmentIntensity = 0.5;
+    const sun = new THREE.DirectionalLight(0xfff2e0, 2.4);
     sun.position.set(2, 4, 5);
-    scene.add(sun);
+    scene.add(sun, new THREE.HemisphereLight(0xcfe0ff, 0x6b5a48, 0.6));
     const n = +(q.n || 6);
-    const tier = q.tier || 'high';
-    if (q.head) return this.heads(q, scene, n, tier);
-    const t0 = performance.now();
-    const bt = bodyTemplate(tier);
-    const ht = handTemplate(tier);
-    const tTpl = performance.now() - t0;
-    const info = { tpl: tTpl, tplBody: bt.buildMs, tplHand: ht.buildMs, humans: [] };
-    const mat = new THREE.MeshStandardMaterial({ color: 0xc89070, roughness: 0.55, wireframe: !!q.wire });
+    const level = q.level != null ? +q.level : 1;
+    const clay = new THREE.MeshStandardMaterial({ color: 0xc9a58c, roughness: 0.55 });
+    const wire = new THREE.MeshBasicMaterial({ color: 0x1a1a1a, wireframe: true, transparent: true, opacity: 0.35 });
+    const info = [];
+    const presets = [
+      { sex: 'm', fat: 0.15, muscle: 0.5 }, { sex: 'f', fat: 0.3 }, { sex: 'm', fat: 0.85, belly: 0.9 },
+      { sex: 'f', fat: 0.75, chest: 0.85 }, { sex: 'm', age: 82, fat: 0.35 }, { sex: 'f', age: 24, fat: 0.1 },
+      { sex: 'x', fat: 0.5 }, { sex: 'm', muscle: 0.95, fat: 0.2, shoulders: 0.9 },
+    ];
     for (let i = 0; i < n; i++) {
-      const p = i === 0 ? TEMPLATE_PARAMS : randomHumanParams(+(q.seed || 1000) + i * 7);
+      const pr = presets[i % presets.length];
+      const p = normalizeParams({ ...randomHumanParams(+(q.seed || 11) + i * 7, { sex: pr.sex }), ...pr });
+      const t0 = performance.now();
+      const dims = computeJoints(p);
+      const { cage } = buildBodyCage(p, dims);
       const t1 = performance.now();
-      const rig = buildRig(p);
-      const sb = shapeBody(bt, p, rig);
-      const grp = new THREE.Group();
-      const add = (pos, nrm, idx) => {
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-        g.setIndex(new THREE.BufferAttribute(idx, 1));
-        grp.add(new THREE.Mesh(g, mat));
-        return idx.length / 3;
-      };
-      let tris = add(sb.positions, sb.normals, bt.index);
-      for (const side of ['L', 'R']) {
-        const h = shapeHand(ht, p, rig, side, sb.prims.find((x) => x.forearm === side));
-        tris += add(h.positions, h.normals, h.index);
+      const c = refine(cage, level);
+      const t2 = performance.now();
+      const g = new THREE.BufferGeometry();
+      const pos = new Float32Array(c.nv * 3);
+      for (let v = 0; v < c.nv; v++) pos.set(c.data.subarray(v * c.D, v * c.D + 3), v * 3);
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setIndex(triangulate(c));
+      g.computeVertexNormals();
+      const mesh = new THREE.Mesh(g, clay);
+      const x = (i - (n - 1) / 2) * 0.75;
+      mesh.position.x = x;
+      mesh.rotation.y = THREE.MathUtils.degToRad(+(q.rot || 0));
+      scene.add(mesh);
+      if (q.cage) {
+        const cg = new THREE.BufferGeometry();
+        const cp = new Float32Array(cage.nv * 3);
+        for (let v = 0; v < cage.nv; v++) cp.set(cage.data.subarray(v * cage.D, v * cage.D + 3), v * 3);
+        cg.setAttribute('position', new THREE.BufferAttribute(cp, 3));
+        cg.setIndex(triangulate(cage));
+        const cm = new THREE.Mesh(cg, wire);
+        cm.position.x = x;
+        cm.rotation.y = mesh.rotation.y;
+        scene.add(cm);
       }
-      info.humans.push({ ms: +(performance.now() - t1).toFixed(1), tris, fat: +p.fat.toFixed(2), h: +p.height.toFixed(2) });
-      grp.position.x = (i - (n - 1) / 2) * 0.85;
-      if (q.side) grp.rotation.y = (Math.PI / 2) * +q.side;
-      scene.add(grp);
+      const T = topology(cage);
+      let bnd = 0;
+      const bverts = [];
+      for (let e = 0; e < T.ne; e++) if (T.ef[e * 2 + 1] < 0) { bnd++; bverts.push(T.ev[e * 2]); }
+      const cnt = new Map();
+      for (let q4 = 0; q4 < cage.quads.length; q4 += 4) for (let k = 0; k < 4; k++) {
+        const a = cage.quads[q4 + k], b = cage.quads[q4 + ((k + 1) & 3)];
+        const key = a + ',' + b;
+        cnt.set(key, (cnt.get(key) || 0) + 1);
+      }
+      let flips = 0;
+      for (const [key] of cnt) { const [a, b] = key.split(','); if (cnt.has(a + ',' + b) && cnt.get(a + ',' + b) > 1) flips++; if (cnt.has(b + ',' + a) === false) {} }
+      let sameDir = 0;
+      const sd = [];
+      for (const [key] of cnt) { const [a, b] = key.split(',').map(Number); if (cnt.get(key) > 1) { sameDir++; sd.push([a, b].map((v) => [cage.data[v * cage.D], cage.data[v * cage.D + 1], cage.data[v * cage.D + 2]].map((x) => +x.toFixed(3)))); } }
+      const und = new Map();
+      for (const [key, c2] of cnt) { const [a, b] = key.split(',').map(Number); const k2 = Math.min(a, b) + ',' + Math.max(a, b); und.set(k2, (und.get(k2) || 0) + c2); }
+      window.__nm = [...und].filter(([, c2]) => c2 > 2).map(([k2, c2]) => [k2, c2]);
+      window.__sd = sd;
+      info.push({ bnd, sameDir, bpts: bverts.slice(0, 40).map((v) => [cage.data[v * cage.D], cage.data[v * cage.D + 1], cage.data[v * cage.D + 2]].map((x) => +x.toFixed(3))) });
+      info.push({ cageMs: +(t1 - t0).toFixed(1), subMs: +(t2 - t1).toFixed(1), tris: g.index.count / 3, cageV: cage.nv });
     }
     window.__info = info;
-    const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
-    const ty = q.ty ? +q.ty : 0.9;
-    const tx = q.tx ? +q.tx : 0;
-    cam.position.set(tx, ty + 0.1, q.dist ? +q.dist : 7.5);
-    cam.lookAt(tx, ty, 0);
-    e.setView(scene, cam);
-  }
-  heads(q, scene, n, tier) {
-    const e = this.engine;
-    const t0 = performance.now();
-    const ht = headTemplate(tier);
-    const info = { tpl: performance.now() - t0, heads: [] };
-    const skin = new THREE.MeshStandardMaterial({ color: 0xc89070, roughness: 0.55, wireframe: !!q.wire });
-    const white = new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.15 });
-    const iris = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.2 });
-    const vc = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4 });
-    const jawI = FACE_BONES.indexOf('jaw');
-    const lipDI = FACE_BONES.indexOf('lip.D');
-    const pivot = new THREE.Vector3(0, -0.032, -0.03);
-    const close = (pos, wfn) => {
-      const v = new THREE.Vector3();
-      for (let i = 0; i < pos.length / 3; i++) {
-        const w = wfn(i);
-        if (!w) continue;
-        v.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]).sub(pivot).applyAxisAngle(new THREE.Vector3(1, 0, 0), -JAW_BIND_OPEN * w * (q.open ? -4 : 1)).add(pivot);
-        pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
-      }
-    };
-    for (let i = 0; i < n; i++) {
-      const p = i === 0 ? TEMPLATE_PARAMS : randomHumanParams(+(q.seed || 2000) + i * 13);
-      const t1 = performance.now();
-      const L = faceLayout(p);
-      findEyes(p, L);
-      const sh = shapeHead(ht, p, L, { neckR: 0.06 });
-      close(sh.positions, (v) => {
-        let w = 0;
-        for (let k = 0; k < 4; k++) { const b = ht.skinIndex[v * 4 + k]; if (b === jawI || b === lipDI) w += ht.skinWeight[v * 4 + k]; }
-        return w;
-      });
-      const grp = new THREE.Group();
-      const add = (pos, nrm, idx, m) => {
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        if (nrm) g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-        g.setIndex(new THREE.BufferAttribute(idx, 1));
-        if (!nrm) g.computeVertexNormals();
-        const mesh = new THREE.Mesh(g, m);
-        grp.add(mesh);
-        return mesh;
-      };
-      add(sh.positions, sh.normals, ht.index, skin);
-      for (const side of [1, -1]) {
-        const ear = shapeEar(ht.ear, L, side);
-        add(ear.positions, ear.normals, ear.index, skin);
-      }
-      for (const ey of L.eyes) {
-        const em = new THREE.Mesh(new THREE.SphereGeometry(ey.R, 32, 20), white);
-        em.position.copy(ey.c);
-        grp.add(em);
-        const ir = new THREE.Mesh(new THREE.CircleGeometry(ey.R * 0.48, 24), iris);
-        ir.position.copy(ey.c).add(new THREE.Vector3(0, 0, ey.R * 1.002));
-        grp.add(ir);
-        for (const which of ['upper', 'lower']) {
-          const lid = lidShell(L, ey, which, tier);
-          add(lid.positions, lid.normals, lid.index, skin);
-        }
-      }
-      const up = teethArch(L, 'upper', { age: p.age, tierName: tier });
-      const lo = teethArch(L, 'lower', { age: p.age, tierName: tier });
-      const tg = tongueGeometry(L, tier);
-      for (const t of [up, lo, tg]) {
-        const m = add(t.positions, t.normals, t.index, vc);
-        m.geometry.setAttribute('color', new THREE.BufferAttribute(t.colors, 3));
-      }
-      info.heads.push(+(performance.now() - t1).toFixed(1));
-      grp.position.x = (i - (n - 1) / 2) * 0.3;
-      if (q.side) grp.rotation.y = (Math.PI / 2) * +q.side;
-      if (q.ry) grp.rotation.y = +q.ry;
-      scene.add(grp);
+    const cam = new THREE.PerspectiveCamera(+(q.fov || 30), 1, 0.01, 100);
+    let ty = +(q.ty || 0.95);
+    let tx = +(q.tx || 0);
+    let tz = 0;
+    if (q.focus) {
+      // Focus on a joint of the first figure, e.g. focus=hand.L
+      const p0 = normalizeParams({ ...randomHumanParams(+(q.seed || 11), { sex: presets[0].sex }), ...presets[0] });
+      const fj = computeJoints(p0).j[q.focus];
+      tx = fj.x + (0 - (n - 1) / 2) * 0.75;
+      ty = fj.y;
+      tz = fj.z;
     }
-    window.__info = info;
-    const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
-    const tx = q.tx ? +q.tx : 0;
-    const ty = q.ty ? +q.ty : 0;
-    cam.position.set(tx, ty, q.dist ? +q.dist : 1.6);
-    cam.lookAt(tx, ty, 0);
+    cam.position.set(tx + +(q.cx || 0), ty + +(q.cy || 0.1), tz + +(q.dist || 6.5));
+    cam.lookAt(tx, ty, tz);
     e.setView(scene, cam);
   }
   update() {}
   exit() {}
 }
-runState(ShapeDev);
+runState(ShapeLab);

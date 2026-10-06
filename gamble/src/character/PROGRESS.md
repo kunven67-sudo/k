@@ -1,44 +1,43 @@
 # character module — progress log
 
 Owner of: `src/character/**`, `dev/character*.html|js`.
-View: http://127.0.0.1:8765/gamble/dev/character.html (main), dev/character-shape.html (raw sculpt).
+View: http://127.0.0.1:8765/gamble/dev/character.html
 
-## Architecture decisions (attempt 2)
+## Attempt 3 (2026-10-06) — geometry pipeline replaced
 
-- Attempt 1 polygonized every human from scratch: 3.1 s / 33k tris per body, 0.8 s per head
-  (headless). Far over budget (<150 ms, ~25k tris). **Replaced by templates**:
-  1. A *template* sculpt (SDF of an average person) is polygonized once per tier on a fine grid
-     (surface nets) and decimated with QEM (`decimate.js`) to an adaptive, budgeted mesh. Skin
-     weights / regions / head UVs are computed once on the template.
-  2. Each human = template retargeted to their rig (linear-blend from template bind pose to the
-     human's bind pose) and then *projected* onto that human's own SDF (a few Newton steps along
-     the field gradient). Normals come from the analytic field gradient → perfectly smooth.
-  3. Topology is shared, so garments (clipped offset shells of body regions), hair roots, face
-     UVs and texture layouts are defined once per template.
-- Head: separate template (surface nets at ~2.5 mm, decimated with feature importance). Eye
-  sockets are holes filled by eyeballs + **lid shells** (rotating spherical caps, weighted to lid
-  bones) — robust blinking/tracking with no fragile eyelid topology. Mouth = slit + mouth bag in
-  the SDF; jaw bone opens it; teeth/tongue meshes inside.
-- Face animation = **face bones** (jaw, lips, corners, cheeks, brows, lids, nose, tongue) with
-  gaussian-falloff weights, not morph targets (morph textures per unique NPC are too heavy).
-- Textures: no garment UVs. Fabric/skin detail is sampled **triplanar in bind space** (attribute
-  `position` before skinning) so it sticks to the deforming body. Head gets fixed UVs from the
-  template (direction-space equirect with the face magnified) for the per-human face paint.
-- Draw calls per human: skin(body+head+hands+ears) · eyes · mouth · face-cards(lashes/brows/beard)
-  · hair · clothes · accessories(+lenses) ≈ 8.
+Attempt 2 (SDF surface-nets template + QEM + projection) produced blobby clay figures (screenshot
+review: hanger shoulders, egg head, no neck, 10 s template build). Replaced by a classic
+"box-modeling in code" pipeline that artists would recognise:
+
+1. **Body = Catmull-Clark subdivision cage** (`subdiv.js`, `bodycage.js`). The cage is built from
+   rings around the skeleton: torso 16 verts/ring (half-step angles so the midline is an edge),
+   arms 10/ring extruded from a 3x2 shoulder hole, legs 8/ring sharing a crotch strip quad, hands
+   flattened 10-rings whose end cap (4 quads) extrudes 4 fingers + a side face extrudes the thumb,
+   feet as a bent tube. Cage verts carry dense bone weights + region ids; weights/regions are
+   subdivided with the same stencils. The cage is solved so its **limit surface interpolates** the
+   designed surface points (few iterations of C += S - limit(C)). Level 1 + push-to-limit (high),
+   level 2 (ultra/hero), level 1 coarse (low).
+2. **Head = radial projection of an art-directed SDF** (`headgen.js`): a warped direction grid
+   (dense on the face) shot from a point inside the head onto a smooth-union SDF sculpt (cranium,
+   jaw, cheeks, brow, nose, lips, eye sockets + lid bands, neck). Eyeballs are part of the SDF so
+   the skin meets them exactly; verts that land on the eyeball are pulled behind it (depth buffer
+   draws a perfect lid line). Mouth = one grid row split between head/jaw (cut), deep groove.
+   Grid (u,v) doubles as face-paint UV. Neck bottom ring matches the body neck top ring.
+3. Garments = offset shells of body cage regions (so skinning matches), body faces under opaque
+   garments are dropped (no poke-through, fewer tris).
+
+Kept from attempt 2: `schema.js` (params, i18n), rig bone convention (`rig.js`), shaderlib/skin
+material ideas, eyes.js eye atlas, anim/* skeleton (to be finished).
 
 ## Status
-
-- [ ] M1 sdf culling speedup, QEM decimator, body template, retarget+project, clay review
-- [ ] M2 head template, eyes, lid shells, mouth interior, ears
-- [ ] M3 skin / eye / teeth materials, face paint, detail maps
-- [ ] M4 rig: face/jiggle bones, skinning, deformation test
-- [ ] M5 locomotion (foot planting, foot IK), idle, look-at, face animation
-- [ ] M6 clothes (all garments, uniforms, torn/stained), shoes, hats, glasses
-- [ ] M7 hair (strands high / cards low, guide springs), facial hair, brows, lashes
-- [ ] M8 one-shot actions (all 26), sit/stand, hand poses
-- [ ] M9 dirt / bruises / sweat / dirtiness, perf pass, caching
-- [ ] M10 dev page polish + screenshots
+- [ ] A1 subdiv.js + bodycage.js + clay screenshot of nude body lineup
+- [ ] A2 headgen.js (SDF sculpt, grid, eyes, mouth cut) + face close-up
+- [ ] A3 materials: skin (paint in head UV), eyes, mouth/teeth
+- [ ] A4 rig wiring, skinning, face bones, jiggle; deformation test
+- [ ] A5 clothes (tops/bottoms/shoes/outer/uniforms), hats, glasses
+- [ ] A6 hair + facial hair + brows/lashes
+- [ ] A7 locomotion/idle/look/face anim, foot IK, one-shots, sit/stand
+- [ ] A8 dirt/bruises/sweat, caching, perf, dev page polish, screenshots
 
 ## Next
-Start M1.
+A1.

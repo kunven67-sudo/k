@@ -193,7 +193,7 @@ const DRAW = {
     }
     r.save();
     hardBlob(r, S / 2, S / 2, S * 0.3, new Rng(vi + 99), N, 0.3);
-    r.fillStyle = 'rgb(0,45,0)';
+    r.fillStyle = 'rgb(0,125,0)'; // satin, not a mirror: reads as a stain at grazing angles
     r.fill();
     r.restore();
   },

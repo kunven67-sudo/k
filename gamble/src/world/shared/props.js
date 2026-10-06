@@ -915,8 +915,9 @@ export function setBoxFaceUV(g) {
   const nor = g.attributes.normal;
   for (let i = 0; i < uv.count; i++) {
     const nz = nor.getZ(i);
+    // BoxGeometry already lays each face's U left→right as seen from outside, so the back face
+    // reads correctly without flipping; only the thin edges get a sliver of the border colour.
     if (Math.abs(nz) < 0.5) uv.setXY(i, 0.01, 0.5);
-    else if (nz < 0) uv.setX(i, 1 - uv.getX(i)); // back face reads correctly too (mirrored UV fix)
   }
   uv.needsUpdate = true;
   return g;

@@ -209,13 +209,13 @@ export function buildArch(ctx) {
         kind: 'neon',
         width: 2.6,
         reflectK: 1.2,
-        poolK: 0.7,
+        poolK: 0.28,
         groundY: 0,
       });
     }
   }
   for (const s of [-1, 1]) {
-    lights.push({ pos: new THREE.Vector3(0, beamY + 2, z0 + s * 0.6), color: 0xff4a4a, intensity: 24, distance: 26, kind: 'neon', width: 6, reflectK: 1.5, poolK: 0.6, groundY: 0, realLight: false });
+    lights.push({ pos: new THREE.Vector3(0, beamY + 2, z0 + s * 0.6), color: 0xff4a4a, intensity: 24, distance: 26, kind: 'neon', width: 6, reflectK: 1.5, poolK: 0.3, groundY: 0, realLight: false });
   }
   for (const sx of [-1, 1]) {
     lights.push({ pos: new THREE.Vector3(sx * LEG_X, 4, z0 + 0.9), color: 0xffd090, intensity: 8, distance: 10, kind: 'neon', width: 1.2, groundY: 0.15 });

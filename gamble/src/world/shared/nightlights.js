@@ -18,6 +18,18 @@ import * as THREE from 'three';
 import { canvasTexture } from '../../gfx/textures.js';
 import { damp } from '../../core/util.js';
 
+// Additive geometry must fade to black in fog (mixing toward the fog colour would ADD the haze
+// once per overlapping quad and wash distant streets out to a flat cream).
+const ADDITIVE_FOG = /* glsl */ `
+  #ifdef USE_FOG
+    #ifdef FOG_EXP2
+      float addFog = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
+    #else
+      float addFog = smoothstep( fogNear, fogFar, vFogDepth );
+    #endif
+    gl_FragColor.rgb *= 1.0 - addFog;
+  #endif`;
+
 const POOL_SIZE = { low: 2, medium: 4, high: 6, ultra: 8 };
 
 function radialTexture() {
@@ -85,14 +97,15 @@ export class NightLights {
         .replace('#include <opaque_fragment>', `
           // Wet pavement scatters less light diffusely (more goes into the reflection streaks).
           outgoingLight *= uNight * uPoolK * (1.0 - uWet * 0.35);
-          #include <opaque_fragment>`);
+          #include <opaque_fragment>`)
+        .replace('#include <fog_fragment>', ADDITIVE_FOG);
     };
     mat.customProgramCacheKey = () => 'light-pools';
     const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
     const m4 = new THREE.Matrix4();
     const c = new THREE.Color();
     src.forEach((l, i) => {
-      const r = (l.distance ?? 12) * (l.kind === 'street' ? 0.95 : l.kind === 'neon' ? 0.55 : 0.75);
+      const r = (l.distance ?? 12) * (l.kind === 'street' ? 0.72 : l.kind === 'neon' ? 0.5 : 0.65);
       const gy = l.groundY ?? (l.pos.y > 2 ? groundYAt(l) : l.pos.y - 1);
       // Pools sit under the source, pushed slightly out for wall-mounted signs.
       const p = l.groundPos || new THREE.Vector3(l.pos.x, gy + 0.02, l.pos.z);
@@ -100,7 +113,7 @@ export class NightLights {
       mesh.setMatrixAt(i, m4);
       // Pool brightness ∝ source intensity / height² (inverse square to the ground), clamped.
       const hgt = Math.max(1.5, l.pos.y - gy);
-      const k = Math.min(1.4, ((l.intensity ?? 10) / (hgt * hgt)) * 1.9) * (l.poolK ?? 1);
+      const k = Math.min(0.85, ((l.intensity ?? 10) / (hgt * hgt)) * 1.15) * (l.poolK ?? 1);
       c.set(l.color).multiplyScalar(k);
       mesh.setColorAt(i, c);
       void col;
@@ -189,7 +202,7 @@ export class NightLights {
           float ripple = mix(1.0, band, 0.7);
           float a = across * along * ripple * vFade * uNight * uWet;
           gl_FragColor = vec4(vCol * a * 1.15, 1.0);
-          #include <fog_fragment>
+          ${ADDITIVE_FOG}
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,
