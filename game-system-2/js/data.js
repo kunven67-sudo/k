@@ -78,21 +78,34 @@
     return Object.assign({
       name: 'Untitled Game', desc: '', emoji: '🎮', color: null, folder: '', fav: false,
       entry: 'index.html', source: 'local', size: 0, fileCount: 0, created: Date.now(), updated: Date.now(),
-      lastPlayed: 0, playTime: 0, launches: 0, isolate: true, kitAutosave: false, cover: null
+      lastPlayed: 0, playTime: 0, launches: 0, isolate: true, kitAutosave: false, cover: null, kind: 'game'
     }, g);
   }
   D.normalize = normalize;
 
+  /* games open full screen, apps open in a window */
+  D.isApp = function (g) { return !!g && g.kind === 'app'; };
+  D.cleanWin = function (w) {
+    if (!w || typeof w !== 'object') return undefined;
+    var ww = Math.round(Number(w.w)), hh = Math.round(Number(w.h));
+    if (!(ww >= 200 && ww <= 4000 && hh >= 160 && hh <= 4000)) return undefined;
+    return { w: ww, h: hh };
+  };
+
   /* ---------------- queries ---------------- */
   D.get = function (id) { return D.games.get(id) || null; };
-  D.list = function () {
-    return Array.from(D.games.values()).sort(function (a, b) {
+  /* kind: 'game' or 'app' (leave it out for both) */
+  D.list = function (kind) {
+    return Array.from(D.games.values()).filter(function (g) {
+      return !kind || (kind === 'app') === D.isApp(g);
+    }).sort(function (a, b) {
       return (b.lastPlayed || 0) - (a.lastPlayed || 0) || (b.created || 0) - (a.created || 0);
     });
   };
+  /* folders are for games (apps live in the Apps tab) */
   D.folders = function () {
     var set = {};
-    D.games.forEach(function (g) { if (g.folder) set[g.folder] = (set[g.folder] || 0) + 1; });
+    D.games.forEach(function (g) { if (g.folder && !D.isApp(g)) set[g.folder] = (set[g.folder] || 0) + 1; });
     return Object.keys(set).sort(function (a, b) { return a.localeCompare(b); }).map(function (f) { return { name: f, count: set[f] }; });
   };
   D.findByName = function (name) {
@@ -182,7 +195,7 @@
     if (!g) return null;
     await D.ensureLocalFiles(g);
     var files = (await GS2DB.filesOf(id)).map(function (f) { return { p: f.p, b: f.b, t: f.t }; });
-    var copy = Object.assign({}, g, { id: undefined, name: g.name + ' (copy)', source: g.source === 'link' ? 'link' : 'local', siteRev: undefined, siteFiles: undefined, playTime: 0, launches: 0, lastPlayed: 0, fav: false });
+    var copy = Object.assign({}, g, { id: undefined, name: g.name + ' (copy)', source: g.source === 'link' ? 'link' : 'local', siteRev: undefined, siteFiles: undefined, fromSite: undefined, builtin: undefined, playTime: 0, launches: 0, lastPlayed: 0, fav: false });
     return D.addGame(copy, files);
   };
 
@@ -357,8 +370,11 @@
       manifest = await r.json();
     } catch (e) { return 0; }
     if (!manifest || !Array.isArray(manifest.games)) return 0;
+    D.builtins = manifest.games.filter(function (sg) { return sg && sg.builtin === true && typeof sg.id === 'string'; })
+      .map(function (sg) { return { id: sg.id, name: String(sg.name || sg.id) }; });
     var tomb = (await GS2DB.kvGet('tombstones')) || {};
     var changed = 0;
+    var newsGames = 0, newsApps = 0;
     for (var i = 0; i < manifest.games.length; i++) {
       var sg = manifest.games[i];
       if (!sg || typeof sg.id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(sg.id)) continue;
@@ -385,6 +401,11 @@
         size: Number(sg.size) || 0,
         fileCount: files.length,
         isolate: sg.isolate !== false,
+        kind: cur && cur.kindSet ? cur.kind : (sg.kind === 'app' ? 'app' : 'game'),
+        win: D.cleanWin(sg.win),
+        linkMode: cur && cur.linkMode ? cur.linkMode : (sg.linkMode === 'popup' || sg.linkMode === 'inside' ? sg.linkMode : undefined),
+        builtin: sg.builtin === true || undefined,
+        icon: typeof sg.icon === 'string' && /^[a-zA-Z]{1,20}$/.test(sg.icon) ? sg.icon : undefined,
         created: cur ? cur.created : Date.now(),
         updated: Date.now()
       }));
@@ -397,9 +418,21 @@
       await GS2DB.saveGame(rec, cur ? [] : null);
       D.games.set(rec.id, rec);
       changed++;
+      if (!rec.builtin) { if (D.isApp(rec)) newsApps++; else newsGames++; }
     }
     if (changed) D.emit('games');
+    D.lastSyncNews = { games: newsGames, apps: newsApps };
     return changed;
+  };
+
+  /* built-in apps that were deleted: bring them back */
+  D.builtins = [];
+  D.missingBuiltins = function () { return D.builtins.filter(function (b) { return !D.games.has(b.id); }); };
+  D.restoreBuiltins = async function () {
+    var tomb = (await GS2DB.kvGet('tombstones')) || {};
+    D.missingBuiltins().forEach(function (b) { delete tomb[b.id]; });
+    await GS2DB.kvSet('tombstones', tomb);
+    return D.syncSiteGames();
   };
 
   /* Download every file of a website game into the browser (needed before editing/backup/offline) */

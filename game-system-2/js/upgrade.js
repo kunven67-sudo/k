@@ -187,7 +187,7 @@
       Sound.good();
       UI.toast('Upgraded! Play it and it should continue where you left off from now on.', {
         type: 'good', timeout: 9000, sound: false,
-        actions: [{ label: 'Play now', kind: 'primary', onClick: function () { Player.launch(id); } }]
+        actions: [{ label: 'Play now', kind: 'primary', onClick: function () { Player.launch(id, { fresh: true }); } }]
       });
       return true;
     }

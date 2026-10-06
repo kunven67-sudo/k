@@ -5,7 +5,7 @@
   var h = U.h;
   function $(id) { return document.getElementById(id); }
 
-  var VIEWS = ['home', 'library', 'saves', 'stats', 'settings', 'editor'];
+  var VIEWS = ['home', 'library', 'apps', 'saves', 'stats', 'settings', 'editor'];
   var started = false;
   var swState = null; /* null = unknown, false = not available */
   var hadController = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
@@ -82,6 +82,8 @@
     var prev = D.ui.view;
     var prevEl = $('view-' + prev);
     if (prevEl && prev !== name) { D.ui.scroll[prev] = prevEl.scrollTop; }
+    /* full-size app windows step aside so you can see the screen you picked */
+    if (started && prev !== name) Win.uncover();
     D.ui.view = name;
     D.saveUISoon();
     VIEWS.forEach(function (v) {
@@ -178,7 +180,7 @@
       e.ctrlKey === (hk.indexOf('ctrl') >= 0) && e.altKey === (hk.indexOf('alt') >= 0) && e.shiftKey === (hk.indexOf('shift') >= 0);
   }
 
-  var TAB_ORDER = ['home', 'library', 'saves', 'stats'];
+  var TAB_ORDER = ['home', 'library', 'apps', 'saves', 'stats'];
   function cycleTab(dir) {
     var list = TAB_ORDER.concat(Editor.isOpen() ? ['editor'] : []);
     var i = list.indexOf(D.ui.view);
@@ -330,6 +332,8 @@
       go(v === 'editor' ? 'home' : v, { noSound: true });
     }
     requestAnimationFrame(moveGlow);
+    /* the app windows that were open last time */
+    Win.restoreAll();
     if (D.ui.playing) setTimeout(function () { Player.offerResume(D.ui.playing); }, 450);
   }
 
@@ -345,7 +349,7 @@
 
   async function boot() {
     /* reloaded while a game was open: forget the extra Back-button step */
-    if (history.state && history.state.gs2 === 'game') { try { history.replaceState(null, ''); } catch (e) { /* ignore */ } }
+    if (history.state && history.state.gs2) { try { history.replaceState(null, ''); } catch (e) { /* ignore */ } }
     applyEarly();
     BG.init($('bg'), D.settings.bg);
     registerSW();
@@ -371,7 +375,7 @@
       var el = $('view-' + v);
       if (el) el.addEventListener('scroll', U.debounce(function () { if (D.ui.view === v) { D.ui.scroll[v] = el.scrollTop; D.saveUISoon(); } }, 250), { passive: true });
     });
-    window.addEventListener('pagehide', function () { Player.onPageHide(); D.onPageHide(); });
+    window.addEventListener('pagehide', function () { Player.onPageHide(); Win.onPageHide(); D.onPageHide(); });
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'hidden') { D.saveUI(); D.flushPlay(); }
     });
@@ -388,8 +392,12 @@
     else { $('title-screen').hidden = true; enterApp(); }
 
     /* games that come with the website */
-    D.syncSiteGames().then(function (n) {
-      if (n && started) UI.toast(n + ' game' + (n === 1 ? '' : 's') + ' from your website ' + (n === 1 ? 'is' : 'are') + ' ready', { icon: 'globe', sound: false });
+    D.syncSiteGames().then(function () {
+      var ns = D.lastSyncNews || { games: 0, apps: 0 };
+      var parts = [];
+      if (ns.games) parts.push(ns.games + ' game' + (ns.games === 1 ? '' : 's'));
+      if (ns.apps) parts.push(ns.apps + ' app' + (ns.apps === 1 ? '' : 's'));
+      if (parts.length && started) UI.toast(parts.join(' and ') + ' from your website ' + (ns.games + ns.apps === 1 ? 'is' : 'are') + ' ready', { icon: 'globe', sound: false });
       setTimeout(function () { D.prefetchSiteGames(); }, 5000);
     });
   }
@@ -407,10 +415,14 @@
   function wireTopbar() {
     $('brand').addEventListener('click', function () { go('home'); });
     document.querySelectorAll('.tab').forEach(function (t) {
-      t.addEventListener('click', function () { go(t.dataset.view); });
+      t.addEventListener('click', function () {
+        /* clicking the tab you're already on tucks the app windows away */
+        if (D.ui.view === t.dataset.view && Win.minimizeAll()) { Sound.back(); return; }
+        go(t.dataset.view);
+      });
     });
     $('btn-search').addEventListener('click', openSearch);
-    $('btn-add').addEventListener('click', function () { Importer.addDialog(); });
+    $('btn-add').addEventListener('click', function () { Importer.addDialog(D.ui.view === 'apps' ? { kind: 'app' } : null); });
     $('btn-settings').addEventListener('click', function () { go('settings'); });
     $('btn-profile').addEventListener('click', function () { go('settings'); });
     $('err-badge').addEventListener('click', function () { Player.toggleMenu(); });

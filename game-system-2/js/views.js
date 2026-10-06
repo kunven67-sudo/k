@@ -12,9 +12,10 @@
 
   function renderHome() {
     var view = $('view-home');
-    var games = D.list();
+    var games = D.list('game');
     if (!games.length) { view.replaceChildren(welcome()); App.setAccent(null); return; }
-    var sel = D.get(D.ui.sel) || games[0];
+    var sel = D.get(D.ui.sel);
+    if (!sel || D.isApp(sel)) sel = games[0];
     if (D.ui.sel !== sel.id) { D.ui.sel = sel.id; D.saveUISoon(); }
 
     var hero = h('section.hero');
@@ -135,6 +136,11 @@
       h('span.mc-ico', I('sparkle')), h('div', h('b', 'Rules for AI games'), h('span', 'Copy this to any AI so its games work + save'))));
     items.push(h('button.mini-card', { onclick: function () { App.go('library'); } },
       h('span.mc-ico', I('library')), h('div', h('b', 'Library'), h('span', games.length + ' game' + (games.length === 1 ? '' : 's') + ' · search, folders, favorites'))));
+    var apps = D.list('app');
+    items.push(h('button.mini-card', { onclick: function () { App.go('apps'); } },
+      h('span.mc-ico', I('apps')), h('div', h('b', 'Apps'), h('span', apps.length
+        ? apps.slice().sort(byName).slice(0, 3).map(function (a) { return a.name; }).join(', ') + (apps.length > 3 ? ' + ' + (apps.length - 3) + ' more' : '')
+        : 'Music, notes, websites… in windows'))));
     return h('div.home-strip', items);
   }
 
@@ -149,31 +155,58 @@
         h('button.btn.primary', { onclick: function () { Importer.importOldFolder(); } }, I('folder'), 'Import my old games'),
         h('button.btn', { onclick: function () { Importer.pasteDialog(); } }, I('code'), 'Paste game code'),
         h('button.btn', { onclick: function () { aiRules(); } }, I('sparkle'), 'Rules for AI games'),
-        h('button.btn', { onclick: function () { Backup.pickRestore(); } }, I('download'), 'Restore a backup')));
+        h('button.btn', { onclick: function () { Backup.pickRestore(); } }, I('download'), 'Restore a backup'),
+        D.list('app').length ? h('button.btn', { onclick: function () { App.go('apps'); } }, I('apps'), 'Try the apps') : null));
   }
 
   /* =====================================================================
      GAME DETAILS + MENUS
      ===================================================================== */
+  function noun(g) { return D.isApp(g) ? 'app' : 'game'; }
+  function byName(a, b) { return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }); }
+  /* "games", "apps", or "games and apps" for a bunch of ids */
+  function nounFor(ids) {
+    var apps = ids.filter(function (id) { return D.isApp(D.get(id)); }).length;
+    return apps === ids.length ? 'apps' : (apps ? 'games and apps' : 'games');
+  }
+
   function gameMenu(id, x, y) {
     var g = D.get(id);
     if (!g) return;
+    var app = D.isApp(g);
     UI.contextMenu(x, y, [
-      { icon: 'play', label: 'Play', onClick: function () { Player.launch(id); } },
+      app ? { icon: 'win', label: Win.isOpen(id) ? 'Show' : 'Open', onClick: function () { Player.launch(id); } }
+        : { icon: 'play', label: 'Play', onClick: function () { Player.launch(id); } },
+      app && !Win.wantsPopup(g) ? { icon: 'full', label: 'Open full screen', onClick: function () { if (Win.isOpen(id)) Win.close(id, { quiet: true }); Player.launch(id, { fullscreen: true }); } } : null,
+      app && Win.isOpen(id) ? { icon: 'x', label: 'Close window', onClick: function () { Win.close(id); } } : null,
       g.source !== 'link' ? { icon: 'code', label: 'Edit code', onClick: function () { Editor.open(id); } } : null,
-      { icon: g.fav ? 'star' : 'starFill', label: g.fav ? 'Unfavorite' : 'Favorite', onClick: function () { D.updateGame(id, { fav: !g.fav }); } },
+      app ? null : { icon: g.fav ? 'star' : 'starFill', label: g.fav ? 'Unfavorite' : 'Favorite', onClick: function () { D.updateGame(id, { fav: !g.fav }); } },
       { icon: 'tag', label: 'Rename', onClick: function () { renameGame(id); } },
-      { icon: 'folder', label: 'Move to folder', onClick: function () { moveToFolder([id]); } },
+      app ? null : { icon: 'folder', label: 'Move to folder', onClick: function () { moveToFolder([id]); } },
       { icon: 'image', label: 'Change picture', onClick: function () { Pics.open(id); } },
+      { icon: app ? 'gamepad' : 'apps', label: app ? 'Move to Games' : 'Move to Apps', onClick: function () { setKind(id, app ? 'game' : 'app'); } },
       { icon: 'more', label: 'Details & more', onClick: function () { gameDetails(id); } },
       'sep',
       { icon: 'trash', label: 'Delete', danger: true, onClick: function () { deleteGames([id]); } }
     ]);
   }
 
+  /* games open full screen, apps open in a window */
+  async function setKind(id, kind) {
+    var g = D.get(id);
+    if (!g || (kind === 'app') === D.isApp(g)) return;
+    if (kind === 'game' && Win.isOpen(id)) Win.close(id, { quiet: true });
+    await D.updateGame(id, { kind: kind, kindSet: true });
+    Sound.select();
+    UI.toast('"' + g.name + '" moved to ' + (kind === 'app' ? 'Apps' : 'Games') + '.', {
+      icon: kind === 'app' ? 'apps' : 'gamepad', sound: false,
+      actions: [{ label: 'Go there', onClick: function () { App.go(kind === 'app' ? 'apps' : 'library'); } }]
+    });
+  }
+
   async function renameGame(id) {
     var g = D.get(id);
-    var n = await UI.prompt('Rename game', 'Name', g.name, { ok: 'Rename', max: 80 });
+    var n = await UI.prompt('Rename ' + noun(g), 'Name', g.name, { ok: 'Rename', max: 80 });
     if (n) await D.updateGame(id, { name: n });
   }
 
@@ -204,28 +237,43 @@
 
   async function deleteGames(ids) {
     var names = ids.map(function (id) { var g = D.get(id); return g ? g.name : id; });
-    var ok = await UI.confirm(ids.length === 1 ? 'Delete "' + names[0] + '"?' : 'Delete ' + ids.length + ' games?',
-      h('div', h('p', 'This removes ' + (ids.length === 1 ? 'the game, its saves and its stats' : 'these games, their saves and their stats') + ' from Game System. Can\'t undo!'),
+    var what = ids.length === 1 ? noun(D.get(ids[0])) : nounFor(ids);
+    var ok = await UI.confirm(ids.length === 1 ? 'Delete "' + names[0] + '"?' : 'Delete ' + ids.length + ' ' + what + '?',
+      h('div', h('p', 'This removes ' + (ids.length === 1 ? 'the ' + what + ', its saves and its stats' : 'these ' + what + ', their saves and their stats') + ' from Game System. Can\'t undo!'),
         h('p.small.muted', 'Want to be safe? Make a backup first (Settings → Back up everything).')),
       { ok: 'Delete', danger: true, icon: 'trash' });
     if (!ok) return false;
     for (var i = 0; i < ids.length; i++) {
       if (Editor.currentId() === ids[i]) { await Editor.close(); }
+      if (Win.isOpen(ids[i])) Win.close(ids[i], { quiet: true });
       await D.deleteGame(ids[i]);
     }
     Sound.back();
-    UI.toast(ids.length === 1 ? '"' + names[0] + '" deleted' : ids.length + ' games deleted', { icon: 'trash', sound: false });
+    UI.toast(ids.length === 1 ? '"' + names[0] + '" deleted' : ids.length + ' ' + what + ' deleted', { icon: 'trash', sound: false });
     return true;
   }
 
   async function gameDetails(id) {
     var g = D.get(id);
     if (!g) return;
-    var save = g.source === 'link' ? null : await D.latestSave(id);
+    var app = D.isApp(g);
+    var isLink = g.source === 'link';
+    var save = isLink ? null : await D.latestSave(id);
     var keys = D.storageKeys(id);
     var isolateSw = h('label.switch', h('input', { type: 'checkbox', checked: g.isolate !== false, onchange: function (e) { D.updateGame(id, { isolate: e.target.checked }); } }), h('i'));
+    function reopen() { m.close(); gameDetails(id); }
+    var kindSeg = seg([['game', [I('gamepad'), 'Game']], ['app', [I('apps'), 'App']]], app ? 'app' : 'game', async function (k) {
+      await setKind(id, k);
+      reopen();
+    });
+    var linkSeg = isLink && app ? seg([['auto', 'Automatic'], ['inside', 'Inside a window'], ['popup', 'Its own popup']], g.linkMode || 'auto', function (k) {
+      D.updateGame(id, { linkMode: k === 'auto' ? undefined : k });
+    }) : null;
+    var host = '';
+    try { host = isLink ? new URL(g.url).hostname : ''; } catch (e) { host = ''; }
     var m = UI.modal({
-      title: g.emoji + ' ' + g.name,
+      title: g.name,
+      icon: app ? 'win' : 'gamepad',
       wide: true,
       body: h('div',
         h('div.det-top',
@@ -233,34 +281,37 @@
           h('div',
             g.desc ? h('p', g.desc) : h('p.muted', 'No description yet.'),
             h('div.det-stats',
-              stat(U.fmtDuration((g.playTime || 0) + (D.pendingPlay[id] || 0)), 'Played'),
-              stat(String(g.launches || 0), 'Launches'),
-              stat(g.lastPlayed ? U.timeAgo(g.lastPlayed) : 'Never', 'Last played'),
-              g.source !== 'link' ? stat(U.fmtBytes(g.size), (g.fileCount || 0) + ' files') : stat('Link', g.url ? new URL(g.url).hostname : '')),
+              app ? null : stat(U.fmtDuration((g.playTime || 0) + (D.pendingPlay[id] || 0)), 'Played'),
+              stat(String(g.launches || 0), app ? 'Times opened' : 'Launches'),
+              stat(g.lastPlayed ? U.timeAgo(g.lastPlayed) : 'Never', app ? 'Last opened' : 'Last played'),
+              !isLink ? stat(U.fmtBytes(g.size), (g.fileCount || 0) + ' file' + (g.fileCount === 1 ? '' : 's')) : stat('Website', host)),
             h('p.small.muted', I('save'), ' ', save ? 'Resume point saved ' + U.timeAgo(save.t) + ' (' + U.fmtBytes(save.size || 0) + ')' : (g.kitAutosave ? 'Uses the Save Kit' : 'No resume point yet'),
               keys.length ? ' · ' + keys.length + ' saved value' + (keys.length === 1 ? '' : 's') : ''))),
         h('div.hr'),
         h('div.act-grid',
-          h('button.btn.primary', { onclick: function () { m.close(); Player.launch(id); } }, UI.icon('play'), 'Play'),
-          g.source !== 'link' ? h('button.btn', { onclick: function () { m.close(); Editor.open(id); } }, UI.icon('code'), 'Edit code') : null,
+          h('button.btn.primary', { onclick: function () { m.close(); Player.launch(id); } }, UI.icon(app ? 'win' : 'play'), app ? 'Open' : 'Play'),
+          app && !Win.wantsPopup(g) ? h('button.btn', { onclick: function () { m.close(); if (Win.isOpen(id)) Win.close(id, { quiet: true }); Player.launch(id, { fullscreen: true }); } }, I('full'), 'Open full screen') : null,
+          !isLink ? h('button.btn', { onclick: function () { m.close(); Editor.open(id); } }, UI.icon('code'), 'Edit code') : null,
           h('button.btn', { onclick: function () { m.close(); renameGame(id); } }, I('tag'), 'Rename'),
           h('button.btn', { onclick: function () { m.close(); Pics.open(id); } }, I('image'), 'Change picture'),
-          g.cover ? h('button.btn', { onclick: async function () { await D.setCover(id, null); m.close(); gameDetails(id); } }, I('x'), 'Remove picture') : null,
+          g.cover ? h('button.btn', { onclick: async function () { await D.setCover(id, null); reopen(); } }, I('x'), g.icon ? 'Use the app icon' : 'Remove picture') : null,
           h('button.btn', { onclick: async function () {
-            var d = await UI.prompt('Description', 'What is this game about?', g.desc || '', { ok: 'Save', max: 600 });
-            if (d !== null) { await D.updateGame(id, { desc: d }); m.close(); gameDetails(id); }
+            var d = await UI.prompt('Description', 'What is this ' + noun(g) + ' about?', g.desc || '', { ok: 'Save', max: 600 });
+            if (d !== null) { await D.updateGame(id, { desc: d }); reopen(); }
           } }, I('text'), 'Description'),
-          h('button.btn', { onclick: function () { m.close(); moveToFolder([id]); } }, UI.icon('folder'), 'Folder'),
-          h('button.btn' + (g.fav ? '.fav-on' : ''), { onclick: async function () { await D.updateGame(id, { fav: !g.fav }); m.close(); gameDetails(id); } }, I(g.fav ? 'starFill' : 'star'), g.fav ? 'Unfavorite' : 'Favorite'),
-          g.source !== 'link' && !g.kitAutosave ? h('button.btn.good', { onclick: function () { m.close(); Upgrade.open(id); } }, I('resume'), 'Make it continue where I left off') : null,
-          g.source !== 'link' ? h('button.btn', { onclick: function () { m.close(); updateFiles(id); } }, UI.icon('upload'), 'Update game files') : null,
-          g.source !== 'link' ? h('button.btn', { onclick: function () { downloadGame(id); } }, UI.icon('download'), 'Download game') : null,
-          h('button.btn', { onclick: async function () { m.close(); var c = await D.duplicateGame(id); if (c) { D.ui.sel = c.id; App.refresh(); UI.toast('Made a copy', { icon: 'copy' }); } } }, UI.icon('copy'), 'Duplicate'),
-          g.source !== 'link' ? h('button.btn', { onclick: function () { m.close(); App.go('saves'); setTimeout(function () { viewSaves(id); }, 200); } }, UI.icon('save'), 'Saves') : null,
+          app ? null : h('button.btn', { onclick: function () { m.close(); moveToFolder([id]); } }, UI.icon('folder'), 'Folder'),
+          app ? null : h('button.btn' + (g.fav ? '.fav-on' : ''), { onclick: async function () { await D.updateGame(id, { fav: !g.fav }); reopen(); } }, I(g.fav ? 'starFill' : 'star'), g.fav ? 'Unfavorite' : 'Favorite'),
+          !isLink && !g.kitAutosave ? h('button.btn.good', { onclick: function () { m.close(); Upgrade.open(id); } }, I('resume'), 'Make it continue where I left off') : null,
+          !isLink ? h('button.btn', { onclick: function () { m.close(); updateFiles(id); } }, UI.icon('upload'), 'Update ' + noun(g) + ' files') : null,
+          !isLink ? h('button.btn', { onclick: function () { downloadGame(id); } }, UI.icon('download'), 'Download ' + noun(g)) : null,
+          h('button.btn', { onclick: async function () { m.close(); var c = await D.duplicateGame(id); if (c) { if (!D.isApp(c)) D.ui.sel = c.id; App.refresh(); UI.toast('Made a copy', { icon: 'copy' }); } } }, UI.icon('copy'), 'Duplicate'),
+          !isLink ? h('button.btn', { onclick: function () { m.close(); App.go('saves'); setTimeout(function () { viewSaves(id); }, 200); } }, UI.icon('save'), 'Saves') : null,
           h('button.btn.danger', { onclick: async function () { if (await deleteGames([id])) m.close(); } }, UI.icon('trash'), 'Delete')),
-        g.source !== 'link' ? h('div', h('div.hr'),
-          h('div.set-row', h('div.st', h('b', I('lock'), ' Private saves'), h('span', 'Keeps this game\'s saves separate from other games. Turn off only if an old game can\'t find its saves.')), isolateSw)) : null,
-        g.source === 'site' ? h('p.small.muted', { style: { marginTop: '10px' } }, I('globe'), ' This game comes with your website. If you edit it, it becomes your own copy.') : null)
+        h('div.hr'),
+        h('div.set-row', h('div.st', h('b', 'This is a…'), h('span', 'Games open full screen. Apps open in a window, so you can use a few at once.')), kindSeg),
+        linkSeg ? h('div.set-row', h('div.st', h('b', 'Open this website'), h('span', 'Some websites (like YouTube or Google) refuse to show up inside other sites. Those open in their own popup window.')), linkSeg) : null,
+        !isLink ? h('div.set-row', h('div.st', h('b', I('lock'), ' Private saves'), h('span', 'Keeps this ' + noun(g) + '\'s saves separate from everything else. Turn off only if an old game can\'t find its saves.')), isolateSw) : null,
+        g.source === 'site' ? h('p.small.muted', { style: { marginTop: '10px' } }, I('globe'), ' This ' + noun(g) + ' comes with your website. If you edit it, it becomes your own copy.') : null)
     });
   }
   function stat(v, l) { return h('div.stat-box', h('div.sv', v), h('div.sl', l)); }
@@ -325,7 +376,7 @@
   function renderLibrary() {
     var view = $('view-library');
     var lib = D.ui.lib;
-    var all = D.list();
+    var all = D.list('game');
     var sorters = {
       recent: null,
       name: function (a, b) { return a.name.localeCompare(b.name); },
@@ -335,7 +386,8 @@
     };
     function filtered() {
       var q = (lib.q || '').trim().toLowerCase();
-      var list = all.filter(function (g) {
+      /* searching also finds apps */
+      var list = (q ? D.list() : all).filter(function (g) {
         if (lib.folder === 'fav' && !g.fav) return false;
         if (lib.folder === 'none' && g.folder) return false;
         if (lib.folder && lib.folder.indexOf('f:') === 0 && g.folder !== lib.folder.slice(2)) return false;
@@ -377,7 +429,7 @@
       grid.replaceChildren();
       if (!list.length) {
         grid.appendChild(h('div.empty-note', { style: { gridColumn: '1 / -1' } }, h('span.big', I(all.length ? 'search' : 'gamepad')),
-          all.length ? 'No games match that. Try another search.' : 'No games yet. Hit "Add" to bring some in!'));
+          all.length || (lib.q || '').trim() ? 'Nothing matches that. Try another search.' : 'No games yet. Hit "Add" to bring some in!'));
         return;
       }
       list.forEach(function (g) { grid.appendChild(card(g)); });
@@ -389,18 +441,18 @@
         'aria-label': g.name,
         onclick: function () {
           if (selectMode) { toggleSel(g.id, c); return; }
-          D.ui.sel = g.id;
+          if (!D.isApp(g)) D.ui.sel = g.id;
           Player.launch(g.id);
         },
         oncontextmenu: function (e) { e.preventDefault(); gameMenu(g.id, e.clientX, e.clientY); }
       },
         selectMode ? h('span.check', isSel ? I('check') : null) : null,
-        h('div.card-flags', g.fav ? h('span', { title: 'Favorite' }, I('starFill')) : null, g.source === 'site' ? h('span', { title: 'On your website' }, I('globe')) : null, g.source === 'link' ? h('span', { title: 'Link' }, I('link')) : null),
+        h('div.card-flags', D.isApp(g) ? h('span', { title: 'App (opens in a window)' }, I('apps')) : null, g.fav ? h('span', { title: 'Favorite' }, I('starFill')) : null, g.source === 'site' ? h('span', { title: 'On your website' }, I('globe')) : null, g.source === 'link' ? h('span', { title: 'Link' }, I('link')) : null),
         h('div.card-art', UI.art(g, { lazy: true, noName: true })),
-        h('span.card-play', UI.icon('play')),
+        h('span.card-play', UI.icon(D.isApp(g) ? 'win' : 'play')),
         h('div.card-body',
           h('div.card-name', g.name),
-          h('div.card-meta', h('span', I('clock'), ' ' + U.fmtDuration((g.playTime || 0) + (D.pendingPlay[g.id] || 0))), h('span', g.lastPlayed ? U.timeAgo(g.lastPlayed) : 'new'))));
+          h('div.card-meta', D.isApp(g) ? h('span', I('apps'), ' App') : h('span', I('clock'), ' ' + U.fmtDuration((g.playTime || 0) + (D.pendingPlay[g.id] || 0))), h('span', g.lastPlayed ? U.timeAgo(g.lastPlayed) : 'new'))));
       UI.tilt(c, 6);
       UI.longPress(c, function (x, y) { gameMenu(g.id, x, y); });
       c.addEventListener('mouseleave', function () { c.style.transform = ''; });
@@ -439,6 +491,74 @@
       chips, grid, bulk));
     renderGrid();
     if (selectMode) renderBulk();
+  }
+
+  /* =====================================================================
+     APPS (like a phone home screen; apps open in windows)
+     ===================================================================== */
+  var appsQ = '';
+  function renderApps() {
+    var view = $('view-apps');
+    var all = D.list('app').sort(byName);
+    var grid = h('div.app-grid', { role: 'list' });
+    var search = all.length > 8 ? h('input.input', { type: 'search', placeholder: 'Search your apps…', 'aria-label': 'Search apps', value: appsQ }) : null;
+    if (search) {
+      search.value = appsQ;
+      search.addEventListener('input', U.debounce(function () { appsQ = search.value; fill(); }, 100));
+    }
+
+    function icon(g) {
+      var open = Win.isOpen(g.id);
+      var b = h('button.app-icon' + (open ? '.running' : ''), {
+        role: 'listitem',
+        'data-id': g.id,
+        'aria-label': g.name + (open ? ' (open)' : ''),
+        title: g.desc || g.name,
+        onclick: function () { Player.launch(g.id); },
+        oncontextmenu: function (e) { e.preventDefault(); gameMenu(g.id, e.clientX, e.clientY); }
+      },
+        h('span.ai-art', UI.art(g, { noName: true, lazy: true }),
+          g.source === 'link' ? h('span.ai-flag', { title: Win.wantsPopup(g) ? 'Website (opens in its own popup)' : 'Website' }, I(Win.wantsPopup(g) ? 'popout' : 'globe')) : null),
+        h('span.ai-name', g.name),
+        h('span.ai-dot', { 'aria-hidden': 'true' }));
+      UI.longPress(b, function (x, y) { gameMenu(g.id, x, y); });
+      return b;
+    }
+
+    function fill() {
+      var q = (appsQ || '').trim().toLowerCase();
+      var list = all.filter(function (g) { return !q || (g.name + ' ' + (g.desc || '')).toLowerCase().indexOf(q) >= 0; });
+      grid.replaceChildren();
+      list.forEach(function (g) { grid.appendChild(icon(g)); });
+      if (!q) {
+        grid.appendChild(h('button.app-icon.add', { onclick: function () { Importer.addDialog({ kind: 'app' }); }, 'aria-label': 'Add an app' },
+          h('span.ai-art', I('plus')), h('span.ai-name', 'Add app')));
+      } else if (!list.length) {
+        grid.appendChild(h('div.empty-note', { style: { gridColumn: '1 / -1' } }, h('span.big', I('search')), 'No apps match that.'));
+      }
+    }
+    fill();
+
+    var missing = D.missingBuiltins();
+    var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    view.replaceChildren(h('div.page',
+      h('h1.page-title', 'Apps'),
+      h('p.page-sub', all.length
+        ? 'Apps open in a window, so you can use a few at once (music keeps playing while you game). ' + (touch ? 'Hold' : 'Right-click') + ' an app for options.'
+        : 'Apps open in a window, so you can use a few at once. Add your own app files, or any website.'),
+      h('div.lib-toolbar',
+        search ? h('div.search', I('search'), search) : h('div.grow'),
+        h('button.btn', { onclick: function () { Importer.linkDialog({ kind: 'app' }); } }, I('globe'), 'Add a website'),
+        h('button.btn.primary', { onclick: function () { Importer.addDialog({ kind: 'app' }); } }, I('plus'), 'Add app')),
+      grid,
+      missing.length ? h('div.panel.builtin-back',
+        h('div', h('b', 'Want the built-in apps back?'), h('span.muted', ' ' + missing.map(function (b) { return b.name; }).join(', '))),
+        h('button.btn.sm', { onclick: async function (e) {
+          e.currentTarget.disabled = true;
+          var n = await D.restoreBuiltins();
+          UI.toast(n ? 'Built-in apps are back!' : 'Couldn\'t get them. Are you offline?', { type: n ? 'good' : 'warn', icon: 'apps' });
+          App.refresh();
+        } }, I('restart'), 'Bring them back')) : null));
   }
 
   /* =====================================================================
@@ -629,7 +749,7 @@
      ===================================================================== */
   function renderStats() {
     var view = $('view-stats');
-    var games = D.list();
+    var games = D.list('game');
     var total = 0, launches = 0;
     games.forEach(function (g) { total += (g.playTime || 0) + (D.pendingPlay[g.id] || 0); launches += g.launches || 0; });
     var top = games.slice().sort(function (a, b) { return ((b.playTime || 0) + (D.pendingPlay[b.id] || 0)) - ((a.playTime || 0) + (D.pendingPlay[a.id] || 0)); })
@@ -877,6 +997,7 @@
     render: function (name) {
       if (name === 'home') renderHome();
       else if (name === 'library') renderLibrary();
+      else if (name === 'apps') renderApps();
       else if (name === 'saves') renderSaves();
       else if (name === 'stats') renderStats();
       else if (name === 'settings') renderSettings();

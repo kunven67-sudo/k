@@ -18,6 +18,7 @@ window.GameSystem = window.GameSystem || (function () {
     autoSave: function (fn, seconds) { getState = fn; setInterval(write, (seconds || 5) * 1000); return this; },
     saveNow: function () { write(); },
     clear: function () { try { localStorage.removeItem(KEY); } catch (e) {} },
-    onPause: function () {}, onResume: function () {}, toast: function () {}, quit: function () {}
+    onPause: function () {}, onResume: function () {}, toast: function () {}, quit: function () {},
+    offerPicture: function () { return false; }
   };
 })();

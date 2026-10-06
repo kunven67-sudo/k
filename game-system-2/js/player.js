@@ -50,7 +50,17 @@
     menu: function (id) { if (cur && cur.id === id) toggleMenu(); },
     edge: function (id) { if (cur && cur.id === id) showPill(); },
     toast: function (id, msg) { if (cur && cur.id === id) ptoast(String(msg)); else UI.toast(String(msg)); },
-    quit: function () { if (cur) setTimeout(function () { close(); }, 0); },
+    quit: function (id) {
+      if (id && window.Win && Win.isOpen(id)) { setTimeout(function () { Win.close(id); }, 0); return; }
+      if (cur && (!id || cur.id === id)) setTimeout(function () { close(); }, 0);
+    },
+    /* an app (like Drawing) offers a picture to use as a game/app picture */
+    picture: function (id, dataUrl) {
+      if (typeof dataUrl !== 'string' || !/^data:image\/(png|jpeg|webp);base64,/.test(dataUrl) || dataUrl.length > 12000000) return false;
+      if (!sinkFor(id)) return false;
+      setTimeout(function () { Pics.useFor(U.dataUrlToBlob(dataUrl), id); }, 0);
+      return true;
+    },
     ready: function (id, info) { var s = sinkFor(id); if (s && s.ready) s.ready(info || {}); },
     kitInfo: function (id, info) { var s = sinkFor(id); if (s && s.kitInfo) s.kitInfo(info || {}); }
   };
@@ -160,9 +170,10 @@
   function popGameState() {
     if (history.state && history.state.gs2 === 'game') { ignorePop = true; history.back(); }
   }
-  window.addEventListener('popstate', function () {
-    if (ignorePop) { ignorePop = false; return; }
+  window.addEventListener('popstate', function (e) {
+    if (ignorePop) { ignorePop = false; e.gs2Handled = true; return; }
     if (!cur) return;
+    e.gs2Handled = true;
     if (!el('console-drawer').hidden) { Player.closeConsole(); pushGameState(); return; }
     if (cur.menuOpen) { close(); return; }
     openMenu();
@@ -280,6 +291,8 @@
     opts = opts || {};
     var g = D.get(id);
     if (!g) { UI.toast('That game is gone.', { type: 'warn' }); return; }
+    /* apps open in a window instead */
+    if (D.isApp(g) && !opts.fullscreen) { await Win.open(id, { fresh: opts.fresh }); return; }
     if (cur) await close({ quiet: true, keepHistory: true });
     if (UI.modalCount()) document.querySelectorAll('.modal-back').forEach(function (b) { b.remove(); });
     UI.closeMenu();
@@ -664,7 +677,7 @@
     var save = g.source === 'link' ? null : await D.latestSave(id);
     var mode = D.settings.resume || 'popup';
     if (mode === 'menu') { D.ui.playing = null; D.saveUI(); return; }
-    if (mode === 'auto') { launch(id, { resumed: true }); return; }
+    if (mode === 'auto') { launch(id, { resumed: true, fullscreen: true }); return; }
     var art = h('div.det-art', { style: { width: '100%', marginBottom: '14px' } }, UI.art(g));
     var always = h('input', { type: 'checkbox', onchange: function () {
       D.settings.resume = always.checked ? 'auto' : 'popup';
@@ -680,7 +693,7 @@
         h('label.check-row.small', always, h('span', 'Always jump straight in next time (you can change this in Settings)'))),
       actions: [
         { label: 'Not now', kind: 'ghost', onClick: function () { D.ui.playing = null; D.saveUI(); } },
-        { label: 'CONTINUE', icon: 'play', kind: 'primary', autofocus: true, onClick: function () { launch(id, { resumed: true }); } }
+        { label: 'CONTINUE', icon: 'play', kind: 'primary', autofocus: true, onClick: function () { launch(id, { resumed: true, fullscreen: true }); } }
       ],
       onClose: function (reason) { if (reason !== 'action') { D.ui.playing = null; D.saveUI(); } }
     });

@@ -62,7 +62,7 @@
         }
       }
       files.unshift({ path: 'gs2-backup.json', data: JSON.stringify(manifest) });
-      files.push({ path: 'README.txt', data: 'This is a Game System 2.0 backup (' + games.length + ' games, made ' + new Date().toLocaleString() + ').\r\n\r\nTo restore it: open Game System 2.0 -> Settings -> "Restore a backup" -> pick this .zip file.\r\nYou don\'t need to unzip it.\r\n' });
+      files.push({ path: 'README.txt', data: 'This is a Game System 2.0 backup (' + countText(games) + ', made ' + new Date().toLocaleString() + ').\r\n\r\nTo restore it: open Game System 2.0 -> Settings -> "Restore a backup" -> pick this .zip file.\r\nYou don\'t need to unzip it.\r\n' });
       var zip = await GS2Zip.makeZip(files, function (n, total) { p.set('Zipping… ' + n + '/' + total, 0.5 + n / total * 0.5); });
       p.close();
       var name = 'game-system-backup-' + U.dayKey() + (full ? '' : '-' + games.length + '-games') + '.zip';
@@ -105,7 +105,7 @@
       title: 'Restore backup',
       icon: 'download',
       body: h('div',
-        h('p', 'Backup from ', h('b', new Date(manifest.created).toLocaleString()), ' with ', h('b', manifest.games.length + ' game' + (manifest.games.length === 1 ? '' : 's')), '.'),
+        h('p', 'Backup from ', h('b', new Date(manifest.created).toLocaleString()), ' with ', h('b', countText(manifest.games.filter(Boolean))), '.'),
         existing ? h('div', h('p.small.muted', existing + ' of them ' + (existing === 1 ? 'is' : 'are') + ' already in your library. What should happen to those?'), modeSeg) : null,
         manifest.settings ? h('label.row', { style: { marginTop: '14px' } }, setCb, 'Also restore my settings (name, colors, etc.)') : null),
       actions: [{ label: 'Cancel', kind: 'ghost' }, { label: 'Restore', kind: 'primary', onClick: function () { run(); } }]
@@ -114,7 +114,7 @@
     async function run() {
       var p = progressModal('Restoring', 'download');
       try {
-        var restored = 0;
+        var restoredList = [];
         var savesById = {};
         (manifest.saves || []).forEach(function (s) { savesById[s.g] = s; });
         for (var i = 0; i < manifest.games.length; i++) {
@@ -142,7 +142,7 @@
           if (sv && sv.data != null) await D.putSave(meta.id, sv.data, sv.t || Date.now());
           var ls = (manifest.storage || {})[meta.id];
           if (ls) Object.keys(ls).forEach(function (k) { try { localStorage.setItem('gs2:ls:' + meta.id + ':' + k, String(ls[k])); } catch (e) { /* full */ } });
-          restored++;
+          restoredList.push(rec);
         }
         if (manifest.days && typeof manifest.days === 'object') {
           Object.keys(manifest.days).forEach(function (day) {
@@ -161,7 +161,7 @@
         p.close();
         D.emit('games');
         Sound.good();
-        UI.toast(restored + ' game' + (restored === 1 ? '' : 's') + ' restored! Welcome back.', { type: 'good', sound: false });
+        UI.toast(countText(restoredList) + ' restored! Welcome back.', { type: 'good', sound: false });
         App.go('home');
       } catch (err) {
         p.close();
@@ -170,12 +170,22 @@
     }
   }
 
+  /* "3 games and 4 apps" */
+  function countText(list) {
+    var apps = list.filter(D.isApp).length;
+    var games = list.length - apps;
+    var parts = [];
+    if (games || !apps) parts.push(games + ' game' + (games === 1 ? '' : 's'));
+    if (apps) parts.push(apps + ' app' + (apps === 1 ? '' : 's'));
+    return parts.join(' and ');
+  }
+
   /* ---------------- build the Netlify folder ---------------- */
   async function buildSite() {
     var games = D.list();
     var ok = await UI.confirm('Build website folder',
       h('div',
-        h('p', 'I\'ll make ONE zip with Game System 2.0 + ', h('b', games.length + ' game' + (games.length === 1 ? '' : 's')), ' inside. Put it on Netlify and your games work on any computer.'),
+        h('p', 'I\'ll make ONE zip with Game System 2.0 + ', h('b', countText(games)), ' inside. Put it on Netlify and your games work on any computer.'),
         h('p.small.muted', 'Saves are NOT included (they stay in each browser). Use a backup to move saves.')),
       { ok: 'Build it', icon: 'box' });
     if (!ok) return;
@@ -198,6 +208,11 @@
           rev: g.source === 'site' ? (g.siteRev || 1) : Math.floor((g.updated || g.created || Date.now()) / 1000),
           isolate: g.isolate !== false
         };
+        if (D.isApp(g)) item.kind = 'app';
+        if (g.win) item.win = g.win;
+        if (g.linkMode) item.linkMode = g.linkMode;
+        if (g.builtin) item.builtin = true;
+        if (g.icon) item.icon = g.icon;
         if (g.source === 'link') {
           item.url = g.url;
         } else {

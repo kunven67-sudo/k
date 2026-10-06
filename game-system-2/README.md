@@ -1,6 +1,6 @@
 # Game System 2.0
 
-Your games, one system. Drop in games, play them, and they continue exactly where you left off, even after your PC turns off.
+Your games and apps, one system. Drop in games, play them, and they continue exactly where you left off, even after your PC turns off. Apps (music, notes, websites…) open in windows next to it all.
 
 ## Put it on your website (Netlify)
 
@@ -48,6 +48,33 @@ That game doesn't use the Save Kit. It may remember your progress, but it can't 
 Your saves stay. If the new code breaks something, open the upgrade window again and press **Undo last upgrade**.
 
 To always skip the "Continue?" popup: **Settings → Start-up & resume → When I come back to a game → Jump right in**, or tick the box on the popup.
+
+## Apps
+
+The **Apps** tab is like a phone home screen. Apps open in a **window** instead of full screen, so you can use a few at once:
+
+- Drag a window by its top bar, resize it from the bottom-right corner, double-click the top bar to make it full size.
+- The **–** button minimizes it to the taskbar at the bottom. Minimized apps keep running (music keeps playing, even while you play a game).
+- Windows that were open come back after your PC restarts, and apps that use the Save Kit come back to the same spot.
+- On a phone, apps fill the screen. The phone's **Back** button minimizes them.
+
+Built-in apps:
+
+| App | What it does |
+|---|---|
+| **Music** | Add your own songs (mp3, m4a, wav, ogg, flac…). Shuffle, repeat, a visualizer, keyboard controls. Songs are saved in this browser. |
+| **Notes** | Notes that save while you type. Search, pin, download as .txt. |
+| **Calculator** | Science buttons, history, keyboard typing. |
+| **Drawing** | Brush, highlighter, shapes, fill bucket, undo. **Use as picture** turns your drawing into a game's picture. |
+
+Deleted a built-in app? The Apps tab has a **Bring them back** button.
+
+Adding your own apps:
+
+- **Add app** on the Apps tab works like adding games (files, folders, zips, pasted code).
+- **Add a website** puts any website in your apps. Big sites like YouTube, Google or Discord refuse to show up inside other sites, so those open in their own popup window (you can change this in the app's options).
+- When you import, every item has a **Game / App** switch. Importing your old folder sorts things automatically (anything in an "Apps" or "Tools" section of your old menu becomes an app).
+- Any game can become an app (and back): right-click it → **Move to Apps** / **Move to Games**.
 
 ## Game pictures
 
@@ -106,7 +133,10 @@ GameSystem.autoSave(() => ({ /* everything needed to continue */ }));  // saved 
 GameSystem.save(state);                   // save right now
 GameSystem.clear();                       // delete the save (new game)
 GameSystem.onPause(fn); GameSystem.onResume(fn);   // quick menu opened / closed
+GameSystem.offerPicture(canvas.toDataURL());       // let the player use a picture as a game's picture
 ```
+
+The function you give `autoSave` gets a reason: `'auto'` (the timer, every few seconds) or `'exit'` / `'flush'` / `'manual'` (closing or saving now). Heavy apps can return a slightly older state for `'auto'` and an exact one for the others.
 
 For games that should also work outside Game System, paste `kit/save-kit.js` at the top of the game's script.
 
@@ -120,7 +150,8 @@ Each game also gets its own private `localStorage`, `sessionStorage` and Indexed
 | `sw.js` | Service worker: serves games from the browser at `play/<game>/`, keeps the app working offline |
 | `kit/gs2-kit.js` | Added to every game automatically (Save Kit, private saves, error reporting) |
 | `kit/save-kit.js` | Copy-paste Save Kit for AI-made games |
-| `games/games.json` | Games that come with the website (made by **Build website folder**) |
+| `games/games.json` | Games and apps that come with the website (made by **Build website folder**) |
+| `games/gs2-*/` | The built-in apps (Music, Notes, Calculator, Drawing) |
 | `vendor/` | CodeMirror (code editor) and Acorn (syntax checker), MIT licensed |
 | `fonts/` | Orbitron and Chakra Petch, SIL Open Font License |
 

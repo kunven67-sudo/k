@@ -193,18 +193,41 @@
       if (img && !cur.img) cur.img = index.get(resolve('', img).toLowerCase()) || null;
       out.set(real, cur);
     }
+    /* which section of the old menu is a link in? ("Apps" / "Tools" vs "Games") */
+    var marks = [];
+    var hm;
+    var headRe = /<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi;
+    while ((hm = headRe.exec(text))) marks.push({ pos: hm.index, text: hm[1].replace(/<[^>]+>/g, ' ') });
+    var boxRe = /<(?:section|div|ul|nav|main|article)\b[^>]*\b(?:id|class)\s*=\s*["']([^"']*)["']/gi;
+    while ((hm = boxRe.exec(text))) {
+      if (/\b(apps?|tools?|utilit(?:y|ies)|games?)\b/i.test(hm[1].replace(/[-_]/g, ' '))) marks.push({ pos: hm.index, text: hm[1].replace(/[-_]/g, ' ') });
+    }
+    marks.sort(function (a, b) { return a.pos - b.pos; });
+    function sectionAt(pos) {
+      var t = '';
+      for (var i = 0; i < marks.length && marks[i].pos < pos; i++) t = marks[i].text;
+      if (/\b(apps?|tools?|utilit(?:y|ies))\b/i.test(t)) return 'app';
+      if (/\bgames?\b/i.test(t)) return 'game';
+      return '';
+    }
+    function setKind(path, kind) {
+      if (!kind) return;
+      var real = index.get(resolve('', path).toLowerCase()) || index.get((resolve('', path) + '/index.html').toLowerCase()) || index.get((resolve('', path) + 'index.html').toLowerCase());
+      if (real && out.has(real) && !out.get(real).kind) out.get(real).kind = kind;
+    }
     var m;
     var aRe = /<a\b[^>]*?href\s*=\s*["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
     while ((m = aRe.exec(text))) {
       var img = /<img[^>]+src\s*=\s*["']([^"']+)["']/i.exec(m[2]);
       add(m[1], m[2], img && img[1]);
+      setKind(m[1], sectionAt(m.index));
     }
     var clickRe = /<(button|div|li|span|article|section|td|p)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
     while ((m = clickRe.exec(text))) {
       var attrs = m[2];
       if (!/\bon\w+\s*=/i.test(attrs) && !/\bdata-[\w-]+\s*=/i.test(attrs)) continue;
       var target = /([\w./%-]+\.html?)\b/i.exec(attrs);
-      if (target) add(target[1], m[3]);
+      if (target) { add(target[1], m[3]); setKind(target[1], sectionAt(m.index)); }
     }
     var objRe = /\{[^{}]{0,600}\}/g;
     while ((m = objRe.exec(text))) {
@@ -214,8 +237,19 @@
       var name = /\b(?:name|title|label|text)\s*:\s*["'`]([^"'`]{1,60})["'`]/i.exec(block);
       var pic = /\b(?:img|image|icon|thumb|thumbnail|cover|pic)\s*:\s*["'`]([^"'`\s]+)["'`]/i.exec(block);
       add(file[1], name && name[1], pic && pic[1]);
+      var kindM = /\b(?:type|kind|category|cat|section|group)\s*:\s*["'`]([^"'`]{1,30})["'`]/i.exec(block);
+      if (kindM) setKind(file[1], /\b(apps?|tools?|utilit(?:y|ies))\b/i.test(kindM[1]) ? 'app' : (/\bgames?\b/i.test(kindM[1]) ? 'game' : ''));
+      else setKind(file[1], sectionAt(m.index));
     }
     return out;
+  }
+
+  /* does the name sound like an app (music player, notes…) instead of a game? */
+  var APP_WORDS = /\b(music|mp3|player|radio|playlist|notes?|notepad|journal|diary|calculator|calc|paint|drawing|draw|sketch|whiteboard|todo|to-?do|tasks?|timer|stopwatch|clock|alarm|countdown|weather|chat|messenger|browser|text editor|code editor|converter|calendar|planner|tracker|recorder|camera|translator|dictionary|gallery|photos?|video player|budget|reader|viewer|tools?|utility|settings|app)\b/i;
+  var GAME_WORDS = /\b(game|play|quest|simulator|sim|shooter|racing|racer|clicker|tycoon|rpg|adventure|platformer|puzzle|arcade|battle|war|fight|run(ner)?|craft|zombie|snake|tetris|pong|chess|casino|slots?|blackjack|poker|level|boss)\b/i;
+  function guessKind(name) {
+    var n = String(name || '');
+    return APP_WORDS.test(n) && !GAME_WORDS.test(n) ? 'app' : 'game';
   }
 
   /* "🐍 Snake Game" → { emoji: '🐍', text: 'Snake Game' } */
@@ -286,7 +320,7 @@
         var labels = launcherLabels(ltext, index);
         games.forEach(function (g) {
           var lab = labels.get(g.origPath);
-          if (lab) { g.label = lab.label; if (lab.img) g.coverPath = lab.img; }
+          if (lab) { g.label = lab.label; if (lab.img) g.coverPath = lab.img; if (lab.kind) g.kindHint = lab.kind; }
         });
         var lpaths = await collectRefs(rootIndex.path, byPath, index);
         lpaths = lpaths.filter(function (p) { return !/\.html?$/i.test(p) || p === rootIndex.path; });
@@ -316,6 +350,7 @@
       g.emoji = em.emoji || U.guessEmoji(g.name + ' ' + (g.title || ''));
       g.size = g.files.reduce(function (s, f) { return s + (f.file ? f.file.size : 0); }, 0);
       g.checked = !g.launcher;
+      g.kind = g.launcher ? 'game' : (hints.kind === 'app' || hints.kind === 'game' ? hints.kind : (g.kindHint || guessKind(g.name + ' ' + (g.title || ''))));
       var existing = D.findByName(g.name);
       g.existingId = existing ? existing.id : null;
       g.mode = existing ? 'update' : 'new';
@@ -365,7 +400,7 @@
         return;
       }
       busy.set('Finding games…');
-      var res = await detect(all, { zipName: zipName });
+      var res = await detect(all, { zipName: zipName, kind: opts.kind });
       busy.close();
       if (!res.games.length) {
         UI.alert('No games found', res.note || 'Couldn\'t find a game in there.');
@@ -377,6 +412,31 @@
       console.error(err);
       UI.alert('That didn\'t work', h('div', h('p', err.message || String(err)), h('p.muted.small', 'Try adding the files a different way (for example unzip it and add the folder).')));
     }
+  }
+
+  /* a small Game | App switch */
+  function kindSwitch(value, onPick) {
+    var el = h('div.seg.kind-seg', { role: 'group', 'aria-label': 'Game or app' });
+    [['game', 'gamepad', 'Game'], ['app', 'apps', 'App']].forEach(function (k) {
+      el.appendChild(h('button' + (k[0] === value ? '.on' : ''), {
+        type: 'button',
+        title: k[0] === 'app' ? 'Opens in a window' : 'Opens full screen',
+        'aria-pressed': k[0] === value ? 'true' : 'false',
+        onclick: function () {
+          el.querySelectorAll('button').forEach(function (b) { b.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); });
+          this.classList.add('on');
+          this.setAttribute('aria-pressed', 'true');
+          Sound.select();
+          onPick(k[0]);
+        }
+      }, I(k[1]), k[2]));
+    });
+    return el;
+  }
+  function kindWord(list) {
+    var apps = list.filter(function (g) { return g.kind === 'app'; }).length;
+    if (apps && apps === list.length) return 'app';
+    return apps ? 'game or app' : 'game';
   }
 
   function review(res, opts) {
@@ -393,27 +453,31 @@
       var n = games.filter(function (g) { return g.checked; }).length;
       count.textContent = n;
       if (importBtn) importBtn.disabled = n === 0;
+      var apps = games.filter(function (g) { return g.checked && g.kind === 'app'; }).length;
+      folderField.hidden = n > 0 && apps === n;
     }
+    var folderField = h('div.field', h('label', 'Put games in folder (optional)'), folderInput, dl);
 
     function row(g) {
-      var cb = h('input', { type: 'checkbox', checked: g.checked, 'aria-label': 'Import this game' });
+      var cb = h('input', { type: 'checkbox', checked: g.checked, 'aria-label': 'Import this' });
       var artBox = h('div.ri-art', UI.art({ name: g.name, emoji: g.emoji, color: U.colorFor(g.name) }, { noName: true }));
-      var name = h('input.input', { value: g.name, maxlength: 80, 'aria-label': 'Game name' });
+      var name = h('input.input', { value: g.name, maxlength: 80, 'aria-label': 'Name' });
       name.value = g.name;
       var modeSel = null;
       if (g.existingId) {
         modeSel = h('select.select', { style: { width: 'auto' }, onchange: function () { g.mode = modeSel.value; } },
           h('option', { value: 'update' }, 'Update existing (keeps saves)'),
-          h('option', { value: 'new' }, 'Add as a new game'));
+          h('option', { value: 'new' }, 'Add as a new one'));
         modeSel.value = g.mode;
       }
+      var kindSel = g.launcher ? null : kindSwitch(g.kind, function (k) { g.kind = k; g.kindTouched = true; refreshCount(); });
       var el = h('div.review-item' + (g.checked ? '' : '.off'),
         cb, artBox,
         h('div.ri-main', name,
           h('div.ri-sub', I('file'), ' ' + g.entry + ' · ' + g.files.length + ' file' + (g.files.length === 1 ? '' : 's') + ' · ' + U.fmtBytes(g.size), g.coverFile ? [' · ', I('image'), ' cover found'] : null),
           g.launcher ? h('div.ri-warn', I('info'), ' This looks like your OLD game menu page, not a game. Leave it unchecked unless you want it.') : null,
-          g.existingId ? h('div.ri-warn', I('warn'), ' You already have a game called "' + D.get(g.existingId).name + '"') : null),
-        modeSel ? h('div.row', modeSel) : h('div'));
+          g.existingId ? h('div.ri-warn', I('warn'), ' You already have ' + (D.isApp(D.get(g.existingId)) ? 'an app' : 'a game') + ' called "' + D.get(g.existingId).name + '"') : null),
+        h('div.ri-side', kindSel, modeSel));
       cb.addEventListener('change', function () { g.checked = cb.checked; el.classList.toggle('off', !g.checked); refreshCount(); });
       name.addEventListener('input', function () {
         g.name = name.value;
@@ -423,20 +487,24 @@
     }
     games.forEach(function (g) { list.appendChild(row(g)); });
 
+    var real = games.filter(function (g) { return !g.launcher; });
+    var word = kindWord(real);
+    var plural = function (n) { return n === 1 ? word : (word === 'game or app' ? 'games and apps' : word + 's'); };
     var intro = res.legacy
-      ? h('p', 'Found your old Game System folder! I found ', h('b', String(games.length - 1)), ' game' + (games.length - 1 === 1 ? '' : 's') + '. Check the names and hit import.')
-      : h('p', 'Found ', h('b', String(games.length)), ' game' + (games.length === 1 ? '' : 's') + '. Fix the names if you want, then import.');
+      ? h('p', 'Found your old Game System folder! I found ', h('b', String(real.length)), ' ' + plural(real.length) + '. Check the names, pick ', h('b', 'Game'), ' or ', h('b', 'App'), ' for each, and hit import.')
+      : h('p', 'Found ', h('b', String(games.length)), ' ' + plural(games.length) + '. Fix the names if you want, then import.');
 
     var m = UI.modal({
-      title: 'Import games',
+      title: word === 'app' ? 'Import apps' : 'Import',
       icon: 'download',
       wide: true,
       body: h('div', intro,
-        h('div.field', h('label', 'Put them in folder (optional)'), folderInput, dl),
+        h('p.small.muted', I('gamepad'), ' Games open full screen. ', I('apps'), ' Apps open in a window, so you can use a few at once.'),
+        folderField,
         list),
       actions: [
         { label: 'Cancel', kind: 'ghost' },
-        games.length > 1 ? { label: 'It\'s all ONE game', icon: 'link', kind: 'ghost', onClick: function () { mergeAsOne(); return false; } } : null,
+        games.length > 1 ? { label: 'It\'s all ONE ' + (word === 'app' ? 'app' : 'game'), icon: 'link', kind: 'ghost', onClick: function () { mergeAsOne(); return false; } } : null,
         { label: 'Import', kind: 'primary', id: 'btn-do-import', onClick: function () { return doImport(games, folderInput.value.trim(), m); } }
       ]
     });
@@ -447,25 +515,27 @@
     /* rebuild from the original upload, with everything as one game */
     function mergeAsOne() {
       m.close();
-      oneGame(res);
+      oneGame(res, opts);
     }
   }
 
   /* Re-detect everything as one game (entry = top index.html or first html) */
-  function oneGame(res) {
+  function oneGame(res, opts) {
     var all = res._all;
     if (!all) return;
+    opts = opts || {};
     var htmls = all.filter(function (e) { return /\.html?$/i.test(e.path); });
     var entry = (htmls.find(function (e) { return /^index\.html?$/i.test(e.path); }) || htmls[0]).path;
     var name = res.rootName || U.prettyName(baseName(entry));
     review({
       games: [{
         entry: entry, files: all.slice(), name: name, emoji: U.guessEmoji(name), checked: true,
+        kind: opts.kind === 'app' || opts.kind === 'game' ? opts.kind : guessKind(name),
         size: all.reduce(function (s, f) { return s + f.file.size; }, 0),
         existingId: D.findByName(name) ? D.findByName(name).id : null, mode: D.findByName(name) ? 'update' : 'new'
       }],
       rootName: res.rootName
-    }, {});
+    }, { kind: opts.kind });
   }
 
   async function doImport(games, folder, m) {
@@ -479,24 +549,28 @@
       var g = chosen[i];
       var files = g.files.map(function (f) { return { p: f.path, b: f.file, t: U.mimeOf(f.path) }; });
       var id;
+      var kind = g.kind === 'app' ? 'app' : 'game';
       if (g.mode === 'update' && g.existingId && D.get(g.existingId)) {
         await D.replaceFiles(g.existingId, files, g.entry);
-        await D.updateGame(g.existingId, { name: g.name.trim(), emoji: g.emoji });
+        var patch = { name: g.name.trim(), emoji: g.emoji };
+        if (g.kindTouched) { patch.kind = kind; patch.kindSet = true; }
+        await D.updateGame(g.existingId, patch);
         id = g.existingId;
       } else {
-        var rec = await D.addGame({ name: g.name.trim(), emoji: g.emoji, entry: g.entry, folder: folder }, files);
+        var rec = await D.addGame({ name: g.name.trim(), emoji: g.emoji, entry: g.entry, folder: kind === 'app' ? '' : folder, kind: kind }, files);
         id = rec.id;
       }
       if (g.coverFile) { try { await D.setCover(id, g.coverFile); } catch (e) { /* bad picture */ } }
-      if (!firstId) firstId = id;
+      if (!firstId && !D.isApp(D.get(id))) firstId = id;
       done++;
       prog.firstChild.style.width = Math.round(done / chosen.length * 100) + '%';
     }
     if (navigator.storage && navigator.storage.persist) { try { await navigator.storage.persist(); } catch (e) { /* ignore */ } }
     Sound.good();
-    UI.toast(done === 1 ? '"' + chosen[0].name + '" is ready to play!' : done + ' games imported! Let\'s gooo', { type: 'good' });
+    var allApps = chosen.every(function (g) { return g.kind === 'app'; });
+    UI.toast(done === 1 ? '"' + chosen[0].name + '" is ready' + (allApps ? '!' : ' to play!') : done + ' ' + (allApps ? 'apps' : 'imported') + (allApps ? ' added!' : '! Let\'s gooo'), { type: 'good' });
     if (firstId) { D.ui.sel = firstId; D.saveUI(); }
-    App.go('home');
+    App.go(allApps ? 'apps' : 'home');
     return true;
   }
 
@@ -509,8 +583,17 @@
       code + '\n</script>\n</body>\n</html>\n';
   }
 
-  async function pasteDialog(prefill) {
-    var nameIn = h('input.input', { placeholder: 'Name your game', maxlength: 80 });
+  async function pasteDialog(prefill, opts) {
+    opts = opts || {};
+    var kind = opts.kind === 'app' ? 'app' : 'game';
+    var kindTouched = opts.kind === 'app' || opts.kind === 'game';
+    var nameIn = h('input.input', { placeholder: 'Name it', maxlength: 80, 'aria-label': 'Name' });
+    var addBtn = null, playBtn = null;
+    var kindSel = kindSwitch(kind, function (k) { kind = k; kindTouched = true; relabel(); });
+    function relabel() {
+      if (addBtn) addBtn.textContent = kind === 'app' ? 'Add app' : 'Add game';
+      if (playBtn) playBtn.lastChild.textContent = kind === 'app' ? 'Add & open' : 'Add & play';
+    }
     var emoji = '🎮';
     var host = h('div', { style: { height: '46vh', minHeight: '260px', position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--line2)' } });
     var status = h('div.small.muted', { style: { minHeight: '22px', marginTop: '8px' } }, 'Paste the code the AI gave you (the whole thing).');
@@ -518,20 +601,22 @@
     var editor = null;
     var nameTouched = false;
 
-    UI.modal({
-      title: 'Paste game code',
+    var pm = UI.modal({
+      title: kind === 'app' ? 'Paste app code' : 'Paste game code',
       icon: 'code',
       xwide: true,
       body: h('div',
-        h('div.row', { style: { marginBottom: '12px' } }, h('div.grow', nameIn),
+        h('div.row', { style: { marginBottom: '12px' } }, h('div.grow', nameIn), kindSel,
           h('button.btn.sm', { onclick: function () { appendDialog(); }, title: 'The AI got cut off and sent the rest in another message? Glue it on here.' }, I('fileAdd'), 'Glue on more code')),
         banner, host, status),
       actions: [
         { label: 'Cancel', kind: 'ghost' },
-        { label: 'Add game', kind: '', onClick: function () { return save(false); } },
-        { label: 'Add & play', icon: 'play', kind: 'primary', onClick: function () { return save(true); } }
+        { label: kind === 'app' ? 'Add app' : 'Add game', kind: '', id: 'btn-paste-add', onClick: function () { return save(false); } },
+        { label: kind === 'app' ? 'Add & open' : 'Add & play', icon: 'play', kind: 'primary', id: 'btn-paste-play', onClick: function () { return save(true); } }
       ]
     });
+    addBtn = pm.el.querySelector('#btn-paste-add');
+    playBtn = pm.el.querySelector('#btn-paste-play');
     nameIn.addEventListener('input', function () { nameTouched = true; });
 
     editor = await Editor.mini(host, prefill || '', { placeholder: 'Paste your game code here…' });
@@ -550,7 +635,14 @@
       }
       if (!nameTouched) {
         var t = titleOf(code);
-        if (t) { nameIn.value = t; emoji = U.guessEmoji(t); }
+        if (t) {
+          nameIn.value = t;
+          emoji = U.guessEmoji(t);
+          if (!kindTouched) {
+            var k = guessKind(t);
+            if (k !== kind) { kind = k; kindSel.replaceWith(kindSel = kindSwitch(kind, function (x) { kind = x; kindTouched = true; relabel(); })); relabel(); }
+          }
+        }
       }
       if (!code.trim()) { banner.replaceChildren(); status.textContent = 'Paste the code the AI gave you (the whole thing).'; return; }
       var isMarkup = /<\s*(html|body|head|script|div|canvas|style|!doctype)\b/i.test(code);
@@ -582,48 +674,73 @@
     async function save(play) {
       var code = editor.getValue();
       if (!code.trim()) { UI.toast('Paste some code first, bro', { type: 'warn' }); return false; }
-      var name = nameIn.value.trim() || titleOf(code) || 'My Game';
+      var name = nameIn.value.trim() || titleOf(code) || (kind === 'app' ? 'My App' : 'My Game');
       var html = wrapIfScriptOnly(code, name);
       var existing = D.findByName(name);
       var id;
       var files = [{ p: 'index.html', b: new Blob([html], { type: 'text/html' }), t: 'text/html' }];
-      if (existing && await UI.confirm('Update "' + existing.name + '"?', 'You already have a game with this name. Update it with this new code? (Your saves stay.)', { ok: 'Update it', cancel: 'Add as new' })) {
+      if (existing && await UI.confirm('Update "' + existing.name + '"?', 'You already have ' + (D.isApp(existing) ? 'an app' : 'a game') + ' with this name. Update it with this new code? (Your saves stay.)', { ok: 'Update it', cancel: 'Add as new' })) {
         await D.replaceFiles(existing.id, files, 'index.html');
         id = existing.id;
       } else {
-        id = (await D.addGame({ name: name, emoji: emoji === '🎮' ? U.guessEmoji(name) : emoji, entry: 'index.html' }, files)).id;
+        id = (await D.addGame({ name: name, emoji: emoji === '🎮' ? U.guessEmoji(name) : emoji, entry: 'index.html', kind: kind }, files)).id;
       }
-      D.ui.sel = id;
-      D.saveUI();
+      var isApp = D.isApp(D.get(id));
+      if (!isApp) { D.ui.sel = id; D.saveUI(); }
       UI.toast('"' + name + '" added!', { type: 'good' });
-      App.go('home');
-      if (play) setTimeout(function () { Player.launch(id); }, 250);
+      App.go(isApp ? 'apps' : 'home');
+      if (play) setTimeout(function () { Player.launch(id, { fresh: true }); }, 250);
       return true;
     }
   }
 
   /* ---------------- link ---------------- */
-  function linkDialog() {
-    var name = h('input.input', { placeholder: 'Game name' });
-    var url = h('input.input', { placeholder: 'https://…', type: 'url' });
+  function linkDialog(opts) {
+    opts = opts || {};
+    var kind = opts.kind === 'app' ? 'app' : 'game';
+    var name = h('input.input', { placeholder: 'Name', 'aria-label': 'Name' });
+    var url = h('input.input', { placeholder: 'https://…', type: 'url', 'aria-label': 'Link' });
+    var mode = 'auto';
+    var modeSeg = h('div.seg');
+    [['auto', 'Automatic'], ['inside', 'Inside a window'], ['popup', 'Its own popup']].forEach(function (o) {
+      modeSeg.appendChild(h('button' + (o[0] === mode ? '.on' : ''), { type: 'button', onclick: function () {
+        mode = o[0];
+        modeSeg.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b === this); }, this);
+        Sound.select();
+      } }, o[1]));
+    });
+    var modeField = h('div.field', h('label', 'Open it'), modeSeg,
+      h('p.small.muted', { style: { margin: '6px 0 0' } }, 'Big sites like YouTube, Google or Discord refuse to show up inside other sites. "Automatic" opens those in their own popup window.'));
+    modeField.hidden = kind !== 'app';
+    var note = h('p.muted.small', kind === 'app' ? '' : 'Some websites don\'t allow being shown inside other sites. If it shows an error, use "Open in new tab" from the quick menu.');
+    var kindSel = kindSwitch(kind, function (k) {
+      kind = k;
+      modeField.hidden = k !== 'app';
+      note.textContent = k === 'app' ? '' : 'Some websites don\'t allow being shown inside other sites. If it shows an error, use "Open in new tab" from the quick menu.';
+    });
     UI.modal({
-      title: 'Add a game link',
+      title: kind === 'app' ? 'Add a website app' : 'Add a game link',
       icon: 'link',
       body: h('div',
-        h('p.muted.small', 'Some websites don\'t allow being shown inside other sites. If it shows an error, use "Open in new tab" from the quick menu.'),
+        note,
+        h('div.field', h('label', 'Link'), url),
         h('div.field', h('label', 'Name'), name),
-        h('div.field', h('label', 'Link'), url)),
+        h('div.field', h('label', 'This is a…'), kindSel),
+        modeField),
       actions: [{ label: 'Cancel', kind: 'ghost' }, { label: 'Add', kind: 'primary', onClick: async function () {
         var u = url.value.trim();
-        if (!/^https?:\/\//i.test(u)) { UI.toast('The link needs to start with https://', { type: 'warn' }); return false; }
-        var n = name.value.trim() || (function () { try { return U.prettyName(new URL(u).hostname.replace(/^www\./, '').split('.')[0]); } catch (e) { return 'Web Game'; } })();
-        var g = await D.addGame({ name: n, source: 'link', url: u, entry: '' }, []);
-        D.ui.sel = g.id;
-        D.saveUI();
-        App.go('home');
-        UI.toast('Link added', { type: 'good', icon: 'link' });
+        if (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(u)) u = 'https://' + u;
+        if (!/^https?:\/\/[^\s/]+\.[^\s]+/i.test(u)) { UI.toast('That doesn\'t look like a link. It should look like https://example.com', { type: 'warn' }); return false; }
+        var n = name.value.trim() || (function () { try { return U.prettyName(new URL(u).hostname.replace(/^www\./, '').split('.')[0]); } catch (e) { return 'Website'; } })();
+        var meta = { name: n, source: 'link', url: u, entry: '', kind: kind };
+        if (kind === 'app' && mode !== 'auto') meta.linkMode = mode;
+        var g = await D.addGame(meta, []);
+        if (kind === 'app') { App.go('apps'); }
+        else { D.ui.sel = g.id; D.saveUI(); App.go('home'); }
+        UI.toast('"' + n + '" added', { type: 'good', icon: 'link' });
       } }]
     });
+    setTimeout(function () { url.focus(); }, 60);
   }
 
   /* ---------------- the big "Add games" dialog ---------------- */
@@ -640,24 +757,27 @@
     input.click();
   }
 
-  function addDialog() {
-    var dz = h('div.dropzone', { tabindex: 0, onclick: function () { m.close(); pickFiles(); }, onkeydown: function (e) { if (e.key === 'Enter') { m.close(); pickFiles(); } } },
-      h('div.dz-icon', I('inbox')), h('div.dz-title', 'Drop games here'), h('div.dz-sub', '.html · .zip · whole folders · Game System backups'));
+  function addDialog(opts) {
+    opts = opts || {};
+    var app = opts.kind === 'app';
+    var k = app ? { kind: 'app' } : {};
+    var dz = h('div.dropzone', { tabindex: 0, dataset: { kind: app ? 'app' : '' }, onclick: function () { m.close(); pickFiles(k); }, onkeydown: function (e) { if (e.key === 'Enter') { m.close(); pickFiles(k); } } },
+      h('div.dz-icon', I('inbox')), h('div.dz-title', app ? 'Drop apps here' : 'Drop games here'), h('div.dz-sub', '.html · .zip · whole folders · Game System backups'));
     dz.addEventListener('dragover', function (e) { e.preventDefault(); dz.classList.add('over'); });
     dz.addEventListener('dragleave', function () { dz.classList.remove('over'); });
     var m = UI.modal({
-      title: 'Add games',
+      title: app ? 'Add apps' : 'Add games',
       icon: 'plus',
       wide: true,
       body: h('div', dz,
         h('div.act-grid', { style: { marginTop: '16px' } },
-          h('button.btn', { onclick: function () { m.close(); pickFiles(); } }, I('file'), 'Pick files'),
-          h('button.btn', { onclick: function () { m.close(); pickFiles({ folder: true }); } }, I('folder'), 'Pick a folder'),
-          h('button.btn', { onclick: function () { m.close(); pasteDialog(); } }, I('code'), 'Paste code'),
-          h('button.btn', { onclick: function () { m.close(); linkDialog(); } }, I('link'), 'Add a link'),
-          h('button.btn', { onclick: function () { m.close(); importOldFolder(); } }, I('library'), 'Import my old games'),
+          h('button.btn', { onclick: function () { m.close(); pickFiles(k); } }, I('file'), 'Pick files'),
+          h('button.btn', { onclick: function () { m.close(); pickFiles(Object.assign({ folder: true }, k)); } }, I('folder'), 'Pick a folder'),
+          h('button.btn', { onclick: function () { m.close(); pasteDialog('', k); } }, I('code'), 'Paste code'),
+          h('button.btn', { onclick: function () { m.close(); linkDialog(k); } }, I(app ? 'globe' : 'link'), app ? 'Add a website' : 'Add a link'),
+          h('button.btn', { onclick: function () { m.close(); importOldFolder(); } }, I('library'), 'Import my old games + apps'),
           h('button.btn', { onclick: function () { m.close(); Views.aiRules(); } }, I('sparkle'), 'Rules for AI games')),
-        h('p.small.muted', { style: { marginTop: '14px', marginBottom: 0 } }, 'Tip: if a game has pictures or sounds in other files, add the whole folder or a .zip so nothing is missing.'))
+        h('p.small.muted', { style: { marginTop: '14px', marginBottom: 0 } }, 'Tip: if ' + (app ? 'an app' : 'a game') + ' has pictures or sounds in other files, add the whole folder or a .zip so nothing is missing.'))
     });
   }
 
@@ -701,9 +821,12 @@
       if (!document.getElementById('player').hidden) return;
       var got = entriesFromDataTransfer(e.dataTransfer);
       var m = UI.topModal();
-      if (m && m.el.querySelector('.dropzone')) m.close();
+      var dzEl = m && m.el.querySelector('.dropzone');
+      /* dropped on the Apps screen (or the "Add apps" box) → they're apps */
+      var kind = dzEl ? (dzEl.dataset.kind || undefined) : (D.ui.view === 'apps' && !m ? 'app' : undefined);
+      if (dzEl) m.close();
       if (Editor.isOpen() && Editor.wantsDrop(e)) { walk(got.roots, got.loose).then(Editor.addDroppedFiles); return; }
-      walk(got.roots, got.loose).then(function (list) { handleEntries(list, {}); }).catch(function (err) {
+      walk(got.roots, got.loose).then(function (list) { handleEntries(list, { kind: kind }); }).catch(function (err) {
         UI.alert('Couldn\'t read those files', err.message || String(err));
       });
     });

@@ -294,10 +294,11 @@
     if (!gameId || !realLS || json == null || json.length > 1500000) return;
     try { realLS.setItem(EMERG, JSON.stringify({ data: json, t: t || Date.now() })); } catch (e) { /* full */ }
   }
-  function snapshot() {
+  /* reason: 'auto' (the timer: a slightly old state is OK), or 'manual' / 'exit' / 'flush' (must be up to date) */
+  function snapshot(reason) {
     if (!getter) return null;
     var s;
-    try { s = getter(); } catch (e) {
+    try { s = getter(reason || 'flush'); } catch (e) {
       log('error', 'Save Kit: your autoSave() function crashed: ' + (e && e.message), { kind: 'error', stack: e && e.stack ? String(e.stack) : '' });
       return null;
     }
@@ -308,13 +309,13 @@
     }
   }
   function tick(kind) {
-    var json = snapshot();
+    var json = snapshot(kind || 'auto');
     if (json != null && json !== lastJson) persist(json, kind || 'auto');
   }
 
   function onHide() {
     if (!getter) return;
-    var json = snapshot();
+    var json = snapshot('exit');
     if (json == null) json = lastJson;
     if (json == null) return;
     if (json !== lastJson) persist(json, 'exit');
@@ -378,10 +379,13 @@
     onResume: function (fn) { if (typeof fn === 'function') resumeFns.push(fn); },
     toast: function (msg) { call('toast', String(msg)); },
     quit: function () { onHide(); call('quit'); },
+    /* Offer a picture (a data: URL from canvas.toDataURL) to use as the picture of a game or app.
+       Game System asks the player which one. Returns false outside Game System. */
+    offerPicture: function (dataUrl) { return call('picture', String(dataUrl || '')) === true; },
 
     /* ---- used by the Game System itself ---- */
     _flush: function () {
-      var json = snapshot();
+      var json = snapshot('flush');
       if (json != null) { lastJson = json; return json; }
       return null;
     },

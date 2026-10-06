@@ -1,1 +1,85 @@
-{ "gs2": 1, "games": [] }
+{
+ "gs2": 1,
+ "games": [
+  {
+   "id": "gs2-music",
+   "name": "Music",
+   "desc": "Play your own songs with a glowing visualizer. Keeps playing while you game, and comes back to the same spot in the song.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "music",
+   "color": "#ff2bd6",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 36614,
+   "isolate": true,
+   "win": {
+    "w": 760,
+    "h": 580
+   }
+  },
+  {
+   "id": "gs2-notes",
+   "name": "Notes",
+   "desc": "Write anything. Saves while you type, and puts your cursor right back where it was.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "note",
+   "color": "#ffcc00",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 21572,
+   "isolate": true,
+   "win": {
+    "w": 860,
+    "h": 580
+   }
+  },
+  {
+   "id": "gs2-calculator",
+   "name": "Calculator",
+   "desc": "A calculator with science buttons, history, and keyboard typing.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "calc",
+   "color": "#00e5ff",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 26067,
+   "isolate": true,
+   "win": {
+    "w": 400,
+    "h": 620
+   }
+  },
+  {
+   "id": "gs2-drawing",
+   "name": "Drawing",
+   "desc": "Draw, paint and fill. Use your drawing as the picture for any game.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "brush",
+   "color": "#3dffa0",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 31379,
+   "isolate": true,
+   "win": {
+    "w": 1020,
+    "h": 680
+   }
+  }
+ ]
+}

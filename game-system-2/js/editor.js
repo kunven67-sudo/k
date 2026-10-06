@@ -405,7 +405,7 @@
       title,
       h('div.sep'),
       h('button.btn.sm.primary', { onclick: function () { saveAll(); }, title: 'Save (Ctrl+S)' }, UI.icon('save'), 'Save'),
-      h('button.btn.sm', { onclick: async function () { if (await saveAll()) Player.launch(E.id); }, title: 'Save and play (Ctrl+Enter)' }, UI.icon('play'), 'Play'),
+      h('button.btn.sm', { onclick: async function () { if (await saveAll()) Player.launch(E.id, { fresh: true }); }, title: 'Save and play (Ctrl+Enter)' }, UI.icon('play'), 'Play'),
       previewBtn,
       h('div.sep'),
       h('button.icon-btn.sm', { title: 'Find (Ctrl+F)', onclick: function () { if (E.cm) E.cm.execCommand('findPersistent'); } }, UI.icon('search')),
@@ -462,7 +462,7 @@
     E.cm.on('cursorActivity', function () { updateStatus(); persistStateSoon(); });
     E.cm.setOption('extraKeys', Object.assign({}, E.cm.getOption('extraKeys'), {
       'Ctrl-S': function () { saveAll(); }, 'Cmd-S': function () { saveAll(); },
-      'Ctrl-Enter': function () { saveAll().then(function (ok) { if (ok) Player.launch(E.id); }); }
+      'Ctrl-Enter': function () { saveAll().then(function (ok) { if (ok) Player.launch(E.id, { fresh: true }); }); }
     }));
 
     function renderProblems() {

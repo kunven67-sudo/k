@@ -101,7 +101,14 @@
     paw: '<circle cx="6.5" cy="9.5" r="2"/><circle cx="12" cy="6.5" r="2"/><circle cx="17.5" cy="9.5" r="2"/><path d="M12 12c-3 0-6 3.5-6 6 0 2 2 2.5 3 2 1.5-.8 4.5-.8 6 0 1 .5 3 0 3-2 0-2.5-3-6-6-6z"/>',
     spiral: '<path d="M12 12a1 1 0 1 1 1-1 2.5 2.5 0 1 1-3.5-2.3 4.5 4.5 0 1 1-1.6 7.8 6.8 6.8 0 1 1 11.6-4.5"/>',
     slots: '<rect x="3" y="5" width="15" height="15" rx="2"/><path d="M6.5 9v7M10.5 9v7M14.5 9v7M18 10.5h2.5v5"/><circle cx="20.5" cy="8.2" r="1.4"/>',
-    brick: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 12h18M9 5v7M15 12v7"/>'
+    brick: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 12h18M9 5v7M15 12v7"/>',
+    apps: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
+    minus: '<path d="M5 12h14"/>',
+    win: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8.5h18"/><path d="M6 6.2h.01M8.5 6.2h.01"/>',
+    popout: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>',
+    calc: '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><rect x="8" y="5.5" width="8" height="4" rx="1"/><path d="M8.5 13h.01M12 13h.01M15.5 13h.01M8.5 16.5h.01M12 16.5h.01M15.5 16.5v2.5M8.5 19h3.5"/>',
+    brush: '<path d="M20.5 3.5c-2.5 1.5-7.5 6-9.5 9l2 2c3-2 7.5-7 9-9.5z" transform="translate(-1 0)"/><path d="M9.5 13.8c-2.2 0-3.7 1.6-3.7 3.6 0 1.2-.8 2.2-2.3 2.6 3.6 1.4 8.3.4 8.3-3.9z"/>',
+    note: '<path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8.5 11h7M8.5 14.5h7M8.5 18h4"/>'
   };
   function icon(name, cls) {
     var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -325,10 +332,11 @@
     var url = game && game.cover ? D.coverUrl(game) : null;
     if (url) return h('img', { src: url, alt: '', draggable: false, loading: opts.lazy ? 'lazy' : null, decoding: 'async' });
     var c = (game && game.color) || U.colorFor(game ? game.name : '?');
-    /* no picture yet: neon letters (or the emoji, if the player picked one) */
+    /* no picture yet: neon letters, the app's icon, or the emoji (if the player picked one) */
     var face = game && game.art === 'emoji' && game.emoji
       ? h('span.pe', game.emoji)
-      : h('span.pl', initials(game ? game.name : '?'));
+      : game && game.icon && ICONS[game.icon] ? icon(game.icon, 'pi')
+        : h('span.pl', initials(game ? game.name : '?'));
     var p = h('div.proc', face, opts.noName ? null : h('span.pn', game ? game.name : ''));
     p.style.setProperty('--c', c);
     if (opts.emojiSize) p.style.setProperty('--es', opts.emojiSize + 'px');
@@ -423,10 +431,20 @@
     var cs = getComputedStyle(el);
     return cs.visibility !== 'hidden' && cs.display !== 'none';
   }
+  /* hidden behind an app window? (then arrow keys skip it) */
+  function covered(el) {
+    var layer = document.getElementById('windows');
+    if (!layer || !layer.childElementCount || el.closest('.app-win, .win-dock')) return false;
+    var b = el.getBoundingClientRect();
+    var x = b.left + b.width / 2, y = b.top + b.height / 2;
+    if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return false;
+    var top = document.elementFromPoint(x, y);
+    return !!(top && top.closest && top.closest('.app-win, .win-dock'));
+  }
   function focusables(root) {
     return Array.prototype.slice.call(root.querySelectorAll(
       'button, a[href], input:not([type=hidden]), select, textarea, [tabindex]:not([tabindex="-1"])'
-    )).filter(visible);
+    )).filter(function (el) { return visible(el) && !covered(el); });
   }
   function navRoot() {
     var m = topModal();

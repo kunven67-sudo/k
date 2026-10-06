@@ -606,5 +606,52 @@
     render();
   }
 
-  window.Pics = { open: open, guessIcon: guessIcon, letterArt: letterArt, iconArt: iconArt, patternArt: patternArt, BLOCK: BLOCK, aiUrl: aiUrl };
+  /* An app (like Drawing) offers a picture: pick which game or app gets it. */
+  var offerOpen = false;
+  function useFor(blob, fromId) {
+    if (!blob || offerOpen) return;
+    offerOpen = true;
+    var url = URL.createObjectURL(blob);
+    var search = h('input.input', { type: 'search', placeholder: 'Search your games and apps…', 'aria-label': 'Search' });
+    var list = h('div.pick-list');
+    var busy = false;
+    function render() {
+      var q = search.value.trim().toLowerCase();
+      var all = D.list().filter(function (g) { return g.id !== fromId && (!q || g.name.toLowerCase().indexOf(q) >= 0); });
+      if (!all.length) { list.replaceChildren(h('div.empty-note', q ? 'Nothing matches that.' : 'No games or apps yet.')); return; }
+      list.replaceChildren.apply(list, all.map(function (g) {
+        return h('button.pick-item', { onclick: function () { pick(g); } },
+          h('span.pk-art', UI.art(g, { noName: true })),
+          h('span.pk-name', g.name),
+          h('span.pk-kind', D.isApp(g) ? 'App' : 'Game'));
+      }));
+    }
+    async function pick(g) {
+      if (busy) return;
+      busy = true;
+      try {
+        await D.setCover(g.id, blob);
+        await D.updateGame(g.id, { art: 'picture' });
+        Sound.good();
+        UI.toast('New picture for "' + g.name + '"!', { type: 'good', icon: 'image', sound: false });
+        m.close();
+      } catch (e) {
+        busy = false;
+        UI.toast('Couldn\'t use that picture: ' + (e.message || e), { type: 'bad' });
+      }
+    }
+    search.addEventListener('input', render);
+    var m = UI.modal({
+      title: 'Use this picture for…',
+      icon: 'image',
+      wide: true,
+      body: h('div', h('div.pick-preview', h('img', { src: url, alt: 'Your picture' })), search, list),
+      actions: [{ label: 'Cancel', kind: 'ghost' }],
+      onClose: function () { offerOpen = false; setTimeout(function () { URL.revokeObjectURL(url); }, 1000); }
+    });
+    render();
+    setTimeout(function () { var b = list.querySelector('.pick-item'); if (b) b.focus(); }, 60);
+  }
+
+  window.Pics = { open: open, useFor: useFor, guessIcon: guessIcon, letterArt: letterArt, iconArt: iconArt, patternArt: patternArt, BLOCK: BLOCK, aiUrl: aiUrl };
 })();

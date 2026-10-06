@@ -37,6 +37,7 @@
       <nav class="tabs" id="tabs" aria-label="Main">
         <button class="tab" data-view="home" data-nav>Home</button>
         <button class="tab" data-view="library" data-nav>Library</button>
+        <button class="tab" data-view="apps" data-nav>Apps</button>
         <button class="tab" data-view="saves" data-nav>Saves</button>
         <button class="tab" data-view="stats" data-nav>Stats</button>
         <button class="tab tab-editor" data-view="editor" data-nav hidden>Editor</button>
@@ -62,11 +63,16 @@
     <main class="views" id="views">
       <section class="view" id="view-home" data-view="home"></section>
       <section class="view" id="view-library" data-view="library"></section>
+      <section class="view" id="view-apps" data-view="apps"></section>
       <section class="view" id="view-saves" data-view="saves"></section>
       <section class="view" id="view-stats" data-view="stats"></section>
       <section class="view" id="view-settings" data-view="settings"></section>
       <section class="view view-editor" id="view-editor" data-view="editor"></section>
     </main>
+
+    <!-- App windows + the taskbar for them -->
+    <div id="windows" class="windows" aria-label="Open apps"></div>
+    <nav id="win-dock" class="win-dock" aria-label="Open apps" hidden></nav>
   </div>
 
   <!-- The game player -->
@@ -126,6 +132,7 @@
   <script src="js/backup.js"></script>
   <script src="js/upgrade.js"></script>
   <script src="js/pics.js"></script>
+  <script src="js/windows.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

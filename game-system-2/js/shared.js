@@ -2,14 +2,14 @@
 (function (root) {
   'use strict';
 
-  var APP_VERSION = '2.1.0';
+  var APP_VERSION = '2.2.0';
 
   /* Every file of the app itself (used for offline caching and for "Build website folder") */
   var APP_FILES = [
     'index.html', 'manifest.webmanifest', 'sw.js', '_headers',
     'css/app.css',
     'js/shared.js', 'js/db.js', 'js/zip.js', 'js/util.js', 'js/sound.js', 'js/bg.js', 'js/ui.js', 'js/data.js',
-    'js/importer.js', 'js/player.js', 'js/editor.js', 'js/views.js', 'js/backup.js', 'js/upgrade.js', 'js/pics.js', 'js/app.js',
+    'js/importer.js', 'js/player.js', 'js/editor.js', 'js/views.js', 'js/backup.js', 'js/upgrade.js', 'js/pics.js', 'js/windows.js', 'js/app.js',
     'kit/gs2-kit.js', 'kit/save-kit.js',
     'vendor/codemirror.min.js', 'vendor/codemirror.css', 'vendor/acorn.min.js', 'vendor/LICENSES.txt',
     'fonts/orbitron-latin-500-normal.woff2', 'fonts/orbitron-latin-700-normal.woff2', 'fonts/orbitron-latin-900-normal.woff2',
