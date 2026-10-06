@@ -1,0 +1,21 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>boot check</title></head><body>
+<script type="importmap">{ "imports": { "three": "../js/vendor/three/build/three.module.js", "three/addons/": "../js/vendor/three/addons/", "rapier": "../js/vendor/rapier/rapier.mjs" } }</script>
+<script type="module">
+import RAPIER from 'rapier';
+import * as THREE from 'three';
+import { loadData } from '../js/core/data.js';
+import { fbm3 } from '../js/core/math.js';
+const out = {};
+try {
+  await RAPIER.init();
+  const w = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+  const b = w.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 10, 0));
+  w.createCollider(RAPIER.ColliderDesc.ball(0.5), b);
+  for (let i = 0; i < 60; i++) w.step();
+  out.rapier = RAPIER.version(); out.y = b.translation().y;
+  const t0 = performance.now(); const d = await loadData(); out.dataMs = Math.round(performance.now() - t0);
+  out.topoLen = d.topo.length; out.everestish = d.topo[Math.round((90 - 28) * 6) * 2160 + Math.round((86.9 + 180) * 6)];
+  out.three = THREE.REVISION; out.noise = fbm3(0.3, 0.2, 0.1);
+} catch (e) { out.error = String(e && e.stack || e); }
+window.__out = out; document.title = 'done';
+</script></body></html>

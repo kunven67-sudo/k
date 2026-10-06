@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Physbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Physbox: a workshop on a real planet. Dark graphite panels, safety-orange accents,
+   engineering readouts in mono. Single deliberate dark look. */
+:root {
+  --bg: #0b0d10;
+  --panel: rgba(16, 19, 24, 0.86);
+  --panel-solid: #12161c;
+  --panel-2: #1a1f27;
+  --line: rgba(220, 228, 240, 0.12);
+  --line-strong: rgba(220, 228, 240, 0.24);
+  --ink: #e9edf3;
+  --dim: #8d97a6;
+  --faint: #5c6573;
+  --accent: #ff8a1f;        /* safety orange */
+  --accent-ink: #1a0d00;
+  --ok: #6fdc8c;
+  --warn: #ffd23f;
+  --bad: #ff5a4f;
+  --info: #6cc4ff;
+  --font-display: "Chakra Petch", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Consolas", "Menlo", monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); overflow: hidden; }
+body { font: 14px/1.45 var(--font-body); -webkit-font-smoothing: antialiased; }
+[hidden] { display: none !important; }
+canvas#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+#ui { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+#ui > * { pointer-events: auto; }
+#loading { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--bg); transition: opacity 0.6s; }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading .box { display: grid; gap: 14px; width: min(420px, calc(100vw - 32px)); }
+#loading .logo { font: 700 44px/1 var(--font-display); letter-spacing: 0.04em; }
+#loading .logo b { color: var(--accent); font-weight: 700; }
+#loading .bar { height: 3px; background: var(--line); overflow: hidden; }
+#loading .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.3s; }
+#loading .step { font: 12px/1.4 var(--font-mono); color: var(--dim); letter-spacing: 0.04em; }
+#fatal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(5, 6, 8, 0.94); padding: 16px; }
+#fatal .box { width: min(720px, 100%); display: grid; gap: 12px; }
+#fatal h1 { margin: 0; font: 700 24px/1.2 var(--font-display); color: var(--bad); }
+#fatal pre { margin: 0; max-height: 50vh; overflow: auto; padding: 12px; background: var(--panel-solid); border: 1px solid var(--line); font: 12px/1.5 var(--font-mono); white-space: pre-wrap; color: var(--dim); }
+#fatal button { justify-self: start; padding: 8px 14px; background: var(--accent); color: var(--accent-ink); border: 0; font: 600 13px/1 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="view" tabindex="0" aria-label="Physbox world"></canvas>
+<div id="ui"></div>
+
+<div id="loading" role="status" aria-live="polite">
+  <div class="box">
+    <div class="logo">PHYS<b>BOX</b></div>
+    <div class="bar"><i id="load-bar"></i></div>
+    <div class="step" id="load-step">Starting</div>
+  </div>
+</div>
+
+<div id="fatal" hidden>
+  <div class="box">
+    <h1>Physbox hit a problem</h1>
+    <pre class="fatal-msg"></pre>
+    <button type="button" onclick="location.reload()">Reload</button>
+  </div>
+</div>
+
+<script type="importmap">{ "imports": { "three": "./js/vendor/three/build/three.module.js", "three/addons/": "./js/vendor/three/addons/", "rapier": "./js/vendor/rapier/rapier.mjs" } }</script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
