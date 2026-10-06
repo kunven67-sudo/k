@@ -8,6 +8,7 @@
 // saved story (the world save doesn't keep who's in the tank), so a story can
 // always be picked up where it was left.
 import * as THREE from 'three';
+import { TOWN_LOOKS, nameFor, jobOf } from './humans/looks.js';
 
 const KEY = 'torture-humans-story-1';
 const TINY = 0.05;
@@ -102,11 +103,29 @@ export class Story {
     return true;
   }
 
+  // missions where you need someone to shrink: if hardly anyone is out on the
+  // street (most are at work in the daytime), visitors walk into town
+  crowd(min = 3) {
+    if (this.spawning || (this.visitors ?? 0) >= 8 || !this.spawnPerson) return;
+    const out = this.townsfolk().filter((h) => h.state !== 'away').length;
+    if (out >= min) return;
+    const spots = this.g.level.town?.spots;
+    if (!spots?.length) return;
+    const look = TOWN_LOOKS[(Math.random() * TOWN_LOOKS.length) | 0];
+    const spot = spots[(Math.random() * spots.length) | 0];
+    this.spawning = true;
+    this.spawnPerson(look, { name: nameFor(look), job: jobOf(look), at: spot.p })
+      .then((h) => { if (h) this.visitors = (this.visitors ?? 0) + 1; })
+      .catch((e) => console.warn('[story] visitor', e.message))
+      .finally(() => { this.spawning = false; });
+  }
+
   ensureCitizens(n) {
     let have = this.citizens().length;
-    for (const h of this.townsfolk()) {
+    // people out on the street first, then anyone (even if they're at work right now)
+    const folk = this.townsfolk().sort((a, b) => (a.state === 'away') - (b.state === 'away'));
+    for (const h of folk) {
       if (have >= n) break;
-      if (h.state === 'away') continue;
       if (this.cageNow(h)) have++;
     }
   }
@@ -349,6 +368,7 @@ export class Story {
     this.watchCare(dt);
     const m = this.mission;
     m.t += dt;
+    if (m.def.needsPeople) this.crowd(3);
     const r = m.def.update(this, m, dt);
     if (r === 'done') this.completeMission();
     else if (typeof r === 'string' && r.startsWith('fail:')) this.failMission(r.slice(5));
@@ -393,6 +413,7 @@ const MISSIONS = [
   // 1 ---------------------------------------------------------------------
   {
     title: 'It works!',
+    needsPeople: true,
     intro: () => [
       { text: 'Your secret basement lab. Three years of work, and tonight the shrink ray is finally finished.' },
       { who: 'you', text: 'Okay. Okay okay okay. Time to test it.' },
@@ -449,6 +470,7 @@ const MISSIONS = [
   // 3 ---------------------------------------------------------------------
   {
     title: 'Population: 3',
+    needsPeople: true,
     prepare: (s, m) => { if (m.resumed) s.ensureCitizens(1); },
     intro: () => [
       { who: 'you', text: 'One person isn\'t a town. It\'s just a lonely guy in a box.' },
@@ -556,6 +578,7 @@ const MISSIONS = [
   // 6 ---------------------------------------------------------------------
   {
     title: 'Missing persons',
+    needsPeople: true,
     prepare: (s) => s.ensureCitizens(3),
     intro: (s) => [
       { text: 'The town has noticed. Posters everywhere: MISSING. HAVE YOU SEEN THESE PEOPLE?' },
