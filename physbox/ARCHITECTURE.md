@@ -250,6 +250,12 @@ roughness }, seaLevel: 0, hasOcean, radius }`. Deterministic, fast (≥ 200k sam
 Biome ids (`BIOMES` export): 0 ocean, 1 beach, 2 desert, 3 grassland, 4 savanna, 5 temperate forest,
 6 tropical forest, 7 taiga, 8 tundra, 9 ice, 10 rock, 11 regolith (Moon/Mercury), 12 mars dust, 13 venus basalt.
 
+### world/terrain/terrain.js — TerrainSystem (engine.terrain, wave 2)
+`terrain.surface(bodyName)` → the height-function object above. `terrain.groundAltitude(local)` → ground altitude
+(m above the reference body's radius) directly below/above a local point — same reference as `frame.altitudeAt`.
+`terrain.groundNormal(local, out)`. `terrain.addCrater(body, dirUnit, radius, depth)`, `terrain.addFlatZone(...)`.
+Physics' safety net calls `engine.terrain?.groundAltitude?.(p)` when it exists.
+
 ### core/settings.js — Settings
 `settings.get(key)`, `settings.set(key, value)`, `settings.onChange(key, fn)`, `settings.schema` (array of
 `{ key, label, group, type: 'bool'|'range'|'select'|'key', default, min, max, step, options }`), persisted under

@@ -2,6 +2,8 @@
 
 - Serve the folder: `npx http-server -p 8770 -s -c-1 .` (from `physbox/`), open http://localhost:8770/.
 - Lint: `npx eslint js` (from `physbox/`).
+- Node: run `sh tests/setup-node.sh` once so bare imports (`three`, `three/addons/...`, `rapier`) resolve in Node.
+  Rapier works in Node too (`await RAPIER.init()`), so physics can be tested without a browser.
 - Pure logic (ephemeris, height functions, materials…): write Node scripts in `tests/` that import the modules
   directly (`node tests/xxx.test.mjs`). Node has no `DecompressionStream`-free path issue: use `zlib.inflateSync`
   on `data/*.bin` to get the grids.
