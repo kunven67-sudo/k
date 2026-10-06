@@ -1,13 +1,13 @@
 // The pause menu: Esc (or the mouse getting freed) stops the game and shows
 // Resume, Settings, Save, Load, Controls help and Quit. It's also the start
-// screen ("Play") the first time.
+// screen the first time: Sandbox (play freely) or Story (missions with an ending).
 //
 // Browsers swallow the Esc key while the mouse is captured (Esc just frees the
 // mouse), so we open the menu when the mouse gets freed, unless another window
 // (shop, phone, chat, backpack...) freed it on purpose.
 export class PauseMenu {
-  constructor({ input, canvas, settingsPanel, save, load, toast, isBusy, start = true }) {
-    Object.assign(this, { input, canvas, settingsPanel, save, load, toast, isBusy });
+  constructor({ input, canvas, settingsPanel, save, load, toast, isBusy, start = true, storyInfo = null, onSandbox = null, onStory = null }) {
+    Object.assign(this, { input, canvas, settingsPanel, save, load, toast, isBusy, storyInfo, onSandbox, onStory });
     this.el = document.getElementById('pausemenu');
     if (!this.el) { this.el = document.createElement('div'); this.el.id = 'pausemenu'; document.body.appendChild(this.el); }
     this.paused = false;
@@ -15,7 +15,8 @@ export class PauseMenu {
     this.el.addEventListener('click', (e) => this.onClick(e));
     document.addEventListener('pointerlockchange', () => {
       const locked = document.pointerLockElement === this.canvas;
-      if (locked) { this.started = true; if (this.paused) this.hide(); return; }
+      // (on the start screen, clicking the game doesn't skip choosing a mode)
+      if (locked) { if (!this.started && this.choosing) { document.exitPointerLock?.(); return; } this.started = true; if (this.paused) this.hide(); return; }
       // the mouse got freed: if nothing else asked for it, that was Esc → pause
       if (this.started && !this.paused && !this.isBusy?.() && !this.settingsPanel.isOpen) this.show();
     });
@@ -23,7 +24,7 @@ export class PauseMenu {
       // another window (shop, phone, settings...) already used this Esc to close itself
       if (e.code !== 'Escape' || e.defaultPrevented || this.settingsPanel.binding || this.settingsPanel.isOpen) return;
       // the same Esc press can free the mouse (which already opened the menu): don't also close it
-      if (this.paused) { if (performance.now() - this.shownAt > 400) { e.preventDefault(); this.resume(); } }
+      if (this.paused) { if (this.choosing) return; if (performance.now() - this.shownAt > 400) { e.preventDefault(); this.resume(); } }
       else if (this.started && !this.isBusy?.()) { e.preventDefault(); this.show(); }
     });
     if (start) this.show({ title: true });
@@ -36,13 +37,20 @@ export class PauseMenu {
     this.input.clear();
     if (document.pointerLockElement) document.exitPointerLock?.();
     const first = title || !this.started;
+    this.choosing = first && !!this.onStory;
+    const st = this.storyInfo?.() || {};
+    const startButtons = this.onStory
+      ? `<button data-act="sandbox" class="main">🏖 Sandbox <small>do whatever you want</small></button>
+      ${st.saved ? `<button data-act="story-continue" class="main">📖 Continue story <small>Mission ${st.mission} of 10</small></button>
+      <button data-act="story-new">📖 New story</button>` : '<button data-act="story-new" class="main">📖 Story <small>Tiny Town Ruler · 10 missions</small></button>'}`
+      : '<button data-act="resume" class="main">▶ Play</button>';
     this.el.innerHTML = `<div class="box">
       <h1>${first ? 'TORTURE HUMANS' : 'Paused'}</h1>
       ${first ? '<p class="sub">a game about being big, and being very, very small</p>' : ''}
-      <button data-act="resume" class="main">${first ? '▶ Play' : '▶ Resume'}</button>
+      ${!first && st.playing ? `<p class="sub">📖 Mission ${st.mission}: ${st.title}</p>` : ''}
+      ${first ? startButtons : '<button data-act="resume" class="main">▶ Resume</button>'}
       <button data-act="settings">⚙ Settings</button>
-      ${first ? '' : '<button data-act="save">💾 Save game</button>'}
-      <button data-act="load">📂 Load game</button>
+      ${first ? '' : '<button data-act="save">💾 Save game</button>\n      <button data-act="load">📂 Load game</button>'}
       <button data-act="help">❓ Controls</button>
       <button data-act="quit">✖ Quit</button>
     </div>`;
@@ -66,6 +74,17 @@ export class PauseMenu {
     if (!b) return;
     const act = b.dataset.act;
     if (act === 'resume') this.resume();
+    else if (act === 'sandbox' || act === 'story-new' || act === 'story-continue') {
+      if (this.busyStart) return;
+      if (act === 'story-new' && this.storyInfo?.().saved && !confirm('Start the story over from Mission 1?')) return;
+      this.busyStart = true;
+      this.choosing = false;
+      try {
+        if (act === 'sandbox') await this.onSandbox?.();
+        else await this.onStory?.({ resume: act === 'story-continue' });
+      } finally { this.busyStart = false; }
+      this.resume();
+    }
     else if (act === 'settings') {
       this.el.hidden = true;
       this.settingsPanel.open({ onClose: () => { this.el.hidden = false; this.input.enabled = false; } });
@@ -78,7 +97,7 @@ export class PauseMenu {
       const c = document.getElementById('controls');
       if (c) c.hidden = !c.hidden;
     } else if (act === 'quit') {
-      this.save();
+      if (this.started) this.save(); // (not from the start screen: nothing to save yet)
       window.close();
       this.toast?.('Saved. You can close the window now.');
     }

@@ -280,6 +280,7 @@ export class Colony {
       out.push(p);
     }
     this.note(`dropped ${count} ${kind}`);
+    this.onDrop?.(kind, count); // (the story counts meals)
     return out;
   }
 

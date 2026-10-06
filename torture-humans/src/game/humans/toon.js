@@ -34,6 +34,7 @@ const OUTFITS = {
   'security guard': { shirt: 0x1e1e1e, pants: 0x1e1e1e, shoes: 0x111111, badge: true },
   'fitness coach': { shirt: 0xe23a6a, pants: 0x222244, shoes: 0xf2f2f2, sleeves: 'short' },
   carpenter: { shirt: 0x8a3a2a, pants: 0x3a4a6a, shoes: 0x4a2e18, sleeves: 'rolled' },
+  mayor: { shirt: 0x1e2230, pants: 0x1e2230, shoes: 0x111111, tie: 0xc0291a, hat: 'tophat', badge: true },
 };
 
 function rng(seed) {
@@ -507,6 +508,11 @@ export function buildToon(template, { seed = 'x', gender = 'm', job = '', style 
       if (hat === 'police') B.ellipsoid(top.clone().add(new THREE.Vector3(0, 0.02, hr.z * 1.04)), new THREE.Vector3(0.016, 0.018, 0.005), new THREE.Color(0xd4b04a), one('Bip01_Head'), { seg: 8, rings: 6 });
     } else if (hat === 'chef') {
       B.tube(top.clone().add(new THREE.Vector3(0, -0.01, 0)), top.clone().add(new THREE.Vector3(0, 0.12 * H, 0)), hr.x * 0.95, hr.x * 1.25, new THREE.Color(0xfafafa), one('Bip01_Head'), { seg: 16, rings: 3 });
+    } else if (hat === 'tophat') {
+      const black = new THREE.Color(0x15151a);
+      B.ellipsoid(top.clone().add(new THREE.Vector3(0, -0.01, 0)), new THREE.Vector3(hr.x * 1.25, 0.007, hr.z * 1.25), black, one('Bip01_Head'), { seg: 18, rings: 4 });
+      B.tube(top.clone().add(new THREE.Vector3(0, -0.01, 0)), top.clone().add(new THREE.Vector3(0, 0.15 * H, 0)), hr.x * 0.82, hr.x * 0.86, black, one('Bip01_Head'), { seg: 16, rings: 3 });
+      B.tube(top.clone().add(new THREE.Vector3(0, 0.0, 0)), top.clone().add(new THREE.Vector3(0, 0.025 * H, 0)), hr.x * 0.84, hr.x * 0.85, new THREE.Color(0x8a1a1a), one('Bip01_Head'), { seg: 16, rings: 1 });
     } else if (hat.startsWith('helmet')) {
       B.ellipsoid(top.clone().add(new THREE.Vector3(0, -0.02, 0)), hr.clone().multiplyScalar(1.12).setY(hr.y * 0.75), new THREE.Color(hat === 'helmet-red' ? 0xc0291a : 0xf2c21a), one('Bip01_Head'), { seg: 18, rings: 8, cut: (l) => l.y > -0.15 });
     }

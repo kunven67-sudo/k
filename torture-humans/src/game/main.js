@@ -26,6 +26,7 @@ import { TinyReality } from './tiny-reality.js';
 import { SettingsPanel } from './ui/settings-panel.js';
 import { PauseMenu } from './ui/pause-menu.js';
 import { Phone, saveGame, loadGame, hasSave } from './phone.js';
+import { Story } from './story.js';
 import { TOWN_LOOKS, isFemale, nameFor, jobOf } from './humans/looks.js';
 import { buildToon } from './humans/toon.js';
 import { Hands } from './gadgets/hands.js';
@@ -168,6 +169,19 @@ export async function boot() {
   const audio = new Audio({ settings, camera });
   speech.audio = audio;
   for (const h of humans) { h.speech = speech; h.player = player; }
+  // someone new walks into town (the story's mayor)
+  const spawnPerson = async (look, { name, job, at }) => {
+    const gender = isFemale(look) ? 'f' : 'm';
+    await lib.require(baseClips(gender));
+    const tpl = await avatarFor(look, { job });
+    const h = new Human({ template: tpl, lib, nav, physics, scene, gender, position: nav.closest(at) || at, area: level.town?.area, settings, profile: { look, name, job } });
+    h.townie = true;
+    h.speech = speech;
+    h.player = player;
+    if (zone === 'lab') h.character.root.visible = false;
+    humans.push(h);
+    return h;
+  };
   // the shrink ray works on things too
   const resizer = new Resizer({ physics, props: level.props, rebuildProps: level.rebuildProps, player });
   const hands = new Hands({ scene, camera, physics, player, input, humans, cage, colony, speech, audio, resizer });
@@ -415,13 +429,35 @@ export async function boot() {
   // saving: F5 / F9, every 2 minutes, and when you close the game; picks up where you left off
   Object.defineProperty(game, 'zone', { get: () => zone });
   // Esc: the pause menu (and the start screen)
-  const pauseMenu = new PauseMenu({ input, canvas: input.target, settingsPanel, save: () => saveGame(game), load: () => loadGame(game), toast, isBusy: () => !input.enabled, start: !params.has('paused') });
+  // Story mode ("Tiny Town Ruler") or Sandbox: picked on the start screen; each has its own save
+  game.mode = 'sandbox';
+  const story = new Story(game, { spawnPerson, toast });
+  game.story = story;
+  game.save = () => { if (game.mode === 'story') story.save(); return saveGame(game); };
+  game.load = () => loadGame(game);
+  const pauseMenu = new PauseMenu({
+    input, canvas: input.target, settingsPanel, save: () => game.save(), load: () => game.load(), toast, isBusy: () => !input.enabled, start: !params.has('paused'),
+    storyInfo: () => {
+      if (game.mode === 'story' && story.active && !story.ending) return { playing: true, mission: story.missionNumber, title: story.mission?.def.title ?? '' };
+      const st = Story.saved();
+      return st && !st.done ? { saved: true, mission: st.index + 1 } : {};
+    },
+    // the start screen's choices
+    onSandbox: async () => {
+      game.mode = 'sandbox';
+      if (hasSave('sandbox') && !params.has('fresh')) await loadGame(game).then((ok) => ok && toast('Welcome back! (F5 saves, F9 loads)')).catch((e) => console.warn('[save]', e.message));
+    },
+    onStory: async ({ resume }) => {
+      game.mode = 'story';
+      if (resume && hasSave('story')) await loadGame(game).catch((e) => console.warn('[save]', e.message));
+      if (!resume) Story.clear();
+      story.begin({ resume });
+    },
+  });
   game.pauseMenu = pauseMenu;
   settings.onChange((d, patch) => { if (patch.gameplay?.camera && patch.gameplay.camera !== player.mode) player.toggleCamera(); });
-  game.save = () => saveGame(game);
-  game.load = () => loadGame(game);
-  if (hasSave() && !params.has('paused') && !params.has('fresh')) loadGame(game).then((ok) => ok && toast('Welcome back! (F5 saves, F9 loads)')).catch((e) => console.warn('[save]', e.message));
-  addEventListener('beforeunload', () => { if (!params.has('paused')) saveGame(game); });
+  // (never save from the start screen: that would replace a real save with a brand-new world)
+  addEventListener('beforeunload', () => { if (!params.has('paused') && pauseMenu.started) game.save(); });
   let autosave = 120;
   hands.ctx.toast = toast;
   window.game = game; // for tests and debugging
@@ -456,9 +492,9 @@ export async function boot() {
     footsteps.update(wdt);
     phone.update(dt);
     jobs.update(dt, camera);
-    if (input.pressed('quickSave')) toast(saveGame(game) ? 'Game saved' : 'Could not save');
+    if (input.pressed('quickSave')) toast(game.save() ? 'Game saved' : 'Could not save');
     if (input.pressed('quickLoad')) loadGame(game).then((ok) => toast(ok ? 'Game loaded' : 'No saved game yet'));
-    if (!params.has('paused') && (autosave -= dt) <= 0) { autosave = 120; saveGame(game); }
+    if (!params.has('paused') && pauseMenu.started && (autosave -= dt) <= 0) { autosave = 120; game.save(); }
     vitals.update(dt);
     nav.update(wdt);
     colony?.update(wdt);
@@ -469,6 +505,7 @@ export async function boot() {
     talk.update(dt);
     police.update(wdt);
     speech.update(dt);
+    story.update(dt);
     level.update?.(wdt);
     input.endFrame();
     game.frame++;

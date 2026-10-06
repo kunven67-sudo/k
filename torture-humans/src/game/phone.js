@@ -107,6 +107,8 @@ export class Phone {
 // ---- saving and loading (F5 / F9, and every 2 minutes)
 
 const KEY = 'torture-humans-save-1';
+// story mode keeps its own world save (so it never mixes with your sandbox)
+const keyFor = (mode) => (mode === 'story' ? `${KEY}-story` : KEY);
 
 export function saveGame(g) {
   const p = g.player, f = g.family;
@@ -125,16 +127,16 @@ export function saveGame(g) {
     pets: g.pets ? g.pets.list.map((x) => ({ kind: x.kind, name: x.profile.name, love: x.love })) : [],
     messages: g.phone?.messages ?? [],
   };
-  try { localStorage.setItem(KEY, JSON.stringify(data)); return true; } catch { return false; }
+  try { localStorage.setItem(keyFor(g.mode), JSON.stringify(data)); return true; } catch { return false; }
 }
 
-export function hasSave() {
-  try { return !!localStorage.getItem(KEY); } catch { return false; }
+export function hasSave(mode = 'sandbox') {
+  try { return !!localStorage.getItem(keyFor(mode)); } catch { return false; }
 }
 
 export async function loadGame(g) {
   let d;
-  try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { d = null; }
+  try { d = JSON.parse(localStorage.getItem(keyFor(g.mode)) || 'null'); } catch { d = null; }
   if (!d || d.v !== 1 || !Array.isArray(d.player?.feet) || d.player.feet.length !== 3 || !d.player.feet.every(Number.isFinite)) return false;
   try {
     return await applySave(g, d);
