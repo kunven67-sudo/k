@@ -126,6 +126,48 @@
     "h": 620
    },
    "saveKit": true
+  },
+  {
+   "id": "gs2-timer",
+   "name": "Timer",
+   "desc": "Timers, a stopwatch with laps, and alarms. They ring over your games, even when this app is closed.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "clock",
+   "color": "#ff8a3d",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 26890,
+   "isolate": true,
+   "win": {
+    "w": 720,
+    "h": 640
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-code",
+   "name": "Code",
+   "desc": "Write HTML, CSS and JavaScript and see it live. Examples and lessons inside. Save what you make as a real game or app.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "code",
+   "color": "#3dffa0",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 45915,
+   "isolate": true,
+   "win": {
+    "w": 1180,
+    "h": 720
+   },
+   "saveKit": true
   }
  ]
 }

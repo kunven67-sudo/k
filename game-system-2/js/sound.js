@@ -257,6 +257,13 @@
       tone(990, 0.12, { type: 'sine', gain: 0.12, raw: true });
       tone(560, 0.22, { type: 'sine', gain: 0.12, delay: 0.1, raw: true });
     },
+    /* a timer or alarm going off: called once a second (n = how many times so far) */
+    alarm: function (n) {
+      var hi = (n || 0) % 4 === 3 ? 1320 : 1046;
+      tone(hi, 0.12, { type: 'square', gain: 0.07, raw: true });
+      tone(hi, 0.12, { type: 'square', gain: 0.07, delay: 0.18, raw: true });
+      tone(hi * 1.25, 0.16, { type: 'square', gain: 0.06, delay: 0.36, raw: true });
+    },
     /* a trophy unlocked */
     trophy: function () {
       [784, 988, 1175, 1568].forEach(function (f, i) { tone(f, 0.22, { type: 'triangle', gain: 0.08, delay: i * 0.07 }); });

@@ -8,7 +8,7 @@
   var APP_FILES = [
     'index.html', 'manifest.webmanifest', 'sw.js', '_headers',
     'css/app.css',
-    'js/shared.js', 'js/db.js', 'js/zip.js', 'js/util.js', 'js/sound.js', 'js/bg.js', 'js/ui.js', 'js/data.js', 'js/themes.js', 'js/trophies.js', 'js/media.js',
+    'js/shared.js', 'js/db.js', 'js/zip.js', 'js/util.js', 'js/sound.js', 'js/bg.js', 'js/ui.js', 'js/data.js', 'js/themes.js', 'js/trophies.js', 'js/media.js', 'js/timers.js',
     'js/layout.js', 'js/importer.js', 'js/player.js', 'js/editor.js', 'js/grid.js', 'js/views.js', 'js/backup.js', 'js/upgrade.js', 'js/pics.js', 'js/windows.js', 'js/capture.js', 'js/notify.js', 'js/app.js',
     'kit/gs2-kit.js', 'kit/save-kit.js',
     'vendor/codemirror.min.js', 'vendor/codemirror.css', 'vendor/acorn.min.js', 'vendor/LICENSES.txt',

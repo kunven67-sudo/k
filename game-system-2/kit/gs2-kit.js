@@ -511,6 +511,31 @@
       pending: function (app) { return media('pending', { app: app }); },
       stats: function () { return media('stats'); }
     };
+    /* timers + alarms (they live in Game System, so they ring even when the app is closed) */
+    var timers = function (op, arg) {
+      var r = call('timers', op, arg || {});
+      return r && typeof r.then === 'function' ? r : Promise.reject(new Error('Open this inside Game System'));
+    };
+    GameSystem.timers = {
+      list: function () { return timers('list'); },
+      add: function (o) { return timers('add', o); },
+      pause: function (id) { return timers('pause', { id: id }); },
+      resume: function (id) { return timers('resume', { id: id }); },
+      restart: function (id) { return timers('restart', { id: id }); },
+      addTime: function (id, ms) { return timers('addTime', { id: id, ms: ms }); },
+      remove: function (id) { return timers('remove', { id: id }); },
+      addAlarm: function (o) { return timers('addAlarm', o); },
+      editAlarm: function (id, patch) { return timers('editAlarm', { id: id, patch: patch }); },
+      removeAlarm: function (id) { return timers('removeAlarm', { id: id }); },
+      stopRing: function (key) { return timers('stopRing', { key: key }); },
+      notify: function () { return timers('notify'); },
+      notifyState: function () { return timers('notifyState'); }
+    };
+    /* turn code into a real game or app in Game System (the Code app uses this) */
+    GameSystem.create = function (o) {
+      var r = call('create', o || {});
+      return r && typeof r.then === 'function' ? r : Promise.reject(new Error('Open this inside Game System'));
+    };
   }
   try {
     Object.defineProperty(window, 'GameSystem', { value: GameSystem, writable: true, configurable: true, enumerable: false });

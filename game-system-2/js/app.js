@@ -285,6 +285,12 @@
       if ($('title-screen') && !$('title-screen').hidden && !['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) { e.preventDefault(); enterFromTitle(); }
       return;
     }
+    /* a timer or alarm is ringing: Esc / Enter = OK */
+    if (Timers.ringing() && (e.key === 'Escape' || (e.key === 'Enter' && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('.ring-pop')))) && !UI.isTyping()) {
+      e.preventDefault();
+      Timers.dismissTop();
+      return;
+    }
     /* your screenshot / record keys */
     if (!e.repeat && !UI.isTyping()) {
       var cap = Capture.keyAction(e);
@@ -387,7 +393,7 @@
       else UI.moveFocus('down');
       return;
     }
-    if (k === 'b') { back(); return; }
+    if (k === 'b') { if (Timers.ringing()) Timers.dismissTop(); else back(); return; }
     if (k === 'x') {
       var f = document.activeElement;
       if (f && f.classList && f.classList.contains('gi')) {
@@ -473,6 +479,7 @@
     Trophies.init();
     Media.init();
     Capture.init();
+    Timers.init();
     applySettings();
 
     D.on(function (type) {

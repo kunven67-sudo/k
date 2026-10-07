@@ -123,9 +123,14 @@
     return run(['games', 'files'], 'readwrite', function (tx) {
       tx.objectStore('games').put(game);
       if (files) {
-        deleteFilesOf(game.id, tx);
+        /* delete the old files FIRST, then write the new ones. (Deleting with a cursor while writing
+           would delete new files that have the same name as old ones.) */
         var fs = tx.objectStore('files');
-        files.forEach(function (f) { fs.put({ g: game.id, p: f.p, b: f.b, t: f.t || '' }); });
+        var req = fs.index('g').getAllKeys(game.id);
+        req.onsuccess = function () {
+          (req.result || []).forEach(function (k) { fs.delete(k); });
+          files.forEach(function (f) { fs.put({ g: game.id, p: f.p, b: f.b, t: f.t || '' }); });
+        };
       }
     });
   }

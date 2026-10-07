@@ -74,10 +74,45 @@
       if (!sinkFor(id)) return Promise.reject(new Error('Not running'));
       return Media.forApp(id, String(op || ''), arg && typeof arg === 'object' ? arg : {});
     },
+    /* timers + alarms for the Timer app */
+    timers: function (id, op, arg) {
+      if (!sinkFor(id) || !window.Timers) return Promise.reject(new Error('Not running'));
+      return Timers.forApp(id, String(op || ''), arg && typeof arg === 'object' ? arg : {});
+    },
+    /* the Code app saves a project as a game/app (or updates the one it made before) */
+    create: function (id, o) {
+      if (!sinkFor(id)) return Promise.reject(new Error('Not running'));
+      var app = D.get(id);
+      if (!app || !app.builtin || id !== 'gs2-code') return Promise.reject(new Error('Only the Code app can do that.'));
+      return makeFromCode(o && typeof o === 'object' ? o : {});
+    },
     ready: function (id, info) { var s = sinkFor(id); if (s && s.ready) s.ready(info || {}); },
     kitInfo: function (id, info) { var s = sinkFor(id); if (s && s.kitInfo) s.kitInfo(info || {}); }
   };
   window.__GS2_HOST = Host;
+
+  async function makeFromCode(o) {
+    var html = typeof o.html === 'string' ? o.html : '';
+    if (!html.trim()) throw new Error('There\'s no code yet.');
+    if (html.length > 5 * 1024 * 1024) throw new Error('That\'s too much code (max 5 MB).');
+    var name = String(o.name || 'My game').trim().slice(0, 60) || 'My game';
+    var kind = o.kind === 'app' ? 'app' : 'game';
+    var files = [{ p: 'index.html', b: new Blob([html], { type: 'text/html' }), t: 'text/html' }];
+    var old = typeof o.id === 'string' ? D.get(o.id) : null;
+    if (old && old.fromCode) {
+      /* update the one made before: same game, new code (saves and picture stay) */
+      await D.replaceFiles(old.id, files, 'index.html');
+      if (old.name !== name) await D.updateGame(old.id, { name: name });
+      if (window.Win && Win.isOpen(old.id)) Win.close(old.id);
+      return { id: old.id, kind: D.isApp(D.get(old.id)) ? 'app' : 'game', updated: true };
+    }
+    var g = await D.addGame({ name: name, entry: 'index.html', kind: kind, kindSet: true, fromCode: true }, files);
+    UI.toast('"' + g.name + '" is in your ' + (kind === 'app' ? 'Apps' : 'Library') + ' now.', {
+      type: 'good', icon: 'code', title: 'Made with Code', sound: false,
+      actions: [{ label: kind === 'app' ? 'Open' : 'Play', kind: 'primary', onClick: function () { launch(g.id); } }]
+    });
+    return { id: g.id, kind: kind, updated: false };
+  }
 
   /* ---------------- log store (shared by the player + editor preview) ---------------- */
   function LogStore(onChange) {

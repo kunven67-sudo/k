@@ -137,6 +137,8 @@ Built-in apps:
 | **Drawing** | Brush, highlighter, shapes, fill bucket, undo. **Use as picture** turns your drawing into a game's picture, and the gallery button saves it to the Gallery. |
 | **Gallery** | Your screenshots, recordings, drawings and photos, newest first (like a phone's camera roll). Filter by kind or game, look at them big, download, rename, delete several at once, or use one as a game's picture. |
 | **Video** | Watch your recordings, your own video files (saved in this browser) and YouTube links. Remembers where you stopped in each video. The **mini player** button floats the video over your games. |
+| **Timer** | Timers (with names, like "Pizza"), a stopwatch with laps, and alarms (once, school days, weekends, any days). When one goes off it pops up over everything, games too, with a sound. **+1 min** / **Snooze**, or **OK** (Esc and controller B work too). Timers keep counting when the app is closed, and the stopwatch keeps running. |
+| **Code** | Write HTML, CSS and JavaScript and see it live next to your code. Errors show in the console with the line (click it to jump there). **Examples** has lessons and small games (Snake, Catch the stars, Quiz…). **Save as…** turns your project into a real game or app in Game System, and **Update it** puts your new code into the same game later. **Ask AI** copies your code with your question for any AI chat. |
 
 Deleted a built-in app? The Apps tab has a **Bring them back** button.
 
@@ -223,7 +225,7 @@ Each game also gets its own private `localStorage`, `sessionStorage` and Indexed
 | `kit/gs2-kit.js` | Added to every game automatically (Save Kit, private saves, error reporting) |
 | `kit/save-kit.js` | Copy-paste Save Kit for AI-made games |
 | `games/games.json` | Games and apps that come with the website (made by **Build website folder**) |
-| `games/gs2-*/` | The built-in apps (Music, Notes, Calculator, Drawing, Gallery, Video) |
+| `games/gs2-*/` | The built-in apps (Music, Notes, Calculator, Drawing, Gallery, Video, Timer, Code) |
 | `vendor/` | CodeMirror (code editor) and Acorn (syntax checker), MIT licensed |
 | `fonts/` | Orbitron and Chakra Petch, SIL Open Font License |
 
