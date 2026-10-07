@@ -69,6 +69,11 @@
         /* your trophies + profile picture */
         manifest.trophies = Trophies.exportData();
         if (D.avatar) { manifest.avatarFile = 'profile/avatar.jpg'; files.push({ path: manifest.avatarFile, data: D.avatar }); }
+        /* the Gallery: screenshots, recordings, drawings, photos */
+        p.set('Packing the Gallery…', 0.5);
+        await Media.init();
+        manifest.media = [];
+        Media.exportFiles().forEach(function (x) { files.push(x.file); if (x.meta) manifest.media.push(x.meta); });
       }
       files.unshift({ path: 'gs2-backup.json', data: JSON.stringify(manifest) });
       files.push({ path: 'README.txt', data: 'This is a Game System 2.0 backup (' + countText(games) + ', made ' + new Date().toLocaleString() + ').\r\n\r\nTo restore it: open Game System 2.0 -> Settings -> "Restore a backup" -> pick this .zip file.\r\nYou don\'t need to unzip it.\r\n' });
@@ -167,6 +172,10 @@
           await GS2DB.kvSet('days', D.days);
         }
         if (manifest.trophies) Trophies.importData(manifest.trophies);
+        if (Array.isArray(manifest.media) && manifest.media.length) {
+          p.set('Restoring the Gallery…', 0.95);
+          try { await Media.importList(manifest.media, function (path) { return byPath.get(prefix + path) || null; }); } catch (e) { /* keep going */ }
+        }
         if (manifest.avatarFile && byPath.get(prefix + manifest.avatarFile) && (withSettings || !D.avatar)) {
           try { await D.setAvatar(new Blob([byPath.get(prefix + manifest.avatarFile)], { type: 'image/jpeg' })); } catch (e) { /* keep going */ }
         }

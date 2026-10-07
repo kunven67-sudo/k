@@ -201,6 +201,37 @@
     });
   }
 
+  /* Settings → "Check for updates": ask the website for a newer Game System right now */
+  var checking = false;
+  async function checkUpdate() {
+    if (checking) return;
+    if (!('serviceWorker' in navigator) || location.protocol === 'file:') {
+      UI.toast('Updates only work when Game System is on your website (like Netlify).', { type: 'warn' });
+      return;
+    }
+    checking = true;
+    var t = UI.toast('Checking for updates…', { icon: 'reload', timeout: 0, sound: false });
+    try {
+      var reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) throw new Error('not set up yet, reload the page once');
+      await reg.update();
+      var nw = reg.installing || reg.waiting;
+      t.close();
+      if (nw) {
+        /* a new version is coming in: the "Update ready" popup shows up when it's done */
+        UI.toast('Found an update! Getting it ready…', { icon: 'sparkle', sound: false });
+        if (nw.state === 'installed' && reg.waiting) reg.waiting.postMessage({ type: 'skip' });
+      } else {
+        UI.toast('You have the newest Game System (' + GS2Shared.APP_VERSION + ').', { type: 'good', icon: 'check' });
+      }
+    } catch (e) {
+      t.close();
+      UI.toast('Couldn\'t check for updates (' + (navigator.onLine === false ? 'you\'re offline' : (e.message || 'no answer')) + ').', { type: 'warn' });
+    } finally {
+      checking = false;
+    }
+  }
+
   async function swReady() {
     if (swState === false || !('serviceWorker' in navigator)) return false;
     try {
@@ -253,6 +284,11 @@
     if (!started) {
       if ($('title-screen') && !$('title-screen').hidden && !['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) { e.preventDefault(); enterFromTitle(); }
       return;
+    }
+    /* your screenshot / record keys */
+    if (!e.repeat && !UI.isTyping()) {
+      var cap = Capture.keyAction(e);
+      if (cap) { e.preventDefault(); Capture.run(cap); return; }
     }
     if ((e.ctrlKey || e.metaKey) && (e.key || '').toLowerCase() === 's' && !e.defaultPrevented) {
       /* Ctrl+S anywhere in the editor saves (and never opens the browser's "save page" box) */
@@ -323,6 +359,7 @@
       state.x = state.x || b(2);
       state.lb = state.lb || b(4);
       state.rb = state.rb || b(5);
+      state.start = state.start || b(9);
     }
     var playing = !$('player').hidden && !Player.menuOpen() && !UI.modalCount();
     if (any && !playing && document.hasFocus()) {
@@ -332,7 +369,7 @@
           else if (now >= pads.next[d]) { pads.next[d] = now + 110; fire(d); }
         }
       });
-      ['a', 'b', 'x', 'lb', 'rb'].forEach(function (k) { if (state[k] && !pads.prev[k]) fire(k); });
+      ['a', 'b', 'x', 'lb', 'rb', 'start'].forEach(function (k) { if (state[k] && !pads.prev[k]) fire(k); });
     }
     pads.prev = state;
     if (any) padLoop = requestAnimationFrame(pollPads);
@@ -362,6 +399,8 @@
     }
     if (k === 'lb') cycleTab(-1);
     if (k === 'rb') cycleTab(1);
+    /* Start: jump between open app windows */
+    if (k === 'start' && !UI.modalCount()) { if (!Win.cycle()) UI.toast('No app windows open', { icon: 'win', sound: false }); }
   }
   window.addEventListener('gamepadconnected', function (e) {
     if (!padLoop) padLoop = requestAnimationFrame(pollPads);
@@ -432,6 +471,8 @@
     }
     await Layout.init();
     Trophies.init();
+    Media.init();
+    Capture.init();
     applySettings();
 
     D.on(function (type) {
@@ -522,7 +563,8 @@
     setAccent: setAccent,
     setAccentFor: setAccentFor,
     applySettings: applySettings,
-    swReady: swReady
+    swReady: swReady,
+    checkUpdate: checkUpdate
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

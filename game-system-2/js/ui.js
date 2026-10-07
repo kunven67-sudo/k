@@ -116,6 +116,10 @@
     move: '<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/>',
     bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
     ungroup: '<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/><path d="M14 4h4a2 2 0 0 1 2 2v4M10 20H6a2 2 0 0 1-2-2v-4"/>',
+    mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+    rec: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
+    video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>',
     sliders: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>'
   };
   function icon(name, cls) {
@@ -512,6 +516,8 @@
   }
 
   window.UI = {
+    /* where popups go: inside the fullscreen game if it's fullscreen (else they'd be invisible), else the page */
+    overlayRoot: function () { var f = document.fullscreenElement; return f && !/^(IFRAME|VIDEO|CANVAS)$/.test(f.tagName) ? f : document.body; },
     icon: icon, hasIcon: function (n) { return !!ICONS[n]; }, iconMarkup: iconMarkup, initials: initials, modal: modal, topModal: topModal, confirm: confirmBox, prompt: promptBox, alert: alertBox,
     toast: toast, contextMenu: contextMenu, longPress: longPress, closeMenu: closeMenu, art: art, tilt: tilt, pickEmoji: pickEmoji,
     moveFocus: moveFocus, focusables: focusables, isTyping: isTyping, modalCount: function () { return stack.length; }

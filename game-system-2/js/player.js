@@ -61,6 +61,19 @@
       setTimeout(function () { Pics.useFor(U.dataUrlToBlob(dataUrl), id); }, 0);
       return true;
     },
+    /* a key was pressed inside a game/app: your screenshot or record key? (returns true if it was) */
+    keyAction: function (id, e) {
+      if (!sinkFor(id) || !e || !window.Capture) return false;
+      var what = Capture.keyAction(e);
+      if (!what) return false;
+      setTimeout(function () { Capture.run(what); }, 0);
+      return true;
+    },
+    /* the Gallery: only Game System's own apps get in */
+    media: function (id, op, arg) {
+      if (!sinkFor(id)) return Promise.reject(new Error('Not running'));
+      return Media.forApp(id, String(op || ''), arg && typeof arg === 'object' ? arg : {});
+    },
     ready: function (id, info) { var s = sinkFor(id); if (s && s.ready) s.ready(info || {}); },
     kitInfo: function (id, info) { var s = sinkFor(id); if (s && s.kitInfo) s.kitInfo(info || {}); }
   };
@@ -278,7 +291,7 @@
     var kitText = window.__GS2_KIT_SRC || '';
     if (!kitText) { try { kitText = await (await fetch('kit/gs2-kit.js')).text(); } catch (e) { kitText = ''; } }
     var boot = {
-      id: g.id, name: g.name, entry: entry.p, isolate: g.isolate !== false, hotkey: D.settings.hotkey,
+      id: g.id, name: g.name, entry: entry.p, isolate: g.isolate !== false, hotkey: D.settings.hotkey || 'F2',
       autosave: D.settings.autosaveSec, resume: save ? { data: save.data, t: save.t } : null
     };
     var bootUrl = await dataUrl(new Blob([GS2Shared.bootScript(boot, kitText)]), 'text/javascript');
@@ -338,6 +351,7 @@
     D.ui.playing = id;
     D.ui.sel = id;
     D.saveUI();
+    Capture.gameChanged();
     var launches = (g.launches || 0) + 1;
     var continuing = !opts.fresh && D.resumeKind(g) === 'save' && !!D.saveIndex[id];
     D.updateGame(id, { lastPlayed: Date.now(), launches: launches });
@@ -461,7 +475,9 @@
     clearInterval(c.gp);
     var now = performance.now();
     if (document.visibilityState === 'visible' && !c.menuOpen) D.addPlayTime(c.id, Math.min(now - c.lastTick, 2500), true);
+    Capture.gameClosing(c.id);
     cur = null;
+    Capture.gameChanged();
     if (!D.isApp(c.game)) Trophies.event('session', { ms: Date.now() - c.start, active: c.activeMs });
     if (c.unsink) c.unsink();
     blankFrame(c.frame);
@@ -532,7 +548,9 @@
       menuItem('play', 'Resume', closeMenu, { key: 'Esc' }),
       !isLink && (cur.autosave || g.kitAutosave) ? menuItem('save', 'Save now', async function () { var ok = await flushSave(); ptoast(ok ? 'Progress saved' : 'Nothing new to save', null, null, 'save'); refreshMenuSave(); }) : null,
       menuItem('full', document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen', function () { toggleFullscreen(); closeMenu(); }, { key: 'F11' }),
-      !isLink ? menuItem('camera', 'Use screenshot as cover', screenshotCover) : null,
+      menuItem('camera', 'Take a screenshot', function () { closeMenu(); setTimeout(function () { Capture.shot(); }, 120); }, { key: D.settings.shotKey || '' }),
+      menuItem(Capture.isRecording() ? 'stop' : 'rec', Capture.isRecording() ? 'Stop recording' : 'Record video', function () { closeMenu(); setTimeout(function () { Capture.toggleRec(); }, 120); }, { key: D.settings.recKey || '' }),
+      !isLink ? menuItem('image', 'Use screenshot as cover', screenshotCover) : null,
       D.simple() ? (cur.logs.errors ? menuItem('bug', 'This game had a problem', function () { closeMenu(true); problemDialog(); }) : null)
         : menuItem('bug', 'Errors & console' + (cur.logs.errors ? ' (' + cur.logs.errors + ')' : ''), function () { closeMenu(true); openConsole(); }),
       !isLink && !D.simple() ? menuItem('code', 'Edit code', function () { var id = cur.id; close({ quiet: true }).then(function () { Editor.open(id); }); }) : null,
@@ -562,6 +580,8 @@
     }
   }
   function toggleMenu() { if (!cur) return; if (cur.menuOpen) closeMenu(); else openMenu(); }
+  /* redraw the quick menu if it's open (e.g. the Record button became Stop) */
+  function refreshMenu() { if (cur && cur.menuOpen) { cur.menuOpen = false; openMenu(); } }
 
   function toggleFullscreen() {
     if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
@@ -758,6 +778,9 @@
     launch: launch,
     close: close,
     isPlaying: function () { return !!cur; },
+    kit: kit,
+    refreshMenu: refreshMenu,
+    toast: function (msg, type) { ptoast(String(msg), type || null); },
     currentId: function () { return cur ? cur.id : null; },
     menuOpen: function () { return !!(cur && cur.menuOpen); },
     toggleMenu: toggleMenu,

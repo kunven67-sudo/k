@@ -261,7 +261,7 @@
       Sound.trophy();
     }
     pop.addEventListener('click', function () { if (!(window.Player && Player.isPlaying())) open(); });
-    document.body.appendChild(pop);
+    UI.overlayRoot().appendChild(pop);
     requestAnimationFrame(function () { pop.classList.add('show'); });
     setTimeout(function () {
       pop.classList.remove('show');

@@ -4,7 +4,7 @@
      - window.GameSystem  → the Save Kit (load / save / autoSave) so games resume where you left off
      - its own private localStorage / sessionStorage / IndexedDB (games can't mess up each other's saves)
      - error + console reporting to the Game System (so you can see what's broken)
-     - the quick menu hotkey and the screenshot-to-cover button */
+     - the quick menu hotkey, your screenshot/record keys, and what recordings need (canvas + sound) */
 (function gs2Kit() {
   'use strict';
   if (!window.__GS2_BOOT) {
@@ -36,6 +36,69 @@
     var args = [gameId];
     for (var i = 1; i < arguments.length; i++) args.push(arguments[i]);
     try { return host[name].apply(host, args); } catch (e) { return undefined; }
+  }
+
+  /* ---------- game sound tap (so recordings can have the game's sound) ----------
+     Everything a game plays through Web Audio also goes to a hidden "tap"; <audio>/<video> elements
+     are remembered so their sound can be grabbed too. Nothing is recorded unless you hit Record. */
+  var audioTaps = [];
+  var mediaEls = [];
+  (function () {
+    try {
+      var AN = window.AudioNode, ADN = window.AudioDestinationNode;
+      if (AN && ADN && AN.prototype.connect && !AN.prototype.connect.__gs2) {
+        var origC = AN.prototype.connect, origD = AN.prototype.disconnect;
+        var tapOf = function (ctx) {
+          if (ctx.__gs2tap || typeof ctx.createMediaStreamDestination !== 'function') return ctx.__gs2tap || null;
+          try { ctx.__gs2tap = ctx.createMediaStreamDestination(); audioTaps.push(ctx.__gs2tap); } catch (e) { ctx.__gs2tap = null; }
+          return ctx.__gs2tap;
+        };
+        var c = function (target) {
+          var r = origC.apply(this, arguments);
+          try { if (target instanceof ADN) { var t = tapOf(this.context); if (t) origC.call(this, t); } } catch (e) { /* ignore */ }
+          return r;
+        };
+        var d = function (target) {
+          var r = origD.apply(this, arguments);
+          try { if (target instanceof ADN && this.context.__gs2tap) origD.call(this, this.context.__gs2tap); } catch (e) { /* not connected */ }
+          return r;
+        };
+        c.__gs2 = true;
+        AN.prototype.connect = c;
+        AN.prototype.disconnect = d;
+      }
+      var HM = window.HTMLMediaElement;
+      if (HM && HM.prototype.play && !HM.prototype.play.__gs2) {
+        var origP = HM.prototype.play;
+        var p = function () { try { if (mediaEls.indexOf(this) < 0) { mediaEls.push(this); if (mediaEls.length > 64) mediaEls.shift(); } } catch (e) { /* ignore */ } return origP.apply(this, arguments); };
+        p.__gs2 = true;
+        HM.prototype.play = p;
+      }
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && AC.prototype.createMediaElementSource) {
+        var origM = AC.prototype.createMediaElementSource;
+        AC.prototype.createMediaElementSource = function (el) { try { el.__gs2webaudio = true; } catch (e) { /* ignore */ } return origM.apply(this, arguments); };
+      }
+    } catch (e) { /* old browser: recordings just won't have the game's sound */ }
+  })();
+  function soundTracks() {
+    var out = [];
+    audioTaps.forEach(function (t) { try { t.stream.getAudioTracks().forEach(function (tr) { out.push(tr); }); } catch (e) { /* ignore */ } });
+    mediaEls.forEach(function (el) {
+      if (el.__gs2webaudio || !el.isConnected && el.paused) return;
+      try {
+        var st = el.captureStream ? el.captureStream() : (el.mozCaptureStream ? el.mozCaptureStream() : null);
+        if (st) st.getAudioTracks().forEach(function (tr) { out.push(tr); });
+      } catch (e) { /* cross-origin sound: skip */ }
+    });
+    return out;
+  }
+  function bigCanvas() {
+    var list = Array.prototype.slice.call(document.querySelectorAll('canvas')).filter(function (c) {
+      return c.width > 32 && c.height > 32 && c.offsetParent !== null;
+    });
+    list.sort(function (a, b) { return b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight; });
+    return list[0] || null;
   }
 
   /* ---------- private storage per game ---------- */
@@ -398,17 +461,15 @@
       resumeFns.forEach(function (fn) { try { fn(); } catch (e) { /* ignore */ } });
       try { window.dispatchEvent(new Event('gs2resume')); } catch (e) { /* ignore */ }
     },
-    _screenshot: function () {
+    /* opts: { max: longest side (720), type: 'image/jpeg' | 'image/png' } */
+    _screenshot: function (opts) {
+      opts = opts || {};
       return new Promise(function (resolve) {
-        var list = Array.prototype.slice.call(document.querySelectorAll('canvas')).filter(function (c) {
-          return c.width > 32 && c.height > 32 && c.offsetParent !== null;
-        });
-        if (!list.length) return resolve(null);
-        list.sort(function (a, b) { return b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight; });
-        var c = list[0];
+        var c = bigCanvas();
+        if (!c) return resolve(null);
         requestAnimationFrame(function () {
           try {
-            var s = Math.min(1, 720 / c.width);
+            var s = Math.min(1, (opts.max || 720) / Math.max(c.width, opts.max ? c.height : 0));
             var out = document.createElement('canvas');
             out.width = Math.max(1, Math.round(c.width * s));
             out.height = Math.max(1, Math.round(c.height * s));
@@ -416,12 +477,41 @@
             x.fillStyle = '#000';
             x.fillRect(0, 0, out.width, out.height);
             x.drawImage(c, 0, 0, out.width, out.height);
-            resolve(out.toDataURL('image/jpeg', 0.86));
+            resolve(opts.type === 'image/png' ? out.toDataURL('image/png') : out.toDataURL('image/jpeg', 0.86));
           } catch (e) { resolve(null); }
         });
       });
-    }
+    },
+    /* the game's biggest canvas as a live video stream (for recording); null if there's no canvas */
+    _canvasStream: function (fps) {
+      var c = bigCanvas();
+      if (!c || typeof c.captureStream !== 'function') return null;
+      try { return c.captureStream(fps || 30); } catch (e) { return null; }
+    },
+    /* the game's sound as audio tracks (for recording) */
+    _audioTracks: function () { return soundTracks(); }
   };
+  /* the Gallery (only Game System's own apps are allowed to use it) */
+  if (host) {
+    var media = function (op, arg) {
+      var r = call('media', op, arg || {});
+      return r && typeof r.then === 'function' ? r : Promise.reject(new Error('Open this inside Game System'));
+    };
+    GameSystem.media = {
+      list: function (filter) { return media('list', filter); },
+      get: function (id) { return media('get', { id: id }); },
+      add: function (o) { return media('add', o); },
+      remove: function (id) { return media('remove', { id: id }); },
+      rename: function (id, name) { return media('rename', { id: id, name: name }); },
+      download: function (id) { return media('download', { id: id }); },
+      use: function (id) { return media('use', { id: id }); },
+      watch: function (id) { return media('watch', { id: id }); },
+      covers: function () { return media('covers'); },
+      games: function () { return media('games'); },
+      pending: function (app) { return media('pending', { app: app }); },
+      stats: function () { return media('stats'); }
+    };
+  }
   try {
     Object.defineProperty(window, 'GameSystem', { value: GameSystem, writable: true, configurable: true, enumerable: false });
   } catch (e) { window.GameSystem = GameSystem; }
@@ -434,6 +524,12 @@
     var want = { ctrl: parts.indexOf('ctrl') >= 0, alt: parts.indexOf('alt') >= 0, shift: parts.indexOf('shift') >= 0 };
     window.addEventListener('keydown', function (e) {
       if (!e.key) return;
+      /* your screenshot / record keys (Game System checks them, so new keys work right away) */
+      if (!e.repeat && call('keyAction', { key: e.key, code: e.code, ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey })) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
       if (e.key.toLowerCase() !== hkKey && String(e.code).toLowerCase() !== hkKey) return;
       if (e.ctrlKey !== want.ctrl || e.altKey !== want.alt || e.shiftKey !== want.shift) return;
       e.preventDefault();

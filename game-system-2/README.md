@@ -12,6 +12,8 @@ Your games and apps, one system. Drop in games, play them, and they continue exa
 
 Netlify keeps your old versions in **Deploys**, so you can always click an old one and publish it again if you need to go back.
 
+**Getting updates:** after you put a new version on Netlify, Game System notices by itself the next time you open it and shows **Update ready → Reload now** (the bell has it too). Want to check right away? **Settings → App → Check for updates**. Your games, saves and settings stay; only Game System itself updates.
+
 ## Move your old games over
 
 Your old games are files in the old Netlify folder. To bring them in:
@@ -102,6 +104,20 @@ Click your name at the top right:
 - **Profile picture**: upload one, make one with the **AI avatar** maker (describe it and pick a style; 18+ stuff is blocked and the free AI's safe filter is on), or **Draw one** in the Drawing app and hit **Use as picture** → **My profile picture**
 - Your level, points, the next reward, and a button to the trophy room
 
+## Screenshots and recording
+
+Set it up in **Settings → Screenshots & recording**:
+
+- **Pick your own keys** for screenshots and recording (like F8 and F9). They work everywhere, in games too.
+- Or use the buttons in the in-game quick menu (**Take a screenshot**, **Record video**), the **floating camera button** (tap = screenshot, hold = record; shows on phones by default), or a controller's **View/Select** button (tap = screenshot, hold = record).
+- Screenshots flash, make a camera sound, and show a little picture in the corner. Click it to open the Gallery, or hit **Use as cover** to make it the game's picture.
+- While recording, a red **REC** timer shows at the top. Press your key again (or the stop button) to stop. Quitting the game stops it too.
+- **Sound**: the game's sound, the game + your mic, or no sound. **Hear yourself** lets you hear your mic while recording (use headphones).
+- **Quality** (Low / Medium / High / Ultra) and **Max length** are settings. Settings shows about how many MB a minute takes.
+- Everything goes to the **Gallery** app, and also to your Downloads folder (you can turn that off). The Gallery is in your backups.
+
+Games that draw on a canvas are recorded straight from the game (no popup). For the menus and games without a canvas, the browser asks what to share: pick **This tab** (turn on "Share tab audio" for sound). Phones can only screenshot and record canvas games.
+
 ## Apps
 
 The **Apps** tab is like a phone home screen. Apps open in a **window** instead of full screen, so you can use a few at once:
@@ -118,7 +134,9 @@ Built-in apps:
 | **Music** | Add your own songs (mp3, m4a, wav, ogg, flac…). Shuffle, repeat, a visualizer, keyboard controls. Songs are saved in this browser. |
 | **Notes** | Notes that save while you type. Search, pin, download as .txt. |
 | **Calculator** | Science buttons, history, keyboard typing. |
-| **Drawing** | Brush, highlighter, shapes, fill bucket, undo. **Use as picture** turns your drawing into a game's picture. |
+| **Drawing** | Brush, highlighter, shapes, fill bucket, undo. **Use as picture** turns your drawing into a game's picture, and the gallery button saves it to the Gallery. |
+| **Gallery** | Your screenshots, recordings, drawings and photos, newest first (like a phone's camera roll). Filter by kind or game, look at them big, download, rename, delete several at once, or use one as a game's picture. |
+| **Video** | Watch your recordings, your own video files (saved in this browser) and YouTube links. Remembers where you stopped in each video. The **mini player** button floats the video over your games. |
 
 Deleted a built-in app? The Apps tab has a **Bring them back** button.
 
@@ -172,6 +190,7 @@ When you paste AI code with **Add** → **Paste code**, Game System checks it:
 
 - Arrow keys or a controller move around. **Enter** / **A** picks. **Esc** / **B** goes back.
 - **/** searches your games. **[** and **]** switch tabs. Controller **LB**/**RB** switch tabs too.
+- Controller **Start** jumps between open app windows.
 - Right-click a game for more options.
 
 ## The Save Kit (for game makers)
@@ -204,7 +223,7 @@ Each game also gets its own private `localStorage`, `sessionStorage` and Indexed
 | `kit/gs2-kit.js` | Added to every game automatically (Save Kit, private saves, error reporting) |
 | `kit/save-kit.js` | Copy-paste Save Kit for AI-made games |
 | `games/games.json` | Games and apps that come with the website (made by **Build website folder**) |
-| `games/gs2-*/` | The built-in apps (Music, Notes, Calculator, Drawing) |
+| `games/gs2-*/` | The built-in apps (Music, Notes, Calculator, Drawing, Gallery, Video) |
 | `vendor/` | CodeMirror (code editor) and Acorn (syntax checker), MIT licensed |
 | `fonts/` | Orbitron and Chakra Petch, SIL Open Font License |
 

@@ -398,6 +398,7 @@
     var W = wins.get(id);
     if (!W) return;
     var flushed = flush(W);
+    if (window.Capture) Capture.gameClosing(id);
     if (W.unsink) W.unsink();
     Player.blankFrame(W.frame);
     W.el.classList.remove('active');
@@ -547,6 +548,26 @@
     uncover: uncover,
     minimizeAll: minimizeAll,
     onPageHide: onPageHide,
-    flushAll: function () { wins.forEach(flush); }
+    flushAll: function () { wins.forEach(flush); },
+    /* the window in front (not minimized), for screenshots */
+    activeFrame: function () { var W = activeId && wins.get(activeId); return W && !W.min ? { id: W.id, frame: W.frame, full: !!W.max || isPhone() } : null; },
+    /* tell every open app something happened (e.g. 'gs2media' when the Gallery changed) */
+    broadcast: function (name) {
+      wins.forEach(function (W) {
+        try { if (W.frame && W.frame.contentWindow) W.frame.contentWindow.dispatchEvent(new Event(name)); } catch (e) { /* website app */ }
+      });
+    },
+    /* controller Start button: bring the next window to the front */
+    cycle: function () {
+      var list = ordered();
+      if (!list.length) return false;
+      list.sort(function (a, b) { return a.order - b.order; });
+      var i = list.findIndex(function (W) { return W.id === activeId && !W.min; });
+      var next = list[(i + 1) % list.length];
+      raise(next);
+      focusApp(next);
+      Sound.select();
+      return true;
+    }
   };
 })();

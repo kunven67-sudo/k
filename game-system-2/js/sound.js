@@ -243,6 +243,20 @@
         tone(f, 1.8, { type: 'sine', gain: 0.045, delay: 0.12 + i * 0.07, attack: 0.08 });
       });
     },
+    /* camera shutter: two quick clicks */
+    shutter: function () {
+      noise(0.05, { filter: 'highpass', from: 2500, to: 6000, gain: 0.35, peakAt: 0.15 });
+      noise(0.08, { filter: 'bandpass', from: 1800, to: 900, gain: 0.25, peakAt: 0.2, delay: 0.07 });
+    },
+    /* recording started / stopped */
+    recStart: function () {
+      tone(660, 0.12, { type: 'sine', gain: 0.12, raw: true });
+      tone(990, 0.18, { type: 'sine', gain: 0.12, delay: 0.1, raw: true });
+    },
+    recStop: function () {
+      tone(990, 0.12, { type: 'sine', gain: 0.12, raw: true });
+      tone(560, 0.22, { type: 'sine', gain: 0.12, delay: 0.1, raw: true });
+    },
     /* a trophy unlocked */
     trophy: function () {
       [784, 988, 1175, 1568].forEach(function (f, i) { tone(f, 0.22, { type: 'triangle', gain: 0.08, delay: i * 0.07 }); });

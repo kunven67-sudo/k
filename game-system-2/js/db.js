@@ -5,12 +5,13 @@
      games  {id, name, ...}             one record per game
      files  {g, p, b, t}                game files: g = game id, p = path, b = Blob, t = mime type
      saves  {g, data, t, size}          Save Kit resume points (data is a JSON string)
-     kv     {k, v}                      settings mirror, stats, misc */
+     kv     {k, v}                      settings mirror, stats, misc
+     media  {id, kind, g, t, b, ...}    screenshots, recordings, drawings, photos (the Gallery) */
 (function (root) {
   'use strict';
 
   var NAME = 'gs2';
-  var VERSION = 1;
+  var VERSION = 2;
   var dbPromise = null;
 
   function upgrade(db) {
@@ -21,6 +22,7 @@
     }
     if (!db.objectStoreNames.contains('saves')) db.createObjectStore('saves', { keyPath: 'g' });
     if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv', { keyPath: 'k' });
+    if (!db.objectStoreNames.contains('media')) db.createObjectStore('media', { keyPath: 'id' });
   }
 
   function open() {
@@ -151,8 +153,8 @@
 
   /* Wipe everything Game System 2.0 stores in IndexedDB. */
   function wipe() {
-    return run(['games', 'files', 'saves', 'kv'], 'readwrite', function (tx) {
-      ['games', 'files', 'saves', 'kv'].forEach(function (s) { tx.objectStore(s).clear(); });
+    return run(['games', 'files', 'saves', 'kv', 'media'], 'readwrite', function (tx) {
+      ['games', 'files', 'saves', 'kv', 'media'].forEach(function (s) { tx.objectStore(s).clear(); });
     });
   }
 

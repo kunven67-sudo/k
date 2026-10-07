@@ -36,6 +36,7 @@ self.addEventListener('message', function (event) {
   var d = event.data || {};
   if (d.type === 'ping' && event.source) event.source.postMessage({ gs2sw: 'pong', version: VERSION });
   if (d.type === 'claim') event.waitUntil(self.clients.claim());
+  if (d.type === 'skip') self.skipWaiting();
 });
 
 self.addEventListener('fetch', function (event) {

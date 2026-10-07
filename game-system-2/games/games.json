@@ -72,16 +72,58 @@
    "builtin": true,
    "icon": "brush",
    "color": "#3dffa0",
-   "rev": 2,
+   "rev": 3,
    "entry": "index.html",
    "files": [
     "index.html"
    ],
-   "size": 31379,
+   "size": 32216,
    "isolate": true,
    "win": {
     "w": 1020,
     "h": 680
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-gallery",
+   "name": "Gallery",
+   "desc": "All your screenshots, recordings, drawings and photos, newest first. Look at them big, download them, or use one as a game's picture.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "image",
+   "color": "#5c8dff",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 30992,
+   "isolate": true,
+   "win": {
+    "w": 980,
+    "h": 660
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-video",
+   "name": "Video",
+   "desc": "Watch your recordings, your own videos and YouTube links. The mini player floats over your games.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "video",
+   "color": "#ff3d6e",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 26973,
+   "isolate": true,
+   "win": {
+    "w": 1000,
+    "h": 620
    },
    "saveKit": true
   }

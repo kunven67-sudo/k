@@ -1056,6 +1056,7 @@
     ['mode', 'sliders', 'Simple or Pro'],
     ['startup', 'resume', 'Start-up & games'],
     ['sound', 'volume', 'Sound'],
+    ['capture', 'camera', 'Screenshots & recording'],
     ['notices', 'bell', 'Notifications'],
     ['data', 'lifebuoy', 'Backups & data'],
     ['website', 'globe', 'Website folder'],
@@ -1079,6 +1080,9 @@
     var autoSel = h('select.select', { style: { width: 'auto' }, 'aria-label': 'Auto-save', onchange: function () { set('autosaveSec', Number(autoSel.value)); } },
       [3, 5, 10, 20, 30].map(function (n) { return h('option', { value: n }, 'every ' + n + ' sec'); }));
     autoSel.value = String(st.autosaveSec || 5);
+    var maxSel = h('select.select', { style: { width: 'auto' }, 'aria-label': 'Max recording length', onchange: function () { set('recMax', Number(maxSel.value)); } },
+      [[1, '1 minute'], [5, '5 minutes'], [10, '10 minutes'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [0, 'No limit']].map(function (o) { return h('option', { value: o[0] }, o[1]); }));
+    maxSel.value = String(st.recMax == null ? 10 : st.recMax);
     var meter = h('div');
     storageMeter(meter);
 
@@ -1124,6 +1128,19 @@
         setRow('Menu music', 'Chill background music in the menus, made to match your theme. It stops while you play a game or use the Music app.', sw(st.menuMusic, function (v) { set('menuMusic', v); })),
         setRow('Volume', null, vol)
       ]),
+      panel('capture', [
+        setRow('Screenshot key', 'Takes a screenshot anytime, in games too. Pick your own (like F8).', keyPicker('shotKey', 'Screenshot')),
+        setRow('Record key', 'Press once to start recording, again to stop. Pick your own (like F9).', keyPicker('recKey', 'Record')),
+        setRow('Sound in recordings', 'Game sound, game sound + your mic, or no sound', seg([['game', [I('volume'), 'Game']], ['mic', [I('mic'), 'Game + mic']], ['none', [I('x'), 'None']]], st.recSound || 'game', function (v) { set('recSound', v); renderSettings(); })),
+        st.recSound === 'mic' ? setRow('Hear yourself', 'Hear your mic while recording. Use headphones, or it echoes!', sw(st.recMonitor, function (v) { set('recMonitor', v); })) : null,
+        setRow('Quality', 'Higher = sharper and smoother, but bigger files. Now: about ' + Capture.mbPerMin(st.recQuality || 'med') + ' MB per minute (at most).', seg(Object.keys(Capture.QUALITY).map(function (k) { return [k, Capture.QUALITY[k].label]; }), st.recQuality || 'med', function (v) { set('recQuality', v); renderSettings(); })),
+        setRow('Max length', 'A recording stops by itself after this long', maxSel),
+        setRow('Screenshots to Downloads', 'They always go to the Gallery app. This also saves a copy in your Downloads.', sw(st.shotDownload, function (v) { set('shotDownload', v); })),
+        setRow('Recordings to Downloads', 'Same, for videos', sw(st.recDownload, function (v) { set('recDownload', v); })),
+        setRow('Floating camera button', 'A round button you can drag anywhere. Tap = screenshot, hold = record.', seg([['phone', 'Phones'], ['always', 'In games'], ['rec', 'While recording'], ['off', 'Off']], st.capFloat || 'phone', function (v) { set('capFloat', v); })),
+        setRow('Controller', 'View/Select button: tap = screenshot, hold = record', sw(st.padCapture !== false, function (v) { set('padCapture', v); })),
+        setRow('Gallery', 'All your screenshots, recordings and drawings', h('button.btn.sm', { onclick: function () { Capture.openGallery(); } }, I('image'), 'Open Gallery'))
+      ]),
       panel('notices', [
         setRow('Backup reminder', 'The bell reminds you if your last backup is over a week old', sw(st.backupNag, function (v) { set('backupNag', v); }))
       ]),
@@ -1146,7 +1163,8 @@
       panel('app', [
         installPrompt ? setRow('Install as an app', 'Opens in its own window, like a real console', h('button.btn.sm.primary', { onclick: async function () { installPrompt.prompt(); try { await installPrompt.userChoice; } catch (e) { /* ignore */ } installPrompt = null; renderSettings(); } }, 'Install')) :
           setRow('Install as an app', 'In Chrome/Edge: click the install icon in the address bar (or the ⋮ menu → Install)', null),
-        setRow('Version', null, h('span.tag', 'Game System ' + GS2Shared.APP_VERSION))
+        setRow('Version', null, h('span.tag', 'Game System ' + GS2Shared.APP_VERSION)),
+        setRow('Updates', 'Game System checks by itself every time you open it. Press this to check right now.', h('button.btn.sm', { onclick: function () { App.checkUpdate(); } }, I('reload'), 'Check for updates'))
       ]),
       panel('danger', [
         setRow('Delete EVERYTHING', 'All games, saves, stats and settings. Make a backup first!', h('button.btn.sm.danger', { onclick: nukeAll }, 'Delete all'))
@@ -1333,6 +1351,36 @@
       h('b', name), h('span', text));
   }
 
+  /* pick a key for screenshots / recording */
+  function keyPicker(key, label) {
+    var cur = D.settings[key] || '';
+    var btn = h('button.btn.sm' + (cur ? '' : '.ghost'), { onclick: function () { listen(); } }, cur ? h('kbd', cur) : 'Pick a key');
+    var clear = cur ? h('button.icon-btn.sm', { title: 'No key', 'aria-label': 'Remove the ' + label + ' key', onclick: function () { set(key, ''); renderSettings(); } }, I('x')) : null;
+    function listen() {
+      btn.replaceChildren('Press a key…');
+      btn.classList.add('on');
+      function onKey(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (['Shift', 'Control', 'Alt', 'Meta'].indexOf(e.key) >= 0) return;
+        window.removeEventListener('keydown', onKey, true);
+        btn.classList.remove('on');
+        if (e.key === 'Escape') { renderSettings(); return; }
+        var k = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+        var combo = (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + k;
+        if (/^[A-Z0-9 ]$/.test(k) && !e.ctrlKey && !e.altKey) { UI.toast('A plain letter would clash with games. Use an F-key (like F8) or add Ctrl/Alt.', { type: 'warn' }); renderSettings(); return; }
+        if (/^(F5|F11|F12|Tab|Enter|Backspace|ArrowUp|ArrowDown|ArrowLeft|ArrowRight)$/.test(combo)) { UI.toast(combo + ' is used by the browser or menus. Pick another one.', { type: 'warn' }); renderSettings(); return; }
+        var taken = [['hotkey', 'the quick menu'], ['shotKey', 'screenshots'], ['recKey', 'recording']].find(function (o) { return o[0] !== key && String(D.settings[o[0]] || (o[0] === 'hotkey' ? 'F2' : '')).toLowerCase() === combo.toLowerCase(); });
+        if (taken) { UI.toast(combo + ' is already the key for ' + taken[1] + '.', { type: 'warn' }); renderSettings(); return; }
+        set(key, combo);
+        UI.toast(label + ' key is now ' + combo, { icon: 'keyboard' });
+        renderSettings();
+      }
+      window.addEventListener('keydown', onKey, true);
+    }
+    return h('div.row', { style: { gap: '6px' } }, btn, clear);
+  }
+
   function recordHotkey(btn) {
     btn.replaceChildren('Press a key…');
     btn.classList.add('on');
@@ -1347,6 +1395,11 @@
       var combo = (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + k;
       if (/^[A-Z0-9 ]$/.test(k) && !e.ctrlKey && !e.altKey) {
         UI.toast('A plain letter would clash with games. Use an F-key or add Ctrl/Alt.', { type: 'warn' });
+        renderSettings();
+        return;
+      }
+      if ([D.settings.shotKey, D.settings.recKey].some(function (k) { return k && k.toLowerCase() === combo.toLowerCase(); })) {
+        UI.toast(combo + ' is already your screenshot or record key.', { type: 'warn' });
         renderSettings();
         return;
       }

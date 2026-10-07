@@ -19,7 +19,18 @@
     reduceMotion: false,
     lastBackup: 0,
     backupNag: true,
-    welcomed: false
+    welcomed: false,
+    /* screenshots + recording */
+    shotKey: '',           /* you pick your own (like F8) */
+    recKey: '',            /* like F9 */
+    recSound: 'game',      /* game | mic (game + your mic) | none */
+    recQuality: 'med',     /* low | med | high | ultra */
+    recMax: 10,            /* minutes, 0 = no limit */
+    recMonitor: false,     /* hear your mic while recording */
+    recDownload: true,     /* also save recordings to Downloads */
+    shotDownload: true,    /* also save screenshots to Downloads */
+    capFloat: 'phone',     /* floating camera button: phone | always | rec | off */
+    padCapture: true       /* controller View/Select button: tap = screenshot, hold = record */
   };
   var DEFAULT_UI = {
     view: 'home',

@@ -1797,3 +1797,58 @@ body.konami #app { animation: rainbowHue 1.3s linear 2; }
   .tr-home-lv { width: 240px; }
   .tr-mini { width: 220px; }
 }
+
+/* =====================================================================
+   SCREENSHOTS + RECORDING
+   ===================================================================== */
+.cap-flash { position: fixed; inset: 0; z-index: 470; background: #fff; pointer-events: none; animation: capFlash .55s ease-out forwards; }
+@keyframes capFlash { from { opacity: .85; } to { opacity: 0; } }
+/* the little picture in the corner after a screenshot */
+.cap-prev {
+  position: fixed; left: 16px; bottom: 16px; z-index: 455; width: 220px; border-radius: 14px; overflow: hidden;
+  background: var(--panel-solid); border: 1px solid rgba(var(--accent-rgb), .5);
+  box-shadow: 0 16px 50px rgba(0,0,0,.6), 0 0 26px rgba(var(--accent-rgb), .3);
+  animation: capIn .45s var(--spring) both;
+}
+.cap-prev.out { animation: capOut .3s var(--ease) both; }
+@keyframes capIn { from { opacity: 0; transform: translate(-30px, 30px) scale(.6) rotate(-6deg); } to { opacity: 1; transform: none; } }
+@keyframes capOut { to { opacity: 0; transform: translateX(-40px); } }
+.cp-img { display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: 0; background: #000; cursor: zoom-in; }
+.cp-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 10px; font-size: 12.5px; }
+.cp-row b { flex: 1 1 auto; white-space: nowrap; }
+.cp-row .btn { padding: 5px 9px; font-size: 12px; }
+@media (max-width: 620px) { .cp-row b { flex-basis: 100%; } .cp-row .btn { flex: 1; } }
+/* REC 0:42 */
+.rec-pill {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 460; display: flex; align-items: center; gap: 8px;
+  padding: 6px 6px 6px 14px; border-radius: 30px; background: rgba(12, 4, 8, .88); border: 1px solid rgba(255, 61, 110, .6);
+  box-shadow: 0 8px 30px rgba(0,0,0,.5), 0 0 24px rgba(255, 61, 110, .35); color: #fff; font-family: var(--display); letter-spacing: .06em;
+  backdrop-filter: blur(8px); animation: pillIn .35s var(--spring) both;
+}
+.rp-dot { width: 10px; height: 10px; border-radius: 50%; background: #ff3d6e; box-shadow: 0 0 10px #ff3d6e; animation: recBlink 1.1s steps(2, start) infinite; }
+@keyframes recBlink { to { visibility: hidden; } }
+.rp-label { font-size: 11px; font-weight: 900; color: #ff8aa8; }
+.rp-time { font-size: 14px; font-variant-numeric: tabular-nums; min-width: 42px; }
+.rp-max { font-size: 11px; color: rgba(255,255,255,.55); }
+.rp-stop { width: 30px; height: 30px; border-radius: 50%; border: 0; background: #ff3d6e; display: grid; place-items: center; margin-left: 4px; }
+.rp-stop i { width: 10px; height: 10px; border-radius: 2px; background: #fff; display: block; }
+.rp-stop:hover { filter: brightness(1.15); }
+/* floating camera button */
+.cap-float {
+  position: fixed; right: 16px; bottom: 96px; z-index: 458; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(10, 12, 22, .82); border: 1px solid rgba(var(--accent-rgb), .55); color: var(--accent);
+  box-shadow: 0 8px 26px rgba(0,0,0,.5), 0 0 18px rgba(var(--accent-rgb), .3); touch-action: none; user-select: none; -webkit-user-select: none;
+  backdrop-filter: blur(6px);
+}
+.cap-float .ico { width: 24px; height: 24px; }
+.cap-float .cf-dot { position: absolute; right: 6px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #ff3d6e; display: none; box-shadow: 0 0 8px #ff3d6e; }
+.cap-float.recording { border-color: #ff3d6e; color: #ff3d6e; animation: recGlow 1.4s ease-in-out infinite; }
+.cap-float.recording .cf-dot { display: block; }
+@keyframes recGlow { 50% { box-shadow: 0 8px 26px rgba(0,0,0,.5), 0 0 30px rgba(255, 61, 110, .7); } }
+@media (max-width: 620px) {
+  .cap-prev { left: 12px; bottom: calc(80px + env(safe-area-inset-bottom)); width: 180px; }
+  .rec-pill { top: calc(70px + env(safe-area-inset-top)); }
+}
+/* while a screenshot of the whole tab is taken, our own popups step aside */
+body.capturing .toasts, body.capturing .cap-prev, body.capturing .trophy-pop, body.capturing .cap-float, body.capturing .notice-panel { visibility: hidden !important; }
