@@ -136,8 +136,9 @@ export function buildMouth(L, seg = 18) {
       const bone = upper ? 'head' : 'jaw';
       // Rounded tooth: a small lathe around the vertical axis, tip toward the bite line.
       const base = part.nv;
-      const ring = 8;
-      const rows = 4;
+      // Low tier (seg < 14): hexagonal 2-row teeth (24 x 24 tris) instead of 24 x 64.
+      const ring = seg < 14 ? 6 : 8;
+      const rows = seg < 14 ? 2 : 4;
       for (let rI = 0; rI <= rows; rI++) {
         const f = rI / rows; // 0 = gum, 1 = biting edge
         const yy = (upper ? 1 : -1) * h * (1 - f);

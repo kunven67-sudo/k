@@ -179,9 +179,18 @@ function build(p, rig, tier) {
     packWeights(head.weights, v * NBh, NBh, HEAD_BONES, boneIndex, si, sw, o);
     fuv[o * 2] = head.uv[v * 2];
     fuv[o * 2 + 1] = head.uv[v * 2 + 1];
-    const inner = sstep(0.005, 0.0, Math.abs(y - L.mouthY)) * sstep(L.mouthZ - 0.003, L.mouthZ - 0.01, z) * (Math.abs(x) < L.mouthHalfW ? 1 : 0);
+    // Mouth interior: skin behind the lip front (following the mouth's curvature toward the corners)
+    // is wet dark-red; deeper = darker. Hidden when closed, it reads as a real mouth when open.
+    const xr = Math.abs(x) / L.mouthHalfW;
+    const zRef = L.mouthZ - 0.008 * xr * xr;
+    // (z window bounded behind so the back of the head at mouth height is never flagged.)
+    const depth = sstep(zRef - 0.002, zRef - 0.011, z) * sstep(zRef - 0.045, zRef - 0.03, z);
+    const inner = sstep(0.011, 0.004, Math.abs(y - L.mouthY)) * depth * sstep(1.08, 0.9, xr);
+    // The split row where the lips meet: when the jaw opens, the band stretched between the lips
+    // shades from lip colour to dark mouth (closed, it is a thin lip seam).
+    const seam = sstep(0.0035, 0.0008, Math.abs(y - L.mouthY)) * sstep(zRef - 0.03, zRef - 0.02, z) * sstep(1.0, 0.85, xr);
     fdat[o * 4] = 1;
-    fdat[o * 4 + 1] = inner * 0.2;
+    fdat[o * 4 + 1] = Math.max(inner * (0.22 + 0.6 * depth), seam * 0.9);
     fdat[o * 4 + 3] = headAO(sdf, x, y, z, head.nrm, v);
     mask[o * 4] = g(Math.hypot(x, y - L.noseTipY, z - L.noseTipZ), 0.012) * 0.35;
   }
@@ -214,7 +223,7 @@ function build(p, rig, tier) {
   skin.setIndex(new THREE.BufferAttribute(index, 1));
   skin.computeBoundingSphere();
   // ---- eyes and mouth
-  const eyes = partGeometry(buildEyes(L, tier === 'low' ? 14 : 24), hc, hsc, boneIndex);
+  const eyes = partGeometry(buildEyes(L, tier === 'low' ? 12 : 20), hc, hsc, boneIndex);
   const mouth = partGeometry(buildMouth(L, tier === 'low' ? 10 : 16), hc, hsc, boneIndex, true);
   // ---- face paint mapper (unit-space front point -> canvas px)
   const toUV = head.info.toUV;

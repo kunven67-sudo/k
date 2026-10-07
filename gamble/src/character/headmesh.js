@@ -26,7 +26,8 @@ export const HEAD_BONES = [
 ];
 const HB = new Map(HEAD_BONES.map((n, i) => [n, i]));
 
-export const HEAD_RES = { low: [48, 40], medium: [64, 52], high: [80, 64], ultra: [104, 84] };
+// Grid columns x rows (the magnifier warp concentrates them on the face). Budget: head ~8k tris high.
+export const HEAD_RES = { low: [40, 32], medium: [60, 48], high: [64, 50], ultra: [104, 84] };
 
 /** Column azimuth from s in [-1, 1): face magnified. */
 export const colAz = (s) => PI * (0.36 * s + 0.64 * s * s * s);

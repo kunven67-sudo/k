@@ -197,8 +197,17 @@ export class Engine {
     await sleep(ms);
   }
 
+  // True while a state change (fade/exit/enter) is in progress.
+  get transitioning() {
+    return this._transitioning;
+  }
+
   async go(name, params = {}, { fade = true, fadeMs = 600 } = {}) {
-    if (this._transitioning) return;
+    if (this._transitioning) {
+      // Queue the latest request instead of dropping it; it runs when the current one ends.
+      this._queued = { name, params, opts: { fade, fadeMs } };
+      return;
+    }
     const StateClass = this.states.get(name);
     if (!StateClass) throw new Error(`Unknown state "${name}"`);
     this._transitioning = true;
@@ -230,6 +239,11 @@ export class Engine {
       if (fade) await this.fade(false, fadeMs);
     } finally {
       this._transitioning = false;
+    }
+    if (this._queued) {
+      const q = this._queued;
+      this._queued = null;
+      await this.go(q.name, q.params, q.opts);
     }
   }
 

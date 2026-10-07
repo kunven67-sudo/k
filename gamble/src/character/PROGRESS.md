@@ -90,3 +90,40 @@ strap spikes, glasses lens bloom, flat card mustache/brows, A-pose arms, build 1
   Hat brims are closed felt profiles (no sun glint line).
 - Tool: scratchpad/sim (node --import ./reg.mjs walk.mjs|pose.mjs): runs Human in node with
   browser shims + 'three' loader → numeric gait/pose checks without the browser.
+
+## Session 5 (2026-10-06, finish) — state check
+Verified by screenshots (lineup + busts): everything A1..A7 exists and runs end-to-end — clothed,
+haired, idling/walking humans on the curb, busts view with glasses/hats/moustache. Build 1.8-2.6 s
+for the page in headless. Remaining issues seen: one 404 on page load, grey long hair ragged,
+heads read slightly small for the chunky style, skin tone a bit flat/pale on light skins.
+Status table (truthful): A1 done, A2 done (SDF loft head + lid patches), A3 done (skin.js paint,
+eyes.js, mouth in facefeatures.js), A4 done (rig.js, jiggle.js, face bones), A5 done (clothes,
+outfit, clothmat, accessories), A6 done (hair.js, facecards.js), A7 done (locomotion/ik/idle/
+face/actions), A8 partial (dirt/bruise uniforms exist in skin.js — verify; cache; perf).
+NEXT: fix 404, verify A8 + cache + tri/draw-call counts, polish, final screenshots.
+- DONE (s5): accessories merged per material (hat parts, glasses frame, lenses) → max 13 draws
+  (was 19). HEAD_RES high 72x56 / low 40x32, low-tier teeth 6x2, hair locks 96/22.
+  Measured (dev page, 8 people): high 23.5-31k tris, low 8.5-11k tris. Still over budget → next.
+  How to measure: scratchpad probe.mjs + stats.js (traverse root, count index/3) — recreate if lost.
+- DONE (s5): face offsets x1.9 (FACE_EXAGGERATION in anim/face.js) + jaw 0.42 rad: expressions now
+  read (happy/surprised/angry/sad grid checked). Budgets after tuning: high 21-27.5k tris,
+  low 8.3-10.5k, ≤13 draws (hat+glasses+bowtie wearers), most 6-11.
+- DONE (s5): hair/brow/beard cards re-wound to match authored normals (orientToNormals in human.js) → dark blotches on every lock gone.
+- DONE (s5): HEAD_UNIT 0.32→0.285 (heads ~12% bigger, cartoon read; everything scales via hsc).
+- DONE (s5): hat clip also removes lock tips in a 1.6x column (no tips through the band); free curtain lock tips overhang 0.3x and taper less (no icicles).
+- DONE (s5): idle/walk forearm twist sign flipped (palms now face the thighs, not forward);
+  arms held 0.09 rad further out over skirts/dresses. dev page `view=builds` (slim/heavy,
+  young/old contrast line-up on the sidewalk).
+- DONE (s5): mouth interior flag in meshbuild (lip seam row + skin behind the lip front, bounded so
+  the back of the head is never flagged); jaw 0.62 rad/unit → surprised/O visemes open visibly.
+  Verified expression grid (happy/surprised/angry/sad) — NOTE for screenshots: run ONE shot.mjs
+  at a time; two in parallel starve SwiftShader and evals land on stale frames (looked "broken").
+  Never use top-level `const` in shot.mjs evals (redeclaration error on the 2nd eval) — use IIFEs.
+
+## Status (end of session 5)
+A1-A7 done and verified in screenshots; A8: dirt/bruise/sweat uniforms + setters exist (D key),
+caching (shape geometry by param hash, garments by key), perf tuned (see numbers above).
+Known gaps: open-mouth interior shows stretched lower-lip skin + sky slivers at the corners (no
+dark mouth bag visible); face paint soft at extreme close-up (512 px face texture); grey long
+hair under hats has see-through gaps; walk reads slightly crouched/forward-leaning at 1.3+ m/s.
+Final screenshots: scratchpad/character/final_*.png.

@@ -13,7 +13,7 @@ export const NOISE = { felt: noise(0.85, 0.55), leather: noise(0.35, 0.5, 4), pa
 const CSS = /* css */ `
 :root { --text-scale: 1; }
 .gx-overlay {
-  position: absolute; inset: 0; display: grid; place-items: center;
+  position: absolute; inset: 0; display: grid; place-items: center; grid-template-columns: minmax(0, 1fr); box-sizing: border-box;
   padding: calc(14px + var(--safe-top)) calc(12px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(12px + var(--safe-left));
   background: radial-gradient(120% 90% at 50% 40%, rgba(8,6,10,.35), rgba(4,3,5,.82));
   backdrop-filter: blur(5px) saturate(.9); -webkit-backdrop-filter: blur(5px) saturate(.9);
@@ -24,7 +24,7 @@ const CSS = /* css */ `
 
 /* ---------- The table: wood edge → padded leather rail → brass piping → felt ---------- */
 .gx-table {
-  position: relative; width: min(980px, 100%); max-height: 100%;
+  position: relative; width: min(980px, 100%); max-height: calc(100dvh - 28px - var(--safe-top, 0px) - var(--safe-bottom, 0px)); box-sizing: border-box;
   display: flex; flex-direction: column;
   padding: 18px; border-radius: 46px;
   background:
@@ -67,7 +67,7 @@ const CSS = /* css */ `
 .gx-foot { position: relative; z-index: 1; display: flex; gap: 12px; justify-content: center; align-items: center; padding: 10px 18px 18px; flex-wrap: wrap; }
 
 /* ---------- Clay chips (tabs) ---------- */
-.gx-tabs { position: relative; z-index: 1; display: flex; gap: 10px; justify-content: center; padding: 12px 14px 6px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+.gx-tabs { position: relative; z-index: 1; flex: none; display: flex; gap: 10px; justify-content: center; padding: 12px 14px 6px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
 .gx-tabs::-webkit-scrollbar { display: none; }
 .gx-tab { all: unset; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 76px; outline: none; }
 .gx-chip {
@@ -193,6 +193,8 @@ const CSS = /* css */ `
   .gx-slider { max-width: none; }
   .gx-tabs { justify-content: flex-start; gap: 4px; padding: 10px 10px 4px; }
   .gx-tab { min-width: 66px; }
+  .gx-foot { flex-wrap: nowrap; gap: 10px; padding: 8px 12px 14px; }
+  .gx-foot .gx-btn { min-width: 0; flex: 1; padding: 12px 8px 11px; font-size: 1em; letter-spacing: .1em; }
   .gx-chip { width: 44px; height: 44px; }
   .gx-tab-label { font-size: .64em; }
 }

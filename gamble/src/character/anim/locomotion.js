@@ -297,7 +297,10 @@ export class Locomotion {
     pose.add('head', -lean * 0.3 - slouch * 0.25 + mood.sad * 0.1 + mood.tired * 0.06, Math.sin(ph) * twist * 0.4 + this.yawRate * 0.05, -this.sideSpring.x * 0.3 + mood.drunk * 0.1 * Math.sin(this.time * 0.8));
     // Arms: relax from the bind A-pose to hanging, then swing opposite to the legs.
     const fat = this.h.params.fat;
-    const hang = 0.62 - fat * 0.16 - (st.armOut || 0) - this.crouch * 0.05;
+    // Flared garments (skirt, dress) hold the hands a little further out so they don't sink in.
+    const P = this.h.params;
+    const flare = P.bottom === 'skirt' || P.top === 'dress' ? 0.09 : 0;
+    const hang = 0.62 - fat * 0.16 - flare - (st.armOut || 0) - this.crouch * 0.05;
     const elbow0 = 0.22 + (st.elbow || 0) + run * 0.9 + mood.angry * 0.2;
     for (const [side, sgn] of [['L', 1], ['R', -1]]) {
       const sw = Math.sin(ph) * swingA * sgn; // left arm forward when the right leg is forward
@@ -306,7 +309,7 @@ export class Locomotion {
       const fwdSw = Math.max(0, sw);
       const zSign = side === 'L' ? 1 : -1;
       pose.add(name, sw + run * 0.15, 0, -hang * zSign);
-      pose.add(`forearm.${side}`, elbow0 + fwdSw * 0.6 + breath * 0.01, -1.0 * zSign, 0);
+      pose.add(`forearm.${side}`, elbow0 + fwdSw * 0.6 + breath * 0.01, 1.0 * zSign, 0);
       pose.add(`hand.${side}`, 0.12, -0.35 * zSign, -0.12 * zSign);
       pose.add(`clavicle.${side}`, 0, sw * 0.08, (breath * 0.012 - slouch * 0.12) * zSign);
     }

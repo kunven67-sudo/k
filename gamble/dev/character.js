@@ -5,6 +5,7 @@
 //   view=face&i=N          close-up of person N cycling expressions, then visemes.
 //   view=busts&i=N         head-and-shoulders of people N..N+3 side by side (face/hair review).
 //   view=heads&i=N         person N three times: front, three-quarter, profile (&bald=1 for sculpt).
+//   view=builds            contrast line-up: slim / heavy, young / old, both sexes (BUILDS below).
 //
 // Keys:  1-9 0 - =  one-shots (wave, cheer, shrug, facepalm, knock, drink, phone-up/down,
 //        sit/stand, stretch, yawn, pat-pockets …; see panel)   E next expression   V visemes
@@ -41,6 +42,16 @@ injectStyle('dev-char', `
   .dch-state { margin:6px 0; font-size:12px; }
   .dch-help { opacity:.55; font-size:10.5px; }
 `);
+
+// view=builds: overrides chosen to show the range of the body/age sliders side by side.
+const BUILDS = [
+  { sex: 'm', age: 22, fat: 0.02, muscle: 0.3, top: 'tank', hat: 'none', glasses: 'none' },
+  { sex: 'm', age: 52, fat: 1.0, belly: 1.0, muscle: 0.3, top: 'tshirt', hat: 'none' },
+  { sex: 'f', age: 23, fat: 0.1, muscle: 0.2, hat: 'none', glasses: 'none' },
+  { sex: 'f', age: 58, fat: 0.95, belly: 0.8, hat: 'none' },
+  { sex: 'm', age: 88, fat: 0.35, hat: 'none' },
+  { sex: 'f', age: 86, fat: 0.25, hat: 'none' },
+];
 
 const KEYMAP = ['wave', 'cheer', 'shrug', 'facepalm', 'knock', 'drink', 'phone-up', 'phone-down', 'sit', 'stand', 'stretch', 'yawn'];
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
@@ -96,7 +107,7 @@ class CharacterDev {
     this.visOn = false;
     this.dirty = false;
     this.seed = +(q.seed || 7);
-    this.n = this.view === 'face' ? 1 : this.view === 'busts' ? 4 : this.view === 'heads' ? 3 : +(q.n || 8);
+    this.n = this.view === 'face' ? 1 : this.view === 'busts' ? 4 : this.view === 'heads' ? 3 : this.view === 'builds' ? BUILDS.length : +(q.n || 8);
     this.humans = [];
     this._spawn();
 
@@ -107,6 +118,8 @@ class CharacterDev {
       this.orbit = { yaw: +(q.yaw || 0.25), pitch: +(q.pitch || 0.02), dist: +(q.dist || 0.75), target: new THREE.Vector3() };
     } else if (this.view === 'heads') {
       this.orbit = { yaw: 0.0001, pitch: 0.0, dist: +(q.dist || 1.25), target: new THREE.Vector3(0, 1.62, 0) };
+    } else if (this.view === 'builds') {
+      this.orbit = { yaw: +(q.yaw || 0.0001), pitch: +(q.pitch || 0.04), dist: +(q.dist || 5.2), target: new THREE.Vector3(0, 1.05, 1.3) };
     } else if (this.view === 'busts') {
       this.orbit = { yaw: +(q.yaw || 0.0001), pitch: +(q.pitch || 0.02), dist: +(q.dist || 2.7), target: new THREE.Vector3(0, +(q.ty || 1.5), 0) };
     } else {
@@ -154,13 +167,13 @@ class CharacterDev {
     const tier = this.q.tier || this.engine.tier;
     for (let i = 0; i < this.n; i++) {
       const idx = this.view === 'face' || this.view === 'heads' ? this.focus : this.view === 'busts' ? this.focus + i : i;
-      const cast = CAST[idx % CAST.length];
+      const cast = this.view === 'builds' ? BUILDS[i] : CAST[idx % CAST.length];
       const { uniform, sex, ...rest } = cast;
       const p = randomHumanParams(this.seed * 101 + idx * 7, { sex, uniform, ...rest });
       // ?bald=1: sculpt review (no hair, beard, hat or glasses).
       if (this.q.bald === '1') Object.assign(p, { hairStyle: 'bald', facialHair: 'none', hat: 'none', glasses: 'none', stubble: 0 });
       const human = createHuman(p, { tier, hero: this.view === 'face' });
-      const walker = this.view !== 'face' && i >= 4;
+      const walker = this.view !== 'face' && this.view !== 'builds' && i >= 4;
       const busts = this.view === 'busts';
       const heads = this.view === 'heads';
       const x = walker ? (i - 5.5) * 1.4 : (i - 1.5) * (busts ? 0.56 : 1.05);
@@ -168,6 +181,7 @@ class CharacterDev {
       human.root.position.set(x, this.ground(x, z), z);
       human.root.rotation.y = walker ? (i % 2 ? Math.PI : 0) : heads ? [0, 0.7, 1.5708][i] : 0;
       if (heads) human.root.position.set((i - 1) * 0.36, 0, 0);
+      if (this.view === 'builds') human.root.position.set((i - (this.n - 1) / 2) * 0.82, this.ground(0, 1.3), 1.3);
       human.setFootIK((fx, fy, fz) => ({ y: this.ground(fx, fz), normal: new THREE.Vector3(0, 1, 0) }));
       this.scene.add(human.root);
       this.humans.push({ human, walker, dir: i % 2 ? -1 : 1, x, turn: 0, speed: 1.15 + (i % 3) * 0.2 });

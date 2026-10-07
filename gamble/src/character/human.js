@@ -294,6 +294,7 @@ export class Human {
     }
     for (const i of fc.index) index.push(i + nh);
     if (!index.length) return;
+    orientToNormals(index, pos, nrm);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
@@ -364,6 +365,28 @@ export class Human {
     u.uLidU.value.set(Math.sin(L.lidUpper - lids.upperL), Math.sin(L.lidUpper - lids.upperR));
     this.mouthMat.userData.u.uOpen.value = this.animator.face.mouthOpen;
     void _v;
+  }
+}
+
+/**
+ * Flip triangles whose winding disagrees with their authored vertex normals. Hair locks and cards
+ * are double-sided: three.js negates the normal on back faces, so a card wound "inwards" but seen
+ * from outside would be lit as if facing the scalp (dark blotches on every lock).
+ */
+function orientToNormals(index, pos, nrm) {
+  for (let t = 0; t < index.length; t += 3) {
+    const a = index[t] * 3;
+    const b = index[t + 1] * 3;
+    const c = index[t + 2] * 3;
+    const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+    const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+    const gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+    const d = gx * (nrm[a] + nrm[b] + nrm[c]) + gy * (nrm[a + 1] + nrm[b + 1] + nrm[c + 1]) + gz * (nrm[a + 2] + nrm[b + 2] + nrm[c + 2]);
+    if (d < 0) {
+      const tmp = index[t + 1];
+      index[t + 1] = index[t + 2];
+      index[t + 2] = tmp;
+    }
   }
 }
 

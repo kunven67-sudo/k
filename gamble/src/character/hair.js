@@ -223,8 +223,8 @@ export function buildHair(p, L, tier = 'high') {
   const d = { ...base, t: base.t.map((v) => v * vol) };
   const sdf = hairSDF(L, d, head);
   const low = tier === 'low';
-  const C = low ? 40 : 72;
-  const R = low ? 26 : 48;
+  const C = low ? 34 : 56;
+  const R = low ? 22 : 38;
   const elTop = 89.6 * D2R;
   const elBot = d.curtain ? -78 * D2R : -40 * D2R;
   const out = { pos: [], nrm: [], tan: [], uv: [], cover: [], wts: [], index: [] };
@@ -285,7 +285,7 @@ export function buildHair(p, L, tier = 'high') {
   }
   const shellN = out.pos.length / 3;
   // ---- locks
-  const nLocks = Math.round((low ? 26 : 120) * (d.locks || 1));
+  const nLocks = Math.round((low ? 22 : 96) * (d.locks || 1));
   const segs = low ? 3 : 6;
   const across = low ? 2 : 3;
   for (let k = 0; k < nLocks; k++) {
@@ -332,7 +332,7 @@ export function buildHair(p, L, tier = 'high') {
         f = [f[0] * cos(ang) + sd[0] * sin(ang), f[1] * cos(ang) + sd[1] * sin(ang), f[2] * cos(ang) + sd[2] * sin(ang)];
       }
       const side = [f[1] * n[2] - f[2] * n[1], f[2] * n[0] - f[0] * n[2], f[0] * n[1] - f[1] * n[0]];
-      const w = width * (1 - tt * tt * 0.75);
+      const w = width * (1 - tt * tt * (free ? 0.35 : 0.75));
       const lift = lift0 + liftTip * tt * tt;
       const W = swayWeights(px, py);
       for (let a = 0; a < across; a++) {
@@ -348,7 +348,8 @@ export function buildHair(p, L, tier = 'high') {
       }
       fPrev = { n };
       if (sI < segs) {
-        const step = len / segs;
+        // Past the curtain's bottom edge locks only overhang a little (long free tips read as icicles).
+        const step = (len / segs) * (free ? 0.3 : 1);
         px += f[0] * step;
         py += f[1] * step;
         pz += f[2] * step;
@@ -478,7 +479,11 @@ float hHash( float n ) { return fract( sin( n * 91.345 ) * 47453.5453 ); }`)
   // Hat clip: hair inside the crown (above the band) is hidden.
   if ( uClip.w > 0.0 ) {
     vec3 q = vBindP - uClip.xyz;
-    if ( q.y > 0.0 && ( q.x * q.x ) / ( uClipR.x * uClipR.x ) + ( q.z * q.z ) / ( uClipR.z * uClipR.z ) < 1.0 ) discard;
+    float e = ( q.x * q.x ) / ( uClipR.x * uClipR.x ) + ( q.z * q.z ) / ( uClipR.z * uClipR.z );
+    if ( q.y > 0.0 && e < 1.0 ) discard;
+    // Head-hair locks stand off the scalp: clip them in a wider column so no tips poke through the
+    // band or brim (brows/lashes/beard sit far below the band and are unaffected).
+    if ( vCover > 9.5 && vCover < 11.5 && q.y > -0.012 && e < 1.6 ) discard;
   }
   float a;
   if ( vCover > 11.5 ) {

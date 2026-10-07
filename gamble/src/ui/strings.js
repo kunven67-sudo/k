@@ -58,6 +58,8 @@ i18n.register('ui', {
     'set.reset': 'Reset table',
     'set.resetConfirm': 'Reset every setting to the house default?',
     'set.resetDone': 'Everything is back to the house defaults.',
+    'set.on': 'ON',
+    'set.off': 'OFF',
     'tab.graphics': 'Graphics',
     'tab.audio': 'Audio',
     'tab.controls': 'Controls',
@@ -193,6 +195,7 @@ i18n.register('ui', {
     'cred.thirdParty': 'Built with',
     'cred.fonts': 'Typefaces',
     'cred.thanks': 'Thanks for playing.',
+    'cred.made': 'Made from scratch',
     'cred.back': 'Back to the machine',
   },
   es: {
@@ -246,6 +249,8 @@ i18n.register('ui', {
     'set.reset': 'Restablecer mesa',
     'set.resetConfirm': '¿Volver todos los ajustes a los de la casa?',
     'set.resetDone': 'Todo ha vuelto a los ajustes de la casa.',
+    'set.on': 'SÍ',
+    'set.off': 'NO',
     'tab.graphics': 'Gráficos',
     'tab.audio': 'Audio',
     'tab.controls': 'Controles',
@@ -379,6 +384,7 @@ i18n.register('ui', {
     'cred.thirdParty': 'Hecho con',
     'cred.fonts': 'Tipografías',
     'cred.thanks': 'Gracias por jugar.',
+    'cred.made': 'Hecho desde cero',
     'cred.back': 'Volver a la máquina',
   },
 });

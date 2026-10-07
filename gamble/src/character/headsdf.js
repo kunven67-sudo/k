@@ -15,7 +15,8 @@ const sstep = (a, b, x) => {
   const t = clamp((x - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
 };
-export const HEAD_UNIT = 0.32;
+// 0.285 (not the anatomical 0.32): heads render ~12% larger than H/5.5 for the chunky cartoon read.
+export const HEAD_UNIT = 0.285;
 export const JAW_BIND_OPEN = 0;
 /** Projection centre of the head grid (unit space). */
 export const PROJ = [0, -0.035, -0.008];

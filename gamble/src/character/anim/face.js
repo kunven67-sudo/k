@@ -10,6 +10,9 @@ import * as THREE from 'three';
 import { clamp, damp, lerp } from '../../core/util.js';
 import { Rng } from '../../core/rng.js';
 
+/** Scale of all face-bone offsets (1 = anatomical). */
+const FACE_EXAGGERATION = 1.9;
+
 export const EXPRESSIONS = {
   neutral: {},
   happy: { smile: 0.9, squint: 0.45, browOuterUp: 0.2, jawOpen: 0.1, mouthWide: 0.25, cheekUp: 0.6 },
@@ -185,7 +188,10 @@ export class Face {
     const L = this.L;
     const k = this.k;
     const g = (n) => c[n] || 0;
-    const T = (bone, x, y, z) => bone.position.add(_v.set(x * k, y * k, z * k));
+    // Cartoon exaggeration: offsets below are anatomical millimetres; chunky stylised faces need
+    // roughly double so expressions read at gameplay distance.
+    const ke = k * FACE_EXAGGERATION;
+    const T = (bone, x, y, z) => bone.position.add(_v.set(x * ke, y * ke, z * ke));
     // Brows.
     for (const [s, sx] of [['L', 1], ['R', -1]]) {
       const inUp = g(`browInnerUp.${s}`);
@@ -213,7 +219,7 @@ export class Face {
     T(B.nose, 0, 0.003 * g('sneer'), 0.0008 * g('sneer'));
     // Jaw (+X opens), tongue.
     const jaw = clamp(g('jawOpen') - lipsPress * 0.02, -0.02, 1.1);
-    B.jaw.quaternion.multiply(_q.setFromEuler(_e.set(jaw * 0.34, g('jawSide') * 0.08, 0)));
+    B.jaw.quaternion.multiply(_q.setFromEuler(_e.set(jaw * 0.62, g('jawSide') * 0.08, 0)));
     this.mouthOpen = clamp(jaw * 1.6 + g('funnel') * 0.3, 0, 1);
     B.tongue.quaternion.multiply(_q.setFromEuler(_e.set(-g('tongueUp') * 0.45, 0, 0)));
     T(B.tongue, 0, 0.004 * g('tongueUp'), 0.004 * g('tongueUp') + 0.012 * g('tongueOut'));

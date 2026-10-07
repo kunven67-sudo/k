@@ -3,7 +3,8 @@
 //
 // Usage: node shot.mjs <url> <outPrefix> [stepsJson]
 //   steps: [{wait:ms} | {key:'KeyW', ms:800} | {click:[x,y]} | {mouse:[dx,dy]} | {shot:'name'} |
-//           {eval:'js expression'} | {type:'text'} | {viewport:[w,h]}]
+//           {eval:'js code (function-scoped; value of last expression is printed)'} | {type:'text'} | {viewport:[w,h]}]
+// Run ONE shot.mjs at a time: parallel runs starve SwiftShader and capture stale frames.
 // Env: SHOT_W/SHOT_H viewport (default 1280x720), SHOT_MOBILE=1 to emulate an iPhone,
 //      SHOT_QUALITY=low|medium|high|ultra to force a tier, SHOT_CLEAR=1 to wipe localStorage first.
 // Set PW=/path/to/node_modules/playwright/index.mjs if playwright isn't installed next to this file.
@@ -45,7 +46,7 @@ for (const s of steps) {
   if (s.key) { await page.keyboard.down(s.key); await page.waitForTimeout(s.ms || 100); await page.keyboard.up(s.key); }
   if (s.press) await page.keyboard.press(s.press);
   if (s.type) await page.keyboard.type(s.type);
-  if (s.eval) { try { const r = await page.evaluate(s.eval); if (r !== undefined) console.log('eval:', JSON.stringify(r)); } catch (e) { logs.push('[eval] ' + e.message); } }
+  if (s.eval) { try { const r = await page.evaluate(`(function(){ return eval(${JSON.stringify(s.eval)}); })()`); if (r !== undefined) console.log('eval:', JSON.stringify(r)); } catch (e) { logs.push('[eval] ' + e.message); } }
   if (s.shot) { const p = `${out}-${String(n++).padStart(2, '0')}-${s.shot}.png`; await page.screenshot({ path: p }); console.log('saved', p); }
 }
 console.log(logs.length ? logs.join('\n') : 'no console errors');

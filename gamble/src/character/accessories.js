@@ -253,6 +253,40 @@ function glassesGeometry(kind, L, sdf) {
   return { frame, lenses };
 }
 
+/** Merge geometries (position/normal/uv, indexed) so one material = one draw call. */
+function mergeSimple(list) {
+  if (list.length === 1) return list[0];
+  let nv = 0;
+  let ni = 0;
+  for (const g of list) {
+    nv += g.attributes.position.count;
+    ni += g.index ? g.index.count : g.attributes.position.count;
+  }
+  const pos = new Float32Array(nv * 3);
+  const nor = new Float32Array(nv * 3);
+  const uv = new Float32Array(nv * 2);
+  const idx = new Uint32Array(ni);
+  let vo = 0;
+  let io = 0;
+  for (const g of list) {
+    if (!g.attributes.normal) g.computeVertexNormals();
+    const n = g.attributes.position.count;
+    pos.set(g.attributes.position.array, vo * 3);
+    nor.set(g.attributes.normal.array, vo * 3);
+    if (g.attributes.uv) uv.set(g.attributes.uv.array, vo * 2);
+    if (g.index) for (let i = 0; i < g.index.count; i++) idx[io++] = g.index.array[i] + vo;
+    else for (let i = 0; i < n; i++) idx[io++] = i + vo;
+    vo += n;
+    g.dispose();
+  }
+  const m = new THREE.BufferGeometry();
+  m.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  m.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  m.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  m.setIndex(new THREE.BufferAttribute(idx, 1));
+  return m;
+}
+
 /** Build the accessories for a human. Returns [{ mesh, boneName }] and an optional hair clip. */
 export function buildAccessories(human) {
   const p = human.params;
@@ -268,10 +302,17 @@ export function buildAccessories(human) {
     const hg = hatGeometry(p.hat, sdf);
     clip = hg.clip;
     const color = CLOTH_COLORS[p.hatColor] ?? 0x8a1a1a;
+    // Parts sharing fabric/colour/sidedness are merged: a hat costs 1-3 draw calls, not 5+.
+    const groups = new Map();
     for (const part of hg.parts) {
+      const key = `${part.fabric}|${part.band ? 1 : 0}|${part.double ? 1 : 0}`;
+      if (!groups.has(key)) groups.set(key, { part, list: [] });
+      groups.get(key).list.push(toWorld(part.g));
+    }
+    for (const { part, list } of groups.values()) {
       const m = createClothMaterial({ fabric: part.fabric, color: part.band ? 0x1c1a18 : color, tierName, wear: p.wear, dirt: p.dirtiness * 0.6, seed: p.seed + 3 });
       if (part.double) m.side = THREE.DoubleSide;
-      out.push({ geometry: toWorld(part.g), material: m, bone: 'head', cloth: true });
+      out.push({ geometry: mergeSimple(list), material: m, bone: 'head', cloth: true });
     }
   }
   if (p.glasses && p.glasses !== 'none') {
@@ -280,8 +321,8 @@ export function buildAccessories(human) {
     const fm = new THREE.MeshPhysicalMaterial({ color: metal ? 0xc9a75a : p.glasses === 'reading' ? 0x5a3a26 : 0x151515, metalness: metal ? 1 : 0, roughness: metal ? 0.3 : 0.35, clearcoat: metal ? 0 : 0.8 });
     const dark = p.glasses === 'sunglasses' || p.glasses === 'aviator';
     const lm = new THREE.MeshPhysicalMaterial({ color: dark ? 0x1a2420 : 0xdfe8ee, metalness: 0, roughness: 0.22, specularIntensity: 0.3, envMapIntensity: 0.6, transparent: true, opacity: dark ? 0.82 : 0.1, side: THREE.DoubleSide, depthWrite: false });
-    for (const g of gg.frame) out.push({ geometry: toWorld(g), material: fm, bone: 'head' });
-    for (const g of gg.lenses) out.push({ geometry: toWorld(g), material: lm, bone: 'head', noShadow: true });
+    out.push({ geometry: mergeSimple(gg.frame.map(toWorld)), material: fm, bone: 'head' });
+    out.push({ geometry: mergeSimple(gg.lenses.map(toWorld)), material: lm, bone: 'head', noShadow: true });
   }
   if (p.top === 'dealer') {
     // Bow tie at the collar front.
