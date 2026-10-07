@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drawing</title>
+<style>
+  :root {
+    --bg: #07080f; --bar: #0d1020; --panel: #141a30; --hi: #1d2442; --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.16);
+    --text: #eef1ff; --muted: #8d93b5; --acc: #3dffa0; --acc2: #00e5ff;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; }
+  button { font-family: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+  svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; pointer-events: none; }
+  .app { display: flex; flex-direction: column; height: 100%; }
+  .bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--bar); border-bottom: 1px solid var(--line); flex-wrap: wrap; row-gap: 6px; }
+  .grp { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(0,0,0,.3); border: 1px solid var(--line); }
+  .tb { width: 34px; height: 34px; border-radius: 9px; border: 0; background: none; color: var(--muted); display: grid; place-items: center; position: relative; transition: background .12s, color .12s; }
+  .tb:hover { background: rgba(255,255,255,.07); color: var(--text); }
+  .tb.on { background: var(--acc); color: #04120b; box-shadow: 0 0 12px rgba(61,255,160,.45); }
+  .tb:disabled { opacity: .35; cursor: default; background: none; }
+  .tb.txt { width: auto; padding: 0 10px; font-size: 12.5px; font-weight: 700; display: inline-flex; gap: 6px; align-items: center; }
+  .size { display: flex; align-items: center; gap: 8px; padding: 0 8px; height: 40px; }
+  .size input { width: 96px; accent-color: var(--acc); }
+  .dot { width: 28px; height: 28px; display: grid; place-items: center; }
+  .dot i { display: block; border-radius: 50%; background: currentColor; max-width: 28px; max-height: 28px; min-width: 2px; min-height: 2px; }
+  .colors { display: flex; gap: 4px; align-items: center; padding: 4px 6px; flex-wrap: wrap; }
+  .sw { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,.18); padding: 0; transition: transform .12s; }
+  .sw:hover { transform: scale(1.15); }
+  .sw.on { border-color: #fff; box-shadow: 0 0 0 2px var(--acc); transform: scale(1.12); }
+  .custom { position: relative; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255,255,255,.3); background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+  .custom input { position: absolute; inset: -6px; width: 40px; height: 40px; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+  .grow { flex: 1; }
+  .stage { flex: 1; position: relative; min-height: 0; overflow: hidden; background:
+    radial-gradient(circle at 50% 40%, rgba(61,255,160,.06), transparent 60%), repeating-conic-gradient(#0b0d17 0 25%, #0e1120 0 50%) 0 0 / 22px 22px; }
+  canvas { position: absolute; display: block; touch-action: none; }
+  #c { box-shadow: 0 10px 40px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08); cursor: crosshair; }
+  #o { pointer-events: none; }
+  .stage.picker #c { cursor: copy; }
+  .stage.fill #c { cursor: cell; }
+  .stage.hide-cursor #c { cursor: none; }
+  .dlg-back { position: fixed; inset: 0; background: rgba(2,3,8,.6); display: grid; place-items: center; z-index: 10; padding: 16px; }
+  .dlg-back[hidden] { display: none; }
+  .dlg { background: #10142a; border: 1px solid var(--line2); border-radius: 16px; padding: 18px; width: min(380px, 100%); box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .dlg h2 { margin: 0 0 6px; font-size: 18px; }
+  .dlg p { margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+  .dlg .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .btn { border: 1px solid var(--line2); background: var(--panel); border-radius: 10px; padding: 9px 14px; font-weight: 700; font-size: 13.5px; display: inline-flex; align-items: center; gap: 8px; }
+  .btn:hover { background: var(--hi); }
+  .btn.primary { background: var(--acc); color: #04120b; border-color: var(--acc); }
+  .paper { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(255,255,255,.4); display: inline-block; }
+  .toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%) translateY(16px); opacity: 0; pointer-events: none; background: #1b2140; border: 1px solid var(--line2); color: var(--text); padding: 9px 14px; border-radius: 22px; font-size: 13px; transition: all .2s; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 20; max-width: calc(100% - 30px); text-align: center; }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+  .drop { position: absolute; inset: 0; border: 3px dashed var(--acc); background: rgba(61,255,160,.08); display: grid; place-items: center; font-weight: 800; font-size: 18px; color: var(--acc); pointer-events: none; z-index: 3; }
+  .drop[hidden] { display: none; }
+  @media (max-width: 640px) {
+    .tb { width: 32px; height: 32px; }
+    .size input { width: 70px; }
+    .tb.txt span { display: none; }
+    .tb.txt { width: 32px; padding: 0; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar" id="bar">
+    <div class="grp" id="tools" role="toolbar" aria-label="Tools"></div>
+    <div class="grp size" title="Brush size ( [ and ] keys )">
+      <span class="dot"><i id="dot"></i></span>
+      <input type="range" id="size" min="1" max="80" aria-label="Brush size">
+    </div>
+    <div class="grp" id="fillgrp" hidden><button class="tb" id="b-filled" title="Filled shapes" aria-label="Filled shapes"></button></div>
+    <div class="grp colors" id="colors" aria-label="Colors"></div>
+    <div class="grow"></div>
+    <div class="grp">
+      <button class="tb" id="b-undo" title="Undo (Ctrl+Z)" aria-label="Undo"></button>
+      <button class="tb" id="b-redo" title="Redo (Ctrl+Y)" aria-label="Redo"></button>
+    </div>
+    <div class="grp">
+      <button class="tb" id="b-new" title="New drawing" aria-label="New drawing"></button>
+      <button class="tb" id="b-open" title="Open a picture to draw on" aria-label="Open a picture"></button>
+      <button class="tb" id="b-save" title="Download as PNG" aria-label="Download"></button>
+      <button class="tb" id="b-gallery" title="Save to the Gallery app" aria-label="Save to Gallery" hidden></button>
+      <button class="tb txt" id="b-use" title="Use this drawing as the picture of a game or app"></button>
+    </div>
+  </div>
+  <div class="stage" id="stage">
+    <canvas id="c" width="1280" height="720" aria-label="Drawing"></canvas>
+    <canvas id="o" width="1280" height="720" aria-hidden="true"></canvas>
+    <div class="drop" id="drop" hidden>Drop a picture to draw on it</div>
+  </div>
+</div>
+<div class="dlg-back" id="dlg-new" hidden>
+  <div class="dlg" role="dialog" aria-label="New drawing">
+    <h2>New drawing?</h2>
+    <p>This clears what you drew. (You can still undo it.) Pick the paper:</p>
+    <div class="row">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn" data-paper="#0b0d18"><span class="paper" style="background:#0b0d18"></span>Dark</button>
+      <button class="btn primary" data-paper="#ffffff"><span class="paper" style="background:#fff"></span>White</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="file" accept="image/*" hidden>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var GS = window.GameSystem || (function () {
+    var KEY = 'gs2-drawing';
+    return {
+      load: function () { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } },
+      autoSave: function (fn) {
+        function w() { try { localStorage.setItem(KEY, JSON.stringify(fn('exit'))); } catch (e) { /* too big for the browser */ } }
+        window.addEventListener('pagehide', w);
+        document.addEventListener('visibilitychange', function () { if (document.hidden) w(); });
+      },
+      offerPicture: function () { return false; }
+    };
+  })();
+
+  var W = 1280, H = 720;
+  var ICON = {
+    brush: '<path d="M19 3c-2.4 1.4-7 5.6-8.8 8.4l1.9 1.9c2.8-1.8 7-6.4 8.4-8.8z"/><path d="M9.3 13c-2 0-3.4 1.5-3.4 3.3 0 1.1-.7 2-2.1 2.4 3.3 1.3 7.6.4 7.6-3.6z"/>',
+    marker: '<path d="M15.5 4.5l4 4L10 18H6v-4z"/><path d="M4 21h9" stroke-width="3" opacity=".6"/>',
+    eraser: '<path d="M20 20H9L4 15a2 2 0 0 1 0-2.8L13.2 3a2 2 0 0 1 2.8 0L21 8a2 2 0 0 1 0 2.8L11.5 20"/><path d="M7 11l7 7"/>',
+    line: '<path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.6" fill="currentColor"/><circle cx="19" cy="5" r="1.6" fill="currentColor"/>',
+    rect: '<rect x="4" y="6" width="16" height="12" rx="1.5"/>',
+    ellipse: '<ellipse cx="12" cy="12" rx="8.5" ry="6.5"/>',
+    fill: '<path d="M5 11l7-7 7 7-7 7z"/><path d="M19 15s2 2.3 2 3.5a2 2 0 0 1-4 0c0-1.2 2-3.5 2-3.5z" fill="currentColor"/>',
+    picker: '<path d="M14.5 4.5a2.1 2.1 0 0 1 3 0l2 2a2.1 2.1 0 0 1 0 3L17 12l-5-5z"/><path d="M12 7l-7.5 7.5L4 20l5.5-.5L17 12"/>',
+    undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+    redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>',
+    new: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15h6"/>',
+    open: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
+    save: '<path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+    gallery: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>',
+    use: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/><path d="M16 3v4M14 5h4"/>',
+    filled: '<rect x="4" y="6" width="16" height="12" rx="1.5" fill="currentColor"/>',
+    hollow: '<rect x="4" y="6" width="16" height="12" rx="1.5"/>'
+  };
+  function svg(n) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[n] + '</svg>'; }
+  var TOOLS = [
+    ['brush', 'Brush (B)', 'b'], ['marker', 'Highlighter (M)', 'm'], ['eraser', 'Eraser (E)', 'e'], ['line', 'Line (L)', 'l'],
+    ['rect', 'Rectangle (R)', 'r'], ['ellipse', 'Circle (O)', 'o'], ['fill', 'Fill bucket (F)', 'f'], ['picker', 'Pick a color from the drawing (I)', 'i']
+  ];
+  var SWATCHES = ['#000000', '#ffffff', '#8d93b5', '#ff3d6e', '#ff6a00', '#ffcc00', '#3dffa0', '#00e5ff', '#2b6bff', '#b26bff', '#ff2bd6', '#8b5a2b'];
+
+  var state = { tool: 'brush', color: '#ff2bd6', size: 8, bg: '#ffffff', filled: false, recent: [], img: null };
+  var saved = GS.load();
+  if (saved && typeof saved === 'object') {
+    if (TOOLS.some(function (t) { return t[0] === saved.tool; })) state.tool = saved.tool;
+    if (/^#[0-9a-f]{6}$/i.test(saved.color || '')) state.color = saved.color;
+    if (/^#[0-9a-f]{6}$/i.test(saved.bg || '')) state.bg = saved.bg;
+    state.size = Math.min(80, Math.max(1, Number(saved.size) || 8));
+    state.filled = !!saved.filled;
+    if (Array.isArray(saved.recent)) state.recent = saved.recent.filter(function (c) { return /^#[0-9a-f]{6}$/i.test(c); }).slice(0, 6);
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var c = $('c'), o = $('o'), stage = $('stage');
+  var ctx = c.getContext('2d');
+  var octx = o.getContext('2d');
+
+  /* ---------------- the saved picture (kept fresh for the Save Kit) ---------------- */
+  var imgCache = null;   /* data: URL of the picture */
+  var dirty = false;     /* the canvas changed since imgCache was made */
+  var cacheSeq = 0;
+  function refreshCache(blob) {
+    var my = ++cacheSeq;
+    var fr = new FileReader();
+    fr.onload = function () { if (my === cacheSeq) { imgCache = fr.result; dirty = false; } };
+    fr.readAsDataURL(blob);
+  }
+  GS.autoSave(function (reason) {
+    if (dirty && reason !== 'auto') {
+      try { imgCache = c.toDataURL('image/png'); dirty = false; cacheSeq++; } catch (e) { /* ignore */ }
+    }
+    return { tool: state.tool, color: state.color, size: state.size, bg: state.bg, filled: state.filled, recent: state.recent, img: imgCache };
+  });
+
+  /* ---------------- undo / redo (pictures squeezed into PNGs, so it stays light) ---------------- */
+  var hist = [], hi = -1, restoreSeq = 0, restoring = false;
+  function snapshot() {
+    var slot = { blob: null };
+    slot.ready = new Promise(function (res) {
+      c.toBlob(function (b) { slot.blob = b; res(b); if (b && hist[hi] === slot) refreshCache(b); }, 'image/png');
+    });
+    hist = hist.slice(0, hi + 1);
+    hist.push(slot);
+    if (hist.length > 40) hist.shift();
+    hi = hist.length - 1;
+    dirty = true;
+    updateUndo();
+  }
+  function restore(i) {
+    var slot = hist[i];
+    if (!slot) return;
+    hi = i;
+    updateUndo();
+    var my = ++restoreSeq;
+    restoring = true;
+    slot.ready.then(function (b) {
+      if (!b || my !== restoreSeq) return;
+      return loadImage(URL.createObjectURL(b), true).then(function (img) {
+        if (my !== restoreSeq) return;
+        ctx.save();
+        ctx.globalCompositeOperation = 'copy';
+        ctx.drawImage(img, 0, 0, W, H);
+        ctx.restore();
+        dirty = true;
+        refreshCache(b);
+      });
+    }).catch(function () { /* ignore */ }).then(function () { if (my === restoreSeq) restoring = false; });
+  }
+  function undo() { if (hi > 0) { restore(hi - 1); toast('Undo'); } }
+  function redo() { if (hi < hist.length - 1) { restore(hi + 1); toast('Redo'); } }
+  function updateUndo() { $('b-undo').disabled = hi <= 0; $('b-redo').disabled = hi >= hist.length - 1; }
+
+  function loadImage(src, revoke) {
+    return new Promise(function (res, rej) {
+      var img = new Image();
+      img.onload = function () { if (revoke) URL.revokeObjectURL(src); res(img); };
+      img.onerror = function () { if (revoke) URL.revokeObjectURL(src); rej(new Error('bad picture')); };
+      img.src = src;
+    });
+  }
+
+  /* ---------------- fit the canvas in the window ---------------- */
+  var view = { x: 0, y: 0, w: W, h: H, s: 1 };
+  function fit() {
+    var r = stage.getBoundingClientRect();
+    var pad = r.width < 500 ? 8 : 18;
+    var s = Math.min((r.width - pad * 2) / W, (r.height - pad * 2) / H);
+    s = Math.max(0.05, s);
+    view.w = Math.round(W * s); view.h = Math.round(H * s); view.s = s;
+    view.x = Math.round((r.width - view.w) / 2); view.y = Math.round((r.height - view.h) / 2);
+    [c, o].forEach(function (el) {
+      el.style.left = view.x + 'px'; el.style.top = view.y + 'px';
+      el.style.width = view.w + 'px'; el.style.height = view.h + 'px';
+    });
+  }
+  window.addEventListener('resize', fit);
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(stage);
+
+  function pos(e) {
+    var r = c.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height), p: e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 0.5 };
+  }
+
+  /* ---------------- drawing ---------------- */
+  var drawing = null;
+  function widthFor(p) { return state.tool === 'marker' ? state.size * 2.2 : state.size * (drawing && drawing.pen ? 0.35 + p * 1.3 : 1); }
+
+  c.addEventListener('pointerdown', function (e) {
+    if (drawing || restoring || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.preventDefault();
+    var pt = pos(e);
+    if (state.tool === 'picker') { pickColor(pt); return; }
+    if (state.tool === 'fill') { floodFill(Math.floor(pt.x), Math.floor(pt.y), state.color); snapshot(); return; }
+    try { c.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    drawing = { id: e.pointerId, tool: state.tool, start: pt, last: pt, mid: pt, pts: [pt], pen: e.pointerType === 'pen', shift: e.shiftKey };
+    if (state.tool === 'brush' || state.tool === 'eraser') dot(pt);
+    else drawOverlay(pt);
+  });
+  c.addEventListener('pointermove', function (e) {
+    if (!drawing) { hover(e); return; }
+    if (e.pointerId !== drawing.id) return;
+    var list = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (!list.length) list = [e];
+    drawing.shift = e.shiftKey;
+    list.forEach(function (ev) {
+      var pt = pos(ev);
+      if (state.tool === 'brush' || state.tool === 'eraser') segment(pt);
+      drawing.pts.push(pt);
+      drawing.last = pt;
+    });
+    if (state.tool !== 'brush' && state.tool !== 'eraser') drawOverlay(drawing.last);
+  });
+  function end(e) {
+    if (!drawing || (e && e.pointerId !== drawing.id)) return;
+    var d = drawing;
+    if (d.tool === 'brush' || d.tool === 'eraser') {
+      /* finish the curve to the last point */
+      ctx.beginPath();
+      strokeStyle();
+      ctx.lineWidth = widthFor(d.last.p);
+      ctx.moveTo(d.mid.x, d.mid.y);
+      ctx.lineTo(d.last.x, d.last.y);
+      ctx.stroke();
+    } else {
+      octx.clearRect(0, 0, W, H);
+      paintShape(ctx, d, d.last);
+    }
+    drawing = null;
+    snapshot();
+  }
+  c.addEventListener('pointerup', end);
+  c.addEventListener('pointercancel', end);
+  c.addEventListener('lostpointercapture', end);
+  c.addEventListener('pointerleave', function () { if (!drawing) { octx.clearRect(0, 0, W, H); stage.classList.remove('hide-cursor'); } });
+
+  function strokeStyle() {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = drawing && drawing.tool === 'eraser' ? state.bg : state.color;
+    ctx.fillStyle = ctx.strokeStyle;
+  }
+  function dot(pt) {
+    strokeStyle();
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, widthFor(pt.p) / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function segment(pt) {
+    var d = drawing;
+    var mid = { x: (d.last.x + pt.x) / 2, y: (d.last.y + pt.y) / 2 };
+    strokeStyle();
+    ctx.lineWidth = widthFor((d.last.p + pt.p) / 2);
+    ctx.beginPath();
+    ctx.moveTo(d.mid.x, d.mid.y);
+    ctx.quadraticCurveTo(d.last.x, d.last.y, mid.x, mid.y);
+    ctx.stroke();
+    d.mid = mid;
+  }
+  function drawOverlay(pt) {
+    octx.clearRect(0, 0, W, H);
+    paintShape(octx, drawing, pt);
+  }
+  /* highlighter + shapes are drawn on the top layer while you drag, then stamped down */
+  function paintShape(x, d, pt) {
+    x.save();
+    x.lineCap = 'round';
+    x.lineJoin = 'round';
+    x.strokeStyle = x.fillStyle = state.color;
+    x.lineWidth = widthFor(0.5);
+    if (d.tool === 'marker') {
+      x.globalAlpha = 0.38;
+      x.beginPath();
+      var p = d.pts;
+      x.moveTo(p[0].x, p[0].y);
+      if (p.length === 1) x.lineTo(p[0].x + 0.01, p[0].y);
+      for (var i = 1; i < p.length - 1; i++) {
+        x.quadraticCurveTo(p[i].x, p[i].y, (p[i].x + p[i + 1].x) / 2, (p[i].y + p[i + 1].y) / 2);
+      }
+      if (p.length > 1) x.lineTo(p[p.length - 1].x, p[p.length - 1].y);
+      x.stroke();
+      x.restore();
+      return;
+    }
+    var sx = d.start.x, sy = d.start.y, ex = pt.x, ey = pt.y;
+    if (d.shift) {
+      if (d.tool === 'line') {
+        /* snap to 45° steps */
+        var ang = Math.round(Math.atan2(ey - sy, ex - sx) / (Math.PI / 4)) * (Math.PI / 4);
+        var len = Math.hypot(ex - sx, ey - sy);
+        ex = sx + Math.cos(ang) * len; ey = sy + Math.sin(ang) * len;
+      } else {
+        var m = Math.max(Math.abs(ex - sx), Math.abs(ey - sy));
+        ex = sx + Math.sign(ex - sx || 1) * m; ey = sy + Math.sign(ey - sy || 1) * m;
+      }
+    }
+    x.beginPath();
+    if (d.tool === 'line') { x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke(); }
+    else if (d.tool === 'rect') {
+      x.rect(Math.min(sx, ex), Math.min(sy, ey), Math.abs(ex - sx), Math.abs(ey - sy));
+      if (state.filled) x.fill(); else x.stroke();
+    } else if (d.tool === 'ellipse') {
+      x.ellipse((sx + ex) / 2, (sy + ey) / 2, Math.max(0.5, Math.abs(ex - sx) / 2), Math.max(0.5, Math.abs(ey - sy) / 2), 0, 0, Math.PI * 2);
+      if (state.filled) x.fill(); else x.stroke();
+    }
+    x.restore();
+  }
+  /* a ring that shows how big the brush is */
+  function hover(e) {
+    if (e.pointerType !== 'mouse' || ['brush', 'marker', 'eraser'].indexOf(state.tool) < 0) { stage.classList.remove('hide-cursor'); return; }
+    var pt = pos(e);
+    var r = Math.max(1.5, (state.tool === 'marker' ? state.size * 2.2 : state.size) / 2);
+    octx.clearRect(0, 0, W, H);
+    octx.save();
+    octx.lineWidth = 1.5 / view.s;
+    octx.strokeStyle = 'rgba(0,0,0,.6)';
+    octx.beginPath(); octx.arc(pt.x, pt.y, r + 1 / view.s, 0, Math.PI * 2); octx.stroke();
+    octx.strokeStyle = 'rgba(255,255,255,.9)';
+    octx.beginPath(); octx.arc(pt.x, pt.y, r, 0, Math.PI * 2); octx.stroke();
+    octx.restore();
+    stage.classList.toggle('hide-cursor', r * view.s > 4);
+  }
+
+  function pickColor(pt) {
+    var d = ctx.getImageData(Math.min(W - 1, Math.max(0, Math.floor(pt.x))), Math.min(H - 1, Math.max(0, Math.floor(pt.y))), 1, 1).data;
+    var hex = '#' + [d[0], d[1], d[2]].map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join('');
+    setColor(hex, true);
+    setTool(prevTool || 'brush');
+    toast('Picked ' + hex);
+  }
+
+  /* fill an area of the same color (scanline flood fill) */
+  function floodFill(x0, y0, hex) {
+    if (x0 < 0 || y0 < 0 || x0 >= W || y0 >= H) return;
+    var img = ctx.getImageData(0, 0, W, H);
+    var data = img.data;
+    var fc = hexRgb(hex);
+    var i0 = (y0 * W + x0) * 4;
+    var tr = data[i0], tg = data[i0 + 1], tb = data[i0 + 2], ta = data[i0 + 3];
+    if (Math.abs(tr - fc[0]) + Math.abs(tg - fc[1]) + Math.abs(tb - fc[2]) < 3 && ta === 255) return;
+    var TOL = 48;
+    function match(i) {
+      return Math.abs(data[i] - tr) + Math.abs(data[i + 1] - tg) + Math.abs(data[i + 2] - tb) + Math.abs(data[i + 3] - ta) <= TOL;
+    }
+    var seen = new Uint8Array(W * H);
+    var stack = [x0, y0];
+    while (stack.length) {
+      var y = stack.pop(), x = stack.pop();
+      var p = y * W + x;
+      while (x >= 0 && !seen[p] && match(p * 4)) { x--; p--; }
+      x++; p++;
+      var up = false, down = false;
+      while (x < W && !seen[p] && match(p * 4)) {
+        seen[p] = 1;
+        var i = p * 4;
+        data[i] = fc[0]; data[i + 1] = fc[1]; data[i + 2] = fc[2]; data[i + 3] = 255;
+        if (y > 0) {
+          var a = p - W;
+          if (!seen[a] && match(a * 4)) { if (!up) { stack.push(x, y - 1); up = true; } } else up = false;
+        }
+        if (y < H - 1) {
+          var b = p + W;
+          if (!seen[b] && match(b * 4)) { if (!down) { stack.push(x, y + 1); down = true; } } else down = false;
+        }
+        x++; p++;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  function hexRgb(h) { var n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+
+  /* ---------------- toolbar ---------------- */
+  var prevTool = null;
+  function setTool(t) {
+    if (t === 'picker' && state.tool !== 'picker') prevTool = state.tool;
+    state.tool = t;
+    document.querySelectorAll('#tools .tb').forEach(function (b) { b.classList.toggle('on', b.dataset.tool === t); b.setAttribute('aria-pressed', b.dataset.tool === t ? 'true' : 'false'); });
+    $('fillgrp').hidden = !(t === 'rect' || t === 'ellipse');
+    stage.classList.toggle('picker', t === 'picker');
+    stage.classList.toggle('fill', t === 'fill');
+    octx.clearRect(0, 0, W, H);
+    updateDot();
+  }
+  function setColor(hex, remember) {
+    state.color = hex.toLowerCase();
+    if (remember && SWATCHES.indexOf(state.color) < 0) {
+      state.recent = [state.color].concat(state.recent.filter(function (x) { return x !== state.color; })).slice(0, 6);
+      renderColors();
+    }
+    document.querySelectorAll('#colors .sw').forEach(function (b) { b.classList.toggle('on', b.dataset.c === state.color); });
+    $('pick').value = state.color;
+    updateDot();
+  }
+  function updateDot() {
+    var d = $('dot');
+    var px = Math.max(2, Math.min(28, (state.tool === 'marker' ? state.size * 2.2 : state.size) * 0.5));
+    d.style.width = d.style.height = px + 'px';
+    d.style.color = state.tool === 'eraser' ? state.bg : state.color;
+    d.style.opacity = state.tool === 'marker' ? '.5' : '1';
+    d.style.boxShadow = state.tool === 'eraser' ? '0 0 0 1px rgba(255,255,255,.5)' : 'none';
+  }
+  function renderColors() {
+    var box = $('colors');
+    box.innerHTML = '';
+    SWATCHES.concat(state.recent).forEach(function (hex) {
+      var b = document.createElement('button');
+      b.className = 'sw' + (hex === state.color ? ' on' : '');
+      b.style.background = hex;
+      b.dataset.c = hex;
+      b.title = hex;
+      b.setAttribute('aria-label', 'Color ' + hex);
+      b.addEventListener('click', function () { setColor(hex); if (state.tool === 'eraser' || state.tool === 'picker') setTool('brush'); });
+      box.appendChild(b);
+    });
+    var custom = document.createElement('label');
+    custom.className = 'custom';
+    custom.title = 'Any color';
+    custom.innerHTML = '<input type="color" id="pick" aria-label="Pick any color">';
+    box.appendChild(custom);
+    var pick = custom.querySelector('input');
+    pick.value = state.color;
+    pick.addEventListener('input', function () { setColor(pick.value); });
+    pick.addEventListener('change', function () { setColor(pick.value, true); if (state.tool === 'eraser' || state.tool === 'picker') setTool('brush'); });
+  }
+
+  TOOLS.forEach(function (t) {
+    var b = document.createElement('button');
+    b.className = 'tb';
+    b.dataset.tool = t[0];
+    b.title = t[1];
+    b.setAttribute('aria-label', t[1]);
+    b.innerHTML = svg(t[0]);
+    b.addEventListener('click', function () { setTool(t[0]); });
+    $('tools').appendChild(b);
+  });
+  $('b-undo').innerHTML = svg('undo');
+  $('b-redo').innerHTML = svg('redo');
+  $('b-new').innerHTML = svg('new');
+  $('b-open').innerHTML = svg('open');
+  $('b-save').innerHTML = svg('save');
+  $('b-use').innerHTML = svg('use') + '<span>Use as picture</span>';
+  $('b-gallery').innerHTML = svg('gallery');
+  $('b-gallery').hidden = !(GS.media && GS.media.add);
+  function renderFilled() { $('b-filled').innerHTML = svg(state.filled ? 'filled' : 'hollow'); $('b-filled').classList.toggle('on', state.filled); $('b-filled').title = state.filled ? 'Filled shapes (click for outlines)' : 'Outline shapes (click for filled)'; }
+  $('b-filled').addEventListener('click', function () { state.filled = !state.filled; renderFilled(); });
+  renderFilled();
+  renderColors();
+
+  var sizeEl = $('size');
+  sizeEl.value = state.size;
+  sizeEl.addEventListener('input', function () { state.size = Number(sizeEl.value); updateDot(); });
+  $('b-undo').addEventListener('click', undo);
+  $('b-redo').addEventListener('click', redo);
+
+  /* new drawing */
+  $('b-new').addEventListener('click', function () { $('dlg-new').hidden = false; $('dlg-new').querySelector('.primary').focus(); });
+  $('dlg-new').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (e.target === $('dlg-new') || (b && b.hasAttribute('data-close'))) { $('dlg-new').hidden = true; return; }
+    if (b && b.dataset.paper) {
+      state.bg = b.dataset.paper;
+      ctx.save(); ctx.globalCompositeOperation = 'copy'; ctx.fillStyle = state.bg; ctx.fillRect(0, 0, W, H); ctx.restore();
+      snapshot();
+      updateDot();
+      $('dlg-new').hidden = true;
+      toast('Fresh paper!');
+    }
+  });
+
+  /* open / paste / drop a picture */
+  function drawPicture(file) {
+    if (!file || !/^image\//.test(file.type)) { toast('That\'s not a picture'); return; }
+    loadImage(URL.createObjectURL(file), true).then(function (img) {
+      var s = Math.min(W / img.width, H / img.height);
+      var w = img.width * s, h = img.height * s;
+      ctx.save();
+      ctx.fillStyle = state.bg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+      ctx.restore();
+      snapshot();
+      toast('Picture added. Draw on it!');
+    }, function () { toast('Couldn\'t open that picture'); });
+  }
+  $('b-open').addEventListener('click', function () { $('file').value = ''; $('file').click(); });
+  $('file').addEventListener('change', function () { drawPicture($('file').files[0]); });
+  window.addEventListener('paste', function (e) {
+    var items = (e.clipboardData && e.clipboardData.files) || [];
+    if (items[0] && /^image\//.test(items[0].type)) { e.preventDefault(); drawPicture(items[0]); }
+  });
+  var dragDepth = 0;
+  window.addEventListener('dragenter', function (e) { e.preventDefault(); dragDepth++; $('drop').hidden = false; });
+  window.addEventListener('dragleave', function () { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('drop').hidden = true; });
+  window.addEventListener('dragover', function (e) { e.preventDefault(); });
+  window.addEventListener('drop', function (e) {
+    e.preventDefault(); dragDepth = 0; $('drop').hidden = true;
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) drawPicture(f);
+  });
+
+  /* save + use as a game picture */
+  $('b-save').addEventListener('click', function () {
+    c.toBlob(function (b) {
+      if (!b) { toast('Couldn\'t save it'); return; }
+      var url = URL.createObjectURL(b);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'drawing-' + new Date().toISOString().slice(0, 10) + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      toast('Saved to your Downloads');
+    }, 'image/png');
+  });
+  $('b-gallery').addEventListener('click', function () {
+    if (!GS.media) return;
+    var btn = this;
+    btn.disabled = true;
+    c.toBlob(function (b) {
+      if (!b) { btn.disabled = false; toast('Couldn\'t save it'); return; }
+      GS.media.add({ blob: b, kind: 'drawing' }).then(function () { toast('Saved to the Gallery'); }, function (err) { toast('Couldn\'t save it: ' + (err && err.message || err)); })
+        .then(function () { btn.disabled = false; });
+    }, 'image/png');
+  });
+  $('b-use').addEventListener('click', function () {
+    var ok = false;
+    try { ok = GS.offerPicture && GS.offerPicture(c.toDataURL('image/jpeg', 0.92)); } catch (e) { ok = false; }
+    if (!ok) toast('Open Drawing inside Game System to use it as a game picture');
+  });
+
+  /* keyboard */
+  window.addEventListener('keydown', function (e) {
+    if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return;
+    var k = (e.key || '').toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+    if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
+    if ((e.ctrlKey || e.metaKey) && k === 's') { e.preventDefault(); $('b-save').click(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (k === 'escape') { $('dlg-new').hidden = true; return; }
+    if (k === '[' || k === ']') {
+      state.size = Math.min(80, Math.max(1, state.size + (k === ']' ? (state.size >= 10 ? 4 : 1) : -(state.size > 10 ? 4 : 1))));
+      sizeEl.value = state.size; updateDot(); e.preventDefault(); return;
+    }
+    var t = TOOLS.find(function (x) { return x[2] === k; });
+    if (t) { setTool(t[0]); e.preventDefault(); }
+  });
+
+  var toastTimer = 0;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1700);
+  }
+
+  /* ---------------- start: bring back the last drawing ---------------- */
+  function blank() { ctx.save(); ctx.fillStyle = state.bg; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  blank();
+  fit();
+  setTool(state.tool);
+  setColor(state.color);
+  var start = saved && typeof saved.img === 'string' && /^data:image\//.test(saved.img) ? saved.img : null;
+  if (start) {
+    imgCache = start;
+    loadImage(start).then(function (img) {
+      ctx.drawImage(img, 0, 0, W, H);
+      snapshot();
+      dirty = false;
+    }, function () { snapshot(); });
+  } else {
+    snapshot();
+  }
+  requestAnimationFrame(fit);
+})();
+</script>
+</body>
+</html>
