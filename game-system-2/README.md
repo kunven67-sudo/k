@@ -104,6 +104,19 @@ Click your name at the top right:
 - **Profile picture**: upload one, make one with the **AI avatar** maker (describe it and pick a style; 18+ stuff is blocked and the free AI's safe filter is on), or **Draw one** in the Drawing app and hit **Use as picture** → **My profile picture**
 - Your level, points, the next reward, and a button to the trophy room
 
+## VEX, your helper
+
+VEX is the glowing orb in the corner (drag it anywhere). Click it, press your keys, or just say its name.
+
+- **Talk or type.** Type in the chat, hold the mic button, set a **hold-to-talk key** and a **chat key** (Settings → VEX), or hold **Y** on a controller.
+- **Say "VEX".** Turn on **Listen for its name** in Settings → VEX and allow the mic (Chrome or Edge). Then say "VEX" or "Hey VEX" anytime (in one go, or say "VEX", wait for the beep, then ask), even in a game: the game pauses while you talk, and when VEX has answered the chat closes and the game keeps going.
+- **It does stuff:** "play Snake", "open Music", "go to settings", "timer 5 minutes called pizza", "alarm 7:30 on school days", "how long is left?", "turn off the 7:30 alarm", "stop" (when something is ringing: it only stops the ringing, your alarm stays), "play music" / "next song", "take a screenshot", "record this", "put Snake in Arcade folder", "sort my games into folders", "favorite Snake", "rename Snake to Snake 2", "change theme to lava", "turn on simple mode", "back up my games", "what's my level?", "how long did I play today?", "what should I play?", "play a game" (picks one for you), "make a theme". You can ask however you like ("can you please play Snake"); questions like "how do I delete a game?" get an answer instead of doing it.
+- **It makes and fixes games:** "make a game where you dodge lava" adds a new game to your Library. "fix Snake (because…)" rewrites the game's code with the AI and keeps a backup: say **undo** to put it back.
+- **It remembers:** "remember that I like racing games". "What do you remember?" shows it; you can see and delete memories in Settings → VEX. The chat history is kept too.
+- **Brain:** simple stuff always works without any AI. For questions and making/fixing games it uses the free AI (Pollinations), or **your own key** (Claude, OpenAI, Gemini, OpenRouter or any OpenAI-style service). Your key is saved only in this browser, never in backups or your website folder.
+- **Make it yours:** voice, speed, pitch, personality (Hype, Calm, Sarcastic, Pro), talk out loud or not, ask before doing stuff (always / big stuff / never), hide the orb until you call it, and orb colors you unlock by leveling up.
+- The first time you open Game System, VEX shows you around. **Settings → VEX → Show me around** does it again.
+
 ## Screenshots and recording
 
 Set it up in **Settings → Screenshots & recording**:

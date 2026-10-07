@@ -63,12 +63,15 @@
     },
     /* a key was pressed inside a game/app: your screenshot or record key? (returns true if it was) */
     keyAction: function (id, e) {
-      if (!sinkFor(id) || !e || !window.Capture) return false;
-      var what = Capture.keyAction(e);
+      if (!sinkFor(id) || !e) return false;
+      if (window.Vex && Vex.keyAction(e)) return true;
+      var what = window.Capture ? Capture.keyAction(e) : null;
       if (!what) return false;
       setTimeout(function () { Capture.run(what); }, 0);
       return true;
     },
+    /* a key was let go inside a game/app (for VEX hold-to-talk) */
+    keyUpAction: function (id, e) { return !!(sinkFor(id) && e && window.Vex && Vex.keyUp(e)); },
     /* the Gallery: only Game System's own apps get in */
     media: function (id, op, arg) {
       if (!sinkFor(id)) return Promise.reject(new Error('Not running'));
@@ -90,6 +93,15 @@
     kitInfo: function (id, info) { var s = sinkFor(id); if (s && s.kitInfo) s.kitInfo(info || {}); }
   };
   window.__GS2_HOST = Host;
+
+  /* the errors from the last time each game ran (VEX's "fix this game" reads them) */
+  var lastErrs = {};
+  function rememberErrors(c) {
+    try {
+      var rows = (c.logs && c.logs.rows || []).filter(function (r) { return r.level === 'error'; }).slice(-20);
+      lastErrs[c.id] = rows.map(function (r) { return r.text + (r.line ? ' (line ' + r.line + ')' : ''); });
+    } catch (e) { /* ignore */ }
+  }
 
   async function makeFromCode(o) {
     var html = typeof o.html === 'string' ? o.html : '';
@@ -511,6 +523,7 @@
     var now = performance.now();
     if (document.visibilityState === 'visible' && !c.menuOpen) D.addPlayTime(c.id, Math.min(now - c.lastTick, 2500), true);
     Capture.gameClosing(c.id);
+    rememberErrors(c);
     cur = null;
     Capture.gameChanged();
     if (!D.isApp(c.game)) Trophies.event('session', { ms: Date.now() - c.start, active: c.activeMs });
@@ -813,6 +826,8 @@
     launch: launch,
     close: close,
     isPlaying: function () { return !!cur; },
+    focusGame: focusGame,
+    lastErrors: function (id) { if (cur && cur.id === id) rememberErrors(cur); return (lastErrs[id] || []).slice(); },
     kit: kit,
     refreshMenu: refreshMenu,
     toast: function (msg, type) { ptoast(String(msg), type || null); },

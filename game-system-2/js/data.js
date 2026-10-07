@@ -30,7 +30,22 @@
     recDownload: true,     /* also save recordings to Downloads */
     shotDownload: true,    /* also save screenshots to Downloads */
     capFloat: 'phone',     /* floating camera button: phone | always | rec | off */
-    padCapture: true       /* controller View/Select button: tap = screenshot, hold = record */
+    padCapture: true,      /* controller View/Select button: tap = screenshot, hold = record */
+    /* VEX, the helper */
+    vexOn: true,
+    vexIdle: 'orb',        /* orb (small breathing orb) | hidden (until called) */
+    vexWake: 'off',        /* off | name ("VEX") | hey ("Hey VEX"); needs the mic allowed first */
+    vexMicOk: false,
+    vexTalkKey: '',        /* hold to talk */
+    vexChatKey: '',        /* open / close the chat */
+    vexSpeak: true,        /* talk out loud */
+    vexVoice: '',
+    vexRate: 1.05,
+    vexPitch: 1,
+    vexPersonality: 'hype', /* hype | calm | sarcastic | pro */
+    vexAsk: 'big',         /* always | big | never: ask before doing things */
+    vexBrain: 'free',      /* free (Pollinations) | key (your own key, saved only in this browser) | off */
+    vexColor: 'neon'       /* neon | plasma (level 7) | gold (level 11) */
   };
   var DEFAULT_UI = {
     view: 'home',

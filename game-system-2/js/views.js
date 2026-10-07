@@ -1057,6 +1057,7 @@
     ['startup', 'resume', 'Start-up & games'],
     ['sound', 'volume', 'Sound'],
     ['capture', 'camera', 'Screenshots & recording'],
+    ['vex', 'sparkle', 'VEX (your helper)'],
     ['notices', 'bell', 'Notifications'],
     ['data', 'lifebuoy', 'Backups & data'],
     ['website', 'globe', 'Website folder'],
@@ -1141,6 +1142,7 @@
         setRow('Controller', 'View/Select button: tap = screenshot, hold = record', sw(st.padCapture !== false, function (v) { set('padCapture', v); })),
         setRow('Gallery', 'All your screenshots, recordings and drawings', h('button.btn.sm', { onclick: function () { Capture.openGallery(); } }, I('image'), 'Open Gallery'))
       ]),
+      panel('vex', vexRows()),
       panel('notices', [
         setRow('Backup reminder', 'The bell reminds you if your last backup is over a week old', sw(st.backupNag, function (v) { set('backupNag', v); }))
       ]),
@@ -1351,6 +1353,102 @@
       h('b', name), h('span', text));
   }
 
+  /* ---------------- VEX settings ---------------- */
+  function vexRows() {
+    var st = D.settings;
+    var rows = [setRow('VEX', 'Your helper orb. Click it, use your keys, or say its name.', sw(st.vexOn !== false, function (v) { set('vexOn', v); renderSettings(); }))];
+    if (st.vexOn === false) return rows;
+    var canHear = Vex.canHear();
+    var wake = st.vexMicOk ? (st.vexWake || 'off') : 'off';
+    rows.push(
+      setRow('When nobody is talking', 'Show the little orb, or hide VEX until you call it', seg([['orb', 'Show the orb'], ['hidden', 'Hide until called']], st.vexIdle || 'orb', function (v) { set('vexIdle', v); })),
+      setRow('Listen for its name', canHear ? 'After you allow the mic, just say "VEX" (or "Hey VEX") and it answers. Your browser\'s voice service hears what the mic hears while this is on.' : 'Your browser can\'t do voice (Chrome and Edge can). You can still type to VEX.',
+        canHear ? seg([['off', 'Off'], ['name', '"VEX"'], ['hey', '"Hey VEX"']], wake, function (v) {
+          if (v !== 'off' && !D.settings.vexMicOk) { Vex.allowMic().then(function (ok) { if (ok) { set('vexWake', v); } renderSettings(); }); return; }
+          set('vexWake', v); Vex.setListening(v !== 'off');
+        }) : null),
+      setRow('Hold-to-talk key', 'Hold it down, talk, let go. Works in games too.', keyPicker('vexTalkKey', 'Talk to VEX')),
+      setRow('Chat key', 'Opens and closes the VEX chat', keyPicker('vexChatKey', 'VEX chat')),
+      setRow('Talk out loud', 'VEX reads its answers out loud', sw(st.vexSpeak !== false, function (v) { set('vexSpeak', v); renderSettings(); }))
+    );
+    if (st.vexSpeak !== false && window.speechSynthesis) {
+      var voices = speechSynthesis.getVoices();
+      var cur = Vex.pickVoice();
+      var vsel = h('select.select', { style: { maxWidth: '230px' }, 'aria-label': 'VEX voice', onchange: function () { set('vexVoice', vsel.value); Vex.speak('Yo, this is my new voice!'); } },
+        voices.length ? voices.map(function (v) { return h('option', { value: v.voiceURI }, v.name + ' (' + v.lang + ')'); }) : [h('option', { value: '' }, 'Default voice')]);
+      if (cur) vsel.value = cur.voiceURI;
+      if (!voices.length) setTimeout(function () { if (speechSynthesis.getVoices().length && D.ui.view === 'settings') renderSettings(); }, 800);
+      var rate = h('input', { type: 'range', min: 0.7, max: 1.6, step: 0.05, value: st.vexRate || 1.05, 'aria-label': 'Speed', style: { maxWidth: '150px' } });
+      rate.value = st.vexRate || 1.05;
+      rate.addEventListener('change', function () { set('vexRate', Number(rate.value)); Vex.speak('This is how fast I talk.'); });
+      var pitch = h('input', { type: 'range', min: 0.5, max: 1.7, step: 0.05, value: st.vexPitch || 1, 'aria-label': 'Pitch', style: { maxWidth: '150px' } });
+      pitch.value = st.vexPitch || 1;
+      pitch.addEventListener('change', function () { set('vexPitch', Number(pitch.value)); Vex.speak('This is how high or low I sound.'); });
+      rows.push(setRow('Voice', 'Pick the voice you like (the list comes from your device)', vsel), setRow('Speed', null, rate), setRow('Pitch', null, pitch));
+    }
+    rows.push(
+      setRow('Personality', 'How VEX talks to you', seg([['hype', 'Hype'], ['calm', 'Calm'], ['sarcastic', 'Sarcastic'], ['pro', 'Pro']], st.vexPersonality || 'hype', function (v) { set('vexPersonality', v); })),
+      setRow('Ask before doing stuff', 'Big stuff = deleting, fixing or making games, sorting folders. Deleting always asks.', seg([['always', 'Always'], ['big', 'Big stuff'], ['never', 'Never']], st.vexAsk || 'big', function (v) { set('vexAsk', v); })),
+      setRow('Brain', 'Simple stuff ("play Snake", "timer 5 min") always works without AI. For questions and making or fixing games: the free AI (what you ask, your name and your game names are sent to Pollinations), your own key (smarter; sent to the company you pick), or no AI.',
+        seg([['free', 'Free AI'], ['key', 'My own key'], ['off', 'No AI']], st.vexBrain || 'free', function (v) { set('vexBrain', v); renderSettings(); }))
+    );
+    if (st.vexBrain === 'key') rows.push(vexKeyForm());
+    var colors = [['neon', 'Neon'], ['plasma', Trophies.hasLevel(7) ? 'Plasma' : [I('lock'), 'Plasma (Lv 7)']], ['gold', Trophies.hasLevel(11) ? 'Gold' : [I('lock'), 'Gold (Lv 11)']]];
+    rows.push(
+      setRow('Orb color', 'More colors unlock as you level up', seg(colors, st.vexColor || 'neon', function (v) {
+        if ((v === 'plasma' && !Trophies.hasLevel(7)) || (v === 'gold' && !Trophies.hasLevel(11))) { UI.toast('Level up to unlock that color! You\'re level ' + Trophies.info().level + '.', { type: 'warn', icon: 'lock' }); renderSettings(); return; }
+        set('vexColor', v); Vex.repaint();
+      })),
+      setRow('Memory', Vex.memories().length + ' thing' + (Vex.memories().length === 1 ? '' : 's') + ' VEX remembers (say "remember that…")', h('div.row', { style: { gap: '6px' } },
+        h('button.btn.sm', { onclick: vexMemoryDialog }, I('eye'), 'See'),
+        h('button.btn.sm.ghost', { onclick: async function () { if (await UI.confirm('Forget everything?', 'VEX forgets all the things you told it to remember.', { ok: 'Forget', danger: true })) { Vex.forget(); renderSettings(); } } }, I('trash'), 'Forget all'))),
+      setRow('Chat history', Vex.history().length + ' messages, kept forever', h('button.btn.sm.ghost', { onclick: async function () { if (await UI.confirm('Clear the chat?', 'Deletes all your messages with VEX.', { ok: 'Clear', danger: true })) { Vex.clearHistory(); renderSettings(); } } }, I('trash'), 'Clear')),
+      setRow('Tour', 'Let VEX show you around again', h('button.btn.sm', { onclick: function () { Vex.tour(); } }, I('sparkle'), 'Show me around'))
+    );
+    return rows;
+  }
+  function vexKeyForm() {
+    var k = VexBrain.keyInfo() || { provider: 'anthropic', key: '', model: '' };
+    var names = { anthropic: 'Claude (Anthropic)', openai: 'OpenAI', gemini: 'Google Gemini', openrouter: 'OpenRouter', custom: 'Other (OpenAI-style)' };
+    /* a model name only works with its own company, so switching clears it */
+    var prov = h('select.select', { 'aria-label': 'AI provider', onchange: function () { model.value = ''; model.placeholder = VexBrain.DEFAULT_MODELS[prov.value] || 'model name'; urlRow.hidden = prov.value !== 'custom'; } },
+      Object.keys(names).map(function (p) { return h('option', { value: p }, names[p]); }));
+    prov.value = k.provider || 'anthropic';
+    var key = h('input.input', { type: 'password', placeholder: 'Paste your API key', autocomplete: 'off', 'aria-label': 'API key' });
+    key.value = k.key || '';
+    var model = h('input.input', { placeholder: VexBrain.DEFAULT_MODELS[prov.value] || 'model name', 'aria-label': 'Model' });
+    model.value = k.model || '';
+    var url = h('input.input', { placeholder: 'https://… (the part before /chat/completions)', 'aria-label': 'API address' });
+    url.value = k.url || '';
+    var urlRow = h('label.vk-wide', { hidden: prov.value !== 'custom' }, 'Address', url);
+    function save() {
+      U.lsSet('gs2:vexKey', { provider: prov.value, key: key.value.trim(), model: model.value.trim(), url: url.value.trim() });
+    }
+    return h('div.panel.vex-key', { 'data-text': 'api key claude openai gemini openrouter model' },
+      h('div.vk-grid', h('label', 'Provider', prov), h('label', 'Model (empty = best default)', model), h('label.vk-wide', 'API key', key), urlRow),
+      h('p.small.muted', 'Your key is saved only in this browser. It is NOT put in backups or in your website folder.'),
+      h('div.row', { style: { gap: '6px' } },
+        h('button.btn.sm.primary', { onclick: function () { save(); UI.toast('Key saved (only in this browser).', { type: 'good', icon: 'key' }); } }, I('check'), 'Save'),
+        h('button.btn.sm', { onclick: async function () {
+          save();
+          var t = UI.toast('Testing…', { timeout: 0, sound: false });
+          try { var r = await VexBrain.ai([{ role: 'user', content: 'Reply with exactly: VEX is online.' }], { system: 'You are a connection test. Follow the instruction exactly.', max: 300 }); t.close(); UI.toast('It works! The AI said: "' + String(r).trim().slice(0, 80) + '"', { type: 'good' }); }
+          catch (e) { t.close(); UI.toast('Didn\'t work: ' + (e.message === 'busy' ? 'the AI is busy, try again soon' : e.message || e), { type: 'bad' }); }
+        } }, I('bolt'), 'Test it'),
+        h('button.btn.sm.ghost', { onclick: function () { U.lsSet('gs2:vexKey', null); renderSettings(); UI.toast('Key removed.', { icon: 'trash' }); } }, I('trash'), 'Remove key')));
+  }
+  function vexMemoryDialog() {
+    var list = Vex.memories();
+    UI.modal({
+      title: 'What VEX remembers',
+      icon: 'sparkle',
+      body: list.length ? h('div.vex-mem', list.map(function (m) {
+        return h('div.vm-row', h('span', m.text), h('em', U.timeAgo(m.t)), h('button.icon-btn.sm', { 'aria-label': 'Forget this', title: 'Forget this', onclick: function () { Vex.forget(m.text, true); this.closest('.vm-row').remove(); } }, I('x')));
+      })) : h('p.muted', 'Nothing yet. Tell VEX "remember that I like racing games".'),
+      actions: [{ label: 'Done', kind: 'primary' }]
+    });
+  }
+
   /* pick a key for screenshots / recording */
   function keyPicker(key, label) {
     var cur = D.settings[key] || '';
@@ -1370,7 +1468,7 @@
         var combo = (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + k;
         if (/^[A-Z0-9 ]$/.test(k) && !e.ctrlKey && !e.altKey) { UI.toast('A plain letter would clash with games. Use an F-key (like F8) or add Ctrl/Alt.', { type: 'warn' }); renderSettings(); return; }
         if (/^(F5|F11|F12|Tab|Enter|Backspace|ArrowUp|ArrowDown|ArrowLeft|ArrowRight)$/.test(combo)) { UI.toast(combo + ' is used by the browser or menus. Pick another one.', { type: 'warn' }); renderSettings(); return; }
-        var taken = [['hotkey', 'the quick menu'], ['shotKey', 'screenshots'], ['recKey', 'recording']].find(function (o) { return o[0] !== key && String(D.settings[o[0]] || (o[0] === 'hotkey' ? 'F2' : '')).toLowerCase() === combo.toLowerCase(); });
+        var taken = [['hotkey', 'the quick menu'], ['shotKey', 'screenshots'], ['recKey', 'recording'], ['vexTalkKey', 'talking to VEX'], ['vexChatKey', 'the VEX chat']].find(function (o) { return o[0] !== key && String(D.settings[o[0]] || (o[0] === 'hotkey' ? 'F2' : '')).toLowerCase() === combo.toLowerCase(); });
         if (taken) { UI.toast(combo + ' is already the key for ' + taken[1] + '.', { type: 'warn' }); renderSettings(); return; }
         set(key, combo);
         UI.toast(label + ' key is now ' + combo, { icon: 'keyboard' });
@@ -1398,8 +1496,8 @@
         renderSettings();
         return;
       }
-      if ([D.settings.shotKey, D.settings.recKey].some(function (k) { return k && k.toLowerCase() === combo.toLowerCase(); })) {
-        UI.toast(combo + ' is already your screenshot or record key.', { type: 'warn' });
+      if ([D.settings.shotKey, D.settings.recKey, D.settings.vexTalkKey, D.settings.vexChatKey].some(function (k) { return k && k.toLowerCase() === combo.toLowerCase(); })) {
+        UI.toast(combo + ' is already used for screenshots, recording or VEX.', { type: 'warn' });
         renderSettings();
         return;
       }

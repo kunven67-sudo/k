@@ -562,6 +562,12 @@
       call('menu');
     }, true);
 
+    /* letting go of a key (VEX hold-to-talk) */
+    window.addEventListener('keyup', function (e) {
+      if (!e.key) return;
+      if (call('keyUpAction', { key: e.key, code: e.code, ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey })) { e.preventDefault(); e.stopImmediatePropagation(); }
+    }, true);
+
     var lastEdge = 0;
     window.addEventListener('mousemove', function (e) {
       if (e.clientY > 6 || document.pointerLockElement) return;

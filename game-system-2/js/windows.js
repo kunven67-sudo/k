@@ -551,6 +551,15 @@
     flushAll: function () { wins.forEach(flush); },
     /* the window in front (not minimized), for screenshots */
     activeFrame: function () { var W = activeId && wins.get(activeId); return W && !W.min ? { id: W.id, frame: W.frame, full: !!W.max || isPhone() } : null; },
+    /* send one app an event (VEX controls the Music app this way) */
+    dispatch: function (id, name, detail) {
+      var W = wins.get(id);
+      try {
+        var w = W && W.frame && W.frame.contentWindow;
+        if (w) { w.dispatchEvent(new w.CustomEvent(name, { detail: detail })); return true; }
+      } catch (e) { /* website app */ }
+      return false;
+    },
     /* tell every open app something happened (e.g. 'gs2media' when the Gallery changed) */
     broadcast: function (name) {
       wins.forEach(function (W) {

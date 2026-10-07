@@ -652,6 +652,30 @@
     });
   }
 
+  /* VEX (Game System's helper) can control the music: "play music", "next song", "what song is this?" */
+  var songsReady = false, waitingRemote = [];
+  function remote(d) {
+    var reply = typeof d.reply === 'function' ? d.reply : function () {};
+    if (!tracks.length) { reply({ error: 'empty' }); return; }
+    var cmd = d.cmd;
+    if (cmd === 'play') doPlay(true);
+    else if (cmd === 'pause') doPause();
+    else if (cmd === 'toggle') toggle();
+    else if (cmd === 'next') { startGraph(); next(false); }
+    else if (cmd === 'prev') { startGraph(); prev(); }
+    else if (cmd === 'shuffle') { state.shuffle = !state.shuffle; shuffleIcon(); }
+    else if (cmd === 'louder') { state.vol = Math.min(100, state.vol + 15); state.muted = false; volIcon(); }
+    else if (cmd === 'quieter') { state.vol = Math.max(0, state.vol - 15); volIcon(); }
+    setTimeout(function () {
+      var t = state.cur ? find(state.cur) : null;
+      try { reply({ title: t ? t.title : '', playing: !audio.paused, shuffle: state.shuffle }); } catch (e) { /* Game System went away */ }
+    }, 150);
+  }
+  window.addEventListener('gs2remote', function (e) {
+    var d = e.detail || {};
+    if (songsReady) remote(d); else waitingRemote.push(d);
+  });
+
   var toastTimer = 0;
   function toast(msg) {
     var t = $('toast');
@@ -679,7 +703,11 @@
       state.cur = null;
       showNow();
     }
+    songsReady = true;
+    waitingRemote.splice(0).forEach(remote);
   }).catch(function () {
+    songsReady = true;
+    waitingRemote.splice(0).forEach(remote);
     toast('This browser won\'t let the Music app save songs (private window?)');
   });
 })();

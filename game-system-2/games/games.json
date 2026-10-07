@@ -9,12 +9,12 @@
    "builtin": true,
    "icon": "music",
    "color": "#ff2bd6",
-   "rev": 2,
+   "rev": 3,
    "entry": "index.html",
    "files": [
     "index.html"
    ],
-   "size": 36614,
+   "size": 37983,
    "isolate": true,
    "win": {
     "w": 760,

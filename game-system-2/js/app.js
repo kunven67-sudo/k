@@ -291,8 +291,9 @@
       Timers.dismissTop();
       return;
     }
-    /* your screenshot / record keys */
+    /* your VEX keys, then your screenshot / record keys */
     if (!e.repeat && !UI.isTyping()) {
+      if (Vex.keyAction(e)) { e.preventDefault(); return; }
       var cap = Capture.keyAction(e);
       if (cap) { e.preventDefault(); Capture.run(cap); return; }
     }
@@ -447,7 +448,9 @@
     Win.restoreAll();
     /* first start: Simple or Pro? (then the "continue?" popup) */
     var resume = function () { if (D.ui.playing) setTimeout(function () { Player.offerResume(D.ui.playing); }, 300); };
-    if (!D.settings.mode) setTimeout(function () { Views.askMode().then(resume); }, 500);
+    /* first start: "Simple or Pro?", then VEX shows you around (once) */
+    var tourNext = function () { if (!U.lsGet('gs2:vexTour', 0) && D.settings.vexOn !== false) setTimeout(function () { if (!UI.modalCount() && $('player').hidden) Vex.tour(); }, 600); };
+    if (!D.settings.mode) setTimeout(function () { Views.askMode().then(function () { tourNext(); resume(); }); }, 500);
     else resume();
   }
 
@@ -480,6 +483,7 @@
     Media.init();
     Capture.init();
     Timers.init();
+    Vex.init();
     applySettings();
 
     D.on(function (type) {
