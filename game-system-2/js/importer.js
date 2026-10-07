@@ -782,12 +782,17 @@
     });
   }
 
-  function importOldFolder() {
+  async function importOldFolder() {
+    /* the old Game System app kept its games in this browser: bring those over (with their progress) */
+    var found = null;
+    if (window.OldGS) { try { found = await OldGS.scan(); } catch (e) { found = null; } }
+    if (found) { OldGS.offer(false); return; }
     UI.modal({
       title: 'Import your old games',
       icon: 'library',
       body: h('div',
-        h('p', 'Pick the folder you used to drag onto Netlify for your old Game System. I\'ll find every game inside it.'),
+        h('p', 'I looked in this browser for your old Game System\'s games and didn\'t find any. (That only works on the same website and in the same browser you used the old one in.)'),
+        h('p', 'If your old games were files in the folder you put on Netlify, pick that folder and I\'ll find every game inside it.'),
         h('p.muted.small', 'Lost that folder? On Netlify open your site → Deploys → click your last deploy → "Download deploy" (or similar). Unzip it and pick that folder.'),
         h('p.muted.small', 'Nothing gets deleted. Your old folder stays exactly how it is.')),
       actions: [{ label: 'Cancel', kind: 'ghost' }, { label: 'Pick the folder', icon: 'folder', kind: 'primary', onClick: function () { pickFiles({ folder: true, legacy: true }); } }]

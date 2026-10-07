@@ -4,3 +4,5 @@
   Cache-Control: no-cache
 /games/games.json
   Cache-Control: no-cache
+/service-worker.js
+  Cache-Control: no-cache

@@ -317,6 +317,16 @@
     saveSoon(); emit();
   }
   /* "Arrange by name / most played / newest": rewrites your order once */
+  /* put these first, in this order (like the games brought over from the old Game System) */
+  async function toFront(screen, ids) {
+    if (!L[screen] || !ids || !ids.length) return;
+    reconcile();
+    var list = L[screen];
+    var front = ids.map(function (id) { return 'g:' + id; }).filter(function (k, i, arr) { return list.indexOf(k) >= 0 && arr.indexOf(k) === i; });
+    L[screen] = front.concat(list.filter(function (e) { return front.indexOf(e) < 0; }));
+    await save();
+    emit();
+  }
   function arrange(screen, how) {
     var sorters = {
       name: function (a, b) { return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }); },
@@ -414,6 +424,7 @@
     takeOut: held(takeOut),
     setFolderCover: setFolderCover,
     arrange: arrange,
+    toFront: held(toFront),
     nudge: nudge,
     view: view,
     setView: setView,

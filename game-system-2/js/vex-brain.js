@@ -299,6 +299,18 @@
     { test: /\bwhat('?s| is) the time\b|\bwhat time is it\b/, run: function () { return 'It\'s ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.'; } },
     { test: /\bwhat('?s| is) (the |today'?s )?date\b|\bwhat day is (it|today)\b/, run: function () { return 'Today is ' + new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) + '.'; } },
 
+    /* ---- the old Game System's games, still in this browser ---- */
+    { test: /\b(bring|move|get|import|find|transfer|copy)( over| back| in)? (all )?(of )?(my )?(old|previous) (games|stuff|saves|apps|progress|data|game system)\b|\bold game system\b/, run: async function () {
+      var found = await OldGS.scan();
+      if (!found) return 'I don\'t see your old Game System in this browser. It has to be the same website and the same browser you used the old one in.';
+      var fresh = found.items.filter(function (x) { return x.ok && !x.here; }).length;
+      var song = found.music && !found.musicHere;
+      if (!fresh && !song) return 'Your old games are already here, bro. Check your Library!';
+      Vex.closeSoon();
+      setTimeout(function () { OldGS.offer(false); }, 500);
+      return fresh ? 'Found ' + fresh + ' of your old games and apps! Check the list and hit the button.' : 'Your old games are already here. Your old menu song isn\'t in Music yet though.';
+    } },
+
     /* ---- making + fixing games (AI). Checked early, so the idea can say anything ("skip rope", "play music"…) ---- */
     { test: /^(make|create|build|code|generate|design) (me )?(a |an |another |one more |my own )?((new|cool|fun|simple|small|little|video|mini|web|browser|3d|2d|quick) )*(game|app)\b(.*)$/, run: function (m) {
       var kind = m[6] === 'app' ? 'app' : 'game';

@@ -16,13 +16,16 @@ Netlify keeps your old versions in **Deploys**, so you can always click an old o
 
 ## Move your old games over
 
-Your old games are files in the old Netlify folder. To bring them in:
+Your old Game System app kept your games and their saves inside your browser. Game System 2.0 can read them, as long as it's on the **same website** (gamesystem2.netlify.app) and you open it in the **same browser on the same PC**.
 
-1. Open Game System 2.0 and click **Add** → **Import my old games**.
-2. Pick the old folder you used to drag onto Netlify. If you lost it: Netlify → your site → **Deploys** → click your last deploy → download it, then unzip it.
-3. Game System finds every game in there, names them, and grabs cover pictures. Check the list and click **Import**.
+1. Put Game System 2.0 on your same Netlify site (see above).
+2. Open gamesystem2.netlify.app in the browser you always used (or open the installed app like before). If the old one still shows, press **Ctrl + F5**.
+3. A popup says **Found your old Game System!** with all your games and apps. Click **Bring them over**.
+4. That's it. They show up first in your Library with their pictures, and your progress is still in them (they keep using the same save space as before, so "Private saves" is off for them). Your old menu song goes into the Music app.
 
-Your old folder is never changed or deleted.
+Missed the popup? **Add → Import my old games**, **Settings → Backups & data → Import old games**, or tell VEX "bring over my old games". Nothing in the old app's storage is changed or deleted, and backups include the old games' progress.
+
+Old games that were files in a folder you put on Netlify work too: if no old app is found in your browser, the same button lets you pick that folder.
 
 ## Put your games on the website (so they work on any computer)
 

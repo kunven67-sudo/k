@@ -62,6 +62,8 @@
           manifest.storage[g.id] = ls;
         }
       }
+      /* old games (Private saves off) keep their progress in the website's shared space: take that too */
+      if (window.OldGS && games.some(function (x) { return x.isolate === false; })) manifest.shared = OldGS.sharedSaves();
       if (full) {
         var lay = Layout.exportData();
         manifest.layout = lay.data;
@@ -158,6 +160,14 @@
           var ls = (manifest.storage || {})[meta.id];
           if (ls) Object.keys(ls).forEach(function (k) { try { localStorage.setItem('gs2:ls:' + meta.id + ':' + k, String(ls[k])); } catch (e) { /* full */ } });
           restoredList.push(rec);
+        }
+        /* progress of games that use the shared save space (old games) */
+        if (manifest.shared && typeof manifest.shared === 'object') {
+          Object.keys(manifest.shared).forEach(function (k) {
+            if (k.indexOf('gs2') === 0) return;
+            if (mode === 'missing' && localStorage.getItem(k) !== null) return;
+            try { localStorage.setItem(k, String(manifest.shared[k])); } catch (e) { /* full */ }
+          });
         }
         /* your order and folders */
         if (manifest.layout) {

@@ -8,7 +8,8 @@
   var VIEWS = ['home', 'library', 'apps', 'saves', 'stats', 'settings', 'editor'];
   var started = false;
   var swState = null; /* null = unknown, false = not available */
-  var hadController = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+  /* only our own service worker counts (the OLD Game System's one being replaced is not an "update") */
+  var hadController = !!(navigator.serviceWorker && navigator.serviceWorker.controller && /\/sw\.js(\?|$)/.test(navigator.serviceWorker.controller.scriptURL || ''));
 
   /* ---------------- colors ---------------- */
   function hexToHsl(hex) {
@@ -450,8 +451,10 @@
     var resume = function () { if (D.ui.playing) setTimeout(function () { Player.offerResume(D.ui.playing); }, 300); };
     /* first start: "Simple or Pro?", then VEX shows you around (once) */
     var tourNext = function () { if (!U.lsGet('gs2:vexTour', 0) && D.settings.vexOn !== false) setTimeout(function () { if (!UI.modalCount() && $('player').hidden) Vex.tour(); }, 600); };
-    if (!D.settings.mode) setTimeout(function () { Views.askMode().then(function () { tourNext(); resume(); }); }, 500);
-    else resume();
+    /* the old Game System's games still in this browser? offer to bring them over (once) */
+    var oldOnes = function () { return window.OldGS ? OldGS.offer(true).catch(function () { /* never block start-up */ }) : Promise.resolve(); };
+    if (!D.settings.mode) setTimeout(function () { Views.askMode().then(oldOnes).then(function () { tourNext(); resume(); }); }, 500);
+    else setTimeout(function () { oldOnes().then(resume); }, 300);
   }
 
   /* ---------------- boot ---------------- */
