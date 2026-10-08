@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GAMBLE sound board</title>
+<link rel="icon" href="../assets/icons/icon-192.png">
+<style>
+  :root {
+    --bg: #0b0d0c; --felt: #10241b; --panel: #141917; --line: #26302b; --ink: #e9e4d6;
+    --dim: #8d978f; --gold: #d8b25a; --red: #d0553f; --ok: #6fc28b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 14px/1.4 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 20px 16px 60px;
+    background: radial-gradient(1200px 600px at 20% -10%, #17352a 0%, transparent 60%), var(--bg); min-height: 100vh; }
+  h1 { font: 700 26px/1 Georgia, "Times New Roman", serif; letter-spacing: .12em; margin: 0 0 4px; color: var(--gold); }
+  .sub { color: var(--dim); margin: 0 0 18px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .side { order: -1; position: static; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  section h2 { font: 600 11px/1 ui-monospace, Menlo, monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin: 0 0 10px; display: flex; justify-content: space-between; }
+  section h2 span { color: var(--dim); letter-spacing: .05em; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { font: 12px/1 ui-monospace, Menlo, monospace; color: var(--ink); background: #1b221f; border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 9px; cursor: pointer; transition: background .12s, border-color .12s; }
+  button:hover { border-color: var(--gold); }
+  button.loop::after { content: " ∞"; color: var(--dim); }
+  button.on { background: #3a2f12; border-color: var(--gold); color: #fff3cf; }
+  button.bad { border-color: var(--red); }
+  .side { position: sticky; top: 12px; }
+  canvas { width: 100%; display: block; border-radius: 6px; background: #000; }
+  .stats { font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--dim); margin-top: 8px; white-space: pre-wrap; min-height: 3em; }
+  .stats b { color: var(--ink); font-weight: 600; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .row label { font: 12px ui-monospace, Menlo, monospace; color: var(--dim); display: flex; gap: 6px; align-items: center; }
+  input[type=range] { accent-color: var(--gold); width: 120px; }
+  .tracks button { font-size: 13px; padding: 10px 12px; }
+  #report { font: 11px/1.45 ui-monospace, Menlo, monospace; color: var(--dim); max-height: 300px; overflow: auto; white-space: pre; }
+  .ok { color: var(--ok); } .warn { color: var(--red); }
+  #specs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  #specs figure { margin: 0; } #specs figcaption { font: 11px ui-monospace, Menlo, monospace; color: var(--dim); padding-top: 3px; }
+</style>
+</head><body>
+<div class="wrap">
+  <h1>GAMBLE · SOUND BOARD</h1>
+  <p class="sub">Every procedural sound and the generative band. Click to audition; the panel shows the waveform, spectrogram and level check.</p>
+  <div class="grid">
+    <div id="groups"></div>
+    <div class="side">
+      <section>
+        <h2>Band <span id="section">—</span></h2>
+        <div class="btns tracks" id="tracks"></div>
+        <div class="row">
+          <label>muffle <input id="muffle" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <label>radio <input id="radio" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <button id="stop">stop</button>
+          <button id="render">render 16 s</button>
+        </div>
+      </section>
+      <section>
+        <h2>Scope <span id="name">—</span></h2>
+        <canvas id="wave" width="800" height="90"></canvas>
+        <canvas id="spec" width="800" height="260" style="margin-top:6px"></canvas>
+        <div class="stats" id="stats">Pick a sound.</div>
+      </section>
+      <section>
+        <h2>Verify <span id="vsum"></span></h2>
+        <div class="btns"><button id="verify">check every sound</button><button id="verifyMusic">render all tracks</button></div>
+        <div id="specs"></div>
+        <div id="report"></div>
+      </section>
+    </div>
+  </div>
+</div>
+<script type="module" src="./audio.js"></script>
+</body></html>

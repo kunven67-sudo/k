@@ -13,6 +13,7 @@ import './sfx/ui.js';
 import { SURFACES } from './sfx/steps.js';
 import './sfx/doors.js';
 import './sfx/home.js';
+import './sfx/bath.js';
 import './sfx/body.js';
 import './sfx/phone.js';
 import './sfx/ambience.js';

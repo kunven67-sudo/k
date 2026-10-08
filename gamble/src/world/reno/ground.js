@@ -32,6 +32,11 @@ export function buildGround(ctx, opts = {}) {
   const roads = ROADS.map((r) => ({ ...r, rect: roadRect(r) }));
   const surfaces = opts.surfaces || [];
   const voids = [RESERVED.eldoradoInterior, RESERVED.starlite];
+  // The motel builder owns its whole parcel (lot slab, sunken pool basin): no city ground or
+  // collider there at all, so the pool basin is not capped by an invisible y = 0 floor.
+  const cutouts = [RESERVED.starlite];
+  // Motel driveway: a 10 m curb cut in the north curb of E 4th St (sidewalk ramps down to the road).
+  const DRIVEWAYS = [{ x0: 196, x1: 206, z: -ROADS[0].hw, depth: 1.6 }];
 
   // ---- grid breakpoints ----
   const xsSet = new Set([BOUNDS.x0, BOUNDS.x1]);
@@ -48,6 +53,10 @@ export function buildGround(ctx, opts = {}) {
     addX(v.x1);
     addZ(v.z0);
     addZ(v.z1);
+  }
+  for (const d of DRIVEWAYS) {
+    addX(d.x0);
+    addX(d.x1);
   }
   for (const s of surfaces) {
     addX(s.x0);
@@ -80,7 +89,9 @@ export function buildGround(ctx, opts = {}) {
       else if (roads.some((r) => inRect(cx, cz, r.rect, WALK_W))) type = 'walk';
       if (type === 'road' && inTrench && !onBridge(cx)) type = 'trench';
       const surf = surfaces.find((s) => inRect(cx, cz, s));
-      cells.push({ i, j, x0, x1, z0, z1, cx, cz, type, surf: surf?.kind || null, bridge: inTrench && onBridge(cx) });
+      const cut = type === 'void' && cutouts.some((v) => inRect(cx, cz, v));
+      const drive = type === 'walk' ? DRIVEWAYS.find((d) => cx > d.x0 && cx < d.x1 && Math.abs(z1 - d.z) < 1e-3) : null;
+      cells.push({ i, j, x0, x1, z0, z1, cx, cz, type, cut, drive, surf: surf?.kind || null, bridge: inTrench && onBridge(cx) });
     }
   }
 
@@ -95,6 +106,7 @@ export function buildGround(ctx, opts = {}) {
     parking: bleached(mat('asphalt', { seed: 9, wear: 0.45, dirt: 0.6 }), 1.45), // sun-bleached old lots
     dirt: mat('dirt', { seed: 6 }),
     gravel: mat('gravel', { seed: 3 }),
+    apron: mat('concrete', { seed: 17, dirt: 0.55 }),
     wall: mat('board-concrete', { seed: 2 }),
     ballast: mat('ballast'),
     steel: mat('steel', { wear: 0.6, dirt: 0.5 }),
@@ -140,6 +152,7 @@ export function buildGround(ctx, opts = {}) {
       flat(c.x0, c.x1, c.z0, c.z1, 0, M.asphalt);
     } else if (c.type === 'walk' || c.type === 'lot') {
       if (c.corner) buildCorner(c);
+      else if (c.drive) buildDriveway(c);
       else {
         // Inset the top where a curb runs along an edge (the curb has its own bevelled top).
         const e = edgesToRoad(c);
@@ -154,6 +167,31 @@ export function buildGround(ctx, opts = {}) {
     }
   }
 
+  // Driveway apron: flat sidewalk behind, then a concrete ramp down to a rolled 2 cm lip at the
+  // gutter. Collider: the flat part as a box, the ramp as a thin rotated slab (autostep-free).
+  function buildDriveway(c) {
+    const d = c.drive;
+    const zr = c.z1 - d.depth; // top of the ramp
+    const w = c.x1 - c.x0;
+    flat(c.x0, c.x1, c.z0, zr, CURB_H, surfMat(c));
+    const lip = 0.02;
+    const len = Math.hypot(d.depth, CURB_H - lip);
+    const ang = Math.atan2(CURB_H - lip, d.depth);
+    const ramp = planeGeo(w, len);
+    ramp.rotateX(ang).translate(c.cx, (CURB_H + lip) / 2, (zr + c.z1) / 2);
+    batch.add(ramp, M.apron, { castShadow: false, receiveShadow: true, grime: 0.6 });
+    const lipGeo = new RoundedBoxGeometry(w, lip + 0.02, CURB_W, 2, 0.01);
+    batch.add(lipGeo, M.curb, { matrix: new THREE.Matrix4().makeTranslation(c.cx, lip / 2 - 0.005, c.z1 - CURB_W / 2), castShadow: false, grime: 0.7 });
+    const gut = planeGeo(w, 0.55);
+    gut.translate(c.cx, 0.004, c.z1 + 0.275);
+    batch.add(gut, M.gutter, { castShadow: false });
+    colliders.aabb(c.x0, CURB_H - 1, c.z0, c.x1, CURB_H, zr);
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), ang);
+    const ctr = new THREE.Vector3(c.cx, (CURB_H + lip) / 2, (zr + c.z1) / 2).add(new THREE.Vector3(0, -0.15, 0).applyQuaternion(q));
+    colliders.physics?.addStaticBox({ x: ctr.x, y: ctr.y, z: ctr.z }, { x: w, y: 0.3, z: len }, q);
+    colliders.aabb(c.x0, -1, c.z1 - 0.05, c.x1, 0, c.z1); // road edge under the lip
+  }
+
   function edgesToRoad(c) {
     return {
       W: cell(c.i - 1, c.j)?.type === 'road',
@@ -164,7 +202,7 @@ export function buildGround(ctx, opts = {}) {
   }
 
   // ---- colliders: merge runs of equal height per row ----
-  const heightOf = (c) => (c.type === 'walk' || c.type === 'lot' ? CURB_H : c.type === 'trench' ? null : 0);
+  const heightOf = (c) => (c.cut || c.drive ? null : c.type === 'walk' || c.type === 'lot' ? CURB_H : c.type === 'trench' ? null : 0);
   for (let j = 0; j < NZ; j++) {
     let run = null;
     const flush = () => {
@@ -193,7 +231,7 @@ export function buildGround(ctx, opts = {}) {
   // ---- curbs + gutters along every walk/lot edge that meets a road ----
   const curbRuns = []; // {axis, fixed, a0, a1, side} side: +1 → sidewalk on +side
   for (const c of cells) {
-    if (!(c.type === 'walk' || c.type === 'lot') || c.corner) continue;
+    if (!(c.type === 'walk' || c.type === 'lot') || c.corner || c.drive) continue;
     const e = edgesToRoad(c);
     if (e.W) curbRuns.push({ axis: 'z', fixed: c.x0, a0: c.z0, a1: c.z1, side: 1 });
     if (e.E) curbRuns.push({ axis: 'z', fixed: c.x1, a0: c.z0, a1: c.z1, side: -1 });
