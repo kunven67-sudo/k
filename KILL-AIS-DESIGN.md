@@ -20,6 +20,14 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - You were on your computer, typed **"make a game"** into an AI chat, and it sent you a **virus**. You got sucked into the file.
 - **Opening cinematic:** your computer → you typing "make a game" → the virus → sucked in. **Everything has sound and music, including the typing.**
 - The **virus only talks in cutscenes**.
+- **No tutorial and no tips.** Instead, right after the intro:
+  1. **Clippy** (the nice AI) walks up: *"Hey, you look new, you need hel-"*
+  2. A **no-name grunt bot** shoots Clippy in the head and he falls to the ground.
+  3. The grunt bot drops dead too, because **Clippy secretly poisoned it** to save you.
+  4. Clippy's **last words glitch out a clue** (a passcode or secret).
+  5. You **pick up the grunt's gun** with a full pickup animation. That's how you get your first gun.
+- **Clippy is dead (RIP)** but shows up later as a **glitchy ghost** at big moments.
+- **Animations for everything** (picking up guns, searching bodies…).
 - **Ending:** *to be decided later*
 - Inside-the-file world look: *(designer's choice)*
 
@@ -84,7 +92,10 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 - **Movement:** jump, sprint, slide, **grappling hook**.
 - **Full body:** look down and see your legs and shadow.
+- **Fall damage** from big falls.
 - **Carry 2 guns** at once.
+- **First gun:** a beat-up, scratched glitchy prototype pistol that sometimes jams.
+- **Looting:** press a key to search dead AIs (with an animation).
 - **Melee:** combat knife, energy sword AND punches.
 - **Grenades:** frag, EMP, virus (hacked AIs fight each other), smoke, plus 5 extra:
   - Black hole (sucks AIs into one spot)
@@ -161,6 +172,8 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - **One default crosshair.**
 - **Damage numbers:** on/off toggle in settings.
 - **Graphics menu.**
+- **Every key can be rebound** in settings.
+- **Pausing only at shop terminals** (the file never stops).
 - **No photo mode.**
 
 ## 14. Sound
