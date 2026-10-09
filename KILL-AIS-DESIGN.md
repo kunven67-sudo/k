@@ -29,7 +29,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - **Clippy is dead (RIP)** but shows up later as a **glitchy ghost** at big moments.
 - **Animations for everything** (picking up guns, searching bodies…).
 - **Ending:** *to be decided later*
-- Inside-the-file world look: *(designer's choice)*
+- Inside-the-file world look: *(designer's choice)*, but **every level looks like its boss's era**. Level 1 (ELIZA, 1966) is an old computer lab with giant tape machines and green screens. Later levels get more modern, then futuristic.
 
 ## 3. Enemies (the AIs)
 
@@ -40,6 +40,10 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - **Hundreds of AIs per map**: a huge battlefield.
 - Extra enemy types: **flying drones, big armored tanks, snipers, swarms of tiny bots**.
 - **AI names only show when you aim at one.**
+- **Weak spots:** what a headshot does **depends on the gun** (snipers instakill, pistols just do extra damage), plus a **glowing chest core** (shoot it to make them explode), **antennas/sensors** (shoot them off to blind the AI for a bit), and **legs** (makes them limp or crawl).
+- **Spotted icons:** `?` over their head when suspicious, `!` when they see you.
+- **Alarm towers:** AIs run to them to call more AIs, so destroy or hack them first.
+- **Dead bodies stay until you search them**, then glitch away. Other AIs that find a body get suspicious.
 - **When you shoot one:** sparks, black oil AND glowing code spray out.
 - **When you kill one** (all of these): sparks and explosion, glitch and pixelate away, ragdoll collapse, shatter into falling code.
 
@@ -93,6 +97,9 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - **Movement:** jump, sprint, slide, **grappling hook**.
 - **Full body:** look down and see your legs and shadow.
 - **Fall damage** from big falls.
+- **Lean** around corners with **Q and E**.
+- **Full stealth:** crouch-walk to sneak, AIs hear loud guns, silencers keep you hidden, silent knife kills from behind.
+- **Vision gear:** night vision goggles (shop), thermal scope (attachment), code vision (see AIs as glowing code through walls for a few seconds).
 - **Carry 2 guns** at once.
 - **First gun:** a beat-up, scratched glitchy prototype pistol that sometimes jams.
 - **Looting:** press a key to search dead AIs (with an animation).
@@ -133,7 +140,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 - Money is called **Crypto** (glowing crypto coins).
 - **Kill streaks give bonus Crypto.**
-- **Shop terminals** are inside the levels; you walk up to them.
+- **Shop terminals** are inside the levels; you walk up to them. They're **just a machine** (no shopkeeper, no talking).
   - They're **safe zones**, but AIs can **hack the prices up**. **Kill the AI that hacked it** to fix the prices.
 - **Saving only at shop terminals.** **3 save slots.**
 
@@ -141,6 +148,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 - **100 guns**: real-life (pistols, rifles, snipers), crazy (rocket launchers, miniguns), sci-fi lasers and plasma. They need to be really cool and fun.
 - **Limited ammo + realistic reloading**; ammo refills sold at shop terminals.
+- **Realistic, heavy recoil** you have to control (gun skills in the skill tree make it easier).
 - **Realistic bullet drop and travel time for all guns.**
 - **Attachments:** scopes/zoom, silencers, bigger magazines, elemental rounds (fire, shock, glitch). From **shop terminals** and **boss drops**.
 - **Gun skins:** gold (earned with lots of kills), glitch (animated, corrupted), AI-logo (themed after bosses you beat).
@@ -195,6 +203,8 @@ What the first build should have:
 2. A shop terminal and Crypto
 3. Real AI chat (Gemini) + the "make a game" trap
 4. Level 1 boss fight: **ELIZA**
+5. The intro cinematic (computer → "make a game" → virus → sucked in)
+6. The Clippy scene
 
 ## Still Open
 
