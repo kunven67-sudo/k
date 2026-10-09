@@ -22,10 +22,10 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - The **virus only talks in cutscenes**.
 - **No tutorial and no tips.** Instead, right after the intro:
   1. **Clippy** (the nice AI) walks up: *"Hey, you look new, you need hel-"*
-  2. A **no-name grunt bot** shoots Clippy in the head and he falls to the ground.
+  2. A **no-name grunt bot** shoots Clippy in the head **with its built-in arm cannon** and he falls to the ground.
   3. The grunt bot drops dead too, because **Clippy secretly poisoned it** to save you.
   4. Clippy's **last words glitch out a clue** (a passcode or secret).
-  5. You **pick up the grunt's gun** with a full pickup animation. That's how you get your first gun.
+  5. You **rip the arm cannon off the grunt's body**, very gory and gross (wires snapping, black oil squirting, sparks, glowing code dripping), with a full animation. That arm cannon is your first gun.
 - **Clippy is dead (RIP)** but shows up later as a **glitchy ghost** at big moments.
 - **Animations for everything** (picking up guns, searching bodies…).
 - **Ending:** *to be decided later*
@@ -35,7 +35,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 - Use **real AI product names** (ChatGPT, Gemini, Grok…) and **act/talk like their real selves**.
 - The more guns you own, the stronger/smarter the AIs get, and they become **different AIs with different names**.
-- How they fight: *(designer's choice: whatever looks cool/realistic)*
+- **AIs don't carry guns.** How they attack **depends on the AI**: built-in body weapons (arm cannons, laser eyes, shoulder rockets), code/energy blasts, melee rushes, and hacking. Body weapons can't be picked up (except the scripted Clippy-scene arm cannon).
 - Smarter AIs **flank you, take cover, dodge bullets, and adapt to how you play** and need to look insanely cool.
 - **Hundreds of AIs per map**: a huge battlefield.
 - **Regular AI names:** a mix of real AIs (many copies of each), and their **versions upgrade the more guns you own** (GPT-2 / Cleverbot early → GPT-4 / Gemini 2 later).
@@ -105,7 +105,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - **Full stealth:** crouch-walk to sneak, AIs hear loud guns, silencers keep you hidden, silent knife kills from behind.
 - **Vision gear:** night vision goggles (shop), thermal scope (attachment), code vision (see AIs as glowing code through walls for a few seconds).
 - **Carry 2 guns** at once.
-- **First gun:** a beat-up, scratched glitchy prototype pistol that sometimes jams.
+- **First gun:** the grunt bot's ripped-off arm cannon, a beat-up, scratched, glitchy prototype pistol that sometimes jams.
 - **Looting:** press a key to search dead AIs (with an animation).
 - **Melee:** combat knife, energy sword AND punches.
 - **Grenades:** frag, EMP, virus (hacked AIs fight each other), smoke, plus 5 extra:
@@ -151,11 +151,13 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 ## 10. Guns & Gear
 
 - **100 guns**: real-life (pistols, rifles, snipers), crazy (rocket launchers, miniguns), sci-fi lasers and plasma. They need to be really cool and fun.
+- Guns come from the **shop, boss drops and secrets** (AIs don't carry guns).
+- **Gun upgrade levels** bought at the shop (damage, fire rate…). **Max level unlocks the gold skin.**
 - **Limited ammo + realistic reloading**; ammo refills sold at shop terminals.
 - **Realistic, heavy recoil** you have to control (gun skills in the skill tree make it easier).
 - **Realistic bullet drop and travel time for all guns.**
 - **Attachments:** scopes/zoom, silencers, bigger magazines, elemental rounds (fire, shock, glitch). From **shop terminals** and **boss drops**.
-- **Gun skins:** gold (earned with lots of kills), glitch (animated, corrupted), AI-logo (themed after bosses you beat).
+- **Gun skins:** gold (earned with lots of kills, or by maxing the gun's upgrade level), glitch (animated, corrupted), AI-logo (themed after bosses you beat).
 - **Outfits:** bought at the shop AND unlocked with trophies. **Secret trophies give the coolest outfits.**
 
 ## 11. Skill Tree
@@ -179,6 +181,8 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 ## 13. HUD & Settings
 
+- **Main menu = your infected desktop**: icons for Play, Settings, Trophies… It **glitches more the more you've died**.
+- **Logo:** glitchy, shaking, color-tearing **red text**.
 - HUD: all three styles: minimal, full sci-fi, and computer-desktop look.
 - **Minimap / radar.**
 - **One default crosshair.**
