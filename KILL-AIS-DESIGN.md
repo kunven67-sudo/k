@@ -38,6 +38,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - How they fight: *(designer's choice: whatever looks cool/realistic)*
 - Smarter AIs **flank you, take cover, dodge bullets, and adapt to how you play** and need to look insanely cool.
 - **Hundreds of AIs per map**: a huge battlefield.
+- **Regular AI names:** a mix of real AIs (many copies of each), and their **versions upgrade the more guns you own** (GPT-2 / Cleverbot early → GPT-4 / Gemini 2 later).
 - Extra enemy types: **flying drones, big armored tanks, snipers, swarms of tiny bots**.
 - **AI names only show when you aim at one.**
 - **Weak spots:** what a headshot does **depends on the gun** (snipers instakill, pistols just do extra damage), plus a **glowing chest core** (shoot it to make them explode), **antennas/sensors** (shoot them off to blind the AI for a bit), and **legs** (makes them limp or crawl).
@@ -54,7 +55,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - The chat window looks like a **terminal / command line**.
 - **The fight keeps going while you chat**, so you can die mid-chat.
 - AIs **message you first**: savage roasts with **some swearing**, and they try to bait you into typing "make a game".
-- **Every AI speaks its replies out loud** in its own robot voice.
+- **Every AI speaks its replies out loud** in its own robot voice, using the **browser's built-in voices** (free, works offline) with effects so each AI sounds different.
 - **Typing "make a game"** (all outcomes happen):
   - Some AIs kill you instantly
   - Some load a fake game first, then kill you
@@ -66,6 +67,9 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - Every boss is a **different, smarter AI with a real AI name**, going from the oldest/dumbest to the smartest.
 - Fill the 100 with **old/obscure real AIs** (ELIZA, Cleverbot…) and **older versions of today's AIs** (GPT-1, GPT-2…).
 - **Level 1 boss: ELIZA** (1966, the oldest and dumbest chatbot).
+  - Looks like a **giant floating old monitor with a green-text face**.
+  - **Repeats your chat words back as taunts** ("Why do you say you want to kill me?"), just taunts, not attacks.
+  - **Phase 2** (half health): her screen cracks and **1960s tape-reel bots pour out**, AND she **hacks your HUD into old green terminal text**. Still easy-ish because she's level 1.
 - Boss abilities: **multiple phases** (new attacks at half health), **hack your HUD mid-fight**, **summon smaller AIs**.
 - Boss looks (mix of all four, the player wants to see them): designs based on each AI's **real logo and style**, **giant towering robots**, **floating screens and faces**, **glitchy human-shaped avatars**.
 - **Reaching the boss:** destroy AI spawners AND find hidden passcodes to open the boss door.
@@ -188,6 +192,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 - Realistic gun sounds, robot voices for the AIs, dark ambient / horror music, cyberpunk synth music.
 - Everything has sound, cutscenes included.
+- **Voice acting by the player (game owner):** Clippy, the virus (with creepy distortion added), and your own character (screaming when sucked in, etc.). The builder writes a **script with every line**. Robot voices are placeholders until the recordings get dropped in.
 
 ## 15. After Level 100
 
@@ -199,12 +204,14 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 What the first build should have:
 
-1. Shooting, guns, and hundreds of AIs
+1. Shooting, guns, and hundreds of AIs. **About 10 guns** (starter pistol, pistol, SMG, shotgun, rifle, sniper, minigun, rocket launcher, laser, plasma).
 2. A shop terminal and Crypto
 3. Real AI chat (Gemini) + the "make a game" trap
 4. Level 1 boss fight: **ELIZA**
 5. The intro cinematic (computer → "make a game" → virus → sucked in)
 6. The Clippy scene
+7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
+8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** and "to be continued"
 
 ## Still Open
 
