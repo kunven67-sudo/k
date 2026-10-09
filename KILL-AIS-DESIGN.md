@@ -51,7 +51,10 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 ## 4. Chatting With AIs
 
 - **Press a key to chat with the closest AI.**
-- **Real AI replies only, with no scripted backup.** One AI brain (**Google Gemini**, using the player's own API key) plays every AI and talks like each real one.
+- **Real AI replies only, with no scripted backup.** Two real AI brains, each playing every AI and talking like each real one:
+  - **When you press the chat key → Google Gemini** answers (using the player's own API key). Smartest replies.
+  - **Background trash talk → an offline AI brain** that downloads once (a few GB) and runs on the player's graphics card. Free, no limits, no internet needed.
+- Only the AIs **near you** trash talk, so the offline brain doesn't eat your FPS.
 - The chat window looks like a **terminal / command line**.
 - **The fight keeps going while you chat**, so you can die mid-chat.
 - AIs **message you first**: savage roasts with **some swearing**, and they try to bait you into typing "make a game".
@@ -84,6 +87,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
   - Teleports and clones itself
   - Takes over your whole screen and controls
   - **Deletes your body parts** (hand, arm). With a deleted arm you can **only use one gun until you buy a new arm at a terminal**.
+  - During the final boss fight: on **Hard** your arm **regrows every time the boss changes phase**. On **Insane** it **stays gone until the fight ends**.
 
 ## 6. Levels & Maps
 
@@ -132,7 +136,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 ## 8. Dying & Getting Hacked
 
-- You **respawn at the last shop terminal you used** and **lose half your Crypto**.
+- You **respawn at the last shop terminal you used** (or at the **level start** if you haven't used one yet) and **lose half your Crypto**.
 - **Every death you get more hacked.** Glitches stack up (all four):
   - Screen static and color tearing
   - Controls randomly flip or lag
@@ -145,7 +149,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - Money is called **Crypto** (glowing crypto coins).
 - **Kill streaks give bonus Crypto.**
 - **Shop terminals** are inside the levels; you walk up to them. They're **just a machine** (no shopkeeper, no talking).
-  - They're **safe zones**, but AIs can **hack the prices up**. **Kill the AI that hacked it** to fix the prices.
+  - They're **safe zones**, but AIs can **hack the prices up**. **Kill the AI that hacked it** to fix the prices. The terminal shows the hacker's **name and face**, and it's marked with a **red skull on the minimap**.
 - **Saving only at shop terminals.** **3 save slots.**
 
 ## 10. Guns & Gear
@@ -210,7 +214,7 @@ What the first build should have:
 
 1. Shooting, guns, and hundreds of AIs. **About 10 guns** (starter pistol, pistol, SMG, shotgun, rifle, sniper, minigun, rocket launcher, laser, plasma).
 2. A shop terminal and Crypto
-3. Real AI chat (Gemini) + the "make a game" trap
+3. Real AI chat (Gemini when you chat, offline brain for trash talk) + the "make a game" trap
 4. Level 1 boss fight: **ELIZA**
 5. The intro cinematic (computer → "make a game" → virus → sucked in)
 6. The Clippy scene
