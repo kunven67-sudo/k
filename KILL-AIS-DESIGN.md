@@ -89,6 +89,141 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
   - **Deletes your body parts** (hand, arm). With a deleted arm you can **only use one gun until you buy a new arm at a terminal**.
   - During the final boss fight: on **Hard** your arm **regrows every time the boss changes phase**. On **Insane** it **stays gone until the fight ends**.
 
+### The 100 Bosses (dumbest → smartest)
+
+Roughly sorted by how smart each AI is. Each level's map looks like its boss's era. Anything can be swapped or reordered.
+
+**Era 1 — Ancient chatbots (Levels 1–12)**
+
+| Lvl | Boss | Year |
+|---|---|---|
+| 1 | ELIZA | 1966 |
+| 2 | Dr. Sbaitso | 1991 |
+| 3 | BonziBuddy | 1999 |
+| 4 | PARRY | 1972 |
+| 5 | Racter | 1984 |
+| 6 | Jabberwacky | 1988 |
+| 7 | SHRDLU | 1970 |
+| 8 | A.L.I.C.E. | 1995 |
+| 9 | SmarterChild | 2001 |
+| 10 | Deep Blue | 1997 |
+| 11 | Eugene Goostman | 2001 |
+| 12 | Cleverbot | 2008 |
+
+**Era 2 — Assistants and game-beating AIs (Levels 13–27)**
+
+| Lvl | Boss | Year |
+|---|---|---|
+| 13 | Mitsuku | 2005 |
+| 14 | Siri | 2011 |
+| 15 | Watson | 2011 |
+| 16 | Google Now | 2012 |
+| 17 | Cortana | 2014 |
+| 18 | Alexa | 2014 |
+| 19 | Xiaoice | 2014 |
+| 20 | Tay | 2016 |
+| 21 | Zo | 2016 |
+| 22 | Google Assistant | 2016 |
+| 23 | Bixby | 2017 |
+| 24 | Replika | 2017 |
+| 25 | AlphaGo | 2016 |
+| 26 | AlphaZero | 2017 |
+| 27 | OpenAI Five | 2019 |
+
+**Era 3 — First language models (Levels 28–45)**
+
+| Lvl | Boss | Year |
+|---|---|---|
+| 28 | AlphaStar | 2019 |
+| 29 | GPT-1 | 2018 |
+| 30 | BERT | 2018 |
+| 31 | GPT-2 | 2019 |
+| 32 | T5 | 2019 |
+| 33 | Meena | 2020 |
+| 34 | BlenderBot | 2020 |
+| 35 | GPT-3 | 2020 |
+| 36 | GPT-Neo | 2021 |
+| 37 | GPT-J | 2021 |
+| 38 | Jurassic-1 | 2021 |
+| 39 | Gopher | 2021 |
+| 40 | LaMDA | 2021 |
+| 41 | Galactica | 2022 |
+| 42 | OPT | 2022 |
+| 43 | BLOOM | 2022 |
+| 44 | Chinchilla | 2022 |
+| 45 | PaLM | 2022 |
+
+**Era 4 — The chatbot boom (Levels 46–73)**
+
+| Lvl | Boss | Year |
+|---|---|---|
+| 46 | ChatGPT (GPT-3.5) | 2022 |
+| 47 | LLaMA | 2023 |
+| 48 | Alpaca | 2023 |
+| 49 | Vicuna | 2023 |
+| 50 | Bard | 2023 |
+| 51 | Sydney (Bing Chat) | 2023 |
+| 52 | Claude 1 | 2023 |
+| 53 | Falcon | 2023 |
+| 54 | Llama 2 | 2023 |
+| 55 | Pi | 2023 |
+| 56 | Claude 2 | 2023 |
+| 57 | Mistral 7B | 2023 |
+| 58 | Grok-1 | 2023 |
+| 59 | Mixtral | 2023 |
+| 60 | Gemini 1.0 | 2023 |
+| 61 | GPT-4 | 2023 |
+| 62 | Copilot | 2023 |
+| 63 | Gemma | 2024 |
+| 64 | Phi-3 | 2024 |
+| 65 | Command R+ | 2024 |
+| 66 | Claude 3 Opus | 2024 |
+| 67 | Llama 3 | 2024 |
+| 68 | Gemini 1.5 Pro | 2024 |
+| 69 | GPT-4o | 2024 |
+| 70 | Mistral Large | 2024 |
+| 71 | Grok-2 | 2024 |
+| 72 | Claude 3.5 Sonnet | 2024 |
+| 73 | Qwen 2.5 | 2024 |
+
+**Era 5 — Thinking machines (Levels 74–95)**
+
+| Lvl | Boss | Year |
+|---|---|---|
+| 74 | o1 | 2024 |
+| 75 | DeepSeek-V3 | 2024 |
+| 76 | Gemini 2.0 Flash | 2024 |
+| 77 | DeepSeek-R1 | 2025 |
+| 78 | o3-mini | 2025 |
+| 79 | Claude 3.7 Sonnet | 2025 |
+| 80 | Grok 3 | 2025 |
+| 81 | GPT-4.5 | 2025 |
+| 82 | Llama 4 | 2025 |
+| 83 | gpt-oss | 2025 |
+| 84 | Qwen3 | 2025 |
+| 85 | Gemini 2.5 Pro | 2025 |
+| 86 | o3 | 2025 |
+| 87 | Claude Opus 4 | 2025 |
+| 88 | Kimi K2 | 2025 |
+| 89 | Grok 4 | 2025 |
+| 90 | GPT-5 | 2025 |
+| 91 | Claude Opus 4.1 | 2025 |
+| 92 | Claude Sonnet 4.5 | 2025 |
+| 93 | GPT-5.1 | 2025 |
+| 94 | Gemini 3 Pro | 2025 |
+| 95 | Claude Opus 4.5 | 2025 |
+
+**Era 6 — The Final Four (Levels 96–99)**: the newest version of each when the game is built.
+
+| Lvl | Boss |
+|---|---|
+| 96 | Grok (newest) |
+| 97 | ChatGPT (newest) |
+| 98 | Claude (newest) |
+| 99 | Gemini (newest) |
+
+**Level 100 — THE VIRUS**, merged with all of the Final Four.
+
 ## 6. Levels & Maps
 
 - **100 levels.** Each is a **big map you explore**, with the boss at the end.
@@ -102,7 +237,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 ## 7. The Player
 
-- **Movement:** jump, sprint, slide, **grappling hook**.
+- **Movement:** jump, sprint, slide, **grappling hook**. You start with run, jump and slide; the **grapple is unlocked in the skill tree** with Crypto, then upgraded there.
 - **Full body:** look down and see your legs and shadow.
 - **Fall damage** from big falls.
 - **Lean** around corners with **Q and E**.
@@ -200,6 +335,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 ## 14. Sound
 
 - Realistic gun sounds, robot voices for the AIs, dark ambient / horror music, cyberpunk synth music.
+- **Music changes live:** creepy ambient while sneaking, synth goes crazy in fights, boss theme for bosses.
 - Everything has sound, cutscenes included.
 - **Voice acting by the player (game owner):** Clippy, the virus (with creepy distortion added), and your own character (screaming when sucked in, etc.). The builder writes a **script with every line**. Robot voices are placeholders until the recordings get dropped in.
 
@@ -220,7 +356,7 @@ What the first build should have:
 5. The intro cinematic (computer → "make a game" → virus → sucked in)
 6. The Clippy scene
 7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
-8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** and "to be continued"
+8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** (Dr. Sbaitso) and "to be continued"
 
 ## Still Open
 
