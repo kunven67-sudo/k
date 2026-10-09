@@ -17,6 +17,11 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 ## 2. Story
 
+- **KILL AIs is a side story, not the main storyline.** The main game is **ANT WORK 2** (`ant-work-2.html` on the `claude/practical-lovelace-knfqpf` branch), which will send you into KILL AIs.
+- **Same hero as Ant Work 2** (the player voices them).
+- KILL AIs is **its own game in its own folder**, and Ant Work 2 links to it / opens it.
+- *Later (when Ant Work 2 is done):* how Ant Work 2 sends you in, and which Ant Work 2 characters cameo.
+
 - You were on your computer, typed **"make a game"** into an AI chat, and it sent you a **virus**. You got sucked into the file.
 - **Opening cinematic:** your computer → you typing "make a game" → the virus → sucked in. **Everything has sound and music, including the typing.**
 - The **virus only talks in cutscenes**.
@@ -77,6 +82,8 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - Boss looks (mix of all four, the player wants to see them): designs based on each AI's **real logo and style**, **giant towering robots**, **floating screens and faces**, **glitchy human-shaped avatars**.
 - **Reaching the boss:** destroy AI spawners AND find hidden passcodes to open the boss door.
 - **Slow-mo kill cam** when you kill a boss; it gets cooler and cooler the better the boss is.
+- **Every one of the 100 bosses has a unique special move** based on what it's famous for (Deep Blue plays chess with you as the pieces, AlphaGo drops giant Go stones, Tay turns evil mid-fight…).
+- **Revenge lines:** later bosses from the same company remember who you killed ("you killed my little brother").
 
 ### Level 100 Final Boss
 
@@ -337,7 +344,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - Realistic gun sounds, robot voices for the AIs, dark ambient / horror music, cyberpunk synth music.
 - **Music changes live:** creepy ambient while sneaking, synth goes crazy in fights, boss theme for bosses.
 - Everything has sound, cutscenes included.
-- **Voice acting by the player (game owner):** Clippy, the virus (with creepy distortion added), and your own character (screaming when sucked in, etc.). The builder writes a **script with every line**. Robot voices are placeholders until the recordings get dropped in.
+- **Voice acting by the player (game owner):** Clippy, the virus (with creepy distortion added), and the hero (the same hero as Ant Work 2: screaming when sucked in, etc.). The builder writes a **script with every line**. Robot voices are placeholders until the recordings get dropped in.
 
 ## 15. After Level 100
 
@@ -362,3 +369,5 @@ What the first build should have:
 
 - Story ending
 - New game mode after level 100
+- How Ant Work 2 sends you into KILL AIs (could replace or change the "make a game" virus intro)
+- Which Ant Work 2 characters cameo
