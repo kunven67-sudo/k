@@ -98,7 +98,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - **Random map events** *(designer's choice; picked all three)*: glitch storms, blackouts, firewall walls.
 - **Destruction:** a lot breaks (cover, walls, glass, screens).
 - **Liquids:** glowing **data lakes** (swim, and AIs can't see you underwater) AND deadly **corrupted goo** (glitches you like a hack).
-- **Vehicles:** hoverbike AND tank.
+- **Vehicles:** hoverbike AND tank, once maps get bigger: **hoverbike around level 10, tank around level 25**.
 
 ## 7. The Player
 
@@ -108,7 +108,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - **Lean** around corners with **Q and E**.
 - **Full stealth:** crouch-walk to sneak, AIs hear loud guns, silencers keep you hidden, silent knife kills from behind.
 - **Vision gear:** night vision goggles (shop), thermal scope (attachment), code vision (see AIs as glowing code through walls for a few seconds).
-- **Carry 2 guns** at once.
+- **Carry 2 guns** at once. Every other gun you own sits in a **gun locker inside every terminal**: swap at any terminal, and upgrades stay on them.
 - **First gun:** the grunt bot's ripped-off arm cannon, a beat-up, scratched, glitchy prototype pistol that sometimes jams.
 - **Looting:** press a key to search dead AIs (with an animation).
 - **Melee:** combat knife, energy sword AND punches.
@@ -131,6 +131,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 ### Sidekick
 
 - **Recruited by hacking an AI**, which then **changes to your colors**.
+- **Up to 3 sidekicks on Hard, unlimited on Insane.**
 - Shoots enemies, hacks turrets, heals you, distracts enemies.
 - When it goes down **you have to revive it in time, or it's gone forever**.
 
@@ -181,7 +182,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - Chatting with every AI
 - Secret trophies (unlock the best outfits)
 - Super rare Insane-mode trophy
-- **Trophy room** you walk around in, **only in safe zones**.
+- **Trophy room** you walk around in, **only in safe zones**. It's a **glitchy copy of your real bedroom** from before you got sucked in, with trophies on the shelves and **every boss you beat mounted on the wall** like a hunting trophy.
 
 ## 13. HUD & Settings
 
