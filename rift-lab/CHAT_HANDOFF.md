@@ -320,3 +320,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Tutorial → **tips the first time you do something** (never again after; can turn off in settings).
 - Starting money (mansion / pay mode) → **rich inventor** (sold inventions, own the mansion, still pay bills, taxes, staff, power).
 - Claude picked (realism rule): **the player needs the bathroom too**; god mode turns needs off.
+- Food tab → **all**: groceries (raw stuff to cook), snacks + drinks (made-up brands), ready meals, kitchen stuff.
+- Everyday tab → **all**: bathroom stuff, clothes + shoes (every season), toys + sports gear, office + school stuff (real distinct book titles).
+- Social media app name → **Buzzr**.
+- Natural disasters → **both**: real-life chance (setting to turn off/up) AND trigger them yourself from the phone. People + firefighters react.
