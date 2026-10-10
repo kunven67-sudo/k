@@ -14,6 +14,7 @@ import { ensureStyles } from './styles.js';
 import { overlay, button, showCard } from './kit.js';
 import { openSettings } from './settings.js';
 import { uiSound } from './sfx.js';
+import { gameSystem } from '../core/gamesystem.js';
 
 i18n.register('gmenu', {
   en: {
@@ -23,6 +24,7 @@ i18n.register('gmenu', {
     resume: 'Back to it',
     settings: 'Settings',
     quit: 'Main menu',
+    exit: 'Quit game',
     quitTitle: 'Leave for now?',
     quitBody: 'Your life is saved. Time in Reno keeps moving while you’re gone — *rent included*.',
     quitYes: 'Main menu',
@@ -35,6 +37,7 @@ i18n.register('gmenu', {
     resume: 'Volver',
     settings: 'Ajustes',
     quit: 'Menú principal',
+    exit: 'Salir del juego',
     quitTitle: '¿Te vas por ahora?',
     quitBody: 'Tu vida está guardada. El tiempo en Reno sigue mientras no estás, *renta incluida*.',
     quitYes: 'Menú principal',
@@ -99,12 +102,24 @@ export function openGameMenu(engine, { onClose, onQuit } = {}) {
     onQuit?.();
     engine.go('menu');
   }, { ghost: true });
+  // Inside Game System 2.0 there's somewhere to go back to.
+  const exitBtn = gameSystem.inSystem
+    ? button(t('gmenu.exit'), () => {
+      try {
+        save.commit();
+      } catch {
+        /* autosave already ran */
+      }
+      gameSystem.saveNow();
+      gameSystem.quit();
+    }, { ghost: true })
+    : null;
 
   const table = el('div', { class: 'gx-table gm-table', role: 'dialog', 'aria-modal': 'true' }, [
     el('div', { class: 'gx-felt' }, [
       el('div', { class: 'gx-head' }, [time, el('h2', { class: 'gx-title', text: t('gmenu.title') })]),
       el('div', { class: 'gx-body gm-body' }, [
-        el('div', { class: 'gm-buttons' }, [resume, settingsBtn, quit]),
+        el('div', { class: 'gm-buttons' }, [resume, settingsBtn, quit, exitBtn].filter(Boolean)),
         el('p', { class: 'gm-note', text: t('gmenu.note') }),
       ]),
     ]),

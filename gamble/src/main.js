@@ -1,5 +1,7 @@
 // GAMBLE — entry point. Boots core systems, registers game states and starts the loop.
 
+// Must stay first: restores the launcher's save into storage before anything reads it.
+import { gameSystem } from './core/gamesystem.js';
 import { Engine } from './core/engine.js';
 import { input } from './core/input.js';
 import { audio } from './core/audio.js';
@@ -19,6 +21,10 @@ async function main() {
   for (const ev of ['pointerdown', 'keydown', 'touchend']) window.addEventListener(ev, unlock, { passive: true });
 
   await initPhysics();
+
+  // Game System 2.0: go quiet while the launcher pauses us.
+  gameSystem.onPause(() => audio.ctx?.suspend?.());
+  gameSystem.onResume(() => audio.ctx?.resume?.());
 
   const engine = new Engine(canvas);
   window.__gamble = { engine, bus, save, input, audio }; // dev console access
