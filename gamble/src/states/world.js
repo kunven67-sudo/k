@@ -26,6 +26,7 @@ import { Ambience } from '../player/ambience.js';
 import { loadSound, music } from '../player/sound.js';
 import { ROOM, Y0 } from '../world/motel/layout.js';
 import '../player/strings.js';
+import { openGameMenu, isGameMenuOpen } from '../ui/gamemenu.js';
 
 save.registerSlice('player', {
   create: () => ({ position: null, yaw: 0, roomNumber: randomRoomNumber(), zone: null }),
@@ -151,6 +152,10 @@ export class WorldState {
       this.lifeSys = null;
     }
 
+    this._offLock = bus.on('input:pointerlock', (locked) => {
+      if (!locked && input.wantPointerLock && this.ready && !this._uiBusy()) this._openMenu();
+    });
+
     this.bloom0 = e.bloomStrength;
     e.setView(scene, camera);
     input.setPointerLock(true);
@@ -185,6 +190,7 @@ export class WorldState {
     if (!this.ready) return;
     const w = this.world;
     const pl = this.player;
+    this._menuInput();
     for (const it of this.interactables) it.update?.(dt);
     this.opening?.update(dt);
     if (this.opening?.done) this.opening.tail(dt);
@@ -199,6 +205,37 @@ export class WorldState {
     const bloomWant = this.zone?.indoor ? 0.22 : this.bloom0;
     this.engine.bloomStrength += (bloomWant - this.engine.bloomStrength) * Math.min(1, dt * 2.5);
     this._save(dt);
+  }
+
+  // ---- in-game menu (Esc / ☰): the world keeps going, you just stand still --------------------
+
+  /** Something else owns the keyboard/Escape right now (phone, pockets, a dialogue, a game seat…). */
+  _uiBusy() {
+    const pl = this.player;
+    return !!(
+      isGameMenuOpen() || pl.seatedAt || this.lifeSys?.phone?.isOpen || this.lifeSys?.pockets?.isOpen ||
+      document.querySelector('.lf-dlg, .gx-overlay') || this.sleep?.busy || (this.opening && !this.opening.done)
+    );
+  }
+
+  _menuInput() {
+    // Escape is judged against last frame's state: the phone closes itself on the same keydown.
+    if (input.pressed('menu') && !this._busyPrev) this._openMenu();
+    this._busyPrev = this._uiBusy();
+  }
+
+  _openMenu() {
+    if (isGameMenuOpen() || this._uiBusy()) return;
+    const pl = this.player;
+    const wasLocked = pl.locked;
+    pl.locked = true;
+    input.setPointerLock(false);
+    openGameMenu(this.engine, {
+      onClose: () => {
+        pl.locked = wasLocked;
+        input.setPointerLock(true);
+      },
+    });
   }
 
   _zones(dt) {
@@ -257,6 +294,7 @@ export class WorldState {
     fx.uVignette.value = 0.2;
     if (this.bloom0 != null) this.engine.bloomStrength = this.bloom0;
     clock.speed = 1;
+    this._offLock?.();
     input.setPointerLock(false);
     this._save(99);
     this.ambience?.dispose();

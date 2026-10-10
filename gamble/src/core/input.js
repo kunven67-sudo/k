@@ -246,6 +246,10 @@ injectStyle('touch-controls', `
     background:rgba(10,10,12,.35); color:#fff; font:600 11px var(--font-ui); display:grid; place-items:center;
     -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); touch-action:none; }
   .tc-btn.active { background:rgba(216,178,90,.55); }
+  .tc-btn svg { width:26px; height:26px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .tc-top { position:absolute; left:calc(12px + var(--safe-left)); top:calc(12px + var(--safe-top)); display:flex; gap:10px; pointer-events:none; }
+  .tc-top .tc-btn { width:48px; height:48px; }
+  .tc-top .tc-btn svg { width:22px; height:22px; }
   .tc-hidden { display:none !important; }
 `);
 
@@ -332,16 +336,22 @@ class TouchControls {
     right.addEventListener('pointerup', endLook);
     right.addEventListener('pointercancel', endLook);
 
-    const buttons = document.createElement('div');
-    buttons.className = 'tc-buttons';
-    const defs = [
-      ['phone', '📱'], ['emote', '🖐'], ['jump', '⤒'],
-      ['crouch', '⤓'], ['use', 'USE'], ['interact', 'E'],
-    ];
-    for (const [action, label] of defs) {
+    // Stroked 24×24 icons (no emoji in the game's art).
+    const ICON = {
+      phone: 'M8 2.5h8a1.5 1.5 0 0 1 1.5 1.5v16a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 20V4A1.5 1.5 0 0 1 8 2.5z M10.5 18.5h3 M13 6.5l-2.5 4 M14.5 9l-2 3',
+      emote: 'M8 13V5.5a1.5 1.5 0 0 1 3 0V11 M11 10V4a1.5 1.5 0 0 1 3 0v6 M14 10V5.5a1.5 1.5 0 0 1 3 0V12 M17 9.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-2.7L4.3 14.6a1.6 1.6 0 0 1 2.6-1.8L8 14',
+      jump: 'M12 20V5 M6 11l6-6 6 6 M5 21h14',
+      crouch: 'M12 4v15 M6 13l6 6 6-6 M5 3h14',
+      use: 'M9 11V6a3 3 0 0 1 6 0v5 M6 11h12l-1 9H7z M12 14v3',
+      interact: 'M7 11V5.5a1.5 1.5 0 0 1 3 0V12 M10 11V4a1.5 1.5 0 0 1 3 0v7 M13 11V5.5a1.5 1.5 0 0 1 3 0V13 M16 10a1.5 1.5 0 0 1 3 0v4.5A6.5 6.5 0 0 1 12.5 21h-.8a5.5 5.5 0 0 1-4.6-2.5L4 14a1.5 1.5 0 0 1 2.5-1.6L7 13',
+      menu: 'M4 7h16 M4 12h16 M4 17h16',
+      pockets: 'M5 4h14v9a7 7 0 0 1-14 0z M5 8h14 M9.5 4v4',
+    };
+    const make = (action, parent) => {
       const b = document.createElement('button');
       b.className = 'tc-btn';
-      b.textContent = label;
+      b.setAttribute('aria-label', action);
+      b.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICON[action]}"/></svg>`;
       b.dataset.action = action;
       b.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
@@ -355,8 +365,16 @@ class TouchControls {
       b.addEventListener('pointerup', up);
       b.addEventListener('pointercancel', up);
       b.addEventListener('pointerleave', up);
-      buttons.appendChild(b);
-    }
+      parent.appendChild(b);
+    };
+    const buttons = document.createElement('div');
+    buttons.className = 'tc-buttons';
+    for (const action of ['phone', 'emote', 'jump', 'crouch', 'use', 'interact']) make(action, buttons);
+    const top = document.createElement('div');
+    top.className = 'tc-top';
+    for (const action of ['menu', 'pockets']) make(action, top);
+    this.root.appendChild(top);
+    this.top = top;
     this.root.appendChild(buttons);
     this.buttons = buttons;
   }
@@ -364,6 +382,7 @@ class TouchControls {
   setVisible(v) {
     for (const z of this.zones) z.classList.toggle('tc-hidden', !v);
     this.buttons.classList.toggle('tc-hidden', !v);
+    this.top?.classList.toggle('tc-hidden', !v);
   }
 }
 
