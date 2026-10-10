@@ -303,3 +303,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Town size → user: **"if its fun yes"** → Claude picked: **start as a small town** (~60 houses, downtown, 4 shops, park, school, police + fire station, hospital; every building has a full inside), **grow it into a bigger city later** if it runs smooth.
 - Mansion household → **pick when making the world** (alone / staff / family / both).
 - People's voices → **setting: free built-in voices by default, real AI voices with the user's API key**.
+- Extra mansion rooms → **all**: gym + spa + sauna + hot tub, chef kitchen + wine cellar + bar, library (REAL distinct books) + office + music room, bowling alley + indoor basketball.
+- Park → **all**: playground + basketball + tennis, pond with ducks + walking trails, skate park + dog park, picnic area + food truck + fountain.
+- People can build → **all**: shelters → cabins → houses, farms/wells/fences/barns, furniture/tools/workshops (forge, sawmill), roads/bridges/boats/shops.
+- Weapons → **full real weapons**. Claude said honestly it would've kept hunting gear only (doesn't want a shooter game), but will make it real: gun store + background check/license, ammo costs money, recoil, reloading, people panic/call 911, police react.
