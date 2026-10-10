@@ -311,3 +311,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Spawn tab after Furniture → **Food + everyday stuff** (survival start, fill the fridge).
 - Holidays → **yes, people celebrate** (Halloween, Christmas lights, 4th of July fireworks, birthdays), depending on the person.
 - Car brand names → **Claude makes them up** (real-sounding brands with logos + history).
+- Car brands kept → **Velaro** (Italian-style sports/supercars, V12s, famous red), **Hesper Motorwerk** (German-style luxury sedans/SUVs), **Nimbo** (cheap Japanese-style first cars). **Torvik rejected** → trucks need a new brand.
+- People look → **Sims-like** (real proportions + faces, a bit smoothed, light on lag, clear emotions).
+- Cars → **full custom shop** (paint/wraps, rims/tires, engine tune, suspension, body kits, interior; mods change real driving).
+- Cooking → **hands-on (grab + drag) + a recipe helper app on the phone**; undercooked food carries real germs.
