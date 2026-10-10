@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b0a0c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GAMBLE">
+  <meta name="description" content="GAMBLE — a Loaded Dice Studios game. Virtual money only.">
+  <title>GAMBLE</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./assets/icons/icon-180.png">
+  <link rel="stylesheet" href="./css/game.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.js",
+      "three/addons/": "./vendor/three/addons/",
+      "rapier": "./vendor/rapier/rapier.mjs"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas" tabindex="0" aria-label="GAMBLE game view"></canvas>
+    <div id="ui-root"></div>
+    <div id="touch-root"></div>
+    <div id="fade" class="fade"></div>
+  </div>
+  <noscript><p class="noscript">GAMBLE needs JavaScript and a WebGL-capable browser.</p></noscript>
+  <script src="./src/gamesystem-kit.js"></script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

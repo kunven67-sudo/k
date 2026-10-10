@@ -1,0 +1,120 @@
+/* GAMBLE — base styles. Feature UIs (menus, phone, creator…) add their own scoped styles
+   under #ui-root via their modules; keep this file to fonts, tokens and global layout. */
+
+@font-face { font-family: 'Playfair Display'; src: url('../assets/fonts/playfair-display-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('../assets/fonts/playfair-display-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('../assets/fonts/playfair-display-latin-400-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Rye'; src: url('../assets/fonts/rye-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/inter-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/inter-latin-500-normal.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/inter-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/inter-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Bebas Neue'; src: url('../assets/fonts/bebas-neue-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Special Elite'; src: url('../assets/fonts/special-elite-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Monoton'; src: url('../assets/fonts/monoton-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+
+:root {
+  --ink: #0b0a0c;
+  --paper: #f3ead8;
+  --felt: #0f4a32;
+  --felt-dark: #0a3323;
+  --felt-light: #1a6b49;
+  --gold: #d8b25a;
+  --gold-bright: #f6d88a;
+  --gold-dark: #8a6a26;
+  --chip-red: #b3202a;
+  --chip-blue: #1f4fa3;
+  --chip-green: #1d7a3e;
+  --chip-black: #17161a;
+  --neon-pink: #ff3ea5;
+  --neon-cyan: #3ef2ff;
+  --danger: #e04545;
+  --font-casino: 'Playfair Display', Georgia, serif;
+  --font-western: 'Rye', 'Playfair Display', serif;
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Bebas Neue', 'Inter', sans-serif;
+  --font-type: 'Special Elite', 'Courier New', monospace;
+  --font-neon: 'Monoton', 'Bebas Neue', sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+#app { position: fixed; inset: 0; }
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+  background: #000;
+}
+
+#ui-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+#ui-root > * { pointer-events: auto; }
+#ui-root > .passthrough { pointer-events: none; }
+
+#touch-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 100;
+  transition: opacity var(--fade-ms, 600ms) ease;
+}
+.fade.on { opacity: 1; }
+
+.noscript {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 600 18px var(--font-ui);
+}
+
+/* Dev overlay (F3). Hidden from players: the game has no HUD. */
+.dev-overlay {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  padding: 6px 8px;
+  font: 11px/1.35 ui-monospace, Menlo, Consolas, monospace;
+  color: #b8ffcf;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+  white-space: pre;
+  pointer-events: none;
+  z-index: 200;
+}
