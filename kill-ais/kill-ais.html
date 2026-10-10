@@ -3176,6 +3176,7 @@ function updateViewmodel(dt, speed) {
   } else {
     /* no gun yet: hands reach out (ripping the cannon off, searching bodies) */
     const r = W.rip > 0 || W.search > 0 ? 1 : 0, wob = Math.sin(VM.t * 20) * 0.01 * r;
+    if (!r) { placeArm(VM.armR, elR, _wr, false); placeArm(VM.armL, elL, _wl, false); return; } /* empty hands stay down out of view */
     _pA.set(0.11 + wob, -0.19 - r * 0.05 + by0, -0.32 - r * 0.12); _e.set(-0.7 - r * 0.4, 0.25, 0.35, 'YXZ'); _qA.setFromEuler(_e); setHand(H.grip, _pA, _qA);
     placeArm(VM.armR, elR, wristOf(H.grip, _wr), true);
     if (!PL.armGone) { _pB.set(-0.11 - wob, -0.2 - r * 0.05 + by0, -0.32 - r * 0.12); _e.set(-0.2, -0.3, -0.5, 'YXZ'); _qB.setFromEuler(_e); setHand(H.under, _pB, _qB); placeArm(VM.armL, elL, wristOf(H.under, _wl), true); }
@@ -5946,7 +5947,7 @@ function frame(now) {
 /* test hook: run the game logic forward without drawing (cutscene waits get to finish too) */
 async function sim(sec, dt = 1 / 30) {
   const n = Math.ceil(sec / dt);
-  for (let i = 0; i < n; i++) { tick(dt, false); endFrameInput(); if (i % 3 === 2) await null; }
+  for (let i = 0; i < n; i++) { tick(dt, false); endFrameInput(); for (let k = 0; k < 4; k++) await null; }
 }
 function step(dt, rdt) {
   G.time += dt; G.stats.time += rdt;
@@ -5999,7 +6000,7 @@ async function boot() {
   hideEl('loading');
   if (saved && saved.v === 1) restore(saved); else { G.trophies = LS.get('killais:trophies', {}) || {}; showTitle(); }
   requestAnimationFrame((t) => { lastT = t; frame(t); });
-  window.__KA = { THREE, sim, BRC, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight };
+  window.__KA = { THREE, sim, BRC, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight };
 }
 boot().catch((err) => { console.error(err); const e = $('loadErr'); if (e) { e.style.display = 'block'; $('loadErrMsg').textContent = String(err && err.message || err); } });
 </script>
