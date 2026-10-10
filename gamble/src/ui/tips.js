@@ -61,12 +61,20 @@ const LOCAL = [
   ['Buffet Shrimp Supply “Holding,” Say Officials', 'Las gambas del bufé “aguantan”, según las autoridades', 'Officials did not define “holding.”', 'No definieron “aguantan”.'],
 ];
 
+// The DMV creator stores { first, last }; older saves may hold a plain string.
+function fullName(c) {
+  const n = c?.name ?? c?.firstName;
+  if (!n) return '';
+  if (typeof n === 'string') return n;
+  return [n.first, n.last].filter(Boolean).join(' ');
+}
+
 function lifeStories() {
   const out = [];
   try {
     const obits = save.obituaries();
     for (const o of obits.slice(0, 3)) {
-      const name = o.character?.name || o.character?.firstName || 'Local Resident';
+      const name = fullName(o.character) || 'Local Resident';
       const cause = o.cause || o.causeOfDeath;
       out.push([
         `${name} Remembered by Few, Missed by Fewer`,
@@ -76,7 +84,7 @@ function lifeStories() {
       ]);
     }
     const life = save.life || (save.hasLife() ? JSON.parse(localStorage.getItem('gamble.life.v1') || 'null') : null);
-    const name = life?.character?.name || life?.character?.firstName;
+    const name = fullName(life?.character);
     if (name) {
       out.push([
         `${name} Spotted Downtown, Looking “Like a Person With Plans”`,

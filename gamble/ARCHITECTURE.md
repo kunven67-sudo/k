@@ -229,8 +229,13 @@ speakers), routed through the `music` bus with room reverb.
   `zone:entered/left` and calls `audio.setRoom`.
 
 ### casino (`src/casino/`)
-- `buildEldoradoInterior(...)`, `Cage`, `SlotMachine`, `BlackjackTable`, `RouletteTable`,
-  `Ticket`. Games use `fairRandom()`; real house edge (slots ~92% RTP, roulette American 00).
+- Full contract: `src/casino/CONTRACT.md` (lanes, factory API, floor plan, rules, quality bar).
+- Shared: `chips.js` (per-casino chip counts, Nevada colours, buy-in/pay/take/colour-up),
+  `station.js` (`Station` base: seats, sit/stand, close-up camera, pointer picking, UI layer),
+  `tickets.js` (TITO vouchers as pocket items).
+- `buildEldoradoInterior(engine, physics, { tier, scene })` (index.js) → `{ group, zones,
+  interactables, stations, update(dt, ctx), dispose() }`; tables via `tables/index.js`, slots via
+  `slots/index.js`. Games use `fairRandom()`; real house edge (slots 88–95 % RTP, roulette 00).
 
 ## 7. Testing
 

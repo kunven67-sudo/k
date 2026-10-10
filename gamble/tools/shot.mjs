@@ -47,7 +47,7 @@ for (const s of steps) {
   if (s.press) await page.keyboard.press(s.press);
   if (s.type) await page.keyboard.type(s.type);
   if (s.eval) { try { const r = await page.evaluate(`(function(){ return eval(${JSON.stringify(s.eval)}); })()`); if (r !== undefined) console.log('eval:', JSON.stringify(r)); } catch (e) { logs.push('[eval] ' + e.message); } }
-  if (s.shot) { const p = `${out}-${String(n++).padStart(2, '0')}-${s.shot}.png`; await page.screenshot({ path: p }); console.log('saved', p); }
+  if (s.shot) { const p = `${out}-${String(n++).padStart(2, '0')}-${s.shot}.png`; await page.screenshot({ path: p, timeout: 300000 }); console.log('saved', p); }
 }
 console.log(logs.length ? logs.join('\n') : 'no console errors');
 await browser.close();
