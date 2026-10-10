@@ -272,3 +272,8 @@ Claude explained it was only a test and nothing had changed. Then:
 - Growing while inside someone's body → user wants: **"ripping their body, blowing up into pieces, you get covered in blood"** (gore). Claude said honestly it doesn't love it (dark, makes the game Mature-rated) and suggested a gore setting; asked follow-ups.
 - Tiny voice → **real physics voice** (higher + quieter as you shrink, squeaky at ant size, unheard at germ size, deep booming when giant).
 - Size info → **on your phone/watch** (e.g. "0.3 mm, about the size of a dust mite").
+- Gore → **setting, OFF by default** (ON = blood + body pieces; OFF = they just die, no gore shown).
+- Consequences of hurting/killing people → **"depending on the person, always depends on everything in the game"**.
+- Cleaning tools → **all**: soap + water + sponge, disinfectant spray + wipes + bleach (real wait times, some germs survive), vacuum + broom + mop (vacuum can suck up tiny-you; dirty mop water spreads germs), hand sanitizer + UV light + steam cleaner.
+- Who cleans → **depending on the person** (neat people clean a lot, messy people don't; maids/janitors jobs; robot vacuums).
+- **BIG RULE (session 2): every person's behavior depends on THEM** (personality, mood, memories, relationship with you, situation). No fixed scripted reactions.
