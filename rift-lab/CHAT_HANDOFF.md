@@ -315,3 +315,8 @@ Claude explained it was only a test and nothing had changed. Then:
 - People look → **Sims-like** (real proportions + faces, a bit smoothed, light on lag, clear emotions).
 - Cars → **full custom shop** (paint/wraps, rims/tires, engine tune, suspension, body kits, interior; mods change real driving).
 - Cooking → **hands-on (grab + drag) + a recipe helper app on the phone**; undercooked food carries real germs.
+- Truck/van/off-road brand → **Grizz** (off-road monsters, lifted trucks + jeeps).
+- Phone apps → **all**: map + GPS + weather, calls + texts + contacts (people text you first too), social media (people post videos of you, likes, going viral), bank + shopping + camera/gallery. (Plus spawn app + watch/size info.)
+- Tutorial → **tips the first time you do something** (never again after; can turn off in settings).
+- Starting money (mansion / pay mode) → **rich inventor** (sold inventions, own the mansion, still pay bills, taxes, staff, power).
+- Claude picked (realism rule): **the player needs the bathroom too**; god mode turns needs off.
