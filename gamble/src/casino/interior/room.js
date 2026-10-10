@@ -380,7 +380,7 @@ function buildCeiling(C) {
       add(new THREE.BoxGeometry(bw, 0.035, bd).translate(x, CEIL_Y - 0.012, z), M.gold, { castShadow: false });
     }
     add(new THREE.PlaneGeometry(w, d).rotateX(Math.PI / 2).translate(cx, CEIL_Y + D, cz), M.plasterWarm, { castShadow: false });
-    glows.add(new THREE.Vector3(cx, CEIL_Y + D - 0.01, cz), DOWN, [w * 1.05, d * 1.05], 0xffc27a, 0.22);
+    glows.add(new THREE.Vector3(cx, CEIL_Y + D - 0.01, cz), DOWN, [w * 1.05, d * 1.05], 0xffc27a, 0.42);
     const key = `${c.cx.toFixed(1)},${c.cz.toFixed(1)}`;
     c.kind = chand.has(key) ? 'chandelier' : (c.i + c.k) % 3 === 0 ? 'eye' : 'down';
     // Medallion ring.

@@ -29,7 +29,8 @@ export const BJ = {
   RchairC: 1.37,
   seatH: 0.5,
   dealer: new THREE.Vector3(0, 0, -0.66),
-  shoe: new THREE.Vector3(0.62, 0.76, -0.355),
+  shoe: new THREE.Vector3(0.6, 0.76, -0.36),
+  shoeYaw: -0.22, // mouth (shoe −x') toward −X, turned a little to the dealer
   discard: new THREE.Vector3(-0.64, 0.76, -0.37),
   dealerCards: new THREE.Vector3(0, 0.76, -0.235),
   rack: { x0: -0.3, x1: 0.3, z0: -0.462, z1: -0.305 },
@@ -365,34 +366,43 @@ export function buildBlackjackTable(group, { physics, limits, h17, tier }) {
   }
   const rolls = rackRolls(rackDenoms, rk);
 
-  // Shoe (dealer's left): black acrylic body, slanted front, the stack of cards inside.
-  const shoe = new THREE.Group();
-  shoe.position.copy(BJ.shoe);
-  shoe.rotation.y = -Math.PI / 2 - 0.25; // mouth toward the table centre / dealer's right
-  {
+  // Shoe (dealer's left): smoked acrylic body with a slanted front window and a brass mouth
+  // plate. Shoe frame: x' runs from the mouth (0) to the back (0.2), y up, z' across (±0.05). The
+  // mouth faces the dealer's right hand (−X), turned a little toward the dealer.
+  const shoeFrame = new THREE.Matrix4().compose(BJ.shoe, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), BJ.shoeYaw), new THREE.Vector3(1, 1, 1));
+  const smoked = new THREE.MeshStandardMaterial({ color: 0x15100e, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.86 });
+  smoked.name = 'shoe-acrylic';
+  const shoeBody = (() => {
     const prof = new THREE.Shape();
-    // Side profile (x along the shoe: 0 = mouth, 0.2 = back; y up).
     prof.moveTo(0, 0);
     prof.lineTo(0.2, 0);
     prof.lineTo(0.2, 0.1);
-    prof.lineTo(0.05, 0.1);
-    prof.lineTo(0.0, 0.035);
+    prof.lineTo(0.055, 0.1);
+    prof.lineTo(0.0, 0.03);
     prof.closePath();
-    const geo = new THREE.ExtrudeGeometry(prof, { depth: 0.1, bevelEnabled: true, bevelSize: 0.004, bevelThickness: 0.004, bevelSegments: 2 });
-    geo.translate(-0.02, 0, -0.05);
-    const m = new THREE.Matrix4().makeRotationY(Math.PI / 2);
-    parts.push({ geo: boxUV(geo, 0.3), mat: mats.plastic, matrix: new THREE.Matrix4().compose(BJ.shoe, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, shoe.rotation.y, 0)), new THREE.Vector3(1, 1, 1)).multiply(m) });
-    // Brass mouth plate.
-    parts.push({ geo: boxUV(roundedBox(0.105, 0.006, 0.03, 0.002), 0.3), mat: mats.brass, matrix: new THREE.Matrix4().compose(BJ.shoe, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, shoe.rotation.y, 0)), new THREE.Vector3(1, 1, 1)).multiply(trs(0, 0.034, 0.02, -1.0)) });
-  }
-  // The visible card block inside the shoe (scaled by what's left).
+    const geo = new THREE.ExtrudeGeometry(prof, { depth: 0.092, bevelEnabled: true, bevelSize: 0.004, bevelThickness: 0.004, bevelSegments: 2, curveSegments: 2 });
+    geo.translate(0, 0, -0.046);
+    const m = new THREE.Mesh(boxUV(geo, 0.3), smoked);
+    m.applyMatrix4(shoeFrame);
+    m.castShadow = true;
+    m.renderOrder = 1;
+    return m;
+  })();
+  // Brass mouth plate along the bottom of the window + the base runner.
+  parts.push({ geo: boxUV(roundedBox(0.018, 0.006, 0.104, 0.002), 0.3), mat: mats.brass, matrix: shoeFrame.clone().multiply(trs(0.004, 0.028, 0)) });
+  parts.push({ geo: boxUV(roundedBox(0.21, 0.008, 0.108, 0.003), 0.3), mat: mats.brass, matrix: shoeFrame.clone().multiply(trs(0.1, 0.004, 0)) });
+  // The cards inside (scaled along x' by what's left in the shoe).
   const paperMat = mat('paper', { color: 0xf2eee2, dirt: 0.15 });
-  const stackGeo = boxUV(new THREE.BoxGeometry(0.066, 0.09, 0.16), 0.1);
-  stackGeo.translate(0, 0, -0.08);
+  const stackGeo = boxUV(new THREE.BoxGeometry(1, 0.078, 0.066), 0.1);
+  stackGeo.translate(0.5, 0.05, 0);
   const shoeStack = new THREE.Mesh(stackGeo, paperMat);
-  shoeStack.position.copy(BJ.shoe).add(new THREE.Vector3(0, 0.052, 0));
-  shoeStack.rotation.set(0, shoe.rotation.y + Math.PI / 2 + Math.PI / 2, 0);
-  shoeStack.scale.set(1, 0.85, 1);
+  shoeStack.matrixAutoUpdate = false;
+  shoeStack.userData.frame = shoeFrame.clone().multiply(trs(0.06, 0, 0));
+  shoeStack.userData.setFraction = (f) => {
+    shoeStack.matrix.copy(shoeStack.userData.frame).multiply(new THREE.Matrix4().makeScale(Math.max(0.003, 0.13 * f), 1, 1));
+    shoeStack.matrixWorldNeedsUpdate = true;
+  };
+  shoeStack.userData.setFraction(1);
 
   // Discard holder: clear acrylic box + its card stack.
   const acrylic = new THREE.MeshStandardMaterial({ color: 0xdfe8ea, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.28, depthWrite: false });
@@ -442,8 +452,8 @@ export function buildBlackjackTable(group, { physics, limits, h17, tier }) {
     const dir = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
     const right = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a));
     const cam = {
-      pos: new THREE.Vector3(0, BJ.feltY, BJ.cz).addScaledVector(dir, 1.6).addScaledVector(right, 0.2).setY(1.36),
-      target: new THREE.Vector3(0, 0, BJ.cz).addScaledVector(dir, 0.42).addScaledVector(right, 0.03).setY(0.86),
+      pos: new THREE.Vector3(0, BJ.feltY, BJ.cz).addScaledVector(dir, 1.38).addScaledVector(right, 0.2).setY(1.64),
+      target: new THREE.Vector3(0, 0, BJ.cz).addScaledVector(dir, 0.48).addScaledVector(right, 0.02).setY(0.72),
     };
     seats.push({
       pos: feet,
@@ -460,7 +470,7 @@ export function buildBlackjackTable(group, { physics, limits, h17, tier }) {
   // Merge statics per material.
   const statics = mergeByMaterial(parts);
   for (const m of statics) group.add(m);
-  group.add(...felts, rolls, shoeStack, dbox, discardStack, paddle, sign);
+  group.add(...felts, rolls, shoeBody, shoeStack, dbox, discardStack, paddle, sign);
   for (const m of [shoeStack, discardStack, paddle]) {
     m.castShadow = true;
     m.receiveShadow = true;
@@ -485,6 +495,7 @@ export function buildBlackjackTable(group, { physics, limits, h17, tier }) {
     seats,
     statics: [...statics, ...felts, rolls],
     shoeStack,
+    shoeFrame,
     discardStack,
     colliders: colliders.filter(Boolean),
     chairColliders,

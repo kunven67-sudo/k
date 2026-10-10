@@ -115,7 +115,7 @@ export function buildFountain(C) {
     new THREE.RingGeometry(0.85, R_BOWL - 0.06, 96, 2).rotateX(-Math.PI / 2).translate(X, Y_BOWL - 0.035, Z),
     new THREE.CircleGeometry(R_UP - 0.07, 48).rotateX(-Math.PI / 2).translate(X, Y_UP - 0.03, Z),
   ];
-  const surfMesh = new THREE.Mesh(mergeGeometries(surf.map((g) => g.toNonIndexed()), false), waterMat);
+  const surfMesh = new THREE.Mesh(mergeGeometries(surf.map((g) => (g.index ? g.toNonIndexed() : g)), false), waterMat);
   surfMesh.renderOrder = 1;
   wGroup.add(surfMesh);
   // Overflow sheet around the lower bowl (flares out a little as it falls).
@@ -314,9 +314,9 @@ function fishGeometry() {
   }
   body.computeVertexNormals();
   body.rotateX(-Math.PI / 2 + 0.5);
-  parts.push(body.toNonIndexed());
+  parts.push(body.index ? body.toNonIndexed() : body);
   const tail = new THREE.ConeGeometry(0.14, 0.18, 3).scale(1, 1, 0.25).rotateX(Math.PI).translate(0, 0.02, 0.32);
-  parts.push(tail.toNonIndexed());
+  parts.push(tail.index ? tail.toNonIndexed() : tail);
   return mergeGeometries(parts, false);
 }
 
@@ -345,7 +345,7 @@ function arcTube(p0, p1, lift, r0, r1) {
     pos.setXYZ(i, pp.x + q.x, pp.y + q.y, pp.z + q.z);
   }
   g.computeVertexNormals();
-  return g.toNonIndexed();
+  return g.index ? g.toNonIndexed() : g;
 }
 
 function bendSheet(g, yTop, yBot) {
@@ -374,7 +374,7 @@ const GLSL_NOISE = /* glsl */ `
   }`;
 
 function waterSurfaceMat() {
-  const m = new THREE.MeshStandardMaterial({ color: 0x174a4c, roughness: 0.05, metalness: 0.0, transparent: true, opacity: 0.78, envMapIntensity: 1.6, depthWrite: false });
+  const m = new THREE.MeshStandardMaterial({ color: 0x0f3436, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.74, envMapIntensity: 0.7, depthWrite: false });
   const uniforms = { uTime: { value: 0 }, uDrops: { value: Array.from({ length: DROPS }, () => new THREE.Vector3()) } };
   m.userData.uniforms = uniforms;
   m.onBeforeCompile = (sh) => {
@@ -452,10 +452,10 @@ function fallingWaterMat() {
         float s2 = fnoise(vec2(across * 90.0 + 7.0, flow * 4.5 - uTime));
         float streak = smoothstep(0.35, 0.95, s1 * 0.6 + s2 * 0.5);
         float fres = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.0);
-        vec3 deep = vec3(0.35, 0.55, 0.56);
-        vec3 col = mix(deep, vec3(1.0, 0.98, 0.94), streak * 0.7 + fres * 0.35);
-        float a = 0.06 + streak * 0.42 + fres * 0.22;
-        gl_FragColor = vec4(col * 1.15, a);
+        vec3 deep = vec3(0.22, 0.36, 0.36);
+        vec3 col = mix(deep, vec3(0.95, 0.96, 0.92), streak * 0.65 + fres * 0.3);
+        float a = 0.025 + streak * 0.3 + fres * 0.28;
+        gl_FragColor = vec4(col, a);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,

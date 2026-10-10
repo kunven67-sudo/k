@@ -57,7 +57,7 @@ export const CAGE_WINDOWS = [45.0, 48.3, 51.6, 54.9]; // window centres (z) alon
 export const KIOSKS = [{ x: -74.0, z: 41.2 }, { x: -74.0, z: 60.8 }];
 export const ATM = { x: -74.0, z: 62.4 };
 
-export const BAR = { x0: -40.0, x1: -16.0, z0: 86.0, z1: 99.6, front: 91.6, back: 98.75 };
+export const BAR = { x0: -40.0, x1: -16.0, z0: 86.0, z1: 99.6, front: 95.2, back: 98.15 };
 
 export const RESTROOMS = { x0: -79.6, x1: -76.2, z0: 84.0, z1: 99.6 };
 export const ELEVATORS = { x0: -79.6, x1: -73.0, z0: 14.0, z1: 29.0, doors: [16.4, 19.6, 22.8, 26.0] };
@@ -93,8 +93,8 @@ export const CLOSED_TABLES = [
 ];
 export const PIT_PODIUM = { x: PIT.x, z: PIT.z + 0.4 };
 
-// Slot banks. Bank `position` is the centre of the machine row(s); arrangement 'row' backs onto
-// a wall or rail, 'back-to-back' is an island with machines on both sides. Pitch 0.78 m.
+// Slot banks. Bank `position` is the machines' front plane for a 'row' (cabinets ~0.6 m deep
+// behind it, backs to a wall) and the spine for 'back-to-back' islands. Pitch 0.78 m.
 // Aisles between banks are ≥ 2.4 m (checked in dev: __casino.checkAisles()).
 export const SLOT_BANKS = [
   // North-west block — Wild West Gold (islands of 2×4).
@@ -108,8 +108,8 @@ export const SLOT_BANKS = [
   { id: 'sp-b1', theme: 'space', count: 8, arrangement: 'back-to-back', x: -38.2, z: 28.0, yaw: 0, denom: 0.05 },
   { id: 'sp-b2', theme: 'space', count: 8, arrangement: 'back-to-back', x: -32.2, z: 28.0, yaw: 0, denom: 0.01 },
   // North wall rows (backs to the wall, players stand south of them).
-  { id: 'dr-n1', theme: 'dragon', count: 6, arrangement: 'row', x: -65.0, z: 13.45, yaw: 0, denom: 0.01 },
-  { id: 'dr-n2', theme: 'dragon', count: 6, arrangement: 'row', x: -36.0, z: 13.45, yaw: 0, denom: 0.01 },
+  { id: 'dr-n1', theme: 'dragon', count: 6, arrangement: 'row', x: -65.0, z: 13.15, yaw: 0, denom: 0.01 },
+  { id: 'dr-n2', theme: 'dragon', count: 6, arrangement: 'row', x: -36.0, z: 13.15, yaw: 0, denom: 0.01 },
   // Classic corner (lever machines) by the chamfer door.
   { id: 'cl-1', theme: 'classic-fruit', count: 6, arrangement: 'back-to-back', x: -24.6, z: 24.4, yaw: 0, denom: 1 },
   { id: 'cl-2', theme: 'classic-fruit', count: 6, arrangement: 'back-to-back', x: -24.6, z: 31.2, yaw: 0, denom: 0.25 },
@@ -117,7 +117,7 @@ export const SLOT_BANKS = [
   { id: 'dr-e1', theme: 'dragon', count: 8, arrangement: 'back-to-back', x: -25.4, z: 68.0, yaw: Math.PI / 2, denom: 0.01 },
   { id: 'dr-e2', theme: 'dragon', count: 8, arrangement: 'back-to-back', x: -25.4, z: 77.4, yaw: Math.PI / 2, denom: 0.05 },
   // Along the Virginia St wall, south of the foyer (backs to the wall, players face west).
-  { id: 'ww-e1', theme: 'wild-west', count: 6, arrangement: 'row', x: -13.45, z: 72.0, yaw: -Math.PI / 2, denom: 1 },
+  { id: 'ww-e1', theme: 'wild-west', count: 6, arrangement: 'row', x: -13.1, z: 72.0, yaw: -Math.PI / 2, denom: 1 },
 ];
 
 // ---- Spawns (feet, view yaw = looking along (-sin, -cos)) -------------------------------------

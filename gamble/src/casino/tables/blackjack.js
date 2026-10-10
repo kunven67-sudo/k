@@ -36,9 +36,13 @@ const AX = new THREE.Vector3(1, 0, 0);
 const AZ = new THREE.Vector3(0, 0, 1);
 const STACK_ORDER = [1, 2.5, 5, 25, 100, 500, 1000];
 
-const MOUTH = new THREE.Vector3(0.548, 0.792, -0.33);
-const OUT = new THREE.Vector3(0.43, 0.7615, -0.3);
+// Shoe mouth / where the left hand slides each card out to (computed from the shoe frame).
+const MOUTH = new THREE.Vector3();
+const OUT = new THREE.Vector3();
 const RACK_FRONT = new THREE.Vector3(0, 0.76, -0.285);
+
+/** The pure-rules view of a table hand (rules work on card values, the table on card handles). */
+const rv = (hand) => ({ cards: hand.vals, bet: hand.bet, fromSplit: hand.fromSplit, splitAces: hand.splitAces, doubled: hand.doubled });
 
 /** Card orientation from yaw, flip angle (0 = face up, π = face down) and tilt. */
 function cardQ(yaw, flip, tilt = 0, out = new THREE.Quaternion()) {
@@ -60,6 +64,15 @@ export class BlackjackTable extends TableBase {
     const built = buildBlackjackTable(group, { physics: o.physics, limits, h17, tier: o.tier });
     super(o, { group, seats: built.seats, label: 'blackjack', game: 'blackjack' });
     this.built = built;
+    MOUTH.set(0.012, 0.036, 0).applyMatrix4(built.shoeFrame);
+    OUT.set(-0.16, 0.0015, 0.015).applyMatrix4(built.shoeFrame);
+    // The next card's back shows through the shoe's front window.
+    {
+      const q = new THREE.Quaternion().setFromRotationMatrix(built.shoeFrame);
+      const yaw = new THREE.Euler().setFromQuaternion(q, 'YXZ').y;
+      const p = new THREE.Vector3(0.032, 0.064, 0).applyMatrix4(built.shoeFrame);
+      this._windowCard = this.cards.spawn(0, p, cardQ(yaw + Math.PI / 2, Math.PI, -0.9));
+    }
     this.colliders = built.colliders;
     this.chairColliders = built.chairColliders;
     this.limits = limits;
@@ -82,13 +95,14 @@ export class BlackjackTable extends TableBase {
     this.dealerCards = [];
     this.phase = 'idle';
     this.footprint = { w: 3.0, d: 2.3 };
+    this._npcTarget = Math.min(this.low ? 1 : 6, o.npcs ?? 2);
     this.pitAnchor = new THREE.Vector3(1.1, 1.8, -1.6);
 
     // Dealer (hands resting on the edge in front of the rack).
     this.createDealer(
       BJ.dealer,
-      new THREE.Vector3(0.16, 0.778, -0.452),
-      new THREE.Vector3(-0.16, 0.778, -0.452),
+      new THREE.Vector3(0.36, 0.782, -0.43),
+      new THREE.Vector3(-0.36, 0.782, -0.43),
       () => this._lookTarget()
     );
     // NPC players: low tier keeps it to the dealer + one.
@@ -139,7 +153,7 @@ export class BlackjackTable extends TableBase {
   _stackPos(spot, k, n, row = 0, out = new THREE.Vector3()) {
     const r = BJ.Rstack + row * 0.042;
     const step = 0.044 / r;
-    const a = spot.a + 0.085 + (k - (n - 1) / 2) * step;
+    const a = spot.a + 0.012 + (k - (n - 1) / 2) * step;
     return polar(r, a, BJ.feltY, out);
   }
 
@@ -147,7 +161,7 @@ export class BlackjackTable extends TableBase {
 
   _syncShoeStack() {
     const left = this.shoe.remaining / (this.shoe.decks * 52);
-    this.built.shoeStack.scale.z = Math.max(0.02, left);
+    this.built.shoeStack.userData.setFraction(left);
     this.built.discardStack.scale.y = Math.max(0.0001, this.discards * 0.00029);
     this.built.discardStack.position.y = BJ.feltY + (this.discards * 0.00029) / 2 + 0.002;
   }
@@ -167,8 +181,8 @@ export class BlackjackTable extends TableBase {
   restNpcHands(npc) {
     const s = this.spots[npc.seat] || { a: BJ.seatA[npc.seat], right: new THREE.Vector3(Math.cos(BJ.seatA[npc.seat]), 0, -Math.sin(BJ.seatA[npc.seat])) };
     const base = polar(BJ.Rf + 0.03, s.a, BJ.feltY + 0.06);
-    npc.hands.rest('L', this.W(base.clone().addScaledVector(s.right, -0.13)), ORIENT.palmDownIn);
-    npc.hands.rest('R', this.W(base.clone().addScaledVector(s.right, 0.13)), ORIENT.palmDownIn);
+    npc.hands.rest('L', this.W(base.clone().addScaledVector(s.right, -0.18)), ORIENT.palmDownIn);
+    npc.hands.rest('R', this.W(base.clone().addScaledVector(s.right, 0.18)), ORIENT.palmDownIn);
   }
 
   _syncNpcStacks(npc) {
@@ -280,6 +294,7 @@ export class BlackjackTable extends TableBase {
     await this.tw.until(() => {
       const pl = this._playerSpot();
       if (pl) {
+        if (this._pendingDrops > 0 || this.drag) return false;
         if (this._dealRequested) return true;
         const anyNpc = this.spots.some((s) => s.owner !== 'player' && s.betPile);
         // A seated player who isn't betting doesn't hold the others up forever.
@@ -344,6 +359,7 @@ export class BlackjackTable extends TableBase {
       s.hands = [{ spot: s, idx: 0, cards: [], vals: [], bet: s.betPile.value, betPile: s.betPile, dblPile: null, fromSplit: false, splitAces: false, doubled: false, done: false, result: null }];
       s.roundStake = s.betPile.value;
       s.roundBack = 0;
+      if (s.owner === 'player') s.lastBet = s.betPile.value;
     }
     this.phase = 'dealing';
     this._refreshUI();
@@ -417,8 +433,8 @@ export class BlackjackTable extends TableBase {
   /** Shoe → (left hand slides it out) → right hand carries it to `to` and lays it down. */
   async _cardFromShoe(v, to, yaw, faceUp, { reveal = faceUp } = {}) {
     const d = this.dealer;
-    const yaw0 = Math.PI / 2;
-    const c = this.cards.spawn(v, MOUTH, cardQ(yaw0, Math.PI, 0.32));
+    const yaw0 = BJ.shoeYaw + Math.PI / 2;
+    const c = this.cards.spawn(v, MOUTH, cardQ(yaw0, Math.PI, -0.45));
     if (!c) return null;
     // Left hand: pull the card out of the shoe onto the felt.
     const mouthW = this.W(MOUTH.clone().add(_v.set(-0.02, 0.012, 0)));
@@ -429,7 +445,7 @@ export class BlackjackTable extends TableBase {
     await this.tw.to(0.17, (k) => {
       c.pos.lerpVectors(p0, OUT, k);
       c.pos.y += 0.006 * Math.sin(k * Math.PI);
-      cardQ(yaw0, Math.PI, 0.32 * (1 - k), c.quat);
+      cardQ(yaw0, Math.PI, -0.45 * (1 - k), c.quat);
       c.commit();
       d.hands.set('L', this.W(_v.copy(c.pos).add(_v2.set(0.03, 0.012, 0))), { shape: 'flat', rot: ORIENT.palmDown });
     }, ease.out);
@@ -546,7 +562,7 @@ export class BlackjackTable extends TableBase {
     for (;;) {
       const t = handTotal(hand.vals).total;
       if (t >= 21 || hand.doubled || (hand.splitAces && hand.cards.length >= 2)) break;
-      const legal = legalActions(hand, s.hands.length, this.rules);
+      const legal = legalActions(rv(hand), s.hands.length, this.rules);
       if (!legal.hit) break;
       let act;
       if (s.owner === 'player') act = await this._askPlayer(hand, legal);
@@ -849,7 +865,7 @@ export class BlackjackTable extends TableBase {
   async _settleHand(hand, natural) {
     const s = hand.spot;
     const dealerVals = this.dealerCards.map((c) => c.v);
-    const r = natural ? { result: 'blackjack', returned: hand.bet * (1 + this.rules.blackjackPays) } : settleHand(hand, dealerVals, this.rules);
+    const r = natural ? { result: 'blackjack', returned: hand.bet * (1 + this.rules.blackjackPays) } : settleHand(rv(hand), dealerVals, this.rules);
     if (isBust(hand.vals)) Object.assign(r, { result: 'bust', returned: 0 });
     hand.result = r.result;
     this._focusSpot = s;
@@ -996,8 +1012,8 @@ export class BlackjackTable extends TableBase {
     spot.owner = 'player';
     this.seatPlayer(seat);
     const base = polar(BJ.Rf + 0.035, spot.a, BJ.feltY + 0.062);
-    this.playerHands.rest('L', this.W(base.clone().addScaledVector(spot.right, -0.14)), ORIENT.palmDownIn);
-    this.playerHands.rest('R', this.W(base.clone().addScaledVector(spot.right, 0.14)), ORIENT.palmDownIn);
+    this.playerHands.rest('L', this.W(base.clone().addScaledVector(spot.right, -0.19)), ORIENT.palmDownIn);
+    this.playerHands.rest('R', this.W(base.clone().addScaledVector(spot.right, 0.19)), ORIENT.palmDownIn);
     this.tui.setPlaque(`Blackjack ${money(this.limits.min)} – ${money(this.limits.max)}`, `${tt(this.rules.h17 ? 'h17' : 's17')} · ${tt('bjPays')}`);
     window.addEventListener('keydown', this._keys);
     this._syncMyStacks();
@@ -1064,11 +1080,11 @@ export class BlackjackTable extends TableBase {
   _requestDeal() {
     const spot = this._playerSpot();
     if (!spot || this.phase !== 'betting') return;
-    if (!spot.betPile || spot.betPile.value < this.limits.min) {
+    const pending = (this._pendingDrops || 0) > 0;
+    if (!spot.betPile || (spot.betPile.value < this.limits.min && !pending)) {
       this.toast(tt('under', { min: money(this.limits.min) }));
       return;
     }
-    spot.lastBet = spot.betPile.value;
     this._dealRequested = true;
   }
 
@@ -1083,7 +1099,15 @@ export class BlackjackTable extends TableBase {
     const src = from || this._stackPos(spot, 1, 3).setY(BJ.feltY + 0.05);
     const vals = Object.keys(counts).map(Number).sort((a, b) => b - a);
     const n = vals.reduce((a, v) => a + counts[v], 0);
-    for (const v of vals) for (let i = 0; i < counts[v]; i++) await this.dropChip(spot.betPile, kindOf(v), src, n > 6 ? 0.08 : 0.16);
+    // Chips in the air still count as being bet: Deal waits for them to land.
+    this._pendingDrops = (this._pendingDrops || 0) + n;
+    const pile = spot.betPile;
+    for (const v of vals) {
+      for (let i = 0; i < counts[v]; i++) {
+        await this.dropChip(pile, kindOf(v), src, n > 6 ? 0.08 : 0.16);
+        this._pendingDrops--;
+      }
+    }
     if (spot.betPile.value >= 100 && !this._calledChecks) {
       this._calledChecks = true;
       this.dsay('d.checks');

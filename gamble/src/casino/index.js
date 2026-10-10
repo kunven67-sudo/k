@@ -27,6 +27,9 @@ import { buildRoom } from './interior/room.js';
 import { Chandeliers, eyeDomes, casinoSigns } from './interior/fixtures.js';
 import { DoorSet } from './interior/doors.js';
 import { buildFountain } from './interior/fountain.js';
+import { buildAreas } from './interior/areas.js';
+import { buildCage, Cage } from './cage.js';
+import { FloorPeople } from './npcs.js';
 import { CasinoSound, patchZoneAmbience } from './interior/sounds.js';
 import { toast } from '../ui/kit.js';
 import {
@@ -80,6 +83,8 @@ export async function buildEldoradoInterior(engine, physics, { tier, scene, rng 
   const chand = new Chandeliers(C);
   for (const [x, z, s] of CHANDELIERS) chand.add(x, z, s);
   const fountain = buildFountain(C);
+  const areas = buildAreas(C);
+  const cageGeo = buildCage(C);
 
   // ---- doors (Virginia St ×3 pairs, 4th St ×2 pairs, chamfer corner ×2 pairs) ----
   const doors = new DoorSet({ physics, mats: M });
@@ -130,6 +135,21 @@ export async function buildEldoradoInterior(engine, physics, { tier, scene, rng 
     spots.add(B.x, B.z, 2.6, 0.22, { 'classic-fruit': 0xffc070, 'wild-west': 0xffa860, space: 0x80b0ff, dragon: 0xff7060 }[B.theme] ?? 0xffd0a0);
   }
   for (const T of TABLES) spots.add(T.x, T.z, 2.4, 0.38, 0xffe0b0);
+
+  // ---- people (staff, slot players, a server) and the cage / kiosk / ATM dialogs ----
+  let people = null;
+  try {
+    people = new FloorPeople(C, { tier, banks, cageStand: cageGeo.stand, barStand: areas.bar ? { pos: areas.bar.stand, x0: areas.bar.x0, x1: areas.bar.x1 } : null });
+    C.updaters.push((dt, ctx, st) => people.update(dt, ctx, st));
+    C.disposers.push(() => people.dispose());
+  } catch (e) {
+    console.warn('[casino] people failed', e);
+  }
+  // Lane B's tables use the pit boss as the anchor for his lines.
+  if (people?.pitBoss) for (const st of stations) st.pitBoss = people.pitBoss.human;
+  C.cage = new Cage(C, people);
+  C.disposers.push(() => C.cage.dispose());
+  if (C.escalatorTex) C.updaters.push((dt) => (C.escalatorTex.offset.y = (C.escalatorTex.offset.y - dt * 0.45) % 1));
 
   // ---- bake the floor now that every light footprint is known, then build the batch ----
   for (const b of baked) {
@@ -266,6 +286,11 @@ export async function buildEldoradoInterior(engine, physics, { tier, scene, rng 
     state,
     coffers: room.coffers,
     fountain,
+    areas,
+    get people() {
+      return people;
+    },
+    cage: C.cage,
     nearestEntrance: (p) => Math.min(...entrances.map((e) => e.distanceTo(p))),
     colliderCount: colliders.count,
     isInside,

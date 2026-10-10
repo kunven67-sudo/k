@@ -4,12 +4,12 @@ Owner: lane C. Files: `src/casino/slots/**`, `dev/slots.html|js`, `tools/slot-si
 
 ## Checklist
 - [x] Math: PAR sheets per theme (`math/*.js`) + `tools/slot-sim.mjs` ≥ 10M spins each (see table below)
-- [ ] Symbol art (canvas) per theme
-- [ ] Cabinets: video upright + retro mechanical stepper, swivel stool
-- [ ] Play flow: bills / TITO in, credits, bet/lines, spin/lever, reels, rollup, big win, free spins
-- [ ] Cash out → TITO print; hand pay ≥ $1,200 with W-2G
-- [ ] createSlotBank (row / back-to-back), seatNpc/unseatNpc
-- [ ] Dev page `dev/slots.html`
+- [x] Symbol art (canvas) per theme — `art/{classic,west,space,dragon}.js`, atlases `art/atlas.js`, signage `art/signage.js` (review: `dev/slots.html?view=symbols`)
+- [~] Cabinets: assembled in `index.js` (first screenshots OK: bank of 4 West renders, NPC seated). Geometry (`cabinet/video.js`, `cabinet/stepper.js`, `cabinet/stool.js`, LED/button materials `cabinet/materials.js`), stepper drums `reels3d.js`, video screen `screen.js`, sounds `sound.js` — NOT yet assembled/viewed (next: machine.js + index.js bank + dev room)
+- [~] Play flow written (`machine.js` director, `ui.js` wallet/bar, keys) — being debugged (screen canvas: reels not visible yet)
+- [~] Cash out → TITO print; hand pay ≥ $1,200 with W-2G (`handpay.js`) — written, untested
+- [~] createSlotBank (row / back-to-back), seatNpc/unseatNpc — written, row tested
+- [~] Dev page `dev/slots.html` (room, all themes, player, NPCs, `?view=symbols|signs|screen`, `__step`)
 - [ ] Perf numbers for a bank of 8
 
 ## Decisions

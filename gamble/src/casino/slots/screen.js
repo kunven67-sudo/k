@@ -70,7 +70,7 @@ export class VideoScreen {
   // ---- reel control -------------------------------------------------------------------------------
 
   stripOf(r) {
-    return this.m.strips[this.reels[r].set].keys;
+    return this.m.strips[this.reels[r].set][r].keys;
   }
 
   spinStart(set = 'base') {
@@ -634,7 +634,7 @@ export class VideoScreen {
     const { x: X, y: Y, cell: C } = REEL;
     g.save();
     g.fillStyle = 'rgba(8,6,12,.94)';
-    g.fillRect(X - 8, Y - 8, C * 5 + 16, C * 3 + 16 + 40);
+    g.fillRect(X - 8, Y - 8, C * 5 + 16, C * 3 + 16 + 46);
     bevelText(g, t('slots.screen.paytable'), 256, Y + 12, { font: `400 28px ${FONTS.display}`, fill: metalGrad(g, 0, Y, 0, Y + 24, METAL.gold), inkW: 4, tracking: 3 });
     const pays = this.par.pays;
     const keys = Object.keys(pays).filter((k) => pays[k].some((v) => v > 0));
@@ -652,7 +652,7 @@ export class VideoScreen {
     const help = this.par.kind === 'ways' ? t('slots.screen.payHelpWays') : t('slots.screen.payHelpLines');
     const feat = { 'wild-west': 'payHelpWest', space: 'payHelpSpace', dragon: 'payHelpDragon' }[this.theme];
     wrapText(g, `${help} ${t(`slots.screen.${feat}`)}`, 256, Y + 34 + Math.ceil(keys.length / 2) * 46 + 4, 480, 18, `500 15px ${FONTS.ui}`, '#d8d0c0');
-    bevelText(g, t('slots.screen.touchToClose'), 256, Y + C * 3 + 22, { font: `400 18px ${FONTS.display}`, fill: 'rgba(255,255,255,.6)', inkW: 0, inner: null, shadow: false });
+    bevelText(g, t('slots.screen.touchToClose'), 256, Y + C * 3 + 32, { font: `400 18px ${FONTS.display}`, fill: 'rgba(255,255,255,.6)', inkW: 0, inner: null, shadow: false });
     g.restore();
   }
 

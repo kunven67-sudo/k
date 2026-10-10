@@ -152,8 +152,9 @@ export function fillGrid(m, stops, set = 'base', grid = new Int8Array(CELLS)) {
  */
 export function evalLines(m, grid, wins = null, lineMult = 1) {
   const { lines, pays, W, S, C } = m;
+  const nLines = m._nLines || lines.length;
   let total = 0;
-  for (let li = 0; li < lines.length; li++) {
+  for (let li = 0; li < nLines; li++) {
     const L = lines[li];
     let wildRun = 0;
     while (wildRun < REELS && grid[L[wildRun]] === W) wildRun++;
@@ -232,7 +233,7 @@ export function countSym(grid, s) {
 /** Wins of one grid as a multiple of the total bet (lines: all lines played at 1 credit each). */
 function gridWin(m, grid, wins, mult = 1) {
   if (m.kind === 'ways') return evalWays(m, grid, wins, mult) / m.waysUnit;
-  return evalLines(m, grid, wins, mult) / m.lines.length;
+  return evalLines(m, grid, wins, mult) / (m._nLines || m.lines.length);
 }
 
 // ---- features -------------------------------------------------------------------------------------
@@ -376,7 +377,9 @@ function cellsOf(grid, s) {
  * With { detail: true } also: stops, landed (pre-feature grid), grid (after expansion), wins
  * (line/ways/scatter), expanded reels, free: {spins,total}, holdSpin: {...}, coinFaces.
  */
-export function playSpin(m, rng, { detail = false, stops: forced = null } = {}) {
+export function playSpin(m, rng, { detail = false, stops: forced = null, lines = 0 } = {}) {
+  // Line games: only the first `lines` paylines are live (each pays per credit on that line).
+  m._nLines = m.kind === 'lines' ? Math.max(1, Math.min(m.lines.length, lines || m.lines.length)) : 0;
   const stops = forced ? Int16Array.from(forced) : spinStops(m, rng, 'base');
   const grid = detail ? new Int8Array(CELLS) : m._grid;
   fillGrid(m, stops, 'base', grid);

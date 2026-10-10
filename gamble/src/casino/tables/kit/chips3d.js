@@ -60,11 +60,11 @@ function drawTop(g, k, x0, y0, S) {
   }
   // Molded ring and inlay.
   g.beginPath();
-  g.arc(cx, cy, rr * 0.74, 0, Math.PI * 2);
+  g.arc(cx, cy, rr * 0.63, 0, Math.PI * 2);
   g.strokeStyle = spot;
   g.lineWidth = S * 0.018;
   g.stroke();
-  const inlayR = rr * 0.66;
+  const inlayR = rr * 0.55;
   const ig = g.createRadialGradient(cx - inlayR * 0.3, cy - inlayR * 0.3, inlayR * 0.1, cx, cy, inlayR);
   if (k === WHEEL_KIND) {
     ig.addColorStop(0, '#ffffff');
@@ -101,12 +101,12 @@ function drawTop(g, k, x0, y0, S) {
   }
   // Curved house text around the inlay.
   g.fillStyle = ink;
-  g.font = `700 ${S * 0.068}px "Playfair Display", Georgia, serif`;
+  g.font = `700 ${S * 0.056}px "Playfair Display", Georgia, serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   const text = 'ELDORADO · RENO NEVADA · ';
   const chars = [...text];
-  const rt = inlayR * 0.8;
+  const rt = inlayR * 0.79;
   for (let i = 0; i < chars.length; i++) {
     const a = -Math.PI / 2 + (i / chars.length) * Math.PI * 2;
     g.save();
@@ -117,7 +117,7 @@ function drawTop(g, k, x0, y0, S) {
   }
   // Denomination.
   const label = denomLabel(d.v);
-  g.font = `700 ${S * (label.length > 2 ? 0.22 : 0.27)}px "Playfair Display", Georgia, serif`;
+  g.font = `700 ${S * (label.length > 2 ? 0.18 : 0.22)}px "Playfair Display", Georgia, serif`;
   g.fillStyle = d.v === 1 ? '#22396e' : d.v === 1000 ? '#3a2a06' : hex(d.color === 0x1b1b1d ? 0x1b1b1d : d.color);
   g.fillText(label, cx, cy + S * 0.012);
   g.restore();

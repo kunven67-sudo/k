@@ -151,16 +151,25 @@ export function buildVideoCabinet({ kind = 'lines', denomColor = 0xffd23a, tier 
 
   // ---- screen + bezel -----------------------------------------------------------------------------
   const S = D.screen;
-  const sp = slopedPanel(S.w, S.z0, S.y0, S.z1, S.y1, 0.01, 0, 0.004);
+  // the glass sits in a recess: a backing slab behind it, gloss frame bars proud of it
+  const sp = slopedPanel(S.w, S.z0, S.y0, S.z1, S.y1, 0.0, 0, 0.0);
   const bezel = 0.03;
-  const bp = slopedPanel(S.w + bezel * 2, S.z0, S.y0 - 0.02, S.z1, S.y1 + 0.02, 0.03, 0, -0.004);
+  const bp = slopedPanel(S.w + bezel * 2, S.z0, S.y0 - 0.02, S.z1, S.y1 + 0.02, 0.03, 0, -0.03);
   bag.add('black', bp.geo, bp.matrix, { uvTile: 0.5 });
-  // chrome bezel frame strips (thin) around the glass
+  const dir = new THREE.Vector3(0, S.y1 - S.y0, S.z1 - S.z0).normalize();
   for (const s of [-1, 1]) {
-    const fr = slopedPanel(0.01, S.z0, S.y0 - 0.012, S.z1, S.y1 + 0.012, 0.012, s * (S.w / 2 + 0.008), 0.009);
+    const fb = slopedPanel(bezel, S.z0, S.y0 - 0.02, S.z1, S.y1 + 0.02, 0.04, s * (S.w / 2 + bezel / 2), 0.008);
+    bag.add('black', fb.geo, fb.matrix, { uvTile: 0.5 });
+    const fr = slopedPanel(0.008, S.z0, S.y0 - 0.02, S.z1, S.y1 + 0.02, 0.01, s * (S.w / 2 + 0.004), 0.01);
     bag.add('chrome', fr.geo, fr.matrix);
+    // top / bottom bars
+    const yEnd = s < 0 ? S.y0 : S.y1;
+    const zEnd = s < 0 ? S.z0 : S.z1;
+    const c = new THREE.Vector3(0, yEnd, zEnd).addScaledVector(dir, s * 0.012).addScaledVector(sp.normal, 0.008 - 0.02);
+    const bar = new THREE.BoxGeometry(S.w + bezel * 2, 0.026, 0.04);
+    bag.add('black', bar, new THREE.Matrix4().compose(c, new THREE.Quaternion().setFromEuler(new THREE.Euler(sp.ang, 0, 0)), new THREE.Vector3(1, 1, 1)), { uvTile: 0.5 });
   }
-  const screen = { w: S.w, h: sp.len, matrix: sp.matrix, normal: sp.normal, curve: 0.016 };
+  const screen = { w: S.w, h: sp.len, matrix: sp.matrix, normal: sp.normal, curve: 0.014 };
 
   // ---- top cap, topper, candle ---------------------------------------------------------------------
   bag.box('body', Wi, 0.07, 0.44, 0, 2.025, -0.38, { r: 0.01, seg, uvTile: 0.8 });

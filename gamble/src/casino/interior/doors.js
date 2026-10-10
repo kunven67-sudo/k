@@ -51,7 +51,7 @@ function leafGeometries(H) {
   }
   glass.push(new THREE.BoxGeometry(0.83, H - 0.43, 0.012).translate(0.5, 0.29 + (H - 0.43) / 2, 0));
   const prep = (gs) => {
-    const g = mergeGeometries(gs.map((x) => x.toNonIndexed()), false);
+    const g = mergeGeometries(gs.map((x) => (x.index ? x.toNonIndexed() : x)), false);
     worldUV(g, 0.5);
     return g;
   };

@@ -182,7 +182,7 @@ export function buildStepperCabinet({ variant = 'single', denomColor = 0xffd23a,
     candle: new THREE.Vector3(cx, 2.07, cz),
     screenCenter: new THREE.Vector3(0, R.cy, Wn.z),
     deckCenter: new THREE.Vector3(0, 0.96, 0.08),
-    lever: { hub: hub.clone().add(new THREE.Vector3(0.05, 0, 0)), length: 0.36, rest: -0.2 },
+    lever: { hub: hub.clone().add(new THREE.Vector3(0.05, 0, 0)), length: 0.36, rest: 0.1 },
   };
   const colliders = [
     { center: new THREE.Vector3(0, 0.45, -0.255), size: new THREE.Vector3(W, 0.9, 0.62) },

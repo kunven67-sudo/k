@@ -33,7 +33,7 @@ export function classicMath(variant = 'single') {
   return m;
 }
 
-export const spinVideo = (theme) => playSpin(videoMath(theme), fairRng, { detail: true });
+export const spinVideo = (theme, lines = 0) => playSpin(videoMath(theme), fairRng, { detail: true, lines });
 export const spinStepper = (variant, coins) => spinClassic(classicMath(variant), fairRng, coins);
 export const pearlFace = () => coinFace(videoMath('dragon'), fairRng);
 

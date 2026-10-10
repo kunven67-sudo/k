@@ -1,10 +1,11 @@
-// Table games (lane B). STUB — replaced by the tables lane (see ../CONTRACT.md).
-import { stubStation } from '../_stub.js';
-
-export function createBlackjackTable(opts) {
-  return stubStation({ ...opts, w: 2.4, d: 1.3, h: 0.76, color: 0x1f5a35, seats: 7 });
-}
-
-export function createRouletteTable(opts) {
-  return stubStation({ ...opts, w: 3.0, d: 1.4, h: 0.76, color: 0x1f5a35, seats: 6 });
-}
+// Table games (lane B) — factory API from ../CONTRACT.md.
+//
+//   createBlackjackTable({ engine, physics, tier, casino, id, position, yaw, limits: { min, max }, rng, npcs })
+//   createRouletteTable({ engine, physics, tier, casino, id, position, yaw, limits: { min, max, insideMin }, rng, npcs })
+//     → Station subclass: { group, interactables, update(dt, ctx), dispose(), footprint: { w, d } }
+//
+// Both build their own group (placed at `position` / `yaw`), add static colliders to `physics` and
+// run their own dealer + NPC players. Extras lane A may use: `table.pitBoss = human` (anchor for pit
+// boss lines), `table.devSpeed` (animation speed multiplier).
+export { createBlackjackTable, BlackjackTable } from './blackjack.js';
+export { createRouletteTable, RouletteTable } from './roulette.js';

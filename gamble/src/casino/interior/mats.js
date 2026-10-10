@@ -97,7 +97,7 @@ let PAL = null;
 export function casinoMats() {
   if (PAL) return PAL;
   PAL = {
-    carpet: mat('carpet-casino', { color: 0x4f0c17, color2: 0xc79a3e, color3: 0x153f4c, dirt: 0.3, seed: 301 }),
+    carpet: mat('carpet-casino', { color: 0x420a14, color2: 0xc79a3e, color3: 0x1d4a52, dirt: 0.3, seed: 301, tileMeters: 1.45 }),
     marble: mat('marble', { color: 0xeadfc6, color2: 0xa98d63, tiles: 2, seed: 302 }),
     marbleSlab: mat('marble', { color: 0xefe5cf, color2: 0xc4ae88, tiles: 0, veins: 0.55, seed: 303, tileMeters: 0.9 }),
     marbleRed: mat('marble', { color: 0x7a2a22, color2: 0xd6b48a, tiles: 0, seed: 304 }),
@@ -125,6 +125,7 @@ export function casinoMats() {
     darkRed: mat('metal-painted', { color: 0x5a1218, wear: 0.2, dirt: 0.2, seed: 326 }),
     rubber: mat('rubber', { color: 0x141414 }),
     paper: mat('paper', { color: 0xf1ead9, dirt: 0.15 }),
+    flower: mat('plastic', { color: 0xffffff, wear: 0.05, dirt: 0.08, seed: 331 }),
     mirror: Object.assign(new THREE.MeshStandardMaterial({ color: 0xcfd2cf, metalness: 1, roughness: 0.04, envMapIntensity: 1.3 }), { name: 'casino-mirror' }),
     // Cheap reflective glass: no transmission pass (phones), env reflections only.
     glass: Object.assign(new THREE.MeshStandardMaterial({ color: 0xd8e4e2, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.16, depthWrite: false, envMapIntensity: 1.8, side: THREE.DoubleSide }), { name: 'casino-glass' }),

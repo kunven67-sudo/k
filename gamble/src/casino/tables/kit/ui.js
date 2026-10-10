@@ -37,7 +37,7 @@ const CSS = `
   box-shadow: 0 0 0 1px rgba(216,178,90,.55), 0 8px 20px rgba(0,0,0,.4); text-align:center; white-space:nowrap; }
 .tbl-plaque .t { font: 700 14px/1.1 "Playfair Display", Georgia, serif; color:#e8cf8a; letter-spacing:.04em; }
 .tbl-plaque .s { font: 500 11px/1.3 Inter, sans-serif; color:#d9cdb0; opacity:.85; }
-.tbl-status { position:absolute; left:50%; bottom:calc(max(14px, env(safe-area-inset-bottom)) + 92px); transform:translateX(-50%);
+.tbl-status { position:absolute; left:50%; top:calc(max(12px, env(safe-area-inset-top)) + 74px); transform:translateX(-50%);
   display:flex; gap:8px; pointer-events:none; flex-wrap:wrap; justify-content:center; max-width:calc(100vw - 24px); }
 .tbl-pill { padding:5px 11px 6px; border-radius:999px; background: rgba(10,8,6,.66); box-shadow: 0 0 0 1px rgba(216,178,90,.4);
   font: 600 13px/1.1 Inter, sans-serif; color:#f3e7c6; white-space:nowrap; }
@@ -65,7 +65,6 @@ const CSS = `
   .tbl-btn { width:62px; height:62px; font-size:16px; }
   .tbl-btn::before { inset:7px; }
   .tbl-btn.small { width:52px; height:52px; font-size:13px; }
-  .tbl-status { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 140px); }
   .tbl-bar { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 52px); gap:7px; }
 }
 `;

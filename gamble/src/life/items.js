@@ -341,9 +341,127 @@ export function walletOpen(license, amount) {
   return c;
 }
 
+// ---- casino items (drawn by the casino floor lane) ----
+
+const CASINO_TITLES = { eldorado: 'ELDORADO RESORT CASINO', 'silver-legacy': 'SILVER LEGACY RESORT CASINO', 'circus-circus': 'CIRCUS CIRCUS RENO' };
+const ONES = ['ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+const TENS = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+function words(n) {
+  if (n < 20) return ONES[n];
+  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? `-${ONES[n % 10]}` : '');
+  if (n < 1000) return `${ONES[Math.floor(n / 100)]} HUNDRED${n % 100 ? ` ${words(n % 100)}` : ''}`;
+  if (n < 1e6) return `${words(Math.floor(n / 1000))} THOUSAND${n % 1000 ? ` ${words(n % 1000)}` : ''}`;
+  return String(n);
+}
+
+/** TITO cash-out voucher: thermal paper, casino header, barcode, validation number, amount. */
+function tito(item) {
+  const W = 300;
+  const H = 136;
+  const [c, g] = canvas(W, H);
+  g.save();
+  g.translate(W / 2, H / 2);
+  g.rotate(-0.02);
+  g.translate(-W / 2, -H / 2);
+  const pg = g.createLinearGradient(0, 0, 0, H);
+  pg.addColorStop(0, '#fbfaf6');
+  pg.addColorStop(1, '#ecebe4');
+  g.fillStyle = pg;
+  g.fillRect(6, 6, W - 12, H - 12);
+  g.fillStyle = '#16161a';
+  g.textAlign = 'center';
+  g.font = '700 10px "Inter"';
+  g.fillText(CASINO_TITLES[item.casino] || String(item.casino || '').toUpperCase(), W / 2, 20);
+  g.font = '400 8px "Inter"';
+  g.fillText('345 N VIRGINIA ST · RENO NV', W / 2, 30);
+  g.font = '700 13px "Bebas Neue"';
+  g.fillText('CASHOUT TICKET', W / 2, 44);
+  // Barcode (Interleaved 2 of 5 look) from the validation digits.
+  const digits = String(item.validation || item.id || '').replace(/\D/g, '').padEnd(18, '0');
+  let x = 34;
+  for (let i = 0; i < digits.length * 2 && x < W - 34; i++) {
+    const d = +digits[i % digits.length];
+    const wide = (d + i) % 3 === 0;
+    g.fillRect(x, 50, wide ? 3 : 1.4, 26);
+    x += (wide ? 3 : 1.4) + ((d + i) % 2 ? 2.4 : 1.4);
+  }
+  g.font = '400 8px "Inter"';
+  g.fillText(`VALIDATION ${item.validation || ''}`, W / 2, 86);
+  const amt = Math.round((item.amount || 0) * 100);
+  const dollars = Math.floor(amt / 100);
+  const cents = amt % 100;
+  g.font = '700 7px "Inter"';
+  g.fillText(`${words(dollars)} DOLLARS AND ${String(cents).padStart(2, '0')}/100`, W / 2, 97);
+  g.font = '700 22px "Inter"';
+  g.fillText(`$${(amt / 100).toFixed(2)}`, W / 2, 119);
+  g.textAlign = 'left';
+  g.font = '400 7px "Inter"';
+  const d = new Date(item.issuedMs || Date.now());
+  g.fillText(`${d.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}  ${d.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: '2-digit', minute: '2-digit' })}`, 14, 119);
+  g.textAlign = 'right';
+  g.fillText(`MACHINE ${String(item.machine || '').toUpperCase().slice(0, 10)}`, W - 14, 112);
+  g.fillText('VOID AFTER 90 DAYS', W - 14, 122);
+  // Thermal fade + a fold line.
+  g.fillStyle = 'rgba(200,190,160,.12)';
+  g.fillRect(6, H / 2, W - 12, H / 2 - 6);
+  g.strokeStyle = 'rgba(0,0,0,.08)';
+  g.beginPath();
+  g.moveTo(W * 0.62, 6);
+  g.lineTo(W * 0.6, H - 6);
+  g.stroke();
+  g.restore();
+  grain(g, W, H, 10, 17);
+  return c;
+}
+
+const CHIP_COLORS = { 1: ['#eeeae0', '#2b58a8'], 2.5: ['#e59ab0', '#ffffff'], 5: ['#b11d26', '#f4f0e6'], 25: ['#1c7a3b', '#f4f0e6'], 100: ['#1b1b1d', '#f4f0e6'], 500: ['#5a2a8a', '#f2d24a'], 1000: ['#e3b223', '#1b1b1d'] };
+
+/** A few stacks of clay chips (side view), one per denomination held. */
+function chipStacks(item) {
+  const W = 200;
+  const H = 150;
+  const [c, g] = canvas(W, H);
+  const counts = Object.entries(item.counts || {}).filter(([, n]) => n > 0).sort((a, b) => +b[0] - +a[0]);
+  const n = Math.max(1, counts.length);
+  const sw = Math.min(46, (W - 20) / n - 6);
+  counts.forEach(([den, cnt], i) => {
+    const [col, stripe] = CHIP_COLORS[den] || ['#888', '#fff'];
+    const cx = W / 2 + (i - (n - 1) / 2) * (sw + 8);
+    const k = Math.min(14, cnt);
+    for (let j = 0; j < k; j++) {
+      const y = H - 18 - j * 6.2;
+      g.fillStyle = col;
+      g.beginPath();
+      g.ellipse(cx, y, sw / 2, sw * 0.17, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillRect(cx - sw / 2, y - 6, sw, 6);
+      g.fillStyle = stripe;
+      for (let s = 0; s < 5; s++) g.fillRect(cx - sw / 2 + 2 + s * (sw / 5), y - 5, sw / 12, 4);
+      g.fillStyle = 'rgba(0,0,0,.18)';
+      g.fillRect(cx - sw / 2, y - 0.8, sw, 0.8);
+    }
+    const ty = H - 18 - k * 6.2;
+    g.fillStyle = col;
+    g.beginPath();
+    g.ellipse(cx, ty, sw / 2, sw * 0.17, 0, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = stripe;
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.ellipse(cx, ty, sw * 0.32, sw * 0.1, 0, 0, Math.PI * 2);
+    g.stroke();
+  });
+  g.fillStyle = 'rgba(0,0,0,.25)';
+  g.beginPath();
+  g.ellipse(W / 2, H - 10, W * 0.42, 6, 0, 0, Math.PI * 2);
+  g.fill();
+  return c;
+}
+
 /** Canvas for a pocket item. */
 export function itemCanvas(item, ctx) {
-  const key = `${item.kind}:${item.kind === 'cash' ? ctx.cash : ''}:${item.kind === 'keycard' ? ctx.room : ''}`;
+  const extra = item.kind === 'tito' ? `${item.id}` : item.kind === 'chips' ? JSON.stringify(item.counts || {}) : '';
+  const key = `${item.kind}:${item.kind === 'cash' ? ctx.cash : ''}:${item.kind === 'keycard' ? ctx.room : ''}:${extra}`;
   if (cache.has(key)) return cache.get(key);
   let c;
   if (item.kind === 'wallet') c = wallet();
@@ -352,6 +470,8 @@ export function itemCanvas(item, ctx) {
   else if (item.kind === 'keycard') c = keycard(ctx.room);
   else if (item.kind === 'napkin') c = napkin(item.name, item.number);
   else if (item.kind === 'receipt') c = receipt();
+  else if (item.kind === 'tito') c = tito(item);
+  else if (item.kind === 'chips') c = chipStacks(item);
   else return null;
   cache.set(key, c);
   return c;

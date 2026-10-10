@@ -255,7 +255,9 @@ export class TableHands {
       const dz = _v.z - sh.z;
       const dist = Math.hypot(dx, dz, (_v.y - sh.y) * 0.6);
       if (c.active) {
-        reach = Math.max(reach, clamp((dist - 0.4) * 1.6, 0, 0.42) * c.w);
+        // Seated players lean a little; a standing dealer bends over the layout.
+        const r = this.seated ? clamp((dist - 0.48) * 1.0, 0, 0.14) : clamp((dist - 0.4) * 1.6, 0, 0.42);
+        reach = Math.max(reach, r * c.w);
         yaw += clamp(Math.atan2(dx, Math.max(0.05, dz)) * 0.25, -0.3, 0.3) * c.w;
       }
     }
