@@ -252,3 +252,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Day length → **choose when making a world** (real 24h / 2h / 48 min / 24 min per day). Fast-forward works on top.
 - Night sky → **real star map** (real constellations, Milky Way, real moon phases, planets, shooting stars, correct for California + date).
 - Using doors/drawers/fridges → **grab + drag with the mouse only** (like a real hand pulling, Amnesia-style). No tap-to-open.
+- Strength → **real strength for everything**: hands AND gun have weight limits. Heavy stuff needs pushing/dragging, a dolly, forklift or people helping.
+- Electricity → **real power**: plug into outlets, empty world needs a generator/solar/power lines, breakers trip on overload, fridge food spoils when power dies.
+- Spawned furniture → **empty, like new from the store** (fits "nothing is random"; you/people fill it).
+- Aging → **full real aging**: dust, scratches, sun-faded fabric, wood weathers/rots in rain, metal rusts, food rots (feeds the micro world).
