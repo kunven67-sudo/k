@@ -307,3 +307,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Park → **all**: playground + basketball + tennis, pond with ducks + walking trails, skate park + dog park, picnic area + food truck + fountain.
 - People can build → **all**: shelters → cabins → houses, farms/wells/fences/barns, furniture/tools/workshops (forge, sawmill), roads/bridges/boats/shops.
 - Weapons → **full real weapons**. Claude said honestly it would've kept hunting gear only (doesn't want a shooter game), but will make it real: gun store + background check/license, ammo costs money, recoil, reloading, people panic/call 911, police react.
+- Multiplayer → **single-player now, co-op later**.
+- Spawn tab after Furniture → **Food + everyday stuff** (survival start, fill the fridge).
+- Holidays → **yes, people celebrate** (Halloween, Christmas lights, 4th of July fireworks, birthdays), depending on the person.
+- Car brand names → **Claude makes them up** (real-sounding brands with logos + history).
