@@ -328,3 +328,6 @@ Claude explained it was only a test and nothing had changed. Then:
 - Portal colors → **pick your own in settings** (default NOT blue/orange).
 - Music → **all**: car radio stations (made-up, DJs, ads, genres), chill adaptive background music, speakers + playable instruments (people dance).
 - TV → **real news about your world** (reports what actually happened, incl. you) + made-up shows, sports, cartoons.
+- Portal powers part 1 → **size portals** (one side big, other tiny: shrink/grow by walking through), **portals on moving stuff** (cars, deer, people, the Moon), **space portals** (air rushes out, stuff sucked through, freezing). **Portal chains NOT picked** → one portal pair at a time. User again: **"and the portal can do insane stuff"**.
+- Portal powers part 2 → **all**: water/fire/air/sound/smell flow through (drain a lake, river onto a wildfire), one-way + window portals (spy), portals between maps, portal traps.
+- More Rift Tool powers → **all**: X-ray scanner, magnet beam (real magnetism, metal only), weld + glue (build contraptions), slow-mo bubble. Total powers now 11: portals, shrink/grow, grab/throw, freeze, clone, anti-gravity, super launch, X-ray, magnet, weld/glue, slow-mo.
