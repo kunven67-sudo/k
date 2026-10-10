@@ -142,6 +142,8 @@ export class Player {
     if (this.brokenLeg > 0) speed = Math.min(speed, 0.9);
     if (!this.swimming) speed *= 1 - this.wading * 0.55;
     if (fz > 0.5) speed *= 0.8; // walking backwards is slower
+    const carrying = this.carry ? this.carry() : 0;
+    if (carrying > 0) speed *= 1 - Math.min(0.65, carrying / 90); // heavy things slow you down
     this.moveMode = !moving ? 'idle' : this.swimming ? 'swim' : speed >= SPEED.sprint * 0.8 ? 'sprint' : speed >= SPEED.jog * 0.8 ? 'jog' : this.crouching ? 'crouch' : 'walk';
 
     // --- stamina ---

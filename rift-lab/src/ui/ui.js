@@ -119,7 +119,7 @@ export class UI {
     const state = {
       name: 'My World', seed: defaultSeed, map: 'empty', terrain: 'meadow',
       start: 'now', startAt: '', dayLength: 'real', spawnMode: 'free', arrival: 'appear',
-      kit: 'none', godMode: false, deathMode: 'respawn', gore: false, disasters: 'real', battery: 'real',
+      kit: 'none', godMode: false, deathMode: 'respawn', gore: false, disasters: 'real', battery: 'real', startMoney: '10000',
     };
     const chipGroup = (key, options) => h('div', { class: 'chips' }, options.map(([val, label, soon]) => {
       const c = h('button', { class: `chip ${state[key] === val ? 'on' : ''} ${soon ? 'soon' : ''}`, onclick: () => {
@@ -148,6 +148,7 @@ export class UI {
       h('div', { class: 'field' }, h('label', {}, 'Start date + time'), chipGroup('start', [['now', 'Right now (your real clock)'], ['pick', 'Pick a date']]), startInput),
       h('div', { class: 'field' }, h('label', {}, 'Length of one day'), chipGroup('dayLength', [['real', 'Real 24 h'], ['2h', '2 hours'], ['48m', '48 min'], ['24m', '24 min']])),
       h('div', { class: 'field' }, h('label', {}, 'Spawning'), chipGroup('spawnMode', [['free', 'Free (shows real prices)'], ['pay', 'Pay mode']])),
+      h('div', { class: 'field' }, h('label', {}, 'Start money (Pay mode)'), chipGroup('startMoney', [['0', '$0'], ['1000', '$1,000'], ['10000', '$10,000'], ['100000', '$100,000'], ['rich', 'Rich inventor']])),
       h('div', { class: 'field' }, h('label', {}, 'Spawned stuff arrives'), chipGroup('arrival', [['appear', 'Where I point'], ['truck', 'Delivery truck', true]])),
       h('div', { class: 'field' }, h('label', {}, 'Start kit'), chipGroup('kit', [['none', 'Clothes + phone'], ['camping', 'Camping kit', true], ['survival', 'Survival kit', true]])),
       h('div', { class: 'field' }, h('label', {}, 'When you die'), chipGroup('deathMode', [['respawn', 'Wake up at spawn'], ['hospital', 'Hospital + bill', true], ['perma', 'Permadeath']])),
@@ -307,6 +308,13 @@ export class UI {
       <div class="line">🌙 <b>${moonPhaseName(sky.state.phase)}</b> (${Math.round(sky.state.moonIllum * 100)}%)</div>
       <div class="line">📏 Your size: <b>${size}</b> (normal)</div>
       <div class="line">${clock.fastForward > 1 ? `⏩ <b>x${clock.fastForward}</b>` : `🍂 ${cap(clock.season())}`}</div>`;
+  }
+
+  buildBanner(on) {
+    if (!on) { this.buildEl?.remove(); this.buildEl = null; return; }
+    if (this.buildEl) return;
+    this.buildEl = h('div', { class: 'build-banner panel', html: '<b>BUILD MODE</b> · click pick up / set down · scroll turn · <kbd>R</kbd> freeze · <kbd>X</kbd> delete · <kbd>Z</kbd> undo · <kbd>B</kbd> exit' });
+    this.layer.append(this.buildEl);
   }
 
   speed(mult) {

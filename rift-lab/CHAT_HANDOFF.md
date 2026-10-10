@@ -390,3 +390,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - **User (going to sleep): "Stop asking me questions. Pick the best option yourself and keep building."** → From here Claude picks the realest/best option itself, keeps building piece by piece, pushes each finished chunk, and logs every pick it made in this file (section 6) so the user can review when back.
 
 ## 6. Picks Claude made while the user slept
+- Phone held close (~17 cm) + near the middle of the view when up, so the screen is readable (real people bring the phone up to read it).
+- Interaction picks (mouse only, per the user): left-click hold = grab with real strength (430 N, ~40 kg lift); swing + let go = toss; hold right-click = wind-up throw (max ~24 m/s for light things, heavier = slower); scroll while holding = closer/farther.
+- Build mode keys: B toggle, click pick/drop, scroll rotate (Shift fine), R freeze, X delete, Z undo. L = flashlight (also a phone button). Tab = phone.
+- Flat-pack items spawn assembled for now (boxes + assembly come in 2b). Power-needing items show a "needs power" badge; power comes in 2b.

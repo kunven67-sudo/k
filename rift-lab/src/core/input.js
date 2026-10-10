@@ -15,6 +15,9 @@ export const BINDINGS = {
   phone: ['Tab'],
   pause: ['Escape'],
   fastForward: ['KeyF'],
+  build: ['KeyB'],
+  undo: ['KeyZ'],
+  flashlight: ['KeyL'],
 };
 
 class Input {
@@ -67,10 +70,11 @@ class Input {
 
   lock() {
     if (!this.canvas || this.locked) return;
+    const quiet = (p) => { if (p && p.catch) p.catch(() => {}); };
     try {
       const p = this.canvas.requestPointerLock({ unadjustedMovement: true });
-      if (p && p.catch) p.catch(() => this.canvas.requestPointerLock());
-    } catch { this.canvas.requestPointerLock(); }
+      if (p && p.catch) p.catch(() => { try { quiet(this.canvas.requestPointerLock()); } catch { /* needs a click */ } });
+    } catch { try { quiet(this.canvas.requestPointerLock()); } catch { /* needs a click */ } }
   }
 
   unlock() {

@@ -11,6 +11,13 @@ import { Player } from './player/player.js';
 import { audio } from './audio/audio.js';
 import { UI, randomSeed } from './ui/ui.js';
 import { saves } from './core/saves.js';
+import { ItemManager } from './items/manager.js';
+import { getItem } from './items/catalog.js';
+import { Hands } from './player/hands.js';
+import { BuildTools } from './player/build.js';
+import { Phone3D } from './player/phone3d.js';
+import { PhoneUI } from './ui/phone.js';
+import { astronomy } from './core/time.js';
 
 const canvas = document.getElementById('view');
 const ui = new UI(document.getElementById('ui'), document.getElementById('fx'));
@@ -33,6 +40,16 @@ scene.background = new THREE.Color(0x000000);
 const camera = new THREE.PerspectiveCamera(settings.fov, innerWidth / innerHeight, 0.05, 14000);
 scene.add(camera);
 input.attach(canvas);
+
+// Phone flashlight: a real LED, about 120 candela, lights ~10 m ahead and casts shadows.
+const flashlight = new THREE.SpotLight(0xfff2dc, 0, 30, 0.6, 0.6, 2);
+flashlight.position.set(0.1, -0.1, 0);
+flashlight.target.position.set(0.03, -0.06, -6);
+flashlight.castShadow = true;
+flashlight.shadow.mapSize.set(1024, 1024);
+flashlight.shadow.camera.near = 0.1;
+flashlight.shadow.bias = -0.0005;
+camera.add(flashlight, flashlight.target);
 
 function resize() {
   const scale = settings.renderScale * Math.min(window.devicePixelRatio || 1, 2);
@@ -62,6 +79,108 @@ game.renderer = renderer;
 game.scene = scene;
 
 let RAPIER = null;
+
+const START_MONEY = { 0: 0, 1000: 1000, 10000: 10000, 100000: 100000, rich: 12000000 };
+
+const phoneUI = new PhoneUI(document.getElementById('ui'), {
+  renderer,
+  clock: () => game.clock,
+  sky: () => game.world.sky,
+  weather: () => weatherNow(),
+  payMode: () => game.info?.spawnMode === 'pay',
+  money: () => game.money,
+  transactions: () => game.transactions,
+  spawn: (id, chosen, price) => beginSpawn(id, chosen, price),
+  buildActive: () => !!game.build?.active,
+  setBuild: (on) => setBuild(on),
+  flashlight: () => !!game.flashOn,
+  setFlashlight: (on) => setFlashlight(on),
+  setFastForward: (m) => { game.clock.fastForward = m; ui.speed(m); },
+  openSettings: () => { closePhone(false); pause(true); },
+  sound: () => audio.ui('click'),
+  toast: (t) => ui.toast(t),
+});
+game.phoneUI = phoneUI;
+
+function openPhone() {
+  if (game.phoneOpen || game.state !== 'play' || !game.phone) return;
+  game.phoneOpen = true;
+  game.build.cancelPlacing();
+  game.phone.setUp(true);
+  phoneUI.show(true);
+  input.unlock();
+  ui.clickToPlay(false);
+  audio.ui('open');
+  ui.tip('phone', 'Tap the screen with your mouse. <kbd>Tab</kbd> or <kbd>Esc</kbd> puts the phone away. You can still walk while you look at it.', 7);
+}
+
+function closePhone(relock = true) {
+  if (!game.phoneOpen) return;
+  game.phoneOpen = false;
+  game.phone.setUp(false);
+  phoneUI.show(false);
+  if (relock && game.state === 'play') { input.lock(); setTimeout(() => { if (!input.locked && game.state === 'play' && !game.phoneOpen) ui.clickToPlay(true); }, 300); }
+}
+
+function setFlashlight(on) {
+  game.flashOn = on;
+  flashlight.intensity = on ? 120 : 0;
+  game.phone?.setFlash(on);
+  audio.ui('click');
+}
+
+function setBuild(on) {
+  game.build.setActive(on);
+  ui.buildBanner(on);
+  if (on) ui.tip('build', 'Build mode: aim at something you spawned. <b>Click</b> to pick it up, <b>scroll</b> to turn it, <b>click</b> to set it down. <kbd>R</kbd> freeze · <kbd>X</kbd> delete · <kbd>Z</kbd> undo · <kbd>B</kbd> exit.', 9);
+}
+
+function beginSpawn(id, chosen, price) {
+  closePhone(true);
+  setBuild(false);
+  const item = getItem(id);
+  game.build.startPlacing(id, chosen, (pose) => {
+    if (game.info.spawnMode === 'pay') {
+      if (game.money < price) { ui.toast(`Not enough money (${'$' + Math.round(game.money).toLocaleString()}).`); return null; }
+      game.money -= price;
+      game.transactions.push({ what: item.name, amount: price, at: game.clock.ms });
+    }
+    const it = game.items.spawn(id, chosen, pose);
+    audio.land(3);
+    if (item.flatpack) ui.tip('flatpack', 'Real flat-pack furniture comes in a box. For now it shows up built; boxes + building it yourself are coming next.', 7);
+    if (item.power) ui.tip('power', 'This needs electricity. There is no power out here yet: generators, solar + cords are coming next.', 7);
+    ui.tip('grab', 'Hold <b>left-click</b> to grab things. Heavy stuff only drags (real strength). Swing + let go to toss, hold <b>right-click</b> to wind up a throw.', 9);
+    return it;
+  });
+  ui.tip('place', 'Point where it should go. <b>Scroll</b> turns it, <b>click</b> places it, <b>right-click</b> cancels.', 7);
+}
+
+// Simple real-world weather for the Empty World (37.6° N): seasonal + daily temperature curve.
+let sunCache = { day: -1 };
+function weatherNow() {
+  const c = game.clock, w = game.world;
+  const l = c.local();
+  const doy = c.dayOfYear();
+  const mean = 14.5 - 7.5 * Math.cos(2 * Math.PI * (doy - 15) / 365);
+  const cloud = w.sky.cloudCover;
+  const amp = 7 * (1 - cloud * 0.6);
+  const tempC = mean + amp * Math.cos(2 * Math.PI * (l.hours - 15) / 24);
+  if (sunCache.day !== doy) {
+    const midnight = c.ms - l.hours * 3600000;
+    let rise = null, set = null, prev = null;
+    for (let m = 0; m <= 24 * 60; m += 4) {
+      const t = midnight + m * 60000;
+      const alt = Math.asin(astronomy(t, c.latitude, c.longitude).sun.y) * 180 / Math.PI + 0.833;
+      if (prev !== null) { if (prev < 0 && alt >= 0) rise = t; if (prev >= 0 && alt < 0) set = t; }
+      prev = alt;
+    }
+    const fmt = (t) => { if (!t) return '—'; const d = new Date(t - c.tzOffsetMin * 60000); const hh = d.getUTCHours(), mm = String(d.getUTCMinutes()).padStart(2, '0'); return `${hh % 12 || 12}:${mm} ${hh < 12 ? 'AM' : 'PM'}`; };
+    sunCache = { day: doy, sunrise: fmt(rise), sunset: fmt(set) };
+  }
+  const night = w.sky.state.night > 0.5;
+  const desc = cloud > 0.75 ? 'Cloudy' : cloud > 0.4 ? (night ? 'Partly cloudy night' : 'Partly cloudy') : (night ? 'Clear night' : 'Sunny');
+  return { tempC, clouds: cloud, windMs: w.wind * 7, desc, sunrise: sunCache.sunrise, sunset: sunCache.sunset };
+}
 
 async function boot() {
   const bar = ui.loading('Starting up');
@@ -98,10 +217,27 @@ async function loadWorld(info, { menu = false, bar = null, saveData = null } = {
       game.player.yaw = p.yaw; game.player.pitch = p.pitch;
       Object.assign(game.player, { health: p.health ?? 100, stamina: p.stamina ?? 100, limp: p.limp ?? 0, brokenLeg: p.brokenLeg ?? 0 });
     }
+    game.items = new ItemManager({ physics: game.physics, scene });
+    game.hands = new Hands({ physics: game.physics, camera, items: game.items, player: game.player });
+    game.player.carry = () => game.hands.carryMass;
+    game.build = new BuildTools({ physics: game.physics, camera, items: game.items, player: game.player, hands: game.hands, onMessage: (t) => ui.toast(t, 2) });
+    game.phone = new Phone3D(camera);
+    game.money = saveData?.money ?? START_MONEY[info.startMoney ?? 10000] ?? 10000;
+    game.transactions = saveData?.transactions ?? [];
+    if (saveData?.items) game.items.restoreAll(saveData.items);
+    if (saveData?.flashOn) setFlashlight(true);
   }
 }
 
 function disposeWorld() {
+  if (game.phoneOpen) closePhone(false);
+  phoneUI.show(false);
+  phoneUI.stack = [];
+  if (game.phone) { camera.remove(game.phone.root); game.phone = null; }
+  if (game.build) { game.build.cancelPlacing(); game.build.setActive(false); ui.buildBanner(false); game.build = null; }
+  if (game.hands) { game.hands.dispose(); game.hands = null; }
+  if (game.items) { game.items.clear(); game.items = null; }
+  setFlashlight(false);
   if (game.player) { game.player.dispose(); game.player = null; }
   if (game.world) { game.world.dispose(); game.world = null; }
   if (game.physics) { game.physics.free(); game.physics = null; }
@@ -132,7 +268,7 @@ async function createWorld(opts) {
     id: `w${Date.now().toString(36)}`, name: opts.name.trim() || 'My World', seed: String(opts.seed || randomSeed()).trim(),
     map: 'empty', mapName: 'Empty World · Meadow + forest', dayLength: opts.dayLength, startMs,
     spawnMode: opts.spawnMode, arrival: opts.arrival, kit: opts.kit, godMode: opts.godMode,
-    deathMode: opts.deathMode, gore: opts.gore, disasters: opts.disasters, battery: opts.battery,
+    deathMode: opts.deathMode, gore: opts.gore, disasters: opts.disasters, battery: opts.battery, startMoney: opts.startMoney,
   };
   await loadWorld(info);
   saveGame(true);
@@ -157,11 +293,14 @@ function startPlay(fresh) {
     ui.tip('watch', 'Hold <kbd>T</kbd> to look at your watch: real time, date and moon phase.', 7);
     ui.tip('nohud', 'No HUD: you <b>feel</b> it. Heavy breathing = tired, red edges = hurt. (HUD is in Settings.)', 8);
     ui.tip('crouch', '<kbd>Ctrl</kbd> crouch · <kbd>Q</kbd>/<kbd>E</kbd> lean · <kbd>Caps</kbd> jog · <kbd>F</kbd> fast-forward time', 8);
+    ui.tip('phonekey', 'Press <kbd>Tab</kbd> to take out your phone: spawn furniture, build mode, flashlight, weather. <kbd>L</kbd> = flashlight.', 9);
   }
 }
 
-function pause() {
+function pause(openSettings = false) {
   if (game.state !== 'play') return;
+  if (game.phoneOpen) closePhone(false);
+  game.build?.cancelPlacing();
   game.state = 'paused';
   saveGame();
   ui.clickToPlay(false);
@@ -173,11 +312,13 @@ function pause() {
     onSettings: () => { audio.ui(); const s = ui.settingsSheet({ onBack: () => { audio.ui(); s.remove(); } }); el.append(s); },
     onQuit: async () => { audio.ui(); saveGame(); await loadWorld({ seed: game.info.seed, dayLength: 'real', startMs: Date.now() }, { menu: true }); game.menuSeed = game.info?.seed; showMainMenu(); },
   });
+  if (openSettings) { const st = ui.settingsSheet({ onBack: () => { audio.ui(); st.remove(); } }); el.append(st); }
 }
 
 function resume() {
   game.state = 'play';
   ui.playOverlay();
+  ui.buildBanner(!!game.build?.active);
   input.lock();
 }
 
@@ -188,18 +329,27 @@ function saveGame(silent) {
     info: game.info,
     clockMs: game.clock.ms,
     player: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw, pitch: p.pitch, health: p.health, stamina: p.stamina, limp: p.limp, brokenLeg: p.brokenLeg },
+    items: game.items ? game.items.serialize() : [],
+    money: game.money, transactions: game.transactions, flashOn: !!game.flashOn,
   });
   if (!silent) game.autosaveT = 60;
 }
 
 canvas.addEventListener('click', () => {
-  if (game.state === 'play' && !input.locked) { audio.start(); input.lock(); }
+  if (game.state !== 'play') return;
+  if (game.phoneOpen) { closePhone(true); return; } // clicking the world puts the phone away
+  if (!input.locked) { audio.start(); input.lock(); }
 });
 document.addEventListener('pointerlockchange', () => {
   if (game.state === 'play') {
     if (input.locked) ui.clickToPlay(false);
-    else pause();
+    else if (!game.phoneOpen) pause();
   }
+});
+window.addEventListener('keydown', (e) => {
+  if (game.state !== 'play') return;
+  if (e.code === 'Tab') { e.preventDefault(); if (game.phoneOpen) closePhone(true); else openPhone(); }
+  else if (e.code === 'Escape' && game.phoneOpen) closePhone(true);
 });
 
 // ---------------- the loop ----------------
@@ -220,9 +370,24 @@ function frame(now) {
         game.clock.fastForward = steps[(steps.indexOf(game.clock.fastForward) + 1) % steps.length];
         ui.speed(game.clock.fastForward);
       }
+      if (!game.phoneOpen && input.locked) {
+        if (input.actionPressed('build')) setBuild(!game.build.active);
+        if (input.actionPressed('undo') && game.build.active) game.build.undoLast();
+        if (input.actionPressed('flashlight')) setFlashlight(!game.flashOn);
+      }
+      game.hands.update(dt);
+      game.build.update(dt);
       game.clock.advance(dt);
       const alpha = game.physics.update(dt);
       p.updateCamera(dt, alpha);
+      game.items.update();
+      game.phone.update(dt, p.moveMode && p.moveMode !== 'idle');
+      if (game.phone.root.visible && game.phoneOpen) {
+        phoneUI.setTransform(game.phone.screenTransform(innerWidth, innerHeight));
+        game.phoneTick = (game.phoneTick || 0) + dt;
+        if (game.phoneTick > 1) { game.phoneTick = 0; phoneUI.refreshTop(); }
+      }
+      handleHandEvents();
       handlePlayerEvents(p);
       ui.watch(input.action('watch'), game.clock, w.sky);
       ui.hud(settings.hud, p);
@@ -239,6 +404,18 @@ function frame(now) {
   if (game.state === 'menu' || game.state === 'play') updateAudio(dt);
   renderer.render(scene, camera);
   input.endFrame();
+}
+
+function handleHandEvents() {
+  const hd = game.hands;
+  if (ui.dot) ui.dot.className = 'dot' + (hd.held ? ' holding' : hd.aim?.movable && !game.build.active ? ' grab' : '') + (hd.charge > 0 ? ' charge' : '');
+  for (const e of hd.events) {
+    if (e.type === 'grab') {
+      if (audio.started) audio.burst({ dur: 0.06, freq: 900, q: 1, gain: 0.08 });
+      if (e.mass * 9.81 > 430) ui.tip('heavy', `That's about ${Math.round(e.mass)} kg: too heavy to lift alone. You can drag it, or use build mode.`, 6);
+    } else if (e.type === 'throw' && audio.started) audio.burst({ dur: 0.18, freq: 500, q: 0.6, gain: 0.08, attack: 0.05 });
+  }
+  hd.events.length = 0;
 }
 
 function handlePlayerEvents(p) {
