@@ -264,3 +264,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - How spawned items arrive → **a setting** (appear where you point / delivery truck).
 - Temperature → **full real temperature** (shiver → hypothermia, sweat → heatstroke, sunburn, wet clothes colder, jackets, campfires).
 - Start date → **today's real date + time** (from the PC clock).
+- Micro physics → **real micro physics** (sticky water drops / surface tension, getting trapped in drops, dust sticks to you, air feels thick, molecules jostle you at germ size) **BUT NO walking on walls** ("no walking on walls bro").
+- Micro danger → **only what would really happen** (dust mites ignore you, amoeba can swallow germ-sized you, ants grab you, spiders hunt you at ant size).
+- Inside bodies → **yes, the real way** (enter via cut/mouth/nose; real blood cells, skin layers, lungs; white blood cells chase you).
+- See micro without shrinking → **magnifying glass + microscope** spawnable items (scrape a sample onto a slide, see real bacteria).
