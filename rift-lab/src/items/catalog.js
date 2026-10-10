@@ -62,7 +62,7 @@ add({
 });
 
 add({
-  id: 'loveseat-nordbo', name: 'KLIPPA Loveseat', brand: BRANDS.flatpack, style: 'flatpack', room: 'Living room', price: 349, mass: 30, flatpack: true,
+  id: 'loveseat-nordbo', assemblyMin: 45, name: 'KLIPPA Loveseat', brand: BRANDS.flatpack, style: 'flatpack', room: 'Living room', price: 349, mass: 30, flatpack: true,
   rating: 3.9, reviews: 8412, blurb: 'Comes flat in a box. Removable, washable cover. Particle board + pine frame.',
   quotes: ['"Took me 2 hours. One screw was missing so it wobbles a bit lol."', '"Great for the price. Don\'t jump on it."'],
   options: { color: fabricOpt('Charcoal') },
@@ -143,7 +143,7 @@ add({
 });
 
 add({
-  id: 'coffee-nordbo', name: 'LACKA Coffee Table', brand: BRANDS.flatpack, style: 'flatpack', room: 'Living room', price: 49, mass: 9, flatpack: true,
+  id: 'coffee-nordbo', assemblyMin: 15, name: 'LACKA Coffee Table', brand: BRANDS.flatpack, style: 'flatpack', room: 'Living room', price: 49, mass: 9, flatpack: true,
   rating: 4.1, reviews: 23110, blurb: 'Hollow honeycomb-paper core inside a paper-thin laminate. Super light. Super cheap.',
   quotes: ['"It\'s $49, what did you expect? It\'s perfect."', '"Dented when I set my laptop down too hard."'],
   options: { finish: { label: 'Finish', choices: [{ id: 'white', label: 'White', price: 0 }, { id: 'oakprint', label: 'Oak-look print', price: 10 }], def: 'white' } },
@@ -204,14 +204,14 @@ add({
     return { mass: 6, parts: [
       ...legs,
       cyl(0.03, 0.06, 0, 1.33, 0, 'metal:brass', { seg: 12 }),
-      cone(0.24, 0.2, 0.3, 0, 1.5, 0, `shade:${o.shade}`, { seg: 36, hollow: 0.05 }),
+      cone(0.24, 0.2, 0.3, 0, 1.5, 0, `shade:${o.shade}`, { seg: 36, hollow: 0.05, use: 'switch' }),
       sph(0.045, 0, 1.44, 0, 'bulb', { col: false, light: { type: 'point', color: 0xffc98a, lumens: 800, offset: [0, 1.44, 0] } }),
     ] };
   },
 });
 
 add({
-  id: 'bookshelf-nordbo', name: 'BILLA Bookcase', brand: BRANDS.flatpack, style: 'flatpack', room: 'Living room', price: 79, mass: 29, flatpack: true,
+  id: 'bookshelf-nordbo', assemblyMin: 40, name: 'BILLA Bookcase', brand: BRANDS.flatpack, style: 'flatpack', room: 'Living room', price: 79, mass: 29, flatpack: true,
   rating: 4.5, reviews: 41023, blurb: 'The bookcase in every apartment on Earth. 5 shelves, 30 kg of books per shelf before it sags.',
   quotes: ['"Bought 6. Built 6. Have regrets about my weekend."', '"Anchor it to the wall!!"'],
   options: { finish: { label: 'Finish', choices: [{ id: 'white', label: 'White', price: 0 }, { id: 'oakprint', label: 'Oak-look print', price: 10 }], def: 'white' } },
@@ -278,7 +278,7 @@ add({
 });
 
 add({
-  id: 'bunkbed-nordbo', name: 'STUVA Bunk Bed (twin)', brand: BRANDS.flatpack, style: 'flatpack', room: 'Bedroom', price: 299, mass: 46, flatpack: true,
+  id: 'bunkbed-nordbo', assemblyMin: 150, name: 'STUVA Bunk Bed (twin)', brand: BRANDS.flatpack, style: 'flatpack', room: 'Bedroom', price: 299, mass: 46, flatpack: true,
   rating: 4.0, reviews: 5320, blurb: 'Solid pine. Ladder on the side. 162 parts + 1 allen key. Max 100 kg on top.',
   quotes: ['"Instructions had no words. Just a little cartoon guy looking sad."'],
   options: { wood: woodOpt('pine', ['pine', 'whiteoak']) },
@@ -360,7 +360,7 @@ add({
 });
 
 add({
-  id: 'wardrobe-nordbo', name: 'PAXA Wardrobe (2-door)', brand: BRANDS.flatpack, style: 'flatpack', room: 'Bedroom', price: 199, mass: 72, flatpack: true,
+  id: 'wardrobe-nordbo', assemblyMin: 120, name: 'PAXA Wardrobe (2-door)', brand: BRANDS.flatpack, style: 'flatpack', room: 'Bedroom', price: 199, mass: 72, flatpack: true,
   rating: 3.8, reviews: 6201, blurb: 'Two hinged doors, hanging rail + a shelf. Tall. Anchor it to a wall or it can tip.',
   quotes: ['"Doors needed adjusting for an hour to line up."', '"Fits SO much."'],
   options: { finish: { label: 'Finish', choices: [{ id: 'white', label: 'White', price: 0 }, { id: 'oakprint', label: 'Oak-look print', price: 20 }], def: 'white' } },
@@ -694,6 +694,109 @@ add({
 });
 
 // =====================================================================
+// POWER (real electricity: nothing electric works without it)
+// =====================================================================
+add({
+  id: 'generator-torque', tab: 'power', name: 'Torque PowerPro 3500 Generator', brand: 'Torque', style: 'power', room: 'Power', price: 599, mass: 48,
+  rating: 4.4, reviews: 7710, blurb: '3,500 W running. Pull-start gas engine, 15 L tank (~9 hours at half load). Ships EMPTY: fill it from a gas can. Loud. Never run it indoors.',
+  quotes: ['"Took 3 pulls on a cold morning, then purred."', '"Ran my fridge + lights through a whole power outage."'],
+  source: { watts: 3500, outlets: [[0.21, 0.42, 0.24], [0.21, 0.42, 0.14]], kind: 'generator', tank: 15 },
+  options: {},
+  build() {
+    const F = 'metal:black', R = 'plastic:0xc0392b';
+    const parts = [];
+    // tube frame cage
+    for (const x of [-0.29, 0.29]) {
+      parts.push(cyl(0.016, 0.55, x, 0.3, -0.25, F, { seg: 10 }), cyl(0.016, 0.55, x, 0.3, 0.25, F, { seg: 10 }));
+      parts.push(cyl(0.016, 0.5, x, 0.03, 0, F, { rot: [90, 0, 0], seg: 10 }), cyl(0.016, 0.5, x, 0.57, 0, F, { rot: [90, 0, 0], seg: 10 }));
+    }
+    parts.push(cyl(0.016, 0.58, 0, 0.57, -0.25, F, { rot: [0, 0, 90], seg: 10 }), cyl(0.016, 0.58, 0, 0.57, 0.25, F, { rot: [0, 0, 90], seg: 10 }));
+    parts.push(box(0.36, 0.28, 0.3, -0.05, 0.2, -0.02, 'metal:iron', { round: 0.02 }));          // engine
+    parts.push(box(0.2, 0.22, 0.2, 0.16, 0.18, 0.0, 'metal:steel', { round: 0.03 }));           // alternator
+    parts.push(box(0.5, 0.12, 0.38, 0, 0.5, 0, R, { round: 0.05 }));                            // fuel tank
+    parts.push(cyl(0.035, 0.03, -0.12, 0.575, 0.05, 'plastic:0x111111', { seg: 16, use: 'fuel' })); // fuel cap
+    parts.push(box(0.03, 0.2, 0.22, 0.27, 0.36, 0.19, 'plastic:0x1d1d1f', { round: 0.006 }));    // control panel
+    parts.push(box(0.012, 0.035, 0.03, 0.287, 0.42, 0.24, 'plastic:0xf2f2f2', { col: false }), box(0.012, 0.035, 0.03, 0.287, 0.42, 0.14, 'plastic:0xf2f2f2', { col: false }));
+    parts.push(box(0.014, 0.03, 0.018, 0.288, 0.3, 0.24, 'plastic:0xe74c3c', { use: 'switch', col: false }));  // on/off switch
+    parts.push(box(0.014, 0.026, 0.02, 0.288, 0.3, 0.16, 'plastic:0x111111', { use: 'breaker', col: false }));  // breaker
+    parts.push(cap(0.012, 0.05, -0.27, 0.3, 0.08, 'plastic:0x111111', { rot: [0, 0, 90], use: 'pullstart' })); // pull-cord handle
+    parts.push(cyl(0.03, 0.12, -0.2, 0.22, -0.2, 'metal:steel', { rot: [90, 0, 0], seg: 14 }));                // muffler
+    return { mass: 48, parts };
+  },
+});
+
+add({
+  id: 'gascan', tab: 'power', name: '5-Gallon Gas Can', brand: 'Torque', style: 'power', room: 'Power', price: 55, mass: 16,
+  rating: 4.2, reviews: 3020, blurb: '19 L of regular gasoline (price includes the gas). Hold it next to a generator\'s fuel cap to pour.',
+  quotes: ['"Spout is annoying but it works."'],
+  options: {},
+  build() {
+    return { mass: 16, parts: [
+      box(0.24, 0.32, 0.36, 0, 0.16, 0, 'plastic:0xc0392b', { round: 0.03 }),
+      box(0.05, 0.03, 0.2, 0, 0.345, -0.02, 'plastic:0xc0392b', { round: 0.01 }),
+      cyl(0.016, 0.16, 0, 0.36, 0.16, 'plastic:0x1d1d1f', { rot: [55, 0, 0], seg: 10 }),
+    ] };
+  },
+});
+
+add({
+  id: 'powerstation-sunstack', tab: 'power', name: 'SunStack 2000 Power Station', brand: 'SunStack', style: 'power', room: 'Power', price: 1299, mass: 22,
+  rating: 4.7, reviews: 5108, blurb: '2,048 Wh battery + 2,000 W outlets. Silent. Charges from SunStack solar panels within 6 m. Ships 80% charged.',
+  quotes: ['"Runs my fridge all night on what the panels made during the day."'],
+  source: { watts: 2000, outlets: [[0.0, 0.18, 0.15], [0.08, 0.18, 0.15], [-0.08, 0.18, 0.15]], kind: 'battery', wh: 2048 },
+  options: {},
+  build() {
+    return { mass: 22, parts: [
+      box(0.4, 0.3, 0.28, 0, 0.15, 0, 'plastic:0x2a2d33', { round: 0.03 }),
+      box(0.38, 0.06, 0.26, 0, 0.33, 0, 'plastic:0x3d424b', { round: 0.02 }),  // handle
+      box(0.14, 0.07, 0.006, -0.08, 0.2, 0.141, 'plastic:0x0b0c0f', { col: false, screen: true }),
+      box(0.03, 0.02, 0.01, 0.14, 0.24, 0.142, 'plastic:0x34c759', { col: false, use: 'switch' }),
+    ] };
+  },
+});
+
+add({
+  id: 'solarpanel', tab: 'power', name: 'SunStack 400 W Solar Panel', brand: 'SunStack', style: 'power', room: 'Power', price: 499, mass: 21,
+  rating: 4.6, reviews: 2290, blurb: '400 W in full sun pointed right at it. Less in clouds, at sunrise/sunset, or in shade. Nothing at night (it\'s real).',
+  quotes: ['"Got 330 W at noon in October."'],
+  options: {},
+  build() {
+    const parts = [
+      box(1.13, 0.035, 1.72, 0, 0.75, 0, 'plastic:0x10233f', { rot: [-35, 0, 0], round: 0.006, solar: true }),
+      box(1.15, 0.04, 1.74, 0, 0.745, -0.004, 'metal:steel', { rot: [-35, 0, 0], vis: false }),
+      cyl(0.016, 1.05, -0.5, 0.52, -0.55, 'metal:steel', { seg: 8 }), cyl(0.016, 1.05, 0.5, 0.52, -0.55, 'metal:steel', { seg: 8 }),
+      cyl(0.016, 0.5, -0.5, 0.25, 0.5, 'metal:steel', { seg: 8 }), cyl(0.016, 0.5, 0.5, 0.25, 0.5, 'metal:steel', { seg: 8 }),
+      box(1.1, 0.03, 0.03, 0, 0.02, -0.55, 'metal:steel'), box(1.1, 0.03, 0.03, 0, 0.02, 0.5, 'metal:steel'),
+    ];
+    return { mass: 21, parts };
+  },
+});
+
+add({
+  id: 'extcord', tab: 'power', name: '25 ft Extension Cord + 3-Outlet Box', brand: 'Coast Hardware', style: 'power', room: 'Power', price: 24, mass: 1.4,
+  rating: 4.5, reviews: 9811, blurb: 'Reaches 7.6 m from a power source. Plug up to 3 things into the box. Overload it and the source\'s breaker trips.',
+  quotes: ['"Bright orange so you don\'t trip on it. I tripped on it."'],
+  source: { watts: 1875, outlets: [[0.0, 0.05, 0.05], [-0.05, 0.05, 0.05], [0.05, 0.05, 0.05]], kind: 'strip', reach: 7.6 },
+  options: {},
+  build() { return { mass: 1.4, parts: [box(0.16, 0.05, 0.09, 0, 0.025, 0, 'plastic:0xff7a1a', { round: 0.012 })] }; },
+});
+
+add({
+  id: 'tablelamp-ardent', name: 'Fontaine Brass Table Lamp', brand: BRANDS.luxury, style: 'luxury', room: 'Living room', price: 690, mass: 4.2,
+  rating: 4.8, reviews: 402, blurb: 'Solid brass column, pleated silk shade, warm 2700 K bulb. Click it to switch on (needs power).', power: 9,
+  quotes: ['"Like a hotel lobby lamp."'],
+  options: {},
+  build() {
+    return { mass: 4.2, parts: [
+      cyl(0.09, 0.025, 0, 0.0125, 0, 'metal:brass', { seg: 28 }),
+      cone(0.03, 0.022, 0.42, 0, 0.235, 0, 'metal:brass', { seg: 20, use: 'switch' }),
+      cone(0.2, 0.14, 0.26, 0, 0.56, 0, 'shade:0xefe6d2', { seg: 36, hollow: 0.05, use: 'switch' }),
+      sph(0.04, 0, 0.5, 0, 'bulb', { col: false, light: { lumens: 800, color: 0xffc98a, offset: [0, 0.5, 0] } }),
+    ] };
+  },
+});
+
+// =====================================================================
 export const CATALOG = ITEMS;
 export const ROOMS = ['Living room', 'Bedroom', 'Kitchen + dining', 'Bathroom', 'Office', 'Outdoor'];
 export const STYLES = { modern: 'Modern', flatpack: 'Flat-pack', luxury: 'Luxury', rustic: 'Rustic + vintage' };
@@ -703,10 +806,47 @@ export const TABS = [
   { id: 'electronics', label: 'Electronics', icon: '📺' }, { id: 'tools', label: 'Tools', icon: '🔧' },
   { id: 'nature', label: 'Nature', icon: '🌲' }, { id: 'animals', label: 'Animals', icon: '🦌' },
   { id: 'people', label: 'People', icon: '🧍' }, { id: 'vehicles', label: 'Vehicles', icon: '🚗' },
-  { id: 'buildings', label: 'Buildings', icon: '🏠' }, { id: 'power', label: 'Power', icon: '⚡' },
+  { id: 'buildings', label: 'Buildings', icon: '🏠' }, { id: 'power', label: 'Power', icon: '⚡', ready: true },
 ];
 
-export function getItem(id) { return ITEMS.find((i) => i.id === id); }
+export function getItem(id) { return ITEMS.find((i) => i.id === id) || SPECIAL[id]; }
+export const tabOf = (it) => it.tab || 'furniture';
+
+// Special items that aren't in the shop: the cardboard box flat-pack furniture ships in,
+// and the flattened box left over after you build it.
+const SPECIAL = {
+  flatbox: {
+    id: 'flatbox', raw: true, name: 'Flat-pack box', brand: 'Nordbo', price: 0, rating: 0, reviews: 0,
+    build(o) {
+      const { L, W, H } = o;
+      const t = 0.006, C = 'cardboard';
+      return {
+        mass: o.mass,
+        bodies: {
+          main: {},
+          flapA: { joint: 'revolute', axis: [0, 0, 1], limits: [0, 0], anchor: [-W / 2, H, 0] },
+          flapB: { joint: 'revolute', axis: [0, 0, 1], limits: [0, 0], anchor: [W / 2, H, 0] },
+        },
+        parts: [
+          box(W, t, L, 0, t / 2, 0, C), box(t, H, L, -W / 2 + t / 2, H / 2, 0, C), box(t, H, L, W / 2 - t / 2, H / 2, 0, C),
+          box(W - 2 * t, H, t, 0, H / 2, -L / 2 + t / 2, C), box(W - 2 * t, H, t, 0, H / 2, L / 2 - t / 2, C),
+          // what's inside: stacked panels, a bag of screws, instructions, an allen key
+          box(W - 0.04, H * 0.62, L - 0.06, 0, t + H * 0.31, 0, 'board:white', { col: false, use: 'assemble' }),
+          box(0.12, 0.03, 0.18, W * 0.2, t + H * 0.62 + 0.015, -L * 0.2, 'plastic:0xdddddd', { col: false, use: 'assemble' }),
+          box(0.21, 0.004, 0.3, -W * 0.15, t + H * 0.62 + 0.002, L * 0.15, 'paint:White', { col: false, use: 'assemble' }),
+          // the lid: two flaps, taped down the middle
+          box(W / 2 - 0.002, t, L, -W / 4, H + t / 2, 0, C, { body: 'flapA' }),
+          box(W / 2 - 0.002, t, L, W / 4, H + t / 2, 0, C, { body: 'flapB' }),
+          box(0.05, 0.002, L + 0.02, 0, H + t + 0.001, 0, 'plastic:0xc8a46a', { col: false, use: 'cutTape', tape: true }),
+        ],
+      };
+    },
+  },
+  cardboard: {
+    id: 'cardboard', raw: true, name: 'Flattened cardboard', brand: 'Nordbo', price: 0, rating: 0, reviews: 0,
+    build(o) { return { mass: o.mass || 2, parts: [box(o.W || 0.9, 0.012, o.L || 1.4, 0, 0.006, 0, 'cardboard')] }; },
+  },
+};
 
 export function defaultOptions(item) {
   const o = {};
@@ -729,6 +869,7 @@ export function resolve(item, chosen) {
 }
 
 export function buildSpec(item, chosen) {
+  if (item.raw) { const spec = item.build(chosen || {}); spec.bodies = spec.bodies || { main: {} }; spec.price = 0; return spec; }
   const { vals, price } = resolve(item, chosen);
   const spec = item.build(vals);
   spec.bodies = spec.bodies || { main: {} };

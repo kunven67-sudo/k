@@ -26,6 +26,8 @@ export class Hands {
     this.enabled = true;
     this.events = [];
     this._dir = new THREE.Vector3();
+    this.rc = new THREE.Raycaster();
+    this.pending = null;
     this.unhook = physics.onStep((h) => this.fixedStep(h));
   }
 
@@ -43,10 +45,30 @@ export class Hands {
       const body = col.parent();
       if (item && body) {
         const p = { x: cam.x + dir.x * hit.timeOfImpact, y: cam.y + dir.y * hit.timeOfImpact, z: cam.z + dir.z * hit.timeOfImpact };
-        this.aim = { item, body, collider: col, point: p, dist: hit.timeOfImpact, movable: body.isDynamic() };
+        // which exact part are you pointing at? (switches, pull cords, tape, box contents)
+        this.rc.set(cam, dir);
+        this.rc.far = REACH + 0.3;
+        const vis = this.rc.intersectObject(item.root, true).find((x) => x.object.visible && !x.object.userData.outline && x.object.userData.part);
+        const part = vis?.object.userData.part || col.userData?.part;
+        this.aim = { item, body, collider: col, point: p, dist: hit.timeOfImpact, movable: body.isDynamic(), part, use: part?.use };
       }
     }
-    if (input.mousePressed(0) && this.aim && this.aim.movable && !this.held) this.grab(this.aim);
+    if (input.mousePressed(0) && this.aim && !this.held && !this.pending) {
+      if (this.aim.use) this.pending = { aim: this.aim, t: 0 };
+      else if (this.aim.movable) this.grab(this.aim);
+    }
+    if (this.pending) {
+      const pa = this.pending.aim;
+      if (input.mouse(0)) {
+        this.pending.t += dt;
+        if (pa.use === 'assemble') this.events.push({ type: 'assembleHold', item: pa.item, dt });
+        else if (this.pending.t > 0.25 && pa.movable) { this.grab(pa); this.pending = null; } // held = grab it instead
+      } else {
+        if (this.pending.t <= 0.25) this.events.push({ type: 'use', item: pa.item, part: pa.part });
+        if (pa.use === 'assemble') this.events.push({ type: 'assembleStop' });
+        this.pending = null;
+      }
+    }
     if (this.held && !input.mouse(0)) this.release(false);
     if (this.held) {
       if (input.wheel) this.held.dist = clamp(this.held.dist - input.wheel * 0.12, 0.55, REACH);

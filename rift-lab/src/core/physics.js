@@ -15,7 +15,12 @@ export class Physics {
     this.world.timestep = 1 / 60;
     this.acc = 0;
     this.stepHooks = new Set();
+    this.forceHooks = new Set();
+    this.queue = new RAPIER.EventQueue(true);
   }
+
+  // fn(event) for every hard contact (impacts) reported by the engine
+  onForce(fn) { this.forceHooks.add(fn); return () => this.forceHooks.delete(fn); }
 
   // fn(dt) runs once per fixed step, before the physics step
   onStep(fn) { this.stepHooks.add(fn); return () => this.stepHooks.delete(fn); }
@@ -26,7 +31,9 @@ export class Physics {
     const h = this.world.timestep;
     while (this.acc >= h && steps < 5) {
       for (const fn of this.stepHooks) fn(h);
-      this.world.step();
+      this.world.step(this.queue);
+      this.queue.drainContactForceEvents((e) => { for (const fn of this.forceHooks) fn(e); });
+      this.queue.drainCollisionEvents(() => {});
       this.acc -= h;
       steps++;
     }

@@ -1,7 +1,7 @@
 // The Vireo phone's screen: home, Spawn (shop), Build, Flashlight, Weather, Bank, Lab Notes...
 
 import { h } from './ui.js';
-import { CATALOG, ROOMS, STYLES, TABS, getItem, resolve, defaultOptions, buildSpec } from '../items/catalog.js';
+import { CATALOG, ROOMS, STYLES, TABS, getItem, resolve, defaultOptions, buildSpec, tabOf } from '../items/catalog.js';
 import { specBounds } from '../items/builder.js';
 import { productPhoto } from '../items/photo.js';
 import { settings } from '../core/settings.js';
@@ -111,7 +111,8 @@ export class PhoneUI {
     const drawCards = () => {
       cards.innerHTML = '';
       const q = s.q.trim().toLowerCase();
-      const list = CATALOG.filter((it) => (s.room === 'All' || it.room === s.room) && (s.style === 'All' || it.style === s.style)
+      const furn = s.tab === 'furniture';
+      const list = CATALOG.filter((it) => tabOf(it) === s.tab && (!furn || s.room === 'All' || it.room === s.room) && (!furn || s.style === 'All' || it.style === s.style)
         && (!q || `${it.name} ${it.brand} ${it.room} ${it.blurb}`.toLowerCase().includes(q)));
       if (!list.length) cards.append(h('div', { class: 'ph-center', style: 'grid-column:1/3' }, 'Nothing found. Try "sofa" or "lamp".'));
       for (const it of list) {
@@ -130,7 +131,8 @@ export class PhoneUI {
       page.append(h('div', { class: 'ph-center' }, h('div', { style: 'font-size:44px' }, tab.icon), h('h3', { style: 'color:#121316' }, `${tab.label} is coming soon`), `This tab gets filled in a later piece of the build. Furniture is first, then ${tab.id === 'food' ? 'Food (it\'s next!)' : 'Food + everyday stuff'}.`));
       return page;
     }
-    page.append(rooms, styles, cards);
+    if (s.tab === 'furniture') page.append(rooms, styles);
+    page.append(cards);
     drawCards();
     return page;
   }

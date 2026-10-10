@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { getItem, buildSpec, defaultOptions } from './catalog.js';
 import { buildVisual, buildColliders, specBounds } from './builder.js';
+import { cutTape } from './flatpack.js';
 
 let nextUid = 1;
 
@@ -17,9 +18,26 @@ export class SpawnedItem {
     this.itemId = itemId;
     this.chosen = { ...defaultOptions(this.def), ...(chosen || {}) };
     this.spec = buildSpec(this.def, this.chosen);
+    this.state = saved?.state ? JSON.parse(JSON.stringify(saved.state)) : {};
+    // a missing screw: one leg is a few millimeters short, so it really rocks
+    if (this.chosen._wobble != null) {
+      const legs = this.spec.parts.map((p, i) => [p, i]).filter(([p]) => (p.s === 'box' || p.s === 'cyl' || p.s === 'cone') && p.p && Math.abs(p.p[1] - (p.s === 'box' ? p.size[1] : p.h) / 2) < 0.01);
+      if (legs.length) {
+        const [leg, i] = legs[this.chosen._wobble % legs.length];
+        const nl = { ...leg, p: [leg.p[0], leg.p[1] + 0.003, leg.p[2]] };
+        if (nl.s === 'box') nl.size = [leg.size[0], leg.size[1] - 0.006, leg.size[2]]; else nl.h = leg.h - 0.006;
+        this.spec.parts[i] = nl;
+      }
+    }
+    // parts that broke off before (saved) stay gone
+    for (const i of this.state.broken || []) if (this.spec.parts[i]) this.spec.parts[i] = { ...this.spec.parts[i], vis: false, col: false };
     this.bounds = specBounds(this.spec);
     this.frozen = false;
     const { groups, lights } = buildVisual(this.spec);
+    // lamps need their own bulb/shade materials so one can glow while another is off
+    for (const g of Object.values(groups)) g.traverse((o) => {
+      if (o.isMesh && (o.material.userData?.bulb || o.material.userData?.shade)) { o.material = o.material.clone(); o.material.userData.own = true; }
+    });
     this.groups = groups;
     this.lights = lights;
     this.root = new THREE.Group();
@@ -44,6 +62,7 @@ export class SpawnedItem {
         col.userData = { item: this, bodyName: name, surface: c.phys.sound, part: c.part };
         this.colliders.push(col);
         mgr.byHandle.set(col.handle, this);
+        mgr.onCollider?.(col, c.part, this);
       }
       this.bodies[name] = body;
     }
@@ -72,6 +91,8 @@ export class SpawnedItem {
       this.joints.push({ name, joint: j, type: b.joint });
     }
     if (saved) this.restore(saved);
+    if (this.itemId === 'flatbox' && this.state.tapeCut) cutTape(this);
+    if (this.state.bulbBroken) for (const L of this.lights) L.mesh.visible = false;
     this.sync();
   }
 
@@ -122,7 +143,9 @@ export class SpawnedItem {
       const t = b.translation(), r = b.rotation();
       bodies[name] = { t: [t.x, t.y, t.z], q: [r.x, r.y, r.z, r.w] };
     }
-    return { uid: this.uid, id: this.itemId, chosen: this.chosen, frozen: this.frozen, bodies };
+    const state = { ...this.state };
+    delete state.powered; delete state.load; delete state.solarW;
+    return { uid: this.uid, id: this.itemId, chosen: this.chosen, frozen: this.frozen, bodies, state };
   }
 
   restore(s) {
