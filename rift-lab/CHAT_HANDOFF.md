@@ -277,3 +277,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Cleaning tools → **all**: soap + water + sponge, disinfectant spray + wipes + bleach (real wait times, some germs survive), vacuum + broom + mop (vacuum can suck up tiny-you; dirty mop water spreads germs), hand sanitizer + UV light + steam cleaner.
 - Who cleans → **depending on the person** (neat people clean a lot, messy people don't; maids/janitors jobs; robot vacuums).
 - **BIG RULE (session 2): every person's behavior depends on THEM** (personality, mood, memories, relationship with you, situation). No fixed scripted reactions.
+- Furniture styles → **all four**: modern + minimal, cheap flat-pack (IKEA-like: particle board, breaks easier, swells when wet), luxury mansion (leather, marble, walnut, gold), rustic farmhouse + vintage.
+- Assembly → **cheap = comes in a box** (screws + instructions, build with tools, missing screw = wobbly), **expensive = comes built**.
+- Customize before spawning → **yes: color, fabric, wood, size**; price changes with choices.
+- Moving spawned stuff → **build mode ALWAYS available on the phone** (god tool move/rotate); real strength applies to your hands + gun.
