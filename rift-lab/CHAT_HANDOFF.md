@@ -291,3 +291,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - **LESSON:** don't ask questions that the "depends on everything / whatever is realistic" rule already answers. Pick the realest option yourself and tell the user. Only ask about real choices (taste, design, settings).
 - Gun battery → **a setting** (real battery / self-recharging / unlimited).
 - Digging → **yes, real digging** (shovels, holes, trenches, dirt piles, water fills holes, dams, mud, people dig for mining + farming).
+- Empty World map → **new each world, made like real geology** (rivers carve valleys downhill into lakes) + a shareable seed number.
+- Screen look → **like your own eyes** (natural colors, eye adaptation dark↔bright, no movie filters).
+- Gun name → **The Rift Tool**.
+- Backstory → **you built it** (you're the scientist; lab notes on your phone). Plus user: **"you can build gadgets and more, you can drop it too and shrink on it and explore it, like other places like a ps5 or xbox or pc, like different devices, so many"** → you build gadgets, and you can shrink down and explore INSIDE devices (the Rift Tool itself, game consoles, PCs, many devices). Real brands can't be used → real-looking consoles/PCs with made-up names, real insides.
