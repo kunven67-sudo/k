@@ -281,3 +281,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Assembly → **cheap = comes in a box** (screws + instructions, build with tools, missing screw = wobbly), **expensive = comes built**.
 - Customize before spawning → **yes: color, fabric, wood, size**; price changes with choices.
 - Moving spawned stuff → **build mode ALWAYS available on the phone** (god tool move/rotate); real strength applies to your hands + gun.
+- Gun look → **rugged real-world lab tool** (scratched metal + carbon fiber, little screens + dials showing the power, cables, swappable battery; looks like a real prototype). Own design, not Portal's.
+- Movement → **full real movement**: walk, sprint, crouch, crawl/prone, lean, climb/mantle fences + walls, ladders, swim, dive, hold breath, sit, lie down. All keys rebindable.
+- Character per world → **pick when making a world** (use your main character or make a new one).
+- Main menu background → **space → Earth → clouds → forest → shrinks into a dewdrop on a leaf**.
