@@ -324,3 +324,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Everyday tab → **all**: bathroom stuff, clothes + shoes (every season), toys + sports gear, office + school stuff (real distinct book titles).
 - Social media app name → **Buzzr**.
 - Natural disasters → **both**: real-life chance (setting to turn off/up) AND trigger them yourself from the phone. People + firefighters react.
+- Portal look → **a torn rift in space** (jagged crack in reality, edges flicker + bend light like gravity lensing, sparks, deep hum). User: **"the portal better look good buddy"**. Also: **"the gun can do insane more stuff, I'm talking about the portals"** → portals need crazy extra powers (asked next).
+- Portal colors → **pick your own in settings** (default NOT blue/orange).
+- Music → **all**: car radio stations (made-up, DJs, ads, genres), chill adaptive background music, speakers + playable instruments (people dance).
+- TV → **real news about your world** (reports what actually happened, incl. you) + made-up shows, sports, cartoons.
