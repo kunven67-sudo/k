@@ -17,6 +17,9 @@ import { Hands } from './player/hands.js';
 import { BuildTools } from './player/build.js';
 import { Phone3D } from './player/phone3d.js';
 import { PhoneUI } from './ui/phone.js';
+import { PowerGrid } from './items/power.js';
+import { FlatPack } from './items/flatpack.js';
+import { Breaking } from './items/breaking.js';
 import { astronomy } from './core/time.js';
 
 const canvas = document.getElementById('view');
@@ -145,10 +148,12 @@ function beginSpawn(id, chosen, price) {
       game.money -= price;
       game.transactions.push({ what: item.name, amount: price, at: game.clock.ms });
     }
-    const it = game.items.spawn(id, chosen, pose);
+    // flat-pack furniture arrives in its box; everything else comes built
+    const it = item.flatpack ? game.flat.spawnBox(id, chosen, pose) : game.items.spawn(id, chosen, pose);
     audio.land(3);
-    if (item.flatpack) ui.tip('flatpack', 'Real flat-pack furniture comes in a box. For now it shows up built; boxes + building it yourself are coming next.', 7);
-    if (item.power) ui.tip('power', 'This needs electricity. There is no power out here yet: generators, solar + cords are coming next.', 7);
+    if (item.flatpack) ui.tip('flatpack', 'Flat-pack: it came in a box. <b>Click the tape</b> to cut it, <b>drag the flaps</b> open, then <b>hold left-click</b> on the parts to build it (time speeds up while you work).', 10);
+    if (item.power) ui.tip('power', 'This needs electricity: spawn a generator (Power tab) or a SunStack + solar panel within its cord length (~1.8 m). Click it to switch on.', 9);
+    if (id === 'generator-torque') ui.tip('generator', 'Generators ship empty. Grab a gas can and hold it by the fuel cap to pour, then <b>click the pull-cord</b> to start it.', 9);
     ui.tip('grab', 'Hold <b>left-click</b> to grab things. Heavy stuff only drags (real strength). Swing + let go to toss, hold <b>right-click</b> to wind up a throw.', 9);
     return it;
   });
@@ -218,6 +223,10 @@ async function loadWorld(info, { menu = false, bar = null, saveData = null } = {
       Object.assign(game.player, { health: p.health ?? 100, stamina: p.stamina ?? 100, limp: p.limp ?? 0, brokenLeg: p.brokenLeg ?? 0 });
     }
     game.items = new ItemManager({ physics: game.physics, scene });
+    const say = (t) => ui.toast(t, 4);
+    game.breaking = new Breaking({ physics: game.physics, items: game.items, scene, world: game.world, audio, onMessage: say });
+    game.power = new PowerGrid({ items: game.items, scene, clock: game.clock, sky: game.world.sky, world: game.world, audio, camera, onMessage: say });
+    game.flat = new FlatPack({ items: game.items, clock: game.clock, audio, onMessage: say });
     game.hands = new Hands({ physics: game.physics, camera, items: game.items, player: game.player });
     game.player.carry = () => game.hands.carryMass;
     game.build = new BuildTools({ physics: game.physics, camera, items: game.items, player: game.player, hands: game.hands, onMessage: (t) => ui.toast(t, 2) });
@@ -225,6 +234,7 @@ async function loadWorld(info, { menu = false, bar = null, saveData = null } = {
     game.money = saveData?.money ?? START_MONEY[info.startMoney ?? 10000] ?? 10000;
     game.transactions = saveData?.transactions ?? [];
     if (saveData?.items) game.items.restoreAll(saveData.items);
+    if (saveData?.debris) game.breaking.restore(saveData.debris);
     if (saveData?.flashOn) setFlashlight(true);
   }
 }
@@ -236,6 +246,9 @@ function disposeWorld() {
   if (game.phone) { camera.remove(game.phone.root); game.phone = null; }
   if (game.build) { game.build.cancelPlacing(); game.build.setActive(false); ui.buildBanner(false); game.build = null; }
   if (game.hands) { game.hands.dispose(); game.hands = null; }
+  if (game.flat) { game.flat.stop(); game.flat = null; }
+  if (game.power) { game.power.dispose(); game.power = null; }
+  if (game.breaking) { game.breaking.dispose(); game.breaking = null; }
   if (game.items) { game.items.clear(); game.items = null; }
   setFlashlight(false);
   if (game.player) { game.player.dispose(); game.player = null; }
@@ -330,6 +343,7 @@ function saveGame(silent) {
     clockMs: game.clock.ms,
     player: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw, pitch: p.pitch, health: p.health, stamina: p.stamina, limp: p.limp, brokenLeg: p.brokenLeg },
     items: game.items ? game.items.serialize() : [],
+    debris: game.breaking ? game.breaking.serialize() : [],
     money: game.money, transactions: game.transactions, flashOn: !!game.flashOn,
   });
   if (!silent) game.autosaveT = 60;
@@ -381,6 +395,10 @@ function frame(now) {
       const alpha = game.physics.update(dt);
       p.updateCamera(dt, alpha);
       game.items.update();
+      game.breaking.update(dt);
+      game.breaking.sync();
+      game.power.update(dt, game.hands);
+      if (game.flat.working && !input.mouse(0)) { game.flat.stop(); ui.progress(null); }
       game.phone.update(dt, p.moveMode && p.moveMode !== 'idle');
       if (game.phone.root.visible && game.phoneOpen) {
         phoneUI.setTransform(game.phone.screenTransform(innerWidth, innerHeight));
@@ -414,6 +432,13 @@ function handleHandEvents() {
       if (audio.started) audio.burst({ dur: 0.06, freq: 900, q: 1, gain: 0.08 });
       if (e.mass * 9.81 > 430) ui.tip('heavy', `That's about ${Math.round(e.mass)} kg: too heavy to lift alone. You can drag it, or use build mode.`, 6);
     } else if (e.type === 'throw' && audio.started) audio.burst({ dur: 0.18, freq: 500, q: 0.6, gain: 0.08, attack: 0.05 });
+    else if (e.type === 'use') {
+      // mouse only: clicking a switch, a pull-cord, a breaker, tape on a box...
+      if (!game.flat.use(e.item, e.part)) game.power.use(e.item, e.part);
+    } else if (e.type === 'assembleHold') {
+      const prog = game.flat.hold(e.item, e.dt);
+      ui.progress(prog == null ? null : prog);
+    } else if (e.type === 'assembleStop') { game.flat.stop(); ui.progress(null); }
   }
   hd.events.length = 0;
 }

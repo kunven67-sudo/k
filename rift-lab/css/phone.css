@@ -89,3 +89,9 @@
 .dot.grab { width: 14px; height: 14px; margin: -7px 0 0 -7px; background: transparent; border: 2px solid rgba(255,255,255,0.9); }
 .dot.holding { width: 10px; height: 10px; margin: -5px 0 0 -5px; background: rgba(159,232,255,0.95); }
 .dot.charge { box-shadow: 0 0 0 4px rgba(255,200,120,0.6); }
+
+/* building a flat-pack: ring around the center of the screen */
+.progress-wrap { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; pointer-events: none; }
+.progress-ring { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(#9fe8ff var(--p, 0%), rgba(255,255,255,0.15) 0); -webkit-mask: radial-gradient(circle, transparent 17px, #000 18px); mask: radial-gradient(circle, transparent 17px, #000 18px); }
+.progress-wrap span { position: absolute; top: 54px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 13px; color: #fff; text-shadow: 0 1px 3px #000; }

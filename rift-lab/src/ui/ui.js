@@ -310,6 +310,13 @@ export class UI {
       <div class="line">${clock.fastForward > 1 ? `⏩ <b>x${clock.fastForward}</b>` : `🍂 ${cap(clock.season())}`}</div>`;
   }
 
+  progress(p) {
+    if (p == null) { this.progEl?.remove(); this.progEl = null; return; }
+    if (!this.progEl) { this.progEl = h('div', { class: 'progress-wrap' }, h('div', { class: 'progress-ring' }), h('span')); this.layer.append(this.progEl); }
+    this.progEl.firstChild.style.setProperty('--p', `${Math.round(p * 100)}%`);
+    this.progEl.lastChild.textContent = `Building… ${Math.round(p * 100)}%`;
+  }
+
   buildBanner(on) {
     if (!on) { this.buildEl?.remove(); this.buildEl = null; return; }
     if (this.buildEl) return;
