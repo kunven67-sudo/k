@@ -339,3 +339,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Extra vehicles → **all**: boats + jet skis (speedboats, fishing boats, yachts, kayaks), submarine (deep pressure, darkness, deep-sea creatures), rocket to space (real launch physics, orbit, land on the Moon), trains + subway.
 - Character maker extras → **all**: tattoos + piercings (age/fade), glasses + accessories, makeup + nails, beards + body hair (grow out over days).
 - Claude picked (realism rule): **X-ray scanner uses real radiation** (single scan tiny/safe, repeated scans add up).
+- Space → **real solar system + real stars** (real planets + moons with NASA maps, real gravity per planet, real nearby stars + Milky Way shape).
+- Aliens → **real aliens far away** (on planets around far stars). Follow-ups asked next.
+- Super launch → **hold to charge + faint arc preview**, real physics on landing.
+- Instant replay → **yes**: last 30 s from any angle, save clips to the phone gallery, post on Buzzr and people react.
