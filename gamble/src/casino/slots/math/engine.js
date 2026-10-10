@@ -47,7 +47,29 @@ export function buildStrip(counts, { seed = 1, stacks = {} } = {}) {
       [blocks[(i + 1) % blocks.length], blocks[j]] = [blocks[j], blocks[(i + 1) % blocks.length]];
     }
   }
-  return blocks.flat();
+  // Scatters are spaced at least 3 stops apart, so a reel never shows two in its window.
+  let strip = blocks.flat();
+  for (let pass = 0; pass < 200; pass++) {
+    const n = strip.length;
+    let bad = -1;
+    for (let i = 0; i < n && bad < 0; i++) {
+      if (!spread.includes(strip[i])) continue;
+      for (let d = 1; d < 3; d++) if (strip[(i + d) % n] === strip[i]) bad = (i + d) % n;
+    }
+    if (bad < 0) break;
+    const j = r.int(0, n - 1);
+    if (strip[j] === strip[bad] || stacked(strip, j)) continue;
+    [strip[bad], strip[j]] = [strip[j], strip[bad]];
+  }
+  return strip;
+}
+
+const spread = ['S'];
+// Don't break up a stack when moving a scatter.
+function stacked(strip, j) {
+  const n = strip.length;
+  const k = strip[j];
+  return strip[(j + 1) % n] === k || strip[(j - 1 + n) % n] === k;
 }
 
 /** Compile a PAR definition into int arrays the evaluator can run fast. */
