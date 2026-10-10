@@ -76,7 +76,7 @@ export function inMarble(x, z) {
 }
 
 function buildFloor(C) {
-  const { M, spots, add, colliders } = C;
+  const { M, add, colliders } = C;
   // Carpet: a 1.2 m grid (for the baked light) minus cells entirely under marble / outside.
   const cs = 1.2;
   const nx = Math.ceil((SHELL.x1 - SHELL.x0) / cs);
@@ -116,8 +116,7 @@ function buildFloor(C) {
   carpet.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   carpet.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(pos.length).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
   carpet.setIndex(idx);
-  spots.bake(carpet, 1, wallShade);
-  add(carpet, tinted(M.carpet), { castShadow: false });
+  C.addBaked(carpet, tinted(M.carpet), 1, wallShade, { castShadow: false });
 
   // Marble: foyer, cage apron, restroom corridor, elevator lobby (subdivided for the bake).
   const my = FLOOR_Y + 0.006;
@@ -125,8 +124,7 @@ function buildFloor(C) {
     const w = r.x1 - r.x0;
     const d = r.z1 - r.z0;
     const g = new THREE.PlaneGeometry(w, d, Math.max(1, Math.round(w / 1.2)), Math.max(1, Math.round(d / 1.2))).rotateX(-Math.PI / 2).translate((r.x0 + r.x1) / 2, my, (r.z0 + r.z1) / 2);
-    spots.bake(g, 1.05, wallShade);
-    add(g, tinted(M.marble), { castShadow: false });
+    C.addBaked(g, tinted(M.marble), 1.05, wallShade, { castShadow: false });
     // Brass edge strip where marble meets carpet (hides the joint).
     const strips = [];
     if (r.x0 > SHELL.x0 + 0.1) strips.push([r.x0, (r.z0 + r.z1) / 2, 0.035, d]);
@@ -137,11 +135,9 @@ function buildFloor(C) {
   }
   // Fountain plaza: cream marble ring with a red-marble compass star and a dark border.
   const ring = new THREE.RingGeometry(FOUNTAIN.basinR - 0.1, FOUNTAIN.ringR, 120, 8).rotateX(-Math.PI / 2).translate(FOUNTAIN.x, my, FOUNTAIN.z);
-  spots.bake(ring, 1.05);
-  add(ring, tinted(M.marble), { castShadow: false });
+  C.addBaked(ring, tinted(M.marble), 1.05, null, { castShadow: false });
   const border = new THREE.RingGeometry(FOUNTAIN.ringR, RING_OUT, 120, 1).rotateX(-Math.PI / 2).translate(FOUNTAIN.x, my, FOUNTAIN.z);
-  spots.bake(border, 0.9);
-  add(border, tinted(M.marbleDark), { castShadow: false });
+  C.addBaked(border, tinted(M.marbleDark), 0.9, null, { castShadow: false });
   for (const r of [FOUNTAIN.ringR + 0.02, RING_OUT - 0.02]) add(new THREE.RingGeometry(r - 0.02, r + 0.02, 120, 1).rotateX(-Math.PI / 2).translate(FOUNTAIN.x, my + 0.0015, FOUNTAIN.z), M.brass, { castShadow: false });
   // Star: 16 long thin rays (alternating red / green marble) between the basin and the border.
   const star = [];
@@ -164,7 +160,7 @@ function buildFloor(C) {
 }
 
 /** Corners and wall bases sit in shadow: darken the bake within ~1.5 m of a wall. */
-function wallShade(x, _y, z) {
+export function wallShade(x, _y, z) {
   const d = Math.min(x - SHELL.x0, SHELL.x1 - x, z - SHELL.z0, SHELL.z1 - z, (CHAMFER.a[0] - CHAMFER.a[1] - (x - z)) / Math.SQRT2);
   const k = Math.min(1, Math.max(0, d / 1.6));
   return 0.72 + 0.28 * k * k * (3 - 2 * k);

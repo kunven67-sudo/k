@@ -114,12 +114,13 @@ export async function buildReno(engine, physics, { tier, month, eldorado = {} } 
 
   // ---- Interactables (owners for the player's interaction raycasts) ----
   const interactables = [
-    {
+    // With eldorado.openDoors the casino builder hangs the real doors (src/casino/interior/doors.js);
+    // otherwise the closed doors report where they lead.
+    ...(eldorado.openDoors ? [] : [{
       id: 'eldorado-doors', kind: 'door', position: new THREE.Vector3(-12.3, 1.3, 50),
       describe: () => t('reno.eldo.entrance'),
-      // The casino builder hooks the real door; until then the doors report where they lead.
       onInteract: () => ({ venue: 'eldorado', to: eldo.entrance }),
-    },
+    }]),
     { id: 'bus-stop-4th', kind: 'bus-stop', position: new THREE.Vector3(166, 1.0, 9.6), describe: () => 'RTC', onInteract: () => ({ routes: ['11', '18'] }) },
   ];
 

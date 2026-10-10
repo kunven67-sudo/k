@@ -15,6 +15,7 @@ import { createSky } from '../gfx/sky.js';
 import { setMaxAnisotropy } from '../gfx/textures.js';
 import { buildReno } from './reno/index.js';
 import { buildStarlite } from './motel/index.js';
+import { buildEldoradoInterior } from '../casino/index.js';
 
 export async function buildWorld(engine, physics, { tier, scene, onProgress } = {}) {
   tier = tier || engine.tier;
@@ -33,17 +34,29 @@ export async function buildWorld(engine, physics, { tier, scene, onProgress } = 
   progress(0.05);
   const sky = createSky(scene, engine.renderer, { tier });
   progress(0.15);
-  const reno = await buildReno(engine, physics, { tier });
+  // openDoors: the casino builder hangs the Eldorado's real doors in the shell's openings.
+  const reno = await buildReno(engine, physics, { tier, eldorado: { openDoors: true } });
   group.add(reno.group);
-  progress(0.6);
+  progress(0.55);
   const motel = await buildStarlite(engine, physics, { tier });
   group.add(motel.group);
+  progress(0.75);
+  const casino = await buildEldoradoInterior(engine, physics, { tier, scene });
+  group.add(casino.group);
   progress(0.95);
 
   // Merged views. Motel zones come first so the room wins over the city's broad 4th St box.
-  const zones = [...motel.zones, ...reno.zones];
-  const interactables = [...motel.interactables, ...reno.interactables];
+  const zones = [...motel.zones, ...casino.zones, ...reno.zones];
+  const interactables = [...motel.interactables, ...casino.interactables, ...reno.interactables];
   const spawn = { ...reno.spawn, ...motel.spawn, street: reno.spawn.motelFront };
+  for (const [k, v] of Object.entries(casino.spawn)) spawn[`casino${k[0].toUpperCase()}${k.slice(1)}`] = v;
+
+  // The casino's real-light pool trades places with the motel's night pool (same size per tier)
+  // so the scene's light count — and every shader — stays the same wherever you are.
+  const motelPool = [];
+  motel.group.traverse((o) => o.isPointLight && o.parent?.name === 'night-lights' && motelPool.push(o));
+  const rainMesh = reno.group.getObjectByName('rain');
+  let cityHidden = false;
 
   const weather = { cloudCover: 0.16, rain: 0, fog: 0 };
   const viewer = new THREE.Vector3();
@@ -54,6 +67,7 @@ export async function buildWorld(engine, physics, { tier, scene, onProgress } = 
     sky,
     reno,
     motel,
+    casino,
     zones,
     interactables,
     spawn,
@@ -72,8 +86,24 @@ export async function buildWorld(engine, physics, { tier, scene, onProgress } = 
       sky.update(clock, w, viewer);
       reno.update(dt, clock, { weather: w, camera: ctx.camera, viewer, sky });
       motel.update(dt, clock, { camera: ctx.camera, viewer, sky, scene, weather: w, indoorLighting: true, citySigns: true });
+      casino.update(dt, { camera: ctx.camera, viewer, player: ctx.player, sky, scene, clock });
+      const inCasino = casino.state.near;
+      casino.lightPool.setVisible(inCasino || !motelPool.length);
+      for (const l of motelPool) l.visible = !inCasino;
+      // No rain falls indoors.
+      if (rainMesh && casino.state.inside > 0.5) rainMesh.visible = false;
+      // Deep inside the casino (well away from every door) the city can't be seen: skip drawing it
+      // (its light pool group stays, so the light count never changes).
+      const cam = ctx.camera?.position || viewer;
+      const hideCity = casino.state.insideNow && casino.nearestEntrance(cam) > 16;
+      if (hideCity !== cityHidden) {
+        cityHidden = hideCity;
+        for (const c of reno.group.children) if (c.name !== 'night-lights') c.visible = !hideCity;
+      }
+      if (hideCity) for (const c of reno.group.children) if (c.name !== 'night-lights') c.visible = false;
     },
     dispose() {
+      casino.dispose?.();
       motel.dispose?.();
       reno.dispose?.();
       sky.dispose?.();

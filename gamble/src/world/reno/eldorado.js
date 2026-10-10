@@ -49,6 +49,9 @@ export function buildEldorado(ctx, { clearGlass = false, openDoors = false } = {
     dark: mat('metal-painted', { color: 0x2a1d18, wear: 0.2, dirt: 0.3, seed: 94 }),
   };
   const doorStyle = clearGlass ? 'clear' : 'casino';
+  // With openDoors the casino builder (src/casino) hangs real, hinged doors in these openings, so
+  // the facade leaves them empty ('void') and only the lintels get colliders.
+  const doorKind = openDoors ? 'void' : 'door';
 
   // ---- Faces (manual frames for the chamfered footprint) ----
   const faces = {
@@ -68,7 +71,7 @@ export function buildEldorado(ctx, { clearGlass = false, openDoors = false } = {
   // Main entrance: three door pairs with stone piers between them; glass transom above.
   const doorW = 2.6;
   const doorZ = [46.7, 50, 53.3];
-  for (const dz of doorZ) vOpen.push({ kind: 'door', x0: vx(dz + doorW / 2), x1: vx(dz - doorW / 2), y0: 0, y1: 3.2, style: doorStyle, glassTint: 0x6a5a48 });
+  for (const dz of doorZ) vOpen.push({ kind: doorKind, door: true, x0: vx(dz + doorW / 2), x1: vx(dz - doorW / 2), y0: 0, y1: 3.2, style: doorStyle, glassTint: 0x6a5a48 });
   vOpen.push({ kind: 'shop', x0: vx(entr.z1), x1: vx(entr.z0), y0: 3.55, y1: 5.6, style: doorStyle, mullions: 5, glassTint: 0x6a5a48 });
   // Ground floor display windows (lit show posters) between pilasters.
   const bays = [];
@@ -205,7 +208,7 @@ export function buildEldorado(ctx, { clearGlass = false, openDoors = false } = {
     t: T,
     wall: M.wall,
     tint: CREAM,
-    openings: [{ kind: 'door', x0: 1.4, x1: C.len - 1.4, y0: 0, y1: 3.2, style: doorStyle, glassTint: 0x6a5a48 }],
+    openings: [{ kind: doorKind, x0: 1.4, x1: C.len - 1.4, y0: 0, y1: 3.2, style: doorStyle, glassTint: 0x6a5a48 }],
     cellMat: groundCell(),
     splitY: [1.0],
     bands: [{ y: 6.85, h: 0.55, d: 0.45, mat: M.gold, tint: 0xffffff, cap: true }, { y: 13.2, h: 0.8, d: 0.6, mat: M.gold, tint: 0xffffff, cap: true }],
@@ -232,7 +235,7 @@ export function buildEldorado(ctx, { clearGlass = false, openDoors = false } = {
     if (x < -40 && x > -50) continue; // side entrance under the skyway
     fOpen.push({ kind: 'shop', x0: fx(x + 1.6), x1: fx(x - 1.6), y0: 1.0, y1: 4.6, style: doorStyle, glassTint: 0x5e5246, mullions: 1 });
   }
-  fOpen.push({ kind: 'door', x0: fx(-42.5), x1: fx(-47.5), y0: 0, y1: 3.2, style: doorStyle, glassTint: 0x6a5a48 });
+  fOpen.push({ kind: doorKind, door: true, x0: fx(-42.5), x1: fx(-47.5), y0: 0, y1: 3.2, style: doorStyle, glassTint: 0x6a5a48 });
   for (let x = -20; x > -79; x -= 3.6) {
     for (const [y0, y1] of [[7.9, 9.9], [10.9, 12.6]]) {
       if (y0 > 10 && x < -30 && x > -64) continue;
@@ -344,9 +347,9 @@ export function buildEldorado(ctx, { clearGlass = false, openDoors = false } = {
   ctx.extraMeshes.push(bulbs.build('eldorado-letter-bulbs'), down.build('eldorado-downlights'), fascia.build('eldorado-fascia'), crown.build('eldorado-crown'));
 
   // ---- Colliders: per wall (the casino volume stays open for the casino builder) ----
-  wallColliders(colliders, faces.virginia, H, T, vOpen.filter((o) => o.kind === 'door'), openDoors);
+  wallColliders(colliders, faces.virginia, H, T, vOpen.filter((o) => o.door), openDoors);
   wallColliders(colliders, faces.chamfer, H, T, [{ x0: 1.4, x1: C.len - 1.4, y0: 0, y1: 3.2 }], openDoors);
-  wallColliders(colliders, faces.fourth, H, T, fOpen.filter((o) => o.kind === 'door'), openDoors);
+  wallColliders(colliders, faces.fourth, H, T, fOpen.filter((o) => o.door), openDoors);
   wallColliders(colliders, faces.west, H, T, [], false);
   wallColliders(colliders, faces.south, H, T, [], false);
   colliders.aabb(X0, Y0 + H - 0.45, Z0, X1, Y0 + H, Z1);

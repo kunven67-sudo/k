@@ -196,7 +196,7 @@ export class WorldState {
     if (this.opening?.done) this.opening.tail(dt);
     this.sleep.update(dt);
     pl.update(dt);
-    w.update(dt, clock, { camera: this.camera, viewer: pl.position });
+    w.update(dt, clock, { camera: this.camera, viewer: pl.position, player: pl });
     this.clerk.update(dt, this.camera.position);
     this.lifeSys?.update?.(dt);
     this._zones(dt);

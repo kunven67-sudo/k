@@ -19,7 +19,7 @@ const setRGB = (out, c) => {
 
 registerKind('marble', {
   tileMeters: 1.2,
-  defaults: { color: 0xe9dcc2, color2: 0xa88e66, tiles: 2, wear: 0.2, dirt: 0.2 },
+  defaults: { color: 0xe9dcc2, color2: 0xa88e66, tiles: 2, veins: 1, wear: 0.2, dirt: 0.2 },
   normalStrength: 1.2,
   build(u, v, out, { N, o, color }) {
     const vein = hexToRgb(o.color2);
@@ -45,7 +45,7 @@ registerKind('marble', {
     const fine = (1 - smoothstep(0.0, 0.018, Math.abs(f2))) * 0.55;
     const cloud = N.fbm(ou * 1.3, ov * 1.3, { freq: 3, octaves: 5 }) * 0.5 + 0.5;
     let c = color.map((x) => x * (0.9 + cloud * 0.12 + (id - 0.5) * 0.05));
-    c = mix3(c, vein, clamp(main * 0.85 + fine, 0, 1));
+    c = mix3(c, vein, clamp((main * 0.85 + fine) * o.veins, 0, 1));
     // Foot traffic dulls the polish and greys the grout.
     const scuff = smoothstep(0.55, 0.9, N.fbm(u + 3.1, v, { freq: 6, octaves: 4 }) * 0.5 + 0.5) * o.wear;
     c = mix3(c, [0.42, 0.38, 0.33], grout * 0.85);
@@ -99,7 +99,7 @@ export function casinoMats() {
   PAL = {
     carpet: mat('carpet-casino', { color: 0x4f0c17, color2: 0xc79a3e, color3: 0x153f4c, dirt: 0.3, seed: 301 }),
     marble: mat('marble', { color: 0xeadfc6, color2: 0xa98d63, tiles: 2, seed: 302 }),
-    marbleSlab: mat('marble', { color: 0xeee3cb, color2: 0xb39a72, tiles: 0, seed: 303 }),
+    marbleSlab: mat('marble', { color: 0xefe5cf, color2: 0xc4ae88, tiles: 0, veins: 0.55, seed: 303, tileMeters: 0.9 }),
     marbleRed: mat('marble', { color: 0x7a2a22, color2: 0xd6b48a, tiles: 0, seed: 304 }),
     marbleDark: mat('marble', { color: 0x1d1a18, color2: 0xcfc5b4, tiles: 0, seed: 305 }),
     marbleGreen: mat('marble', { color: 0x1f4a3a, color2: 0xd8e2c8, tiles: 0, seed: 306 }),
