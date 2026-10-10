@@ -159,3 +159,151 @@ Everything that goes in the game. Made from every answer you gave (two chats), p
 - 🧠 You can also get a normal job if you want
 - ✅ Getting arrested = bail, lawyer, court, maybe jail time 🧠
 
+
+---
+
+## 4. 🔧 THE RIFT TOOL (your gun)
+
+### 4.1 Look
+- ✅ **Rugged real-world lab tool**: scratched metal + carbon fiber, little screens + dials that show the current power, cables, a **swappable battery**, looks like a real prototype
+- 🧠 It gets dirty, scratched + dusty over time (and has germs on the grip 🦠)
+- 🧠 Screen shows: current power, battery %, power level, size readout
+- ✅ You can **shrink down and explore inside it** (circuit boards, coils, battery cells)
+
+### 4.2 Switching powers
+- ✅ **Hold-key wheel menu** (slow-mo while it's open) + **number keys / scroll wheel**
+- 🧠 Each power has its own sound, screen color, beam/effect + recoil feel
+
+### 4.3 The 11 powers ✅
+1. **Portals** (one pair at a time, see 4.4)
+2. **Shrink / Grow ray**: hold buttons to shrink/grow + a size slider. Works on you, people, animals, objects, buildings, planets. ✅ **Everything on/in it shrinks too** (house = people + furniture + germs inside). ✅ Real square-cube law.
+3. **Grab + throw**: ✅ real weight limit, which grows with your size (strength x size²)
+4. **Freeze**: ✅ **real ice**. Water turns to ice, things get brittle + **shatter**, people get hypothermia, it melts back
+5. **Clone**: objects, animals, people. ✅ Cloned people = **same body, no memories** (an adult body with a brand-new mind, has to learn to walk/talk)
+6. **Anti-gravity**: ✅ **zero gravity, real space drift** (floats, spins, drifts until it bumps something, wind pushes it)
+7. **Super launch**: ✅ **hold to charge + faint arc preview**, real landing physics
+8. **X-ray scanner**: see inside walls, people's bones, devices, pipes, wires, germs 🧠 uses real radiation (one scan is tiny, lots of scans add up)
+9. **Magnet beam**: real magnetism, pulls metal only (cars, cans, tools, guns), wood + plastic don't care
+10. **Weld + glue**: stick things together for real, build crazy contraptions (welds can break under too much force 🧠)
+11. **Slow-mo bubble**: time slows inside a bubble you shoot (watch splashes, bullets, explosions in slow motion)
+
+### 4.4 Portals 🌀
+- ✅ **Look**: a **torn rift in space**, a jagged crack in reality. The edges flicker + **bend light like real gravity lensing**, sparks, a deep hum when you're close. "Better look good buddy" → it will 😤
+- ✅ **Colors**: pick your own 2 colors ⚙️ (default is NOT blue/orange)
+- ✅ **See yourself** through portals (your full body, from any angle)
+- ✅ **Scale with your size** (giant you = giant portals, tiny you = tiny portals)
+- ✅ Recursive views (portal looking into a portal looking into a portal...)
+- ✅ **Momentum carries through** ("speedy thing goes in, speedy thing comes out")
+- ✅ **Size portals**: one side big, the other side tiny. Walk in normal size, come out germ-size (throw a car in, it comes out like a toy 🚗)
+- ✅ **Portals on moving stuff**: a moving car, a running deer, someone's back, the Moon. It moves with them
+- ✅ **Space portals**: open one into space and air rushes out, stuff gets sucked through, it gets freezing cold 🥶
+- ✅ **Portal anywhere on Earth**: open one at the bottom of the ocean and water BLASTS out with crushing pressure; open one in Antarctica and a blizzard pours in
+- ✅ **Water, fire, air, sound + smells go through**: drain a lake, pour a river onto a wildfire, wind blows through
+- ✅ **One-way portals** + **window portals** (look only, spy 👀)
+- ✅ **Portals between maps** (Mansion ↔ Empty World ↔ Portal Lab)
+- ✅ **Portal traps**: a hidden portal on the floor, someone steps on it and drops somewhere else (they react depending on the person 😂)
+- ✅ **Portal slicing**: close a portal while something is halfway through and it gets cut clean in half ✂️ (people follow the gore setting)
+- ✅ **Infinite fall cannon**: portal on the floor + ceiling, fall until real max speed (~200 km/h), then fling yourself across the map
+- ✅ **Reach-through hand portal**: a tiny portal by your hand, reach through to grab/punch/poke stuff far away 👋
+- ✅ Portals to far stars (to get to the aliens, see 16)
+- ❌ Portal chains (not picked, one pair at a time)
+
+### 4.5 Battery ⚙️
+- ✅ Setting: real battery (every power uses charge, big stuff drains way more, plug in or swap spare batteries) / self-recharge / unlimited
+
+### 4.6 Upgrades ✅ (built on your workbench)
+- Bigger battery, faster charging, stronger grab, longer range, better scope/zoom, quieter, X-ray resolution, portal range, shrink speed, wider shrink beam 🧠
+
+---
+
+## 5. 📏 SIZE: FROM GALAXY TO ATOMS
+
+### 5.1 How resizing works
+- ✅ **Hold buttons to shrink/grow + a size slider**
+- ✅ **Smooth**: the world grows around you, **NOT a teleport**. Colors fade to gray once you're smaller than light waves
+- ✅ Bring people/objects down tiny with you
+- ✅ Size readout on your **watch/phone** ("0.3 mm, about the size of a dust mite")
+- ✅ Time stays normal when you're giant
+
+### 5.2 Real size physics
+- ✅ **Square-cube law**: strength x size², weight x size³
+- ✅ Tiny = you fall slowly, but big falls still hurt
+- ✅ Giant = heavy + slow, ground cracks under your feet, every step booms
+- ✅ **Voice**: higher + quieter as you shrink (squeaky at ant size, nobody can hear you at germ size), deep booming when giant
+- 🧠 **Hearing**: sounds get deeper + slower to you when tiny, higher when giant
+- 🧠 **Breathing/air**: air feels thick like honey when tiny ✅, thin when giant
+
+### 5.3 The size ladder 🪜
+| Your size | What it's like |
+|---|---|
+| 🌌 Galaxy | the Milky Way spiral below you, stars like sand |
+| ⭐ Star system | the Sun like a ball, planets orbiting |
+| 🌍 Planet | grab + throw the Moon 🌕 (real impact + undo button) |
+| 🏔️ Mountain | towns like toys, clouds at your knees |
+| 🏢 Building | step over houses, cars are shoes |
+| 🧍 Normal | you |
+| 🐭 Mouse | furniture is huge, a cat is a monster |
+| 🐜 Ant | ⭐ the micro world starts (5.4) |
+| 🦠 Germ | bacteria, mold, pollen, skin flakes |
+| 🧬 Virus | viruses, surface textures |
+| 💧 Molecule | water, proteins, DNA, crystals |
+| ⚛️ Atom | atoms arranged per material |
+| 🔵 Below atoms | electron clouds + a tiny nucleus |
+
+### 5.4 Micro world rules 🔬
+- ✅ **NOTHING IS RANDOM.** Everything has a real cause + history. Someone ate here → crumbs → bacteria. A dog walked here → hair + dirt. It rained → mud + spores. The game **remembers what happened to every surface.**
+- ✅ **Real micro physics**: water drops are sticky jelly balls (surface tension) you can get **trapped** in, dust **sticks** to you, air feels thick, at germ size molecules **bump you around** (you shake)
+- ✅ **Look**: like real **electron-microscope pictures** (gray/false color) once you're smaller than light waves
+- ✅ **Danger = only what really happens**: dust mites ignore you (they eat skin flakes), an amoeba CAN swallow germ-sized you, ants grab you, spiders hunt you, a vacuum sucks you up 😳
+- 🧠 Micro life lives real lives: bacteria split about every 20 min (when warm + wet), mold grows in damp spots over days, mites eat + lay eggs, viruses die off on dry surfaces in hours
+- 🧠 Germs spread by touch: hands → door handle → phone → face
+
+### 5.5 What's at each micro size ✅
+- **🐜 Ant size**: crumbs, hairs, dust bunnies, carpet fibers, **dust mites**, water drops, **tardigrades**, springtails, mite eggs + poop, pet dander, microplastics, soot, plant cells in food, cotton + paper fibers, sand grains, salt + sugar crystals, pollen clumps, sawdust, rust flakes, paint chips, glitter 😂, lint
+- **🦠 Germ size**: bacteria (rods, spheres, spirals), mold + its spores, yeast, pollen grains (spiky!), skin flakes, amoebas, algae, **biofilms** in sinks + drains, red blood cells from cuts, white blood cells, fingerprint oil, sweat drops, smoke particles, diatoms (glass shells)
+- **🧬 Virus size**: cold + flu viruses, **bacteriophages** (the moon-lander virus that attacks bacteria), surface textures (scratches like canyons), plastic + metal grain, chip transistors
+- **💧 Molecule size**: water molecules, proteins, DNA, enzymes, fats, salt + sugar crystals (cubes + grids), paint layers, soap molecules grabbing germs + oil ✅🧠, caffeine, plastic chains
+- **⚛️ Atom size**: atoms arranged per material (metal grid, salt checkerboard, wood + plastic tangles, diamond lattice, silicon crystal)
+- **🔵 Below atoms**: electron clouds + tiny nucleus, protons + neutrons
+
+### 5.6 Micro stuff per surface (with WHY it's there) ✅
+- **Kitchen counter**: crumbs (someone ate), raw-chicken juice → salmonella 🦠 (someone didn't clean), grease (cooking), sponge = germ city
+- **Kitchen sink + drain**: biofilm slime, food bits, mold
+- **Fridge**: mold on old food, ice crystals, spilled milk bacteria
+- **Toilet + bathroom**: E. coli near the toilet (flush spray 🤢), soap scum, mold in the shower grout, hair in the drain, toothbrush germs
+- **Bed**: skin flakes, **dust mites** (millions), sweat, hair, drool 😂
+- **Carpet + couch**: dust, mites, pet hair, crumbs, sand from shoes
+- **Phone + keyboard + controller**: SUPER germy, skin oil, crumbs in keys
+- **Door handles + light switches**: germs from hands, fingerprint oil
+- **Money + cards**: germs from everybody
+- **Pet bowls + beds**: saliva bacteria, fur, fleas maybe
+- **TV + PC inside**: dust bunnies, pet hair in fans, skin flakes in the dust
+- **Outdoors (grass, soil, ponds, flowers, fur)**: see 7.9
+- **Your body**: skin bacteria, hair, sweat, cuts (blood cells), eyelash mites (Demodex, real! 😳)
+- **Food**: plant cells, yeast in bread, bacteria in yogurt + cheese (the good ones), mold on old fruit
+- **Space + Moon**: moon dust (sharp like glass), no life ✅ except where aliens live
+
+### 5.7 Inside bodies 🫀 ✅
+- Get in **through a cut, mouth or nose** (people + animals)
+- See: skin layers, sweat glands, hair roots, blood vessels + **blood cells flowing**, muscles, lungs (tiny air sacs), stomach (acid = danger 🔥), intestines (good bacteria), heart chambers (it pumps you along!)
+- **White blood cells chase you** like you're a germ
+- The person/animal feels it **depending on the person** (itchy, sneeze, cough)
+- ✅ **Growing while inside**: they get torn apart, you get covered in blood. **Gore setting OFF by default** (OFF = they just die, no gore shown)
+
+### 5.8 Inside devices 💻 ✅
+- **Consoles + gaming PCs**: motherboard, graphics card, CPU, RAM, fans, power supply, cables
+- **Phones, TVs, laptops**: tiny packed circuit boards, screen pixels up close, batteries
+- **Cars + engines**: pistons moving, fuel injectors, spark plugs firing, the car computer
+- **Kitchen appliances**: microwave (magnetron), fridge compressor, toaster coils (HOT 🔥)
+- **The Rift Tool itself**
+- And smaller ✅: 🐜 dust bunnies + pet hair in fans, solder hills, crumbs in keyboards → 🦠 bacteria on controllers + phone screens → 🧬 transistors like a city grid 🏙️ → ⚛️ silicon crystal, copper atoms, **electrons flowing** when it's on ⚡
+- 🧠 Mess with it from inside: cut a wire = it breaks, short circuit = sparks + smoke, get zapped by live electricity
+
+### 5.9 See micro without shrinking 🔬 ✅
+- **Magnifying glass**, **microscope** (scrape a sample onto a slide, see real bacteria), 🧠 **electron microscope** for your lab, petri dishes (grow germs from a swab!), cotton swabs, slides, test tubes
+
+### 5.10 Giant + space stuff 🌕 ✅
+- Look + fly around space, **real orbits + gravity**
+- **Grab + throw planets** 😂 (real square-cube: heavy + slow, but you can)
+- **Moon into Earth** = real impact (shockwave, tsunami, everything breaks) + an **"undo disaster" button**
+- 🧠 Giant footsteps = earthquakes, breath = wind, sneeze = storm 😂
