@@ -343,3 +343,8 @@ Claude explained it was only a test and nothing had changed. Then:
 - Aliens → **real aliens far away** (on planets around far stars). Follow-ups asked next.
 - Super launch → **hold to charge + faint arc preview**, real physics on landing.
 - Instant replay → **yes**: last 30 s from any angle, save clips to the phone gallery, post on Buzzr and people react.
+- Alien type → **both smart + wild** (alien animals + plants on some planets; a few have smart aliens with cities, language + tech).
+- Alien look → **science-based evolution** (shaped by their planet: heavy gravity = short/thick, dim red star = dark leaves, thick air = huge flyers).
+- Getting to alien planets → **grow giant + portals** (no fake FTL ships).
+- Aliens visiting Earth → **only if they find you** (may follow you back depending on them; people freak out, it's on the news).
+- Claude picked (realism rule): **alien languages are learned slowly by practice**.
