@@ -1121,24 +1121,6 @@ function texFrom(c, rep = true, srgb = true) {
   t.anisotropy = R.renderer ? Math.min(8, R.renderer.capabilities.getMaxAnisotropy()) : 1;
   return t;
 }
-function speckle(x, w, h, amt, n = 0) {
-  const id = x.getImageData(0, 0, w, h), d = id.data;
-  for (let i = 0; i < d.length; i += 4) { const r = (Math.random() - 0.5) * amt; d[i] += r; d[i + 1] += r; d[i + 2] += r; }
-  x.putImageData(id, 0, 0);
-}
-/* turn a grayscale height canvas into a normal map */
-function normalFrom(hc, strength = 2) {
-  const w = hc.width, h = hc.height, src = hc.getContext('2d').getImageData(0, 0, w, h).data;
-  const out = mkCanvas(w, h), ox = out.getContext('2d'), od = ox.createImageData(w, h), d = od.data;
-  const H = (x, y) => src[(((y + h) % h) * w + ((x + w) % w)) * 4] / 255;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const dx = (H(x + 1, y) - H(x - 1, y)) * strength, dy = (H(x, y + 1) - H(x, y - 1)) * strength;
-    const l = Math.sqrt(dx * dx + dy * dy + 1), i = (y * w + x) * 4;
-    d[i] = (-dx / l * 0.5 + 0.5) * 255; d[i + 1] = (dy / l * 0.5 + 0.5) * 255; d[i + 2] = (1 / l * 0.5 + 0.5) * 255; d[i + 3] = 255;
-  }
-  ox.putImageData(od, 0, 0);
-  return texFrom(out, true, false);
-}
 /* ---------- procedural texture toolkit: tileable value noise ---------- */
 function hash2(x, y, s) {
   let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s | 0, 1274126177)) | 0;
@@ -1241,6 +1223,19 @@ function buildTextures() {
     TEX.brushed = texFrom(pixCanvas(N, N, (x, y, i) => { const a = 0.72 + (br[i] - 0.5) * 0.12; return [a, a, a * 1.01]; }));
     TEX.brushedR = roughTex(pixCanvas(N, N, (x, y, i) => { const r = 0.26 + (br[i] - 0.5) * 0.18; return [r, r, r]; }));
     TEX.brushedN = normalFromHeight(br, N, N, 0.8);
+  }
+  /* ===== diamond tread plate (stairs, catwalks, the booth floor) ===== */
+  {
+    const N = 128, hgt = new Float32Array(N * N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      let h = 0;
+      for (const [cx, cy, a] of [[32, 32, 1], [96, 96, 1], [96, 32, -1], [32, 96, -1]]) {
+        const dx = ((x - cx + N * 1.5) % N) - N / 2, dy = ((y - cy + N * 1.5) % N) - N / 2, u = (dx + a * dy) / Math.SQRT2, v = (dx - a * dy) / Math.SQRT2, d = Math.abs(u) / 24 + Math.abs(v) / 6;
+        if (d < 1) h = Math.max(h, Math.sqrt(1 - d));
+      }
+      hgt[y * N + x] = h;
+    }
+    TEX.plateN = normalFromHeight(hgt, N, N, 3); TEX.plateN.repeat.set(8, 8);
   }
   /* ===== concrete ===== */
   {
@@ -1447,7 +1442,7 @@ function buildMaterials() {
   MAT.lake = std({ color: 0x021a20, normalMap: TEX.waterN, normalScale: new THREE.Vector2(0.6, 0.6), emissive: 0x3ef2ff, emissiveMap: TEX.lake, emissiveIntensity: 0.55, roughness: 0.04, metalness: 0.2, transparent: true, opacity: 0.9, depthWrite: false, envMapIntensity: 1.6 });
   MAT.goo = std({ color: 0x24063a, emissive: 0xa040ff, emissiveIntensity: 0.7, roughness: 0.04, metalness: 0.1, normalMap: TEX.waterN, envMapIntensity: 1.5 });
   MAT.rail = std({ color: 0xd8b43a, map: TEX.paint, roughnessMap: TEX.paintR, roughness: 1, metalness: 0.4 });
-  MAT.grate = std({ color: 0x5a6066, map: TEX.brushed, roughnessMap: TEX.brushedR, roughness: 1, metalness: 0.85 });
+  MAT.grate = std({ color: 0x8d949b, map: TEX.brushed, normalMap: TEX.plateN, normalScale: new THREE.Vector2(1.2, 1.2), roughnessMap: TEX.brushedR, roughness: 1, metalness: 0.65, envMapIntensity: 1.1 });
   MAT.red = std({ color: 0x400008, emissive: 0xff1428, emissiveIntensity: 2.5, roughness: 0.3 });
   MAT.redPaint = std({ color: 0xb0161b, roughness: 0.35, metalness: 0.2 });
   MAT.purple = std({ color: 0x220033, emissive: 0xb050ff, emissiveIntensity: 2.5, roughness: 0.3, transparent: true, opacity: 0.85 });
@@ -1847,6 +1842,14 @@ function extinguisher(x, z, rot) {
   part(MAT.rubber, new THREE.TorusGeometry(0.06, 0.012, 6, 12, Math.PI), x, z, rot, 0.07, 1.2, 0.12, 0, Math.PI / 2);
   part(MAT.metalDark, new THREE.BoxGeometry(0.12, 0.08, 0.04), x, z, rot, 0, 1.25, 0.02);
 }
+/* safety railing: posts + top and middle pipe rails + toe board, with one thin collider */
+function railing(x0, z0, x1, z1, y, h = 1.05) {
+  const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 1.4));
+  for (let i = 0; i <= n; i++) { const t = i / n; cyl(lerp(x0, x1, t), y, lerp(z0, z1, t), 0.024, h, MAT.rail, 8); }
+  pipe(x0, y + h, z0, x1, y + h, z1, 0.026, MAT.rail, 10); pipe(x0, y + h * 0.52, z0, x1, y + h * 0.52, z1, 0.017, MAT.rail, 8);
+  const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), tb = new THREE.BoxGeometry(alongX ? len : 0.012, 0.1, alongX ? 0.012 : len); tb.translate((x0 + x1) / 2, y + 0.05, (z0 + z1) / 2); addGeo(MAT.rail, tb);
+  addCol(Math.min(x0, x1) - 0.05, y, Math.min(z0, z1) - 0.05, Math.max(x0, x1) + 0.05, y + h, Math.max(z0, z1) + 0.05);
+}
 function floorCable(pts) {
   const curve = new THREE.CatmullRomCurve3(pts.map(([x, z]) => V3(x, 0.025, z)));
   addGeo(MAT.cable, new THREE.TubeGeometry(curve, Math.max(8, pts.length * 8), 0.022, 6, false));
@@ -2186,7 +2189,7 @@ function buildLevel1() {
   part(MAT.cabDark, rbox(12, 3, 12, 0.04), 36, -2, 0, 0, 1.5, 0); addCol(30, 0, -8, 42, 3, 4);
   box(36, 3, -2, 12, 0.08, 12, MAT.grate, { col: false, tu: 1 });
   for (let i = 0; i < 8; i++) box(24.375 + i * 0.75, 0, 1, 0.75, (i + 1) * 0.375, 3, MAT.grate, { tu: 1 });
-  box(36, 3, -7.95, 12, 1.05, 0.1, MAT.rail); box(41.95, 3, -2, 0.1, 1.05, 12, MAT.rail); box(36, 3, 3.95, 12, 1.05, 0.1, MAT.rail); box(30.05, 3, -5, 0.1, 1.05, 6, MAT.rail);
+  railing(30, -7.95, 42, -7.95, 3); railing(41.95, -8, 41.95, 4, 3); railing(30, 3.95, 42, 3.95, 3); railing(30.05, -8, 30.05, -2, 3);
   crtDesk(38, -4, 0, false);
 
   /* ===== INTAKE HALL (start) ===== */
@@ -2221,9 +2224,9 @@ function buildLevel1() {
 
   /* ===== DATA LAKE (east) ===== */
   box(69, 3.0, -6, 2, 0.2, 64, MAT.grate, { tu: 1 });
-  box(68.05, 3.2, -6, 0.08, 1.0, 64, MAT.rail); box(69.95, 3.2, -6, 0.08, 1.0, 64, MAT.rail);
+  railing(68.05, -38, 68.05, 26, 3.2, 1.0); railing(69.95, -38, 69.95, 26, 3.2, 1.0);
   box(69, 3.0, -41, 10, 0.2, 6, MAT.grate, { tu: 1 });
-  box(64.05, 3.2, -41, 0.08, 1, 6, MAT.rail); box(73.95, 3.2, -41, 0.08, 1, 6, MAT.rail); box(69, 3.2, -43.95, 10, 1, 0.08, MAT.rail);
+  railing(64.05, -44, 64.05, -38, 3.2, 1); railing(73.95, -44, 73.95, -38, 3.2, 1); railing(64, -43.95, 74, -43.95, 3.2, 1);
   for (let i = 0; i < 9; i++) { const z1 = 34 - i * 0.889; box(69, 0, z1 - 0.444, 2, (i + 1) * 0.356, 0.889, MAT.grate, { tu: 1 }); }
   for (const z of [-40, -28, -14, 0, 14]) for (const x of [68.1, 69.9]) box(x, z > -34 && z < 22 ? LAKE.floor : 0, z, 0.16, (z > -34 && z < 22 ? -LAKE.floor : 0) + 3.0, 0.16, MAT.metal, { tu: 1 });
   for (const [gx, gz, r] of [[52, 36, 2.6], [78, 40, 3.2], [60, 48, 2.2], [88, -20, 2.8], [50, -40, 2.4]]) {
@@ -3190,7 +3193,7 @@ function projMesh(kind) {
   const pool = PROJ_MESH[kind];
   for (const m of pool) if (!m.visible) { m.visible = true; return m; }
   let m;
-  if (kind === 'rocket') { m = new THREE.Group(); cy(m, 0.04, 0.4, new THREE.MeshStandardMaterial({ color: 0x5a5a40, metalness: 0.5, roughness: 0.5 }), 0, 0, 0); const c = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 10), GM.metal); c.rotation.x = -Math.PI / 2; c.position.z = -0.26; m.add(c); const fl = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffaa44, toneMapped: false })); fl.position.z = 0.22; m.add(fl); }
+  if (kind === 'rocket') { m = new THREE.Group(); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 14), GM.olive); body.rotation.x = Math.PI / 2; m.add(body); const c = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 14), GM.olive); c.rotation.x = -Math.PI / 2; c.position.z = -0.26; m.add(c); for (let k = 0; k < 4; k++) { const fin = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.07, 0.08), GM.metal); fin.rotation.z = (k * Math.PI) / 4; fin.position.z = 0.16; m.add(fin); } const fl = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffaa44, toneMapped: false })); fl.position.z = 0.22; m.add(fl); }
   else if (kind === 'plasma') m = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), new THREE.MeshBasicMaterial({ color: 0x8fe8ff, toneMapped: false }));
   else if (kind === 'pixel') m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 }));
   else { m = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshStandardMaterial({ color: 0x3a4a2a, roughness: 0.6, metalness: 0.4 })); m.add(b); const l = new THREE.Mesh(new THREE.SphereGeometry(0.015, 6, 4), MAT.red); l.position.y = 0.06; m.add(l); }
@@ -3301,7 +3304,7 @@ function startReload() {
   const g = GUNS[id], st = PL.guns[id], gs = gunStats(id);
   if (st.jammed) { st.jammed = false; W.jamClear = 0.8; SFX.rack(); return; }
   if (st.mag >= gs.mag || st.res <= 0) return;
-  W.reloadTotal = W.reload = g.shells ? gs.reload : gs.reload * (PL.armGone ? 1.6 : 1); W.reloadStage = 0;
+  W.reloadTotal = W.reload = g.shells ? gs.reload : gs.reload * (PL.armGone ? 1.6 : 1); W.reloadStage = 0; W.reloadGun = id;
   if (!g.shells) { SFX.magOut(); setTimeout(() => { if (W.reload > 0) SFX.magIn(); }, W.reload * 520); }
   if (Math.random() < 0.12) heroLine('reload');
 }
@@ -3335,6 +3338,7 @@ function updateWeapon(dt) {
   const id = curGun(); const busy = W.knife > 0 || W.heal > 0 || W.gren > 0 || W.search > 0 || W.rip > 0 || Chat.open || PL.controlLock;
   if (!id || !PL.hasGun) return;
   const g = GUNS[id];
+  if (W.reload > 0 && W.reloadGun !== id) W.reload = 0; /* the gun changed mid-reload: that reload belonged to the other gun */
   if (W.reload > 0) { W.reload -= dt; if (W.reload <= 0) { W.reload = 0; finishReload(); } if (g.shells && Input.firePressed && PL.guns[id].mag > 0) W.reload = 0; }
   if (g.spin) {
     const want = Input.fire && !busy && W.reload <= 0;
