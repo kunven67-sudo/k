@@ -379,3 +379,8 @@ Claude explained it was only a test and nothing had changed. Then:
 - **"Please don't rush. I don't care if it takes an hour, a day, even 100 years. Do this list perfect."** The user said they'll put Claude on "ultracode".
 - The master list lives in `rift-lab/MASTER_LIST.md`.
 - **Mid-list, the user said: "before you do that whole list, can you make the game first? ... then you can make the list after"** → master list paused after section 12.7 (see the note at the end of MASTER_LIST.md). Building the Empty World + spawn app now; keep asking questions between build chunks.
+
+## 5. Build log (session 2)
+- **Piece 1 pushed:** project scaffold (`rift-lab/`, three r180 + Rapier 0.19 vendored, import map, no build step), main menu + new-world sheet + saves + settings, Empty World (meadow + oak/maple/birch forest, lake + river, real sky/astronomy), player controller (walk/jog/sprint/stamina/crouch/lean/jump/mantle/swim/breath/fall damage), procedural audio.
+- Collision tests (headless): trunks 1–5 cm from bark, rocks 2–15 cm, logs 2–3 cm, vaulting over logs works, 48° slopes stop you.
+- Known: very dark on moonless nights (realistic, flashlight comes with the phone), heavy scene (~7M triangles incl. shadows), no character body / third person yet, phone + spawn app is piece 2.
