@@ -378,3 +378,4 @@ Claude explained it was only a test and nothing had changed. Then:
 - **Add an experiment thing**: experiment on people by strapping them to a chair ("you have to"). Claude: realistic version = Experiment Lab with a test chair; people can volunteer (paid, like real science studies), forcing someone = kidnapping with real consequences, depending on the person.
 - **"Please don't rush. I don't care if it takes an hour, a day, even 100 years. Do this list perfect."** The user said they'll put Claude on "ultracode".
 - The master list lives in `rift-lab/MASTER_LIST.md`.
+- **Mid-list, the user said: "before you do that whole list, can you make the game first? ... then you can make the list after"** → master list paused after section 12.7 (see the note at the end of MASTER_LIST.md). Building the Empty World + spawn app now; keep asking questions between build chunks.

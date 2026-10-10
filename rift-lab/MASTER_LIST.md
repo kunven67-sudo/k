@@ -640,3 +640,80 @@ Everything that goes in the game. Made from every answer you gave (two chats), p
 
 ### 11.3 Selling ✅
 - List gadgets on the shopping app, people buy + review them ⭐ → grow into **your own company** (hire people, build a factory, compete)
+
+---
+
+## 12. 📱 THE SPAWN APP: EVERY TAB + EVERY ITEM
+
+### 12.0 How it works ✅
+- Looks like a **real shopping app**: real-looking photo, **price**, **reviews ⭐**, **Customize** button, **category tabs + search bar**
+- ✅ **Customize before spawning**: color, fabric, wood, size → **price changes**
+- ✅ **Free mode** (just appears, still shows the real price) or **Pay mode** (costs money) ⚙️
+- ✅ Arrives where you point OR by **delivery truck/drone** ⚙️
+- ✅ **Cheap stuff comes flat-pack in a box** (screws + instructions, build it yourself, a missing screw = wobbly 😂). **Expensive stuff comes built**
+- ✅ **Empty, like new from the store** (nothing random inside, you fill it)
+- ✅ **Real power**: anything electric needs to be plugged in + powered ⚡
+- ✅ **Real aging**: dust, scratches, fading, rot, rust, mold over time
+- ✅ After spawning: **build mode** (move/rotate anything), **freeze in place**, **undo/delete**, **save + load**. Placement is **totally free (physics decides)**
+- ✅ **Everything works** (doors, drawers, TV, fridge, stove, toilet, lamps) and **people use them too**
+- ✅ **Realistic breaking**: glass shatters, wood splinters, metal dents 🧠 + fabric tears, stuffing pops out, particle board crumbles, ceramic cracks, plastic snaps
+- 🧠 Sort by price / rating / newest, favorites ⭐, recently spawned, "spawn again", shopping cart (Pay mode)
+
+### 12.1 🛋️ FURNITURE ⭐ (built first)
+✅ **4 styles**: **Modern + minimal** · **Cheap flat-pack** (🏷️ brand **Nordbo**, particle board, breaks easier, swells when wet) · **Luxury mansion** (🏷️ brand **Maison Ardent**: leather, marble, walnut, gold) · **Rustic farmhouse + vintage** (old wood, scratches, antiques)
+🧠 **Materials**: oak, walnut, pine, maple, cherry, bamboo, particle board, MDF, steel, brass, chrome, glass, marble, granite, leather, fabric, velvet, linen, wool, wicker, rattan, plastic
+
+- **Living room** ✅: sofas (loveseat, 3-seat, L-shaped sectional, sleeper sofa, chesterfield, futon), armchairs, recliners (manual + power), rocking chair, bean bag, ottoman, pouf, coffee tables, side tables, console table, TV stand, entertainment center, bookshelves, cube shelves, display cabinet, floor lamps, table lamps, arc lamp, ceiling lights, chandeliers, rugs (area, runner, shag, Persian-style), curtains, blinds, throw pillows, blankets, wall art, mirrors, wall clock, grandfather clock, plant pots (real + fake plants), vases, candles, fireplace (wood, gas, electric) + fireplace tools, magazine rack, aquarium
+- **Bedroom** ✅: beds (twin, full, queen, king, California king, bunk bed, loft bed, daybed, canopy bed, Murphy bed, crib, toddler bed), mattresses (spring, memory foam, futon: **dust mites live in them** 🔬), headboards, sheets, pillows, comforters, duvets, nightstands, dressers, chest of drawers, wardrobe, armoire, closet organizer, vanity + stool, full-length mirror, jewelry box, laundry hamper, alarm clock, toy box, changing table, nursing chair, baby monitor
+- **Kitchen + dining** ✅: dining tables (round, long, extendable, bar-height), dining chairs, benches, bar stools, kitchen island, cabinets, countertops (granite, quartz, laminate, butcher block), sinks (single, double, farmhouse), faucets, dishwasher, **fridges** (top-freezer, side-by-side, French door, mini fridge, wine fridge), chest freezer, **stoves** (gas with real flames, electric, induction), wall oven, range hood, microwave, trash + recycling bins, pantry shelves, china cabinet, sideboard, bar cart, high chair
+- **Bathroom** ✅: toilets (flush, refill, clog 😂, splash germs 🤢), sink + vanity, bathtubs (built-in, clawfoot, jacuzzi), showers (stall, walk-in, rain head), shower curtain or glass door, medicine cabinet mirror, towel racks, toilet paper holder, bath mats, shelves, hamper, scale, bidet
+- **Office** ✅: desks (computer, standing, L-shaped, executive), office chairs, **gaming chairs**, filing cabinets, bookshelves, whiteboard, corkboard, desk lamps, printer stand, safe, globe, monitor arms
+- **Outdoor + patio** 🧠: patio tables + chairs, lounge chairs, hammock, porch swing, picnic table, Adirondack chairs, sun umbrella, fire pit, BBQ grills (gas + charcoal), patio heater, garden bench, planters, string lights, gazebo, pergola, pool loungers, pool floaties
+- **Laundry** 🧠: washer, dryer, iron + ironing board, drying rack, laundry basket, utility sink
+- **Entry + hallway** 🧠: coat rack, shoe rack, bench, umbrella stand, key hooks, doormat
+- **Garage** 🧠: metal shelves, tool chest, pegboard, workbench, storage bins, bike rack
+- **Game room** ✅: pool table, ping pong table, air hockey, foosball, arcade machines, poker table, dartboard, home bar
+- **Kids' rooms** 🧠: kid beds (race-car bed 😂), small desks, toy shelves, play tent, bean bags, night lights
+
+### 12.2 🍎 FOOD ✅ (next tab after Furniture)
+🧠 Food **spoils + rots** (fridge slows it), **mold grows** 🔬, cooking changes it (raw → cooked → burnt), nutrition matters, allergies are real, raw chicken has germs ✅
+
+- **Fruit**: apples, bananas, oranges, lemons, limes, grapes, strawberries, blueberries, raspberries, cherries, peaches, pears, plums, mangoes, pineapples, watermelons, cantaloupes, kiwis, avocados, coconuts, pomegranates, figs, grapefruit
+- **Vegetables**: lettuce, spinach, kale, cabbage, broccoli, cauliflower, carrots, potatoes, sweet potatoes, onions, garlic, tomatoes, cucumbers, bell peppers, jalapeños, corn, peas, green beans, zucchini, squash, pumpkins, mushrooms, celery, asparagus, eggplant, radishes, beets
+- **Meat**: chicken (breasts, thighs, wings, whole), turkey, beef (steaks, ground beef, ribs, roast), pork (chops, bacon, ham, sausages), lamb, deli meats, hot dogs
+- **Seafood**: salmon, tuna, cod, tilapia, shrimp, crab, lobster, oysters, clams, mussels
+- **Dairy + eggs**: milk (whole, 2%, skim, oat, almond), eggs, butter, cheese (cheddar, mozzarella, parmesan, swiss, brie, cream cheese), yogurt (live bacteria 🔬), cream, sour cream, ice cream
+- **Bakery**: bread loaves, baguettes, bagels, croissants, muffins, donuts, tortillas, burger buns, cakes, pies, cookies, cupcakes
+- **Pantry**: rice, pasta, flour, sugar, salt, pepper, cooking oil, olive oil, vinegar, canned + dry beans, canned soup, cereal (🏷️ **Sugar Stars**), oatmeal, peanut butter, jam, honey, maple syrup, ketchup, mustard, mayo, hot sauce, soy sauce, BBQ sauce, salsa, baking soda, baking powder, yeast, chocolate chips, nuts, dried fruit
+- **Spices**: garlic powder, paprika, cumin, cinnamon, oregano, basil, chili powder, curry, nutmeg, ginger, thyme
+- **Frozen**: frozen pizza, fries, nuggets, frozen veggies, waffles, ice cubes, popsicles
+
+### 12.3 🥤 SNACKS + DRINKS ✅ (🏷️ made-up brands)
+- **Snacks**: chips (🏷️ **Crunchos**), pretzels, popcorn, crackers, cookies, candy bars (🏷️ **Choco Bomb**), gummies, lollipops, gum, granola bars, beef jerky, trail mix, nuts
+- **Drinks**: bottled water (🏷️ **Pure Springs**), soda (🏷️ **Fizzo Cola**, **Lemon Zap**), juice (orange, apple, grape), sparkling water, sports drinks, energy drinks (🏷️ **Volt Rush**), coffee (beans, ground, instant), tea, hot cocoa, smoothies, milkshakes
+- **Grown-up drinks** 🧠 (the bar + wine cellar ✅): beer, wine, liquor. People get drunk depending on the person (and can't drive safely)
+
+### 12.4 🍔 READY MEALS ✅
+- Burgers + fries (🏷️ **Burger Barn**), pizza (🏷️ **Slice Bros**), tacos + burritos, sushi, fried chicken, hot dogs, sandwiches, salads, pasta, Chinese takeout, ramen, curry, BBQ ribs, mac + cheese, soup, frozen dinners, **leftovers in containers** ✅, cake slices, ice cream cones
+
+### 12.5 🍳 KITCHEN STUFF ✅
+- **Cookware**: frying pans, saucepans, stock pots, cast iron skillet, wok, Dutch oven, sheet pans, baking dishes, muffin tins
+- **Knives + tools**: chef's knife, bread knife, paring knife, cleaver, cutting boards, spatulas, whisks, ladles, tongs, peelers, graters, can openers, measuring cups + spoons, mixing bowls, rolling pin, colander, oven mitts, apron
+- **Dishes**: plates, bowls, cups, mugs, glasses, wine glasses, silverware, napkins, placemats, salt + pepper shakers, spice rack
+- **Small appliances**: blender, toaster, coffee maker, kettle, stand mixer, food processor, slow cooker, air fryer, rice cooker, waffle maker
+- **Storage + clean-up**: food containers, foil, plastic wrap, paper towels, dish soap, **sponges** (germ city 🦠), dish rack, trash bags
+
+### 12.6 🪥 BATHROOM STUFF ✅
+- Toothbrush (manual + electric), toothpaste, floss, mouthwash, toilet paper, towels, washcloths, shampoo, conditioner, body wash, bar soap, hand soap, razors, shaving cream, deodorant, cologne + perfume, lotion, **sunscreen** (stops sunburn ✅), hair dryer, hairbrush, comb, hair gel, makeup ✅, nail clippers, tweezers, cotton swabs, pads + tampons, contact lens stuff, loofah, shower cap
+
+### 12.7 🧽 CLEANING STUFF ✅ (all of it, with real effects)
+- **Soap + water + sponge** (soap really breaks up germs + oil, rinsing washes them away, the sponge gets germy itself)
+- **Disinfectant spray + wipes + bleach** (kill most germs only if you wait the real time, about 30 s to 10 min; some survive)
+- **Vacuum** (upright, handheld, **robot vacuum** ✅), **broom + dustpan**, **mop + bucket** (dirty mop water spreads germs ✅)
+- **Hand sanitizer**, **UV light**, **steam cleaner** ✅
+- 🧠 Scrub brushes, rubber gloves, microfiber cloths, glass cleaner, toilet cleaner, mold remover, laundry detergent, dryer sheets, lint roller, duster, air freshener, carpet cleaner, pressure washer
+- ✅ **Who cleans depends on the person** (neat people a lot, messy people never 😂, maids + janitors as jobs)
+
+---
+
+> ⏸️ **List paused here (session 2).** The user said: "make the game first, then do the list after." Still to write: rest of the spawn tabs (electronics 🏷️ consoles/GPUs/phones, tools + building materials, clothes, toys + sports, office + school + books, instruments, medical, camping + garden, farm, pets, nature, buildings, power + utilities, lab gear, party + holidays, street stuff, weapons, junk/physics stuff, space stuff), made-up brands + movies/shows, Experiment Lab, rest of Earth, space + aliens, events, animations, physics + collisions, look + colors, music + sound, settings, controls, achievements, Portal Lab, build order.
