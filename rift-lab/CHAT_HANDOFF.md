@@ -387,3 +387,6 @@ Claude explained it was only a test and nothing had changed. Then:
 - After piece 1 (user answers): next = **phone + spawn app + furniture**; phone = **real 3D phone in your hand** (arm lifts it, tap with mouse, world keeps going); nights = **keep it real + phone flashlight** (campfires/lamps light things, eyes adjust); Pay-mode start money in Empty World = **pick in the new-world menu** ($0 / $1k / $10k / $100k / rich inventor).
 - Piece 2 plan: 2a phone + apps + flashlight + spawn app + spawning + grab/drag + build mode + saving spawned stuff → 2b doors/drawers joints, flat-pack boxes + assembly, breaking, real power (generator + cords) → 2c more items + customization + reviews.
 - Piece 2 answers: phone brand **Vireo**; throwing = **both** (swing + let go, or hold right-click to wind up; heavier = shorter); "use" = **mouse only** (no use key: click switches, drag box flaps, hand does everything); build-mode highlight = **soft glowing outline**.
+- **User (going to sleep): "Stop asking me questions. Pick the best option yourself and keep building."** → From here Claude picks the realest/best option itself, keeps building piece by piece, pushes each finished chunk, and logs every pick it made in this file (section 6) so the user can review when back.
+
+## 6. Picks Claude made while the user slept
