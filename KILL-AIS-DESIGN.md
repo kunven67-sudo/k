@@ -42,13 +42,15 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 - The more guns you own, the stronger/smarter the AIs get, and they become **different AIs with different names**.
 - **AIs don't carry guns.** How they attack **depends on the AI**: built-in body weapons (arm cannons, laser eyes, shoulder rockets), code/energy blasts, melee rushes, and hacking. Body weapons can't be picked up (except the scripted Clippy-scene arm cannon).
 - Smarter AIs **flank you, take cover, dodge bullets, and adapt to how you play** and need to look insanely cool.
-- **Hundreds of AIs per map**: a huge battlefield.
+- **How many AIs:** about **50 per map**, in **squads of 3** spread around the level (plus 3 snipers). It used to be hundreds, but the owner played it and it was way too laggy and impossible, so it changed. The number is the same on every graphics setting.
+- **Hard, not impossible:** only **a few AIs attack you at the same time** (4 shooters, 2 melee hitters, 1 sniper; 3 shooters once the AIs are the smart versions because they aim better). The rest keep moving, flank, and wait for their turn.
+- **AI compilers** (the purple towers that build AIs) only have **8 AIs inside each**, shown when you aim at one. They slowly rebuild their own guards when you kill them, then they run out. Destroying one deletes the AIs still inside it.
 - **Regular AI names:** a mix of real AIs (many copies of each), and their **versions upgrade the more guns you own** (GPT-2 / Cleverbot early → GPT-4 / Gemini 2 later).
 - Extra enemy types: **flying drones, big armored tanks, snipers, swarms of tiny bots**.
 - **AI names only show when you aim at one.**
 - **Weak spots:** what a headshot does **depends on the gun** (snipers instakill, pistols just do extra damage), plus a **glowing chest core** (shoot it to make them explode), **antennas/sensors** (shoot them off to blind the AI for a bit), and **legs** (makes them limp or crawl).
 - **Spotted icons:** `?` over their head when suspicious, `!` when they see you.
-- **Alarm towers:** AIs run to them to call more AIs, so destroy or hack them first.
+- **Alarm towers:** AIs run to them to call more AIs, so destroy or hack them first. You get a warning when an AI starts running to one (and it blinks on the minimap). An alarm is a **12-second siren**: AIs near the tower learn where you are and the closest AI compiler sends **one squad of 3**. Then that tower needs **2 minutes** to reset, and no tower can go off for **a minute**.
 - **Dead bodies stay until you search them**, then glitch away. Other AIs that find a body get suspicious.
 - **When you shoot one:** sparks, black oil AND glowing code spray out.
 - **When you kill one** (all of these): sparks and explosion, glitch and pixelate away, ragdoll collapse, shatter into falling code.
@@ -80,7 +82,7 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
   - **Phase 2** (half health): her screen cracks and **1960s tape-reel bots pour out**, AND she **hacks your HUD into old green terminal text**. Still easy-ish because she's level 1.
 - Boss abilities: **multiple phases** (new attacks at half health), **hack your HUD mid-fight**, **summon smaller AIs**.
 - Boss looks (mix of all four, the player wants to see them): designs based on each AI's **real logo and style**, **giant towering robots**, **floating screens and faces**, **glitchy human-shaped avatars**.
-- **Reaching the boss:** destroy AI spawners AND find hidden passcodes to open the boss door.
+- **Reaching the boss:** destroy the 3 AI compilers (spawners) AND find hidden passcodes to open the boss door.
 - **Slow-mo kill cam** when you kill a boss; it gets cooler and cooler the better the boss is.
 - **Every one of the 100 bosses has a unique special move** based on what it's famous for (Deep Blue plays chess with you as the pieces, AlphaGo drops giant Go stones, Tay turns evil mid-fight…).
 - **Revenge lines:** later bosses from the same company remember who you killed ("you killed my little brother").
@@ -284,8 +286,8 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - You **respawn at the last shop terminal you used** (or at the **level start** if you haven't used one yet) and **lose half your Crypto**.
 - **Every death you get more hacked.** Glitches stack up (all four):
   - Screen static and color tearing
-  - Controls randomly flip or lag
-  - Fake enemies and fake HUD numbers
+  - Controls randomly flip or lag (a blinking **VIRUS** label with a countdown shows while it happens, so you know it's the virus and not your computer)
+  - Fake enemies (they flicker red and vanish when shot) and fake HUD numbers
   - Hacked text popups from the AI that hacked you
 - **Fix it:** buy **antivirus** at a shop terminal.
 
@@ -339,7 +341,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Minimap / radar.**
 - **One default crosshair.**
 - **Damage numbers:** on/off toggle in settings.
-- **Graphics menu** with the **same presets as Ant Work 2**: Toaster, Potato, Low, Medium, High, Ultra, Insane.
+- **Graphics menu** with the **same presets as Ant Work 2**: Toaster, Potato, Low, Medium, High, Ultra, Insane. They only change the graphics, never how many AIs there are.
 - **Field of view** slider (works like other shooters: 90 by default).
 - **Loading screen = a fake virus download bar.**
 - **Every key can be rebound** in settings.
@@ -366,7 +368,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
   - Real-looking materials made by code: waxed vinyl floor tiles, painted walls with a wainscot and chair rail, acoustic ceiling tiles, brushed steel, wood grain, fabric, rubber
   - A detailed 1960s computer lab: fluorescent ceiling lights, mainframes with spinning tape reels and blinking lamp panels, CRT desks with keyboards, office chairs, printers, filing cabinets, pipes, clocks, fire extinguishers, exit signs
   - Lighting: baked light pools and contact shadows on the floor, reflections captured from the lab itself, soft shadows from above, ambient occlusion on the High+ presets, a film-style color grade
-  - **Android AIs** (helmet heads with glowing eyes, armor in their brand color, the arm cannon) with a cheaper model for far-away AIs so hundreds of them still run smooth
+  - **Android AIs** (helmet heads with glowing eyes, armor in their brand color, the arm cannon) with a cheaper model for far-away AIs so they run smooth
   - **Real-looking guns** (an M4-style rifle, a Glock-style pistol, a pump shotgun with shells on the side, a bolt sniper with a big scope…) held by **gloved hands with fingers wrapped around the grip**, hoodie sleeves, and the broken watch
   - **The intro is your real bedroom at night:** desk lamp, PC with RGB, bed, bookshelf, window with blinds and the city outside, and you in a hoodie on a gaming chair
 
@@ -376,7 +378,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 
 What the first build should have:
 
-1. Shooting, guns, and hundreds of AIs. **About 10 guns** (starter pistol, pistol, SMG, shotgun, rifle, sniper, minigun, rocket launcher, laser, plasma).
+1. Shooting, guns, and lots of AIs (about 50 per map, see section 3). **About 10 guns** (starter pistol, pistol, SMG, shotgun, rifle, sniper, minigun, rocket launcher, laser, plasma).
 2. A shop terminal and Crypto
 3. Real AI chat (Gemini when you chat, offline brain for trash talk) + the "make a game" trap
 4. Level 1 boss fight: **ELIZA**
