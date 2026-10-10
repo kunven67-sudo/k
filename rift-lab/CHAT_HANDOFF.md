@@ -361,3 +361,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Money from inventions → user "1 and 2 idk really" → Claude picked **both**: sell gadgets on the shopping app (reviews), grow into your own company (hire people, factory, compete).
 - Neighbors → **random, depending on the person**.
 - Mansion security → **gate with code + cameras on your phone + alarm that calls police**.
+- People's AI chat brain → **setting: free local AI on the user's GPU (no key, less smart, may lag a bit) OR a Claude API key (smartest, costs a little)**.
+- Kids → **yes: baby (Sims-style, nothing explicit) or adopt**; they grow up + learn from you.
+- Permadeath death → **world ends** (saved as a memory).
+- Subtitles → **setting, ON by default**.
