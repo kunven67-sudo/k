@@ -365,3 +365,16 @@ Claude explained it was only a test and nothing had changed. Then:
 - Kids → **yes: baby (Sims-style, nothing explicit) or adopt**; they grow up + learn from you.
 - Permadeath death → **world ends** (saved as a memory).
 - Subtitles → **setting, ON by default**.
+- Logo → **torn text with a rift glowing through** (letters cracked open like the portals).
+- Spawn app → **like a real shopping app** (real-looking photos, price, reviews, customize button, categories + search).
+- Menus → **clean see-through glass menus over the live 3D background**; in-game everything is on your phone.
+- First launch → **short intro + skip button** (late night in your garage, you finish the Rift Tool, test it, something shrinks, then the character maker).
+
+### Big message from the user (session 2)
+- **"Can you just make a list so the questions are all done"**: write ONE huge master list of everything in the game (everything in real life), tell them when it's done. They will then ask **"What else to add?"** to check it wasn't rushed. It must be **a LOT** ("it has to be the whole world"), including made-up versions of things that can't be copied (movies, shows, computers, graphics cards...).
+- **Everything must be "fire"**: animations for everything, collisions, colors, all of it must be very good. ("I'm pretty sure I already told you but they need to be very good.")
+- **Music setting** so it doesn't feel boring.
+- **More settings** to do stuff.
+- **Add an experiment thing**: experiment on people by strapping them to a chair ("you have to"). Claude: realistic version = Experiment Lab with a test chair; people can volunteer (paid, like real science studies), forcing someone = kidnapping with real consequences, depending on the person.
+- **"Please don't rush. I don't care if it takes an hour, a day, even 100 years. Do this list perfect."** The user said they'll put Claude on "ultracode".
+- The master list lives in `rift-lab/MASTER_LIST.md`.
