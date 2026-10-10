@@ -431,3 +431,141 @@ Everything that goes in the game. Made from every answer you gave (two chats), p
 - **Coast**: seagulls, brown pelicans, sandpipers, sea lions, harbor seals, sea otters (crack shells on their bellies 🦦), dolphins, **gray whales + humpbacks** (real migration seasons), leopard sharks, rays, jellyfish, octopus, kelp forests, garibaldi fish, sea urchins, mussels, barnacles, sand crabs, starfish, sea anemones, hermit crabs
 - **Open ocean**: tuna, mahi-mahi, swordfish, great white sharks, blue whales, sea turtles, flying fish, sunfish (mola mola)
 - **Deep sea** ✅ (submarine): anglerfish, giant squid, vampire squid, gulper eel, lanternfish, hatchetfish, sixgill sharks, sea cucumbers, tube worms + **hydrothermal vents**, whale falls, total darkness + bioluminescence ✨, crushing pressure
+
+---
+
+## 8. 🏰 MANSION TOWN (sandbox 2)
+
+✅ **Every building has a full, detailed inside** ("not just books like huhhh??"). ✅ California **coast** town, foggy mornings, palm trees, mild winters, almost never snows. ✅ Starts as a **small town**, grows into a bigger city later if it runs smooth.
+
+### 8.1 Your mansion ✅ (classic outside, modern luxury inside)
+- **Outside**: front **gate with a code** ✅, long driveway, fountain, gardens, lawn, palm trees, **swimming pool** ✅ + pool house + hot tub ✅, outdoor kitchen + BBQ, patio, rooftop terrace with an ocean view 🧠, gardener's shed
+- **Security** ✅: gate code, **cameras you watch on your phone**, alarm that calls the police
+- **Garage** ✅: a red **Velaro** supercar, a **Hesper** luxury SUV, a lifted **Grizz** truck. Plus the **messy garage workshop** ✅ (tools on the wall, workbench, gadget parts everywhere)
+- **Grand foyer**: the **big double staircase** ✅, chandelier, marble floor
+- **Living rooms** (formal + family), **formal dining room**, **chef kitchen** ✅ + **walk-in pantry** ✅ + breakfast nook
+- **Bar** ✅ + **wine cellar** ✅ (underground, wine racks, cool + damp = mold spot 🔬)
+- **Home theater** ✅ (big screen, reclining seats, popcorn machine), **game room** ✅ (pool table, arcade machines, consoles, air hockey, foosball, poker table)
+- **Bowling alley** ✅ (2 lanes, real pins + ball physics), **indoor basketball** ✅ half court
+- **Gym** ✅ (weights, treadmill, bike, rowing machine, mirror wall), **spa** ✅, **sauna** ✅ + steam room (great germ + mold spot 🦠)
+- **Library** ✅ (REAL books with different titles + covers, a rolling ladder, reading chairs, fireplace), **office** ✅ (desk, PC, filing cabinets), **music room** ✅ (grand piano, guitars, drums, recording studio)
+- **Bedrooms**: master suite (huge bed, walk-in closet, master bath with a big tub + rain shower), 4 guest rooms, kids' rooms + nursery (if you have kids ✅), staff rooms ✅
+- **Working rooms**: laundry room, mudroom, utility room (water heater, **breaker panel** ⚡, AC/heating, water filter), security room (camera screens), storage, attic, basement
+- 🧠 Elevator, intercom, smart lights, fireplaces
+- ✅ **Secret lab** under the mansion 🧪 (🧠 hidden door behind a library bookshelf): workbenches, screens, your gadgets, electron microscope, test chamber, the **Experiment Lab** (section 14)
+
+### 8.2 Town buildings ✅🧠
+- **~60 houses** with different styles 🧠: California ranch, Spanish, craftsman bungalow, modern, beach cottages, apartments, a mobile home park. Each one lived-in by real people who own their stuff ✅
+- **Your 4 first shops** ✅: grocery store, restaurant + café, gas station, hardware store
+- **More shops** ✅: clothes store, barber + salon, car dealer + mechanic + custom shop, electronics store, pet store + vet, bank, licensed gun store, pharmacy
+- **Town services** ✅🧠: school (kids go every weekday), police station (+ holding cells), fire station, hospital (ER, rooms, surgery, maternity), doctor's office, dentist, post office, city hall, courthouse, public library, church, cemetery (funerals)
+- **Fun places** 🧠: movie theater (made-up movies 🎬), bowling alley, gym, bar, pizza place, fast food, ice cream shop, bakery, donut shop, arcade (on the pier)
+- **Other** 🧠: laundromat, car wash, motel, parking lots, a construction site, a small factory (your future company ✅), recycling center + dump, power substation, water tower, marina (boats ✅), **train station** ✅, bus stops ✅, a small airfield (planes need a runway ✅) + hospital helipad
+
+### 8.3 The park ✅ (all of it)
+- Playground (kids play), basketball + tennis courts, pond with ducks + walking trails (joggers, benches, people feeding ducks, frogs at night), skate park (tricks + falls), dog park (fetch), picnic area + BBQ grills, food truck + **ice cream truck** 🍦, fountain (coins in it)
+
+### 8.4 The beach ✅ (all of it)
+- **Pier**: fishing, **arcade**, little amusement park + **Ferris wheel** 🎡
+- **Lifeguard towers** + **surfers** (real waves, **rip currents** pull you out 🌊)
+- **Boardwalk**: tacos, ice cream, surf shop, street performers
+- **Tide pools**: crabs, starfish, anemones (micro world goldmine 🔬)
+- 🧠 Sandcastles, beach volleyball, seagulls stealing fries 😂, sunburns, tide going in + out
+
+### 8.5 How the town works 🧠
+- Roads with lanes, traffic lights, stop signs, crosswalks, sidewalks, street lights. **Full traffic rules** ✅ (speed limits, police pull you over)
+- **Power lines** + poles + transformers ⚡ (real power ✅: storms knock them out = blackouts)
+- **Water pipes + sewers** (a sewer = biofilm heaven for the micro world 🔬), storm drains, fire hydrants
+- Cell towers (phone signal), weekly **trash pickup**, mail delivery, recycling
+- Cars driving around ✅ with real drivers (they go to work, shop, get gas)
+
+---
+
+## 9. 👥 PEOPLE (the biggest part)
+
+✅ **THE BIG RULE: everything depends on the person.** Personality, mood, memories, relationship with you, the situation. No fixed scripts.
+
+### 9.1 Look
+- ✅ **Sims-like**: real proportions + faces, a little smoothed, clear emotions, light on lag
+- 🧠 All ages: babies, toddlers, kids, teens, adults, elders. Every skin tone, body type, hair type
+- 🧠 Clothes match their personality, job, money + the weather
+
+### 9.2 Brain 🧠 ✅
+- ✅ **Built-in smart brains** for everyone + ✅ **real AI chat** ⚙️ (free local AI on your graphics card OR your Claude API key)
+- ✅ **Decide for themselves**: wander, use stuff nearby, talk to each other, follow you, have plans + goals
+- ✅ **Commands**: "sit", "follow me", "build a house"... they might **obey, refuse, argue, or say "ok" and not do it** (lie), depending on personality, mood, trust, how busy they are
+- ✅ **Real memories**: remember what you did (the good AND the bad), grudges, favors, love
+- 🧠 **Gossip** spreads through town ("did you see that guy shrink a car?!")
+- **Personality traits** 🧠: brave ↔ scared, honest ↔ liar, neat ↔ messy ✅, hard-working ↔ lazy, kind ↔ mean, calm ↔ hot-headed, outgoing ↔ shy, generous ↔ greedy, patient ↔ impatient, curious, funny, loyal, jealous, romantic, nerdy, sporty, artistic, picky eater, germaphobe 🦠, early bird / night owl
+- **Emotions** 🧠: happy, sad, angry, scared, disgusted, surprised, embarrassed, bored, lonely, in love, jealous, proud, stressed, tired, excited. Shown on their face, body + voice
+- **Talents** ✅: everyone's naturally better at some things
+
+### 9.3 Talking 🗣️ ✅
+- Talk out loud to each other + you. **You type anything or talk with your microphone**
+- ✅ **Voices** ⚙️: free built-in voices / real AI voices with your key. ✅ **Subtitles** ON by default
+- 🧠 Mostly English, some Spanish + other languages (it's California), with accents
+- 🧠 They call + text you, and post about you on **Buzzr** ✅
+
+### 9.4 Needs ✅
+- Food, water, sleep, bathroom, hygiene, fun, friends, comfort, warmth, health
+- ✅ **Starving is real**: weak → pass out → die
+- ✅ Food from farming, lakes/rivers/wells, fishing, fruit trees, shops, or **you feeding them**
+
+### 9.5 Daily life ✅ (full)
+- Wake up, bathroom, shower, get dressed, breakfast, commute, work/school, lunch, errands, shopping, cook dinner, clean (**depending on the person** ✅), relax (TV, phone, video games, read, exercise, walk the dog, park, beach, surf), hang out, date, go to bed
+- 🧠 Weekends are different (sleep in, parties, BBQs, beach days)
+- ✅ **Holidays**: Halloween (decorations + trick-or-treating 🎃), Christmas lights 🎄, 4th of July fireworks 🎆, birthdays 🎂, depending on the person 🧠 + New Year's, Thanksgiving dinner, Valentine's Day, Easter egg hunts
+
+### 9.6 Jobs + money 💼 ✅ (real jobs, real pay)
+- **Shops**: cashier, stocker, store manager, chef, cook, waiter, barista, gas station clerk, hardware clerk, mechanic, car salesperson, barber, hairstylist, pharmacist, bank teller, vet, pet groomer, gun store clerk
+- **Emergency** ✅: police officer, detective, 911 dispatcher, firefighter, paramedic, doctor, nurse, surgeon
+- **Town**: teacher, principal, janitor ✅, librarian, mail carrier, garbage collector, bus driver, train conductor, pilot, mayor, judge, lawyer, dentist, lifeguard ✅, surf instructor, coach
+- **Building + making**: construction worker, electrician, plumber, carpenter, roofer, painter, farmer, fisher, miner, lumberjack, factory worker, truck driver, **delivery driver** ✅
+- **Homes**: **maid** ✅, **butler** ✅, chef ✅, **gardener** ✅, **pool cleaner** ✅, nanny, babysitter
+- **Media + fun**: **news reporter + camera operator** ✅ (the TV news), **radio DJ** ✅, musician, street performer ✅, artist, food truck owner, ice cream truck driver, **Buzzr influencer** 😂
+- **Smart jobs**: scientist, engineer, programmer, real estate agent, security guard
+
+### 9.7 Skills + learning ✅
+- ✅ **Learn by practice + teaching each other**, takes REAL time, depends on the person + their talents
+- Skills 🧠: building, carpentry, cooking, farming, fishing, hunting, mining, woodcutting, metalworking, electronics, mechanics, first aid + medicine, driving, flying, swimming, sewing, pottery, singing, instruments, art, writing, teaching, languages, sports, fighting, shooting, cleaning, selling + trading, leading, programming, science
+
+### 9.8 What people can BUILD 🏗️ ✅ ("100 things", needs materials + skill)
+- **Materials** ✅: chop trees, mine stone + metal, you give them, trade + shops
+- **Shelters → houses**: lean-to, debris hut, tent, log cabin, sod house, adobe house, wood-frame house, brick house, 2-story house, apartment building
+- **Farms**: garden beds, crop fields, fences, gates, barns, chicken coops, pig pens, stables, silos, scarecrows, irrigation ditches, **wells**, water tower, windmill, greenhouse, compost pile, beehives
+- **Furniture + tools**: chairs, tables, beds, shelves, chests, doors, windows, axes, hammers, saws, shovels, hoes, knives, bows + arrows, fishing rods, nets, baskets, rope, cloth (loom), pottery, bricks
+- **Workshops**: workbench, **forge** + anvil, **sawmill**, kiln, tannery, smokehouse, bread oven, grain mill, water wheel
+- **Roads, bridges, boats + shops**: dirt paths → gravel → stone → paved roads, footbridges → wooden → stone bridges, rafts → canoes → rowboats → sailboats, docks, market stalls, their own shops + restaurants
+- **Community**: campfire circle, meeting hall, school, clinic, town square, statue, walls, watchtower, signs, street lamps, power (windmill generator, water wheel, solar if you give them panels)
+
+### 9.9 Relationships ❤️ ✅
+- Friends, best friends, enemies, grudges, crushes, dating, marriage, 🧠 breakups + divorce
+- ✅ **People can love YOU too** (friends + dating + marriage, Sims-style, family-friendly)
+- ✅ **Families + kids grow up**, ✅ you can have kids (baby or adopt)
+- 🧠 Getting old, dying of old age → **funeral + grave**, family grieves + remembers ✅, kids inherit stuff
+
+### 9.10 Health 🏥 ✅
+- ✅ **Germs spread + people get sick**, washing hands helps
+- Sicknesses 🧠: colds, flu, stomach bugs, food poisoning (undercooked chicken ✅), strep throat, pink eye, chickenpox (kids), new virus outbreaks, pollen allergies (spring!), asthma, infections, toothaches
+- Injuries 🧠: cuts, bruises, broken bones, burns, concussions, sunburn, heatstroke, hypothermia, frostbite, poison ivy, bee stings (allergic = dangerous), snake bites, tick bites
+- Doctors, hospital, pharmacy + medicine treat them. Real healing time
+
+### 9.11 How they react ✅ ("like real people would", depending on the person)
+- **Your Rift Tool**: shocked, run, scream, **film you**, call 911, get curious, ask to try it, remember it forever
+- **Tiny you on them**: they feel it (itch, tickle), look for you, **flick you off** 😂
+- **Standing on their hand/head** ✅ when tiny (they might carry you around if they like you)
+- **Messing with their stuff** ✅: angry, chase you, **call the police**
+- **Hurting/killing someone** ✅: depends on everyone (fight back, run, call 911, witnesses, police investigate, family grieves)
+- **Shrinking them / bringing them tiny**: panic, wonder, depending on the person
+- **Aliens** ✅: freak out, it's on the news
+
+### 9.12 Spawning people ✅
+- **Random real people** (real-feeling name, age, backstory, family memories, job, skills, personality) + **design your own** (character maker)
+- ✅ **Glass cage** (spawnable glass box)
+- ✅ Shrink them, clone them, bring them tiny
+
+### 9.13 Police, ambulance, firefighters 🚓🚑🚒 ✅
+- Answer 911 calls with sirens + real drive times, investigate, arrest, treat injuries, take people to the hospital, put out fires, rescue cats from trees 😂
+
+### 9.14 Crime 🚔 ✅ (depending on the person)
+- Shoplifting, theft, break-ins, car theft, vandalism, fights, speeding + traffic tickets, scams. Police investigate. Lock your doors 🔒
