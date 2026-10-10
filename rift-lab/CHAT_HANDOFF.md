@@ -357,3 +357,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Starting garage → **3 cars: red Velaro supercar, Hesper luxury SUV, lifted Grizz truck**.
 - Crime → **real crime, depending on the person** (theft, break-ins, car theft; police investigate).
 - Claude picked (realism rule): **getting arrested works like real life** (bail, lawyer, court, maybe jail time; depends on what you did + witnesses).
+- Beach → **all**: pier + arcade + Ferris wheel, lifeguards + surfers (real waves, rip currents), boardwalk shops + food, tide pools (crabs, starfish, anemones; micro world spot).
+- Money from inventions → user "1 and 2 idk really" → Claude picked **both**: sell gadgets on the shopping app (reviews), grow into your own company (hire people, factory, compete).
+- Neighbors → **random, depending on the person**.
+- Mansion security → **gate with code + cameras on your phone + alarm that calls police**.
