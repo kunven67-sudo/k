@@ -299,3 +299,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Gadgets → **drones (incl. a tiny rideable one), robots, security + traps, Rift Tool upgrades, AND "make your own"** (free invention from real parts with real rules). Claude was honest: free invention is the hardest feature.
 - Explorable devices → **consoles + gaming PCs, phones/TVs/laptops, cars + engines, kitchen appliances**. User: "and if you shrink to micro?" → yes, all the way down: ant size (dust bunnies, pet hair in fans, solder, crumbs), germ size (bacteria on controllers/phones, skin flakes in PC dust), virus size (chip surface, transistors like a city grid), atom size (silicon crystal, copper atoms, electrons flowing when on).
 - Your lab → **both**: messy garage workshop + a bigger secret lab under the mansion (Empty World: spawn a lab building).
+- Mansion style → **mix: classic outside, modern luxury inside**.
+- Town size → user: **"if its fun yes"** → Claude picked: **start as a small town** (~60 houses, downtown, 4 shops, park, school, police + fire station, hospital; every building has a full inside), **grow it into a bigger city later** if it runs smooth.
+- Mansion household → **pick when making the world** (alone / staff / family / both).
+- People's voices → **setting: free built-in voices by default, real AI voices with the user's API key**.
