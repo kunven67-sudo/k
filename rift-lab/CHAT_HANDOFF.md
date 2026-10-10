@@ -334,3 +334,8 @@ Claude explained it was only a test and nothing had changed. Then:
 - Portal powers part 3 → **all**: portal anywhere on Earth (ocean floor = crushing water blast, Antarctica = blizzard pours in), portal slicing (close a portal mid-object = cut in half; people follow gore setting), infinite fall cannon (real terminal velocity ~200 km/h, then fling), reach-through hand portal.
 - Clone a person → **same body, no memories** (adult body with a brand-new mind, like a newborn: can't walk/talk well at first, learns from you/others).
 - Freeze → **real ice** (water turns to ice, things get brittle + shatter, people get hypothermia, it melts back).
+- Anti-gravity → **zero gravity, real space drift** (floats, keeps spinning/drifting until it bumps something, wind pushes it).
+- Shrink area → **everything on/in it shrinks too** (house = people/furniture/germs inside; cup = coffee + germs).
+- Extra vehicles → **all**: boats + jet skis (speedboats, fishing boats, yachts, kayaks), submarine (deep pressure, darkness, deep-sea creatures), rocket to space (real launch physics, orbit, land on the Moon), trains + subway.
+- Character maker extras → **all**: tattoos + piercings (age/fade), glasses + accessories, makeup + nails, beards + body hair (grow out over days).
+- Claude picked (realism rule): **X-ray scanner uses real radiation** (single scan tiny/safe, repeated scans add up).
