@@ -169,7 +169,7 @@ export function buildStepperCabinet({ variant = 'single', denomColor = 0xffd23a,
   bag.cyl('chrome', 0.026, 0.032, 0.014, cx, 2.137, cz, { seg: 16 });
 
   // lever: chrome hub on the right side panel; the arm + knob are instanced by the bank
-  const hub = new THREE.Vector3(W / 2 + 0.035, 1.13, -0.2);
+  const hub = new THREE.Vector3(W / 2 + 0.035, 1.08, -0.01); // forward on the panel, within a seated arm's reach
   bag.cyl('chrome', 0.055, 0.055, 0.05, hub.x - 0.01, hub.y, hub.z, { rz: Math.PI / 2, seg: 24 });
   bag.cyl('dark', 0.07, 0.07, 0.012, W / 2 + 0.006, hub.y, hub.z, { rz: Math.PI / 2, seg: 24 });
   bag.cyl('chrome', 0.03, 0.03, 0.04, hub.x + 0.03, hub.y, hub.z, { rz: Math.PI / 2, seg: 16 });
@@ -182,7 +182,7 @@ export function buildStepperCabinet({ variant = 'single', denomColor = 0xffd23a,
     candle: new THREE.Vector3(cx, 2.07, cz),
     screenCenter: new THREE.Vector3(0, R.cy, Wn.z),
     deckCenter: new THREE.Vector3(0, 0.96, 0.08),
-    lever: { hub: hub.clone().add(new THREE.Vector3(0.05, 0, 0)), length: 0.36, rest: 0.1 },
+    lever: { hub: hub.clone().add(new THREE.Vector3(0.05, 0, 0)), length: 0.36, rest: 0.22, pulled: 1.2 },
   };
   const colliders = [
     { center: new THREE.Vector3(0, 0.45, -0.255), size: new THREE.Vector3(W, 0.9, 0.62) },

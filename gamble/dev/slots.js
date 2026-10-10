@@ -19,6 +19,7 @@ import { slice } from '../src/life/state.js';
 import { createHuman, randomHumanParams } from '../src/character/index.js';
 import { Player } from '../src/player/index.js';
 import { createSlotBank } from '../src/casino/slots/index.js';
+import { spinVideo, spinStepper } from '../src/casino/slots/math/index.js';
 import { symbolAtlas, THEME_ART } from '../src/casino/slots/art/atlas.js';
 import { slotFontsReady, METAL } from '../src/casino/slots/art/paint.js';
 import { logoTexture, bellyTexture, buttonAtlas, bankSignTexture } from '../src/casino/slots/art/signage.js';
@@ -259,6 +260,27 @@ class SlotsDev {
     ceil.rotation.x = Math.PI / 2;
     ceil.position.set((ROOM.x0 + ROOM.x1) / 2, wallH, (ROOM.z0 + ROOM.z1) / 2);
     scene.add(ceil);
+  }
+
+  /** Dev: make machine i's next spin one (fair) result that shows `what`: free | hold | big | handpay | top. */
+  force(theme, i = 0, what = 'free') {
+    const m = this.machine(theme, i);
+    const ok = {
+      free: (r) => r.freeGame,
+      hold: (r) => r.holdSpin,
+      big: (r) => r.total >= 20 && !r.freeGame && !r.holdSpin,
+      handpay: (r) => m.dollars(Math.round((r.total ?? r.win) * m.betCredits())) >= 1200 || m.dollars(r.win ?? 0) >= 1200,
+      top: (r) => r.top,
+      win: (r) => (r.total ?? r.win) > 0 && (r.wins?.length || r.lines?.length) > 1,
+    }[what];
+    m.devNext = () => {
+      for (let k = 0; k < 2e6; k++) {
+        const r = m.kind === 'video' ? spinVideo(theme, m.lines) : spinStepper(m.variant, m.coins);
+        if (ok(r)) return r;
+      }
+      return null;
+    };
+    return m.id;
   }
 
   machine(theme, i = 0) {

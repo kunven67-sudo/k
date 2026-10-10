@@ -257,7 +257,7 @@ export class BlackjackTable extends TableBase {
   }
 
   _maybeNewNpc() {
-    if (this.low || this.npcs.length >= (this._npcTarget ?? 2)) return;
+    if (this.npcs.length >= (this._npcTarget ?? 2)) return;
     if (this.rng.next() > 0.25) return;
     const free = this.spots.filter((s) => !s.owner && !this.seats[s.i].occupant);
     if (free.length <= 2) return;

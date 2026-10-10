@@ -34,18 +34,18 @@ const CAMS = {
   // Over the seated player's head (hands on the deck stay in view), looking down at the deck and
   // up the screen; phones in portrait step back so the whole face of the machine fits.
   video: {
-    pos: new THREE.Vector3(0.2, 1.8, 0.8),
-    target: new THREE.Vector3(0, 1.3, -0.12),
-    posNarrow: new THREE.Vector3(0.06, 1.95, 1.35),
-    targetNarrow: new THREE.Vector3(0, 1.32, -0.1),
+    pos: new THREE.Vector3(0.24, 1.86, 1.12),
+    target: new THREE.Vector3(0, 1.4, -0.12),
+    posNarrow: new THREE.Vector3(0.08, 2.0, 1.75),
+    targetNarrow: new THREE.Vector3(0, 1.38, -0.1),
     screenPos: new THREE.Vector3(0.03, 1.66, 0.6),
     screenPosNarrow: new THREE.Vector3(0.0, 1.62, 0.98),
     screenTarget: new THREE.Vector3(0, 1.52, -0.11),
   },
   stepper: {
-    pos: new THREE.Vector3(0.2, 1.66, 0.76),
-    target: new THREE.Vector3(0, 1.14, -0.06),
-    posNarrow: new THREE.Vector3(0.06, 1.85, 1.3),
+    pos: new THREE.Vector3(0.26, 1.72, 1.02),
+    target: new THREE.Vector3(0.02, 1.26, -0.06),
+    posNarrow: new THREE.Vector3(0.08, 1.9, 1.6),
     targetNarrow: new THREE.Vector3(0, 1.18, -0.05),
     screenPos: new THREE.Vector3(0.0, 1.38, 0.5),
     screenPosNarrow: new THREE.Vector3(0.0, 1.4, 0.82),
@@ -510,10 +510,10 @@ export function createSlotBank({ engine, physics, tier, casino = 'eldorado', id 
       levers.arm.instanceMatrix.needsUpdate = true;
       levers.knob.instanceMatrix.needsUpdate = true;
     },
-    leverKnobWorld(machine) {
+    leverKnobWorld(machine, angle) {
       const hub = machine.cab.anchors.lever?.hub;
       if (!hub) return null;
-      const a = machine.lever?.angle ?? 0;
+      const a = angle ?? machine.lever?.angle ?? 0;
       const local = new THREE.Vector3(hub.x, hub.y + Math.cos(a) * (leverArm + 0.02), hub.z + Math.sin(a) * (leverArm + 0.02));
       return local.applyMatrix4(machine.group.matrixWorld);
     },

@@ -498,7 +498,9 @@ export class SlotMachine extends Station {
     this.balance -= bet * this.denomCents;
     this.lastWinCredits = 0;
     this._syncMeters();
-    const res = spinVideo(this.theme, this.lines);
+    // dev pages may filter for a feature (`devNext`); the outcome itself is still a fair spin
+    const res = this.devNext?.() || spinVideo(this.theme, this.lines);
+    this.devNext = null;
     this._lastResult = res;
     sc.setMessage(t('slots.screen.goodLuck'));
     if (!this.npc) this.setLed(1);
@@ -822,12 +824,13 @@ export class SlotMachine extends Station {
     this.lastWinCredits = 0;
     this._meterPaid = 0;
     this._syncMeters();
-    const res = spinStepper(this.variant, coins);
+    const res = this.devNext?.() || spinStepper(this.variant, coins);
+    this.devNext = null;
     // the arm: from wherever the hand left it, down to the stop, then the spring returns it
-    const human = this.npc ? this.npc.human : this.player?.human;
-    human?.play?.('pull-lever', { side: 'R', speed: from > 0.5 ? 1.6 : 1 });
+    // The hand grips the knob with IK all the way down and back up (the generic 'pull-lever'
+    // action's hand path can't know where this cabinet's lever is).
     const L = this.lever;
-    L.anim = { t: from > 0.5 ? 0.55 : 0, from };
+    L.anim = { t: from > 0.5 ? 0.55 * 1.8 : 0, from, human: this.npc ? this.npc.human : this.player?.human };
     this.sound('slot.lever', { gain: 0.9 });
     if (!this.npc) this.setLed(1);
     await this.wait(from > 0.5 ? 0.2 : 0.62);
@@ -906,16 +909,24 @@ export class SlotMachine extends Station {
   _updateLever(dt) {
     const L = this.lever;
     const A = this.cab.anchors.lever;
-    const pulled = 1.15;
+    const pulled = A.pulled ?? 1.2;
     let a = A.rest;
     if (L.anim) {
       L.anim.t += dt;
       const u = L.anim.t / 1.8;
-      // matches the 'pull-lever' action: reach, pull (back-out), hold, release
+      // reach (0–0.3), pull down against the spring (0.3–0.55), hold, let it ride back (0.7–0.95)
       const pull = ss(0.3, 0.55, u) * (1 - ss(0.7, 0.95, u));
       const start = L.anim.from * (1 - ss(0.55, 0.75, u));
       a = A.rest + (pulled - A.rest) * Math.max(pull, start);
-      if (u >= 1) L.anim = null;
+      const h = L.anim.human;
+      if (h?.setHandTarget) {
+        if (u < 0.8) h.setHandTarget('R', this.bank.leverKnobWorld(this, a));
+        else h.setHandTarget('R', null);
+      }
+      if (u >= 1) {
+        h?.setHandTarget?.('R', null);
+        L.anim = null;
+      }
     } else if (L.drag) {
       a = A.rest + (pulled - A.rest) * L.drag.a;
     }
@@ -926,7 +937,7 @@ export class SlotMachine extends Station {
     // the player's hand follows the knob while dragging
     const h = this.player?.human;
     if (L.drag && h?.setHandTarget) {
-      h.setHandTarget('R', this.bank.leverKnobWorld(this));
+      h.setHandTarget('R', this.bank.leverKnobWorld(this, a));
       this._handTimer = 0.2;
     }
   }
@@ -1070,7 +1081,7 @@ export class SlotMachine extends Station {
     if (this.kind === 'stepper') {
       this._updateDrums(dt);
       this._updateLever(dt);
-      this.bank.setMeter(this, this.credits, this.coins, this._meterPaid ?? 0);
+      this.bank.setMeter(this, this.credits + (this.phase === 'spin' ? this._meterPaid || 0 : 0), this.coins, this._meterPaid ?? 0);
     }
     // stool collider comes back once the player has stepped away
     if (this._standingPlayer && !this.active) {

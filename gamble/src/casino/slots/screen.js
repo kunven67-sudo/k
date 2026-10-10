@@ -634,7 +634,7 @@ export class VideoScreen {
     const { x: X, y: Y, cell: C } = REEL;
     g.save();
     g.fillStyle = 'rgba(8,6,12,.94)';
-    g.fillRect(X - 8, Y - 8, C * 5 + 16, C * 3 + 16 + 46);
+    g.fillRect(X - 8, Y - 8, C * 5 + 16, C * 3 + 16 + 58);
     bevelText(g, t('slots.screen.paytable'), 256, Y + 12, { font: `400 28px ${FONTS.display}`, fill: metalGrad(g, 0, Y, 0, Y + 24, METAL.gold), inkW: 4, tracking: 3 });
     const pays = this.par.pays;
     const keys = Object.keys(pays).filter((k) => pays[k].some((v) => v > 0));
@@ -643,7 +643,7 @@ export class VideoScreen {
       const col = i % 2;
       const row = Math.floor(i / 2);
       const x = X + 6 + col * 242;
-      const y = Y + 34 + row * 46;
+      const y = Y + 32 + row * 44;
       this.atlas.draw(g, k, x, y, 42);
       const p = pays[k];
       const txt = `5× ${p[5] * unit}   4× ${p[4] * unit}   3× ${p[3] * unit}`;
@@ -651,8 +651,8 @@ export class VideoScreen {
     });
     const help = this.par.kind === 'ways' ? t('slots.screen.payHelpWays') : t('slots.screen.payHelpLines');
     const feat = { 'wild-west': 'payHelpWest', space: 'payHelpSpace', dragon: 'payHelpDragon' }[this.theme];
-    wrapText(g, `${help} ${t(`slots.screen.${feat}`)}`, 256, Y + 34 + Math.ceil(keys.length / 2) * 46 + 4, 480, 18, `500 15px ${FONTS.ui}`, '#d8d0c0');
-    bevelText(g, t('slots.screen.touchToClose'), 256, Y + C * 3 + 32, { font: `400 18px ${FONTS.display}`, fill: 'rgba(255,255,255,.6)', inkW: 0, inner: null, shadow: false });
+    wrapText(g, `${help} ${t(`slots.screen.${feat}`)}`, 256, Y + 32 + Math.ceil(keys.length / 2) * 44 + 2, 480, 17, `500 15px ${FONTS.ui}`, '#d8d0c0');
+    bevelText(g, t('slots.screen.touchToClose'), 256, Y + C * 3 + 44, { font: `400 18px ${FONTS.display}`, fill: 'rgba(255,255,255,.6)', inkW: 0, inner: null, shadow: false });
     g.restore();
   }
 

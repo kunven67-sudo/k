@@ -197,6 +197,21 @@ export async function buildEldoradoInterior(engine, physics, { tier, scene, rng 
   const cullDist = CULL[tier.name] ?? 38;
   const entrances = [new THREE.Vector3(-12.2, 1.5, 50), new THREE.Vector3(-45, 1.5, 12.2), new THREE.Vector3(-14.6, 1.5, 14.6)];
   const isInside = (p) => p.y < 7 && p.y > -1 && insideShell(p.x, p.z, -0.05);
+  // Door openings as boxes: from inside, the city only needs drawing when one is in view.
+  const portals = [
+    new THREE.Box3(new THREE.Vector3(-12.7, 0, 45.2), new THREE.Vector3(-11.8, 3.5, 54.8)),
+    new THREE.Box3(new THREE.Vector3(-47.7, 0, 11.8), new THREE.Vector3(-42.3, 3.5, 12.7)),
+    new THREE.Box3(new THREE.Vector3(-16.4, 0, 12.6), new THREE.Vector3(-12.6, 3.5, 16.4)),
+  ];
+  const frustum = new THREE.Frustum();
+  const pm = new THREE.Matrix4();
+  function doorsInView(camera, maxDist = 45) {
+    if (!camera) return true;
+    pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    frustum.setFromProjectionMatrix(pm);
+    for (const b of portals) if (b.distanceToPoint(camera.position) < maxDist && frustum.intersectsBox(b)) return true;
+    return false;
+  }
 
   function update(dt, ctx = {}) {
     state.time += dt;
@@ -241,7 +256,7 @@ export async function buildEldoradoInterior(engine, physics, { tier, scene, rng 
     }
     // Deep inside, the sun's shadow map has nothing to do: stop re-rendering it (toggling
     // castShadow would recompile every shader; autoUpdate doesn't).
-    if (sky?.sunLight?.shadow) sky.sunLight.shadow.autoUpdate = !(inside && nearDoor > 16);
+    if (sky?.sunLight?.shadow) sky.sunLight.shadow.autoUpdate = !inside;
     const sc = ctx.scene || scene;
     if (sc && envRT) {
       if (k > 0.5) {
@@ -292,6 +307,7 @@ export async function buildEldoradoInterior(engine, physics, { tier, scene, rng 
     },
     cage: C.cage,
     nearestEntrance: (p) => Math.min(...entrances.map((e) => e.distanceTo(p))),
+    doorsInView,
     colliderCount: colliders.count,
     isInside,
     update,

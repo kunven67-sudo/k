@@ -92,10 +92,10 @@ export async function buildWorld(engine, physics, { tier, scene, onProgress } = 
       for (const l of motelPool) l.visible = !inCasino;
       // No rain falls indoors.
       if (rainMesh && casino.state.inside > 0.5) rainMesh.visible = false;
-      // Deep inside the casino (well away from every door) the city can't be seen: skip drawing it
+      // Inside the casino with no door opening in view, the city can't be seen: skip drawing it
       // (its light pool group stays, so the light count never changes).
       const cam = ctx.camera?.position || viewer;
-      const hideCity = casino.state.insideNow && casino.nearestEntrance(cam) > 16;
+      const hideCity = casino.state.insideNow && (casino.nearestEntrance(cam) > 4 && !casino.doorsInView(ctx.camera));
       if (hideCity !== cityHidden) {
         cityHidden = hideCity;
         for (const c of reno.group.children) if (c.name !== 'night-lights') c.visible = !hideCity;
