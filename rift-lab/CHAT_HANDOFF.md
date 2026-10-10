@@ -352,3 +352,8 @@ Claude explained it was only a test and nothing had changed. Then:
 - Sleep → **time skips (world keeps living) + sometimes a short weird dream about the day**.
 - Gamepad → **later** (keyboard + mouse first).
 - Achievements → **yes, fun hidden ones** ("Shrank a whale", "Threw the Moon").
+- Mansion town location → **California coast** (beach + ocean nearby, foggy mornings, palm trees, mild winters, almost never snows, surfers).
+- More shops → **all**: clothes store + barber/salon, car dealer + mechanic (+ custom shop), electronics + pet store (+ vet), bank + licensed gun store + pharmacy.
+- Starting garage → **3 cars: red Velaro supercar, Hesper luxury SUV, lifted Grizz truck**.
+- Crime → **real crime, depending on the person** (theft, break-ins, car theft; police investigate).
+- Claude picked (realism rule): **getting arrested works like real life** (bail, lawyer, court, maybe jail time; depends on what you did + witnesses).
