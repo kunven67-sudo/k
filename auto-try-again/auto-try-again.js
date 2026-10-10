@@ -30,7 +30,7 @@
   // Finds things like "1 PM", "1:00 pm", "13:00" next to words like reset/until/at.
   function findResetTime() {
     const text = document.body.innerText || '';
-    const m = text.match(/(?:reset|resets|until|after|at)[^\d]{0,20}(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?/i);
+    const m = text.match(/\b(?:resets?|until|after|at)\b[^\d]{0,20}(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?/i);
     if (!m) return null;
     let h = parseInt(m[1], 10);
     const min = m[2] ? parseInt(m[2], 10) : 0;
