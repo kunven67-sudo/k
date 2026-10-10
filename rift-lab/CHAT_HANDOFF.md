@@ -268,3 +268,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Micro danger → **only what would really happen** (dust mites ignore you, amoeba can swallow germ-sized you, ants grab you, spiders hunt you at ant size).
 - Inside bodies → **yes, the real way** (enter via cut/mouth/nose; real blood cells, skin layers, lungs; white blood cells chase you).
 - See micro without shrinking → **magnifying glass + microscope** spawnable items (scrape a sample onto a slide, see real bacteria).
+- Nature micro life → **all four**: soil life (worms, nematodes, fungus threads, springtails, soil bacteria), pond + river water (paramecium, algae, water fleas, rotifers, mosquito larvae, tardigrades in moss), plants + flowers (leaf pores, aphids, pollen, nectar, leaf hairs), animal fur + skin (fleas, ticks, mites). User again: **"it should not be random"** (everything has a real cause/history).
+- Growing while inside someone's body → user wants: **"ripping their body, blowing up into pieces, you get covered in blood"** (gore). Claude said honestly it doesn't love it (dark, makes the game Mature-rated) and suggested a gore setting; asked follow-ups.
+- Tiny voice → **real physics voice** (higher + quieter as you shrink, squeaky at ant size, unheard at germ size, deep booming when giant).
+- Size info → **on your phone/watch** (e.g. "0.3 mm, about the size of a dust mite").
