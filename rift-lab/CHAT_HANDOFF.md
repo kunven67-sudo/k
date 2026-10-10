@@ -285,3 +285,9 @@ Claude explained it was only a test and nothing had changed. Then:
 - Movement → **full real movement**: walk, sprint, crouch, crawl/prone, lean, climb/mantle fences + walls, ladders, swim, dive, hold breath, sit, lie down. All keys rebindable.
 - Character per world → **pick when making a world** (use your main character or make a new one).
 - Main menu background → **space → Earth → clouds → forest → shrinks into a dewdrop on a leaf**.
+- Animals → **all**: deer, rabbits, squirrels, raccoons; wolves, foxes, bears, coyotes; songbirds, hawks, owls, ducks, crows; fish, frogs, turtles, snakes + bugs (bees, butterflies, fireflies, mosquitoes, ants).
+- **COLLISIONS MUST BE VERY GOOD** (user stressed this): collision must match exactly what you see. If it looks like you can walk under it, crawl under it or jump over it, you can. **No walking through stuff, no invisible barriers.** World edges = real visible mountains/ocean, not invisible walls. Test this before calling anything done.
+- Pets/taming → user: **"bro i said it depends on everything thats realistic is that not?"** → it depends on the animal, its personality, how you treat it, etc.
+- **LESSON:** don't ask questions that the "depends on everything / whatever is realistic" rule already answers. Pick the realest option yourself and tell the user. Only ask about real choices (taste, design, settings).
+- Gun battery → **a setting** (real battery / self-recharging / unlimited).
+- Digging → **yes, real digging** (shovels, holes, trenches, dirt piles, water fills holes, dams, mud, people dig for mining + farming).
