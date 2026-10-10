@@ -1,6 +1,6 @@
 # KILL AIs — Game Design Notes
 
-Every answer locked in during the design chat. **Nothing is built yet** — the game gets built only after the word **stop**.
+Every answer locked in during the design chat. **v1 is built:** `kill-ais/kill-ais.html` (one file, open it in a browser).
 
 Items marked *(designer's choice)* are ones the answer was "whatever makes it cool", so the builder picks.
 
@@ -263,6 +263,8 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Bullet time:** slow motion **only when you get a headshot**.
 - **Hack tool** that takes over enemy turrets.
 - **Health packs & armor:** sold at shop terminals, dropped by dead AIs, hidden around the map.
+- **The shrink watch from Ant Work 2** is on your left wrist, but **the virus broke it** (it just glitches "ERR"). How it gets fixed comes later, when Ant Work 2 is done.
+- **The hero talks:** reaction lines, grunts and cutscene lines (voiced by the owner). **Headshots** get a cool announcer voice done by somebody else (the hero doesn't say it).
 
 ### Hacking AIs (all three ways)
 
@@ -294,6 +296,8 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Shop terminals** are inside the levels; you walk up to them. They're **just a machine** (no shopkeeper, no talking).
   - They're **safe zones**, but AIs can **hack the prices up**. **Kill the AI that hacked it** to fix the prices. The terminal shows the hacker's **name and face**, and it's marked with a **red skull on the minimap**.
 - **Saving only at shop terminals.** **3 save slots.**
+- **Hack the prices yourself:** a risky mini-game at the terminal. Win = cheaper prices, lose = it backfires.
+- **Ammo crates** in ELIZA's chamber respawn, so you can never get stuck with no ammo in a boss fight.
 
 ## 10. Guns & Gear
 
@@ -324,6 +328,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - Chatting with every AI
 - Secret trophies (unlock the best outfits)
 - Super rare Insane-mode trophy
+- **Trophies show in both KILL AIs and Ant Work 2.**
 - **Trophy room** you walk around in, **only in safe zones**. It's a **glitchy copy of your real bedroom** from before you got sucked in, with trophies on the shelves and **every boss you beat mounted on the wall** like a hunting trophy.
 
 ## 13. HUD & Settings
@@ -334,7 +339,9 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Minimap / radar.**
 - **One default crosshair.**
 - **Damage numbers:** on/off toggle in settings.
-- **Graphics menu.**
+- **Graphics menu** with the **same presets as Ant Work 2**: Toaster, Potato, Low, Medium, High, Ultra, Insane.
+- **Field of view** slider (works like other shooters: 90 by default).
+- **Loading screen = a fake virus download bar.**
 - **Every key can be rebound** in settings.
 - **Pausing only at shop terminals** (the file never stops).
 - **No photo mode.**
@@ -349,6 +356,19 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 ## 15. After Level 100
 
 - **New game mode:** *to be decided later*
+
+## 16. How It's Built & How It Looks
+
+- **KILL AIs is a side story of Ant Work 2** (same hero). It's its **own game**, linked from Ant Work 2.
+- **One HTML file**, three.js from jsdelivr, **no image or sound files**: every texture, model and sound is made by code.
+- **Game System 2.0 save kit:** everything autosaves, reopening the game resumes where you were (skips the title), New Game wipes the save. Keyboard + mouse **and** touch. Never uses F2.
+- **Realism pass** (the owner said: forget the rules, just make it look realistic):
+  - Real-looking materials made by code: waxed vinyl floor tiles, painted walls with a wainscot and chair rail, acoustic ceiling tiles, brushed steel, wood grain, fabric, rubber
+  - A detailed 1960s computer lab: fluorescent ceiling lights, mainframes with spinning tape reels and blinking lamp panels, CRT desks with keyboards, office chairs, printers, filing cabinets, pipes, clocks, fire extinguishers, exit signs
+  - Lighting: baked light pools and contact shadows on the floor, reflections captured from the lab itself, soft shadows from above, ambient occlusion on the High+ presets, a film-style color grade
+  - **Android AIs** (helmet heads with glowing eyes, armor in their brand color, the arm cannon) with a cheaper model for far-away AIs so hundreds of them still run smooth
+  - **Real-looking guns** (an M4-style rifle, a Glock-style pistol, a pump shotgun with shells on the side, a bolt sniper with a big scope…) held by **gloved hands with fingers wrapped around the grip**, hoodie sleeves, and the broken watch
+  - **The intro is your real bedroom at night:** desk lamp, PC with RGB, bed, bookshelf, window with blinds and the city outside, and you in a hoodie on a gaming chair
 
 ---
 
@@ -365,9 +385,12 @@ What the first build should have:
 7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
 8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** (Dr. Sbaitso) and "to be continued"
 
+**Built so far:** all 8 of the above. **Not in v1 yet:** 3 save slots (v1 autosaves 1), sidekicks, the skill tree and grapple, the trophy room, vision gear, the extra grenades, the energy sword, the other 90 guns and 99 bosses.
+
 ## Still Open
 
 - Story ending
 - New game mode after level 100
 - How Ant Work 2 sends you into KILL AIs (could replace or change the "make a game" virus intro)
 - Which Ant Work 2 characters cameo
+- How the broken shrink watch gets fixed (after Ant Work 2 is done)
