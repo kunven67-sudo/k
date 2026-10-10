@@ -307,3 +307,127 @@ Everything that goes in the game. Made from every answer you gave (two chats), p
 - **Grab + throw planets** 😂 (real square-cube: heavy + slow, but you can)
 - **Moon into Earth** = real impact (shockwave, tsunami, everything breaks) + an **"undo disaster" button**
 - 🧠 Giant footsteps = earthquakes, breath = wind, sneeze = storm 😂
+
+---
+
+## 6. 🌲 EMPTY WORLD (sandbox 1) ⭐
+
+### 6.1 The land
+- ✅ ⭐ **Grass meadow + oak/maple forest** first (most detailed). Later: desert + canyon, snow + mountains, beach + ocean, white grid
+- ✅ **Huge (~2 km)** with real edges (mountains + ocean, **no invisible walls**) + an Earth-like far horizon with curvature + haze
+- ✅ **Real geology**: new map each world from a seed, hills, valleys, rivers carving downhill into lakes
+- ✅ **Start**: just you + untouched nature (trees, rocks, animals, water)
+- 🧠 Land features: hills, valleys, cliffs, rocky outcrops, boulders, meadows, marsh/wetland, river banks, sandbars, gravel beds, a waterfall, **caves** (limestone, stalactites, bats, dark + echoey), springs
+- 🧠 **Ground layers** you dig through: grass + roots → topsoil (dark, worms) → subsoil (clay) → gravel → bedrock
+- 🧠 **Rocks**: granite, limestone, sandstone, shale, basalt, quartz, **flint** (makes sparks + sharp tools), **clay** (pottery + bricks), sand, gravel, river stones
+- 🧠 **Ores** for mining: coal, iron, copper, tin, lead, zinc, silver, gold (rare), gems (very rare: quartz crystals, garnet, amethyst)
+
+### 6.2 Digging ⛏️ ✅
+- Shovels, pickaxes, hands (slow), excavators (later)
+- Dig holes + trenches, dirt piles up, **water fills holes**, build **dams**, rain makes **mud**, tunnels can **collapse** 🧠, your people dig for mining + farming + wells
+
+### 6.3 Water 💧 ✅
+- **Real flowing water**: rivers, streams, rapids, a waterfall, lakes, ponds, springs, puddles
+- Swimming, diving, floating/sinking by real density (wood floats, rocks sink, ice floats, people float a little)
+- 🧠 Currents push you, splashes, ripples, waves, wet things look darker + shiny, things soak up water (flat-pack swells ✅)
+- 🧠 **Dirty water = germs** 🦠: drink from a pond and you might get sick. Boil it, filter it, or dig a well
+- 🧠 Rivers rise in rain + **flood**, ponds **freeze** in winter (thick ice holds you, thin ice breaks 😱)
+- 🧠 Slow erosion: rivers slowly carve their banks over years (fast-forward)
+
+### 6.4 Fire 🔥
+- 🧠 Make fire: lighter, matches, **flint + steel**, friction bow drill
+- Campfires (warm you ✅, cook food, light at night, smoke), torches, charcoal
+- ✅ **Wildfire**: lightning or a careless campfire, spreads with wind + dry grass, smoke, ash, burned ground → **regrowth** over years
+- 🧠 Fire spreads to furniture, houses, trees, people get burns, smoke detectors beep
+
+### 6.5 Weather 🌦️ ✅ (all of it, choose in the menu or let it be real)
+- Clear, partly cloudy, overcast, morning **fog**, **dew** (dewdrops on leaves 💧), drizzle, rain, heavy rain, thunderstorm (lightning starts fires + can hit you ⚡), hail, wind + gusts, heat wave, drought, frost, snow, blizzard, sleet, freezing rain, ice storm, rainbow after rain, rare tornado
+- 🧠 Real clouds (cumulus, stratus, cirrus, storm towers) that move with the wind + cast **shadows on the ground**
+- 🧠 Effects: puddles grow, mud, wet shiny surfaces, snow piles up with **footprints**, melting, wind bends trees + grass, leaves blow around, umbrellas flip 😂
+
+### 6.6 Seasons 🍂 ✅ (affect crops + life)
+- **Spring**: buds, flowers, baby animals, rain, mud, birds come back
+- **Summer**: deep green, hot, bugs, thunderstorms, fireflies at night ✨
+- **Fall**: leaves turn orange/red/yellow + **drop**, harvest, animals store food, birds migrate south
+- **Winter**: bare trees, snow, frozen ponds, bears hibernate, short days, long nights
+
+### 6.7 Sky 🌌 ✅
+- **Real sun position** for the real date + place, real sunrise/sunset colors, golden hour, blue hour
+- **Real star map**: real constellations, the Milky Way, planets in their real spots, real moon phases + moonrise
+- Shooting stars + 🧠 real **meteor showers on real dates** (Perseids ~Aug 12, Geminids ~Dec 14), real **eclipses** when they really happen, satellites + the space station passing over
+- 🧠 Empty World = super dark sky, tons of stars. Town = light pollution, fewer stars
+
+---
+
+## 7. 🌿 NATURE: PLANTS, ANIMALS + MICRO LIFE
+
+✅ **Plants grow + spread** (seeds, years, fire, regrowth). ✅ **Full wildlife ecosystem.**
+
+### 7.1 Trees 🌳 (✅ oak + maple mix forest)
+- **Oaks**: red oak, white oak, bur oak (acorns 🌰 → squirrels + deer eat them)
+- **Maples**: sugar maple (real syrup from sap 🍁), red maple, silver maple
+- Also: American beech, paper birch (white bark), yellow birch, shagbark hickory, black walnut, black cherry, white ash, basswood, tulip tree, sycamore, cottonwood, black willow (by water), American elm, eastern hemlock, white pine, eastern red cedar, flowering dogwood, redbud, serviceberry, hawthorn, wild crabapple
+- 🧠 Every stage: seed → seedling → sapling → young → old giant → dead standing snag → fallen log → rotting into soil
+- 🧠 Storms knock trees down, lightning splits them, beavers chew them, woodpeckers make holes
+
+### 7.2 Bushes, vines + ground plants
+- **Berries**: blackberry, raspberry, blueberry, elderberry, wild strawberry (🧠 some berries are poisonous: pokeweed, nightshade)
+- Sumac, hazelnut, spicebush, viburnum, wild rose, honeysuckle, witch hazel, **poison ivy** (🧠 touch it = itchy rash for days 😬)
+- Vines: wild grape, Virginia creeper
+- **Ferns**: bracken, ostrich fern (fiddleheads), Christmas fern, cinnamon fern
+- **Moss** (tardigrades live in it 🔬), lichen, liverworts
+
+### 7.3 Flowers 🌼
+- Meadow: dandelion, white + red clover, oxeye daisy, black-eyed Susan, goldenrod, **milkweed** (monarch butterflies 🦋), purple coneflower, wild bergamot, Queen Anne's lace, chicory, buttercup, lupine, aster, thistle, Joe-Pye weed
+- Forest floor: trillium, violets, bloodroot, wild columbine, mayapple, jack-in-the-pulpit
+- Water: cattails, water lilies, pickerelweed
+
+### 7.4 Grasses
+- Kentucky bluegrass, fescue, timothy, big bluestem, little bluestem, switchgrass, foxtail, sedges, rushes
+- 🧠 Grass bends when you walk through it, gets trampled into paths, grows back, turns brown in drought + winter
+
+### 7.5 Mushrooms + fungi 🍄
+- Edible: chanterelle, morel (spring), chicken-of-the-woods, oyster mushroom, puffball
+- 🧠 **Deadly**: death cap, destroying angel, fly agaric (red with white dots). Eat the wrong one = really sick or dead 💀
+- Turkey tail, shelf fungus, honey fungus, slime mold (it MOVES slowly 😳)
+
+### 7.6 Crops + farming 🌽 (for you + your people)
+- **Crops**: corn, wheat, oats, barley, rice (needs flooding), potatoes, tomatoes, carrots, lettuce, cabbage, broccoli, beans, peas, soybeans, pumpkins, squash, zucchini, cucumbers, onions, garlic, peppers, strawberries, watermelon, cantaloupe, sunflowers, cotton (for cloth), herbs (basil, mint, parsley, cilantro, rosemary)
+- **Fruit + nut trees**: apple, pear, peach, plum, cherry, orange, lemon, avocado, fig, walnut, almond, pecan
+- 🧠 Real farming: plow/dig, plant seeds, water, weeds, bugs eat crops, fertilizer (compost + manure), harvest in the right season, frost kills crops, crop rotation
+- ✅ **Seasons decide** what grows when
+
+### 7.7 Animals 🦌 (✅ all of them)
+- **Plant eaters + small mammals**: white-tailed deer, cottontail rabbits, gray squirrels, red squirrels, flying squirrels, chipmunks, raccoons (dig through your trash 😂), groundhogs, opossums, skunks (spray = you stink for days 🦨), porcupines, beavers (build real dams), muskrats, river otters, mink, weasels, mice, voles, shrews, moles, bats, elk, wild turkeys
+- **Predators**: gray wolves, red foxes, black bears, coyotes, bobcats
+- **Birds**: robins, cardinals, blue jays, chickadees, sparrows, finches, warblers, bluebirds, wrens, mockingbirds, woodpeckers, hummingbirds, swallows, doves, quail, pheasants, crows, ravens, red-tailed hawks, bald eagles, turkey vultures, great horned owls, barred owls, mallards, wood ducks, Canada geese, great blue herons, kingfishers
+- **Fish** (river + lake): trout, largemouth bass, smallmouth bass, bluegill, perch, northern pike, catfish, carp, minnows, salmon (swim upriver in fall)
+- **Frogs + reptiles**: bullfrogs, spring peepers, tree frogs, toads, salamanders, newts, snapping turtles, painted turtles, box turtles, garter snakes, rat snakes, water snakes, **rattlesnakes + copperheads** (venomous 🐍), skinks
+- **Bugs**: honeybees, bumblebees, wasps, hornets, monarch + swallowtail butterflies, moths, **fireflies**, mosquitoes (bites itch!), ants, ladybugs, stag beetles, dung beetles, grasshoppers, crickets (night chirps 🦗), cicadas (summer buzz), dragonflies, damselflies, flies, gnats, **ticks**, praying mantises, stink bugs, aphids, caterpillars, termites, water striders, centipedes, millipedes, earthworms, snails, slugs
+- **Spiders**: orb weavers (real webs with dew on them), wolf spiders, jumping spiders, black widows (venomous)
+
+### 7.8 How animals live ✅ (depending on the animal)
+- Eat, drink, sleep, mate, have babies, grow up, get old, die. Real food chains: wolves hunt deer, hawks hunt rabbits, owls hunt mice at night
+- **Notice you by sight + hearing + SMELL**: wind direction matters, crouch + go slow = quieter, deer stomp + snort + run, wolves track your scent
+- 🧠 Daily rhythms: deer at dawn + dusk, owls + raccoons at night, birds sing at sunrise
+- 🧠 Seasons: birds migrate, bears hibernate, squirrels bury nuts (and forget some → new trees 🌳)
+- 🧠 **Signs they leave (nothing random!)**: tracks in mud + snow, poop, scratched trees, nests, burrows, dens, beaver dams, deer beds in flattened grass, feathers, shed antlers
+- ✅ Hunting + fishing (fishing rod, bait, nets, bow, hunting rifle)
+- ✅ Pets + taming **depend on everything** (the animal, its personality, how you treat it, how hungry/scared it is). Wolves never fully tame 🧠
+- 🧠 Animals get sick, get hurt, limp, heal, carry fleas + ticks
+
+### 7.9 Nature micro life 🔬 ✅ (not random!)
+- **Soil**: earthworms, nematodes, **fungus threads connecting tree roots** (the "wood wide web"), springtails, soil mites, soil bacteria, tardigrades
+- **Pond + river water**: paramecium, algae, water fleas, rotifers, mosquito larvae, hydra, copepods, diatoms, tardigrades in wet moss
+- **Plants + flowers**: leaf pores opening + closing (they breathe!), aphids, pollen grains, nectar, tiny leaf hairs, chloroplasts, sap flowing
+- **Animals' fur + skin**: fleas, ticks, mites, lice, fur scales up close
+
+### 7.10 Other terrains (built after the meadow)
+- **Desert + canyon**: saguaro, prickly pear, Joshua trees, sagebrush, creosote, red rock layers, flash floods. Lizards, Gila monsters, rattlesnakes, scorpions, tarantulas, roadrunners, jackrabbits, kit foxes, coyotes, bighorn sheep, vultures
+- **Snow + mountains**: spruce, fir, pine, aspen, glaciers, avalanches 🧠, frozen lakes. Mountain goats, elk, moose, wolverines, lynx, snowshoe hares (turn white in winter), marmots, pikas, ptarmigan, golden eagles
+- **Beach + ocean**: dunes, dune grass, palm trees, tide pools, waves, tides. Crabs, gulls, pelicans, sea turtles, dolphins, seals, fish
+
+### 7.11 Ocean life 🌊 (coast + submarine)
+- **Coast**: seagulls, brown pelicans, sandpipers, sea lions, harbor seals, sea otters (crack shells on their bellies 🦦), dolphins, **gray whales + humpbacks** (real migration seasons), leopard sharks, rays, jellyfish, octopus, kelp forests, garibaldi fish, sea urchins, mussels, barnacles, sand crabs, starfish, sea anemones, hermit crabs
+- **Open ocean**: tuna, mahi-mahi, swordfish, great white sharks, blue whales, sea turtles, flying fish, sunfish (mola mola)
+- **Deep sea** ✅ (submarine): anglerfish, giant squid, vampire squid, gulper eel, lanternfish, hatchetfish, sixgill sharks, sea cucumbers, tube worms + **hydrothermal vents**, whale falls, total darkness + bioluminescence ✨, crushing pressure
