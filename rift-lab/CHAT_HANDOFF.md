@@ -260,3 +260,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - HUD → **no HUD by default** (stomach growls, blur when tired, heavy breathing, watch/phone for time) **+ a HUD on/off setting**.
 - Phone → **yes, a real phone**: time, weather, map, camera + photos, call/text people, bank app, and **the spawn menu is an app on it**.
 - Death → **a setting**: hospital + bill / permadeath / respawn at bed.
+- Empty World start kit → **just clothes + phone** (survival). User: "dont i got a fridge?" → yes, spawn it from the phone app, but it arrives empty + needs power hooked up.
+- How spawned items arrive → **a setting** (appear where you point / delivery truck).
+- Temperature → **full real temperature** (shiver → hypothermia, sweat → heatstroke, sunburn, wet clothes colder, jackets, campfires).
+- Start date → **today's real date + time** (from the PC clock).
