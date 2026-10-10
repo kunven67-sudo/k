@@ -348,3 +348,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Getting to alien planets → **grow giant + portals** (no fake FTL ships).
 - Aliens visiting Earth → **only if they find you** (may follow you back depending on them; people freak out, it's on the news).
 - Claude picked (realism rule): **alien languages are learned slowly by practice**.
+- Rest of Earth (outside your town) → **real land shape from real elevation data + generated towns/forests/wildlife fitting each real region**. Claude was honest: the whole real Earth street-by-street isn't possible.
+- Sleep → **time skips (world keeps living) + sometimes a short weird dream about the day**.
+- Gamepad → **later** (keyboard + mouse first).
+- Achievements → **yes, fun hidden ones** ("Shrank a whale", "Threw the Moon").
