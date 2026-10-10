@@ -256,3 +256,7 @@ Claude explained it was only a test and nothing had changed. Then:
 - Electricity → **real power**: plug into outlets, empty world needs a generator/solar/power lines, breakers trip on overload, fridge food spoils when power dies.
 - Spawned furniture → **empty, like new from the store** (fits "nothing is random"; you/people fill it).
 - Aging → **full real aging**: dust, scratches, sun-faded fabric, wood weathers/rots in rain, metal rusts, food rots (feeds the micro world).
+- Giant strength → **real square-cube law** (strength x size², weight x size³). At planet size you can still throw the Moon, it just feels heavy + slow.
+- HUD → **no HUD by default** (stomach growls, blur when tired, heavy breathing, watch/phone for time) **+ a HUD on/off setting**.
+- Phone → **yes, a real phone**: time, weather, map, camera + photos, call/text people, bank app, and **the spawn menu is an app on it**.
+- Death → **a setting**: hospital + bill / permadeath / respawn at bed.
