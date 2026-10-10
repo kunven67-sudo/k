@@ -244,3 +244,11 @@ Claude explained it was only a test and nothing had changed. Then:
 - Saving → **push after every finished chunk** (and save this file too).
 - First terrain to build + make the most detailed → **Grass meadow + forest** (trees to chop, river + lake, deer/rabbits/wolves/birds, farm land).
 - Your body → **make your own character** (face, body, skin, hair, height, voice; light on lag like the other people).
+- Forest → **oak + maple mix** (fall colors, leaves drop in winter, bushes, ferns, mushrooms, fallen logs).
+- Animals notice you by **sight + hearing + smell** (wind direction matters, crouch/slow = quieter, deer stomp + run, wolves track scent).
+- Your body → **full real body**: stamina, heavy breathing, sweat, limping, bleeding, bones break and heal slowly.
+- Character maker → **sliders for everything** (nose, eyes, jaw, ears, body shape, height, weight, skin, freckles, scars, hair styles + color, voice pitch).
+- Spawning cost in Empty World → **toggle in settings** (free or pay mode, chosen when making a new world). Items show real prices.
+- Day length → **choose when making a world** (real 24h / 2h / 48 min / 24 min per day). Fast-forward works on top.
+- Night sky → **real star map** (real constellations, Milky Way, real moon phases, planets, shooting stars, correct for California + date).
+- Using doors/drawers/fridges → **grab + drag with the mouse only** (like a real hand pulling, Amnesia-style). No tap-to-open.
