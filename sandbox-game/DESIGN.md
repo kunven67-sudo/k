@@ -96,6 +96,14 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 
 ## v1 details
 - **Guns**: pistol, assault rifle, shotgun, sniper.
+- **Spawn menu**: tabs (Shapes / Props / Explosives / Weapons / Tools) + search bar.
+- **v1 props**:
+  - Construction: concrete blocks, cinder blocks, steel beams, wood planks, pallets, scaffolding
+  - Containers: wooden crates, oil drums, propane/gas tanks, shipping container, cardboard boxes
+  - Everyday: soda cans, vending machine, TV, PC tower, chairs, tables, fridge
+  - Glass: window panes, glass walls, bottles
+- **Resizing**: Shift + scroll on the ghost preview (basic shapes only; props stay real size).
+- **Weight**: real density per material, bigger = heavier.
 - **Arena size**: medium, ~300m.
 - **Explosion feel**: camera shake (by distance), ear ringing + muffled sound when too close, visible shockwave + dust cloud, scorch marks that stay on the ground.
 - **Main menu**: live 3D background, a slow camera flying over the arena while stuff explodes, menu on the side.
