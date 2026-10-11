@@ -57,6 +57,7 @@ HELP = f"""{G}{BOLD}Commands{END}
   {G}/project <name>{END}  🎮 new game project in its own folder
   {G}/versions{END}        🕘 backups of your file   {G}/restore <n>{END}  go back to backup n
   {G}/style{END}           🎨 what I learned about how you code
+  {G}/docs <words>{END}    📖 search the real pygame + ursina functions
   {G}/xp{END}              ⭐ your level
   {G}/mode teach|code|hints{END}   how I help you
   {G}/model <name>{END}    switch brain    {G}/clear{END}  new chat    {G}/quit{END}  bye
@@ -206,6 +207,17 @@ class CLI:
         V.save_version(self.path, self.code(), "before-restore")
         self.path.write_text(old, encoding="utf-8")
         self.say(f"↩ Restored backup {arg}. (Your code from before is backed up too.)")
+
+    def cmd_docs(self, arg):
+        docs = self.ai.docs
+        if not docs.ready or docs.stale():
+            self.say("📖 Building the offline docs (one time, a few seconds)...", M)
+            docs.rebuild()
+        hits = docs.search(arg, limit=15)
+        if not hits:
+            return self.say("Nothing found. Try a name like set_mode, Rect, raycast, Entity", Y)
+        for e in hits:
+            print(f"  {G}{e['name']}{END}{M}{e['sig']}{END}" + (f"\n      {e['doc']}" if e["doc"] else ""))
 
     def cmd_style(self, _arg):
         style = self.ai.style

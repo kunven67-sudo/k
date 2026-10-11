@@ -31,6 +31,27 @@ from codebrain.paths import projects_dir  # noqa: E402
 from codebrain import selfcheck  # noqa: E402
 from codebrain import versions as V  # noqa: E402
 from codebrain.style import StyleProfile, analyze  # noqa: E402
+from codebrain.docs import Docs  # noqa: E402
+from codebrain import testrun  # noqa: E402
+import importlib.util  # noqa: E402
+
+HAVE_PYGAME = importlib.util.find_spec("pygame") is not None
+
+
+def fake_docs():
+    """A tiny docs index (so tests work without pygame/ursina installed)."""
+    path = tmpfile("docs_index.json")
+    data = {"index_version": 2, "versions": {},
+            "entries": [{"name": "pygame.display.set_mode", "kind": "function", "sig": "",
+                         "doc": "set_mode(size=(0, 0)) -> Surface"},
+                        {"name": "ursina.raycast", "kind": "function", "sig": "(origin, direction)", "doc": ""},
+                        {"name": "pygame.Rect.colliderect", "kind": "method", "sig": "", "doc": "colliderect(Rect)"}],
+            "members": {"pygame": ["init", "display", "Rect", "K_a", "QUIT"], "pygame.display": ["set_mode", "flip"],
+                        "ursina": ["Ursina", "Entity", "color", "raycast"],
+                        "ursina.prefabs.first_person_controller": ["FirstPersonController"]},
+            "star": {"ursina": ["Ursina", "Entity", "color", "raycast", "camera"]}}
+    path.write_text(json.dumps(data))
+    return Docs(path)
 
 try:
     import pyflakes  # noqa: F401
@@ -52,6 +73,7 @@ def write_prog(code):
 class FakeOllama(BaseHTTPRequestHandler):
     """Pretends to be Ollama so we can test without a real brain."""
     reply = "Here you go!\n```python\nprint('hi')\n```\nLESSON: always close your brackets."
+    completion = "(800, 600))"
     queue = []          # if not empty, answers come from here first (one per request)
     requests = []
 
@@ -68,6 +90,12 @@ class FakeOllama(BaseHTTPRequestHandler):
     def do_POST(self):
         payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         FakeOllama.requests.append((self.path, payload))
+        if self.path == "/api/generate":
+            body = json.dumps({"response": self.completion, "done": True}).encode()
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(body)
+            return
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson")
         self.end_headers()
@@ -421,6 +449,71 @@ class TestVersions(unittest.TestCase):
         self.assertEqual(versions[0][0].read_text(), f"x = {V.KEEP + 4}\n")
 
 
+class TestDocs(unittest.TestCase):
+    def test_search_and_prompt(self):
+        docs = fake_docs()
+        self.assertEqual(docs.search("how do I use set_mode?")[0]["name"], "pygame.display.set_mode")
+        self.assertIn("pygame.display.set_mode", docs.prompt_text("make a window with set_mode"))
+        self.assertEqual(docs.prompt_text("hello there"), "")
+
+    def test_made_up_functions_caught(self):
+        docs = fake_docs()
+        bad = "import pygame\npygame.init()\nwin = pygame.display.set_window((1, 1))\nprint(win)\n"
+        api = lambda code: [p for p in selfcheck.check_code(code, docs=docs) if "isn't installed" not in p]
+        self.assertTrue(any("set_window" in p for p in api(bad)))
+        good = "import pygame\npygame.init()\nwin = pygame.display.set_mode((1, 1))\npygame.display.flip()\n"
+        self.assertEqual(api(good), [])
+        fake_import = "from ursina.prefabs.first_person_controller import FirstPersonCamera\nimport random\nx = 1\n"
+        self.assertTrue(any("FirstPersonCamera" in p for p in api(fake_import)))
+
+    @unittest.skipUnless(HAVE_PYFLAKES, "pyflakes not installed")
+    def test_star_import_typos(self):
+        docs = fake_docs()
+        code = "from ursina import *\napp = Ursina()\ncube = Entiti(model='cube', color=color.red)\napp.run()\n"
+        problems = selfcheck.check_code(code, docs=docs)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("Entiti", problems[0])
+
+    @unittest.skipUnless(HAVE_PYGAME, "pygame not installed")
+    def test_real_index_build(self):
+        from codebrain.docs import build_index, index_path
+        self.assertGreater(build_index(), 100)
+        docs = Docs(index_path())
+        self.assertFalse(docs.stale())
+        self.assertIn("set_mode", docs.members("pygame.display"))
+
+
+class TestTestRun(unittest.TestCase):
+    def test_ok_crash_and_input(self):
+        self.assertEqual(testrun.test_run({"main.py": "print('hi')\n"}, "main.py").status, "ok")
+        crash = testrun.test_run({"main.py": "x = [1]\nprint(x[5])\n"}, "main.py")
+        self.assertTrue(crash.crashed)
+        self.assertIn("IndexError", crash.error)
+        self.assertNotIn("_codebrain_testrun", crash.error)
+        typing = testrun.test_run({"main.py": "a = int(input('n? '))\nb = input()\nprint(a + 1)\n"}, "main.py")
+        self.assertEqual(typing.status, "ok")
+
+    def test_long_running_is_alive(self):
+        result = testrun.test_run({"main.py": "import time\nwhile True:\n    time.sleep(0.1)\n"}, "main.py", seconds=1)
+        self.assertEqual(result.status, "alive")
+
+    def test_dangerous_code_is_not_run(self):
+        marker = projects_dir() / f"should_survive_{time.time_ns()}.txt"
+        marker.write_text("x")
+        code = f"import os\nos.remove({str(marker)!r})\n"
+        self.assertEqual(testrun.test_run({"main.py": code}, "main.py").status, "skipped")
+        self.assertTrue(marker.exists())
+        self.assertTrue(testrun.is_safe("import re\nre.compile('x')\ns = 'a'.replace('a', 'b')\n")[0])
+
+    def test_runs_in_a_copy(self):
+        folder = projects_dir() / f"copytest_{time.time_ns()}"
+        folder.mkdir(parents=True)
+        (folder / "data.txt").write_text("original")
+        code = "open('data.txt', 'w').write('changed')\nimport json\nprint(1)\n"
+        self.assertEqual(testrun.test_run({"main.py": code}, "main.py", folder).status, "ok")
+        self.assertEqual((folder / "data.txt").read_text(), "original")     # real file untouched
+
+
 class FakeRecorder:
     def __init__(self, audio):
         self.audio = audio
@@ -498,7 +591,7 @@ class TestBrainAndAssistant(unittest.TestCase):
         cfg["model"] = model
         FakeOllama.queue[:] = []
         return Assistant(config=cfg, memory=Memory(tmpfile("m.json")), xp=XP(tmpfile("x.json")),
-                         style=StyleProfile(tmpfile("style.json")))
+                         style=StyleProfile(tmpfile("style.json")), docs=Docs(tmpfile("no_docs.json")))
 
     def test_pick_model(self):
         self.assertEqual(pick_model(12), "qwen2.5-coder:14b")
@@ -584,7 +677,7 @@ class TestBrainAndAssistant(unittest.TestCase):
         reply, _, _ = ai.ask("make a dice roller", None,
                              on_status=lambda t: events.append("status"), on_reset=lambda: events.append("reset"))
         self.assertEqual(reply, fixed)
-        self.assertEqual(events, ["status", "reset"])
+        self.assertEqual(events[:2], ["status", "reset"])          # then maybe a 🧪 test-run status
         self.assertEqual([m["role"] for m in ai.history], ["user", "assistant"])   # the fix request is hidden
         self.assertEqual(ai.history[-1]["content"], fixed)
         self.assertIn("SELF-CHECK", FakeOllama.requests[-1][1]["messages"][-1]["content"])
@@ -604,6 +697,27 @@ class TestBrainAndAssistant(unittest.TestCase):
         FakeOllama.queue[:] = [broken]
         reply, _, _ = ai.ask("make a dice roller")
         self.assertEqual(reply, broken)
+
+    def test_test_run_crash_triggers_fix(self):
+        ai = self.make()
+        crashes = "```python\nimport random\n\nitems = [1, 2]\nprint(items[random.randint(5, 9)])\n```"
+        FakeOllama.queue[:] = [crashes, "```python\n" + GOOD_PROGRAM + "```"]
+        reply, _, _ = ai.ask("make something")
+        self.assertIn("def roll", reply)
+        self.assertIn("IndexError", FakeOllama.requests[-1][1]["messages"][-1]["content"])
+
+    def test_docs_reach_the_prompt(self):
+        ai = self.make()
+        ai.docs = fake_docs()
+        ai.ask("how do I use set_mode?")
+        self.assertIn("pygame.display.set_mode", FakeOllama.requests[-1][1]["messages"][0]["content"])
+
+    def test_autocomplete(self):
+        ai = self.make()
+        self.assertEqual(ai.brain.complete("screen = pygame.display.set_mode(", ""), "(800, 600))")
+        path, payload = FakeOllama.requests[-1]
+        self.assertEqual(path, "/api/generate")
+        self.assertEqual(payload["options"]["stop"], ["\n"])
 
     def test_style_learned_after_good_run(self):
         ai = self.make()

@@ -1,10 +1,14 @@
 """The thinking part shared by the window app and the terminal: chat, explain, Bug Detective, eyes, learning."""
 
 import re
+from pathlib import Path
 
 from codebrain import prompts
 from codebrain import project as P
 from codebrain import selfcheck
+from codebrain import testrun
+from codebrain.codeblocks import best_code
+from codebrain.docs import Docs
 from codebrain.brain import Brain
 from codebrain.config import Config
 from codebrain.memory import Memory
@@ -17,11 +21,12 @@ MAX_EDITOR_CHARS = 8000
 
 
 class Assistant:
-    def __init__(self, config=None, memory=None, xp=None, brain=None, style=None):
+    def __init__(self, config=None, memory=None, xp=None, brain=None, style=None, docs=None):
         self.config = config or Config()
         self.memory = memory or Memory()
         self.xp = xp or XP()
         self.style = style or StyleProfile()
+        self.docs = docs or Docs()
         self.brain = brain or Brain(self.config)
         self.history = []          # [{"role": "user"/"assistant", "content": ...}]
         self.pending_fix = None    # a Bug Detective fix waiting to be proven by a good run
@@ -51,6 +56,9 @@ class Assistant:
         style = self.style.prompt_text()
         if style:
             system += "\n\n" + style
+        api = self.docs.prompt_text(message or query[:500])
+        if api:
+            system += "\n\n" + api
         room = self.budget() - len(system)
         extra = []
         if code and code.strip():
@@ -85,7 +93,9 @@ class Assistant:
             return reply
         folder = P.project_folder(ctx["path"]) if ctx.get("path") else None
         for attempt in range(tries + 1):
-            problems = selfcheck.check_reply(reply, folder, ctx.get("code"))
+            problems = selfcheck.check_reply(reply, folder, ctx.get("code"), self.docs)
+            if not problems and self.config.get("test_run", True):
+                problems = self._test_run(reply, folder, ctx, on_status)
             if not problems:
                 return reply
             if attempt == tries:      # still not perfect: be honest about it
@@ -114,6 +124,25 @@ class Assistant:
             self.history[-1] = {"role": "assistant", "content": fixed}   # the fixed answer replaces the old one
             reply = fixed
         return reply
+
+    def _test_run(self, reply, folder, ctx, on_status):
+        """🧪 Run the answer's program for a few seconds in a temp copy. Returns problems (or [])."""
+        files = dict(P.file_blocks(reply))
+        current = Path(ctx["path"]).name if ctx.get("path") else None
+        if files:
+            main = current if current in files else "main.py" if "main.py" in files else next(iter(files))
+        else:
+            code = best_code(reply)
+            if not code or not selfcheck._looks_complete(code) or "import" not in code:
+                return []                          # just a piece of code, nothing to run
+            main = current or "main.py"
+            files = {main: code}
+        if on_status:
+            on_status("🧪 Test-running my code for a few seconds...")
+        result = testrun.test_run(files, main, folder)
+        if result.crashed:
+            return [f"when I test-ran {main}, it crashed:\n{result.error[-1500:]}"]
+        return []
 
     # ---------- what the buttons do ----------
     def ask(self, message, on_token=None, filename=None, editor_code=None, path=None, **hooks):

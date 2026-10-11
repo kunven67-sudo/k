@@ -68,6 +68,67 @@ def defined_names(code):
     return names
 
 
+API_LIBS = ("pygame", "ursina")
+
+
+def _api_problems(tree, docs):
+    """Calls to pygame/ursina functions that don't exist in the versions installed on this PC."""
+    if not docs or not docs.ready:
+        return []
+    known_modules = docs.data["members"]
+    problems, aliases = [], {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                root = a.name.split(".")[0]
+                if root in API_LIBS:
+                    aliases[a.asname or root] = a.name if a.asname else root
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module \
+                and node.module.split(".")[0] in API_LIBS and node.module in known_modules:
+            have = set(known_modules[node.module])
+            for a in node.names:
+                if a.name == "*":
+                    continue
+                if a.name in have:
+                    if f"{node.module}.{a.name}" in known_modules:          # from pygame import display
+                        aliases[a.asname or a.name] = f"{node.module}.{a.name}"
+                else:
+                    problems.append(f"line {node.lineno}: '{node.module}' has no '{a.name}' in your installed version")
+    reported = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute):
+            continue
+        chain, cur = [], node
+        while isinstance(cur, ast.Attribute):
+            chain.append(cur.attr)
+            cur = cur.value
+        if not (isinstance(cur, ast.Name) and cur.id in aliases):
+            continue
+        prefix = aliases[cur.id]
+        for part in reversed(chain):
+            if prefix not in known_modules:
+                break              # it's a class or object now (pygame.Rect(...).x) - not checked
+            if part not in known_modules[prefix]:
+                key = f"{prefix}.{part}"
+                if key not in reported:
+                    reported.add(key)
+                    problems.append(f"line {node.lineno}: {key} doesn't exist in your installed "
+                                    f"{prefix.split('.')[0]} (made-up function?)")
+                break
+            prefix = f"{prefix}.{part}"
+    return problems
+
+
+def _star_modules(tree):
+    return [n.module for n in tree.body if isinstance(n, ast.ImportFrom) and n.module
+            and any(a.name == "*" for a in n.names)]
+
+
+def _without_star_imports(tree):
+    body = [n for n in tree.body if not (isinstance(n, ast.ImportFrom) and any(a.name == "*" for a in n.names))]
+    return ast.Module(body=body, type_ignores=[])
+
+
 def _has_imports(tree):
     return any(isinstance(n, (ast.Import, ast.ImportFrom)) for n in tree.body)
 
@@ -85,7 +146,7 @@ def _name_problems(tree, filename, known=()):
     return problems
 
 
-def check_code(code, project_folder=None, filename="answer.py", other_files=(), editor_code=None):
+def check_code(code, project_folder=None, filename="answer.py", other_files=(), editor_code=None, docs=None):
     """Return a list of problems in one piece of code (empty list = looks good).
 
     editor_code = the user's open file: a piece of code meant to be ADDED to it may use its names."""
@@ -100,16 +161,29 @@ def check_code(code, project_folder=None, filename="answer.py", other_files=(), 
     if missing:
         problems.append("imports a library that isn't installed: " + ", ".join(missing) +
                         " (only the standard library, pygame and ursina are available)")
+    problems += _api_problems(tree, docs)
     # Typo check: for whole programs (own imports), or pieces that go into a file whose names we know.
     known = defined_names(editor_code) if editor_code else set()
-    if _has_imports(tree):
+    stars = _star_modules(tree)
+    star_names = set()
+    if stars and docs and docs.ready:
+        for module in stars:
+            names = docs.star_names(module)
+            if not names:
+                star_names = None          # a star import we don't know -> can't check names
+                break
+            star_names |= names
+    if stars and star_names:
+        # 'from ursina import *': we know every name ursina gives you, so typos like Entiti get caught
+        problems += _name_problems(_without_star_imports(tree), filename, (known or set()) | star_names)
+    elif _has_imports(tree):
         problems += _name_problems(tree, filename, known or ())
     elif editor_code and known is not None:
         problems += _name_problems(tree, filename, known)
     return problems
 
 
-def check_reply(reply, project_folder=None, editor_code=None):
+def check_reply(reply, project_folder=None, editor_code=None, docs=None):
     """Check every complete-looking python block in an answer. Returns ['block 1: ...', ...]."""
     from codebrain.project import file_blocks
     blocks = [(lang, code) for lang, code, _s, _e in find_blocks(reply) if lang in PY_LANGS]
@@ -119,6 +193,6 @@ def check_reply(reply, project_folder=None, editor_code=None):
     for n, (_lang, code) in enumerate(blocks, start=1):
         if not _looks_complete(code):
             continue
-        for p in check_code(code, project_folder, other_files=created, editor_code=editor_code):
+        for p in check_code(code, project_folder, other_files=created, editor_code=editor_code, docs=docs):
             problems.append(f"code block {n}, {p}")
     return problems

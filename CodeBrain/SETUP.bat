@@ -59,6 +59,9 @@ if errorlevel 1 (
     echo [!] Some game libraries failed to install. CodeBrain still works - try SETUP.bat again later.
 )
 
+echo       Building offline docs for pygame + ursina...
+".venv\Scripts\python.exe" -m codebrain --build-docs
+
 rem ---------------------------------------------------------------- 3. voice (optional)
 echo.
 echo [3/6] Installing voice (talk to CodeBrain)...

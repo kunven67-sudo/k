@@ -18,6 +18,7 @@ from codebrain.config import MODEL_BY_VRAM
 from codebrain.highlight import IndexMapper, spans
 from codebrain.memory import CATEGORIES
 from codebrain.paths import home_dir, projects_dir
+from codebrain.pixelart import PixelArtWindow
 from codebrain.runner import CodeRun, error_line_number, python_exe
 from codebrain.snippets import CATEGORIES as SNIPPET_CATEGORIES
 from codebrain.snippets import Snippets, snippet_part
@@ -52,6 +53,8 @@ Here's what I can do:
 • 🐛 Code crashed? Press Bug Detective and I'll explain + fix it
 • 🔍 Select some code and press Explain
 • 📸 Game looks weird? Run it, then press Look and I'll SEE it and help fix it
+• 🧰 Tools: 📖 offline pygame/ursina docs, 🎨 pixel art editor, 🕘 backups
+• 👻 While you type I suggest the rest of the line in gray. Press Tab to accept it
 • 📚 Open Lessons to learn step by step. Your zombie game + 4D maze guides are in there too 🧟🌀
 • 📦 Snippets = ready-made game code (jump, sprint, shooting...) you can drop in
 • 🎤 Hold the mic button (or F2) and talk to me. 🔊 I can read my answers out loud too
@@ -77,6 +80,12 @@ class CodeBrainApp:
         self.voice_missing = missing_parts()
         self.ptt = None if self.voice_missing else PushToTalk(self.ai.config.get("voice_model", "base.en"))
         self._ptt_release_job = None
+        self.theme = {"panel": PANEL, "border": BORDER, "bg": BG}
+        self.brain_ready = False
+        self._ghost = None
+        self._ghost_text = ""
+        self._ac_job = None
+        self._ac_seq = 0
 
         root.title("CodeBrain 🧠")
         try:
@@ -133,6 +142,9 @@ class CodeBrainApp:
         style.map("Treeview", background=[("selected", GREEN_DIM)], foreground=[("selected", "#001a0a")])
         style.configure("TRadiobutton", background=BG, foreground=TEXT)
         style.configure("TCheckbutton", background=BG, foreground=TEXT)
+        style.configure("TMenubutton", background=PANEL2, foreground=GREEN, bordercolor=GREEN_DIM, padding=(8, 4),
+                        font=(UI, 10, "bold"), arrowcolor=GREEN)
+        style.map("TMenubutton", background=[("active", BORDER)])
         style.configure("TCombobox", fieldbackground=PANEL, foreground=TEXT, background=PANEL2)
         style.configure("TPanedwindow", background=BORDER)
 
@@ -158,6 +170,8 @@ class CodeBrainApp:
         b = self._menu(bar)
         b.add_command(label="📚 Lessons", command=self.open_lessons)
         b.add_command(label="📦 Snippets", command=self.open_snippets)
+        b.add_command(label="📖 Docs (pygame + ursina)", command=self.open_docs)
+        b.add_command(label="🎨 Pixel Art", command=self.open_pixel_art)
         b.add_command(label="🧠 Memory viewer", command=self.open_memory)
         b.add_command(label="🧹 New chat (forget this conversation)", command=self.clear_chat)
         b.add_separator()
@@ -195,7 +209,15 @@ class CodeBrainApp:
         self.speak_btn.pack(side="right", padx=4)
         self._update_speak_btn()
         ttk.Button(top, text="🧠 Memory", command=self.open_memory).pack(side="right", padx=4)
-        ttk.Button(top, text="📦 Snippets", command=self.open_snippets).pack(side="right", padx=4)
+        tools = ttk.Menubutton(top, text="🧰 Tools ▾")
+        tools_menu = self._menu(tools)
+        tools_menu.add_command(label="📦 Snippets", command=self.open_snippets)
+        tools_menu.add_command(label="📖 Docs (pygame + ursina)", command=self.open_docs)
+        tools_menu.add_command(label="🎨 Pixel Art", command=self.open_pixel_art)
+        tools_menu.add_command(label="🕘 Versions of this file", command=self.open_versions)
+        tools_menu.add_command(label="🩺 Doctor", command=self.open_doctor)
+        tools["menu"] = tools_menu
+        tools.pack(side="right", padx=4)
         ttk.Button(top, text="📚 Lessons", command=self.open_lessons).pack(side="right", padx=4)
         xpbox = ttk.Frame(top)
         xpbox.pack(side="left", padx=24)
@@ -324,8 +346,10 @@ class CodeBrainApp:
         ed.bind("<ISO_Left_Tab>", self._untab)
         ed.bind("<BackSpace>", self._smart_backspace)
         ed.bind("<<Modified>>", self._on_modified)
-        ed.bind("<KeyRelease>", lambda e: self._update_lines())
-        ed.bind("<MouseWheel>", lambda e: self.root.after(1, self._update_lines))
+        ed.bind("<KeyRelease>", self._editor_key_release)
+        ed.bind("<Key>", self._editor_key, add="+")
+        ed.bind("<Button-1>", lambda e: self._hide_ghost(), add="+")
+        ed.bind("<MouseWheel>", lambda e: (self._hide_ghost(), self.root.after(1, self._update_lines)))
         ed.bind("<Button-4>", lambda e: self.root.after(1, self._update_lines))
         ed.bind("<Button-5>", lambda e: self.root.after(1, self._update_lines))
 
@@ -341,14 +365,24 @@ class CodeBrainApp:
     def _startup(self):
         def progress(text):
             self.ui(lambda: self.set_status("🧠 " + text, YELLOW))
+        threading.Thread(target=self._prepare_docs, daemon=True).start()
         try:
             self.ai.brain.ensure_ready(on_progress=progress)
+            self.brain_ready = True
             self.ui(lambda: self.set_status(f"🧠 Brain ready: {self.ai.brain.model}", GREEN))
         except Exception as e:
             msg = str(e)
             self.ui(lambda: (self.set_status("🧠 Brain offline", RED),
                              self.chat_add("note", f"⚠️ {msg}\n(You can still write + run code. "
                                                    f"Chat starts working once the brain is ready.)")))
+
+    def _prepare_docs(self):
+        """📖 Build the offline docs once (and again when pygame/ursina get updated)."""
+        try:
+            if self.ai.docs.stale():
+                self.ai.docs.rebuild()
+        except Exception:
+            pass   # docs are a bonus; CodeBrain works without them
 
     def ui(self, fn):
         """Ask the main thread to run fn (Tk only likes being touched from one thread)."""
@@ -777,7 +811,68 @@ class CodeBrainApp:
         self.editor.yview(*args)
         self.lines.yview_moveto(self.editor.yview()[0])
 
+    # ================================================================ 👻 ghost-text autocomplete
+    _NO_SUGGEST_KEYS = {"Tab", "Escape", "Up", "Down", "Left", "Right", "Home", "End", "Prior", "Next",
+                        "Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Caps_Lock", "F5", "F2"}
+
+    def _editor_key(self, event):
+        if event.keysym != "Tab":
+            self._hide_ghost()
+
+    def _editor_key_release(self, event):
+        self._update_lines()
+        if self._ac_job:
+            self.root.after_cancel(self._ac_job)
+            self._ac_job = None
+        if event.keysym in self._NO_SUGGEST_KEYS or event.state & 0x4:      # 0x4 = Ctrl held
+            return
+        if self.ai.config.get("autocomplete", True) and self.brain_ready and not self.thinking:
+            self._ac_job = self.root.after(650, self._request_completion)
+
+    def _request_completion(self):
+        self._ac_job = None
+        ed = self.editor
+        if ed.get("insert", "insert lineend").strip() or ed.tag_ranges("sel"):
+            return                                     # only at the end of a line
+        before = ed.get("insert linestart", "insert")
+        if not before or before.lstrip().startswith("#"):
+            return
+        prefix = ed.get("1.0", "insert")[-3000:]
+        suffix = ed.get("insert", "end-1c")[:1000]
+        self._ac_seq += 1
+        seq, spot = self._ac_seq, ed.index("insert")
+
+        def work():
+            try:
+                text = self.ai.brain.complete(prefix, suffix)
+            except Exception:
+                return
+            self.ui(lambda: self._show_ghost(seq, spot, text))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _show_ghost(self, seq, spot, text):
+        if seq != self._ac_seq or self.editor.index("insert") != spot or not text.strip() or self.thinking:
+            return
+        bbox = self.editor.bbox("insert")
+        if not bbox:
+            return
+        self._hide_ghost()
+        x, y, _w, _h = bbox
+        self._ghost = tk.Label(self.editor, text=text + "   ⇥ Tab", fg="#557a62", bg=PANEL, bd=0, padx=0, pady=0,
+                               font=(MONO, self.font_size))
+        self._ghost.place(x=x, y=y, bordermode="outside")     # bbox counts from the outer edge
+        self._ghost_text = text
+
+    def _hide_ghost(self):
+        self._ac_seq += 1                             # any suggestion still on its way is now too late
+        self._ghost_text = ""
+        if self._ghost is not None:
+            self._ghost.destroy()
+            self._ghost = None
+
     def _auto_indent(self, _event):
+        self._hide_ghost()
         line = self.editor.get("insert linestart", "insert")
         indent = line[: len(line) - len(line.lstrip())]
         if line.rstrip().endswith(":"):
@@ -799,6 +894,12 @@ class CodeBrainApp:
             return None
 
     def _tab(self, _event):
+        if self._ghost_text:                      # 👻 accept the suggestion
+            text = self._ghost_text
+            self._hide_ghost()
+            self.editor.insert("insert", text)
+            self.editor.see("insert")
+            return "break"
         sel = self._selected_lines()
         if sel and sel[0] != sel[1]:
             for n in range(sel[0], sel[1] + 1):
@@ -808,6 +909,7 @@ class CodeBrainApp:
         return "break"
 
     def _untab(self, _event):
+        self._hide_ghost()
         sel = self._selected_lines() or (int(self.editor.index("insert").split(".")[0]),) * 2
         for n in range(sel[0], sel[1] + 1):
             line = self.editor.get(f"{n}.0", f"{n}.end")
@@ -817,6 +919,7 @@ class CodeBrainApp:
         return "break"
 
     def _smart_backspace(self, _event):
+        self._hide_ghost()
         if self.editor.tag_ranges("sel"):
             return None
         before = self.editor.get("insert linestart", "insert")
@@ -1050,6 +1153,13 @@ class CodeBrainApp:
 
     def open_snippets(self):
         SnippetsWindow(self)
+
+    def open_docs(self):
+        DocsWindow(self)
+
+    def open_pixel_art(self):
+        folder = (P.project_folder(self.current_path) if self.current_path else projects_dir()) / "assets"
+        PixelArtWindow(self, folder)
 
     def open_versions(self):
         if not self.current_path:
@@ -1505,11 +1615,92 @@ class VersionsWindow:
             self.win.destroy()
 
 
+class DocsWindow:
+    """📖 Search the real pygame + ursina functions installed on this PC."""
+
+    def __init__(self, app):
+        self.app = app
+        self.docs = app.ai.docs
+        self.results = []
+        self.win = app._toplevel("📖 Docs: pygame + ursina", "1050x640")
+        bar = ttk.Frame(self.win, padding=8)
+        bar.pack(fill="x")
+        ttk.Label(bar, text="🔍 Search:").pack(side="left")
+        self.query = tk.Entry(bar, bg=PANEL, fg=TEXT, insertbackground=GREEN, relief="flat", font=(MONO, 12),
+                              highlightthickness=1, highlightbackground=BORDER)
+        self.query.pack(side="left", fill="x", expand=True, padx=6)
+        self.query.bind("<KeyRelease>", lambda e: self.search())
+        self.status = ttk.Label(self.win, text="", style="Muted.TLabel", padding=(8, 0))
+        self.status.pack(anchor="w")
+        pane = ttk.PanedWindow(self.win, orient="horizontal")
+        pane.pack(fill="both", expand=True, padx=8, pady=8)
+        self.list = tk.Listbox(pane, bg=PANEL, fg=TEXT, selectbackground=GREEN_DIM, selectforeground="#001a0a",
+                               relief="flat", highlightthickness=0, font=(MONO, 11), activestyle="none", width=46)
+        pane.add(self.list, weight=1)
+        self.list.bind("<<ListboxSelect>>", lambda e: self.show())
+        self.detail = app._text(pane, state="disabled")
+        pane.add(self.detail, weight=2)
+        btns = ttk.Frame(self.win, padding=(8, 0, 8, 8))
+        btns.pack(fill="x")
+        ttk.Button(btns, text="📥 Insert into my code", command=self.insert).pack(side="left")
+        ttk.Button(btns, text="🧠 Ask CodeBrain how to use it", command=self.ask).pack(side="left", padx=6)
+        if not self.docs.ready:
+            self.docs.load()
+        self.status.configure(text="Type a name like set_mode, Rect, raycast, FirstPersonController..." if
+                              self.docs.ready else "📖 Docs are still being built - try again in a minute.")
+        self.query.focus_set()
+
+    def search(self):
+        self.results = self.docs.search(self.query.get(), limit=60) if self.docs.ready else []
+        self.list.delete(0, "end")
+        for e in self.results:
+            self.list.insert("end", e["name"])
+        if self.results:
+            self.list.selection_set(0)
+            self.show()
+
+    def chosen(self):
+        sel = self.list.curselection()
+        return self.results[sel[0]] if sel else None
+
+    def show(self):
+        e = self.chosen()
+        if not e:
+            return
+        text = f"{e['name']}\n\n{e['kind']}"
+        if e["sig"]:
+            text += f"\n\n{e['name'].rsplit('.', 1)[-1]}{e['sig']}"
+        if e["doc"]:
+            text += f"\n\n{e['doc']}"
+        self.detail.configure(state="normal")
+        self.detail.delete("1.0", "end")
+        self.detail.insert("1.0", text)
+        self.detail.configure(state="disabled")
+
+    def insert(self):
+        e = self.chosen()
+        if e:
+            name = e["name"]
+            for prefix in ("ursina.prefabs.", "ursina.shaders.", "ursina."):
+                if name.startswith(prefix):          # ursina names are used without the 'ursina.' part
+                    name = name.split(".")[-2] + "." + name.split(".")[-1] if e["kind"] == "method" else \
+                        name.rsplit(".", 1)[-1]
+                    break
+            self.app.editor.insert("insert", name + ("()" if e["kind"] in ("function", "method") else ""))
+            self.app.root.lift()
+
+    def ask(self):
+        e = self.chosen()
+        if e:
+            self.app.ask_codebrain(f"How do I use {e['name']}? Show me a small example and explain it.")
+            self.app.root.lift()
+
+
 class SettingsWindow:
     def __init__(self, app):
         self.app = app
         cfg = app.ai.config
-        self.win = app._toplevel("⚙️ Settings", "600x680")
+        self.win = app._toplevel("⚙️ Settings", "620x740")
         f = ttk.Frame(self.win, padding=16)
         f.pack(fill="both", expand=True)
 
@@ -1549,6 +1740,12 @@ class SettingsWindow:
         ttk.Label(f, text="🔄 Self-check", font=(UI, 11, "bold")).pack(anchor="w", pady=(10, 0))
         ttk.Checkbutton(f, text="Double-check my code for mistakes before showing it (a bit slower)",
                         variable=self.self_check).pack(anchor="w", padx=12)
+        self.test_run = tk.BooleanVar(value=cfg.get("test_run", True))
+        ttk.Checkbutton(f, text="🧪 Secretly test-run my code for a few seconds (safe code only)",
+                        variable=self.test_run).pack(anchor="w", padx=12)
+        self.autocomplete = tk.BooleanVar(value=cfg.get("autocomplete", True))
+        ttk.Checkbutton(f, text="👻 Suggest the rest of the line while I type (Tab accepts)",
+                        variable=self.autocomplete).pack(anchor="w", padx=12)
 
         ttk.Button(f, text="💾 Save", style="Run.TButton", command=self.save).pack(anchor="e", pady=16)
 
@@ -1564,6 +1761,8 @@ class SettingsWindow:
             pass
         cfg["voice_auto_send"] = bool(self.auto_send.get())
         cfg["self_check"] = bool(self.self_check.get())
+        cfg["test_run"] = bool(self.test_run.get())
+        cfg["autocomplete"] = bool(self.autocomplete.get())
         if self.voice_model.get() != cfg.get("voice_model"):
             cfg["voice_model"] = self.voice_model.get()
             if self.app.ptt:

@@ -28,6 +28,8 @@ DEFAULTS = {
     "voice_auto_send": True,    # send right after you finish talking
     "vision_model": "qwen2.5vl:7b",   # 👀 CodeBrain's eyes (only downloaded if you say yes)
     "self_check": True,         # 🔄 check its own code for mistakes before you use it
+    "test_run": True,           # 🧪 secretly test-run its own code for a few seconds (safe code only)
+    "autocomplete": True,       # 👻 gray ghost-text suggestions while you type (Tab accepts)
 }
 
 

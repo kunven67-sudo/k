@@ -63,8 +63,20 @@ everything, and it learns from what breaks.
   press 📸 Look. CodeBrain screenshots your game window, a local vision brain (`qwen2.5vl:7b`) describes
   what it sees, and the coding brain uses that to fix your code. It's all on your PC too.
 - 🔄 **Self-check**: CodeBrain checks its own code before you use it: broken Python, typos in names,
-  and made-up libraries. If it finds a mistake, it quietly fixes it and swaps in the fixed answer
+  made-up libraries, and **made-up functions** (like `pygame.display.set_window`, which doesn't exist).
+  If it finds a mistake, it quietly fixes it and swaps in the fixed answer
   ("🔄 double-checked my code and fixed a mistake"). It can be turned off in ⚙️ Settings.
+- 🧪 **Secret test runs**: it also *runs* its own code for a few seconds in a temporary copy of your
+  project, so crashes get fixed before you see them. pygame games run invisibly; 3D games use a tiny
+  minimized window (you might see it flash). For safety, code that deletes files, runs other programs
+  or uses the internet is never test-run. Your own code still only runs when you press ▶ Run.
+- 📖 **Offline docs**: CodeBrain reads the real pygame + ursina installed on your PC, looks up the
+  functions you ask about before answering, and you can search them yourself (🧰 Tools → 📖 Docs).
+- 👻 **Ghost-text autocomplete**: stop typing for a moment and the brain suggests the rest of the line
+  in gray. Press **Tab** to accept it, or just keep typing.
+- 🎨 **Pixel art editor** (🧰 Tools → 🎨 Pixel Art): draw 16/32/64-pixel sprites with pencil, fill,
+  mirror and color picker, then save PNGs into your game's `assets` folder.
+  "🧠 How do I put this in my game?" shows you the code.
 - 🎨 **Learns your style**: every program that runs without errors teaches CodeBrain how YOU code
   (names, spaces, quotes, comments, window sizes) and what you already know (loops, classes, lists…).
   It writes code your way and doesn't over-explain things you already know. See it in 🧠 Memory → 🎨 My style.
@@ -117,7 +129,8 @@ and CodeBrain coaches you. 💪 Both plans are saved in CodeBrain's memory, so i
 | Hold F2 | 🎤 Talk |
 | Ctrl+S / Ctrl+O / Ctrl+N | Save / Open / New |
 | Enter / Shift+Enter | Send chat / new line |
-| Tab / Shift+Tab | Indent / un-indent |
+| Tab | Accept 👻 suggestion (or indent) |
+| Shift+Tab | Un-indent |
 | Ctrl+= / Ctrl+- | Bigger / smaller text |
 
 Terminal mode: type `/help`.

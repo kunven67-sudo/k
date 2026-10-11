@@ -162,6 +162,24 @@ class Brain:
                 break
         return "".join(parts)
 
+    def complete(self, prefix, suffix="", max_tokens=40):
+        """👻 Autocomplete: what comes at the cursor (fill-in-the-middle). Returns the rest of the line."""
+        payload = {
+            "model": self.model, "prompt": prefix, "suffix": suffix, "stream": False, "keep_alive": "30m",
+            "options": {"num_predict": max_tokens, "temperature": 0.2, "stop": ["\n"],
+                        "num_ctx": min(4096, int(self.config["context_size"]))},
+        }
+        try:
+            with self._request("/api/generate", payload, timeout=20) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            raise BrainError(e.read().decode("utf-8", "replace")) from e
+        except urllib.error.URLError as e:
+            raise BrainError("brain offline") from e
+        if data.get("error"):
+            raise BrainError(data["error"])
+        return data.get("response", "").split("\n")[0].rstrip()
+
     @property
     def vision_model(self):
         return self.config.get("vision_model", "qwen2.5vl:7b")

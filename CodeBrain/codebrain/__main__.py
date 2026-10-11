@@ -12,6 +12,10 @@ def main():
         from codebrain.config import Config
         print(Config()["model"])
         return
+    if "--build-docs" in sys.argv:  # used by SETUP.bat + in the background
+        from codebrain.docs import run_build
+        run_build()
+        return
     if "--vision-model" in sys.argv:  # used by SETUP.bat
         from codebrain.config import Config
         print(Config()["vision_model"])

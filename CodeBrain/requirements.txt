@@ -2,3 +2,4 @@
 pygame>=2.5
 ursina>=7.0
 pyflakes>=3.0     # 🔄 self-check: spots typos in code
+pillow>=9.0     # 🎨 pixel art + 📸 screenshots
