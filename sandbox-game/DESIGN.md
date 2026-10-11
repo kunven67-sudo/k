@@ -67,6 +67,19 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
   - Aim down sights
   - Infinite ammo toggle
 
+## Damage & health (when god mode is off)
+- **Hurt by**: explosions + shrapnel, falls, heavy objects hitting/crushing you, your own ricochets.
+- **Real-life damage model**:
+  - Body-part damage (head, chest, arms, legs). Leg hit = limp, arm hit = shaky aim.
+  - Bleeding (need a bandage), broken bones from falls (need a splint), burns.
+  - Damage effects depend on what hit you.
+- **Healing**: like real life. Slow natural healing + treatment.
+- **Medical items (v1)**: bandage (stops bleeding), splint (fixes limp), medkit (bigger heal), painkillers (removes shaky aim/blur for a while).
+- **Gore**: FULL MAX gore. Blood, wounds, dismemberment (sliced up, shot apart).
+  - Applies to: the player, ragdoll dummies, town NPCs (later).
+  - Losing a limb = you bleed out fast and die.
+- **Death**: your body ragdolls, screen fades, respawn at spawn point. Builds stay.
+
 ## Life sim town
 - **Jobs + money**, including a **tech job** (computer store / PC repair).
 - **Taxes + bills**.
