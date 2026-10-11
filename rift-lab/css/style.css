@@ -35,6 +35,16 @@ button, input, select { font: inherit; color: inherit; }
 .fx-tired { background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.55) 100%); }
 .fx-water { background: linear-gradient(180deg, rgba(20, 70, 70, 0.55), rgba(5, 30, 35, 0.8)); backdrop-filter: blur(3px); transition: opacity 0.1s; }
 .fx-fade { background: #000; transition: opacity 0.8s; }
+.fx-sick { background: radial-gradient(ellipse at center, transparent 40%, rgba(90, 120, 40, 0.35) 100%); transition: opacity 1.2s; }
+.fx-thirst { background: radial-gradient(ellipse at center, transparent 35%, rgba(60, 40, 20, 0.55) 100%); backdrop-filter: saturate(0.55); transition: opacity 2s; }
+.fx-lidtop, .fx-lidbottom { background: linear-gradient(180deg, #000 85%, rgba(0, 0, 0, 0)); transition: none; height: 100%; }
+.fx-lidbottom { background: linear-gradient(0deg, #000 85%, rgba(0, 0, 0, 0)); }
+.sleep-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #cfd6ea; text-align: center; z-index: 5; }
+.sleep-screen .zz { font-size: 44px; animation: zz 3s ease-in-out infinite; }
+.sleep-screen .t { font: 600 54px 'Inter', sans-serif; letter-spacing: -1px; margin-top: 8px; }
+.sleep-screen .s { opacity: 0.75; margin-top: 6px; }
+.sleep-screen .hint { opacity: 0.45; font-size: 12px; margin-top: 22px; }
+@keyframes zz { 0%, 100% { transform: translateY(0); opacity: 0.6; } 50% { transform: translateY(-8px); opacity: 1; } }
 .fx-cold { background: radial-gradient(ellipse at center, transparent 55%, rgba(160, 200, 255, 0.25) 100%); }
 
 /* ---------- glass panels ---------- */

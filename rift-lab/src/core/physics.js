@@ -1,6 +1,7 @@
 // Rapier physics world with a fixed 60 Hz step (stable, same result on every PC).
 
 import RAPIER from 'rapier';
+import * as THREE from 'three';
 
 let ready = null;
 export function initPhysics() {
@@ -32,6 +33,7 @@ export class Physics {
     while (this.acc >= h && steps < 5) {
       for (const fn of this.stepHooks) fn(h);
       this.world.step(this.queue);
+      this.guardGround();
       this.queue.drainContactForceEvents((e) => { for (const fn of this.forceHooks) fn(e); });
       this.queue.drainCollisionEvents(() => {});
       this.acc -= h;
@@ -39,6 +41,41 @@ export class Physics {
     }
     if (steps === 5) this.acc = 0;
     return this.acc / h; // interpolation alpha
+  }
+
+  // The engine's CCD misses small, fast things against the terrain heightfield (they tunnel through).
+  // The terrain is a height function, so nothing real can have its middle under it: anything that
+  // ends up there is put back on the surface and its fall stops (a tiny bounce, real friction).
+  setGround(heightAt) { this.groundAt = heightAt; }
+
+  guardGround() {
+    const hAt = this.groundAt;
+    if (!hAt) return;
+    const q = this._gq ||= new THREE.Quaternion(), c = this._gc ||= new THREE.Vector3(), v = this._gv ||= new THREE.Vector3();
+    const each = this.world.forEachActiveRigidBody ? 'forEachActiveRigidBody' : 'forEachRigidBody';
+    this.world[each]((b) => {
+      if (!b.isDynamic()) return;
+      const bb = b.userData?.item?.bounds || b.userData?.bounds;
+      if (!bb || bb.isEmpty()) return;
+      const t = b.translation(), r = b.rotation();
+      q.set(r.x, r.y, r.z, r.w);
+      bb.getCenter(c).applyQuaternion(q);
+      const cy = c.y;
+      c.x += t.x; c.y += t.y; c.z += t.z;
+      const gy = hAt(c.x, c.z);
+      if (!(c.y < gy)) return;
+      // how far its lowest corner hangs below its middle, as it's turned right now
+      let below = 0;
+      for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+        v.set(x, y, z).applyQuaternion(q);
+        below = Math.max(below, cy - v.y);
+      }
+      const lift = gy + below + 0.003 - c.y;
+      b.setTranslation({ x: t.x, y: t.y + lift, z: t.z }, true);
+      const lv = b.linvel(), av = b.angvel();
+      b.setLinvel({ x: lv.x * 0.6, y: Math.max(0, -lv.y) * 0.12, z: lv.z * 0.6 }, true);
+      b.setAngvel({ x: av.x * 0.5, y: av.y * 0.5, z: av.z * 0.5 }, true);
+    });
   }
 
   castRay(origin, dir, maxToi, excludeCollider) {

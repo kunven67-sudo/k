@@ -19,6 +19,7 @@ export const DEFAULTS = {
   subtitles: true,
   units: 'imperial',        // imperial | metric
   headBob: true,
+  needs: 'real',            // real | relaxed | off  (hunger, thirst, sleep)
   // Audio
   volMaster: 0.8,
   volEffects: 0.9,

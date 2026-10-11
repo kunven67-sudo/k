@@ -57,7 +57,7 @@ export class UI {
   constructor(root, fxRoot) {
     this.root = root;
     this.fx = {};
-    for (const k of ['hurt', 'tired', 'water', 'cold', 'fade']) {
+    for (const k of ['hurt', 'tired', 'water', 'cold', 'sick', 'thirst', 'lidtop', 'lidbottom', 'fade']) {
       const el = h('div', { class: `fx-layer fx-${k}` });
       fxRoot.append(el);
       this.fx[k] = el;
@@ -217,6 +217,7 @@ export class UI {
       ],
       gameplay: () => [
         sw('hud', 'HUD', 'Off = you feel it instead (stomach growls, heavy breathing, red edges)'),
+        chips('needs', 'Hunger, thirst + sleep', [['real', 'Real'], ['relaxed', 'Relaxed (half as fast)'], ['off', 'Off']]),
         sw('tips', 'First-time tips'),
         sw('subtitles', 'Subtitles'),
         chips('units', 'Units', [['imperial', 'Feet + °F'], ['metric', 'Meters + °C']]),
@@ -307,7 +308,8 @@ export class UI {
     this.watchEl.innerHTML = `<div class="time">${clock.formatTime()}</div><div class="date">${clock.formatDate()}</div>
       <div class="line">🌙 <b>${moonPhaseName(sky.state.phase)}</b> (${Math.round(sky.state.moonIllum * 100)}%)</div>
       <div class="line">📏 Your size: <b>${size}</b> (normal)</div>
-      <div class="line">${clock.fastForward > 1 ? `⏩ <b>x${clock.fastForward}</b>` : `🍂 ${cap(clock.season())}`}</div>`;
+      <div class="line">${clock.fastForward > 1 ? `⏩ <b>x${clock.fastForward}</b>` : `🍂 ${cap(clock.season())}`}</div>
+      ${this.bodyLine ? `<div class="line">${this.bodyLine}</div>` : ''}`;
   }
 
   progress(p) {
@@ -334,7 +336,9 @@ export class UI {
     if (!show) { this.hudEl?.remove(); this.hudEl = null; return; }
     if (!this.hudEl) { this.hudEl = h('div', { class: 'hud panel' }); this.layer.append(this.hudEl); }
     const m = (label, v, col) => `${label}<div class="meter"><i style="width:${Math.max(0, Math.min(100, v))}%;background:${col}"></i></div>`;
-    this.hudEl.innerHTML = m('Health', p.health, '#ff7a7a') + m('Stamina', p.stamina, '#ffffff') + (p.breath < 45 ? m('Air', (p.breath / 45) * 100, '#7ef2ff') : '');
+    const n = p.needs && p.needs.mode !== 'off' ? p.needs : null;
+    this.hudEl.innerHTML = m('Health', p.health, '#ff7a7a') + m('Stamina', p.stamina, '#ffffff') + (p.breath < 45 ? m('Air', (p.breath / 45) * 100, '#7ef2ff') : '')
+      + (n ? m('Food', (1 - n.hunger) * 100, '#ffc56b') + m('Water', (1 - Math.min(1, n.thirst)) * 100, '#6bc8ff') + m('Energy', (1 - Math.min(1, n.tiredness)) * 100, '#c9b6ff') : '');
   }
 
   feel(p, dt) {
@@ -345,10 +349,25 @@ export class UI {
     const tired = Math.max(0, (40 - p.stamina) / 40);
     this.fx.tired.style.opacity = (tired * 0.7).toFixed(3);
     this.fx.water.style.opacity = p.underwater ? '1' : '0';
+    const n = p.needs && p.needs.mode !== 'off' ? p.needs : null;
+    const lid = n ? Math.min(1, n.blink || 0) : 0;
+    this.fx.lidtop.style.opacity = this.fx.lidbottom.style.opacity = lid > 0.01 ? '1' : '0';
+    this.fx.lidtop.style.transform = `translateY(${(-100 + lid * 50).toFixed(1)}%)`;
+    this.fx.lidbottom.style.transform = `translateY(${(100 - lid * 50).toFixed(1)}%)`;
+    this.fx.sick.style.opacity = n && n.nauseous ? (0.35 + 0.25 * Math.sin(performance.now() / 900)).toFixed(3) : '0';
+    this.fx.thirst.style.opacity = n ? Math.max(0, Math.min(0.85, (n.thirst - 0.45) * 1.4)).toFixed(3) : '0';
+  }
+
+  // asleep: the screen goes dark, the clock races, click to wake up early
+  sleepScreen(info) {
+    if (!info) { this.sleepEl?.remove(); this.sleepEl = null; this.fx.fade.style.opacity = '0'; return; }
+    this.fx.fade.style.opacity = '1';
+    if (!this.sleepEl) { this.sleepEl = h('div', { class: 'sleep-screen' }); this.layer.append(this.sleepEl); }
+    this.sleepEl.innerHTML = `<div class="zz">💤</div><div class="t">${info.time}</div><div class="s">${info.text}</div><div class="hint">Click to wake up</div>`;
   }
 
   deathScreen({ cause, deathMode, onRespawn, onQuit }) {
-    const why = { fall: 'You fell too far.', drowning: 'You drowned.' }[cause] || 'You died.';
+    const why = { fall: 'You fell too far.', drowning: 'You drowned.', dehydration: 'You died of thirst. (About 3 days without water.)', starvation: 'You starved.' }[cause] || 'You died.';
     const el = h('div', { class: 'center-screen dead', style: 'background:rgba(0,0,0,0.6)' },
       h('div', { class: 'panel', style: 'padding:30px;text-align:center;min-width:320px' },
         h('h1', {}, deathMode === 'perma' ? 'The End' : 'You Died'),

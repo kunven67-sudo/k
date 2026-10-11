@@ -20,6 +20,8 @@ import { PhoneUI } from './ui/phone.js';
 import { PowerGrid } from './items/power.js';
 import { FlatPack, boxFor } from './items/flatpack.js';
 import { Breaking } from './items/breaking.js';
+import { Consume } from './items/consume.js';
+import { Needs } from './player/needs.js';
 import { astronomy } from './core/time.js';
 
 const canvas = document.getElementById('view');
@@ -102,6 +104,8 @@ const phoneUI = new PhoneUI(document.getElementById('ui'), {
   openSettings: () => { closePhone(false); pause(true); },
   sound: () => audio.ui('click'),
   toast: (t) => ui.toast(t),
+  needs: () => game.needs,
+  sleepHere: () => { closePhone(true); startSleep(0.5, 'on the ground'); },
 });
 game.phoneUI = phoneUI;
 
@@ -215,6 +219,7 @@ async function loadWorld(info, { menu = false, bar = null, saveData = null } = {
   camera.position.set(game.world.gen.spawn.x, game.world.height(game.world.gen.spawn.x, game.world.gen.spawn.z) + 2, game.world.gen.spawn.z);
   renderer.compile(scene, camera);
   if (!menu) {
+    game.physics.setGround((x, z) => game.world.height(x, z));
     game.player = new Player({ physics: game.physics, camera, world: game.world, audio, godMode: !!info.godMode });
     if (saveData?.player) {
       const p = saveData.player;
@@ -224,6 +229,8 @@ async function loadWorld(info, { menu = false, bar = null, saveData = null } = {
       game.player.yaw = p.yaw; game.player.pitch = p.pitch;
       Object.assign(game.player, { health: p.health ?? 100, stamina: p.stamina ?? 100, limp: p.limp ?? 0, brokenLeg: p.brokenLeg ?? 0 });
     }
+    game.needs = new Needs(game.player, game.clock, saveData?.needs);
+    game.player.needs = game.needs;
     game.items = new ItemManager({ physics: game.physics, scene });
     const say = (t) => ui.toast(t, 4);
     game.breaking = new Breaking({ physics: game.physics, items: game.items, scene, world: game.world, audio, onMessage: say });
@@ -231,6 +238,10 @@ async function loadWorld(info, { menu = false, bar = null, saveData = null } = {
     game.flat = new FlatPack({ items: game.items, clock: game.clock, audio, onMessage: say });
     game.hands = new Hands({ physics: game.physics, camera, items: game.items, player: game.player });
     game.player.carry = () => game.hands.carryMass;
+    game.consume = new Consume({
+      items: game.items, camera, physics: game.physics, player: game.player, hands: game.hands, needs: game.needs, clock: game.clock, audio, scene,
+      weather: () => game.weatherC ?? 18, onMessage: say, onTip: (id, html, s) => ui.tip(id, html, s),
+    });
     game.build = new BuildTools({ physics: game.physics, camera, items: game.items, player: game.player, hands: game.hands, onMessage: (t) => ui.toast(t, 2) });
     game.phone = new Phone3D(camera);
     game.money = saveData?.money ?? START_MONEY[info.startMoney ?? 10000] ?? 10000;
@@ -248,6 +259,9 @@ function disposeWorld() {
   if (game.phone) { camera.remove(game.phone.root); game.phone = null; }
   if (game.build) { game.build.cancelPlacing(); game.build.setActive(false); ui.buildBanner(false); game.build = null; }
   if (game.hands) { game.hands.dispose(); game.hands = null; }
+  if (game.sleeping) stopSleep(true);
+  if (game.consume) { game.consume.dispose(); game.consume = null; }
+  game.needs = null;
   if (game.flat) { game.flat.stop(); game.flat = null; }
   ui.progress(null);
   ui.speed(1);
@@ -349,12 +363,14 @@ function saveGame(silent) {
     items: game.items ? game.items.serialize() : [],
     debris: game.breaking ? game.breaking.serialize() : [],
     money: game.money, transactions: game.transactions, flashOn: !!game.flashOn,
+    needs: game.needs ? game.needs.serialize() : null,
   });
   if (!silent) game.autosaveT = 60;
 }
 
 canvas.addEventListener('click', () => {
   if (game.state !== 'play') return;
+  if (game.sleeping) { game.needs?.stopSleep(); return; }
   if (game.phoneOpen) { closePhone(true); return; } // clicking the world puts the phone away
   if (!input.locked) { audio.start(); input.lock(); }
 });
@@ -381,9 +397,10 @@ function frame(now) {
   if (game.state === 'play' || game.state === 'paused' || game.state === 'dead') {
     const p = game.player;
     if (game.state === 'play') {
-      if (input.locked) p.handleLook();
+      if (input.locked && !game.sleeping) p.handleLook();
       p.pollInput();
-      if (input.actionPressed('fastForward')) {
+      if (game.sleeping) updateSleep(dt);
+      else if (input.actionPressed('fastForward')) {
         const steps = [1, 10, 100, 1000];
         game.clock.fastForward = steps[(steps.indexOf(game.clock.fastForward) + 1) % steps.length];
         ui.speed(game.clock.fastForward);
@@ -394,11 +411,13 @@ function frame(now) {
         if (input.actionPressed('flashlight')) setFlashlight(!game.flashOn);
       }
       game.hands.update(dt);
+      if (!game.sleeping) game.consume.update(dt);
       game.build.update(dt);
       game.clock.advance(dt);
       const alpha = game.physics.update(dt);
       p.updateCamera(dt, alpha);
       game.items.update();
+      game.consume.lateUpdate(dt);
       game.breaking.update(dt);
       game.breaking.sync();
       game.power.update(dt, game.hands);
@@ -409,8 +428,14 @@ function frame(now) {
         game.phoneTick = (game.phoneTick || 0) + dt;
         if (game.phoneTick > 1) { game.phoneTick = 0; phoneUI.refreshTop(); }
       }
+      game.weatherT = (game.weatherT || 0) - dt;
+      if (game.weatherT <= 0) { game.weatherT = 1; game.weatherC = weatherNow().tempC; game.needs.weatherTemp = game.weatherC; }
+      game.needs.update(dt, p.moveMode);
       handleHandEvents();
+      handleNeedsEvents();
       handlePlayerEvents(p);
+      const nw = game.needs.mode !== 'off' ? game.needs.words() : null;
+      ui.bodyLine = nw ? `🍽 ${nw.food} · 💧 ${nw.water} · 😴 ${nw.sleep}${nw.sick ? `<br>🤢 ${nw.sick}` : ''}` : '';
       ui.watch(input.action('watch'), game.clock, w.sky);
       ui.hud(settings.hud, p);
       ui.feel(p, dt);
@@ -437,14 +462,82 @@ function handleHandEvents() {
       if (e.mass * 9.81 > 430) ui.tip('heavy', `That's about ${Math.round(e.mass)} kg: too heavy to lift alone. You can drag it, or use build mode.`, 6);
     } else if (e.type === 'throw' && audio.started) audio.burst({ dur: 0.18, freq: 500, q: 0.6, gain: 0.08, attack: 0.05 });
     else if (e.type === 'use') {
-      // mouse only: clicking a switch, a pull-cord, a breaker, tape on a box...
-      if (!game.flat.use(e.item, e.part)) game.power.use(e.item, e.part);
+      // mouse only: clicking food picks it up, a bed lies down, a switch / pull-cord / breaker / tape does its thing
+      if (e.item.def?.food && !e.part?.use) game.consume.take(e.item, e.part);
+      else if (e.item.def?.sleep && !e.part?.use) startSleep(e.item.def.sleep, `on the ${e.item.def.name.split(' ').slice(-1)[0].toLowerCase()}`);
+      else if (!game.flat.use(e.item, e.part)) game.power.use(e.item, e.part);
     } else if (e.type === 'assembleHold') {
       const prog = game.flat.hold(e.item, e.dt);
       ui.progress(prog == null ? null : prog);
     } else if (e.type === 'assembleStop') { game.flat.stop(); ui.progress(null); }
   }
   hd.events.length = 0;
+}
+
+// ---------------- sleeping ----------------
+function startSleep(quality, where) {
+  const n = game.needs;
+  if (!n || n.mode === 'off') { ui.toast('Sleep is off (Settings → Gameplay → Hunger, thirst + sleep).'); return; }
+  if (game.sleeping) return;
+  if (!n.canSleep()) { ui.toast('You lie down... but you\'re not tired. You get back up.', 4); return; }
+  if (n.thirst > 0.7 || n.hunger > 0.92) { ui.toast(`You're too ${n.thirst > 0.7 ? 'thirsty' : 'hungry'} to fall asleep.`, 4); return; }
+  if (n.nauseous) { ui.toast('Your stomach is too upset to sleep right now.', 4); return; }
+  game.consume.dropHeld();
+  if (game.build.active) setBuild(false);
+  n.startSleep(quality);
+  game.player.asleep = true;
+  // a full night passes in ~25 real seconds
+  const base = game.clock.rate / game.clock.fastForward;
+  game.sleeping = { savedFF: game.clock.fastForward, where, quality };
+  game.clock.fastForward = Math.max(1, 1150 / base);
+  if (audio.started) audio.burst({ dur: 0.5, freq: 400, type: 'lowpass', gain: 0.12, buffer: audio.brown });
+}
+
+function updateSleep() {
+  const n = game.needs, sl = game.sleeping;
+  if (!n?.sleeping) { stopSleep(false); return; }
+  if (input.mousePressed(0) || input.actionPressed('jump')) { n.stopSleep(); stopSleep(false); return; }
+  const q = sl.quality >= 0.95 ? 'Deep sleep' : sl.quality >= 0.7 ? 'Sleeping' : 'Restless sleep';
+  ui.sleepScreen({ time: game.clock.formatTime(), text: `${q} ${sl.where} · ${n.sleeping.slept.toFixed(1)} h` });
+}
+
+function stopSleep(silent) {
+  const sl = game.sleeping;
+  if (!sl) return;
+  game.sleeping = null;
+  game.player && (game.player.asleep = false);
+  if (game.clock) game.clock.fastForward = sl.savedFF;
+  ui.sleepScreen(null);
+  ui.speed(game.clock?.fastForward || 1);
+}
+
+// ---------------- your body ----------------
+function handleNeedsEvents() {
+  const n = game.needs;
+  for (const e of n.events) {
+    if (e.type === 'growl' && audio.started) {
+      // a real stomach growl: low rumbling gurgle
+      audio.burst({ dur: 1.4, freq: 140, q: 2.5, gain: 0.22 * e.k, buffer: audio.brown, attack: 0.25 });
+      audio.tone({ freq: 95, freqEnd: 62, dur: 0.9, gain: 0.05 * e.k, type: 'sine', delay: 0.2 });
+      ui.tip('hungry', 'Your stomach is growling. Food is on your phone: <b>Spawn → Food</b>. Hold <kbd>T</kbd> to check how hungry you are.', 9);
+    } else if (e.type === 'yawn' && audio.started) {
+      audio.burst({ dur: 1.6, freq: 520, q: 0.8, gain: 0.07, buffer: audio.pink, attack: 0.5 });
+      audio.tone({ freq: 210, freqEnd: 130, dur: 1.2, gain: 0.03, type: 'sine', delay: 0.3 });
+      ui.tip('sleepy', 'You\'re getting tired. Click a bed, mattress or sofa to sleep (or Vitals app → Sleep here).', 9);
+    } else if (e.type === 'vomit') {
+      ui.toast('You threw up. 🤢 Drink some water.', 4);
+      if (audio.started) audio.burst({ dur: 0.7, freq: 300, type: 'lowpass', gain: 0.2, buffer: audio.brown, attack: 0.05 });
+    } else if (e.type === 'sickStart') ui.toast(`Your stomach turns... ${e.name.toLowerCase()}. 🤢 It should pass in about a day. Keep drinking water.`, 6);
+    else if (e.type === 'sickEnd') ui.toast('You feel better. 🙂', 4);
+    else if (e.type === 'wake') {
+      stopSleep(true);
+      ui.toast(e.groggy ? `You wake up groggy after ${n.log.lastSleepH.toFixed(1)} h.` : `You slept ${n.log.lastSleepH.toFixed(1)} h. Feeling rested. ☀️`, 4);
+    }
+  }
+  n.events.length = 0;
+  if (n.mode !== 'off') {
+    if (n.thirst > 0.3) ui.tip('thirsty', 'You\'re thirsty: your mouth is dry. Grab a drink (<b>Spawn → Food → Drinks</b>). The lake water isn\'t safe to drink without boiling.', 9);
+  }
 }
 
 function handlePlayerEvents(p) {
@@ -473,6 +566,7 @@ function onDeath(cause) {
       p.body.setTranslation({ x: sp.x, y: y + 1, z: sp.z }, true);
       p.pos.set(sp.x, y + 0.1, sp.z); p.prevPos.copy(p.pos);
       Object.assign(p, { dead: false, health: 60, stamina: 50, breath: 45 });
+      game.needs?.respawn();
       p.vel.set(0, 0, 0);
       saveGame();
       startPlay(false);

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { getItem, buildSpec, defaultOptions } from './catalog.js';
 import { buildVisual, buildColliders, specBounds } from './builder.js';
 import { cutTape } from './flatpack.js';
+import { foodSpec } from './foodstate.js';
 
 let nextUid = 1;
 
@@ -35,6 +36,8 @@ export class SpawnedItem {
     // parts that broke off before (saved) stay gone
     for (const i of this.state.broken || []) if (this.spec.parts[i]) this.spec.parts[i] = { ...this.spec.parts[i], vis: false, col: false };
     if (this.state.massLost && this.spec.mass) this.spec.mass = Math.max(this.spec.mass * 0.05, this.spec.mass - this.state.massLost);
+    // food: opened / taken out / eaten / finished changes the parts themselves
+    if (this.def.food) this.spec = foodSpec(this.spec, this.state, this.def.food);
     // fresh spawns settle for a moment before anything can break (no shattering on arrival)
     this.noBreakUntil = performance.now() + 1500;
     this.bounds = specBounds(this.spec);
@@ -61,7 +64,7 @@ export class SpawnedItem {
       const bdesc = R.RigidBodyDesc.dynamic()
         .setTranslation(pos.x, pos.y, pos.z)
         .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
-        .setLinearDamping(0.05).setAngularDamping(0.15)
+        .setLinearDamping(0.05).setAngularDamping(this.spec.mass < 5 ? 0.9 : 0.15) // small round things: rolling resistance
         .setCcdEnabled(true);
       const body = world.createRigidBody(bdesc);
       body.userData = { item: this, bodyName: name };
@@ -95,13 +98,15 @@ export class SpawnedItem {
       const j = world.createImpulseJoint(data, main, this.bodies[name], true);
       j.setContactsEnabled(false);
       if (b.limits) j.setLimits(b.limits[0], b.limits[1]);
-      try { j.configureMotorVelocity(0, b.joint === 'prismatic' ? 3.0 : 1.5); } catch { /* older builds */ }
-      this.joints.push({ name, joint: j, type: b.joint });
+      const factor = b.joint === 'prismatic' ? 3.0 : 1.5;
+      try { j.configureMotorVelocity(0, factor); } catch { /* older builds */ }
+      this.joints.push({ name, joint: j, type: b.joint, seal: !!b.seal, axis: b.axis, factor, sealed: false });
     }
     if (saved) this.restore(saved);
     if (this.itemId === 'flatbox' && this.state.tapeCut) cutTape(this);
     if (this.state.bulbBroken) for (const L of this.lights) L.mesh.visible = false;
     this.sync();
+    mgr.onBuilt?.(this);
   }
 
   get mass() { let m = 0; for (const b of Object.values(this.bodies)) m += b.mass(); return m; }
@@ -189,6 +194,48 @@ export class ItemManager {
     this.scene = scene;
     this.items = [];
     this.byHandle = new Map();
+    this.unhook = physics.onStep(() => this.seals());
+  }
+
+  // Fridge hinges have a self-closing cam + magnetic gaskets: within ~35° of shut a door swings
+  // closed by itself and stays sealed (a drawer within ~6 cm slides shut). Gentle enough that your
+  // hand still opens it easily; past that point it stays wherever you leave it.
+  seals() {
+    const q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(), ax = new THREE.Vector3();
+    for (const it of this.items) {
+      for (const j of it.joints) {
+        if (!j.seal) continue;
+        const main = it.bodies.main, b = it.bodies[j.name];
+        if (!b) continue;
+        const rm = main.rotation(), rb = b.rotation();
+        q0.set(rm.x, rm.y, rm.z, rm.w);
+        let pos;
+        if (j.type === 'prismatic') {
+          const tm = main.translation(), tb = b.translation();
+          ax.set(...j.axis).applyQuaternion(q0);
+          pos = (tb.x - tm.x) * ax.x + (tb.y - tm.y) * ax.y + (tb.z - tm.z) * ax.z;
+        } else {
+          q1.set(rb.x, rb.y, rb.z, rb.w).premultiply(q0.clone().invert());
+          pos = 2 * Math.atan2(q1.x * j.axis[0] + q1.y * j.axis[1] + q1.z * j.axis[2], q1.w);
+        }
+        // zones (with a little hysteresis): 'seal' = magnets at the last few degrees, 'cam' = swings
+        // itself shut, 'free' = stays where you leave it
+        const P = j.type === 'prismatic';
+        const a = Math.abs(pos), cur = j.sealed || 'free';
+        let want = cur;
+        if (a < (P ? 0.01 : 0.04)) want = 'seal';
+        else if (a < (P ? 0.06 : 0.6)) want = cur === 'seal' && a < (P ? 0.018 : 0.07) ? 'seal' : cur === 'free' && a > (P ? 0.05 : 0.5) ? 'free' : 'cam';
+        else if (a > (P ? 0.09 : 0.75)) want = 'free';
+        if (want !== cur) {
+          j.sealed = want === 'free' ? false : want;
+          try {
+            if (want === 'seal') j.joint.configureMotorPosition(0, P ? 900 : 400, P ? 40 : 20);
+            else if (want === 'cam') j.joint.configureMotorPosition(0, P ? 120 : 40, P ? 15 : 8);
+            else j.joint.configureMotorVelocity(0, j.factor);
+          } catch { /* */ }
+        }
+      }
+    }
   }
 
   spawn(itemId, chosen, transform, saved) {

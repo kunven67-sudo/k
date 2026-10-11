@@ -30,6 +30,8 @@ const metalOpt = (def = 'black') => ({ label: 'Metal', choices: [{ id: 'black', 
 const sizeOpt = (choices, def) => ({ label: 'Size', choices, def });
 function cap1(s) { return s[0].toUpperCase() + s.slice(1); }
 
+import FOOD from './food/index.js';
+
 const ITEMS = [];
 const add = (def) => { ITEMS.push(def); return def; };
 
@@ -37,7 +39,7 @@ const add = (def) => { ITEMS.push(def); return def; };
 // LIVING ROOM
 // =====================================================================
 add({
-  id: 'sofa-kai', name: 'Kai 3-Seat Sofa', brand: BRANDS.modern, style: 'modern', room: 'Living room', price: 1299, mass: 55,
+  id: 'sofa-kai', name: 'Kai 3-Seat Sofa', brand: BRANDS.modern, style: 'modern', room: 'Living room', price: 1299, mass: 55, sleep: 0.75,
   rating: 4.6, reviews: 2184, blurb: 'Low, clean lines, deep seats, solid hardwood frame, black steel legs.',
   quotes: ['"Deep enough to nap on. Cushions held their shape after a year."', '"The navy is darker in person but I love it."'],
   options: { kind: fabricKindOpt(), color: fabricOpt('Stone gray'), legs: metalOpt('black'), size: sizeOpt([{ id: '2', label: '2-seat (1.7 m)', price: -300, w: 1.7 }, { id: '3', label: '3-seat (2.2 m)', price: 0, w: 2.2 }, { id: '4', label: '4-seat (2.7 m)', price: 450, w: 2.7 }], '3') },
@@ -62,7 +64,7 @@ add({
 });
 
 add({
-  id: 'loveseat-nordbo', assemblyMin: 45, name: 'KLIPPA Loveseat', brand: BRANDS.flatpack, style: 'flatpack', room: 'Living room', price: 349, mass: 30, flatpack: true,
+  id: 'loveseat-nordbo', assemblyMin: 45, name: 'KLIPPA Loveseat', brand: BRANDS.flatpack, style: 'flatpack', room: 'Living room', price: 349, mass: 30, sleep: 0.6, flatpack: true,
   rating: 3.9, reviews: 8412, blurb: 'Comes flat in a box. Removable, washable cover. Particle board + pine frame.',
   quotes: ['"Took me 2 hours. One screw was missing so it wobbles a bit lol."', '"Great for the price. Don\'t jump on it."'],
   options: { color: fabricOpt('Charcoal') },
@@ -80,7 +82,7 @@ add({
 });
 
 add({
-  id: 'chesterfield-ardent', name: 'Belmont Chesterfield', brand: BRANDS.luxury, style: 'luxury', room: 'Living room', price: 6800, mass: 88,
+  id: 'chesterfield-ardent', name: 'Belmont Chesterfield', brand: BRANDS.luxury, style: 'luxury', room: 'Living room', price: 6800, mass: 88, sleep: 0.75,
   rating: 4.9, reviews: 311, blurb: 'Hand-tufted full-grain leather, rolled arms, kiln-dried oak frame, turned walnut feet.',
   quotes: ['"Smells like a library in the best way."', '"Two delivery guys needed. It is HEAVY."'],
   options: { leather: leatherOpt() },
@@ -241,7 +243,7 @@ add({
 // BEDROOM
 // =====================================================================
 add({
-  id: 'bed-kai', name: 'Kai Upholstered Bed Frame', brand: BRANDS.modern, style: 'modern', room: 'Bedroom', price: 1099, mass: 48,
+  id: 'bed-kai', name: 'Kai Upholstered Bed Frame', brand: BRANDS.modern, style: 'modern', room: 'Bedroom', price: 1099, mass: 48, sleep: 0.5,
   rating: 4.6, reviews: 2730, blurb: 'Padded headboard, solid slats. Mattress sold separately (like real stores).',
   quotes: ['"No squeaks. Headboard is great for reading in bed."'],
   options: { color: fabricOpt('Stone gray'), size: sizeOpt([{ id: 'full', label: 'Full', price: -150, w: 1.37 }, { id: 'queen', label: 'Queen', price: 0, w: 1.52 }, { id: 'king', label: 'King', price: 250, w: 1.93 }], 'queen') },
@@ -258,7 +260,7 @@ add({
 });
 
 add({
-  id: 'mattress', name: 'Cloudrest Memory Foam Mattress', brand: 'Cloudrest', style: 'modern', room: 'Bedroom', price: 799, mass: 36,
+  id: 'mattress', name: 'Cloudrest Memory Foam Mattress', brand: 'Cloudrest', style: 'modern', room: 'Bedroom', price: 799, mass: 36, sleep: 1.0,
   rating: 4.5, reviews: 15022, blurb: '28 cm thick. Comes with a sheet, duvet + 2 pillows. Dust mites will move in eventually (they always do).',
   quotes: ['"Sleeping hot but SO comfy."'],
   options: { size: sizeOpt([{ id: 'twin', label: 'Twin', price: -350, w: 0.97, l: 1.9 }, { id: 'full', label: 'Full', price: -150, w: 1.37, l: 1.9 }, { id: 'queen', label: 'Queen', price: 0, w: 1.52, l: 2.03 }, { id: 'king', label: 'King', price: 300, w: 1.93, l: 2.03 }], 'queen'), color: fabricOpt('Cream') },
@@ -278,7 +280,7 @@ add({
 });
 
 add({
-  id: 'bunkbed-nordbo', assemblyMin: 150, name: 'STUVA Bunk Bed (twin)', brand: BRANDS.flatpack, style: 'flatpack', room: 'Bedroom', price: 299, mass: 46, flatpack: true,
+  id: 'bunkbed-nordbo', assemblyMin: 150, name: 'STUVA Bunk Bed (twin)', brand: BRANDS.flatpack, style: 'flatpack', room: 'Bedroom', price: 299, mass: 46, sleep: 0.85, flatpack: true,
   rating: 4.0, reviews: 5320, blurb: 'Solid pine. Ladder on the side. 162 parts + 1 allen key. Max 100 kg on top.',
   quotes: ['"Instructions had no words. Just a little cartoon guy looking sad."'],
   options: { wood: woodOpt('pine', ['pine', 'whiteoak']) },
@@ -461,9 +463,10 @@ add({
       mass: 138,
       bodies: {
         main: {},
-        doorL: { joint: 'revolute', axis: [0, 1, 0], limits: [-2.0, 0], anchor: [-W / 2, 1.2, D / 2 + 0.03] },
-        doorR: { joint: 'revolute', axis: [0, 1, 0], limits: [0, 2.0], anchor: [W / 2, 1.2, D / 2 + 0.03] },
-        freezer: { joint: 'prismatic', axis: [0, 0, 1], limits: [0, 0.45], anchor: [0, 0.32, 0] },
+        // magnetic gaskets hold the doors + drawer shut (you can still pull them open)
+        doorL: { joint: 'revolute', axis: [0, 1, 0], limits: [-2.0, 0], anchor: [-W / 2, 1.2, D / 2 + 0.03], seal: true },
+        doorR: { joint: 'revolute', axis: [0, 1, 0], limits: [0, 2.0], anchor: [W / 2, 1.2, D / 2 + 0.03], seal: true },
+        freezer: { joint: 'prismatic', axis: [0, 0, 1], limits: [0, 0.45], anchor: [0, 0.32, 0], seal: true },
       },
       parts: [
         // cabinet: real hollow box so stuff fits inside
@@ -797,12 +800,22 @@ add({
 });
 
 // =====================================================================
+for (const f of FOOD) add({ tab: 'food', ...f });
+
+// add items at runtime (dev tools, mods); replaces an item with the same id
+export function registerItems(list) {
+  for (const def of list) {
+    const i = ITEMS.findIndex((x) => x.id === def.id);
+    if (i >= 0) ITEMS[i] = def; else ITEMS.push(def);
+  }
+}
+
 export const CATALOG = ITEMS;
 export const ROOMS = ['Living room', 'Bedroom', 'Kitchen + dining', 'Bathroom', 'Office', 'Outdoor'];
 export const STYLES = { modern: 'Modern', flatpack: 'Flat-pack', luxury: 'Luxury', rustic: 'Rustic + vintage' };
 export const TABS = [
   { id: 'furniture', label: 'Furniture', icon: '🛋️', ready: true },
-  { id: 'food', label: 'Food', icon: '🍎' }, { id: 'everyday', label: 'Everyday', icon: '🧴' },
+  { id: 'food', label: 'Food', icon: '🍎', ready: true }, { id: 'everyday', label: 'Everyday', icon: '🧴' },
   { id: 'electronics', label: 'Electronics', icon: '📺' }, { id: 'tools', label: 'Tools', icon: '🔧' },
   { id: 'nature', label: 'Nature', icon: '🌲' }, { id: 'animals', label: 'Animals', icon: '🦌' },
   { id: 'people', label: 'People', icon: '🧍' }, { id: 'vehicles', label: 'Vehicles', icon: '🚗' },

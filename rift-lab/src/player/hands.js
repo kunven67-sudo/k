@@ -35,7 +35,7 @@ export class Hands {
 
   // per rendered frame
   update(dt) {
-    if (!this.enabled || !input.locked) { if (this.held) this.release(false); this.cancelPending(); this.aim = null; return; }
+    if (!this.enabled || !input.locked || this.busy?.()) { if (this.held) this.release(false); this.cancelPending(); this.aim = null; return; }
     // the thing you were clicking on is gone (built, broken, deleted)
     if (this.pending && !this.items.items.includes(this.pending.aim.item)) this.cancelPending();
     if (this.held && !this.heldValid()) { this.held = null; this.charge = 0; }
@@ -53,7 +53,9 @@ export class Hands {
         this.rc.far = REACH + 0.3;
         const vis = this.rc.intersectObject(item.root, true).find((x) => x.object.visible && !x.object.userData.outline && x.object.userData.part);
         const part = vis?.object.userData.part || col.userData?.part;
-        this.aim = { item, body, collider: col, point: p, dist: hit.timeOfImpact, movable: body.isDynamic(), part, use: part?.use };
+        // food: a click picks it up; beds + sofas: a click lies down to sleep
+        const use = part?.use || (item.def?.food ? 'take' : item.def?.sleep ? 'sleep' : undefined);
+        this.aim = { item, body, collider: col, point: p, dist: hit.timeOfImpact, movable: body.isDynamic(), part, use };
       }
     }
     if (input.mousePressed(0) && this.aim && !this.held && !this.pending) {

@@ -61,6 +61,11 @@ export class Player {
     this.underwater = false;
     this.wading = 0;
     this.dead = false;
+    // set by your body's needs (hungry, thirsty, tired, sick): slower recovery, less in the tank, dizziness
+    this.regenMul = 1;
+    this.staminaCap = 100;
+    this.sway = 0;       // extra camera roll (radians)
+    this.swayPitch = 0;  // extra camera pitch (radians)
 
     this.mantle = null;   // climbing/vaulting over something
     this.stepDist = 0;
@@ -113,10 +118,12 @@ export class Player {
 
     // --- wanted direction ---
     let fx = 0, fz = 0;
-    if (input.action('forward')) fz -= 1;
-    if (input.action('back')) fz += 1;
-    if (input.action('left')) fx -= 1;
-    if (input.action('right')) fx += 1;
+    const awake = !this.asleep;
+    if (awake && input.action('forward')) fz -= 1;
+    if (awake && input.action('back')) fz += 1;
+    if (awake && input.action('left')) fx -= 1;
+    if (awake && input.action('right')) fx += 1;
+    if (!awake) this.jumpQ = 0;
     const len = Math.hypot(fx, fz);
     if (len > 0) { fx /= len; fz /= len; }
     const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
@@ -126,11 +133,11 @@ export class Player {
     if (this.jogQ) { this.jogToggle = !this.jogToggle; this.jogQ = false; }
     const jumpNow = this.jumpQ > 0;
     if (this.jumpQ > 0) this.jumpQ -= h;
-    const wantCrouch = input.action('crouch') && !this.swimming;
+    const wantCrouch = (input.action('crouch') || !!this.asleep) && !this.swimming;
     this.setCrouch(wantCrouch);
 
     const moving = len > 0;
-    const wantSprint = input.action('sprint') && moving && !this.crouching && fz < 0.2;
+    const wantSprint = awake && input.action('sprint') && moving && !this.crouching && fz < 0.2;
     let speed;
     if (this.swimming) speed = wantSprint && !this.exhausted ? SPEED.swimFast : SPEED.swim;
     else if (this.crouching) speed = SPEED.crouch;
@@ -150,7 +157,8 @@ export class Player {
     const drain = this.swimming ? (moving ? (speed > 1.2 ? 9 : 3) : 1.2) : this.moveMode === 'sprint' ? 9 : this.moveMode === 'jog' ? 1.6 : 0;
     if (this.godMode) this.stamina = 100;
     else if (drain > 0) this.stamina = Math.max(0, this.stamina - drain * h);
-    else this.stamina = Math.min(100, this.stamina + (moving ? 7 : 13) * h);
+    else this.stamina = Math.min(this.staminaCap, this.stamina + (moving ? 7 : 13) * this.regenMul * h);
+    if (this.stamina > this.staminaCap) this.stamina = Math.max(this.staminaCap, this.stamina - 20 * h);
     if (this.stamina < 4) this.exhausted = true;
     if (this.exhausted && this.stamina > 35) this.exhausted = false;
 
@@ -385,7 +393,7 @@ export class Player {
     );
     // limp: a little dip every other step
     if (this.limp > 0 && this.grounded && this.moveMode !== 'idle') this.camera.position.y -= Math.max(0, Math.sin(this.bob * 0.5)) * 0.05 * this.limp;
-    this.camera.rotation.set(this.pitch, this.yaw, -this.lean * 0.12, 'YXZ');
+    this.camera.rotation.set(this.pitch + this.swayPitch, this.yaw, -this.lean * 0.12 + this.sway, 'YXZ');
   }
 
   dispose() {

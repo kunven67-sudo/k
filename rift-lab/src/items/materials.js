@@ -9,7 +9,7 @@ const S = 512;
 const texCache = new Map();
 const matCache = new Map();
 
-function canvasTex(draw, { srgb = true, w = S, h = S, repeat = 1 } = {}) {
+export function canvasTex(draw, { srgb = true, w = S, h = S, repeat = 1 } = {}) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const ctx = c.getContext('2d');
@@ -22,7 +22,7 @@ function canvasTex(draw, { srgb = true, w = S, h = S, repeat = 1 } = {}) {
   return t;
 }
 
-function heightToNormal(hgt, w, h, strength) {
+export function heightToNormal(hgt, w, h, strength) {
   const out = new Uint8Array(w * h * 4);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const l = hgt[y * w + ((x - 1 + w) % w)], r = hgt[y * w + ((x + 1) % w)];
@@ -40,7 +40,7 @@ function heightToNormal(hgt, w, h, strength) {
   return t;
 }
 
-function cached(key, make) {
+export function cached(key, make) {
   if (!texCache.has(key)) texCache.set(key, make());
   return texCache.get(key);
 }
@@ -284,6 +284,36 @@ export const LEATHER_COLORS = { 'Cognac': 0x8a4f2a, 'Espresso': 0x3b261b, 'Black
 export const METAL_FINISHES = { 'Black steel': 'black', 'Brushed steel': 'steel', 'Brass': 'brass', 'Chrome': 'chrome', 'Gold': 'gold' };
 export const PAINT_COLORS = { 'White': 0xf1f0ec, 'Black': 0x202022, 'Sage': 0x9aa58d, 'Navy': 0x2b3550, 'Natural': null };
 
+// ---------- add-on materials (food aisles etc. register their own) ----------
+// registerMaterial('apple', (a, b, c) => new THREE.MeshPhysicalMaterial(...)) -> key 'apple:red' calls fn('red')
+// registerPhysical('apple', { density, friction, sound, breaks, strength })
+// registerLabel('cola-can', { w, h, draw(ctx, w, h) }) -> key 'label:cola-can' (or 'label:cola-can:gloss' / ':matte' / ':foil')
+const EXTRA = new Map();
+const LABELS = new Map();
+export function registerMaterial(kind, make) { EXTRA.set(kind, make); }
+export function registerPhysical(kind, props) { PHYSICAL[kind] = { density: 900, friction: 0.5, sound: 'soft', breaks: null, strength: 1, ...props }; }
+export function registerLabel(id, design) { LABELS.set(id, design); }
+
+function labelMaterial(id, finish) {
+  const d = LABELS.get(id);
+  if (!d) return new THREE.MeshStandardMaterial({ color: 0xff00ff });
+  const map = cached('label:' + id, () => {
+    const t = canvasTex((ctx, w, h) => d.draw(ctx, w, h), { w: d.w || 512, h: d.h || 512 });
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    t.anisotropy = 16;
+    return t;
+  });
+  // printed packaging: paper/card is matte, plastic film + coated card is glossy, chip bags are foil
+  const f = finish || d.finish || 'gloss';
+  const m = f === 'foil'
+    ? new THREE.MeshPhysicalMaterial({ map, roughness: 0.28, metalness: 0.55, clearcoat: 0.6, clearcoatRoughness: 0.2 })
+    : f === 'matte'
+      ? new THREE.MeshStandardMaterial({ map, roughness: 0.8 })
+      : new THREE.MeshPhysicalMaterial({ map, roughness: 0.42, clearcoat: 0.5, clearcoatRoughness: 0.15 });
+  if (d.transparent) { m.transparent = true; m.alphaTest = 0.02; m.side = THREE.DoubleSide; }
+  return m;
+}
+
 // ---------- the material factory ----------
 // key examples: 'wood:oak', 'fabric:woven:Stone gray', 'leather:Cognac', 'metal:brass', 'glass:clear',
 // 'marble:white', 'ceramic', 'board:white', 'board:chip', 'paint:Sage', 'cardboard', 'foam', 'rubber'
@@ -368,12 +398,24 @@ export function material(key) {
       m.userData.tile = 1;
       break;
     }
+    case 'label': m = labelMaterial(a, b); break;
+    case 'liquid': {
+      // a drink: a=color, b=opacity (1 = opaque like milk)
+      const op = b ? Number(b) : 0.85;
+      m = new THREE.MeshPhysicalMaterial({ color: a ? Number(a) : 0xdfeff2, roughness: 0.08, transparent: op < 1, opacity: op, depthWrite: op >= 1, ior: 1.33 });
+      break;
+    }
+    case 'clearplastic':
+      // PET bottles + clamshells: see-through, a little wavy, light, doesn't shatter
+      m = new THREE.MeshPhysicalMaterial({ color: a ? Number(a) : 0xf2f7f7, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.17, ior: 1.57, specularIntensity: 1, envMapIntensity: 1.3, depthWrite: false, side: THREE.DoubleSide });
+      m.userData.glass = true;
+      break;
     case 'foam': m = new THREE.MeshStandardMaterial({ color: 0xe9e3cf, roughness: 1 }); break;
     case 'rubber': m = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.85 }); break;
     case 'plastic': m = new THREE.MeshPhysicalMaterial({ color: a ? Number(a) : 0x222222, roughness: 0.4, clearcoat: 0.3 }); break;
     case 'bulb': m = new THREE.MeshStandardMaterial({ color: 0xfff6e0, emissive: 0x000000, roughness: 0.2 }); m.userData.bulb = true; break;
     case 'shade': m = new THREE.MeshStandardMaterial({ color: a ? Number(a) : 0xf2ead8, roughness: 0.95, side: THREE.DoubleSide, emissive: 0x000000 }); m.userData.shade = true; break;
-    default: m = new THREE.MeshStandardMaterial({ color: 0xff00ff });
+    default: m = EXTRA.has(kind) ? EXTRA.get(kind)(a, b, key.split(':')[3]) : new THREE.MeshStandardMaterial({ color: 0xff00ff });
   }
   m.userData.key = key;
   matCache.set(key, m);
@@ -398,6 +440,9 @@ export const PHYSICAL = {
   plastic: { density: 950, friction: 0.5, sound: 'plastic', breaks: 'crack', strength: 0.8 },
   bulb: { density: 500, friction: 0.3, sound: 'glass', breaks: 'shatter', strength: 0.2 },
   solar: { density: 2500, friction: 0.4, sound: 'glass', breaks: 'shatter', strength: 0.6 },
+  label: { density: 400, friction: 0.5, sound: 'cardboard', breaks: null, strength: 1 },
+  liquid: { density: 1000, friction: 0.3, sound: 'soft', breaks: null, strength: 9 },
+  clearplastic: { density: 1380, friction: 0.4, sound: 'plastic', breaks: null, strength: 9 },
   shade: { density: 200, friction: 0.6, sound: 'soft', breaks: 'tear', strength: 2 },
 };
 

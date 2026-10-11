@@ -433,3 +433,19 @@ Claude explained it was only a test and nothing had changed. Then:
     - A glass table dropped from 3.5 m shatters, and a chair dropped from 6 m loses a part.
     - Knocking a lamp over pops its bulb.
     - Delete-while-plugged-in and build-while-clicking cause no crashes.
+- **Piece 3 (food + body), first chunk, pushed so the user can play:**
+  - What works:
+    - Hunger, thirst and sleep with real physiology (Settings → Gameplay: Real / Relaxed / Off).
+    - A Vitals phone app.
+    - Click food to hold it; click to open, bite or sip; right-click to set it down, hold right-click to throw.
+    - Real bite marks; drinks drain; multipacks (take one bottle out of a 24-pack).
+    - Spoilage by temperature, and fridge cooling.
+    - Food poisoning.
+    - Sleeping on beds, mattresses and sofas, or on the ground from the Vitals app.
+  - Food items so far: Gala apple, 500 mL water bottle, 24-pack of water (`src/items/food/_example.js`).
+  - Fixed:
+    - Small things fell through the terrain (ground guard added in `physics.js`).
+    - Fridge doors and freezer drawer swung open on slopes (magnetic seal + self-closing cam added).
+  - TODO next session:
+    - The aisle workflow hit the usage limit. `produce.js` and `drinks.js` are partial and unverified, and NOT loaded yet (`index.js` only loads `_example.js`). Finish them plus bakery, snacks, fridge, frozen and pantry, run `tools/foodlab.html` checks, then add them to `food/index.js`.
+    - Fridge doors can still rest ~5-7° ajar on steep slopes.

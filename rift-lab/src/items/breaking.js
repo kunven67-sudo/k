@@ -306,6 +306,8 @@ export class Breaking {
     if (!desc) { geo.dispose(); return; }
     const body = w.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w }).setLinvel(vel.x, vel.y, vel.z).setCcdEnabled(true));
     w.createCollider(desc.setDensity(part.dens ?? phys.density * (part.hollow ?? 1)).setFriction(phys.friction), body);
+    geo.computeBoundingBox();
+    body.userData = { bounds: geo.boundingBox.clone() }; // so the ground guard can catch it
     const mesh = new THREE.Mesh(geo, material(part.mat || 'wood'));
     mesh.castShadow = true; mesh.receiveShadow = true;
     this.scene.add(mesh);
@@ -329,6 +331,7 @@ export class Breaking {
     const v = vel.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.5, Math.random() * 1.8, (Math.random() - 0.5) * 2.5));
     const body = w.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setLinvel(v.x, v.y, v.z).setAngvel(spin).setCcdEnabled(true));
     w.createCollider(desc.setDensity(2500).setFriction(0.3), body);
+    body.userData = { bounds: new THREE.Box3().setFromArray(pts) };
     const g = new THREE.BufferGeometry();
     const tri = [];
     // fan the hexagon top + bottom

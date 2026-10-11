@@ -16,7 +16,7 @@ export class PhoneUI {
     this.el = h('div', { class: 'phone-screen' });
     root.append(this.el);
     this.stack = [];
-    this.shop = { tab: 'furniture', room: 'All', style: 'All', q: '' };
+    this.shop = { tab: 'furniture', room: 'All', style: 'All', aisle: 'All', q: '' };
     this.el.addEventListener('wheel', (e) => e.stopPropagation(), { passive: true });
     this.el.addEventListener('mousedown', (e) => e.stopPropagation());
   }
@@ -85,6 +85,7 @@ export class PhoneUI {
           app('🐝', 'Buzzr', 'linear-gradient(135deg,#ffcc00,#ff9500)', () => this.go('buzzr')),
           app('💬', 'Messages', 'linear-gradient(135deg,#5ef08a,#21c45a)', () => this.go('messages')),
           app('🎵', 'Music', 'linear-gradient(135deg,#ff5e7e,#d6246e)', () => this.go('music')),
+          app('❤️', 'Vitals', 'linear-gradient(135deg,#ffffff,#ffe1e6)', () => this.go('vitals')),
           app('⚙️', 'Settings', 'linear-gradient(135deg,#9ea3ad,#5f646d)', () => this.svc.openSettings()),
         ),
       ),
@@ -102,24 +103,27 @@ export class PhoneUI {
     const s = this.shop;
     const pay = this.svc.payMode();
     const tabs = h('div', { class: 'ph-tabs' }, TABS.map((t) => h('div', { class: `ph-tab ${s.tab === t.id ? 'on' : ''} ${t.ready ? '' : 'locked'}`, onclick: () => { this.svc.sound('click'); s.tab = t.id; this.render(); } }, `${t.icon} ${t.label}`)));
-    const search = h('input', { type: 'text', placeholder: 'Search sofas, beds, fridge...', value: s.q });
+    const search = h('input', { type: 'text', placeholder: s.tab === 'food' ? 'Search apples, milk, chips...' : 'Search sofas, beds, fridge...', value: s.q });
     search.addEventListener('input', () => { s.q = search.value; drawCards(); });
     search.addEventListener('keydown', (e) => e.stopPropagation());
     const rooms = h('div', { class: 'ph-tabs' }, ['All', ...ROOMS].map((r) => h('div', { class: `ph-tab ${s.room === r ? 'on' : ''}`, onclick: () => { s.room = r; this.render(); } }, r)));
     const styles = h('div', { class: 'ph-tabs' }, ['All', ...Object.keys(STYLES)].map((st) => h('div', { class: `ph-tab ${s.style === st ? 'on' : ''}`, onclick: () => { s.style = st; this.render(); } }, st === 'All' ? 'All styles' : STYLES[st])));
+    const aisles = h('div', { class: 'ph-tabs' }, ['All', ...Object.keys(AISLES)].map((a) => h('div', { class: `ph-tab ${s.aisle === a ? 'on' : ''}`, onclick: () => { s.aisle = a; this.render(); } }, a === 'All' ? 'All aisles' : AISLES[a])));
     const cards = h('div', { class: 'ph-cards' });
     const drawCards = () => {
       cards.innerHTML = '';
       const q = s.q.trim().toLowerCase();
-      const furn = s.tab === 'furniture';
-      const list = CATALOG.filter((it) => tabOf(it) === s.tab && (!furn || s.room === 'All' || it.room === s.room) && (!furn || s.style === 'All' || it.style === s.style)
-        && (!q || `${it.name} ${it.brand} ${it.room} ${it.blurb}`.toLowerCase().includes(q)));
+      const furn = s.tab === 'furniture', food = s.tab === 'food';
+      const list = CATALOG.filter((it) => it.shop !== false && tabOf(it) === s.tab && (!furn || s.room === 'All' || it.room === s.room) && (!furn || s.style === 'All' || it.style === s.style)
+        && (!food || s.aisle === 'All' || it.aisle === s.aisle)
+        && (!q || `${it.name} ${it.brand} ${it.room || ''} ${it.aisle || ''} ${it.blurb}`.toLowerCase().includes(q)));
       if (!list.length) cards.append(h('div', { class: 'ph-center', style: 'grid-column:1/3' }, 'Nothing found. Try "sofa" or "lamp".'));
       for (const it of list) {
         const img = h('img', { alt: it.name });
         cards.append(h('div', { class: 'ph-card', onclick: () => { this.svc.sound('click'); this.go('product', { id: it.id, chosen: defaultOptions(it) }); } },
           img, h('div', { class: 't' }, it.name), h('div', { class: 'b' }, it.brand),
           h('div', { class: 'p' }, money(it.price), h('small', {}, `${it.rating.toFixed(1)}★ (${it.reviews.toLocaleString()})`))));
+        if (it.food && it.price < 10) cards.lastChild.querySelector('.p').firstChild.textContent = '$' + it.price.toFixed(2);
         // render photos a few at a time so the phone stays smooth
         this.queuePhoto(img, it.id, defaultOptions(it));
       }
@@ -132,6 +136,7 @@ export class PhoneUI {
       return page;
     }
     if (s.tab === 'furniture') page.append(rooms, styles);
+    if (s.tab === 'food') page.append(aisles);
     page.append(cards);
     drawCards();
     return page;
@@ -156,8 +161,12 @@ export class PhoneUI {
     const b = specBounds(spec);
     const imperial = settings.units === 'imperial';
     const dim = (m) => imperial ? `${Math.round(m * 39.37)}"` : `${Math.round(m * 100)} cm`;
-    const sizeTxt = `${dim(b.max.x - b.min.x)} W × ${dim(b.max.z - b.min.z)} D × ${dim(b.max.y - b.min.y)} H`;
-    const massTxt = imperial ? `${Math.round(spec.mass * 2.2046)} lb` : `${Math.round(spec.mass)} kg`;
+    const massTxt = spec.mass < 1
+      ? (imperial ? `${(spec.mass * 35.274).toFixed(spec.mass < 0.3 ? 1 : 0)} oz` : `${Math.round(spec.mass * 1000)} g`)
+      : spec.mass < 10 ? (imperial ? `${(spec.mass * 2.2046).toFixed(1)} lb` : `${spec.mass.toFixed(1)} kg`)
+        : (imperial ? `${Math.round(spec.mass * 2.2046)} lb` : `${Math.round(spec.mass)} kg`);
+    const dimTxt = (m) => (m < 0.3 ? (imperial ? `${(m * 39.37).toFixed(1)}"` : `${(m * 100).toFixed(1)} cm`) : dim(m));
+    const sizeLine = `${dimTxt(b.max.x - b.min.x)} W × ${dimTxt(b.max.z - b.min.z)} D × ${dimTxt(b.max.y - b.min.y)} H`;
     const hero = h('img', { class: 'ph-hero', src: productPhoto(this.svc.renderer, id, chosen) });
     const page = h('div', { class: 'ph-page', style: 'padding-top:50px' },
       h('div', { class: 'ph-head', style: 'position:absolute;top:50px;left:0;z-index:2' }, h('span', { class: 'ph-back', onclick: () => { this.svc.sound('click'); this.back(); } }, '‹')),
@@ -165,12 +174,14 @@ export class PhoneUI {
       h('div', { class: 'ph-prod' },
         h('h3', {}, it.name), h('div', { class: 'brand' }, it.brand),
         h('div', { style: 'margin-top:6px' }, h('span', { class: 'ph-stars' }, stars(it.rating)), ` ${it.rating.toFixed(1)} · ${it.reviews.toLocaleString()} reviews`),
-        h('div', { class: 'price' }, money(price)),
+        h('div', { class: 'price' }, it.food && price < 10 ? '$' + price.toFixed(2) : money(price)),
         h('div', {},
-          it.flatpack ? h('span', { class: 'ph-badge box' }, '📦 Flat-pack: comes in a box') : h('span', { class: 'ph-badge' }, '✔ Comes assembled'),
+          ...(it.food ? foodBadges(it.food) : [it.flatpack ? h('span', { class: 'ph-badge box' }, '📦 Flat-pack: comes in a box') : h('span', { class: 'ph-badge' }, '✔ Comes assembled')]),
           it.power ? h('span', { class: 'ph-badge warn' }, `⚡ Needs power (${it.power} W)`) : null,
-          h('span', { class: 'ph-badge' }, `⚖ ${massTxt}`), h('span', { class: 'ph-badge' }, `📐 ${sizeTxt}`)),
+          it.sleep ? h('span', { class: 'ph-badge' }, `💤 You can sleep on it`) : null,
+          h('span', { class: 'ph-badge' }, `⚖ ${massTxt}`), h('span', { class: 'ph-badge' }, `📐 ${sizeLine}`)),
         h('p', {}, it.blurb),
+        it.food ? nutritionPanel(it) : null,
         ...Object.entries(it.options || {}).map(([k, opt]) => [
           h('div', { class: 'ph-opt' }, opt.label),
           h('div', { class: 'ph-chips' }, opt.choices.map((c) => {
@@ -259,6 +270,34 @@ export class PhoneUI {
       h('p', { style: 'opacity:0.6' }, '(The Rift Tool shows up in a later piece of the build.)'));
   }
 
+  // ---------------- Vitals (your body) ----------------
+  page_vitals() {
+    const n = this.svc.needs();
+    const page = h('div', { class: 'ph-page' }, ...this.header('Vitals', 'Vireo Health'));
+    if (!n || n.mode === 'off') { page.append(h('div', { class: 'ph-center' }, 'Hunger, thirst + sleep are turned off (Settings → Gameplay).')); return page; }
+    const w = n.words();
+    const imperial = settings.units === 'imperial';
+    const ring = (label, val, word, col) => h('div', { class: 'ph-ring' },
+      h('div', { class: 'ring', style: `background:conic-gradient(${col} ${Math.round(val * 100)}%, #e8e9ee 0)` }, h('div', { class: 'in' }, `${Math.round(val * 100)}%`)),
+      h('b', {}, label), h('span', {}, word));
+    page.append(h('div', { class: 'ph-rings' },
+      ring('Food', 1 - n.hunger, w.food, '#ff9f43'),
+      ring('Water', 1 - Math.min(1, n.thirst), w.water, '#2f9bff'),
+      ring('Energy', 1 - Math.min(1, n.tiredness), w.sleep, '#8e6bff')));
+    const L = n.log, vol = (l) => imperial ? `${Math.round(l * 33.814)} fl oz` : `${l.toFixed(2)} L`;
+    const kg = (k) => imperial ? `${Math.round(k * 2.2046)} lb` : `${k.toFixed(1)} kg`;
+    const rows = [
+      ['Eaten today', `${Math.round(L.kcalIn)} kcal`], ['Burned today', `${Math.round(L.kcalOut)} kcal`], ['Drank today', vol(L.waterIn)],
+      ['Awake for', `${n.awakeH.toFixed(1)} h`], ['Last sleep', L.lastSleepH ? `${L.lastSleepH.toFixed(1)} h` : '—'],
+      ['Caffeine', `${Math.round(n.caffeineMg)} mg`], ['Weight', kg(n.weightKg)], ['Condition', w.sick || (n.sick ? 'You ate something risky… 😬' : 'Healthy')],
+    ];
+    page.append(h('div', { class: 'ph-section' }, ...rows.map(([k, v]) => h('div', { class: 'ph-row' }, h('span', {}, k), h('b', {}, v)))));
+    page.append(h('div', { class: 'ph-section', style: 'margin-top:14px' },
+      h('div', { class: 'ph-buy', style: 'position:static;margin:6px 0', onclick: () => { this.svc.sound('click'); this.svc.sleepHere(); } }, '💤 Sleep here (on the ground)'),
+      h('p', { style: 'color:#6b6f78;font-size:12.5px;line-height:1.5' }, 'Beds sleep best. Click a mattress, bed or sofa to sleep on it. You wake up on your own once you\'re rested (or if you get really hungry or thirsty).')));
+    return page;
+  }
+
   page_soon(page) {
     const info = {
       map: ['🗺️', 'Map', 'A real map of your world with GPS is coming.'],
@@ -269,4 +308,41 @@ export class PhoneUI {
     }[page] || ['📱', page, 'Coming soon.'];
     return h('div', { class: 'ph-page' }, ...this.header(info[1]), h('div', { class: 'ph-center' }, h('div', { style: 'font-size:54px' }, info[0]), info[2]));
   }
+}
+
+const AISLES = { produce: 'Produce', drinks: 'Drinks', bakery: 'Bakery', snacks: 'Snacks', fridge: 'Dairy + meat', frozen: 'Frozen', pantry: 'Pantry' };
+
+function foodBadges(f) {
+  const out = [];
+  out.push(h('span', { class: 'ph-badge' }, f.keep === 'freezer' ? '❄️ Keep frozen' : f.keep === 'fridge' ? '🧊 Keep refrigerated' : '🏠 Store at room temp'));
+  if (f.units) out.push(h('span', { class: 'ph-badge box' }, `📦 ${f.units} inside`));
+  if (f.raw) out.push(h('span', { class: 'ph-badge warn' }, '🔥 Cook before eating'));
+  if (f.open === 'knife') out.push(h('span', { class: 'ph-badge warn' }, '🔪 Needs a knife'));
+  return out;
+}
+
+function shelfText(f) {
+  const d = (x) => (x >= 365 ? `${Math.round(x / 365 * 10) / 10} yr` : x >= 60 ? `${Math.round(x / 30)} mo` : x >= 14 ? `${Math.round(x / 7)} wk` : x >= 1 ? `${Math.round(x)} day${Math.round(x) === 1 ? '' : 's'}` : `${Math.round(x * 24)} h`);
+  const sh = f.shelf || {};
+  const bits = [];
+  if (sh.room) bits.push(`${d(sh.room)} on the counter`);
+  if (sh.fridge) bits.push(`${d(sh.fridge)} in the fridge`);
+  if (sh.freezer) bits.push(`${d(sh.freezer)} frozen`);
+  return `Keeps about ${bits.join(', ')}${sh.opened ? `; ${d(sh.opened)} once opened` : ''}.`;
+}
+
+// a real-looking Nutrition Facts panel for the whole thing
+function nutritionPanel(it) {
+  const f = it.food;
+  const unit = f.units ? getItem(f.unitId) : null;
+  const e = (unit ? unit.food.eat : f.eat) || {};
+  const row = (label, v, unitTxt, bold = true, indent = false) => (v == null ? null : h('div', { class: `nf-row ${indent ? 'ind' : ''}` }, h('span', {}, bold ? h('b', {}, label) : label, ` ${Math.round(v * 10) / 10}${unitTxt}`)));
+  return h('div', { class: 'nf' },
+    h('div', { class: 'nf-title' }, 'Nutrition Facts'),
+    h('div', { class: 'nf-serv' }, unit ? `Per ${unit.name.toLowerCase()} · ${f.units} per pack` : 'Whole package'),
+    h('div', { class: 'nf-cal' }, h('b', {}, 'Calories'), h('b', {}, `${Math.round(e.kcal || 0)}`)),
+    row('Total Fat', e.fatG, 'g'), row('Sodium', e.sodiumMg, 'mg'), row('Total Carbohydrate', e.carbsG, 'g'),
+    row('Dietary Fiber', e.fiberG, 'g', false, true), row('Total Sugars', e.sugarG, 'g', false, true), row('Protein', e.proteinG, 'g'),
+    e.caffeineMg ? row('Caffeine', e.caffeineMg, 'mg') : null,
+    h('div', { class: 'nf-foot' }, shelfText(f)));
 }
