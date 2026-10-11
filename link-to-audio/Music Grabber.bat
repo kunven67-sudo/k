@@ -71,7 +71,7 @@ set "LINK=!LINK:"=!"
 echo.
 
 rem TikTok "sound" pages (tiktok.com/music/...) are not supported by the downloader.
-echo "!LINK!" | findstr /i "tiktok.com/music/" >nul && (
+if not "!LINK:tiktok.com/music/=!"=="!LINK!" (
   echo   That's a TikTok SOUND page - those can't be downloaded directly.
   echo.
   echo   Do this instead:
