@@ -86,7 +86,15 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Sound**: realistic weapon/explosion sounds (echo, distance delay, muffled far away), ambient world (birds, wind, traffic, city), music + car radio, material impact sounds (wood thunk, metal clang, glass smash).
 - **Saving**: auto-save life progress, save/load arena builds, multiple save slots.
 
+## You & the world
+- **Full body**: look down and see your legs, hands hold items, real shadow.
+- **One default character** (no character creator).
+- **Day/night cycle**: real sunrise/sunset, street lights at night. 1 in-game day = 48 real minutes.
+- **Weather**: rain, fog, storms, snow, wet roads.
+- **Seasons**: summer/fall/winter/spring.
+- **Arena time controls**: set time of day/weather + slow motion.
+
 ## Open questions
 - Liquids (needs the preview page)
 - What exactly goes in each version
-- Sound, music, menus, HUD, settings, saving
+- Settings menu
