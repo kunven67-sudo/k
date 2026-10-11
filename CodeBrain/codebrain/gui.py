@@ -18,7 +18,9 @@ from codebrain.config import MODEL_BY_VRAM
 from codebrain.highlight import IndexMapper, spans
 from codebrain.memory import CATEGORIES
 from codebrain.paths import home_dir, projects_dir
+from codebrain.leveleditor import LevelEditorWindow
 from codebrain.pixelart import PixelArtWindow
+from codebrain.soundmaker import SoundMakerWindow
 from codebrain.runner import CodeRun, error_line_number, python_exe
 from codebrain.snippets import CATEGORIES as SNIPPET_CATEGORIES
 from codebrain.snippets import Snippets, snippet_part
@@ -53,7 +55,7 @@ Here's what I can do:
 • 🐛 Code crashed? Press Bug Detective and I'll explain + fix it
 • 🔍 Select some code and press Explain
 • 📸 Game looks weird? Run it, then press Look and I'll SEE it and help fix it
-• 🧰 Tools: 📖 offline pygame/ursina docs, 🎨 pixel art editor, 🕘 backups
+• 🧰 Tools: 📖 docs, 🎨 pixel art, 🔊 sound + music maker, 🗺️ level editors (2D + 4D), 🕘 backups
 • 👻 While you type I suggest the rest of the line in gray. Press Tab to accept it
 • 📚 Open Lessons to learn step by step. Your zombie game + 4D maze guides are in there too 🧟🌀
 • 📦 Snippets = ready-made game code (jump, sprint, shooting...) you can drop in
@@ -172,6 +174,9 @@ class CodeBrainApp:
         b.add_command(label="📦 Snippets", command=self.open_snippets)
         b.add_command(label="📖 Docs (pygame + ursina)", command=self.open_docs)
         b.add_command(label="🎨 Pixel Art", command=self.open_pixel_art)
+        b.add_command(label="🔊 Sound & Music", command=self.open_sound)
+        b.add_command(label="🗺️ Level Editor", command=self.open_levels)
+        b.add_command(label="🧑‍🏫 What should I learn next?", command=self.what_next)
         b.add_command(label="🧠 Memory viewer", command=self.open_memory)
         b.add_command(label="🧹 New chat (forget this conversation)", command=self.clear_chat)
         b.add_separator()
@@ -214,6 +219,9 @@ class CodeBrainApp:
         tools_menu.add_command(label="📦 Snippets", command=self.open_snippets)
         tools_menu.add_command(label="📖 Docs (pygame + ursina)", command=self.open_docs)
         tools_menu.add_command(label="🎨 Pixel Art", command=self.open_pixel_art)
+        tools_menu.add_command(label="🔊 Sound & Music", command=self.open_sound)
+        tools_menu.add_command(label="🗺️ Level Editor", command=self.open_levels)
+        tools_menu.add_command(label="🧑‍🏫 What should I learn next?", command=self.what_next)
         tools_menu.add_command(label="🕘 Versions of this file", command=self.open_versions)
         tools_menu.add_command(label="🩺 Doctor", command=self.open_doctor)
         tools["menu"] = tools_menu
@@ -1157,6 +1165,23 @@ class CodeBrainApp:
     def open_docs(self):
         DocsWindow(self)
 
+    def _game_folder(self):
+        return P.project_folder(self.current_path) if self.current_path else projects_dir()
+
+    def open_sound(self):
+        SoundMakerWindow(self, self._game_folder() / "assets")
+
+    def open_levels(self):
+        LevelEditorWindow(self, self._game_folder() / "levels")
+
+    def what_next(self):
+        if self.thinking:
+            return
+        self.chat_add("you", "🧑‍🏫 What should I learn next?")
+        hooks = self._hooks()
+        self._think(lambda on_token: self.ai.next_steps(on_token, **hooks), kind="chat")
+        self.root.lift()
+
     def open_pixel_art(self):
         folder = (P.project_folder(self.current_path) if self.current_path else projects_dir()) / "assets"
         PixelArtWindow(self, folder)
@@ -1208,6 +1233,7 @@ class LessonsWindow:
         self.buttons.pack(fill="x")
         self.quiz_frame = ttk.Frame(right, padding=(0, 10, 0, 0))
         self.quiz_frame.pack(fill="x")
+        ttk.Button(right, text="🧑‍🏫 What should I learn next?", command=app.what_next).pack(anchor="e", pady=(10, 0))
         self.fill_tree()
 
     def fill_tree(self):

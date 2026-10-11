@@ -93,6 +93,18 @@ and found these problems:
 Write your WHOLE answer again with these problems fixed, with complete code. Only use libraries that are \
 installed (standard library, pygame, ursina) and the user's own project files. Don't mention this check."""
 
+NEXT_STEPS = """🧑‍🏫 What should I learn next?
+
+Here's where I am:
+- Level {level} ({title}), {xp} XP
+- Things I've used in programs that worked: {skills}
+- Lessons I finished: {lessons}
+- Lessons I haven't done yet: {todo}
+- My projects: {projects}
+
+Pick the ONE best next thing for me to learn (not too hard, not too easy, and useful for my games).
+Tell me: 1) what it is and why it helps my games, 2) a tiny example, 3) a small challenge to practice it."""
+
 EDITOR_CONTEXT = """(The user's editor currently has the file "{filename}" open:)
 ```python
 {code}

@@ -194,6 +194,19 @@ class Assistant:
                                          on_status=on_status, on_reset=reset)
         return f"👀 **What I see:** {seen}\n\n{reply}", [], level_up
 
+    def next_steps(self, on_token=None, **hooks):
+        """🧑‍🏫 Suggest what to learn next, based on skills, lessons and projects."""
+        from codebrain import lessons as L
+        done = set(self.xp.data["lessons_done"])
+        text = prompts.NEXT_STEPS.format(
+            level=self.xp.level, title=self.xp.title, xp=self.xp.total,
+            skills=", ".join(self.style.skills(min_times=1)) or "nothing yet",
+            lessons=", ".join(l["title"] for l in L.LESSONS if l["id"] in done) or "none yet",
+            todo=", ".join(l["title"] for l in L.LESSONS if l["id"] not in done)[:900] or "none",
+            projects=", ".join(p["name"] for p in self.memory.data["projects"]) or "none")
+        reply, level_up = self._converse(text, on_token, "learn next lessons skills", **hooks)
+        return reply, [], level_up
+
     def after_run(self, result, code=None):
         """Call after every run. Learns from success/failure. Returns a hype message or None."""
         if result.stopped or result.crashed:

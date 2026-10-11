@@ -77,6 +77,16 @@ everything, and it learns from what breaks.
 - 🎨 **Pixel art editor** (🧰 Tools → 🎨 Pixel Art): draw 16/32/64-pixel sprites with pencil, fill,
   mirror and color picker, then save PNGs into your game's `assets` folder.
   "🧠 How do I put this in my game?" shows you the code.
+- 🔊 **Sound & Music maker** (🧰 Tools): make sound effects with sliders, starting from presets like laser,
+  jump, coin, explosion, sword swoosh, power-up and 🧟 zombie groan. 🎲 makes a different version.
+  The 🎵 Music tab is a beat grid (8 spooky notes + kick/snare/hi-hat) with presets. Everything saves
+  as `.wav` into `assets/sounds` or `assets/music`. The sounds are made with math, so you don't download anything.
+- 🗺️ **Level editors** (🧰 Tools): a 🧱 2D tile editor (walls, coins, enemies, spikes, doors, goal) and a
+  🌀 **4D maze editor** where you paint each slice of the 4th dimension (w = 0..3) and see the next slice's
+  walls faintly. They save simple text files in `levels/` or copy as Python, and "🧠 How do I load this?"
+  teaches you the loading code.
+- 🧑‍🏫 **What should I learn next?** (in Lessons or 🧰 Tools): looks at your skills, finished lessons and
+  projects, then suggests ONE next thing with a tiny example and a challenge.
 - 🎨 **Learns your style**: every program that runs without errors teaches CodeBrain how YOU code
   (names, spaces, quotes, comments, window sizes) and what you already know (loops, classes, lists…).
   It writes code your way and doesn't over-explain things you already know. See it in 🧠 Memory → 🎨 My style.

@@ -58,6 +58,7 @@ HELP = f"""{G}{BOLD}Commands{END}
   {G}/versions{END}        🕘 backups of your file   {G}/restore <n>{END}  go back to backup n
   {G}/style{END}           🎨 what I learned about how you code
   {G}/docs <words>{END}    📖 search the real pygame + ursina functions
+  {G}/next{END}            🧑‍🏫 what should I learn next?
   {G}/xp{END}              ⭐ your level
   {G}/mode teach|code|hints{END}   how I help you
   {G}/model <name>{END}    switch brain    {G}/clear{END}  new chat    {G}/quit{END}  bye
@@ -218,6 +219,9 @@ class CLI:
             return self.say("Nothing found. Try a name like set_mode, Rect, raycast, Entity", Y)
         for e in hits:
             print(f"  {G}{e['name']}{END}{M}{e['sig']}{END}" + (f"\n      {e['doc']}" if e["doc"] else ""))
+
+    def cmd_next(self, _arg):
+        self.stream(lambda t: self.ai.next_steps(t, **self.hooks()))
 
     def cmd_style(self, _arg):
         style = self.ai.style

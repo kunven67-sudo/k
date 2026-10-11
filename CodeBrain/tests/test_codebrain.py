@@ -33,6 +33,9 @@ from codebrain import versions as V  # noqa: E402
 from codebrain.style import StyleProfile, analyze  # noqa: E402
 from codebrain.docs import Docs  # noqa: E402
 from codebrain import testrun  # noqa: E402
+from codebrain import synth  # noqa: E402
+from codebrain import leveleditor as LE  # noqa: E402
+import wave  # noqa: E402
 import importlib.util  # noqa: E402
 
 HAVE_PYGAME = importlib.util.find_spec("pygame") is not None
@@ -514,6 +517,62 @@ class TestTestRun(unittest.TestCase):
         self.assertEqual((folder / "data.txt").read_text(), "original")     # real file untouched
 
 
+class TestSynth(unittest.TestCase):
+    def test_every_sfx_preset(self):
+        for name in synth.PRESETS:
+            samples = synth.make_sfx(synth.preset(name))
+            self.assertAlmostEqual(len(samples) / synth.RATE, synth.preset(name)["duration"], places=2)
+            peak = max(abs(x) for x in samples)
+            self.assertTrue(0.1 < peak <= 1.0, name)
+
+    def test_pitch_really_slides(self):
+        def crossings(samples):
+            return sum(1 for a, b in zip(samples, samples[1:]) if a < 0 <= b)
+        laser = synth.make_sfx({"wave": "sine", "freq_start": 2000, "freq_end": 200, "duration": 1.0, "decay": 0})
+        half = len(laser) // 2
+        self.assertGreater(crossings(laser[:half]), 2 * crossings(laser[half:]))   # high first, low later
+
+    def test_mutate_stays_sane(self):
+        import random
+        p = synth.mutate(synth.preset("🔫 Laser"), rng=random.Random(3))
+        self.assertTrue(0.03 <= p["duration"] <= 3.0)
+        self.assertEqual(p["wave"], "square")
+
+    def test_music_and_wav(self):
+        pattern, bpm, inst = synth.preset_pattern("⚡ Action")
+        self.assertTrue(any(any(row) for row in pattern["notes"]))
+        samples = synth.make_music(pattern, bpm, inst, bars=2)
+        self.assertEqual(len(samples), int(60 / bpm / 4 * synth.RATE) * 16 * 2)
+        path = synth.write_wav(tmpfile("song.wav"), samples)
+        with wave.open(str(path)) as w:
+            self.assertEqual((w.getnchannels(), w.getsampwidth(), w.getframerate()), (1, 2, synth.RATE))
+            self.assertEqual(w.getnframes(), len(samples))
+        silent = synth.make_music(synth.empty_pattern(), 120, "square", bars=1)
+        self.assertEqual(max(abs(x) for x in silent), 0)
+        synth.write_wav(tmpfile("silent.wav"), silent)          # all-quiet music doesn't crash
+
+
+class TestLevelFiles(unittest.TestCase):
+    def test_2d_roundtrip(self):
+        grid = LE.blank_level(6, 4)
+        grid[1][1], grid[2][3] = "P", "C"
+        text = LE.level_to_text(grid)
+        self.assertEqual(text.splitlines()[0], "######")
+        self.assertEqual(LE.parse_level_text(text), grid)
+        self.assertIn('"#P...#",', LE.as_python("LEVEL", grid=grid))
+
+    def test_4d_roundtrip(self):
+        slices = [LE.blank_level(5, 5) for _ in range(LE.SLICES)]
+        slices[2][2][2] = "K"
+        text = LE.maze_to_text(slices)
+        self.assertEqual(text.count("=== w="), 4)
+        self.assertEqual(LE.parse_maze_text(text), slices)
+        code = LE.as_python("MAZE", slices=slices)
+        namespace = {}
+        exec(code, namespace)
+        self.assertEqual(namespace["MAZE"][2][2], "##K.#".replace("##K", "#.K"))
+
+
 class FakeRecorder:
     def __init__(self, audio):
         self.audio = audio
@@ -718,6 +777,15 @@ class TestBrainAndAssistant(unittest.TestCase):
         path, payload = FakeOllama.requests[-1]
         self.assertEqual(path, "/api/generate")
         self.assertEqual(payload["options"]["stop"], ["\n"])
+
+    def test_next_steps(self):
+        ai = self.make()
+        ai.xp.finish_lesson("py1")
+        reply, learned, _ = ai.next_steps()
+        prompt = FakeOllama.requests[-1][1]["messages"][-1]["content"]
+        self.assertIn("print() and variables", prompt)            # finished lesson listed
+        self.assertIn("Graveyard Zombies", prompt)                 # projects listed
+        self.assertEqual(learned, [])
 
     def test_style_learned_after_good_run(self):
         ai = self.make()
