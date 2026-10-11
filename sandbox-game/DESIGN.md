@@ -132,6 +132,10 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Resizing**: Shift + scroll on the ghost preview (basic shapes only; props stay real size).
 - **Weight**: real density per material, bigger = heavier.
 - **Arena size**: medium, ~300m.
+- **Start time**: golden hour sunset (time controls can change it).
+- **Camera feel**: head bob, lean left/right, landing dip, heavy breathing + sway after sprinting.
+- **Screen effects**: motion blur, lens flare/sun glare, film grain + vignette, depth of field when aiming. (Each toggleable in graphics settings for the GT 1030.)
+- **Footsteps**: per surface (concrete, metal, wood, glass shards, puddles).
 - **Spawn point**: small concrete control building with a big window over the arena; door leads outside.
 - **Arena music**: off by default. Spawnable radio/boombox prop plays music (and can be blown up).
 - **Detonation**: remote detonator (blow all at once), timer with beeping, fuse on TNT (sparks + hiss), chain reactions (TNT/C4/gas tanks set each other off).
