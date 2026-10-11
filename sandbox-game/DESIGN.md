@@ -16,7 +16,12 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Ask detailed questions before building anything.**
 
 ## Tech
-- Browser, Three.js, PC mouse + keyboard.
+- Browser (owner uses **Edge**), Three.js, PC mouse + keyboard.
+- **Owner's PC**: NVIDIA GT 1030 2GB (entry-level), 16GB RAM. Target **60 FPS**.
+  - Default preset tuned for GT 1030: 1K textures, sun is the only shadow light, render scale + upscale, tuned debris caps.
+  - "High" preset for stronger GPUs.
+  - If FPS drops in huge explosions: **keep the realistic look, allow FPS drops** (don't auto-lower quality).
+- **Sounds**: real recorded CC0 sounds (not generated).
 - Real photo-scanned textures (free CC0 sources like Poly Haven / ambientCG).
 - First person.
 
@@ -33,6 +38,7 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Spawn menu**: big grid with pictures (Garry's Mod / People Playground style).
 - **Placement**: ghost preview → rotate → click to place.
 - **Building**: snap to grid + weld tool.
+- Objects spawn as their **real-life material** by default (barrel = metal, crate = wood); the edit tool can swap the material.
 - **Spawnable**: basic shapes, real props (barrels, crates, tires, pallets, gas tanks, concrete blocks), vehicles, ragdoll crash-test dummies.
 
 ### Materials (all realistic)
