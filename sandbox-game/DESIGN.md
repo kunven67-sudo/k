@@ -85,10 +85,14 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 ## Controls
 - **B** opens the spawn menu.
 - **Hotbar 1-9 + mouse scroll** to switch tools/guns.
+- **Space x2** = double jump, **hold Space** = jetpack, **V** = fly toggle.
 - **Z** undo last spawn. Delete tool, Clear All button, Freeze tool (freeze objects in mid-air).
 
 ## v1 details
 - **Guns**: pistol, assault rifle, shotgun, sniper.
+- **Arena size**: medium, ~300m.
+- **Explosion feel**: camera shake (by distance), ear ringing + muffled sound when too close, visible shockwave + dust cloud, scorch marks that stay on the ground.
+- **Main menu**: live 3D background, a slow camera flying over the arena while stuff explodes, menu on the side.
 - **Arena look**: concrete test facility. Huge concrete pad, painted grid lines, ramps, tall pillars, shipping containers, chain-link fence, open sky.
 
 ## Settings menu
