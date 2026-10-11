@@ -53,6 +53,11 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 | TNT | explodes |
 | Fuel / gas tanks | explode when shot or burned |
 
+- **Material details**:
+  - Concrete: steel **rebar** inside. Concrete crumbles, rebar sticks out and holds chunks together.
+  - Glass: **normal** (big sharp shards) and **tempered** (tiny cubes all at once, e.g. car windows).
+  - Metal: dents, bends under load (steel beams), tears open from big blasts (drums, sheets), scorches black + glows red when very hot.
+  - Ice: slippery, melts slowly (faster near heat/explosions, leaves a puddle), spiderweb cracks before shattering.
 - **Breaking**: realistic per-material fracture; chunks fade over time (no lag).
 - **Fire**: spreads across wood, chars objects black so they crumble, rising smoke, metal glows hot.
 - **Liquids**: undecided. Owner wants a **preview page** comparing faked liquids vs real liquid sim first.
