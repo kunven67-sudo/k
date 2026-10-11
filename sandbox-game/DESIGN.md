@@ -76,10 +76,20 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 ## Space
 - Rockets, the Moon, zero-gravity sandbox (later version).
 
-## Version plan (draft, still being decided)
-- **v1**: sandbox arena core: movement, spawn menu, materials, breaking, explosions.
-- **v2+**: guns, grapple, portal gun, fire, ragdolls, vehicles...
+## Version plan
+- **v1 (core)**: movement + full body, spawn menu + all 8 materials (ghost preview, snap, weld), explosives (TNT, C4, grenades, rocket launcher) + realistic breaking + player launch, a few guns (recoil, ADS, bullet holes), settings menu.
+- **v1.5 (extras)**: grapple gun, fire, ragdoll dummies, portal gun.
+- **After v1.5**: liquids preview page → rest of explosives & guns, vehicles...
 - **Later**: town + life sim systems, then space.
+
+## Controls
+- **B** opens the spawn menu.
+
+## Settings menu
+- Graphics quality (Low/Med/High/Ultra), shadows, render distance, FPS counter
+- Mouse sensitivity, FOV
+- Volume sliders: master, effects, music, ambient
+- Gameplay toggles: god mode, infinite ammo, debris limit
 
 ## Feel & menus
 - **HUD**: minimal realistic. Small crosshair, ammo only when holding a gun, money/time small in a corner.
@@ -95,6 +105,4 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Arena time controls**: set time of day/weather + slow motion.
 
 ## Open questions
-- Liquids (needs the preview page)
-- What exactly goes in each version
-- Settings menu
+- Liquids (preview page after v1)
