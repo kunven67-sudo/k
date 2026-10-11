@@ -70,7 +70,7 @@ export class PowerGrid {
 
   worldPoint(it, local) {
     const b = it.bodies.main, t = b.translation(), r = b.rotation();
-    return new THREE.Vector3(...local).applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w)).add(new THREE.Vector3(t.x, t.y, t.z));
+    return new THREE.Vector3(...local).multiplyScalar(it.scale || 1).applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w)).add(new THREE.Vector3(t.x, t.y, t.z));
   }
 
   cordPoint(it) {

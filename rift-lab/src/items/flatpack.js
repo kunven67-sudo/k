@@ -113,7 +113,8 @@ export class FlatPack {
     const { L, W } = box.chosen;
     this.items.remove(box);
     pose.position.y += 0.005;
-    const built = this.items.spawn(def.id, chosen, pose);
+    // a box you shrank (or grew) with the Rift Tool builds furniture at that size
+    const built = this.items.spawn(def.id, chosen, pose, box.scale !== 1 ? { state: { scale: box.scale } } : undefined);
     // leftover: the flattened box, set down next to it
     const side = new THREE.Vector3(1, 0, 0).applyQuaternion(pose.quaternion);
     const scrap = pose.position.clone().addScaledVector(side, (built.bounds.max.x - built.bounds.min.x) / 2 + 0.8);

@@ -31,6 +31,13 @@ export class Hands {
     this.unhook = physics.onStep((h) => this.fixedStep(h));
   }
 
+  // your strength + reach follow your size (strength x size^2, reach x size)
+  get sz() { return this.player.size || 1; }
+  get reach() { return REACH * this.sz; }
+  get force() { return HAND_FORCE * this.sz * this.sz; }
+  get throwImp() { return THROW_IMPULSE * Math.pow(this.sz, 2.5); }
+  get maxThrow() { return MAX_THROW_SPEED * Math.sqrt(this.sz); }
+
   lookDir() { return this.camera.getWorldDirection(this._dir); }
 
   // per rendered frame
@@ -40,7 +47,7 @@ export class Hands {
     if (this.pending && !this.items.items.includes(this.pending.aim.item)) this.cancelPending();
     if (this.held && !this.heldValid()) { this.held = null; this.charge = 0; }
     const cam = this.camera.position, dir = this.lookDir();
-    const hit = this.physics.castRay({ x: cam.x, y: cam.y, z: cam.z }, { x: dir.x, y: dir.y, z: dir.z }, REACH, this.player.collider);
+    const hit = this.physics.castRay({ x: cam.x, y: cam.y, z: cam.z }, { x: dir.x, y: dir.y, z: dir.z }, this.reach, this.player.collider);
     this.aim = null;
     if (hit) {
       const col = hit.collider;
@@ -50,7 +57,7 @@ export class Hands {
         const p = { x: cam.x + dir.x * hit.timeOfImpact, y: cam.y + dir.y * hit.timeOfImpact, z: cam.z + dir.z * hit.timeOfImpact };
         // which exact part are you pointing at? (switches, pull cords, tape, box contents)
         this.rc.set(cam, dir);
-        this.rc.far = REACH + 0.3;
+        this.rc.far = this.reach + 0.3;
         const vis = this.rc.intersectObject(item.root, true).find((x) => x.object.visible && !x.object.userData.outline && x.object.userData.part);
         const part = vis?.object.userData.part || col.userData?.part;
         // food: a click picks it up; beds + sofas: a click lies down to sleep
@@ -78,7 +85,7 @@ export class Hands {
     }
     if (this.held && !input.mouse(0)) this.release(false);
     if (this.held) {
-      if (input.wheel) this.held.dist = clamp(this.held.dist - input.wheel * 0.12, 0.55, REACH);
+      if (input.wheel) this.held.dist = clamp(this.held.dist - input.wheel * 0.12 * this.sz, 0.55 * this.sz, this.reach);
       if (input.mouse(2)) this.charge = Math.min(1, this.charge + dt / 0.8);
       else if (this.charge > 0) { this.throw(); }
     } else this.charge = 0;
@@ -101,7 +108,7 @@ export class Hands {
     const t = body.translation(), r = body.rotation();
     const q = new THREE.Quaternion(r.x, r.y, r.z, r.w).invert();
     const local = new THREE.Vector3(a.point.x - t.x, a.point.y - t.y, a.point.z - t.z).applyQuaternion(q);
-    this.held = { body, item: a.item, local, dist: Math.max(0.55, a.dist), angDamp: body.angularDamping() };
+    this.held = { body, item: a.item, local, dist: Math.max(0.55 * this.sz, a.dist), angDamp: body.angularDamping() };
     body.setAngularDamping(3.5);
     body.wakeUp();
     this.events.push({ type: 'grab', item: a.item, mass: body.mass() });
@@ -121,9 +128,9 @@ export class Hands {
     if (!h) return;
     const m = h.body.mass();
     // you can only throw what you can lift
-    if (m * 9.81 < HAND_FORCE * 0.9) {
+    if (m * 9.81 < this.force * 0.9) {
       const dir = this.lookDir();
-      const speed = Math.min(MAX_THROW_SPEED, (THROW_IMPULSE * this.charge) / m);
+      const speed = Math.min(this.maxThrow, (this.throwImp * this.charge) / m);
       const j = m * speed;
       h.body.applyImpulse({ x: dir.x * j, y: dir.y * j + m * 0.8 * this.charge, z: dir.z * j }, true);
     }
@@ -145,15 +152,16 @@ export class Hands {
     const com = body.worldCom ? body.worldCom() : t;
     const rel = new THREE.Vector3(anchor.x - com.x, anchor.y - com.y, anchor.z - com.z);
     const vAnchor = new THREE.Vector3(lv.x, lv.y, lv.z).add(new THREE.Vector3(av.x, av.y, av.z).cross(rel));
-    const m = Math.min(body.mass(), 60);
+    const cap = 60 * this.sz * this.sz * this.sz;
+    const m = Math.min(body.mass(), cap);
     const w = 11;
     const F = target.sub(anchor).multiplyScalar(m * w * w).addScaledVector(vAnchor, -2 * m * w * 0.9);
-    F.y += Math.min(body.mass(), 60) * 9.81; // hold it up against gravity (if you're strong enough)
+    F.y += Math.min(body.mass(), cap) * 9.81; // hold it up against gravity (if you're strong enough)
     const len = F.length();
-    if (len > HAND_FORCE) F.multiplyScalar(HAND_FORCE / len);
+    if (len > this.force) F.multiplyScalar(this.force / len);
     body.applyImpulseAtPoint({ x: F.x * h, y: F.y * h, z: F.z * h }, { x: anchor.x, y: anchor.y, z: anchor.z }, true);
     // it slipped out of your hand (too far away)
-    if (anchor.distanceTo(cam) > REACH + 0.9) this.release(false);
+    if (anchor.distanceTo(cam) > this.reach + 0.9 * this.sz) this.release(false);
   }
 
   get carryMass() { return this.held ? this.held.body.mass() : 0; }

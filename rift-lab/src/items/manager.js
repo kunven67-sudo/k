@@ -38,6 +38,8 @@ export class SpawnedItem {
     if (this.state.massLost && this.spec.mass) this.spec.mass = Math.max(this.spec.mass * 0.05, this.spec.mass - this.state.massLost);
     // food: opened / taken out / eaten / finished changes the parts themselves
     if (this.def.food) this.spec = foodSpec(this.spec, this.state, this.def.food);
+    // shrunk or grown by the Rift Tool: every length x scale, weight x scale^3 (square-cube law)
+    if (this.state.scale && this.state.scale !== 1) this.spec = scaleSpec(this.spec, this.state.scale);
     // fresh spawns settle for a moment before anything can break (no shattering on arrival)
     this.noBreakUntil = performance.now() + 1500;
     this.bounds = specBounds(this.spec);
@@ -108,6 +110,8 @@ export class SpawnedItem {
     this.sync();
     mgr.onBuilt?.(this);
   }
+
+  get scale() { return this.state.scale || 1; }
 
   get mass() { let m = 0; for (const b of Object.values(this.bodies)) m += b.mass(); return m; }
 
@@ -187,6 +191,31 @@ export class SpawnedItem {
   }
 }
 
+export function scaleSpec(spec, k) {
+  const m = (v) => v * k;
+  const parts = spec.parts.map((p) => {
+    const q = { ...p };
+    if (q.size) q.size = q.size.map(m);
+    for (const key of ['r', 'h', 'r2', 'round']) if (q[key] != null) q[key] *= k;
+    if (q.p) q.p = q.p.map(m);
+    if (q.lathe) q.lathe = q.lathe.map(([r, y]) => [r * k, y * k]);
+    if (q.pts) q.pts = q.pts.map((pt) => pt.map(m));
+    if (q.rs) q.rs = q.rs.map(m);
+    if (q.volume) q.volume *= k * k * k;
+    if (q.light) q.light = { ...q.light, offset: q.light.offset?.map(m) };
+    q.uvScale = (q.uvScale || 1) * k; // the wood grain / fabric weave shrinks with it
+    return q;
+  });
+  const bodies = {};
+  for (const [n, b] of Object.entries(spec.bodies || {})) {
+    const c = { ...b };
+    if (c.anchor) c.anchor = c.anchor.map(m);
+    if (c.joint === 'prismatic' && c.limits) c.limits = c.limits.map(m);
+    bodies[n] = c;
+  }
+  return { ...spec, parts, bodies, mass: spec.mass * k * k * k };
+}
+
 export class ItemManager {
   constructor({ physics, scene }) {
     this.physics = physics;
@@ -242,6 +271,18 @@ export class ItemManager {
     const it = new SpawnedItem(this, itemId, chosen, transform, saved);
     this.items.push(it);
     return it;
+  }
+
+  // re-make an item from its saved state, same place (after it changed size)
+  rebuild(it) {
+    const saved = it.serialize();
+    const t = it.bodies.main.translation(), r = it.bodies.main.rotation();
+    const lv = it.bodies.main.linvel(), av = it.bodies.main.angvel();
+    this.remove(it);
+    const nu = this.spawn(saved.id, saved.chosen, { position: new THREE.Vector3(t.x, t.y, t.z), quaternion: new THREE.Quaternion(r.x, r.y, r.z, r.w) }, saved);
+    nu.bodies.main.setLinvel(lv, true);
+    nu.bodies.main.setAngvel(av, true);
+    return nu;
   }
 
   remove(it) {

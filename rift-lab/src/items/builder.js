@@ -165,7 +165,7 @@ export function buildVisual(spec) {
   for (const pt of spec.parts) {
     if (pt.vis === false) continue;
     const mat = material(pt.mat || 'wood:oak');
-    const geo = partGeometry(pt, mat.userData.tile || 1);
+    const geo = partGeometry(pt, (mat.userData.tile || 1) * (pt.uvScale || 1));
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(...(pt.p || [0, 0, 0]));
     mesh.quaternion.copy(partQuat(pt));

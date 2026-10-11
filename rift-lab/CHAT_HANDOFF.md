@@ -449,3 +449,24 @@ Claude explained it was only a test and nothing had changed. Then:
   - TODO next session:
     - The aisle workflow hit the usage limit. `produce.js` and `drinks.js` are partial and unverified, and NOT loaded yet (`index.js` only loads `_example.js`). Finish them plus bakery, snacks, fridge, frozen and pantry, run `tools/foodlab.html` checks, then add them to `food/index.js`.
     - Fridge doors can still rest ~5-7° ajar on steep slopes.
+- **Rift Tool v1: shrink + grow (user asked for it; built solo to save credits, no workflows):**
+  - Controls:
+    - **G** takes it out / puts it away.
+    - **Hold LMB** shrinks what you aim at, **hold RMB** grows it. Shift = faster (x2 or x8 per second).
+    - **V** points it at yourself.
+    - Phone → **Rift** app: log size slider, battery, "back to normal".
+  - Real scaling laws:
+    - Lengths x k, weight x k³ (fully tested: sofa ¼ = 0.86 kg, apple 8x = 92 kg).
+    - Your strength x k², reach x k, walk speed x √k (tiny you: 0.32 m/s).
+    - Jump stays ~45 cm (Borelli). Terminal velocity x √k: tiny you shrugs off falls, giants get hurt sooner.
+    - Metabolism x k^-0.75 (Kleiber). Bites are mouth-sized, so a giant swallows an apple whole.
+  - Phone + tool shrink with you (a "kit" group on the camera). Textures shrink with objects.
+  - Battery = the world setting:
+    - real: charges within ~2 m of a live generator/SunStack
+    - recharge: self-recharging
+    - unlimited
+  - Limits for now: you 0.03x-8x (5 cm to 14 m), objects 0.02x-10x. Growing checks for headroom.
+  - Next for size:
+    - micro world details (dust mites, germs)
+    - voice/sound pitch by size
+    - bring held things with you when you shrink (right now food in hand gets set down first)

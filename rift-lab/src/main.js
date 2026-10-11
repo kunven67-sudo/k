@@ -22,6 +22,7 @@ import { FlatPack, boxFor } from './items/flatpack.js';
 import { Breaking } from './items/breaking.js';
 import { Consume } from './items/consume.js';
 import { Needs } from './player/needs.js';
+import { RiftTool } from './player/rifttool.js';
 import { astronomy } from './core/time.js';
 
 const canvas = document.getElementById('view');
@@ -44,6 +45,10 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 const camera = new THREE.PerspectiveCamera(settings.fov, innerWidth / innerHeight, 0.05, 14000);
 scene.add(camera);
+// everything you carry (phone, Rift Tool) lives in this group so it shrinks + grows with you
+const kit = new THREE.Group();
+kit.name = 'kit';
+camera.add(kit);
 input.attach(canvas);
 
 // Phone flashlight: a real LED, about 120 candela, lights ~10 m ahead and casts shadows.
@@ -105,6 +110,10 @@ const phoneUI = new PhoneUI(document.getElementById('ui'), {
   sound: () => audio.ui('click'),
   toast: (t) => ui.toast(t),
   needs: () => game.needs,
+  rift: () => game.rift,
+  player: () => game.player,
+  setSelfSize: (s) => { if (game.rift) game.rift.selfTarget = s; },
+  equipRift: () => { closePhone(true); if (game.build?.active) setBuild(false); game.rift?.setEquipped(true); },
   sleepHere: () => { closePhone(true); startSleep(0.5, 'on the ground'); },
 });
 game.phoneUI = phoneUI;
@@ -137,6 +146,7 @@ function setFlashlight(on) {
 }
 
 function setBuild(on) {
+  if (on) game.rift?.setEquipped(false);
   game.build.setActive(on);
   ui.buildBanner(on);
   if (on) ui.tip('build', 'Build mode: aim at something you spawned. <b>Click</b> to pick it up, <b>scroll</b> to turn it, <b>click</b> to set it down. <kbd>R</kbd> freeze · <kbd>X</kbd> delete · <kbd>Z</kbd> undo · <kbd>B</kbd> exit.', 9);
@@ -228,6 +238,7 @@ async function loadWorld(info, { menu = false, bar = null, saveData = null } = {
       game.player.prevPos.copy(game.player.pos);
       game.player.yaw = p.yaw; game.player.pitch = p.pitch;
       Object.assign(game.player, { health: p.health ?? 100, stamina: p.stamina ?? 100, limp: p.limp ?? 0, brokenLeg: p.brokenLeg ?? 0 });
+      if (p.size && p.size !== 1) game.player.setSize(p.size);
     }
     game.needs = new Needs(game.player, game.clock, saveData?.needs);
     game.player.needs = game.needs;
@@ -244,6 +255,12 @@ async function loadWorld(info, { menu = false, bar = null, saveData = null } = {
     });
     game.build = new BuildTools({ physics: game.physics, camera, items: game.items, player: game.player, hands: game.hands, onMessage: (t) => ui.toast(t, 2) });
     game.phone = new Phone3D(camera);
+    kit.add(game.phone.root);
+    game.rift = new RiftTool({
+      physics: game.physics, camera, kit, items: game.items, player: game.player, power: game.power, consume: game.consume, scene, audio,
+      battery: info.battery || 'real', saved: saveData?.rift, onMessage: (t) => ui.toast(t, 3), onTip: (id, html, sec) => ui.tip(id, html, sec),
+    });
+    game.hands.busy = () => !!game.consume?.held || !!game.rift?.equipped;
     game.money = saveData?.money ?? START_MONEY[info.startMoney ?? 10000] ?? 10000;
     game.transactions = saveData?.transactions ?? [];
     if (saveData?.items) game.items.restoreAll(saveData.items);
@@ -256,7 +273,10 @@ function disposeWorld() {
   if (game.phoneOpen) closePhone(false);
   phoneUI.show(false);
   phoneUI.stack = [];
-  if (game.phone) { camera.remove(game.phone.root); game.phone = null; }
+  if (game.rift) { game.rift.dispose(); game.rift = null; }
+  kit.scale.setScalar(1);
+  camera.near = 0.05; camera.updateProjectionMatrix();
+  if (game.phone) { game.phone.root.parent?.remove(game.phone.root); game.phone = null; }
   if (game.build) { game.build.cancelPlacing(); game.build.setActive(false); ui.buildBanner(false); game.build = null; }
   if (game.hands) { game.hands.dispose(); game.hands = null; }
   if (game.sleeping) stopSleep(true);
@@ -359,7 +379,8 @@ function saveGame(silent) {
   saves.save(game.info, {
     info: game.info,
     clockMs: game.clock.ms,
-    player: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw, pitch: p.pitch, health: p.health, stamina: p.stamina, limp: p.limp, brokenLeg: p.brokenLeg },
+    player: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw, pitch: p.pitch, health: p.health, stamina: p.stamina, limp: p.limp, brokenLeg: p.brokenLeg, size: p.size },
+    rift: game.rift ? game.rift.serialize() : null,
     items: game.items ? game.items.serialize() : [],
     debris: game.breaking ? game.breaking.serialize() : [],
     money: game.money, transactions: game.transactions, flashOn: !!game.flashOn,
@@ -409,15 +430,18 @@ function frame(now) {
         if (input.actionPressed('build')) setBuild(!game.build.active);
         if (input.actionPressed('undo') && game.build.active) game.build.undoLast();
         if (input.actionPressed('flashlight')) setFlashlight(!game.flashOn);
+        if (input.actionPressed('rift') && !game.sleeping) { if (game.build.active) setBuild(false); game.rift.setEquipped(!game.rift.equipped); }
       }
       game.hands.update(dt);
       if (!game.sleeping) game.consume.update(dt);
+      game.rift.update(dt, { locked: input.locked, blocked: game.phoneOpen || game.build.active || !!game.sleeping });
       game.build.update(dt);
       game.clock.advance(dt);
       const alpha = game.physics.update(dt);
       p.updateCamera(dt, alpha);
       game.items.update();
       game.consume.lateUpdate(dt);
+      game.rift.lateUpdate(dt);
       game.breaking.update(dt);
       game.breaking.sync();
       game.power.update(dt, game.hands);
@@ -436,7 +460,7 @@ function frame(now) {
       handlePlayerEvents(p);
       const nw = game.needs.mode !== 'off' ? game.needs.words() : null;
       ui.bodyLine = nw ? `🍽 ${nw.food} · 💧 ${nw.water} · 😴 ${nw.sleep}${nw.sick ? `<br>🤢 ${nw.sick}` : ''}` : '';
-      ui.watch(input.action('watch'), game.clock, w.sky);
+      ui.watch(input.action('watch'), game.clock, w.sky, p.heightM);
       ui.hud(settings.hud, p);
       ui.feel(p, dt);
       game.autosaveT -= dt;
@@ -483,6 +507,7 @@ function startSleep(quality, where) {
   if (n.thirst > 0.7 || n.hunger > 0.92) { ui.toast(`You're too ${n.thirst > 0.7 ? 'thirsty' : 'hungry'} to fall asleep.`, 4); return; }
   if (n.nauseous) { ui.toast('Your stomach is too upset to sleep right now.', 4); return; }
   game.consume.dropHeld();
+  game.rift.setEquipped(false);
   if (game.build.active) setBuild(false);
   n.startSleep(quality);
   game.player.asleep = true;
@@ -567,6 +592,7 @@ function onDeath(cause) {
       p.pos.set(sp.x, y + 0.1, sp.z); p.prevPos.copy(p.pos);
       Object.assign(p, { dead: false, health: 60, stamina: 50, breath: 45 });
       game.needs?.respawn();
+      p.setSize(1);
       p.vel.set(0, 0, 0);
       saveGame();
       startPlay(false);

@@ -303,11 +303,15 @@ export class UI {
       this.watchEl = h('div', { class: 'watch panel' });
       this.layer.append(this.watchEl);
     }
-    const ft = sizeM * 3.28084;
-    const size = settings.units === 'imperial' ? `${Math.floor(ft)}' ${Math.round((ft % 1) * 12)}"` : `${sizeM.toFixed(2)} m`;
+    const ft = sizeM * 3.28084, inch = sizeM * 39.37;
+    const size = settings.units === 'imperial'
+      ? (inch < 12 ? `${inch < 2 ? inch.toFixed(2) : inch.toFixed(1)}"` : `${Math.floor(ft)}' ${Math.round((ft % 1) * 12)}"`)
+      : (sizeM < 1 ? `${(sizeM * 100).toFixed(sizeM < 0.1 ? 1 : 0)} cm` : `${sizeM.toFixed(2)} m`);
+    const like = [[0.012, 'about an ant'], [0.03, 'about a bumblebee'], [0.08, 'about a mouse'], [0.2, 'about a hamster standing up'], [0.45, 'about a cat'],
+      [0.9, 'about a toddler'], [1.5, 'about a kid'], [2.1, 'normal'], [3.5, 'about an elephant'], [6.5, 'about a giraffe'], [11, 'about a house'], [99, 'about a building']].find(([m]) => sizeM < m)[1];
     this.watchEl.innerHTML = `<div class="time">${clock.formatTime()}</div><div class="date">${clock.formatDate()}</div>
       <div class="line">🌙 <b>${moonPhaseName(sky.state.phase)}</b> (${Math.round(sky.state.moonIllum * 100)}%)</div>
-      <div class="line">📏 Your size: <b>${size}</b> (normal)</div>
+      <div class="line">📏 Your size: <b>${size}</b> (${like})</div>
       <div class="line">${clock.fastForward > 1 ? `⏩ <b>x${clock.fastForward}</b>` : `🍂 ${cap(clock.season())}`}</div>
       ${this.bodyLine ? `<div class="line">${this.bodyLine}</div>` : ''}`;
   }

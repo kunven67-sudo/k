@@ -18,6 +18,7 @@ const SPEED = { walk: 1.45, jog: 3.3, sprint: 6.1, crouch: 0.85, swim: 0.95, swi
 
 export class Player {
   constructor({ physics, camera, world, audio, godMode = false }) {
+    this.size = 1;          // 1 = normal (1.8 m). The Rift Tool changes it.
     this.physics = physics;
     this.camera = camera;
     this.world = world;
@@ -27,8 +28,8 @@ export class Player {
 
     const sp = world.gen.spawn;
     const y = world.terrain.height(sp.x, sp.z) + 0.05;
-    this.body = physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(sp.x, y + STAND_HALF + RADIUS, sp.z));
-    this.collider = physics.world.createCollider(R.ColliderDesc.capsule(STAND_HALF, RADIUS).setFriction(0), this.body);
+    this.body = physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(sp.x, y + this.standHalf + this.rad, sp.z));
+    this.collider = physics.world.createCollider(R.ColliderDesc.capsule(this.standHalf, this.rad).setFriction(0), this.body);
     this.collider.userData = { kind: 'player' };
     this.controller = physics.world.createCharacterController(0.02);
     this.controller.setUp({ x: 0, y: 1, z: 0 });
@@ -44,8 +45,8 @@ export class Player {
     this.vel = new THREE.Vector3();
     this.grounded = false;
     this.crouching = false;
-    this.halfHeight = STAND_HALF;
-    this.eye = EYE_STAND;
+    this.halfHeight = this.standHalf;
+    this.eye = this.eyeStand;
     this.jogToggle = false;
     this.lean = 0;
     this.godMode = godMode;
@@ -83,9 +84,59 @@ export class Player {
     this.events = [];
   }
 
+  // ---------- your size (real scaling laws) ----------
+  // lengths x size, weight x size^3, strength x size^2, walking speed x sqrt(size) (pendulum legs),
+  // jump height stays ~45 cm (Borelli's law), terminal velocity x sqrt(size) (tiny = slow falls)
+  get rad() { return RADIUS * this.size; }
+  get standHalf() { return STAND_HALF * this.size; }
+  get crouchHalf() { return CROUCH_HALF * this.size; }
+  get eyeStand() { return EYE_STAND * this.size; }
+  get eyeCrouch() { return EYE_CROUCH * this.size; }
+  get spd() {
+    const k = Math.sqrt(this.size);
+    if (this._spdK !== k) { this._spdK = k; this._spd = Object.fromEntries(Object.entries(SPEED).map(([n, v]) => [n, v * k])); }
+    return this._spd;
+  }
+  get heightM() { return 1.8 * this.size; }
+
+  setSize(s) {
+    s = clamp(s, 0.03, 8);
+    if (Math.abs(s - this.size) < 1e-5) return;
+    const feet = this.pos.clone();
+    this.size = s;
+    this.halfHeight = this.crouching ? this.crouchHalf : this.standHalf;
+    this.collider.setRadius(this.rad);
+    this.collider.setHalfHeight(this.halfHeight);
+    this.body.setTranslation({ x: feet.x, y: feet.y + this.halfHeight + this.rad, z: feet.z }, true);
+    this.body.setNextKinematicTranslation({ x: feet.x, y: feet.y + this.halfHeight + this.rad, z: feet.z });
+    this.eye = this.crouching ? this.eyeCrouch : this.eyeStand;
+    this.controller.setOffset?.(Math.max(0.0008, 0.02 * s));
+    this.controller.enableAutostep(0.38 * s, 0.12 * s, true);
+    this.controller.enableSnapToGround(0.4 * s);
+    this.controller.setCharacterMass(75 * s * s * s);
+    // the camera's near plane follows your eyes so tiny you can still see things right in front of you
+    this.camera.near = clamp(0.05 * s, 0.004, 0.05);
+    this.camera.updateProjectionMatrix();
+  }
+
+  // is there room for a bigger you right here? (no growing through ceilings or into trees)
+  roomFor(s) {
+    const t = this.body.translation();
+    const top = this.pos.y + 1.8 * this.size;
+    const need = 1.8 * (s - this.size) + 0.05 * s;
+    if (need <= 0) return true;
+    const up = this.physics.castRay({ x: t.x, y: top - 0.01 * this.size, z: t.z }, { x: 0, y: 1, z: 0 }, need, this.collider);
+    if (up) return false;
+    const r = RADIUS * s;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (this.physics.castRay({ x: t.x, y: this.pos.y + Math.min(1.2 * s, top - this.pos.y), z: t.z }, { x: dx, y: 0, z: dz }, r, this.collider)) return false;
+    }
+    return true;
+  }
+
   readPos(out) {
     const t = this.body.translation();
-    return out.set(t.x, t.y - this.halfHeight - RADIUS, t.z); // feet
+    return out.set(t.x, t.y - this.halfHeight - this.rad, t.z); // feet
   }
 
   get feet() { return this.pos; }
@@ -111,8 +162,8 @@ export class Player {
     const feet = this.pos;
     const waterY = world.waterAt(feet.x, feet.z);
     const depth = waterY - feet.y;
-    this.wading = clamp(depth / 1.2, 0, 1);
-    this.swimming = depth > 1.25;
+    this.wading = clamp(depth / (1.2 * this.size), 0, 1);
+    this.swimming = depth > 1.25 * this.size;
     const eyeY = feet.y + this.eye;
     this.underwater = waterY > eyeY - 0.02;
 
@@ -139,19 +190,19 @@ export class Player {
     const moving = len > 0;
     const wantSprint = awake && input.action('sprint') && moving && !this.crouching && fz < 0.2;
     let speed;
-    if (this.swimming) speed = wantSprint && !this.exhausted ? SPEED.swimFast : SPEED.swim;
-    else if (this.crouching) speed = SPEED.crouch;
-    else if (wantSprint && !this.exhausted && this.brokenLeg <= 0) speed = SPEED.sprint;
-    else if (this.jogToggle || (wantSprint && this.exhausted)) speed = SPEED.jog;
-    else speed = SPEED.walk;
+    if (this.swimming) speed = wantSprint && !this.exhausted ? this.spd.swimFast : this.spd.swim;
+    else if (this.crouching) speed = this.spd.crouch;
+    else if (wantSprint && !this.exhausted && this.brokenLeg <= 0) speed = this.spd.sprint;
+    else if (this.jogToggle || (wantSprint && this.exhausted)) speed = this.spd.jog;
+    else speed = this.spd.walk;
     // injuries + water slow you down
     speed *= 1 - this.limp * 0.55;
     if (this.brokenLeg > 0) speed = Math.min(speed, 0.9);
     if (!this.swimming) speed *= 1 - this.wading * 0.55;
     if (fz > 0.5) speed *= 0.8; // walking backwards is slower
     const carrying = this.carry ? this.carry() : 0;
-    if (carrying > 0) speed *= 1 - Math.min(0.65, carrying / 90); // heavy things slow you down
-    this.moveMode = !moving ? 'idle' : this.swimming ? 'swim' : speed >= SPEED.sprint * 0.8 ? 'sprint' : speed >= SPEED.jog * 0.8 ? 'jog' : this.crouching ? 'crouch' : 'walk';
+    if (carrying > 0) speed *= 1 - Math.min(0.65, carrying / (90 * this.size * this.size)); // heavy things slow you down (strength x size^2)
+    this.moveMode = !moving ? 'idle' : this.swimming ? 'swim' : speed >= this.spd.sprint * 0.8 ? 'sprint' : speed >= this.spd.jog * 0.8 ? 'jog' : this.crouching ? 'crouch' : 'walk';
 
     // --- stamina ---
     const drain = this.swimming ? (moving ? (speed > 1.2 ? 9 : 3) : 1.2) : this.moveMode === 'sprint' ? 9 : this.moveMode === 'jog' ? 1.6 : 0;
@@ -170,7 +221,7 @@ export class Player {
 
     if (this.swimming) {
       // float with your head just above the water; space swims up, crouch dives
-      const target = waterY - 1.42;
+      const target = waterY - 1.42 * this.size;
       let vy = (target - feet.y) * 2.2;
       if (input.action('jump')) vy = 1.0;
       if (input.action('crouch')) vy = -1.1;
@@ -178,7 +229,7 @@ export class Player {
       this.vel.y += clamp(vy - this.vel.y, -3 * h, 3 * h);
     } else {
       if (this.grounded) {
-        if (this.vel.y < 0) this.vel.y = -1.5; // stick to slopes
+        if (this.vel.y < 0) this.vel.y = -1.5 * Math.sqrt(this.size); // stick to slopes
         if (jumpNow && this.tryMantle(dirX, dirZ, moving)) {
           this.jumpQ = 0; // climbing instead of jumping
         } else if (jumpNow && !this.crouching && this.brokenLeg <= 0) {
@@ -191,7 +242,8 @@ export class Player {
       } else {
         this.vel.y -= 9.81 * h;
         // air drag -> real terminal velocity (~55 m/s belly down)
-        this.vel.y -= Math.sign(this.vel.y) * this.vel.y * this.vel.y * 0.0032 * h;
+        // (tiny you has a lot more air drag for your weight: terminal velocity x sqrt(size))
+        this.vel.y -= Math.sign(this.vel.y) * this.vel.y * this.vel.y * (0.0032 / this.size) * h;
       }
     }
 
@@ -213,13 +265,15 @@ export class Player {
     if (Math.abs(mv.z) < Math.abs(desired.z) * 0.5) this.vel.z *= 0.5;
     if (desired.y > 0 && mv.y < desired.y * 0.5) this.vel.y = 0; // bumped your head
 
-    this.pos.set(nx, ny - this.halfHeight - RADIUS, nz);
+    this.pos.set(nx, ny - this.halfHeight - this.rad, nz);
 
     // --- landing ---
     if (!wasGrounded && this.grounded && fallSpeed > 2) {
-      this.landDip = Math.min(0.35, fallSpeed * 0.035);
-      this.events.push({ type: 'land', speed: fallSpeed });
-      if (fallSpeed > 6.8 && !this.godMode) this.takeFall(fallSpeed);
+      this.landDip = Math.min(0.35, fallSpeed * 0.035) * this.size;
+      this.events.push({ type: 'land', speed: fallSpeed / Math.sqrt(this.size) });
+      // small bodies shrug off falls, giants break under their own weight
+      const tol = Math.pow(this.size, -0.4);
+      if (fallSpeed > 6.8 * tol && !this.godMode) this.takeFall(fallSpeed / tol);
     }
     if (this.swimming && !wasGrounded && fallSpeed > 4) this.events.push({ type: 'splash', speed: fallSpeed });
 
@@ -233,7 +287,7 @@ export class Player {
     const hs = Math.hypot(mv.x, mv.z);
     if ((this.grounded || this.wading > 0.05) && hs > 0.0005) {
       this.stepDist += hs;
-      const stride = this.moveMode === 'sprint' ? 1.55 : this.moveMode === 'jog' ? 1.1 : this.crouching ? 0.55 : 0.74;
+      const stride = (this.moveMode === 'sprint' ? 1.55 : this.moveMode === 'jog' ? 1.1 : this.crouching ? 0.55 : 0.74) * this.size;
       this.bob += (hs / stride) * Math.PI;
       if (this.stepDist > stride) {
         this.stepDist = 0;
@@ -257,43 +311,43 @@ export class Player {
     // look where you're facing (or moving)
     let fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     if (moving) { const l = Math.hypot(dirX, dirZ); fx = dirX / l; fz = dirZ / l; }
-    const f = this.pos;
+    const f = this.pos, S = this.size;
     let wall = null;
-    for (const hh of [0.25, 0.5, 0.8, 1.1, 1.4]) {
-      const hit = this.physics.castRay({ x: f.x, y: f.y + hh, z: f.z }, { x: fx, y: 0, z: fz }, RADIUS + 0.6, this.collider);
+    for (const hh of [0.25 * S, 0.5 * S, 0.8 * S, 1.1 * S, 1.4 * S]) {
+      const hit = this.physics.castRay({ x: f.x, y: f.y + hh, z: f.z }, { x: fx, y: 0, z: fz }, this.rad + 0.6 * S, this.collider);
       if (hit && (!wall || hit.timeOfImpact < wall)) wall = hit.timeOfImpact;
     }
     if (wall == null) return false;
     // find the top of the thing, then what's behind it
     const probe = (dist) => {
       const x = f.x + fx * dist, z = f.z + fz * dist;
-      const hit = this.physics.castRay({ x, y: f.y + 2.2, z }, { x: 0, y: -1, z: 0 }, 3.5, this.collider);
-      return hit ? { x, z, y: f.y + 2.2 - hit.timeOfImpact } : null;
+      const hit = this.physics.castRay({ x, y: f.y + 2.2 * S, z }, { x: 0, y: -1, z: 0 }, 3.5 * S, this.collider);
+      return hit ? { x, z, y: f.y + 2.2 * S - hit.timeOfImpact } : null;
     };
-    const top = probe(wall + 0.12);
+    const top = probe(wall + 0.12 * S);
     if (!top) return false;
     const rise = top.y - f.y;
-    if (rise < 0.3 || rise > 1.55) return false;
+    if (rise < 0.3 * S || rise > 1.55 * S) return false;
     // thin obstacle (log, fence)? land on the far side. Thick (boulder, wall top)? stand on top.
     let target = null;
-    for (const extra of [0.55, 0.85, 1.15]) {
-      const beyond = probe(wall + extra + RADIUS);
-      if (beyond && beyond.y < top.y - 0.25 && beyond.y > f.y - 1.6) { target = { ...beyond, over: true }; break; }
+    for (const extra of [0.55 * S, 0.85 * S, 1.15 * S]) {
+      const beyond = probe(wall + extra + this.rad);
+      if (beyond && beyond.y < top.y - 0.25 * S && beyond.y > f.y - 1.6 * S) { target = { ...beyond, over: true }; break; }
     }
     if (!target) {
-      const onTop = probe(wall + RADIUS + 0.15);
-      if (!onTop || Math.abs(onTop.y - top.y) > 0.3) return false;
+      const onTop = probe(wall + this.rad + 0.15 * S);
+      if (!onTop || Math.abs(onTop.y - top.y) > 0.3 * S) return false;
       target = { ...onTop, over: false };
     }
     // room for your body there?
-    const head = this.physics.castRay({ x: target.x, y: target.y + 0.05, z: target.z }, { x: 0, y: 1, z: 0 }, 1.75, this.collider);
+    const head = this.physics.castRay({ x: target.x, y: target.y + 0.05 * S, z: target.z }, { x: 0, y: 1, z: 0 }, 1.75 * S, this.collider);
     if (head) return false;
-    const peak = Math.max(top.y, target.y) + 0.15;
-    const dur = (0.45 + rise * 0.35) * (this.exhausted ? 1.4 : 1);
-    this.mantle = { t: 0, dur, from: this.pos.clone(), peak, to: new THREE.Vector3(target.x, target.y + 0.02, target.z), over: target.over };
+    const peak = Math.max(top.y, target.y) + 0.15 * S;
+    const dur = (0.45 + rise / S * 0.35) * Math.sqrt(S) * (this.exhausted ? 1.4 : 1);
+    this.mantle = { t: 0, dur, from: this.pos.clone(), peak, to: new THREE.Vector3(target.x, target.y + 0.02 * S, target.z), over: target.over };
     this.vel.set(0, 0, 0);
-    if (!this.godMode) this.stamina = Math.max(0, this.stamina - 6 - rise * 6);
-    this.events.push({ type: 'climb', rise });
+    if (!this.godMode) this.stamina = Math.max(0, this.stamina - 6 - rise / S * 6);
+    this.events.push({ type: 'climb', rise: rise / S });
     return true;
   }
 
@@ -308,7 +362,7 @@ export class Player {
     const yUp = lerp(m.from.y, m.peak, 1 - (1 - up) * (1 - up));
     const y = t < 0.6 ? yUp : lerp(m.peak, m.to.y, smoothstep(0.6, 1, t));
     this.pos.set(x, y, z);
-    this.body.setNextKinematicTranslation({ x, y: y + this.halfHeight + RADIUS, z });
+    this.body.setNextKinematicTranslation({ x, y: y + this.halfHeight + this.rad, z });
     this.bob += h * 6;
     if (m.t >= 1) {
       this.mantle = null;
@@ -322,10 +376,10 @@ export class Player {
     if (!want) {
       // only stand up if there is room above your head
       const t = this.body.translation();
-      const hit = this.physics.castRay({ x: t.x, y: t.y + CROUCH_HALF + RADIUS - 0.05, z: t.z }, { x: 0, y: 1, z: 0 }, (STAND_HALF - CROUCH_HALF) * 2 + 0.1, this.collider);
+      const hit = this.physics.castRay({ x: t.x, y: t.y + this.crouchHalf + this.rad - 0.05 * this.size, z: t.z }, { x: 0, y: 1, z: 0 }, (this.standHalf - this.crouchHalf) * 2 + 0.1 * this.size, this.collider);
       if (hit) return;
     }
-    const newHalf = want ? CROUCH_HALF : STAND_HALF;
+    const newHalf = want ? this.crouchHalf : this.standHalf;
     const t = this.body.translation();
     const dy = newHalf - this.halfHeight;
     this.collider.setHalfHeight(newHalf);
@@ -358,7 +412,7 @@ export class Player {
   surfaceUnder() {
     if (this.wading > 0.08) return 'water';
     const t = this.body.translation();
-    const hit = this.physics.castRay({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 }, this.halfHeight + RADIUS + 0.4, this.collider);
+    const hit = this.physics.castRay({ x: t.x, y: t.y, z: t.z }, { x: 0, y: -1, z: 0 }, this.halfHeight + this.rad + 0.4 * this.size, this.collider);
     const surf = hit?.collider?.userData?.surface;
     if (surf && surf !== 'ground') return surf;
     return this.world.surfaceAt(this.pos.x, this.pos.z);
@@ -367,32 +421,32 @@ export class Player {
   // camera follows the eyes; called every rendered frame
   updateCamera(dt, alpha) {
     const p = this.prevPos.clone().lerp(this.pos, alpha);
-    const targetEye = this.crouching ? EYE_CROUCH : EYE_STAND;
+    const targetEye = this.crouching ? this.eyeCrouch : this.eyeStand;
     this.eye = lerp(this.eye, targetEye, 1 - Math.exp(-dt * 10));
     this.landDip = lerp(this.landDip, 0, 1 - Math.exp(-dt * 7));
     let bobY = 0, bobX = 0;
     if (settings.headBob && this.grounded) {
       const amp = this.moveMode === 'sprint' ? 0.045 : this.moveMode === 'jog' ? 0.03 : this.moveMode === 'idle' ? 0 : 0.018;
-      bobY = Math.abs(Math.sin(this.bob)) * amp - amp * 0.5;
-      bobX = Math.cos(this.bob) * amp * 0.6;
+      bobY = (Math.abs(Math.sin(this.bob)) * amp - amp * 0.5) * this.size;
+      bobX = Math.cos(this.bob) * amp * 0.6 * this.size;
     }
     // breathing (heavy when out of breath)
     const tired = 1 - this.stamina / 100;
     const breathAmp = 0.004 + tired * tired * 0.02;
     const bt = performance.now() / 1000 * (1.4 + tired * 1.6);
-    const breathY = Math.sin(bt * 2) * breathAmp;
+    const breathY = Math.sin(bt * 2) * breathAmp * this.size;
     // lean around corners
     const wantLean = (input.action('leanRight') ? 1 : 0) - (input.action('leanLeft') ? 1 : 0);
     this.lean = lerp(this.lean, this.swimming ? 0 : wantLean, 1 - Math.exp(-dt * 9));
     const rightX = Math.cos(this.yaw), rightZ = -Math.sin(this.yaw);
-    const leanOff = this.lean * 0.38;
+    const leanOff = this.lean * 0.38 * this.size;
     this.camera.position.set(
       p.x + rightX * (bobX + leanOff),
       p.y + this.eye + bobY + breathY - this.landDip,
       p.z + rightZ * (bobX + leanOff),
     );
     // limp: a little dip every other step
-    if (this.limp > 0 && this.grounded && this.moveMode !== 'idle') this.camera.position.y -= Math.max(0, Math.sin(this.bob * 0.5)) * 0.05 * this.limp;
+    if (this.limp > 0 && this.grounded && this.moveMode !== 'idle') this.camera.position.y -= Math.max(0, Math.sin(this.bob * 0.5)) * 0.05 * this.limp * this.size;
     this.camera.rotation.set(this.pitch + this.swayPitch, this.yaw, -this.lean * 0.12 + this.sway, 'YXZ');
   }
 

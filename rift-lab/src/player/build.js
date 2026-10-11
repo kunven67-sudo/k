@@ -32,7 +32,7 @@ const outlineMat = new THREE.ShaderMaterial({
 const ghostMat = new THREE.MeshBasicMaterial({ color: 0xbfe9ff, transparent: true, opacity: 0.28, depthWrite: false });
 const ghostBad = new THREE.MeshBasicMaterial({ color: 0xff8a8a, transparent: true, opacity: 0.28, depthWrite: false });
 
-function addOutline(item) {
+export function addOutline(item) {
   const list = [];
   for (const g of Object.values(item.groups)) {
     g.traverse((o) => {
@@ -47,7 +47,7 @@ function addOutline(item) {
   }
   return list;
 }
-function removeOutline(list) { for (const m of list || []) m.parent?.remove(m); }
+export function removeOutline(list) { for (const m of list || []) m.parent?.remove(m); }
 
 export class BuildTools {
   constructor({ physics, camera, items, player, hands, onMessage }) {

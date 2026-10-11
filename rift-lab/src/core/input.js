@@ -18,6 +18,8 @@ export const BINDINGS = {
   build: ['KeyB'],
   undo: ['KeyZ'],
   flashlight: ['KeyL'],
+  rift: ['KeyG'],        // take out / put away the Rift Tool
+  riftSelf: ['KeyV'],    // point it at yourself / back at things
 };
 
 class Input {

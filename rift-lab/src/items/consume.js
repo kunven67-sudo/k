@@ -80,7 +80,8 @@ export class Consume {
       this.hold(unit);
       return;
     }
-    if (item.mass > MAX_ONE_HAND_KG) { this.onMessage(`That's ${Math.round(item.mass)} kg: too heavy to hold in one hand. Hold left-click to drag it.`); return; }
+    const ps = this.player.size || 1;
+    if (item.mass > MAX_ONE_HAND_KG * ps * ps) { this.onMessage(ps < 0.8 ? `At your size that ${item.def.name.split(',')[0].toLowerCase()} is way too heavy to hold. Hold left-click to drag it.` : `That's ${Math.round(item.mass)} kg: too heavy to hold in one hand. Hold left-click to drag it.`); return; }
     this.sound('take');
     this.hold(item);
   }
@@ -142,9 +143,10 @@ export class Consume {
     const h = this.held;
     if (!h || !this.items.items.includes(h.item)) return;
     const cam = this.camera;
-    const m = h.maxDim;
+    const S = this.player.size || 1;
+    const m = h.maxDim / S; // how big it is compared to you
     // resting in your right hand, lower right of your view, turned a little toward you
-    const handPos = new THREE.Vector3(0.15 + m * 0.25, -0.16 - m * 0.3, -0.34 - m * 0.55);
+    const handPos = new THREE.Vector3(0.15 + m * 0.25, -0.16 - m * 0.3, -0.34 - m * 0.55).multiplyScalar(S);
     const handQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, -0.35 + (h.item.state.turn || 0), 0.04));
     let pos = handPos, q = handQ;
     if (h.anim) {
@@ -155,14 +157,14 @@ export class Consume {
         const tipQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(1.75, -0.1, 0));
         q = handQ.clone().slerp(tipQ, e);
         const top = new THREE.Vector3(0, h.size.y - h.center.y, 0).applyQuaternion(tipQ);
-        const mouth = new THREE.Vector3(0, -0.055, -0.07).sub(top);
+        const mouth = new THREE.Vector3(0, -0.055, -0.07).multiplyScalar(S).sub(top);
         pos = handPos.clone().lerp(mouth, e);
       } else if (a.kind === 'bite') {
-        const mouth = new THREE.Vector3(0, -0.07, -0.11 - m * 0.42);
+        const mouth = new THREE.Vector3(0, -0.07, -0.11 - m * 0.42).multiplyScalar(S);
         pos = handPos.clone().lerp(mouth, e);
         q = handQ.clone().slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, h.item.state.turn || 0, 0)), e);
       } else if (a.kind === 'open') {
-        pos = handPos.clone().add(new THREE.Vector3(-0.06 * e, 0.05 * e, 0.04 * e));
+        pos = handPos.clone().add(new THREE.Vector3(-0.06 * e, 0.05 * e, 0.04 * e).multiplyScalar(S));
         q = handQ.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, a.spin ? e * 1.2 : 0, a.spin ? 0 : e * 0.2)));
       }
     }
@@ -226,10 +228,13 @@ export class Consume {
       if (Math.random() < 0.15) this.needs?.poison(0.35);
       return;
     }
-    const portion = Math.min(s.left ?? 1, 1 / f.bites);
+    // a bite is the size of YOUR mouth: tiny you nibbles, giant you swallows it whole
+    const ps = this.player.size || 1, rel = Math.pow(ps / (it.scale || 1), 3);
+    const portion = Math.min(s.left ?? 1, rel / f.bites);
+    const sc = Math.pow(it.scale || 1, 3) / Math.pow(ps, 3); // real amounts -> what it means to your body
     const n = {};
-    for (const [k, v] of Object.entries(f.eat || {})) n[k] = v * portion;
-    const vol = drink ? (f.eat.waterL || 0.3) * portion : (f.netKg || 0.1) * portion * 1.1;
+    for (const [k, v] of Object.entries(f.eat || {})) n[k] = v * portion * sc;
+    const vol = (drink ? (f.eat.waterL || 0.3) : (f.netKg || 0.1) * 1.1) * portion * sc;
     this.needs?.consume(n, vol);
     s.left = Math.max(0, (s.left ?? 1) - portion);
     s.ate = (s.ate || 0) + 1;
@@ -282,7 +287,9 @@ export class Consume {
     if (!best) return;
     const idx = it.spec.parts.indexOf(best.o.userData.part);
     const nrm = new THREE.Vector3().fromBufferAttribute(best.o.geometry.attributes.normal, best.i).normalize();
-    const R = Math.min(0.03, Math.max(0.012, this.held.maxDim * 0.24));
+    const ps = this.player.size || 1;
+    const R = Math.min(0.03, Math.max(0.012, this.held.maxDim / ps * 0.24)) * ps;
+    if (R < 0.0015 || (it.state.bites || []).length > 60) return; // nibbles too small to see
     const c = best.v.clone().addScaledVector(nrm, -R * 0.42);
     (it.state.bites ||= []).push([idx, +c.x.toFixed(4), +c.y.toFixed(4), +c.z.toFixed(4), +R.toFixed(4)]);
   }

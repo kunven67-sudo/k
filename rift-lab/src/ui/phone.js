@@ -44,7 +44,7 @@ export class PhoneUI {
   render() {
     const { page, arg } = this.stack[this.stack.length - 1];
     this.el.innerHTML = '';
-    const light = !['home', 'notes'].includes(page);
+    const light = !['home', 'notes', 'rift'].includes(page);
     this.el.className = `phone-screen on ${light ? 'ph-light' : ''}`;
     const body = this[`page_${page}`] ? this[`page_${page}`](arg) : this.page_soon(page);
     this.el.append(body);
@@ -86,6 +86,7 @@ export class PhoneUI {
           app('💬', 'Messages', 'linear-gradient(135deg,#5ef08a,#21c45a)', () => this.go('messages')),
           app('🎵', 'Music', 'linear-gradient(135deg,#ff5e7e,#d6246e)', () => this.go('music')),
           app('❤️', 'Vitals', 'linear-gradient(135deg,#ffffff,#ffe1e6)', () => this.go('vitals')),
+          app('🌀', 'Rift', 'linear-gradient(135deg,#2a2140,#7d5cff)', () => this.go('rift')),
           app('⚙️', 'Settings', 'linear-gradient(135deg,#9ea3ad,#5f646d)', () => this.svc.openSettings()),
         ),
       ),
@@ -268,6 +269,37 @@ export class PhoneUI {
       h('p', {}, 'Things to remember: the square-cube law is real. Shrink something to half size and it weighs an eighth. Grow it and it gets heavy FAST.'),
       h('p', {}, 'Battery is the problem. Big jobs drain it. Need a better cell.'),
       h('p', { style: 'opacity:0.6' }, '(The Rift Tool shows up in a later piece of the build.)'));
+  }
+
+  // ---------------- Rift (your size + the tool) ----------------
+  page_rift() {
+    const r = this.svc.rift(), p = this.svc.player();
+    const page = h('div', { class: 'ph-page ph-dark', style: 'background:#0b0a12;color:#eceaf6' }, ...this.header('Rift', 'The Rift Tool · prototype R-1'));
+    if (!r || !p) return page;
+    const imperial = settings.units === 'imperial';
+    const fmt = (m) => (imperial ? (m < 0.3 ? `${(m * 39.37).toFixed(m < 0.05 ? 2 : 1)} in` : `${(m * 3.28084).toFixed(1)} ft`) : (m < 1 ? `${(m * 100).toFixed(m < 0.1 ? 1 : 0)} cm` : `${m.toFixed(2)} m`));
+    // slider is logarithmic: 0.03x .. 8x
+    const lo = Math.log(0.03), hi = Math.log(8);
+    const toSlider = (k) => Math.round(((Math.log(k) - lo) / (hi - lo)) * 1000);
+    const fromSlider = (v) => Math.exp(lo + (v / 1000) * (hi - lo));
+    const label = h('div', { class: 'ph-big', style: 'font-size:46px;font-weight:600' }, fmt(1.8 * p.size));
+    const sub = h('div', { style: 'text-align:center;color:#a99fd6;font-size:13px' }, `x${p.size.toFixed(p.size < 0.1 ? 3 : 2)} · weight ${(75 * p.size ** 3).toFixed(p.size < 0.3 ? 3 : 1)} kg · strength x${(p.size ** 2).toFixed(2)}`);
+    const slider = h('input', { type: 'range', min: 0, max: 1000, value: toSlider(this.riftGoal ?? p.size), style: 'width:100%;accent-color:#9b7dff' });
+    slider.addEventListener('input', () => { const k = fromSlider(+slider.value); this.riftGoal = k; label.textContent = fmt(1.8 * k); });
+    slider.addEventListener('change', () => { this.svc.sound('click'); this.svc.setSelfSize(fromSlider(+slider.value)); });
+    const batt = r.batteryMode === 'unlimited' ? '∞' : `${Math.round(r.battery)}%`;
+    page.append(label, sub,
+      h('div', { class: 'ph-section', style: 'margin-top:18px' }, h('div', { style: 'font-size:12px;color:#8b84ad;margin-bottom:6px' }, 'YOUR SIZE (slide, then let go)'), slider,
+        h('div', { style: 'display:flex;justify-content:space-between;font-size:11px;color:#6f688f' }, h('span', {}, 'ant-ish'), h('span', {}, 'normal'), h('span', {}, 'giant'))),
+      h('div', { class: 'ph-section', style: 'margin-top:16px' },
+        h('div', { class: 'ph-row', style: 'border-color:#2a2740' }, h('span', {}, 'Battery'), h('b', {}, `${batt}${r.batteryMode === 'real' ? ' · charges near a power source' : r.batteryMode === 'recharge' ? ' · self-recharging' : ''}`)),
+        h('div', { class: 'ph-row', style: 'border-color:#2a2740' }, h('span', {}, 'Take it out / put away'), h('b', {}, 'G')),
+        h('div', { class: 'ph-row', style: 'border-color:#2a2740' }, h('span', {}, 'Shrink / grow'), h('b', {}, 'hold LMB / RMB')),
+        h('div', { class: 'ph-row', style: 'border-color:#2a2740' }, h('span', {}, 'Aim at yourself'), h('b', {}, 'V')),
+        h('div', { class: 'ph-buy', style: 'position:static;margin:14px 0 6px;background:#7d5cff', onclick: () => { this.svc.sound('click'); this.svc.equipRift(); } }, '🌀 Take out the Rift Tool'),
+        h('div', { class: 'ph-buy', style: 'position:static;margin:6px 0;background:#2a2740', onclick: () => { this.svc.sound('click'); this.riftGoal = 1; this.svc.setSelfSize(1); this.render(); } }, 'Back to normal size'),
+        h('p', { style: 'color:#8b84ad;font-size:12.5px;line-height:1.5' }, 'Real scaling: half your size = 1/8 your weight but only 1/4 your strength. Tiny you falls slowly and shrugs off drops; giant you breaks under big falls.')));
+    return page;
   }
 
   // ---------------- Vitals (your body) ----------------

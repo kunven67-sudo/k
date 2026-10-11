@@ -121,7 +121,9 @@ export class Needs {
     const asleep = !!this.sleeping;
     const met = asleep ? MET.sleep : MET[moveMode] ?? MET.idle;
     // burn
-    const burn = met * 75 * h * (this.sick && this.sick.onsetH <= 0 ? 1.1 : 1);
+    // small bodies burn faster for their size (Kleiber's law: metabolism ~ mass^0.75)
+    const bodyK = Math.pow(p.size || 1, -0.75);
+    const burn = met * 75 * h * bodyK * (this.sick && this.sick.onsetH <= 0 ? 1.1 : 1);
     this.log.kcalOut += burn;
     this.reserve -= burn;
     // digest: big meals absorb faster at first, ~3-5 h for a full meal
@@ -135,7 +137,7 @@ export class Needs {
     // water out: ~0.1 L/h just living + sweat when working hard or hot
     const tempC = this.weatherTemp ?? 18;
     const heat = tempC > 25 ? 1 + (tempC - 25) / 8 : 1;
-    this.waterDef += (0.1 + Math.max(0, met - 2) * 0.075 * heat) * h;
+    this.waterDef += (0.1 + Math.max(0, met - 2) * 0.075 * heat) * h * bodyK;
     this.waterDef = Math.max(-0.8, this.waterDef); // extra water just gets peed out
     // caffeine half-life ~5 h
     this.caffeineMg *= Math.pow(0.5, h / 5);
