@@ -3,6 +3,7 @@
 import os
 import sys
 import threading
+import time
 from pathlib import Path
 
 from codebrain import lessons as L
@@ -51,6 +52,8 @@ HELP = f"""{G}{BOLD}Commands{END}
   {G}/speak on|off{END}    🔊 read my answers out loud
   {G}/snippets{END}        📦 list snippets   {G}/snippet <id>{END}  show one
   {G}/snippet <id> add{END}  add it to your file   {G}/snippet <id> try{END}  run its demo
+  {G}/look <question>{END} 📸 I take a screenshot in 3 seconds (switch to your game!) and look at it
+  {G}/project <name>{END}  🎮 new game project in its own folder
   {G}/xp{END}              ⭐ your level
   {G}/mode teach|code|hints{END}   how I help you
   {G}/model <name>{END}    switch brain    {G}/clear{END}  new chat    {G}/quit{END}  bye
@@ -103,14 +106,15 @@ class CLI:
 
         try:
             result = job(on_token)
+            if buf[0]:
+                print(buf[0])
+                buf[0] = ""
         except KeyboardInterrupt:
             print(f"\n{M}(stopped){END}")
             return None
         except Exception as e:
             print(f"\n{R}⚠️ {e}{END}")
             return None
-        if buf[0]:
-            print(buf[0])
         self.last_reply = result[0]
         if self.ai.config.get("speak_answers", True):
             self.speaker.say(self.last_reply)
@@ -330,8 +334,48 @@ class CLI:
         print(f"{G}{part}{END}")
         self.say(f"\n/snippet {sid} add  -> add to your file   •   /snippet {sid} try  -> run the demo", M)
 
+    def cmd_look(self, arg):
+        brain = self.ai.brain
+        if not brain.has_model(brain.vision_model):
+            if not input(f"{Y}I need my eyes ({brain.vision_model}, ~6 GB, one time). Download? (y/n) {END}"
+                         ).lower().startswith("y"):
+                return
+            last = [""]
+
+            def progress(t):
+                if t != last[0]:
+                    last[0] = t
+                    print(f"\r{M}{t[:90]:<90}{END}", end="", flush=True)
+            try:
+                brain.pull_model(progress, model=brain.vision_model)
+                print()
+            except Exception as e:
+                return self.say(f"\n⚠️ {e}", R)
+        from codebrain.screenshot import grab_screen, to_png
+        for n in (3, 2, 1):
+            print(f"{Y}📸 Switch to your game... {n}{END}", flush=True)
+            time.sleep(1)
+        try:
+            png = to_png(grab_screen())
+        except Exception as e:
+            return self.say(f"Couldn't take a screenshot: {e}", R)
+        self.say("📸 Got it! Looking...", M)
+        name = self.path.name if self.path else None
+        self.stream(lambda t: self.ai.look(png, arg, t, name, self.code(), self.path))
+
+    def cmd_project(self, arg):
+        name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in arg.strip()) or "my_game"
+        folder = projects_dir() / name
+        folder.mkdir(parents=True, exist_ok=True)
+        main = folder / "main.py"
+        if not main.exists():
+            main.write_text(f'# {name} - start here!\nprint("Welcome to {name}! 🎮")\n', encoding="utf-8")
+        self.path = main
+        self.say(f"🎮 Project '{name}' ready: {main}\nEvery file in that folder, I can read when you ask about it.")
+
     def chat(self, line):
-        result = self.stream(lambda t: self.ai.ask(line, t, self.path.name if self.path else None, self.code()))
+        result = self.stream(lambda t: self.ai.ask(line, t, self.path.name if self.path else None, self.code(),
+                                                   self.path))
         if result and result[1]:
             for item in result[1]:
                 self.say(f"🧠 Saved to memory: {item['text']}", M)

@@ -26,6 +26,8 @@ from codebrain.xp import XP, xp_for_level  # noqa: E402
 from codebrain import snippets as SN  # noqa: E402
 from codebrain.voice import PushToTalk, missing_parts, speakable  # noqa: E402
 from codebrain.doctor import Doctor  # noqa: E402
+from codebrain import project as P  # noqa: E402
+from codebrain.paths import projects_dir  # noqa: E402
 
 
 def tmpfile(name):
@@ -260,6 +262,43 @@ class TestSnippets(unittest.TestCase):
         self.assertIsNone(SN.Snippets(lib.path).get(item["id"]))
 
 
+class TestProject(unittest.TestCase):
+    def setUp(self):
+        self.folder = projects_dir() / f"game_{time.time_ns()}"
+        (self.folder / "levels").mkdir(parents=True)
+        (self.folder / "main.py").write_text("import enemies\nfrom levels import level1\nprint('main')\n")
+        (self.folder / "enemies.py").write_text("class Zombie:\n    speed = 3\n")
+        (self.folder / "levels" / "__init__.py").write_text("")
+        (self.folder / "levels" / "level1.py").write_text("LAYOUT = '###'\n")
+        (self.folder / "player.py").write_text("class Player:\n    hp = 100\n")
+        (self.folder / "sounds.py").write_text("BOOM = 1\n")
+
+    def ctx(self, message, budget=20000):
+        main = self.folder / "main.py"
+        return P.build_context(message, main, main.read_text(), budget)
+
+    def test_project_folder(self):
+        self.assertEqual(P.project_folder(self.folder / "levels" / "level1.py"), self.folder)
+
+    def test_imports_and_mentions(self):
+        text = self.ctx("why is my player so slow?")
+        self.assertIn("class Zombie", text)          # imported by main.py
+        self.assertIn("class Player", text)          # mentioned by name
+        self.assertNotIn("BOOM", text)               # not relevant
+        self.assertIn("sounds.py", text)             # but listed
+        self.assertIn("BOOM", self.ctx("check my whole project"))
+
+    def test_budget(self):
+        self.assertLessEqual(len(self.ctx("check my whole project", budget=900)), 900)
+        self.assertEqual(P.build_context("hi", None, "", 5000), "")
+
+    def test_file_blocks(self):
+        reply = "Two files:\n```python\n# file: enemies.py\nclass Zombie: pass\n```\n```python\n# player.py\nx = 1\n```\n```python\nprint(1)\n```"
+        self.assertEqual([n for n, _ in P.file_blocks(reply)], ["enemies.py", "player.py"])
+        self.assertIsNone(P.safe_target(self.folder, "../../evil.py"))
+        self.assertEqual(P.safe_target(self.folder, "levels/level2.py"), (self.folder / "levels" / "level2.py").resolve())
+
+
 class FakeRecorder:
     def __init__(self, audio):
         self.audio = audio
@@ -377,6 +416,40 @@ class TestBrainAndAssistant(unittest.TestCase):
         msg = ai.after_run(ok)
         self.assertIn("squashed", msg)
         self.assertTrue(ai.memory.data["fixes"][0]["confirmed"])
+
+    def test_project_files_reach_the_brain(self):
+        ai = self.make()
+        folder = projects_dir() / f"proj_{time.time_ns()}"
+        folder.mkdir(parents=True)
+        (folder / "enemies.py").write_text("ZOMBIE_SPEED = 42\n")
+        main = folder / "main.py"
+        main.write_text("import enemies\n")
+        ai.ask("why are zombies fast?", None, "main.py", main.read_text(), main)
+        self.assertIn("ZOMBIE_SPEED = 42", FakeOllama.requests[-1][1]["messages"][0]["content"])
+
+    def test_history_fits_budget(self):
+        ai = self.make()
+        ai.config["context_size"] = 4096
+        for i in range(30):
+            ai.history += [{"role": "user", "content": "q" * 1500}, {"role": "assistant", "content": "a" * 1500}]
+        ai.ask("last question")
+        sent = FakeOllama.requests[-1][1]["messages"]
+        self.assertLessEqual(sum(len(m["content"]) for m in sent), ai.budget() + 3000)
+        self.assertEqual(sent[-1]["content"], "last question")
+
+    def test_look(self):
+        ai = self.make()
+        statuses = []
+        reply, learned, _ = ai.look(b"\x89PNG fake", "", None, "game.py", "x = 1", None, statuses.append)
+        vision_path, vision_payload = FakeOllama.requests[-2]
+        self.assertEqual(vision_payload["model"], "qwen2.5vl:7b")
+        self.assertEqual(len(vision_payload["messages"][0]["images"]), 1)
+        self.assertIn("Does anything look wrong", vision_payload["messages"][0]["content"])
+        coder_payload = FakeOllama.requests[-1][1]
+        self.assertEqual(coder_payload["model"], "test-model")
+        self.assertIn("screenshot", coder_payload["messages"][-1]["content"])
+        self.assertTrue(reply.startswith("👀"))
+        self.assertEqual(len(statuses), 2)
 
     def test_brain_error(self):
         ai = self.make(model="broken")

@@ -111,14 +111,14 @@ class Brain:
         except Exception:
             return []
 
-    def has_model(self):
-        names = self.installed_models()
-        want = self.model if ":" in self.model else self.model + ":latest"
-        return want in names
+    def has_model(self, model=None):
+        model = model or self.model
+        want = model if ":" in model else model + ":latest"
+        return want in self.installed_models()
 
-    def pull_model(self, on_progress=None):
-        """Download the brain. on_progress(text) gets called with status updates."""
-        for msg in self._stream("/api/pull", {"model": self.model, "stream": True}, timeout=None):
+    def pull_model(self, on_progress=None, model=None):
+        """Download a brain. on_progress(text) gets called with status updates."""
+        for msg in self._stream("/api/pull", {"model": model or self.model, "stream": True}, timeout=None):
             if on_progress:
                 status = msg.get("status", "")
                 total, done = msg.get("total"), msg.get("completed")
@@ -161,6 +161,23 @@ class Brain:
             if msg.get("done"):
                 break
         return "".join(parts)
+
+    @property
+    def vision_model(self):
+        return self.config.get("vision_model", "qwen2.5vl:7b")
+
+    def see(self, prompt, png_bytes):
+        """👀 Ask the vision brain about a picture. Returns its description."""
+        import base64
+        payload = {
+            "model": self.vision_model,
+            "messages": [{"role": "user", "content": prompt,
+                          "images": [base64.b64encode(png_bytes).decode("ascii")]}],
+            "stream": True,
+            "keep_alive": "5m",
+            "options": {"temperature": 0.1, "num_ctx": 8192},
+        }
+        return "".join(m.get("message", {}).get("content", "") for m in self._stream("/api/chat", payload)).strip()
 
     def quick(self, prompt, system=None):
         """One-shot question, no streaming (used for small background jobs)."""

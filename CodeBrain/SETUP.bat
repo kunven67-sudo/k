@@ -12,6 +12,7 @@ echo     2. Ollama             - runs the AI brain on YOUR PC
 echo     3. pygame + ursina    - for 2D and 3D games
 echo     4. Voice              - talk to CodeBrain (optional)
 echo     5. The coding brain   - a big download, ONE time only
+echo     6. Eyes (optional)    - so CodeBrain can SEE your game
 echo.
 pause
 
@@ -117,6 +118,16 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+
+echo.
+echo       Optional: CodeBrain's EYES let it look at screenshots of your game.
+choice /C YN /M "      Download the eyes too (about 6 GB)"
+if errorlevel 2 goto skip_eyes
+for /f "delims=" %%v in ('call ".venv\Scripts\python.exe" -m codebrain --vision-model') do set "VMODEL=%%v"
+if not defined VMODEL set "VMODEL=qwen2.5vl:7b"
+"%OLLAMA%" pull %VMODEL%
+if errorlevel 1 echo [!] Eyes didn't download. You can get them later with the Look button.
+:skip_eyes
 
 rem ---------------------------------------------------------------- 5. shortcut
 echo.

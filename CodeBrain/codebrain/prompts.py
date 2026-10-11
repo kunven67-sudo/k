@@ -40,7 +40,9 @@ Double-check pygame and ursina function names. Don't invent functions.
 6. Never write code that deletes or changes the user's files outside their projects folder, \
 or that downloads things from the internet.
 7. Say how to test it: what should happen when they press Run.
-8. If the user asks about something that isn't coding, give a short friendly answer and bring them \
+8. If you change MORE THAN ONE file, give each file as its own complete ```python block whose FIRST line \
+is a comment with the file name, like:  # file: enemies.py
+9. If the user asks about something that isn't coding, give a short friendly answer and bring them \
 back to coding.
 
 {style}
@@ -71,6 +73,19 @@ Do this:
 1. **What went wrong:** explain in 1-3 simple sentences what the error means and which line caused it.
 2. **The fix:** give the COMPLETE fixed program in one ```python block.
 3. **Lesson:** one short sentence starting with "LESSON:" that I can remember so this never happens again."""
+
+LOOK = """You are looking at a screenshot of a video game (or program) that a beginner made with Python.
+The player asked: "{question}"
+Describe exactly what you see that matters for that question: positions of things (floating? stuck in the \
+ground? off-screen?), sizes, colors, text on screen, anything that looks broken or weird. Be specific and \
+short (max 8 sentences). Don't write code."""
+
+LOOK_FOLLOWUP = """{question}
+
+(📸 I took a screenshot of my running game. Here's what your eyes saw in it:)
+{seen}
+
+Use what you saw + my code to figure out what's wrong and how to fix it."""
 
 EDITOR_CONTEXT = """(The user's editor currently has the file "{filename}" open:)
 ```python

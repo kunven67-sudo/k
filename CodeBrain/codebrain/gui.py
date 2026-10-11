@@ -1,8 +1,10 @@
 """CodeBrain 🧠 window app: chat on the left, code editor + output on the right. Dark + green."""
 
+import base64
 import queue
 import sys
 import threading
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -10,6 +12,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from codebrain import lessons as L
 from codebrain.assistant import Assistant
 from codebrain.codeblocks import best_code
+from codebrain import project as P
 from codebrain.config import MODEL_BY_VRAM
 from codebrain.highlight import IndexMapper, spans
 from codebrain.memory import CATEGORIES
@@ -47,6 +50,7 @@ Here's what I can do:
 • ▶️ Press Run (F5) to test your code. I only run code when YOU press it.
 • 🐛 Code crashed? Press Bug Detective and I'll explain + fix it
 • 🔍 Select some code and press Explain
+• 📸 Game looks weird? Run it, then press Look and I'll SEE it and help fix it
 • 📚 Open Lessons to learn step by step. Your zombie game + 4D maze guides are in there too 🧟🌀
 • 📦 Snippets = ready-made game code (jump, sprint, shooting...) you can drop in
 • 🎤 Hold the mic button (or F2) and talk to me. 🔊 I can read my answers out loud too
@@ -113,7 +117,7 @@ class CodeBrainApp:
         style.configure("Muted.TLabel", background=BG, foreground=MUTED)
         style.configure("Title.TLabel", background=BG, foreground=GREEN, font=(UI, 16, "bold"))
         style.configure("TButton", background=PANEL2, foreground=GREEN, bordercolor=GREEN_DIM,
-                        focusthickness=0, padding=(10, 5), font=(UI, 10, "bold"))
+                        focusthickness=0, padding=(8, 4), font=(UI, 10, "bold"))
         style.map("TButton", background=[("active", BORDER), ("disabled", PANEL)],
                   foreground=[("disabled", MUTED)])
         style.configure("Run.TButton", background=GREEN_DIM, foreground="#001a0a")
@@ -139,6 +143,7 @@ class CodeBrainApp:
         bar = self._menu(self.root)
         f = self._menu(bar)
         f.add_command(label="New file          Ctrl+N", command=self.new_file)
+        f.add_command(label="🎮 New game project (its own folder)...", command=self.new_project)
         f.add_command(label="Open...           Ctrl+O", command=self.open_file)
         f.add_command(label="Save              Ctrl+S", command=self.save_file)
         f.add_command(label="Save as...", command=lambda: self.save_file(save_as=True))
@@ -253,11 +258,14 @@ class CodeBrainApp:
         self.bug_btn = ttk.Button(tools, text="🐛 Bug Detective", command=self.bug_detective, state="disabled")
         self.bug_btn.pack(side="left", padx=4)
         ttk.Button(tools, text="🔍 Explain", command=self.explain).pack(side="left", padx=4)
-        ttk.Button(tools, text="💾", width=3, command=self.save_file).pack(side="right")
-        ttk.Button(tools, text="📂", width=3, command=self.open_file).pack(side="right", padx=4)
-        ttk.Button(tools, text="📄", width=3, command=self.new_file).pack(side="right")
-        self.file_label = ttk.Label(ed, text="", style="Muted.TLabel")
-        self.file_label.pack(anchor="w")
+        ttk.Button(tools, text="📸 Look", command=self.look).pack(side="left", padx=4)
+        filerow = ttk.Frame(ed, padding=(0, 0, 0, 4))
+        filerow.pack(fill="x")
+        ttk.Button(filerow, text="💾 Save", command=self.save_file).pack(side="right")
+        ttk.Button(filerow, text="📂 Open", command=self.open_file).pack(side="right", padx=4)
+        ttk.Button(filerow, text="📄 New", command=self.new_file).pack(side="right")
+        self.file_label = ttk.Label(filerow, text="", style="Muted.TLabel")
+        self.file_label.pack(side="left", fill="x", expand=True)
 
         edbox = ttk.Frame(ed)
         edbox.pack(fill="both", expand=True)
@@ -431,7 +439,8 @@ class CodeBrainApp:
         self.chat_add("you", text)
         code = self.editor.get("1.0", "end-1c")
         name = Path(self.current_path).name if self.current_path else "untitled.py"
-        self._think(lambda on_token: self.ai.ask(text, on_token, name, code), kind="chat")
+        path = self.current_path
+        self._think(lambda on_token: self.ai.ask(text, on_token, name, code, path), kind="chat")
 
     def ask_codebrain(self, text):
         """Send a message as if you typed it (used by Lessons)."""
@@ -501,9 +510,15 @@ class CodeBrainApp:
         if kind == "chat" and result[1]:
             for item in result[1]:
                 self.chat_add("note", f"🧠 Saved to memory: {item['text']}")
-        code = best_code(reply)
-        if code:
-            self._add_code_button(code)
+        files = P.file_blocks(reply)
+        if files:
+            for name, file_code in files:
+                self._add_code_button(file_code, label=f"📥 Save as {name}",
+                                      command=lambda n=name, c=file_code: self.save_project_file(n, c))
+        else:
+            code = best_code(reply)
+            if code:
+                self._add_code_button(code)
         if self.ai.config.get("speak_answers", True):
             self.speaker.say(reply)
         self.celebrate(level_up)
@@ -571,10 +586,10 @@ class CodeBrainApp:
         self._ptt_release_job = None
         self.mic_up()
 
-    def _add_code_button(self, code):
-        btn = tk.Button(self.chat, text="📥 Put this code in the editor", bg=GREEN_DIM, fg="#001a0a",
+    def _add_code_button(self, code, label="📥 Put this code in the editor", command=None):
+        btn = tk.Button(self.chat, text=label, bg=GREEN_DIM, fg="#001a0a",
                         activebackground=GREEN, relief="flat", font=(UI, 10, "bold"), cursor="hand2",
-                        command=lambda: self.put_in_editor(code))
+                        command=command or (lambda: self.put_in_editor(code)))
         self.chat.configure(state="normal")
         self.chat.window_create("end", window=btn, padx=4, pady=4)
         self.chat.insert("end", "\n")
@@ -592,6 +607,113 @@ class CodeBrainApp:
         self.chat_add("bot", "Fresh chat! 🧹 (I still remember you + your projects in my long-term memory.)")
 
     # ================================================================ editor
+    def save_project_file(self, name, code):
+        """📥 Save as <name>: write one file of a multi-file answer into your game's folder."""
+        folder = P.project_folder(self.current_path) if self.current_path else projects_dir()
+        target = P.safe_target(folder, name)
+        if target is None:
+            messagebox.showerror("Can't save", f"'{name}' is outside your project folder, so I won't save it there.")
+            return
+        if self.current_path and target == Path(self.current_path).resolve():
+            self.put_in_editor(code)
+            return
+        if target.exists() and not messagebox.askyesno("Replace file?", f"{target.name} already exists. Replace it?"):
+            return
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(code.rstrip("\n") + "\n", encoding="utf-8")
+        self.chat_add("note", f"💾 Saved {target.relative_to(folder)} in {folder.name}/")
+
+    def new_project(self):
+        if not self._confirm_discard():
+            return
+        name = simpledialog.askstring("New game project", "Name your game (example: zombie_game):")
+        if not name:
+            return
+        safe = "".join(ch if ch.isalnum() or ch in "-_ " else "_" for ch in name).strip().replace(" ", "_")
+        folder = projects_dir() / (safe or "my_game")
+        folder.mkdir(parents=True, exist_ok=True)
+        main = folder / "main.py"
+        if not main.exists():
+            main.write_text(f'# {name} - start here! Press Run (F5).\nprint("Welcome to {name}! 🎮")\n',
+                            encoding="utf-8")
+        self.load_path(main)
+        self.chat_add("note", f"🎮 New project '{folder.name}'. Every file you make in this folder, "
+                              "I can read when you ask me about it.")
+
+    # ================================================================ eyes 👀
+    def look(self):
+        if self.thinking:
+            return
+        brain = self.ai.brain
+        if not brain.is_running():
+            messagebox.showinfo("Eyes", "My brain (Ollama) isn't running yet, so I can't look. Try again in a moment!")
+            return
+        if not brain.has_model(brain.vision_model):
+            if messagebox.askyesno("Download my eyes? 👀",
+                                   f"To SEE your game I need my eyes: '{brain.vision_model}' "
+                                   "(about 6 GB, one time only, then offline).\n\nDownload now?"):
+                self._download_eyes()
+            return
+        question = self.entry.get("1.0", "end").strip()
+        self.entry.delete("1.0", "end")
+        try:
+            from codebrain.screenshot import to_png
+            img = self._take_screenshot()
+        except Exception as e:
+            messagebox.showerror("Screenshot", f"I couldn't take a screenshot: {e}")
+            return
+        png, thumb = to_png(img), to_png(img, max_side=360)
+        self.speaker.stop()
+        self.chat_add("you", "📸 " + (question or "Look at my game. Does anything look wrong?"))
+        self._chat_image(thumb)
+        code = self.editor.get("1.0", "end-1c")
+        name = Path(self.current_path).name if self.current_path else "untitled.py"
+        path = self.current_path
+        status = lambda t: self.ui(lambda: self.set_status(t, YELLOW))
+        self._think(lambda on_token: self.ai.look(png, question, on_token, name, code, path, status), kind="chat")
+
+    def _take_screenshot(self):
+        """Your running game's window if there is one, otherwise the whole screen (with me hidden)."""
+        from codebrain.screenshot import grab_screen, grab_window_of_pid
+        img = None
+        if self.run and self.run.running:
+            img = grab_window_of_pid(self.run.proc.pid)
+        if img is None:
+            self.root.iconify()
+            self.root.update()
+            time.sleep(0.7)
+            try:
+                img = grab_screen()
+            finally:
+                self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+        return img
+
+    def _chat_image(self, png):
+        photo = tk.PhotoImage(data=base64.b64encode(png).decode("ascii"))
+        self._chat_images = getattr(self, "_chat_images", []) + [photo]   # Tk forgets images nobody holds
+        self.chat.configure(state="normal")
+        self.chat.image_create("end", image=photo, padx=4, pady=4)
+        self.chat.insert("end", "\n")
+        self.chat.configure(state="disabled")
+        self.chat.see("end")
+
+    def _download_eyes(self):
+        brain = self.ai.brain
+        model = brain.vision_model
+
+        def work():
+            try:
+                brain.pull_model(lambda t: self.ui(lambda: self.set_status("👀 " + t, YELLOW)), model=model)
+                self.ui(lambda: (self.set_status("👀 Eyes ready!", GREEN),
+                                 self.chat_add("note", "👀 My eyes are ready! Run your game and press 📸 Look.")))
+            except Exception as e:
+                err = str(e)
+                self.ui(lambda: self.set_status("👀 Eyes download failed: " + err, RED))
+
+        threading.Thread(target=work, daemon=True).start()
+
     def put_in_editor(self, code):
         current = self.editor.get("1.0", "end-1c").strip()
         if current and current != code.strip():
@@ -870,7 +992,8 @@ class CodeBrainApp:
         error = self.last_result.error_text
         name = self.current_path.name if self.current_path else "untitled.py"
         self.chat_add("you", "🐛 Bug Detective: why did my code crash?")
-        self._think(lambda on_token: self.ai.bug_detective(code, error, name, on_token), kind="bug")
+        path = self.current_path
+        self._think(lambda on_token: self.ai.bug_detective(code, error, name, on_token, path), kind="bug")
 
     def explain(self):
         if self.thinking:

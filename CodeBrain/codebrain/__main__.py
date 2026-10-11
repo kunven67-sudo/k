@@ -12,6 +12,10 @@ def main():
         from codebrain.config import Config
         print(Config()["model"])
         return
+    if "--vision-model" in sys.argv:  # used by SETUP.bat
+        from codebrain.config import Config
+        print(Config()["vision_model"])
+        return
     if "--doctor" in sys.argv:  # used by DOCTOR.bat
         from codebrain.doctor import run_doctor
         problems = run_doctor()

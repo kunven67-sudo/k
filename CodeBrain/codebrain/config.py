@@ -26,6 +26,7 @@ DEFAULTS = {
     "voice_model": "base.en",   # base.en = fast, small.en = understands you better
     "speak_answers": True,      # 🔊 read answers out loud
     "voice_auto_send": True,    # send right after you finish talking
+    "vision_model": "qwen2.5vl:7b",   # 👀 CodeBrain's eyes (only downloaded if you say yes)
 }
 
 
@@ -42,6 +43,13 @@ def detect_vram_gb():
         return max(values) / 1024 if values else None
     except Exception:
         return None
+
+
+def pick_context(vram_gb):
+    """Bigger cards can let the brain see more at once (more code + longer chats)."""
+    if vram_gb is not None and vram_gb >= 14:
+        return 16384
+    return 8192
 
 
 def pick_model(vram_gb):
@@ -63,7 +71,9 @@ class Config:
             except (OSError, ValueError):
                 pass
         else:
-            self.data["model"] = pick_model(detect_vram_gb())
+            vram = detect_vram_gb()
+            self.data["model"] = pick_model(vram)
+            self.data["context_size"] = pick_context(vram)
             self.save()
 
     def __getitem__(self, key):

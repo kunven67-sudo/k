@@ -114,6 +114,11 @@ class Doctor:
             self.bad(f"Brain '{cfg['model']}' isn't downloaded. Installed: {', '.join(installed) or 'none'}",
                      "Run SETUP.bat (it downloads it), or pick an installed one in ⚙️ Settings.")
             return
+        if brain.has_model(brain.vision_model):
+            self.ok(f"Eyes '{brain.vision_model}' are downloaded (📸 Look)")
+        else:
+            self.warn(f"Eyes '{brain.vision_model}' aren't downloaded yet.",
+                      "That's fine - press 📸 Look in CodeBrain and it offers to download them (~6 GB).")
         if not self.deep:
             return
         print(f"  {M}…asking the brain a test question (first time can take ~30 s while it loads)…{END}")

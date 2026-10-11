@@ -13,7 +13,7 @@ It only does one thing, **coding**, and it's built to teach you how to make game
 1. Download this folder (green **Code** button on GitHub → **Download ZIP**, then unzip it).
 2. Open the `CodeBrain` folder and **double-click `SETUP.bat`**.
    - It installs Python, Ollama (the brain engine), pygame + ursina (game stuff),
-     voice, and the coding brain itself.
+     voice, and the coding brain itself. It also asks if you want CodeBrain's 👀 eyes (optional, ~6 GB).
    - The brain is a big download (~9 GB) but **only once**. Grab a snack 🍕
 3. Done! Double-click **CodeBrain** on your Desktop.
 
@@ -55,6 +55,13 @@ everything, and it learns from what breaks.
   It sees the code in your editor, so you can just ask "what's wrong with my code?"
 - ▶️ **Run (F5)**: tests your code. It **only runs when you press it**, never by itself.
   If your program asks a question with `input()`, type the answer in the box under Output.
+- 🗂️ **Whole project**: make a game with **File → 🎮 New game project** and it gets its own folder.
+  CodeBrain reads the other files in that folder when they matter: files your code imports, files you
+  name ("check enemies.py"), or everything if you say "whole project". When it changes several files,
+  you get a **📥 Save as enemies.py** button for each one.
+- 📸 **Look (CodeBrain's eyes)**: run your game, type what's wrong ("why is my zombie floating?") and
+  press 📸 Look. CodeBrain screenshots your game window, a local vision brain (`qwen2.5vl:7b`) describes
+  what it sees, and the coding brain uses that to fix your code. It's all on your PC too.
 - 🐛 **Bug Detective**: when your code crashes, the line turns red. Press Bug Detective and it
   explains what went wrong in simple words, then gives you fixed code.
 - 🔍 **Explain**: highlight any code (or nothing = the whole file) and it explains it piece by piece.
