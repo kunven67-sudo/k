@@ -96,8 +96,8 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - Rockets, the Moon, zero-gravity sandbox (later version).
 
 ## Version plan
-- **v1 (core)**: movement + full body, spawn menu + all 8 materials (ghost preview, snap, weld), explosives (TNT, C4, grenades, rocket launcher) + realistic breaking + player launch, a few guns (recoil, ADS, bullet holes), settings menu.
-- **v1.5 (extras)**: grapple gun, fire, ragdoll dummies, portal gun.
+- **v1 (core)**: movement + full body, spawn menu + all 8 materials (ghost preview, snap), connectors (weld, glue, nails/screws, hinges), explosives (TNT, C4, grenades, rocket launcher) + realistic breaking + player launch, guns (pistol, AR, shotgun, sniper), damage/gore/medical, slow-motion button, settings menu.
+- **v1.5 (extras)**: grapple gun, fire, ragdoll dummies, portal gun, wheels + motors, ropes/chains.
 - **After v1.5**: liquids preview page → rest of explosives & guns, vehicles...
 - **Later**: town + life sim systems, then space.
 
@@ -107,6 +107,7 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Space x2** = double jump, **hold Space** = jetpack, **V** = fly toggle.
 - **E** pick up light objects with hands, hold click to throw harder (heavy things are too heavy, like real life).
 - **Physics gun** (edit tool): hold click to grab, drag with mouse, scroll to push/pull, **R** to rotate, release to drop, right-click to freeze. (R reloads when a gun is out.)
+- **Slow-motion button** (key TBD).
 - **Z** undo last spawn. Delete tool, Clear All button, Freeze tool (freeze objects in mid-air).
 
 ## v1 details
@@ -135,7 +136,7 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - Graphics quality (Low/Med/High/Ultra), shadows, render distance, FPS counter
 - Mouse sensitivity, FOV
 - Volume sliders: master, effects, music, ambient
-- Gameplay toggles: god mode, infinite ammo, debris limit
+- Gameplay toggles: god mode, infinite ammo, debris limit, gore level (default MAX)
 
 ## Feel & menus
 - **HUD**: minimal realistic. Small crosshair, ammo only when holding a gun, money/time small in a corner.
