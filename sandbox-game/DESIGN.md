@@ -95,7 +95,10 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Z** undo last spawn. Delete tool, Clear All button, Freeze tool (freeze objects in mid-air).
 
 ## v1 details
-- **Guns**: pistol, assault rifle, shotgun, sniper.
+- **Guns**: pistol, assault rifle, shotgun, sniper. Modern real-world style with generic names ("9mm Pistol", "Assault Rifle").
+  - Ballistics: bullet drop (sniper), bullet travel time, ricochets off metal at shallow angles (sparks), hip-fire spread.
+  - Handling: scope sway + breathing (hold Shift to steady), gun lowers when sprinting, shell casings eject and clink, muzzle flash light + smoke.
+  - Impacts: bullets push objects, enough hits break wood/glass/concrete, shot gas tanks/drums leak then explode, per-material effects (wood splinters, concrete dust, metal sparks, glass cracks).
 - **Spawn menu**: tabs (Shapes / Props / Explosives / Weapons / Tools) + search bar.
 - **v1 props**:
   - Construction: concrete blocks, cinder blocks, steel beams, wood planks, pallets, scaffolding
