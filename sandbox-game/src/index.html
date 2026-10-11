@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Real Life Sandbox</title>
+<style>/*__CSS__*/</style>
+</head>
+<body>
+  <div id="game"></div>
+
+  <!-- Main menu (the arena renders live behind it) -->
+  <div id="main-menu" class="screen">
+    <div class="menu-side">
+      <h1 class="title">REAL LIFE<span>SANDBOX</span></h1>
+      <button class="mbtn primary" data-action="play">Sandbox Arena</button>
+      <button class="mbtn locked" disabled>Life Mode <small>coming soon</small></button>
+      <button class="mbtn" data-action="settings">Settings</button>
+      <button class="mbtn" data-action="controls">Controls</button>
+      <p class="version">v1 · chunk 1 preview</p>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="screen">
+    <div class="loading-box">
+      <div class="loading-title">REAL LIFE SANDBOX</div>
+      <div class="bar"><div id="loading-fill"></div></div>
+      <div id="loading-tip" class="tip"></div>
+    </div>
+  </div>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <div id="crosshair"></div>
+    <div id="tool-info"></div>
+    <div id="hotbar"></div>
+    <div id="jetpack"><div id="jetpack-fill"></div></div>
+    <div id="status-tags"></div>
+    <div id="fps"></div>
+    <div id="hint"></div>
+  </div>
+
+  <!-- Spawn menu (B) -->
+  <div id="spawn-menu" class="screen hidden">
+    <div class="spawn-panel">
+      <div class="spawn-top">
+        <div id="spawn-tabs"></div>
+        <input id="spawn-search" type="text" placeholder="Search..." autocomplete="off" />
+      </div>
+      <div id="spawn-grid"></div>
+      <div class="spawn-foot">Click an item to put it in your hand · B or Esc to close</div>
+    </div>
+  </div>
+
+  <!-- Pause (Esc) -->
+  <div id="pause" class="screen hidden">
+    <div class="pause-panel">
+      <h2>Paused</h2>
+      <button class="mbtn primary" data-action="resume">Resume</button>
+      <button class="mbtn" data-action="settings">Settings</button>
+      <button class="mbtn" data-action="controls">Controls</button>
+      <button class="mbtn" data-action="clear">Clear Arena</button>
+      <button class="mbtn" data-action="quit">Main Menu</button>
+    </div>
+  </div>
+
+  <!-- Settings / controls panel (shared by main menu + pause) -->
+  <div id="panel" class="screen hidden">
+    <div class="panel-box">
+      <h2 id="panel-title"></h2>
+      <div id="panel-body"></div>
+      <button class="mbtn" data-action="panel-back">Back</button>
+    </div>
+  </div>
+
+  <script>/*__JS__*/</script>
+</body>
+</html>

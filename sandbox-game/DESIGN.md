@@ -1,7 +1,7 @@
 # Sandbox Game: Design Doc
 
 > Name: **Real Life Sandbox**
-> Status: planning (no code yet; nothing gets built until the owner says "build it")
+> Status: building **v1, chunk 1** (owner said build it). Play by double-clicking `RealLifeSandbox.html`.
 
 ## Big picture
 A **realistic first-person life sim town + sandbox arena**, playing in the browser (Three.js).
@@ -108,6 +108,16 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **v1.5 (extras)**: grapple gun, fire, ragdoll dummies, portal gun, wheels + motors, ropes/chains.
 - **After v1.5**: liquids preview page → rest of explosives & guns, vehicles...
 - **Later**: town + life sim systems, then space.
+
+## Build chunks (v1)
+1. **Chunk 1**: arena + movement + spawn menu + materials + breaking + explosives + tools.
+2. **Chunk 2**: guns, damage, gore, medical, full body + hands/tool viewmodels.
+3. **Chunk 3**: polish (main menu extras, achievements, more hints, screen effects, sounds once real assets are reachable).
+
+## Play setup
+- One HTML file, double-click to open in Edge.
+- **Auto fullscreen on Play** so Ctrl+W (crouch + forward) can't close the tab. Esc leaves fullscreen and pauses.
+- Real photo textures + recorded sounds: blocked by this cloud environment's network policy until the owner allows the asset sites. The game picks them up automatically from `assets/` once added.
 
 ## Controls (all rebindable in settings; full list shown in the Esc menu)
 | Key | Action |
