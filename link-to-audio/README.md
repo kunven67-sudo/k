@@ -1,27 +1,18 @@
-# 🎵 Link → Audio
+# 🎵 Music Grabber (Windows)
 
-Paste a link to anything with sound and get an MP3 you can keep and share.
-Works with YouTube, SoundCloud, Bandcamp, TikTok, Twitter/X, Vimeo, direct audio links, and [loads more](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
+One file. Nothing to install.
 
-## How to use
+1. Download **`Music Grabber.bat`** and double-click it.
+   (If Windows says "Windows protected your PC" → **More info** → **Run anyway**.)
+2. First time only: it grabs its tools by itself (~150 MB, a few minutes).
+3. Copy a music link, right-click in the window to paste, press **Enter**.
+4. The song lands in **Downloads\Music Grabber** as an MP3 and the folder pops open.
 
-1. Install **Python** once: https://www.python.org/downloads/
-   (on Windows, tick **"Add Python to PATH"** during install)
-2. Double-click:
-   - Windows → `Start (Windows).bat`
-   - Mac → `Start (Mac).command`
-   - Or run `python grab_audio.py`
-3. Paste the link, hit **Download** (or Enter). Pick mp3 / m4a / wav if you want.
-4. Your file lands in the `Downloads` folder right here. Hit **Open folder** to see it.
+Works with YouTube, SoundCloud, TikTok, Bandcamp, Twitter/X, Vimeo and
+[tons more](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
+Won't work with Spotify / Apple Music (they block downloads) or anything behind a login.
 
-The first run takes a minute because it installs what it needs automatically.
+It auto-updates every time you open it, so links keep working when sites change.
+Tools live in `%LOCALAPPDATA%\MusicGrabber`. Delete that folder to remove them.
 
-You can also skip the window: `python grab_audio.py <link> <another link>`
-
-## If a link stops working
-Sites change stuff all the time. Update the downloader:
-```
-python -m pip install --user -U yt-dlp
-```
-
-Only download stuff you're allowed to (your own uploads, free/Creative Commons music, etc.).
+Only download stuff you're allowed to.
