@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Portal Gun Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;700&display=swap">
+<style>
+  /* Layout: a workbench — the 3D stage fills the left, a control rail sits on the right (stacks below on phones). */
+  :root {
+    --bg: #0d1215;
+    --surface: #141b1f;
+    --raise: #1b2429;
+    --line: #27333a;
+    --fg: #dde6e3;
+    --muted: #8b9c9a;
+    --led: #ff4436;
+    --accent: #3dff74;
+    --font-display: 'Oxanium', 'Segoe UI', system-ui, sans-serif;
+    --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.5 var(--font-body);
+  }
+  .app {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(360px, 58vh) auto;
+    gap: 12px;
+    padding-inline: 16px;
+    padding-block: 12px 20px;
+    min-height: 100%;
+  }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 {
+    margin: 0;
+    font: 700 1.6rem/1.1 var(--font-display);
+    letter-spacing: 0.02em;
+    text-wrap: balance;
+  }
+  h1 span { color: var(--accent); transition: color 0.4s; }
+  .tag { font: 500 0.75rem var(--font-mono); color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+
+  .stage {
+    position: relative;
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  .stage canvas:active { cursor: grabbing; }
+  .tip {
+    position: absolute; left: 0; top: 0;
+    max-width: 240px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    pointer-events: none;
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+  .tip b { display: block; font: 600 0.85rem var(--font-display); color: var(--accent); letter-spacing: 0.03em; }
+  .hint {
+    position: absolute; left: 12px; bottom: 10px; right: 12px;
+    font: 500 0.72rem var(--font-mono);
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    pointer-events: none;
+  }
+
+  .rail { display: grid; gap: 12px; align-content: start; min-width: 0; }
+  section.block {
+    display: grid; gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+  .label {
+    font: 600 0.72rem var(--font-mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .label output { color: var(--fg); font-variant-numeric: tabular-nums; }
+
+  .dim { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: stretch; }
+  .led {
+    display: grid; place-items: center; gap: 2px;
+    padding: 8px 6px;
+    border-radius: 8px;
+    background: #1d0a08;
+    border: 1px solid #3a1612;
+    text-align: center;
+  }
+  .led strong {
+    font: 700 1.7rem/1 var(--font-mono);
+    color: var(--led);
+    text-shadow: 0 0 10px color-mix(in srgb, var(--led) 70%, transparent);
+    letter-spacing: 0.06em;
+  }
+  .led small { color: #d58a80; font-size: 0.75rem; }
+
+  button {
+    font: 600 0.88rem var(--font-body);
+    color: var(--fg);
+    background: var(--raise);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 9px 12px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button:hover { border-color: var(--muted); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button[aria-pressed="true"] { border-color: var(--accent); }
+  .arrow { width: 44px; font-size: 1.1rem; padding: 0; }
+
+  .cores { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .core {
+    display: grid; justify-items: center; gap: 4px;
+    padding: 8px 2px 6px;
+    font: 600 0.7rem var(--font-mono);
+  }
+  .core i {
+    width: 14px; height: 26px; border-radius: 7px;
+    background: var(--c);
+    box-shadow: 0 0 10px var(--c);
+  }
+  .core-note { margin: 0; color: var(--muted); font-size: 0.82rem; }
+
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+  .fire {
+    font: 700 1rem var(--font-display);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 13px;
+    color: #06140a;
+    background: var(--accent);
+    border-color: transparent;
+    box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .fire:hover { border-color: transparent; filter: brightness(1.08); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row button { flex: 1 1 120px; }
+
+  .print p { margin: 0; color: var(--muted); font-size: 0.85rem; }
+  .print dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 0.85rem; }
+  .print dt { color: var(--muted); }
+  .print dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .status { min-height: 1.3em; font-size: 0.82rem; color: var(--muted); }
+  .fineprint { margin: 0; color: var(--muted); font-size: 0.75rem; }
+
+  @media (min-width: 900px) {
+    html, body { height: 100%; }
+    .app {
+      height: 100%;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+    header { grid-column: 1 / -1; }
+    .rail { overflow-y: auto; padding-right: 2px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Portal Gun <span>Workbench</span></h1>
+    <div class="tag">Model P01 · fan build · units in cm</div>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="tip" id="tip" hidden></div>
+    <div class="hint" id="hint">Drag to orbit · scroll or pinch to zoom · hover a part to name it · F to fire</div>
+  </main>
+
+  <aside class="rail">
+    <section class="block" aria-labelledby="dim-label">
+      <div class="label" id="dim-label">Destination dimension</div>
+      <div class="dim">
+        <button class="arrow" id="dim-prev" aria-label="Previous dimension">◀</button>
+        <div class="led" aria-live="polite"><strong id="dim-code">C-137</strong><small id="dim-note">Similar to ours</small></div>
+        <button class="arrow" id="dim-next" aria-label="Next dimension">▶</button>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="core-label">
+      <div class="label" id="core-label">Interchangeable core</div>
+      <div class="cores" id="cores"></div>
+      <p class="core-note" id="core-note"></p>
+    </section>
+
+    <section class="block">
+      <label class="label" for="explode">Exploded view <output id="explode-out">0%</output></label>
+      <input type="range" id="explode" min="0" max="100" value="0">
+    </section>
+
+    <section class="block">
+      <button class="fire" id="fire">Open portal</button>
+      <div class="row">
+        <button id="spin" aria-pressed="true">Auto-rotate</button>
+        <button id="sound" aria-pressed="true">Sound</button>
+      </div>
+    </section>
+
+    <section class="block print">
+      <div class="label">3D print it</div>
+      <dl>
+        <dt>Size</dt><dd id="size">…</dd>
+        <dt>Files</dt><dd>STL (mm) + GLB (m)</dd>
+      </dl>
+      <p>Print the shell, grip and dial in white PLA, and the vial in translucent green PETG. Split the STL into parts in your slicer.</p>
+      <button id="download">Download model (.zip)</button>
+      <div class="status" id="status" role="status"></div>
+    </section>
+
+    <p class="fineprint">Fan-made model inspired by Rick and Morty. Not affiliated with Adult Swim.</p>
+  </aside>
+</div>
+
+<script type="importmap">
+  { "imports": {
+    "three": "./vendor/three/build/three.module.js",
+    "three/addons/": "./vendor/three/examples/jsm/"
+  } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { buildPortalGun, exportCopy } from './model.js';
+
+const DIMENSIONS = [
+  { code: 'C-137', note: 'Similar to ours' },
+  { code: 'C-131', note: 'Mostly harmless' },
+  { code: 'J19-Z7', note: 'Pizza people' },
+  { code: '35-C', note: 'Giant everything' },
+  { code: 'D-99', note: 'Everyone wears hats' },
+  { code: 'Z-912', note: 'Crystalline world' },
+  { code: 'N-69', note: 'Infernal. Stability low' },
+  { code: 'C-500A', note: 'Unstable. Do not stay' },
+];
+const CORES = [
+  { id: 'green', name: 'Green', code: '2B', hex: 0x3dff74, css: '#3dff74', note: 'General use. Stable portals.' },
+  { id: 'blue', name: 'Blue', code: '4D', hex: 0x3ab8ff, css: '#3ab8ff', note: 'Deep exploration.' },
+  { id: 'red', name: 'Red', code: '7A', hex: 0xff4a3a, css: '#ff5a4a', note: 'Hostile universes.' },
+  { id: 'purple', name: 'Purple', code: 'X', hex: 0xb05cff, css: '#b878ff', note: 'Forbidden realities.' },
+  { id: 'gold', name: 'Gold', code: 'Ω', hex: 0xffc533, css: '#ffc533', note: 'God mode. Extreme use only.' },
+];
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+
+// Renderer and scene
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const BG = 0x0d1215;
+scene.background = new THREE.Color(BG);
+scene.fog = new THREE.Fog(BG, 70, 150);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 400);
+camera.position.set(14, 10, 44);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 0);
+controls.enableDamping = true;
+controls.minDistance = 16;
+controls.maxDistance = 110;
+controls.maxPolarAngle = Math.PI * 0.53;
+controls.autoRotate = !reduceMotion;
+controls.autoRotateSpeed = 0.8;
+
+const key = new THREE.DirectionalLight(0xffffff, 1.6);
+key.position.set(12, 30, 18);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+Object.assign(key.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 80 });
+key.shadow.bias = -0.0005;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x9fd8ff, 0.7);
+rim.position.set(-20, 8, -24);
+scene.add(rim);
+
+const FLOOR_Y = -13;
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.ShadowMaterial({ opacity: 0.35 }));
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = FLOOR_Y;
+floor.receiveShadow = true;
+scene.add(floor);
+const grid = new THREE.GridHelper(120, 60, 0x2c3a42, 0x1c262c);
+grid.position.y = FLOOR_Y + 0.01;
+scene.add(grid);
+
+// The gun
+const api = buildPortalGun(THREE);
+const gun = api.group;
+scene.add(gun);
+const coreLight = new THREE.PointLight(0x3dff74, 8, 14, 1.6);
+coreLight.position.set(-3.2, 7, 0);
+scene.add(coreLight);
+
+// Frequency display texture
+const screenCanvas = document.createElement('canvas');
+screenCanvas.width = 512; screenCanvas.height = 300;
+const screenTex = new THREE.CanvasTexture(screenCanvas);
+screenTex.colorSpace = THREE.SRGBColorSpace;
+screenTex.anisotropy = 4;
+api.screenMaterial.map = screenTex;
+api.screenMaterial.color.setScalar(1.7); // above 1 so the LEDs bloom
+function drawScreen(text) {
+  const g = screenCanvas.getContext('2d');
+  g.fillStyle = '#1a0504';
+  g.fillRect(0, 0, 512, 300);
+  g.strokeStyle = 'rgba(255,70,54,0.08)';
+  for (let y = 0; y < 300; y += 6) { g.beginPath(); g.moveTo(0, y); g.lineTo(512, y); g.stroke(); }
+  g.fillStyle = '#ff6a5a';
+  g.font = '700 34px "IBM Plex Mono", monospace';
+  g.fillText('DIM', 28, 56);
+  for (let i = 0; i < 4; i++) g.fillRect(420 + i * 18, 52 - i * 9, 11, 8 + i * 9);
+  g.shadowColor = '#ff2a1a';
+  g.shadowBlur = 24;
+  g.fillStyle = '#ff4436';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  const size = text.length > 5 ? 104 : 128;
+  g.font = `700 ${size}px "IBM Plex Mono", monospace`;
+  g.fillText(text, 256, 178);
+  g.shadowBlur = 0;
+  g.textAlign = 'left';
+  g.textBaseline = 'alphabetic';
+  screenTex.needsUpdate = true;
+}
+
+// Bloom
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.4, 1.4);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  composer.setSize(w, h);
+  camera.aspect = w / h;
+  // Pull back on narrow screens so the whole gun stays in frame.
+  camera.fov = w / h < 0.9 ? 50 : 36;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+// Dimension selection
+let dimIndex = 0, dialTarget = 0, scrambleUntil = 0;
+function setDimension(i) {
+  dimIndex = (i + DIMENSIONS.length) % DIMENSIONS.length;
+  const d = DIMENSIONS[dimIndex];
+  $('dim-code').textContent = d.code;
+  $('dim-note').textContent = d.note;
+  dialTarget = -dimIndex * (Math.PI * 2 / DIMENSIONS.length);
+  scrambleUntil = performance.now() + (reduceMotion ? 0 : 320);
+  click();
+}
+$('dim-prev').onclick = () => setDimension(dimIndex - 1);
+$('dim-next').onclick = () => setDimension(dimIndex + 1);
+
+// Core selection
+let core = CORES[0];
+const coreBox = $('cores');
+for (const c of CORES) {
+  const b = document.createElement('button');
+  b.className = 'core';
+  b.style.setProperty('--c', c.css);
+  b.setAttribute('aria-pressed', String(c === core));
+  b.setAttribute('aria-label', `${c.name} core ${c.code}`);
+  b.innerHTML = `<i></i>${c.code}`;
+  b.onclick = () => setCore(c);
+  coreBox.append(b);
+}
+function setCore(c) {
+  core = c;
+  api.setCoreColor(c.hex);
+  coreLight.color.setHex(c.hex);
+  portalMat.uniforms.uColor.value.setHex(c.hex);
+  bolt.material.color.setHex(c.hex);
+  document.documentElement.style.setProperty('--accent', c.css);
+  $('core-note').textContent = `${c.name} ${c.code}: ${c.note}`;
+  [...coreBox.children].forEach((b, i) => b.setAttribute('aria-pressed', String(CORES[i] === c)));
+}
+
+// Exploded view
+let explodeTarget = 0, explode = 0;
+$('explode').oninput = (e) => {
+  explodeTarget = e.target.value / 100;
+  $('explode-out').textContent = `${e.target.value}%`;
+};
+
+// Portal
+const portalMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uOpen: { value: 0 }, uColor: { value: new THREE.Color(core.hex) } },
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform float uTime, uOpen; uniform vec3 uColor; varying vec2 vUv;
+    void main() {
+      vec2 p = vUv * 2.0 - 1.0;
+      float a = atan(p.y, p.x);
+      float r = length(p) + 0.04 * sin(a * 7.0 + uTime * 3.0) + 0.03 * sin(a * 13.0 - uTime * 5.0);
+      float s1 = sin(a * 5.0 + r * 16.0 - uTime * 4.5) * 0.5 + 0.5;
+      float s2 = sin(a * 3.0 - r * 9.0 + uTime * 2.7) * 0.5 + 0.5;
+      float inside = smoothstep(1.0, 0.9, r);
+      float rim = smoothstep(0.62, 0.96, r) * inside;
+      vec3 col = uColor * (0.25 + 1.1 * s1 * s2) + uColor * rim * 2.2 + vec3(0.9, 1.0, 0.9) * pow(max(1.0 - r, 0.0), 5.0) * 0.8;
+      gl_FragColor = vec4(col * 1.4, inside * uOpen * (0.82 + 0.18 * rim));
+    }`,
+});
+const PORTAL_POS = new THREE.Vector3(30, 0, 0);
+const portal = new THREE.Mesh(new THREE.PlaneGeometry(14, 19), portalMat);
+portal.position.copy(PORTAL_POS);
+portal.visible = false;
+scene.add(portal);
+const portalLight = new THREE.PointLight(0x3dff74, 0, 40, 1.4);
+portalLight.position.copy(PORTAL_POS).add(new THREE.Vector3(-2, 0, 0));
+scene.add(portalLight);
+const bolt = new THREE.Mesh(new THREE.SphereGeometry(0.7, 20, 12), new THREE.MeshBasicMaterial({ color: core.hex, toneMapped: false }));
+bolt.visible = false;
+scene.add(bolt);
+
+const HOME_TARGET = new THREE.Vector3(0, 0, 0);
+const PORTAL_VIEW = new THREE.Vector3(15, 0, 0);
+let panTarget = HOME_TARGET.clone();
+let shot = null; // { start }
+function fire() {
+  if (shot) return;
+  shot = { start: performance.now() };
+  panTarget = PORTAL_VIEW.clone();
+  zap();
+}
+$('fire').onclick = fire;
+addEventListener('keydown', (e) => {
+  if (e.target.closest('input')) return;
+  if (e.key === 'f' || e.key === 'F') fire();
+  if (e.key === 'ArrowRight') setDimension(dimIndex + 1);
+  if (e.key === 'ArrowLeft') setDimension(dimIndex - 1);
+});
+
+$('spin').onclick = (e) => {
+  controls.autoRotate = !controls.autoRotate;
+  e.currentTarget.setAttribute('aria-pressed', String(controls.autoRotate));
+};
+$('spin').setAttribute('aria-pressed', String(controls.autoRotate));
+
+// Sound (synthesised, starts only after a click)
+let audio = null, soundOn = true;
+$('sound').onclick = (e) => {
+  soundOn = !soundOn;
+  e.currentTarget.setAttribute('aria-pressed', String(soundOn));
+};
+function ac() {
+  if (!soundOn) return null;
+  try { audio ??= new AudioContext(); } catch { return null; }
+  if (audio.state === 'suspended') audio.resume();
+  return audio;
+}
+function click() {
+  const a = ac(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = 'square'; o.frequency.value = 1800;
+  g.gain.setValueAtTime(0.04, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.05);
+  o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + 0.06);
+}
+function zap() {
+  const a = ac(); if (!a) return;
+  const t = a.currentTime;
+  const o = a.createOscillator(), f = a.createBiquadFilter(), g = a.createGain();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(1400, t);
+  o.frequency.exponentialRampToValueAtTime(90, t + 0.45);
+  f.type = 'lowpass'; f.frequency.value = 2400;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+  o.connect(f).connect(g).connect(a.destination); o.start(t); o.stop(t + 0.55);
+  // Whoosh of the portal opening: filtered noise sweeping up.
+  const len = a.sampleRate * 1.6, buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const n = a.createBufferSource(), bp = a.createBiquadFilter(), ng = a.createGain();
+  n.buffer = buf; bp.type = 'bandpass'; bp.Q.value = 3;
+  bp.frequency.setValueAtTime(200, t + 0.3);
+  bp.frequency.exponentialRampToValueAtTime(1600, t + 1.2);
+  ng.gain.setValueAtTime(0.0001, t + 0.3);
+  ng.gain.exponentialRampToValueAtTime(0.25, t + 0.5);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+  n.connect(bp).connect(ng).connect(a.destination); n.start(t + 0.3); n.stop(t + 1.9);
+}
+
+// Part names on hover / tap
+const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
+const tip = $('tip');
+let tipTimer = 0, downAt = null;
+function partAt(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObject(gun, true)[0];
+  let o = hit?.object;
+  while (o && !o.userData.label) o = o.parent;
+  return o ? { part: o, x: e.clientX - r.left, y: e.clientY - r.top, w: r.width } : null;
+}
+function showTip(found) {
+  if (!found) { tip.hidden = true; return; }
+  tip.innerHTML = '';
+  const b = document.createElement('b');
+  b.textContent = found.part.userData.label;
+  tip.append(b, found.part.userData.info);
+  tip.hidden = false;
+  const x = Math.min(found.x + 14, found.w - tip.offsetWidth - 8);
+  tip.style.transform = `translate(${Math.max(8, x)}px, ${Math.max(8, found.y - tip.offsetHeight - 12)}px)`;
+}
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'mouse' && e.buttons === 0) showTip(partAt(e));
+});
+renderer.domElement.addEventListener('pointerleave', () => { tip.hidden = true; });
+renderer.domElement.addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'mouse' || !downAt) return;
+  if (Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 8) return;
+  showTip(partAt(e));
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => { tip.hidden = true; }, 2600);
+});
+
+// Size readout from the real geometry
+const size = new THREE.Box3().setFromObject(exportCopy(THREE, api, 1)).getSize(new THREE.Vector3());
+$('size').textContent = `${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} cm`;
+
+// Download: STL + GLB in a zip (stored, uncompressed)
+const crcTable = new Uint32Array(256).map((_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) c = crcTable[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+const DOS_DATE = (46 << 9) | (10 << 5) | 11; // 2026-10-11
+function zip(files) {
+  const enc = new TextEncoder(), chunks = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = f.data, crc = crc32(data);
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true); local.setUint16(4, 20, true); local.setUint16(12, DOS_DATE, true);
+    local.setUint32(14, crc, true); local.setUint32(18, data.length, true); local.setUint32(22, data.length, true);
+    local.setUint16(26, name.length, true);
+    chunks.push(local, name, data);
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(14, DOS_DATE, true);
+    cd.setUint32(16, crc, true); cd.setUint32(20, data.length, true); cd.setUint32(24, data.length, true);
+    cd.setUint16(28, name.length, true); cd.setUint32(42, offset, true);
+    central.push(cd, name);
+    offset += 30 + name.length + data.length;
+  }
+  const cdSize = central.reduce((s, c) => s + c.byteLength, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...chunks, ...central, end], { type: 'application/zip' });
+}
+const README = `Portal Gun - fan-made 3D model
+
+portal-gun.stl  Millimetres. One body made of overlapping parts; split it into
+                parts in your slicer (e.g. PrusaSlicer: Split to objects).
+portal-gun.glb  Metres, with materials. Opens in Blender, Windows 3D Viewer,
+                or https://gltf-viewer.donmccurdy.com
+
+Inspired by Rick and Morty. Not affiliated with Adult Swim.
+`;
+const downloadsReady = window.claude?.use ? window.claude.use('downloads') : Promise.resolve(undefined);
+const status = $('status');
+$('download').onclick = async () => {
+  status.textContent = 'Building files…';
+  try {
+    const stl = new STLExporter().parse(exportCopy(THREE, api, 10), { binary: true });
+    const glb = await new GLTFExporter().parseAsync(exportCopy(THREE, api, 0.01), { binary: true });
+    const blob = zip([
+      { name: 'portal-gun.stl', data: new Uint8Array(stl.buffer) },
+      { name: 'portal-gun.glb', data: new Uint8Array(glb) },
+      { name: 'README.txt', data: new TextEncoder().encode(README) },
+    ]);
+    const downloads = await downloadsReady;
+    if (downloads === undefined) {
+      // Opened as a plain web page: a normal download link works.
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'portal-gun.zip';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      status.textContent = 'Saved portal-gun.zip.';
+    } else if (downloads === null) {
+      status.textContent = 'Downloads aren’t available in this view. Open the page in a browser to save the model.';
+    } else {
+      await downloads.save({ filename: 'portal-gun.zip', data: blob });
+      status.textContent = 'Saved portal-gun.zip.';
+    }
+  } catch (err) {
+    status.textContent = err?.code === 'declined' ? 'Download cancelled.' : `Couldn’t build the files: ${err?.message || err}`;
+  }
+};
+
+// Animation loop
+const clock = new THREE.Clock();
+const tmp = new THREE.Vector3();
+let recoil = 0, flash = 0;
+function frame() {
+  const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05), panDt = Math.min(rawDt, 0.25);
+  const t = clock.elapsedTime, now = performance.now();
+  api.update(t);
+
+  explode += (explodeTarget - explode) * Math.min(1, dt * 8);
+  api.setExplode(explode);
+
+  const spin = api.dialSpin.rotation;
+  spin.x += (dialTarget - spin.x) * Math.min(1, dt * 10);
+  if (now < scrambleUntil) {
+    const chars = '0123456789ABCDEFJZ-';
+    drawScreen(Array.from(DIMENSIONS[dimIndex].code, () => chars[(Math.random() * chars.length) | 0]).join(''));
+  } else if (scrambleUntil) {
+    drawScreen(DIMENSIONS[dimIndex].code);
+    scrambleUntil = 0;
+  }
+
+  if (shot) {
+    const s = (now - shot.start) / 1000;
+    const travel = 0.4, hold = 3.6, close = 0.6;
+    if (s < 0.05) { recoil = 1; flash = 1; }
+    if (s < travel) {
+      bolt.visible = true;
+      gun.localToWorld(tmp.copy(api.emitterTip));
+      bolt.position.lerpVectors(tmp, PORTAL_POS, s / travel);
+    } else bolt.visible = false;
+    let open = 0;
+    if (s >= travel && s < travel + 0.5) { const k = (s - travel) / 0.5; open = 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2); }
+    else if (s >= travel + 0.5 && s < travel + hold) open = 1;
+    else if (s >= travel + hold && s < travel + hold + close) open = 1 - (s - travel - hold) / close;
+    portal.visible = open > 0.001;
+    portal.scale.setScalar(Math.max(open, 0.001));
+    portalMat.uniforms.uOpen.value = Math.min(1, open * 1.5);
+    portalLight.color.setHex(core.hex);
+    portalLight.intensity = 90 * Math.min(1, open) * (0.85 + 0.15 * Math.sin(t * 20));
+    if (s > travel + hold) panTarget = HOME_TARGET.clone();
+    if (s > travel + hold + close) { shot = null; portal.visible = false; portalLight.intensity = 0; }
+  }
+  portalMat.uniforms.uTime.value = t;
+  // Turn the portal toward the viewer so it never shows edge-on.
+  portal.rotation.y = Math.atan2(camera.position.x - portal.position.x, camera.position.z - portal.position.z);
+
+  recoil = Math.max(0, recoil - dt * 5);
+  flash = Math.max(0, flash - dt * 3);
+  gun.position.x = -0.9 * Math.sin(recoil * Math.PI) * recoil;
+  gun.rotation.z = 0.06 * Math.sin(recoil * Math.PI) * recoil;
+  api.materials.glow.emissiveIntensity = 2.4 + flash * 6;
+  coreLight.intensity = 8 + 3 * Math.sin(t * 2.2) + flash * 30;
+
+  // Pan the view toward the portal and back, keeping the orbit offset.
+  tmp.subVectors(panTarget, controls.target).multiplyScalar(1 - Math.exp(-panDt * 4));
+  controls.target.add(tmp);
+  camera.position.add(tmp);
+
+  controls.update();
+  composer.render();
+  requestAnimationFrame(frame);
+}
+
+setCore(core);
+drawScreen(DIMENSIONS[0].code);
+document.fonts?.ready.then(() => drawScreen(DIMENSIONS[dimIndex].code));
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
