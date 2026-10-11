@@ -92,6 +92,8 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **B** opens the spawn menu.
 - **Hotbar 1-9 + mouse scroll** to switch tools/guns.
 - **Space x2** = double jump, **hold Space** = jetpack, **V** = fly toggle.
+- **E** pick up light objects with hands, hold click to throw harder (heavy things are too heavy, like real life).
+- **Physics gun** (edit tool): hold click to grab, drag with mouse, scroll to push/pull, **R** to rotate, release to drop, right-click to freeze. (R reloads when a gun is out.)
 - **Z** undo last spawn. Delete tool, Clear All button, Freeze tool (freeze objects in mid-air).
 
 ## v1 details
@@ -108,6 +110,8 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Resizing**: Shift + scroll on the ghost preview (basic shapes only; props stay real size).
 - **Weight**: real density per material, bigger = heavier.
 - **Arena size**: medium, ~300m.
+- **Detonation**: remote detonator (blow all at once), timer with beeping, fuse on TNT (sparks + hiss), chain reactions (TNT/C4/gas tanks set each other off).
+- **Grenades**: cook it (pull pin, hold), real bounce & roll, hold to throw farther with arc preview, shrapnel that damages/dents nearby stuff.
 - **Explosion feel**: camera shake (by distance), ear ringing + muffled sound when too close, visible shockwave + dust cloud, scorch marks that stay on the ground.
 - **Main menu**: live 3D background, a slow camera flying over the arena while stuff explodes, menu on the side.
 - **Arena look**: concrete test facility. Huge concrete pad, painted grid lines, ramps, tall pillars, shipping containers, chain-link fence, open sky.
