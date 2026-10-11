@@ -84,6 +84,12 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 
 ## Controls
 - **B** opens the spawn menu.
+- **Hotbar 1-9 + mouse scroll** to switch tools/guns.
+- **Z** undo last spawn. Delete tool, Clear All button, Freeze tool (freeze objects in mid-air).
+
+## v1 details
+- **Guns**: pistol, assault rifle, shotgun, sniper.
+- **Arena look**: concrete test facility. Huge concrete pad, painted grid lines, ramps, tall pillars, shipping containers, chain-link fence, open sky.
 
 ## Settings menu
 - Graphics quality (Low/Med/High/Ultra), shadows, render distance, FPS counter
