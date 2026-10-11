@@ -12,10 +12,14 @@ import { physicalOf, material } from './materials.js';
 import { partQuat } from './builder.js';
 
 // force (N) a part of "average" size can take before it breaks
-const BREAK_FORCE = { glass: 2600, mirror: 2200, ceramic: 7000, bulb: 250, wood: 6500, paint: 6500, board: 2600, marble: 16000, plastic: 4200, metal: 9000 };
+const BREAK_FORCE = { glass: 2000, mirror: 1800, solar: 5000, ceramic: 5000, bulb: 250, wood: 3800, paint: 3800, board: 1800, marble: 16000, plastic: 4200, metal: 9000 };
+// these crack from a shock anywhere on the thing (drop a glass table on its legs and the top still goes)
+const FRAGILE = new Set(['glass', 'mirror', 'solar', 'ceramic', 'bulb']);
+const kindOf = (part) => (part.mat || 'wood').split(':')[0];
 
 export function breakForce(part) {
-  const kind = (part.mat || 'wood').split(':')[0];
+  if (part.noBreak || part.vis === false) return Infinity; // hidden helper shapes + box contents never break
+  const kind = kindOf(part);
   const base = BREAK_FORCE[kind];
   if (!base) return Infinity;
   let area;
@@ -110,31 +114,56 @@ export class Breaking {
     const w = this.physics.world;
     const f = e.totalForceMagnitude();
     const c1 = w.getCollider(e.collider1()), c2 = w.getCollider(e.collider2());
-    for (const [c, other] of [[c1, c2], [c2, c1]]) {
-      const item = c && this.items.itemOfCollider(c);
+    if (!c1 || !c2) return;
+    // where they touched (copied now: the other collider may be gone by the time we use it)
+    let point = null;
+    try {
+      w.contactPair(c1, c2, (m) => {
+        if (point || m.numSolverContacts() < 1) return;
+        const q = m.solverContactPoint(0);
+        point = new THREE.Vector3(q.x, q.y, q.z);
+      });
+    } catch { /* no manifold */ }
+    // something carried in build mode is moved by your god-hand, not by real force
+    const kin = [c1, c2].some((c) => c.parent()?.isKinematic());
+    for (const c of [c1, c2]) {
+      const item = this.items.itemOfCollider(c);
       if (!item) continue;
       const part = c.userData?.part;
       if (!part) continue;
-      this.queue.push({ item, col: c, part, f, other });
+      this.queue.push({ item, col: c, part, f, point, kin });
     }
+  }
+
+  alive(item, col) {
+    return this.items.items.includes(item) && item.colliders.includes(col);
   }
 
   update(dt) {
     const q = this.queue;
     this.queue = [];
     const done = new Set();
+    const now = performance.now();
+    // the whole jolt each body took this frame (all its contacts together)
+    const shock = new Map();
+    for (const ev of q) {
+      if (ev.kin) continue;
+      const b = ev.col.parent();
+      if (b) shock.set(b.handle, (shock.get(b.handle) || 0) + ev.f);
+    }
     for (const ev of q) {
       const { item, col, part, f } = ev;
-      if (!this.items.items.includes(item) || done.has(col.handle)) continue;
+      if (!this.alive(item, col) || done.has(col.handle)) continue;
       const phys = physicalOf(part.mat || 'wood');
       // sound (max ~12 per second per item)
-      const now = performance.now();
       if (now - (this.lastSound.get(item.uid) || 0) > 80) {
         this.lastSound.set(item.uid, now);
         this.impactSound(phys.sound, f, item.spec.mass || 10);
       }
-      // lamps: a hard knock pops the bulb
-      if (item.def?.power && item.lights?.length && f > 900 && !item.state?.bulbBroken) {
+      // just spawned / set down / carried in build mode: no breaking from settling in
+      if (ev.kin || now < (item.noBreakUntil || 0)) continue;
+      // lamps: a hard knock pops the bulb (judged by how hard the lamp itself got hit)
+      if (item.def?.power && item.lights?.length && f / Math.max(1, item.mass) > 200 && !item.state?.bulbBroken) {
         (item.state ||= {}).bulbBroken = true;
         for (const L of item.lights) {
           L.mesh.visible = false;
@@ -145,7 +174,23 @@ export class Breaking {
       }
       if (f > breakForce(part)) {
         done.add(col.handle);
-        this.breakPart(item, col, part, f, phys.breaks, ev.other);
+        this.breakPart(item, col, part, f, phys.breaks, ev.point);
+      }
+      // the shock travels through the frame into glass/ceramic parts on the same body
+      const body = col.parent();
+      const total = body ? shock.get(body.handle) || 0 : 0;
+      if (total > 0 && this.items.items.includes(item)) {
+        for (const c of [...item.colliders]) {
+          if (done.has(c.handle) || c.parent() !== body) continue;
+          const p2 = c.userData?.part;
+          if (!p2 || !FRAGILE.has(kindOf(p2))) continue;
+          if (total * 0.6 > breakForce(p2)) {
+            done.add(c.handle);
+            this.breakPart(item, c, p2, total * 0.6, physicalOf(p2.mat).breaks, null);
+            if (!this.items.items.includes(item)) break;
+          }
+        }
+        if (body) shock.delete(body.handle); // one shock check per body per frame
       }
     }
     this.particles.update(dt);
@@ -162,22 +207,31 @@ export class Breaking {
     return { pos: new THREE.Vector3(t.x, t.y, t.z), quat: new THREE.Quaternion(r.x, r.y, r.z, r.w) };
   }
 
-  breakPart(item, col, part, force, how, other) {
-    if (how === 'dent') { this.dent(item, part, other, force); return; }
+  breakPart(item, col, part, force, how, point) {
+    if (how === 'dent') { this.dent(item, part, point, force); return; }
     if (!how || how === 'tear') return;
     const body = col.parent();
     const lv = body.linvel();
     const vel = new THREE.Vector3(lv.x, lv.y, lv.z);
     const pose = this.partWorldPose(item, col);
-    // remove the part from the item
+    const dens = col.density();
+    // remove the part from the item (it takes its weight with it)
+    item.state ||= {};
+    item.state.massLost = (item.state.massLost || 0) + col.mass();
     this.items.byHandle.delete(col.handle);
     item.colliders = item.colliders.filter((c) => c !== col);
     this.physics.world.removeCollider(col, true);
-    for (const m of this.partMeshes(item, part)) m.parent.remove(m);
+    for (const m of this.partMeshes(item, part)) { m.parent.remove(m); if (m.userData.ownGeo) m.geometry.dispose(); }
     const idx = item.spec.parts.indexOf(part);
-    (item.state ||= {}).broken = [...(item.state.broken || []), idx];
+    item.state.broken = [...(item.state.broken || []), idx];
     body.wakeUp();
     const mat = part.mat || 'wood';
+    this.afterBreak(item, part, pose, vel, force, how, mat, dens);
+    // nothing left on that body: it's gone (a door with no panel, or the whole frame)
+    if (!item.colliders.some((c) => c.parent() === body)) this.dropBody(item, body);
+  }
+
+  afterBreak(item, part, pose, vel, force, how, mat, dens) {
     if (how === 'shatter') {
       const size = part.s === 'box' ? part.size : [part.r * 2 || 0.1, part.h || 0.1, part.r * 2 || 0.1];
       const n = Math.round(Math.min(14, Math.max(5, (size[0] * size[2]) * 40)));
@@ -185,7 +239,7 @@ export class Breaking {
         const off = new THREE.Vector3((Math.random() - 0.5) * size[0], (Math.random() - 0.5) * (size[1] || 0.01), (Math.random() - 0.5) * size[2]).applyQuaternion(pose.quat);
         this.spawnShard(pose.pos.clone().add(off), mat, Math.max(0.025, Math.min(0.12, Math.sqrt(size[0] * size[2]) / 4)), vel);
       }
-      this.particles.burst(pose.pos, 140, { color: mat.startsWith('glass') ? 0xe8f4f2 : 0xf6f6f3, size: 0.007, speed: 2.2, vel, life: 60 });
+      this.particles.burst(pose.pos, 140, { color: mat.startsWith('glass') ? 0xe8f4f2 : mat.startsWith('solar') ? 0x1a2236 : 0xf6f6f3, size: 0.007, speed: 2.2, vel, life: 60 });
       this.shatterSound(Math.min(1.5, force / 3000));
       return;
     }
@@ -201,28 +255,57 @@ export class Breaking {
         const local = [0, 0, 0];
         local[axis] = (lo + hi - 1) / 2 * long;
         const p = pose.pos.clone().add(new THREE.Vector3(...local).applyQuaternion(pose.quat));
-        this.spawnDebris({ ...part, size, p: [0, 0, 0], rot: null }, p, pose.quat, vel);
+        this.spawnDebris({ ...part, size, p: [0, 0, 0], rot: null, dens }, p, pose.quat, vel);
       }
     } else {
-      this.spawnDebris({ ...part, p: [0, 0, 0], rot: null }, pose.pos, pose.quat, vel);
+      this.spawnDebris({ ...part, p: [0, 0, 0], rot: null, dens }, pose.pos, pose.quat, vel);
     }
     this.particles.burst(pose.pos, 50, { color, size: mat.startsWith('marble') ? 0.01 : 0.006, speed: 1.4, vel });
     this.crackSound(mat, Math.min(1.5, force / 6000));
-    if (!item.colliders.some((c) => c.parent() === item.bodies.main)) this.onMessage(`The ${item.def.name} fell apart.`);
+  }
+
+  // a body lost its last part. A door/drawer just goes; if the main frame is gone, whatever
+  // is left (doors, drawers) falls loose and the item no longer exists.
+  dropBody(item, body) {
+    const w = this.physics.world;
+    const name = Object.keys(item.bodies).find((n) => item.bodies[n] === body);
+    if (!name) return;
+    if (name === 'main') {
+      for (const c of [...item.colliders]) {
+        const part = c.userData?.part;
+        if (!part || part.vis === false) continue;
+        const b = c.parent(), lv = b.linvel();
+        const pose = this.partWorldPose(item, c);
+        this.spawnDebris({ ...part, p: [0, 0, 0], rot: null, dens: c.density() }, pose.pos, pose.quat, new THREE.Vector3(lv.x, lv.y, lv.z));
+      }
+      this.items.remove(item);
+      this.onMessage(`The ${item.def.name} fell apart.`);
+      return;
+    }
+    const j = item.joints.find((x) => x.name === name);
+    if (j) { w.removeImpulseJoint(j.joint, true); item.joints = item.joints.filter((x) => x !== j); }
+    w.removeRigidBody(body);
+    delete item.bodies[name];
+    if (item.groups[name]) { item.root.remove(item.groups[name]); delete item.groups[name]; }
   }
 
   spawnDebris(part, pos, quat, vel) {
     const R = this.R, w = this.physics.world;
-    const body = w.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w }).setLinvel(vel.x, vel.y, vel.z).setCcdEnabled(true));
     const phys = physicalOf(part.mat || 'wood');
-    let desc;
-    if (part.s === 'box') { const r = Math.min(part.round ?? 0.004, ...part.size.map((s) => s / 2 - 1e-4)); desc = r > 0.0015 ? R.ColliderDesc.roundCuboid(part.size[0] / 2 - r, part.size[1] / 2 - r, part.size[2] / 2 - r, r) : R.ColliderDesc.cuboid(...part.size.map((s) => s / 2)); }
-    else if (part.s === 'cyl') desc = R.ColliderDesc.cylinder(part.h / 2, part.r);
-    else if (part.s === 'sphere') desc = R.ColliderDesc.ball(part.r);
-    else if (part.s === 'capsule') desc = R.ColliderDesc.capsule(part.h / 2, part.r);
-    else desc = R.ColliderDesc.ball(0.05);
-    w.createCollider(desc.setDensity(phys.density * 0.8).setFriction(phys.friction), body);
-    const geo = part.s === 'box' ? new THREE.BoxGeometry(...part.size) : part.s === 'cyl' ? new THREE.CylinderGeometry(part.r, part.r, part.h, 12) : part.s === 'cone' ? new THREE.CylinderGeometry(part.r2, part.r, part.h, 12) : new THREE.SphereGeometry(part.r || 0.05, 10, 8);
+    // same shape for the mesh and the collider
+    let geo, desc;
+    if (part.s === 'box') {
+      const r = Math.min(part.round ?? 0.004, ...part.size.map((s) => s / 2 - 1e-4));
+      desc = r > 0.0015 ? R.ColliderDesc.roundCuboid(part.size[0] / 2 - r, part.size[1] / 2 - r, part.size[2] / 2 - r, r) : R.ColliderDesc.cuboid(...part.size.map((s) => s / 2));
+      geo = new THREE.BoxGeometry(...part.size);
+    } else if (part.s === 'cyl') { desc = R.ColliderDesc.cylinder(part.h / 2, part.r); geo = new THREE.CylinderGeometry(part.r, part.r, part.h, 12); }
+    else if (part.s === 'cone') { geo = new THREE.CylinderGeometry(part.r2, part.r, part.h, 12); desc = R.ColliderDesc.convexHull(new Float32Array(geo.attributes.position.array)); }
+    else if (part.s === 'capsule') { desc = R.ColliderDesc.capsule(part.h / 2, part.r); geo = new THREE.CapsuleGeometry(part.r, part.h, 4, 10); }
+    else if (part.s === 'sphere') { desc = R.ColliderDesc.ball(part.r); geo = new THREE.SphereGeometry(part.r, 10, 8); }
+    else { desc = R.ColliderDesc.ball(0.05); geo = new THREE.SphereGeometry(0.05, 10, 8); }
+    if (!desc) { geo.dispose(); return; }
+    const body = w.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w }).setLinvel(vel.x, vel.y, vel.z).setCcdEnabled(true));
+    w.createCollider(desc.setDensity(part.dens ?? phys.density * (part.hollow ?? 1)).setFriction(phys.friction), body);
     const mesh = new THREE.Mesh(geo, material(part.mat || 'wood'));
     mesh.castShadow = true; mesh.receiveShadow = true;
     this.scene.add(mesh);
@@ -253,8 +336,8 @@ export class Breaking {
     for (let i = 1; i < 5; i++) tri.push(...P(0), ...P(i), ...P(i + 1));
     g.setAttribute('position', new THREE.Float32BufferAttribute(tri, 3));
     g.computeVertexNormals();
-    const m = material(mat).clone();
-    m.side = THREE.DoubleSide;
+    let m = this.shardMats?.get(mat);
+    if (!m) { m = material(mat).clone(); m.side = THREE.DoubleSide; (this.shardMats ||= new Map()).set(mat, m); }
     const mesh = new THREE.Mesh(g, m);
     this.scene.add(mesh);
     this.debris.push({ body, mesh, part: { shard: true, pts, mat } });
@@ -262,18 +345,19 @@ export class Breaking {
   }
 
   trimDebris() {
-    while (this.debris.length > 180) {
-      const d = this.debris.shift();
-      this.physics.world.removeRigidBody(d.body);
-      this.scene.remove(d.mesh);
-    }
+    while (this.debris.length > 180) this.freeDebris(this.debris.shift());
   }
 
-  dent(item, part, other, force) {
+  freeDebris(d) {
+    this.physics.world.removeRigidBody(d.body);
+    this.scene.remove(d.mesh);
+    d.mesh.geometry.dispose(); // shard materials are shared + kept; part materials are cached
+  }
+
+  dent(item, part, point, force) {
     const meshes = this.partMeshes(item, part);
-    if (!meshes.length || !other) return;
-    const ot = other.translation();
-    const hit = new THREE.Vector3(ot.x, ot.y, ot.z);
+    if (!meshes.length || !point) return;
+    const hit = point;
     for (const mesh of meshes) {
       if (!mesh.userData.ownGeo) { mesh.geometry = mesh.geometry.clone(); mesh.userData.ownGeo = true; }
       const inv = new THREE.Matrix4().copy(mesh.matrixWorld).invert();
@@ -358,8 +442,15 @@ export class Breaking {
 
   dispose() {
     this.unhook();
-    for (const d of this.debris) { this.physics.world.removeRigidBody(d.body); this.scene.remove(d.mesh); }
+    for (const d of this.debris) this.freeDebris(d);
+    this.debris = [];
+    for (const m of this.shardMats?.values() || []) m.dispose();
+    this.shardMats = null;
     this.scene.remove(this.particles.mesh);
+    this.particles.geo.dispose();
+    this.particles.mesh.material.dispose();
+    this.particles.mesh.dispose?.();
+    if (this.items.onCollider) this.items.onCollider = null;
   }
 }
 

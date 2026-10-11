@@ -44,7 +44,8 @@ export class PowerGrid {
     const s = item.state;
     const src = item.def?.source;
     if (src?.kind === 'generator') { s.fuel ??= 0; s.running ??= false; s.tripped ??= false; }
-    if (src?.kind === 'battery') { s.charge ??= src.wh * 0.8; s.on ??= true; s.tripped ??= false; }
+    if (src?.kind === 'battery') { s.charge ??= src.wh * 0.8; s.on ??= true; s.tripped ??= false; s.empty ??= s.charge <= 1; }
+    if (src?.kind === 'strip') s.tripped ??= false;
     if (item.itemId === 'gascan') s.fuel ??= 18.9;
     if (item.def?.power) s.on ??= !hasSwitch(item); // fridges are always on; lamps start switched off
     return s;
@@ -56,8 +57,8 @@ export class PowerGrid {
   sourceLive(it) {
     const s = this.st(it), src = it.def.source;
     if (src.kind === 'generator') return s.running && !s.tripped && s.fuel > 0;
-    if (src.kind === 'battery') return s.on && !s.tripped && s.charge > 1;
-    if (src.kind === 'strip') { const up = this.links.find((l) => l.from === it); return up ? this.sourceLive(up.to) : false; }
+    if (src.kind === 'battery') return s.on && !s.tripped && !s.empty;
+    if (src.kind === 'strip') { if (s.tripped) return false; const up = this.links.find((l) => l.from === it); return up ? this.sourceLive(up.to) : false; }
     return false;
   }
 
@@ -81,43 +82,43 @@ export class PowerGrid {
   // ---------- connecting things ----------
   solve() {
     const items = this.items.items;
+    const alive = new Set(items);
     const sources = items.filter((it) => this.isSource(it));
     const links = [];
     const used = new Map(); // source -> Set(outlet index)
-    const take = (src, devPoint, reach) => {
+    const mark = (s, i) => (used.get(s) || used.set(s, new Set()).get(s)).add(i);
+    const free = (s, i) => !used.get(s)?.has(i);
+    const linked = new Set();
+    const reachOf = (it) => (it.def.source?.kind === 'strip' ? it.def.source.reach : CORD[it.itemId] ?? CORD.default);
+    const plugAt = (it) => (it.def.source?.kind === 'strip' ? it.position : this.cordPoint(it));
+    // what's already plugged in stays plugged in while its cord still reaches (no outlet stealing)
+    for (const l of this.links) {
+      if (l.kind === 'solar' || !alive.has(l.from) || !alive.has(l.to) || linked.has(l.from) || !free(l.to, l.outlet)) continue;
+      const out = l.to.def.source?.outlets?.[l.outlet];
+      if (!out || this.worldPoint(l.to, out).distanceTo(plugAt(l.from)) > reachOf(l.from)) continue;
+      mark(l.to, l.outlet); linked.add(l.from); links.push(l);
+    }
+    const nearestFree = (point, reach, allowStrips) => {
       let best = null;
       for (const s of sources) {
-        if (s.def.source.kind === 'strip' && reach !== null && s === devPoint.self) continue;
-        const outs = s.def.source.outlets;
-        for (let i = 0; i < outs.length; i++) {
-          if (used.get(s)?.has(i)) continue;
-          const p = this.worldPoint(s, outs[i]);
-          const d = p.distanceTo(devPoint.p);
-          if (d <= reach && (!best || d < best.d)) best = { s, i, d, p };
-        }
+        if (!allowStrips && s.def.source.kind === 'strip') continue; // no daisy-chaining cords
+        s.def.source.outlets.forEach((o, i) => {
+          if (!free(s, i)) return;
+          const d = this.worldPoint(s, o).distanceTo(point);
+          if (d <= reach && (!best || d < best.d)) best = { s, i, d };
+        });
       }
       return best;
     };
-    // strips first (they plug into real sources only: no daisy-chaining)
-    for (const strip of sources.filter((s) => s.def.source.kind === 'strip')) {
-      const p = strip.position;
-      let best = null;
-      for (const s of sources) {
-        if (s.def.source.kind === 'strip') continue;
-        s.def.source.outlets.forEach((o, i) => {
-          if (used.get(s)?.has(i)) return;
-          const q = this.worldPoint(s, o), d = q.distanceTo(p);
-          if (d <= strip.def.source.reach && (!best || d < best.d)) best = { s, i, d };
-        });
-      }
-      if (best) { (used.get(best.s) || used.set(best.s, new Set()).get(best.s)).add(best.i); links.push({ from: strip, to: best.s, outlet: best.i, kind: 'strip' }); }
+    // extension cords plug into real sources only
+    for (const strip of sources.filter((s) => s.def.source.kind === 'strip' && !linked.has(s))) {
+      const best = nearestFree(strip.position, strip.def.source.reach, false);
+      if (best) { mark(best.s, best.i); linked.add(strip); links.push({ from: strip, to: best.s, outlet: best.i, kind: 'strip' }); }
     }
-    this.links = links; // so strips resolve their upstream while devices connect
-    // devices
-    for (const dev of items.filter((it) => it.def?.power)) {
-      const reach = CORD[dev.itemId] ?? CORD.default;
-      const best = take(null, { p: this.cordPoint(dev), self: dev }, reach);
-      if (best) { (used.get(best.s) || used.set(best.s, new Set()).get(best.s)).add(best.i); links.push({ from: dev, to: best.s, outlet: best.i, kind: 'device' }); }
+    // devices plug into the closest free outlet their cord reaches (a source or a cord box)
+    for (const dev of items.filter((it) => it.def?.power && !linked.has(it))) {
+      const best = nearestFree(this.cordPoint(dev), reachOf(dev), true);
+      if (best) { mark(best.s, best.i); linked.add(dev); links.push({ from: dev, to: best.s, outlet: best.i, kind: 'device' }); }
     }
     // solar panels -> nearest battery station within 6 m
     for (const panel of items.filter((it) => it.itemId === 'solarpanel')) {
@@ -136,34 +137,43 @@ export class PowerGrid {
   update(dt, hands) {
     const items = this.items.items;
     for (const it of items) this.st(it);
+    // something got deleted, broken or built: re-plug right now (never keep a cord to nothing)
+    const alive = new Set(items);
+    if (this.links.some((l) => !alive.has(l.from) || !alive.has(l.to))) this.solveT = 0;
     this.solveT -= dt;
     if (this.solveT <= 0) { this.solveT = 0.25; this.solve(); }
 
     const gameHours = (dt * this.clock.rate) / 3600;
     // loads per root source
     const load = new Map();
+    const addLoad = (k, w) => load.set(k, (load.get(k) || 0) + w);
     for (const it of items) if (it.state) it.state.powered = false;
     for (const l of this.links) {
       if (l.kind !== 'device') continue;
       const root = this.rootSource(l.to);
-      if (!root || !this.sourceLive(root)) continue;
+      if (!root || !this.sourceLive(l.to)) continue;
       const dev = l.from;
       dev.state.powered = true;
-      if (dev.state.on) load.set(root, (load.get(root) || 0) + draw(dev));
+      if (dev.state.on) { const w = this.draw(dev, dt); addLoad(root, w); if (l.to !== root) addLoad(l.to, w); }
     }
+    for (const it of items) if (it.def?.power && it.state) it.state.wasOn = it.state.powered && it.state.on;
     // sources: fuel, battery, overloads
     for (const it of items) {
       if (!this.isSource(it)) continue;
       const s = it.state, src = it.def.source;
       const w = load.get(it) || 0;
       s.load = w;
-      if (w > src.watts && !s.tripped && this.sourceLive(it)) {
+      // breakers ride out a short surge (a motor starting) but not a real overload
+      s.overT = w > src.watts ? (s.overT || 0) + dt : 0;
+      if ((w > src.watts * 1.2 || s.overT > 2) && !s.tripped && this.sourceLive(it)) {
         s.tripped = true;
-        this.onMessage(`${it.def.name}: breaker tripped (too much plugged in: ${Math.round(w)} W of ${src.watts} W). Click the breaker to reset.`);
+        s.overT = 0;
+        this.onMessage(`${it.def.name}: breaker tripped (too much plugged in: ${Math.round(w)} W of ${src.watts} W). Click ${src.kind === 'strip' ? 'the cord box' : 'the breaker'} to reset.`);
         this.audio.ui?.('click');
       }
       if (src.kind === 'generator' && s.running) {
-        s.fuel = Math.max(0, s.fuel - gameHours * (0.35 + 1.25 * (w / src.watts)));
+        // ~1.65 L an hour at half load: a 15 L tank lasts about 9 hours
+        s.fuel = Math.max(0, s.fuel - gameHours * (0.6 + 2.1 * Math.min(1, w / src.watts)));
         if (s.fuel <= 0) { s.running = false; this.onMessage('The generator ran out of gas and stopped.'); }
       }
       if (src.kind === 'battery') {
@@ -171,7 +181,10 @@ export class PowerGrid {
         for (const l of this.links) if (l.kind === 'solar' && l.to === it) solarW += this.solarWatts(l.from);
         s.solarW = solarW;
         s.charge = clamp(s.charge + gameHours * (solarW * 0.9 - (this.sourceLive(it) ? w : 0)), 0, src.wh);
-        if (s.charge <= 1 && s.on) this.onMessage('The SunStack battery is empty.');
+        // shuts off when flat, comes back once the panels put a little in (no flickering on/off)
+        s.empty = s.charge <= 1 || (s.empty && s.charge < 0.03 * src.wh);
+        if (s.empty && s.on && !s.emptyWarned) { s.emptyWarned = true; this.onMessage('The SunStack battery is empty.'); }
+        if (!s.empty) s.emptyWarned = false;
       }
     }
     // pouring gas: hold a gas can right by the generator's fuel cap
@@ -194,8 +207,20 @@ export class PowerGrid {
     this.updateSounds();
   }
 
+  // watts a device pulls right now. A fridge compressor kicks on with a big surge for a moment.
+  draw(dev, dt) {
+    const s = dev.state;
+    if (dev.itemId === 'fridge-kelvin') {
+      if (!s.wasOn) s.surgeT = 1.5;
+      if (s.surgeT > 0) { s.surgeT -= dt; return 1200; }
+    }
+    return dev.def.power || 0;
+  }
+
   solarWatts(panel) {
-    const part = panel.spec.parts.find((p) => p.solar);
+    const idx = panel.spec.parts.findIndex((p) => p.solar);
+    if (idx < 0 || panel.state?.broken?.includes(idx)) return 0; // smashed glass makes nothing
+    const part = panel.spec.parts[idx];
     const r = panel.bodies.main.rotation();
     const n = new THREE.Vector3(0, 1, 0).applyEuler(new THREE.Euler(...part.rot.map((d) => d * Math.PI / 180))).applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w));
     const sun = this.sky.sunDir;
@@ -230,7 +255,12 @@ export class PowerGrid {
       else this.onMessage('Sputter... try pulling again.');
       return true;
     }
-    if (kind === 'breaker') { if (s.tripped) { s.tripped = false; this.onMessage('Breaker reset.'); } this.audio.ui?.('click'); return true; }
+    if (kind === 'breaker') {
+      if (s.tripped) { s.tripped = false; s.overT = 0; this.onMessage('Breaker reset.'); }
+      else if (item.def.source?.kind === 'strip') this.onMessage(`Cord box: ${Math.round(s.load || 0)} W of ${item.def.source.watts} W.`);
+      this.audio.ui?.('click');
+      return true;
+    }
     if (kind === 'fuel') { this.onMessage(`Fuel: ${s.fuel.toFixed(1)} of 15 L. Hold a gas can here to pour.`); return true; }
     return false;
   }
@@ -249,7 +279,7 @@ export class PowerGrid {
         const m = it.bodies.main.rotation();
         const qm = new THREE.Quaternion(m.x, m.y, m.z, m.w);
         interior = ['doorL', 'doorR'].some((n) => { const r = it.bodies[n]?.rotation(); return r && qm.angleTo(new THREE.Quaternion(r.x, r.y, r.z, r.w)) > 0.15; });
-        on = s.powered && interior;
+        on = s.powered && interior && !s.bulbBroken;
       }
       for (const L of it.lights) {
         setGlow(L.mesh, on);
@@ -309,13 +339,17 @@ export class PowerGrid {
 
   dispose() {
     this.scene.remove(this.cordGroup);
-    for (const l of this.lights) this.scene.remove(l);
+    for (const c of this.cords.values()) c.mesh.geometry.dispose();
+    this.cords.clear();
+    this.cordMat.dispose();
+    this.cordMatOrange.dispose();
+    for (const l of this.lights) { this.scene.remove(l); l.dispose?.(); }
     this.engine?.stop();
+    this.engine = null;
   }
 }
 
 function hasSwitch(item) { return item.spec.parts.some((p) => p.use === 'switch'); }
-function draw(dev) { return dev.def.power || 0; }
 
 function setGlow(mesh, on, k = 1) {
   const m = mesh.material;

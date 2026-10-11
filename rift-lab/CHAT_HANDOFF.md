@@ -397,3 +397,39 @@ Claude explained it was only a test and nothing had changed. Then:
 - **Power (2b picks):** nothing electric works without a source. Torque PowerPro 3500 W gas generator ships **empty**, so you fill it by holding a 5-gal gas can (19 L) by its fuel cap (pours ~0.3 L/s). Click the pull-cord to start (55% chance per pull, like a cold engine). It burns 0.35 + 1.25 × load L per game hour. SunStack 2000 power station (2,048 Wh, 2,000 W, ships 80% charged) charges from SunStack 400 W panels within 6 m, using the real sun angle + clouds (0 W at night). 25 ft extension cord box (7.6 m reach, no daisy-chaining). Devices auto-plug when their cord (~1.8 m) reaches a free outlet, and a visible sagging cord is drawn. Overload trips the breaker (click it to reset). Lamps start switched **off**: click to switch on. The fridge's inside light comes on when a door is open. 6 pooled point lights (nearest lamps win) so the game doesn't stutter.
 - **Flat-pack (2b picks):** flat-pack items arrive in a taped Nordbo box sized from the furniture. Click the tape to cut it, drag the 2 flaps open, then hold left-click on the parts. Time runs **x60 while you build** (loveseat 45 min, coffee table 15, bookcase 40, wardrobe 120, bunk bed 150 game-minutes). 12% chance of a missing screw: one leg ends up 6 mm short, so the piece really rocks. A flattened box is left over.
 - **Breaking (2b picks):** based on real impact force (N). Glass/ceramic/bulbs shatter into physics shards + glitter. Wood snaps off (boards over 55 cm split in two) + splinters. Particle board crumbles easier. Marble/plastic crack. Metal dents. Fabric just thuds. A hard knock (>900 N) pops a lamp's bulb. Broken parts are saved; tiny shards are not kept between sessions. Impact sounds per material.
+- **2b fix round (after a 46-finding bug hunt + headless tests):**
+  - Fixed crashes when something you're using disappears: a box that just got built, a generator you deleted while lamps were plugged in, or a part that got hit after it broke off.
+  - Real numbers I changed:
+    - Generator burns **0.6 + 2.1 × load L/h**, so a 15 L tank lasts about 9 h at half load, like the real spec.
+    - The SunStack shuts off when flat and only comes back at 3% charge, so it doesn't flicker. It warns you once.
+    - A fridge compressor pulls a **1,200 W surge** for 1.5 s when it kicks on.
+    - Breakers ride out short surges but trip on a real overload: over 120% instantly, or over 100% for 2 s.
+    - The cord box got its own **15 A breaker** (click the box to reset or read its load).
+  - Things you plugged in stay plugged in; a new device can't steal an outlet.
+  - Solar panel:
+    - Tilted **28°**, matching its legs, glass facing you when placed.
+    - New real look: 108 half-cut mono cells, busbars, the split down the middle, an aluminum frame, and tempered glass.
+    - Smashed glass makes 0 W.
+  - Flat-pack:
+    - The weight sits in the parts inside, so the flaps are light cardboard (~50 g).
+    - Building runs time at **at least 60×**: a faster day setting isn't sped up even more.
+    - The finished piece stands upright even if the box got knocked over.
+    - The placement ghost shows the **box**, not the built furniture.
+    - Missing-screw wobble now only shortens a real leg.
+  - Breaking:
+    - Lowered to realistic numbers: wood 3,800 N, particle board 1,800, glass 2,000, ceramic 5,000, tempered solar glass 5,000.
+    - **The shock travels through the frame**: drop a glass table on its legs and the glass top still shatters.
+    - Lamp bulbs pop by how hard the lamp itself got hit, so a heavy object bumping a lamp isn't the same as the lamp falling over.
+    - New spawns and things you set down in build mode get 1.5 s to settle before anything can break.
+    - Build-mode carrying never breaks things, because it's a god-hand.
+    - Broken-off parts keep their real weight as debris, and the item gets that much lighter.
+    - A door with nothing left on it falls away. If the whole frame breaks, everything left falls apart as loose pieces.
+  - Memory: debris, shards, cords, materials and particles are all freed (no slowdowns over long sessions).
+  - Tested headless:
+    - Pour gas, then pull-start, and the lamp lights at night.
+    - Fridge through the cord box, with its surge visible.
+    - Solar charging at midday.
+    - Cut tape, pull both flaps open **by hand**, hold to build, and the bookshelf appears in 40 s with the box left over.
+    - A glass table dropped from 3.5 m shatters, and a chair dropped from 6 m loses a part.
+    - Knocking a lamp over pops its bulb.
+    - Delete-while-plugged-in and build-while-clicking cause no crashes.

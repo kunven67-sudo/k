@@ -46,5 +46,5 @@ export class Physics {
     return this.world.castRay(ray, maxToi, true, undefined, undefined, excludeCollider);
   }
 
-  free() { this.world.free(); }
+  free() { this.queue.free(); this.world.free(); this.stepHooks.clear(); this.forceHooks.clear(); }
 }

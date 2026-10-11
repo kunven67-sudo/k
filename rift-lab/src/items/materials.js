@@ -236,6 +236,45 @@ function cardboardTextures() {
   });
 }
 
+// A 400 W solar panel face: 108 half-cut mono cells (6 x 18) on a white backsheet, thin silver
+// busbars, the split down the middle, and the aluminum frame. One texture = the whole panel.
+function solarTextures() {
+  return cached('solar', () => {
+    const W = 1024, H = 672; // canvas x = panel length (1.72 m), y = width (1.13 m)
+    const map = canvasTex((ctx) => {
+      ctx.fillStyle = '#c9ccd0'; ctx.fillRect(0, 0, W, H);            // frame
+      ctx.fillStyle = '#e9ecef'; ctx.fillRect(12, 12, W - 24, H - 24); // backsheet
+      const cols = 18, rows = 6, gap = 3, mid = 10;
+      const cw = (W - 24 - mid - gap * (cols + 1)) / cols, ch = (H - 24 - gap * (rows + 1)) / rows;
+      const rand = mulberry32(400);
+      for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+        const x = 12 + gap + i * (cw + gap) + (i >= cols / 2 ? mid : 0), y = 12 + gap + j * (ch + gap);
+        const g = ctx.createLinearGradient(x, y, x + cw, y + ch);
+        const t = rand() * 6;
+        g.addColorStop(0, `rgb(${16 + t},${22 + t},${38 + t})`); g.addColorStop(1, `rgb(${10 + t},${14 + t},${28 + t})`);
+        ctx.fillStyle = g;
+        // mono cells have clipped corners
+        const k = 5;
+        ctx.beginPath();
+        ctx.moveTo(x + k, y); ctx.lineTo(x + cw - k, y); ctx.lineTo(x + cw, y + k); ctx.lineTo(x + cw, y + ch - k);
+        ctx.lineTo(x + cw - k, y + ch); ctx.lineTo(x + k, y + ch); ctx.lineTo(x, y + ch - k); ctx.lineTo(x, y + k); ctx.closePath();
+        ctx.fill();
+        // fine fingers + busbars
+        ctx.fillStyle = 'rgba(120,130,150,0.18)';
+        for (let f = 2; f < cw; f += 3) ctx.fillRect(x + f, y + 1, 0.6, ch - 2);
+        ctx.fillStyle = 'rgba(205,210,220,0.7)';
+        for (let b = 1; b <= 9; b++) ctx.fillRect(x, y + (ch * b) / 10 - 0.5, cw, 1);
+      }
+      // ribbon tabs between strings
+      ctx.fillStyle = 'rgba(200,205,212,0.9)';
+      ctx.fillRect(14, 12, 4, H - 24); ctx.fillRect(W - 18, 12, 4, H - 24);
+    }, { w: W, h: H });
+    map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+    map.anisotropy = 16;
+    return { map };
+  });
+}
+
 // ---------- palettes for options ----------
 export const FABRIC_COLORS = {
   'Stone gray': 0x8d8b88, 'Charcoal': 0x3c3d40, 'Oatmeal': 0xcbbfa8, 'Navy': 0x27324a, 'Forest green': 0x34503c,
@@ -318,6 +357,17 @@ export function material(key) {
       m.userData.tile = 1.0;
       break;
     }
+    case 'solar': {
+      // tempered glass over the cells; the UVs of the 1.72 x 1.13 m panel face map onto the whole texture
+      const t = solarTextures();
+      const map = t.map.clone();
+      map.repeat.set(1 / 1.72, 1 / 1.13);
+      map.offset.set((0.86 - 0.37) / 1.72, (0.565 - 0.11) / 1.13);
+      map.needsUpdate = true;
+      m = new THREE.MeshPhysicalMaterial({ map, roughness: 0.32, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.2 });
+      m.userData.tile = 1;
+      break;
+    }
     case 'foam': m = new THREE.MeshStandardMaterial({ color: 0xe9e3cf, roughness: 1 }); break;
     case 'rubber': m = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.85 }); break;
     case 'plastic': m = new THREE.MeshPhysicalMaterial({ color: a ? Number(a) : 0x222222, roughness: 0.4, clearcoat: 0.3 }); break;
@@ -347,6 +397,7 @@ export const PHYSICAL = {
   rubber: { density: 1100, friction: 0.95, sound: 'soft', breaks: null, strength: 9 },
   plastic: { density: 950, friction: 0.5, sound: 'plastic', breaks: 'crack', strength: 0.8 },
   bulb: { density: 500, friction: 0.3, sound: 'glass', breaks: 'shatter', strength: 0.2 },
+  solar: { density: 2500, friction: 0.4, sound: 'glass', breaks: 'shatter', strength: 0.6 },
   shade: { density: 200, friction: 0.6, sound: 'soft', breaks: 'tear', strength: 2 },
 };
 

@@ -46,8 +46,10 @@ export class FlatPack {
     return ['flapA', 'flapB'].every((n) => { const r = box.bodies[n].rotation(); return qm.angleTo(new THREE.Quaternion(r.x, r.y, r.z, r.w)) > 1.25; });
   }
 
+  alive(box) { return !!box && this.items.items.includes(box); }
+
   use(box, part) {
-    if (box.itemId !== 'flatbox') return false;
+    if (box.itemId !== 'flatbox' || !this.alive(box)) return false;
     box.state ||= {};
     if (part.use === 'cutTape') {
       if (box.state.tapeCut) return true;
@@ -66,15 +68,18 @@ export class FlatPack {
 
   // called every frame while you hold left-click on the box's contents
   hold(box, dt) {
-    if (!box || box.itemId !== 'flatbox') { this.stop(); return; }
-    if (!box.state?.tapeCut) { this.stop(); return; }
-    if (!this.flapsOpen(box)) { this.stop(); return; }
+    if (!this.alive(box) || box.itemId !== 'flatbox') { this.stop(); return null; }
+    if (!box.state?.tapeCut) { this.stop(); return null; }
+    if (!this.flapsOpen(box)) { this.stop(); return null; }
     const def = getItem(box.chosen.forId);
     const need = def.assemblyMin || 30;
     if (this.working !== box) {
+      this.stop();
       this.working = box;
       this.savedFF = this.clock.fastForward;
-      this.clock.fastForward = 60;
+      // time runs at least 60x real while you work (faster day settings already are)
+      const base = this.clock.rate / this.clock.fastForward;
+      this.clock.fastForward = Math.max(1, 60 / base);
     }
     box.state.progress = (box.state.progress || 0) + (dt * this.clock.rate) / 60; // game minutes
     this.tick = (this.tick || 0) + dt;
@@ -85,8 +90,9 @@ export class FlatPack {
       if (r < 0.6) for (let i = 0; i < 3; i++) this.audio.tone?.({ freq: 3200 + Math.random() * 600, dur: 0.012, gain: 0.04, type: 'square', delay: i * 0.05 });
       else this.audio.burst?.({ dur: 0.08, freq: 400, q: 2, gain: 0.12 });
     }
-    if (box.state.progress >= need) this.finish(box, def);
-    return Math.min(1, box.state.progress / need);
+    const p = Math.min(1, box.state.progress / need);
+    if (box.state.progress >= need) { this.finish(box, def); return null; }
+    return p;
   }
 
   stop() {
@@ -98,13 +104,15 @@ export class FlatPack {
   finish(box, def) {
     this.stop();
     const t = box.bodies.main.translation(), r = box.bodies.main.rotation();
-    const pose = { position: new THREE.Vector3(t.x, t.y, t.z), quaternion: new THREE.Quaternion(r.x, r.y, r.z, r.w) };
+    // it stands up the right way even if the box got knocked over: keep only the box's heading
+    const yaw = new THREE.Euler().setFromQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w), 'YXZ').y;
+    const pose = { position: new THREE.Vector3(t.x, t.y, t.z), quaternion: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw) };
     const chosen = JSON.parse(box.chosen.forChosen || '{}');
     const missing = Math.random() < MISSING_SCREW_CHANCE;
     if (missing) chosen._wobble = Math.floor(Math.random() * 97);
     const { L, W } = box.chosen;
     this.items.remove(box);
-    pose.position.y += 0.02;
+    pose.position.y += 0.005;
     const built = this.items.spawn(def.id, chosen, pose);
     // leftover: the flattened box, set down next to it
     const side = new THREE.Vector3(1, 0, 0).applyQuaternion(pose.quaternion);

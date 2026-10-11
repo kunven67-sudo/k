@@ -35,7 +35,10 @@ export class Hands {
 
   // per rendered frame
   update(dt) {
-    if (!this.enabled || !input.locked) { if (this.held) this.release(false); this.aim = null; return; }
+    if (!this.enabled || !input.locked) { if (this.held) this.release(false); this.cancelPending(); this.aim = null; return; }
+    // the thing you were clicking on is gone (built, broken, deleted)
+    if (this.pending && !this.items.items.includes(this.pending.aim.item)) this.cancelPending();
+    if (this.held && !this.heldValid()) { this.held = null; this.charge = 0; }
     const cam = this.camera.position, dir = this.lookDir();
     const hit = this.physics.castRay({ x: cam.x, y: cam.y, z: cam.z }, { x: dir.x, y: dir.y, z: dir.z }, REACH, this.player.collider);
     this.aim = null;
@@ -61,7 +64,9 @@ export class Hands {
       const pa = this.pending.aim;
       if (input.mouse(0)) {
         this.pending.t += dt;
-        if (pa.use === 'assemble') this.events.push({ type: 'assembleHold', item: pa.item, dt });
+        // building only goes on while you keep your hands on that box
+        if (pa.use === 'assemble' && this.aim?.item !== pa.item) this.cancelPending();
+        else if (pa.use === 'assemble') this.events.push({ type: 'assembleHold', item: pa.item, dt });
         else if (this.pending.t > 0.25 && pa.movable) { this.grab(pa); this.pending = null; } // held = grab it instead
       } else {
         if (this.pending.t <= 0.25) this.events.push({ type: 'use', item: pa.item, part: pa.part });
@@ -75,6 +80,18 @@ export class Hands {
       if (input.mouse(2)) this.charge = Math.min(1, this.charge + dt / 0.8);
       else if (this.charge > 0) { this.throw(); }
     } else this.charge = 0;
+  }
+
+  // still holding something real? (it could have been built, deleted, or snapped off)
+  heldValid() {
+    const h = this.held;
+    return !!h && this.items.items.includes(h.item) && Object.values(h.item.bodies).includes(h.body);
+  }
+
+  cancelPending() {
+    if (!this.pending) return;
+    if (this.pending.aim.use === 'assemble') this.events.push({ type: 'assembleStop' });
+    this.pending = null;
   }
 
   grab(a) {
@@ -115,7 +132,7 @@ export class Hands {
     const held = this.held;
     if (!held) return;
     const body = held.body;
-    if (typeof body.isValid === 'function' && !body.isValid()) { this.held = null; return; }
+    if (!this.heldValid()) { this.held = null; return; }
     const cam = this.camera.position;
     const dir = this.lookDir();
     const target = new THREE.Vector3().copy(cam).addScaledVector(dir, held.dist);
@@ -139,5 +156,5 @@ export class Hands {
 
   get carryMass() { return this.held ? this.held.body.mass() : 0; }
 
-  dispose() { this.release(false); this.unhook(); }
+  dispose() { this.release(false); this.pending = null; this.unhook(); }
 }

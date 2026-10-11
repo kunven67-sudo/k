@@ -21,7 +21,10 @@ export class SpawnedItem {
     this.state = saved?.state ? JSON.parse(JSON.stringify(saved.state)) : {};
     // a missing screw: one leg is a few millimeters short, so it really rocks
     if (this.chosen._wobble != null) {
-      const legs = this.spec.parts.map((p, i) => [p, i]).filter(([p]) => (p.s === 'box' || p.s === 'cyl' || p.s === 'cone') && p.p && Math.abs(p.p[1] - (p.s === 'box' ? p.size[1] : p.h) / 2) < 0.01);
+      const onMain = (p) => (p.body || 'main') === 'main' && p.col !== false && !p.rot;
+      let legs = this.spec.parts.map((p, i) => [p, i]).filter(([p]) => p.leg && onMain(p));
+      // no tagged legs: anything standing on the floor (bookshelf sides, a wardrobe plinth)
+      if (!legs.length) legs = this.spec.parts.map((p, i) => [p, i]).filter(([p]) => onMain(p) && (p.s === 'box' || p.s === 'cyl' || p.s === 'cone') && p.p && Math.abs(p.p[1] - (p.s === 'box' ? p.size[1] : p.h) / 2) < 0.01);
       if (legs.length) {
         const [leg, i] = legs[this.chosen._wobble % legs.length];
         const nl = { ...leg, p: [leg.p[0], leg.p[1] + 0.003, leg.p[2]] };
@@ -31,6 +34,9 @@ export class SpawnedItem {
     }
     // parts that broke off before (saved) stay gone
     for (const i of this.state.broken || []) if (this.spec.parts[i]) this.spec.parts[i] = { ...this.spec.parts[i], vis: false, col: false };
+    if (this.state.massLost && this.spec.mass) this.spec.mass = Math.max(this.spec.mass * 0.05, this.spec.mass - this.state.massLost);
+    // fresh spawns settle for a moment before anything can break (no shattering on arrival)
+    this.noBreakUntil = performance.now() + 1500;
     this.bounds = specBounds(this.spec);
     this.frozen = false;
     const { groups, lights } = buildVisual(this.spec);
@@ -50,6 +56,8 @@ export class SpawnedItem {
     this.bodies = {};
     this.colliders = [];
     for (const name of Object.keys(groups)) {
+      // a door or drawer whose every part broke off isn't there anymore
+      if (name !== 'main' && !(cols[name] || []).length) continue;
       const bdesc = R.RigidBodyDesc.dynamic()
         .setTranslation(pos.x, pos.y, pos.z)
         .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
@@ -144,7 +152,8 @@ export class SpawnedItem {
       bodies[name] = { t: [t.x, t.y, t.z], q: [r.x, r.y, r.z, r.w] };
     }
     const state = { ...this.state };
-    delete state.powered; delete state.load; delete state.solarW;
+    // live readings get recomputed every frame; don't save them
+    for (const k of ['powered', 'load', 'solarW', 'emptyWarned', 'surgeT', 'wasOn', 'overT']) delete state[k];
     return { uid: this.uid, id: this.itemId, chosen: this.chosen, frozen: this.frozen, bodies, state };
   }
 
@@ -155,7 +164,7 @@ export class SpawnedItem {
       body.setTranslation({ x: b.t[0], y: b.t[1], z: b.t[2] }, true);
       body.setRotation({ x: b.q[0], y: b.q[1], z: b.q[2], w: b.q[3] }, true);
     }
-    if (s.frozen) this.setFrozen(true);
+    if (!!s.frozen !== this.frozen) this.setFrozen(!!s.frozen);
   }
 
   dispose() {
@@ -164,6 +173,12 @@ export class SpawnedItem {
     for (const c of this.colliders) this.mgr.byHandle.delete(c.handle);
     for (const b of Object.values(this.bodies)) world.removeRigidBody(b);
     this.mgr.scene.remove(this.root);
+    // GPU memory this item owns (shared cached geometry/materials stay)
+    this.root.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.userData.ownGeo) o.geometry.dispose();
+      if (o.material?.userData?.own) o.material.dispose();
+    });
   }
 }
 

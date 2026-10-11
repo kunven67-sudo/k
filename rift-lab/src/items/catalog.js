@@ -15,8 +15,8 @@ const cyl = (r, h, x, y, z, mat, o = {}) => ({ s: 'cyl', r, h, p: [x, y, z], mat
 const cone = (r, r2, h, x, y, z, mat, o = {}) => ({ s: 'cone', r, r2, h, p: [x, y, z], mat, ...o });
 const sph = (r, x, y, z, mat, o = {}) => ({ s: 'sphere', r, p: [x, y, z], mat, ...o });
 const cap = (r, h, x, y, z, mat, o = {}) => ({ s: 'capsule', r, h, p: [x, y, z], mat, ...o });
-const legsAt = (pts, h, r, mat, o = {}) => pts.map(([x, z]) => cyl(r, h, x, h / 2, z, mat, o));
-const taperLegs = (pts, h, r, r2, mat) => pts.map(([x, z]) => cone(r, r2, h, x, h / 2, z, mat, { seg: 12 }));
+const legsAt = (pts, h, r, mat, o = {}) => pts.map(([x, z]) => cyl(r, h, x, h / 2, z, mat, { leg: true, ...o }));
+const taperLegs = (pts, h, r, r2, mat) => pts.map(([x, z]) => cone(r, r2, h, x, h / 2, z, mat, { seg: 12, leg: true }));
 const corners = (w, d, inset) => [[-w / 2 + inset, -d / 2 + inset], [w / 2 - inset, -d / 2 + inset], [-w / 2 + inset, d / 2 - inset], [w / 2 - inset, d / 2 - inset]];
 
 // options
@@ -134,7 +134,7 @@ add({
     const M = `metal:${o.legs}`, W = 1.2, D = 0.6, H = 0.42;
     return { mass: 24, parts: [
       box(W, 0.01, D, 0, H - 0.005, 0, `glass:${o.glass}`, { round: 0.003 }),
-      ...corners(W - 0.06, D - 0.06, 0).map(([x, z]) => box(0.025, H - 0.01, 0.025, x, (H - 0.01) / 2, z, M, { round: 0.002 })),
+      ...corners(W - 0.06, D - 0.06, 0).map(([x, z]) => box(0.025, H - 0.01, 0.025, x, (H - 0.01) / 2, z, M, { leg: true, round: 0.002 })),
       box(W - 0.06, 0.02, 0.02, 0, H - 0.02, -(D - 0.06) / 2, M), box(W - 0.06, 0.02, 0.02, 0, H - 0.02, (D - 0.06) / 2, M),
       box(0.02, 0.02, D - 0.06, -(W - 0.06) / 2, H - 0.02, 0, M), box(0.02, 0.02, D - 0.06, (W - 0.06) / 2, H - 0.02, 0, M),
       box(W - 0.1, 0.01, D - 0.1, 0, 0.12, 0, `glass:${o.glass}`, { round: 0.003 }), // lower shelf
@@ -151,7 +151,7 @@ add({
     const B = `board:${o.finish}`;
     return { mass: 9, parts: [
       box(0.9, 0.05, 0.55, 0, 0.425, 0, B, { round: 0.002, hollow: 0.2 }),
-      ...corners(0.9, 0.55, 0.025).map(([x, z]) => box(0.05, 0.4, 0.05, x, 0.2, z, B, { round: 0.002, hollow: 0.3 })),
+      ...corners(0.9, 0.55, 0.025).map(([x, z]) => box(0.05, 0.4, 0.05, x, 0.2, z, B, { leg: true, round: 0.002, hollow: 0.3 })),
       box(0.8, 0.012, 0.45, 0, 0.12, 0, B),
     ] };
   },
@@ -182,7 +182,7 @@ add({
     const Wd = `wood:${o.wood}`, W = 1.3, D = 0.7;
     const parts = [];
     for (let i = 0; i < 4; i++) parts.push(box(W, 0.05, D / 4 - 0.004, 0, 0.425, -D / 2 + D / 8 + i * D / 4, Wd, { round: 0.006, grain: 'x' }));
-    parts.push(...corners(W, D, 0.06).map(([x, z]) => box(0.09, 0.4, 0.09, x, 0.2, z, Wd, { round: 0.006, grain: 'y' })));
+    parts.push(...corners(W, D, 0.06).map(([x, z]) => box(0.09, 0.4, 0.09, x, 0.2, z, Wd, { leg: true, round: 0.006, grain: 'y' })));
     parts.push(box(W - 0.15, 0.03, D - 0.15, 0, 0.1, 0, Wd, { grain: 'x' }));
     parts.push(box(W - 0.2, 0.06, 0.04, 0, 0.36, -D / 2 + 0.07, Wd), box(W - 0.2, 0.06, 0.04, 0, 0.36, D / 2 - 0.07, Wd));
     return { mass: 38, parts };
@@ -284,7 +284,7 @@ add({
   options: { wood: woodOpt('pine', ['pine', 'whiteoak']) },
   build(o) {
     const Wd = `wood:${o.wood}`, W = 1.0, L = 2.06, H = 1.6;
-    const parts = [...corners(W, L, 0.03).map(([x, z]) => box(0.055, H, 0.055, x, H / 2, z, Wd, { grain: 'y' }))];
+    const parts = [...corners(W, L, 0.03).map(([x, z]) => box(0.055, H, 0.055, x, H / 2, z, Wd, { leg: true, grain: 'y' }))];
     for (const y of [0.3, 1.25]) {
       parts.push(box(0.03, 0.14, L - 0.06, -W / 2 + 0.03, y, 0, Wd), box(0.03, 0.14, L - 0.06, W / 2 - 0.03, y, 0, Wd));
       parts.push(box(W - 0.06, 0.02, L - 0.08, 0, y - 0.04, 0, Wd));
@@ -423,7 +423,7 @@ add({
     const Wd = `wood:${o.wood}`, W = 0.45, D = 0.5, S = 0.46;
     const parts = [
       box(W, 0.035, D, 0, S, 0, Wd, { round: 0.006 }),
-      ...corners(W, D, 0.025).map(([x, z], i) => box(0.035, i < 2 ? 0.92 : S, 0.035, x, (i < 2 ? 0.92 : S) / 2, z, Wd, { grain: 'y' })),
+      ...corners(W, D, 0.025).map(([x, z], i) => box(0.035, i < 2 ? 0.92 : S, 0.035, x, (i < 2 ? 0.92 : S) / 2, z, Wd, { leg: true, grain: 'y' })),
       box(W - 0.05, 0.03, 0.02, 0, S - 0.06, -D / 2 + 0.025, Wd), box(W - 0.05, 0.03, 0.02, 0, S - 0.06, D / 2 - 0.025, Wd),
       box(0.02, 0.025, D - 0.05, -W / 2 + 0.025, 0.15, 0, Wd), box(0.02, 0.025, D - 0.05, W / 2 - 0.025, 0.15, 0, Wd),
     ];
@@ -610,7 +610,7 @@ add({
       bodies: { main: {}, drawer: { joint: 'prismatic', axis: [0, 0, 1], limits: [0, 0.4], anchor: [0, H - 0.08, 0] } },
       parts: [
         box(W, 0.03, D, 0, H - 0.015, 0, Wd, { round: 0.004 }),
-        ...corners(W, D, 0.04).map(([x, z]) => box(0.03, H - 0.03, 0.03, x, (H - 0.03) / 2, z, M, { round: 0.003 })),
+        ...corners(W, D, 0.04).map(([x, z]) => box(0.03, H - 0.03, 0.03, x, (H - 0.03) / 2, z, M, { leg: true, round: 0.003 })),
         box(W - 0.08, 0.04, 0.02, 0, H - 0.05, -D / 2 + 0.04, M),
         box(0.6, 0.012, D - 0.1, 0, H - 0.115, -0.01, Wd),
         ...drawerParts('drawer', 0.56, 0.07, D - 0.12, 0, H - 0.08, -0.01, Wd, 'wood:maple', box(0.12, 0.012, 0.015, 0, H - 0.08, (D - 0.12) / 2 + 0.005, M)),
@@ -762,8 +762,8 @@ add({
   options: {},
   build() {
     const parts = [
-      box(1.13, 0.035, 1.72, 0, 0.75, 0, 'plastic:0x10233f', { rot: [-35, 0, 0], round: 0.006, solar: true }),
-      box(1.15, 0.04, 1.74, 0, 0.745, -0.004, 'metal:steel', { rot: [-35, 0, 0], vis: false }),
+      box(1.13, 0.035, 1.72, 0, 0.75, 0, 'solar', { rot: [28, 0, 0], round: 0.006, solar: true }),
+      box(1.15, 0.04, 1.74, 0, 0.745, -0.003, 'metal:steel', { rot: [28, 0, 0], vis: false }),
       cyl(0.016, 1.05, -0.5, 0.52, -0.55, 'metal:steel', { seg: 8 }), cyl(0.016, 1.05, 0.5, 0.52, -0.55, 'metal:steel', { seg: 8 }),
       cyl(0.016, 0.5, -0.5, 0.25, 0.5, 'metal:steel', { seg: 8 }), cyl(0.016, 0.5, 0.5, 0.25, 0.5, 'metal:steel', { seg: 8 }),
       box(1.1, 0.03, 0.03, 0, 0.02, -0.55, 'metal:steel'), box(1.1, 0.03, 0.03, 0, 0.02, 0.5, 'metal:steel'),
@@ -774,11 +774,11 @@ add({
 
 add({
   id: 'extcord', tab: 'power', name: '25 ft Extension Cord + 3-Outlet Box', brand: 'Coast Hardware', style: 'power', room: 'Power', price: 24, mass: 1.4,
-  rating: 4.5, reviews: 9811, blurb: 'Reaches 7.6 m from a power source. Plug up to 3 things into the box. Overload it and the source\'s breaker trips.',
+  rating: 4.5, reviews: 9811, blurb: 'Reaches 7.6 m from a power source. Plug up to 3 things into the box. Built-in 15 A breaker: overload it and it trips (click the box to reset).',
   quotes: ['"Bright orange so you don\'t trip on it. I tripped on it."'],
   source: { watts: 1875, outlets: [[0.0, 0.05, 0.05], [-0.05, 0.05, 0.05], [0.05, 0.05, 0.05]], kind: 'strip', reach: 7.6 },
   options: {},
-  build() { return { mass: 1.4, parts: [box(0.16, 0.05, 0.09, 0, 0.025, 0, 'plastic:0xff7a1a', { round: 0.012 })] }; },
+  build() { return { mass: 1.4, parts: [box(0.16, 0.05, 0.09, 0, 0.025, 0, 'plastic:0xff7a1a', { round: 0.012, use: 'breaker' }), box(0.02, 0.008, 0.014, 0.05, 0.053, -0.02, 'plastic:0x111111', { col: false, use: 'breaker' })] }; },
 });
 
 add({
@@ -831,7 +831,7 @@ const SPECIAL = {
           box(W, t, L, 0, t / 2, 0, C), box(t, H, L, -W / 2 + t / 2, H / 2, 0, C), box(t, H, L, W / 2 - t / 2, H / 2, 0, C),
           box(W - 2 * t, H, t, 0, H / 2, -L / 2 + t / 2, C), box(W - 2 * t, H, t, 0, H / 2, L / 2 - t / 2, C),
           // what's inside: stacked panels, a bag of screws, instructions, an allen key
-          box(W - 0.04, H * 0.62, L - 0.06, 0, t + H * 0.31, 0, 'board:white', { col: false, use: 'assemble' }),
+          box(W - 0.04, H * 0.62, L - 0.06, 0, t + H * 0.31, 0, 'board:white', { use: 'assemble', noBreak: true }),
           box(0.12, 0.03, 0.18, W * 0.2, t + H * 0.62 + 0.015, -L * 0.2, 'plastic:0xdddddd', { col: false, use: 'assemble' }),
           box(0.21, 0.004, 0.3, -W * 0.15, t + H * 0.62 + 0.002, L * 0.15, 'paint:White', { col: false, use: 'assemble' }),
           // the lid: two flaps, taped down the middle

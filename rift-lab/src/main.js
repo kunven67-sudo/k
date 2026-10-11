@@ -18,7 +18,7 @@ import { BuildTools } from './player/build.js';
 import { Phone3D } from './player/phone3d.js';
 import { PhoneUI } from './ui/phone.js';
 import { PowerGrid } from './items/power.js';
-import { FlatPack } from './items/flatpack.js';
+import { FlatPack, boxFor } from './items/flatpack.js';
 import { Breaking } from './items/breaking.js';
 import { astronomy } from './core/time.js';
 
@@ -142,7 +142,9 @@ function beginSpawn(id, chosen, price) {
   closePhone(true);
   setBuild(false);
   const item = getItem(id);
-  game.build.startPlacing(id, chosen, (pose) => {
+  // flat-pack furniture: what you're placing is the box it ships in
+  const [ghostId, ghostChosen] = item.flatpack ? ['flatbox', boxFor(id, chosen)] : [id, chosen];
+  game.build.startPlacing(ghostId, ghostChosen, (pose) => {
     if (game.info.spawnMode === 'pay') {
       if (game.money < price) { ui.toast(`Not enough money (${'$' + Math.round(game.money).toLocaleString()}).`); return null; }
       game.money -= price;
@@ -247,6 +249,8 @@ function disposeWorld() {
   if (game.build) { game.build.cancelPlacing(); game.build.setActive(false); ui.buildBanner(false); game.build = null; }
   if (game.hands) { game.hands.dispose(); game.hands = null; }
   if (game.flat) { game.flat.stop(); game.flat = null; }
+  ui.progress(null);
+  ui.speed(1);
   if (game.power) { game.power.dispose(); game.power = null; }
   if (game.breaking) { game.breaking.dispose(); game.breaking = null; }
   if (game.items) { game.items.clear(); game.items = null; }

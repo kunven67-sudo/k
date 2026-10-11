@@ -217,6 +217,7 @@ export class BuildTools {
     body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     c.item.wake();
+    c.item.noBreakUntil = performance.now() + 1500; // set down by the god-hand: let it settle
     this.undo.push({ type: 'move', item: c.item, before: c.before });
     if (this.undo.length > 60) this.undo.shift();
   }
