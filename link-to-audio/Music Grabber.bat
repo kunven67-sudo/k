@@ -70,6 +70,20 @@ if not defined LINK goto ask
 set "LINK=!LINK:"=!"
 echo.
 
+rem TikTok "sound" pages (tiktok.com/music/...) are not supported by the downloader.
+echo "!LINK!" | findstr /i "tiktok.com/music/" >nul && (
+  echo   That's a TikTok SOUND page - those can't be downloaded directly.
+  echo.
+  echo   Do this instead:
+  echo     1. On that sound page, tap any video that uses the sound
+  echo     2. Click Share, then Copy link
+  echo     3. Paste THAT link here - you'll get the same audio as an MP3
+  echo.
+  echo   Press any key to try again...
+  pause >nul
+  goto ask
+)
+
 "%YTDLP%" "!LINK!" --no-playlist -x --audio-format mp3 --audio-quality 0 --embed-metadata --no-mtime --windows-filenames --ffmpeg-location "%FFDIR%" --js-runtimes "deno:%DENO%" -o "%OUT%\%%(title)s.%%(ext)s"
 
 echo.
