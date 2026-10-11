@@ -14,7 +14,12 @@ from codebrain.config import MODEL_BY_VRAM
 from codebrain.highlight import IndexMapper, spans
 from codebrain.memory import CATEGORIES
 from codebrain.paths import home_dir, projects_dir
-from codebrain.runner import CodeRun, error_line_number
+from codebrain.runner import CodeRun, error_line_number, python_exe
+from codebrain.snippets import CATEGORIES as SNIPPET_CATEGORIES
+from codebrain.snippets import Snippets, snippet_part
+from codebrain.voice import PushToTalk, Speaker, missing_parts
+
+ASSETS = Path(__file__).with_name("assets")
 
 # ---------- theme: dark + green 💚 ----------
 BG = "#0b0f0c"
@@ -42,7 +47,9 @@ Here's what I can do:
 • ▶️ Press Run (F5) to test your code. I only run code when YOU press it.
 • 🐛 Code crashed? Press Bug Detective and I'll explain + fix it
 • 🔍 Select some code and press Explain
-• 📚 Open Lessons to learn step by step. Your zombie game guide is in there too 🧟
+• 📚 Open Lessons to learn step by step. Your zombie game + 4D maze guides are in there too 🧟🌀
+• 📦 Snippets = ready-made game code (jump, sprint, shooting...) you can drop in
+• 🎤 Hold the mic button (or F2) and talk to me. 🔊 I can read my answers out loud too
 • 🧠 I remember you, your projects and every bug we fixed
 
 Let's build something 🔥"""
@@ -59,8 +66,21 @@ class CodeBrainApp:
         self.thinking = False
         self.cancel_thinking = False
         self.font_size = int(self.ai.config.get("font_size", 12))
+        self.run_from_editor = True
+        self.snippets = Snippets()
+        self.speaker = Speaker()
+        self.voice_missing = missing_parts()
+        self.ptt = None if self.voice_missing else PushToTalk(self.ai.config.get("voice_model", "base.en"))
+        self._ptt_release_job = None
 
         root.title("CodeBrain 🧠")
+        try:
+            self._icon = tk.PhotoImage(file=str(ASSETS / "codebrain.png"))
+            root.iconphoto(True, self._icon)
+            if IS_WIN:
+                root.iconbitmap(default=str(ASSETS / "codebrain.ico"))
+        except tk.TclError:
+            pass
         root.geometry("1400x860")
         root.minsize(900, 560)
         root.configure(bg=BG)
@@ -75,6 +95,8 @@ class CodeBrainApp:
         self.new_file(ask=False)
         self.set_status("Waking up the brain...", YELLOW)
         threading.Thread(target=self._startup, daemon=True).start()
+        if self.ptt:
+            self.ptt.preload()      # get the voice model ready in the background
         root.after(30, self._poll)
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -105,6 +127,7 @@ class CodeBrainApp:
         style.configure("Treeview", background=PANEL, foreground=TEXT, fieldbackground=PANEL, rowheight=26)
         style.map("Treeview", background=[("selected", GREEN_DIM)], foreground=[("selected", "#001a0a")])
         style.configure("TRadiobutton", background=BG, foreground=TEXT)
+        style.configure("TCheckbutton", background=BG, foreground=TEXT)
         style.configure("TCombobox", fieldbackground=PANEL, foreground=TEXT, background=PANEL2)
         style.configure("TPanedwindow", background=BORDER)
 
@@ -127,10 +150,12 @@ class CodeBrainApp:
 
         b = self._menu(bar)
         b.add_command(label="📚 Lessons", command=self.open_lessons)
+        b.add_command(label="📦 Snippets", command=self.open_snippets)
         b.add_command(label="🧠 Memory viewer", command=self.open_memory)
         b.add_command(label="🧹 New chat (forget this conversation)", command=self.clear_chat)
         b.add_separator()
         b.add_command(label="⚙️ Settings", command=self.open_settings)
+        b.add_command(label="🩺 Doctor (check everything)", command=self.open_doctor)
         bar.add_cascade(label="CodeBrain", menu=b)
 
         v = self._menu(bar)
@@ -159,7 +184,11 @@ class CodeBrainApp:
         self.status_label = tk.Label(top, text="", bg=BG, fg=MUTED, font=(UI, 10))
         self.status_label.pack(side="right")
         ttk.Button(top, text="⚙️", width=3, command=self.open_settings).pack(side="right", padx=(0, 12))
+        self.speak_btn = ttk.Button(top, text="", width=8, command=self.toggle_speak)
+        self.speak_btn.pack(side="right", padx=4)
+        self._update_speak_btn()
         ttk.Button(top, text="🧠 Memory", command=self.open_memory).pack(side="right", padx=4)
+        ttk.Button(top, text="📦 Snippets", command=self.open_snippets).pack(side="right", padx=4)
         ttk.Button(top, text="📚 Lessons", command=self.open_lessons).pack(side="right", padx=4)
         xpbox = ttk.Frame(top)
         xpbox.pack(side="left", padx=24)
@@ -194,15 +223,20 @@ class CodeBrainApp:
 
         box = ttk.Frame(left, padding=(0, 6, 0, 0))
         box.pack(fill="x")
-        self.entry = self._text(box, mono=False, height=3)
-        self.entry.pack(side="left", fill="x", expand=True)
         btns = ttk.Frame(box)
-        btns.pack(side="right", padx=(6, 0))
+        btns.pack(side="right", padx=(6, 0))      # packed first so the buttons always get room
+        self.entry = self._text(box, mono=False, height=3, width=20)
+        self.entry.pack(side="left", fill="both", expand=True)
         self.send_btn = ttk.Button(btns, text="Send ➤", command=self.send, style="Run.TButton")
         self.send_btn.pack(fill="x")
         self.stop_think_btn = ttk.Button(btns, text="⏹ Stop", command=self.stop_thinking, state="disabled")
         self.stop_think_btn.pack(fill="x", pady=(4, 0))
-        ttk.Label(left, text="Enter = send   •   Shift+Enter = new line", style="Muted.TLabel").pack(anchor="w")
+        self.mic_btn = ttk.Button(btns, text="🎤 Hold")
+        self.mic_btn.pack(fill="x", pady=(4, 0))
+        self.mic_btn.bind("<ButtonPress-1>", lambda e: self.mic_down())
+        self.mic_btn.bind("<ButtonRelease-1>", lambda e: self.mic_up())
+        ttk.Label(left, text="Enter = send   •   Shift+Enter = new line   •   hold F2 or 🎤 = talk",
+                  style="Muted.TLabel").pack(anchor="w")
 
         # ---- right: editor + output
         right = ttk.PanedWindow(main, orient="vertical")
@@ -264,6 +298,8 @@ class CodeBrainApp:
     def _bind_keys(self):
         r = self.root
         r.bind("<F5>", lambda e: self.run_code())
+        r.bind("<KeyPress-F2>", self._f2_down)
+        r.bind("<KeyRelease-F2>", self._f2_up)
         r.bind("<Control-s>", lambda e: (self.save_file(), "break")[1])
         r.bind("<Control-o>", lambda e: (self.open_file(), "break")[1])
         r.bind("<Control-n>", lambda e: (self.new_file(), "break")[1])
@@ -391,6 +427,7 @@ class CodeBrainApp:
         if not text or self.thinking:
             return
         self.entry.delete("1.0", "end")
+        self.speaker.stop()
         self.chat_add("you", text)
         code = self.editor.get("1.0", "end-1c")
         name = Path(self.current_path).name if self.current_path else "untitled.py"
@@ -467,8 +504,72 @@ class CodeBrainApp:
         code = best_code(reply)
         if code:
             self._add_code_button(code)
+        if self.ai.config.get("speak_answers", True):
+            self.speaker.say(reply)
         self.celebrate(level_up)
         self.refresh_xp()
+
+    # ================================================================ voice
+    def _update_speak_btn(self):
+        on = self.ai.config.get("speak_answers", True)
+        self.speak_btn.configure(text="🔊 On" if on else "🔇 Off")
+
+    def toggle_speak(self):
+        on = not self.ai.config.get("speak_answers", True)
+        self.ai.config["speak_answers"] = on
+        if not on:
+            self.speaker.stop()
+        elif not self.speaker.available:
+            messagebox.showinfo("Talk back", "I couldn't find a voice on this PC to talk with.")
+        self._update_speak_btn()
+
+    def mic_down(self):
+        if not self.ptt:
+            messagebox.showinfo("Voice", "Voice isn't installed yet (missing: " + ", ".join(self.voice_missing) +
+                                ").\nRun SETUP.bat again to add it.")
+            return
+        if self.thinking or self.ptt.listening:
+            return
+        self.speaker.stop()
+        try:
+            self.ptt.press()
+        except Exception as e:
+            self.set_status(f"🎤 {e}", RED)
+            return
+        self.mic_btn.configure(text="🔴 Listening")
+        self.set_status("🎤 Listening... let go when you're done", RED)
+
+    def mic_up(self):
+        if not self.ptt or not self.ptt.listening:
+            return
+        self.mic_btn.configure(text="🎤 Hold")
+        self.set_status("✍️ Turning your voice into text... (first time takes longer)", YELLOW)
+        self.ptt.release(on_text=lambda t: self.ui(lambda: self._voice_text(t)),
+                         on_error=lambda m: self.ui(lambda: self.set_status("🎤 " + m, RED)))
+
+    def _voice_text(self, text):
+        if not text:
+            self.set_status("🎤 I didn't hear anything. Hold the button while you talk!", YELLOW)
+            return
+        self.set_status("🧠 Ready", GREEN)
+        existing = self.entry.get("1.0", "end-1c").strip()
+        self.entry.insert("end", (" " if existing else "") + text)
+        if self.ai.config.get("voice_auto_send", True):
+            self.send()
+
+    def _f2_down(self, _event):
+        if self._ptt_release_job:            # key auto-repeat: still holding, ignore
+            self.root.after_cancel(self._ptt_release_job)
+            self._ptt_release_job = None
+            return
+        self.mic_down()
+
+    def _f2_up(self, _event):
+        self._ptt_release_job = self.root.after(120, self._f2_really_up)
+
+    def _f2_really_up(self):
+        self._ptt_release_job = None
+        self.mic_up()
 
     def _add_code_button(self, code):
         btn = tk.Button(self.chat, text="📥 Put this code in the editor", bg=GREEN_DIM, fg="#001a0a",
@@ -686,16 +787,24 @@ class CodeBrainApp:
             return
         if not self.save_file():
             return
+        self.run_file(self.current_path, from_editor=True)
+
+    def run_file(self, path, from_editor=False):
+        if self.run and self.run.running:
+            messagebox.showinfo("Busy", "Something is already running. Press ■ Stop first.")
+            return
         self.output.configure(state="normal")
         self.output.delete("1.0", "end")
         self.output.configure(state="disabled")
-        self.editor.tag_remove("errline", "1.0", "end")
-        self.out(f"▶ Running {self.current_path.name}...\n", "info")
+        if from_editor:
+            self.editor.tag_remove("errline", "1.0", "end")
+        self.out(f"▶ Running {Path(path).name}...\n", "info")
         try:
-            self.run = CodeRun(self.current_path)
+            self.run = CodeRun(path)
         except OSError as e:
             self.out(f"Couldn't start Python: {e}\n", "err")
             return
+        self.run_from_editor = from_editor
         self.run_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
         self.bug_btn.configure(state="disabled", style="TButton")
@@ -720,6 +829,12 @@ class CodeBrainApp:
         self.last_result = result
         self.run_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
+        if not self.run_from_editor:
+            if result.crashed:
+                self.out("\n💥 This demo crashed. Copy the error into the chat and I'll help!\n", "err")
+            else:
+                self.out("\n✅ Demo finished.\n" if not result.stopped else "\n■ Stopped.\n", "info")
+            return
         if result.stopped:
             self.out("\n■ Stopped.\n", "info")
         elif result.crashed:
@@ -787,10 +902,23 @@ class CodeBrainApp:
     def open_settings(self):
         SettingsWindow(self)
 
+    def open_snippets(self):
+        SnippetsWindow(self)
+
+    def open_doctor(self):
+        import subprocess
+        flags = subprocess.CREATE_NEW_CONSOLE if IS_WIN else 0
+        try:
+            subprocess.Popen([python_exe(), "-m", "codebrain", "--doctor", "--pause"],
+                             cwd=str(Path(__file__).resolve().parent.parent), creationflags=flags)
+        except OSError as e:
+            messagebox.showerror("Doctor", str(e))
+
     def on_close(self):
         if self.run and self.run.running:
             self.run.stop()
         if self._confirm_discard():
+            self.speaker.stop()
             self.root.destroy()
 
 
@@ -987,11 +1115,146 @@ class MemoryWindow:
             self.refresh()
 
 
+class SnippetsWindow:
+    def __init__(self, app):
+        self.app = app
+        self.lib = app.snippets
+        self.snippet = None
+        self.win = app._toplevel("📦 Code Snippets", "1150x720")
+        ttk.Label(self.win, text="Ready-made pieces of game code. ▶ Try it to see it work, 📥 Insert to drop "
+                                 "the useful part into your code at the cursor.", style="Muted.TLabel",
+                  padding=8).pack(anchor="w")
+        pane = ttk.PanedWindow(self.win, orient="horizontal")
+        pane.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self.tree = ttk.Treeview(pane, show="tree")
+        self.tree.column("#0", width=300, minwidth=220)
+        pane.add(self.tree, weight=0)
+        self.tree.bind("<<TreeviewSelect>>", lambda e: self.show())
+
+        right = ttk.Frame(pane, padding=(12, 0))
+        pane.add(right, weight=3)
+        self.title = ttk.Label(right, text="", style="Title.TLabel")
+        self.title.pack(anchor="w")
+        self.desc = ttk.Label(right, text="", wraplength=760, style="Muted.TLabel")
+        self.desc.pack(anchor="w", pady=(2, 6))
+        bar = ttk.Frame(right)
+        bar.pack(fill="x", pady=(0, 6))
+        ttk.Button(bar, text="📥 Insert at cursor", style="Run.TButton", command=self.insert).pack(side="left")
+        ttk.Button(bar, text="▶ Try it", command=self.try_it).pack(side="left", padx=6)
+        ttk.Button(bar, text="📋 Copy", command=self.copy).pack(side="left")
+        ttk.Button(bar, text="🔍 Explain", command=self.explain).pack(side="left", padx=6)
+        self.del_btn = ttk.Button(bar, text="🗑 Delete", style="Alert.TButton", command=self.delete)
+        self.del_btn.pack(side="right")
+        box = ttk.Frame(right)
+        box.pack(fill="both", expand=True)
+        self.code = app._text(box, wrap="none", state="disabled")
+        app._scrolled(box, self.code).pack(side="right", fill="y")
+        self.code.pack(side="left", fill="both", expand=True)
+        for tag, color in (("keyword", GREEN), ("builtin", BLUE), ("number", ORANGE), ("defname", PURPLE),
+                           ("string", YELLOW), ("comment", MUTED)):
+            self.code.tag_configure(tag, foreground=color)
+        self.code.tag_configure("dim", foreground="#4a5a50")
+        ttk.Button(right, text="⭐ Save what I selected in the editor as my own snippet",
+                   command=self.save_selection).pack(anchor="w", pady=(8, 0))
+        self.fill()
+
+    def fill(self, select=None):
+        self.tree.delete(*self.tree.get_children())
+        for cat in SNIPPET_CATEGORIES:
+            items = self.lib.in_category(cat)
+            parent = self.tree.insert("", "end", text=f"{cat} ({len(items)})", open=True)
+            for s in items:
+                self.tree.insert(parent, "end", iid=s["id"], text=s["name"])
+        first = select or (self.lib.all()[0]["id"] if self.lib.all() else None)
+        if first:
+            self.tree.selection_set(first)
+            self.tree.see(first)
+
+    def show(self):
+        sel = self.tree.selection()
+        snippet = self.lib.get(sel[0]) if sel else None
+        if not snippet:
+            return
+        self.snippet = snippet
+        self.title.configure(text=snippet["name"])
+        lib = f"  [{snippet['lib']}]" if snippet.get("lib") else ""
+        self.desc.configure(text=snippet["description"] + lib)
+        self.del_btn.configure(state="normal" if snippet.get("user") else "disabled")
+        code = snippet["code"]
+        self.code.configure(state="normal")
+        self.code.delete("1.0", "end")
+        self.code.insert("1.0", code)
+        mapper = IndexMapper(code, self.app._utf16)
+        for tag, a, b in spans(code):
+            self.code.tag_add(tag, mapper.index(a), mapper.index(b))
+        # dim the demo part so the useful snippet part stands out
+        part = snippet_part(code)
+        start = code.find(part)
+        if part != code.strip("\n") and start >= 0:
+            self.code.tag_add("dim", "1.0", mapper.index(start))
+            self.code.tag_add("dim", mapper.index(start + len(part)), "end")
+            self.code.see(mapper.index(start))
+        self.code.configure(state="disabled")
+
+    def insert(self):
+        if not self.snippet:
+            return
+        ed = self.app.editor
+        ed.edit_separator()
+        ed.insert("insert", "\n" + snippet_part(self.snippet["code"]) + "\n")
+        ed.edit_separator()
+        self.app._rehighlight()
+        self.app.root.lift()
+        ed.focus_set()
+
+    def try_it(self):
+        if not self.snippet:
+            return
+        folder = projects_dir() / "snippets"
+        folder.mkdir(exist_ok=True)
+        path = folder / f"try_{self.snippet['id']}.py"
+        path.write_text(self.snippet["code"], encoding="utf-8")
+        self.app.run_file(path)
+
+    def copy(self):
+        if self.snippet:
+            self.win.clipboard_clear()
+            self.win.clipboard_append(snippet_part(self.snippet["code"]))
+
+    def explain(self):
+        if not self.snippet or self.app.thinking:
+            return
+        part = snippet_part(self.snippet["code"])
+        self.app.chat_add("you", f"🔍 Explain the '{self.snippet['name']}' snippet")
+        self.app._think(lambda on_token: self.app.ai.explain(part, on_token), kind="explain")
+        self.app.root.lift()
+
+    def delete(self):
+        if self.snippet and self.snippet.get("user") and messagebox.askyesno(
+                "Delete?", f"Delete your snippet '{self.snippet['name']}'?", parent=self.win):
+            self.lib.delete(self.snippet["id"])
+            self.snippet = None
+            self.fill()
+
+    def save_selection(self):
+        try:
+            code = self.app.editor.get("sel.first", "sel.last")
+        except tk.TclError:
+            messagebox.showinfo("Save snippet", "First select (highlight) some code in the editor!", parent=self.win)
+            return
+        name = simpledialog.askstring("Save snippet", "Name for this snippet:", parent=self.win)
+        if not name:
+            return
+        desc = simpledialog.askstring("Save snippet", "What does it do? (optional)", parent=self.win) or ""
+        item = self.lib.add(name, code, desc)
+        self.fill(select=item["id"])
+
+
 class SettingsWindow:
     def __init__(self, app):
         self.app = app
         cfg = app.ai.config
-        self.win = app._toplevel("⚙️ Settings", "560x460")
+        self.win = app._toplevel("⚙️ Settings", "580x600")
         f = ttk.Frame(self.win, padding=16)
         f.pack(fill="both", expand=True)
 
@@ -1019,6 +1282,15 @@ class SettingsWindow:
         self.ctx = tk.StringVar(value=str(cfg["context_size"]))
         ttk.Combobox(f, textvariable=self.ctx, values=["4096", "8192", "16384", "32768"], width=12).pack(anchor="w")
 
+        ttk.Label(f, text="🎤 Voice", font=(UI, 11, "bold")).pack(anchor="w", pady=(10, 0))
+        self.voice_model = tk.StringVar(value=cfg.get("voice_model", "base.en"))
+        vrow = ttk.Frame(f)
+        vrow.pack(anchor="w")
+        for value, label in (("base.en", "Fast"), ("small.en", "Understands me better")):
+            ttk.Radiobutton(vrow, text=label, value=value, variable=self.voice_model).pack(side="left", padx=(12, 0))
+        self.auto_send = tk.BooleanVar(value=cfg.get("voice_auto_send", True))
+        ttk.Checkbutton(f, text="Send my message as soon as I stop talking", variable=self.auto_send).pack(anchor="w", padx=12)
+
         ttk.Button(f, text="💾 Save", style="Run.TButton", command=self.save).pack(anchor="e", pady=16)
 
     def save(self):
@@ -1031,6 +1303,12 @@ class SettingsWindow:
             cfg["context_size"] = int(self.ctx.get())
         except ValueError:
             pass
+        cfg["voice_auto_send"] = bool(self.auto_send.get())
+        if self.voice_model.get() != cfg.get("voice_model"):
+            cfg["voice_model"] = self.voice_model.get()
+            if self.app.ptt:
+                self.app.ptt = PushToTalk(cfg["voice_model"])
+                self.app.ptt.preload()
         self.win.destroy()
         if cfg["model"] != old_model:
             self.app.set_status("Switching brain...", YELLOW)
@@ -1042,6 +1320,7 @@ def run_gui():
         try:
             import ctypes
             ctypes.windll.shcore.SetProcessDpiAwareness(1)   # sharp text on big screens
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("CodeBrain")  # our icon in the taskbar
         except Exception:
             pass
     root = tk.Tk()

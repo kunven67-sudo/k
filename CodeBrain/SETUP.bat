@@ -10,7 +10,8 @@ echo   This installs (all free, no API key):
 echo     1. Python 3.12        - runs your code
 echo     2. Ollama             - runs the AI brain on YOUR PC
 echo     3. pygame + ursina    - for 2D and 3D games
-echo     4. The coding brain   - a big download, ONE time only
+echo     4. Voice              - talk to CodeBrain (optional)
+echo     5. The coding brain   - a big download, ONE time only
 echo.
 pause
 
@@ -25,7 +26,7 @@ if errorlevel 1 (
 
 rem ---------------------------------------------------------------- 1. Python
 echo.
-echo [1/5] Looking for Python 3.12...
+echo [1/6] Looking for Python 3.12...
 call :find_python
 if not defined PY (
     echo       Not found - installing Python 3.12...
@@ -42,7 +43,7 @@ echo       Using: %PY%
 
 rem ---------------------------------------------------------------- 2. venv + game libraries
 echo.
-echo [2/5] Making CodeBrain's own Python space + installing pygame and ursina...
+echo [2/6] Making CodeBrain's own Python space + installing pygame and ursina...
 if not exist ".venv\Scripts\python.exe" (
     "%PY%" -m venv .venv
 )
@@ -57,9 +58,20 @@ if errorlevel 1 (
     echo [!] Some game libraries failed to install. CodeBrain still works - try SETUP.bat again later.
 )
 
+rem ---------------------------------------------------------------- 3. voice (optional)
+echo.
+echo [3/6] Installing voice (talk to CodeBrain)...
+".venv\Scripts\python.exe" -m pip install -r requirements-voice.txt
+if errorlevel 1 (
+    echo [!] Voice didn't install. Everything else still works - try SETUP.bat again later.
+) else (
+    ".venv\Scripts\python.exe" -m codebrain --download-voice
+    if errorlevel 1 echo [!] Voice model didn't download yet - it will try again the first time you use the mic.
+)
+
 rem ---------------------------------------------------------------- 3. Ollama
 echo.
-echo [3/5] Looking for Ollama (the brain engine)...
+echo [4/6] Looking for Ollama (the brain engine)...
 call :find_ollama
 if not defined OLLAMA (
     echo       Not found - installing Ollama...
@@ -94,7 +106,7 @@ goto wait_ollama
 
 rem ---------------------------------------------------------------- 4. the brain
 echo.
-echo [4/5] Picking the smartest brain your graphics card can handle...
+echo [5/6] Picking the smartest brain your graphics card can handle...
 for /f "delims=" %%m in ('call ".venv\Scripts\python.exe" -m codebrain --pick-model') do set "MODEL=%%m"
 if not defined MODEL set "MODEL=qwen2.5-coder:14b"
 echo       Brain: %MODEL%
@@ -108,10 +120,11 @@ if errorlevel 1 (
 
 rem ---------------------------------------------------------------- 5. shortcut
 echo.
-echo [5/5] Making a Desktop shortcut...
+echo [6/6] Making a Desktop shortcut...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\CodeBrain.lnk');" ^
   "$s.TargetPath='%~dp0.venv\Scripts\pythonw.exe';$s.Arguments='-m codebrain';$s.WorkingDirectory='%~dp0';" ^
+  "$s.IconLocation='%~dp0codebrain\assets\codebrain.ico';" ^
   "$s.Description='CodeBrain - your offline coding coach';$s.Save()" >nul 2>&1
 
 echo.
@@ -119,6 +132,7 @@ echo   =============================================
 echo     ALL DONE!  Double-click "CodeBrain" on your
 echo     Desktop, or CodeBrain.bat in this folder.
 echo     Terminal mode: CodeBrain-Terminal.bat
+echo     Problems? Double-click DOCTOR.bat
 echo   =============================================
 echo.
 pause

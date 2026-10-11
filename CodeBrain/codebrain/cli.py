@@ -2,6 +2,7 @@
 
 import os
 import sys
+import threading
 from pathlib import Path
 
 from codebrain import lessons as L
@@ -10,6 +11,9 @@ from codebrain.codeblocks import best_code
 from codebrain.memory import CATEGORIES
 from codebrain.paths import projects_dir
 from codebrain.runner import run_interactive
+from codebrain.snippets import CATEGORIES as SNIPPET_CATEGORIES
+from codebrain.snippets import Snippets, snippet_part
+from codebrain.voice import PushToTalk, Speaker, missing_parts
 
 if sys.platform == "win32":
     os.system("")  # turns on colors in the Windows terminal
@@ -43,6 +47,10 @@ HELP = f"""{G}{BOLD}Commands{END}
   {G}/lessons{END}         📚 list lessons    {G}/lesson <id>{END}  start one (example: /lesson py1)
   {G}/memory{END}          🧠 see my memories  {G}/forget <id>{END}  delete one
   {G}/remember <text>{END} make me remember something
+  {G}/voice{END}           🎤 talk to me (press Enter when you're done talking)
+  {G}/speak on|off{END}    🔊 read my answers out loud
+  {G}/snippets{END}        📦 list snippets   {G}/snippet <id>{END}  show one
+  {G}/snippet <id> add{END}  add it to your file   {G}/snippet <id> try{END}  run its demo
   {G}/xp{END}              ⭐ your level
   {G}/mode teach|code|hints{END}   how I help you
   {G}/model <name>{END}    switch brain    {G}/clear{END}  new chat    {G}/quit{END}  bye
@@ -52,6 +60,9 @@ Anything else = chat with me."""
 class CLI:
     def __init__(self):
         self.ai = Assistant()
+        self.snippets = Snippets()
+        self.speaker = Speaker()
+        self.ptt = None
         self.path = None
         self.last_reply = ""
         self.last_result = None
@@ -101,6 +112,8 @@ class CLI:
         if buf[0]:
             print(buf[0])
         self.last_reply = result[0]
+        if self.ai.config.get("speak_answers", True):
+            self.speaker.say(self.last_reply)
         if best_code(self.last_reply):
             self.say("📥 Type /save to put this code into your file" +
                      ("" if self.path else " (open or /new a file first)"), M)
@@ -251,6 +264,78 @@ class CLI:
         self.ai.config["model"] = arg.strip()
         self.start_brain()
 
+    def cmd_voice(self, _arg):
+        missing = missing_parts()
+        if missing:
+            return self.say(f"Voice isn't installed (missing: {', '.join(missing)}). Run SETUP.bat again.", Y)
+        if self.ptt is None:
+            self.ptt = PushToTalk(self.ai.config.get("voice_model", "base.en"))
+        self.speaker.stop()
+        try:
+            self.ptt.press()
+        except Exception as e:
+            return self.say(f"🎤 {e}", R)
+        input(f"{R}🔴 Listening... talk now, then press Enter.{END}")
+        done = threading.Event()
+        heard = {}
+        self.say("✍️ Turning your voice into text... (first time takes longer)", M)
+        self.ptt.release(on_text=lambda t: (heard.update(text=t), done.set()),
+                         on_error=lambda m: (heard.update(error=m), done.set()))
+        done.wait()
+        if heard.get("error"):
+            return self.say(heard["error"], R)
+        text = heard.get("text", "")
+        if not text:
+            return self.say("🎤 I didn't hear anything. Try again!", Y)
+        print(f"{B}{BOLD}you said:{END} {text}")
+        self.chat(text)
+
+    def cmd_speak(self, arg):
+        on = arg.strip().lower() != "off"
+        self.ai.config["speak_answers"] = on
+        if not on:
+            self.speaker.stop()
+        self.say("🔊 I'll read my answers out loud." if on else "🔇 Okay, text only.")
+
+    def cmd_snippets(self, _arg):
+        for cat in SNIPPET_CATEGORIES:
+            items = self.snippets.in_category(cat)
+            if items:
+                self.say(f"\n{BOLD}{cat}")
+                for s in items:
+                    print(f"  {Y}{s['id']:<14}{END} {s['name']}  {M}{s['description'][:70]}{END}")
+        self.say("\nShow one with /snippet <id>", M)
+
+    def cmd_snippet(self, arg):
+        sid, _, action = arg.strip().partition(" ")
+        snippet = self.snippets.get(sid)
+        if not snippet:
+            return self.say("Which one? See /snippets", Y)
+        part = snippet_part(snippet["code"])
+        if action == "add":
+            if not self.path:
+                return self.say("Open a file first: /open name.py", Y)
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write("\n" + part + "\n")
+            return self.say(f"📥 Added '{snippet['name']}' to the end of {self.path.name}")
+        if action == "try":
+            folder = projects_dir() / "snippets"
+            folder.mkdir(exist_ok=True)
+            demo = folder / f"try_{snippet['id']}.py"
+            demo.write_text(snippet["code"], encoding="utf-8")
+            self.say(f"▶ Running the demo (Ctrl+C to stop)", M)
+            run_interactive(demo)
+            return
+        self.say(f"\n{BOLD}{snippet['name']}{END}{G}  {snippet['description']}")
+        print(f"{G}{part}{END}")
+        self.say(f"\n/snippet {sid} add  -> add to your file   •   /snippet {sid} try  -> run the demo", M)
+
+    def chat(self, line):
+        result = self.stream(lambda t: self.ai.ask(line, t, self.path.name if self.path else None, self.code()))
+        if result and result[1]:
+            for item in result[1]:
+                self.say(f"🧠 Saved to memory: {item['text']}", M)
+
     def cmd_clear(self, _arg):
         self.ai.reset()
         self.say("🧹 Fresh chat! (Long-term memory is still there.)")
@@ -301,10 +386,8 @@ class CLI:
                 else:
                     self.say("Unknown command. Type /help", Y)
                 continue
-            result = self.stream(lambda t: self.ai.ask(line, t, self.path.name if self.path else None, self.code()))
-            if result and result[1]:
-                for item in result[1]:
-                    self.say(f"🧠 Saved to memory: {item['text']}", M)
+            self.chat(line)
+        self.speaker.stop()
         self.say("👋 See you next time! Keep coding 🔥")
 
 

@@ -23,6 +23,9 @@ from codebrain.highlight import IndexMapper, spans  # noqa: E402
 from codebrain.memory import Memory  # noqa: E402
 from codebrain.runner import CodeRun, error_line_number, run_blocking  # noqa: E402
 from codebrain.xp import XP, xp_for_level  # noqa: E402
+from codebrain import snippets as SN  # noqa: E402
+from codebrain.voice import PushToTalk, missing_parts, speakable  # noqa: E402
+from codebrain.doctor import Doctor  # noqa: E402
 
 
 def tmpfile(name):
@@ -69,6 +72,14 @@ class FakeOllama(BaseHTTPRequestHandler):
 class TestMemory(unittest.TestCase):
     def setUp(self):
         self.mem = Memory(tmpfile("memory.json"))
+
+    def test_seeds_game_plans_once(self):
+        names = [p["name"] for p in self.mem.data["projects"]]
+        self.assertEqual(names, ["Graveyard Zombies", "4D Maze"])
+        self.assertIn("slide", self.mem.context_text("how do I do the 4d maze slices?"))
+        # deleting a plan sticks (it doesn't come back next time)
+        self.mem.forget(self.mem.data["projects"][1]["id"])
+        self.assertEqual([p["name"] for p in Memory(self.mem.path).data["projects"]], ["Graveyard Zombies"])
 
     def test_seeds_zombie_plan(self):
         self.assertEqual(self.mem.data["projects"][0]["name"], "Graveyard Zombies")
@@ -206,8 +217,9 @@ class TestLessons(unittest.TestCase):
             if quiz:
                 self.assertLess(quiz["answer"], len(quiz["options"]))
         zombie = lessons.in_track(lessons.TRACK_ZOMBIE)
-        self.assertEqual(len(zombie), 13)
-        self.assertTrue(all(not l["code"] and l["ask"] for l in zombie))  # you build it yourself!
+        maze = lessons.in_track(lessons.TRACK_MAZE)
+        self.assertEqual((len(zombie), len(maze)), (13, 8))
+        self.assertTrue(all(not l["code"] and l["ask"] for l in zombie + maze))  # you build them yourself!
 
     def test_basic_lessons_run(self):
         inputs = {"py2": "Kai\n12\nlaser\n"}
@@ -216,6 +228,97 @@ class TestLessons(unittest.TestCase):
             p.write_text(lesson["code"], encoding="utf-8")
             result = run_blocking(p, timeout=30, input_text=inputs.get(lesson["id"], ""))
             self.assertFalse(result.crashed, f"{lesson['id']} crashed:\n{result.stderr}")
+
+
+class TestSnippets(unittest.TestCase):
+    def test_builtin(self):
+        ids = [x["id"] for x in SN.BUILTIN]
+        self.assertEqual(len(ids), len(set(ids)))
+        for snip in SN.BUILTIN:
+            self.assertIn(snip["category"], SN.CATEGORIES)
+            compile(snip["code"], snip["id"], "exec")
+            part = SN.snippet_part(snip["code"])
+            self.assertTrue(part.startswith(SN.START) and part.endswith(SN.END), snip["id"])
+            compile(part, snip["id"] + "-part", "exec")   # the inserted piece is valid Python on its own
+        for cat in SN.CATEGORIES[:4]:
+            self.assertGreaterEqual(len([x for x in SN.BUILTIN if x["category"] == cat]), 2)
+
+    def test_highscore_runs(self):
+        snip = next(x for x in SN.BUILTIN if x["id"] == "highscore")
+        p = write_prog(snip["code"])
+        first = run_blocking(p, timeout=30)
+        second = run_blocking(p, timeout=30)
+        self.assertFalse(first.crashed or second.crashed, first.stderr + second.stderr)
+        self.assertTrue(p.with_name("highscore.json").exists())
+
+    def test_my_snippets(self):
+        lib = SN.Snippets(tmpfile("snippets.json"))
+        item = lib.add("double jump", "def double_jump():\n    pass")
+        self.assertEqual(SN.Snippets(lib.path).get(item["id"])["name"], "double jump")
+        self.assertEqual(SN.snippet_part(item["code"]), "def double_jump():\n    pass")
+        self.assertTrue(lib.delete(item["id"]))
+        self.assertIsNone(SN.Snippets(lib.path).get(item["id"]))
+
+
+class FakeRecorder:
+    def __init__(self, audio):
+        self.audio = audio
+        self.started = False
+
+    def start(self):
+        self.started = True
+
+    def stop(self):
+        return self.audio
+
+
+class FakeTranscriber:
+    def load(self):
+        pass
+
+    def transcribe(self, audio):
+        if audio is None:
+            return ""
+        return "make me a snake game"
+
+
+class TestVoice(unittest.TestCase):
+    def test_speakable(self):
+        text = "LET'S GO 🔥 **Nice!**\n```python\nprint('x')\n```\nThen `run` it.\n```python\nmore\n```"
+        said = speakable(text)
+        self.assertNotIn("print", said)
+        self.assertNotIn("🔥", said)
+        self.assertNotIn("*", said)
+        self.assertEqual(said.count("I put the code on the screen"), 1)
+        self.assertIn("Then run it.", said)
+        self.assertLess(len(speakable("word. " * 1000)), 1300)
+
+    def test_push_to_talk(self):
+        heard, errors = [], []
+        done = threading.Event()
+        ptt = PushToTalk(recorder=FakeRecorder([0.1] * 16000), transcriber=FakeTranscriber())
+        ptt.release(heard.append, errors.append)          # not listening yet -> ignored
+        ptt.press()
+        self.assertTrue(ptt.listening)
+        ptt.release(lambda t: (heard.append(t), done.set()), errors.append)
+        self.assertTrue(done.wait(5))
+        self.assertEqual(heard, ["make me a snake game"])
+        self.assertFalse(ptt.listening)
+        self.assertEqual(errors, [])
+
+    def test_missing_parts_is_a_list(self):
+        self.assertIsInstance(missing_parts(), list)
+
+
+class TestDoctor(unittest.TestCase):
+    def test_runs_without_crashing(self):
+        import contextlib
+        import io
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            Doctor(deep=False).run()
+        self.assertIn("CodeBrain Doctor", out.getvalue())
+        self.assertNotIn("crashed", out.getvalue())
 
 
 class TestBrainAndAssistant(unittest.TestCase):

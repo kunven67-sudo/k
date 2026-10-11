@@ -23,6 +23,9 @@ DEFAULTS = {
     "teach_mode": "teach",      # teach | code | hints
     "skill_level": "total beginner",
     "font_size": 12,
+    "voice_model": "base.en",   # base.en = fast, small.en = understands you better
+    "speak_answers": True,      # 🔊 read answers out loud
+    "voice_auto_send": True,    # send right after you finish talking
 }
 
 

@@ -41,9 +41,29 @@ Suggested build order: 1) ground+sky+player  2) tombstones+fog+moon  3) laser sh
 7) sword  8) HUD + minimap  9) coins + shop  10) boss  11) menus + difficulty
 12) sounds + lightning + flashlight  13) high score saving."""
 
+MAZE_PLAN = """\
+GAME PLAN: "4D Maze" - a first-person 3D maze with a 4th dimension (Python + Ursina).
+The user is building this THEMSELF. Teach it step by step; don't dump the whole game at once.
+- The maze has 4 slices along the 4th dimension w (w = 0..3). Each slice is a normal 3D maze
+  (a list of strings, '#' = wall) with different walls.
+- You only see the slice you're in. Q = slide to w-1, E = slide to w+1, with a flash effect.
+- You can't slide into a slice where a wall is at your position (red warning).
+- HUD shows 'W: 2 / 4', each slice has its own color tint, see-through ghost walls preview the next slice.
+- Keys are hidden in different slices; collect all to open the exit.
+- Later: random 4D maze generator (recursive backtracker over x, z, w), run timer + best time saved.
+Suggested build order: 1) 3D maze from strings  2) 4 slices  3) Q/E sliding  4) wall blocking
+5) HUD + tints + ghost walls  6) keys + exit  7) random generator  8) timer + best time."""
+
+DEFAULT_PROJECTS = [
+    ("Graveyard Zombies", "3D first-person zombie shooter you're building yourself", ZOMBIE_PLAN,
+     "zombie zombies graveyard shooter boss wave waves laser sword tombstone"),
+    ("4D Maze", "First-person maze where Q/E slide you through the 4th dimension", MAZE_PLAN,
+     "maze mazes dimension slice slices tesseract"),
+]
+
 _WORD = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]+")
 _STOP = set("the a an and or to of in on is it this that for with my me i you be are was "
-            "can do how what why make code python".split())
+            "can do how what why make code python game games user step build".split())
 
 
 def _words(text):
@@ -63,12 +83,21 @@ class Memory:
                 loaded = json.loads(self.path.read_text(encoding="utf-8"))
                 for c in CATEGORIES:
                     self.data[c] = list(loaded.get(c, []))
+                self.data["seeded"] = list(loaded.get("seeded", []))
             except (OSError, ValueError):
                 # Keep a copy of the broken file instead of losing memories.
                 self.path.rename(self.path.with_suffix(f".broken-{int(time.time())}.json"))
-        if not self.data["projects"]:
-            self.add_project("Graveyard Zombies", "3D first-person zombie shooter you're building yourself",
-                             ZOMBIE_PLAN, save=False)
+        # Add any default game plans that aren't there yet (once only - deleting one sticks).
+        seeded = self.data.setdefault("seeded", [])
+        names = {p["name"] for p in self.data["projects"]}
+        changed = False
+        for name, description, plan, keywords in DEFAULT_PROJECTS:
+            if name not in seeded:
+                if name not in names:
+                    self.add_project(name, description, plan, save=False, keywords=keywords)
+                seeded.append(name)
+                changed = True
+        if changed:
             self.save()
 
     def save(self):
@@ -97,8 +126,10 @@ class Memory:
     def add_note(self, text):
         return self._add("notes", {"text": text.strip()})
 
-    def add_project(self, name, description, plan="", save=True):
-        return self._add("projects", {"name": name, "description": description, "plan": plan}, save)
+    def add_project(self, name, description, plan="", save=True, keywords=""):
+        """keywords = words that mean 'the user is talking about this project' (the name counts too)."""
+        return self._add("projects", {"name": name, "description": description, "plan": plan,
+                                      "keywords": keywords}, save)
 
     def add_fix(self, error, lesson, confirmed=False):
         """Save a bug + how it got fixed. Same error again? Bump its counter instead."""
@@ -206,7 +237,7 @@ class Memory:
             q = _words(query)
             for p in self.data["projects"]:
                 lines.append(f"- {p['name']}: {p['description']}")
-                if include_plans and p.get("plan") and (q & _words(p["name"] + " " + p["plan"])):
+                if include_plans and p.get("plan") and (q & _words(p["name"] + " " + p.get("keywords", ""))):
                     lines.append(p["plan"])
         files = self.scan_project_files(limit=15)
         if files:

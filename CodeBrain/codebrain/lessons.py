@@ -1,15 +1,16 @@
-"""📚 Lessons: Python basics -> 2D window -> how 3D works -> building your zombie game.
+"""📚 Lessons: Python basics -> 2D window -> how 3D works -> building your zombie game + 4D maze.
 
 Every lesson has an explanation, example code you can load + run, a challenge, and a quiz.
-The zombie track has NO game code on purpose: you build it yourself, CodeBrain coaches you.
+The game tracks have NO game code on purpose: you build them yourself, CodeBrain coaches you.
 """
 
 PY_TRACK = "🐍 Python Basics"
 TRACK_2D = "🕹️ Making a 2D Window"
 TRACK_3D = "🧊 How 3D Works"
 TRACK_ZOMBIE = "🧟 Build Your Zombie Game"
+TRACK_MAZE = "🌀 Build Your 4D Maze"
 
-TRACKS = [PY_TRACK, TRACK_2D, TRACK_3D, TRACK_ZOMBIE]
+TRACKS = [PY_TRACK, TRACK_2D, TRACK_3D, TRACK_ZOMBIE, TRACK_MAZE]
 
 LESSONS = [
     # ------------------------------------------------------------------ PYTHON BASICS
@@ -398,7 +399,7 @@ green_cube = Entity(model='cube', color=color.green, position=(0, 3, 0))     # U
 blue_cube = Entity(model='cube', color=color.azure, position=(0, 0.5, 4))    # FORWARD
 yellow_cube = Entity(model='cube', color=color.yellow, position=(3, 0.5, 0)) # RIGHT
 
-Text("Hold right mouse to look around, scroll to zoom", position=(-0.85, 0.47))
+Text("Hold right mouse to look around, scroll to zoom", position=window.top_left + Vec2(0.03, -0.03))
 EditorCamera()      # lets you fly the camera around with the mouse
 
 
@@ -485,7 +486,7 @@ for i in range(10):
                           position=(random.uniform(-12, 12), random.uniform(1, 4), random.uniform(6, 18))))
 
 score = 0
-score_text = Text(f"Score: {score}", position=(-0.85, 0.45), scale=2)
+score_text = Text(f"Score: {score}", position=window.top_left + Vec2(0.03, -0.03), scale=2)
 
 
 def input(key):
@@ -630,13 +631,40 @@ ZOMBIE_STEPS = [
      "Teach me step 13: save my high score to a file and show it on the main menu."),
 ]
 
-for n, (title, text, ask) in enumerate(ZOMBIE_STEPS, start=1):
-    LESSONS.append({
-        "id": f"zg{n}", "track": TRACK_ZOMBIE, "title": f"Step {n}: {title}",
-        "text": text + "\n\n💡 YOU build this one. Press 'Ask CodeBrain' and it will teach you how, "
-                       "then type it into your own file in the editor.\nPress 'I did it ✅' when it works!",
-        "code": "", "challenge": "", "quiz": None, "ask": ask,
-    })
+# 4D maze: first-person 3D maze, Q/E slides you through the 4th dimension (w) and walls change.
+MAZE_STEPS = [
+    ("A 3D maze from text", "Draw the maze as a list of strings ('#' = wall, '.' = floor) and turn every '#' into a "
+     "wall cube. Walk around it with a FirstPersonController.",
+     "Teach me step 1 of my 4D Maze game: build a first-person 3D maze in ursina from a list of strings where '#' is a wall. Explain every line."),
+    ("Add the 4th dimension", "Now the maze is a LIST of mazes, one for each w (w = 0, 1, 2, 3). Each w-slice has "
+     "different walls. Make all the wall cubes for every slice, but only show slice 0.",
+     "Teach me step 2 of my 4D Maze: store the maze as 4 slices (w = 0 to 3), each a list of strings, build wall entities for every slice and only show the slice I'm in."),
+    ("Slide with Q / E 🤯", "Press E to go to w+1 and Q to go to w-1. Hide the old slice's walls and show the new "
+     "slice's walls. Add a smooth flash so the slide feels cool.",
+     "Teach me step 3: press Q and E to slide through the 4th dimension, hiding and showing the walls of each w-slice, with a cool flash effect."),
+    ("Don't get stuck in a wall", "If there's a wall where you're standing in the next slice, you can't slide there. "
+     "Show a red warning instead.",
+     "Teach me step 4: block sliding to another w-slice when a wall is at my position in that slice, and show a red warning message."),
+    ("See the 4th dimension", "Show 'W: 2 / 4' on screen, tint the world a different color for each w, and draw "
+     "see-through 'ghost' walls from the next slice so you can plan ahead.",
+     "Teach me step 5: a HUD that shows which w-slice I'm in, a different color tint for each slice, and transparent ghost walls showing the next slice."),
+    ("Keys + exit door", "Hide keys in different slices. Collect them all to open the exit.",
+     "Teach me step 6: collectible keys hidden in different w-slices and an exit door that opens when I have them all."),
+    ("Random 4D mazes", "Generate a new maze every game with a 'maze generator' algorithm that also connects "
+     "slices (you can only slide where there's an opening).",
+     "Teach me step 7: generate a random 4D maze (x, z and w) with a recursive backtracker algorithm and build it in ursina."),
+    ("Timer + best time 🏆", "A timer for each run. Save your best time to a file and show it on the start screen.",
+     "Teach me step 8: a run timer and saving my best time to a file, shown on a start screen."),
+]
+
+for track, prefix, steps in ((TRACK_ZOMBIE, "zg", ZOMBIE_STEPS), (TRACK_MAZE, "mz", MAZE_STEPS)):
+    for n, (title, text, ask) in enumerate(steps, start=1):
+        LESSONS.append({
+            "id": f"{prefix}{n}", "track": track, "title": f"Step {n}: {title}",
+            "text": text + "\n\n💡 YOU build this one. Press 'Ask CodeBrain' and it will teach you how, "
+                           "then type it into your own file in the editor.\nPress 'I did it ✅' when it works!",
+            "code": "", "challenge": "", "quiz": None, "ask": ask,
+        })
 
 
 def by_id(lesson_id):
