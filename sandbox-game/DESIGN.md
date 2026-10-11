@@ -109,14 +109,31 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **After v1.5**: liquids preview page → rest of explosives & guns, vehicles...
 - **Later**: town + life sim systems, then space.
 
-## Controls
-- **B** opens the spawn menu.
-- **Hotbar 1-9 + mouse scroll** to switch tools/guns.
-- **Space x2** = double jump, **hold Space** = jetpack, **V** = fly toggle.
-- **E** pick up light objects with hands, hold click to throw harder (heavy things are too heavy, like real life).
-- **Physics gun** (edit tool): hold click to grab, drag with mouse, scroll to push/pull, **R** to rotate, release to drop, right-click to freeze. (R reloads when a gun is out.)
-- **T** = slow-motion toggle (sound slows + deepens too).
-- **Z** undo last spawn. Delete tool, Clear All button, Freeze tool (freeze objects in mid-air).
+## Controls (all rebindable in settings; full list shown in the Esc menu)
+| Key | Action |
+|---|---|
+| W A S D | Move |
+| Mouse | Look |
+| Shift | Sprint (while aiming the sniper: hold breath to steady) |
+| Space | Jump |
+| Space x2 | Double jump |
+| Hold Space (in air) | Jetpack |
+| Ctrl (hold) / C (toggle) | Crouch; crouch while sprinting = slide |
+| V | Fly toggle |
+| Q / E | Lean left / right |
+| F | Pick up light objects with hands; hold left click to throw harder |
+| Left click | Fire / use tool |
+| Right click | Aim down sights / physics gun: freeze |
+| R | Reload / physics gun: rotate held object |
+| 1-9, mouse scroll | Hotbar |
+| B | Spawn menu |
+| Shift + scroll | Resize ghost preview (basic shapes) |
+| T | Slow-motion toggle (sound slows + deepens too) |
+| Z | Undo last spawn |
+| Esc | Pause menu: settings, controls, save/load |
+
+- **Physics gun** (edit tool): hold click to grab, drag with mouse, scroll to push/pull, R to rotate, release to drop, right-click to freeze.
+- Cleanup: Delete tool, Clear All button, Freeze tool (freeze objects in mid-air).
 
 ## v1 details
 - **Guns**: pistol, assault rifle, shotgun, sniper. Modern real-world style with generic names ("9mm Pistol", "Assault Rifle").
