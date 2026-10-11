@@ -62,6 +62,14 @@ everything, and it learns from what breaks.
 - 📸 **Look (CodeBrain's eyes)**: run your game, type what's wrong ("why is my zombie floating?") and
   press 📸 Look. CodeBrain screenshots your game window, a local vision brain (`qwen2.5vl:7b`) describes
   what it sees, and the coding brain uses that to fix your code. It's all on your PC too.
+- 🔄 **Self-check**: CodeBrain checks its own code before you use it: broken Python, typos in names,
+  and made-up libraries. If it finds a mistake, it quietly fixes it and swaps in the fixed answer
+  ("🔄 double-checked my code and fixed a mistake"). It can be turned off in ⚙️ Settings.
+- 🎨 **Learns your style**: every program that runs without errors teaches CodeBrain how YOU code
+  (names, spaces, quotes, comments, window sizes) and what you already know (loops, classes, lists…).
+  It writes code your way and doesn't over-explain things you already know. See it in 🧠 Memory → 🎨 My style.
+- 💾 **Automatic backups**: every Run and Save keeps a copy of your file (the last 50).
+  Press 🕘 to see what changed and ↩ restore any old version.
 - 🐛 **Bug Detective**: when your code crashes, the line turns red. Press Bug Detective and it
   explains what went wrong in simple words, then gives you fixed code.
 - 🔍 **Explain**: highlight any code (or nothing = the whole file) and it explains it piece by piece.

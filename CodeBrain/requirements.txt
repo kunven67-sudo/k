@@ -1,3 +1,4 @@
 # Game libraries CodeBrain teaches with (the AI brain itself comes from Ollama, not pip)
 pygame>=2.5
 ursina>=7.0
+pyflakes>=3.0     # 🔄 self-check: spots typos in code

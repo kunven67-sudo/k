@@ -62,6 +62,12 @@ class Doctor:
                 self.ok(f"{name} ({why})")
             except Exception as e:
                 self.bad(f"{name} is missing ({why}): {e}", "Run SETUP.bat again.")
+        try:
+            importlib.import_module("pyflakes")
+            self.ok("pyflakes (🔄 self-check typo finder)")
+        except Exception:
+            self.warn("pyflakes is missing, so self-check can't spot typos (it still checks the rest).",
+                      "Run SETUP.bat again.")
         from codebrain.voice import Speaker, missing_parts
         missing = missing_parts()
         if missing:

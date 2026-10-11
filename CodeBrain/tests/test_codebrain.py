@@ -28,6 +28,15 @@ from codebrain.voice import PushToTalk, missing_parts, speakable  # noqa: E402
 from codebrain.doctor import Doctor  # noqa: E402
 from codebrain import project as P  # noqa: E402
 from codebrain.paths import projects_dir  # noqa: E402
+from codebrain import selfcheck  # noqa: E402
+from codebrain import versions as V  # noqa: E402
+from codebrain.style import StyleProfile, analyze  # noqa: E402
+
+try:
+    import pyflakes  # noqa: F401
+    HAVE_PYFLAKES = True
+except ImportError:
+    HAVE_PYFLAKES = False
 
 
 def tmpfile(name):
@@ -43,6 +52,7 @@ def write_prog(code):
 class FakeOllama(BaseHTTPRequestHandler):
     """Pretends to be Ollama so we can test without a real brain."""
     reply = "Here you go!\n```python\nprint('hi')\n```\nLESSON: always close your brackets."
+    queue = []          # if not empty, answers come from here first (one per request)
     requests = []
 
     def log_message(self, *args):
@@ -64,8 +74,9 @@ class FakeOllama(BaseHTTPRequestHandler):
         if payload.get("model") == "broken":
             self.wfile.write(json.dumps({"error": "model 'broken' not found"}).encode() + b"\n")
             return
-        for i in range(0, len(self.reply), 7):
-            chunk = {"message": {"role": "assistant", "content": self.reply[i:i + 7]}, "done": False}
+        reply = FakeOllama.queue.pop(0) if FakeOllama.queue else self.reply
+        for i in range(0, len(reply), 7):
+            chunk = {"message": {"role": "assistant", "content": reply[i:i + 7]}, "done": False}
             self.wfile.write(json.dumps(chunk).encode() + b"\n")
             self.wfile.flush()
         self.wfile.write(json.dumps({"message": {"content": ""}, "done": True}).encode() + b"\n")
@@ -299,6 +310,117 @@ class TestProject(unittest.TestCase):
         self.assertEqual(P.safe_target(self.folder, "levels/level2.py"), (self.folder / "levels" / "level2.py").resolve())
 
 
+GOOD_PROGRAM = """import random
+
+def roll():
+    return random.randint(1, 6)
+
+print(roll())
+"""
+
+
+class TestSelfCheck(unittest.TestCase):
+    def test_good_code_passes(self):
+        self.assertEqual(selfcheck.check_code(GOOD_PROGRAM), [])
+
+    def test_syntax_error(self):
+        problems = selfcheck.check_code("import random\ndef roll(:\n    return 1\nprint(roll())\n")
+        self.assertTrue(problems and "line 2" in problems[0])
+
+    def test_made_up_library(self):
+        problems = selfcheck.check_code("import pygame3d\nimport random\nx = 1\nprint(x)\n")
+        self.assertIn("pygame3d", problems[0])
+
+    @unittest.skipUnless(HAVE_PYFLAKES, "pyflakes not installed")
+    def test_typo(self):
+        problems = selfcheck.check_code("import random\nscreen = 1\nprint(scren)\nprint(random.random())\n")
+        self.assertTrue(any("scren" in p for p in problems))
+
+    def test_reply_checks_only_full_programs(self):
+        self.assertEqual(selfcheck.check_reply("just do:\n```python\nplayer.speed += 1\n```"), [])
+        bad = "```python\nimport random\n\ndef roll(:\n    pass\n```"
+        self.assertEqual(len(selfcheck.check_reply(bad)), 1)
+
+    def test_pieces_for_the_open_file(self):
+        editor = "import pygame\nplayer = pygame.Rect(0, 0, 10, 10)\nspeed = 5\n"
+        piece = "```python\ndef move():\n    player.x += speed\n    return player\n```"
+        self.assertEqual(selfcheck.check_reply(piece), [])                          # no imports -> syntax only
+        self.assertEqual(selfcheck.check_reply(piece, editor_code=editor), [])      # names come from the file
+        if HAVE_PYFLAKES:
+            typo = "```python\ndef move():\n    playr.x += speed\n    return 1\n```"
+            self.assertTrue(any("playr" in p for p in selfcheck.check_reply(typo, editor_code=editor)))
+        star = "from ursina import *\napp = Ursina()\n"
+        self.assertEqual(selfcheck.check_reply("```python\ndef go():\n    camera.y += 1\n    return 1\n```",
+                                               editor_code=star), [])
+
+    def test_files_from_same_answer_count(self):
+        reply = ("```python\n# file: enemies.py\nimport random\nSPEED = 3\nHP = 10\nNAME = 'z'\n```\n"
+                 "```python\n# file: main.py\nimport enemies\nimport random\nprint(enemies.SPEED)\nprint(1)\n```")
+        self.assertEqual(selfcheck.check_reply(reply), [])
+
+
+class TestStyle(unittest.TestCase):
+    PROG = """import pygame
+import random
+
+# my game
+class Player:
+    def __init__(self):
+        self.move_speed = 5
+
+def spawn_enemy(enemy_list):
+    enemy_list.append({"x": random.randint(0, 800)})
+
+screen = pygame.display.set_mode((800, 600))
+enemies = []
+for wave_number in range(3):
+    spawn_enemy(enemies)
+print(f"{len(enemies)} enemies")
+"""
+
+    def test_analyze(self):
+        f = analyze(self.PROG)
+        self.assertEqual(max(f["naming"], key=f["naming"].get), "snake_case")
+        self.assertIn("class", f["concepts"])
+        self.assertIn("pygame", f["concepts"])
+        self.assertEqual(f["window_sizes"], [(800, 600)])
+        self.assertIsNone(analyze("def broken(:"))
+
+    def test_profile_learns(self):
+        style = StyleProfile(tmpfile("style.json"))
+        self.assertEqual(style.prompt_text(), "")
+        self.assertFalse(style.learn("x = 1"))               # too small to learn from
+        for _ in range(3):
+            self.assertTrue(style.learn(self.PROG))
+        text = StyleProfile(style.path).prompt_text()
+        self.assertIn("snake_case", text)
+        self.assertIn("4 spaces", text)
+        self.assertIn("800x600", text)
+        self.assertIn("classes", text)
+        style.reset()
+        self.assertEqual(style.data["programs"], 0)
+
+
+class TestVersions(unittest.TestCase):
+    def test_save_list_restore(self):
+        path = write_prog("print(1)\n")
+        self.assertIsNotNone(V.save_version(path, "print(1)\n"))
+        self.assertIsNone(V.save_version(path, "print(1)\n"))          # unchanged -> no duplicate
+        V.save_version(path, "print(2)\n")
+        versions = V.list_versions(path)
+        self.assertEqual(len(versions), 2)
+        self.assertEqual(versions[0][0].read_text(), "print(2)\n")      # newest first
+        self.assertIn("+print(2)", V.diff("print(1)\n", "print(2)\n"))
+
+    def test_keeps_only_latest(self):
+        path = write_prog("x")
+        for i in range(V.KEEP + 5):
+            V.save_version(path, f"x = {i}\n")
+        versions = V.list_versions(path)
+        self.assertEqual(len(versions), V.KEEP)
+        self.assertEqual(versions[0][0].read_text(), f"x = {V.KEEP + 4}\n")
+
+
 class FakeRecorder:
     def __init__(self, audio):
         self.audio = audio
@@ -374,7 +496,9 @@ class TestBrainAndAssistant(unittest.TestCase):
         cfg = Config(tmpfile("config.json"))
         cfg["ollama_url"] = f"http://127.0.0.1:{self.server.server_port}"
         cfg["model"] = model
-        return Assistant(config=cfg, memory=Memory(tmpfile("m.json")), xp=XP(tmpfile("x.json")))
+        FakeOllama.queue[:] = []
+        return Assistant(config=cfg, memory=Memory(tmpfile("m.json")), xp=XP(tmpfile("x.json")),
+                         style=StyleProfile(tmpfile("style.json")))
 
     def test_pick_model(self):
         self.assertEqual(pick_model(12), "qwen2.5-coder:14b")
@@ -450,6 +574,42 @@ class TestBrainAndAssistant(unittest.TestCase):
         self.assertIn("screenshot", coder_payload["messages"][-1]["content"])
         self.assertTrue(reply.startswith("👀"))
         self.assertEqual(len(statuses), 2)
+
+    def test_self_check_swaps_in_fixed_answer(self):
+        ai = self.make()
+        broken = "Here:\n```python\nimport random\n\ndef roll(:\n    return 1\n```"
+        fixed = "Here:\n```python\n" + GOOD_PROGRAM + "```"
+        FakeOllama.queue[:] = [broken, fixed]
+        events = []
+        reply, _, _ = ai.ask("make a dice roller", None,
+                             on_status=lambda t: events.append("status"), on_reset=lambda: events.append("reset"))
+        self.assertEqual(reply, fixed)
+        self.assertEqual(events, ["status", "reset"])
+        self.assertEqual([m["role"] for m in ai.history], ["user", "assistant"])   # the fix request is hidden
+        self.assertEqual(ai.history[-1]["content"], fixed)
+        self.assertIn("SELF-CHECK", FakeOllama.requests[-1][1]["messages"][-1]["content"])
+
+    def test_self_check_gives_up_honestly(self):
+        ai = self.make()
+        broken = "```python\nimport random\n\ndef roll(:\n    return 1\n```"
+        FakeOllama.queue[:] = [broken, broken, broken]
+        reply, _, _ = ai.ask("make a dice roller")
+        self.assertIn("self-check still sees", reply)
+        self.assertEqual(FakeOllama.queue, [])
+
+    def test_self_check_can_be_turned_off(self):
+        ai = self.make()
+        ai.config["self_check"] = False
+        broken = "```python\nimport random\n\ndef roll(:\n    return 1\n```"
+        FakeOllama.queue[:] = [broken]
+        reply, _, _ = ai.ask("make a dice roller")
+        self.assertEqual(reply, broken)
+
+    def test_style_learned_after_good_run(self):
+        ai = self.make()
+        ok = run_blocking(write_prog(GOOD_PROGRAM), timeout=30)
+        ai.after_run(ok, code=TestStyle.PROG)
+        self.assertEqual(ai.style.data["programs"], 1)
 
     def test_brain_error(self):
         ai = self.make(model="broken")

@@ -27,6 +27,7 @@ DEFAULTS = {
     "speak_answers": True,      # 🔊 read answers out loud
     "voice_auto_send": True,    # send right after you finish talking
     "vision_model": "qwen2.5vl:7b",   # 👀 CodeBrain's eyes (only downloaded if you say yes)
+    "self_check": True,         # 🔄 check its own code for mistakes before you use it
 }
 
 

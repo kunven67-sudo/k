@@ -4,9 +4,11 @@ import re
 
 from codebrain import prompts
 from codebrain import project as P
+from codebrain import selfcheck
 from codebrain.brain import Brain
 from codebrain.config import Config
 from codebrain.memory import Memory
+from codebrain.style import StyleProfile
 from codebrain.xp import XP
 
 CHARS_PER_TOKEN = 3          # code is about 3 characters per token
@@ -15,10 +17,11 @@ MAX_EDITOR_CHARS = 8000
 
 
 class Assistant:
-    def __init__(self, config=None, memory=None, xp=None, brain=None):
+    def __init__(self, config=None, memory=None, xp=None, brain=None, style=None):
         self.config = config or Config()
         self.memory = memory or Memory()
         self.xp = xp or XP()
+        self.style = style or StyleProfile()
         self.brain = brain or Brain(self.config)
         self.history = []          # [{"role": "user"/"assistant", "content": ...}]
         self.pending_fix = None    # a Bug Detective fix waiting to be proven by a good run
@@ -45,6 +48,9 @@ class Assistant:
 
     def _messages(self, query, filename=None, code=None, path=None, message=""):
         system = prompts.system_prompt(self.config, self.memory, query)
+        style = self.style.prompt_text()
+        if style:
+            system += "\n\n" + style
         room = self.budget() - len(system)
         extra = []
         if code and code.strip():
@@ -61,7 +67,7 @@ class Assistant:
             system += "\n\n" + "\n\n".join(extra)
         return [{"role": "system", "content": system}] + self._trim_history(self.history, max(2000, room))
 
-    def _converse(self, user_text, on_token, query, xp_action="chat", **ctx):
+    def _converse(self, user_text, on_token, query, xp_action="chat", on_status=None, on_reset=None, **ctx):
         self.history.append({"role": "user", "content": user_text})
         try:
             reply = self.brain.chat(self._messages(query, message=user_text, **ctx), on_token=on_token)
@@ -69,15 +75,54 @@ class Assistant:
             self.history.pop()
             raise
         self.history.append({"role": "assistant", "content": reply})
+        reply = self._self_check(reply, query, on_token, on_status, on_reset, ctx)
         level_up = self.xp.add(xp_action)
         return reply, level_up
 
+    def _self_check(self, reply, query, on_token, on_status, on_reset, ctx, tries=2):
+        """🔄 Check the code in the answer; if it's broken, quietly ask for a fixed answer (up to `tries` times)."""
+        if not self.config.get("self_check", True):
+            return reply
+        folder = P.project_folder(ctx["path"]) if ctx.get("path") else None
+        for attempt in range(tries + 1):
+            problems = selfcheck.check_reply(reply, folder, ctx.get("code"))
+            if not problems:
+                return reply
+            if attempt == tries:      # still not perfect: be honest about it
+                note = ("\n\n⚠️ *My self-check still sees a possible problem: " + "; ".join(problems[:3]) +
+                        ". If it crashes, press 🐛 Bug Detective.*")
+                if on_token:
+                    on_token(note)
+                reply += note
+                self.history[-1]["content"] = reply
+                return reply
+            if on_status:
+                on_status("🔄 Self-check found a mistake in my code - fixing it...")
+            fix_request = prompts.SELF_CHECK.format(problems="\n".join("- " + p for p in problems))
+            self.history.append({"role": "user", "content": fix_request})
+            try:
+                if on_reset:
+                    on_reset()
+                fixed = self.brain.chat(self._messages(query, message=fix_request, **ctx), on_token=on_token)
+            except InterruptedError:
+                self.history.pop()
+                raise
+            except Exception:
+                self.history.pop()
+                return reply          # couldn't fix it; keep the first answer
+            self.history.pop()                                   # the fix request
+            self.history[-1] = {"role": "assistant", "content": fixed}   # the fixed answer replaces the old one
+            reply = fixed
+        return reply
+
     # ---------- what the buttons do ----------
-    def ask(self, message, on_token=None, filename=None, editor_code=None, path=None):
-        """Normal chat. Returns (reply, learned_memories, level_up_message)."""
+    def ask(self, message, on_token=None, filename=None, editor_code=None, path=None, **hooks):
+        """Normal chat. Returns (reply, learned_memories, level_up_message).
+        hooks: on_status(text), on_reset() - used by the self-check to swap in a fixed answer."""
         learned = self.memory.learn_from_message(message)
         query = message + " " + (editor_code or "")[:2000]
-        reply, level_up = self._converse(message, on_token, query, filename=filename, code=editor_code, path=path)
+        reply, level_up = self._converse(message, on_token, query, filename=filename, code=editor_code, path=path,
+                                         **hooks)
         return reply, learned, level_up
 
     def explain(self, code, on_token=None):
@@ -85,35 +130,47 @@ class Assistant:
         reply, level_up = self._converse(text, on_token, code, xp_action="explain")
         return reply, level_up
 
-    def bug_detective(self, code, error, filename="untitled.py", on_token=None, path=None):
+    def bug_detective(self, code, error, filename="untitled.py", on_token=None, path=None, **hooks):
         """Explain a crash + give fixed code. Remembers the lesson (confirmed once the fix runs OK)."""
         text = prompts.BUG_DETECTIVE.format(filename=filename, code=code[:MAX_EDITOR_CHARS], error=error[-3000:])
         reply, level_up = self._converse(text, on_token, error + " " + code[:1500], xp_action="explain",
-                                         path=path, code=code)
+                                         path=path, code=code, **hooks)
         lesson = prompts.extract_lesson(reply) or reply.split("\n\n")[0][:300]
         self.pending_fix = self.memory.add_fix(error, lesson)
         return reply, level_up
 
-    def look(self, png_bytes, question, on_token=None, filename=None, editor_code=None, path=None, on_status=None):
+    def look(self, png_bytes, question, on_token=None, filename=None, editor_code=None, path=None, on_status=None,
+             on_reset=None):
         """👀 Look at a screenshot: the vision brain describes it, then the coding brain fixes the code."""
         question = question.strip() or "Look at my game. Does anything look wrong? How do I fix it?"
         if on_status:
             on_status("👀 Looking at your screenshot...")
         seen = self.brain.see(prompts.LOOK.format(question=question), png_bytes)
         seen = re.sub(r"```.*?(```|\Z)", "", seen, flags=re.S).strip() or "(I couldn't make out much.)"
+        header = f"👀 **What I see:** {seen}\n\n"
         if on_token:
-            on_token(f"👀 **What I see:** {seen}\n\n")
+            on_token(header)
         if on_status:
             on_status("🧠 Thinking about how to fix it...")
+
+        def reset():               # self-check swapped the answer: keep showing what we saw
+            if on_reset:
+                on_reset()
+            if on_token:
+                on_token(header)
+
         text = prompts.LOOK_FOLLOWUP.format(question=question, seen=seen)
         query = question + " " + (editor_code or "")[:2000]
-        reply, level_up = self._converse(text, on_token, query, filename=filename, code=editor_code, path=path)
+        reply, level_up = self._converse(text, on_token, query, filename=filename, code=editor_code, path=path,
+                                         on_status=on_status, on_reset=reset)
         return f"👀 **What I see:** {seen}\n\n{reply}", [], level_up
 
-    def after_run(self, result):
+    def after_run(self, result, code=None):
         """Call after every run. Learns from success/failure. Returns a hype message or None."""
         if result.stopped or result.crashed:
             return None
+        if code:
+            self.style.learn(code)        # 🎨 it worked -> learn how you like to write code
         msgs = []
         if self.pending_fix:
             self.memory.confirm_fix(self.pending_fix["id"])

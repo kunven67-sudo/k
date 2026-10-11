@@ -12,6 +12,7 @@ from codebrain.codeblocks import best_code
 from codebrain.memory import CATEGORIES
 from codebrain.paths import projects_dir
 from codebrain.runner import run_interactive
+from codebrain import versions as V
 from codebrain.snippets import CATEGORIES as SNIPPET_CATEGORIES
 from codebrain.snippets import Snippets, snippet_part
 from codebrain.voice import PushToTalk, Speaker, missing_parts
@@ -54,6 +55,8 @@ HELP = f"""{G}{BOLD}Commands{END}
   {G}/snippet <id> add{END}  add it to your file   {G}/snippet <id> try{END}  run its demo
   {G}/look <question>{END} 📸 I take a screenshot in 3 seconds (switch to your game!) and look at it
   {G}/project <name>{END}  🎮 new game project in its own folder
+  {G}/versions{END}        🕘 backups of your file   {G}/restore <n>{END}  go back to backup n
+  {G}/style{END}           🎨 what I learned about how you code
   {G}/xp{END}              ⭐ your level
   {G}/mode teach|code|hints{END}   how I help you
   {G}/model <name>{END}    switch brain    {G}/clear{END}  new chat    {G}/quit{END}  bye
@@ -86,6 +89,14 @@ class CLI:
         if p.suffix == "" and not p.exists():
             p = p.with_suffix(".py")
         return p
+
+    def hooks(self):
+        def on_status(text):
+            print(f"\n{M}{text}{END}", flush=True)
+
+        def on_reset():
+            print(f"\n{Y}🔄 I double-checked my code and found a mistake. Here's the fixed answer:{END}\n", flush=True)
+        return {"on_status": on_status, "on_reset": on_reset}
 
     def stream(self, job):
         print(f"\n{G}{BOLD}🧠 CodeBrain{END}")
@@ -152,13 +163,18 @@ class CLI:
             return self.say("My last answer had no code in it.", Y)
         if not self.path:
             self.cmd_new("my_program.py")
+        if self.path.exists():
+            V.save_version(self.path, self.path.read_text(encoding="utf-8", errors="replace"), "before-save")
         self.path.write_text(code + "\n", encoding="utf-8")
+        V.save_version(self.path, code + "\n", "save")
         self.say(f"💾 Saved to {self.path}. Type /run to test it!")
 
     def cmd_run(self, _arg):
         if not self.path:
             return self.say("Open a file first: /open name.py", Y)
         self.say(f"▶ Running {self.path.name} (Ctrl+C to stop)\n" + "─" * 50, M)
+        code = self.code()
+        V.save_version(self.path, code, "run")
         result = run_interactive(self.path)
         self.last_result = result
         print(M + "─" * 50 + END)
@@ -168,14 +184,42 @@ class CLI:
             self.say("💥 It crashed! Type /fix and I'll explain + fix it.", R)
         else:
             self.say("✅ Finished with no errors!")
-        msg = self.ai.after_run(result)
+        msg = self.ai.after_run(result, code=code)
         if msg:
             self.say(msg, Y)
+
+    def cmd_versions(self, _arg):
+        if not self.path:
+            return self.say("Open a file first: /open name.py", Y)
+        versions = V.list_versions(self.path)
+        if not versions:
+            return self.say("No backups yet. /run or /save and I'll start keeping them 💾", Y)
+        for n, (_v, stamp, lines) in enumerate(versions, start=1):
+            print(f"  {Y}{n:>3}{END}  {stamp}  {M}({lines} lines){END}")
+        self.say("Go back with /restore <number>", M)
+
+    def cmd_restore(self, arg):
+        versions = V.list_versions(self.path) if self.path else []
+        if not arg.strip().isdigit() or not 1 <= int(arg) <= len(versions):
+            return self.say("Which one? See /versions", Y)
+        old = versions[int(arg) - 1][0].read_text(encoding="utf-8", errors="replace")
+        V.save_version(self.path, self.code(), "before-restore")
+        self.path.write_text(old, encoding="utf-8")
+        self.say(f"↩ Restored backup {arg}. (Your code from before is backed up too.)")
+
+    def cmd_style(self, _arg):
+        style = self.ai.style
+        self.say(f"🎨 I've studied {style.data['programs']} of your programs that worked.")
+        for line in style.summary_lines():
+            print(f"  • You {line}")
+        if style.skills():
+            print(f"  🧠 You've used: {', '.join(style.skills())}")
 
     def cmd_fix(self, _arg):
         if not self.last_result or not self.last_result.crashed:
             return self.say("No crash to investigate. /run your code first 🔍", Y)
-        self.stream(lambda t: self.ai.bug_detective(self.code(), self.last_result.error_text, self.path.name, t))
+        self.stream(lambda t: self.ai.bug_detective(self.code(), self.last_result.error_text, self.path.name, t,
+                                                    self.path, **self.hooks()))
 
     def cmd_explain(self, _arg):
         code = self.code()
@@ -361,7 +405,7 @@ class CLI:
             return self.say(f"Couldn't take a screenshot: {e}", R)
         self.say("📸 Got it! Looking...", M)
         name = self.path.name if self.path else None
-        self.stream(lambda t: self.ai.look(png, arg, t, name, self.code(), self.path))
+        self.stream(lambda t: self.ai.look(png, arg, t, name, self.code(), self.path, **self.hooks()))
 
     def cmd_project(self, arg):
         name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in arg.strip()) or "my_game"
@@ -375,7 +419,7 @@ class CLI:
 
     def chat(self, line):
         result = self.stream(lambda t: self.ai.ask(line, t, self.path.name if self.path else None, self.code(),
-                                                   self.path))
+                                                   self.path, **self.hooks()))
         if result and result[1]:
             for item in result[1]:
                 self.say(f"🧠 Saved to memory: {item['text']}", M)

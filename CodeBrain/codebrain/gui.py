@@ -13,6 +13,7 @@ from codebrain import lessons as L
 from codebrain.assistant import Assistant
 from codebrain.codeblocks import best_code
 from codebrain import project as P
+from codebrain import versions as V
 from codebrain.config import MODEL_BY_VRAM
 from codebrain.highlight import IndexMapper, spans
 from codebrain.memory import CATEGORIES
@@ -147,6 +148,7 @@ class CodeBrainApp:
         f.add_command(label="Open...           Ctrl+O", command=self.open_file)
         f.add_command(label="Save              Ctrl+S", command=self.save_file)
         f.add_command(label="Save as...", command=lambda: self.save_file(save_as=True))
+        f.add_command(label="🕘 Versions (automatic backups)...", command=self.open_versions)
         f.add_separator()
         f.add_command(label="📂 Open my projects folder", command=self.open_projects_folder)
         f.add_separator()
@@ -262,6 +264,7 @@ class CodeBrainApp:
         filerow = ttk.Frame(ed, padding=(0, 0, 0, 4))
         filerow.pack(fill="x")
         ttk.Button(filerow, text="💾 Save", command=self.save_file).pack(side="right")
+        ttk.Button(filerow, text="🕘", width=3, command=self.open_versions).pack(side="right", padx=(0, 4))
         ttk.Button(filerow, text="📂 Open", command=self.open_file).pack(side="right", padx=4)
         ttk.Button(filerow, text="📄 New", command=self.new_file).pack(side="right")
         self.file_label = ttk.Label(filerow, text="", style="Muted.TLabel")
@@ -440,7 +443,8 @@ class CodeBrainApp:
         code = self.editor.get("1.0", "end-1c")
         name = Path(self.current_path).name if self.current_path else "untitled.py"
         path = self.current_path
-        self._think(lambda on_token: self.ai.ask(text, on_token, name, code, path), kind="chat")
+        hooks = self._hooks()
+        self._think(lambda on_token: self.ai.ask(text, on_token, name, code, path, **hooks), kind="chat")
 
     def ask_codebrain(self, text):
         """Send a message as if you typed it (used by Lessons)."""
@@ -481,6 +485,18 @@ class CodeBrainApp:
                 self.ui(lambda: self._done_thinking(None, kind, error=err))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _hooks(self):
+        """Callbacks the brain uses from its background thread (status text + self-check answer swap)."""
+        return {"on_status": lambda t: self.ui(lambda: self.set_status(t, YELLOW)),
+                "on_reset": lambda: self.ui(self._reset_reply)}
+
+    def _reset_reply(self):
+        """🔄 Self-check found a mistake: wipe the answer so the fixed one replaces it."""
+        self.chat.configure(state="normal")
+        self.chat.delete("reply_start", "end-1c")
+        self.chat.insert("end", "🔄 (double-checked my code and fixed a mistake)\n", "note")
+        self.chat.configure(state="disabled")
 
     def _append_token(self, tok):
         self.chat.configure(state="normal")
@@ -669,8 +685,8 @@ class CodeBrainApp:
         code = self.editor.get("1.0", "end-1c")
         name = Path(self.current_path).name if self.current_path else "untitled.py"
         path = self.current_path
-        status = lambda t: self.ui(lambda: self.set_status(t, YELLOW))
-        self._think(lambda on_token: self.ai.look(png, question, on_token, name, code, path, status), kind="chat")
+        hooks = self._hooks()
+        self._think(lambda on_token: self.ai.look(png, question, on_token, name, code, path, **hooks), kind="chat")
 
     def _take_screenshot(self):
         """Your running game's window if there is one, otherwise the whole screen (with me hidden)."""
@@ -714,9 +730,9 @@ class CodeBrainApp:
 
         threading.Thread(target=work, daemon=True).start()
 
-    def put_in_editor(self, code):
+    def put_in_editor(self, code, confirm=True):
         current = self.editor.get("1.0", "end-1c").strip()
-        if current and current != code.strip():
+        if confirm and current and current != code.strip():
             if not messagebox.askyesno("Replace code?", "Replace the code in the editor with this code?\n"
                                                         "(You can undo with Ctrl+Z.)"):
                 return
@@ -882,6 +898,10 @@ class CodeBrainApp:
         except OSError as e:
             messagebox.showerror("Can't save", str(e))
             return False
+        try:
+            V.save_version(self.current_path, code, "save")                # 💾 automatic backup
+        except OSError:
+            pass
         self._update_title()
         return True
 
@@ -909,6 +929,8 @@ class CodeBrainApp:
             return
         if not self.save_file():
             return
+        self._last_run_code = self.editor.get("1.0", "end-1c")
+        V.save_version(self.current_path, self._last_run_code, "run")      # 💾 automatic backup
         self.run_file(self.current_path, from_editor=True)
 
     def run_file(self, path, from_editor=False):
@@ -968,7 +990,7 @@ class CodeBrainApp:
                 self.editor.see(f"{line}.0")
         else:
             self.out("\n✅ Finished with no errors!\n", "info")
-        self.celebrate(self.ai.after_run(result))
+        self.celebrate(self.ai.after_run(result, code=getattr(self, "_last_run_code", None)))
 
     def stop_code(self):
         if self.run:
@@ -993,7 +1015,8 @@ class CodeBrainApp:
         name = self.current_path.name if self.current_path else "untitled.py"
         self.chat_add("you", "🐛 Bug Detective: why did my code crash?")
         path = self.current_path
-        self._think(lambda on_token: self.ai.bug_detective(code, error, name, on_token, path), kind="bug")
+        hooks = self._hooks()
+        self._think(lambda on_token: self.ai.bug_detective(code, error, name, on_token, path, **hooks), kind="bug")
 
     def explain(self):
         if self.thinking:
@@ -1027,6 +1050,12 @@ class CodeBrainApp:
 
     def open_snippets(self):
         SnippetsWindow(self)
+
+    def open_versions(self):
+        if not self.current_path:
+            messagebox.showinfo("Versions", "Save your file first. Then every Run and Save keeps a backup copy 💾")
+            return
+        VersionsWindow(self)
 
     def open_doctor(self):
         import subprocess
@@ -1176,6 +1205,13 @@ class MemoryWindow:
             lb.bind("<Double-Button-1>", lambda e, c=cat: self.details(c))
             self.tabs.add(frame, text=self.LABELS[cat])
             self.lists[cat] = lb
+        style_frame = ttk.Frame(self.tabs)
+        self.style_text = app._text(style_frame, mono=False, state="disabled")
+        self.style_text.pack(fill="both", expand=True, padx=4, pady=4)
+        ttk.Button(style_frame, text="🧹 Forget my style (start learning again)", command=self.reset_style
+                   ).pack(anchor="w", padx=4, pady=(0, 6))
+        self.tabs.add(style_frame, text="🎨 My style")
+        self.show_style()
         bar = ttk.Frame(self.win, padding=8)
         bar.pack(fill="x")
         ttk.Button(bar, text="➕ Add", command=self.add).pack(side="left")
@@ -1184,7 +1220,28 @@ class MemoryWindow:
         self.refresh()
 
     def current(self):
-        return CATEGORIES[self.tabs.index("current")]
+        index = self.tabs.index("current")
+        return CATEGORIES[index] if index < len(CATEGORIES) else None
+
+    def show_style(self):
+        style = self.app.ai.style
+        lines = style.summary_lines()
+        skills = style.skills()
+        text = (f"I learn your style from programs that run with no errors. "
+                f"So far I've studied {style.data['programs']}.\n\n")
+        text += ("✍️ How you write code:\n" + "\n".join(f"  • You {l}" for l in lines) + "\n\n") if lines else \
+            "✍️ How you write code: I need to see a few more of your programs first!\n\n"
+        text += ("🧠 Things you've used successfully:\n  " + ", ".join(skills)) if skills else \
+            "🧠 Things you've used successfully: nothing yet. Run some code! 🚀"
+        self.style_text.configure(state="normal")
+        self.style_text.delete("1.0", "end")
+        self.style_text.insert("1.0", text)
+        self.style_text.configure(state="disabled")
+
+    def reset_style(self):
+        if messagebox.askyesno("Forget style?", "Forget everything I learned about your coding style?", parent=self.win):
+            self.app.ai.style.reset()
+            self.show_style()
 
     @staticmethod
     def label(cat, item):
@@ -1203,6 +1260,8 @@ class MemoryWindow:
 
     def selected(self):
         cat = self.current()
+        if cat is None:
+            return None, None
         sel = self.lists[cat].curselection()
         return (cat, self.mem.data[cat][sel[0]]) if sel else (cat, None)
 
@@ -1215,6 +1274,8 @@ class MemoryWindow:
 
     def add(self):
         cat = self.current()
+        if cat is None:
+            return
         if cat == "projects":
             name = simpledialog.askstring("New project", "Project name:", parent=self.win)
             if not name:
@@ -1373,11 +1434,82 @@ class SnippetsWindow:
         self.fill(select=item["id"])
 
 
+class VersionsWindow:
+    """🕘 Every backup of the open file. Pick one to see what changed, then restore it if you want."""
+
+    def __init__(self, app):
+        self.app = app
+        self.path = app.current_path
+        self.win = app._toplevel(f"🕘 Versions of {self.path.name}", "1100x680")
+        ttk.Label(self.win, text="A copy is saved every time you Run or Save. Green + = lines added since then, "
+                                 "red - = lines removed.", style="Muted.TLabel", padding=8).pack(anchor="w")
+        pane = ttk.PanedWindow(self.win, orient="horizontal")
+        pane.pack(fill="both", expand=True, padx=8)
+        self.list = tk.Listbox(pane, bg=PANEL, fg=TEXT, selectbackground=GREEN_DIM, selectforeground="#001a0a",
+                               relief="flat", highlightthickness=0, font=(MONO, 11), activestyle="none", width=34)
+        pane.add(self.list, weight=0)
+        self.list.bind("<<ListboxSelect>>", lambda e: self.show())
+        self.view = app._text(pane, wrap="none", state="disabled")
+        pane.add(self.view, weight=3)
+        self.view.tag_configure("add", foreground=GREEN)
+        self.view.tag_configure("del", foreground=RED)
+        self.view.tag_configure("hunk", foreground=BLUE)
+        bar = ttk.Frame(self.win, padding=8)
+        bar.pack(fill="x")
+        ttk.Button(bar, text="↩ Restore this version", style="Run.TButton", command=self.restore).pack(side="left")
+        ttk.Button(bar, text="📄 Show whole file", command=lambda: self.show(full=True)).pack(side="left", padx=6)
+        self.versions = V.list_versions(self.path)
+        for _v, stamp, lines in self.versions:
+            self.list.insert("end", f"{stamp}  ({lines} lines)")
+        if self.versions:
+            self.list.selection_set(0)
+            self.show()
+        else:
+            self.set_text("No backups yet. Press Run or Save and I'll start keeping them! 💾")
+
+    def chosen(self):
+        sel = self.list.curselection()
+        return self.versions[sel[0]][0] if sel else None
+
+    def set_text(self, text, colored=False):
+        self.view.configure(state="normal")
+        self.view.delete("1.0", "end")
+        for line in text.splitlines(True):
+            tag = None
+            if colored:
+                tag = ("add" if line.startswith("+") and not line.startswith("+++") else
+                       "del" if line.startswith("-") and not line.startswith("---") else
+                       "hunk" if line.startswith("@@") else None)
+            self.view.insert("end", line, tag)
+        self.view.configure(state="disabled")
+
+    def show(self, full=False):
+        version = self.chosen()
+        if not version:
+            return
+        old = version.read_text(encoding="utf-8", errors="replace")
+        if full:
+            self.set_text(old)
+            return
+        now = self.app.editor.get("1.0", "end-1c")
+        changes = V.diff(old, now)
+        self.set_text(changes or "✅ This version is exactly the same as your code right now.", colored=True)
+
+    def restore(self):
+        version = self.chosen()
+        if version and messagebox.askyesno("Restore?", "Put this old version in the editor?\n"
+                                                       "(Your current code gets backed up first, and Ctrl+Z works.)",
+                                           parent=self.win):
+            V.save_version(self.path, self.app.editor.get("1.0", "end-1c"), "before-restore")
+            self.app.put_in_editor(version.read_text(encoding="utf-8", errors="replace"), confirm=False)
+            self.win.destroy()
+
+
 class SettingsWindow:
     def __init__(self, app):
         self.app = app
         cfg = app.ai.config
-        self.win = app._toplevel("⚙️ Settings", "580x600")
+        self.win = app._toplevel("⚙️ Settings", "600x680")
         f = ttk.Frame(self.win, padding=16)
         f.pack(fill="both", expand=True)
 
@@ -1413,6 +1545,10 @@ class SettingsWindow:
             ttk.Radiobutton(vrow, text=label, value=value, variable=self.voice_model).pack(side="left", padx=(12, 0))
         self.auto_send = tk.BooleanVar(value=cfg.get("voice_auto_send", True))
         ttk.Checkbutton(f, text="Send my message as soon as I stop talking", variable=self.auto_send).pack(anchor="w", padx=12)
+        self.self_check = tk.BooleanVar(value=cfg.get("self_check", True))
+        ttk.Label(f, text="🔄 Self-check", font=(UI, 11, "bold")).pack(anchor="w", pady=(10, 0))
+        ttk.Checkbutton(f, text="Double-check my code for mistakes before showing it (a bit slower)",
+                        variable=self.self_check).pack(anchor="w", padx=12)
 
         ttk.Button(f, text="💾 Save", style="Run.TButton", command=self.save).pack(anchor="e", pady=16)
 
@@ -1427,6 +1563,7 @@ class SettingsWindow:
         except ValueError:
             pass
         cfg["voice_auto_send"] = bool(self.auto_send.get())
+        cfg["self_check"] = bool(self.self_check.get())
         if self.voice_model.get() != cfg.get("voice_model"):
             cfg["voice_model"] = self.voice_model.get()
             if self.app.ptt:

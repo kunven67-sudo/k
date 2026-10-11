@@ -87,6 +87,12 @@ LOOK_FOLLOWUP = """{question}
 
 Use what you saw + my code to figure out what's wrong and how to fix it."""
 
+SELF_CHECK = """SELF-CHECK (automatic message, not from the user): I checked the code in your last answer \
+and found these problems:
+{problems}
+Write your WHOLE answer again with these problems fixed, with complete code. Only use libraries that are \
+installed (standard library, pygame, ursina) and the user's own project files. Don't mention this check."""
+
 EDITOR_CONTEXT = """(The user's editor currently has the file "{filename}" open:)
 ```python
 {code}
