@@ -57,6 +57,9 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
   - Concrete: steel **rebar** inside. Concrete crumbles, rebar sticks out and holds chunks together.
   - Glass: **normal** (big sharp shards) and **tempered** (tiny cubes all at once, e.g. car windows).
   - Metal: dents, bends under load (steel beams), tears open from big blasts (drums, sheets), scorches black + glows red when very hot.
+  - Wood: splits along the grain with jagged splintered ends, splinters fly on impact, plywood layers peel apart vs solid wood snaps, bullet holes go all the way through (light shows through).
+  - Rubber: realistic bounce (balls bounce more than tires), squishes on impact, tires pop when shot, tears in blasts, melts + black smoke when burning (v1.5 fire).
+  - Fuel/gas: leaks/sprays when shot, leaked fuel makes an ignitable puddle (v1.5 fire), shot propane tanks can rocket off before exploding, bigger tank = bigger explosion.
   - Ice: slippery, melts slowly (faster near heat/explosions, leaves a puddle), spiderweb cracks before shattering.
 - **Breaking**: realistic per-material fracture; chunks fade over time (no lag).
 - **Fire**: spreads across wood, chars objects black so they crumble, rising smoke, metal glows hot.
