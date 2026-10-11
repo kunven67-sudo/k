@@ -107,7 +107,7 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Space x2** = double jump, **hold Space** = jetpack, **V** = fly toggle.
 - **E** pick up light objects with hands, hold click to throw harder (heavy things are too heavy, like real life).
 - **Physics gun** (edit tool): hold click to grab, drag with mouse, scroll to push/pull, **R** to rotate, release to drop, right-click to freeze. (R reloads when a gun is out.)
-- **Slow-motion button** (key TBD).
+- **T** = slow-motion toggle (sound slows + deepens too).
 - **Z** undo last spawn. Delete tool, Clear All button, Freeze tool (freeze objects in mid-air).
 
 ## v1 details
@@ -124,6 +124,8 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Resizing**: Shift + scroll on the ghost preview (basic shapes only; props stay real size).
 - **Weight**: real density per material, bigger = heavier.
 - **Arena size**: medium, ~300m.
+- **Spawn point**: small concrete control building with a big window over the arena; door leads outside.
+- **Arena music**: off by default. Spawnable radio/boombox prop plays music (and can be blown up).
 - **Detonation**: remote detonator (blow all at once), timer with beeping, fuse on TNT (sparks + hiss), chain reactions (TNT/C4/gas tanks set each other off).
 - **Rocket launcher**: RPG style. Single shot, slow reload, smoke trail, backblast behind you. Rocket jumping works but hurts (unless god mode).
 - **Connectors**: weld (metal, strongest), glue, nails/screws (wood, weaker), ropes/chains, hinges, wheels + motors. All have realistic strength and snap under enough force.
