@@ -124,6 +124,8 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **Weight**: real density per material, bigger = heavier.
 - **Arena size**: medium, ~300m.
 - **Detonation**: remote detonator (blow all at once), timer with beeping, fuse on TNT (sparks + hiss), chain reactions (TNT/C4/gas tanks set each other off).
+- **Rocket launcher**: RPG style. Single shot, slow reload, smoke trail, backblast behind you. Rocket jumping works but hurts (unless god mode).
+- **Connectors**: weld (metal, strongest), glue, nails/screws (wood, weaker), ropes/chains, hinges, wheels + motors. All have realistic strength and snap under enough force.
 - **Grenades**: cook it (pull pin, hold), real bounce & roll, hold to throw farther with arc preview, shrapnel that damages/dents nearby stuff.
 - **Explosion feel**: camera shake (by distance), ear ringing + muffled sound when too close, visible shockwave + dust cloud, scorch marks that stay on the ground.
 - **Main menu**: live 3D background, a slow camera flying over the arena while stuff explodes, menu on the side.
