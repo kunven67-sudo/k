@@ -1,6 +1,6 @@
 # Sandbox Game: Design Doc
 
-> Working title: TBD
+> Name: **Real Life Sandbox**
 > Status: planning (no code yet; nothing gets built until the owner says "build it")
 
 ## Big picture
@@ -81,8 +81,12 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 - **v2+**: guns, grapple, portal gun, fire, ragdolls, vehicles...
 - **Later**: town + life sim systems, then space.
 
+## Feel & menus
+- **HUD**: minimal realistic. Small crosshair, ammo only when holding a gun, money/time small in a corner.
+- **Sound**: realistic weapon/explosion sounds (echo, distance delay, muffled far away), ambient world (birds, wind, traffic, city), music + car radio, material impact sounds (wood thunk, metal clang, glass smash).
+- **Saving**: auto-save life progress, save/load arena builds, multiple save slots.
+
 ## Open questions
-- Game name
 - Liquids (needs the preview page)
 - What exactly goes in each version
 - Sound, music, menus, HUD, settings, saving
