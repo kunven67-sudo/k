@@ -48,6 +48,8 @@ export class Player {
     this.firstPerson = settings.get('firstPerson');
     this.crouching = false;
     this.lastImpact = 0;
+    this.jumpBuffer = 0; // a jump press waits up to 0.12 s for the next physics step / landing
+    this.resizeTarget = null; // set by machines (the lab's reset pad): smoothly go to this scale
 
     const physics = game.physics;
     const H = this.height;
@@ -172,12 +174,25 @@ export class Player {
 
     // Watch: hold to shrink / grow, smooth like a zoom. Shift = faster.
     const dir = (input.down('grow') ? 1 : 0) - (input.down('shrink') ? 1 : 0);
+    if (dir) this.resizeTarget = null; // your own watch always wins over a machine
     const want = dir * (input.down('sprint') ? 2.4 : 0.9);
-    this.sizeRate = dir ? damp(this.sizeRate, want, 5, dt) : damp(this.sizeRate, 0, 14, dt);
+    if (this.resizeTarget !== null && !dir) {
+      // Machine resize: ease toward the target size (fast when far, gentle at the end).
+      const gap = Math.log(this.resizeTarget / s);
+      const rate = clamp(gap * 5, -2.4, 2.4);
+      this.sizeRate = Math.sign(rate) * Math.max(Math.abs(rate), 0.05);
+      if (Math.abs(gap) < 0.01 || Math.abs(this.sizeRate * dt) >= Math.abs(gap)) {
+        if (this.tryResize(this.resizeTarget, false)) bus.emit('player:resized', this.resizeTarget);
+        else bus.emit('player:blocked');
+        this.resizeTarget = null;
+        this.sizeRate = 0;
+      }
+    } else this.sizeRate = dir ? damp(this.sizeRate, want, 5, dt) : damp(this.sizeRate, 0, 14, dt);
     if (Math.abs(this.sizeRate) > 1e-4) {
       const ns = clamp(s * Math.exp(this.sizeRate * dt), MIN_SCALE, MAX_SCALE);
       if (!this.tryResize(ns, input.down('force'))) {
         this.sizeRate = 0;
+        this.resizeTarget = null;
         this.blockedT = 1.5;
         bus.emit('player:blocked');
       }
@@ -205,7 +220,9 @@ export class Player {
     const vt = 55 * Math.sqrt(this.scale);
     this.vel.y -= G * dt;
     this.vel.y -= Math.sign(this.vel.y) * G * (this.vel.y / vt) ** 2 * dt;
-    if (this.grounded && input.pressed('jump')) {
+    this.jumpBuffer = Math.max(0, this.jumpBuffer - dt);
+    if (this.grounded && this.jumpBuffer > 0) {
+      this.jumpBuffer = 0;
       const jumpH = 0.45 * (this.scale < 1 ? Math.pow(this.scale, 0.3) : Math.pow(this.scale, 0.15));
       this.vel.y = Math.sqrt(2 * G * jumpH);
       this.grounded = false;
@@ -260,6 +277,12 @@ export class Player {
     this.health = 100;
   }
 
+  // Called once per frame before the physics steps: remember presses so none get lost on frames
+  // that happen to have no physics step (fast monitors run more frames than physics steps).
+  latchInput() {
+    if (input.pressed('jump')) this.jumpBuffer = 0.12;
+  }
+
   // --- per frame --------------------------------------------------------------------------------
   update(dt, alpha) {
     const look = input.consumeLook();
@@ -293,6 +316,7 @@ export class Player {
 
   // Third-person camera with collision, or first-person.
   updateCamera(camera, dt) {
+    if (this.showcase) return this._showcaseCamera(camera, dt);
     const H = this.height;
     const physics = this.game.physics;
     const fp = this.firstPerson;
@@ -333,6 +357,40 @@ export class Player {
     this.model.visible = !fp && dist > H * 0.35;
   }
 }
+
+// Title-screen shot: the camera in front of you, a little to the side, slowly drifting, with you on
+// the right of the frame (the menu is on the left). Never inside a wall.
+Player.prototype._showcaseCamera = function (camera, dt) {
+  const H = this.height;
+  const physics = this.game.physics;
+  this._showT = (this._showT || 0) + dt;
+  const f = this.facing + Math.sin(this._showT * 0.12) * 0.18;
+  const front = new THREE.Vector3(-Math.sin(f), 0, -Math.cos(f));
+  const side = new THREE.Vector3(Math.cos(f), 0, -Math.sin(f)); // your right
+  const chest = this.renderFeet.clone().addScaledVector(UP, H * 0.7);
+  const want = front.clone().multiplyScalar(1.65 * H).addScaledVector(side, -0.5 * H).addScaledVector(UP, 0.05 * H);
+  const dist = want.length();
+  const dir = want.clone().divideScalar(dist);
+  const hit = physics.sphereCast(chest, dir, H * 0.08, dist, {
+    excludeBody: this.body,
+    predicate: (c) => {
+      const o = physics.ownerOf(c);
+      return !(o && (o === this || (o.mass !== undefined && o.size < H * 0.4)));
+    },
+  });
+  const d = hit ? Math.max(H * 0.5, hit.dist - H * 0.05) : dist;
+  camera.position.copy(chest).addScaledVector(dir, d);
+  // Aim to the left of you so you stand in the right part of the picture.
+  const camRight = new THREE.Vector3().crossVectors(dir.clone().negate(), UP).normalize();
+  const look = chest.clone().addScaledVector(UP, H * 0.02).addScaledVector(camRight, -0.5 * H * (d / dist));
+  camera.up.set(0, 1, 0);
+  camera.lookAt(look);
+  camera.near = Math.max(1e-6, H * 0.03);
+  camera.far = clamp(H * 4000, 80, 4000);
+  camera.fov = settings.get('fov');
+  camera.updateProjectionMatrix();
+  this.model.visible = true;
+};
 
 // Temporary body until The Glitch model is in (a capsule with a visor so you can see facing).
 function placeholderModel() {

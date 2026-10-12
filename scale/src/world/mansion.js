@@ -21,6 +21,7 @@ import '../props/furniture.js';
 import { Door } from './doors.js';
 import { FM } from '../props/furniture.js';
 import { mergeByMaterial } from '../render/merge.js';
+import { bus } from '../core/events.js';
 
 const GF = 0; // ground floor top
 const UF = 3.3; // upper floor top
@@ -76,7 +77,13 @@ export async function buildMansion(game) {
   // ---------------------------------------------------------------- ground / site
   // Terrain: the ground around the house sits 2 cm below the floor.
   const groundY = -0.02;
-  physics.staticBox(0, groundY - 2, 0, 200, 2, 200);
+  // Solid ground (4 m deep) everywhere except where something is dug into it: the basement lab,
+  // the pool and the street (the road sits a few cm lower than the lawn).
+  groundWithHoles(physics, groundY, [
+    [-12, -8, -3, 2.4], // basement (RIFT LAB)
+    [0, -22, 12, -12], // pool
+    [-200, 32.5, 200, 42], // road
+  ]);
   const lawnRects = [
     [-11.9, 8.3, -1.1, 29.7], [1.1, 8.3, 11.9, 29.7], [12.3, -30, 40, 29.7], [-40, -30, -21.2, 29.7],
     [-21.2, -30, -2.2, -8.3], [-2.2, -30, 14.2, -24.2], [-2.2, -9.8, 12.3, -8.3], [14.2, -24.2, 12.3, -9.8],
@@ -403,7 +410,7 @@ export async function buildMansion(game) {
   game.mansion = { doors, lamps };
 
   return {
-    spawn: { position: [7.4, 0.02, 2.0], yaw: Math.PI * 0.62, pitch: -0.12 },
+    spawn: { position: [6.6, 0.02, 2.5], yaw: -1.85, pitch: -0.14 },
   };
 }
 
@@ -488,10 +495,9 @@ function buildLab(game, M, kit) {
       ringGlow.material.color.setRGB(0.18, 0.95, 1).multiplyScalar(1.6 + Math.sin(this.t * 2.2) * 0.5);
     },
   });
-  // Reset pad (glowing circle): step on it to go back to normal size.
-  const pad = add(new THREE.CylinderGeometry(0.6, 0.6, 0.02, 40), M.labGlow, -4.6, y + 0.01, -6.6);
-  pad.castShadow = false;
-  game.resetPad = { x: -4.6, z: -6.6, y, r: 0.6 };
+  // Reset pad: a glowing disc set flush into the floor (so even an ant-sized you can walk onto it).
+  // Step on it at any size and it brings you back to normal size (1.75 m), smoothly.
+  buildResetPad(game, -4.6, y, -6.6, 0.6);
   // Workbenches along the east wall.
   for (const z of [-6.8, -4.2]) {
     add(new THREE.BoxGeometry(0.9, 0.06, 2.0), M.steel, -3.6, y + 0.93, z);
@@ -524,6 +530,109 @@ function buildLab(game, M, kit) {
   }
   game.lighting.addLamp({ position: new THREE.Vector3(cx, y + 1.75, cz - 0.3), color: 0x5ef6ff, intensity: 6, range: 6 });
   void kit;
+}
+
+// The ground as a few big boxes around rectangular holes [x0, z0, x1, z1]. Cells are merged into
+// long strips so it stays a handful of colliders.
+function groundWithHoles(physics, top, holes, half = 200) {
+  const xs = new Set([-half, half]), zs = new Set([-half, half]);
+  for (const [x0, z0, x1, z1] of holes) {
+    xs.add(Math.max(-half, Math.min(half, x0))).add(Math.max(-half, Math.min(half, x1)));
+    zs.add(Math.max(-half, Math.min(half, z0))).add(Math.max(-half, Math.min(half, z1)));
+  }
+  const X = [...xs].sort((a, b) => a - b), Z = [...zs].sort((a, b) => a - b);
+  const inHole = (x, z) => holes.some(([x0, z0, x1, z1]) => x > x0 && x < x1 && z > z0 && z < z1);
+  for (let i = 0; i < X.length - 1; i++) {
+    const x0 = X[i], x1 = X[i + 1];
+    if (x1 - x0 < 1e-6) continue;
+    let start = null;
+    for (let j = 0; j <= Z.length - 1; j++) {
+      const solid = j < Z.length - 1 && Z[j + 1] - Z[j] > 1e-6 && !inHole((x0 + x1) / 2, (Z[j] + Z[j + 1]) / 2);
+      if (solid && start === null) start = Z[j];
+      if (!solid && start !== null) {
+        physics.staticBox((x0 + x1) / 2, top - 2, (start + Z[j]) / 2, (x1 - x0) / 2, 2, (Z[j] - start) / 2);
+        start = null;
+      }
+    }
+  }
+}
+
+function buildResetPad(game, px, py, pz, R) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 512;
+  const c = cv.getContext('2d');
+  c.translate(256, 256);
+  const ring = (r, w, col, blur) => {
+    c.shadowColor = col;
+    c.shadowBlur = blur;
+    c.strokeStyle = col;
+    c.lineWidth = w;
+    c.beginPath();
+    c.arc(0, 0, r, 0, Math.PI * 2);
+    c.stroke();
+  };
+  c.fillStyle = '#0a1016';
+  c.beginPath();
+  c.arc(0, 0, 254, 0, Math.PI * 2);
+  c.fill();
+  ring(246, 8, '#2ef2ff', 18);
+  ring(200, 3, '#2ef2ff', 8);
+  ring(120, 2, '#1aa6b8', 4);
+  c.shadowBlur = 0;
+  for (let i = 0; i < 72; i++) {
+    const a = (i / 72) * Math.PI * 2;
+    const l = i % 6 === 0 ? 22 : 10;
+    c.strokeStyle = i % 6 === 0 ? '#9ff8ff' : '#1d7f8c';
+    c.lineWidth = i % 6 === 0 ? 3 : 2;
+    c.beginPath();
+    c.moveTo(Math.cos(a) * (236 - l), Math.sin(a) * (236 - l));
+    c.lineTo(Math.cos(a) * 236, Math.sin(a) * 236);
+    c.stroke();
+  }
+  c.fillStyle = '#bffaff';
+  c.font = 'bold 54px Arial, sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText('1 : 1', 0, -18);
+  c.font = '600 24px Arial, sans-serif';
+  c.fillStyle = '#5fd9e6';
+  c.fillText('RESET  ·  1.75 m', 0, 34);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false });
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(R, 64), mat);
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.set(px, py + 0.0004, pz);
+  disc.renderOrder = 1;
+  game.scene.add(disc);
+  game.resetPad = { x: px, y: py, z: pz, r: R };
+  // Armed when you step on; disarms until you step off again (so you can shrink while standing on it).
+  const pad = { armed: true, active: false, t: 0 };
+  game.updatables.add({
+    update(dt) {
+      const pl = game.player;
+      if (!pl) return;
+      pad.t += dt;
+      const dx = pl.feet.x - px, dz = pl.feet.z - pz;
+      const on = dx * dx + dz * dz < R * R && Math.abs(pl.feet.y - py) < 0.3 && pl.grounded;
+      if (!on) {
+        pad.armed = true;
+        pad.active = false;
+      } else if (pad.armed) {
+        pad.armed = false;
+        if (Math.abs(Math.log(pl.scale)) > 0.01) {
+          pad.active = true;
+          pl.resizeTarget = 1;
+          bus.emit('toast', 'Reset pad: back to normal size');
+        }
+      }
+      if (pad.active && pl.resizeTarget === null) pad.active = false;
+      // Brighter and pulsing while it's working.
+      const k = pad.active ? 1.5 + Math.sin(pad.t * 14) * 0.5 : 1 + Math.sin(pad.t * 2) * 0.08;
+      mat.color.setScalar(k);
+    },
+  });
 }
 
 function labScreenTexture() {

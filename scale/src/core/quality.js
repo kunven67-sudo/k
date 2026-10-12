@@ -28,7 +28,7 @@ function autoTier() {
   const r = gpu.toLowerCase();
   if (r.includes('swiftshader') || r.includes('llvmpipe') || r === 'none') return 'low';
   if (device.isMobile) return device.isIOS ? 'medium' : 'low';
-  // Entry-level cards (GT 1030/710/730, MX laptop chips, integrated graphics) start on medium.
+  // Entry-level cards (GT-series, MX laptop chips, integrated graphics) start on medium.
   if (/gt \d{3}\b|mx\s?\d{3}|intel|uhd|iris|vega \d\b|radeon\(tm\) graphics/.test(r)) return 'medium';
   if (/rtx [2-9]0[6-9]0|rtx [4-9]0[7-9]0|rx [67]\d{3}|rx 9\d{3}|arc a7/.test(r)) return 'ultra';
   return 'high';

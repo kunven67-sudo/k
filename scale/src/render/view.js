@@ -13,6 +13,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { settings } from '../core/settings.js';
+import { bus } from '../core/events.js';
 
 const SPLIT_RATIO = 8000; // max far/near ratio per pass
 
@@ -121,10 +123,15 @@ export class View {
     }
     this.resize();
     window.addEventListener('resize', () => this.resize());
+    bus.on('settings', ({ key }) => {
+      if (key === 'renderScale') this.resize();
+    });
   }
 
   _pixelRatio() {
-    return Math.min(window.devicePixelRatio || 1, this.tier.pixelRatio);
+    // Resolution setting: fewer pixels = faster on weak graphics cards and phones.
+    const rs = Math.min(1, Math.max(0.5, Number(settings.get('renderScale')) || 1));
+    return Math.min(window.devicePixelRatio || 1, this.tier.pixelRatio) * rs;
   }
 
   _size() {

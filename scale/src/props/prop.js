@@ -21,6 +21,9 @@ const _e = new THREE.Euler();
 const _box = new THREE.Box3();
 const _anchor = new THREE.Vector3();
 const _origin = new THREE.Vector3();
+const _q2 = new THREE.Quaternion();
+const _q3 = new THREE.Quaternion();
+const ZERO = new THREE.Vector3();
 
 function shapeVolume(sh) {
   switch (sh.t) {
@@ -84,6 +87,51 @@ export const MATERIALS = {
   food: { friction: 0.8, restitution: 0.08 },
   stone: { friction: 0.7, restitution: 0.15 },
 };
+
+// Would a thing built from `def` at scale s, with its model origin (bottom center) at `origin` and
+// turned by `quat`, overlap anything solid? Light loose things (less than a quarter of its weight)
+// don't count: they'd just get pushed aside. `strict` counts everything, including you.
+export function fitsAt(game, def, s, origin, quat, { excludeBody = null, mass = def.mass * s ** 3, strict = false } = {}) {
+  const physics = game.physics;
+  const size = (def.size || 0.1) * s;
+  // Lift clears the small resting overlap physics allows between touching things.
+  const lift = Math.max(size * 0.04, 4e-5);
+  for (const sh of def.shapes) {
+    const d = makeColliderDesc(sh, s * 0.97, ZERO);
+    const p = sh.p || [0, 0, 0];
+    _v.set(p[0] * s, p[1] * s, p[2] * s).applyQuaternion(quat);
+    let rot = quat;
+    const r = sh.r3 || sh.rot;
+    if (r) rot = _q2.copy(quat).multiply(_q3.setFromEuler(_e.set(r[0], r[1], r[2])));
+    const pos = { x: origin.x + _v.x, y: origin.y + _v.y + lift, z: origin.z + _v.z };
+    const blockers = physics.overlaps(d.shape, pos, { x: rot.x, y: rot.y, z: rot.z, w: rot.w }, {
+      excludeBody,
+      predicate: (c) => {
+        const o = physics.ownerOf(c);
+        if (!o) return true; // static world
+        if (o === game.player) return strict;
+        if (o.held) return false;
+        if (strict) return true;
+        return o.mass === undefined || o.mass > mass * 4; // light things just get pushed
+      },
+    });
+    if (blockers.length) return false;
+  }
+  return true;
+}
+
+// Center of mass of a definition (scale 1, model space), volume-weighted over its shapes.
+export function defCenterOfMass(def, out = new THREE.Vector3()) {
+  out.set(0, 0, 0);
+  let vol = 0;
+  for (const sh of def.shapes) {
+    const p = sh.p || [0, 0, 0];
+    const v = shapeVolume(sh);
+    out.addScaledVector(_v.set(p[0], p[1], p[2]), v);
+    vol += v;
+  }
+  return out.divideScalar(Math.max(1e-12, vol));
+}
 
 export class Prop {
   constructor(game, def, { position = [0, 0, 0], rotationY = 0, quaternion = null, scale = 1, sleeping = true } = {}) {
@@ -294,30 +342,13 @@ export class Prop {
 
   // Would the prop at scale s (origin at `at`) overlap anything solid it can't push?
   hasRoomAt(s, at = null) {
-    const physics = this.game.physics;
     const t = at || this.body.translation();
     const r = this.body.rotation();
     _q.set(r.x, r.y, r.z, r.w);
-    // Lift clears the small resting overlap physics allows between touching things.
-    const lift = Math.max(this.size1 * s * 0.04, 4e-5);
-    const m = this.com1;
-    for (const sh of this.def.shapes) {
-      const d = makeColliderDesc(sh, s * 0.97, m);
-      const p = sh.p || [0, 0, 0];
-      _v.set((p[0] - m.x) * s, (p[1] - m.y) * s, (p[2] - m.z) * s).applyQuaternion(_q);
-      const pos = { x: t.x + _v.x, y: t.y + _v.y + lift, z: t.z + _v.z };
-      const blockers = physics.overlaps(d.shape, pos, r, {
-        excludeBody: this.body,
-        predicate: (c) => {
-          const o = physics.ownerOf(c);
-          if (!o) return true; // static world
-          if (o === this.game.player) return false;
-          return o.mass === undefined || o.mass > this.mass * 4; // light things just get pushed
-        },
-      });
-      if (blockers.length) return false;
-    }
-    return true;
+    // Model origin = center of mass position minus the rotated center-of-mass offset.
+    _origin.copy(this.com1).multiplyScalar(s).applyQuaternion(_q);
+    _anchor.set(t.x - _origin.x, t.y - _origin.y, t.z - _origin.z);
+    return fitsAt(this.game, this.def, s, _anchor, _q, { excludeBody: this.body, mass: this.def.mass * s ** 3 });
   }
 
   _readBody(pos, quat) {
