@@ -385,6 +385,7 @@ type of land there (desert, forest, snow, ocean), not a real copy of that place.
   the stairs for real: you tumble step by step, hitting each step, at real speed (a tumble down a whole flight takes a couple of seconds,
   it's not instant and it's not slow-mo). You take damage on every hit (head, back, arms), can break a wrist or ankle, and end
   up at the bottom hurt. You can grab the railing to stop yourself if you have a hand free.
+  Setting: "slow-mo big falls" (off by default) turns on slow-motion for big falls like a movie.
 
 ### Needs (turn them off with Robot mode)
 - **Hunger**: based on calories. Your body burns calories every minute (more when you move, more when you're cold, way more
@@ -1287,6 +1288,9 @@ Each predator does what the real one does to prey your size. With max gore on, i
   stalks and strikes, a dog runs and sniffs (smell vision shows scent trails), a cat jumps high and sees in the dark,
   a bird flies (glide and flap), a fish swims, a person does anything a person does (and other people think it's them).
 - The possessed creature remembers it afterwards (people are freaked out, lost time).
+- **Crimes while possessing someone**: cameras and witnesses see THEIR face, so they get blamed and arrested first (and they swear
+  they don't remember doing it). If a detective finds evidence of your RIFT tech (your frozen body nearby, footage of you with
+  the headset on, the possessed person's story checking out), the case turns toward you.
 - If the creature dies while you're in it, you snap back to your body (and it hurts).
 
 ### Never-bugs
@@ -1304,6 +1308,7 @@ running through, marine fog in the mornings). Parts:
 - **Your mansion** on the hill above town (ocean view), behind a gate.
 - **Residential streets**: houses of all kinds (big, small, old, new, apartments, a trailer park), each with its own family,
   yard, cars, trash cans, mailbox, junk in the garage.
+- **Every building can be entered**: every house, apartment, shop and public building has a full inside with real stuff in it.
 - **Downtown / main street**: the shops.
 - **Civic stuff**: police station, courthouse, jail, fire station, hospital, city hall, post office, library, church,
   cemetery, school.
@@ -1327,6 +1332,8 @@ running through, marine fog in the mornings). Parts:
   monitor wall (security cameras, scanners), glass terrariums and tanks for shrunk things, the experiment room (section 7),
   specimen fridge, cages, a decontamination shower, a 3D printer, a microscope station, a whiteboard full of equations.
 - **Security**: the alarm system (section 6) with a real security company that calls you, then the police, if it goes off.
+- **The lab is 100% hidden**: nobody in town can ever find it (not burglars, not cops with a warrant, not escaped shrunk people,
+  who can only describe "a giant lab" that nobody can locate). It's your safe zone.
 
 ### Downtown shops (each one fully inside, with workers, real stock and prices)
 - **Grocery store**: aisles (section 8), carts, checkout lanes, self-checkout, bakery, deli, produce misting, frozen aisle
@@ -1714,8 +1721,10 @@ FPS counter.
 soundtrack on/off, soundtrack style (cinematic, chill, minimal), mute when the game is in the background.
 **Gameplay**: sandbox mode vs real-life mode, needs (full, basic, off/Robot mode), permadeath (off/on: on = death ends the world),
 gore (off, normal, max), time speed, day length, starting season, weather (realistic, any weather), crime and police on/off,
-creatures (realistic, less scary, none), spiders/bugs look (normal or "less creepy" for people who hate spiders),
-difficulty of creatures, fall damage, AI brain (built-in, free local AI, your Claude API key), NPC population.
+creatures (realistic, less scary, none), bug look (100% real by default, or "less creepy" for people who hate spiders),
+difficulty of creatures, fall damage, slow-mo big falls (off by default), starting money (pick when you make a world),
+how fast kids grow up (real, medium, fast), AI brain (built-in, free local AI, your Claude API key), Claude key use
+(off / only when I talk to someone / everything, plus a daily spending limit), NPC population.
 **Controls**: mouse sensitivity, invert Y, controller support, key rebinding for everything, hold vs toggle (crouch, sprint, aim),
 camera distance, first-person/third-person default, mobile layout editor (move and resize touch buttons).
 **Accessibility**: subtitles (on by default), subtitle size and background, speaker names, sound visualizer (shows where sounds
@@ -1728,7 +1737,9 @@ come from), reduce flashing (glitch effects calmer), screen shake on/off, text s
   with The Glitch or your character standing there.
 - Menus: Play (new world, load world), Settings, Character, Credits, Quit.
 - **New world**: pick the world seed (or random), sandbox/real-life mode, permadeath, needs, and your character.
-- **First time you start**: a short intro in the lab (see Questions to pick how it goes), then you're free.
+- **First time you start**: a normal morning in your mansion bedroom. You explore the house, find the hidden bookshelf door
+  (hints if you get stuck), go down into the lab, and finish building the watch with the RIFT machine (this is the tutorial:
+  shrink, grow, the ray, your phone). Then a cutscene: "2 YEARS LATER". Then free play.
 - **Pause menu**: resume, settings, save, load, photo mode, quit to menu.
 - **HUD**: minimal: your size on the watch, health only when hurt, needs only when they're getting low, what's in your hands,
   small interaction prompts. Turn everything off for clean screenshots.
@@ -1885,28 +1896,19 @@ This is many sessions of work.
 
 ---
 
-## 23. Questions for you
+## 23. Your answers (decided)
 
-1. **Name**: is the game **SCALE** with **RIFT LAB** as the name of your lab/company (the torn-rift logo shows on the menu as the
-   studio), or should the whole game be called RIFT LAB?
-2. **The first time you start**: (a) you wake up in the lab as the RIFT machine finishes building the watch, and a short tutorial
-   happens right there; (b) you start normally in your mansion bedroom and find the hidden lab yourself; (c) a cinematic: a lab
-   accident turns you into The Glitch (or gives the regular dude the watch); (d) figure it out.
-3. **"Fall slow, not fast" on stairs**: do you mean the tumble should look real (step by step, a couple of seconds for a whole flight,
-   like section 4 says), or that the game should go slow-motion while you fall?
-4. **Being a kid**: when you play as a kid, should deadly stuff knock you out (wake up at the hospital/home), or should you not be
-   able to get into deadly situations at all (creatures ignore you, like other kids)?
-5. **Possessing people**: if you possess someone and commit a crime with their body, should THEY get blamed (cops arrest them,
-   they don't remember it)?
-6. **Your secret lab**: can townspeople find it (a nosy neighbor, a cop with a warrant, a burglar), or is it 100% hidden?
-7. **Real-life mode money**: how rich do you start? (a) mansion rich (millions), (b) comfortable (enough to live, the business
-   makes the rest), (c) you pick in settings.
-8. **How fast kids grow up**: (a) real time scaled to the day setting (years of play), (b) fast (a kid grows up in a few in-game
-   weeks), (c) a setting.
-9. **Bug look**: should spiders and the mantis be shown 100% real by default (some people get freaked out), with a "less creepy"
-   option, or the other way around?
-10. **Houses you can go into**: every house in town fully enterable (more to build, more detail to load), or your mansion +
-    about half the houses + all the shops?
-11. **Using your Claude key**: when people talk using your key, each conversation costs a little on your Claude account.
-    OK to use it for every conversation, or only when you talk to someone directly (and the built-in brain does background chatter)?
-12. **Anything else** you thought of while reading this: send it and it goes in.
+1. **Name**: the game is **SCALE**. **RIFT LAB** is your secret lab, your inventions company, and the studio logo (torn text with
+   a glowing rift) that plays first on the menu.
+2. **First start**: a normal morning in your mansion, find the hidden lab, finish the watch (tutorial), then "2 YEARS LATER",
+   then free play (section 18).
+3. **Stair falls**: real tumble at real speed, plus a "slow-mo big falls" setting (off by default).
+4. **Kid player**: deadly stuff knocks you out and you wake up at the hospital or home. No gore ever.
+5. **Possession crimes**: the possessed person gets blamed first; evidence of your RIFT tech can turn the case toward you (section 12).
+6. **Secret lab**: 100% hidden, nobody can find it.
+7. **Starting money**: picked in settings when you make a world.
+8. **Growing up speed**: a setting (real, medium, fast).
+9. **Bug look**: 100% real by default, "less creepy" option in settings.
+10. **Interiors**: every building can be entered.
+11. **Claude key use**: a setting: off / only when you talk to someone / everything, with a daily spending limit.
+12. **Anything else**: send it any time and it goes in.
