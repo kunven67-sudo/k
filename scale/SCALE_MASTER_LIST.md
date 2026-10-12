@@ -179,6 +179,23 @@ You shrink wherever you're standing. The game knows what's under your feet, so i
   (Demodex mites, real, most adults have them). They can feel you if you're above about 1 mm and they'll swat you.
 - **Shrinking on a plant**: leaf surfaces have little hairs and mouth-like holes (stomata), aphids, ladybugs, dew drops.
 - **Shrinking on food**: bread is a sponge cave, a cookie is rough rock with sugar crystals, cheese is smooth, salt grains are cubes.
+- **Shrinking on the shop stuff** (everything in the shopping app works the same way, by what it's really made of):
+  - **Graphics card**: the shroud is a black plastic plain; the fan openings are pits with giant blades. The aluminum fins are a
+    maze of thin silver walls, the copper heat pipes are pipelines, the chips are flat buildings with printing on top, the gold
+    PCIe fingers are a shiny gold floor. When it's running, the fans make a storm that blows you away and the fins are hot.
+  - **Phone**: the screen glass is smooth and slippery; fingerprints are greasy ridges. When the screen is on, at about 0.1 mm you
+    see the separate red, green and blue lights (pixels) glowing under your feet. The camera lens is a huge glass dome.
+  - **Game controller**: the buttons are hills, the gaps around them are pits you can fall into, the thumbstick tops are rubber
+    craters with grip texture, the touch pad is a glassy plain.
+  - **Donut**: icing is slippery and sticky (sugar), sprinkles are as big as logs, the dough is full of holes like a sponge cave.
+  - **Gummy bear**: sticky and squishy; you sink in and get stuck, and it takes real strength (for your size) to pull free.
+  - **Apple**: waxy skin you slide on, little light dots (lenticels, the apple's breathing holes); bite marks show the wet
+    cells inside. **Banana**: soft brown spots you sink into.
+  - **Basketball**: the pebble bumps are boulders and the black seams are canyons. **Coin**: the letters, star and rim are
+    mountains and trenches; the reeded edge is a wall of ridges. **Die**: the dots are craters.
+  - **Bottled water**: fall in and the surface tension holds you like a sticky trampoline (hard to climb out); the cap ridges are
+    a wall of ribs. **Battery**: 1.5 V can't hurt you at any size (real), but a dead short (both ends touching metal) gets hot.
+  - **Toy brick**: the studs are round towers; underneath it's hollow with tubes, a perfect tiny shelter.
 
 ### Growing inside a house
 - The watch checks for room before it grows you. If your head would hit the ceiling, it stops and the watch says
@@ -1303,6 +1320,34 @@ Each predator does what the real one does to prey your size. With max gore on, i
 - Ride the dog (at mouse size, hold its fur), the cat, a bird (it flies where it wants unless you possess it), a beetle (slow but
   climbs walls), a rat, a dragonfly (fast, hard to hold onto), a horse (if you add a ranch later) at normal size.
 - Animals don't like being ridden: some throw you off, some don't notice, depends on the animal and its mood.
+
+### Riding and going inside bugs
+- **Ride bugs** when you're smaller than them: stand on an ant, a beetle, a mantis or a spider and hold on. Each bug reacts like
+  the real one: an ant tries to bite you off, a beetle doesn't care, a mantis cleans itself and can grab you off its back,
+  a spider shakes and bites.
+- **Go inside bugs** (you have to be really small): bugs don't breathe through their mouth, they have little breathing holes
+  on their sides (spiracles) that lead into air tubes (tracheae) all through the body. A dust-size you can crawl in through those
+  or through the mouth into the gut. Inside: the air tubes branching like a tree, muscles, the gut, the long tube-shaped heart
+  pumping green-yellow blood (hemolymph). The bug feels you: it scrapes, twitches, and can die if you hurt it.
+- **Getting eaten whole**: animals that swallow whole (frogs, lizards, birds, fish) swallow you and you see the inside from
+  where you went in: the throat, then the stomach. Get out fast before the stomach acid gets you: climb, struggle, shrink ray,
+  or grow (grow too much inside and it kills the animal, with max gore). Bugs eat the real way: a mantis chews (max gore), a
+  spider bites, wraps you in silk and injects venom (you're paralyzed, then digested), an ant colony drags you home.
+
+### Going inside people (adults only, never kids, all made-up people)
+- **Every real way in**, and the deeper you go the smaller you have to be:
+  - **Mouth**: teeth (cavities are real holes, plaque is sticky), tongue (taste buds are bumps), then the throat, the stomach
+    (acid, it hurts and slowly dissolves you), the intestines.
+  - **Nose**: nose hairs like a forest, sticky mucus that traps you, and if you're dust-size, down into the lungs (tiny air sacs).
+  - **Ear**: earwax (sticky), the ear canal, the eardrum (you can hear it boom when they talk).
+  - **A cut**: into the blood. Red blood cells are 7-8 µm discs tumbling past, white blood cells hunt you like a germ, the blood
+    takes you to the heart (a huge pumping room).
+- **The body reacts for real**: a tickle in the nose makes them sneeze (you get blasted out at about 160 km/h), something in the
+  throat makes them cough, they swallow, they scratch an itch, white blood cells attack. They feel it and wonder what's wrong.
+- **Feeling you on their skin depends on your size (real)**: about ant size and bigger, they feel you crawling and swat or brush
+  you off (sooner on hairy spots); smaller than that, they don't feel you at all; dust-mite size, never.
+- **Hurting them from inside** works with the gore setting (adults only): poke, cut or grow inside them and they get sick,
+  bleed, cough blood, and can die. People notice something is wrong and go to the doctor (who finds nothing, or finds you).
 
 ### Possessing anything alive
 - With the possession headset (section 7), aim at any living thing (not kids): you take control and your body stands frozen
