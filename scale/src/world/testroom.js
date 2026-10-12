@@ -59,15 +59,16 @@ export async function buildTestRoom(game) {
 
   const P = (id, x, y, z, ry = 0) => new Prop(game, CATALOG[id], { position: [x, y, z], rotationY: ry });
   P('table', 0, 0.01, 0.3);
-  P('soda_can', 0.25, 0.751, 0.2);
-  P('mug', -0.3, 0.751, 0.35, 0.8);
-  P('cookie', 0.05, 0.751, 0.5);
-  P('book', -0.5, 0.751, 0.1, 0.3);
+  // Table top: rug (1 cm) + 75 cm = 0.76 m.
+  P('soda_can', 0.25, 0.761, 0.2);
+  P('mug', -0.3, 0.761, 0.35, 0.8);
+  P('cookie', 0.05, 0.761, 0.5);
+  P('book', -0.5, 0.761, 0.1, 0.3);
   P('box', 2.2, 0.0, -1.5, 0.4);
   P('ball', -2.0, 0.0, 1.8);
   P('soda_can', 1.6, 0.0, 1.2);
   // A few crumbs on the table and under it (someone ate a cookie here, Rule 1).
-  const crumbs = [[0.1, 0.751, 0.45], [0.13, 0.751, 0.47], [0.02, 0.751, 0.55], [0.3, 0.011, 0.6], [0.31, 0.011, 0.62], [-0.2, 0.011, 0.4]];
+  const crumbs = [[0.1, 0.761, 0.45], [0.13, 0.761, 0.47], [0.02, 0.761, 0.55], [0.3, 0.011, 0.6], [0.31, 0.011, 0.62], [-0.2, 0.011, 0.4]];
   for (const c of crumbs) P('crumb', ...c);
 
   return { spawn: { position: [0.4, 0.02, 1.6], yaw: 0.25 } };

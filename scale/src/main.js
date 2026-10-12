@@ -11,6 +11,7 @@ async function main() {
   await initPhysics();
   const game = new Game(canvas);
   window.__scale = game; // dev console access + automated tests
+  window.__input = input;
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) ? Number(q.get(k)) : undefined);
   const spawnOverride = {};

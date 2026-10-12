@@ -416,7 +416,7 @@ export function createGlitch({ coat = 0xe9e7e2, coatTrim = 0x1a1c22, suit = 0x10
   }
 
   // speed: horizontal speed normalized to human size (m/s at 1.75 m). scale: body scale.
-  function animate(dt, { speed = 0, grounded = true, vy = 0, crouch = false, scaleRate = 0, scale = 1, hurt = 0 } = {}) {
+  function animate(dt, { speed = 0, grounded = true, vy = 0, crouch = false, scaleRate = 0, scale = 1, hurt = 0, poseR = null, poseL = null, aimPitch = 0 } = {}) {
     st.t += dt;
     U.uTime.value = st.t;
     // Glitch intensity: calm idle flicker, wild while resizing or hurt.
@@ -462,6 +462,22 @@ export function createGlitch({ coat = 0xe9e7e2, coatTrim = 0x1a1c22, suit = 0x10
       B['elbow' + k].rotation.x = -(0.25 + 1.05 * r * moving + st.air * 0.4 + 0.08 * Math.sin(st.t * 1.1));
       B['wrist' + k].rotation.x = -0.1;
     }
+    // Hand poses override the swing: aiming the ray, holding things, the phone.
+    st.poseR = damp(st.poseR ?? 0, poseR ? 1 : 0, 12, dt);
+    st.poseL = damp(st.poseL ?? 0, poseL ? 1 : 0, 12, dt);
+    const blendPose = (k, x, z, elbow, wrist, w) => {
+      B['arm' + k].rotation.x += (x - B['arm' + k].rotation.x) * w;
+      B['arm' + k].rotation.z += (z - B['arm' + k].rotation.z) * w;
+      B['elbow' + k].rotation.x += (elbow - B['elbow' + k].rotation.x) * w;
+      B['wrist' + k].rotation.x += (wrist - B['wrist' + k].rotation.x) * w;
+    };
+    if (poseR === 'aim') blendPose('R', Math.PI / 2 + aimPitch, 0.04, -0.04, 0, st.poseR);
+    else if (poseR === 'hold') blendPose('R', 0.85, 0.12, -1.0, -0.2, st.poseR);
+    else if (poseR === 'carry2') blendPose('R', 1.05, -0.28, -0.75, -0.3, st.poseR);
+    if (poseL === 'phone') blendPose('L', 0.55, 0.1, -1.75, 0.35, st.poseL);
+    else if (poseL === 'hold') blendPose('L', 0.85, -0.12, -1.0, -0.2, st.poseL);
+    else if (poseL === 'carry2') blendPose('L', 1.05, 0.28, -0.75, -0.3, st.poseL);
+
     // Hips bob and twist, body leans into running.
     const bob = Math.abs(Math.sin(ph)) * (0.012 + 0.03 * r) * moving;
     B.hips.position.y = 0.95 - bob - crouchK * 0.28 + Math.sin(st.t * 1.6) * 0.004 * (1 - moving);

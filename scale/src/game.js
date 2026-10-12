@@ -81,10 +81,16 @@ export class Game {
     this.fps = this.fps * 0.95 + (1 / Math.max(1e-3, dt)) * 0.05;
     if (!this.paused && this.player) {
       this.time += dt;
-      this.physics.update(dt, (step) => this.player.fixedUpdate(step));
+      this.physics.update(dt, (step) => {
+        this.player.fixedUpdate(step);
+        this.player.hands.fixedUpdate(step);
+      });
       this.player.update(dt, this.physics.alpha);
       for (const u of this.updatables) u.update(dt, this);
       this.player.updateCamera(this.camera, dt);
+      this.camera.updateMatrixWorld();
+      this.player.hands.updateLook(this.camera);
+      this.player.hands.update(dt);
       this.sky.update(dt, this.camera);
       this._updateExposure(dt);
       this.lighting.update(this.player.height);

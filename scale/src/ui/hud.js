@@ -35,6 +35,7 @@ export class Hud {
     this.hurtT = 0;
     this.lastSize = '';
     bus.on('player:blocked', () => this.toast('Not enough room to grow (hold F to force it)'));
+    bus.on('toast', (t) => this.toast(t));
     bus.on('player:hurt', () => (this.hurtT = 4));
     bus.on('frame', (dt) => this.update(dt));
   }
@@ -49,9 +50,12 @@ export class Hud {
     const p = this.el.prompt;
     if (!text) {
       p.classList.remove('show');
+      this._lastPrompt = '';
       return;
     }
-    p.innerHTML = `<b>${key}</b>${text}`;
+    const html = key ? `<b>${key}</b>${text}` : text;
+    if (html !== this._lastPrompt) p.innerHTML = html;
+    this._lastPrompt = html;
     p.classList.add('show');
   }
 
@@ -68,6 +72,9 @@ export class Hud {
       this.lastSize = s;
     }
     this.el.watch.classList.toggle('changing', Math.abs(pl.sizeRate) > 0.01);
+    const pt = pl.hands?.promptText();
+    if (pt) this.prompt(pt[0], pt[1]);
+    else this.prompt(null, null);
     this.el.watch.classList.toggle('blocked', pl.blockedT > 0);
     if (this.toastT > 0) {
       this.toastT -= dt;

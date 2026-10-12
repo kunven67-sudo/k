@@ -16,6 +16,7 @@ export const BINDINGS = {
   force: ['KeyF'],
   interact: ['KeyE'],
   drop: ['KeyG'],
+  throw: ['KeyQ'],
   phone: ['Tab'],
   view: ['KeyT'],
   pause: ['Escape', 'KeyP'],

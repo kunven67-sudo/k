@@ -13,6 +13,8 @@ import { settings } from '../core/settings.js';
 import { clamp, damp, angDiff } from '../core/util.js';
 import { bus } from '../core/events.js';
 import { createGlitch } from './glitch.js';
+import { Hands } from './hands.js';
+import { ShrinkRay, Phone } from './tools.js';
 
 export const BASE_HEIGHT = 1.75;
 export const MIN_SCALE = 0.0008; // 1.4 mm (Wave 1 floor; the micro world goes further later)
@@ -76,6 +78,9 @@ export class Player {
       }
     });
     game.scene.add(this.object);
+    this.hands = new Hands(this, game);
+    this.hands.addTool('ray', new ShrinkRay(game, this));
+    this.hands.addTool('phone', new Phone(game, this));
     this.camPos = new THREE.Vector3();
     this.camTarget = new THREE.Vector3();
     this.camDistM = this.camDist * this.height; // actual camera distance in meters (after collision)
@@ -191,7 +196,10 @@ export class Player {
     const k = this.grounded ? 12 : 2.5;
     this.vel.x = damp(this.vel.x, wx * speed, k, dt);
     this.vel.z = damp(this.vel.z, wz * speed, k, dt);
-    if (Math.hypot(wx, wz) > 0.1) this.facing += angDiff(this.facing, Math.atan2(-wx, -wz)) * (1 - Math.exp(-12 * dt));
+    // Aiming the ray (or charging a throw) turns your body to face where you look.
+    const aiming = this.hands && ((this.hands.slots.right?.kind === 'tool' && this.hands.slots.right.ref.id === 'ray') || this.hands.charge > 0);
+    if (aiming) this.facing += angDiff(this.facing, this.yaw) * (1 - Math.exp(-14 * dt));
+    else if (Math.hypot(wx, wz) > 0.1) this.facing += angDiff(this.facing, Math.atan2(-wx, -wz)) * (1 - Math.exp(-12 * dt));
 
     // Gravity with air drag (terminal velocity ~ sqrt(size)).
     const vt = 55 * Math.sqrt(this.scale);
@@ -277,7 +285,10 @@ export class Player {
   _animate(dt) {
     const hs = Math.hypot(this.vel.x, this.vel.z) / Math.sqrt(this.scale);
     this.hurtFx = Math.max(0, (this.hurtFx || 0) - dt);
-    this.model.userData.animate?.(dt, { speed: hs, grounded: this.grounded, vy: this.vel.y / Math.sqrt(this.scale), crouch: this.crouching, scaleRate: this.sizeRate, scale: this.scale, hurt: this.hurtFx });
+    const R = this.hands?.slots.right, L = this.hands?.slots.left;
+    const poseR = !R ? null : R.kind === 'tool' ? (R.ref.id === 'ray' ? 'aim' : 'hold') : R.two ? 'carry2' : 'hold';
+    const poseL = !L ? null : L.kind === 'tool' ? (L.ref.id === 'phone' ? 'phone' : 'hold') : L.two ? 'carry2' : 'hold';
+    this.model.userData.animate?.(dt, { speed: hs, grounded: this.grounded, vy: this.vel.y / Math.sqrt(this.scale), crouch: this.crouching, scaleRate: this.sizeRate, scale: this.scale, hurt: this.hurtFx, poseR, poseL, aimPitch: this.pitch });
   }
 
   // Third-person camera with collision, or first-person.

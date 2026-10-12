@@ -14,8 +14,12 @@ import { RAPIER, GROUPS } from '../core/physics.js';
 import { clamp } from '../core/util.js';
 
 const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
+const _box = new THREE.Box3();
+const _anchor = new THREE.Vector3();
+const _origin = new THREE.Vector3();
 
 function shapeVolume(sh) {
   switch (sh.t) {
@@ -33,22 +37,25 @@ function shapeVolume(sh) {
   }
 }
 
-function makeColliderDesc(sh, s) {
-  let d;
+function makeShape(sh, s) {
   switch (sh.t) {
-    case 'box': d = RAPIER.ColliderDesc.cuboid(sh.s[0] * s, sh.s[1] * s, sh.s[2] * s); break;
-    case 'cyl': d = RAPIER.ColliderDesc.cylinder(sh.h * s, sh.r * s); break;
-    case 'ball': d = RAPIER.ColliderDesc.ball(sh.r * s); break;
-    case 'cap': d = RAPIER.ColliderDesc.capsule(sh.h * s, sh.r * s); break;
+    case 'box': return new RAPIER.Cuboid(sh.s[0] * s, sh.s[1] * s, sh.s[2] * s);
+    case 'cyl': return new RAPIER.Cylinder(sh.h * s, sh.r * s);
+    case 'ball': return new RAPIER.Ball(sh.r * s);
+    case 'cap': return new RAPIER.Capsule(sh.h * s, sh.r * s);
     case 'hull': {
       const f = new Float32Array(sh.pts.length * 3);
       sh.pts.forEach((p, i) => { f[i * 3] = p[0] * s; f[i * 3 + 1] = p[1] * s; f[i * 3 + 2] = p[2] * s; });
-      d = RAPIER.ColliderDesc.convexHull(f);
-      break;
+      return new RAPIER.ConvexPolyhedron(f, null);
     }
   }
+  return null;
+}
+
+function makeColliderDesc(sh, s, com) {
+  const d = new RAPIER.ColliderDesc(makeShape(sh, s));
   const p = sh.p || [0, 0, 0];
-  d.setTranslation(p[0] * s, p[1] * s, p[2] * s);
+  d.setTranslation((p[0] - com.x) * s, (p[1] - com.y) * s, (p[2] - com.z) * s);
   const r = sh.r3 || sh.rot;
   if (r) {
     _q.setFromEuler(_e.set(r[0], r[1], r[2]));
@@ -86,12 +93,21 @@ export class Prop {
     this.scale = scale;
     this.mat = MATERIALS[def.material] || MATERIALS.plastic;
     this.volume1 = def.shapes.reduce((a, sh) => a + shapeVolume(sh), 0); // m^3 at scale 1
+    // Center of mass (scale 1, model space). The physics body's origin sits exactly here, so resizing
+    // never shifts it (Rapier keeps a body's center of mass fixed when its shapes change).
+    this.com1 = new THREE.Vector3();
+    for (const sh of def.shapes) {
+      const p = sh.p || [0, 0, 0];
+      this.com1.addScaledVector(_v.set(p[0], p[1], p[2]), shapeVolume(sh));
+    }
+    this.com1.divideScalar(Math.max(1e-12, this.volume1));
     this.density = def.mass / Math.max(1e-9, this.volume1);
     this.size1 = def.size || this._extent();
 
     this.object = new THREE.Group();
     this.object.name = def.id;
     this.model = def.build();
+    this.model.position.copy(this.com1).negate(); // model origin (bottom center) relative to the center of mass
     this.object.add(this.model);
     this.object.userData.prop = this;
     this.object.traverse((o) => {
@@ -102,15 +118,27 @@ export class Prop {
     });
 
     const physics = game.physics;
-    const bd = RAPIER.RigidBodyDesc.dynamic().setTranslation(position[0], position[1], position[2]).setCanSleep(true).setCcdEnabled(true);
-    if (quaternion) bd.setRotation(quaternion);
-    else if (rotationY) {
-      _q.setFromAxisAngle(_v.set(0, 1, 0), rotationY);
-      bd.setRotation({ x: _q.x, y: _q.y, z: _q.z, w: _q.w });
-    }
+    if (quaternion) _q.set(quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+    else _q.setFromAxisAngle(_v.set(0, 1, 0), rotationY || 0);
+    const c = _v.copy(this.com1).multiplyScalar(scale).applyQuaternion(_q);
+    const bd = RAPIER.RigidBodyDesc.dynamic()
+      .setTranslation(position[0] + c.x, position[1] + c.y, position[2] + c.z)
+      .setRotation({ x: _q.x, y: _q.y, z: _q.z, w: _q.w })
+      .setCanSleep(true)
+      .setCcdEnabled(true);
     this.body = physics.world.createRigidBody(bd);
     this.colliders = [];
     this._buildColliders();
+    // Spawn safety (no-bugs rulebook): never start inside a wall, table or person. Lift until free.
+    if (!this.hasRoomAt(scale, this.body.translation())) {
+      const step = this.size1 * scale * 0.05;
+      for (let i = 1; i <= 60; i++) {
+        const t = this.body.translation();
+        const up = { x: t.x, y: t.y + step, z: t.z };
+        this.body.setTranslation(up, false);
+        if (this.hasRoomAt(scale, up)) break;
+      }
+    }
     if (sleeping) this.body.sleep();
 
     this.prevPos = new THREE.Vector3();
@@ -148,13 +176,33 @@ export class Prop {
     return this.size1 * this.scale;
   }
 
+  // Resize the existing colliders in place. Rebuilding them would throw away their contacts, and a
+  // collider with no contacts "falls" every step (that's how a resized can once fell through a table).
+  _resizeColliders() {
+    const s = this.scale;
+    this.def.shapes.forEach((sh, i) => {
+      const c = this.colliders[i];
+      c.setShape(makeShape(sh, s));
+      const p = sh.p || [0, 0, 0];
+      const m = this.com1;
+      c.setTranslationWrtParent({ x: (p[0] - m.x) * s, y: (p[1] - m.y) * s, z: (p[2] - m.z) * s });
+    });
+    this._setDamping();
+  }
+
+  _setDamping() {
+    const vt = terminalVelocity(this.size, this.density);
+    this.body.setLinearDamping(9.81 / vt * 0.5);
+    this.body.setAngularDamping(this.size < 0.05 ? 0.6 : 0.15);
+  }
+
   _buildColliders() {
     const physics = this.game.physics;
     for (const c of this.colliders) physics.removeCollider(c);
     this.colliders = [];
     const s = this.scale;
     for (const sh of this.def.shapes) {
-      const d = makeColliderDesc(sh, s)
+      const d = makeColliderDesc(sh, s, this.com1)
         .setDensity(this.density)
         .setFriction(this.mat.friction)
         .setRestitution(this.mat.restitution)
@@ -163,39 +211,99 @@ export class Prop {
       physics.own(c, this);
       this.colliders.push(c);
     }
-    const vt = terminalVelocity(this.size, this.density);
-    this.body.setLinearDamping(9.81 / vt * 0.5);
-    this.body.setAngularDamping(this.size < 0.05 ? 0.6 : 0.15);
+    this._setDamping();
   }
 
   setGroups(g) {
     for (const c of this.colliders) c.setCollisionGroups(g);
   }
 
-  // Resize around the model origin. Returns false if there's no room (the ray stops growing it).
+  // Resize in place. The shape's center stays put sideways; if growing would push its lowest point
+  // into what it's resting on, it's lifted by exactly that much (never pushed down: when something
+  // shrinks it just settles with gravity, like it would for real). Returns false if there's no room
+  // to grow (the ray stops growing it).
   setScale(s, { force = false } = {}) {
     s = clamp(s, 1e-4, 200);
     if (s === this.scale) return true;
-    if (s > this.scale && !force && !this.hasRoomAt(s)) return false;
+    const t = this.body.translation();
+    const obj = this.object;
+    obj.position.set(t.x, t.y, t.z);
+    obj.updateMatrixWorld(true);
+    _box.setFromObject(obj);
+    const cx0 = (_box.min.x + _box.max.x) / 2, cz0 = (_box.min.z + _box.max.z) / 2, y0 = _box.min.y;
+    const oldScale = this.scale;
+    obj.scale.setScalar(s);
+    obj.updateMatrixWorld(true);
+    _box.setFromObject(obj);
+    const cx1 = (_box.min.x + _box.max.x) / 2, cz1 = (_box.min.z + _box.max.z) / 2, y1 = _box.min.y;
+    // Resting things keep their bottom planted. Things in the air resize around their center of mass
+    // and are only ever lifted, never pushed down into something.
+    let resting = this.resizeResting;
+    if (!this.resizing) {
+      const lv = this.body.linvel();
+      resting = Math.abs(lv.y) < Math.max(0.02, this.size * 0.5) && Math.hypot(lv.x, lv.z) < Math.max(0.05, this.size);
+    }
+    const dy = resting ? y0 - y1 : Math.max(0, y0 - y1);
+    const newOrigin = _v2.set(t.x + (cx0 - cx1), t.y + dy, t.z + (cz0 - cz1));
+    if (s > oldScale && !force && !this.hasRoomAt(s, newOrigin)) {
+      obj.scale.setScalar(oldScale);
+      obj.updateMatrixWorld(true);
+      return false;
+    }
     this.scale = s;
-    this.object.scale.setScalar(s);
-    this._buildColliders();
+    this._resizeColliders();
+    this.body.setTranslation({ x: newOrigin.x, y: newOrigin.y, z: newOrigin.z }, true);
+    // Kinematic bodies move to their "next" position each step; set it too or they snap back.
+    this.body.setNextKinematicTranslation({ x: newOrigin.x, y: newOrigin.y, z: newOrigin.z });
+    this.curPos.copy(newOrigin);
+    this.prevPos.copy(newOrigin);
+    obj.position.copy(newOrigin);
+    this.lastResizeStep = this.game.physics.stepCount;
+    // A single resize that isn't part of a beam (spawning, loading) still needs fresh contacts.
+    if (!this.resizing) {
+      this.beginResize();
+      this.autoEnd = true;
+    }
     this.body.wakeUp();
     return true;
   }
 
-  // Would the prop at scale s overlap anything solid it can't push? (walls, floors, heavy stuff)
-  hasRoomAt(s) {
-    const physics = this.game.physics;
+  // The ray's field holds the object while it's resizing: kinematic (no gravity, no stale contacts),
+  // bottom planted. Released back to normal physics when the beam lets go.
+  beginResize() {
+    if (this.resizing) return;
+    const lv = this.body.linvel();
+    this.resizeResting = Math.abs(lv.y) < Math.max(0.02, this.size * 0.5) && Math.hypot(lv.x, lv.z) < Math.max(0.05, this.size);
+    this.resizing = true;
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     const t = this.body.translation();
+    this.body.setNextKinematicTranslation(t);
+    this.body.setNextKinematicRotation(this.body.rotation());
+  }
+
+  endResize() {
+    if (!this.resizing) return;
+    this.resizing = false;
+    this.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
+    this.body.wakeUp();
+  }
+
+  // Would the prop at scale s (origin at `at`) overlap anything solid it can't push?
+  hasRoomAt(s, at = null) {
+    const physics = this.game.physics;
+    const t = at || this.body.translation();
     const r = this.body.rotation();
     _q.set(r.x, r.y, r.z, r.w);
+    // Lift clears the small resting overlap physics allows between touching things.
+    const lift = Math.max(this.size1 * s * 0.04, 4e-5);
+    const m = this.com1;
     for (const sh of this.def.shapes) {
-      const d = makeColliderDesc(sh, s * 0.98);
+      const d = makeColliderDesc(sh, s * 0.97, m);
       const p = sh.p || [0, 0, 0];
-      _v.set(p[0] * s, p[1] * s, p[2] * s).applyQuaternion(_q);
-      // A tiny lift so resting contact with the floor doesn't count as "no room".
-      const pos = { x: t.x + _v.x, y: t.y + _v.y + this.size * s * 0.01, z: t.z + _v.z };
+      _v.set((p[0] - m.x) * s, (p[1] - m.y) * s, (p[2] - m.z) * s).applyQuaternion(_q);
+      const pos = { x: t.x + _v.x, y: t.y + _v.y + lift, z: t.z + _v.z };
       const blockers = physics.overlaps(d.shape, pos, r, {
         excludeBody: this.body,
         predicate: (c) => {
@@ -218,6 +326,10 @@ export class Prop {
   }
 
   savePrev() {
+    if (this.resizing && this.game.physics.stepCount - (this.lastResizeStep ?? 0) > 3) {
+      this.endResize();
+      this.autoEnd = false;
+    }
     this.prevPos.copy(this.curPos);
     this.prevQuat.copy(this.curQuat);
   }
