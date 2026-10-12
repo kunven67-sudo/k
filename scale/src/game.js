@@ -8,11 +8,14 @@ import { Lighting } from './render/lighting.js';
 import { SkyDome } from './render/skydome.js';
 import { Player } from './player/player.js';
 import { currentTier } from './core/quality.js';
+import { installDetail, updateDetail } from './render/detail.js';
+import { Scatter } from './render/scatter.js';
 
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
     this.tier = currentTier();
+    installDetail(this.tier.name !== 'low');
     this.view = new View(canvas, this.tier);
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.05, 2000);
@@ -26,6 +29,7 @@ export class Game {
     this.lighting = new Lighting(this.scene, this.camera, this.tier);
     this.sky = new SkyDome(this.view.renderer, this.scene, this.lighting);
     this.view.setView(this.scene, this.camera, this.sky.scene);
+    this.scatter = new Scatter(this);
     this.fps = 60;
     this.outdoor = 1; // 0 = deep indoors, 1 = open sky (drives exposure, like eyes adjusting)
     this.exposure = 1;
@@ -70,7 +74,7 @@ export class Game {
     requestAnimationFrame(loop);
   }
 
-  tick(forcedDt) {
+  tick(forcedDt, render = true) {
     const now = performance.now();
     const dt = forcedDt ?? Math.min(0.1, (now - this._last) / 1000);
     this._last = now;
@@ -84,10 +88,12 @@ export class Game {
       this.sky.update(dt, this.camera);
       this._updateExposure(dt);
       this.lighting.update(this.player.height);
+      updateDetail(this.camera);
+      this.scatter.update();
       if (this.frame % 120 === 0) for (const p of this.props) p.checkBounds();
     }
     bus.emit('frame', dt);
-    this.view.render();
+    if (render) this.view.render();
     input.endFrame();
     this.frame++;
   }

@@ -9,11 +9,11 @@ const once = (k, f) => (cache.has(k) ? cache.get(k) : (cache.set(k, f()), cache.
 
 // ---- shared materials ---------------------------------------------------------------------------
 const M = {
-  alu: () => once('alu', () => std({ color: 0xc9ccd1, metalness: 1, roughness: 0.28 })),
-  ceramic: (c) => once('cer' + c, () => phys({ color: c, roughness: 0.18, clearcoat: 0.6, clearcoatRoughness: 0.1 })),
+  alu: () => once('alu', () => std({ color: 0xc9ccd1, metalness: 1, roughness: 0.28 }, { detail: 'metal' })),
+  ceramic: (c) => once('cer' + c, () => phys({ color: c, roughness: 0.18, clearcoat: 0.6, clearcoatRoughness: 0.1 }, { detail: 'glass' })),
   wood: (c) => once('wood' + c, () => {
     const t = TX.woodFloor(c);
-    return std({ map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap, roughness: 1 });
+    return std({ map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap, roughness: 1 }, { detail: 'wood' });
   }),
   cardboard: () => once('cardboard', () => {
     const t = TX.generate('cardboard', 256, (u, v) => {
@@ -22,7 +22,7 @@ const M = {
       const d = 0.8 + f * 0.2;
       return [0.66 * d, 0.5 * d, 0.33 * d, f * 0.5 + fl * 0.2, 0.95];
     });
-    return std({ map: t.map, normalMap: t.normalMap, roughness: 0.95 });
+    return std({ map: t.map, normalMap: t.normalMap, roughness: 0.95 }, { detail: 'fabric' });
   }),
   cookie: () => once('cookie', () => {
     const t = TX.generate('cookie', 256, (u, v) => {
@@ -32,10 +32,10 @@ const M = {
       const d = 0.75 + f * 0.35;
       return [0.78 * d, 0.55 * d, 0.3 * d, f, 0.9];
     }, { normalStrength: 5 });
-    return std({ map: t.map, normalMap: t.normalMap, roughness: 0.85 });
+    return std({ map: t.map, normalMap: t.normalMap, roughness: 0.85 }, { detail: 'food' });
   }),
-  rubber: (c) => once('rub' + c, () => std({ color: c, roughness: 0.55 })),
-  paper: (c) => once('paper' + c, () => std({ color: c, roughness: 0.9 })),
+  rubber: (c) => once('rub' + c, () => std({ color: c, roughness: 0.55 }, { detail: 'plastic' })),
+  paper: (c) => once('paper' + c, () => std({ color: c, roughness: 0.9 }, { detail: 'fabric' })),
 };
 
 // Soda can label: drawn on a canvas, wraps around the can body.
@@ -69,7 +69,7 @@ function canLabel(brand, c1, c2) {
     const t = new THREE.CanvasTexture(cv);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 8;
-    return std({ map: t, metalness: 0.65, roughness: 0.3 });
+    return std({ map: t, metalness: 0.65, roughness: 0.3 }, { detail: 'paint' });
   });
 }
 

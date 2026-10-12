@@ -77,7 +77,7 @@ export class Player {
     game.scene.add(this.object);
     this.camPos = new THREE.Vector3();
     this.camTarget = new THREE.Vector3();
-    this.camDistSmoothed = this.camDist;
+    this.camDistM = this.camDist * this.height; // actual camera distance in meters (after collision)
     this._syncObject();
   }
 
@@ -301,9 +301,11 @@ export class Player {
         },
       });
       dist = hit ? Math.max(H * 0.15, hit.dist - H * 0.02) : want;
-      // Pull in fast, ease back out.
-      this.camDistSmoothed = dist < this.camDistSmoothed ? dist : damp(this.camDistSmoothed, dist, 6, dt);
-      dist = Math.min(dist, this.camDistSmoothed);
+      // Pull in fast, ease back out. Size changes rescale the remembered distance.
+      if (this._camH && this._camH !== H) this.camDistM *= H / this._camH;
+      this._camH = H;
+      this.camDistM = dist < this.camDistM ? dist : damp(this.camDistM, dist, 6, dt);
+      dist = Math.min(dist, this.camDistM);
       camera.position.copy(pivot).addScaledVector(back, dist);
     } else {
       camera.position.copy(pivot).addScaledVector(fwd, H * 0.06);

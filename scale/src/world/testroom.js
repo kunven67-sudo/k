@@ -9,14 +9,14 @@ export async function buildTestRoom(game) {
   const { scene, physics } = game;
   const W = 7, D = 6, Hc = 2.6, T = 0.15;
   const floorT = TX.withRepeat(TX.woodFloor(), W / 2, D / 2);
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(W, 0.1, D), std({ ...floorT, roughness: 1 }, { indoor: true }));
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(W, 0.1, D), std({ ...floorT, roughness: 1 }, { indoor: true, detail: 'wood' }));
   floor.position.y = -0.05;
   floor.receiveShadow = true;
   scene.add(floor);
   physics.staticBox(0, -0.05, 0, W / 2, 0.05, D / 2);
 
   const wallT = TX.withRepeat(TX.plaster(), 3, 1.2);
-  const wallMat = std({ ...wallT, roughness: 1 }, { indoor: true });
+  const wallMat = std({ ...wallT, roughness: 1 }, { indoor: true, detail: 'plaster' });
   const wall = (x, z, w, d, h = Hc, y = h / 2) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
     m.position.set(x, y, z);
@@ -40,15 +40,17 @@ export async function buildTestRoom(game) {
 
   // Rug under the table.
   const rugT = TX.withRepeat(TX.carpet(0x7d6450), 4, 3);
-  const rug = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.01, 1.9), std({ ...rugT, roughness: 1 }, { indoor: true }));
+  const rug = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.01, 1.9), std({ ...rugT, roughness: 1 }, { indoor: true, detail: 'carpet' }));
   rug.position.set(0, 0.005, 0.3);
   rug.receiveShadow = true;
   scene.add(rug);
   physics.staticBox(0, 0.005, 0.3, 1.3, 0.005, 0.95);
+  game.scatter.addSurface({ minX: -1.3, maxX: 1.3, minZ: 0.3 - 0.95, maxZ: 0.3 + 0.95, y: 0.01, kind: 'carpet', color: 0x7d6450 });
+  game.scatter.addSurface({ minX: -W / 2, maxX: W / 2, minZ: -D / 2, maxZ: D / 2, y: 0.0, kind: 'woodfloor' });
 
   // Outside ground so the window shows something.
   const grassT = TX.withRepeat(TX.grass(), 40, 40);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), std({ ...grassT, roughness: 1 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), std({ ...grassT, roughness: 1 }, { detail: 'soil' }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.11;
   ground.receiveShadow = true;

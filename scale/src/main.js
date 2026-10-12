@@ -25,7 +25,7 @@ async function main() {
   if (q.has('frames')) {
     // Test mode: run N fixed frames then flag ready (used by the screenshot harness).
     const n = num('frames');
-    for (let i = 0; i < n; i++) game.tick(1 / 60);
+    for (let i = 0; i < n; i++) game.tick(1 / 60, i === n - 1);
     window.__ready = true;
     return;
   }

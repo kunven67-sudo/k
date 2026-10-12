@@ -18,7 +18,6 @@ export function addShaderHook(fn) {
 
 function apply(m) {
   m.defines = m.defines || {};
-  const own = m.userData.onCompile;
   if (csm) {
     m.defines.USE_CSM = 1;
     m.defines.CSM_CASCADES = csm.cascades;
@@ -39,13 +38,14 @@ function apply(m) {
       csm.shaders.set(m, shader);
     }
     for (const h of hooks) h(shader, m);
-    own?.(shader, m, renderer);
+    m.userData.onCompile?.(shader, m, renderer); // read late: callers may set it after prep()
   };
-  m.customProgramCacheKey = () => `${csm ? 'csm' + csm.cascades : 'nocsm'}|${m.userData.cacheKey || ''}`;
+  m.customProgramCacheKey = () => `${csm ? 'csm' + csm.cascades : 'nocsm'}|${m.userData.detail || ''}|${m.userData.cacheKey || ''}`;
   m.needsUpdate = true;
 }
 
-export function prep(m, { indoor = false } = {}) {
+export function prep(m, { indoor = false, detail = null } = {}) {
+  if (detail) m.userData.detail = detail;
   if (registry.has(m)) return m;
   if (indoor && m.envMapIntensity !== undefined) m.envMapIntensity = (m.userData.envBase ?? m.envMapIntensity) * 0.18;
   registry.add(m);
