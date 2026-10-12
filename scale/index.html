@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#07080b">
+  <title>SCALE</title>
+  <link rel="stylesheet" href="./src/ui/style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.js",
+      "three/addons/": "./vendor/three/addons/",
+      "rapier": "./vendor/rapier/rapier.mjs"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="view" tabindex="0" aria-label="SCALE game view"></canvas>
+    <div id="ui"></div>
+  </div>
+  <noscript>SCALE needs JavaScript and WebGL 2.</noscript>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
