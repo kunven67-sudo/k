@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { setIndoorEnvScale } from './materials.js';
 
 export class SkyDome {
   constructor(renderer, worldScene, lighting) {
@@ -82,6 +83,7 @@ export class SkyDome {
     const useRoom = b > 0.5;
     const env = useRoom ? this.roomEnv : this.skyEnv;
     if (this.worldScene.environment !== env) this.worldScene.environment = env;
+    setIndoorEnvScale(useRoom ? 0.7 : 0.1);
     const dip = 1 - Math.min(1, Math.abs(b - 0.5) * 2);
     this.worldScene.environmentIntensity = (useRoom ? 0.55 : 0.85) * (1 - dip * 0.6);
   }

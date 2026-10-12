@@ -22,7 +22,7 @@ export const FM = {
   }),
   metal: (c, r = 0.3) => once('fm' + c + r, () => std({ color: c, metalness: 1, roughness: r }, { indoor: true, detail: 'metal' })),
   plastic: (c, r = 0.45) => once('fp' + c + r, () => std({ color: c, roughness: r }, { indoor: true, detail: 'plastic' })),
-  glass: () => once('fglass', () => phys({ color: 0xffffff, metalness: 0, roughness: 0.03, transmission: 0.92, thickness: 0.01, ior: 1.5, transparent: true, opacity: 0.35 }, { indoor: true, detail: 'glass' })),
+  glass: () => once('fglass', () => phys({ color: 0xe6eef2, metalness: 0, roughness: 0.03, transparent: true, opacity: 0.18, envMapIntensity: 1.3, depthWrite: false, side: THREE.DoubleSide }, { indoor: true, detail: 'glass' })),
   screen: () => once('fscreen', () => std({ color: 0x050607, roughness: 0.08, metalness: 0.2 }, { indoor: true, detail: 'glass' })),
   ceramic: (c) => once('fc' + c, () => phys({ color: c, roughness: 0.25, clearcoat: 0.5 }, { indoor: true, detail: 'glass' })),
   soil: () => once('fsoil', () => std({ color: 0x3b2a1e, roughness: 1 }, { indoor: true, detail: 'soil' })),

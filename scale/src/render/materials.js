@@ -44,10 +44,25 @@ function apply(m) {
   m.needsUpdate = true;
 }
 
+// Indoor surfaces get far less sky light than outdoor ones (a real room in daylight is ~100x dimmer
+// than outside). When the player is outdoors (sky environment), indoor materials use a small share
+// of it, so from outside windows look dark like in real life. Indoors, the room environment applies.
+const indoorMats = new Set();
+let indoorScale = 0.7;
+export function setIndoorEnvScale(v) {
+  if (v === indoorScale) return;
+  indoorScale = v;
+  for (const m of indoorMats) m.envMapIntensity = m.userData.envBase * v;
+}
+
 export function prep(m, { indoor = false, detail = null } = {}) {
   if (detail) m.userData.detail = detail;
   if (registry.has(m)) return m;
-  if (indoor && m.envMapIntensity !== undefined) m.envMapIntensity = (m.userData.envBase ?? m.envMapIntensity) * 0.7;
+  if (indoor && m.envMapIntensity !== undefined) {
+    m.userData.envBase = m.userData.envBase ?? m.envMapIntensity;
+    m.envMapIntensity = m.userData.envBase * indoorScale;
+    indoorMats.add(m);
+  }
   registry.add(m);
   apply(m);
   return m;

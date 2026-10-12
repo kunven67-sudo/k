@@ -89,16 +89,27 @@ export class Kit {
       const cx = ax + dirX * c, cz = az + dirZ * c;
       this.box(cx, y0 + (yb + yt) / 2, cz, s1 - s0, yt - yb, t, faceMats, { rotY });
     };
-    const ops = [...openings].sort((p, q) => p.at - q.at);
-    let cur = 0;
-    for (const o of ops) {
-      const s0 = o.at - o.w / 2, s1 = o.at + o.w / 2;
-      seg(cur, s0, 0, h);
-      seg(s0, s1, 0, o.bottom); // below a window
-      seg(s0, s1, o.top, h); // header above
-      cur = s1;
+    // Split the wall into columns at every opening edge. In each column, the solid parts are the
+    // full height minus every opening that covers that column (windows stacked on two floors, a door
+    // under a window, etc. all work).
+    const cuts = new Set([0, len]);
+    for (const o of openings) {
+      cuts.add(Math.max(0, Math.min(len, o.at - o.w / 2)));
+      cuts.add(Math.max(0, Math.min(len, o.at + o.w / 2)));
     }
-    seg(cur, len, 0, h);
+    const xs = [...cuts].sort((a, b) => a - b);
+    for (let i = 0; i < xs.length - 1; i++) {
+      const s0 = xs[i], s1 = xs[i + 1];
+      if (s1 - s0 < 1e-4) continue;
+      const mid = (s0 + s1) / 2;
+      const holes = openings.filter((o) => mid > o.at - o.w / 2 && mid < o.at + o.w / 2).map((o) => [o.bottom, o.top]).sort((a, b) => a[0] - b[0]);
+      let y = 0;
+      for (const [b, t] of holes) {
+        if (b > y) seg(s0, s1, y, b);
+        y = Math.max(y, t);
+      }
+      if (y < h) seg(s0, s1, y, h);
+    }
     return { len, dirX, dirZ, rotY };
   }
 

@@ -57,10 +57,11 @@ function mats() {
   M.cabinet = std({ color: 0x2a2d31, roughness: 0.55 }, { indoor: true, detail: 'paint' });
   M.steel = std({ color: 0xbfc3c8, metalness: 1, roughness: 0.25 }, { indoor: true, detail: 'metal' });
   M.porcelain = phys({ color: 0xf7f7f5, roughness: 0.12, clearcoat: 0.8 }, { indoor: true, detail: 'glass' });
-  M.glass = phys({ color: 0xffffff, metalness: 0, roughness: 0.02, transmission: 0.95, thickness: 0.012, ior: 1.5, transparent: true, opacity: 0.25 }, { detail: 'glass' });
-  M.water = phys({ color: 0x2a9fc2, metalness: 0, roughness: 0.03, transmission: 0.85, thickness: 1.2, ior: 1.33, transparent: true, opacity: 0.7 }, { detail: 'glass' });
+  // Window glass: clear with sky reflections (no refraction pass: real panes barely bend light).
+  M.glass = phys({ color: 0xdfe8ec, metalness: 0, roughness: 0.02, transparent: true, opacity: 0.16, envMapIntensity: 1.4, depthWrite: false, side: THREE.DoubleSide }, { detail: 'glass' });
+  M.water = phys({ color: 0x2a9fc2, metalness: 0, roughness: 0.04, transparent: true, opacity: 0.62, envMapIntensity: 1.2, depthWrite: false }, { detail: 'glass' });
   M.poolTile = std({ ...TX.withRepeat(TX.tile(0x6fb6cf, 0x4d8da3, 4), 0.5, 0.5), roughness: 0.4 }, { detail: 'glass' });
-  M.labPanel = std({ color: 0x1b1e24, roughness: 0.4, metalness: 0.5 }, { indoor: true, detail: 'metal' });
+  M.labPanel = std({ color: 0x2c313a, roughness: 0.45, metalness: 0.45 }, { indoor: true, detail: 'metal' });
   M.lightPanel = new THREE.MeshBasicMaterial({ color: 0xfff1dc, toneMapped: false });
   M.labGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x2ef2ff).multiplyScalar(2), toneMapped: false });
   return M;
@@ -233,7 +234,8 @@ export async function buildMansion(game) {
   kit.box(2.25, UF + 0.5, 0.67, 1.45, 1.0, 0.05, M.trimDark);
 
   // ---------------------------------------------------------------- basement (RIFT LAB) walls
-  const lw = (ax, az, bx, bz) => kit.wall(ax, az, bx, bz, BF - 0.3, 3.6 + 0.3, INT * 2, { a: M.labPanel, b: M.labPanel, edge: M.labPanel }, []);
+  // Lab walls stop at the underside of the ground floor slab (-0.3), so they don't fight it for pixels.
+  const lw = (ax, az, bx, bz) => kit.wall(ax, az, bx, bz, BF - 0.3, 3.6, INT * 2, { a: M.labPanel, b: M.labPanel, edge: M.labPanel }, []);
   lw(-12, -8, -3, -8);
   lw(-3, -8, -3, 2.4);
   lw(-3, 2.4, -12, 2.4);
