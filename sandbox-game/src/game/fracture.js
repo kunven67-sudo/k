@@ -34,8 +34,23 @@ function dedupe(pts) {
     const k = `${Math.round(p.x * 2000)},${Math.round(p.y * 2000)},${Math.round(p.z * 2000)}`;
     if (!seen.has(k)) { seen.add(k); out.push(p); }
   }
-  // keep hulls cheap: thin out near-duplicate clusters
-  return out.length > 64 ? out.filter((_, i) => i % Math.ceil(out.length / 64) === 0) : out;
+  return hullVertices(out);
+}
+
+// Keep only the corners of the convex hull (interior points add nothing but cost).
+function hullVertices(pts) {
+  if (pts.length <= 4) return pts;
+  try {
+    const hull = new ConvexHull().setFromPoints(pts);
+    const set = new Set();
+    for (const f of hull.faces) {
+      let e = f.edge;
+      do { set.add(e.head().point); e = e.next; } while (e !== f.edge);
+    }
+    return set.size >= 4 ? [...set].map((p) => p.clone()) : pts;
+  } catch (_) {
+    return pts;
+  }
 }
 
 function bboxOf(points) { return new THREE.Box3().setFromPoints(points); }

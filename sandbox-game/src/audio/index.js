@@ -125,6 +125,8 @@ class AudioEngine {
     if (!this.ready || this.ac.state !== 'running') return null;
     const list = this.bank[name];
     if (!list?.length) return null;
+    // voice limit: when lots of debris is clattering, drop the quiet sounds
+    if (!loop && this.voices >= 40 && vol < 0.6) return null;
     const ac = this.ac;
     const src = ac.createBufferSource();
     src.buffer = pick(list);
@@ -156,6 +158,8 @@ class AudioEngine {
     node.connect(g);
     g.connect(bus === 'music' ? this.musicBus : bus === 'amb' ? this.ambBus : this.fxBus);
     src.start(when);
+    this.voices = (this.voices || 0) + 1;
+    src.onended = () => { this.voices--; };
     return { src, gain: g, panner: pos ? node : null };
   }
 

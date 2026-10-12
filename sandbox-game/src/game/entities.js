@@ -187,7 +187,7 @@ export function spawn(defId, o = {}) {
   e.prevQuat.copy(quat);
   ctx.scene.add(e.root);
   entities.set(e.id, e);
-  if (e.debris) debrisList.push(e);
+  if (e.debris || o.temp) { debrisList.push(e); if (o.temp && !e.debris) e.life = 90000; }
   return e;
 }
 
@@ -251,6 +251,13 @@ export function updateDebris(dt) {
     alive++;
   }
   let excess = alive - limit;
+  // way over the limit (huge chain reaction): drop the oldest right away instead of fading
+  while (alive > limit * 1.5) {
+    const old = debrisList.find((d) => d.alive);
+    if (!old) break;
+    removeEntity(old, { silent: true });
+    alive--; excess--;
+  }
   for (const e of debrisList) {
     const old = now - e.born > (e.life ?? 40000);
     if ((excess > 0 || old) && e.fade === 0) { e.fade = 0.0001; excess--; }
@@ -297,8 +304,13 @@ function hitFromContact(h, other, J, dir, sign) {
 }
 
 // Core damage rule. `dv` is a velocity change (m/s) for impacts, or an equivalent for blasts.
+let breakBudget = 0;
+export function resetBreakBudget() { breakBudget = 8; } // max fractures per physics step
+
 export function damagePart(e, part, dv, point, inDir, kind = 'impact') {
   if (!e.alive || !e.parts.includes(part)) return;
+  // small debris and second-generation chunks don't shatter again (stops runaway chain-breaking)
+  if (e.debris || (e.gen ?? 0) >= 2) return;
   const m = MATERIALS[part.mat] || MATERIALS.wood;
   if (e.explosive) {
     const tough = e.explosive.kind === 'tnt' || e.explosive.kind === 'c4' ? 30 : e.explosive.kind === 'propane' ? 14 : 18;
@@ -439,6 +451,10 @@ export function breakPart(e, part, worldPoint, energy = 1) {
   if (!e.alive || !e.parts.includes(part)) return;
   const m = MATERIALS[part.mat] || MATERIALS.wood;
   if (m.fracture === 'none') return;
+  if (breakBudget <= 0) return;
+  if (sizeOf(shapePoints(part.shape)).length() < 0.12) return; // too small to break further
+  breakBudget--;
+  const gen = (e.gen ?? 0) + 1;
   const M = partWorldMatrix(e, part);
   const invM = M.clone().invert();
   const pts = shapePoints(part.shape);
@@ -471,12 +487,13 @@ export function breakPart(e, part, worldPoint, energy = 1) {
     const kick = outward.lengthSq() > 1e-6 ? outward.normalize().multiplyScalar(rnd(0.3, 1.5) * Math.min(energy, 3)) : new THREE.Vector3();
     const tiny = z.length() < 0.25;
     const ne = spawn(null, {
-      pos: wpos, quat: partQuat.clone(), debris: tiny || m.fracture === 'cubes' || m.fracture === 'shards',
+      pos: wpos, quat: partQuat.clone(), debris: tiny || m.fracture === 'cubes' || m.fracture === 'shards', temp: true,
       vel: baseVel.clone().add(kick), ccd: z.length() < 0.15,
       parts: [{ shape: { type: 'hull', points: local }, mat: part.mat, meshes: [{ geo, material: [outerMat, innerMat] }], pos: [0, 0, 0], rot: [0, 0, 0], mass: Math.max(0.01, (totalMass * vol) / totalVol), hp: 60 }],
     });
     if (!ne) continue;
     ne.defId = 'chunk';
+    ne.gen = gen;
     if (ne.debris) ne.life = rnd(25000, 45000);
     if (wasFrozen && !worldPoint) { /* frozen glass falls once broken */ }
   }

@@ -8,7 +8,7 @@ import { Environment } from './world/environment.js';
 import { buildArena } from './world/arena.js';
 import { Effects } from './fx/effects.js';
 import { ctx } from './game/ctx.js';
-import { initEntities, spawn, recordPrev, syncVisuals, processImpacts, updateDebris, updateJoints, clearAll, entities, removeEntity, entityFromCollider } from './game/entities.js';
+import { initEntities, resetBreakBudget, spawn, recordPrev, syncVisuals, processImpacts, updateDebris, updateJoints, clearAll, entities, removeEntity, entityFromCollider } from './game/entities.js';
 import { initExplosions, updateExplosives, explode } from './game/explosions.js';
 import { Player } from './game/player.js';
 import { initTools, updateToolsFrame, updateToolsStep, resetTools, say } from './game/tools.js';
@@ -311,6 +311,7 @@ function loop(now) {
   const running = mode !== 'paused';
   if (running) {
     stepPhysics(realDt, (dt) => {
+      resetBreakBudget();
       recordPrev();
       if (mode === 'playing' || mode === 'spawn') { player.step(dt, realDt); updateToolsStep(dt); }
     }, (dt) => {
