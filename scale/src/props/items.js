@@ -717,7 +717,7 @@ def({
     }
     return g;
   },
-  shapes: [{ t: 'cyl', r: 0.039, h: 0.016, p: [0, 0.016, 0] }, { t: 'ball', r: 0.024, p: [0, 0.07, 0.016] }],
+  shapes: [{ t: 'cyl', r: 0.043, h: 0.016, p: [0, 0.016, 0] }, { t: 'ball', r: 0.024, p: [0, 0.07, 0.016] }],
 });
 
 // Toy brick, 2x4: 31.8 x 15.8 x 9.6 mm, 2.3 g. (Real-life hazard when stepped on barefoot.)

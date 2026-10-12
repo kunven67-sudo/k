@@ -22,10 +22,13 @@ import { Door } from './doors.js';
 import { FM } from '../props/furniture.js';
 import { mergeByMaterial } from '../render/merge.js';
 import { bus } from '../core/events.js';
+import { Mantis } from '../life/mantis.js';
 
 const GF = 0; // ground floor top
 const UF = 3.3; // upper floor top
 const BF = -3.6; // basement floor top
+// Window glass: solid, but you (and animals) can see through it.
+const GLASS = { kind: 'glass', name: 'Window glass', seeThrough: true };
 const CH = 3.0; // ceiling height
 const EXT = 0.3; // exterior wall thickness
 const INT = 0.15; // interior wall thickness
@@ -93,6 +96,9 @@ export async function buildMansion(game) {
     kit.box((x0 + x1) / 2, groundY - 0.05, (z0 + z1) / 2, Math.abs(x1 - x0), 0.1, Math.abs(z1 - z0), M.lawn, { tile: 1, noCollide: true });
     game.scatter.addSurface({ minX: Math.min(x0, x1), maxX: Math.max(x0, x1), minZ: Math.min(z0, z1), maxZ: Math.max(z0, z1), y: groundY, kind: 'lawn' });
   }
+  // A wild praying mantis hunting in the front lawn by the walk (California gardens have lots).
+  game.afterBuild = game.afterBuild || [];
+  game.afterBuild.push(() => new Mantis(game, { position: [2.4, groundY, 11.5], yaw: -2.2, hunger: 0.7 }));
   // Far ground out to the horizon (simple, the town replaces it in Wave 2).
   const far = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), std({ ...TX.withRepeat(TX.grass(), 200, 200), roughness: 1 }, { detail: 'soil' }));
   far.rotation.x = -Math.PI / 2;
@@ -271,7 +277,7 @@ export async function buildMansion(game) {
 
   // ---------------------------------------------------------------- windows (black frames + glass)
   const windowPane = (x, y, z, w, h, rotY) => {
-    kit.box(x, y, z, w, h, 0.02, M.glass, { rotY, noCollide: false });
+    kit.box(x, y, z, w, h, 0.02, M.glass, { rotY, noCollide: false, owner: GLASS });
     const t = 0.05;
     const dx = Math.cos(rotY), dz = -Math.sin(rotY);
     kit.box(x, y + h / 2 - t / 2, z, w, t, 0.08, M.trimDark, { rotY, noCollide: true });
@@ -520,8 +526,11 @@ function buildLab(game, M, kit) {
     physics.staticBox(x, y + 1.0, -1.0, 0.3, 1.0, 0.45);
   }
   // Terrarium on a table (for things you shrink).
-  new Prop(game, CATALOG.table, { position: [-6.5, y, 0.6], rotationY: 0 });
-  new Prop(game, CATALOG.terrarium, { position: [-6.5, y + 0.76, 0.6] });
+  // (Clear of the lab stairs, which run along z 0.95..2.25.)
+  new Prop(game, CATALOG.table, { position: [-6.5, y, 0.25], rotationY: 0 });
+  new Prop(game, CATALOG.terrarium, { position: [-6.5, y + 0.751, 0.25] });
+  // Your specimen: a European praying mantis living in the terrarium (on the soil, 5 cm above the base).
+  new Mantis(game, { position: [-6.62, y + 0.751 + 0.0505, 0.27], yaw: 2.4, hunger: 0.6 });
   // Lab lights: cold white strips.
   for (const [x, z] of [[-7.5, -6], [-7.5, -2], [-5, -4], [-10, -4], [-8, 1.2]]) {
     const strip = add(new THREE.BoxGeometry(1.4, 0.03, 0.12), M.lightPanel, x, -0.33, z);

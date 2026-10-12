@@ -3,6 +3,7 @@
 // In sandbox mode it's free and arrives instantly through a rift (see props/spawn.js).
 import { CATALOG } from '../props/catalog.js';
 import '../props/items.js';
+import '../life/mantis.js';
 import { hash3, formatLength } from '../core/util.js';
 import { bus } from '../core/events.js';
 import { input } from '../core/input.js';
@@ -20,7 +21,7 @@ const ICON = {
   battery: '<svg viewBox="0 0 28 24"><rect x="1.5" y="6" width="22" height="12" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.55"/><rect x="3.6" y="8.1" width="15" height="7.8" rx="1.8" fill="currentColor"/><path d="M25.2 10v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.55"/></svg>',
 };
 
-const CATS = ['All', 'Electronics', 'Furniture', 'Food & drink', 'Toys', 'Home', 'Kitchen', 'Sports', 'Office', 'Garden', 'Containers'];
+const CATS = ['All', 'Electronics', 'Pets & bugs', 'Furniture', 'Food & drink', 'Toys', 'Home', 'Kitchen', 'Sports', 'Office', 'Garden', 'Containers'];
 
 const money = (p) => {
   const d = Math.floor(p);
@@ -71,7 +72,7 @@ export class PhoneUI {
     this.search = this.$('.hl-search input');
     this.items = Object.values(CATALOG).filter((d) => d.shop !== false && d.price !== undefined);
     // Popular stuff first (like a real store's front page), then by department and price.
-    const FEATURED = ['gpu', 'console', 'controller', 'smartphone', 'basketball', 'donut', 'soda_can', 'duck', 'tv65', 'pc_tower', 'apple', 'gummy_red'];
+    const FEATURED = ['gpu', 'mantis', 'console', 'controller', 'smartphone', 'basketball', 'donut', 'soda_can', 'duck', 'tv65', 'pc_tower', 'apple', 'gummy_red'];
     const rank = (d) => (FEATURED.includes(d.id) ? FEATURED.indexOf(d.id) : 100 + CATS.indexOf(d.category));
     this.items.sort((a, b) => rank(a) - rank(b) || a.price - b.price);
 

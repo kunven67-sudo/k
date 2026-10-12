@@ -48,7 +48,7 @@ export class Kit {
 
   // A solid box: centered at (x,y,z), size (w,h,d), rotated around Y. One material, or an array of
   // six materials in BoxGeometry face order [+x,-x,+y,-y,+z,-z]. Adds a collider unless noCollide.
-  box(x, y, z, w, h, d, mat, { rotY = 0, tile = 1, noCollide = false, friction } = {}) {
+  box(x, y, z, w, h, d, mat, { rotY = 0, tile = 1, noCollide = false, friction, owner = null } = {}) {
     _q.setFromAxisAngle(UP, rotY);
     _m.compose(_v.set(x, y, z), _q, _s.set(1, 1, 1));
     const g = worldBox(w, h, d, _m, tile);
@@ -63,7 +63,7 @@ export class Kit {
     } else {
       this.add(g, mat);
     }
-    if (!noCollide) this.physics.staticBox(x, y, z, w / 2, h / 2, d / 2, null, rotY, friction);
+    if (!noCollide) this.physics.staticBox(x, y, z, w / 2, h / 2, d / 2, owner, rotY, friction);
   }
 
   // Horizontal slab with its TOP at y.

@@ -416,11 +416,11 @@ export function createGlitch({ coat = 0xe9e7e2, coatTrim = 0x1a1c22, suit = 0x10
   }
 
   // speed: horizontal speed normalized to human size (m/s at 1.75 m). scale: body scale.
-  function animate(dt, { speed = 0, grounded = true, vy = 0, crouch = false, scaleRate = 0, scale = 1, hurt = 0, poseR = null, poseL = null, aimPitch = 0 } = {}) {
+  function animate(dt, { speed = 0, grounded = true, vy = 0, crouch = false, scaleRate = 0, scale = 1, hurt = 0, poseR = null, poseL = null, aimPitch = 0, held = false, dead = false } = {}) {
     st.t += dt;
     U.uTime.value = st.t;
     // Glitch intensity: calm idle flicker, wild while resizing or hurt.
-    st.glitchTarget = 0.035 + Math.min(1, Math.abs(scaleRate) * 1.2) + hurt * 0.8;
+    st.glitchTarget = 0.035 + Math.min(1, Math.abs(scaleRate) * 1.2) + hurt * 0.8 + (held ? 0.3 : 0);
     st.glitch = damp(st.glitch, st.glitchTarget, 6, dt);
     U.uGlitch.value = st.glitch;
     root.updateWorldMatrix(true, false);
@@ -478,6 +478,33 @@ export function createGlitch({ coat = 0xe9e7e2, coatTrim = 0x1a1c22, suit = 0x10
     else if (poseL === 'hold') blendPose('L', 0.85, -0.12, -1.0, -0.2, st.poseL);
     else if (poseL === 'carry2') blendPose('L', 1.05, 0.28, -0.75, -0.3, st.poseL);
 
+    // Caught by something: kicking legs, arms pushing up at what's holding you (fast, desperate).
+    st.held = damp(st.held ?? 0, held ? 1 : 0, 10, dt);
+    if (st.held > 0.01) {
+      const w = st.held, f = st.t * 13 * cadenceScale;
+      for (const [k, off] of [['L', 0], ['R', 2.1]]) {
+        const s = k === 'L' ? -1 : 1;
+        B['hip' + k].rotation.x += (Math.sin(f + off) * 0.7 + 0.3 - B['hip' + k].rotation.x) * w;
+        B['knee' + k].rotation.x += (-0.6 - Math.max(0, Math.sin(f + off + 1)) * 0.9 - B['knee' + k].rotation.x) * w;
+        B['arm' + k].rotation.x += (-2.5 + Math.sin(f * 1.1 + off) * 0.45 - B['arm' + k].rotation.x) * w;
+        B['arm' + k].rotation.z += (s * (0.35 + Math.sin(f + off) * 0.15) - B['arm' + k].rotation.z) * w;
+        B['elbow' + k].rotation.x += (-0.5 - Math.max(0, Math.sin(f * 1.3 + off)) * 0.9 - B['elbow' + k].rotation.x) * w;
+      }
+    }
+    // Dead: limp (arms out, knees soft, head rolled to the side).
+    st.dead = damp(st.dead ?? 0, dead ? 1 : 0, 6, dt);
+    if (st.dead > 0.01) {
+      const w = st.dead;
+      for (const k of ['L', 'R']) {
+        const s = k === 'L' ? -1 : 1;
+        B['hip' + k].rotation.x += (0.15 - B['hip' + k].rotation.x) * w;
+        B['knee' + k].rotation.x += (-0.25 - B['knee' + k].rotation.x) * w;
+        B['arm' + k].rotation.x += (-0.2 - B['arm' + k].rotation.x) * w;
+        B['arm' + k].rotation.z += (s * 0.9 - B['arm' + k].rotation.z) * w;
+        B['elbow' + k].rotation.x += (-0.2 - B['elbow' + k].rotation.x) * w;
+      }
+    }
+
     // Hips bob and twist, body leans into running.
     const bob = Math.abs(Math.sin(ph)) * (0.012 + 0.03 * r) * moving;
     B.hips.position.y = 0.95 - bob - crouchK * 0.28 + Math.sin(st.t * 1.6) * 0.004 * (1 - moving);
@@ -490,6 +517,10 @@ export function createGlitch({ coat = 0xe9e7e2, coatTrim = 0x1a1c22, suit = 0x10
     st.look = damp(st.look, (1 - moving) * Math.sin(st.t * 0.37) * 0.35, 2, dt);
     B.head.rotation.y = st.look - B.chest.rotation.y;
     B.head.rotation.x = -st.lean * 0.6;
+    if (st.dead > 0.01) {
+      B.head.rotation.z = 0.5 * st.dead;
+      B.head.rotation.x += 0.3 * st.dead;
+    } else B.head.rotation.z = 0;
 
     // Coat tails: front panels follow each thigh, back panel lags and flutters with speed.
     const swingL = B.hipL.rotation.x, swingR = B.hipR.rotation.x;
@@ -508,7 +539,11 @@ export function createGlitch({ coat = 0xe9e7e2, coatTrim = 0x1a1c22, suit = 0x10
     const blinkCycle = (st.t % 4.3) / 4.3;
     const blink = blinkCycle > 0.97 ? 0.1 : 1;
     st.squint = damp(st.squint, Math.min(1, Math.abs(scaleRate) * 2), 8, dt);
-    for (const e of eyes) e.scale.y = blink * (1 - st.squint * 0.55);
+    // Dead: the eyes go dark.
+    for (const e of eyes) {
+      e.scale.y = blink * (1 - st.squint * 0.55) * (1 - st.dead * 0.92);
+      e.visible = st.dead < 0.97;
+    }
 
     updateCables();
   }

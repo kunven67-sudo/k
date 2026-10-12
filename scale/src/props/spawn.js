@@ -48,7 +48,9 @@ export class Spawner {
   spawn(def, scale) {
     const spot = this.findSpot(def, scale);
     if (!spot) return null;
-    const prop = new Prop(this.game, def, { position: [spot.x, spot.y, spot.z], rotationY: spot.yaw, scale, sleeping: false });
+    const prop = def.spawn
+      ? def.spawn(this.game, { position: [spot.x, spot.y, spot.z], yaw: spot.yaw, scale }) // a live animal
+      : new Prop(this.game, def, { position: [spot.x, spot.y, spot.z], rotationY: spot.yaw, scale, sleeping: false });
     prop.body.wakeUp();
     const size = def.size * scale;
     this.portals.push(new RiftPortal(this.game, spot, size, prop));
@@ -189,7 +191,8 @@ class RiftPortal {
     // The thing grows out of the rift over a quarter second (just how it looks; its physics body
     // is already its full size, so nothing can end up inside it).
     this.s = prop.scale;
-    prop.object.scale.setScalar(prop.scale * 0.02);
+    this.grow = prop.kind !== 'creature'; // animals just step out (they set their own scale every frame)
+    if (this.grow) prop.object.scale.setScalar(prop.scale * 0.02);
   }
 
   update(dt) {
@@ -200,14 +203,14 @@ class RiftPortal {
     this.disc.material.uniforms.uOpen.value = open;
     this.beam.material.uniforms.uFade.value = t < 0.12 ? 0 : t < 0.5 ? 1 : Math.max(0, 1 - (t - 0.5) / 0.3);
     const p = this.prop;
-    if (p.object.parent) {
+    if (p.object.parent && this.grow) {
       const k = Math.min(1, Math.max(0, (t - 0.1) / 0.28));
       const e = 1 - Math.pow(1 - k, 3);
       // If the ray or anything else resized it meanwhile, use its real current size.
       p.object.scale.setScalar(p.scale * Math.max(0.02, e));
     }
     if (t > 1.0) {
-      if (p.object.parent) p.object.scale.setScalar(p.scale);
+      if (p.object.parent && this.grow) p.object.scale.setScalar(p.scale);
       this.group.removeFromParent();
       this.disc.material.dispose();
       this.beam.material.dispose();

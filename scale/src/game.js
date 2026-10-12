@@ -12,6 +12,7 @@ import { installDetail, updateDetail } from './render/detail.js';
 import { Scatter } from './render/scatter.js';
 import { Spawner } from './props/spawn.js';
 import { Thumbs } from './ui/thumbs.js';
+import { Gore } from './life/gore.js';
 
 export class Game {
   constructor(canvas) {
@@ -23,6 +24,7 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.05, 2000);
     this.physics = new Physics();
     this.props = new Set();
+    this.creatures = new Set();
     this.updatables = new Set(); // things with update(dt)
     this.time = 0;
     this.frame = 0;
@@ -34,6 +36,7 @@ export class Game {
     this.scatter = new Scatter(this);
     this.spawner = new Spawner(this);
     this.thumbs = new Thumbs(this);
+    this.gore = new Gore(this);
     this.ui = {}; // hud, menu, phone, touch (made in main.js)
     this.fps = 60;
     this.outdoor = 1; // 0 = deep indoors, 1 = open sky (drives exposure, like eyes adjusting)
@@ -44,12 +47,15 @@ export class Game {
   async loadWorld(buildWorld, opts = {}) {
     const info = await buildWorld(this);
     this.spawn = info.spawn;
+    for (const f of this.afterBuild || []) f();
+    this.afterBuild = [];
     const sp = { ...info.spawn, ...opts };
     this.player = new Player(this, { position: sp.position, yaw: sp.yaw, scale: sp.scale ?? 1 });
     this.player.pitch = sp.pitch ?? this.player.pitch;
-    // Start with your eyes already adjusted to where you are (no fade from "outdoors" at spawn).
-    // One physics step first: new colliders only answer ray queries after the world has stepped.
-    this.physics.world.step();
+    // Let everything settle before you see it: 1.5 s of physics while loading, so nothing hand-placed
+    // floats or sits inside something (it falls/gets pushed out now, not in front of you).
+    this.physics.settle(this.props, 90);
+    for (const c of this.creatures) c._place(true);
     this.player.updateCamera(this.camera, 0);
     this.camera.updateMatrixWorld();
     this._updateExposure(0, true);
@@ -64,7 +70,10 @@ export class Game {
       for (const d of dirs) {
         const l = Math.hypot(d[0], d[1], d[2]);
         const hit = this.physics.raycast(o, { x: d[0] / l, y: d[1] / l, z: d[2] / l }, 60, {
-          predicate: (c) => !this.physics.ownerOf(c),
+          predicate: (c) => {
+            const o = this.physics.ownerOf(c);
+            return !o || o.kind === 'glass';
+          },
         });
         if (!hit) open++;
       }

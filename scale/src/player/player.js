@@ -12,6 +12,7 @@ import { input } from '../core/input.js';
 import { settings } from '../core/settings.js';
 import { clamp, damp, angDiff } from '../core/util.js';
 import { bus } from '../core/events.js';
+import { settings as _settings } from '../core/settings.js';
 import { createGlitch } from './glitch.js';
 import { Hands } from './hands.js';
 import { ShrinkRay, Phone } from './tools.js';
@@ -44,6 +45,10 @@ export class Player {
     this.sizeRate = 0;
     this.blockedT = 0;
     this.health = 100;
+    this.dead = false;
+    this.deadT = 0;
+    this.heldBy = null; // a creature holding you (mantis claws, a spider...)
+    this.struggle = 0; // 0..1, how close you are to getting free
     this.camDist = 2.4; // body heights
     this.firstPerson = settings.get('firstPerson');
     this.crouching = false;
@@ -133,6 +138,7 @@ export class Player {
         const o = physics.ownerOf(c);
         if (o === this) return false;
         if (o && o.held) return false;
+        if (o && o === this.heldBy) return false;
         if (o && o.mass !== undefined) return o.mass > this.mass * 0.25 * (s / this.scale) ** 3; // light things get pushed aside
         return true; // walls, floors, ceilings
       },
@@ -169,6 +175,13 @@ export class Player {
   // --- per fixed step ---------------------------------------------------------------------------
   fixedUpdate(dt) {
     this.prevFeet.copy(this.feet);
+    if (this.dead) {
+      // Lying there. You come back after a few seconds (or the world ends, with permadeath on).
+      this.deadT += dt;
+      this.sizeRate = 0;
+      if (this.deadT > 4.5 && !_settings.get('permadeath')) this.respawn();
+      return;
+    }
     const s = this.scale;
     const H = this.height;
 
@@ -196,6 +209,14 @@ export class Player {
         this.blockedT = 1.5;
         bus.emit('player:blocked');
       }
+    }
+
+    if (this.heldBy) {
+      this.vel.set(0, 0, 0);
+      this.grounded = false;
+      this.airTime = 0;
+      if (this.blockedT > 0) this.blockedT -= dt;
+      return;
     }
 
     // Movement intent relative to camera yaw.
@@ -230,9 +251,12 @@ export class Player {
 
     // Character controller: slide along walls, step up stairs, snap to the ground.
     const desired = { x: this.vel.x * dt, y: this.vel.y * dt, z: this.vel.z * dt };
+    // Animals are left out of the controller: it pushes you away from any self-moving body from about
+    // 5 cm before you touch it, which is nothing at normal size but 10 body lengths when you're tiny.
+    // Bumping into animals is handled right after, exactly.
     this.kcc.computeColliderMovement(this.collider, desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, GROUPS.player, (c) => {
       const o = this.game.physics.ownerOf(c);
-      return !(o && o.held);
+      return !(o && (o.held || o.kind === 'creature'));
     });
     const m = this.kcc.computedMovement();
     const wasGrounded = this.grounded;
@@ -247,11 +271,39 @@ export class Player {
     this.feet.x += m.x;
     this.feet.y += m.y;
     this.feet.z += m.z;
+    this._pushOutOfCreatures();
     this.body.setNextKinematicTranslation({ x: this.feet.x, y: this.feet.y + H / 2, z: this.feet.z });
 
     // Safety net: never fall out of the world.
     if (this.feet.y < -60 || !Number.isFinite(this.feet.y)) this.respawn();
     if (this.blockedT > 0) this.blockedT -= dt;
+  }
+
+  // If you're overlapping an animal's body, get pushed straight out of it by exactly the overlap.
+  _pushOutOfCreatures() {
+    if (!this.game.creatures?.size) return;
+    const physics = this.game.physics;
+    const H = this.height, r = this.radius;
+    const shape = new RAPIER.Capsule(Math.max(1e-6, H / 2 - r), r);
+    const rot = { x: 0, y: 0, z: 0, w: 1 };
+    for (let iter = 0; iter < 2; iter++) {
+      const pos = { x: this.feet.x, y: this.feet.y + H / 2, z: this.feet.z };
+      let moved = false;
+      for (const c of physics.overlaps(shape, pos, rot, { predicate: (c) => physics.ownerOf(c)?.kind === 'creature' })) {
+        const o = physics.ownerOf(c);
+        const sh = o.shapeOf?.(c);
+        if (!sh) continue;
+        const ct = shape.contactShape(pos, rot, sh, c.translation(), c.rotation(), 0);
+        if (!ct || ct.distance >= 0) continue;
+        // normal1 points from you toward the animal; move the other way (never down into the floor).
+        const d = -ct.distance + Math.max(1e-6, H * 0.002);
+        this.feet.x -= ct.normal1.x * d;
+        this.feet.z -= ct.normal1.z * d;
+        if (ct.normal1.y < 0) this.feet.y -= ct.normal1.y * d;
+        moved = true;
+      }
+      if (!moved) break;
+    }
   }
 
   // Impact damage depends on absolute impact speed (tissue stress ~ v^2, size-independent).
@@ -260,13 +312,81 @@ export class Player {
     this.lastImpact = speed;
     if (speed > 7.5) {
       const dmg = Math.round((speed - 7.5) ** 1.6 * 4);
-      this.health = Math.max(0, this.health - dmg);
-      this.hurtFx = 1;
-      bus.emit('player:hurt', { amount: dmg, cause: 'fall', speed });
+      this.hurt(dmg, { cause: speed > 20 ? 'Hit the ground way too hard' : 'Fell too hard', at: this.feet.clone(), dir: new THREE.Vector3(0, 1, 0), gore: dmg > 25 });
     }
   }
 
+  // Getting hurt by anything (falls, bites, hits). With gore on, you bleed: The Glitch bleeds dark,
+  // with glitching cyan bits.
+  hurt(amount, { cause = 'Hurt', at = null, dir = null, gore = false } = {}) {
+    if (this.dead || amount <= 0) return;
+    this.health = Math.max(0, this.health - amount);
+    this.hurtFx = 1;
+    bus.emit('player:hurt', { amount, cause });
+    if (gore && this.game.gore) {
+      const p = at || this.feet.clone().addScaledVector(UP, this.height * 0.55);
+      this.game.gore.burst(p, dir || UP, this.height, 6 + Math.min(14, amount * 0.4), { glitch: true });
+    }
+    if (this.health <= 0) this.die(cause);
+  }
+
+  die(cause) {
+    if (this.dead) return;
+    this.dead = true;
+    this.deadT = 0;
+    this.health = 0;
+    this.resizeTarget = null;
+    bus.emit('player:died', { cause, permadeath: !!_settings.get('permadeath') });
+  }
+
+  // A creature caught you (mantis claws, a spider's bite and wrap).
+  grabbed(by) {
+    this.heldBy = by;
+    this.struggle = 0;
+    this.vel.set(0, 0, 0);
+    this.resizeTarget = null;
+  }
+
+  released(by, vel = null) {
+    if (this.heldBy !== by) return;
+    this.heldBy = null;
+    this.struggle = 0;
+    if (vel) this.vel.copy(vel);
+    this.grounded = false;
+  }
+
+  // Held at a point (your middle), moved there by whatever is holding you.
+  holdAt(point) {
+    this.feet.copy(point).addScaledVector(UP, -this.height * 0.5);
+    // Never pushed into the ground: if you're bigger than the gap under the claws (you grew), your
+    // feet rest on the ground and the claws hold you higher up.
+    const physics = this.game.physics;
+    const hit = physics.raycast({ x: point.x, y: point.y, z: point.z }, { x: 0, y: -1, z: 0 }, this.height * 2, {
+      excludeBody: this.body,
+      predicate: (c) => {
+        const o = physics.ownerOf(c);
+        return !(o && (o === this.heldBy || o.kind === 'creature' || o.held));
+      },
+    });
+    if (hit && this.feet.y < hit.point.y + this.height * 0.01) this.feet.y = hit.point.y + this.height * 0.01;
+    this.prevFeet.copy(this.feet);
+    this.renderFeet.copy(this.feet);
+    const c = { x: this.feet.x, y: this.feet.y + this.height / 2, z: this.feet.z };
+    this.body.setTranslation(c, true);
+    this.body.setNextKinematicTranslation(c);
+    this._syncObject();
+  }
+
   respawn() {
+    if (this.heldBy) this.released(this.heldBy);
+    this.dead = false;
+    this.deadT = 0;
+    this.resizeTarget = null;
+    this.sizeRate = 0;
+    this.jumpBuffer = 0;
+    this.model.rotation.set(0, 0, 0);
+    this.model.position.set(0, 0, 0);
+    bus.emit('player:respawn');
     const sp = this.game.spawn;
     this.feet.fromArray(sp.position);
     this.prevFeet.copy(this.feet);
@@ -311,7 +431,12 @@ export class Player {
     const R = this.hands?.slots.right, L = this.hands?.slots.left;
     const poseR = !R ? null : R.kind === 'tool' ? (R.ref.id === 'ray' ? 'aim' : 'hold') : R.two ? 'carry2' : 'hold';
     const poseL = !L ? null : L.kind === 'tool' ? (L.ref.id === 'phone' ? 'phone' : 'hold') : L.two ? 'carry2' : 'hold';
-    this.model.userData.animate?.(dt, { speed: hs, grounded: this.grounded, vy: this.vel.y / Math.sqrt(this.scale), crouch: this.crouching, scaleRate: this.sizeRate, scale: this.scale, hurt: this.hurtFx, poseR, poseL, aimPitch: this.pitch });
+    this.model.userData.animate?.(dt, { speed: this.dead || this.heldBy ? 0 : hs, grounded: this.grounded || !!this.heldBy, vy: this.vel.y / Math.sqrt(this.scale), crouch: this.crouching, scaleRate: this.sizeRate, scale: this.scale, hurt: this.hurtFx, poseR, poseL, aimPitch: this.pitch, held: !!this.heldBy && !this.dead, dead: this.dead });
+    // Dead and not held: the body falls over backwards and lies on the ground.
+    const lie = this.dead && !this.heldBy ? 1 : 0;
+    this._lie = damp(this._lie || 0, lie, lie ? 5 : 20, dt);
+    this.model.rotation.x = this._lie * 1.5;
+    this.model.position.y = this._lie * 0.12;
   }
 
   // Third-person camera with collision, or first-person.

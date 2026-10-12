@@ -28,7 +28,9 @@ export class Hud {
         <button data-slot="slot2"><kbd>2</kbd>${SLOT_ICON.ray}<span>Ray</span></button>
         <button data-slot="slot3"><kbd>Tab</kbd>${SLOT_ICON.phone}<span>Phone</span></button>
       </div>
-      <div class="fps"></div>`;
+      <div class="fps"></div>
+      <div class="struggle"><b>Caught!</b><span class="how">Spam <kbd>Space</kbd> to struggle</span><div class="sbar"><i></i></div></div>
+      <div class="death"><div class="dt">You died</div><div class="dc"></div><div class="dn"></div></div>`;
     root.appendChild(hud);
     const q = (s) => hud.querySelector(s);
     this.el = {
@@ -43,6 +45,12 @@ export class Hud {
       health: q('.health'),
       healthBar: q('.health i'),
       slots: [...hud.querySelectorAll('.hotbar button')],
+      struggle: q('.struggle'),
+      sbar: q('.struggle .sbar i'),
+      how: q('.struggle .how'),
+      death: q('.death'),
+      dc: q('.death .dc'),
+      dn: q('.death .dn'),
     };
     // The hand bar works by tapping too (phones). It sends the same action as the number keys.
     for (const b of this.el.slots) {
@@ -59,6 +67,12 @@ export class Hud {
     bus.on('player:resized', () => this.toast('Back to normal size'));
     bus.on('toast', (t) => (typeof t === 'string' ? this.toast(t) : this.toast(t.text, t.secs)));
     bus.on('player:hurt', () => (this.hurtT = 4));
+    bus.on('player:died', ({ cause, permadeath }) => {
+      this.el.dc.textContent = cause || '';
+      this.el.dn.textContent = permadeath ? 'Permadeath is on. This world has ended.' : 'Waking up back home...';
+      this.el.death.classList.add('show');
+    });
+    bus.on('player:respawn', () => this.el.death.classList.remove('show'));
     bus.on('frame', (dt) => this.update(dt));
   }
 
@@ -108,6 +122,15 @@ export class Hud {
       this.el.slots[1].classList.toggle('on', !!ray);
       this.el.slots[2].classList.toggle('on', !!phone);
       this.root.classList.toggle('phone-open', !!phone);
+    }
+    // Caught by something: show how close you are to getting free.
+    const held = !!pl.heldBy && !pl.dead;
+    this.el.struggle.classList.toggle('show', held);
+    if (held) {
+      this.el.sbar.style.width = `${Math.round(Math.min(1, pl.struggle) * 100)}%`;
+      const touch = this.root.classList.contains('touch');
+      const how = touch ? 'Tap jump fast to struggle' : 'Spam <kbd>Space</kbd> to struggle';
+      if (this._how !== how) this.el.how.innerHTML = this._how = how;
     }
     if (this.toastT > 0) {
       this.toastT -= dt;

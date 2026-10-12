@@ -1,5 +1,5 @@
 // SCALE entry point.
-import { initPhysics } from './core/physics.js';
+import { initPhysics, RAPIER } from './core/physics.js';
 import { input } from './core/input.js';
 import { Game } from './game.js';
 import { CATALOG } from './props/catalog.js';
@@ -18,6 +18,7 @@ async function main() {
   window.__scale = game; // dev console access + automated tests
   window.__input = input;
   window.__cat = CATALOG;
+  window.__RAP = RAPIER;
   const q = new URLSearchParams(location.search);
   const num = (k) => (q.has(k) ? Number(q.get(k)) : undefined);
   const spawnOverride = {};

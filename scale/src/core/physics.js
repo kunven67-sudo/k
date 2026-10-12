@@ -66,6 +66,21 @@ export class Physics {
     return n;
   }
 
+  // Run the world for a while with every loose object awake, then put the ones at rest to sleep.
+  settle(props, steps = 90) {
+    for (const p of props) p.body.wakeUp();
+    for (let i = 0; i < steps; i++) this.world.step();
+    for (const p of props) {
+      p._readBody(p.curPos, p.curQuat);
+      p.prevPos.copy(p.curPos);
+      p.prevQuat.copy(p.curQuat);
+      p.object.position.copy(p.curPos);
+      p.object.quaternion.copy(p.curQuat);
+      const v = p.body.linvel();
+      if (Math.hypot(v.x, v.y, v.z) < 0.02) p.body.sleep();
+    }
+  }
+
   own(collider, owner) {
     this.owners.set(collider.handle, owner);
     return collider;

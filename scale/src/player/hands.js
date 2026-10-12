@@ -70,6 +70,12 @@ export class Hands {
     this.aimPoint = hit ? hit.point : camera.position.clone().addScaledVector(dir, maxD * 4);
     this.aimHit = hit;
     this.look = null;
+    if (hit && hit.owner && hit.owner.kind === 'creature') {
+      // Looking at an animal: what it is and what it thinks of you (no grabbing live animals yet).
+      const d = hit.dist;
+      this.look = { creature: hit.owner, point: hit.point, dist: d, reachable: d < pl.camDistM + pl.height * 8 + hit.owner.size * 4 };
+      return;
+    }
     if (hit && hit.owner && typeof hit.owner.interactText === 'function') {
       const chest = _v2.copy(pl.feet).addScaledVector(THREE.Object3D.DEFAULT_UP, pl.height * 0.6);
       const d = hit.point.distanceTo(chest);
@@ -128,6 +134,7 @@ export class Hands {
   promptText() {
     const lk = this.look;
     if (!lk || !lk.reachable) return null;
+    if (lk.creature) return ['', lk.creature.describe(this.player)];
     if (lk.interact) return ['E', lk.interact.interactText(this.player)];
     const p = lk.prop;
     if (p.held) return null;
@@ -140,9 +147,10 @@ export class Hands {
   // ---- actions ------------------------------------------------------------------------------------
   update(dt) {
     const pl = this.player;
-    if (input.pressed('interact') && this.look && this.look.reachable) {
+    if (pl.dead) return;
+    if (input.pressed('interact') && this.look && this.look.reachable && !pl.heldBy) {
       if (this.look.interact) this.look.interact.interact(this.player);
-      else this.pickUp(this.look.prop);
+      else if (this.look.prop) this.pickUp(this.look.prop);
     }
     if (input.pressed('drop')) this.drop();
     if (input.pressed('slot1')) this.equipTool(null);
