@@ -266,7 +266,10 @@ function loop(now) {
     updateDemo(realDt);
     const t = now / 1000 * 0.06;
     camera.position.set(Math.cos(t) * 11, 3.2 + Math.sin(t * 0.7) * 0.8, Math.sin(t) * 11);
-    camera.lookAt(0, 1.2, 0);
+    // aim a bit left of the stack so it shows on the right, clear of the menu buttons
+    const toC = new THREE.Vector3(0, 1.2, 0).sub(camera.position).normalize();
+    const right = toC.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
+    camera.lookAt(new THREE.Vector3(0, 1.2, 0).addScaledVector(right, -4.5));
   } else if (mode !== 'loading') {
     player.updateCamera(realDt, physicsState.alpha);
   }

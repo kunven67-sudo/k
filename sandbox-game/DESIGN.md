@@ -114,6 +114,15 @@ A **realistic first-person life sim town + sandbox arena**, playing in the brows
 2. **Chunk 2**: guns, damage, gore, medical, full body + hands/tool viewmodels.
 3. **Chunk 3**: polish (main menu extras, achievements, more hints, screen effects, sounds once real assets are reachable).
 
+## Chunk 2 decisions
+- **Outfit** (visible body + hands): work clothes. Jeans, work boots, gloves, hi-vis vest.
+- **Ammo** (infinite ammo off): spawnable ammo boxes; grab with F.
+- **Gun audio**: indoor vs outdoor (indoors boom + echo, outdoors crack + roll off the hills).
+- **Assault rifle**: auto / semi switch on **X**.
+- **Medical use**: takes time like real life (bandage ~3s, splint ~6s, medkit ~8s), can't shoot meanwhile, interrupted if hit.
+- **Med keys**: H bandage, J splint, K medkit, L painkillers (hotbar stays for tools).
+- **Injury info**: screen effects (red edges, blur, heartbeat, limp) + body status picture in the Esc menu + tiny icons only when bleeding/broken.
+
 ## Play setup
 - One HTML file, double-click to open in Edge.
 - **Auto fullscreen on Play** so Ctrl+W (crouch + forward) can't close the tab. Esc leaves fullscreen and pauses.
