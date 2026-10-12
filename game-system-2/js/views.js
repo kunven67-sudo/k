@@ -1408,10 +1408,11 @@
     return rows;
   }
   function vexKeyForm() {
-    var k = VexBrain.keyInfo() || { provider: 'anthropic', key: '', model: '' };
+    /* new here? start on the free one (Google Gemini) */
+    var k = VexBrain.keyInfo() || { provider: 'gemini', key: '', model: '' };
     var names = { anthropic: 'Claude (Anthropic)', openai: 'OpenAI', gemini: 'Google Gemini', openrouter: 'OpenRouter', custom: 'Other (OpenAI-style)' };
     /* a model name only works with its own company, so switching clears it */
-    var prov = h('select.select', { 'aria-label': 'AI provider', onchange: function () { model.value = ''; model.placeholder = VexBrain.DEFAULT_MODELS[prov.value] || 'model name'; urlRow.hidden = prov.value !== 'custom'; } },
+    var prov = h('select.select', { 'aria-label': 'AI provider', onchange: function () { model.value = ''; model.placeholder = VexBrain.DEFAULT_MODELS[prov.value] || 'model name'; urlRow.hidden = prov.value !== 'custom'; freeTip.hidden = prov.value !== 'gemini'; } },
       Object.keys(names).map(function (p) { return h('option', { value: p }, names[p]); }));
     prov.value = k.provider || 'anthropic';
     var key = h('input.input', { type: 'password', placeholder: 'Paste your API key', autocomplete: 'off', 'aria-label': 'API key' });
@@ -1421,11 +1422,16 @@
     var url = h('input.input', { placeholder: 'https://… (the part before /chat/completions)', 'aria-label': 'API address' });
     url.value = k.url || '';
     var urlRow = h('label.vk-wide', { hidden: prov.value !== 'custom' }, 'Address', url);
+    /* the free way: a Google Gemini key */
+    var freeTip = h('p.small.vk-free', { hidden: prov.value !== 'gemini' }, I('sparkle'), ' Free key: open ',
+      h('a', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener' }, 'aistudio.google.com/apikey'),
+      ', sign in with Google, press "Create API key", copy it and paste it here.');
     function save() {
       U.lsSet('gs2:vexKey', { provider: prov.value, key: key.value.trim(), model: model.value.trim(), url: url.value.trim() });
     }
     return h('div.panel.vex-key', { 'data-text': 'api key claude openai gemini openrouter model' },
       h('div.vk-grid', h('label', 'Provider', prov), h('label', 'Model (empty = best default)', model), h('label.vk-wide', 'API key', key), urlRow),
+      freeTip,
       h('p.small.muted', 'Your key is saved only in this browser. It is NOT put in backups or in your website folder.'),
       h('div.row', { style: { gap: '6px' } },
         h('button.btn.sm.primary', { onclick: function () { save(); UI.toast('Key saved (only in this browser).', { type: 'good', icon: 'key' }); } }, I('check'), 'Save'),
