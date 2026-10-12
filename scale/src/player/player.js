@@ -12,6 +12,7 @@ import { input } from '../core/input.js';
 import { settings } from '../core/settings.js';
 import { clamp, damp, angDiff } from '../core/util.js';
 import { bus } from '../core/events.js';
+import { createGlitch } from './glitch.js';
 
 export const BASE_HEIGHT = 1.75;
 export const MIN_SCALE = 0.0008; // 1.4 mm (Wave 1 floor; the micro world goes further later)
@@ -66,7 +67,7 @@ export class Player {
 
     this.object = new THREE.Group();
     this.object.name = 'player';
-    this.model = model || placeholderModel();
+    this.model = model || createGlitch();
     this.object.add(this.model);
     this.object.traverse((o) => {
       if (o.isMesh) {
@@ -235,6 +236,7 @@ export class Player {
     if (speed > 7.5) {
       const dmg = Math.round((speed - 7.5) ** 1.6 * 4);
       this.health = Math.max(0, this.health - dmg);
+      this.hurtFx = 1;
       bus.emit('player:hurt', { amount: dmg, cause: 'fall', speed });
     }
   }
@@ -274,7 +276,8 @@ export class Player {
 
   _animate(dt) {
     const hs = Math.hypot(this.vel.x, this.vel.z) / Math.sqrt(this.scale);
-    this.model.userData.animate?.(dt, { speed: hs, grounded: this.grounded, vy: this.vel.y / Math.sqrt(this.scale), crouch: this.crouching, scaleRate: this.sizeRate });
+    this.hurtFx = Math.max(0, (this.hurtFx || 0) - dt);
+    this.model.userData.animate?.(dt, { speed: hs, grounded: this.grounded, vy: this.vel.y / Math.sqrt(this.scale), crouch: this.crouching, scaleRate: this.sizeRate, scale: this.scale, hurt: this.hurtFx });
   }
 
   // Third-person camera with collision, or first-person.

@@ -21,6 +21,8 @@ async function main() {
   game.debug = q.has('debug');
   game.testMode = q.has('frames');
   await game.loadWorld(buildTestRoom, spawnOverride);
+  if (q.has('face')) game.player.facing = num('face');
+  if (q.has('dist')) game.player.camDist = num('dist');
   game.hud = new Hud(document.getElementById('ui'), game);
   if (q.has('frames')) {
     // Test mode: run N fixed frames then flag ready (used by the screenshot harness).
