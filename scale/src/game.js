@@ -60,6 +60,7 @@ export class Game {
       this.outdoorTarget = open / dirs.length;
     }
     this.outdoor += ((this.outdoorTarget ?? 1) - this.outdoor) * (1 - Math.exp(-1.5 * dt));
+    this.sky.setIndoor(1 - this.outdoor);
     // Indoors the eye opens up (higher exposure); outside in daylight it closes down.
     const target = 1.45 - this.outdoor * 0.6;
     this.exposure += (target - this.exposure) * (1 - Math.exp(-1.2 * dt));

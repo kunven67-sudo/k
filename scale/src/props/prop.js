@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { RAPIER, GROUPS } from '../core/physics.js';
 import { clamp } from '../core/util.js';
+import { mergeByMaterial } from '../render/merge.js';
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -107,6 +108,7 @@ export class Prop {
     this.object = new THREE.Group();
     this.object.name = def.id;
     this.model = def.build();
+    if (!def.noMerge) mergeByMaterial(this.model);
     this.model.position.copy(this.com1).negate(); // model origin (bottom center) relative to the center of mass
     this.object.add(this.model);
     this.object.userData.prop = this;

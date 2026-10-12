@@ -51,6 +51,51 @@ export class Lighting {
       setCSM(null);
     }
     this._lastKey = '';
+    // Lamp pool: a fixed number of point lights (changing the count would recompile every shader),
+    // handed each frame to the nearest lamps that are switched on.
+    this.lamps = [];
+    this.pool = [];
+    // Spot lights aimed down: recessed ceiling lights are cones (the ceiling above them stays darker,
+    // like real life); lamps with a shade use a near-hemisphere cone.
+    for (let i = 0; i < tier.maxLights; i++) {
+      const l = new THREE.SpotLight(0xffffff, 0, 8, 1.2, 0.6, 2);
+      l.castShadow = false;
+      scene.add(l, l.target);
+      this.pool.push(l);
+    }
+  }
+
+  // position: Vector3 (or object with getWorldPosition), color, intensity (candela-ish), range (m).
+  addLamp({ position, object = null, color = 0xffe1b8, intensity = 8, range = 8, on = true, cone = 1.5 }) {
+    const lamp = { position: position ? position.clone() : new THREE.Vector3(), object, color: new THREE.Color(color), intensity, range, on, cone };
+    this.lamps.push(lamp);
+    return lamp;
+  }
+
+  _updateLamps() {
+    const cam = this.camera.position;
+    const active = [];
+    for (const l of this.lamps) {
+      if (!l.on) continue;
+      if (l.object) l.object.getWorldPosition(l.position);
+      const d = l.position.distanceToSquared(cam);
+      if (d > (l.range * 3) ** 2) continue;
+      active.push([d, l]);
+    }
+    active.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < this.pool.length; i++) {
+      const pl = this.pool[i];
+      const a = active[i];
+      if (a) {
+        pl.position.copy(a[1].position);
+        pl.target.position.set(a[1].position.x, a[1].position.y - 1, a[1].position.z);
+        pl.target.updateMatrixWorld();
+        pl.color.copy(a[1].color);
+        pl.intensity = a[1].intensity;
+        pl.distance = a[1].range;
+        pl.angle = a[1].cone;
+      } else pl.intensity = 0;
+    }
   }
 
   setSun(dir, color, intensity) {
@@ -62,6 +107,7 @@ export class Lighting {
   // Call every frame after the camera moved. `height` = player body height in meters.
   update(height) {
     this.height = height;
+    this._updateLamps();
     const cam = this.camera;
     if (this.csm) {
       const pc = this.proxyCam;

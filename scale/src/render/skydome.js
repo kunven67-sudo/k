@@ -2,6 +2,7 @@
 // Replaced by the full day/night sky (sun, moon, stars, clouds, California coast horizon) later in Wave 1.
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 export class SkyDome {
   constructor(renderer, worldScene, lighting) {
@@ -35,6 +36,9 @@ export class SkyDome {
     this.azimuth = 215;
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.envRT = null;
+    // Indoor bounce light: a soft room environment (light coming back off floors and walls).
+    this.roomEnv = this.pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.indoorBlend = 0; // 0 = outdoor sky light, 1 = indoor bounce light
     this._apply();
   }
 
@@ -57,12 +61,29 @@ export class SkyDome {
     // Environment lighting from the sky (reflections + soft ambient).
     if (this.envRT) this.envRT.dispose();
     this.envRT = this.pmrem.fromScene(this.envScene, 0, 1, 2000);
-    this.worldScene.environment = this.envRT.texture;
+    this.skyEnv = this.envRT.texture;
+    this._applyEnv();
     this.envGround.material.color.setRGB(0.23, 0.22, 0.19).multiplyScalar(0.3 + 0.9 * e);
     this.worldScene.environmentIntensity = 0.85;
     // Ambient comes from the sky map (which indoor materials scale down); the hemisphere light is
     // only a faint fill so rooms don't get lit through their walls.
     this.lighting.hemi.intensity = 0.04 + 0.06 * e;
+  }
+
+  // `indoor` 0..1 from the game's sky-visibility probe. Swaps the ambient light source halfway and
+  // dips the intensity around the swap so it reads as eyes adjusting, not a pop.
+  setIndoor(indoor) {
+    this.indoorBlend = indoor;
+    this._applyEnv();
+  }
+
+  _applyEnv() {
+    const b = this.indoorBlend;
+    const useRoom = b > 0.5;
+    const env = useRoom ? this.roomEnv : this.skyEnv;
+    if (this.worldScene.environment !== env) this.worldScene.environment = env;
+    const dip = 1 - Math.min(1, Math.abs(b - 0.5) * 2);
+    this.worldScene.environmentIntensity = (useRoom ? 0.55 : 0.85) * (1 - dip * 0.6);
   }
 
   update(dt, camera) {}

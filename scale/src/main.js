@@ -4,6 +4,7 @@ import { input } from './core/input.js';
 import { Game } from './game.js';
 import { Hud } from './ui/hud.js';
 import { buildTestRoom } from './world/testroom.js';
+import { buildMansion } from './world/mansion.js';
 
 async function main() {
   const canvas = document.getElementById('view');
@@ -21,7 +22,7 @@ async function main() {
   if (q.has('scale')) spawnOverride.scale = num('scale');
   game.debug = q.has('debug');
   game.testMode = q.has('frames');
-  await game.loadWorld(buildTestRoom, spawnOverride);
+  await game.loadWorld(q.get('world') === 'test' ? buildTestRoom : buildMansion, spawnOverride);
   if (q.has('face')) game.player.facing = num('face');
   if (q.has('dist')) game.player.camDist = num('dist');
   game.hud = new Hud(document.getElementById('ui'), game);

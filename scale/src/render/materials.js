@@ -47,7 +47,7 @@ function apply(m) {
 export function prep(m, { indoor = false, detail = null } = {}) {
   if (detail) m.userData.detail = detail;
   if (registry.has(m)) return m;
-  if (indoor && m.envMapIntensity !== undefined) m.envMapIntensity = (m.userData.envBase ?? m.envMapIntensity) * 0.18;
+  if (indoor && m.envMapIntensity !== undefined) m.envMapIntensity = (m.userData.envBase ?? m.envMapIntensity) * 0.7;
   registry.add(m);
   apply(m);
   return m;

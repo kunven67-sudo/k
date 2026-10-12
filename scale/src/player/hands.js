@@ -70,6 +70,12 @@ export class Hands {
     this.aimPoint = hit ? hit.point : camera.position.clone().addScaledVector(dir, maxD * 4);
     this.aimHit = hit;
     this.look = null;
+    if (hit && hit.owner && typeof hit.owner.interactText === 'function') {
+      const chest = _v2.copy(pl.feet).addScaledVector(THREE.Object3D.DEFAULT_UP, pl.height * 0.6);
+      const d = hit.point.distanceTo(chest);
+      this.look = { interact: hit.owner, point: hit.point, dist: d, reachable: d < Math.max(this.reach, 0.25) + 0.35 * pl.scale };
+      return;
+    }
     // Forgiving aim (no-bugs rulebook: small things must always be easy to grab): if the ray lands on
     // the floor/table/wall right next to a small loose thing, snap to the nearest one.
     if (hit && !(hit.owner && hit.owner.kind === 'prop')) {
@@ -122,6 +128,7 @@ export class Hands {
   promptText() {
     const lk = this.look;
     if (!lk || !lk.reachable) return null;
+    if (lk.interact) return ['E', lk.interact.interactText(this.player)];
     const p = lk.prop;
     if (p.held) return null;
     const m = p.mass;
@@ -133,7 +140,10 @@ export class Hands {
   // ---- actions ------------------------------------------------------------------------------------
   update(dt) {
     const pl = this.player;
-    if (input.pressed('interact') && this.look && this.look.reachable) this.pickUp(this.look.prop);
+    if (input.pressed('interact') && this.look && this.look.reachable) {
+      if (this.look.interact) this.look.interact.interact(this.player);
+      else this.pickUp(this.look.prop);
+    }
     if (input.pressed('drop')) this.drop();
     if (input.pressed('slot1')) this.equipTool(null);
     if (input.pressed('slot2')) this.equipTool('ray');
