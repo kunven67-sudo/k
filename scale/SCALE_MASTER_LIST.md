@@ -672,8 +672,31 @@ Everything has a real strength. If a hit is harder than that, it breaks, and how
 - Laptops (battery, lid closes, it sleeps), tablets, old desktop PCs at school.
 
 ### The internet inside the game
-- Needs a modem + router (plugged in, powered). Wi-Fi has range and walls weaken it. Unplug the router = no internet.
-  Power outage = no internet. Phones also use cell signal (weak in some spots like the sewer).
+**Getting internet works like real life: you pay for it.**
+- **Internet companies**: made-up providers in town (a cable company, a fiber company, a cheap one with bad service).
+  Each has plans: speeds (slow, medium, fast, gigabit fiber), monthly price, a contract or no contract, and real
+  service quality (the cheap one goes down more when it's busy at night).
+- **Signing up**: call them on your phone, go to their store downtown, or sign up on their website at a library or
+  café computer (you don't have internet at home yet). You pick a plan, they run a credit check, set a monthly bill.
+- **The internet box**: they mail you a modem + Wi-Fi router box (or a technician comes on a scheduled day and time,
+  and you have to be home to let them in). You plug the modem into the wall jack and power, connect the router, wait for
+  the lights to turn green, then set the Wi-Fi name and password. Do it wrong (wrong cable, no power) and nothing works.
+- **The bill**: comes every month (in the mail and in your email/bank app). Pay it on time or you get late fees, then
+  the speed drops, then the company **cuts your internet off** until you pay. Autopay is an option.
+- **Wi-Fi in your house**: the router has a real range; walls and floors weaken it, so the basement lab and the far end of
+  the mansion get weak signal unless you buy and set up mesh Wi-Fi boxes or extenders. The PC can use a cable instead
+  (faster, steadier). Too many devices streaming at once = everything slows down.
+- **Speed test app**: shows your real in-game speed; downloads, video and online games depend on it.
+- **Other people's Wi-Fi**: every house has its own network with a name you can see on your phone. Locked ones need the
+  password (a neighbor might give it to you if they like you, or you can find it written on their fridge). Using someone's
+  Wi-Fi without asking is something people react to if they find out. Open public Wi-Fi at the café, library and airport-style
+  spots (slow, and sketchy for logging into your bank).
+- **Phone service**: your phone has its own monthly plan (made-up carriers) with a data limit; go over it and it slows to a
+  crawl or costs extra. Signal is real: full bars outside, weak in the basement, the sewer, inside a fridge.
+  You can turn your phone into a hotspot for your laptop.
+- **Outages**: storms, a truck hitting a pole, the company doing work, a squirrel chewing a line (real), you unplugging
+  the box, or not paying. The company's app shows the outage and when it should be fixed.
+- Unplug the router = no internet. Power outage = no Wi-Fi (unless the router is on a battery backup).
 - Websites (all made up, all inside the game):
   - A search engine (search for things in the town, people, products, how-to guides).
   - A social media site where townspeople post what happens to them, with comments and likes
