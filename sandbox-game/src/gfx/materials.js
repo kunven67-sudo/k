@@ -3,6 +3,7 @@
 // (real photo-scanned CC0 textures); until then the materials use plain PBR values.
 import * as THREE from 'three';
 import ASSETS from 'virtual:assets';
+import { proceduralTextures } from './proctex.js';
 
 // breakDV: velocity change (m/s) in a single hit that breaks it. Infinity = never shatters.
 // blast: how much explosion damage it takes (1 = normal).
@@ -57,6 +58,17 @@ export function getMaterial(id, opts = {}) {
   if (albedo && opts.color == null) params.map = albedo;
   if (normal) params.normalMap = normal;
   if (rough) params.roughnessMap = rough;
+  // No photo textures yet: use the generated ones (luminance detail tinted by the color).
+  const proc = !albedo ? proceduralTextures(id) : null;
+  if (proc) {
+    if (proc.map) params.map = proc.map;
+    if (proc.normalMap) { params.normalMap = proc.normalMap; params.normalScale = new THREE.Vector2(0.6, 0.6); }
+    if (proc.roughnessMap) {
+      params.roughnessMap = proc.roughnessMap;
+      // roughnessMap multiplies the value, so rescale to keep the intended average roughness
+      params.roughness = Math.min(1, params.roughness / proc.roughnessMap.userData.mean);
+    }
+  }
   if (m.opacity != null) {
     params.transparent = true;
     params.opacity = opts.inner ? Math.min(1, m.opacity + 0.25) : m.opacity;

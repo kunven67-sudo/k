@@ -119,7 +119,21 @@ function addPart(e, p) {
   desc.setFriction(m.friction).setRestitution(m.restitution);
   desc.setCollisionGroups(e.debris ? GROUPS.debris : GROUPS.object);
   desc.setActiveEvents(R.ActiveEvents.CONTACT_FORCE_EVENTS);
-  const collider = world.createCollider(desc, e.body);
+  let collider;
+  try {
+    collider = world.createCollider(desc, e.body);
+  } catch (_) {
+    // a sliver too thin for a convex hull: fall back to its bounding box
+    if (p.shape.type !== 'hull') return;
+    const b = new THREE.Box3().setFromPoints(shapePoints(p.shape));
+    const h = b.getSize(new THREE.Vector3()).multiplyScalar(0.5).max(new THREE.Vector3(0.004, 0.004, 0.004));
+    const c = b.getCenter(new THREE.Vector3());
+    const fb = R.ColliderDesc.cuboid(h.x, h.y, h.z).setTranslation(p.pos[0] + c.x, p.pos[1] + c.y, p.pos[2] + c.z).setRotation(q)
+      .setFriction(m.friction).setRestitution(m.restitution).setCollisionGroups(e.debris ? GROUPS.debris : GROUPS.object)
+      .setActiveEvents(R.ActiveEvents.CONTACT_FORCE_EVENTS);
+    if (p.mass) fb.setMass(p.mass); else fb.setDensity(m.density);
+    collider = world.createCollider(fb, e.body);
+  }
   const pg = new THREE.Group();
   pg.position.fromArray(p.pos);
   pg.quaternion.copy(q);

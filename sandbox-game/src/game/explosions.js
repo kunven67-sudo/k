@@ -30,6 +30,8 @@ export function detonateNow(e) {
   if (!e.alive) return;
   const pos = e.position();
   const ex = e.explosive || { kind: 'tnt', power: 1 };
+  ctx.audio?.loop('fuse' + e.id, 'hiss', 0);
+  ctx.audio?.loop('vent' + e.id, 'hiss', 0);
   removeEntity(e, { silent: true });
   explode(pos, ex.power, { fuel: ex.kind === 'fuel' || ex.kind === 'propane', source: e, shrapnel: ex.shrapnel || (ex.kind === 'c4' || ex.kind === 'tnt' ? 20 : 0) });
 }

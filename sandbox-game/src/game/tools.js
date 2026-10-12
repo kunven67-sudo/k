@@ -112,7 +112,7 @@ function describe(e) {
   const m = MATERIALS[e.mainMat]?.name || '';
   const kg = e.mass;
   const w = kg >= 1000 ? `${(kg / 1000).toFixed(1)} t` : kg >= 10 ? `${kg.toFixed(0)} kg` : `${kg.toFixed(1)} kg`;
-  return `${name} · ${m} · ${w}${e.frozen ? ' · frozen' : ''}`;
+  return `${name} · ${m} · ${w}${e.frozen ? ' · frozen' : ''}${e.defId === 'boombox' ? ' · F: radio' : ''}`;
 }
 
 // --------------------------------------------------------------------------- per-frame (input) + per-step (physics)
@@ -402,11 +402,11 @@ function weldFrame() {
 
 // grenade -----------------------------------------------------------------
 function grenadeFrame(realDt) {
-  if (input.mouseHit(0) && !state.grenade) state.grenade = { charge: 0, cooking: false, fuse: rnd(4.0, 5.0) };
+  if (input.mouseHit(0) && !state.grenade) { state.grenade = { charge: 0, cooking: false, fuse: rnd(4.0, 5.0) }; ctx.audio?.play('pin', { vol: 0.6 }); }
   const g = state.grenade;
   if (!g) return;
   if (input.mouseDown(0)) g.charge = Math.min(1, g.charge + realDt / 0.9);
-  if (input.mouseHit(2) && !g.cooking) { g.cooking = true; say('Spoon off: it\'s cooking!'); ctx.onClick?.(); }
+  if (input.mouseHit(2) && !g.cooking) { g.cooking = true; say('Spoon off: it\'s cooking!'); ctx.audio?.play('spoon', { vol: 0.4, rate: 1.6 }); }
   const { pos, vel } = throwParams(g.charge);
   // arc preview
   const p = arc.geometry.attributes.position;
@@ -418,6 +418,7 @@ function grenadeFrame(realDt) {
   p.needsUpdate = true;
   arc.computeLineDistances();
   if (input.mouseUp(0)) {
+    ctx.audio?.play('whoosh', { vol: 0.25, rate: 1.8 });
     const e = spawnGrenade(pos, vel, g.fuse);
     if (e) undoStack.push(e);
     state.grenade = null;
@@ -469,7 +470,7 @@ function rpgFrame() {
   mesh.position.copy(pos);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), fwd);
   scene.add(mesh);
-  state.rockets.push({ pos, vel: fwd.clone().multiplyScalar(115).add(ctx.player.vel), fwd, t: 0, mesh });
+  state.rockets.push({ id: Math.random(), pos, vel: fwd.clone().multiplyScalar(115).add(ctx.player.vel), fwd, t: 0, mesh });
   // launch flash + backblast cone behind you
   const back = fwd.clone().negate();
   const tail = camera.position.clone().addScaledVector(back, 0.6);
@@ -510,10 +511,12 @@ function updateRockets(dt) {
       const p = hit ? r.pos.clone().addScaledVector(step.normalize(), Math.max(0, hit.timeOfImpact - 0.05)) : r.pos.clone();
       scene.remove(r.mesh);
       state.rockets.splice(i, 1);
+      ctx.audio?.loop('rocket' + r.id, 'jet', 0);
       explode(p, 0.6, { shrapnel: 30 });
       continue;
     }
     r.pos.add(step);
+    ctx.audio?.loop('rocket' + r.id, 'jet', 0.9, r.pos, 1.8);
     r.mesh.position.copy(r.pos);
     r.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), r.vel.clone().normalize());
     const tail = r.pos.clone().addScaledVector(r.vel.clone().normalize(), -0.35);
@@ -528,6 +531,11 @@ const MAX_LIFT = 30; // kg a person can comfortably carry in front of them
 function togglePickup() {
   if (state.hand) { dropHand(0); return; }
   const h = aim(2.6, groups(0xffff, G.OBJECT | G.DEBRIS | G.STATIC));
+  if (h?.entity?.defId === 'boombox') {
+    const st = ctx.audio?.radioNext(h.entity);
+    say(st ? `📻 ${st}` : 'Radio off');
+    return;
+  }
   if (!h?.entity || h.entity.frozen) { say('Nothing to pick up'); return; }
   const e = h.entity;
   if (e.mass > MAX_LIFT) { say(`Too heavy to lift (${e.mass >= 1000 ? (e.mass / 1000).toFixed(1) + ' t' : Math.round(e.mass) + ' kg'})`); return; }

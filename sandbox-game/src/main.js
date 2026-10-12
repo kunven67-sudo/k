@@ -8,7 +8,7 @@ import { Environment } from './world/environment.js';
 import { buildArena } from './world/arena.js';
 import { Effects } from './fx/effects.js';
 import { ctx } from './game/ctx.js';
-import { initEntities, spawn, recordPrev, syncVisuals, processImpacts, updateDebris, updateJoints, clearAll, entities, removeEntity } from './game/entities.js';
+import { initEntities, spawn, recordPrev, syncVisuals, processImpacts, updateDebris, updateJoints, clearAll, entities, removeEntity, entityFromCollider } from './game/entities.js';
 import { initExplosions, updateExplosives, explode } from './game/explosions.js';
 import { Player } from './game/player.js';
 import { initTools, updateToolsFrame, updateToolsStep, resetTools, say } from './game/tools.js';
@@ -17,6 +17,8 @@ import { showHud, updateHud, hint, refreshHotbar } from './ui/hud.js';
 import { initSpawnMenu, openSpawnMenu, closeSpawnMenu, spawnMenuOpen } from './ui/spawnMenu.js';
 import { initMenus, show, loadingTip } from './ui/menus.js';
 import { renderThumbs } from './ui/thumbs.js';
+import { audio } from './audio/index.js';
+import { R, G, groups } from './engine/physics.js';
 
 const $ = (id) => document.getElementById(id);
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -72,6 +74,9 @@ async function boot() {
   });
   onSettingsChange(onSetting);
   hookGameEvents();
+  await progress(0.65, 'Recording sounds...');
+  await audio.init();
+  ctx.audio = audio;
   await progress(0.7, loadingTip());
 
   // precompile shaders with every material in view so the first explosion doesn't stutter
@@ -164,6 +169,7 @@ function updateDemo(dt) {
 
 // --------------------------------------------------------------------------- game flow
 function startGame() {
+  audio.ac?.resume();
   show('main-menu', false);
   resetWorld();
   player.teleport(arena.spawn.pos, arena.spawn.yaw);
@@ -196,6 +202,7 @@ function resume() {
 }
 
 function toMenu() {
+  audio.stopAllRadios();
   show('pause', false);
   showHud(false);
   input.enabled = false;
@@ -227,7 +234,61 @@ function closeSpawn() {
 
 function hookGameEvents() {
   ctx.onSpawn = () => hint('undo', 'Z undoes your last spawn · G toggles grid snap');
-  ctx.onExplosion = () => hint('slowmo', 'Press T for slow motion');
+  ctx.onExplosion = (pos, power, fuel) => { audio.explosion(pos, power, fuel); hint('slowmo', 'Press T for slow motion'); };
+  ctx.onPlayerBlast = (d, radius) => { if (d < radius * 0.55) audio.earRinging(Math.min(1, 1.2 - d / (radius * 0.55))); };
+  ctx.onImpact = (e, part, dv, point) => {
+    const now = performance.now();
+    if (dv < 1.6 || now - (e.lastSnd || 0) < 90) return;
+    e.lastSnd = now;
+    audio.impact(part.mat, point || e.position(), (dv - 1) / 6);
+  };
+  ctx.onBreak = (mat, pos, size) => audio.breakSound(mat, pos, size);
+  ctx.onLand = (impact) => { if (impact > 2.5) audio.play('land', { vol: Math.min(1, impact / 9) }); };
+  ctx.onClick = () => audio.play('click', { vol: 0.5 });
+  ctx.onRpgFire = () => audio.play('rpg', { vol: 1.3 });
+
+}
+
+// --------------------------------------------------------------------------- sound upkeep
+let lastBob = 0;
+const activeLoops = new Set();
+function updateAudio(realDt) {
+  if (!audio.ready) return;
+  audio.updateRadios();
+  const playing = mode === 'playing' || mode === 'spawn';
+  // footsteps on each step of the head-bob cycle
+  if (playing && player.grounded && !player.flying) {
+    const stepIdx = Math.floor(player.bob / Math.PI);
+    if (stepIdx !== lastBob && Math.hypot(player.vel.x, player.vel.z) > 0.6) {
+      const f = player.feet;
+      const hit = world.castRay(new R.Ray({ x: f.x, y: f.y + 0.1, z: f.z }, { x: 0, y: -1, z: 0 }), 0.5, true, undefined, groups(0xffff, G.STATIC | G.OBJECT), player.collider);
+      let surf = 'stepConcrete';
+      if (hit) {
+        const e = entityFromCollider(hit.collider.handle);
+        const m = e ? e.mainMat : hit.collider.friction() < 0.5 ? 'steel' : 'concrete';
+        surf = m === 'steel' || m === 'aluminum' ? 'stepMetal' : m === 'wood' || m === 'plywood' ? 'stepWood' : 'stepConcrete';
+      }
+      const run = Math.hypot(player.vel.x, player.vel.z) / 6.6;
+      audio.play(surf, { vol: player.crouching ? 0.12 : 0.22 + run * 0.25, rate: 0.9 + Math.random() * 0.2 });
+    }
+    lastBob = stepIdx;
+  }
+  audio.loop('jetpack', 'jet', playing && player.jetting ? 0.45 : 0, null, 1);
+  // fuses hiss, C4 timers beep (faster near the end), venting propane screams
+  const seen = new Set();
+  for (const e of entities.values()) {
+    const ex = e.explosive;
+    if (!ex) continue;
+    if (ex.fuseLit && ex.countdown != null) { audio.loop('fuse' + e.id, 'hiss', 0.35, e.root.position, 1.4); seen.add('fuse' + e.id); }
+    if (ex.timer && ex.countdown != null) {
+      e._beep = (e._beep ?? 0) - realDt;
+      if (e._beep <= 0) { audio.play('beep', { pos: e.root.position.clone(), vol: 0.5, ref: 2 }); e._beep = ex.countdown > 3 ? 1 : ex.countdown > 1 ? 0.4 : 0.15; }
+    }
+    if (e.rocketing) { audio.loop('vent' + e.id, 'hiss', 1.0, e.root.position, 0.7); seen.add('vent' + e.id); }
+  }
+  for (const id of activeLoops) if (!seen.has(id)) audio.loop(id, 'hiss', 0);
+  activeLoops.clear();
+  for (const id of seen) activeLoops.add(id);
 }
 
 // --------------------------------------------------------------------------- loop
@@ -274,6 +335,8 @@ function loop(now) {
     player.updateCamera(realDt, physicsState.alpha);
   }
   env.follow(camera.position);
+  audio.setListener(camera);
+  updateAudio(realDt);
   if (mode === 'playing' || mode === 'spawn') updateHud(realDt, player);
   renderer.domElement.style.filter = fx.blur > 0.02 ? `blur(${(fx.blur * 3).toFixed(1)}px) saturate(${(1 - fx.blur * 0.6).toFixed(2)})` : '';
   renderer.render(scene, camera);
