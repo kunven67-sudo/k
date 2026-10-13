@@ -13,6 +13,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { AOPass, FinishShader } from './postfx.js';
 import { settings } from '../core/settings.js';
 import { bus } from '../core/events.js';
 
@@ -74,9 +75,11 @@ class ScaleScenePass extends Pass {
       nc.matrixWorldInverse.copy(cam.matrixWorldInverse);
       renderer.render(scene, nc);
       v.passes = 2;
+      v.lastCam = nc; // the depth buffer now holds the near pass (what screen effects read)
     } else {
       renderer.render(scene, cam);
       v.passes = 1;
+      v.lastCam = cam;
     }
     renderer.autoClear = oldAuto;
   }
@@ -88,7 +91,9 @@ export class View {
     this.tier = tier;
     const r = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, preserveDrawingBuffer: false });
     r.outputColorSpace = THREE.SRGBColorSpace;
-    r.toneMapping = THREE.ACESFilmicToneMapping;
+    const tm = new URLSearchParams(location.search).get('tm');
+    // Neutral tone mapping: true colors like a real camera (ACES pushes colors, AgX washes them out).
+    r.toneMapping = tm === 'aces' ? THREE.ACESFilmicToneMapping : tm === 'agx' ? THREE.AgXToneMapping : THREE.NeutralToneMapping;
     r.toneMappingExposure = 1.0;
     r.shadowMap.enabled = tier.shadows;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -102,13 +107,25 @@ export class View {
     this.farCam = new THREE.PerspectiveCamera();
     this.nearCam = new THREE.PerspectiveCamera();
     this.passes = 1;
+    this.aoRadius = 0.5; // ambient occlusion reach (m), follows your size
+    this.dynScale = 1; // auto quality's resolution scale
 
     const size = this._size();
     this.composer = new EffectComposer(r);
     this.composer.setPixelRatio(this._pixelRatio());
     this.composer.setSize(size.w, size.h);
+    // The scene's depth is kept as a texture so screen effects (ambient occlusion) can read it.
+    for (const rt of [this.composer.renderTarget1, this.composer.renderTarget2]) {
+      rt.depthTexture = new THREE.DepthTexture(size.w, size.h);
+      rt.depthTexture.type = THREE.UnsignedIntType;
+    }
     this.scenePass = new ScaleScenePass(this);
     this.composer.addPass(this.scenePass);
+    // Ambient occlusion: on for High/Ultra; on Auto it starts on and the auto quality decides.
+    if (tier.ao || tier.auto) {
+      this.ao = new AOPass(this);
+      this.composer.addPass(this.ao);
+    }
     if (tier.bloom) {
       this.bloom = new UnrealBloomPass(new THREE.Vector2(size.w, size.h), 0.16, 0.25, 1.6);
       this.composer.addPass(this.bloom);
@@ -121,6 +138,8 @@ export class View {
       this.aa = new ShaderPass(FXAAShader);
       this.composer.addPass(this.aa);
     }
+    this.finish = new ShaderPass(FinishShader);
+    this.composer.addPass(this.finish);
     this.resize();
     window.addEventListener('resize', () => this.resize());
     bus.on('settings', ({ key }) => {
@@ -131,7 +150,14 @@ export class View {
   _pixelRatio() {
     // Resolution setting: fewer pixels = faster on weak graphics cards and phones.
     const rs = Math.min(1, Math.max(0.5, Number(settings.get('renderScale')) || 1));
-    return Math.min(window.devicePixelRatio || 1, this.tier.pixelRatio) * rs;
+    return Math.min(window.devicePixelRatio || 1, this.tier.pixelRatio) * rs * (this.dynScale ?? 1);
+  }
+
+  // Auto quality's resolution (separate from your own Resolution setting).
+  setDynScale(v) {
+    if (Math.abs(v - this.dynScale) < 1e-3) return;
+    this.dynScale = v;
+    this.resize();
   }
 
   _size() {
@@ -166,6 +192,8 @@ export class View {
     this.renderer.info.reset();
     this.scene.updateMatrixWorld();
     this.camera.updateMatrixWorld();
+    if (this.ao) this.ao.radius = this.aoRadius;
+    this.finish.uniforms.uTime.value = performance.now() / 1000;
     this.composer.render();
   }
 }

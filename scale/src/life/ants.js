@@ -22,6 +22,7 @@ import * as TX from '../render/textures.js';
 import { clamp, damp, hash3 } from '../core/util.js';
 import { bus } from '../core/events.js';
 import { solveKnee } from './creature.js';
+import { makeThin } from '../render/thin.js';
 
 const ANT_L = 0.0026;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -50,7 +51,7 @@ const once = (k, f) => (cache.has(k) ? cache.get(k) : (cache.set(k, f()), cache.
 function antMats() {
   return once('ants', () => ({
     body: phys({ color: 0x4a2f1c, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.25 }, { detail: 'chitin' }),
-    leg: std({ color: 0x5e3d24, roughness: 0.45 }, { detail: 'chitin' }),
+    leg: makeThin(std({ color: 0x5e3d24, roughness: 0.45 }, { detail: 'chitin' })),
     food: std({ color: 0xc89a5c, roughness: 0.8 }, { detail: 'food' }),
     egg: phys({ color: 0xf3efe4, roughness: 0.25, clearcoat: 0.6, transmission: 0 }),
     larva: std({ color: 0xefe9da, roughness: 0.5 }, { detail: 'skin' }),

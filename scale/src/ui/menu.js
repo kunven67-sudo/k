@@ -194,7 +194,7 @@ export class Menu {
     const q = settings.get('quality');
     const tierName = { low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' };
     box.innerHTML = `
-      <div class="row"><span>Graphics<small>Auto picked ${tierName[detectedTier]} for this computer</small></span>
+      <div class="row"><span>Graphics<small>Auto picked ${tierName[detectedTier]} for this computer${q === 'auto' && this.game?.autoQ ? ` and keeps it smooth (now: ${this.game.autoQ.state})` : ''}. Ultra turns everything on, even if it lags.</small></span>
         <div class="seg" data-key="quality">${['auto', 'low', 'medium', 'high', 'ultra'].map((v) => `<button data-v="${v}" class="${q === v ? 'on' : ''}">${v === 'auto' ? 'Auto' : tierName[v]}</button>`).join('')}</div></div>
       <div class="row restart" hidden><span>Graphics changes need a restart<small>Your world isn't saved yet in this early version</small></span><button class="mn-small" data-act="reload">Restart now</button></div>
       ${slider('renderScale', 'Resolution', 0.5, 1, 0.05, (v) => `${Math.round(v * 100)}%`, 'Lower = faster on weak graphics cards')}

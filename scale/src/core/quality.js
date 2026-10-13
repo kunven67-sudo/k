@@ -39,7 +39,7 @@ export const TIERS = {
   low: { name: 'low', pixelRatio: 0.85, shadows: false, cascades: 0, shadowSize: 512, bloom: false, ao: false, aa: 'fxaa', detail: 0.4, maxLights: 2, crowd: 0.5 },
   medium: { name: 'medium', pixelRatio: 1, shadows: true, cascades: 2, shadowSize: 1024, bloom: true, ao: false, aa: 'fxaa', detail: 0.7, maxLights: 3, crowd: 0.75 },
   high: { name: 'high', pixelRatio: 1.25, shadows: true, cascades: 3, shadowSize: 2048, bloom: true, ao: true, aa: 'smaa', detail: 1, maxLights: 4, crowd: 1 },
-  ultra: { name: 'ultra', pixelRatio: 1.75, shadows: true, cascades: 4, shadowSize: 2048, bloom: true, ao: true, aa: 'smaa', detail: 1.5, maxLights: 6, crowd: 1.3 },
+  ultra: { name: 'ultra', pixelRatio: 2, shadows: true, cascades: 4, shadowSize: 4096, bloom: true, ao: true, aa: 'smaa', detail: 1.5, maxLights: 8, crowd: 1.3 },
 };
 
 // ?q=low|medium|high|ultra forces a tier for this page load only (testing, screenshots).
@@ -47,5 +47,7 @@ const urlTier = new URLSearchParams(location.search).get('q');
 
 export function currentTier() {
   const q = urlTier || settings.get('quality');
-  return TIERS[q === 'auto' ? detectedTier : q] || TIERS.medium;
+  const t = TIERS[q === 'auto' ? detectedTier : q] || TIERS.medium;
+  // Auto: the detected tier, with the auto quality free to add/remove effects while you play.
+  return q === 'auto' && !urlTier ? { ...t, auto: true } : t;
 }

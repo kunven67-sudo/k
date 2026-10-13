@@ -129,7 +129,9 @@ export class Hud {
     if (held) {
       this.el.sbar.style.width = `${Math.round(Math.min(1, pl.struggle) * 100)}%`;
       const touch = this.root.classList.contains('touch');
-      const how = touch ? 'Tap jump fast to struggle' : 'Spam <kbd>Space</kbd> to struggle';
+      // Whatever holds you can say how you really get out (silk: only by getting stronger).
+      const hint = pl.heldBy.holdHint?.(touch);
+      const how = pl.paralysis >= 0.85 ? 'Venom: you can\'t move' : hint || (touch ? 'Tap jump fast to struggle' : 'Spam <kbd>Space</kbd> to struggle');
       if (this._how !== how) this.el.how.innerHTML = this._how = how;
     }
     if (this.toastT > 0) {

@@ -60,6 +60,10 @@ export class Player {
     this.dead = false;
     this.deadT = 0;
     this.heldBy = null; // a creature holding you (mantis claws, a spider...)
+    // Venom in you (spider bites): paralysis builds up over a couple of seconds (0 = fine, 1 = can't
+    // move a muscle, not even to press the watch), and wears off slowly as your body clears it.
+    this.venom = 0;
+    this.paralysis = 0;
     this.struggle = 0; // 0..1, how close you are to getting free
     this.camDist = 2.4; // body heights
     this.firstPerson = settings.get('firstPerson');
@@ -156,6 +160,7 @@ export class Player {
         if (o === this) return false;
         if (o && o.held) return false;
         if (o && o === this.heldBy) return false;
+        if (o && o.kind === 'creature') return false; // animals get shoved aside as you grow (not walls)
         if (o && o.mass !== undefined) return o.mass > this.mass * 0.25 * (s / this.scale) ** 3; // light things get pushed aside
         return true; // walls, floors, ceilings
       },
@@ -202,8 +207,15 @@ export class Player {
     const s = this.scale;
     const H = this.height;
 
+    // Venom: takes a couple of seconds to spread (your window to grow out of trouble).
+    if (this.venom > 0) {
+      this.paralysis = Math.min(Math.min(1, this.venom), this.paralysis + dt / 2.5);
+      this.venom = Math.max(0, this.venom - dt * 0.07); // your body clears it over about a minute
+    } else this.paralysis = Math.max(0, this.paralysis - dt * 0.15);
+    const canAct = this.paralysis < 0.85; // fingers still work (the watch, struggling)
+
     // Watch: hold to shrink / grow, smooth like a zoom. Shift = faster.
-    const dir = (input.down('grow') ? 1 : 0) - (input.down('shrink') ? 1 : 0);
+    const dir = canAct ? (input.down('grow') ? 1 : 0) - (input.down('shrink') ? 1 : 0) : 0;
     if (dir) this.resizeTarget = null; // your own watch always wins over a machine
     const want = dir * (input.down('sprint') ? 2.4 : 0.9);
     if (this.resizeTarget !== null && !dir) {
@@ -241,7 +253,7 @@ export class Player {
     this.crouching = input.down('crouch');
     const sprint = input.down('sprint') && !dir;
     const legs = Math.sqrt(this.scale);
-    const speed = (this.crouching ? 1.1 : sprint ? 6.2 : 3.2) * legs;
+    const speed = (this.crouching ? 1.1 : sprint ? 6.2 : 3.2) * legs * (1 - this.paralysis);
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     // Camera looks along -Z when yaw = 0.
     const wx = mv.x * cos - mv.y * sin;
@@ -261,7 +273,7 @@ export class Player {
     this.vel.y -= G * dt;
     this.vel.y -= Math.sign(this.vel.y) * G * (this.vel.y / vt) ** 2 * dt;
     this.jumpBuffer = Math.max(0, this.jumpBuffer - dt);
-    if (this.grounded && this.jumpBuffer > 0) {
+    if (this.grounded && this.jumpBuffer > 0 && this.paralysis < 0.5) {
       this.jumpBuffer = 0;
       const jumpH = 0.45 * (this.scale < 1 ? Math.pow(this.scale, 0.3) : Math.pow(this.scale, 0.15));
       this.vel.y = Math.sqrt(2 * G * jumpH);
@@ -323,6 +335,8 @@ export class Player {
     this.feet.z += m.z;
     if (H < TINY) this._tinySafety(oldFeet, dt);
     this._pushOutOfCreatures();
+    // Other things you touch that aren't solid bodies (spider silk...).
+    if (this.game.playerConstraints) for (const f of this.game.playerConstraints) f(this);
     this.body.setNextKinematicTranslation({ x: this.feet.x, y: this.feet.y + H / 2, z: this.feet.z });
 
     // Safety net: never fall out of the world.
@@ -466,6 +480,7 @@ export class Player {
         if (!ct || ct.distance >= 0) continue;
         // normal1 points from you toward the animal; move the other way (never down into the floor).
         const d = -ct.distance + Math.max(1e-6, H * 0.002);
+        o.onPlayerContact?.(this); // pressed against an animal (a black widow bites when squeezed)
         this.feet.x -= ct.normal1.x * d;
         this.feet.z -= ct.normal1.z * d;
         if (ct.normal1.y < 0) this.feet.y -= ct.normal1.y * d;
@@ -506,6 +521,11 @@ export class Player {
     this.health = 0;
     this.resizeTarget = null;
     bus.emit('player:died', { cause, permadeath: !!_settings.get('permadeath') });
+  }
+
+  // A venomous bite. `dose`: how much compared to what paralyzes someone your size (1 = fully).
+  envenom(dose) {
+    this.venom = Math.min(4, this.venom + dose);
   }
 
   // A creature caught you (mantis claws, a spider's bite and wrap).
@@ -576,6 +596,9 @@ export class Player {
     this._configureForScale();
     this.body.setTranslation({ x: this.feet.x, y: this.feet.y + this.height / 2, z: this.feet.z }, true);
     this.health = 100;
+    this.venom = 0;
+    this.paralysis = 0;
+    this.wrapped = 0;
   }
 
   // Called once per frame before the physics steps: remember presses so none get lost on frames

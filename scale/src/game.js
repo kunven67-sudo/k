@@ -9,6 +9,10 @@ import { SkyDome } from './render/skydome.js';
 import { Player } from './player/player.js';
 import { currentTier } from './core/quality.js';
 import { installDetail, updateDetail } from './render/detail.js';
+import { installThin, updateThin } from './render/thin.js';
+import { Probes } from './render/probes.js';
+import { AutoQuality } from './core/autoquality.js';
+import { SilkOnPlayer } from './life/silkfx.js';
 import { Scatter } from './render/scatter.js';
 import { Spawner } from './props/spawn.js';
 import { Thumbs } from './ui/thumbs.js';
@@ -19,7 +23,9 @@ export class Game {
     this.canvas = canvas;
     this.tier = currentTier();
     installDetail(this.tier.name !== 'low');
+    installThin();
     this.view = new View(canvas, this.tier);
+    this.autoQ = new AutoQuality(this.view, { enabled: !!this.tier.auto });
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.05, 2000);
     this.physics = new Physics();
@@ -53,13 +59,22 @@ export class Game {
     this.afterBuild = [];
     const sp = { ...info.spawn, ...opts };
     this.player = new Player(this, { position: sp.position, yaw: sp.yaw, scale: sp.scale ?? 1 });
+    this.updatables.add(new SilkOnPlayer(this)); // spider silk on you (cocoon, stray strands)
     this.player.pitch = sp.pitch ?? this.player.pitch;
     // Let everything settle before you see it: 1.5 s of physics while loading, so nothing hand-placed
     // floats or sits inside something (it falls/gets pushed out now, not in front of you).
     this.physics.settle(this.props, 90);
     for (const c of this.creatures) c._place(true);
+    for (const f of this.afterSettle || []) f();
+    this.afterSettle = [];
     this.player.updateCamera(this.camera, 0);
     this.camera.updateMatrixWorld();
+    // Photograph each room's real light (see render/probes.js).
+    this.probes = new Probes(this);
+    if (this.probeSpots?.length) {
+      this.scene.updateMatrixWorld(true);
+      this.probes.capture(this.probeSpots, { size: this.tier.name === 'low' ? 64 : 128 });
+    }
     this._updateExposure(0, true);
     bus.emit('world:loaded', this);
   }
@@ -84,6 +99,7 @@ export class Game {
     this.outdoor += ((this.outdoorTarget ?? 1) - this.outdoor) * (snap ? 1 : 1 - Math.exp(-1.5 * dt));
     // Underground (inside an ant nest): only lights that are down there count.
     const caveTarget = this.underground.some((u) => u.contains(this.camera.position)) ? 1 : 0;
+    this.sky.probeEnv = this.probes?.update(this.camera.position)?.env || null;
     this.cave += (caveTarget - this.cave) * (snap ? 1 : 1 - Math.exp(-3 * dt));
     this.sky.setIndoor(1 - this.outdoor, this.cave);
     // Indoors the eye opens up (higher exposure); outside in daylight it closes down; in the dark
@@ -106,6 +122,7 @@ export class Game {
     const dt = forcedDt ?? Math.min(0.1, (now - this._last) / 1000);
     this._last = now;
     this.fps = this.fps * 0.95 + (1 / Math.max(1e-3, dt)) * 0.05;
+    if (forcedDt === undefined && render) this.autoQ.update(dt);
     if (!this.paused && this.player) {
       this.time += dt;
       this.player.latchInput();
@@ -123,6 +140,8 @@ export class Game {
       this._updateExposure(dt);
       this.lighting.update(this.player.height);
       updateDetail(this.camera);
+      updateThin(this.camera, this.view.renderer.domElement.height);
+      this.view.aoRadius = this.player.height * 0.4;
       this.scatter.update();
       if (this.frame % 120 === 0) for (const p of this.props) p.checkBounds();
     }

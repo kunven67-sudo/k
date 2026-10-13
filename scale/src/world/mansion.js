@@ -24,6 +24,7 @@ import { mergeByMaterial } from '../render/merge.js';
 import { bus } from '../core/events.js';
 import { Mantis } from '../life/mantis.js';
 import { AntColony } from '../life/ants.js';
+import { buildSpiderHomes, placeSpiders } from './spiderhomes.js';
 
 const GF = 0; // ground floor top
 const UF = 3.3; // upper floor top
@@ -104,6 +105,11 @@ export async function buildMansion(game) {
     for (const [x0, z0, x1, z1] of subtractRect(r, nestBox)) kit.box((x0 + x1) / 2, groundY - 0.05, (z0 + z1) / 2, Math.abs(x1 - x0), 0.1, Math.abs(z1 - z0), M.lawn, { tile: 1, noCollide: true });
     for (const [x0, z0, x1, z1] of subtractRect(r, dirtBox)) game.scatter.addSurface({ minX: Math.min(x0, x1), maxX: Math.max(x0, x1), minZ: Math.min(z0, z1), maxZ: Math.max(z0, z1), y: groundY, kind: 'lawn' });
   }
+  // Shrubs and the firewood pile now; their spiders and webs once physics has settled (webs are
+  // glued to whatever the spider's lines hit).
+  buildSpiderHomes(game, groundY);
+  game.afterSettle = game.afterSettle || [];
+  game.afterSettle.push(() => placeSpiders(game, groundY));
   // A wild praying mantis hunting in the front lawn by the walk (California gardens have lots).
   game.afterBuild = game.afterBuild || [];
   game.afterBuild.push(() => new Mantis(game, { position: [2.4, groundY, 11.5], yaw: -2.2, hunger: 0.7 }));
@@ -448,6 +454,21 @@ export async function buildMansion(game) {
   for (const [x, z] of [[-16.5, 2], [-16.5, -1.5]]) ceilingLight(x, 3.4 - 0.3, z, 7, 9, 0xe8f0ff); // garage
   ceilingLight(-4.1, CH, 1.6, 4, 5); // lab landing
   game.mansion = { doors, lamps };
+  // Light probes: one photo of each room's light (render/probes.js). Box = the room.
+  const R = (name, x0, z0, x1, z1, y0, y1, at) => ({ name, at, box: [x0, y0, z0, x1, y1, z1] });
+  game.probeSpots = [
+    R('living', 3, 0, 12, 8, -0.1, UF, [7.5, 1.5, 4.2]),
+    R('kitchen', 3, -8, 12, 0, -0.1, UF, [6.5, 1.5, -3.2]),
+    R('office', -12, 2.4, -3, 8, -0.1, UF, [-7.5, 1.5, 4.6]),
+    R('game room', -12, -8, -3, 2.4, -0.1, UF, [-7.5, 1.5, -3.6]),
+    R('hall', -3, -8, 3, 8, -0.1, UF, [0, 1.5, 2]),
+    R('bedroom', 3, 0, 12, 8, UF, UF + 3.6, [7.5, UF + 1.5, 3.5]),
+    R('master bath', 3, -8, 12, 0, UF, UF + 3.6, [7.5, UF + 1.5, -4]),
+    R('landing', -3, -8, 3, 8, UF, UF + 3.6, [0, UF + 1.5, 1]),
+    R('guest room', -12, -8, -3, 8, UF, UF + 3.6, [-7.5, UF + 1.5, 0]),
+    R('lab', -12, -8, -3, 2.4, BF - 0.1, -0.1, [-7.5, BF + 1.5, -3]),
+    R('garage', -21, -4, -12, 8, -0.15, 3.4, [-16.5, 1.5, 2]),
+  ];
 
   return {
     spawn: { position: [6.6, 0.02, 2.5], yaw: -1.85, pitch: -0.14 },

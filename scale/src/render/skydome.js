@@ -83,12 +83,14 @@ export class SkyDome {
   _applyEnv() {
     const b = this.indoorBlend;
     const useRoom = b > 0.5;
-    const env = useRoom ? this.roomEnv : this.skyEnv;
+    // Indoors: the photo of the room you're in (render/probes.js), or the generic room light.
+    const probe = useRoom && this.probeEnv;
+    const env = useRoom ? probe || this.roomEnv : this.skyEnv;
     if (this.worldScene.environment !== env) this.worldScene.environment = env;
-    setIndoorEnvScale(useRoom ? 0.7 : 0.1);
+    setIndoorEnvScale(probe ? 1 : useRoom ? 0.7 : 0.1);
     const dip = 1 - Math.min(1, Math.abs(b - 0.5) * 2);
     const dark = 1 - (this.cave || 0);
-    this.worldScene.environmentIntensity = (useRoom ? 0.55 : 0.85) * (1 - dip * 0.6) * (0.03 + 0.97 * dark);
+    this.worldScene.environmentIntensity = (probe ? 1.3 : useRoom ? 0.55 : 0.85) * (1 - dip * 0.6) * (0.03 + 0.97 * dark);
     this.lighting.hemi.intensity = (this.hemiBase ?? 0.1) * dark;
     this.lighting.daylight = dark;
   }
