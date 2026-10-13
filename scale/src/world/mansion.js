@@ -23,12 +23,15 @@ import { FM } from '../props/furniture.js';
 import { mergeByMaterial } from '../render/merge.js';
 import { bus } from '../core/events.js';
 import { Mantis } from '../life/mantis.js';
+import { AntColony } from '../life/ants.js';
 
 const GF = 0; // ground floor top
 const UF = 3.3; // upper floor top
 const BF = -3.6; // basement floor top
 // Window glass: solid, but you (and animals) can see through it.
 const GLASS = { kind: 'glass', name: 'Window glass', seeThrough: true };
+// The Argentine ant colony's nest entrance: in the lawn behind the kitchen.
+const ANTS = { x: 10.5, z: -9.1 };
 const CH = 3.0; // ceiling height
 const EXT = 0.3; // exterior wall thickness
 const INT = 0.15; // interior wall thickness
@@ -86,15 +89,20 @@ export async function buildMansion(game) {
     [-12, -8, -3, 2.4], // basement (RIFT LAB)
     [0, -22, 12, -12], // pool
     [-200, 32.5, 200, 42], // road
+    [ANTS.x - 0.05, ANTS.z - 0.05, ANTS.x + 0.05, ANTS.z + 0.05], // the ant nest (it has its own ground)
   ]);
   const lawnRects = [
     [-11.9, 8.3, -1.1, 29.7], [1.1, 8.3, 11.9, 29.7], [12.3, -30, 40, 29.7], [-40, -30, -21.2, 29.7],
     [-21.2, -30, -2.2, -8.3], [-2.2, -30, 14.2, -24.2], [-2.2, -9.8, 12.3, -8.3], [14.2, -24.2, 12.3, -9.8],
     [-21.2, -8.3, -12.3, -4.2],
   ];
-  for (const [x0, z0, x1, z1] of lawnRects) {
-    kit.box((x0 + x1) / 2, groundY - 0.05, (z0 + z1) / 2, Math.abs(x1 - x0), 0.1, Math.abs(z1 - z0), M.lawn, { tile: 1, noCollide: true });
-    game.scatter.addSurface({ minX: Math.min(x0, x1), maxX: Math.max(x0, x1), minZ: Math.min(z0, z1), maxZ: Math.max(z0, z1), y: groundY, kind: 'lawn' });
+  // The lawn slab is 10 cm thick, so it's cut away over the whole ant nest (the rooms are dug into that
+  // space; the nest draws its own thin grass lid). Grass blades still grow up to the bare dirt patch.
+  const nestBox = [ANTS.x - 0.05, ANTS.z - 0.05, ANTS.x + 0.05, ANTS.z + 0.05];
+  const dirtBox = [ANTS.x - 0.015, ANTS.z - 0.015, ANTS.x + 0.015, ANTS.z + 0.015];
+  for (const r of lawnRects) {
+    for (const [x0, z0, x1, z1] of subtractRect(r, nestBox)) kit.box((x0 + x1) / 2, groundY - 0.05, (z0 + z1) / 2, Math.abs(x1 - x0), 0.1, Math.abs(z1 - z0), M.lawn, { tile: 1, noCollide: true });
+    for (const [x0, z0, x1, z1] of subtractRect(r, dirtBox)) game.scatter.addSurface({ minX: Math.min(x0, x1), maxX: Math.max(x0, x1), minZ: Math.min(z0, z1), maxZ: Math.max(z0, z1), y: groundY, kind: 'lawn' });
   }
   // A wild praying mantis hunting in the front lawn by the walk (California gardens have lots).
   game.afterBuild = game.afterBuild || [];
@@ -356,8 +364,34 @@ export async function buildMansion(game) {
   for (const [dx, dz, r] of [[-0.62, -0.5, Math.PI / 2], [-0.62, 0.5, Math.PI / 2], [0.62, -0.5, -Math.PI / 2], [0.62, 0.5, -Math.PI / 2]]) P('dining_chair', 5.4 + dx, 0, -2.2 + dz, r);
   P('mug', 7.2, 0.941, -4.1, 0.6);
   P('soda_can', 7.8, 0.941, -4.3);
-  P('cookie', 7.5, 0.941, -3.9);
-  for (const [x, z] of [[7.52, -3.83], [7.55, -3.86], [7.47, -3.95], [7.6, -3.8]]) P('crumb', x, 0.941, z);
+  const cookie = P('cookie', 7.5, 0.941, -3.9);
+  const crumbs = [[7.52, -3.83], [7.55, -3.86], [7.47, -3.95], [7.6, -3.8]].map(([x, z]) => P('crumb', x, 0.941, z));
+  // The ant trail (see life/ants.js for why it's there): nest hole -> lawn -> up the 2 cm step at the open half of the
+  // sliding door -> threshold -> kitchen floor -> up the back of the island -> under the counter's lip ->
+  // up its edge -> along the counter to the crumbs by the cookie.
+  game.afterBuild = game.afterBuild || [];
+  game.afterBuild.push(() => new AntColony(game, {
+    entrance: [ANTS.x, -0.02, ANTS.z],
+    lidMaterial: M.lawn,
+    food: [...crumbs, cookie],
+    route: [
+      [[9.6, -0.01999, -8.6], [0, 1, 0]],
+      [[8.8, -0.01999, -8.1502], [0, 1, 0]],
+      [[8.8, -0.0195, -8.1501], [0, 0, -1]],
+      [[8.8, -0.0003, -8.1501], [0, 0, -1]],
+      [[8.8, 0.00001, -8.149], [0, 1, 0]],
+      [[8.4, 0.00001, -6.2], [0, 1, 0]],
+      [[7.62, 0.00001, -4.7512], [0, 1, 0]],
+      [[7.62, 0.0004, -4.7501], [0, 0, -1]],
+      [[7.62, 0.8995, -4.7501], [0, 0, -1]],
+      [[7.62, 0.89989, -4.7506], [0, -1, 0]],
+      [[7.62, 0.89989, -4.7996], [0, -1, 0]],
+      [[7.62, 0.9004, -4.80011], [0, 0, -1]],
+      [[7.62, 0.9396, -4.80011], [0, 0, -1]],
+      [[7.62, 0.94001, -4.7992], [0, 1, 0]],
+      [[7.56, 0.94001, -3.88], [0, 1, 0]],
+    ],
+  }));
   // Office: desk with the PC setup facing the window.
   P('desk', -7.5, 0, 6.6, Math.PI);
   P('office_chair', -7.5, 0, 5.8, Math.PI);
@@ -543,6 +577,19 @@ function buildLab(game, M, kit) {
 
 // The ground as a few big boxes around rectangular holes [x0, z0, x1, z1]. Cells are merged into
 // long strips so it stays a handful of colliders.
+// A rectangle [x0, z0, x1, z1] minus another one, as up to 4 rectangles.
+function subtractRect(r, c) {
+  const [x0, z0, x1, z1] = [Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])];
+  if (c[2] <= x0 || c[0] >= x1 || c[3] <= z0 || c[1] >= z1) return [r];
+  const out = [];
+  if (c[1] > z0) out.push([x0, z0, x1, c[1]]);
+  if (c[3] < z1) out.push([x0, c[3], x1, z1]);
+  const zz0 = Math.max(z0, c[1]), zz1 = Math.min(z1, c[3]);
+  if (c[0] > x0) out.push([x0, zz0, c[0], zz1]);
+  if (c[2] < x1) out.push([c[2], zz0, x1, zz1]);
+  return out;
+}
+
 function groundWithHoles(physics, top, holes, half = 200) {
   const xs = new Set([-half, half]), zs = new Set([-half, half]);
   for (const [x0, z0, x1, z1] of holes) {

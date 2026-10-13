@@ -293,7 +293,20 @@ export class Prop {
       const lv = this.body.linvel();
       resting = Math.abs(lv.y) < Math.max(0.02, this.size * 0.5) && Math.hypot(lv.x, lv.z) < Math.max(0.05, this.size);
     }
-    const dy = resting ? y0 - y1 : Math.max(0, y0 - y1);
+    let dy = resting ? y0 - y1 : Math.max(0, y0 - y1);
+    if (resting) {
+      // Resting things sink a hair into what they sit on (physics allows that). Plant the new bottom
+      // ON the surface underneath instead, or the resized thing starts inside the table and gets
+      // shoved out violently when it's let go.
+      const physics = this.game.physics;
+      const sz = this.size1 * Math.max(s, oldScale);
+      const from = { x: cx1 + (cx0 - cx1), y: y0 + sz * 0.3, z: cz1 + (cz0 - cz1) };
+      const hit = physics.raycast(from, { x: 0, y: -1, z: 0 }, sz * 0.6, { excludeBody: this.body, predicate: (c) => physics.ownerOf(c) !== this.game.player });
+      if (hit && hit.normal.y > 0.7) {
+        const floorY = hit.point.y + Math.max(1e-5, sz * 0.002);
+        if (y0 + dy - (y0 - y1) < floorY + 0 && y1 + dy < floorY) dy = floorY - y1;
+      }
+    }
     const newOrigin = _v2.set(t.x + (cx0 - cx1), t.y + dy, t.z + (cz0 - cz1));
     if (s > oldScale && !force && !this.hasRoomAt(s, newOrigin)) {
       obj.scale.setScalar(oldScale);
@@ -336,6 +349,9 @@ export class Prop {
   endResize() {
     if (!this.resizing) return;
     this.resizing = false;
+    // Fresh colliders: the physics engine keeps the old "touching" data from before the resize (a
+    // full-size can buried in the table), and would shove the thing out violently on the next step.
+    this._buildColliders();
     this.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
     this.body.wakeUp();
   }

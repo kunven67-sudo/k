@@ -15,6 +15,7 @@ export class Lighting {
     this.sunDir = new THREE.Vector3(-0.4, -0.8, -0.35).normalize();
     this.sunColor = new THREE.Color(1, 0.96, 0.9);
     this.sunIntensity = 3.2;
+    this.daylight = 1; // 0 when you're underground (the sun can't reach you there)
     this.height = 1.75;
     this.hemi = new THREE.HemisphereLight(0xbfd6ff, 0x6b5a48, 0.55);
     scene.add(this.hemi);
@@ -66,8 +67,10 @@ export class Lighting {
   }
 
   // position: Vector3 (or object with getWorldPosition), color, intensity (candela-ish), range (m).
-  addLamp({ position, object = null, color = 0xffe1b8, intensity = 8, range = 8, on = true, cone = 1.5 }) {
-    const lamp = { position: position ? position.clone() : new THREE.Vector3(), object, color: new THREE.Color(color), intensity, range, on, cone };
+  // `underground`: a light that's down in a nest/tunnel. When you're underground only those count (the
+  // lamps up in the house can't shine through the dirt), and above ground only the others do.
+  addLamp({ position, object = null, color = 0xffe1b8, intensity = 8, range = 8, on = true, cone = 1.5, dir = null, priority = false, underground = false }) {
+    const lamp = { position: position ? position.clone() : new THREE.Vector3(), object, color: new THREE.Color(color), intensity, range, on, cone, dir, priority, underground };
     this.lamps.push(lamp);
     return lamp;
   }
@@ -75,12 +78,13 @@ export class Lighting {
   _updateLamps() {
     const cam = this.camera.position;
     const active = [];
+    const below = this.daylight < 0.5;
     for (const l of this.lamps) {
-      if (!l.on) continue;
+      if (!l.on || l.underground !== below) continue;
       if (l.object) l.object.getWorldPosition(l.position);
       const d = l.position.distanceToSquared(cam);
       if (d > (l.range * 3) ** 2) continue;
-      active.push([d, l]);
+      active.push([l.priority ? -1 : d, l]); // priority lamps (your own light) always get a slot
     }
     active.sort((a, b) => a[0] - b[0]);
     for (let i = 0; i < this.pool.length; i++) {
@@ -88,7 +92,9 @@ export class Lighting {
       const a = active[i];
       if (a) {
         pl.position.copy(a[1].position);
-        pl.target.position.set(a[1].position.x, a[1].position.y - 1, a[1].position.z);
+        const dir = a[1].dir;
+        if (dir) pl.target.position.copy(a[1].position).add(dir);
+        else pl.target.position.set(a[1].position.x, a[1].position.y - 1, a[1].position.z);
         pl.target.updateMatrixWorld();
         pl.color.copy(a[1].color);
         pl.intensity = a[1].intensity;
@@ -125,7 +131,7 @@ export class Lighting {
       this.csm.lightMargin = margin;
       for (const l of this.csm.lights) {
         l.color.copy(this.sunColor);
-        l.intensity = this.sunIntensity;
+        l.intensity = this.sunIntensity * this.daylight;
         l.shadow.camera.near = 0.5;
         l.shadow.camera.far = margin * 2 + maxFar;
       }
@@ -147,7 +153,7 @@ export class Lighting {
       }
     } else {
       this.sun.color.copy(this.sunColor);
-      this.sun.intensity = this.sunIntensity;
+      this.sun.intensity = this.sunIntensity * this.daylight;
       this.sun.position.copy(cam.position).addScaledVector(this.sunDir, -50);
       this.sun.target.position.copy(cam.position);
     }

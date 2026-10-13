@@ -41,6 +41,8 @@ export class Game {
     this.fps = 60;
     this.outdoor = 1; // 0 = deep indoors, 1 = open sky (drives exposure, like eyes adjusting)
     this.exposure = 1;
+    this.cave = 0; // 0 = above ground, 1 = underground (no daylight at all)
+    this.underground = []; // places daylight can't reach: { contains(point) }
     this._last = performance.now();
   }
 
@@ -80,9 +82,13 @@ export class Game {
       this.outdoorTarget = open / dirs.length;
     }
     this.outdoor += ((this.outdoorTarget ?? 1) - this.outdoor) * (snap ? 1 : 1 - Math.exp(-1.5 * dt));
-    this.sky.setIndoor(1 - this.outdoor);
-    // Indoors the eye opens up (higher exposure); outside in daylight it closes down.
-    const target = 1.0 - this.outdoor * 0.35;
+    // Underground (inside an ant nest): only lights that are down there count.
+    const caveTarget = this.underground.some((u) => u.contains(this.camera.position)) ? 1 : 0;
+    this.cave += (caveTarget - this.cave) * (snap ? 1 : 1 - Math.exp(-3 * dt));
+    this.sky.setIndoor(1 - this.outdoor, this.cave);
+    // Indoors the eye opens up (higher exposure); outside in daylight it closes down; in the dark
+    // it opens all the way.
+    const target = 1.0 - this.outdoor * 0.35 + this.cave * 0.3;
     this.exposure += (target - this.exposure) * (snap ? 1 : 1 - Math.exp(-1.2 * dt));
     this.view.renderer.toneMappingExposure = this.exposure;
   }

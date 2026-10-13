@@ -117,20 +117,34 @@ export class Physics {
   }
 
   // Exact triangle collider for odd static shapes (stair stringers, sculpted terrain).
-  staticTrimesh(geometry, matrixWorld, owner = null) {
+  // `inside`: the surface is walked on from the inside (tunnels, rooms in the ground). Triangles only
+  // stop things on their front side, so their winding is flipped to face in.
+  staticTrimesh(geometry, matrixWorld, owner = null, { inside = false } = {}) {
     const g = geometry.index ? geometry.toNonIndexed() : geometry;
     const pos = g.attributes.position;
-    const verts = new Float32Array(pos.count * 3);
     const v = new THREE.Vector3();
+    // The physics engine does its math in 32-bit floats, which near x = 10 m are only good to ~1
+    // micrometer: as big as the gap a 1 mm you keeps from walls. So the triangles are stored around
+    // their own center (small numbers, ~0.004 micrometer precision) and the collider is placed there.
+    const box = new THREE.Box3();
+    for (let i = 0; i < pos.count; i++) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(matrixWorld));
+    const c = box.getCenter(new THREE.Vector3());
+    const verts = new Float32Array(pos.count * 3);
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i).applyMatrix4(matrixWorld);
-      verts[i * 3] = v.x;
-      verts[i * 3 + 1] = v.y;
-      verts[i * 3 + 2] = v.z;
+      verts[i * 3] = v.x - c.x;
+      verts[i * 3 + 1] = v.y - c.y;
+      verts[i * 3 + 2] = v.z - c.z;
     }
     const idx = new Uint32Array(pos.count);
-    for (let i = 0; i < pos.count; i++) idx[i] = i;
-    const d = RAPIER.ColliderDesc.trimesh(verts, idx).setCollisionGroups(GROUPS.static);
+    for (let i = 0; i < pos.count; i += 3) {
+      idx[i] = i;
+      idx[i + 1] = inside ? i + 2 : i + 1;
+      idx[i + 2] = inside ? i + 1 : i + 2;
+    }
+    // FIX_INTERNAL_EDGES stops things that roll or slide across the surface (props, balls) from catching
+    // on the seams between its triangles. (Your own tiny movement uses rays, see Player._tinyVertical.)
+    const d = RAPIER.ColliderDesc.trimesh(verts, idx, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(c.x, c.y, c.z).setCollisionGroups(GROUPS.static);
     return this.own(this.world.createCollider(d), owner);
   }
 

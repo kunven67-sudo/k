@@ -63,18 +63,20 @@ export class SkyDome {
     if (this.envRT) this.envRT.dispose();
     this.envRT = this.pmrem.fromScene(this.envScene, 0, 1, 2000);
     this.skyEnv = this.envRT.texture;
-    this._applyEnv();
     this.envGround.material.color.setRGB(0.23, 0.22, 0.19).multiplyScalar(0.3 + 0.9 * e);
-    this.worldScene.environmentIntensity = 0.85;
     // Ambient comes from the sky map (which indoor materials scale down); the hemisphere light is
     // only a faint fill so rooms don't get lit through their walls.
-    this.lighting.hemi.intensity = 0.04 + 0.06 * e;
+    this.hemiBase = 0.04 + 0.06 * e;
+    this._applyEnv();
   }
 
   // `indoor` 0..1 from the game's sky-visibility probe. Swaps the ambient light source halfway and
   // dips the intensity around the swap so it reads as eyes adjusting, not a pop.
-  setIndoor(indoor) {
+  // `cave` 0..1: how far underground the camera is (an ant nest, later sewers). No sun, no sky and
+  // no bounce light reach down there; only lights that are actually there (your eyes) do.
+  setIndoor(indoor, cave = 0) {
     this.indoorBlend = indoor;
+    this.cave = cave;
     this._applyEnv();
   }
 
@@ -85,7 +87,10 @@ export class SkyDome {
     if (this.worldScene.environment !== env) this.worldScene.environment = env;
     setIndoorEnvScale(useRoom ? 0.7 : 0.1);
     const dip = 1 - Math.min(1, Math.abs(b - 0.5) * 2);
-    this.worldScene.environmentIntensity = (useRoom ? 0.55 : 0.85) * (1 - dip * 0.6);
+    const dark = 1 - (this.cave || 0);
+    this.worldScene.environmentIntensity = (useRoom ? 0.55 : 0.85) * (1 - dip * 0.6) * (0.03 + 0.97 * dark);
+    this.lighting.hemi.intensity = (this.hemiBase ?? 0.1) * dark;
+    this.lighting.daylight = dark;
   }
 
   update(dt, camera) {}

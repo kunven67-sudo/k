@@ -126,10 +126,11 @@ In SCALE:
   from almost any height. A scientist named J.B.S. Haldane wrote that you could drop a mouse down a deep mine shaft and it would
   walk away, while a human would die. In SCALE, at ant size you can jump off the kitchen counter and land without getting hurt.
   At human size a staircase fall hurts. At giant size a fall from your own height can break bones.
-- **Heat and hunger**: small bodies lose heat super fast (lots of skin for how little body there is). Real tiny mammals like
-  shrews eat close to their own body weight every day. When you or shrunk people are tiny, you get cold fast and hungry fast
-  (compared to your size), so shrunk people need lots of food and need to stay warm (fire, cotton, huddling).
-  The amounts are tiny in real terms: a crumb feeds a 2 mm person for days.
+- **Heat and hunger: no side effects.** In real life a tiny body loses heat super fast and has to eat almost nonstop, and
+  a bug grown to dog size couldn't breathe (bugs have no lungs) and its legs would snap. In SCALE the **RIFT field keeps
+  every resized body working normally at its new size**: that's the whole trick of the invention, and why shrunk people
+  can live and build. No extra cold, no extra hunger, giant bugs don't suffocate. (Only if the field itself gets broken
+  does real physics take over.) The world around you is still real physics (falling, wind, water, below).
 - **Surface tension**: water acts like a stretchy skin. For you at normal size it's nothing. For a 2 mm person, a water drop
   is a sticky blob that can grab you and hold you, and getting out is hard. Water striders can walk on water because of this,
   and in SCALE, if you're light enough, so can you.
@@ -209,8 +210,9 @@ You shrink wherever you're standing. The game knows what's under your feet, so i
 
 ### How the shrink ray works
 - Hold fire to shrink what you're aiming at, hold alt-fire to grow it, smooth, with a beam you can see.
-- Works on anything: objects, furniture, people, pets, bugs, plants, cars, buildings' loose parts.
-  (Walls, floors and the ground can't be resized because they're part of the building and the earth.)
+- Works on anything: objects, furniture, people, pets, bugs, plants, cars, whole buildings, mountains, planets, stars,
+  galaxies (see "Shrinking and growing ANYTHING" below). A wall or floor isn't resized by itself: aiming at one resizes the
+  whole building it belongs to, as one unit. Aiming at the ground resizes the whole planet (from space, see below).
 - What happens to a shrunk thing:
   - Its weight drops by the cube (half size = 1/8 the weight). A shrunk car is light enough to pick up.
   - Its strength drops by the square. A shrunk dog is a strong little dog for its size but harmless to you.
@@ -218,6 +220,24 @@ You shrink wherever you're standing. The game knows what's under your feet, so i
 - Growing stops if there's no room (same check as your watch), unless you use force mode.
 - Living things you shrink stay alive and aware; they freak out depending on who they are (section 11).
 - **Kids can't be targeted**: the ray beam slides off them.
+
+### Shrinking and growing ANYTHING (buildings, planets, stars, galaxies)
+- **Weight scales with size.** Same material, so half the size = 1/8 the weight. A car shrunk to toy size weighs about as
+  much as a toy car; an ant grown to dog size weighs about as much as a dog.
+- **Everything goes with it.** A building shrinks with everything inside it (furniture, pets, people). A planet shrinks
+  with its air, oceans, cities and its moon. A shrunk star is still hot and bright (just tiny), so don't hold it.
+  A galaxy (billions of real-looking stars) can sit in a jar on your desk.
+- **If you're inside or on it, you go with it.** Shrink the building you're standing in, a car you're driving, or a bug
+  you're riding: you change size together, like one thing. From inside, nothing seems different, until you look out the
+  window and the world is suddenly huge.
+- **Micro stuff never vanishes.** Shrink a bug smaller than you, then smaller, then put it inside the PS5: it's still there,
+  at its real size, doing real things (blown around by the fan, crawling on circuits). Shrink yourself to follow it and the
+  detail around you keeps appearing (dust, fibers, cells, molecules) with no loading screens. The ray's smallest size is
+  atom size.
+- **Growing micro stuff makes the real giant version**: a dust mite grows into an eight-legged monster, a bacterium into a
+  wobbly blob, a tardigrade into a giant water bear, a salt grain into a perfect giant cube crystal.
+- **Collisions follow the size, always.** Whatever size something becomes, what you see is exactly what you bump into:
+  no invisible walls, nothing you can walk through, at every size.
 
 ### Never-bugs
 - Growing never puts you inside a wall or the ceiling. If you'd overlap anything, the grow stops first.
@@ -341,6 +361,9 @@ type of land there (desert, forest, snow, ocean), not a real copy of that place.
   launch from the beach or a launch pad you build, real orbit (about 7.8 km/s sideways to stay up), real reentry heat.
 - Ride it at normal size to the Moon or Mars the real way, or shrink the rocket and launch it as a toy, or grow yourself and
   carry it up by hand (that's the sci-fi way).
+- Three ways to space, all real in the game: **build or buy a rocket** (or build a whole ship from real parts, section 5
+  "Building"), **grow giant** and step out into space, or **RIFT teleport** (the RIFT machine opens a portal to places it
+  knows, if it has enough power).
 - Space is deadly without a suit: no air, freezing in shadow, burning in sunlight. Your RIFT field covers you;
   people you bring don't get one unless they wear a suit.
 
@@ -506,6 +529,22 @@ and the game is built so it can't be broken:
 - **Pockets**: small things only (phone, keys, wallet, coins, a candy bar). Big things go in the backpack or your hands.
 - **Swapping**: a hotbar shows what's in your hands and on you. Pick a slot and the game moves things between hands and pockets
   with animations.
+
+### Your gear is real (phone, watch, shrink ray)
+- Your phone, RIFT watch and shrink ray are real objects you carry: phone in a pocket, watch on your wrist, ray on a strap.
+  You can drop them, pick them up again, hand them to someone, leave them on a table. Nothing pops out of nowhere: taking
+  the phone out means taking it out of the pocket it's in (you see it).
+- If you take the watch off or drop it, you can't change size until you get it back (it's the thing that does it).
+- They're tough (made in the RIFT lab), so normal bumps don't wreck them, but they're real things in the world.
+
+### Building (you, and shrunk people, can build anything real)
+- **You build with real parts**: motors, batteries, wires, switches, screens, chips, metal, wood, plastic, screws, glue.
+  Put them together and it works only if it would work in real life (enough power, the right parts, connected right).
+  A fan, a robot, a car, a drone, a ship: if real parts can make it, you can.
+- **Shrunk people build too**, by who they are: an engineer can build a robot, a carpenter a house, a kid a fort
+  (section 11).
+- **Open and edit any gadget**: open your ray, watch, phone, a PS5, a robot someone built: swap parts, upgrade them,
+  break them, rewire them, and it changes what the gadget does.
 
 ### Picking things up (including off the floor)
 - Look at anything and it highlights if you can interact with it. Small things get an extra-big highlight zone so you never
@@ -949,8 +988,13 @@ The spawn menu is an app on your phone that looks and works like a real shopping
 with pictures (real rendered images of the 3D model, no emojis), price, size, weight, material, reviews from townspeople,
 a cart, and checkout.
 
+Nothing ever appears from nowhere. Two ways things get to you, each with a real cause:
+- **Normal delivery** (like real life): a driver or drone brings it, it takes real minutes, it's left at your door/gate.
+- **Instant, through the RIFT machine**: the machine in your lab (your invention) pulls it in through a portal next to you
+  (or where you aim). It needs power: no power, no portal. This is the only way anything appears instantly.
+
 Two modes (pick when you make a world, change in settings):
-- **Sandbox mode**: everything is free and arrives instantly through a RIFT portal next to you (or where you aim).
+- **Sandbox mode**: everything is free and the RIFT machine has unlimited power, so everything can come instantly.
   You pick the size it arrives at: real size, your size, or any size.
 - **Real-life mode**: everything costs real money (realistic prices). Delivery takes time: a delivery van drives to your gate,
   the driver walks it up (or leaves it at the gate if it's closed and nobody's there). A porch thief (someone in town with low

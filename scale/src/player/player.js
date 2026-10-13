@@ -24,14 +24,26 @@ const G = 9.81;
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
+const _sv = new THREE.Vector3();
+const _sd = new THREE.Vector3();
+const TINY = 0.1; // under 10 cm tall, up/down movement uses exact rays (see _tinyVertical)
+const TINY_RAYS = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+const DOWN = { x: 0, y: -1, z: 0 };
+const UPV = { x: 0, y: 1, z: 0 };
 
 export class Player {
   constructor(game, { position = [0, 0, 0], yaw = 0, scale = 1, model = null } = {}) {
     this.game = game;
     this.kind = 'player';
     this.name = 'You';
+    // Rays for tiny movement ignore you, what you're holding, and animals (handled on their own).
+    this._rayFilter = (c) => {
+      const o = game.physics.ownerOf(c);
+      return !(o && (o === this || o.held || o.kind === 'creature'));
+    };
     this.scale = scale;
     this.feet = new THREE.Vector3().fromArray(position);
     this.prevFeet = this.feet.clone();
@@ -117,8 +129,13 @@ export class Player {
     this.collider.setRadius(r);
     this.collider.setHalfHeight(Math.max(1e-6, H / 2 - r));
     this.kcc.setOffset(Math.max(2e-6, 0.004 * H));
+    // The controller's anti-sticking nudge is a fixed 0.1 mm by default: fine at 1.75 m, but 7% of your
+    // height at 1.4 mm (you'd float, and get pushed through thin floors). Scale it with you.
+    this.kcc.setNormalNudgeFactor(1e-4 * (H / BASE_HEIGHT));
     this.kcc.enableAutostep(0.22 * H, 0.04 * H, false);
-    this.kcc.enableSnapToGround(0.18 * H);
+    // When tiny, standing/landing/slopes are done with exact rays instead (see _tinyVertical).
+    if (H < TINY) this.kcc.disableSnapToGround();
+    else this.kcc.enableSnapToGround(0.18 * H);
     this.kcc.setCharacterMass(this.mass);
     this.game.physics.setLengthUnit(H * 0.5);
   }
@@ -237,8 +254,10 @@ export class Player {
     if (aiming) this.facing += angDiff(this.facing, this.yaw) * (1 - Math.exp(-14 * dt));
     else if (Math.hypot(wx, wz) > 0.1) this.facing += angDiff(this.facing, Math.atan2(-wx, -wz)) * (1 - Math.exp(-12 * dt));
 
-    // Gravity with air drag (terminal velocity ~ sqrt(size)).
+    // Gravity with air drag (terminal velocity ~ sqrt(size)). The step uses the average speed over the
+    // step (exact for constant gravity), so a tiny you doesn't drop twice as far in the first frame.
     const vt = 55 * Math.sqrt(this.scale);
+    let vyStart = this.vel.y;
     this.vel.y -= G * dt;
     this.vel.y -= Math.sign(this.vel.y) * G * (this.vel.y / vt) ** 2 * dt;
     this.jumpBuffer = Math.max(0, this.jumpBuffer - dt);
@@ -246,21 +265,51 @@ export class Player {
       this.jumpBuffer = 0;
       const jumpH = 0.45 * (this.scale < 1 ? Math.pow(this.scale, 0.3) : Math.pow(this.scale, 0.15));
       this.vel.y = Math.sqrt(2 * G * jumpH);
+      vyStart = this.vel.y; // a jump starts at full speed
       this.grounded = false;
     }
 
     // Character controller: slide along walls, step up stairs, snap to the ground.
-    const desired = { x: this.vel.x * dt, y: this.vel.y * dt, z: this.vel.z * dt };
+    const desired = { x: this.vel.x * dt, y: (vyStart + this.vel.y) * 0.5 * dt, z: this.vel.z * dt };
     // Animals are left out of the controller: it pushes you away from any self-moving body from about
     // 5 cm before you touch it, which is nothing at normal size but 10 body lengths when you're tiny.
     // Bumping into animals is handled right after, exactly.
-    this.kcc.computeColliderMovement(this.collider, desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, GROUPS.player, (c) => {
+    const filter = (c) => {
       const o = this.game.physics.ownerOf(c);
       return !(o && (o.held || o.kind === 'creature'));
-    });
-    const m = this.kcc.computedMovement();
+    };
+    // When you're tiny (under 10 cm) the physics engine's character mover can't be trusted with up and
+    // down: pressing down on a curved floor made of many small triangles (a tunnel, a crumb) it slips
+    // through, more often the smaller you are. So when tiny:
+    //  - sideways moves still use it (sliding along walls, stepping up), in sub-moves of at most ~0.3
+    //    body heights, with no push down;
+    //  - standing, landing, slopes, ledges and ceilings use exact rays (_tinyVertical).
+    const world = this.game.physics.world;
+    const m = { x: 0, y: 0, z: 0 };
+    let subGrounded = false;
+    const move = (dx, dy, dz) => {
+      if (m.x || m.y || m.z) {
+        this.body.setTranslation({ x: this.feet.x + m.x, y: this.feet.y + H / 2 + m.y, z: this.feet.z + m.z }, false);
+        world.propagateModifiedBodyPositionsToColliders();
+      }
+      this.kcc.computeColliderMovement(this.collider, { x: dx, y: dy, z: dz }, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, GROUPS.player, filter);
+      const sm = this.kcc.computedMovement();
+      m.x += sm.x;
+      m.y += sm.y;
+      m.z += sm.z;
+      return this.kcc.computedGrounded();
+    };
+    if (H < TINY) {
+      const subs = Math.min(12, Math.max(1, Math.ceil(Math.hypot(desired.x, desired.z) / (0.3 * H))));
+      if (desired.x || desired.z) for (let i = 0; i < subs; i++) move(desired.x / subs, 0, desired.z / subs);
+      // Back to where the body was this step, so its real motion (and what it pushes) is the whole move.
+      this.body.setTranslation({ x: this.feet.x, y: this.feet.y + H / 2, z: this.feet.z }, false);
+      world.propagateModifiedBodyPositionsToColliders();
+      this._tinyWalls(m);
+      subGrounded = this._tinyVertical(m, desired.y);
+    } else subGrounded = move(desired.x, desired.y, desired.z);
     const wasGrounded = this.grounded;
-    this.grounded = this.kcc.computedGrounded();
+    this.grounded = subGrounded;
     const vyBefore = this.vel.y;
     if (this.grounded && this.vel.y < 0) {
       if (!wasGrounded && this.airTime > 0.15) this._land(-vyBefore);
@@ -268,15 +317,135 @@ export class Player {
     }
     if (!this.grounded && desired.y > 0 && m.y < desired.y * 0.5) this.vel.y = Math.min(0, this.vel.y); // bonked a ceiling
     this.airTime = this.grounded ? 0 : this.airTime + dt;
+    const oldFeet = _v3.copy(this.feet);
     this.feet.x += m.x;
     this.feet.y += m.y;
     this.feet.z += m.z;
+    if (H < TINY) this._tinySafety(oldFeet, dt);
     this._pushOutOfCreatures();
     this.body.setNextKinematicTranslation({ x: this.feet.x, y: this.feet.y + H / 2, z: this.feet.z });
 
     // Safety net: never fall out of the world.
     if (this.feet.y < -60 || !Number.isFinite(this.feet.y)) this.respawn();
     if (this.blockedT > 0) this.blockedT -= dt;
+  }
+
+  // Walls when you're tiny: the sideways move is checked with rays at knee, waist and head height (from
+  // where you were toward where the controller put you). Anything too steep to stand on stops you there.
+  // Knee height is above the step-up height, so you still step onto crumbs and bumps.
+  _tinyWalls(m) {
+    const dh = Math.hypot(m.x, m.z);
+    if (dh < 1e-9) return;
+    const physics = this.game.physics;
+    const H = this.height, r = this.radius;
+    const eps = Math.max(1e-6, 0.004 * H);
+    const opts = { excludeBody: this.body, predicate: this._rayFilter };
+    _sd.set(m.x / dh, 0, m.z / dh);
+    let keep = dh;
+    for (const h of [0.3, 0.55, 0.85]) {
+      _sv.set(this.feet.x, this.feet.y + Math.max(0, m.y) + H * h, this.feet.z);
+      const hit = physics.raycast(_sv, _sd, dh + r, opts);
+      if (hit && hit.normal.y < 0.5 && hit.normal.y > -0.5) keep = Math.min(keep, Math.max(0, hit.dist - r - eps));
+    }
+    if (keep < dh) {
+      m.x = _sd.x * keep;
+      m.z = _sd.z * keep;
+    }
+  }
+
+  // Up and down when you're tiny, with exact rays (they work the same at any size). `m` is this step's
+  // move so far (sideways); its y gets set here. Five rays under your feet (middle and around) find the
+  // highest walkable surface: you land on it, stand on it, step up onto small bumps (up to a quarter of
+  // your height) and follow it down slopes while walking. Ceilings stop you going up.
+  // Returns whether you're standing on something.
+  _tinyVertical(m, dy) {
+    const physics = this.game.physics;
+    const H = this.height, r = this.radius;
+    const opts = { excludeBody: this.body, predicate: this._rayFilter };
+    const x = this.feet.x + m.x, z = this.feet.z + m.z, y0 = this.feet.y + m.y;
+    const eps = Math.max(1e-6, 0.004 * H);
+    const up = 0.25 * H;
+    const follow = this.grounded && dy <= 0 ? Math.hypot(m.x, m.z) * 1.2 + 0.03 * H : 0; // down a slope up to 50 degrees
+    const reach = up + Math.max(0, -dy) + follow;
+    let ground = -Infinity, block = -Infinity, bn = null;
+    const k = r * 0.7;
+    for (const [ox, oz] of TINY_RAYS) {
+      _sv.set(x + ox * k, y0 + up, z + oz * k);
+      const hit = physics.raycast(_sv, DOWN, reach, opts);
+      if (!hit) continue;
+      if (hit.normal.y > 0.5) ground = Math.max(ground, hit.point.y);
+      else if (hit.point.y > block) {
+        block = hit.point.y; // too steep to stand on, but you can't fall through it either
+        bn = hit.normal;
+      }
+    }
+    let ny = y0 + dy;
+    let grounded = false;
+    if (ground > -Infinity && (ny <= ground + eps || follow > 0)) {
+      ny = ground + eps;
+      grounded = true;
+    } else if (block > -Infinity && ny <= block + eps && dy < 0) {
+      // Landed on a steep surface: you slide off it (down and away), like real life.
+      ny = block + eps;
+      const slide = Math.min(0.3 * H, -dy * 0.7);
+      const hl = Math.hypot(bn.x, bn.z) || 1;
+      m.x += (bn.x / hl) * slide;
+      m.z += (bn.z / hl) * slide;
+    }
+    if (ny > y0) {
+      // Going up: stop at a ceiling.
+      _sv.set(x, y0 + H * 0.6, z);
+      const hit = physics.raycast(_sv, UPV, H * 0.4 + (ny - y0), opts);
+      if (hit && hit.normal.y < -0.3) {
+        ny = Math.min(ny, Math.max(y0, hit.point.y - H - eps));
+        if (!grounded) this.vel.y = Math.min(0, this.vel.y);
+      }
+    }
+    m.y = ny - this.feet.y;
+    return grounded;
+  }
+
+  // Safety net when you're tiny: the character controller can slip through triangle surfaces (tunnels,
+  // sculpted ground) when you're a few millimeters tall. Rays are exact at any size, so the move is
+  // checked with rays and stopped at any surface they find: walls, floors, ceilings.
+  _tinySafety(oldFeet, dt) {
+    const physics = this.game.physics;
+    const H = this.height, r = this.radius;
+    const pred = (c) => {
+      const o = physics.ownerOf(c);
+      return !(o && (o === this || o.held || o.kind === 'creature'));
+    };
+    const opts = { excludeBody: this.body, predicate: pred };
+    const off = Math.max(2e-6, 0.004 * H);
+    // Sideways: from the old middle of your body toward the new one.
+    const c0 = _sv.set(oldFeet.x, oldFeet.y + H * 0.5, oldFeet.z);
+    const dx = this.feet.x - oldFeet.x, dz = this.feet.z - oldFeet.z;
+    const dh = Math.hypot(dx, dz);
+    if (dh > 1e-9) {
+      const dir = _sd.set(dx / dh, 0, dz / dh);
+      const hit = physics.raycast(c0, dir, dh + r, opts);
+      if (hit && Math.abs(hit.normal.y) < 0.7) {
+        const keep = Math.max(0, hit.dist - r - off);
+        this.feet.x = oldFeet.x + dir.x * keep;
+        this.feet.z = oldFeet.z + dir.z * keep;
+      }
+    }
+    // Up: don't push your head through a ceiling.
+    if (this.feet.y > oldFeet.y) {
+      const hit = physics.raycast(c0, { x: 0, y: 1, z: 0 }, H * 0.5 + (this.feet.y - oldFeet.y), opts);
+      if (hit && hit.normal.y < -0.3) {
+        this.feet.y = Math.min(this.feet.y, hit.point.y - H - off);
+        this.vel.y = Math.min(0, this.vel.y);
+      }
+    }
+    // Down: if you sank into the floor (or through it), stand back on top of it.
+    const mid = _sv.set(this.feet.x, Math.max(this.feet.y, oldFeet.y) + H * 0.5, this.feet.z);
+    const down = physics.raycast(mid, { x: 0, y: -1, z: 0 }, mid.y - this.feet.y + H * 0.02, opts);
+    if (down && down.normal.y > 0.6 && down.point.y > this.feet.y - H * 0.002) {
+      this.feet.y = down.point.y + off;
+      if (this.vel.y < 0) this.vel.y = 0;
+      this.grounded = true;
+    }
   }
 
   // If you're overlapping an animal's body, get pushed straight out of it by exactly the overlap.
@@ -371,6 +540,18 @@ export class Player {
     if (hit && this.feet.y < hit.point.y + this.height * 0.01) this.feet.y = hit.point.y + this.height * 0.01;
     this.prevFeet.copy(this.feet);
     this.renderFeet.copy(this.feet);
+    const c = { x: this.feet.x, y: this.feet.y + this.height / 2, z: this.feet.z };
+    this.body.setTranslation(c, true);
+    this.body.setNextKinematicTranslation(c);
+    this._syncObject();
+  }
+
+  // Put your feet at a point (no fall, no momentum).
+  teleport(point) {
+    this.feet.copy(point);
+    this.prevFeet.copy(this.feet);
+    this.renderFeet.copy(this.feet);
+    this.vel.set(0, 0, 0);
     const c = { x: this.feet.x, y: this.feet.y + this.height / 2, z: this.feet.z };
     this.body.setTranslation(c, true);
     this.body.setNextKinematicTranslation(c);
