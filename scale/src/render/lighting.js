@@ -1,0 +1,161 @@
+// Sun, sky light and shadows.
+//
+// Shadows use cascades (CSM): several shadow maps, each covering a bigger area further from the
+// camera. The cascade sizes follow the player's height, so at 2 mm tall the first cascade covers a
+// few centimeters (crisp shadows of crumbs and fibers) while the last one still covers the whole
+// house (so the roof shades the rooms and the sun only comes in through windows).
+import * as THREE from 'three';
+import { CSM } from 'three/addons/csm/CSM.js';
+import { setCSM } from './materials.js';
+
+export class Lighting {
+  constructor(scene, camera, tier) {
+    this.scene = scene;
+    this.tier = tier;
+    this.sunDir = new THREE.Vector3(-0.4, -0.8, -0.35).normalize();
+    this.sunColor = new THREE.Color(1, 0.96, 0.9);
+    this.sunIntensity = 3.2;
+    this.daylight = 1; // 0 when you're underground (the sun can't reach you there)
+    this.height = 1.75;
+    this.hemi = new THREE.HemisphereLight(0xbfd6ff, 0x6b5a48, 0.55);
+    scene.add(this.hemi);
+    this.proxyCam = new THREE.PerspectiveCamera(70, 1, 0.05, 300);
+    this.camera = camera;
+    if (tier.shadows && tier.cascades > 0) {
+      this.csm = new CSM({
+        camera: this.proxyCam,
+        parent: scene,
+        cascades: tier.cascades,
+        maxFar: 300,
+        mode: 'custom',
+        shadowMapSize: tier.shadowSize,
+        lightDirection: this.sunDir,
+        lightIntensity: this.sunIntensity,
+        lightNear: 1,
+        lightFar: 600,
+        lightMargin: 250,
+        shadowBias: -0.0001,
+        customSplitsCallback: (n, near, far, breaks) => {
+          // Geometric spread from ~6 body heights to the max distance.
+          const first = Math.max(near * 4, this.height * 6);
+          const ratio = Math.pow(far / first, 1 / Math.max(1, n - 1));
+          for (let i = 0; i < n - 1; i++) breaks.push(Math.min(0.999, (first * Math.pow(ratio, i)) / far));
+          breaks.push(1);
+        },
+      });
+      this.csm.fade = true;
+      for (const l of this.csm.lights) l.shadow.normalBias = 0.02;
+      setCSM(this.csm);
+    } else {
+      this.sun = new THREE.DirectionalLight(this.sunColor, this.sunIntensity);
+      scene.add(this.sun, this.sun.target);
+      setCSM(null);
+    }
+    this._lastKey = '';
+    // Lamp pool: a fixed number of point lights (changing the count would recompile every shader),
+    // handed each frame to the nearest lamps that are switched on.
+    this.lamps = [];
+    this.pool = [];
+    // Spot lights aimed down: recessed ceiling lights are cones (the ceiling above them stays darker,
+    // like real life); lamps with a shade use a near-hemisphere cone.
+    for (let i = 0; i < tier.maxLights; i++) {
+      const l = new THREE.SpotLight(0xffffff, 0, 8, 1.2, 0.6, 2);
+      l.castShadow = false;
+      scene.add(l, l.target);
+      this.pool.push(l);
+    }
+  }
+
+  // position: Vector3 (or object with getWorldPosition), color, intensity (candela-ish), range (m).
+  // `underground`: a light that's down in a nest/tunnel. When you're underground only those count (the
+  // lamps up in the house can't shine through the dirt), and above ground only the others do.
+  addLamp({ position, object = null, color = 0xffe1b8, intensity = 8, range = 8, on = true, cone = 1.5, dir = null, priority = false, underground = false }) {
+    const lamp = { position: position ? position.clone() : new THREE.Vector3(), object, color: new THREE.Color(color), intensity, range, on, cone, dir, priority, underground };
+    this.lamps.push(lamp);
+    return lamp;
+  }
+
+  _updateLamps() {
+    const cam = this.camera.position;
+    const active = [];
+    const below = this.daylight < 0.5;
+    for (const l of this.lamps) {
+      if (!l.on || l.underground !== below) continue;
+      if (l.object) l.object.getWorldPosition(l.position);
+      const d = l.position.distanceToSquared(cam);
+      if (d > (l.range * 3) ** 2) continue;
+      active.push([l.priority ? -1 : d, l]); // priority lamps (your own light) always get a slot
+    }
+    active.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < this.pool.length; i++) {
+      const pl = this.pool[i];
+      const a = active[i];
+      if (a) {
+        pl.position.copy(a[1].position);
+        const dir = a[1].dir;
+        if (dir) pl.target.position.copy(a[1].position).add(dir);
+        else pl.target.position.set(a[1].position.x, a[1].position.y - 1, a[1].position.z);
+        pl.target.updateMatrixWorld();
+        pl.color.copy(a[1].color);
+        pl.intensity = a[1].intensity;
+        pl.distance = a[1].range;
+        pl.angle = a[1].cone;
+      } else pl.intensity = 0;
+    }
+  }
+
+  setSun(dir, color, intensity) {
+    this.sunDir.copy(dir).normalize();
+    this.sunColor.copy(color);
+    this.sunIntensity = intensity;
+  }
+
+  // Call every frame after the camera moved. `height` = player body height in meters.
+  update(height) {
+    this.height = height;
+    this._updateLamps();
+    const cam = this.camera;
+    if (this.csm) {
+      const pc = this.proxyCam;
+      pc.position.copy(cam.position);
+      pc.quaternion.copy(cam.quaternion);
+      pc.fov = cam.fov;
+      pc.aspect = cam.aspect;
+      pc.near = cam.near;
+      // Shadows reach ~400 body heights, at least 40 m (whole house), at most 300 m.
+      const maxFar = Math.min(300, Math.max(40, height * 400));
+      pc.far = maxFar;
+      this.csm.maxFar = maxFar;
+      // Light box depth: must include the roof and trees above a tiny player.
+      const margin = Math.max(60, height * 40);
+      this.csm.lightMargin = margin;
+      for (const l of this.csm.lights) {
+        l.color.copy(this.sunColor);
+        l.intensity = this.sunIntensity * this.daylight;
+        l.shadow.camera.near = 0.5;
+        l.shadow.camera.far = margin * 2 + maxFar;
+      }
+      pc.updateProjectionMatrix();
+      pc.updateMatrixWorld();
+      const key = `${pc.near.toPrecision(3)}|${maxFar.toPrecision(3)}|${pc.fov}|${pc.aspect.toFixed(3)}`;
+      if (key !== this._lastKey) {
+        this.csm.updateFrustums();
+        this._lastKey = key;
+      }
+      this.csm.update();
+      // Bias in world units must follow each cascade's texel size or tiny things lose their shadows.
+      for (const l of this.csm.lights) {
+        const sc = l.shadow.camera;
+        sc.updateProjectionMatrix();
+        const texel = (sc.right - sc.left) / l.shadow.mapSize.x;
+        l.shadow.normalBias = texel * 1.2;
+        l.shadow.bias = -(texel * 0.5) / (sc.far - sc.near);
+      }
+    } else {
+      this.sun.color.copy(this.sunColor);
+      this.sun.intensity = this.sunIntensity * this.daylight;
+      this.sun.position.copy(cam.position).addScaledVector(this.sunDir, -50);
+      this.sun.target.position.copy(cam.position);
+    }
+  }
+}
