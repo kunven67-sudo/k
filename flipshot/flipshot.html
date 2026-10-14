@@ -1626,7 +1626,7 @@ const REBORN_ITEMS = [
 
 /* ---- pop-up tips (shown once) ---- */
 const TIPS = {
-  chute:    ["PARACHUTE", "On the way down, press Space (or tap FLIP) to open it. You float slowly, even with Fall Speed maxed."],
+  chute:    ["PARACHUTE", "Auto parachute is on: it opens by itself at the top. Turn it off in Upgrades and use Space or FLIP instead."],
   welcome:  ["FLIP!", "Tap FLIP (or press Space). Better bottles fly higher and pay more."],
   ring:     ["STICK THE LANDING", "When the ring closes around your bottle, tap. Nail it for a PERFECT."],
   loot:     ["SKY LOOT", "Tap the coins and gems floating past during a flight."],
@@ -1662,7 +1662,7 @@ const SAVE_VERSION = 4;
 function freshG1(){
   return {
     coins:0, best:0, owned:["classic"], equipped:"classic", streak:0,
-    up:{}, shields:0, refill:0, autoOn:false,
+    up:{}, shields:0, refill:0, autoOn:false, autoChute:false,
     trophies:{}, rivalsWon:{}, places:["kitchen"], place:"kitchen",
     trail:"streak", landfx:"puff", table:"place", trails:["streak"], landfxs:["puff"], tables:["place"],
     maxH:0, warned:false, runBest:0, runLands:0, dormant:{},
@@ -6085,6 +6085,7 @@ function startFlip(auto){
   };
   if(f.cosmic) f.ph = { launch:0.07, up:0.56, hang:0.66, down:1 };
   if(f.omega){ f.T = FLIGHT_T[16]; f.cosmic = true; }
+  if(up1("chute") > 0 && save.g1.autoChute && !f.omega) f.chuteQ = true;   /* auto parachute */
   f.rt = rotTable(f);
   f.rotEnd = f.spins * TAU + (f.capTry ? Math.PI : 0);
   spawnLoot(f);
@@ -6107,7 +6108,7 @@ function startFlip(auto){
 /* where the bottle is, frame by frame */
 function updateFlight(dt){
   const f = G1.flight;
-  if(f.chuteQ && !f.chute && f.t >= f.ph.hang * f.T) openChute(f);
+  if(f.chuteQ && !f.chute && f.t >= chuteFrom(f)) openChute(f);
   if(f.chute) f.chute.age += dt;
   f.t += dt * (f.chute ? chuteRate(f) : 1);
   const u = clamp(f.t / f.T, 0, 1);
@@ -6165,7 +6166,7 @@ function updateFlight(dt){
   /* the omega flip breaks everything at the top */
   if(f.omega && f.t > f.T * 0.6 && !f.broke){ f.broke = true; beginUniverseBreak(); return; }
   /* sky loot magnet */
-  if(!f.room) lootMagnet(f);
+  lootMagnet(f, dt);
   /* trail of ghost bottles */
   G1.trail.push({ L:G1.camL, px:G1.altPx, x:G1.x, rot:G1.rot, blend:G1.blend, roomY:G1.roomY });
   if(G1.trail.length > 40) G1.trail.shift();
@@ -6194,13 +6195,15 @@ function ringTap(f){
 
 /* ---------- parachute ---------- */
 /* while it's open the way down runs on the chute's own speed, so Fall Speed upgrades don't rush it */
+/* the chute can open once the bottle starts coming down */
+function chuteFrom(f){ return (f.room ? 0.5 : f.ph.hang) * f.T; }
 function chuteRate(f){ return CHUTES[f.chute.lvl - 1].slow * clamp(f.T / (f.T0 || f.T), 0.4, 1.3); }
-function canChute(f){ return !!f && up1("chute") > 0 && !f.room && !f.omega && G1.mode === "flight" && !f.chute && f.touchT < 0 && f.t < f.T * 0.97; }
+function canChute(f){ return !!f && up1("chute") > 0 && !f.omega && G1.mode === "flight" && !f.chute && f.touchT < 0 && f.t < f.T * 0.97; }
 function g1Chute(){
   const f = G1.flight;
   if(!canChute(f)) return false;
   /* pressed on the way up: it opens by itself at the top */
-  if(f.t < f.ph.hang * f.T){ if(!f.chuteQ){ f.chuteQ = true; play("click"); floatText("PARACHUTE READY", W / 2, bottleScreenY() - f.hB * 1.4, "#9fe8ff", 15, 0.9); } return true; }
+  if(f.t < chuteFrom(f)){ if(!f.chuteQ){ f.chuteQ = true; play("click"); floatText("PARACHUTE READY", W / 2, bottleScreenY() - f.hB * 1.4, "#9fe8ff", 15, 0.9); } return true; }
   openChute(f);
   return true;
 }
@@ -6463,9 +6466,15 @@ function spawnLoot(f){
       value:unit * (kind === "coin" ? 0.12 : kind === "star" ? 0.3 : 0.8), got:false });
   }
 }
-function lootScreen(l){
+function lootBase(l){
   if(l.room) return { x:l.x * W, y:floorY() - l.px + G1.roomY };
   return { x:l.x * W, y:lmY(l.L, G1.camL) };
+}
+/* where the loot is drawn: a magnet pulls it in toward the bottle */
+function lootScreen(l){
+  const p = lootBase(l);
+  if(l.pull > 0){ const e = l.pull * l.pull; p.x = lerp(p.x, W / 2 + G1.x, e); p.y = lerp(p.y, bottleScreenY(), e); }
+  return p;
 }
 function collectLoot(l, auto){
   l.got = true;
@@ -6478,17 +6487,20 @@ function collectLoot(l, auto){
   burst(8, { x:p.x, y:p.y, speed:120, life:0.5, size:3, type:"glow", col:l.kind === "gem" ? "#7affff" : "#ffd23a", g:0, world:true });
   if(!auto && !save.meta.tips.loot) save.meta.tips.loot = 1;
 }
-function lootMagnet(f){
+function lootMagnet(f, dt){
   const range = Math.max(magnetRange(up1("magnet")), buffOn("magnet") ? 260 : 0);
   if(!range) return;
-  /* measured from where the bottle really is; loot that zipped past the bottle since last frame still counts */
+  /* measured from where the bottle really is; loot that zipped past the bottle since last frame still counts.
+     Caught loot flies into the bottle so you can see the magnet working */
   const by = bottleScreenY(), bx = W / 2 + G1.x;
   for(const l of f.loot){
-    if(l.got || l.room) continue;
-    const p = lootScreen(l), dy = p.y - by, pdy = l.pdy;
-    l.pdy = dy;
-    if(Math.abs(p.x - bx) > range) continue;
-    if(Math.abs(dy) < range * 0.7 || (pdy !== undefined && Math.sign(pdy) !== Math.sign(dy))) collectLoot(l, true);
+    if(l.got) continue;
+    if(!l.pull){
+      const p = lootBase(l), dx = p.x - bx, dy = p.y - by, pdy = l.pdy;
+      l.pdy = dy;
+      if(Math.hypot(dx, dy * 0.8) < range || (pdy !== undefined && Math.sign(pdy) !== Math.sign(dy) && Math.abs(dx) < range)) l.pull = 0.001;
+    }
+    if(l.pull){ l.pull = Math.min(1, l.pull + dt * 5); if(l.pull >= 1) collectLoot(l, true); }
   }
 }
 
@@ -11840,7 +11852,7 @@ function buyUp1(u){
   g1.coins -= c; g1.up[u.id] = l + 1;
   if(u.id === "keeper") g1.shields = Math.min(g1.up.keeper, g1.shields + 1);
   if(u.id === "auto"){ g1.autoOn = true; tip("auto"); }
-  if(u.id === "chute" && l === 0) tip("chute");
+  if(u.id === "chute" && l === 0){ g1.autoChute = true; tip("chute"); }
   play("buy"); buzz("tap");
   checkAchSoon(); persist(); paintHud();
   return true;
@@ -12093,11 +12105,13 @@ SHEETS.upgrades = {
   sub:() => "They stay until the universe breaks.",
   render(body){
     upgradeRows(body, UPG1, up1, (u, l) => upCost(u, l), buyUp1, "coins", (u, box) => {
-      if(u.id !== "auto") return;
-      const tg = mkBtn("", "", () => { save.g1.autoOn = !save.g1.autoOn; persist(); paintHud(); sheetRefresh(); });
+      /* on/off switches next to Auto Flip and Parachute (auto parachute opens it at the top of every flip) */
+      if(u.id !== "auto" && u.id !== "chute") return;
+      const key = u.id === "auto" ? "autoOn" : "autoChute";
+      const tg = mkBtn("", "", () => { save.g1[key] = !save.g1[key]; persist(); paintHud(); sheetRefresh(); });
       tg.style.minWidth = "54px";
       box.insertBefore(tg, box.lastChild);
-      onRefresh(() => { const own = up1("auto") > 0; tg.style.display = own ? "" : "none"; tg.textContent = save.g1.autoOn ? "ON" : "OFF"; tg.className = save.g1.autoOn ? "" : "sel"; });
+      onRefresh(() => { const own = up1(u.id) > 0; tg.style.display = own ? "" : "none"; tg.textContent = (u.id === "chute" ? "AUTO " : "") + (save.g1[key] ? "ON" : "OFF"); tg.className = save.g1[key] ? "" : "sel"; });
     });
   }
 };
