@@ -176,7 +176,7 @@ body.g2 .big{background:repeating-linear-gradient(-45deg,#ffcc1a 0 14px,#f0b800 
 .tabs button{background:var(--btn);color:var(--mute);font-size:11px;padding:7px 11px;border-radius:999px;flex:none}
 .tabs button.on{background:var(--accent);color:var(--ink)}
 .tabs button.locked{opacity:.5}
-.scroll{overflow-y:auto;padding:2px 2px 6px;-webkit-overflow-scrolling:touch;min-height:0;flex:1}
+.scroll{overflow-y:auto;overflow-anchor:none;padding:2px 2px 6px;-webkit-overflow-scrolling:touch;min-height:0;flex:1}
 .closer{margin-top:10px;padding:13px;background:var(--btn);color:var(--text);font-size:14px;flex:none}
 .sec{display:flex;align-items:center;gap:8px;margin:14px 0 8px}
 .sec:first-child{margin-top:2px}
@@ -11607,10 +11607,11 @@ function renderSheet(resetScroll){
   SH.refresh = []; SH.cards = []; SH.vis.clear(); SH.focusI = -1;
   body.innerHTML = "";
   d.render(body, SH.tab);
+  /* fill in every row first, then put the scroll back, so buying something never moves the list */
+  sheetRefresh();
   body.scrollTop = keep;
   const on = tb.querySelector("button.on");
-  if(on && on.scrollIntoView) on.scrollIntoView({ block:"nearest", inline:"nearest" });
-  sheetRefresh();
+  if(on) tb.scrollLeft = Math.max(0, on.offsetLeft - tb.clientWidth / 2 + on.offsetWidth / 2);
 }
 function onRefresh(fn){ SH.refresh.push(fn); }
 function sheetRefresh(){ for(const fn of SH.refresh){ try{ fn(); }catch(e){ console.error(e); } } }
