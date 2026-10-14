@@ -1485,8 +1485,15 @@ function buffDurLv(l){ return 30 + l * 6; }
 function eyeMul(l){ return 1 + l * 0.12; }
 function lootMul(l){ return 1 + l * 0.5; }
 function magnetRange(l){ return l ? 40 + l * 22 : 0; }
+/* parachutes: each level is a new, cooler chute that falls slower */
+const CHUTES = [
+  { name:"Canvas Chute",  slow:0.42 },
+  { name:"Racing Wing",   slow:0.32 },
+  { name:"Golden Glider", slow:0.24 }
+];
 const UPG1 = [
   { id:"fall",  name:"Fall Speed",      max:10, base:90,   grow:2.15, desc:l => "Flights take " + Math.round(fallMul(l) * 100) + "% of the time" },
+  { id:"chute", name:"Parachute",       max:3,  base:1500, grow:15,   desc:l => l ? CHUTES[l - 1].name + ": the way down takes " + (1 / CHUTES[l - 1].slow).toFixed(1) + "x longer" : "Float down slowly and grab more sky loot" },
   { id:"grip",  name:"Landing Grip",    max:8,  base:70,   grow:2.4,  desc:l => "Base landing odds " + Math.round(baseLand(l) * 100) + "%" },
   { id:"mult",  name:"Coin Multiplier", max:20, base:110,  grow:2.6,  desc:l => "All coins " + fmtMul(coinMulLv(l)) },
   { id:"keeper",name:"Streak Keeper",   max:3,  base:400,  grow:5,    desc:l => l ? l + " shield" + (l > 1 ? "s" : "") + ", one refills every 4 landings" : "Survive a miss without losing your streak" },
@@ -1619,6 +1626,7 @@ const REBORN_ITEMS = [
 
 /* ---- pop-up tips (shown once) ---- */
 const TIPS = {
+  chute:    ["PARACHUTE", "On the way down, press Space (or tap FLIP) to open it. You float slowly, even with Fall Speed maxed."],
   welcome:  ["FLIP!", "Tap FLIP (or press Space). Better bottles fly higher and pay more."],
   ring:     ["STICK THE LANDING", "When the ring closes around your bottle, tap. Nail it for a PERFECT."],
   loot:     ["SKY LOOT", "Tap the coins and gems floating past during a flight."],
@@ -6067,7 +6075,7 @@ function startFlip(auto){
   const room = ht <= 1;
   const k = bottleScale(), hB = B.shape.h * k;
   const f = {
-    B:B, ht:ht, D:D, Lmax:D.L, T:FLIGHT_T[ht] * fm, t:0, room:room, cosmic:!room && D.land !== "table", land:D.land,
+    B:B, ht:ht, D:D, Lmax:D.L, T:FLIGHT_T[ht] * fm, T0:FLIGHT_T[ht], t:0, room:room, cosmic:!room && D.land !== "table", land:D.land,
     spins:room ? (Math.random() < 0.55 ? 1 : 2) : clamp(2 + ht, 3, 14),
     capTry:Math.random() < 0.04, golden:Math.random() < goldenChance(),
     drift:room ? (Math.random() * 2 - 1) * 16 + G1.wind * 0.6 : (Math.random() * 2 - 1) * 10,
@@ -6099,7 +6107,9 @@ function startFlip(auto){
 /* where the bottle is, frame by frame */
 function updateFlight(dt){
   const f = G1.flight;
-  f.t += dt;
+  if(f.chuteQ && !f.chute && f.t >= f.ph.hang * f.T) openChute(f);
+  if(f.chute) f.chute.age += dt;
+  f.t += dt * (f.chute ? chuteRate(f) : 1);
   const u = clamp(f.t / f.T, 0, 1);
   const fy = floorY();
   if(f.vis && !f.vis.started && f.t >= f.vis.at){ startVisitor(f); return; }
@@ -6182,10 +6192,29 @@ function ringTap(f){
   else { play("click"); floatText(err < 0 ? "EARLY" : "LATE", W / 2, bottleScreenY() - f.hB * 1.5, "#9fb8c2", 15, 0.7); }
 }
 
+/* ---------- parachute ---------- */
+/* while it's open the way down runs on the chute's own speed, so Fall Speed upgrades don't rush it */
+function chuteRate(f){ return CHUTES[f.chute.lvl - 1].slow * clamp(f.T / (f.T0 || f.T), 0.4, 1.3); }
+function canChute(f){ return !!f && up1("chute") > 0 && !f.room && !f.omega && G1.mode === "flight" && !f.chute && f.touchT < 0 && f.t < f.T * 0.97; }
+function g1Chute(){
+  const f = G1.flight;
+  if(!canChute(f)) return false;
+  /* pressed on the way up: it opens by itself at the top */
+  if(f.t < f.ph.hang * f.T){ if(!f.chuteQ){ f.chuteQ = true; play("click"); floatText("PARACHUTE READY", W / 2, bottleScreenY() - f.hB * 1.4, "#9fe8ff", 15, 0.9); } return true; }
+  openChute(f);
+  return true;
+}
+function openChute(f){
+  f.chute = { lvl:clamp(up1("chute"), 1, CHUTES.length), age:0 };
+  f.chuteQ = false;
+  play("whoosh", 1.4); play("flop"); buzz("tap");
+}
+
 /* ---------- touchdown + the roll ---------- */
 function touchdown(){
   const f = G1.flight;
   f.touchT = f.t;
+  if(f.chute) G1.chuteFall = { lvl:f.chute.lvl, t:0 };
   G1.altPx = 0; G1.roomY = 0;
   if(!f.cosmic){ G1.blend = 0; G1.camL = 0; }
   G1.rot = f.rotEnd;
@@ -6562,6 +6591,7 @@ function g1Key(){
   if(G1.mode === "idle"){ startFlip(false); return; }
   const f = G1.flight;
   if(G1.mode === "flight" && f && ringActive(f)) ringTap(f);
+  else if(G1.mode === "flight" && f) g1Chute();
   else if(G1.mode === "replay") stopReplay();
 }
 
@@ -6875,6 +6905,58 @@ const LM_NAMES = { heli:"NEWS HELICOPTER", hotair:"HOT AIR BALLOON", plane:"AIRL
   saturn:"SATURN", uranus:"URANUS", neptune:"NEPTUNE", pluto:"PLUTO", voyager:"VOYAGER 1", oort:"OORT CLOUD", proxima:"PROXIMA CENTAURI",
   cluster:"STAR CLUSTER", milkyway:"THE MILKY WAY", andromeda:"ANDROMEDA", clusters:"GALAXY CLUSTERS", web:"THE COSMIC WEB", edge:"EDGE OF THE UNIVERSE", multiverse:"THE MULTIVERSE" };
 
+/* ---------- parachutes ---------- */
+/* x, y = the bottle; hB = bottle height on screen; open = 0..1 how far it has opened */
+function drawChute(g, x, y, hB, lvl, open, t, alpha){
+  const s = open < 1 ? 1 + 2.2 * Math.pow(open - 1, 3) + 1.2 * Math.pow(open - 1, 2) : 1;   /* pops open with a little overshoot */
+  const cw = hB * (lvl === 2 ? 1.9 : 1.55) * s, dh = cw * (lvl === 2 ? 0.2 : 0.42);
+  const cy = y - hB * 1.25 - cw * 0.1, sway = Math.sin(t * 1.7) * 0.07;
+  g.save(); g.globalAlpha = alpha;
+  /* lines from the canopy edge down to the bottle */
+  g.strokeStyle = lvl === 3 ? "rgba(255,230,160,.8)" : "rgba(235,240,245,.7)"; g.lineWidth = 1;
+  const n = lvl === 2 ? 7 : 6;
+  for(let i = 0; i <= n; i++){
+    const rx = -cw / 2 + cw * i / n;
+    g.beginPath(); g.moveTo(x + Math.cos(sway) * rx, cy + Math.sin(sway) * rx + 2); g.lineTo(x, y - hB * 0.3); g.stroke();
+  }
+  g.translate(x, cy); g.rotate(sway);
+  if(lvl === 3) glowAdd(g, 0, -dh * 0.4, cw * 0.9, "#ffd76b", 0.35 + 0.1 * Math.sin(t * 4));
+  if(lvl === 2){
+    /* ram-air racing wing: an arched strip of cells, red and black */
+    const outer = new Path2D(); outer.moveTo(-cw / 2, 4); outer.quadraticCurveTo(0, -dh * 2.2, cw / 2, 4); outer.lineTo(cw / 2, -4); outer.quadraticCurveTo(0, -dh * 2.2 - 12, -cw / 2, -4); outer.closePath();
+    g.save(); g.clip(outer);
+    for(let i = 0; i < 9; i++){ g.fillStyle = i % 2 ? "#141414" : "#e0242a"; g.fillRect(-cw / 2 + cw * i / 9, -dh * 3, cw / 9 + 1, dh * 4 + 20); }
+    const sh = g.createLinearGradient(0, -dh * 2.4, 0, 6); sh.addColorStop(0, "rgba(255,255,255,.35)"); sh.addColorStop(1, "rgba(0,0,0,.35)");
+    g.fillStyle = sh; g.fillRect(-cw / 2, -dh * 3, cw, dh * 4 + 20);
+    g.restore();
+    g.strokeStyle = "rgba(0,0,0,.6)"; g.lineWidth = 1.2; g.stroke(outer);
+  }else{
+    /* round canopy: gores that meet at the top */
+    const dome = new Path2D(); dome.moveTo(-cw / 2, 0); dome.bezierCurveTo(-cw / 2, -dh * 1.35, cw / 2, -dh * 1.35, cw / 2, 0);
+    for(let i = n; i > 0; i--){ const x1 = -cw / 2 + cw * i / n, x0 = -cw / 2 + cw * (i - 1) / n; dome.quadraticCurveTo((x0 + x1) / 2, -dh * 0.16, x0, 0); }
+    dome.closePath();
+    g.save(); g.clip(dome);
+    for(let i = 0; i < n; i++){
+      const x0 = -cw / 2 + cw * i / n, x1 = -cw / 2 + cw * (i + 1) / n;
+      g.fillStyle = lvl === 3 ? (i % 2 ? "#f6c945" : "#c98a0e") : (i % 2 ? "#f4f1ea" : "#f07a1a");
+      g.beginPath(); g.moveTo(0, -dh * 1.05); g.lineTo(x0 * 1.2, 2); g.lineTo(x1 * 1.2, 2); g.closePath(); g.fill();
+    }
+    const hl = g.createRadialGradient(-cw * 0.18, -dh * 0.9, 2, 0, -dh * 0.4, cw * 0.62);
+    hl.addColorStop(0, "rgba(255,255,255,.4)"); hl.addColorStop(0.5, "rgba(255,255,255,0)"); hl.addColorStop(1, "rgba(0,0,0,.3)");
+    g.fillStyle = hl; g.fillRect(-cw / 2, -dh * 1.4, cw, dh * 1.5);
+    g.restore();
+    g.strokeStyle = lvl === 3 ? "rgba(255,240,190,.9)" : "rgba(60,40,20,.45)"; g.lineWidth = lvl === 3 ? 1.6 : 1; g.stroke(dome);
+    if(lvl === 3){
+      /* a star on top and sparkles falling off the edge */
+      g.fillStyle = "#fff6d0"; g.beginPath();
+      for(let i = 0; i < 10; i++){ const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? cw * 0.035 : cw * 0.085; g.lineTo(Math.cos(a) * r, -dh * 0.62 + Math.sin(a) * r); }
+      g.fill();
+      for(let i = 0; i < 6; i++){ const ph = (t * 0.8 + i / 6) % 1; glowAdd(g, (hash01(i) - 0.5) * cw, ph * hB * 0.9, 3 + hash01(i + 2) * 3, "#ffe7a0", 1 - ph); }
+    }
+  }
+  g.restore();
+}
+
 /* visitor actors */
 /* how big each visitor is next to the bottle, and where its feet are in its own drawing units */
 const VIS_SIZE = { dog:[1.5, 31], kid:[1.7, 46.8], mom:[2.0, 65], raccoon:[1.3, 25], cat:[1.15, 25], monkey:[1.3, 39] };
@@ -7044,6 +7126,14 @@ function drawG1(t, dt){
     const x = W / 2 + G1.x, y = bottleScreenY();
     if(f && f.golden && (G1.mode === "flight" || G1.mode === "settle")) glowAdd(ctx, x, y, B.shape.h * k * 1.8, "#ffd166", 0.6);
     drawBottleAt(ctx, B, x, y, G1.rot, G1.squash, t, { heat:G1.heat, alpha:G1.alpha });
+    const hBc = B.shape.h * k;
+    if(f && f.chute && G1.mode === "flight" && f.touchT < 0) drawChute(ctx, x, y, hBc, f.chute.lvl, Math.min(1, f.chute.age / 0.35), t, 1);
+    else if(G1.chuteFall){
+      /* after landing the chute drops down over the bottle and fades */
+      const cf = G1.chuteFall; cf.t += dt;
+      if(cf.t > 0.8) G1.chuteFall = null;
+      else drawChute(ctx, x + cf.t * 30, y + cf.t * cf.t * hBc * 1.4, hBc * (1 - cf.t * 0.35), cf.lvl, 1, t, 1 - cf.t / 0.8);
+    }
     if(f && f.golden && (G1.mode === "flight" || G1.mode === "settle")){
       ctx.save(); ctx.translate(x, y); ctx.rotate(G1.rot); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.35;
       ctx.fillStyle = "#ffcf4a"; ctx.fill(bottleGeom(B.shape, k).body); ctx.restore();
@@ -11245,7 +11335,9 @@ function hudG1(){
   let r = esc(curPlace().name);
   if(top < NTIERS - 1) r = "Tier " + (top + 2) + ": " + countInTier(top) + "/5 &middot; " + r;
   setHTML("sub-r", r);
-  setText("flip-sub", "+" + fmt(payPreview(B)) + " per landing");
+  const fl = G1.flight;
+  setText("flip-sub", G1.mode === "flight" && fl && fl.chute ? CHUTES[fl.chute.lvl - 1].name + " open" :
+    G1.mode === "flight" && canChute(fl) ? (fl.chuteQ ? "parachute ready" : "tap for PARACHUTE") : "+" + fmt(payPreview(B)) + " per landing");
   const autoOwned = up1("auto") > 0;
   setOn("auto", "on", autoOwned);
   setOn("auto", "live", autoOwned && g1.autoOn);
@@ -11745,6 +11837,7 @@ function buyUp1(u){
   g1.coins -= c; g1.up[u.id] = l + 1;
   if(u.id === "keeper") g1.shields = Math.min(g1.up.keeper, g1.shields + 1);
   if(u.id === "auto"){ g1.autoOn = true; tip("auto"); }
+  if(u.id === "chute" && l === 0) tip("chute");
   play("buy"); buzz("tap");
   checkAchSoon(); persist(); paintHud();
   return true;
@@ -11797,6 +11890,7 @@ function drawUpIcon(g, w, hh, id, t){
   g.translate(w / 2, hh / 2);
   g.strokeStyle = "#dfeae8"; g.fillStyle = "#dfeae8"; g.lineWidth = 2; g.lineCap = "round"; g.lineJoin = "round";
   switch(id){
+    case "chute": g.beginPath(); g.arc(0, -2, 10, Math.PI, TAU); g.closePath(); g.fill(); g.beginPath(); g.moveTo(-10, -2); g.lineTo(0, 11); g.lineTo(10, -2); g.moveTo(0, -2); g.lineTo(0, 11); g.stroke(); break;
     case "fall": g.beginPath(); g.moveTo(0, -12); g.lineTo(0, 10); g.moveTo(-7, 3); g.lineTo(0, 10); g.lineTo(7, 3); g.stroke(); g.globalAlpha = 0.5; g.beginPath(); g.moveTo(-9, -10); g.lineTo(-9, -2); g.moveTo(9, -10); g.lineTo(9, -2); g.stroke(); break;
     case "grip": g.beginPath(); g.ellipse(0, 6, 11, 4, 0, 0, TAU); g.stroke(); g.fillRect(-3, -12, 6, 16); break;
     case "mult": ctext(g, "x2", 0, 1, 16, "#f3b229", "center", "18px Anton, Impact, sans-serif", false); break;
@@ -12323,7 +12417,7 @@ const KEY_ACTIONS = [
   ["action", "Main action (flip, smash, punch)", "Space", 0],
   ["bottles", "Bottles", "KeyB", 1], ["upgrades", "Upgrades", "KeyU", 0], ["missions", "Missions", "KeyM", 0],
   ["places", "Places", "KeyP", 1], ["daily", "Daily", "KeyD", 0], ["style", "Style", "KeyS", 1], ["book", "Book", "KeyK", 0],
-  ["trophies", "Trophies", "KeyT", 0], ["menu", "Menu", "KeyO", 0], ["auto", "Auto on/off", "KeyA", 1], ["replay", "Replay", "KeyR", 1],
+  ["trophies", "Trophies", "KeyT", 0], ["menu", "Menu", "KeyO", 0], ["auto", "Auto on/off", "KeyA", 1], ["replay", "Replay", "KeyR", 1], ["chute", "Parachute (or Space while falling)", "KeyV", 1],
   ["crates", "Crates", "KeyC", 2], ["weapons", "Weapons", "KeyW", 2], ["bosses", "Bosses", "KeyX", 2], ["targets", "Targets", "KeyG", 3],
   ["throw", "Throw a rock", "KeyE", 3]
 ];
@@ -13334,6 +13428,7 @@ window.addEventListener("keydown", e => {
     return;
   }
   if(a === "replay"){ if(save.chapter === 1) startReplay(); return; }
+  if(a === "chute"){ if(save.chapter === 1) g1Chute(); return; }
   if(a === "throw"){ if(save.chapter === 3){ audioInit(); g3ThrowNext(); } return; }
   const name = sheetForAction(a);
   if(!name) return;
