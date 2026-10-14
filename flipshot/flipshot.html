@@ -1484,7 +1484,7 @@ function glassChance(l){ return 0.06 + l * 0.03; }
 function buffDurLv(l){ return 30 + l * 6; }
 function eyeMul(l){ return 1 + l * 0.12; }
 function lootMul(l){ return 1 + l * 0.5; }
-function magnetRange(l){ return l ? 40 + l * 22 : 0; }
+function magnetRange(l){ return l ? 90 + l * 45 : 0; }
 /* parachutes: each level is a new, cooler chute that falls slower */
 const CHUTES = [
   { name:"Canvas Chute",  slow:0.42 },
@@ -6479,13 +6479,16 @@ function collectLoot(l, auto){
   if(!auto && !save.meta.tips.loot) save.meta.tips.loot = 1;
 }
 function lootMagnet(f){
-  const range = Math.max(magnetRange(up1("magnet")), buffOn("magnet") ? 200 : 0);
+  const range = Math.max(magnetRange(up1("magnet")), buffOn("magnet") ? 260 : 0);
   if(!range) return;
-  const by = bottleScreenY();
+  /* measured from where the bottle really is; loot that zipped past the bottle since last frame still counts */
+  const by = bottleScreenY(), bx = W / 2 + G1.x;
   for(const l of f.loot){
     if(l.got || l.room) continue;
-    const p = lootScreen(l);
-    if(Math.abs(p.y - by) < range * 0.5 && Math.abs(p.x - W / 2) < range) collectLoot(l, true);
+    const p = lootScreen(l), dy = p.y - by, pdy = l.pdy;
+    l.pdy = dy;
+    if(Math.abs(p.x - bx) > range) continue;
+    if(Math.abs(dy) < range * 0.7 || (pdy !== undefined && Math.sign(pdy) !== Math.sign(dy))) collectLoot(l, true);
   }
 }
 
