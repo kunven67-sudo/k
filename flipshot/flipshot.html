@@ -6167,7 +6167,8 @@ function updateFlight(dt){
 
 /* ---------- stick the landing ---------- */
 function ringTime(f){ return Math.min(0.78, f.T * 0.62); }
-function ringActive(f){ return f && G1.mode === "flight" && !f.tap && f.t >= f.T - ringTime(f) && f.t <= f.T + ringWindows(f.ht).good; }
+/* no timing ring: landings are pure chance (better bottles and upgrades = better odds) */
+function ringActive(f){ return false; }
 function ringTap(f){
   const w = ringWindows(f.ht), err = f.t - f.T;
   let res = "miss";
@@ -6220,7 +6221,7 @@ function landWin(f, clutch){
   if(f.capTry){ pay *= 5; tags.push("CAP STAND"); g1.stats.caps++; }
   if(f.golden){ pay *= 10; tags.push("GOLDEN FLIP"); g1.stats.golden++; }
   if(clutch){ pay *= 1.5; tags.push("CLUTCH"); g1.stats.clutch++; missionTick(1, "clutch", 1); }
-  if(f.tap && f.tap.res === "perfect"){ pay *= 1.5; tags.push("PERFECT"); g1.stats.perfects++; missionTick(1, "perfects", 1); }
+  if(Math.random() < 0.2){ pay *= 1.5; tags.push("PERFECT"); g1.stats.perfects++; missionTick(1, "perfects", 1); }
   earn("coins", pay);
   g1.stats.lands++; g1.runLands++;
   if(g1.streak > g1.runBest) g1.runBest = g1.streak;
@@ -7046,7 +7047,7 @@ function drawG1(t, dt){
       ctx.fillStyle = "#ffcf4a"; ctx.fill(bottleGeom(B.shape, k).body); ctx.restore();
     }
   }
-  drawRing(ctx, f, t);
+  /* (the old timing ring is gone) */
   drawParts(ctx);
   drawFloats(ctx);
   if(G1.mode === "warp"){

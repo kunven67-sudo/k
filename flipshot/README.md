@@ -8,7 +8,7 @@ Open `flipshot.html` in a browser on PC or phone. It's one file with nothing to 
 
 ## Controls
 
-- Space, Enter or tap: flip. Tap again right when the ring closes to stick the landing.
+- Space, Enter or tap: flip. Landing is luck: better bottles and upgrades raise your odds.
 - B bottles, U upgrades, M missions, P places, D daily, S style, K book, T trophies, O menu
 - A auto flip on/off, R replay your last flip
 - Esc closes menus, Tab switches menu tabs, arrow keys move through menu buttons
