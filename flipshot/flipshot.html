@@ -1157,7 +1157,7 @@ function rivalById(id){ for(const r of RIVALS) if(r.id === id) return r; return 
 /* ================= GLASS + BUFFS ================= */
 const GLASSES = [
   { id:"cup",    name:"Cup",        w:52, buffs:["coins","speed","grip"] },
-  { id:"wine",   name:"Wine Glass", w:27, buffs:["lucky","magnet","perfect"] },
+  { id:"wine",   name:"Wine Glass", w:27, buffs:["lucky","magnet"] },
   { id:"mirror", name:"Mirror",     w:14, buffs:["guard","moon"] },
   { id:"tv",     name:"Old TV",     w:7,  buffs:["triple"] }
 ];
@@ -1474,6 +1474,8 @@ const VISITORS3 = [
    ===================================================================== */
 
 /* ---- chapter 1 upgrades ---- */
+/* chance a landing counts as PERFECT (x1.5 pay) */
+function perfectChance(eye, hawk){ return Math.min(0.6, 0.2 + eye * 0.04 + hawk * 0.02); }
 function fallMul(l){ return 1 - l * 0.045; }               /* 10 levels: flights take 55% of the time */
 function baseLand(l){ return 0.5 + l * 0.03; }              /* 50% .. 74% */
 function coinMulLv(l){ return 1 + l * 0.4; }
@@ -1493,7 +1495,7 @@ const UPG1 = [
   { id:"stack", name:"Double Buff",     max:5,  base:1800, grow:3.1,  desc:l => l ? Math.round(l * 12) + "% chance glass gives two buffs" : "Glass can give two buffs at once" },
   { id:"auto",  name:"Auto Flip",       max:1,  base:1500, grow:1,    desc:l => l ? "Flips on its own. Toggle it on the table" : "Keeps flipping without tapping" },
   { id:"magnet",name:"Magnet",          max:5,  base:900,  grow:3.2,  desc:l => l ? "Pulls in sky loot from " + magnetRange(l) + "px away" : "Sky loot flies to you" },
-  { id:"eye",   name:"Steady Eye",      max:5,  base:700,  grow:3.2,  desc:l => "Landing ring " + Math.round(eyeMul(l) * 100) + "% as wide" },
+  { id:"eye",   name:"Steady Eye",      max:5,  base:700,  grow:3.2,  desc:l => Math.round(perfectChance(l, 0) * 100) + "% of landings are PERFECT" },
   { id:"loot",  name:"Sky Loot",        max:6,  base:1100, grow:3.2,  desc:l => "Sky loot worth " + fmtMul(lootMul(l)) },
   { id:"idle",  name:"Idle Hours",      max:6,  base:2500, grow:4.2,  desc:l => "Auto flip earns while away for up to " + IDLE_HOURS[l] + "h" }
 ];
@@ -1599,7 +1601,7 @@ const MISSIONS = {
 /* ---- rebirth shop ---- */
 const PERKS = [
   { id:"soul",   name:"Steady Soul",      max:5, cost:l => 2 + l * 2, desc:l => "+" + (l * 2) + "% landing odds in FLIP" },
-  { id:"hawk",   name:"Hawk Eye",         max:5, cost:l => 2 + l * 2, desc:l => "Landing ring +" + (l * 10) + "% wider" },
+  { id:"hawk",   name:"Hawk Eye",         max:5, cost:l => 2 + l * 2, desc:l => "+" + (l * 2) + "% more PERFECT landings" },
   { id:"height", name:"Head for Heights", max:5, cost:l => 3 + l * 2, desc:l => "+" + (l * 15) + "% height bonus" },
   { id:"golden", name:"Golden Touch",     max:4, cost:l => 3 + l * 3, desc:l => "+" + (l * 0.5) + "% golden flip chance" },
   { id:"heavy",  name:"Heavy Hands",      max:5, cost:l => 3 + l * 2, desc:l => "+" + (l * 25) + "% crit damage in SMASH" },
@@ -6221,7 +6223,7 @@ function landWin(f, clutch){
   if(f.capTry){ pay *= 5; tags.push("CAP STAND"); g1.stats.caps++; }
   if(f.golden){ pay *= 10; tags.push("GOLDEN FLIP"); g1.stats.golden++; }
   if(clutch){ pay *= 1.5; tags.push("CLUTCH"); g1.stats.clutch++; missionTick(1, "clutch", 1); }
-  if(Math.random() < 0.2){ pay *= 1.5; tags.push("PERFECT"); g1.stats.perfects++; missionTick(1, "perfects", 1); }
+  if(Math.random() < perfectChance(up1("eye"), perk("hawk"))){ pay *= 1.5; tags.push("PERFECT"); g1.stats.perfects++; missionTick(1, "perfects", 1); }
   earn("coins", pay);
   g1.stats.lands++; g1.runLands++;
   if(g1.streak > g1.runBest) g1.runBest = g1.streak;
@@ -7388,7 +7390,7 @@ function smashGlass(){
   addBuff(b1);
   let b2 = null;
   if(Math.random() < up1("stack") * 0.12){
-    const all = ["coins", "grip", "speed", "lucky", "guard", "magnet", "moon", "perfect"].filter(x => x !== b1);
+    const all = ["coins", "grip", "speed", "lucky", "guard", "magnet", "moon"].filter(x => x !== b1);
     b2 = pickR(all); addBuff(b2); g1.stats.doubles++;
   }
   say(BUFFS[b1].name + (b2 ? " + " + BUFFS[b2].name : ""), G.type.name.toUpperCase(), BUFFS[b1].color);
