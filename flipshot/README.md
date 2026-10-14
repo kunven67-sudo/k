@@ -6,6 +6,8 @@ Open `flipshot.html` in a browser on PC or phone. It's one file with nothing to 
 
 `flipshot-trailer.mp4` is a recorded run through the whole game with the game's own sound. It shows everything, so skip it if you don't want spoilers.
 
+`flipshot-holidays.mp4` shows what the game looks like on Halloween, Christmas, New Year and Valentine's Day.
+
 ## Controls
 
 - Space, Enter or tap: flip. Landing is luck: better bottles and upgrades raise your odds.
