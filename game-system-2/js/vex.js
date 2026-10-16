@@ -40,7 +40,7 @@
     orb = h('button.vex-orb', { 'aria-label': 'VEX (your helper)', title: 'VEX: click to talk' },
       h('span.vo-glow'), h('span.vo-ring'), h('span.vo-ring.r2'), h('span.vo-swirl'), h('span.vo-core'), h('span.vo-eye'));
     var pos = U.lsGet('gs2:vexOrb', null);
-    if (pos && isFinite(pos.x) && isFinite(pos.y)) placeOrb(pos.x, pos.y);
+    if (!phone() && pos && isFinite(pos.x) && isFinite(pos.y)) placeOrb(pos.x, pos.y);
     var down = null, moved = false;
     orb.addEventListener('pointerdown', function (e) {
       down = { x: e.clientX, y: e.clientY, l: orb.offsetLeft, t: orb.offsetTop };
@@ -48,7 +48,7 @@
       try { orb.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     });
     orb.addEventListener('pointermove', function (e) {
-      if (!down) return;
+      if (!down || phone()) return;   /* phones: VEX lives in the top bar, so no dragging */
       var dx = e.clientX - down.x, dy = e.clientY - down.y;
       if (!moved && Math.hypot(dx, dy) > 6) moved = true;
       if (moved) { placeOrb(down.l + dx, down.t + dy); if (panel && open) placePanel(); }
@@ -71,12 +71,17 @@
     y = Math.max(4, Math.min(window.innerHeight - s - 4, y));
     orb.style.left = x + 'px'; orb.style.top = y + 'px'; orb.style.right = 'auto'; orb.style.bottom = 'auto';
   }
+  /* phones: the orb sits in the top bar (css), so it never covers cards or text */
+  function phone() { return window.matchMedia('(max-width: 620px)').matches; }
+  /* a game is on screen (apps in windows don't count) */
+  function inGame() { var p = document.getElementById('player'); return !!(p && !p.hidden); }
   var mood = 'idle';   /* idle | listening | thinking | talking */
   function setMood(m) { mood = m; paintOrb(); }
   function paintOrb() {
     if (!orb) return;
     orb.className = 'vex-orb mood-' + mood + ' color-' + orbColor() + (open ? ' open' : '');
-    var hidden = !on() || (st().vexIdle === 'hidden' && mood === 'idle' && !open);
+    /* while a game plays the orb stays out of the way; it comes back when you call VEX (hotkey, wake word) */
+    var hidden = !on() || (mood === 'idle' && !open && (st().vexIdle === 'hidden' || inGame()));
     orb.hidden = hidden;
     if (statusEl) statusEl.textContent = { idle: listening ? 'Listening for "VEX"' : 'Ready', listening: 'Listening…', thinking: thinkLabel || 'Thinking…', talking: 'Talking' }[mood];
   }
@@ -563,7 +568,14 @@
     await load();
     if (on()) makeOrb();
     if (window.speechSynthesis && speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = function () { /* voices are ready */ };
-    window.addEventListener('resize', U.debounce(function () { if (orb && orb.style.left) placeOrb(orb.offsetLeft, orb.offsetTop); if (open) placePanel(); }, 120));
+    window.addEventListener('resize', U.debounce(function () {
+      if (orb && phone()) { orb.style.left = orb.style.top = orb.style.right = orb.style.bottom = ''; }
+      else if (orb) { var pos = U.lsGet('gs2:vexOrb', null); if (pos && isFinite(pos.x)) placeOrb(pos.x, pos.y); else if (orb.style.left) placeOrb(orb.offsetLeft, orb.offsetTop); }
+      if (open) placePanel();
+    }, 120));
+    /* hide / show the orb when a game opens or closes */
+    var playerEl = document.getElementById('player');
+    if (playerEl && window.MutationObserver) new MutationObserver(paintOrb).observe(playerEl, { attributes: true, attributeFilter: ['hidden'] });
     document.addEventListener('fullscreenchange', function () {
       var root = UI.overlayRoot();
       [orb, panel].forEach(function (el) { if (el && el.parentNode !== root) root.appendChild(el); });

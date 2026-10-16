@@ -1980,8 +1980,11 @@ body.capturing .toasts, body.capturing .cap-prev, body.capturing .trophy-pop, bo
 @media (max-width: 620px) {
   /* phones: the chat has its own little orb, so the big one steps aside */
   .vex-orb.open { display: none; }
-  .vex-orb { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  /* the orb lives in the top bar next to the logo, so it never sits on top of cards or text */
+  .vex-orb { left: 62px; top: calc(14px + env(safe-area-inset-top)); bottom: auto; transform: scale(.68); transform-origin: 0 0; }
+  .brand { margin-right: 40px; }
 }
+@media (max-width: 400px) { .top-right { gap: 4px; } }
 /* VEX sits above games (z 100) but under dialogs (z 120) */
 .vex-orb { z-index: 110; }
 .vex-panel { z-index: 112; }

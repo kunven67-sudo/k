@@ -85,7 +85,7 @@
         return now + 'Themes change the colors, background, fonts, sounds and the title screen. Pick one in Settings → Look, or make your own from words or a picture. Some bonus themes unlock at higher levels.';
       },
       go: setting('look') },
-    { keys: ['moving background', 'background', 'lag', 'laggy', 'slow pc', 'battery', 'scanlines', 'less motion', 'animations'],
+    { keys: ['moving background', 'background', 'lag', 'laggy', 'lagging', 'slow', 'slow pc', 'choppy', 'low fps', 'battery', 'scanlines', 'less motion', 'animations'],
       say: 'Settings → Look → Moving background: Full, Calm (saves battery) or Off (fastest for slow PCs). "Less motion" turns off most animations.',
       go: setting('look') },
     { keys: ['trophy', 'trophies', 'achievement', 'achievements', 'level', 'levels', 'points', 'xp', 'rewards', 'level up', 'trophy room'],
@@ -137,7 +137,8 @@
       say: 'Games are saved inside your browser on this device, not online. Chrome lets a website use a big part of your free disk space, so even big games fit. Settings → Backups & data shows how much you use.',
       go: setting('data') },
     { keys: ['github', 'git hub'],
-      say: 'You don\'t need GitHub for anything. Your games live in your browser on your PC. If you find a game on GitHub, download it (green Code button → Download ZIP) and add the zip here. If it\'s a Windows .exe game, a website can\'t run it.' },
+      say: 'Game System doesn\'t need GitHub: your games live in your browser on this device. Got a game on GitHub? Open it there, press the green Code button → Download ZIP, then Add the zip here. Want your games online for any computer? Use Settings → Website folder and drag it onto Netlify. (Windows .exe games can\'t run in a website.)',
+      go: setting('website') },
     { keys: ['delete a game', 'remove a game', 'uninstall', 'delete game'],
       say: 'Right-click the game → Delete (it asks first). Or tell me "delete" and the name.' },
     { keys: ['delete everything', 'reset everything', 'wipe everything', 'start fresh', 'danger zone'],
