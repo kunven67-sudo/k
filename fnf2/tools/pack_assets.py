@@ -54,6 +54,12 @@ PACKS = {
         'preload/data/ui/freeplay/albums/*.json', 'preload/data/ui/freeplay/styles/*.json', 'fonts/YoureGone-Regular.otf',
         'preload/music/freeplayRandom/freeplayRandom.ogg', 'preload/music/freeplayRandom/freeplayRandom-metadata.json',
         *[f'shared/music/results{r}{p}/*' for r in ['SHIT', 'NORMAL', 'EXCELLENT', 'PERFECT'] for p in ['', '-pico']],
+        # results screen (safe versions only: no "hearts" naughty layer)
+        *[f'shared/images/resultScreen/{d}{e}' for d in ['', 'clearPercent/', 'rankText/', 'results-bf/resultsEXCELLENT/', 'results-bf/resultsGOOD/', 'results-bf/resultsGOOD/bf/',
+          'results-bf/resultsGREAT/bf/', 'results-bf/resultsGREAT/gf/', 'results-bf/resultsPERFECT/bed/', 'results-bf/resultsPERFECT/tickleFight/', 'results-bf/resultsSHIT/',
+          'results-pico/resultsGOOD/', 'results-pico/resultsGREAT/', 'results-pico/resultsPERFECT/', 'results-pico/resultsSHIT/'] for e in ['*.png', '*.xml', '*.json']],
+        'preload/sounds/ranks/*.ogg', 'shared/sounds/tickleFight.ogg',
+        'preload/data/stickerpacks/*.json', 'shared/images/transitionSwag/stickers-set-1/*.png', 'shared/images/transitionSwag/stickers-set-2/*.png', 'shared/sounds/stickersounds/keys/*.ogg',
         # sounds + music
         'preload/sounds/scrollMenu.ogg', 'preload/sounds/confirmMenu.ogg', 'preload/sounds/cancelMenu.ogg',
         'preload/sounds/fav.ogg', 'preload/sounds/unfav.ogg', 'preload/images/digital_numbers.*', 'preload/images/digital_numbers_pico.*',

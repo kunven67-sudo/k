@@ -61,6 +61,7 @@ G.audio = (function () {
         const off = Math.max(0, Math.min(buf.duration - 0.05, o.offset || 0));
         const end = o.end && o.end > off + 1 ? Math.min(o.end, buf.duration) : 0;
         if (M.loop && (off || end)) { src.loopStart = off; src.loopEnd = end || buf.duration; }
+        if (o.onEnd) src.onended = () => { if (M.src === src) { M.src = null; M.id = null; o.onEnd(); } };
         src.start(t, off); M.src = src; M.gain = g; M.start = t - off; M.dur = buf.duration;
         M.loopA = M.loop ? off : 0; M.loopB = M.loop ? (end || buf.duration) : buf.duration;
       });
@@ -75,6 +76,9 @@ G.audio = (function () {
     },
     setVolume(v, fade) { M.vol = v; if (!M.gain) return; const t = ctx.currentTime; M.gain.gain.cancelScheduledValues(t); M.gain.gain.setValueAtTime(M.gain.gain.value, t); M.gain.gain.linearRampToValueAtTime(Math.max(0.0001, v), t + (fade || 0.01)); },
     current() { return M.src ? { id: M.id, bpm: M.bpm } : null; },
+    // playback speed (pitch goes with it, like FlxSound.pitch)
+    setRate(r, fade) { if (!M.src) return; const p = M.src.playbackRate, t = ctx.currentTime; p.cancelScheduledValues(t); p.setValueAtTime(p.value, t); p.linearRampToValueAtTime(r, t + (fade || 0.01)); },
+    duration() { return M.dur || 0; },
     time() {
       if (!M.src) return 0; let t = (ctx.currentTime - M.start) * 1000 - A.latency(); if (t < 0) return 0;
       if (M.loop && M.dur) { const a = (M.loopA || 0) * 1000, b = (M.loopB || M.dur) * 1000; if (t >= b) t = a + (t - b) % (b - a); }

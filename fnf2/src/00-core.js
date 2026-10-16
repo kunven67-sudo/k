@@ -173,10 +173,12 @@ G.resize = function () {
 window.addEventListener('resize', () => G.resize());
 
 // transform helpers. All drawing happens in 1280x720 game space.
+// screen-wide camera zoom/offset a menu can set while it draws (freeplay rank camera, shakes)
+G.screenZoom = 1; G.screenOff = { x: 0, y: 0 };
 G.setScreenT = function (ctx, zoom) {
   // HUD space; optional zoom about the screen centre (FNF camHUD bop)
-  const q = G.q, z = zoom || 1;
-  ctx.setTransform(q * z, 0, 0, q * z, q * (G.W / 2) * (1 - z), q * (G.H / 2) * (1 - z));
+  const q = G.q, z = (zoom || 1) * (G.screenZoom || 1), o = G.screenOff;
+  ctx.setTransform(q * z, 0, 0, q * z, q * (G.W / 2) * (1 - z) + q * o.x, q * (G.H / 2) * (1 - z) + q * o.y);
 };
 G.Camera = class {
   constructor(x, y, zoom) { this.x = x || G.W / 2; this.y = y || G.H / 2; this.zoom = zoom || 1; this.angle = 0; this.sx = 0; this.sy = 0; this.shakeI = 0; this.shakeT = 0; }
@@ -745,9 +747,12 @@ G.loop = function () {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.canvas.width, G.canvas.height);
+  G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
   try { if (G.screen && G.screen.draw) G.screen.draw(ctx); } catch (e) { G.reportError(e, 'draw ' + G.screenName); }
+  G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   G.drawTransition(ctx);
+  if (G.stickers && G.stickers.active) { try { G.stickers.update(dt); G.stickers.draw(ctx); } catch (e) { G.reportError(e, 'stickers'); G.stickers.active = false; } }
   G.drawOverlay(ctx, dt);
   requestAnimationFrame(G.loop);
 };

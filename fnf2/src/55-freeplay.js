@@ -716,6 +716,7 @@
       this.fav = G.save.favorites = G.save.favorites || {};
       this.state = 'intro'; this.t = 0; this.went = false;
       this.fromResults = p.fromResults ? p : null;
+      if (p.fromResults) { if (p.songId) this.remember.id = p.songId; if (p.diff) this.remember.diff = p.diff; }
       // card, DJ
       this.card = this.player === 'pico' ? new PicoCard(this) : new Card(this, this.player);
       this.dj = new DJ(this.player);
@@ -792,7 +793,7 @@
       this.card.introDone();
       this.refreshDots(this.allDiffs.indexOf(this.diff), this.allDiffs.indexOf(this.diff));
       this.dotsVis = true; for (const d of this.dots) { d.alpha = 0; this.tw.to(d, { alpha: d.inactive ? 0.33 : 1 }, 0.5, E.quartOut); }
-      if (this.fromResults && this.fromResults.rank) {
+      if (this.fromResults && this.fromResults.rank && this.fromResults.playRankAnim) {
         const bad = this.fromResults.rank === 'LOSS' || this.fromResults.rank === 'SHIT';
         this.dj.fistPump(bad);
       }
