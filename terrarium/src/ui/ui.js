@@ -77,7 +77,7 @@ export class UI {
     this.micEl = h('div', { class: 'mic', style: { display: 'none' } });
     put(hud, this.bubbleLayer, this.tagLayer, this.vignette, this.cross, this.prompt, this.hotbarEl, this.statsEl, this.watchEl, this.topEl, this.feedEl, this.fpsEl, this.info, this.micEl);
     put(this.root, hud);
-    this.fadeEl = h('div', { class: 'fade' });
+    this.fadeEl = h('div', { class: 'fade passive' });
     this.toastEl = null;
     put(this.root, this.fadeEl);
     hud.style.display = 'none';

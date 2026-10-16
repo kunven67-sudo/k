@@ -16,7 +16,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #050807; col
 canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 #ui { position: fixed; inset: 0; pointer-events: none; }
 #ui > * { pointer-events: auto; }
-#ui .passive, #ui .passive * { pointer-events: none; }
+#ui .passive, #ui .passive *, #ui .fade { pointer-events: none; }
 button { font-family: var(--font); cursor: pointer; }
 input, select, textarea { font-family: var(--font); }
 
@@ -107,7 +107,7 @@ hr.sep { border: none; border-top: 1px solid var(--line); margin: 10px 0; }
 .feed .item.bad { border-color: var(--bad); }
 .feed .item.love { border-color: var(--love); }
 .feed .item.warm { border-color: var(--acc2); }
-.feed .item.click { pointer-events: auto; cursor: pointer; }
+#hud .feed .item.click { pointer-events: auto; cursor: pointer; }
 @keyframes fin { from { opacity: 0; transform: translateX(-8px); } }
 .toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); background: rgba(0,0,0,.72); padding: 9px 16px; border-radius: 10px; font-size: 15px; animation: fin .2s; text-align: center; max-width: 70vw; }
 .bubble { position: fixed; transform: translate(-50%, -100%); background: rgba(255,255,255,.95); color: #111; padding: 6px 10px; border-radius: 12px; font-size: 13px; max-width: 260px; line-height: 1.3; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
