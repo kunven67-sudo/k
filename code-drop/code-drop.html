@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CODE DROP</title>
+<meta name="theme-color" content="#0f1115">
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --line: #2a2f3a;
+    --text: #e6e8ee;
+    --dim: #8b93a5;
+    --accent: #ffb547;
+    --accent-ink: #1a1203;
+    --good: #57d38c;
+    --bad: #ff6b6b;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .logo {
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    font-size: 18px;
+    white-space: nowrap;
+  }
+  .logo b { color: var(--accent); }
+  .sub { color: var(--dim); font-size: 13px; }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .field {
+    display: flex;
+    align-items: center;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    flex: 1 1 260px;
+    min-width: 0;
+  }
+  .field label {
+    padding: 0 10px;
+    color: var(--dim);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+  .field input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    font: 15px var(--mono);
+    padding: 9px 10px 9px 0;
+    outline: none;
+  }
+  select, button {
+    font: 600 14px var(--sans);
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--text);
+    padding: 9px 12px;
+    cursor: pointer;
+  }
+  select { padding-right: 8px; }
+  button:hover, select:hover { border-color: #3c4352; }
+  button:active { transform: translateY(1px); }
+  button.primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .spacer { flex: 1; }
+  main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    position: relative;
+  }
+  .editor {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    min-width: 0;
+    background: var(--bg);
+  }
+  .gutter {
+    padding: 12px 8px 12px 12px;
+    color: #4d5566;
+    font: 13px/1.5 var(--mono);
+    text-align: right;
+    user-select: none;
+    overflow: hidden;
+    white-space: pre;
+    border-right: 1px solid var(--line);
+    min-width: 48px;
+  }
+  textarea {
+    flex: 1;
+    min-width: 0;
+    resize: none;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font: 13px/1.5 var(--mono);
+    padding: 12px;
+    white-space: pre;
+    overflow: auto;
+    tab-size: 2;
+  }
+  textarea::placeholder { color: #4d5566; }
+  .drop {
+    position: absolute;
+    inset: 12px;
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    background: rgba(15, 17, 21, 0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--accent);
+    pointer-events: none;
+  }
+  .drop.on { display: flex; }
+  footer {
+    display: flex;
+    gap: 16px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--dim);
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  footer .ok { color: var(--good); }
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 48px;
+    transform: translate(-50%, 20px);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    max-width: calc(100% - 32px);
+  }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  .toast.bad { border-color: var(--bad); }
+  .preview {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 11, 14, 0.96);
+    display: none;
+    flex-direction: column;
+    padding: 16px;
+    z-index: 10;
+  }
+  .preview.on { display: flex; }
+  .preview-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+  }
+  .preview-head span { flex: 1; font-weight: 700; }
+  .preview iframe {
+    flex: 1;
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+  }
+  input[type=file] { display: none; }
+  @media (max-width: 640px) {
+    header { padding: 10px 16px; }
+    .sub { display: none; }
+    .bar { padding: 10px 16px; }
+    .bar button, .bar select { flex: 1 1 auto; }
+    .spacer { display: none; }
+    .gutter { min-width: 36px; padding-left: 6px; }
+    .preview { padding: 8px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">CODE<b>DROP</b></div>
+  <div class="sub">Paste code, name it, download the file.</div>
+</header>
+
+<div class="bar">
+  <div class="field">
+    <label for="name">File name</label>
+    <input id="name" spellcheck="false" autocomplete="off" placeholder="my-game.html">
+  </div>
+  <select id="type" title="File type">
+    <option value="auto">Auto type</option>
+    <option value="html">.html</option>
+    <option value="js">.js</option>
+    <option value="css">.css</option>
+    <option value="py">.py</option>
+    <option value="json">.json</option>
+    <option value="md">.md</option>
+    <option value="txt">.txt</option>
+    <option value="csv">.csv</option>
+    <option value="xml">.xml</option>
+    <option value="svg">.svg</option>
+    <option value="bat">.bat</option>
+    <option value="sh">.sh</option>
+  </select>
+  <button id="openBtn" title="Load a file from your device">Open</button>
+  <button id="pasteBtn" title="Paste from clipboard">Paste</button>
+  <button id="copyBtn">Copy</button>
+  <button id="clearBtn">Clear</button>
+  <div class="spacer"></div>
+  <button id="previewBtn" title="Run HTML here">Preview</button>
+  <button id="dlBtn" class="primary" title="Ctrl+S">Download</button>
+  <input id="fileIn" type="file">
+</div>
+
+<main id="main">
+  <div class="editor">
+    <div class="gutter" id="gutter">1</div>
+    <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"
+      placeholder="Paste or type your code here, or drop a file on this box."></textarea>
+  </div>
+  <div class="drop" id="drop">Drop the file to load it</div>
+</main>
+
+<footer>
+  <span id="stLines">0 lines</span>
+  <span id="stSize">0 B</span>
+  <span id="stType">Type: -</span>
+  <span id="stSave"></span>
+</footer>
+
+<div class="preview" id="preview">
+  <div class="preview-head">
+    <span id="previewTitle">Preview</span>
+    <button id="tabBtn">Open in new tab</button>
+    <button id="closeBtn" class="primary">Close</button>
+  </div>
+  <iframe id="frame" title="Preview"
+    sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-pointer-lock allow-popups allow-downloads"
+    allow="fullscreen; autoplay; gamepad"></iframe>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var code = $('code'), gutter = $('gutter'), nameIn = $('name'), typeSel = $('type');
+  var toastEl = $('toast'), toastTimer = 0;
+
+  var MIME = {
+    html: 'text/html', js: 'text/javascript', css: 'text/css', py: 'text/x-python',
+    json: 'application/json', md: 'text/markdown', txt: 'text/plain', csv: 'text/csv',
+    xml: 'application/xml', svg: 'image/svg+xml', bat: 'text/plain', sh: 'text/x-sh'
+  };
+  var DRAFT_KEY = 'codedrop.draft.v1';
+
+  function toast(msg, bad) {
+    toastEl.textContent = msg;
+    toastEl.className = 'toast on' + (bad ? ' bad' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.className = 'toast' + (bad ? ' bad' : ''); }, 2200);
+  }
+
+  // Best guess at what kind of code this is.
+  function detect(src) {
+    var s = src.trim();
+    if (!s) return 'txt';
+    var head = s.slice(0, 600).toLowerCase();
+    if (/^<!doctype html|^<html|<head[\s>]|<body[\s>]/.test(head) || /<script[\s>]/.test(head)) return 'html';
+    if (/^<svg[\s>]/.test(head) || (/^<\?xml/.test(head) && head.indexOf('<svg') !== -1)) return 'svg';
+    if (/^<\?xml/.test(head)) return 'xml';
+    if (/^[\[{]/.test(s)) { try { JSON.parse(s); return 'json'; } catch (e) {} }
+    if (/^#!.*\b(ba|z)?sh\b/.test(head)) return 'sh';
+    if (/^@echo off/.test(head)) return 'bat';
+    if (/^(import |from \S+ import |def |class \w+[:(]|print\()/m.test(s) && !/[;{}]\s*$/m.test(s.slice(0, 2000))) return 'py';
+    if (/^\s*(\.|#|[a-z][\w-]*|\*|@media|@import|:root)[^{\n]*\{[^}]*:[^}]*\}/i.test(s) && !/\b(function|const|let|var)\b/.test(s.slice(0, 2000))) return 'css';
+    if (/\b(function|const|let|var|=>|document\.|window\.|console\.)\b/.test(s)) return 'js';
+    if (/^#{1,6} |\n#{1,6} /.test(s)) return 'md';
+    return 'txt';
+  }
+
+  function currentType() {
+    return typeSel.value === 'auto' ? detect(code.value) : typeSel.value;
+  }
+
+  // Windows-safe name with the right extension.
+  function fileName() {
+    var type = currentType();
+    var n = nameIn.value.trim().replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/^\.+/, '');
+    if (!n) n = 'my-file';
+    var m = n.match(/\.([a-z0-9]{1,6})$/i);
+    if (!m) n += '.' + type;
+    return n;
+  }
+
+  function extOf(n) {
+    var m = n.match(/\.([a-z0-9]{1,6})$/i);
+    return m ? m[1].toLowerCase() : '';
+  }
+
+  function fmtSize(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(2) + ' MB';
+  }
+
+  var lastLineCount = -1;
+  function refresh() {
+    var v = code.value;
+    var lines = v ? v.split('\n').length : 1;
+    if (lines !== lastLineCount) {
+      var out = new Array(lines);
+      for (var i = 0; i < lines; i++) out[i] = i + 1;
+      gutter.textContent = out.join('\n');
+      lastLineCount = lines;
+    }
+    gutter.scrollTop = code.scrollTop;
+    var bytes = new Blob([v]).size;
+    var name = fileName();
+    var ext = extOf(name);
+    $('stLines').textContent = lines + (lines === 1 ? ' line' : ' lines');
+    $('stSize').textContent = fmtSize(bytes);
+    $('stType').textContent = 'Type: .' + ext + (typeSel.value === 'auto' ? ' (auto)' : '');
+    nameIn.placeholder = 'my-file.' + currentType();
+    $('previewBtn').disabled = !(ext === 'html' || ext === 'htm' || ext === 'svg') || !v.trim();
+    $('dlBtn').disabled = !v;
+  }
+
+  var raf = 0, saveTimer = 0;
+  function onChange() {
+    if (!raf) raf = requestAnimationFrame(function () { raf = 0; refresh(); });
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, 600);
+  }
+
+  function saveDraft() {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ code: code.value, name: nameIn.value, type: typeSel.value }));
+      $('stSave').textContent = 'Draft saved';
+      $('stSave').className = 'ok';
+    } catch (e) {
+      $('stSave').textContent = 'Draft not saved (browser storage off or full)';
+      $('stSave').className = '';
+    }
+  }
+
+  function loadDraft() {
+    try {
+      var d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (d && typeof d.code === 'string') {
+        code.value = d.code;
+        nameIn.value = d.name || '';
+        if (d.type && typeSel.querySelector('option[value="' + d.type + '"]')) typeSel.value = d.type;
+      }
+    } catch (e) {}
+  }
+
+  function download() {
+    if (!code.value) { toast('Nothing to download yet', true); return; }
+    var name = fileName();
+    var ext = extOf(name);
+    var blob = new Blob([code.value], { type: (MIME[ext] || 'text/plain') + ';charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    toast('Downloaded ' + name);
+  }
+
+  function readFile(file) {
+    if (!file) return;
+    if (file.size > 25 * 1048576) { toast('That file is over 25 MB, too big for this', true); return; }
+    var r = new FileReader();
+    r.onload = function () {
+      var text = String(r.result);
+      if (text.indexOf('\u0000') !== -1) { toast('That looks like a picture or program, not code', true); return; }
+      code.value = text;
+      nameIn.value = file.name;
+      typeSel.value = 'auto';
+      lastLineCount = -1;
+      code.scrollTop = 0;
+      onChange();
+      toast('Loaded ' + file.name);
+    };
+    r.onerror = function () { toast('Could not read that file', true); };
+    r.readAsText(file);
+  }
+
+  // Insert text at the cursor and keep undo working where the browser allows it.
+  function insertAtCursor(text) {
+    code.focus();
+    var ok = false;
+    try { ok = document.execCommand('insertText', false, text); } catch (e) {}
+    if (!ok) {
+      var s = code.selectionStart, e2 = code.selectionEnd;
+      code.value = code.value.slice(0, s) + text + code.value.slice(e2);
+      code.selectionStart = code.selectionEnd = s + text.length;
+    }
+    onChange();
+  }
+
+  // Editor
+  code.addEventListener('input', onChange);
+  code.addEventListener('scroll', function () { gutter.scrollTop = code.scrollTop; });
+  code.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      insertAtCursor('  ');
+    }
+  });
+  nameIn.addEventListener('input', onChange);
+  typeSel.addEventListener('change', function () {
+    // Swap the extension in the name box so it matches the picked type.
+    if (typeSel.value !== 'auto' && nameIn.value.trim()) {
+      nameIn.value = nameIn.value.trim().replace(/\.[a-z0-9]{1,6}$/i, '') + '.' + typeSel.value;
+    }
+    onChange();
+  });
+
+  // Buttons
+  $('dlBtn').addEventListener('click', download);
+  $('openBtn').addEventListener('click', function () { $('fileIn').click(); });
+  $('fileIn').addEventListener('change', function () {
+    readFile(this.files && this.files[0]);
+    this.value = '';
+  });
+  $('pasteBtn').addEventListener('click', function () {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+      code.focus();
+      toast('Press Ctrl+V (or long-press, Paste) in the box', true);
+      return;
+    }
+    navigator.clipboard.readText().then(function (t) {
+      if (!t) { toast('Clipboard is empty', true); return; }
+      insertAtCursor(t);
+      toast('Pasted');
+    }, function () {
+      code.focus();
+      toast('Browser blocked it, press Ctrl+V in the box', true);
+    });
+  });
+  $('copyBtn').addEventListener('click', function () {
+    if (!code.value) { toast('Nothing to copy', true); return; }
+    var done = function () { toast('Copied'); };
+    var fallback = function () {
+      code.focus();
+      code.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      ok ? done() : toast('Could not copy, select it and press Ctrl+C', true);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code.value).then(done, fallback);
+    } else fallback();
+  });
+  $('clearBtn').addEventListener('click', function () {
+    if (!code.value && !nameIn.value) return;
+    if (!confirm('Clear the code and file name?')) return;
+    code.value = '';
+    nameIn.value = '';
+    typeSel.value = 'auto';
+    onChange();
+    code.focus();
+  });
+
+  // Preview
+  var previewUrl = '';
+  function closePreview() {
+    $('preview').classList.remove('on');
+    $('frame').srcdoc = '';
+    $('frame').removeAttribute('srcdoc');
+  }
+  $('previewBtn').addEventListener('click', function () {
+    if (this.disabled) return;
+    $('previewTitle').textContent = 'Preview: ' + fileName();
+    $('frame').srcdoc = code.value;
+    $('preview').classList.add('on');
+  });
+  $('closeBtn').addEventListener('click', closePreview);
+  $('tabBtn').addEventListener('click', function () {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    var ext = extOf(fileName());
+    previewUrl = URL.createObjectURL(new Blob([code.value], { type: (ext === 'svg' ? 'image/svg+xml' : 'text/html') + ';charset=utf-8' }));
+    var w = window.open(previewUrl, '_blank');
+    if (!w) toast('Pop-up blocked, allow pop-ups for this page', true);
+  });
+
+  // Keys
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      download();
+    } else if (e.key === 'Escape' && $('preview').classList.contains('on')) {
+      closePreview();
+    }
+  });
+
+  // Drag and drop
+  var dragDepth = 0;
+  window.addEventListener('dragenter', function (e) {
+    if (!e.dataTransfer || Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') === -1) return;
+    e.preventDefault();
+    dragDepth++;
+    $('drop').classList.add('on');
+  });
+  window.addEventListener('dragover', function (e) { e.preventDefault(); });
+  window.addEventListener('dragleave', function () {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) $('drop').classList.remove('on');
+  });
+  window.addEventListener('drop', function (e) {
+    e.preventDefault();
+    dragDepth = 0;
+    $('drop').classList.remove('on');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) readFile(f);
+  });
+
+  // Save right away when the tab closes so the last edits aren't lost.
+  window.addEventListener('pagehide', function () { clearTimeout(saveTimer); saveDraft(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') { clearTimeout(saveTimer); saveDraft(); }
+  });
+
+  loadDraft();
+  refresh();
+})();
+</script>
+</body>
+</html>
