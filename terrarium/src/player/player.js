@@ -2,7 +2,6 @@
 // First person shows your big rubber-glove hand; third person shows your whole body.
 import * as THREE from 'three';
 import { Body, poseTargets, J } from '../life/body.js';
-import { MeshSink } from '../life/render.js';
 import { scientistLook } from '../life/looks.js';
 import { TINY } from '../life/items.js';
 import { act, actPressed, input } from '../core/input.js';
@@ -76,10 +75,9 @@ export class Player {
 
   // ------------------------------------------------------------- models
   buildModel() {
-    if (this.sink) { this.body.dispose(); this.sink.dispose(); }
+    if (this.body) this.body.dispose();
     if (this.creature) { this.game.scene.remove(this.creature); this.creature = null; }
-    this.sink = new MeshSink(this.game.scene);
-    this.body = new Body(this.look, this.sink, { pos: this.pos, yaw: this.yaw, scale: this.scale });
+    this.body = new Body(this.look, this.game.scene, { pos: this.pos, yaw: this.yaw, scale: this.scale, hi: true });
     this.body.groundFn = (x, z, y) => this.game.groundAt(x, z, y);
     this.anim = { phase: 0, speed: 0, action: null, at: 0, crouch: 0 };
     if (this.form === 'cat') this.creature = buildCat();

@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import { h, put, clear, btn } from './dom.js';
 import { Preview } from './preview.js';
 import { Body, poseTargets, J } from '../life/body.js';
-import { MeshSink } from '../life/render.js';
 import { settings } from '../core/settings.js';
 import { sfx } from '../core/audio.js';
 import { CORES } from '../gadgets/parts.js';
@@ -59,14 +58,12 @@ export function buildExpTable(ui) {
     put(body, left, right);
     p.removedOrgans = p.removedOrgans || [];
     let open = false;
-    let sink = null, b3 = null;
+    let b3 = null;
     const organs = new THREE.Group();
     const buildModel = () => {
       if (b3) b3.dispose();
-      if (sink) sink.dispose();
-      sink = new MeshSink(pv.scene);
       // the same person at human size, lying on the table
-      b3 = new Body(p.look, sink, { pos: new THREE.Vector3(0, 0.05, 0), yaw: Math.PI / 2, scale: 1 });
+      b3 = new Body(p.look, pv.scene, { pos: new THREE.Vector3(0, 0.05, 0), yaw: Math.PI / 2, scale: 1, hi: true });
       for (const j of p.body.cut) b3.sever(j);
       b3.groundFn = () => 0.05;
       for (let i = 0; i < 80; i++) { poseTargets(b3, { pos: new THREE.Vector3(0, 0.05, 0), yaw: Math.PI / 2, phase: 0, speed: 0, action: 'sleep', at: 0, lying: true }); b3.simulate(1 / 60, 9.8, 30); }
@@ -76,13 +73,13 @@ export function buildExpTable(ui) {
       table.position.y = 0.0;
       pv.root.clear();
       pv.root.add(table, organs);
-      if (open) cutOpen(); else { sink.setClip(null); organs.clear(); }
+      if (open) cutOpen(); else { b3.setClip(null); organs.clear(); }
     };
     const cutOpen = () => {
       // slice the front half away (they're lying on their back) and put the organs where they really are
       const neck = b3.P(J.neck, new THREE.Vector3()), pel = b3.P(J.pelvis, new THREE.Vector3()), head = b3.P(J.head, new THREE.Vector3());
       const cutY = (neck.y + pel.y) / 2 + 0.01;
-      sink.setClip([new THREE.Plane(new THREE.Vector3(0, -1, 0), cutY)]);
+      b3.setClip([new THREE.Plane(new THREE.Vector3(0, -1, 0), cutY)]);
       b3.render(0);
       organs.clear();
       const along = (t) => neck.clone().lerp(pel, t);
@@ -142,7 +139,7 @@ export function buildExpTable(ui) {
             if (!open && p.alive && !confirm(`Cut ${p.name} open while they're awake?`)) return;
             open = !open;
             if (open) { sfx('slice'); if (p.alive) { p.hurtByPlayer(25); p.health -= 20; p.bleed += 0.6; p.say('NO! NO! STOP! AAAAAAH!', { kind: 'scared', scream: true }); if (p.health <= 0) p.die('died on the operating table', { from: 'player' }); } g.feed(`You cut ${p.name} open on the table`, 'bad', p); say('Click an organ in the picture to take it out.'); cutOpen(); }
-            else { sink.setClip(null); organs.clear(); if (p.alive) { p.bleed = Math.max(0, p.bleed - 0.4); p.bandaged = 80; say('Stitched them up.'); } }
+            else { b3.setClip(null); organs.clear(); if (p.alive) { p.bleed = Math.max(0, p.bleed - 0.4); p.bandaged = 80; say('Stitched them up.'); } }
             drawLeft();
           }, open ? '' : 'danger'),
         ),
@@ -198,7 +195,7 @@ export function buildExpTable(ui) {
     };
     buildModel();
     drawLeft();
-    ui.showModal('exptable', { title: 'Experiment table', body, wide: true, onClose: () => { pv.dispose(); if (b3) b3.dispose(); if (sink) sink.dispose(); } });
+    ui.showModal('exptable', { title: 'Experiment table', body, wide: true, onClose: () => { pv.dispose(); if (b3) b3.dispose(); } });
   };
 
   return { exptable };

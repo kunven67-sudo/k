@@ -3,6 +3,7 @@
 // Limbs can be cut off at any joint: the cut point is duplicated so the limb flies away on its own.
 import * as THREE from 'three';
 import { clamp, lerp } from '../core/util.js';
+import { HumanMesh } from './human.js';
 
 // point indices
 export const J = { head: 0, neck: 1, pelvis: 2, lSh: 3, lEl: 4, lHa: 5, rSh: 6, rEl: 7, rHa: 8, lHip: 9, lKn: 10, lFt: 11, rHip: 12, rKn: 13, rFt: 14, lToe: 15, rToe: 16 };
@@ -25,6 +26,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 const _col = new THREE.Color();
 const _basis = new THREE.Matrix4();
 const _mh = new THREE.Matrix4();
+const _eul = new THREE.Euler(), _hf = new THREE.Vector3(), _hs = new THREE.Vector3(), _hu = new THREE.Vector3();
 
 function quatFromTo(dir) { return _q.setFromUnitVectors(UP, dir); }
 
@@ -43,10 +45,10 @@ function ik(S, T, a, b, P, out) {
 }
 
 export class Body {
-  constructor(look, sink, opts = {}) {
+  constructor(look, parent, opts = {}) {
     this.look = look;
-    this.sink = sink;
-    this.slot = sink.alloc();
+    this.parent = parent;
+    this.hiDetail = !!opts.hi;
     this.scale = opts.scale ?? 1;          // world size factor (1 = normal person)
     this.p = new Float32Array(N * 3);      // positions
     this.o = new Float32Array(N * 3);      // previous positions
@@ -76,6 +78,8 @@ export class Body {
     this.ground = 0;
     this.lastImpact = 0;
     this.build(opts.pos || new THREE.Vector3(), opts.yaw || 0);
+    this.human = new HumanMesh(look, parent);
+    this.human.forceHi = this.hiDetail;
     this.applyColors();
   }
 
@@ -123,42 +127,7 @@ export class Body {
   }
 
   // ------------------------------------------------------------- colors
-  applyColors() {
-    const L = this.look, s = this.sink, sl = this.slot;
-    const c = (hex) => {
-      _col.set(hex);
-      if (this.tint) _col.lerp(_col.clone().set(this.tint.color), this.tint.amt);
-      return _col;
-    };
-    const longSleeve = L.top === 'long' || L.top === 'hoodie' || L.top === 'uniform' || L.top === 'suit' || L.top === 'coat';
-    const tank = L.top === 'tank';
-    s.color('torso', sl, 0, c(L.shirt));
-    s.color('half', sl, 0, c(L.shirt)); s.color('half', sl, 1, c(L.pants));
-    s.color('pelvis', sl, 0, c(L.pants));
-    s.color('head', sl, 0, c(L.skin));
-    s.color('nose', sl, 0, c(new THREE.Color(L.skin).multiplyScalar(0.92).getHex()));
-    for (let i = 0; i < 2; i++) {
-      s.color('eye', sl, i, c(0xf8f8f4)); s.color('pupil', sl, i, c(L.eyes));
-      s.color('brow', sl, i, c(L.hairColor)); s.color('ear', sl, i, c(L.skin));
-      s.color('upperArm', sl, i, c(tank ? L.skin : L.shirt)); s.color('forearm', sl, i, c(longSleeve ? L.shirt : L.skin));
-      s.color('hand', sl, i, c(L.gloves || L.skin));
-      s.color('thigh', sl, i, c(L.bottom === 'skirt' ? L.skin : L.pants));
-      s.color('shin', sl, i, c(L.bottom === 'long' ? L.pants : L.skin));
-      s.color('foot', sl, i, c(L.shoes));
-      s.color('shoulder', sl, i, c(tank ? L.skin : L.shirt));
-    }
-    s.color('mouth', sl, 0, c(0x6a1d22));
-    for (let i = 0; i < 8; i++) s.color('stump', sl, i, c(0xa3121b));
-    if (L.hair !== 'bald') s.color('hair_' + L.hair, sl, 0, c(L.hairColor));
-    if (L.beard) s.color('beard', sl, 0, c(L.hairColor));
-    if (L.mustache) s.color('mustache', sl, 0, c(L.hairColor));
-    if (L.glasses) s.color('glasses', sl, 0, c(0x1a1a1a));
-    if (L.goggles) s.color('goggles', sl, 0, c(0x2b6e5e));
-    if (L.hat) s.color('hat_' + L.hat, sl, 0, c(L.hatColor || 0x222222));
-    if (L.bottom === 'skirt') s.color('skirt', sl, 0, c(L.pants));
-    if (L.coat) s.color('coat', sl, 0, c(L.coat));
-    if (L.pack) s.color('pack', sl, 0, c(L.pack));
-  }
+  applyColors() { this.human.setColors(this.look, this.tint); }
 
   setTint(color, amt) {
     const nt = color == null ? null : { color, amt };
@@ -396,12 +365,14 @@ export class Body {
         for (const l of lower) this.link(l, wl, 1, 'torsoL');
         this.halves = { wu, wl };
         this.stumps.push({ a: wu, aIn: J.neck, b: wl, bIn: J.pelvis, flip: true });
+        this.human.cut('waist');
         this.ragdoll(99);
         return { base: wu, piece: wl, loose: [wl, J.pelvis, J.lHip, J.rHip] };
       }
       default: return null;
     }
     this.stumps.push({ a: base, aIn, b: k, bIn, joint });
+    this.human.cut(joint);
     if (!this.loosePoints) this.loosePoints = new Set();
     for (const i of loose) this.loosePoints.add(i);
     return { base, piece: k, loose };
@@ -415,198 +386,50 @@ export class Body {
 
   // ------------------------------------------------------------- rendering
   render(time) {
-    const s = this.sink, sl = this.slot;
     if (this.hidden) { this.hideAll(); return; }
-    const sc = this.sc, L = this.look;
-    const wf = 1 + L.fat * 0.35;
+    this.human.setVisible(true);
     const p = this.p;
     const v = (i, out) => out.set(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
-
-    // torso basis
-    const neck = v(J.neck, _a.clone()), pel = v(J.pelvis, _b.clone());
-    const up = _c.subVectors(neck, pel); const tl = up.length() || 1e-6; up.divideScalar(tl);
-    const side = v(J.lSh, _d).sub(v(J.rSh, _e)).normalize();
-    const fwd = new THREE.Vector3().crossVectors(side, up).normalize();
-    side.crossVectors(up, fwd).normalize();
-    _basis.makeBasis(side, up, fwd);
-    const torsoQ = new THREE.Quaternion().setFromRotationMatrix(_basis);
-    this.fwd = fwd;
-    const jg = this.jig * (0.6 + L.fat);
-
-    if (!this.halves) {
-      _p.addVectors(neck, pel).multiplyScalar(0.5);
-      _s.set(sc * 1.25 * wf * (1 - jg * 0.5), (tl / 0.45) * (1 + jg), sc * 0.95 * (1 + L.fat * 0.4) * (1 - jg * 0.4));
-      _m.compose(_p, torsoQ, _s); s.set('torso', sl, 0, _m);
-      s.hide('half', sl, 0); s.hide('half', sl, 1);
-    } else {
-      s.hide('torso', sl, 0);
-      const parts = [[J.neck, this.halves.wu, 0], [this.halves.wl, J.pelvis, 1]];
-      for (const [a, b, i] of parts) {
-        v(a, _p); v(b, _e);
-        const dir = _e.clone().sub(_p); const l = dir.length() || 1e-6; dir.divideScalar(l);
-        _p.add(_e).multiplyScalar(0.5);
-        _s.set(sc * 1.25 * wf, l / 0.22, sc * 0.95 * (1 + L.fat * 0.4));
-        _m.compose(_p, quatFromTo(dir), _s); s.set('half', sl, i, _m);
-      }
-    }
-    // pelvis / hips
-    _p.copy(pel).addScaledVector(up, -0.02 * sc);
-    _s.set(sc * 1.08 * wf, sc * 0.75, sc * (0.95 + L.fat * 0.3));
-    _m.compose(_p, torsoQ, _s); s.set('pelvis', sl, 0, _m);
-
-    // shoulders
-    for (let i = 0; i < 2; i++) {
-      const sh = i === 0 ? J.lSh : J.rSh;
-      v(sh, _p);
-      _s.setScalar(sc * (1 + L.fat * 0.25) * (L.muscle ? 1.15 : 1));
-      _m.compose(_p, torsoQ, _s); s.set('shoulder', sl, i, _m);
-    }
-
-    // limbs
-    const limbW = sc * (1 + L.fat * 0.3) * (L.muscle ? 1.12 : 1);
-    for (const sg of this.segs) {
-      v(sg.a, _p); v(sg.b, _e);
-      const dir = _e.clone().sub(_p); const l = dir.length() || 1e-6; dir.divideScalar(l);
-      const base = sg.part === 'upperArm' ? 0.15 + 0.136 : sg.part === 'forearm' ? 0.14 + 0.12 : sg.part === 'thigh' ? 0.26 + 0.176 : 0.27 + 0.152;
-      _p.add(_e).multiplyScalar(0.5);
-      _s.set(limbW, (l + base * 0.35 * sc) / (base * 1.0) * 0.9 + 0.0, limbW);
-      _s.y = Math.max(_s.y, sc * 0.4);
-      _m.compose(_p, quatFromTo(dir), _s); s.set(sg.part, sl, sg.side, _m);
-    }
-    // hands
-    for (let i = 0; i < 2; i++) {
-      const fa = this.segs[i === 0 ? 1 : 3];
-      v(fa.b, _p); v(fa.a, _e);
-      const dir = _p.clone().sub(_e).normalize();
-      _m.compose(_p, quatFromTo(dir), _s.setScalar(sc * (L.gloves ? 1.08 : 1)));
-      s.set('hand', sl, i, _m);
-    }
-    // feet
-    for (let i = 0; i < 2; i++) {
-      const sg = this.segs[i === 0 ? 5 : 7];
-      const ft = sg.b, toe = i === 0 ? J.lToe : J.rToe;
-      v(ft, _p); v(toe, _e);
-      const f = _e.clone().sub(_p); f.y *= 0.3; if (f.lengthSq() < 1e-12) f.copy(fwd); f.normalize();
-      const sd = new THREE.Vector3().crossVectors(UP, f).normalize();
-      const u = new THREE.Vector3().crossVectors(f, sd);
-      _basis.makeBasis(sd, u, f);
-      _q.setFromRotationMatrix(_basis);
-      _m.compose(_p, _q, _s.setScalar(sc)); s.set('foot', sl, i, _m);
-    }
-
-    // head
-    const hs = sc * L.headScale;
+    // torso frame (also tells the AI which way a ragdoll is facing)
+    const neck = v(J.neck, _a), pel = v(J.pelvis, _b);
+    const up = _c.subVectors(neck, pel); if (up.lengthSq() < 1e-14) up.set(0, 1, 0); up.normalize();
+    const side = v(J.lSh, _d).sub(v(J.rSh, _e)); side.addScaledVector(up, -side.dot(up)); if (side.lengthSq() < 1e-14) side.set(1, 0, 0); side.normalize();
+    const fwd = (this.fwd ||= new THREE.Vector3()).crossVectors(side, up).normalize();
+    // head: looks where they look (or spins if it came off)
     v(J.head, _p);
     if (this.headLoose) {
-      _q.setFromEuler(new THREE.Euler(this.headSpin.x * 0.016, this.headSpin.y * 0.016, this.headSpin.z * 0.016));
+      _q.setFromEuler(_eul.set(this.headSpin.x * 0.016, this.headSpin.y * 0.016, this.headSpin.z * 0.016));
       if (!this.asleep) { this.headQ.multiply(_q); this.headSpin.multiplyScalar(0.985); }
     } else {
-      const hu = _e.copy(_p).sub(neck).normalize();
-      const hf = fwd.clone();
+      const hu = _e.copy(_p).sub(neck); if (hu.lengthSq() < 1e-14) hu.copy(up); hu.normalize();
+      const hf = _hf.copy(fwd);
       if (this.mode === 'anim' && this.lookYaw) hf.applyAxisAngle(hu, this.lookYaw);
       hf.addScaledVector(hu, -hf.dot(hu)).normalize();
       if (this.lookPitch) hf.addScaledVector(hu, -this.lookPitch * 0.6).normalize();
-      const hsd = new THREE.Vector3().crossVectors(hu, hf).normalize();
-      const hu2 = new THREE.Vector3().crossVectors(hf, hsd);
+      const hsd = _hs.crossVectors(hu, hf).normalize();
+      const hu2 = _hu.crossVectors(hf, hsd);
       _basis.makeBasis(hsd, hu2, hf);
       this.headQ.setFromRotationMatrix(_basis);
     }
-    _m.compose(_p, this.headQ, _s.set(hs, hs * (1 + jg * 0.6), hs));
-    s.set('head', sl, 0, _m);
-    _mh.copy(_m);
-    this.renderFace(_mh, hs, time);
-
-    // stumps (red cut ends with a bit of bone): each cap points out of the piece it belongs to
-    let si = 0;
-    const cap = (at, from, size) => {
-      if (si >= 8) return;
-      v(at, _p); v(from, _e);
-      const d = _p.clone().sub(_e); const l = d.length();
-      if (l < 1e-7) d.copy(UP); else d.divideScalar(l);
-      _m.compose(_p, quatFromTo(d), _s.set(size * sc, sc * 0.05, size * sc));
-      s.set('stump', sl, si++, _m);
-    };
-    for (const st of this.stumps) {
-      const size = st.joint === 'neck' || st.flip ? 0.11 : st.joint && st.joint.includes('Hip') ? 0.09 : 0.07;
-      cap(st.a, st.aIn, size);
-      if (st.joint === 'neck') {
-        if (si < 8) {
-          _e.set(0, -1, 0).applyQuaternion(this.headQ);
-          v(J.head, _p).addScaledVector(_e, 0.15 * hs);
-          _m.compose(_p, quatFromTo(_e), _s.set(0.09 * sc, sc * 0.05, 0.09 * sc));
-          s.set('stump', sl, si++, _m);
-        }
-      } else cap(st.b, st.bIn, size);
-    }
-    for (; si < 8; si++) s.hide('stump', sl, si);
-
-    // extras attached to body
-    if (L.bottom === 'skirt') { _m.compose(pel, torsoQ, _s.set(sc * wf, sc, sc * wf)); s.set('skirt', sl, 0, _m); }
-    if (L.coat) {
-      _p.copy(neck).addScaledVector(up, -0.02 * sc);
-      _m.compose(_p, torsoQ, _s.set(sc * 1.2 * wf, sc * 1.05, sc * 1.05 * (1 + L.fat * 0.4))); s.set('coat', sl, 0, _m);
-    }
-    if (L.pack) {
-      _p.addVectors(neck, pel).multiplyScalar(0.5).addScaledVector(fwd, -0.19 * sc * (1 + L.fat * 0.3));
-      _m.compose(_p, torsoQ, _s.setScalar(sc)); s.set('pack', sl, 0, _m);
-    }
+    this.human.update(this, time, HumanMesh.camera);
   }
 
-  renderFace(headM, hs, time) {
-    const s = this.sink, sl = this.slot, F = this.face, L = this.look;
-    // blink
-    F.blink -= 0.016;
-    if (F.blink < -3 - Math.random() * 3) F.blink = 0.12;
-    const closed = Math.max(F.closed, F.blink > 0 ? 1 : 0);
-    const eyeH = 1 - closed * 0.9;
-    const put = (key, i, x, y, z, sx = 1, sy = 1, sz = 1, rz = 0) => {
-      _q.setFromEuler(new THREE.Euler(0, 0, rz));
-      _m2.compose(_p.set(x, y, z), _q, _s.set(sx, sy, sz));
-      _m.multiplyMatrices(headM, _m2);
-      s.set(key, sl, i, _m);
-    };
-    const es = L.eyeSize || 1;
-    for (let i = 0; i < 2; i++) {
-      const sx = i === 0 ? 1 : -1;
-      put('eye', i, sx * 0.062, 0.03, 0.135, es, eyeH * es, es * 0.8);
-      if (closed > 0.6) s.hide('pupil', sl, i);
-      else put('pupil', i, sx * 0.062 + F.lookX * 0.018, 0.03 + F.lookY * 0.015, 0.162, es * (F.scared ? 0.7 : 1), es * (F.scared ? 0.7 : 1), 0.6);
-      // brows: angry = slanted down to the middle, sad = up in the middle, scared = high
-      const tilt = (F.angry * 0.5 - F.sad * 0.45) * sx;
-      const by = 0.095 + F.scared * 0.02 + F.sad * 0.006 - F.angry * 0.012;
-      put('brow', i, sx * 0.064, by, 0.15, 1, 1 + (L.thickBrows ? 0.6 : 0), 1, tilt);
-      put('ear', i, sx * 0.163, 0.0, -0.005, 1, 1, 1);
-    }
-    // mouth: smile widens + curves (approximated by scale), open = taller
-    const open = clamp(F.open, 0, 1);
-    const w = 1 + F.smile * 0.35 - open * 0.25;
-    put('mouth', 0, 0, -0.062 + F.smile * 0.004, 0.15, w, 1 + open * 3.2, 1, 0);
-    put('nose', 0, 0, -0.005, 0.165, 1, 1, 1);
-    if (L.hair !== 'bald') put('hair_' + L.hair, 0, 0, 0, 0);
-    if (L.beard) put('beard', 0, 0, 0, 0); else s.hide('beard', sl, 0);
-    if (L.mustache) put('mustache', 0, 0, 0, 0); else s.hide('mustache', sl, 0);
-    if (L.glasses) put('glasses', 0, 0, 0, 0); else s.hide('glasses', sl, 0);
-    if (L.goggles) put('goggles', 0, 0, 0, 0); else s.hide('goggles', sl, 0);
-    if (L.hat) put('hat_' + L.hat, 0, 0, 0, 0);
-  }
+  hideAll() { this.human.setVisible(false); }
 
-  hideAll() {
-    const s = this.sink, sl = this.slot;
-    for (const k of ['torso', 'pelvis', 'head', 'mouth', 'nose', 'beard', 'mustache', 'glasses', 'goggles', 'skirt', 'coat', 'pack']) s.hide(k, sl, 0);
-    for (const k of ['half', 'eye', 'pupil', 'brow', 'ear', 'upperArm', 'forearm', 'hand', 'thigh', 'shin', 'foot', 'shoulder']) { s.hide(k, sl, 0); s.hide(k, sl, 1); }
-    for (let i = 0; i < 8; i++) s.hide('stump', sl, i);
-    if (this.look.hair !== 'bald') s.hide('hair_' + this.look.hair, sl, 0);
-    if (this.look.hat) s.hide('hat_' + this.look.hat, sl, 0);
-  }
-
-  // When the look changes (hair, hat) clear the old optional parts.
+  // When the look changes (mutations, robot parts, growing up) rebuild the mesh.
   relook(newLook) {
-    this.hideAll();
     this.look = newLook;
+    const cuts = this.human.cuts || [];
+    this.human.dispose();
+    this.human = new HumanMesh(newLook, this.parent);
+    this.human.forceHi = this.hiDetail;
+    for (const j of cuts) this.human.cut(j);
     this.applyColors();
   }
 
-  dispose() { this.hideAll(); this.sink.release(this.slot); }
+  setClip(planes) { this.human.setClip(planes); }
+
+  dispose() { this.human.dispose(); }
 }
 
 // ------------------------------------------------------------- animation

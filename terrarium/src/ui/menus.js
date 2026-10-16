@@ -11,7 +11,6 @@ import { CLAUDE_MODELS, loadLocal, localState } from '../talk/llm.js';
 import { listWorlds, getWorld, putWorld, deleteWorld, newId, downloadWorld, readWorldFile } from '../save.js';
 import { Preview } from './preview.js';
 import { Body, poseTargets } from '../life/body.js';
-import { MeshSink } from '../life/render.js';
 import { scientistLook, SKIN, HAIR_COLORS } from '../life/looks.js';
 import { HAIR_STYLES } from '../life/parts.js';
 import { rand, escapeHtml } from '../core/util.js';
@@ -327,11 +326,10 @@ export function buildMenus(ui) {
     const L = { ...(g.customLook || {}) };
     const cv = h('canvas', { class: 'preview', style: { width: '100%', height: '320px', borderRadius: '10px', background: 'radial-gradient(circle at 50% 40%, #213536, #0b1213)' } });
     const pv = new Preview(cv, { dist: 3.1, height: 0.95, fov: 32 });
-    const sink = new MeshSink(pv.scene);
     let body3 = null;
     const rebuild = () => {
       if (body3) body3.dispose();
-      body3 = new Body(scientistLook(L), sink, { pos: new THREE.Vector3(0, 0, 0), yaw: 0, scale: 1 });
+      body3 = new Body(scientistLook(L), pv.scene, { pos: new THREE.Vector3(0, 0, 0), yaw: 0, scale: 1, hi: true });
       body3.groundFn = () => 0;
     };
     rebuild();

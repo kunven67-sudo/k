@@ -6,7 +6,7 @@ import { CAGE, NAT } from './world/cage.js';
 import { LAB, STAIRS } from './world/lab.js';
 import { HOUSE } from './world/house.js';
 import { FX } from './fx/fx.js';
-import { InstancedSink } from './life/render.js';
+import { HumanMesh } from './life/human.js';
 import { Person } from './life/person.js';
 import { Body, J } from './life/body.js';
 import { makeLook, randomName, JOB_KEYS, randomTraits } from './life/looks.js';
@@ -78,7 +78,10 @@ export class Game {
     this.cage = this.world.cage;
     this.fx = new FX(scene);
     this.fx.groundFn = (x, z, y) => this.groundAt(x, z, y);
-    this.sink = new InstancedSink(scene, 128);
+    this.sink = new THREE.Group(); // everyone's body meshes live here
+    this.sink.name = 'people';
+    scene.add(this.sink);
+    HumanMesh.camera = camera;
     this.society = new Society(this);
     this.world.society = this.society;
     this.ai = new AI(this);
@@ -1318,7 +1321,6 @@ export class Game {
       else if (p._drawn) { p.body.hideAll(); p._drawn = false; }
       if (p.objectForm && p.objectForm.mesh) p.objectForm.mesh.visible = vis;
     }
-    this.sink.flush();
     // sounds of the cage when you're near it
     const nearCage = this.zone === 'lab' && Math.hypot(pl.pos.x - (CAGE.x0 + CAGE.x1) / 2, pl.pos.z - (CAGE.z0 + CAGE.z1) / 2) < 4;
     setLoop('rain', nearCage && (this.cage.weather.rain || this.cage.weather.storm) ? 0.25 : 0);
