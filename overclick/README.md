@@ -23,9 +23,13 @@ A real auto clicker for Windows 10/11. It clicks your actual mouse in any game o
 | Fast | 25 clicks/sec |
 | Turbo | 50 clicks/sec |
 | Insane | 100 clicks/sec |
-| MAX POWER | Any speed you type: seconds, milliseconds, minutes or clicks/sec. **0 = as fast as your PC can go** |
+| MAX POWER | Any speed you type: seconds, milliseconds, minutes or clicks/sec, up to 1,000,000+ per second. One-tap 1K / 10K / 100K / 1M / NO LIMIT buttons. **0 = as fast as your PC can go** |
 
 Insane and MAX POWER show a warning the first time you pick them.
+
+Above 5,000 clicks/sec, OVERCLICK hands clicks to Windows in batches of up to 256 per call, so the real
+top speed depends on your PC. The big number on screen is how many clicks really went out. Most games
+and websites only count a few hundred per second and drop the rest.
 
 ### Auto clickers
 

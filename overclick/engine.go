@@ -7,11 +7,23 @@ import (
 	"time"
 )
 
-// Backend does the real clicking. Click returns how many clicks really happened:
-// 0 when it skipped (the spot is on OVERCLICK itself), 2 for a double click.
+// Backend does the real clicking. Click does n clicks in a row for c in one go
+// and returns how many really happened: 0 when it skipped (the spot is on
+// OVERCLICK itself), 2n for double clicks. EscDown reports the Esc key right now.
 type Backend interface {
-	Click(c *ClickerCfg, returnMouse bool) int
+	Click(c *ClickerCfg, n int, returnMouse bool) int
+	EscDown() bool
 }
+
+const (
+	// Faster than 5,000 clicks/s, clicks go out in batches: one trip to Windows
+	// carries up to maxBatch clicks instead of one. That's what gets MAX POWER
+	// from thousands to hundreds of thousands per second.
+	batchBelow = 200 * time.Microsecond
+	maxBatch   = 256
+	// How often the click loop checks Esc itself, on top of the hotkey.
+	escPoll = 2 * time.Millisecond
+)
 
 type runConfig struct {
 	clickers    []ClickerCfg
@@ -37,7 +49,7 @@ type runClicker struct {
 
 type Engine struct {
 	backend  Backend
-	onFinish func() // runs in its own goroutine when a stop rule ends the run
+	onFinish func(reason string) // runs in its own goroutine when the run ends by itself ("done" or "esc")
 
 	mu      sync.Mutex
 	running bool
@@ -172,11 +184,11 @@ func waitUntil(t time.Time, stop, wake <-chan struct{}) int {
 }
 
 func (e *Engine) loop(stopCh, done chan struct{}, stop StopRule, start time.Time) {
-	finished := false
+	finished := ""
 	defer func() {
 		close(done)
-		if finished && e.onFinish != nil {
-			go e.onFinish()
+		if finished != "" && e.onFinish != nil {
+			go e.onFinish(finished)
 		}
 	}()
 
@@ -187,6 +199,8 @@ func (e *Engine) loop(stopCh, done chan struct{}, stop StopRule, start time.Time
 	var cur *runConfig
 	var list []*runClicker
 	spins := 0
+	escWas := e.backend.EscDown() // only a new press counts, not one held while starting
+	var escAt time.Time
 	for {
 		if p := e.pending.Load(); p != cur {
 			cur = p
@@ -220,33 +234,62 @@ func (e *Engine) loop(stopCh, done chan struct{}, stop StopRule, start time.Time
 		}
 		now := time.Now()
 		if !deadline.IsZero() && !now.Before(deadline) {
-			finished = true
+			finished = "done"
 			return
 		}
 		if nx == nil || now.Before(nx.next) {
 			continue
 		}
 
-		n := e.backend.Click(&nx.cfg, cur.returnMouse)
-		total := e.total.Add(int64(n))
+		// How many clicks are due right now: 1 normally, a whole batch at top speed.
+		n := 1
+		if nx.interval < batchBelow {
+			n = maxBatch
+			if nx.interval > 0 {
+				n = min(int(now.Sub(nx.next)/nx.interval)+1, maxBatch)
+			}
+		}
+		if stop.Mode == "clicks" {
+			per := int64(1)
+			if nx.cfg.Double {
+				per = 2
+			}
+			if left := (stop.Clicks - e.total.Load() + per - 1) / per; left < int64(n) {
+				n = int(max(left, 1))
+			}
+		}
+
+		got := e.backend.Click(&nx.cfg, n, cur.returnMouse)
+		total := e.total.Add(int64(got))
 
 		now = time.Now()
 		switch {
-		case n == 0 && nx.interval < time.Millisecond:
+		case got == 0 && nx.interval < time.Millisecond:
 			nx.next = now.Add(time.Millisecond) // skipped: don't burn the CPU retrying
 		case nx.interval == 0:
 			nx.next = now
 		default:
-			nx.next = nx.next.Add(nx.interval)
-			// Fell way behind (PC busy)? Carry on from now instead of a burst of catch-up clicks.
+			nx.next = nx.next.Add(time.Duration(n) * nx.interval)
+			// Fell way behind (PC busy, or asked for more than it can do)? Carry on
+			// from now instead of a burst of catch-up clicks.
 			if now.Sub(nx.next) > 50*time.Millisecond {
 				nx.next = now
 			}
 		}
 
 		if stop.Mode == "clicks" && total >= stop.Clicks {
-			finished = true
+			finished = "done"
 			return
+		}
+		// Esc check right here too, so stopping never waits on anything else.
+		if now.Sub(escAt) >= escPoll {
+			escAt = now
+			down := e.backend.EscDown()
+			if down && !escWas {
+				finished = "esc"
+				return
+			}
+			escWas = down
 		}
 		if nx.interval < time.Millisecond {
 			if spins++; spins%32 == 0 {

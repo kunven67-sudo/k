@@ -61,10 +61,10 @@ func absCoord(p, origin, size int32) int32 {
 	return int32(v)
 }
 
-// clickInputs builds one SendInput batch: optional move to the spot, the
-// click(s), optional move back. Batching keeps it atomic, so the click can't
-// land somewhere else if the real mouse moves halfway through.
-func clickInputs(buf []input, c *ClickerCfg, cur point, vx, vy, vw, vh int32, returnMouse bool) ([]input, int) {
+// clickInputs builds one SendInput batch: optional move to the spot, n
+// clicks (or double clicks), optional move back. One batch is atomic, so the
+// clicks can't land somewhere else if the real mouse moves halfway through.
+func clickInputs(buf []input, c *ClickerCfg, n int, cur point, vx, vy, vw, vh int32, returnMouse bool) ([]input, int) {
 	buf = buf[:0]
 	move := func(p point) {
 		buf = append(buf, input{Mi: mouseInput{
@@ -80,7 +80,7 @@ func clickInputs(buf []input, c *ClickerCfg, cur point, vx, vy, vw, vh int32, re
 	if c.Double {
 		reps = 2
 	}
-	for i := 0; i < reps; i++ {
+	for i := 0; i < n*reps; i++ {
 		buf = append(buf,
 			input{Mi: mouseInput{Flags: down, ExtraInfo: injectedTag}},
 			input{Mi: mouseInput{Flags: up, ExtraInfo: injectedTag}})
@@ -88,5 +88,20 @@ func clickInputs(buf []input, c *ClickerCfg, cur point, vx, vy, vw, vh int32, re
 	if !c.Follow && returnMouse {
 		move(cur)
 	}
-	return buf, reps
+	return buf, n * reps
+}
+
+// clicksSent works out how many clicks made it when SendInput only took part
+// of a batch (it returns how many inputs it inserted).
+func clicksSent(sent, total, clicks int, moved bool) int {
+	if sent >= total {
+		return clicks
+	}
+	if moved {
+		sent--
+	}
+	if sent <= 0 {
+		return 0
+	}
+	return min(sent/2, clicks)
 }

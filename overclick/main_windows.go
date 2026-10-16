@@ -30,7 +30,7 @@ var font600 []byte
 //go:embed ui/fonts/chakra-petch-700.woff2
 var font700 []byte
 
-const appVersion = "1.0.0"
+const appVersion = "1.1.0"
 
 // WebView2 must be created and pumped on the main OS thread.
 func init() { runtime.LockOSThread() }
@@ -75,7 +75,7 @@ func main() {
 	app.st = loadSettings(app.path)
 	app.keepSpotsOnScreen()
 	app.eng = NewEngine(&winBackend{app: app})
-	app.eng.onFinish = func() { app.Stop("done") }
+	app.eng.onFinish = app.Stop
 	app.ui = newWinUI(app)
 	theUI = app.ui
 	go app.ui.run()
@@ -477,11 +477,13 @@ func commas(n int64) string {
 
 // winBackend clicks for real with SendInput.
 type winBackend struct {
-	app *App
-	buf []input
+	app            *App
+	buf            []input
+	screenAt       time.Time
+	vx, vy, vw, vh int32
 }
 
-func (b *winBackend) Click(c *ClickerCfg, returnMouse bool) int {
+func (b *winBackend) Click(c *ClickerCfg, n int, returnMouse bool) int {
 	cur := getCursorPos()
 	spot := cur
 	if !c.Follow {
@@ -491,11 +493,17 @@ func (b *winBackend) Click(c *ClickerCfg, returnMouse bool) int {
 	if b.app.main != 0 && rootWindowAt(spot) == b.app.main {
 		return 0
 	}
-	vx, vy, vw, vh := virtualScreen()
-	in, reps := clickInputs(b.buf, c, cur, vx, vy, vw, vh, returnMouse)
-	b.buf = in
-	if sendInputs(in) == 0 {
-		return 0
+	// The screen layout barely ever changes; asking Windows every click wastes time at top speed.
+	if now := time.Now(); now.Sub(b.screenAt) > 500*time.Millisecond {
+		b.vx, b.vy, b.vw, b.vh = virtualScreen()
+		b.screenAt = now
 	}
-	return reps
+	in, clicks := clickInputs(b.buf, c, n, cur, b.vx, b.vy, b.vw, b.vh, returnMouse)
+	b.buf = in
+	return clicksSent(sendInputs(in), len(in), clicks, !c.Follow)
+}
+
+func (b *winBackend) EscDown() bool {
+	r, _, _ := pGetAsyncKeyState.Call(vkEscape)
+	return r&0x8000 != 0
 }

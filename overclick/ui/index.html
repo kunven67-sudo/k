@@ -97,8 +97,15 @@ section{margin-top:18px}
 .sel-in{padding:8px 8px;border-radius:9px;background:var(--bg);border:1px solid var(--line2);font-size:13px}
 .readout{flex:1;min-width:120px;font:600 13px/1.25 var(--head);letter-spacing:.03em;color:var(--dim)}
 .readout b{color:var(--text)}
+.valrow>.num{width:124px}
 .danger{width:100%;display:none;font-size:12px;color:#ff9fb0;padding-top:2px}
 .danger.show{display:block}
+.quick{display:flex;gap:5px;width:100%;flex-wrap:wrap}
+.quick button{flex:1;min-width:58px;white-space:nowrap;padding:8px 6px 7px;border-radius:9px;background:var(--bg);border:1px solid var(--line2);font:700 14px/1 var(--head);letter-spacing:.04em;color:var(--dim)}
+.quick button small{display:block;font:600 9.5px/1 var(--head);letter-spacing:.1em;color:var(--faint);margin-top:4px}
+.quick button:hover{color:var(--text);border-color:var(--max)}
+.quick button.on{color:#fff;border-color:var(--max);background:color-mix(in srgb,var(--max) 18%,var(--bg));box-shadow:0 0 14px color-mix(in srgb,var(--max) 35%,transparent)}
+.quick button.on small{color:#ffb3c0}
 
 /* clicker cards */
 .card{--c:#4cc9ff;position:relative;padding:12px;border-radius:15px;background:var(--panel);border:1px solid var(--line);margin-bottom:9px;transition:opacity .2s,border-color .2s}
@@ -131,7 +138,7 @@ section{margin-top:18px}
 .hint{grid-column:2;font-size:11.5px;color:var(--faint);margin-top:-3px}
 .own .sel-in{padding:6px 8px}
 .own{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.own .num{width:76px;font-size:14px;padding:6px 8px}
+.own .num{width:112px;font-size:14px;padding:6px 8px}
 .own .readout{font-size:12px;min-width:0;flex:1 1 100%}
 
 /* stop rule */
@@ -278,6 +285,7 @@ footer b{font:600 12px var(--head);color:var(--dim);letter-spacing:.04em}
     <p><b>Esc</b> always stops it while it's clicking. So does your start/stop key.</p>
     <p>OVERCLICK never clicks its own window, so you can always hit the big button to stop.</p>
     <p>Not clicking in a game? Some games run as admin. Close OVERCLICK, right-click it and pick <b>Run as administrator</b>.</p>
+    <p>The big number is how many clicks OVERCLICK really sends. Games only count what they can handle, often a few hundred a second.</p>
     <p>Some online games kick or ban players for auto clickers. Use it where it's allowed.</p>
   </div>
 </aside>
@@ -308,7 +316,7 @@ const MODES = [
   { id: 'fast', name: 'FAST', sub: '25 clicks / sec', bars: 2 },
   { id: 'turbo', name: 'TURBO', sub: '50 clicks / sec', bars: 3 },
   { id: 'insane', name: 'INSANE', sub: '100 clicks / sec', bars: 4 },
-  { id: 'max', name: 'MAX POWER', sub: 'You pick. Down to 0', bars: 5 },
+  { id: 'max', name: 'MAX POWER', sub: 'Up to 1M / sec', bars: 5 },
 ];
 const RANK = { custom: 0, normal: 1, fast: 2, turbo: 3, insane: 4, max: 5 };
 const PRESET = { normal: 100, fast: 40, turbo: 20, insane: 10 };
@@ -469,9 +477,14 @@ $('#tiles').addEventListener('click', async e => {
 });
 
 // The "how fast" box for CUSTOM and MAX POWER. `key` says which speed it edits.
+// One-tap speeds for MAX POWER, in clicks per second ("0" = no limit at all).
+const QUICK = [['1000', '1K'], ['10000', '10K'], ['100000', '100K'], ['1000000', '1M'], ['0', 'NO LIMIT']];
+const quickOn = (sp, v) => (v === '0' ? intervalMs(sp) <= 0 : sp.unit === 'cps' && Number(sp.value) === Number(v));
 function valRowHTML(sp, key, compact) {
   const u = sp.unit;
-  return `<input class="num" type="number" min="0" step="any" value="${+sp.value}" data-k="${key}" data-f="value" aria-label="Speed amount">
+  const quick = sp.mode !== 'max' ? '' : `<div class="quick">${QUICK.map(([v, l]) =>
+    `<button data-k="${key}" data-q="${v}" class="${quickOn(sp, v) ? 'on' : ''}">${l}<small>${v === '0' ? 'GO CRAZY' : 'PER SEC'}</small></button>`).join('')}</div>`;
+  return quick + `<input class="num" type="number" min="0" step="any" value="${+sp.value}" data-k="${key}" data-f="value" aria-label="Speed amount">
     <select class="sel-in" data-k="${key}" data-f="unit" aria-label="Speed unit">
       <option value="ms"${u === 'ms' ? ' selected' : ''}>milliseconds</option>
       <option value="s"${u === 's' ? ' selected' : ''}>seconds</option>
@@ -503,9 +516,13 @@ function updateReadout(key) {
   let note = '';
   const raw = intervalMs({ ...sp, mode: 'max' });
   if (sp.mode === 'custom' && raw < 20) note = 'CUSTOM tops out at 50 clicks / sec. Pick INSANE or MAX POWER to go faster.';
-  if (sp.mode === 'max' && raw < 1) note = raw <= 0
-    ? 'No limit: thousands of clicks every second. Some apps freeze at this speed. ' + S.hotkey + ' or Esc stops it.'
-    : 'Over 1,000 clicks every second. Some apps freeze at this speed. ' + S.hotkey + ' or Esc stops it.';
+  if (sp.mode === 'max' && raw < 1) {
+    note = raw > 0.1 ? 'Over 1,000 clicks every second. Some apps freeze at this speed. '
+      : 'Your PC sends as many as it can, and the big number shows how many really went out. '
+        + 'Most games only count a few hundred a second and drop the rest. Some apps freeze. ';
+    note += S.hotkey + ' or Esc stops it.';
+  }
+  for (const b of document.querySelectorAll(`[data-q][data-k="${key}"]`)) b.classList.toggle('on', quickOn(sp, b.dataset.q));
   dg.textContent = note;
   dg.classList.toggle('show', !!note);
 }
@@ -517,6 +534,17 @@ document.addEventListener('input', e => {
   if (e.target.dataset.f === 'value') sp.value = e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0);
   else sp.unit = e.target.value;
   updateReadout(k);
+  refresh();
+  save();
+});
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-q]');
+  const sp = b && speedFor(b.dataset.k);
+  if (!sp) return;
+  if (b.dataset.q === '0') { sp.value = 0; sp.unit = 'ms'; } else { sp.value = Number(b.dataset.q); sp.unit = 'cps'; }
+  sfx.max();
+  if (b.dataset.k === 'main') renderValRow($('#mainVal'), S.main, 'main'); else renderList();
   refresh();
   save();
 });
@@ -683,7 +711,10 @@ function refresh() {
   $('#powerLbl').textContent = running ? 'STOP' : 'START';
   $('#modeOut').textContent = f ? modeName(f.mode) : 'ALL OFF';
   if (running) {
-    $('#bigCap').textContent = 'Clicks / sec';
+    // Asked for more than the PC can push? Say so instead of looking broken.
+    const p = plannedCps();
+    const topped = lastStatus.elapsed > 1.5 && p >= 10000 && lastStatus.cps < p * 0.8;
+    $('#bigCap').textContent = topped ? 'Clicks / sec · PC max' : 'Clicks / sec';
     $('#big').textContent = fmt(lastStatus.cps);
   } else {
     const p = plannedCps();

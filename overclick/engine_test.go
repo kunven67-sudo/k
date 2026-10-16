@@ -11,22 +11,28 @@ import (
 )
 
 type fakeBackend struct {
-	mu     sync.Mutex
-	clicks map[int]int
-	calls  atomic.Int64
-	skip   bool
+	mu      sync.Mutex
+	clicks  map[int]int
+	calls   atomic.Int64
+	biggest atomic.Int64
+	esc     atomic.Bool
+	skip    bool
 }
 
 func newFake() *fakeBackend { return &fakeBackend{clicks: map[int]int{}} }
 
-func (f *fakeBackend) Click(c *ClickerCfg, _ bool) int {
+func (f *fakeBackend) EscDown() bool { return f.esc.Load() }
+
+func (f *fakeBackend) Click(c *ClickerCfg, n int, _ bool) int {
 	f.calls.Add(1)
+	if int64(n) > f.biggest.Load() {
+		f.biggest.Store(int64(n))
+	}
 	if f.skip {
 		return 0
 	}
-	n := 1
 	if c.Double {
-		n = 2
+		n *= 2
 	}
 	f.mu.Lock()
 	f.clicks[c.ID] += n
@@ -123,7 +129,7 @@ func TestStopAfterClicks(t *testing.T) {
 	f := newFake()
 	e := NewEngine(f)
 	finished := make(chan struct{})
-	e.onFinish = func() { e.Stop(); close(finished) }
+	e.onFinish = func(string) { e.Stop(); close(finished) }
 	e.Start(&runConfig{clickers: []ClickerCfg{cfg(1, Speed{Mode: "max", Value: 0})}}, StopRule{Mode: "clicks", Clicks: 25})
 	select {
 	case <-finished:
@@ -142,7 +148,7 @@ func TestStopAfterTime(t *testing.T) {
 	f := newFake()
 	e := NewEngine(f)
 	finished := make(chan struct{})
-	e.onFinish = func() { e.Stop(); close(finished) }
+	e.onFinish = func(string) { e.Stop(); close(finished) }
 	start := time.Now()
 	// 1 click per minute: the time limit must still end it on time, not after a minute
 	e.Start(&runConfig{clickers: []ClickerCfg{cfg(1, Speed{Mode: "max", Value: 1, Unit: "min"})}}, StopRule{Mode: "time", Seconds: 0.2})
@@ -338,5 +344,91 @@ func TestFastestSpeed(t *testing.T) {
 	}
 	if s, ok := fastestSpeed(&st); !ok || s.Mode != "insane" {
 		t.Errorf("got %+v", s)
+	}
+}
+
+func TestOneMillionTarget(t *testing.T) {
+	f := newFake()
+	e := NewEngine(f)
+	e.Start(&runConfig{clickers: []ClickerCfg{cfg(1, Speed{Mode: "max", Value: 1_000_000, Unit: "cps"})}}, StopRule{Mode: "never"})
+	time.Sleep(300 * time.Millisecond)
+	total, _ := e.Stop()
+	// The fake backend is instant, so the engine itself must keep pace with 1M/s
+	// (in batches) without overshooting.
+	if total < 240_000 || total > 320_000 {
+		t.Errorf("1M/s for 0.3s: got %d clicks", total)
+	}
+	if b := f.biggest.Load(); b < 2 || b > maxBatch {
+		t.Errorf("batch size %d", b)
+	}
+}
+
+func TestNoLimitUsesFullBatches(t *testing.T) {
+	f := newFake()
+	e := NewEngine(f)
+	e.Start(&runConfig{clickers: []ClickerCfg{cfg(1, Speed{Mode: "max", Value: 0})}}, StopRule{Mode: "never"})
+	time.Sleep(100 * time.Millisecond)
+	total, _ := e.Stop()
+	if f.biggest.Load() != maxBatch || total < 1_000_000 {
+		t.Errorf("no limit: batch %d, %d clicks in 0.1s", f.biggest.Load(), total)
+	}
+}
+
+func TestSlowSpeedsStayOneAtATime(t *testing.T) {
+	f := newFake()
+	e := NewEngine(f)
+	e.Start(&runConfig{clickers: []ClickerCfg{cfg(1, Speed{Mode: "max", Value: 1, Unit: "ms"})}}, StopRule{Mode: "never"})
+	time.Sleep(100 * time.Millisecond)
+	e.Stop()
+	if f.biggest.Load() != 1 {
+		t.Errorf("1 ms speed sent batches of %d", f.biggest.Load())
+	}
+}
+
+func TestStopAfterClicksWithBatches(t *testing.T) {
+	for _, dbl := range []bool{false, true} {
+		f := newFake()
+		e := NewEngine(f)
+		finished := make(chan struct{})
+		e.onFinish = func(string) { e.Stop(); close(finished) }
+		c := cfg(1, Speed{Mode: "max", Value: 0})
+		c.Double = dbl
+		e.Start(&runConfig{clickers: []ClickerCfg{c}}, StopRule{Mode: "clicks", Clicks: 1001})
+		select {
+		case <-finished:
+		case <-time.After(2 * time.Second):
+			t.Fatal("never finished")
+		}
+		want := 1001
+		if dbl {
+			want = 1002 // double clicks come in pairs
+		}
+		if got := f.count(1); got != want {
+			t.Errorf("double=%v: got %d clicks, want %d", dbl, got, want)
+		}
+	}
+}
+
+func TestEscStopsFromInsideTheLoop(t *testing.T) {
+	f := newFake()
+	f.esc.Store(true) // Esc already held when starting: must not count
+	e := NewEngine(f)
+	reason := make(chan string, 1)
+	e.onFinish = func(r string) { e.Stop(); reason <- r }
+	e.Start(&runConfig{clickers: []ClickerCfg{cfg(1, Speed{Mode: "max", Value: 0})}}, StopRule{Mode: "never"})
+	time.Sleep(30 * time.Millisecond)
+	if !e.Running() {
+		t.Fatal("stopped because Esc was already down at start")
+	}
+	f.esc.Store(false)
+	time.Sleep(10 * time.Millisecond)
+	f.esc.Store(true)
+	select {
+	case r := <-reason:
+		if r != "esc" {
+			t.Errorf("reason %q", r)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Esc didn't stop it")
 	}
 }

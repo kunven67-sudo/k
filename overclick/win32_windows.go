@@ -16,6 +16,7 @@ var (
 
 	pSendInput                  = user32.NewProc("SendInput")
 	pGetCursorPos               = user32.NewProc("GetCursorPos")
+	pGetAsyncKeyState           = user32.NewProc("GetAsyncKeyState")
 	pWindowFromPoint            = user32.NewProc("WindowFromPoint")
 	pGetAncestor                = user32.NewProc("GetAncestor")
 	pGetSystemMetrics           = user32.NewProc("GetSystemMetrics")
