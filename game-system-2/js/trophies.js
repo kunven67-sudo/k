@@ -384,7 +384,10 @@
       aiPrev.replaceChildren(h('div.spinner'));
       aiNote.textContent = 'The AI is drawing… this can take up to a minute.';
       try {
-        var blob = await Pics.avatarAi(aiIn.value, aiStyle);
+        var blob = await Pics.avatarAi(aiIn.value, aiStyle, function (s) {
+          aiNote.textContent = s ? 'The free picture AI makes 1 picture every 45 seconds. Yours starts in ' + s + 's, just wait.'
+            : 'The AI is drawing… this can take up to a minute.';
+        }, function () { return !!(profileM && profileM.isOpen()); });
         if (!profileM || !profileM.isOpen()) return;
         aiResult = blob;
         if (aiUrl) URL.revokeObjectURL(aiUrl);
@@ -395,12 +398,12 @@
         Sound.good();
       } catch (e) {
         var msg = e && e.message;
+        if (msg === 'closed') return;
         aiPrev.replaceChildren(aiResult && aiUrl ? h('img', { src: aiUrl, alt: '' }) : I('user'));
         aiNote.style.color = 'var(--warn)';
         aiNote.textContent = msg === 'empty' ? 'Type what your avatar should look like first.'
           : msg === 'blocked' ? 'Nope, that one is not allowed. Try something else.'
-          : msg === 'wait' ? 'Slow down a bit! Try again in ' + e.wait + ' seconds.'
-          : msg === 'busy' ? 'The picture AI is busy right now. Wait a bit and try again.'
+          : msg === 'busy' ? 'The picture AI is too busy right now. Try again in a minute.'
           : 'The picture AI didn\'t answer (it might be down or blocked). Try again in a minute.';
       }
       makeBtn.disabled = false;

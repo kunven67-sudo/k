@@ -376,8 +376,12 @@
   ];
   /* Words that would make an 18+ picture. Pollinations' own safe filter is on too. */
   var BLOCK = /\b(nude|nudes|nudity|naked|nsfw|sex|sexy|sexual|porn\w*|hentai|xxx|erotic\w*|lewd|boob\w*|breast\w*|nipple\w*|genital\w*|penis|vagina|butt\s*naked|topless|bottomless|lingerie|bikini|underwear|panties|thong|strip(per|ping|club)?|onlyfans|fetish\w*|bdsm|bondage|orgy|horny|seductive|sensual|playboy|milf|gore|gory|dismember\w*|decapitat\w*|beheading|torture|mutilat\w*|disembowel\w*)\b/i;
-  var COOLDOWN = 16000;
-  var lastAi = 0;
+  /* the free Pollinations picture AI only makes 1 picture every 45 seconds per internet connection
+     (it answers 402 "FREE_LIMIT" with a Retry-After before that), so pictures wait their turn */
+  var COOLDOWN = 46000;
+  var lastAi = Number(U.lsGet('gs2:aiPicAt', 0)) || 0;
+  function markAi(at) { lastAi = at || Date.now(); U.lsSet('gs2:aiPicAt', lastAi); }
+  function waitLeft() { return Math.max(0, COOLDOWN - (Date.now() - lastAi)); }
 
   function aiUrl(prompt, styleKey, seed) {
     var st = STYLES.find(function (s) { return s.key === styleKey; }) || STYLES[0];
@@ -391,7 +395,12 @@
     var t = setTimeout(function () { ctl.abort(); }, 100000);
     try {
       var r = await fetch(url, { signal: ctl.signal, mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
-      if (r.status === 429) throw new Error('busy');
+      /* 402 = too soon for the free limit, 429 = slow down, 503 = the free AI is full right now: all say how long to wait */
+      if (r.status === 429 || r.status === 402 || r.status === 503) {
+        var e = new Error('busy');
+        e.wait = Math.min(120, Math.max(5, parseInt(r.headers.get('Retry-After'), 10) || 45));
+        throw e;
+      }
       if (!r.ok) throw new Error('status ' + r.status);
       var blob = await r.blob();
       if (!/^image\//.test(blob.type) || blob.size < 2000) throw new Error('not a picture');
@@ -401,23 +410,43 @@
     }
   }
 
-  /* AI profile picture (square). Throws Error('empty' | 'blocked' | 'wait' | 'busy' | …). */
+  /* Makes the picture, waiting its turn first. onWait(seconds) shows the countdown; stillWanted() false = give up.
+     If the AI still says "too soon" (another tab, another device on the same Wi-Fi) it waits what it asks and tries again. */
+  async function makePicture(url, onWait, stillWanted) {
+    for (var tries = 0; ; tries++) {
+      while (waitLeft() > 0) {
+        if (stillWanted && !stillWanted()) throw new Error('closed');
+        if (onWait) onWait(Math.ceil(waitLeft() / 1000));
+        await U.sleep(Math.min(1000, waitLeft()));
+      }
+      if (stillWanted && !stillWanted()) throw new Error('closed');
+      if (onWait) onWait(0);
+      markAi();
+      try {
+        var blob = await fetchImage(url);
+        markAi();   /* the AI counts its 45 seconds from when the picture is done */
+        return blob;
+      } catch (err) {
+        if (err && err.message === 'busy' && tries < 4) { markAi(Date.now() - COOLDOWN + (err.wait + 1) * 1000); continue; }
+        throw err;
+      }
+    }
+  }
+
+  /* AI profile picture (square). Throws Error('empty' | 'blocked' | 'busy' | …). */
   var AV_STYLES = {
     cartoon: '3D cartoon character portrait, animated movie style, colorful, soft lighting, cute and polished',
     pixel: 'pixel art character portrait, 16-bit retro game style, crisp pixels, vibrant palette',
     neon: 'neon cyberpunk character portrait, glowing outlines, dark background with neon lights',
     comic: 'comic book style character portrait, bold ink lines, bright flat colors, action hero vibe'
   };
-  async function avatarAi(prompt, style) {
+  async function avatarAi(prompt, style, onWait, stillWanted) {
     prompt = String(prompt || '').trim();
     if (!prompt) throw new Error('empty');
     if (BLOCK.test(prompt)) throw new Error('blocked');
-    var wait = COOLDOWN - (Date.now() - lastAi);
-    if (wait > 0) { var e = new Error('wait'); e.wait = Math.ceil(wait / 1000); throw e; }
-    lastAi = Date.now();
     var full = (AV_STYLES[style] || AV_STYLES.cartoon) + ', ' + prompt + ', head and shoulders, centered, simple background, fully clothed, no text, no words, family friendly';
-    return fetchImage('https://image.pollinations.ai/prompt/' + encodeURIComponent(full) +
-      '?width=512&height=512&seed=' + ((Math.random() * 1e9) | 0) + '&nologo=true&safe=true&model=flux');
+    return makePicture('https://image.pollinations.ai/prompt/' + encodeURIComponent(full) +
+      '?width=512&height=512&seed=' + ((Math.random() * 1e9) | 0) + '&nologo=true&safe=true&model=flux', onWait, stillWanted);
   }
 
   /* ---------------- the picture maker window ---------------- */
@@ -548,6 +577,8 @@
       input.click();
     }
 
+    var making = false;   /* one picture at a time */
+    var aiNote = h('div.small.muted.ai-note');   /* kept when the style changes, so a waiting picture can still talk */
     var aiPrompt = (g.name + (g.desc ? ', ' + g.desc : '')).slice(0, 300);
     function renderAi() {
       var input = h('textarea.input', { rows: 3, maxlength: 400, placeholder: 'What should the picture show? For example: a neon casino at night with slot machines' });
@@ -556,14 +587,14 @@
       var styleSeg = h('div.seg', STYLES.map(function (s) {
         return h('button' + (s.key === state.style ? '.on' : ''), { onclick: function () { state.style = s.key; renderAi(); } }, s.label);
       }));
-      var genBtn = h('button.btn.primary', { onclick: generate }, I('sparkle'), 'Make picture');
-      var note = h('div.small.muted.ai-note');
+      var genBtn = h('button.btn.primary', { onclick: generate, disabled: making }, I('sparkle'), 'Make picture');
+      var note = aiNote;
       opts.replaceChildren(h('div.label', 'Describe the picture'), input, h('div.label', 'Style'), styleSeg,
         h('div.row', { style: { marginTop: '12px' } }, genBtn), note,
         h('p.small.dim', { style: { marginTop: '12px' } }, 'Made by the free Pollinations picture AI. No 18+ pictures. What you type is sent to their website.'));
-      tickCooldown(genBtn);
 
       async function generate() {
+        if (making) return;
         var p = input.value.trim();
         if (p.length < 3) { UI.toast('Describe the picture first.', { type: 'warn' }); return; }
         if (BLOCK.test(p)) {
@@ -572,37 +603,37 @@
           Sound.error();
           return;
         }
-        var wait = COOLDOWN - (Date.now() - lastAi);
-        if (wait > 0) { note.textContent = 'The free AI allows one picture every 15 seconds. Wait ' + Math.ceil(wait / 1000) + 's.'; return; }
-        lastAi = Date.now();
         note.style.color = '';
-        note.textContent = 'Making your picture… this can take up to a minute.';
+        making = true;
         genBtn.disabled = true;
-        preview.replaceChildren(h('div.pic-empty', h('div.spinner'), h('div', 'The AI is drawing…')));
+        var waitMsg = h('div', 'The AI is drawing…');
+        preview.replaceChildren(h('div.pic-empty', h('div.spinner'), waitMsg));
         useBtn.disabled = true;
         state.seed = (Math.random() * 1e9) | 0;
         try {
-          var blob = await fetchImage(aiUrl(p, state.style, state.seed));
+          var blob = await makePicture(aiUrl(p, state.style, state.seed), function (s) {
+            waitMsg.textContent = s ? 'Your turn in ' + s + 's…' : 'The AI is drawing…';
+            note.textContent = s ? 'The free picture AI makes 1 picture every 45 seconds. Yours starts by itself, just wait.'
+              : 'Making your picture… this can take up to a minute.';
+          }, function () { return m.isOpen(); });
+          if (!m.isOpen()) return;
           state.aiResult = { blob: blob, ai: true };
           setResult(state.aiResult);
           note.textContent = 'Like it? Hit "Use this picture". Don\'t like it? Make another one.';
           Sound.good();
         } catch (err) {
+          making = false;
+          if (err && err.message === 'closed') return;
           setResult(state.aiResult);
           note.style.color = 'var(--warn)';
           note.textContent = err && err.message === 'busy'
-            ? 'The picture AI is busy right now. Wait a bit and try again.'
-            : 'The picture AI didn\'t answer (' + (err && err.name === 'AbortError' ? 'it took too long' : 'it might be down or blocked') + '). Try again in a minute, or use another style tab.';
+            ? 'The picture AI is too busy right now. Try again in a minute.'
+            : 'The picture AI didn\'t answer (' + (err && err.name === 'AbortError' ? 'it took too long' : 'it might be down or blocked') + '). Try again in a minute, or make one in the Neon letters or Icon tab.';
         }
-        genBtn.disabled = false;
-        tickCooldown(genBtn);
+        making = false;
+        /* the style may have been changed while it drew: the button on screen now is a new one */
+        opts.querySelectorAll('.btn.primary').forEach(function (b) { b.disabled = false; });
       }
-    }
-    function tickCooldown(btn) {
-      var left = COOLDOWN - (Date.now() - lastAi);
-      if (left <= 0 || !m.isOpen()) { btn.disabled = false; return; }
-      btn.disabled = true;
-      setTimeout(function () { if (btn.isConnected) tickCooldown(btn); }, 500);
     }
 
     async function use() {
