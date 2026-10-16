@@ -1,5 +1,12 @@
 # REAL LIFE: Master List
 
+> **For the AI building this:** this is the full design for a browser game called REAL LIFE.
+> Every answer here was picked by the player who wants the game, so follow it as written. Build it
+> as a folder of files (section 38), first-person 3D with Three.js, keyboard + mouse on PC. Build
+> the **[FIRST]** stuff first as an early playable, then the updates in order. "Yep that's on
+> earth" means: make it work exactly like real life, with real-world details. The rules in
+> section 0 are hard limits, don't change them.
+
 Everything planned for REAL LIFE, in one place. It's a first-person 3D life sim. You get
 born, grow up from a kid, and live a whole life: school, jobs, money, buying real stuff,
 cars, houses, relationships, travel, crime, getting old. Everything depends on everything.
@@ -20,9 +27,12 @@ Tags used below:
    (wrong PC part won't fit, a couch won't fit through a small door, no gas = car stops).
 3. **Kids are protected.** No gore on kids ever: if a kid "dies" from something violent they get
    knocked out and wake up in the hospital instead. Kids can't buy guns or alcohol anywhere.
-   No dating or romance with kids. Kids only get crushes and hold hands as teens.
-4. **Romance stays off-screen.** Adults can kiss on screen. Anything past kissing is a Sims-style
-   fade to black + time skip. No sounds, nothing shown.
+   No dating or romance with kids. Teens (13-17) only get crushes, holding hands and at most a
+   quick innocent peck with another teen. Never anything between a teen and an adult.
+4. **Romance stays off-screen.** Adults (18+ with 18+) can kiss and make out on screen with
+   clothes on. Anything past that is a Sims-style fade to black + time skip. No sounds, nothing
+   shown, no text describing it. No sexual content, no sexual websites, no jiggle physics on
+   bodies. Never if either person is drunk. A "no" always ends it.
 5. **Permadeath.** One life per save. When you die, it's over: funeral, life recap, new life.
 6. **Parody brands only.** Everything real gets a parody name (see section 13).
 7. **No lag.** Smart auto graphics keeps it smooth on a low-end GPU, with an Ultra preset for
@@ -426,31 +436,137 @@ hold, use, break, sell, or throw away.
 
 ## 26. Relationships + romance
 
+Everything here is "yep that's on earth". The other person always decides for themselves.
+
 - **Friends + enemies [FIRST basic]:** friendship grows by hanging out, helping, gifts, and falls
   apart from lying, ignoring, stealing. Bullies, rivals, enemies.
-- **Teens [LATER]:** crushes, hand holding, awkward notes.
+- **Who likes who [LATER]:** every NPC has their own orientation (straight, gay, bi), their own
+  type and deal-breakers. You pick yours. Some people won't be into you no matter what.
+- **Attraction [LATER]:** every NPC likes different things: looks, fitness, money, job, humor,
+  kindness, style, car, their own taste. Not everyone will like you.
+- **Meeting people [LATER]:** everywhere real: school, college, work, gym, coffee shop, through
+  friends, neighbors, the dating app, church, hobbies and clubs, a wrong-number text, bumping into
+  someone. Bars and clubs too (section 26b).
+- **Teens (13-17) [LATER]:** crushes, holding hands, passing notes, texting, school dances, friends
+  teasing you, strict parents finding out. A first kiss between two teens of the same age group
+  only: a quick innocent peck, the camera cuts away, both get a "First Kiss" memory. They have
+  to like you first and can say no or get embarrassed. Nothing more than that, and never with an
+  adult.
 - **Flirting (adults) [LATER]:** type-anything flirting. They react by personality: some love
   cheesy lines, some think you're weird. Creepy = bad reputation.
-- **Attraction [LATER]:** every NPC likes different things: looks, fitness, money, job, humor,
-  kindness, style, their own taste. Not everyone will like you.
+- **Texting [LATER]:** type anything, they reply by personality + mood. Left on read,
+  double-texting looks desperate, the "typing..." bubble that stops, good-morning texts, pet
+  names, emojis. If they like you they text first.
 - **Dating app [LATER]:** Tindr on your phone: swipe, match, chat, ghosted, catfished, meet up.
 - **Dates [LATER]:** restaurant, movie theater, park walk, beach, arcade, fair, coffee, cook at
   home. What matters: your outfit, hygiene, being on time, who pays, what you talk about, your
-  car. Gifts: flowers, chocolate, jewelry, stuffed animals, or something they mentioned wanting.
-- **Kissing (adults) [LATER]:** real animation, both lean in and react after. The other person
-  decides. Types: peck, hug + kiss, date kiss, goodbye kiss, wedding kiss. People who see it
-  remember it.
-- **Off-screen time (adults) [LATER]:** ask your partner (option or type it), they decide.
-  Walk to the bedroom holding hands, door closes, lights off, fade to black, wake up next to
-  each other. "Loved" mood + relationship up. Pharmacy protection lowers the pregnancy chance.
-  Pregnancy test, telling the family.
+  car. Gifts: flowers, chocolate, jewelry, stuffed animals, or something they hinted they wanted.
+- **Kissing (adults 18+) [LATER]:** real animation, both lean in and react after. The other
+  person decides. Types: peck, hug + kiss, date kiss, goodbye kiss, wedding kiss. People who see
+  it remember it.
+- **Making out (adults 18+ with 18+ only) [LATER]:** a longer kiss animation, clothes stay on,
+  normal camera, PG-13 movie level. Either one can start or stop it. In public people stare or
+  comment, at work you can get in trouble with your boss. If you're cheating and someone sees,
+  word gets back to your partner.
+- **Your partner starts things too [LATER]:** they can kiss you first (more when the relationship
+  and mood are high, after a good date or a gift; a shy partner rarely does, a flirty one does a
+  lot). You kiss back or turn away (turning away makes them sad/awkward, worse if it keeps
+  happening).
+- **Off-screen time (adults) [LATER]:** either of you can ask, in a normal non-explicit way
+  ("wanna head to bed?"). The answer is Yes or Not tonight, decided by mood, energy, sickness,
+  stress, a fight earlier that day, and how things are between you. Saying no now and then is
+  fine. Never happens if either person is drunk or wasted (the other says "you're drunk, let's
+  just sleep"). If yes: walk to the bedroom holding hands, door closes, lights click off, fade to
+  black. Next morning: wake up next to each other, "Loved" mood, relationship up, breakfast
+  together. Pharmacy protection lowers the pregnancy chance. Pregnancy test, telling the family.
+  That's the whole thing, nothing more gets added to it.
+- **Asking your partner for things [LATER]:** type ANY request ("make dinner", "come to the
+  store with me", "stop texting your ex", "get a job", "move to Japan with me"). They understand
+  it and answer yes / no / maybe / a counter-offer based on their personality, mood, how much
+  they love you, how fair the ask is, how you asked (bossy annoys them, nice works better) and
+  your history (always asking and never giving back = more no's). Big asks start a real
+  conversation. They ask YOU for things too, and ignoring them causes drama.
+- **Their family [LATER]:** dinner with their family, parents like or hate you (job, manners,
+  looks, car), the overprotective dad, splitting holidays between families, in-laws visiting,
+  family pressure to marry or have kids.
+- **Living together [LATER]:** move in (your place, theirs, or a new one), split rent and bills,
+  fights about chores, dishes and mess, sharing the bed (they steal the blanket), merging
+  furniture, cooking for each other, habits that are annoying or cute.
+- **Dates to remember [LATER]:** they remember anniversaries, birthdays and Valentine's.
+  Forgetting = a big fight. Gifts matter (they hint what they want), surprise parties,
+  Valentine's dinner reservations sell out, flowers, cards, jewelry.
 - **Drama [LATER]:** jealousy (texting someone else too much), cheating found out through texts
-  or witnesses, getting cheated on, fights about money/chores/time, breakups, exes texting you.
-- **Moving in + marriage [LATER]:** move in together, split rent, propose with a ring you buy
-  (cheap vs huge diamond), wedding with guests, honeymoon trip.
+  or witnesses, getting cheated on, fights about money/chores/time, exes texting you.
+- **Proposals + weddings [LATER]:** pick the ring (cheap vs huge diamond), the place and the
+  moment. They can say no, even in public. Plan the wedding: venue, guest list, dress/suit, cake,
+  DJ, budget, family drama. Type your own vows. A real ceremony, reception and dancing, then a
+  honeymoon trip.
+- **Breakups [LATER]:** over text, in person, or they dump you. Sad for days (eating junk, can't
+  sleep, bad at work), longer relationship = worse heartbreak. Move out, split your stuff, mutual
+  friends pick sides, seeing them with someone new, sometimes getting back together.
 - **Divorce [LATER]:** splits money and the house, a custody court, child support.
-- **Your own kids [LATER]:** pregnancy or adoption, a baby that needs care, kids grow up with
-  their own personalities. (Permadeath: you don't continue as them.)
+- **Your own kids [LATER]:** talk about wanting kids first (they might not want any). Pregnancy
+  takes months with checkups and cravings, birth at the hospital, or adoption. Babies cry at
+  night, need diapers and formula, daycare costs money. Kids get traits and looks from both
+  parents and grow up with their own personalities. When you die you can keep playing as your
+  kid.
+
+## 26b. Drinking, parties + nightlife (adults only)
+
+Legal drinking age depends on the country (section 20). Kids who find beer just get sick and
+in trouble (section 7).
+
+- **Where to drink [LATER]:** bars, clubs, house parties, restaurants, liquor store, the fridge
+  at home. ID checks everywhere, fake IDs can get caught. Happy hour prices, last call, bouncers,
+  the bartender cutting you off, running a tab, tipping, BYOB parties.
+- **How drunk you get [LATER]:** tipsy -> drunk -> wasted, based on how much you drink, your body
+  weight and whether you ate. Tipsy = chattier, a bit more confident. Drunk = slurred texts,
+  wobbly walking. Wasted = throwing up, passing out.
+- **Drunk effects on screen [LATER]:** stronger the drunker you are. Tipsy = slight sway. Drunk =
+  blur, double vision, delayed mouse. Wasted = spinning screen, stumbling, falling over.
+- **Drunk flirting [LATER]:** depends on the NPC. Some think drunk you is fun, some are turned off
+  right away. A drunk kiss at a party is two people being sloppy and awkward, never one person
+  taking advantage of the other.
+- **Parties [LATER]:** house parties with music and crowds, beer pong, flip cup, someone puking in
+  the bathroom, neighbors calling the cops about the noise, the party getting busted.
+- **Bars + clubs [LATER]:** buy someone a drink, dance floor, get numbers, get rejected, a
+  wingman friend helps, bouncers kick out messy drunks, people lying about being single.
+- **Getting home [LATER]:** ride-share app, taxi, a sober friend drives, walk home, crash on a
+  couch. Drunk driving = swerving controls, cops, DUI, license taken away, crashes, jail.
+- **Drunk drama [LATER]:** drunk texting or calling your ex, bar fights, crying at parties,
+  telling secrets, saying the wrong thing to your partner, getting kicked out, losing your phone
+  or wallet. Plus the funny stuff: bad dancing, karaoke, falling asleep in weird places.
+- **The next morning [LATER]:** blackout gaps if you got wasted (you find out what happened from
+  texts, photos on social media, friends telling you), embarrassing posts going viral, people
+  remembering what you did, apologizing to fix it.
+- **Hangovers [LATER]:** headache, light hurts your eyes, nausea, low energy, late for work or
+  school. Water, greasy food, sleep and pharmacy pills help. Worse as you get older.
+- **Your partner + drinking [LATER]:** depends on them: some party with you, some hate it.
+  Drinking too often becomes a real addiction: fights, breakups, your family worried, rehab, AA
+  meetings.
+
+## 26c. Breaking stuff
+
+All "yep that's on earth".
+
+- **What breaks [FIRST basic / LATER full]:** everything that breaks in real life: glass,
+  plates, TVs, phones, furniture, walls (holes in drywall), car windows, PC parts. Things break
+  based on what they're made of and how hard they get hit.
+- **How it looks [FIRST]:** real pieces by material: glass shards, wood splinters, phone screen
+  cracks that spread, a TV screen spiderweb. Pieces bounce and fall with physics.
+- **After it breaks [LATER]:** broken pieces stay until someone cleans them up. You can step on
+  glass and get cut. Pay to fix or replace it, repair shops, insurance claims. Parents get mad if
+  you're a kid, the landlord keeps your deposit, breaking someone else's stuff = police or paying
+  them back.
+- **Wearing out [LATER]:** stuff ages on its own: phone batteries get weak, shoes wear out, the
+  couch sags, the fridge breaks, the water heater leaks, car parts fail, PC fans die. Cheap stuff
+  breaks faster than good stuff.
+- **Breaking stuff when mad [LATER]:** punch a wall (hurts your hand, leaves a hole), throw your
+  controller, smash your phone. Rage rooms you can pay to visit. It costs money, can hurt you,
+  and people react.
+- **Fixing it yourself [LATER]:** repair skill. Watch how-to videos on the in-game video site, buy
+  parts and tools, fix it by hand (replace a phone screen, patch drywall, fix a leak). Mess up =
+  it gets worse. Or pay a pro.
 
 ## 27. Your phone
 
@@ -467,8 +583,29 @@ You might not have one as a kid until your parents buy one or you buy it yoursel
 
 ## 28. In-game internet
 
-All parody sites, on the PC and phone. [LATER] unless noted.
+All parody sites, on the PC and phone. [LATER] unless noted. The internet works like it does in
+real life, and you pay for it.
 
+- **Getting internet:** pick a made-up internet company and a plan (speed vs price). A
+  technician installs the modem + router, or you set it up yourself. Monthly bill, cut off if
+  unpaid, outages happen. As a kid your family has it; as an adult you sign up yourself.
+- **Wi-Fi:** range depends on rooms and walls (weak in the basement), passwords, neighbors
+  stealing your Wi-Fi, speed slows when the family is streaming, an ethernet cable is faster,
+  rebooting the router fixes things, public Wi-Fi at cafes.
+- **Phone data:** made-up phone carriers with data limits, slow after the limit, overage fees,
+  dead zones, roaming costs extra abroad, kids on their parents' plan.
+- **The browser:** a real-looking browser on the PC and phone: tabs, address bar, typing site
+  names, a parody search engine, bookmarks, history, ads, pop-ups.
+- **Making your own stuff:** post on social media, record and upload videos, start a channel, go
+  viral or flop, earn money from views and sponsors, sell on the marketplace, make your own
+  website or online store.
+- **Dangers:** scam sites, phishing texts and emails, hacked accounts, stolen card numbers,
+  viruses, catfishing, cyberbullying as a kid, strangers online (kids get safety warnings).
+- **Kid rules:** depend on your family. Strict parents = parental controls, screen time limits,
+  phone taken at night, checking your texts. Chill parents = more freedom. Getting around the
+  rules and getting caught = grounded.
+- **First playable [FIRST]:** home Wi-Fi + the phone browser + a shopping site + a bank app. The
+  rest comes in updates.
 - **Shopping + selling:** Amazan, PC part stores, car sites, eBuy, Facebuk Marketplace.
 - **Dark web:** special browser, sketchy shops, scams, police can track you.
 - **Video + social:** YouTub (made-up videos), Instagran, TikTak, forums where people argue,
@@ -477,8 +614,6 @@ All parody sites, on the PC and phone. [LATER] unless noted.
   listings, flight booking, maps.
 - **Games + downloads:** download in-game games (FPS by your GPU), free downloads that might
   give you a virus, scam sites ("free gift card!!") that steal your money.
-- **Internet bill:** pay an internet company, modem + router setup, Wi-Fi range, cut off if
-  unpaid.
 
 ## 29. TV, movies + music
 
