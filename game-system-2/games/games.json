@@ -1,0 +1,173 @@
+{
+ "gs2": 1,
+ "games": [
+  {
+   "id": "gs2-music",
+   "name": "Music",
+   "desc": "Play your own songs with a glowing visualizer. Keeps playing while you game, and comes back to the same spot in the song.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "music",
+   "color": "#ff2bd6",
+   "rev": 3,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 37983,
+   "isolate": true,
+   "win": {
+    "w": 760,
+    "h": 580
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-notes",
+   "name": "Notes",
+   "desc": "Write anything. Saves while you type, and puts your cursor right back where it was.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "note",
+   "color": "#ffcc00",
+   "rev": 2,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 21572,
+   "isolate": true,
+   "win": {
+    "w": 860,
+    "h": 580
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-calculator",
+   "name": "Calculator",
+   "desc": "A calculator with science buttons, history, and keyboard typing.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "calc",
+   "color": "#00e5ff",
+   "rev": 2,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 26067,
+   "isolate": true,
+   "win": {
+    "w": 400,
+    "h": 620
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-drawing",
+   "name": "Drawing",
+   "desc": "Draw, paint and fill. Use your drawing as the picture for any game.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "brush",
+   "color": "#3dffa0",
+   "rev": 3,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 32216,
+   "isolate": true,
+   "win": {
+    "w": 1020,
+    "h": 680
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-gallery",
+   "name": "Gallery",
+   "desc": "All your screenshots, recordings, drawings and photos, newest first. Look at them big, download them, or use one as a game's picture.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "image",
+   "color": "#5c8dff",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 30992,
+   "isolate": true,
+   "win": {
+    "w": 980,
+    "h": 660
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-video",
+   "name": "Video",
+   "desc": "Watch your recordings, your own videos and YouTube links. The mini player floats over your games.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "video",
+   "color": "#ff3d6e",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 26973,
+   "isolate": true,
+   "win": {
+    "w": 1000,
+    "h": 620
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-timer",
+   "name": "Timer",
+   "desc": "Timers, a stopwatch with laps, and alarms. They ring over your games, even when this app is closed.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "clock",
+   "color": "#ff8a3d",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 26890,
+   "isolate": true,
+   "win": {
+    "w": 720,
+    "h": 640
+   },
+   "saveKit": true
+  },
+  {
+   "id": "gs2-code",
+   "name": "Code",
+   "desc": "Write HTML, CSS and JavaScript and see it live. Examples and lessons inside. Save what you make as a real game or app.",
+   "kind": "app",
+   "builtin": true,
+   "icon": "code",
+   "color": "#3dffa0",
+   "rev": 1,
+   "entry": "index.html",
+   "files": [
+    "index.html"
+   ],
+   "size": 45915,
+   "isolate": true,
+   "win": {
+    "w": 1180,
+    "h": 720
+   },
+   "saveKit": true
+  }
+ ]
+}
