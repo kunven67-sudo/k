@@ -580,25 +580,57 @@
     return aiFree(messages, opts);
   }
 
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function httpErr(r) { var e = new Error('The free AI didn\'t answer (' + r.status + ').'); e.status = r.status; e.retryAfter = Number(r.headers.get('Retry-After')) || 0; return e; }
+  /* the free AI (Pollinations). It has a few doors; if one is down or busy, try the next. */
   async function aiFree(messages, opts) {
     var body = { model: 'openai', messages: [{ role: 'system', content: opts.system || '' }].concat(messages), private: true, seed: (Math.random() * 1e6) | 0 };
-    var to = withTimeout(opts.long ? 180000 : 45000);
-    try {
-      /* the OpenAI-style door first, then the simple one */
-      try {
-        var r = await fetch('https://text.pollinations.ai/openai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: to.signal, credentials: 'omit' });
-        if (r.ok) {
-          var txt = await r.text();
-          try { var j = JSON.parse(txt); var c = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content; if (c) return String(c); } catch (e) { if (txt.trim()) return txt; }
-        } else if (r.status === 429) throw new Error('busy');
-      } catch (e) { if (e.message === 'busy' || e.name === 'AbortError') throw e; }
-      var r2 = await fetch('https://text.pollinations.ai/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: to.signal, credentials: 'omit' });
-      if (r2.status === 429) throw new Error('busy');
-      if (!r2.ok) throw new Error('The free AI didn\'t answer (' + r2.status + ').');
-      var t2 = (await r2.text()).trim();
-      if (!t2) throw new Error('The free AI sent an empty answer.');
-      return t2;
-    } finally { to.done(); }
+    var lastUser = String((messages.filter(function (m) { return m.role === 'user'; }).pop() || {}).content || '');
+    var doors = [
+      async function (signal) {
+        var r = await fetch('https://text.pollinations.ai/openai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: signal, credentials: 'omit' });
+        if (!r.ok) throw httpErr(r);
+        var txt = await r.text(), j = null;
+        try { j = JSON.parse(txt); } catch (e) { j = null; }
+        var c = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+        if (c) return String(c);
+        if (!j && txt.trim()) return txt;
+        throw new Error('The free AI sent an empty answer.');
+      },
+      async function (signal) {
+        var r = await fetch('https://text.pollinations.ai/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: signal, credentials: 'omit' });
+        if (!r.ok) throw httpErr(r);
+        var t = (await r.text()).trim();
+        if (!t || /^\{\s*"error"/.test(t)) throw new Error('The free AI sent an empty answer.');
+        return t;
+      }
+    ];
+    /* the simplest door last (short questions only: it's a link) */
+    if (!opts.long && lastUser && lastUser.length < 1200) {
+      doors.push(async function (signal) {
+        var sys = 'You are VEX, the friendly helper inside Game System, a game launcher. Answer in 1-3 short, simple sentences.';
+        var r = await fetch('https://text.pollinations.ai/' + encodeURIComponent(lastUser) + '?model=openai&private=true&system=' + encodeURIComponent(sys), { signal: signal, credentials: 'omit' });
+        if (!r.ok) throw httpErr(r);
+        var t = (await r.text()).trim();
+        if (!t || /^\{\s*"error"/.test(t)) throw new Error('The free AI sent an empty answer.');
+        return t;
+      });
+    }
+    var each = opts.long ? 170000 : 22000;
+    var lastErr = null, waited = false;
+    for (var i = 0; i < doors.length; i++) {
+      var to = withTimeout(each);
+      try { return await doors[i](to.signal); }
+      catch (e) {
+        lastErr = e;
+        /* a long job (making a game) that timed out: starting over would take just as long */
+        if (e.name === 'AbortError' && opts.long) break;
+        /* busy for a moment: wait once, then try the same door again */
+        if ((e.status === 429 || e.status === 503) && !waited) { waited = true; await wait(Math.min(6000, Math.max(1500, (e.retryAfter || 3) * 1000))); i--; }
+      } finally { to.done(); }
+    }
+    if (lastErr && lastErr.status === 429) throw new Error('busy');
+    throw lastErr || new Error('The free AI didn\'t answer.');
   }
 
   /* your own key. Claude goes through Anthropic's official SDK (loaded when first needed). */
@@ -610,7 +642,7 @@
     }
     return new anthropicSdk({ apiKey: key, dangerouslyAllowBrowser: true, maxRetries: 1, timeout: 180000 });
   }
-  var DEFAULT_MODELS = { anthropic: 'claude-opus-5-5', openai: 'gpt-4o-mini', gemini: 'gemini-2.5-flash', openrouter: 'openrouter/auto', custom: '' };
+  var DEFAULT_MODELS = { anthropic: 'claude-opus-5-5', openai: 'gpt-4o-mini', gemini: 'gemini-flash-latest', openrouter: 'openrouter/auto', custom: '' };
   async function aiWithKey(messages, opts) {
     var k = keyInfo();
     var provider = k.provider || 'anthropic';
@@ -650,19 +682,29 @@
     var to = withTimeout(opts.long ? 180000 : 60000);
     try {
       if (provider === 'gemini') {
-        var g = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': k.key }, signal: to.signal,
-          body: JSON.stringify({
-            systemInstruction: opts.system ? { parts: [{ text: opts.system }] } : undefined,
-            contents: messages.map(function (m) { return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }; }),
-            generationConfig: { maxOutputTokens: max }
-          })
-        });
-        if (g.status === 429) throw new Error('busy');
-        var gj = await g.json().catch(function () { return {}; });
-        if (!g.ok) throw new Error('Gemini said no (' + g.status + '): ' + ((gj.error && gj.error.message) || '').slice(0, 140));
-        var parts = gj.candidates && gj.candidates[0] && gj.candidates[0].content && gj.candidates[0].content.parts || [];
-        return parts.map(function (p) { return p.text || ''; }).join('');
+        /* newer Gemini models think first, and that counts toward the limit: leave room */
+        var gmax = opts.max ? Math.max(opts.max, 1024) : opts.long ? 65536 : 8192;
+        var askGemini = async function (name) {
+          var g = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(name) + ':generateContent', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': k.key }, signal: to.signal,
+            body: JSON.stringify({
+              systemInstruction: opts.system ? { parts: [{ text: opts.system }] } : undefined,
+              contents: messages.map(function (m) { return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }; }),
+              generationConfig: { maxOutputTokens: gmax }
+            })
+          });
+          if (g.status === 429) throw new Error('busy');
+          return { g: g, gj: await g.json().catch(function () { return {}; }) };
+        };
+        var gr = await askGemini(model);
+        /* the "newest Flash" name isn't there for this key: use the one we know */
+        if (gr.g.status === 404 && !k.model) gr = await askGemini('gemini-2.5-flash');
+        if (!gr.g.ok) throw new Error((gr.g.status === 400 || gr.g.status === 403) && /api key/i.test(JSON.stringify(gr.gj)) ? 'Your Gemini key didn\'t work. Check it in Settings → VEX.' : 'Gemini said no (' + gr.g.status + '): ' + ((gr.gj.error && gr.gj.error.message) || '').slice(0, 140));
+        var cand = gr.gj.candidates && gr.gj.candidates[0];
+        var parts = cand && cand.content && cand.content.parts || [];
+        var gtext = parts.filter(function (p) { return !p.thought; }).map(function (p) { return p.text || ''; }).join('');
+        if (!gtext) throw new Error('Gemini sent an empty answer' + (cand && cand.finishReason ? ' (' + cand.finishReason + ')' : '') + '.');
+        return gtext;
       }
       var url = provider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : provider === 'openrouter' ? 'https://openrouter.ai/api/v1/chat/completions' : String(k.url || '').replace(/\/+$/, '') + '/chat/completions';
       var o = await fetch(url, {
@@ -692,6 +734,7 @@
       'You focus on Game System and games. If asked about something unrelated, give a short answer and steer back.',
       'Game System features: Home (big showcase, rows), Library (all games and apps, folders, own order, drag to move), Apps tab (Music, Notes, Calculator, Drawing, Gallery, Video, Timer, Code), Saves, Stats with the trophy room, Settings (themes, Home layouts, Simple or Pro, sounds, screenshot/record keys, VEX settings, backups, website folder). Games with the Save Kit continue where you left off; others can be upgraded with "Make it continue". Screenshots and recordings go to the Gallery. Level ' + inf.level + ' (' + inf.title + '), ' + inf.got + '/' + inf.total + ' trophies.',
       'If the user wants you to DO something in Game System that you can do, put ONE line at the very end exactly like: ACTION: {"do":"play","name":"Snake"}. Allowed "do" values: play (name), open_app (name), go (view: home|library|apps|saves|stats|settings), timer (seconds, label), alarm (time "HH:MM", days [0-6]), music (cmd: play|pause|next|prev), screenshot, record, folder (name, folder), favorite (name), theme (name), make_game (idea), fix_game (name, problem). Only use names from the list below. Never invent other actions.',
+      window.VexKnow ? 'Facts about Game System (use these, never guess how Game System works):\n' + VexKnow.facts() : '',
       'Their games and apps:\n' + (list || '(none yet)'),
       mem ? 'Things they asked you to remember:\n' + mem : '',
       'Now: ' + new Date().toLocaleString() + '. Screen: ' + (Player.isPlaying() ? 'playing ' + ((D.get(Player.currentId()) || {}).name || 'a game') : D.ui.view) + '.'
@@ -830,7 +873,7 @@
      HANDLING WHAT YOU SAID
      ===================================================================== */
   /* the whole answer has to be yes/no: "go to settings" or "stop recording" are new commands, not answers */
-  var YES = /^(yes|yeah|yea|yep|yup|ya|sure|ok|okay|do it|go|go ahead|please|bet|of course|alright|y|absolutely|let'?s go|let'?s do it)( (please|bro|vex|man|dude|sure|do it|go ahead|thanks))*[\s!.,]*$/;
+  var YES = /^(yes|yeah|yea|yep|yup|ya|sure|ok|okay|do it|go|go ahead|please|bet|of course|alright|y|absolutely|let'?s go|let'?s do it|show me|take me there|open it|go there|try again|again)( (please|bro|vex|man|dude|sure|do it|go ahead|thanks))*[\s!.,]*$/;
   var NO = /^(no|nah|nope|cancel|stop|never ?mind|don'?t|n|nothing|forget it|not now)( (thanks|thank you|bro|vex|man|dude|please))*[\s!.,]*$/;
   async function runCommand(t, fromAi, raw) {
     var l = lead(t) || t;
@@ -843,6 +886,39 @@
       if (r != null) return r;
     }
     return fromAi ? null : undefined;
+  }
+
+  /* "what's my level?", "what time is it?" and other questions about YOU are commands, not "how does it work" */
+  var PERSONAL = /\btime is it\b|\bwhat should i play\b|\bwhat song\b|\bhow many\b|\b(left|remaining)\b|\bmy (level|points|trophies|alarms|timers?|most played|favou?rite game)\b|\bhow (long|much) (did|have) i\b|\bwhat do you (remember|know about me)\b|\bwhat have i told you\b|\b(who|what) are you\b|\bwhat can you do\b|\bwhat('?s| is) (the |today'?s )?(date|time)\b|\bwhat day is\b|\bwhat('?s| is) my name\b/;
+  /* an answer VEX knows by heart, with "Show me" when there's a place to go */
+  function knowReply(know, before) {
+    var out = { text: (before ? before + ' ' : '') + know.text };
+    if (know.go) {
+      pending = { kind: 'confirm', run: function () { try { know.go(); } catch (e) { /* ignore */ } Vex.closeSoon(); return ok(); } };
+      out.chips = ['Show me'];
+    }
+    return out;
+  }
+  /* the AI didn't answer: still be useful */
+  function aiReason(e) {
+    var m = (e && e.message) || '';
+    if (m === 'busy') return 'it\'s too busy';
+    if (e && e.name === 'AbortError') return 'it took too long';
+    if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'I can\'t reach it. Are you online?';
+    var st = /\((\d{3})\)/.exec(m);
+    return st ? 'it said error ' + st[1] : 'it had a problem';
+  }
+  function aiTrouble(e, know, raw, history) {
+    if (e && e.message === 'off') return know ? knowReply(know) : line('noAi');
+    var free = aiMode() === 'free';
+    if (know) return knowReply(know, free ? 'My AI brain isn\'t answering right now, but here\'s what I know:' : 'The AI didn\'t answer (' + aiErrorText(e).replace(/[.]$/, '') + '), but here\'s what I know:');
+    pending = { kind: 'confirm', run: function () { return handle(raw, history); } };
+    return {
+      text: free
+        ? 'My free AI brain isn\'t answering right now (' + aiReason(e) + '). Try again in a bit. For a smarter me that works every time, add a free key: ask me "how do I get a free key?"'
+        : aiErrorText(e),
+      chips: free ? ['Try again', 'How do I get a free key?'] : ['Try again']
+    };
   }
 
   /* history: [{role, content}] (recent chat, for the AI) */
@@ -872,11 +948,17 @@
       }
       pending = null;   /* they said something else: forget the question */
     }
-    /* "I like racing games" style facts are remembered too */
+    /* a question about Game System ("what is quality?") is answered from what VEX knows, no AI needed.
+       Questions come before commands: "how do I take a screenshot?" explains it, it doesn't take one. */
+    var l = lead(t) || t;
+    var know = !PERSONAL.test(l) && window.VexKnow ? VexKnow.answer(l) : null;
+    if (know && know.sure && asking(l)) return knowReply(know);
     var r = await runCommand(t, false, stripWake(String(raw).trim()));
     if (r !== undefined && r !== null) return r;
+    /* just a word or two, like "quality" */
+    if (know && know.sure && l.split(' ').length <= 3) return knowReply(know);
     /* the AI */
-    if (aiMode() === 'off') return line('unknown');
+    if (aiMode() === 'off') return know ? knowReply(know) : line('unknown');
     try {
       Vex.thinking(true);
       var msgs = (history || []).slice(-10).concat([{ role: 'user', content: raw }]);
@@ -893,7 +975,7 @@
       }
       return clean || line('unknown');
     } catch (e) {
-      return aiErrorText(e);
+      return aiTrouble(e, know, raw, history);
     } finally {
       Vex.thinking(false);
     }
