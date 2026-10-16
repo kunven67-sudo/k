@@ -111,6 +111,47 @@ export async function claudeReply(p, text, g, history) {
   return { reply: out, usage: res.usage };
 }
 
+// ------------------------------------------------------------- gadget + potion inventor (type a description)
+// The model only picks from the real parts list, so whatever it invents is a gadget the game can actually run.
+export async function claudeInvent(kind, text, parts) {
+  const c = getClient();
+  if (!c) throw new Error('No API key');
+  const model = settings.claudeModel || 'claude-opus-5-5';
+  const schema = {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'A short cool name for it (2-4 words).' },
+      body: { type: 'string', enum: parts.bodies, description: 'The gadget body (ignored for potions).' },
+      cores: { type: 'array', items: { type: 'string', enum: parts.cores }, description: 'The 1 to 3 effects that do what the player described.' },
+      mod: { type: 'string', enum: parts.mods, description: 'How it fires (ignored for potions).' },
+      power: { type: 'integer', description: '1 to 10' },
+      area: { type: 'integer', description: '1 to 10' },
+      time: { type: 'integer', description: '1 to 10 (10 = permanent)' },
+      shots: { type: 'integer', description: '1 to 5' },
+      objectType: { type: 'string', enum: parts.objects, description: 'If it turns people into an object: which object. Else chair.' },
+      explain: { type: 'string', description: 'One sentence telling the player what it does and why these parts.' },
+    },
+    required: ['name', 'body', 'cores', 'mod', 'power', 'area', 'time', 'shots', 'objectType', 'explain'],
+    additionalProperties: false,
+  };
+  const params = {
+    model,
+    max_tokens: 2000,
+    system: `You design ${kind === 'potion' ? 'potions' : 'gadgets'} for a sandbox game about a mad scientist and tiny people in a glass cage. Turn the player's idea into the closest combination of the real parts. Use 1 to 3 cores. Keep the name fun.`,
+    messages: [{ role: 'user', content: `Make me a ${kind}: ${text}` }],
+    output_config: { effort: 'low', format: betaJSONSchemaOutputFormat(schema) },
+  };
+  if (model !== 'claude-haiku-5-5') { params.betas = ['server-side-fallback-2026-07-01']; params.fallbacks = 'default'; }
+  let res;
+  try { res = await c.beta.messages.parse(params); } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) throw new Error('Your Claude API key was rejected. Check it in Settings > AI Brain.');
+    if (e instanceof Anthropic.APIConnectionError) throw new Error('Could not reach Claude (no internet?).');
+    throw new Error('Claude could not make it: ' + (e.message || 'error'));
+  }
+  if (res.stop_reason === 'refusal' || !res.parsed_output) throw new Error('Claude would not design that one.');
+  return res.parsed_output;
+}
+
 // ------------------------------------------------------------- local free AI (WebLLM)
 let engine = null, loading = null;
 export const localState = { status: 'not downloaded', progress: 0 };

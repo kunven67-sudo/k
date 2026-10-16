@@ -111,7 +111,7 @@ export class Colliders {
   }
 
   // Ray vs boxes + fields. Returns {dist, point, normal, box} or null.
-  raycast(origin, dir, maxDist, onlySolid = true) {
+  raycast(origin, dir, maxDist, onlySolid = true, skip = null) {
     let best = maxDist, bestBox = null, bestN = null;
     const inv = [1 / dir.x, 1 / dir.y, 1 / dir.z];
     const o = [origin.x, origin.y, origin.z];
@@ -123,7 +123,7 @@ export class Colliders {
       if (t > best + CELL) break;
       const px = o[0] + dir.x * t, pz = o[2] + dir.z * t;
       for (const b of this.near(px, pz, CELL * 0.5)) {
-        if (seen.has(b) || (onlySolid && !b.solid && !b.walk)) continue;
+        if (seen.has(b) || (onlySolid && !b.solid && !b.walk) || (skip && skip(b))) continue;
         seen.add(b);
         let tmin = -Infinity, tmax = Infinity, axis = -1, sign = 1;
         for (let a = 0; a < 3; a++) {

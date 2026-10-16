@@ -50,6 +50,8 @@ export const ITEMS = {
   rifle: { label: 'Rifle', kind: 'weapon', weapon: { type: 'shot', dmg: 70, reach: 26, speed: 0.6, ranged: true, proj: 'bullet', twoHand: true }, tech: 3, recipe: { metal: 5, powder: 2, wood: 1 }, r: 0.6, make: () => grp(at(box(0.05, 0.08, 0.9, 0x5a3a22), 0, 0.08, 0), at(cyl(0.015, 0.015, 0.5, 0x2a2a2a, 0.3, 0.8), 0, 0.12, 0.6, Math.PI / 2, 0, 0)) },
   zapspear: { label: 'Shock spear', kind: 'weapon', weapon: { type: 'pierce', dmg: 40, reach: 1.3, speed: 1.0, shock: true }, tech: 4, recipe: { metal: 2, wood: 2, electric: 1 }, r: 0.8, make: () => grp(at(cyl(0.02, 0.02, 1.6, 0x3a3a3a, 0.3, 0.8), 0, 0.8, 0), at(new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.16, 6), glow(0x60c0ff, 2)), 0, 1.66, 0)) },
   tinyray: { label: 'Tiny shrink ray', kind: 'weapon', weapon: { type: 'gadget', dmg: 0, reach: 20, speed: 0.4, ranged: true, proj: 'shrink' }, tech: 5, recipe: { metal: 4, electric: 2 }, r: 0.2, make: () => grp(at(box(0.06, 0.1, 0.25, 0x3a4a4a, 0.3, 0.7), 0, 0.08, 0), at(sph(0.05, 0x63e6be, 0.2, 0.2), 0, 0.12, 0.14)) },
+  // one of YOUR gadgets dropped in the cage (the model is swapped for the real gadget)
+  gadgetDrop: { label: 'Your gadget', kind: 'weapon', weapon: { type: 'gadget', dmg: 0, reach: 16, speed: 0.5, ranged: true, proj: 'gadget' }, r: 0.18, make: () => grp(at(box(0.05, 0.08, 0.2, 0x3a4446, 0.4, 0.6), 0, 0.04, 0)) },
   lamp: { label: 'Lamp', kind: 'misc', light: true, tech: 4, recipe: { metal: 1, electric: 1 }, r: 0.15, make: () => grp(at(cyl(0.02, 0.02, 1.4, 0x3a3a3a, 0.3, 0.8), 0, 0.7, 0), at(sph(0.08, 0xfff2d0), 0, 1.45, 0)) },
 
   // ---------------- things from YOUR world (real meters)

@@ -105,7 +105,10 @@ export class Cage {
     this.hatch.position.set(hx, lidY + 0.002, hz);
     this.lid.add(this.hatch);
     g.add(this.lid);
-    this.lidBox = C.add(CAGE.x0, CAGE.top, CAGE.z0, CAGE.x1, CAGE.top + 0.012, CAGE.z1, { zone: 'lab', walk: true, tag: 'lid' });
+    // the lid is 4 panels around the hatch + the hatch itself, so an open hatch is a real hole
+    this.lidBoxes = panels.map(([a, b, c, d]) => C.add(a, CAGE.top, b, c, CAGE.top + 0.012, d, { zone: 'lab', walk: true, tag: 'lid' }));
+    this.hatchBox = C.add(hx - hw, CAGE.top, hz - hw, hx + hw, CAGE.top + 0.012, hz + hw, { zone: 'lab', walk: true, tag: 'lid' });
+    this.hatchRect = { x0: hx - hw, x1: hx + hw, z0: hz - hw, z1: hz + hw };
     // hanging lamp = the cage "sun"
     const lampY = CAGE.top + 0.75;
     mk(new THREE.CylinderGeometry(0.004, 0.004, 0.6, 6), frame, cx, lampY + 0.35, cz);
@@ -174,8 +177,20 @@ export class Cage {
   waterDepth(x, z) { return Math.max(0, this.waterY - this.heightAt(x, z)); }
 
   raycast(o, d, max) {
-    // march through the terrain box
-    let t = 0;
+    // clip the ray to the soil box first (cheap), then march through it
+    const lo = [CAGE.x0, CAGE.base - 0.06, CAGE.z0], hi = [CAGE.x1, CAGE.base + 0.42, CAGE.z1];
+    const oa = [o.x, o.y, o.z], da = [d.x, d.y, d.z];
+    let tn = 0, tf = max;
+    for (let a = 0; a < 3; a++) {
+      if (Math.abs(da[a]) < 1e-12) { if (oa[a] < lo[a] || oa[a] > hi[a]) return null; continue; }
+      let t1 = (lo[a] - oa[a]) / da[a], t2 = (hi[a] - oa[a]) / da[a];
+      if (t1 > t2) { const tt = t1; t1 = t2; t2 = tt; }
+      if (t1 > tn) tn = t1;
+      if (t2 < tf) tf = t2;
+      if (tn > tf) return null;
+    }
+    max = tf;
+    let t = Math.max(0, tn - CAGE.cell);
     const step = CAGE.cell * 0.5;
     let prevAbove = true;
     for (let s = 0; s < 4000 && t <= max; s++) {
@@ -191,8 +206,6 @@ export class Cage {
         }
         prevAbove = above;
       } else prevAbove = true;
-      // skip quickly if ray is far above the cage
-      if (y > CAGE.top + 0.5 && d.y > 0) return null;
       t += step;
     }
     return null;
@@ -686,14 +699,20 @@ export class Cage {
     if (at) this.cracks.push(at.clone());
   }
 
-  setLid(open) { this.lidOpen = open; this.lid.visible = !open; this.lidBox.on = !open; }
-  setHatch(open) { this.hatchOpen = open; this.hatch.visible = !open; }
+  setLid(open) {
+    this.lidOpen = open; this.lid.visible = !open;
+    for (const b of this.lidBoxes) b.on = !open;
+    this.hatchBox.on = !open && !this.hatchOpen;
+  }
+  setHatch(open) { this.hatchOpen = open; this.hatch.visible = !open; this.hatchBox.on = !this.lidOpen && !open; }
+  // is the top open above (x,z)? (whole lid off, or the hatch is open right there)
+  openAbove(x, z) { if (this.lidOpen) return true; const h = this.hatchRect; return this.hatchOpen && x > h.x0 && x < h.x1 && z > h.z0 && z < h.z1; }
 
   // ------------------------------------------------------------- save / load
   save() {
     return {
       theme: this.theme, h: Array.from(this.h, (v) => Math.round(v * 10000) / 10000), paint: Array.from(this.paint), waterY: this.baseWater,
-      nat: this.nat.map((o) => ({ ...o })), weather: { ...this.weather }, snow: this.snowCover, lid: this.lidOpen, glassHP: this.glassHP,
+      nat: this.nat.map((o) => ({ ...o })), weather: { ...this.weather }, snow: this.snowCover, lid: this.lidOpen, hatch: this.hatchOpen, glassHP: this.glassHP,
       lava: this.lavaPools.map((l) => [l.x, l.z]), graffiti: this.graffiti,
     };
   }
@@ -706,6 +725,7 @@ export class Cage {
     Object.assign(this.weather, d.weather || {});
     this.snowCover = d.snow || 0;
     this.glassHP = d.glassHP ?? 100;
+    this.setHatch(!!d.hatch);
     this.setLid(!!d.lid);
     this.clearLava();
     for (const [x, z] of d.lava || []) this.addLava(x, z);

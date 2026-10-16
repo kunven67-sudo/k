@@ -320,6 +320,21 @@ export class StreetLife {
     if (victim && victim.street && !this.missing.includes(victim)) this.missing.push(victim);
   }
 
+  // someone got out of your house (escaped the lab) and is now out on the street, telling everyone
+  adoptEscapee(p) {
+    const g = this.game;
+    if (this.walkers.includes(p)) return;
+    p.street = true; p.loc = 'world'; p.task = null; p.order = null;
+    p.lane = STREET.walkNear; p.walkDir = rand() < 0.5 ? 1 : -1;
+    p.seenByPlayer = true;
+    this.walkers.push(p);
+    this.panic(p, 'escaped');
+    p.panicT = 25;
+    p.say(rand.pick(['HELP! THERE\'S A LAB UNDER THAT HOUSE!', 'Somebody call the police! He has people in his BASEMENT!', 'I got out! I GOT OUT!']), { kind: 'scared', scream: true });
+    g.feed(`${p.name} escaped your house and is telling everyone what's in your basement!`, 'bad', p);
+    if (settings.witnesses === 'police') { this.wanted = Math.min(5, this.wanted + 2); this.wantedT = 120; if (!this.police.length) this.callPolice(); }
+  }
+
   callPolice() {
     const g = this.game;
     const c = new Car(g, { police: true, pos: new THREE.Vector3(STREET.road.x0 + 4, G0, 16), yaw: Math.PI / 2, lane: 'east', cruise: 14 });

@@ -71,7 +71,8 @@ export class Player {
   get seesInvisible() { return false; }
   get tool() { return this.hotbar[this.slot]; }
   get weapon() { const h = this.holding; return h && h.kind === 'item' && h.ref.def.weapon && h.ref.size > this.height * 0.15 ? h.ref : null; }
-  get bp() { const t = this.tool; return t && typeof t === 'object' ? t : null; }
+  get bp() { const t = this.tool; return t && typeof t === 'object' && !t.potion ? t : null; }
+  get potion() { const t = this.tool; return t && typeof t === 'object' && t.potion ? t : null; }
 
   // ------------------------------------------------------------- models
   buildModel() {
@@ -145,6 +146,21 @@ export class Player {
       this.gadgetMesh = this.game.gadgets.model(bp);
       this.gadgetMesh.position.set(0, 0.035, 0.0);
       this.hand.add(this.gadgetMesh);
+    } else if (this.potion) {
+      // a little glass flask with the potion glowing inside
+      const pot = this.potion;
+      const g = new THREE.Group();
+      const glass = new THREE.MeshPhysicalMaterial({ color: 0xe8f6ff, roughness: 0.05, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false });
+      const liquid = new THREE.MeshStandardMaterial({ color: pot.color, emissive: pot.color, emissiveIntensity: 0.6, roughness: 0.2, transparent: true, opacity: 0.85 });
+      const flask = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), glass); flask.position.y = 0.04;
+      const liq = new THREE.Mesh(new THREE.SphereGeometry(0.031, 16, 12, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), liquid); liq.position.y = 0.04;
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.012, 0.035, 12, 1, true), glass); neck.position.y = 0.088;
+      const cork = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.009, 0.014, 10), new THREE.MeshStandardMaterial({ color: 0x9a6a3a, roughness: 0.9 })); cork.position.y = 0.11;
+      flask.renderOrder = 6; neck.renderOrder = 6;
+      g.add(liq, flask, neck, cork);
+      g.position.set(0.0, 0.02, -0.03);
+      this.gadgetMesh = g;
+      this.hand.add(g);
     }
     this.bottleMesh.visible = this.tool === 'bottle';
   }
@@ -163,7 +179,7 @@ export class Player {
     // can't grow through a ceiling (or the cage lid)
     const c = this.game.world.colliders.ceilingAt(this.pos.x, this.pos.z, this.pos.y + this.height * 0.5, this.height * 0.15);
     let maxH = isFinite(c) ? (c - this.pos.y) * 0.97 : 12 * 1.75;
-    if (this.inCage && !this.game.cage.lidOpen) maxH = Math.min(maxH, (this.game.cageTopY - this.pos.y) * 0.95);
+    if (this.inCage && !this.game.cage.openAbove(this.pos.x, this.pos.z)) maxH = Math.min(maxH, (this.game.cageTopY - this.pos.y) * 0.95);
     return maxH / (1.75 * this.look.height);
   }
 
@@ -214,7 +230,8 @@ export class Player {
     const wx = fx * cos + fz * sin, wz = -fx * sin + fz * cos;
     const sprint = act('sprint') ? 1.9 : 1;
     const crouch = act('crouch') ? 0.45 : 1;
-    const sp = 1.6 * Math.pow(this.scale * this.look.height, 0.75) * sprint * crouch * (form.speed || 1) * (this.inWater() ? 0.5 : 1);
+    if (this.speedBoost > 0) this.speedBoost -= dt;
+    const sp = 1.6 * Math.pow(this.scale * this.look.height, 0.75) * sprint * crouch * (form.speed || 1) * (this.inWater() ? 0.5 : 1) * (this.speedBoost > 0 ? 1.8 : 1);
     const accel = 1 - Math.exp(-dt * (this.onGround ? 12 : 2.5));
     this.vel.x = lerp(this.vel.x, wx * sp, accel);
     this.vel.z = lerp(this.vel.z, wz * sp, accel);
@@ -294,6 +311,7 @@ export class Player {
     if (actPressed('flip')) {
       if (this.bp) g.toast(g.gadgets.cycle(this.bp)), this.setGadgetMesh();
       else if (tool === 'bottle') { this.bottleLid = !this.bottleLid; g.toast(this.bottleLid ? 'Lid on.' : 'Lid off.'); sfx('click'); }
+      else if (this.potion) { g.drinkPotion(this.potion); return; }
     }
     // animals don't use gadgets
     if (!form.gadgets) {
@@ -371,6 +389,12 @@ export class Player {
     return h.add(_v.set(0, this.height * 0.03, 0));
   }
 
+  // the spot on the ground under your hand (tiny people walk there when you say "come here")
+  handGround() {
+    const h = this.handPos;
+    return new THREE.Vector3(h.x, this.game.groundAt(h.x, h.z, h.y), h.z);
+  }
+
   // grab whatever is under the crosshair (people, bugs, items, small cars)
   grabAt(aim) {
     const g = this.game;
@@ -434,7 +458,8 @@ export class Player {
       r.vy = 0;
       if (r.objectForm) { r.pos.copy(at); r.objectForm.mesh.position.copy(at); }
     } else if (h.kind === 'item') {
-      r.heldBy = null; r.pos.copy(at); r.vel.copy(vel); r.rest = false;
+      r.heldBy = null; r.heldByLast = 'player'; r.pos.copy(at); r.vel.copy(vel); r.rest = false;
+      r.mesh.quaternion.identity(); r.mesh.rotation.set(0, r.yaw, 0);
       g.onItemDropped(r);
     } else if (h.kind === 'bug') { r.held = false; r.pos.copy(at); r.vy = vel.y; r.vel.copy(vel); }
     else if (h.kind === 'car') { r.held = false; r.pos.copy(at); r.dropped(vel); }
@@ -731,7 +756,7 @@ export class Player {
     if (!third) {
       const pinchT = this.holding ? 1 : 0;
       this.pinch = damp(this.pinch, pinchT, 14, dt);
-      const fist = this.punchT > 0 ? 1 : this.bp ? 0.85 : 0;
+      const fist = this.punchT > 0 ? 1 : this.bp ? 0.85 : this.potion ? 0.6 : 0;
       this.fingers.forEach((f, i) => {
         const curl = f.thumb ? 0.2 + this.pinch * 0.6 : (i === 0 ? this.pinch * 1.1 : this.pinch * 0.4) + fist * 1.3 + this.grip * 0.4;
         f.base.rotation.x = -curl * 0.9;

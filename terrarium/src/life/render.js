@@ -68,7 +68,8 @@ export class InstancedSink {
   color(key, slot, i, c) { const mesh = this.meshes[key]; if (mesh) { mesh.setColorAt(slot * PART_MULT[key] + i, c); mesh.instanceColor.needsUpdate = true; } }
 
   flush() {
-    for (const m of Object.values(this.meshes)) m.instanceMatrix.needsUpdate = true;
+    // only draw the slots that are in use (empty slots would still cost vertices on the GPU)
+    for (const [key, m] of Object.entries(this.meshes)) { m.count = this.used * PART_MULT[key]; m.instanceMatrix.needsUpdate = true; }
   }
 
   setVisible(v) { for (const m of Object.values(this.meshes)) m.visible = v; }
@@ -89,7 +90,7 @@ export class MeshSink {
     let m = this.meshes.get(id);
     if (!m) {
       const mat = new THREE.MeshStandardMaterial({ roughness: SHINY.has(key) ? 0.18 : 0.62, color: this.colors.get(id) || 0xffffff });
-      if (this.clip && (key === 'torso' || key === 'head' || key === 'half' || key === 'pelvis' || key.startsWith('hair_') || key.startsWith('hat_'))) {
+      if (this.clip && (key === 'torso' || key === 'head' || key === 'half' || key === 'pelvis' || key === 'coat' || key === 'skirt' || key.startsWith('hair_') || key.startsWith('hat_'))) {
         mat.clippingPlanes = this.clip; mat.side = THREE.DoubleSide;
       }
       m = new THREE.Mesh(PARTS[key], mat);
@@ -111,7 +112,7 @@ export class MeshSink {
     this.clip = planes;
     for (const [id, m] of this.meshes) {
       const key = id.replace(/\d+$/, '');
-      if (key === 'torso' || key === 'head' || key === 'half' || key === 'pelvis' || key.startsWith('hair_') || key.startsWith('hat_')) {
+      if (key === 'torso' || key === 'head' || key === 'half' || key === 'pelvis' || key === 'coat' || key === 'skirt' || key.startsWith('hair_') || key.startsWith('hat_')) {
         m.material.clippingPlanes = planes; m.material.side = planes ? THREE.DoubleSide : THREE.FrontSide; m.material.needsUpdate = true;
       }
     }

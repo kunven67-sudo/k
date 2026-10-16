@@ -726,7 +726,7 @@ export class Person {
       rel: [...this.rel.entries()], partner: this.partner, married: this.married, parents: this.parents, kids: this.kids, tribe: this.tribe,
       inv: this.inv, mem: this.mem.slice(-20), sick: this.sick, cut: [...this.body.cut], brokenLeg: this.brokenLeg, money: this.money,
       loc: this.loc === 'held' ? 'cage' : this.loc, jar: this.jarId, home: this.home, kills: this.kills, title: this.title, buried: this.buried, playerName: this.remembersPlayerAs,
-      holding: this.holding ? this.holding.type : null, objectForm: this.objectForm, robot: this.robot, bornDay: this.bornDay, deathDay: this.deathDay,
+      holding: this.holding ? this.holding.type : null, objectForm: this.objectForm ? { type: this.objectForm.type, t: this.objectForm.t } : null, robot: this.robot, bornDay: this.bornDay, deathDay: this.deathDay,
     };
     return o;
   }

@@ -12,7 +12,7 @@ const _v = new THREE.Vector3(), _v2 = new THREE.Vector3();
 const RES_LIST = ['wood', 'stone', 'fiber', 'metal', 'clay', 'powder', 'electric'];
 
 // what a person wants to hold, best first
-const WEAPON_PREF = ['tinyray', 'rifle', 'pistol', 'zapspear', 'razor', 'sword', 'needle', 'cleaver', 'shard', 'metal_axe', 'toothpick', 'spear', 'knife', 'stone_axe', 'tack', 'club', 'stone_pick', 'metal_pick'];
+const WEAPON_PREF = ['gadgetDrop', 'tinyray', 'rifle', 'pistol', 'zapspear', 'razor', 'sword', 'needle', 'cleaver', 'shard', 'metal_axe', 'toothpick', 'spear', 'knife', 'stone_axe', 'tack', 'club', 'stone_pick', 'metal_pick'];
 
 export class AI {
   constructor(game) {
@@ -35,6 +35,8 @@ export class AI {
 
   // ------------------------------------------------------------- main loop
   update(p, dt) {
+    // normal-size people out on the street live by the street's rules
+    if (p.street && p.scale > 0.3 && !p.inCage && !p.order) { this.game.streetLife.updatePerson(p, dt); return; }
     p.thinkT -= dt;
     if (p.thinkT <= 0) { p.thinkT = 0.7 + rand() * 0.6; this.think(p); }
     if (p.task) {
@@ -92,6 +94,8 @@ export class AI {
       else { p.task = this.orderTask(p, p.order); p.stop(); return; }
     }
     if (cur && cur.order) return;
+    // outside the cage (escaped, just spawned, dropped on the table...) life is different
+    if (!p.inCage) return this.thinkLoose(p);
     if (cur && (cur.type === 'bury' || cur.type === 'carry') && cur.stage > 0) return;
     // babies + kids
     if (p.kid) return this.thinkKid(p);
@@ -193,6 +197,41 @@ export class AI {
     if (cur && cur.lock && cur.t < cur.lock && bs < 70) return;
     p.task = best === cur ? cur : { t: 0, stage: 0, ...best };
     if (p.task !== cur) p.stop();
+  }
+
+  // loose outside the cage: tiny escapees on the table/floor, or full-size people in your lab
+  thinkLoose(p) {
+    const g = this.game;
+    const pl = g.player;
+    const H = p.height;
+    const cur = p.task;
+    const keep = (type) => cur && cur.type === type && !cur.failed;
+    if (p.burning > 0) { if (!keep('flee')) this.giveTask(p, { type: 'flee', from: p.pos.clone(), time: 3 }); return; }
+    // attacked: fight back or run
+    if (p.lastAttacker && g.time - p.lastAttackT < 8) {
+      const a = p.lastAttacker === 'player' ? pl : p.lastAttacker;
+      const tough = (p.has('brave') || p.has('strong') || p.holding) && p.health > 35;
+      if (a === pl && pl.scale > p.scale * 3) { if (!keep('flee')) this.giveTask(p, { type: 'flee', from: pl.pos.clone(), time: 5 }); return; }
+      if (a && (a === pl || a.alive)) { if (tough) { if (!keep('fight')) this.giveTask(p, { type: 'fight', target: p.lastAttacker, why: 'self-defense' }); } else if (!keep('flee')) this.giveTask(p, { type: 'flee', from: a.pos.clone(), time: 5 }); return; }
+    }
+    if (p.kid) { if (!keep('stay')) p.task = { type: 'stay', target: p.parents.map((id) => g.byId(id)).find((q) => q && q.alive), t: 0, stage: 0 }; return; }
+    // a giant (you) close by
+    const giant = pl.scale > p.scale * 4;
+    const dPl = p.dist(pl.pos);
+    if (giant && dPl < Math.max(pl.height * 1.3, H * 10) && !p.held) {
+      if (p.op > 55 && !keep('watch')) { this.giveTask(p, { type: 'watch', pos: pl.pos.clone(), time: 3 }); if (rand() < 0.3) p.say(chatter(p, 'giant', g), { kind: 'chat' }); return; }
+      if (p.op <= 55) { if (!keep('flee') && !keep('hide')) { this.giveTask(p, { type: 'flee', from: pl.pos.clone(), time: 4 }); if (g.time - p.lastSpeak > 4 && rand() < 0.5) p.say(rand.pick(['It\'s the GIANT! Run!', 'Don\'t look at it, just RUN!', 'No no no no...', 'Please don\'t step on me!']), { kind: 'scared', scream: true }); } return; }
+    }
+    // full-size and scared in your lab: they try to find a way out (the stairs)
+    if (H > 0.8 && g.world.zoneAt(p.pos) !== 'street' && !p.fromMachineCalm && (p.fear > 45 || p.op < -10)) { if (!keep('leaveLab')) this.giveTask(p, { type: 'leaveLab' }); return; }
+    // hungry: food lying around
+    if (p.needs.hunger < 40) {
+      const food = this.findItem(p, (i) => (i.def.kind === 'food' || i.def.kind === 'fooddep') && !i.heldBy, H * 60);
+      if (food && !keep('eatLoose')) { this.giveTask(p, { type: 'eatLoose', item: food }); return; }
+    }
+    if (cur && !cur.failed) return;
+    if (rand() < 0.4) this.giveTask(p, { type: 'hide' });
+    else this.giveTask(p, { type: 'wander' });
   }
 
   thinkKid(p) {
@@ -697,6 +736,34 @@ export class AI {
         return tk.failed;
       }
       case 'dropit': { if (p.holding) g.dropHeld(p); return true; }
+      case 'eatLoose': {
+        const it = tk.item;
+        if (!it || it.heldBy || !g.items.includes(it)) return true;
+        if (!this.go(p, it.pos.x, it.pos.z, H * 0.5 + it.radius)) return tk.failed || tk.t > 40;
+        p.anim.action = 'eat';
+        if (tk.t > 3) { p.needs.hunger = Math.min(100, p.needs.hunger + 40); if (it.pool && it.pool.food) { it.pool.food -= 10; if (it.pool.food <= 0) g.removeItem(it); } else if (it.def.kind === 'food') g.removeItem(it); return true; }
+        return false;
+      }
+      case 'leaveLab': {
+        // walk to the stairs, climb them, through the secret bookshelf door, out the front door
+        const z = g.world.zoneAt(p.pos);
+        const run = p.fear > 70;
+        const shelf = g.world.bookshelf, door = g.world.frontDoor;
+        if (!tk.said) { tk.said = true; p.say(rand.pick(['I have to get out of here.', 'There has to be a way out...', 'Stairs! Over there!', 'Nope. Nope nope nope.']), { kind: 'scared' }); }
+        let tx, tz;
+        if (z === 'lab') { tx = -6.2; tz = 5.6; }
+        else if (z === 'stairs') {
+          if (p.pos.y < 3.25) { tx = -6.2; tz = 0.7; }
+          else {
+            tx = -4.6; tz = 0.35;
+            if (!shelf.open && Math.hypot(p.pos.x + 5.4, p.pos.z - 0.35) < 1.3) { g.world.toggleDoor(shelf, true); g.feed(`${p.name} found the secret bookshelf door from the inside and opened it!`, 'bad', p); }
+          }
+        } else if (z === 'house') {
+          if (p.pos.z < 5.3) { tx = 0; tz = 5.5; } else { tx = 0; tz = 7.4; if (!door.open) g.world.toggleDoor(door, true); }
+        } else { g.streetLife.adoptEscapee(p); return true; }
+        this.go(p, tx, tz, 0.25, run);
+        return tk.failed || tk.t > 90;
+      }
       case 'give_player': {
         if (!p.holding) return true;
         if (g.player.scale > p.scale * 4) { p.anim.action = 'hold'; if (tk.t > 2) { g.player.receiveFrom(p); return true; } return false; }
@@ -1156,7 +1223,7 @@ export class AI {
             const wasAlive = t.alive;
             t.hurt({ dmg, type: w.type, from: p, dir, point, part });
             if (w.shock) { t.stun = 2; g.fx.burst(point, 0x60c0ff, 6, H, 1, { glow: true }); }
-            if (wasAlive && !t.alive) { p.kills++; this.onKill(p, t, tk); }
+            void wasAlive; // kills are counted in game.onDeath (melee, shots, everything)
           }
           sfx(w.type === 'blade' ? 'slice' : 'hit', { vol: g.audibleVol(p.pos, 0.5), pitch: 1.6 });
         }

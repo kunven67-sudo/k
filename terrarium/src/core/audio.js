@@ -82,6 +82,8 @@ export function sfx(name, opts = {}) {
     case 'squish': noise(t, 0.18, 0.4 * v, 'lowpass', 900 * p, 2, sfxBus, 200); osc('sine', 160 * p, t, 0.15, 0.25 * v, sfxBus, 60); break;
     case 'splat': noise(t, 0.12, 0.35 * v, 'lowpass', 1400 * p, 1, sfxBus, 300); break;
     case 'slice': noise(t, 0.12, 0.25 * v, 'highpass', 3500 * p, 1, sfxBus, 7000); noise(t + 0.04, 0.12, 0.3 * v, 'lowpass', 900, 2); break;
+    case 'shot': noise(t, 0.09, 0.55 * v, 'lowpass', 2600 * p, 0.8, sfxBus, 400); osc('square', 140 * p, t, 0.06, 0.2 * v, sfxBus, 50); noise(t + 0.02, 0.35, 0.12 * v, 'bandpass', 900 * p, 0.5); break;
+    case 'bow': osc('triangle', 260 * p, t, 0.12, 0.15 * v, sfxBus, 110 * p); noise(t, 0.1, 0.12 * v, 'highpass', 3000); break;
     case 'thud': osc('sine', 110 * p, t, 0.18, 0.35 * v, sfxBus, 45); noise(t, 0.08, 0.15 * v, 'lowpass', 500); break;
     case 'hit': osc('triangle', 220 * p, t, 0.08, 0.25 * v, sfxBus, 90); noise(t, 0.06, 0.2 * v, 'bandpass', 1200 * p); break;
     case 'glass': osc('sine', 2400 * p, t, 0.35, 0.12 * v); osc('sine', 3700 * p, t, 0.2, 0.06 * v); break;
