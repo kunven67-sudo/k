@@ -11,6 +11,8 @@ G.A = {
   has(p) { return p in this.raw; },
   text(p) { const v = this.raw[p]; return typeof v === 'string' && !v.startsWith('data:') ? v : null; },
   json(p) {
+    // our own characters are made on first use from a real one (15-forge.js)
+    if (p.startsWith('preload/data/characters/') && G.OWN && G.Forge) { const id = p.slice(24, -5); if (G.OWN[id] && !G.Forge.built[id]) G.Forge.ensure(id); }
     if (this._json.has(p)) return this._json.get(p);
     const t = this.text(p); let v = null;
     if (t != null) { try { v = JSON.parse(t); } catch (e) { G.reportError(e, 'json ' + p); } }
