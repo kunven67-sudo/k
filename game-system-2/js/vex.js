@@ -516,7 +516,15 @@
     var spot = h('div.vex-tour-spot');
     var box = h('div.vex-tour-box', { role: 'dialog', 'aria-label': 'VEX tour' });
     document.body.appendChild(shade); document.body.appendChild(spot); document.body.appendChild(box);
-    function end() { shade.remove(); spot.remove(); box.remove(); U.lsSet('gs2:vexTour', Date.now()); window.speechSynthesis && speechSynthesis.cancel(); window.removeEventListener('keydown', key, true); }
+    /* a popup (dropped files, a hotkey) or a game opening mid-tour would end up stuck under the shade:
+       step out of the way and pick the tour back up once things are quiet again */
+    var busy = function () { var p = document.getElementById('player'); return UI.modalCount() > 0 || (p && !p.hidden); };
+    var watch = setInterval(function () {
+      if (!busy()) return;
+      end(false);
+      var wait = setInterval(function () { if (!busy()) { clearInterval(wait); setTimeout(function () { if (!busy() && !U.lsGet('gs2:vexTour', 0)) tour(); }, 800); } }, 500);
+    }, 300);
+    function end(done) { clearInterval(watch); shade.remove(); spot.remove(); box.remove(); if (done !== false) U.lsSet('gs2:vexTour', Date.now()); window.speechSynthesis && speechSynthesis.cancel(); window.removeEventListener('keydown', key, true); }
     function key(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); end(); } }
     window.addEventListener('keydown', key, true);
     function show() {
