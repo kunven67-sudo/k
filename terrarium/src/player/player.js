@@ -32,7 +32,7 @@ export class Player {
     this.camera = camera;
     this.pos = new THREE.Vector3(0, 0, 2.6);
     this.vel = new THREE.Vector3();
-    this.yaw = Math.PI; this.pitch = -0.15;
+    this.yaw = 0; this.pitch = -0.2;
     this.scale = 1; this.targetScale = 1;
     this.onGround = true;
     this.view = 'first';
@@ -370,7 +370,8 @@ export class Player {
   }
 
   muzzlePos() {
-    if (this.view === 'first' && this.gadgetMesh) { const m = this.gadgetMesh.userData.muzzle || new THREE.Vector3(); return this.gadgetMesh.localToWorld(m.clone()); }
+    // (userData gets JSON-copied when a model is cloned, so rebuild the vector)
+    if (this.view === 'first' && this.gadgetMesh) { const u = this.gadgetMesh.userData.muzzle; return this.gadgetMesh.localToWorld(u ? new THREE.Vector3(u.x, u.y, u.z) : new THREE.Vector3()); }
     const h = this.body.P(J.rHa, new THREE.Vector3());
     return h;
   }
@@ -673,7 +674,7 @@ export class Player {
     this.health = 100;
     this.setScale(1); this.targetScale = 1;
     this.pos.set(0, 0, 2.6); this.vel.set(0, 0, 0);
-    this.yaw = Math.PI; this.pitch = -0.15;
+    this.yaw = 0; this.pitch = -0.2;
     g.ui.fade(() => g.toast('You woke up in the lab.'));
     void where;
   }
@@ -734,7 +735,7 @@ export class Player {
     const b = this.body;
     this.anim.at += dt;
     const st = this._st || (this._st = { pos: new THREE.Vector3() });
-    st.pos.copy(this.pos); st.yaw = this.yaw; st.phase = this.anim.phase; st.speed = Math.min(2.2, this.anim.speed);
+    st.pos.copy(this.pos); st.yaw = this.yaw + Math.PI; st.phase = this.anim.phase; st.speed = Math.min(2.2, this.anim.speed);
     st.action = this.punchT > 0 ? 'punch' : this.holding ? 'carry' : this.bp ? 'aim' : null;
     st.at = this.punchT > 0 ? 0.25 - this.punchT : this.anim.at;
     st.crouch = this.anim.crouch; st.air = this.anim.air; st.lying = false;

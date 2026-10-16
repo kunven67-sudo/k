@@ -1,7 +1,7 @@
 // Main menu (live lab behind frosted glass), new world, load, pause, settings, help, game over,
 // character maker, saving.
 import * as THREE from 'three';
-import { h, clear, btn, seg, slider, toggle, setrow, colorInput } from './dom.js';
+import { h, put, clear, btn, seg, slider, toggle, setrow, colorInput } from './dom.js';
 import { settings, saveSettings, KEY_LABELS, DEFAULT_KEYS, keyName } from '../core/settings.js';
 import { setQualityChoice } from '../core/quality.js';
 import { applyVolumes, playTrack, playMp3, TRACKS, initAudio, sfx } from '../core/audio.js';
@@ -46,7 +46,7 @@ export function buildMenus(ui) {
       ),
       h('div', { class: 'menu-foot' }, 'TERRARIUM · early playable · everything is saved in this browser'),
     );
-    ui.root.append(menuEl);
+    put(ui.root, menuEl);
   };
 
   M.hideMain = () => { if (menuEl) { menuEl.remove(); menuEl = null; } };
@@ -79,7 +79,7 @@ export function buildMenus(ui) {
       clear(body);
       const nameInp = h('input', { type: 'text', class: 'txt', value: o.name, maxlength: 40 });
       nameInp.addEventListener('input', () => { o.name = nameInp.value; });
-      body.append(
+      put(body, 
         h('label', { class: 'field' }, 'World name', nameInp),
         setrow('Mode', seg([['creative', 'Creative'], ['money', 'Money mode']], o.mode, (v) => { o.mode = v; draw(); }), o.mode === 'creative' ? 'Everything free and unlocked. Pure sandbox.' : 'Start basic. Earn money (sell gadgets, computer jobs) and buy parts, pets, upgrades.'),
         o.mode === 'money' ? setrow('Starting money', slider(0, 3000, 50, o.money, (v) => { o.money = v; }, (v) => '$' + v)) : null,
@@ -128,11 +128,11 @@ export function buildMenus(ui) {
     });
     const list = await listWorlds();
     clear(body);
-    body.append(h('div', { class: 'row' }, btn('Upload a save file', () => fileInp.click()), fileInp, h('span', { class: 'muted' }, `${list.length} saved world${list.length === 1 ? '' : 's'}`)));
-    if (!list.length) body.append(h('div', { class: 'muted', style: { padding: '20px 0' } }, 'No saved worlds yet. Make one with Play.'));
+    put(body, h('div', { class: 'row' }, btn('Upload a save file', () => fileInp.click()), fileInp, h('span', { class: 'muted' }, `${list.length} saved world${list.length === 1 ? '' : 's'}`)));
+    if (!list.length) put(body, h('div', { class: 'muted', style: { padding: '20px 0' } }, 'No saved worlds yet. Make one with Play.'));
     const grid = h('div', { class: 'grid3' });
     for (const w of list) {
-      grid.append(h('div', { class: 'card col' },
+      put(grid, h('div', { class: 'card col' },
         w.thumb ? h('img', { src: w.thumb, style: { width: '100%', borderRadius: '8px', aspectRatio: '16/9', objectFit: 'cover' } }) : h('div', { style: { aspectRatio: '16/9', background: '#0b1213', borderRadius: '8px' } }),
         h('b', {}, w.name),
         h('div', { class: 'muted' }, `${w.mode === 'money' ? 'Money mode' : 'Creative'} · day ${w.day || 1} · ${w.people ?? '?'} alive · ${new Date(w.updated).toLocaleString()}`),
@@ -143,7 +143,7 @@ export function buildMenus(ui) {
           btn('Delete', async () => { if (!confirm(`Delete "${w.name}" forever?`)) return; await deleteWorld(w.id); M.load(); }, 'danger small'),
         )));
     }
-    body.append(grid);
+    put(body, grid);
   };
 
   // ------------------------------------------------------------- saving
@@ -249,10 +249,10 @@ export function buildMenus(ui) {
     const save = () => saveSettings();
     const draw = () => {
       clear(tabs);
-      for (const [k, l] of TABS) tabs.append(h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; draw(); } }, l));
+      for (const [k, l] of TABS) put(tabs, h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; draw(); } }, l));
       clear(body);
       if (tab === 'graphics') {
-        body.append(
+        put(body, 
           setrow('Quality', seg([['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra'], ['insane', 'INSANE']], settings.quality, (v) => setQualityChoice(v)), 'Auto watches your FPS and picks the best look that stays smooth (it never goes above High by itself). INSANE turns everything to max even if it lags.'),
           setrow('Shadows', toggle(settings.shadows, (v) => { settings.shadows = v; save(); })),
           setrow('Grass', toggle(settings.grass, (v) => { settings.grass = v; save(); })),
@@ -263,7 +263,7 @@ export function buildMenus(ui) {
           setrow('FPS counter', toggle(settings.showFps, (v) => { settings.showFps = v; save(); })),
         );
       } else if (tab === 'gameplay') {
-        body.append(
+        put(body, 
           setrow('Gore', seg([['none', 'None'], ['some', 'Some blood'], ['max', 'MAX']], settings.gore, (v) => { settings.gore = v; save(); }), 'MAX: limbs come off depending on the weapon and where it hits. Kids can never be hurt, no matter what.'),
           setrow('Kids grow up', slider(0.25, 4, 0.25, settings.kidGrow, (v) => { settings.kidGrow = v; save(); }, (v) => v + 'x')),
           setrow('Witnesses on the street', seg([['police', 'Police + wanted'], ['panic', 'Panic only'], ['none', 'Nobody cares']], settings.witnesses, (v) => { settings.witnesses = v; save(); })),
@@ -281,16 +281,16 @@ export function buildMenus(ui) {
         const modelSel = h('select', { class: 'txt' }, CLAUDE_MODELS.map(([id, label]) => h('option', { value: id, selected: settings.claudeModel === id }, label)));
         modelSel.addEventListener('change', () => { settings.claudeModel = modelSel.value; save(); });
         const st = h('span', { class: 'muted' }, `Local AI: ${localState.status}${localState.progress ? ' ' + Math.round(localState.progress * 100) + '%' : ''}`);
-        body.append(
+        put(body, 
           setrow('Who thinks for them', seg([['builtin', 'Built-in brain'], ['local', 'Free local AI'], ['claude', 'Your Claude key']], settings.brain, (v) => { settings.brain = v; save(); draw(); }), 'Built-in: instant, no download, knows their personality, mood and memories. Local: a free AI model that downloads once and runs on your graphics card. Claude: your own API key (smartest, costs a little per message).'),
         );
-        if (settings.brain === 'claude') body.append(setrow('Claude API key', keyInp, 'Stays in this browser and is only sent to Anthropic.'), setrow('Model', modelSel));
-        if (settings.brain === 'local') body.append(setrow('Local model', h('span', { class: 'row' }, btn('Download + load', async () => { try { await loadLocal((p) => { st.textContent = `Local AI: ${localState.status} ${Math.round(p * 100)}%`; }); st.textContent = 'Local AI: ready'; } catch (e) { st.textContent = 'Local AI failed: ' + e.message; } }), st), 'About 400 MB, once. Needs a browser with WebGPU (Chrome/Edge). If it fails, people use the built-in brain.'));
-        body.append(h('div', { class: 'muted' }, 'If the AI brain fails or is slow, the built-in brain answers instead, so talking never breaks.'));
+        if (settings.brain === 'claude') put(body, setrow('Claude API key', keyInp, 'Stays in this browser and is only sent to Anthropic.'), setrow('Model', modelSel));
+        if (settings.brain === 'local') put(body, setrow('Local model', h('span', { class: 'row' }, btn('Download + load', async () => { try { await loadLocal((p) => { st.textContent = `Local AI: ${localState.status} ${Math.round(p * 100)}%`; }); st.textContent = 'Local AI: ready'; } catch (e) { st.textContent = 'Local AI failed: ' + e.message; } }), st), 'About 400 MB, once. Needs a browser with WebGPU (Chrome/Edge). If it fails, people use the built-in brain.'));
+        put(body, h('div', { class: 'muted' }, 'If the AI brain fails or is slow, the built-in brain answers instead, so talking never breaks.'));
       } else if (tab === 'audio') {
         const mp3 = h('input', { type: 'file', accept: 'audio/*', style: { display: 'none' } });
         mp3.addEventListener('change', () => { if (mp3.files[0]) { playMp3(mp3.files[0]); ui.toast('Playing your music.'); } });
-        body.append(
+        put(body, 
           setrow('Voices', seg([['babble', 'Babble (Sims style)'], ['spoken', 'Real spoken voice']], settings.voice, (v) => { settings.voice = v; save(); })),
           setrow('Subtitles (speech bubbles)', toggle(settings.subtitles, (v) => { settings.subtitles = v; save(); })),
           setrow('Master volume', slider(0, 1, 0.05, settings.master, (v) => { settings.master = v; save(); applyVolumes(); }, (v) => Math.round(v * 100) + '%')),
@@ -313,9 +313,9 @@ export function buildMenus(ui) {
             };
             addEventListener('keydown', on, true);
           });
-          body.append(setrow(label, b));
+          put(body, setrow(label, b));
         }
-        body.append(h('div', { class: 'row', style: { marginTop: '8px' } }, btn('Reset to default', () => { settings.keys = { ...DEFAULT_KEYS }; save(); draw(); })));
+        put(body, h('div', { class: 'row', style: { marginTop: '8px' } }, btn('Reset to default', () => { settings.keys = { ...DEFAULT_KEYS }; save(); draw(); })));
       }
     };
     draw();
@@ -339,7 +339,7 @@ export function buildMenus(ui) {
     pv.onFrame = () => { t += 1 / 60; poseTargets(body3, { pos: new THREE.Vector3(), yaw: 0, phase: 0, speed: 0, action: null, at: t }); body3.simulate(1 / 60, 9.8, 24); body3.render(t); };
     const ctl = h('div', { class: 'col' });
     const upd = (k, v) => { L[k] = v; rebuild(); };
-    ctl.append(
+    put(ctl, 
       setrow('Body', seg([['m', 'Masc'], ['f', 'Fem']], L.sex || 'm', (v) => upd('sex', v))),
       setrow('Skin', h('div', { class: 'row' }, SKIN.map((c) => h('span', { class: 'swatch', style: { background: '#' + c.toString(16).padStart(6, '0') }, onclick: () => upd('skin', c) })), colorInput(L.skin ?? 0xe8b893, (c) => upd('skin', c)))),
       setrow('Hair', seg(HAIR_STYLES.map((s) => [s, s]), L.hair || 'spiky', (v) => upd('hair', v))),

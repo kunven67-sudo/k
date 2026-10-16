@@ -1,6 +1,6 @@
 // The chem set: make your own potions the same way as gadgets (mix effects + sliders, or describe it).
 // Throw a potion (click) to splash whoever it hits, or press the flip key (R) to drink it yourself.
-import { h, clear, btn, slider } from './dom.js';
+import { h, put, clear, btn, slider } from './dom.js';
 import { CORES } from '../gadgets/parts.js';
 import { settings } from '../core/settings.js';
 import { sfx } from '../core/audio.js';
@@ -28,7 +28,7 @@ export function buildChem(ui) {
       nameInp.addEventListener('input', () => { o.name = nameInp.value; });
       const desc = h('input', { type: 'text', class: 'txt', placeholder: 'Or describe it: "makes them fall in love and dance"', style: { flex: 1 } });
       const color = mixColor(o.effects);
-      body.append(
+      put(body, 
         h('div', { class: 'row' }, desc, btn('Mix it', async () => {
           const text = desc.value.trim();
           if (!text) return;

@@ -157,6 +157,11 @@ hr.sep { border: none; border-top: 1px solid var(--line); margin: 10px 0; }
 .shopitem .price { color: #a6f5c8; font-weight: 700; }
 .camview { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 8px; }
 
+@media (max-width: 1250px) {
+  .slot { width: 50px; height: 50px; font-size: 9px; }
+  .stats { width: 190px; bottom: 80px; }
+  .watch { width: 180px; bottom: 80px; }
+}
 @media (max-width: 700px) {
   .feed { width: 210px; }
   .stats { width: 170px; }

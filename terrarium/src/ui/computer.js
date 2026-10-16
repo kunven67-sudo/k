@@ -1,6 +1,6 @@
 // The lab computer: shop (gadget parts, pets, bugs), sell gadgets online, bank, computer jobs,
 // spy cameras (cage + street), and the news log.
-import { h, clear, btn } from './dom.js';
+import { h, put, clear, btn } from './dom.js';
 import { CORES, BODIES, complexity } from '../gadgets/parts.js';
 import { BUGS } from '../life/bugs.js';
 import { sfx } from '../core/audio.js';
@@ -35,30 +35,30 @@ export function buildComputer(ui) {
     const money = g.mode === 'money';
     const draw = () => {
       clear(tabs);
-      for (const [k, l] of TABS) tabs.append(h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; draw(); } }, l));
+      for (const [k, l] of TABS) put(tabs, h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; draw(); } }, l));
       clear(body);
-      if (money) body.append(h('div', { class: 'money', style: { marginBottom: '6px' } }, `Wallet ${fmtMoney(g.money)}${g.bank ? '   ·   Bank ' + fmtMoney(g.bank) : ''}`));
-      else body.append(h('div', { class: 'muted' }, 'Creative mode: everything is free and unlocked.'));
+      if (money) put(body, h('div', { class: 'money', style: { marginBottom: '6px' } }, `Wallet ${fmtMoney(g.money)}${g.bank ? '   ·   Bank ' + fmtMoney(g.bank) : ''}`));
+      else put(body, h('div', { class: 'muted' }, 'Creative mode: everything is free and unlocked.'));
       if (tab === 'shop') {
-        body.append(h('b', {}, 'Gadget parts'));
+        put(body, h('b', {}, 'Gadget parts'));
         const grid = h('div', { class: 'shopgrid' });
         for (const [k, c] of Object.entries(CORES)) {
           if (c.tier === 0) continue;
           const own = !money || g.unlocks.has('core:' + k);
-          grid.append(h('div', { class: 'shopitem' }, h('b', { style: { color: '#' + c.color.toString(16).padStart(6, '0') } }, c.label + ' core'), h('div', { class: 'muted' }, c.desc), own ? h('span', { class: 'tag' }, 'owned') : h('span', { class: 'price' }, fmtMoney(TIER_PRICE[c.tier])),
+          put(grid, h('div', { class: 'shopitem' }, h('b', { style: { color: '#' + c.color.toString(16).padStart(6, '0') } }, c.label + ' core'), h('div', { class: 'muted' }, c.desc), own ? h('span', { class: 'tag' }, 'owned') : h('span', { class: 'price' }, fmtMoney(TIER_PRICE[c.tier])),
             own ? null : btn('Buy', () => { if (!g.spend(TIER_PRICE[c.tier], c.label + ' core')) return; g.unlocks.add('core:' + k); sfx('cash'); draw(); }, 'small')));
         }
         for (const [k, b] of Object.entries(BODIES)) {
           if (!b.price) continue;
           const own = !money || g.unlocks.has('body:' + k);
-          grid.append(h('div', { class: 'shopitem' }, h('b', {}, b.label + ' body'), h('div', { class: 'muted' }, b.desc), own ? h('span', { class: 'tag' }, 'owned') : h('span', { class: 'price' }, fmtMoney(b.price)),
+          put(grid, h('div', { class: 'shopitem' }, h('b', {}, b.label + ' body'), h('div', { class: 'muted' }, b.desc), own ? h('span', { class: 'tag' }, 'owned') : h('span', { class: 'price' }, fmtMoney(b.price)),
             own ? null : btn('Buy', () => { if (!g.spend(b.price, b.label + ' body')) return; g.unlocks.add('body:' + k); sfx('cash'); draw(); }, 'small')));
         }
-        body.append(grid, h('b', { style: { marginTop: '10px' } }, 'Pets (they live in the lab)'));
+        put(body, grid, h('b', { style: { marginTop: '10px' } }, 'Pets (they live in the lab)'));
         const pets = h('div', { class: 'shopgrid' });
         for (const [k, d] of Object.entries(BUGS)) {
           if (!d.pet) continue;
-          pets.append(h('div', { class: 'shopitem' }, h('b', {}, d.label), h('div', { class: 'muted' }, d.desc || ''), money ? h('span', { class: 'price' }, fmtMoney(d.price)) : null,
+          put(pets, h('div', { class: 'shopitem' }, h('b', {}, d.label), h('div', { class: 'muted' }, d.desc || ''), money ? h('span', { class: 'price' }, fmtMoney(d.price)) : null,
             btn('Buy', () => {
               if (!g.spend(money ? d.price : 0, d.label)) return;
               const pos = g.player.pos.clone(); pos.x += 0.8; pos.y = 0.05;
@@ -67,33 +67,33 @@ export function buildComputer(ui) {
               sfx('cash'); ui.close();
             }, 'small')));
         }
-        body.append(pets);
+        put(body, pets);
       } else if (tab === 'sell') {
         const all = [...g.player.hotbar.map((t, i) => ({ t, where: 'slot', i })), ...g.backpack.map((t, i) => ({ t, where: 'pack', i }))].filter((x) => x.t && typeof x.t === 'object' && !x.t.potion);
-        body.append(h('div', { class: 'muted' }, 'Sell a gadget you built right now, or list a blueprint: people order copies every day and you get paid each morning.'));
+        put(body, h('div', { class: 'muted' }, 'Sell a gadget you built right now, or list a blueprint: people order copies every day and you get paid each morning.'));
         const grid = h('div', { class: 'shopgrid' });
         for (const x of all) {
           const v = Math.round(complexity(x.t) * 0.8);
-          grid.append(h('div', { class: 'shopitem' }, h('b', {}, x.t.name), h('div', { class: 'muted' }, x.t.cores.map((k) => CORES[k].label).join(' + ')), h('span', { class: 'price' }, fmtMoney(v)), btn('Sell it', () => {
+          put(grid, h('div', { class: 'shopitem' }, h('b', {}, x.t.name), h('div', { class: 'muted' }, x.t.cores.map((k) => CORES[k].label).join(' + ')), h('span', { class: 'price' }, fmtMoney(v)), btn('Sell it', () => {
             if (!confirm(`Sell ${x.t.name} for ${fmtMoney(v)}?`)) return;
             if (x.where === 'slot') { g.player.hotbar[x.i] = null; g.player.setGadgetMesh(); } else g.backpack.splice(x.i, 1);
             if (money) g.addMoney(v, `Sold ${x.t.name}`); else ui.toast('Sold (money only counts in Money mode).');
             draw();
           }, 'small')));
         }
-        if (!all.length) grid.append(h('div', { class: 'muted' }, 'No gadgets to sell.'));
-        body.append(grid, h('b', { style: { marginTop: '10px' } }, 'Listed blueprints'));
+        if (!all.length) put(grid, h('div', { class: 'muted' }, 'No gadgets to sell.'));
+        put(body, grid, h('b', { style: { marginTop: '10px' } }, 'Listed blueprints'));
         g.listings = g.listings || [];
         const lg = h('div', { class: 'chips' });
         for (const b of g.blueprints) {
           const listed = g.listings.some((l) => l.name === b.name);
-          lg.append(h('span', { class: 'chip' + (listed ? ' on' : ''), onclick: () => { if (listed) g.listings = g.listings.filter((l) => l.name !== b.name); else g.listings.push({ name: b.name, value: complexity(b), sold: 0 }); draw(); } }, `${b.name} · ${fmtMoney(complexity(b))}${listed ? ' (listed)' : ''}`));
+          put(lg, h('span', { class: 'chip' + (listed ? ' on' : ''), onclick: () => { if (listed) g.listings = g.listings.filter((l) => l.name !== b.name); else g.listings.push({ name: b.name, value: complexity(b), sold: 0 }); draw(); } }, `${b.name} · ${fmtMoney(complexity(b))}${listed ? ' (listed)' : ''}`));
         }
-        body.append(lg, h('div', { class: 'muted' }, `${g.listings.length} listed. Sold so far: ${g.listings.reduce((s, l) => s + l.sold, 0)}.`));
+        put(body, lg, h('div', { class: 'muted' }, `${g.listings.length} listed. Sold so far: ${g.listings.reduce((s, l) => s + l.sold, 0)}.`));
       } else if (tab === 'bank') {
         g.bank = g.bank || 0;
         const amt = h('input', { type: 'number', class: 'txt', value: 100, min: 1, style: { width: '120px' } });
-        body.append(
+        put(body, 
           h('div', {}, `In the bank: ${fmtMoney(g.bank)}. It earns 2% every in-game day.`),
           h('div', { class: 'row' }, amt,
             btn('Deposit', () => { const n = Math.min(g.money, Math.max(0, Number(amt.value) || 0)); if (!n) return; g.money -= n; g.bank += n; sfx('cash'); draw(); }),
@@ -101,17 +101,17 @@ export function buildComputer(ui) {
           money ? null : h('div', { class: 'muted' }, 'The bank only matters in Money mode.'),
         );
       } else if (tab === 'jobs') {
-        body.append(h('div', { class: 'muted' }, 'Work from the lab. Time flies while you work (the cage keeps living at 20x).'));
+        put(body, h('div', { class: 'muted' }, 'Work from the lab. Time flies while you work (the cage keeps living at 20x).'));
         const grid = h('div', { class: 'shopgrid' });
-        for (const j of JOBS_PC) grid.append(h('div', { class: 'shopitem' }, h('b', {}, j.name), h('div', { class: 'muted' }, `${j.hours} hours`), h('span', { class: 'price' }, fmtMoney(j.pay)), btn('Do it', () => { ui.close(); g.startJob(j); }, 'small')));
-        body.append(grid);
+        for (const j of JOBS_PC) put(grid, h('div', { class: 'shopitem' }, h('b', {}, j.name), h('div', { class: 'muted' }, `${j.hours} hours`), h('span', { class: 'price' }, fmtMoney(j.pay)), btn('Do it', () => { ui.close(); g.startJob(j); }, 'small')));
+        put(body, grid);
       } else if (tab === 'cams') {
-        body.append(h('div', { class: 'muted' }, 'Spy cameras. Watch without them seeing you. Left/right arrows switch cameras, Esc to stop.'));
-        body.append(h('div', { class: 'grid3' }, CAMS.map((c, i) => h('div', { class: 'card click', onclick: () => { ui.close(true); g.startCams(i); } }, h('b', {}, c.name)))));
+        put(body, h('div', { class: 'muted' }, 'Spy cameras. Watch without them seeing you. Left/right arrows switch cameras, Esc to stop.'));
+        put(body, h('div', { class: 'grid3' }, CAMS.map((c, i) => h('div', { class: 'card click', onclick: () => { ui.close(true); g.startCams(i); } }, h('b', {}, c.name)))));
       } else if (tab === 'news') {
         const list = h('div', { class: 'col', style: { maxHeight: '55vh', overflow: 'auto' } });
-        for (const n of [...g.news].reverse().slice(0, 120)) list.append(h('div', { class: 'feed', style: { position: 'static', width: 'auto' } }, h('div', { class: 'item ' + (n.kind || '') }, `Day ${n.day}: ${n.text}`)));
-        body.append(list);
+        for (const n of [...g.news].reverse().slice(0, 120)) put(list, h('div', { class: 'feed', style: { position: 'static', width: 'auto' } }, h('div', { class: 'item ' + (n.kind || '') }, `Day ${n.day}: ${n.text}`)));
+        put(body, list);
       }
     };
     draw();

@@ -17,6 +17,9 @@ export function h(tag, props = {}, ...kids) {
   return el;
 }
 
+// append that skips null/false (DOM append would print "null")
+export function put(parent, ...kids) { for (const c of kids.flat(3)) if (c != null && c !== false) parent.append(c); return parent; }
+
 export const clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); return el; };
 
 export function btn(label, onClick, cls = '') {

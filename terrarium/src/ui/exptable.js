@@ -1,7 +1,7 @@
 // The experiment table: scan someone's mind, open them up (cartoony organs, follows the gore setting,
 // adults only), replace lost limbs with robot parts, inject potions, test gadgets, heal, release.
 import * as THREE from 'three';
-import { h, clear, btn } from './dom.js';
+import { h, put, clear, btn } from './dom.js';
 import { Preview } from './preview.js';
 import { Body, poseTargets, J } from '../life/body.js';
 import { MeshSink } from '../life/render.js';
@@ -56,7 +56,7 @@ export function buildExpTable(ui) {
     pv.pitch = 0.9;
     const out = h('div', { class: 'col', style: { maxHeight: '36vh', overflow: 'auto', fontSize: '13px' } });
     const right = h('div', { class: 'col' }, cv, h('div', { class: 'muted' }, 'Drag to turn, scroll to zoom.'), out);
-    body.append(left, right);
+    put(body, left, right);
     p.removedOrgans = p.removedOrgans || [];
     let open = false;
     let sink = null, b3 = null;
@@ -132,7 +132,7 @@ export function buildExpTable(ui) {
       const lost = [...p.body.cut].filter((j) => !j.startsWith('neck') && j !== 'waist');
       const gadgets = g.player.hotbar.concat(g.backpack).filter((t) => t && typeof t === 'object' && !t.potion);
       const potions = g.player.hotbar.concat(g.backpack).filter((t) => t && t.potion);
-      left.append(
+      put(left, 
         h('h3', { style: { margin: 0 } }, `${p.name} ${p.last}`),
         h('div', {}, h('span', { class: 'hp' }, p.alive ? `${Math.max(0, Math.round(p.health))}/100` : 'DEAD'), '  ', h('span', { class: 'muted' }, p.alive ? p.feeling() : p.cause)),
         h('div', { class: 'row' },

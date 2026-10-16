@@ -15,6 +15,11 @@ const SHINY = new Set(['eye', 'pupil', 'glasses', 'goggles', 'mouth']);
 const NO_SHADOW = new Set(['eye', 'pupil', 'brow', 'mouth', 'nose', 'ear', 'glasses', 'mustache', 'stump']);
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 
+// Parts everyone has are stored densely (slot * mult + i). Optional parts (hair styles, hats, beards,
+// glasses, stumps, cut-in-half torsos...) get their own small packed list, so 40 hair styles nobody
+// is wearing don't cost the GPU anything.
+const DENSE = new Set(['torso', 'pelvis', 'head', 'eye', 'pupil', 'brow', 'mouth', 'nose', 'ear', 'upperArm', 'forearm', 'hand', 'thigh', 'shin', 'foot', 'shoulder']);
+
 export class InstancedSink {
   constructor(scene, capacity = 96) {
     buildParts();
@@ -23,53 +28,92 @@ export class InstancedSink {
     this.meshes = {};
     this.free = [];
     this.used = 0;
+    this.sparse = {};   // key -> {cap, map: Map(slot*16+i -> idx), free: [], top}
     this.matte = new THREE.MeshStandardMaterial({ roughness: 0.62, metalness: 0 });
     this.shiny = new THREE.MeshStandardMaterial({ roughness: 0.18, metalness: 0.05 });
-    this.build();
+    for (const key of Object.keys(PART_MULT)) if (!DENSE.has(key)) this.sparse[key] = { cap: 16, map: new Map(), free: [], top: 0 };
+    for (const key of Object.keys(PART_MULT)) this.makeMesh(key);
   }
 
-  build() {
-    for (const [key, mult] of Object.entries(PART_MULT)) {
-      const old = this.meshes[key];
-      const m = new THREE.InstancedMesh(PARTS[key], SHINY.has(key) ? this.shiny : this.matte, this.cap * mult);
-      m.frustumCulled = false;
-      m.castShadow = !NO_SHADOW.has(key);
-      m.receiveShadow = key === 'torso' || key === 'head';
-      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      const col = new Float32Array(this.cap * mult * 3).fill(1);
-      m.instanceColor = new THREE.InstancedBufferAttribute(col, 3);
-      for (let i = 0; i < this.cap * mult; i++) m.setMatrixAt(i, ZERO);
-      if (old) {
-        // copy old data into the bigger buffers
-        m.instanceMatrix.array.set(old.instanceMatrix.array);
-        m.instanceColor.array.set(old.instanceColor.array);
-        this.scene.remove(old);
-        old.dispose();
-      }
-      m.userData.part = key;
-      this.meshes[key] = m;
-      this.scene.add(m);
+  capOf(key) { return DENSE.has(key) ? this.cap * PART_MULT[key] : this.sparse[key].cap; }
+
+  makeMesh(key) {
+    const old = this.meshes[key];
+    const n = this.capOf(key);
+    const m = new THREE.InstancedMesh(PARTS[key], SHINY.has(key) ? this.shiny : this.matte, n);
+    m.frustumCulled = false;
+    m.castShadow = !NO_SHADOW.has(key);
+    m.receiveShadow = key === 'torso' || key === 'head';
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3).fill(1), 3);
+    for (let i = 0; i < n; i++) m.setMatrixAt(i, ZERO);
+    if (old) {
+      // copy old data into the bigger buffers
+      m.instanceMatrix.array.set(old.instanceMatrix.array);
+      m.instanceColor.array.set(old.instanceColor.array);
+      this.scene.remove(old);
+      old.dispose();
     }
+    m.userData.part = key;
+    m.count = 0;
+    this.meshes[key] = m;
+    this.scene.add(m);
   }
 
   alloc() {
     if (this.free.length) return this.free.pop();
-    if (this.used >= this.cap) { this.cap *= 2; this.build(); }
+    if (this.used >= this.cap) { this.cap *= 2; for (const k of DENSE) this.makeMesh(k); }
     return this.used++;
   }
 
   release(slot) {
-    for (const [key, mult] of Object.entries(PART_MULT)) for (let i = 0; i < mult; i++) this.meshes[key].setMatrixAt(slot * mult + i, ZERO);
+    for (const key of DENSE) { const mult = PART_MULT[key]; for (let i = 0; i < mult; i++) this.meshes[key].setMatrixAt(slot * mult + i, ZERO); }
+    for (const [key, sp] of Object.entries(this.sparse)) {
+      for (let i = 0; i < PART_MULT[key]; i++) {
+        const id = slot * 16 + i;
+        const idx = sp.map.get(id);
+        if (idx === undefined) continue;
+        this.meshes[key].setMatrixAt(idx, ZERO);
+        sp.map.delete(id); sp.free.push(idx);
+      }
+    }
     this.free.push(slot);
   }
 
-  set(key, slot, i, m) { const mesh = this.meshes[key]; if (mesh) mesh.setMatrixAt(slot * PART_MULT[key] + i, m); }
-  hide(key, slot, i) { const mesh = this.meshes[key]; if (mesh) mesh.setMatrixAt(slot * PART_MULT[key] + i, ZERO); }
-  color(key, slot, i, c) { const mesh = this.meshes[key]; if (mesh) { mesh.setColorAt(slot * PART_MULT[key] + i, c); mesh.instanceColor.needsUpdate = true; } }
+  // index of (slot, i) in a mesh; optional parts get a packed index the first time they're used
+  idx(key, slot, i, make) {
+    if (DENSE.has(key)) return slot * PART_MULT[key] + i;
+    const sp = this.sparse[key];
+    if (!sp) return -1;
+    const id = slot * 16 + i;
+    let k = sp.map.get(id);
+    if (k !== undefined || !make) return k ?? -1;
+    if (sp.free.length) k = sp.free.pop();
+    else {
+      if (sp.top >= sp.cap) { sp.cap *= 2; this.makeMesh(key); }
+      k = sp.top++;
+    }
+    sp.map.set(id, k);
+    // a new packed instance takes this slot's color for that part
+    const c = sp.colors && sp.colors.get(id);
+    if (c) { this.meshes[key].setColorAt(k, c); this.meshes[key].instanceColor.needsUpdate = true; }
+    return k;
+  }
+
+  set(key, slot, i, m) { const mesh = this.meshes[key]; if (!mesh) return; const k = this.idx(key, slot, i, true); if (k >= 0) mesh.setMatrixAt(k, m); }
+  hide(key, slot, i) { const mesh = this.meshes[key]; if (!mesh) return; const k = this.idx(key, slot, i, false); if (k >= 0) mesh.setMatrixAt(k, ZERO); }
+  color(key, slot, i, c) {
+    const mesh = this.meshes[key];
+    if (!mesh) return;
+    const sp = this.sparse[key];
+    if (sp) { (sp.colors ||= new Map()).set(slot * 16 + i, c.clone()); }
+    const k = this.idx(key, slot, i, false);
+    if (k >= 0) { mesh.setColorAt(k, c); mesh.instanceColor.needsUpdate = true; }
+  }
 
   flush() {
-    // only draw the slots that are in use (empty slots would still cost vertices on the GPU)
-    for (const [key, m] of Object.entries(this.meshes)) { m.count = this.used * PART_MULT[key]; m.instanceMatrix.needsUpdate = true; }
+    // only draw what's in use (empty instances would still cost vertices on the GPU)
+    for (const [key, m] of Object.entries(this.meshes)) { m.count = DENSE.has(key) ? this.used * PART_MULT[key] : this.sparse[key].top; m.instanceMatrix.needsUpdate = true; }
   }
 
   setVisible(v) { for (const m of Object.values(this.meshes)) m.visible = v; }

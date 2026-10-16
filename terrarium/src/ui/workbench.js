@@ -1,6 +1,6 @@
 // The gadget workbench: endless gadgets from parts (body + up to 3 cores + mod + sliders), a live 3D
 // preview built from the parts, type-a-description (built-in parser or your Claude key), blueprints.
-import { h, clear, btn, slider, setrow, colorInput } from './dom.js';
+import { h, put, clear, btn, slider, setrow, colorInput } from './dom.js';
 import { BODIES, CORES, MODS, OBJECT_TYPES, DEFAULT_STATS, blueprint, complexity, instability } from '../gadgets/parts.js';
 import { buildGadgetModel } from '../gadgets/model.js';
 import { Preview } from './preview.js';
@@ -57,7 +57,7 @@ export function buildWorkbench(ui) {
     const drawInfo = () => {
       clear(info);
       const cost = Math.round(complexity(bp) * 0.5);
-      info.append(
+      put(info, 
         h('div', {}, h('b', {}, bp.name || 'Unnamed'), ' ', h('span', { class: 'muted' }, `${BODIES[bp.body].label} · ${MODS[bp.mod].label}`)),
         h('div', {}, bp.cores.map((k) => h('span', { class: 'tag', style: { color: '#' + CORES[k].color.toString(16).padStart(6, '0') } }, CORES[k].label))),
         h('div', { class: 'muted' }, bp.cores.map((k) => CORES[k].desc).join(' + ')),
@@ -89,7 +89,7 @@ export function buildWorkbench(ui) {
         sfx('ui');
         draw(); refresh3d(); drawInfo();
       }, 'primary');
-      left.append(
+      put(left, 
         h('div', { class: 'row' }, desc), h('div', { class: 'row' }, descBtn, h('span', { class: 'muted' }, settings.brain === 'claude' && settings.claudeKey ? 'Uses your Claude key.' : 'Built-in inventor (add your Claude key in Settings for a smarter one).')),
         h('hr', { class: 'sep' }),
         h('label', { class: 'field' }, 'Name', nameInp),

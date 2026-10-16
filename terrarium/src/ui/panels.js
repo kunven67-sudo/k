@@ -1,7 +1,7 @@
 // The lab's machines and your tools: cage control panel, supply shelf, spawn machine, changer,
 // backpack, mind headband. (Workbench, computer, chem set and experiment table have their own files.)
 import * as THREE from 'three';
-import { h, clear, btn, seg, slider, toggle, setrow, colorInput, hex } from './dom.js';
+import { h, put, clear, btn, seg, slider, toggle, setrow, colorInput, hex } from './dom.js';
 import { settings } from '../core/settings.js';
 import { sfx } from '../core/audio.js';
 import { fmtMoney, rand } from '../core/util.js';
@@ -31,11 +31,11 @@ export function buildPanels(ui) {
     const TABS = [['weather', 'Weather + light'], ['time', 'Time'], ['cage', 'Lid + glass'], ['terrain', 'Terrain brush'], ['bugs', 'Drop in bugs'], ['you', 'Go inside']];
     const draw = () => {
       clear(tabs);
-      for (const [k, l] of TABS) tabs.append(h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; draw(); } }, l));
+      for (const [k, l] of TABS) put(tabs, h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; draw(); } }, l));
       clear(body);
       if (tab === 'weather') {
         const w = (key, label, hint, on = () => {}) => setrow(label, toggle(!!W[key], (v) => { W[key] = v ? 1 : 0; on(v); sfx('click'); }), hint);
-        body.append(
+        put(body, 
           w('rain', 'Rain', 'Sprinklers in the lid. Puts out fires, fills the pond a little.'),
           w('snow', 'Snow', 'Cold. Snow piles up, the pond freezes. They need fire, clothes and shelter.'),
           w('heat', 'Heat lamp', 'Hot and dry. They get thirsty fast. Melts snow.'),
@@ -49,13 +49,13 @@ export function buildPanels(ui) {
           setrow('Lab lights', seg([['auto', 'Auto'], ['on', 'On'], ['off', 'Off (dark lab)']], g.world.labLights, (v) => { g.world.labLights = v; })),
         );
       } else if (tab === 'time') {
-        body.append(
+        put(body, 
           setrow('Cage time speed', seg([[0, 'Pause'], [0.25, '0.25x'], [0.5, 'Slow'], [1, '1x'], [2, '2x'], [5, '5x'], [20, '20x']], g.world.speed, (v) => { g.world.speed = v; }), `Also ${settings.keys.slower.replace('Comma', ',')} / ${settings.keys.faster.replace('Period', '.')} keys. At 1x a whole day is 16 minutes.`),
           setrow('Set the time', h('span', { class: 'row' }, ...[[7, 'Morning'], [12, 'Noon'], [18.5, 'Sunset'], [22, 'Night']].map(([t, l]) => btn(l, () => { if (t < g.world.time) g.world.day++; g.world.time = t; sfx('click'); }, 'small')))),
           h('div', { class: 'muted' }, 'They sleep at night (the cage lamp goes dark when the clock says night).'),
         );
       } else if (tab === 'cage') {
-        body.append(
+        put(body, 
           setrow('Lid', seg([[false, 'Closed'], [true, 'Off (wide open)']], c.lidOpen, (v) => { c.setLid(v); sfx('slide'); }), 'With the lid off you can reach in with your hand. They could climb out if they build something tall...'),
           setrow('Hatch', seg([[false, 'Closed'], [true, 'Open']], c.hatchOpen, (v) => { c.setHatch(v); sfx('click'); }), 'A small square door in the lid. Drop things through it.'),
           setrow('Glass', h('span', { class: 'row' }, h('span', {}, `${Math.round(c.glassHP)}/100${c.broken ? ' (CRACKED THROUGH)' : ''}`), btn('Repair the glass' + price(50), () => { if (c.glassHP >= 100) { ui.toast('The glass is fine.'); return; } if (!g.spend(g.mode === 'money' ? 50 : 0, 'Glass repair')) return; g.repairGlass(); sfx('glass'); ui.toast('Glass repaired.'); draw(); }, 'small')), 'Strength is in Settings > Gameplay.'),
@@ -74,7 +74,7 @@ export function buildPanels(ui) {
         const b = g.brush || { tool: 'raise', radius: 0.08, strength: 1 };
         const tools = [['raise', 'Raise'], ['lower', 'Dig'], ['smooth', 'Smooth'], ['flatten', 'Flatten'], ['paint:grass', 'Grass'], ['paint:dirt', 'Dirt'], ['paint:sand', 'Sand'], ['paint:snow', 'Snow'], ['paint:rock', 'Rock'], ['paint:farm', 'Farm soil'], ['paint:mud', 'Mud']];
         const nat = Object.entries(NAT).map(([k, v]) => ['nat:' + k, v.label]).concat([['erase', 'Remove plants/rocks']]);
-        body.append(
+        put(body, 
           setrow('Shape + paint', seg(tools, b.tool, (v) => { b.tool = v; })),
           setrow('Place nature', seg(nat, b.tool, (v) => { b.tool = v; })),
           setrow('Size', slider(0.02, 0.3, 0.01, b.radius, (v) => { b.radius = v; }, (v) => Math.round(v * 100) + ' cm')),
@@ -86,12 +86,12 @@ export function buildPanels(ui) {
         const grid = h('div', { class: 'shopgrid' });
         for (const [k, d] of Object.entries(BUGS)) {
           if (d.pet) continue;
-          grid.append(h('div', { class: 'shopitem' }, h('b', {}, d.label), h('div', { class: 'muted' }, `${Math.round(d.len * 1000)} mm long${d.hunter ? ' · hunts people' : ''}${d.poison ? ' · venom' : ''}`), g.mode === 'money' ? h('div', { class: 'price' }, fmtMoney(d.price)) : null,
+          put(grid, h('div', { class: 'shopitem' }, h('b', {}, d.label), h('div', { class: 'muted' }, `${Math.round(d.len * 1000)} mm long${d.hunter ? ' · hunts people' : ''}${d.poison ? ' · venom' : ''}`), g.mode === 'money' ? h('div', { class: 'price' }, fmtMoney(d.price)) : null,
             btn('Drop one in', () => { if (!g.spend(g.mode === 'money' ? d.price : 0, d.label)) return; const s = g.randomCageSpot(0.1); g.spawnBug(k, s.add(new THREE.Vector3(0, 0.05, 0)), 1); g.feed(`You dropped a ${d.label.toLowerCase()} in the cage`, d.hunter ? 'bad' : ''); sfx('drop'); }, 'small')));
         }
-        body.append(grid, h('div', { class: 'muted' }, 'A praying mantis is twice as tall as they are. Bugs eat the dead, hunters hunt the living.'));
+        put(body, grid, h('div', { class: 'muted' }, 'A praying mantis is twice as tall as they are. Bugs eat the dead, hunters hunt the living.'));
       } else if (tab === 'you') {
-        body.append(
+        put(body, 
           h('div', { class: 'muted' }, 'The panel has a little teleporter wired into the cage. You can also shrink with your watch and climb in through the hatch.'),
           h('div', { class: 'row' },
             btn('Shrink me and put me inside', () => { const s = g.randomCageSpot(0.2); g.player.setScale(TINY * 1.02); g.player.targetScale = g.player.scale; g.player.pos.copy(s); g.player.vel.set(0, 0, 0); sfx('teleport'); ui.close(); ui.toast('You\'re in the cage, their size. Hold X to grow (the lid stops you unless it\'s open).'); }, 'primary'),
@@ -112,7 +112,7 @@ export function buildPanels(ui) {
       if (!d) continue;
       const cost = d.price ?? 1;
       const what = d.give ? Object.entries(d.give).map(([r, n]) => `${r} ${n}`).join(', ') : d.weapon ? `weapon (${d.weapon.type})` : d.shelter ? `shelter for ${d.shelter}` : d.kind;
-      grid.append(h('div', { class: 'shopitem' }, h('b', {}, d.label), h('div', { class: 'muted' }, what), g.mode === 'money' ? h('div', { class: 'price' }, fmtMoney(cost)) : null,
+      put(grid, h('div', { class: 'shopitem' }, h('b', {}, d.label), h('div', { class: 'muted' }, what), g.mode === 'money' ? h('div', { class: 'price' }, fmtMoney(cost)) : null,
         btn('Take one', () => {
           if (!g.spend(g.mode === 'money' ? cost : 0, d.label)) return;
           const pl = g.player;
@@ -136,7 +136,7 @@ export function buildPanels(ui) {
       nameInp.addEventListener('input', () => { o.name = nameInp.value.trim(); });
       const jobSel = h('select', { class: 'txt' }, JOB_KEYS.map((k) => h('option', { value: k, selected: o.job === k }, JOBS[k].label)));
       jobSel.addEventListener('change', () => { o.job = jobSel.value; if (o.look) { const nl = makeLook({ sex: o.sex, job: o.job }); o.look.shirt = nl.shirt; o.look.top = nl.top; o.look.hat = nl.hat; o.look.hatColor = nl.hatColor; } });
-      body.append(
+      put(body, 
         h('div', { class: 'muted' }, 'Makes a brand-new grown-up person. Pick everything, or leave it random. Kids are only ever born in the cage.'),
         h('div', { class: 'grid2' },
           h('label', { class: 'field' }, 'Name', nameInp),
@@ -149,7 +149,7 @@ export function buildPanels(ui) {
       if (o.custom) {
         const L = o.look;
         const sw = (arr, key) => h('div', { class: 'row' }, arr.map((c) => h('span', { class: 'swatch' + (L[key] === c ? ' on' : ''), style: { background: hex(c) }, onclick: () => { L[key] = c; draw(); } })), colorInput(L[key], (c) => { L[key] = c; }));
-        body.append(
+        put(body, 
           setrow('Skin', sw(SKIN, 'skin')),
           setrow('Hair', seg(HAIR_STYLES.map((s) => [s, s]), L.hair, (v) => { L.hair = v; })),
           setrow('Hair color', sw(HAIR_COLORS, 'hairColor')),
@@ -161,7 +161,7 @@ export function buildPanels(ui) {
           setrow('Glasses', toggle(!!L.glasses, (v) => { L.glasses = v; })),
         );
       }
-      body.append(setrow('Then', seg([[true, 'Walk them into the shrink chamber'], [false, 'Leave them full size in the lab']], o.shrink, (v) => { o.shrink = v; }), o.shrink ? 'They come out tiny on the chamber tray.' : 'A full-size scared stranger in your lab. They might try to escape up the stairs.'));
+      put(body, setrow('Then', seg([[true, 'Walk them into the shrink chamber'], [false, 'Leave them full size in the lab']], o.shrink, (v) => { o.shrink = v; }), o.shrink ? 'They come out tiny on the chamber tray.' : 'A full-size scared stranger in your lab. They might try to escape up the stairs.'));
     };
     draw();
     ui.showModal('spawner', {
@@ -179,13 +179,13 @@ export function buildPanels(ui) {
     const grid = h('div', { class: 'grid3' });
     for (const [k, f] of Object.entries(FORMS)) {
       if (k === 'person') continue;
-      grid.append(h('div', { class: 'card click' + (pl.form === k ? ' on' : ''), onclick: () => { pl.changeForm(k); ui.close(); } }, h('b', {}, f.label), h('div', { class: 'muted' }, f.desc)));
+      put(grid, h('div', { class: 'card click' + (pl.form === k ? ' on' : ''), onclick: () => { pl.changeForm(k); ui.close(); } }, h('b', {}, f.label), h('div', { class: 'muted' }, f.desc)));
     }
-    body.append(grid);
+    put(body, grid);
     const copyable = g.people.filter((p) => p.alive && !p.kid && p.scale < 0.2);
-    body.append(h('div', { style: { marginTop: '10px' } }, h('b', {}, 'Copy a person'), h('div', { class: 'muted' }, FORMS.person.desc + ' Their friends and partner will think you ARE them, unless you act weird.')));
-    body.append(h('div', { class: 'chips' }, copyable.length ? copyable.slice(0, 40).map((p) => h('span', { class: 'chip', onclick: () => { pl.changeForm('person', p); ui.close(); } }, p.name + ' ' + p.last)) : h('span', { class: 'muted' }, 'Nobody to copy yet.')));
-    if (pl.disguise) body.append(h('div', { class: 'row', style: { marginTop: '10px' } }, btn('Tell them who you really are', () => { const near = g.people.filter((p) => p.alive && !p.kid && p.dist(pl.pos) < pl.height * 15)[0]; if (near) pl.revealDisguise(near); pl.changeForm('scientist'); ui.close(); }, 'danger')));
+    put(body, h('div', { style: { marginTop: '10px' } }, h('b', {}, 'Copy a person'), h('div', { class: 'muted' }, FORMS.person.desc + ' Their friends and partner will think you ARE them, unless you act weird.')));
+    put(body, h('div', { class: 'chips' }, copyable.length ? copyable.slice(0, 40).map((p) => h('span', { class: 'chip', onclick: () => { pl.changeForm('person', p); ui.close(); } }, p.name + ' ' + p.last)) : h('span', { class: 'muted' }, 'Nobody to copy yet.')));
+    if (pl.disguise) put(body, h('div', { class: 'row', style: { marginTop: '10px' } }, btn('Tell them who you really are', () => { const near = g.people.filter((p) => p.alive && !p.kid && p.dist(pl.pos) < pl.height * 15)[0]; if (near) pl.revealDisguise(near); pl.changeForm('scientist'); ui.close(); }, 'danger')));
     ui.showModal('changer', { title: 'The changer', body, wide: true });
   };
 
@@ -197,21 +197,21 @@ export function buildPanels(ui) {
     const label = (t) => (!t ? 'empty' : t === 'hand' ? 'Hand' : t === 'bottle' ? 'Glass bottle' : t === 'headband' ? 'Mind headband' : t.potion ? `${t.name} (potion x${t.uses ?? 1})` : t.name);
     const draw = () => {
       clear(body);
-      body.append(h('div', { class: 'muted' }, picked ? 'Now click a belt slot or the backpack to move it there.' : 'Click something, then click where it should go. Your tool belt (1-9):'));
-      body.append(h('div', { class: 'row' }, pl.hotbar.map((t, i) => h('div', { class: 'card click' + (picked && picked.from === 'slot' && picked.i === i ? ' on' : ''), style: { width: '100px', minHeight: '64px', fontSize: '12px' }, onclick: () => {
+      put(body, h('div', { class: 'muted' }, picked ? 'Now click a belt slot or the backpack to move it there.' : 'Click something, then click where it should go. Your tool belt (1-9):'));
+      put(body, h('div', { class: 'row' }, pl.hotbar.map((t, i) => h('div', { class: 'card click' + (picked && picked.from === 'slot' && picked.i === i ? ' on' : ''), style: { width: '100px', minHeight: '64px', fontSize: '12px' }, onclick: () => {
         if (!picked) { if (t) { picked = { from: 'slot', i }; } draw(); return; }
         const src = picked.from === 'slot' ? pl.hotbar[picked.i] : g.backpack[picked.i];
         if (picked.from === 'slot') { pl.hotbar[picked.i] = pl.hotbar[i]; pl.hotbar[i] = src; }
         else { g.backpack.splice(picked.i, 1); if (pl.hotbar[i]) g.backpack.push(pl.hotbar[i]); pl.hotbar[i] = src; }
         picked = null; pl.setGadgetMesh(); draw();
       } }, h('div', { class: 'muted' }, String(i + 1)), label(t)))));
-      body.append(h('div', { style: { marginTop: '8px' } }, h('b', {}, `Backpack (${g.backpack.length})`)));
+      put(body, h('div', { style: { marginTop: '8px' } }, h('b', {}, `Backpack (${g.backpack.length})`)));
       const packRow = h('div', { class: 'row card click', style: { minHeight: '60px' }, onclick: () => {
         if (picked && picked.from === 'slot') { const t = pl.hotbar[picked.i]; if (t === 'hand') { ui.toast('Your hand stays on the belt.'); } else { g.backpack.push(t); pl.hotbar[picked.i] = null; pl.setGadgetMesh(); } picked = null; draw(); }
       } });
-      g.backpack.forEach((t, i) => packRow.append(h('span', { class: 'chip' + (picked && picked.from === 'pack' && picked.i === i ? ' on' : ''), onclick: (e) => { e.stopPropagation(); picked = { from: 'pack', i }; draw(); } }, label(t), h('span', { class: 'muted', style: { marginLeft: '6px', cursor: 'pointer' }, onclick: (e) => { e.stopPropagation(); if (confirm(`Throw away ${label(t)}?`)) { g.backpack.splice(i, 1); picked = null; draw(); } } }, '×'))));
-      if (!g.backpack.length) packRow.append(h('span', { class: 'muted' }, 'Empty. Make gadgets at the workbench and potions at the chem set.'));
-      body.append(packRow);
+      g.backpack.forEach((t, i) => put(packRow, h('span', { class: 'chip' + (picked && picked.from === 'pack' && picked.i === i ? ' on' : ''), onclick: (e) => { e.stopPropagation(); picked = { from: 'pack', i }; draw(); } }, label(t), h('span', { class: 'muted', style: { marginLeft: '6px', cursor: 'pointer' }, onclick: (e) => { e.stopPropagation(); if (confirm(`Throw away ${label(t)}?`)) { g.backpack.splice(i, 1); picked = null; draw(); } } }, '×'))));
+      if (!g.backpack.length) put(packRow, h('span', { class: 'muted' }, 'Empty. Make gadgets at the workbench and potions at the chem set.'));
+      put(body, packRow);
     };
     draw();
     ui.showModal('backpack', { title: 'Backpack + tool belt', body, wide: true });

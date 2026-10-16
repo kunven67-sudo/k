@@ -164,7 +164,7 @@ export class Game {
     this.over = false;
     const pl = this.player;
     pl.holding = null; pl.bottle = []; pl.possess = null; pl.health = 100;
-    pl.pos.set(0, 0, 2.6); pl.vel.set(0, 0, 0); pl.yaw = Math.PI; pl.pitch = -0.15;
+    pl.pos.set(0, 0, 2.6); pl.vel.set(0, 0, 0); pl.yaw = 0; pl.pitch = -0.2;
     pl.form = 'scientist'; pl.disguise = null; pl.changeFormQuiet(); pl.setScale(1); pl.targetScale = 1;
     pl.needs = { hunger: 100, thirst: 100, energy: 100 };
     this.world.bookshelf.open = false; this.world.frontDoor.open = false;

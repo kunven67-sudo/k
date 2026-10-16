@@ -1,6 +1,6 @@
 // Everything on screen that isn't the 3D world: HUD, speech bubbles, news feed, chat, menus, panels.
 import * as THREE from 'three';
-import { h, clear, btn } from './dom.js';
+import { h, put, clear, btn } from './dom.js';
 import { settings, keyName } from '../core/settings.js';
 import { input, actPressed, act, lockPointer, unlockPointer } from '../core/input.js';
 import { quality } from '../core/quality.js';
@@ -75,11 +75,11 @@ export class UI {
     this.tagLayer = h('div', { class: 'passive' });
     this.info = h('div', { class: 'infocard panel', style: { display: 'none' } });
     this.micEl = h('div', { class: 'mic', style: { display: 'none' } });
-    hud.append(this.bubbleLayer, this.tagLayer, this.vignette, this.cross, this.prompt, this.hotbarEl, this.statsEl, this.watchEl, this.topEl, this.feedEl, this.fpsEl, this.info, this.micEl);
-    this.root.append(hud);
+    put(hud, this.bubbleLayer, this.tagLayer, this.vignette, this.cross, this.prompt, this.hotbarEl, this.statsEl, this.watchEl, this.topEl, this.feedEl, this.fpsEl, this.info, this.micEl);
+    put(this.root, hud);
     this.fadeEl = h('div', { class: 'fade' });
     this.toastEl = null;
-    this.root.append(this.fadeEl);
+    put(this.root, this.fadeEl);
     hud.style.display = 'none';
   }
 
@@ -89,7 +89,7 @@ export class UI {
     if (!text) return;
     if (this.toastEl) this.toastEl.remove();
     const el = this.toastEl = h('div', { class: 'toast passive' }, text);
-    this.root.append(el);
+    put(this.root, el);
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => { el.remove(); if (this.toastEl === el) this.toastEl = null; }, 2600 + text.length * 25);
   }
@@ -105,7 +105,7 @@ export class UI {
 
   moneyPop(n, why) {
     const el = h('div', { class: 'toast passive', style: { top: '64px', left: 'auto', right: '14px', transform: 'none', fontSize: '13px', color: n >= 0 ? '#a6f5c8' : '#ff9c9c' } }, `${n >= 0 ? '+' : '-'}${fmtMoney(Math.abs(n))}${why ? '  ' + why : ''}`);
-    this.root.append(el);
+    put(this.root, el);
     setTimeout(() => el.remove(), 2200);
   }
 
@@ -124,7 +124,7 @@ export class UI {
   bubble(p, text, kind = 'chat', dur = 3) {
     if (!settings.subtitles) return;
     let b = this.bubbles.get(p);
-    if (!b) { b = { el: h('div', { class: 'bubble' }) }; this.bubbles.set(p, b); this.bubbleLayer.append(b.el); }
+    if (!b) { b = { el: h('div', { class: 'bubble' }) }; this.bubbles.set(p, b); put(this.bubbleLayer, b.el); }
     b.el.className = 'bubble ' + kind;
     clear(b.el).append(h('span', { class: 'who' }, p.name), text);
     b.until = this.g.time + dur;
@@ -134,7 +134,7 @@ export class UI {
   thinking(p, on) {
     if (!on) { const b = this.bubbles.get(p); if (b && b.think) { b.el.remove(); this.bubbles.delete(p); } return; }
     let b = this.bubbles.get(p);
-    if (!b) { b = { el: h('div', { class: 'bubble' }) }; this.bubbles.set(p, b); this.bubbleLayer.append(b.el); }
+    if (!b) { b = { el: h('div', { class: 'bubble' }) }; this.bubbles.set(p, b); put(this.bubbleLayer, b.el); }
     b.el.className = 'bubble think';
     clear(b.el).append(h('span', { class: 'who' }, p.name), '...');
     b.until = this.g.time + 30; b.think = true;
@@ -142,7 +142,7 @@ export class UI {
 
   playerSaid(text, p) {
     const el = h('div', { class: 'toast passive', style: { top: 'auto', bottom: '150px', background: 'rgba(20,60,50,.8)', fontSize: '14px' } }, `You to ${p ? p.name : 'everyone'}: "${text}"`);
-    this.root.append(el);
+    put(this.root, el);
     setTimeout(() => el.remove(), 3500);
   }
 
@@ -188,7 +188,7 @@ export class UI {
       const s = this.toScreen(p.objectForm ? p.objectForm.mesh.position.clone().add(_v.set(0, p.height * 1.1, 0)) : p.headPos(new THREE.Vector3()).add(_v.set(0, p.height * 0.14, 0)));
       if (!s) continue;
       const hp = p.alive ? `${Math.max(0, Math.round(p.health))}/100` : 'dead';
-      this.tagLayer.append(h('div', { class: 'nametag', style: { left: s.x + 'px', top: s.y + 'px' } }, `${p.name}${p.isClone ? ' (clone)' : ''}  ${hp}`));
+      put(this.tagLayer, h('div', { class: 'nametag', style: { left: s.x + 'px', top: s.y + 'px' } }, `${p.name}${p.isClone ? ' (clone)' : ''}  ${hp}`));
     }
   }
 
@@ -280,16 +280,16 @@ export class UI {
         const slot = h('div', { class: 'slot' + (pl.slot === i ? ' on' : '') }, h('span', { class: 'n' }, i + 1), label, t && typeof t === 'object' && !t.potion && g.mode === 'money' ? bar : null);
         if (t && typeof t === 'object' && t.opts && t.opts.color != null) slot.style.borderBottom = `3px solid #${(t.opts.color >>> 0).toString(16).padStart(6, '0')}`;
         this.batBars[i] = t && typeof t === 'object' ? { bar, t } : null;
-        this.hotbarEl.append(slot);
+        put(this.hotbarEl, slot);
       });
     }
     for (const b of this.batBars || []) if (b) b.bar.firstChild.style.width = Math.round((b.t.charge ?? 1) * 100) + '%';
     // stats
     clear(this.statsEl);
     const bar = (label, v, col) => h('div', { class: 'stat' }, h('span', { style: { width: '58px' } }, label), h('div', { class: 'bar' }, h('i', { style: { width: clamp(v, 0, 100) + '%', background: col } })));
-    this.statsEl.append(h('div', { class: 'stat' }, h('span', { class: 'hp', style: { color: pl.health < 30 ? '#ff7a7a' : '#e9f1ee' } }, `${Math.max(0, Math.ceil(pl.health))}`), h('span', { class: 'muted' }, '/100 health'), h('span', { class: 'tag', style: { marginLeft: 'auto' } }, FORMS[pl.form].label + (pl.disguise ? ': ' + pl.disguise.name : ''))));
-    this.statsEl.append(bar('Health', pl.health, pl.health < 30 ? '#ff5d5d' : '#63e6be'));
-    if (settings.yourNeeds && !FORMS[pl.form].noNeeds) { this.statsEl.append(bar('Hunger', pl.needs.hunger, '#ffb347'), bar('Thirst', pl.needs.thirst, '#5ab0ff'), bar('Energy', pl.needs.energy, '#c0a0ff')); }
+    put(this.statsEl, h('div', { class: 'stat' }, h('span', { class: 'hp', style: { color: pl.health < 30 ? '#ff7a7a' : '#e9f1ee' } }, `${Math.max(0, Math.ceil(pl.health))}`), h('span', { class: 'muted' }, '/100 health'), h('span', { class: 'tag', style: { marginLeft: 'auto' } }, FORMS[pl.form].label + (pl.disguise ? ': ' + pl.disguise.name : ''))));
+    put(this.statsEl, bar('Health', pl.health, pl.health < 30 ? '#ff5d5d' : '#63e6be'));
+    if (settings.yourNeeds && !FORMS[pl.form].noNeeds) { put(this.statsEl, bar('Hunger', pl.needs.hunger, '#ffb347'), bar('Thirst', pl.needs.thirst, '#5ab0ff'), bar('Energy', pl.needs.energy, '#c0a0ff')); }
     // size watch
     const H = pl.height;
     const glow = pl.watchGlow > 0.05;
@@ -298,14 +298,14 @@ export class UI {
     this.watchEl.style.boxShadow = glow ? '0 0 22px rgba(99,230,190,.45)' : '';
     // top right
     clear(this.topEl);
-    this.topEl.append(h('div', { class: 'timebox' }, g.world.timeString()));
+    put(this.topEl, h('div', { class: 'timebox' }, g.world.timeString()));
     const sp = g.world.speed;
-    this.topEl.append(h('div', { class: 'timebox' }, sp === 0 ? 'cage time PAUSED' : `cage time ${sp}x  (${keyName(settings.keys.slower)} / ${keyName(settings.keys.faster)})`));
-    if (g.mode === 'money') this.topEl.append(h('div', { class: 'money' }, fmtMoney(g.money)));
+    put(this.topEl, h('div', { class: 'timebox' }, sp === 0 ? 'cage time PAUSED' : `cage time ${sp}x  (${keyName(settings.keys.slower)} / ${keyName(settings.keys.faster)})`));
+    if (g.mode === 'money') put(this.topEl, h('div', { class: 'money' }, fmtMoney(g.money)));
     const wanted = g.streetLife.wanted;
-    if (wanted > 0) this.topEl.append(h('div', { class: 'wanted' }, 'WANTED ' + '■'.repeat(Math.ceil(wanted)) + '□'.repeat(5 - Math.ceil(wanted))));
+    if (wanted > 0) put(this.topEl, h('div', { class: 'wanted' }, 'WANTED ' + '■'.repeat(Math.ceil(wanted)) + '□'.repeat(5 - Math.ceil(wanted))));
     const alive = g.people.filter((p) => p.alive && p.inCage).length;
-    this.topEl.append(h('div', { class: 'timebox' }, `${alive} alive in the cage · ${TECH[g.society.tech] ? TECH[g.society.tech].name : ''}`));
+    put(this.topEl, h('div', { class: 'timebox' }, `${alive} alive in the cage · ${TECH[g.society.tech] ? TECH[g.society.tech].name : ''}`));
     // fps
     this.fpsEl.style.display = settings.showFps ? '' : 'none';
     if (settings.showFps) this.fpsEl.textContent = `${Math.round(quality.fps)} fps  ${quality.level}  ${g.renderer.info.render.calls} calls`;
@@ -330,7 +330,7 @@ export class UI {
     const action = p.objectForm ? `stuck as a ${p.objectForm.type}` : p.loc === 'jar' ? 'in a jar' : p.loc === 'table' ? 'strapped to the table' : p.held ? 'in your hand' : p.loc === 'bottle' ? 'in your bottle' : p.asleep ? 'sleeping' : p.task ? (TASK_WORDS[p.task.type] || p.task.type) + (p.task.order ? ' (you told them to)' : '') : 'thinking';
     const thought = !p.alive ? `Cause of death: ${p.cause}` : p.thought || this.guessThought(p);
     const needs = ['hunger', 'thirst', 'energy', 'social', 'fun', 'hygiene', 'warmth', 'bladder'];
-    this.info.append(
+    put(this.info, 
       h('h3', {}, `${p.name} ${p.last}${p.isClone ? ' (clone)' : ''}${p.title ? ' · ' + p.title : ''}`),
       h('div', { class: 'muted' }, `${p.ageYears} years old · ${job}${p.kid ? '' : ' · ' + (p.sex === 'm' ? 'man' : 'woman')}`),
       h('div', { class: 'row', style: { marginTop: '6px' } }, h('span', { class: 'hp', style: { color: p.health < 30 ? '#ff7a7a' : '#e9f1ee' } }, p.alive ? `${Math.max(0, Math.round(p.health))}/100` : 'DEAD'), h('span', {}, p.alive ? p.feeling() : ''), p.sick ? h('span', { class: 'tag bad' }, 'sick: ' + p.sick.kind) : null, p.bleed > 0.1 ? h('span', { class: 'tag bad' }, p.bandaged > 0 ? 'bandaged' : 'bleeding') : null, p.limbsLost ? h('span', { class: 'tag bad' }, `${p.limbsLost} limb${p.limbsLost > 1 ? 's' : ''} lost`) : null, p.brokenLeg != null ? h('span', { class: 'tag bad' }, 'broken leg') : null),
@@ -393,7 +393,7 @@ export class UI {
     const toEl = h('span', { class: 'to' }, target ? `to ${target.name}` : 'to everyone nearby');
     const inp = h('input', { type: 'text', placeholder: target ? `Say something to ${target.name}...  (Enter to send, Esc to cancel)` : 'Say something to everyone nearby...', maxlength: 240 });
     const wrap = h('div', { class: 'chat' }, toEl, inp);
-    this.root.append(wrap);
+    put(this.root, wrap);
     setTimeout(() => inp.focus(), 0);
     const done = () => { this.chatOpen = false; wrap.remove(); input.typing = false; };
     inp.addEventListener('keydown', (e) => {
@@ -441,14 +441,14 @@ export class UI {
     this.close(true);
     const box = h('div', { class: 'modal panel', style: wide ? { width: 'min(1100px, 96vw)' } : {} });
     const head = h('header', {}, h('h2', {}, title), locked ? null : h('button', { class: 'x', onclick: () => this.close() }, '×'));
-    box.append(head);
-    if (tabs) box.append(tabs);
+    put(box, head);
+    if (tabs) put(box, tabs);
     const bodyEl = h('div', { class: 'body' }, body);
-    box.append(bodyEl);
-    if (buttons.length) box.append(h('footer', {}, buttons.map(([l, fn, cls]) => btn(l, fn, cls))));
+    put(box, bodyEl);
+    if (buttons.length) put(box, h('footer', {}, buttons.map(([l, fn, cls]) => btn(l, fn, cls))));
     const wrap = h('div', { class: 'modal-wrap' }, box);
     wrap.addEventListener('mousedown', (e) => { if (e.target === wrap && !locked) this.close(); });
-    this.root.append(wrap);
+    put(this.root, wrap);
     this.modal = { name, el: wrap, body: bodyEl, onClose, locked };
     unlockPointer();
     return this.modal;
