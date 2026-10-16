@@ -9,7 +9,9 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i >= 0 ? args[i + 1] : def; };
-const out = path.resolve(opt('out', path.join(ROOT, 'fnf2.html')));
+const out = path.resolve(opt('out', path.join(ROOT, 'build', 'fnf2.html')));
+// private FNF asset pack made by tools/pack_assets.py (git-ignored, never published)
+const assetsFile = opt('assets', path.join(ROOT, 'build', 'assets.js'));
 const only = opt('only', null);
 const minify = args.includes('--min');
 
@@ -41,6 +43,7 @@ for (const f of files) {
     '\n</script>\n';
 }
 
+const assetTag = (!args.includes('--no-assets') && fs.existsSync(assetsFile)) ? '<script>\n' + fs.readFileSync(assetsFile, 'utf8').replace(/<\/script/gi, '<\\/script') + '\n</script>\n' : '';
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,7 +51,7 @@ const html = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>FNF 2</title>
+<title>FNF 2 (private copy)</title>
 <style>
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden;
     touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -60,8 +63,9 @@ const html = `<!DOCTYPE html>
 <canvas id="game" width="1280" height="720" tabindex="0"></canvas>
 <script>
 ${fontJs}</script>
-${scripts}</body>
+${assetTag}${scripts}</body>
 </html>
 `;
+fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 console.log('built', out, (html.length / 1024).toFixed(0) + ' KB', files.length + ' modules: ' + files.join(' '));

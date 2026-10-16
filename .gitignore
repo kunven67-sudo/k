@@ -1,0 +1,4 @@
+
+# FNF 2 private build output (contains Friday Night Funkin assets, never commit)
+fnf2/build/
+fnf2/*.private.html

@@ -514,6 +514,27 @@ G.chars = {
     return true;
   },
 };
+// One placed, beat-dancing character (menus, story band, results, gameplay).
+// FNF rules: 'idle' dancers bop every 2nd beat, 'leftRight' dancers (MEL) swap
+// danceLeft/danceRight every beat. A special anim with `lock` seconds is not
+// interrupted by beats until the lock runs out.
+G.Dancer = class {
+  constructor(id) { this.id = id; this.anim = 'idle'; this.at = 0; this.lock = 0; this.side = false; }
+  get def() { return G.chars.get(this.id); }
+  play(anim, lock) { this.anim = anim; this.at = 0; this.lock = lock || 0; }
+  beat(b, force) {
+    const d = this.def;
+    if (!d) return;
+    if (this.lock > 0 && !force) return;
+    if (d.dance === 'leftRight') { this.side = !this.side; this.play(this.side ? 'danceLeft' : 'danceRight'); }
+    else if (b % 2 === 0 || force) this.play('idle');
+  }
+  update(dt) { this.at += dt; if (this.lock > 0) this.lock -= dt; }
+  draw(ctx, x, y, scale, flip, info) {
+    if (this.def) G.chars.draw(ctx, this.id, this.anim, this.at, x, y, scale, flip, info);
+    else if (G.drawPlaceholderChar) { ctx.save(); ctx.translate(x, y); ctx.scale(scale || 1, scale || 1); G.drawPlaceholderChar(ctx, this.id || '?', '#777'); ctx.restore(); }
+  }
+};
 // Stages. See CONTRACT.md for the def format.
 G.stages = {
   defs: {},
