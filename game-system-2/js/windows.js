@@ -418,7 +418,8 @@
     if (!dock) return;
     var tabs = isPhone() && document.getElementById('tabs');
     var r = tabs && tabs.getBoundingClientRect();
-    dock.style.bottom = r && r.height ? Math.round(window.innerHeight - r.top + 6) + 'px' : '';
+    /* flush on top of the tab bar, so it fills the strip under the app (no page peeking through) */
+    dock.style.bottom = r && r.height ? Math.round(window.innerHeight - r.top) + 'px' : '';
   }
 
   /* the taskbar at the bottom: one button per open app */
