@@ -36,7 +36,7 @@ PACKS = {
         # fonts
         'fonts/vcr.ttf',
         # menus / ui
-        'preload/images/alphabet.*', 'preload/images/logoBumpin.*', 'preload/images/gfDanceTitle.*', 'preload/images/title-screen-text/*',
+        'preload/images/alphabet.*', 'preload/images/fonts/*.png', 'preload/images/fonts/*.xml', 'preload/images/logoBumpin.*', 'preload/images/gfDanceTitle.*', 'preload/images/title-screen-text/*',
         'preload/images/menuBG.png', 'preload/images/menuBGMagenta.png', 'preload/images/menuDesat.png', 'preload/images/newgrounds_logo.png',
         'preload/images/mainmenu/storymode.*', 'preload/images/mainmenu/freeplay.*', 'preload/images/mainmenu/options.*', 'preload/images/mainmenu/credits.*',
         'preload/images/storymenu/titles/tutorial.png', 'preload/images/storymenu/titles/week1.png',
@@ -48,8 +48,15 @@ PACKS = {
         'shared/images/healthBar.png', 'shared/images/ui/countdown/funkin/*',
         'shared/images/stageback.png', 'shared/images/stagefront.png', 'shared/images/stagecurtains.png', 'week1/images/erect/*',
         *[f'shared/images/characters/{c}/*' for c in CHARS_EARLY],
+        # freeplay (V-Slice DJ menu)
+        'preload/images/freeplay/*.png', 'preload/images/freeplay/*.xml', 'preload/images/freeplay/*.json', 'preload/images/freeplay/albumRoll/*.png', 'preload/images/freeplay/albumRoll/*.xml', 'preload/images/freeplay/albumRoll/*.json', 'preload/images/freeplay/albumRoll/freeplayAlbum/*.png', 'preload/images/freeplay/albumRoll/freeplayAlbum/*.xml', 'preload/images/freeplay/albumRoll/freeplayAlbum/*.json', 'preload/images/freeplay/backing-text-yeah/*.png', 'preload/images/freeplay/backing-text-yeah/*.xml', 'preload/images/freeplay/backing-text-yeah/*.json', 'preload/images/freeplay/backingCards/*.png', 'preload/images/freeplay/backingCards/*.xml', 'preload/images/freeplay/backingCards/*.json', 'preload/images/freeplay/backingCards/newCharacter/*.png', 'preload/images/freeplay/backingCards/newCharacter/*.xml', 'preload/images/freeplay/backingCards/newCharacter/*.json', 'preload/images/freeplay/backingCards/pico/*.png', 'preload/images/freeplay/backingCards/pico/*.xml', 'preload/images/freeplay/backingCards/pico/*.json', 'preload/images/freeplay/backingCards/pico/pico-confirm/*.png', 'preload/images/freeplay/backingCards/pico/pico-confirm/*.xml', 'preload/images/freeplay/backingCards/pico/pico-confirm/*.json', 'preload/images/freeplay/freeplay-boyfriend/*.png', 'preload/images/freeplay/freeplay-boyfriend/*.xml', 'preload/images/freeplay/freeplay-boyfriend/*.json', 'preload/images/freeplay/freeplay-pico/*.png', 'preload/images/freeplay/freeplay-pico/*.xml', 'preload/images/freeplay/freeplay-pico/*.json', 'preload/images/freeplay/freeplayCapsule/*.png', 'preload/images/freeplay/freeplayCapsule/*.xml', 'preload/images/freeplay/freeplayCapsule/*.json', 'preload/images/freeplay/freeplayCapsule/capsule/*.png', 'preload/images/freeplay/freeplayCapsule/capsule/*.xml', 'preload/images/freeplay/freeplayCapsule/capsule/*.json', 'preload/images/freeplay/freeplaySelector/*.png', 'preload/images/freeplay/freeplaySelector/*.xml', 'preload/images/freeplay/freeplaySelector/*.json', 'preload/images/freeplay/freeplayStars/*.png', 'preload/images/freeplay/freeplayStars/*.xml', 'preload/images/freeplay/freeplayStars/*.json', 'preload/images/freeplay/icons/*.png', 'preload/images/freeplay/icons/*.xml', 'preload/images/freeplay/icons/*.json', 'preload/images/freeplay/instBox/*.png', 'preload/images/freeplay/instBox/*.xml', 'preload/images/freeplay/instBox/*.json', 'preload/images/freeplay/sortedLetters/*.png', 'preload/images/freeplay/sortedLetters/*.xml', 'preload/images/freeplay/sortedLetters/*.json',
+        'preload/data/players/*.json', 'fonts/5by7.ttf', 'fonts/5by7_b.ttf',
+        'preload/data/ui/freeplay/albums/*.json', 'preload/data/ui/freeplay/styles/*.json', 'fonts/YoureGone-Regular.otf',
+        'preload/music/freeplayRandom/freeplayRandom.ogg', 'preload/music/freeplayRandom/freeplayRandom-metadata.json',
+        *[f'shared/music/results{r}{p}/*' for r in ['SHIT', 'NORMAL', 'EXCELLENT', 'PERFECT'] for p in ['', '-pico']],
         # sounds + music
         'preload/sounds/scrollMenu.ogg', 'preload/sounds/confirmMenu.ogg', 'preload/sounds/cancelMenu.ogg',
+        'preload/sounds/fav.ogg', 'preload/sounds/unfav.ogg', 'preload/images/digital_numbers.*', 'preload/images/digital_numbers_pico.*',
         'shared/sounds/missnote1.ogg', 'shared/sounds/missnote2.ogg', 'shared/sounds/missnote3.ogg',
         'shared/sounds/gameplay/countdown/funkin/*.ogg', 'shared/sounds/gameplay/gameover/fnf_loss_sfx.ogg', 'shared/sounds/gameplay/gameover/fnf_loss_sfx-pico.ogg',
         'shared/music/gameplay/gameover/*.ogg',

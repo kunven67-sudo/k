@@ -32,6 +32,7 @@ G.audio = (function () {
   };
   // short names used around the game
   const SFX = {
+    fav: 'preload/sounds/fav.ogg', unfav: 'preload/sounds/unfav.ogg',
     scroll: 'preload/sounds/scrollMenu.ogg', confirm: 'preload/sounds/confirmMenu.ogg', cancel: 'preload/sounds/cancelMenu.ogg',
     miss1: 'shared/sounds/missnote1.ogg', miss2: 'shared/sounds/missnote2.ogg', miss3: 'shared/sounds/missnote3.ogg',
     intro3: 'shared/sounds/gameplay/countdown/funkin/introTHREE.ogg', intro2: 'shared/sounds/gameplay/countdown/funkin/introTWO.ogg',
@@ -56,7 +57,12 @@ G.audio = (function () {
         const g = ctx.createGain(); src.connect(g); g.connect(bus.music);
         const t = ctx.currentTime;
         if (o.fadeIn) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(M.vol, t + o.fadeIn); } else g.gain.value = M.vol;
-        src.start(t); M.src = src; M.gain = g; M.start = t; M.dur = buf.duration;
+        // offset/end in seconds: start partway in, and loop only that part (freeplay song previews)
+        const off = Math.max(0, Math.min(buf.duration - 0.05, o.offset || 0));
+        const end = o.end && o.end > off + 1 ? Math.min(o.end, buf.duration) : 0;
+        if (M.loop && (off || end)) { src.loopStart = off; src.loopEnd = end || buf.duration; }
+        src.start(t, off); M.src = src; M.gain = g; M.start = t - off; M.dur = buf.duration;
+        M.loopA = M.loop ? off : 0; M.loopB = M.loop ? (end || buf.duration) : buf.duration;
       });
     },
     stop(fade) {
@@ -69,7 +75,11 @@ G.audio = (function () {
     },
     setVolume(v, fade) { M.vol = v; if (!M.gain) return; const t = ctx.currentTime; M.gain.gain.cancelScheduledValues(t); M.gain.gain.setValueAtTime(M.gain.gain.value, t); M.gain.gain.linearRampToValueAtTime(Math.max(0.0001, v), t + (fade || 0.01)); },
     current() { return M.src ? { id: M.id, bpm: M.bpm } : null; },
-    time() { if (!M.src) return 0; let t = (ctx.currentTime - M.start) * 1000 - A.latency(); if (M.loop && M.dur) t = ((t % (M.dur * 1000)) + M.dur * 1000) % (M.dur * 1000); return t; },
+    time() {
+      if (!M.src) return 0; let t = (ctx.currentTime - M.start) * 1000 - A.latency(); if (t < 0) return 0;
+      if (M.loop && M.dur) { const a = (M.loopA || 0) * 1000, b = (M.loopB || M.dur) * 1000; if (t >= b) t = a + (t - b) % (b - a); }
+      return t;
+    },  // never wrap the first few ms of latency to the end of the loop
   };
 
   // ---- songs: {inst, voices:[{path, who:'p'|'o'}]} -> handle

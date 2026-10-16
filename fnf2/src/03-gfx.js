@@ -45,6 +45,9 @@ G.Sparrow = {
 // ------------------------------------------------------------------ Adobe Animate texture atlas
 const mul = (p, l) => [p[0] * l[0] + p[2] * l[1], p[1] * l[0] + p[3] * l[1], p[0] * l[2] + p[2] * l[3], p[1] * l[2] + p[3] * l[3], p[0] * l[4] + p[2] * l[5] + p[4], p[1] * l[4] + p[3] * l[5] + p[5]];
 const BLEND = { 0: 'lighter', 2: 'darken', 3: 'difference', 5: 'hard-light', 8: 'lighten', 9: 'multiply', 11: 'overlay', 12: 'screen' };
+// Animate exports use short ("G", "LP") or long ("graphic", "loop") names
+const SYMTYPE = { G: 'G', graphic: 'G', MC: 'MC', movieclip: 'MC', B: 'B', button: 'B' };
+const LOOPTYPE = { LP: 'LP', loop: 'LP', PO: 'PO', playonce: 'PO', SF: 'SF', singleframe: 'SF', RP: 'RP', playreverse: 'RP' };
 function readMatrix(o) {
   if (o.MX) return o.MX.slice(0, 6);
   if (o.M3D) { const m = o.M3D; return Array.isArray(m) ? [m[0], m[1], m[4], m[5], m[12], m[13]] : [m.m00, m.m01, m.m10, m.m11, m.m30, m.m31]; }
@@ -59,7 +62,12 @@ function parseTimeline(tl, name) {
       const els = [];
       for (const E of (F.E || F.elements || [])) {
         const si = E.SI || E.SYMBOL_Instance, asi = E.ASI || E.ATLAS_SPRITE_instance;
-        if (si) els.push({ s: si.SN || si.SYMBOL_name, ff: si.FF || si.firstFrame || 0, st: si.ST || si.symbolType || 'G', lp: si.LP || si.loop || 'LP', m: readMatrix(si), b: BLEND[si.B] || null, a: si.C && si.C.M === 'CA' ? si.C.AM : (si.C && si.C.AM != null ? si.C.AM : 1) });
+        if (si) {
+          const C = si.C || si.color;
+          const am = C ? (C.AM != null ? C.AM : C.alphaMultiplier) : null;
+          const trp = si.TRP || si.transformationPoint || null;
+          els.push({ s: si.SN || si.SYMBOL_name, ff: si.FF || si.firstFrame || 0, st: SYMTYPE[si.ST || si.symbolType] || 'G', lp: LOOPTYPE[si.LP || si.loop] || 'LP', m: readMatrix(si), b: BLEND[si.B != null ? si.B : si.blend] || null, a: am != null ? am : 1, trp });
+        }
         else if (asi) els.push({ n: asi.N || asi.name, m: readMatrix(asi) });
       }
       const fi = F.I != null ? F.I : F.index, du = F.DU != null ? F.DU : F.duration;
@@ -96,11 +104,26 @@ G.Atlas = {
     const labels = {};
     for (const L of main.layers) for (const F of L.frames) if (F.label) labels[F.label] = { start: F.i, len: F.du };
     const md = anim.MD || anim.metadata || {};
-    const atlas = { kind: 'atlas', base, sprites, symbols, main, labels, fps: md.FRT || md.framerate || 24, _bounds: new Map() };
+    // the main symbol's placement on the Animate stage (used when a sprite applies the stage matrix, e.g. freeplay DJs)
+    const sti = AN.STI || AN.StageInstance; const stiSI = sti && (sti.SI || sti.SYMBOL_Instance);
+    const stage = stiSI ? readMatrix(stiSI) : [1, 0, 0, 1, 0, 0];
+    const atlas = { kind: 'atlas', base, sprites, symbols, main, labels, stage, fps: md.FRT || md.framerate || 24, _bounds: new Map(), swaps: {} };
     // the main symbol also lives in the dictionary for nested lookups
     if (!symbols[main.name]) symbols[main.name] = main;
     this.cache.set(base, atlas);
     return atlas;
+  },
+  // FunkinSprite.scaleElement: grow the first element of a symbol (frame 0) by `scale` (added to the matrix)
+  scaleElement(atlas, symbol, scale, posOff) {
+    const sym = atlas && atlas.symbols[symbol]; if (!sym) return;
+    let e = null;
+    for (const L of sym.layers) { const k = L.at[0]; if (k >= 0 && L.frames[k].els.length) { e = L.frames[k].els[0]; break; } }
+    if (!e || e._scaled) return;
+    e._scaled = true;
+    const tp = e.trp || { x: 0, y: 0 };
+    e.m = e.m.slice(); e.m[0] += scale; e.m[3] += scale;
+    e.m[4] -= tp.x * scale + (posOff || 0); e.m[5] -= tp.y * scale + (posOff || 0);
+    // keep the bounds measured at load time: the sprite's anchor doesn't move (like flixel-animate)
   },
   // which frame of a symbol to show for an instance placed on a keyframe
   subFrame(e, local, count) {
@@ -129,6 +152,8 @@ G.Atlas = {
             ctx.drawImage(s.img, s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
           }
         } else {
+          const swap = atlas.swaps[e.s];
+          if (swap) { if (e.a !== 1) ctx.globalAlpha *= e.a; ctx.drawImage(swap.img, swap.x || 0, swap.y || 0, swap.w || swap.img.width, swap.h || swap.img.height); ctx.restore(); continue; }
           const sym = atlas.symbols[e.s];
           if (sym) {
             if (e.a !== 1) ctx.globalAlpha *= e.a;
@@ -341,46 +366,68 @@ G.HudCam = class {
 };
 
 // ------------------------------------------------------------------ FNF Alphabet text
-// bold = the white/black menu letters ("A bold"); otherwise "capital"/"lowercase" black letters.
-const ALPHA_SYM = {
-  '&': 'amp', "'": 'apostraphie', '\\': '\\', ',': 'comma', '$': 'dollarsign ', '!': 'exclamation point', '/': 'forward slash',
-  '#': 'hashtag ', '.': 'period', '?': 'question mark', '(': 'start parentheses', ')': 'end parentheses', '*': 'multiply x',
-  '<': 'left arrow', '>': 'right arrow', '^': 'up arrow', '~': '~', '-': '-', '+': '+', ':': ':', ';': ';', '=': '=', '@': '@', '%': '%', '_': '_', '|': '|', '[': '[', ']': ']',
+// Same rules as the Funkin' engine's AtlasText: one sparrow sheet per font
+// (preload/images/fonts/bold|default|freeplay-clear), letters bottom-aligned on
+// the tallest glyph, spaces 40px. Fonts that only have capitals force upper case.
+const ATLAS_SYM = {
+  '&': '-andpersand-', "'": '-apostraphie-', '\\': '-back slash-', ',': '-comma-', '-': '-dash-', '!': '-exclamation point-',
+  '/': '-forward slash-', '>': '-greater than-', '<': '-less than-', '*': '-multiply x-', '.': '-period-', '?': '-question mark-',
+  '\u2190': '-left arrow-', '\u2192': '-right arrow-', '\u2191': '-up arrow-', '\u2193': '-down arrow-', '\u2665': '-heart-',
+  '\u201c': '-start quote-', '\u201d': '-end quote-', '"': '-start quote-',
+};
+G.AtlasFont = {
+  cache: {},
+  get(name) {
+    if (name in this.cache) return this.cache[name];
+    const sheet = G.Sparrow.load('preload/images/fonts/' + name);
+    let font = null;
+    if (sheet) {
+      let maxH = 0, up = false, low = false;
+      for (const f of sheet.frames) { maxH = Math.max(maxH, f.h); if (/^[A-Z]\d+$/.test(f.name)) up = true; if (/^[a-z]\d+$/.test(f.name)) low = true; }
+      font = { sheet, maxH, caseAllowed: up !== low ? (up ? 'upper' : 'lower') : 'both', glyphs: {} };
+    }
+    this.cache[name] = font;
+    return font;
+  },
+  glyph(font, ch) {
+    if (ch in font.glyphs) return font.glyphs[ch];
+    const frames = G.Sparrow.byPrefix(font.sheet, ATLAS_SYM[ch] || ch);
+    return (font.glyphs[ch] = frames.length ? frames : null);
+  },
 };
 G.Alphabet = class {
+  // bold = true -> 'bold' font (white menu letters), false -> 'default' (black letters), or pass a font name
   constructor(text, bold, x, y) {
-    this.x = x || 0; this.y = y || 0; this.bold = bold !== false; this.scale = 1; this.alpha = 1; this.visible = true;
-    this.t = 0; this.color = null; this.scroll = 0;
+    this.x = x || 0; this.y = y || 0;
+    this.fontName = typeof bold === 'string' ? bold : (bold !== false ? 'bold' : 'default');
+    this.bold = this.fontName === 'bold';
+    this.scale = 1; this.alpha = 1; this.visible = true;
+    this.t = 0; this.scroll = 0;
     this.setText(text || '');
     // FNF menu-item behaviour (isMenuItem + targetY)
     this.isMenuItem = false; this.targetY = 0; this.changeX = true; this.changeY = true; this.distancePerItem = { x: 20, y: 120 }; this.startPosition = { x: 0, y: 0 };
   }
   setText(text) {
     this.text = String(text);
-    const sheet = G.Sparrow.load('preload/images/alphabet');
-    this.sheet = sheet;
+    const font = this.font = G.AtlasFont.get(this.fontName);
+    this.sheet = font && font.sheet;
     this.letters = [];
-    if (!sheet) return;
+    this.width = 0; this.height = font ? font.maxH : 70;
+    if (!font) return;
+    let str = this.text;
+    if (font.caseAllowed === 'upper') str = str.toUpperCase(); else if (font.caseAllowed === 'lower') str = str.toLowerCase();
     let x = 0, y = 0;
-    for (const ch of this.text) {
-      if (ch === '\n') { x = 0; y += 70; continue; }
+    for (const ch of str) {
       if (ch === ' ') { x += 40; continue; }
-      let prefix;
-      if (/[a-zA-Z]/.test(ch)) prefix = this.bold ? ch.toUpperCase() + ' bold' : (ch === ch.toUpperCase() ? ch + ' capital' : ch + ' lowercase');
-      else if (/[0-9]/.test(ch)) prefix = ch;
-      else prefix = ALPHA_SYM[ch] || ch;
-      const frames = G.Sparrow.byPrefix(sheet, prefix);
-      if (!frames.length) { x += 40; continue; }
+      if (ch === '\n') { x = 0; y += font.maxH; continue; }
+      const frames = G.AtlasFont.glyph(font, ch);
+      if (!frames) { x += 40; continue; }
       const f0 = frames[0];
-      // FNF aligns letters on a baseline: bottom of each glyph on the line
-      const lh = this.bold ? 70 : 68;
-      let ly = y + lh - f0.fh;
-      if (!this.bold && /[,.]/.test(ch)) ly = y + lh - f0.fh;
-      if (/[-]/.test(ch)) ly = y + lh / 2 - f0.fh / 2;
-      this.letters.push({ frames, x, y: ly, w: f0.fw });
-      x += f0.fw + (this.bold ? 0 : 2);
+      this.letters.push({ frames, x, y: y + font.maxH - f0.fh });
+      x += f0.fw;
+      this.width = Math.max(this.width, x);
     }
-    this.width = x; this.height = y + 70;
+    this.height = y + font.maxH;
   }
   update(dt) {
     this.t += dt;

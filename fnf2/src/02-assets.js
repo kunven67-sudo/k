@@ -61,13 +61,18 @@ G.A = {
 };
 // FNF's real VCR font (falls back to VT323 from the base build)
 G.FONT.vcr = "'VCR', 'FNFVcr', 'Courier New', monospace";
+G.FONT.f5 = "'5by7', 'VCR', monospace";
+G.FONT.f5b = "'5by7b', '5by7', 'VCR', monospace";
+G.FONT.gone = "'YoureGone', 'VCR', sans-serif";
 G.assetsReady = (async function () {
-  const f = G.A.raw['fonts/vcr.ttf'];
-  if (f) {
+  // FNF's own fonts: VCR (HUD/menus) and 5by7 (freeplay)
+  for (const [file, name] of [['fonts/vcr.ttf', 'VCR'], ['fonts/5by7.ttf', '5by7'], ['fonts/5by7_b.ttf', '5by7b'], ['fonts/YoureGone-Regular.otf', 'YoureGone']]) {
+    const f = G.A.raw[file];
+    if (!f) continue;
     try {
       const bin = atob(f.slice(f.indexOf(',') + 1)); const u8 = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-      const ff = new FontFace('VCR', u8.buffer); await ff.load(); document.fonts.add(ff);
+      const ff = new FontFace(name, u8.buffer); await ff.load(); document.fonts.add(ff);
     } catch (e) { /* fallback font is fine */ }
   }
   await G.A.loadImages();
