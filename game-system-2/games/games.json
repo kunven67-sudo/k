@@ -114,12 +114,12 @@
    "builtin": true,
    "icon": "video",
    "color": "#ff3d6e",
-   "rev": 1,
+   "rev": 2,
    "entry": "index.html",
    "files": [
     "index.html"
    ],
-   "size": 26973,
+   "size": 27038,
    "isolate": true,
    "win": {
     "w": 1000,

@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
 
-  var APP_VERSION = '2.3.0';
+  var APP_VERSION = '2.4.0';
 
   /* Every file of the app itself (used for offline caching and for "Build website folder") */
   var APP_FILES = [
