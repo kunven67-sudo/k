@@ -112,7 +112,7 @@ export class Cage {
     const shade = mk(new THREE.CylinderGeometry(0.12, 0.32, 0.18, 24, 1, true), std(0x2f5c4f, 0.5, 0.5, { side: THREE.DoubleSide }), cx, lampY, cz);
     shade.castShadow = false;
     this.bulb = mk(new THREE.SphereGeometry(0.06, 14, 10), glow(0xfff2d0, 3), cx, lampY - 0.04, cz);
-    this.sun = new THREE.SpotLight(0xfff4dc, 30, 3.2, 0.95, 0.55, 1.2);
+    this.sun = new THREE.SpotLight(0xfff4dc, 12, 3.2, 0.95, 0.55, 1.2);
     this.sun.position.set(cx, lampY - 0.06, cz);
     this.sun.target.position.set(cx, CAGE.base, cz);
     this.sun.castShadow = true;
@@ -615,11 +615,11 @@ export class Cage {
     const W = this.weather;
     const day = ctx.daylight; // 0 night .. 1 noon
     const lampOn = W.lamp === 'on' || (W.lamp === 'auto' && day > 0.05);
-    const target = W.lamp === 'off' ? 0 : W.lamp === 'on' ? 30 : 30 * clamp(day * 1.4, 0, 1);
+    const target = W.lamp === 'off' ? 0 : W.lamp === 'on' ? 12 : 12 * clamp(day * 1.4, 0, 1);
     this.sun.intensity = lerp(this.sun.intensity, target * (W.storm ? 0.45 : W.rain ? 0.7 : 1) * (W.fog ? 0.8 : 1), 1 - Math.exp(-dt * 3));
     const warm = 1 - clamp(day * 2, 0, 1);
     this.sun.color.setRGB(1, 0.92 - warm * 0.2, 0.8 - warm * 0.35);
-    this.bulb.material.emissiveIntensity = lampOn ? 0.5 + this.sun.intensity / 10 : 0.05;
+    this.bulb.material.emissiveIntensity = lampOn ? 0.5 + this.sun.intensity / 4 : 0.05;
     this.heatLight.intensity = W.heat ? 4 + Math.sin(ctx.time * 3) * 0.3 : 0;
     // fan
     if (W.wind) this.fanBlades.rotation.x += dt * 30;

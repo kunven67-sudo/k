@@ -32,7 +32,7 @@ export const defaults = () => ({
   yourNeeds: false,
   cageDeath: 'respawn', // respawn | keepgear | permadeath
   brain: 'builtin', // builtin | local | claude
-  claudeKey: '', claudeModel: 'claude-haiku-5-5',
+  claudeKey: '', claudeModel: 'claude-opus-5-5',
   localModel: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
   voice: 'babble', // babble | spoken
   subtitles: true,

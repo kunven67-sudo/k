@@ -7,6 +7,7 @@
     "dev": "node build.mjs --watch"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "three": "0.170.0"
   },
   "devDependencies": {
