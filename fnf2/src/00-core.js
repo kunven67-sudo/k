@@ -614,7 +614,8 @@ G.input = {
     if (G.trans.active && down) return; // ignore presses mid transition
     if (scr && scr.onKey) { try { if (scr.onKey(code, down, repeat, e) === true) return; } catch (err) { G.reportError(err, 'onKey'); } }
     if (I.blockKeys) return;
-    if (scr && scr.onAction) for (const a of acts) { try { scr.onAction(a, down, repeat, e); } catch (err) { G.reportError(err, 'onAction ' + a); } }
+    // a screen returns true when it used the key, so a key bound to two actions (Enter = accept + pause) only fires once
+  if (scr && scr.onAction) for (const a of acts) { try { if (scr.onAction(a, down, repeat, e) === true) break; } catch (err) { G.reportError(err, 'onAction ' + a); } }
   }
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));

@@ -3,6 +3,7 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
   const q = G.query;
   if (q.dev === 'stage') return G.start('devStage', q);
   if (q.dev === 'char') return G.start('devChar', q);
+  if (q.dev === 'atlas') return G.start('devAtlas', q);
   if (q.dev === 'screen' && G.screens[q.name]) return G.start(q.name, q);
   if (q.dev === 'results') {
     // fake stats for a rank: ?dev=results&rank=good|great|excellent|perfect|gold|loss&player=bf|pico

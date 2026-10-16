@@ -33,7 +33,7 @@
   G.screens.title = {
     enter(p) {
       this.skipped = !!(p && p.skipIntro) || !!G._titleSeen;
-      this.lines = []; this.ng = false; this.t = 0; this.transitioning = false;
+      this.lines = []; this.ng = false; this.t = 0; this.transitioning = false; this.went = false;
       this.beat = new G.BeatTracker();
       // random intro pair from FNF's introText.txt
       const txt = (G.A.text('preload/data/introText.txt') || 'shoutouts to tom fulp--lmao').split('\n').map(s => s.trim()).filter(Boolean);
@@ -205,7 +205,7 @@
       this.arrowR = new G.Sprite(G.W - 35, 480).loadSparrow('preload/images/storymenu/ui/arrows'); this.arrowR.addAnim('idle', 'rightIdle0'); this.arrowR.addAnim('press', 'rightConfirm0'); this.arrowR.play('idle');
       this.arrowL.updateHitbox(); this.arrowR.updateHitbox();
       this.beat = new G.BeatTracker();
-      this.chosen = false; this.ct = 0; this.score = 0; this.scoreLerp = 0;
+      this.chosen = false; this.ct = 0; this.went = false; this.score = 0; this.scoreLerp = 0;
       this.swipe = new G.Swipe();
       this.changeLevel(0, true); this.changeDiff(0, true);
       G.playMenuMusic(0);
@@ -245,15 +245,16 @@
       const L = this.levels[this.sel];
       const ok = d => L.songs.every(sid => G.Songs.difficulties(sid, this.player).some(x => x.diff === d));
       const list = G.DIFF_ORDER.filter(ok);
-      const cur = this.diffs[this.diffIdx];
+      // keep the picked difficulty by name (it survives week changes + coming back from a song)
+      const cur = this.diffName || G.settings.storyDiff || 'normal';
       this.diffs = list.length ? list : ['normal'];
-      this.diffIdx = Math.max(0, this.diffs.indexOf(cur));
-      if (this.diffs.indexOf(cur) < 0) this.diffIdx = Math.min(1, this.diffs.length - 1);
+      this.diffIdx = this.diffs.indexOf(cur);
+      if (this.diffIdx < 0) this.diffIdx = Math.max(0, this.diffs.indexOf('normal'));
       this.makeDiffSprite();
     },
     changeDiff(d, quiet) {
       this.diffIdx = (this.diffIdx + d + this.diffs.length) % this.diffs.length;
-      if (d !== 0) (d < 0 ? this.arrowL : this.arrowR).play('press', true);
+      if (d !== 0) { this.diffName = G.settings.storyDiff = this.diffs[this.diffIdx]; G.saveSettings(); (d < 0 ? this.arrowL : this.arrowR).play('press', true); }
       this.makeDiffSprite();
     },
     makeDiffSprite() {

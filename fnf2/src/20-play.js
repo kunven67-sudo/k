@@ -171,7 +171,7 @@
       // characters, stage, cameras
       const stepSec = this.cond.stepCrochet / 1000;
       const holding = this.keys.some(k => k) || this.botHolding;
-      for (const c of [this.gf, this.dad, this.bf]) if (c) c.tick(dt, stepSec, c === this.bf ? holding : false);
+      for (const c of [this.gf, this.dad, this.bf]) if (c) { c.playHealth = this.health; c.tick(dt, stepSec, c === this.bf ? holding : false); }
       this.stage.update(dt);
       this.updateCamera(dt);
       for (const L of this.lines) for (const s of L.strums) {
@@ -225,6 +225,7 @@
     },
     handleEvent(e) {
       const v = e.v;
+      for (const c of [this.gf, this.dad, this.bf]) if (c && c.script && c.script.onEvent) c.script.onEvent(c, e.e, v);
       switch (e.e) {
         case 'FocusCamera': {
           let ch = v != null && typeof v === 'object' ? v.char : v; if (ch == null) ch = 0;
@@ -439,12 +440,12 @@
     // -------------------------------------------------- input
     onAction(a, down, repeat) {
       if (this.failed) { if (down && (a === 'back' || a === 'accept')) this.exitToMenu(); return; }
-      if (this.gameOver) { if (down && !repeat) this.gameOverAction(a); return; }
-      if (this.paused) { if (down) this.pauseAction(a, repeat); return; }
+      if (this.gameOver) { if (down && !repeat) return this.gameOverAction(a); return; }
+      if (this.paused) { if (down) return this.pauseAction(a, repeat); return; }
       const m = /^note(\d)$/.exec(a);
       if (m) { if (repeat) return; if (down) this.press(+m[1]); else this.release(+m[1]); return; }
       if (!down || repeat) return;
-      if (a === 'pause' && this.started) this.openPause();
+      if (a === 'pause' && this.started) { this.openPause(); return true; }
       if (a === 'reset' && this.started && !this.paused) this.health = 0;
     },
     onBlur() { if (this.started && !this.paused && !this.gameOver && !this.ended) this.openPause(); },
@@ -475,9 +476,10 @@
     updatePause(dt) { const pm = this.pauseMenu; pm.t += dt; for (const a of pm.items) a.update(dt); },
     pauseAction(a, repeat) {
       const pm = this.pauseMenu;
-      if (a === 'ui_up' || a === 'ui_down') { pm.sel = (pm.sel + (a === 'ui_up' ? -1 : 1) + pm.items.length) % pm.items.length; G.sfx('scroll', { vol: 0.4 }); this.layoutPause(); }
-      else if (a === 'accept' && !repeat) this.pauseChoose();
-      else if (a === 'back' && !repeat) { if (pm.mode === 'diff') this.backToPauseMain(); else this.resume(); }
+      if (a === 'ui_up' || a === 'ui_down') { pm.sel = (pm.sel + (a === 'ui_up' ? -1 : 1) + pm.items.length) % pm.items.length; G.sfx('scroll', { vol: 0.4 }); this.layoutPause(); return true; }
+      if (a === 'accept' && !repeat) { this.pauseChoose(); return true; }
+      if (a === 'back' && !repeat) { if (pm.mode === 'diff') this.backToPauseMain(); else this.resume(); return true; }
+      return false;
     },
     pausePointer(x, y) {
       const pm = this.pauseMenu;
@@ -583,7 +585,8 @@
       if (this.gameOver) { this.drawGameOver(ctx); return; }
       // world
       for (const s of this.stage.ordered()) {
-        const slot = s === this.bf ? 'bf' : s === this.dad ? 'dad' : s === this.gf ? 'gf' : null;
+        const o = s.owner || s;
+        const slot = o === this.bf ? 'bf' : o === this.dad ? 'dad' : o === this.gf ? 'gf' : null;
         const f = slot && this.charFilter[slot];
         if (f) { ctx.save(); ctx.filter = f; s.draw(ctx, this.cam); ctx.restore(); ctx.filter = 'none'; }
         else s.draw(ctx, this.cam);
@@ -592,6 +595,10 @@
       // HUD
       this.drawHUD(ctx);
       if (this.paused) this.drawPause(ctx);
+    },
+    songLabel() {
+      const dn = (G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff;
+      return this.song.name.toLowerCase().includes(String(dn).toLowerCase()) ? this.song.name : this.song.name + ' (' + dn + ')';
     },
     noteY(t) { const d = (t - this.songPos) * PX_PER_MS * this.scrollSpeed; return this.down ? -d : d; },
     drawHUD(ctx) {
@@ -652,7 +659,7 @@
         ctx.fillStyle = '#000'; ctx.fillRect(tx - 4, ty - 4, tw + 8, 19);
         ctx.fillStyle = '#fff'; ctx.fillRect(tx, ty, tw * prog, 11);
         const left = Math.max(0, (this.audio.length - this.songPos) / 1000);
-        const txt = G.settings.timeBar === 'left' ? G.fmtTime(left) : G.settings.timeBar === 'elapsed' ? G.fmtTime(Math.max(0, this.songPos / 1000)) : this.song.name + ' (' + (G.DIFF_INFO[this.song.diff] || {}).name + ')';
+        const txt = G.settings.timeBar === 'left' ? G.fmtTime(left) : G.settings.timeBar === 'elapsed' ? G.fmtTime(Math.max(0, this.songPos / 1000)) : this.songLabel();
         G.vcr(ctx, txt, G.W / 2, ty - 6, { align: 'center', size: 22, outline: 2 });
       }
       for (const s of this.popups) s.draw(ctx, hud);

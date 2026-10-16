@@ -120,7 +120,7 @@
       at(DELAY.flash[this.rank] * R, () => this.displayRankText());
       at(DELAY.music[this.rank] * R, () => this.playMusic());
       this.chars = this.buildChars();
-      this.leaving = false;
+      this.leaving = false; this.went = false; this.leaveT = 0;
     },
     tween(obj, prop, from, to, dur, ease, delay) { this.tweens.push({ obj, prop, from, to, dur, ease: ease || (x => x), start: this.t + (delay || 0) }); obj[prop] = from; },
     // ---- difficulty + small clear % + song name drop in under the bar, then drift along it (timerThenSongName)

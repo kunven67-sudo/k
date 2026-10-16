@@ -54,8 +54,18 @@ const mul = (p, l) => [p[0] * l[0] + p[2] * l[1], p[1] * l[0] + p[3] * l[1], p[0
 const BLEND = { 0: 'lighter', 2: 'darken', 3: 'difference', 5: 'hard-light', 8: 'lighten', 9: 'multiply', 11: 'overlay', 12: 'screen' };
 function readMatrix(o) {
   if (o.MX) return o.MX.slice(0, 6);
-  if (o.M3D) { const m = o.M3D; return Array.isArray(m) ? [m[0], m[1], m[4], m[5], m[12], m[13]] : [m.m00, m.m01, m.m10, m.m11, m.m30, m.m31]; }
+  const m = o.M3D || o.Matrix3D;   // short + long ("Matrix3D") export formats
+  if (m) return Array.isArray(m) ? [m[0], m[1], m[4], m[5], m[12], m[13]] : [m.m00, m.m01, m.m10, m.m11, m.m30, m.m31];
   return [1, 0, 0, 1, 0, 0];
+}
+// long-format exports spell out symbol types / loop modes / colour effects
+const ST_LONG = { graphic: 'G', movieclip: 'MC', button: 'B' }, LP_LONG = { loop: 'LP', playonce: 'PO', singleframe: 'SF', playoncereverse: 'PO', loopreverse: 'LP' };
+function readAlpha(si) {
+  const c = si.C || si.color;
+  if (!c) return 1;
+  if (c.AM != null) return c.AM;
+  if (c.alphaMultiplier != null) return c.alphaMultiplier;
+  return 1;
 }
 function parseTimeline(tl, name) {
   const layers = [];
@@ -66,14 +76,17 @@ function parseTimeline(tl, name) {
       const els = [];
       for (const E of (F.E || F.elements || [])) {
         const si = E.SI || E.SYMBOL_Instance, asi = E.ASI || E.ATLAS_SPRITE_instance;
-        if (si) els.push({ s: si.SN || si.SYMBOL_name, ff: si.FF || si.firstFrame || 0, st: si.ST || si.symbolType || 'G', lp: si.LP || si.loop || 'LP', m: readMatrix(si), b: BLEND[si.B] || null, a: si.C && si.C.M === 'CA' ? si.C.AM : (si.C && si.C.AM != null ? si.C.AM : 1) });
+        if (si) {
+          const st = si.ST || si.symbolType || 'G', lp = si.LP || si.loop || 'LP';
+          els.push({ s: si.SN || si.SYMBOL_name, ff: si.FF || si.firstFrame || 0, st: ST_LONG[st] || st, lp: LP_LONG[lp] || lp, m: readMatrix(si), b: BLEND[si.B != null ? si.B : si.blend] || null, a: readAlpha(si) });
+        }
         else if (asi) els.push({ n: asi.N || asi.name, m: readMatrix(asi) });
       }
       const fi = F.I != null ? F.I : F.index, du = F.DU != null ? F.DU : F.duration;
       frames.push({ i: fi, du, label: F.N || F.name || null, els });
       frameCount = Math.max(frameCount, fi + du);
     }
-    layers.push({ name: L.LN || L.Layer_name, type: L.LT || null, frames });
+    layers.push({ name: L.LN || L.Layer_name, type: L.LT || L.Layer_type || null, frames });
   }
   // keyframe lookup tables
   for (const L of layers) {

@@ -27,6 +27,7 @@ PACKS = {
         # data
         'preload/data/introText.txt',
         'preload/data/characters/bf.json', 'preload/data/characters/gf.json', 'preload/data/characters/dad.json', 'preload/data/characters/pico-playable.json', 'preload/data/characters/pico.json',
+        'preload/data/characters/nene.json',
         'preload/data/stages/mainStage.json', 'preload/data/stages/mainStageErect.json',
         'preload/data/levels/tutorial.json', 'preload/data/levels/week1.json',
         'preload/data/notestyles/funkin.json',
@@ -48,6 +49,9 @@ PACKS = {
         'shared/images/healthBar.png', 'shared/images/ui/countdown/funkin/*',
         'shared/images/stageback.png', 'shared/images/stagefront.png', 'shared/images/stagecurtains.png', 'week1/images/erect/*',
         *[f'shared/images/characters/{c}/*' for c in CHARS_EARLY],
+        # Nene + her A-Bot speaker (Pico mixes)
+        'shared/images/characters/nene/*', 'shared/images/characters/abot/abotSystem/*', 'shared/images/characters/abot/systemEyes/*',
+        'shared/images/characters/abot/aBotViz.*', 'shared/images/characters/abot/stereoBG.png', 'preload/images/storymenu/props/nene.*',
         # sounds + music
         'preload/sounds/scrollMenu.ogg', 'preload/sounds/confirmMenu.ogg', 'preload/sounds/cancelMenu.ogg',
         'shared/sounds/missnote1.ogg', 'shared/sounds/missnote2.ogg', 'shared/sounds/missnote3.ogg',
@@ -102,10 +106,29 @@ def to_webp(src):
 def to_mp3(src, voices):
     def f():
         args = ['ffmpeg', '-v', 'error', '-i', src]
-        if voices: args += ['-ac', '1', '-b:a', '72k']
-        else: args += ['-ac', '2', '-b:a', '112k']
+        if voices: args += ['-ac', '1', '-b:a', '64k']
+        else: args += ['-ac', '2', '-b:a', '96k']
         return run(args + ['-f', 'mp3', '-'])
-    return conv_cached(src, 'mp3v' if voices else 'mp3i', f)
+    return conv_cached(src, 'mp3v64' if voices else 'mp3i96', f)
+
+# Animate atlases: keep only what the player reads (matrix as a 6-number MX, names, frames),
+# drop decomposed matrices / transformation points and round the numbers
+DROP_KEYS = {'DecomposedMatrix', 'DCM', 'transformationPoint', 'TRP', 'Instance_Name', 'IN'}
+def slim_atlas(o):
+    if isinstance(o, dict):
+        out = {}
+        for k, v in o.items():
+            if k in DROP_KEYS: continue
+            if k in ('M3D', 'Matrix3D'):
+                m = v
+                mx = [m[0], m[1], m[4], m[5], m[12], m[13]] if isinstance(m, list) else [m['m00'], m['m01'], m['m10'], m['m11'], m['m30'], m['m31']]
+                out['MX'] = [round(x, 4) for x in mx]
+                continue
+            out[k] = slim_atlas(v)
+        return out
+    if isinstance(o, list): return [slim_atlas(v) for v in o]
+    if isinstance(o, float): return round(o, 4)
+    return o
 
 def main():
     ap = argparse.ArgumentParser()
@@ -149,7 +172,10 @@ def main():
         elif ext in ('.ttf', '.otf'):
             data = 'data:font/ttf;base64,' + base64.b64encode(open(src, 'rb').read()).decode()
         elif ext == '.json':
-            try: data = json.dumps(json.load(open(src, encoding='utf-8-sig')), separators=(',', ':'))
+            try:
+                j = json.load(open(src, encoding='utf-8-sig'))
+                if os.path.basename(rel) == 'Animation.json': j = slim_atlas(j)
+                data = json.dumps(j, separators=(',', ':'))
             except Exception: data = open(src, encoding='utf-8-sig').read()
         elif ext in ('.xml', '.txt', '.srt'):
             data = open(src, encoding='utf-8-sig').read()

@@ -60,3 +60,18 @@ G.screens.devChar = {
     });
   },
 };
+// ?dev=atlas&path=shared/images/characters/abot/abotSystem&frames=0,1,5[&sym=name]  -> draws an Animate atlas
+G.screens.devAtlas = {
+  enter(p) { this.a = G.Atlas.load(p.path); this.frames = (p.frames || '0').split(',').map(Number); this.sym = p.sym || null; this.bg = p.bg || '#5a5a6e'; },
+  draw(ctx) {
+    G.setScreenT(ctx); ctx.fillStyle = this.bg; ctx.fillRect(0, 0, G.W, G.H);
+    const a = this.a; if (!a) { G.vcr(ctx, 'no atlas', 20, 20, { size: 24 }); return; }
+    const tl = this.sym ? a.symbols[this.sym] : a.main, b = G.Atlas.bounds(a, tl);
+    const n = this.frames.length, cw = G.W / n, s = Math.min(cw / b.w, (G.H - 40) / b.h) * 0.95;
+    this.frames.forEach((f, i) => {
+      ctx.save(); ctx.translate(cw * i + (cw - b.w * s) / 2, 30); ctx.scale(s, s); ctx.translate(-b.x, -b.y);
+      G.Atlas.draw(ctx, a, tl, Math.min(f, tl.frameCount - 1)); ctx.restore();
+      G.vcr(ctx, 'f' + f + ' / ' + tl.frameCount, cw * i + 6, 6, { size: 18 });
+    });
+  },
+};
