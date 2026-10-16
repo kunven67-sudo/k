@@ -79,7 +79,8 @@ Skippable at any point.
 - **Day length [FIRST]:** 24 real minutes = 1 in-game day (1 real minute = 1 game hour).
 - **Sleeping skips time [FIRST]:** sleep in a bed and it fast-forwards to morning (needs still
   change while you sleep).
-- **Aging by days [FIRST]:** see Open Question 1 at the bottom for how many days = 1 year.
+- **Aging by days [FIRST]:** 4 in-game days = 1 year (each day is about 3 months of life, one
+  day per season). Kid (8) to adult (18) takes about 16 hours of play.
 - **Life stages:** baby -> toddler -> kid (about 6-12) -> teen (13-17) -> young adult (18-25) ->
   adult (26-49) -> middle age (50-64) -> old (65+).
 - **Your body grows [FIRST for kid, LATER for the rest]:** height, voice, face slowly change. Teens
@@ -605,11 +606,12 @@ A folder of files (`real-life/`):
 
 ---
 
-## Open questions
+## Decided after the list
 
-1. **How many in-game days = 1 year?** With a 24-minute day:
-   - 4 days = 1 year -> kid (8) to adult (18) in about 16 hours of play
-   - 8 days = 1 year -> about 32 hours of play
-   - 12 days = 1 year -> about 48 hours of play
-2. **Hometown name + which US state?** It decides weather, laws and sales tax.
-3. **How big is the first neighborhood?** One street with about 10 houses, or a few blocks?
+1. **Aging speed:** 4 in-game days = 1 year. Kid (8) to adult (18) in about 16 hours of play.
+   Each day = one season of that year (spring, summer, fall, winter).
+2. **Hometown:** Maple Hollow, Ohio, a Midwest suburb. Real 4 seasons with snowy winters and
+   fall leaves, Ohio sales tax (5.75% state + local), cheaper prices than the coasts.
+3. **First neighborhood size:** one street first (about 10 houses, a few you can go inside, the
+   park at the end, and a small shopping plaza with the 3 stores). It grows to a few blocks
+   (3-4 streets, about 30 houses, the school, a bigger shopping area) in an update.
