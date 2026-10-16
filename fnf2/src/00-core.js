@@ -87,6 +87,7 @@ G.DEFAULT_SETTINGS = {
   quality: 'auto',      // 'auto' | 'high' | 'low'
   timeBar: 'name',      // 'name' | 'left' | 'elapsed' | 'off'
   comboPopups: true,
+  naughty: true,        // FNF's 'Naughtyness' (off = the clean versions of scenes)
   // audio
   vol: { master: 0.9, music: 0.8, vocals: 1, sfx: 0.8 },
   // controls

@@ -565,15 +565,15 @@
       const acc = this.accN ? this.accSum / this.accN : 0;
       const stats = { score: Math.round(this.score), misses: this.misses, maxCombo: this.maxCombo, tally: Object.assign({}, this.tally), acc, totalNotes: this.notes.filter(n => n.line === 1).length };
       const cheated = this.botplay || this.practice;
-      if (!cheated) G.submitScore(s.id + (s.variation !== 'default' ? '-' + s.variation : ''), p.diff, 'bf', { score: stats.score, acc, misses: stats.misses, fc: this.misses === 0 });
+      const songBest = !cheated && G.submitScore(s.id + (s.variation !== 'default' ? '-' + s.variation : ''), p.diff, 'bf', { score: stats.score, acc, misses: stats.misses, fc: this.misses === 0 });
       if (p.mode === 'story') {
         const ws = p.weekStats || { score: 0, misses: 0, maxCombo: 0, tally: { killer: 0, sick: 0, good: 0, bad: 0, shit: 0, miss: 0, total: 0 }, accSum: 0, accN: 0, totalNotes: 0 };
         ws.score += stats.score; ws.misses += stats.misses; ws.maxCombo = Math.max(ws.maxCombo, stats.maxCombo); ws.totalNotes += stats.totalNotes;
         for (const k in ws.tally) ws.tally[k] += stats.tally[k] || 0; ws.accSum += this.accSum; ws.accN += this.accN;
         if (p.songIndex + 1 < p.songs.length) { G.setScreen('play', Object.assign({}, p, { songIndex: p.songIndex + 1, weekStats: ws })); return; }
-        if (!cheated && p.week) G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
-        G.setScreen(G.screens.results ? 'results' : 'storyMenu', { mode: 'story', week: p.week, diff: p.diff, stats: Object.assign({}, ws, { acc: ws.accN ? ws.accSum / ws.accN : 0 }), title: (G.A.json('preload/data/levels/' + p.week + '.json') || {}).name || p.week, player: this.bf.id });
-      } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, title: s.name, player: this.bf.id });
+        const weekBest = !cheated && !!p.week && G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
+        G.setScreen(G.screens.results ? 'results' : 'storyMenu', { mode: 'story', week: p.week, diff: p.diff, newBest: weekBest, stats: Object.assign({}, ws, { acc: ws.accN ? ws.accSum / ws.accN : 0 }), title: (G.A.json('preload/data/levels/' + p.week + '.json') || {}).name || p.week, player: this.bf.id });
+      } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, newBest: songBest, title: s.name, player: this.bf.id });
     },
     // -------------------------------------------------- drawing
     draw(ctx) {

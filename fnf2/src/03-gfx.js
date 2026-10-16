@@ -11,10 +11,17 @@ G.Sparrow = {
     const xml = G.A.text(base + '.xml'), img = G.A.image(base + '.png');
     let sheet = null;
     if (xml && img) {
-      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      // Tolerant parse (like Flixel's): FNF sheets contain frame names such as "<0000"
+      // and "&0000", which are invalid XML and make a strict DOMParser stop halfway.
       const frames = [];
-      for (const n of doc.getElementsByTagName('SubTexture')) {
-        const g = k => n.getAttribute(k), num = k => (g(k) == null ? null : parseFloat(g(k)));
+      const ent = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+      const tagRe = /<SubTexture\b((?:\s+[\w:-]+\s*=\s*"[^"]*")*)\s*\/?>/g;
+      let m;
+      while ((m = tagRe.exec(xml))) {
+        const attrs = {};
+        const attrRe = /([\w:-]+)\s*=\s*"([^"]*)"/g; let a;
+        while ((a = attrRe.exec(m[1]))) attrs[a[1]] = ent(a[2]);
+        const g = k => (k in attrs ? attrs[k] : null), num = k => (g(k) == null ? null : parseFloat(g(k)));
         const f = { name: g('name'), x: num('x'), y: num('y'), w: num('width'), h: num('height'), rot: g('rotated') === 'true' };
         if (g('frameX') != null) { f.ox = -num('frameX'); f.oy = -num('frameY'); f.fw = num('frameWidth'); f.fh = num('frameHeight'); }
         else { f.ox = 0; f.oy = 0; f.fw = f.rot ? f.h : f.w; f.fh = f.rot ? f.w : f.h; }

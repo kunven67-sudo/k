@@ -52,7 +52,11 @@ PACKS = {
         'preload/sounds/scrollMenu.ogg', 'preload/sounds/confirmMenu.ogg', 'preload/sounds/cancelMenu.ogg',
         'shared/sounds/missnote1.ogg', 'shared/sounds/missnote2.ogg', 'shared/sounds/missnote3.ogg',
         'shared/sounds/gameplay/countdown/funkin/*.ogg', 'shared/sounds/gameplay/gameover/fnf_loss_sfx.ogg', 'shared/sounds/gameplay/gameover/fnf_loss_sfx-pico.ogg',
-        'shared/music/gameplay/gameover/*.ogg',
+        'shared/music/gameplay/gameover/gameOver.ogg', 'shared/music/gameplay/gameover/gameOverEnd.ogg', 'shared/music/gameplay/gameover/gameOver-pico.ogg', 'shared/music/gameplay/gameover/gameOverEnd-pico.ogg',
+        # results screen (art for BF + Pico, rank music)
+        'shared/images/resultScreen/**', 'preload/data/players/*.json',
+        *[f'shared/music/{r}{v}/*.ogg' for r in ['resultsPERFECT', 'resultsEXCELLENT', 'resultsNORMAL', 'resultsSHIT'] for v in ['', '-pico']],
+        *[f'shared/music/{r}{v}/*.json' for r in ['resultsPERFECT', 'resultsEXCELLENT', 'resultsNORMAL', 'resultsSHIT'] for v in ['', '-pico']],
         'preload/music/freakyMenu/freakyMenu.ogg', 'shared/music/breakfast/breakfast.ogg',
         # songs
         'songs/tutorial/Inst.ogg', 'songs/tutorial/Voices-bf.ogg', 'songs/tutorial/Voices-gf.ogg',
@@ -117,6 +121,12 @@ def main():
         run(['git', '-C', a.src, 'sparse-checkout', 'add', *sparse_dirs(pats)])
     files = []
     for p in pats:
+        if p.endswith('/**'):  # whole folder, recursive
+            root = os.path.join(a.src, p[:-3])
+            if not os.path.isdir(root): print('missing dir for', p, file=sys.stderr); continue
+            for dp, dn, fn in os.walk(root):
+                for f in fn: files.append(os.path.relpath(os.path.join(dp, f), a.src))
+            continue
         base = os.path.join(a.src, os.path.dirname(p))
         if not os.path.isdir(base):
             print('missing dir for', p, file=sys.stderr); continue

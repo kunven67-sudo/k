@@ -454,7 +454,7 @@
       ctx.globalAlpha = 0.6; ctx.fillStyle = '#000'; ctx.fillRect(bx - 6, 0, w + 18, 66 + 30); ctx.globalAlpha = 1;
       G.vcr(ctx, sc, G.W - 6, 5, { size: 32, align: 'right', outline: 0 });
       if (s && this.diff) G.vcr(ctx, '< ' + G.DIFF_INFO[this.diff.diff].name + ' >', bx + (w + 6) / 2, 41, { size: 24, align: 'center', outline: 0 });
-      G.vcr(ctx, (this.player === 'pico' ? 'PLAYING AS PICO' : 'PLAYING AS BOYFRIEND') + '   (' + (G.touchMode ? 'swipe left/right: difficulty' : 'TAB: switch, LEFT/RIGHT: difficulty') + ')', bx + (w + 6) / 2, 70, { size: 16, align: 'center', outline: 0 });
+      G.vcr(ctx, (this.player === 'pico' ? 'PICO' : 'BOYFRIEND') + (G.touchMode ? '' : ' - TAB to switch'), bx + (w + 6) / 2, 70, { size: 16, align: 'center', outline: 0, maxWidth: w + 6 });
       G.ui.drawBack(ctx);
     },
   };

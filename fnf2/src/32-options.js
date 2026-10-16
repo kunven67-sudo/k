@@ -14,6 +14,7 @@
   const save = () => { G.saveSettings(); if (G.audio) G.audio.applyVolumes(); };
   // preference rows: [label, type, get, set, desc, extra]
   const PREFS = [
+    ['Naughtyness', 'bool', () => S().naughty !== false, v => S().naughty = v, 'Off = the clean versions of a few cutscenes and results screens.'],
     ['Downscroll', 'bool', () => S().downscroll, v => S().downscroll = v, 'Notes move down toward the strumline at the bottom of the screen.'],
     ['Middlescroll', 'bool', () => S().middlescroll, v => S().middlescroll = v, 'Your arrows sit in the middle and the opponent arrows are hidden.'],
     ['Ghost Tapping', 'bool', () => S().ghostTapping, v => S().ghostTapping = v, 'Pressing a key when there is no note does not count as a miss.'],
