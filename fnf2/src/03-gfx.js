@@ -3,6 +3,21 @@
 // HaxeFlixel + the Funkin' engine so offsets/positions from FNF's data files work as-is.
 
 // ------------------------------------------------------------------ Sparrow (XML) sheets
+// Colour filters (Erect stage tints) are baked into a copy of each source texture once,
+// instead of running ctx.filter on every sprite piece every frame (that was very slow).
+// While G.imgFilter is set, every texture lookup goes through the tinted copy.
+G.imgFilter = null;
+G.srcImg = (function () {
+  const cache = new WeakMap();
+  return function (img) {
+    const f = G.imgFilter;
+    if (!f || !img) return img;
+    let m = cache.get(img); if (!m) { m = new Map(); cache.set(img, m); }
+    let c = m.get(f);
+    if (!c) { c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.filter = f; x.drawImage(img, 0, 0); m.set(f, c); }
+    return c;
+  };
+})();
 G.Sparrow = {
   cache: new Map(),
   // base = "shared/images/notes" (no extension)
@@ -41,10 +56,11 @@ G.Sparrow = {
   },
   draw(ctx, sheet, f) {
     if (!f) return;
-    if (!f.rot) { ctx.drawImage(sheet.img, f.x, f.y, f.w, f.h, f.ox, f.oy, f.w, f.h); return; }
+    const img = G.srcImg(sheet.img);
+    if (!f.rot) { ctx.drawImage(img, f.x, f.y, f.w, f.h, f.ox, f.oy, f.w, f.h); return; }
     // stored rotated 90deg: draw region rotated back (Flixel ANGLE_NEG_90)
     ctx.save(); ctx.translate(f.ox, f.oy); ctx.transform(0, -1, 1, 0, 0, f.w);
-    ctx.drawImage(sheet.img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    ctx.drawImage(img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
     ctx.restore();
   },
 };
@@ -146,7 +162,7 @@ G.Atlas = {
           const s = atlas.sprites[e.n];
           if (s) {
             if (s.rot) { ctx.transform(0, -1, 1, 0, 0, s.w); }
-            ctx.drawImage(s.img, s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
+            ctx.drawImage(G.srcImg(s.img), s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
           }
         } else {
           const sym = atlas.symbols[e.s];
@@ -317,8 +333,8 @@ G.Sprite = class {
       ctx.translate(-b.x, -b.y);
       G.Atlas.draw(ctx, a.atlas, a.tl, a.frames[this.fi]);
     } else if (this.sheet && this.sheet.frames[0]) G.Sparrow.draw(ctx, this.sheet, this.sheet.frames[0]);
-    else if (this.img) ctx.drawImage(this.img, 0, 0);
-    else if (this.solid) { ctx.fillStyle = this.solid; ctx.fillRect(0, 0, this.frameW, this.frameH); }
+    else if (this.img) ctx.drawImage(G.srcImg(this.img), 0, 0);
+    else if (this.solid) { if (G.imgFilter) ctx.filter = G.imgFilter; ctx.fillStyle = this.solid; ctx.fillRect(0, 0, this.frameW, this.frameH); ctx.filter = "none"; }
   }
 };
 

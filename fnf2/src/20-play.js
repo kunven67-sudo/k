@@ -588,7 +588,7 @@
         const o = s.owner || s;
         const slot = o === this.bf ? 'bf' : o === this.dad ? 'dad' : o === this.gf ? 'gf' : null;
         const f = slot && this.charFilter[slot];
-        if (f) { ctx.save(); ctx.filter = f; s.draw(ctx, this.cam); ctx.restore(); ctx.filter = 'none'; }
+        if (f) { G.imgFilter = f; try { s.draw(ctx, this.cam); } finally { G.imgFilter = null; } }
         else s.draw(ctx, this.cam);
       }
       this.cam.drawFX(ctx);
@@ -654,7 +654,8 @@
       if (this.practice) G.vcr(ctx, 'PRACTICE MODE', G.W / 2, this.down ? G.H - 160 : 130, { align: 'center', size: 22, alpha: 0.8 });
       // time bar (Psych)
       if (G.settings.timeBar !== 'off') {
-        const ty = this.down ? G.H - 44 : 19, tw = 400, tx = G.W / 2 - tw / 2;
+        // always at the top: in downscroll the arrows own the bottom of the screen
+        const ty = 19, tw = 400, tx = G.W / 2 - tw / 2;
         const prog = G.clamp(this.songPos / this.audio.length, 0, 1);
         ctx.fillStyle = '#000'; ctx.fillRect(tx - 4, ty - 4, tw + 8, 19);
         ctx.fillStyle = '#fff'; ctx.fillRect(tx, ty, tw * prog, 11);

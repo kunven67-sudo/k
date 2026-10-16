@@ -49,8 +49,8 @@
       this.swipe = new G.Swipe();
       this.buildMain();
     },
-    buildMain() {
-      this.page = 'main'; this.sel = 0;
+    buildMain(sel) {
+      this.page = 'main'; this.sel = sel || 0;
       this.items = ['PREFERENCES', 'CONTROLS', 'INPUT OFFSETS', 'EXIT'].map((s, i) => { const a = new G.Alphabet(s, true, 0, 0); a.x = (G.W - a.width) / 2; a.y = 120 + i * 120 + (G.H - 4 * 120) / 2 - 60; return a; });
     },
     buildPrefs() {
@@ -97,7 +97,8 @@
         else if (a === 'back') this.exit();
         return;
       }
-      if (a === 'back' && !this.cal) { G.sfx('cancel'); save(); this.buildMain(); return; }
+      // back to the main list with the same item still picked (like FNF)
+      if (a === 'back' && !this.cal) { G.sfx('cancel'); save(); this.buildMain({ prefs: 0, controls: 1, offsets: 2 }[this.page] || 0); return true; }
       if (this.page === 'prefs') {
         const r = this.rows[this.sel];
         if (a === 'ui_up' || a === 'ui_down') { this.sel = (this.sel + (a === 'ui_up' ? -1 : 1) + this.rows.length) % this.rows.length; G.sfx('scroll'); }

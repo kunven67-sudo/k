@@ -779,6 +779,7 @@ G.query = (function () { const o = {}; new URLSearchParams(location.search).forE
 
 // started by 99-main.js once every module has loaded
 G.start = function (firstScreen, params) {
+  const boot = document.getElementById('boot'); if (boot) boot.remove();
   G.resize();
   G.setScreen(firstScreen, params, { instant: true });
   requestAnimationFrame(G.loop);
