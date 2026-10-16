@@ -72,6 +72,11 @@ PACKS = {
         *[f'songs/{s}/{f}.ogg' for s in SONGS_EARLY for f in ['Inst', 'Voices-bf', 'Voices-dad', 'Inst-erect', 'Voices-bf-erect', 'Voices-dad-erect', 'Inst-pico', 'Voices-pico-playable-pico', 'Voices-dad-pico']],
     ],
 }
+# extra characters (for making our own characters from the real art)
+CHARS_MORE = ['darnell', 'monster', 'nene', 'tankman/basic', 'tankman/sing-alts', 'momCar', 'bf-dark', 'pico-dark', 'gf-dark', 'spooky_dark', 'otis', 'parents-christmas', 'pico-christmas', 'nene-dark']
+PACKS['design'] = PACKS['early'] + [p for c in CHARS_MORE for p in (f'shared/images/characters/{c}/*', f'shared/images/characters/{c}.*')] + [
+    'preload/data/characters/*.json', 'shared/images/characters/SpookyKids.*', 'shared/images/characters/senpai.*', 'shared/images/characters/spirit.*',
+    'preload/images/icons/*.png']
 # every pattern above must also be in the sparse checkout (directories, for --fetch)
 def sparse_dirs(patterns):
     out = set()

@@ -50,6 +50,8 @@
         const d = hueDist(h, c.h); if (d > c.hr + c.soft) continue;
         if (d > c.hr) w = 1 - (d - c.hr) / c.soft;
       }
+      if (c.keep) return null;
+      if (c.alpha != null && !c.to && c.dh == null && c.sat == null && c.val == null) return [R, Gc, B, c.alpha];
       let nh, ns, nv;
       if (c.to) {
         // keep this pixel's shading relative to the rule's source colour
@@ -60,31 +62,37 @@
       if (c.sat != null && c.to) ns = Math.min(1, ns * c.sat);
       if (c.val != null && c.to) nv = Math.min(1, nv * c.val);
       const o = hsv2rgb(nh, ns, nv);
+      if (c.alpha != null) o[3] = c.alpha;
       if (w >= 1) return o;
       return [Math.round(R + (o[0] - R) * w), Math.round(Gc + (o[1] - Gc) * w), Math.round(B + (o[2] - B) * w)];
     }
     return null;
   }
-  // repaint an image (or only some rectangles of it) -> canvas
+  // repaint an image -> canvas. rects = [{x,y,w,h,rules}] get their own rules (for those pixels only),
+  // every other pixel uses `rules`. Rules may set {alpha} (0 = erase) or {keep:true} (leave as is).
   function recolor(img, rules, rects) {
-    const c = G.makeCanvas(img.width, img.height), x = c.getContext('2d', { willReadFrequently: true });
+    const W = img.width, H = img.height;
+    const c = G.makeCanvas(W, H), x = c.getContext('2d', { willReadFrequently: true });
     x.drawImage(img, 0, 0);
-    const zones = rects || [{ x: 0, y: 0, w: img.width, h: img.height, rules }];
-    for (const z of zones) {
-      if (z.w <= 0 || z.h <= 0) continue;
-      const rr = (z.rules || rules).map(compile);
+    const sets = [(rules || []).map(compile)].concat((rects || []).map(z => (z.rules || []).map(compile)));
+    if (sets.every(r => !r.length)) return c;
+    const owner = rects && rects.length ? new Int16Array(W * H) : null;
+    if (owner) rects.forEach((z, zi) => {
+      const x0 = Math.max(0, z.x | 0), y0 = Math.max(0, z.y | 0), x1 = Math.min(W, (z.x + z.w) | 0), y1 = Math.min(H, (z.y + z.h) | 0);
+      for (let yy = y0; yy < y1; yy++) owner.fill(zi + 1, yy * W + x0, yy * W + x1);
+    });
+    const id = x.getImageData(0, 0, W, H), d = id.data;
+    const memos = sets.map(() => new Map());
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      if (d[i + 3] === 0) continue;
+      const si = owner ? owner[p] : 0, rr = sets[si];
       if (!rr.length) continue;
-      const id = x.getImageData(z.x, z.y, z.w, z.h), d = id.data;
-      const memo = new Map();
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] === 0) continue;
-        const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
-        let o = memo.get(key);
-        if (o === undefined) { o = apply(rr, d[i], d[i + 1], d[i + 2]); memo.set(key, o); }
-        if (o) { d[i] = o[0]; d[i + 1] = o[1]; d[i + 2] = o[2]; }
-      }
-      x.putImageData(id, z.x, z.y);
+      const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2], memo = memos[si];
+      let o = memo.get(key);
+      if (o === undefined) { o = apply(rr, d[i], d[i + 1], d[i + 2]); memo.set(key, o); }
+      if (o) { d[i] = o[0]; d[i + 1] = o[1]; d[i + 2] = o[2]; if (o[3] != null) d[i + 3] = Math.round(d[i + 3] * o[3]); }
     }
+    x.putImageData(id, 0, 0);
     return c;
   }
 
@@ -96,7 +104,7 @@
     clone(srcPrefix, dstPrefix, def) {
       const A = G.A;
       for (const k of Object.keys(A.raw)) {
-        if (!k.startsWith(srcPrefix)) continue;
+        if (!(k.startsWith(srcPrefix + '/') || k.startsWith(srcPrefix + '.'))) continue;
         const nk = dstPrefix + k.slice(srcPrefix.length);
         if (k.endsWith('.png')) {
           const img = A.image(k); if (!img) continue;
@@ -107,9 +115,9 @@
             rects = [];
             if (sj) for (const s of sj.ATLAS.SPRITES) {
               const S = s.SPRITE;
-              for (const pre in def.parts) if (S.name.startsWith(pre)) { rects.push({ x: S.x, y: S.y, w: S.rotated ? S.h : S.w, h: S.rotated ? S.w : S.h, rules: def.parts[pre] }); break; }
+              // part keys: exact sprite name, or "prefix*"
+              for (const key in def.parts) if (key === S.name || (key.endsWith('*') && S.name.startsWith(key.slice(0, -1)))) { rects.push({ x: S.x, y: S.y, w: S.rotated ? S.h : S.w, h: S.rotated ? S.w : S.h, rules: def.parts[key] }); break; }
             }
-            if (def.rules) rects.unshift({ x: 0, y: 0, w: img.width, h: img.height, rules: def.rules });
           }
           A._img.set(nk, recolor(img, def.rules || [], rects));
           A.raw[nk] = 'data:forged';
@@ -133,6 +141,8 @@
         const dst = 'own/images/' + id + '/' + src.split('/images/')[1];
         this.clone(src, dst, def);
         map[p] = 'own:' + id + '/' + src.split('/images/')[1];
+        // optional edits of the copied Animate atlas (extra layers, hidden parts, scaled elements)
+        if (def.edit && A.raw[dst + '/Animation.json']) { const atlas = G.Atlas.load(dst); if (atlas) def.edit(atlas, { G, path: p, dst }); }
       }
       d.assetPath = map[bd.assetPath] || d.assetPath;
       for (const a of d.animations || []) if (a.assetPath && map[a.assetPath]) a.assetPath = map[a.assetPath];
