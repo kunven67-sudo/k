@@ -64,7 +64,7 @@ def sparse_dirs(patterns):
     out = set()
     for p in patterns:
         d = os.path.dirname(p) if any(ch in p for ch in '*?') or '.' in os.path.basename(p) else p
-        out.add('/' + d + '/')
+        out.add(d.strip('/'))   # plain dir names work for cone-mode sparse checkouts
     return sorted(out)
 
 # ---------------------------------------------------------------- converters
