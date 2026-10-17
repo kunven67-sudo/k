@@ -229,6 +229,8 @@ class Cape {
   update(dt, root, colliders) {
     const W = this.W, H = this.H, seg = this.len / (H - 1);
     const anchorsW = this.local.map(v => v.clone().applyMatrix4(this.anchorBone.matrixWorld));
+    // teleport / respawn: drop the old cloth instead of stretching it across the map
+    if (this.ready && this.p[0].distanceTo(anchorsW[0]) > 1.5) this.ready = false;
     if (!this.ready) {
       for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const k = j * W + i; this.p[k].copy(anchorsW[i]).y -= j * seg; this.o[k].copy(this.p[k]); }
       this.ready = true;

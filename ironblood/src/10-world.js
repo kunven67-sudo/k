@@ -173,7 +173,7 @@ function splatAt(x, z, h, slope) {
 }
 
 // ---------- renderer, post-processing ----------
-const QUALITY = { Max: { grass: 30, radius: 3, shadow: 4096, ratio: Math.min(devicePixelRatio, 2) }, High: { grass: 18, radius: 3, shadow: 2048, ratio: Math.min(devicePixelRatio, 1.5) }, Medium: { grass: 10, radius: 2, shadow: 2048, ratio: 1 } };
+const QUALITY = { Max: { grass: 34, radius: 4, shadow: 4096, ratio: Math.min(devicePixelRatio, 2) }, High: { grass: 18, radius: 3, shadow: 2048, ratio: Math.min(devicePixelRatio, 1.5) }, Medium: { grass: 10, radius: 2, shadow: 2048, ratio: 1 } };
 let qName = 'Max';
 // ?lite: tiny test mode for screenshots on machines without a graphics card
 const LITE = /lite/.test(location.search);
@@ -227,7 +227,7 @@ function pbr(n, opts = {}) {
 function setRepeat(m, rx, ry) { for (const k of ['map', 'normalMap', 'roughnessMap']) if (m[k]) { m[k] = m[k].clone(); m[k].needsUpdate = true; m[k].repeat.set(rx, ry); } return m; }
 
 // ---------- terrain: six real surfaces blended by height, slope and place ----------
-const LAYERS = ['leafy_grass', 'stony_dirt_path', 'brown_mud_02', 'cliff_side', 'snow_02', 'cobblestone_floor_04'];
+const LAYERS = ['forrest_ground_01', 'stony_dirt_path', 'brown_mud_02', 'cliff_side', 'snow_02', 'cobblestone_floor_04'];
 const LAYER_TILE = [3.5, 4, 4.5, 9, 6, 2.6];
 const LAYER_ROUGH = [0.95, 0.9, 0.32, 0.82, 0.5, 0.72];
 const terrainUniforms = {
@@ -247,7 +247,7 @@ terrainMat.onBeforeCompile = (sh) => {
     .replace('#include <map_fragment>', `
       float w0 = vSA.x, w1 = vSA.y, w2 = vSA.z, w3 = vSB.x, w4 = vSB.y, w5 = vSB.z;
       vec3 col = vec3(0.0); vec3 nrm = vec3(0.0); float rgh = 0.0;
-      if (w0 > 0.01) { col += tri(tD[0], vW * uTile[0]).rgb * w0; nrm += texture2D(tN[0], vW * uTile[0]).xyz * w0; rgh += uRough[0] * w0; }
+      if (w0 > 0.01) { col += tri(tD[0], vW * uTile[0]).rgb * vec3(0.82, 1.0, 0.7) * w0; nrm += texture2D(tN[0], vW * uTile[0]).xyz * w0; rgh += uRough[0] * w0; }
       if (w1 > 0.01) { col += tri(tD[1], vW * uTile[1]).rgb * w1; nrm += texture2D(tN[1], vW * uTile[1]).xyz * w1; rgh += uRough[1] * w1; }
       if (w2 > 0.01) { col += tri(tD[2], vW * uTile[2]).rgb * w2; nrm += texture2D(tN[2], vW * uTile[2]).xyz * w2; rgh += uRough[2] * w2; }
       if (w3 > 0.01) { col += tri(tD[3], vW * uTile[3]).rgb * w3; nrm += texture2D(tN[3], vW * uTile[3]).xyz * w3; rgh += uRough[3] * w3; }
