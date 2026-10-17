@@ -392,7 +392,9 @@
       this.health = Math.min(H.max, this.health + (H[r] || 0));
       this.tally[r]++; this.tally.total++;
       this.accSum += ACC[r]; this.accN++;
-      this.combo++; this.maxCombo = Math.max(this.maxCombo, this.combo);
+      // like V-Slice: a BAD or SHIT hit still counts as a hit, but it breaks your combo
+      if (r === 'bad' || r === 'shit') { if (this.combo >= 10 && G.settings.comboPopups !== false) this.popCombo(0); this.combo = 0; }
+      else { this.combo++; this.maxCombo = Math.max(this.maxCombo, this.combo); }
       if (r === 'sick' || r === 'killer') this.splash(n.lane);
       if (G.settings.comboPopups !== false) { this.popRating(r === 'killer' ? 'sick' : r); if (this.combo >= 10) this.popCombo(this.combo); }
       const suffix = n.kind === 'alt' ? '-alt' : '';

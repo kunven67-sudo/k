@@ -25,8 +25,12 @@
     return b;
   }
   // st = { look, px, py (-1..1 look direction), ps (iris scale), purple }
+  // the composed eye only changes when the look / iris / purple change: reuse the last one (no rebuild every frame)
+  const lastKey = {};
   function composeEye(st, key) {
     const m = META(), L = m && m.looks[st.look]; if (!L) return null;
+    const sig = st.look + '|' + st.px.toFixed(2) + '|' + st.py.toFixed(2) + '|' + st.ps.toFixed(2) + '|' + (st.purple > 0 ? st.purple.toFixed(2) : 0);
+    if (lastKey[key] && lastKey[key].sig === sig) return lastKey[key].E;
     const back = img(L.back), iris = img(L.iris), mask = img(L.mask);
     if (!back || !iris || !mask) return null;
     const [w, h] = L.size;
@@ -48,7 +52,9 @@
       c.fillStyle = 'rgba(58,22,118,' + (0.62 * st.purple).toFixed(3) + ')'; c.fillRect(0, 0, w, h);
       c.globalCompositeOperation = 'source-over';
     }
-    return { cv: c.canvas, L };
+    const E = { cv: c.canvas, L };
+    lastKey[key] = { sig, E };
+    return E;
   }
   const glowCache = {};
   function glowArt(col) {
@@ -88,6 +94,15 @@
       ch._drops = []; ch._splats = []; ch._dropT = 0.5; ch._puddle = 0; ch._burst = -1;
       const play = ch.play.bind(ch);
       ch.play = (n, f, r) => { const ok = play(n, f, r); if (ok) FX.onAnim(ch, n); return ok; };
+      // build every look once now, so the first time each one shows up mid-song there's no hitch
+      try {
+        const m = META(), tiny = G.makeCanvas(2, 2).getContext('2d');
+        if (m) for (const look in m.looks) {
+          const E = composeEye({ look, px: 0, py: 0, ps: 1, purple: 0 }, 'warm');
+          if (E) tiny.drawImage(E.cv, 0, 0, 2, 2);
+          tiny.drawImage(glowArt(GLOW[look] || GLOW.void), 0, 0, 2, 2);
+        }
+      } catch (e) {}
     },
     setLook(ch, look) { if (ch._look !== look) { ch._look = look; ch._glitch = 0.09; } },
     onAnim(ch, name) {
@@ -164,8 +179,7 @@
       let ex = e[0], ey = e[1];
       if (ch._shake > 0) { ex += (Math.random() - 0.5) * 22 * ch._shake / 0.35; ey += (Math.random() - 0.5) * 14 * ch._shake / 0.35; }
       c.save();
-      c.globalCompositeOperation = 'lighter';
-      c.globalAlpha = 0.3 + 0.25 * ch._glowP;
+      c.globalAlpha = 0.24 + 0.2 * ch._glowP;                  // plain alpha: an additive glow this big lags slow PCs
       c.drawImage(glowArt(GLOW[ch._look]), ex - 560, ey - 440, 1120, 880);
       c.restore();
       if (GOO) this.drawPuddle(ch, c, ex);

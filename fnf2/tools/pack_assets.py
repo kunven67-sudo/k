@@ -30,6 +30,7 @@ PACKS = {
         'preload/data/characters/nene.json',
         'preload/data/stages/mainStage.json', 'preload/data/stages/mainStageErect.json',
         'preload/data/stages/phillyStreets.json', 'weekend1/images/phillyStreets/*.png', 'weekend1/images/phillyStreets/*.xml', 'weekend1/images/SpraycanPile.*',   # WRATH's night street
+        'sserafim/images/cutscene/bfGetUp/*', 'sserafim/images/cutscene/gfGetUp/*',   # BF + GF sitting (WRATH's Brain Freeze cutscene)
         'preload/data/levels/tutorial.json', 'preload/data/levels/week1.json',
         'preload/data/notestyles/funkin.json',
         'preload/data/songs/tutorial/*.json',
@@ -128,7 +129,7 @@ def to_mp3(src, voices):
 
 # Animate atlases: keep only what the player reads (matrix as a 6-number MX, names, frames),
 # drop decomposed matrices / transformation points and round the numbers
-DROP_KEYS = {'DecomposedMatrix', 'DCM', 'transformationPoint', 'TRP', 'Instance_Name', 'IN'}
+DROP_KEYS = {'DecomposedMatrix', 'DCM', 'Instance_Name', 'IN'}      # keep TRP: puppets turn pieces around it
 def slim_atlas(o):
     if isinstance(o, dict):
         out = {}

@@ -76,18 +76,27 @@
       const ck = G.A.image(IMG + 'cracks.png');
       if (ck) {
         S.cracks = new G.Sprite(0, 0).loadImage(ck);
-        S.cracks.scale.x = S.cracks.scale.y = 1.5; S.cracks.updateHitbox();
-        S.cracks.x = 693 - S.cracks.width / 2; S.cracks.y = 700; S.cracks.zIndex = 60; S.cracks.name = 'cracks';
+        S.cracks.scale.x = S.cracks.scale.y = 1.9; S.cracks.updateHitbox();
+        S.cracks.x = 700 - S.cracks.width / 2; S.cracks.y = 845 - S.cracks.height / 2; S.cracks.zIndex = 60; S.cracks.name = 'cracks';
         st.props.push(S.cracks);
       }
       S.glow = new G.Sprite(0, 0).loadImage(glowImage(256, '255,30,30'));
-      S.glow.scale.x = S.glow.scale.y = 3.2; S.glow.updateHitbox(); S.glow.blend = 'lighter'; S.glow.zIndex = 190; S.glow.name = 'eyeGlow';
+      S.glow.scale.x = S.glow.scale.y = 3.2; S.glow.updateHitbox(); S.glow.zIndex = 190; S.glow.name = 'eyeGlow';
       st.props.push(S.glow);
       // the static for the TV glitch
       S.noise = document.createElement('canvas'); S.noise.width = 320; S.noise.height = 180;
       const nx = S.noise.getContext('2d'), id = nx.createImageData(320, 180);
       for (let i = 0; i < id.data.length; i += 4) { const v = Math.random() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; }
       nx.putImageData(id, 0, 0);
+      S.scan = document.createElement('canvas'); S.scan.width = 8; S.scan.height = G.H + 4;
+      const sc = S.scan.getContext('2d'); sc.fillStyle = '#000'; for (let y = 0; y < S.scan.height; y += 4) sc.fillRect(0, y, 8, 1.5);
+      // the void's red vignette, drawn once
+      S.vig = document.createElement('canvas'); S.vig.width = 320; S.vig.height = 180;
+      const vc = S.vig.getContext('2d'), vg = vc.createRadialGradient(160, 90, 45, 160, 90, 162);
+      vg.addColorStop(0, 'rgba(40,0,0,0)'); vg.addColorStop(1, 'rgba(40,0,0,0.7)'); vc.fillStyle = vg; vc.fillRect(0, 0, 320, 180);
+      // every picture this stage can swap to gets decoded + sent to the GPU now, not mid-song (that was a big hitch)
+      const tiny = document.createElement('canvas').getContext('2d'); tiny.canvas.width = tiny.canvas.height = 2;
+      for (const sp of st.props) for (const img of texturesOf(sp)) try { tiny.drawImage(img, 0, 0, 2, 2); } catch (e) {}
       // light up the characters' tinted textures before the song starts
       for (const ph in TINT) for (const slot in TINT[ph]) warm(slot === 'bf' ? P.bf : slot === 'gf' ? P.gf : P.dad, TINT[ph][slot]);
       if (P.dadForms) warm(P.dadForms[0], TINT.night.dad);
@@ -131,9 +140,13 @@
       const S = P.park, ph = S.phase, v = S.void;
       for (const L of S.layers) {
         const k = 1 - v;
+        const na = L.night ? S.night * (1 - S.red) * k : 0, ra = L.red ? S.red * k : 0;
         L.base.alpha = k;
-        if (L.night) L.night.alpha = S.night * (1 - S.red) * k;
-        if (L.red) L.red.alpha = S.red * k;
+        if (L.night) L.night.alpha = na;
+        if (L.red) L.red.alpha = ra;
+        // a fully opaque copy on top hides the layer under it: don't draw both (big layers = lag)
+        L.base.visible = !(na >= 1 || ra >= 1);
+        if (L.night) L.night.visible = !(ra >= 1);
       }
       if (S.sky) S.sky.solid = ph === 'day' ? '#9fc7ee' : ph === 'night' ? '#141a38' : ph === 'red' ? '#6a0010' : '#000';
       for (const c of S.crowd) c.alpha = S.red * (1 - v) * 0.92;
@@ -152,24 +165,22 @@
         const cv = ctx.canvas, sx = cv.width / W, sy = cv.height / H;
         ctx.save(); G.setScreenT(ctx);
         // torn horizontal bands
-        const n = 3 + Math.floor(g * 8);
+        const n = 2 + Math.floor(g * 4);
         for (let i = 0; i < n; i++) {
           const y = Math.random() * H, h = 6 + Math.random() * 40 * g, dx = (Math.random() - 0.5) * 120 * g;
           ctx.drawImage(cv, 0, y * sy, cv.width, h * sy, dx, y, W, h);
         }
-        // static + scanlines
-        ctx.globalAlpha = Math.min(0.55, g * 0.45); ctx.globalCompositeOperation = 'overlay';
+        // static + scanlines (one cached picture each)
+        ctx.globalAlpha = Math.min(0.32, g * 0.28);
         ctx.drawImage(S.noise, Math.random() * -40, Math.random() * -40, W + 40, H + 40);
-        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = Math.min(0.35, g * 0.3); ctx.fillStyle = '#000';
-        for (let y = (G.time * 90) % 4; y < H; y += 4) ctx.fillRect(0, y, W, 1.5);
+        ctx.globalAlpha = Math.min(0.35, g * 0.3);
+        ctx.drawImage(S.scan, 0, -((G.time * 90) % 4), W, H + 4);
         if (Math.random() < g * 0.12) { ctx.globalAlpha = 0.85; ctx.drawImage(S.noise, 0, 0, W, H); }   // the signal drops for a frame
         ctx.restore();
       }
       if (S.phase === 'void' && S.void > 0) {
-        ctx.save(); G.setScreenT(ctx);
-        const r = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.9);
-        r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(1, `rgba(40,0,0,${0.7 * S.void})`);
-        ctx.fillStyle = r; ctx.fillRect(0, 0, W, H); ctx.restore();
+        ctx.save(); G.setScreenT(ctx); ctx.globalAlpha = S.void;
+        ctx.drawImage(S.vig, 0, 0, W, H); ctx.restore();
       }
     },
   };
