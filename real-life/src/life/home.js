@@ -76,10 +76,24 @@ export class Home {
           size: [1.0, 0.7, 2.0],
           label: () => (s.owner === 'you' ? (clock.isNight || me.needs.energy < 0.5 ? 'Go to sleep' : 'Lie down / nap') : s.owner === 'parents' ? "Lie on your parents' bed" : 'Lie down'),
           use: () => (s.owner === 'you' && (clock.isNight || me.needs.energy < 0.5) ? this.sleep(s) : this.lieDown(s)),
+          alt: s.owner === 'you' ? { key: 'F', text: 'Make your bed' } : null,
+          useAlt: s.owner === 'you' ? () => this.makeBed() : null,
         });
         break;
       case 'seat':
-        add({ size: [0.6, 0.9, 0.6], label: () => `Sit on the ${s.label}`, use: () => this.player.sitOn(s, 'sit') });
+        add({
+          size: [0.6, 0.9, 0.6],
+          label: () => {
+            const who = this.life.people?.occupant(s);
+            if (who) return `${who.displayName()} is sitting there`;
+            return s.table && this.life.people?.mealOn() ? `Sit down and eat ${this.life.people.mealOn()}` : `Sit on the ${s.label}`;
+          },
+          use: () => {
+            if (this.life.people?.occupant(s)) return;
+            this.player.sitOn(s, 'sit');
+            if (s.table) this.life.people?.tryFamilyMeal();
+          },
+        });
         break;
       case 'couch':
         add({
@@ -395,13 +409,34 @@ export class Home {
     this.hud.toast(`${heated ? 'You heat up and eat' : pr.food?.thirst > (pr.food?.hunger || 0) ? 'You drink' : 'You eat'} ${pr.name.toLowerCase()}.`);
   }
 
+  /** Lying in a bed: feet at the root (foot end), head on the pillow at the headboard (-Z of the bed). */
+  _lie(s) {
+    const ry = s.rotY ?? 0;
+    const half = this.player.height * 0.48;
+    const at = s.at.clone().setY(s.at.y + 0.02).add(new THREE.Vector3(Math.sin(ry) * half, 0, Math.cos(ry) * half));
+    this.player.sitOn({ at, faceYaw: ry, floorY: this.house.floorY }, 'lie');
+  }
+
   sleep(s) {
-    this.player.sitOn({ at: s.at.clone().setY(s.at.y + 0.02), faceYaw: Math.PI }, 'lie');
+    this._lie(s);
+    if (s.owner === 'you') this.d.bedMade = false;
     this.life.sleep();
   }
 
+  makeBed() {
+    if (this.d.bedMade) {
+      this.hud.toast('Your bed is already made.');
+      return;
+    }
+    this.d.bedMade = true;
+    this._passTime(2);
+    this.hud.toast('You make your bed. Pillow fluffed, blanket straight.');
+    bus.emit('chore:done', { chore: 'bed' });
+  }
+
   lieDown(s) {
-    this.player.sitOn({ at: s.at.clone().setY(s.at.y + 0.02), faceYaw: Math.PI }, 'lie');
+    this._lie(s);
+    if (s.owner === 'you') this.d.bedMade = false;
   }
 
   /** Each game hour: life in the house moves on (dishes pile up, trash fills, couch coins). */

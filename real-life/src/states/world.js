@@ -19,6 +19,9 @@ import { randomLook, childLook } from '../people/look.js';
 import { FAMILY_LOT, CURB } from '../world/layout.js';
 import { Life } from '../life/index.js';
 import { me } from '../life/me.js';
+import { People } from '../people/index.js';
+import { Chores } from '../life/chores.js';
+import { Talk } from '../talk/index.js';
 
 export class WorldState {
   constructor(engine) {
@@ -39,6 +42,10 @@ export class WorldState {
     this.player = new Player(e, world, { look: life.character.look, age: Math.max(1, clock.age), spawn: sp.pos, yaw: sp.yaw, name: life.character.name });
     this.hud = new Hud(e.uiRoot);
     this.life = new Life({ engine: e, world, player: this.player, hud: this.hud });
+    this.people = new People({ world, player: this.player, hud: this.hud, life: this.life });
+    this.life.people = this.people;
+    this.life.chores = new Chores(this.life);
+    this.talk = new Talk({ world, player: this.player, hud: this.hud, life: this.life, people: this.people });
     this.camOverride = params.cam ? params.cam.split(',').map(Number) : null;
     e.setView(world.scene, this.player.camera);
     input.setPointerLock?.(true);
@@ -54,6 +61,8 @@ export class WorldState {
     if (input.pressed('menu') && panelOpen()) closeTopPanel();
     this.life.update(dt);
     p.update(dt);
+    this.people.update(dt);
+    this.talk.update(dt);
     if (this.camOverride) {
       const [x, y, z, yaw, pitch] = this.camOverride;
       p.camera.position.set(x, y, z);
@@ -70,6 +79,9 @@ export class WorldState {
 
   exit() {
     for (const off of this._offs || []) off();
+    this.talk?.dispose();
+    this.life?.chores?.dispose();
+    this.people?.dispose();
     this.life?.dispose();
     this.hud?.dispose();
     this.player?.dispose();

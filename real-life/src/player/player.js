@@ -210,7 +210,7 @@ export class Player {
     this.seat = { at: spot.at.clone().setY(spot.at.y - (pose === 'sit' ? 0.47 * (this.height / 1.75) : 0)), faceYaw: spot.faceYaw ?? 0, pose, spot };
     if (pose === 'lie') this.seat.at.y = spot.at.y;
     this.yaw = (spot.faceYaw ?? 0) + Math.PI;
-    this.pitch = 0;
+    this.pitch = pose === 'lie' ? 0.75 : 0; // lying on your back: looking up past your feet
     this.controller.enabled = false;
   }
 

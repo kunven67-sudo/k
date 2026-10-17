@@ -162,7 +162,8 @@ export function plan(rec, clock, ctx) {
       if (h < 11) return first ? { act: { kind: 'stand', spot: S.sinkKitchen } } : { act: { kind: 'stand', node: ctx.homeRoom.garage } };
       return { act: { kind: 'tv', spot: S.couch, alt: !first } };
     }
-    return { act: { kind: 'stand', node: ctx.homeRoom.kitchen } };
+    // A day off at home: one in the kitchen, the other on the couch.
+    return first ? { act: { kind: 'stand', node: ctx.homeRoom.kitchen } } : { act: { kind: 'tv', spot: S.couch, alt: true } };
   }
   if (rec.role === 'staff') {
     const st = ctx.stores[rec.store];

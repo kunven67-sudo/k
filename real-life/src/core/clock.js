@@ -280,9 +280,11 @@ export class GameClock {
   }
 
   /** "7:05 AM" */
-  timeText() {
-    const h = this.hour;
-    const m = Math.floor(this.minutes % 60);
+  /** "7:05 PM" for now, or for any minutes-since-midnight. */
+  timeText(minutes = this.minutes) {
+    const mm = ((minutes % 1440) + 1440) % 1440;
+    const h = Math.floor(mm / 60);
+    const m = Math.floor(mm % 60);
     return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
   }
 

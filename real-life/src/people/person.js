@@ -241,7 +241,8 @@ export class Person {
         mat.roughness = Math.max(mat.roughness ?? 1, 0.62);
         if (SKIN_MATS.has(name)) mat.color.copy(skin);
         else if (SKIN_DARK_MATS.has(name)) mat.color.copy(skin).multiplyScalar(0.82);
-        else if (HAIR_MATS.has(name)) mat.color.copy(name === 'Hair_Blond' ? hair.clone().lerp(new THREE.Color('#e9d7a8'), 0.15) : hair);
+        // Two-tone hair kits (Hair_Blond main + Hair_Brown strands): strands a shade darker.
+        else if (HAIR_MATS.has(name)) mat.color.copy(name === 'Hair_Brown' && list.some((x) => x.material.name === 'Hair_Blond') ? hair.clone().multiplyScalar(0.72) : hair);
         else if (BROW_MATS.has(name)) mat.color.copy(brows);
         else if (m === main) {
           const hex = part === 'body' ? outfit.topColor : part === 'legs' ? outfit.bottomColor : part === 'feet' ? outfit.shoeColor : null;

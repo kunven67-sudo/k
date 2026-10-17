@@ -153,6 +153,7 @@ export class Npc {
       body.pose = 'stand';
       body.mood = this.mood || 'neutral';
     }
+    if (this.talkingTo) this.faceTowards(this.talkingTo.position);
     this.yaw = dampAngle(this.yaw, this.targetYaw ?? this.yaw, 0.08, dt);
     body.root.position.copy(this._seatPos || this.pos);
     body.root.rotation.y = this._seatYaw ?? this.yaw;
@@ -181,13 +182,17 @@ export class Npc {
     if (act.kind === 'sit' || act.kind === 'tv') {
       body.pose = 'sit';
       this._seatPos = spot.at.clone().setY(spot.at.y - 0.47 * (this.height / 1.75));
+      if (act.offset) this._seatPos.add(act.offset);
       this._seatYaw = spot.faceYaw ?? 0;
     } else if (act.kind === 'sleep') {
       body.pose = 'sleep';
+      // Lying: feet at the root, head along the bed (towards the headboard at -Z of the bed).
+      const ry = spot.rotY ?? 0;
+      const half = this.height * 0.48;
       this._seatPos = spot.at.clone().setY(spot.at.y + 0.04);
-      this._seatYaw = (spot.rotY ?? 0) + Math.PI;
-      // Feet at the root: put them at the foot end of the bed.
-      this._seatPos.add(new THREE.Vector3(Math.sin(spot.rotY ?? 0) * 0.85, 0, Math.cos(spot.rotY ?? 0) * 0.85));
+      this._seatPos.add(_v.set(Math.sin(ry) * half, 0, Math.cos(ry) * half));
+      if (act.offset) this._seatPos.add(act.offset);
+      this._seatYaw = ry;
     } else {
       body.pose = 'stand';
       this._seatPos = null;
