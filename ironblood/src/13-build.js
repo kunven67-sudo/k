@@ -478,10 +478,8 @@ function buildCamps() {
   for (const c of CAMP_SPOTS) {
     if (Math.hypot(c.x - CASTLE.x, c.z - CASTLE.z) < CASTLE.r) { addFire(c.x + 4, terrainH(c.x + 4, c.z) + 0.1, c.z + 2, 0.75); continue; }
     const y = terrainH(c.x, c.z);
-    // campfire: stone ring, logs, flames
-    for (let i = 0; i < 9; i++) { const a = i * 0.7; B.add(MAT.stone, new THREE.DodecahedronGeometry(0.22), c.x + Math.cos(a) * 0.7, y + 0.1, c.z + Math.sin(a) * 0.7, a); }
-    for (let i = 0; i < 4; i++) B.add(MAT.char, cylW(0.08, 0.08, 1.1, 7, 1), c.x, y + 0.15, c.z, i * 0.8, 0, Math.PI / 2 - 0.2);
-    addFire(c.x, y + 0.15, c.z, 0.8);
+    // campfire flames (the scanned stone fire pit goes under them)
+    addFire(c.x, y + 0.25, c.z, 0.8);
     circles.push({ x: c.x, z: c.z, r: 0.9 });
     // tents around it
     const n = 2 + Math.floor(r() * 2);

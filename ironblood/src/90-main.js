@@ -3,15 +3,15 @@
 buildWorld();
 let modelReady = false;
 const loader = new GLTFLoader();
-setTimeout(() => {
-  try { buildNature(); } catch (e) { console.error('nature failed', e); natureReady = true; }
-}, 30);
+loadScans(() => { try { buildNature(); } catch (e) { console.error('nature failed', e); natureReady = true; } });
+// a real photographed sky lights and reflects on everything in daytime
+new RGBELoader().load('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr', (t) => { t.mapping = THREE.EquirectangularReflectionMapping; hdrEnv = pmrem.fromEquirectangular(t).texture; t.dispose(); });
 loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb', (gltf) => {
   soldierGLTF = gltf; modelReady = true;
 }, undefined, (err) => { console.error(err); $('loadText').textContent = 'Could not load the knight model. Check your internet and refresh.'; $('playBtn').textContent = 'LOAD FAILED'; });
 let worldStarted = false;
 function checkReady() {
-  const pct = Math.round(((texDone / Math.max(1, texPending)) * 0.6 + (modelReady ? 0.25 : 0) + (natureReady ? 0.15 : 0)) * 100);
+  const pct = Math.round(((texDone / Math.max(1, texPending)) * 0.35 + (modelReady ? 0.15 : 0) + (scansLoaded / SCANS.length) * 0.45 + (natureReady ? 0.05 : 0)) * 100);
   if (!worldStarted) $('loadText').textContent = 'Loading the world... ' + pct + '%';
   if (worldStarted || !modelReady || !natureReady || texDone < texPending) return;
   worldStarted = true;
@@ -124,3 +124,5 @@ updateGrass(player.pos.x, player.pos.z, true);
 frame();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
 window.__game = { get player() { return player; }, fighters, setTime: (h) => { dayT = h / 24; }, keys, mouse, settings, gore, stats, get yaw() { return yaw; }, set yaw(v) { yaw = v; }, startAttack: (d, k) => player.startAttack(d, k), start: () => { audioInit(); $('title').style.display = 'none'; $('hud').classList.add('on'); playing = true; paused = false; } };
+window.__W = { SQUARE, CASTLE, BRIDGE, BATTLE_X, FORTRESS, groundH };
+window.__dbg = () => ({ modelReady, natureReady, texDone, texPending, worldStarted, scans: scansLoaded + '/' + SCANS.length, cells: natureCells.size, inst: [...natureCells.values()].flat().reduce((a, m) => a + m.count, 0), fps: $('fps').textContent });

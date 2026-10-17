@@ -175,12 +175,14 @@ function splatAt(x, z, h, slope) {
 // ---------- renderer, post-processing ----------
 const QUALITY = { Max: { grass: 30, radius: 3, shadow: 4096, ratio: Math.min(devicePixelRatio, 2) }, High: { grass: 18, radius: 3, shadow: 2048, ratio: Math.min(devicePixelRatio, 1.5) }, Medium: { grass: 10, radius: 2, shadow: 2048, ratio: 1 } };
 let qName = 'Max';
+// ?lite: tiny test mode for screenshots on machines without a graphics card
+const LITE = /lite/.test(location.search);
 try { const s = localStorage.getItem('ironblood.quality2'); if (QUALITY[s]) qName = s; } catch (e) {}
 let Q = QUALITY[qName];
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Q.ratio);
+renderer.setPixelRatio(LITE ? 0.5 : Q.ratio);
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !LITE;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.62;
@@ -200,7 +202,7 @@ const envTex = (() => {
 scene.environment = envTex;
 const composerRT = new THREE.WebGLRenderTarget(innerWidth * Q.ratio, innerHeight * Q.ratio, { type: THREE.HalfFloatType, samples: 4 });
 const composer = new EffectComposer(renderer, composerRT);
-composer.setPixelRatio(Q.ratio);
+composer.setPixelRatio(LITE ? 0.5 : Q.ratio);
 composer.setSize(innerWidth, innerHeight);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.32, 0.55, 0.92);
@@ -305,7 +307,7 @@ const river = (() => {
     if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  const w = new Water(g, { textureWidth: 1024, textureHeight: 1024, waterNormals, sunDirection: new THREE.Vector3(0.5, 0.7, 0.3), sunColor: 0xfff2dd, waterColor: 0x1d3b3a, distortionScale: 2.4, fog: true, alpha: 1 });
+  const w = new Water(g, { textureWidth: LITE ? 128 : 1024, textureHeight: LITE ? 128 : 1024, waterNormals, sunDirection: new THREE.Vector3(0.5, 0.7, 0.3), sunColor: 0xfff2dd, waterColor: 0x1d3b3a, distortionScale: 2.4, fog: true, alpha: 1 });
   w.rotation.x = -Math.PI / 2; w.position.y = WATER_Y;
   w.material.uniforms.size.value = 3.5;
   scene.add(w);
@@ -318,7 +320,7 @@ const skyU = sky.material.uniforms;
 skyU.turbidity.value = 4.5; skyU.rayleigh.value = 1.4; skyU.mieCoefficient.value = 0.004; skyU.mieDirectionalG.value = 0.82;
 const envSky = new Sky(); envSky.scale.setScalar(100);
 const envScene = new THREE.Scene(); envScene.add(envSky);
-let envRT = null, envSunY = -9;
+let envRT = null, envSunY = -9, hdrEnv = null;
 function captureSkyEnv(sunDirV, force) {
   if (!force && Math.abs(sunDirV.y - envSunY) < 0.03) return;
   envSunY = sunDirV.y;
@@ -326,7 +328,7 @@ function captureSkyEnv(sunDirV, force) {
   envSky.material.uniforms.sunPosition.value.copy(sunDirV);
   if (envRT) envRT.dispose();
   envRT = pmrem.fromScene(envScene, 0.02);
-  scene.environment = envRT.texture;
+  scene.environment = (sunDirV.y > 0.12 && hdrEnv) ? hdrEnv : envRT.texture;
 }
 const starGeo = new THREE.BufferGeometry();
 {

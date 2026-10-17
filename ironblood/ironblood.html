@@ -170,7 +170,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { Tree } from 'https://cdn.jsdelivr.net/npm/@dgreenheck/ez-tree@1.1.0/build/ez-tree.es.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
 // ---------- helpers ----------
 function mulberry32(a) {
@@ -349,12 +349,14 @@ function splatAt(x, z, h, slope) {
 // ---------- renderer, post-processing ----------
 const QUALITY = { Max: { grass: 30, radius: 3, shadow: 4096, ratio: Math.min(devicePixelRatio, 2) }, High: { grass: 18, radius: 3, shadow: 2048, ratio: Math.min(devicePixelRatio, 1.5) }, Medium: { grass: 10, radius: 2, shadow: 2048, ratio: 1 } };
 let qName = 'Max';
+// ?lite: tiny test mode for screenshots on machines without a graphics card
+const LITE = /lite/.test(location.search);
 try { const s = localStorage.getItem('ironblood.quality2'); if (QUALITY[s]) qName = s; } catch (e) {}
 let Q = QUALITY[qName];
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Q.ratio);
+renderer.setPixelRatio(LITE ? 0.5 : Q.ratio);
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !LITE;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.62;
@@ -374,7 +376,7 @@ const envTex = (() => {
 scene.environment = envTex;
 const composerRT = new THREE.WebGLRenderTarget(innerWidth * Q.ratio, innerHeight * Q.ratio, { type: THREE.HalfFloatType, samples: 4 });
 const composer = new EffectComposer(renderer, composerRT);
-composer.setPixelRatio(Q.ratio);
+composer.setPixelRatio(LITE ? 0.5 : Q.ratio);
 composer.setSize(innerWidth, innerHeight);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.32, 0.55, 0.92);
@@ -479,7 +481,7 @@ const river = (() => {
     if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  const w = new Water(g, { textureWidth: 1024, textureHeight: 1024, waterNormals, sunDirection: new THREE.Vector3(0.5, 0.7, 0.3), sunColor: 0xfff2dd, waterColor: 0x1d3b3a, distortionScale: 2.4, fog: true, alpha: 1 });
+  const w = new Water(g, { textureWidth: LITE ? 128 : 1024, textureHeight: LITE ? 128 : 1024, waterNormals, sunDirection: new THREE.Vector3(0.5, 0.7, 0.3), sunColor: 0xfff2dd, waterColor: 0x1d3b3a, distortionScale: 2.4, fog: true, alpha: 1 });
   w.rotation.x = -Math.PI / 2; w.position.y = WATER_Y;
   w.material.uniforms.size.value = 3.5;
   scene.add(w);
@@ -492,7 +494,7 @@ const skyU = sky.material.uniforms;
 skyU.turbidity.value = 4.5; skyU.rayleigh.value = 1.4; skyU.mieCoefficient.value = 0.004; skyU.mieDirectionalG.value = 0.82;
 const envSky = new Sky(); envSky.scale.setScalar(100);
 const envScene = new THREE.Scene(); envScene.add(envSky);
-let envRT = null, envSunY = -9;
+let envRT = null, envSunY = -9, hdrEnv = null;
 function captureSkyEnv(sunDirV, force) {
   if (!force && Math.abs(sunDirV.y - envSunY) < 0.03) return;
   envSunY = sunDirV.y;
@@ -500,7 +502,7 @@ function captureSkyEnv(sunDirV, force) {
   envSky.material.uniforms.sunPosition.value.copy(sunDirV);
   if (envRT) envRT.dispose();
   envRT = pmrem.fromScene(envScene, 0.02);
-  scene.environment = envRT.texture;
+  scene.environment = (sunDirV.y > 0.12 && hdrEnv) ? hdrEnv : envRT.texture;
 }
 const starGeo = new THREE.BufferGeometry();
 {
@@ -615,159 +617,211 @@ function updateGrass(px, pz, force) {
 }
 function clearGrass() { for (const [, m] of chunks) { scene.remove(m); m.dispose(); } chunks.clear(); lastChunkKey = ''; }
 
-// ---------- nature: real generated trees, bushes, dead trees, mossy boulders ----------
-const treeVariants = [];
-const natureCells = new Map(); // 100 m cells, each with its own instanced meshes so far ones get culled
-function makeTreeVariant(preset, seed, height, opts = {}) {
-  const t = new Tree();
-  t.loadPreset(preset);
-  t.options.seed = seed;
-  if (opts.leafCount) t.options.leaves.count = opts.leafCount;
-  if (opts.tint) t.options.leaves.tint = opts.tint;
-  t.generate();
-  t.branchesMesh.geometry.computeBoundingBox();
-  const bb = new THREE.Box3().setFromObject(t);
-  const s = height / Math.max(0.01, bb.max.y - bb.min.y);
-  const v = { tree: t, scale: s, bare: !!opts.bare, kind: opts.kind, trunkR: (t.options.branch.radius[0] || 1) * s };
-  t.branchesMesh.material.envMapIntensity = 0.4;
-  treeVariants.push(v);
-  return v;
+// ---------- nature: real 3D scans (Poly Haven, CC0), placed in 100 m cells ----------
+const ASSET_BASE = 'https://raw.githubusercontent.com/kunven67-sudo/k/claude/adult-game-concept-llgnf3/ironblood/assets/';
+const SCANS = ['fir', 'oak', 'dead_tree_trunk', 'dead_tree_trunk_02', 'tree_stump_01', 'root_cluster_01', 'dry_branches_medium_01', 'fern_02', 'grass_medium_01', 'grass_medium_02', 'moss_01', 'rock_moss_set_01', 'rock_moss_set_02', 'namaqualand_boulder_02', 'stone_fire_pit', 'wooden_crate_01', 'kite_shield', 'large_castle_door'];
+const scan = {};          // name -> list of variants; a variant is a list of { geo, mat, card }
+let scansLoaded = 0;
+const natureCells = new Map();
+const windUniforms = { uTime: { value: 0 } };
+// leaves and needles sway: more at the tips (higher up), each tree on its own beat
+function addWind(mat, strength) {
+  if (mat.userData.wind) return;
+  mat.userData.wind = true;
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = windUniforms.uTime;
+    sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        vec2 wp = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
+      #else
+        vec2 wp = vec2(0.0);
+      #endif
+      float hgt = max(0.0, position.y);
+      float sw = sin(uTime * 1.3 + wp.x * 0.2 + wp.y * 0.15) * 0.6 + sin(uTime * 2.7 + position.x * 2.0 + position.z * 2.0) * 0.25;
+      transformed.x += sw * ${strength.toFixed(3)} * hgt;
+      transformed.z += sw * ${(strength * 0.6).toFixed(3)} * hgt;`);
+  };
+  mat.customProgramCacheKey = () => 'wind' + strength;
 }
-function plantCellMesh(variant, cellKey, matrices) {
-  const out = [];
-  const parts = variant.bare ? [variant.tree.branchesMesh] : [variant.tree.branchesMesh, variant.tree.leavesMesh];
-  for (const src of parts) {
-    const m = new THREE.InstancedMesh(src.geometry, src.material, matrices.length);
-    matrices.forEach((mx, i) => m.setMatrixAt(i, mx));
-    m.castShadow = true; m.receiveShadow = true;
-    m.computeBoundingSphere();
-    scene.add(m); out.push(m);
+function loadScans(onDone) {
+  const L = new GLTFLoader();
+  for (const name of SCANS) {
+    L.load(ASSET_BASE + name + '.glb', (gltf) => {
+      gltf.scene.updateMatrixWorld(true);
+      // each top-level node is one variant (the fir file holds three different trees)
+      const tops = gltf.scene.children.length > 1 ? gltf.scene.children : [gltf.scene];
+      scan[name] = tops.map(top => {
+        const parts = [];
+        top.updateMatrixWorld(true);
+        const inv = new THREE.Matrix4().makeTranslation(-top.position.x, 0, -top.position.z);
+        top.traverse(o => {
+          if (!o.isMesh) return;
+          const geo = o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+          const mat = o.material;
+          const card = mat.alphaTest > 0 || mat.transparent;
+          if (card) { mat.transparent = false; mat.alphaTest = Math.max(0.35, mat.alphaTest); mat.side = THREE.DoubleSide; addWind(mat, name === 'fir' ? 0.006 : name === 'oak' ? 0.012 : 0.03); }
+          mat.envMapIntensity = 0.7;
+          parts.push({ geo, mat, card });
+        });
+        const bb = new THREE.Box3(); for (const p of parts) { p.geo.computeBoundingBox(); bb.union(p.geo.boundingBox); }
+        return { parts, height: bb.max.y - bb.min.y, radius: Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2 };
+      });
+      scansLoaded++;
+      if (scansLoaded === SCANS.length) onDone();
+    }, undefined, (e) => { console.warn('scan failed', name, e); scan[name] = []; scansLoaded++; if (scansLoaded === SCANS.length) onDone(); });
   }
-  if (!natureCells.has(cellKey)) natureCells.set(cellKey, []);
-  natureCells.get(cellKey).push(...out);
+}
+// one instanced mesh per part per cell; far cells draw only part of the leaf cards
+function plant(name, vi, key, mats, opts = {}) {
+  const v = scan[name] && scan[name][vi];
+  if (!v || !mats.length) return;
+  if (!natureCells.has(key)) natureCells.set(key, []);
+  for (const lod of [0, 1]) {
+    if (lod === 1 && opts.noFar) continue;
+    for (const p of v.parts) {
+      let geo = p.geo;
+      if (lod === 1 && p.card && geo.index) {
+        geo = new THREE.BufferGeometry();
+        for (const k in p.geo.attributes) geo.setAttribute(k, p.geo.attributes[k]);
+        geo.setIndex(p.geo.index);
+        geo.setDrawRange(0, Math.floor(p.geo.index.count * 0.35 / 3) * 3);
+      }
+      const m = new THREE.InstancedMesh(geo, p.mat, mats.length);
+      mats.forEach((mx, i) => m.setMatrixAt(i, mx));
+      m.castShadow = lod === 0 && !opts.noShadow; m.receiveShadow = true;
+      m.computeBoundingSphere();
+      m.userData.lod = lod; m.userData.range = opts.range || 1;
+      m.visible = false;
+      scene.add(m);
+      natureCells.get(key).push(m);
+    }
+  }
 }
 let natureReady = false;
 function buildNature() {
-  const V = {
-    oak: [makeTreeVariant('Oak Medium', 11, 13, { kind: 'oak' }), makeTreeVariant('Oak Large', 23, 17, { kind: 'oak' })],
-    ash: [makeTreeVariant('Ash Medium', 31, 15, { kind: 'ash' }), makeTreeVariant('Aspen Medium', 41, 14, { kind: 'aspen' })],
-    pine: [makeTreeVariant('Pine Medium', 51, 19, { kind: 'pine' }), makeTreeVariant('Pine Large', 61, 25, { kind: 'pine' }), makeTreeVariant('Pine Small', 71, 12, { kind: 'pine' })],
-    bush: [makeTreeVariant('Bush 1', 81, 1.7, { kind: 'bush' }), makeTreeVariant('Bush 2', 91, 1.4, { kind: 'bush' }), makeTreeVariant('Bush 3', 101, 2.0, { kind: 'bush' })],
-    dead: [makeTreeVariant('Ash Medium', 111, 11, { kind: 'dead', bare: true }), makeTreeVariant('Oak Medium', 121, 9, { kind: 'dead', bare: true })],
-  };
-  // gather placements per variant per cell
   const buckets = new Map();
-  const add = (v, x, z, s, ry, collide) => {
-    const y = terrainH(x, z) - 0.15 * s;
-    const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry), new THREE.Vector3(v.scale * s, v.scale * s, v.scale * s));
+  const put = (name, vi, x, z, s, ry, opts = {}) => {
+    const y = terrainH(x, z) - (opts.sink || 0.05) * s;
+    const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(opts.tilt || 0, ry, opts.tilt2 || 0)), new THREE.Vector3(s, s, s));
     const key = Math.floor(x / 100) + ',' + Math.floor(z / 100);
-    const bk = treeVariants.indexOf(v) + '|' + key;
-    if (!buckets.has(bk)) buckets.set(bk, { v, key, list: [] });
+    const bk = name + '|' + vi + '|' + key;
+    if (!buckets.has(bk)) buckets.set(bk, { name, vi, key, list: [], opts });
     buckets.get(bk).list.push(m);
-    if (collide) circles.push({ x, z, r: Math.max(0.25, Math.min(0.7, v.trunkR * s * 0.9)) });
+    if (opts.r) circles.push({ x, z, r: opts.r * s });
   };
   const r = mulberry32(2024);
   const clear = (x, z, pad) => {
     if (pathDist(x, z) < 5 + pad || riverDist(x, z) < 13 + pad || onBridge(x, z)) return false;
     if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + pad) return false;
     if (Math.hypot(x - CASTLE.x, z - CASTLE.z) < CASTLE.r + 10 + pad) return false;
-    if (Math.hypot(x - FORTRESS.x, z - FORTRESS.z) < FORTRESS.r + 20 + pad) return false;
+    if (Math.hypot(x - FORTRESS.x, z - FORTRESS.z) < FORTRESS.r + 22 + pad) return false;
     if (solidAt(x, z, 2 + pad)) return false;
     for (const c of CAMP_SPOTS) if (Math.hypot(x - c.x, z - c.z) < 14) return false;
     return true;
   };
   const spaced = [];
   const farEnough = (x, z, d) => { for (const p of spaced) if (Math.abs(p[0] - x) < d && Math.abs(p[1] - z) < d && Math.hypot(p[0] - x, p[1] - z) < d) return false; return true; };
-  // pine forests on the mountain slopes and the western woods
-  for (let i = 0, n = 0; i < 40000 && n < 620; i++) {
+  const firN = scan.fir.length;
+  // fir forests: the mountain slopes and the western woods
+  for (let i = 0, n = 0; i < 40000 && n < 420; i++) {
     const x = (r() * 2 - 1) * (HALF - 10), z = (r() * 2 - 1) * (HALF - 10);
-    const north = smooth(-110, -170, z), west = smooth(-200, -260, x);
-    const dens = Math.max(north, west) * (0.5 + 0.5 * fbm(x * 0.02, z * 0.02, 3));
+    const dens = Math.max(smooth(-110, -170, z), smooth(-200, -260, x)) * (0.5 + 0.5 * fbm(x * 0.02, z * 0.02, 3));
     if (r() > dens) continue;
     const h = terrainH(x, z), sl = slopeAt(x, z);
-    if (sl > 0.85 || h > 95 + fbm(x * 0.03, z * 0.03, 2) * 12 || !clear(x, z, 0) || !farEnough(x, z, 5.5)) continue;
+    if (sl > 0.85 || h > 95 + fbm(x * 0.03, z * 0.03, 2) * 12 || !clear(x, z, 0) || !farEnough(x, z, 6)) continue;
     spaced.push([x, z]);
-    add(V.pine[Math.floor(r() * 3)], x, z, 0.75 + r() * 0.5, r() * 6.28, true); n++;
+    put('fir', Math.floor(r() * Math.max(1, firN - 1)), x, z, 0.85 + r() * 0.45, r() * 6.28, { r: 0.35 });
+    n++;
   }
-  // broadleaf groves across the valley
-  for (let i = 0, n = 0; i < 40000 && n < 300; i++) {
+  // broadleaf groves across the valley, a few firs mixed in
+  for (let i = 0, n = 0; i < 40000 && n < 260; i++) {
     const x = (r() * 2 - 1) * (HALF - 10), z = -100 + r() * (HALF + 90);
     if (x > BATTLE_X - 25) continue;
-    const grove = fbm(x * 0.012 + 3, z * 0.012, 3);
-    if (grove < 0.12 && r() > 0.04) continue;
+    if (fbm(x * 0.012 + 3, z * 0.012, 3) < 0.1 && r() > 0.04) continue;
     if (!clear(x, z, 0) || slopeAt(x, z) > 0.6 || !farEnough(x, z, 7)) continue;
     spaced.push([x, z]);
-    const v = r() < 0.55 ? V.oak[Math.floor(r() * 2)] : V.ash[Math.floor(r() * 2)];
-    add(v, x, z, 0.8 + r() * 0.45, r() * 6.28, true); n++;
+    if (r() < 0.75) put('oak', 0, x, z, 1.0 + r() * 0.6, r() * 6.28, { r: 0.3 });
+    else put('fir', Math.floor(r() * firN), x, z, 0.8 + r() * 0.4, r() * 6.28, { r: 0.35 });
+    n++;
   }
-  // dead, burned trees on the battlefield
-  for (let i = 0, n = 0; i < 5000 && n < 45; i++) {
-    const x = BATTLE_X + r() * (HALF - BATTLE_X - 10), z = (r() * 2 - 1) * (HALF - 20);
+  // forest floor: ferns, roots, stumps, fallen dry branches, moss, near the trees
+  for (const [tx, tz] of spaced.slice()) {
+    const k = r();
+    if (k < 0.55) for (let j = 0; j < 3; j++) { const a = r() * 6.28, d = 1.5 + r() * 4; const x = tx + Math.cos(a) * d, z = tz + Math.sin(a) * d; if (!solidAt(x, z, 0.5) && pathDist(x, z) > 3) put('fern_02', 0, x, z, 0.8 + r() * 0.8, r() * 6.28, { noShadow: true, range: 0.6 }); }
+    if (k > 0.85) { const a = r() * 6.28, x = tx + Math.cos(a) * 3, z = tz + Math.sin(a) * 3; put(r() < 0.5 ? 'tree_stump_01' : 'root_cluster_01', 0, x, z, 0.8 + r() * 0.5, r() * 6.28, { r: 0.4 }); }
+    if (k > 0.6 && k < 0.72) { const a = r() * 6.28, x = tx + Math.cos(a) * 4, z = tz + Math.sin(a) * 4; put('dry_branches_medium_01', 0, x, z, 1, r() * 6.28, { noShadow: true, range: 0.6 }); }
+    if (k > 0.4 && k < 0.5) { const a = r() * 6.28, x = tx + Math.cos(a) * 2, z = tz + Math.sin(a) * 2; put('moss_01', 0, x, z, 1 + r(), r() * 6.28, { noShadow: true, range: 0.6 }); }
+  }
+  // grass clumps scattered in the fields (the short blades are drawn separately)
+  for (let i = 0, n = 0; i < 20000 && n < 700; i++) {
+    const x = (r() * 2 - 1) * (HALF - 10), z = -150 + r() * (HALF + 140);
+    if (x > BATTLE_X + 30 || pathDist(x, z) < 3 || riverDist(x, z) < 12 || solidAt(x, z, 1) || onBridge(x, z)) continue;
+    if (Math.hypot(x - SQUARE.x, z - SQUARE.z) < SQUARE.r + 4) continue;
+    const sp = splatAt(x, z, terrainH(x, z), slopeAt(x, z));
+    if (sp.grass < 0.6) continue;
+    put(r() < 0.5 ? 'grass_medium_01' : 'grass_medium_02', 0, x, z, 0.8 + r() * 0.6, r() * 6.28, { noShadow: true, range: 0.6, noFar: true });
+    n++;
+  }
+  // dead trees on the battlefield, fallen trunks in the woods
+  for (let i = 0, n = 0; i < 5000 && n < 60; i++) {
+    const battle = n < 40;
+    const x = battle ? BATTLE_X + r() * (HALF - BATTLE_X - 10) : (r() * 2 - 1) * (HALF - 20), z = (r() * 2 - 1) * (HALF - 20);
     if (!clear(x, z, 0) || !farEnough(x, z, 9)) continue;
     spaced.push([x, z]);
-    add(V.dead[Math.floor(r() * 2)], x, z, 0.8 + r() * 0.5, r() * 6.28, true); n++;
+    put(r() < 0.5 ? 'dead_tree_trunk' : 'dead_tree_trunk_02', 0, x, z, 0.9 + r() * 0.5, r() * 6.28, { r: 0.4 });
+    n++;
   }
-  // bushes along the river, forest edges and fields
-  for (let i = 0, n = 0; i < 30000 && n < 700; i++) {
-    const x = (r() * 2 - 1) * (HALF - 10), z = -180 + r() * (HALF + 170);
-    const rd = riverDist(x, z);
-    const near = rd < 26 ? 0.6 : 0.08 + Math.max(0, fbm(x * 0.03, z * 0.03, 2)) * 0.5;
-    if (r() > near || x > BATTLE_X + 10) continue;
-    if (rd < 12.5 || pathDist(x, z) < 3.5 || solidAt(x, z, 1.5) || Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r - 18 || slopeAt(x, z) > 0.7) continue;
-    if (Math.hypot(x - CASTLE.x, z - CASTLE.z) < CASTLE.r + 2) continue;
-    add(V.bush[Math.floor(r() * 3)], x, z, 0.7 + r() * 0.7, r() * 6.28, false); n++;
-  }
-  for (const b of buckets.values()) plantCellMesh(b.v, b.key, b.list);
-  buildRocks(r);
-  natureReady = true;
-}
-// mossy boulders: real rock texture with moss growing on the tops
-let rockMat = null;
-function buildRocks(r) {
-  rockMat = pbr('mossy_rock', { roughness: 1 });
-  for (const k of ['map', 'normalMap', 'roughnessMap']) rockMat[k].repeat.set(1.5, 1.5);
-  const shapes = [];
-  for (let k = 0; k < 4; k++) {
-    const g = new THREE.IcosahedronGeometry(1, 3);
-    const p = g.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-      const n = 1 + fbm(x * 1.6 + k * 9, z * 1.6 + y * 1.3, 4) * 0.42;
-      p.setXYZ(i, x * n * (1 + k * 0.12), y * n * (0.55 + k * 0.08), z * n);
-    }
-    g.computeVertexNormals();
-    shapes.push({ g, list: [] });
-  }
-  for (let i = 0, n = 0; i < 20000 && n < 320; i++) {
+  // boulders and mossy rocks: mountains, river banks, fields
+  for (let i = 0, n = 0; i < 20000 && n < 260; i++) {
     const x = (r() * 2 - 1) * (HALF - 10), z = (r() * 2 - 1) * (HALF - 10);
     const sl = slopeAt(x, z), rd = riverDist(x, z);
     const want = (z < -120 ? 0.25 : 0.03) + (sl > 0.5 ? 0.2 : 0) + (rd > 11 && rd < 18 ? 0.25 : 0);
     if (r() > want) continue;
     if (pathDist(x, z) < 4 || onBridge(x, z) || solidAt(x, z, 2) || Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r - 10 || Math.hypot(x - CASTLE.x, z - CASTLE.z) < CASTLE.r) continue;
-    const s = 0.4 + r() ** 2.2 * (z < -120 ? 4.5 : 2.2);
-    shapes[Math.floor(r() * 4)].list.push({ x, z, s, ry: r() * 6.28 });
-    if (s > 0.6) circles.push({ x, z, r: s * 0.85 });
+    const big = z < -120 && r() < 0.5;
+    const name = big ? 'namaqualand_boulder_02' : r() < 0.5 ? 'rock_moss_set_01' : 'rock_moss_set_02';
+    const v = scan[name] && scan[name][0];
+    const s = (big ? 1.2 + r() * 2.5 : 0.7 + r() * 1.4);
+    put(name, 0, x, z, s, r() * 6.28, { sink: 0.1, r: v ? v.radius * 0.8 : 0.6, range: big ? 1 : 0.8 });
     n++;
   }
-  for (const sh of shapes) {
-    const m = new THREE.InstancedMesh(sh.g, rockMat, sh.list.length);
-    sh.list.forEach((o, i) => m.setMatrixAt(i, new THREE.Matrix4().compose(new THREE.Vector3(o.x, terrainH(o.x, o.z) + o.s * 0.15, o.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), o.ry), new THREE.Vector3(o.s, o.s, o.s))));
-    m.castShadow = m.receiveShadow = true; m.computeBoundingSphere();
-    scene.add(m);
-  }
+  for (const b of buckets.values()) plant(b.name, b.vi, b.key, b.list, b.opts);
+  placeCampScans();
+  natureReady = true;
 }
-// far forest cells are hidden (fog covers the edge)
+// scanned props at the camps: fire pits, crates, shields leaning on things
+function placeCampScans() {
+  const r = mulberry32(31);
+  const props = new Map();
+  const add = (name, x, z, s, ry, y) => {
+    const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y ?? terrainH(x, z), z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new THREE.Vector3(s, s, s));
+    const key = Math.floor(x / 100) + ',' + Math.floor(z / 100);
+    const k = name + '|' + key;
+    if (!props.has(k)) props.set(k, { name, key, list: [] });
+    props.get(k).list.push(m);
+  };
+  for (const c of CAMP_SPOTS) {
+    if (!(Math.hypot(c.x - CASTLE.x, c.z - CASTLE.z) < CASTLE.r)) add('stone_fire_pit', c.x, c.z, 1.1, r() * 6.28);
+    for (let i = 0; i < 3; i++) { const a = r() * 6.28, d = 4 + r() * 2, x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d; if (!solidAt(x, z, 0.6)) { add('wooden_crate_01', x, z, 1, r() * 6.28); circles.push({ x, z, r: 0.45 }); } }
+    const a = r() * 6.28, x = c.x + Math.cos(a) * 3, z = c.z + Math.sin(a) * 3; add('kite_shield', x, z, 1, a);
+  }
+  for (const p of props.values()) plant(p.name, 0, p.key, p.list, { range: 0.8 });
+}
 let natureCheck = 0;
 function updateNature(dt, t) {
-  for (const v of treeVariants) if (!v.bare) v.tree.update(t);
+  windUniforms.uTime.value = t;
   natureCheck -= dt;
   if (natureCheck > 0) return;
-  natureCheck = 0.5;
-  const px = Math.floor(camera.position.x / 100), pz = Math.floor(camera.position.z / 100);
+  natureCheck = 0.4;
+  const cx0 = camera.position.x / 100, cz0 = camera.position.z / 100;
   for (const [key, list] of natureCells) {
     const [cx, cz] = key.split(',').map(Number);
-    const vis = Math.max(Math.abs(cx - px), Math.abs(cz - pz)) <= 3;
-    for (const m of list) m.visible = vis;
+    // distance from the camera to the nearest edge of the cell, in cells
+    const dx = Math.max(0, Math.abs(cx + 0.5 - cx0) - 0.5), dz = Math.max(0, Math.abs(cz + 0.5 - cz0) - 0.5), d = Math.hypot(dx, dz);
+    for (const m of list) {
+      const near = d < 0.9 * m.userData.range;
+      m.visible = m.userData.lod === 0 ? near : !near && d < 3.2 * m.userData.range;
+    }
   }
 }
 
@@ -1250,10 +1304,8 @@ function buildCamps() {
   for (const c of CAMP_SPOTS) {
     if (Math.hypot(c.x - CASTLE.x, c.z - CASTLE.z) < CASTLE.r) { addFire(c.x + 4, terrainH(c.x + 4, c.z) + 0.1, c.z + 2, 0.75); continue; }
     const y = terrainH(c.x, c.z);
-    // campfire: stone ring, logs, flames
-    for (let i = 0; i < 9; i++) { const a = i * 0.7; B.add(MAT.stone, new THREE.DodecahedronGeometry(0.22), c.x + Math.cos(a) * 0.7, y + 0.1, c.z + Math.sin(a) * 0.7, a); }
-    for (let i = 0; i < 4; i++) B.add(MAT.char, cylW(0.08, 0.08, 1.1, 7, 1), c.x, y + 0.15, c.z, i * 0.8, 0, Math.PI / 2 - 0.2);
-    addFire(c.x, y + 0.15, c.z, 0.8);
+    // campfire flames (the scanned stone fire pit goes under them)
+    addFire(c.x, y + 0.25, c.z, 0.8);
     circles.push({ x: c.x, z: c.z, r: 0.9 });
     // tents around it
     const n = 2 + Math.floor(r() * 2);
@@ -1319,6 +1371,7 @@ function updateSky(dt = 0) {
   moonMesh.position.copy(camera.position).addScaledVector(sunDir, -1500);
   moonMesh.visible = night > 0.05;
   renderer.toneMappingExposure = 0.6 + night * 0.25;
+  if (hdrEnv && envRT) scene.environment = e > 0.12 ? hdrEnv : envRT.texture;
   scene.environmentIntensity = (0.2 + 0.8 * day) * (1 - weather.rain * 0.4);
   // fog: thick and gray on the battlefield, white haze in the snow
   const px = player.pos.x, pz = player.pos.z;
@@ -3567,15 +3620,15 @@ document.addEventListener('pointerlockchange', () => {
 buildWorld();
 let modelReady = false;
 const loader = new GLTFLoader();
-setTimeout(() => {
-  try { buildNature(); } catch (e) { console.error('nature failed', e); natureReady = true; }
-}, 30);
+loadScans(() => { try { buildNature(); } catch (e) { console.error('nature failed', e); natureReady = true; } });
+// a real photographed sky lights and reflects on everything in daytime
+new RGBELoader().load('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr', (t) => { t.mapping = THREE.EquirectangularReflectionMapping; hdrEnv = pmrem.fromEquirectangular(t).texture; t.dispose(); });
 loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb', (gltf) => {
   soldierGLTF = gltf; modelReady = true;
 }, undefined, (err) => { console.error(err); $('loadText').textContent = 'Could not load the knight model. Check your internet and refresh.'; $('playBtn').textContent = 'LOAD FAILED'; });
 let worldStarted = false;
 function checkReady() {
-  const pct = Math.round(((texDone / Math.max(1, texPending)) * 0.6 + (modelReady ? 0.25 : 0) + (natureReady ? 0.15 : 0)) * 100);
+  const pct = Math.round(((texDone / Math.max(1, texPending)) * 0.35 + (modelReady ? 0.15 : 0) + (scansLoaded / SCANS.length) * 0.45 + (natureReady ? 0.05 : 0)) * 100);
   if (!worldStarted) $('loadText').textContent = 'Loading the world... ' + pct + '%';
   if (worldStarted || !modelReady || !natureReady || texDone < texPending) return;
   worldStarted = true;
@@ -3688,6 +3741,8 @@ updateGrass(player.pos.x, player.pos.z, true);
 frame();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
 window.__game = { get player() { return player; }, fighters, setTime: (h) => { dayT = h / 24; }, keys, mouse, settings, gore, stats, get yaw() { return yaw; }, set yaw(v) { yaw = v; }, startAttack: (d, k) => player.startAttack(d, k), start: () => { audioInit(); $('title').style.display = 'none'; $('hud').classList.add('on'); playing = true; paused = false; } };
+window.__W = { SQUARE, CASTLE, BRIDGE, BATTLE_X, FORTRESS, groundH };
+window.__dbg = () => ({ modelReady, natureReady, texDone, texPending, worldStarted, scans: scansLoaded + '/' + SCANS.length, cells: natureCells.size, inst: [...natureCells.values()].flat().reduce((a, m) => a + m.count, 0), fps: $('fps').textContent });
 </script>
 </body>
 </html>

@@ -25,6 +25,7 @@ function updateSky(dt = 0) {
   moonMesh.position.copy(camera.position).addScaledVector(sunDir, -1500);
   moonMesh.visible = night > 0.05;
   renderer.toneMappingExposure = 0.6 + night * 0.25;
+  if (hdrEnv && envRT) scene.environment = e > 0.12 ? hdrEnv : envRT.texture;
   scene.environmentIntensity = (0.2 + 0.8 * day) * (1 - weather.rain * 0.4);
   // fog: thick and gray on the battlefield, white haze in the snow
   const px = player.pos.x, pz = player.pos.z;
