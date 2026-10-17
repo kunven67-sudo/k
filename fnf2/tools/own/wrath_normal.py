@@ -585,6 +585,59 @@ def icon(sprites, path):
     sheet.save(path)
 
 
+def pixel_icon(png_path):
+    """Freeplay capsule icon (PixelatedIcon): his head shrunk to pixel art in his own colours with a
+    1px dark outline, 50x50 frames laid out like bfpixel (idle, confirm squash -> stretch -> hold)."""
+    import cv2
+    rgba, parts = _parts_cache
+    H, W = rgba.shape[:2]
+
+    def head(mouth, rot=0):
+        im = Image.new('RGBA', (W, H))
+        for nm in ('head', 'mouth_' + mouth): im.alpha_composite(Image.fromarray(parts[nm], 'RGBA'))
+        if rot: im = im.rotate(rot, resample=Image.BICUBIC, center=NECK)
+        c, _, _ = P.crop_alpha(np.array(im), 0)
+        return c
+    src = head('frown')
+    px = src[src[..., 3] > 200][:, :3].astype(np.float32)
+    _, _, pal = cv2.kmeans(px, 12, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 40, 0.5), 4, cv2.KMEANS_PP_CENTERS)
+    pal = pal.astype(np.uint8)
+    PL = cv2.cvtColor(pal.reshape(1, -1, 3), cv2.COLOR_RGB2LAB).reshape(-1, 3).astype(np.float32)
+    k4 = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
+    ink = (22, 18, 34)
+
+    def pix(c, h, sx=1.0, sy=1.0):
+        k = h / c.shape[0]
+        w, hh = max(1, round(c.shape[1] * k * sx)), max(1, round(c.shape[0] * k * sy))
+        sm = cv2.resize(c, (w, hh), interpolation=cv2.INTER_AREA)
+        al = sm[..., 3] > 110
+        L = cv2.cvtColor(sm[..., :3].reshape(1, -1, 3), cv2.COLOR_RGB2LAB).reshape(-1, 3).astype(np.float32)
+        idx = np.argmin(((L[:, None, :] - PL[None]) ** 2).sum(2), 1).reshape(al.shape)
+        o = np.zeros((hh + 2, w + 2, 4), np.uint8)
+        o[1:-1, 1:-1, :3] = pal[idx]; o[1:-1, 1:-1, 3] = np.where(al, 255, 0)
+        A = o[..., 3] > 0
+        ring = ndimage.binary_dilation(A, structure=k4) & ~A
+        edge = A & ~ndimage.binary_erosion(A, structure=k4)
+        o[edge, :3] = ink; o[ring, :3] = ink; o[ring, 3] = 255
+        return P.crop_alpha(o, 0)[0]
+    frames = [('idle0001', pix(src, 32)),
+              ('confirm0001', pix(src, 32)),
+              ('confirm0002', pix(head('aa'), 32, 1.08, 0.84)),
+              ('confirm0003', pix(head('aa', 8), 32, 0.88, 1.14)),
+              ('confirm0004', pix(head('aa', 4), 32)),
+              ('confirm-hold0001', pix(head('aa', 4), 32))]
+    sheetW = sum(f.shape[1] + 1 for _, f in frames); sheetH = max(f.shape[0] for _, f in frames)
+    sheet = Image.new('RGBA', (sheetW, sheetH)); x = 0; subs = []
+    for name, f in frames:
+        sheet.alpha_composite(Image.fromarray(f, 'RGBA'), (x, 0))
+        fx, fy = (50 - f.shape[1]) // 2, 44 - f.shape[0]          # centred, standing on the same line as bfpixel
+        subs.append('  <SubTexture name="%s" x="%d" y="0" width="%d" height="%d" frameX="-%d" frameY="-%d" frameWidth="50" frameHeight="50"/>' % (name, x, f.shape[1], f.shape[0], fx, fy))
+        x += f.shape[1] + 1
+    os.makedirs(os.path.dirname(png_path), exist_ok=True)
+    sheet.save(png_path)
+    open(png_path[:-4] + '.xml', 'w').write('<?xml version="1.0" encoding="UTF-8"?>\n<TextureAtlas imagePath="%s">\n%s\n</TextureAtlas>\n' % (os.path.basename(png_path), '\n'.join(subs)))
+
+
 _parts_cache = None
 
 
@@ -599,6 +652,7 @@ def write(out_root):
           'healthIcon': {'id': ID}, 'healthColor': '#4a78d0',
           'animations': [dict({'name': v, 'prefix': k}, **({'looped': True} if v == 'snap' else {})) for k, v in names.items()]}
     icon(sprites, os.path.join(out_root, 'preload/images/icons', 'icon-' + ID + '.png'))
+    pixel_icon(os.path.join(out_root, 'preload/images/freeplay/icons', 'wrathpixel.png'))
     cd = os.path.join(out_root, 'preload/data/characters'); os.makedirs(cd, exist_ok=True)
     json.dump(ch, open(os.path.join(cd, ID + '.json'), 'w'), indent=1)
     print('atlas', size, 'frames', sum(len(f) for _, f in seq))

@@ -22,6 +22,7 @@ from scipy import ndimage, signal
 FNF = os.environ.get('FNF_ASSETS', '/home/user/funkincrew/funkin.assets')
 SR = 44100
 BPM = 150
+BUSIER = os.environ.get('GLARE_BUSIER', '1') == '1'
 BEAT = 60 / BPM
 RNG = np.random.default_rng(7)
 
@@ -378,6 +379,57 @@ BF_SYL = [('bopeebo/Voices-bf.ogg', 17.1, 0.27), ('bopeebo/Voices-bf.ogg', 21.91
 WRATH_SYL = [('bopeebo/Voices-dad.ogg', 14.7, 0.28), ('bopeebo/Voices-dad.ogg', 15.3, 0.16), ('bopeebo/Voices-dad.ogg', 14.4, 0.2), ('bopeebo/Voices-dad.ogg', 4.8, 0.5)]
 
 
+# how busy each section gets (FNF-style 16th pickups, passing notes, quick repeats added on top of
+# the written melody). 0 = sung exactly as written. The extra notes are only charted on Hard.
+BUSY = {4: 0.4, 8: 0.4, 12: 0.8, 16: 0.8, 20: 0.9, 24: 0.0, 28: 0.0, 32: 0.0,
+        36: 0.85, 40: 0.85, 44: 0.95, 48: 0.95, 52: 0.95, 56: 0.0, 60: 0.0, 64: 0.5}
+SCALE1 = [57, 59, 60, 62, 64, 65, 67, 68, 69]          # A minor (+G#) - stage 1
+SCALE2 = [57, 58, 60, 62, 64, 65, 68, 69]              # A minor with Bb + G# - the eye
+
+
+def busier(notes):
+    """Fill the gaps in each singer's line like real FNF vocals: a passing note or a quick repeat
+    between two 8ths, a pickup before the next note after a quarter. Same tune, more to hit."""
+    rng = np.random.default_rng(7)
+    out = list(notes)
+    for who in 'wb':
+        seq = [x for x in notes if x['who'] == who]
+        for x, nx in zip(seq, seq[1:]):
+            p = BUSY.get(int(x['beat'] // 4) // 4 * 4, 0.0)
+            if p <= 0 or nx['beat'] - x['beat'] > 2.0 + 1e-6: continue
+            gap, scale = nx['beat'] - x['beat'], (SCALE2 if x['stage'] == 2 else SCALE1)
+            def step(m, d):
+                o = (m // 12 - 4) * 12 if False else 0
+                pc = [v + 12 * k for k in range(-3, 3) for v in scale]
+                pc = sorted(set(pc)); i = min(range(len(pc)), key=lambda j: abs(pc[j] - m))
+                return pc[max(0, min(len(pc) - 1, i + d))]
+            if abs(gap - 0.5) < 1e-6 and x['len'] <= 0.5 + 1e-6 and rng.random() < p:
+                d = nx['m'] - x['m']
+                m2 = x['m'] if (d == 0 or rng.random() < 0.25) else step(x['m'], 1 if d > 0 else -1)
+                x['len'] = 0.25
+                out.append({'who': who, 'beat': x['beat'] + 0.25, 'len': 0.25, 'm': m2, 'stage': x['stage'], 'extra': True})
+            elif abs(gap - 0.75) < 1e-6 and x['len'] <= 0.75 + 1e-6 and rng.random() < p:
+                x['len'] = 0.5                          # a 16th right before the next note
+                out.append({'who': who, 'beat': x['beat'] + 0.5, 'len': 0.25, 'm': step(nx['m'], -1 if nx['m'] >= x['m'] else 1), 'stage': x['stage'], 'extra': True})
+            elif gap >= 1.5 - 1e-6 and x['len'] <= 1.0 + 1e-6 and rng.random() < p * 0.7:
+                x['len'] = min(x['len'], 0.5)           # fill a held gap: answer note + pickup
+                e = x['beat'] + gap
+                out.append({'who': who, 'beat': e - 1.0, 'len': 0.5, 'm': step(x['m'], 1), 'stage': x['stage'], 'extra': True})
+                out.append({'who': who, 'beat': e - 0.25, 'len': 0.25, 'm': step(nx['m'], -1 if nx['m'] >= x['m'] else 1), 'stage': x['stage'], 'extra': True})
+            elif abs(gap - 1.0) < 1e-6 and x['len'] <= 0.75 + 1e-6 and rng.random() < p:
+                d = nx['m'] - x['m']
+                if rng.random() < 0.5:              # two 16th pickups into the next note
+                    x['len'] = min(x['len'], 0.5)
+                    a = step(nx['m'], -2 if d >= 0 else 2); b = step(nx['m'], -1 if d >= 0 else 1)
+                    out.append({'who': who, 'beat': x['beat'] + 0.5, 'len': 0.25, 'm': a, 'stage': x['stage'], 'extra': True})
+                    out.append({'who': who, 'beat': x['beat'] + 0.75, 'len': 0.25, 'm': b, 'stage': x['stage'], 'extra': True})
+                else:                               # an 8th answer note
+                    x['len'] = min(x['len'], 0.5)
+                    out.append({'who': who, 'beat': x['beat'] + 0.5, 'len': 0.5, 'm': step(x['m'], 1 if d >= 0 else -1), 'stage': x['stage'], 'extra': True})
+    out.sort(key=lambda x: (x['beat'], x['who']))
+    return out
+
+
 def sung():
     """Every sung note: who, beat (from the song start), length (beats), midi (as written), stage."""
     out = []
@@ -386,7 +438,7 @@ def sung():
             w, (b, l, nn) = (who, x) if who else (x[0], x[1:])
             out.append({'who': w, 'beat': bar * 4 + b, 'len': l, 'm': n(nn), 'stage': 2 if bar >= S2 else 1})
     out.sort(key=lambda x: (x['beat'], x['who']))
-    return out
+    return busier(out) if BUSIER else out
 
 
 # ---------------------------------------------------------------- arranging
@@ -676,25 +728,39 @@ def lanes(notes):
             prev = x
 
 
+JUMP = {0: 3, 3: 0, 1: 2, 2: 1}                 # the other arrow of a two-arrow jump
+
+
 def chart(notes):
     lanes(notes)
     out = {'easy': [], 'normal': [], 'hard': []}
     last_easy = {'w': -9.0, 'b': -9.0}
+    prev_end = {'w': -9.0, 'b': -9.0}
     for x in notes:
         nt = {'t': round(x['beat'] * BEAT * 1000, 2), 'd': x['lane'] + (4 if x['who'] == 'w' else 0)}
         if x['len'] >= 0.75: nt['l'] = round((x['len'] - 0.25) * BEAT * 1000, 2)
+        # Hard: every sung note (incl. the busy extras) + jumps where a phrase starts after a rest
+        # and on the big held notes, like FNF's hard charts
         out['hard'].append(nt)
+        starts = x['beat'] - prev_end[x['who']] >= 1.5 - 1e-6 and abs(x['beat'] % 2) < 1e-6
+        if starts or x['len'] >= 1.5 - 1e-6:
+            j = dict(nt); j['d'] = JUMP[x['lane']] + (4 if x['who'] == 'w' else 0); out['hard'].append(j)
+            if x['len'] >= 1.5 - 1e-6 and x['stage'] == 2: out['normal'].append(j)
+        prev_end[x['who']] = x['beat'] + x['len']
+        if x.get('extra'): continue
+        # Normal: the melody as written. Easy: the 8th-note melody, at least a beat apart
+        out['normal'].append(nt)
         on8 = abs(x['beat'] * 2 - round(x['beat'] * 2)) < 1e-6
-        if on8: out['normal'].append(nt)
-        if on8 and x['beat'] - last_easy[x['who']] >= 1 - 1e-6:
+        if on8 and x['beat'] - last_easy[x['who']] >= 0.75 - 1e-6:
             out['easy'].append(nt); last_easy[x['who']] = x['beat']
+    for k in out: out[k].sort(key=lambda q: (q['t'], q['d']))
     events = [{'t': 0, 'e': 'FocusCamera', 'v': 1}]
     for bar, who in CAMERA[1:]: events.append({'t': round(T(bar) * 1000, 2), 'e': 'FocusCamera', 'v': who})
     events.append({'t': round(T(SNAP, 2) * 1000, 2), 'e': 'WrathSnap', 'v': {}})
     events.append({'t': round(T(35) * 1000, 2), 'e': 'WrathEye', 'v': {}})            # the eye opens: stage 2
     events.append({'t': round(T(OUT) * 1000, 2), 'e': 'PlayAnimation', 'v': {'target': 'bf', 'anim': 'hey', 'force': True}})
     events.sort(key=lambda e: e['t'])
-    return {'version': '2.0.0', 'scrollSpeed': {'easy': 1.8, 'normal': 2.2, 'hard': 2.6}, 'events': events, 'notes': out,
+    return {'version': '2.0.0', 'scrollSpeed': {'easy': 2.0, 'normal': 2.4, 'hard': 2.8}, 'events': events, 'notes': out,
             'generatedBy': 'FNF 2 - tools/own/glare.py'}
 
 
@@ -703,7 +769,7 @@ META = {
     'playData': {
         'difficulties': ['easy', 'normal', 'hard'],
         'characters': {'player': 'bf', 'girlfriend': 'gf', 'opponent': 'wrath-normal', 'opponentVocals': ['wrath'], 'playerVocals': ['bf']},
-        'stage': 'phillyStreets', 'noteStyle': 'funkin', 'ratings': {'easy': 3, 'normal': 5, 'hard': 7},
+        'stage': 'phillyStreets', 'noteStyle': 'funkin', 'ratings': {'easy': 4, 'normal': 7, 'hard': 11},
     },
     'generatedBy': 'FNF 2 - tools/own/glare.py',
     'timeChanges': [{'t': 0, 'b': 0, 'bpm': BPM, 'bt': [4, 4, 4, 4]}],
