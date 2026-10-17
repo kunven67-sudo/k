@@ -32,6 +32,8 @@ const RULES = {
   screens: { sev: 0.4, what: 'using screens when you were banned' },
   grounded: { sev: 0.75, what: 'leaving the house while you\'re grounded' },
   shoplifting: { sev: 0.85, what: 'stealing from the store' },
+  'skip-school': { sev: 0.9, what: 'skipping school' },
+  homework: { sev: 0.3, what: 'not doing your homework' },
 };
 const STYLE_K = { strict: 1.5, overprotective: 1.25, chill: 0.65, fun: 0.55, 'doesnt-care': 0.2 };
 const LOT = LOTS.find((l) => l.family);
@@ -51,6 +53,7 @@ export class Rules {
       bus.on('rule:tattle', (e) => this._tattle(e)),
       bus.on('clock:hour', () => this._hourly()),
       bus.on('tv:changed', ({ channel }) => channel && this._screens()),
+      bus.on('school:note', () => this._incident({ rule: 'homework', sev: 0.3, t: clock.total, evidence: 'call' })),
     ];
   }
 
@@ -131,7 +134,7 @@ export class Rules {
 
   _broken({ rule, severity, by, witnessed }) {
     if (clock.age >= 18) return;
-    if (rule === 'shoplifting') {
+    if (rule === 'shoplifting' || rule === 'skip-school') {
       // The store has your face on camera; the manager calls home.
       this._incident({ rule, sev: severity ?? 0.85, t: clock.total, evidence: 'call', by: by || null });
       return;
@@ -204,6 +207,14 @@ export class Rules {
       if (!this.inYard(pl) || !this.life.world.isIndoors(pl)) {
         d.missingSince ??= clock.total;
         d.missingAtNight = true;
+      }
+    }
+    // School day, still at home at 7:50: "You're going to be late!"
+    if (this.life.school?._schoolDay() && hf > 7.85 && hf < 8.6 && !this.life.school.d.attended[clock.dayIndex] && this.inYard(pl) && d.nudgeDay !== clock.dayIndex) {
+      const seen = this.people.witnesses(pl, { noise: 0.2 }).find((n) => n.rec.family && n.rec.role !== 'sibling');
+      if (seen) {
+        d.nudgeDay = clock.dayIndex;
+        this.people.say(seen, `${save.life.character.name}! You're going to be late for school! Go, go, go!`, { loud: true });
       }
     }
     // Up past bedtime and a parent sees you.
@@ -288,7 +299,12 @@ export class Rules {
       heard: `I heard that. ${cap(R.what)}? Excuse me?`,
       told: `${sib?.rec.name || 'Somebody'} told me you were ${R.what}. Is that true?`,
       trace: inc.rule === 'beer' ? 'There are beers missing from the garage fridge. Do you know anything about that?' : inc.rule === 'stealing' ? `There's ${inc.amount ? '$' + inc.amount.toFixed(0) : 'money'} missing from my dresser. Did you take it?` : 'Somebody ate almost all the cookies. Was that you?',
-      call: `The manager at the store just called me. They say you tried to walk out without paying. ${name}, what were you thinking?`,
+      call:
+        inc.rule === 'skip-school'
+          ? `The school called me at work. You weren't in class today. Where were you?`
+          : inc.rule === 'homework'
+            ? 'Your teacher sent a note home. You didn\'t turn in your homework?'
+            : `The manager at the store just called me. They say you tried to walk out without paying. ${name}, what were you thinking?`,
     }[inc.evidence] || `We need to talk about ${R.what}.`;
     const extra = inc.rule === 'outside' || inc.rule === 'night' ? ` Where were you?! I've been worried sick${inc.gone > 120 ? ' for hours' : ''}.` : '';
     const panel = openPanel({ title: `${p.displayName()} wants a word`, sub: inc.sev > 0.7 ? 'You are in big trouble.' : inc.sev > 0.35 ? "You're in trouble." : 'Uh oh.', closable: false, className: 'talk' });

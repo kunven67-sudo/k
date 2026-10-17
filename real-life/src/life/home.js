@@ -147,7 +147,13 @@ export class Home {
         add({ size: [0.5, 0.7, 0.5], label: () => (this.d.trash > 0.7 ? 'Take out the trash (full)' : 'Trash can'), use: () => this.trash() });
         break;
       case 'desk':
-        add({ size: [1.4, 0.4, 0.8], label: () => 'Draw at your desk', use: () => this.activity('You draw for a while.', 'fun', 0.25, 30) });
+        add({
+          size: [1.4, 0.4, 0.8],
+          label: () => (this.life.school?.homeworkLeft ? `Do your homework (${this.life.school.d.homework.subject})` : 'Draw at your desk'),
+          use: () => (this.life.school?.doHomework() ? null : this.activity('You draw for a while.', 'fun', 0.25, 30)),
+          alt: { key: 'F', text: 'Draw' },
+          useAlt: () => this.activity('You draw for a while.', 'fun', 0.25, 30),
+        });
         break;
       case 'pc':
         add({

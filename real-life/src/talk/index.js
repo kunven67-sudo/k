@@ -73,7 +73,7 @@ export class Talk {
       lastName: this.people.family[0]?.rec.last,
       weather: this.world.weather,
       badWeather: (this.world.weather?.rain || 0) > 0.3,
-      homeworkLeft: false,
+      homeworkLeft: !!this.life.school?.homeworkLeft,
     };
   }
 

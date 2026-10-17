@@ -166,9 +166,10 @@ export function buildNav(world) {
   }
 
   // ------------------------------------------------------------------ school front door (kids walk there)
-  const schoolDoor = nav.add(V(SCHOOL.x0 - 1.4, Y, (SCHOOL.z0 + SCHOOL.z1) / 2), { tag: 'school' });
-  const schoolWalk = nav.add(V((xE + SCHOOL.x0) / 2, Y, (SCHOOL.z0 + SCHOOL.z1) / 2), { tag: 'school' });
-  nav.chain([nav.nearest(V(xE, Y, (SCHOOL.z0 + SCHOOL.z1) / 2), (n) => elmE.includes(n.id)), schoolWalk, schoolDoor]);
+  const sdz = (SCHOOL.z0 + 20 + SCHOOL.z1 - 6) / 2; // the main doors (see town.js buildSchool)
+  const schoolDoor = nav.add(V(SCHOOL.x0 + 8 - 1.4, Y, sdz), { tag: 'school' });
+  const schoolWalk = nav.add(V((xE + SCHOOL.x0 + 8) / 2, Y, sdz), { tag: 'school' });
+  nav.chain([nav.nearest(V(xE, Y, sdz), (n) => elmE.includes(n.id)), schoolWalk, schoolDoor]);
   world.schoolDoorNode = schoolDoor;
 
   // ------------------------------------------------------------------ park
