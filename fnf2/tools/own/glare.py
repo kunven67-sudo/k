@@ -1,7 +1,7 @@
 """GLARE - WRATH's own song (original), made in code.
 
 Stage 1: a funky night-street groove while he's still the normal guy.
-The snap: the beat tape-stops, a heartbeat while his body tears open (sfx_transform.py), the eye rips out.
+The snap: the beat tape-stops, a heartbeat, he screams and his voice sinks into the eye's demon voice.
 Stage 2: heavy and creepy for the giant eye (reese bass, 808, choir, music-box bell).
 
 Instruments are synthesised here (numpy) and mixed with pedalboard effects.
@@ -17,7 +17,6 @@ import argparse, json, math, os, subprocess
 import numpy as np
 import soundfile as sf
 import pedalboard as pb
-import sfx_transform
 from scipy import ndimage, signal
 
 FNF = os.environ.get('FNF_ASSETS', '/home/user/funkincrew/funkin.assets')
@@ -283,7 +282,7 @@ def fx(x2, *plugins):
 
 # ---------------------------------------------------------------- the song map (150 BPM, 70 bars, ~1:53)
 # stage 1 (the normal guy)  bars 0-31 + the first half of 32
-# the snap                  tape stop at bar 32 beat 2, heartbeat + tearing + bones 33-34, the eye rips out in 35
+# the snap                  tape stop at bar 32 beat 2, heartbeat + his scream sinking into the demon voice 33-35
 # stage 2 (the giant eye)   bars 36-67, the ending 68-69
 TR1, SNAP, S2, TR2, FIN, OUT, END = 20, 32, 36, 52, 64, 68, 70
 
@@ -448,12 +447,10 @@ def stage1_bar(tr, bar):
 
 
 def the_snap(tr):
-    """Bar 32 beat 2: everything tape-stops. A heartbeat under wet tearing + cracking bones, a rising dread, then the eye rips out."""
+    """Bar 32 beat 2: everything tape-stops. A heartbeat, his scream, a rising dread, then the eye rips out."""
     hb = lp(kick(0.4), 160)                                                                      # heartbeat under it
     for beat in (0.0, 2.0): tr['fx'].add(T(SNAP + 1, beat), hb, 1.2); tr['fx'].add(T(SNAP + 1, beat + .45), hb, 0.8)
     for beat in (0.0, 1.0, 2.0, 3.0): tr['fx'].add(T(SNAP + 2, beat), hb, 1.25); tr['fx'].add(T(SNAP + 2, beat + .4), hb, 0.85)
-    # his body tearing open (sfx_transform.py): the pull-out lands on bar 35 with the boom
-    tr['sfx'].add(T(SNAP + 1), sfx_transform.render().mean(0))
     L = int(8 * BEAT * SR)
     tr['fx'].add(T(SNAP + 2), bp(noise(L), 300, 6000) * np.linspace(0, 1, L) ** 2.5 * 0.6, 0.8)      # dread riser
     tr['choir'].add(T(SNAP + 2), choir(n('A2'), 4 * BEAT), 0.35)                                  # low drone
@@ -522,11 +519,31 @@ def sing(tr, notes):
         if x['who'] == 'b': tr['bf'].add(t, bv.note(x['m'] - 4, L), 0.8)
         elif x['stage'] == 1: tr['wrath'].add(t, wv.note(x['m'] - 5, L), 0.8)
         else:
-            tr['wrath'].add(t, wv.note(x['m'] + 2, L), 0.75)
-            tr['wrath_lo'].add(t, wv.note(x['m'] - 10, L), 0.7)       # the demon underneath
-    # the eye opening: one long scream
-    tr['wrath'].add(T(SNAP + 3, 2), wv.note(n('F4'), 2 * BEAT), 0.7)
-    tr['wrath_lo'].add(T(SNAP + 3, 2), wv.note(n('Bb2'), 2 * BEAT), 0.9)
+            tr['wrath'].add(t, wv.note(x['m'] - 3, L), 0.75)              # the eye's voice: deeper
+            tr['wrath_lo'].add(t, wv.note(x['m'] - 15, L), 0.7)       # the demon underneath
+
+
+def scream():
+    """The snap (bars 33-35): WRATH screams in his normal voice, and as he turns into the eye the
+    scream sinks, shakes and distorts into the eye's deep demon voice, roaring when the eye opens."""
+    syl, p = Voice(WRATH_SYL[3:]).syl[0]
+    rip = T(SNAP + 3) - T(SNAP + 1)                              # the eye opens (bar 35)
+    dur = T(S2) - T(SNAP + 1) + 1.0
+    n_ = int(dur * SR); t = np.arange(n_) / SR
+    k = np.clip((t - 0.7) / (rip - 0.7), 0, 1) ** 1.6            # 0 = his normal voice, 1 = the eye
+    m = 64 - 19 * k + (0.15 + 0.9 * k) * np.sin(2 * np.pi * (5 + 3 * k) * t)    # E4 sinking to A2, shaking more
+    def sung(m):
+        r = 2 ** ((m - p) / 12)
+        need = int(r.sum()) + SR
+        src = pb.time_stretch(syl[None, :].astype(np.float32), SR, stretch_factor=len(syl) / need)[0]
+        return np.interp(np.cumsum(r), np.arange(len(src)), src)
+    main, demon = sung(m), sung(m - 12)
+    env = np.interp(t, [0, 0.15, rip - 0.1, rip, rip + 0.5, dur - 0.2, dur], [0, 0.45, 0.85, 1.3, 1.0, 0.6, 0])
+    clean = stereo(main * env * (1 - k))
+    dirty = fx(stereo(main * env * k), pb.Distortion(drive_db=18), pb.LowpassFilter(3200))
+    deep = fx(stereo(demon * env * np.clip(k * 1.4 - 0.2, 0, 1)), pb.Distortion(drive_db=20), pb.Bitcrush(bit_depth=8), pb.LowpassFilter(1800))
+    return fx(clean + dirty + deep * 1.2, pb.Compressor(threshold_db=-18, ratio=3),
+              pb.Reverb(room_size=0.85, wet_level=0.3, dry_level=1.0, width=1.0))
 
 
 # ---------------------------------------------------------------- edits + mastering (same on every stem so they stay in sync)
@@ -570,7 +587,7 @@ def master_gain(x, thr=-16.0, ratio=2.0, att=0.015, rel=0.15, makeup=5.8, ceil=-
 
 
 LEVEL = {'kick': -12, 'snare': -17, 'hat': -29, 'bass': -16, 'keys': -21, 'pluck': -25, 'pad': -23, 'reese': -19,
-         'b808': -15, 'choir': -23, 'bell': -22, 'crash': -31, 'fx': -31, 'sfx': -14}
+         'b808': -15, 'choir': -23, 'bell': -22, 'crash': -31, 'fx': -31}
 
 
 def level(x, db):
@@ -612,7 +629,6 @@ def render():
         + part('bell', 0.25, 0.6, pb.Delay(delay_seconds=BEAT * 1.5, feedback=0.35, mix=0.3), rev(0.5, 0.9))
         + part('crash', -0.1, 0.5)
         + part('fx', 0, 0.3, rev(0.3, 0.8))
-        + part('sfx', 0, 0.4)
     )
     # WRATH: clean while he's the normal guy, glitchy in the snap bar, a distorted demon as the eye
     s1, g0, s2 = int(T(SNAP) * SR), int(T(SNAP, 2) * SR), int(T(SNAP + 1) * SR)
@@ -620,7 +636,9 @@ def render():
     w[:, s1:g0] = fx(w[:, s1:g0], pb.Bitcrush(bit_depth=6))
     w[:, s2:] = fx(w[:, s2:], pb.Distortion(drive_db=10), pb.HighpassFilter(180), pb.Delay(delay_seconds=BEAT * 0.5, feedback=0.25, mix=0.2))
     lo = fx(stereo(tr['wrath_lo'].buf), pb.Distortion(drive_db=16), pb.LowpassFilter(2200), pb.Bitcrush(bit_depth=8))
-    wv = level(fx(w, pb.Compressor(threshold_db=-18, ratio=4), rev(0.18, 0.45)), -15) + level(lo, -21)
+    wv = level(fx(w, pb.Compressor(threshold_db=-18, ratio=4), rev(0.18, 0.45)), -15) + level(lo, -18)
+    sc = level(scream(), -13)                                      # the snap: his scream turning into the eye's voice
+    a = int(T(SNAP + 1) * SR); wv[:, a:a + sc.shape[1]] += sc[:, :wv.shape[1] - a]
     bv = level(fx(stereo(tr['bf'].buf), pb.Compressor(threshold_db=-18, ratio=4), rev(0.15, 0.4)), -15)
 
     stems = [inst, wv, bv]
