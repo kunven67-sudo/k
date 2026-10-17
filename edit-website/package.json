@@ -1,0 +1,13 @@
+{
+  "name": "edit-website",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Edit any website live: bookmark button + Chrome extension",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node tools/test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}
