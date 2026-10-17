@@ -97,8 +97,15 @@ function labelMaterial(p, opts = {}) {
 }
 
 /** Geometry + material for a product (cached; meshes share them). */
-export function packageMesh(p) {
-  if (cache.has(p.id)) return cache.get(p.id);
+/**
+ * Geometry + material for a product. lod 'low' = the shelf version (stores show hundreds of
+ * them): fewer sides on cans/bottles, flat-edged boxes. Same size, same label.
+ */
+export function packageMesh(p, lod = 'high') {
+  const ck = lod === 'low' ? `${p.id}|low` : p.id;
+  if (cache.has(ck)) return cache.get(ck);
+  if (lod === 'low' && p.pack.shape === 'model') return packageMesh(p); // models are already light
+  const low = lod === 'low';
   const [w, h, d] = p.pack.size;
   const shape = p.pack.shape;
   let geometry;
@@ -121,9 +128,9 @@ export function packageMesh(p) {
     geometry = merged;
     material = mats;
   } else {
-    material = labelMaterial(p, { metal: shape === 'can' ? 0.6 : 0, rough: shape === 'can' ? 0.3 : shape === 'bag' ? 0.35 : 0.55 });
+    material = low ? packageMesh(p).material : labelMaterial(p, { metal: shape === 'can' ? 0.6 : 0, rough: shape === 'can' ? 0.3 : shape === 'bag' ? 0.35 : 0.55 });
     if (shape === 'box' || shape === 'carton' || shape === 'tray') {
-      geometry = new RoundedBoxGeometry(w, h, d, 1, Math.min(0.004, w / 4, h / 4, d / 4));
+      geometry = low ? new THREE.BoxGeometry(w, h, d) : new RoundedBoxGeometry(w, h, d, 1, Math.min(0.004, w / 4, h / 4, d / 4));
       if (shape === 'carton') {
         // Gable top.
         const top = new THREE.CylinderGeometry(0.001, w * 0.72, h * 0.18, 4, 1);
@@ -133,7 +140,7 @@ export function packageMesh(p) {
       }
       geometry.translate(0, h / 2, 0);
     } else if (shape === 'bag') {
-      geometry = new RoundedBoxGeometry(w, h, d, 3, Math.min(d * 0.45, 0.03));
+      geometry = new RoundedBoxGeometry(w, h, d, low ? 1 : 2, Math.min(d * 0.45, 0.03));
       // Puff the middle out a little like a chip bag.
       const pos = geometry.attributes.position;
       for (let i = 0; i < pos.count; i++) {
@@ -144,7 +151,7 @@ export function packageMesh(p) {
       geometry.computeVertexNormals();
       geometry.translate(0, h / 2, 0);
     } else if (shape === 'can' || shape === 'jar') {
-      geometry = new THREE.CylinderGeometry(w / 2, w / 2, h, 18, 1);
+      geometry = new THREE.CylinderGeometry(w / 2, w / 2, h, low ? 9 : 18, 1);
       geometry.translate(0, h / 2, 0);
     } else if (shape === 'bottle') {
       const pts = [];
@@ -157,12 +164,12 @@ export function packageMesh(p) {
       pts.push(new THREE.Vector2(r * 0.33, h * 0.92));
       pts.push(new THREE.Vector2(r * 0.33, h));
       pts.push(new THREE.Vector2(0.001, h));
-      geometry = new THREE.LatheGeometry(pts, 16);
+      geometry = new THREE.LatheGeometry(pts, low ? 8 : 16);
       if (p.pack.clear) material.transparent = true, (material.opacity = 0.85);
     } else if (shape === 'jug') {
       geometry = new RoundedBoxGeometry(w, h * 0.82, d, 2, 0.02);
       geometry.translate(0, h * 0.41, 0);
-      const neck = new THREE.CylinderGeometry(w * 0.16, w * 0.22, h * 0.18, 12);
+      const neck = new THREE.CylinderGeometry(w * 0.16, w * 0.22, h * 0.18, low ? 6 : 12);
       neck.translate(0, h * 0.91, 0);
       geometry = mergeGeometries([geometry.toNonIndexed(), neck.toNonIndexed()], false);
     } else {
@@ -172,7 +179,7 @@ export function packageMesh(p) {
   }
   geometry.computeBoundingBox();
   const out = { geometry, material };
-  cache.set(p.id, out);
+  cache.set(ck, out);
   return out;
 }
 

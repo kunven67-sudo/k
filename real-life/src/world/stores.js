@@ -35,6 +35,15 @@ export function buildStores(world, B, root) {
       if (!s.def) continue;
       const h = clock.hourFloat;
       s.isOpen = h >= s.def.open && h < s.def.close;
+      // Shelves full of products only draw when you're inside or right outside the glass
+      // (thousands of cans + bottles through the windows from the parking lot = lag).
+      const d = s.def;
+      const inside = viewer.x > d.x0 - 0.5 && viewer.x < d.x1 && viewer.z > d.z0 && viewer.z < d.z1;
+      const show = inside || (viewer.x < d.x0 + 1 && s.entrance.distanceTo(viewer) < 24);
+      if (show !== s._shown) {
+        s._shown = show;
+        for (const im of s.productMeshes || []) im.visible = show;
+      }
     }
     for (const d of doors) {
       const st = d.store;
@@ -48,7 +57,7 @@ export function buildStores(world, B, root) {
         d.collider.setEnabled(d.open < 0.6);
       }
     }
-    for (const t of tvs) t.update(dt);
+    for (const t of tvs) if (t.store?._shown !== false) t.update(dt);
   };
   return out;
 }
@@ -142,6 +151,7 @@ function buildStore(world, B, root, def) {
   else furnitureLayout(ctx, def);
   // Instanced product meshes (one per product).
   finishInstances(ctx);
+  finishTags(S, root);
   // Registers.
   for (const r of S.registers) register(ctx, r);
   S.entrance = new THREE.Vector3(x0 + 2.5, FY, doorZ);
@@ -203,6 +213,7 @@ function electronicsLayout(ctx, def) {
     const p = tvs[i % tvs.length];
     const [w, h] = [p.pack.size[0] * 0.95, p.pack.size[1] * 0.8];
     const tv = demoScreen(root, wallX, FY + 1.7 + (i % 2) * 0.2, z + w / 2, w, h, -Math.PI / 2, i);
+    tv.store = S;
     S.tvs.push(tv);
     priceTag(root, wallX - 0.05, FY + 0.95, z + w / 2, -Math.PI / 2, p);
     z += w + 0.45;
@@ -429,7 +440,7 @@ function finishInstances(ctx) {
   }
   for (const [id, slots] of byP) {
     const p = PRODUCT[id];
-    const { geometry, material } = packageMesh(p);
+    const { geometry, material } = packageMesh(p, 'low');
     const total = slots.reduce((n, s) => n + s.units.length, 0);
     const im = new THREE.InstancedMesh(geometry, material, total);
     im.castShadow = false;
@@ -447,6 +458,7 @@ function finishInstances(ctx) {
     im.instanceMatrix.needsUpdate = true;
     im.computeBoundingSphere();
     ctx.root.add(im);
+    (ctx.S.productMeshes ||= []).push(im);
   }
 }
 
@@ -487,35 +499,86 @@ function aisleSigns(ctx, list) {
   }
 }
 
-const tagCache = new Map();
+// Price tags: hundreds per store, so they're batched into ONE mesh with one texture atlas per
+// store (one draw call instead of 500). priceTag() just records; finishTags() builds the mesh.
+let tagBatch = [];
+
 function priceTag(root, x, y, z, yaw, p, big = false, flat = false) {
-  const key = `${p.id}-${big ? 1 : 0}`;
-  let tex = tagCache.get(key);
-  if (!tex) {
-    tex = canvasTexture(`tag-${key}`, 256, 128, (c, w, h) => {
-      c.fillStyle = big ? '#ffda1a' : '#ffffff';
-      c.fillRect(0, 0, w, h);
-      c.fillStyle = '#111';
-      c.font = 'bold 22px Inter, Arial, sans-serif';
-      c.fillText(p.name.slice(0, 22), 10, 30);
-      c.font = '900 54px Inter, Arial, sans-serif';
-      const dollars = Math.floor(p.price);
-      const cents = Math.round((p.price - dollars) * 100);
-      c.fillText(`$${dollars}`, 10, 98);
-      c.font = '900 30px Inter, Arial, sans-serif';
-      c.fillText(String(cents).padStart(2, '0'), 12 + c.measureText(`$${dollars}`).width * 1.8, 76);
-      if (p.unit) {
-        c.font = '18px Inter, Arial';
-        c.fillText(p.unit, 180, 110);
-      }
+  tagBatch.push({ x, y, z, yaw, p, big, s: big ? 0.32 : flat ? 0.1 : 0.14 });
+}
+
+function finishTags(S, root) {
+  const list = tagBatch;
+  tagBatch = [];
+  if (!list.length) return;
+  const keys = [...new Set(list.map((t) => `${t.p.id}|${t.big ? 1 : 0}`))];
+  const CW = 192;
+  const CH = 96;
+  const cols = Math.floor(2048 / CW);
+  const rows = Math.ceil(keys.length / cols);
+  const H = Math.min(2048, 2 ** Math.ceil(Math.log2(Math.max(1, rows) * CH)));
+  const c = document.createElement('canvas');
+  c.width = 2048;
+  c.height = H;
+  const g = c.getContext('2d');
+  const cell = new Map();
+  keys.forEach((k, i) => {
+    const [id, big] = k.split('|');
+    const p = PRODUCT[id];
+    const cx = (i % cols) * CW;
+    const cy = Math.floor(i / cols) * CH;
+    cell.set(k, [cx / 2048, 1 - (cy + CH) / H, (cx + CW) / 2048, 1 - cy / H]);
+    g.fillStyle = big === '1' ? '#ffda1a' : '#ffffff';
+    g.fillRect(cx + 1, cy + 1, CW - 2, CH - 2);
+    g.fillStyle = '#111';
+    g.font = 'bold 16px Inter, Arial, sans-serif';
+    g.fillText(p.name.slice(0, 22), cx + 8, cy + 22);
+    g.font = '900 40px Inter, Arial, sans-serif';
+    const dollars = Math.floor(p.price);
+    const cents = Math.round((p.price - dollars) * 100);
+    g.fillText(`$${dollars}`, cx + 8, cy + 74);
+    const dw = g.measureText(`$${dollars}`).width;
+    g.font = '900 22px Inter, Arial, sans-serif';
+    g.fillText(String(cents).padStart(2, '0'), cx + 12 + dw, cy + 57);
+    if (p.unit) {
+      g.font = '14px Inter, Arial';
+      g.fillText(p.unit, cx + CW - 52, cy + 86);
+    }
+  });
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const n = list.length;
+  const pos = new Float32Array(n * 4 * 3);
+  const nor = new Float32Array(n * 4 * 3);
+  const uv = new Float32Array(n * 4 * 2);
+  const idx = new Uint32Array(n * 6);
+  const v = new THREE.Vector3();
+  list.forEach((t, i) => {
+    const [u0, v0, u1, v1] = cell.get(`${t.p.id}|${t.big ? 1 : 0}`);
+    const hw = t.s;
+    const hh = t.s / 2;
+    const cs = Math.cos(t.yaw);
+    const sn = Math.sin(t.yaw);
+    // Plane facing +Z rotated by yaw around Y.
+    [[-hw, -hh, u0, v0], [hw, -hh, u1, v0], [hw, hh, u1, v1], [-hw, hh, u0, v1]].forEach(([lx, ly, uu, vv], k) => {
+      v.set(t.x + lx * cs, t.y + ly, t.z - lx * sn);
+      pos.set([v.x, v.y, v.z], (i * 4 + k) * 3);
+      nor.set([sn, 0, cs], (i * 4 + k) * 3);
+      uv.set([uu, vv], (i * 4 + k) * 2);
     });
-    tagCache.set(key, tex);
-  }
-  const s = big ? 0.32 : flat ? 0.1 : 0.14;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(s * 2, s), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
-  m.position.set(x, y, z);
-  m.rotation.y = yaw;
-  root.add(m);
+    idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6);
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+  mesh.name = `${S.id}-price-tags`;
+  root.add(mesh);
+  (S.productMeshes ||= []).push(mesh); // hidden from far away together with the products
 }
 
 function signBox(root, x, y, z, def, [bg, fg]) {

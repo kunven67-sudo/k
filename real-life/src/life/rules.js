@@ -114,6 +114,12 @@ export class Rules {
     const parent = wit.find((n) => n.rec.family && n.rec.role !== 'sibling');
     const sib = wit.find((n) => n.rec.role === 'sibling');
     const inc = { rule, sev: severity ?? RULES[rule]?.sev ?? 0.3, t: clock.total, amount };
+    if (rule === 'accident') {
+      // Nobody gets punished for an accident. Parents are kind about it (strict ones a bit tired).
+      if (parent) this.people.say(parent, parent.rec.traits.warmth > 0.45 ? "Oh, honey... it's okay. It happens. Go get cleaned up, I'll get the sheets." : "Again? Okay. Shower, now. I'll deal with the mess.", { loud: true });
+      return;
+    }
+    if (!RULES[rule]) return; // not something parents care about
     if (parent) {
       this._incident({ ...inc, evidence: 'seen', by: parent.id });
       return;
@@ -135,8 +141,9 @@ export class Rules {
   _broken({ rule, severity, by, witnessed }) {
     if (clock.age >= 18) return;
     if (rule === 'shoplifting' || rule === 'skip-school') {
-      // The store has your face on camera; the manager calls home.
-      this._incident({ rule, sev: severity ?? 0.85, t: clock.total, evidence: 'call', by: by || null });
+      // The store has your face on camera / the school office: they call your parents.
+      const parentAway = (this.people?.parents || []).every((p) => p.away);
+      this._incident({ rule, sev: severity ?? 0.85, t: clock.total, evidence: 'call', by: by || null, parentAway });
       return;
     }
     this._incident({ rule, sev: severity ?? RULES[rule]?.sev ?? 0.4, t: clock.total, evidence: witnessed ? 'seen' : 'heard', by });
@@ -301,7 +308,7 @@ export class Rules {
       trace: inc.rule === 'beer' ? 'There are beers missing from the garage fridge. Do you know anything about that?' : inc.rule === 'stealing' ? `There's ${inc.amount ? '$' + inc.amount.toFixed(0) : 'money'} missing from my dresser. Did you take it?` : 'Somebody ate almost all the cookies. Was that you?',
       call:
         inc.rule === 'skip-school'
-          ? `The school called me at work. You weren't in class today. Where were you?`
+          ? `The school called${inc.parentAway ? ' me at work' : ''}. You weren't in class today. Where were you?`
           : inc.rule === 'homework'
             ? 'Your teacher sent a note home. You didn\'t turn in your homework?'
             : `The manager at the store just called me. They say you tried to walk out without paying. ${name}, what were you thinking?`,
