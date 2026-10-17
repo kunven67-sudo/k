@@ -1,13 +1,11 @@
 """WRATH's transform sound (the snap in GLARE, over the heartbeat): real recorded
-gore foley cut up and layered. Meat ripping builds up, bones break, and the
-eye tears out with a wet splat, then slime drips.
+bone breaks, getting faster and louder, the biggest one when the eye rips out.
 
-The recordings are CC0 sound packs from OpenGameArt (downloaded into a cache
-the first time, never committed):
-  "Ripping into meat", "Fleshy bone break/snap SFX", "Deep bone crack/break SFX",
-  "8 wet squish slurp impacts", "Slimy monster or murder sounds", "Squish sounds effects"
+The recordings are CC0 packs from OpenGameArt ("Fleshy bone break/snap SFX"),
+downloaded into a cache the first time, never committed. Only the crisp,
+cracking ones are used, at their real pitch (low/deep breaks sounded like plops).
 
-  python3 fnf2/tools/own/sfx_transform.py OUT.wav      # 4.8 s, the pull-out lands at 3.2 s
+  python3 fnf2/tools/own/sfx_transform.py OUT.wav      # 4.8 s, the biggest break lands at 3.2 s
 """
 import io, os, sys, urllib.request, zipfile
 import numpy as np
@@ -18,7 +16,6 @@ from scipy import signal
 SR = 44100
 LEN = 4.8
 RIP = 3.2          # the big pull-out (= bar 35 in GLARE)
-PITCH = 0.88       # everything a bit lower = a bigger, heavier body
 CACHE = os.path.expanduser('~/.cache/fnf2/gore')
 OGA = 'https://opengameart.org/sites/default/files/'
 FILES = ['rippingintomeat_0.mp3', 'wet_breaks.zip', 'deep_breaks.zip', 'independent_nu_ljudbank-wet_squish_slurp_impacts.7z',
@@ -48,11 +45,6 @@ def load(src):
     if x.ndim > 1: x = x.mean(1)
     if sr != SR: x = signal.resample_poly(x, SR, sr)
     return x
-
-
-def heavy(x, k=PITCH):
-    """Pitch + slow down together (tape style) -> bigger and heavier."""
-    return signal.resample(x, int(len(x) / k))
 
 
 def env_db(x, h):
@@ -104,16 +96,17 @@ def norm(x): return x / (np.abs(x).max() + 1e-9)
 
 
 def render():
-    wet = [norm(heavy(load(('wet_breaks.zip', 'Wet Break %d.wav' % k)))) for k in range(1, 11)]
-    deep = [norm(heavy(load(('deep_breaks.zip', 'Deep Break %d.wav' % k)))) for k in range(1, 11)]
+    # only the crisp, cracking breaks (the deep/low ones sounded like plops), at their real pitch
+    hp = signal.butter(2, 300, 'high', fs=SR, output='sos')
+    crack = [norm(signal.sosfilt(hp, load(('wet_breaks.zip', 'Wet Break %d.wav' % k)))) for k in (10, 5, 8, 9, 3, 2, 7)]
 
     B = {'bone': Buf()}
     # bones breaking: a few cracks, then faster and louder, the biggest one on the pull-out
     hits = [(0.4, .35), (1.0, .45), (1.6, .7), (2.0, .75), (2.25, .55), (2.4, .85), (2.6, .6), (2.8, .9), (2.95, .7), (3.08, .8)]
     for i, (bt, g) in enumerate(hits):
-        B['bone'].add(bt, (wet if i % 2 == 0 else deep)[i % 10], g)
-    B['bone'].add(RIP, deep[2], 1.4); B['bone'].add(RIP + 0.012, wet[7], 1.2); B['bone'].add(RIP + 0.03, norm(heavy(deep[5], 0.8)), 1.0)
-    B['bone'].add(RIP + 0.45, wet[4], 0.5); B['bone'].add(RIP + 0.8, deep[8], 0.35)
+        B['bone'].add(bt, crack[i % len(crack)], g)
+    for j, k in enumerate((0, 1, 2)): B['bone'].add(RIP + 0.015 * j, crack[k], 1.3)
+    B['bone'].add(RIP + 0.45, crack[3], 0.5); B['bone'].add(RIP + 0.8, crack[4], 0.35)
 
     def lvl(x, db):
         r = np.sqrt((x[np.abs(x) > np.abs(x).max() * 0.05] ** 2).mean())
@@ -122,7 +115,7 @@ def render():
     mix = mix[:int((LEN + 0.6) * SR)]
     d = int(0.006 * SR)
     st = np.stack([mix, np.concatenate([np.zeros(d), mix[:-d]]) * 0.85 + mix * 0.15]).astype(np.float32)
-    st = pb.Pedalboard([pb.HighpassFilter(40), pb.LowShelfFilter(cutoff_frequency_hz=180, gain_db=3),
+    st = pb.Pedalboard([pb.HighpassFilter(120),
                         pb.Reverb(room_size=0.2, wet_level=0.08, dry_level=1.0, width=0.5),
                         pb.Compressor(threshold_db=-12, ratio=2, attack_ms=3, release_ms=100)])(st, SR)
     st = st / np.abs(st).max() * 0.89
