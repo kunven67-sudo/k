@@ -1,17 +1,21 @@
 // FNF 2 - developer preview screens (only with ?dev=... in the URL)
 //   ?dev=stage&id=mainStage[&bf=bf&dad=dad&gf=gf][&focus=mid|bf|dad|gf][&anim=bf:singLEFT,dad:singUP][&t=0.3]
+//     [&demo=dad] sing a fixed little pattern (every arrow, misses, hey) [&label=0] no text [&zoom=0.8]
 //   ?dev=char&id=bf&anims=idle,singLEFT[&at=0.2]
+// demo pattern by step: 0-3 = left/down/up/right, 4-7 = misses, 'hey'
+const DEMO = { 16: 0, 20: 1, 24: 2, 28: 3, 32: 0, 34: 0, 36: 3, 38: 3, 40: 2, 42: 1, 44: 2, 46: 0, 52: 4, 60: 5, 68: 3, 70: 2, 72: 1, 74: 0, 80: 'hey' };
 G.screens.devStage = {
   enter(p) {
     this.stage = new G.Stage(p.id || 'mainStage');
     const mk = (slot, id) => { if (!id || id === 'none') return; const c = new G.Character(id, slot); this.stage.addCharacter(c, slot); };
     mk('gf', p.gf || 'gf'); mk('dad', p.dad || 'dad'); mk('bf', p.bf || 'bf');
-    this.cam = new G.FCam(this.stage.zoom);
+    this.cam = new G.FCam(p.zoom ? +p.zoom : this.stage.zoom);
     this.focus = p.focus || 'mid';
     this.t = 0; this.step = -1; this.bpm = +(p.bpm || 100);
     this.forced = {};
     for (const s of (p.anim || '').split(',').filter(Boolean)) { const [who, a] = s.split(':'); this.forced[who] = a; const c = this.stage.chars[who]; if (c) c.playAnim(a, true); }
     this.freeze = p.t != null ? +p.t : null;
+    this.demo = p.demo || null; this.label = p.label !== '0';
     if (this.freeze != null) for (const k in this.stage.chars) { const c = this.stage.chars[k]; c.update(this.freeze); }
     this.aim(true);
   },
@@ -32,7 +36,12 @@ G.screens.devStage = {
     if (this.freeze != null) { this.aim(true); return; }
     this.t += dt;
     const step = Math.floor(this.t * this.bpm / 15);
-    while (this.step < step) { this.step++; this.stage.onStep(this.step); for (const k in this.stage.chars) if (!this.forced[k]) this.stage.chars[k].onStep(this.step); }
+    while (this.step < step) {
+      this.step++; this.stage.onStep(this.step);
+      for (const k in this.stage.chars) if (!this.forced[k]) this.stage.chars[k].onStep(this.step);
+      const c = this.demo && this.stage.chars[this.demo], d = c && DEMO[this.step % 96];
+      if (d != null) { if (d === 'hey') { c.playAnim('hey', true); c.holdTimer = 0; } else c.sing(d % 4, d >= 4); }
+    }
     for (const k in this.stage.chars) this.stage.chars[k].tick(dt, 15 / this.bpm, false);
     this.stage.update(dt);
     this.aim(false);
@@ -41,7 +50,7 @@ G.screens.devStage = {
   draw(ctx) {
     G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
     this.stage.draw(ctx, this.cam);
-    G.vcr(ctx, 'stage ' + this.stage.id + '  focus ' + this.focus, 8, G.H - 28, { size: 20 });
+    if (this.label) G.vcr(ctx, 'stage ' + this.stage.id + '  focus ' + this.focus, 8, G.H - 28, { size: 20 });
   },
 };
 G.screens.devChar = {

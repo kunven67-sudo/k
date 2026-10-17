@@ -43,30 +43,33 @@
   // repaint one pixel (r,g,b) -> [r,g,b] or null when no rule matches
   function apply(rules, R, Gc, B) {
     const [h, s, v] = rgb2hsv(R, Gc, B);
+    // pick the rule that fits best: a full hue match wins at once, otherwise the closest soft match
+    let best = null, bw = 0;
     for (const c of rules) {
       if (s < c.s[0] || s > c.s[1] || v < c.v[0] || v > c.v[1]) continue;
       let w = 1;
       if (!c.gray) {
-        const d = hueDist(h, c.h); if (d > c.hr + c.soft) continue;
+        const d = hueDist(h, c.h); if (d >= c.hr + c.soft) continue;
         if (d > c.hr) w = 1 - (d - c.hr) / c.soft;
       }
-      if (c.keep) return null;
-      if (c.alpha != null && !c.to && c.dh == null && c.sat == null && c.val == null) return [R, Gc, B, c.alpha];
-      let nh, ns, nv;
-      if (c.to) {
-        // keep this pixel's shading relative to the rule's source colour
-        nh = (c.th + (c.gray ? 0 : (h - c.fh)) + 720) % 360;
-        if (c.gray) { ns = c.ts * (c.keepSat ? 1 : 1); nv = Math.min(1, v / Math.max(0.05, c.fv) * c.tv); }
-        else { ns = Math.min(1, s * (c.ts / Math.max(0.05, c.fs))); nv = Math.min(1, v * (c.tv / Math.max(0.05, c.fv))); }
-      } else { nh = (h + (c.dh || 0) + 360) % 360; ns = Math.min(1, s * (c.sat == null ? 1 : c.sat)); nv = Math.min(1, v * (c.val == null ? 1 : c.val)); }
-      if (c.sat != null && c.to) ns = Math.min(1, ns * c.sat);
-      if (c.val != null && c.to) nv = Math.min(1, nv * c.val);
-      const o = hsv2rgb(nh, ns, nv);
-      if (c.alpha != null) o[3] = c.alpha;
-      if (w >= 1) return o;
-      return [Math.round(R + (o[0] - R) * w), Math.round(Gc + (o[1] - Gc) * w), Math.round(B + (o[2] - B) * w)];
+      if (w > bw) { best = c; bw = w; if (w >= 1) break; }
     }
-    return null;
+    const c = best;
+    if (!c) return null;
+    if (c.keep) return null;
+    if (c.alpha != null && !c.to && c.dh == null && c.sat == null && c.val == null) return [R, Gc, B, c.alpha];
+    let nh, ns, nv;
+    if (c.to) {
+      // keep this pixel's shading relative to the rule's source colour
+      nh = (c.th + (c.gray ? 0 : (h - c.fh)) + 720) % 360;
+      if (c.gray) { ns = c.ts; nv = Math.min(1, v / Math.max(0.05, c.fv) * c.tv); }
+      else { ns = Math.min(1, s * (c.ts / Math.max(0.05, c.fs))); nv = Math.min(1, v * (c.tv / Math.max(0.05, c.fv))); }
+    } else { nh = (h + (c.dh || 0) + 360) % 360; ns = Math.min(1, s * (c.sat == null ? 1 : c.sat)); nv = Math.min(1, v * (c.val == null ? 1 : c.val)); }
+    if (c.sat != null && c.to) ns = Math.min(1, ns * c.sat);
+    if (c.val != null && c.to) nv = Math.min(1, nv * c.val);
+    const o = hsv2rgb(nh, ns, nv);
+    if (c.alpha != null) o[3] = c.alpha;
+    return o;
   }
   // repaint an image -> canvas. rects = [{x,y,w,h,rules}] get their own rules (for those pixels only),
   // every other pixel uses `rules`. Rules may set {alpha} (0 = erase) or {keep:true} (leave as is).
@@ -110,14 +113,18 @@
           const img = A.image(k); if (!img) continue;
           let rects = null;
           // atlas parts: repaint only the named spritemap sprites
-          if (def.parts && /spritemap\d*\.png$/.test(k)) {
+          if ((def.parts || def.zones) && /spritemap\d*\.png$/.test(k)) {
             const sj = A.json(k.replace(/\.png$/, '.json'));
             rects = [];
+            const byName = {};
             if (sj) for (const s of sj.ATLAS.SPRITES) {
-              const S = s.SPRITE;
+              const S = s.SPRITE; byName[S.name] = S;
+              if (!def.parts) continue;
               // part keys: exact sprite name, or "prefix*"
               for (const key in def.parts) if (key === S.name || (key.endsWith('*') && S.name.startsWith(key.slice(0, -1)))) { rects.push({ x: S.x, y: S.y, w: S.rotated ? S.h : S.w, h: S.rotated ? S.w : S.h, rules: def.parts[key] }); break; }
             }
+            // zones: a box inside one sprite (sprite-local px) with its own rules, e.g. just one eye
+            for (const z of def.zones || []) { const S = byName[z.sprite]; if (S) rects.push({ x: S.x + z.box[0], y: S.y + z.box[1], w: z.box[2] - z.box[0], h: z.box[3] - z.box[1], rules: z.rules }); }
           }
           A._img.set(nk, recolor(img, def.rules || [], rects));
           A.raw[nk] = 'data:forged';

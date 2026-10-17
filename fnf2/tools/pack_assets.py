@@ -127,6 +127,7 @@ def main():
     ap.add_argument('--pack', default='early')
     ap.add_argument('--out', default=os.path.join(ROOT, 'build', 'assets.js'))
     ap.add_argument('--fetch', action='store_true')
+    ap.add_argument('--own', default=os.path.join(ROOT, 'build', 'own'), help='our own characters made by tools/own/*.py (same folder layout as the assets)')
     a = ap.parse_args()
     pats = PACKS[a.pack]
     if a.fetch:
@@ -142,10 +143,15 @@ def main():
         if not hits: print('no match:', p, file=sys.stderr)
         for h in hits: files.append(os.path.join(os.path.dirname(p), h))
     files = sorted(set(files))
+    srcs = {rel: os.path.join(a.src, rel) for rel in files}
+    if os.path.isdir(a.own):
+        for d, _, fs in os.walk(a.own):
+            for f in fs:
+                rel = os.path.relpath(os.path.join(d, f), a.own).replace(os.sep, '/')
+                srcs[rel] = os.path.join(d, f)
     out = {}
     total = 0
-    for rel in files:
-        src = os.path.join(a.src, rel)
+    for rel, src in sorted(srcs.items()):
         ext = os.path.splitext(rel)[1].lower()
         if ext == '.png':
             data = 'data:image/webp;base64,' + base64.b64encode(to_webp(src)).decode()
