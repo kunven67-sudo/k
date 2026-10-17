@@ -186,6 +186,11 @@ class Input {
 
   // Called by the engine at the start of each frame.
   beginFrame() {
+    // A text box that got removed from the page never fires focusout: check what really has focus.
+    if (this.typing) {
+      const a = document.activeElement;
+      this.typing = !!a && a.isConnected && (/^(INPUT|TEXTAREA)$/.test(a.tagName) || a.isContentEditable);
+    }
     let x = 0;
     let y = 0;
     if (!this.typing) {

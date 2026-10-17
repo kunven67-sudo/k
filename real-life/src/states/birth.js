@@ -468,14 +468,16 @@ export class BirthState {
     this.player?.dispose();
     this.player = null;
     e.setBlur(0);
+    e.physics = null; // the engine disposes e.physics on a state change: this world lives on
     e.go('world', { world: this.world, wake: true }, { fadeMs: 400 });
   }
 
-  update(dt) {
+  update(dt, realDt = dt) {
     this.t += dt;
-    // Hold Enter to skip.
-    if (input.keysDown?.has('Enter') || input.keysDown?.has('NumpadEnter')) this.skipHold += dt;
-    else this.skipHold = Math.max(0, this.skipHold - dt * 2);
+    // Hold Enter to skip (real seconds, so a slow PC doesn't make it take longer).
+    const rd = Math.min(0.25, realDt || dt);
+    if (input.keysDown?.has('Enter') || input.keysDown?.has('NumpadEnter')) this.skipHold += rd;
+    else this.skipHold = Math.max(0, this.skipHold - rd * 2);
     this.skipBar.style.width = `${Math.min(100, (this.skipHold / 1.2) * 100)}%`;
     if (this.skipHold > 1.2 && !this.skipped) {
       this.skipped = true;
