@@ -207,7 +207,8 @@ class Fighter {
     const cyc = this.w.Run > this.w.Walk ? this.act.Run : this.act.Walk;
     const ph = (cyc.time / cyc.getClip().duration) % 1;
     if (s > 0.4 && this.grounded && Math.floor(ph * 2) !== Math.floor(this.stepPhase * 2)) {
-      const surf = this.pos.y < WATER_Y - 0.1 ? 'water' : pathDist(this.pos.x, this.pos.z) < 1.6 ? 'dirt' : 'grass';
+      const sp = splatAt(this.pos.x, this.pos.z, this.pos.y, 0);
+      const surf = this.pos.y < WATER_Y - 0.1 ? 'water' : sp.snow > 0.5 ? 'snow' : sp.mud > 0.45 ? 'mud' : sp.dirt + sp.cobble > 0.5 ? 'dirt' : 'grass';
       sfx.step(this.pos, surf, true, this.isPlayer ? 1 : 0.6);
     }
     this.stepPhase = ph;

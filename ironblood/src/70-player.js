@@ -4,7 +4,7 @@ let player = { pos: new THREE.Vector3(4, 0, 4), alive: false };
 const stats = { str: 0, spd: 0, strXp: 0, spdXp: 0, kills: 0, sword: 'arming', deaths: 0 };
 try { Object.assign(stats, JSON.parse(localStorage.getItem('ironblood.stats') || '{}')); } catch (e) {}
 function saveStats() { try { localStorage.setItem('ironblood.stats', JSON.stringify(stats)); } catch (e) {} }
-const SPAWN = { x: BARN.x + 9, z: BARN.z + 2 };
+const SPAWN = { x: SQUARE.x + 2, z: SQUARE.z + 9 };
 let bandages = 6, bandaging = 0;
 
 function createPlayer() {
@@ -272,7 +272,8 @@ function updateCamera(dt) {
   }
   const gh = groundH(want.x, want.z) + 0.3;
   if (want.y < gh) want.y = gh;
-  if (barnDist(want.x, want.z) < 0.4 && want.y < barnLevel + 8.5) want.lerp(head, 0.6);
+  // don't let the camera go inside walls: slide it in toward you
+  for (let i = 0; i < 6; i++) { const b = solidAt(want.x, want.z, 0.25); if (!b || want.y > b.h1 + 0.2) break; want.lerp(head, 0.3); }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
   const k = Math.min(1, (finisherCam > 0 ? 6 : 16) * dt);
   camPos.lerp(want, k); camLook.lerp(look, k);

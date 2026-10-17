@@ -123,6 +123,8 @@ const sfx = {
     if (!ac) return; const t = ac.currentTime, out = spatial(pos, 0.22 * vol);
     if (surface === 'water') { const f = noiseHit(t, 0.2, 'bandpass', 900, 1.5, 0.7, out, 0.8, 0.02); f.frequency.exponentialRampToValueAtTime(400, t + 0.2); }
     else if (surface === 'dirt') noiseHit(t, 0.07, 'bandpass', 700, 0.9, 0.8, out);
+    else if (surface === 'mud') { const f = noiseHit(t, 0.16, 'bandpass', 500, 2.5, 0.8, out, 0.6, 0.02); f.frequency.exponentialRampToValueAtTime(250, t + 0.16); }
+    else if (surface === 'snow') { noiseHit(t, 0.14, 'bandpass', 1400, 1.2, 0.6, out, 1, 0.03); noiseHit(t + 0.03, 0.08, 'highpass', 3500, 0.7, 0.3, out); }
     else { noiseHit(t, 0.1, 'highpass', 2500, 0.5, 0.45, out); noiseHit(t, 0.05, 'lowpass', 300, 0.8, 0.5, out); }
     if (armored) for (const m of [1, 1.7, 2.9]) tone('sine', (1300 + Math.random() * 300) * m, 0, t + 0.01, 0.002, 0.05 / m, 0.12, out);
   },
@@ -155,6 +157,13 @@ const sfx = {
     o.start(t); vib.start(t); o.stop(t + cfg.dur + 0.1); vib.stop(t + cfg.dur + 0.1);
   },
   ui(freq = 660) { if (!ac) return; const t = ac.currentTime, out = spatial(null, 0.2); tone('triangle', freq, freq * 1.5, t, 0.005, 0.5, 0.15, out); },
+  // thunder: a crack, then a long low roll
+  thunder() {
+    if (!ac) return; const t = ac.currentTime, out = spatial(null, 0.9);
+    noiseHit(t, 0.25, 'lowpass', 2500, 0.6, 0.7, out);
+    const f = noiseHit(t + 0.05, 3.5, 'lowpass', 220, 0.9, 1.0, out, 0.5, 0.25);
+    f.frequency.setValueAtTime(320, t); f.frequency.exponentialRampToValueAtTime(70, t + 3.5);
+  },
   heartbeat() { if (!ac) return; const t = ac.currentTime, out = spatial(null, 0.5); tone('sine', 60, 40, t, 0.01, 0.9, 0.12, out); tone('sine', 55, 38, t + 0.18, 0.01, 0.6, 0.12, out); },
 };
 

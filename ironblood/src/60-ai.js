@@ -8,12 +8,24 @@ function collideFighter(f) {
     if (d2 < rr * rr) { const d = Math.sqrt(d2) || 1e-4; p.x = c.x + dx / d * rr; p.z = c.z + dz / d * rr; }
   }
   for (const s of segs) {
+    if (s.h0 !== undefined && (p.y > s.h1 || p.y + 1.8 < s.h0)) continue;
     const dx = s.bx - s.ax, dz = s.bz - s.az;
     const t = Math.max(0, Math.min(1, ((p.x - s.ax) * dx + (p.z - s.az) * dz) / (dx * dx + dz * dz)));
     const cx = s.ax + dx * t, cz = s.az + dz * t, ox = p.x - cx, oz = p.z - cz, d = Math.hypot(ox, oz);
     if (d < BODY_R) {
       if (d > 1e-4) { p.x = cx + ox / d * BODY_R; p.z = cz + oz / d * BODY_R; }
       else { const len = Math.hypot(dx, dz); p.x = cx - dz / len * BODY_R; p.z = cz + dx / len * BODY_R; }
+    }
+  }
+  // walls, houses, ruins: push out of oriented boxes you're not standing on top of
+  for (const b of boxes) {
+    if (p.y > b.h1 - 0.3 || p.y + 1.8 < b.h0) continue;
+    const dx = p.x - b.cx, dz = p.z - b.cz, u = dx * b.c - dz * b.s, v = dx * b.s + dz * b.c;
+    const ou = b.hw + BODY_R - Math.abs(u), ov = b.hd + BODY_R - Math.abs(v);
+    if (ou > 0 && ov > 0) {
+      let nu = u, nv = v;
+      if (ou < ov) nu = Math.sign(u || 1) * (b.hw + BODY_R); else nv = Math.sign(v || 1) * (b.hd + BODY_R);
+      p.x = b.cx + nu * b.c + nv * b.s; p.z = b.cz - nu * b.s + nv * b.c;
     }
   }
   // bodies push each other apart (living, standing ones)
@@ -80,9 +92,7 @@ function tickVitals(f, dt) {
 const HOUSES = [
   { name: 'Red', cloth: 0x7a1717 }, { name: 'Blue', cloth: 0x1a2f6e }, { name: 'Green', cloth: 0x1e4d25 }, { name: 'Gold', cloth: 0x8a6a1a }, { name: 'Black', cloth: 0x222222 },
 ];
-const CAMPS = [
-  { x: BARN.x + 16, z: BARN.z - 12 }, { x: 46, z: 52 }, { x: POND.x - 24, z: POND.z + 8 }, { x: -22, z: -62 }, { x: 72, z: -14 }, { x: -70, z: 6 },
-].map((c, i) => ({ ...c, house: HOUSES[i % HOUSES.length], members: [], respawn: i < 2 ? 3 : 0 }));
+const CAMPS = CAMP_SPOTS.map((c, i) => ({ ...c, house: HOUSES[i % HOUSES.length], members: [], respawn: 0 }));
 const TIER_LOOK = [
   { metal: 0x7f8286, rough: 0.55, leather: 0x4a3426, body: 0x5a4a3a, swords: ['arming', 'falchion'] },
   { metal: 0x9da3aa, rough: 0.4, leather: 0x3d2a1e, body: 0x4a3c30, swords: ['falchion', 'longsword', 'arming'] },
@@ -94,8 +104,8 @@ function spawnKnight(camp) {
   const L = TIER_LOOK[tier];
   const sword = SWORDS.find(s => s.id === L.swords[Math.floor(Math.random() * L.swords.length)]);
   const f = new Fighter({ tier, metal: L.metal, rough: L.rough, cloth: camp.house.cloth, leather: L.leather, body: L.body, sword });
-  const a = Math.random() * 6.28, d = 2 + Math.random() * 5;
-  f.pos.set(camp.x + Math.cos(a) * d, 0, camp.z + Math.sin(a) * d);
+  const a = Math.random() * 6.28, d = 2.5 + Math.random() * 4;
+  f.pos.set(camp.x + Math.cos(a) * d, terrainH(camp.x, camp.z), camp.z + Math.sin(a) * d);
   collideFighter(f);
   f.pos.y = groundH(f.pos.x, f.pos.z);
   f.facing = Math.random() * 6.28;
@@ -197,7 +207,7 @@ function updateSpawns(dt) {
     const d = Math.hypot(c.x - player.pos.x, c.z - player.pos.z);
     if (c.members.length === 0) {
       if (c.respawn > 0) { c.respawn -= 1; continue; }
-      if (d > 30 && d < 110 && alive < 8) {
+      if (d > 35 && d < 160 && alive < 9) {
         const n = 2 + Math.floor(Math.random() * 2);
         for (let i = 0; i < n; i++) spawnKnight(c);
         c.respawn = 45;

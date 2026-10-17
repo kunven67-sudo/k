@@ -128,12 +128,16 @@ const gore = (() => {
         if (p.life > 0 && Math.random() < 0.3) stain(p.p.x, gh + 0.012 + Math.random() * 0.004, p.p.z, 0.08 + Math.random() * 0.22);
         continue;
       }
-      // splashes onto the barn walls
-      if (barnDist(p.p.x, p.p.z) < 0.04 && p.p.y < barnLevel + 5) {
+      // splashes onto walls: houses, castle walls, ruins
+      const wb = solidAt(p.p.x, p.p.z, 0.02);
+      if (wb && p.p.y > wb.h0 && p.p.y < wb.h1) {
         p.on = false; pMesh.setMatrixAt(i, zero);
-        const dx = p.p.x - BARN.x, dz = p.p.z - BARN.z;
-        const n = Math.abs(dx) / BARN.w > Math.abs(dz) / BARN.d ? new THREE.Vector3(Math.sign(dx), 0, 0) : new THREE.Vector3(0, 0, Math.sign(dz));
-        stain(p.p.x + n.x * 0.03, p.p.y, p.p.z + n.z * 0.03, 0.12 + Math.random() * 0.2, n);
+        const dx = p.p.x - wb.cx, dz = p.p.z - wb.cz, u = dx * wb.c - dz * wb.s, v = dx * wb.s + dz * wb.c;
+        let lu = 0, lv = 0, pu = u, pv = v;
+        if (wb.hw - Math.abs(u) < wb.hd - Math.abs(v)) { lu = Math.sign(u); pu = Math.sign(u) * (wb.hw + 0.03); } else { lv = Math.sign(v); pv = Math.sign(v) * (wb.hd + 0.03); }
+        const n = new THREE.Vector3(lu * wb.c + lv * wb.s, 0, -lu * wb.s + lv * wb.c);
+        const wx = wb.cx + pu * wb.c + pv * wb.s, wz = wb.cz - pu * wb.s + pv * wb.c;
+        stain(wx, p.p.y, wz, 0.12 + Math.random() * 0.2, n);
         continue;
       }
       m4.makeScale(p.s, p.s * (1 + Math.min(2, p.v.length() * 0.15)), p.s).setPosition(p.p);

@@ -1,18 +1,29 @@
 
-// ---------- startup ----------
+// ---------- startup: build the world, generate the forests, load the knights ----------
+buildWorld();
+let modelReady = false;
 const loader = new GLTFLoader();
+setTimeout(() => {
+  try { buildNature(); } catch (e) { console.error('nature failed', e); natureReady = true; }
+}, 30);
 loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb', (gltf) => {
-  soldierGLTF = gltf;
+  soldierGLTF = gltf; modelReady = true;
+}, undefined, (err) => { console.error(err); $('loadText').textContent = 'Could not load the knight model. Check your internet and refresh.'; $('playBtn').textContent = 'LOAD FAILED'; });
+let worldStarted = false;
+function checkReady() {
+  const pct = Math.round(((texDone / Math.max(1, texPending)) * 0.6 + (modelReady ? 0.25 : 0) + (natureReady ? 0.15 : 0)) * 100);
+  if (!worldStarted) $('loadText').textContent = 'Loading the world... ' + pct + '%';
+  if (worldStarted || !modelReady || !natureReady || texDone < texPending) return;
+  worldStarted = true;
   player = createPlayer();
-  for (const c of CAMPS.slice(0, 4)) { const n = 2 + Math.floor(Math.random() * 2); for (let i = 0; i < n; i++) spawnKnight(c); c.respawn = 45; }
+  for (const c of CAMPS.slice(0, 5)) { const n = 2 + Math.floor(Math.random() * 2); for (let i = 0; i < n; i++) spawnKnight(c); c.respawn = 45; }
   ui.weaponCard();
+  captureSkyEnv(sunDir, true);
   $('playBtn').disabled = false; $('playBtn').textContent = 'PLAY';
   $('loadText').textContent = 'Ready.';
-}, (e) => { if (e.total) $('loadText').textContent = 'Loading the knights... ' + Math.round(e.loaded / e.total * 100) + '%'; },
-(err) => { console.error(err); $('loadText').textContent = 'Could not load the knight model. Check your internet and refresh.'; $('playBtn').textContent = 'LOAD FAILED'; });
-
+}
 $('playBtn').onclick = () => {
-  if (!soldierGLTF) return;
+  if (!worldStarted) return;
   audioInit();
   $('title').style.display = 'none';
   $('hud').classList.add('on');
@@ -39,12 +50,12 @@ function frame() {
   if (hitStopT > 0) { hitStopT -= realDt; scale = 0.1; }
   if (slowmoT > 0) { slowmoT -= realDt; scale *= slowmo; if (slowmoT <= 0) slowmo = 1; }
   if (finisherCam > 0) finisherCam -= realDt;
-  const live = playing && !paused && soldierGLTF;
+  const live = playing && !paused && worldStarted;
   const dt = live ? realDt * scale : 0;
   clockNow += dt;
   if (live) { elapsed += dt; dayT = (dayT + dt / DAY_SECONDS) % 1; }
 
-  if (soldierGLTF && player.alive !== undefined) {
+  if (worldStarted) {
     if (live) {
       updatePlayer(dt);
       for (const f of fighters) if (f.ai) { tickVitals(f, dt); updateKnight(f, dt); if (!f.alive || f.down) f.updateFall(dt); }
@@ -74,42 +85,42 @@ function frame() {
       }
     }
   }
+  checkReady();
   updateGrass(player.pos.x, player.pos.z, false);
-  grassUniforms.uTime.value = elapsed + performance.now() * 0.0002;
+  const wt = elapsed + performance.now() * 0.0002;
+  grassUniforms.uTime.value = wt;
   grassUniforms.uPlayer.value.copy(player.pos);
-  updateSky();
-  animateLife(dt, elapsed);
+  const lightK = updateSky(realDt);
+  captureSkyEnv(sunDir, false);
+  animateLife(dt, elapsed, player.pos);
+  updateWeather(realDt, wt);
+  updateFires(realDt, wt, lightK.night);
+  clothUniforms.uTime.value = wt;
+  if (natureReady) updateNature(realDt, wt);
+  river.material.uniforms.time.value += realDt * 0.35;
+  river.material.uniforms.sunDirection.value.copy(sunDir);
   const dayK = smooth(-0.04, 0.12, sunDir.y);
   updateAmbience(realDt, dayK);
   let inFight = false;
   for (const f of fighters) if (f.ai && f.alive && f.ai.alert && f.pos.distanceTo(player.pos) < 30) { inFight = true; break; }
   updateMusic(inFight && player.alive);
-  if (playing && soldierGLTF) updateCamera(realDt);
+  if (playing && worldStarted) updateCamera(realDt);
   else {
     // title screen: slow drift around the field
     titleOrbit += realDt * 0.05;
-    const cx = SPAWN.x, cz = SPAWN.z;
-    camera.position.set(cx + Math.cos(titleOrbit) * 9, groundH(cx, cz) + 2.4, cz + Math.sin(titleOrbit) * 9);
-    camera.lookAt(cx, groundH(cx, cz) + 1.2, cz);
+    const cx = SQUARE.x, cz = SQUARE.z;
+    camera.position.set(cx + Math.cos(titleOrbit) * 34, groundH(cx, cz) + 9, cz + Math.sin(titleOrbit) * 34);
+    camera.lookAt(cx, groundH(cx, cz) + 3, cz);
   }
   sun.position.copy(player.pos).addScaledVector(sunDir, 90); sun.target.position.copy(player.pos);
   moon.position.copy(player.pos).addScaledVector(sunDir, -90); moon.target.position.copy(player.pos);
-  envIntensity(dayK);
-  sky.position.copy(camera.position); stars.position.copy(camera.position);
-  if (playing && soldierGLTF) ui.update(realDt);
-  renderer.render(scene, camera);
+  stars.position.copy(camera.position);
+  if (playing && worldStarted) ui.update(realDt);
+  composer.render();
   fpsAcc += realDt; fpsFrames++;
   if (fpsAcc > 0.5) { $('fps').textContent = Math.round(fpsFrames / fpsAcc) + ' FPS | ' + qName; fpsAcc = 0; fpsFrames = 0; }
 }
-// metal reflections dim at night
-let lastEnvK = -1;
-function envIntensity(k) {
-  const v = 0.25 + 0.75 * k;
-  if (Math.abs(v - lastEnvK) < 0.02) return;
-  lastEnvK = v;
-  scene.traverse(o => { if (o.material && o.material.envMap) o.material.envMapIntensity = (o.material.metalness > 0.95 ? 1.2 : 0.9) * v; });
-}
 updateGrass(player.pos.x, player.pos.z, true);
 frame();
-addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
 window.__game = { get player() { return player; }, fighters, setTime: (h) => { dayT = h / 24; }, keys, mouse, settings, gore, stats, get yaw() { return yaw; }, set yaw(v) { yaw = v; }, startAttack: (d, k) => player.startAttack(d, k), start: () => { audioInit(); $('title').style.display = 'none'; $('hud').classList.add('on'); playing = true; paused = false; } };

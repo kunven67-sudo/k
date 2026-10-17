@@ -127,8 +127,9 @@ const ui = (() => {
 // ---------- settings menu ----------
 function applyQuality(name) {
   qName = name; Q = QUALITY[qName];
-  try { localStorage.setItem('ironblood.quality', qName); } catch (e) {}
+  try { localStorage.setItem('ironblood.quality2', qName); } catch (e) {}
   renderer.setPixelRatio(Q.ratio); renderer.setSize(innerWidth, innerHeight);
+  composer.setPixelRatio(Q.ratio); composer.setSize(innerWidth, innerHeight);
   sun.shadow.mapSize.set(Q.shadow, Q.shadow);
   if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
   clearGrass(); updateGrass(player.pos.x, player.pos.z, true);

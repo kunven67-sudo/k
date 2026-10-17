@@ -54,7 +54,7 @@ function addBlood(mat, uniforms) {
   return mat;
 }
 function metalMat(color, rough, uniforms) {
-  return addBlood(new THREE.MeshStandardMaterial({ color, metalness: 0.9, roughness: rough, map: scratchTex, roughnessMap: roughTex, envMap: envTex, envMapIntensity: 1 }), uniforms);
+  return addBlood(new THREE.MeshStandardMaterial({ color, metalness: 0.9, roughness: rough, map: scratchTex, roughnessMap: roughTex }), uniforms);
 }
 function clothMat(color, uniforms) {
   return addBlood(new THREE.MeshStandardMaterial({ color, metalness: 0, roughness: 0.92, map: clothTex, side: THREE.DoubleSide }), uniforms);
@@ -312,10 +312,10 @@ function swordBladeGeo(len, w0, w1, thick, curve = 0, singleEdge = false, widenT
 }
 function makeSword(def, U) {
   const g = new THREE.Group();
-  const steel = addBlood(new THREE.MeshStandardMaterial({ color: 0xd4d8dc, metalness: 1, roughness: 0.18, envMap: envTex, envMapIntensity: 1.2, map: scratchTex }), U);
-  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2724, metalness: 0.6, roughness: 0.45, envMap: envTex });
+  const steel = addBlood(new THREE.MeshStandardMaterial({ color: 0xd4d8dc, metalness: 1, roughness: 0.16, map: scratchTex }), U);
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2724, metalness: 0.6, roughness: 0.45 });
   const grip = new THREE.MeshStandardMaterial({ color: 0x2b1a10, roughness: 0.85, map: clothTex });
-  const gold = new THREE.MeshStandardMaterial({ color: 0x8a6a32, metalness: 0.9, roughness: 0.35, envMap: envTex });
+  const gold = new THREE.MeshStandardMaterial({ color: 0x8a6a32, metalness: 0.9, roughness: 0.35 });
   let blade, guard, handle, pommel;
   switch (def.id) {
     case 'katana':

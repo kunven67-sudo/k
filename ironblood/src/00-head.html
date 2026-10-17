@@ -117,7 +117,7 @@
   <div class="tagline">A DARK KNIGHT. A SWORD. NO MERCY.</div>
   <button class="btn" id="playBtn" disabled>LOADING...</button>
   <button class="btn ghost" id="titleSettings">SETTINGS</button>
-  <div id="loadText">Loading the knights...</div>
+  <div id="loadText">Loading the world...</div>
   <div class="warn">Warning: extreme blood and gore (cut limbs, organs). You can turn it down in Settings with the gore slider.</div>
   <div class="keys">
     <span><b>WASD</b></span><span>Walk</span><span><b>Shift</b></span><span>Sprint</span>
@@ -137,7 +137,7 @@
     <div class="row"><label>Music</label><input type="range" id="sMusic" min="0" max="100"><em></em></div>
     <div class="row"><label>Sound effects</label><input type="range" id="sSfx" min="0" max="100"><em></em></div>
     <div class="row"><label>Gore</label><input type="range" id="sGore" min="0" max="2" step="1"><em></em></div>
-    <div class="row"><label>Graphics</label><select id="sQuality"><option>Low</option><option>Medium</option><option>High</option></select><em></em></div>
+    <div class="row"><label>Graphics</label><select id="sQuality"><option>Max</option><option>High</option><option>Medium</option></select><em></em></div>
     <div class="row"><label>Mouse speed</label><input type="range" id="sSens" min="20" max="250"><em></em></div>
     <div class="row"><label>Damage numbers</label><select id="sDmgNums"><option value="1">On</option><option value="0">Off</option></select><em></em></div>
     <div class="row"><label>Hardcore</label><select id="sHard"><option value="0">Off (respawn at the barn)</option><option value="1">On (death resets your strength)</option></select><em></em></div>
@@ -154,8 +154,8 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
   }
 }
 </script>
@@ -164,5 +164,11 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { Water } from 'three/addons/objects/Water.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Tree } from 'https://cdn.jsdelivr.net/npm/@dgreenheck/ez-tree@1.1.0/build/ez-tree.es.js';
 
