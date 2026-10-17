@@ -168,40 +168,52 @@ def dark(rgba, mode):
     return np.dstack([out.clip(0, 255).astype(np.uint8), rgba[..., 3]])
 
 
-def cracks(w=1300, h=280, seed=4):
-    """The ground splitting open in the void: jagged black cracks with hot red light deep inside."""
-    from PIL import ImageDraw
-    rng = np.random.default_rng(seed)
-    m, c = Image.new('L', (w, h), 0), Image.new('L', (w, h), 0)
-    dm, dc = ImageDraw.Draw(m), ImageDraw.Draw(c)
+def sparrow_frame(base, name):
+    """One frame of an official FNF Sparrow sheet, as a picture."""
+    import re
+    img = Image.open(os.path.join(FA, base + '.png')).convert('RGBA')
+    xml = open(os.path.join(FA, base + '.xml'), encoding='utf-8-sig').read()
+    for m in re.findall(r'<SubTexture\b([^>]*)/?>', xml):
+        f = dict(re.findall(r'([\w]+)="([^"]*)"', m))
+        if f['name'] == name:
+            x, y, w, h = [int(float(f[k])) for k in ('x', 'y', 'width', 'height')]
+            c = img.crop((x, y, x + w, y + h))
+            return c.transpose(Image.ROTATE_90) if f.get('rotated') == 'true' else c
+    raise KeyError(name)
 
-    def crack(x, y, ang0, length, width, depth):
-        ang, pts = ang0, [(x, y)]
-        while length > 0 and 4 < y < h - 4:
-            step = rng.uniform(12, 30)
-            ang = ang0 + 0.55 * (ang - ang0) + rng.normal(0, 0.5)        # zig-zag, but keep heading the same way
-            x += np.cos(ang) * step; y += np.sin(ang) * step * 0.4         # flat: the ground is seen at an angle
-            pts.append((x, y)); length -= step
-            if depth < 2 and rng.random() < 0.12:
-                crack(x, y, ang + rng.choice([-1, 1]) * rng.uniform(0.5, 1.0), length * rng.uniform(0.25, 0.45), width * 0.55, depth + 1)
-        for i in range(len(pts) - 1):
-            k = 1 - i / max(1, len(pts) - 1)
-            wd = width * (0.3 + 0.7 * k)
-            dm.line([pts[i], pts[i + 1]], fill=255, width=max(2, int(round(wd))))
-            if wd > 4: dc.line([pts[i], pts[i + 1]], fill=255, width=max(1, int(round(wd * 0.32))))
-    cx, cy = w / 2, h * 0.5
-    crack(cx, cy, np.pi, w * 0.46, 14, 0)
-    crack(cx, cy, 0.0, w * 0.46, 14, 0)
-    for ang in (2.3, 0.8, -2.5, -0.6):
-        crack(cx + rng.normal(0, 25), cy, ang, rng.uniform(90, 170), 7, 1)
-    a = cv2.GaussianBlur(np.array(m).astype(np.float32) / 255, (0, 0), 0.7)
-    core = cv2.GaussianBlur(np.array(c).astype(np.float32) / 255, (0, 0), 0.9)
-    glow = np.clip(cv2.GaussianBlur(np.array(c).astype(np.float32) / 255, (0, 0), 10) * 2.2, 0, 1)
-    rgb = np.array([200, 14, 10], np.float32) * glow[..., None]
-    al = glow * 0.55
-    rgb = rgb * (1 - a[..., None]) + np.array([6, 0, 2]) * a[..., None]; al = np.maximum(al, a)
-    rgb = rgb * (1 - core[..., None]) + np.array([255, 70, 30]) * core[..., None]
-    return np.dstack([rgb.clip(0, 255), al.clip(0, 1) * 255]).astype(np.uint8)
+
+def cracks(w=1300, h=300):
+    """The ground splitting open in the void. The crack shapes are FNF's own lightning bolts
+    (Weekend 1, Blazin) laid flat on the ground, wide end under the eye: black ink edge,
+    dark red gap, hot light deep inside, a soft red glow around."""
+    def bolt(name, rot, flip, width, squash):
+        c = sparrow_frame('weekend1/images/phillyBlazin/lightning', name)
+        im = Image.fromarray(((np.array(c)[..., 3] > 127) * 255).astype(np.uint8))
+        if flip: im = im.transpose(Image.FLIP_LEFT_RIGHT)
+        im = im.rotate(rot, expand=True, resample=Image.BICUBIC)
+        im = im.crop(im.getbbox())
+        s = width / im.width
+        im = im.resize((int(width), max(4, int(im.height * s * squash))), Image.LANCZOS)
+        return np.array(im).astype(np.float32) / 255
+    m = np.zeros((h, w), np.float32)
+    # (frame, rotation, flip, width, squash, centre x, centre y)
+    for n, r, f, wd, sq, cx, cy in [('lightning0001', -90, False, 560, 0.28, 375, 152),
+                                     ('lightning0001', 90, True, 560, 0.28, 925, 150),
+                                     ('lightning0007', -90, False, 250, 0.36, 520, 178),
+                                     ('lightning0007', 90, True, 240, 0.36, 790, 124)]:
+        b = bolt(n, r, f, wd, sq)
+        bh, bw = b.shape; x0, y0 = int(cx - bw / 2), int(cy - bh / 2)
+        xs0, ys0, xs1, ys1 = max(0, x0), max(0, y0), min(w, x0 + bw), min(h, y0 + bh)
+        m[ys0:ys1, xs0:xs1] = np.maximum(m[ys0:ys1, xs0:xs1], b[ys0 - y0:ys1 - y0, xs0 - x0:xs1 - x0])
+    gap = m > 0.5
+    ink = ndimage.binary_dilation(gap, iterations=4)
+    core = ndimage.binary_erosion(gap, iterations=4)
+    deep = ndimage.binary_erosion(gap, iterations=9)
+    glow = np.clip(cv2.GaussianBlur(gap.astype(np.float32), (0, 0), 14) * 1.6, 0, 1)
+    rgb = np.zeros((h, w, 3), np.float32); rgb[:] = (190, 10, 10); al = glow * 0.5
+    rgb[ink] = (8, 0, 4); al = np.where(ink, 1, al)
+    rgb[gap] = (120, 0, 12); rgb[core] = (230, 40, 20); rgb[deep] = (255, 120, 50)
+    return np.dstack([rgb.clip(0, 255), (al * 255).clip(0, 255)]).astype(np.uint8)
 
 
 def inked(rgba, seed=5, inner=True):

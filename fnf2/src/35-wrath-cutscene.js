@@ -174,7 +174,7 @@
   };
 
   // ---------------------------------------------------------------- the cutscene
-  const SND = 'shared/sounds/wrath-park/', DLG = 'shared/images/dialogue/';
+  const SND = 'shared/sounds/wrath-park/', DLG = 'shared/images/dialogue/', FX = 'shared/images/fx/';
   const JINGLE = 'shared/music/wrath-park/jingle.ogg', JBPM = 116;
   const CAN = { x: 1393, y: 600 };                                   // the trash can's mouth (world)
   const LINES = [
@@ -227,7 +227,9 @@
       this.can = st.props.find(p => p.name === 'trashcan');
       if (this.can) this.can.home = { x: this.can.x, y: this.can.y };
       // the thrown cone + little effects
-      this.cone = null; this.fx = [];
+      this.cone = null; this.fxs = [];
+      // FNF's own effect art (tools/own/fx.py): icy zap + sparks for the brain freeze, dust puffs
+      G.A.warmNow([FX + 'ice-zap.png', FX + 'ice-twinkle.png', FX + 'ice-sparks.png', FX + 'dust.png', FX + 'can-impact.png']);
       // dialogue box (Psych Engine's speech bubble) + FNF letters
       const b = this.box = new G.Sprite(70, 370); b.loadSparrow(DLG + 'speech_bubble');
       for (const [n, pre, loop] of [['normal', 'speech bubble normal', true], ['normalOpen', 'Speech Bubble Normal Open', false], ['angry', 'AHH speech bubble', true], ['angryOpen', 'speech bubble loud open', false],
@@ -274,7 +276,7 @@
       B.setPose('freeze'); this.squash(B, -0.08); this.freeze = 1; this.bolts.visible = true; this.boltT = 0;
       G.sfx(SND + 'freeze.ogg', { vol: 0.9 }); G.sfx(SND + 'sparkle.ogg', { vol: 0.7 }); G.sfx(SND + 'shiver.ogg', { vol: 0.8 });
       if (G.settings.flashing !== false) this.P.cam.flash('#cfefff', 0.45);
-      this.punch(0.12); this.burst(28);
+      this.punch(0.12); this.iceZap();
       yield wait(1.6);
       // 4. GF laughs at him
       this.moveCam(740, 445, 1.12, 0.9, ease.inOut);
@@ -295,7 +297,7 @@
       this.squash(B, -0.06); G.sfx(SND + 'toss.ogg', { vol: 0.9 });
       this.throwCone();
       yield until(() => !this.cone);
-      G.sfx(SND + 'clang.ogg', { vol: 1 }); this.canShake = 0.6; this.P.cam.shake(0.006, 0.2); this.puffAt(CAN.x, CAN.y + 20, 8, '#ffffff');
+      G.sfx(SND + 'clang.ogg', { vol: 1 }); this.canShake = 0.6; this.P.cam.shake(0.006, 0.2); this.fxSprite(FX + 'can-impact', 'CanImpactParticle', CAN.x - 10, CAN.y - 60, 0.9 / 0.6, { fps: 16 });
       this.bounce(Gf, 2);
       yield wait(0.75);
       // 7. BF gets up -> the battle
@@ -376,7 +378,7 @@
         return k >= 1;
       });
       A.x = ax; A.y = ay; A.playAnim('singDOWN', true); A.holdTimer = 0;
-      G.sfx(SND + 'puff.ogg', { vol: 0.9 }); this.puffAt(fx, fy, 14, '#e9d9c4'); P.cam.shake(0.005, 0.15);
+      G.sfx(SND + 'puff.ogg', { vol: 0.9 }); this.dustAt(fx, fy, 2); P.cam.shake(0.005, 0.15);
       yield wait(0.35);
       A.playAnim('hey', true);
       G.audio.music.stop(0.8);
@@ -410,18 +412,34 @@
     // a quick squash (+) or stretch (-) that springs back, FNF style
     squash(s, q) { s.sqT = 0; s.sqA = q; },
     bounce(s, n) { s.bounceT = 0; s.bounceN = n; },
-    burst(n) {
-      const B = this.bf, h = B.at(135, 175), cx = h.x, cy = h.y;
-      for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2, v = 140 + Math.random() * 260;
-        this.fx.push({ kind: 'spark', x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: 0.7 + Math.random() * 0.7, t: 0, s: 6 + Math.random() * 10, c: Math.random() < 0.5 ? '#ffffff' : '#9fe6ff' });
-      }
+    // one FNF effect sprite in the world: plays once, then goes away
+    fxSprite(sheet, prefix, x, y, sc, opt) {
+      const o = opt || {};
+      const sp = new G.Sprite(0, 0).loadSparrow(sheet);
+      if (!sp.sheet) return null;
+      if (!sp.addAnim('go', prefix, o.fps || 24, false)) return null;     // (prefix = the whole frame name minus the numbers)
+      sp.play('go', true);
+      sp.scale.x = sp.scale.y = sc; sp.updateHitbox();
+      sp.flipX = !!o.flip; sp.angle = o.angle || 0; sp.blend = o.blend || null; sp.alpha = o.alpha == null ? 1 : o.alpha;
+      sp.x = x - sp.width / 2; sp.y = o.bottom ? y - sp.height : y - sp.height / 2;
+      sp.done = false; sp.onFinish = () => { sp.done = true; };
+      this.fxs.push(sp);
+      return sp;
     },
-    puffAt(x, y, n, c) {
-      for (let i = 0; i < n; i++) {
-        const a = Math.PI + (i / (n - 1)) * Math.PI, v = 80 + Math.random() * 160;
-        this.fx.push({ kind: 'puff', x: x + (Math.random() - 0.5) * 30, y, vx: Math.cos(a) * v * 1.4, vy: Math.sin(a) * v * 0.5, life: 0.45 + Math.random() * 0.3, t: 0, s: 14 + Math.random() * 16, c });
-      }
+    // BRAIN FREEZE: Weekend 1's impact flash in ice blue + freeplay's spark burst, from his head
+    iceZap() {
+      const h = this.bf.at(135, 175);
+      this.fxSprite(FX + 'ice-zap', 'CanImpactParticle', h.x + 70, h.y - 55, 0.75 / 0.6, { flip: true, angle: -30, fps: 12 });
+      this.fxSprite(FX + 'ice-sparks', 'sparks', h.x, h.y, 0.8 / 0.5, { fps: 12 });
+    },
+    // little icy twinkles popping round his head while he shivers
+    twinkle() {
+      const h = this.bf.at(135, 175), a = Math.random() * Math.PI * 2, r = 70 + Math.random() * 90;
+      this.fxSprite(FX + 'ice-twinkle', 'sparkle Export', h.x + Math.cos(a) * r, h.y + Math.sin(a) * r * 0.8, 2.2 + Math.random() * 1.2, { fps: 24 });
+    },
+    // a dust cloud on the ground (Weekend 1's explosion smoke, recoloured + flattened)
+    dustAt(x, y, sc) {
+      this.fxSprite(FX + 'dust', 'explosion round 1 short', x, y + 12, (sc || 1) / 0.22 * 0.2, { bottom: true, fps: 24 });
     },
     throwCone() {
       const B = this.bf, h = B.at(74, 237);                 // his cone, in the picture
@@ -468,7 +486,7 @@
         const bo = this.bolts; this.boltT += dt;
         bo.visible = this.freeze > 0.15; bo.x = bo.home.x + (Math.floor(this.t * 30) % 2 ? 3 : -3); bo.y = bo.home.y + Math.sin(this.boltT * 20) * 2;
         bo.alpha = Math.min(1, this.freeze * 3); const bs = SIT_SC * (1 + 0.25 * Math.max(0, 1 - this.boltT / 0.18)); bo.scale.x = bo.scale.y = bs;
-        if (Math.random() < dt * 14 * this.freeze) this.burst(1);
+        if (Math.random() < dt * 5 * this.freeze) this.twinkle();
       } else B.tint = null;
       if (this.B_jolt > 0) { this.B_jolt = Math.max(0, this.B_jolt - dt); B.y -= Math.sin(this.B_jolt / 0.25 * Math.PI) * 18; }
       for (const s of [this.gf, this.bf]) if (s.bounceN) { s.bounceT += dt; const k = s.bounceT / 0.18; if (k >= s.bounceN) s.bounceN = 0; else s.y = s.home.y - Math.abs(Math.sin(k * Math.PI)) * 8; }
@@ -490,8 +508,8 @@
       const c = this.cone;
       if (c) { c.t += dt; if (c.t >= c.dur) this.cone = null; }
       // particles
-      for (const f of this.fx) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vy += (f.kind === 'spark' ? 380 : -40) * dt; f.vx *= Math.pow(0.2, dt); }
-      this.fx = this.fx.filter(f => f.t < f.life);
+      for (const f of this.fxs) f.update(dt);
+      this.fxs = this.fxs.filter(f => !f.done);
       // dialogue box + typing
       const b = this.box; b.update(dt);
       if (b.visible && b.finished && b.animName.endsWith('Open')) { if (this.closing) { b.visible = false; this.closing = false; } else { b.play(b.animName.replace('Open', ''), true); this.boxOffsets(); } }
@@ -546,33 +564,20 @@
     },
     skip() {
       if (this.done) return;
-      this.co = null; this.box.visible = false; this.line = null; this.cone = null; this.fx = [];
+      this.co = null; this.box.visible = false; this.line = null; this.cone = null; this.fxs = [];
       this.finish();
     },
     // drawn over the world
     draw(ctx) {
       const P = this.P;
       // world-space effects: the flying cone + particles
-      if (this.cone || this.fx.length) {
+      const c = this.cone;
+      if (c && c.img) {
         P.cam.apply(ctx, 1, 1);
-        const c = this.cone;
-        if (c && c.img) {
-          const k = Math.min(1, c.t / c.dur), x = G.lerp(c.x0, c.x1, k), y = G.lerp(c.y0, c.y1, k) - Math.sin(Math.PI * k) * 330;
-          ctx.save(); ctx.translate(x, y); ctx.rotate(k * Math.PI * 3.2); ctx.scale(0.36, 0.36); ctx.drawImage(c.img, -c.img.width / 2, -c.img.height / 2); ctx.restore();
-        }
-        for (const f of this.fx) {
-          const a = 1 - f.t / f.life;
-          ctx.save(); ctx.globalAlpha = Math.max(0, a); ctx.translate(f.x, f.y);
-          if (f.kind === 'spark') {
-            const r = f.s * (0.6 + 0.4 * a); ctx.rotate(f.t * 3); ctx.fillStyle = f.c;
-            ctx.beginPath(); ctx.moveTo(0, -r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.quadraticCurveTo(0, 0, 0, r); ctx.quadraticCurveTo(0, 0, -r, 0); ctx.quadraticCurveTo(0, 0, 0, -r); ctx.fill();
-          } else {
-            ctx.fillStyle = f.c; ctx.strokeStyle = 'rgba(40,30,30,0.6)'; ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.arc(0, 0, f.s * (1.4 - 0.4 * a), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-          }
-          ctx.restore();
-        }
+        const k = Math.min(1, c.t / c.dur), x = G.lerp(c.x0, c.x1, k), y = G.lerp(c.y0, c.y1, k) - Math.sin(Math.PI * k) * 330;
+        ctx.save(); ctx.translate(x, y); ctx.rotate(k * Math.PI * 3.2); ctx.scale(0.36, 0.36); ctx.drawImage(c.img, -c.img.width / 2, -c.img.height / 2); ctx.restore();
       }
+      for (const f of this.fxs) f.draw(ctx, P.cam);
       G.setScreenT(ctx);
       if (this.dim > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.dim.toFixed(3) + ')'; ctx.fillRect(0, 0, G.W, G.H); }
       if (this.box.visible) this.box.draw(ctx, null);

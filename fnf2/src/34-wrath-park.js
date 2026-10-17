@@ -77,6 +77,13 @@
         S.cracks = new G.Sprite(0, 0).loadImage(ck);
         S.cracks.scale.x = S.cracks.scale.y = 1.9; S.cracks.updateHitbox();
         S.cracks.x = 700 - S.cracks.width / 2; S.cracks.y = 845 - S.cracks.height / 2; S.cracks.zIndex = 60; S.cracks.name = 'cracks';
+        // the ground rips open from the middle out (only the opened part is drawn)
+        S.cracks.reveal = 0;
+        S.cracks.drawContent = function (ctx) {
+          const r = this.reveal; if (r <= 0) return;
+          const im = G.srcImg(this.img), w = im.width, h = im.height, half = Math.min(w / 2, w / 2 * r), cx = w / 2;
+          ctx.drawImage(im, cx - half, 0, half * 2, h, cx - half, 0, half * 2, h);
+        };
         st.props.push(S.cracks);
       }
       S.glow = new G.Sprite(0, 0).loadImage(glowImage(256, '255,30,30'));
@@ -104,7 +111,7 @@
     },
     reset(P) {
       const S = P.park; if (!S) return;
-      S.phase = 'day'; S.night = 0; S.red = 0; S.void = 0; S.glitch = 0; S.burst = 0; S.crack = 0; S.crackPulse = 0;
+      S.phase = 'day'; S.night = 0; S.red = 0; S.void = 0; S.glitch = 0; S.burst = 0; S.crack = 0; S.crackTo = 0; S.crackPulse = 0;
       this.apply(P);
       if (S.kenny) S.kenny.visible = false;                               // Kenny is only in the cutscene
     },
@@ -112,13 +119,17 @@
       const S = P.park; if (!S) return;
       if (name === 'WrathSnap') { S.phase = 'night'; S.glitch = 1.2; }
       else if (name === 'WrathEye') { S.phase = 'red'; S.glitch = 0.5; }
-      else if (name === 'ParkVoid') { S.phase = 'void'; S.glitch = 0.7; }
+      else if (name === 'ParkVoid') { S.phase = 'void'; S.glitch = 0.7; S.crackTo = 0.22; S.crackPulse = 1; }
     },
     beat(P, beat) {
       const S = P.park; if (!S) return;
       if (S.phase === 'red') for (const c of S.crowd) c.play('idle', true);
       if (S.phase === 'night' && Math.random() < 0.35) S.burst = 0.18 + Math.random() * 0.2;    // the picture keeps cutting out
-      if (S.phase === 'void' && S.crack < 1 && beat % 2 === 0) { S.crackPulse = 1; if (G.settings.flashing !== false) P.cam.shake(0.006, 0.2); }
+      // the crack rips a bit further every other beat until it's open all the way
+      if (S.phase === 'void' && S.crackTo < 1 && beat % 2 === 0) {
+        S.crackTo = Math.min(1, S.crackTo + 0.13); S.crackPulse = 1;
+        if (G.settings.flashing !== false) P.cam.shake(0.006, 0.2);
+      }
     },
     update(P, dt) {
       const S = P.park; if (!S) return;
@@ -127,7 +138,7 @@
       S.night = ph === 'night' ? Math.min(1, S.night + dt * 6) : ph === 'day' ? 0 : S.night;
       S.red = ph === 'red' || ph === 'void' ? 1 : 0;
       S.void = ph === 'void' ? Math.min(1, S.void + dt / 1.6) : 0;
-      if (ph === 'void') S.crack = Math.min(1, S.crack + dt / 3.2);
+      if (ph === 'void') S.crack += (S.crackTo - S.crack) * Math.min(1, dt * 14);    // each rip snaps open fast
       S.glitch = Math.max(0, S.glitch - dt); S.burst = Math.max(0, S.burst - dt);
       S.crackPulse = Math.max(0, S.crackPulse - dt * 2.5);
       // the eye's glow sits behind it
@@ -150,7 +161,7 @@
       }
       if (S.sky) S.sky.solid = ph === 'day' ? '#9fc7ee' : ph === 'night' ? '#141a38' : ph === 'red' ? '#6a0010' : '#000';
       for (const c of S.crowd) c.alpha = S.red * (1 - v) * 0.92;
-      if (S.cracks) S.cracks.alpha = ph === 'void' ? Math.min(1, S.crack * 1.4) : 0;
+      if (S.cracks) { S.cracks.alpha = ph === 'void' ? 1 : 0; S.cracks.reveal = ph === 'void' ? S.crack : 0; }
       if (S.glow) S.glow.alpha = ph === 'void' ? 0.35 + 0.45 * v + 0.2 * S.crackPulse : ph === 'red' ? 0.25 : 0;
       if (S.kenny && ph !== 'day') S.kenny.visible = false;
       P.charFilter = Object.assign({}, TINT[ph]);
