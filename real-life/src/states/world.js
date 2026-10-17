@@ -31,6 +31,8 @@ import { openPause } from '../ui/pause.js';
 import { Traffic } from '../world/traffic.js';
 import { assets } from '../gfx/assets.js';
 import { Ambience } from '../world/ambience.js';
+import { Grass } from '../gfx/grass.js';
+import { settings } from '../core/settings.js';
 import { prewarm } from '../audio/index.js';
 
 export class WorldState {
@@ -67,6 +69,8 @@ export class WorldState {
     this.life.phone = this.phone;
     this.radio = new Radio(this.life);
     this.ambience = new Ambience(world);
+    this.grass = new Grass(world, { radius: (e.tier?.grass ?? 1) >= 1 ? 15 : 10 });
+    this.grass.setEnabled(settings.get('grass') !== false && (e.tier?.grass ?? 1) > 0);
     prewarm?.(['amb.birds', 'amb.night', 'amb.wind', 'amb.traffic', 'fridge.hum']);
     this.ready = true;
     if (params.wake) {
@@ -80,6 +84,7 @@ export class WorldState {
     e.setView(world.scene, this.player.camera);
     input.setPointerLock?.(true);
     this._offs = [
+      bus.on('settings:changed', ({ key, value }) => key === 'grass' && this.grass.setEnabled(value !== false)),
       bus.on('door:locked', ({ door }) => this.hud.toast(`${door.name} is locked.`)),
       bus.on('me:cash', ({ amount, why }) => amount > 0 && why && why !== 'piggy' && this.hud.toast(`+$${amount.toFixed(2)}`)),
     ];
@@ -101,6 +106,7 @@ export class WorldState {
     this.phone.update(dt);
     this.radio.update(dt);
     this.ambience.update(dt, p.position);
+    this.grass.update(p.position);
     this.life.update(dt);
     p.update(dt);
     this.people.update(dt);
@@ -126,6 +132,7 @@ export class WorldState {
     for (const off of this._offs || []) off();
     this.radio?.dispose();
     this.ambience?.dispose();
+    this.grass?.dispose();
     this.phone?.dispose();
     this.talk?.dispose();
     this.life?.chores?.dispose();

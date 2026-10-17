@@ -9,6 +9,7 @@
 // the Person class instead, from their age and genes).
 
 import * as THREE from 'three';
+import { realify } from './realmat.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
@@ -60,7 +61,7 @@ const RECOLOR = {
   },
 };
 
-function prepare(gltf, kit) {
+function prepare(gltf, kit, name) {
   const recolor = RECOLOR[kit];
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return;
@@ -86,6 +87,8 @@ function prepare(gltf, kit) {
       if ('envMapIntensity' in m) m.envMapIntensity = 0.7;
     }
   });
+  // Flat-coloured furniture / house / car kits get real textured materials (gfx/realmat.js).
+  realify(kit, name, gltf.scene);
   let skinned = false;
   gltf.scene.traverse((o) => {
     if (o.isSkinnedMesh) skinned = true;
@@ -104,7 +107,7 @@ export const assets = {
       const p = loader
         .loadAsync(`${BASE}${kit}/${name}.glb`)
         .then((g) => {
-          prepare(g, kit);
+          prepare(g, kit, name);
           ready.set(k, g);
           return g;
         })

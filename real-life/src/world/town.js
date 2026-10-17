@@ -14,6 +14,7 @@ import { canvasTexture } from '../gfx/textures.js';
 import { Builder } from './builder.js';
 import { buildHouse, buildShell, FLOOR_Y } from './house.js';
 import { placeInstances } from './instanced.js';
+import { plantVegetation } from '../gfx/vegetation.js';
 import { Rng } from '../core/rng.js';
 import { buildStores } from './stores.js';
 import { CURB, MAPLE, ELM, CULDESAC, SIDEWALK, FAMILY_LOT, LOTS, PARK, PLAZA, SCHOOL, BOUNDS } from './layout.js';
@@ -47,6 +48,8 @@ function treeName(base, season) {
 export function buildTown(world, opts) {
   const { family } = opts;
   const scene = world.scene;
+  PAVED = [];
+  world.paved = PAVED;
   const root = new THREE.Group();
   root.name = 'town';
   scene.add(root);
@@ -231,23 +234,13 @@ export function buildTown(world, opts) {
   const keepPines = pines.filter(clearOfRoad);
   const treeGroup = new THREE.Group();
   root.add(treeGroup);
+  // Real trees (gfx/vegetation.js): near ones full detail + shadows, the woods a lighter version.
+  const inTown = (t) => Math.abs(t.z) < 48 && t.x > BOUNDS.x0 - 4 && t.x < BOUNDS.x1 + 4;
+  for (const t of keep) t.far = !inTown(t);
+  for (const t of keepPines) t.far = !inTown(t);
   const plantTrees = (season) => {
-    for (const c of [...treeGroup.children]) {
-      treeGroup.remove(c);
-    }
-    const byName = new Map();
-    for (const t of keep) {
-      const n = treeName(t.base, season);
-      if (!byName.has(n)) byName.set(n, []);
-      byName.get(n).push(t);
-    }
-    for (const [n, list] of byName) placeInstances(treeGroup, 'nature', n, list);
-    const pineBy = new Map();
-    for (const t of keepPines) {
-      if (!pineBy.has(t.base)) pineBy.set(t.base, []);
-      pineBy.get(t.base).push(t);
-    }
-    for (const [n, list] of pineBy) placeInstances(treeGroup, 'nature', n, list);
+    for (const c of [...treeGroup.children]) treeGroup.remove(c);
+    plantVegetation(treeGroup, { trees: keep, pines: keepPines, season });
   };
   plantTrees(opts.season);
   // Tree trunks block you (only the ones you can reach).
@@ -262,10 +255,14 @@ export function buildTown(world, opts) {
       if (Math.abs(x - doorX) < 1.8) continue;
       if (h.family && Math.abs(x - h.house.garageDoor.cx) < 3.4) continue;
       if (!h.family && h.house.garageX != null && Math.abs(x - h.house.garageX) < 3.4) continue;
-      bushes.push({ x, z: front, rotY: rng.range(0, 6), scale: rng.range(0.5, 0.68) });
+      bushes.push({ x, z: front, rotY: rng.range(0, 6), scale: rng.range(1.0, 1.35) });
     }
   }
-  placeInstances(root, 'nature', 'plant_bushDetailed', bushes);
+  plantVegetation(root, { bushes, season: opts.season });
+  for (const h of houses) {
+    const b = h.house.bounds;
+    if (b) PAVED.push({ x0: b.min.x - 0.3, x1: b.max.x + 0.3, z0: b.min.z - 0.3, z1: b.max.z + 0.3, s: 'building' });
+  }
 
   // ------------------------------------------------------------------ streetlights + signs
   const lampMat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xffd9a0, emissiveIntensity: 0 });
@@ -319,13 +316,18 @@ export function buildTown(world, opts) {
 
 // ---------------------------------------------------------------------------------------- pieces
 
+// Hard surfaces that aren't lawn (driveways, walkways, houses): grass + footsteps read this.
+let PAVED = [];
+
 function driveway(B, m, cx, zRoad, zHouse, w) {
   const z0 = zRoad;
   const z1 = zHouse;
+  PAVED.push({ x0: cx - w / 2, x1: cx + w / 2, z0: Math.min(z0, z1), z1: Math.max(z0, z1), s: 'concrete' });
   B.box(cx, CURB + 0.012, (z0 + z1) / 2, w, 0.024, Math.abs(z1 - z0), [m, m, m, null, m, m], { collide: false, shadow: false });
 }
 
 function walkTo(B, m, x, zDoor, zSidewalk) {
+  PAVED.push({ x0: x - 0.6, x1: x + 0.6, z0: Math.min(zDoor, zSidewalk), z1: Math.max(zDoor, zSidewalk), s: 'concrete' });
   B.box(x, CURB + 0.01, (zDoor + zSidewalk) / 2, 1.2, 0.02, Math.abs(zSidewalk - zDoor), [m, m, m, null, m, m], { collide: false, shadow: false });
 }
 

@@ -14,6 +14,7 @@ import { clock } from '../core/clock.js';
 import { audio } from '../core/audio.js';
 import { settings } from '../core/settings.js';
 import { assets } from '../gfx/assets.js';
+import { carPaint } from '../gfx/realmat.js';
 import { ELM, MAPLE, CURB } from './layout.js';
 
 export const CAR_MODELS = ['NormalCar1', 'NormalCar2', 'SUV', 'SportsCar', 'SportsCar2', 'Taxi', 'Cop'];
@@ -38,23 +39,11 @@ export class Traffic {
   _make(model, color) {
     const m = assets.model('autos', model);
     if (color) {
-      // Repaint the biggest body material.
-      let best = null;
-      let n = 0;
+      // Repaint the body (realmat marked it as car paint) in this car's colour.
+      const paint = carPaint(new THREE.Color(color).getHex());
       m.traverse((o) => {
-        if (!o.isMesh) return;
-        const c = o.geometry.attributes.position.count;
-        const name = (o.material.name || '').toLowerCase();
-        if (/glass|window|black|tire|wheel|light|chrome|grey|gray/.test(name)) return;
-        if (c > n) {
-          n = c;
-          best = o;
-        }
+        if (o.isMesh && o.material.userData?.carPaint) o.material = paint;
       });
-      if (best) {
-        best.material = best.material.clone();
-        best.material.color.set(color);
-      }
     }
     m.traverse((o) => {
       if (o.isMesh) {

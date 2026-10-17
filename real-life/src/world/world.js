@@ -18,6 +18,7 @@ import { Interactables } from './interact.js';
 import { Lights } from './lights.js';
 import { Doors } from './doors.js';
 import { buildTown, townAssets } from './town.js';
+import { vegetationTick } from '../gfx/vegetation.js';
 import { WINDOW_MATS } from './house.js';
 import { wallClock } from './decor.js';
 import { audio } from '../core/audio.js';
@@ -133,6 +134,7 @@ export class World {
     if ((p.z > SIDEWALK.mapleS.z0 && p.z < SIDEWALK.mapleS.z1) || (p.z > SIDEWALK.mapleN.z0 && p.z < SIDEWALK.mapleN.z1)) return 'concrete';
     if ((p.x > SIDEWALK.elmW.x0 && p.x < SIDEWALK.elmW.x1) || (p.x > SIDEWALK.elmE.x0 && p.x < SIDEWALK.elmE.x1)) return 'concrete';
     if (p.x > PLAZA.x0 && p.x < PLAZA.x1 && p.z > PLAZA.z0 && p.z < PLAZA.z1) return 'asphalt';
+    for (const r of this.paved || []) if (p.x > r.x0 && p.x < r.x1 && p.z > r.z0 && p.z < r.z1) return r.s === 'building' ? 'concrete' : r.s;
     return 'grass';
   }
 
@@ -143,6 +145,7 @@ export class World {
   }
 
   update(dt, { viewer, camera } = {}) {
+    vegetationTick(performance.now() / 1000);
     if (!this.ready) return;
     if (viewer) this._viewer.copy(viewer);
     this.sky.update(clock, this.weather, this._viewer);
