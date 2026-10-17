@@ -48,7 +48,7 @@
   const P = G.screens.play = {
     enter(params) {
       this.params = params = Object.assign({ mode: 'freeplay', songs: ['tutorial'], songIndex: 0, diff: 'normal', variation: null, week: null, weekStats: null, deaths: 0 }, params);
-      this.ready = false; this.failed = null;
+      this.ready = false; this.failed = null; this.cutscene = null;
       this.song = G.Songs.build(params.songs[params.songIndex], params.diff, params.variation);
       if (!this.song) { this.failed = 'Missing chart: ' + params.songs[params.songIndex] + ' (' + params.diff + ')'; return; }
       this.setupWorld();
@@ -58,7 +58,11 @@
       G.audio.preload(['miss1', 'miss2', 'miss3', 'intro3', 'intro2', 'intro1', 'introGo']);
       G.audio.song({ inst: this.song.inst, voices: this.song.voices, rate: G.settings.songSpeed }).then(h => {
         if (G.screen !== this) return;
-        this.audio = h; this.ready = true; this.startCountdown();
+        this.audio = h; this.ready = true;
+        // a song's own intro cutscene (first try only)
+        const cs = G.Cutscenes && G.Cutscenes[this.song.id];
+        if (cs && !params.deaths && !params.noCutscene) { try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
+        if (!this.cutscene) this.startCountdown();
       });
     },
     leave() { if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); },
@@ -79,6 +83,7 @@
         this.stage.addCharacter(eye, 'dad'); this.stage.addCharacter(this.dad, 'dad');
         this.dadForms = [this.dad, eye];
       }
+      const sfx = G.SongFX && G.SongFX[s.id]; if (sfx && sfx.setup) sfx.setup(this);
       this.applyStageFX();
       this.stageZoom = this.stage.zoom;
       this.cam = new G.FCam(this.stageZoom);
@@ -173,6 +178,7 @@
     // -------------------------------------------------- per-frame
     update(dt) {
       if (this.failed || !this.ready) return;
+      if (this.cutscene) { this.cutscene.update(dt); if (this.cutscene.done) { this.cutscene = null; this.startCountdown(); } return; }
       if (this.gameOver) { this.updateGameOver(dt); return; }
       if (this.paused) { this.updatePause(dt); return; }
       const prev = this.songPos;
@@ -488,6 +494,7 @@
       if (this.failed) { if (down && (a === 'back' || a === 'accept')) this.exitToMenu(); return; }
       if (this.gameOver) { if (down && !repeat) this.gameOverAction(a); return; }
       if (this.paused) { if (down) this.pauseAction(a, repeat); return; }
+      if (this.cutscene) { this.cutscene.onAction(a, down, repeat); return; }
       const m = /^note(\d)$/.exec(a);
       if (m) { if (repeat) return; if (down) this.press(+m[1]); else this.release(+m[1]); return; }
       if (!down || repeat) return;
@@ -497,6 +504,7 @@
     onBlur() { if (this.started && !this.paused && !this.gameOver && !this.ended) this.openPause(); },
     onPointer(type, x, y, id) {
       if (this.paused) { if (type === 'down') this.pausePointer(x, y); return; }
+      if (this.cutscene) { if (type === 'down') this.cutscene.onAction(y < 90 && x > G.W - 160 ? 'back' : 'accept', true, false); return; }
       if (this.gameOver) { if (type === 'down') this.gameOverAction(y < 120 && x < 140 ? 'back' : 'accept'); return; }
       if (!G.touchMode) return;
       // pause button top-right
@@ -558,7 +566,7 @@
       this.layoutPause();
     },
     resume() { this.paused = false; this.pauseMenu = null; G.audio.music.stop(0.1); this.audio.resume(); },
-    restart() { G.audio.music.stop(0); G.setScreen('play', Object.assign({}, this.params, { weekStats: this.params.weekStats }), { instant: false }); },
+    restart() { G.audio.music.stop(0); G.setScreen('play', Object.assign({}, this.params, { weekStats: this.params.weekStats, noCutscene: true }), { instant: false }); },
     exitToMenu() {
       G.audio.music.stop(0);
       if (this.audio) this.audio.stop();
@@ -644,6 +652,7 @@
         else s.draw(ctx, this.cam);
       }
       this.cam.drawFX(ctx);
+      if (this.cutscene) { this.cutscene.draw(ctx); return; }
       // HUD
       if (this.hud.alpha > 0.01) { ctx.save(); ctx.globalAlpha = this.hud.alpha; this.drawHUD(ctx); ctx.restore(); }
       if (this.paused) this.drawPause(ctx);

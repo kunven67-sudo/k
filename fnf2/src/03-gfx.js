@@ -11,7 +11,9 @@ G.Sparrow = {
     const xml = G.A.text(base + '.xml'), img = G.A.image(base + '.png');
     let sheet = null;
     if (xml && img) {
-      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      // some FNF sheets (the black 'default' font) use raw & < > as frame names: escape them first
+      const safe = xml.replace(/name="([^"]*)"/g, (m, v) => 'name="' + v.replace(/&(?!(amp|lt|gt|quot|apos|#\d+);)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '"');
+      const doc = new DOMParser().parseFromString(safe, 'text/xml');
       const frames = [];
       for (const n of doc.getElementsByTagName('SubTexture')) {
         const g = k => n.getAttribute(k), num = k => (g(k) == null ? null : parseFloat(g(k)));
@@ -376,6 +378,8 @@ const ATLAS_SYM = {
   '\u2190': '-left arrow-', '\u2192': '-right arrow-', '\u2191': '-up arrow-', '\u2193': '-down arrow-', '\u2665': '-heart-',
   '\u201c': '-start quote-', '\u201d': '-end quote-', '"': '-start quote-',
 };
+// letters that sit higher than the baseline (Psych Engine's alphabet.json: [normal, bold] lift in px)
+const ATLAS_LIFT = { "'": [32, 40], '"': [32, 40], '\u201c': [24, 40], '\u201d': [24, 40], '-': [16, 16], '*': [28, 40], '+': [7, 12], ':': [2, 8], ';': [-2, 4], '^': [28, 38], ',': [-6, -4], '~': [16, 20] };
 G.AtlasFont = {
   cache: {},
   get(name) {
@@ -424,7 +428,8 @@ G.Alphabet = class {
       const frames = G.AtlasFont.glyph(font, ch);
       if (!frames) { x += 40; continue; }
       const f0 = frames[0];
-      this.letters.push({ frames, x, y: y + font.maxH - f0.fh });
+      const lift = ATLAS_LIFT[ch]; const ly = lift ? lift[this.bold ? 1 : 0] : 0;
+      this.letters.push({ frames, x, y: y + font.maxH - f0.fh - ly });
       x += f0.fw;
       this.width = Math.max(this.width, x);
     }
