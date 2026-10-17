@@ -6,9 +6,9 @@ const loader = new GLTFLoader();
 loadScans(() => { try { buildNature(); } catch (e) { console.error('nature failed', e); natureReady = true; } });
 // a real photographed sky lights and reflects on everything in daytime
 new RGBELoader().load('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr', (t) => { t.mapping = THREE.EquirectangularReflectionMapping; hdrEnv = pmrem.fromEquirectangular(t).texture; t.dispose(); });
-loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb', (gltf) => {
+loadGLB(loader, 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb', (gltf) => {
   soldierGLTF = gltf; modelReady = true;
-}, undefined, (err) => { console.error(err); $('loadText').textContent = 'Could not load the knight model. Check your internet and refresh.'; $('playBtn').textContent = 'LOAD FAILED'; });
+}, (err) => { console.error(err); $('loadText').textContent = 'Could not load the knight model. Check your internet and refresh.'; $('playBtn').textContent = 'LOAD FAILED'; });
 let worldStarted = false;
 function checkReady() {
   const pct = Math.round(((texDone / Math.max(1, texPending)) * 0.35 + (modelReady ? 0.15 : 0) + (scansLoaded / SCANS.length) * 0.45 + (natureReady ? 0.05 : 0)) * 100);
@@ -16,6 +16,7 @@ function checkReady() {
   if (worldStarted || !modelReady || !natureReady || texDone < texPending) return;
   worldStarted = true;
   player = createPlayer();
+  initVillage();
   for (const c of CAMPS.slice(0, 5)) { const n = 2 + Math.floor(Math.random() * 2); for (let i = 0; i < n; i++) spawnKnight(c); c.respawn = 45; }
   ui.weaponCard();
   captureSkyEnv(sunDir, true);
@@ -40,6 +41,8 @@ $('respawnBtn').onclick = () => {
 
 // ---------- main loop ----------
 const clock = new THREE.Clock();
+let animTick = 0;
+initTalk();
 let fpsAcc = 0, fpsFrames = 0, elapsed = 0, deathShown = false, deathT = 0, titleOrbit = 0;
 const capeCols = [{ x: 0, y: 0, z: 0, r: 0.21 }, { x: 0, y: 0, z: 0, r: 0.2 }, { x: 0, y: 0, z: 0, r: 0.12 }, { x: 0, y: 0, z: 0, r: 0.12 }];
 const _cv = new THREE.Vector3();
@@ -60,10 +63,16 @@ function frame() {
       updatePlayer(dt);
       for (const f of fighters) if (f.ai) { tickVitals(f, dt); updateKnight(f, dt); if (!f.alive || f.down) f.updateFall(dt); }
       for (const f of fighters) updateAttack(f, dt);
+      updateVillage(dt);
       updateSpawns(realDt);
     }
+    animTick++;
     for (const f of fighters) {
-      if (live || !f.animatedOnce) { f.animate(live ? dt : 0.016); f.animatedOnce = true; }
+      if (f.inside) continue;
+      // far away people move their bodies less often (saves a lot of time)
+      const far = !f.isPlayer && f.alive && f.pos.distanceToSquared(camera.position) > 45 * 45;
+      if (far && f.animatedOnce && (animTick + f.animSlot) % 3) { f.skipDt = (f.skipDt || 0) + dt; continue; }
+      if (live || !f.animatedOnce) { f.animate(live ? dt + (f.skipDt || 0) : 0.016); f.skipDt = 0; f.animatedOnce = true; }
       f.armor.uniforms.uBlood.value = f.blood;
       if (f.cape && live) {
         f.b.Spine1.getWorldPosition(_cv); Object.assign(capeCols[0], { x: _cv.x, y: _cv.y, z: _cv.z });
@@ -73,6 +82,7 @@ function frame() {
         f.cape.update(Math.max(dt, 0.001), f.root, capeCols);
       }
     }
+    if (live) updateScene(dt);
     gore.update(dt);
     // death screen
     if (!player.alive && playing) {
@@ -104,7 +114,7 @@ function frame() {
   let inFight = false;
   for (const f of fighters) if (f.ai && f.alive && f.ai.alert && f.pos.distanceTo(player.pos) < 30) { inFight = true; break; }
   updateMusic(inFight && player.alive);
-  if (playing && worldStarted) updateCamera(realDt);
+  if (playing && worldStarted) { updateCamera(realDt); cameraFx(elapsed); }
   else {
     // title screen: slow drift around the field
     titleOrbit += realDt * 0.05;
@@ -124,5 +134,7 @@ updateGrass(player.pos.x, player.pos.z, true);
 frame();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
 window.__game = { get player() { return player; }, fighters, setTime: (h) => { dayT = h / 24; }, keys, mouse, settings, gore, stats, get yaw() { return yaw; }, set yaw(v) { yaw = v; }, startAttack: (d, k) => player.startAttack(d, k), start: () => { audioInit(); $('title').style.display = 'none'; $('hud').classList.add('on'); playing = true; paused = false; } };
+window.__V = { villagers, vsave, openTalk, say, startRaid, startScene, endTalk, openShop, closeShop, raid, interactTarget, get talk() { return talk; }, get scene() { return scene0; }, get uiOpen() { return uiOpen; }, get state() { return { paused, playing, hitStopT, slowmo, slowmoT, cutscene, uiOpen, passedOut, finisherCam }; } };
 window.__W = { SQUARE, CASTLE, BRIDGE, BATTLE_X, FORTRESS, groundH };
 window.__dbg = () => ({ modelReady, natureReady, texDone, texPending, worldStarted, scans: scansLoaded + '/' + SCANS.length, cells: natureCells.size, inst: [...natureCells.values()].flat().reduce((a, m) => a + m.count, 0), fps: $('fps').textContent });
+window.__R = { renderer, composer, camera };

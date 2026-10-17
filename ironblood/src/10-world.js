@@ -190,6 +190,7 @@ document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0xbcd3e6, 0.0028);
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.08, 2500);
+camera.layers.enable(1); // layer 1: things the river does not reflect (grass, ground clutter)
 const pmrem = new THREE.PMREMGenerator(renderer);
 // a soft outdoor reflection until the real sky is captured
 const envTex = (() => {
@@ -307,9 +308,12 @@ const river = (() => {
     if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  const w = new Water(g, { textureWidth: LITE ? 128 : 1024, textureHeight: LITE ? 128 : 1024, waterNormals, sunDirection: new THREE.Vector3(0.5, 0.7, 0.3), sunColor: 0xfff2dd, waterColor: 0x1d3b3a, distortionScale: 2.4, fog: true, alpha: 1 });
+  const w = new Water(g, { textureWidth: LITE ? 128 : 768, textureHeight: LITE ? 128 : 768, waterNormals, sunDirection: new THREE.Vector3(0.5, 0.7, 0.3), sunColor: 0xfff2dd, waterColor: 0x1d3b3a, distortionScale: 2.4, fog: true, alpha: 1 });
   w.rotation.x = -Math.PI / 2; w.position.y = WATER_Y;
   w.material.uniforms.size.value = 3.5;
+  // the reflection is a whole second render: redo it every other frame only
+  const reflect = w.onBeforeRender; let wf = 0;
+  w.onBeforeRender = function (r, sc, cam) { if ((wf++ & 1) === 0) reflect.call(this, r, sc, cam); };
   scene.add(w);
   return w;
 })();
@@ -402,6 +406,7 @@ function buildChunk(cx, cz) {
   const r = mulberry32((cx * 73856093) ^ (cz * 19349663));
   const count = Math.round(CHUNK * CHUNK * Q.grass);
   const mesh = new THREE.InstancedMesh(bladeGeo, grassMat, count);
+  mesh.layers.set(1);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
   const g1 = new THREE.Color(0x34501c), g2 = new THREE.Color(0x587a2a), dry = new THREE.Color(0x8a8a48);
   let n = 0;

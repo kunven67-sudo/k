@@ -30,7 +30,7 @@ function collideFighter(f) {
   }
   // bodies push each other apart (living, standing ones)
   for (const o of fighters) {
-    if (o === f || !o.alive || o.down || f.down) continue;
+    if (o === f || !o.alive || o.down || f.down || o.inside) continue;
     const dx = p.x - o.pos.x, dz = p.z - o.pos.z, d = Math.hypot(dx, dz), rr = BODY_R * 2;
     if (d < rr && d > 1e-4) { const push = (rr - d) * 0.5; p.x += dx / d * push; p.z += dz / d * push; }
   }
@@ -99,29 +99,55 @@ const TIER_LOOK = [
   { metal: 0xb9bec4, rough: 0.27, leather: 0x2e2018, body: 0x3a3028, swords: ['longsword', 'claymore'] },
 ];
 let attackTokens = 0;
-function spawnKnight(camp) {
+function spawnKnight(camp, at) {
   const r = Math.random(), tier = r < 0.5 ? 0 : r < 0.84 ? 1 : 2;
   const L = TIER_LOOK[tier];
   const sword = SWORDS.find(s => s.id === L.swords[Math.floor(Math.random() * L.swords.length)]);
   const f = new Fighter({ tier, metal: L.metal, rough: L.rough, cloth: camp.house.cloth, leather: L.leather, body: L.body, sword });
-  const a = Math.random() * 6.28, d = 2.5 + Math.random() * 4;
-  f.pos.set(camp.x + Math.cos(a) * d, terrainH(camp.x, camp.z), camp.z + Math.sin(a) * d);
+  const a = Math.random() * 6.28, d = 2.5 + Math.random() * 4, c0 = at || camp;
+  f.pos.set(c0.x + Math.cos(a) * d, terrainH(c0.x, c0.z), c0.z + Math.sin(a) * d);
   collideFighter(f);
   f.pos.y = groundH(f.pos.x, f.pos.z);
   f.facing = Math.random() * 6.28;
   f.voicePitch = 0.85 + Math.random() * 0.3;
   f.name = camp.house.name + ' ' + TIER[tier].name;
+  f.houseName = camp.house.name;
+  // what's on him: a coin purse (copper) and the gear you can strip and sell
+  f.purse = [8 + Math.floor(Math.random() * 18), 15 + Math.floor(Math.random() * 30), 40 + Math.floor(Math.random() * 70)][tier];
+  f.loot = [['Dented kettle hat', 14], ['Mail shirt', 40], ['Plate harness', 110]][tier];
   f.ai = { state: 'patrol', camp, wait: Math.random() * 3, tx: f.pos.x, tz: f.pos.z, alert: false, strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, cd: 1 + Math.random(), blockT: 0, courage: Math.random(), shouted: false, react: 0, crawlT: 0 };
-  camp.members.push(f);
+  if (!at) camp.members.push(f);
   return f;
 }
 function alertNear(f, who) {
   for (const o of fighters) if (o.ai && o.alive && !o.ai.alert && o.pos.distanceTo(f.pos) < 22) { o.ai.alert = true; o.ai.react = 0.3 + Math.random() * 0.6; }
 }
 const _wish = new THREE.Vector3();
+// the nearest enemy this fighter can see (you, your allies, villagers, knights)
+function pickTarget(f) {
+  let best = null, bd = 1e9;
+  for (const o of fighters) {
+    if (!o.alive || o.inside || !hostile(f, o)) continue;
+    const d = o.pos.distanceTo(f.pos) * (o.isPlayer ? 0.8 : 1) * (o.down ? 1.6 : 1);
+    if (d < bd && d < 40) { bd = d; best = o; }
+  }
+  return best;
+}
 function updateKnight(f, dt) {
-  const ai = f.ai, P = player;
+  const ai = f.ai;
   if (!f.alive) return;
+  ai.pickT = (ai.pickT || 0) - dt;
+  if (ai.pickT <= 0 || !ai.target || !ai.target.alive || ai.target.inside) { ai.pickT = 0.6 + Math.random() * 0.4; ai.target = pickTarget(f); }
+  const P = ai.target || player;
+  // allies with nothing to fight follow you
+  if (ai.follow && (!ai.target || ai.target.pos.distanceTo(f.pos) > 22) && !f.down) {
+    ai.alert = false;
+    const d = _wish.copy(player.pos).sub(f.pos).setY(0), dist = d.length();
+    const w = new THREE.Vector3(); let sp = 0;
+    if (dist > 3) { w.copy(d).normalize(); sp = dist > 9 ? 5.5 : dist > 5 ? 3.5 : 1.6; }
+    stepFighter(f, dt, w, sp * f.legMult, dist > 0.5 ? Math.atan2(d.x, d.z) : f.facing, 7);
+    return;
+  }
   // lost a leg: crawl away, face down, sobbing
   if (f.down) {
     ai.crawlT += dt;
@@ -142,13 +168,13 @@ function updateKnight(f, dt) {
   const faceP = Math.atan2(toP.x, toP.z);
   const fwd = { x: Math.sin(f.facing), z: Math.cos(f.facing) };
   // noticing you: sight cone, close range, or getting hit
-  if (!ai.alert && P.alive) {
+  if (!ai.alert && ai.target && P.alive) {
     const inCone = (fwd.x * toP.x + fwd.z * toP.z) > Math.cos(1.0);
-    if ((dist < 28 && inCone) || dist < 7 || f.lastHitBy === P) { ai.alert = true; ai.react = 0.25 + Math.random() * 0.4; }
+    if ((dist < 28 && inCone) || dist < 7 || (f.lastHitBy && f.lastHitBy.alive)) { ai.alert = true; ai.react = 0.25 + Math.random() * 0.4; }
   }
   if (ai.alert && !ai.shouted && ai.react <= 0) { ai.shouted = true; sfx.voice(f.pos, 'shout', f.voicePitch); alertNear(f, P); }
   if (ai.react > 0) ai.react -= dt;
-  if (!P.alive) ai.alert = false;
+  if (!ai.target || !P.alive) ai.alert = false;
   let wish = new THREE.Vector3(), speed = 0, face = f.facing;
   const tierSpd = f.T.speed * f.legMult;
   if (!ai.alert || ai.react > 0) {
@@ -179,18 +205,19 @@ function updateKnight(f, dt) {
     ai.cd -= dt;
     // block when you swing at them (better knights block more)
     if (P.attack && P.attack.t < P.attack.dur * 0.35 && !f.attack && ai.blockT <= 0 && f.canAct()) {
-      const chance = [0.22, 0.42, 0.62][f.tier] * (f.stamina > 20 ? 1 : 0.2);
+      const chance = (f.T.block || [0.22, 0.42, 0.62][f.tier] || 0.3) * (f.stamina > 20 ? 1 : 0.2);
       if (Math.random() < chance * dt * 8) { f.blocking = true; f.blockStart = now() - 0.05 - Math.random() * 0.2; ai.blockT = 0.7; }
     }
     if (ai.blockT > 0) { ai.blockT -= dt; if (ai.blockT <= 0) f.blocking = false; }
-    if (ai.cd <= 0 && !f.attack && !f.blocking && f.canAct() && attackTokens < 2 && P.alive) {
+    // only two people swing at the same person at once, the rest circle and wait
+    if (ai.cd <= 0 && !f.attack && !f.blocking && f.canAct() && (P.tokens || 0) < 2 && P.alive) {
       const dirs = ['R', 'L', 'U', 'S', 'R', 'L', 'D'];
       const kind = f.tier === 2 && Math.random() < 0.3 ? 'heavy' : 'light';
-      if (f.startAttack(dirs[Math.floor(Math.random() * dirs.length)], kind)) { ai.attacking = true; attackTokens++; f.attack.dur *= 1.15; }
-      ai.cd = 0.7 + Math.random() * 1.6 - f.tier * 0.15;
+      if (f.startAttack(dirs[Math.floor(Math.random() * dirs.length)], kind)) { ai.attacking = P; P.tokens = (P.tokens || 0) + 1; f.attack.dur *= 1.15; }
+      ai.cd = 0.7 + Math.random() * 1.6 - Math.min(2, f.tier) * 0.15;
     }
   }
-  if (ai.attacking && !f.attack) { ai.attacking = false; attackTokens = Math.max(0, attackTokens - 1); }
+  if (ai.attacking && !f.attack) { ai.attacking.tokens = Math.max(0, (ai.attacking.tokens || 1) - 1); ai.attacking = false; }
   if (!f.canAct()) { speed *= 0.2; }
   if (f.stagger > 0) wish.multiplyScalar(0);
   stepFighter(f, dt, wish, speed, face, 7);
@@ -220,7 +247,7 @@ function updateSpawns(dt) {
 }
 function removeFighter(f) {
   scene.remove(f.root);
-  if (f.swordMesh.parent === scene) scene.remove(f.swordMesh);
+  if (f.swordMesh && f.swordMesh.parent === scene) scene.remove(f.swordMesh);
   if (f.cape) scene.remove(f.cape.mesh);
   if (f.tag) f.tag.remove();
   const i = fighters.indexOf(f); if (i >= 0) fighters.splice(i, 1);

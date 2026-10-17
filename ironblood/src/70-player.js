@@ -6,6 +6,8 @@ try { Object.assign(stats, JSON.parse(localStorage.getItem('ironblood.stats') ||
 function saveStats() { try { localStorage.setItem('ironblood.stats', JSON.stringify(stats)); } catch (e) {} }
 const SPAWN = { x: SQUARE.x + 2, z: SQUARE.z + 9 };
 let bandages = 6, bandaging = 0;
+// talking / shopping (uiOpen) and kissing scenes (cutscene) take the controls away
+let uiOpen = false, cutscene = false, sceneCam = null, lovedT = 0;
 
 function createPlayer() {
   const f = new Fighter({ player: true, tier: 3, metal: 0x70747c, rough: 0.27, cloth: 0x24242b, leather: 0x2a221c, body: 0x2a2a2e, sword: SWORDS.find(s => s.id === stats.sword) || SWORDS[0], name: 'You' });
@@ -24,7 +26,7 @@ function createPlayer() {
   };
   return f;
 }
-function unlockedSwords() { return SWORDS.filter(s => stats.kills >= s.unlock); }
+function unlockedSwords() { return SWORDS.filter(s => stats.kills >= s.unlock || vsave.owned.includes(s.id)); }
 
 // permanent growth: it's you that gets stronger, not the sword
 function gainXp(raw) {
@@ -47,8 +49,10 @@ function hitStop(t) { hitStopT = Math.max(hitStopT, t); }
 addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (['Space', 'Tab'].includes(e.code)) e.preventDefault();
-  if (!playing || paused || !player.alive) return;
+  if (!playing || paused || !player.alive || uiOpen || cutscene || passedOut) return;
   if (e.repeat) return;
+  if (e.code === 'KeyE') { const t = interactTarget(); if (t && t.kind === 'talk') openTalk(t.o); else if (t && t.kind === 'loot') lootBody(t.o); }
+  if (e.code === 'KeyH') useHealItem();
   if (e.code === 'Space' && player.grounded && player.canAct() && player.stamina > 8) { player.vy = 5.6; player.grounded = false; player.useStamina(8); }
   if (e.code === 'KeyC') tryDodge();
   if (e.code === 'KeyQ') toggleLock();
@@ -60,16 +64,16 @@ addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.l = mouse.r = false; if (player.blocking) player.blocking = false; });
 addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('mousemove', (e) => {
-  if (!playing || paused) return;
+  if (!playing || paused || uiOpen || cutscene) return;
   if (document.pointerLockElement !== renderer.domElement) return;
   const s = 0.0024 * settings.sens / 100;
   if (finisherCam <= 0) { yaw -= e.movementX * s; pitch = Math.min(1.2, Math.max(-0.35, pitch + e.movementY * s * 0.9)); }
   mouse.hist.push({ dx: e.movementX, dy: e.movementY, t: performance.now() });
   if (mouse.hist.length > 40) mouse.hist.shift();
 });
-addEventListener('wheel', (e) => { if (playing && !paused) camDist = Math.min(7, Math.max(2.2, camDist + Math.sign(e.deltaY) * 0.4)); }, { passive: true });
+addEventListener('wheel', (e) => { if (playing && !paused && !uiOpen) camDist = Math.min(7, Math.max(2.2, camDist + Math.sign(e.deltaY) * 0.4)); }, { passive: true });
 addEventListener('mousedown', (e) => {
-  if (!playing || paused) return;
+  if (!playing || paused || uiOpen || cutscene || passedOut) return;
   if (document.pointerLockElement !== renderer.domElement) { requestLock(); return; }
   audioInit();
   if (!player.alive) return;
@@ -117,7 +121,7 @@ function toggleLock() {
   let best = null, bd = 1e9;
   const cf = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
   for (const o of fighters) {
-    if (o.isPlayer || !o.alive) continue;
+    if (o.isPlayer || !o.alive || o.inside || !(o.team === 'knight' || o.angryAtYou)) continue;
     const d = o.pos.distanceTo(player.pos);
     if (d > 20) continue;
     const dir = o.pos.clone().sub(player.pos).setY(0).normalize();
@@ -131,7 +135,7 @@ function tryFinisher() {
   if (!f.canAct() || f.attack || !f.hasSword) return;
   let best = null, bd = 3;
   for (const o of fighters) {
-    if (o.isPlayer || !o.alive) continue;
+    if (o.isPlayer || !o.alive || o.inside || !(o.team === 'knight' || o.angryAtYou)) continue;
     const d = o.pos.distanceTo(f.pos);
     const weak = o.stagger > 0 || o.hp < o.maxHp * 0.3 || o.down || !o.hasSword;
     if (d < bd && weak) { bd = d; best = o; }
@@ -201,7 +205,10 @@ function updatePlayer(dt) {
   tickVitals(f, dt);
   if (!f.alive) { f.updateFall(dt); return; }
   if (lockTarget && (!lockTarget.alive || lockTarget.pos.distanceTo(f.pos) > 25)) lockTarget = null;
-  const w = playing && !paused ? moveWish() : new THREE.Vector3();
+  const w = playing && !paused && !uiOpen && !cutscene && !passedOut ? moveWish() : new THREE.Vector3();
+  // ale makes you weave about
+  if (drunk > 0.3 && w.lengthSq() > 0) { const a = Math.sin(elapsed * 1.3) * Math.min(0.9, (drunk - 0.3) * 1.2); w.set(w.x * Math.cos(a) - w.z * Math.sin(a), 0, w.x * Math.sin(a) + w.z * Math.cos(a)); }
+  if (lovedT > 0) { lovedT -= dt; if (f.staminaDelay <= 0) f.stamina = Math.min(100, f.stamina + dt * 9); }
   const wantsSprint = (keys.ShiftLeft || keys.ShiftRight) && w.lengthSq() > 0 && f.stamina > 1 && !f.blocking && bandaging <= 0;
   let speed = 0;
   if (w.lengthSq() > 0) speed = wantsSprint ? 6.4 : 1.9;
@@ -234,6 +241,7 @@ function updatePlayer(dt) {
 }
 function playerDied() {
   stats.deaths++;
+  onPlayerDeathVillage();
   if (settings.hard) { stats.str = 0; stats.spd = 0; stats.strXp = 0; stats.spdXp = 0; stats.kills = 0; stats.sword = 'arming'; }
   saveStats();
 }
@@ -262,7 +270,8 @@ function updateCamera(dt) {
   const cp = Math.cos(pitch);
   let want = new THREE.Vector3(Math.sin(yaw) * cp, Math.sin(pitch), Math.cos(yaw) * cp).multiplyScalar(camDist).add(head).addScaledVector(right, 0.45);
   let look = head.clone().addScaledVector(right, 0.45);
-  if (finisherCam > 0 && f.attack && f.attack.fin) {
+  if (sceneCam) { want = sceneCam.pos.clone(); look = sceneCam.look.clone(); }
+  else if (finisherCam > 0 && f.attack && f.attack.fin) {
     // cinematic side view of the finisher
     const o = f.attack.fin.target;
     const mid = f.pos.clone().lerp(o.pos, 0.5).setY(f.pos.y + 1.3);
@@ -275,7 +284,7 @@ function updateCamera(dt) {
   // don't let the camera go inside walls: slide it in toward you
   for (let i = 0; i < 6; i++) { const b = solidAt(want.x, want.z, 0.25); if (!b || want.y > b.h1 + 0.2) break; want.lerp(head, 0.3); }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
-  const k = Math.min(1, (finisherCam > 0 ? 6 : 16) * dt);
+  const k = Math.min(1, (finisherCam > 0 || sceneCam ? 4 : 16) * dt);
   camPos.lerp(want, k); camLook.lerp(look, k);
   camera.position.copy(camPos);
   if (shakeAmt > 0.001) {

@@ -96,8 +96,11 @@ function addFire(x, y, z, size = 1) {
     s.scale.set(0.6 * size, 1.1 * size, 1); g.add(s); sprites.push({ s, ph: Math.random() * 10 });
   }
   scene.add(g);
-  fires.push({ g, sprites, size, pos: new THREE.Vector3(x, y + 0.5 * size, z) });
+  const e = { g, sprites, size, pos: new THREE.Vector3(x, y + 0.5 * size, z) };
+  fires.push(e);
+  return e;
 }
+function removeFire(e) { scene.remove(e.g); const i = fires.indexOf(e); if (i >= 0) fires.splice(i, 1); for (const l of firePool) if (l.userData.fire === e) { l.userData.fire = null; l.intensity = 0; } }
 const firePool = [];
 for (let i = 0; i < 8; i++) { const l = new THREE.PointLight(0xff8a3a, 0, 18, 2); scene.add(l); firePool.push(l); }
 let fireAssign = 0;
@@ -195,6 +198,9 @@ function house(B, x, z, ry, w, d, floors, roof, opts = {}) {
   addBox(x, z, Math.max(w, uw) + 0.3, Math.max(d, ud) + 0.3, ry, base, topY + rise, 'house');
   return { y0, topY };
 }
+// every village building, so people know where their doors are
+const VHOUSES = [], VSTALLS = [];
+function doorSpot(x, z, ry, dz, dx = 0) { const p = new THREE.Vector3(dx, 0, dz).applyMatrix4(frameAt(x, 0, z, ry)); return { x: p.x, z: p.z }; }
 function buildVillage() {
   const B = new Builder();
   const r = mulberry32(77);
@@ -219,6 +225,7 @@ function buildVillage() {
     canopy.position.set(x, y + 2.5, z); canopy.rotation.set(-Math.PI / 2 + 0.2, 0, 0, 'YXZ'); canopy.rotation.y = ry; canopy.castShadow = true; scene.add(canopy);
     for (let k = 0; k < 3; k++) B.add(MAT.wood, cylW(0.28, 0.28, 0.7, 12, 1), -0.8 + k * 0.8 + (r() - 0.5) * 0.2, 0.35, 1.3 + r() * 0.3, 0, 0, 0, F);
     addBox(x, z, 2.8, 1.8, ry, -1e9, 1e9, 'stall');
+    VSTALLS.push({ x, z, ry, front: doorSpot(x, z, ry, -1.6) });
   }
   // houses around the square, facing it
   const spots = [];
@@ -232,7 +239,9 @@ function buildVillage() {
     spots.push([x, z]);
     const ry = Math.atan2(SQUARE.x - x, SQUARE.z - z);
     const tavern = n === 0, smithy = n === 1;
-    if (smithy) { blacksmith(B, x, z, ry); n++; continue; }
+    if (smithy) { blacksmith(B, x, z, ry); VHOUSES.push({ x, z, ry, w: 6.6, d: 5.6, kind: 'smithy', door: doorSpot(x, z, ry, 3.6), work: doorSpot(x, z, ry, 1.0, 0.3) }); n++; continue; }
+    const healer = n === 2;
+    VHOUSES.push({ x, z, ry, w: tavern ? 11 : w, d: tavern ? 8 : dd, kind: tavern ? 'tavern' : healer ? 'healer' : 'house', door: doorSpot(x, z, ry, (tavern ? 8 : dd) / 2 + 1.1) });
     house(B, x, z, ry, tavern ? 11 : w, tavern ? 8 : dd, tavern || r() < 0.4 ? 2 : 1, r() < 0.65 ? 'thatch' : 'slate');
     if (tavern) {
       // hanging sign
@@ -240,6 +249,13 @@ function buildVillage() {
       B.add(MAT.darkWood, boxW(0.1, 0.1, 1.4, 1), 2.2, 3.4, 4.6, 0, 0, 0, F);
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), new THREE.MeshStandardMaterial({ map: signTex('THE RED BOAR'), side: THREE.DoubleSide }));
       sign.position.set(0, 0, 0); const sp = new THREE.Vector3(2.2, 3.0, 5.1).applyMatrix4(F); sign.position.copy(sp); sign.rotation.y = ry + Math.PI / 2; scene.add(sign);
+    }
+    if (healer) {
+      // the healer's sign: a green cross on a board over the door, herbs drying
+      const F = frameAt(x, terrainH(x, z), z, ry);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), new THREE.MeshStandardMaterial({ map: signTex('HEALER'), side: THREE.DoubleSide }));
+      sign.position.copy(new THREE.Vector3(1.4, 3.0, dd / 2 + 0.25).applyMatrix4(F)); sign.rotation.y = ry; scene.add(sign);
+      for (let k = 0; k < 4; k++) B.add(MAT.thatch, boxW(0.12, 0.35, 0.12, 1), -1.8 + k * 0.3, 2.35, dd / 2 + 0.25, 0, 0, 0, F);
     }
     if (r() < 0.6) { const F = frameAt(x, 0, z, ry); const tp = new THREE.Vector3(1.0, 0, dd / 2 + 1.2).applyMatrix4(F); torchSpots.push([tp.x, tp.z]); }
     n++;

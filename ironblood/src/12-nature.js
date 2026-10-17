@@ -25,10 +25,27 @@ function addWind(mat, strength) {
   };
   mat.customProgramCacheKey = () => 'wind' + strength;
 }
+// downloaded models are kept in the browser (IndexedDB), so the second start is fast
+const fileCache = (() => {
+  let dbp = null;
+  const open = () => dbp || (dbp = new Promise((res, rej) => { const r = indexedDB.open('ironblood', 1); r.onupgradeneeded = () => r.result.createObjectStore('files'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }));
+  const tx = (mode, fn) => open().then(db => new Promise((res) => { const q = fn(db.transaction('files', mode).objectStore('files')); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }));
+  return { get: (k) => tx('readonly', s => s.get(k)), put: (k, v) => tx('readwrite', s => s.put(v, k)) };
+})();
+const CACHE_VER = 'v1|';
+async function cachedBuf(url) {
+  try { const hit = await fileCache.get(CACHE_VER + url); if (hit) return hit; } catch (e) {}
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + url);
+  const b = await r.arrayBuffer();
+  fileCache.put(CACHE_VER + url, b).catch(() => {});
+  return b;
+}
+function loadGLB(L, url, ok, fail) { cachedBuf(url).then(b => L.parse(b, '', ok, fail)).catch(fail); }
 function loadScans(onDone) {
   const L = new GLTFLoader();
   for (const name of SCANS) {
-    L.load(ASSET_BASE + name + '.glb', (gltf) => {
+    loadGLB(L, ASSET_BASE + name + '.glb', (gltf) => {
       gltf.scene.updateMatrixWorld(true);
       // each top-level node is one variant (the fir file holds three different trees)
       const tops = gltf.scene.children.length > 1 ? gltf.scene.children : [gltf.scene];
@@ -50,7 +67,7 @@ function loadScans(onDone) {
       });
       scansLoaded++;
       if (scansLoaded === SCANS.length) onDone();
-    }, undefined, (e) => { console.warn('scan failed', name, e); scan[name] = []; scansLoaded++; if (scansLoaded === SCANS.length) onDone(); });
+    }, (e) => { console.warn('scan failed', name, e); scan[name] = []; scansLoaded++; if (scansLoaded === SCANS.length) onDone(); });
   }
 }
 // impostor: the game photographs each tree from the front and side once, far trees become two crossed cards
@@ -124,6 +141,8 @@ function plant(name, vi, key, mats, opts = {}) {
       m.computeBoundingSphere();
       m.userData.d0 = d0; m.userData.d1 = d1;
       m.visible = false;
+      // ground clutter stays out of the river's reflection (it would cost a whole extra render)
+      if ((opts.kind || 'prop') !== 'tree' && mode !== 'imp') m.layers.set(1);
       scene.add(m);
       natureCells.get(key).push(m);
     }

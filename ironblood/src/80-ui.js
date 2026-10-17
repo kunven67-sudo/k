@@ -66,6 +66,14 @@ const ui = (() => {
     combo.style.opacity = f.heat >= 1 ? 1 : 0;
     combo.textContent = 'COMBO x' + Math.floor(f.heat) + '  (+' + Math.round(f.heat * 5) + '% dmg)';
     $('levels').innerHTML = `STRENGTH ${stats.str} &nbsp; SWORD SPEED ${stats.spd}`;
+    $('purse').textContent = 'PURSE ' + money(vsave.coins) + (vsave.goods.length ? '  |  ' + goodsSummary() : '');
+    const food = ['draught', 'stew', 'bread', 'honeycake'].reduce((a, k) => a + (vsave.items[k] || 0), 0);
+    $('food').textContent = food ? 'H: eat / drink (' + food + ')' : '';
+    // what E would do
+    const it = !uiOpen && !cutscene && f.alive ? interactTarget() : null;
+    $('prompt').style.display = it ? 'block' : 'none';
+    if (it) $('prompt').innerHTML = '<b>E</b> ' + it.text;
+    if (raid.active) $('raidLine').textContent = 'RAID: ' + raid.members.length + ' ' + raid.house + ' raiders in Ashford'; else $('raidLine').textContent = '';
     // where the next swing will come from
     if (f.attack) drawDir(f.attack.dir); else if (mouse.hist.length) {
       const t = performance.now(); let dx = 0, dy = 0;
@@ -87,15 +95,20 @@ const ui = (() => {
     const tags = $('tags');
     for (const o of fighters) {
       if (o.isPlayer) continue;
-      const show = o.alive && (o.ai && (o.ai.alert || o.hp < o.maxHp)) && o.pos.distanceTo(f.pos) < 24;
+      const near = o.pos.distanceTo(f.pos);
+      const show = o.alive && !o.inside && (o.vill ? near < 9 || (o.hp < o.maxHp && near < 24) : (o.ai && (o.ai.alert || o.hp < o.maxHp)) && near < 24);
       if (!show) { if (o.tag) o.tag.style.display = 'none'; continue; }
       if (!o.tag) { o.tag = document.createElement('div'); o.tag.className = 'tag'; o.tag.innerHTML = '<div class="tn"></div><div class="tv"></div><div class="tb"><i></i></div>'; tags.appendChild(o.tag); }
       const head = o.b.HeadTop_End.getWorldPosition(new THREE.Vector3()); head.y += 0.25;
       const s = toScreen(head);
       if (!s.vis) { o.tag.style.display = 'none'; continue; }
       o.tag.style.display = 'block'; o.tag.style.left = s.x + 'px'; o.tag.style.top = s.y + 'px';
-      o.tag.children[0].textContent = o.name;
-      o.tag.children[1].textContent = Math.max(0, Math.ceil(o.hp)) + ' / ' + o.maxHp;
+      const friendly = o.vill && !o.angryAtYou;
+      o.tag.classList.toggle('friend', !!friendly);
+      o.tag.children[0].textContent = o.vill ? o.vill.p.name + (o.vill.mode === 'ally' ? ' (with you)' : '') : o.name;
+      const hurt = !o.vill || o.hp < o.maxHp;
+      o.tag.children[1].textContent = hurt ? Math.max(0, Math.ceil(o.hp)) + ' / ' + o.maxHp : o.vill.p.title;
+      o.tag.children[2].style.display = hurt ? 'block' : 'none';
       o.tag.querySelector('i').style.width = Math.max(0, o.hp / o.maxHp * 100) + '%';
     }
     // damage numbers float up and fade
@@ -144,6 +157,7 @@ function bindSettings() {
   }
   $('sQuality').value = qName; $('sQuality').onchange = (e) => applyQuality(e.target.value);
   $('sDmgNums').value = String(settings.dmgNums); $('sDmgNums').onchange = (e) => { settings.dmgNums = +e.target.value; saveSettings(); };
+  $('sBrain').value = settings.brain; $('sBrain').onchange = (e) => { settings.brain = e.target.value; settings.brainAsked = 1; saveSettings(); if (settings.brain === 'ai') loadBrain(); };
   $('sHard').value = String(settings.hard); $('sHard').onchange = (e) => { settings.hard = +e.target.value; saveSettings(); };
 }
 bindSettings();
@@ -160,6 +174,10 @@ $('resumeBtn').onclick = () => {
   paused = false; requestLock();
 };
 $('titleSettings').onclick = () => openPause(true);
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape') return;
+  if (shopOpen) closeShop(); else if (talk) endTalk();
+});
 document.addEventListener('pointerlockchange', () => {
-  if (document.pointerLockElement !== renderer.domElement && playing && player.alive && !paused) openPause(false);
+  if (document.pointerLockElement !== renderer.domElement && playing && player.alive && !paused && !uiOpen && !cutscene && !passedOut) openPause(false);
 });

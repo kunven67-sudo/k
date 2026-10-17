@@ -80,6 +80,40 @@
   .center { text-align: center; margin-top: 14px; }
   #deathTitle { font-family: Cinzel, serif; font-weight: 900; font-size: 72px; color: #a31212; letter-spacing: .12em; text-shadow: 0 0 24px rgba(160,0,0,.5); }
   #loadText { margin-top: 10px; font-size: 12px; color: var(--dim); }
+  #purse { font-family: Cinzel, serif; font-weight: 800; font-size: 13px; color: #e2c77a; margin-top: 4px; }
+  #food { font-size: 11px; color: var(--dim); }
+  #raidLine { font-family: Cinzel, serif; font-weight: 800; color: #ff6a4a; font-size: 13px; animation: pulse 1.2s infinite; }
+  #prompt { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); font-size: 14px; text-shadow: 0 1px 3px #000; display: none; background: rgba(0,0,0,.35); padding: 4px 12px; border-radius: 4px; }
+  #prompt b { display: inline-block; padding: 0 6px; border: 1px solid rgba(255,255,255,.5); border-radius: 3px; margin-right: 6px; font-size: 12px; }
+  .tag.friend .tn { color: #cfe3b0; opacity: 1; font-size: 11px; }
+  .tag.friend .tv { font-weight: 400; opacity: .75; font-size: 10px; }
+  .panel { position: absolute; display: none; flex-direction: column; background: rgba(14,13,12,.93); border: 1px solid rgba(226,199,122,.25); border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.6); pointer-events: auto; color: var(--bright); }
+  #talk { left: 24px; top: 50%; transform: translateY(-50%); width: min(430px, calc(100% - 48px)); height: min(560px, calc(100% - 60px)); }
+  .phead { padding: 12px 16px 10px; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .phead .pn { font-family: Cinzel, serif; font-weight: 800; font-size: 20px; }
+  .phead .pt { font-size: 12px; color: var(--dim); }
+  .phead .pr { font-size: 12px; color: #e2c77a; margin-top: 4px; }
+  #talkLog { flex: 1; overflow-y: auto; padding: 10px 16px; font-size: 14px; line-height: 1.45; }
+  #talkLog .line { margin: 6px 0; }
+  #talkLog .line b { color: #e2c77a; font-weight: 700; }
+  #talkLog .line.me b { color: #9fb7d9; }
+  #talkLog .line.typing span { opacity: .5; animation: pulse 1s infinite; }
+  #talkBtns { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px; border-top: 1px solid rgba(255,255,255,.08); }
+  .chip { cursor: pointer; font-size: 12px; font-weight: 700; color: #1a0f06; background: #d9c99c; border: 0; border-radius: 4px; padding: 6px 10px; }
+  .chip:hover { filter: brightness(1.1); }
+  .chip.ghost { background: transparent; color: var(--bright); border: 1px solid rgba(255,255,255,.3); }
+  .chip:disabled { opacity: .35; cursor: default; }
+  .tin { display: flex; gap: 6px; padding: 8px 14px 6px; }
+  #talkIn { flex: 1; background: #1d1b19; color: var(--bright); border: 1px solid #4a4236; border-radius: 4px; padding: 8px 10px; font-size: 14px; outline: none; }
+  #talkIn:focus { border-color: #b39a4a; }
+  #brainLine { font-size: 11px; color: var(--dim); padding: 0 14px 10px; }
+  #brainAsk { display: none; margin: 0 14px 10px; padding: 10px; border: 1px solid rgba(226,199,122,.3); border-radius: 6px; font-size: 12px; line-height: 1.4; }
+  #shop { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(640px, calc(100% - 32px)); max-height: calc(100% - 60px); }
+  #shopRows { overflow-y: auto; padding: 6px 14px 12px; }
+  .srow { display: grid; grid-template-columns: 1fr 70px auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .srow b { display: block; font-size: 14px; } .srow small { color: var(--dim); font-size: 11px; }
+  .srow em { font-style: normal; color: #e2c77a; font-weight: 700; text-align: right; font-size: 13px; }
+  #fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -89,7 +123,11 @@
     <div class="kills" id="kills">0 KILLS</div>
     <div id="combo">COMBO x0</div>
     <div id="levels"></div>
+    <div id="purse"></div>
+    <div id="food"></div>
+    <div id="raidLine"></div>
   </div>
+  <div id="prompt"></div>
   <div id="tags"></div>
   <div id="reticle"></div>
   <svg id="dir" viewBox="-23 -23 46 46"></svg>
@@ -110,6 +148,20 @@
   </div>
 </div>
 <div id="vignette"></div>
+<div id="fade"></div>
+<div class="panel" id="talk">
+  <div class="phead"><div class="pn" id="talkName"></div><div class="pt" id="talkTitle"></div><div class="pr" id="talkRel"></div></div>
+  <div id="talkLog"></div>
+  <div id="talkBtns"></div>
+  <div class="tin"><input id="talkIn" maxlength="200" placeholder="Say anything... (Enter to send, Esc to leave)" autocomplete="off"><button class="chip" id="talkSend">Say</button></div>
+  <div id="brainAsk">The villagers can think with a small AI brain that runs inside the game on your graphics card. It downloads once (about 900 MB) and then works offline. Until then they use the built-in brain.<div style="margin-top:8px"><button class="chip" id="brainYes">Download the AI brain</button> <button class="chip ghost" id="brainNo">Use the built-in brain</button></div></div>
+  <div id="brainLine"></div>
+</div>
+<div class="panel" id="shop">
+  <div class="phead"><div class="pn" id="shopName"></div><div class="pr" id="shopPurse"></div></div>
+  <div id="shopRows"></div>
+  <div style="padding:8px 14px 14px;text-align:right"><button class="chip ghost" id="shopBack">Back (Esc)</button></div>
+</div>
 
 <div class="screen" id="title">
   <div class="logo">IRON<span class="blood">BLOOD</span></div>
@@ -127,6 +179,7 @@
     <span><b>Space</b></span><span>Jump (click in air = slam)</span><span><b>Q</b></span><span>Lock on</span>
     <span><b>F</b></span><span>Finisher</span><span><b>B</b></span><span>Bandage</span>
     <span><b>X</b></span><span>Switch sword</span><span><b>Esc</b></span><span>Pause / settings</span>
+    <span><b>E</b></span><span>Talk / trade / search bodies</span><span><b>H</b></span><span>Eat or drink a draught</span>
   </div>
 </div>
 
@@ -140,6 +193,7 @@
     <div class="row"><label>Graphics</label><select id="sQuality"><option>Max</option><option>High</option><option>Medium</option></select><em></em></div>
     <div class="row"><label>Mouse speed</label><input type="range" id="sSens" min="20" max="250"><em></em></div>
     <div class="row"><label>Damage numbers</label><select id="sDmgNums"><option value="1">On</option><option value="0">Off</option></select><em></em></div>
+    <div class="row"><label>Village brain</label><select id="sBrain"><option value="ai">AI in the game (about 900 MB once)</option><option value="builtin">Built-in (no download)</option></select><em></em></div>
     <div class="row"><label>Hardcore</label><select id="sHard"><option value="0">Off (respawn at the barn)</option><option value="1">On (death resets your strength)</option></select><em></em></div>
     <div class="center"><button class="btn" id="resumeBtn">RESUME</button></div>
   </div>
@@ -364,6 +418,7 @@ document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0xbcd3e6, 0.0028);
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.08, 2500);
+camera.layers.enable(1); // layer 1: things the river does not reflect (grass, ground clutter)
 const pmrem = new THREE.PMREMGenerator(renderer);
 // a soft outdoor reflection until the real sky is captured
 const envTex = (() => {
@@ -481,9 +536,12 @@ const river = (() => {
     if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  const w = new Water(g, { textureWidth: LITE ? 128 : 1024, textureHeight: LITE ? 128 : 1024, waterNormals, sunDirection: new THREE.Vector3(0.5, 0.7, 0.3), sunColor: 0xfff2dd, waterColor: 0x1d3b3a, distortionScale: 2.4, fog: true, alpha: 1 });
+  const w = new Water(g, { textureWidth: LITE ? 128 : 768, textureHeight: LITE ? 128 : 768, waterNormals, sunDirection: new THREE.Vector3(0.5, 0.7, 0.3), sunColor: 0xfff2dd, waterColor: 0x1d3b3a, distortionScale: 2.4, fog: true, alpha: 1 });
   w.rotation.x = -Math.PI / 2; w.position.y = WATER_Y;
   w.material.uniforms.size.value = 3.5;
+  // the reflection is a whole second render: redo it every other frame only
+  const reflect = w.onBeforeRender; let wf = 0;
+  w.onBeforeRender = function (r, sc, cam) { if ((wf++ & 1) === 0) reflect.call(this, r, sc, cam); };
   scene.add(w);
   return w;
 })();
@@ -576,6 +634,7 @@ function buildChunk(cx, cz) {
   const r = mulberry32((cx * 73856093) ^ (cz * 19349663));
   const count = Math.round(CHUNK * CHUNK * Q.grass);
   const mesh = new THREE.InstancedMesh(bladeGeo, grassMat, count);
+  mesh.layers.set(1);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
   const g1 = new THREE.Color(0x34501c), g2 = new THREE.Color(0x587a2a), dry = new THREE.Color(0x8a8a48);
   let n = 0;
@@ -643,10 +702,27 @@ function addWind(mat, strength) {
   };
   mat.customProgramCacheKey = () => 'wind' + strength;
 }
+// downloaded models are kept in the browser (IndexedDB), so the second start is fast
+const fileCache = (() => {
+  let dbp = null;
+  const open = () => dbp || (dbp = new Promise((res, rej) => { const r = indexedDB.open('ironblood', 1); r.onupgradeneeded = () => r.result.createObjectStore('files'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }));
+  const tx = (mode, fn) => open().then(db => new Promise((res) => { const q = fn(db.transaction('files', mode).objectStore('files')); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }));
+  return { get: (k) => tx('readonly', s => s.get(k)), put: (k, v) => tx('readwrite', s => s.put(v, k)) };
+})();
+const CACHE_VER = 'v1|';
+async function cachedBuf(url) {
+  try { const hit = await fileCache.get(CACHE_VER + url); if (hit) return hit; } catch (e) {}
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + url);
+  const b = await r.arrayBuffer();
+  fileCache.put(CACHE_VER + url, b).catch(() => {});
+  return b;
+}
+function loadGLB(L, url, ok, fail) { cachedBuf(url).then(b => L.parse(b, '', ok, fail)).catch(fail); }
 function loadScans(onDone) {
   const L = new GLTFLoader();
   for (const name of SCANS) {
-    L.load(ASSET_BASE + name + '.glb', (gltf) => {
+    loadGLB(L, ASSET_BASE + name + '.glb', (gltf) => {
       gltf.scene.updateMatrixWorld(true);
       // each top-level node is one variant (the fir file holds three different trees)
       const tops = gltf.scene.children.length > 1 ? gltf.scene.children : [gltf.scene];
@@ -668,7 +744,7 @@ function loadScans(onDone) {
       });
       scansLoaded++;
       if (scansLoaded === SCANS.length) onDone();
-    }, undefined, (e) => { console.warn('scan failed', name, e); scan[name] = []; scansLoaded++; if (scansLoaded === SCANS.length) onDone(); });
+    }, (e) => { console.warn('scan failed', name, e); scan[name] = []; scansLoaded++; if (scansLoaded === SCANS.length) onDone(); });
   }
 }
 // impostor: the game photographs each tree from the front and side once, far trees become two crossed cards
@@ -742,6 +818,8 @@ function plant(name, vi, key, mats, opts = {}) {
       m.computeBoundingSphere();
       m.userData.d0 = d0; m.userData.d1 = d1;
       m.visible = false;
+      // ground clutter stays out of the river's reflection (it would cost a whole extra render)
+      if ((opts.kind || 'prop') !== 'tree' && mode !== 'imp') m.layers.set(1);
       scene.add(m);
       natureCells.get(key).push(m);
     }
@@ -969,8 +1047,11 @@ function addFire(x, y, z, size = 1) {
     s.scale.set(0.6 * size, 1.1 * size, 1); g.add(s); sprites.push({ s, ph: Math.random() * 10 });
   }
   scene.add(g);
-  fires.push({ g, sprites, size, pos: new THREE.Vector3(x, y + 0.5 * size, z) });
+  const e = { g, sprites, size, pos: new THREE.Vector3(x, y + 0.5 * size, z) };
+  fires.push(e);
+  return e;
 }
+function removeFire(e) { scene.remove(e.g); const i = fires.indexOf(e); if (i >= 0) fires.splice(i, 1); for (const l of firePool) if (l.userData.fire === e) { l.userData.fire = null; l.intensity = 0; } }
 const firePool = [];
 for (let i = 0; i < 8; i++) { const l = new THREE.PointLight(0xff8a3a, 0, 18, 2); scene.add(l); firePool.push(l); }
 let fireAssign = 0;
@@ -1068,6 +1149,9 @@ function house(B, x, z, ry, w, d, floors, roof, opts = {}) {
   addBox(x, z, Math.max(w, uw) + 0.3, Math.max(d, ud) + 0.3, ry, base, topY + rise, 'house');
   return { y0, topY };
 }
+// every village building, so people know where their doors are
+const VHOUSES = [], VSTALLS = [];
+function doorSpot(x, z, ry, dz, dx = 0) { const p = new THREE.Vector3(dx, 0, dz).applyMatrix4(frameAt(x, 0, z, ry)); return { x: p.x, z: p.z }; }
 function buildVillage() {
   const B = new Builder();
   const r = mulberry32(77);
@@ -1092,6 +1176,7 @@ function buildVillage() {
     canopy.position.set(x, y + 2.5, z); canopy.rotation.set(-Math.PI / 2 + 0.2, 0, 0, 'YXZ'); canopy.rotation.y = ry; canopy.castShadow = true; scene.add(canopy);
     for (let k = 0; k < 3; k++) B.add(MAT.wood, cylW(0.28, 0.28, 0.7, 12, 1), -0.8 + k * 0.8 + (r() - 0.5) * 0.2, 0.35, 1.3 + r() * 0.3, 0, 0, 0, F);
     addBox(x, z, 2.8, 1.8, ry, -1e9, 1e9, 'stall');
+    VSTALLS.push({ x, z, ry, front: doorSpot(x, z, ry, -1.6) });
   }
   // houses around the square, facing it
   const spots = [];
@@ -1105,7 +1190,9 @@ function buildVillage() {
     spots.push([x, z]);
     const ry = Math.atan2(SQUARE.x - x, SQUARE.z - z);
     const tavern = n === 0, smithy = n === 1;
-    if (smithy) { blacksmith(B, x, z, ry); n++; continue; }
+    if (smithy) { blacksmith(B, x, z, ry); VHOUSES.push({ x, z, ry, w: 6.6, d: 5.6, kind: 'smithy', door: doorSpot(x, z, ry, 3.6), work: doorSpot(x, z, ry, 1.0, 0.3) }); n++; continue; }
+    const healer = n === 2;
+    VHOUSES.push({ x, z, ry, w: tavern ? 11 : w, d: tavern ? 8 : dd, kind: tavern ? 'tavern' : healer ? 'healer' : 'house', door: doorSpot(x, z, ry, (tavern ? 8 : dd) / 2 + 1.1) });
     house(B, x, z, ry, tavern ? 11 : w, tavern ? 8 : dd, tavern || r() < 0.4 ? 2 : 1, r() < 0.65 ? 'thatch' : 'slate');
     if (tavern) {
       // hanging sign
@@ -1113,6 +1200,13 @@ function buildVillage() {
       B.add(MAT.darkWood, boxW(0.1, 0.1, 1.4, 1), 2.2, 3.4, 4.6, 0, 0, 0, F);
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), new THREE.MeshStandardMaterial({ map: signTex('THE RED BOAR'), side: THREE.DoubleSide }));
       sign.position.set(0, 0, 0); const sp = new THREE.Vector3(2.2, 3.0, 5.1).applyMatrix4(F); sign.position.copy(sp); sign.rotation.y = ry + Math.PI / 2; scene.add(sign);
+    }
+    if (healer) {
+      // the healer's sign: a green cross on a board over the door, herbs drying
+      const F = frameAt(x, terrainH(x, z), z, ry);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), new THREE.MeshStandardMaterial({ map: signTex('HEALER'), side: THREE.DoubleSide }));
+      sign.position.copy(new THREE.Vector3(1.4, 3.0, dd / 2 + 0.25).applyMatrix4(F)); sign.rotation.y = ry; scene.add(sign);
+      for (let k = 0; k < 4; k++) B.add(MAT.thatch, boxW(0.12, 0.35, 0.12, 1), -1.8 + k * 0.3, 2.35, dd / 2 + 0.25, 0, 0, 0, F);
     }
     if (r() < 0.6) { const F = frameAt(x, 0, z, ry); const tp = new THREE.Vector3(1.0, 0, dd / 2 + 1.2).applyMatrix4(F); torchSpots.push([tp.x, tp.z]); }
     n++;
@@ -1585,7 +1679,7 @@ function animateLife(dt, t, P) {
 }
 
 // ---------- audio: every sound is synthesized live ----------
-const settings = { master: 80, music: 55, sfx: 85, gore: 2, sens: 100, dmgNums: 1, hard: 0 };
+const settings = { master: 80, music: 55, sfx: 85, gore: 2, sens: 100, dmgNums: 1, hard: 0, brain: 'ai', brainAsked: 0 };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('ironblood.settings') || '{}')); } catch (e) {}
 function saveSettings() { try { localStorage.setItem('ironblood.settings', JSON.stringify(settings)); } catch (e) {} }
 
@@ -1741,6 +1835,43 @@ const sfx = {
     g.connect(out); bg.connect(out);
     o.start(t); vib.start(t); o.stop(t + cfg.dur + 0.1); vib.stop(t + cfg.dur + 0.1);
   },
+  // medieval murmur: quick made-up syllables shaped like speech, one per word
+  murmur(pos, text, pitch = 1, female = false) {
+    if (!ac) return 0;
+    const words = Math.min(26, Math.max(2, text.split(/\s+/).length));
+    let t = ac.currentTime + 0.02;
+    const out = spatial(pos, 0.32);
+    const base = (female ? 215 : 118) * pitch;
+    const V = [[730, 1090], [530, 1840], [270, 2290], [570, 840], [440, 1020], [660, 1700], [300, 870]];
+    for (let w = 0; w < words; w++) {
+      const syl = 1 + Math.floor(Math.random() * 2);
+      for (let k = 0; k < syl; k++) {
+        const d = 0.07 + Math.random() * 0.07;
+        const o = ac.createOscillator(); o.type = 'sawtooth';
+        const f0 = base * (0.92 + Math.random() * 0.16) * (w === words - 1 && k === syl - 1 ? (/\?\s*$/.test(text) ? 1.18 : 0.86) : 1);
+        o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f0 * (0.94 + Math.random() * 0.1), t + d);
+        const g = ac.createGain(); env(g, t, 0.015, 0.5, d);
+        const [a1, a2] = V[Math.floor(Math.random() * V.length)];
+        for (const [fr, q] of [[a1 * (female ? 1.15 : 1), 5], [a2 * (female ? 1.12 : 1), 7], [2500, 9]]) { const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = fr; f.Q.value = q; o.connect(f); f.connect(g); }
+        // a soft consonant puff before some syllables
+        if (Math.random() < 0.6) noiseHit(t - 0.012, 0.03, 'highpass', 3000 + Math.random() * 3000, 1, 0.12, out, 1, 0.002);
+        g.connect(out); o.start(t); o.stop(t + d + 0.05);
+        t += d + 0.015;
+      }
+      t += 0.05 + Math.random() * 0.06 + (/[,.!?]$/.test(text.split(/\s+/)[w] || '') ? 0.18 : 0);
+    }
+    return t - ac.currentTime;
+  },
+  // the village bell: a raid is coming
+  bell() {
+    if (!ac) return; const t0 = ac.currentTime;
+    for (let i = 0; i < 6; i++) {
+      const t = t0 + i * 0.9, out = spatial(null, 0.35);
+      for (const [m, v] of [[1, 1], [2.0, 0.5], [2.76, 0.35], [5.4, 0.15]]) tone('sine', 392 * m, 392 * m * 0.998, t, 0.005, v, 2.4, out);
+    }
+  },
+  kiss() { if (!ac) return; const t = ac.currentTime, out = spatial(null, 0.12); noiseHit(t, 0.06, 'bandpass', 1800, 3, 0.4, out, 1, 0.004); },
+  coins() { if (!ac) return; const t = ac.currentTime, out = spatial(null, 0.25); for (let i = 0; i < 5; i++) tone('triangle', 2400 + Math.random() * 1600, 0, t + i * 0.05 + Math.random() * 0.03, 0.002, 0.3, 0.12, out); },
   ui(freq = 660) { if (!ac) return; const t = ac.currentTime, out = spatial(null, 0.2); tone('triangle', freq, freq * 1.5, t, 0.005, 0.5, 0.15, out); },
   // thunder: a crack, then a long low roll
   thunder() {
@@ -1931,6 +2062,9 @@ const TIER = [
   { name: 'Man-at-Arms', hp: 110, armor: { head: 0.65, neck: 0.3, chest: 0.65, belly: 0.5, uarm: 0.5, farm: 0.4, thigh: 0.45, shin: 0.5 }, speed: 1 },
   { name: 'Knight', hp: 130, armor: { head: 0.8, neck: 0.35, chest: 0.8, belly: 0.65, uarm: 0.65, farm: 0.6, thigh: 0.65, shin: 0.65 }, speed: 0.92 },
   { name: 'You', hp: 100, armor: { head: 0.7, neck: 0.35, chest: 0.7, belly: 0.55, uarm: 0.55, farm: 0.5, thigh: 0.55, shin: 0.55 }, speed: 1 },
+  // 4 = villager in plain clothes, 5 = a fighter in leather and padded cloth
+  { name: 'Villager', hp: 80, armor: { head: 0.05, neck: 0, chest: 0.08, belly: 0.06, uarm: 0.05, farm: 0.04, thigh: 0.05, shin: 0.08 }, speed: 1 },
+  { name: 'Fighter', hp: 100, armor: { head: 0.1, neck: 0.05, chest: 0.28, belly: 0.22, uarm: 0.18, farm: 0.2, thigh: 0.15, shin: 0.2 }, speed: 1.08, block: 0.5 },
 ];
 
 function bone(model, n) { return model.getObjectByName('mixamorig' + n); }
@@ -2279,9 +2413,218 @@ function torsoGash() {
   return g;
 }
 
+// ---------- medieval clothes, built onto the soldier skeleton like the armor ----------
+// real fabric scans (Poly Haven, CC0): linen, wool, leather
+const FABRIC = {};
+function fabrics() {
+  if (FABRIC.linen) return FABRIC;
+  const mk = (n, rep, diff = 'diff') => { const m = { map: tex(n, diff), normalMap: tex(n, 'nor_gl', false), roughnessMap: tex(n, 'rough', false) }; for (const k in m) m[k].repeat.set(rep, rep); return m; };
+  FABRIC.linen = mk('rough_linen', 3);
+  FABRIC.wool = mk('poly_wool_herringbone', 3);
+  FABRIC.boucle = mk('wool_boucle', 3);
+  FABRIC.leather = mk('brown_leather', 2, 'albedo');
+  return FABRIC;
+}
+function clothPBR(kind, color, U) {
+  const f = fabrics()[kind];
+  // the weave comes from the normal + roughness scans; the color is the real dye (scan colors tint everything grey-blue)
+  return addBlood(new THREE.MeshStandardMaterial({ color, map: kind === 'leather' ? f.map : null, normalMap: f.normalMap, normalScale: new THREE.Vector2(1.4, 1.4), roughnessMap: f.roughnessMap, roughness: 1, metalness: 0, side: THREE.DoubleSide }), U);
+}
+// ---------- skinned clothes ----------
+// The soldier mesh wears army gear. Smoothing it (Taubin) melts the pouches and pads into a plain body shape,
+// then it's puffed out a little and painted by body region: top, legs, boots, hands.
+let clothBase = null;
+function clothBaseFrom(mesh) {
+  if (clothBase) return clothBase;
+  const g = mesh.geometry, pos = g.attributes.position, n = pos.count, idx = g.index.array;
+  const bones = mesh.skeleton.bones.map(b => b.name.replace('mixamorig', ''));
+  const si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+  // weld vertices split at UV seams so smoothing doesn't tear the mesh
+  const key = new Map(), weld = new Int32Array(n), wp = [];
+  for (let i = 0; i < n; i++) { const k = Math.round(pos.getX(i) * 10) + ',' + Math.round(pos.getY(i) * 10) + ',' + Math.round(pos.getZ(i) * 10); let w = key.get(k); if (w === undefined) { w = wp.length / 3; key.set(k, w); wp.push(pos.getX(i), pos.getY(i), pos.getZ(i)); } weld[i] = w; }
+  const W = wp.length / 3, P = new Float32Array(wp);
+  const nb = Array.from({ length: W }, () => new Set());
+  for (let t = 0; t < idx.length; t += 3) { const a = weld[idx[t]], b = weld[idx[t + 1]], c = weld[idx[t + 2]]; nb[a].add(b).add(c); nb[b].add(a).add(c); nb[c].add(a).add(b); }
+  // region per vertex from its strongest bone
+  const region = new Uint8Array(n); // 0 top, 1 legs, 2 boots, 3 hands, 4 head
+  const wRegion = new Uint8Array(W);
+  for (let i = 0; i < n; i++) {
+    let best = 0, bw = -1;
+    for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; best = si.getComponent(i, k); } }
+    const bn = bones[best] || '', z = pos.getZ(i);
+    let r = 0;
+    if (/Hand/.test(bn)) r = 3; else if (/Head|Neck/.test(bn)) r = 4;
+    else if (/Foot|Toe/.test(bn) || (/Leg/.test(bn) && z < 40)) r = 2;
+    else if (/UpLeg|Leg/.test(bn)) r = 1;
+    region[i] = r; wRegion[weld[i]] = r;
+  }
+  // pull pouches, pads and straps in: each vertex may sit only so far from its bone (cm)
+  // bone positions in the mesh's own space (the model is still in its rest pose here)
+  mesh.updateWorldMatrix(true, true);
+  const toMesh = mesh.matrixWorld.clone().invert();
+  const bp = mesh.skeleton.bones.map(b => b.getWorldPosition(new THREE.Vector3()).applyMatrix4(toMesh));
+  const bi = (nm) => bones.indexOf(nm);
+  const LIMB = { LeftArm: ['LeftForeArm', 6.0], RightArm: ['RightForeArm', 6.0], LeftForeArm: ['LeftHand', 4.8], RightForeArm: ['RightHand', 4.8], LeftShoulder: ['LeftArm', 7.0], RightShoulder: ['RightArm', 7.0],
+    LeftUpLeg: ['LeftLeg', 8.2], RightUpLeg: ['RightLeg', 8.2], LeftLeg: ['LeftFoot', 6.0], RightLeg: ['RightFoot', 6.0] };
+  const TORSO = { Hips: [16.5, 11.5], Spine: [15.5, 11], Spine1: [16, 11.5], Spine2: [17.5, 12] };
+  const seg = (p, a, b) => { const ab = _sa.copy(b).sub(a), t = Math.max(0, Math.min(1, _sb.copy(p).sub(a).dot(ab) / ab.lengthSq())); return _sc.copy(a).addScaledVector(ab, t); };
+  const _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sc = new THREE.Vector3(), pv = new THREE.Vector3();
+  const domBone = new Int32Array(W).fill(-1);
+  for (let i = 0; i < n; i++) { let best = 0, bw = -1; for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; best = si.getComponent(i, k); } } domBone[weld[i]] = best; }
+  for (let v = 0; v < W; v++) {
+    const nm = bones[domBone[v]]; if (!nm) continue;
+    pv.set(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]);
+    if (LIMB[nm]) {
+      const [child, R] = LIMB[nm], a = bp[domBone[v]], b = bp[bi(child)]; if (!b) continue;
+      if (/Leg$/.test(nm) && !/Up/.test(nm) && pv.z < 40) continue; // boots keep their shape
+      const c = seg(pv, a, b), d = pv.distanceTo(c);
+      if (d > R) { const k = (R + (d - R) * 0.12) / d; pv.sub(c).multiplyScalar(k).add(c); }
+    } else if (TORSO[nm]) {
+      const [rx, ry] = TORSO[nm], c = bp[domBone[v]];
+      const dx = pv.x - c.x, dy = pv.y - c.y, e = Math.hypot(dx / rx, dy / ry);
+      if (e > 1) { const k = (1 + (e - 1) * 0.12) / e; pv.x = c.x + dx * k; pv.y = c.y + dy * k; }
+    } else continue;
+    P[v * 3] = pv.x; P[v * 3 + 1] = pv.y; P[v * 3 + 2] = pv.z;
+  }
+  // Taubin smoothing on the body (not hands or face): shrink-free blur of the gear
+  const tmp = new Float32Array(W * 3);
+  for (let it = 0; it < 24; it++) {
+    const lam = it % 2 ? -0.53 : 0.5;
+    for (let v = 0; v < W; v++) {
+      if (wRegion[v] >= 3 || nb[v].size === 0) { tmp[v * 3] = P[v * 3]; tmp[v * 3 + 1] = P[v * 3 + 1]; tmp[v * 3 + 2] = P[v * 3 + 2]; continue; }
+      let x = 0, y = 0, z = 0; for (const u of nb[v]) { x += P[u * 3]; y += P[u * 3 + 1]; z += P[u * 3 + 2]; }
+      const c = nb[v].size;
+      tmp[v * 3] = P[v * 3] + lam * (x / c - P[v * 3]); tmp[v * 3 + 1] = P[v * 3 + 1] + lam * (y / c - P[v * 3 + 1]); tmp[v * 3 + 2] = P[v * 3 + 2] + lam * (z / c - P[v * 3 + 2]);
+    }
+    P.set(tmp);
+  }
+  // smooth normals on the welded shape, then puff the cloth out a little (units are cm here)
+  const N = new Float32Array(W * 3);
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = weld[idx[t]], b = weld[idx[t + 1]], c = weld[idx[t + 2]];
+    const ax = P[b * 3] - P[a * 3], ay = P[b * 3 + 1] - P[a * 3 + 1], az = P[b * 3 + 2] - P[a * 3 + 2];
+    const bx = P[c * 3] - P[a * 3], by = P[c * 3 + 1] - P[a * 3 + 1], bz = P[c * 3 + 2] - P[a * 3 + 2];
+    const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+    for (const v of [a, b, c]) { N[v * 3] += nx; N[v * 3 + 1] += ny; N[v * 3 + 2] += nz; }
+  }
+  const outP = new Float32Array(n * 3), outN = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const v = weld[i]; let nx = N[v * 3], ny = N[v * 3 + 1], nz = N[v * 3 + 2]; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    const puff = region[i] === 3 ? 0 : region[i] === 4 ? 0.3 : region[i] === 2 ? 0.9 : 0.7;
+    outP[i * 3] = P[v * 3] + nx * puff; outP[i * 3 + 1] = P[v * 3 + 1] + ny * puff; outP[i * 3 + 2] = P[v * 3 + 2] + nz * puff;
+    outN[i * 3] = nx; outN[i * 3 + 1] = ny; outN[i * 3 + 2] = nz;
+  }
+  // triangles sorted into material groups: cloth (top + legs), boots, hands; the head is under the hood
+  const groups = [[], [], []];
+  for (let t = 0; t < idx.length; t += 3) {
+    const r = Math.max(region[idx[t]], region[idx[t + 1]], region[idx[t + 2]]);
+    if (r === 4) continue;
+    groups[r <= 1 ? 0 : r === 2 ? 1 : 2].push(idx[t], idx[t + 1], idx[t + 2]);
+  }
+  const index = [], gr = [];
+  for (let k = 0; k < 3; k++) { gr.push([index.length, groups[k].length]); index.push(...groups[k]); }
+  clothBase = { outP, outN, region, index, gr, uv: g.attributes.uv, si, sw };
+  return clothBase;
+}
+function skinnedClothes(model, o, [top, legs, boots, skinM], U) {
+  let body = null;
+  model.traverse(m => { if (m.isSkinnedMesh && !m.name.includes('visor')) body = m; });
+  if (!body) return;
+  const B = clothBaseFrom(body);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(B.outP, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(B.outN, 3));
+  g.setAttribute('uv', B.uv); g.setAttribute('skinIndex', B.si); g.setAttribute('skinWeight', B.sw);
+  // top and leg colors ride in vertex colors so both share one cloth material
+  const ct = new THREE.Color(o.top), cl = new THREE.Color(o.legs || 0x4a3c30), col = new Float32Array(B.region.length * 3);
+  const dress = o.dress ?? o.sex === 'f';
+  for (let i = 0; i < B.region.length; i++) { const c = B.region[i] === 1 && !dress ? cl : ct; col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(B.index);
+  for (let k = 0; k < 3; k++) g.addGroup(B.gr[k][0], B.gr[k][1], k);
+  g.boundingSphere = body.geometry.boundingSphere; g.boundingBox = body.geometry.boundingBox;
+  const cloth = top.clone(); cloth.vertexColors = true; cloth.color.set(0xffffff); cloth.side = THREE.FrontSide; addBlood(cloth, U);
+  const mesh = new THREE.SkinnedMesh(g, [cloth, boots, skinM]);
+  mesh.bind(body.skeleton, body.bindMatrix);
+  mesh.castShadow = true; mesh.frustumCulled = false;
+  body.parent.add(mesh);
+  body.visible = false;
+}
+// outfit: { sex: 'm'|'f', dress, top, topKind, legs, boots, hood (bool), hoodColor, hoodKind, apron, cloak, veil, belt }
+function buildClothes(model, o) {
+  const U = { uBlood: { value: 0 } };
+  const top = clothPBR(o.topKind || 'linen', o.top, U), legs = clothPBR('wool', o.legs || 0x4a3c30, U);
+  const boots = clothPBR('leather', o.boots || 0x3a2a1e, U), hoodM = clothPBR(o.hoodKind || 'wool', o.hoodColor || o.top, U);
+  const leather = clothPBR('leather', 0x5a3e28, U);
+  const shadow = new THREE.MeshBasicMaterial({ color: 0x050403, side: THREE.DoubleSide });
+  hoodM.envMapIntensity = 0.55;
+  const parts = [];
+  model.updateMatrixWorld(true);
+  // pieces on the same bone with the same cloth become one mesh (fewer draw calls)
+  const acc = new Map();
+  const put = (boneName, geos, mat) => {
+    const key = boneName + '|' + mat.uuid;
+    if (!acc.has(key)) acc.set(key, { boneName, mat, geos: [] });
+    for (const g of Array.isArray(geos) ? geos : [geos]) acc.get(key).geos.push(g.index ? g.toNonIndexed() : g);
+  };
+  const f = o.sex === 'f', dress = o.dress ?? f;
+  // the body itself becomes the clothes: shirt/tunic, hose, boots, bare hands (bends exactly with the body)
+  const skin = clothPBR('leather', 0x9a7462, U); skin.map = null; skin.normalMap = null; skin.roughness = 0.75; skin.color.set(o.skin || 0x9a7462);
+  skinnedClothes(model, o, [top, legs, boots, skin], U);
+  if (dress) {
+    // long dress skirt from the waist to the ankles
+    put('Hips', lathe([[0.17, 1.08], [0.2, 0.95], [0.25, 0.7], [0.31, 0.4], [0.36, 0.12], [0.38, 0.03]], 0, 0.03, 1, 0.85, 28), top);
+  } else {
+    // tunic skirt to mid-thigh
+    put('Hips', lathe([[0.165, 1.06], [0.19, 0.92], [0.215, 0.72], [0.22, 0.66]], 0, 0.03, 1, 0.82, 24), top);
+  }
+  if (o.belt !== false) put('Hips', lathe([[0.0, 1.05], [0.18, 1.05], [0.18, 1.09], [0.0, 1.09]], 0, 0.03, 1, 0.82), leather);
+  if (o.apron) put('Spine', boxAt(0.32, 0.72, 0.014, 0, 0.92, -0.135, 0.06), leather);
+  // the hood: a deep wool cowl with the face in shadow, mantle over the shoulders
+  if (o.hood) {
+    const hood = new THREE.SphereGeometry(0.165, 22, 14, -0.95, Math.PI + 1.9, 0, Math.PI * 0.68);
+    hood.scale(1, 1.15, 1.12); hood.translate(0, 1.71, 0.03);
+    put('Head', hood, hoodM);
+    // a peak at the front so the face sits deep inside
+    put('Head', shell(0.17, 0, 1.79, -0.02, 0.9, 0.5, 1.1, Math.PI * 2, Math.PI * 0.45, 0.35, 0), hoodM);
+    put('Head', new THREE.CircleGeometry(0.105, 18).translate(0, 1.69, -0.095).rotateY(Math.PI), shadow);
+    put('Spine2', cylBetween([0, 1.36, 0.05], [0, 1.56, 0.05], 0.29, 0.13, 22, true), hoodM);
+  }
+  if (o.veil) {
+    // wimple + veil: linen fitted round the head and neck, face in its shadow, the veil falling down the back
+    const w = new THREE.SphereGeometry(0.128, 24, 14, -0.75, Math.PI + 1.5, 0, Math.PI * 0.74);
+    w.scale(1, 1.12, 1.08); w.translate(0, 1.712, 0.022);
+    put('Head', w, hoodM);
+    put('Head', new THREE.CircleGeometry(0.08, 18).rotateY(Math.PI).translate(0, 1.69, -0.098), shadow);
+    put('Neck', cylBetween([0, 1.47, 0.03], [0, 1.63, 0.025], 0.1, 0.078, 18), hoodM);
+    const back = new THREE.CylinderGeometry(0.14, 0.2, 0.3, 18, 1, true, -1.35, 2.7);
+    back.translate(0, 1.6, 0.035);
+    put('Head', back, hoodM);
+  }
+  if (o.cloak) put('Spine2', boxAt(0.5, 1.05, 0.02, 0, 0.98, 0.2, -0.05), hoodM);
+  for (const { boneName, mat, geos } of acc.values()) {
+    for (const g of geos) { for (const n of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(n)) g.deleteAttribute(n); if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); }
+    const m = new THREE.Mesh(geos.length > 1 ? mergeGeometries(geos) : geos[0], mat);
+    m.castShadow = mat !== shadow; m.userData.armor = true;
+    bone(model, boneName).attach(m); parts.push(m);
+  }
+  return { parts, uniforms: U, mats: [top, legs, boots, hoodM, leather], limbMat: top };
+}
+
 // ---------- fighters (you and every knight share this) ----------
 let soldierGLTF = null;
 const fighters = [];
+// who fights whom: knights against everyone else; you can cut anyone except your own allies
+const deathHooks = [], hitHooks = [];
+function hostile(a, b) {
+  if (a === b) return false;
+  const A = a.team, B = b.team;
+  if (A === 'knight') return B !== 'knight';
+  if (B === 'knight') return true;
+  if (A === 'you') return B === 'villager';
+  if (B === 'you') return A === 'villager' && !!a.angryAtYou;
+  return false;
+}
 
 // hit zones: from bone, to bone, radius, armor key, base hp, severs at bone, damage multiplier
 const PARTS = {
@@ -2384,6 +2727,7 @@ function segSeg(p1, q1, p2, q2, outPoint) {
 class Fighter {
   constructor(opt) {
     this.isPlayer = !!opt.player;
+    this.team = opt.team || (opt.player ? 'you' : 'knight');
     this.tier = opt.tier;
     this.T = TIER[opt.tier];
     this.name = opt.name || this.T.name;
@@ -2392,7 +2736,8 @@ class Fighter {
     this.model = skeletonClone(soldierGLTF.scene);
     tintBody(this.model, opt.body);
     // armor + cape are fitted in the soldier's own pose first, then the whole thing is turned around
-    this.armor = buildArmor(this.model, { tier: opt.player ? 1 : opt.tier, metal: opt.metal, rough: opt.rough, cloth: opt.cloth, leather: opt.leather, player: opt.player });
+    this.armor = opt.outfit ? buildClothes(this.model, opt.outfit) : buildArmor(this.model, { tier: opt.player ? 1 : opt.tier, metal: opt.metal, rough: opt.rough, cloth: opt.cloth, leather: opt.leather, player: opt.player });
+    if (opt.scale) this.root.scale.setScalar(opt.scale);
     if (opt.player) this.cape = new Cape(this.model, opt.cloth, this.armor.uniforms);
     this.model.rotation.y = Math.PI; // the soldier faces -Z, turn it to face +Z
     this.root.add(this.model);
@@ -2427,10 +2772,12 @@ class Fighter {
     this.heat = 0; this.heatTimer = 0;
     this.stepPhase = 0;
     this.prevBlade = null;
-    this.setSword(opt.sword || SWORDS[0]);
+    this.hasSword = false;
+    if (opt.sword !== null) this.setSword(opt.sword || SWORDS[0]);
     this.deathT = 0;
     this.lastHitBy = null;
     this.painT = 0;
+    this.animSlot = fighters.length % 3;
     fighters.push(this);
   }
   setSword(def) {
@@ -2441,7 +2788,7 @@ class Fighter {
     scene.add(this.swordMesh);
     this.hasSword = true;
   }
-  get dmgMult() { return 1 + this.heat * 0.05 + (this.isPlayer ? stats.str * 0.025 : 0); }
+  get dmgMult() { return 1 + this.heat * 0.05 + (this.isPlayer ? stats.str * 0.025 + vsave.edge * 0.05 : 0); }
   get spdMult() {
     const arm = this.parts.ruarm.gone || this.parts.rfarm.gone ? 0.5 : 0.65 + 0.35 * Math.min(this.parts.ruarm.hp / this.parts.ruarm.max, this.parts.rfarm.hp / this.parts.rfarm.max);
     return (1 + this.heat * 0.03 + (this.isPlayer ? stats.spd * 0.012 : 0)) * Math.max(0.5, arm);
@@ -2524,7 +2871,7 @@ class Fighter {
     const up = _v1.set(0, 1, 0), right = _vr.set(-1, 0, 0).applyQuaternion(this.root.quaternion);
     if (Math.abs(cp.yaw) > 0.001) rotateBoneWorld(this.b.Spine1, up, cp.yaw * 0.6);
     if (Math.abs(cp.pitch) > 0.001) rotateBoneWorld(this.b.Spine, right, -cp.pitch * 0.7);
-    if (!this.hasSword) return;
+    if (!this.hasSword || this.noArms) return;
     // hands go where the swing path says
     this.handW = this.handW || new THREE.Vector3();
     this.bladeW = this.bladeW || new THREE.Vector3();
@@ -2576,7 +2923,7 @@ class Fighter {
     if (part.gone) return;
     const pierce = Math.min(0.95, (o.pierce || 0) + (o.stab ? 0.3 : 0));
     let armor = this.T.armor[P.key];
-    if (this.isPlayer) armor *= 0.35 + 0.65 * (this.armorHp / 100);
+    if (this.isPlayer) armor = Math.min(0.92, armor * (0.35 + 0.65 * (this.armorHp / 100)) + vsave.armorLvl * 0.06);
     const through = 1 - armor * (1 - pierce);
     let dmg = raw * P.mult * through;
     const stopped = through < 0.45;
@@ -2595,6 +2942,7 @@ class Fighter {
       if ((k === 'chest' || k === 'belly') && !o.stab && dmg > 26 && settings.gore >= 2) gore.gash(this, k, at);
     }
     if (o.from) o.from.blood = Math.min(1, o.from.blood + (stopped ? 0 : dmg * 0.004));
+    for (const h of hitHooks) h(this, o.from, dmg);
     // reactions
     if (dmg > 22 || o.power >= 1.6) { this.stagger = Math.max(this.stagger, 0.55); this.attack = null; }
     else if (dmg > 6) this.stagger = Math.max(this.stagger, 0.18);
@@ -2637,6 +2985,8 @@ class Fighter {
     const coreEnd = joint.clone().addScaledVector(axis, len);
     const core = new THREE.Mesh(cylBetween(joint.toArray(), coreEnd.toArray(), r * 0.95, r * 0.8, 10), ORGAN_MATS.flesh);
     core.position.sub(center); piece.add(core);
+    // clothed people: the sleeve or trouser leg goes with the limb
+    if (this.armor.limbMat && boneName !== 'Head') { const sl = new THREE.Mesh(cylBetween(joint.toArray(), coreEnd.toArray(), r * 1.25, r * 1.1, 12, true), this.armor.limbMat); sl.position.sub(center); piece.add(sl); }
     const capOut = stumpCap(r, boneName === 'Head');
     capOut.position.copy(joint).sub(center).addScaledVector(axis, -0.002);
     capOut.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis.clone().negate());
@@ -2700,6 +3050,7 @@ class Fighter {
     else if (o && o.stab && (o.part === 'chest' || o.part === 'belly') && settings.gore >= 2) gore.openTorso(this, o, true);
     gore.pool(this);
     if (o && o.from) o.from.onKill && o.from.onKill(this, how);
+    for (const h of deathHooks) h(this, (o && o.from) || this.lastHitBy, how);
   }
   // falling over and lying still (procedural, no ragdoll)
   updateFall(dt) {
@@ -2733,7 +3084,7 @@ function updateAttack(f, dt) {
     f.bladeSeg(_bA, _bB);
     const prev = f.prevBlade;
     for (const o of fighters) {
-      if (o === f || !o.alive || a.hit.has(o) || (f.isPlayer === o.isPlayer) || o.dodge > 0.1) continue;
+      if (o === f || !o.alive || o.inside || a.hit.has(o) || !hostile(f, o) || o.dodge > 0.1) continue;
       if (o.pos.distanceTo(f.pos) > 3.5) continue;
       let best = null, bestD = 1e9;
       // sweep: test the blade now and in-between last frame and now
@@ -3020,7 +3371,7 @@ function collideFighter(f) {
   }
   // bodies push each other apart (living, standing ones)
   for (const o of fighters) {
-    if (o === f || !o.alive || o.down || f.down) continue;
+    if (o === f || !o.alive || o.down || f.down || o.inside) continue;
     const dx = p.x - o.pos.x, dz = p.z - o.pos.z, d = Math.hypot(dx, dz), rr = BODY_R * 2;
     if (d < rr && d > 1e-4) { const push = (rr - d) * 0.5; p.x += dx / d * push; p.z += dz / d * push; }
   }
@@ -3089,29 +3440,55 @@ const TIER_LOOK = [
   { metal: 0xb9bec4, rough: 0.27, leather: 0x2e2018, body: 0x3a3028, swords: ['longsword', 'claymore'] },
 ];
 let attackTokens = 0;
-function spawnKnight(camp) {
+function spawnKnight(camp, at) {
   const r = Math.random(), tier = r < 0.5 ? 0 : r < 0.84 ? 1 : 2;
   const L = TIER_LOOK[tier];
   const sword = SWORDS.find(s => s.id === L.swords[Math.floor(Math.random() * L.swords.length)]);
   const f = new Fighter({ tier, metal: L.metal, rough: L.rough, cloth: camp.house.cloth, leather: L.leather, body: L.body, sword });
-  const a = Math.random() * 6.28, d = 2.5 + Math.random() * 4;
-  f.pos.set(camp.x + Math.cos(a) * d, terrainH(camp.x, camp.z), camp.z + Math.sin(a) * d);
+  const a = Math.random() * 6.28, d = 2.5 + Math.random() * 4, c0 = at || camp;
+  f.pos.set(c0.x + Math.cos(a) * d, terrainH(c0.x, c0.z), c0.z + Math.sin(a) * d);
   collideFighter(f);
   f.pos.y = groundH(f.pos.x, f.pos.z);
   f.facing = Math.random() * 6.28;
   f.voicePitch = 0.85 + Math.random() * 0.3;
   f.name = camp.house.name + ' ' + TIER[tier].name;
+  f.houseName = camp.house.name;
+  // what's on him: a coin purse (copper) and the gear you can strip and sell
+  f.purse = [8 + Math.floor(Math.random() * 18), 15 + Math.floor(Math.random() * 30), 40 + Math.floor(Math.random() * 70)][tier];
+  f.loot = [['Dented kettle hat', 14], ['Mail shirt', 40], ['Plate harness', 110]][tier];
   f.ai = { state: 'patrol', camp, wait: Math.random() * 3, tx: f.pos.x, tz: f.pos.z, alert: false, strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, cd: 1 + Math.random(), blockT: 0, courage: Math.random(), shouted: false, react: 0, crawlT: 0 };
-  camp.members.push(f);
+  if (!at) camp.members.push(f);
   return f;
 }
 function alertNear(f, who) {
   for (const o of fighters) if (o.ai && o.alive && !o.ai.alert && o.pos.distanceTo(f.pos) < 22) { o.ai.alert = true; o.ai.react = 0.3 + Math.random() * 0.6; }
 }
 const _wish = new THREE.Vector3();
+// the nearest enemy this fighter can see (you, your allies, villagers, knights)
+function pickTarget(f) {
+  let best = null, bd = 1e9;
+  for (const o of fighters) {
+    if (!o.alive || o.inside || !hostile(f, o)) continue;
+    const d = o.pos.distanceTo(f.pos) * (o.isPlayer ? 0.8 : 1) * (o.down ? 1.6 : 1);
+    if (d < bd && d < 40) { bd = d; best = o; }
+  }
+  return best;
+}
 function updateKnight(f, dt) {
-  const ai = f.ai, P = player;
+  const ai = f.ai;
   if (!f.alive) return;
+  ai.pickT = (ai.pickT || 0) - dt;
+  if (ai.pickT <= 0 || !ai.target || !ai.target.alive || ai.target.inside) { ai.pickT = 0.6 + Math.random() * 0.4; ai.target = pickTarget(f); }
+  const P = ai.target || player;
+  // allies with nothing to fight follow you
+  if (ai.follow && (!ai.target || ai.target.pos.distanceTo(f.pos) > 22) && !f.down) {
+    ai.alert = false;
+    const d = _wish.copy(player.pos).sub(f.pos).setY(0), dist = d.length();
+    const w = new THREE.Vector3(); let sp = 0;
+    if (dist > 3) { w.copy(d).normalize(); sp = dist > 9 ? 5.5 : dist > 5 ? 3.5 : 1.6; }
+    stepFighter(f, dt, w, sp * f.legMult, dist > 0.5 ? Math.atan2(d.x, d.z) : f.facing, 7);
+    return;
+  }
   // lost a leg: crawl away, face down, sobbing
   if (f.down) {
     ai.crawlT += dt;
@@ -3132,13 +3509,13 @@ function updateKnight(f, dt) {
   const faceP = Math.atan2(toP.x, toP.z);
   const fwd = { x: Math.sin(f.facing), z: Math.cos(f.facing) };
   // noticing you: sight cone, close range, or getting hit
-  if (!ai.alert && P.alive) {
+  if (!ai.alert && ai.target && P.alive) {
     const inCone = (fwd.x * toP.x + fwd.z * toP.z) > Math.cos(1.0);
-    if ((dist < 28 && inCone) || dist < 7 || f.lastHitBy === P) { ai.alert = true; ai.react = 0.25 + Math.random() * 0.4; }
+    if ((dist < 28 && inCone) || dist < 7 || (f.lastHitBy && f.lastHitBy.alive)) { ai.alert = true; ai.react = 0.25 + Math.random() * 0.4; }
   }
   if (ai.alert && !ai.shouted && ai.react <= 0) { ai.shouted = true; sfx.voice(f.pos, 'shout', f.voicePitch); alertNear(f, P); }
   if (ai.react > 0) ai.react -= dt;
-  if (!P.alive) ai.alert = false;
+  if (!ai.target || !P.alive) ai.alert = false;
   let wish = new THREE.Vector3(), speed = 0, face = f.facing;
   const tierSpd = f.T.speed * f.legMult;
   if (!ai.alert || ai.react > 0) {
@@ -3169,18 +3546,19 @@ function updateKnight(f, dt) {
     ai.cd -= dt;
     // block when you swing at them (better knights block more)
     if (P.attack && P.attack.t < P.attack.dur * 0.35 && !f.attack && ai.blockT <= 0 && f.canAct()) {
-      const chance = [0.22, 0.42, 0.62][f.tier] * (f.stamina > 20 ? 1 : 0.2);
+      const chance = (f.T.block || [0.22, 0.42, 0.62][f.tier] || 0.3) * (f.stamina > 20 ? 1 : 0.2);
       if (Math.random() < chance * dt * 8) { f.blocking = true; f.blockStart = now() - 0.05 - Math.random() * 0.2; ai.blockT = 0.7; }
     }
     if (ai.blockT > 0) { ai.blockT -= dt; if (ai.blockT <= 0) f.blocking = false; }
-    if (ai.cd <= 0 && !f.attack && !f.blocking && f.canAct() && attackTokens < 2 && P.alive) {
+    // only two people swing at the same person at once, the rest circle and wait
+    if (ai.cd <= 0 && !f.attack && !f.blocking && f.canAct() && (P.tokens || 0) < 2 && P.alive) {
       const dirs = ['R', 'L', 'U', 'S', 'R', 'L', 'D'];
       const kind = f.tier === 2 && Math.random() < 0.3 ? 'heavy' : 'light';
-      if (f.startAttack(dirs[Math.floor(Math.random() * dirs.length)], kind)) { ai.attacking = true; attackTokens++; f.attack.dur *= 1.15; }
-      ai.cd = 0.7 + Math.random() * 1.6 - f.tier * 0.15;
+      if (f.startAttack(dirs[Math.floor(Math.random() * dirs.length)], kind)) { ai.attacking = P; P.tokens = (P.tokens || 0) + 1; f.attack.dur *= 1.15; }
+      ai.cd = 0.7 + Math.random() * 1.6 - Math.min(2, f.tier) * 0.15;
     }
   }
-  if (ai.attacking && !f.attack) { ai.attacking = false; attackTokens = Math.max(0, attackTokens - 1); }
+  if (ai.attacking && !f.attack) { ai.attacking.tokens = Math.max(0, (ai.attacking.tokens || 1) - 1); ai.attacking = false; }
   if (!f.canAct()) { speed *= 0.2; }
   if (f.stagger > 0) wish.multiplyScalar(0);
   stepFighter(f, dt, wish, speed, face, 7);
@@ -3210,7 +3588,7 @@ function updateSpawns(dt) {
 }
 function removeFighter(f) {
   scene.remove(f.root);
-  if (f.swordMesh.parent === scene) scene.remove(f.swordMesh);
+  if (f.swordMesh && f.swordMesh.parent === scene) scene.remove(f.swordMesh);
   if (f.cape) scene.remove(f.cape.mesh);
   if (f.tag) f.tag.remove();
   const i = fighters.indexOf(f); if (i >= 0) fighters.splice(i, 1);
@@ -3223,6 +3601,8 @@ try { Object.assign(stats, JSON.parse(localStorage.getItem('ironblood.stats') ||
 function saveStats() { try { localStorage.setItem('ironblood.stats', JSON.stringify(stats)); } catch (e) {} }
 const SPAWN = { x: SQUARE.x + 2, z: SQUARE.z + 9 };
 let bandages = 6, bandaging = 0;
+// talking / shopping (uiOpen) and kissing scenes (cutscene) take the controls away
+let uiOpen = false, cutscene = false, sceneCam = null, lovedT = 0;
 
 function createPlayer() {
   const f = new Fighter({ player: true, tier: 3, metal: 0x70747c, rough: 0.27, cloth: 0x24242b, leather: 0x2a221c, body: 0x2a2a2e, sword: SWORDS.find(s => s.id === stats.sword) || SWORDS[0], name: 'You' });
@@ -3241,7 +3621,7 @@ function createPlayer() {
   };
   return f;
 }
-function unlockedSwords() { return SWORDS.filter(s => stats.kills >= s.unlock); }
+function unlockedSwords() { return SWORDS.filter(s => stats.kills >= s.unlock || vsave.owned.includes(s.id)); }
 
 // permanent growth: it's you that gets stronger, not the sword
 function gainXp(raw) {
@@ -3264,8 +3644,10 @@ function hitStop(t) { hitStopT = Math.max(hitStopT, t); }
 addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (['Space', 'Tab'].includes(e.code)) e.preventDefault();
-  if (!playing || paused || !player.alive) return;
+  if (!playing || paused || !player.alive || uiOpen || cutscene || passedOut) return;
   if (e.repeat) return;
+  if (e.code === 'KeyE') { const t = interactTarget(); if (t && t.kind === 'talk') openTalk(t.o); else if (t && t.kind === 'loot') lootBody(t.o); }
+  if (e.code === 'KeyH') useHealItem();
   if (e.code === 'Space' && player.grounded && player.canAct() && player.stamina > 8) { player.vy = 5.6; player.grounded = false; player.useStamina(8); }
   if (e.code === 'KeyC') tryDodge();
   if (e.code === 'KeyQ') toggleLock();
@@ -3277,16 +3659,16 @@ addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.l = mouse.r = false; if (player.blocking) player.blocking = false; });
 addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('mousemove', (e) => {
-  if (!playing || paused) return;
+  if (!playing || paused || uiOpen || cutscene) return;
   if (document.pointerLockElement !== renderer.domElement) return;
   const s = 0.0024 * settings.sens / 100;
   if (finisherCam <= 0) { yaw -= e.movementX * s; pitch = Math.min(1.2, Math.max(-0.35, pitch + e.movementY * s * 0.9)); }
   mouse.hist.push({ dx: e.movementX, dy: e.movementY, t: performance.now() });
   if (mouse.hist.length > 40) mouse.hist.shift();
 });
-addEventListener('wheel', (e) => { if (playing && !paused) camDist = Math.min(7, Math.max(2.2, camDist + Math.sign(e.deltaY) * 0.4)); }, { passive: true });
+addEventListener('wheel', (e) => { if (playing && !paused && !uiOpen) camDist = Math.min(7, Math.max(2.2, camDist + Math.sign(e.deltaY) * 0.4)); }, { passive: true });
 addEventListener('mousedown', (e) => {
-  if (!playing || paused) return;
+  if (!playing || paused || uiOpen || cutscene || passedOut) return;
   if (document.pointerLockElement !== renderer.domElement) { requestLock(); return; }
   audioInit();
   if (!player.alive) return;
@@ -3334,7 +3716,7 @@ function toggleLock() {
   let best = null, bd = 1e9;
   const cf = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
   for (const o of fighters) {
-    if (o.isPlayer || !o.alive) continue;
+    if (o.isPlayer || !o.alive || o.inside || !(o.team === 'knight' || o.angryAtYou)) continue;
     const d = o.pos.distanceTo(player.pos);
     if (d > 20) continue;
     const dir = o.pos.clone().sub(player.pos).setY(0).normalize();
@@ -3348,7 +3730,7 @@ function tryFinisher() {
   if (!f.canAct() || f.attack || !f.hasSword) return;
   let best = null, bd = 3;
   for (const o of fighters) {
-    if (o.isPlayer || !o.alive) continue;
+    if (o.isPlayer || !o.alive || o.inside || !(o.team === 'knight' || o.angryAtYou)) continue;
     const d = o.pos.distanceTo(f.pos);
     const weak = o.stagger > 0 || o.hp < o.maxHp * 0.3 || o.down || !o.hasSword;
     if (d < bd && weak) { bd = d; best = o; }
@@ -3418,7 +3800,10 @@ function updatePlayer(dt) {
   tickVitals(f, dt);
   if (!f.alive) { f.updateFall(dt); return; }
   if (lockTarget && (!lockTarget.alive || lockTarget.pos.distanceTo(f.pos) > 25)) lockTarget = null;
-  const w = playing && !paused ? moveWish() : new THREE.Vector3();
+  const w = playing && !paused && !uiOpen && !cutscene && !passedOut ? moveWish() : new THREE.Vector3();
+  // ale makes you weave about
+  if (drunk > 0.3 && w.lengthSq() > 0) { const a = Math.sin(elapsed * 1.3) * Math.min(0.9, (drunk - 0.3) * 1.2); w.set(w.x * Math.cos(a) - w.z * Math.sin(a), 0, w.x * Math.sin(a) + w.z * Math.cos(a)); }
+  if (lovedT > 0) { lovedT -= dt; if (f.staminaDelay <= 0) f.stamina = Math.min(100, f.stamina + dt * 9); }
   const wantsSprint = (keys.ShiftLeft || keys.ShiftRight) && w.lengthSq() > 0 && f.stamina > 1 && !f.blocking && bandaging <= 0;
   let speed = 0;
   if (w.lengthSq() > 0) speed = wantsSprint ? 6.4 : 1.9;
@@ -3451,6 +3836,7 @@ function updatePlayer(dt) {
 }
 function playerDied() {
   stats.deaths++;
+  onPlayerDeathVillage();
   if (settings.hard) { stats.str = 0; stats.spd = 0; stats.strXp = 0; stats.spdXp = 0; stats.kills = 0; stats.sword = 'arming'; }
   saveStats();
 }
@@ -3479,7 +3865,8 @@ function updateCamera(dt) {
   const cp = Math.cos(pitch);
   let want = new THREE.Vector3(Math.sin(yaw) * cp, Math.sin(pitch), Math.cos(yaw) * cp).multiplyScalar(camDist).add(head).addScaledVector(right, 0.45);
   let look = head.clone().addScaledVector(right, 0.45);
-  if (finisherCam > 0 && f.attack && f.attack.fin) {
+  if (sceneCam) { want = sceneCam.pos.clone(); look = sceneCam.look.clone(); }
+  else if (finisherCam > 0 && f.attack && f.attack.fin) {
     // cinematic side view of the finisher
     const o = f.attack.fin.target;
     const mid = f.pos.clone().lerp(o.pos, 0.5).setY(f.pos.y + 1.3);
@@ -3492,7 +3879,7 @@ function updateCamera(dt) {
   // don't let the camera go inside walls: slide it in toward you
   for (let i = 0; i < 6; i++) { const b = solidAt(want.x, want.z, 0.25); if (!b || want.y > b.h1 + 0.2) break; want.lerp(head, 0.3); }
   if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
-  const k = Math.min(1, (finisherCam > 0 ? 6 : 16) * dt);
+  const k = Math.min(1, (finisherCam > 0 || sceneCam ? 4 : 16) * dt);
   camPos.lerp(want, k); camLook.lerp(look, k);
   camera.position.copy(camPos);
   if (shakeAmt > 0.001) {
@@ -3504,6 +3891,1105 @@ function updateCamera(dt) {
   const fov = 55 + (f.speed > 4.5 ? 7 : 0);
   camera.fov += (fov - camera.fov) * Math.min(1, dt * 5);
   camera.updateProjectionMatrix();
+}
+
+// ---------- the village of Ashford: its people, their days, money, raids ----------
+const money = (c) => { c = Math.max(0, Math.round(c)); const g = Math.floor(c / 240), s = Math.floor((c % 240) / 12), k = c % 12; return [g && g + 'g', s && s + 's', (k || (!g && !s)) && k + 'c'].filter(Boolean).join(' '); };
+const hourNow = () => dayT * 24;
+// plain medieval dyes
+const DYE = { linen: 0xcfc3a8, white: 0xe6dfcf, russet: 0x7a3b22, woad: 0x34506e, madder: 0x8a2a20, weld: 0xb39a4a, brown: 0x5b4330, dark: 0x3e342a, green: 0x4a5a30, moss: 0x3e4a2a, grey: 0x6f6a62, black: 0x2a2624, plum: 0x5a2a4a };
+
+// everyone in Ashford: all grown adults with their own lives
+const PERSONAS = [
+  { id: 'wulf', name: 'Wulf', age: 52, sex: 'm', title: 'the blacksmith', home: 'h0', work: 'smithy', evening: 'tavern', armed: 'falchion', fighter: true, shop: 'smith', pitch: 0.8, family: ['hedda'],
+    outfit: { top: DYE.brown, legs: DYE.dark, hood: true, hoodColor: DYE.grey, apron: true },
+    desc: 'gruff and short with words, proud of his steel, protective of his daughter Hedda, does not trust knights', likes: ['steel', 'sword', 'forge', 'iron', 'work', 'blade', 'hammer', 'ale'], dislikes: ['lazy', 'flatter', 'cheat'],
+    addr: 'knight', oath: 'Hmph.' },
+  { id: 'hedda', name: 'Hedda', age: 24, sex: 'f', title: "the smith's daughter", home: 'h0', work: 'smithy', evening: 'square', armed: 'arming', fighter: true, romance: true, shop: 'smith', pitch: 1.0, family: ['wulf'],
+    outfit: { top: DYE.russet, veil: true, hoodColor: DYE.linen, hoodKind: 'linen', apron: true },
+    desc: 'blunt, strong, laughs loud, hates being treated as fragile, respects honest fighters, dreams of leaving to see the world', likes: ['sword', 'fight', 'strong', 'honest', 'adventure', 'travel', 'train', 'steel', 'world', 'spar'], dislikes: ['liar', 'coward', 'fragile', 'weak', 'pity'],
+    gifts: { ring: 2, ribbon: 0, honeycake: 2, perfume: -1, flowers: 0, comb: 1 }, jealous: 0.4, bold: 0.9, warmth: 0.6, addr: 'you', oath: 'Ha!' },
+  { id: 'godric', name: 'Godric', age: 46, sex: 'm', title: 'the innkeeper', home: 'tavern', work: 'tavern', evening: 'tavern', shop: 'tavern', pitch: 0.9,
+    outfit: { top: DYE.russet, legs: DYE.brown, hood: true, hoodColor: DYE.brown, apron: true },
+    desc: 'jolly, loud, loves a good story and a full purse, hates brawls in his inn', likes: ['ale', 'story', 'song', 'coin', 'food', 'stew', 'mead'], dislikes: ['brawl', 'thief', 'cheap'],
+    addr: 'friend', oath: 'Ho there!' },
+  { id: 'elske', name: 'Elske', age: 22, sex: 'f', title: 'the tavern maid', home: 'tavern', work: 'tavern', evening: 'tavern', romance: true, shop: 'tavern', pitch: 1.12,
+    outfit: { top: DYE.madder, veil: true, hoodColor: DYE.white, hoodKind: 'linen', apron: true },
+    desc: 'cheerful and teasing, flirts with everyone but guards her heart, loves songs and dancing, wants someone kind who makes her laugh', likes: ['song', 'sing', 'dance', 'laugh', 'joke', 'funny', 'kind', 'music', 'smile'], dislikes: ['rude', 'brute', 'cruel', 'shout'],
+    gifts: { ribbon: 3, flowers: 3, perfume: 2, ring: 2, honeycake: 1, comb: 2 }, jealous: 0.7, bold: 0.6, warmth: 0.85, addr: 'love', oath: 'Oh, you!' },
+  { id: 'agnes', name: 'Agnes', age: 63, sex: 'f', title: 'the healer', home: 'healer', work: 'healer', evening: 'home', shop: 'healer', pitch: 0.92,
+    outfit: { top: DYE.green, veil: true, hoodColor: DYE.white, hoodKind: 'linen', cloak: true },
+    desc: 'old, wise and stern, has stitched more knights than she can count, hates needless killing', likes: ['herb', 'peace', 'honest', 'pray', 'heal'], dislikes: ['kill', 'waste', 'blood', 'boast'],
+    addr: 'child', oath: 'Mercy.' },
+  { id: 'isolde', name: 'Isolde', age: 26, sex: 'f', title: "the healer's apprentice", home: 'healer', work: 'healer', evening: 'square', romance: true, shop: 'healer', pitch: 1.06,
+    outfit: { top: DYE.woad, veil: true, hoodColor: DYE.linen, hoodKind: 'linen' },
+    desc: 'gentle, quiet and shy, reads the stars and knows every herb, hates needless killing, opens up slowly to someone patient and kind', likes: ['herb', 'star', 'flower', 'book', 'gentle', 'kind', 'peace', 'heal', 'quiet', 'moon', 'read'], dislikes: ['kill', 'shout', 'blood', 'boast', 'cruel'],
+    gifts: { flowers: 4, perfume: 1, ring: 2, ribbon: 1, honeycake: 1, comb: 1 }, jealous: 0.3, bold: 0.2, warmth: 0.9, shy: true, addr: 'ser', oath: 'Oh.' },
+  { id: 'maren', name: 'Maren', age: 28, sex: 'f', title: 'the huntress', home: 'h1', work: 'woods', evening: 'tavern', armed: 'arming', fighter: true, romance: true, pitch: 0.98,
+    outfit: { dress: false, top: DYE.green, legs: DYE.dark, hood: true, hoodColor: DYE.moss, cloak: true },
+    desc: 'bold and sharp-tongued, independent, a skilled hunter who mocks weakness, drawn to danger and courage, wants a partner who can keep up with her', likes: ['hunt', 'fight', 'brave', 'courage', 'forest', 'deer', 'wild', 'sword', 'kill', 'knight', 'danger'], dislikes: ['coward', 'boring', 'clingy', 'liar', 'weak'],
+    gifts: { ring: 1, ribbon: -1, flowers: 0, perfume: -1, honeycake: 2, comb: 0 }, jealous: 0.5, bold: 1, warmth: 0.5, addr: 'big man', oath: 'Tch.' },
+  { id: 'rosalind', name: 'Rosalind', age: 30, sex: 'f', title: 'the cloth merchant', home: 'h2', work: 'stall0', evening: 'square', romance: true, shop: 'gifts', pitch: 1.04,
+    outfit: { top: DYE.weld, veil: true, hoodColor: DYE.white, hoodKind: 'linen', cloak: true },
+    desc: 'clever and witty, ambitious, loves fine things and a hard bargain, gets jealous fast, wants someone with means and a quick mind', likes: ['coin', 'gold', 'silk', 'fine', 'clever', 'wit', 'trade', 'rich', 'jewel', 'ring'], dislikes: ['poor', 'dull', 'cheap', 'rude', 'stupid'],
+    gifts: { ring: 4, perfume: 3, ribbon: 1, flowers: 1, honeycake: 0, comb: 2 }, jealous: 0.95, bold: 0.7, warmth: 0.5, addr: 'my lord', oath: 'Well now.' },
+  { id: 'odo', name: 'Odo', age: 38, sex: 'm', title: 'the baker', home: 'h3', work: 'stall1', evening: 'tavern', shop: 'bakery', pitch: 0.95,
+    outfit: { top: DYE.linen, legs: DYE.brown, hood: true, hoodColor: DYE.linen, hoodKind: 'linen', apron: true },
+    desc: 'round, friendly and nervous, gossips about everyone, terrified of knights', likes: ['bread', 'cake', 'honey', 'gossip', 'food'], dislikes: ['knight', 'blood', 'fight'], addr: 'ser', oath: 'Oh dear.' },
+  { id: 'bertram', name: 'Bertram', age: 44, sex: 'm', title: 'the farmer', home: 'h4', work: 'field', evening: 'tavern', pitch: 0.86, family: ['alys'],
+    outfit: { top: DYE.grey, legs: DYE.brown, hood: true, hoodColor: DYE.brown },
+    desc: 'tired and plain-spoken, married to Alys, worried about the harvest and the raids', likes: ['harvest', 'rain', 'field', 'ale', 'alys'], dislikes: ['knight', 'raid', 'drought'], addr: 'ser', oath: 'Aye.' },
+  { id: 'alys', name: 'Alys', age: 40, sex: 'f', title: "the farmer's wife", home: 'h4', work: 'field', evening: 'home', pitch: 1.0, family: ['bertram'], married: true,
+    outfit: { top: DYE.brown, veil: true, hoodColor: DYE.linen, hoodKind: 'linen', apron: true },
+    desc: 'practical and kind, married to Bertram and happy with him, mothers the whole village', likes: ['kind', 'help', 'bread', 'field'], dislikes: ['rude', 'blood', 'kill'], addr: 'dear', oath: 'Goodness.' },
+  { id: 'tobin', name: 'Tobin', age: 33, sex: 'm', title: 'the woodcutter', home: 'h5', work: 'woods', evening: 'tavern', pitch: 0.9,
+    outfit: { top: DYE.russet, legs: DYE.dark, hood: true, hoodColor: DYE.green },
+    desc: 'quiet and strong, likes trees more than people, makes dry jokes', likes: ['wood', 'tree', 'axe', 'forest', 'quiet'], dislikes: ['noise', 'fire'], addr: 'friend', oath: 'Mm.' },
+  { id: 'edric', name: 'Edric', age: 35, sex: 'm', title: 'the village watchman', home: 'h6', work: 'square', evening: 'tavern', armed: 'longsword', fighter: true, pitch: 0.88,
+    outfit: { top: DYE.grey, topKind: 'boucle', legs: DYE.dark, hood: true, hoodColor: DYE.black, cloak: true },
+    desc: 'stern former soldier who guards Ashford alone, respects strength but watches you closely', likes: ['sword', 'guard', 'duty', 'fight', 'brave', 'train'], dislikes: ['thief', 'coward', 'trouble'], addr: 'stranger', oath: 'Hm.' },
+  { id: 'piers', name: 'Piers', age: 50, sex: 'm', title: 'the drunk', home: 'h7', work: 'tavern', evening: 'tavern', pitch: 0.84,
+    outfit: { top: DYE.grey, legs: DYE.brown, hood: true, hoodColor: DYE.grey },
+    desc: 'always drunk, rambling, funny, once a soldier, tells wild stories that are sometimes true', likes: ['ale', 'mead', 'drink', 'story', 'war'], dislikes: ['water', 'sober', 'priest'], addr: 'lad', oath: 'Hic.' },
+];
+const PERSONA = Object.fromEntries(PERSONAS.map(p => [p.id, p]));
+
+// ---------- what you own ----------
+const ITEMS = {
+  bread: { name: 'Bread', heal: 10 }, stew: { name: 'Bowl of stew', heal: 25 }, draught: { name: 'Healing draught', heal: 50, stopBleed: true },
+  honeycake: { name: 'Honey cake', heal: 6, gift: true }, flowers: { name: 'Wildflowers', gift: true }, ribbon: { name: 'Silk ribbon', gift: true },
+  comb: { name: 'Carved comb', gift: true }, perfume: { name: 'Rose perfume', gift: true }, ring: { name: 'Silver ring', gift: true },
+};
+const vsave = { coins: 30, items: {}, goods: [], owned: ['arming'], armorLvl: 0, edge: 0, day: 1, anger: {}, people: {}, ally: null };
+try { Object.assign(vsave, JSON.parse(localStorage.getItem('ironblood.village') || '{}')); } catch (e) {}
+for (const p of PERSONAS) vsave.people[p.id] = Object.assign({ alive: true, opinion: 0, fear: 0, aff: 0, stage: 'stranger', mem: [], gainDay: 0, gained: 0, pending: [], metDay: 0, kissedDay: 0 }, vsave.people[p.id] || {});
+let vDirty = false, vSaveT = 0;
+function vSave() { vDirty = true; }
+function vFlush(dt) { vSaveT -= dt; if (vDirty && vSaveT <= 0) { vSaveT = 4; vDirty = false; try { localStorage.setItem('ironblood.village', JSON.stringify(vsave)); } catch (e) {} } }
+function remember(st, text) { st.mem.push('Day ' + vsave.day + ': ' + text); if (st.mem.length > 8) st.mem.shift(); vSave(); }
+function addCoins(c) { vsave.coins = Math.max(0, Math.round(vsave.coins + c)); vSave(); }
+function addItem(id, n = 1) { vsave.items[id] = (vsave.items[id] || 0) + n; if (vsave.items[id] <= 0) delete vsave.items[id]; vSave(); }
+
+// ---------- where things are ----------
+const SPOTS = {};
+function villageSpots() {
+  const houses = VHOUSES.filter(h => h.kind === 'house');
+  SPOTS.tavern = VHOUSES.find(h => h.kind === 'tavern');
+  SPOTS.smithy = VHOUSES.find(h => h.kind === 'smithy');
+  SPOTS.healer = VHOUSES.find(h => h.kind === 'healer');
+  houses.forEach((h, i) => { SPOTS['h' + i] = h; });
+  // fields and the wood's edge: open ground just outside the houses
+  const ring = (dist, n) => {
+    const out = [];
+    for (let i = 0; i < 64 && out.length < n; i++) {
+      const a = i * 2.4, x = SQUARE.x + Math.cos(a) * dist, z = SQUARE.z + Math.sin(a) * dist;
+      if (solidAt(x, z, 2) || riverDist(x, z) < 14 || slopeAt(x, z) > 0.35) continue;
+      out.push({ x, z });
+    }
+    return out;
+  };
+  SPOTS.fields = ring(62, 4); SPOTS.woods = ring(84, 4);
+}
+// the spot a person wants to be at right now, from their daily routine
+function scheduleSpot(p, h) {
+  const home = SPOTS[p.home] || SPOTS.h0;
+  if (h >= 22 || h < 6) return { ...home.door, inside: true, slot: 'sleep' };
+  if (h < 7.5) return { ...jit(home.door, 1.5), slot: 'morning' };
+  const where = h < 18 ? p.work : p.evening;
+  const slot = h < 18 ? 'work' : 'evening';
+  if (where === 'home') return h >= 20 ? { ...home.door, inside: true, slot } : { ...jit(home.door, 2), slot };
+  if (where === 'smithy') return { ...jit(SPOTS.smithy.work, 0.8), slot, face: SPOTS.smithy };
+  if (where === 'tavern' || where === 'healer') { const b = SPOTS[where]; return { ...jit(b.door, where === 'tavern' && slot === 'evening' ? 3.5 : 1.6), slot }; }
+  if (where.startsWith('stall')) { const s = VSTALLS[+where[5]] || VSTALLS[0]; return { ...s.front, slot, face: s }; }
+  if (where === 'field' || where === 'woods') { const list = where === 'field' ? SPOTS.fields : SPOTS.woods; const s = list[(p.id.charCodeAt(0) + p.id.length) % Math.max(1, list.length)] || SQUARE; return { ...jit(s, 5), slot, wander: 7 }; }
+  const a = Math.random() * 6.28, r = 3.5 + Math.random() * 8;
+  return { x: SQUARE.x + Math.cos(a) * r, z: SQUARE.z + Math.sin(a) * r, slot, wander: 9 };
+}
+function jit(p, r) { const a = Math.random() * 6.28, d = Math.random() * r; return { x: p.x + Math.cos(a) * d, z: p.z + Math.sin(a) * d }; }
+
+// ---------- the people themselves ----------
+const villagers = [];
+function personFor(id) { return villagers.find(v => v.vill.p.id === id); }
+function spawnVillager(p) {
+  const st = vsave.people[p.id];
+  const f = new Fighter({ tier: p.fighter ? 5 : 4, team: 'villager', outfit: { sex: p.sex, ...p.outfit }, body: p.sex === 'f' ? 0x6e5848 : 0x5e4a3c, sword: null, scale: p.sex === 'f' ? 0.93 : 1 + (p.id.length % 3) * 0.02, name: p.name });
+  f.voicePitch = (p.sex === 'f' ? 1.45 : 1) * p.pitch;
+  f.vill = { p, st, mode: 'life', goal: null, slot: '', wait: 0, stuckT: 0, lx: 0, lz: 0, detourT: 0, dx: 0, dz: 0, talkT: 0, fleeT: 0 };
+  f.purse = 3 + Math.floor(Math.random() * 20);
+  const g = scheduleSpot(p, hourNow());
+  f.pos.set(g.x, groundH(g.x, g.z), g.z);
+  collideFighter(f); f.pos.y = groundH(f.pos.x, f.pos.z);
+  f.facing = Math.random() * 6.28;
+  f.vill.goal = g; f.vill.slot = g.slot;
+  if (g.inside) setInside(f, true);
+  villagers.push(f);
+  return f;
+}
+function setInside(f, v) { f.inside = v; f.root.visible = !v; if (v) { f.vel.set(0, 0, 0); f.speed = 0; } }
+function arm(f) { if (!f.hasSword && f.vill.p.armed && !f.severed.includes('RightArm') && !f.severed.includes('RightForeArm')) f.setSword(SWORDS.find(s => s.id === f.vill.p.armed)); }
+function disarm(f) { if (f.hasSword && f.alive) { scene.remove(f.swordMesh); f.hasSword = false; f.swordMesh = null; f.attack = null; f.blocking = false; } }
+// a villager picks up their sword and fights (raids, defending themselves, or with you)
+function toFight(f, opt = {}) {
+  if (talkWho() === f) endTalk();
+  arm(f);
+  if (!f.hasSword) return toFlee(f);
+  if (f.inside) { setInside(f, false); const d = (SPOTS[f.vill.p.home] || SPOTS.h0).door; f.pos.set(d.x, groundH(d.x, d.z), d.z); }
+  f.vill.mode = opt.follow ? 'ally' : 'fight';
+  f.team = opt.follow ? 'ally' : 'villager';
+  f.ai = { state: 'patrol', camp: { x: f.pos.x, z: f.pos.z }, wait: 0, tx: f.pos.x, tz: f.pos.z, alert: !!opt.alert, strafe: 1, strafeT: 0, cd: 0.6, blockT: 0, courage: f.vill.p.bold ?? 0.7, shouted: true, react: 0, crawlT: 0, follow: !!opt.follow };
+}
+function toLife(f) {
+  if (f.ai && f.ai.attacking) { f.ai.attacking.tokens = Math.max(0, (f.ai.attacking.tokens || 1) - 1); }
+  f.ai = null; f.team = 'villager'; f.angryAtYou = false; f.vill.mode = 'life'; f.vill.goal = null; f.blocking = false;
+  disarm(f);
+}
+function toFlee(f) { if (f.vill.mode === 'ally') return; if (talkWho() === f) endTalk(); f.ai = null; f.vill.mode = 'flee'; f.vill.fleeT = 25 + Math.random() * 15; }
+
+const _vw = new THREE.Vector3(), _zero = new THREE.Vector3();
+function walkTo(f, tx, tz, speed, dt) {
+  const v = f.vill;
+  let gx = tx, gz = tz;
+  if (v.detourT > 0) { v.detourT -= dt; gx = v.dx; gz = v.dz; }
+  const dx = gx - f.pos.x, dz = gz - f.pos.z, d = Math.hypot(dx, dz);
+  if (d < 0.45) { if (v.detourT > 0) { v.detourT = 0; return false; } stepFighter(f, dt, _zero, 0, null); return true; }
+  stepFighter(f, dt, _vw.set(dx / d, 0, dz / d), speed * f.legMult, Math.atan2(dx, dz), 6);
+  // walked into a wall? go round it
+  v.stuckT += dt;
+  if (v.stuckT > 1.0) {
+    const moved = Math.hypot(f.pos.x - v.lx, f.pos.z - v.lz);
+    if (moved < 0.3 * speed && v.detourT <= 0) {
+      const rx = tx - f.pos.x, rz = tz - f.pos.z, rd = Math.hypot(rx, rz) || 1, side = Math.random() < 0.5 ? 1 : -1, len = 3.5 + Math.random() * 3;
+      v.dx = f.pos.x + (-rz / rd) * side * len - (rx / rd) * 1.2; v.dz = f.pos.z + (rx / rd) * side * len - (rz / rd) * 1.2; v.detourT = 2.4;
+    }
+    v.stuckT = 0; v.lx = f.pos.x; v.lz = f.pos.z;
+  }
+  return false;
+}
+function nearestThreat(f, r) {
+  let best = null, bd = r;
+  for (const o of fighters) { if (o.team !== 'knight' || !o.alive || o.down) continue; const d = o.pos.distanceTo(f.pos); if (d < bd) { bd = d; best = o; } }
+  return best;
+}
+function updateVillager(f, dt) {
+  const v = f.vill, p = v.p;
+  if (!f.alive) { f.updateFall(dt); return; }
+  if (f.ai) return; // fighting: the knight brain drives them
+  tickVitals(f, dt);
+  if (!f.alive) return;
+  if (f.down) { f.updateFall(dt); if (Math.random() < dt * 0.5) sfx.voice(f.pos, 'hurt', f.voicePitch); return; }
+  const h = hourNow();
+  // knights close by: armed villagers fight, the rest run home and bar the door
+  if (v.mode === 'life' || v.mode === 'talk') {
+    const th = nearestThreat(f, raid.active ? 45 : 16);
+    if (th && th.ai && th.ai.alert || (th && raid.active)) { if (v.mode === 'talk') endTalk(); if (p.fighter && !p.married && f.hp > f.maxHp * 0.35) toFight(f, { alert: true }); else toFlee(f); return; }
+  }
+  if (v.mode === 'talk' || v.mode === 'scene') {
+    if (v.mode === 'talk') { const d = _vw.copy(player.pos).sub(f.pos); f.facing = angleLerp(f.facing, Math.atan2(d.x, d.z), Math.min(1, dt * 5)); }
+    stepFighter(f, dt, _zero, 0, null);
+    return;
+  }
+  if (v.mode === 'flee') {
+    const home = (SPOTS[p.home] || SPOTS.h0).door;
+    if (!f.inside) { if (walkTo(f, home.x, home.z, 4.6, dt)) setInside(f, true); if (Math.random() < dt * 0.25) sfx.voice(f.pos, p.sex === 'f' ? 'scream' : 'shout', f.voicePitch); }
+    v.fleeT -= dt;
+    if (v.fleeT <= 0 && !raid.active && !nearestThreat(f, 35)) { v.mode = 'life'; v.goal = null; }
+    return;
+  }
+  // everyday life
+  if (!v.goal || v.slotCheck === undefined || (v.slotCheck -= dt) <= 0) {
+    v.slotCheck = 3;
+    const want = scheduleSpot(p, h);
+    if (!v.goal || want.slot !== v.slot || want.inside !== v.goal.inside) { v.goal = want; v.slot = want.slot; v.wait = Math.random() * 4; }
+  }
+  const g = v.goal;
+  if (f.inside) {
+    if (!g.inside) { setInside(f, false); const d = (SPOTS[p.home] || SPOTS.h0).door; f.pos.set(d.x, groundH(d.x, d.z), d.z); }
+    return;
+  }
+  if (v.wait > 0) { v.wait -= dt; stepFighter(f, dt, _zero, 0, g.face ? Math.atan2(g.face.x - f.pos.x, g.face.z - f.pos.z) : null); return; }
+  const late = h >= 21.5 || (h >= 5.5 && h < 6);
+  if (walkTo(f, g.x, g.z, late ? 2.2 : 1.35, dt)) {
+    if (g.inside) { setInside(f, true); return; }
+    v.wait = 4 + Math.random() * 10;
+    if (g.wander) { const a = Math.random() * 6.28, r = Math.random() * g.wander; v.goal = { ...g, x: g.x + Math.cos(a) * r * 0.5, z: g.z + Math.sin(a) * r * 0.5 }; }
+  }
+}
+
+// ---------- what people think of you ----------
+function witnesses(at, r, except) { return villagers.filter(o => o !== except && o.alive && !o.inside && o.pos.distanceTo(at) < r); }
+function spreadWord(fromWho, text, dOpinion, dFear, delayH = 1) {
+  for (const o of villagers) {
+    if (!o.alive || o === fromWho) continue;
+    o.vill.st.pending.push({ at: vsave.day * 24 + hourNow() + delayH * (0.5 + Math.random()), text, dOpinion, dFear });
+  }
+  vSave();
+}
+function processGossip() {
+  const t = vsave.day * 24 + hourNow();
+  for (const o of villagers) {
+    const st = o.vill.st;
+    if (!st.pending.length) continue;
+    const due = st.pending.filter(g => g.at <= t);
+    if (!due.length) continue;
+    st.pending = st.pending.filter(g => g.at > t);
+    for (const g of due) {
+      if (g.jealous) { jealousy(o, g.text, false); continue; }
+      st.opinion = clampO(st.opinion + g.dOpinion); st.fear = Math.min(100, st.fear + g.dFear);
+      remember(st, 'heard ' + g.text);
+    }
+  }
+}
+const clampO = (v) => Math.max(-100, Math.min(100, v));
+hitHooks.push((victim, by, dmg) => {
+  if (!victim.vill || !by) return;
+  const st = victim.vill.st;
+  if (by.isPlayer) {
+    st.opinion = clampO(st.opinion - 20 - dmg * 0.3); st.fear = Math.min(100, st.fear + 25);
+    remember(st, 'the dark knight cut me with his sword');
+    if (victim.vill.mode === 'talk') endTalk();
+    if (victim.vill.mode === 'ally') { victim.ai.follow = false; vsave.ally = null; }
+    const fightBack = victim.vill.p.fighter && victim.hp > victim.maxHp * 0.3;
+    if (fightBack) { victim.angryAtYou = true; if (!victim.ai || victim.ai.follow) toFight(victim, { alert: true }); if (victim.ai) { victim.ai.target = player; victim.ai.pickT = 8; } }
+    else toFlee(victim);
+    for (const w of witnesses(victim.pos, 22, victim)) {
+      w.vill.st.opinion = clampO(w.vill.st.opinion - 8); w.vill.st.fear = Math.min(100, w.vill.st.fear + 15);
+      if (w.vill.p.fighter && (w.vill.p.bold || 0.7) > 0.5 && !w.vill.p.married && w.vill.mode !== 'ally') { w.angryAtYou = true; if (!w.ai) toFight(w, { alert: true }); if (w.ai) { w.ai.target = player; w.ai.pickT = 8; } }
+      else if (w.vill.mode !== 'ally' && w.vill.mode !== 'fight') toFlee(w);
+    }
+  } else if (by.team === 'knight' && !victim.ai) { if (victim.vill.p.fighter && victim.hp > victim.maxHp * 0.35) toFight(victim, { alert: true }); else toFlee(victim); }
+});
+deathHooks.push((victim, by, how) => {
+  const mine = by && (by.isPlayer || by.team === 'ally');
+  if (victim.team === 'knight' && mine && victim.houseName) {
+    // every knight you kill makes his house want revenge on Ashford
+    vsave.anger[victim.houseName] = (vsave.anger[victim.houseName] || 0) + 1 + victim.tier * 0.6;
+    if (victim.ai && victim.ai.raid) for (const w of villagers) if (w.alive && w.pos.distanceTo(victim.pos) < 70) { w.vill.st.opinion = clampO(w.vill.st.opinion + 4); w.vill.st.fear = Math.max(0, w.vill.st.fear - 4); if (Math.random() < 0.3) remember(w.vill.st, 'the dark knight killed a raider in Ashford'); }
+    if (personFor('maren') && personFor('maren').alive) { const st = vsave.people.maren; if (st.opinion > -20 && Math.random() < 0.25) st.aff = Math.min(100, st.aff + 1); }
+    vSave();
+  }
+  if (victim.vill) {
+    const st = victim.vill.st, p = victim.vill.p;
+    st.alive = false;
+    if (victim === talkWho()) endTalk();
+    if (vsave.ally === p.id) vsave.ally = null;
+    if (by && by.isPlayer) {
+      for (const w of witnesses(victim.pos, 35, victim)) { w.vill.st.opinion = clampO(w.vill.st.opinion - 55); w.vill.st.fear = Math.min(100, w.vill.st.fear + 50); remember(w.vill.st, 'watched the dark knight murder ' + p.name); if (w.vill.p.romance) w.vill.st.aff = Math.max(0, w.vill.st.aff - 45); }
+      spreadWord(victim, 'that the dark knight murdered ' + p.name, -30, 30, 1);
+      for (const id of p.family || []) { const fs = vsave.people[id]; if (fs) { fs.opinion = -100; fs.aff = 0; if (fs.stage === 'courting' || fs.stage === 'lover') fs.stage = 'ex'; } }
+      ui.message('YOU MURDERED ' + p.name.toUpperCase(), 2.5);
+    } else spreadWord(victim, 'that ' + p.name + ' was killed by knights', 0, 10, 0.5);
+    vSave();
+  }
+});
+
+// ---------- coins, loot, what you carry ----------
+function onPlayerDeathVillage() {
+  const lost = Math.floor(vsave.coins * 0.5);
+  if (lost > 0) { addCoins(-lost); setTimeout(() => ui.sub('Someone emptied your purse while you lay dying: lost ' + money(lost), 4), 400); }
+  if (vsave.ally) { const a = personFor(vsave.ally); if (a && a.alive) toLife(a); vsave.ally = null; }
+}
+function lootBody(o) {
+  const got = [];
+  if (o.purse > 0) { addCoins(o.purse); got.push(money(o.purse)); o.purse = 0; }
+  if (o.loot) { vsave.goods.push({ name: o.loot[0], value: o.loot[1] }); got.push(o.loot[0].toLowerCase()); o.loot = null; vSave(); }
+  if (got.length) { sfx.coins(); ui.sub('Took ' + got.join(' and '), 2.5); }
+  if (o.vill) for (const w of witnesses(o.pos, 20)) { w.vill.st.opinion = clampO(w.vill.st.opinion - 12); remember(w.vill.st, 'saw the dark knight rob the body of ' + o.vill.p.name); }
+}
+function useHealItem() {
+  const f = player;
+  const id = ['draught', 'stew', 'bread', 'honeycake'].find(k => vsave.items[k] > 0);
+  if (!id) { ui.sub('No food or draughts. Buy some at the tavern or the healer.', 2); return; }
+  if (f.hp >= f.maxHp && f.bleed < 0.05) { ui.sub('You are not hurt', 1.2); return; }
+  const it = ITEMS[id];
+  addItem(id, -1);
+  f.hp = Math.min(f.maxHp, f.hp + it.heal);
+  if (it.stopBleed) f.bleed = 0;
+  sfx.ui(380); ui.sub((id === 'draught' ? 'Drank a healing draught' : 'Ate the ' + it.name.toLowerCase()) + ' (+' + it.heal + ' health)', 1.8);
+}
+function goodsSummary() { return vsave.goods.length ? vsave.goods.length + ' goods to sell' : ''; }
+
+// ---------- drink ----------
+let drunk = 0, passedOut = 0;
+function drinkAle(strength) {
+  drunk += strength;
+  player.hp = Math.min(player.maxHp, player.hp + 4);
+  if (drunk > 1.25) setTimeout(passOut, 1800);
+}
+function passOut() {
+  if (!player.alive || passedOut > 0) return;
+  passedOut = 1;
+  endTalk(); closeShop();
+  fadeTo(1, 1.2, () => {
+    dayT = (dayT + 3 / 24) % 1;
+    const inTavern = SPOTS.tavern && player.pos.distanceTo(new THREE.Vector3(SPOTS.tavern.door.x, player.pos.y, SPOTS.tavern.door.z)) < 10;
+    const lost = Math.floor(vsave.coins * (inTavern ? 0.15 : 0.3 + Math.random() * 0.4));
+    addCoins(-lost);
+    drunk = 0.45;
+    setTimeout(() => fadeTo(0, 2.5, () => { passedOut = 0; ui.sub('You wake up on the ground with a pounding head.' + (lost > 0 ? ' Your purse is ' + money(lost) + ' lighter.' : ''), 5); }), 900);
+  });
+}
+function fadeTo(a, dur, done) {
+  const el = document.getElementById('fade');
+  el.style.transition = 'opacity ' + dur + 's'; el.style.opacity = a;
+  setTimeout(() => done && done(), dur * 1000 + 50);
+}
+function sleepAtInn() {
+  closeShop(); endTalk();
+  cutscene = true;
+  fadeTo(1, 1.4, () => {
+    // past 7 AM the clock wraps to tomorrow, and the day counter ticks over by itself
+    dayT = 7 / 24;
+    const f = player;
+    f.hp = f.maxHp; f.bleed = 0; f.stamina = 100; drunk = 0;
+    for (const k in f.parts) if (!f.parts[k].gone) f.parts[k].hp = Math.min(f.parts[k].max, f.parts[k].hp + f.parts[k].max * 0.6);
+    for (const v of villagers) if (v.vill) { v.vill.goal = null; }
+    vSave();
+    setTimeout(() => fadeTo(0, 2, () => { cutscene = false; ui.message('MORNING', 1.6); ui.sub('You slept at The Red Boar. Day ' + vsave.day + '.', 3); requestLock(); }), 800);
+  });
+}
+
+// ---------- raids: the houses come for revenge ----------
+const raid = { active: false, house: null, members: [], t: 0, burning: [], nextCheck: 0, cool: 0 };
+function raidCheck(dt) {
+  raid.cool -= dt;
+  if (raid.active) {
+    raid.t += dt;
+    raid.members = raid.members.filter(m => m.alive);
+    // raiders torch houses they walk past
+    for (const m of raid.members) {
+      if (m.down || raid.burning.length >= 4 || Math.random() > dt * 0.06) continue;
+      const h = VHOUSES.find(b => b.kind !== 'smithy' && Math.hypot(b.x - m.pos.x, b.z - m.pos.z) < Math.max(b.w, b.d) / 2 + 5 && !raid.burning.some(x => x.house === b));
+      if (h) burnHouse(h);
+    }
+    if (raid.members.length === 0 || raid.t > 150) endRaid(raid.members.length === 0);
+  }
+  for (let i = raid.burning.length - 1; i >= 0; i--) {
+    const b = raid.burning[i]; b.t -= dt;
+    if (Math.random() < dt * 9) smoke.emit(b.top.x + (Math.random() - 0.5) * 3, b.top.y, b.top.z + (Math.random() - 0.5) * 3, 1);
+    if (b.t <= 0) { for (const e of b.fires) removeFire(e); raid.burning.splice(i, 1); }
+  }
+  if (raid.active || raid.cool > 0 || !player.alive) return;
+  raid.nextCheck -= dt;
+  if (raid.nextCheck > 0) return;
+  raid.nextCheck = DAY_SECONDS / 24; // once an hour of game time
+  if (Math.hypot(player.pos.x - SQUARE.x, player.pos.z - SQUARE.z) > 220) return;
+  const list = Object.entries(vsave.anger).filter(([, a]) => a >= 2).sort((a, b) => b[1] - a[1]);
+  for (const [house, anger] of list) if (Math.random() < Math.min(0.4, (anger - 1) * 0.02)) { startRaid(house, anger); break; }
+}
+function startRaid(houseName, anger) {
+  const camp = CAMPS.find(c => c.house.name === houseName) || CAMPS[0];
+  const n = Math.min(7, 2 + Math.floor(anger / 3));
+  const dx = camp.x - SQUARE.x, dz = camp.z - SQUARE.z, d = Math.hypot(dx, dz) || 1;
+  const at = { x: SQUARE.x + dx / d * 74, z: SQUARE.z + dz / d * 74 };
+  raid.active = true; raid.house = houseName; raid.t = 0; raid.members = []; raid.size = n;
+  for (let i = 0; i < n; i++) {
+    const k = spawnKnight(camp, { x: at.x + (Math.random() - 0.5) * 8, z: at.z + (Math.random() - 0.5) * 8 });
+    k.ai.raid = true; k.ai.camp = { x: SQUARE.x, z: SQUARE.z }; k.ai.tx = SQUARE.x; k.ai.tz = SQUARE.z; k.ai.wait = 0;
+    k.name = houseName + ' Raider';
+    raid.members.push(k);
+  }
+  sfx.bell();
+  ui.message('RAID ON ASHFORD', 2.6);
+  setTimeout(() => ui.sub(n + ' knights of the ' + houseName + ' house are coming for revenge.', 4), 900);
+  for (const v of villagers) if (v.alive && !v.ai) { if (v.vill.p.fighter && !v.vill.p.married && v.hp > v.maxHp * 0.4) toFight(v, {}); else toFlee(v); }
+}
+function endRaid(beaten) {
+  raid.active = false; raid.cool = DAY_SECONDS * 0.4;
+  vsave.anger[raid.house] = Math.max(0, (vsave.anger[raid.house] || 0) - raid.size * 0.7);
+  for (const m of raid.members) if (m.alive) { m.ai.raid = false; m.ai.camp = CAMPS.find(c => c.house.name === raid.house) || CAMPS[0]; m.ai.alert = false; }
+  raid.members = [];
+  if (beaten) { ui.message('ASHFORD IS SAFE', 2); for (const v of villagers) if (v.alive && Math.hypot(v.pos.x - player.pos.x, v.pos.z - player.pos.z) < 90) { v.vill.st.opinion = clampO(v.vill.st.opinion + 6); remember(v.vill.st, 'the dark knight helped beat off a raid from the ' + raid.house + ' house'); } }
+  else ui.sub('The raiders pull back.', 3);
+  setTimeout(() => { for (const v of villagers) if (v.alive && v.vill.mode === 'fight' && !v.angryAtYou) toLife(v); }, 8000);
+  vSave();
+}
+function burnHouse(h) {
+  const top = { x: h.x, y: terrainH(h.x, h.z) + 5.2, z: h.z };
+  const fires = [];
+  for (let i = 0; i < 3; i++) fires.push(addFire(h.x + (Math.random() - 0.5) * h.w * 0.6, top.y - 0.8 + Math.random(), h.z + (Math.random() - 0.5) * h.d * 0.6, 1.6 + Math.random() * 0.8));
+  raid.burning.push({ house: h, fires, top, t: 90 + Math.random() * 60 });
+  for (const v of villagers) if (v.alive && SPOTS[v.vill.p.home] === h && v.inside) { setInside(v, false); toFlee(v); v.vill.mode = 'flee'; v.vill.fleeT = 40; v.pos.set(h.door.x, groundH(h.door.x, h.door.z), h.door.z); v.vill.st.opinion = clampO(v.vill.st.opinion - 3); remember(v.vill.st, 'raiders burned my house because of the dark knight\'s killing'); }
+  sfx.thud(new THREE.Vector3(h.x, top.y, h.z), 1.5);
+}
+// smoke from burning roofs
+const smoke = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31);
+  gr.addColorStop(0, 'rgba(70,66,62,0.75)'); gr.addColorStop(1, 'rgba(70,66,62,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  const pool = [];
+  for (let i = 0; i < 80; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0 })); s.visible = false; scene.add(s); pool.push({ s, life: 0 }); }
+  let k = 0;
+  return {
+    emit(x, y, z, size) { const p = pool[k++ % pool.length]; p.s.position.set(x, y, z); p.life = 1; p.size = size; p.s.visible = true; },
+    update(dt) { for (const p of pool) { if (p.life <= 0) continue; p.life -= dt * 0.12; p.s.position.y += dt * 2.2; p.s.position.x += dt * 0.6; const sc = p.size * (2 + (1 - p.life) * 7); p.s.scale.set(sc, sc, 1); p.s.material.opacity = Math.max(0, p.life) * 0.55; if (p.life <= 0) p.s.visible = false; } },
+  };
+})();
+
+// ---------- the village every frame ----------
+let lastDayT = dayT, villageReady = false;
+function initVillage() {
+  villageSpots();
+  for (const p of PERSONAS) if (vsave.people[p.id].alive) spawnVillager(p);
+  if (vsave.ally) { const a = personFor(vsave.ally); if (a) { a.pos.copy(player.pos).add(new THREE.Vector3(1.5, 0, 1.5)); setInside(a, false); toFight(a, { follow: true }); } }
+  villageReady = true;
+}
+function updateVillage(dt) {
+  if (!villageReady) return;
+  if (dayT < lastDayT) { vsave.day++; for (const v of villagers) if (v.vill.mode === 'ally' && v.alive) { /* allies go home at night on their own below */ } vSave(); }
+  lastDayT = dayT;
+  for (const f of villagers) updateVillager(f, dt);
+  // allies head home to sleep after dark
+  const h = hourNow();
+  if ((h > 22.5 || h < 5) && vsave.ally) { const a = personFor(vsave.ally); if (a && a.alive && !raid.active) { toLife(a); vsave.ally = null; ui.sub(a.vill.p.name + ' heads home to sleep.', 2.5); } }
+  // fighters calm down when nothing is left to fight
+  for (const f of villagers) {
+    if (!f.alive || !f.ai || f.vill.mode !== 'fight') continue;
+    if (f.angryAtYou) { if (f.pos.distanceTo(player.pos) > 45 || !player.alive) { f.calmT = (f.calmT || 0) + dt; if (f.calmT > 20) { f.calmT = 0; toLife(f); } } continue; }
+    if (!raid.active && !nearestThreat(f, 40)) { f.calmT = (f.calmT || 0) + dt; if (f.calmT > 6) { f.calmT = 0; toLife(f); } }
+  }
+  // fear fades slowly, gossip travels
+  for (const f of villagers) { const st = f.vill.st; if (st.fear > 0) st.fear = Math.max(0, st.fear - dt * 0.05); }
+  processGossip();
+  raidCheck(dt);
+  smoke.update(dt);
+  if (drunk > 0) drunk = Math.max(0, drunk - dt * 0.006);
+  vFlush(dt);
+}
+// what E does right now, and the hint for it
+function interactTarget() {
+  if (!player.alive) return null;
+  const f = player, fwd = _vw.set(Math.sin(f.facing), 0, Math.cos(f.facing));
+  let best = null, bs = 1e9;
+  for (const o of fighters) {
+    if (o === f || o.inside) continue;
+    const d = o.pos.distanceTo(f.pos);
+    if (o.alive && o.vill && !o.down && d < 2.8 && o.vill.mode !== 'flee' && o.vill.mode !== 'fight' && !o.angryAtYou) {
+      const dir = o.pos.clone().sub(f.pos).setY(0).normalize(), s = d * (1.6 - dir.dot(fwd));
+      if (s < bs) { bs = s; best = { kind: 'talk', o, text: 'Talk to ' + o.vill.p.name }; }
+    } else if (!o.alive && d < 2.0 && (o.purse > 0 || o.loot)) {
+      if (d < bs) { bs = d; best = { kind: 'loot', o, text: 'Search the body' }; }
+    }
+  }
+  return best;
+}
+function cameraFx(t) {
+  if (drunk > 0.08) {
+    const k = Math.min(1, drunk);
+    camera.rotateZ(Math.sin(t * 0.9) * 0.05 * k);
+    camera.rotateX(Math.sin(t * 0.63) * 0.02 * k);
+  }
+}
+
+// ---------- talking: a small AI inside the game, with a built-in brain as backup ----------
+const brain = { state: 'off', engine: null, progress: 0, text: '', busy: false, model: '' };
+const BRAIN_URL = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm';
+async function loadBrain() {
+  if (brain.state === 'loading' || brain.state === 'ready') return;
+  brain.state = 'loading'; brain.text = 'Starting the village brain...'; talkUI.brainLine();
+  try {
+    if (!navigator.gpu) throw new Error('This browser has no WebGPU. Use Chrome or Edge.');
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) throw new Error('No WebGPU graphics adapter found.');
+    const f16 = adapter.features.has('shader-f16');
+    brain.model = f16 ? 'Llama-3.2-1B-Instruct-q4f16_1-MLC' : 'Llama-3.2-1B-Instruct-q4f32_1-MLC';
+    const webllm = await import(BRAIN_URL);
+    brain.engine = await webllm.CreateMLCEngine(brain.model, { initProgressCallback: (r) => { brain.progress = r.progress || 0; brain.text = r.text || ''; talkUI.brainLine(); } });
+    brain.state = 'ready'; brain.text = 'Village brain ready.';
+  } catch (e) {
+    console.warn('brain failed', e);
+    brain.state = 'failed'; brain.text = 'The AI brain could not start (' + (e.message || e) + '). People use the built-in brain.';
+  }
+  talkUI.brainLine();
+}
+const BANNED = /\b(sex|sexual|naked|nude|nudity|undress|breasts?|boobs?|tits?|nipples?|genitals?|penis|vagina|cock|dick|pussy|orgasm|moan(?:ing|s)?|lick(?:ing)? (?:your|my) body|bed with|sleep with|make love|horny|aroused|arousal|fuck(?:ing)? (?:you|me|her))\b/i;
+function cleanLine(s, name) {
+  s = (s || '').replace(/\[[^\]]*\]/g, '').replace(/^\s*["']|["']\s*$/g, '').replace(new RegExp('^\\s*' + name + '\\s*:\\s*', 'i'), '').replace(/\*[^*]{0,80}\*/g, (m) => m).trim();
+  s = s.split('\n')[0];
+  const sent = s.match(/[^.!?]+[.!?]*/g) || [s];
+  s = sent.slice(0, 2).join(' ').trim();
+  if (s.length > 230) s = s.slice(0, 227).replace(/\s+\S*$/, '') + '...';
+  if (/as an ai|language model|assistant|i cannot assist/i.test(s)) return '';
+  return s;
+}
+function relationText(st, p) {
+  const bits = [];
+  bits.push(st.opinion <= -60 ? 'You hate him.' : st.opinion <= -25 ? 'You dislike and distrust him.' : st.opinion < 10 ? 'You do not know him well and are a little wary.' : st.opinion < 40 ? 'You like him.' : 'You like and trust him a great deal.');
+  if (st.fear > 50) bits.push('You are afraid of him.');
+  if (p.romance) bits.push({ stranger: '', friend: 'You see him as a friend.', courting: 'You are courting him, it is still new and exciting.', lover: 'He is your lover and you love him.', ex: 'He used to be your lover, you broke up and it still stings.' }[st.stage] || '');
+  if (p.romance && st.aff > 30 && st.stage !== 'ex') bits.push(st.aff > 70 ? 'You are deeply attracted to him.' : 'You find him attractive.');
+  return bits.filter(Boolean).join(' ');
+}
+function situationText(f) {
+  const h = hourNow(), bits = [];
+  bits.push('It is ' + (h < 5 ? 'the middle of the night' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'late at night') + ', day ' + vsave.day + '.');
+  if (player.blood > 0.4) bits.push("He is covered in other men's blood.");
+  if (drunk > 0.5) bits.push('He is drunk and smells of ale.');
+  if (raid.active) bits.push('Knights are raiding the village right now!');
+  if (stats.kills > 0) bits.push('People say he has killed ' + stats.kills + ' knights.');
+  const dead = PERSONAS.filter(q => !vsave.people[q.id].alive).map(q => q.name);
+  if (dead.length) bits.push('Dead villagers: ' + dead.join(', ') + '.');
+  const others = PERSONAS.filter(q => q.romance && q !== f.vill.p && ['courting', 'lover'].includes(vsave.people[q.id].stage));
+  if (others.length && f.vill.st.mem.some(m => /kiss|court/.test(m))) bits.push('You know he is also with ' + others.map(q => q.name).join(' and ') + '.');
+  return bits.join(' ');
+}
+function systemPrompt(f, decision) {
+  const p = f.vill.p, st = f.vill.st;
+  return `You are ${p.name}, ${p.age}, ${p.title} in the medieval village of Ashford. You are a ${p.sex === 'f' ? 'woman' : 'man'}. Personality: ${p.desc}. You like: ${p.likes.join(', ')}. You dislike: ${p.dislikes.join(', ')}.
+You are talking to a tall stranger in black scratched plate armor, a dark hood and a helmet with glowing red eye slits. He is a swordsman.
+${relationText(st, p)}
+Things you remember: ${st.mem.length ? st.mem.slice(-5).join('; ') : 'nothing yet, you just met him'}.
+${situationText(f)}
+${decision ? 'What you decided: ' + decision + ' Say it in your own words.' : ''}
+Rules: stay in character as a real medieval villager. Answer in 1 or 2 short sentences of plain old-fashioned English. Never say you are an AI. Mild swearing is fine if it suits you. Romance stays sweet: flirting, holding hands, kissing and making out with clothes on at most. If he asks for anything sexual or more than that, refuse firmly and in character. Never describe sexual acts. At the very end add one tag for how his words made you feel: [+2], [+1], [0], [-1] or [-2].`;
+}
+async function aiLine(f, said, decision) {
+  if (brain.state !== 'ready' || brain.busy) return null;
+  brain.busy = true;
+  try {
+    const hist = (f.vill.hist || []).slice(-6);
+    const msgs = [{ role: 'system', content: systemPrompt(f, decision) }, ...hist, { role: 'user', content: said }];
+    const job = brain.engine.chat.completions.create({ messages: msgs, max_tokens: 80, temperature: 0.85, top_p: 0.9 });
+    const r = await Promise.race([job, new Promise(res => setTimeout(() => res(null), 30000))]);
+    const raw = r && r.choices && r.choices[0] && r.choices[0].message.content;
+    if (!raw) return null;
+    const tag = raw.match(/\[([+-]?\d)\]/);
+    const line = cleanLine(raw, f.vill.p.name);
+    if (!line || BANNED.test(line)) return null;
+    return { line, mood: tag ? Math.max(-2, Math.min(2, +tag[1])) : 0 };
+  } catch (e) { console.warn(e); return null; }
+  finally { brain.busy = false; }
+}
+
+// ---------- the built-in brain: reads what you said, decides, answers in character ----------
+const INTENTS = [
+  ['explicit', BANNED],
+  ['bye', /\b(bye|farewell|goodbye|good night|see you|later|i must go|gotta go)\b/i],
+  ['breakup', /\b(it'?s over|break up|we'?re done|leave you|not love you|done with you)\b/i],
+  ['makeout', /\b(make out|makeout|snog|hold me close|cuddle)\b/i],
+  ['kiss', /\b(kiss|smooch)\b/i],
+  ['love', /\b(i love you|love you|marry me|be my wife)\b/i],
+  ['court', /\b(be my (girl|lady|woman|love|sweetheart)|court(ing)? you|go out with me|be mine|be together|walk out with me|a chance with you)\b/i],
+  ['fight', /\b(fight (with|beside) me|join me|come with me|follow me|help me fight|fight together|watch my back)\b/i],
+  ['dismiss', /\b(go home|stay here|wait here|leave me|you can go|stop following)\b/i],
+  ['threat', /\b(kill you|cut you|gut you|i'?ll hurt|you'?ll die|i'?ll burn|threat)\b/i],
+  ['insult', /\b(stupid|ugly|idiot|whore|bitch|fool|shut up|hate you|dumb|wench|cow|pig|peasant scum|worthless|fat)\b/i],
+  ['flirt', /\b(beautiful|pretty|lovely|gorgeous|cute|your eyes|i like you|fancy you|handsome|sweet thing|stunning|you look nice|you'?re nice to look at|date)\b/i],
+  ['sorry', /\b(sorry|apolog|forgive me|my fault)\b/i],
+  ['thanks', /\b(thank|thanks|grateful)\b/i],
+  ['greet', /\b(hi|hello|hail|good (morrow|morning|day|evening)|hey|greetings|howdy|yo)\b/i],
+  ['howare', /\b(how are you|how fare|how do you do|how'?s it going|are you well|you ok)\b/i],
+  ['name', /\b(who are you|your name|what are you called|what do you do)\b/i],
+  ['me', /\b(who am i|what do you think of me|do you like me|do you trust me|am i)\b/i],
+  ['trade', /\b(buy|sell|trade|wares|price|cost|shop|goods)\b/i],
+  ['knights', /\b(knights?|camps?|raid|raiders|house|red|blue|green|gold|black|enemy|war|battle)\b/i],
+  ['village', /\b(village|ashford|this place|where am i|town|people here|who lives)\b/i],
+  ['drink', /\b(ale|drink|beer|mead|wine|drunk)\b/i],
+  ['weather', /\b(weather|rain|sun|cold|warm|snow|storm)\b/i],
+  ['news', /\b(news|rumou?r|gossip|heard|anything new|what'?s happening)\b/i],
+];
+function intentOf(text) { for (const [k, re] of INTENTS) if (re.test(text)) return k; return 'chat'; }
+function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+function fill(s, f) {
+  const p = f.vill.p;
+  const other = PERSONAS.find(q => q.romance && q !== p && ['courting', 'lover'].includes(vsave.people[q.id].stage));
+  return s.replace(/\{addr\}/g, p.addr).replace(/\{name\}/g, p.name).replace(/\{oath\}/g, p.oath).replace(/\{title\}/g, p.title).replace(/\{other\}/g, other ? other.name : 'another').replace(/\{kills\}/g, stats.kills);
+}
+function toneOf(st) { return st.fear > 60 || st.opinion <= -40 ? 'cold' : st.opinion < 10 ? 'wary' : st.opinion < 40 ? 'warm' : 'close'; }
+const LINES = {
+  greet: { cold: ['What do you want.', 'Keep walking, {addr}.', 'Stay back from me.'], wary: ['...Good day.', 'Aye? What is it?', '{oath} Can I help you?'], warm: ['Good morrow, {addr}!', 'Ah, it is you again.', 'Well met, {addr}.'], close: ['There you are! I was hoping you would come by.', 'Hello, you.', 'My favorite knight.'] },
+  howare: { cold: ['Better when you are gone.'], wary: ['I am well enough.', 'Getting by. Like everyone.'], warm: ['Not bad at all, thank you for asking.', 'Busy, but well.'], close: ['Better now that you are here.', 'Good. Truly good.'] },
+  thanks: { cold: ['Hmph.'], wary: ['Mm.', 'Aye.'], warm: ['Think nothing of it.', 'Any time.'], close: ['For you? Always.'] },
+  sorry: { cold: ['Words cost nothing.', 'Sorry does not undo it.'], wary: ['...Fine. We will see.'], warm: ['It is forgotten.', 'Alright. I believe you.'], close: ['Come here, you fool. It is alright.'] },
+  insult: { cold: ['Piss off.', 'Go to the devil.'], wary: ['How dare you.', 'Mind your tongue, {addr}.'], warm: ['That was cruel. Why would you say that?'], close: ['That... hurt. Truly.'] },
+  threat: { cold: ['Then do it, butcher, and be damned.', 'Help! Edric!'], wary: ['Stay away from me!'], warm: ['You do not mean that. Do you?'], close: ['Is that what I am to you?'] },
+  drink: { cold: ['Drink alone.'], wary: ['Godric sells ale at The Red Boar.'], warm: ['A mug at The Red Boar sounds fine.', "Godric's ale is cheap and strong. Mostly strong."], close: ['Buy me one and I will keep you company.'] },
+  weather: { cold: ['Ask the sky.'], wary: ['Fair enough today.'], warm: ['The fields could use rain.', 'The sky looks mean over the battlefield again.'], close: ['Any weather is fine with you here.'] },
+  village: { cold: ['It was quiet before you came.'], wary: ['Ashford. Farmers, a smith, an inn. Nothing worth stealing.'], warm: ['Ashford is small, but we look after each other. Wulf has the forge, Godric the inn, Agnes heals.', 'The Red Boar is the inn, the forge is Wulf\'s, the healer has the green cross.'], close: ['It is home. Maybe it could be yours too.'] },
+  bye: { cold: ['Good riddance.'], wary: ['Farewell.'], warm: ['Fare you well, {addr}.', 'Safe roads.'], close: ['Come back to me soon.', 'Do not get yourself killed.'] },
+  chat: { cold: ['I have nothing to say to you.', 'Leave me be.'], wary: ['Hm. If you say so.', 'I would not know about that.', 'Strange thing to say.'], warm: ['Ha, maybe so.', 'I suppose you are right.', 'That is one way to see it.', 'Hm, I had not thought of that.'], close: ['I could listen to you talk all day.', 'Ha! You always say the strangest things.', 'Tell me more.'] },
+};
+function newsLine(f) {
+  const angry = Object.entries(vsave.anger).sort((a, b) => b[1] - a[1])[0];
+  const dead = PERSONAS.filter(q => !vsave.people[q.id].alive);
+  const opts = [];
+  if (angry && angry[1] >= 2) opts.push(`They say the ${angry[0]} house is furious about the knights you killed. They will come for Ashford, mark me.`);
+  if (dead.length) opts.push(`We buried ${dead[dead.length - 1].name}. The village is not the same.`);
+  const couple = PERSONAS.find(q => q.romance && ['courting', 'lover'].includes(vsave.people[q.id].stage));
+  if (couple && couple !== f.vill.p) opts.push(`Everyone is talking about you and ${couple.name}.`);
+  if (stats.kills > 5) opts.push(`Folk say you have killed ${stats.kills} knights. Some call you a hero. Some call you a butcher.`);
+  opts.push('Knights camp all around the fields. The houses fight each other and take it out on us.', 'Piers swears he saw a ghost knight on the battlefield. Piers also sees two of everything.', 'The castle lord stopped protecting us years ago. We pay for nothing.');
+  return pick(opts);
+}
+// how a person reacts to being asked for something romantic
+function decide(f, what) {
+  const p = f.vill.p, st = f.vill.st;
+  const watchers = witnesses(f.pos, 10, f).length;
+  const partner = PERSONAS.find(q => q.romance && q !== p && ['courting', 'lover'].includes(vsave.people[q.id].stage));
+  if (!p.romance || p.sex !== 'f') return { ok: false, line: pick(p.married ? ["I'm a married woman. Go on with you."] : p.sex === 'm' ? ['Ha! Not my type, knight.', 'I will pretend you did not say that.'] : ['Oh, I am far too old for that nonsense, {addr}.']) };
+  if (p.married) return { ok: false, line: "I'm married, and happily." };
+  if (st.fear > 50 || st.opinion < 0) return { ok: false, line: pick(['Stay away from me.', 'After what you have done? No.']) };
+  if (player.blood > 0.55) return { ok: false, line: pick(["You are soaked in blood! Wash first, gods' sake.", 'Not while you are dripping with some poor man\'s blood.']) };
+  if (drunk > 0.75) return { ok: false, line: pick(['You reek of ale. Ask me when you are sober.', 'You can barely stand. No.']) };
+  if (what === 'court') {
+    if (st.stage === 'courting' || st.stage === 'lover') return { ok: false, line: 'We are already together, silly.' };
+    if (st.stage === 'ex' && st.aff < 55) return { ok: false, line: 'We tried that. You broke my heart once already.' };
+    if (partner && st.mem.some(m => m.includes(partner.name))) return { ok: false, line: `And what about ${partner.name}? I know about her.` };
+    if (st.aff >= 35 + (1 - (p.bold || 0.5)) * 10 && st.opinion >= 20) return { ok: true, line: pick(['...Yes. I would like that.', 'Ha! I thought you would never ask. Yes.', 'Alright, knight. Court me, then. Do not make me regret it.']) };
+    return { ok: false, line: pick(['I hardly know you.', 'Slow down. Win me first.', 'Maybe one day. Not today.']) };
+  }
+  if (what === 'kiss') {
+    if (!['courting', 'lover'].includes(st.stage)) return { ok: false, line: st.aff > 30 ? pick(['Ask me properly first. We are not courting.', 'Ha. Not so fast.']) : pick(['Excuse me?', 'Certainly not.']) };
+    if (p.shy && watchers > 0) return { ok: false, line: 'Not here. People are watching...' };
+    if (st.aff < 45) return { ok: false, line: 'Not yet. Be patient with me.' };
+    return { ok: true };
+  }
+  if (what === 'makeout') {
+    if (st.stage !== 'lover') return { ok: false, line: st.stage === 'courting' ? 'Steady. We have only just begun courting.' : 'What? No.' };
+    if (watchers > 0) return { ok: false, line: pick(['Not in front of everyone!', 'Somewhere quieter, love.']) };
+    if (st.aff < 70) return { ok: false, line: 'Not tonight. Just kiss me.' };
+    return { ok: true };
+  }
+  if (what === 'love') {
+    if (st.stage === 'lover') return { ok: true, line: pick(['And I love you. Gods help me.', 'I know. I love you too.']) };
+    if (st.stage === 'courting' && st.aff >= 65) return { ok: true, promote: true, line: pick(['...I love you too. There, I said it.', 'I have wanted to hear that. I love you.']) };
+    return { ok: false, line: st.stage === 'courting' ? 'That is a big word. Give it time.' : 'You barely know me!' };
+  }
+  return { ok: false };
+}
+function builtinReply(f, text, forced) {
+  const p = f.vill.p, st = f.vill.st;
+  const intent = forced || intentOf(text);
+  const t = toneOf(st);
+  let line = '', dOp = 0, dAff = 0, dFear = 0, action = null, decision = '';
+  const L = (k) => fill(pick((LINES[k] && (LINES[k][t] || LINES[k].wary)) || LINES.chat[t]), f);
+  // likes and dislikes in what you said
+  const lower = text.toLowerCase();
+  const liked = p.likes.filter(w => lower.includes(w)).length, disliked = p.dislikes.filter(w => lower.includes(w)).length;
+  switch (intent) {
+    case 'explicit':
+      line = pick(p.sex === 'f' ? ['How dare you speak to me like that.', 'Filthy brute. Get away from me.', 'That is no way to talk to a woman. Shame on you.'] : ['Watch your mouth, knight.', 'Disgusting. Go cool your head in the river.']);
+      dOp = -8; dAff = -12; decision = 'You refuse, offended.'; break;
+    case 'greet': line = L('greet'); dOp = st.metDay === vsave.day ? 0 : 1; st.metDay = vsave.day; break;
+    case 'howare': line = L('howare'); dOp = 1; break;
+    case 'name': line = fill(`I am {name}, {title}.`, f) + (t === 'cold' ? '' : ' ' + fill(pick(['And you?', 'Who are you under all that iron?', 'You are the knight everyone talks about.']), f)); dOp = 1; break;
+    case 'me': line = t === 'cold' ? 'I think you are a butcher.' : t === 'wary' ? 'I do not know you yet.' : st.stage === 'lover' ? 'I think you know exactly what I think of you.' : t === 'close' ? 'I like you. More than I should.' : 'You seem alright. For a man in that much steel.'; break;
+    case 'thanks': line = L('thanks'); dOp = 1; break;
+    case 'sorry': line = L('sorry'); dOp = st.opinion < 0 ? 3 : 0; dFear = -3; break;
+    case 'insult': line = L('insult'); dOp = -7; dAff = -10; break;
+    case 'threat': line = L('threat'); dOp = -12; dAff = -15; dFear = 18; break;
+    case 'drink': line = L('drink'); if (p.likes.includes('ale')) dOp = 1; break;
+    case 'weather': line = L('weather'); break;
+    case 'village': line = L('village'); dOp = 1; break;
+    case 'news': case 'knights': line = t === 'cold' ? 'Ask someone else.' : newsLine(f); break;
+    case 'trade': line = p.shop ? (st.opinion <= -30 ? 'I will not sell to you.' : pick(['Have a look, then.', 'Coin first, then goods.', 'See anything you like?'])) : "I have nothing to sell. Try the stalls, the inn or Wulf's forge."; action = p.shop && st.opinion > -30 ? 'trade' : null; break;
+    case 'flirt': {
+      if (!p.romance) { line = p.sex === 'm' ? pick(['Ha! Flattery will not get you a discount.', 'Keep that for the ladies, knight.']) : 'Oh, stop it. I am old enough to be your mother.'; break; }
+      const open = st.opinion >= 5 && st.fear < 40 && st.stage !== 'ex';
+      if (!open) { line = pick(['Save your sweet words.', 'Is that supposed to work on me?']); dAff = -1; break; }
+      const k = st.aff + (p.bold || 0.5) * 20;
+      line = k > 60 ? pick(['Keep talking like that and I might believe you.', 'You are trouble, you know that?', 'Ha! And you are not so bad yourself.']) : k > 30 ? pick(['Flatterer.', 'Oh, you. Stop it.', '*laughs* Is that so?']) : pick(['Hm. Bold of you.', 'You do not waste time, do you?']);
+      dAff = 3 + (p.bold || 0.5) * 2; dOp = 1; break;
+    }
+    case 'court': { const r = decide(f, 'court'); line = fill(r.line, f); if (r.ok) { action = 'court'; dAff = 5; } else dAff = -1; decision = r.ok ? 'You say yes, you will court him.' : 'You say no: ' + r.line; break; }
+    case 'love': { const r = decide(f, 'love'); line = fill(r.line || 'Hm.', f); if (r.promote) action = 'lover'; dAff = r.ok ? 4 : -1; decision = r.ok ? 'You love him too and say so.' : 'You do not say it back: ' + (r.line || ''); break; }
+    case 'kiss': { const r = decide(f, 'kiss'); if (r.ok) { action = 'kiss'; line = pick(['Come here, then.', '*smiles and steps closer*', 'I was waiting for that.']); } else { line = fill(r.line, f); dAff = -1; } decision = r.ok ? 'You say yes and lean in to kiss him.' : 'You refuse: ' + r.line; break; }
+    case 'makeout': { const r = decide(f, 'makeout'); if (r.ok) { action = 'makeout'; line = pick(['*pulls you close* Come here.', 'Nobody is watching...', 'I thought you would never ask.']); } else { line = fill(r.line, f); } decision = r.ok ? 'You say yes and pull him close.' : 'You refuse: ' + r.line; break; }
+    case 'breakup':
+      if (['courting', 'lover'].includes(st.stage)) { action = 'breakup'; line = pick(['...What? After everything?', 'Fine. Go, then. Go!', 'You bastard. I trusted you.']); dAff = -40; dOp = -20; decision = 'He just broke up with you. You are hurt and angry.'; }
+      else line = 'We were never together, you fool.';
+      break;
+    case 'fight': {
+      if (!p.fighter) { line = pick(["I'm no fighter.", 'Me? I would only get in your way.']); break; }
+      if (p.married) { line = 'My place is here with my family.'; break; }
+      if (vsave.ally === p.id) { line = "I'm already with you."; break; }
+      const ok = st.opinion >= 30 || ['courting', 'lover'].includes(st.stage);
+      if (ok) { action = 'ally'; line = pick(p.id === 'maren' ? ['Finally, something fun. Lead on.', 'Try to keep up.'] : p.id === 'hedda' ? ['About time someone asked. Let me get my sword.', 'Ha! Let us go break some knights.'] : p.id === 'wulf' ? ['Hmph. For a while. My forge waits.'] : ['Aye. I will watch your back.']); }
+      else line = pick(['I do not know you well enough to bleed for you.', 'Earn my trust first.']);
+      decision = ok ? 'You agree to fight beside him.' : 'You refuse to fight beside him.'; break;
+    }
+    case 'dismiss':
+      if (vsave.ally === p.id) { action = 'dismiss'; line = pick(['Alright. I will head back.', 'Call on me when you need a sword.']); }
+      else line = 'I was not following you.';
+      break;
+    default:
+      line = L('chat');
+  }
+  if (liked) { dOp += Math.min(2, liked); dAff += p.romance ? Math.min(4, liked * 2) : 0; if (['greet', 'howare', 'thanks', 'name'].includes(intent)) line += ' ' + pick(['And you like ' + p.likes.find(w => lower.includes(w)) + '? Now we are talking.', 'Ha, you know the way to my heart.']); if (intent === 'chat') line = pick(['Oh, now you are speaking my language.', 'Ha! You know about that?', 'Now that is something I care about.', 'You and I will get along.']); }
+  if (disliked) { dOp -= Math.min(2, disliked); dAff -= Math.min(3, disliked * 2); if (intent === 'chat') line = pick(['I do not care for that.', 'Hm. Let us talk of something else.']); }
+  // first words of the day: blood and ale get noticed
+  if (st.lastLook !== vsave.day * 100 + Math.floor(hourNow())) {
+    st.lastLook = vsave.day * 100 + Math.floor(hourNow());
+    if (player.blood > 0.4) { line = pick(['Saints, you are covered in blood!', 'Is that... all blood?']) + ' ' + line; if (p.id === 'maren') dAff += 1; else if (p.warmth > 0.7 || p.id === 'agnes') dOp -= 1; }
+    else if (drunk > 0.6) line = pick(['You smell like a brewery.', 'How much have you had?']) + ' ' + line;
+  }
+  return { intent, line, dOp, dAff, dFear, action, decision };
+}
+function applyFeelings(f, r, aiMood = 0) {
+  const st = f.vill.st, p = f.vill.p;
+  // people warm up slowly: each day only so much goodwill from talk alone
+  if (st.gainDay !== vsave.day) { st.gainDay = vsave.day; st.gained = 0; }
+  let up = Math.max(0, r.dOp + aiMood * 0.5), upA = Math.max(0, r.dAff + (p.romance ? aiMood : 0));
+  const room = Math.max(0, 14 - st.gained);
+  const scale = room / 14;
+  up *= scale; upA *= scale; st.gained += up + upA * 0.5;
+  st.opinion = clampO(st.opinion + up + Math.min(0, r.dOp + aiMood));
+  if (p.romance && st.opinion > -10) st.aff = Math.max(0, Math.min(100, st.aff + upA + Math.min(0, r.dAff)));
+  st.fear = Math.max(0, Math.min(100, st.fear + r.dFear));
+  if (st.stage === 'stranger' && st.opinion >= 20) st.stage = 'friend';
+  // courting that has gone sour ends
+  if (['courting', 'lover'].includes(st.stage) && st.aff < 18) { st.stage = 'ex'; remember(st, 'I broke it off with the dark knight'); setTimeout(() => npcSay(f, pick(["We're finished. Don't come to me again.", 'I cannot do this anymore. It is over.'])), 1600); }
+  vSave();
+}
+
+// ---------- romance: witnesses, jealousy, scenes ----------
+function jealousy(o, what, saw) {
+  const st = o.vill.st, p = o.vill.p;
+  if (!['courting', 'lover'].includes(st.stage)) return;
+  st.aff = Math.max(0, st.aff - (12 + 30 * (p.jealous || 0.5)));
+  st.opinion = clampO(st.opinion - 10);
+  remember(st, (saw ? 'saw' : 'heard about') + ' him ' + what);
+  st.angry = what;
+  if (st.aff < 20) { st.stage = 'ex'; remember(st, 'broke up with him over ' + what); }
+  if (saw && !o.inside) { sfx.murmur(o.pos, 'You... how could you!', 1, true); ui.sub(p.name + ' saw you ' + what + '!', 3); }
+  vSave();
+}
+function romanceWitnessed(f, what) {
+  for (const q of PERSONAS) {
+    if (!q.romance || q === f.vill.p) continue;
+    const st = vsave.people[q.id], o = personFor(q.id);
+    if (!st.alive || !['courting', 'lover'].includes(st.stage) || !o) continue;
+    if (!o.inside && o.pos.distanceTo(f.pos) < 22) jealousy(o, what, true);
+    else st.pending.push({ at: vsave.day * 24 + hourNow() + 1 + Math.random() * 3, text: what, jealous: true });
+  }
+  // the village gossips about who you court
+  for (const w of witnesses(f.pos, 18, f)) if (Math.random() < 0.6) remember(w.vill.st, 'saw the dark knight ' + what);
+}
+let scene0 = null;
+function startScene(f, kind) {
+  closeTalkPanel();
+  const P = player, v = f.vill;
+  v.mode = 'scene'; cutscene = true;
+  const dir = _vw.copy(f.pos).sub(P.pos).setY(0); if (dir.lengthSq() < 0.01) dir.set(Math.sin(P.facing), 0, Math.cos(P.facing)); dir.normalize();
+  P.facing = Math.atan2(dir.x, dir.z); P.root.rotation.y = P.facing;
+  P.vel.set(0, 0, 0); P.blocking = false; P.attack = null;
+  f.pos.copy(P.pos).addScaledVector(dir, 0.46); f.pos.y = groundH(f.pos.x, f.pos.z);
+  f.facing = P.facing + Math.PI; f.root.rotation.y = f.facing;
+  P.noArms = true; f.noArms = true;
+  if (P.swordMesh) P.swordMesh.visible = false;
+  scene0 = { f, kind, t: 0, dur: kind === 'kiss' ? 4.2 : 10, side: Math.random() < 0.5 ? 1 : -1, smacks: 0 };
+  romanceWitnessed(f, kind === 'kiss' ? 'kissing ' + v.p.name : 'making out with ' + v.p.name);
+}
+const _ax = new THREE.Vector3(), _ay = new THREE.Vector3(0, 1, 0), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3(), _pl = new THREE.Vector3();
+function leanBody(o, lean, tilt, look) {
+  const q = o.root.quaternion;
+  const right = _ax.set(-1, 0, 0).applyQuaternion(q);
+  rotateBoneWorld(o.b.Spine1, right, -lean * 0.55);
+  rotateBoneWorld(o.b.Spine2, right, -lean * 0.4);
+  rotateBoneWorld(o.b.Head, right, -look);
+  const fwd = _ax.set(0, 0, 1).applyQuaternion(q);
+  rotateBoneWorld(o.b.Head, fwd, tilt);
+}
+function armTo(o, side, target, poleDir) {
+  const up = side === 'L' ? o.b.LeftArm : o.b.RightArm, fo = side === 'L' ? o.b.LeftForeArm : o.b.RightForeArm, ha = side === 'L' ? o.b.LeftHand : o.b.RightHand;
+  if (o.parts[side === 'L' ? 'luarm' : 'ruarm'].gone || o.parts[side === 'L' ? 'lfarm' : 'rfarm'].gone) return;
+  solveArm(up, fo, ha, target, poleDir);
+}
+function updateScene(dt) {
+  const s = scene0; if (!s) return;
+  s.t += dt;
+  const P = player, f = s.f, k = s.t / s.dur;
+  const w = smooth(0, 0.14, k) * (1 - smooth(0.86, 1, k));
+  const mk = s.kind === 'makeout';
+  // heads tilt the same way (their own right), so they meet; making out slowly switches sides
+  const sideNow = mk ? Math.sin(s.t * 0.9) : s.side;
+  const sway = mk ? Math.sin(s.t * 1.7) * 0.04 : 0;
+  leanBody(P, w * 0.42, w * 0.32 * sideNow, w * 0.22);
+  leanBody(f, w * 0.3, w * 0.32 * sideNow, -w * 0.12);
+  if (sway) { rotateBoneWorld(P.b.Spine1, _ay, sway * w); rotateBoneWorld(f.b.Spine1, _ay, -sway * w); }
+  // arms: her hands up round his neck (or on his chest), his hands at her waist / back
+  if (w > 0.05) {
+    const pq = P.root.quaternion, fq = f.root.quaternion;
+    const pNeck = P.b.Neck.getWorldPosition(_t1), fSpine = f.b.Spine1.getWorldPosition(_t2);
+    for (const sd of ['L', 'R']) {
+      const sgn = sd === 'L' ? 1 : -1;
+      // her: hands reach behind his neck (making out) or rest on his chest (kiss)
+      const tgt = _pl.copy(pNeck).add(_ax.set(sgn * 0.11, mk ? 0.0 : -0.22, mk ? -0.08 : 0.06).applyQuaternion(pq));
+      armTo(f, sd, tgt.lerp(f.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - w), _ax.set(sgn * 0.6, -1, -0.3).applyQuaternion(fq));
+      const ht = new THREE.Vector3().copy(fSpine).add(_ax.set(sgn * 0.17, mk ? 0.05 : -0.12, mk ? -0.12 : 0.02).applyQuaternion(fq));
+      armTo(P, sd, ht.lerp(P.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - w), _ax.set(sgn * 0.7, -1, -0.2).applyQuaternion(pq));
+    }
+  }
+  if (w > 0.9 && s.t > 0.8 + s.smacks * (mk ? 1.6 : 9)) { s.smacks++; sfx.kiss(); }
+  // a slow side shot
+  const mid = P.pos.clone().lerp(f.pos, 0.5); mid.y += 1.5;
+  const side = _ax.set(Math.cos(P.facing), 0, -Math.sin(P.facing));
+  const orbit = Math.sin(s.t * 0.25) * 0.5;
+  sceneCam = { pos: mid.clone().addScaledVector(side, 1.7 * Math.cos(orbit)).addScaledVector(_t1.set(Math.sin(P.facing), 0, Math.cos(P.facing)), 1.7 * Math.sin(orbit) - 0.3).add(_t2.set(0, 0.1, 0)), look: mid };
+  if (s.t >= s.dur) endScene();
+}
+function endScene() {
+  const s = scene0; if (!s) return;
+  scene0 = null; sceneCam = null; cutscene = false;
+  const P = player, f = s.f, st = f.vill.st, p = f.vill.p;
+  P.noArms = false; f.noArms = false;
+  if (P.swordMesh) P.swordMesh.visible = true;
+  f.vill.mode = 'life'; f.vill.goal = null; f.vill.wait = 3;
+  st.aff = Math.min(100, st.aff + (s.kind === 'kiss' ? 4 : 6)); st.opinion = clampO(st.opinion + 2);
+  st.kissedDay = vsave.day;
+  remember(st, s.kind === 'kiss' ? 'kissed him' : 'made out with him');
+  lovedT = 600;
+  ui.message(s.kind === 'kiss' ? p.name.toUpperCase() + ' KISSED YOU' : 'LOVED', 1.8);
+  ui.sub('Loved: stamina comes back faster for a while.', 3);
+  vSave(); requestLock();
+}
+
+// ---------- the talk panel ----------
+let talk = null;
+function talkWho() { return talk && talk.f; }
+const talkUI = {
+  el: null,
+  init() {
+    this.el = document.getElementById('talk');
+    document.getElementById('talkSend').onclick = () => this.send();
+    document.getElementById('talkIn').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') this.send(); if (e.key === 'Escape') endTalk(); });
+    document.getElementById('talkIn').addEventListener('keyup', (e) => e.stopPropagation());
+  },
+  header() {
+    if (!talk) return;
+    const f = talk.f, p = f.vill.p, st = f.vill.st;
+    document.getElementById('talkName').textContent = p.name;
+    document.getElementById('talkTitle').textContent = p.title + ', ' + p.age;
+    const op = st.fear > 60 ? 'Afraid of you' : st.opinion <= -60 ? 'Hates you' : st.opinion <= -25 ? 'Dislikes you' : st.opinion < 10 ? 'Wary of you' : st.opinion < 40 ? 'Likes you' : 'Trusts you';
+    const rom = p.romance ? ' | ' + ({ stranger: 'Stranger', friend: 'Friend', courting: 'Courting you', lover: 'Your lover', ex: 'Your ex' }[st.stage]) + ' | Heart ' + Math.round(st.aff) + '/100' : '';
+    document.getElementById('talkRel').textContent = op + ' (' + Math.round(st.opinion) + ')' + rom;
+    this.buttons();
+  },
+  buttons() {
+    const f = talk.f, p = f.vill.p, st = f.vill.st, box = document.getElementById('talkBtns');
+    const b = [['Greet', () => say('Good day to you.', 'greet')], ['Ask about news', () => say('Any news around here?', 'news')]];
+    if (p.shop) b.push(['Trade', () => openShop(f)]);
+    if (Object.keys(vsave.items).some(k => ITEMS[k].gift)) b.push(['Give a gift', () => this.gifts()]);
+    if (p.romance && st.stage !== 'lover') b.push(['Flirt', () => say(pick(['You look lovely today.', 'I could not stop thinking about you.', 'Your smile could stop a war.']), 'flirt')]);
+    if (p.romance && ['friend', 'ex', 'stranger'].includes(st.stage)) b.push(['Ask to court her', () => say('Would you let me court you?', 'court')]);
+    if (p.romance && ['courting', 'lover'].includes(st.stage)) b.push(['Kiss', () => say('*leans in for a kiss*', 'kiss')]);
+    if (p.romance && st.stage === 'courting') b.push(['Say "I love you"', () => say('I love you.', 'love')]);
+    if (p.romance && st.stage === 'lover') b.push(['Make out', () => say('*pulls you close*', 'makeout')]);
+    if (p.fighter && vsave.ally !== p.id) b.push(['Fight with me', () => say('Will you fight beside me?', 'fight')]);
+    if (vsave.ally === p.id) b.push(['Go home', () => say('Go home and rest. I will manage.', 'dismiss')]);
+    if (p.romance && ['courting', 'lover'].includes(st.stage)) b.push(['Break up', () => say("I'm sorry. It's over between us.", 'breakup')]);
+    b.push(['Goodbye', () => { say('Farewell.', 'bye'); setTimeout(endTalk, 900); }]);
+    box.innerHTML = '';
+    for (const [t, fn] of b) { const el = document.createElement('button'); el.className = 'chip'; el.textContent = t; el.onclick = fn; box.appendChild(el); }
+  },
+  gifts() {
+    const box = document.getElementById('talkBtns'); box.innerHTML = '';
+    for (const id of Object.keys(vsave.items)) {
+      if (!ITEMS[id].gift) continue;
+      const el = document.createElement('button'); el.className = 'chip'; el.textContent = ITEMS[id].name + ' x' + vsave.items[id];
+      el.onclick = () => giveGift(talk.f, id); box.appendChild(el);
+    }
+    const back = document.createElement('button'); back.className = 'chip ghost'; back.textContent = 'Back'; back.onclick = () => this.buttons(); box.appendChild(back);
+  },
+  log(who, text, cls) {
+    const box = document.getElementById('talkLog');
+    const d = document.createElement('div'); d.className = 'line ' + (cls || '');
+    d.innerHTML = '<b></b> <span></span>'; d.children[0].textContent = who + ':'; d.children[1].textContent = text;
+    box.appendChild(d); box.scrollTop = box.scrollHeight;
+    while (box.children.length > 40) box.removeChild(box.firstChild);
+    return d;
+  },
+  send() {
+    const inp = document.getElementById('talkIn'), t = inp.value.trim();
+    if (!t || !talk) return;
+    inp.value = '';
+    say(t);
+  },
+  brainLine() {
+    const el = document.getElementById('brainLine'); if (!el) return;
+    const opt = document.getElementById('brainAsk');
+    if (settings.brain !== 'ai') { el.textContent = 'Built-in brain (switch to the AI brain in Settings)'; opt.style.display = 'none'; return; }
+    if (brain.state === 'off') { el.textContent = ''; opt.style.display = settings.brainAsked ? 'none' : 'block'; if (settings.brainAsked) loadBrain(); return; }
+    opt.style.display = 'none';
+    el.textContent = brain.state === 'loading' ? brain.text.replace(/\[.*?\]/g, '').slice(0, 120) + ' (' + Math.round(brain.progress * 100) + '%) - people use the built-in brain until it is ready' : brain.text;
+  },
+};
+function openTalk(f) {
+  talk = { f };
+  f.vill.mode = 'talk'; f.vill.hist = f.vill.hist || [];
+  uiOpen = true;
+  if (document.pointerLockElement) document.exitPointerLock();
+  talkUI.el.style.display = 'flex';
+  document.getElementById('talkLog').innerHTML = '';
+  talkUI.header(); talkUI.brainLine();
+  for (const h of f.vill.hist.slice(-4)) talkUI.log(h.role === 'user' ? 'You' : f.vill.p.name, h.content, h.role === 'user' ? 'me' : '');
+  const st = f.vill.st;
+  // a jealous lover confronts you first
+  if (st.angry) { npcSay(f, pick([`I know about you ${st.angry}. Do not lie to me.`, `${st.angry}? Really? In front of the whole village?`])); st.angry = null; vSave(); }
+  else npcSay(f, builtinReply(f, '', 'greet').line);
+  setTimeout(() => { const i = document.getElementById('talkIn'); if (i) i.focus(); }, 50);
+}
+function closeTalkPanel() { if (talkUI.el) talkUI.el.style.display = 'none'; uiOpen = shopOpen; talk = null; }
+function endTalk() {
+  if (!talk) return;
+  const f = talk.f;
+  if (f.vill.mode === 'talk') { f.vill.mode = 'life'; f.vill.wait = 2; }
+  closeTalkPanel();
+  if (!cutscene && !shopOpen) requestLock();
+}
+function npcSay(f, line) {
+  if (!line) return;
+  const p = f.vill.p;
+  if (talk && talk.f === f) talkUI.log(p.name, line);
+  else ui.sub(p.name + ': ' + line, 4);
+  f.vill.hist = f.vill.hist || [];
+  f.vill.hist.push({ role: 'assistant', content: line }); if (f.vill.hist.length > 12) f.vill.hist.shift();
+  sfx.murmur(f.pos, line.replace(/\*[^*]*\*/g, ''), f.vill.p.pitch, p.sex === 'f');
+}
+async function say(text, forced) {
+  if (!talk) return;
+  const f = talk.f;
+  talkUI.log('You', text, 'me');
+  f.vill.hist.push({ role: 'user', content: text }); if (f.vill.hist.length > 12) f.vill.hist.shift();
+  const r = builtinReply(f, text, forced);
+  let line = r.line, mood = 0;
+  // the AI words it; the game still decides what actually happens
+  if (brain.state === 'ready' && settings.brain === 'ai' && r.intent !== 'explicit' && r.intent !== 'trade') {
+    const typing = talkUI.log(f.vill.p.name, '...', 'typing');
+    const out = await aiLine(f, text, r.decision);
+    typing.remove();
+    if (talk && talk.f === f && out) { line = out.line; mood = r.action || r.decision ? 0 : out.mood; }
+  }
+  if (!talk || talk.f !== f) return;
+  applyFeelings(f, r, mood);
+  npcSay(f, line);
+  doAction(f, r.action);
+  if (talk) talkUI.header();
+}
+function doAction(f, a) {
+  if (!a) return;
+  const st = f.vill.st, p = f.vill.p;
+  if (a === 'trade') setTimeout(() => openShop(f), 500);
+  if (a === 'court') { st.stage = 'courting'; remember(st, 'agreed to let the dark knight court me'); romanceWitnessed(f, 'courting ' + p.name); ui.message('COURTING ' + p.name.toUpperCase(), 2); }
+  if (a === 'lover') { st.stage = 'lover'; remember(st, 'told him I love him'); ui.message(p.name.toUpperCase() + ' LOVES YOU', 2); }
+  if (a === 'breakup') { st.stage = 'ex'; remember(st, 'he broke up with me'); spreadWord(f, 'that the dark knight left ' + p.name, -2, 0, 1); setTimeout(endTalk, 1500); }
+  if (a === 'kiss' || a === 'makeout') setTimeout(() => { if (f.alive && f.vill.mode === 'talk') startScene(f, a); }, 900);
+  if (a === 'ally') setTimeout(() => { endTalk(); vsave.ally = p.id; toFight(f, { follow: true }); vSave(); ui.sub(p.name + ' fights beside you now. Talk to her or him again to send them home.', 3.5); }, 800);
+  if (a === 'dismiss') { vsave.ally = null; toLife(f); vSave(); setTimeout(endTalk, 900); }
+  vSave();
+}
+function giveGift(f, id) {
+  const p = f.vill.p, st = f.vill.st;
+  addItem(id, -1);
+  const v = p.gifts ? (p.gifts[id] ?? 0) : (id === 'honeycake' ? 1 : 0);
+  const name = ITEMS[id].name.toLowerCase();
+  talkUI.log('You', '*gives ' + p.name + ' the ' + name + '*', 'me');
+  const line = v >= 3 ? pick([`Oh! The ${name}... it is perfect.`, `For me? Truly? Thank you!`]) : v >= 1 ? pick([`That is kind of you. Thank you.`, `A ${name}? You remembered.`]) : v === 0 ? pick(['Oh. Thank you, I suppose.', 'Hm. Well, it is the thought.']) : pick([`What am I meant to do with a ${name}?`, `...You do not know me at all, do you?`]);
+  applyFeelings(f, { dOp: 1 + Math.max(0, v), dAff: p.romance ? v * 3 + 1 : 0, dFear: -2 }, 0);
+  npcSay(f, line);
+  remember(st, 'he gave me a ' + name);
+  talkUI.header();
+}
+
+// ---------- shops ----------
+let shopOpen = false, shopWho = null;
+const haggles = {};
+const SWORD_PRICE = { arming: 24, falchion: 72, katana: 216, longsword: 168, claymore: 360, zwei: 480 };
+function priceFor(f, base) { const op = f.vill.st.opinion; return Math.max(1, Math.round(base * (1 - op * 0.0018) * (raid.active ? 1.3 : 1))); }
+function shopRows(f) {
+  const kind = f.vill.p.shop, P = player, rows = [];
+  const buy = (key, label, base, sub, fn, can = true) => rows.push({ key, label, base, sub, fn, can });
+  if (kind === 'smith') {
+    for (const s of SWORDS) if (!vsave.owned.includes(s.id)) buy('sw_' + s.id, s.name, SWORD_PRICE[s.id], s.sub + ' | dmg ' + s.dmg + ', ' + s.weight + ' kg', () => { vsave.owned.push(s.id); ui.weaponCard(); ui.sub('Bought the ' + s.name + '. Press X to switch swords.', 3); });
+    const dmg = Math.round(100 - P.armorHp);
+    if (dmg > 0) buy('repair', 'Repair your armor', Math.max(4, Math.round(dmg * 1.2)), 'Hammer out the dents (' + Math.round(P.armorHp) + '% now)', () => { P.armorHp = 100; });
+    if (vsave.armorLvl < 3) buy('armor', 'Thicker plates (level ' + (vsave.armorLvl + 1) + ')', [120, 300, 600][vsave.armorLvl], 'Takes the edge off every hit, forever', () => { vsave.armorLvl++; });
+    if (vsave.edge < 3) buy('edge', 'Sharpen and temper your blades (level ' + (vsave.edge + 1) + ')', [40, 90, 180][vsave.edge], '+5% damage with every sword, forever', () => { vsave.edge++; });
+    vsave.goods.forEach((g, i) => rows.push({ key: 'sell_' + i + g.name, label: 'Sell: ' + g.name, base: Math.round(g.value * 0.55), sub: 'Loot from a dead knight', sell: true, fn: () => { vsave.goods.splice(i, 1); } }));
+  }
+  if (kind === 'tavern') {
+    buy('bread', 'Bread', 3, '+10 health, take it with you', () => addItem('bread'));
+    buy('stew', 'Bowl of stew', 8, '+25 health, take it with you', () => addItem('stew'));
+    buy('ale', 'Mug of ale', 4, 'Drink it now. Too many and you pass out.', () => { drinkAle(0.28); sfx.ui(300); });
+    buy('mead', 'Cup of mead', 6, 'Sweet and strong. Drink it now.', () => { drinkAle(0.4); sfx.ui(300); });
+    buy('room', 'A room for the night', 12, 'Sleep until morning, wake up healed', () => setTimeout(sleepAtInn, 200), hourNow() >= 18 || hourNow() < 6);
+  }
+  if (kind === 'healer') {
+    buy('bandage', 'Linen bandage', 6, 'Stops bleeding (B)', () => { bandages++; });
+    buy('draught', 'Healing draught', 15, '+50 health and stops bleeding (H)', () => addItem('draught'));
+    let missing = 0; for (const k in P.parts) if (!P.parts[k].gone) missing += P.parts[k].max - P.parts[k].hp;
+    if (missing > 3 || P.hp < P.maxHp) buy('mend', 'Stitch and set your wounds', Math.max(10, Math.round(missing * 0.4 + (P.maxHp - P.hp) * 0.3)), 'Heals every wound. No one can grow back a lost limb.', () => { for (const k in P.parts) if (!P.parts[k].gone) P.parts[k].hp = P.parts[k].max; P.hp = P.maxHp; P.bleed = 0; });
+  }
+  if (kind === 'gifts') {
+    buy('ribbon', 'Silk ribbon', 5, 'A gift', () => addItem('ribbon'));
+    buy('comb', 'Carved comb', 8, 'A gift', () => addItem('comb'));
+    buy('perfume', 'Rose perfume', 14, 'A gift', () => addItem('perfume'));
+    buy('ring', 'Silver ring', 36, 'A serious gift', () => addItem('ring'));
+  }
+  if (kind === 'bakery') {
+    buy('bread', 'Bread', 2, '+10 health', () => addItem('bread'));
+    buy('honeycake', 'Honey cake', 4, '+6 health, or a sweet gift', () => addItem('honeycake'));
+    buy('flowers', 'Wildflowers', 2, 'Picked this morning. A gift.', () => addItem('flowers'));
+  }
+  return rows;
+}
+function openShop(f) {
+  if (f.vill.st.opinion <= -30) { npcSay(f, pick(['I will not sell to you. Get out.', 'Your coin is no good here, butcher.'])); return; }
+  shopOpen = true; shopWho = f; uiOpen = true;
+  if (talkUI.el) talkUI.el.style.display = 'none';
+  if (document.pointerLockElement) document.exitPointerLock();
+  document.getElementById('shop').style.display = 'flex';
+  renderShop();
+}
+function closeShop() {
+  if (!shopOpen) return;
+  shopOpen = false; document.getElementById('shop').style.display = 'none';
+  if (talk && talk.f === shopWho && shopWho.alive) { talkUI.el.style.display = 'flex'; talkUI.header(); uiOpen = true; }
+  else { uiOpen = !!talk; if (!uiOpen && !cutscene) requestLock(); }
+}
+function renderShop() {
+  const f = shopWho, p = f.vill.p;
+  document.getElementById('shopName').textContent = p.name + ', ' + p.title;
+  document.getElementById('shopPurse').textContent = 'Your purse: ' + money(vsave.coins) + (Object.keys(vsave.items).length ? ' | Carrying: ' + Object.entries(vsave.items).map(([k, n]) => ITEMS[k].name + ' x' + n).join(', ') : '');
+  const box = document.getElementById('shopRows'); box.innerHTML = '';
+  for (const r of shopRows(f)) {
+    const hk = p.id + r.key + vsave.day, hg = haggles[hk];
+    let price = r.sell ? Math.round(r.base * (1 + f.vill.st.opinion * 0.001)) : priceFor(f, r.base);
+    if (hg) price = Math.round(price * hg.mult);
+    const row = document.createElement('div'); row.className = 'srow';
+    row.innerHTML = '<div><b></b><small></small></div><em></em><button class="chip"></button><button class="chip ghost">Haggle</button>';
+    row.querySelector('b').textContent = r.label; row.querySelector('small').textContent = r.sub; row.querySelector('em').textContent = money(price);
+    const bb = row.children[2], hb = row.children[3];
+    bb.textContent = r.sell ? 'Sell' : 'Buy';
+    bb.disabled = !r.can || (!r.sell && vsave.coins < price);
+    if (!r.can) bb.title = 'Rooms are only rented in the evening';
+    bb.onclick = () => {
+      if (r.sell) addCoins(price); else { if (vsave.coins < price) return; addCoins(-price); }
+      sfx.coins(); r.fn(); vSave();
+      if (!r.sell) f.vill.st.opinion = clampO(f.vill.st.opinion + 0.5);
+      renderShop();
+    };
+    hb.disabled = !!hg;
+    hb.onclick = () => {
+      // haggling: how much they like you and how stubborn they are
+      const chance = 0.32 + f.vill.st.opinion / 220 + (p.id === 'rosalind' ? -0.12 : 0) + (p.id === 'piers' ? 0.2 : 0);
+      const win = Math.random() < chance;
+      haggles[hk] = { mult: r.sell ? (win ? 1.2 : 0.95) : (win ? 0.8 : 1.1) };
+      npcSay(f, win ? pick(['Fine, fine. You drive a hard bargain.', 'Alright, for you. Do not tell anyone.', 'Ugh. Deal.']) : pick(['No. That is my price. Now it is higher for wasting my time.', 'Do I look like a fool? No.', 'Haggle with someone else.']));
+      if (!talk || talk.f !== f) ui.sub(p.name + ': ' + (win ? 'Deal.' : 'No.'), 2);
+      if (!win) f.vill.st.opinion = clampO(f.vill.st.opinion - 1);
+      renderShop();
+    };
+    box.appendChild(row);
+  }
+  if (!box.children.length) box.innerHTML = '<div class="srow"><div><b>Nothing for you right now.</b></div></div>';
+}
+function initTalk() {
+  talkUI.init();
+  document.getElementById('shopBack').onclick = () => closeShop();
+  document.getElementById('brainYes').onclick = () => { settings.brainAsked = 1; settings.brain = 'ai'; saveSettings(); loadBrain(); talkUI.brainLine(); };
+  document.getElementById('brainNo').onclick = () => { settings.brainAsked = 1; settings.brain = 'builtin'; saveSettings(); talkUI.brainLine(); const s = document.getElementById('sBrain'); if (s) s.value = 'builtin'; };
+  if (settings.brain === 'ai' && settings.brainAsked) setTimeout(loadBrain, 4000);
 }
 
 // ---------- HUD + menus ----------
@@ -3573,6 +5059,14 @@ const ui = (() => {
     combo.style.opacity = f.heat >= 1 ? 1 : 0;
     combo.textContent = 'COMBO x' + Math.floor(f.heat) + '  (+' + Math.round(f.heat * 5) + '% dmg)';
     $('levels').innerHTML = `STRENGTH ${stats.str} &nbsp; SWORD SPEED ${stats.spd}`;
+    $('purse').textContent = 'PURSE ' + money(vsave.coins) + (vsave.goods.length ? '  |  ' + goodsSummary() : '');
+    const food = ['draught', 'stew', 'bread', 'honeycake'].reduce((a, k) => a + (vsave.items[k] || 0), 0);
+    $('food').textContent = food ? 'H: eat / drink (' + food + ')' : '';
+    // what E would do
+    const it = !uiOpen && !cutscene && f.alive ? interactTarget() : null;
+    $('prompt').style.display = it ? 'block' : 'none';
+    if (it) $('prompt').innerHTML = '<b>E</b> ' + it.text;
+    if (raid.active) $('raidLine').textContent = 'RAID: ' + raid.members.length + ' ' + raid.house + ' raiders in Ashford'; else $('raidLine').textContent = '';
     // where the next swing will come from
     if (f.attack) drawDir(f.attack.dir); else if (mouse.hist.length) {
       const t = performance.now(); let dx = 0, dy = 0;
@@ -3594,15 +5088,20 @@ const ui = (() => {
     const tags = $('tags');
     for (const o of fighters) {
       if (o.isPlayer) continue;
-      const show = o.alive && (o.ai && (o.ai.alert || o.hp < o.maxHp)) && o.pos.distanceTo(f.pos) < 24;
+      const near = o.pos.distanceTo(f.pos);
+      const show = o.alive && !o.inside && (o.vill ? near < 9 || (o.hp < o.maxHp && near < 24) : (o.ai && (o.ai.alert || o.hp < o.maxHp)) && near < 24);
       if (!show) { if (o.tag) o.tag.style.display = 'none'; continue; }
       if (!o.tag) { o.tag = document.createElement('div'); o.tag.className = 'tag'; o.tag.innerHTML = '<div class="tn"></div><div class="tv"></div><div class="tb"><i></i></div>'; tags.appendChild(o.tag); }
       const head = o.b.HeadTop_End.getWorldPosition(new THREE.Vector3()); head.y += 0.25;
       const s = toScreen(head);
       if (!s.vis) { o.tag.style.display = 'none'; continue; }
       o.tag.style.display = 'block'; o.tag.style.left = s.x + 'px'; o.tag.style.top = s.y + 'px';
-      o.tag.children[0].textContent = o.name;
-      o.tag.children[1].textContent = Math.max(0, Math.ceil(o.hp)) + ' / ' + o.maxHp;
+      const friendly = o.vill && !o.angryAtYou;
+      o.tag.classList.toggle('friend', !!friendly);
+      o.tag.children[0].textContent = o.vill ? o.vill.p.name + (o.vill.mode === 'ally' ? ' (with you)' : '') : o.name;
+      const hurt = !o.vill || o.hp < o.maxHp;
+      o.tag.children[1].textContent = hurt ? Math.max(0, Math.ceil(o.hp)) + ' / ' + o.maxHp : o.vill.p.title;
+      o.tag.children[2].style.display = hurt ? 'block' : 'none';
       o.tag.querySelector('i').style.width = Math.max(0, o.hp / o.maxHp * 100) + '%';
     }
     // damage numbers float up and fade
@@ -3651,6 +5150,7 @@ function bindSettings() {
   }
   $('sQuality').value = qName; $('sQuality').onchange = (e) => applyQuality(e.target.value);
   $('sDmgNums').value = String(settings.dmgNums); $('sDmgNums').onchange = (e) => { settings.dmgNums = +e.target.value; saveSettings(); };
+  $('sBrain').value = settings.brain; $('sBrain').onchange = (e) => { settings.brain = e.target.value; settings.brainAsked = 1; saveSettings(); if (settings.brain === 'ai') loadBrain(); };
   $('sHard').value = String(settings.hard); $('sHard').onchange = (e) => { settings.hard = +e.target.value; saveSettings(); };
 }
 bindSettings();
@@ -3667,8 +5167,12 @@ $('resumeBtn').onclick = () => {
   paused = false; requestLock();
 };
 $('titleSettings').onclick = () => openPause(true);
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape') return;
+  if (shopOpen) closeShop(); else if (talk) endTalk();
+});
 document.addEventListener('pointerlockchange', () => {
-  if (document.pointerLockElement !== renderer.domElement && playing && player.alive && !paused) openPause(false);
+  if (document.pointerLockElement !== renderer.domElement && playing && player.alive && !paused && !uiOpen && !cutscene && !passedOut) openPause(false);
 });
 
 // ---------- startup: build the world, generate the forests, load the knights ----------
@@ -3678,9 +5182,9 @@ const loader = new GLTFLoader();
 loadScans(() => { try { buildNature(); } catch (e) { console.error('nature failed', e); natureReady = true; } });
 // a real photographed sky lights and reflects on everything in daytime
 new RGBELoader().load('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr', (t) => { t.mapping = THREE.EquirectangularReflectionMapping; hdrEnv = pmrem.fromEquirectangular(t).texture; t.dispose(); });
-loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb', (gltf) => {
+loadGLB(loader, 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb', (gltf) => {
   soldierGLTF = gltf; modelReady = true;
-}, undefined, (err) => { console.error(err); $('loadText').textContent = 'Could not load the knight model. Check your internet and refresh.'; $('playBtn').textContent = 'LOAD FAILED'; });
+}, (err) => { console.error(err); $('loadText').textContent = 'Could not load the knight model. Check your internet and refresh.'; $('playBtn').textContent = 'LOAD FAILED'; });
 let worldStarted = false;
 function checkReady() {
   const pct = Math.round(((texDone / Math.max(1, texPending)) * 0.35 + (modelReady ? 0.15 : 0) + (scansLoaded / SCANS.length) * 0.45 + (natureReady ? 0.05 : 0)) * 100);
@@ -3688,6 +5192,7 @@ function checkReady() {
   if (worldStarted || !modelReady || !natureReady || texDone < texPending) return;
   worldStarted = true;
   player = createPlayer();
+  initVillage();
   for (const c of CAMPS.slice(0, 5)) { const n = 2 + Math.floor(Math.random() * 2); for (let i = 0; i < n; i++) spawnKnight(c); c.respawn = 45; }
   ui.weaponCard();
   captureSkyEnv(sunDir, true);
@@ -3712,6 +5217,8 @@ $('respawnBtn').onclick = () => {
 
 // ---------- main loop ----------
 const clock = new THREE.Clock();
+let animTick = 0;
+initTalk();
 let fpsAcc = 0, fpsFrames = 0, elapsed = 0, deathShown = false, deathT = 0, titleOrbit = 0;
 const capeCols = [{ x: 0, y: 0, z: 0, r: 0.21 }, { x: 0, y: 0, z: 0, r: 0.2 }, { x: 0, y: 0, z: 0, r: 0.12 }, { x: 0, y: 0, z: 0, r: 0.12 }];
 const _cv = new THREE.Vector3();
@@ -3732,10 +5239,16 @@ function frame() {
       updatePlayer(dt);
       for (const f of fighters) if (f.ai) { tickVitals(f, dt); updateKnight(f, dt); if (!f.alive || f.down) f.updateFall(dt); }
       for (const f of fighters) updateAttack(f, dt);
+      updateVillage(dt);
       updateSpawns(realDt);
     }
+    animTick++;
     for (const f of fighters) {
-      if (live || !f.animatedOnce) { f.animate(live ? dt : 0.016); f.animatedOnce = true; }
+      if (f.inside) continue;
+      // far away people move their bodies less often (saves a lot of time)
+      const far = !f.isPlayer && f.alive && f.pos.distanceToSquared(camera.position) > 45 * 45;
+      if (far && f.animatedOnce && (animTick + f.animSlot) % 3) { f.skipDt = (f.skipDt || 0) + dt; continue; }
+      if (live || !f.animatedOnce) { f.animate(live ? dt + (f.skipDt || 0) : 0.016); f.skipDt = 0; f.animatedOnce = true; }
       f.armor.uniforms.uBlood.value = f.blood;
       if (f.cape && live) {
         f.b.Spine1.getWorldPosition(_cv); Object.assign(capeCols[0], { x: _cv.x, y: _cv.y, z: _cv.z });
@@ -3745,6 +5258,7 @@ function frame() {
         f.cape.update(Math.max(dt, 0.001), f.root, capeCols);
       }
     }
+    if (live) updateScene(dt);
     gore.update(dt);
     // death screen
     if (!player.alive && playing) {
@@ -3776,7 +5290,7 @@ function frame() {
   let inFight = false;
   for (const f of fighters) if (f.ai && f.alive && f.ai.alert && f.pos.distanceTo(player.pos) < 30) { inFight = true; break; }
   updateMusic(inFight && player.alive);
-  if (playing && worldStarted) updateCamera(realDt);
+  if (playing && worldStarted) { updateCamera(realDt); cameraFx(elapsed); }
   else {
     // title screen: slow drift around the field
     titleOrbit += realDt * 0.05;
@@ -3796,8 +5310,10 @@ updateGrass(player.pos.x, player.pos.z, true);
 frame();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
 window.__game = { get player() { return player; }, fighters, setTime: (h) => { dayT = h / 24; }, keys, mouse, settings, gore, stats, get yaw() { return yaw; }, set yaw(v) { yaw = v; }, startAttack: (d, k) => player.startAttack(d, k), start: () => { audioInit(); $('title').style.display = 'none'; $('hud').classList.add('on'); playing = true; paused = false; } };
+window.__V = { villagers, vsave, openTalk, say, startRaid, startScene, endTalk, openShop, closeShop, raid, interactTarget, get talk() { return talk; }, get scene() { return scene0; }, get uiOpen() { return uiOpen; }, get state() { return { paused, playing, hitStopT, slowmo, slowmoT, cutscene, uiOpen, passedOut, finisherCam }; } };
 window.__W = { SQUARE, CASTLE, BRIDGE, BATTLE_X, FORTRESS, groundH };
 window.__dbg = () => ({ modelReady, natureReady, texDone, texPending, worldStarted, scans: scansLoaded + '/' + SCANS.length, cells: natureCells.size, inst: [...natureCells.values()].flat().reduce((a, m) => a + m.count, 0), fps: $('fps').textContent });
+window.__R = { renderer, composer, camera };
 </script>
 </body>
 </html>

@@ -92,6 +92,9 @@ const TIER = [
   { name: 'Man-at-Arms', hp: 110, armor: { head: 0.65, neck: 0.3, chest: 0.65, belly: 0.5, uarm: 0.5, farm: 0.4, thigh: 0.45, shin: 0.5 }, speed: 1 },
   { name: 'Knight', hp: 130, armor: { head: 0.8, neck: 0.35, chest: 0.8, belly: 0.65, uarm: 0.65, farm: 0.6, thigh: 0.65, shin: 0.65 }, speed: 0.92 },
   { name: 'You', hp: 100, armor: { head: 0.7, neck: 0.35, chest: 0.7, belly: 0.55, uarm: 0.55, farm: 0.5, thigh: 0.55, shin: 0.55 }, speed: 1 },
+  // 4 = villager in plain clothes, 5 = a fighter in leather and padded cloth
+  { name: 'Villager', hp: 80, armor: { head: 0.05, neck: 0, chest: 0.08, belly: 0.06, uarm: 0.05, farm: 0.04, thigh: 0.05, shin: 0.08 }, speed: 1 },
+  { name: 'Fighter', hp: 100, armor: { head: 0.1, neck: 0.05, chest: 0.28, belly: 0.22, uarm: 0.18, farm: 0.2, thigh: 0.15, shin: 0.2 }, speed: 1.08, block: 0.5 },
 ];
 
 function bone(model, n) { return model.getObjectByName('mixamorig' + n); }

@@ -2,6 +2,17 @@
 // ---------- fighters (you and every knight share this) ----------
 let soldierGLTF = null;
 const fighters = [];
+// who fights whom: knights against everyone else; you can cut anyone except your own allies
+const deathHooks = [], hitHooks = [];
+function hostile(a, b) {
+  if (a === b) return false;
+  const A = a.team, B = b.team;
+  if (A === 'knight') return B !== 'knight';
+  if (B === 'knight') return true;
+  if (A === 'you') return B === 'villager';
+  if (B === 'you') return A === 'villager' && !!a.angryAtYou;
+  return false;
+}
 
 // hit zones: from bone, to bone, radius, armor key, base hp, severs at bone, damage multiplier
 const PARTS = {
@@ -104,6 +115,7 @@ function segSeg(p1, q1, p2, q2, outPoint) {
 class Fighter {
   constructor(opt) {
     this.isPlayer = !!opt.player;
+    this.team = opt.team || (opt.player ? 'you' : 'knight');
     this.tier = opt.tier;
     this.T = TIER[opt.tier];
     this.name = opt.name || this.T.name;
@@ -112,7 +124,8 @@ class Fighter {
     this.model = skeletonClone(soldierGLTF.scene);
     tintBody(this.model, opt.body);
     // armor + cape are fitted in the soldier's own pose first, then the whole thing is turned around
-    this.armor = buildArmor(this.model, { tier: opt.player ? 1 : opt.tier, metal: opt.metal, rough: opt.rough, cloth: opt.cloth, leather: opt.leather, player: opt.player });
+    this.armor = opt.outfit ? buildClothes(this.model, opt.outfit) : buildArmor(this.model, { tier: opt.player ? 1 : opt.tier, metal: opt.metal, rough: opt.rough, cloth: opt.cloth, leather: opt.leather, player: opt.player });
+    if (opt.scale) this.root.scale.setScalar(opt.scale);
     if (opt.player) this.cape = new Cape(this.model, opt.cloth, this.armor.uniforms);
     this.model.rotation.y = Math.PI; // the soldier faces -Z, turn it to face +Z
     this.root.add(this.model);
@@ -147,10 +160,12 @@ class Fighter {
     this.heat = 0; this.heatTimer = 0;
     this.stepPhase = 0;
     this.prevBlade = null;
-    this.setSword(opt.sword || SWORDS[0]);
+    this.hasSword = false;
+    if (opt.sword !== null) this.setSword(opt.sword || SWORDS[0]);
     this.deathT = 0;
     this.lastHitBy = null;
     this.painT = 0;
+    this.animSlot = fighters.length % 3;
     fighters.push(this);
   }
   setSword(def) {
@@ -161,7 +176,7 @@ class Fighter {
     scene.add(this.swordMesh);
     this.hasSword = true;
   }
-  get dmgMult() { return 1 + this.heat * 0.05 + (this.isPlayer ? stats.str * 0.025 : 0); }
+  get dmgMult() { return 1 + this.heat * 0.05 + (this.isPlayer ? stats.str * 0.025 + vsave.edge * 0.05 : 0); }
   get spdMult() {
     const arm = this.parts.ruarm.gone || this.parts.rfarm.gone ? 0.5 : 0.65 + 0.35 * Math.min(this.parts.ruarm.hp / this.parts.ruarm.max, this.parts.rfarm.hp / this.parts.rfarm.max);
     return (1 + this.heat * 0.03 + (this.isPlayer ? stats.spd * 0.012 : 0)) * Math.max(0.5, arm);
@@ -244,7 +259,7 @@ class Fighter {
     const up = _v1.set(0, 1, 0), right = _vr.set(-1, 0, 0).applyQuaternion(this.root.quaternion);
     if (Math.abs(cp.yaw) > 0.001) rotateBoneWorld(this.b.Spine1, up, cp.yaw * 0.6);
     if (Math.abs(cp.pitch) > 0.001) rotateBoneWorld(this.b.Spine, right, -cp.pitch * 0.7);
-    if (!this.hasSword) return;
+    if (!this.hasSword || this.noArms) return;
     // hands go where the swing path says
     this.handW = this.handW || new THREE.Vector3();
     this.bladeW = this.bladeW || new THREE.Vector3();
@@ -296,7 +311,7 @@ class Fighter {
     if (part.gone) return;
     const pierce = Math.min(0.95, (o.pierce || 0) + (o.stab ? 0.3 : 0));
     let armor = this.T.armor[P.key];
-    if (this.isPlayer) armor *= 0.35 + 0.65 * (this.armorHp / 100);
+    if (this.isPlayer) armor = Math.min(0.92, armor * (0.35 + 0.65 * (this.armorHp / 100)) + vsave.armorLvl * 0.06);
     const through = 1 - armor * (1 - pierce);
     let dmg = raw * P.mult * through;
     const stopped = through < 0.45;
@@ -315,6 +330,7 @@ class Fighter {
       if ((k === 'chest' || k === 'belly') && !o.stab && dmg > 26 && settings.gore >= 2) gore.gash(this, k, at);
     }
     if (o.from) o.from.blood = Math.min(1, o.from.blood + (stopped ? 0 : dmg * 0.004));
+    for (const h of hitHooks) h(this, o.from, dmg);
     // reactions
     if (dmg > 22 || o.power >= 1.6) { this.stagger = Math.max(this.stagger, 0.55); this.attack = null; }
     else if (dmg > 6) this.stagger = Math.max(this.stagger, 0.18);
@@ -357,6 +373,8 @@ class Fighter {
     const coreEnd = joint.clone().addScaledVector(axis, len);
     const core = new THREE.Mesh(cylBetween(joint.toArray(), coreEnd.toArray(), r * 0.95, r * 0.8, 10), ORGAN_MATS.flesh);
     core.position.sub(center); piece.add(core);
+    // clothed people: the sleeve or trouser leg goes with the limb
+    if (this.armor.limbMat && boneName !== 'Head') { const sl = new THREE.Mesh(cylBetween(joint.toArray(), coreEnd.toArray(), r * 1.25, r * 1.1, 12, true), this.armor.limbMat); sl.position.sub(center); piece.add(sl); }
     const capOut = stumpCap(r, boneName === 'Head');
     capOut.position.copy(joint).sub(center).addScaledVector(axis, -0.002);
     capOut.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis.clone().negate());
@@ -420,6 +438,7 @@ class Fighter {
     else if (o && o.stab && (o.part === 'chest' || o.part === 'belly') && settings.gore >= 2) gore.openTorso(this, o, true);
     gore.pool(this);
     if (o && o.from) o.from.onKill && o.from.onKill(this, how);
+    for (const h of deathHooks) h(this, (o && o.from) || this.lastHitBy, how);
   }
   // falling over and lying still (procedural, no ragdoll)
   updateFall(dt) {
@@ -453,7 +472,7 @@ function updateAttack(f, dt) {
     f.bladeSeg(_bA, _bB);
     const prev = f.prevBlade;
     for (const o of fighters) {
-      if (o === f || !o.alive || a.hit.has(o) || (f.isPlayer === o.isPlayer) || o.dodge > 0.1) continue;
+      if (o === f || !o.alive || o.inside || a.hit.has(o) || !hostile(f, o) || o.dodge > 0.1) continue;
       if (o.pos.distanceTo(f.pos) > 3.5) continue;
       let best = null, bestD = 1e9;
       // sweep: test the blade now and in-between last frame and now

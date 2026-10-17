@@ -1,6 +1,6 @@
 
 // ---------- audio: every sound is synthesized live ----------
-const settings = { master: 80, music: 55, sfx: 85, gore: 2, sens: 100, dmgNums: 1, hard: 0 };
+const settings = { master: 80, music: 55, sfx: 85, gore: 2, sens: 100, dmgNums: 1, hard: 0, brain: 'ai', brainAsked: 0 };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('ironblood.settings') || '{}')); } catch (e) {}
 function saveSettings() { try { localStorage.setItem('ironblood.settings', JSON.stringify(settings)); } catch (e) {} }
 
@@ -156,6 +156,43 @@ const sfx = {
     g.connect(out); bg.connect(out);
     o.start(t); vib.start(t); o.stop(t + cfg.dur + 0.1); vib.stop(t + cfg.dur + 0.1);
   },
+  // medieval murmur: quick made-up syllables shaped like speech, one per word
+  murmur(pos, text, pitch = 1, female = false) {
+    if (!ac) return 0;
+    const words = Math.min(26, Math.max(2, text.split(/\s+/).length));
+    let t = ac.currentTime + 0.02;
+    const out = spatial(pos, 0.32);
+    const base = (female ? 215 : 118) * pitch;
+    const V = [[730, 1090], [530, 1840], [270, 2290], [570, 840], [440, 1020], [660, 1700], [300, 870]];
+    for (let w = 0; w < words; w++) {
+      const syl = 1 + Math.floor(Math.random() * 2);
+      for (let k = 0; k < syl; k++) {
+        const d = 0.07 + Math.random() * 0.07;
+        const o = ac.createOscillator(); o.type = 'sawtooth';
+        const f0 = base * (0.92 + Math.random() * 0.16) * (w === words - 1 && k === syl - 1 ? (/\?\s*$/.test(text) ? 1.18 : 0.86) : 1);
+        o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f0 * (0.94 + Math.random() * 0.1), t + d);
+        const g = ac.createGain(); env(g, t, 0.015, 0.5, d);
+        const [a1, a2] = V[Math.floor(Math.random() * V.length)];
+        for (const [fr, q] of [[a1 * (female ? 1.15 : 1), 5], [a2 * (female ? 1.12 : 1), 7], [2500, 9]]) { const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = fr; f.Q.value = q; o.connect(f); f.connect(g); }
+        // a soft consonant puff before some syllables
+        if (Math.random() < 0.6) noiseHit(t - 0.012, 0.03, 'highpass', 3000 + Math.random() * 3000, 1, 0.12, out, 1, 0.002);
+        g.connect(out); o.start(t); o.stop(t + d + 0.05);
+        t += d + 0.015;
+      }
+      t += 0.05 + Math.random() * 0.06 + (/[,.!?]$/.test(text.split(/\s+/)[w] || '') ? 0.18 : 0);
+    }
+    return t - ac.currentTime;
+  },
+  // the village bell: a raid is coming
+  bell() {
+    if (!ac) return; const t0 = ac.currentTime;
+    for (let i = 0; i < 6; i++) {
+      const t = t0 + i * 0.9, out = spatial(null, 0.35);
+      for (const [m, v] of [[1, 1], [2.0, 0.5], [2.76, 0.35], [5.4, 0.15]]) tone('sine', 392 * m, 392 * m * 0.998, t, 0.005, v, 2.4, out);
+    }
+  },
+  kiss() { if (!ac) return; const t = ac.currentTime, out = spatial(null, 0.12); noiseHit(t, 0.06, 'bandpass', 1800, 3, 0.4, out, 1, 0.004); },
+  coins() { if (!ac) return; const t = ac.currentTime, out = spatial(null, 0.25); for (let i = 0; i < 5; i++) tone('triangle', 2400 + Math.random() * 1600, 0, t + i * 0.05 + Math.random() * 0.03, 0.002, 0.3, 0.12, out); },
   ui(freq = 660) { if (!ac) return; const t = ac.currentTime, out = spatial(null, 0.2); tone('triangle', freq, freq * 1.5, t, 0.005, 0.5, 0.15, out); },
   // thunder: a crack, then a long low roll
   thunder() {
