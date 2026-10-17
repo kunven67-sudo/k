@@ -229,7 +229,7 @@ class Fighter {
     }
     const g = this.blocking ? GUARD_BLOCK : this.speed > 3.5 ? GUARD_RUN : GUARD;
     if (!this.curPose) this.curPose = { h: g.h.clone(), b: g.b.clone(), yaw: 0, pitch: 0 };
-    return { h: _tgt.h.copy(g.h), b: _tgt.b.copy(g.b), yaw: g.yaw, pitch: g.pitch, motion: _tgt.m.set(0, 0, 1) };
+    return { h: _tgt.h.copy(g.h), b: _tgt.b.copy(g.b), yaw: g.yaw, pitch: this.dodge > 0 ? 0.6 : g.pitch, motion: _tgt.m.set(0, 0, 1) };
   }
   pose(dt) {
     const tg = this.target();
@@ -445,7 +445,7 @@ function updateAttack(f, dt) {
     f.bladeSeg(_bA, _bB);
     const prev = f.prevBlade;
     for (const o of fighters) {
-      if (o === f || !o.alive || a.hit.has(o) || (f.isPlayer === o.isPlayer)) continue;
+      if (o === f || !o.alive || a.hit.has(o) || (f.isPlayer === o.isPlayer) || o.dodge > 0.1) continue;
       if (o.pos.distanceTo(f.pos) > 3.5) continue;
       let best = null, bestD = 1e9;
       // sweep: test the blade now and in-between last frame and now

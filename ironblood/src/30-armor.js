@@ -286,7 +286,7 @@ const SWORDS = [
   { id: 'zwei', name: 'Zweihander', sub: 'Huge German two-hander, splits armor', weight: 3.2, dmg: 74, speed: 0.6, reach: 1.42, pierce: 0.62, cut: 1.2, unlock: 45 },
 ];
 // blade: rings of a lozenge (or single-edge) cross-section along +Y, ending in a point
-function bladeGeo(len, w0, w1, thick, curve = 0, singleEdge = false, widenTip = 0) {
+function swordBladeGeo(len, w0, w1, thick, curve = 0, singleEdge = false, widenTip = 0) {
   const N = 14, pos = [];
   const ring = (y, w, t, cx) => singleEdge
     ? [[cx - w, y, 0], [cx + w * 0.55, y, t], [cx + w * 0.6, y, -t], [cx - w, y, 0]]
@@ -319,32 +319,32 @@ function makeSword(def, U) {
   let blade, guard, handle, pommel;
   switch (def.id) {
     case 'katana':
-      blade = bladeGeo(0.72, 0.016, 0.012, 0.0055, -0.04, true);
+      blade = swordBladeGeo(0.72, 0.016, 0.012, 0.0055, -0.04, true);
       guard = new THREE.CylinderGeometry(0.042, 0.042, 0.008, 18);
       handle = cylBetween([0, -0.27, 0], [0, -0.01, 0], 0.016, 0.015, 10); pommel = new THREE.CylinderGeometry(0.018, 0.018, 0.02, 10).translate(0, -0.28, 0);
       break;
     case 'falchion':
-      blade = bladeGeo(0.72, 0.022, 0.03, 0.005, 0, true, 0.03);
+      blade = swordBladeGeo(0.72, 0.022, 0.03, 0.005, 0, true, 0.03);
       guard = new THREE.BoxGeometry(0.17, 0.018, 0.025);
       handle = cylBetween([0, -0.12, 0], [0, -0.01, 0], 0.015, 0.014, 10); pommel = new THREE.SphereGeometry(0.024, 12, 8).translate(0, -0.135, 0);
       break;
     case 'longsword':
-      blade = bladeGeo(0.95, 0.024, 0.008, 0.006);
+      blade = swordBladeGeo(0.95, 0.024, 0.008, 0.006);
       guard = new THREE.BoxGeometry(0.22, 0.018, 0.024);
       handle = cylBetween([0, -0.22, 0], [0, -0.01, 0], 0.016, 0.014, 10); pommel = new THREE.SphereGeometry(0.028, 12, 8).scale(1, 1, 0.6).translate(0, -0.24, 0);
       break;
     case 'claymore':
-      blade = bladeGeo(1.12, 0.028, 0.01, 0.0065);
+      blade = swordBladeGeo(1.12, 0.028, 0.01, 0.0065);
       guard = mergeGeometries([new THREE.BoxGeometry(0.3, 0.02, 0.026), new THREE.BoxGeometry(0.03, 0.03, 0.03).translate(0.15, 0.03, 0), new THREE.BoxGeometry(0.03, 0.03, 0.03).translate(-0.15, 0.03, 0)].map(x => x.toNonIndexed()));
       guard.rotateZ(0); handle = cylBetween([0, -0.3, 0], [0, -0.01, 0], 0.018, 0.016, 10); pommel = new THREE.SphereGeometry(0.032, 12, 8).translate(0, -0.32, 0);
       break;
     case 'zwei':
-      blade = bladeGeo(1.32, 0.03, 0.011, 0.007);
+      blade = swordBladeGeo(1.32, 0.03, 0.011, 0.007);
       guard = mergeGeometries([new THREE.BoxGeometry(0.4, 0.024, 0.028), new THREE.BoxGeometry(0.06, 0.012, 0.02).translate(0.045, 0.2, 0), new THREE.BoxGeometry(0.06, 0.012, 0.02).translate(-0.045, 0.2, 0)].map(x => x.toNonIndexed()));
       handle = cylBetween([0, -0.38, 0], [0, -0.01, 0], 0.019, 0.017, 10); pommel = new THREE.SphereGeometry(0.036, 12, 8).translate(0, -0.4, 0);
       break;
     default:
-      blade = bladeGeo(0.78, 0.022, 0.009, 0.0055);
+      blade = swordBladeGeo(0.78, 0.022, 0.009, 0.0055);
       guard = new THREE.BoxGeometry(0.18, 0.016, 0.022);
       handle = cylBetween([0, -0.11, 0], [0, -0.01, 0], 0.015, 0.014, 10); pommel = new THREE.SphereGeometry(0.025, 12, 8).translate(0, -0.125, 0);
   }
