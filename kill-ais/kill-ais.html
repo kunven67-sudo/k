@@ -6192,6 +6192,7 @@ function vehMove(V, dt) {
   if (V.kind === 'tank' && tankWet(V, nx, nz) && !tankWet(V, ox, oz)) { if (!tankWet(V, nx, oz)) nz = oz; else if (!tankWet(V, ox, nz)) nx = ox; else { nx = ox; nz = oz; } }
   V.x = nx; V.z = nz;
   vehCollide(V);
+  if (V.kind === 'tank' && tankWet(V, V.x, V.z) && !tankWet(V, ox, oz)) { V.x = ox; V.z = oz; V.vx = V.vz = 0; V.spd = 0; } /* never get shoved into the water */
   /* walls stop you (a hard crash hurts the bike) */
   if (dt > 0) {
     const ax = (V.x - ox) / dt, az = (V.z - oz) / dt, sp1 = Math.hypot(ax, az);
@@ -6222,7 +6223,10 @@ function vehCollide(V) {
   for (const O of VEH) {
     if (O === V || O.dead) continue;
     const rr = (V.kind === 'tank' ? 2.6 : 1.1) + (O.kind === 'tank' ? 2.6 : 1.1), dx = V.x - O.x, dz = V.z - O.z, d = Math.hypot(dx, dz);
-    if (d < rr && d > 1e-4) { V.x = O.x + (dx / d) * rr; V.z = O.z + (dz / d) * rr; }
+    if (d >= rr || d <= 1e-4) continue;
+    /* a tank shoves a parked bike out of its way; anything else gets pushed back itself */
+    if (V.kind === 'tank' && O.kind === 'bike' && !O.rider) { O.x = V.x - (dx / d) * rr; O.z = V.z - (dz / d) * rr; vehCollide(O); O.y = vehGround(O); placeVehicle(O); }
+    else { V.x = O.x + (dx / d) * rr; V.z = O.z + (dz / d) * rr; }
   }
   /* the boss door is too small for it */
   let blocked = false;
