@@ -280,7 +280,7 @@
             const d = this.dadForms[0], eyeEv = this.song.events.find(x => x.e === 'WrathEye');
             this.snap = { t0: this.songPos, end: eyeEv ? eyeEv.t : this.songPos + 4000 };
             d.playAnim('snap', true); d._locked = true;
-            const hx = d.x + d.width * 0.5, hy = d.y + d.height * 0.37, dur = 1.6;
+            const hx = d.x + d.width * 0.5, hy = d.y + d.height * 0.37, dur = 0.85;
             this.camTween = { t: 0, dur, x0: this.cam.x, y0: this.cam.y, x1: hx, y1: hy, ease: easeFn('expo', 'Out') };
             this.zoomTween = { t: 0, dur, z0: this.camZoom, z1: this.stageZoom * 1.55, ease: easeFn('expo', 'Out') };
           }

@@ -36,6 +36,11 @@ NECK = (304, 420)                            # head turns here
 SHOULDER = (468, 545)                        # mic arm swings here
 WRIST = (590, 660)                           # mic hand bends here
 SKIN = '#fcc9a5'
+HIP_ARM = [(212, 465), (0, 465), (0, 875), (305, 875), (300, 812), (270, 700), (215, 588), (198, 520)]
+HIP_HAND = (100, 690, 275, 850)              # x0, y0, x1, y1 of the hip hand (+ cuff)
+BODY_EDGE = [(224, 464), (198, 504), (200, 556), (216, 590), (270, 700), (300, 812)]
+LARM_S = (214, 528)                          # the other shoulder (slump pose)
+LWRIST = (240, 712)                          # where the hip hand meets its sleeve
 NECK_C = '#e89468'
 SLEEVE_C = '#e8a85c'
 SCALE = 0.56                                 # picture px -> game px (BF-sized head)
@@ -101,6 +106,28 @@ def build_parts():
     pn.poly(edge + [(540, 700), (500, 640), (474, 560), (466, 530)], SLEEVE_C)
     pn.line(edge, 8)
     parts['sleeve'] = P.over(pn.result(), sl)
+
+    # -- the snap slump: the hip arm comes off the sweater (its side gets its own edge) and the
+    #    hip hand is kept on its own, so both arms can hang limp
+    t = parts['torso']
+    arm = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(arm).polygon(HIP_ARM, fill=255)
+    arm = np.array(arm) > 0
+    hand = t.copy(); box = np.zeros((H, W), bool); box[HIP_HAND[1]:HIP_HAND[3], HIP_HAND[0]:HIP_HAND[2]] = True
+    rgb = t[..., :3].astype(int)
+    peach = (rgb[..., 0] > 200) & (rgb[..., 1] > 130) & (rgb[..., 0] > rgb[..., 2] + 40) & (rgb[..., 1] < 215) & (rgb[..., 2] > 100) & (t[..., 3] > 100)
+    peach &= box & arm
+    peach = ndimage.binary_opening(peach, iterations=2)
+    keep = ndimage.binary_dilation(peach, iterations=9) & (peach | (cu.ink & box & arm))
+    hand[~keep] = 0
+    parts['lhand'] = hand
+    body = t.copy(); body[arm] = 0
+    pn = P.Paint(W, H)
+    edge = P.smooth(BODY_EDGE)
+    pn.poly(edge + [(340, 812), (340, 470)], SWEATER)
+    pn.poly([(x + 14, y) for x, y in edge[len(edge) // 3:]] + [(edge[-1][0] - 2, edge[-1][1]), (edge[len(edge) // 3][0], edge[len(edge) // 3][1])], SWEATER_SHADE)
+    pn.line(edge, 8.5)
+    parts['torso_slump'] = P.under(body, pn.result())
 
     # -- mouths for singing (drawn to match: thick black line, dark inside, pink tongue)
     for nm, spec in MOUTHS.items(): parts['mouth_' + nm] = draw_mouth(W, H, **spec)
@@ -409,7 +436,9 @@ def anims():
         settle = dict(flinch, ik=((tx + 6, ty + 16), hr + 8), lids='worry')
         A[lab + ' Miss'] = (24, 'miss', [(0, hurt), (4, settle)])
     # the snap: head drops, face in shadow, arms hang, he trembles (loops until the eye opens)
-    sl = lambda dx, r: dict(pose(legs(0.97, 1.0, dict(sx=1.0, sy=0.975, rot=2, dx=dx * 0.6)), dict(head=dict(rot=22 + r, dy=44, dx=12 + dx), arm=dict(rot=8), wrist=dict(rot=10))), swap={'head': 'head_dark'})
+    # anime "head down": shoulders drop + round forward, both arms hang limp, mic dangling
+    sl = lambda dx, r: dict(pose(legs(0.96, 1.0, dict(sx=1.0, sy=0.965, rot=4, dx=8 + dx * 0.6, dy=10)), dict(head=dict(rot=24 + r, dy=52, dx=16 + dx))),
+                            ik=((520 + dx, 790), 18), larm=(226 + dx, 776), swap={'head': 'head_dark'})
     A['Snap'] = (8, 'none', [(0, sl(-3, 0)), (2, sl(3, 1.2)), (4, sl(-2, -0.6)), (6, sl(3.5, 0.8))])
     A['Hey'] = (26, 'hey', [
         (0, dict(pose(legs(1.05, 0.98, dict(sy=1.03)), dict(head=dict(rot=5, dy=-12))), ik=((604, 372), -8))),
@@ -421,6 +450,7 @@ def anims():
 
 ORDER = ('shoes', 'pants', 'sleeve', 'torso', 'head', 'MOUTH', 'hand')
 ORDER_RAP = ('shoes', 'pants', 'torso', 'uparm', 'forearm', 'head', 'MOUTH', 'LIDS', 'hand')
+ORDER_SLUMP = ('shoes', 'pants', 'torso_slump', 'larm_up', 'larm_fore', 'lhand', 'uparm', 'forearm', 'head', 'MOUTH', 'hand')
 
 
 def frames_for(rig, slots, spec, miss):
@@ -431,7 +461,7 @@ def frames_for(rig, slots, spec, miss):
         k = max(i for i, (kf, _) in enumerate(keys) if kf <= f)
         key = keys[k][1]
         swap = key.get('swap', {})
-        bones = {b: v for b, v in key.items() if b not in ('ik', 'lids', 'swap')}
+        bones = {b: v for b, v in key.items() if b not in ('ik', 'lids', 'swap', 'larm')}
         Wd = rig.world(bones)
         fr = []
         if 'ik' in key:
@@ -443,14 +473,21 @@ def frames_for(rig, slots, spec, miss):
                 'forearm': P.mmul(B, P.mmul(P.T(*E), R(math.degrees(af)))),
                 'hand': P.mmul(B, hand_at(Wt, af, hand_turn)),
             }
-            for nm in ORDER_RAP:
+            if 'larm' in key:                      # the other arm hangs too (slump)
+                LE, LW, lau, laf = ik(LARM_S, key['larm'], 108, 112, pref=(-1.0, 0.3))
+                a = math.degrees(laf)
+                place['larm_up'] = P.mmul(B, P.mmul(P.T(*LARM_S), R(math.degrees(lau))))
+                place['larm_fore'] = P.mmul(B, P.mmul(P.T(*LE), R(a)))
+                place['lhand'] = P.mmul(B, P.mmul(P.T(LW[0] + 10 * math.cos(laf), LW[1] + 10 * math.sin(laf)), P.mmul(R(a - 138), P.T(-LWRIST[0], -LWRIST[1]))))
+            for nm in (ORDER_SLUMP if 'larm' in key else ORDER_RAP):
                 if nm == 'LIDS':
                     if not key.get('lids'): continue
                     nm = 'lids_' + key['lids']
                 nm = 'mouth_' + mouth if nm == 'MOUTH' else nm
-                bone, x0, y0, extra = slots[nm]
+                spr = {'larm_up': 'uparm', 'larm_fore': 'forearm'}.get(nm, nm)
+                bone, x0, y0, extra = slots[spr]
                 base = place[nm] if nm in place else Wd[bone]
-                fr.append((nm + t, P.mmul(base, P.mmul(P.T(x0, y0), extra))))
+                fr.append((swap.get(spr, spr) + t, P.mmul(base, P.mmul(P.T(x0, y0), extra))))
         else:
             for nm in ORDER:
                 nm = 'mouth_' + mouth if nm == 'MOUTH' else nm
@@ -470,6 +507,7 @@ def build():
     parts['pants'] = draw_pants(W, int(FEET[1]) + 40)
     sprites, slots = {}, {}
     for nm, im in parts.items():
+        if nm in ('torso_slump', 'lhand'): continue
         c, x0, y0 = P.crop_alpha(im)
         bone = {'torso': 'body', 'sleeve': 'arm', 'hand': 'wrist', 'pants': 'pants'}.get(nm, 'head')
         sprites[nm] = c; slots[nm] = (bone, x0, y0, P.M())
@@ -477,6 +515,9 @@ def build():
     for nm, (L, r0, r1) in {'uparm': (ARM_L1, 40, 43), 'forearm': (ARM_L2, 43, 50)}.items():
         im, ox, oy = draw_tube(L, r0, r1)
         sprites[nm] = im; slots[nm] = (None, 0, 0, P.T(-ox, -oy))
+    for nm, bone in (('torso_slump', 'body'), ('lhand', None)):
+        c, x0, y0 = P.crop_alpha(parts_full[nm])
+        sprites[nm] = c; slots[nm] = (bone, x0, y0, P.M())
     for kind in LIDS:
         c, x0, y0 = P.crop_alpha(draw_lids(rgba, kind))
         sprites['lids_' + kind] = c; slots['lids_' + kind] = ('head', x0, y0, P.M())
