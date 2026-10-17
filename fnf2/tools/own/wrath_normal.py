@@ -104,6 +104,9 @@ def build_parts():
 
     # -- mouths for singing (drawn to match: thick black line, dark inside, pink tongue)
     for nm, spec in MOUTHS.items(): parts['mouth_' + nm] = draw_mouth(W, H, **spec)
+    # idle: a small frown in place of the drawing's :3 (same line weight)
+    fr = P.Paint(W, H); fr.line(P.bez((296, 397), (318, 383), (352, 383), (374, 396)), 7)
+    parts['mouth_frown'] = fr.result()
 
     return rgba, parts
 
@@ -372,7 +375,7 @@ def lean(dx, body=None):
 # 'lids' = eyelid look. Values hold until the next key (Animate on twos).
 def anims():
     A = {}
-    A['Idle'] = (14, 'smile', [
+    A['Idle'] = (14, 'frown', [
         (0, pose(legs(0.955, 1.03, dict(sx=1.02, sy=0.97)), dict(head=dict(dy=22, rot=-4), arm=dict(rot=5), wrist=dict(rot=6)))),
         (2, pose(legs(0.975, 1.015, dict(sx=1.01, sy=0.985)), dict(head=dict(dy=17, rot=-5), arm=dict(rot=4), wrist=dict(rot=4)))),
         (4, pose(legs(0.992, 1.004), dict(head=dict(dy=8, rot=-3), arm=dict(rot=2), wrist=dict(rot=2)))),
@@ -505,7 +508,7 @@ def icon(sprites, path):
     """Health icon (2 frames of 150x150: fine, losing) from his own head, with a fat icon outline."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     sheet = Image.new('RGBA', (300, 150))
-    for i, (mouth, rot) in enumerate((('smile', 0), ('miss', -8))):
+    for i, (mouth, rot) in enumerate((('frown', 0), ('miss', -8))):
         rgba, parts = _parts_cache
         H, W = rgba.shape[:2]
         im = Image.new('RGBA', (W, H))
