@@ -4,6 +4,8 @@ bone breaks, getting faster and louder, the biggest one when the eye rips out.
 The recordings are CC0 packs from OpenGameArt ("Fleshy bone break/snap SFX"),
 downloaded into a cache the first time, never committed. Only the crisp,
 cracking ones are used, at their real pitch (low/deep breaks sounded like plops).
+If fnf2/private/transform-ref.wav exists (a private recording, never committed),
+its cracking is the main sound and the CC0 cracks only punch up the pull-out.
 
   python3 fnf2/tools/own/sfx_transform.py OUT.wav      # 4.8 s, the biggest break lands at 3.2 s
 """
@@ -17,6 +19,9 @@ SR = 44100
 LEN = 4.8
 RIP = 3.2          # the big pull-out (= bar 35 in GLARE)
 CACHE = os.path.expanduser('~/.cache/fnf2/gore')
+# a private bone-crack recording the user gave us (git-ignored); used when it's there
+REF = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'private', 'transform-ref.wav')
+REF_AT = 0.35      # start of its densest cracking
 OGA = 'https://opengameart.org/sites/default/files/'
 FILES = ['rippingintomeat_0.mp3', 'wet_breaks.zip', 'deep_breaks.zip', 'independent_nu_ljudbank-wet_squish_slurp_impacts.7z',
          'squish_02.mp3', 'squish_04.mp3', 'squish_06.mp3', 'squishsplat_impact.mp3'] + \
@@ -101,12 +106,23 @@ def render():
     crack = [norm(signal.sosfilt(hp, load(('wet_breaks.zip', 'Wet Break %d.wav' % k)))) for k in (10, 5, 8, 9, 3, 2, 7)]
 
     B = {'bone': Buf()}
-    # bones breaking: a few cracks, then faster and louder, the biggest one on the pull-out
-    hits = [(0.4, .35), (1.0, .45), (1.6, .7), (2.0, .75), (2.25, .55), (2.4, .85), (2.6, .6), (2.8, .9), (2.95, .7), (3.08, .8)]
-    for i, (bt, g) in enumerate(hits):
-        B['bone'].add(bt, crack[i % len(crack)], g)
-    for j, k in enumerate((0, 1, 2)): B['bone'].add(RIP + 0.015 * j, crack[k], 1.3)
-    B['bone'].add(RIP + 0.45, crack[3], 0.5); B['bone'].add(RIP + 0.8, crack[4], 0.35)
+    if os.path.exists(REF):
+        # the user's own bone-crack recording (private): its densest 4.8 s, swelling up to the pull-out
+        x, sr = sf.read(REF)
+        x = x.mean(1) if x.ndim > 1 else x
+        if sr != SR: x = signal.resample_poly(x, SR, sr)
+        seg = x[int(REF_AT * SR):int((REF_AT + LEN) * SR)]
+        ramp = np.interp(np.arange(len(seg)) / SR, [0, RIP, LEN], [0.55, 1.0, 0.8])
+        f = int(0.03 * SR); seg = seg * ramp; seg[:f] *= np.linspace(0, 1, f)
+        B['bone'].add(0, norm(seg), 1.0)
+        for j, k in enumerate((0, 1, 2)): B['bone'].add(RIP + 0.015 * j, crack[k], 0.55)
+    else:
+        # bones breaking: a few cracks, then faster and louder, the biggest one on the pull-out
+        hits = [(0.4, .35), (1.0, .45), (1.6, .7), (2.0, .75), (2.25, .55), (2.4, .85), (2.6, .6), (2.8, .9), (2.95, .7), (3.08, .8)]
+        for i, (bt, g) in enumerate(hits):
+            B['bone'].add(bt, crack[i % len(crack)], g)
+        for j, k in enumerate((0, 1, 2)): B['bone'].add(RIP + 0.015 * j, crack[k], 1.3)
+        B['bone'].add(RIP + 0.45, crack[3], 0.5); B['bone'].add(RIP + 0.8, crack[4], 0.35)
 
     def lvl(x, db):
         r = np.sqrt((x[np.abs(x) > np.abs(x).max() * 0.05] ** 2).mean())
