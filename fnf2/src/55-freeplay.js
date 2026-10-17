@@ -10,12 +10,22 @@
   E.quintOut = E.quintOut || (t => 1 - Math.pow(1 - t, 5));
   E.sineOut = E.sineOut || (t => Math.sin(t * Math.PI / 2));
   E.expoIn = E.expoIn || (t => t <= 0 ? 0 : Math.pow(2, 10 * t - 10));
+  // FlxEase versions (the rank slam uses these exact curves)
+  E.sineIn = E.sineIn || (t => 1 - Math.cos(t * Math.PI / 2));
+  E.quartIn = E.quartIn || (t => t * t * t * t);
+  E.fxBackIn = t => t * t * (2.70158 * t - 1.70158);
+  E.fxBackOut = t => { const u = t - 1; return 1 - u * u * (-2.70158 * u - 1.70158); };
+  E.fxBackInOut = t => { t *= 2; if (t < 1) return t * t * (2.70158 * t - 1.70158) / 2; t -= 2; return (1 - t * t * (-2.70158 * t - 1.70158)) / 2 + 0.5; };
+  E.fxElasticOut = t => t >= 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t - 0.1) * (2 * Math.PI) / 0.4) + 1;
+  E.fxExpoIn = t => t <= 0 ? 0 : Math.pow(2, 10 * (t - 1));
   E.circInOut = E.circInOut || (t => t < 0.5 ? (1 - Math.sqrt(1 - Math.pow(2 * t, 2))) / 2 : (Math.sqrt(1 - Math.pow(-2 * t + 2, 2)) + 1) / 2);
   // MathUtil.smoothLerpPrecision: 99% of the way there after `dur` seconds, at any frame rate
   const sl = (a, b, dt, dur) => b + (a - b) * Math.pow(0.01, dt / dur);
   const hex = c => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
   const mix = (a, b, t) => { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.max(0, Math.min(255, Math.round(v + (B[i] - v) * t))).toString(16).padStart(2, '0')).join(''); };
   const NUMS = ['ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
+  // ScoringRank.getRankingFreeplayColor
+  const RANK_COLOR = { SHIT: '#6044FF', GOOD: '#EF8764', GREAT: '#EAF6FF', EXCELLENT: '#FDCB42', PERFECT: '#FF58B4', PERFECT_GOLD: '#FFB619' };
 
   // ---------------------------------------------------------------- tweens + timers (FlxTween / FlxTimer)
   class Tw {
@@ -113,6 +123,7 @@
     play(name, loop, from) {
       const lab = this.atlas && this.atlas.labels[this.prefix[name]];
       if (!lab) return false;
+      if (name !== 'fistPump' && name !== 'loss') this.pumpIntro = null;
       this.cur = { start: lab.start, len: lab.len, loop: !!loop, loopFrom: 0 }; this.name = name; this.fi = Math.min(from || 0, lab.len - 1); this.t = 0; this.finished = false;
       if (name !== 'idle') this.afk = 0;
       return true;
@@ -125,6 +136,7 @@
         if (this.fi < this.cur.len - 1) this.fi++;
         else if (this.cur.loop) this.fi = this.cur.loopFrom;
         else if (!this.finished) { this.finished = true; this.done(this.name); break; }
+        if (this.pumpIntro && this.pumpIntro.e > -1 && this.fi >= this.pumpIntro.e) this.fi = this.pumpIntro.s;
       }
       if (this.name === 'idle' && this.cur) { this.afk += dt; if (this.afk > 60 && this.has('idleEasterEgg')) this.play('idleEasterEgg'); }
     }
@@ -133,13 +145,18 @@
       else if (name === 'idleEasterEgg' || name === 'charSelect') this.play('idle', true);
       else if (name === 'fistPump' || name === 'loss') { this.play('idle', true); }
     }
-    // fist pump after a good result: intro frames, then loop (FreeplayDJ fistPump data)
+    // results -> freeplay (FreeplayDJ FistPumpIntro / FistPump): the intro frames repeat while the
+    // rank shows, then the pump plays out once and he goes back to idle
+    fistPumpIntro(bad) {
+      const fp = this.data.fistPump || {};
+      const s = (bad ? fp.introBadStartFrame : fp.introStartFrame) || 0, e = bad ? fp.introBadEndFrame : fp.introEndFrame;
+      if (!this.play(bad ? 'loss' : 'fistPump', false, s)) return;
+      this.pumpIntro = { s, e: e == null ? -1 : e };
+    }
     fistPump(bad) {
       const fp = this.data.fistPump || {};
-      if (!this.play(bad ? 'loss' : 'fistPump')) return;
-      const loopFrom = bad ? (fp.loopBadStartFrame || 0) : (fp.loopStartFrame || 4);
-      this.cur.loop = true; this.cur.loopFrom = Math.min(loopFrom, this.cur.len - 1);
-      this.pumpT = 2.6;
+      this.pumpIntro = null;
+      this.play(bad ? 'loss' : 'fistPump', false, (bad ? fp.loopBadStartFrame : fp.loopStartFrame) || 0);
     }
     draw(ctx) {
       if (!this.cur || !this.atlas) return;
@@ -403,7 +420,17 @@
       this.favAnim = null;
       this.curSel = 0;
       this.nudge = 0;
+      // rank animation bits (SongMenuItem ranking / fakeRanking / sparkle / evilTrail)
+      this.angle = 0; this.rankHide = false; this.rankScale = 0.9; this.fakeRank = null; this.fakeA = 0;
+      this.shakeFx = null; this.trail = null; this.sparkle = null; this.sparkleT = 1;
     }
+    // IntervalShake: every `interval` s jump to a random spot around where it was (intensity x width), easing down
+    shake(dur, interval, i0, i1, ease, done) {
+      if (this.shakeFx) return;
+      this.shakeFx = { x0: this.x, y0: this.y, dur, interval, i0, i1, ease, done, t: 0, acc: 0, n: Math.floor(dur / interval), k: 0 };
+    }
+    // the rank-colour impact trail behind the capsule on the slam (fadeAnim)
+    fadeAnim(rank) { this.trail = { t: 0, color: RANK_COLOR[rank] || '#6044FF' }; }
     intendedY(i) { return i * (this.ch * 0.8 + 10) + 120; }
     initJumpIn(force) {
       if (force) return this.forcePosition();
@@ -470,12 +497,48 @@
         }
       }
       if (this.favAnim) { this.favAnim.t += dt; while (this.favAnim.t >= 1 / 24) { this.favAnim.t -= 1 / 24; this.favAnim.f += this.favAnim.dir; } }
+      const sh = this.shakeFx;
+      if (sh) {
+        sh.acc += dt;
+        while (sh && sh.acc >= sh.interval) {
+          sh.acc -= sh.interval; sh.k++;
+          const sc = 1 - (sh.ease ? sh.ease(Math.min(1, (sh.k * sh.interval) / sh.dur)) : (sh.k * sh.interval) / sh.dur);
+          const cur = sh.i1 + (sh.i0 - sh.i1) * sc, w = this.cw * 0.8;
+          this.x = sh.x0 + (Math.random() * 2 - 1) * cur * w; this.y = sh.y0 + (Math.random() * 2 - 1) * cur * w;
+          if (sh.k >= sh.n) { this.x = sh.x0; this.y = sh.y0; this.shakeFx = null; if (sh.done) sh.done(); break; }
+        }
+      }
+      if (this.trail) { this.trail.t += dt; if (this.trail.t >= 0.6) this.trail = null; }
+      // PERFECT (gold) badges twinkle now and then
+      if (this.s && this.s.rank === 'PERFECT_GOLD' && !this.rankHide) {
+        this.sparkleT -= dt;
+        if (this.sparkleT <= 0) { this.sparkleT = 1.2 + Math.random() * 3.3; this.sparkle = { x: 420 - 20 + Math.random() * 23, y: 41 - 29 + Math.random() * 33, t: 0 }; }
+        if (this.sparkle) this.sparkle.t += dt;
+      } else this.sparkle = null;
     }
     hit(px, py) { const hx = this.x + 100, hy = this.y + 20; return px >= hx && px <= hx + this.cw / 1.4 && py >= hy && py <= hy + this.ch / 1.4; }
     draw(ctx) {
+      if (this.angle) {
+        // a rotated capsule turns around its middle (FlxSpriteGroup angle)
+        const cx = this.x + this.nudge + this.cw / 2, cy = this.y + this.ch / 2;
+        const m = ctx.getTransform();
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(this.angle * Math.PI / 180); ctx.translate(-cx, -cy);
+        this.drawBody(ctx);
+        ctx.restore(); ctx.setTransform(m);
+      } else this.drawBody(ctx);
+    }
+    drawBody(ctx) {
       const X = this.x + this.nudge, Y = this.y;
       if (Y < -160 || Y > H + 10 || X > W) return;
       const fp = this.fp, sel = this.selected;
+      if (this.trail) {
+        // impact copy of the capsule growing to 2.5x in the rank colour, fading out (additive)
+        const k = this.trail.t / 0.6, frames0 = this.selFrames, f0 = frames0.length ? frames0[0] : null;
+        if (f0) for (let i = 0; i < 4; i++) {
+          const kk = Math.max(0, k - i * 0.05), sc = 0.8 + (2.5 - 0.8) * Math.min(1, kk / 0.83);
+          drawF(ctx, tint(white(this.sheet, f0), this.trail.color, 'trail' + this.trail.color), null, X, Y, { sx: sc, orX: this.cw / 2, orY: this.ch / 2, alpha: 0.22 * (1 - E.quadOut(k)) * (1 - i * 0.2), blend: 'lighter' });
+        }
+      }
       // the capsule itself (scale 0.8 around its centre; unselected sits 5px right)
       const frames = sel ? this.selFrames : this.offFrames;
       const f = frames.length ? frames[this.fi % frames.length] : null;
@@ -501,9 +564,20 @@
           if (i === 2 && dg[2] === 1) temp -= 4;
           fp.drawNum(ctx, small, dg[i], X + shiftX + i * 11 + temp + (dg[i] === 1 ? 4 : dg[i] === 3 ? 1 : 0), Y + 88.5, sa);
         }
-        // rank badge
-        const rank = this.s.rank && fp.rankFrames(this.s.rank);
-        if (rank) drawF(ctx, rank.sheet, rank.f, X + 420 - rank.cx, Y + 41 - rank.cy, { alpha: sel ? 1 : 0.7 });
+        // rank badge (FreeplayRank: additive, scale 0.9, grey + 70% when not selected, a blurred copy for the glow)
+        const drawRank = (r, sc, a, grey) => {
+          const rk = fp.rankFrames(r); if (!rk) return;
+          const f = rk.f, o = { sx: sc, orX: f.fw / 2, orY: f.fh / 2, offX: 0.05 * f.fw, offY: 0.05 * f.fh, blend: 'lighter' };
+          drawF(ctx, fp.rankBlur(r), null, X + 420 - 6, Y + 41 - 6, Object.assign({}, o, { orX: f.fw / 2 + 6, orY: f.fh / 2 + 6, alpha: sa }));
+          drawF(ctx, grey ? tint(fp.rankImg(r), '#AAAAAA', 'rankgrey' + r) : fp.rankImg(r), null, X + 420, Y + 41, Object.assign({}, o, { alpha: a * sa }));
+        };
+        if (this.fakeRank && this.fakeA > 0) drawRank(this.fakeRank, 0.9, this.fakeA, false);
+        else if (this.s.rank && !this.rankHide) drawRank(this.s.rank, this.rankScale, sel ? 1 : 0.7, !sel);
+        if (this.sparkle) {
+          const sp = SP('freeplay/sparkle'), fr = sp ? G.Sparrow.byPrefix(sp, 'sparkle Export0') : [];
+          const fi = Math.floor(this.sparkle.t * 24);
+          if (fr.length && fi < fr.length) drawF(ctx, sp, fr[fi], X + this.sparkle.x, Y + this.sparkle.y, { sx: 0.8, orX: fr[0].fw / 2, orY: fr[0].fh / 2, alpha: 0.7, blend: 'lighter' });
+        }
       }
       // title
       if (this.showGrp) {
@@ -717,6 +791,8 @@
       this.state = 'intro'; this.t = 0; this.went = false;
       this.fromResults = p.fromResults ? p : null;
       if (p.fromResults) { if (p.songId) this.remember.id = p.songId; if (p.diff) this.remember.diff = p.diff; }
+      // a new/better rank: the rank camera starts black and plays the slam once the DJ intro is done
+      this.rankFx = p.fromResults && p.playRankAnim && p.rank ? { pending: true, fade: 1, bgA: 0, zoom: 1, funny: 1, vigA: 0, shakeT: 0 } : null;
       // card, DJ
       this.card = this.player === 'pico' ? new PicoCard(this) : new Card(this, this.player);
       this.dj = new DJ(this.player);
@@ -764,10 +840,19 @@
       // songs
       this.allSongs = buildSongs(this.player);
       this.sel = 0; this.list = []; this.caps = [];
-      this.generate(this.filterFor(this.letters.current()), false);
-      // intro: wait for the DJ, then everything else pops in
-      this.dj.onIntroDone = () => this.onIntroDone();
-      if (!this.dj.cur) this.onIntroDone();
+      // back from the results screen (under the stickers): no intro, everything already in place (forceSkipIntro)
+      const skip = !!(p.fromResults && G.stickers);
+      this.generate(this.filterFor(this.letters.current()), false, skip);
+      if (skip) {
+        this.tw.cancel(this); this.card.skipIntro();
+        this.overlayX = this.bgX; this.overhangY = -100; this.hintY = 18;
+        this.dj.play('idle', true);
+        this.onIntroDone();
+      } else {
+        // intro: wait for the DJ, then everything else pops in
+        this.dj.onIntroDone = () => this.onIntroDone();
+        if (!this.dj.cur) this.onIntroDone();
+      }
       if (G.audio.music.current() == null || (G.audio.music.current().id || '').indexOf('freakyMenu') < 0) G.menuMusic.start(0.5);
       this.previewT = -1; this.previewing = null;
     },
@@ -793,9 +878,10 @@
       this.card.introDone();
       this.refreshDots(this.allDiffs.indexOf(this.diff), this.allDiffs.indexOf(this.diff));
       this.dotsVis = true; for (const d of this.dots) { d.alpha = 0; this.tw.to(d, { alpha: d.inactive ? 0.33 : 1 }, 0.5, E.quartOut); }
-      if (this.fromResults && this.fromResults.rank && this.fromResults.playRankAnim) {
-        const bad = this.fromResults.rank === 'LOSS' || this.fromResults.rank === 'SHIT';
-        this.dj.fistPump(bad);
+      if (this.rankFx && this.rankFx.pending) {
+        this.rankFx.pending = false;
+        this.rankAnimStart(this.fromResults);
+        if (this.album.skipIntro) this.album.skipIntro();
       }
     },
     // ------------------------------------------------------------ list building (generateSongList)
@@ -1018,7 +1104,11 @@
       this.t += dt;
       this.tw.update(dt);
       this.dj.update(dt);
-      if (this.dj.pumpT != null) { this.dj.pumpT -= dt; if (this.dj.pumpT <= 0) { this.dj.pumpT = null; this.dj.play('idle', true); } }
+      const R = this.rankFx;
+      if (R) {
+        if (R.sparks) R.sparks.t += dt;
+        if (R.shakeT > 0) { R.shakeT -= dt; R.sx = (Math.random() * 2 - 1) * 0.0045 * W; R.sy = (Math.random() * 2 - 1) * 0.0045 * H; if (R.shakeT <= 0) R.sx = R.sy = 0; }
+      }
       this.card.update(dt);
       for (const c of this.caps) c.update(dt);
       this.letters.update(dt); this.album.update(dt);
@@ -1098,12 +1188,122 @@
     },
     rankFrames(rank) {
       const sh = SP('freeplay/rankbadges'); if (!sh) return null;
-      const name = { PERFECT_GOLD: 'PERFECTSICK', PERFECT: 'PERFECT', EXCELLENT: 'EXCELLENT', GREAT: 'GREAT', GOOD: 'GOOD', SHIT: 'LOSS', LOSS: 'LOSS' }[rank] || rank;
-      const fr = G.Sparrow.byPrefix(sh, name); const f = fr[0]; if (!f) return null;
+      const name = { PERFECT_GOLD: 'PERFECT rank GOLD', PERFECT: 'PERFECT rank0', EXCELLENT: 'EXCELLENT rank0', GREAT: 'GREAT rank0', GOOD: 'GOOD rank0', SHIT: 'LOSS rank0', LOSS: 'LOSS rank0' }[rank] || rank;
+      let fr = sh.frames.filter(f => f.name.startsWith(name)); if (!fr.length) fr = G.Sparrow.byPrefix(sh, name);
+      const f = fr[0]; if (!f) return null;
       return { sheet: sh, f, cx: 0, cy: 0 };
     },
+    // the badge as one image + a softly blurred copy (GaussianBlurShader(1) glow), 6px padding
+    rankImg(rank) {
+      const rk = this.rankFrames(rank); if (!rk) return null;
+      return G.cached('fprank:' + rank, rk.f.fw, rk.f.fh, c => G.Sparrow.draw(c, rk.sheet, rk.f));
+    },
+    rankBlur(rank) {
+      const img = this.rankImg(rank); if (!img) return null;
+      return G.cached('fprankblur:' + rank, img.width + 12, img.height + 12, c => { c.filter = 'blur(1.6px)'; c.drawImage(img, 6, 6); c.filter = 'none'; });
+    },
+    // ------------------------------------------------------------ results -> freeplay rank animation
+    // (FreeplayState.rankAnimStart / rankDisplayNew / rankAnimSlam, same timings + curves)
+    rankAnimStart(fr) {
+      const cap = this.caps[this.sel]; if (!cap || !cap.s) { this.rankFx = null; return; }
+      this.state = 'ranking';
+      const R = this.rankFx;
+      R.cap = cap; R.bad = fr.rank === 'SHIT' || fr.rank === 'LOSS';
+      cap.sparkle = null; cap.sparkleT = 1;
+      this.dj.fistPumpIntro(R.bad);
+      R.fade = 1; this.tw.to(R, { fade: 0 }, 0.5);               // rankCamera.fade(black, 0.5, fadeIn)
+      G.audio.music.setVolume(0, 0.05);
+      R.bgA = 1;
+      if (fr.oldRank) { cap.fakeRank = fr.oldRank; cap.fakeA = 1; R.sparksColor = RANK_COLOR[fr.oldRank] || '#FFFFFF'; }
+      else { cap.fakeRank = null; cap.fakeA = 0; }
+      cap.lerp = false; cap.inRank = true; cap.rankHide = true;
+      R.orig = { x: intendedX(1), y: cap.intendedY(1) };
+      R.zoom = 1.85; this.tw.to(R, { zoom: 1.8 }, 0.6, E.sineIn);
+      R.funny = 1.15; this.tw.to(R, { funny: 1.1 }, 0.6, E.sineIn);
+      cap.x = W / 2 - cap.cw / 2; cap.y = H / 2 - cap.ch / 2;
+      this.tw.after(0.5, () => this.rankDisplayNew(fr));
+    },
+    rankDisplayNew(fr) {
+      const R = this.rankFx, cap = R.cap;
+      cap.rankHide = false; cap.rankScale = 20;
+      this.tw.to(cap, { rankScale: 0.9 }, 0.1);
+      this.tw.after(0.1, () => {
+        cap.fakeRank = null; cap.fakeA = 0;
+        if (fr.oldRank) R.sparks = { t: 0 };
+        G.sfx('preload/sounds/ranks/' + (fr.rank === 'SHIT' ? 'rankinbad' : (fr.rank === 'PERFECT' || fr.rank === 'PERFECT_GOLD') ? 'rankinperfect' : 'rankinnormal') + '.ogg');
+        R.zoom = 1.3; this.tw.to(R, { zoom: 1.5 }, 0.3, E.fxBackInOut);
+        cap.x -= 10; cap.y -= 20;
+        this.tw.to(R, { funny: 1.05 }, 0.3, E.fxElasticOut);
+        cap.angle = -3; this.tw.to(cap, { angle: 0 }, 0.5, E.fxBackOut);
+        cap.shake(0.3, 1 / 30, 0.1, 0, E.quadOut);
+      });
+      this.tw.after(0.4, () => {
+        this.tw.to(R, { funny: 1 }, 0.8, E.sineIn);
+        this.tw.to(R, { zoom: 1.2 }, 0.8, E.fxBackIn);
+        R.capTw = this.tw.to(cap, { x: R.orig.x - 7, y: R.orig.y - 80 }, 0.8 + 0.5, E.quartIn);
+      });
+      this.tw.after(0.6, () => this.rankAnimSlam(fr));
+    },
+    rankAnimSlam(fr) {
+      const R = this.rankFx, cap = R.cap;
+      this.tw.to(R, { bgA: 0 }, 0.5, E.fxExpoIn);
+      G.sfx('preload/sounds/ranks/' + ({ SHIT: 'loss', GOOD: 'good', GREAT: 'great', EXCELLENT: 'excellent', PERFECT: 'perfect', PERFECT_GOLD: 'perfect' }[fr.rank] || 'loss') + '.ogg');
+      this.tw.after(0.5, () => {
+        R.shakeT = 0.35;                                     // funnyCam.shake(0.0045, 0.35)
+        this.dj.fistPump(R.bad);
+        R.zoom = 0.8; this.tw.to(R, { zoom: 1 }, 1, E.fxElasticOut);
+        R.funny = 0.8; this.tw.to(R, { funny: 1 }, 0.8, E.fxElasticOut);
+        this.caps.forEach((c, index) => {
+          const d = Math.abs(index - this.sel) - 1;
+          if (d >= 5) return;
+          if (index === this.sel) {
+            if (R.capTw) R.capTw.dead = true;
+            c.fadeAnim(fr.rank);
+            R.vigColor = RANK_COLOR[fr.rank] || '#6044FF'; R.vigA = 1; this.tw.to(R, { vigA: 0 }, 0.6, E.expoOut);
+            c.x = R.orig.x; c.y = R.orig.y;
+            c.shake(0.6, 1 / 24, 0.12, 0, E.quadOut, () => {
+              c.lerp = true; c.inRank = false;
+              this.rankFx = null; this.state = 'idle';
+              this.previewT = 0; this.previewing = null;
+            });
+            this.tw.to(c, { angle: 0 }, 0.5, E.fxBackOut);
+          } else {
+            this.tw.after(d / 20, () => {
+              c.lerp = false;
+              c.angle = -10 + d * 2 + Math.random() * (20 - d * 4);
+              this.tw.to(c, { angle: 0 }, 0.5, E.fxBackOut);
+              c.shake(0.6, 1 / 24, 0.12 / (d + 1), 0, E.quadOut, () => { c.lerp = true; });
+            });
+          }
+        });
+      });
+    },
+    drawRankCam(ctx) {
+      const R = this.rankFx; if (!R) return;
+      G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
+      G.setScreenT(ctx);
+      if (R.vigA > 0) { const v = IMG('freeplay/rankVignette'); if (v) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = R.vigA; ctx.drawImage(tint(v, R.vigColor, 'vig' + R.vigColor), 0, 0, W, H); ctx.restore(); } }
+      G.screenZoom = R.zoom; G.setScreenT(ctx);
+      if (R.bgA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + (0.827 * R.bgA) + ')'; ctx.fillRect(-W, -H, W * 3, H * 3); }
+      if (R.cap && R.cap.inRank) R.cap.draw(ctx);
+      if (R.sparks) {
+        G.setScreenT(ctx);
+        const a = SP('freeplay/sparks'), b = SP('freeplay/sparksadd');
+        const fa = a ? G.Sparrow.byPrefix(a, 'sparks') : [], fb = b ? G.Sparrow.byPrefix(b, 'sparks add') : [];
+        const fi = Math.floor(R.sparks.t * 24);
+        if (fi < fa.length) {
+          drawF(ctx, a, fa[fi], 517, 134, { sx: 0.5, orX: fa[0].fw / 2, orY: fa[0].fh / 2, offX: -0.25 * fa[0].fw, offY: -0.25 * fa[0].fh, blend: 'lighter' });
+          if (fb[fi]) drawF(ctx, tint(G.cached('fpspk' + fi, fb[fi].fw, fb[fi].fh, c => G.Sparrow.draw(c, b, fb[fi])), R.sparksColor, 'spk' + fi + R.sparksColor), null, 498, 116, { sx: 0.5, orX: fb[0].fw / 2, orY: fb[0].fh / 2, offX: -0.25 * fb[0].fw, offY: -0.25 * fb[0].fh, blend: 'lighter' });
+        }
+      }
+      G.screenZoom = 1; G.setScreenT(ctx);
+      if (R.fade > 0) { ctx.fillStyle = 'rgba(0,0,0,' + R.fade + ')'; ctx.fillRect(0, 0, W, H); }
+    },
     draw(ctx) {
+      const R = this.rankFx;
+      G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+      if (R && !R.pending) { G.screenZoom = R.funny; G.screenOff.x = R.sx || 0; G.screenOff.y = R.sy || 0; }
       this.card.draw(ctx);
       this.dj.draw(ctx);
       G.setScreenT(ctx);
@@ -1128,7 +1328,7 @@
         ctx.restore();
       }
       // capsules
-      for (const c of this.caps) c.draw(ctx);
+      for (const c of this.caps) if (!c.inRank) c.draw(ctx);
       G.setScreenT(ctx);
       this.album.draw(ctx);
       G.setScreenT(ctx);
@@ -1165,6 +1365,8 @@
       ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
       if (G.touchMode && this.textsVis) G.text(ctx, '<---', 8, 72, { font: 'vcr', size: 40, baseline: 'top' });
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }
+      if (R) { if (R.pending) { G.screenZoom = 1; G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); } else this.drawRankCam(ctx); }
+      G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
     },
     drawDiffSprite(ctx, d) {
       const base = 'freeplay/freeplay' + d.id;
