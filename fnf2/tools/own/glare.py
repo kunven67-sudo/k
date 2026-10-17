@@ -691,6 +691,7 @@ def chart(notes):
     events = [{'t': 0, 'e': 'FocusCamera', 'v': 1}]
     for bar, who in CAMERA[1:]: events.append({'t': round(T(bar) * 1000, 2), 'e': 'FocusCamera', 'v': who})
     events.append({'t': round(T(SNAP, 2) * 1000, 2), 'e': 'WrathSnap', 'v': {}})
+    events.append({'t': round(T(35) * 1000, 2), 'e': 'WrathEye', 'v': {}})            # the eye opens: stage 2
     events.append({'t': round(T(OUT) * 1000, 2), 'e': 'PlayAnimation', 'v': {'target': 'bf', 'anim': 'hey', 'force': True}})
     events.sort(key=lambda e: e['t'])
     return {'version': '2.0.0', 'scrollSpeed': {'easy': 1.8, 'normal': 2.2, 'hard': 2.6}, 'events': events, 'notes': out,
@@ -702,7 +703,7 @@ META = {
     'playData': {
         'difficulties': ['easy', 'normal', 'hard'],
         'characters': {'player': 'bf', 'girlfriend': 'gf', 'opponent': 'wrath-normal', 'opponentVocals': ['wrath'], 'playerVocals': ['bf']},
-        'stage': 'mainStage', 'noteStyle': 'funkin', 'ratings': {'easy': 3, 'normal': 5, 'hard': 7},
+        'stage': 'phillyStreets', 'noteStyle': 'funkin', 'ratings': {'easy': 3, 'normal': 5, 'hard': 7},
     },
     'generatedBy': 'FNF 2 - tools/own/glare.py',
     'timeChanges': [{'t': 0, 'b': 0, 'bpm': BPM, 'bt': [4, 4, 4, 4]}],

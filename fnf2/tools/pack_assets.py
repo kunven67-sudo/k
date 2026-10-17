@@ -28,6 +28,7 @@ PACKS = {
         'preload/data/introText.txt',
         'preload/data/characters/bf.json', 'preload/data/characters/gf.json', 'preload/data/characters/dad.json', 'preload/data/characters/pico-playable.json', 'preload/data/characters/pico.json',
         'preload/data/stages/mainStage.json', 'preload/data/stages/mainStageErect.json',
+        'preload/data/stages/phillyStreets.json', 'weekend1/images/phillyStreets/*.png', 'weekend1/images/phillyStreets/*.xml', 'weekend1/images/SpraycanPile.*',   # WRATH's night street
         'preload/data/levels/tutorial.json', 'preload/data/levels/week1.json',
         'preload/data/notestyles/funkin.json',
         'preload/data/songs/tutorial/*.json',

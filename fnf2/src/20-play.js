@@ -72,6 +72,13 @@
       this.bf = mk(s.chars.player, 'bf', 'bf');
       // tutorial: GF is the opponent, standing at GF's spot
       if (s.chars.opponent === s.chars.gf && this.gf) { this.dad.x = this.gf.x; this.dad.y = this.gf.y; this.dad.camFocus = Object.assign({}, this.gf.camFocus); this.stage.chars.gf = null; this.gf = null; this.dad.zIndex = 100; }
+      // WRATH: the giant eye (stage 2) is made up front so the swap at the eye-open never hitches
+      this.dadForms = null;
+      if (this.dad && s.events.some(e => e.e === 'WrathEye')) {
+        const eye = new G.Character('wrath-eye', 'dad');
+        this.stage.addCharacter(eye, 'dad'); this.stage.addCharacter(this.dad, 'dad');
+        this.dadForms = [this.dad, eye];
+      }
       this.applyStageFX();
       this.stageZoom = this.stage.zoom;
       this.cam = new G.FCam(this.stageZoom);
@@ -116,6 +123,11 @@
       this.splashes = []; this.covers = [];
       this.countdownSpr = null;
     },
+    swapDad(c) {
+      this.stage.addCharacter(c, 'dad');
+      this.dad = c; c.dance(true);
+      this.iconP2 = this.makeIcon(c, false);
+    },
     makeIcon(ch, player) {
       const id = (ch && ch.healthIcon && ch.healthIcon.id) || 'face';
       let img = G.A.image('preload/images/icons/icon-' + id + '.png') || G.A.image('preload/images/icons/icon-face.png');
@@ -138,6 +150,8 @@
       this.popups = []; this.splashes = []; this.covers = [];
       this.vocalsOn = true;
       for (const L of this.lines) for (const s2 of L.strums) { s2.playA('static', true); s2.confirmHold = -1; }
+      this.snap = null; if (this.hud) this.hud.alpha = 1;
+      if (this.dadForms) { this.dadForms[0]._locked = false; if (this.dad !== this.dadForms[0]) this.swapDad(this.dadForms[0]); else this.stage.chars.dad = this.dad; }
       this.iconP1.scale = this.iconP2.scale = 1;
     },
     // -------------------------------------------------- countdown
@@ -167,6 +181,7 @@
       const jpos = this.songPos - (G.settings.offset || 0);
       this.cond.update(this.songPos, st => this.onStep(st), bt => this.onBeat(bt));
       this.processEvents();
+      this.updateSnap(dt);
       this.updateNotes(jpos, dt);
       // characters, stage, cameras
       const stepSec = this.cond.stepCrochet / 1000;
@@ -202,6 +217,17 @@
       if (beat >= 0 && G.settings.camZoom && this.zoomRate > 0 && beat % this.zoomRate === 0 && this.camZoom * this.bopMul < 1.35 * this.stageZoom) {
         this.bopMul = this.bopIntensity; this.hudZoom += this.hudBopIntensity;
       }
+    },
+    // WRATH's snap cutscene (inside the song): HUD away, trembling, glitching into the eye at the end
+    updateSnap(dt) {
+      const sn = this.snap;
+      if (!sn) { if (this.hud.alpha < 1 && !this.gameOver) this.hud.alpha = Math.min(1, this.hud.alpha + dt * 3); return; }
+      this.hud.alpha = Math.max(0, this.hud.alpha - dt * 2.5);
+      const k = G.clamp((this.songPos - sn.t0) / (sn.end - sn.t0), 0, 1);
+      if (G.settings.flashing !== false) this.cam.shake(0.0015 + 0.006 * k * k, 0.05);
+      // the last half second he flickers between himself and the eye
+      const left = sn.end - this.songPos, F = this.dadForms;
+      this.stage.chars.dad = left < 550 && Math.floor(left / 70) % 2 === 0 ? F[1] : F[0];
     },
     updateCamera(dt) {
       if (this.camTween) {
@@ -248,6 +274,27 @@
           else this.zoomTween = { t: 0, dur: Math.max(0.001, (v.duration || 4) * this.cond.stepCrochet / 1000), z0: this.camZoom, z1: z, ease: easeFn(v.ease || 'linear', v.easeDir) };
           break;
         }
+        // WRATH snaps: zoom in on him, he looks down, face in shadow, trembling, HUD fades out
+        case 'WrathSnap':
+          if (this.dadForms) {
+            const d = this.dadForms[0], eyeEv = this.song.events.find(x => x.e === 'WrathEye');
+            this.snap = { t0: this.songPos, end: eyeEv ? eyeEv.t : this.songPos + 4000 };
+            d.playAnim('snap', true); d._locked = true;
+            const hx = d.x + d.width * 0.5, hy = d.y + d.height * 0.37, dur = 1.6;
+            this.camTween = { t: 0, dur, x0: this.cam.x, y0: this.cam.y, x1: hx, y1: hy, ease: easeFn('expo', 'Out') };
+            this.zoomTween = { t: 0, dur, z0: this.camZoom, z1: this.stageZoom * 1.55, ease: easeFn('expo', 'Out') };
+          }
+          break;
+        // ...and turns into the giant eye
+        case 'WrathEye':
+          if (this.dadForms) {
+            this.snap = null; this.dadForms[0]._locked = false;
+            this.swapDad(this.dadForms[1]);
+            this.camTween = null; this.zoomTween = { t: 0, dur: 0.6, z0: this.camZoom, z1: this.stageZoom, ease: easeFn('expo', 'Out') };
+            const f = this.dad.camFocus; this.cam.focus(f.x, f.y);
+            if (G.settings.flashing !== false) { this.cam.flash('#ff1e2e', 0.8); this.cam.shake(0.012, 0.6); }
+          }
+          break;
         case 'SetCameraBop': this.zoomRate = v.rate != null ? v.rate : 4; this.bopIntensity = 1 + ((v.intensity != null ? v.intensity : 1) * 0.015); this.hudBopIntensity = (v.intensity != null ? v.intensity : 1) * 0.03; break;
       }
     },
@@ -296,7 +343,7 @@
       s.playA('confirm', true); s.confirmHold = n.len > 0 ? -1 : 0;
       const suffix = n.kind === 'alt' ? '-alt' : '';
       if (n.kind === 'hey') this.dad.playAnim('hey', true);
-      else { this.dad.lastNote = n; this.dad.sing(n.lane, false, suffix); }
+      else if (!this.dad._locked) { this.dad.lastNote = n; this.dad.sing(n.lane, false, suffix); }
       if (this.audio) this.audio.setVolume('o', 1);
     },
     // player pressed a lane
@@ -598,7 +645,7 @@
       }
       this.cam.drawFX(ctx);
       // HUD
-      this.drawHUD(ctx);
+      if (this.hud.alpha > 0.01) { ctx.save(); ctx.globalAlpha = this.hud.alpha; this.drawHUD(ctx); ctx.restore(); }
       if (this.paused) this.drawPause(ctx);
     },
     noteY(t) { const d = (t - this.songPos) * PX_PER_MS * this.scrollSpeed; return this.down ? -d : d; },

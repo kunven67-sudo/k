@@ -6,13 +6,16 @@
 // Each arrow has its own look (the user's pictures):
 //   idle = black eye w/ glowing red ring, LEFT = white spiral, DOWN = grey red ring,
 //   UP = blue rings, RIGHT = red veiny.
-// Long notes shake the camera.
+// Goo drips off the bottom spikes (drops = the red picture's beads repainted), splats on the
+// road into a goo pool (FNF's street puddle shape) - long notes shake the camera + burst goo
+// (Weekend 1's spray paint splash, repainted).
 (function () {
   const DIR = 'shared/images/characters/wrath-eye/';
   const img = n => G.A.image(DIR + n + '.png');
   const META = () => G.A.json(DIR + 'meta.json');
   const GLOW = { void: '#ff2a44', spiral: '#cfc6ff', redring: '#ff3434', blue: '#566dff', veins: '#ff1414' };
   const BY_DIR = ['spiral', 'redring', 'blue', 'veins'];
+  const GOO = false;                                       // goo drips/pool/splash: saved for later (user, 2026-10-17)
 
   // ---------------------------------------------------------------- composing the eye
   const bufs = {};
@@ -68,7 +71,7 @@
   };
   const KEYS = Object.keys(POSE.idle);
   const FRAME = { w: 1000, h: 1000 }, REST = [500, 470];
-  const SIZE = 1.25;                                       // a bit bigger than the pictures' natural size
+  const SIZE = 1.1;                                       // a bit bigger than the pictures' natural size
 
   // ---------------------------------------------------------------- the character fx
   G.OwnFX = G.OwnFX || {};
@@ -82,6 +85,7 @@
       ch._p = Object.assign({}, POSE.idle); ch._tgt = POSE.idle; ch._hit = 0;
       ch._look = 'void'; ch._glitch = 0; ch._purple = 0; ch._shake = 0; ch._bop = 0; ch._glowP = 0;
       ch._t = Math.random() * 10;
+      ch._drops = []; ch._splats = []; ch._dropT = 0.5; ch._puddle = 0; ch._burst = -1;
       const play = ch.play.bind(ch);
       ch.play = (n, f, r) => { const ok = play(n, f, r); if (ok) FX.onAnim(ch, n); return ok; };
     },
@@ -94,6 +98,7 @@
         this.setLook(ch, BY_DIR[d]);
         for (const k of KEYS) ch._p[k] = G.lerp(ch._p[k], ch._tgt[k], 0.7);   // FNF poses hit on the first frame
         if (ch._miss) { ch._purple = 1; ch._shake = 0.35; } else ch._purple = 0;
+        if (GOO && d === 1 && !ch._miss) this.release(ch, 2);
       } else {
         ch._tgt = POSE.idle; ch._miss = false;
         if (name === 'idle') { ch._bop = 1; this.setLook(ch, 'void'); }
@@ -104,6 +109,7 @@
       const n = ch.lastNote; ch.lastNote = null;
       if (miss || !n || !(n.len > 240)) return;
       ch._shake = Math.max(ch._shake, 0.2);
+      if (GOO) { ch._burst = 0; this.release(ch, 3); }
       const ps = G.screens && G.screens.play;
       if (ps && ps.cam && ps.dad === ch && G.settings.flashing !== false) ps.cam.shake(0.007, 0.2);
     },
@@ -122,6 +128,36 @@
       ch._shake = Math.max(0, ch._shake - dt);
       ch._bop = Math.max(0, ch._bop - dt * 5);
       ch._glowP = Math.max(0, ch._glowP - dt * 3);
+      ch._puddle = Math.max(0, ch._puddle - dt * 2.5);
+      if (ch._burst >= 0) { ch._burst += dt; if (ch._burst > 8 / 24) ch._burst = -1; }
+      // drips: grow on a spike tip, let go, fall, splat on the road
+      ch._dropT -= dt;
+      if (GOO && ch._dropT <= 0 && ch._drops.length < 5) { ch._dropT = 0.4 + Math.random() * 0.8; ch._drops.push({ i: Math.floor(Math.random() * 6), g: 0, rate: 0.9 + Math.random() * 0.8, fall: false, x: 0, y: 0, vy: 0, s: 0.8 + Math.random() * 0.45 }); }
+      for (const d of ch._drops) {
+        if (!d.fall) {
+          d.g += dt * d.rate;
+          const a = this.tip(ch, d.i); if (a) { d.x = a[0]; d.y = a[1]; }
+          if (d.g >= 1) { d.fall = true; d.vy = 80; d.y += 30 * d.s; }
+        } else {
+          d.vy += 2300 * dt; d.y += d.vy * dt;
+          if (d.y >= FRAME.h - 14) { d.dead = true; ch._puddle = Math.max(ch._puddle, 0.4); ch._splats.push({ x: d.x, y: FRAME.h - 30, t: 0 }); }
+        }
+      }
+      ch._drops = ch._drops.filter(d => !d.dead);
+      for (const sp of ch._splats) sp.t += dt;
+      ch._splats = ch._splats.filter(sp => sp.t < 8 / 24);
+    },
+    // drop some goo right now (DOWN notes, long notes)
+    release(ch, n) {
+      for (let k = 0; k < n; k++) { const a = this.tip(ch, Math.floor(Math.random() * 6)); if (a) ch._drops.push({ i: 0, g: 1, rate: 1, fall: true, x: a[0] + (Math.random() - 0.5) * 30, y: a[1] + 20, vy: 300 + Math.random() * 300, s: 0.9 + Math.random() * 0.5 }); }
+    },
+    // a bottom spike tip of the current look, in frame space (follows the eye's pose)
+    tip(ch, i) {
+      const m = META(), L = m && m.looks[ch._look]; if (!L || !L.drips || !L.drips.length) return null;
+      const pt = L.drips[i % L.drips.length], p = ch._p, e = this.eyePos(ch);
+      const k = SIZE * L.scale, x = (pt[0] - L.center[0]) * k * p.sx, y = (pt[1] - L.center[1]) * k * p.sy;
+      const r = p.rot * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r);
+      return [e[0] + x * cs - y * sn, e[1] + x * sn + y * cs];
     },
     draw(ch, c) {
       const p = ch._p, e = this.eyePos(ch), t = ch._t;
@@ -132,6 +168,7 @@
       c.globalAlpha = 0.3 + 0.25 * ch._glowP;
       c.drawImage(glowArt(GLOW[ch._look]), ex - 560, ey - 440, 1120, 880);
       c.restore();
+      if (GOO) this.drawPuddle(ch, c, ex);
       const E = composeEye({ look: ch._look, px: p.px, py: p.py, ps: p.ps * (ch._purple > 0.3 ? 0.82 : 1), purple: ch._purple }, ch._key);
       if (!E) return;
       const { cv, L } = E, cx = L.center[0], cy = L.center[1];
@@ -147,11 +184,29 @@
         }
       } else c.drawImage(cv, -cx, -cy);
       c.restore();
+      if (GOO) this.drawGoo(ch, c, ex, ey);
+    },
+    drawPuddle(ch, c, ex) {
+      const pu = img('goo-puddle'); if (!pu) return;
+      const w = 640 * (1 + ch._puddle * 0.05), h = w * pu.height / pu.width;
+      c.drawImage(pu, G.lerp(REST[0], ex, 0.3) - w / 2, FRAME.h - h * 0.62, w, h);
+    },
+    drawGoo(ch, c, ex, ey) {
+      const drop = img('goo-drop'), m = META();
+      if (drop) for (const d of ch._drops) {
+        const W = 38 * d.s;
+        if (!d.fall) { const g = Math.min(1, d.g), w = W * (0.45 + 0.55 * g), h = w * (1 + 0.9 * g); c.drawImage(drop, d.x - w / 2, d.y - 8, w, h); }
+        else { const st = Math.min(1.8, 1 + d.vy / 1600); c.drawImage(drop, d.x - W / 2 / st, d.y - W * st / 2, W / st, W * st); }
+      }
+      const n = (m && m.splash) || 0;
+      const frame = (t, s, x, y) => { const f = img('goo-splash-' + Math.min(n - 1, Math.floor(t * 12))); if (f) c.drawImage(f, x - f.width * s / 2, y - f.height * s / 2, f.width * s, f.height * s); };
+      for (const sp of ch._splats) frame(sp.t, 0.32, sp.x, sp.y);
+      if (ch._burst >= 0) frame(ch._burst, 1.1, ex + 20, ey + 120);
     },
   };
 
   // ---------------------------------------------------------------- character data + health icon
-  const DATA = { version: '1.0.0', name: 'WRATH', renderType: 'own', fx: 'wrathEye', scale: 1, singTime: 6, danceEvery: 1, offsets: [-80, 0], cameraOffsets: [80, -110], healthIcon: { id: 'wrath-eye' }, animations: [] };
+  const DATA = { version: '1.0.0', name: 'WRATH', renderType: 'own', fx: 'wrathEye', scale: 1, singTime: 6, danceEvery: 1, offsets: [60, 0], cameraOffsets: [-260, 150], healthIcon: { id: 'wrath-eye' }, animations: [] };
   if (G.A && G.A._json) G.A._json.set('preload/data/characters/wrath-eye.json', DATA);
   // health icon (fine / losing), made from the eye once the art has loaded
   function makeIcon() {

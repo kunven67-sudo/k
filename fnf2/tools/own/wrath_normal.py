@@ -408,6 +408,9 @@ def anims():
         hurt = dict(flinch, ik=((tx + 10, ty + 26), hr + 16), lids='worry')
         settle = dict(flinch, ik=((tx + 6, ty + 16), hr + 8), lids='worry')
         A[lab + ' Miss'] = (24, 'miss', [(0, hurt), (4, settle)])
+    # the snap: head drops, face in shadow, arms hang, he trembles (loops until the eye opens)
+    sl = lambda dx, r: dict(pose(legs(0.97, 1.0, dict(sx=1.0, sy=0.975, rot=2, dx=dx * 0.6)), dict(head=dict(rot=22 + r, dy=44, dx=12 + dx), arm=dict(rot=8), wrist=dict(rot=10))), swap={'head': 'head_dark'})
+    A['Snap'] = (8, 'none', [(0, sl(-3, 0)), (2, sl(3, 1.2)), (4, sl(-2, -0.6)), (6, sl(3.5, 0.8))])
     A['Hey'] = (26, 'hey', [
         (0, dict(pose(legs(1.05, 0.98, dict(sy=1.03)), dict(head=dict(rot=5, dy=-12))), ik=((604, 372), -8))),
         (2, dict(pose(legs(1.025, 0.99, dict(sy=1.015)), dict(head=dict(rot=4, dy=-9))), ik=((600, 382), -6))),
@@ -427,7 +430,8 @@ def frames_for(rig, slots, spec, miss):
     for f in range(n):
         k = max(i for i, (kf, _) in enumerate(keys) if kf <= f)
         key = keys[k][1]
-        bones = {b: v for b, v in key.items() if b not in ('ik', 'lids')}
+        swap = key.get('swap', {})
+        bones = {b: v for b, v in key.items() if b not in ('ik', 'lids', 'swap')}
         Wd = rig.world(bones)
         fr = []
         if 'ik' in key:
@@ -451,6 +455,7 @@ def frames_for(rig, slots, spec, miss):
             for nm in ORDER:
                 nm = 'mouth_' + mouth if nm == 'MOUTH' else nm
                 bone, x0, y0, extra = slots[nm]
+                nm = swap.get(nm, nm)
                 fr.append((nm + t, P.mmul(Wd[bone], P.mmul(P.T(x0, y0), extra))))
         out.append(fr)
     return out
@@ -460,6 +465,7 @@ def build():
     global _parts_cache
     rgba, parts = build_parts()
     _parts_cache = (rgba, dict(parts))
+    parts_full = dict(parts)
     H, W = rgba.shape[:2]
     parts['pants'] = draw_pants(W, int(FEET[1]) + 40)
     sprites, slots = {}, {}
@@ -477,12 +483,23 @@ def build():
     c, x0, y0 = P.crop_alpha(bf_shoes())
     sprites['shoes'] = c
     slots['shoes'] = ('shoes', 0, 0, P.mmul(P.T(SHOE_X + x0 * SHOE_K, SHOE_Y + y0 * SHOE_K), P.M(SHOE_K, 0, 0, SHOE_K)))
+    # the snap: his face sinks into a dark shadow (hair stays, everything under it goes dark)
+    face = np.array(P.over(parts_full['head'], parts_full['mouth_frown']))
+    rgb = face[..., :3].astype(float)
+    hair = (rgb[..., 2] > 150) & (rgb[..., 2] > rgb[..., 0] + 60)
+    dark = face.copy()
+    shade = np.array([22, 15, 32], float)
+    dark[..., :3] = np.where(hair[..., None], rgb * 0.45 + shade * 0.25, rgb * 0.02 + shade * 0.9).clip(0, 255).astype(np.uint8)
+    hx0, hy0 = slots['head'][1], slots['head'][2]
+    sprites['head_dark'] = dark[hy0:hy0 + sprites['head'].shape[0], hx0:hx0 + sprites['head'].shape[1]]
+    slots['head_dark'] = slots['head']
+    sprites['mouth_none'] = np.zeros((2, 2, 4), np.uint8); slots['mouth_none'] = ('head', 0, 0, P.M())
     # misses: every piece pulled into BF's miss purple
     for nm in list(sprites): sprites[nm + '_miss'] = P.purple(sprites[nm]); slots[nm + '_miss'] = slots[nm]
     return sprites, slots
 
 
-ANIM_ORDER = ['Idle', 'Left', 'Down', 'Up', 'Right', 'Left Miss', 'Down Miss', 'Up Miss', 'Right Miss', 'Hey']
+ANIM_ORDER = ['Idle', 'Left', 'Down', 'Up', 'Right', 'Left Miss', 'Down Miss', 'Up Miss', 'Right Miss', 'Hey', 'Snap']
 
 
 def all_frames():
@@ -535,11 +552,11 @@ def write(out_root):
     d = os.path.join(out_root, 'shared/images/characters', ID)
     size = P.write_atlas(d, ID, sprites, seq)
     names = {'Idle': 'idle', 'Left': 'singLEFT', 'Down': 'singDOWN', 'Up': 'singUP', 'Right': 'singRIGHT',
-             'Left Miss': 'singLEFTmiss', 'Down Miss': 'singDOWNmiss', 'Up Miss': 'singUPmiss', 'Right Miss': 'singRIGHTmiss', 'Hey': 'hey'}
+             'Left Miss': 'singLEFTmiss', 'Down Miss': 'singDOWNmiss', 'Up Miss': 'singUPmiss', 'Right Miss': 'singRIGHTmiss', 'Hey': 'hey', 'Snap': 'snap'}
     ch = {'version': '1.0.0', 'name': 'WRATH', 'renderType': 'animateatlas', 'assetPath': 'shared:characters/' + ID,
           'scale': SCALE, 'flipX': False, 'offsets': [0, 0], 'cameraOffsets': [0, 0], 'singTime': 8,
           'healthIcon': {'id': ID}, 'healthColor': '#4a78d0',
-          'animations': [{'name': v, 'prefix': k} for k, v in names.items()]}
+          'animations': [dict({'name': v, 'prefix': k}, **({'looped': True} if v == 'snap' else {})) for k, v in names.items()]}
     icon(sprites, os.path.join(out_root, 'preload/images/icons', 'icon-' + ID + '.png'))
     cd = os.path.join(out_root, 'preload/data/characters'); os.makedirs(cd, exist_ok=True)
     json.dump(ch, open(os.path.join(cd, ID + '.json'), 'w'), indent=1)
