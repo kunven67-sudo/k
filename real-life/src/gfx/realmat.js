@@ -98,9 +98,15 @@ export function carPaint(color) {
   return t;
 }
 
+/** Rocks from the nature kit: flat-coloured low-poly -> weathered stone texture. */
+function natureKit(model, m) {
+  if (!/^(rock|stone|cliff)/i.test(model)) return null;
+  return tri('concrete', { color: q(hex(m)), wear: 0.7, dirt: 0.6 }, { roughness: 0.95 });
+}
+
 /** Replace a whole loaded model's materials (called once per model when it loads). */
 export function realify(kit, model, root) {
-  if (!['home', 'furniture', 'autos'].includes(kit)) return;
+  if (!['home', 'furniture', 'autos', 'nature'].includes(kit)) return;
   // The car body = the material covering the most triangles that isn't glass/lights/tyres.
   let biggest = null;
   if (kit === 'autos') {
@@ -119,7 +125,7 @@ export function realify(kit, model, root) {
   root.traverse((o) => {
     if (!o.isMesh) return;
     const swap = (m) => {
-      const r = kit === 'home' ? homeKit(model, m) : kit === 'furniture' ? furnitureKit(model, m) : autoKit(model, m, biggest);
+      const r = kit === 'home' ? homeKit(model, m) : kit === 'furniture' ? furnitureKit(model, m) : kit === 'nature' ? natureKit(model, m) : autoKit(model, m, biggest);
       return r || m;
     };
     o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);

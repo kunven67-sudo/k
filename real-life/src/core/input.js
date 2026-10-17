@@ -79,7 +79,7 @@ class Input {
     canvas.addEventListener('mousedown', (e) => {
       this.pointer.buttons = e.buttons;
       this.pointer.dragging = true;
-      if (this.wantPointerLock && !this.pointerLocked && !device.isTouch) canvas.requestPointerLock?.();
+      if (this.wantPointerLock && !this.pointerLocked && !device.isTouch) this._lock();
       bus.emit('input:pointerdown', { button: e.button });
     });
     window.addEventListener('mouseup', (e) => {
@@ -89,7 +89,11 @@ class Input {
     });
     window.addEventListener('mousemove', (e) => {
       const sens = settings.get('mouseSensitivity');
-      if (this.pointerLocked) {
+      // Read the lock straight from the document: 'pointerlockchange' can arrive a few frames
+      // late, and mouse moves in between used to be thrown away.
+      this.pointerLocked = document.pointerLockElement === canvas;
+      // Browsers sometimes report one huge jump right after the lock: ignore spikes.
+      if (this.pointerLocked && Math.abs(e.movementX) < 300 && Math.abs(e.movementY) < 300) {
         this.look.x += e.movementX * sens;
         this.look.y += e.movementY * sens * (settings.get('invertY') ? -1 : 1);
       }
@@ -232,8 +236,20 @@ class Input {
     this.wheel = 0;
   }
 
+  /** Ask for mouse-look. Only works inside a click/key handler; quietly fails otherwise. */
+  _lock() {
+    try {
+      const r = this.canvas?.requestPointerLock?.();
+      r?.catch?.(() => {});
+    } catch {
+      /* not allowed right now: the next click on the game does it */
+    }
+  }
+
   setPointerLock(want) {
     this.wantPointerLock = want;
+    // Closing a menu with a click (Resume, Close) counts as a user gesture: lock straight away.
+    if (want && !this.pointerLocked && !device.isTouch && navigator.userActivation?.isActive) this._lock();
     if (!want && document.pointerLockElement) document.exitPointerLock?.();
     if (this.touch) this.touch.setVisible(want);
   }

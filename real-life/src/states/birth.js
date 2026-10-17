@@ -66,7 +66,7 @@ export class BirthState {
     this.life = life;
     this.recs = makeResidents(life).filter((r) => r.family);
     this.parents = this.recs.filter((r) => r.role !== 'sibling');
-    this.ui = el('div', {});
+    this.ui = el('div', { class: 'passthrough' }); // full-screen overlay bits only: clicks go to the game
     this.lids = el('div', { class: 'bt-lids' }, [el('i'), el('i')]);
     this.card = el('div', { class: 'bt-card dark on' }, ['']);
     this.flash = el('div', { class: 'bt-flash' });
@@ -498,6 +498,7 @@ export class BirthState {
 
   _hospitalUpdate(dt) {
     const e = this.engine;
+    if (!this.faces || !this.hCam) return; // still loading the hospital (enter() is async)
     // Eyes slowly learn to focus.
     const focus = Math.min(1, Math.max(0, (this.t - 3) / 14));
     e.setBlur(1 - focus * 0.8);

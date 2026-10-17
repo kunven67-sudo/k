@@ -58,6 +58,7 @@ export class WorldState {
     this.life = new Life({ engine: e, world, player: this.player, hud: this.hud });
     await assets.preload(Traffic.assets());
     this.traffic = new Traffic(world);
+    this.traffic.fillLot(world.town.lotStalls || []);
     this.people = new People({ world, player: this.player, hud: this.hud, life: this.life, traffic: this.traffic });
     this.life.people = this.people;
     this.life.chores = new Chores(this.life);

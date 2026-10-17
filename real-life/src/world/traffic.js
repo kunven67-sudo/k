@@ -16,6 +16,7 @@ import { settings } from '../core/settings.js';
 import { assets } from '../gfx/assets.js';
 import { carPaint } from '../gfx/realmat.js';
 import { ELM, MAPLE, CURB } from './layout.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const CAR_MODELS = ['NormalCar1', 'NormalCar2', 'SUV', 'SportsCar', 'SportsCar2', 'Taxi', 'Cop'];
 const PAINT = ['#b8bcc2', '#1d1f24', '#f2f2f0', '#8b1e22', '#1f3f73', '#5d6a72', '#2f5d3a', '#c7a46b', '#6a1f45', '#d9d4c7'];
@@ -99,6 +100,64 @@ export class Traffic {
     this.cars.push(car);
     this.parked.set(ownerId, car);
     return car;
+  }
+
+  /**
+   * Shoppers' cars in the plaza lot (they never move, so all of them are merged into one mesh
+   * per material: a full lot for a handful of draw calls). Nose-in at the wheel stop.
+   */
+  fillLot(stalls) {
+    let seed = 77;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const groups = new Map(); // material -> geometries
+    const models = CAR_MODELS.filter((m) => m !== 'Taxi' && m !== 'Cop');
+    const tmp = new THREE.Group();
+    for (const s of stalls) {
+      if (s.reserved || rnd() > 0.42) continue;
+      const m = assets.model('autos', models[Math.floor(rnd() * models.length)]);
+      const paint = carPaint(new THREE.Color(PAINT[Math.floor(rnd() * PAINT.length)]).getHex());
+      m.traverse((o) => {
+        if (o.isMesh && o.material.userData?.carPaint) o.material = paint;
+      });
+      const box = new THREE.Box3().setFromObject(m);
+      const size = box.getSize(new THREE.Vector3());
+      m.position.set(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
+      const g = new THREE.Group();
+      g.add(m);
+      const yaw = s.row === 0 ? -Math.PI / 2 : Math.PI / 2;
+      // Pulled up close to the wheel stop, a little off-centre like real parking.
+      const inset = 2.75 - size.z / 2 - 0.35;
+      g.position.set(s.x + (s.row === 0 ? -inset : inset), CURB, s.z + (rnd() - 0.5) * 0.3);
+      g.rotation.y = yaw + (rnd() - 0.5) * 0.06;
+      tmp.add(g);
+      tmp.updateMatrixWorld(true);
+      g.traverse((o) => {
+        if (!o.isMesh) return;
+        const src = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+        // The car files store positions as packed (quantized) integers; moving them in place
+        // would clamp every car to a 2 m blob at the origin, so copy into plain floats first.
+        const geo = new THREE.BufferGeometry();
+        for (const a of ['position', 'normal', 'uv']) {
+          const at = src.attributes[a];
+          if (!at) continue;
+          const arr = new Float32Array(at.count * at.itemSize);
+          for (let i = 0; i < at.count; i++) for (let k = 0; k < at.itemSize; k++) arr[i * at.itemSize + k] = at.getComponent(i, k);
+          geo.setAttribute(a, new THREE.BufferAttribute(arr, at.itemSize));
+        }
+        geo.applyMatrix4(o.matrixWorld);
+        if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((geo.attributes.position.count) * 2), 2));
+        if (!groups.has(o.material)) groups.set(o.material, []);
+        groups.get(o.material).push(geo);
+      });
+      tmp.remove(g);
+      this.world.physics.addStaticBox({ x: g.position.x, y: CURB + size.y * 0.45, z: g.position.z }, { x: size.z * 0.95, y: size.y * 0.9, z: size.x * 0.92 }, null);
+    }
+    for (const [material, geos] of groups) {
+      const mesh = new THREE.Mesh(mergeGeometries(geos), material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.world.scene.add(mesh);
+    }
   }
 
   parkedCarOf(ownerId) {

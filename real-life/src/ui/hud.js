@@ -9,12 +9,19 @@
 
 import { el, injectStyle } from '../core/util.js';
 import { settings } from '../core/settings.js';
+import { input } from '../core/input.js';
+import { device } from '../core/quality.js';
 
 injectStyle('hud', `
-.hud { position: fixed; inset: 0; pointer-events: none; z-index: 20; font-family: var(--font-round); color: #fff; }
+/* #ui-root > * turns pointer events on for every UI root; the HUD covers the whole screen, so
+   it must let clicks through to the game (clicking the game is what locks the mouse to turn). */
+#ui-root > .hud, .hud { position: fixed; inset: 0; pointer-events: none; z-index: 20; font-family: var(--font-round); color: #fff; }
 .hud-dot { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%;
   background: rgba(255,255,255,.92); box-shadow: 0 0 0 1.5px rgba(0,0,0,.35); transition: transform .12s ease, background .12s ease; }
 .hud-dot.on { transform: scale(1.7); background: #fff; }
+.hud-click { position: absolute; left: 50%; top: 56%; transform: translateX(-50%); padding: 7px 14px; border-radius: 999px; background: rgba(10,10,14,.55);
+  font-size: 14px; letter-spacing: .02em; opacity: 0; transition: opacity .25s ease; }
+.hud-click.on { opacity: 1; }
 .hud-hint { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); display: flex; gap: 8px; align-items: center;
   font-size: 15px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,.7); white-space: nowrap; opacity: 0; transition: opacity .12s ease; }
 .hud-hint.on { opacity: 1; }
@@ -47,12 +54,13 @@ export class Hud {
   constructor(root) {
     this.root = el('div', { class: 'hud' });
     this.dot = el('div', { class: 'hud-dot' });
+    this.clickHint = el('div', { class: 'hud-click' }, ['Click to look around']);
     this.hint = el('div', { class: 'hud-hint' });
     this.needs = el('div', { class: 'hud-needs' });
     this.toasts = el('div', { class: 'hud-toasts' });
     this.sub = el('div', { class: 'hud-sub' });
     this.clockEl = el('div', { class: 'hud-clock' });
-    this.root.append(this.dot, this.hint, this.needs, this.toasts, this.sub, this.clockEl);
+    this.root.append(this.dot, this.clickHint, this.hint, this.needs, this.toasts, this.sub, this.clockEl);
     root.appendChild(this.root);
     this._hintKey = '';
     this._subT = 0;
@@ -110,6 +118,12 @@ export class Hud {
   }
 
   update(dt) {
+    // Mouse not locked (start of the game, after Esc / a menu): say how to get it back.
+    const showClick = !device.isTouch && input.wantPointerLock && !input.pointerLocked && this.dot.style.display !== 'none';
+    if (showClick !== this._clickShown) {
+      this._clickShown = showClick;
+      this.clickHint.classList.toggle('on', showClick);
+    }
     if (this._subT > 0) {
       this._subT -= dt;
       if (this._subT <= 0) this.sub.replaceChildren();

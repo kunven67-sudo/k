@@ -189,6 +189,7 @@ export class World {
     this.doors.update(dt);
     // Streetlight bulbs + neighbours' windows glow at night.
     this.town.lampMat.emissiveIntensity = night ? 3 : 0;
+    for (const m of this.town.lotPools || []) m.visible = night;
     const winMat = night ? WINDOW_MATS.night : WINDOW_MATS.day;
     for (const w of this.shellWindows) if (w.material !== winMat) w.material = winMat;
     if (clock.season !== this.season) this.setSeason(clock.season);

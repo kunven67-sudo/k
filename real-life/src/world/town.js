@@ -17,7 +17,8 @@ import { placeInstances } from './instanced.js';
 import { plantVegetation } from '../gfx/vegetation.js';
 import { Rng } from '../core/rng.js';
 import { buildStores } from './stores.js';
-import { CURB, MAPLE, ELM, CULDESAC, SIDEWALK, FAMILY_LOT, LOTS, PARK, PLAZA, SCHOOL, BOUNDS } from './layout.js';
+import { CURB, MAPLE, ELM, CULDESAC, SIDEWALK, FAMILY_LOT, LOTS, PARK, PLAZA, SCHOOL, BOUNDS, STORES } from './layout.js';
+import { buildLot, lightPools, LOT_CORRAL_Z } from './lot.js';
 
 export const SEASON_TREES = {
   spring: (t) => t,
@@ -34,6 +35,7 @@ export function townAssets() {
   for (const t of PINES) list.push(['nature', t]);
   for (const n of ['plant_bush', 'plant_bushLarge', 'plant_bushDetailed', 'flower_redA', 'flower_yellowA', 'flower_purpleA', 'rock_largeA', 'rock_smallA', 'log', 'stump_round', 'grass_large']) list.push(['nature', n]);
   for (const n of ['light-square', 'road-sign-stop', 'construction-barrier', 'construction-cone']) list.push(['roads', n]);
+  list.push(['home', 'Trashcan_Large']);
   for (const n of ['shopping-basket', 'shopping-cart', 'cash-register']) list.push(['market', n]);
   for (const n of ['Bed_Bunk', 'Couch_L', 'Couch_Small2', 'Table_RoundSmall', 'Carpet_1', 'Houseplant_3', 'Chair_1', 'Stool', 'Light_Desk']) list.push(['home', n]);
   for (const n of ['banana', 'apple', 'orange', 'lemon', 'tomato', 'broccoli', 'watermelon', 'grapes', 'onion', 'cake-birthday']) list.push(['food', n]);
@@ -267,6 +269,7 @@ export function buildTown(world, opts) {
   // ------------------------------------------------------------------ streetlights + signs
   const lampMat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xffd9a0, emissiveIntensity: 0 });
   const lamps = [];
+  const poolAt = [];
   let k = 0;
   for (let x = MAPLE.x0 + 14; x < eW - 4; x += 28) {
     const side = k++ % 2 ? 1 : -1;
@@ -276,11 +279,13 @@ export function buildTown(world, opts) {
     bulb.position.set(x, CURB + 4.62, z - side * 1.35);
     root.add(bulb);
     lamps.push(world.lights.addLamp(new THREE.Vector3(x, CURB + 4.4, z - side * 1.35), { intensity: 30, range: 16 }));
+    poolAt.push(new THREE.Vector3(x, 0.02, z - side * 1.35));
   }
   for (let z = -84; z <= 84; z += 30) {
     for (const x of [eW - 0.5, eE + 0.5]) {
       B.model('roads', 'light-square', { x, y: CURB, z, rotY: x < ELM.x ? -Math.PI / 2 : Math.PI / 2, collide: [0.2, 9, 0.2] });
       lamps.push(world.lights.addLamp(new THREE.Vector3(x + (x < ELM.x ? 1.35 : -1.35), CURB + 4.4, z), { intensity: 30, range: 16 }));
+      poolAt.push(new THREE.Vector3(x + (x < ELM.x ? 1.35 : -1.35), 0.02, z));
     }
   }
   B.model('roads', 'road-sign-stop', { x: eW - 0.6, y: CURB, z: MAPLE.half + 0.6, rotY: -Math.PI / 2, scale: 4.6, collide: [0.15, 3, 0.15] });
@@ -294,9 +299,21 @@ export function buildTown(world, opts) {
   // Plaza parking lot (stores.js puts the stores on it).
   const lotMat = mat('asphalt', { wear: 0.25, dirt: 0.35 });
   B.box((PLAZA.x0 + PLAZA.x1) / 2, CURB - 0.05, (PLAZA.z0 + PLAZA.z1) / 2, PLAZA.x1 - PLAZA.x0, 0.12, PLAZA.z1 - PLAZA.z0, [null, null, lotMat, null, null, null], { collide: false, shadow: false });
+  const stalls = [];
+  const doorZs = Object.values(STORES).map((d) => (d.z0 + d.z1) / 2);
   for (let z = PLAZA.z0 + 6; z < PLAZA.z1 - 4; z += 2.8) {
     for (const x of [96, 106]) line(x, z, 5.5, 0.12, white, CURB + 0.01);
+    if (z + 2.8 < PLAZA.z1 - 4) {
+      for (const [row, x] of [[0, 96], [1, 106]]) {
+        const sz = z + 1.4;
+        const acc = row === 1 && doorZs.some((dz) => Math.abs(dz - sz) < 2.9);
+        const corral = row === 1 && Math.abs(sz - LOT_CORRAL_Z) < 1;
+        stalls.push({ x, z: sz, row, headX: row === 0 ? 93.4 : 108.6, acc, reserved: acc || corral });
+      }
+    }
   }
+  const lot = buildLot(world, B, root, stalls, lampMat);
+  const streetPools = lightPools(root, poolAt, lampMat, 11);
 
   const stores = buildStores(world, B, root);
 
@@ -311,6 +328,8 @@ export function buildTown(world, opts) {
     familyMailbox,
     plantTrees,
     windowsMat: null,
+    lotStalls: stalls,
+    lotPools: [lot.poolMesh, streetPools],
   };
 }
 
@@ -381,12 +400,12 @@ function buildPark(world, B, root, rng) {
   const pond = new THREE.Mesh(new THREE.CircleGeometry(9, 40), water);
   pond.rotation.x = -Math.PI / 2;
   pond.scale.set(1.3, 1, 1);
-  pond.position.set(cx, CURB - 0.25, 0);
+  pond.position.set(cx, CURB + 0.03, 0); // above the lawn (the ground has no hole here)
   root.add(pond);
   const bank = new THREE.Mesh(new THREE.RingGeometry(8.6, 9.6, 40), mat('dirt'));
   bank.rotation.x = -Math.PI / 2;
   bank.scale.set(1.3, 1, 1);
-  bank.position.set(cx, CURB + 0.004, 0);
+  bank.position.set(cx, CURB + 0.02, 0);
   root.add(bank);
   // Water is a shallow drop: a low ring of rocks keeps you out (you can't swim yet).
   for (let i = 0; i < 26; i++) {
