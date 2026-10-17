@@ -106,7 +106,19 @@ renderer.toneMappingExposure = 1.05;
 document.body.prepend(renderer.domElement);
 // reflections for metal armor and blades
 const pmrem = new THREE.PMREMGenerator(renderer);
-const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+// an outdoor reflection: bright sky above, hazy horizon, grass and dirt below, a hot sun spot
+const envTex = (() => {
+  const es = new THREE.Scene();
+  const m = new THREE.ShaderMaterial({ side: THREE.BackSide, vertexShader: 'varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: `varying vec3 d; void main(){ float h = d.y;
+      vec3 sky = mix(vec3(0.78,0.84,0.9), vec3(0.32,0.5,0.8), clamp(h,0.0,1.0));
+      vec3 gnd = mix(vec3(0.35,0.38,0.25), vec3(0.16,0.2,0.1), clamp(-h*3.0,0.0,1.0));
+      vec3 c = h > 0.0 ? sky : gnd;
+      c += vec3(6.0,5.5,4.8) * pow(max(dot(d, normalize(vec3(0.5,0.75,0.35))),0.0), 160.0);
+      gl_FragColor = vec4(c, 1.0); }` });
+  es.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), m));
+  return pmrem.fromScene(es, 0).texture;
+})();
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xbcd3e6, 55, 240);

@@ -31,8 +31,8 @@ const GUARD = { h: V(-0.12, 1.12, 0.36), b: V(0.25, 0.9, 0.35).normalize(), yaw:
 const GUARD_RUN = { h: V(-0.24, 1.0, 0.12), b: V(-0.25, 0.55, -0.8).normalize(), yaw: 0, pitch: 0 };
 const GUARD_BLOCK = { h: V(-0.05, 1.42, 0.38), b: V(0.95, 0.3, 0.1).normalize(), yaw: 0.1, pitch: 0 };
 const SWINGS = {
-  R: [[0, GUARD], [0.3, { h: V(-0.42, 1.42, 0.02), b: V(-0.75, 0.35, -0.55), yaw: -0.5, pitch: 0 }], [0.45, { h: V(-0.08, 1.32, 0.55), b: V(-0.1, 0.05, 1), yaw: 0, pitch: 0.05 }], [0.62, { h: V(0.38, 1.22, 0.28), b: V(0.85, -0.1, 0.2), yaw: 0.55, pitch: 0.05 }], [1, GUARD]],
-  L: [[0, GUARD], [0.3, { h: V(0.32, 1.45, 0.08), b: V(0.75, 0.35, -0.5), yaw: 0.45, pitch: 0 }], [0.45, { h: V(0.02, 1.32, 0.55), b: V(0.1, 0.05, 1), yaw: 0, pitch: 0.05 }], [0.62, { h: V(-0.4, 1.2, 0.3), b: V(-0.85, -0.1, 0.2), yaw: -0.5, pitch: 0.05 }], [1, GUARD]],
+  R: [[0, GUARD], [0.3, { h: V(-0.42, 1.42, 0.02), b: V(-0.75, 0.35, -0.55), yaw: -0.5, pitch: 0 }], [0.45, { h: V(-0.06, 1.3, 0.68), b: V(-0.25, 0.02, 1), yaw: 0, pitch: 0.05 }], [0.62, { h: V(0.36, 1.22, 0.42), b: V(0.9, -0.1, 0.45), yaw: 0.55, pitch: 0.05 }], [1, GUARD]],
+  L: [[0, GUARD], [0.3, { h: V(0.32, 1.45, 0.08), b: V(0.75, 0.35, -0.5), yaw: 0.45, pitch: 0 }], [0.45, { h: V(0.0, 1.3, 0.68), b: V(0.25, 0.02, 1), yaw: 0, pitch: 0.05 }], [0.62, { h: V(-0.38, 1.2, 0.42), b: V(-0.9, -0.1, 0.45), yaw: -0.5, pitch: 0.05 }], [1, GUARD]],
   U: [[0, GUARD], [0.3, { h: V(-0.08, 1.9, 0.02), b: V(0, 0.45, -0.9), yaw: -0.1, pitch: -0.18 }], [0.45, { h: V(-0.04, 1.45, 0.55), b: V(0, 0.25, 1), yaw: 0, pitch: 0.15 }], [0.62, { h: V(-0.04, 0.85, 0.5), b: V(0, -0.8, 0.55), yaw: 0, pitch: 0.38 }], [1, GUARD]],
   D: [[0, GUARD], [0.3, { h: V(-0.42, 1.0, 0.05), b: V(-0.7, -0.35, -0.5), yaw: -0.45, pitch: 0.3 }], [0.45, { h: V(-0.05, 0.85, 0.55), b: V(-0.1, -0.45, 0.9), yaw: 0, pitch: 0.45 }], [0.62, { h: V(0.38, 0.8, 0.3), b: V(0.8, -0.5, 0.2), yaw: 0.5, pitch: 0.4 }], [1, GUARD]],
   S: [[0, GUARD], [0.3, { h: V(-0.15, 1.22, 0.0), b: V(0, 0.12, 1), yaw: -0.25, pitch: 0 }], [0.45, { h: V(-0.06, 1.28, 0.8), b: V(0, 0.05, 1), yaw: 0.12, pitch: 0.12 }], [0.62, { h: V(-0.06, 1.28, 0.72), b: V(0, 0.05, 1), yaw: 0.1, pitch: 0.1 }], [1, GUARD]],
@@ -110,10 +110,11 @@ class Fighter {
     this.root = new THREE.Group();
     this.root.rotation.order = 'YXZ';
     this.model = skeletonClone(soldierGLTF.scene);
-    this.model.rotation.y = Math.PI; // the soldier faces -Z, turn it to face +Z
     tintBody(this.model, opt.body);
+    // armor + cape are fitted in the soldier's own pose first, then the whole thing is turned around
     this.armor = buildArmor(this.model, { tier: opt.player ? 1 : opt.tier, metal: opt.metal, rough: opt.rough, cloth: opt.cloth, leather: opt.leather, player: opt.player });
     if (opt.player) this.cape = new Cape(this.model, opt.cloth, this.armor.uniforms);
+    this.model.rotation.y = Math.PI; // the soldier faces -Z, turn it to face +Z
     this.root.add(this.model);
     scene.add(this.root);
     if (this.cape) scene.add(this.cape.mesh);
@@ -449,9 +450,9 @@ function updateAttack(f, dt) {
       if (o.pos.distanceTo(f.pos) > 3.5) continue;
       let best = null, bestD = 1e9;
       // sweep: test the blade now and in-between last frame and now
-      for (let s = 0; s <= 2; s++) {
+      for (let s = 0; s <= 4; s++) {
         if (s > 0 && !prev) break;
-        const lt = s / 2;
+        const lt = s / 4;
         _sA.copy(prev ? prev.a : _bA).lerp(_bA, s === 0 ? 1 : lt);
         _sB.copy(prev ? prev.b : _bB).lerp(_bB, s === 0 ? 1 : lt);
         for (const k in PARTS) {

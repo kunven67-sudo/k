@@ -161,7 +161,8 @@ function updateKnight(f, dt) {
     ai.strafeT -= dt;
     if (ai.strafeT <= 0) { ai.strafe = Math.random() < 0.5 ? 1 : -1; ai.strafeT = 1 + Math.random() * 2; }
     const side = new THREE.Vector3(toP.z, 0, -toP.x).multiplyScalar(ai.strafe);
-    const keep = dist > 2.1 ? 0.7 : dist < 1.5 ? -0.8 : 0;
+    const ideal = 1.05 + f.sword.reach * 0.55;
+    const keep = dist > ideal + 0.3 ? 0.7 : dist < ideal - 0.35 ? -0.8 : 0;
     wish.copy(side).addScaledVector(toP, keep).normalize();
     speed = 1.0 * tierSpd;
     if (f.attack) { speed = 0.6; wish.copy(toP); }

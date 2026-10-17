@@ -42,7 +42,7 @@ function addBlood(mat, uniforms) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uBlood = uniforms.uBlood;
     sh.vertexShader = 'varying vec3 vObjP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vObjP = position;');
-    sh.fragmentShader = 'uniform float uBlood; varying vec3 vObjP;\n' + BLOOD_GLSL + sh.fragmentShader
+    sh.fragmentShader = 'uniform float uBlood; varying vec3 vObjP;\n' + BLOOD_GLSL + '\n' + sh.fragmentShader
       .replace('#include <map_fragment>', `#include <map_fragment>
         float bn = bnoise(vObjP * 13.0) * 0.6 + bnoise(vObjP * 41.0) * 0.4;
         float bloodMask = smoothstep(1.0 - uBlood - 0.04, 1.0 - uBlood + 0.04, bn) * step(0.001, uBlood);
@@ -54,7 +54,7 @@ function addBlood(mat, uniforms) {
   return mat;
 }
 function metalMat(color, rough, uniforms) {
-  return addBlood(new THREE.MeshStandardMaterial({ color, metalness: 0.88, roughness: rough, map: scratchTex, roughnessMap: roughTex, envMap: envTex, envMapIntensity: 0.9 }), uniforms);
+  return addBlood(new THREE.MeshStandardMaterial({ color, metalness: 0.9, roughness: rough, map: scratchTex, roughnessMap: roughTex, envMap: envTex, envMapIntensity: 1 }), uniforms);
 }
 function clothMat(color, uniforms) {
   return addBlood(new THREE.MeshStandardMaterial({ color, metalness: 0, roughness: 0.92, map: clothTex, side: THREE.DoubleSide }), uniforms);
@@ -127,7 +127,7 @@ function buildArmor(model, opt) {
     put('Head', helm, M);
     // eye slit (glows on you) and breathing holes
     const slitMat = opt.player
-      ? new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff3a1a, emissiveIntensity: 2.4 })
+      ? new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff1608, emissiveIntensity: 3 })
       : new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1 });
     put('Head', [boxAt(0.085, 0.014, 0.02, -0.045, 1.715, -0.088, 0, 0.32), boxAt(0.085, 0.014, 0.02, 0.045, 1.715, -0.088, 0, -0.32)], slitMat);
     const holes = [];

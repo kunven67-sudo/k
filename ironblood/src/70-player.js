@@ -8,7 +8,7 @@ const SPAWN = { x: BARN.x + 9, z: BARN.z + 2 };
 let bandages = 6, bandaging = 0;
 
 function createPlayer() {
-  const f = new Fighter({ player: true, tier: 3, metal: 0x1b1c1f, rough: 0.36, cloth: 0x111113, leather: 0x1a1512, body: 0x141414, sword: SWORDS.find(s => s.id === stats.sword) || SWORDS[0], name: 'You' });
+  const f = new Fighter({ player: true, tier: 3, metal: 0x70747c, rough: 0.27, cloth: 0x24242b, leather: 0x2a221c, body: 0x2a2a2e, sword: SWORDS.find(s => s.id === stats.sword) || SWORDS[0], name: 'You' });
   f.pos.set(SPAWN.x, groundH(SPAWN.x, SPAWN.z), SPAWN.z);
   f.facing = -Math.PI / 2; // toward the fields
   f.voicePitch = 0.82;

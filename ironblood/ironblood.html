@@ -274,7 +274,19 @@ renderer.toneMappingExposure = 1.05;
 document.body.prepend(renderer.domElement);
 // reflections for metal armor and blades
 const pmrem = new THREE.PMREMGenerator(renderer);
-const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+// an outdoor reflection: bright sky above, hazy horizon, grass and dirt below, a hot sun spot
+const envTex = (() => {
+  const es = new THREE.Scene();
+  const m = new THREE.ShaderMaterial({ side: THREE.BackSide, vertexShader: 'varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: `varying vec3 d; void main(){ float h = d.y;
+      vec3 sky = mix(vec3(0.78,0.84,0.9), vec3(0.32,0.5,0.8), clamp(h,0.0,1.0));
+      vec3 gnd = mix(vec3(0.35,0.38,0.25), vec3(0.16,0.2,0.1), clamp(-h*3.0,0.0,1.0));
+      vec3 c = h > 0.0 ? sky : gnd;
+      c += vec3(6.0,5.5,4.8) * pow(max(dot(d, normalize(vec3(0.5,0.75,0.35))),0.0), 160.0);
+      gl_FragColor = vec4(c, 1.0); }` });
+  es.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), m));
+  return pmrem.fromScene(es, 0).texture;
+})();
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xbcd3e6, 55, 240);
@@ -1148,7 +1160,7 @@ function addBlood(mat, uniforms) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uBlood = uniforms.uBlood;
     sh.vertexShader = 'varying vec3 vObjP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vObjP = position;');
-    sh.fragmentShader = 'uniform float uBlood; varying vec3 vObjP;\n' + BLOOD_GLSL + sh.fragmentShader
+    sh.fragmentShader = 'uniform float uBlood; varying vec3 vObjP;\n' + BLOOD_GLSL + '\n' + sh.fragmentShader
       .replace('#include <map_fragment>', `#include <map_fragment>
         float bn = bnoise(vObjP * 13.0) * 0.6 + bnoise(vObjP * 41.0) * 0.4;
         float bloodMask = smoothstep(1.0 - uBlood - 0.04, 1.0 - uBlood + 0.04, bn) * step(0.001, uBlood);
@@ -1160,7 +1172,7 @@ function addBlood(mat, uniforms) {
   return mat;
 }
 function metalMat(color, rough, uniforms) {
-  return addBlood(new THREE.MeshStandardMaterial({ color, metalness: 0.88, roughness: rough, map: scratchTex, roughnessMap: roughTex, envMap: envTex, envMapIntensity: 0.9 }), uniforms);
+  return addBlood(new THREE.MeshStandardMaterial({ color, metalness: 0.9, roughness: rough, map: scratchTex, roughnessMap: roughTex, envMap: envTex, envMapIntensity: 1 }), uniforms);
 }
 function clothMat(color, uniforms) {
   return addBlood(new THREE.MeshStandardMaterial({ color, metalness: 0, roughness: 0.92, map: clothTex, side: THREE.DoubleSide }), uniforms);
@@ -1233,7 +1245,7 @@ function buildArmor(model, opt) {
     put('Head', helm, M);
     // eye slit (glows on you) and breathing holes
     const slitMat = opt.player
-      ? new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff3a1a, emissiveIntensity: 2.4 })
+      ? new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff1608, emissiveIntensity: 3 })
       : new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1 });
     put('Head', [boxAt(0.085, 0.014, 0.02, -0.045, 1.715, -0.088, 0, 0.32), boxAt(0.085, 0.014, 0.02, 0.045, 1.715, -0.088, 0, -0.32)], slitMat);
     const holes = [];
@@ -1576,8 +1588,8 @@ const GUARD = { h: V(-0.12, 1.12, 0.36), b: V(0.25, 0.9, 0.35).normalize(), yaw:
 const GUARD_RUN = { h: V(-0.24, 1.0, 0.12), b: V(-0.25, 0.55, -0.8).normalize(), yaw: 0, pitch: 0 };
 const GUARD_BLOCK = { h: V(-0.05, 1.42, 0.38), b: V(0.95, 0.3, 0.1).normalize(), yaw: 0.1, pitch: 0 };
 const SWINGS = {
-  R: [[0, GUARD], [0.3, { h: V(-0.42, 1.42, 0.02), b: V(-0.75, 0.35, -0.55), yaw: -0.5, pitch: 0 }], [0.45, { h: V(-0.08, 1.32, 0.55), b: V(-0.1, 0.05, 1), yaw: 0, pitch: 0.05 }], [0.62, { h: V(0.38, 1.22, 0.28), b: V(0.85, -0.1, 0.2), yaw: 0.55, pitch: 0.05 }], [1, GUARD]],
-  L: [[0, GUARD], [0.3, { h: V(0.32, 1.45, 0.08), b: V(0.75, 0.35, -0.5), yaw: 0.45, pitch: 0 }], [0.45, { h: V(0.02, 1.32, 0.55), b: V(0.1, 0.05, 1), yaw: 0, pitch: 0.05 }], [0.62, { h: V(-0.4, 1.2, 0.3), b: V(-0.85, -0.1, 0.2), yaw: -0.5, pitch: 0.05 }], [1, GUARD]],
+  R: [[0, GUARD], [0.3, { h: V(-0.42, 1.42, 0.02), b: V(-0.75, 0.35, -0.55), yaw: -0.5, pitch: 0 }], [0.45, { h: V(-0.06, 1.3, 0.68), b: V(-0.25, 0.02, 1), yaw: 0, pitch: 0.05 }], [0.62, { h: V(0.36, 1.22, 0.42), b: V(0.9, -0.1, 0.45), yaw: 0.55, pitch: 0.05 }], [1, GUARD]],
+  L: [[0, GUARD], [0.3, { h: V(0.32, 1.45, 0.08), b: V(0.75, 0.35, -0.5), yaw: 0.45, pitch: 0 }], [0.45, { h: V(0.0, 1.3, 0.68), b: V(0.25, 0.02, 1), yaw: 0, pitch: 0.05 }], [0.62, { h: V(-0.38, 1.2, 0.42), b: V(-0.9, -0.1, 0.45), yaw: -0.5, pitch: 0.05 }], [1, GUARD]],
   U: [[0, GUARD], [0.3, { h: V(-0.08, 1.9, 0.02), b: V(0, 0.45, -0.9), yaw: -0.1, pitch: -0.18 }], [0.45, { h: V(-0.04, 1.45, 0.55), b: V(0, 0.25, 1), yaw: 0, pitch: 0.15 }], [0.62, { h: V(-0.04, 0.85, 0.5), b: V(0, -0.8, 0.55), yaw: 0, pitch: 0.38 }], [1, GUARD]],
   D: [[0, GUARD], [0.3, { h: V(-0.42, 1.0, 0.05), b: V(-0.7, -0.35, -0.5), yaw: -0.45, pitch: 0.3 }], [0.45, { h: V(-0.05, 0.85, 0.55), b: V(-0.1, -0.45, 0.9), yaw: 0, pitch: 0.45 }], [0.62, { h: V(0.38, 0.8, 0.3), b: V(0.8, -0.5, 0.2), yaw: 0.5, pitch: 0.4 }], [1, GUARD]],
   S: [[0, GUARD], [0.3, { h: V(-0.15, 1.22, 0.0), b: V(0, 0.12, 1), yaw: -0.25, pitch: 0 }], [0.45, { h: V(-0.06, 1.28, 0.8), b: V(0, 0.05, 1), yaw: 0.12, pitch: 0.12 }], [0.62, { h: V(-0.06, 1.28, 0.72), b: V(0, 0.05, 1), yaw: 0.1, pitch: 0.1 }], [1, GUARD]],
@@ -1655,10 +1667,11 @@ class Fighter {
     this.root = new THREE.Group();
     this.root.rotation.order = 'YXZ';
     this.model = skeletonClone(soldierGLTF.scene);
-    this.model.rotation.y = Math.PI; // the soldier faces -Z, turn it to face +Z
     tintBody(this.model, opt.body);
+    // armor + cape are fitted in the soldier's own pose first, then the whole thing is turned around
     this.armor = buildArmor(this.model, { tier: opt.player ? 1 : opt.tier, metal: opt.metal, rough: opt.rough, cloth: opt.cloth, leather: opt.leather, player: opt.player });
     if (opt.player) this.cape = new Cape(this.model, opt.cloth, this.armor.uniforms);
+    this.model.rotation.y = Math.PI; // the soldier faces -Z, turn it to face +Z
     this.root.add(this.model);
     scene.add(this.root);
     if (this.cape) scene.add(this.cape.mesh);
@@ -1994,9 +2007,9 @@ function updateAttack(f, dt) {
       if (o.pos.distanceTo(f.pos) > 3.5) continue;
       let best = null, bestD = 1e9;
       // sweep: test the blade now and in-between last frame and now
-      for (let s = 0; s <= 2; s++) {
+      for (let s = 0; s <= 4; s++) {
         if (s > 0 && !prev) break;
-        const lt = s / 2;
+        const lt = s / 4;
         _sA.copy(prev ? prev.a : _bA).lerp(_bA, s === 0 ? 1 : lt);
         _sB.copy(prev ? prev.b : _bB).lerp(_bB, s === 0 ? 1 : lt);
         for (const k in PARTS) {
@@ -2404,7 +2417,8 @@ function updateKnight(f, dt) {
     ai.strafeT -= dt;
     if (ai.strafeT <= 0) { ai.strafe = Math.random() < 0.5 ? 1 : -1; ai.strafeT = 1 + Math.random() * 2; }
     const side = new THREE.Vector3(toP.z, 0, -toP.x).multiplyScalar(ai.strafe);
-    const keep = dist > 2.1 ? 0.7 : dist < 1.5 ? -0.8 : 0;
+    const ideal = 1.05 + f.sword.reach * 0.55;
+    const keep = dist > ideal + 0.3 ? 0.7 : dist < ideal - 0.35 ? -0.8 : 0;
     wish.copy(side).addScaledVector(toP, keep).normalize();
     speed = 1.0 * tierSpd;
     if (f.attack) { speed = 0.6; wish.copy(toP); }
@@ -2467,7 +2481,7 @@ const SPAWN = { x: BARN.x + 9, z: BARN.z + 2 };
 let bandages = 6, bandaging = 0;
 
 function createPlayer() {
-  const f = new Fighter({ player: true, tier: 3, metal: 0x1b1c1f, rough: 0.36, cloth: 0x111113, leather: 0x1a1512, body: 0x141414, sword: SWORDS.find(s => s.id === stats.sword) || SWORDS[0], name: 'You' });
+  const f = new Fighter({ player: true, tier: 3, metal: 0x70747c, rough: 0.27, cloth: 0x24242b, leather: 0x2a221c, body: 0x2a2a2e, sword: SWORDS.find(s => s.id === stats.sword) || SWORDS[0], name: 'You' });
   f.pos.set(SPAWN.x, groundH(SPAWN.x, SPAWN.z), SPAWN.z);
   f.facing = -Math.PI / 2; // toward the fields
   f.voicePitch = 0.82;
