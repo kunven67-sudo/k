@@ -39,8 +39,11 @@ G.A = {
       const img = new Image();
       img.src = this.raw[p];
       this._img.set(p, img);
-      jobs.push((img.decode ? img.decode() : new Promise(r => { img.onload = r; })).catch(() => {}));
+      jobs.push((img.decode ? img.decode() : new Promise(r => { img.onload = r; })).catch(() => {}).then(() => {
+        done++; const el = document.getElementById('boot'); if (el) el.textContent = 'Loading... ' + Math.round(done / jobs.length * 100) + '%';
+      }));
     }
+    let done = 0;
     return Promise.all(jobs);
   },
   // audio: decoded on demand and cached

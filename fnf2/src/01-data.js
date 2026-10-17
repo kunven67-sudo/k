@@ -3,13 +3,14 @@
 G.WEEK_ORDER = ['tutorial', 'week1', 'week2', 'week3', 'week4', 'week5', 'week6', 'week7', 'weekend1', 'wrath'];
 G.availableWeeks = () => G.WEEK_ORDER.filter(id => { const L = G.A.json('preload/data/levels/' + id + '.json'); return L && L.songs.some(s => G.Songs.meta(s)); });
 G.CREDITS = [
-  { head: 'FNF 2 (private copy)' },
-  { name: 'Idea + direction', role: 'ven / jason' },
-  { name: 'Engine (browser port)', role: 'built with Claude Code' },
-  { head: "Friday Night Funkin'" },
+  // the big menu letters have no bold punctuation, so names stay plain (details go in the footer)
+  { head: 'FNF 2' },
+  { name: 'ven / jason', role: 'Idea + direction' },
+  { name: 'Claude Code', role: 'Built the engine (browser port)' },
+  { head: 'Friday Night Funkin' },
   { name: 'ninjamuffin99', role: 'Programming' },
-  { name: 'PhantomArcade3K', role: 'Art + Animation' },
+  { name: 'PhantomArcade', role: 'Art + Animation' },
   { name: 'evilsk8r', role: 'Art' },
   { name: 'Kawai Sprite', role: 'Music' },
-  { name: 'The Funkin Crew', role: 'All FNF art, music + charts belong to them' },
+  { name: 'The Funkin Crew', role: 'All FNF art, music + charts belong to them. Private copy.' },
 ];

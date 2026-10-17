@@ -57,10 +57,12 @@ const html = `<!DOCTYPE html>
     touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { display: flex; align-items: center; justify-content: center; }
   canvas { display: block; background: #000; image-rendering: auto; outline: none; }
+  #boot { position: fixed; right: 24px; bottom: 18px; color: #fff; font: bold 22px monospace; letter-spacing: 1px; z-index: 5; pointer-events: none; }
 </style>
 </head>
 <body>
 <canvas id="game" width="1280" height="720" tabindex="0"></canvas>
+<div id="boot">Loading...</div>
 <script>
 ${fontJs}</script>
 ${assetTag}${scripts}</body>

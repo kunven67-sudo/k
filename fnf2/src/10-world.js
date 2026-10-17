@@ -53,6 +53,8 @@ G.Character = class extends G.Sprite {
     // our own characters can bring live tricks (30-own-chars.js), e.g. WRATH's changing eye
     this.fx = d.fx && G.OwnFX && G.OwnFX[d.fx] || null;
     if (this.fx && this.fx.init) this.fx.init(this);
+    this.script = (G.CharScripts && (G.CharScripts[id] || G.CharScripts[id.split('-')[0]])) || null;
+    if (this.script && this.script.init) this.script.init(this);
     this.dance(true);
     this.updateHitbox();
   }
@@ -74,6 +76,7 @@ G.Character = class extends G.Sprite {
   isSinging() { return this.animName.startsWith('sing') && !this.animName.endsWith('-end'); }
   dance(force) {
     if (this.isDead) return;
+    if (this.script && this.script.dance) { this.script.dance(this, force); return; }
     if (!force) {
       if (this.isSinging()) return;
       if (!this.animName.startsWith('dance') && !this.animName.startsWith('idle') && !this.finished) return;
@@ -100,6 +103,7 @@ G.Character = class extends G.Sprite {
   tick(dt, stepSec, holdingNote) {
     this.update(dt);
     if (this.fx && this.fx.update) this.fx.update(this, dt);
+    if (this.script && this.script.tick) this.script.tick(this, dt);
     if (this.isDead) return;
     if (this.finished && !this.animName.endsWith('-hold') && this.anims[this.animName + '-hold']) this.play(this.animName + '-hold');
     if (this.isSinging()) {
@@ -165,8 +169,10 @@ G.Stage = class {
       }
       this.props.push(spr);
     }
-    this.chars = {};
+    this.chars = {}; this.extras = [];
   }
+  // extra sprites that belong to a character (Nene's A-Bot speaker...), drawn in zIndex order with the stage
+  addExtra(spr, owner) { spr.owner = owner; this.extras.push(spr); }
   // add a character at its stage slot (bf/dad/gf)
   addCharacter(ch, slot) {
     const cd = (this.data.characters || {})[slot] || { position: [0, 0], zIndex: 0, cameraOffsets: [0, 0] };
@@ -178,10 +184,12 @@ G.Stage = class {
     const co = cd.cameraOffsets || [0, 0];
     ch.camFocus.x += co[0]; ch.camFocus.y += co[1];
     this.chars[slot] = ch;
+    if (ch.script && ch.script.attach) ch.script.attach(ch, this);
   }
   ordered() {
     const all = this.props.slice();
     for (const k in this.chars) if (this.chars[k]) all.push(this.chars[k]);
+    for (const e of this.extras) if (!e.owner || Object.values(this.chars).includes(e.owner)) all.push(e);
     return all.sort((a, b) => a.zIndex - b.zIndex);
   }
   update(dt) { for (const p of this.props) p.update(dt); }

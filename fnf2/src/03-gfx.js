@@ -3,6 +3,21 @@
 // HaxeFlixel + the Funkin' engine so offsets/positions from FNF's data files work as-is.
 
 // ------------------------------------------------------------------ Sparrow (XML) sheets
+// Colour filters (Erect stage tints) are baked into a copy of each source texture once,
+// instead of running ctx.filter on every sprite piece every frame (that was very slow).
+// While G.imgFilter is set, every texture lookup goes through the tinted copy.
+G.imgFilter = null;
+G.srcImg = (function () {
+  const cache = new WeakMap();
+  return function (img) {
+    const f = G.imgFilter;
+    if (!f || !img) return img;
+    let m = cache.get(img); if (!m) { m = new Map(); cache.set(img, m); }
+    let c = m.get(f);
+    if (!c) { c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.filter = f; x.drawImage(img, 0, 0); m.set(f, c); }
+    return c;
+  };
+})();
 G.Sparrow = {
   cache: new Map(),
   // base = "shared/images/notes" (no extension)
@@ -11,12 +26,17 @@ G.Sparrow = {
     const xml = G.A.text(base + '.xml'), img = G.A.image(base + '.png');
     let sheet = null;
     if (xml && img) {
-      // some FNF sheets (the black 'default' font) use raw & < > as frame names: escape them first
-      const safe = xml.replace(/name="([^"]*)"/g, (m, v) => 'name="' + v.replace(/&(?!(amp|lt|gt|quot|apos|#\d+);)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '"');
-      const doc = new DOMParser().parseFromString(safe, 'text/xml');
+      // Tolerant parse (like Flixel's): FNF sheets contain frame names such as "<0000"
+      // and "&0000", which are invalid XML and make a strict DOMParser stop halfway.
       const frames = [];
-      for (const n of doc.getElementsByTagName('SubTexture')) {
-        const g = k => n.getAttribute(k), num = k => (g(k) == null ? null : parseFloat(g(k)));
+      const ent = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+      const tagRe = /<SubTexture\b((?:\s+[\w:-]+\s*=\s*"[^"]*")*)\s*\/?>/g;
+      let m;
+      while ((m = tagRe.exec(xml))) {
+        const attrs = {};
+        const attrRe = /([\w:-]+)\s*=\s*"([^"]*)"/g; let a;
+        while ((a = attrRe.exec(m[1]))) attrs[a[1]] = ent(a[2]);
+        const g = k => (k in attrs ? attrs[k] : null), num = k => (g(k) == null ? null : parseFloat(g(k)));
         const f = { name: g('name'), x: num('x'), y: num('y'), w: num('width'), h: num('height'), rot: g('rotated') === 'true' };
         if (g('frameX') != null) { f.ox = -num('frameX'); f.oy = -num('frameY'); f.fw = num('frameWidth'); f.fh = num('frameHeight'); }
         else { f.ox = 0; f.oy = 0; f.fw = f.rot ? f.h : f.w; f.fh = f.rot ? f.w : f.h; }
@@ -36,10 +56,11 @@ G.Sparrow = {
   },
   draw(ctx, sheet, f) {
     if (!f) return;
-    if (!f.rot) { ctx.drawImage(sheet.img, f.x, f.y, f.w, f.h, f.ox, f.oy, f.w, f.h); return; }
+    const img = G.srcImg(sheet.img);
+    if (!f.rot) { ctx.drawImage(img, f.x, f.y, f.w, f.h, f.ox, f.oy, f.w, f.h); return; }
     // stored rotated 90deg: draw region rotated back (Flixel ANGLE_NEG_90)
     ctx.save(); ctx.translate(f.ox, f.oy); ctx.transform(0, -1, 1, 0, 0, f.w);
-    ctx.drawImage(sheet.img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    ctx.drawImage(img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
     ctx.restore();
   },
 };
@@ -52,8 +73,18 @@ const SYMTYPE = { G: 'G', graphic: 'G', MC: 'MC', movieclip: 'MC', B: 'B', butto
 const LOOPTYPE = { LP: 'LP', loop: 'LP', PO: 'PO', playonce: 'PO', SF: 'SF', singleframe: 'SF', RP: 'RP', playreverse: 'RP' };
 function readMatrix(o) {
   if (o.MX) return o.MX.slice(0, 6);
-  if (o.M3D) { const m = o.M3D; return Array.isArray(m) ? [m[0], m[1], m[4], m[5], m[12], m[13]] : [m.m00, m.m01, m.m10, m.m11, m.m30, m.m31]; }
+  const m = o.M3D || o.Matrix3D;   // short + long ("Matrix3D") export formats
+  if (m) return Array.isArray(m) ? [m[0], m[1], m[4], m[5], m[12], m[13]] : [m.m00, m.m01, m.m10, m.m11, m.m30, m.m31];
   return [1, 0, 0, 1, 0, 0];
+}
+// long-format exports spell out symbol types / loop modes / colour effects
+const ST_LONG = { graphic: 'G', movieclip: 'MC', button: 'B' }, LP_LONG = { loop: 'LP', playonce: 'PO', singleframe: 'SF', playoncereverse: 'PO', loopreverse: 'LP' };
+function readAlpha(si) {
+  const c = si.C || si.color;
+  if (!c) return 1;
+  if (c.AM != null) return c.AM;
+  if (c.alphaMultiplier != null) return c.alphaMultiplier;
+  return 1;
 }
 function parseTimeline(tl, name) {
   const layers = [];
@@ -76,7 +107,7 @@ function parseTimeline(tl, name) {
       frames.push({ i: fi, du, label: F.N || F.name || null, els });
       frameCount = Math.max(frameCount, fi + du);
     }
-    layers.push({ name: L.LN || L.Layer_name, type: L.LT || null, frames });
+    layers.push({ name: L.LN || L.Layer_name, type: L.LT || L.Layer_type || null, frames });
   }
   // keyframe lookup tables
   for (const L of layers) {
@@ -151,7 +182,7 @@ G.Atlas = {
           const s = atlas.sprites[e.n];
           if (s) {
             if (s.rot) { ctx.transform(0, -1, 1, 0, 0, s.w); }
-            ctx.drawImage(s.img, s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
+            ctx.drawImage(G.srcImg(s.img), s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
           }
         } else {
           const swap = atlas.swaps[e.s];
@@ -325,8 +356,8 @@ G.Sprite = class {
       G.Atlas.draw(ctx, a.atlas, a.tl, a.frames[this.fi]);
     } else if (a && a.kind === 'own') { if (this.fx && this.fx.draw) this.fx.draw(this, ctx); }
     else if (this.sheet && this.sheet.frames[0]) G.Sparrow.draw(ctx, this.sheet, this.sheet.frames[0]);
-    else if (this.img) ctx.drawImage(this.img, 0, 0);
-    else if (this.solid) { ctx.fillStyle = this.solid; ctx.fillRect(0, 0, this.frameW, this.frameH); }
+    else if (this.img) ctx.drawImage(G.srcImg(this.img), 0, 0);
+    else if (this.solid) { if (G.imgFilter) ctx.filter = G.imgFilter; ctx.fillStyle = this.solid; ctx.fillRect(0, 0, this.frameW, this.frameH); ctx.filter = "none"; }
   }
 };
 
@@ -396,7 +427,13 @@ G.AtlasFont = {
   },
   glyph(font, ch) {
     if (ch in font.glyphs) return font.glyphs[ch];
-    const frames = G.Sparrow.byPrefix(font.sheet, ATLAS_SYM[ch] || ch);
+    let frames = G.Sparrow.byPrefix(font.sheet, ATLAS_SYM[ch] || ch);
+    // FNF's bold font has no numbers: borrow them from Psych Engine's bold alphabet (same art)
+    if (!frames.length && /[0-9]/.test(ch)) {
+      const ps = G.Sparrow.load('shared/images/psych/alphabet');
+      const pf = ps ? G.Sparrow.byPrefix(ps, ch + (font === this.cache.bold ? ' bold instance 1' : ' normal instance 1')) : [];
+      if (pf.length) { frames = pf.slice(); frames.sheet = ps; }
+    }
     return (font.glyphs[ch] = frames.length ? frames : null);
   },
 };
@@ -429,7 +466,7 @@ G.Alphabet = class {
       if (!frames) { x += 40; continue; }
       const f0 = frames[0];
       const lift = ATLAS_LIFT[ch]; const ly = lift ? lift[this.bold ? 1 : 0] : 0;
-      this.letters.push({ frames, x, y: y + font.maxH - f0.fh - ly });
+      this.letters.push({ frames, sheet: frames.sheet, x, y: y + font.maxH - f0.fh - ly });
       x += f0.fw;
       this.width = Math.max(this.width, x);
     }
@@ -453,7 +490,7 @@ G.Alphabet = class {
     for (const L of this.letters) {
       const f = L.frames[fi % L.frames.length];
       ctx.save(); ctx.translate(L.x, L.y);
-      G.Sparrow.draw(ctx, this.sheet, f);
+      G.Sparrow.draw(ctx, L.sheet || this.sheet, f);
       ctx.restore();
     }
     ctx.restore();

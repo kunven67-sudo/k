@@ -192,7 +192,7 @@
       // characters, stage, cameras
       const stepSec = this.cond.stepCrochet / 1000;
       const holding = this.keys.some(k => k) || this.botHolding;
-      for (const c of [this.gf, this.dad, this.bf]) if (c) c.tick(dt, stepSec, c === this.bf ? holding : false);
+      for (const c of [this.gf, this.dad, this.bf]) if (c) { c.playHealth = this.health; c.tick(dt, stepSec, c === this.bf ? holding : false); }
       this.stage.update(dt);
       this.updateCamera(dt);
       for (const L of this.lines) for (const s of L.strums) {
@@ -257,6 +257,7 @@
     },
     handleEvent(e) {
       const v = e.v;
+      for (const c of [this.gf, this.dad, this.bf]) if (c && c.script && c.script.onEvent) c.script.onEvent(c, e.e, v);
       switch (e.e) {
         case 'FocusCamera': {
           let ch = v != null && typeof v === 'object' ? v.char : v; if (ch == null) ch = 0;
@@ -492,13 +493,13 @@
     // -------------------------------------------------- input
     onAction(a, down, repeat) {
       if (this.failed) { if (down && (a === 'back' || a === 'accept')) this.exitToMenu(); return; }
-      if (this.gameOver) { if (down && !repeat) this.gameOverAction(a); return; }
-      if (this.paused) { if (down) this.pauseAction(a, repeat); return; }
-      if (this.cutscene) { this.cutscene.onAction(a, down, repeat); return; }
+      if (this.gameOver) { if (down && !repeat) return this.gameOverAction(a); return; }
+      if (this.paused) { if (down) return this.pauseAction(a, repeat); return; }
+      if (this.cutscene) { this.cutscene.onAction(a, down, repeat); return true; }
       const m = /^note(\d)$/.exec(a);
       if (m) { if (repeat) return; if (down) this.press(+m[1]); else this.release(+m[1]); return; }
       if (!down || repeat) return;
-      if (a === 'pause' && this.started) this.openPause();
+      if (a === 'pause' && this.started) { this.openPause(); return true; }
       if (a === 'reset' && this.started && !this.paused) this.health = 0;
     },
     onBlur() { if (this.started && !this.paused && !this.gameOver && !this.ended) this.openPause(); },
@@ -530,9 +531,10 @@
     updatePause(dt) { const pm = this.pauseMenu; pm.t += dt; for (const a of pm.items) a.update(dt); },
     pauseAction(a, repeat) {
       const pm = this.pauseMenu;
-      if (a === 'ui_up' || a === 'ui_down') { pm.sel = (pm.sel + (a === 'ui_up' ? -1 : 1) + pm.items.length) % pm.items.length; G.sfx('scroll', { vol: 0.4 }); this.layoutPause(); }
-      else if (a === 'accept' && !repeat) this.pauseChoose();
-      else if (a === 'back' && !repeat) { if (pm.mode === 'diff') this.backToPauseMain(); else this.resume(); }
+      if (a === 'ui_up' || a === 'ui_down') { pm.sel = (pm.sel + (a === 'ui_up' ? -1 : 1) + pm.items.length) % pm.items.length; G.sfx('scroll', { vol: 0.4 }); this.layoutPause(); return true; }
+      if (a === 'accept' && !repeat) { this.pauseChoose(); return true; }
+      if (a === 'back' && !repeat) { if (pm.mode === 'diff') this.backToPauseMain(); else this.resume(); return true; }
+      return false;
     },
     pausePointer(x, y) {
       const pm = this.pauseMenu;
@@ -634,8 +636,8 @@
         ws.score += stats.score; ws.misses += stats.misses; ws.maxCombo = Math.max(ws.maxCombo, stats.maxCombo); ws.totalNotes += stats.totalNotes;
         for (const k in ws.tally) ws.tally[k] += stats.tally[k] || 0; ws.accSum += this.accSum; ws.accN += this.accN;
         if (p.songIndex + 1 < p.songs.length) { G.setScreen('play', Object.assign({}, p, { songIndex: p.songIndex + 1, weekStats: ws })); return; }
-        if (!cheated && p.week) G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
-        G.setScreen(G.screens.results ? 'results' : 'storyMenu', { mode: 'story', week: p.week, diff: p.diff, stats: Object.assign({}, ws, { acc: ws.accN ? ws.accSum / ws.accN : 0 }), title: (G.A.json('preload/data/levels/' + p.week + '.json') || {}).name || p.week, player: this.bf.id });
+        const weekBest = !cheated && !!p.week && G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
+        G.setScreen(G.screens.results ? 'results' : 'storyMenu', { mode: 'story', week: p.week, diff: p.diff, newBest: weekBest, stats: Object.assign({}, ws, { acc: ws.accN ? ws.accSum / ws.accN : 0 }), title: (G.A.json('preload/data/levels/' + p.week + '.json') || {}).name || p.week, player: this.bf.id });
       } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, title: s.name, player: this.bf.id, prevRank, isNewHighscore, cheated });
     },
     // -------------------------------------------------- drawing
@@ -646,9 +648,10 @@
       if (this.gameOver) { this.drawGameOver(ctx); return; }
       // world
       for (const s of this.stage.ordered()) {
-        const slot = s === this.bf ? 'bf' : s === this.dad ? 'dad' : s === this.gf ? 'gf' : null;
+        const o = s.owner || s;
+        const slot = o === this.bf ? 'bf' : o === this.dad ? 'dad' : o === this.gf ? 'gf' : null;
         const f = slot && this.charFilter[slot];
-        if (f) { ctx.save(); ctx.filter = f; s.draw(ctx, this.cam); ctx.restore(); ctx.filter = 'none'; }
+        if (f) { G.imgFilter = f; try { s.draw(ctx, this.cam); } finally { G.imgFilter = null; } }
         else s.draw(ctx, this.cam);
       }
       this.cam.drawFX(ctx);
@@ -656,6 +659,10 @@
       // HUD
       if (this.hud.alpha > 0.01) { ctx.save(); ctx.globalAlpha = this.hud.alpha; this.drawHUD(ctx); ctx.restore(); }
       if (this.paused) this.drawPause(ctx);
+    },
+    songLabel() {
+      const dn = (G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff;
+      return this.song.name.toLowerCase().includes(String(dn).toLowerCase()) ? this.song.name : this.song.name + ' (' + dn + ')';
     },
     noteY(t) { const d = (t - this.songPos) * PX_PER_MS * this.scrollSpeed; return this.down ? -d : d; },
     drawHUD(ctx) {
@@ -711,12 +718,13 @@
       if (this.practice) G.vcr(ctx, 'PRACTICE MODE', G.W / 2, this.down ? G.H - 160 : 130, { align: 'center', size: 22, alpha: 0.8 });
       // time bar (Psych)
       if (G.settings.timeBar !== 'off') {
-        const ty = this.down ? G.H - 44 : 19, tw = 400, tx = G.W / 2 - tw / 2;
+        // always at the top: in downscroll the arrows own the bottom of the screen
+        const ty = 19, tw = 400, tx = G.W / 2 - tw / 2;
         const prog = G.clamp(this.songPos / this.audio.length, 0, 1);
         ctx.fillStyle = '#000'; ctx.fillRect(tx - 4, ty - 4, tw + 8, 19);
         ctx.fillStyle = '#fff'; ctx.fillRect(tx, ty, tw * prog, 11);
         const left = Math.max(0, (this.audio.length - this.songPos) / 1000);
-        const txt = G.settings.timeBar === 'left' ? G.fmtTime(left) : G.settings.timeBar === 'elapsed' ? G.fmtTime(Math.max(0, this.songPos / 1000)) : this.song.name + ' (' + (G.DIFF_INFO[this.song.diff] || {}).name + ')';
+        const txt = G.settings.timeBar === 'left' ? G.fmtTime(left) : G.settings.timeBar === 'elapsed' ? G.fmtTime(Math.max(0, this.songPos / 1000)) : this.songLabel();
         G.vcr(ctx, txt, G.W / 2, ty - 6, { align: 'center', size: 22, outline: 2 });
       }
       for (const s of this.popups) s.draw(ctx, hud);

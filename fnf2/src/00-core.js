@@ -87,6 +87,7 @@ G.DEFAULT_SETTINGS = {
   quality: 'auto',      // 'auto' | 'high' | 'low'
   timeBar: 'name',      // 'name' | 'left' | 'elapsed' | 'off'
   comboPopups: true,
+  naughty: true,        // FNF's 'Naughtyness' (off = the clean versions of scenes)
   // audio
   vol: { master: 0.9, music: 0.8, vocals: 1, sfx: 0.8 },
   // controls
@@ -615,7 +616,8 @@ G.input = {
     if (G.trans.active && down) return; // ignore presses mid transition
     if (scr && scr.onKey) { try { if (scr.onKey(code, down, repeat, e) === true) return; } catch (err) { G.reportError(err, 'onKey'); } }
     if (I.blockKeys) return;
-    if (scr && scr.onAction) for (const a of acts) { try { scr.onAction(a, down, repeat, e); } catch (err) { G.reportError(err, 'onAction ' + a); } }
+    // a screen returns true when it used the key, so a key bound to two actions (Enter = accept + pause) only fires once
+  if (scr && scr.onAction) for (const a of acts) { try { if (scr.onAction(a, down, repeat, e) === true) break; } catch (err) { G.reportError(err, 'onAction ' + a); } }
   }
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));
@@ -782,6 +784,7 @@ G.query = (function () { const o = {}; new URLSearchParams(location.search).forE
 
 // started by 99-main.js once every module has loaded
 G.start = function (firstScreen, params) {
+  const boot = document.getElementById('boot'); if (boot) boot.remove();
   G.resize();
   G.setScreen(firstScreen, params, { instant: true });
   requestAnimationFrame(G.loop);

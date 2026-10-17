@@ -3,7 +3,14 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
   const q = G.query;
   if (q.dev === 'stage') return G.start('devStage', q);
   if (q.dev === 'char') return G.start('devChar', q);
+  if (q.dev === 'atlas') return G.start('devAtlas', q);
   if (q.dev === 'screen' && G.screens[q.name]) return G.start(q.name, q);
+  if (q.dev === 'results') {
+    // fake stats for a rank: ?dev=results&rank=good|great|excellent|perfect|gold|loss&player=bf|pico
+    const n = 200, mk = { gold: [200, 0, 0, 0, 0], perfect: [190, 10, 0, 0, 0], excellent: [170, 20, 5, 2, 3], great: [160, 20, 7, 3, 10], good: [130, 20, 20, 10, 20], loss: [60, 20, 30, 20, 70] }[q.rank || 'good'];
+    return G.start('results', { mode: 'freeplay', diff: q.diff || 'hard', title: q.title || 'Bopeebo', player: q.player || 'bf', newBest: q.best === '1',
+      stats: { score: +(q.score || 312840), maxCombo: mk[0] - 3, totalNotes: n, tally: { killer: 0, sick: mk[0], good: mk[1], bad: mk[2], shit: mk[3], miss: mk[4] } } });
+  }
   if (q.bot) G.settings.botplay = q.bot === '1';
   if (q.down) G.settings.downscroll = q.down === '1';
   if (q.dev === 'song' && G.screens.play) return G.start('play', { mode: 'freeplay', songs: [q.id || 'tutorial'], diff: q.diff || 'normal', variation: q.variation || 'default', week: null });

@@ -11,6 +11,8 @@ G.audio = (function () {
   const bus = { music: ctx.createGain(), vocals: ctx.createGain(), sfx: ctx.createGain() };
   for (const k in bus) bus[k].connect(master);
   A.bus = bus;
+  // the song's instrumental also feeds an analyser (Nene's A-Bot visualizer bars)
+  A.analyser = ctx.createAnalyser(); A.analyser.fftSize = 1024; A.analyser.smoothingTimeConstant = 0.5;
   A.applyVolumes = function () {
     const v = G.settings.vol;
     master.gain.value = v.master; bus.music.gain.value = v.music; bus.vocals.gain.value = v.vocals; bus.sfx.gain.value = v.sfx;
@@ -103,13 +105,14 @@ G.audio = (function () {
         this.t0 = now - posMs / 1000 / this.rate;
         for (const tr of tracks) {
           const g = ctx.createGain(); g.gain.value = tr.vol; g.connect(tr.bus);
+          if (tr.who === 'inst') g.connect(A.analyser);
           const s = ctx.createBufferSource(); s.buffer = tr.buf; s.playbackRate.value = this.rate; s.connect(g);
           if (posMs >= 0) s.start(now, posMs / 1000); else s.start(now - posMs / 1000 / this.rate, 0);
           tr.src = s; tr.gain = g;
         }
-        this.paused = false;
+        this.paused = false; A.songPlaying = true;
       },
-      _stopNodes() { for (const tr of tracks) { if (tr.src) { try { tr.src.stop(); } catch (e) {} tr.src.disconnect(); tr.src = null; } } },
+      _stopNodes() { A.songPlaying = false; for (const tr of tracks) { if (tr.src) { try { tr.src.stop(); } catch (e) {} tr.src.disconnect(); tr.src = null; } } },
       play(posMs) { this.ended = false; this._play(posMs || 0); },
       time() {
         if (this.paused) return this.pos;

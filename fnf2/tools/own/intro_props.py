@@ -137,6 +137,9 @@ def main():
     for f in ('speech_bubble.png', 'speech_bubble.xml'): shutil.copy(os.path.join(PSY, 'assets/shared/images', f), os.path.join(dd, f))
     for f in ('BF_Dialogue.png', 'BF_Dialogue.xml', 'GF_Dialogue.png', 'GF_Dialogue.xml', 'bf.json', 'gf.json'):
         shutil.copy(os.path.join(PSY, 'assets/shared/images/dialogue', f), os.path.join(dd, f))
+    # Psych's alphabet (its bold font has the numbers FNF's own bold font is missing)
+    pd = os.path.join(ROOT, 'build', 'own', 'shared', 'images', 'psych'); os.makedirs(pd, exist_ok=True)
+    for f in ('alphabet.png', 'alphabet.xml'): shutil.copy(os.path.join(PSY, 'assets/shared/images', f), os.path.join(pd, f))
     for f in sorted(os.listdir(OUT)): print(f, Image.open(os.path.join(OUT, f)).size)
 
 
