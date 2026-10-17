@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#222}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const r = new THREE.WebGLRenderer({antialias:true}); r.setSize(innerWidth,innerHeight); document.body.appendChild(r.domElement);
+r.toneMapping = THREE.ACESFilmicToneMapping;
+const s = new THREE.Scene(); s.background = new THREE.Color(0x303030);
+s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+const c = new THREE.PerspectiveCamera(35, innerWidth/innerHeight, 0.01, 10); c.position.set(0.0,0.25,0.25); c.lookAt(0,-0.02,-0.02);
+const d = new THREE.DirectionalLight(0xffffff, 2); d.position.set(1,2,1); s.add(d);
+new GLTFLoader().load('hand-right.glb', g => {
+  g.scene.traverse(o => { if (o.isMesh) o.material = new THREE.MeshPhysicalMaterial({color:0xd9a184, roughness:0.55, sheen:0.4, sheenColor:new THREE.Color(0xff9a80)}); });
+  const holder = new THREE.Group(); holder.add(g.scene); g.scene.rotation.x = -Math.PI/2; s.add(holder); holder.position.set(-0.08,0,0.05);
+  const box = new THREE.Box3().setFromObject(g.scene); console.log('box', JSON.stringify(box));
+  
+  const w3 = g.scene.clone(); w3.traverse(o=>{ if(o.isMesh) o.material = new THREE.MeshBasicMaterial({color:0x00ff00, wireframe:true}); }); const h3=new THREE.Group(); h3.add(w3); w3.rotation.x=-Math.PI/2; h3.position.set(0.08,0,0.05); s.add(h3);
+  r.render(s,c); window.__ready = true;
+});
+</script></body></html>

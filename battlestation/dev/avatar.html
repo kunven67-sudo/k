@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#222}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search);
+const r = new THREE.WebGLRenderer({antialias:true}); r.setSize(innerWidth,innerHeight); document.body.appendChild(r.domElement);
+r.toneMapping = THREE.ACESFilmicToneMapping;
+const s = new THREE.Scene(); s.background = new THREE.Color(0x404448);
+s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture; s.environmentIntensity=0.6;
+const c = new THREE.PerspectiveCamera(30, innerWidth/innerHeight, 0.01, 50);
+const d = new THREE.DirectionalLight(0xffffff, 2.5); d.position.set(1,2,2); s.add(d);
+new GLTFLoader().load(q.get('f')||'avatar_raw.glb', g => {
+  const names=[];
+  g.scene.traverse(o => { if (o.isMesh) { names.push(o.name+':'+o.material.name); const m=o.material; m.transparent=false; m.alphaTest = /eyebrow|eyelash|short/.test(m.name)?0.5:0; m.depthWrite=true; m.vertexColors=false; m.needsUpdate=true;
+     if (/casualsuit06|shoes/.test(m.name)) o.visible = q.get('outfit')==='tee' ? !/casualsuit02/.test(m.name) : true;
+     if (/casualsuit06/.test(m.name) && q.get('outfit')!=='tee') o.visible=false;
+     if (/casualsuit02/.test(m.name) && q.get('outfit')==='tee') o.visible=false;
+  }});
+  console.log(names.join(' | '));
+  s.add(g.scene);
+  const box = new THREE.Box3().setFromObject(g.scene); console.log('box', JSON.stringify(box));
+  const view = q.get('view')||'full';
+  const hand = g.scene.getObjectByName('hand_r'); const hp = new THREE.Vector3(); hand.getWorldPosition(hp); console.log('hand_r', hp.toArray().map(v=>v.toFixed(3)).join(','));
+  const head = g.scene.getObjectByName('head'); const hd = new THREE.Vector3(); head.getWorldPosition(hd); console.log('head', hd.toArray().map(v=>v.toFixed(3)).join(','));
+  if (view==='full') { c.position.set(0,1.0,4.2); c.lookAt(0,0.95,0); }
+  else if (view==='hand') { c.position.set(hp.x-0.05,hp.y+0.15,hp.z+0.35); c.lookAt(hp.x-0.08,hp.y-0.02,hp.z); }
+  else if (view==='face') { c.position.set(hd.x,hd.y+0.08,hd.z+0.7); c.lookAt(hd.x,hd.y+0.08,hd.z); }
+  r.render(s,c); window.__ready = true;
+});
+</script></body></html>

@@ -1,0 +1,4 @@
+node_modules/
+assets_src/
+dist/
+dev/*.glb

@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+new GLTFLoader().load('avatar_raw.glb', g => {
+  g.scene.updateMatrixWorld(true);
+  const out = {};
+  const v = new THREE.Vector3(), q = new THREE.Quaternion();
+  g.scene.traverse(o => { if (o.isBone) { o.getWorldPosition(v); o.getWorldQuaternion(q); out[o.name] = { w: v.toArray().map(x=>+x.toFixed(3)), lp: o.position.toArray().map(x=>+x.toFixed(3)), lq: o.quaternion.toArray().map(x=>+x.toFixed(3)), wq: q.toArray().map(x=>+x.toFixed(3)), parent: o.parent.name }; } });
+  const eyes = g.scene.getObjectByName('Playerhigh-poly') || g.scene.children.find(c=>/high/.test(c.name));
+  let eb = null; g.scene.traverse(o => { if (o.isMesh && /high-poly/.test(o.material.name)) { const b = new THREE.Box3().setFromObject(o); eb = b.getCenter(new THREE.Vector3()).toArray().map(x=>+x.toFixed(3)); } });
+  window.__out = { bones: out, eyes: eb, root: g.scene.children.map(c=>c.name+':'+c.type) };
+  window.__ready = true;
+});
+</script></body></html>
