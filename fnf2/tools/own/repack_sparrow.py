@@ -25,7 +25,7 @@ def frames_of(xml):
     return out
 
 
-def repack(png, xml_path, out_base, keep=None, scale=0.5, pad=2, max_w=2048):
+def repack(png, xml_path, out_base, keep=None, scale=0.5, pad=2, max_w=None):
     img = Image.open(png).convert('RGBA')
     xml = open(xml_path, encoding='utf-8-sig').read()
     frames = [f for f in frames_of(xml) if not keep or any(f['name'].startswith(k) for k in keep)]
@@ -49,19 +49,35 @@ def repack(png, xml_path, out_base, keep=None, scale=0.5, pad=2, max_w=2048):
         M = int(np.ceil(2 / scale)) + 2       # transparent margin: the snapped box can poke past the cut
         padded = Image.new('RGBA', (cut.width + 2 * M, cut.height + 2 * M), (0, 0, 0, 0)); padded.paste(cut, (M, M))
         src = (sx0 / scale - f['fx'] + M, sy0 / scale - f['fy'] + M, sx1 / scale - f['fx'] + M, sy1 / scale - f['fy'] + M)
-        small = padded.resize((tw, th), Image.LANCZOS, box=src)
+        if scale == 1 and all(float(v).is_integer() for v in src):
+            small = padded.crop(tuple(int(v) for v in src))          # same size: a plain cut, pixel for pixel
+        else:
+            small = padded.resize((tw, th), Image.LANCZOS, box=src)
         key = hashlib.sha1(small.tobytes() + bytes(str((tw, th)), 'ascii')).hexdigest()
         if key not in by_hash:
             by_hash[key] = len(pieces); pieces.append(small)
         entries.append((f, by_hash[key], sx0, sy0))
-    # shelf pack, tallest first
+    # shelf pack, tallest first; try a few sheet widths and keep the smallest sheet
     order = sorted(range(len(pieces)), key=lambda i: -pieces[i].size[1])
-    pos, x, y, row_h, W = {}, 0, 0, 0, 0
-    for i in order:
-        w, h = pieces[i].size
-        if x + w + pad > max_w: x, y, row_h = 0, y + row_h + pad, 0
-        pos[i] = (x, y); x += w + pad; row_h = max(row_h, h); W = max(W, x)
-    H = y + row_h
+    def shelf(mw):
+        pos, x, y, row_h, W = {}, 0, 0, 0, 0
+        for i in order:
+            w, h = pieces[i].size
+            if x + w + pad > mw: x, y, row_h = 0, y + row_h + pad, 0
+            pos[i] = (x, y); x += w + pad; row_h = max(row_h, h); W = max(W, x)
+        return pos, W, y + row_h
+    widest = max(p.size[0] for p in pieces) + pad
+    if max_w is None:
+        area = sum((p.size[0] + pad) * (p.size[1] + pad) for p in pieces)
+        tries = sorted({max(widest, int(area ** 0.5 * k)) for k in (0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.25, 1.4, 1.6, 1.8, 2.0)})
+        best = None
+        for mw in tries:
+            pos, W, H = shelf(mw)
+            if max(W, H) > 8192: continue
+            if best is None or W * H < best[1] * best[2]: best = (pos, W, H)
+        pos, W, H = best or shelf(max(widest, int(area ** 0.5)))
+    else:
+        pos, W, H = shelf(max_w)
     sheet = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     for i, p in pos.items(): sheet.paste(pieces[i], p)
     sheet.save(out_base + '.png')

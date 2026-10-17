@@ -118,6 +118,29 @@ def to_webp(src):
         return b.getvalue()
     return conv_cached(src, 'webp', f)
 
+def tight_sparrow(png, xml):
+    """A Sparrow sheet trimmed + de-duplicated + packed tight again, pixel for pixel (tools/own/repack_sparrow.py).
+    Many sheets are mostly empty space or the same drawing many times. -> (png, xml) paths, the originals if not worth it."""
+    st1, st2 = os.stat(png), os.stat(xml)
+    key = hashlib.sha1(f'{png}|{st1.st_size}|{st1.st_mtime}|{xml}|{st2.st_size}|{st2.st_mtime}|tight3'.encode()).hexdigest()
+    d = os.path.join(CACHE, 'tight', key); base = os.path.join(d, 'sheet')
+    if os.path.exists(base + '.skip'): return png, xml
+    if not os.path.exists(base + '.png'):
+        from PIL import Image
+        sys.path.insert(0, os.path.join(ROOT, 'tools', 'own'))
+        from repack_sparrow import repack
+        os.makedirs(d, exist_ok=True)
+        try:
+            (w, h), nframes, _ = repack(png, xml, base, scale=1)
+            W, H = Image.open(png).size
+            if nframes < 2 or w * h > 0.7 * W * H: raise ValueError('not worth it')
+        except Exception:
+            open(base + '.skip', 'w').close()
+            for e in ('.png', '.xml'):
+                if os.path.exists(base + e): os.remove(base + e)
+            return png, xml
+    return base + '.png', base + '.xml'
+
 def to_mp3(src, voices):
     def f():
         args = ['ffmpeg', '-v', 'error', '-i', src]
@@ -179,6 +202,17 @@ def main():
             for f in fs:
                 rel = os.path.relpath(os.path.join(d, f), a.own).replace(os.sep, '/')
                 srcs[rel] = os.path.join(d, f)
+    # Sparrow sheets: use the tight copy (same pixels, much less memory)
+    saved = 0
+    for rel in list(srcs):
+        if rel.endswith('.png') and rel[:-4] + '.xml' in srcs:
+            p2, x2 = tight_sparrow(srcs[rel], srcs[rel[:-4] + '.xml'])
+            if p2 != srcs[rel]:
+                from PIL import Image
+                s0, s1 = Image.open(srcs[rel]).size, Image.open(p2).size
+                saved += (s0[0] * s0[1] - s1[0] * s1[1]) * 4
+                srcs[rel], srcs[rel[:-4] + '.xml'] = p2, x2
+    print(f'tight sheets saved {saved / 1e6:.0f} MB of decoded pictures')
     out = {}
     total = 0
     for rel, src in sorted(srcs.items()):
