@@ -30,6 +30,8 @@ import { Radio } from '../life/radio.js';
 import { openPause } from '../ui/pause.js';
 import { Traffic } from '../world/traffic.js';
 import { assets } from '../gfx/assets.js';
+import { Ambience } from '../world/ambience.js';
+import { prewarm } from '../audio/index.js';
 
 export class WorldState {
   constructor(engine) {
@@ -64,6 +66,8 @@ export class WorldState {
     this.phone = new Phone({ engine: e, world, player: this.player, hud: this.hud, life: this.life, people: this.people, talk: this.talk });
     this.life.phone = this.phone;
     this.radio = new Radio(this.life);
+    this.ambience = new Ambience(world);
+    prewarm?.(['amb.birds', 'amb.night', 'amb.wind', 'amb.traffic', 'fridge.hum']);
     this.ready = true;
     if (params.wake) {
       // First morning as a big kid: you wake up in your own bed.
@@ -96,6 +100,7 @@ export class WorldState {
     if (input.pressed('phone') && !panelOpen()) this.phone.toggle();
     this.phone.update(dt);
     this.radio.update(dt);
+    this.ambience.update(dt, p.position);
     this.life.update(dt);
     p.update(dt);
     this.people.update(dt);
@@ -120,6 +125,7 @@ export class WorldState {
   exit() {
     for (const off of this._offs || []) off();
     this.radio?.dispose();
+    this.ambience?.dispose();
     this.phone?.dispose();
     this.talk?.dispose();
     this.life?.chores?.dispose();
