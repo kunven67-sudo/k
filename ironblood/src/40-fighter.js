@@ -442,6 +442,12 @@ function updateAttack(f, dt) {
   if (a.kind === 'heavy' && a.hold) { a.t = Math.min(a.t + dt, a.dur * 0.3); return; }
   a.t += dt;
   const t = a.t / a.dur;
+  // step into the swing, like a real swordsman (bodies still stop you)
+  if (t > 0.22 && t < 0.5 && !f.down && a.kind !== 'finisher') {
+    const step = (0.38 / (0.28 * a.dur)) * dt;
+    f.pos.x += Math.sin(f.facing) * step; f.pos.z += Math.cos(f.facing) * step;
+    collideFighter(f);
+  }
   if (!a.swung && t >= ACTIVE_FROM - 0.06) { a.swung = true; sfx.swing(f.swordMesh.position, f.sword.weight, a.power); if (a.power > 1.2 || Math.random() < 0.35) sfx.voice(f.pos, 'exert', f.voicePitch || 1); }
   if (t >= ACTIVE_FROM && t <= ACTIVE_TO && f.hasSword) {
     f.bladeSeg(_bA, _bB);
