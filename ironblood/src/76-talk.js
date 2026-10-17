@@ -355,8 +355,14 @@ function updateScene(dt) {
   if (w > 0.9 && breath < 0.3 && t > 1.9 + s.smacks * (mk ? 1.7 : 9)) { s.smacks++; sfx.kiss(); }
   // a slow side shot that drifts in closer
   const mid = P.pos.clone().lerp(f.pos, 0.5); mid.y += 1.52;
-  const side = _ax.set(Math.cos(P.facing), 0, -Math.sin(P.facing));
-  const orbit = Math.sin(t * 0.22) * 0.45, dist = lerp(2.0, 1.35, smooth(0, s.dur, t));
+  // shoot from whichever side is open (not inside a wall), drifting a little round them
+  if (s.camSide === undefined) {
+    s.camSide = 0;
+    for (const sd of [1, -1]) { let ok = true; for (const d of [0.8, 1.4, 2.0]) { const x = mid.x + Math.cos(P.facing) * sd * d, z = mid.z - Math.sin(P.facing) * sd * d; const b = solidAt(x, z, 0.3); if (b && mid.y < b.h1 + 0.2) ok = false; } if (ok) { s.camSide = sd; break; } }
+  }
+  const sideSign = s.camSide || 1;
+  const side = _ax.set(Math.cos(P.facing) * sideSign, 0, -Math.sin(P.facing) * sideSign);
+  const orbit = Math.sin(t * 0.22) * 0.4 * sideSign, dist = s.camSide ? lerp(2.0, 1.45, smooth(0, s.dur, t)) : 1.1;
   sceneCam = { pos: mid.clone().addScaledVector(side, dist * Math.cos(orbit)).addScaledVector(_t1.set(Math.sin(P.facing), 0, Math.cos(P.facing)), dist * Math.sin(orbit) - 0.25).add(_t2.set(0, 0.06, 0)), look: mid };
   if (t >= s.dur) endScene();
 }
