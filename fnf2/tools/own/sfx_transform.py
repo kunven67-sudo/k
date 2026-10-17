@@ -1,12 +1,15 @@
-"""WRATH's transform sound (the snap in GLARE, over the heartbeat): wet squish, flesh tearing, bones
-cracking, goo stretching, then one big wet pull-out and the eye squelching open.
-All made in code (numpy + pedalboard), nothing sampled.
+"""WRATH's transform sound (the snap in GLARE, over the heartbeat): real recorded
+gore foley cut up and layered. Meat ripping builds up, bones break, and the
+eye tears out with a wet splat, then slime drips.
+
+The recordings are CC0 sound packs from OpenGameArt (downloaded into a cache
+the first time, never committed):
+  "Ripping into meat", "Fleshy bone break/snap SFX", "Deep bone crack/break SFX",
+  "8 wet squish slurp impacts", "Slimy monster or murder sounds", "Squish sounds effects"
 
   python3 fnf2/tools/own/sfx_transform.py OUT.wav      # 4.8 s, the pull-out lands at 3.2 s
-
-glare.py drops it into the snap (bar 33, so the pull-out hits bar 35 with the boom).
 """
-import sys
+import io, os, sys, urllib.request, zipfile
 import numpy as np
 import soundfile as sf
 import pedalboard as pb
@@ -15,159 +18,139 @@ from scipy import signal
 SR = 44100
 LEN = 4.8
 RIP = 3.2          # the big pull-out (= bar 35 in GLARE)
+PITCH = 0.88       # everything a bit lower = a bigger, heavier body
+CACHE = os.path.expanduser('~/.cache/fnf2/gore')
+OGA = 'https://opengameart.org/sites/default/files/'
+FILES = ['rippingintomeat_0.mp3', 'wet_breaks.zip', 'deep_breaks.zip', 'independent_nu_ljudbank-wet_squish_slurp_impacts.7z',
+         'squish_02.mp3', 'squish_04.mp3', 'squish_06.mp3', 'squishsplat_impact.mp3'] + \
+        ['slimy_monster_or_murderd_sound%s.mp3' % s for s in ('', '_1', '_2', '_3', '_4', '_5', '_6', '_7')]
 rng = np.random.default_rng(13)
 
 
-def env_exp(n, tau): return np.exp(-np.arange(n) / (tau * SR))
+def fetch(name):
+    p = os.path.join(CACHE, name)
+    if not os.path.exists(p):
+        os.makedirs(CACHE, exist_ok=True)
+        with urllib.request.urlopen(OGA + name) as r: data = r.read()
+        open(p, 'wb').write(data)
+    return p
 
 
-def bandnoise(n, lo, hi, order=2):
-    return signal.sosfilt(signal.butter(order, [lo, min(hi, SR * 0.45)], 'band', fs=SR, output='sos'), rng.uniform(-1, 1, n))
+def load(src):
+    """file path or (archive, member) -> mono float at SR"""
+    if isinstance(src, tuple):
+        arc, member = src
+        if arc.endswith('.zip'): x, sr = sf.read(io.BytesIO(zipfile.ZipFile(fetch(arc)).read(member)))
+        else:
+            import py7zr
+            with py7zr.SevenZipFile(fetch(arc)) as z: x, sr = sf.read(z.read([member])[member])
+    else: x, sr = sf.read(fetch(src))
+    if x.ndim > 1: x = x.mean(1)
+    if sr != SR: x = signal.resample_poly(x, SR, sr)
+    return x
 
 
-def reson(x, f, q):
-    b, a = signal.iirpeak(min(f, SR * 0.45), q, fs=SR)
-    return signal.lfilter(b, a, x)
+def heavy(x, k=PITCH):
+    """Pitch + slow down together (tape style) -> bigger and heavier."""
+    return signal.resample(x, int(len(x) / k))
 
 
-def glide_sine(n, f0, f1, curve=1.0):
-    f = f0 * (f1 / f0) ** (np.linspace(0, 1, n) ** curve)
-    return np.sin(2 * np.pi * np.cumsum(f) / SR)
+def env_db(x, h):
+    return 20 * np.log10(np.array([np.sqrt((x[i:i + h] ** 2).mean()) for i in range(0, len(x) - h, h)]) + 1e-9)
+
+
+def rips(x):
+    """Cut the loud tearing moments out of the long meat-ripping recording."""
+    h = SR // 50
+    db = env_db(x, h)
+    out, i = [], 0
+    while i < len(db):
+        if db[i] > -17:
+            a = max(0, i - 3)
+            b = i
+            while b < len(db) and (db[b] > -27 or b - i < 8) and b - a < 35: b += 1
+            seg = x[a * h:b * h].copy()
+            f = int(0.01 * SR); seg[:f] *= np.linspace(0, 1, f); seg[-4 * f:] *= np.linspace(1, 0, 4 * f)
+            out.append((seg, float(db[i:b].max())))
+            i = b + 5
+        else: i += 1
+    return out
+
+
+def bed(x, dur):
+    """The quiet wet handling between the rips: squelchy meat noise to build on."""
+    h = SR // 50
+    e = env_db(x, h)
+    quiet = [i for i in range(len(e) - 40) if (e[i:i + 40] < -20).all() and (e[i:i + 40] > -34).all()]
+    n = int(dur * SR); y = np.zeros(n); pos = 0; f = int(0.05 * SR)
+    while pos < n:
+        i = quiet[rng.integers(len(quiet))] * h
+        seg = x[i:i + int(0.8 * SR)].copy()
+        seg[:f] *= np.linspace(0, 1, f); seg[-f:] *= np.linspace(1, 0, f)
+        y[pos:pos + len(seg)] += seg[:n - pos]
+        pos += len(seg) - f
+    return y
 
 
 class Buf:
-    def __init__(self): self.x = np.zeros(int(LEN * SR) + SR)
+    def __init__(self): self.x = np.zeros(int((LEN + 1.5) * SR))
     def add(self, t, y, g=1.0):
         i = int(t * SR)
-        if i < 0: y, i = y[-i:], 0
         y = y[:len(self.x) - i]
         self.x[i:i + len(y)] += y * g
 
 
-def bubble(f0=None, tau=None):
-    """A wet goo bubble: a short sine that pitches UP as it pops."""
-    f0 = f0 or rng.uniform(250, 900)
-    tau = tau or rng.uniform(0.008, 0.025)
-    n = int(tau * 6 * SR)
-    t = np.arange(n) / SR
-    f = f0 * (1 + 9 * t / (tau * 6))
-    return np.sin(2 * np.pi * np.cumsum(f) / SR) * env_exp(n, tau) * (1 - np.exp(-np.arange(n) / 30))
-
-
-def squish(dur=None, c=None):
-    """One squelch: noise through a moving mouth-like resonance + a few bubbles."""
-    dur = dur or rng.uniform(0.05, 0.16)
-    n = int(dur * SR)
-    c = c or rng.uniform(280, 900)
-    nz = rng.uniform(-1, 1, n)
-    # cut the burst in pieces with the resonance sliding down (the 'shlorp')
-    out = np.zeros(n); hop = 256
-    for k in range(0, n, hop):
-        f = c * (1 - 0.55 * k / n)
-        seg = reson(nz[max(0, k - 512):k + hop], f, 4.5)[-min(hop, n - k):]
-        out[k:k + len(seg)] = seg
-    e = np.sin(np.pi * np.linspace(0, 1, n)) ** 0.7
-    y = out * e
-    for _ in range(rng.integers(1, 4)):
-        b = bubble(c * rng.uniform(0.7, 1.5))
-        p = rng.integers(0, max(1, n - len(b) // 2))
-        y[p:p + len(b)] += b[:n - p] * 0.35
-    return y
-
-
-def crackle(dur, rate0, rate1, lo=900, hi=5000, gain=1.0):
-    """Tearing flesh: lots of tiny wet cracks, getting denser (rate per second)."""
-    n = int(dur * SR)
-    y = np.zeros(n)
-    t = 0.0
-    while t < dur:
-        r = rate0 + (rate1 - rate0) * (t / dur)
-        t += rng.exponential(1 / r)
-        i = int(t * SR)
-        if i >= n: break
-        m = int(rng.uniform(0.002, 0.009) * SR)
-        g = bandnoise(m, lo * rng.uniform(0.7, 1.3), hi) * env_exp(m, rng.uniform(0.0008, 0.003))
-        y[i:i + m] += g[:n - i] * rng.uniform(0.3, 1.0)
-    # fibrous strands stretching under it
-    fib = bandnoise(n, 500, 2600) * np.abs(signal.sosfilt(signal.butter(1, 35, 'low', fs=SR, output='sos'), rng.uniform(-1, 1, n))) * 6
-    return (y + fib * 0.35) * gain
-
-
-def bone_crack():
-    """A sharp crack: snap transient + short knocking modes + a small thud."""
-    n = int(0.25 * SR)
-    snap = bandnoise(n, 1800, 9000) * env_exp(n, 0.004)
-    modes = sum(np.sin(2 * np.pi * f * np.arange(n) / SR) * env_exp(n, tau) * a
-                for f, tau, a in ((rng.uniform(900, 1300), 0.03, .5), (rng.uniform(2000, 2600), 0.018, .35), (rng.uniform(3100, 3800), 0.012, .25)))
-    thud = glide_sine(n, 140, 60) * env_exp(n, 0.05) * 0.6
-    y = snap * 1.7 + modes * 1.2 + thud
-    # a second splinter right after
-    d = int(rng.uniform(0.012, 0.03) * SR)
-    y[d:] += (bandnoise(n, 2500, 9000) * env_exp(n, 0.003))[:n - d] * 0.6
-    return y
-
-
-def suction_pop():
-    """The pull-out: wet suction release, a deep drop and a goo slap."""
-    n = int(0.9 * SR)
-    pop = glide_sine(n, 900, 70, 0.45) * env_exp(n, 0.07)
-    body = signal.sosfilt(signal.butter(2, 400, 'low', fs=SR, output='sos'), rng.uniform(-1, 1, n)) * env_exp(n, 0.12) * 3
-    slap = bandnoise(n, 300, 2500) * env_exp(n, 0.03)
-    return pop * 0.9 + body * 0.8 + slap * 0.7
-
-
-def stretch_goo(dur):
-    """Thick goo pulling apart: low wet groan + bubbles popping all over it."""
-    n = int(dur * SR)
-    t = np.arange(n) / SR
-    f = 70 + 40 * np.sin(2 * np.pi * 0.7 * t) + 25 * t / dur
-    groan = np.tanh(np.sin(2 * np.pi * np.cumsum(f) / SR) * 2.5) * 0.25
-    groan = signal.sosfilt(signal.butter(2, 600, 'low', fs=SR, output='sos'), groan) * np.linspace(0.2, 1, n)
-    y = groan
-    for _ in range(int(dur * 28)):
-        b = bubble()
-        p = rng.integers(0, n - len(b))
-        y[p:p + len(b)] += b * rng.uniform(0.15, 0.45)
-    return y
+def norm(x): return x / (np.abs(x).max() + 1e-9)
 
 
 def render():
-    B = {k: Buf() for k in ('wet', 'tear', 'bone', 'goo', 'pop')}
-    # bar 33: it starts inside him - small squishes, the first tears
-    t = 0.05
-    while t < RIP - 0.2:
-        k = t / RIP
-        B['wet'].add(t, squish(c=rng.uniform(240, 700 + 450 * k)), 0.7 + 0.6 * k)
-        t += rng.uniform(0.06, 0.24) * (1 - 0.55 * k)
-    B['tear'].add(0.4, crackle(1.2, 35, 130), 0.7)
-    B['tear'].add(1.7, crackle(RIP - 1.7 + 0.05, 110, 600, 700, 6000), 1.0)          # ripping louder and louder
-    # bar 34: bones cracking (on the beat, then a messy one)
-    for bt in (1.6, 1.8, 2.0, 2.25, 2.4, 2.55, 2.7, 2.8, 2.95, 3.08):
-        B['bone'].add(bt, bone_crack(), 1.0 if bt in (1.6, 2.0, 2.4, 2.8) else 0.65)
-    B['goo'].add(1.4, stretch_goo(RIP - 1.4), 0.9)
-    # bar 35: THE PULL-OUT
-    B['tear'].add(RIP - 0.06, crackle(0.12, 1200, 1500, 600, 7000), 1.4)             # last strands snap
-    B['pop'].add(RIP, suction_pop(), 1.3)
-    B['wet'].add(RIP + 0.02, squish(0.25, 420), 1.3)
-    B['wet'].add(RIP + 0.06, squish(0.35, 240), 1.3)                                  # meat slap
-    B['pop'].add(RIP + 0.04, bandnoise(int(0.4 * SR), 120, 900) * env_exp(int(0.4 * SR), 0.06) * 2.2, 1.0)
-    # after: dripping goo, the eye squelching open
-    for _ in range(40):
-        tt = RIP + 0.25 + rng.uniform(0, 1.3) ** 1.5
-        B['goo'].add(tt, bubble(rng.uniform(350, 1100), rng.uniform(0.01, 0.02)), rng.uniform(0.2, 0.5))
-    B['wet'].add(RIP + 0.55, squish(0.4, 300), 0.9)
-    B['wet'].add(RIP + 1.0, squish(0.3, 520), 0.6)
+    meat = load(FILES[0])
+    R = sorted(rips(meat), key=lambda r: r[1])                     # quietest -> loudest rip
+    wet = [norm(heavy(load(('wet_breaks.zip', 'Wet Break %d.wav' % k)))) for k in range(1, 11)]
+    deep = [norm(heavy(load(('deep_breaks.zip', 'Deep Break %d.wav' % k)))) for k in range(1, 11)]
+    try: splat = [norm(heavy(load((FILES[3], 'impsplat/impactsplat0%d.mp3.flac' % k)), 0.8)) for k in (1, 3, 5, 8)]
+    except Exception: splat = [norm(heavy(load('squishsplat_impact.mp3'), 0.8))]
+    slime = [norm(heavy(load(f), 0.8)) for f in FILES[8:]]
+    squish = [norm(heavy(load(f), 0.85)) for f in FILES[4:8]]
+
+    B = {k: Buf() for k in ('bed', 'rip', 'bone', 'splat', 'slime')}
+    # it starts inside him: wet meat squelching that gets louder
+    b = norm(heavy(bed(meat, RIP + 0.3)))
+    B['bed'].add(0.0, b * np.linspace(0.2, 0.8, len(b)) ** 1.5)
+    # rips tearing more and more often, getting louder, the loudest saved for the pull-out
+    small, big = R[:len(R) // 2], R[len(R) // 2:-1]
+    t, k = 0.25, 0
+    while t < RIP - 0.25:
+        prog = t / RIP
+        pool = small if prog < 0.45 else big
+        B['rip'].add(t, norm(heavy(pool[k % len(pool)][0])), 0.3 + 0.7 * prog)
+        t += rng.uniform(0.32, 0.5) * (1 - 0.5 * prog); k += 1
+    # bones breaking (the 4 big ones on the beat at 150 BPM, smaller ones in between)
+    for i, (bt, g) in enumerate(((1.6, 1.0), (2.0, 1.0), (2.25, 0.6), (2.4, 1.0), (2.6, 0.55), (2.8, 1.0), (3.0, 0.7))):
+        B['bone'].add(bt, (wet if i % 2 == 0 else deep)[i], g)
+        if g == 1.0: B['bone'].add(bt + 0.01, deep[(i + 5) % 10], 0.5)
+    # THE PULL-OUT: the loudest rip + a deep break + wet splats
+    B['rip'].add(RIP - 0.08, norm(heavy(R[-1][0])), 2.2)
+    B['bone'].add(RIP, deep[2], 1.6)
+    B['splat'].add(RIP + 0.03, splat[0], 1.8)
+    B['splat'].add(RIP + 0.08, squish[3], 1.1)
+    # the eye squelches out: slime + splats dripping
+    for j, dt in enumerate((0.3, 0.55, 0.8, 1.05, 1.3)):
+        B['slime'].add(RIP + dt, slime[j % len(slime)], 0.9 - 0.12 * j)
+    for j, dt in enumerate((0.45, 0.95)):
+        B['splat'].add(RIP + dt, splat[(j + 1) % len(splat)], 0.5 - 0.15 * j)
+    B['slime'].add(RIP + 0.2, squish[0], 0.6)
 
     def lvl(x, db):
-        r = np.sqrt((x[np.abs(x) > np.abs(x).max() * 0.02] ** 2).mean())
+        r = np.sqrt((x[np.abs(x) > np.abs(x).max() * 0.05] ** 2).mean())
         return x * 10 ** (db / 20) / max(r, 1e-9)
-    mix = (lvl(B['wet'].x, -14) + lvl(B['tear'].x, -17) + lvl(B['bone'].x, -14) + lvl(B['goo'].x, -18) + lvl(B['pop'].x, -6))
+    mix = lvl(B['bed'].x, -22) + lvl(B['rip'].x, -15) + lvl(B['bone'].x, -13) + lvl(B['splat'].x, -12) + lvl(B['slime'].x, -16)
     mix = mix[:int((LEN + 0.6) * SR)]
-    # slightly wide + a small wet room
-    d = int(0.007 * SR)
-    st = np.stack([mix, np.concatenate([np.zeros(d), mix[:-d]]) * 0.9 + mix * 0.1]).astype(np.float32)
-    st = pb.Pedalboard([pb.HighpassFilter(35), pb.Reverb(room_size=0.25, wet_level=0.12, dry_level=1.0, width=0.6),
-                        pb.Compressor(threshold_db=-14, ratio=2.5, attack_ms=5, release_ms=120)])(st, SR)
+    d = int(0.006 * SR)
+    st = np.stack([mix, np.concatenate([np.zeros(d), mix[:-d]]) * 0.85 + mix * 0.15]).astype(np.float32)
+    st = pb.Pedalboard([pb.HighpassFilter(40), pb.LowShelfFilter(cutoff_frequency_hz=180, gain_db=3),
+                        pb.Reverb(room_size=0.2, wet_level=0.08, dry_level=1.0, width=0.5),
+                        pb.Compressor(threshold_db=-12, ratio=2, attack_ms=3, release_ms=100)])(st, SR)
     st = st / np.abs(st).max() * 0.89
     f = int(0.4 * SR); st[:, -f:] *= np.linspace(1, 0, f)
     return st
