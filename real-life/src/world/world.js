@@ -37,6 +37,12 @@ const HOUSE_ASSETS = [
   ['furniture', 'televisionVintage'], ['furniture', 'cabinetTelevision'], ['furniture', 'computerScreen'], ['furniture', 'computerKeyboard'], ['furniture', 'laptop'],
   ['furniture', 'cardboardBoxClosed'], ['furniture', 'tableCoffee'], ['furniture', 'rugDoormat'], ['furniture', 'kitchenMicrowave'], ['furniture', 'toaster'],
   ['furniture', 'kitchenCoffeeMachine'], ['furniture', 'radio'],
+  // Lived-in clutter.
+  ['furniture', 'pillow'], ['furniture', 'cardboardBoxOpen'], ['furniture', 'trashcan'], ['furniture', 'rugRounded'], ['furniture', 'rugRectangle'],
+  ['furniture', 'speakerSmall'], ['furniture', 'coatRackStanding'],
+  ['home', 'Trashcan_Small2'], ['home', 'Bathroom_ToiletPaperPile'], ['home', 'Houseplant_3'], ['home', 'Houseplant_4'], ['home', 'NightStand_3'],
+  ['food', 'cup'], ['food', 'glass'], ['food', 'mug'], ['food', 'bowl'], ['food', 'apple'], ['food', 'orange'], ['food', 'banana'], ['food', 'plate-dinner'],
+  ['food', 'plate'], ['food', 'cutting-board'], ['food', 'knife-block'], ['food', 'pan'],
 ];
 
 const _warm = new THREE.Color();

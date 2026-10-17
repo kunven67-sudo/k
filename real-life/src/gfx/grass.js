@@ -27,9 +27,11 @@ function bladeTexture() {
     const lean = (rnd() - 0.5) * 60;
     const w = 3 + rnd() * 4;
     const grad = g.createLinearGradient(0, H, 0, H - h);
-    const l = 0.75 + rnd() * 0.35;
-    grad.addColorStop(0, `rgb(${Math.round(78 * l)},${Math.round(100 * l)},${Math.round(46 * l)})`);
-    grad.addColorStop(1, `rgb(${Math.round(132 * l)},${Math.round(160 * l)},${Math.round(80 * l)})`);
+    // Close to the lawn texture's own colour so the blades blend in instead of reading as
+    // dark clover blotches.
+    const l = 0.88 + rnd() * 0.24;
+    grad.addColorStop(0, `rgb(${Math.round(92 * l)},${Math.round(116 * l)},${Math.round(56 * l)})`);
+    grad.addColorStop(1, `rgb(${Math.round(136 * l)},${Math.round(162 * l)},${Math.round(84 * l)})`);
     g.fillStyle = grad;
     g.beginPath();
     g.moveTo(x - w, H);
@@ -43,11 +45,11 @@ function bladeTexture() {
 }
 
 function tuftGeometry() {
-  // Two crossed quads, 0.42 wide, 0.3 tall; normals straight up so tufts light like the lawn.
+  // Two crossed quads, 26 cm wide, 13 cm tall (a mowed lawn); normals straight up so tufts light like the lawn.
   const parts = [];
   for (const a of [0, Math.PI / 2]) {
-    const g = new THREE.PlaneGeometry(0.34, 0.24);
-    g.translate(0, 0.12, 0);
+    const g = new THREE.PlaneGeometry(0.26, 0.13);
+    g.translate(0, 0.065, 0);
     g.rotateY(a);
     parts.push(g);
   }
@@ -79,7 +81,7 @@ function hash(x, z) {
 }
 
 export class Grass {
-  constructor(world, { radius = 15, spacing = 0.27 } = {}) {
+  constructor(world, { radius = 14, spacing = 0.2 } = {}) {
     this.world = world;
     this.spacing = spacing;
     this.radius = radius;
@@ -165,7 +167,7 @@ export class Grass {
           scale = Math.min(1, edge * 4) * (0.7 + h1 * 0.6);
         }
         this._q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, h2 * Math.PI * 2);
-        this._s.set(scale, scale * (0.8 + h2 * 0.5), scale);
+        this._s.set(scale, scale * (0.75 + h2 * 0.4), scale);
         this._m.compose(p, this._q, this._s);
         this.mesh.setMatrixAt(i, this._m);
         this._c.setRGB(0.92 + h1 * 0.22, 0.95 + h2 * 0.15, 0.85 + h1 * 0.15);

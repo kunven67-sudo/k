@@ -124,7 +124,7 @@ function needleTexture() {
         const l = len * (1 - t * 0.45) * r.range(0.7, 1.1);
         const col = new THREE.Color('#2f4a24').offsetHSL(r.range(-0.02, 0.02), r.range(-0.05, 0.05), r.range(-0.06, 0.08));
         g.strokeStyle = `#${col.getHexString()}`;
-        g.lineWidth = r.range(1.2, 2.2);
+        g.lineWidth = r.range(1.8, 3.0);
         g.beginPath();
         g.moveTo(x, y);
         g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
@@ -132,6 +132,23 @@ function needleTexture() {
       }
     }
   };
+  // A ragged dark mass behind the twigs: the inner needles you can't see through. Without it
+  // the thin needle strokes vanish in the smaller mipmaps and far pines look like bare poles.
+  g.fillStyle = '#233a1b';
+  g.beginPath();
+  g.moveTo(14, H / 2);
+  for (let i = 0; i <= 40; i++) {
+    const t = i / 40;
+    const half = (1 - t) * 62 + 6;
+    g.lineTo(14 + (W - 40) * t, H / 2 + 26 * t - half * r.range(0.65, 1));
+  }
+  for (let i = 40; i >= 0; i--) {
+    const t = i / 40;
+    const half = (1 - t) * 62 + 6;
+    g.lineTo(14 + (W - 40) * t, H / 2 + 26 * t + half * r.range(0.65, 1));
+  }
+  g.closePath();
+  g.fill();
   twig(10, H / 2, W - 10, H / 2 + 26, 34, 5);
   for (let i = 0; i < 9; i++) {
     const t = 0.12 + i * 0.09;
@@ -344,24 +361,29 @@ function pine(seed, far) {
     const k = t / (tiers - 1);
     const y = 1.6 + k * (H - 2.0);
     const len = (1 - k) * 2.6 + 0.5;
-    const n = far ? 4 : 6;
+    const n = far ? 5 : 7;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + t * 0.7 + rng.range(-0.2, 0.2);
-      // A drooping branch card: from the trunk out to `len`, tilted down.
-      const g = new THREE.PlaneGeometry(len, len * 0.5);
-      g.translate(len / 2, 0, 0);
-      g.rotateX(-Math.PI / 2 + rng.range(-0.25, 0.25)); // lie flat-ish
-      g.rotateZ(-rng.range(0.25, 0.45)); // droop
-      g.rotateY(a);
-      g.translate(0, y, 0);
-      const nor = g.attributes.normal;
-      const pos = g.attributes.position;
-      const v = new THREE.Vector3();
-      for (let j = 0; j < pos.count; j++) {
-        v.set(pos.getX(j), 0.9, pos.getZ(j)).normalize();
-        nor.setXYZ(j, v.x, v.y, v.z);
+      const droop = rng.range(0.25, 0.45);
+      // Each drooping branch = two crossed cards: one lying flat-ish (seen from above/below)
+      // and one standing up along the branch (seen from the side). With only the flat one a pine
+      // looked like a bare pole from street level.
+      for (const stand of [false, true]) {
+        const g = new THREE.PlaneGeometry(len, len * (stand ? 0.42 : 0.55));
+        g.translate(len / 2, 0, 0);
+        if (!stand) g.rotateX(-Math.PI / 2 + rng.range(-0.25, 0.25));
+        g.rotateZ(-droop);
+        g.rotateY(a);
+        g.translate(0, y, 0);
+        const nor = g.attributes.normal;
+        const pos = g.attributes.position;
+        const v = new THREE.Vector3();
+        for (let j = 0; j < pos.count; j++) {
+          v.set(pos.getX(j), 0.9, pos.getZ(j)).normalize();
+          nor.setXYZ(j, v.x, v.y, v.z);
+        }
+        cards.push(g);
       }
-      cards.push(g);
     }
   }
   return { wood: mergeGeometries(wood), leaves: mergeGeometries(cards) };

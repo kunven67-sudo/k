@@ -288,6 +288,13 @@ export function buildHouse(world, B, I, opts) {
     B.model('furniture', 'books', { x: r.min.x + 0.15, y: Y + 1.62, z: r.min.z + 0.6, rotY: Math.PI / 2, collide: 'none' });
     B.model('home', 'Light_Ceiling5', { x: c.x, y: H, z: c.z, collide: 'none' });
     R.kid.lightAt = c.clone().setY(H - 0.25);
+    // Lived-in stuff: pillow, books on the desk, a toy box, a lunch box... nobody's room is empty.
+    B.model('furniture', 'pillow', { x: bedX, y: Y + 0.5, z: r.min.z + 0.28, rotY: 0.08, scale: 1.3, stretch: [1.3, 0.7, 1], collide: 'none' });
+    B.model('furniture', 'books', { x: r.min.x + 2.2, y: Y + 0.77, z: r.min.z + 0.3, scale: 1.2, rotY: 0.3, collide: 'none' });
+    B.model('food', 'cup', { x: r.min.x + 3.0, y: Y + 0.77, z: r.min.z + 0.55, collide: 'none' });
+    B.model('furniture', 'cardboardBoxOpen', { x: r.min.x + 0.35, y: Y, z: r.min.z + 2.45, scale: 1.5, rotY: 0.2, collide: 'box' });
+    B.model('furniture', 'bear', { x: r.min.x + 0.38, y: Y + 0.28, z: r.min.z + 2.45, scale: 0.7, rotY: -0.6, collide: 'none' });
+    B.model('furniture', 'trashcan', { x: r.min.x + 3.55, y: Y, z: r.min.z + 0.3, scale: 1.4, collide: 'none' });
   }
 
   // ---- Bathroom ----
@@ -305,6 +312,9 @@ export function buildHouse(world, B, I, opts) {
     B.model('home', 'Bathroom_ToiletPaper', { x: r.max.x - 0.06, y: Y + 0.7, z: r.min.z + 2.0, rotY: -Math.PI / 2, collide: 'none' });
     B.model('home', 'Light_CeilingSingle', { x: c.x, y: H, z: c.z, collide: 'none' });
     R.bath.lightAt = c.clone().setY(H - 0.25);
+    B.model('furniture', 'rugRounded', { x: c.x, y: Y + 0.004, z: r.min.z + 1.1, scale: 1.6, collide: 'none' });
+    B.model('home', 'Trashcan_Small2', { x: r.max.x - 0.25, y: Y, z: r.max.z - 0.25, collide: 'none' });
+    B.model('home', 'Bathroom_ToiletPaperPile', { x: r.max.x - 0.2, y: Y, z: r.min.z + 2.05, collide: 'none' });
   }
 
   // ---- Spare / sibling room ----
@@ -339,6 +349,10 @@ export function buildHouse(world, B, I, opts) {
     H1('home', 'Drawer_2', { x: bx + 0.5, z: r.max.z - 0.3, rotY: Math.PI });
     spot('dresser', { room: 'master', at: new THREE.Vector3(bx + 0.5, Y + 0.5, r.max.z - 0.3), label: "parents' dresser", loot: 'parents-dresser', private: true });
     B.model('home', 'Light_Ceiling3', { x: bx, y: H, z: r.getCenter(new THREE.Vector3()).z, collide: 'none' });
+    for (const dx of [-0.42, 0.42]) B.model('furniture', 'pillow', { x: bx + dx, y: Y + 0.47, z: r.min.z + 0.3, rotY: dx * 0.15, scale: 1.3, stretch: [1.3, 0.7, 1], collide: 'none' });
+    B.model('home', 'Light_Desk', { x: bx + 1.02, y: Y + 0.47, z: r.min.z + 0.27, collide: 'none' });
+    B.model('food', 'glass', { x: bx - 0.9, y: Y + 0.47, z: r.min.z + 0.3, collide: 'none' });
+    H1('home', 'Houseplant_3', { x: r.max.x - 0.3, z: r.max.z - 0.3, collide: 'none' });
     R.master.lightAt = r.getCenter(new THREE.Vector3()).setY(H - 0.3);
   }
 
@@ -366,6 +380,16 @@ export function buildHouse(world, B, I, opts) {
     R.living.lightAt = c.clone().setY(H - 0.6);
     B.model('home', 'Curtains_Double', { x: X(winLiving1.u), y: Y + 0.45, z: r.max.z - 0.12, rotY: Math.PI, scale: 0.6, collide: 'none' });
     B.model('furniture', 'rugDoormat', { x: X(doorFront.u), y: Y, z: r.max.z - 0.4, scale: 2.2, collide: 'none' });
+    // Pillows, a side table with a lamp, speakers by the TV, a coat rack by the door, stuff on the
+    // coffee table: what a real family living room has lying around.
+    for (const dz of [-0.55, 0.55]) B.model('furniture', 'pillow', { x: couchX + 0.18, y: Y + 0.46, z: tvZ + dz, rotY: -Math.PI / 2 + dz * 0.3, scale: 1.2, stretch: [1.2, 0.8, 1], collide: 'none' });
+    H1('home', 'NightStand_3', { x: couchX + 0.1, z: tvZ + 1.35, rotY: -Math.PI / 2 });
+    B.model('furniture', 'lampRoundTable', { x: couchX + 0.1, y: Y + 0.47, z: tvZ + 1.35, scale: 1.5, collide: 'none' });
+    for (const dz of [-0.8, 0.8]) B.model('furniture', 'speakerSmall', { x: r.min.x + 0.27, y: Y + 0.62, z: tvZ + dz, rotY: Math.PI / 2, scale: 1.6, collide: 'none' });
+    B.model('furniture', 'books', { x: X(2.5), y: Y + 0.46, z: tvZ - 0.2, scale: 0.9, rotY: 1.2, collide: 'none' });
+    B.model('food', 'mug', { x: X(2.7), y: Y + 0.46, z: tvZ + 0.25, collide: 'none' });
+    B.model('furniture', 'coatRackStanding', { x: X(doorFront.u) + 1.0, y: Y, z: r.max.z - 0.3, collide: 'none' });
+    H1('home', 'Houseplant_4', { x: r.min.x + 0.4, z: r.min.z + 0.4, collide: 'none' });
   }
 
   // ---- Kitchen ----
@@ -401,6 +425,16 @@ export function buildHouse(world, B, I, opts) {
       spot('seat', { room: 'kitchen', at: new THREE.Vector3(tx + dx, Y + 0.47, tz + dz), faceYaw: ry, label: 'chair', table: true });
     }
     B.collider(tx, Y + 0.37, tz, 1.5, 0.74, 0.95);
+    // Fruit bowl + place mats on the table, a cutting board, knife block, dish stack and a mat by
+    // the sink.
+    B.model('food', 'bowl', { x: tx, y: Y + 0.75, z: tz, scale: 0.45, collide: 'none' });
+    [['apple', -0.04, 0.03], ['orange', 0.05, -0.02], ['banana', 0.0, 0.05], ['apple', 0.03, 0.06]].forEach(([f, dx, dz], i) => B.model('food', f, { x: tx + dx, y: Y + 0.79 + (i > 2 ? 0.03 : 0), z: tz + dz, rotY: i * 1.7, collide: 'none' }));
+    for (const [dx, dz] of [[-0.5, 0.42], [0.5, 0.42], [-0.5, -0.42], [0.5, -0.42]]) B.model('food', 'plate-dinner', { x: tx + dx, y: Y + 0.75, z: tz + dz, collide: 'none' });
+    B.model('food', 'cutting-board', { x: ux0 + 3 * 0.5 + 0.12, y: Y + 0.82, z: zc + 0.02, rotY: Math.PI + 0.2, collide: 'none' });
+    B.model('food', 'knife-block', { x: ux0 + 3.5 * 0.5, y: Y + 0.82, z: zc + 0.1, rotY: Math.PI, collide: 'none' });
+    for (let i = 0; i < 4; i++) B.model('food', 'plate', { x: sinkX + 0.32, y: Y + 0.82 + i * 0.018, z: zc + 0.05, collide: 'none' });
+    B.model('food', 'pan', { x: ux0 + 4 * 0.5, y: Y + 0.86, z: zc - 0.05, rotY: 2.4, collide: 'none' });
+    B.model('furniture', 'rugRectangle', { x: sinkX, y: Y + 0.004, z: zc - 0.75, scale: 1.4, collide: 'none' });
     H1('home', 'Trashcan_Small1', { x: r.min.x + 0.35, z: r.max.z - 0.35, collide: 'box' });
     spot('trash-kitchen', { room: 'kitchen', at: new THREE.Vector3(r.min.x + 0.35, Y + 0.4, r.max.z - 0.35), label: 'trash can' });
     B.model('home', 'Light_Chandelier', { x: tx, y: H, z: tz, collide: 'none' });
@@ -483,7 +517,8 @@ export function buildHouse(world, B, I, opts) {
   sw('room2', X(7.8), Y + 1.2, R.room2.box.max.z - 0.01, Math.PI);
   {
     const M = R.master.box;
-    D.picture(M.getCenter(new THREE.Vector3()).x, Y + 1.6, M.min.z + 0.01, 0, 0.9, 0.55, 'landscape', seed + 21);
+    // On the side wall: the back wall has the window (the picture used to hang over the glass).
+    D.picture(M.max.x - 0.01, Y + 1.6, M.getCenter(new THREE.Vector3()).z, -Math.PI / 2, 0.9, 0.55, 'landscape', seed + 21);
     sw('master', X(10.6), Y + 1.2, M.max.z - 0.01, Math.PI);
   }
   sw('garage', X(12.9) + 0.11, Y + 1.0, Z(3.2) + 0.65, Math.PI / 2);
@@ -646,7 +681,7 @@ export function buildShell(world, B, { x0, zf, width = 13, depth = 10, stories =
     B.slab(gx0, Z(0.2), gx1, Z(gd - 0.2), 0.14, foundation, { thick: 0.1 });
   }
   // Main roof.
-  gableRoof(world, B, { x0: X(hu0 - 0.4), x1: X(hu0 + width + 0.4), zFront: Math.max(Z(-0.45), Z(depth + 0.45)), zBack: Math.min(Z(-0.45), Z(depth + 0.45)), y: wallH + 0.02, rise: stories === 2 ? 2.3 : 2.0, mat: roofMat, gable: sidingMat, fascia: trim });
+  gableRoof(world, B, { x0: X(hu0 - 0.4), x1: X(hu0 + width + 0.4), zFront: Math.max(Z(-0.45), Z(depth + 0.45)), zBack: Math.min(Z(-0.45), Z(depth + 0.45)), y: wallH + 0.02, rise: stories === 2 ? 3.0 : 2.4, mat: roofMat, gable: sidingMat, fascia: trim });
 
   // Front door + porch.
   const doorMat = mat('painted-wood', { color: rng.pick([0x6b2d2a, 0x2d3e5c, 0x1f3b2e, 0x2b2b2b, 0x8a6a3a]), wear: 0.1, dirt: 0.1 });
@@ -666,12 +701,15 @@ export function buildShell(world, B, { x0, zf, width = 13, depth = 10, stories =
     put(w.w / 2 - 0.03, w.y, 0.06, w.h);
     put(0, w.y, w.w, 0.035);
     // Shutters on front windows look very Midwest.
-    if (w.front && !w.upper) {
+    if (w.front) {
       for (const s of [-1, 1]) B.box(w.x + dir.x * s * (w.w / 2 + 0.25), w.y, w.z + facing * 0.12, 0.42, w.h, 0.04, mat('painted-wood', { color: 0x2d3a33, wear: 0.1, dirt: 0.1 }), { rotY: w.rotY, collide: false });
     }
     const g = new THREE.PlaneGeometry(w.w - 0.12, w.h - 0.12);
     g.rotateY(Math.atan2(w.n[0], w.n[1]));
-    g.translate(w.x + w.n[0] * 0.03, w.y, w.z + w.n[1] * 0.03);
+    // Upstairs windows have no hole cut in the wall (they'd overlap the ground floor openings),
+    // so their glass sits just proud of the siding instead of inside the wall.
+    const out = w.upper ? 0.103 : 0.03;
+    g.translate(w.x + w.n[0] * out, w.y, w.z + w.n[1] * out);
     geos.push(g);
   }
   const winMesh = new THREE.Mesh(mergeGeos(geos), WINDOW_MATS.day);
