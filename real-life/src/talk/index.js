@@ -168,7 +168,8 @@ export class Talk {
   }
 
   _note(text) {
-    this._add('note', text);
+    if (this._viaText || !this.log || !this.npc) this.hud.toast(text);
+    else this._add('note', text);
   }
 
   async _send(textIn) {
@@ -195,7 +196,8 @@ export class Talk {
     this._busy = false;
   }
 
-  _apply(npc, reply, text, ctx) {
+  _apply(npc, reply, text, ctx, viaText = false) {
+    this._viaText = viaText;
     const mem = ctx.mem;
     mem.talks = (mem.talks || 0) + 1;
     mem.lastTalk = clock.total;
@@ -204,13 +206,16 @@ export class Talk {
     if (reply.opinion) mem.opinion = Math.max(-100, Math.min(100, mem.opinion + reply.opinion));
     if (reply.mood) npc.mood = reply.mood === 'neutral' ? null : reply.mood;
     mem.said = [...(mem.said || []), { t: Math.round(clock.total), you: text.slice(0, 200), them: reply.say.slice(0, 200) }].slice(-12);
-    this._add('them', reply.say);
-    const h = speak(npc, reply.say, { position: npc.pos.clone().setY(npc.pos.y + npc.height * 0.9), mood: reply.mood });
-    npc.body?.talk(h?.duration || Math.min(6, 1 + reply.say.length / 14));
+    if (!viaText) {
+      this._add('them', reply.say);
+      const h = speak(npc, reply.say, { position: npc.pos.clone().setY(npc.pos.y + npc.height * 0.9), mood: reply.mood });
+      npc.body?.talk(h?.duration || Math.min(6, 1 + reply.say.length / 14));
+      if (reply.anim) npc.body?.play(reply.anim);
+    }
     if (npc.body && npc.mood) npc.body.mood = npc.mood;
-    if (reply.anim) npc.body?.play(reply.anim);
     this._act(npc, reply.act, ctx);
-    this._meter();
+    if (!viaText) this._meter();
+    this._viaText = false;
     bus.emit('talk:said', { npc, text, reply });
   }
 
@@ -252,7 +257,7 @@ export class Talk {
         this._note(`${npc.displayName()} makes you ${snack}.`);
         me.restore('hunger', 0.28);
         this.life.home.d.dishes = Math.min(1, (this.life.home.d.dishes || 0) + 0.1);
-        setTimeout(() => this.panel?.close(), 900);
+        if (!this._viaText) setTimeout(() => this.panel?.close(), 900);
         this.life.skip(6);
         break;
       }
@@ -263,7 +268,7 @@ export class Talk {
         bus.emit('rule:tattle', { rule: act.rule, by: npc.id });
         break;
       case 'end':
-        setTimeout(() => this.panel?.close(), 1400);
+        if (!this._viaText) setTimeout(() => this.panel?.close(), 1400);
         break;
       default:
         break;

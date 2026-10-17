@@ -198,10 +198,14 @@ export class People {
       }
       n.cameFrom = p.exit;
       n.cameWhy = p.why;
-      if (snap || !n.body?.root.visible) return n.setAway(p.at);
+      if (snap || !n.body?.root.visible) {
+        if (!snap && n.rec.family) bus.emit('family:left', { npc: n, why: p.why });
+        return n.setAway(p.at);
+      }
       // Walk out (front door / driveway / store doors), then disappear.
       const exit = this._exitNode(n, p.exit, p.why);
       n.goTo(exit, { kind: 'leave', where: p.at });
+      if (n.rec.family) bus.emit('family:left', { npc: n, why: p.why });
       return;
     }
     const act = { ...p.act };
@@ -410,7 +414,9 @@ export class People {
     if (h < ready - 0.1 || h > ready + 0.25) return;
     this.d.meals[key] = { called: true };
     const line = meal === 'breakfast' ? `${save.life.character.name}! Breakfast is ready!` : `${save.life.character.name}! Dinner! Come eat!`;
-    this.say(n, line, { loud: true });
+    const home = this.world.isIndoors(this.player.position) && this.player.position.distanceTo(n.pos) < 30;
+    if (home) this.say(n, line, { loud: true });
+    else bus.emit('family:text', { npc: n, text: meal === 'breakfast' ? 'Breakfast is ready, where are you?' : 'Dinner is on the table. Come home!' });
     void p;
   }
 

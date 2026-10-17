@@ -25,6 +25,11 @@ import { Talk } from '../talk/index.js';
 import { Rules } from '../life/rules.js';
 import { LemonadeStand } from '../life/lemonade.js';
 import { School } from '../life/school.js';
+import { Phone } from '../ui/phone.js';
+import { Radio } from '../life/radio.js';
+import { openPause } from '../ui/pause.js';
+
+const STATES_HAVE_MENU = true;
 
 export class WorldState {
   constructor(engine) {
@@ -52,6 +57,9 @@ export class WorldState {
     this.life.lemonade = new LemonadeStand(this.life);
     this.life.school = new School(this.life);
     this.talk = new Talk({ world, player: this.player, hud: this.hud, life: this.life, people: this.people });
+    this.phone = new Phone({ engine: e, world, player: this.player, hud: this.hud, life: this.life, people: this.people, talk: this.talk });
+    this.life.phone = this.phone;
+    this.radio = new Radio(this.life);
     this.camOverride = params.cam ? params.cam.split(',').map(Number) : null;
     e.setView(world.scene, this.player.camera);
     input.setPointerLock?.(true);
@@ -64,7 +72,14 @@ export class WorldState {
   update(dt) {
     const p = this.player;
     if (!p) return;
-    if (input.pressed('menu') && panelOpen()) closeTopPanel();
+    if (input.pressed('menu')) {
+      if (panelOpen()) closeTopPanel();
+      else if (this.phone.isOpen) this.phone.close();
+      else openPause({ engine: this.engine, onQuit: () => this.engine.go(STATES_HAVE_MENU ? 'menu' : 'world') });
+    }
+    if (input.pressed('phone') && !panelOpen()) this.phone.toggle();
+    this.phone.update(dt);
+    this.radio.update(dt);
     this.life.update(dt);
     p.update(dt);
     this.people.update(dt);
@@ -87,6 +102,8 @@ export class WorldState {
 
   exit() {
     for (const off of this._offs || []) off();
+    this.radio?.dispose();
+    this.phone?.dispose();
     this.talk?.dispose();
     this.life?.chores?.dispose();
     this.life?.rules?.dispose();

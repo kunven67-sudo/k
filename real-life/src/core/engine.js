@@ -308,7 +308,7 @@ export class Engine {
     if (steps === 4) this._acc = 0;
     this.physics?.sync();
 
-    if (this.state && !this._transitioning) {
+    if (this.state && !this._transitioning && !this.paused) {
       clock.update(dt);
       this.state.update?.(dt, realDt);
     } else if (this.state) {

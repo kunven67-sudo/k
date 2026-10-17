@@ -46,7 +46,7 @@ export class Life {
     this.home.update(dt);
     this.shopping.update(dt);
     // Panels free the mouse and freeze you in place.
-    this.player.locked = panelOpen() || this._sleeping || this._busy;
+    this.player.locked = panelOpen() || this.phone?.isOpen || this._sleeping || this._busy;
     this._effects(dt);
     this.hud.setNeeds(NEEDS.map((id) => ({ id, label: NEED_LABEL[id], value: me.needs[id] })));
   }
