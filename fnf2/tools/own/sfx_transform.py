@@ -104,47 +104,21 @@ def norm(x): return x / (np.abs(x).max() + 1e-9)
 
 
 def render():
-    meat = load(FILES[0])
-    R = sorted(rips(meat), key=lambda r: r[1])                     # quietest -> loudest rip
     wet = [norm(heavy(load(('wet_breaks.zip', 'Wet Break %d.wav' % k)))) for k in range(1, 11)]
     deep = [norm(heavy(load(('deep_breaks.zip', 'Deep Break %d.wav' % k)))) for k in range(1, 11)]
-    try: splat = [norm(heavy(load((FILES[3], 'impsplat/impactsplat0%d.mp3.flac' % k)), 0.8)) for k in (1, 3, 5, 8)]
-    except Exception: splat = [norm(heavy(load('squishsplat_impact.mp3'), 0.8))]
-    slime = [norm(heavy(load(f), 0.8)) for f in FILES[8:]]
-    squish = [norm(heavy(load(f), 0.85)) for f in FILES[4:8]]
 
-    B = {k: Buf() for k in ('bed', 'rip', 'bone', 'splat', 'slime')}
-    # it starts inside him: wet meat squelching that gets louder
-    b = norm(heavy(bed(meat, RIP + 0.3)))
-    B['bed'].add(0.0, b * np.linspace(0.2, 0.8, len(b)) ** 1.5)
-    # rips tearing more and more often, getting louder, the loudest saved for the pull-out
-    small, big = R[:len(R) // 2], R[len(R) // 2:-1]
-    t, k = 0.25, 0
-    while t < RIP - 0.25:
-        prog = t / RIP
-        pool = small if prog < 0.45 else big
-        B['rip'].add(t, norm(heavy(pool[k % len(pool)][0])), 0.3 + 0.7 * prog)
-        t += rng.uniform(0.32, 0.5) * (1 - 0.5 * prog); k += 1
-    # bones breaking (the 4 big ones on the beat at 150 BPM, smaller ones in between)
-    for i, (bt, g) in enumerate(((1.6, 1.0), (2.0, 1.0), (2.25, 0.6), (2.4, 1.0), (2.6, 0.55), (2.8, 1.0), (3.0, 0.7))):
-        B['bone'].add(bt, (wet if i % 2 == 0 else deep)[i], g)
-        if g == 1.0: B['bone'].add(bt + 0.01, deep[(i + 5) % 10], 0.5)
-    # THE PULL-OUT: the loudest rip + a deep break + wet splats
-    B['rip'].add(RIP - 0.08, norm(heavy(R[-1][0])), 2.2)
-    B['bone'].add(RIP, deep[2], 1.6)
-    B['splat'].add(RIP + 0.03, splat[0], 1.8)
-    B['splat'].add(RIP + 0.08, squish[3], 1.1)
-    # the eye squelches out: slime + splats dripping
-    for j, dt in enumerate((0.3, 0.55, 0.8, 1.05, 1.3)):
-        B['slime'].add(RIP + dt, slime[j % len(slime)], 0.9 - 0.12 * j)
-    for j, dt in enumerate((0.45, 0.95)):
-        B['splat'].add(RIP + dt, splat[(j + 1) % len(splat)], 0.5 - 0.15 * j)
-    B['slime'].add(RIP + 0.2, squish[0], 0.6)
+    B = {'bone': Buf()}
+    # bones breaking: a few cracks, then faster and louder, the biggest one on the pull-out
+    hits = [(0.4, .35), (1.0, .45), (1.6, .7), (2.0, .75), (2.25, .55), (2.4, .85), (2.6, .6), (2.8, .9), (2.95, .7), (3.08, .8)]
+    for i, (bt, g) in enumerate(hits):
+        B['bone'].add(bt, (wet if i % 2 == 0 else deep)[i % 10], g)
+    B['bone'].add(RIP, deep[2], 1.4); B['bone'].add(RIP + 0.012, wet[7], 1.2); B['bone'].add(RIP + 0.03, norm(heavy(deep[5], 0.8)), 1.0)
+    B['bone'].add(RIP + 0.45, wet[4], 0.5); B['bone'].add(RIP + 0.8, deep[8], 0.35)
 
     def lvl(x, db):
         r = np.sqrt((x[np.abs(x) > np.abs(x).max() * 0.05] ** 2).mean())
         return x * 10 ** (db / 20) / max(r, 1e-9)
-    mix = lvl(B['bed'].x, -22) + lvl(B['rip'].x, -15) + lvl(B['bone'].x, -13) + lvl(B['splat'].x, -12) + lvl(B['slime'].x, -16)
+    mix = lvl(B['bone'].x, -13)
     mix = mix[:int((LEN + 0.6) * SR)]
     d = int(0.006 * SR)
     st = np.stack([mix, np.concatenate([np.zeros(d), mix[:-d]]) * 0.85 + mix * 0.15]).astype(np.float32)
