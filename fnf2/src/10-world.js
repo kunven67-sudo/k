@@ -49,6 +49,9 @@ G.Character = class extends G.Sprite {
     this.healthIcon = Object.assign({ id: id, flipX: false, isPixel: false }, d.healthIcon || {});
     this.deathData = d.death || {};
     this.startingAnimation = d.startingAnimation || null;
+    // our own characters can bring live tricks (30-own-chars.js), e.g. WRATH's changing eye
+    this.fx = d.fx && G.OwnFX && G.OwnFX[d.fx] || null;
+    if (this.fx && this.fx.init) this.fx.init(this);
     this.dance(true);
     this.updateHitbox();
   }
@@ -90,6 +93,7 @@ G.Character = class extends G.Sprite {
     const n = 'sing' + ['LEFT', 'DOWN', 'UP', 'RIGHT'][dir] + (miss ? 'miss' : '') + (suffix || '');
     this.holdTimer = 0;
     if (!this.playAnim(n, true) && miss) this.playAnim('sing' + ['LEFT', 'DOWN', 'UP', 'RIGHT'][dir], true);
+    if (this.fx && this.fx.onSing) this.fx.onSing(this, dir, miss);
   }
   // per-frame: hold timers + "-hold" follow-up animations (BaseCharacter.onUpdate)
   tick(dt, stepSec, holdingNote) {

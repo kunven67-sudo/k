@@ -37,84 +37,24 @@
   };
 
   // ---------------------------------------------------------------- WRATH
-  // A hair bang hanging over his left eye, drawn in Pico's head-art pixel space (265 x 223).
-  // The hidden eye sits inside x 42-64, y 144-185 in every frame of every pose.
-  function wrathBang(glow) {
-    const c = G.makeCanvas(265, 223), x = c.getContext('2d');
-    const base = '#2b2735', shade = '#151219', ink = '#000';
-    x.lineJoin = 'round'; x.lineCap = 'round';
-    // main lock: starts inside the hair, sweeps down over the eye to a sharp tip
-    const lock = () => {
-      x.beginPath();
-      x.moveTo(34, 88);
-      x.quadraticCurveTo(14, 118, 20, 152);
-      x.quadraticCurveTo(25, 182, 36, 214);        // tip
-      x.quadraticCurveTo(52, 190, 66, 170);
-      x.quadraticCurveTo(84, 140, 92, 112);
-      x.lineTo(104, 96);
-    };
-    lock(); x.closePath(); x.fillStyle = base; x.fill();
-    // shadow along the face side
-    x.save(); lock(); x.closePath(); x.clip();
-    x.beginPath(); x.moveTo(104, 96); x.quadraticCurveTo(84, 150, 36, 214); x.lineTo(70, 214); x.lineTo(120, 120); x.closePath(); x.fillStyle = shade; x.fill();
-    // glowing streak (like Pico's lighter hair streaks)
-    if (glow) {
-      x.beginPath(); x.moveTo(44, 108); x.quadraticCurveTo(32, 140, 36, 176); x.lineWidth = 5; x.strokeStyle = glow; x.stroke();
-      x.beginPath(); x.moveTo(60, 112); x.quadraticCurveTo(54, 128, 52, 146); x.lineWidth = 3.5; x.stroke();
-    }
-    x.restore();
-    // black ink outline on the hanging sides only (the top joins the hair)
-    x.beginPath(); x.moveTo(30, 96); x.quadraticCurveTo(14, 118, 20, 152); x.quadraticCurveTo(25, 182, 36, 214);
-    x.quadraticCurveTo(52, 190, 66, 170); x.quadraticCurveTo(84, 140, 92, 112); x.lineTo(98, 104);
-    x.lineWidth = 7; x.strokeStyle = ink; x.stroke();
-    return c;
-  }
-  const PICO_FACES = new Set(['0', '1', '2', '3', '5', '6', '9', '10', '15']);
-  // the visible (near) eye's box in each Pico face drawing (sprite px)
-  const NEAR_EYE = { '0': [58, 40, 70, 94], '1': [58, 39, 72, 92], '2': [63, 31, 86, 68], '3': [66, 31, 87, 75], '5': [60, 44, 85, 57], '6': [45, 42, 82, 65], '9': [61, 46, 80, 91], '10': [62, 42, 82, 92], '15': [64, 34, 80, 94] };
-
-  // colours shared by the two WRATH looks
-  // Pico's hair: streak (h34), base (h20), shadow (h8). Wide windows so the soft edge pixels
-  // (hair->outline, hair->skin) are caught too and no orange fringe is left.
-  const HAIR = (streak) => [
-    { from: '#f8a838', to: streak, h: 37, hr: 6, soft: 2, s: [0.45, 1], v: [0.06, 1] },
-    { from: '#f86820', to: '#2b2735', h: 20, hr: 10, soft: 2, s: [0.42, 1], v: [0.06, 1] },
-    { from: '#f83010', to: '#151219', h: 4, hr: 7, soft: 2, s: [0.42, 1], v: [0.06, 1] },
-  ];
-  const SOLE = (to) => ({ from: '#f8f0c8', to, h: 45, hr: 22, soft: 3, s: [0, 0.4], v: [0.25, 1] });
-  const SKIN_C = [C('#f8d0a8', '#e4dde8', 14, 0.24), C('#f87880', '#b48aa4', 8)];
-  const SLEEVE_C = [C('#105848', '#16141c', 14), C('#088030', '#2a2733', 14), C('#20a058', '#2a2733', 12), C('#50e858', '#3d3a48', 12)];
-  const GUN_CRAZY = [C('#88b8b8', '#ff3a55', 10)].concat(SLEEVE_C, SKIN_C);
-  const wrathCrazy = {
-    base: 'pico', name: 'WRATH',
-    healthColor: '#ff2340',
-    rules: [],
-    parts: {
-      '14': HAIR('#ff2340').concat(SKIN_C),
-      '13': SKIN_C,
-      '16': SLEEVE_C,
-      '4': SLEEVE_C,
-      '18': GUN_CRAZY, '19': GUN_CRAZY, '20': GUN_CRAZY,
+  // Both of WRATH's looks are built as atlases by tools/own/: wrath_normal.py (stage 1, cut from
+  // a reference drawing) and wrath.py (stage 2, BF's real cut-out art repainted, mint or black hair).
+  // Stage 2 has ONE eye with 5 looks (frames of the WRATH_EYE symbol); it keeps changing while he raps.
+  G.OwnFX = G.OwnFX || {};
+  G.OwnFX.wrath = {
+    init(ch) {
+      ch._eyes = []; ch._eye = 0; ch._eyeNotes = 0; ch._eyeEvery = 3;
+      const a = ch.atlas; if (!a) return;
+      for (const T of Object.values(a.symbols)) for (const L of T.layers) for (const F of L.frames)
+        for (const e of F.els) if (e.s === 'WRATH_EYE' || e.s === 'WRATH_EYE_m') ch._eyes.push(e);
+      this.setEye(ch, 0);
     },
-    zones: [],
-    edit(atlas) {
-      G.OwnArt.glueAboveFace(atlas, { symbol: 'pico default head', inner: '14', name: 'WRATH_BANG', img: wrathBang('#ff2340'), isFace: e => (e.n != null && PICO_FACES.has(e.n)) || e.s === 'pico default face' });
+    setEye(ch, k) { ch._eye = k; for (const e of ch._eyes) e.ff = k; },
+    // a new look every 2-4 notes, never the same one twice in a row
+    onSing(ch) {
+      if (++ch._eyeNotes < ch._eyeEvery) return;
+      ch._eyeNotes = 0; ch._eyeEvery = 2 + Math.floor(Math.random() * 3);
+      this.setEye(ch, (ch._eye + 1 + Math.floor(Math.random() * 4)) % 5);
     },
-    iconRules: [C('#f8a838', '#ff2340', 5), C('#f86820', '#2b2735', 7, 0.2), C('#f83010', '#151219', 5, 0.15), C('#f8d0a8', '#e4dde8', 14, 0.2), C('#f87880', '#b48aa4', 8)],
   };
-  const LEGS_CRAZY = [
-    SOLE('#cdc8d6'),
-    C('#f83010', '#ff2340', 6, 0.12), C('#f86820', '#ff5066', 6, 0.14),            // glowing laces
-    C('#681838', '#1d1a24', 8), C('#b81830', '#34303e', 5, 0.12),                  // shoes
-    C('#d04848', '#3d0c18', 5, 0.14), C('#d08858', '#5c1626', 6, 0.14), C('#e8b078', '#7c2434', 5, 0.14), // pants
-  ].concat(SLEEVE_C);
-  for (const n of ['7', '8', '11', '12', '17']) wrathCrazy.parts[n] = LEGS_CRAZY;
-  for (const n of PICO_FACES) {
-    wrathCrazy.parts[n] = [C('#f80058', '#a3001f', 8, 0.2), C('#f87880', '#b48aa4', 8)];
-    // his one eye glows red (teeth stay white)
-    wrathCrazy.zones.push({ sprite: n, box: NEAR_EYE[n], rules: [GRAY('#ff2a3c', 0.25), C('#f80058', '#a3001f', 8, 0.2), C('#f87880', '#b48aa4', 8)] });
-  }
-  G.OWN['wrath'] = wrathCrazy;
-
-  // WRATH's normal form (the story intro guy) is cut from the user's own drawing: tools/own/wrath_normal.py
 })();
