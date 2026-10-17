@@ -296,6 +296,13 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Up to 3 sidekicks on Hard, unlimited on Insane.**
 - Shoots enemies, hacks turrets, heals you, distracts enemies.
 - When it goes down **you have to revive it in time, or it's gone forever**.
+- **Built:**
+  - Three ways to hack one: hold USE next to an AI under 35% health; beat the arrow-key code mini-game on a frozen AI (EMP'd, tased, darted); or load a hack round (GEAR tab, press J) and shoot an AI with it
+  - It turns your colors (cyan) and gets "(YOURS)" after its name. Up to 3 (more on Insane)
+  - It follows you, shoots the AIs it can see (and the boss), heals you when you're under 60 HP and close, and hacks alarm towers near it
+  - Enemy AIs shoot at it too, so it pulls fire off you. Your own bullets and explosions go through it
+  - When it goes down: revive it within 30s (hold USE next to it), or it's gone for good
+  - Sidekicks follow you to the next level and are saved
 
 ## 8. Dying & Getting Hacked
 
@@ -413,7 +420,7 @@ What the first build should have:
 7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
 8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** (Dr. Sbaitso) and "to be continued"
 
-**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook, all 9 grenades, the vision gear, all 100 guns and gun skins**. **Not built yet:** 3 save slots (it autosaves 1), sidekicks, the trophy room, vehicles (hoverbike, tank), Insane mode, the energy sword.
+**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook, all 9 grenades, the vision gear, all 100 guns, gun skins and sidekicks**. **Not built yet:** 3 save slots (it autosaves 1), the trophy room, vehicles (hoverbike, tank), Insane mode, the energy sword.
 
 ## Still Open
 
