@@ -17,7 +17,7 @@ export class UI {
     this.tab = 'resume';
     this.seat = { hud: false, x: 0, hot: -1 };
     this.settings = Object.assign({
-      quality: 'auto', sens: 1, seatFov: 60, seatLow: 0.13, volume: 0.9, ambient: 0.8, outages: true, keylock: true, fpsShow: false,
+      quality: 'auto', sens: 1, seatFov: 68, seatLow: 0.17, volume: 0.9, ambient: 0.8, outages: true, keylock: true, fpsShow: false,
     }, load('bs_settings'));
     this.outfit = load('bs_outfit');
     this.buildSeatbar();
@@ -142,6 +142,7 @@ export class UI {
   // ------------------------------------------------------------------ pause menu
   openMenu(tab = 'resume') {
     this.menuOpen = true;
+    this.openedAt = performance.now();
     this.tab = tab;
     this.g.input.unlock();
     this.renderMenu();

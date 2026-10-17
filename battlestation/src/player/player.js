@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Avatar } from './avatar.js';
 import { Hands } from './hands.js';
-import { placeRoot, sitLegs, walkLegs, spineAndHead, hangArms, lieDown } from './poses.js';
+import { placeRoot, sitLegs, walkLegs, spineAndHead, hangArms, lieDown, lyingPose } from './poses.js';
 import { DESK_ROT } from '../world/desk.js';
 
 // You. States: bed (waking up), walk, sit (at the PC), look (seated, looking around), couch.
@@ -72,6 +72,7 @@ export class Player {
   // out of bed: swing your legs out and stand up next to the nightstand
   getUp() {
     if (this.state !== 'bed') return;
+    if (this.sleeping) this.g.toggleSleep(false);
     this.trans = { t: 0, dur: 1.6, from: this.camPose() };
     this.pos.set(1.9, 0, 3.35);
     this.yaw = 0.55; this.pitch = -0.2; this.bodyYaw = this.yaw;
@@ -80,7 +81,7 @@ export class Player {
 
   lieDown() {
     this.trans = { t: 0, dur: 1.4, from: this.camPose() };
-    this.seatLook.yaw = 0; this.seatLook.pitch = 0;
+    this.seatLook.yaw = -0.45; this.seatLook.pitch = -0.6; // head on the pillow, looking down the bed at the room
     this.setState('bed');
   }
 
@@ -127,7 +128,7 @@ export class Player {
     const fast = input.down('ShiftLeft') || input.down('ShiftRight');
     const crouching = input.down('ControlLeft') || input.down('KeyC');
     this.crouch += ((crouching ? 1 : 0) - this.crouch) * Math.min(1, dt * 8);
-    const speed = (fast ? 2.2 : 1.35) * (1 - this.crouch * 0.55);
+    const speed = (fast ? 2.2 : 1.35) * (1 - this.crouch * 0.55) * (this.g.needs?.speed() ?? 1);
     const len = Math.hypot(mx, mz);
     const want = new THREE.Vector3();
     if (len > 0) {
@@ -206,8 +207,7 @@ export class Player {
     } else if (this.state === 'bed') {
       const b = this.g.bed;
       lieDown(av, b.pelvis, b.headDir);
-      for (const s of ['l', 'r']) av.relaxFingers(s, 0.5);
-      spineAndHead(av, Math.atan2(b.headDir.x, b.headDir.z) + Math.PI, 0, this.lookDir(), 0.6);
+      lyingPose(av, b.headDir, this.lookDir());
     }
     av.root.updateMatrixWorld(true);
   }

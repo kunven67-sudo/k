@@ -109,3 +109,30 @@ export function lieDown(av, pelvisWorld, headDir) {
   av.root.position.copy(pelvisWorld).sub(off);
   av.root.updateMatrixWorld(true);
 }
+
+// While lying: spine stays flat with the body, the head (propped on the pillow) turns toward
+// where you look, arms rest along your sides / on your belly under the covers.
+export function lyingPose(av, headDir, lookDir) {
+  av.root.updateMatrixWorld(true);
+  const toes = headDir.clone().negate();
+  const right = av.pos('upperarm_r').sub(av.pos('upperarm_l')).normalize();
+  // neck lifted a little by the pillow
+  av.pointBone('neck_01', headDir.clone().addScaledVector(UP, 0.45).normalize());
+  const look = lookDir.clone().normalize();
+  const face = UP.clone().lerp(look, 0.55).normalize();
+  const top = headDir.clone().addScaledVector(face, -headDir.dot(face)).normalize();
+  av.orientBone('head', face, top);
+  // legs straight and close together, feet pointing up (toes make the duvet bump)
+  for (const [side, s] of [['l', -1], ['r', 1]]) {
+    av.pointBone('thigh_' + side, toes.clone().addScaledVector(right, s * 0.035).addScaledVector(UP, 0.02).normalize());
+    av.pointBone('calf_' + side, toes.clone().addScaledVector(right, s * 0.01).addScaledVector(UP, -0.03).normalize());
+    av.pointBone('foot_' + side, UP.clone().multiplyScalar(0.55).add(toes).addScaledVector(right, s * 0.3).normalize());
+    av.pointBone('ball_' + side, UP.clone().multiplyScalar(0.3).add(toes).addScaledVector(right, s * 0.3).normalize());
+  }
+  for (const [side, s] of [['l', -1], ['r', 1]]) {
+    av.pointBone('upperarm_' + side, toes.clone().addScaledVector(right, s * 0.18).addScaledVector(UP, -0.08).normalize());
+    av.pointBone('lowerarm_' + side, toes.clone().addScaledVector(UP, 0.06).addScaledVector(right, s * 0.04).normalize());
+    av.orientHand(side, toes.clone(), right.clone().multiplyScalar(-s).addScaledVector(UP, 0.3).normalize());
+    av.relaxFingers(side, 0.5);
+  }
+}

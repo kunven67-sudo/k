@@ -43,7 +43,7 @@ export async function buildHouse(ctx) {
     const len = axis === 'x' ? x1 - x0 : z1 - z0;
     const local = holes.map(o => ({ x0: o.a0 - (axis === 'x' ? x0 : z0), x1: o.a1 - (axis === 'x' ? x0 : z0), y0: o.y0, y1: o.y1 }));
     const geos = [];
-    for (const r of faceRects(len, H, local)) {
+    for (const r of faceRects(len, H + 0.03, local)) { // a bit taller: they poke into the roof slab, no light gap
       const g = axis === 'x' ? boxMM(x0 + r.x0, r.y0, z0, x0 + r.x1, r.y1, z1) : boxMM(x0, r.y0, z0 + r.x0, x1, r.y1, z0 + r.x1);
       geos.push(g);
       if (r.y0 < 1.9) { // anything you could bump into
@@ -213,7 +213,7 @@ export async function buildHouse(ctx) {
     leaf.position.z = 0;
     G.add(pivot);
     // which way it swings: into the room it belongs to
-    const swingSign = key === 'bedroom' ? -1 : key === 'bathroom' ? 1 : 1;
+    const swingSign = key === 'bedroom' ? 1 : key === 'bathroom' ? -1 : 1; // +1 turns the leaf toward -x
     const door = { key, pivot, leaf, open: 0, target: 0, base: ang, width, locked: !!dd.locked, swingSign };
     const col = physics.add({ x: 0, z: 0, hx: width / 2, hz: 0.03, y0: 0, y1: dd.h });
     door.collider = col;

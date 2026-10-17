@@ -648,7 +648,10 @@ export class OS {
     c.y += dy;
     const dd = c.x < this.displays[1].x ? this.displays[0] : this.displays[1];
     // pushing up past the top edge goes to the bar above the monitors (the game watches hudEscape)
-    if (c.y < dd.y) { this.hudEscape += dd.y - c.y; c.y = dd.y; } else if (dy > 0) this.hudEscape = 0;
+    // only in the middle of the top edge, so flicking up to a menu or a close button never triggers it
+    const mid = c.x > dd.x + dd.w * 0.22 && c.x < dd.x + dd.w * 0.78 && !this.drag;
+    if (c.y < dd.y) { if (mid) this.hudEscape += dd.y - c.y; c.y = dd.y; } else if (dy > 0 || !mid) this.hudEscape = 0;
+    this.hudEscapeT = performance.now();
     c.y = Math.min(dd.y + dd.h - 1, c.y);
     if (this.drag) {
       const w = this.drag.w;

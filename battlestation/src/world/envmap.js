@@ -32,11 +32,34 @@ export class RoomEnv {
 
   all() { for (const k of Object.keys(ROOMS)) this.capture(k, 2); }
 
-  // keep the room you're in fresh; others refresh lazily
+  // keep the room you're in fresh; others refresh lazily. One cube face per frame so it never hitches.
   update(room, dirty) {
     if (dirty) this.queue = [room, ...Object.keys(ROOMS).filter(k => k !== room)];
-    if (this.queue.length) this.capture(this.queue.shift(), 1);
-    else if (room && performance.now() - (this.age[room] || 0) > 20000) this.capture(room, 1);
+    if (!this.job) {
+      if (this.queue.length) this.job = { room: this.queue.shift(), face: 0 };
+      else if (room && performance.now() - (this.age[room] || 0) > 20000) this.job = { room, face: 0 };
+    }
+    if (this.job) this.step();
     return this.envs[room] || this.envs.bedroom;
+  }
+
+  step() {
+    const j = this.job, r = this.renderer, cam = this.cam, R = ROOMS[j.room];
+    if (j.face === 0) { cam.position.set((R.x0 + R.x1) / 2, 1.35, (R.z0 + R.z1) / 2); cam.updateMatrixWorld(true); }
+    const prevRT = r.getRenderTarget(), prevEnv = this.scene.environment, au = r.shadowMap.autoUpdate;
+    r.shadowMap.autoUpdate = false; // shadows from the last real frame are fine for a bounce snapshot
+    this.scene.environment = this.envs[j.room] || null;
+    r.setRenderTarget(this.rt, j.face);
+    r.render(this.scene, cam.children[j.face]);
+    r.setRenderTarget(prevRT);
+    r.shadowMap.autoUpdate = au;
+    this.scene.environment = prevEnv;
+    if (++j.face === 6) {
+      const old = this.envs[j.room];
+      this.envs[j.room] = this.pmrem.fromCubemap(this.rt.texture).texture;
+      old?.dispose();
+      this.age[j.room] = performance.now();
+      this.job = null;
+    }
   }
 }

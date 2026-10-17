@@ -139,6 +139,39 @@ export class Audio {
   }
 
   // A simple electronic beep (microwave, router, BIOS POST).
+  noiseBuf() {
+    if (this._noise) return this._noise;
+    const ctx = this.ctx, len = ctx.sampleRate * 4;
+    const b = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = b.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.04 * w) / 1.04; d[i] = w * 0.5 + last * 3; }
+    return (this._noise = b);
+  }
+
+  // short shaped burst of noise: can opening, fizz, cloth, spray. env = [attack, hold, release] seconds
+  burst(o = {}) {
+    if (!this.ctx) return;
+    this.noiseBuf();
+    const ctx = this.ctx, t = ctx.currentTime + (o.delay || 0);
+    const src = ctx.createBufferSource(); src.buffer = this._noise; src.playbackRate.value = o.rate ?? 1;
+    const f = ctx.createBiquadFilter(); f.type = o.filter || 'bandpass'; f.frequency.value = o.freq ?? 3000; f.Q.value = o.q ?? 0.8;
+    if (o.sweep) f.frequency.exponentialRampToValueAtTime(o.sweep, t + (o.env?.[0] ?? 0.01) + (o.env?.[1] ?? 0.1) + (o.env?.[2] ?? 0.2));
+    const g = ctx.createGain();
+    const [a, h, r] = o.env || [0.005, 0.08, 0.25];
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(o.vol ?? 0.1, t + a);
+    g.gain.setValueAtTime(o.vol ?? 0.1, t + a + h); g.gain.exponentialRampToValueAtTime(0.0001, t + a + h + r);
+    src.connect(f).connect(g);
+    let out = g;
+    if (o.pos) {
+      const pan = ctx.createPanner(); pan.panningModel = 'HRTF'; pan.refDistance = 0.4;
+      pan.positionX.value = o.pos.x; pan.positionY.value = o.pos.y; pan.positionZ.value = o.pos.z;
+      g.connect(pan); out = pan;
+    }
+    out.connect(this.bus.sfx);
+    src.start(t, Math.random() * 2); src.stop(t + a + h + r + 0.05);
+  }
+
   beep(freq = 2000, dur = 0.12, o = {}) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime + (o.delay || 0);
@@ -166,14 +199,7 @@ export class Audio {
   noiseLoop(o = {}) {
     if (!this.ctx) return null;
     const ctx = this.ctx;
-    if (!this._noise) {
-      const len = ctx.sampleRate * 4;
-      const b = ctx.createBuffer(1, len, ctx.sampleRate);
-      const d = b.getChannelData(0);
-      let last = 0;
-      for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.04 * w) / 1.04; d[i] = w * 0.5 + last * 3; }
-      this._noise = b;
-    }
+    this.noiseBuf();
     const src = ctx.createBufferSource();
     src.buffer = this._noise; src.loop = true;
     src.playbackRate.value = o.rate ?? 1;

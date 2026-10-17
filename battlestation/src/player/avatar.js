@@ -50,7 +50,7 @@ export class Avatar {
     this.headHidden = false;
     ctx.scene.add(this.root);
     this.computeHandFrames();
-    this.outfit = { sleeves: 'long', top: 0x232428, pants: 'joggers', pantsColor: 0x5b5d61, shoes: true, skin: 'light', watch: true };
+    this.outfit = { sleeves: 'long', top: 0x232428, pants: 'joggers', pantsColor: 0x5b5d61, shoes: false, skin: 'light', watch: true };
   }
 
   async setupMaterials() {
@@ -61,10 +61,12 @@ export class Avatar {
     this.coverMask = { value: new THREE.Vector3(1, 0, 1) };
     skin.onBeforeCompile = (s) => {
       s.uniforms.coverMask = this.coverMask;
-      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying float vCover;\nuniform vec3 coverMask;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCover = dot(color.rgb, coverMask);');
-      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vCover;')
-        .replace('void main() {', 'void main() {\nif (vCover > 0.5) discard;');
+      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying float vCover;\nvarying float vSock;\nuniform vec3 coverMask;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCover = dot(color.rgb, coverMask);\nvSock = color.b * (1.0 - coverMask.z);');
+      // no shoes on = socks (where the shoes would be)
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vCover;\nvarying float vSock;')
+        .replace('void main() {', 'void main() {\nif (vCover > 0.5) discard;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\nif (vSock > 0.5) diffuseColor.rgb = vec3(0.075, 0.077, 0.085) * (0.85 + 0.15 * diffuseColor.r);');
     };
     body.material = skin;
     this.skinMat = skin;

@@ -54,7 +54,7 @@ export async function buildBedroom(ctx) {
   p2.position.set(0.8, BED.top + 0.25, 4.63); p2.rotation.set(-1.12, -0.05, 0.02);
   B.pillows = [p1, p2];
   // duvet: draped over the mattress, morphs between "you're under it" and "thrown back"
-  B.pelvis = new THREE.Vector3(0.78, BED.top + 0.08, 3.66);
+  B.pelvis = new THREE.Vector3(0.78, BED.top + 0.08, 3.7);
   const duvet = mesh(duvetGeo(BED, mx0, mx1, mz0, mz1, B.pelvis.x), duvetFab, { parent: scene });
   duvet.material = duvetFab.clone();
   duvet.material.side = THREE.DoubleSide;
@@ -110,6 +110,7 @@ export async function buildBedroom(ctx) {
   B.cans.push(await energyCan(ctx, { x: 4.2, y: 0.4, z: 1.55, flavor: 1 }));
   B.remote = buildRemote(ctx);
   B.remote.position.set(4.18, 0.4, 2.42); B.remote.rotation.y = 1.4;
+  ctx.interact.add(B.remote, { range: 2.4, label: () => B.tv.on ? 'Turn off the TV' : 'Turn on the TV', use: () => B.tvPower() });
 
   // ---- TV wall: media console, console, 55" TV -------------------------------------------------
   const cab = await model('modern_wooden_cabinet');
@@ -128,7 +129,37 @@ export async function buildBedroom(ctx) {
   B.tv = tv;
   // wall bracket hidden behind the TV
   mesh(box(0.4, 0.3, 0.035, 0.004), paint(0x111111, 0.5, 0.6), { parent: scene, pos: [5.4 - 0.02, tv.group.position.y, 1.92], rot: [0, Math.PI / 2, 0] });
-  B.tick.push(dt => tv.update(dt));
+  // TV: remote turns it on; with nothing playing it shows the "no signal" box drifting around
+  B.tvState = { t: 0, x: 200, y: 160, vx: 70, vy: 46 };
+  const tvDraw = (dt) => {
+    const st = B.tvState, c = tv.ctx, [W, Hh] = tv.res;
+    st.t += dt;
+    if (!tv.on) return;
+    if (B.tvSource) { B.tvSource(c, W, Hh, dt); tv.markDirty(); return; }
+    c.fillStyle = '#000'; c.fillRect(0, 0, W, Hh);
+    if (st.t < 2.2) { // brand splash
+      c.globalAlpha = Math.min(1, st.t * 2) * Math.min(1, (2.2 - st.t) * 3);
+      c.fillStyle = '#e8e8e8'; c.font = '600 64px Arial'; c.textAlign = 'center'; c.fillText('VIEWMAX', W / 2, Hh / 2 + 20);
+      c.globalAlpha = 1; c.textAlign = 'left';
+    } else {
+      st.x += st.vx * dt; st.y += st.vy * dt;
+      if (st.x < 20 || st.x > W - 360) st.vx *= -1;
+      if (st.y < 20 || st.y > Hh - 150) st.vy *= -1;
+      c.fillStyle = 'rgba(40,40,46,0.92)'; c.fillRect(st.x, st.y, 340, 130);
+      c.fillStyle = '#fff'; c.font = '600 30px Arial'; c.fillText('HDMI 1', st.x + 24, st.y + 50);
+      c.fillStyle = '#bbb'; c.font = '22px Arial'; c.fillText('No signal', st.x + 24, st.y + 88);
+      c.fillText('Check that the device is on.', st.x + 24, st.y + 116);
+    }
+    tv.markDirty();
+  };
+  B.tick.push(dt => { tvDraw(dt); tv.signal = tv.on; tv.update(dt); });
+  const tvPower = () => {
+    tv.on = !tv.on; B.tvState.t = 0;
+    if (!tv.on) { tv.ctx.fillStyle = '#000'; tv.ctx.fillRect(0, 0, ...tv.res); tv.markDirty(); }
+    ctx.audio.beep(tv.on ? 1300 : 700, 0.05, { vol: 0.015, type: 'sine', pos: tv.group.position });
+    ctx.envDirty = true;
+  };
+  B.tvPower = tvPower;
 
   // ---- ceiling fan with a light kit + two pull chains ------------------------------------------
   B.fan = await buildFan(ctx, new THREE.Vector3(2.7, H, 2.5));
@@ -190,7 +221,7 @@ function duvetGeo(BED, mx0, mx1, mz0, mz1, bodyX) {
   const posA = [], posB = [], uvs = [], idx = [];
   const cx = (mx0 + mx1) / 2, hw = (mx1 - mx0) / 2;
   const bodyH = (z) => { // how tall your body is under the covers along the bed
-    const k = [[2.72, 0.05], [2.8, 0.17], [2.9, 0.12], [3.1, 0.12], [3.4, 0.15], [3.7, 0.19], [3.95, 0.22], [4.1, 0.2]];
+    const k = [[2.64, 0.06], [2.72, 0.2], [2.86, 0.16], [3.05, 0.15], [3.4, 0.17], [3.7, 0.2], [3.95, 0.23], [4.1, 0.22]];
     if (z <= k[0][0]) return 0;
     for (let i = 1; i < k.length; i++) if (z <= k[i][0]) { const t = (z - k[i - 1][0]) / (k[i][0] - k[i - 1][0]); return k[i - 1][1] + (k[i][1] - k[i - 1][1]) * t; }
     return 0.2;
@@ -208,7 +239,8 @@ function duvetGeo(BED, mx0, mx1, mz0, mz1, bodyX) {
         const e = (hangFoot + Math.PI * rc / 2) - s; // past the foot edge
         let z, dropZ;
         if (e > 0) { const [o, d] = drape(e); z = mz0 - o; dropZ = d; } else { z = mz0 - e; dropZ = 0; }
-        const bx = Math.exp(-Math.pow((x - bodyX) / 0.2, 2));
+        // your body under it: flat on top across your shoulders/legs, soft falloff to the sides
+        const ax = Math.abs(x - bodyX), fo = Math.max(0, 1 - (ax - 0.22) / 0.17), bx = ax < 0.22 ? 1 : fo * fo * (3 - 2 * fo);
         const lift = dropX === 0 && dropZ === 0 ? bodyH(z) * bx : 0;
         let y = top - Math.max(dropX, dropZ) + lift + wr * (1 + lift * 4);
         // top edge folds over a little (sheet showing)
@@ -314,6 +346,19 @@ export async function energyCan(ctx, o) {
   g.rotation.y = o.rot ?? Math.random() * 6;
   ctx.scene.add(g);
   const can = { group: g, flavor: f, sips: 6, open: false };
+  ctx.interact.add(g, {
+    range: 2.2,
+    label: () => can.sips <= 0 ? 'Empty can' : can.open ? `Drink ${f.name}` : `Open ${f.name}`,
+    enabled: () => !!ctx.needs,
+    use: () => {
+      const pos = g.getWorldPosition(new THREE.Vector3()).setY(o.y + 0.12);
+      if (can.sips <= 0) { ctx.toast('It\'s empty.'); ctx.audio.beep(160, 0.05, { vol: 0.02, type: 'triangle', pos }); return; }
+      if (!can.open) { can.open = true; ctx.audio.burst({ pos, freq: 4200, q: 0.6, vol: 0.22, env: [0.002, 0.03, 0.35], sweep: 1800 }); ctx.audio.beep(900, 0.03, { vol: 0.03, type: 'triangle', pos }); return; }
+      can.sips--;
+      ctx.needs.drink(0.07, { caffeine: 0.12, sugar: 0.08, text: can.sips ? `Sip of ${f.name}.` : `Finished the ${f.name}.` });
+      ctx.audio.burst({ pos, freq: 700, q: 0.4, vol: 0.06, env: [0.05, 0.25, 0.2] });
+    },
+  });
   return can;
 }
 

@@ -14,6 +14,7 @@ import { Player } from './player/player.js';
 import { Rig } from './pc/rig.js';
 import { UI } from './ui.js';
 import { Scanner } from './pc/scanner.js';
+import { Needs } from './player/needs.js';
 
 const $ = id => document.getElementById(id);
 
@@ -49,8 +50,9 @@ export class Game {
     this.audio = new Audio();
     this.physics = new Physics();
     this.interact = new Interact(this.camera);
-    this.settings = { sens: 1, seatFov: 60, seatLow: 0.13 };
+    this.settings = { sens: 1, seatFov: 68, seatLow: 0.17 };
     this.ui = new UI(this);
+    this.needs = new Needs(this);
     const q = this.params.get('q');
     this.renderer.set(q || this.ui.settings.quality);
     this.renderer.setup(this.scene, this.camera);
@@ -74,6 +76,8 @@ export class Game {
     const lp = this.params.get('lights');
     if (lp !== null) this.lights.setRoom('bedroom', lp === '1');
     this.progress(0.46, 'Plugging in your PC');
+    this.renderer.onChange((lvl) => this.lightBudget(lvl));
+    this.lightBudget(this.renderer.level);
     this.rig = new Rig(this);
     this.scanner = new Scanner(this);
     await this.scanner.boot();
@@ -94,6 +98,7 @@ export class Game {
     if (st) this.devState(st);
     else {
       this.player.state = 'bed';
+      this.player.seatLook.yaw = -0.45; this.player.seatLook.pitch = -0.6;
       this.bedroom.setCovered(true, true);
       this.lids(0, 0);
       this.ui.showStart(() => this.wakeUp());
@@ -104,11 +109,24 @@ export class Game {
   devState(st) {
     this.started = true;
     this.input.enabled = true;
-    if (st === 'sit') { this.player.state = 'sit'; if (this.params.get('pc') === 'on') this.os.go('desktop'); }
-    else if (st === 'bed') { this.player.state = 'bed'; this.bedroom.setCovered(true, true); }
+    if (st === 'sit') { this.player.state = 'sit'; if (this.params.get('pc') === 'on') { this.rig.onPower(true); this.os.go('desktop'); } }
+    else if (st === 'bed') { this.player.state = 'bed'; this.player.seatLook.yaw = -0.45; this.player.seatLook.pitch = -0.6; this.bedroom.setCovered(true, true); }
     else if (st === 'walk') { const [x, z, yaw, pitch] = (this.params.get('at') || '3,3,1.57,0').split(',').map(Number); this.player.standAt(x, z, yaw); this.player.pitch = pitch || 0; this.bedroom.setCovered(false, true); }
     else this.player.state = 'none';
     this.devCamera();
+  }
+
+  // Weaker graphics cards can't afford every soft light in the room: drop the subtle ones first.
+  lightBudget(lvl) {
+    const L = this.lights, d = this.desk, B = this.bedroom;
+    if (!L || !d || !B) return;
+    const rank = { low: 0, medium: 1, high: 2, ultra: 3 }[lvl] ?? 2;
+    for (const s of L.skyLights) s.light.visible = rank >= 1;
+    for (const m of d.monitors) m.glow.visible = rank >= 1;
+    B.tv.glow.visible = rank >= 1;
+    d.led.wallGlow.visible = rank >= 2; d.led.underGlow.visible = rank >= 2;
+    for (const r of Object.values(L.rooms)) for (const l of r.lights) l.fill.visible = rank >= 1;
+    d.tower.spill.visible = rank >= 2;
   }
 
   // ------------------------------------------------------------------ waking up
@@ -170,7 +188,8 @@ export class Game {
   onKey(e, down) {
     const ui = this.ui, p = this.player, st = p.state;
     if (e.code === 'F1') { if (down) ui.menuOpen ? ui.closeMenu() : ui.openMenu(); return true; }
-    if (ui.menuOpen || !this.started) return true;
+    if (ui.menuOpen) { if (down && e.code === 'Escape' && performance.now() - ui.openedAt > 400) ui.closeMenu(); return true; }
+    if (!this.started) return true;
     if (st === 'sit') {
       if (ui.seat.hud) {
         if (down && e.code === 'Escape') ui.exitSeatHud();
@@ -181,6 +200,7 @@ export class Game {
       this.os.key(e, down);
       return true;
     }
+    if (p.sleeping && down) { this.toggleSleep(false); return true; }
     if (e.code === 'Escape' && down) { if (st === 'look') { p.backToPc(); return true; } ui.openMenu(); return true; }
     if (e.code === 'KeyE') this.useKey(down);
     if (down && !e.repeat) {
@@ -232,7 +252,11 @@ export class Game {
     if (ui.seat.hud) { ui.seatHud(dx, dy); return; }
     this.os.mouseMove(dx, dy);
     this.player.hands.mouseMove(dx, dy, this.os.cursor);
-    if (this.os.hudEscape > 45) ui.enterSeatHud();
+    // keep pushing up past the screen: the bar slides down a bit, then opens
+    const e = this.os.hudEscape;
+    if (e > 170) ui.enterSeatHud();
+    else if (e > 30) { if (ui.seatMode !== 'peek') ui.setSeatbar('peek'); }
+    else if (ui.seatMode === 'peek') ui.setSeatbar('hide');
   }
 
   keySound(code) {
@@ -246,13 +270,25 @@ export class Game {
   useKey(down) {
     if (down) {
       const it = this.interact.current;
-      if (!it) return;
+      if (!it) { if (this.player.state === 'bed') this.toggleSleep(); return; }
       if (it.hold && (!it.hold.enabled || it.hold.enabled())) this.holding = { it, t: 0 };
       else it.use();
     } else if (this.holding) {
       if (!this.holding.done && this.holding.t < 0.45) this.holding.it.use();
       this.holding = null;
     }
+  }
+
+  // napping in bed: eyes close, tiredness drains fast, any key wakes you up
+  toggleSleep(force) {
+    const p = this.player, n = this.needs;
+    const on = force ?? !p.sleeping;
+    if (on === p.sleeping) return;
+    if (on && n.effTired() < 0.25) { this.toast('You\'re not tired.'); return; }
+    p.sleeping = on;
+    this.lids(on ? 0 : 1, on ? 2.2 : 1.4);
+    this.hint(on ? 'Sleeping... press any key to wake up' : '', on ? 0 : 1);
+    if (!on && n.effTired() < 0.05) this.toast('You feel rested.');
   }
 
   footstep(pos, fast) {
@@ -274,6 +310,19 @@ export class Game {
     if (prev === 'bed' && s !== 'bed') this.bedroom.setCovered(false);
     if (s === 'bed') this.bedroom.setCovered(true);
     $('hint').classList.remove('on');
+  }
+
+  // what your body does to the picture: heavy eyes, blur when you're wrecked
+  body(dt) {
+    const n = this.needs, p = this.player;
+    const b = n.blur();
+    const cv = $('view');
+    const f = b > 0.05 ? `blur(${Math.min(3, b).toFixed(2)}px)` : '';
+    if (cv.style.filter !== f) cv.style.filter = f;
+    if (!p.sleeping && this.started && n.effTired() > 0.85) {
+      this._blinkT = (this._blinkT ?? 6) - dt;
+      if (this._blinkT < 0) { this._blinkT = 8 + Math.random() * 10; this.lids(0.15, 0.6); setTimeout(() => { if (!this.player.sleeping) this.lids(1, 0.9); }, 900); }
+    }
   }
 
   devCamera() {
@@ -312,6 +361,10 @@ export class Game {
     this.bedroom.update(dt);
     const p = this.player;
     if (p.state !== 'none') p.update(dt, this.input);
+    this.needs.update(dt, p.sleeping);
+    if (p.sleeping) { this.needs.rest(dt); if (this.needs.effTired() <= 0) this.toggleSleep(false); }
+    this.body(dt);
+    if (this.os.hudEscape > 0 && performance.now() - (this.os.hudEscapeT || 0) > 700 && !this.ui.seat.hud) { this.os.hudEscape = 0; if (this.ui.seatMode === 'peek') this.ui.setSeatbar('hide'); }
     if (this.params.get('freecam')) { p.avatar.hideHead(false); this.devCamera(); }
     // what you're looking at (not while your eyes are on the monitors)
     if (p.state !== 'sit' && p.state !== 'none' && !p.trans) {
