@@ -124,10 +124,58 @@
   };
   G.WrathPoses = POSES;
 
+  // ---------------------------------------------------------------- BF + GF on the bench
+  // Cut out of the user's bench picture (tools/own/bench_cut.py: flat colours, clean ink). Every pose
+  // keeps the spot it had in the picture, measured from GF's corner, so they line up like drawn.
+  // Mirrored: GF sits on the left (WRATH walks up to her first), BF on the right by the trash can.
+  const SIT = 'shared/images/wrath-park/sit/';
+  const SIT_SC = 0.88, SIT_FLIP = true, SIT_X = 698, SIT_Y = 592.8 - 328 * 0.88;
+  const SIT_POSES = { bf: { eat: ['bf-eat', 'eat'], lick: ['bf-lick', 'lick'], freeze: ['bf-freeze', 'freeze'] }, gf: { sit: ['gf-freeze', 'freeze'] } };
+  G.sitSprite = function (who, z) {
+    const meta = G.A.json(SIT + 'sit.json'); if (!meta) return null;
+    const s = new G.Sprite(0, 0);
+    s.poses = {};
+    for (const name in SIT_POSES[who]) {
+      const [file, panel] = SIT_POSES[who][name], m = meta[file], g = meta['gfpos-' + panel];
+      s.poses[name] = { img: G.A.image(SIT + file + '.png'), rx: m.x - g.x, ry: m.y - g.y, w: m.w, h: m.h };
+    }
+    s.flipX = SIT_FLIP; s.zIndex = z; s.sq = 0;
+    s.anims.pose = { kind: 'own', n: 1, fps: 24, loop: true }; s.cur = s.anims.pose; s.animName = 'pose'; s.finished = false;
+    // where a picture point lands in the world
+    s.place = function () {
+      const p = this.pp, sx = SIT_SC * (1 + this.sq * 0.5), sy = SIT_SC * (1 - this.sq);
+      this.frameW = p.w; this.frameH = p.h; this.scale.x = sx; this.scale.y = sy; this.updateHitbox();
+      const left = SIT_FLIP ? SIT_X - (p.rx + p.w) * SIT_SC : SIT_X + p.rx * SIT_SC, top = SIT_Y + p.ry * SIT_SC;
+      // squash keeps the seat (bottom middle) still
+      this.home = { x: left + p.w * (SIT_SC - sx) / 2, y: top + p.h * (SIT_SC - sy) };
+      this.x = this.home.x; this.y = this.home.y;
+    };
+    s.setPose = function (n) { if (!this.poses[n]) return; this.poseName = n; this.pp = this.poses[n]; this.place(); };
+    s.squash = function (q) { this.sq = q; this.place(); };
+    // world point of a picture point (relative to this pose's corner)
+    s.at = function (px, py) { const p = this.pp; return { x: SIT_FLIP ? this.home.x + (p.w - px) * SIT_SC : this.home.x + px * SIT_SC, y: this.home.y + py * SIT_SC }; };
+    let off = null;
+    s.fx = { draw(sp, ctx) {
+      const p = sp.pp; if (!p || !p.img) return;
+      const t = sp.tint;
+      if (!t || !(t.a > 0)) { ctx.drawImage(p.img, 0, 0); return; }
+      if (!off) off = document.createElement('canvas');
+      if (off.width !== p.w || off.height !== p.h) { off.width = p.w; off.height = p.h; }
+      const o = off.getContext('2d');
+      o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(0, 0, p.w, p.h); o.drawImage(p.img, 0, 0);
+      o.globalCompositeOperation = 'source-atop';
+      const g = o.createRadialGradient(t.x, t.y, 0, t.x, t.y, t.r);
+      g.addColorStop(0, t.color.replace('A', t.a.toFixed(3))); g.addColorStop(0.6, t.color.replace('A', (t.a * 0.7).toFixed(3))); g.addColorStop(1, t.color.replace('A', '0'));
+      o.fillStyle = g; o.fillRect(0, 0, p.w, p.h);
+      ctx.drawImage(off, 0, 0);
+    } };
+    s.setPose(Object.keys(s.poses)[0]);
+    return s;
+  };
+
   // ---------------------------------------------------------------- the cutscene
   const SND = 'shared/sounds/wrath-park/', DLG = 'shared/images/dialogue/';
   const JINGLE = 'shared/music/wrath-park/jingle.ogg', JBPM = 116;
-  const SEAT = { gf: [600, 548], bf: [842, 548] };
   const CAN = { x: 1393, y: 600 };                                   // the trash can's mouth (world)
   const LINES = [
     { who: 'wrath', text: "heh. brain freeze? that's tragic, little man." },
@@ -148,7 +196,7 @@
   G.Cutscenes = G.Cutscenes || {};
   G.Cutscenes.glare = {
     create(P) {
-      if (P.stage.id !== 'wrathPark' || !G.A.json(BF + '/Animation.json')) return null;
+      if (P.stage.id !== 'wrathPark' || !G.A.json(SIT + 'sit.json')) return null;
       const cs = Object.create(Scene);
       cs.init(P);
       return cs;
@@ -161,11 +209,19 @@
       this.getup = (G.query && G.query.getup) || G.settings.wrathGetup || 'hop';
       this.orig = { bf: st.chars.bf, gf: st.chars.gf };
       st.chars.bf = null; st.chars.gf = null;
-      // BF + GF on the bench (FNF's own sitting art, posed)
-      const mk = (base, sc, seat, z, pose) => { const s = G.puppetSprite(base); s.scale.x = s.scale.y = sc; s.updateHitbox(); s.sitAt(seat[0], seat[1]); s.home = { x: s.x, y: s.y }; s.zIndex = z; s.pose = POSES[pose]; st.props.push(s); return s; };
-      this.gf = mk(GF, 0.66, SEAT.gf, 60, 'gfEat');
-      this.bf = mk(BF, 0.62, SEAT.bf, 61, 'bfEat');
+      // BF + GF on the bench (cut from the user's bench picture)
+      const sit = (who, z) => { const s = G.sitSprite(who, z); st.props.push(s); return s; };
+      this.gf = sit('gf', 60); this.bf = sit('bf', 61);
+      // the blue brain-freeze bolts (same picture), over BF's head
+      const meta = G.A.json(SIT + 'sit.json'), bm = meta.bolts, gp = meta['gfpos-freeze'];
+      const bo = this.bolts = new G.Sprite(0, 0).loadImage(SIT + 'bolts.png');
+      bo.flipX = SIT_FLIP; bo.scale.x = bo.scale.y = SIT_SC; bo.updateHitbox(); bo.zIndex = 62; bo.visible = false;
+      bo.home = { x: SIT_X - (bm.x - gp.x + bm.w) * SIT_SC, y: SIT_Y + (bm.y - gp.y) * SIT_SC }; bo.x = bo.home.x; bo.y = bo.home.y;
+      st.props.push(bo);
       this.dad = P.dad;
+      // WRATH isn't here yet: he walks in from the left when he starts talking
+      this.dadHome = { x: P.dad.originalPosition.x, y: P.dad.originalPosition.y };
+      this.dad.x = this.dadHome.x - 950; this.walk = null;
       this.kenny = st.props.find(p => p.name === 'kenny');
       if (this.kenny) { this.kenny.visible = true; this.kenny.play('serve', true); this.kenny.onFinish = n => { if (n === 'serve') this.kenny.play('idle', true); }; }
       this.can = st.props.find(p => p.name === 'trashcan');
@@ -195,8 +251,8 @@
     moveCam(x, y, z, dur, e) { this.cam.tw = { x0: this.cam.x, y0: this.cam.y, z0: this.cam.z, x, y, z, t: 0, dur, e: e || ease.inOut }; },
     camOn(who, z) {
       if (who === 'wrath') return this.moveCam(330, 560, z || 1.05, 0.55, ease.expo);
-      if (who === 'gf') return this.moveCam(640, 430, z || 1.25, 0.55, ease.expo);
-      if (who === 'bf') return this.moveCam(860, 430, z || 1.3, 0.55, ease.expo);
+      if (who === 'gf') return this.moveCam(570, 440, z || 1.25, 0.55, ease.expo);
+      if (who === 'bf') return this.moveCam(815, 440, z || 1.3, 0.55, ease.expo);
     },
     // ------------------------------------------------ the scene, shot by shot
     *script() {
@@ -206,16 +262,16 @@
       this.licking = true;
       yield wait(4.2);
       // 2. closer: BF looks at his cone... and takes a HUGE bite
-      this.moveCam(850, 420, 1.45, 1.6, ease.inOut);
+      this.moveCam(815, 440, 1.45, 1.6, ease.inOut);
       yield wait(1.8);
-      this.licking = false; B.pose = POSES.bfGrin;
+      this.licking = false; B.setPose('eat');
       yield wait(0.7);
-      B.pose = POSES.bfChomp; G.sfx(SND + 'crunch.ogg', { vol: 1 }); this.punch(0.08); this.P.cam.shake(0.004, 0.15);
+      B.setPose('lick'); this.squash(B, 0.06); G.sfx(SND + 'crunch.ogg', { vol: 1 }); this.punch(0.08); this.P.cam.shake(0.004, 0.15);
       yield wait(0.25); G.sfx(SND + 'crunch2.ogg', { vol: 0.8 });
       yield wait(0.45);
       // 3. BRAIN FREEZE: everything stops, he goes blue, shivers, holds his head
       G.audio.music.setVolume(0.12, 0.15);
-      B.pose = POSES.bfFreeze; this.freeze = 1;
+      B.setPose('freeze'); this.squash(B, -0.08); this.freeze = 1; this.bolts.visible = true; this.boltT = 0;
       G.sfx(SND + 'freeze.ogg', { vol: 0.9 }); G.sfx(SND + 'sparkle.ogg', { vol: 0.7 }); G.sfx(SND + 'shiver.ogg', { vol: 0.8 });
       if (G.settings.flashing !== false) this.P.cam.flash('#cfefff', 0.45);
       this.punch(0.12); this.burst(28);
@@ -224,22 +280,23 @@
       this.moveCam(740, 445, 1.12, 0.9, ease.inOut);
       G.audio.music.setVolume(0.45, 1.2);
       yield wait(0.35);
-      Gf.pose = POSES.gfLaugh; G.sfx(SND + 'gf-laugh.ogg', { vol: 0.8 }); this.bounce(Gf, 3);
+      G.sfx(SND + 'gf-laugh.ogg', { vol: 0.8 }); this.bounce(Gf, 3);
       yield wait(1.6);
       // 5. a voice from the side... WRATH
-      B.pose = POSES.bfLook; Gf.pose = POSES.gfLook;
+      B.setPose('eat'); this.bolts.visible = false;
       G.sfx(SND + 'whip.ogg', { vol: 0.7 });
       G.audio.music.setVolume(0.28, 0.6);
+      yield* this.wrathWalksIn();
       for (const L of LINES.slice(0, -1)) { yield* this.say(L); }
       // 6. "Bop!" -> the cone goes in the trash
       yield* this.say(LINES[LINES.length - 1], true);
       this.moveCam(1040, 470, 1.0, 0.5, ease.expo);
-      B.pose = POSES.bfWind; yield wait(0.28);
-      B.pose = POSES.bfThrow; G.sfx(SND + 'toss.ogg', { vol: 0.9 });
+      this.squash(B, 0.07); yield wait(0.28);
+      this.squash(B, -0.06); G.sfx(SND + 'toss.ogg', { vol: 0.9 });
       this.throwCone();
       yield until(() => !this.cone);
       G.sfx(SND + 'clang.ogg', { vol: 1 }); this.canShake = 0.6; this.P.cam.shake(0.006, 0.2); this.puffAt(CAN.x, CAN.y + 20, 8, '#ffffff');
-      Gf.pose = POSES.gfLaugh; this.bounce(Gf, 2);
+      this.bounce(Gf, 2);
       yield wait(0.75);
       // 7. BF gets up -> the battle
       yield* this.getUp();
@@ -258,18 +315,27 @@
       if (changed) this.camOn(L.who);
       // who's talking reacts
       if (L.who === 'wrath') { this.dad.playAnim(L.anim || 'idle', true); if (L.anim) this.dad.holdTimer = -99; }
-      if (L.who === 'bf') { this.B_jolt = 0.25; G.sfx(SND + (L.text.startsWith('Beep') ? 'bf-beep' : 'bf0') + '.ogg', { vol: 0.9 }); this.bf.pose = L.text.startsWith('Beep') ? POSES.bfJolt : POSES.bfGrin; }
-      if (L.who === 'gf') { this.gf.pose = POSES.gfLook; this.bounce(this.gf, 1); }
+      if (L.who === 'bf') { this.B_jolt = 0.25; G.sfx(SND + (L.text.startsWith('Beep') ? 'bf-beep' : 'bf0') + '.ogg', { vol: 0.9 }); }
+      if (L.who === 'gf') this.bounce(this.gf, 1);
       this.advance = false;
       yield until(() => this.typed >= this.full.length && (this.advance || (last && this.tt > 0.6)));
       G.sfx(DLG_SND + 'dialogueClose.ogg', { vol: 0.55 });
       if (L.who === 'wrath' && L.anim) { this.dad.holdTimer = 0; }
       if (last) { const n = b.animName.replace('Open', ''); b.play(n + 'Open', true, true); this.boxOffsets(); this.text.setText(''); this.dim = 0; this.line = null; this.closing = true; }
     },
+    // he strolls in, a bounce on every step (his own walk drawings will replace this)
+    *wrathWalksIn() {
+      const D = this.dad;
+      this.moveCam(420, 520, 1.0, 1.9, ease.inOut);
+      this.walk = { t: 0, dur: 1.9, x0: D.x, x1: this.dadHome.x, steps: 6 };
+      D.playAnim('idle', true);
+      yield until(() => !this.walk);
+      D.playAnim('idle', true);
+    },
     *getUp() {
       const P = this.P, st = P.stage, B = this.bf;
       const battle = () => {
-        st.props.splice(st.props.indexOf(this.bf), 1); st.props.splice(st.props.indexOf(this.gf), 1);
+        for (const o of [this.bf, this.gf, this.bolts]) if (st.props.includes(o)) st.props.splice(st.props.indexOf(o), 1);
         st.chars.bf = this.orig.bf; st.chars.gf = this.orig.gf;
         if (this.kenny) this.kenny.visible = false;
       };
@@ -311,7 +377,6 @@
       });
       A.x = ax; A.y = ay; A.playAnim('singDOWN', true); A.holdTimer = 0;
       G.sfx(SND + 'puff.ogg', { vol: 0.9 }); this.puffAt(fx, fy, 14, '#e9d9c4'); P.cam.shake(0.005, 0.15);
-      this.gf.pose = POSES.gfLook;
       yield wait(0.35);
       A.playAnim('hey', true);
       G.audio.music.stop(0.8);
@@ -328,10 +393,10 @@
     },
     finish() {
       const P = this.P, st = P.stage;
-      if (st.props.includes(this.bf)) st.props.splice(st.props.indexOf(this.bf), 1);
-      if (st.props.includes(this.gf)) st.props.splice(st.props.indexOf(this.gf), 1);
+      for (const o of [this.bf, this.gf, this.bolts]) if (o && st.props.includes(o)) st.props.splice(st.props.indexOf(o), 1);
       st.chars.bf = this.orig.bf; st.chars.gf = this.orig.gf;
       this.orig.bf.x = this.orig.bf.originalPosition.x; this.orig.bf.y = this.orig.bf.originalPosition.y;
+      this.walk = null; this.dad.x = this.dadHome.x; this.dad.y = this.dadHome.y; this.dad.angle = 0;
       if (this.kenny) this.kenny.visible = false;
       if (this.can && this.can.home) { this.can.x = this.can.home.x; this.can.y = this.can.home.y; this.can.angle = 0; }
       G.audio.music.stop(0.5);
@@ -342,9 +407,11 @@
     },
     // ------------------------------------------------ little effects
     punch(z) { this.punchZ = (this.punchZ || 0) + z; },
+    // a quick squash (+) or stretch (-) that springs back, FNF style
+    squash(s, q) { s.sqT = 0; s.sqA = q; },
     bounce(s, n) { s.bounceT = 0; s.bounceN = n; },
     burst(n) {
-      const B = this.bf, cx = B.x + B.width * 0.42, cy = B.y + B.height * 0.32;
+      const B = this.bf, h = B.at(135, 175), cx = h.x, cy = h.y;
       for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2, v = 140 + Math.random() * 260;
         this.fx.push({ kind: 'spark', x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: 0.7 + Math.random() * 0.7, t: 0, s: 6 + Math.random() * 10, c: Math.random() < 0.5 ? '#ffffff' : '#9fe6ff' });
@@ -357,9 +424,8 @@
       }
     },
     throwCone() {
-      const B = this.bf;
-      const x0 = B.x + B.width * 0.3, y0 = B.y + B.height * 0.15;
-      this.cone = { x0, y0, x1: CAN.x, y1: CAN.y, t: 0, dur: 0.62, img: G.A.image(CONE_PINK), rot: 0 };
+      const B = this.bf, h = B.at(74, 237);                 // his cone, in the picture
+      this.cone = { x0: h.x, y0: h.y, x1: CAN.x, y1: CAN.y, t: 0, dur: 0.62, img: G.A.image(SIT + 'cone-vanilla.png'), rot: 0 };
     },
     // ------------------------------------------------ frame
     update(dt) {
@@ -389,17 +455,34 @@
       P.cam.update(dt);
       // BF: licking, jolting, shivering, cold face
       const B = this.bf;
-      if (this.licking) B.pose = Math.floor(this.t / 0.55) % 2 ? POSES.bfEat : POSES.bfGrin;
+      if (this.licking) { const p = Math.floor(this.t / 0.55) % 2 ? 'eat' : 'lick'; if (B.poseName !== p) { B.setPose(p); this.squash(B, p === 'lick' ? 0.04 : -0.03); } }
+      for (const s of [this.gf, this.bf]) {
+        if (s.sqA) { s.sqT += dt; const k = s.sqT / 0.22; s.squash(k >= 1 ? 0 : s.sqA * Math.cos(k * Math.PI * 1.5) * (1 - k)); if (k >= 1) s.sqA = 0; }
+      }
       B.x = B.home.x; B.y = B.home.y;
       if (this.freeze > 0) {
         this.freeze = Math.max(0, this.freeze - dt / 3.6);
         const sh = Math.min(1, this.freeze * 1.6) * 4;
         B.x += (Math.floor(this.t * 40) % 2 ? sh : -sh);
-        B.tint = { a: Math.min(0.6, this.freeze * 0.9), color: 'rgba(80,170,255,A)', x: 210, y: 400, r: 190 };
+        B.tint = { a: Math.min(0.55, this.freeze * 0.9), color: 'rgba(80,170,255,A)', x: 135, y: 175, r: 165 };
+        const bo = this.bolts; this.boltT += dt;
+        bo.visible = this.freeze > 0.15; bo.x = bo.home.x + (Math.floor(this.t * 30) % 2 ? 3 : -3); bo.y = bo.home.y + Math.sin(this.boltT * 20) * 2;
+        bo.alpha = Math.min(1, this.freeze * 3); const bs = SIT_SC * (1 + 0.25 * Math.max(0, 1 - this.boltT / 0.18)); bo.scale.x = bo.scale.y = bs;
         if (Math.random() < dt * 14 * this.freeze) this.burst(1);
       } else B.tint = null;
       if (this.B_jolt > 0) { this.B_jolt = Math.max(0, this.B_jolt - dt); B.y -= Math.sin(this.B_jolt / 0.25 * Math.PI) * 18; }
       for (const s of [this.gf, this.bf]) if (s.bounceN) { s.bounceT += dt; const k = s.bounceT / 0.18; if (k >= s.bounceN) s.bounceN = 0; else s.y = s.home.y - Math.abs(Math.sin(k * Math.PI)) * 8; }
+      // WRATH walking in
+      const W = this.walk;
+      if (W) {
+        W.t += dt; const k = Math.min(1, W.t / W.dur), e = k < 0.85 ? k / 0.85 * 0.93 : 0.93 + (1 - Math.pow(1 - (k - 0.85) / 0.15, 2)) * 0.07;
+        const ph = k * W.steps * Math.PI, step = Math.abs(Math.sin(ph));
+        this.dad.x = G.lerp(W.x0, W.x1, e);
+        this.dad.y = this.dadHome.y - step * 16 * (1 - k * 0.6);
+        this.dad.angle = Math.sin(ph) * 2.2 * (1 - k);
+        if (Math.floor(ph / Math.PI) !== W.lastStep) { W.lastStep = Math.floor(ph / Math.PI); if (k < 0.97) G.sfx(SND + 'puff.ogg', { vol: 0.18 }); }
+        if (k >= 1) { this.dad.x = W.x1; this.dad.y = this.dadHome.y; this.dad.angle = 0; this.walk = null; }
+      }
       // trash can rattles
       if (this.can && this.canShake > 0) { this.canShake = Math.max(0, this.canShake - dt); const k = this.canShake / 0.6; this.can.angle = Math.sin(this.t * 55) * 9 * k; this.can.x = this.can.home.x + Math.sin(this.t * 40) * 5 * k; }
       else if (this.can && this.can.home) { this.can.angle = 0; this.can.x = this.can.home.x; }

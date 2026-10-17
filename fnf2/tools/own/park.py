@@ -262,7 +262,7 @@ def stage_json():
              startingAnimation='idle', danceEvery=0),
         prop('truck', P + 'truck', TRUCK_POS, TRUCK_SC, TRUCK_SCROLL, 22),
         prop('front', P + 'front', at('front'), 1.5, 0.9, 30),
-        prop('bench', P + 'bench', (-300, -150), 1.5, 1.0, 50),
+        prop('bench', P + 'bench', (-101, 28.8), 1.2, 1.0, 50),     # sized so BF + GF from the bench picture fit on it
         prop('trashcan', P + 'trashcan', (1300, 555), 0.47, 1.0, 55),
     ]
     chars = {'bf': dict(zIndex=300, position=[1125, 880], cameraOffsets=[-180, -60]),
