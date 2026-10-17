@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#16151a">
+  <meta name="description" content="REAL LIFE: be born, grow up and live a whole life.">
+  <title>REAL LIFE</title>
+  <link rel="stylesheet" href="./css/game.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.js",
+      "three/addons/": "./vendor/three/addons/",
+      "rapier": "./vendor/rapier/rapier.mjs"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas" tabindex="0" aria-label="REAL LIFE game view"></canvas>
+    <div id="ui-root"></div>
+    <div id="touch-root"></div>
+    <div id="fade" class="fade"></div>
+  </div>
+  <noscript><p class="noscript">REAL LIFE needs JavaScript and a WebGL-capable browser.</p></noscript>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
