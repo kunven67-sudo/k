@@ -251,7 +251,7 @@ export class People {
         if (act.spot) {
           if (act.kind === 'tv' && act.alt) act.offset = this._side(act.spot, act.spot.width > 1.5 ? 0.55 : 0.4);
           if (act.kind === 'tv' && !act.alt) act.offset = this._side(act.spot, act.spot.width > 1.5 ? -0.55 : -0.4);
-          if (act.kind === 'sleep' && act.spot.owner === 'parents') act.offset = this._side(act.spot, n.rec.role === 'mom' || n.rec.role === 'grandma' ? -0.38 : 0.38, true);
+          if (act.kind === 'sleep' && act.spot.owner === 'parents') act.offset = this._side(act.spot, n.rec.primary ? -0.38 : 0.38, true);
           return act.spot.nav;
         }
         return act.node;

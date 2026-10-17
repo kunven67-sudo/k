@@ -6,7 +6,7 @@
 //   plan(rec, clock, ctx) -> { at: 'home' | 'work' | 'store:grocery' | node, act }
 
 import { Rng } from '../core/rng.js';
-import { randomLook } from './look.js';
+import { randomLook, childLook } from './look.js';
 import { LOTS } from '../world/layout.js';
 
 const FIRST = {
@@ -58,8 +58,9 @@ export function makeResidents(life) {
     out.push({
       id: `fam-${m.role}${i}`,
       family: true,
+      primary: i === 0,
       role: m.role,
-      call: { mom: 'Mom', dad: 'Dad', grandma: 'Grandma', grandpa: 'Grandpa' }[m.role] || m.name,
+      call: { mom: 'Mom', dad: 'Dad', mom2: 'Mama', dad2: 'Papa', grandma: 'Grandma', grandpa: 'Grandpa' }[m.role] || m.name,
       name: m.name || rng.pick(FIRST[sex]),
       last,
       sex,
@@ -76,9 +77,11 @@ export function makeResidents(life) {
   });
   // Sibling.
   if (fam.house?.sibling && fam.house.sibling !== 'none') {
-    const sex = rng.pick(['f', 'm']);
     const age = fam.house.sibling === 'older' ? 12 : 5;
-    out.push({ id: 'fam-sib', family: true, role: 'sibling', name: rng.pick(FIRST[sex]), last, sex, age, look: randomLook(rng, { sex, age }), job: age < 6 ? 'kindergarten' : 'school', traits: traits(rng, { talkative: 0.7, nosy: 0.7 }), home: 'home', startAway: null });
+    // Same genes as your family photo on the new life screen.
+    const look = fam.geneSeed && fam.mom?.look ? childLook(new Rng(fam.geneSeed + 9), fam.mom.look, (fam.dad || fam.mom).look) : randomLook(rng, { sex: rng.pick(['f', 'm']), age });
+    const sex = look.sex;
+    out.push({ id: 'fam-sib', family: true, role: 'sibling', name: rng.pick(FIRST[sex]), last, sex, age, look, job: age < 6 ? 'kindergarten' : 'school', traits: traits(rng, { talkative: 0.7, nosy: 0.7 }), home: 'home', startAway: null });
   }
   // ---- neighbours ----
   for (const lot of LOTS) {
@@ -146,7 +149,7 @@ export function plan(rec, clock, ctx) {
   const weekend = wd === 0 || wd === 6;
   const S = ctx.spots;
   if (rec.family) {
-    const isParent = rec.role === 'mom' || rec.role === 'dad' || rec.role.startsWith('grand');
+    const isParent = rec.role !== 'sibling';
     if (rec.role === 'sibling') {
       if (h < 7.5 || h >= 21) return { act: { kind: 'sleep', spot: S.siblingBed || S.couch } };
       if (!weekend && h >= 8 && h < 15.5) return { at: 'away', exit: 'front', why: 'school' };
@@ -154,7 +157,7 @@ export function plan(rec, clock, ctx) {
       return { act: { kind: 'tv', spot: S.couch } };
     }
     if (!isParent) return { act: { kind: 'stand', node: ctx.homeRoom.living } };
-    const first = rec.role === 'mom' || rec.role === 'grandma';
+    const first = !!rec.primary; // the first parent cooks + does the dishes (the other one watches TV... real)
     const wake = weekend ? 8 : 6.5;
     const bed = weekend ? 23 : 22.5;
     if (h < wake || h >= bed) return { act: { kind: 'sleep', spot: S.parentsBed } };

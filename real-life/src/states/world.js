@@ -29,8 +29,6 @@ import { Phone } from '../ui/phone.js';
 import { Radio } from '../life/radio.js';
 import { openPause } from '../ui/pause.js';
 
-const STATES_HAVE_MENU = true;
-
 export class WorldState {
   constructor(engine) {
     this.engine = engine;
@@ -40,12 +38,14 @@ export class WorldState {
     const e = this.engine;
     if (!save.life) devLife(params);
     const life = save.life;
+    if (life.opening && life.opening !== 'done') return e.go('birth');
     this.lifeData = life;
     if (params.hour) clock.reset(clock.dayIndex, +params.hour * 60);
-    const world = new World(e);
+    // The birth sequence hands over the world it already built (no second loading screen).
+    const world = params.world || new World(e);
     this.world = world;
     e.physics = world.physics;
-    await world.build({ family: life.family.house, season: clock.season }, (p, msg) => e.setLoading?.(p, msg));
+    if (!params.world) await world.build({ family: life.family.house, season: clock.season }, (p, msg) => e.setLoading?.(p, msg));
     const sp = spawnPoint(world, params.spawn || life.slices.player?.spawn || 'bed');
     this.player = new Player(e, world, { look: life.character.look, age: Math.max(1, clock.age), spawn: sp.pos, yaw: sp.yaw, name: life.character.name });
     this.hud = new Hud(e.uiRoot);
@@ -60,6 +60,13 @@ export class WorldState {
     this.phone = new Phone({ engine: e, world, player: this.player, hud: this.hud, life: this.life, people: this.people, talk: this.talk });
     this.life.phone = this.phone;
     this.radio = new Radio(this.life);
+    if (params.wake) {
+      // First morning as a big kid: you wake up in your own bed.
+      const bed = world.home.spots.find((s) => s.kind === 'bed' && s.owner === 'you');
+      if (bed) this.life.home._lie(bed);
+      setTimeout(() => this.hud.toast(`You wake up in your room. You're ${Math.floor(clock.age)} now.`, 5000), 1200);
+      setTimeout(() => this.hud.toast('Tip: walk up to things and press E. Tab = your phone. Esc = pause.', 7000), 6800);
+    }
     this.camOverride = params.cam ? params.cam.split(',').map(Number) : null;
     e.setView(world.scene, this.player.camera);
     input.setPointerLock?.(true);
@@ -69,13 +76,17 @@ export class WorldState {
     ];
   }
 
+  fixedUpdate(step) {
+    this.player?.fixedUpdate(step);
+  }
+
   update(dt) {
     const p = this.player;
     if (!p) return;
     if (input.pressed('menu')) {
       if (panelOpen()) closeTopPanel();
       else if (this.phone.isOpen) this.phone.close();
-      else openPause({ engine: this.engine, onQuit: () => this.engine.go(STATES_HAVE_MENU ? 'menu' : 'world') });
+      else openPause({ engine: this.engine, onQuit: () => this.engine.go('menu') });
     }
     if (input.pressed('phone') && !panelOpen()) this.phone.toggle();
     this.phone.update(dt);

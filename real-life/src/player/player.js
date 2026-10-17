@@ -90,6 +90,7 @@ export class Player {
   }
 
   eye(out) {
+    if (this.forceCrawl) return out.copy(this.position).setY(this.position.y + this.height * 0.48);
     const crouch = this._crouchK * 0.35 * this.height;
     return out.copy(this.position).setY(this.position.y + this.height * 0.93 - crouch);
   }
@@ -141,8 +142,8 @@ export class Player {
     } else {
       body.root.position.copy(this.position);
       body.root.rotation.y = this.yaw + Math.PI;
-      body.pose = c.crouch ? 'crawl' : body.pose === 'carry' ? 'carry' : 'stand';
-      if (body.pose === 'crawl' && this.age >= 2) body.pose = 'stand';
+      body.pose = c.crouch || this.forceCrawl ? 'crawl' : body.pose === 'carry' ? 'carry' : 'stand';
+      if (body.pose === 'crawl' && this.age >= 2 && !this.forceCrawl) body.pose = 'stand';
       body.setMotion({ speed: c.speed, grounded: c.grounded });
     }
     body.update(dt);
