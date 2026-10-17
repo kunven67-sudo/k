@@ -1,7 +1,7 @@
 """GLARE - WRATH's own song (original), made in code.
 
 Stage 1: a funky night-street groove while he's still the normal guy.
-The snap: the beat tape-stops, his body tears open (sfx_transform.py), the eye rips out.
+The snap: the beat tape-stops, a heartbeat while his body tears open (sfx_transform.py), the eye rips out.
 Stage 2: heavy and creepy for the giant eye (reese bass, 808, choir, music-box bell).
 
 Instruments are synthesised here (numpy) and mixed with pedalboard effects.
@@ -283,7 +283,7 @@ def fx(x2, *plugins):
 
 # ---------------------------------------------------------------- the song map (150 BPM, 70 bars, ~1:53)
 # stage 1 (the normal guy)  bars 0-31 + the first half of 32
-# the snap                  tape stop at bar 32 beat 2, tearing + bones 33-34, the eye rips out in 35
+# the snap                  tape stop at bar 32 beat 2, heartbeat + tearing + bones 33-34, the eye rips out in 35
 # stage 2 (the giant eye)   bars 36-67, the ending 68-69
 TR1, SNAP, S2, TR2, FIN, OUT, END = 20, 32, 36, 52, 64, 68, 70
 
@@ -448,7 +448,10 @@ def stage1_bar(tr, bar):
 
 
 def the_snap(tr):
-    """Bar 32 beat 2: everything tape-stops. Wet tearing + cracking bones, a rising dread, then the eye rips out."""
+    """Bar 32 beat 2: everything tape-stops. A heartbeat under wet tearing + cracking bones, a rising dread, then the eye rips out."""
+    hb = lp(kick(0.4), 160)                                                                      # heartbeat under it
+    for beat in (0.0, 2.0): tr['fx'].add(T(SNAP + 1, beat), hb, 1.2); tr['fx'].add(T(SNAP + 1, beat + .45), hb, 0.8)
+    for beat in (0.0, 1.0, 2.0, 3.0): tr['fx'].add(T(SNAP + 2, beat), hb, 1.25); tr['fx'].add(T(SNAP + 2, beat + .4), hb, 0.85)
     # his body tearing open (sfx_transform.py): the pull-out lands on bar 35 with the boom
     tr['sfx'].add(T(SNAP + 1), sfx_transform.render().mean(0))
     L = int(8 * BEAT * SR)
@@ -567,7 +570,7 @@ def master_gain(x, thr=-16.0, ratio=2.0, att=0.015, rel=0.15, makeup=5.8, ceil=-
 
 
 LEVEL = {'kick': -12, 'snare': -17, 'hat': -29, 'bass': -16, 'keys': -21, 'pluck': -25, 'pad': -23, 'reese': -19,
-         'b808': -15, 'choir': -23, 'bell': -22, 'crash': -31, 'fx': -31, 'sfx': -17}
+         'b808': -15, 'choir': -23, 'bell': -22, 'crash': -31, 'fx': -31, 'sfx': -14}
 
 
 def level(x, db):

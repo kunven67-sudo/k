@@ -1,4 +1,4 @@
-"""WRATH's transform sound (the snap in GLARE): wet squish, flesh tearing, bones
+"""WRATH's transform sound (the snap in GLARE, over the heartbeat): wet squish, flesh tearing, bones
 cracking, goo stretching, then one big wet pull-out and the eye squelching open.
 All made in code (numpy + pedalboard), nothing sampled.
 
@@ -100,7 +100,7 @@ def bone_crack():
     modes = sum(np.sin(2 * np.pi * f * np.arange(n) / SR) * env_exp(n, tau) * a
                 for f, tau, a in ((rng.uniform(900, 1300), 0.03, .5), (rng.uniform(2000, 2600), 0.018, .35), (rng.uniform(3100, 3800), 0.012, .25)))
     thud = glide_sine(n, 140, 60) * env_exp(n, 0.05) * 0.6
-    y = snap * 1.2 + modes + thud
+    y = snap * 1.7 + modes * 1.2 + thud
     # a second splinter right after
     d = int(rng.uniform(0.012, 0.03) * SR)
     y[d:] += (bandnoise(n, 2500, 9000) * env_exp(n, 0.003))[:n - d] * 0.6
@@ -137,20 +137,22 @@ def render():
     t = 0.05
     while t < RIP - 0.2:
         k = t / RIP
-        B['wet'].add(t, squish(c=rng.uniform(260, 700 + 400 * k)), 0.55 + 0.5 * k)
-        t += rng.uniform(0.09, 0.34) * (1 - 0.55 * k)
-    B['tear'].add(0.5, crackle(1.1, 25, 90), 0.5)
-    B['tear'].add(1.7, crackle(RIP - 1.7 + 0.05, 80, 420, 700, 6000), 0.75)          # ripping louder and louder
+        B['wet'].add(t, squish(c=rng.uniform(240, 700 + 450 * k)), 0.7 + 0.6 * k)
+        t += rng.uniform(0.06, 0.24) * (1 - 0.55 * k)
+    B['tear'].add(0.4, crackle(1.2, 35, 130), 0.7)
+    B['tear'].add(1.7, crackle(RIP - 1.7 + 0.05, 110, 600, 700, 6000), 1.0)          # ripping louder and louder
     # bar 34: bones cracking (on the beat, then a messy one)
-    for bt in (1.6, 2.0, 2.4, 2.55, 2.8, 3.0):
-        B['bone'].add(bt, bone_crack(), 0.9 if bt in (1.6, 2.4, 2.8) else 0.6)
+    for bt in (1.6, 1.8, 2.0, 2.25, 2.4, 2.55, 2.7, 2.8, 2.95, 3.08):
+        B['bone'].add(bt, bone_crack(), 1.0 if bt in (1.6, 2.0, 2.4, 2.8) else 0.65)
     B['goo'].add(1.4, stretch_goo(RIP - 1.4), 0.9)
     # bar 35: THE PULL-OUT
     B['tear'].add(RIP - 0.06, crackle(0.12, 1200, 1500, 600, 7000), 1.4)             # last strands snap
     B['pop'].add(RIP, suction_pop(), 1.3)
-    B['wet'].add(RIP + 0.02, squish(0.25, 420), 1.2)
+    B['wet'].add(RIP + 0.02, squish(0.25, 420), 1.3)
+    B['wet'].add(RIP + 0.06, squish(0.35, 240), 1.3)                                  # meat slap
+    B['pop'].add(RIP + 0.04, bandnoise(int(0.4 * SR), 120, 900) * env_exp(int(0.4 * SR), 0.06) * 2.2, 1.0)
     # after: dripping goo, the eye squelching open
-    for _ in range(26):
+    for _ in range(40):
         tt = RIP + 0.25 + rng.uniform(0, 1.3) ** 1.5
         B['goo'].add(tt, bubble(rng.uniform(350, 1100), rng.uniform(0.01, 0.02)), rng.uniform(0.2, 0.5))
     B['wet'].add(RIP + 0.55, squish(0.4, 300), 0.9)
@@ -159,7 +161,7 @@ def render():
     def lvl(x, db):
         r = np.sqrt((x[np.abs(x) > np.abs(x).max() * 0.02] ** 2).mean())
         return x * 10 ** (db / 20) / max(r, 1e-9)
-    mix = (lvl(B['wet'].x, -16) + lvl(B['tear'].x, -20) + lvl(B['bone'].x, -17) + lvl(B['goo'].x, -20) + lvl(B['pop'].x, -9))
+    mix = (lvl(B['wet'].x, -14) + lvl(B['tear'].x, -17) + lvl(B['bone'].x, -14) + lvl(B['goo'].x, -18) + lvl(B['pop'].x, -6))
     mix = mix[:int((LEN + 0.6) * SR)]
     # slightly wide + a small wet room
     d = int(0.007 * SR)
