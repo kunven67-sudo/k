@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Avatar } from './avatar.js';
 import { Hands } from './hands.js';
-import { placeRoot, sitLegs, walkLegs, spineAndHead, hangArms, lieDown, lyingPose } from './poses.js';
+import { placeRoot, sitLegs, walkLegs, spineAndHead, hangArms, lieDown, lyingPose, holdArm } from './poses.js';
 import { DESK_ROT } from '../world/desk.js';
 
 // You. States: bed (waking up), walk, sit (at the PC), look (seated, looking around), couch.
@@ -184,6 +184,7 @@ export class Player {
       if (this.crouch > 0.05) this.crouchLegs(bodyY);
       spineAndHead(av, bodyY, 0.04 + this.crouch * 0.3, this.dir(), 1);
       hangArms(av, bodyY, this.phase, this.stride);
+      if (this.g.held?.has) holdArm(av, this.dir(), this.g.held.lift());
     } else if (this.state === 'sit' || this.state === 'look') {
       const chair = this.g.desk.chair;
       const bodyY = DESK_ROT + Math.PI + Math.PI / 2 * 0; // face the desk (world -x)
@@ -204,6 +205,7 @@ export class Player {
       spineAndHead(av, yaw, -0.08, this.lookDir(), 0.85);
       hangArms(av, yaw, 0, 0);
       for (const side of ['l', 'r']) av.relaxFingers(side, 0.45);
+      if (this.g.held?.has) holdArm(av, this.lookDir(), this.g.held.lift());
     } else if (this.state === 'bed') {
       const b = this.g.bed;
       lieDown(av, b.pelvis, b.headDir);

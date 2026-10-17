@@ -345,19 +345,27 @@ export async function energyCan(ctx, o) {
   g.position.set(o.x, o.y, o.z);
   g.rotation.y = o.rot ?? Math.random() * 6;
   ctx.scene.add(g);
-  const can = { group: g, flavor: f, sips: 6, open: false };
+  const can = { group: g, obj: g, flavor: f, sips: 6, open: false, name: f.name + ' can', kind: 'drink', useTime: 1.7 };
+  can.onUse = () => {
+    const pos = g.getWorldPosition(new THREE.Vector3());
+    if (can.sips <= 0) { ctx.toast('It\'s empty. Throw it in the trash.'); return false; }
+    if (!can.open) { // first click cracks it open
+      can.open = true;
+      ctx.audio.burst({ pos, freq: 4200, q: 0.6, vol: 0.22, env: [0.002, 0.03, 0.35], sweep: 1800 });
+      ctx.audio.beep(900, 0.03, { vol: 0.03, type: 'triangle', pos });
+      return false;
+    }
+    can.sips--;
+    ctx.needs?.drink(0.07, { caffeine: 0.12, sugar: 0.08, text: can.sips ? null : `Finished the ${f.name}.` });
+    ctx.audio.burst({ pos, freq: 700, q: 0.4, vol: 0.06, env: [0.05, 0.25, 0.2] });
+    return false;
+  };
+  can.skipUse = () => !can.open; // opening it doesn't need the drink animation
   ctx.interact.add(g, {
-    range: 2.2,
-    label: () => can.sips <= 0 ? 'Empty can' : can.open ? `Drink ${f.name}` : `Open ${f.name}`,
-    enabled: () => !!ctx.needs,
-    use: () => {
-      const pos = g.getWorldPosition(new THREE.Vector3()).setY(o.y + 0.12);
-      if (can.sips <= 0) { ctx.toast('It\'s empty.'); ctx.audio.beep(160, 0.05, { vol: 0.02, type: 'triangle', pos }); return; }
-      if (!can.open) { can.open = true; ctx.audio.burst({ pos, freq: 4200, q: 0.6, vol: 0.22, env: [0.002, 0.03, 0.35], sweep: 1800 }); ctx.audio.beep(900, 0.03, { vol: 0.03, type: 'triangle', pos }); return; }
-      can.sips--;
-      ctx.needs.drink(0.07, { caffeine: 0.12, sugar: 0.08, text: can.sips ? `Sip of ${f.name}.` : `Finished the ${f.name}.` });
-      ctx.audio.burst({ pos, freq: 700, q: 0.4, vol: 0.06, env: [0.05, 0.25, 0.2] });
-    },
+    range: 2.2, solid: false,
+    label: () => can.sips <= 0 ? `Take the empty ${f.name} can` : `Take the ${f.name}`,
+    enabled: () => !!ctx.held && ctx.held.item !== can,
+    use: () => ctx.held.take(can),
   });
   return can;
 }

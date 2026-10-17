@@ -52,7 +52,7 @@ export async function buildKitchen(ctx) {
   }
   // countertop with a hole for the sink
   const sinkX0 = 8.55, sinkX1 = 9.15, sinkZ0 = 0.1, sinkZ1 = 0.52;
-  for (const [a, b, c, d] of [[7.0, Z0, sinkX0, Z0 + DEPTH + 0.02], [sinkX1, Z0, 10.17, Z0 + DEPTH + 0.02], [sinkX0, Z0, sinkX1, sinkZ0], [sinkX0, sinkZ1, sinkX1, Z0 + DEPTH + 0.02]]) {
+  for (const [a, b, c, d] of [[7.0, Z0, 7.69, Z0 + DEPTH + 0.02], [8.45, Z0, sinkX0, Z0 + DEPTH + 0.02], [sinkX1, Z0, 10.17, Z0 + DEPTH + 0.02], [sinkX0, Z0, sinkX1, sinkZ0], [sinkX0, sinkZ1, sinkX1, Z0 + DEPTH + 0.02]]) { // no counter over the range
     const top = mesh(boxMM(a, BASE_H, c === sinkX0 ? b : b, c, TOP_H, d), marble, { parent: scene, name: 'counter' });
     K.surfaces.push(top); ctx.interact.block(top);
   }
@@ -306,7 +306,7 @@ function buildMicrowave(ctx, at) {
   const light = new THREE.PointLight(0xffd9a0, 0, 0.8, 2);
   light.position.set(-0.06, Hh * 0.6, 0);
   g.add(light);
-  const M = { g, doorPivot, open: 0, target: 0, running: 0, food: null, hum: null, t: 0, dispTex: disp, done: false };
+  const M = { g, doorPivot, open: 0, target: 0, running: 0, food: null, hum: null, t: 0, dispTex: disp, done: false, light };
   const drawDisp = (txt) => {
     const c = disp.image.getContext('2d');
     c.fillStyle = '#000'; c.fillRect(0, 0, 128, 48);
@@ -315,9 +315,16 @@ function buildMicrowave(ctx, at) {
   };
   M.drawDisp = drawDisp;
   const pos = at.clone().add(new THREE.Vector3(0, 0.14, 0));
+  const canHeat = () => M.target && !M.food && ctx.held?.item?.micro;
   ctx.interact.add(doorPivot, {
-    range: 1.9, label: () => M.target ? 'Close microwave' : 'Open microwave',
+    range: 1.9, label: () => canHeat() ? `Put the ${ctx.held.item.name} in` : M.target ? 'Close microwave' : 'Open microwave',
     use: () => {
+      if (canHeat()) {
+        const it = ctx.held.item;
+        ctx.held.putDownAt(M.inside.clone());
+        M.food = it; it.inMicro = true;
+        return;
+      }
       if (M.running) { M.running = 0; M.stop(); }
       M.target = M.target ? 0 : 1;
       ctx.audio.play(M.target ? 'microwave_open.ogg' : 'microwave_close.ogg', { pos, vol: 0.45 });
@@ -417,7 +424,7 @@ async function buildFridge(ctx, K, o) {
     const b = waterBottle(ctx);
     b.position.set(x0 + 0.12 + i * 0.09, 0.075, z0 + 0.4);
     scene.add(b);
-    K.items.push(drinkItem(ctx, b, { name: 'water bottle', sips: 5, per: 0.09, text: 'Cold water.' }));
+    K.items.push(drinkItem(ctx, b, { name: 'water bottle', sips: 5, per: 0.09, text: 'Cold water.', hang: 0.1 }));
   }
   // milk carton
   const milk = new THREE.Group();
@@ -425,7 +432,7 @@ async function buildFridge(ctx, K, o) {
   mesh(new THREE.CylinderGeometry(0.0, 0.053, 0.04, 4, 1).rotateY(Math.PI / 4), white, { parent: milk, pos: [0, 0.22, 0] });
   milk.position.set(x1 - 0.14, shelves[1] + 0.006, z0 + 0.3);
   scene.add(milk);
-  K.items.push(drinkItem(ctx, milk, { name: 'milk', sips: 8, per: 0.07, eat: 0.04, text: 'Cold milk.' }));
+  K.items.push(drinkItem(ctx, milk, { name: 'milk', sips: 8, per: 0.07, eat: 0.04, text: 'Cold milk.', hang: 0.11 }));
   // leftover pizza box with slices
   const pz = new THREE.Group();
   mesh(box(0.34, 0.04, 0.34, 0.004), paint(0xc9a173, 0.85), { parent: pz, pos: [0, 0.02, 0] });
@@ -443,12 +450,12 @@ async function buildFridge(ctx, K, o) {
   mesh(cyl(0.067, 0.067, 0.015, 32), paint(0xf0e6d2, 0.4), { parent: ice, pos: [0, 0.125, 0] });
   ice.position.set(cx + 0.12, split + 0.02, z0 + 0.35);
   scene.add(ice);
-  K.items.push(foodItem(ctx, ice, { name: 'ice cream', eat: 0.15, bites: 4, text: 'Ice cream straight from the tub.', sugar: 0.3, cold: true }));
+  K.items.push(foodItem(ctx, ice, { name: 'ice cream', eat: 0.15, bites: 4, text: 'Ice cream straight from the tub.', sugar: 0.3, cold: true, hang: 0.06 }));
   void items;
   const F = { doors, light: lightF, hum: null };
   F.update = (dt) => {
     let anyOpen = 0;
-    for (const d of doors) { d.open += (d.target - d.open) * Math.min(1, dt * 5); d.piv.rotation.y = -d.open * 1.9; anyOpen = Math.max(anyOpen, d.open); }
+    for (const d of doors) { d.open += (d.target - d.open) * Math.min(1, dt * 5); d.piv.rotation.y = d.open * 1.55; anyOpen = Math.max(anyOpen, d.open); } // swings out into the room, stops at the wall
     lightF.intensity = doors[0].open > 0.05 ? 1.2 : 0;
     const a = ctx.audio;
     if (a.ctx && !F.hum) { F.hum = a.play('fridge_loop.ogg', { pos: new THREE.Vector3(cx, 1.6, z0 + 0.3), loop: true, vol: 0.18, ref: 0.6, bus: 'ambient' }); }
@@ -502,7 +509,8 @@ function iceTex() {
 
 // food you can pick up and eat (bite by bite). Microwave-able items get better when hot.
 export function foodItem(ctx, obj, o) {
-  const item = { obj, name: o.name, kind: 'food', bites: o.bites || 1, hot: false, useTime: 1.4 };
+  const item = { obj, name: o.name, kind: 'food', bites: o.bites || 1, hot: false, useTime: 1.4, micro: !!o.micro, hang: o.hang ?? 0.0 };
+  item.onTake = () => { if (ctx.kitchen?.micro.food === item) { ctx.kitchen.micro.food = null; item.inMicro = false; } };
   item.onUse = () => {
     item.bites--;
     ctx.needs?.eat(o.eat / (o.bites || 1) * (item.hot ? 1.3 : 1), item.bites <= 0 ? (item.hot ? o.hotText || o.text : o.text) : null);
@@ -513,7 +521,7 @@ export function foodItem(ctx, obj, o) {
     return item.bites <= 0;
   };
   ctx.interact.add(obj, {
-    range: 2.0, label: () => `Take ${o.name === 'ice cream' ? 'the' : 'a'} ${o.name}${item.hot ? ' (hot)' : ''}`,
+    range: 2.0, solid: false, label: () => `Take ${o.name === 'ice cream' ? 'the' : 'a'} ${o.name}${item.hot ? ' (hot)' : ''}`,
     enabled: () => !!ctx.held && ctx.held.item !== item,
     use: () => ctx.held.take(item),
   });
@@ -521,7 +529,7 @@ export function foodItem(ctx, obj, o) {
 }
 
 export function drinkItem(ctx, obj, o) {
-  const item = { obj, name: o.name, kind: 'drink', sips: o.sips, useTime: 1.7 };
+  const item = { obj, name: o.name, kind: 'drink', sips: o.sips, useTime: 1.7, hang: o.hang ?? 0.08 };
   item.onUse = () => {
     if (item.sips <= 0) { ctx.toast('It\'s empty.'); return false; }
     item.sips--;
@@ -531,7 +539,7 @@ export function drinkItem(ctx, obj, o) {
     return false; // empty containers stay in your hand: throw them away or put them down
   };
   ctx.interact.add(obj, {
-    range: 2.0, label: () => `Take the ${o.name}`, enabled: () => !!ctx.held && ctx.held.item !== item,
+    range: 2.0, solid: false, label: () => `Take the ${o.name}`, enabled: () => !!ctx.held && ctx.held.item !== item,
     use: () => ctx.held.take(item),
   });
   return item;
@@ -556,7 +564,7 @@ function buildTrash(ctx, at) {
       T.target = 1; T.closeAt = performance.now() + 1100;
       ctx.audio.play('microwave_open.ogg', { pos: at.clone().setY(0.6), vol: 0.25, rate: 0.7 });
       const it = ctx.held?.item;
-      if (it) { ctx.held.item = null; ctx.scene.remove(it.obj); ctx.audio.play('pickup.ogg', { pos: at.clone().setY(0.4), vol: 0.35, rate: 0.6 }); }
+      if (it) { ctx.held.item = null; ctx.held.using = false; it.obj.visible = false; ctx.scene.remove(it.obj); ctx.audio.play('pickup.ogg', { pos: at.clone().setY(0.4), vol: 0.35, rate: 0.6 }); }
     },
   });
   T.update = (dt) => {

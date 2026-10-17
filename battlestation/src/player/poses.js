@@ -136,3 +136,19 @@ export function lyingPose(av, headDir, lookDir) {
     av.relaxFingers(side, 0.5);
   }
 }
+
+// Holding something in your right hand: it sits at the bottom right of your view, and comes up
+// to your mouth while you drink / eat (lift 0..1).
+export function holdArm(av, lookDir, lift = 0) {
+  av.root.updateMatrixWorld(true);
+  const eye = av.eyeWorld(new THREE.Vector3());
+  const look = lookDir.clone().normalize();
+  const right = new THREE.Vector3().crossVectors(look, UP).normalize();
+  const up = new THREE.Vector3().crossVectors(right, look).normalize();
+  const rest = eye.clone().addScaledVector(look, 0.36).addScaledVector(up, -0.27).addScaledVector(right, 0.15);
+  const mouth = eye.clone().addScaledVector(look, 0.12).addScaledVector(up, -0.11).addScaledVector(right, 0.04);
+  av.armIK('r', rest.lerp(mouth, lift), right.clone().multiplyScalar(0.7).addScaledVector(UP, -0.7));
+  const fingers = look.clone().addScaledVector(right, -0.6).addScaledVector(up, 0.2 + lift * 0.5).normalize();
+  av.orientHand('r', fingers, right.clone().addScaledVector(up, 0.2));
+  av.relaxFingers('r', 0.95);
+}

@@ -15,6 +15,10 @@ import { Rig } from './pc/rig.js';
 import { UI } from './ui.js';
 import { Scanner } from './pc/scanner.js';
 import { Needs } from './player/needs.js';
+import { Held } from './player/held.js';
+import { buildKitchen } from './world/kitchen.js';
+import { buildBathroom } from './world/bathroom.js';
+import { buildHallway } from './world/hallway.js';
 
 const $ = id => document.getElementById(id);
 
@@ -50,6 +54,7 @@ export class Game {
     this.audio = new Audio();
     this.physics = new Physics();
     this.interact = new Interact(this.camera);
+    this.held = new Held(this);
     this.settings = { sens: 1, seatFov: 68, seatLow: 0.17 };
     this.ui = new UI(this);
     this.needs = new Needs(this);
@@ -65,6 +70,11 @@ export class Game {
     this.desk.chair.syncCollider();
     this.progress(0.33, 'Making your bed');
     this.bedroom = await buildBedroom(this);
+    this.progress(0.36, 'Stocking the fridge');
+    this.kitchen = await buildKitchen(this);
+    this.progress(0.37, 'Cleaning the bathroom');
+    this.bathroom = await buildBathroom(this);
+    this.hallway = await buildHallway(this);
     this.progress(0.38, 'Making you');
     this.bed = { pelvis: this.bedroom.pelvis.clone(), headDir: new THREE.Vector3(0, 0, 1) };
     this.player = new Player(this);
@@ -113,6 +123,7 @@ export class Game {
     else if (st === 'bed') { this.player.state = 'bed'; this.player.seatLook.yaw = -0.45; this.player.seatLook.pitch = -0.6; this.bedroom.setCovered(true, true); }
     else if (st === 'walk') { const [x, z, yaw, pitch] = (this.params.get('at') || '3,3,1.57,0').split(',').map(Number); this.player.standAt(x, z, yaw); this.player.pitch = pitch || 0; this.bedroom.setCovered(false, true); }
     else this.player.state = 'none';
+    if (this.params.get('hold') === 'can') this.held.take(this.bedroom.cans[0]);
     this.devCamera();
   }
 
@@ -127,6 +138,7 @@ export class Game {
     d.led.wallGlow.visible = rank >= 2; d.led.underGlow.visible = rank >= 2;
     for (const r of Object.values(L.rooms)) for (const l of r.lights) l.fill.visible = rank >= 1;
     d.tower.spill.visible = rank >= 2;
+    if (this.kitchen) { this.kitchen.fridge.light.visible = rank >= 1; this.kitchen.micro.light.visible = rank >= 1; }
   }
 
   // ------------------------------------------------------------------ waking up
@@ -202,7 +214,8 @@ export class Game {
     }
     if (p.sleeping && down) { this.toggleSleep(false); return true; }
     if (e.code === 'Escape' && down) { if (st === 'look') { p.backToPc(); return true; } ui.openMenu(); return true; }
-    if (e.code === 'KeyE') this.useKey(down);
+    if (e.code === 'KeyE') this.useKey(down, 'e');
+    if (e.code === 'KeyG' && down && this.held.has) this.held.putDownAt(null);
     if (down && !e.repeat) {
       if (st === 'bed' && ['KeyW', 'Space', 'KeyA', 'KeyD', 'KeyS'].includes(e.code)) p.getUp();
       else if (st === 'couch' && ['KeyW', 'Space', 'KeyS'].includes(e.code)) p.leaveCouch();
@@ -222,7 +235,7 @@ export class Game {
       this.audio.play(down ? 'mouse_down.ogg' : 'mouse_up.ogg', { pos: m, vol: 0.32, jitter: 0.05, ref: 0.3 });
       return;
     }
-    if (b === 0) this.useKey(down);
+    if (b === 0) this.useKey(down, 'mouse');
     if (b === 2 && down && p.state === 'look') p.backToPc();
   }
 
@@ -267,10 +280,16 @@ export class Game {
   }
 
   // E / left click on what you're looking at. Some things want you to hold.
-  useKey(down) {
+  useKey(down, how = 'e') {
     if (down) {
       const it = this.interact.current;
-      if (!it) { if (this.player.state === 'bed') this.toggleSleep(); return; }
+      if (!it) {
+        const H = this.held;
+        if (H.has && how === 'mouse') { H.use(); return; }
+        if (H.has && how === 'e') { const p = H.surfaceHit(); if (p) H.putDownAt(p); else this.toast('Look at a table or counter to put it down (G drops it).'); return; }
+        if (this.player.state === 'bed') this.toggleSleep();
+        return;
+      }
       if (it.hold && (!it.hold.enabled || it.hold.enabled())) this.holding = { it, t: 0 };
       else it.use();
     } else if (this.holding) {
@@ -307,9 +326,27 @@ export class Game {
     } else if (s === 'look') ui.setSeatbar('show');
     else { ui.exitSeatHud(); ui.setSeatbar('hide'); }
     if (prev === 'sit') { for (const code of [...this.player.hands.held.keys()]) this.player.hands.keyUp(code); }
+    if (this.held.has && (s === 'sit' || s === 'bed')) {
+      // you need both hands: it goes on the desk next to the keyboard / on the nightstand
+      const spot = s === 'sit' ? this.desk.toWorld(0.62, -0.3).setY(0.74) : new THREE.Vector3(1.72, 0.55, 4.42);
+      this.held.putDownAt(spot);
+    }
     if (prev === 'bed' && s !== 'bed') this.bedroom.setCovered(false);
     if (s === 'bed') this.bedroom.setCovered(true);
     $('hint').classList.remove('on');
+  }
+
+  // Your eyes adjust: a sunny white kitchen and a dark hallway don't get the same exposure.
+  adaptEyes(dt) {
+    const day = this.lights.daylight ?? 0, room = this.room, L = this.lights.rooms;
+    const bright = { kitchen: 0.62, bedroom: 0.82, bathroom: 0.8, hallway: 0.95 }[room] ?? 0.85;
+    const lit = L[room]?.on ? 1 : 0;
+    const night = room === 'hallway' ? 1.12 : lit ? 1.0 : 1.18;
+    const target = THREE.MathUtils.lerp(night, bright, day);
+    this.exposure = this.exposure ?? target;
+    // pupils: fast to close in bright light, slower to open in the dark
+    this.exposure += (target - this.exposure) * Math.min(1, dt * (target < this.exposure ? 1.6 : 0.7));
+    this.renderer.gl.toneMappingExposure = this.exposure;
   }
 
   // what your body does to the picture: heavy eyes, blur when you're wrecked
@@ -359,8 +396,11 @@ export class Game {
     this.rig.update(dt);
     this.desk.update(dt, this.t, this.os.on && this.os.state !== 'sleep');
     this.bedroom.update(dt);
+    this.kitchen.update(dt);
+    this.bathroom.update(dt);
     const p = this.player;
     if (p.state !== 'none') p.update(dt, this.input);
+    this.held.update(dt, p.avatar);
     this.needs.update(dt, p.sleeping);
     if (p.sleeping) { this.needs.rest(dt); if (this.needs.effTired() <= 0) this.toggleSleep(false); }
     this.body(dt);
@@ -382,6 +422,7 @@ export class Game {
     this.audio.update(this.camera);
     this.ui.update();
     this.room = roomAt(this.camera.position.x, this.camera.position.z) || this.room || 'bedroom';
+    this.adaptEyes(dt);
     this.scene.environment = this.env.update(this.room, this.envDirty);
     this.envDirty = false;
   }

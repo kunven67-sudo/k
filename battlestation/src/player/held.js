@@ -28,6 +28,7 @@ export class Held {
   use() {
     const it = this.item;
     if (!it || this.using) return;
+    if (it.skipUse?.()) { it.onUse?.(this); return; } // e.g. cracking a can open
     this.using = true;
     this.useT = 0;
     this._fired = false;
@@ -78,24 +79,26 @@ export class Held {
     if (!it) return;
     if (this.using) {
       this.useT += dt / (it.useTime || 1.6);
-      if (!this._fired && this.useT > 0.45) { this._fired = true; const gone = it.onUse?.(this); if (gone) { this.g.scene.remove(it.obj); this.item = null; this.using = false; return; } }
+      if (!this._fired && this.useT > 0.45) { this._fired = true; const gone = it.onUse?.(this); if (gone) { it.obj.visible = false; this.g.scene.remove(it.obj); this.item = null; this.using = false; return; } }
       if (this.useT >= 1) { this.using = false; this.useT = 0; }
     }
-    const hand = av.bones.hand_r;
+    // in your fist: a bit along the fingers, against the palm, upright
+    const hand = av.bones.hand_r, f = av.handFrame.r;
     hand.updateMatrixWorld(true);
-    const m = hand.matrixWorld;
-    const off = it.grip || _grip;
-    it.obj.position.copy(off).applyMatrix4(m);
-    // keep it upright-ish (a can stays standing in your hand) but follow the hand's heading
-    const fwd = new THREE.Vector3().setFromMatrixColumn(m, 0);
-    const yaw = Math.atan2(fwd.x, fwd.z);
+    const q = hand.getWorldQuaternion(_qh);
+    const fwd = _f.copy(f.fwd).applyQuaternion(q), back = _b.copy(f.back).applyQuaternion(q);
+    const g = it.grip || _grip; // [along fingers, out of the palm, along the thumb]
+    it.obj.position.setFromMatrixPosition(hand.matrixWorld).addScaledVector(fwd, g.x).addScaledVector(back, -g.y);
+    it.obj.position.y -= it.hang ?? 0.05; // the hand wraps around the middle of the thing
+    const yaw = Math.atan2(-back.x, -back.z);
     let tilt = 0;
-    if (this.using) tilt = Math.sin(Math.min(1, this.useT) * Math.PI) * (it.kind === 'drink' ? 1.25 : 0.2);
-    it.obj.quaternion.setFromEuler(new THREE.Euler(0, yaw, 0, 'YXZ')).multiply(_qt.setFromAxisAngle(_x, -tilt));
+    if (this.using) tilt = Math.sin(Math.min(1, this.useT) * Math.PI) * (it.kind === 'drink' ? 1.5 : 0.25);
+    it.obj.quaternion.setFromEuler(_e.set(0, yaw, 0, 'YXZ')).multiply(_qt.setFromAxisAngle(_z, tilt));
   }
 
   // how far up toward your mouth the hand is (0..1) for the arm pose
   lift() { return this.using ? Math.sin(Math.min(1, this.useT) * Math.PI) : 0; }
 }
-const _up = new THREE.Vector3(0, 1, 0), _x = new THREE.Vector3(1, 0, 0), _c = new THREE.Vector2(0, 0), _qt = new THREE.Quaternion();
-const _grip = new THREE.Vector3(0, 0.08, 0.03);
+const _up = new THREE.Vector3(0, 1, 0), _z = new THREE.Vector3(0, 0, 1), _c = new THREE.Vector2(0, 0), _qt = new THREE.Quaternion(), _qh = new THREE.Quaternion();
+const _f = new THREE.Vector3(), _b = new THREE.Vector3(), _e = new THREE.Euler();
+const _grip = new THREE.Vector3(0.06, 0.04, 0);

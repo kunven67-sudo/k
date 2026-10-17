@@ -140,6 +140,9 @@ export class Avatar {
     this.watch = g;
   }
 
+  // recompute the skin right now (after changing bones mid-frame, e.g. for the mirror)
+  skeletonUpdate() { for (const m of Object.values(this.meshes)) if (m.isSkinnedMesh) m.skeleton.update(); }
+
   hideHead(hide) {
     this.headHidden = hide;
     const s = hide ? 0.001 : 1;
