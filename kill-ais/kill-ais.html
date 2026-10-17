@@ -213,6 +213,7 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
 #cgSeq span.ok{background:#0f3d24;color:var(--green)}#cgSeq span.cur{border-color:#fff;box-shadow:0 0 10px #fff}
 .cg-bar{height:6px;background:#111;margin-top:12px}#cgFill{height:100%;background:var(--green)}
 #cgBtns{margin-top:10px}#cgBtns button{width:54px;height:54px;font-size:26px;margin:0 4px;background:#0f3d24;border:1px solid var(--green);color:#fff}
+#troomHint{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:26;font-family:var(--mono);font-size:13px;color:#ffd65a;background:rgba(20,12,4,.8);border:1px solid #6a4a2a;padding:8px 12px;border-radius:3px}
 #nvfx{position:fixed;inset:0;z-index:23;pointer-events:none;opacity:0}
 #nvfx.nv{opacity:1;background:radial-gradient(ellipse at center,transparent 52%,rgba(0,0,0,.85) 100%),repeating-linear-gradient(0deg,rgba(0,0,0,.14) 0 1px,transparent 1px 3px)}
 #nvfx.therm{opacity:1;background:radial-gradient(circle at center,transparent 40%,rgba(0,0,0,.92) 41%)}
@@ -386,6 +387,7 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
   <div class="dk-icons">
     <button class="dk-icon" data-act="play"><span class="ic">💀</span><span>KILL_AIs.exe</span></button>
     <button class="dk-icon" data-act="new"><span class="ic">🆕</span><span>New Game</span></button>
+    <button class="dk-icon" data-act="load"><span class="ic">💾</span><span>Load Game</span></button>
     <button class="dk-icon" data-act="settings"><span class="ic">⚙️</span><span>Settings</span></button>
     <button class="dk-icon" data-act="trophies"><span class="ic">🏆</span><span>Trophies</span></button>
     <button class="dk-icon" data-act="readme"><span class="ic">📄</span><span>readme.txt</span></button>
@@ -436,6 +438,7 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
 <canvas id="static" width="256" height="144"></canvas>
 <div id="codevis"></div>
 <div id="nvfx"></div>
+<div id="troomHint" class="hidden">🏆 TROPHY ROOM · WASD to walk · mouse to look · <b>Esc</b> or <b>F</b> to go back <button id="troomBack" class="sbtn">BACK</button></div>
 <div id="codegame" class="hidden"><div class="cg-box"><div id="cgName">HACKING</div><div class="cg-sub">Press the arrows (or W A S D) in order, fast!</div><div id="cgSeq"></div><div class="cg-bar"><div id="cgFill"></div></div><div id="cgBtns"><button data-k="l">←</button><button data-k="u">↑</button><button data-k="d">↓</button><button data-k="r">→</button></div></div></div>
 <div id="popups"></div>
 <div id="flash"></div>
@@ -627,6 +630,7 @@ addEventListener('keyup', (e) => { Input.keys.delete(e.code); });
 addEventListener('blur', () => { Input.keys.clear(); Input.fire = false; Input.aim = false; });
 document.addEventListener('mousedown', (e) => {
   audioInit();
+  if (G.screen === 'troom' && !Input.locked && !Touch.on) { requestLock(); return; }
   if (G.screen !== 'play' || Touch.on) return;
   if (e.target !== R.canvas) return;
   if (!Input.locked && !Touch.on) { requestLock(); return; }
@@ -1012,11 +1016,11 @@ const G = {
 Object.defineProperty(G, 'eliza', { get() { return G.boss; }, set(v) { G.boss = v; } }); /* old name for the boss */
 const R = { renderer: null, canvas: null, scene: null, camera: null, composer: null, renderPass: null, bloom: null, glitch: null, sun: null, hemi: null, envTex: null, pts: [] };
 const PL = {
-  x: 0, y: 0, z: 84, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: true, crouch: 0, slideT: 0, lean: 0, height: 1.7,
+  x: 0, y: 0, z: 84, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: true, crouch: 0, slideT: 0, lungeT: 0, lean: 0, height: 1.7,
   hp: 100, armor: 0, hack: 0, crypto: 0, meds: 0, frags: 0, alive: true, invuln: 0, swim: false, under: false, gooT: 0,
   peakY: 0, stepAcc: 0, recoilP: 0, recoilY: 0, ads: 0, bob: 0, hurtT: 0, lastHurt: 0, regenBlock: 0,
   guns: {}, owned: [], slots: [null, null], cur: 0, checkpoint: -1, hasGun: false, armGone: false,
-  passcodes: [false, false, false], controlLock: false, lookLock: false, skills: {}, gren: {}, gsel: 'frag', nvg: false, allies: [], hackRounds: 0,
+  passcodes: [false, false, false], controlLock: false, lookLock: false, skills: {}, gren: {}, gsel: 'frag', nvg: false, allies: [], hackRounds: 0, sword: false, outfit: 'hoodie', outfits: [],
 };
 const STATS0 = () => ({ kills: 0, headshots: 0, shots: 0, hits: 0, earned: 0, deaths: 0, time: 0, bestStreak: 0, chats: 0, searched: 0 });
 G.stats = STATS0();
@@ -2703,7 +2707,7 @@ function initBody() {
   const hoodie = new THREE.MeshStandardMaterial({ color: 0x434a53, roughness: 0.95 });
   const shoe = new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.62, normalMap: TEX.stippleN, normalScale: v2(0.3) });
   const sole = new THREE.MeshStandardMaterial({ color: 0xebe8e1, roughness: 0.75 });
-  const g = new THREE.Group(); g.userData.noEnv = true; R.scene.add(g); BODY.grp = g;
+  const g = new THREE.Group(); g.userData.noEnv = true; R.scene.add(g); BODY.grp = g; BODY.mats = { jeans, hoodie };
   const torso = new THREE.Mesh(new RoundedBoxGeometry(0.46, 0.62, 0.27, 2, 0.08), hoodie); torso.position.set(0, 1.12, 0.17); g.add(torso); BODY.parts.torso = torso;
   torso.material = hoodie.clone(); torso.material.colorWrite = false; torso.material.depthWrite = false; /* invisible to you, but it still casts your shadow */
   const hips = new THREE.Mesh(new RoundedBoxGeometry(0.36, 0.2, 0.24, 2, 0.07), jeans); hips.position.set(0, 0.86, 0.15); g.add(hips);
@@ -3299,6 +3303,7 @@ function initViewmodel() {
   gBox(0.028, 0.007, 0.05, GM.metal, 0, 0.05, -0.003, 0.002, 0, 0, 0, VM.knife);
   GG = VM.knife; gProf([[0.007, 0.053], [0.007, 0.19], [0.0, 0.222], [-0.012, 0.2], [-0.016, 0.17], [-0.016, 0.056]], 0.0035, GM.blade, 0, 0, 0, 0.0008); GG = null;
   VM.knife.visible = false;
+  buildSword();
   /* health pack (lives in the left hand) */
   VM.med = new THREE.Group(); VM.H.under.add(VM.med);
   gBox(0.12, 0.075, 0.1, GM.medRed, 0, 0.028, 0, 0.012, 0, 0, 0, VM.med);
@@ -3429,13 +3434,13 @@ function updateViewmodel(dt, speed) {
   if (VM.flashT > 0) { VM.flashT -= dt; VM.flash.rotation.z = rand(0, TAU); const s = rand(0.75, 1.25) * (g && g.cls === 'heavy' ? 1.3 : g && g.cls === 'shotgun' ? 1.5 : g && g.cls === 'pistol' ? 0.8 : 1); VM.flash.scale.set(s, s, s * rand(0.8, 1.4)); }
   /* hands + sleeves */
   const H = VM.H; for (const k in H) H[k].visible = false;
-  VM.knife.visible = false; VM.med.visible = false;
+  VM.knife.visible = false; VM.med.visible = false; if (VM.sword) VM.sword.visible = false;
   const elR = _er.set(0.24, -0.34, 0.12), elL = _el.set(-0.24, -0.36, 0.1); /* shoulders */
   if (W.knife > 0) {
-    const k = 1 - W.knife / 0.45, a = Math.sin(k * Math.PI), sw = smooth(clamp(k * 1.7, 0, 1));
+    const k = 1 - W.knife / (W.knifeT || 0.45), a = Math.sin(k * Math.PI), sw = smooth(clamp(k * 1.7, 0, 1));
     _pA.set(0.15 - sw * 0.24, -0.14 + a * 0.05, -0.3 - a * 0.1);
     _e.set(-1.05 - a * 0.25, 0.5 - sw * 1.3, -0.5 + sw * 1.0, 'YXZ'); _qA.setFromEuler(_e);
-    setHand(H.grip, _pA, _qA); VM.knife.visible = true;
+    setHand(H.grip, _pA, _qA); (PL.sword && VM.sword ? VM.sword : VM.knife).visible = true;
     placeArm(VM.armR, elR, wristOf(H.grip, _wr), true); placeArm(VM.armL, elL, _wl.set(-0.2, -0.3, -0.3), false);
     return;
   }
@@ -3499,7 +3504,7 @@ function fireShot(ck = 1) {
     const sr = (spread * Math.PI) / 180, a = rand(0, TAU), r = Math.sqrt(Math.random()) * sr;
     const yaw = PL.yaw + Math.cos(a) * r, pitch = PL.pitch + Math.sin(a) * r + PL.recoilP;
     const dx = -Math.sin(yaw) * Math.cos(pitch), dy = Math.sin(pitch), dz = -Math.cos(yaw) * Math.cos(pitch);
-    spawnBullet(cp.x, cp.y, cp.z, dx, dy, dz, g, gs.dmg * (g.charge ? 0.25 + 0.75 * ck : 1), id, mz, ck);
+    spawnBullet(cp.x, cp.y, cp.z, dx, dy, dz, g, gs.dmg * (g.charge ? 0.25 + 0.75 * ck : 1) * (insaneSuit() ? 2 : 1), id, mz, ck);
   }
   if (W.hackUsed) { W.hackLoaded = false; HUD.dirty = true; }
   W.bloom = Math.min(W.bloom + (g.cls === 'smg' || g.cls === 'heavy' ? 0.25 : 0.4), 3);
@@ -3696,8 +3701,9 @@ function updateWeapon(dt) {
   if (!Input.fire) PL.recoilP = damp(PL.recoilP, 0, 7, dt); else PL.recoilP = damp(PL.recoilP, 0, 1.5, dt);
 }
 /* knife */
-function startKnife() { if (W.knife > 0 || W.heal > 0) return; W.knife = 0.45; W.knifeHit = false; SFX.swing(); W.reload = 0; }
+function startKnife() { if (W.knife > 0 || W.heal > 0) return; W.knife = W.knifeT = PL.sword ? 0.5 : 0.45; W.knifeHit = false; SFX.swing(); W.reload = 0; if (PL.sword) { SFX.zap(null, 220); swordLunge(); } }
 function knifeHit() {
+  if (PL.sword) { swordHit(); return; }
   const fx0 = -Math.sin(PL.yaw), fz0 = -Math.cos(PL.yaw);
   let best = null, bd = 2.4;
   forNearBots(PL.x, PL.z, 3, (b) => {
@@ -3710,7 +3716,7 @@ function knifeHit() {
   if (best) {
     const behind = Math.cos(angDiff(best.yaw, Math.atan2(PL.x - best.x, PL.z - best.z))) < -0.3;
     const unaware = best.state !== 'alert';
-    const dmg = behind && unaware ? 9999 : behind ? 110 : 55;
+    const dmg = behind && unaware ? 9999 : (behind ? 110 : 55) * (insaneSuit() ? 2 : 1);
     hitBot(best, dmg, 'torso', best.x, best.y + 1.2, best.z, fx0, 0, fz0, { id: 'knife', melee: true, silent: behind && unaware });
     SFX.stab();
   } else if (G.boss && G.boss.alive && Math.hypot(G.boss.x - PL.x, G.boss.z - PL.z) < (G.boss.reach || 4)) hitBoss(40, 'body', PL.x, PL.y + 1.5, PL.z, { id: 'knife' });
@@ -3963,6 +3969,7 @@ function updatePlayer(dt) {
   PL.ads = damp(PL.ads, wantAds ? 1 : 0, 14, dt);
   W.sprinting = !Chat.open && !PL.controlLock && isDown('sprint') && mz < -0.3 && PL.onGround && !crouchKey && PL.slideT <= 0 && !Input.fire && PL.ads < 0.3 && !PL.swim;
   let speed = W.sprinting ? 7.2 * (1 + 0.08 * sk('legs')) : 4.6;
+  if (insaneSuit()) speed *= 1.45;
   if (PL.crouch > 0.5 && PL.slideT <= 0) speed = 2.3;
   if (PL.ads > 0.5) speed = Math.min(speed, 3.0);
   if (g && g.slow) speed *= g.slow;
@@ -3975,7 +3982,8 @@ function updatePlayer(dt) {
     PL.slideT -= dt; const f = Math.exp(-1.7 * (1 - 0.2 * sk('slide')) * dt); PL.vx *= f; PL.vz *= f;
     PL.vx += wx * 2 * dt; PL.vz += wz * 2 * dt;
     if (Math.hypot(PL.vx, PL.vz) < 3.3 || (!crouchKey && !Touch.btn.crouch && PL.slideT < 0.75)) PL.slideT = 0;
-  } else {
+  } else if (PL.lungeT > 0) { PL.lungeT -= dt; if (PL.lungeT <= 0) { PL.vx *= 0.2; PL.vz *= 0.2; } } /* sword lunge: dash, then brake right in front of the AI */
+  else {
     const acc = PL.onGround || PL.swim ? 12 : 2.4;
     PL.vx = damp(PL.vx, wx * speed, acc, dt); PL.vz = damp(PL.vz, wz * speed, acc, dt);
   }
@@ -4036,7 +4044,7 @@ function updatePlayer(dt) {
   /* corrupted goo */
   let inGoo = false;
   if (PL.onGround && PL.y < 0.1) for (const c of LV.goo) if ((PL.x - c.x) ** 2 + (PL.z - c.z) ** 2 < c.r * c.r) { inGoo = true; break; }
-  if (inGoo) {
+  if (inGoo && PL.outfit !== 'hazmat') {
     PL.gooT += dt; PL.hp -= 7 * dt; HUD.dirty = true; G.gooFx = 0.4;
     if (PL.hp <= 0) { PL.hp = 0; die({ name: 'CORRUPTED GOO' }, 'goo'); return; }
     if (PL.gooT > 2.5) { PL.gooT = 0; addHack(1, 'CORRUPTED GOO got into your files'); SFX.glitch(0.8); }
@@ -4086,6 +4094,7 @@ function hurt(amount, src, cause = 'shot') {
   if (PL.hp < 30 && Math.random() < 0.25) heroLine('lowhp'); else if (Math.random() < 0.06) heroLine('hurt');
 }
 function addHack(n, reason, quiet) {
+  if (insaneSuit() && n > 0) return;
   const before = PL.hack; PL.hack = clamp(PL.hack + n, 0, 6); HUD.dirty = true;
   if (PL.hack > before && !quiet) { toast('⚠ HACK LEVEL ' + PL.hack + (reason ? ' — ' + reason : ''), 'bad', 2600); SFX.glitch(1); G.hackFx.nextStatic = 0.2; }
 }
@@ -4093,7 +4102,7 @@ function die(src, cause) {
   if (!PL.alive) return;
   PL.alive = false; G.stats.deaths++; G.deaths++;
   const lost = Math.floor(PL.crypto / 2); PL.crypto -= lost;
-  G.firewallSaved = Math.random() < 0.35 * sk('firewall'); if (!G.firewallSaved) PL.hack = clamp(PL.hack + 1, 0, 6);
+  G.firewallSaved = insaneSuit() || Math.random() < 0.35 * sk('firewall'); if (!G.firewallSaved) PL.hack = clamp(PL.hack + 1, 0, 6);
   G.lastHacker = src && src.name ? src.name : cause === 'fall' ? 'GRAVITY' : 'THE VIRUS';
   if (G.boss && G.boss.active && G.boss.phase === 2) G.boss.died = true;
   Chat.close(); W.reload = 0; W.knife = 0; W.heal = 0; Input.fire = false;
@@ -4108,7 +4117,7 @@ function die(src, cause) {
 function respawn() {
   const T = PL.checkpoint >= 0 ? TERMS[PL.checkpoint] : null;
   PL.x = T ? T.front.x + Math.sin(T.rot) * 1.5 : START.x; PL.z = T ? T.front.z + Math.cos(T.rot) * 1.5 : START.z; PL.y = 0;
-  PL.yaw = T ? T.rot + Math.PI : START.yaw; PL.pitch = 0; PL.vx = PL.vy = PL.vz = 0; PL.onGround = true; PL.peakY = 0;
+  PL.yaw = T ? T.rot + Math.PI : START.yaw; PL.pitch = 0; PL.vx = PL.vy = PL.vz = 0; PL.lungeT = 0; PL.onGround = true; PL.peakY = 0;
   PL.hp = 100; PL.alive = true; PL.invuln = 3; PL.armGone = false; PL.slideT = 0; PL.swim = false; grappleRelease(true);
   $('death').classList.add('hidden');
   R.camera.rotation.z = 0;
@@ -4249,7 +4258,7 @@ function resetBot(b) {
     lsx: 0, lsz: 0, lastSeen: -99, wT: 0, tx: 0, tz: 0, atkT: rand(0.5, 2), burst: 0, burstT: 0, phase: rand(0, 6), limp: 0, legDmg: 0, crawl: false, blindT: 0, confT: 0, burnT: 0,
     aimT: 0, fall: 0, deathKind: 0, searched: false, glitchT: 0, flash: 0, coreDmg: 0, tower: -1, towerT: 0, seen: false, ghost: false, ghostT: 0, summoned: false, perch: null,
     chat: [], prof: null, flinch: 0, strafe: 1, strafeT: 0, dodgeT: 0, stuckT: 0, sideT: 0, sideX: 0, sideZ: 0, noCannon: false, noSearch: false, special: '', retreatT: 0,
-    aimP: 0, headYaw: 0, windT: 0, static: false, icon: 0, antennaGone: false, deadT: 0, killedBy: '', speedK: 1, coreBoom: false, spawnT: 0, stunT: 0, ally: false, down: false, downT: 0, tgt: null, tgtT: 0, twr: null, towerT: 0, hurtT: -99, mute: false, hacker: -1,
+    aimP: 0, headYaw: 0, windT: 0, static: false, icon: 0, antennaGone: false, deadT: 0, killedBy: '', speedK: 1, coreBoom: false, spawnT: 0, stunT: 0, ally: false, down: false, downT: 0, tgt: null, tgtT: 0, twr: null, hurtT: -99, mute: false, hacker: -1,
     turnT: 0, turnK: 's', turnWait: 0, wantT: -9, wantK: 's' });
 }
 function pickName(tier) { const list = TIER_NAMES[clamp(tier, 0, 3)]; return levelAIName() || pick(list); }
@@ -4262,7 +4271,7 @@ function spawnBot(type, x, z, o = {}) {
   }
   if (b === CLIP.grunt) CLIP.grunt = null; /* that slot is a new AI now */
   resetBot(b);
-  const T = BOT_TYPES[type], tier = o.tier != null ? o.tier : Math.max(ownedTier(), lvlTier());
+  const T = BOT_TYPES[type], tier = o.tier != null ? o.tier : Math.min(3, Math.max(ownedTier(), lvlTier()) + (G.insane ? 1 : 0));
   b.active = true; b.type = type; b.tier = tier;
   b.base = o.base || (type === 'tape' ? 'TAPE-BOT' : pickName(tier));
   b.name = o.name || b.base + ' #' + randi(10, 999);
@@ -5067,6 +5076,7 @@ function updateObjective() {
     t = '<span class="tt">LEVEL ' + LVL.n + ' · OPEN ' + boss + '\'S DOOR (NORTH)</span>Passcode pieces ' + pc + '/3 [' + code + '] · AI compilers destroyed ' + sp + '/3';
     if (pc === 3 && sp === 3) t = '<span class="tt">OBJECTIVE</span>Everything is ready. Use the keypad at ' + boss + '\'S door (north).';
   }
+  if (G.insane && t) t = t.replace('<span class="tt">', '<span class="tt">😈 INSANE · ');
   if (el._t !== t) { el._t = t; el.innerHTML = t; }
 }
 function buildMinimapImage() {
@@ -5191,7 +5201,7 @@ const TROPHIES = [
   ['diver', '🤿', 'Data Diver', 'Find the stash at the bottom of the data lake', 1], ['secretRoom', '🚪', 'Behind The Shelf', 'Find the secret room', 1],
   ['secret', '💰', 'Finders Keepers', 'Find a hidden Crypto stash', 1], ['clippy', '📎', "It Looks Like You're Dead", "See Clippy's ghost", 1],
   ['reader', '📜', 'History Nerd', 'Read every sign about old AIs', 1],
-  ['hook', '🕷', 'Spider-Hacker', 'Hang from the ceiling with the grappling hook'], ['gun25', '🔫', 'Collector', 'Own 25 guns'], ['sidekick', '🤝', 'Friend Request', 'Hack an AI into a sidekick'], ['squad', '👥', 'Squad Goals', 'Have 3 sidekicks at once'], ['gun50', '🧰', 'Gun Nut', 'Own 50 guns'], ['gun100', '💯', 'The Whole Arsenal', 'Own all 100 guns', 1], ['secretGun', '🗝', 'Hidden Arsenal', 'Find a gun in a secret room', 1], ['skills', '🌳', 'Big Brain', 'Max out every skill in the skill tree'],
+  ['hook', '🕷', 'Spider-Hacker', 'Hang from the ceiling with the grappling hook'], ['gun25', '🔫', 'Collector', 'Own 25 guns'], ['sidekick', '🤝', 'Friend Request', 'Hack an AI into a sidekick'], ['troom', '🛏', 'Home Sweet Home', 'Visit your trophy room'], ['insaneWin', '😈', 'Certified Insane', 'Beat the game on INSANE (super rare)', 1], ['squad', '👥', 'Squad Goals', 'Have 3 sidekicks at once'], ['gun50', '🧰', 'Gun Nut', 'Own 50 guns'], ['gun100', '💯', 'The Whole Arsenal', 'Own all 100 guns', 1], ['secretGun', '🗝', 'Hidden Arsenal', 'Find a gun in a secret room', 1], ['skills', '🌳', 'Big Brain', 'Max out every skill in the skill tree'],
   ['boss10', '🔟', 'Ten Down', 'Beat 10 bosses'], ['boss25', '🏅', 'Quarter Way', 'Beat 25 bosses'], ['boss50', '🏆', 'Halfway Hacker', 'Beat 50 bosses'],
   ['boss99', '👑', 'The Final Four', 'Beat the newest Grok, ChatGPT, Claude and Gemini (level 99)'], ['virus', '🦠', 'Antivirus Incarnate', 'Delete THE VIRUS (level 100)'],
 ];
@@ -5280,6 +5290,7 @@ const GEAR = [
   ['armor', 'Armor plate (+50)', 'Armor takes 2/3 of the damage until it breaks.', () => 80, () => PL.armor < 100, () => { PL.armor = Math.min(100, PL.armor + 50); }],
   ...GREN_ORDER.map((t) => ['g_' + t, '● ' + GREN_T[t][0], GREN_T[t][5] + ' Carry up to ' + GREN_T[t][3] + '. Throw: ' + keyName(S.keys.grenade) + ', pick the type: ' + keyName(S.keys.gnext) + '.', () => GREN_T[t][4], () => grenCount(t) < GREN_T[t][3], () => { grenAdd(t, 1); if (t !== 'frag' && grenCount(PL.gsel) <= 0) PL.gsel = t; }]),
   ['hackr', '🤝 Hack rounds (x3)', 'Press ' + keyName(S.keys.hackround) + ' to load one into your gun: the next AI it hits becomes your sidekick (not bosses or snipers). Up to 3 sidekicks.', () => 400, () => (PL.hackRounds || 0) < 9, () => { PL.hackRounds = (PL.hackRounds || 0) + 3; }],
+  ['sword', '⚔ Energy sword', 'Replaces your knife (' + keyName(S.keys.knife) + '): 3.4m reach, hits up to 3 AIs in a wide arc, and lunges you at the AI in front of you. Yours forever.', () => 1500, () => !PL.sword, () => { PL.sword = true; toast('⚔ Energy sword! Press ' + (Touch.on ? 'KNIFE' : keyName(S.keys.knife)) + ' to swing it.', 'good', 3500); }],
   ['nvg', '🌙 Night vision goggles', 'See in the dark (everything turns green). Press ' + keyName(S.keys.nvg) + ' to turn them on and off. Yours forever.', () => 300, () => !PL.nvg, () => { PL.nvg = true; toast('🌙 Night vision goggles: press ' + (Touch.on ? 'NV' : keyName(S.keys.nvg)) + ' to turn them on.', 'good', 3500); }],
   ['anti', 'ANTIVIRUS', 'Removes ALL hack levels and the glitches that come with them.', () => 150, () => PL.hack > 0, () => { if (PL.hack >= 3) trophy('antivirus'); PL.hack = 0; G.hackFx.flip = 0; G.hackFx.lag = 0; toast('Antivirus installed. You are clean... for now.', 'good'); }],
 ];
@@ -5310,7 +5321,7 @@ Shop.render = function () {
   if (T.hackedBy >= 0) { hk.classList.remove('hidden'); hk.textContent = '!! PRICES HACKED BY ' + (BOTS[T.hackedBy].name || '???') + ' — everything costs double. Kill it to fix (red skull on the minimap).'; }
   else if (T.discount) { hk.classList.remove('hidden'); hk.textContent = 'You hacked this terminal: 25% OFF everything.'; hk.style.background = '#0f3d24'; }
   else hk.classList.add('hidden');
-  const tabs = [['guns', 'GUNS'], ['gear', 'GEAR'], ['upg', 'UPGRADES'], ['skills', 'SKILLS'], ['hack', 'HACK PRICES'], ['troph', 'TROPHIES'], ['menu', 'PAUSE MENU']];
+  const tabs = [['guns', 'GUNS'], ['gear', 'GEAR'], ['upg', 'UPGRADES'], ['skills', 'SKILLS'], ['outfits', 'OUTFITS'], ['hack', 'HACK PRICES'], ['troph', 'TROPHIES'], ['menu', 'PAUSE MENU']];
   $('shTabs').innerHTML = tabs.map(([k, n]) => '<button class="sh-tab' + (k === this.tab ? ' on' : '') + '" data-tab="' + k + '">' + n + '</button>').join('');
   let h = '';
   const bar = (v, max) => '<i><em style="width:' + clamp((v / max) * 100, 3, 100) + '%"></em></i>';
@@ -5360,6 +5371,13 @@ Shop.render = function () {
       h += '</div>';
     }
     h += '</div>';
+  } else if (this.tab === 'outfits') {
+    h += '<div class="note">What your arms, gloves and legs look like. Some outfits do something extra.</div>';
+    for (const k in OUTFITS) {
+      const o = OUTFITS[k], ok = outfitOk(k), on = PL.outfit === k, price = this.price(o[5]);
+      h += '<div class="it"><div><b>' + (on ? '✓ ' : '') + esc(o[0]) + '</b><small>' + esc(o[1]) + '</small></div><div class="acts">'
+        + (ok ? '<button class="sbtn" data-outfit="' + k + '" ' + (on ? 'disabled' : '') + '>' + (on ? 'Wearing' : 'Wear') + '</button>' : o[5] ? '<button class="sbtn" data-buyoutfit="' + k + '" ' + (PL.crypto < price ? 'disabled' : '') + '>Buy <span class="price">₿' + price + '</span></button>' : '<button class="sbtn" disabled>🔒 Locked</button>') + '</div></div>';
+    }
   } else if (this.tab === 'hack') {
     const cd = Math.ceil(T.hackCd || 0);
     h += '<div id="hackGame"><div class="note">Hack this terminal for 25% off everything. Press <b>SPACE</b> (or the button) when the cursor is inside the green zone, 3 times in a row. If you fail, the terminal screams and every AI nearby comes running.</div>';
@@ -5369,10 +5387,11 @@ Shop.render = function () {
     else h += '<div id="hgTrack"><div id="hgZone"></div><div id="hgCursor"></div></div><div id="hgInfo" class="note">Round 1/3</div><button class="sbtn" id="hgGo">' + (this.hg ? 'HACK! (Space)' : 'Start hacking') + '</button>';
     h += '</div>';
   } else if (this.tab === 'troph') {
-    h += '<div class="note">' + Object.keys(G.trophies).length + '/' + TROPHIES.length + ' trophies. (The walk-in trophy room — your glitchy bedroom with boss heads on the wall — comes in a later version.)</div>';
+    h += '<div class="note">' + Object.keys(G.trophies).length + '/' + TROPHIES.length + ' trophies.</div><p style="text-align:center"><button class="sbtn" data-act="troom">🚪 Walk into the trophy room (your glitchy bedroom)</button></p>';
     for (const t of TROPHIES) { const got = G.trophies[t[0]]; h += '<div class="troph ' + (got ? '' : 'locked') + '"><div class="ti">' + (got || !t[4] ? t[1] : '❓') + '</div><div><b>' + (got || !t[4] ? esc(t[2]) : 'Secret trophy') + '</b><small>' + (got || !t[4] ? esc(t[3]) : 'Keep exploring...') + '</small></div></div>'; }
   } else if (this.tab === 'menu') {
     h += '<div style="text-align:center;padding:20px"><div class="note">The game is paused while you use a terminal. This is the only place you can pause.</div><p><button class="sbtn" data-act="settings">⚙ Settings</button></p><p><button class="sbtn" data-act="close">▶ Back to the fight</button></p><p><button class="sbtn red" data-act="quit">Save &amp; quit to desktop</button></p></div>';
+    h += '<div class="note" style="margin-top:12px">💾 SAVE SLOTS · save your run here and load it any time (the autosave keeps running too)</div>' + slotsHTML(true);
   }
   $('shBody').innerHTML = h;
   $('shFoot').textContent = 'Checkpoint: you respawn here · ' + (Touch.on ? 'tap ✕ to close' : 'Esc or ' + keyName(S.keys.use) + ' closes');
@@ -5395,6 +5414,11 @@ Shop.click = function (e) {
   if (t.dataset.elem) { const [id, k] = t.dataset.elem.split(':'); this.buy(this.price(ELEM[k].price), () => { PL.guns[id].att.elem = k; VM.dirty = true; }); return; }
   if (t.id === 'hgGo') { if (!this.hg) this.hgStart(); else this.hgHit(); return; }
   if (t.dataset.act === 'close') { this.close(); return; }
+  if (t.dataset.act === 'troom') { enterTrophyRoom(); return; }
+  if (t.dataset.outfit) { if (outfitOk(t.dataset.outfit)) { PL.outfit = t.dataset.outfit; applyOutfit(); SFX.buy(); } this.render(); return; }
+  if (t.dataset.buyoutfit) { const k = t.dataset.buyoutfit; this.buy(this.price(OUTFITS[k][5]), () => { PL.outfits = (PL.outfits || []).concat(k); PL.outfit = k; applyOutfit(); }); return; }
+  if (t.dataset.slotsave) { saveSlot(+t.dataset.slotsave); this.render(); return; }
+  if (t.dataset.slotload) { loadSlot(+t.dataset.slotload); return; }
   if (t.dataset.act === 'settings') { openSettings(); return; }
   if (t.dataset.act === 'quit') { this.close(); quitToDesktop(); return; }
 };
@@ -5420,6 +5444,7 @@ Shop.hgHit = function () {
   }
 };
 $('shop').addEventListener('click', (e) => Shop.click(e));
+$('troomBack').addEventListener('click', () => { SFX.ui(); exitTrophyRoom(); });
 document.querySelectorAll('#cgBtns button').forEach((bt) => { const go = (e) => { e.preventDefault(); codeKey(bt.dataset.k); }; bt.addEventListener('touchstart', go, { passive: false }); bt.addEventListener('mousedown', go); });
 $('shop').addEventListener('change', (e) => { const t = e.target; if (t.dataset && t.dataset.skinsel && t.value && PL.guns[t.dataset.skinsel] && skinOk(t.dataset.skinsel, t.value)) { PL.guns[t.dataset.skinsel].skin = t.value; VM.dirty = true; Shop.render(); } });
 $('shClose').addEventListener('click', () => Shop.close());
@@ -5755,6 +5780,166 @@ function loadHackRound() {
   PL.hackRounds--; W.hackLoaded = true; SFX.rack(); HUD.dirty = true; toast('🤝 Hack round loaded: shoot an AI to make it your sidekick.', 'good', 2200);
 }
 
+/* ============================ energy sword, outfits, Insane mode, save slots, trophy room ============================ */
+/* ---- energy sword: replaces the knife once you buy it ---- */
+function buildSword() {
+  const s = new THREE.Group(); VM.H.grip.add(s); VM.sword = s;
+  gBox(0.026, 0.11, 0.03, GM.rubber, 0, -0.006, 0.002, 0.006, 0, 0, 0, s);
+  gBox(0.052, 0.012, 0.04, GM.metal, 0, 0.056, 0, 0.003, 0, 0, 0, s);
+  gCylY(0.012, 0.03, GM.metal, 0, 0.075, 0, 12, 0.012, s);
+  const core = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.78, 0.018), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false })); core.position.y = 0.48; s.add(core);
+  const glow = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.82, 0.04), new THREE.MeshBasicMaterial({ color: 0x3ef2ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); glow.position.y = 0.48; s.add(glow);
+  s.visible = false; VM.swordGlow = glow;
+}
+function swordLunge() {
+  /* lunge at the closest AI ahead (1.5 to 6m away) */
+  const fx0 = -Math.sin(PL.yaw), fz0 = -Math.cos(PL.yaw); let best = null, bd = 6;
+  forNearBots(PL.x, PL.z, 7, (b) => { if (b.dead || b.ghost || b.ally) return; const dx = b.x - PL.x, dz = b.z - PL.z, d = Math.hypot(dx, dz); if (d > bd || d < 1.5 || (dx * fx0 + dz * fz0) / d < 0.75) return; best = b; bd = d; });
+  if (best && PL.onGround) { const dx = best.x - PL.x, dz = best.z - PL.z, d = Math.hypot(dx, dz); PL.vx = (dx / d) * 14; PL.vz = (dz / d) * 14; PL.lungeT = Math.max(0, d - 1.7) / 14; SFX.whoosh(); }
+}
+function swordHit() {
+  const fx0 = -Math.sin(PL.yaw), fz0 = -Math.cos(PL.yaw), hits = [];
+  forNearBots(PL.x, PL.z, 4, (b) => { if (b.dead || b.ghost || b.ally) return; const dx = b.x - PL.x, dz = b.z - PL.z, d = Math.hypot(dx, dz); if (d > 3.4 || (dx * fx0 + dz * fz0) / (d || 1) < 0.3 || Math.abs(b.y - PL.y) > 2.2) return; hits.push([d, b]); });
+  hits.sort((a, b) => a[0] - b[0]);
+  const dmg = 190 * (1 + (LVL.n - 1) * 0.012) * (insaneSuit() ? 2 : 1);
+  for (const [, b] of hits.slice(0, 3)) {
+    const behind = Math.cos(angDiff(b.yaw, Math.atan2(PL.x - b.x, PL.z - b.z))) < -0.3, unaware = b.state !== 'alert';
+    hitBot(b, behind && unaware ? 9999 : dmg, 'torso', b.x, b.y + 1.2, b.z, fx0, 0, fz0, { id: 'sword', melee: true, silent: behind && unaware });
+    fx.sparks(b.x, b.y + 1.2, b.z, fx0, 0.3, fz0, 12, 5); fx.glow(b.x, b.y + 1.2, b.z, 0.3, 0.9, 1, 0.8, 0.12);
+  }
+  if (hits.length) SFX.stab();
+  else if (G.boss && G.boss.alive && Math.hypot(G.boss.x - PL.x, G.boss.z - PL.z) < (G.boss.reach || 4) + 1) hitBoss(dmg * 0.85, 'body', PL.x, PL.y + 1.5, PL.z, { id: 'sword' });
+}
+/* ---- outfits: [name, what it is, sleeve color, glove color, pants color, price, trophy that unlocks it] ---- */
+const OUTFITS = {
+  hoodie: ['Grey hoodie', 'What you were wearing when the virus got you.', 0x48505a, 0x5e5648, 0x3a4a66, 0, null],
+  tactical: ['Tactical', 'Olive jacket and black gloves. Looks the part.', 0x4f5739, 0x232320, 0x3a3d2c, 800, null],
+  hazmat: ['Hazmat suit', 'Bright yellow. Corrupted goo can\'t hurt you or hack you.', 0xd8b820, 0x151515, 0xc8a818, 1500, null],
+  neon: ['Neon hacker', 'Black with glowing cyan. Unlocked by beating 25 bosses.', 0x101418, 0x3ef2ff, 0x101418, 0, 'boss25'],
+  goldfit: ['Gold-plated', 'Shiny. Unlocked by owning 50 guns.', 0xc8a040, 0xe6b84a, 0x9a7a30, 0, 'gun50'],
+  insane: ['INSANE suit', 'Unlocked by beating the game on Insane. You can\'t be hacked, you do double damage and you run super fast.', 0x200006, 0xff2a3d, 0x200006, 0, 'insaneWin'],
+};
+const outfitOk = (k) => { const o = OUTFITS[k]; return !!o && (k === 'hoodie' || (PL.outfits || []).includes(k) || (!!o[6] && !!G.trophies[o[6]])); };
+const insaneSuit = () => PL.outfit === 'insane';
+function applyOutfit() {
+  if (!OUTFITS[PL.outfit] || !outfitOk(PL.outfit)) PL.outfit = 'hoodie';
+  const o = OUTFITS[PL.outfit], glow = PL.outfit === 'neon' ? 0x3ef2ff : PL.outfit === 'insane' ? 0xff2a3d : 0;
+  if (GM.sleeve) GM.sleeve.color.setHex(o[2]);
+  for (const m of [GM.glove, GM.gloveLeather]) if (m) m.color.setHex(o[3]);
+  if (BODY.mats) { BODY.mats.jeans.color.setHex(o[4]); BODY.mats.hoodie.color.setHex(o[2]); }
+  for (const m of [GM.sleeve, GM.glove, GM.gloveLeather]) if (m) { m.emissive.setHex(glow); m.emissiveIntensity = glow ? 0.3 : 0; }
+}
+/* ---- Insane mode: unlocked by beating the game. Tougher, faster, meaner AIs and bosses. Beat it for the INSANE suit ---- */
+const insaneUnlocked = () => !!LS.get('killais:insane', 0);
+function applyDifficulty() { DIFF.hp = G.insane ? 1.6 : 1; DIFF.dmg = G.insane ? 1.5 : 1; }
+function insaneBoss(E) { if (G.insane && !E.insaneHp) { E.insaneHp = true; E.maxHp *= 1.5; E.hp = E.maxHp; } }
+/* ---- 3 save slots (at terminals; load from the desktop too). The autosave keeps running as always ---- */
+const slotInfo = (n) => LS.get('killais:slot' + n, null);
+function saveSlot(n) {
+  const data = serialize();
+  LS.set('killais:slot' + n, { t: Date.now(), lv: LVL.n, boss: LVL.bossName, crypto: PL.crypto, kills: G.stats.kills, insane: !!G.insane, data });
+  SFX.buy(); toast('💾 Saved to slot ' + n + '.', 'good', 2000);
+}
+function loadSlot(n) {
+  const s = slotInfo(n); if (!s || !s.data) return false;
+  closeWin(); if (Shop.open) Shop.close(); hideEl('desktop');
+  restore(JSON.parse(JSON.stringify(s.data)));
+  try { GameSystem.saveNow(); } catch (e) { /* ignore */ }
+  toast('💾 Loaded slot ' + n + ': level ' + s.lv + '.', 'good', 2500); return true;
+}
+function slotsHTML(canSave) {
+  let h = '';
+  for (let n = 1; n <= 3; n++) {
+    const s = slotInfo(n);
+    h += '<div class="it"><div><b>Slot ' + n + '</b><small>' + (s ? 'Level ' + s.lv + ' (' + esc(s.boss) + ')' + (s.insane ? ' · INSANE' : '') + ' · ₿' + s.crypto + ' · ' + s.kills + ' AIs deleted · ' + new Date(s.t).toLocaleString() : 'empty') + '</small></div><div class="acts">'
+      + (canSave ? '<button class="sbtn" data-slotsave="' + n + '">Save here</button>' : '') + (s ? '<button class="sbtn" data-slotload="' + n + '">Load</button>' : '') + '</div></div>';
+  }
+  return h;
+}
+/* ---- trophy room: a glitchy copy of your real bedroom. Your trophies on the shelves, every boss you beat on the wall ---- */
+const TROOM = { on: false, grp: null, T: null, x: 0.9, z: 2.7, yaw: 0, pitch: 0, gT: 3, hidden: [] };
+function enterTrophyRoom() {
+  if (!Shop.open) return;
+  const T = Shop.T; Shop.close(); buildIntro();
+  Object.assign(TROOM, { on: true, T, x: 0.9, z: 2.7, yaw: 0.35, pitch: -0.05, gT: 2 });
+  TROOM.vis = Intro.scene.children.map((o) => [o, o.visible]); for (const o of Intro.scene.children) o.visible = o !== Intro.tunnel;
+  /* you're walking around now, not sitting at the desk */
+  TROOM.hidden = []; Intro.scene.traverse((o) => { if (o === Intro.body || (o.isMesh && (o.material === GM.sleeve || o.material === GM.rib)) || o === Intro['hand-1'] || o === Intro.hand1) { if (o.visible) { o.visible = false; TROOM.hidden.push(o); } } });
+  buildTrophyDecor();
+  const c = Intro.cam; c.rotation.order = 'YXZ'; c.aspect = innerWidth / innerHeight; c.fov = 70; c.updateProjectionMatrix();
+  G.screen = 'troom'; hideEl('hud'); hideEl('touch'); showEl('troomHint'); Music.set('menu'); SFX.glitch(0.8); flashScreen(0.5, 400);
+  if (Touch.on) showEl('touch'); else requestLock();
+  trophy('troom');
+}
+function exitTrophyRoom() {
+  if (!TROOM.on) return;
+  TROOM.on = false; hideEl('troomHint'); for (const o of TROOM.hidden) o.visible = true; TROOM.hidden = [];
+  /* put the bedroom back the way the intro left it (no trophies in a New Game cutscene) */
+  for (const [o, v] of TROOM.vis || []) o.visible = v; TROOM.vis = null; if (TROOM.grp) TROOM.grp.visible = false;
+  Intro.cam.rotation.order = 'XYZ'; R.canvas.style.filter = '';
+  G.screen = 'play'; showEl('hud'); Music.set('level'); SFX.glitch(0.6);
+  if (TROOM.T) Shop.openAt(TROOM.T);
+}
+function buildTrophyDecor() {
+  if (TROOM.grp) { Intro.scene.remove(TROOM.grp); TROOM.grp.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); for (const m of [].concat(o.material)) { if (m.map) m.map.dispose(); if (m.emissiveMap) m.emissiveMap.dispose(); m.dispose(); } } }); }
+  const grp = new THREE.Group(); TROOM.grp = grp; Intro.scene.add(grp);
+  const std = (o) => new THREE.MeshStandardMaterial(o), wood = std({ color: 0x6a4a2a, map: TEX.wood, roughness: 0.5 }), goldM = std({ color: 0xe6b84a, metalness: 1, roughness: 0.2 });
+  const mesh = (geo, mat, x, y, z, ry = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; grp.add(m); return m; };
+  /* three shelves above the bed, full of trophy cups */
+  const got = TROPHIES.filter((t) => G.trophies[t[0]]), cupG = new THREE.LatheGeometry([[0, 0], [0.04, 0], [0.04, 0.012], [0.012, 0.02], [0.01, 0.06], [0.045, 0.085], [0.05, 0.13], [0.044, 0.135], [0.03, 0.09], [0, 0.085]].map((p) => new THREE.Vector2(p[0], p[1])), 18);
+  for (let r = 0; r < 3; r++) {
+    const y = 1.2 + r * 0.42; mesh(new THREE.BoxGeometry(0.24, 0.025, 2.3), wood, -2.08, y, 1.7);
+    const row = got.slice(r * 12, r * 12 + 12);
+    const c = mkCanvas(1024, 48), x = c.getContext('2d'); x.fillStyle = '#2a1a0c'; x.fillRect(0, 0, 1024, 48); x.font = '22px monospace'; x.fillStyle = '#ffd65a'; x.textAlign = 'center';
+    row.forEach((t, i) => { const z = 0.65 + i * 0.19; mesh(cupG, goldM, -2.06, y + 0.013, z); x.fillText(t[1], ((2.85 - z) / 2.3) * 1024, 32); });
+    const lab = mesh(new THREE.PlaneGeometry(2.3, 0.05), std({ map: texFrom(c, false), roughness: 0.6 }), -1.955, y - 0.02, 1.7, Math.PI / 2); lab.position.x = -1.955;
+  }
+  /* warm lamps so the gold shines */
+  for (const [px, py, pz, k] of [[-1.55, 2.35, 1.7, 5], [0.4, 2.5, 2.3, 4], [2.1, 2.35, 1.75, 4]]) { const l = new THREE.PointLight(0xffd49a, k, 4.5, 2); l.position.set(px, py, pz); grp.add(l); }
+  /* the back wall: every boss you beat, mounted like hunting trophies */
+  const beat = Math.min(100, G.bossesBeaten || 0), W2 = 2048, H2 = 960, c = mkCanvas(W2, H2), x = c.getContext('2d');
+  x.fillStyle = '#20150c'; x.fillRect(0, 0, W2, H2); x.fillStyle = '#ffd65a'; x.font = 'bold 44px monospace'; x.textAlign = 'center'; x.fillText('BOSSES DELETED: ' + beat + ' / 100', W2 / 2, 52);
+  for (let i = 0; i < 100; i++) {
+    const cx = 20 + (i % 10) * 201, cy = 74 + Math.floor(i / 10) * 88, d = BOSS_DATA[i], won = i < beat;
+    x.fillStyle = won ? '#5a3a1e' : '#120c08'; x.beginPath(); x.roundRect(cx, cy, 190, 80, 12); x.fill();
+    if (won) {
+      const col = '#' + new THREE.Color(d[4]).getHexString();
+      x.fillStyle = col; x.beginPath(); x.arc(cx + 34, cy + 40, 26, 0, TAU); x.fill(); x.fillStyle = '#000'; x.font = 'bold 20px monospace'; x.fillText(d[0].replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase(), cx + 34, cy + 47);
+      x.fillStyle = '#f2e6c8'; x.font = 'bold 17px monospace'; x.textAlign = 'left'; x.fillText(d[0].slice(0, 13), cx + 66, cy + 36); x.font = '15px monospace'; x.fillStyle = '#c8b090'; x.fillText(d[1] + ' · L' + (i + 1), cx + 66, cy + 60); x.textAlign = 'center';
+    } else { x.fillStyle = '#3a2a1a'; x.font = 'bold 30px monospace'; x.fillText('?', cx + 95, cy + 52); }
+  }
+  const tex = texFrom(c, false); tex.colorSpace = THREE.SRGBColorSpace;
+  mesh(new THREE.PlaneGeometry(5.0, 2.34), std({ map: tex, roughness: 0.7 }), 0.4, 1.38, 3.39, Math.PI);
+  /* the last 3 bosses you beat as 3D heads on wooden shields (right wall) */
+  for (let k = 0; k < Math.min(3, beat); k++) {
+    const d = BOSS_DATA[beat - 1 - k], z = 0.8 + k * 0.95, col = d[4];
+    mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 6), wood, 2.97, 1.65, z).rotation.set(0, 0, Math.PI / 2);
+    /* its face: a dead screen with two glowing eyes and its name */
+    const hex = '#' + new THREE.Color(col).getHexString(), hc = mkCanvas(128, 96), hx = hc.getContext('2d'); hx.fillStyle = '#000'; hx.fillRect(0, 0, 128, 96); hx.fillStyle = hex;
+    hx.fillRect(26, 22, 26, 16); hx.fillRect(76, 22, 26, 16); hx.font = 'bold 20px monospace'; hx.textAlign = 'center'; hx.fillText(d[0].replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase(), 64, 80);
+    const shell = std({ color: new THREE.Color(col).multiplyScalar(0.3).add(new THREE.Color(0x202226)), metalness: 0.5, roughness: 0.4 });
+    mesh(new THREE.BoxGeometry(0.26, 0.2, 0.22), [shell, shell, shell, shell, shell, std({ color: 0x000000, emissive: 0xffffff, emissiveMap: texFrom(hc, false), emissiveIntensity: 1.3 })], 2.8, 1.65, z, Math.PI / 2);
+    mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.12, 6), shell, 2.8, 1.81, z); mesh(new THREE.SphereGeometry(0.018, 10, 8), std({ color: 0x000000, emissive: col, emissiveIntensity: 2 }), 2.8, 1.875, z);
+    /* little gold name plate under the shield */
+    const pc = mkCanvas(256, 48), px = pc.getContext('2d'); px.fillStyle = '#e6b84a'; px.fillRect(0, 0, 256, 48); px.fillStyle = '#3a2408'; px.font = 'bold 22px monospace'; px.textAlign = 'center'; px.fillText(d[0].slice(0, 16) + ' · L' + (beat - k), 128, 32);
+    mesh(new THREE.PlaneGeometry(0.42, 0.08), std({ map: texFrom(pc, false), metalness: 0.6, roughness: 0.3 }), 2.95, 1.3, z, -Math.PI / 2);
+  }
+}
+function updateTrophyRoom(dt) {
+  const sens = 0.0021 * S.sens;
+  TROOM.yaw -= Input.mdx * sens; TROOM.pitch = clamp(TROOM.pitch - Input.mdy * sens * (S.invertY ? -1 : 1), -1.3, 1.3);
+  let mx = (isDown('right') ? 1 : 0) - (isDown('left') ? 1 : 0) + Touch.stick.x, mz = (isDown('back') ? 1 : 0) - (isDown('forward') ? 1 : 0) + Touch.stick.y;
+  const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
+  const sy = Math.sin(TROOM.yaw), cy = Math.cos(TROOM.yaw), sp = 2.2 * dt;
+  TROOM.x = clamp(TROOM.x + (cy * mx + sy * mz) * sp, -0.55, 2.72); TROOM.z = clamp(TROOM.z + (-sy * mx + cy * mz) * sp, 0.25, 3.12);
+  /* it's a glitchy copy: every few seconds it tears */
+  TROOM.gT -= dt; let roll = 0;
+  if (TROOM.gT < 0.15) { roll = rand(-0.05, 0.05); R.canvas.style.filter = 'hue-rotate(' + randi(60, 300) + 'deg) contrast(1.3)'; if (TROOM.grp) TROOM.grp.position.x = rand(-0.02, 0.02); }
+  if (TROOM.gT <= 0) { TROOM.gT = rand(2.5, 6); R.canvas.style.filter = ''; if (TROOM.grp) TROOM.grp.position.x = 0; SFX.glitch(0.3); }
+  const c = Intro.cam; c.position.set(TROOM.x, 1.62, TROOM.z); c.rotation.set(TROOM.pitch, TROOM.yaw, roll, 'YXZ');
+  if (Touch.tap.use) exitTrophyRoom();
+}
+
 /* ============================ chat + real AI ============================ */
 const Chat = { open: false, bot: null, busy: false, typing: null };
 const isTrap = (t) => /\bmake\b[\s\S]{0,24}\bgames?\b/i.test(t) || /\bmakeagame\b/i.test(t.replace(/\s+/g, ''));
@@ -6082,7 +6267,7 @@ function hitEliza(dmg, part, hx, hy, hz, src) {
   if (E.hp <= 0) { E.hp = 0; E.alive = false; startKillcam(hx, hy, hz); }
 }
 function startElizaFight() {
-  const E = G.boss; if (E.active || E.done) return;
+  const E = G.boss; if (E.active || E.done) return; insaneBoss(E);
   E.active = true; E.alive = true; E.atkT = 3; E.talkT = 3; E.summonT = 6; E.died = false;
   DOOR.col.on = true; DOOR.closing = true; ffRebuildBlocked();
   $('bossbar').classList.remove('hidden'); $('bbName').textContent = 'ELIZA (1966)';
@@ -6923,7 +7108,7 @@ function genDeathFx(E) { fx.code(E.x, E.y + E.hb.cy, E.z, 140, E.chatBot.color.r
 
 /* ---------- start, reset ---------- */
 function startGenFight() {
-  const E = G.boss; if (E.active || E.done) return;
+  const E = G.boss; if (E.active || E.done) return; insaneBoss(E);
   E.active = true; E.alive = true; E.atkT = 3; E.talkT = 6; E.summonT = 8; E.died = false;
   DOOR.col.on = true; DOOR.closing = true; ffRebuildBlocked();
   $('bossbar').classList.remove('hidden'); $('bbName').textContent = E.def.name + ' (' + E.def.year + ')';
@@ -7091,13 +7276,13 @@ function updateGen(dt) {
 function virusPhase(E, ph, quiet) {
   if (ph === 2) {
     if (!PL.slots[0]) { PL.slots[0] = PL.slots[1]; PL.slots[1] = null; } PL.cur = 0; W.swap = 0; W.reload = 0; PL.armGone = true; VM.dirty = true; HUD.dirty = true;
-    if (!quiet) toast('⚠ THE VIRUS DELETED YOUR ARM. One gun only, until the next phase.', 'bad', 5000);
+    if (!quiet) toast('⚠ THE VIRUS DELETED YOUR ARM. One gun only, ' + (G.insane ? 'until this fight is over. (Insane)' : 'until the next phase.'), 'bad', 5000);
     if (!E.walls) { E.walls = []; for (let k = 0; k < 4; k++) { const mesh = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 0.5), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff2040, emissiveIntensity: 1.5, transparent: true, opacity: 0.55 })); mesh.userData.noEnv = true; lvAdd(mesh); E.walls.push({ mesh, on: false, t: k * 2.4 }); } }
     for (const w of E.walls) { w.on = true; w.mesh.visible = true; }
     if (!quiet) toast('⚠ THE VIRUS IS REWRITING THE MAP: firewalls!', 'bad', 3500);
   }
   if (ph === 3) {
-    PL.armGone = false; VM.dirty = true; HUD.dirty = true; if (!quiet) toast('Your arm grew back. Finish it!', 'good', 3500);
+    if (!G.insane) { PL.armGone = false; VM.dirty = true; HUD.dirty = true; if (!quiet) toast('Your arm grew back. Finish it!', 'good', 3500); } /* Insane: it stays gone */
     FINAL_FOUR.forEach(([nm, c], i) => { const b = spawnBot('grunt', -15 + i * 10, -95, { summoned: true, state: 'alert', base: nm, name: nm + ' (NEWEST)', color: c, tier: 3, hpMul: 3 }); if (b) E.summonAlive++; });
     G.hackFx.static = 1.2;
   }
@@ -7144,6 +7329,9 @@ async function showEnding() {
     SFX.key(); await wait(0.6);
   }
   trophy('virus');
+  const wasLocked = !insaneUnlocked(); LS.set('killais:insane', 1);
+  if (G.insane) { trophy('insaneWin'); toast('😈 You beat INSANE. The INSANE suit is yours (OUTFITS tab at any terminal).', 'troph', 7000); }
+  else if (wasLocked) toast('😈 INSANE MODE UNLOCKED. Start a New Game to try it.', 'troph', 7000);
   $('tzRoam').textContent = 'Keep exploring level ' + LVL.n; $('tzMenu').textContent = 'Back to desktop'; showEl('tzBtns');
 }
 
@@ -7230,7 +7418,7 @@ async function goToLevel(n) {
   G.screen = 'loading'; G.cine = false; G.killcam = null;
   await loadLevel(n);
   resetLevelState(); G.lv0 = Object.assign({}, G.stats); /* the stats screen shows this level only */
-  Object.assign(PL, { x: START.x, y: 0, z: START.z, vx: 0, vy: 0, vz: 0, yaw: START.yaw, pitch: 0, onGround: true, crouch: 0, slideT: 0, lean: 0, hp: 100, alive: true, invuln: 2, swim: false, under: false, gooT: 0, peakY: 0,
+  Object.assign(PL, { x: START.x, y: 0, z: START.z, vx: 0, vy: 0, vz: 0, yaw: START.yaw, pitch: 0, onGround: true, crouch: 0, slideT: 0, lungeT: 0, lean: 0, hp: 100, alive: true, invuln: 2, swim: false, under: false, gooT: 0, peakY: 0,
     checkpoint: -1, passcodes: [false, false, false], controlLock: false, lookLock: false, armGone: false, hasGun: PL.hasGun || PL.owned.length > 0 });
   Object.assign(W, { reload: 0, swap: 0, spin: 0, knife: 0, heal: 0, gren: 0, search: 0, rip: 0 });
   G.endRoam = false; G.inGame = true; G.screen = 'teaser';
@@ -7683,13 +7871,15 @@ function showTitle() {
   $('dkSub').textContent = G.deaths > 10 ? 'y0ur c0mputer is m1ne n0w' : G.deaths > 3 ? 'your computer has been infected (badly)' : 'your computer has been infected';
   $('tbItems').innerHTML = '<span class="tb-item">KILL_AIs.exe</span><span class="tb-item">virus.exe (running)</span>' + (G.deaths > 5 ? '<span class="tb-item">ELIZA.exe</span>' : '');
 }
-function playOrContinue() { audioInit(); SFX.ui(); if (G.inGame) enterPlay(); else startNewGame(); }
+function playOrContinue() { audioInit(); SFX.ui(); if (G.inGame) enterPlay(); else askNewGame(); }
 function askNewGame() {
-  if (!G.inGame) { startNewGame(); return; }
-  openWin('New game?', [['x', 'Start over']], () => '<p>Start a brand new run? <b>Your current run will be deleted.</b> (Trophies stay.)</p><p><button class="btn red" data-act="newyes">Yes, delete it and start over</button> <button class="btn" data-act="closewin">Cancel</button></p>');
+  if (!G.inGame && !insaneUnlocked()) { startNewGame(); return; }
+  openWin('New game', [['x', 'New game']], () => (G.inGame ? '<p>Start a brand new run? <b>Your current run will be deleted.</b> (Trophies, outfits you unlocked with trophies, and save slots stay.)</p>' : '<p>Pick how hard you want it.</p>')
+    + '<p><button class="btn red" data-act="newyes">' + (G.inGame ? 'Yes, start over (Hard)' : 'Hard') + '</button>' + (insaneUnlocked() ? ' <button class="btn red" data-act="newinsane">😈 INSANE</button>' : '') + ' <button class="btn" data-act="closewin">Cancel</button></p>'
+    + (insaneUnlocked() ? '<div class="note">INSANE: AIs have 60% more health, hit 50% harder and are smarter; bosses have 50% more health; you can have as many sidekicks as you want. Beat it for the INSANE suit and a super rare trophy.</div>' : ''));
 }
-function startNewGame() {
-  audioInit(); closeWin();
+function startNewGame(insane = false) {
+  audioInit(); closeWin(); G.insane = !!insane; applyDifficulty();
   if (LVL.n !== 1 || !LV.root) buildLevel(1);
   try { GameSystem.clear(); } catch (e) { /* ignore */ }
   resetWorld(true); G.inGame = true;
@@ -7701,7 +7891,7 @@ $('desktop').addEventListener('click', (e) => {
   audioInit();
   const ic = e.target.closest('.dk-icon'); if (!ic) return; SFX.ui();
   const a = ic.dataset.act;
-  if (a === 'play') playOrContinue(); else if (a === 'new') askNewGame(); else if (a === 'settings') openSettings(); else if (a === 'trophies') openTrophies(); else if (a === 'readme') openReadme(); else if (a === 'bin') openBin();
+  if (a === 'play') playOrContinue(); else if (a === 'new') askNewGame(); else if (a === 'load') openWin('Load game', [['x', 'Save slots']], () => '<div class="note">Save slots are made at shop terminals (PAUSE MENU tab).</div>' + slotsHTML(false)); else if (a === 'settings') openSettings(); else if (a === 'trophies') openTrophies(); else if (a === 'readme') openReadme(); else if (a === 'bin') openBin();
 });
 $('tbStart').addEventListener('click', () => { SFX.ui(); openReadme(); });
 function updateDesktop(rdt) {
@@ -7776,6 +7966,7 @@ function settingsHTML(tab) {
 }
 $('winBody').addEventListener('click', (e) => {
   const t = e.target.closest('button'); if (!t) return; SFX.ui();
+  if (t.dataset.slotload) { loadSlot(+t.dataset.slotload); return; }
   if (t.dataset.preset) { S.preset = t.dataset.preset; applyPreset(); renderWin(); return; }
   if (t.dataset.rebind) { Input.rebind = t.dataset.rebind; renderWin(); return; }
   const a = t.dataset.act;
@@ -7786,6 +7977,7 @@ $('winBody').addEventListener('click', (e) => {
   else if (a === 'offline') { AIBrain.loadOffline(() => { if (!$('win').classList.contains('hidden') && WIN.tab === 'ai') renderWin(); }); renderWin(); }
   else if (a === 'closewin') closeWin();
   else if (a === 'newyes') startNewGame();
+  else if (a === 'newinsane') startNewGame(true);
 });
 $('winBody').addEventListener('input', (e) => {
   const t = e.target;
@@ -7820,6 +8012,7 @@ function onKeyAction(e) {
   const c = e.code;
   if (SIDE.code && G.screen === 'play') { if (CODE_KEYS[c]) { e.preventDefault(); codeKey(CODE_KEYS[c]); } else if (c === 'Escape') endCodeGame(false); return; }
   if (!$('win').classList.contains('hidden')) { if (c === 'Escape') closeWin(); return; }
+  if (G.screen === 'troom') { if (c === 'Escape' || c === S.keys.use) exitTrophyRoom(); return; }
   if (Shop.open) { if (c === 'Escape' || c === S.keys.use) Shop.close(); else if (c === 'Space' && Shop.tab === 'hack' && Shop.hg) { e.preventDefault(); Shop.hgHit(); } return; }
   if (G.screen === 'cine' || (G.cine && G.cineKind !== 'killcam')) { if (c === 'Space' || c === 'Escape' || c === 'Enter') skipCine(); return; }
   if (G.screen === 'title') { if (c === 'Enter') playOrContinue(); return; }
@@ -7856,7 +8049,8 @@ function serialize() {
   s.game = {
     t: r2(G.time),
     p: { x: r2(PL.x), y: r2(PL.y), z: r2(PL.z), yaw: r2(PL.yaw), pitch: r2(PL.pitch), hp: r2(PL.hp), armor: r2(PL.armor), hack: PL.hack, crypto: PL.crypto, meds: PL.meds, frags: PL.frags,
-      slots: PL.slots, cur: PL.cur, guns: PL.guns, owned: PL.owned, checkpoint: PL.checkpoint, hasGun: PL.hasGun, passcodes: PL.passcodes, crouch: r2(PL.crouch), alive: PL.alive, skills: PL.skills, gren: PL.gren, gsel: PL.gsel, nvg: PL.nvg, allies: PL.allies, hackRounds: PL.hackRounds || 0 },
+      slots: PL.slots, cur: PL.cur, guns: PL.guns, owned: PL.owned, checkpoint: PL.checkpoint, hasGun: PL.hasGun, passcodes: PL.passcodes, crouch: r2(PL.crouch), alive: PL.alive, skills: PL.skills, gren: PL.gren, gsel: PL.gsel, nvg: PL.nvg, allies: PL.allies, hackRounds: PL.hackRounds || 0, sword: !!PL.sword, outfit: PL.outfit, outfits: PL.outfits },
+    insane: !!G.insane,
     clip: { stage: CLIP.stage, done: CLIP.done, ripReady: CLIP.ripReady },
     door: DOOR.open, secret: !!(LV.secret && LV.secret.open), level: LVL.n, picks: LV.pickups.filter((p) => p.taken).map((p) => p.id), easter: LV.easter.map((e) => (e.read ? 1 : 0)),
     sp: SPAWNERS.map((s2) => Math.max(0, Math.round(s2.hp))), spr: SPAWNERS.map((s2) => s2.reserve), tw: TOWERS.map((t) => [t.alive ? 1 : 0, t.hacked ? 1 : 0, Math.round(t.hp)]), terms: TERMS.map((T) => [T.discount ? 1 : 0, Math.round(T.hackCd || 0)]),
@@ -7875,12 +8069,13 @@ function fairBots(rows, px, pz) {
   return keep.concat(rest, dead);
 }
 function applyGame(g) {
+  G.insane = !!g.insane; applyDifficulty();
   const lv = clamp((g.level | 0) || 1, 1, LAST_LEVEL); if (lv !== LVL.n || !LV.root) buildLevel(lv);
   resetWorld(false);
   G.inGame = true; G.time = g.t || 0;
   const p = g.p || {};
   Object.assign(PL, { x: p.x ?? START.x, y: p.y || 0, z: p.z ?? START.z, yaw: p.yaw || 0, pitch: p.pitch || 0, hp: p.hp ?? 100, armor: p.armor || 0, hack: p.hack || 0, crypto: p.crypto || 0, meds: p.meds || 0, frags: p.frags || 0,
-    slots: p.slots || [null, null], cur: p.cur || 0, guns: p.guns || {}, owned: p.owned || [], checkpoint: p.checkpoint ?? -1, hasGun: !!p.hasGun, passcodes: p.passcodes || [false, false, false], crouch: p.crouch || 0, skills: Object.assign({}, p.skills || {}), gren: Object.assign({}, p.gren || {}), gsel: GREN_T[p.gsel] ? p.gsel : 'frag', nvg: !!p.nvg, allies: (p.allies || []).slice(), hackRounds: p.hackRounds || 0 });
+    slots: p.slots || [null, null], cur: p.cur || 0, guns: p.guns || {}, owned: p.owned || [], checkpoint: p.checkpoint ?? -1, hasGun: !!p.hasGun, passcodes: p.passcodes || [false, false, false], crouch: p.crouch || 0, skills: Object.assign({}, p.skills || {}), gren: Object.assign({}, p.gren || {}), gsel: GREN_T[p.gsel] ? p.gsel : 'frag', nvg: !!p.nvg, allies: (p.allies || []).slice(), hackRounds: p.hackRounds || 0, sword: !!p.sword, outfit: p.outfit || 'hoodie', outfits: (p.outfits || []).slice() });
   if (p.alive === false || PL.hp <= 0) { PL.hp = 100; const T = PL.checkpoint >= 0 ? TERMS[PL.checkpoint] : null; if (T) { PL.x = T.front.x; PL.z = T.front.z; } else { PL.x = START.x; PL.z = START.z; } PL.y = 0; }
   for (const id in PL.guns) PL.guns[id].att = Object.assign({ sil: false, ext: false, scope: false, therm: false, elem: '' }, PL.guns[id].att || {});
   const c = g.clip || {}; CLIP.stage = c.stage || 0; CLIP.done = !!c.done; CLIP.ripReady = !!c.ripReady;
@@ -7909,7 +8104,7 @@ function applyGame(g) {
   else if (DOOR.open && inArena(PL.x, PL.z) && PL.z < DOOR.z - 3 && e.active) { startBossFight(); E.hp = e.hp || E.maxHp; if (e.phase >= 2) bossPhaseQuiet(e.phase); }
   G.stats = Object.assign(STATS0(), g.stats || {}); G.lv0 = Object.assign(STATS0(), g.lv0 || {}); G.saidWords = g.said || []; G.endRoam = !!g.endRoam; G.bonusUnlocked = !!g.bonus; G.hackerTimer = g.hackerT || 150;
   G.bestStreak = G.stats.bestStreak || 0;
-  spawnAllies();
+  spawnAllies(); applyOutfit();
   ffRebuildBlocked(); updateDoorLeds(); HUD.dirty = true; VM.dirty = true;
 }
 /* reset the level: compilers, towers, terminals, pickups, doors, the boss. Your guns and Crypto stay */
@@ -7933,10 +8128,11 @@ function resetLevelState() {
 function resetWorld(pop = true) {
   resetLevelState();
   Object.assign(CLIP, { stage: 0, done: false, ripReady: false, grunt: null, dead: false, ghostT: 0 }); CLIP.mesh.visible = false; CLIP.ghost.visible = false;
-  Object.assign(PL, { x: START.x, y: 0, z: START.z, vx: 0, vy: 0, vz: 0, yaw: START.yaw, pitch: 0, onGround: true, crouch: 0, slideT: 0, lean: 0, hp: 100, armor: 0, hack: 0, crypto: 0, meds: 1, frags: 1,
+  Object.assign(PL, { x: START.x, y: 0, z: START.z, vx: 0, vy: 0, vz: 0, yaw: START.yaw, pitch: 0, onGround: true, crouch: 0, slideT: 0, lungeT: 0, lean: 0, hp: 100, armor: 0, hack: 0, crypto: 0, meds: 1, frags: 1,
     alive: true, invuln: 0, swim: false, under: false, gooT: 0, peakY: 0, recoilP: 0, ads: 0, guns: {}, owned: [], slots: [null, null], cur: 0, checkpoint: -1, hasGun: false, armGone: false,
-    passcodes: [false, false, false], controlLock: false, lookLock: false, skills: {}, gren: {}, gsel: 'frag', nvg: false, allies: [], hackRounds: 0 });
+    passcodes: [false, false, false], controlLock: false, lookLock: false, skills: {}, gren: {}, gsel: 'frag', nvg: false, allies: [], hackRounds: 0, sword: false, outfit: 'hoodie', outfits: [] });
   Object.assign(W, { cool: 0, reload: 0, swap: 0, spin: 0, jamClear: 0, bloom: 0, knife: 0, heal: 0, gren: 0, search: 0, rip: 0 });
+  applyOutfit();
   G.stats = STATS0(); G.lv0 = STATS0(); G.streak = 0; G.bestStreak = 0; G.headStreak = 0; G.endRoam = false; G.saidWords = []; G.bonusUnlocked = false; G.bossesBeaten = 0;
   G.hackFx = { nextStatic: 10, nextPop: 12, nextFake: 8, nextCtl: 30, flip: 0, lag: 0, fakeHud: 0, static: 0 };
   if (pop) populate();
@@ -7970,6 +8166,9 @@ function tick(rdt, draw) {
     if (!paused) step(rdt * G.timeScale, rdt);
     if (draw) { drawAbilities(); FX.tracers.count = trN; FX.tracers.instanceMatrix.needsUpdate = true; if (FX.tracers.instanceColor) FX.tracers.instanceColor.needsUpdate = true; renderScene(R.scene, R.camera); }
     trN = 0;
+  } else if (G.screen === 'troom') {
+    updateTrophyRoom(rdt);
+    if (draw) renderScene(Intro.scene, Intro.cam);
   } else if (G.screen === 'cine') {
     updateIntro(rdt);
     if (draw) renderScene(Intro.scene, Intro.cam);
@@ -8040,7 +8239,7 @@ async function boot() {
   hideEl('loading');
   if (saved && saved.v === 1) restore(saved); else { G.trophies = LS.get('killais:trophies', {}) || {}; showTitle(); }
   requestAnimationFrame((t) => { lastT = t; frame(t); });
-  window.__KA = { recruit, allyList, SIDE, startCodeGame, codeKey, reviveAlly, allyHurt, spawnAllies, loadHackRound, canRecruit, gunSkin, skinOk, rayWorld, GUN_ORDER, gBase, gunReward, levelReach, fireShot, GREN_T, grenCount, grenAdd, cycleGrenade, AREAS, GRENS, detonate, toggleNV, VIS, smokeBlocks, SKILLS, sk, buySkill, GRAP, CODEV, grappleFire, codeVision, resCap, drawAbilities, gunStats, THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight, startBossFight, genReachable, BOSS_DATA, SIG, doAttack, hitBoss, GEN, ERAS, SNIPER_PERCHES, resetLevelState, buildLevel, goToLevel, loadLevel, LVL, ARENA, START, levelDef, unloadLevel, finishBoss, showTeaser, showStats };
+  window.__KA = { enterTrophyRoom, exitTrophyRoom, TROOM, saveSlot, loadSlot, slotInfo, OUTFITS, applyOutfit, outfitOk, insaneUnlocked, swordHit, askNewGame, LS, DIFF, recruit, allyList, SIDE, startCodeGame, codeKey, reviveAlly, allyHurt, spawnAllies, loadHackRound, canRecruit, gunSkin, skinOk, rayWorld, GUN_ORDER, gBase, gunReward, levelReach, fireShot, GREN_T, grenCount, grenAdd, cycleGrenade, AREAS, GRENS, detonate, toggleNV, VIS, smokeBlocks, SKILLS, sk, buySkill, GRAP, CODEV, grappleFire, codeVision, resCap, drawAbilities, gunStats, THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight, startBossFight, genReachable, BOSS_DATA, SIG, doAttack, hitBoss, GEN, ERAS, SNIPER_PERCHES, resetLevelState, buildLevel, goToLevel, loadLevel, LVL, ARENA, START, levelDef, unloadLevel, finishBoss, showTeaser, showStats };
 }
 boot().catch((err) => { console.error(err); const e = $('loadErr'); if (e) { e.style.display = 'block'; $('loadErrMsg').textContent = String(err && err.message || err); } });
 </script>

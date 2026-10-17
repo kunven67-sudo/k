@@ -245,6 +245,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - After THE VIRUS: the ending, then keep exploring level 100 or go back to the desktop.
 - Maps are **mostly flat with a few high spots**.
 - **Difficulty: Hard.** Beat the game to unlock **Insane mode**. Beat Insane → a **really insane outfit** with **all buffs** (can't be hacked + double damage + super speed) and a **super rare trophy**.
+  - **Built:** after you beat THE VIRUS, New Game asks **Hard or 😈 INSANE**. On Insane every AI is one tier tougher, AIs have 1.6× health and hit 1.5× harder, bosses have 1.5× health, you can have up to 12 sidekicks, and THE VIRUS keeps your arm deleted for the rest of the fight. The objective bar shows "😈 INSANE". Beating Insane gives the INSANE suit and the super rare trophy.
 - **Hidden stuff:** secret rooms, hidden Crypto stashes, easter eggs about real AIs, hidden trophies.
 - **Random map events** *(designer's choice; picked all three)*: glitch storms, blackouts, firewall walls.
 - **Destruction:** a lot breaks (cover, walls, glass, screens).
@@ -263,6 +264,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **First gun:** the grunt bot's ripped-off arm cannon, a beat-up, scratched, glitchy prototype pistol that sometimes jams.
 - **Looting:** press a key to search dead AIs (with an animation).
 - **Melee:** combat knife, energy sword AND punches.
+  - **Built: the energy sword** (1500 Crypto, GEAR tab). It replaces the knife: a glowing blue blade that hits up to 3 AIs in an arc, lunges you at an AI 1.5–6m in front of you, and still one-shots AIs from behind if they haven't seen you.
 - **Grenades:** frag, EMP, virus (hacked AIs fight each other), smoke, plus 5 extra:
   - Black hole (sucks AIs into one spot)
   - Firewall (wall of fire)
@@ -321,6 +323,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Shop terminals** are inside the levels; you walk up to them. They're **just a machine** (no shopkeeper, no talking).
   - They're **safe zones**, but AIs can **hack the prices up**. **Kill the AI that hacked it** to fix the prices. The terminal shows the hacker's **name and face**, and it's marked with a **red skull on the minimap**.
 - **Saving only at shop terminals.** **3 save slots.**
+  - **Built:** the PAUSE MENU tab at every terminal has 3 save slots (level, boss, Crypto, kills, date, and 😈 if it's an Insane run). Load them from the desktop's 💾 Load Game icon or from any terminal. The game still autosaves your current run too.
 - **Hack the prices yourself:** a risky mini-game at the terminal. Win = cheaper prices, lose = it backfires.
 - **Ammo crates** in ELIZA's chamber respawn, so you can never get stuck with no ammo in a boss fight.
 
@@ -335,6 +338,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Attachments:** scopes/zoom, silencers, bigger magazines, elemental rounds (fire, shock, glitch). From **shop terminals** and **boss drops**.
 - **Gun skins:** gold (earned with lots of kills, or by maxing the gun's upgrade level), glitch (animated, corrupted), AI-logo (themed after bosses you beat).
 - **Outfits:** bought at the shop AND unlocked with trophies. **Secret trophies give the coolest outfits.**
+  - **Built:** OUTFITS tab at the terminals. Grey hoodie (start), Tactical (800), Hazmat suit (1500, goo can't hurt or hack you), Neon hacker (beat 25 bosses), Gold-plated (own 50 guns), INSANE suit (beat Insane: can't be hacked, double damage, super speed). You see them on your arms and sleeves.
 - **Built: all 100 guns.** The 11 first guns plus 89 more, each built on one of the base gun bodies with its own stats, colors, length and add-ons (drum mags, barrel shrouds, glowing coils, bipods, silencer cans, fuel tanks...):
   - 8 kinds, with a filter in the shop: pistols, SMGs, shotguns, rifles, snipers, heavy, launchers, energy
   - **Shop guns** show up as you reach new levels (the shop teases the next 3 locked ones). **Every 5th boss drops its own gun** (Jabberwacky's Cheese Gun, Deep Blue's Checkmate, ChatGPT's Jailbreak, Claude's Constitution, Gemini's Twin Stars... and ZERO DAY from THE VIRUS). **10 secret guns** sit in secret rooms (levels 3, 13, 23... 93), like the Pixel Pistol, The Golden Gun and rm -rf.
@@ -365,6 +369,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - Super rare Insane-mode trophy
 - **Trophies show in both KILL AIs and Ant Work 2.**
 - **Trophy room** you walk around in, **only in safe zones**. It's a **glitchy copy of your real bedroom** from before you got sucked in, with trophies on the shelves and **every boss you beat mounted on the wall** like a hunting trophy.
+  - **Built:** TROPHIES tab → "Walk into your trophy room". You walk around your glitchy bedroom (WASD + mouse, Esc/F to go back to the terminal). 3 lit shelves of gold cups (one per trophy, with names), a wall of all 100 boss plaques (beaten ones in color, the rest are "?"), and the last 3 bosses you beat mounted as robot heads with glowing eyes and gold name plates. The room tears and color-glitches every few seconds.
 
 ## 13. HUD & Settings
 
@@ -420,7 +425,7 @@ What the first build should have:
 7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
 8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** (Dr. Sbaitso) and "to be continued"
 
-**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook, all 9 grenades, the vision gear, all 100 guns, gun skins and sidekicks**. **Not built yet:** 3 save slots (it autosaves 1), the trophy room, vehicles (hoverbike, tank), Insane mode, the energy sword.
+**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook, all 9 grenades, the vision gear, all 100 guns, gun skins, sidekicks, the energy sword, outfits, Insane mode, 3 save slots and the trophy room**. **Not built yet:** vehicles (hoverbike, tank).
 
 ## Still Open
 
