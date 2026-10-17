@@ -9,11 +9,12 @@ new RGBELoader().load('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloo
 loadGLB(loader, 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Soldier.glb', (gltf) => {
   soldierGLTF = gltf; modelReady = true;
 }, (err) => { console.error(err); $('loadText').textContent = 'Could not load the knight model. Check your internet and refresh.'; $('playBtn').textContent = 'LOAD FAILED'; });
+loadFaces(loader);
 let worldStarted = false;
 function checkReady() {
   const pct = Math.round(((texDone / Math.max(1, texPending)) * 0.35 + (modelReady ? 0.15 : 0) + (scansLoaded / SCANS.length) * 0.45 + (natureReady ? 0.05 : 0)) * 100);
   if (!worldStarted) $('loadText').textContent = 'Loading the world... ' + pct + '%';
-  if (worldStarted || !modelReady || !natureReady || texDone < texPending) return;
+  if (worldStarted || !modelReady || !natureReady || !facesReady || texDone < texPending) return;
   worldStarted = true;
   player = createPlayer();
   initVillage();

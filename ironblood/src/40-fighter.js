@@ -127,6 +127,8 @@ class Fighter {
     this.armor = opt.outfit ? buildClothes(this.model, opt.outfit) : buildArmor(this.model, { tier: opt.player ? 1 : opt.tier, metal: opt.metal, rough: opt.rough, cloth: opt.cloth, leather: opt.leather, player: opt.player });
     if (opt.scale) this.root.scale.setScalar(opt.scale);
     if (opt.player) this.cape = new Cape(this.model, opt.cloth, this.armor.uniforms);
+    // your own face under the helmet: only seen when the helmet comes off (kissing)
+    if (opt.player) { this.face = attachFace(this.model, 'you', this.armor.uniforms); if (this.face) this.face.visible = false; }
     this.model.rotation.y = Math.PI; // the soldier faces -Z, turn it to face +Z
     this.root.add(this.model);
     scene.add(this.root);
@@ -167,6 +169,11 @@ class Fighter {
     this.painT = 0;
     this.animSlot = fighters.length % 3;
     fighters.push(this);
+  }
+  // take the helmet off (and put it back on)
+  helmet(on) {
+    this.model.traverse(o => { if (o.userData.helm) o.visible = on; });
+    if (this.face) this.face.visible = !on;
   }
   setSword(def) {
     if (this.swordMesh) scene.remove(this.swordMesh);

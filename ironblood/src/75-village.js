@@ -3,7 +3,7 @@
 const money = (c) => { c = Math.max(0, Math.round(c)); const g = Math.floor(c / 240), s = Math.floor((c % 240) / 12), k = c % 12; return [g && g + 'g', s && s + 's', (k || (!g && !s)) && k + 'c'].filter(Boolean).join(' '); };
 const hourNow = () => dayT * 24;
 // plain medieval dyes
-const DYE = { linen: 0xcfc3a8, white: 0xe6dfcf, russet: 0x7a3b22, woad: 0x34506e, madder: 0x8a2a20, weld: 0xb39a4a, brown: 0x5b4330, dark: 0x3e342a, green: 0x4a5a30, moss: 0x3e4a2a, grey: 0x6f6a62, black: 0x2a2624, plum: 0x5a2a4a };
+const DYE = { linen: 0xcfc3a8, white: 0xc2b69e, russet: 0x7a3b22, woad: 0x34506e, madder: 0x8a2a20, weld: 0xb39a4a, brown: 0x5b4330, dark: 0x3e342a, green: 0x4a5a30, moss: 0x3e4a2a, grey: 0x6f6a62, black: 0x2a2624, plum: 0x5a2a4a };
 
 // everyone in Ashford: all grown adults with their own lives
 const PERSONAS = [
@@ -118,7 +118,7 @@ const villagers = [];
 function personFor(id) { return villagers.find(v => v.vill.p.id === id); }
 function spawnVillager(p) {
   const st = vsave.people[p.id];
-  const f = new Fighter({ tier: p.fighter ? 5 : 4, team: 'villager', outfit: { sex: p.sex, ...p.outfit }, body: p.sex === 'f' ? 0x6e5848 : 0x5e4a3c, sword: null, scale: p.sex === 'f' ? 0.93 : 1 + (p.id.length % 3) * 0.02, name: p.name });
+  const f = new Fighter({ tier: p.fighter ? 5 : 4, team: 'villager', outfit: { sex: p.sex, face: p.id, ...p.outfit }, body: p.sex === 'f' ? 0x6e5848 : 0x5e4a3c, sword: null, scale: p.sex === 'f' ? 0.93 : 1 + (p.id.length % 3) * 0.02, name: p.name });
   f.voicePitch = (p.sex === 'f' ? 1.45 : 1) * p.pitch;
   f.vill = { p, st, mode: 'life', goal: null, slot: '', wait: 0, stuckT: 0, lx: 0, lz: 0, detourT: 0, dx: 0, dz: 0, talkT: 0, fleeT: 0 };
   f.purse = 3 + Math.floor(Math.random() * 20);

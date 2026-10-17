@@ -291,10 +291,11 @@ function startScene(f, kind) {
   const dir = _vw.copy(f.pos).sub(P.pos).setY(0); if (dir.lengthSq() < 0.01) dir.set(Math.sin(P.facing), 0, Math.cos(P.facing)); dir.normalize();
   P.facing = Math.atan2(dir.x, dir.z); P.root.rotation.y = P.facing;
   P.vel.set(0, 0, 0); P.blocking = false; P.attack = null;
-  f.pos.copy(P.pos).addScaledVector(dir, 0.46); f.pos.y = groundH(f.pos.x, f.pos.z);
+  f.pos.copy(P.pos).addScaledVector(dir, 0.52); f.pos.y = groundH(f.pos.x, f.pos.z);
   f.facing = P.facing + Math.PI; f.root.rotation.y = f.facing;
   P.noArms = true; f.noArms = true;
   if (P.swordMesh) P.swordMesh.visible = false;
+  P.helmet(false);
   scene0 = { f, kind, t: 0, dur: kind === 'kiss' ? 4.2 : 10, side: Math.random() < 0.5 ? 1 : -1, smacks: 0 };
   romanceWitnessed(f, kind === 'kiss' ? 'kissing ' + v.p.name : 'making out with ' + v.p.name);
 }
@@ -322,8 +323,10 @@ function updateScene(dt) {
   // heads tilt the same way (their own right), so they meet; making out slowly switches sides
   const sideNow = mk ? Math.sin(s.t * 0.9) : s.side;
   const sway = mk ? Math.sin(s.t * 1.7) * 0.04 : 0;
-  leanBody(P, w * 0.42, w * 0.32 * sideNow, w * 0.22);
-  leanBody(f, w * 0.3, w * 0.32 * sideNow, -w * 0.12);
+  // he is taller: he bends down to her, she lifts her face and goes up on her toes
+  leanBody(P, w * 0.62, w * 0.3 * sideNow, w * 0.3);
+  leanBody(f, w * 0.2, w * 0.3 * sideNow, -w * 0.36);
+  f.root.position.y = groundH(f.pos.x, f.pos.z) + 0.05 * w;
   if (sway) { rotateBoneWorld(P.b.Spine1, _ay, sway * w); rotateBoneWorld(f.b.Spine1, _ay, -sway * w); }
   // arms: her hands up round his neck (or on his chest), his hands at her waist / back
   if (w > 0.05) {
@@ -352,6 +355,7 @@ function endScene() {
   const P = player, f = s.f, st = f.vill.st, p = f.vill.p;
   P.noArms = false; f.noArms = false;
   if (P.swordMesh) P.swordMesh.visible = true;
+  P.helmet(true);
   f.vill.mode = 'life'; f.vill.goal = null; f.vill.wait = 3;
   st.aff = Math.min(100, st.aff + (s.kind === 'kiss' ? 4 : 6)); st.opinion = clampO(st.opinion + 2);
   st.kissedDay = vsave.day;

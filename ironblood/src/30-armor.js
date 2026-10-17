@@ -127,15 +127,15 @@ function buildArmor(model, opt) {
       boxAt(0.012, 0.05, 0.25, 0, 1.86, 0.03), // crest ridge
       cylBetween([0, 1.55, 0.03], [0, 1.59, 0.03], 0.13, 0.12, 22), // bevor lip
     ];
-    put('Head', helm, M);
+    put('Head', helm, M, { helm: true });
     // eye slit (glows on you) and breathing holes
     const slitMat = opt.player
       ? new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff1608, emissiveIntensity: 3 })
       : new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1 });
-    put('Head', [boxAt(0.085, 0.014, 0.02, -0.045, 1.715, -0.088, 0, 0.32), boxAt(0.085, 0.014, 0.02, 0.045, 1.715, -0.088, 0, -0.32)], slitMat);
+    put('Head', [boxAt(0.085, 0.014, 0.02, -0.045, 1.715, -0.088, 0, 0.32), boxAt(0.085, 0.014, 0.02, 0.045, 1.715, -0.088, 0, -0.32)], slitMat, { helm: true });
     const holes = [];
     for (let i = 0; i < 6; i++) holes.push(boxAt(0.008, 0.008, 0.02, -0.03 + (i % 3) * 0.03, 1.64 - Math.floor(i / 3) * 0.022, -0.118));
-    put('Head', holes, new THREE.MeshBasicMaterial({ color: 0x050505 }));
+    put('Head', holes, new THREE.MeshBasicMaterial({ color: 0x050505 }), { helm: true });
   }
   if (opt.player) {
     // hood over the helmet and onto the shoulders

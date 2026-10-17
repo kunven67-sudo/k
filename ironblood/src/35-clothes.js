@@ -16,6 +16,32 @@ function clothPBR(kind, color, U) {
   // the weave comes from the normal + roughness scans; the color is the real dye (scan colors tint everything grey-blue)
   return addBlood(new THREE.MeshStandardMaterial({ color, map: kind === 'leather' ? f.map : null, normalMap: f.normalMap, normalScale: new THREE.Vector2(1.4, 1.4), roughnessMap: f.roughnessMap, roughness: 1, metalness: 0, side: THREE.DoubleSide }), U);
 }
+// ---------- real faces (MakeHuman CC0 heads, skin painted per person) ----------
+const FACES = {};
+let facesReady = false;
+function loadFaces(L, done) {
+  loadGLB(L, ASSET_BASE + 'faces.glb', (gltf) => {
+    for (const g of gltf.scene.children[0] ? (gltf.scene.children[0].name === 'faces' ? gltf.scene.children[0].children : gltf.scene.children) : []) {
+      g.traverse(o => { if (o.isMesh) { o.castShadow = true; const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { m.envMapIntensity = 0.6; if (m.name.endsWith('_skin')) { m.roughness = 0.58; } } } });
+      FACES[g.name] = g;
+    }
+    facesReady = true; done && done();
+  }, (e) => { console.warn('faces failed', e); facesReady = true; done && done(); });
+}
+// the soldier's face sits here (mesh space, cm): eyes between the visor and the skull
+const EYE_SPOT = new THREE.Vector3(0, 4.2, 168.2);
+function attachFace(model, id, U) {
+  const src = FACES[id]; if (!src) return null;
+  let body = null; model.traverse(m => { if (m.isSkinnedMesh && !m.name.includes('visor')) body = m; });
+  model.updateMatrixWorld(true);
+  const g = src.clone(true);
+  g.traverse(o => { if (o.isMesh) { o.userData.armor = true; o.userData.face = true; if (U && !Array.isArray(o.material) && o.material.name.endsWith('_skin')) { o.material = o.material.clone(); addBlood(o.material, U); } } });
+  g.position.copy(EYE_SPOT).applyMatrix4(body.matrixWorld);
+  g.rotation.set(0, Math.PI, 0);
+  scene.add(g); g.updateMatrixWorld(true);
+  bone(model, 'Head').attach(g);
+  return g;
+}
 // ---------- skinned clothes ----------
 // The soldier mesh wears army gear. Smoothing it (Taubin) melts the pouches and pads into a plain body shape,
 // then it's puffed out a little and painted by body region: top, legs, boots, hands.
@@ -154,6 +180,7 @@ function buildClothes(model, o) {
     for (const g of Array.isArray(geos) ? geos : [geos]) acc.get(key).geos.push(g.index ? g.toNonIndexed() : g);
   };
   const f = o.sex === 'f', dress = o.dress ?? f;
+  const face = o.face ? attachFace(model, o.face, U) : null;
   // the body itself becomes the clothes: shirt/tunic, hose, boots, bare hands (bends exactly with the body)
   const skin = clothPBR('leather', 0x9a7462, U); skin.map = null; skin.normalMap = null; skin.roughness = 0.75; skin.color.set(o.skin || 0x9a7462);
   skinnedClothes(model, o, [top, legs, boots, skin], U);
@@ -165,26 +192,32 @@ function buildClothes(model, o) {
     put('Hips', lathe([[0.165, 1.06], [0.19, 0.92], [0.215, 0.72], [0.22, 0.66]], 0, 0.03, 1, 0.82, 24), top);
   }
   if (o.belt !== false) put('Hips', lathe([[0.0, 1.05], [0.18, 1.05], [0.18, 1.09], [0.0, 1.09]], 0, 0.03, 1, 0.82), leather);
-  if (o.apron) put('Spine', boxAt(0.32, 0.72, 0.014, 0, 0.92, -0.135, 0.06), leather);
+  if (o.apron) {
+    // unbleached linen apron curving round the front of the skirt
+    const ap = new THREE.CylinderGeometry(0.19, 0.29, 0.5, 14, 2, true, Math.PI - 0.95, 1.9);
+    ap.scale(1, 1, 0.88); ap.translate(0, 0.8, 0.03);
+    put('Hips', ap, clothPBR('linen', 0xb9ad94, U));
+  }
   // the hood: a deep wool cowl with the face in shadow, mantle over the shoulders
   if (o.hood) {
-    const hood = new THREE.SphereGeometry(0.165, 22, 14, -0.95, Math.PI + 1.9, 0, Math.PI * 0.68);
-    hood.scale(1, 1.15, 1.12); hood.translate(0, 1.71, 0.03);
+    // a deep wool cowl open at the front so the face shows, mantle over the shoulders
+    const hood = new THREE.SphereGeometry(0.165, 24, 14, -0.62, Math.PI + 1.24, 0, Math.PI * 0.7);
+    hood.scale(1, 1.15, 1.12); hood.translate(0, 1.71, 0.035);
     put('Head', hood, hoodM);
-    // a peak at the front so the face sits deep inside
-    put('Head', shell(0.17, 0, 1.79, -0.02, 0.9, 0.5, 1.1, Math.PI * 2, Math.PI * 0.45, 0.35, 0), hoodM);
-    put('Head', new THREE.CircleGeometry(0.105, 18).translate(0, 1.69, -0.095).rotateY(Math.PI), shadow);
     put('Spine2', cylBetween([0, 1.36, 0.05], [0, 1.56, 0.05], 0.29, 0.13, 22, true), hoodM);
   }
   if (o.veil) {
     // wimple + veil: linen fitted round the head and neck, face in its shadow, the veil falling down the back
-    const w = new THREE.SphereGeometry(0.128, 24, 14, -0.75, Math.PI + 1.5, 0, Math.PI * 0.74);
-    w.scale(1, 1.12, 1.08); w.translate(0, 1.712, 0.022);
+    const w = new THREE.SphereGeometry(0.132, 24, 14, -0.55, Math.PI + 1.1, 0, Math.PI * 0.74);
+    w.scale(1, 1.12, 1.08); w.translate(0, 1.712, 0.03);
     put('Head', w, hoodM);
-    put('Head', new THREE.CircleGeometry(0.08, 18).rotateY(Math.PI).translate(0, 1.69, -0.098), shadow);
     put('Neck', cylBetween([0, 1.47, 0.03], [0, 1.63, 0.025], 0.1, 0.078, 18), hoodM);
-    const back = new THREE.CylinderGeometry(0.14, 0.2, 0.3, 18, 1, true, -1.35, 2.7);
-    back.translate(0, 1.6, 0.035);
+    // the veil: a soft curved drape behind the head, flaring onto the shoulders
+    const back = new THREE.CylinderGeometry(0.135, 0.19, 0.28, 24, 4, true, -1.3, 2.6);
+    const bpos = back.attributes.position;
+    for (let i = 0; i < bpos.count; i++) { const y = bpos.getY(i), k = (0.14 - y) / 0.28; bpos.setZ(i, bpos.getZ(i) + k * k * 0.05); }
+    back.computeVertexNormals();
+    back.translate(0, 1.6, 0.03);
     put('Head', back, hoodM);
   }
   if (o.cloak) put('Spine2', boxAt(0.5, 1.05, 0.02, 0, 0.98, 0.2, -0.05), hoodM);
@@ -194,5 +227,5 @@ function buildClothes(model, o) {
     m.castShadow = mat !== shadow; m.userData.armor = true;
     bone(model, boneName).attach(m); parts.push(m);
   }
-  return { parts, uniforms: U, mats: [top, legs, boots, hoodM, leather], limbMat: top };
+  return { parts, uniforms: U, mats: [top, legs, boots, hoodM, leather], limbMat: top, face };
 }
