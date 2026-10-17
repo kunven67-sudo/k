@@ -128,6 +128,10 @@ export function makeCursor(kind = 'arrow') {
   } else if (kind === 'text') {
     g.strokeStyle = '#000'; g.lineWidth = 3; g.beginPath(); g.moveTo(8, 4); g.lineTo(8, 26); g.moveTo(5, 4); g.lineTo(11, 4); g.moveTo(5, 26); g.lineTo(11, 26); g.stroke();
     g.strokeStyle = '#fff'; g.lineWidth = 1.2; g.stroke();
+  } else if (kind === 'cross') {
+    g.strokeStyle = '#000'; g.lineWidth = 3; g.beginPath(); g.moveTo(16, 4); g.lineTo(16, 28); g.moveTo(4, 16); g.lineTo(28, 16); g.stroke();
+    g.strokeStyle = '#fff'; g.lineWidth = 1.2; g.stroke();
+    // hotspot is the center: shift the drawing up-left so the arrow-style top-left anchor lands in the middle
   } else if (kind === 'busy') {
     g.beginPath(); g.moveTo(1, 1); g.lineTo(1, 18); g.lineTo(5, 14.5); g.lineTo(8, 21); g.lineTo(11, 20); g.lineTo(8, 13.5); g.lineTo(13, 13.5); g.closePath();
     g.fillStyle = '#fff'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = '#000'; g.stroke();
