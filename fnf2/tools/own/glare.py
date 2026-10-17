@@ -22,7 +22,7 @@ from scipy import ndimage, signal
 FNF = os.environ.get('FNF_ASSETS', '/home/user/funkincrew/funkin.assets')
 SR = 44100
 BPM = 150
-BUSIER = os.environ.get('GLARE_BUSIER', '1') == '1'
+BUSIER = os.environ.get('GLARE_BUSIER', '0') == '1'      # 1 = the busier vocal lines (user wanted the old ones back)
 BEAT = 60 / BPM
 RNG = np.random.default_rng(7)
 
