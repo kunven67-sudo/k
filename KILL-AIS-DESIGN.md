@@ -258,7 +258,7 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Fall damage** from big falls.
 - **Lean** around corners with **Q and E**.
 - **Full stealth:** crouch-walk to sneak, AIs hear loud guns, silencers keep you hidden, silent knife kills from behind.
-- **Vision gear:** night vision goggles (shop), thermal scope (attachment), code vision (see AIs as glowing code through walls for a few seconds).
+- **Vision gear:** night vision goggles (shop), thermal scope (attachment), code vision (see AIs as glowing code through walls for a few seconds). **Built:** goggles (GEAR tab, press N: everything turns green and bright), thermal scope (UPGRADES tab: zoom, the world goes gray and AIs glow white-hot while you aim; dead bodies cool down), code vision (skill tree, press B).
 - **Carry 2 guns** at once. Every other gun you own sits in a **gun locker inside every terminal**: swap at any terminal, and upgrades stay on them.
 - **First gun:** the grunt bot's ripped-off arm cannon, a beat-up, scratched, glitchy prototype pistol that sometimes jams.
 - **Looting:** press a key to search dead AIs (with an animation).
@@ -269,6 +269,15 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
   - Delete (anything in the blast gets deleted)
   - Decoy (fake hologram of you)
   - Sticky bomb
+  - **Built:** all 9 kinds are in the GEAR tab (and sometimes on AI bodies). Press Y (or NADE ▸) to pick which one G throws:
+    - Frag (big boom), Sticky bomb (sticks to walls and AIs, booms 2s later)
+    - EMP: AIs freeze for 5s, drones drop, alarm towers and AI compilers shut down for a while, boss shields pop
+    - Smoke: a tall cloud for 14s that AIs can't see through (their name tags hide in it too)
+    - Decoy: a hologram of you that makes noise for 10s; AIs go after it
+    - Virus: AIs in the blast fight each other for 12s
+    - Firewall: a 9m wall of fire for 8s, sideways to your throw
+    - Black hole: sucks AIs in for 3.6s, then booms
+    - DELETE: regular AIs (and bodies) in the blast are deleted, bosses take huge damage, and it hurts you too
 - **Bullet time:** slow motion **only when you get a headshot**.
 - **Hack tool** that takes over enemy turrets.
 - **Health packs & armor:** sold at shop terminals, dropped by dead AIs, hidden around the map.
@@ -399,7 +408,7 @@ What the first build should have:
 7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
 8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** (Dr. Sbaitso) and "to be continued"
 
-**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook and code vision**. **Not built yet:** 3 save slots (it autosaves 1), sidekicks, the trophy room, vehicles (hoverbike, tank), Insane mode, vision gear, the extra grenades, the energy sword, the other 90 guns.
+**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook, all 9 grenades and the vision gear**. **Not built yet:** 3 save slots (it autosaves 1), sidekicks, the trophy room, vehicles (hoverbike, tank), Insane mode, the energy sword, the other 90 guns.
 
 ## Still Open
 
