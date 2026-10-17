@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRONBLOOD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --iron: #8d939b; --blood: #9b1010; --bright: #e8e2d6; --dim: rgba(232,226,214,.62); --panel: rgba(12,12,14,.62); }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #08080a; color: var(--bright); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; }
+  canvas { display: block; }
+  .cinzel { font-family: Cinzel, Georgia, serif; }
+  #hud { position: absolute; inset: 0; pointer-events: none; display: none; }
+  #hud.on { display: block; }
+  .tl { position: absolute; top: 14px; left: 16px; text-shadow: 0 1px 3px #000; font-size: 13px; line-height: 1.45; }
+  .tl .clock { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tr { position: absolute; top: 14px; right: 16px; text-align: right; text-shadow: 0 1px 3px #000; font-size: 13px; line-height: 1.5; }
+  .tr .kills { font-size: 22px; font-weight: 800; font-family: Cinzel, serif; }
+  #combo { font-family: Cinzel, serif; font-weight: 900; font-size: 20px; color: #ffb36b; opacity: 0; transition: opacity .2s; }
+  .bl { position: absolute; left: 16px; bottom: 16px; width: 290px; }
+  .bar { height: 14px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.18); border-radius: 3px; margin-top: 6px; position: relative; overflow: hidden; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; transition: width .12s; }
+  .bar b { position: absolute; right: 6px; top: -1px; font-size: 11px; font-weight: 700; text-shadow: 0 1px 2px #000; }
+  .bar span { position: absolute; left: 6px; top: -1px; font-size: 10px; letter-spacing: .1em; opacity: .85; text-shadow: 0 1px 2px #000; }
+  #hpBar i { background: linear-gradient(#c92a2a, #7d1111); }
+  #arBar i { background: linear-gradient(#a7adb5, #5d636b); }
+  #stBar i { background: linear-gradient(#7ac25a, #3f7a2a); }
+  #status { margin-top: 6px; font-size: 12px; font-weight: 700; letter-spacing: .08em; min-height: 16px; }
+  #status .bleed { color: #ff4d4d; animation: pulse .8s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  #selfBody { position: absolute; left: 316px; bottom: 16px; width: 64px; }
+  .br { position: absolute; right: 16px; bottom: 16px; width: 250px; background: var(--panel); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: 10px 12px; }
+  .br .wname { font-family: Cinzel, serif; font-weight: 800; font-size: 16px; }
+  .br .wsub { font-size: 11px; color: var(--dim); margin-bottom: 6px; }
+  .stat { display: grid; grid-template-columns: 62px 1fr 38px; align-items: center; gap: 6px; font-size: 11px; margin-top: 3px; }
+  .stat .track { height: 6px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
+  .stat .track i { display: block; height: 100%; background: #d8cfbf; }
+  .stat em { font-style: normal; text-align: right; color: var(--dim); }
+  #dir { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; opacity: .55; }
+  #msg { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); font-family: Cinzel, serif; font-weight: 800; font-size: 26px; text-shadow: 0 2px 6px #000; opacity: 0; transition: opacity .3s; white-space: nowrap; }
+  #sub { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); font-size: 14px; text-shadow: 0 1px 3px #000; opacity: 0; transition: opacity .3s; text-align: center; }
+  #tags { position: absolute; inset: 0; }
+  .tag { position: absolute; transform: translate(-50%, -100%); text-align: center; font-size: 11px; font-weight: 700; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+  .tag .tb { width: 74px; height: 6px; background: rgba(0,0,0,.6); border: 1px solid rgba(255,255,255,.25); margin: 2px auto 0; }
+  .tag .tb i { display: block; height: 100%; background: #c92a2a; }
+  .tag .tn { font-size: 10px; opacity: .8; }
+  .dmg { position: absolute; transform: translate(-50%, -50%); font-weight: 900; font-size: 15px; color: #ffd27a; text-shadow: 0 1px 3px #000; pointer-events: none; }
+  .dmg.cut { color: #ff5a5a; font-size: 18px; }
+  #lock { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 8px 12px; display: none; text-align: center; min-width: 170px; }
+  #lock .ln { font-family: Cinzel, serif; font-weight: 800; font-size: 14px; }
+  #lock .lh { font-size: 12px; color: var(--dim); }
+  #lockBody { width: 70px; margin: 4px auto 0; display: block; }
+  #reticle { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 2px solid rgba(255,90,60,.9); border-radius: 50%; display: none; box-shadow: 0 0 8px rgba(255,60,30,.6); }
+  #vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(120,0,0,.0) 100%); transition: background .2s; }
+  .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; }
+  #title { background: radial-gradient(ellipse at center, rgba(8,8,10,.35), rgba(8,8,10,.92)); }
+  .logo { font-family: Cinzel, serif; font-weight: 900; font-size: 92px; letter-spacing: .08em; line-height: 1; position: relative;
+    background: linear-gradient(180deg, #d9dde2 0%, #8d939b 38%, #4b4f55 52%, #9aa0a8 70%, #3b3e43 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 3px 0 #000) drop-shadow(0 0 18px rgba(150,0,0,.35)); }
+  .logo .blood { background: linear-gradient(180deg, #d42a2a, #6e0909 75%); -webkit-background-clip: text; background-clip: text; }
+  .drips { position: relative; height: 34px; width: 520px; margin-top: -6px; }
+  .drips i { position: absolute; top: 0; width: 6px; background: linear-gradient(#7d0a0a, #b31414); border-radius: 0 0 4px 4px; animation: drip 3.5s ease-in infinite; }
+  @keyframes drip { 0% { height: 0; } 60% { height: 30px; } 100% { height: 30px; opacity: 0; } }
+  .tagline { color: var(--dim); margin: 10px 0 24px; letter-spacing: .2em; font-size: 13px; }
+  .btn { pointer-events: auto; cursor: pointer; font-family: Cinzel, serif; font-weight: 800; letter-spacing: .14em; font-size: 16px; color: #1a0606; background: linear-gradient(#e8e2d6, #b9b0a0); border: 0; border-radius: 4px; padding: 12px 36px; margin: 6px; }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.ghost { background: transparent; color: var(--bright); border: 1px solid rgba(255,255,255,.3); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .warn { margin-top: 14px; font-size: 12px; color: #d98c8c; max-width: 440px; }
+  .keys { display: grid; grid-template-columns: auto auto auto auto; gap: 5px 14px; text-align: left; font-size: 12.5px; margin-top: 18px; color: var(--dim); }
+  .keys b { display: inline-block; min-width: 18px; padding: 1px 6px; border: 1px solid rgba(255,255,255,.3); border-radius: 4px; text-align: center; font-size: 11px; color: var(--bright); }
+  #pause, #death { display: none; background: rgba(6,6,8,.82); }
+  .menu { background: rgba(16,16,19,.94); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 22px 26px; width: min(520px, calc(100% - 32px)); pointer-events: auto; text-align: left; }
+  .menu h2 { font-family: Cinzel, serif; margin: 0 0 12px; letter-spacing: .1em; text-align: center; }
+  .row { display: grid; grid-template-columns: 150px 1fr 48px; align-items: center; gap: 10px; margin: 9px 0; font-size: 14px; }
+  .row input[type=range] { width: 100%; }
+  .row select { background: #222; color: var(--bright); border: 1px solid #444; padding: 4px 6px; border-radius: 4px; }
+  .row em { font-style: normal; text-align: right; color: var(--dim); font-size: 12px; }
+  .center { text-align: center; margin-top: 14px; }
+  #deathTitle { font-family: Cinzel, serif; font-weight: 900; font-size: 72px; color: #a31212; letter-spacing: .12em; text-shadow: 0 0 24px rgba(160,0,0,.5); }
+  #loadText { margin-top: 10px; font-size: 12px; color: var(--dim); }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="tl"><div class="clock" id="clock">9:00 AM</div><div id="fps"></div></div>
+  <div class="tr">
+    <div class="kills" id="kills">0 KILLS</div>
+    <div id="combo">COMBO x0</div>
+    <div id="levels"></div>
+  </div>
+  <div id="tags"></div>
+  <div id="reticle"></div>
+  <svg id="dir" viewBox="-23 -23 46 46"></svg>
+  <div id="lock"><div class="ln" id="lockName"></div><div class="lh" id="lockHp"></div><svg id="lockBody" viewBox="0 0 60 120"></svg></div>
+  <div id="msg"></div>
+  <div id="sub"></div>
+  <div class="bl">
+    <div class="bar" id="hpBar"><i></i><span>HEALTH</span><b></b></div>
+    <div class="bar" id="arBar"><i></i><span>ARMOR</span><b></b></div>
+    <div class="bar" id="stBar"><i></i><span>STAMINA</span><b></b></div>
+    <div id="status"></div>
+  </div>
+  <svg id="selfBody" viewBox="0 0 60 120"></svg>
+  <div class="br">
+    <div class="wname" id="wName"></div>
+    <div class="wsub" id="wSub"></div>
+    <div id="wStats"></div>
+  </div>
+</div>
+<div id="vignette"></div>
+
+<div class="screen" id="title">
+  <div class="logo">IRON<span class="blood">BLOOD</span></div>
+  <div class="drips" id="drips"></div>
+  <div class="tagline">A DARK KNIGHT. A SWORD. NO MERCY.</div>
+  <button class="btn" id="playBtn" disabled>LOADING...</button>
+  <button class="btn ghost" id="titleSettings">SETTINGS</button>
+  <div id="loadText">Loading the knights...</div>
+  <div class="warn">Warning: extreme blood and gore (cut limbs, organs). You can turn it down in Settings with the gore slider.</div>
+  <div class="keys">
+    <span><b>WASD</b></span><span>Walk</span><span><b>Shift</b></span><span>Sprint</span>
+    <span><b>Click</b></span><span>Light attack</span><span><b>Hold click</b></span><span>Heavy attack</span>
+    <span><b>Move mouse + click</b></span><span>Swing direction</span><span><b>Middle click</b></span><span>Stab</span>
+    <span><b>Right click</b></span><span>Block / parry</span><span><b>C</b></span><span>Dodge roll</span>
+    <span><b>Space</b></span><span>Jump (click in air = slam)</span><span><b>Q</b></span><span>Lock on</span>
+    <span><b>F</b></span><span>Finisher</span><span><b>B</b></span><span>Bandage</span>
+    <span><b>X</b></span><span>Switch sword</span><span><b>Esc</b></span><span>Pause / settings</span>
+  </div>
+</div>
+
+<div class="screen" id="pause">
+  <div class="menu">
+    <h2>PAUSED</h2>
+    <div class="row"><label>Master volume</label><input type="range" id="sMaster" min="0" max="100"><em></em></div>
+    <div class="row"><label>Music</label><input type="range" id="sMusic" min="0" max="100"><em></em></div>
+    <div class="row"><label>Sound effects</label><input type="range" id="sSfx" min="0" max="100"><em></em></div>
+    <div class="row"><label>Gore</label><input type="range" id="sGore" min="0" max="2" step="1"><em></em></div>
+    <div class="row"><label>Graphics</label><select id="sQuality"><option>Low</option><option>Medium</option><option>High</option></select><em></em></div>
+    <div class="row"><label>Mouse speed</label><input type="range" id="sSens" min="20" max="250"><em></em></div>
+    <div class="row"><label>Damage numbers</label><select id="sDmgNums"><option value="1">On</option><option value="0">Off</option></select><em></em></div>
+    <div class="row"><label>Hardcore</label><select id="sHard"><option value="0">Off (respawn at the barn)</option><option value="1">On (death resets your strength)</option></select><em></em></div>
+    <div class="center"><button class="btn" id="resumeBtn">RESUME</button></div>
+  </div>
+</div>
+
+<div class="screen" id="death">
+  <div id="deathTitle">YOU DIED</div>
+  <div id="deathSub" style="color:var(--dim);margin:8px 0 18px"></div>
+  <button class="btn" id="respawnBtn">RISE AGAIN</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
