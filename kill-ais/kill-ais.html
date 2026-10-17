@@ -890,6 +890,9 @@ function makeLoop(kind) {
   } else if (kind === 'beam') {
     const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 110; const o2 = ctx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = 113;
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400; o.connect(f); o2.connect(f); f.connect(g); o.start(); o2.start(); nodes.push(o, o2);
+  } else if (kind === 'engine') {
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 60; const o2 = ctx.createOscillator(); o2.type = 'square'; o2.frequency.value = 31;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520; o.connect(f); o2.connect(f); f.connect(g); o.start(); o2.start(); nodes.push(o, o2); g._osc = o;
   } else if (kind === 'hum') {
     const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 60; const o2 = ctx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = 120; o.connect(g); o2.connect(g); o.start(); o2.start(); nodes.push(o, o2);
   }
@@ -1016,7 +1019,7 @@ const G = {
 Object.defineProperty(G, 'eliza', { get() { return G.boss; }, set(v) { G.boss = v; } }); /* old name for the boss */
 const R = { renderer: null, canvas: null, scene: null, camera: null, composer: null, renderPass: null, bloom: null, glitch: null, sun: null, hemi: null, envTex: null, pts: [] };
 const PL = {
-  x: 0, y: 0, z: 84, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: true, crouch: 0, slideT: 0, lungeT: 0, lean: 0, height: 1.7,
+  x: 0, y: 0, z: 84, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: true, crouch: 0, slideT: 0, lungeT: 0, veh: null, lean: 0, height: 1.7,
   hp: 100, armor: 0, hack: 0, crypto: 0, meds: 0, frags: 0, alive: true, invuln: 0, swim: false, under: false, gooT: 0,
   peakY: 0, stepAcc: 0, recoilP: 0, recoilY: 0, ads: 0, bob: 0, hurtT: 0, lastHurt: 0, regenBlock: 0,
   guns: {}, owned: [], slots: [null, null], cur: 0, checkpoint: -1, hasGun: false, armGone: false,
@@ -2728,7 +2731,7 @@ function initBody() {
 }
 function updateBody(dt, speed) {
   const g = BODY.grp; if (!g) return;
-  g.visible = G.screen === 'play' && PL.alive && !G.killcam;
+  g.visible = G.screen === 'play' && PL.alive && !G.killcam && !PL.veh;
   g.position.set(PL.x, PL.y, PL.z); g.rotation.y = PL.yaw;
   const cr = PL.crouch, slide = PL.slideT > 0;
   BODY.phase += dt * (PL.onGround ? speed * 1.9 : 0);
@@ -3390,7 +3393,7 @@ function updateViewmodel(dt, speed) {
   if (VM.dirty) rebuildGunModel();
   if (VM.cur && gunSkin(VM.cur.id) === 'glitch') animGlitchSkin();
   const scopedNow = PL.ads > 0.85 && curGun() && GUNS[curGun()].scope;
-  VM.root.visible = G.screen === 'play' && PL.alive && !G.killcam && !G.cine && !scopedNow;
+  VM.root.visible = G.screen === 'play' && PL.alive && !G.killcam && !G.cine && !scopedNow && !PL.veh;
   if (!VM.root.visible) return;
   VM.t += dt;
   VM.watchT -= dt; if (VM.watchT <= 0) { VM.watchT = rand(0.12, 0.5); drawWatch(); }
@@ -3660,6 +3663,7 @@ function switchTo(slot) {
 }
 function updateWeapon(dt) {
   W.cool -= dt; W.bloom = Math.max(0, W.bloom - dt * 3.2);
+  if (PL.veh) { vehWeapons(dt); return; }
   if (W.swap > 0) W.swap = Math.max(0, W.swap - dt);
   if (W.jamClear > 0) W.jamClear = Math.max(0, W.jamClear - dt);
   if (W.knife > 0) {
@@ -3953,6 +3957,7 @@ function updatePlayer(dt) {
   if (!PL.lookLock) { PL.yaw -= Input.mdx * sens; PL.pitch -= Input.mdy * sens * (S.invertY ? -1 : 1); }
   PL.pitch = clamp(PL.pitch, -1.52, 1.52);
   PL.invuln = Math.max(0, PL.invuln - dt);
+  if (PL.veh) { driveVehicle(dt); return; }
   /* move intent */
   let mx = 0, mz = 0;
   if (!PL.controlLock && !Chat.open) {
@@ -4012,7 +4017,7 @@ function updatePlayer(dt) {
     if (PL.y > LAKE.surf - 1.75 && ml > 0.2) { PL.y = 0.02; PL.vy = 1.2; SFX.splash(); }
     else { p.x = clamp(p.x, LAKE.x0 + 0.36, LAKE.x1 - 0.36); p.z = clamp(p.z, LAKE.z0 + 0.36, LAKE.z1 - 0.36); }
   }
-  pushOut(p, 0.35, PL.y, PL.y + PL.height, 0.45);
+  pushOut(p, 0.35, PL.y, PL.y + PL.height, 0.45); vehPushPlayer(p);
   PL.x = clamp(p.x, BOUNDS.x0 + 1, BOUNDS.x1 - 1); PL.z = clamp(p.z, BOUNDS.z0 + 1, BOUNDS.z1 - 1);
   /* vertical */
   const prevY = PL.y; PL.y += PL.vy * dt;
@@ -4085,6 +4090,7 @@ const DIFF = { dmg: 1.0, hp: 1.0 };
 function hurt(amount, src, cause = 'shot') {
   if (!PL.alive || PL.invuln > 0 || G.screen !== 'play' || G.cine || amount <= 0) return;
   if ((cause === 'shot' || cause === 'melee' || cause === 'beam') && inSafeZone(PL.x, PL.z)) return;
+  if (PL.veh && cause !== 'fall' && cause !== 'goo' && cause !== 'trap') { vehHurt(PL.veh, amount * DIFF.dmg, src, cause); return; }
   let dmg = amount * DIFF.dmg;
   if (PL.armor > 0 && cause !== 'fall' && cause !== 'goo') { const ab = Math.min(PL.armor, dmg * 0.66); PL.armor -= ab; dmg -= ab; }
   PL.hp -= dmg; PL.hurtT = 1; PL.lastHurt = G.time; HUD.dirty = true;
@@ -4094,12 +4100,13 @@ function hurt(amount, src, cause = 'shot') {
   if (PL.hp < 30 && Math.random() < 0.25) heroLine('lowhp'); else if (Math.random() < 0.06) heroLine('hurt');
 }
 function addHack(n, reason, quiet) {
-  if (insaneSuit() && n > 0) return;
+  if ((insaneSuit() || (PL.veh && PL.veh.kind === 'tank')) && n > 0) return; /* nothing hacks you inside a tank */
   const before = PL.hack; PL.hack = clamp(PL.hack + n, 0, 6); HUD.dirty = true;
   if (PL.hack > before && !quiet) { toast('⚠ HACK LEVEL ' + PL.hack + (reason ? ' — ' + reason : ''), 'bad', 2600); SFX.glitch(1); G.hackFx.nextStatic = 0.2; }
 }
 function die(src, cause) {
   if (!PL.alive) return;
+  if (PL.veh) exitVehicle(true);
   PL.alive = false; G.stats.deaths++; G.deaths++;
   const lost = Math.floor(PL.crypto / 2); PL.crypto -= lost;
   G.firewallSaved = insaneSuit() || Math.random() < 0.35 * sk('firewall'); if (!G.firewallSaved) PL.hack = clamp(PL.hack + 1, 0, 6);
@@ -4137,6 +4144,7 @@ function findInteract() {
   const look = (x, z, maxD, minDot = 0.5) => { const dx = x - PL.x, dz = z - PL.z, d = Math.hypot(dx, dz); return d < maxD && (d < 0.9 || (dx * fx0 + dz * fz0) / d > minDot); };
   if (CLIP.ripReady && look(CLIP.gx, CLIP.gz, 2.8, 0.2)) return { key: 'rip', label: 'Rip off the arm cannon', hold: 1.5, act: ripCannon, anim: 'rip' };
   for (const T of TERMS) if (Math.hypot(T.x - PL.x, T.z - PL.z) < 2.6 && look(T.x, T.z, 2.6, 0.1)) return { key: 'term' + T.i, label: 'Use ' + T.name + ' (shop · save · pause)', act: () => Shop.openAt(T) };
+  for (const V of VEH) if (!V.dead && Math.hypot(V.x - PL.x, V.z - PL.z) < V.T.reach) return { key: 'veh' + V.i, label: (V.kind === 'tank' ? 'Climb into the tank' : 'Ride the hoverbike') + ' (' + Math.ceil(V.hp) + ' HP)', act: () => enterVehicle(V) };
   if (!DOOR.open && DOOR.mesh && look(DOOR.padX, DOOR.padZ, 2.8, 0.2) && PL.z > DOOR.z) return { key: 'pad', label: doorReady() ? 'Enter the passcode' : 'Keypad: ' + doorStatus(), act: tryDoor };
   if (LV.secret && !LV.secret.open && look(LV.secret.ix, LV.secret.iz, 2.3, 0.6) && LV.secret.side(PL.x, PL.z)) return { key: 'secret', label: 'Push the weird shelf', act: openSecret };
   for (const a of BOTS) if (a.active && a.ally && a.down && look(a.x, a.z, 2.6, 0.2)) return { key: 'rev' + a.i, label: 'Revive ' + a.name + ' (' + Math.ceil(a.downT) + 's left)', hold: 2, act: () => reviveAlly(a), anim: 'search' };
@@ -4151,6 +4159,8 @@ function findInteract() {
 }
 function updateInteract(dt) {
   W.search = 0; W.rip = 0;
+  /* on a vehicle: USE gets you off (the weapon panel says so, no prompt over the vehicle) */
+  if (PL.veh) { INT.cur = null; INT.hold = 0; setPrompt(''); $('holdbar').classList.add('hidden'); if (wasPressed('use') && PL.alive && !Chat.open && !G.cine) exitVehicle(); return; }
   const it = PL.alive && !Chat.open && !PL.controlLock && G.screen === 'play' && !G.cine ? findInteract() : null;
   if (!it) { INT.cur = null; INT.hold = 0; setPrompt(''); $('holdbar').classList.add('hidden'); return; }
   if (!INT.cur || INT.cur.key !== it.key) { INT.cur = it; INT.hold = 0; }
@@ -4471,7 +4481,7 @@ function spawnBolt(x, y, z, vx, vy, vz, dmg, color, src, opts = {}) {
 const _pseg = V3();
 function updateBolts(dt) {
   let n = 0;
-  const px = PL.x, pz = PL.z, py0 = PL.y + 0.1, py1 = PL.y + PL.height;
+  const px = PL.x, pz = PL.z, py0 = PL.y + 0.1, py1 = PL.y + PL.height, hr2 = PL.veh ? PL.veh.T.hitR ** 2 : 0.16;
   for (const e of EB) {
     if (!e.on) continue;
     e.life -= dt; if (e.life <= 0) { e.on = false; continue; }
@@ -4484,7 +4494,7 @@ function updateBolts(dt) {
       let t = a > 1e-9 ? clamp(-(ex * dx + ez * dz) / a, 0, 1) : 0;
       if (t <= tEnd) {
         const cx = e.x + dx * t - px, cz = e.z + dz * t - pz, cyy = e.y + dy * t;
-        if (cx * cx + cz * cz < 0.4 * 0.4 && cyy > py0 && cyy < py1 + 0.15) {
+        if (cx * cx + cz * cz < hr2 && cyy > py0 && cyy < py1 + 0.15) {
           e.on = false;
           if (!e.fake) { const s = e.src; hurt(e.dmg, s ? { x: s.x, z: s.z, name: s.name } : null, 'shot'); }
           fx.sparks(e.x + dx * t, cyy, e.z + dz * t, 0, 1, 0, 4, 3);
@@ -5101,6 +5111,7 @@ function drawMinimap() {
   if (HUD.mapImg) x.drawImage(HUD.mapImg, BOUNDS.x0, BOUNDS.z0, HUD.mapImg.width / HUD.mapK, HUD.mapImg.height / HUD.mapK);
   const dot = (wx, wz, r, col) => { x.fillStyle = col; x.beginPath(); x.arc(wx, wz, r, 0, TAU); x.fill(); };
   for (const T of TERMS) { x.fillStyle = 'rgba(57,255,136,.12)'; x.beginPath(); x.arc(T.x, T.z, T.safeR, 0, TAU); x.fill(); x.fillStyle = T.hackedBy >= 0 ? '#ff3a4e' : '#39ff88'; x.fillRect(T.x - 1.4, T.z - 1.4, 2.8, 2.8); }
+  for (const V of VEH) { if (V.dead) continue; x.save(); x.translate(V.x, V.z); x.rotate(-V.yaw); x.fillStyle = V === PL.veh ? '#ffffff' : V.kind === 'tank' ? '#a8d84a' : '#ffd23a'; if (V.kind === 'tank') x.fillRect(-1.7, -3.2, 3.4, 6.4); else x.fillRect(-0.7, -1.3, 1.4, 2.6); x.restore(); }
   for (const Sp of SPAWNERS) { x.fillStyle = Sp.alive ? '#c070ff' : '#555'; x.save(); x.translate(Sp.x, Sp.z); x.rotate(Math.PI / 4); x.fillRect(-1.6, -1.6, 3.2, 3.2); x.restore(); }
   for (const T of TOWERS) { x.fillStyle = !T.alive ? '#444' : T.hacked ? '#3ec0ff' : T.alarmT > 0 ? (Math.sin(G.time * 12) > 0 ? '#ff1020' : '#ffd23a') : G.time - T.targetT < 0.5 && Math.sin(G.time * 16) > 0 ? '#ff7a00' : '#ffc23a'; x.beginPath(); x.moveTo(T.x, T.z - 1.6); x.lineTo(T.x + 1.4, T.z + 1.2); x.lineTo(T.x - 1.4, T.z + 1.2); x.fill(); }
   dot(DOOR.x, DOOR.z, 1.8, DOOR.open ? '#39ff88' : '#ff3a4e');
@@ -5176,15 +5187,15 @@ function updateHUD(dt) {
   [...pips.children].forEach((p, k) => p.classList.toggle('on', k < PL.hack));
   $('medNum').textContent = '✚ ' + PL.meds; $('grenNum').textContent = '● ' + grenCount(PL.gsel) + ' ' + GREN_T[PL.gsel].at(1);
   $('crypto').textContent = '₿ ' + (fake ? randi(0, 99999) : PL.crypto);
-  const id = curGun();
-  if (id && PL.hasGun) {
+  const id = curGun(), vehSl = PL.veh ? vehHud() : null;
+  if (vehSl) { /* the vehicle's health and guns show in the weapon panel */ } else if (id && PL.hasGun) {
     const st = PL.guns[id], g = GUNS[id], gs = gunStats(id);
     $('gunName').textContent = g.name.toUpperCase() + (st.lvl > 1 ? '  LV' + st.lvl : '') + (st.lvl >= 5 ? ' ★' : '');
     $('mag').textContent = fake ? randi(0, 99) : st.mag; $('reserve').textContent = fake ? randi(0, 999) : st.res;
     $('ammo').classList.toggle('low', st.mag <= Math.ceil(gs.mag * 0.25));
     $('gunState').textContent = W.hackLoaded ? '🤝 HACK ROUND LOADED' : W.chargeT > 0 && g.charge ? 'CHARGING ' + Math.round((W.chargeT / g.charge) * 100) + '%' : st.jammed ? 'JAMMED — press ' + keyName(S.keys.reload) : W.reload > 0 ? 'RELOADING...' : st.mag === 0 && st.res === 0 ? 'NO AMMO — terminals sell ammo' : '';
   } else { $('gunName').textContent = PL.hasGun ? '-' : 'NO WEAPON'; $('mag').textContent = '-'; $('reserve').textContent = '-'; $('gunState').textContent = ''; }
-  const sl = $('gunSlots'); sl.innerHTML = PL.slots.map((s, k) => (s ? '<span class="' + (k === PL.cur ? 'on' : '') + '">' + (k + 1) + ' ' + esc(GUNS[s].name) + '</span>' : '')).join('');
+  const sl = $('gunSlots'); sl.innerHTML = vehSl || PL.slots.map((s, k) => (s ? '<span class="' + (k === PL.cur ? 'on' : '') + '">' + (k + 1) + ' ' + esc(GUNS[s].name) + '</span>' : '')).join('');
   $('hud').classList.toggle('eliza-hack', !!(G.boss && G.boss.hudHack));
   updateObjective();
 }
@@ -5202,6 +5213,7 @@ const TROPHIES = [
   ['secret', '💰', 'Finders Keepers', 'Find a hidden Crypto stash', 1], ['clippy', '📎', "It Looks Like You're Dead", "See Clippy's ghost", 1],
   ['reader', '📜', 'History Nerd', 'Read every sign about old AIs', 1],
   ['hook', '🕷', 'Spider-Hacker', 'Hang from the ceiling with the grappling hook'], ['gun25', '🔫', 'Collector', 'Own 25 guns'], ['sidekick', '🤝', 'Friend Request', 'Hack an AI into a sidekick'], ['troom', '🛏', 'Home Sweet Home', 'Visit your trophy room'], ['insaneWin', '😈', 'Certified Insane', 'Beat the game on INSANE (super rare)', 1], ['squad', '👥', 'Squad Goals', 'Have 3 sidekicks at once'], ['gun50', '🧰', 'Gun Nut', 'Own 50 guns'], ['gun100', '💯', 'The Whole Arsenal', 'Own all 100 guns', 1], ['secretGun', '🗝', 'Hidden Arsenal', 'Find a gun in a secret room', 1], ['skills', '🌳', 'Big Brain', 'Max out every skill in the skill tree'],
+  ['rider', '🏍', 'Easy Rider', 'Ride the hoverbike (level 10+)'], ['squish', '🥞', 'Tank You Very Much', 'Squish an AI with the tank (level 25+)'],
   ['boss10', '🔟', 'Ten Down', 'Beat 10 bosses'], ['boss25', '🏅', 'Quarter Way', 'Beat 25 bosses'], ['boss50', '🏆', 'Halfway Hacker', 'Beat 50 bosses'],
   ['boss99', '👑', 'The Final Four', 'Beat the newest Grok, ChatGPT, Claude and Gemini (level 99)'], ['virus', '🦠', 'Antivirus Incarnate', 'Delete THE VIRUS (level 100)'],
 ];
@@ -5515,6 +5527,7 @@ function grappleRelease(quiet) {
   if (!quiet) SFX.rack();
 }
 function grappleFire() {
+  if (PL.veh) return;
   if (!sk('grapple')) { toast('No grappling hook yet. Buy it in the SKILLS tab at a terminal.', 'bad', 2200); return; }
   if (GRAP.st !== 'off') { grappleRelease(); return; }
   if (GRAP.cd > 0 || PL.swim) return;
@@ -5938,6 +5951,425 @@ function updateTrophyRoom(dt) {
   if (TROOM.gT <= 0) { TROOM.gT = rand(2.5, 6); R.canvas.style.filter = ''; if (TROOM.grp) TROOM.grp.position.x = 0; SFX.glitch(0.3); }
   const c = Intro.cam; c.position.set(TROOM.x, 1.62, TROOM.z); c.rotation.set(TROOM.pitch, TROOM.yaw, roll, 'YXZ');
   if (Touch.tap.use) exitTrophyRoom();
+}
+
+/* ============================ vehicles: the hoverbike (level 10+) and the tank (level 25+) ============================ */
+/* they wait in the start room. USE to get on/off. They don't fit through the boss door.
+   circ: the circles its body is made of for bumping into things [side, along (- = front), radius] */
+const VEH_T = {
+  bike: { name: 'Hoverbike', icon: '🏍', lvl: 10, speed: 13, boost: 22, acc: 5, turn: 3.4, hp: 300, dmgK: 1, circ: [[0, -0.55, 0.55], [0, 0.55, 0.55]], hitR: 0.95, h: 1.6, camD: 5.2, camH: 2.1, step: 0.5, hover: 0.42, reach: 2.4 },
+  tank: { name: 'Tank', icon: '🛡', lvl: 25, speed: 6.4, boost: 6.4, acc: 2.6, turn: 1.25, hp: 1800, dmgK: 0.45, circ: [[0, -1.75, 1.65], [0, 0, 1.65], [0, 1.75, 1.65]], hitR: 1.9, h: 2.75, camD: 9.5, camH: 4.4, step: 0.75, hover: 0, reach: 4.2 },
+};
+const VEH = [];
+/* what they shoot (same bullets as your guns, so they hit AIs, compilers, towers and bosses the same way) */
+const VGUN = {
+  bolt: { speed: 380, grav: 0, tracer: 0x3ef2ff, range: 170, cls: 'scifi' },
+  shell: { speed: 120, grav: 0.25, proj: 'rocket', splash: 6.5, range: 320 },
+  coax: { speed: 760, grav: 1, tracer: 0xffd28a, range: 220 },
+};
+const _vp = { x: 0, z: 0 }, _mzv = new THREE.Vector3(), _aim = { x: 0, y: 0, z: 0 }, _ah = { t: 1, kind: '', b: null, bot: null, part: '', nx: 0, ny: 1, nz: 0 };
+/* a point on the vehicle (side, along) in the world */
+const vehW = (V, lx, lz, out) => { const c = Math.cos(V.yaw), s = Math.sin(V.yaw); out.x = V.x + lx * c + lz * s; out.z = V.z - lx * s + lz * c; return out; };
+const vehKey = (a) => (Touch.on ? { use: 'USE', sprint: 'RUN', jump: 'JUMP' }[a] : keyName(S.keys[a]));
+
+/* ---- looks ---- */
+let VMAT = null;
+function vehMats() {
+  if (VMAT) return VMAT;
+  const std = (o) => { const m = new THREE.MeshStandardMaterial(o); m.userData.keep = true; return m; };
+  VMAT = {
+    red: std({ color: 0xc8202a, metalness: 0.55, roughness: 0.3 }), white: std({ color: 0xe8e8ea, metalness: 0.3, roughness: 0.35 }),
+    dark: std({ color: 0x1a1c20, metalness: 0.6, roughness: 0.45 }), seat: std({ color: 0x141414, roughness: 0.8 }),
+    olive: std({ color: 0x4d5a36, metalness: 0.25, roughness: 0.75 }), oliveD: std({ color: 0x3a4529, metalness: 0.25, roughness: 0.8 }),
+    track: std({ color: 0x1b1b1b, metalness: 0.4, roughness: 0.9 }), steel: std({ color: 0x5a5f66, metalness: 0.85, roughness: 0.35 }),
+    glow: std({ color: 0x041014, emissive: 0x3ef2ff, emissiveIntensity: 2.4 }), hot: std({ color: 0x140600, emissive: 0xff7a2a, emissiveIntensity: 2.2 }),
+    lamp: std({ color: 0x202020, emissive: 0xfff2c8, emissiveIntensity: 2 }), skin: std({ color: 0xc89a78, roughness: 0.7 }),
+    glass: std({ color: 0x5ad8ff, metalness: 0.2, roughness: 0.05, transparent: true, opacity: 0.35 }),
+    pad: new THREE.MeshBasicMaterial({ color: 0x3ef2ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }),
+  };
+  VMAT.pad.userData.keep = true;
+  return VMAT;
+}
+function vmesh(par, geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = true; m.receiveShadow = true; par.add(m); return m; }
+const _la = new THREE.Vector3(), _lb = new THREE.Vector3(), _lup = new THREE.Vector3(0, 1, 0);
+/* an arm or leg: a capsule from a to b */
+function limb(par, a, b, r, mat) {
+  _la.set(a[0], a[1], a[2]); _lb.set(b[0], b[1], b[2]); const len = _la.distanceTo(_lb);
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(0.01, len), 4, 10), mat);
+  m.position.copy(_la).add(_lb).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(_lup, _lb.sub(_la).normalize()); m.castShadow = true; par.add(m); return m;
+}
+/* you, in your hoodie (it follows your outfit) */
+function vehHead(par, x, y, z) {
+  const M = vehMats(), hood = BODY.mats ? BODY.mats.hoodie : M.dark;
+  vmesh(par, new THREE.SphereGeometry(0.12, 16, 12), M.skin, x, y, z - 0.06); vmesh(par, new THREE.SphereGeometry(0.14, 16, 12), hood, x, y + 0.02, z);
+}
+function buildBike(V) {
+  const M = vehMats(), g = new THREE.Group(), hood = BODY.mats ? BODY.mats.hoodie : M.dark, jeans = BODY.mats ? BODY.mats.jeans : M.dark;
+  vmesh(g, rbox(0.62, 0.38, 1.9, 0.12, 2), M.red, 0, 0.78, 0);
+  const nose = new THREE.CylinderGeometry(0.08, 0.3, 0.62, 18); nose.rotateX(-Math.PI / 2); vmesh(g, nose, M.white, 0, 0.78, -1.24);
+  vmesh(g, rbox(0.5, 0.2, 0.62, 0.08, 2), M.red, 0, 1.02, -0.4); vmesh(g, new THREE.BoxGeometry(0.12, 0.012, 0.6), M.white, 0, 1.125, -0.4);
+  vmesh(g, rbox(0.4, 0.12, 0.72, 0.05, 2), M.seat, 0, 1.03, 0.28);
+  vmesh(g, new THREE.BoxGeometry(0.46, 0.3, 0.01), M.glass, 0, 1.24, -0.7, -0.65);
+  const bar = new THREE.CylinderGeometry(0.02, 0.02, 0.72, 8); bar.rotateZ(Math.PI / 2); vmesh(g, bar, M.dark, 0, 1.18, -0.55);
+  for (const sx of [-1, 1]) {
+    const grip = new THREE.CylinderGeometry(0.03, 0.03, 0.12, 10); grip.rotateZ(Math.PI / 2); vmesh(g, grip, M.seat, sx * 0.33, 1.18, -0.55);
+    const gun = new THREE.CylinderGeometry(0.04, 0.05, 0.5, 10); gun.rotateX(Math.PI / 2); vmesh(g, gun, M.steel, sx * 0.36, 0.7, -0.82);
+    vmesh(g, new THREE.SphereGeometry(0.03, 8, 6), M.glow, sx * 0.36, 0.7, -1.07);
+  }
+  V.mz = [-1, 1].map((sx) => { const o = new THREE.Object3D(); o.position.set(sx * 0.36, 0.7, -1.1); g.add(o); return o; });
+  /* hover pods with glowing rings, and the glow they make on the floor */
+  V.pads = [];
+  for (const pz of [-0.6, 0.65]) {
+    vmesh(g, new THREE.CylinderGeometry(0.28, 0.24, 0.14, 20), M.dark, 0, 0.52, pz);
+    const ring = new THREE.TorusGeometry(0.22, 0.03, 8, 24); ring.rotateX(Math.PI / 2); vmesh(g, ring, M.glow, 0, 0.45, pz);
+    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.42, 24), M.pad); pad.rotation.x = -Math.PI / 2; pad.position.set(0, 0.03 - V.T.hover, pz); pad.renderOrder = 2; g.add(pad); V.pads.push(pad);
+  }
+  const th = new THREE.CylinderGeometry(0.15, 0.12, 0.26, 16); th.rotateX(Math.PI / 2); vmesh(g, th, M.dark, 0, 0.84, 1.04);
+  const flame = new THREE.CircleGeometry(0.1, 16); vmesh(g, flame, M.hot, 0, 0.84, 1.18);
+  vmesh(g, new THREE.BoxGeometry(0.04, 0.28, 0.3), M.red, 0, 1.08, 0.86, -0.3);
+  vmesh(g, new THREE.BoxGeometry(0.14, 0.06, 0.03), M.lamp, 0, 0.86, -1.5);
+  /* the rider (only when you're on it) */
+  const r = new THREE.Group(); g.add(r); r.visible = false; V.riderM = r;
+  limb(r, [0, 1.15, 0.25], [0, 1.52, -0.04], 0.19, hood); vehHead(r, 0, 1.76, -0.12);
+  for (const sx of [-1, 1]) {
+    limb(r, [sx * 0.21, 1.5, 0.0], [sx * 0.3, 1.32, -0.28], 0.06, hood); limb(r, [sx * 0.3, 1.32, -0.28], [sx * 0.33, 1.2, -0.55], 0.055, hood);
+    vmesh(r, new THREE.SphereGeometry(0.05, 10, 8), M.seat, sx * 0.33, 1.2, -0.55);
+    limb(r, [sx * 0.11, 1.08, 0.25], [sx * 0.3, 1.1, -0.18], 0.075, jeans); limb(r, [sx * 0.3, 1.1, -0.18], [sx * 0.3, 0.66, -0.02], 0.065, jeans);
+    vmesh(r, rbox(0.1, 0.08, 0.24, 0.03), M.seat, sx * 0.3, 0.6, -0.08);
+  }
+  return g;
+}
+function buildTank(V) {
+  const M = vehMats(), g = new THREE.Group(), hood = BODY.mats ? BODY.mats.hoodie : M.dark;
+  /* tracks + road wheels */
+  V.wheels = [];
+  for (const sx of [-1, 1]) {
+    vmesh(g, rbox(0.62, 0.86, 6.3, 0.3, 2), M.track, sx * 1.45, 0.45, 0);
+    for (let k = 0; k < 6; k++) { const w = new THREE.CylinderGeometry(0.32, 0.32, 0.12, 16); w.rotateZ(Math.PI / 2); V.wheels.push(vmesh(g, w, M.steel, sx * 1.79, 0.4, -2.3 + k * 0.92)); }
+    vmesh(g, new THREE.BoxGeometry(0.74, 0.06, 6.4), M.olive, sx * 1.45, 0.92, 0);
+  }
+  /* hull */
+  vmesh(g, rbox(2.3, 0.75, 5.8, 0.08), M.olive, 0, 0.95, 0);
+  vmesh(g, rbox(2.3, 0.5, 1.1, 0.06), M.olive, 0, 1.0, -2.95, 0.5);
+  vmesh(g, new THREE.BoxGeometry(2.1, 0.12, 1.5), M.oliveD, 0, 1.38, 2.1);
+  for (let k = 0; k < 5; k++) vmesh(g, new THREE.BoxGeometry(1.8, 0.02, 0.06), M.dark, 0, 1.45, 1.55 + k * 0.25);
+  for (const sx of [-1, 1]) vmesh(g, new THREE.BoxGeometry(0.22, 0.12, 0.06), M.lamp, sx * 0.85, 1.12, -3.18);
+  vmesh(g, new THREE.BoxGeometry(0.5, 0.25, 0.3), M.dark, 0.7, 1.2, 2.95);
+  /* turret: turns with your mouse */
+  const tur = new THREE.Group(); tur.position.set(0, 1.33, 0.4); g.add(tur); V.turret = tur;
+  vmesh(tur, rbox(2.0, 0.72, 2.7, 0.12, 2), M.olive, 0, 0.36, 0);
+  vmesh(tur, rbox(1.6, 0.56, 0.7, 0.1, 2), M.olive, 0, 0.32, -1.4);
+  vmesh(tur, new THREE.CylinderGeometry(0.34, 0.34, 0.12, 20), M.oliveD, 0.42, 0.78, 0.35);
+  vmesh(tur, new THREE.CylinderGeometry(0.012, 0.012, 2, 6), M.dark, -0.7, 1.7, 0.95);
+  for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) { const s = new THREE.CylinderGeometry(0.06, 0.06, 0.22, 10); s.rotateX(Math.PI / 2 - 0.4); vmesh(tur, s, M.dark, sx * 1.02, 0.55 + k * 0.1, -0.7); }
+  const gun = new THREE.Group(); gun.position.set(0, 0.38, -1.7); tur.add(gun); V.gun = gun; V.gz0 = -1.7;
+  vmesh(gun, rbox(0.7, 0.48, 0.4, 0.06), M.oliveD, 0, 0, 0);
+  const bar = new THREE.CylinderGeometry(0.09, 0.11, 3.4, 16); bar.rotateX(Math.PI / 2); vmesh(gun, bar, M.oliveD, 0, 0, -1.9);
+  const brk = new THREE.CylinderGeometry(0.16, 0.16, 0.36, 16); brk.rotateX(Math.PI / 2); vmesh(gun, brk, M.dark, 0, 0, -3.62);
+  const cx = new THREE.CylinderGeometry(0.03, 0.03, 0.6, 8); cx.rotateX(Math.PI / 2); vmesh(gun, cx, M.dark, 0.32, 0.06, -0.45);
+  V.mz = [[0, 0, -3.9], [0.32, 0.06, -0.8]].map(([x, y, z]) => { const o = new THREE.Object3D(); o.position.set(x, y, z); gun.add(o); return o; });
+  /* you, popping out of the hatch */
+  const r = new THREE.Group(); tur.add(r); r.visible = false; V.riderM = r;
+  limb(r, [0.42, 0.7, 0.35], [0.42, 1.12, 0.33], 0.19, hood); vehHead(r, 0.42, 1.36, 0.3);
+  for (const sx of [-1, 1]) limb(r, [0.42 + sx * 0.2, 1.08, 0.33], [0.42 + sx * 0.36, 0.86, 0.05], 0.06, hood);
+  return g;
+}
+
+/* ---- spawning ---- */
+const vehGround = (V) => { const g = groundAt(V.x, V.z, 0.5, V.y + 0.5, V.T.step); return V.kind === 'bike' && inLake(V.x, V.z) ? Math.max(g, LAKE.surf) : g; };
+function addVehicle(kind, x, z, yaw) {
+  const T = VEH_T[kind], hp = Math.round(T.hp * lvlDmgK());
+  const V = { i: VEH.length, kind, T, x, z, y: 0, vy: 0, yaw, tyaw: yaw, tpitch: 0, vx: 0, vz: 0, spd: 0, hp, maxHp: hp, dead: false, respawnT: 0, rider: false, spot: { x, z, yaw },
+    cool: 0, cool2: 0, recoil: 0, side: 1, boostE: 1, boosting: false, lean: 0, pitchV: 0, roll: 0, t: 0, noiseT: 0, smokeT: 0, hurtT: -99, camD: T.camD, loop: null, wallT: 0 };
+  V.grp = kind === 'bike' ? buildBike(V) : buildTank(V); V.grp.rotation.order = 'YXZ'; lvAdd(V.grp);
+  V.y = vehGround(V); placeVehicle(V);
+  VEH.push(V); return V;
+}
+function resetVehicle(V) {
+  Object.assign(V, { x: V.spot.x, z: V.spot.z, yaw: V.spot.yaw, tyaw: V.spot.yaw, tpitch: 0, vx: 0, vz: 0, vy: 0, spd: 0, hp: V.maxHp, dead: false, respawnT: 0, boostE: 1, lean: 0, recoil: 0 });
+  V.y = 0; V.y = vehGround(V); V.grp.visible = true; placeVehicle(V);
+}
+function placeVehicle(V, dt = 0) {
+  const g = V.grp, T = V.T; V.t += dt;
+  const bob = V.kind === 'bike' ? Math.sin(V.t * 2.2) * 0.04 : 0;
+  g.position.set(V.x, V.y + T.hover + bob, V.z);
+  if (V.kind === 'bike') { g.rotation.set(V.pitchV, V.yaw, V.lean); for (const p of V.pads) { p.position.y = 0.03 - T.hover - bob; p.material.opacity = 0.13 + Math.sin(V.t * 9) * 0.04; } }
+  else {
+    g.rotation.set(0, V.yaw, 0); V.turret.rotation.y = V.tyaw - V.yaw; V.gun.rotation.x = V.tpitch; V.gun.position.z = V.gz0 + V.recoil * 0.35;
+    V.roll -= (V.spd || 0) * dt / 0.32; for (const w of V.wheels) w.rotation.x = V.roll;
+  }
+}
+
+/* ---- getting on and off ---- */
+function enterVehicle(V, quiet) {
+  if (PL.veh || V.dead || !PL.alive) return;
+  grappleRelease(true); Object.assign(W, { reload: 0, knife: 0, heal: 0, gren: 0, swap: 0 }); Input.fire = false; PL.ads = 0; PL.slideT = 0; PL.lungeT = 0;
+  PL.veh = V; V.rider = true; V.camD = V.T.camD; V.cool = 0.3; V.cool2 = 0;
+  if (!quiet) { PL.yaw = V.kind === 'tank' ? V.tyaw : V.yaw; PL.pitch = -0.2; }
+  V.riderM.visible = true;
+  if (!V.loop && AU.ok) V.loop = makeLoop('engine');
+  HUD.dirty = true;
+  if (quiet) return;
+  SFX.whoosh();
+  toast(V.T.icon + ' ' + (V.kind === 'bike' ? 'HOVERBIKE: WASD drive · mouse steers + aims · ' + (Touch.on ? 'FIRE' : 'click') + ' = blasters · ' + vehKey('sprint') + ' or ' + vehKey('jump') + ' = boost · ' : 'TANK: WASD drive · mouse turns the turret · ' + (Touch.on ? 'FIRE = cannon · AIM' : 'click = cannon · right click') + ' = machine gun · ') + vehKey('use') + ' = get off', 'good', 6500);
+  if (V.kind === 'bike') trophy('rider');
+}
+/* step off next to it (a side with room), or right where it is if it blew up */
+function exitVehicle(force) {
+  const V = PL.veh; if (!V) return false;
+  const hw = V.kind === 'tank' ? 2.4 : 1.05, hl = V.kind === 'tank' ? 3.9 : 1.75;
+  let spot = null;
+  for (let pass = 0; pass < 2 && !spot; pass++) for (const [lx, lz] of [[-hw, 0], [hw, 0], [0, hl], [0, -hl], [-hw, hl], [hw, hl], [-hw, -hl], [hw, -hl]]) {
+    vehW(V, lx, lz, _vp); const p = { x: _vp.x, z: _vp.z }, x0 = p.x, z0 = p.z;
+    if (inLake(p.x, p.z) && (pass === 0 || V.kind === 'tank')) continue; /* dry ground first */
+    pushOut(p, 0.4, V.y, V.y + 1.8, 0.45);
+    if (Math.hypot(p.x - x0, p.z - z0) > 0.05 || p.x < BOUNDS.x0 + 1 || p.x > BOUNDS.x1 - 1 || p.z < BOUNDS.z0 + 1 || p.z > BOUNDS.z1 - 1) continue;
+    if (VEH.some((O) => O !== V && !O.dead && Math.hypot(O.x - p.x, O.z - p.z) < (O.kind === 'tank' ? 3.4 : 1.4))) continue;
+    if (!inLake(p.x, p.z) && groundAt(p.x, p.z, 0.35, V.y + 0.6, 0.6) > V.y + 0.6) continue;
+    spot = p; break;
+  }
+  if (!spot) { if (!force) { toast('No room to get off here. Drive somewhere with more space.', 'bad', 1800); SFX.err(); return false; } spot = { x: V.x, z: V.z }; }
+  vehDetach();
+  const wet = inLake(spot.x, spot.z);
+  PL.x = spot.x; PL.z = spot.z; PL.y = wet ? Math.max(LAKE.floor, LAKE.surf - 1.3) : groundAt(spot.x, spot.z, 0.35, V.y + 0.6, 0.6);
+  PL.vx = V.vx * 0.3; PL.vz = V.vz * 0.3; PL.vy = 0; PL.onGround = !wet; PL.peakY = PL.y; PL.height = 1.78; PL.pitch = clamp(PL.pitch, -0.6, 0.6);
+  if (!force) SFX.land(0.5);
+  return true;
+}
+function vehDetach() {
+  const V = PL.veh; if (!V) return;
+  PL.veh = null; V.rider = false; V.boosting = false; V.riderM.visible = false;
+  if (V.loop) { V.loop.stop(); V.loop = null; }
+  if (V.kind === 'tank') { V.spd = 0; V.vx = V.vz = 0; }
+  HUD.dirty = true;
+}
+
+/* ---- driving (instead of walking while you're on one) ---- */
+function driveVehicle(dt) {
+  const V = PL.veh, T = V.T;
+  PL.pitch = clamp(PL.pitch, -0.75, 0.45);
+  let mx = 0, mz = 0;
+  if (!PL.controlLock && !Chat.open) { mx = (isDown('right') ? 1 : 0) - (isDown('left') ? 1 : 0) + Touch.stick.x; mz = (isDown('back') ? 1 : 0) - (isDown('forward') ? 1 : 0) + Touch.stick.y; }
+  if (G.hackFx.flip > 0) mx = -mx;
+  const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
+  if (V.kind === 'bike') {
+    /* it turns to face where you look; W/S go, A/D slide sideways (it hovers) */
+    const fX = -Math.sin(V.yaw), fZ = -Math.cos(V.yaw), rX = Math.cos(V.yaw), rZ = -Math.sin(V.yaw);
+    const turn = angDiff(V.yaw, PL.yaw);
+    if (ml > 0.1 || Math.hypot(V.vx, V.vz) > 2) V.yaw += clamp(turn, -T.turn * dt, T.turn * dt);
+    const boost = !Chat.open && !PL.controlLock && (isDown('sprint') || isDown('jump')) && mz < -0.2 && V.boostE > 0.05;
+    V.boosting = boost; V.boostE = boost ? Math.max(0, V.boostE - dt / 3) : Math.min(1, V.boostE + dt * 0.22);
+    const fs = -mz * (mz > 0 ? T.speed * 0.45 : boost ? T.boost : T.speed), ss = mx * T.speed * 0.55;
+    V.vx = damp(V.vx, fX * fs + rX * ss, boost ? T.acc * 1.4 : T.acc, dt); V.vz = damp(V.vz, fZ * fs + rZ * ss, boost ? T.acc * 1.4 : T.acc, dt);
+    V.lean = damp(V.lean, clamp(-mx * 0.22 + clamp(turn, -1, 1) * 0.35, -0.45, 0.45), 6, dt); V.pitchV = damp(V.pitchV, boost ? 0.07 : 0, 4, dt);
+  } else {
+    /* tank: push a direction and the hull slowly turns to drive that way (S = back up). The turret follows your mouse */
+    const sY = Math.sin(PL.yaw), cY = Math.cos(PL.yaw), wx = cY * mx + sY * mz, wz = -sY * mx + cY * mz;
+    let spdT = 0;
+    if (ml > 0.1) {
+      let want = Math.atan2(-wx, -wz), dir = 1;
+      if (Math.cos(angDiff(V.yaw, want)) < -0.3) { want += Math.PI; dir = -1; }
+      const d = angDiff(V.yaw, want), y0 = V.yaw; V.yaw += clamp(d, -T.turn * dt, T.turn * dt);
+      if (tankWet(V, V.x, V.z)) { const y1 = V.yaw; V.yaw = y0; if (tankWet(V, V.x, V.z)) V.yaw = y1; } /* don't swing the nose over the water */
+      spdT = dir * T.speed * ml * Math.max(0, Math.cos(d)) ** 2 * (dir < 0 ? 0.6 : 1);
+    }
+    V.spd = damp(V.spd, spdT, T.acc, dt); V.vx = -Math.sin(V.yaw) * V.spd; V.vz = -Math.cos(V.yaw) * V.spd;
+    V.tyaw += clamp(angDiff(V.tyaw, PL.yaw), -2.2 * dt, 2.2 * dt);
+  }
+  vehMove(V, dt);
+  /* you go where it goes */
+  Object.assign(PL, { x: V.x, z: V.z, y: V.y, vx: V.vx, vz: V.vz, vy: 0, onGround: true, peakY: V.y, height: T.h, crouch: 0, ads: 0, swim: false, under: false, wasSwim: false, slideT: 0 });
+  W.sprinting = false; if (BODY.grp) BODY.grp.visible = false;
+  V.noiseT -= dt; if (V.noiseT <= 0) { V.noiseT = 0.5; Noise.emit(V.x, V.z, V.kind === 'tank' ? 30 : 20, 0.6); }
+  const sp = Math.hypot(V.vx, V.vz);
+  if (V.loop) { V.loop.set(0.05 + Math.min(0.1, sp * 0.008), 0); V.loop.freq(V.kind === 'tank' ? 38 + sp * 7 : 70 + sp * 9 + (V.boosting ? 40 : 0)); }
+  vehCamera(V, dt);
+}
+function vehMove(V, dt) {
+  const T = V.T, ox = V.x, oz = V.z, sp0 = Math.hypot(V.vx, V.vz);
+  let nx = V.x + V.vx * dt, nz = V.z + V.vz * dt;
+  /* the tank can't swim: it slides along the shore instead */
+  if (V.kind === 'tank' && tankWet(V, nx, nz) && !tankWet(V, ox, oz)) { if (!tankWet(V, nx, oz)) nz = oz; else if (!tankWet(V, ox, nz)) nx = ox; else { nx = ox; nz = oz; } }
+  V.x = nx; V.z = nz;
+  vehCollide(V);
+  /* walls stop you (a hard crash hurts the bike) */
+  if (dt > 0) {
+    const ax = (V.x - ox) / dt, az = (V.z - oz) / dt, sp1 = Math.hypot(ax, az);
+    if (sp1 < sp0 - 0.5) {
+      V.vx = ax; V.vz = az; if (V.kind === 'tank') V.spd = Math.sign(V.spd) * sp1;
+      if (V.kind === 'bike' && sp0 - sp1 > 9 && V.rider) { vehHurt(V, (sp0 - sp1 - 9) * 5, null, 'crash'); SFX.land(1); shake(0.35); }
+    }
+  }
+  /* floor height (the bike floats over the data lake) */
+  const g0 = groundAt(V.x, V.z, 0.5, V.y, T.step), g = V.kind === 'bike' && inLake(V.x, V.z) ? Math.max(g0, LAKE.surf) : g0;
+  if (g >= V.y - 0.02) { V.y = g; V.vy = 0; } else { V.vy -= 17 * dt; V.y = Math.max(g, V.y + V.vy * dt); if (V.y <= g) V.vy = 0; }
+  placeVehicle(V, dt);
+}
+/* is any part of the tank's box (3.4 x 6.4m) over the data lake? */
+function tankWet(V, x, z) {
+  if (LAKE.x0 > 1e5) return false;
+  const c = Math.cos(V.yaw), s = Math.sin(V.yaw);
+  for (const lx of [-1.75, 0, 1.75]) for (const lz of [-3.25, -1.6, 0, 1.6, 3.25]) if (inLake(x + lx * c + lz * s, z - lx * s + lz * c)) return true;
+  return false;
+}
+function vehCollide(V) {
+  const T = V.T;
+  for (let it = 0; it < 2; it++) for (const [lx, lz, r] of T.circ) {
+    vehW(V, lx, lz, _vp); const px = _vp.x, pz = _vp.z;
+    pushOut(_vp, r, V.y, V.y + T.h, T.step);
+    V.x += _vp.x - px; V.z += _vp.z - pz;
+  }
+  for (const O of VEH) {
+    if (O === V || O.dead) continue;
+    const rr = (V.kind === 'tank' ? 2.6 : 1.1) + (O.kind === 'tank' ? 2.6 : 1.1), dx = V.x - O.x, dz = V.z - O.z, d = Math.hypot(dx, dz);
+    if (d < rr && d > 1e-4) { V.x = O.x + (dx / d) * rr; V.z = O.z + (dz / d) * rr; }
+  }
+  /* the boss door is too small for it */
+  let blocked = false;
+  for (const [lx, lz, r] of T.circ) { vehW(V, lx, lz, _vp); if (_vp.z - r < -75.2) { V.z += -75.2 - (_vp.z - r); blocked = true; } }
+  if (blocked && V.rider && G.time > V.wallT) { V.wallT = G.time + 5; toast('🚫 The ' + T.name.toLowerCase() + ' doesn\'t fit through the boss door. Get off (' + vehKey('use') + ') and walk in.', 'bad', 3000); }
+  V.x = clamp(V.x, BOUNDS.x0 + 2, BOUNDS.x1 - 2); V.z = clamp(V.z, BOUNDS.z0 + 2, BOUNDS.z1 - 2);
+}
+/* third person: the camera floats behind and above it, and slides in when a wall is in the way */
+function vehCamera(V, dt) {
+  const T = V.T, cam = R.camera, cp = Math.cos(PL.pitch), fx0 = -Math.sin(PL.yaw) * cp, fy0 = Math.sin(PL.pitch), fz0 = -Math.cos(PL.yaw) * cp;
+  const px = V.x, py = V.y + T.camH, pz = V.z;
+  let d = T.camD; const h = rayWorld(px, py, pz, -fx0 * d, -fy0 * d, -fz0 * d); if (h) d = Math.max(0.8, h.t * d - 0.4);
+  V.camD = d < V.camD ? d : damp(V.camD, d, 4, dt);
+  const D = V.camD;
+  SHAKE = Math.max(0, SHAKE - dt * 1.8);
+  const sh = SHAKE * SHAKE, shx = (Math.random() - 0.5) * sh * 0.08, shy = (Math.random() - 0.5) * sh * 0.08;
+  cam.position.set(px - fx0 * D, clamp(py - fy0 * D, V.y + 0.5, ceilAt(px, pz) - 0.3), pz - fz0 * D);
+  cam.rotation.set(PL.pitch + shy, PL.yaw + shx, 0);
+  PL.hurtT = Math.max(0, PL.hurtT - dt * 3);
+  const fov = vFov(S.fov + 4 + (V.boosting ? 12 : 0));
+  if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = damp(cam.fov, fov, 6, dt); cam.updateProjectionMatrix(); }
+  if (HUD.scoped) { HUD.scoped = false; $('scope').style.opacity = 0; }
+  if (HUD.adsOn) { HUD.adsOn = false; $('crosshair').classList.remove('ads'); }
+  const sx = Math.round(V.x), sz = Math.round(V.z);
+  R.sun.position.set(sx + 6, 44, sz + 4); R.sun.target.position.set(sx, 0, sz); R.sun.target.updateMatrixWorld();
+}
+/* where the crosshair points (starts at the vehicle so it never aims at something behind you) */
+function vehAim(V) {
+  const cam = R.camera.position, cp = Math.cos(PL.pitch), fx0 = -Math.sin(PL.yaw) * cp, fy0 = Math.sin(PL.pitch), fz0 = -Math.cos(PL.yaw) * cp, s = V.camD, L = 260;
+  const ox = cam.x + fx0 * s, oy = cam.y + fy0 * s, oz = cam.z + fz0 * s;
+  const wh = rayWorld(ox, oy, oz, fx0 * L, fy0 * L, fz0 * L); Object.assign(_ah, { t: wh ? wh.t : 1, kind: '', b: null, bot: null, part: '' });
+  rayBots(ox, oy, oz, fx0 * L, fy0 * L, fz0 * L, _ah, null);
+  if (G.boss && G.boss.alive) rayBoss(ox, oy, oz, fx0 * L, fy0 * L, fz0 * L, _ah);
+  _aim.x = ox + fx0 * L * _ah.t; _aim.y = oy + fy0 * L * _ah.t; _aim.z = oz + fz0 * L * _ah.t; return _aim;
+}
+function vehShoot(m, a, g, dmg, id, spreadDeg) {
+  let dx = a.x - m.x, dy = a.y - m.y, dz = a.z - m.z; const l = Math.hypot(dx, dy, dz) || 1;
+  const t = l / g.speed; dy += 0.5 * 9.81 * g.grav * 2.2 * t * t; /* aim a bit up so the drop lands on the crosshair */
+  const sr = (spreadDeg * Math.PI) / 180, l1 = Math.hypot(dx, dy, dz);
+  dx = dx / l1 + rand(-sr, sr); dy = dy / l1 + rand(-sr, sr); dz = dz / l1 + rand(-sr, sr);
+  const l2 = Math.hypot(dx, dy, dz); W.hackUsed = true; /* a loaded hack round stays in your gun */
+  spawnBullet(m.x, m.y, m.z, dx / l2, dy / l2, dz / l2, g, dmg, id, m); G.stats.shots++;
+}
+/* its guns (instead of yours) */
+function vehWeapons(dt) {
+  const V = PL.veh; V.cool -= dt; V.cool2 -= dt; V.recoil = Math.max(0, V.recoil - dt * 3);
+  if (!PL.alive || Chat.open || PL.controlLock || G.cine || G.killcam) return;
+  if (V.kind === 'bike') {
+    if (!Input.fire || V.cool > 0) return;
+    V.cool = 0.1; V.side = -V.side;
+    const a = vehAim(V), m = V.mz[V.side > 0 ? 1 : 0].getWorldPosition(_mzv);
+    vehShoot(m, a, VGUN.bolt, 22 * lvlHpK(), 'vbike', 0.5);
+    SFX.gun('laser', false, null, 0.6); Noise.emit(V.x, V.z, 26, 1); flashLight(R.muzzle, m.x, m.y, m.z, 4, 0.04);
+    return;
+  }
+  const a = vehAim(V), m0 = V.mz[0].getWorldPosition(_mzv), hd = Math.hypot(a.x - m0.x, a.z - m0.z);
+  V.tpitch = damp(V.tpitch, clamp(Math.atan2(a.y - m0.y, hd), -0.12, 0.35), 6, dt);
+  if (Input.fire && V.cool <= 0) {
+    const yawT = Math.atan2(-(a.x - V.x), -(a.z - V.z));
+    if (Math.abs(angDiff(V.tyaw, yawT)) < 0.1 || hd < 4) {
+      V.cool = 1.7; V.recoil = 1;
+      vehShoot(m0, a, VGUN.shell, 320 * lvlHpK(), 'vtank', 0.15);
+      SFX.boom(V3(m0.x, m0.y, m0.z), 0.9); SFX.gun('rocket'); shake(0.45); fx.smoke(m0.x, m0.y, m0.z, 8); fx.glow(m0.x, m0.y, m0.z, 1, 0.7, 0.3, 1.2, 0.1);
+      flashLight(R.muzzle, m0.x, m0.y, m0.z, 14, 0.06); Noise.emit(V.x, V.z, 60, 1);
+    } else if (G.time > (V.turnMsgT || 0)) { V.turnMsgT = G.time + 1.2; SFX.empty(); }
+  }
+  if (Input.aim && V.cool2 <= 0) {
+    V.cool2 = 0.09; const m1 = V.mz[1].getWorldPosition(_mzv);
+    vehShoot(m1, a, VGUN.coax, 17 * lvlHpK(), 'vcoax', 1.4);
+    SFX.gun('rifle', false, null, 0.7); Noise.emit(V.x, V.z, 40, 1); flashLight(R.muzzle, m1.x, m1.y, m1.z, 6, 0.03);
+  }
+}
+
+/* ---- damage ---- */
+function vehHurt(V, amount, src, cause) {
+  if (V.dead || amount <= 0) return;
+  if (cause === 'boom' && src && src.name === 'YOUR OWN EXPLOSION' && V.kind === 'tank') return; /* tank shells don't hurt the tank */
+  const dmg = amount * V.T.dmgK; V.hp -= dmg; V.hurtT = G.time;
+  if (V.rider) { PL.hurtT = 0.5; shake(Math.min(0.4, dmg / 50)); G.hurtFx = Math.min(1, (G.hurtFx || 0) + dmg / 80); HUD.dirty = true; if (src && src.x != null) dmgIndicator(src.x, src.z); if (Math.random() < 0.3) SFX.metalPing(V3(V.x, V.y + 1, V.z)); }
+  if (V.hp <= 0) destroyVehicle(V);
+}
+function destroyVehicle(V) {
+  V.hp = 0; V.dead = true; V.respawnT = 45;
+  const rode = V.rider; if (rode) exitVehicle(true);
+  V.grp.visible = false; V.vx = V.vz = 0; V.spd = 0;
+  boom(V.x, V.y + 1, V.z, V.kind === 'tank' ? 7 : 4.5, V.kind === 'tank' ? 220 : 90, { src: 'player', notPlayerDmg: true });
+  fx.smoke(V.x, V.y + 1, V.z, 14);
+  if (rode) {
+    PL.invuln = 1.2; PL.hp -= V.kind === 'bike' ? 25 : 10; HUD.dirty = true; G.hurtFx = 1;
+    toast('💥 Your ' + V.T.name.toLowerCase() + ' blew up! It rebuilds itself in the start room in 45 seconds.', 'bad', 4500);
+    if (PL.hp <= 0) { PL.hp = 0; die({ name: 'YOUR ' + V.T.name.toUpperCase() + ' EXPLODING' }, 'boom'); }
+  }
+}
+
+/* ---- every frame: parked ones coast + heal, any of them shove (or ram / squish) AIs ---- */
+function updateVehicles(dt) {
+  for (const V of VEH) {
+    if (V.dead) {
+      V.respawnT -= dt;
+      if (V.respawnT <= 0 && Math.hypot(PL.x - V.spot.x, PL.z - V.spot.z) > 6) { resetVehicle(V); fx.code(V.x, V.y + 1, V.z, 20, 0.3, 1, 0.6, 1); if (Math.hypot(PL.x - V.x, PL.z - V.z) < 80) toast(V.T.icon + ' Your ' + V.T.name.toLowerCase() + ' rebuilt itself in the start room.', 'good', 3000); }
+      continue;
+    }
+    if (!V.rider) {
+      V.vx = damp(V.vx, 0, 2.2, dt); V.vz = damp(V.vz, 0, 2.2, dt); V.boostE = Math.min(1, V.boostE + dt * 0.22); V.lean = damp(V.lean, 0, 4, dt); V.pitchV = damp(V.pitchV, 0, 4, dt);
+      if (Math.hypot(V.vx, V.vz) > 0.05 || V.vy !== 0) vehMove(V, dt); else if (Math.abs(V.x - PL.x) < 60 && Math.abs(V.z - PL.z) < 60) placeVehicle(V, dt);
+      if (G.time - V.hurtT > 5) V.hp = Math.min(V.maxHp, V.hp + V.maxHp * 0.02 * dt); /* self-repair when nobody's on it */
+    }
+    if (V.hp < V.maxHp * 0.35) { V.smokeT -= dt; if (V.smokeT <= 0) { V.smokeT = 0.15; fx.smoke(V.x, V.y + V.T.h * 0.7, V.z, 1); } }
+    if (Math.abs(V.x - PL.x) < 70 && Math.abs(V.z - PL.z) < 70) vehBots(V);
+  }
+}
+function vehBots(V) {
+  const T = V.T, sp = Math.hypot(V.vx, V.vz);
+  forNearBots(V.x, V.z, 6, (b) => {
+    if (b.dead || b.ghost || !b.active) return;
+    if (b.type === 'drone' && b.y > V.y + T.h) return;
+    for (const [lx, lz, r] of T.circ) {
+      vehW(V, lx, lz, _vp); const dx = b.x - _vp.x, dz = b.z - _vp.z, d = Math.hypot(dx, dz), rr = r + 0.38;
+      if (d >= rr) continue;
+      if (V.rider && !b.ally) {
+        if (V.kind === 'tank' && sp > 1.2) { hitBot(b, 99999, 'torso', b.x, b.y + 1, b.z, V.vx / sp, 0, V.vz / sp, { id: 'squish', melee: true }); SFX.squish(); fx.sparks(b.x, b.y + 0.5, b.z, 0, 1, 0, 10, 4); trophy('squish'); return; }
+        if (V.kind === 'bike' && sp > 6 && G.time > (b.ramT || 0)) {
+          b.ramT = G.time + 0.6; hitBot(b, sp * 9 * lvlHpK(), 'torso', b.x, b.y + 1.1, b.z, V.vx / sp, 0.2, V.vz / sp, { id: 'ram', melee: true });
+          V.vx *= 0.6; V.vz *= 0.6; vehHurt(V, 6, null, 'crash'); SFX.stab(); shake(0.25); fx.sparks(b.x, b.y + 1, b.z, -V.vx / sp, 0.5, -V.vz / sp, 10, 5);
+        }
+      }
+      if (!b.dead) { if (d > 1e-4) { b.x = _vp.x + (dx / d) * rr; b.z = _vp.z + (dz / d) * rr; } else b.x = _vp.x + rr; }
+      return;
+    }
+  });
+}
+/* you can't walk through a parked one */
+function vehPushPlayer(p) {
+  for (const V of VEH) {
+    if (V.dead || V === PL.veh || Math.abs(V.x - p.x) > 5 || Math.abs(V.z - p.z) > 5 || PL.y > V.y + V.T.h - 0.3) continue;
+    for (const [lx, lz, r] of V.T.circ) {
+      vehW(V, lx, lz, _vp); const dx = p.x - _vp.x, dz = p.z - _vp.z, d = Math.hypot(dx, dz), rr = r + 0.35;
+      if (d < rr) { if (d > 1e-4) { p.x = _vp.x + (dx / d) * rr; p.z = _vp.z + (dz / d) * rr; } else p.x += rr; }
+    }
+  }
+}
+function vehHud() {
+  const V = PL.veh, T = V.T;
+  $('gunName').textContent = T.icon + ' ' + T.name.toUpperCase(); $('mag').textContent = Math.ceil(V.hp); $('reserve').textContent = V.maxHp;
+  $('ammo').classList.toggle('low', V.hp < V.maxHp * 0.3);
+  $('gunState').textContent = V.kind === 'bike' ? 'BLASTERS · ' + (V.boostE < 0.05 ? 'BOOST EMPTY' : 'BOOST ' + Math.round(V.boostE * 100) + '%') : V.cool > 0 ? 'CANNON RELOADING ' + V.cool.toFixed(1) + 's' : 'CANNON READY';
+  return '<span class="on">' + esc(vehKey('use')) + ' get off</span>' + (V.kind === 'bike' ? '<span>' + esc(vehKey('sprint')) + ' boost</span>' : '<span>' + (Touch.on ? 'AIM' : 'right click') + ' machine gun</span>');
 }
 
 /* ============================ chat + real AI ============================ */
@@ -6784,6 +7216,9 @@ function genLevelInner(def) {
   genRes(-12, -76, 12, -64);
   /* ----- start room ----- */
   genRes(-7, 79, 7, 93.6);
+  /* vehicles wait in the start room: the hoverbike from level 10, the tank from level 25 */
+  if (def.n >= VEH_T.bike.lvl) { genRes(7.5, 76.5, 12.5, 83.5); addVehicle('bike', 10, 80, 0); }
+  if (def.n >= VEH_T.tank.lvl) { genRes(-3.8, 57.5, 3.8, 67.5); addVehicle('tank', 0, 62.5, 0); }
   buildTerminal(0, -14.5, 72, Math.PI / 2); genRes(-22, 64, -7, 80);
   signMesh(makeSign([def.name.toUpperCase() + ' · ' + def.year, def.maker], { bg: E.sbg, fg: E.sfg, sizes: [def.name.length > 14 ? 40 : 56, 28], w: 512, h: 220 }), 0, 4.2, 93.15, 4, 1.7, Math.PI);
   LV.easter.push({ x: 0, z: 92.8, y: 4.2, text: def.name + ' (' + def.year + ', ' + def.maker + '): ' + def.blurb });
@@ -7366,7 +7801,7 @@ function disposeTree(root) {
     if (o.geometry) o.geometry.dispose();
     const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
     for (const m of mats) {
-      if (keepM.has(m) || seen.has(m)) continue; seen.add(m);
+      if (keepM.has(m) || seen.has(m) || m.userData.keep) continue; seen.add(m);
       for (const k of ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'alphaMap']) { const t = m[k]; if (t && !keepT.has(t)) t.dispose(); }
       if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u && u.value && u.value.isTexture && !keepT.has(u.value)) u.value.dispose();
       m.dispose();
@@ -7374,6 +7809,7 @@ function disposeTree(root) {
   });
 }
 function unloadLevel() {
+  vehDetach(); VEH.length = 0;
   for (const b of BOTS) { b.active = false; b.scripted = false; b.static = false; }
   BUL.forEach((b) => { if (b.on) endBullet(b); }); EB.forEach((e) => (e.on = false)); clearAreas();
   if (FX.add) { FX.add.clear(); FX.norm.clear(); FX.holes.count = 0; FX.holeI = 0; FX.puddles.count = 0; FX.puddleI = 0; }
@@ -8024,7 +8460,7 @@ function onKeyAction(e) {
 }
 function updateActions() {
   if (Touch.tap.chat) { if (Chat.open) Chat.close(); else Chat.openNearest(); }
-  if (!PL.alive || Chat.open || PL.controlLock || G.cine) return;
+  if (!PL.alive || Chat.open || PL.controlLock || G.cine || PL.veh) return;
   if (wasPressed('knife')) startKnife();
   if (wasPressed('heal')) useHeal();
   if (PL.hasGun) {
@@ -8052,6 +8488,7 @@ function serialize() {
       slots: PL.slots, cur: PL.cur, guns: PL.guns, owned: PL.owned, checkpoint: PL.checkpoint, hasGun: PL.hasGun, passcodes: PL.passcodes, crouch: r2(PL.crouch), alive: PL.alive, skills: PL.skills, gren: PL.gren, gsel: PL.gsel, nvg: PL.nvg, allies: PL.allies, hackRounds: PL.hackRounds || 0, sword: !!PL.sword, outfit: PL.outfit, outfits: PL.outfits },
     insane: !!G.insane,
     clip: { stage: CLIP.stage, done: CLIP.done, ripReady: CLIP.ripReady },
+    veh: VEH.map((V) => [r2(V.x), r2(V.z), r2(V.yaw), Math.round(V.hp), V.dead ? 1 : 0]), ride: PL.veh ? PL.veh.i : -1,
     door: DOOR.open, secret: !!(LV.secret && LV.secret.open), level: LVL.n, picks: LV.pickups.filter((p) => p.taken).map((p) => p.id), easter: LV.easter.map((e) => (e.read ? 1 : 0)),
     sp: SPAWNERS.map((s2) => Math.max(0, Math.round(s2.hp))), spr: SPAWNERS.map((s2) => s2.reserve), tw: TOWERS.map((t) => [t.alive ? 1 : 0, t.hacked ? 1 : 0, Math.round(t.hp)]), terms: TERMS.map((T) => [T.discount ? 1 : 0, Math.round(T.hackCd || 0)]),
     bots: BOTS.filter((b) => b.active && !b.ally && !b.ghost && !b.summoned && !b.scripted && !(b.dead && b.searched)).map((b) => [TYPES.indexOf(b.type), b.tier, b.name, b.base, r2(b.x), r2(b.y), r2(b.z), r2(b.yaw), Math.round(b.hp), b.dead ? 1 : 0, Math.max(0, STATES.indexOf(b.state)), b.noCannon ? 1 : 0, b.noSearch ? 1 : 0, r2(b.home.x), r2(b.home.z), b === CLIP.grunt ? 1 : 0, b.color.getHex()]),
@@ -8090,6 +8527,7 @@ function applyGame(g) {
   (g.sp || []).forEach((hp, i) => { const Sp = SPAWNERS[i]; if (!Sp) return; Sp.hp = hp; if (hp <= 0) destroySpawner(Sp, true); });
   (g.tw || []).forEach(([al, hk, hp], i) => { const T = TOWERS[i]; if (!T) return; T.hp = hp; if (!al) { T.alive = false; T.col.on = false; T.mat.emissiveIntensity = 0; T.grp.rotation.z = 0.25; } if (hk) { T.hacked = true; T.mat.emissive.setHex(0x3ec0ff); T.mat.emissiveIntensity = 1.4; } });
   (g.terms || []).forEach(([d, cd], i) => { const T = TERMS[i]; if (!T) return; T.discount = d; T.hackCd = cd; drawTerminal(T); });
+  (g.veh || []).forEach(([x, z, yaw, hp, dead], i) => { const V = VEH[i]; if (!V) return; Object.assign(V, { x, z, yaw, tyaw: yaw, hp: clamp(hp, 0, V.maxHp), vx: 0, vz: 0, spd: 0, y: 0 }); V.y = vehGround(V); if (dead || hp <= 0) { V.dead = true; V.respawnT = 20; V.grp.visible = false; } placeVehicle(V); });
   for (const r of fairBots(g.bots || [], PL.x, PL.z)) {
     const b = spawnBot(TYPES[r[0]] || 'grunt', r[4], r[6], { tier: r[1], name: r[2], base: r[3], y: r[5], yaw: r[7], noFx: true, color: r[16], perch: TYPES[r[0]] === 'sniper' ? SNIPER_PERCHES.find((q) => Math.hypot(q.x - r[4], q.z - r[6]) < 2) || null : null });
     if (!b) continue;
@@ -8105,10 +8543,12 @@ function applyGame(g) {
   G.stats = Object.assign(STATS0(), g.stats || {}); G.lv0 = Object.assign(STATS0(), g.lv0 || {}); G.saidWords = g.said || []; G.endRoam = !!g.endRoam; G.bonusUnlocked = !!g.bonus; G.hackerTimer = g.hackerT || 150;
   G.bestStreak = G.stats.bestStreak || 0;
   spawnAllies(); applyOutfit();
+  if (g.ride >= 0 && VEH[g.ride] && !VEH[g.ride].dead && PL.alive) enterVehicle(VEH[g.ride], true);
   ffRebuildBlocked(); updateDoorLeds(); HUD.dirty = true; VM.dirty = true;
 }
 /* reset the level: compilers, towers, terminals, pickups, doors, the boss. Your guns and Crypto stay */
 function resetLevelState() {
+  vehDetach(); for (const V of VEH) resetVehicle(V);
   for (const b of BOTS) { b.active = false; b.scripted = false; }
   BUL.forEach((b) => { if (b.on) endBullet(b); }); EB.forEach((e) => (e.on = false)); GRENS.forEach((g) => (g.mesh.visible = false)); GRENS.length = 0;
   FX.add.clear(); FX.norm.clear(); FX.holes.count = 0; FX.holeI = 0; FX.puddles.count = 0; FX.puddleI = 0;
@@ -8161,6 +8601,7 @@ function tick(rdt, draw) {
   updateCineTimers(rdt);
   updateDesktop(rdt);
   const paused = G.paused || G.sysPaused || G.frozen || document.hidden;
+  if (paused) { if (PL.veh && PL.veh.loop) PL.veh.loop.set(0); if (W.spinLoop) W.spinLoop.set(0); } /* hums and spin-ups go quiet on the pause menu */
   if (draw && (G.screen === 'play' || VIS.mode)) updateVision();
   if (G.screen === 'play') {
     if (!paused) step(rdt * G.timeScale, rdt);
@@ -8194,7 +8635,7 @@ function step(dt, rdt) {
   if (G.killcam) updateKillcam(rdt); else updatePlayer(dt);
   updateWeapon(dt);
   updateBullets(dt); updateGrenades(dt);
-  updateBots(dt); updateBolts(dt); updateSidekicks(dt); updateCodeGame(rdt);
+  updateBots(dt); updateVehicles(dt); updateBolts(dt); updateSidekicks(dt); updateCodeGame(rdt);
   updateTowers(dt); updateSpawners(dt); updateBoss(dt); updateClippy(dt);
   updatePickups(dt); updateInteract(rdt);
   updatePriceHack(dt); updateTrashTalk(rdt); updateHackFx(rdt);
@@ -8239,7 +8680,7 @@ async function boot() {
   hideEl('loading');
   if (saved && saved.v === 1) restore(saved); else { G.trophies = LS.get('killais:trophies', {}) || {}; showTitle(); }
   requestAnimationFrame((t) => { lastT = t; frame(t); });
-  window.__KA = { enterTrophyRoom, exitTrophyRoom, TROOM, saveSlot, loadSlot, slotInfo, OUTFITS, applyOutfit, outfitOk, insaneUnlocked, swordHit, askNewGame, LS, DIFF, recruit, allyList, SIDE, startCodeGame, codeKey, reviveAlly, allyHurt, spawnAllies, loadHackRound, canRecruit, gunSkin, skinOk, rayWorld, GUN_ORDER, gBase, gunReward, levelReach, fireShot, GREN_T, grenCount, grenAdd, cycleGrenade, AREAS, GRENS, detonate, toggleNV, VIS, smokeBlocks, SKILLS, sk, buySkill, GRAP, CODEV, grappleFire, codeVision, resCap, drawAbilities, gunStats, THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight, startBossFight, genReachable, BOSS_DATA, SIG, doAttack, hitBoss, GEN, ERAS, SNIPER_PERCHES, resetLevelState, buildLevel, goToLevel, loadLevel, LVL, ARENA, START, levelDef, unloadLevel, finishBoss, showTeaser, showStats };
+  window.__KA = { LAKE, addHack, VEH, VEH_T, addVehicle, enterVehicle, exitVehicle, vehHurt, destroyVehicle, vehAim, enterTrophyRoom, exitTrophyRoom, TROOM, saveSlot, loadSlot, slotInfo, OUTFITS, applyOutfit, outfitOk, insaneUnlocked, swordHit, askNewGame, LS, DIFF, recruit, allyList, SIDE, startCodeGame, codeKey, reviveAlly, allyHurt, spawnAllies, loadHackRound, canRecruit, gunSkin, skinOk, rayWorld, GUN_ORDER, gBase, gunReward, levelReach, fireShot, GREN_T, grenCount, grenAdd, cycleGrenade, AREAS, GRENS, detonate, toggleNV, VIS, smokeBlocks, SKILLS, sk, buySkill, GRAP, CODEV, grappleFire, codeVision, resCap, drawAbilities, gunStats, THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight, startBossFight, genReachable, BOSS_DATA, SIG, doAttack, hitBoss, GEN, ERAS, SNIPER_PERCHES, resetLevelState, buildLevel, goToLevel, loadLevel, LVL, ARENA, START, levelDef, unloadLevel, finishBoss, showTeaser, showStats };
 }
 boot().catch((err) => { console.error(err); const e = $('loadErr'); if (e) { e.style.display = 'block'; $('loadErrMsg').textContent = String(err && err.message || err); } });
 </script>

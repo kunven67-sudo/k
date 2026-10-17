@@ -251,6 +251,10 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Destruction:** a lot breaks (cover, walls, glass, screens).
 - **Liquids:** glowing **data lakes** (swim, and AIs can't see you underwater) AND deadly **corrupted goo** (glitches you like a hack).
 - **Vehicles:** hoverbike AND tank, once maps get bigger: **hoverbike around level 10, tank around level 25**.
+  - **Built:** both wait in the start room (hoverbike from level 10, tank from level 25). Walk up and press USE to get on, USE again to get off. Third-person camera that slides in when a wall is behind you. Neither fits through the boss door, so boss fights stay on foot.
+  - **Hoverbike:** fast, turns to face where you look, A/D slide sideways, floats over the data lake. Twin laser blasters (click), a boost (Shift or Space, refills), rams AIs at speed. Crashing into a wall too fast hurts it.
+  - **Tank:** slow, the hull turns toward where you push and the turret follows your mouse. Cannon (click, big boom, reloads in 1.7s) and a machine gun (right click). It squishes any AI it drives over, takes less than half damage, and nothing can hack you inside it.
+  - They have their own health (shown in the weapon panel) and repair themselves when nobody's riding. If one gets wrecked it explodes, throws you out, and rebuilds in the start room 45 seconds later. Saves remember where they're parked (and if you were riding). They show on the minimap. Trophies: Easy Rider (ride the bike) and Tank You Very Much (squish an AI).
 
 ## 7. The Player
 
@@ -425,7 +429,7 @@ What the first build should have:
 7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
 8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** (Dr. Sbaitso) and "to be continued"
 
-**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook, all 9 grenades, the vision gear, all 100 guns, gun skins, sidekicks, the energy sword, outfits, Insane mode, 3 save slots and the trophy room**. **Not built yet:** vehicles (hoverbike, tank).
+**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook, all 9 grenades, the vision gear, all 100 guns, gun skins, sidekicks, the energy sword, outfits, Insane mode, 3 save slots and the trophy room**. **plus the hoverbike and the tank.** Everything in this design is built now.
 
 ## Still Open
 
