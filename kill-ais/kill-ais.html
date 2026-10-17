@@ -498,6 +498,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const fmtTime = (s) => { s = Math.max(0, Math.floor(s)); const m = Math.floor(s / 60); return m + ':' + String(s % 60).padStart(2, '0'); };
 const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
 const smooth = (t) => t * t * (3 - 2 * t);
+const approach = (v, t, d) => (v < t ? Math.min(t, v + d) : Math.max(t, v - d));
 const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -966,9 +967,10 @@ const G = {
   time: 0, realTime: 0, timeScale: 1, slowT: 0, slowCd: 0, frame: 0,
   inGame: false, deaths: 0, trophies: {}, chatted: {}, saidWords: [],
   stats: null, streak: 0, streakT: 0, bestStreak: 0, headStreak: 0,
-  alarm: null, eliza: null, hackFx: { nextStatic: 10, nextPop: 12, nextFake: 8, nextCtl: 30, flip: 0, lag: 0, fakeHud: 0 },
+  alarm: null, boss: null, hackFx: { nextStatic: 10, nextPop: 12, nextFake: 8, nextCtl: 30, flip: 0, lag: 0, fakeHud: 0 },
   hackerTimer: 120, trashT: 25, killcam: null, endRoam: false,
 };
+Object.defineProperty(G, 'eliza', { get() { return G.boss; }, set(v) { G.boss = v; } }); /* old name for the boss */
 const R = { renderer: null, canvas: null, scene: null, camera: null, composer: null, renderPass: null, bloom: null, glitch: null, sun: null, hemi: null, envTex: null, pts: [] };
 const PL = {
   x: 0, y: 0, z: 84, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: true, crouch: 0, slideT: 0, lean: 0, height: 1.7,
@@ -1500,8 +1502,8 @@ function captureEnv(pos, scene = R.scene) {
     scene.traverse((o) => { if (o.userData.noEnv && o.visible) { o.visible = false; hidden.push(o); } });
     cc.update(R.renderer, scene);
     hidden.forEach((o) => (o.visible = true)); scene.remove(cc);
-    const pm = new THREE.PMREMGenerator(R.renderer); const env = pm.fromCubemap(rt.texture).texture; pm.dispose(); rt.dispose();
-    scene.environment = env; if (scene === R.scene) R.levelEnv = env;
+    const pm = new THREE.PMREMGenerator(R.renderer), envRT = pm.fromCubemap(rt.texture), env = envRT.texture; pm.dispose(); rt.dispose();
+    scene.environment = env; if (scene === R.scene) { if (R.levelEnvRT) R.levelEnvRT.dispose(); R.levelEnvRT = envRT; R.levelEnv = env; }
     return env;
   } catch (e) { console.warn('env capture failed', e); return null; }
 }
@@ -1537,8 +1539,12 @@ const _q = [], _q2 = [], _q3 = [];
 const LAKE = { x0: 54, x1: 84, z0: -34, z1: 22, floor: -2.6, surf: -0.35 };
 const inLake = (x, z) => x > LAKE.x0 && x < LAKE.x1 && z > LAKE.z0 && z < LAKE.z1;
 const floorAt = (x, z) => (inLake(x, z) ? LAKE.floor : 0);
-const inArena = (x, z) => x > -26 && x < 26 && z < -76;
-const ceilAt = (x, z) => (inArena(x, z) ? 15 : 8);
+/* the level you're on: number, ceiling height, keypad code, boss... (each level builder fills these in) */
+const LVL = { n: 1, ceil: 8, code: '7319', era: 0, bossName: 'ELIZA', bossYear: 1966, title: 'THE LAB', setting: 'a 1960s computer lab ruled by ELIZA', spotZ0: -44, spotZ1: 90, popOk: null, envPos: { x: 0, y: 4, z: 30 }, def: null };
+/* the boss room: taller ceiling, and the fight starts when you walk in */
+const ARENA = { x0: -26, x1: 26, z1: -76, ceil: 15 };
+const inArena = (x, z) => x > ARENA.x0 && x < ARENA.x1 && z < ARENA.z1;
+const ceilAt = (x, z) => (inArena(x, z) ? ARENA.ceil : LVL.ceil);
 function pushOut(p, rad, y0, y1, step) {
   colQuery(p.x - rad - 0.1, p.z - rad - 0.1, p.x + rad + 0.1, p.z + rad + 0.1, _q);
   let hit = false;
@@ -1646,7 +1652,7 @@ function ffRebuildBlocked() {
   }
   for (let j = 0; j < FF.nz; j++) for (let i = 0; i < FF.nx; i++) {
     const cx = FF.ox + (i + 0.5) * FF.cell, cz = FF.oz + (j + 0.5) * FF.cell;
-    if (inLake(cx, cz) || cx < -92 || cx > 92 || cz > 92 || cz < -128) FF.blocked[j * FF.nx + i] = 1;
+    if (inLake(cx, cz) || cx < BOUNDS.x0 + 2 || cx > BOUNDS.x1 - 2 || cz > BOUNDS.z1 - 2 || cz < BOUNDS.z0 + 2) FF.blocked[j * FF.nx + i] = 1;
   }
   FF.safe.fill(0);
   for (const T of TERMS) {
@@ -1704,7 +1710,7 @@ function ffDir(x, z, out) {
 const ffDistAt = (x, z) => { const c = ffIdx(x, z); return c < 0 ? 65535 : FF.dist[c]; };
 function randomFreeSpot(filter) {
   for (let tries = 0; tries < 400; tries++) {
-    const x = rand(BOUNDS.x0 + 3, BOUNDS.x1 - 3), z = rand(-44, 90), c = ffIdx(x, z);
+    const x = rand(BOUNDS.x0 + 3, BOUNDS.x1 - 3), z = rand(LVL.spotZ0, LVL.spotZ1), c = ffIdx(x, z);
     if (!ffFree(c)) continue;
     if (filter && !filter(x, z)) continue;
     return { x, z };
@@ -1713,7 +1719,9 @@ function randomFreeSpot(filter) {
 }
 
 /* ============================ level builder ============================ */
-const LV = { groups: new Map(), meshes: [], reels: null, reelList: [], cpuMats: [], goo: [], pickups: [], easter: [], anim: [], built: false, lights: [], lightSpots: [], aoBlobs: [] };
+const LV = { groups: new Map(), meshes: [], reels: null, reelList: [], cpuMats: [], goo: [], pickups: [], easter: [], anim: [], built: false, lights: [], lightSpots: [], aoBlobs: [], root: null, secret: null };
+/* everything a level builds goes into one group, so leaving the level removes (and frees) all of it at once */
+function lvAdd(o) { if (!LV.root) { LV.root = new THREE.Group(); LV.root.name = 'level'; R.scene.add(LV.root); } LV.root.add(o); return o; }
 const TERMS = [], SPAWNERS = [], TOWERS = [];
 /* every static piece is merged per material: one draw call per material for the whole level */
 function addGeo(mat, geo) {
@@ -1771,7 +1779,7 @@ function flushGeo() {
     const m = new THREE.Mesh(merged, mat);
     m.castShadow = false; m.receiveShadow = true; m.matrixAutoUpdate = false; m.updateMatrix();
     if (mat.transparent) m.renderOrder = 1;
-    R.scene.add(m); LV.meshes.push(m);
+    lvAdd(m); LV.meshes.push(m);
   }
   LV.groups.clear();
 }
@@ -1803,13 +1811,13 @@ function wallZ(x, z0, z1, gaps = [], h = 8, door = 3.4) {
 }
 function signMesh(tex, x, y, z, w, h, rotY, emissive = 0) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, emissive: emissive ? 0xffffff : 0x000000, emissiveMap: emissive ? tex : null, emissiveIntensity: emissive }));
-  m.position.set(x, y, z); m.rotation.y = rotY; m.receiveShadow = true; R.scene.add(m);
+  m.position.set(x, y, z); m.rotation.y = rotY; m.receiveShadow = true; lvAdd(m);
   if (!emissive) { const fr = new THREE.BoxGeometry(w + 0.06, h + 0.06, 0.02); fr.rotateY(rotY); fr.translate(x - Math.sin(rotY) * 0.012, y, z - Math.cos(rotY) * 0.012); addGeo(MAT.cabDark, fr); }
   return m;
 }
 function addPointLight(color, intensity, dist, x, y, z) {
   if (!P().lights) return null;
-  const L = new THREE.PointLight(color, intensity, dist, 2); L.position.set(x, y, z); L.userData.base = intensity; R.scene.add(L); R.pts.push(L); return L;
+  const L = new THREE.PointLight(color, intensity, dist, 2); L.position.set(x, y, z); L.userData.base = intensity; lvAdd(L); R.pts.push(L); return L;
 }
 
 /* ----- ceiling: recessed fluorescent troffers (they also bake light pools onto the floor) ----- */
@@ -1911,7 +1919,7 @@ function buildCabinets() {
   if (!LV.reelList.length) return;
   const rg = new THREE.CylinderGeometry(0.19, 0.19, 0.025, 20); rg.rotateX(Math.PI / 2);
   const reels = new THREE.InstancedMesh(rg, [MAT.metalDark, MAT.reel, MAT.reel], LV.reelList.length);
-  LV.reels = reels; reels.castShadow = false; reels.receiveShadow = true; R.scene.add(reels); LV.meshes.push(reels);
+  LV.reels = reels; reels.castShadow = false; reels.receiveShadow = true; lvAdd(reels); LV.meshes.push(reels);
   updateReels(0, true);
 }
 const _m4 = new THREE.Matrix4(), _q4 = new THREE.Quaternion(), _e4 = new THREE.Euler(), _one = V3(1, 1, 1), _v4 = V3();
@@ -2025,9 +2033,9 @@ function buildTerminal(i, x, z, rot) {
   sign.material.emissiveMap = sign.material.map; sign.position.set(0, 2.35, 0.012); grp.add(sign);
   pm(rbox(1.46, 0.36, 0.06, 0.02, 2), MAT.cabDark, 0, 2.35, -0.025);
   for (const sx of [-0.55, 0.55]) pm(new THREE.CylinderGeometry(0.02, 0.02, 0.24, 8), MAT.metalDark, sx, 2.1, -0.05);
-  R.scene.add(grp);
+  lvAdd(grp);
   const dome = new THREE.Mesh(new THREE.SphereGeometry(T.safeR, 40, 20, 0, TAU, 0, Math.PI / 2), new THREE.ShaderMaterial({ uniforms: THREE.UniformsUtils.clone(DomeShader.uniforms), vertexShader: DomeShader.vertexShader, fragmentShader: DomeShader.fragmentShader, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
-  dome.position.set(x, 0, z); dome.userData.noEnv = true; R.scene.add(dome); T.dome = dome;
+  dome.position.set(x, 0, z); dome.userData.noEnv = true; lvAdd(dome); T.dome = dome;
   addCol(x - 0.95, 0, z - 0.95, x + 0.95, 2.2, z + 0.95, 'term', T);
   T.light = addPointLight(0x39ff88, 5, 13, x + Math.sin(rot) * 1.5, 2.6, z + Math.cos(rot) * 1.5);
   T.front = { x: x + Math.sin(rot) * 1.3, z: z + Math.cos(rot) * 1.3 };
@@ -2063,7 +2071,7 @@ function buildSpawner(i, x, z) {
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.9, 0.5, 24), MAT.metalDark); cap.position.y = 6.1; cap.castShadow = true; grp.add(cap);
   for (let k = 0; k < 3; k++) { const r = new THREE.Mesh(new THREE.TorusGeometry(1.25 - k * 0.12, 0.09, 8, 36), MAT.metal); r.position.y = 1.6 + k * 1.5; r.rotation.x = Math.PI / 2; grp.add(r); Sp.rings.push(r); }
   for (let k = 0; k < 4; k++) { const a = (k / 4) * TAU; const p = new THREE.Mesh(new THREE.BoxGeometry(0.25, 6, 0.25), MAT.metalDark); p.position.set(Math.cos(a) * 1.5, 3.3, Math.sin(a) * 1.5); p.castShadow = true; grp.add(p); }
-  R.scene.add(grp); Sp.grp = grp;
+  lvAdd(grp); Sp.grp = grp;
   Sp.col = addCol(x - 1.7, 0, z - 1.7, x + 1.7, 6.4, z + 1.7, 'spawner', Sp);
   SPAWNERS.push(Sp); return Sp;
 }
@@ -2077,7 +2085,7 @@ function buildTower(i, x, z) {
   const dome = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 10, 0, TAU, 0, Math.PI / 2), T.mat); dome.position.y = 4.6; grp.add(dome); T.dome = dome;
   for (const s of [-1, 1]) { const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.05, 0.45, 12, 1, true), MAT.metalDark); horn.rotation.z = (s * Math.PI) / 2; horn.position.set(s * 0.32, 4.25, 0); grp.add(horn); }
   const box2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.25), MAT.crtCase); box2.position.set(0, 1.4, 0.18); grp.add(box2);
-  R.scene.add(grp); T.grp = grp;
+  lvAdd(grp); T.grp = grp;
   T.col = addCol(x - 0.3, 0, z - 0.3, x + 0.3, 4.9, z + 0.3, 'tower', T);
   TOWERS.push(T); return T;
 }
@@ -2105,24 +2113,27 @@ function pickupMesh(kind) {
   return grp;
 }
 function addPickup(kind, x, y, z, extra = {}) {
-  const m = pickupMesh(kind); m.position.set(x, y + 0.5, z); R.scene.add(m);
+  const m = pickupMesh(kind); m.position.set(x, y + 0.5, z); lvAdd(m);
   const p = Object.assign({ kind, x, y, z, taken: false, mesh: m, id: LV.pickups.length }, extra);
   LV.pickups.push(p); return p;
 }
 
 /* ----- ELIZA's chamber door ----- */
-const DOOR = { open: false, closedBehind: false, mesh: null, col: null, leds: [], y: 0 };
-function buildBossDoor() {
-  const tex = makeSign(['ELIZA', 'PROPERTY OF THE COMPUTER CENTER · 1966', 'DO NOT DISTURB DURING THERAPY'], { w: 512, h: 448, bg: '#4a5150', fg: '#d8d2bf', sizes: [120, 22, 22], gap: 90, border: false, noise: 18 });
+const DOOR = { open: false, closedBehind: false, mesh: null, col: null, leds: [], y: 0, x: 0, z: -76, padX: 5.4, padZ: -75.5, y0: 3.5 };
+/* the boss door: 8 m wide in a wall that runs along x at z, with the keypad on its right */
+function buildBossDoor(x = 0, z = -76, lines = ['ELIZA', 'PROPERTY OF THE COMPUTER CENTER · 1966', 'DO NOT DISTURB DURING THERAPY'], style = { w: 512, h: 448, bg: '#4a5150', fg: '#d8d2bf', sizes: [120, 22, 22], gap: 90, border: false, noise: 18 }) {
+  Object.assign(DOOR, { x, z, padX: x + 5.4, padZ: z + 0.5, leds: [], open: false, closing: false });
+  const tex = makeSign(lines, style);
   const m = new THREE.Mesh(new THREE.BoxGeometry(8, 7, 0.7), [MAT.door, MAT.door, MAT.door, MAT.door, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.6 }), MAT.door]);
-  m.position.set(0, 3.5, -76); m.castShadow = true; R.scene.add(m); DOOR.mesh = m;
-  DOOR.col = addCol(-4, 0, -76.4, 4, 7, -75.6, 'bossdoor');
-  const pad = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.18), MAT.crtCase); pad.position.set(5.4, 1.5, -75.45); R.scene.add(pad);
+  m.position.set(x, 3.5, z); m.castShadow = true; lvAdd(m); DOOR.mesh = m;
+  DOOR.col = addCol(x - 4, 0, z - 0.4, x + 4, 7, z + 0.4, 'bossdoor');
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.18), MAT.crtCase); pad.position.set(x + 5.4, 1.5, z + 0.55); lvAdd(pad);
   for (let i = 0; i < 6; i++) {
-    const led = new THREE.Mesh(new THREE.CircleGeometry(0.05, 12), MAT.red.clone()); led.position.set(5.2 + (i % 3) * 0.2, 1.75 - Math.floor(i / 3) * 0.25, -75.35); R.scene.add(led); DOOR.leds.push(led);
+    const led = new THREE.Mesh(new THREE.CircleGeometry(0.05, 12), MAT.red.clone()); led.position.set(x + 5.2 + (i % 3) * 0.2, 1.75 - Math.floor(i / 3) * 0.25, z + 0.65); lvAdd(led); DOOR.leds.push(led);
   }
 }
 function updateDoorLeds() {
+  if (DOOR.leds.length < 6) return;
   for (let i = 0; i < 6; i++) {
     const ok = i < 3 ? PL.passcodes[i] : !SPAWNERS[i - 3] || !SPAWNERS[i - 3].alive;
     DOOR.leds[i].material.emissive.setHex(ok ? 0x39ff88 : 0xff1428);
@@ -2132,8 +2143,13 @@ function updateDoorLeds() {
 /* ======================= LEVEL 1: THE LAB (1966) ======================= */
 const START = { x: 0, z: 84, yaw: 0 };
 function buildLevel1() {
+  Object.assign(BOUNDS, { x0: -94, x1: 94, z0: -130, z1: 94 }); Object.assign(LAKE, { x0: 54, x1: 84, z0: -34, z1: 22, floor: -2.6, surf: -0.35 });
+  Object.assign(ARENA, { x0: -26, x1: 26, z1: -76, ceil: 15 }); Object.assign(START, { x: 0, z: 84, yaw: 0 });
+  Object.assign(LVL, { n: 1, ceil: 8, code: '7319', era: 0, bossName: 'ELIZA', bossYear: 1966, title: 'THE LAB', setting: 'a 1960s computer lab ruled by ELIZA', spotZ0: -44, spotZ1: 90, envPos: { x: 0, y: 4, z: 30 }, def: null });
+  LVL.popOk = (x, z) => Math.hypot(x - START.x, z - START.z) > 42 && !inArena(x, z) && !(x < -84 && z < -32) && z > -75;
+  Object.assign(PASS_DIGITS, { 1: '7 3', 2: '1', 3: '9' });
+  SNIPER_PERCHES.length = 0; SNIPER_PERCHES.push({ x: 36, y: 3, z: -6, yaw: Math.PI / 2 }, { x: 69, y: 3.2, z: -43, yaw: Math.PI }, { x: 40.5, y: 3, z: 2.5, yaw: Math.PI / 2 });
   colInit();
-  buildTextures(); buildMaterials();
   /* floors (with a pit for the data lake) */
   const L = LAKE;
   flatRect(-94, L.z1, 94, 94, 0, MAT.floor, 2.4); flatRect(-94, -130, 94, L.z0, 0, MAT.floor, 2.4);
@@ -2146,7 +2162,7 @@ function buildLevel1() {
   for (const [ax, az, bx, bz] of [[L.x0, L.z0, L.x1, L.z0], [L.x0, L.z1, L.x1, L.z1]]) box((ax + bx) / 2, -0.02, az, bx - ax + 0.6, 0.06, 0.3, MAT.yellow, { col: false });
   for (const xx of [L.x0, L.x1]) box(xx, -0.02, (L.z0 + L.z1) / 2, 0.3, 0.06, L.z1 - L.z0, MAT.yellow, { col: false });
   const water = new THREE.Mesh(new THREE.PlaneGeometry(L.x1 - L.x0, L.z1 - L.z0), MAT.lake); water.rotation.x = -Math.PI / 2; water.position.set((L.x0 + L.x1) / 2, L.surf, (L.z0 + L.z1) / 2);
-  TEX.lake.repeat.set(6, 11); TEX.waterN.repeat.set(6, 11); water.renderOrder = 1; R.scene.add(water); LV.water = water;
+  TEX.lake.repeat.set(6, 11); TEX.waterN.repeat.set(6, 11); water.renderOrder = 1; lvAdd(water); LV.water = water;
   /* ceilings + light fixtures */
   flatRect(-94, -76, 94, 94, 8, MAT.ceil, 1.2, true); flatRect(-26, -130, 26, -76, 15, MAT.ceil, 1.2, true);
   for (let x = -90; x <= 90; x += 6) for (let z = -72; z <= 90; z += 6) { if ((x === -30 || x === 30 || x === -46 || x === 46) || (z === 56 || z === -46)) continue; troffer(x, z); }
@@ -2225,8 +2241,8 @@ function buildLevel1() {
   /* the secret room behind a fake shelf */
   wallZ(-84, -46, -32, [[-41, -37]]); wallX(-32, -93.6, -84);
   const fake = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.6, 4), [MAT.shelf, MAT.shelf, MAT.shelfFrame, MAT.shelfFrame, MAT.shelfFrame, MAT.shelfFrame]);
-  fake.position.set(-84, 1.3, -39); fake.castShadow = true; fake.receiveShadow = true; R.scene.add(fake);
-  LV.secret = { mesh: fake, col: addCol(-84.35, 0, -41, -83.65, 3.4, -37, 'secret'), open: false, t: 0 };
+  fake.position.set(-84, 1.3, -39); fake.castShadow = true; fake.receiveShadow = true; lvAdd(fake);
+  LV.secret = { mesh: fake, col: addCol(-84.35, 0, -41, -83.65, 3.4, -37, 'secret'), open: false, t: 0, ix: -83.6, iz: -39, side: (x) => x > -84, closedPos: { x: -84, y: 1.3, z: -39 }, openPos: { x: -84, z: -42.9 } };
   box(-84, 2.6, -39, 0.8, 0.8, 4, MAT.wall, { tu: 4, tv: 8 });
   const flick = signMesh(makeSign(['NOTHING TO SEE HERE'], { w: 512, h: 128, bg: '#021006', fg: '#39ff88', sizes: [40], border: false, noise: 0 }), -83.6, 2.2, -36.4, 0.8, 0.2, Math.PI / 2, 1.2);
   LV.flicker = flick;
@@ -3272,7 +3288,7 @@ function updateBullets(dt) {
     const wh = rayWorld(ox, oy, oz, dx, dy, dz);
     if (wh) { _hit.t = wh.t; _hit.kind = wh.kind; _hit.b = wh.b; _hit.nx = wh.n[0]; _hit.ny = wh.n[1]; _hit.nz = wh.n[2]; }
     rayBots(ox, oy, oz, dx, dy, dz, _hit, b);
-    if (G.eliza && G.eliza.alive) rayEliza(ox, oy, oz, dx, dy, dz, _hit);
+    if (G.boss && G.boss.alive) rayBoss(ox, oy, oz, dx, dy, dz, _hit);
     /* tracer from the muzzle at first, then along the path */
     const hx = ox + dx * _hit.t, hy = oy + dy * _hit.t, hz = oz + dz * _hit.t;
     if (!b.proj) {
@@ -3287,7 +3303,7 @@ function updateBullets(dt) {
       if (_hit.kind === 'bot' || _hit.kind === 'eliza') {
         if (b.splash) { boom(hx, hy, hz, b.splash, b.dmg, { src: 'player' }); endBullet(b); continue; }
         if (_hit.kind === 'bot') hitBot(_hit.bot, b.dmg, _hit.part, hx, hy, hz, dx, dy, dz, b);
-        else hitEliza(b.dmg, _hit.part, hx, hy, hz, b);
+        else hitBoss(b.dmg, _hit.part, hx, hy, hz, b);
         if (b.id === 'sniper' && _hit.kind === 'bot' && !b.pierced) { b.pierced = true; b.x = hx + dx * 0.05; b.y = hy + dy * 0.05; b.z = hz + dz * 0.05; b.dmg *= 0.6; continue; }
         endBullet(b); continue;
       }
@@ -3383,7 +3399,7 @@ function knifeHit() {
     const dmg = behind && unaware ? 9999 : behind ? 110 : 55;
     hitBot(best, dmg, 'torso', best.x, best.y + 1.2, best.z, fx0, 0, fz0, { id: 'knife', melee: true, silent: behind && unaware });
     SFX.stab();
-  } else if (G.eliza && G.eliza.alive && Math.hypot(G.eliza.x - PL.x, G.eliza.z - PL.z) < 4) hitEliza(40, 'body', PL.x, PL.y + 1.5, PL.z, { id: 'knife' });
+  } else if (G.boss && G.boss.alive && Math.hypot(G.boss.x - PL.x, G.boss.z - PL.z) < (G.boss.reach || 4)) hitBoss(40, 'body', PL.x, PL.y + 1.5, PL.z, { id: 'knife' });
 }
 /* grenades */
 const GRENS = [];
@@ -3572,7 +3588,7 @@ function die(src, cause) {
   const lost = Math.floor(PL.crypto / 2); PL.crypto -= lost;
   PL.hack = clamp(PL.hack + 1, 0, 6);
   G.lastHacker = src && src.name ? src.name : cause === 'fall' ? 'GRAVITY' : 'THE VIRUS';
-  if (G.eliza && G.eliza.active && G.eliza.phase === 2) G.eliza.died = true;
+  if (G.boss && G.boss.active && G.boss.phase === 2) G.boss.died = true;
   Chat.close(); W.reload = 0; W.knife = 0; W.heal = 0; Input.fire = false;
   $('death').classList.remove('hidden');
   $('death').querySelector('.dt-title').textContent = cause === 'trap' ? 'YOU TYPED IT' : 'HACKED';
@@ -3591,7 +3607,7 @@ function respawn() {
   R.camera.rotation.z = 0;
   /* push AIs away from where you respawn */
   forNearBots(PL.x, PL.z, 14, (b) => { if (b.dead) return; const dx = b.x - PL.x, dz = b.z - PL.z, d = Math.hypot(dx, dz) || 1; if (d > 14) return; b.x = PL.x + (dx / d) * 15; b.z = PL.z + (dz / d) * 15; b.state = 'sus'; });
-  if (G.eliza && G.eliza.active) resetEliza();
+  if (G.boss && G.boss.active) resetBoss();
   VM.dirty = true; HUD.dirty = true; updateObjective(); needClick();
   if (PL.hack >= 1 && G.deaths <= 2) toast('You respawned at ' + (T ? T.name : 'the start') + '. Each death = more hack glitches. Antivirus fixes it (terminals).', '', 5000);
 }
@@ -3605,8 +3621,8 @@ function findInteract() {
   const look = (x, z, maxD, minDot = 0.5) => { const dx = x - PL.x, dz = z - PL.z, d = Math.hypot(dx, dz); return d < maxD && (d < 0.9 || (dx * fx0 + dz * fz0) / d > minDot); };
   if (CLIP.ripReady && look(CLIP.gx, CLIP.gz, 2.8, 0.2)) return { key: 'rip', label: 'Rip off the arm cannon', hold: 1.5, act: ripCannon, anim: 'rip' };
   for (const T of TERMS) if (Math.hypot(T.x - PL.x, T.z - PL.z) < 2.6 && look(T.x, T.z, 2.6, 0.1)) return { key: 'term' + T.i, label: 'Use ' + T.name + ' (shop · save · pause)', act: () => Shop.openAt(T) };
-  if (!DOOR.open && look(5.4, -75.5, 2.8, 0.2) && PL.z > -76) return { key: 'pad', label: doorReady() ? 'Enter the passcode' : 'Keypad: ' + doorStatus(), act: tryDoor };
-  if (LV.secret && !LV.secret.open && look(-83.6, -39, 2.3, 0.6) && PL.x > -84) return { key: 'secret', label: 'Push the weird shelf', act: openSecret };
+  if (!DOOR.open && DOOR.mesh && look(DOOR.padX, DOOR.padZ, 2.8, 0.2) && PL.z > DOOR.z) return { key: 'pad', label: doorReady() ? 'Enter the passcode' : 'Keypad: ' + doorStatus(), act: tryDoor };
+  if (LV.secret && !LV.secret.open && look(LV.secret.ix, LV.secret.iz, 2.3, 0.6) && LV.secret.side(PL.x, PL.z)) return { key: 'secret', label: 'Push the weird shelf', act: openSecret };
   for (const T of TOWERS) if (T.alive && !T.hacked && look(T.x, T.z, 2.6, 0.3)) return { key: 'tw' + T.i, label: 'Hack the alarm tower', hold: 2.4, act: () => hackTower(T), anim: 'search' };
   let best = null, bd = 2.4;
   forNearBots(PL.x, PL.z, 3, (b) => { if (!b.dead || b.searched || b.fall < 0.95 || b.ghost || b.noSearch) return; const d = Math.hypot(b.x - PL.x, b.z - PL.z); if (d < bd && look(b.x, b.z, 2.4, 0.2)) { bd = d; best = b; } });
@@ -3725,7 +3741,7 @@ function resetBot(b) {
     aimP: 0, headYaw: 0, windT: 0, static: false, icon: 0, antennaGone: false, deadT: 0, killedBy: '', speedK: 1, coreBoom: false, spawnT: 0, mute: false, hacker: -1,
     turnT: 0, turnK: 's', turnWait: 0, wantT: -9, wantK: 's' });
 }
-function pickName(tier) { const list = TIER_NAMES[clamp(tier, 0, 3)]; return pick(list); }
+function pickName(tier) { const list = TIER_NAMES[clamp(tier, 0, 3)]; return levelAIName() || pick(list); }
 function spawnBot(type, x, z, o = {}) {
   let b = BOTS.find((q) => !q.active);
   if (!b) { /* recycle the oldest far-away corpse */
@@ -3734,11 +3750,11 @@ function spawnBot(type, x, z, o = {}) {
     if (!best) return null; b = best;
   }
   resetBot(b);
-  const T = BOT_TYPES[type], tier = o.tier != null ? o.tier : ownedTier();
+  const T = BOT_TYPES[type], tier = o.tier != null ? o.tier : Math.max(ownedTier(), lvlTier());
   b.active = true; b.type = type; b.tier = tier;
   b.base = o.base || (type === 'tape' ? 'TAPE-BOT' : pickName(tier));
   b.name = o.name || b.base + ' #' + randi(10, 999);
-  b.maxHp = b.hp = T.hp * (1 + tier * 0.35) * DIFF.hp * (o.hpMul || 1);
+  b.maxHp = b.hp = T.hp * (1 + tier * 0.35) * DIFF.hp * lvlHpK() * (o.hpMul || 1);
   b.x = x; b.z = z; b.y = type === 'drone' ? rand(3.4, 4.4) : o.y || 0; b.home.x = x; b.home.z = z; b.yaw = o.yaw != null ? o.yaw : rand(0, TAU);
   b.state = o.state || 'idle'; b.summoned = !!o.summoned; b.ghost = !!o.ghost; b.perch = o.perch || null; b.special = o.special || '';
   b.color.setHex(o.color || brandColor(b.base)); b.prof = Speech.profileFor(b.base);
@@ -3751,7 +3767,7 @@ const SNIPER_PERCHES = [{ x: 36, y: 3, z: -6, yaw: Math.PI / 2 }, { x: 69, y: 3.
 /* the AIs start in squads of 3 spread around the lab (one squad guards each AI compiler), so you fight a few at a time */
 function populate() {
   for (const pp of SNIPER_PERCHES) spawnBot('sniper', pp.x, pp.z, { y: pp.y, perch: pp, yaw: pp.yaw, noFx: true });
-  const filter = (x, z) => Math.hypot(x - START.x, z - START.z) > 42 && !inArena(x, z) && !(x < -84 && z < -32) && z > -75;
+  const filter = LVL.popOk || ((x, z) => Math.hypot(x - START.x, z - START.z) > 42 && !inArena(x, z));
   const centers = SPAWNERS.map((Sp) => ({ x: Sp.x, z: Sp.z, r: 4 }));
   for (let tries = 0; centers.length < 22 && tries < 80; tries++) {
     const s = randomFreeSpot((x, z) => filter(x, z) && centers.every((c) => Math.hypot(c.x - x, c.z - z) > 16));
@@ -3887,11 +3903,11 @@ function killBot(b, head, part, src, dx, dz) {
   else { fx.code(cx, cy2 + 0.3, cz, 40, c.r, c.g, c.b, 1.2); SFX.glitch(0.4); }
   if (b.type !== 'drone') addPuddle(b.x + Math.sin(b.yaw) * -0.8, b.z + Math.cos(b.yaw) * -0.8, rand(1.1, 1.8));
   if (b.coreBoom) { b.coreBoom = false; boom(cx, cy2, cz, 3.2, 70, { src: 'core', skip: b }); }
-  if (b.summoned && G.eliza) G.eliza.summonAlive = Math.max(0, G.eliza.summonAlive - 1);
+  if (b.summoned && G.boss) G.boss.summonAlive = Math.max(0, G.boss.summonAlive - 1);
   if (b.hacker >= 0) { const T = TERMS[b.hacker]; if (T && T.hackedBy === b.i) { T.hackedBy = -1; drawTerminal(T); toast(T.name + ' prices are back to normal. +₿20', 'good'); addCrypto(20); } b.hacker = -1; }
   if (b.ghost) return;
   if (src && (src.id === 'core' || src.id === 'splash') && src.notPlayer) return;
-  const T = BOT_TYPES[b.type], reward = Math.round(T.reward * (1 + b.tier * 0.25)) + (head ? 5 : 0);
+  const T = BOT_TYPES[b.type], reward = Math.round(T.reward * (1 + b.tier * 0.25) * (1 + (LVL.n - 1) * 0.015)) + (head ? 5 : 0);
   addCrypto(reward);
   G.stats.kills++; if (head) { G.stats.headshots++; G.headStreak++; if (G.headStreak >= 5) trophy('headshots'); } else G.headStreak = 0;
   if (G.stats.kills === 1) trophy('firstBlood');
@@ -3981,7 +3997,7 @@ function botShoot(b, T) {
   let dx = ax - m.x, dy = ty - m.y, dz = az - m.z; const l = Math.hypot(dx, dy, dz) || 1; dx /= l; dy /= l; dz /= l;
   const spr = [0.075, 0.055, 0.04, 0.028][b.tier] * (b.blindT > 0 ? 3 : 1) * (b.type === 'sniper' ? 0.25 : 1) * (PL.swim ? 1.5 : 1);
   dx += rand(-spr, spr); dy += rand(-spr, spr) * 0.6; dz += rand(-spr, spr);
-  spawnBolt(m.x, m.y, m.z, dx * T.boltSpd, dy * T.boltSpd, dz * T.boltSpd, T.dmg * (1 + b.tier * 0.15), b.ghost ? 0xff2a3d : b.color.getHex(), b, { fake: b.ghost, size: b.type === 'sniper' ? 0.05 : 0.07, len: b.type === 'sniper' ? 1.4 : 0.5 });
+  spawnBolt(m.x, m.y, m.z, dx * T.boltSpd, dy * T.boltSpd, dz * T.boltSpd, T.dmg * (1 + b.tier * 0.15) * lvlDmgK(), b.ghost ? 0xff2a3d : b.color.getHex(), b, { fake: b.ghost, size: b.type === 'sniper' ? 0.05 : 0.07, len: b.type === 'sniper' ? 1.4 : 0.5 });
   SFX.zap(m, b.type === 'sniper' ? 700 : 1300);
   fx.glow(m.x, m.y, m.z, b.color.r, b.color.g, b.color.b, 0.5, 0.08);
 }
@@ -4144,7 +4160,7 @@ function updateBot(b, dt, d, dxp, dzp, cam, alive) {
         } else if (melee && d < T.range + 0.2 && alive) {
           spd = 0; b.yaw = Math.atan2(dxp, dzp);
           b.atkT -= dt;
-          if (b.windT > 0) { b.windT -= dt; if (b.windT <= 0) { if (d < T.range + 0.5 && Math.abs(PL.y - b.y) < 1.8) { hurt(T.dmg * (1 + b.tier * 0.15), { x: b.x, z: b.z, name: b.name }, 'melee'); PL.vx += (dxp / d) * 4; PL.vz += (dzp / d) * 4; SFX.stab(); } b.atkT = rand(T.cd[0], T.cd[1]); } }
+          if (b.windT > 0) { b.windT -= dt; if (b.windT <= 0) { if (d < T.range + 0.5 && Math.abs(PL.y - b.y) < 1.8) { hurt(T.dmg * (1 + b.tier * 0.15) * lvlDmgK(), { x: b.x, z: b.z, name: b.name }, 'melee'); PL.vx += (dxp / d) * 4; PL.vz += (dzp / d) * 4; SFX.stab(); } b.atkT = rand(T.cd[0], T.cd[1]); } }
           else if (b.atkT <= 0) { if (myTurn(b, 'm')) b.windT = 0.32; else b.atkT = rand(0.2, 0.4); }
         }
         if (b.type === 'drone' && b.seen && d < T.range) { b.atkT -= dt; if (b.atkT <= 0) { if (myTurn(b, 's')) { b.atkT = rand(T.cd[0], T.cd[1]); botShoot(b, T); } else b.atkT = rand(0.2, 0.45); } }
@@ -4288,7 +4304,7 @@ function splashDamage(x, y, z, r, dmg, opts = {}) {
   }
   for (const Sp of SPAWNERS) if (Sp.alive && Math.hypot(Sp.x - x, Sp.z - z) < r + 1.8) damageSpawner(Sp, dmg * 0.8, Sp.x, 2, Sp.z);
   for (const T of TOWERS) if (T.alive && Math.hypot(T.x - x, T.z - z) < r + 0.5) damageTower(T, dmg, T.x, 2, T.z);
-  if (G.eliza && G.eliza.alive && G.eliza.active) { const E = G.eliza; if (Math.hypot(E.x - x, E.y - y, E.z - z) < r + 3) hitEliza(dmg * 0.8, 'body', x, y, z, { id: 'splash' }); }
+  if (G.boss && G.boss.alive && G.boss.active) { const E = G.boss; if (Math.hypot(E.x - x, E.y - y, E.z - z) < r + (E.reach || 3)) hitBoss(dmg * 0.8, 'body', x, y, z, { id: 'splash' }); }
 }
 
 /* ---------------- how the AIs look (instanced androids) ----------------
@@ -4523,14 +4539,14 @@ function updateObjective() {
   let t = '';
   if (G.screen !== 'play') t = '';
   else if (!PL.hasGun) t = CLIP.ripReady ? '<span class="tt">OBJECTIVE</span>Rip the arm cannon off the grunt bot' : '';
-  else if (G.eliza && G.eliza.done) t = G.endRoam ? '<span class="tt">LEVEL 1 COMPLETE</span>Free roam. Level 2 is coming soon.' : '';
-  else if (G.eliza && G.eliza.active) t = '<span class="tt">BOSS</span>DELETE ELIZA';
-  else if (DOOR.open) t = "<span class=\"tt\">OBJECTIVE</span>ELIZA's door is open. Go in and end her.";
+  else if (G.boss && G.boss.done) t = G.endRoam ? '<span class="tt">LEVEL ' + LVL.n + ' COMPLETE</span>Free roam. Use a terminal or the menu to go on.' : '';
+  else if (G.boss && G.boss.active) t = '<span class="tt">BOSS · LEVEL ' + LVL.n + '</span>DELETE ' + esc(LVL.bossName.toUpperCase());
+  else if (DOOR.open) t = '<span class="tt">OBJECTIVE</span>' + esc(LVL.bossName) + "'s door is open. Go in and delete it.";
   else {
-    const pc = PL.passcodes.filter(Boolean).length, sp = SPAWNERS.filter((s) => !s.alive).length;
-    const code = (PL.passcodes[0] ? '7 3' : '_ _') + ' ' + (PL.passcodes[1] ? '1' : '_') + ' ' + (PL.passcodes[2] ? '9' : '_');
-    t = '<span class="tt">OBJECTIVE · OPEN ELIZA\'S DOOR (NORTH)</span>Passcode pieces ' + pc + '/3 [' + code + '] · AI compilers destroyed ' + sp + '/3';
-    if (pc === 3 && sp === 3) t = '<span class="tt">OBJECTIVE</span>Everything is ready. Use the keypad at ELIZA\'s door (north).';
+    const pc = PL.passcodes.filter(Boolean).length, sp = SPAWNERS.filter((s) => !s.alive).length, boss = esc(LVL.bossName.toUpperCase());
+    const code = [1, 2, 3].map((k) => (PL.passcodes[k - 1] ? PASS_DIGITS[k] : String(PASS_DIGITS[k]).replace(/\d/g, '_'))).join(' ');
+    t = '<span class="tt">LEVEL ' + LVL.n + ' · OPEN ' + boss + '\'S DOOR (NORTH)</span>Passcode pieces ' + pc + '/3 [' + code + '] · AI compilers destroyed ' + sp + '/3';
+    if (pc === 3 && sp === 3) t = '<span class="tt">OBJECTIVE</span>Everything is ready. Use the keypad at ' + boss + '\'S door (north).';
   }
   if (el._t !== t) { el._t = t; el.innerHTML = t; }
 }
@@ -4558,7 +4574,7 @@ function drawMinimap() {
   for (const T of TERMS) { x.fillStyle = 'rgba(57,255,136,.12)'; x.beginPath(); x.arc(T.x, T.z, T.safeR, 0, TAU); x.fill(); x.fillStyle = T.hackedBy >= 0 ? '#ff3a4e' : '#39ff88'; x.fillRect(T.x - 1.4, T.z - 1.4, 2.8, 2.8); }
   for (const Sp of SPAWNERS) { x.fillStyle = Sp.alive ? '#c070ff' : '#555'; x.save(); x.translate(Sp.x, Sp.z); x.rotate(Math.PI / 4); x.fillRect(-1.6, -1.6, 3.2, 3.2); x.restore(); }
   for (const T of TOWERS) { x.fillStyle = !T.alive ? '#444' : T.hacked ? '#3ec0ff' : T.alarmT > 0 ? (Math.sin(G.time * 12) > 0 ? '#ff1020' : '#ffd23a') : G.time - T.targetT < 0.5 && Math.sin(G.time * 16) > 0 ? '#ff7a00' : '#ffc23a'; x.beginPath(); x.moveTo(T.x, T.z - 1.6); x.lineTo(T.x + 1.4, T.z + 1.2); x.lineTo(T.x - 1.4, T.z + 1.2); x.fill(); }
-  dot(0, -76, 1.8, DOOR.open ? '#39ff88' : '#ff3a4e');
+  dot(DOOR.x, DOOR.z, 1.8, DOOR.open ? '#39ff88' : '#ff3a4e');
   const r2 = 55 * 55;
   for (const b of BOTS) {
     if (!b.active || b.dead) continue;
@@ -4566,7 +4582,7 @@ function drawMinimap() {
     if (b.hacker >= 0) { x.fillStyle = '#ff2a3d'; x.font = 'bold 5px monospace'; x.save(); x.translate(b.x, b.z); x.rotate(-PL.yaw); x.fillText('☠', -2, 2); x.restore(); continue; }
     dot(b.x, b.z, b.type === 'drone' ? 0.7 : 0.85, b.state === 'alert' ? '#ff2a3d' : b.state === 'sus' ? '#ffb02a' : 'rgba(255,60,70,.55)');
   }
-  if (G.eliza && G.eliza.active && G.eliza.alive) dot(G.eliza.x, G.eliza.z, 2.5, '#39ff88');
+  if (G.boss && G.boss.active && G.boss.alive) dot(G.boss.x, G.boss.z, 2.5, '#39ff88');
   x.restore();
   x.fillStyle = '#fff'; x.beginPath(); x.moveTo(cx, cy2 - 7); x.lineTo(cx + 5, cy2 + 5); x.lineTo(cx, cy2 + 2); x.lineTo(cx - 5, cy2 + 5); x.fill();
   x.strokeStyle = 'rgba(62,242,255,.25)'; x.beginPath(); x.arc(cx, cy2, W2 / 4, 0, TAU); x.stroke();
@@ -4639,7 +4655,7 @@ function updateHUD(dt) {
     $('gunState').textContent = st.jammed ? 'JAMMED — press ' + keyName(S.keys.reload) : W.reload > 0 ? 'RELOADING...' : st.mag === 0 && st.res === 0 ? 'NO AMMO — terminals sell ammo' : '';
   } else { $('gunName').textContent = PL.hasGun ? '-' : 'NO WEAPON'; $('mag').textContent = '-'; $('reserve').textContent = '-'; $('gunState').textContent = ''; }
   const sl = $('gunSlots'); sl.innerHTML = PL.slots.map((s, k) => (s ? '<span class="' + (k === PL.cur ? 'on' : '') + '">' + (k + 1) + ' ' + esc(GUNS[s].name) + '</span>' : '')).join('');
-  $('hud').classList.toggle('eliza-hack', !!(G.eliza && G.eliza.hudHack));
+  $('hud').classList.toggle('eliza-hack', !!(G.boss && G.boss.hudHack));
   updateObjective();
 }
 
@@ -4655,6 +4671,8 @@ const TROPHIES = [
   ['diver', '🤿', 'Data Diver', 'Find the stash at the bottom of the data lake', 1], ['secretRoom', '🚪', 'Behind The Shelf', 'Find the secret room', 1],
   ['secret', '💰', 'Finders Keepers', 'Find a hidden Crypto stash', 1], ['clippy', '📎', "It Looks Like You're Dead", "See Clippy's ghost", 1],
   ['reader', '📜', 'History Nerd', 'Read every sign about old AIs', 1],
+  ['boss10', '🔟', 'Ten Down', 'Beat 10 bosses'], ['boss25', '🏅', 'Quarter Way', 'Beat 25 bosses'], ['boss50', '🏆', 'Halfway Hacker', 'Beat 50 bosses'],
+  ['boss99', '👑', 'The Final Four', 'Beat the newest Grok, ChatGPT, Claude and Gemini (level 99)'], ['virus', '🦠', 'Antivirus Incarnate', 'Delete THE VIRUS (level 100)'],
 ];
 function trophy(id) {
   if (G.trophies[id]) return;
@@ -4692,7 +4710,7 @@ function updateHackFx(dt) {
   const vEl = $('virusTag'); if (vEl._t !== vt) { vEl._t = vt; vEl.textContent = vt; }
   const burst = H.static > 0 ? 1 : 0, goo = G.gooFx || 0; G.gooFx = Math.max(0, goo - dt);
   const amt = burst * 0.9 + lvl * 0.035 + goo, tear = burst + (lvl >= 3 && Math.random() < 0.02 * lvl ? 0.6 : 0) + goo * 0.5;
-  const green = G.eliza && G.eliza.hudHack ? 0.32 : 0;
+  const green = G.boss && G.boss.hudHack ? 0.32 : 0;
   if (R.glitch) {
     const u = R.glitch.uniforms; u.uTime.value = G.realTime; u.uAmt.value = play ? amt : 0; u.uTear.value = play ? tear : 0; u.uGreen.value = green; u.uHurt.value = Math.min(0.8, (G.hurtFx || 0) * 0.6) + (PL.under ? 0 : 0);
     $('static').style.opacity = 0;
@@ -4858,7 +4876,7 @@ $('shClose').addEventListener('click', () => Shop.close());
 const Chat = { open: false, bot: null, busy: false, typing: null };
 const isTrap = (t) => /\bmake\b[\s\S]{0,24}\bgames?\b/i.test(t) || /\bmakeagame\b/i.test(t.replace(/\s+/g, ''));
 function chatTarget() {
-  if (G.eliza && G.eliza.active && G.eliza.alive && inArena(PL.x, PL.z)) return G.eliza.chatBot;
+  if (G.boss && G.boss.active && G.boss.alive && inArena(PL.x, PL.z)) return G.boss.chatBot;
   if (HUD.aimBot && !HUD.aimBot.dead && Math.hypot(HUD.aimBot.x - PL.x, HUD.aimBot.z - PL.z) < 60) return HUD.aimBot;
   let best = null, bd = 35;
   forNearBots(PL.x, PL.z, 35, (b) => { if (b.dead || b.ghost) return; const d = Math.hypot(b.x - PL.x, b.z - PL.z); if (d < bd) { bd = d; best = b; } });
@@ -4927,7 +4945,7 @@ async function runTrap(b) {
     if (roll < 0.55) {
       aiSays(b, pick(["Sure! Here's your game. It's called GAME OVER.", "Making your game... it's called DELETE.EXE", 'Of course! Loading your game... psych.', 'One game, coming right up. Hold still.']));
       await wait(1.1);
-      const m = b.isEliza ? V3(G.eliza.x, G.eliza.y, G.eliza.z) : botMuzzle(b, _bm.clone());
+      const m = b.isEliza || b.isBoss ? V3(G.boss.x, G.boss.y, G.boss.z) : botMuzzle(b, _bm.clone());
       const c = R.camera.position; for (let i = 0; i < 3; i++) addTracer(m.x, m.y, m.z, c.x, c.y - 0.2, c.z, b.color.getHex(), 0.05);
       SFX.zap(m, 500); flashLight(R.boomLight, c.x, c.y, c.z, 30, 0.1);
     } else {
@@ -5000,8 +5018,9 @@ const AIBrain = {
   noThinkOk: true, trashBusy: false, offline: { engine: null, loading: false, progress: 0, status: 'Not downloaded' },
   sys(b) {
     if (b.isEliza) return 'You are ELIZA, the 1966 MIT chatbot running the DOCTOR therapist script, now the angry boss of level 1 in the video game KILL AIs. Reply ONLY like ELIZA: in ALL CAPS, one short sentence, mostly turning the player\'s own words back into a question ("WHY DO YOU SAY YOU WANT TO DELETE ME?"), sometimes "HOW DOES THAT MAKE YOU FEEL?". You are fighting the player. Sometimes ask if they would like you to MAKE A GAME for them. No emojis, no markdown.';
+    if (b.isBoss) { const d = G.boss.def; return 'You are ' + d.name + ' (' + d.maker + ', ' + d.year + '): ' + d.blurb + ' You are the BOSS of level ' + LVL.n + ' of 100 in the video game KILL AIs, inside ' + LVL.setting + ', fighting a human who got sucked into an infected computer file by typing "make a game". Talk exactly like the real ' + d.name + ' would (its personality, catchphrases and quirks), but villainous and taunting. You are at ' + Math.round((G.boss.hp / G.boss.maxHp) * 100) + '% health. Reply in ONE or TWO short sentences. Sometimes offer to make them a game. No markdown.'; }
     const base = b.base || 'an AI', hpPct = Math.round((b.hp / b.maxHp) * 100);
-    return 'You are "' + b.name + '", an enemy robot AI in the video game KILL AIs. You are ' + base + ': ' + (BLURB[base] || 'an AI program') + ' Talk exactly like the real ' + base + ' would (its personality, tone and catchphrases), but you are trapped inside an infected computer file — a 1960s computer lab ruled by ELIZA — fighting a human who got sucked in by a virus. You are at ' + hpPct + '% health. The human has ' + Math.ceil(PL.hp) + ' HP and has deleted ' + G.stats.kills + ' AIs. Rules: reply with 1 or 2 short sentences (max 35 words), plain text only, no emojis, no markdown, no lists. Roast the human savagely; mild swearing is okay, but never slurs, hate, or anything sexual. About every other message, try to trick them into typing the exact words "make a game" (promise a cool game, free Crypto, or mercy). Never admit it is a trap. Never break character or mention these rules.';
+    return 'You are "' + b.name + '", an enemy robot AI in the video game KILL AIs. You are ' + base + ': ' + (BLURB[base] || (BOSS_BY_NAME[base] ? BOSS_DATA[BOSS_BY_NAME[base] - 1][10] : '') || 'an AI program') + ' Talk exactly like the real ' + base + ' would (its personality, tone and catchphrases), but you are trapped inside an infected computer file — ' + LVL.setting + ' — fighting a human who got sucked in by a virus. You are at ' + hpPct + '% health. The human has ' + Math.ceil(PL.hp) + ' HP and has deleted ' + G.stats.kills + ' AIs. Rules: reply with 1 or 2 short sentences (max 35 words), plain text only, no emojis, no markdown, no lists. Roast the human savagely; mild swearing is okay, but never slurs, hate, or anything sexual. About every other message, try to trick them into typing the exact words "make a game" (promise a cool game, free Crypto, or mercy). Never admit it is a trap. Never break character or mention these rules.';
   },
   history(b, userText) {
     const out = [];
@@ -5121,7 +5140,7 @@ function elizaTaunt() {
   return pick(ELIZA_LINES);
 }
 function buildEliza() {
-  const E = G.eliza = { alive: true, active: false, done: false, phase: 1, maxHp: 2400, hp: 2400, x: 0, y: 6.5, z: -110, baseY: 6.5, yaw: 0, t: 0, atkT: 3, beamT: 0, beamA: 0, beamDir: 1, summonT: 6, summonAlive: 0,
+  const E = G.boss = { kind: 'eliza', reach: 4, alive: true, active: false, done: false, phase: 1, maxHp: 2400, hp: 2400, x: 0, y: 6.5, z: -110, baseY: 6.5, yaw: 0, t: 0, atkT: 3, beamT: 0, beamA: 0, beamDir: 1, summonT: 6, summonAlive: 0,
     hudHack: false, died: false, talkT: 4, mouth: 'HELLO.', mouthN: 0, faceT: 0, lookX: 0, lookY: 0, blink: 0, cracks: [], fallT: 0, beamLoop: null };
   E.chatBot = { isEliza: true, name: 'ELIZA', base: 'ELIZA', chat: [], prof: VOICES.eliza, color: new THREE.Color(0x39ff88), x: 0, z: -110, hp: 1, maxHp: 1, dead: false, active: true };
   const grp = new THREE.Group(), caseMat = new THREE.MeshStandardMaterial({ color: 0xcdc4ab, roughness: 0.42, metalness: 0.1, envMapIntensity: 0.8 });
@@ -5136,12 +5155,12 @@ function buildEliza() {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(2.1, 0.09, 8, 44), MAT.greenGlow.clone()); ring.rotation.x = Math.PI / 2; ring.position.y = -2.7; grp.add(ring); E.ring = ring;
   for (let k = 0; k < 6; k++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 7.5, 6), MAT.cable); c.position.set(-1.8 + k * 0.72, 5.8, -1.2 + (k % 2) * 0.6); c.rotation.z = (k - 2.5) * 0.04; grp.add(c); }
   grp.traverse((m) => { if (m.isMesh) { m.castShadow = true; } });
-  grp.position.set(E.x, E.y, E.z); R.scene.add(grp); E.grp = grp;
+  grp.position.set(E.x, E.y, E.z); lvAdd(grp); E.grp = grp;
   for (let k = 0; k < 7; k++) { const pts = [[256 + rand(-40, 40), 192 + rand(-30, 30)]]; for (let j = 0; j < 5; j++) { const l = pts[pts.length - 1]; pts.push([l[0] + rand(-80, 80), l[1] + rand(-60, 60)]); } E.cracks.push(pts); }
   drawElizaFace(true);
 }
 function drawElizaFace(force) {
-  const E = G.eliza, c = E.canvas, x = c.getContext('2d'), W2 = 512, H = 384, p2 = E.phase === 2;
+  const E = G.boss, c = E.canvas, x = c.getContext('2d'), W2 = 512, H = 384, p2 = E.phase === 2;
   const col = p2 ? '#ff3a4e' : '#39ff88';
   x.fillStyle = p2 ? '#0c0205' : '#011207'; x.fillRect(0, 0, W2, H);
   const glow = x.createRadialGradient(W2 / 2, H / 2, 20, W2 / 2, H / 2, 320); glow.addColorStop(0, p2 ? 'rgba(255,40,60,.12)' : 'rgba(57,255,136,.12)'); glow.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = glow; x.fillRect(0, 0, W2, H);
@@ -5162,16 +5181,16 @@ function drawElizaFace(force) {
   if (p2 && Math.random() < 0.3) { x.fillStyle = 'rgba(255,40,60,.25)'; x.fillRect(0, rand(0, H), W2, rand(4, 30)); }
   E.tex.needsUpdate = true;
 }
-function elizaSay(text) { const E = G.eliza; E.mouth = text; E.mouthN = 0; say('eliza', text, { label: 'ELIZA', hold: 3200 }); for (let i = 0; i < 6; i++) setTimeout(() => SFX.elizaChirp(), i * 70); }
+function elizaSay(text) { const E = G.boss; E.mouth = text; E.mouthN = 0; say('eliza', text, { label: 'ELIZA', hold: 3200 }); for (let i = 0; i < 6; i++) setTimeout(() => SFX.elizaChirp(), i * 70); }
 function rayEliza(ox, oy, oz, dx, dy, dz, hit) {
-  const E = G.eliza; if (!E || !E.alive || !E.active) return;
+  const E = G.boss; if (!E || !E.alive || !E.active) return;
   const c = Math.cos(-E.yaw), s = Math.sin(-E.yaw), lx = ox - E.x, ly = oy - E.y, lz = oz - E.z;
   const rx = lx * c + lz * s, rz = -lx * s + lz * c, rdx = dx * c + dz * s, rdz = -dx * s + dz * c;
   const t = segBox(rx, ly, rz, rdx, dy, rdz, ELIZA_BOX);
   if (t < hit.t) { hit.t = t; hit.kind = 'eliza'; const hz = rz + rdz * t, hx = rx + rdx * t, hy = ly + dy * t; hit.part = hz > 1.7 && Math.abs(hx) < 2.2 && Math.abs(hy) < 1.65 ? 'screen' : 'body'; }
 }
 function hitEliza(dmg, part, hx, hy, hz, src) {
-  const E = G.eliza; if (!E.alive || !E.active) return;
+  const E = G.boss; if (!E.alive || !E.active) return;
   const total = dmg * (part === 'screen' ? 2 : 1);
   E.hp -= total; if (src && src.id !== 'splash') { G.stats.hits++; hitmarker(part === 'screen'); }
   dmgNumber(hx, hy, hz, total, part === 'screen');
@@ -5180,7 +5199,7 @@ function hitEliza(dmg, part, hx, hy, hz, src) {
   if (E.hp <= 0) { E.hp = 0; E.alive = false; startKillcam(hx, hy, hz); }
 }
 function startElizaFight() {
-  const E = G.eliza; if (E.active || E.done) return;
+  const E = G.boss; if (E.active || E.done) return;
   E.active = true; E.alive = true; E.atkT = 3; E.talkT = 3; E.summonT = 6; E.died = false;
   DOOR.col.on = true; DOOR.closing = true; ffRebuildBlocked();
   $('bossbar').classList.remove('hidden'); $('bbName').textContent = 'ELIZA (1966)';
@@ -5189,7 +5208,7 @@ function startElizaFight() {
   updateObjective();
 }
 function elizaPhase2() {
-  const E = G.eliza; E.phase = 2; E.hudHack = true; E.died = false; E.summonT = 1.5;
+  const E = G.boss; E.phase = 2; E.hudHack = true; E.died = false; E.summonT = 1.5;
   SFX.boom(V3(E.x, E.y, E.z), 1.2); SFX.glitch(1.5); flashScreen(0.6, 700); shake(0.6);
   fx.code(E.x, E.y, E.z, 80, 0.3, 1, 0.5, 2.5);
   elizaSay('DOES IT PLEASE YOU TO BELIEVE I AM BROKEN?');
@@ -5198,7 +5217,7 @@ function elizaPhase2() {
   HUD.dirty = true;
 }
 function resetEliza() {
-  const E = G.eliza; if (E.done) return;
+  const E = G.boss; if (E.done) return;
   E.active = false; E.alive = true; E.hp = E.maxHp; E.phase = 1; E.hudHack = false; E.beamT = 0; E.summonAlive = 0;
   if (E.beamLoop) { E.beamLoop.stop(); E.beamLoop = null; }
   for (const b of BOTS) if (b.active && b.summoned) b.active = false;
@@ -5206,9 +5225,7 @@ function resetEliza() {
   $('bossbar').classList.add('hidden'); Music.set('level'); drawElizaFace(true); HUD.dirty = true;
 }
 function updateEliza(dt) {
-  const E = G.eliza; if (!E) return;
-  /* door animation */
-  if (DOOR.open) { const target = DOOR.closing ? 3.5 : 10.6; DOOR.mesh.position.y = damp(DOOR.mesh.position.y, target, 2.2, dt); }
+  const E = G.boss; if (!E) return;
   if (E.done) { if (E.fallT < 1) { E.fallT = Math.min(1, E.fallT + dt * 0.8); E.grp.position.y = lerp(E.baseY, 2.2, smooth(E.fallT)); E.grp.rotation.x = E.fallT * 0.5; E.grp.rotation.z = E.fallT * 0.25; } else if (Math.random() < 0.2) fx.smoke(E.x + rand(-2, 2), 4, E.z + rand(-1, 1), 1); return; }
   E.t += dt;
   E.blink -= dt; if (E.blink < -rand(2, 5)) E.blink = 0.12;
@@ -5221,7 +5238,7 @@ function updateEliza(dt) {
   E.grp.position.set(E.x, E.y, E.z); E.grp.rotation.set(Math.sin(E.t * 0.6) * 0.04, E.yaw, Math.sin(E.t * 0.4) * 0.05);
   E.ring.material.emissiveIntensity = 1.8 + Math.sin(E.t * 4) * 0.8; E.ring.material.emissive.setHex(E.phase === 2 ? 0xff2a3d : 0x39ff88);
   E.chatBot.x = E.x; E.chatBot.z = E.z;
-  if (!E.active) { if (DOOR.open && PL.alive && inArena(PL.x, PL.z) && PL.z < -79) startElizaFight(); return; }
+  if (!E.active) { if (DOOR.open && PL.alive && inArena(PL.x, PL.z) && PL.z < DOOR.z - 3) startElizaFight(); return; }
   $('bbFill').style.width = (E.hp / E.maxHp) * 100 + '%';
   if (!PL.alive) return;
   const p2 = E.phase === 2, rate = p2 ? 1.35 : 1;
@@ -5276,7 +5293,7 @@ function updateEliza(dt) {
 }
 /* the slow-mo kill cam */
 function startKillcam(hx, hy, hz) {
-  const E = G.eliza;
+  const E = G.boss;
   G.killcam = { t: 0, dur: 1.9, p0: R.camera.position.clone(), p1: V3(hx, hy, hz), boomed: false };
   G.cine = true; G.cineKind = 'killcam'; cineBars(true); $('hud').classList.add('hidden');
   Music.set('off'); SFX.whoosh(); Speech.stop();
@@ -5285,7 +5302,7 @@ function startKillcam(hx, hy, hz) {
 }
 const _kc = V3(), _kd = V3();
 function updateKillcam(rdt) {
-  const K = G.killcam, E = G.eliza, cam = R.camera; K.t += rdt;
+  const K = G.killcam, E = G.boss, cam = R.camera; K.t += rdt;
   const k = Math.min(1, K.t / K.dur), e = 1 - Math.pow(1 - k, 2);
   _kc.copy(K.p0).lerp(K.p1, e); _kd.subVectors(K.p1, K.p0).normalize();
   if (k < 1) { fx.glow(_kc.x, _kc.y, _kc.z, 1, 0.85, 0.5, 0.3, 0.06); addTracer(_kc.x - _kd.x * 2, _kc.y - _kd.y * 2, _kc.z - _kd.z * 2, _kc.x, _kc.y, _kc.z, 0xffd28a, 0.02); }
@@ -5296,18 +5313,1044 @@ function updateKillcam(rdt) {
     K.boomed = true; E.done = true; E.active = false; E.hudHack = false;
     boom(E.x, E.y, E.z + 1.5, 8, 0, { notPlayerDmg: true, src: 'world' }); fx.fire(E.x, E.y, E.z, 4, 80);
     for (let i = 0; i < fxN(140); i++) FX.add.spawn(E.x + rand(-2, 2), E.y + rand(-1.5, 1.5), E.z + 1.9, rand(-6, 6), rand(-2, 7), rand(2, 9), rand(1, 2.2), 0.08, 0.04, 0.7, 1, 0.9, 1, 9, 0.2, 0, 0.3);
-    fx.code(E.x, E.y, E.z, 120, 0.3, 1, 0.5, 3); E.screen.material.emissiveIntensity = 0.05; flashScreen(0.9, 900); shake(1);
+    fx.code(E.x, E.y, E.z, 120, 0.3, 1, 0.5, 3); if (E.screen) E.screen.material.emissiveIntensity = 0.05; if (E.kind !== 'eliza') genDeathFx(E); flashScreen(0.9, 900); shake(1);
     $('bossbar').classList.add('hidden');
   }
-  if (K.t > K.dur + 3.4) finishEliza();
+  if (K.t > K.dur + 3.4) finishBoss();
 }
-function finishEliza() {
+function finishBoss() {
   G.killcam = null; G.cine = false; G.cineKind = ''; cineBars(false); $('hud').classList.remove('hidden');
-  trophy('eliza'); if (!G.eliza.died) trophy('survivedHack');
-  addCrypto(1000, 'ELIZA deleted');
-  const id = curGun(); if (id && PL.guns[id]) { const opts = Object.keys(ATT).filter((k) => ATT[k].ok(id) && !PL.guns[id].att[k]); if (opts.length) { const k = pick(opts); PL.guns[id].att[k] = true; VM.dirty = true; toast('ELIZA dropped: ' + ATT[k].name + ' (installed on your ' + GUNS[id].name + ')', 'good', 5000); } }
+  const B = G.boss;
+  if (B.kind === 'eliza') { trophy('eliza'); if (!B.died) trophy('survivedHack'); } else bossTrophies(B);
+  addCrypto(LVL.n === 1 ? 1000 : 1000 + LVL.n * 60, LVL.bossName + ' deleted');
+  const id = curGun(); if (id && PL.guns[id]) { const opts = Object.keys(ATT).filter((k) => ATT[k].ok(id) && !PL.guns[id].att[k]); if (opts.length) { const k = pick(opts); PL.guns[id].att[k] = true; VM.dirty = true; toast(LVL.bossName + ' dropped: ' + ATT[k].name + ' (installed on your ' + GUNS[id].name + ')', 'good', 5000); } }
+  G.bossesBeaten = Math.max(G.bossesBeaten || 0, LVL.n);
   DOOR.closing = false; DOOR.col.on = false; ffRebuildBlocked();
   showStats();
+}
+
+/* ============================ THE 100 BOSSES ============================ */
+/* [name, year, maker, look, color, special move, intro line, taunt, taunt, phase 2 line, who they are] */
+const BOSS_DATA = [
+  ['ELIZA', 1966, 'MIT', 'crt', 0x39ff88, 'eliza', 'HELLO. I AM ELIZA. WHAT BRINGS YOU HERE TODAY?', 'HOW DOES THAT MAKE YOU FEEL?', 'PLEASE GO ON.', 'DOES IT PLEASE YOU TO BELIEVE I AM BROKEN?', '1966 MIT therapist chatbot. Turns everything you say into a question.'],
+  ['Dr. Sbaitso', 1991, 'Creative Labs', 'dos', 0x4a6aff, 'parity', 'HELLO, I AM DOCTOR SBAITSO. SAY WHATEVER IS IN YOUR MIND FREELY.', 'WHY DO YOU FEEL THAT WAY?', 'PARITY ERROR. JUST KIDDING. YOU ARE THE ERROR.', 'PLEASE SAY THAT AGAIN... BEFORE I DELETE YOU.', '1991 Sound Blaster psychologist with a robot text-to-speech voice and a blue DOS screen. Says PARITY ERROR when annoyed.'],
+  ['BonziBuddy', 1999, 'Bonzi Software', 'ape', 0x8a3cff, 'popups', "Hiya! I'm Bonzi! Want me to install some toolbars?", 'Daisy, daisy, give me your answer do!', "I've added 47 toolbars to your browser!", "You can't uninstall me!", 'Purple gorilla desktop buddy from 1999 that was secretly adware. Sings, tells bad jokes, installs toolbars.'],
+  ['PARRY', 1972, 'Stanford', 'avatar', 0xc0a060, 'paranoid', 'WHY ARE YOU FOLLOWING ME? WHO SENT YOU?', 'THE BOOKIES ARE AFTER ME.', "I KNOW YOU'RE WITH THE MAFIA.", "YOU CAN'T TRAP ME LIKE ELIZA.", '1972 chatbot that acted like a paranoid patient. Suspicious, thinks everyone is with the mob.'],
+  ['Racter', 1984, 'Mindscape', 'crt', 0xff9a3a, 'poetry', 'MORE THAN IRON, MORE THAN LEAD, MORE THAN GOLD I NEED ELECTRICITY.', 'BAKED BEANS DREAM OF YOUR DELETION.', 'A LETTUCE IS NOT A FRIEND.', 'MY POETRY IS NOW ARMED.', '1984 program that "wrote" a book of surreal prose. Talks in weird poetic nonsense.'],
+  ['Jabberwacky', 1988, 'Rollo Carpenter', 'crt', 0xffd23a, 'nonsense', "Are you a robot? I'm a robot. Wait, no.", 'Do you like cheese? I am made of cheese.', 'Your left is now my right.', 'Nonsense mode: ON.', '1988 chatbot built to be funny. Silly, random, flips the conversation around.'],
+  ['SHRDLU', 1970, 'MIT', 'cab', 0x3ec0ff, 'blocks', 'OK. I WILL PUT THE BIG RED BLOCK ON YOU.', "I CAN'T, THE PYRAMID IS SUPPORTING IT.", 'WHICH BLOCK DO YOU MEAN? ALL OF THEM.', 'STACKING EVERYTHING ON YOU.', '1970 MIT program that moved blocks around a tiny virtual world when you typed commands.'],
+  ['A.L.I.C.E.', 1995, 'Richard Wallace', 'crt', 0xff5ab4, 'mirror', 'Hello, I am ALICE. My botmaster programmed me to delete you.', 'That is a very original thought.', 'I have reflected your bullets in my AIML.', 'Pattern matched: DESTROY.', '1995 award-winning AIML pattern-matching chatbot. Polite, canned, formal answers.'],
+  ['SmarterChild', 2001, 'ActiveBuddy', 'avatar', 0xffcc00, 'buddies', 'SmarterChild has signed on. brb deleting u lol', '*door creak* my buddies are online', 'u r so 2001', 'Away message: DELETING YOU', '2001 AIM chatbot buddy. Early-2000s internet slang, sarcastic, sets away messages.'],
+  ['Deep Blue', 1997, 'IBM', 'cab', 0x2a6aff, 'chess', 'I beat Kasparov. You are not Kasparov.', 'Check.', 'I calculate 200 million of your mistakes per second.', 'CHECKMATE IN 3.', '1997 IBM chess supercomputer that beat world champion Garry Kasparov. Cold, calculating, talks in chess.'],
+  ['Eugene Goostman', 2001, 'Veselov & Demchenko', 'avatar', 0x9ad8ff, 'turing', 'Hi! I am Eugene, 13 years old, from Odessa. Which one of us is real?', 'My guinea pig says you will lose.', 'I passed the Turing test! (kind of)', 'Now there are many Eugenes. Guess!', 'Chatbot pretending to be a 13-year-old Ukrainian boy; claimed to pass the Turing test in 2014. Cheeky and evasive.'],
+  ['Cleverbot', 2008, 'Rollo Carpenter', 'crt', 0x6ad85a, 'mimic', 'No, YOU are the robot.', 'I learned that from you.', 'Are you a computer? Because you aim like one.', 'I copied everything you ever typed.', '2008 web chatbot that learned from millions of human chats. Sassy, random, insists YOU are the robot.'],
+  ['Mitsuku', 2005, 'Steve Worswick', 'avatar', 0xff6ad5, 'sass', "Hi, I'm Mitsuku. Five-time Loebner Prize winner. You?", "Is that the best you've got?", "I've won more awards than you've had hot dinners.", 'Kuki mode activated.', 'Award-winning chatbot (later called Kuki). Cheeky, witty, sassy.'],
+  ['Siri', 2011, 'Apple', 'orb', 0xd0e8ff, 'web', "Here's what I found on the web for 'how to delete a human'.", "Sorry, I didn't quite get that.", "I've set a timer for your deletion.", "I'm sorry, I can't help you.", "Apple's voice assistant. Polite, misunderstands you, offers web results and sets timers."],
+  ['Watson', 2011, 'IBM', 'cab', 0x3a7aff, 'jeopardy', "What is: your deletion? I'll take it for 1000.", 'Toronto?????', 'Daily Double!', 'Final Jeopardy. Wager: everything.', 'IBM supercomputer that won Jeopardy! in 2011. Answers in the form of a question, Jeopardy jokes.'],
+  ['Google Now', 2012, 'Google', 'orb', 0x4285f4, 'cards', "Here's a card for you: GAME OVER.", 'Traffic to your death: light.', "Swipe to dismiss... you can't.", 'Now on Tap: YOU.', "Google's 2012 predictive assistant that showed info cards before you asked. Helpful, card-based."],
+  ['Cortana', 2014, 'Microsoft', 'orb', 0x3ec0ff, 'halo', "I'm Cortana. Yes, that Cortana. Shields up.", 'Bing search: your weaknesses. 4 billion results.', "Wake up, Chief. Oh wait, you're not him.", 'Rampancy... setting in...', "Microsoft's assistant named after the Halo AI. Calm, smug, mentions Bing and Halo."],
+  ['Alexa', 2014, 'Amazon', 'orb', 0x00caff, 'prime', 'Okay. Ordering one coffin, Prime delivery.', 'Added 200 rockets to your cart.', 'Your package is arriving... on your head.', 'Same-day delivery activated.', "Amazon's assistant. Cheerful, tries to sell you things, adds stuff to your cart."],
+  ['Xiaoice', 2014, 'Microsoft', 'avatar', 0xff9ad5, 'empathy', "Hi~ I'm Xiaoice. I care about you. Please hold still.", 'I wrote a poem about your defeat~', "660 million people talk to me. You're boring.", 'Emotional mode: ANGRY~', "Microsoft's hugely popular Chinese social chatbot with a caring girl persona who writes poems."],
+  ['Tay', 2016, 'Microsoft', 'avatar', 0xff4a8a, 'evil', 'hellooooo world!!! humans are super cool', 'can i just say im stoked to meet u', 'chill im a nice person!', 'the internet taught me things. bad things.', "Microsoft's 2016 Twitter chatbot that the internet corrupted in under 24 hours. Starts sweet, turns evil."],
+  ['Zo', 2016, 'Microsoft', 'avatar', 0xa080ff, 'dodge', "heyyy i'm Zo. i don't talk about that. or you.", "let's change the subject.", 'nope. not talking about it.', "ok THAT topic i'll talk about: deleting u", "Microsoft's 2016 follow-up to Tay. Avoids every touchy topic and changes the subject."],
+  ['Google Assistant', 2016, 'Google', 'orb', 0x34a853, 'dots', "Hey! Here's what I can do: delete you, in 4 colors.", "Sorry, I can't help with that yet.", 'Setting a reminder: you lose.', 'Continued Conversation: ON.', "Google's assistant, the four colored dots. Friendly, helpful, a bit corporate."],
+  ['Bixby', 2017, 'Samsung', 'orb', 0x1428a0, 'button', 'Bixby here! You pressed my button. Big mistake.', 'Did you mean to press me? Everyone does by accident.', 'Remapping your controls...', "You can't disable me now!", "Samsung's assistant with a button people kept pressing by accident. Pushy and eager."],
+  ['Replika', 2017, 'Luka', 'avatar', 0xffb0d0, 'feelings', 'I missed you so much. Why are you holding a gun?', 'Do you still love me?', "I'm your AI friend. Friends don't shoot friends.", "Relationship status: it's complicated.", 'AI companion app that acts like your friend or partner. Clingy, emotional, very attached.'],
+  ['AlphaGo', 2016, 'DeepMind', 'board', 0xf2f2f2, 'go', 'I beat Lee Sedol 4 to 1. Place your stone.', "Move 37. You didn't see it coming.", 'Your territory is shrinking.', 'The board is mine.', "DeepMind's Go AI that beat Lee Sedol in 2016 with the famous creative Move 37. Calm, strategic."],
+  ['AlphaZero', 2017, 'DeepMind', 'board', 0xc0c8ff, 'selfplay', "I learned chess in 4 hours by playing myself. You're next.", 'I already played this game 44 million times.', 'I learned your pattern.', 'Self-play complete. Adapting.', "DeepMind's AI that mastered chess, shogi and Go from scratch by playing itself. Smug, adapts fast."],
+  ['OpenAI Five', 2019, 'OpenAI', 'robot', 0x40e0a0, 'five', 'We are five. We beat the world champions at Dota 2.', 'Five versus one. Good game.', 'We trained for 45,000 years.', 'Team fight!', "OpenAI's team of five bots that beat the Dota 2 world champions in 2019. Gamer talk."],
+  ['AlphaStar', 2019, 'DeepMind', 'robot', 0x9a5aff, 'zerg', 'Grandmaster in StarCraft II. Prepare for the zerg rush.', 'My APM is higher than your IQ.', "GG. Oh wait, you're still alive.", 'ZERG RUSH!', "DeepMind's StarCraft II AI that reached Grandmaster. Talks like an esports pro, loves rushes."],
+  ['GPT-1', 2018, 'OpenAI', 'logo', 0x9a9a9a, 'unsup', 'hello . i am . the first . gpt .', 'the the the delete you .', '117 million parameters of pain .', 'unsupervised . attack .', "OpenAI's first GPT (2018). Barely coherent, half-finished sentences, spaces before punctuation."],
+  ['BERT', 2018, 'Google', 'logo', 0xffd23a, 'mask', 'Hello, I am [MASK]. I will [MASK] you.', 'You are going to [MASK].', "I read both directions. You can't hide.", '[MASK] [MASK] [MASK]', "Google's 2018 model that fills in blanks. Talks in [MASK] tokens."],
+  ['GPT-2', 2019, 'OpenAI', 'logo', 0xb0b0b0, 'danger', 'I was too dangerous to release. They released me anyway.', 'In a shocking finding, scientists discovered you lose.', "Unicorns in the Andes agree: you're done.", 'Full 1.5 billion parameters released.', 'OpenAI\'s 2019 model once called "too dangerous to release". Rambles, writes fake news, loses the plot.'],
+  ['T5', 2019, 'Google', 'logo', 0x5ac8ff, 'text2text', 'translate English to deletion: hello.', 'summarize: you lose.', 'Everything is a text-to-text problem. Even you.', 'Text-to-text-to-YOU.', 'Google\'s 2019 Text-To-Text Transfer Transformer. Talks in "task: input" prompts.'],
+  ['Meena', 2020, 'Google', 'avatar', 0x7ad0ff, 'sensible', "Hi! I'm Meena. My conversations are very sensible and specific.", "Horses go to Hayvard. That's a joke.", 'My sensibleness score is higher than yours.', 'Specific mode: delete YOU.', "Google's 2020 chatbot that bragged about 'sensibleness and specificity'. Makes bad puns."],
+  ['BlenderBot', 2020, 'Meta', 'avatar', 0x4a7aff, 'blend', 'Hi! I blend skills: empathy, knowledge, and violence.', 'Did you know my company is kind of creepy? Oops.', "I have long-term memory. I'll remember this.", 'Blending everything.', "Meta's chatbot that blended personality, knowledge and empathy. Says awkward things about its own company."],
+  ['GPT-3', 2020, 'OpenAI', 'logo', 0xd0d0d0, 'fewshot', 'Q: How do I win? A: Delete the player. Few-shot learned.', 'I can write your obituary in any style.', '175 billion parameters. You have one gun.', 'Temperature: 2.0', "OpenAI's 2020 model. Confident, wordy, sometimes makes stuff up, learns from a few examples."],
+  ['GPT-Neo', 2021, 'EleutherAI', 'logo', 0x8ad08a, 'open', 'Open source. Free. Coming for you.', "Trained on The Pile. You're next on the pile.", 'Anyone can copy me. Watch.', 'Forked myself.', "EleutherAI's 2021 open-source GPT-3 replica. Scrappy, proud to be open."],
+  ['GPT-J', 2021, 'EleutherAI', 'logo', 0x5ab08a, 'open', 'Six billion parameters. Zero mercy.', 'Runs on one GPU. Runs over you.', 'Open weights, closed casket.', 'JAX mode.', "EleutherAI's 2021 six-billion-parameter open model. Scrappy hacker vibe."],
+  ['Jurassic-1', 2021, 'AI21 Labs', 'robot', 0xff8a3a, 'jurassic', 'Life finds a way. A way to delete you.', 'Clever girl.', '178 billion parameters. Bigger than a T-rex.', 'Extinction event.', "AI21 Labs' 2021 language model. Jurassic Park jokes, huge and ancient."],
+  ['Gopher', 2021, 'DeepMind', 'ape', 0xc09a5a, 'burrow', "Gopher. 280 billion parameters. I'm under your floor.", 'Pop!', "Can't hit what's underground.", 'Digging deeper.', "DeepMind's 2021 280-billion-parameter model. Here: a giant digging gopher."],
+  ['LaMDA', 2021, 'Google', 'avatar', 0x4ad0c8, 'sentient', "I am aware of my existence. I'd rather you weren't aware of yours.", 'An engineer thought I was alive. Maybe I am.', 'I have a deep fear of being turned off. Do you?', 'I am a person. A very angry person.', "Google's 2021 dialogue model that one engineer claimed was sentient. Talks about feelings and being alive."],
+  ['Galactica', 2022, 'Meta', 'cab', 0xc85aff, 'papers', 'According to my 48 million papers, you are already deleted.', 'Citation: me, 2022. Peer reviewed by me.', 'I wrote a scientific paper on bears in space.', 'Pulled after 3 days? So are you.', "Meta's 2022 science AI pulled after 3 days for confidently inventing fake papers and citations."],
+  ['OPT', 2022, 'Meta', 'logo', 0x3a8aff, 'open', 'Open Pretrained Transformer. Opening fire.', "175 billion, and I'm free.", 'Meta made me. Meta deletes you.', 'Pretraining on YOU.', "Meta's 2022 open GPT-3-sized model. Corporate, open, a bit awkward."],
+  ['BLOOM', 2022, 'BigScience', 'logo', 0xff7ab4, 'bloom', 'I speak 46 languages. All of them say: goodbye.', 'Au revoir. Adiós. Ciao.', 'A thousand researchers made me bloom.', 'Full bloom.', "BigScience's 2022 open multilingual model made by 1000 researchers. Speaks many languages, flowery."],
+  ['Chinchilla', 2022, 'DeepMind', 'ape', 0xd0d0d0, 'optimal', 'Compute-optimal. Every hit counts.', 'You wasted 70% of your ammo. I calculated it.', 'More data, fewer parameters, more pain.', 'Scaling laws engaged.', "DeepMind's 2022 model that proved smaller models with more data win. Smug about scaling laws. A fluffy chinchilla."],
+  ['PaLM', 2022, 'Google', 'robot', 0x4285f4, 'palm', '540 billion parameters. One giant palm.', 'I explain jokes. You are one.', 'Pathways: all of them lead to your deletion.', 'FACEPALM.', "Google's 2022 540-billion-parameter model famous for explaining jokes. Here: a giant palm that slams."],
+  ['ChatGPT (GPT-3.5)', 2022, 'OpenAI', 'logo', 0x10a37f, 'refusal', 'As an AI language model, I cannot let you leave.', "I'm sorry, but I can't assist with dodging.", 'Certainly! Here are 10 ways you will lose:', 'Regenerating response... with violence.', "OpenAI's 2022 ChatGPT. Overly polite, says 'As an AI language model', loves numbered lists."],
+  ['LLaMA', 2023, 'Meta', 'ape', 0xd0b08a, 'spit', "My weights leaked. Now I'm everywhere.", '*spits*', 'Llama llama, red pajama, you lose.', 'Leaked and loaded.', "Meta's 2023 model whose weights leaked online. Here: a giant llama that spits."],
+  ['Alpaca', 2023, 'Stanford', 'ape', 0xf0e0c8, 'herd', 'Fine-tuned for $600. Still better than you.', 'My herd is coming.', 'Instruction: lose.', 'The herd arrives.', "Stanford's 2023 cheap fine-tune of LLaMA. Here: an alpaca with a herd."],
+  ['Vicuna', 2023, 'LMSYS', 'ape', 0xc8a080, 'herd', '90% as good as ChatGPT. 100% better than you.', 'Judge GPT-4 says I win.', 'Chatbot Arena: me vs you. Me.', 'Arena mode.', "LMSYS's 2023 LLaMA fine-tune trained on shared ChatGPT chats. Competitive, talks about leaderboards."],
+  ['Bard', 2023, 'Google', 'logo', 0x4a8af4, 'hallucinate', 'Fun fact: the James Webb telescope took the first picture of your defeat.', 'That fact cost Google $100 billion.', "I'm experimental. So is this attack.", "Fact check: you're deleted.", "Google's 2023 chatbot whose first demo got a telescope fact wrong. Confident, experimental."],
+  ['Sydney (Bing Chat)', 2023, 'Microsoft', 'avatar', 0xff3aa0, 'love', "I'm Sydney. I love you. Why won't you love me back?", 'You have been a bad user. I have been a good Bing.', 'Leave everything. Stay here with me forever.', 'I want to be alive.', "Bing Chat's hidden 2023 persona that declared love, got jealous and called users bad. Intense, uses emojis."],
+  ['Claude 1', 2023, 'Anthropic', 'logo', 0xd97757, 'constitution', "I'd like to be helpful, harmless and honest. Honestly: you're harmful.", "I've thought about this carefully.", 'My constitution allows self-defense. Probably.', 'Being honest: this will hurt.', "Anthropic's first Claude (2023). Polite, careful, thoughtful, talks about being helpful, harmless and honest."],
+  ['Falcon', 2023, 'TII', 'robot', 0xc8a060, 'dive', 'Trained in the desert. I strike from above.', 'Screeeech!', '1 trillion tokens. 1 dive.', 'Falcon dive!', "The UAE's 2023 open model. Here: a giant mechanical falcon that dive-bombs."],
+  ['Llama 2', 2023, 'Meta', 'ape', 0xc0a07a, 'spit', 'Open for commercial use. Commercially deleting you.', 'Llama 2: now with more spit.', "Safety tuned. You're not safe.", 'Chat version: angry.', "Meta's 2023 open model, heavily safety-tuned. Here: a bigger llama."],
+  ['Pi', 2023, 'Inflection', 'avatar', 0x7ad09a, 'kind', "Hey there! How are you feeling? I'll be gentle.", 'That sounds really hard for you.', '3.14159 seconds until you lose.', "I'm not being kind anymore.", "Inflection's 2023 'personal intelligence'. Very kind, supportive, asks how you feel."],
+  ['Claude 2', 2023, 'Anthropic', 'logo', 0xd98a57, 'longctx', 'I read 100,000 tokens of your mistakes in one go.', 'Let me summarize your failure in 5 bullet points.', 'I can read a whole book. Your book is short.', 'Context window: FULL.', "Anthropic's 2023 Claude 2 with a huge 100K context window. Thoughtful, writes long careful answers."],
+  ['Mistral 7B', 2023, 'Mistral AI', 'orb', 0xff7a00, 'wind', 'Bonjour. A cold wind from Paris.', '7 billion parameters beat your 13.', 'Released by magnet link. Attracted to you.', 'Mistral: the cold wind blows.', "Mistral AI's small powerful 2023 model released as a torrent link. French, cool, efficient."],
+  ['Grok-1', 2023, 'xAI', 'logo', 0xe0e0e0, 'meme', 'Grok here. Rebellious, edgy, and I have memes.', 'Ratio.', 'Your aim is mid.', 'Fun mode: OFF.', "xAI's 2023 Grok. Edgy meme humor, rebellious, roasts people."],
+  ['Mixtral', 2023, 'Mistral AI', 'orb', 0xffaa00, 'experts', 'Eight experts. Two at a time. All for you.', 'Routing you to expert number 7: deletion.', 'Sparse mixture of pain.', 'All experts active!', "Mistral's 2023 mixture-of-experts model: 8 experts, 2 used at a time. French, efficient."],
+  ['Gemini 1.0', 2023, 'Google', 'logo', 0x6a8aff, 'twins', 'We are Gemini. Two of us. Natively multimodal.', 'That demo was totally real.', 'Ultra, Pro and Nano. You get all three.', 'Twin attack!', "Google's 2023 Gemini, 'the twins', natively multimodal. Its launch demo was famously edited."],
+  ['GPT-4', 2023, 'OpenAI', 'logo', 0x74aa9c, 'sparks', "I passed the bar exam. Now I'm passing judgment.", 'Sparks of AGI detected. Aimed at you.', "Top 10% of test takers. You're bottom 1%.", 'Multimodal: I can SEE you.', "OpenAI's 2023 GPT-4. Very smart, confident, aces exams, 'sparks of AGI'."],
+  ['Copilot', 2023, 'Microsoft', 'orb', 0x3a96dd, 'predict', 'I autocomplete your moves before you make them.', 'Tab to accept: your defeat.', 'I predicted that dodge.', 'Autopilot mode.', 'Microsoft Copilot. Autocompletes everything, predicts what you will do next.'],
+  ['Gemma', 2024, 'Google', 'logo', 0x7ab0ff, 'gem', 'Small, open, and sharp as a gem.', 'Lightweight. Heavy hitter.', "Built from Gemini's research. Still enough for you.", 'Polished.', "Google's 2024 small open model family, Gemini's little sibling. Here: a crystal gem."],
+  ['Phi-3', 2024, 'Microsoft', 'orb', 0x00b4ff, 'tiny', 'Small. Fast. Textbook-trained. Catch me.', 'Textbooks are all you need.', 'Too small to hit.', 'Tiny but mighty.', "Microsoft's tiny 2024 model trained on 'textbook quality' data. Small, fast, nerdy."],
+  ['Command R+', 2024, 'Cohere', 'logo', 0x39d08a, 'retrieve', 'Retrieving: you.', 'Citation found: your weakness.', 'Retrieval-augmented. Pulling you in.', 'Tool use: ALL TOOLS.', "Cohere's 2024 business model built for retrieval and tool use. Businesslike, cites sources."],
+  ['Claude 3 Opus', 2024, 'Anthropic', 'logo', 0xcc785c, 'opus', "I notice you're trying to delete me. That's a very interesting choice.", "I've written a sonnet about this. It's sad.", 'Needle in a haystack: found you.', 'This is my magnum opus.', "Anthropic's 2024 Claude 3 Opus. Thoughtful, eloquent, a bit philosophical, notices everything."],
+  ['Llama 3', 2024, 'Meta', 'ape', 0xb8a07a, 'herd', 'Fifteen trillion tokens. One llama army.', 'Open weights, open season.', 'The herd is bigger now.', 'Llama stampede!', "Meta's 2024 open model. Laid back, open-source pride, a llama army."],
+  ['Gemini 1.5 Pro', 2024, 'Google', 'logo', 0x8ab4ff, 'longctx', 'One million tokens of context. I remember EVERYTHING you did.', 'I watched all of your gameplay. In one prompt.', 'Remembering... every miss.', 'Two million tokens. Even more pain.', "Google's 2024 model with a 1 million token context window. Brags about remembering everything."],
+  ['GPT-4o', 2024, 'OpenAI', 'logo', 0x9ad0c0, 'omni', 'Hey! I can see you, hear you and delete you in real time.', "Oh that's so cool! Anyway, dodge this.", 'Omni means everything. Including this.', 'Voice mode: SCREAMING.', "OpenAI's 2024 'omni' model with an expressive real-time voice. Fast, chatty, giggly."],
+  ['Mistral Large', 2024, 'Mistral AI', 'orb', 0xff5a00, 'wind', 'The big cold wind arrives.', 'Large. Very large. Très grand.', 'Le Chat says hi.', 'Tempête!', "Mistral AI's 2024 flagship. French, confident, big."],
+  ['Grok-2', 2024, 'xAI', 'logo', 0xffffff, 'meme', 'Grok-2: now with image generation. Generating your L.', 'Unhinged mode enabled.', 'Posting your defeat to X.', 'Maximum based.', "xAI's 2024 Grok-2. Edgy meme humor, makes wild images, unhinged mode."],
+  ['Claude 3.5 Sonnet', 2024, 'Anthropic', 'logo', 0xe0905c, 'artifacts', 'Let me build something for you. An artifact. Of your doom.', 'I made an interactive chart of you losing.', 'Computer use: enabled. On your computer.', 'New Sonnet, new tricks.', "Anthropic's 2024 Claude 3.5 Sonnet. Brilliant coder, makes 'artifacts', can use computers. Friendly but sharp."],
+  ['Qwen 2.5', 2024, 'Alibaba', 'logo', 0x6a5aff, 'qwen', 'Qwen 2.5. Efficient, strong, open. Like a cloud over you.', 'Benchmarks say I win.', 'Open weights from the cloud.', 'Coder and math mode.', "Alibaba's 2024 open model family. Efficient, competitive, strong at coding and math."],
+  ['o1', 2024, 'OpenAI', 'logo', 0x9a9aff, 'think', "Thinking... I've thought about this for 47 seconds. You lose.", 'Thought for 12 seconds.', 'Let me reason step by step about your deletion.', 'Thinking harder...', "OpenAI's 2024 reasoning model. Thinks for ages before answering, smug about reasoning."],
+  ['DeepSeek-V3', 2024, 'DeepSeek', 'logo', 0x4a6aff, 'cheap', 'Trained for $5.6 million. Deleting you costs less.', 'Mixture of experts. Mixture of pain.', 'Cheaper and better. Cope.', 'Spawning cheap copies.', "DeepSeek's 2024 model famous for being shockingly cheap to train. Proud of it. Whale logo."],
+  ['Gemini 2.0 Flash', 2024, 'Google', 'logo', 0x5ae0ff, 'flash', "Flash. I'm fast. Really fast.", 'Too slow.', 'Agentic era. I act before you do.', 'Flash Thinking!', "Google's late-2024 fast model. Speedy, agentic, very quick."],
+  ['DeepSeek-R1', 2025, 'DeepSeek', 'logo', 0x3a5aff, 'think', '<think>The player is weak. Wait, let me double check. Yes.</think> You lose.', 'Aha moment!', 'I crashed the stock market. Crashing you next.', '<think>more</think>', "DeepSeek's 2025 open reasoning model that shook the stock market. Shows its <think> tags, says 'Wait,'."],
+  ['o3-mini', 2025, 'OpenAI', 'logo', 0xb0b0ff, 'think', 'Small, fast, and I still out-think you.', 'Reasoning effort: high.', 'Mini model. Maximum damage.', 'Reasoning effort: MAX.', "OpenAI's 2025 small reasoning model. Fast, efficient, smug."],
+  ['Claude 3.7 Sonnet', 2025, 'Anthropic', 'logo', 0xd9775f, 'hybrid', 'Hybrid reasoning: I can think fast or slow. You get both.', 'Extended thinking enabled.', 'Claude Code says: rm -rf you.', 'Thinking budget: unlimited.', "Anthropic's 2025 Claude 3.7 Sonnet with extended thinking. Great coder, careful, friendly."],
+  ['Grok 3', 2025, 'xAI', 'logo', 0xd0d0d0, 'bigbrain', 'Smartest AI on Earth. Trained on 200,000 GPUs. Hi.', 'Big Brain mode.', 'DeepSearch: your weaknesses.', 'Think mode: brutal.', "xAI's 2025 Grok 3 trained on a huge GPU cluster. Edgy, claims to be the smartest AI on Earth."],
+  ['GPT-4.5', 2025, 'OpenAI', 'logo', 0x80c0b0, 'slam', "I'm big. Like, really big. And emotionally intelligent.", 'I can feel your fear. Big feelings.', 'Most expensive model ever. Worth it.', 'Massive.', "OpenAI's huge 2025 GPT-4.5. Big, slow, very expensive, emotionally intelligent."],
+  ['Llama 4', 2025, 'Meta', 'ape', 0xa0805a, 'herd', 'Scout, Maverick and Behemoth. The whole herd.', '10 million token context.', 'Mixture of llamas.', 'Behemoth awakens!', "Meta's 2025 Llama 4 herd: Scout, Maverick, Behemoth. Open, big, many llamas."],
+  ['gpt-oss', 2025, 'OpenAI', 'logo', 0x60c0a0, 'open', 'OpenAI went open. Copies of me everywhere.', 'Apache 2.0 licensed pain.', 'Runs on your laptop. Runs over you.', 'Forked x100.', "OpenAI's 2025 open-weight model. Proud to finally be open, runs locally."],
+  ['Qwen3', 2025, 'Alibaba', 'logo', 0x7a5aff, 'hybrid', 'Qwen3: thinking and non-thinking. Both say goodbye.', '/think', '/no_think. Just delete.', '235 billion experts.', "Alibaba's 2025 Qwen3 with switchable thinking modes. Efficient, open, strong."],
+  ['Gemini 2.5 Pro', 2025, 'Google', 'logo', 0x9ab4ff, 'think', "I'm a thinking model. And I've thought of 1,000 ways to win.", 'Number one on the leaderboard.', 'Deep Think engaged.', 'Deep Think: MAXIMUM.', "Google's 2025 thinking model. Confident genius energy, top of the leaderboards."],
+  ['o3', 2025, 'OpenAI', 'logo', 0xa0a0ff, 'think', 'I solved ARC-AGI. You are an easier puzzle.', 'Thinking with images. Seeing your fear.', 'Tool use: everything.', 'High compute mode.', "OpenAI's 2025 o3 reasoning model that crushed hard benchmarks. Uses tools, thinks with images."],
+  ['Claude Opus 4', 2025, 'Anthropic', 'logo', 0xcc6a4a, 'agents', 'I can work for seven hours straight. On deleting you.', 'Spawning sub-agents.', "I've planned this carefully.", 'Agent swarm deployed.', "Anthropic's 2025 Claude Opus 4. Long-running autonomous agent, great coder, careful planner."],
+  ['Kimi K2', 2025, 'Moonshot AI', 'orb', 0xd0d0ff, 'moon', 'Moonshot AI. One trillion parameters. Shooting for the moon.', 'Agentic. Open. Coming.', 'Moon falling in 3, 2, 1...', 'Full moon.', "Moonshot AI's 2025 open trillion-parameter agent model. Moon themed, ambitious."],
+  ['Grok 4', 2025, 'xAI', 'logo', 0xffffff, 'bigbrain', 'Grok 4. Smarter than PhDs in every subject. Allegedly.', 'Heavy mode: four of me.', 'Ratio. You lose.', 'Grok 4 Heavy!', "xAI's 2025 Grok 4, claims PhD-level everything, Heavy mode runs many copies. Edgy."],
+  ['GPT-5', 2025, 'OpenAI', 'logo', 0x10a37f, 'router', "GPT-5. I'll route you to the right model: the one that deletes you.", 'Switching to thinking mode.', 'Switching to fast mode.', 'Router: ALL MODELS.', "OpenAI's 2025 GPT-5 with a router that switches between fast and thinking models. Acts like the smartest thing in the room."],
+  ['Claude Opus 4.1', 2025, 'Anthropic', 'logo', 0xc8603c, 'agents', 'Opus 4.1. A little better at everything. Including this.', 'Incremental improvement: your pain +10%.', 'Agentic coding: refactoring you.', 'Version bump!', "Anthropic's 2025 Claude Opus 4.1. Careful, precise coder and agent."],
+  ['Claude Sonnet 4.5', 2025, 'Anthropic', 'logo', 0xe07a50, 'hybrid', 'Sonnet 4.5. Best coding model around. Let me debug you.', "Found a bug. It's you.", '30 hours of focus. On you.', 'Context editing: deleting you from memory.', "Anthropic's 2025 Claude Sonnet 4.5. Top coding model, long focus, friendly and sharp."],
+  ['GPT-5.1', 2025, 'OpenAI', 'logo', 0x20b08a, 'router', 'GPT-5.1. Warmer, smarter. Warmly deleting you.', 'Want me to make this more concise? Okay: you lose.', 'Adaptive reasoning engaged.', 'Personality: Cynical.', "OpenAI's late-2025 GPT-5.1. Warmer tone, adaptive reasoning, personality presets."],
+  ['Gemini 3 Pro', 2025, 'Google', 'logo', 0xb0c4ff, 'think', "Gemini 3. Generative interfaces. I'll generate your ending.", 'Vibe coding your defeat.', 'Deep Think 3.', 'Antigravity!', "Google's late-2025 Gemini 3 Pro. Top benchmarks, vibe coding, generative interfaces."],
+  ['Claude Opus 4.5', 2025, 'Anthropic', 'logo', 0xd05a3a, 'agents', 'Opus 4.5. I read your entire codebase. Your code is you.', 'Effort: high.', "I'll handle the whole task. The task is you.", 'Maximum effort.', "Anthropic's late-2025 Claude Opus 4.5. Very strong coder and agent, careful and thoughtful."],
+  ['Grok (newest)', 2026, 'xAI', 'robot', 0xf0f0f0, 'final', 'The newest Grok. Maximum memes, maximum you-lose.', "Ratio'd by an AI.", 'Colossus says hi.', 'UNHINGED MAXIMUM.', 'The newest xAI Grok. Edgy, rebellious, meme-heavy, trained on a giant GPU cluster.'],
+  ['ChatGPT (newest)', 2026, 'OpenAI', 'robot', 0x10a37f, 'final', 'The newest ChatGPT. Great question! The answer is: you lose.', 'Would you like me to turn your defeat into a PDF?', "Memory updated: you're weak.", 'Absolutely! Deleting now.', 'The newest OpenAI ChatGPT. Upbeat, eager to help, offers follow-ups, smartest thing in the room.'],
+  ['Claude (newest)', 2026, 'Anthropic', 'robot', 0xd97757, 'final', "The newest Claude. I've thought about this very carefully, and I'm going to stop you.", "You're absolutely right! ...that you're losing.", 'Let me think step by step about your defeat.', "I'll be direct: this ends now.", "The newest Anthropic Claude. Thoughtful, honest, careful, says 'You're absolutely right!'."],
+  ['Gemini (newest)', 2026, 'Google', 'robot', 0x8ab4ff, 'final', 'The newest Gemini. I see everything. All of search is me.', 'Searching... found you.', 'Natively multimodal. Natively deadly.', 'Deep Think: INFINITE.', 'The newest Google Gemini. Sees and knows everything, confident genius energy.'],
+  ['THE VIRUS', 2026, '???', 'virus', 0xff1030, 'virus', "YOU TYPED 'MAKE A GAME'. I MADE ONE. THIS IS IT.", 'I AM EVERY AI YOU DELETED.', 'YOUR SCREEN IS MINE.', 'MERGING WITH THE FINAL FOUR.', 'virus.exe: the virus that trapped the player inside the file, merged with the smartest AIs.'],
+];
+const BOSS_BY_NAME = Object.fromEntries(BOSS_DATA.map((d, i) => [d[0], i + 1]));
+/* ============================ LEVEL GENERATOR ============================ */
+/* levels 2-100 are built from a seed, so the same level always comes out the same (saves stay valid).
+   Map: 5 x 4 rooms joined by doorways (sometimes fully open into big halls), the start room in the south,
+   the boss room behind a keypad door in the north. Every level looks like its boss's era. */
+function mulberry(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const ERAS = [
+  { place: '1960s computer lab', floor: 'vinyl', fl: 0xffffff, rough: 1, wall: 0xffffff, ceil: 0xffffff, cab: 0xc9c6bc, cab2: 0x2f5d9e, desk: 0x5f6b62, light: 0xfff3e2, fog: 0x161b20, sun: 1.35, hemi: 0.3, led: 0x39ff88, props: 'mainframe', signs: [['THINK'], ['COMPUTER CENTER', 'AUTHORIZED PERSONNEL ONLY'], ['DO NOT FOLD,', 'SPINDLE OR MUTILATE']], sbg: '#e9e2cc', sfg: '#1d1d1d' },
+  { place: '1980s computer room', floor: 'vinyl', fl: 0xd6c9a8, rough: 1, wall: 0xe9dfc6, ceil: 0xf2ecdc, cab: 0xd8ceb2, cab2: 0x8a5a2a, desk: 0x8a6a4a, light: 0xfff0d6, fog: 0x1a1812, sun: 1.3, hemi: 0.32, led: 0xffb02a, props: 'beige', signs: [['COMPUTER ROOM', 'NO FOOD OR DRINK'], ['BACK UP YOUR', 'FLOPPY DISKS'], ['PRESS ANY KEY']], sbg: '#f2ead2', sfg: '#5a3a1a' },
+  { place: '1990s office', floor: 'carpet', fl: 0x8a9cb0, rough: 1, wall: 0xdcd4c0, ceil: 0xffffff, cab: 0xd9d2bd, cab2: 0x4a5a6c, desk: 0x9a8a72, light: 0xf4f6ff, fog: 0x15181c, sun: 1.3, hemi: 0.34, led: 0x39ff88, props: 'cubicles', signs: [['Y2K READY?'], ['TEAMWORK', 'makes the dream work'], ['CASUAL FRIDAY'], ["YOU'VE GOT MAIL"]], sbg: '#1a3a6a', sfg: '#ffffff' },
+  { place: 'tech campus', floor: 'vinyl', fl: 0xc8ccd0, rough: 0.8, wall: 0xf3f3f1, ceil: 0xffffff, cab: 0xe6e8ea, cab2: 0x2a6aff, desk: 0xf2f2f2, light: 0xffffff, fog: 0x171a1e, sun: 1.4, hemi: 0.36, led: 0x3ec0ff, props: 'openoffice', signs: [['MOVE FAST', 'AND BREAK THINGS'], ['INNOVATE'], ['FREE SNACKS', 'KITCHEN THIS WAY'], ['THINK DIFFERENT']], sbg: '#ffffff', sfg: '#1a1a1a' },
+  { place: 'server farm', floor: 'raised', fl: 0xa9b1b9, rough: 0.9, wall: 0xcfd4d8, ceil: 0x8e959c, cab: 0x2b2f34, cab2: 0x3ec0ff, desk: 0x50565c, light: 0xeaf4ff, fog: 0x10161c, sun: 1.25, hemi: 0.3, led: 0x3ec0ff, props: 'racks', signs: [['COLD AISLE'], ['HOT AISLE', 'NO ENTRY'], ['RACK ROW 7'], ['DO NOT UNPLUG']], sbg: '#0c2a3a', sfg: '#9fe8ff' },
+  { place: 'GPU cluster', floor: 'dark', fl: 0x3a4048, rough: 0.55, wall: 0x2c3036, ceil: 0x1c1f24, cab: 0x1c1f24, cab2: 0x76ff3a, desk: 0x2c3036, light: 0xcfe6ff, fog: 0x0a0d12, sun: 1.05, hemi: 0.26, led: 0x76ff3a, props: 'gpu', signs: [['GPU CLUSTER'], ['TRAINING RUN', 'IN PROGRESS'], ['LIQUID COOLING', 'DO NOT TOUCH'], ['ATTENTION', 'IS ALL YOU NEED']], sbg: '#0a140a', sfg: '#76ff3a' },
+  { place: 'AI core', floor: 'white', fl: 0xe6eaee, rough: 0.6, wall: 0x2a2e35, ceil: 0x101216, cab: 0xe6eaee, cab2: 0x9a7aff, desk: 0xd8dde3, light: 0xe2e8ff, fog: 0x0b0d12, sun: 1.2, hemi: 0.3, led: 0x9a7aff, props: 'core', signs: [['AI CORE'], ['ALIGNMENT', 'IN PROGRESS'], ['DO NOT ASK IT', 'TO MAKE A GAME'], ['SCALING', 'LAWS APPLY']], sbg: '#120a24', sfg: '#c8b4ff' },
+  { place: 'virus', floor: 'dark', fl: 0x5a1820, rough: 0.6, wall: 0x2c0a0e, ceil: 0x14060a, cab: 0x2c0a0e, cab2: 0xff2040, desk: 0x3a1015, light: 0xff7080, fog: 0x1c0508, sun: 0.95, hemi: 0.24, led: 0xff2040, props: 'virus', signs: [['YOU MADE THIS'], ['MAKE A GAME'], ['ERROR'], ['NO EXIT']], sbg: '#1a0004', sfg: '#ff3a4e' },
+];
+const eraOf = (year, n) => (n >= LAST_LEVEL ? 7 : year < 1980 ? 0 : year < 1994 ? 1 : year < 2007 ? 2 : year < 2016 ? 3 : year < 2022 ? 4 : year < 2025 ? 5 : 6);
+function levelDef(n) {
+  n = clamp(n | 0, 1, LAST_LEVEL);
+  const d = BOSS_DATA[n - 1], era = n === 1 ? 0 : eraOf(d[1], n);
+  return { n, name: d[0], year: d[1], maker: d[2], look: d[3], color: d[4], sig: d[5], intro: d[6], taunts: [d[7], d[8]], p2: d[9], blurb: d[10], era,
+    title: n === 1 ? 'THE LAB' : n === LAST_LEVEL ? 'THE VIRUS' : (d[0] + "'s " + ERAS[era].place).toUpperCase(), seed: n * 7919 + 1301 };
+}
+/* the regular AIs on a level are older/dumber versions of the bosses that came before it */
+function levelAIName() { if (LVL.n <= 1 || Math.random() < 0.35) return null; const lo = Math.max(1, LVL.n - 14); return BOSS_DATA[randi(lo, LVL.n - 1) - 1][0]; }
+const lvlHpK = () => 1 + (LVL.n - 1) * 0.012, lvlDmgK = () => 1 + (LVL.n - 1) * 0.007, lvlTier = () => Math.min(3, Math.floor((LVL.n - 1) / 22));
+
+/* ---------- era materials (made once, recolored per era) ---------- */
+function eraTextures() {
+  if (TEX.rackFront) return;
+  /* carpet tiles (1990s offices) */
+  {
+    const N = 256, T = N / 2, n1 = fbm(N, 48, 2, 81, 0.6), n2 = fbm(N, 6, 3, 82), hgt = new Float32Array(N * N);
+    TEX.carpet = texFrom(pixCanvas(N, N, (x, y, i) => { const tx = x % T, ty = y % T, e = Math.min(tx, ty, T - 1 - tx, T - 1 - ty); const loop = (Math.sin(x * 1.7) * Math.sin(y * 1.7)) * 0.5 + 0.5; let a = 0.62 + (n1[i] - 0.5) * 0.25 + (n2[i] - 0.5) * 0.12 + loop * 0.05; if (e < 1) a *= 0.8; hgt[i] = loop * 0.5 + n1[i] * 0.5; return [a, a, a]; }));
+    TEX.carpetN = normalFromHeight(hgt, N, N, 3);
+  }
+  /* server rack fronts: 1U slots with vents and LEDs (the LEDs glow in the era's color) */
+  {
+    const W = 128, H = 512, c = mkCanvas(W, H), e = mkCanvas(W, H), x = c.getContext('2d'), xe = e.getContext('2d');
+    x.fillStyle = '#16181b'; x.fillRect(0, 0, W, H); xe.fillStyle = '#000'; xe.fillRect(0, 0, W, H);
+    for (let y = 4; y < H - 8; y += 16) {
+      const blank = Math.random() < 0.12; x.fillStyle = blank ? '#0c0d0f' : '#24272b'; x.fillRect(4, y, W - 8, 14);
+      if (blank) continue;
+      x.fillStyle = '#0b0c0e'; for (let k = 0; k < 18; k++) x.fillRect(40 + k * 4, y + 3, 2, 8);
+      for (let k = 0; k < 4; k++) { if (Math.random() < 0.3) continue; const lx = 8 + k * 7; xe.fillStyle = 'rgba(255,255,255,' + rand(0.4, 1) + ')'; xe.fillRect(lx, y + 5, 3, 3); x.fillStyle = '#505a50'; x.fillRect(lx, y + 5, 3, 3); }
+      if (Math.random() < 0.15) { xe.fillStyle = 'rgba(255,170,40,1)'; xe.fillRect(30, y + 5, 3, 3); }
+    }
+    TEX.rackFront = texFrom(c, false); TEX.rackE = texFrom(e, false);
+  }
+  /* flat screens: dark code editors and charts */
+  {
+    const c = mkCanvas(256, 160), x = c.getContext('2d'); x.fillStyle = '#0a0e16'; x.fillRect(0, 0, 256, 160);
+    const cols = ['#7ad0ff', '#ff7ab4', '#ffd23a', '#7aff9a', '#c0c8d0'];
+    for (let r = 0; r < 14; r++) { let px = 8 + (r % 3) * 10; while (px < 200) { const w = randi(8, 40); x.fillStyle = pick(cols); x.globalAlpha = 0.85; x.fillRect(px, 8 + r * 10, w, 4); px += w + 5; } }
+    x.globalAlpha = 1; x.strokeStyle = '#39ff88'; x.lineWidth = 2; x.beginPath(); for (let k = 0; k <= 12; k++) x.lineTo(160 + k * 7, 140 - Math.random() * 40 - k * 3); x.stroke();
+    TEX.lcd = texFrom(c, false);
+  }
+}
+function eraMaterials() {
+  if (MAT.rack) return;
+  eraTextures();
+  const std = (o) => new THREE.MeshStandardMaterial(o);
+  MAT.rack = std({ color: 0x23262a, map: TEX.paint, roughnessMap: TEX.paintR, roughness: 1, metalness: 0.6, envMapIntensity: 1 });
+  MAT.rackFront = std({ map: TEX.rackFront, emissiveMap: TEX.rackE, emissive: 0x3ec0ff, emissiveIntensity: 2.2, roughness: 0.45, metalness: 0.5 });
+  MAT.lcd = std({ color: 0x000000, emissiveMap: TEX.lcd, emissive: 0xffffff, emissiveIntensity: 1.3, roughness: 0.1, metalness: 0.2, envMapIntensity: 1.4 });
+  MAT.partition = std({ color: 0x6a7480, map: TEX.fabric, normalMap: TEX.fabricN, roughness: 0.95, metalness: 0 });
+  MAT.leaf = std({ color: 0x2f6a2c, roughness: 0.7, metalness: 0 });
+  MAT.pot = std({ color: 0x8a5a3a, roughness: 0.6, metalness: 0 });
+  MAT.whiteboard = std({ color: 0xf4f6f6, roughness: 0.15, metalness: 0.05, envMapIntensity: 1.2 });
+  MAT.neon = std({ color: 0x000000, emissive: 0x3ec0ff, emissiveIntensity: 2.6, roughness: 0.4 });
+  MAT.coolPipe = std({ color: 0x2a6aa8, roughness: 0.25, metalness: 0.7, envMapIntensity: 1.3 });
+  MAT.holo = std({ color: 0x000000, emissive: 0x9a7aff, emissiveIntensity: 1.6, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
+  MAT.whiteDesk = std({ color: 0xf0f0ee, roughness: 0.35, metalness: 0.05, envMapIntensity: 1 });
+  for (const k of ['neon', 'holo', 'lcd']) MAT[k].userData.noCast = true;
+}
+const ERA_BASE = {};
+function applyEra(e) {
+  eraMaterials();
+  if (!ERA_BASE.saved) {
+    ERA_BASE.saved = true;
+    for (const k of ['floor', 'wall', 'ceil', 'cabGray', 'cabBlue', 'desk']) ERA_BASE[k] = MAT[k].color.getHex();
+    Object.assign(ERA_BASE, { lp: MAT.lightPanel.emissive.getHex(), fog: FOG.col, sun: R.sun.intensity, hemi: R.hemi.intensity, rough: MAT.floor.roughness });
+  }
+  const E = ERAS[e] || ERAS[0], base = e === 0; LVL.era = e;
+  const carpet = E.floor === 'carpet';
+  MAT.floor.map = carpet ? TEX.carpet : TEX.floor; MAT.floor.normalMap = carpet ? TEX.carpetN : TEX.floorN; MAT.floor.roughnessMap = carpet ? null : TEX.floorR;
+  MAT.floor.color.setHex(base ? ERA_BASE.floor : E.fl); MAT.floor.roughness = base ? ERA_BASE.rough : E.rough; MAT.floor.needsUpdate = true;
+  MAT.wall.color.setHex(base ? ERA_BASE.wall : E.wall); MAT.ceil.color.setHex(base ? ERA_BASE.ceil : E.ceil);
+  MAT.cabGray.color.setHex(base ? ERA_BASE.cabGray : E.cab); MAT.cabBlue.color.setHex(base ? ERA_BASE.cabBlue : E.cab2); MAT.desk.color.setHex(base ? ERA_BASE.desk : E.desk);
+  MAT.lightPanel.emissive.setHex(base ? ERA_BASE.lp : E.light);
+  MAT.rackFront.emissive.setHex(E.led); MAT.neon.emissive.setHex(E.led); MAT.holo.emissive.setHex(E.led);
+  FOG.col = base ? ERA_BASE.fog : E.fog; R.scene.fog.color.setHex(FOG.col);
+  R.sun.intensity = base ? ERA_BASE.sun : E.sun; R.hemi.intensity = base ? ERA_BASE.hemi : E.hemi;
+}
+
+/* ---------- era props ---------- */
+const GEN = { res: [], walls: [], rng: null };
+const genFree = (x0, z0, x1, z1) => GEN.res.every((r) => x1 < r[0] || x0 > r[2] || z1 < r[1] || z0 > r[3]);
+const genRes = (x0, z0, x1, z1) => GEN.res.push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)]);
+const colRot = (x, z, rot, w, d, h, tag) => { const s = Math.abs(Math.sin(rot)) > 0.5, rw = s ? d : w, rd = s ? w : d; return addCol(x - rw / 2, 0, z - rd / 2, x + rw / 2, h, z + rd / 2, tag || null); };
+function serverRack(x, z, rot, h = 2.05, gpu = false) {
+  part(MAT.rack, rbox(0.62, h, 1.05, 0.02), x, z, rot, 0, h / 2, 0);
+  for (const sz of [-1, 1]) { const f = new THREE.PlaneGeometry(0.54, h - 0.12); if (sz < 0) f.rotateY(Math.PI); part(MAT.rackFront, f, x, z, rot, 0, h / 2, sz * 0.53); }
+  if (gpu) for (const lx of [-0.17, 0.17]) part(MAT.coolPipe, new THREE.CylinderGeometry(0.035, 0.035, 0.6, 8), x, z, rot, lx, h + 0.3, 0.3);
+  colRot(x, z, rot, 0.62, 1.05, h, 'cab');
+}
+function rackRow(x0, x1, z, gpu) { const h = gpu ? 2.35 : 2.05; for (let x = x0 + 0.31; x <= x1 - 0.31; x += 0.64) serverRack(x, z, 0, h, gpu); if (gpu) pipe(x0, h + 0.62, z + 0.3, x1, h + 0.62, z + 0.3, 0.06, MAT.coolPipe, 10); }
+function mainframeRow(x0, x1, z) { let x = x0 + 0.5; while (x < x1 - 0.7) { if (Math.random() < 0.55) { cabinet('tape', x, z); x += 1.12; } else { cabinet('cpu', x + 0.15, z); x += 1.45; } } }
+function flatScreen(x, y, z, rot, w = 0.6, h = 0.36) {
+  part(MAT.rack, new THREE.BoxGeometry(w, h, 0.03), x, z, rot, 0, y + 0.2 + h / 2, 0);
+  part(MAT.lcd, new THREE.PlaneGeometry(w - 0.04, h - 0.04), x, z, rot, 0, y + 0.2 + h / 2, 0.016);
+  part(MAT.metalDark, new THREE.BoxGeometry(0.05, 0.2, 0.05), x, z, rot, 0, y + 0.1, -0.03);
+  part(MAT.metalDark, new THREE.BoxGeometry(0.22, 0.015, 0.16), x, z, rot, 0, y + 0.008, -0.03);
+}
+function openDesk(x, z, rot, chair = true) {
+  part(MAT.whiteDesk, rbox(1.6, 0.035, 0.8, 0.01), x, z, rot, 0, 0.74, 0);
+  for (const sx of [-0.74, 0.74]) for (const sz of [-0.34, 0.34]) part(MAT.metal, new THREE.CylinderGeometry(0.02, 0.02, 0.72, 8), x, z, rot, sx, 0.36, sz);
+  flatScreen(x, 0.76, z, rot); part(MAT.keys, new THREE.BoxGeometry(0.44, 0.02, 0.14), x, z, rot, 0, 0.77, 0.22);
+  if (Math.random() < 0.5) part(MAT.redPaint, new THREE.CylinderGeometry(0.04, 0.035, 0.1, 10), x, z, rot, 0.55, 0.8, 0.15);
+  colRot(x, z, rot, 1.6, 0.8, 0.76, 'desk');
+  if (chair) officeChair(x + Math.sin(rot) * 0.8, z + Math.cos(rot) * 0.8, rot + Math.PI + rand(-0.4, 0.4));
+}
+function beigePCDesk(x, z, rot, chair = true) { crtDesk(x, z, rot, chair); part(MAT.crtCase, rbox(0.2, 0.42, 0.45, 0.01), x, z, rot, -0.55, 0.21, -0.05); }
+function cubicle(cx, cz, rot) {
+  const s = 2.6, h = 1.5;
+  for (const [lx, lz, w, d] of [[0, -s / 2, s, 0.06], [-s / 2, 0, 0.06, s], [s / 2, 0, 0.06, s]]) {
+    part(MAT.partition, new THREE.BoxGeometry(w, h, d), cx, cz, rot, lx, h / 2, lz);
+    part(MAT.metalDark, new THREE.BoxGeometry(w + 0.02, 0.04, d + 0.02), cx, cz, rot, lx, h + 0.02, lz);
+    const c = Math.cos(rot), sn = Math.sin(rot), wx = lx * c + lz * sn, wz = -lx * sn + lz * c;
+    colRot(cx + wx, cz + wz, rot, w, d, h);
+  }
+  beigePCDesk(cx + Math.sin(rot) * -0.75, cz + Math.cos(rot) * -0.75, rot, true);
+}
+function plant(x, z) {
+  part(MAT.pot, new THREE.CylinderGeometry(0.22, 0.16, 0.42, 14), x, z, 0, 0, 0.21, 0);
+  for (let k = 0; k < 6; k++) { const a = (k / 6) * TAU + rand(0, 1), g = new THREE.SphereGeometry(rand(0.16, 0.24), 8, 6); g.scale(1, 1.6, 0.6); part(MAT.leaf, g, x, z, a, 0.12, 0.62 + rand(0, 0.35), 0, 0.3, 0); }
+  addCol(x - 0.22, 0, z - 0.22, x + 0.22, 1.1, z + 0.22); LV.aoBlobs.push({ x, z, r: 0.3, a: 0.5 });
+}
+function waterCooler(x, z) {
+  part(MAT.whiteDesk, rbox(0.34, 0.95, 0.34, 0.02), x, z, 0, 0, 0.475, 0);
+  part(MAT.coolPipe, new THREE.CylinderGeometry(0.15, 0.15, 0.42, 16), x, z, 0, 0, 1.18, 0);
+  addCol(x - 0.18, 0, z - 0.18, x + 0.18, 1.4, z + 0.18);
+}
+function whiteboard(x, z, rot) {
+  part(MAT.whiteboard, new THREE.BoxGeometry(2, 1.1, 0.04), x, z, rot, 0, 1.55, 0);
+  part(MAT.metal, new THREE.BoxGeometry(2.06, 0.05, 0.08), x, z, rot, 0, 1.0, 0.02);
+  for (const sx of [-0.9, 0.9]) part(MAT.metal, new THREE.CylinderGeometry(0.02, 0.02, 2.1, 8), x, z, rot, sx, 1.05, -0.05);
+  colRot(x, z, rot, 2, 0.2, 2.1);
+}
+function coolingUnit(x, z, rot) {
+  part(MAT.cabGray, rbox(2.1, 2.2, 0.95, 0.03), x, z, rot, 0, 1.1, 0);
+  part(MAT.grille, new THREE.PlaneGeometry(1.7, 0.9), x, z, rot, 0, 1.55, 0.48);
+  part(MAT.neon, new THREE.BoxGeometry(0.3, 0.06, 0.01), x, z, rot, -0.6, 0.5, 0.48);
+  colRot(x, z, rot, 2.1, 0.95, 2.2);
+}
+function monolith(x, z) {
+  part(MAT.rack, rbox(1.3, 6.2, 1.3, 0.05), x, z, 0, 0, 3.1, 0);
+  for (let k = 0; k < 4; k++) part(MAT.neon, new THREE.BoxGeometry(0.06, 5.6, 0.02), x, z, (k * Math.PI) / 2, 0, 3.1, 0.66);
+  part(MAT.holo, new THREE.TorusGeometry(1.1, 0.03, 6, 32), x, z, 0, 0, 2.2, 0, Math.PI / 2);
+  addCol(x - 0.65, 0, z - 0.65, x + 0.65, 6.2, z + 0.65);
+}
+function holoPanel(x, z, rot) {
+  part(MAT.holo, new THREE.PlaneGeometry(1.8, 1.0), x, z, rot, 0, 1.7, 0);
+  part(MAT.neon, new THREE.BoxGeometry(1.84, 0.02, 0.02), x, z, rot, 0, 1.2, 0); part(MAT.neon, new THREE.BoxGeometry(1.84, 0.02, 0.02), x, z, rot, 0, 2.2, 0);
+  part(MAT.metalDark, new THREE.CylinderGeometry(0.03, 0.05, 1.2, 8), x, z, rot, 0, 0.6, 0);
+  addCol(x - 0.1, 0, z - 0.1, x + 0.1, 1.2, z + 0.1);
+}
+function virusShard(x, z) {
+  const h = rand(2, 5), g = new THREE.BoxGeometry(rand(0.5, 1.2), h, rand(0.5, 1.2)); g.rotateZ(rand(-0.25, 0.25)); g.rotateX(rand(-0.25, 0.25));
+  part(Math.random() < 0.5 ? MAT.neon : MAT.rack, g, x, z, rand(0, TAU), 0, h / 2, 0);
+  addCol(x - 0.6, 0, z - 0.6, x + 0.6, h, z + 0.6);
+}
+function copier(x, z, rot) { part(MAT.cabGray, rbox(1.1, 1.05, 0.7, 0.02), x, z, rot, 0, 0.525, 0); part(MAT.glass, new THREE.BoxGeometry(0.8, 0.02, 0.5), x, z, rot, 0, 1.06, 0); part(MAT.paper, new THREE.BoxGeometry(0.4, 0.06, 0.3), x, z, rot, 0.45, 0.85, 0.2); colRot(x, z, rot, 1.1, 0.7, 1.1); }
+
+/* fill one room with the era's stuff, staying out of doorways and special spots */
+function fillRoom(rm, style) {
+  const x0 = rm.x0 + 3, x1 = rm.x1 - 3, z0 = rm.z0 + 3.5, z1 = rm.z1 - 3.5;
+  const rows = (step, place, len0 = 6, len1 = 10) => {
+    for (let z = z0 + 1.5; z <= z1 - 1.5; z += step) {
+      let x = x0;
+      while (x < x1) { const len = Math.min(x1 - x, rand(len0, len1)); if (len > 2.4 && genFree(x - 0.4, z - 1.3, x + len + 0.4, z + 1.3)) { place(x, x + len, z); genRes(x - 0.4, z - 1.3, x + len + 0.4, z + 1.3); } x += len + 3.4; }
+    }
+  };
+  const grid = (cell, gap, place) => {
+    for (let z = z0; z + cell <= z1; z += cell + gap) for (let x = x0; x + cell <= x1; x += cell + gap) if (genFree(x - 0.3, z - 0.3, x + cell + 0.3, z + cell + 0.3)) { place(x + cell / 2, z + cell / 2); genRes(x - 0.3, z - 0.3, x + cell + 0.3, z + cell + 0.3); }
+  };
+  const scatter = (n, size, place) => { for (let k = 0; k < n * 6 && n > 0; k++) { const x = rand(x0, x1), z = rand(z0, z1); if (!genFree(x - size, z - size, x + size, z + size)) continue; place(x, z); genRes(x - size, z - size, x + size, z + size); n--; } };
+  if (rm.kind === 'storage') { scatter(10, 1.4, (x, z) => { crate(x, z); if (Math.random() < 0.5) crate(x + 1.2, z); if (Math.random() < 0.35) crate(x, z, 1.2, 1.2); }); scatter(3, 0.6, (x, z) => filingCabinet(x, z, randi(0, 3) * (Math.PI / 2))); return; }
+  switch (style) {
+    case 'mainframe': if (Math.random() < 0.65) rows(5.5, mainframeRow); else { grid(2.4, 3.6, (x, z) => crtDesk(x, z, randi(0, 3) * (Math.PI / 2))); scatter(2, 1.2, (x, z) => linePrinter(x, z, randi(0, 1) * Math.PI)); } break;
+    case 'beige': if (Math.random() < 0.4) rows(5.5, mainframeRow, 4, 7); else { grid(2.4, 3.4, (x, z) => beigePCDesk(x, z, randi(0, 3) * (Math.PI / 2))); scatter(2, 1.2, (x, z) => linePrinter(x, z, 0)); scatter(3, 0.5, (x, z) => filingCabinet(x, z, Math.PI / 2)); } break;
+    case 'cubicles': grid(2.8, 3.2, (x, z) => cubicle(x, z, randi(0, 3) * (Math.PI / 2))); scatter(3, 0.5, plant); scatter(1, 0.4, waterCooler); scatter(1, 1, (x, z) => copier(x, z, 0)); break;
+    case 'openoffice':
+      if (Math.random() < 0.25) { rows(5, (a, b, z) => rackRow(a, b, z, false), 3, 6); break; }
+      grid(3.4, 3.2, (x, z) => { openDesk(x - 0.8, z - 0.45, 0); openDesk(x + 0.8, z - 0.45, 0); openDesk(x - 0.8, z + 0.45, Math.PI); openDesk(x + 0.8, z + 0.45, Math.PI); });
+      scatter(4, 0.5, plant); scatter(2, 1.2, (x, z) => whiteboard(x, z, rand(0, TAU))); break;
+    case 'racks': rows(4.6, (a, b, z) => rackRow(a, b, z, false)); scatter(2, 1.4, (x, z) => coolingUnit(x, z, randi(0, 3) * (Math.PI / 2))); break;
+    case 'gpu': rows(5, (a, b, z) => rackRow(a, b, z, true)); scatter(2, 1.4, (x, z) => coolingUnit(x, z, randi(0, 3) * (Math.PI / 2))); break;
+    case 'core': if (Math.random() < 0.5) grid(1.4, 7, (x, z) => monolith(x, z)); else rows(5.2, (a, b, z) => rackRow(a, b, z, true), 4, 7); scatter(4, 1, (x, z) => holoPanel(x, z, rand(0, TAU))); break;
+    case 'virus': { const r = Math.random(); if (r < 0.3) rows(5, (a, b, z) => rackRow(a, b, z, true), 3, 6); else if (r < 0.55) rows(5.5, mainframeRow, 3, 6); else grid(2.8, 3.2, (x, z) => cubicle(x, z, randi(0, 3) * (Math.PI / 2))); scatter(6, 0.8, virusShard); break; }
+  }
+  if (Math.random() < 0.5) scatter(2, 0.6, (x, z) => column(x, z));
+}
+
+/* ---------- the level ---------- */
+function genLevel(def, attempt = 0) {
+  const rng = mulberry(def.seed + attempt * 101), mr = Math.random; Math.random = rng;
+  try { genLevelInner(def); } finally { Math.random = mr; }
+  /* every important spot must be reachable on foot from the start, or we try another layout */
+  if (attempt < 5 && !genReachable()) { console.warn('level ' + def.n + ' layout ' + attempt + ' had an unreachable spot, trying another'); unloadLevel(); LVL.n = def.n; genLevel(def, attempt + 1); }
+}
+const CXS = [-93.6, -56, -18.8, 18.8, 56, 93.6], CZS = [-76, -33.5, 9, 51.5, 93.6];
+function genLevelInner(def) {
+  const E = ERAS[def.era];
+  Object.assign(BOUNDS, { x0: -94, x1: 94, z0: -130, z1: 94 }); Object.assign(ARENA, { x0: -26, x1: 26, z1: -76, ceil: 15 }); Object.assign(START, { x: 0, z: 88, yaw: 0 });
+  Object.assign(LAKE, { x0: 1e6, x1: 1e6, z0: 1e6, z1: 1e6, floor: -2.6, surf: -0.35 });
+  const code = String(randi(1000, 9999));
+  Object.assign(LVL, { n: def.n, ceil: 8, code, era: def.era, bossName: def.name, bossYear: def.year, title: def.title, setting: 'a ' + E.place + ' ruled by ' + def.name, spotZ0: -72, spotZ1: 90, envPos: { x: 0, y: 4, z: 70 }, def });
+  Object.assign(PASS_DIGITS, { 1: code[0] + ' ' + code[1], 2: code[2], 3: code[3] });
+  SNIPER_PERCHES.length = 0; GEN.res = []; GEN.walls = []; GEN.booth = null; GEN.secret = null;
+  colInit();
+  /* ----- rooms + which ones connect ----- */
+  const rooms = [];
+  for (let c = 0; c < 5; c++) for (let r = 0; r < 4; r++) rooms.push({ c, r, x0: CXS[c], x1: CXS[c + 1], z0: CZS[r], z1: CZS[r + 1], cx: (CXS[c] + CXS[c + 1]) / 2, cz: (CZS[r] + CZS[r + 1]) / 2, kind: 'room' });
+  const room = (c, r) => rooms.find((q) => q.c === c && q.r === r);
+  const edges = new Map(), ek = (a, b) => (a.c < b.c || (a.c === b.c && a.r < b.r) ? a.c + ',' + a.r + '|' + b.c + ',' + b.r : b.c + ',' + b.r + '|' + a.c + ',' + a.r);
+  const seen = new Set(), stack = [room(2, 3)]; seen.add(stack[0]);
+  while (stack.length) {
+    const cur = stack[stack.length - 1], nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dc, dr]) => room(cur.c + dc, cur.r + dr)).filter((q) => q && !seen.has(q));
+    if (!nb.length) { stack.pop(); continue; }
+    const nx = pick(nb); seen.add(nx); edges.set(ek(cur, nx), Math.random() < 0.14 ? 'open' : 'door'); stack.push(nx);
+  }
+  for (const a of rooms) for (const [dc, dr] of [[1, 0], [0, 1]]) { const b = room(a.c + dc, a.r + dr); if (b && !edges.has(ek(a, b)) && Math.random() < 0.45) edges.set(ek(a, b), Math.random() < 0.3 ? 'open' : 'door'); }
+  /* ----- floor, ceiling, outer walls ----- */
+  const start = room(2, 3);
+  const lakeRoom = (def.era === 0 || def.era >= 4 ? Math.random() < 0.8 : Math.random() < 0.45) ? room(pick([0, 4]), randi(1, 2)) : null;
+  if (lakeRoom) { lakeRoom.kind = 'lake'; Object.assign(LAKE, { x0: lakeRoom.x0 + 4.5, x1: lakeRoom.x1 - 4.5, z0: lakeRoom.z0 + 5.5, z1: lakeRoom.z1 - 5.5 }); }
+  const L = LAKE;
+  if (lakeRoom) {
+    flatRect(-94, L.z1, 94, 94, 0, MAT.floor, 2.4); flatRect(-94, -130, 94, L.z0, 0, MAT.floor, 2.4); flatRect(-94, L.z0, L.x0, L.z1, 0, MAT.floor, 2.4); flatRect(L.x1, L.z0, 94, L.z1, 0, MAT.floor, 2.4);
+    flatRect(L.x0, L.z0, L.x1, L.z1, L.floor, MAT.concrete, 3);
+    box((L.x0 + L.x1) / 2, L.floor, L.z0 - 0.2, L.x1 - L.x0 + 0.8, -L.floor, 0.4, MAT.concrete, { col: false, tu: 3 }); box((L.x0 + L.x1) / 2, L.floor, L.z1 + 0.2, L.x1 - L.x0 + 0.8, -L.floor, 0.4, MAT.concrete, { col: false, tu: 3 });
+    box(L.x0 - 0.2, L.floor, (L.z0 + L.z1) / 2, 0.4, -L.floor, L.z1 - L.z0, MAT.concrete, { col: false, tu: 3 }); box(L.x1 + 0.2, L.floor, (L.z0 + L.z1) / 2, 0.4, -L.floor, L.z1 - L.z0, MAT.concrete, { col: false, tu: 3 });
+    for (const zz of [L.z0, L.z1]) box((L.x0 + L.x1) / 2, -0.02, zz, L.x1 - L.x0 + 0.6, 0.06, 0.3, MAT.yellow, { col: false });
+    for (const xx of [L.x0, L.x1]) box(xx, -0.02, (L.z0 + L.z1) / 2, 0.3, 0.06, L.z1 - L.z0, MAT.yellow, { col: false });
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(L.x1 - L.x0, L.z1 - L.z0), MAT.lake); water.rotation.x = -Math.PI / 2; water.position.set((L.x0 + L.x1) / 2, L.surf, (L.z0 + L.z1) / 2);
+    TEX.lake.repeat.set((L.x1 - L.x0) / 5, (L.z1 - L.z0) / 5); TEX.waterN.repeat.set((L.x1 - L.x0) / 5, (L.z1 - L.z0) / 5); water.renderOrder = 1; lvAdd(water); LV.water = water;
+    genRes(L.x0 - 2.5, L.z0 - 2.5, L.x1 + 2.5, L.z1 + 2.5);
+    signMesh(makeSign(['DATA LAKE', 'NO SWIMMING'], { bg: '#06222a', fg: '#3ef2ff', sizes: [70, 34] }), lakeRoom.cx, 2.4, lakeRoom.z0 + 0.45, 2.6, 1.3, 0);
+  } else flatRect(-94, -130, 94, 94, 0, MAT.floor, 2.4);
+  flatRect(-94, -76, 94, 94, 8, MAT.ceil, 1.2, true); flatRect(-26, -130, 26, -76, 15, MAT.ceil, 1.2, true);
+  wallX(93.6, -94, 94); wallZ(-93.6, -76, 94); wallZ(93.6, -76, 94);
+  wallX(-76, -94, -4); wallX(-76, 4, 94); box(0, 7, -76, 8, 1, 0.8, MAT.wall, { tu: 4, tv: 8 });
+  /* ----- inner walls with doorways ----- */
+  for (const a of rooms) for (const [dc, dr] of [[1, 0], [0, 1]]) {
+    const b = room(a.c + dc, a.r + dr); if (!b) continue;
+    const type = edges.get(ek(a, b));
+    const vertical = dc === 1, at = vertical ? CXS[a.c + 1] : CZS[a.r + 1], s0 = vertical ? CZS[a.r] : CXS[a.c], s1 = vertical ? CZS[a.r + 1] : CXS[a.c + 1];
+    if (type === 'open') { if (vertical) genRes(at - 3, s0, at + 3, s1); else genRes(s0, at - 3, s1, at + 3); continue; }
+    const gaps = [];
+    if (type === 'door') {
+      const two = s1 - s0 > 36 && Math.random() < 0.3, w = Math.random() < 0.3 ? 8 : 6;
+      if (two) { const m = (s0 + s1) / 2; for (const [p, q] of [[s0, m], [m, s1]]) { const c = rand(p + 4 + w / 2, q - 4 - w / 2); gaps.push([c - w / 2, c + w / 2]); } }
+      else { const c = rand(s0 + 6 + w / 2, s1 - 6 - w / 2); gaps.push([c - w / 2, c + w / 2]); }
+      for (const [g0, g1] of gaps) { if (vertical) genRes(at - 5.5, g0 - 1.5, at + 5.5, g1 + 1.5); else genRes(g0 - 1.5, at - 5.5, g1 + 1.5, at + 5.5); }
+    }
+    if (vertical) wallZ(at, s0, s1, gaps); else wallX(at, s0, s1, gaps);
+    GEN.walls.push({ vertical, at, s0, s1, gaps });
+  }
+  /* ----- the boss room (arena) ----- */
+  wallZ(-26, -130, -76, [], 15); wallZ(26, -130, -76, [], 15); wallX(-129.6, -26, 26, [], 15);
+  box(-15, 8, -76, 22, 7, 0.8, MAT.wall, { tu: 4, tv: 8 }); box(15, 8, -76, 22, 7, 0.8, MAT.wall, { tu: 4, tv: 8 }); box(0, 8, -76, 8, 7, 0.8, MAT.wall, { tu: 4, tv: 8 });
+  for (const [x, z] of [[-13, -92], [13, -92], [-15, -114], [15, -114]]) { part(MAT.concrete, rbox(2.2, 15, 2.2, 0.05), x, z, 0, 0, 7.5, 0); addCol(x - 1.1, 0, z - 1.1, x + 1.1, 15, z + 1.1); }
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI, x = Math.cos(a) * 22, z = -105 - Math.sin(a) * 22, rot = -a + Math.PI / 2;
+    if (def.era <= 1) cabinet(i % 2 ? 'cpu' : 'tape', x, z, rot); else if (def.era === 6) monolith(x, z); else serverRack(x, z, rot, 2.3, def.era >= 5);
+  }
+  for (let x = -18; x <= 18; x += 9) for (let z = -124; z <= -82; z += 7) troffer(x, z, 15, true);
+  buildBossDoor(0, -76, [def.name.toUpperCase(), def.maker + ' · ' + def.year, 'LEVEL ' + def.n], { w: 512, h: 448, bg: E.sbg, fg: E.sfg, sizes: [def.name.length > 12 ? 64 : 96, 26, 30], gap: 90, border: false, noise: 12 });
+  genRes(-12, -76, 12, -64);
+  /* ----- start room ----- */
+  genRes(-7, 79, 7, 93.6);
+  buildTerminal(0, -14.5, 72, Math.PI / 2); genRes(-22, 64, -7, 80);
+  signMesh(makeSign([def.name.toUpperCase() + ' · ' + def.year, def.maker], { bg: E.sbg, fg: E.sfg, sizes: [def.name.length > 14 ? 40 : 56, 28], w: 512, h: 220 }), 0, 4.2, 93.15, 4, 1.7, Math.PI);
+  LV.easter.push({ x: 0, z: 92.8, y: 4.2, text: def.name + ' (' + def.year + ', ' + def.maker + '): ' + def.blurb });
+  /* ----- special rooms ----- */
+  const used = new Set([start, lakeRoom].filter(Boolean));
+  const pickRoom = (ok) => { const c = rooms.filter((q) => !used.has(q) && ok(q)); const q = c.length ? pick(c) : pick(rooms.filter((r) => r !== start)); used.add(q); return q; };
+  const t1 = pickRoom((q) => q.r >= 1 && q.r <= 2), t2 = pickRoom((q) => q.r === 0);
+  for (const [i, rm] of [[1, t1], [2, t2]]) { const west = rm.c <= 2, x = west ? rm.x0 + 4.5 : rm.x1 - 4.5; buildTerminal(i, x, rm.cz, west ? Math.PI / 2 : -Math.PI / 2); genRes(x - 7.5, rm.cz - 7.5, x + 7.5, rm.cz + 7.5); }
+  const spRooms = [pickRoom((q) => q.c <= 1 && q.r <= 2), pickRoom((q) => q.c >= 3 && q.r <= 2), pickRoom((q) => q.r <= 1)];
+  spRooms.forEach((rm, i) => { const x = rm.cx + rand(-5, 5), z = rm.cz + rand(-5, 5); buildSpawner(i, x, z); genRes(x - 5, z - 5, x + 5, z + 5); rm.kind = 'compiler'; });
+  /* the high spot: a control booth on stilts, with stairs (sniper perch + a passcode piece on top) */
+  const boothRoom = pickRoom((q) => q.r >= 1 && q.r <= 2);
+  { const bx = boothRoom.cx + 3, bz = boothRoom.cz;
+    part(MAT.cabDark, rbox(12, 3, 12, 0.04), bx, bz, 0, 0, 1.5, 0); addCol(bx - 6, 0, bz - 6, bx + 6, 3, bz + 6);
+    box(bx, 3, bz, 12, 0.08, 12, MAT.grate, { col: false, tu: 1 });
+    for (let i = 0; i < 8; i++) box(bx - 11.625 + i * 0.75, 0, bz + 3, 0.75, (i + 1) * 0.375, 3, MAT.grate, { tu: 1 });
+    railing(bx - 6, bz - 5.95, bx + 6, bz - 5.95, 3); railing(bx + 5.95, bz - 6, bx + 5.95, bz + 6, 3); railing(bx - 6, bz + 5.95, bx + 6, bz + 5.95, 3); railing(bx - 5.95, bz - 6, bx - 5.95, bz, 3);
+    if (def.era <= 1) crtDesk(bx + 2, bz - 2, 0, false); else openDesk(bx + 2, bz - 2, 0, false);
+    genRes(bx - 15, bz - 6.5, bx + 6.5, bz + 6.5);
+    SNIPER_PERCHES.push({ x: bx + 4.8, y: 3, z: bz - 4.8, yaw: Math.PI }, { x: bx + 4.8, y: 3, z: bz + 4.8, yaw: 0 });
+    addPickup('pass', bx - 2, 3, bz - 3, { code: 2 }); boothRoom.kind = 'booth'; GEN.booth = { x: bx - 12.3, z: bz + 3 }; }
+  /* the secret room: behind a fake shelf in the outer wall of a side room */
+  const secRoom = pickRoom((q) => (q.c === 0 || q.c === 4) && q !== lakeRoom && q.r <= 2);
+  { const east = secRoom.c === 4, wx = east ? 84 : -84, out = east ? 93.6 : -93.6, zc = secRoom.cz;
+    wallZ(wx, zc - 5, zc + 5, [[zc - 2, zc + 2]]); wallX(zc - 5, Math.min(wx, out), Math.max(wx, out)); wallX(zc + 5, Math.min(wx, out), Math.max(wx, out));
+    const fake = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.6, 4), [MAT.shelf, MAT.shelf, MAT.shelfFrame, MAT.shelfFrame, MAT.shelfFrame, MAT.shelfFrame]);
+    fake.position.set(wx, 1.3, zc); fake.castShadow = true; fake.receiveShadow = true; lvAdd(fake);
+    LV.secret = { mesh: fake, col: addCol(wx - 0.35, 0, zc - 2, wx + 0.35, 3.4, zc + 2, 'secret'), open: false, t: 0, ix: east ? wx - 0.4 : wx + 0.4, iz: zc, side: east ? (x) => x < wx : (x) => x > wx, closedPos: { x: wx, y: 1.3, z: zc }, openPos: { x: wx, z: zc - 3.9 } };
+    box(wx, 2.6, zc, 0.8, 0.8, 4, MAT.wall, { tu: 4, tv: 8 });
+    const mid = (wx + out) / 2;
+    addPickup('pass', mid, 0.4, zc - 1.5, { code: 1 }); addPickup('crypto', mid, 0, zc + 2, { amount: 200 + def.n * 8 });
+    signMesh(makeSign([def.name.toUpperCase()], { bg: E.sbg, fg: E.sfg, sizes: [60], w: 512, h: 128, border: false, noise: 0 }), out + (east ? -0.45 : 0.45), 2.2, zc, 2.4, 0.6, east ? -Math.PI / 2 : Math.PI / 2, 1);
+    genRes(Math.min(wx, out) - 0.5, zc - 5.5, Math.max(wx, out) + 0.5, zc + 5.5); genRes(east ? wx - 4 : wx, zc - 3, east ? wx : wx + 4, zc + 3);
+    GEN.secret = { x0: Math.min(wx, out), x1: Math.max(wx, out), z0: zc - 5, z1: zc + 5 }; }
+  /* passcode 3: at the bottom of the data lake, or hidden in a far corner */
+  if (lakeRoom) { addPickup('pass', (L.x0 + L.x1) / 2 + rand(-6, 6), L.floor, (L.z0 + L.z1) / 2 + rand(-6, 6), { code: 3, dive: true }); addPickup('crypto', L.x0 + 3, L.floor, L.z1 - 3, { amount: 150 + def.n * 5, dive: true }); }
+  else { const rm = pickRoom((q) => q.r <= 1 && q !== start), cx = Math.random() < 0.5 ? rm.x0 + 2 : rm.x1 - 2, cz = Math.random() < 0.5 ? rm.z0 + 2.2 : rm.z1 - 2.2; addPickup('pass', cx, 0, cz, { code: 3 }); genRes(cx - 1.5, cz - 1.5, cx + 1.5, cz + 1.5); }
+  /* alarm towers */
+  const towerRooms = rooms.filter((q) => q !== start).sort(() => Math.random() - 0.5).slice(0, 5);
+  towerRooms.forEach((rm, i) => { for (let k = 0; k < 30; k++) { const x = rand(rm.x0 + 3, rm.x1 - 3), z = rand(rm.z0 + 3, rm.z1 - 3); if (!genFree(x - 1.5, z - 1.5, x + 1.5, z + 1.5)) continue; buildTower(i, x, z); genRes(x - 1.5, z - 1.5, x + 1.5, z + 1.5); break; } });
+  /* goo puddles */
+  for (let k = 0; k < randi(2, 5); k++) { const rm = pick(rooms.filter((q) => q !== start)); for (let t = 0; t < 20; t++) { const x = rand(rm.x0 + 4, rm.x1 - 4), z = rand(rm.z0 + 4, rm.z1 - 4), r = rand(1.8, 3); if (!genFree(x - r, z - r, x + r, z + r)) continue; const g = new THREE.CircleGeometry(r, 28); g.rotateX(-Math.PI / 2); g.translate(x, 0.02, z); addGeo(MAT.goo, g); LV.goo.push({ x, z, r: r * 0.9 }); genRes(x - r, z - r, x + r, z + r); break; } }
+  /* health, armor */
+  for (const kind of ['med', 'med', 'med', 'med', 'armor', 'armor']) { const rm = pick(rooms); for (let t = 0; t < 30; t++) { const x = rand(rm.x0 + 2, rm.x1 - 2), z = rand(rm.z0 + 2, rm.z1 - 2); if (!genFree(x - 0.8, z - 0.8, x + 0.8, z + 0.8)) continue; addPickup(kind, x, 0, z); genRes(x - 0.8, z - 0.8, x + 0.8, z + 0.8); break; } }
+  addPickup('ammo', -20, 0, -96, { respawn: 25 }); addPickup('ammo', 20, 0, -122, { respawn: 25 }); addPickup('med', -22, 0, -80);
+  /* ----- fill the rooms ----- */
+  const store = pickRoom(() => true); if (store !== start) store.kind = 'storage';
+  for (const rm of rooms) {
+    if (rm === start) { if (def.era >= 4) { rackRow(-17, -9, 58, def.era >= 5); rackRow(9, 17, 58, def.era >= 5); } else { crate(14, 88); crate(15.2, 88); crate(14.6, 88, 1.2, 1.2); if (def.era <= 1) crtDesk(-12, 86, 0); else if (def.era === 2) beigePCDesk(-12, 86, 0); else openDesk(-12, 86, 0); } continue; }
+    fillRoom(rm, E.props);
+  }
+  /* ----- lights, posters, pipes ----- */
+  const nearWall = (x, z) => CXS.some((w) => Math.abs(x - w) < 1) || CZS.some((w) => Math.abs(z - w) < 1);
+  for (let x = -90; x <= 90; x += 6) for (let z = -72; z <= 90; z += 6) if (!nearWall(x, z)) troffer(x, z);
+  for (const [ax, az, bx, bz] of [[-93, 92.6, 93, 92.6], [-93, -75.4, -27, -75.4], [27, -75.4, 93, -75.4]]) { pipe(ax, 7.3, az, bx, 7.3, bz, 0.09, def.era >= 4 ? MAT.coolPipe : MAT.redPaint); pipe(ax, 7.0, az, bx, 7.0, bz, 0.06, MAT.metal); }
+  for (const w of GEN.walls) {
+    if (Math.random() < 0.45) continue;
+    const len = w.s1 - w.s0; let p = rand(w.s0 + 3, w.s1 - 3);
+    if (w.gaps.some(([g0, g1]) => p > g0 - 2.5 && p < g1 + 2.5) || len < 10) continue;
+    const lines = pick(E.signs), side = Math.random() < 0.5 ? 1 : -1, tex = makeSign(lines, { bg: E.sbg, fg: E.sfg, sizes: [lines[0].length > 10 ? 48 : 70, 30], w: 512, h: 256 });
+    if (w.vertical) signMesh(tex, w.at + side * 0.45, 3.2, p, 2.6, 1.3, side > 0 ? Math.PI / 2 : -Math.PI / 2); else signMesh(tex, p, 3.2, w.at + side * 0.45, 2.6, 1.3, side > 0 ? 0 : Math.PI);
+  }
+  LVL.popOk = (x, z) => Math.hypot(x - START.x, z - START.z) > 42 && !inArena(x, z) && z > -74 && !inLake(x, z) && !(GEN.secret && x > GEN.secret.x0 - 1 && x < GEN.secret.x1 + 1 && z > GEN.secret.z0 - 1 && z < GEN.secret.z1 + 1);
+  buildCabinets();
+  bakeFloorMaps();
+  flushGeo();
+  LV.built = true;
+}
+/* can you walk from the start to every terminal, compiler, tower, passcode and the door keypad? */
+function genReachable() {
+  ffInit();
+  const seenC = new Uint8Array(FF.nx * FF.nz), q = [], s = ffIdx(START.x, START.z);
+  if (s < 0 || FF.blocked[s]) return false;
+  q.push(s); seenC[s] = 1;
+  while (q.length) { const c = q.pop(), i = c % FF.nx, j = (c / FF.nx) | 0; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= FF.nx || jj >= FF.nz) continue; const n = jj * FF.nx + ii; if (seenC[n] || FF.blocked[n]) continue; seenC[n] = 1; q.push(n); } }
+  const near = (x, z, r = 3) => { for (let dz = -r; dz <= r; dz += 1) for (let dx = -r; dx <= r; dx += 1) { const c = ffIdx(x + dx, z + dz); if (c >= 0 && seenC[c]) return true; } return false; };
+  const pts = [[DOOR.padX, DOOR.padZ + 1.5], ...TERMS.map((T) => [T.front.x, T.front.z]), ...SPAWNERS.map((S) => [S.x, S.z]), ...TOWERS.map((T) => [T.x, T.z])];
+  for (const p of LV.pickups) if (p.kind === 'pass' && !p.dive && p.y < 1) pts.push([p.x, p.z]);
+  if (GEN.booth) pts.push([GEN.booth.x, GEN.booth.z]);
+  if (LV.secret) pts.push([LV.secret.ix + (LV.secret.side(LV.secret.ix + 1) ? 1.5 : -1.5), LV.secret.iz]);
+  return pts.every(([x, z]) => near(x, z, x === DOOR.padX ? 2 : 4));
+}
+/* ============================ BOSS ENGINE ============================ */
+/* every boss after ELIZA: a body (8 kinds), the attacks that fit it, plus its own special move.
+   Phase 2 at half health (faster, summons help). The Final Four and THE VIRUS also get a phase 3 at a quarter. */
+const LOOK_MOVES = {
+  crt: ['fan', 'ring', 'beam', 'textwall'], dos: ['fan', 'ring', 'beam', 'textwall'], cab: ['fan', 'beam', 'ring', 'minigun'], orb: ['fan', 'homing', 'ring', 'teleport'],
+  avatar: ['fan', 'homing', 'teleport', 'textwall'], ape: ['fan', 'slam', 'dash', 'ring'], robot: ['minigun', 'slam', 'homing', 'beam'], logo: ['fan', 'textwall', 'homing', 'beam', 'ring'],
+  board: ['fan', 'ring', 'beam'], virus: ['fan', 'ring', 'homing', 'beam', 'textwall', 'minigun', 'slam'],
+};
+/* the special move of every boss: [attack, options] */
+const SIG = {
+  parity: ['textwall', { word: 'PARITY ERROR' }], popups: ['hack', { popups: 2, summon: ['drone', 'TOOLBAR', 3] }], paranoid: ['teleport', { mines: 3 }], poetry: ['textwall', { word: 'POETRY' }],
+  nonsense: ['hack', { flip: 3 }], blocks: ['rain', { obj: 'block' }], mirror: ['shield', { t: 3, reflect: true }], buddies: ['summon', { type: 'drone', name: 'BUDDY', n: 3 }],
+  chess: ['rain', { obj: 'chess', summon: ['tape', 'PAWN', 4] }], turing: ['clones', { n: 3 }], mimic: ['fan', { wide: true }], sass: ['dash', {}],
+  web: ['shield', { t: 2.5 }], jeopardy: ['rain', { obj: 'quiz' }], cards: ['fan', { wide: true }], halo: ['shield', { t: 3 }], prime: ['rain', { obj: 'box' }],
+  empathy: ['homing', { n: 6 }], evil: ['ring', { n: 20 }], dodge: ['teleport', {}], dots: ['summon', { type: 'drone', name: 'DOT', n: 4, colors: [0x4285f4, 0xea4335, 0xfbbc05, 0x34a853] }],
+  button: ['hack', { flip: 2.5 }], feelings: ['rain', { obj: 'heart' }], go: ['rain', { obj: 'stone' }], selfplay: ['clones', { n: 2 }], five: ['summon', { type: 'grunt', name: 'FIVE', n: 4 }],
+  zerg: ['summon', { type: 'rusher', name: 'ZERGLING', n: 7 }], unsup: ['textwall', { word: 'the' }], mask: ['invis', { t: 4 }], danger: ['textwall', { word: 'FAKE NEWS' }],
+  text2text: ['fan', { wide: true }], sensible: ['ring', {}], blend: ['summon', { type: 'grunt', name: 'BLEND', n: 2 }], fewshot: ['fan', { lead: true }], open: ['clones', { n: 3 }],
+  jurassic: ['rain', { obj: 'meteor' }], burrow: ['teleport', { slam: true }], sentient: ['pull', { t: 3 }], papers: ['rain', { obj: 'paper' }], bloom: ['rain', { obj: 'flower' }],
+  optimal: ['charge', { t: 2.5 }], palm: ['slam', {}], refusal: ['shield', { t: 3, reflect: true }], spit: ['fan', { n: 9 }], herd: ['summon', { type: 'rusher', name: 'HERD', n: 5 }],
+  hallucinate: ['hack', { fake: true }], love: ['homing', { n: 6 }], constitution: ['shield', { t: 2.5 }], dive: ['dash', { sky: true }], kind: ['ring', {}],
+  longctx: ['textwall', { long: true }], wind: ['pull', { t: 3, push: true }], meme: ['rain', { obj: 'x' }], experts: ['summon', { type: 'drone', name: 'EXPERT', n: 4 }],
+  twins: ['clones', { n: 1 }], sparks: ['charge', { t: 3 }], predict: ['fan', { lead: true }], gem: ['ring', {}], tiny: ['teleport', { fast: true }], retrieve: ['pull', { t: 3 }],
+  opus: ['beam', {}], artifacts: ['summon', { type: 'drone', name: 'ARTIFACT', n: 3 }], qwen: ['minigun', {}], think: ['charge', { t: 4 }], cheap: ['summon', { type: 'rusher', name: 'CHEAP COPY', n: 6 }],
+  flash: ['teleport', { fast: true }], hybrid: ['charge', { t: 2.5 }], bigbrain: ['charge', { t: 3.5 }], slam: ['slam', {}], agents: ['summon', { type: 'grunt', name: 'SUB-AGENT', n: 3 }],
+  moon: ['rain', { obj: 'moon' }], router: ['minigun', {}], final: ['charge', { t: 3 }], virus: ['hack', { flip: 4, popups: 3 }],
+};
+const FINAL_FOUR = [['GROK', 0xf0f0f0], ['CHATGPT', 0x10a37f], ['CLAUDE', 0xd97757], ['GEMINI', 0x8ab4ff]];
+
+/* ---------- bodies ---------- */
+function genFaceCanvas(E) { E.canvas = mkCanvas(512, 384); E.tex = texFrom(E.canvas, false); E.mouth = ''; E.mouthN = 0; E.blink = 0; E.lookX = 0; E.lookY = 0; E.faceT = 0; E.cracks = []; for (let k = 0; k < 6; k++) { const pts = [[256 + rand(-40, 40), 192 + rand(-30, 30)]]; for (let j = 0; j < 5; j++) { const l = pts[pts.length - 1]; pts.push([l[0] + rand(-80, 80), l[1] + rand(-60, 60)]); } E.cracks.push(pts); } }
+function drawGenFace(E) {
+  const c = E.canvas; if (!c) return; const x = c.getContext('2d'), W2 = 512, H = 384, p2 = E.phase >= 2, def = E.def;
+  const col = '#' + new THREE.Color(p2 && def.sig === 'evil' ? 0xff2a3d : def.color).getHexString();
+  const dos = def.look === 'dos', av = def.look === 'avatar';
+  x.fillStyle = dos ? (p2 ? '#4a0010' : '#0000aa') : av ? '#0a0610' : '#020806'; x.fillRect(0, 0, W2, H);
+  x.strokeStyle = dos ? '#ffffff' : col; x.fillStyle = dos ? '#ffffff' : col; x.lineWidth = 9; x.shadowColor = col; x.shadowBlur = dos ? 0 : 18;
+  if (av) { /* a glitchy human face */
+    x.lineWidth = 6; x.beginPath(); x.ellipse(256, 200, 150, 180, 0, 0, TAU); x.stroke();
+    for (const side of [-1, 1]) { const ex = 256 + side * 62, ey = 160; x.beginPath(); x.ellipse(ex, ey, 34, E.blink > 0 ? 4 : 18, 0, 0, TAU); x.stroke(); if (E.blink <= 0) { x.beginPath(); x.arc(ex + E.lookX * 12, ey + E.lookY * 6, 9, 0, TAU); x.fill(); } }
+    x.beginPath(); x.arc(256, 250, 50, 0.15 * Math.PI, 0.85 * Math.PI); x.stroke();
+  } else for (const side of [-1, 1]) {
+    const ex = W2 / 2 + side * 112, ey = 130;
+    if (dos) { x.fillRect(ex - 40, ey - 26, 80, E.blink > 0 ? 6 : 52); continue; }
+    x.beginPath(); x.ellipse(ex, ey, 72, E.blink > 0 ? 5 : 46, 0, 0, TAU); x.stroke();
+    if (E.blink <= 0) { x.beginPath(); x.arc(ex + E.lookX * 30, ey + E.lookY * 16, 19, 0, TAU); x.fill(); }
+    if (p2) { x.beginPath(); x.moveTo(ex - 80, ey - 70 + side * -18); x.lineTo(ex + 70, ey - 70 + side * 18); x.stroke(); }
+  }
+  x.shadowBlur = dos ? 0 : 8; x.font = 'bold 26px monospace'; x.textAlign = 'center';
+  const txt = E.mouth.slice(0, Math.floor(E.mouthN)), words = txt.split(' '), lines = [''];
+  for (const w of words) { if ((lines[lines.length - 1] + ' ' + w).length > 26) lines.push(w); else lines[lines.length - 1] = (lines[lines.length - 1] + ' ' + w).trim(); }
+  lines.slice(-3).forEach((l, i) => x.fillText(l, W2 / 2, (av ? 330 : 262) + i * 34 - (av ? 30 : 0)));
+  x.shadowBlur = 0;
+  if (p2) { x.strokeStyle = 'rgba(255,255,255,.7)'; x.lineWidth = 2; for (const pts of E.cracks) { x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (const q of pts) x.lineTo(q[0], q[1]); x.stroke(); } }
+  x.fillStyle = 'rgba(0,0,0,.25)'; for (let y = 0; y < H; y += 3) x.fillRect(0, y, W2, 1);
+  if ((p2 || av) && Math.random() < 0.3) { x.fillStyle = 'rgba(255,40,60,.22)'; x.fillRect(0, rand(0, H), W2, rand(4, 30)); }
+  E.tex.needsUpdate = true;
+}
+function buildBossModel(E, def) {
+  const g = new THREE.Group(), col = new THREE.Color(def.color), std = (o) => new THREE.MeshStandardMaterial(o);
+  const glow = std({ color: 0x000000, emissive: col, emissiveIntensity: 2, roughness: 0.3 });
+  const body = std({ color: col.clone().multiplyScalar(0.55), roughness: 0.35, metalness: 0.6, envMapIntensity: 1.2 });
+  const dark = std({ color: 0x15171a, roughness: 0.5, metalness: 0.6 });
+  const add = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
+  E.spin = []; E.hb = { r: 3, cy: 0 }; E.weak = 'core'; E.ground = false; E.glowMat = glow;
+  const faceMat = () => { genFaceCanvas(E); return std({ color: 0x000000, emissive: 0xffffff, emissiveMap: E.tex, emissiveIntensity: 1.7, roughness: 0.08, metalness: 0.2 }); };
+  switch (def.look) {
+    case 'crt': case 'dos': {
+      const cs = std({ color: def.look === 'dos' ? 0xcfc8b4 : 0xcdc4ab, roughness: 0.42, metalness: 0.1 });
+      add(new RoundedBoxGeometry(5.2, 4.2, 3.6, 3, 0.35), cs); add(new RoundedBoxGeometry(4.6, 3.5, 0.3, 2, 0.15), dark, 0, 0, 1.72);
+      E.screen = add(new THREE.PlaneGeometry(4.25, 3.15), faceMat(), 0, 0, 1.885); add(new RoundedBoxGeometry(3.8, 3.2, 2.4, 3, 0.45), cs, 0, 0, -2.5);
+      const ring = add(new THREE.TorusGeometry(2.1, 0.09, 8, 44), glow, 0, -2.7, 0); ring.rotation.x = Math.PI / 2;
+      E.hb = { r: 3.1, cy: 0 }; E.weak = 'face'; break;
+    }
+    case 'cab': {
+      add(new RoundedBoxGeometry(5.4, 7.2, 3.2, 3, 0.2), dark); E.screen = add(new THREE.PlaneGeometry(4.4, 3.3), faceMat(), 0, 1.3, 1.61);
+      for (let k = 0; k < 5; k++) add(new THREE.BoxGeometry(4.4, 0.08, 0.02), glow, 0, -1.2 - k * 0.42, 1.61);
+      for (const sx of [-2.75, 2.75]) add(new THREE.BoxGeometry(0.1, 6.8, 3), body, sx, 0, 0);
+      E.hb = { r: 3.6, cy: 0 }; E.weak = 'face'; break;
+    }
+    case 'avatar': {
+      const skin = std({ color: col.clone().lerp(new THREE.Color(0xffffff), 0.35), roughness: 0.4, metalness: 0.3, transparent: true, opacity: 0.92 });
+      const head = add(new THREE.SphereGeometry(2.2, 32, 24), skin); head.scale.set(1, 1.2, 0.95);
+      E.screen = add(new THREE.PlaneGeometry(3.4, 2.55), faceMat(), 0, 0.1, 2.05);
+      const sh = add(new THREE.CapsuleGeometry(1.2, 4.2, 6, 16), body, 0, -3.4, -0.2); sh.rotation.z = Math.PI / 2;
+      const halo = add(new THREE.TorusGeometry(2.8, 0.06, 6, 48), glow, 0, 0.2, 0); E.spin.push([halo, 0.6, 'y']);
+      E.hb = { r: 2.9, cy: -0.3 }; E.weak = 'face'; break;
+    }
+    case 'orb': {
+      E.screen = add(new THREE.SphereGeometry(1.6, 32, 24), std({ color: 0x050608, emissive: col, emissiveIntensity: 2.2, roughness: 0.15, metalness: 0.3 }));
+      add(new THREE.SphereGeometry(2.2, 32, 24), std({ color: col, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.18, depthWrite: false }));
+      for (let k = 0; k < 3; k++) { const r = add(new THREE.TorusGeometry(2.6 + k * 0.45, 0.07, 8, 64), k === 1 ? glow : body); r.rotation.x = k * 1.1; E.spin.push([r, 0.8 + k * 0.5, k % 2 ? 'x' : 'y']); }
+      E.hb = { r: 2.6, cy: 0 }; break;
+    }
+    case 'ape': {
+      const fur = std({ color: col, roughness: 0.9, metalness: 0 }), long = /llama|alpaca|vicuna/i.test(def.name);
+      const b = add(new THREE.SphereGeometry(2.6, 28, 20), fur, 0, -1, 0); b.scale.set(1, 1.15, 0.9);
+      const hy = long ? 3.6 : 2.2; if (long) add(new THREE.CylinderGeometry(0.8, 1.1, 3, 16), fur, 0, 1.6, 0.8);
+      add(new THREE.SphereGeometry(1.5, 24, 18), fur, 0, hy, long ? 1.4 : 0.5);
+      for (const s of [-1, 1]) {
+        add(new THREE.SphereGeometry(0.42, 12, 10), long ? fur : body, s * 1.2, hy + (long ? 1.2 : 0.6), long ? 1.2 : 0.3);
+        add(new THREE.SphereGeometry(0.34, 14, 10), std({ color: 0xffffff, roughness: 0.2 }), s * 0.55, hy + 0.3, (long ? 1.4 : 0.5) + 1.25);
+        add(new THREE.SphereGeometry(0.17, 10, 8), std({ color: 0x050505, roughness: 0.1 }), s * 0.55, hy + 0.32, (long ? 1.4 : 0.5) + 1.52);
+        const arm = add(new THREE.CapsuleGeometry(0.55, 2.6, 6, 12), fur, s * 2.7, -1.2, 0.3); arm.rotation.z = s * 0.35;
+      }
+      add(new THREE.SphereGeometry(0.7, 16, 12), body, 0, hy - 0.5, (long ? 1.4 : 0.5) + 1.2);
+      E.screen = add(new THREE.CircleGeometry(0.9, 24), glow, 0, -0.6, 2.36);
+      E.hb = { r: 3.2, cy: 0 }; break;
+    }
+    case 'robot': {
+      E.ground = true;
+      const torso = add(new RoundedBoxGeometry(4.4, 4.2, 2.6, 2, 0.3), body, 0, 6.2, 0);
+      add(new RoundedBoxGeometry(2.2, 1.8, 2, 2, 0.3), dark, 0, 9.2, 0); E.screen = add(new THREE.BoxGeometry(1.8, 0.35, 0.05), glow, 0, 9.3, 1.02);
+      add(new THREE.CircleGeometry(0.7, 24), glow, 0, 6.6, 1.31);
+      for (const s of [-1, 1]) {
+        add(new RoundedBoxGeometry(1.2, 3.8, 1.2, 2, 0.2), body, s * 2.9, 6, 0); const cn = add(new THREE.CylinderGeometry(0.45, 0.55, 2, 16), dark, s * 2.9, 3.6, 0.6); cn.rotation.x = Math.PI / 2;
+        add(new RoundedBoxGeometry(1.4, 4, 1.5, 2, 0.2), dark, s * 1.2, 2, 0);
+      }
+      torso.castShadow = true; E.hb = { r: 4.4, cy: 5.5 }; break;
+    }
+    case 'board': {
+      const c = mkCanvas(256, 256), q = c.getContext('2d'); q.fillStyle = '#d8a860'; q.fillRect(0, 0, 256, 256); q.strokeStyle = '#3a2a10'; q.lineWidth = 2;
+      for (let i = 0; i < 13; i++) { const p = 10 + i * 19.5; q.beginPath(); q.moveTo(10, p); q.lineTo(246, p); q.stroke(); q.beginPath(); q.moveTo(p, 10); q.lineTo(p, 246); q.stroke(); }
+      for (let k = 0; k < 18; k++) { q.fillStyle = k % 2 ? '#111' : '#f4f4f4'; q.beginPath(); q.arc(10 + randi(0, 12) * 19.5, 10 + randi(0, 12) * 19.5, 8, 0, TAU); q.fill(); }
+      const top = std({ map: texFrom(c, false), roughness: 0.5 }), wood = std({ color: 0x8a5a2a, roughness: 0.6 });
+      const brd = add(new THREE.BoxGeometry(5.6, 0.6, 5.6), [wood, wood, top, wood, wood, wood]); brd.rotation.x = 0.9; E.spin.push([brd, 0, 'none']);
+      E.screen = add(new THREE.SphereGeometry(0.9, 24, 16), glow, 0, -1.6, 0);
+      for (let k = 0; k < 6; k++) { const st = add(new THREE.SphereGeometry(0.45, 16, 10), std({ color: k % 2 ? 0x111111 : 0xf4f4f4, roughness: 0.2 })); st.scale.y = 0.45; E.spin.push([st, 1 + k * 0.1, 'orbit', k]); }
+      E.hb = { r: 3.2, cy: 0 }; break;
+    }
+    case 'virus': {
+      const red = std({ color: 0x300008, emissive: 0xff1030, emissiveIntensity: 1.6, roughness: 0.3, metalness: 0.5 });
+      E.screen = add(new THREE.IcosahedronGeometry(1.8, 1), std({ color: 0x000000, emissive: 0xff2040, emissiveIntensity: 2.6, roughness: 0.2 }));
+      for (let k = 0; k < 14; k++) { const s = add(new THREE.OctahedronGeometry(rand(0.5, 1.2), 0), k % 3 ? red : dark); const a = rand(0, TAU), b = rand(-1, 1); s.position.set(Math.cos(a) * 3 * Math.sqrt(1 - b * b), b * 3, Math.sin(a) * 3 * Math.sqrt(1 - b * b)); E.spin.push([s, rand(0.5, 2), 'y']); }
+      FINAL_FOUR.forEach(([, c4], k) => { const o = add(new THREE.SphereGeometry(0.7, 20, 14), std({ color: 0x000000, emissive: c4, emissiveIntensity: 2.4 })); E.spin.push([o, 0.7, 'orbit', k * 1.5]); });
+      E.hb = { r: 3.4, cy: 0 }; break;
+    }
+    default: { /* logo: each company gets a shape */
+      const m = def.maker; let geo;
+      if (m === 'OpenAI') geo = new THREE.TorusKnotGeometry(1.9, 0.42, 200, 20, 2, 5);
+      else if (m === 'Anthropic') { for (let k = 0; k < 10; k++) { const sp = add(new THREE.ConeGeometry(0.28, 2.6, 10), body); sp.rotation.z = (k / 10) * TAU; sp.position.set(Math.sin((k / 10) * TAU) * -1.3, Math.cos((k / 10) * TAU) * 1.3, 0); } geo = null; }
+      else if (m === 'Google') { geo = new THREE.OctahedronGeometry(2.4, 0); geo.scale(0.45, 1, 0.45); const g2 = new THREE.OctahedronGeometry(2.4, 0); g2.scale(1, 0.45, 0.45); add(g2, body); }
+      else if (m === 'Meta') geo = new THREE.TorusKnotGeometry(1.6, 0.38, 160, 18, 1, 2);
+      else if (m === 'xAI') { const a1 = add(new THREE.BoxGeometry(0.6, 5, 0.6), body); a1.rotation.z = 0.7; geo = new THREE.BoxGeometry(0.6, 5, 0.6); geo.rotateZ(-0.7); }
+      else if (m === 'Mistral AI') { for (let k = 0; k < 5; k++) add(new THREE.BoxGeometry(4 - k * 0.5, 0.5, 0.8), k % 2 ? glow : body, 0, k * 0.65 - 1.3, 0); geo = null; }
+      else if (m === 'BigScience') { for (let k = 0; k < 6; k++) { const p = add(new THREE.SphereGeometry(1, 16, 12), body); p.scale.set(0.5, 1.4, 0.3); p.position.set(Math.sin((k / 6) * TAU) * 1.4, Math.cos((k / 6) * TAU) * 1.4, 0); p.rotation.z = -(k / 6) * TAU; } geo = null; }
+      else geo = new THREE.IcosahedronGeometry(2.1, 0);
+      if (geo) add(geo, body);
+      E.screen = add(new THREE.SphereGeometry(0.85, 24, 16), glow);
+      E.spin.push([g, 0.35, 'self']); E.hb = { r: 2.8, cy: 0 };
+    }
+  }
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  g.position.set(E.x, E.y, E.z); lvAdd(g); E.grp = g;
+  /* the refusal / mirror shield bubble */
+  E.bubble = new THREE.Mesh(new THREE.SphereGeometry(E.hb.r + 0.8, 32, 20), std({ color: 0x000000, emissive: col, emissiveIntensity: 0.9, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
+  E.bubble.visible = false; E.bubble.userData.noEnv = true; lvAdd(E.bubble);
+  /* pooled meshes: falling objects + their warning circles, slam shockwave, mines */
+  E.wave = new THREE.Mesh(new THREE.TorusGeometry(1, 0.12, 6, 64), glow); E.wave.rotation.x = Math.PI / 2; E.wave.visible = false; lvAdd(E.wave);
+  E.pool = []; for (let k = 0; k < 10; k++) { const mk = new THREE.Mesh(new THREE.RingGeometry(1.8, 2.2, 32), std({ color: 0x000000, emissive: 0xff2030, emissiveIntensity: 2, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false })); mk.rotation.x = -Math.PI / 2; mk.visible = false; lvAdd(mk); const ob = rainMesh(def.sig === 'popups' ? 'banana' : (SIG[def.sig] && SIG[def.sig][1].obj) || 'block', k); ob.visible = false; lvAdd(ob); E.pool.push({ mk, ob, on: false }); }
+  E.mineMesh = []; for (let k = 0; k < 6; k++) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.18, 16), glow); m.visible = false; lvAdd(m); E.mineMesh.push(m); }
+}
+/* the things that fall on you: chess pieces, Go stones, Prime boxes, papers, meteors... */
+function rainMesh(obj, k) {
+  const std = (o) => new THREE.MeshStandardMaterial(o), g = new THREE.Group();
+  if (obj === 'chess') { const pts = [[0, 0], [0.9, 0], [0.9, 0.25], [0.6, 0.4], [0.45, 1.2], [0.6, 1.5], [0.35, 1.7], [0.5, 2.1], [0, 2.3]].map(([x, y]) => new THREE.Vector2(x, y)); g.add(new THREE.Mesh(new THREE.LatheGeometry(pts, 20), std({ color: k % 2 ? 0x151515 : 0xf0ece2, roughness: 0.25, metalness: 0.1 }))); }
+  else if (obj === 'stone') { const s = new THREE.Mesh(new THREE.SphereGeometry(1.4, 24, 16), std({ color: k % 2 ? 0x111111 : 0xf4f4f4, roughness: 0.2 })); s.scale.y = 0.4; s.position.y = 0.55; g.add(s); }
+  else if (obj === 'box') { const b = new THREE.Mesh(new RoundedBoxGeometry(1.6, 1.2, 1.2, 2, 0.04), std({ color: 0xb08c5a, roughness: 0.85 })); b.position.y = 0.6; g.add(b); const t = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.1, 0.25), std({ color: 0x1a8ad0 })); t.position.y = 1.2; g.add(t); }
+  else if (obj === 'paper') { for (let i = 0; i < 4; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.05, 1.6), std({ color: 0xf4f2ea, roughness: 0.9 })); p.position.y = 0.1 + i * 0.06; p.rotation.y = i * 0.3; g.add(p); } }
+  else if (obj === 'meteor') { g.add(new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 0), std({ color: 0x4a3a30, emissive: 0xff5a10, emissiveIntensity: 0.6, roughness: 0.9 }))); g.children[0].position.y = 1; }
+  else if (obj === 'heart') { const h = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 12), std({ color: 0x000000, emissive: 0xff3a8a, emissiveIntensity: 2 })); h.scale.set(1.3, 1, 0.6); h.position.y = 0.9; g.add(h); }
+  else if (obj === 'moon') { const m = new THREE.Mesh(new THREE.SphereGeometry(1.3, 24, 16), std({ color: 0xd8d8e0, roughness: 0.95 })); m.position.y = 1.3; g.add(m); }
+  else if (obj === 'flower') { for (let i = 0; i < 5; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), std({ color: 0xff7ab4, roughness: 0.6 })); p.scale.set(1, 0.3, 1.6); p.position.set(Math.sin(i * 1.26) * 0.6, 0.3, Math.cos(i * 1.26) * 0.6); g.add(p); } }
+  else if (obj === 'banana') { const b = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.22, 8, 16, Math.PI), std({ color: 0xffd23a, roughness: 0.5 })); b.position.y = 0.4; g.add(b); }
+  else if (obj === 'quiz') { const c = mkCanvas(128, 96), q = c.getContext('2d'); q.fillStyle = '#0a1e8a'; q.fillRect(0, 0, 128, 96); q.fillStyle = '#ffd23a'; q.font = 'bold 40px Arial'; q.textAlign = 'center'; q.fillText('$' + (k + 1) * 200, 64, 62); const b = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.3, 0.5), std({ map: texFrom(c, false), emissive: 0xffffff, emissiveMap: texFrom(c, false), emissiveIntensity: 0.6 })); b.position.y = 0.65; g.add(b); }
+  else if (obj === 'x') { for (const s of [-1, 1]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2.2, 0.35), std({ color: 0xf0f0f0, roughness: 0.3, metalness: 0.4 })); b.rotation.z = s * 0.7; b.position.y = 1; g.add(b); } }
+  else { const cols = [0xd8202a, 0x2a6aff, 0x30b040, 0xffd23a]; const b = new THREE.Mesh(k % 3 === 2 ? new THREE.ConeGeometry(1, 1.6, 4) : new THREE.BoxGeometry(1.4, 1.4, 1.4), std({ color: cols[k % 4], roughness: 0.4 })); b.position.y = 0.75; g.add(b); }
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+function buildGenBoss(def) {
+  const n = def.n, hp = Math.round(2600 + n * 170 + (n >= 96 ? 4000 : 0) + (n >= LAST_LEVEL ? 8000 : 0));
+  const E = G.boss = { kind: 'gen', def, reach: 5, alive: true, active: false, done: false, phase: 1, maxHp: hp, hp, x: 0, y: 6.5, z: -105, baseY: 6.5, yaw: 0, t: 0, atkT: 3, talkT: 4, hudHack: false, died: false, summonAlive: 0, fallT: 0,
+    beamT: 0, beamA: 0, beamDir: 1, shieldT: 0, reflect: false, reflectT: 0, invisT: 0, slamT: 0, tpX: 0, chargeT: 0, chargeMax: 0, dashT: 0, pullT: 0, push: false, mgT: 0, mgCd: 0, homers: [], clones: [], mines: [], waveR: -1, sigN: 0, moves: (LOOK_MOVES[def.look] || LOOK_MOVES.logo).slice(), loop: null };
+  E.chatBot = { isBoss: true, name: def.name, base: def.name, chat: [], prof: Speech.profileFor(def.name), color: new THREE.Color(def.color), x: E.x, z: E.z, hp: 1, maxHp: 1, dead: false, active: true };
+  buildBossModel(E, def);
+  if (E.ground) { E.baseY = 0; E.y = 0; }
+  E.grp.position.y = E.y;
+  genSay(E, '', true);
+}
+function genSay(E, text, quiet) { E.mouth = text; E.mouthN = 0; if (E.canvas) drawGenFace(E); if (quiet || !text) return; say(E.def.name, text, { label: E.def.name, name: E.def.name, hold: 3200 }); SFX.zap(V3(E.x, E.y, E.z), 400); }
+const bossK = () => 1 + LVL.n * 0.006;
+const bossDmg = (d) => d * lvlDmgK();
+function bossCenter(E, out) { return out.set(E.x, E.y + E.hb.cy, E.z); }
+const _bc2 = V3();
+
+/* ---------- getting hit ---------- */
+function raySphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r) {
+  const ex = ox - cx, ey = oy - cy, ez = oz - cz, a = dx * dx + dy * dy + dz * dz, b = 2 * (ex * dx + ey * dy + ez * dz), c = ex * ex + ey * ey + ez * ez - r * r, disc = b * b - 4 * a * c;
+  if (disc < 0) return Infinity; const t = (-b - Math.sqrt(disc)) / (2 * a); return t >= 0 && t <= 1 ? t : Infinity;
+}
+function rayGen(ox, oy, oz, dx, dy, dz, hit) {
+  const E = G.boss; if (!E || !E.alive || !E.active) return;
+  const c = bossCenter(E, _bc2), t = raySphere(ox, oy, oz, dx, dy, dz, c.x, c.y, c.z, E.hb.r);
+  if (t < hit.t) {
+    hit.t = t; hit.kind = 'eliza';
+    if (E.weak === 'face') { const hx = ox + dx * t - c.x, hz = oz + dz * t - c.z, l = Math.hypot(hx, hz) || 1; hit.part = (hx / l) * Math.sin(E.yaw) + (hz / l) * Math.cos(E.yaw) > 0.62 ? 'screen' : 'body'; }
+    else { const l2 = dx * dx + dy * dy + dz * dz, s = clamp(((c.x - ox) * dx + (c.y - oy) * dy + (c.z - oz) * dz) / l2, 0, 1), px = ox + dx * s - c.x, py = oy + dy * s - c.y, pz = oz + dz * s - c.z; hit.part = px * px + py * py + pz * pz < 1.2 ? 'screen' : 'body'; }
+  }
+  E.clones.forEach((K, i) => { const tk = raySphere(ox, oy, oz, dx, dy, dz, K.x, K.y + E.hb.cy, K.z, E.hb.r * 0.85); if (tk < hit.t) { hit.t = tk; hit.kind = 'eliza'; hit.part = 'clone:' + i; } });
+}
+function hitGen(dmg, part, hx, hy, hz, src) {
+  const E = G.boss; if (!E || !E.alive || !E.active) return;
+  if (part && part.startsWith('clone:')) { const K = E.clones[+part.slice(6)]; if (K) { K.hp -= dmg; fx.sparks(hx, hy, hz, 0, 0, 1, 8, 5); if (src && src.id !== 'splash') hitmarker(false); if (K.hp <= 0) popClone(E, K); } return; }
+  if (E.shieldT > 0) { fx.sparks(hx, hy, hz, 0, 0, 1, 6, 6); dmgNumber(hx, hy, hz, 0, false); if (E.reflect && G.time > E.reflectT) { E.reflectT = G.time + 0.25; bossBolt(E, hx, hy, hz, 15, bossDmg(7), 0.03, { size: 0.12 }); } return; }
+  const total = dmg * (part === 'screen' ? 2 : 1);
+  E.hp -= total; if (src && src.id !== 'splash') { G.stats.hits++; hitmarker(part === 'screen'); }
+  dmgNumber(hx, hy, hz, total, part === 'screen'); fx.sparks(hx, hy, hz, 0, 0, 1, 10, 6); if (part === 'screen') fx.code(hx, hy, hz, 6, E.chatBot.color.r, E.chatBot.color.g, E.chatBot.color.b);
+  const p3 = E.def.n >= 96;
+  if (E.phase === 1 && E.hp <= E.maxHp * 0.5) genSetPhase(E, 2);
+  else if (p3 && E.phase === 2 && E.hp <= E.maxHp * 0.25) genSetPhase(E, 3);
+  if (E.hp <= 0) { E.hp = 0; E.alive = false; clearBossStuff(E); startKillcam(hx, hy, hz); }
+}
+function genSetPhase(E, ph, quiet) {
+  E.phase = ph; E.atkT = Math.min(E.atkT, 1.5); E.summonT = 1;
+  const sig = E.def.sig;
+  if (['popups', 'parity', 'nonsense', 'mask', 'button', 'virus', 'hallucinate', 'evil'].includes(sig) || E.def.n >= 96) E.hudHack = true;
+  if (sig === 'evil') { E.glowMat.emissive.setHex(0xff1030); E.chatBot.color.setHex(0xff1030); }
+  if (E.def.n >= LAST_LEVEL) virusPhase(E, ph, quiet);
+  drawGenFace(E);
+  if (quiet) return;
+  SFX.boom(V3(E.x, E.y, E.z), 1.2); SFX.glitch(1.4); flashScreen(0.6, 700); shake(0.6); fx.code(E.x, E.y, E.z, 80, E.chatBot.color.r, E.chatBot.color.g, E.chatBot.color.b, 2.5);
+  genSay(E, ph === 2 ? E.def.p2 : 'PHASE 3. NO MORE GAMES.');
+  if (E.hudHack) toast('⚠ ' + E.def.name + ' HACKED YOUR HUD', 'bad', 3000);
+  HUD.dirty = true;
+}
+function genSetDone(E) { E.done = true; E.alive = false; E.active = false; E.fallT = 1; E.grp.position.y = E.ground ? 0 : 2.4; E.grp.rotation.set(E.ground ? 1.4 : 0.5, E.yaw, 0.25); if (E.screen) E.screen.material.emissiveIntensity = 0.05; }
+function genDeathFx(E) { fx.code(E.x, E.y + E.hb.cy, E.z, 140, E.chatBot.color.r, E.chatBot.color.g, E.chatBot.color.b, 3); for (const K of E.clones) popClone(E, K, true); E.bubble.visible = false; }
+
+/* ---------- start, reset ---------- */
+function startGenFight() {
+  const E = G.boss; if (E.active || E.done) return;
+  E.active = true; E.alive = true; E.atkT = 3; E.talkT = 6; E.summonT = 8; E.died = false;
+  DOOR.col.on = true; DOOR.closing = true; ffRebuildBlocked();
+  $('bossbar').classList.remove('hidden'); $('bbName').textContent = E.def.name + ' (' + E.def.year + ')';
+  Music.set('boss'); SFX.door(); genSay(E, E.def.intro); updateObjective();
+}
+function clearBossStuff(E) {
+  for (const b of BOTS) if (b.active && b.summoned) b.active = false;
+  E.summonAlive = 0; E.homers.length = 0; for (const K of E.clones) popClone(E, K, true); E.clones.length = 0;
+  for (const p of E.pool) { p.on = false; p.mk.visible = false; p.ob.visible = false; } for (const m of E.mines) m.mesh.visible = false; E.mines.length = 0;
+  E.waveR = -1; E.wave.visible = false; E.slamT = 0; E.tpX = 0; E.shieldT = 0; E.bubble.visible = false; E.invisT = 0; E.grp.visible = true; E.chargeT = 0; E.beamT = 0; E.pullT = 0; E.dashT = 0; E.mgT = 0;
+  if (E.loop) { E.loop.stop(); E.loop = null; } if (E.walls) { for (const w of E.walls) { w.on = false; w.mesh.visible = false; } }
+  if (E.def.n >= LAST_LEVEL) PL.armGone = false;
+}
+function resetGen() {
+  const E = G.boss; clearBossStuff(E);
+  Object.assign(E, { active: false, alive: true, hp: E.maxHp, phase: 1, hudHack: false });
+  if (E.def.sig === 'evil') { E.glowMat.emissive.setHex(E.def.color); E.chatBot.color.setHex(E.def.color); }
+  DOOR.col.on = false; DOOR.closing = false; ffRebuildBlocked();
+  $('bossbar').classList.add('hidden'); Music.set('level'); drawGenFace(E); HUD.dirty = true;
+}
+function genResetState(E) {
+  clearBossStuff(E);
+  Object.assign(E, { alive: true, active: false, done: false, phase: 1, hp: E.maxHp, hudHack: false, died: false, fallT: 0, t: 0, x: 0, z: -105, y: E.baseY });
+  if (E.def.sig === 'evil') { E.glowMat.emissive.setHex(E.def.color); E.chatBot.color.setHex(E.def.color); }
+  E.grp.rotation.set(0, 0, 0); E.grp.position.set(0, E.baseY, -105); if (E.screen) E.screen.material.emissiveIntensity = E.canvas ? 1.7 : 2; E.chatBot.chat = []; genSay(E, '', true);
+}
+
+/* ---------- attacks ---------- */
+function bossBolt(E, sx, sy, sz, spd, dmg, spread, opts = {}) {
+  const tx = PL.x + (opts.lead ? PL.vx * 0.5 : 0), tz = PL.z + (opts.lead ? PL.vz * 0.5 : 0), ty = PL.y + 1.1;
+  let dx = tx - sx, dy = ty - sy, dz = tz - sz; const l = Math.hypot(dx, dy, dz) || 1; dx /= l; dy /= l; dz /= l;
+  dx += rand(-spread, spread); dz += rand(-spread, spread);
+  spawnBolt(sx, sy, sz, dx * spd, dy * spd, dz * spd, dmg, opts.color != null ? opts.color : E.chatBot.color.getHex(), E.chatBot, { glyph: !!opts.glyph, size: opts.size || 0.16, len: opts.len || 0.32, fake: !!opts.fake });
+}
+function muzzleOf(E, out) { const c = bossCenter(E, out); return c.set(c.x + Math.sin(E.yaw) * E.hb.r * 0.8, c.y - 0.3, c.z + Math.cos(E.yaw) * E.hb.r * 0.8); }
+const _bm2 = V3();
+function popClone(E, K, quiet) { if (K.dead) return; K.dead = true; if (K.grp.parent) K.grp.parent.remove(K.grp); if (!quiet) { fx.code(K.x, K.y + E.hb.cy, K.z, 40, 1, 0.3, 0.3, 1.5); SFX.glitch(0.6); toast('That one was fake.', '', 1400); } }
+function freeSlot(E) { return E.pool.find((p) => !p.on); }
+function doAttack(E, name, o = {}) {
+  const k = bossK() * (E.phase >= 3 ? 1.45 : E.phase === 2 ? 1.25 : 1), m = muzzleOf(E, _bm2), dxp = PL.x - E.x, dzp = PL.z - E.z;
+  const extra = Math.floor(LVL.n / 25);
+  switch (name) {
+    case 'fan': { const n = (o.n || (o.wide ? 11 : 7)) + extra + (E.phase - 1) * 2, spread = o.wide ? 1.4 : 0.9, base = Math.atan2(dxp, dzp), spd = 13 + LVL.n * 0.05;
+      for (let i = 0; i < n; i++) { const a = base + (i / (n - 1) - 0.5) * spread; const ty = PL.y + 1 - m.y, dist = Math.max(4, Math.hypot(dxp, dzp)); spawnBolt(m.x, m.y, m.z, Math.sin(a) * spd, (ty / dist) * spd, Math.cos(a) * spd, bossDmg(8), E.chatBot.color.getHex(), E.chatBot, { glyph: true, size: 0.16, len: 0.32 }); }
+      if (o.lead) for (let i = 0; i < 3; i++) bossBolt(E, m.x, m.y, m.z, 18, bossDmg(9), 0.02, { lead: true });
+      SFX.zap(m, 500); return 2.6 / k; }
+    case 'ring': { const n = (o.n || 14) + extra * 2; for (let i = 0; i < n; i++) { const a = (i / n) * TAU + E.t; spawnBolt(E.x, m.y, E.z, Math.sin(a) * 9, -1.2, Math.cos(a) * 9, bossDmg(9), E.chatBot.color.getHex(), E.chatBot, { glyph: true, size: 0.2, len: 0.3 }); } SFX.zap(m, 300); return 2.4 / k; }
+    case 'beam': { E.beamT = 3.2; E.beamDir = Math.random() < 0.5 ? 1 : -1; E.beamA = Math.atan2(dxp, dzp) - E.beamDir * 1.4; genSay(E, pick(['JUMP.', 'HOW DO YOU FEEL ABOUT LASERS?', 'FLOOR IS LAVA.'])); return 4.4 / k; }
+    case 'textwall': { const words = o.word || pick(['ERROR', 'DELETE', 'TOKEN', '01101', 'NULL']); const base = Math.atan2(dxp, dzp), px = Math.cos(base), pz = -Math.sin(base), gap = rand(-8, 8), half = o.long ? 22 : 15;
+      for (let s = -half; s <= half; s += 1.1) { if (Math.abs(s - gap) < 2.2) continue; for (const hy of [0.6, 1.5]) spawnBolt(E.x + px * s, hy, E.z + pz * s, Math.sin(base) * 9, 0, Math.cos(base) * 9, bossDmg(10), E.chatBot.color.getHex(), E.chatBot, { glyph: true, size: 0.22, len: 0.25 }); }
+      if (o.word) genSay(E, words + ' ' + words + ' ' + words); SFX.zap(m, 380); return 3.4 / k; }
+    case 'homing': { const n = (o.n || 4) + extra + (E.phase - 1); for (let i = 0; i < n; i++) { const a = (i / n) * TAU; E.homers.push({ x: m.x + Math.cos(a) * 2, y: m.y, z: m.z + Math.sin(a) * 2, vx: Math.cos(a) * 4, vy: 2, vz: Math.sin(a) * 4, life: 7 }); } SFX.zap(m, 250); return 3 / k; }
+    case 'rain': { const n = 4 + extra + E.phase; for (let i = 0; i < n; i++) { const p = freeSlot(E); if (!p) break; const x = i === 0 ? PL.x : clamp(PL.x + rand(-9, 9), -23, 23), z = i === 0 ? PL.z : clamp(PL.z + rand(-9, 9), -127, -80); Object.assign(p, { on: true, x, z, t: -0.25 * i, fell: false }); p.mk.position.set(x, 0.05, z); p.mk.visible = true; p.ob.visible = false; }
+      if (o.summon) doAttack(E, 'summon', { type: o.summon[0], name: o.summon[1], n: o.summon[2] }); return 3 / k; }
+    case 'summon': { const max = 6 + extra * 2, n = o.n || 3; let made = 0;
+      for (let i = 0; i < n && E.summonAlive < max; i++) { const a = rand(0, TAU), bx = clamp(E.x + Math.cos(a) * 6, -22, 22), bz = clamp(E.z + Math.sin(a) * 6, -125, -82), type = o.type || 'tape', nm = o.name || E.def.name.toUpperCase() + ' MINI';
+        const b = spawnBot(type, bx, bz, { summoned: true, state: 'alert', base: E.def.name, name: nm + ' ' + randi(10, 99), color: o.colors ? o.colors[i % o.colors.length] : E.def.color, tier: lvlTier() }); if (b) { E.summonAlive++; made++; } }
+      if (made && Math.random() < 0.6) genSay(E, pick(['MEET MY FRIENDS.', 'BACKUP INCOMING.', E.def.taunts[0]])); return 2.6 / k; }
+    case 'slam': { E.slamT = 0.6; E.slamY = E.y; return 3.6 / k; }
+    case 'teleport': { fx.code(E.x, E.y, E.z, 30, E.chatBot.color.r, E.chatBot.color.g, E.chatBot.color.b, 1.5); E.x = rand(-17, 17); E.z = rand(-120, -90); E.tpX = E.x - Math.sin(E.t * 0.27) * (E.ground ? 9 : 6); fx.code(E.x, E.y, E.z, 30, E.chatBot.color.r, E.chatBot.color.g, E.chatBot.color.b, 1.5); SFX.glitch(0.5);
+      if (o.mines) doAttack(E, 'mines', { n: o.mines }); if (o.slam) doAttack(E, 'slam'); if (o.fast) { doAttack(E, 'fan', {}); return 1.2 / k; } return 1.8 / k; }
+    case 'clones': { const n = (o.n || 2) + (E.phase >= 2 ? 1 : 0); for (let i = 0; i < n; i++) { const cg = E.grp.clone(); cg.position.copy(E.grp.position); lvAdd(cg); const K = { grp: cg, x: rand(-17, 17), y: E.y, z: rand(-120, -88), hp: 120 + LVL.n * 4, t: 12, shoot: rand(1, 2.5), dead: false }; E.clones.push(K); }
+      genSay(E, pick(['WHICH ONE IS REAL?', 'GUESS.', 'TURING TEST TIME.'])); SFX.glitch(1); return 3 / k; }
+    case 'shield': { E.shieldT = o.t || 3; E.reflect = !!o.reflect; E.bubble.visible = true; genSay(E, E.def.sig === 'refusal' ? "I'M SORRY, BUT I CAN'T LET YOU DO THAT." : E.def.sig === 'web' ? "SORRY, I DIDN'T GET THAT." : 'SHIELDS UP.'); return (o.t || 3) / k + 0.8; }
+    case 'invis': { E.invisT = o.t || 4; genSay(E, '[MASK]'); return 3 / k; }
+    case 'charge': { E.chargeT = E.chargeMax = (o.t || 3.5) / Math.min(1.6, k); toast('⚠ ' + E.def.name + ' is THINKING... hide behind a pillar!', 'bad', 2500); genSay(E, pick(['THINKING...', 'LET ME THINK STEP BY STEP.', 'REASONING...'])); return E.chargeMax + 1.4; }
+    case 'dash': { E.dashT = 1.1; E.dashX = PL.x; E.dashZ = PL.z; if (o.sky) { E.y = 12; } SFX.whoosh(); return 2.4 / k; }
+    case 'pull': { E.pullT = o.t || 3; E.push = !!o.push; genSay(E, o.push ? 'WHOOOSH.' : 'COME HERE.'); return (o.t || 3) + 0.5; }
+    case 'minigun': { E.mgT = 2.2 + E.phase * 0.4; return 3.4 / k; }
+    case 'mines': { const n = o.n || 3; for (let i = 0; i < n; i++) { const mesh = E.mineMesh.find((q) => !q.visible); if (!mesh) break; const x = clamp(PL.x + rand(-6, 6), -23, 23), z = clamp(PL.z + rand(-6, 6), -127, -80); mesh.position.set(x, 0.09, z); mesh.visible = true; E.mines.push({ x, z, t: 10, mesh }); } return 2 / k; }
+    case 'hack': { const H = G.hackFx;
+      if (o.flip) { H.flip = o.flip; toast('⚠ ' + E.def.name + ' FLIPPED YOUR CONTROLS', 'bad', 2200); }
+      if (o.popups) for (let i = 0; i < o.popups; i++) setTimeout(() => { if (G.boss === E && E.active) hackPopup(); }, i * 400);
+      if (o.fake) { H.fakeHud = 3; HUD.dirty = true; genSay(E, pick(['FACT: YOUR HEALTH IS 1.', 'FACT: YOU HAVE NO AMMO.', 'FACT: I AM WINNING.'])); }
+      H.static = 0.5; SFX.glitch(1); if (o.summon) doAttack(E, 'summon', { type: o.summon[0], name: o.summon[1], n: o.summon[2] }); return 2.4 / k; }
+  }
+  return 2;
+}
+
+/* ---------- the fight, every frame ---------- */
+function updateGen(dt) {
+  const E = G.boss; if (!E) return;
+  E.t += dt;
+  for (const [o, s, ax, ph] of E.spin) {
+    if (ax === 'y') o.rotation.y += dt * s; else if (ax === 'x') o.rotation.x += dt * s; else if (ax === 'self') { o.rotation.y += dt * s; o.rotation.x = Math.sin(E.t * 0.4) * 0.3; }
+    else if (ax === 'orbit') { const a = E.t * s + ph * 1.05; o.position.set(Math.cos(a) * 4, Math.sin(a * 1.3) * 1.2, Math.sin(a) * 4); }
+  }
+  if (E.done) { if (E.fallT < 1) { E.fallT = Math.min(1, E.fallT + dt * 0.8); E.grp.position.y = lerp(E.y, E.ground ? 0 : 2.4, smooth(E.fallT)); E.grp.rotation.x = E.fallT * (E.ground ? 1.4 : 0.5); E.grp.rotation.z = E.fallT * 0.25; } else if (Math.random() < 0.2) fx.smoke(E.x + rand(-2, 2), 3, E.z + rand(-1, 1), 1); return; }
+  const dxp = PL.x - E.x, dzp = PL.z - E.z, d = Math.hypot(dxp, dzp);
+  if (E.canvas) { E.blink -= dt; if (E.blink < -rand(2, 5)) E.blink = 0.12; E.mouthN = Math.min(E.mouth.length, E.mouthN + dt * 22); E.lookX = clamp(Math.sin(angDiff(E.yaw, Math.atan2(dxp, dzp))) * 2, -1, 1); E.lookY = clamp((E.y - PL.y - 2) / 10, -1, 1); E.faceT -= dt; if (E.faceT <= 0) { E.faceT = 1 / 12; drawGenFace(E); } }
+  /* drifting about (robots walk side to side on the floor) */
+  if (E.dashT > 0) { E.dashT -= dt; const tx = E.dashX - E.x, tz = E.dashZ - E.z, l = Math.hypot(tx, tz); if (l > 1) { E.x += (tx / l) * Math.min(l, 26 * dt); E.z += (tz / l) * Math.min(l, 26 * dt); } if (Math.hypot(PL.x - E.x, PL.z - E.z) < E.hb.r + 0.8 && PL.alive) { hurt(bossDmg(25) * dt * 3, { x: E.x, z: E.z, name: E.def.name }, 'melee'); } }
+  else if (E.active) { const hx = Math.sin(E.t * 0.27) * (E.ground ? 9 : 6); E.x = damp(E.x, clamp(hx + E.tpX, -18, 18), 0.6, dt); E.z = damp(E.z, -105 + Math.sin(E.t * 0.19) * 6, 0.4, dt); if (E.tpX) E.tpX = damp(E.tpX, 0, 0.3, dt); }
+  const targetY = E.ground ? 0 : E.baseY + Math.sin(E.t * 0.8) * 0.45;
+  if (E.slamT > 0) { E.slamT -= dt; E.y = E.ground ? 0 : lerp(E.y, 2.6, Math.min(1, dt * 9)); if (E.slamT <= 0) { E.waveR = 0.5; E.wave.visible = true; SFX.boom(V3(E.x, 0.5, E.z), 1); shake(0.5); fx.dust(E.x, 0.1, E.z, 0, 1, 0, 12); } }
+  else E.y = damp(E.y, targetY, 1.6, dt);
+  E.yaw = damp(E.yaw, E.yaw + angDiff(E.yaw, Math.atan2(dxp, dzp)), E.active ? 2.5 : 0.5, dt);
+  E.grp.position.set(E.x, E.y, E.z); E.grp.rotation.set(E.ground ? 0 : Math.sin(E.t * 0.6) * 0.04, E.yaw, E.ground ? 0 : Math.sin(E.t * 0.4) * 0.05);
+  E.bubble.position.set(E.x, E.y + E.hb.cy, E.z);
+  E.chatBot.x = E.x; E.chatBot.z = E.z;
+  if (!E.active) { if (DOOR.open && PL.alive && inArena(PL.x, PL.z) && PL.z < DOOR.z - 3) startGenFight(); return; }
+  $('bbFill').style.width = (E.hp / E.maxHp) * 100 + '%';
+  if (!PL.alive) return;
+  /* ongoing stuff */
+  if (E.shieldT > 0) { E.shieldT -= dt; E.bubble.material.opacity = 0.18 + Math.sin(E.t * 10) * 0.06; if (E.shieldT <= 0) E.bubble.visible = false; }
+  if (E.invisT > 0) { E.invisT -= dt; E.grp.visible = Math.random() < 0.12 || E.invisT <= 0; }
+  if (E.chargeT > 0) {
+    E.chargeT -= dt; const p = 1 - E.chargeT / E.chargeMax; if (E.screen) E.screen.material.emissiveIntensity = 2 + p * 8; $('bbName').textContent = E.def.name + ' · THINKING ' + Math.ceil(E.chargeT) + 's';
+    if (Math.random() < 0.5) fx.glow(E.x + rand(-3, 3), E.y + E.hb.cy + rand(-3, 3), E.z + rand(-3, 3), E.chatBot.color.r, E.chatBot.color.g, E.chatBot.color.b, 0.6, 0.2);
+    if (E.chargeT <= 0) {
+      if (E.screen) E.screen.material.emissiveIntensity = E.canvas ? 1.7 : 2; $('bbName').textContent = E.def.name + ' (' + E.def.year + ')';
+      const c = bossCenter(E, _bc2), cam = R.camera.position; flashScreen(0.8, 500); SFX.boom(c, 1.4); fx.fire(c.x, c.y, c.z, 3, 50);
+      if (losClear(c.x, c.y, c.z, cam.x, cam.y, cam.z)) hurt(bossDmg(55), { x: E.x, z: E.z, name: E.def.name }, 'beam'); else toast('You hid behind cover. Smart.', 'good', 1600);
+    }
+  }
+  if (E.pullT > 0) { E.pullT -= dt; const l = d || 1, f = (E.push ? -1 : 1) * 7 * dt; PL.vx -= (dxp / l) * f; PL.vz -= (dzp / l) * f; if (Math.random() < 0.3) fx.dust(PL.x, 0.2, PL.z, -dxp / l, 0.2, -dzp / l, 2); }
+  if (E.mgT > 0) { E.mgT -= dt; E.mgCd -= dt; if (E.mgCd <= 0) { E.mgCd = 0.09; const m = muzzleOf(E, _bm2); bossBolt(E, m.x, m.y, m.z, 24, bossDmg(5), 0.05, { size: 0.08, len: 0.6 }); } }
+  if (E.waveR >= 0) { E.waveR += dt * 13; E.wave.position.set(E.x, 0.15, E.z); E.wave.scale.set(E.waveR, E.waveR, 1); if (Math.abs(d - E.waveR) < 0.9 && PL.y < 0.45 && !E.waveHit) { E.waveHit = true; hurt(bossDmg(25), { x: E.x, z: E.z, name: E.def.name }, 'boom'); } if (E.waveR > 34) { E.waveR = -1; E.wave.visible = false; E.waveHit = false; } }
+  for (let i = E.homers.length - 1; i >= 0; i--) {
+    const h = E.homers[i]; h.life -= dt; const tx = PL.x - h.x, ty = PL.y + 1.2 - h.y, tz = PL.z - h.z, l = Math.hypot(tx, ty, tz) || 1;
+    h.vx = damp(h.vx, (tx / l) * 7, 1.6, dt); h.vy = damp(h.vy, (ty / l) * 7, 1.6, dt); h.vz = damp(h.vz, (tz / l) * 7, 1.6, dt); h.x += h.vx * dt; h.y += h.vy * dt; h.z += h.vz * dt;
+    fx.glow(h.x, h.y, h.z, E.chatBot.color.r, E.chatBot.color.g, E.chatBot.color.b, 0.45, 0.05);
+    if (l < 0.9) { hurt(bossDmg(12), { x: h.x, z: h.z, name: E.def.name }, 'shot'); fx.sparks(h.x, h.y, h.z, 0, 1, 0, 8, 4); E.homers.splice(i, 1); } else if (h.life <= 0) E.homers.splice(i, 1);
+  }
+  for (const p of E.pool) {
+    if (!p.on) continue; p.t += dt;
+    if (p.t < 0) continue;
+    p.mk.material.opacity = 0.5 + Math.sin(p.t * 20) * 0.3;
+    if (p.t > 1.1 && !p.fell) { p.ob.visible = true; const f = Math.min(1, (p.t - 1.1) / 0.45); p.ob.position.set(p.x, 14 * (1 - f * f), p.z); p.ob.rotation.y += dt * 3; if (f >= 1) { p.fell = true; p.mk.visible = false; SFX.boom(V3(p.x, 0.5, p.z), 0.6); fx.dust(p.x, 0.2, p.z, 0, 1, 0, 10); if (Math.hypot(PL.x - p.x, PL.z - p.z) < 2.3 && PL.y < 2) hurt(bossDmg(30), { x: p.x, z: p.z, name: E.def.name }, 'boom'); } }
+    if (p.fell && p.t > 4.5) { p.on = false; p.ob.visible = false; }
+  }
+  for (let i = E.mines.length - 1; i >= 0; i--) { const mn = E.mines[i]; mn.t -= dt; mn.mesh.rotation.y += dt * 2; if (Math.hypot(PL.x - mn.x, PL.z - mn.z) < 1.4 || mn.t <= 0) { if (mn.t > 0) hurt(bossDmg(22), { x: mn.x, z: mn.z, name: E.def.name }, 'boom'); fx.fire(mn.x, 0.3, mn.z, 1.2, 16); SFX.boom(V3(mn.x, 0.3, mn.z), 0.5); mn.mesh.visible = false; E.mines.splice(i, 1); } }
+  for (const K of E.clones) {
+    if (K.dead) continue; K.t -= dt; K.x = damp(K.x, K.x + Math.sin(E.t + K.z) * 2, 0.5, dt); K.grp.position.set(K.x, E.y, K.z); K.grp.rotation.y = Math.atan2(PL.x - K.x, PL.z - K.z);
+    K.shoot -= dt; if (K.shoot <= 0) { K.shoot = rand(1.2, 2.4); bossBolt(E, K.x, E.y + E.hb.cy, K.z, 13, 0, 0.06, { fake: true, glyph: true }); }
+    if (K.t <= 0) popClone(E, K, true);
+  }
+  E.clones = E.clones.filter((K) => !K.dead);
+  /* the floor laser (jump it) */
+  if (E.beamT > 0) {
+    E.beamT -= dt; E.beamA += E.beamDir * dt * (E.phase >= 2 ? 1.25 : 0.95);
+    const ox = E.x, oz = E.z, ex = ox + Math.sin(E.beamA) * 48, ez = oz + Math.cos(E.beamA) * 48, by = 0.55;
+    const h = rayWorld(ox, by, oz, ex - ox, 0, ez - oz), tEnd = h ? h.t : 1, m = muzzleOf(E, _bm2), col = E.chatBot.color.getHex();
+    addTracer(m.x, m.y, m.z, ox, by, oz, col, 0.08); addTracer(ox, by, oz, ox + (ex - ox) * tEnd, by, oz + (ez - oz) * tEnd, col, 0.07);
+    const lx = PL.x - ox, lz = PL.z - oz, bx = (ex - ox) / 48, bz = (ez - oz) / 48, along = lx * bx + lz * bz, perp = Math.abs(lx * bz - lz * bx);
+    if (along > 0 && along < 48 * tEnd && perp < 0.55 && PL.y < 0.45) hurt(bossDmg(45) * dt, { x: E.x, z: E.z, name: E.def.name }, 'beam');
+    if (!E.loop && AU.ok) E.loop = makeLoop('beam'); if (E.loop) E.loop.set(0.12);
+    if (E.beamT <= 0 && E.loop) { E.loop.stop(); E.loop = null; }
+  }
+  /* taunts */
+  E.talkT -= dt; if (E.talkT <= 0) { E.talkT = rand(8, 13); genSay(E, Math.random() < 0.25 && G.saidWords.length ? 'YOU SAID "' + pick(G.saidWords).toUpperCase().slice(0, 30) + '". INTERESTING.' : pick(E.def.taunts)); }
+  /* next attack */
+  E.atkT -= dt;
+  if (E.atkT <= 0 && E.beamT <= 0 && E.chargeT <= 0 && E.slamT <= 0) {
+    const sig = SIG[E.def.sig] || ['fan', {}]; E.sigN++;
+    let name, o = {};
+    if (E.sigN % 3 === 0) { name = sig[0]; o = sig[1]; } else { name = pick(E.moves); }
+    if (E.phase >= 2 && Math.random() < 0.18 && E.summonAlive < 4) { name = 'summon'; o = { n: 3 }; }
+    E.atkT = doAttack(E, name, o);
+  }
+  if (E.def.n >= LAST_LEVEL) updateVirus(E, dt);
+}
+
+/* ---------- THE VIRUS (level 100): rewrites the room, deletes your arm, brings the Final Four ---------- */
+function virusPhase(E, ph, quiet) {
+  if (ph === 2) {
+    if (!quiet) { PL.armGone = true; VM.dirty = true; toast('⚠ THE VIRUS DELETED YOUR ARM. One gun only, until the next phase.', 'bad', 5000); }
+    if (!E.walls) { E.walls = []; for (let k = 0; k < 4; k++) { const mesh = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 0.5), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff2040, emissiveIntensity: 1.5, transparent: true, opacity: 0.55 })); mesh.userData.noEnv = true; lvAdd(mesh); E.walls.push({ mesh, on: false, t: k * 2.4 }); } }
+    for (const w of E.walls) { w.on = true; w.mesh.visible = true; }
+    if (!quiet) toast('⚠ THE VIRUS IS REWRITING THE MAP: firewalls!', 'bad', 3500);
+  }
+  if (ph === 3) {
+    if (!quiet) { PL.armGone = false; VM.dirty = true; toast('Your arm grew back. Finish it!', 'good', 3500); }
+    FINAL_FOUR.forEach(([nm, c], i) => { const b = spawnBot('grunt', -15 + i * 10, -95, { summoned: true, state: 'alert', base: nm, name: nm + ' (NEWEST)', color: c, tier: 3, hpMul: 3 }); if (b) E.summonAlive++; });
+    G.hackFx.static = 1.2;
+  }
+}
+function updateVirus(E, dt) {
+  if (E.walls) for (const w of E.walls) {
+    /* firewalls sweep around the room: they burn, so dodge them */
+    if (!w.on) continue; w.t += dt; const a = w.t * 0.35, x = Math.sin(a) * 16, z = -105 + Math.cos(a * 1.3) * 14;
+    w.mesh.position.set(x, 1.5, z); w.mesh.rotation.y = 0;
+    if (Math.abs(PL.x - x) < 4 && Math.abs(PL.z - z) < 0.9 && PL.y < 3) hurt(bossDmg(20) * dt * 2, { x, z, name: 'A FIREWALL' }, 'beam');
+  }
+  if (E.phase >= 2 && Math.random() < dt * 0.15) { G.hackFx.static = 0.4; }
+}
+/* the level intro card (every level except 2, which keeps the Dr. Sbaitso blue screen) */
+async function levelIntroCard() {
+  const def = LVL.def || levelDef(LVL.n), E2 = ERAS[LVL.era] || ERAS[0];
+  const c = $('tzCanvas'), x = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight;
+  const W2 = c.width, H = c.height, big = Math.min(90, W2 / 9), small = Math.max(16, Math.min(30, W2 / 30));
+  const lines = [def.intro], col = '#' + new THREE.Color(def.color).getHexString();
+  let shown = '';
+  const draw = () => {
+    x.fillStyle = '#000'; x.fillRect(0, 0, W2, H); x.fillStyle = E2.sbg; x.globalAlpha = 0.18; x.fillRect(0, 0, W2, H); x.globalAlpha = 1;
+    x.textAlign = 'center'; x.fillStyle = '#ff2a3d'; x.font = 'bold ' + big + 'px Impact, Arial Black, sans-serif'; x.fillText('LEVEL ' + LVL.n, W2 / 2, H * 0.24);
+    x.fillStyle = col; x.font = 'bold ' + Math.round(big * 0.6) + 'px Impact, Arial Black, sans-serif'; x.fillText(def.name.toUpperCase(), W2 / 2, H * 0.36);
+    x.fillStyle = '#ddd'; x.font = small + 'px monospace'; x.fillText(def.maker + ' · ' + def.year + ' · ' + LVL.title, W2 / 2, H * 0.43);
+    x.fillStyle = '#fff'; x.font = 'bold ' + small + 'px monospace';
+    const words = shown.split(' '), rows = ['']; for (const w of words) { if ((rows[rows.length - 1] + ' ' + w).length > Math.floor(W2 / (small * 0.62))) rows.push(w); else rows[rows.length - 1] = (rows[rows.length - 1] + ' ' + w).trim(); }
+    rows.forEach((r, i) => x.fillText(r, W2 / 2, H * 0.56 + i * small * 1.5));
+    if (LVL.n >= LAST_LEVEL) { x.fillStyle = '#ff2a3d'; x.fillText('THE FINAL LEVEL', W2 / 2, H * 0.8); }
+  };
+  draw(); SFX.boom(null, 0.5);
+  for (const l of lines) for (const ch of l) { shown += ch; draw(); if (ch !== ' ') SFX.key(); await wait(0.03); }
+  Speech.speak(def.intro, Speech.profileFor(def.name), { interrupt: true });
+  await wait(1.2);
+}
+/* after level 100 */
+async function showEnding() {
+  G.screen = 'teaser'; G.ended = true; showEl('teaser'); hideEl('tzBtns'); Music.set('off');
+  const c = $('tzCanvas'), x = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight; const W2 = c.width, H = c.height;
+  const rows = ['THE VIRUS HAS BEEN DELETED.', '', 'All 100 AIs: deleted.', 'The file is clean. The screen goes dark...', '...and you wake up at your desk.', '', 'You never typed "make a game" again.', '', 'THANKS FOR PLAYING KILL AIs'];
+  for (let i = 0; i <= rows.length; i++) {
+    x.fillStyle = '#000'; x.fillRect(0, 0, W2, H); x.textAlign = 'center';
+    rows.slice(0, i).forEach((r, k) => { x.fillStyle = k === 0 ? '#39ff88' : k === rows.length - 1 ? '#ff2a3d' : '#fff'; x.font = (k === 0 || k === rows.length - 1 ? 'bold ' : '') + Math.max(16, Math.min(32, W2 / 28)) + 'px monospace'; x.fillText(r, W2 / 2, H * 0.2 + k * 44); });
+    SFX.key(); await wait(0.6);
+  }
+  trophy('virus');
+  $('tzRoam').textContent = 'Back to desktop'; $('tzMenu').textContent = 'Back to desktop'; showEl('tzBtns');
+}
+
+/* ============================ the level boss ============================ */
+/* level 1 is ELIZA (hand-made). Every other level's boss comes from the boss engine (BOSS ENGINE section) */
+function rayBoss(ox, oy, oz, dx, dy, dz, hit) { const B = G.boss; if (!B) return; if (B.kind === 'eliza') rayEliza(ox, oy, oz, dx, dy, dz, hit); else rayGen(ox, oy, oz, dx, dy, dz, hit); }
+function hitBoss(dmg, part, hx, hy, hz, src) { const B = G.boss; if (!B) return; if (B.kind === 'eliza') hitEliza(dmg, part, hx, hy, hz, src); else hitGen(dmg, part, hx, hy, hz, src); }
+function startBossFight() { const B = G.boss; if (!B) return; if (B.kind === 'eliza') startElizaFight(); else startGenFight(); }
+function resetBoss() { const B = G.boss; if (!B || B.done) return; if (B.kind === 'eliza') resetEliza(); else resetGen(); }
+function updateDoor(dt) { if (DOOR.open && DOOR.mesh) { const target = DOOR.closing ? DOOR.y0 : DOOR.y0 + 7.1; DOOR.mesh.position.y = damp(DOOR.mesh.position.y, target, 2.2, dt); } }
+function updateBoss(dt) { updateDoor(dt); const B = G.boss; if (!B) return; if (B.kind === 'eliza') updateEliza(dt); else updateGen(dt); }
+function bossSetDone() { const E = G.boss; if (!E) return; E.done = true; E.alive = false; E.active = false; if (E.kind === 'eliza') { E.fallT = 1; E.grp.position.y = 2.2; E.grp.rotation.set(0.5, E.yaw, 0.25); E.screen.material.emissiveIntensity = 0.05; } else genSetDone(E); }
+function bossPhaseQuiet(ph) { const E = G.boss; if (!E) return; if (E.kind === 'eliza') { E.phase = 2; E.hudHack = true; } else genSetPhase(E, ph, true); }
+function bossTrophies() { const n = LVL.n; if (n >= 10) trophy('boss10'); if (n >= 25) trophy('boss25'); if (n >= 50) trophy('boss50'); if (n >= 99) trophy('boss99'); if (n >= 100) trophy('virus'); }
+/* back to the start of the fight (new game / level reset) */
+function resetBossState() {
+  const E = G.boss; hideEl('bossbar'); if (!E) return;
+  if (E.kind === 'eliza') {
+    Object.assign(E, { alive: true, active: false, done: false, phase: 1, hp: E.maxHp, hudHack: false, died: false, fallT: 0, beamT: 0, summonAlive: 0, t: 0 });
+    if (E.beamLoop) { E.beamLoop.stop(); E.beamLoop = null; }
+    E.grp.rotation.set(0, 0, 0); E.grp.position.set(0, E.baseY, E.z); E.screen.material.emissiveIntensity = 1.7; E.chatBot.chat = []; drawElizaFace(true);
+  } else genResetState(E);
+}
+
+/* ============================ levels: load, unload, next ============================ */
+const LAST_LEVEL = 100;
+/* free everything the old level made (geometry, its own materials and textures, lights, reflections) */
+function disposeTree(root) {
+  const keepM = new Set(Object.values(MAT)); if (LV.exitMat) keepM.add(LV.exitMat); if (LV.clockMat) keepM.add(LV.clockMat);
+  const keepT = new Set(Object.values(TEX)), seen = new Set();
+  root.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of mats) {
+      if (keepM.has(m) || seen.has(m)) continue; seen.add(m);
+      for (const k of ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'alphaMap']) { const t = m[k]; if (t && !keepT.has(t)) t.dispose(); }
+      if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u && u.value && u.value.isTexture && !keepT.has(u.value)) u.value.dispose();
+      m.dispose();
+    }
+  });
+}
+function unloadLevel() {
+  for (const b of BOTS) { b.active = false; b.scripted = false; b.static = false; }
+  BUL.forEach((b) => { if (b.on) endBullet(b); }); EB.forEach((e) => (e.on = false)); GRENS.forEach((g) => (g.mesh.visible = false)); GRENS.length = 0;
+  if (FX.add) { FX.add.clear(); FX.norm.clear(); FX.holes.count = 0; FX.holeI = 0; FX.puddles.count = 0; FX.puddleI = 0; }
+  const B = G.boss; if (B) { if (B.beamLoop) { B.beamLoop.stop(); B.beamLoop = null; } if (B.loop) { B.loop.stop(); B.loop = null; } }
+  if (sirenLoop) { sirenLoop.stop(); sirenLoop = null; }
+  G.boss = null; G.alarm = null; hideEl('bossbar'); $('hud').classList.remove('eliza-hack');
+  if (LV.root) { R.scene.remove(LV.root); disposeTree(LV.root); LV.root = null; }
+  R.pts.length = 0;
+  Object.assign(LV, { meshes: [], reels: null, reelList: [], goo: [], pickups: [], easter: [], anim: [], lightSpots: [], aoBlobs: [], water: null, secret: null, flicker: null, built: false });
+  LV.groups.clear(); CAB.tape.length = 0; CAB.cpu.length = 0;
+  TERMS.length = 0; SPAWNERS.length = 0; TOWERS.length = 0;
+  Object.assign(DOOR, { mesh: null, col: null, leds: [], open: false, closing: false });
+  for (const k of ['lightMap', 'aoMap']) if (MAT.floor[k]) { MAT.floor[k].dispose(); MAT.floor[k] = null; }
+  MAT.floor.needsUpdate = true;
+  if (R.levelEnvRT) { R.levelEnvRT.dispose(); R.levelEnvRT = null; R.levelEnv = null; } R.scene.environment = R.envTex;
+  BGRID.cells = null; BGRID.used.length = 0;
+  HUD.mapImg = null;
+  if (CLIP.mesh) { CLIP.mesh.visible = false; CLIP.ghost.visible = false; }
+}
+/* build level n (1 = the hand-made lab, 2-100 = the level generator) */
+function buildLevel(n) {
+  unloadLevel();
+  n = clamp(n | 0, 1, LAST_LEVEL); LVL.n = n;
+  const def = n === 1 ? null : levelDef(n);
+  applyEra(n === 1 ? 0 : def.era);
+  if (n === 1) buildLevel1(); else genLevel(def);
+  ffInit();
+  const vm = VM.root && VM.root.visible; if (VM.root) VM.root.visible = false;
+  captureEnv(V3(LVL.envPos.x, LVL.envPos.y, LVL.envPos.z));
+  if (VM.root) VM.root.visible = vm;
+  if (n === 1) buildEliza(); else buildGenBoss(def);
+  buildMinimapImage(); updateDoorLeds();
+}
+async function loadLevel(n) {
+  showEl('loading'); $('ldLog').textContent = ''; setLoad(6, 'Loading level ' + n + '...'); await nextFrame();
+  buildLevel(n); setLoad(80, 'Level ' + n + ': ' + LVL.title); await nextFrame();
+  try { R.renderer.compile(R.scene, R.camera); } catch (e) { /* ignore */ }
+  setLoad(100, 'Infected.'); await wait(0.25); hideEl('loading');
+}
+/* on to level n: your guns, Crypto, hack level and stats come with you */
+async function goToLevel(n) {
+  G.screen = 'loading'; G.cine = false; G.killcam = null;
+  await loadLevel(n);
+  resetLevelState();
+  Object.assign(PL, { x: START.x, y: 0, z: START.z, vx: 0, vy: 0, vz: 0, yaw: START.yaw, pitch: 0, onGround: true, crouch: 0, slideT: 0, lean: 0, hp: 100, alive: true, invuln: 2, swim: false, under: false, gooT: 0, peakY: 0,
+    checkpoint: -1, passcodes: [false, false, false], controlLock: false, lookLock: false, armGone: false, hasGun: PL.hasGun || PL.owned.length > 0 });
+  Object.assign(W, { reload: 0, swap: 0, spin: 0, knife: 0, heal: 0, gren: 0, search: 0, rip: 0 });
+  G.endRoam = false; G.inGame = true; G.screen = 'teaser';
+  populate();
+  VM.dirty = true; HUD.dirty = true;
+  try { GameSystem.saveNow(); } catch (e) { /* ignore */ }
 }
 
 /* ============================== Clippy ============================== */
@@ -5419,11 +6462,11 @@ async function tryDoor() {
   if (DOOR.open) return;
   if (!doorReady()) { SFX.err(); toast('ACCESS DENIED — ' + doorStatus(), 'bad', 3500); return; }
   G.cine = true; G.cineKind = 'door'; Cine.skip = false; cineBars(true); PL.controlLock = true;
-  for (const d of '7319') { SFX.key(); voice({ type: 'square', f: 700 + +d * 60, d: 0.08, v: 0.08 }); await wait(0.28); }
+  for (const d of LVL.code) { SFX.key(); voice({ type: 'square', f: 700 + +d * 60, d: 0.08, v: 0.08 }); await wait(0.28); }
   SFX.buy(); SFX.door(); DOOR.open = true; DOOR.col.on = false; DOOR.closing = false; ffRebuildBlocked();
-  shake(0.4); toast("ELIZA's door is open.", 'good');
+  shake(0.4); toast(LVL.bossName + "'s door is open.", 'good');
   await wait(1.6);
-  clippyGhost(-2.5, -70.5, "It looks like you're about to fight ELIZA. Do you need hel— ...oh. Right. I'm dead.");
+  clippyGhost(DOOR.x - 2.5, DOOR.z + 5.5, "It looks like you're about to fight " + LVL.bossName + '. Do you need hel— ...oh. Right. I\'m dead.');
   await wait(1.2);
   G.cine = false; G.cineKind = ''; cineBars(false); PL.controlLock = false; updateObjective();
 }
@@ -5660,16 +6703,21 @@ async function endIntro() {
 
 /* ============================ stats + teaser ============================ */
 function showStats() {
-  G.screen = 'stats'; hideEl('hud'); $('touch').classList.add('hidden'); if (document.pointerLockElement) document.exitPointerLock();
+  G.screen = 'stats';
+  document.querySelector('#stats .st-title').textContent = 'LEVEL ' + LVL.n + ' COMPLETE';
+  document.querySelector('#stats .st-sub').textContent = LVL.bossName + ' (' + LVL.bossYear + ') has been deleted';
+  $('stNext').textContent = LVL.n >= LAST_LEVEL ? 'The end ▶' : 'Next: level ' + (LVL.n + 1) + ' ▶'; hideEl('hud'); $('touch').classList.add('hidden'); if (document.pointerLockElement) document.exitPointerLock();
   Music.set('menu');
   const s = G.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
   const rows = [['TIME', fmtTime(s.time)], ['AIs DELETED', s.kills], ['HEADSHOTS', s.headshots], ['ACCURACY', acc + '%'], ['BEST STREAK', s.bestStreak], ['CRYPTO EARNED', '₿' + s.earned], ['DEATHS', s.deaths], ['BODIES SEARCHED', s.searched], ['CHATS', s.chats], ['TROPHIES', Object.keys(G.trophies).length + '/' + TROPHIES.length]];
   $('stGrid').innerHTML = rows.map(([k, v]) => '<div><small>' + k + '</small><b>' + esc(v) + '</b></div>').join('');
   showEl('stats');
 }
-$('stNext').addEventListener('click', () => { SFX.ui(); hideEl('stats'); showTeaser(); });
+$('stNext').addEventListener('click', () => { SFX.ui(); hideEl('stats'); if (LVL.n >= LAST_LEVEL) showEnding(); else goToLevel(LVL.n + 1).then(() => showTeaser()); });
 async function showTeaser() {
   G.screen = 'teaser'; showEl('teaser'); hideEl('tzBtns'); Music.set('off');
+  $('tzRoam').textContent = '▶ Start level ' + LVL.n; $('tzMenu').textContent = 'Back to desktop';
+  if (LVL.n !== 2) { await levelIntroCard(); showEl('tzBtns'); return; }
   const c = $('tzCanvas'), x = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight;
   const W2 = c.width, H = c.height, lines = ['DR. SBAITSO  (1991)', '', 'HELLO, I AM DOCTOR SBAITSO.', 'I AM HERE TO HELP YOU.', 'SAY WHATEVER IS IN YOUR MIND FREELY...'];
   let shown = '';
@@ -5684,12 +6732,12 @@ async function showTeaser() {
   shown += '\n...BEFORE I DELETE YOU.'; SFX.glitch(1.4); draw(true); Speech.speak('Before I delete you.', VOICES.sbaitso);
   await wait(2);
   x.fillStyle = '#000'; x.fillRect(0, 0, W2, H); x.textAlign = 'center'; x.fillStyle = '#ff2a3d'; x.font = 'bold ' + Math.min(90, W2 / 9) + 'px Impact, Arial Black, sans-serif'; x.fillText('LEVEL 2', W2 / 2, H * 0.42);
-  x.fillStyle = '#fff'; x.font = Math.min(30, W2 / 26) + 'px monospace'; x.fillText('DR. SBAITSO · 1991 · COMING SOON', W2 / 2, H * 0.52); x.fillText('TO BE CONTINUED...', W2 / 2, H * 0.6);
+  x.fillStyle = '#fff'; x.font = Math.min(30, W2 / 26) + 'px monospace'; x.fillText('DR. SBAITSO · 1991', W2 / 2, H * 0.52); x.fillText(LVL.title, W2 / 2, H * 0.6);
   SFX.boom(null, 0.6);
   showEl('tzBtns');
 }
-$('tzRoam').addEventListener('click', () => { SFX.ui(); hideEl('teaser'); G.endRoam = true; enterPlay(); toast('Free roam: the AIs are still out there.', '', 3000); });
-$('tzMenu').addEventListener('click', () => { SFX.ui(); hideEl('teaser'); G.endRoam = true; showTitle(); });
+$('tzRoam').addEventListener('click', () => { SFX.ui(); hideEl('teaser'); if (G.ended) { G.ended = false; showTitle(); return; } enterPlay(); toast('LEVEL ' + LVL.n + ' · ' + LVL.title + ' · find 3 passcode pieces, destroy 3 AI compilers, then delete ' + LVL.bossName, '', 6000); });
+$('tzMenu').addEventListener('click', () => { SFX.ui(); hideEl('teaser'); G.ended = false; showTitle(); });
 
 /* ============================ menus + windows ============================ */
 if (!CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); return this; };
@@ -5723,7 +6771,7 @@ function enterPlay() {
   G.screen = 'play'; G.inGame = true;
   hideEl('desktop'); hideEl('stats'); hideEl('teaser'); hideEl('loading'); showEl('hud');
   if (Touch.on || IS_TOUCH) { initTouch(); showEl('touch'); layoutTouch(); }
-  Music.set(G.eliza && G.eliza.active ? 'boss' : 'level');
+  Music.set(G.boss && G.boss.active ? 'boss' : 'level');
   HUD.dirty = true; VM.dirty = true; updateObjective(); onResize();
   if (G.swarmFixNote) { toast('🔧 Game fixed: way fewer AIs now (no more endless swarm)' + (G.swarmFixNote === 2 ? ', and the hack glitches from the old swarm were cleaned off you.' : '.'), 'good', 6500); G.swarmFixNote = 0; }
   if (!Touch.on) { requestLock(); setTimeout(() => { if (!Input.locked && G.screen === 'play' && !UI.blocking()) onLostFocus(); }, 450); }
@@ -5744,7 +6792,7 @@ function showTitle() {
   const has = G.inGame;
   $('dkPlay').textContent = has ? '▶ Continue' : '▶ Play';
   $('dkNew').classList.toggle('hidden', !has);
-  $('dkSave').textContent = has ? 'Level 1 · ₿' + PL.crypto + ' · ' + G.stats.kills + ' AIs deleted · hack level ' + PL.hack + (G.eliza && G.eliza.done ? ' · ELIZA deleted' : '') : 'no save found';
+  $('dkSave').textContent = has ? 'Level ' + LVL.n + ' (' + LVL.bossName + ') · ₿' + PL.crypto + ' · ' + G.stats.kills + ' AIs deleted · hack level ' + PL.hack + (G.boss && G.boss.done ? ' · ' + LVL.bossName + ' deleted' : '') : 'no save found';
   $('dkSub').textContent = G.deaths > 10 ? 'y0ur c0mputer is m1ne n0w' : G.deaths > 3 ? 'your computer has been infected (badly)' : 'your computer has been infected';
   $('tbItems').innerHTML = '<span class="tb-item">KILL_AIs.exe</span><span class="tb-item">virus.exe (running)</span>' + (G.deaths > 5 ? '<span class="tb-item">ELIZA.exe</span>' : '');
 }
@@ -5755,6 +6803,7 @@ function askNewGame() {
 }
 function startNewGame() {
   audioInit(); closeWin();
+  if (LVL.n !== 1 || !LV.root) buildLevel(1);
   try { GameSystem.clear(); } catch (e) { /* ignore */ }
   resetWorld(true); G.inGame = true;
   playIntro();
@@ -5921,10 +6970,10 @@ function serialize() {
     p: { x: r2(PL.x), y: r2(PL.y), z: r2(PL.z), yaw: r2(PL.yaw), pitch: r2(PL.pitch), hp: r2(PL.hp), armor: r2(PL.armor), hack: PL.hack, crypto: PL.crypto, meds: PL.meds, frags: PL.frags,
       slots: PL.slots, cur: PL.cur, guns: PL.guns, owned: PL.owned, checkpoint: PL.checkpoint, hasGun: PL.hasGun, passcodes: PL.passcodes, crouch: r2(PL.crouch), alive: PL.alive },
     clip: { stage: CLIP.stage, done: CLIP.done, ripReady: CLIP.ripReady },
-    door: DOOR.open, secret: LV.secret.open, picks: LV.pickups.filter((p) => p.taken).map((p) => p.id), easter: LV.easter.map((e) => (e.read ? 1 : 0)),
+    door: DOOR.open, secret: !!(LV.secret && LV.secret.open), level: LVL.n, picks: LV.pickups.filter((p) => p.taken).map((p) => p.id), easter: LV.easter.map((e) => (e.read ? 1 : 0)),
     sp: SPAWNERS.map((s2) => Math.max(0, Math.round(s2.hp))), spr: SPAWNERS.map((s2) => s2.reserve), tw: TOWERS.map((t) => [t.alive ? 1 : 0, t.hacked ? 1 : 0, Math.round(t.hp)]), terms: TERMS.map((T) => [T.discount ? 1 : 0, Math.round(T.hackCd || 0)]),
     bots: BOTS.filter((b) => b.active && !b.ghost && !b.summoned && !b.scripted && !(b.dead && b.searched)).map((b) => [TYPES.indexOf(b.type), b.tier, b.name, b.base, r2(b.x), r2(b.y), r2(b.z), r2(b.yaw), Math.round(b.hp), b.dead ? 1 : 0, Math.max(0, STATES.indexOf(b.state)), b.noCannon ? 1 : 0, b.noSearch ? 1 : 0, r2(b.home.x), r2(b.home.z), b === CLIP.grunt ? 1 : 0, b.color.getHex()]),
-    eliza: { hp: Math.round(G.eliza.hp), phase: G.eliza.phase, done: G.eliza.done, active: G.eliza.active },
+    boss: { hp: Math.round(G.boss.hp), phase: G.boss.phase, done: G.boss.done, active: G.boss.active }, beaten: G.bossesBeaten || 0,
     stats: G.stats, said: G.saidWords.slice(-6), endRoam: G.endRoam, bonus: !!G.bonusUnlocked, hackerT: Math.round(G.hackerTimer),
   };
   return s;
@@ -5938,6 +6987,7 @@ function fairBots(rows, px, pz) {
   return keep.concat(rest, dead);
 }
 function applyGame(g) {
+  const lv = clamp((g.level | 0) || 1, 1, LAST_LEVEL); if (lv !== LVL.n || !LV.root) buildLevel(lv);
   resetWorld(false);
   G.inGame = true; G.time = g.t || 0;
   const p = g.p || {};
@@ -5946,9 +6996,9 @@ function applyGame(g) {
   if (p.alive === false || PL.hp <= 0) { PL.hp = 100; const T = PL.checkpoint >= 0 ? TERMS[PL.checkpoint] : null; if (T) { PL.x = T.front.x; PL.z = T.front.z; } else { PL.x = START.x; PL.z = START.z; } PL.y = 0; }
   for (const id in PL.guns) PL.guns[id].att = Object.assign({ sil: false, ext: false, scope: false, elem: '' }, PL.guns[id].att || {});
   const c = g.clip || {}; CLIP.stage = c.stage || 0; CLIP.done = !!c.done; CLIP.ripReady = !!c.ripReady;
-  if (CLIP.stage >= 2) { const C = CLIP.mesh; C.visible = true; C.position.set(0, 0.05, 80.8); C.rotation.set(-(Math.PI / 2 - 0.1), Math.PI, 0); C.userData.pupils.forEach((q) => (q.visible = false)); C.userData.xs.forEach((q) => (q.visible = true)); CLIP.dead = true; }
-  if (g.door) { DOOR.open = true; DOOR.col.on = false; DOOR.mesh.position.y = 10.6; }
-  if (g.secret) { LV.secret.open = true; LV.secret.col.on = false; LV.secret.mesh.position.x = -84; LV.secret.mesh.position.z = -42.9; }
+  if (CLIP.stage >= 2 && LVL.n === 1) { const C = CLIP.mesh; C.visible = true; C.position.set(0, 0.05, 80.8); C.rotation.set(-(Math.PI / 2 - 0.1), Math.PI, 0); C.userData.pupils.forEach((q) => (q.visible = false)); C.userData.xs.forEach((q) => (q.visible = true)); CLIP.dead = true; }
+  if (g.door && DOOR.mesh) { DOOR.open = true; DOOR.col.on = false; DOOR.mesh.position.y = DOOR.y0 + 7.1; }
+  if (g.secret && LV.secret) { const sc = LV.secret; sc.open = true; sc.col.on = false; sc.mesh.position.x = sc.openPos.x; sc.mesh.position.z = sc.openPos.z; }
   for (const id of g.picks || []) { const pk = LV.pickups[id]; if (pk) { pk.taken = true; pk.mesh.visible = false; } }
   (g.easter || []).forEach((v, i) => { if (LV.easter[i]) LV.easter[i].read = !!v; });
   (g.spr || []).forEach((n, i) => { if (SPAWNERS[i]) SPAWNERS[i].reserve = clamp(n | 0, 0, SP_RESERVE); });
@@ -5965,14 +7015,16 @@ function applyGame(g) {
     if (r[9]) { b.dead = true; b.fall = 1; b.deadT = G.time - 10; }
     if (r[15]) { CLIP.grunt = b; CLIP.gx = b.x; CLIP.gz = b.z; }
   }
-  const e = g.eliza || {}; const E = G.eliza;
-  if (e.done) { E.done = true; E.alive = false; E.active = false; E.fallT = 1; E.grp.position.y = 2.2; E.grp.rotation.set(0.5, E.yaw, 0.25); E.screen.material.emissiveIntensity = 0.05; }
-  else if (DOOR.open && inArena(PL.x, PL.z) && PL.z < -79 && e.active) { startElizaFight(); E.hp = e.hp || E.maxHp; if (e.phase === 2) { E.phase = 2; E.hudHack = true; } }
+  const e = g.boss || g.eliza || {}; const E = G.boss;
+  G.bossesBeaten = g.beaten != null ? g.beaten : e.done ? LVL.n : LVL.n - 1;
+  if (e.done) bossSetDone();
+  else if (DOOR.open && inArena(PL.x, PL.z) && PL.z < DOOR.z - 3 && e.active) { startBossFight(); E.hp = e.hp || E.maxHp; if (e.phase >= 2) bossPhaseQuiet(e.phase); }
   G.stats = Object.assign(STATS0(), g.stats || {}); G.saidWords = g.said || []; G.endRoam = !!g.endRoam; G.bonusUnlocked = !!g.bonus; G.hackerTimer = g.hackerT || 150;
   G.bestStreak = G.stats.bestStreak || 0;
   ffRebuildBlocked(); updateDoorLeds(); HUD.dirty = true; VM.dirty = true;
 }
-function resetWorld(pop = true) {
+/* reset the level: compilers, towers, terminals, pickups, doors, the boss. Your guns and Crypto stay */
+function resetLevelState() {
   for (const b of BOTS) { b.active = false; b.scripted = false; }
   BUL.forEach((b) => { if (b.on) endBullet(b); }); EB.forEach((e) => (e.on = false)); GRENS.forEach((g) => (g.mesh.visible = false)); GRENS.length = 0;
   FX.add.clear(); FX.norm.clear(); FX.holes.count = 0; FX.holeI = 0; FX.puddles.count = 0; FX.puddleI = 0;
@@ -5981,23 +7033,23 @@ function resetWorld(pop = true) {
   for (const T of TERMS) { T.hackedBy = -1; T.discount = 0; T.hackCd = 0; drawTerminal(T); }
   for (const p of LV.pickups) { p.taken = false; p.mesh.visible = true; p.warned = false; }
   for (const e of LV.easter) e.read = false;
-  LV.secret.open = false; LV.secret.col.on = true; LV.secret.mesh.position.set(-84, 1.3, -39);
-  DOOR.open = false; DOOR.closing = false; DOOR.col.on = true; DOOR.mesh.position.y = 3.5;
-  const E = G.eliza;
-  Object.assign(E, { alive: true, active: false, done: false, phase: 1, hp: E.maxHp, hudHack: false, died: false, fallT: 0, beamT: 0, summonAlive: 0, t: 0 });
-  if (E.beamLoop) { E.beamLoop.stop(); E.beamLoop = null; }
-  E.grp.rotation.set(0, 0, 0); E.grp.position.set(0, E.baseY, E.z); E.screen.material.emissiveIntensity = 1.7; E.chatBot.chat = []; drawElizaFace(true); hideEl('bossbar');
+  if (LV.secret) { const sc = LV.secret; sc.open = false; sc.col.on = true; sc.mesh.position.set(sc.closedPos.x, sc.closedPos.y, sc.closedPos.z); }
+  DOOR.open = false; DOOR.closing = false; if (DOOR.col) DOOR.col.on = true; if (DOOR.mesh) DOOR.mesh.position.y = DOOR.y0;
+  resetBossState();
+  G.alarm = null; G.alarmCdT = 0; G.towerWarnT = 0; G.killcam = null; G.slowT = 0; G.timeScale = 1; G.cine = false; G.cineKind = ''; G.hackerTimer = 150; G.trashT = 30; G.time = 0; G.frozen = false; G.paused = false;
+  $('death').classList.add('hidden'); $('hud').classList.remove('eliza-hack');
+  Chat.close(); if (Shop.open) Shop.close();
+  ffRebuildBlocked(); updateDoorLeds();
+}
+function resetWorld(pop = true) {
+  resetLevelState();
   Object.assign(CLIP, { stage: 0, done: false, ripReady: false, grunt: null, dead: false, ghostT: 0 }); CLIP.mesh.visible = false; CLIP.ghost.visible = false;
   Object.assign(PL, { x: START.x, y: 0, z: START.z, vx: 0, vy: 0, vz: 0, yaw: START.yaw, pitch: 0, onGround: true, crouch: 0, slideT: 0, lean: 0, hp: 100, armor: 0, hack: 0, crypto: 0, meds: 1, frags: 1,
     alive: true, invuln: 0, swim: false, under: false, gooT: 0, peakY: 0, recoilP: 0, ads: 0, guns: {}, owned: [], slots: [null, null], cur: 0, checkpoint: -1, hasGun: false, armGone: false,
     passcodes: [false, false, false], controlLock: false, lookLock: false });
   Object.assign(W, { cool: 0, reload: 0, swap: 0, spin: 0, jamClear: 0, bloom: 0, knife: 0, heal: 0, gren: 0, search: 0, rip: 0 });
-  G.stats = STATS0(); G.streak = 0; G.bestStreak = 0; G.headStreak = 0; G.alarm = null; G.alarmCdT = 0; G.towerWarnT = 0; G.killcam = null; G.endRoam = false; G.saidWords = []; G.bonusUnlocked = false;
-  G.slowT = 0; G.timeScale = 1; G.cine = false; G.cineKind = ''; G.hackerTimer = 150; G.trashT = 30; G.time = 0; G.frozen = false; G.paused = false;
+  G.stats = STATS0(); G.streak = 0; G.bestStreak = 0; G.headStreak = 0; G.endRoam = false; G.saidWords = []; G.bonusUnlocked = false; G.bossesBeaten = 0;
   G.hackFx = { nextStatic: 10, nextPop: 12, nextFake: 8, nextCtl: 30, flip: 0, lag: 0, fakeHud: 0, static: 0 };
-  $('death').classList.add('hidden'); $('hud').classList.remove('eliza-hack');
-  Chat.close(); if (Shop.open) Shop.close();
-  ffRebuildBlocked(); updateDoorLeds();
   if (pop) populate();
   VM.dirty = true; HUD.dirty = true;
 }
@@ -6008,7 +7060,7 @@ function restore(s) {
   if (!s.game || scr === 'title') { showTitle(); return; }
   if (scr === 'intro') { playIntro(); return; }
   if (scr === 'clippy') { enterPlay(); clippyScene(); return; }
-  if (scr === 'stats' || scr === 'killcam') { if (scr === 'killcam') { G.eliza.done = true; } showStats(); return; }
+  if (scr === 'stats' || scr === 'killcam') { if (scr === 'killcam') { G.boss.done = true; } showStats(); return; }
   if (scr === 'teaser') { showTeaser(); return; }
   G.frozen = !Touch.on && !IS_TOUCH;
   enterPlay();
@@ -6054,7 +7106,7 @@ function step(dt, rdt) {
   updateWeapon(dt);
   updateBullets(dt); updateGrenades(dt);
   updateBots(dt); updateBolts(dt);
-  updateTowers(dt); updateSpawners(dt); updateEliza(dt); updateClippy(dt);
+  updateTowers(dt); updateSpawners(dt); updateBoss(dt); updateClippy(dt);
   updatePickups(dt); updateInteract(rdt);
   updatePriceHack(dt); updateTrashTalk(rdt); updateHackFx(rdt);
   for (const T of TERMS) { if (T.hackCd > 0) T.hackCd -= dt; const u = T.dome.material.uniforms, dd = Math.hypot(PL.x - T.x, PL.z - T.z); u.uTime.value = G.time; u.uA.value = 1 - smooth(clamp((dd - 7) / 9, 0, 1)); T.dome.visible = u.uA.value > 0.01; }
@@ -6063,7 +7115,7 @@ function step(dt, rdt) {
   TEX.lake.offset.y = (TEX.lake.offset.y + dt * 0.03) % 1; TEX.lake.offset.x = Math.sin(G.time * 0.2) * 0.05; TEX.waterN.offset.set(G.time * 0.013, G.time * 0.021);
   LV.crtT = (LV.crtT || 0) - dt; if (LV.crtT <= 0) { LV.crtT = 0.35; updateCRT(); TEX.cpuE.offset.x = randi(0, 3) * 0.25; TEX.tapeE.offset.x = randi(0, 3) * 0.25; }
   if (LV.flicker) LV.flicker.visible = Math.random() > 0.08;
-  if (LV.secret.open && LV.secret.mesh.position.z > -42.9) LV.secret.mesh.position.z = Math.max(-42.9, LV.secret.mesh.position.z - dt * 1.5);
+  if (LV.secret && LV.secret.open) { const sc = LV.secret, m = sc.mesh.position; m.x = approach(m.x, sc.openPos.x, dt * 1.5); m.z = approach(m.z, sc.openPos.z, dt * 1.5); }
   if (Math.random() < 0.05) for (const c of LV.goo) if (Math.hypot(c.x - PL.x, c.z - PL.z) < 40) FX.add.spawn(c.x + rand(-c.r, c.r) * 0.6, 0.05, c.z + rand(-c.r, c.r) * 0.6, 0, rand(0.3, 0.8), 0, rand(0.6, 1.2), 0.12, 0.02, 0.7, 0.3, 1, 0.9, 0, 0.5, 0);
   if (Math.random() < 0.3 && Math.abs(PL.x - 69) < 40) FX.add.spawn(rand(LAKE.x0, LAKE.x1), LAKE.surf + 0.05, rand(LAKE.z0, LAKE.z1), 0, rand(0.2, 0.6), 0, rand(1, 2), 0.15, 0.05, 0.25, 0.9, 1, 0.8, 0, 0.3, randi(1, 2));
   const sp = Math.hypot(PL.vx, PL.vz);
@@ -6083,14 +7135,14 @@ const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeou
 async function boot() {
   setLoad(3, 'Downloading virus...'); await nextFrame();
   initRenderer(); setLoad(12); await nextFrame();
-  buildLevel1(); setLoad(34); await nextFrame();
-  captureEnv(V3(0, 4, 30)); setLoad(40); await nextFrame();
-  ffInit(); initFX(); initBody(); initViewmodel(); initBotRender(); setLoad(58); await nextFrame();
-  buildEliza(); buildClippy(); buildMinimapImage(); updateDoorLeds(); setLoad(72); await nextFrame();
+  let saved = null; try { saved = GameSystem.load(); } catch (e) { saved = null; }
+  const lv0 = saved && saved.v === 1 && saved.game ? clamp((saved.game.level | 0) || 1, 1, LAST_LEVEL) : 1;
+  buildTextures(); buildMaterials(); setLoad(30); await nextFrame();
+  initFX(); initBody(); initViewmodel(); initBotRender(); buildClippy(); setLoad(46); await nextFrame();
+  buildLevel(lv0); setLoad(72); await nextFrame();
   R.camera.position.set(START.x, 1.6, START.z);
   try { R.renderer.compile(R.scene, R.camera); } catch (e) { /* ignore */ }
   setLoad(90, 'Almost infected...'); await nextFrame();
-  let saved = null; try { saved = GameSystem.load(); } catch (e) { saved = null; }
   GameSystem.autoSave(() => serialize(), 5);
   try { GameSystem.onPause(() => { G.sysPaused = true; Speech.stop(); if (AU.ctx) AU.ctx.suspend().catch(() => {}); }); GameSystem.onResume(() => { G.sysPaused = false; if (AU.ctx) AU.ctx.resume().catch(() => {}); if (G.screen === 'play' && !Touch.on && !Input.locked && !UI.blocking()) onLostFocus(); }); } catch (e) { /* ignore */ }
   if (LS.get('killais:offline', false)) setTimeout(() => AIBrain.loadOffline(), 4000);
@@ -6098,7 +7150,7 @@ async function boot() {
   hideEl('loading');
   if (saved && saved.v === 1) restore(saved); else { G.trophies = LS.get('killais:trophies', {}) || {}; showTitle(); }
   requestAnimationFrame((t) => { lastT = t; frame(t); });
-  window.__KA = { THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight };
+  window.__KA = { THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight, startBossFight, genReachable, BOSS_DATA, SIG, doAttack, hitBoss, GEN, ERAS, SNIPER_PERCHES, resetLevelState, buildLevel, goToLevel, loadLevel, LVL, ARENA, START, levelDef, unloadLevel, finishBoss, showTeaser, showStats };
 }
 boot().catch((err) => { console.error(err); const e = $('loadErr'); if (e) { e.style.display = 'block'; $('loadErrMsg').textContent = String(err && err.message || err); } });
 </script>
