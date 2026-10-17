@@ -101,7 +101,8 @@ G.screens.title = {
     this.ng.setGraphicSize(Math.floor(this.ng.width * 0.8)); this.ng.updateHitbox(); this.ng.screenCenter('x');
     this.beat = new G.MenuBeat();
     this.lastBeat = 0;
-    G.menuMusic.start(G.audio.music.current() ? 0 : 4);
+    // the music starts once the title's pictures are decoded, so the intro lines stay on the beat
+    G.A.afterLoad(() => { if (G.screen === this) G.menuMusic.start(G.audio.music.current() ? 0 : 4); });
     if (this.initialized || p.skipIntro) this.skipIntro(true);
   },
   // FNF Alphabet lines in the middle of the black intro (letter layouts cached)

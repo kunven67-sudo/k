@@ -30,21 +30,56 @@ G.A = {
     }
     return (libs[0] || 'shared') + '/images/' + key;
   },
-  image(p) { return this._img.get(p) || null; },
-  // decode every packed image once (fast: WebP data URLs), so drawing never waits
-  loadImages(filter) {
-    const jobs = [];
-    for (const p in this.raw) {
-      if (!p.endsWith('.png') || this._img.has(p) || (filter && !filter(p))) continue;
-      const img = new Image();
-      img.src = this.raw[p];
-      this._img.set(p, img);
-      jobs.push((img.decode ? img.decode() : new Promise(r => { img.onload = r; })).catch(() => {}).then(() => {
-        done++; const el = document.getElementById('boot'); if (el) el.textContent = 'Loading... ' + Math.round(done / jobs.length * 100) + '%';
-      }));
+  // Pictures. The small ones (under 8 MB once decoded) are decoded at boot. The big ones (title GF,
+  // freeplay cards, results art, stage layers...) are decoded the first time a screen asks for them;
+  // the main loop holds the screen (G.A.busy) until they're ready, so nothing pops in half-drawn.
+  // Decoding all 1.4 GB at boot made the browser throw pictures away and decode them again mid-song.
+  image(p) {
+    const img = this._img.get(p);
+    if (img) return img;
+    return this.raw[p] && p.endsWith('.png') ? this._load(p) : null;
+  },
+  HEAVY: 8e6,
+  pending: new Set(),
+  fresh: [],          // just decoded: drawn once on the real canvas so the GPU has them before they're needed
+  busy() { return this.pending.size > 0; },
+  _after: [],
+  afterLoad(fn) { if (this.busy()) this._after.push(fn); else fn(); },   // run once every picture asked for so far is decoded
+  warmNow(list) { for (const i of list) if (i) this.fresh.push(i); },     // hand these to the GPU on the next frame
+  // picture size straight from the file header (PNG or WebP), without decoding it
+  dims(p) {
+    const v = this.raw[p]; if (!v || !v.startsWith('data:')) return null;
+    const i = v.indexOf(',') + 1, bin = atob(v.slice(i, i + 64)), b = k => bin.charCodeAt(k);
+    if (bin.slice(0, 4) === 'RIFF') {
+      const f = bin.slice(12, 16);
+      if (f === 'VP8 ') return [(b(26) | b(27) << 8) & 0x3fff, (b(28) | b(29) << 8) & 0x3fff];
+      if (f === 'VP8L') { const bits = (b(21) | b(22) << 8 | b(23) << 16 | b(24) << 24) >>> 0; return [(bits & 0x3fff) + 1, ((bits >>> 14) & 0x3fff) + 1]; }
+      if (f === 'VP8X') return [1 + (b(24) | b(25) << 8 | b(26) << 16), 1 + (b(27) | b(28) << 8 | b(29) << 16)];
     }
+    if (b(1) === 0x50 && b(2) === 0x4e) return [(b(16) << 24 | b(17) << 16 | b(18) << 8 | b(19)) >>> 0, (b(20) << 24 | b(21) << 16 | b(22) << 8 | b(23)) >>> 0];
+    return null;
+  },
+  _load(p) {
+    const img = new Image(), d = this.dims(p);
+    if (d) { img.width = d[0]; img.height = d[1]; }    // code can read the size before it's decoded
+    img.src = this.raw[p];
+    this._img.set(p, img);
+    const pr = (img.decode ? img.decode() : new Promise(r => { img.onload = r; })).catch(() => {}).then(() => { this.pending.delete(pr); this.fresh.push(img); });
+    this.pending.add(pr);
+    return img;
+  },
+  loadImages() {
+    let n = 0;
+    for (const p in this.raw) {
+      if (!p.endsWith('.png') || this._img.has(p)) continue;
+      const d = this.dims(p);
+      if (d && d[0] * d[1] * 4 >= this.HEAVY) continue;
+      this._load(p); n++;
+    }
+    const all = [...this.pending];
     let done = 0;
-    return Promise.all(jobs);
+    for (const pr of all) pr.then(() => { done++; const el = document.getElementById('boot'); if (el) el.textContent = 'Loading... ' + Math.round(done / all.length * 100) + '%'; });
+    return Promise.all(all).then(() => { this.fresh.length = 0; });
   },
   // audio: decoded on demand and cached
   audio(p) {

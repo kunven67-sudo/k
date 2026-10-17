@@ -14,7 +14,10 @@ G.srcImg = (function () {
     if (!f || !img) return img;
     let m = cache.get(img); if (!m) { m = new Map(); cache.set(img, m); }
     let c = m.get(f);
-    if (!c) { c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.filter = f; x.drawImage(img, 0, 0); m.set(f, c); }
+    if (!c) {
+      if (img.complete === false || img.naturalWidth === 0) return img;   // not decoded yet: don't bake an empty copy
+      c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.filter = f; x.drawImage(img, 0, 0); m.set(f, c);
+    }
     return c;
   };
 })();

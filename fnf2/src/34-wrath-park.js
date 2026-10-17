@@ -13,7 +13,6 @@
     red: { bf: 'brightness(62%) sepia(45%) saturate(190%) hue-rotate(-20deg)', gf: 'brightness(58%) sepia(45%) saturate(190%) hue-rotate(-20deg)' },
     void: { bf: 'brightness(80%) contrast(112%)', gf: 'brightness(55%) contrast(110%)' },
   };
-  const BLACK = 'brightness(0%)';
 
   function texturesOf(sp) {
     const out = new Set();
@@ -64,12 +63,12 @@
       // the shadow crowd behind the fence (FNF's own Erect crowd, blacked out)
       S.crowd = [];
       for (const [x, flip] of [[-560, false], [1150, true]]) {
-        const c = new G.Sprite(x, 150).loadSparrow('week1/images/erect/crowd');
+        // (blacked out + half size at build time: tools/own/park.py)
+        const c = new G.Sprite(x, 150).loadSparrow(IMG + 'crowd-shadow');
         if (!c.sheet) continue;
         c.addAnim('idle', 'idle', 24, false); c.play('idle', true);
-        c.scale.x = c.scale.y = 1.05; c.updateHitbox(); c.x = x; c.y = 150;
+        c.scale.x = c.scale.y = 2.1; c.updateHitbox(); c.x = x; c.y = 150;
         c.scroll.x = c.scroll.y = 0.84; c.zIndex = 26; c.flipX = flip; c.name = 'crowd';
-        c.draw = drawWith(BLACK); warm(c, BLACK);
         st.props.push(c); S.crowd.push(c);
       }
       // the cracks in the ground + the eye's glow (void)
@@ -94,12 +93,13 @@
       S.vig = document.createElement('canvas'); S.vig.width = 320; S.vig.height = 180;
       const vc = S.vig.getContext('2d'), vg = vc.createRadialGradient(160, 90, 45, 160, 90, 162);
       vg.addColorStop(0, 'rgba(40,0,0,0)'); vg.addColorStop(1, 'rgba(40,0,0,0.7)'); vc.fillStyle = vg; vc.fillRect(0, 0, 320, 180);
-      // every picture this stage can swap to gets decoded + sent to the GPU now, not mid-song (that was a big hitch)
-      const tiny = document.createElement('canvas').getContext('2d'); tiny.canvas.width = tiny.canvas.height = 2;
-      for (const sp of st.props) for (const img of texturesOf(sp)) try { tiny.drawImage(img, 0, 0, 2, 2); } catch (e) {}
-      // light up the characters' tinted textures before the song starts
-      for (const ph in TINT) for (const slot in TINT[ph]) warm(slot === 'bf' ? P.bf : slot === 'gf' ? P.gf : P.dad, TINT[ph][slot]);
-      if (P.dadForms) warm(P.dadForms[0], TINT.night.dad);
+      // every picture this stage can swap to goes to the GPU now, not mid-song (that was a big hitch)
+      for (const sp of st.props) G.A.warmNow(texturesOf(sp));
+      // light up the characters' tinted textures before the song starts (once their pictures are decoded)
+      G.A.afterLoad(() => {
+        for (const ph in TINT) for (const slot in TINT[ph]) warm(slot === 'bf' ? P.bf : slot === 'gf' ? P.gf : P.dad, TINT[ph][slot]);
+        if (P.dadForms) warm(P.dadForms[0], TINT.night.dad);
+      });
       this.reset(P);
     },
     reset(P) {

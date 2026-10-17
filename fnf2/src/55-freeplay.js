@@ -79,7 +79,7 @@
     if (b.color !== color) {
       const c = b.c.getContext('2d'); c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, img.width, img.height);
       c.drawImage(img, 0, 0); c.globalCompositeOperation = 'multiply'; c.fillStyle = color; c.fillRect(0, 0, img.width, img.height);
-      c.globalCompositeOperation = 'destination-in'; c.drawImage(img, 0, 0); b.color = color;
+      c.globalCompositeOperation = 'destination-in'; c.drawImage(img, 0, 0); b.color = G.A.busy() ? null : color;
     }
     return b.c;
   }

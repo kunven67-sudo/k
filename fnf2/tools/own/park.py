@@ -21,6 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT = os.path.join(ROOT, 'build', 'own', 'shared', 'images', 'wrath-park')
 KURATA = os.environ.get('KURATA', '/home/user/ref/mods/kurata/x/VsKurata-PsychEngine-Windows64/PsychEngine/mods/mods/images')
+FA = os.environ.get('FA', '/home/user/ref/fa')
 DAYSKY = os.environ.get('DAYSKY', '/home/user/ref/mods/w3day/x/week3-day/assets/images/philly/sky.png')
 sys.path.insert(0, HERE)
 
@@ -254,7 +255,7 @@ def stage_json():
         dict(name='sky', assetPath='#9fc7ee', position=[-800, -800], scale=[4000, 2600], scroll=[0, 0], zIndex=0),
         prop('back', P + 'back-day', at('back'), 1.5, 0.6, 10),
         prop('truckInside', P + 'truck-inside', TRUCK_POS, TRUCK_SC, TRUCK_SCROLL, 20),
-        prop('kenny', P + 'kenny', (TRUCK_POS[0] + 70, TRUCK_POS[1] + 120), 0.42, TRUCK_SCROLL, 21, animType='sparrow',
+        prop('kenny', P + 'kenny', (TRUCK_POS[0] + 70, TRUCK_POS[1] + 120), 0.84, TRUCK_SCROLL, 21, animType='sparrow',
              animations=[dict(name='idle', prefix='unhype idle', frameRate=24, looped=True),
                          dict(name='hype', prefix='hype idle', frameRate=24, looped=True),
                          dict(name='serve', prefix='unhype up', frameRate=24, looped=False)],
@@ -345,7 +346,15 @@ def main():
         if mode == 'night': lit[..., :3] = (inner[..., :3].astype(np.float32) * [1.25, 1.05, 0.7] + [60, 40, 0]).clip(0, 255).astype(np.uint8)
         else: lit = dark(inner, mode)
         Image.fromarray(lit).save(os.path.join(OUT, 'truck-inside-%s.png' % mode))
-    for ext in ('.png', '.xml'): shutil.copyfile(KENNY + ext, os.path.join(OUT, 'kenny' + ext))
+    # Kenny's sheet is 4096x8192 with 200 frames but only 29 different drawings, and he's drawn small:
+    # trimmed, de-duplicated, half size (134 MB in memory -> under 10 MB), drawn at twice the scale
+    from repack_sparrow import repack
+    repack(KENNY + '.png', KENNY + '.xml', os.path.join(OUT, 'kenny'), scale=0.5)
+    # the shadow crowd behind the fence: FNF's Erect crowd, blacked out once here at half size
+    crowd = os.path.join(FA, 'week1', 'images', 'erect', 'crowd')
+    repack(crowd + '.png', crowd + '.xml', os.path.join(OUT, 'crowd-shadow'), scale=0.5)
+    cs = np.asarray(Image.open(os.path.join(OUT, 'crowd-shadow.png')).convert('RGBA')).copy(); cs[..., :3] = 0
+    Image.fromarray(cs).save(os.path.join(OUT, 'crowd-shadow.png'))
     sd = os.path.join(ROOT, 'build', 'own', 'preload', 'data', 'stages'); os.makedirs(sd, exist_ok=True)
     import json
     json.dump(stage_json(), open(os.path.join(sd, 'wrathPark.json'), 'w'), indent=1)

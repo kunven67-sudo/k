@@ -233,7 +233,7 @@ G.cached = function (key, w, h, fn) {
   c = G.makeCanvas(w, h);
   const cx = c.getContext('2d');
   fn(cx, w, h);
-  G._cache.set(key, c);
+  if (!(G.A && G.A.busy())) G._cache.set(key, c);   // a picture it used may not be decoded yet: build it again next time
   return c;
 };
 G.uncache = function (prefix) { for (const k of Array.from(G._cache.keys())) if (k.startsWith(prefix)) G._cache.delete(k); };
@@ -713,6 +713,7 @@ G.drawTransition = function (ctx) {
 G.updateTransition = function (dt) {
   const T = G.trans;
   if (!T.active) return;
+  if (T.phase === 2 && G.A.busy()) return;     // stay covered until the new screen's pictures are ready
   T.t += dt;
   if (T.t >= T.dur) {
     if (T.phase === 1) {
@@ -742,6 +743,14 @@ G.loop = function () {
     }
   }
   const ctx = G.ctx;
+  // big pictures still decoding: hold the screen (keep the last frame up), then hand them to the GPU
+  const busy = G.A.busy() || G.A.fresh.length > 0;
+  if (G.A.fresh.length) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+    for (const img of G.A.fresh.splice(0)) try { ctx.drawImage(img, 0, 0, 1, 1); } catch (e) {}
+  }
+  if (busy) { try { if (G.audio && G.audio.update) G.audio.update(dt); } catch (e) {} G.updateTransition(dt); requestAnimationFrame(G.loop); return; }
+  if (G.A._after.length) for (const fn of G.A._after.splice(0)) try { fn(); } catch (e) { G.reportError(e, 'afterLoad'); }
   try {
     if (G.audio && G.audio.update) G.audio.update(dt);
     if (G.screen && G.screen.update) G.screen.update(dt);
