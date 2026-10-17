@@ -130,12 +130,14 @@ export class BirthState {
     scene.add(key);
     // Your parents lean in. You're in Mom's arms, looking up.
     const cam = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.02, 50);
-    cam.position.set(0, 1.18, 0.32);
+    cam.position.set(0, 1.12, 0.5);
     this.hCam = cam;
     this.faces = [];
     const [pa, pb] = this.parents;
     if (pa) {
-      const p = new Person(pa.look, pa.age, {});
+      // Whoever just gave birth is in a hospital gown.
+      const look = pa.look.sex === 'f' ? { ...pa.look, outfit: { ...pa.look.outfit, topColor: '#a9c9e4', bottomColor: '#a9c9e4' } } : pa.look;
+      const p = new Person(look, pa.age, {});
       p.root.position.set(0, 0, 0);
       p.root.rotation.y = 0;
       p.pose = 'carry';
@@ -144,8 +146,8 @@ export class BirthState {
     }
     if (pb) {
       const p = new Person(pb.look, pb.age, {});
-      p.root.position.set(0.5, 0, 0.12);
-      p.root.rotation.y = -0.5;
+      p.root.position.set(0.62, 0, -0.18);
+      p.root.rotation.y = -0.55;
       scene.add(p.root);
       this.faces.push({ p, rec: pb });
     }
@@ -216,8 +218,11 @@ export class BirthState {
     e.physics = w.physics;
     this.hScene.traverse((o) => o.geometry?.dispose());
     for (const f of this.faces) f.p.dispose();
-    const living = w.home.spawn.living.clone();
-    this.player = new Player(e, w, { look: this.life.character.look, age: 1, spawn: living, yaw: Math.PI / 2, name: this.life.character.name });
+    const couch0 = w.home.spots.find((s) => s.kind === 'couch');
+    const f0 = couch0?.faceYaw ?? 0;
+    // On the rug in front of the couch, looking at it (Mom is a little crawl away).
+    const living = couch0 ? couch0.at.clone().add(new THREE.Vector3(Math.sin(f0) * 2.4, 0, Math.cos(f0) * 2.4)).setY(w.home.floorY + 0.02) : w.home.spawn.living.clone();
+    this.player = new Player(e, w, { look: this.life.character.look, age: 1, spawn: living, yaw: f0, name: this.life.character.name });
     this.player.forceCrawl = true;
     e.setView(w.scene, this.player.camera);
     input.setPointerLock?.(true);
@@ -236,13 +241,13 @@ export class BirthState {
     if (pb && couch) {
       const p = new Person(pb.look, pb.age, {});
       const f = couch.faceYaw;
-      p.root.position.copy(couch.at).add(new THREE.Vector3(Math.sin(f) * 2.3 + Math.cos(f) * 1.1, 0, Math.cos(f) * 2.3 - Math.sin(f) * 1.1)).setY(w.home.floorY);
+      p.root.position.copy(couch.at).add(new THREE.Vector3(Math.sin(f) * 1.6 - Math.cos(f) * 1.4, 0, Math.cos(f) * 1.6 + Math.sin(f) * 1.4)).setY(w.home.floorY);
       p.root.rotation.y = f + Math.PI;
       w.scene.add(p.root);
       this.babyPeople.push({ p, rec: pb });
     }
     const bear = assets.model('furniture', 'bear', { scale: 1.6 });
-    const bp = living.clone().add(new THREE.Vector3(-1.4, 0, 1.2));
+    const bp = living.clone().add(new THREE.Vector3(Math.cos(f0) * 1.3, 0, -Math.sin(f0) * 1.3));
     bear.position.copy(bp).setY(w.home.floorY);
     w.scene.add(bear);
     this.bear = bear;
@@ -498,9 +503,9 @@ export class BirthState {
     const [a, b] = this.faces;
     let goal = this.camLook;
     if (this.lookGoal === 'face' && a) goal = a.p.eyePosition(new THREE.Vector3());
-    else if (this.lookGoal === 'both' && a && b) goal = a.p.eyePosition(new THREE.Vector3()).lerp(b.p.eyePosition(new THREE.Vector3()), 0.45);
+    else if (this.lookGoal === 'both' && a && b) goal = a.p.eyePosition(new THREE.Vector3()).lerp(b.p.eyePosition(new THREE.Vector3()), 0.3);
     this._lk = (this._lk || this.camLook.clone()).lerp(goal, 1 - Math.pow(0.25, dt));
-    cam.position.y = 1.18 + Math.sin(this.t * 1.3) * 0.012; // being rocked gently
+    cam.position.y = 1.12 + Math.sin(this.t * 1.3) * 0.012; // being rocked gently
     cam.position.x = Math.sin(this.t * 0.9) * 0.02;
     cam.lookAt(this._lk);
     for (const f of this.faces) {

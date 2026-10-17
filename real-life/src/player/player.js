@@ -90,7 +90,7 @@ export class Player {
   }
 
   eye(out) {
-    if (this.forceCrawl) return out.copy(this.position).setY(this.position.y + this.height * 0.48);
+    if (this.forceCrawl) return this.body.eyePosition(out); // crawling: eyes are out in front
     const crouch = this._crouchK * 0.35 * this.height;
     return out.copy(this.position).setY(this.position.y + this.height * 0.93 - crouch);
   }
