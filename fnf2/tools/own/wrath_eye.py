@@ -193,37 +193,90 @@ def body_look(T, P):
 
 
 # ---------------------------------------------------------------- the red veiny picture (used whole)
-def veins():
+RED_U = 2.4
+RED_PAL = [(10, 8, 10), (225, 20, 28), (120, 6, 12), (250, 246, 246), (215, 130, 136)]
+INK_C, RED_C, DARK_C, WHITE_C, PINK_C = range(5)
+
+
+def red_template():
+    """The red veiny picture is the best looking eye, so EVERY look is built on it: same shape,
+    beads, spikes, shine and outline, just painted in each look's colours (so all 5 are the same size)."""
     src = load('veins')[0:403, 260:660]
-    U = 2.0
+    U = RED_U
     big = up(src, U)
     r, g, b = big[..., 0], big[..., 1], big[..., 2]
     lum = big.mean(2)
-    core = smooth_mask((lum < 80) | ((r > 140) & (g < 90) & (b < 90)), 1.2)
+    core = smooth_mask((lum < 80) | ((r > 140) & (g < 90) & (b < 90)), 1.2 * U / 2)
     fill = ndimage.binary_fill_holes(ndimage.binary_closing(core, iterations=3))
-    fill = smooth_mask(ndimage.binary_opening(fill, iterations=2), 2.0)
+    fill = smooth_mask(ndimage.binary_opening(fill, iterations=2), 2.0 * U / 2)
     pcx, pcy, pr = (497 - 260) * U, 192 * U, 66 * U          # the big black pupil
     H, W = lum.shape; yy, xx = np.mgrid[0:H, 0:W]
-    hole = (np.hypot(xx - pcx, yy - pcy) <= pr + 6).astype(np.uint8) * 255
+    hole = (np.hypot(xx - pcx, yy - pcy) <= pr + 16).astype(np.uint8) * 255   # pupil + its red edge
     filled = cv2.inpaint(np.clip(big, 0, 255).astype(np.uint8), hole, 30, cv2.INPAINT_TELEA).astype(np.float32)
-    pal = [(10, 8, 10), (225, 20, 28), (120, 6, 12), (250, 246, 246), (215, 130, 136)]
-    flat = [INK, (216, 22, 31), (136, 10, 18), (252, 245, 245), (236, 160, 168)]
-    k = classes(cv2.bilateralFilter(filled, 9, 40, 9), pal, 2.6)
-    o = rgba(H, W)
-    d = ndimage.distance_transform_edt(~fill)                 # its red glow, like the picture
-    g = np.clip(1 - (d - 5) / 24.0, 0, 1) * (d > 5)
-    o[..., :3] = (255, 60, 70); o[..., 3] = 160 * g ** 1.6
-    for i, col in enumerate(flat): put(o, fill & (k == i), col)
-    ink_outline(o, fill, 5)
-    sc = fill & ((k == 3) | (k == 4) | hole.astype(bool))
+    k = classes(cv2.bilateralFilter(filled, 9, 40, 9), RED_PAL, 2.6 * U / 2)
+    sc = fill & ((k == WHITE_C) | (k == PINK_C) | hole.astype(bool))
     alm = biggest(ndimage.binary_fill_holes(smooth_mask(sc, 3)) & fill)
     ays, axs = np.nonzero(alm)
+    center = ((axs.min() + axs.max()) / 2, (ays.min() + ays.max()) / 2)
+    # inside the eyeball: rim band near its edge, big red shading at the bottom, thin red veins
+    dalm = ndimage.distance_transform_edt(alm)
+    redin = alm & ((k == RED_C) | (k == DARK_C))
+    rim = redin & (dalm <= 9 * U)
+    blobs = ndimage.binary_opening(redin & ~rim, iterations=int(3 * U))
+    veins = redin & ~rim & ~blobs
+    # the picture's black shading inside spikes/beads/eyeball (not the outline) becomes a deep shade
+    din = ndimage.distance_transform_edt(fill)
+    deep = (k == INK_C) & (din > 6 * U / 2) & ~ndimage.binary_dilation(hole.astype(bool), iterations=2)
+    return dict(k=k, fill=fill, alm=alm, rim=rim, blobs=blobs, veins=veins, deep=deep, dalm=dalm, pupil=(pcx, pcy, pr), center=center, width=float(np.ptp(axs)), U=U)
+
+
+def red_look(R, P):
+    """Paint the red template in a look's colours. P: light, shade, hl, sclera, scShade, rim, glow, keepVeins."""
+    k, fill, alm = R['k'], R['fill'], R['alm']
+    H, W = k.shape
+    o = rgba(H, W)
+    d = ndimage.distance_transform_edt(~fill)                 # soft glow round everything
+    g = np.clip(1 - (d - 5) / 24.0, 0, 1) * (d > 5)
+    o[..., :3] = hexrgb(P['glow']); o[..., 3] = 160 * g ** 1.6
+    out = fill & ~alm
+    mix = lambda a, b, t: tuple(int(x + (y - x) * t) for x, y in zip(hexrgb(a), hexrgb(b)))
+    put(o, out & (k == RED_C), hexrgb(P['light']))
+    put(o, out & (k == DARK_C), hexrgb(P['shade']))
+    put(o, out & (k == WHITE_C), hexrgb(P['hl']))
+    put(o, out & (k == PINK_C), mix(P['light'], P['hl'], 0.55))
+    put(o, out & (k == INK_C), INK)
+    # the eyeball
+    put(o, alm & (k == WHITE_C), hexrgb(P['sclera']))
+    put(o, alm & (k == PINK_C), hexrgb(P['scShade']))
+    put(o, alm & (k == INK_C), INK)
+    put(o, R['blobs'], hexrgb(P['scShade']))
+    if P.get('keepVeins'):
+        put(o, alm & ((k == RED_C) | (k == DARK_C)) & ~R['blobs'], hexrgb(P['light']))
+        put(o, R['blobs'] & (k == DARK_C), hexrgb(P['shade']))
+        put(o, R['blobs'] & (k == RED_C), hexrgb(P['light']))
+        put(o, R['rim'], hexrgb(P['rim']))
+    else:
+        # veins only on the red eye; everything else red inside the eyeball -> eyeball colours,
+        # then one clean even rim round the eyeball
+        redin = alm & ((k == RED_C) | (k == DARK_C)) & ~R['blobs']
+        put(o, redin, hexrgb(P['sclera']))
+        put(o, alm & (R['dalm'] <= 7 * R['U']), hexrgb(P['rim']))
+    if P.get('deep'):
+        put(o, R['deep'] & out, hexrgb(P['deep']))
+        put(o, R['deep'] & alm, hexrgb(P.get('deepIn', P['scShade'])))
+    ink_outline(o, fill, 5)
+    return o
+
+
+def red_iris_black(R):
+    """The red picture's own pupil: big black disc + two white glints."""
+    pcx, pcy, pr = R['pupil']; U = R['U']
     S = int(pr * 2 + 16); io = rgba(S, S); oy, ox = np.mgrid[0:S, 0:S]; c = S / 2
     put(io, np.hypot(ox - c, oy - c) <= pr, (8, 6, 9))
     for gx, gy, gr in ((464, 145, 6), (488, 202, 7)):
         gx = (gx - 260) * U - pcx + c; gy = gy * U - pcy + c
         put(io, np.hypot(ox - gx, oy - gy) <= gr * U * 0.9, (255, 255, 255))
-    return dict(back=o, alm=alm, iris=io, irisAt=(pcx, pcy), center=((axs.min() + axs.max()) / 2, (ays.min() + ays.max()) / 2), width=float(np.ptp(axs)))
+    return io
 
 
 # ---------------------------------------------------------------- goo (from real art, repainted black)
@@ -245,7 +298,7 @@ def goo_paint(a, lumcuts, mean=False):
 
 def goo_drop(V):
     """A goo drop = the big shiny bead off the red veiny picture, repainted."""
-    b = V['back']; cx, cy, r = 310, 172, 50
+    b = V['back']; cx, cy, r = int(310 * RED_U / 2), int(172 * RED_U / 2), int(50 * RED_U / 2)
     crop = b[cy - r:cy + r, cx - r:cx + r].copy()
     yy, xx = np.mgrid[0:2 * r, 0:2 * r]
     crop[np.hypot(xx - r, yy - r) > r - 3, 3] = 0
@@ -315,34 +368,34 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     for f in os.listdir(a.out):
         if f.endswith('.png') or f.endswith('.json'): os.remove(os.path.join(a.out, f))
-    T = template()
-    W = T['width']
+    T = template()                                           # (spiral iris comes from it)
+    R = red_template()
+    W, pr = R['width'], R['pupil'][2]
     meta = {'looks': {}}
-    def look(name, back, iris, irisAt, center, width, mask):
+    def look(name, back, iris):
         save(back, os.path.join(a.out, 'back-' + name + '.png'))
         save(iris, os.path.join(a.out, 'iris-' + name + '.png'))
-        meta['looks'][name] = {'back': 'back-' + name, 'iris': 'iris-' + name, 'mask': mask,
-                               'center': [round(center[0], 1), round(center[1], 1)], 'irisAt': [round(irisAt[0], 1), round(irisAt[1], 1)],
-                               'scale': round(ALMOND_WORLD / width, 4), 'size': [back.shape[1], back.shape[0]], 'almondW': round(width, 1),
+        c = R['center']
+        meta['looks'][name] = {'back': 'back-' + name, 'iris': 'iris-' + name, 'mask': 'mask-eye',
+                               'center': [round(c[0], 1), round(c[1], 1)], 'irisAt': [round(c[0], 1), round(c[1], 1)],
+                               'scale': round(ALMOND_WORLD / W, 4), 'size': [back.shape[1], back.shape[0]], 'almondW': round(W, 1),
                                'drips': drip_points(back)}
-    save(mask_img(T['alm']), os.path.join(a.out, 'mask-template.png'))
-    ic = T['iris'][:2]
-    sp = iris_spiral(T); k = IRIS * W / T['iris'][2]
-    sp = np.array(Image.fromarray(np.clip(sp, 0, 255).astype(np.uint8), 'RGBA').resize((int(sp.shape[1] * k), int(sp.shape[0] * k)), Image.LANCZOS)).astype(np.float32)
-    look('spiral', body_look(T, dict(hl='#ffffff', light='#eeedf5', mid='#c6c4d6', shade='#8a87a3', rim='#a29fc0', glow='#d4cbff')), sp, ic, T['center'], W, 'mask-template')
-    # each iris keeps its own picture's iris : eyeball size
+    save(mask_img(R['alm']), os.path.join(a.out, 'mask-eye.png'))
+    def resize(o, k):
+        return np.array(Image.fromarray(np.clip(o, 0, 255).astype(np.uint8), 'RGBA').resize((int(o.shape[1] * k), int(o.shape[0] * k)), Image.LANCZOS)).astype(np.float32)
+    sp = iris_spiral(T); sp = resize(sp, pr / T['iris'][2])
+    look('spiral', red_look(R, dict(light='#eeedf5', shade='#9a98b2', hl='#ffffff', sclera='#f8f7fc', scShade='#c9c7da', rim='#a29fc0', glow='#d4cbff', deep='#6f6c88', deepIn='#a9a6c0')), sp)
     rr = iris_from('redring', (625, 418, 96), [(40, 40, 44), (200, 196, 204), (140, 132, 140), (255, 20, 20), (170, 110, 110), (190, 80, 80)],
-                   [(66, 64, 72), (214, 210, 218), (160, 154, 166), (255, 34, 34), (196, 186, 196), (196, 186, 196)], W * IRIS)
-    look('redring', body_look(T, dict(hl='#c2bfcc', light='#6c6a76', mid='#4c4a54', shade='#2c2b32', rim='#a8121c', glow='#ff2a2a')), rr, ic, T['center'], W, 'mask-template')
+                   [(66, 64, 72), (214, 210, 218), (160, 154, 166), (255, 34, 34), (196, 186, 196), (196, 186, 196)], pr)
+    look('redring', red_look(R, dict(light='#5f5d68', shade='#2e2d34', hl='#c9c6d3', sclera='#4c4a53', scShade='#34333a', rim='#b0141f', glow='#ff2a2a', deep='#1c1b21', deepIn='#26252b')), rr)
     bl = iris_from('blue', (531, 403, 104), [(62, 60, 200), (44, 44, 50), (80, 80, 86), (22, 22, 26), (50, 50, 150)],
-                   [(96, 92, 255), (58, 56, 66), (84, 82, 94), (26, 25, 30), (96, 92, 255)], W * IRIS)
-    look('blue', body_look(T, dict(hl='#d6d5ff', light='#6f6cff', mid='#4a47e6', shade='#2a27a4', rim='#24208a', glow='#5c6dff')), bl, ic, T['center'], W, 'mask-template')
+                   [(96, 92, 255), (58, 56, 66), (84, 82, 94), (26, 25, 30), (96, 92, 255)], pr)
+    look('blue', red_look(R, dict(light='#5653ef', shade='#2623a0', hl='#d6d5ff', sclera='#4f4be8', scShade='#3532b4', rim='#1f1b80', glow='#5c6dff', deep='#17157a', deepIn='#262393')), bl)
     vd = iris_from('void', (610, 566, 168), [(20, 20, 22), (190, 190, 192), (130, 130, 134), (255, 30, 30), (80, 80, 84)],
-                   [(22, 21, 26), (200, 198, 206), (146, 142, 154), (255, 38, 38), (92, 90, 100)], W * IRIS)
-    look('void', body_look(T, dict(hl='#9b97ab', light='#3d3b48', mid='#272530', shade='#121116', rim='#aaa5bc', glow='#cfcadf')), vd, ic, T['center'], W, 'mask-template')
-    V = veins()
-    save(mask_img(V['alm']), os.path.join(a.out, 'mask-veins.png'))
-    look('veins', V['back'], V['iris'], V['irisAt'], V['center'], V['width'], 'mask-veins')
+                   [(22, 21, 26), (200, 198, 206), (146, 142, 154), (255, 38, 38), (92, 90, 100)], pr)
+    look('void', red_look(R, dict(light='#34323d', shade='#131217', hl='#a19dae', sclera='#1f1d26', scShade='#121116', rim='#aaa5bc', glow='#cfcadf', deep='#0b0a0e', deepIn='#0b0a0e')), vd)
+    look('veins', red_look(R, dict(light='#d8161f', shade='#880a12', hl='#ffffff', sclera='#fcf5f5', scShade='#ecaab0', rim='#d8161f', glow='#ff3c46', keepVeins=True)), red_iris_black(R))
+    V = dict(back=red_look(R, dict(light='#d8161f', shade='#880a12', hl='#ffffff', sclera='#fcf5f5', scShade='#ecaab0', rim='#d8161f', glow='#ff3c46', keepVeins=True)))
     save(goo_drop(V), os.path.join(a.out, 'goo-drop.png'))
     save(goo_puddle(), os.path.join(a.out, 'goo-puddle.png'))
     sp = goo_splash()

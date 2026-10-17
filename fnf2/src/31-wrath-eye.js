@@ -34,7 +34,7 @@
     // the iris, clipped to the eyeball
     ic.globalCompositeOperation = 'source-over';
     ic.clearRect(0, 0, w, h);
-    const ix = L.irisAt[0] + st.px * L.almondW * 0.17, iy = L.irisAt[1] + st.py * L.almondW * 0.06;
+    const ix = L.irisAt[0] + st.px * L.almondW * 0.085, iy = L.irisAt[1] + st.py * L.almondW * 0.035;
     const iw = iris.width * st.ps, ih = iris.height * st.ps;
     ic.drawImage(iris, ix - iw / 2, iy - ih / 2, iw, ih);
     ic.globalCompositeOperation = 'destination-in';
@@ -65,13 +65,13 @@
   const POSE = {
     idle: { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1, px: 0.45, py: 0.2, ps: 1 },
     L: { dx: -70, dy: -10, rot: -9, sx: 1.06, sy: 0.95, px: -1, py: 0, ps: 0.88 },
-    D: { dx: 0, dy: 55, rot: 0, sx: 1.15, sy: 0.83, px: 0, py: 1, ps: 0.88 },
-    U: { dx: 0, dy: -65, rot: 0, sx: 0.9, sy: 1.15, px: 0, py: -1, ps: 0.88 },
+    D: { dx: 6, dy: 85, rot: 3, sx: 1.04, sy: 0.95, px: 0.15, py: 1, ps: 0.88 },
+    U: { dx: -6, dy: -95, rot: -3, sx: 0.97, sy: 1.04, px: 0.15, py: -1, ps: 0.88 },
     R: { dx: 72, dy: -6, rot: 8, sx: 1.06, sy: 0.95, px: 1, py: 0, ps: 0.88 },
   };
   const KEYS = Object.keys(POSE.idle);
   const FRAME = { w: 1000, h: 1000 }, REST = [500, 470];
-  const SIZE = 1.1;                                       // a bit bigger than the pictures' natural size
+  const SIZE = 1.0;                                       // a bit bigger than the pictures' natural size
 
   // ---------------------------------------------------------------- the character fx
   G.OwnFX = G.OwnFX || {};
@@ -206,7 +206,7 @@
   };
 
   // ---------------------------------------------------------------- character data + health icon
-  const DATA = { version: '1.0.0', name: 'WRATH', renderType: 'own', fx: 'wrathEye', scale: 1, singTime: 6, danceEvery: 1, offsets: [60, 0], cameraOffsets: [-260, 150], healthIcon: { id: 'wrath-eye' }, animations: [] };
+  const DATA = { version: '1.0.0', name: 'WRATH', renderType: 'own', fx: 'wrathEye', scale: 1, singTime: 6, danceEvery: 1, offsets: [-40, 0], cameraOffsets: [-200, 150], healthIcon: { id: 'wrath-eye' }, animations: [] };
   if (G.A && G.A._json) G.A._json.set('preload/data/characters/wrath-eye.json', DATA);
   // health icon (fine / losing), made from the eye once the art has loaded
   function makeIcon() {
