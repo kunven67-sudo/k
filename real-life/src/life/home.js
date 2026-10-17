@@ -150,7 +150,14 @@ export class Home {
         add({ size: [1.4, 0.4, 0.8], label: () => 'Draw at your desk', use: () => this.activity('You draw for a while.', 'fun', 0.25, 30) });
         break;
       case 'pc':
-        add({ size: [0.6, 0.6, 0.5], label: () => 'Play on the PC', use: () => this.activity('You play games on your PC.', 'fun', 0.45, 45) });
+        add({
+          size: [0.6, 0.6, 0.5],
+          label: () => (this.life.rules?.noScreens ? 'Play on the PC (you\'re banned...)' : 'Play on the PC'),
+          use: () => {
+            if (this.life.rules?.noScreens) bus.emit('rule:maybe', { rule: 'screens', severity: 0.4, noise: 0.3 });
+            this.activity('You play games on your PC.', 'fun', 0.45, 45);
+          },
+        });
         break;
       case 'washer':
         add({ size: [0.7, 0.8, 0.7], label: () => 'Washing machine', use: () => this.hud.toast('Your clothes are clean. (Laundry chores come with parents\' rules.)') });

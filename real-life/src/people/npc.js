@@ -27,7 +27,7 @@ export class Npc {
     this.path = [];
     this.pathI = 0;
     this.activity = null; // what to do on arrival / now
-    this.away = rec.startAway ?? 'home'; // null = in the world
+    this.away = 'init'; // null = in the world; 'home' / 'away' / 'offsite' = no body, somewhere else
     this.body = null;
     this.speed = 0;
     this.talkingTo = null;
@@ -132,7 +132,8 @@ export class Npc {
       } else {
         this.waitT = 0;
         this._excused = false;
-        const sp = this.walkSpeed();
+        // Far from you, nobody can tell how fast they walk: catch up on the squeezed game clock.
+        const sp = this.walkSpeed() * (distToViewer > 60 ? 5 : 1);
         const step = Math.min(dist, sp * dt);
         if (dist > 1e-4) {
           this.pos.addScaledVector(_d.normalize(), step);

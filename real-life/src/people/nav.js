@@ -7,7 +7,7 @@
 //   nav.nearest(pos, filter) -> id                     nav.path(fromPos, toId) -> [Vector3...]
 
 import * as THREE from 'three';
-import { CURB, MAPLE, ELM, SIDEWALK, LOTS, PARK, FAMILY_LOT } from '../world/layout.js';
+import { CURB, MAPLE, ELM, SIDEWALK, LOTS, PARK, FAMILY_LOT, SCHOOL } from '../world/layout.js';
 
 export class Nav {
   constructor() {
@@ -164,6 +164,12 @@ export function buildNav(world) {
       nav.chain([r.navCashier, back, loop[0]]);
     }
   }
+
+  // ------------------------------------------------------------------ school front door (kids walk there)
+  const schoolDoor = nav.add(V(SCHOOL.x0 - 1.4, Y, (SCHOOL.z0 + SCHOOL.z1) / 2), { tag: 'school' });
+  const schoolWalk = nav.add(V((xE + SCHOOL.x0) / 2, Y, (SCHOOL.z0 + SCHOOL.z1) / 2), { tag: 'school' });
+  nav.chain([nav.nearest(V(xE, Y, (SCHOOL.z0 + SCHOOL.z1) / 2), (n) => elmE.includes(n.id)), schoolWalk, schoolDoor]);
+  world.schoolDoorNode = schoolDoor;
 
   // ------------------------------------------------------------------ park
   const pcx = (PARK.x0 + PARK.x1) / 2;

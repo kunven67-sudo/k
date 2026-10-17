@@ -6,6 +6,7 @@ import { audio } from './core/audio.js';
 import { initPhysics } from './core/physics.js';
 import { save } from './core/save.js';
 import { bus } from './core/events.js';
+import { clock } from './core/clock.js';
 import { STATES, FIRST_STATE } from './states/index.js';
 
 async function main() {
@@ -16,7 +17,7 @@ async function main() {
 
   await initPhysics();
   const engine = new Engine(canvas);
-  window.__rl = { engine, bus, save, input, audio }; // dev console access
+  window.__rl = { engine, bus, save, input, audio, clock }; // dev console access
   for (const [name, StateClass] of Object.entries(STATES)) engine.register(name, StateClass);
   engine.start();
 

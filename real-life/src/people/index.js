@@ -28,6 +28,7 @@ save.registerSlice('people', {
 });
 
 const _v = new THREE.Vector3();
+const FAR = 55; // metres: past this, walking is skipped (you can't really see them)
 
 export class People {
   constructor({ world, player, hud, life }) {
@@ -143,10 +144,28 @@ export class People {
   _apply(n, p, snap) {
     if (p.at) {
       n.lastExit = p.exit || null;
-      if (n.away) return;
+      const from = n.away;
+      if (from) {
+        // Neighbours leaving their house (work, school) walk out of the front door and away;
+        // coming back they walk up to the door and go in. Nobody pops in or out of thin air.
+        const h = this._houses.get(n.rec.home);
+        const seen = h && this.nav.nodes[h.navDoor].p.distanceTo(this.player.position) < FAR;
+        if (!snap && seen && from === 'home' && p.at !== 'home') {
+          n.appearAt(h.navDoor);
+          n.goTo(this._exitNode(n, p.exit, p.why), { kind: 'leave', where: p.at });
+        } else if (!snap && seen && from !== 'home' && from !== 'init' && p.at === 'home') {
+          if (this._enterNear(n, this._exitNode(n, n.cameFrom, n.cameWhy), h.navDoor)) n.goTo(h.navDoor, { kind: 'leave', where: 'home' });
+          else n.away = p.at;
+        } else n.away = p.at;
+        n.cameFrom = p.exit;
+        n.cameWhy = p.why;
+        return;
+      }
+      n.cameFrom = p.exit;
+      n.cameWhy = p.why;
       if (snap || !n.body?.root.visible) return n.setAway(p.at);
       // Walk out (front door / driveway / store doors), then disappear.
-      const exit = this._exitNode(n, p.exit);
+      const exit = this._exitNode(n, p.exit, p.why);
       n.goTo(exit, { kind: 'leave', where: p.at });
       return;
     }
@@ -155,7 +174,7 @@ export class People {
     if (target == null) return;
     if (n.away) {
       if (snap) n.appearAt(target);
-      else n.appearAt(this._entryNode(n));
+      else if (!this._enterNear(n, this._entryNode(n), target, act)) snap = true;
     }
     if (snap) {
       n.appearAt(target);
@@ -165,6 +184,20 @@ export class People {
       return;
     }
     n.goTo(target, act);
+  }
+
+  /**
+   * Coming from far away (work, school, the other end of town): only the part of the walk you
+   * could actually see is walked. Returns false when the whole route is out of your sight.
+   */
+  _enterNear(n, entry, target, act) {
+    const route = this.nav.route(entry, target);
+    const pl = this.player.position;
+    const near = route.findIndex((id) => this.nav.nodes[id].p.distanceTo(pl) < FAR);
+    if (near < 0) return false;
+    n.appearAt(route[Math.max(0, near - 1)]);
+    void act;
+    return true;
   }
 
   _targetNode(n, act) {
@@ -190,8 +223,14 @@ export class People {
         n.shopStore = act.store;
         n.shopStep = 0;
         return S[act.store].navOutside;
-      case 'play':
-        return this.nav.nearest(new THREE.Vector3(-74, 0.12, -16), (x) => x.spot === 'playground');
+      case 'play': {
+        // Kids near the park go to the playground; the rest play in front of their house.
+        const h = this._houses.get(n.rec.home);
+        const pg = this.nav.nodes.find((x) => x.spot === 'playground');
+        if (!h || (pg && this.nav.nodes[h.navDoor].p.distanceTo(pg.p) < 45)) return pg?.id;
+        const door = this.nav.nodes[h.navDoor].p;
+        return this._pick(this.nav.nodes.filter((x) => (x.tag === 'walk' || x.tag === 'yard') && x.p.distanceTo(door) < 14).map((x) => x.id));
+      }
       case 'walk-park':
         return this._pick(this.nav.nodes.filter((x) => x.tag === 'park').map((x) => x.id));
       case 'walk-street':
@@ -211,8 +250,9 @@ export class People {
     return list[this.rng.int(0, list.length - 1)];
   }
 
-  _exitNode(n, exit) {
+  _exitNode(n, exit, why) {
     const home = this.world.home;
+    if (why === 'school' && n.rec.age >= 6 && this.world.schoolDoorNode != null) return this.world.schoolDoorNode;
     if (n.rec.role === 'staff') return this.world.town.stores[n.rec.store].navOutside;
     if (n.rec.family) {
       if (exit === 'driveway') return home.navDriveway;
@@ -225,7 +265,7 @@ export class People {
 
   /** Coming back: through the same way they left (car in the driveway, front door...). */
   _entryNode(n) {
-    return this._exitNode(n, n.lastExit || (n.rec.family ? 'front' : 'door'));
+    return this._exitNode(n, n.cameFrom || n.lastExit || (n.rec.family ? 'front' : 'door'), n.cameWhy);
   }
 
   // ------------------------------------------------------------------------------- per frame
@@ -242,6 +282,11 @@ export class People {
     for (const n of this.npcs) {
       if (n.away) continue;
       n.update(dt, viewer, this.player);
+      // Walking off somewhere far from you: they're gone once you couldn't see them anyway.
+      if (n.activity?.kind === 'leave' && n.pos.distanceTo(viewer) > FAR + 5 && !n.arrived) {
+        n.setAway(n.activity.where);
+        continue;
+      }
       if (n.arrived) this._arrived(n, dt);
       vis.push(n);
     }
