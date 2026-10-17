@@ -8,7 +8,8 @@
   const H = { max: 2, killer: 0.04, sick: 0.03, good: 0.015, bad: 0, shit: -0.02, miss: -0.08, holdPerSec: 0.12 };
   const ACC = { killer: 1, sick: 1, good: 0.67, bad: 0.34, shit: 0 }; // Psych-style accuracy
   function scorePBOT1(ms) { ms = Math.abs(ms); if (ms > 160) return -100; if (ms < 5) return 500; const f = 1 - 1 / (1 + Math.exp(-0.08 * (ms - 54.99))); return Math.floor(500 * f + 9); }
-  function judge(ms) { ms = Math.abs(ms); return ms <= 12.5 ? 'killer' : ms <= 45 ? 'sick' : ms <= 90 ? 'good' : ms <= 135 ? 'bad' : 'shit'; }
+  // (V-Slice has a 12.5ms 'killer' window in its code, but it's switched off: sick is the best)
+  function judge(ms) { ms = Math.abs(ms); return ms <= 45 ? 'sick' : ms <= 90 ? 'good' : ms <= 135 ? 'bad' : 'shit'; }
   function ratingName(p) { // Psych rating names
     if (p >= 1) return 'Perfect!!'; if (p >= 0.9) return 'Sick!'; if (p >= 0.8) return 'Great'; if (p >= 0.7) return 'Good'; if (p >= 0.69) return 'Nice';
     if (p >= 0.6) return 'Meh'; if (p >= 0.5) return 'Bruh'; if (p >= 0.4) return 'Bad'; if (p >= 0.2) return 'Shit'; return 'You Suck!';
@@ -435,11 +436,12 @@
       G.sfx('miss' + (1 + Math.floor(Math.random() * 3)), { vol: 0.5 + Math.random() * 0.1 });
       this.bf.sing(n.lane, true);
     },
+    // pressing with no note there (ghost tapping off): like V-Slice, -4% health and -10 score,
+    // a quiet miss sound + miss pose, but it doesn't count as a miss or break the combo
     ghostMiss(lane) {
-      this.health += H.miss; this.score -= 10; this.misses++; this.accN++;
-      this.breakCombo();
+      this.health += H.miss; this.score -= 10;
       if (this.audio) this.audio.setVolume('p', 0);
-      G.sfx('miss' + (1 + Math.floor(Math.random() * 3)), { vol: 0.5 + Math.random() * 0.1 });
+      G.sfx('miss' + (1 + Math.floor(Math.random() * 3)), { vol: 0.1 + Math.random() * 0.1 });
       this.bf.sing(lane, true);
     },
     breakCombo() {
