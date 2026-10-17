@@ -758,6 +758,7 @@ def chart(notes):
     for bar, who in CAMERA[1:]: events.append({'t': round(T(bar) * 1000, 2), 'e': 'FocusCamera', 'v': who})
     events.append({'t': round(T(SNAP, 2) * 1000, 2), 'e': 'WrathSnap', 'v': {}})
     events.append({'t': round(T(35) * 1000, 2), 'e': 'WrathEye', 'v': {}})            # the eye opens: stage 2
+    events.append({'t': round(T(TR2) * 1000, 2), 'e': 'ParkVoid', 'v': {}})           # the park falls into the void
     events.append({'t': round(T(OUT) * 1000, 2), 'e': 'PlayAnimation', 'v': {'target': 'bf', 'anim': 'hey', 'force': True}})
     events.sort(key=lambda e: e['t'])
     return {'version': '2.0.0', 'scrollSpeed': {'easy': 2.0, 'normal': 2.4, 'hard': 2.8}, 'events': events, 'notes': out,
@@ -769,7 +770,7 @@ META = {
     'playData': {
         'difficulties': ['easy', 'normal', 'hard'],
         'characters': {'player': 'bf', 'girlfriend': 'gf', 'opponent': 'wrath-normal', 'opponentVocals': ['wrath'], 'playerVocals': ['bf']},
-        'stage': 'phillyStreets', 'noteStyle': 'funkin', 'ratings': {'easy': 4, 'normal': 7, 'hard': 11},
+        'stage': 'wrathPark', 'noteStyle': 'funkin', 'ratings': {'easy': 4, 'normal': 7, 'hard': 11},
     },
     'generatedBy': 'FNF 2 - tools/own/glare.py',
     'timeChanges': [{'t': 0, 'b': 0, 'bpm': BPM, 'bt': [4, 4, 4, 4]}],
@@ -791,7 +792,14 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--own', default=os.path.join(here, '..', '..', 'build', 'own'), help='where the song files go')
     ap.add_argument('--mp3', help='also write the full mix (Inst + both voices) here')
+    ap.add_argument('--chart-only', action='store_true', help='only write the chart + metadata (no audio)')
     a = ap.parse_args()
+    if a.chart_only:
+        d = os.path.join(a.own, 'preload/data/songs/glare'); os.makedirs(d, exist_ok=True)
+        c = chart(sung())
+        json.dump(META, open(os.path.join(d, 'glare-metadata.json'), 'w'), indent=1)
+        json.dump(c, open(os.path.join(d, 'glare-chart.json'), 'w'))
+        print('chart only, notes', {k: len(v) for k, v in c['notes'].items()}); raise SystemExit
     (inst, wv, bv), notes = render()
     full = inst + wv + bv
     print('length', round(full.shape[1] / SR, 1), 's  peak', round(float(np.abs(full).max()), 3))

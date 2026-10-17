@@ -94,7 +94,7 @@ def on_cone(sc, cn, overlap=0.32, width=1.15):
     return out
 
 
-def truck():
+def truck(night=True):
     im = np.array(Image.open(os.path.join(PRIV, 'intro-truck-ref.webp')).convert('RGB'))
     mask = np.zeros(im.shape[:2], np.uint8)
     rect = (392, 38, 1150 - 392, 562 - 38)
@@ -115,8 +115,8 @@ def truck():
     sh = np.clip(1 - np.hypot((xx - 765) / 400.0, (yy - 553) / 16.0), 0, 1) ** 0.7
     o[..., 3] = (sh * 150).astype(np.uint8)
     # night: cooler + darker, like the street's own props
-    night = (im.astype(np.float32) * np.array([0.6, 0.64, 0.82])).clip(0, 255).astype(np.uint8)
-    o[fg, :3] = night[fg]; o[fg, 3] = 255
+    col = (im.astype(np.float32) * np.array([0.6, 0.64, 0.82])).clip(0, 255).astype(np.uint8) if night else im
+    o[fg, :3] = col[fg]; o[fg, 3] = 255
     e = ndimage.binary_dilation(fg, iterations=1) & ~fg
     o[e, :3] = INK; o[e, 3] = 120
     return crop_alpha(o, 2)

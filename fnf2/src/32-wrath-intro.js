@@ -18,19 +18,7 @@
     { who: 'wrath', box: 'normal', text: "...fine. then i'll beat him, and you're coming with me" },
     { who: 'bf', exp: 'excited', box: 'normal', text: 'bop! beep bap skdoo!' },
   ];
-  const TRUCK = { x: 1500, y: 640, scale: 1.12, z: 150 };         // parked behind BF + GF
   const GF_STAND = [1760, 1228];                                   // GF stands next to BF (feet)
-
-  // ---------------------------------------------------------------- the street gets its truck (intro + battle)
-  G.SongFX = G.SongFX || {};
-  G.SongFX.glare = {
-    setup(P) {
-      const img = G.A.image(IMG + 'truck.png'); if (!img) return;
-      const t = new G.Sprite(TRUCK.x, TRUCK.y).loadImage(img);
-      t.scale.x = t.scale.y = TRUCK.scale; t.updateHitbox(); t.x = TRUCK.x; t.y = TRUCK.y; t.zIndex = TRUCK.z; t.name = 'truck';
-      P.stage.props.push(t);
-    },
-  };
 
   // ---------------------------------------------------------------- dialogue portraits
   // Each speaker's portrait is their own in-scene sprite drawn big (GF standing with her cone, BF with

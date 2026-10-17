@@ -83,8 +83,10 @@
         this.stage.addCharacter(eye, 'dad'); this.stage.addCharacter(this.dad, 'dad');
         this.dadForms = [this.dad, eye];
       }
-      const sfx = G.SongFX && G.SongFX[s.id]; if (sfx && sfx.setup) sfx.setup(this);
       this.applyStageFX();
+      // a song's own stage effects (setup / reset / update / beat / event / drawOver)
+      this.sfx = (G.SongFX && G.SongFX[s.id]) || null;
+      if (this.sfx && this.sfx.setup) try { this.sfx.setup(this); } catch (e) { G.reportError(e, 'song fx'); this.sfx = null; }
       this.stageZoom = this.stage.zoom;
       this.cam = new G.FCam(this.stageZoom);
       this.hud = new G.HudCam();
@@ -158,6 +160,7 @@
       this.snap = null; if (this.hud) this.hud.alpha = 1;
       if (this.dadForms) { this.dadForms[0]._locked = false; if (this.dad !== this.dadForms[0]) this.swapDad(this.dadForms[0]); else this.stage.chars.dad = this.dad; }
       this.iconP1.scale = this.iconP2.scale = 1;
+      if (this.sfx && this.sfx.reset) this.sfx.reset(this);
     },
     // -------------------------------------------------- countdown
     startCountdown() {
@@ -194,6 +197,7 @@
       const holding = this.keys.some(k => k) || this.botHolding;
       for (const c of [this.gf, this.dad, this.bf]) if (c) { c.playHealth = this.health; c.tick(dt, stepSec, c === this.bf ? holding : false); }
       this.stage.update(dt);
+      if (this.sfx && this.sfx.update) this.sfx.update(this, dt);
       this.updateCamera(dt);
       for (const L of this.lines) for (const s of L.strums) {
         s.update(dt); centerOffsets(s); if (s.animName === 'confirm') { s.offset.x -= 13; s.offset.y -= 13; }
@@ -220,6 +224,7 @@
     },
     onBeat(beat) {
       this.iconP1.scale = this.iconP2.scale = 1.2;
+      if (beat >= 0 && this.sfx && this.sfx.beat) this.sfx.beat(this, beat);
       if (beat >= 0 && G.settings.camZoom && this.zoomRate > 0 && beat % this.zoomRate === 0 && this.camZoom * this.bopMul < 1.35 * this.stageZoom) {
         this.bopMul = this.bopIntensity; this.hudZoom += this.hudBopIntensity;
       }
@@ -257,6 +262,7 @@
     },
     handleEvent(e) {
       const v = e.v;
+      if (this.sfx && this.sfx.event) this.sfx.event(this, e.e, v);
       for (const c of [this.gf, this.dad, this.bf]) if (c && c.script && c.script.onEvent) c.script.onEvent(c, e.e, v);
       switch (e.e) {
         case 'FocusCamera': {
@@ -654,6 +660,7 @@
         if (f) { G.imgFilter = f; try { s.draw(ctx, this.cam); } finally { G.imgFilter = null; } }
         else s.draw(ctx, this.cam);
       }
+      if (this.sfx && this.sfx.drawOver) this.sfx.drawOver(ctx, this);
       this.cam.drawFX(ctx);
       if (this.cutscene) { this.cutscene.draw(ctx); return; }
       // HUD
