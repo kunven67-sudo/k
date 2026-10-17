@@ -183,7 +183,7 @@ function updateKnight(f, dt) {
     else {
       const dx = ai.tx - f.pos.x, dz = ai.tz - f.pos.z, d = Math.hypot(dx, dz);
       if (d < 0.6) { ai.wait = 2 + Math.random() * 5; const a = Math.random() * 6.28, r = 3 + Math.random() * 9; ai.tx = ai.camp.x + Math.cos(a) * r; ai.tz = ai.camp.z + Math.sin(a) * r; }
-      else { wish.set(dx / d, 0, dz / d); speed = 1.45 * tierSpd; face = Math.atan2(dx, dz); }
+      else { wish.set(dx / d, 0, dz / d); speed = (ai.raid ? 3.4 : 1.45) * tierSpd; face = Math.atan2(dx, dz); }
     }
   } else if (!f.hasSword || (f.hp < f.maxHp * 0.22 && ai.courage < 0.45)) {
     // disarmed or nearly dead and scared: run

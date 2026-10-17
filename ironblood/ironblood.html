@@ -2443,7 +2443,7 @@ function loadFaces(L, done) {
   }, (e) => { console.warn('faces failed', e); facesReady = true; done && done(); });
 }
 // the soldier's face sits here (mesh space, cm): eyes between the visor and the skull
-const EYE_SPOT = new THREE.Vector3(0, 4.2, 168.2);
+const EYE_SPOT = new THREE.Vector3(0, 0.6, 168.6);
 function attachFace(model, id, U) {
   const src = FACES[id]; if (!src) return null;
   let body = null; model.traverse(m => { if (m.isSkinnedMesh && !m.name.includes('visor')) body = m; });
@@ -2454,6 +2454,35 @@ function attachFace(model, id, U) {
   g.rotation.set(0, Math.PI, 0);
   scene.add(g); g.updateMatrixWorld(true);
   bone(model, 'Head').attach(g);
+  return g;
+}
+// a head covering: a soft cowl with folds, a slightly pointed back and an oval hole for the face (model faces -Z)
+function hoodShell(r, sx, sy, sz, cx, cy, cz, holeW, holeH, holeY, thetaLen, point = 0.18, folds = 0.025) {
+  const g = new THREE.SphereGeometry(r, 72, 36, 0, Math.PI * 2, 0, Math.PI * thetaLen);
+  const p = g.attributes.position, d = new THREE.Vector3();
+  const hole = (x, y, z) => { d.set(x, y, z).normalize(); return d.z < 0.05 ? (d.x / holeW) ** 2 + ((d.y - holeY) / holeH) ** 2 : 9; };
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const ph = Math.atan2(z, x), up = y / r;
+    // fabric folds, stronger lower down where the cloth gathers
+    const k = 1 + folds * Math.sin(ph * 9 + up * 4) * (1 - up) * 0.8 + folds * 0.5 * Math.sin(ph * 17) * (1 - up);
+    x *= k; z *= k;
+    // the back of the cowl hangs and points
+    if (z > 0) { z *= 1 + 0.12 * (z / r); if (y > 0) { z += point * r * (y / r) * (z / r); y += point * 0.3 * r * (z / r) * (y / r); } }
+    // the rim round the face comes forward a little so it frames it
+    const h = hole(p.getX(i), p.getY(i), p.getZ(i)); if (h < 1.6) z -= 0.15 * r * Math.max(0, 1.6 - h);
+    p.setXYZ(i, x, y, z);
+  }
+  const idx = g.index.array, keep = [];
+  const P = (j) => [g.attributes.position.getX(j), g.attributes.position.getY(j), g.attributes.position.getZ(j)];
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = P(idx[t]), b = P(idx[t + 1]), c = P(idx[t + 2]);
+    // decide the hole from the undeformed direction of the triangle's centre
+    const m = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
+    if (hole(m[0], m[1], m[2]) >= 1) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+  }
+  g.setIndex(keep);
+  g.scale(sx, sy, sz); g.translate(cx, cy, cz); g.computeVertexNormals();
   return g;
 }
 // ---------- skinned clothes ----------
@@ -2492,7 +2521,7 @@ function clothBaseFrom(mesh) {
   const bi = (nm) => bones.indexOf(nm);
   const LIMB = { LeftArm: ['LeftForeArm', 6.0], RightArm: ['RightForeArm', 6.0], LeftForeArm: ['LeftHand', 4.8], RightForeArm: ['RightHand', 4.8], LeftShoulder: ['LeftArm', 7.0], RightShoulder: ['RightArm', 7.0],
     LeftUpLeg: ['LeftLeg', 8.2], RightUpLeg: ['RightLeg', 8.2], LeftLeg: ['LeftFoot', 6.0], RightLeg: ['RightFoot', 6.0] };
-  const TORSO = { Hips: [16.5, 11.5], Spine: [15.5, 11], Spine1: [16, 11.5], Spine2: [17.5, 12] };
+  const TORSO = { Hips: [15, 10.5], Spine: [14.5, 10.2], Spine1: [16, 11.5], Spine2: [17.5, 12] };
   const seg = (p, a, b) => { const ab = _sa.copy(b).sub(a), t = Math.max(0, Math.min(1, _sb.copy(p).sub(a).dot(ab) / ab.lengthSq())); return _sc.copy(a).addScaledVector(ab, t); };
   const _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sc = new THREE.Vector3(), pv = new THREE.Vector3();
   const domBone = new Int32Array(W).fill(-1);
@@ -2614,19 +2643,14 @@ function buildClothes(model, o) {
   }
   // the hood: a deep wool cowl with the face in shadow, mantle over the shoulders
   if (o.hood) {
-    // a deep wool cowl open at the front so the face shows, mantle over the shoulders
-    const hood = new THREE.SphereGeometry(0.165, 24, 14, -0.62, Math.PI + 1.24, 0, Math.PI * 0.7);
-    hood.scale(1, 1.15, 1.12); hood.translate(0, 1.71, 0.035);
-    put('Head', hood, hoodM);
-    put('Spine2', cylBetween([0, 1.36, 0.05], [0, 1.56, 0.05], 0.29, 0.13, 22, true), hoodM);
+    // a deep wool cowl that covers the top of the head, with an oval opening for the face
+    put('Head', hoodShell(0.152, 1.04, 1.12, 1.12, 0, 1.722, 0.018, 0.7, 0.6, -0.3, 0.74), hoodM);
+    put('Spine2', cylBetween([0, 1.4, 0.04], [0, 1.57, 0.04], 0.24, 0.12, 22, true), hoodM);
   }
   if (o.veil) {
-    // wimple + veil: linen fitted round the head and neck, face in its shadow, the veil falling down the back
-    const w = new THREE.SphereGeometry(0.132, 24, 14, -0.55, Math.PI + 1.1, 0, Math.PI * 0.74);
-    w.scale(1, 1.12, 1.08); w.translate(0, 1.712, 0.03);
-    put('Head', w, hoodM);
+    // wimple + veil: linen fitted round the head and neck, the face framed by it, the veil falling down the back
+    put('Head', hoodShell(0.134, 1.02, 1.12, 1.1, 0, 1.715, 0.022, 0.62, 0.52, -0.3, 0.78, 0.04, 0.012), hoodM);
     put('Neck', cylBetween([0, 1.47, 0.03], [0, 1.63, 0.025], 0.1, 0.078, 18), hoodM);
-    // the veil: a soft curved drape behind the head, flaring onto the shoulders
     const back = new THREE.CylinderGeometry(0.135, 0.19, 0.28, 24, 4, true, -1.3, 2.6);
     const bpos = back.attributes.position;
     for (let i = 0; i < bpos.count; i++) { const y = bpos.getY(i), k = (0.14 - y) / 0.28; bpos.setZ(i, bpos.getZ(i) + k * k * 0.05); }
@@ -3564,7 +3588,7 @@ function updateKnight(f, dt) {
     else {
       const dx = ai.tx - f.pos.x, dz = ai.tz - f.pos.z, d = Math.hypot(dx, dz);
       if (d < 0.6) { ai.wait = 2 + Math.random() * 5; const a = Math.random() * 6.28, r = 3 + Math.random() * 9; ai.tx = ai.camp.x + Math.cos(a) * r; ai.tz = ai.camp.z + Math.sin(a) * r; }
-      else { wish.set(dx / d, 0, dz / d); speed = 1.45 * tierSpd; face = Math.atan2(dx, dz); }
+      else { wish.set(dx / d, 0, dz / d); speed = (ai.raid ? 3.4 : 1.45) * tierSpd; face = Math.atan2(dx, dz); }
     }
   } else if (!f.hasSword || (f.hp < f.maxHp * 0.22 && ai.courage < 0.45)) {
     // disarmed or nearly dead and scared: run
@@ -4713,12 +4737,12 @@ function startScene(f, kind) {
   const dir = _vw.copy(f.pos).sub(P.pos).setY(0); if (dir.lengthSq() < 0.01) dir.set(Math.sin(P.facing), 0, Math.cos(P.facing)); dir.normalize();
   P.facing = Math.atan2(dir.x, dir.z); P.root.rotation.y = P.facing;
   P.vel.set(0, 0, 0); P.blocking = false; P.attack = null;
-  f.pos.copy(P.pos).addScaledVector(dir, 0.52); f.pos.y = groundH(f.pos.x, f.pos.z);
+  f.pos.copy(P.pos).addScaledVector(dir, 0.85); f.pos.y = groundH(f.pos.x, f.pos.z);
   f.facing = P.facing + Math.PI; f.root.rotation.y = f.facing;
   P.noArms = true; f.noArms = true;
   if (P.swordMesh) P.swordMesh.visible = false;
   P.helmet(false);
-  scene0 = { f, kind, t: 0, dur: kind === 'kiss' ? 4.2 : 10, side: Math.random() < 0.5 ? 1 : -1, smacks: 0 };
+  scene0 = { f, kind, dir: dir.clone(), t: 0, dur: kind === 'kiss' ? 5 : 12, side: Math.random() < 0.5 ? 1 : -1, smacks: 0 };
   romanceWitnessed(f, kind === 'kiss' ? 'kissing ' + v.p.name : 'making out with ' + v.p.name);
 }
 const _ax = new THREE.Vector3(), _ay = new THREE.Vector3(0, 1, 0), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3(), _pl = new THREE.Vector3();
@@ -4739,37 +4763,48 @@ function armTo(o, side, target, poleDir) {
 function updateScene(dt) {
   const s = scene0; if (!s) return;
   s.t += dt;
-  const P = player, f = s.f, k = s.t / s.dur;
-  const w = smooth(0, 0.14, k) * (1 - smooth(0.86, 1, k));
-  const mk = s.kind === 'makeout';
-  // heads tilt the same way (their own right), so they meet; making out slowly switches sides
-  const sideNow = mk ? Math.sin(s.t * 0.9) : s.side;
-  const sway = mk ? Math.sin(s.t * 1.7) * 0.04 : 0;
+  const P = player, f = s.f, t = s.t, mk = s.kind === 'makeout';
+  // she steps in close first, then they lean in; at the end they ease apart
+  const appr = smooth(0, 1.2, t);
+  f.pos.copy(P.pos).addScaledVector(s.dir, lerp(0.85, mk ? 0.46 : 0.52, appr)); f.pos.y = groundH(f.pos.x, f.pos.z);
+  f.speed = (1 - appr) * 0.6;
+  const w = smooth(0.7, 1.9, t) * (1 - smooth(s.dur - 1.3, s.dur, t));
+  // heads tilt the same way (their own right) so they meet; making out they slowly trade sides,
+  // part for a breath now and then and keep moving
+  const sideNow = mk ? Math.tanh(Math.sin(t * 0.62 + 0.4) * 2.4) : s.side;
+  const breath = mk ? Math.pow(Math.max(0, Math.sin(t * 0.85 - 1.2)), 10) : 0;
+  const nod = mk ? Math.sin(t * 2.2) * 0.05 + Math.sin(t * 3.4 + 1) * 0.025 : Math.sin(t * 1.6) * 0.02;
+  const lean = w * (1 - breath * 0.25);
   // he is taller: he bends down to her, she lifts her face and goes up on her toes
-  leanBody(P, w * 0.62, w * 0.3 * sideNow, w * 0.3);
-  leanBody(f, w * 0.2, w * 0.3 * sideNow, -w * 0.36);
+  leanBody(P, lean * 0.62, w * 0.3 * sideNow, w * (0.3 + nod));
+  leanBody(f, lean * 0.22, w * 0.3 * sideNow, -w * (0.36 + nod * 0.8));
   f.root.position.y = groundH(f.pos.x, f.pos.z) + 0.05 * w;
-  if (sway) { rotateBoneWorld(P.b.Spine1, _ay, sway * w); rotateBoneWorld(f.b.Spine1, _ay, -sway * w); }
-  // arms: her hands up round his neck (or on his chest), his hands at her waist / back
-  if (w > 0.05) {
+  if (mk) { const sway = Math.sin(t * 0.9) * 0.05 * w; rotateBoneWorld(P.b.Spine1, _ay, sway); rotateBoneWorld(f.b.Spine1, _ay, -sway); }
+  // arms: her hands go to his chest, then slide up round his neck; his hands hold her waist, then her back
+  const up = mk ? smooth(1.3, 3.0, t) : smooth(1.0, 2.4, t) * 0.35;
+  const aw = smooth(0.4, 1.6, t) * (1 - smooth(s.dur - 1.1, s.dur - 0.1, t));
+  if (aw > 0.02) {
     const pq = P.root.quaternion, fq = f.root.quaternion;
-    const pNeck = P.b.Neck.getWorldPosition(_t1), fSpine = f.b.Spine1.getWorldPosition(_t2);
+    const pNeck = P.b.Neck.getWorldPosition(new THREE.Vector3()), fSpine = f.b.Spine1.getWorldPosition(new THREE.Vector3());
     for (const sd of ['L', 'R']) {
       const sgn = sd === 'L' ? 1 : -1;
-      // her: hands reach behind his neck (making out) or rest on his chest (kiss)
-      const tgt = _pl.copy(pNeck).add(_ax.set(sgn * 0.11, mk ? 0.0 : -0.22, mk ? -0.08 : 0.06).applyQuaternion(pq));
-      armTo(f, sd, tgt.lerp(f.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - w), _ax.set(sgn * 0.6, -1, -0.3).applyQuaternion(fq));
-      const ht = new THREE.Vector3().copy(fSpine).add(_ax.set(sgn * 0.17, mk ? 0.05 : -0.12, mk ? -0.12 : 0.02).applyQuaternion(fq));
-      armTo(P, sd, ht.lerp(P.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - w), _ax.set(sgn * 0.7, -1, -0.2).applyQuaternion(pq));
+      const chest = new THREE.Vector3(sgn * 0.1, -0.22, 0.07), nape = new THREE.Vector3(sgn * 0.08, 0.02, -0.07);
+      const tgt = pNeck.clone().add(chest.lerp(nape, up).applyQuaternion(pq));
+      if (mk) tgt.y += Math.sin(t * 0.8 + sgn) * 0.02;
+      armTo(f, sd, tgt.lerp(f.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - aw), _ax.set(sgn * 0.6, -1, -0.3).applyQuaternion(fq));
+      // his hands slowly move over her back
+      const roam = mk ? Math.sin(t * 0.55 + sgn * 1.3) * 0.07 : 0;
+      const ht = fSpine.clone().add(_ax.set(sgn * 0.17, lerp(-0.12, 0.04, up) + roam, lerp(0.02, -0.12, up)).applyQuaternion(fq));
+      armTo(P, sd, ht.lerp(P.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - aw), _ax.set(sgn * 0.7, -1, -0.2).applyQuaternion(pq));
     }
   }
-  if (w > 0.9 && s.t > 0.8 + s.smacks * (mk ? 1.6 : 9)) { s.smacks++; sfx.kiss(); }
-  // a slow side shot
-  const mid = P.pos.clone().lerp(f.pos, 0.5); mid.y += 1.5;
+  if (w > 0.9 && breath < 0.3 && t > 1.9 + s.smacks * (mk ? 1.7 : 9)) { s.smacks++; sfx.kiss(); }
+  // a slow side shot that drifts in closer
+  const mid = P.pos.clone().lerp(f.pos, 0.5); mid.y += 1.52;
   const side = _ax.set(Math.cos(P.facing), 0, -Math.sin(P.facing));
-  const orbit = Math.sin(s.t * 0.25) * 0.5;
-  sceneCam = { pos: mid.clone().addScaledVector(side, 1.7 * Math.cos(orbit)).addScaledVector(_t1.set(Math.sin(P.facing), 0, Math.cos(P.facing)), 1.7 * Math.sin(orbit) - 0.3).add(_t2.set(0, 0.1, 0)), look: mid };
-  if (s.t >= s.dur) endScene();
+  const orbit = Math.sin(t * 0.22) * 0.45, dist = lerp(2.0, 1.35, smooth(0, s.dur, t));
+  sceneCam = { pos: mid.clone().addScaledVector(side, dist * Math.cos(orbit)).addScaledVector(_t1.set(Math.sin(P.facing), 0, Math.cos(P.facing)), dist * Math.sin(orbit) - 0.25).add(_t2.set(0, 0.06, 0)), look: mid };
+  if (t >= s.dur) endScene();
 }
 function endScene() {
   const s = scene0; if (!s) return;
@@ -5336,6 +5371,7 @@ function frame() {
   for (const f of fighters) if (f.ai && f.alive && f.ai.alert && f.pos.distanceTo(player.pos) < 30) { inFight = true; break; }
   updateMusic(inFight && player.alive);
   if (playing && worldStarted) { updateCamera(realDt); cameraFx(elapsed); }
+  if (window.__camOv) { camera.position.copy(window.__camOv.p); camera.lookAt(window.__camOv.t); } // test shots only
   else {
     // title screen: slow drift around the field
     titleOrbit += realDt * 0.05;

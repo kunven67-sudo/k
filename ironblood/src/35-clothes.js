@@ -29,7 +29,7 @@ function loadFaces(L, done) {
   }, (e) => { console.warn('faces failed', e); facesReady = true; done && done(); });
 }
 // the soldier's face sits here (mesh space, cm): eyes between the visor and the skull
-const EYE_SPOT = new THREE.Vector3(0, 4.2, 168.2);
+const EYE_SPOT = new THREE.Vector3(0, 0.6, 168.6);
 function attachFace(model, id, U) {
   const src = FACES[id]; if (!src) return null;
   let body = null; model.traverse(m => { if (m.isSkinnedMesh && !m.name.includes('visor')) body = m; });
@@ -40,6 +40,35 @@ function attachFace(model, id, U) {
   g.rotation.set(0, Math.PI, 0);
   scene.add(g); g.updateMatrixWorld(true);
   bone(model, 'Head').attach(g);
+  return g;
+}
+// a head covering: a soft cowl with folds, a slightly pointed back and an oval hole for the face (model faces -Z)
+function hoodShell(r, sx, sy, sz, cx, cy, cz, holeW, holeH, holeY, thetaLen, point = 0.18, folds = 0.025) {
+  const g = new THREE.SphereGeometry(r, 72, 36, 0, Math.PI * 2, 0, Math.PI * thetaLen);
+  const p = g.attributes.position, d = new THREE.Vector3();
+  const hole = (x, y, z) => { d.set(x, y, z).normalize(); return d.z < 0.05 ? (d.x / holeW) ** 2 + ((d.y - holeY) / holeH) ** 2 : 9; };
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const ph = Math.atan2(z, x), up = y / r;
+    // fabric folds, stronger lower down where the cloth gathers
+    const k = 1 + folds * Math.sin(ph * 9 + up * 4) * (1 - up) * 0.8 + folds * 0.5 * Math.sin(ph * 17) * (1 - up);
+    x *= k; z *= k;
+    // the back of the cowl hangs and points
+    if (z > 0) { z *= 1 + 0.12 * (z / r); if (y > 0) { z += point * r * (y / r) * (z / r); y += point * 0.3 * r * (z / r) * (y / r); } }
+    // the rim round the face comes forward a little so it frames it
+    const h = hole(p.getX(i), p.getY(i), p.getZ(i)); if (h < 1.6) z -= 0.15 * r * Math.max(0, 1.6 - h);
+    p.setXYZ(i, x, y, z);
+  }
+  const idx = g.index.array, keep = [];
+  const P = (j) => [g.attributes.position.getX(j), g.attributes.position.getY(j), g.attributes.position.getZ(j)];
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = P(idx[t]), b = P(idx[t + 1]), c = P(idx[t + 2]);
+    // decide the hole from the undeformed direction of the triangle's centre
+    const m = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
+    if (hole(m[0], m[1], m[2]) >= 1) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+  }
+  g.setIndex(keep);
+  g.scale(sx, sy, sz); g.translate(cx, cy, cz); g.computeVertexNormals();
   return g;
 }
 // ---------- skinned clothes ----------
@@ -78,7 +107,7 @@ function clothBaseFrom(mesh) {
   const bi = (nm) => bones.indexOf(nm);
   const LIMB = { LeftArm: ['LeftForeArm', 6.0], RightArm: ['RightForeArm', 6.0], LeftForeArm: ['LeftHand', 4.8], RightForeArm: ['RightHand', 4.8], LeftShoulder: ['LeftArm', 7.0], RightShoulder: ['RightArm', 7.0],
     LeftUpLeg: ['LeftLeg', 8.2], RightUpLeg: ['RightLeg', 8.2], LeftLeg: ['LeftFoot', 6.0], RightLeg: ['RightFoot', 6.0] };
-  const TORSO = { Hips: [16.5, 11.5], Spine: [15.5, 11], Spine1: [16, 11.5], Spine2: [17.5, 12] };
+  const TORSO = { Hips: [15, 10.5], Spine: [14.5, 10.2], Spine1: [16, 11.5], Spine2: [17.5, 12] };
   const seg = (p, a, b) => { const ab = _sa.copy(b).sub(a), t = Math.max(0, Math.min(1, _sb.copy(p).sub(a).dot(ab) / ab.lengthSq())); return _sc.copy(a).addScaledVector(ab, t); };
   const _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sc = new THREE.Vector3(), pv = new THREE.Vector3();
   const domBone = new Int32Array(W).fill(-1);
@@ -200,19 +229,14 @@ function buildClothes(model, o) {
   }
   // the hood: a deep wool cowl with the face in shadow, mantle over the shoulders
   if (o.hood) {
-    // a deep wool cowl open at the front so the face shows, mantle over the shoulders
-    const hood = new THREE.SphereGeometry(0.165, 24, 14, -0.62, Math.PI + 1.24, 0, Math.PI * 0.7);
-    hood.scale(1, 1.15, 1.12); hood.translate(0, 1.71, 0.035);
-    put('Head', hood, hoodM);
-    put('Spine2', cylBetween([0, 1.36, 0.05], [0, 1.56, 0.05], 0.29, 0.13, 22, true), hoodM);
+    // a deep wool cowl that covers the top of the head, with an oval opening for the face
+    put('Head', hoodShell(0.152, 1.04, 1.12, 1.12, 0, 1.722, 0.018, 0.7, 0.6, -0.3, 0.74), hoodM);
+    put('Spine2', cylBetween([0, 1.4, 0.04], [0, 1.57, 0.04], 0.24, 0.12, 22, true), hoodM);
   }
   if (o.veil) {
-    // wimple + veil: linen fitted round the head and neck, face in its shadow, the veil falling down the back
-    const w = new THREE.SphereGeometry(0.132, 24, 14, -0.55, Math.PI + 1.1, 0, Math.PI * 0.74);
-    w.scale(1, 1.12, 1.08); w.translate(0, 1.712, 0.03);
-    put('Head', w, hoodM);
+    // wimple + veil: linen fitted round the head and neck, the face framed by it, the veil falling down the back
+    put('Head', hoodShell(0.134, 1.02, 1.12, 1.1, 0, 1.715, 0.022, 0.62, 0.52, -0.3, 0.78, 0.04, 0.012), hoodM);
     put('Neck', cylBetween([0, 1.47, 0.03], [0, 1.63, 0.025], 0.1, 0.078, 18), hoodM);
-    // the veil: a soft curved drape behind the head, flaring onto the shoulders
     const back = new THREE.CylinderGeometry(0.135, 0.19, 0.28, 24, 4, true, -1.3, 2.6);
     const bpos = back.attributes.position;
     for (let i = 0; i < bpos.count; i++) { const y = bpos.getY(i), k = (0.14 - y) / 0.28; bpos.setZ(i, bpos.getZ(i) + k * k * 0.05); }

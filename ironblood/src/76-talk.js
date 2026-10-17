@@ -291,12 +291,12 @@ function startScene(f, kind) {
   const dir = _vw.copy(f.pos).sub(P.pos).setY(0); if (dir.lengthSq() < 0.01) dir.set(Math.sin(P.facing), 0, Math.cos(P.facing)); dir.normalize();
   P.facing = Math.atan2(dir.x, dir.z); P.root.rotation.y = P.facing;
   P.vel.set(0, 0, 0); P.blocking = false; P.attack = null;
-  f.pos.copy(P.pos).addScaledVector(dir, 0.52); f.pos.y = groundH(f.pos.x, f.pos.z);
+  f.pos.copy(P.pos).addScaledVector(dir, 0.85); f.pos.y = groundH(f.pos.x, f.pos.z);
   f.facing = P.facing + Math.PI; f.root.rotation.y = f.facing;
   P.noArms = true; f.noArms = true;
   if (P.swordMesh) P.swordMesh.visible = false;
   P.helmet(false);
-  scene0 = { f, kind, t: 0, dur: kind === 'kiss' ? 4.2 : 10, side: Math.random() < 0.5 ? 1 : -1, smacks: 0 };
+  scene0 = { f, kind, dir: dir.clone(), t: 0, dur: kind === 'kiss' ? 5 : 12, side: Math.random() < 0.5 ? 1 : -1, smacks: 0 };
   romanceWitnessed(f, kind === 'kiss' ? 'kissing ' + v.p.name : 'making out with ' + v.p.name);
 }
 const _ax = new THREE.Vector3(), _ay = new THREE.Vector3(0, 1, 0), _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3(), _pl = new THREE.Vector3();
@@ -317,37 +317,48 @@ function armTo(o, side, target, poleDir) {
 function updateScene(dt) {
   const s = scene0; if (!s) return;
   s.t += dt;
-  const P = player, f = s.f, k = s.t / s.dur;
-  const w = smooth(0, 0.14, k) * (1 - smooth(0.86, 1, k));
-  const mk = s.kind === 'makeout';
-  // heads tilt the same way (their own right), so they meet; making out slowly switches sides
-  const sideNow = mk ? Math.sin(s.t * 0.9) : s.side;
-  const sway = mk ? Math.sin(s.t * 1.7) * 0.04 : 0;
+  const P = player, f = s.f, t = s.t, mk = s.kind === 'makeout';
+  // she steps in close first, then they lean in; at the end they ease apart
+  const appr = smooth(0, 1.2, t);
+  f.pos.copy(P.pos).addScaledVector(s.dir, lerp(0.85, mk ? 0.46 : 0.52, appr)); f.pos.y = groundH(f.pos.x, f.pos.z);
+  f.speed = (1 - appr) * 0.6;
+  const w = smooth(0.7, 1.9, t) * (1 - smooth(s.dur - 1.3, s.dur, t));
+  // heads tilt the same way (their own right) so they meet; making out they slowly trade sides,
+  // part for a breath now and then and keep moving
+  const sideNow = mk ? Math.tanh(Math.sin(t * 0.62 + 0.4) * 2.4) : s.side;
+  const breath = mk ? Math.pow(Math.max(0, Math.sin(t * 0.85 - 1.2)), 10) : 0;
+  const nod = mk ? Math.sin(t * 2.2) * 0.05 + Math.sin(t * 3.4 + 1) * 0.025 : Math.sin(t * 1.6) * 0.02;
+  const lean = w * (1 - breath * 0.25);
   // he is taller: he bends down to her, she lifts her face and goes up on her toes
-  leanBody(P, w * 0.62, w * 0.3 * sideNow, w * 0.3);
-  leanBody(f, w * 0.2, w * 0.3 * sideNow, -w * 0.36);
+  leanBody(P, lean * 0.62, w * 0.3 * sideNow, w * (0.3 + nod));
+  leanBody(f, lean * 0.22, w * 0.3 * sideNow, -w * (0.36 + nod * 0.8));
   f.root.position.y = groundH(f.pos.x, f.pos.z) + 0.05 * w;
-  if (sway) { rotateBoneWorld(P.b.Spine1, _ay, sway * w); rotateBoneWorld(f.b.Spine1, _ay, -sway * w); }
-  // arms: her hands up round his neck (or on his chest), his hands at her waist / back
-  if (w > 0.05) {
+  if (mk) { const sway = Math.sin(t * 0.9) * 0.05 * w; rotateBoneWorld(P.b.Spine1, _ay, sway); rotateBoneWorld(f.b.Spine1, _ay, -sway); }
+  // arms: her hands go to his chest, then slide up round his neck; his hands hold her waist, then her back
+  const up = mk ? smooth(1.3, 3.0, t) : smooth(1.0, 2.4, t) * 0.35;
+  const aw = smooth(0.4, 1.6, t) * (1 - smooth(s.dur - 1.1, s.dur - 0.1, t));
+  if (aw > 0.02) {
     const pq = P.root.quaternion, fq = f.root.quaternion;
-    const pNeck = P.b.Neck.getWorldPosition(_t1), fSpine = f.b.Spine1.getWorldPosition(_t2);
+    const pNeck = P.b.Neck.getWorldPosition(new THREE.Vector3()), fSpine = f.b.Spine1.getWorldPosition(new THREE.Vector3());
     for (const sd of ['L', 'R']) {
       const sgn = sd === 'L' ? 1 : -1;
-      // her: hands reach behind his neck (making out) or rest on his chest (kiss)
-      const tgt = _pl.copy(pNeck).add(_ax.set(sgn * 0.11, mk ? 0.0 : -0.22, mk ? -0.08 : 0.06).applyQuaternion(pq));
-      armTo(f, sd, tgt.lerp(f.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - w), _ax.set(sgn * 0.6, -1, -0.3).applyQuaternion(fq));
-      const ht = new THREE.Vector3().copy(fSpine).add(_ax.set(sgn * 0.17, mk ? 0.05 : -0.12, mk ? -0.12 : 0.02).applyQuaternion(fq));
-      armTo(P, sd, ht.lerp(P.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - w), _ax.set(sgn * 0.7, -1, -0.2).applyQuaternion(pq));
+      const chest = new THREE.Vector3(sgn * 0.1, -0.22, 0.07), nape = new THREE.Vector3(sgn * 0.08, 0.02, -0.07);
+      const tgt = pNeck.clone().add(chest.lerp(nape, up).applyQuaternion(pq));
+      if (mk) tgt.y += Math.sin(t * 0.8 + sgn) * 0.02;
+      armTo(f, sd, tgt.lerp(f.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - aw), _ax.set(sgn * 0.6, -1, -0.3).applyQuaternion(fq));
+      // his hands slowly move over her back
+      const roam = mk ? Math.sin(t * 0.55 + sgn * 1.3) * 0.07 : 0;
+      const ht = fSpine.clone().add(_ax.set(sgn * 0.17, lerp(-0.12, 0.04, up) + roam, lerp(0.02, -0.12, up)).applyQuaternion(fq));
+      armTo(P, sd, ht.lerp(P.b[sd === 'L' ? 'LeftHand' : 'RightHand'].getWorldPosition(new THREE.Vector3()), 1 - aw), _ax.set(sgn * 0.7, -1, -0.2).applyQuaternion(pq));
     }
   }
-  if (w > 0.9 && s.t > 0.8 + s.smacks * (mk ? 1.6 : 9)) { s.smacks++; sfx.kiss(); }
-  // a slow side shot
-  const mid = P.pos.clone().lerp(f.pos, 0.5); mid.y += 1.5;
+  if (w > 0.9 && breath < 0.3 && t > 1.9 + s.smacks * (mk ? 1.7 : 9)) { s.smacks++; sfx.kiss(); }
+  // a slow side shot that drifts in closer
+  const mid = P.pos.clone().lerp(f.pos, 0.5); mid.y += 1.52;
   const side = _ax.set(Math.cos(P.facing), 0, -Math.sin(P.facing));
-  const orbit = Math.sin(s.t * 0.25) * 0.5;
-  sceneCam = { pos: mid.clone().addScaledVector(side, 1.7 * Math.cos(orbit)).addScaledVector(_t1.set(Math.sin(P.facing), 0, Math.cos(P.facing)), 1.7 * Math.sin(orbit) - 0.3).add(_t2.set(0, 0.1, 0)), look: mid };
-  if (s.t >= s.dur) endScene();
+  const orbit = Math.sin(t * 0.22) * 0.45, dist = lerp(2.0, 1.35, smooth(0, s.dur, t));
+  sceneCam = { pos: mid.clone().addScaledVector(side, dist * Math.cos(orbit)).addScaledVector(_t1.set(Math.sin(P.facing), 0, Math.cos(P.facing)), dist * Math.sin(orbit) - 0.25).add(_t2.set(0, 0.06, 0)), look: mid };
+  if (t >= s.dur) endScene();
 }
 function endScene() {
   const s = scene0; if (!s) return;

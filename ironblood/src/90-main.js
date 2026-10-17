@@ -116,6 +116,7 @@ function frame() {
   for (const f of fighters) if (f.ai && f.alive && f.ai.alert && f.pos.distanceTo(player.pos) < 30) { inFight = true; break; }
   updateMusic(inFight && player.alive);
   if (playing && worldStarted) { updateCamera(realDt); cameraFx(elapsed); }
+  if (window.__camOv) { camera.position.copy(window.__camOv.p); camera.lookAt(window.__camOv.t); } // test shots only
   else {
     // title screen: slow drift around the field
     titleOrbit += realDt * 0.05;
