@@ -2137,6 +2137,11 @@ function pickupMesh(kind) {
     grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.24, 0.18), [olive, olive, olive, olive, side, side]));
     const lid = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.03, 0.2), olive); lid.position.y = 0.13; grp.add(lid);
     const h = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.01, 6, 12, Math.PI), MAT.metalDark); h.position.y = 0.145; grp.add(h);
+  } else if (kind === 'gun') {
+    const c = mkCanvas(256, 64), x = c.getContext('2d'); x.fillStyle = '#14181c'; x.fillRect(0, 0, 256, 64); x.strokeStyle = '#ffd65a'; x.lineWidth = 4; x.strokeRect(4, 4, 248, 56); x.fillStyle = '#ffd65a'; x.font = 'bold 30px monospace'; x.textAlign = 'center'; x.fillText('SECRET GUN', 128, 43);
+    const side = new THREE.MeshStandardMaterial({ map: texFrom(c, false), roughness: 0.5, metalness: 0.3 }), dark = new THREE.MeshStandardMaterial({ color: 0x14181c, roughness: 0.45, metalness: 0.5 });
+    grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.16, 0.34), [dark, dark, side, dark, side, side]));
+    const glow = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.02, 8, 36), MAT.greenGlow); glow.rotation.x = Math.PI / 2; grp.add(glow);
   } else if (kind === 'crypto') {
     const mat = new THREE.MeshStandardMaterial({ color: 0xffc23a, metalness: 1, roughness: 0.25, emissive: 0x7a4a00, emissiveIntensity: 0.6 });
     for (let i = 0; i < 6; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 20), mat); c.position.set((i % 2) * 0.18 - 0.09, Math.floor(i / 2) * 0.045, 0); grp.add(c); }
@@ -2483,6 +2488,186 @@ const GUNS = {
   maker: { name: 'GAME.EXE', desc: 'A secret gun an AI ACTUALLY made for you. Fires bouncing game pixels.', snd: 'maker', dmg: 48, rpm: 420, auto: true, mag: 50, res: 300, reload: 1.8, speed: 110, grav: 1.4, bounce: 3, spread: 1.2, rec: [0.8, 0.6], head: 2, price: -1, cls: 'scifi', proj: 'pixel', secret: true },
 };
 const GUN_ORDER = ['glitch', 'p9', 'smg', 'shotgun', 'ar', 'sniper', 'minigun', 'rocket', 'laser', 'plasma', 'maker'];
+/* ---------------- the other 89 guns (100 in all) ----------------
+   Each one is built on one of the base guns above (body + feel), with its own stats, look and tricks.
+   [id, base gun, name, what it is, where you get it, price, stats, look]
+   where: a number = sold in terminals from that level on, 'dN' = dropped by the level N boss, 'sN' = hidden in level N's secret room
+   look: metal/anod/poly = colors, fur = 'wood' | 'tan' | 'gold' | color, len = longer/shorter, glow = light color, extras = add-on parts
+   tricks: burst (shots per pull), charge (hold to charge, seconds), pierce (goes through N AIs), homing, range (meters, then the shot is gone),
+   flame ('fire' | 'frost'), leech (heals you by part of the damage), freeze (stuns for N seconds), chain (zaps N more AIs),
+   onHit ('hole' | 'sticky'), wallPass (goes through 1 wall), ramp (each hit in a row does more), silent (built-in silencer), optic (built-in 2x scope) */
+const GUNS2 = [
+  /* ---- pistols ---- */
+  ['derringer', 'p9', 'Pocket Derringer', 'Two huge shots, then reload. Tiny.', 3, 300, { dmg: 62, rpm: 260, mag: 2, res: 30, reload: 1.5, rec: [3.4, 1], head: 2.6 }, { len: 0.62, metal: 0xb8bcc0, anod: 0xa0a4a8, fur: 'wood' }],
+  ['mk45', 'p9', 'Mk.45 Old Faithful', 'Big slow .45 rounds. Old-school steel and wood.', 4, 450, { dmg: 44, rpm: 300, mag: 8, res: 64, reload: 1.6, rec: [2.6, 0.7], head: 2.6 }, { metal: 0x8a8f94, anod: 0x7c8186, poly: 0x5a3a22, fur: 'wood' }],
+  ['taser', 'p9', 'Taser-X', 'Short range zap. The AI freezes for 2.5 seconds.', 5, 500, { dmg: 12, rpm: 120, mag: 2, res: 24, reload: 1.9, elem: 'shock', freeze: 2.5, range: 13, speed: 120, tracer: 0x4ac8ff, cls: 'pistol' }, { anod: 0xd8c22a, poly: 0x222222, glow: 0x4ac8ff, extras: ['stripe'] }],
+  ['flare', 'p9', 'Flare Pistol', 'Shoots a burning flare. Lights up the dark and sets AIs on fire.', 6, 600, { dmg: 40, splash: 1.4, rpm: 90, mag: 1, res: 16, reload: 1.6, speed: 60, grav: 1, elem: 'fire', proj: 'flare', tracer: 0xff7a2a }, { anod: 0xe8641a, poly: 0x1b1b1b, len: 1.05 }],
+  ['auto9', 'p9', 'Auto-9 Machine Pistol', 'A full-auto pistol. Sprays. Kicks.', 8, 700, { auto: true, dmg: 22, rpm: 950, mag: 20, res: 140, spread: 1.8, rec: [1.2, 1.1] }, { anod: 0x262a30, extras: ['extmag'] }],
+  ['rev357', 'p9', '357 Thunder', 'Six-shot revolver. Loud and mean.', 10, 900, { dmg: 72, rpm: 165, mag: 6, res: 48, reload: 2.2, rec: [3.6, 1.2], head: 2.7 }, { metal: 0xc8ccd0, anod: 0xb0b4b8, fur: 'wood', len: 1.1 }],
+  ['hc50', 'p9', 'Hand Cannon .50', 'Seven shots of pure overkill.', 14, 1300, { dmg: 88, rpm: 140, mag: 7, res: 42, reload: 1.9, rec: [5.5, 1.4], head: 2.8 }, { metal: 0xe0e3e6, anod: 0xd2d6da, len: 1.2, extras: ['brake'] }],
+  ['seeker', 'p9', 'Seeker Pistol', 'Its shots curve toward the closest AI.', 30, 1800, { dmg: 30, rpm: 320, mag: 15, res: 90, speed: 45, grav: 0, homing: 3, proj: 'plasma', tracer: 0xff5ab4, cls: 'scifi', snd: 'plasma' }, { anod: 0x3a1a32, glow: 0xff5ab4, extras: ['stripe'] }],
+  /* ---- SMGs ---- */
+  ['spitter', 'smg', 'Micro Spitter', 'Tiny, crazy fast, not very accurate.', 5, 500, { dmg: 15, rpm: 1250, mag: 32, res: 192, spread: 2.6, rec: [0.8, 1.1] }, { len: 0.8, anod: 0x1e2226 }],
+  ['whisper', 'smg', 'Whisper SMG', 'Built-in silencer. AIs barely hear it.', 11, 1100, { dmg: 18, rpm: 820, mag: 30, res: 180, silent: true }, { anod: 0x1b2420, extras: ['can'] }],
+  ['twenties', 'smg', 'Roaring Twenties', 'Drum-fed classic. 50 rounds of jazz.', 12, 1200, { dmg: 26, rpm: 700, mag: 50, res: 250, reload: 2.6, rec: [1.1, 0.9] }, { fur: 'wood', anod: 0x2a2a2a, extras: ['drum'] }],
+  ['viper', 'smg', 'Viper .45', 'Weird recoil system: barely kicks at all.', 16, 1400, { dmg: 24, rpm: 1100, mag: 25, res: 175, rec: [0.45, 0.4], spread: 1.5 }, { anod: 0x3a3d42, poly: 0x111111, len: 0.9 }],
+  ['frostbite', 'smg', 'Frostbite', 'Cryo rounds: AIs freeze for half a second per hit.', 26, 2600, { dmg: 18, rpm: 850, mag: 36, res: 216, freeze: 0.5, tracer: 0x9fe8ff }, { anod: 0xcfe8f5, poly: 0x2a4a5a, glow: 0x9fe8ff, extras: ['coils'] }],
+  ['sprayer', 'laser', 'Photon Sprayer', 'Laser SMG. 60 shots, no drop.', 28, 3000, { dmg: 16, rpm: 1100, mag: 60, res: 300, cls: 'scifi' }, { len: 0.8, glow: 0xff2a5a }],
+  ['vampire', 'smg', 'Vampire', 'Every hit heals you a little.', 34, 3400, { dmg: 19, rpm: 900, mag: 34, res: 204, leech: 0.12, tracer: 0xff1a3a }, { anod: 0x2a0a10, poly: 0x111111, glow: 0xff1a3a, extras: ['stripe'] }],
+  /* ---- shotguns ---- */
+  ['sawn', 'shotgun', 'Sawed-Off', 'Two barrels, short range, huge spread.', 2, 350, { pellets: 10, dmg: 18, mag: 2, res: 30, shells: false, reload: 1.6, rpm: 300, spread: 9, range: 18 }, { len: 0.7, fur: 'wood', extras: ['twin'] }],
+  ['grandpa', 'shotgun', 'Grandpa\'s Double', 'Long double barrel. Two shots, then reload.', 3, 450, { pellets: 10, dmg: 17, mag: 2, res: 32, shells: false, reload: 1.8, rpm: 300, spread: 5.5 }, { len: 1.15, fur: 'wood', metal: 0x6a6e72, extras: ['twin'] }],
+  ['slug', 'shotgun', 'Slug Gun', 'One big slug instead of pellets. Accurate.', 13, 1100, { pellets: 0, dmg: 120, spread: 0.35, head: 2.2, rec: [5, 1.2] }, { anod: 0x3a2a1a, fur: 'wood', extras: ['optic'] }],
+  ['dragon', 'shotgun', 'Dragon\'s Breath', 'Shells full of fire. Short range, sets AIs ablaze.', 19, 1700, { pellets: 8, dmg: 13, elem: 'fire', range: 22, flame: 'fire', tracer: 0xff6a1a }, { anod: 0x5a1a0a, glow: 0xff6a1a, extras: ['stripe'] }],
+  ['sweeper', 'shotgun', 'Street Sweeper', 'Full-auto drum shotgun. Empties a room.', 20, 2000, { auto: true, pellets: 8, dmg: 13, rpm: 240, mag: 12, res: 72, shells: false, reload: 2.6 }, { anod: 0x1c1c1c, extras: ['drum'] }],
+  ['flechette', 'shotgun', 'Flechette 12', 'Steel darts that go through the first AI.', 24, 2100, { pellets: 12, dmg: 11, pierce: 1, spread: 3.2 }, { anod: 0x4a5058, metal: 0x9aa0a6 }],
+  ['doorbuster', 'shotgun', 'Doorbuster', 'Explosive slugs. Boom, every shot.', 32, 3000, { pellets: 0, dmg: 95, splash: 2.2, spread: 0.6, mag: 5, res: 30 }, { anod: 0x6a1a1a, extras: ['brake'] }],
+  ['teslashot', 'shotgun', 'Tesla Shotgun', 'Six lightning pellets that jump to more AIs.', 38, 3600, { pellets: 6, dmg: 20, elem: 'shock', chain: 2, tracer: 0x4ac8ff, cls: 'shotgun', snd: 'laser' }, { anod: 0x1a2a3a, glow: 0x4ac8ff, extras: ['coils'] }],
+  /* ---- rifles ---- */
+  ['ping', 'ar', 'Ping M1', 'Old semi-auto rifle. Ping! when the clip pops out.', 9, 1000, { auto: false, dmg: 62, rpm: 300, mag: 8, res: 64, reload: 1.8, rec: [2.4, 0.6], head: 2.6 }, { fur: 'wood', metal: 0x4a4e52, len: 1.12 }],
+  ['k47', 'ar', 'K-47 Workhorse', 'Hits hard, kicks harder, never breaks.', 10, 1100, { dmg: 38, rpm: 600, rec: [1.9, 0.95] }, { fur: 'wood', anod: 0x2a2a2a, extras: ['brake'] }],
+  ['trident', 'ar', 'Trident', 'Three-round burst rifle. Very accurate.', 12, 1300, { burst: 3, auto: false, dmg: 36, rpm: 900, spread: 0.8 }, { anod: 0x3a4250, extras: ['optic'] }],
+  ['glass', 'ar', 'Glass Cannon', 'Built-in 2x scope. Precise.', 15, 1500, { dmg: 34, spread: 0.7, optic: true }, { anod: 0x2e5a3a, poly: 0x1f3a28, extras: ['optic'] }],
+  ['wildfire', 'ar', 'Wildfire', 'Incendiary rounds built in. Everything burns.', 23, 2400, { dmg: 34, elem: 'fire', tracer: 0xff7a2a }, { anod: 0x3a1a0a, glow: 0xff6a1a, extras: ['stripe'] }],
+  ['static', 'ar', 'Static', 'Shock rounds built in. Zaps jump between AIs.', 25, 2600, { dmg: 32, elem: 'shock', tracer: 0x4ac8ff }, { anod: 0x1a2a3a, glow: 0x4ac8ff, extras: ['stripe'] }],
+  ['corrupter', 'ar', 'Corrupter', 'Glitch rounds built in. Hit AIs turn on each other.', 29, 2900, { dmg: 30, elem: 'glitch', tracer: 0xb046ff }, { anod: 0x2a1a3a, glow: 0xb046ff, extras: ['stripe'] }],
+  ['pulse', 'laser', 'Pulse Rifle', 'Four-shot laser bursts.', 42, 4200, { burst: 4, auto: false, dmg: 31, rpm: 1200, mag: 48, res: 240, tracer: 0x3ef2ff }, { glow: 0x3ef2ff, len: 1.1, extras: ['coils'] }],
+  ['leech', 'ar', 'Leech Rifle', 'Heals you by 10% of the damage you do.', 46, 4800, { dmg: 36, leech: 0.1, tracer: 0xff1a3a }, { anod: 0x2a0a10, glow: 0xff1a3a, extras: ['stripe', 'optic'] }],
+  ['gauss', 'ar', 'Gauss Railgun', 'Hold to charge. A full charge goes through 5 AIs.', 55, 6500, { charge: 1.1, auto: false, dmg: 270, rpm: 60, mag: 4, res: 28, reload: 2.6, pierce: 5, speed: 2400, grav: 0, spread: 0.05, rec: [4, 0.6], head: 2, cls: 'scifi', snd: 'laser', tracer: 0x3ef2ff }, { anod: 0x1a1d22, glow: 0x3ef2ff, len: 1.2, extras: ['coils', 'optic'] }],
+  /* ---- marksman + snipers ---- */
+  ['cowboy', 'shotgun', 'Cowboy Lever-Action', 'Lever rifle. Load rounds one at a time.', 7, 800, { pellets: 0, dmg: 78, rpm: 110, mag: 8, res: 48, spread: 0.25, speed: 600, grav: 1, head: 2.6, rec: [3.2, 0.8], cls: 'sniper', snd: 'rifle' }, { fur: 'wood', metal: 0x5a4a3a, len: 1.15 }],
+  ['dart', 'sniper', 'Dart Rifle', 'Silent darts. AIs fall asleep for 4 seconds.', 13, 1300, { dmg: 40, freeze: 4, silent: true, instakill: false, rpm: 70, mag: 5, res: 30, speed: 300, grav: 1.4, tracer: 0x7dff5a }, { fur: 0x2a4a2a, glow: 0x7dff5a }],
+  ['dmr', 'sniper', 'Marksman DMR', 'Semi-auto with a scope. 10 shots.', 15, 1800, { dmg: 82, rpm: 240, mag: 10, res: 60, reload: 2.4, instakill: false, rec: [3.2, 0.8] }, { fur: 0x2a2d31, anod: 0x343a40, len: 0.95 }],
+  ['crossbow', 'sniper', 'Crossbow', 'Silent bolts with big drop. Goes through one AI.', 17, 1500, { dmg: 150, proj: 'bolt', silent: true, speed: 70, grav: 1.3, mag: 1, res: 20, reload: 1.8, pierce: 1, rpm: 60, instakill: false, head: 3 }, { fur: 'wood', anod: 0x3a2a1a, len: 0.9 }],
+  ['thumper50', 'sniper', 'Thumper .50', 'Anti-material rifle. Goes through 3 AIs.', 36, 4200, { dmg: 270, rpm: 32, mag: 5, res: 25, reload: 3.4, pierce: 3, rec: [9, 1.5] }, { len: 1.18, anod: 0x3a3d32, fur: 0x3a3d32, extras: ['brake', 'bipod'] }],
+  ['boomstick', 'sniper', 'Boomstick', 'Explosive sniper rounds.', 44, 5000, { dmg: 160, splash: 2.4, rpm: 40, mag: 4, res: 24 }, { anod: 0x5a1a1a, fur: 0x5a1a1a, extras: ['brake'] }],
+  ['lightbeam', 'laser', 'Lightbeam', 'Laser sniper. No drop, no wind, no mercy.', 52, 5800, { dmg: 185, rpm: 50, mag: 4, res: 24, reload: 2.8, speed: 3000, spread: 0.03, hipSpread: 2.5, scope: true, instakill: true, auto: false, head: 3.5, cls: 'sniper' }, { glow: 0xff2a5a, len: 1.25, extras: ['coils'] }],
+  ['spinaltap', 'sniper', 'Spinal Tap', 'Railgun sniper. Hold to charge, goes through 10 AIs.', 75, 9000, { charge: 1.6, dmg: 430, pierce: 10, speed: 3200, grav: 0, mag: 3, res: 18, reload: 3.2, tracer: 0x3ef2ff, cls: 'sniper', snd: 'laser' }, { anod: 0x14171b, fur: 0x14171b, glow: 0x3ef2ff, len: 1.2, extras: ['coils'] }],
+  /* ---- heavy ---- */
+  ['beltfed', 'ar', 'Belt-Fed 249', 'Light machine gun. 100 rounds.', 22, 2600, { dmg: 30, rpm: 800, mag: 100, res: 400, reload: 4.5, slow: 0.82, spread: 1.6, rec: [1.1, 1], cls: 'heavy' }, { anod: 0x3a3f2a, len: 1.1, extras: ['box', 'bipod'] }],
+  ['firestart', 'plasma', 'Firestarter', 'Flamethrower. Short range, burns everything.', 21, 2500, { dmg: 9, splash: 0, proj: null, pellets: 3, rpm: 1100, mag: 150, res: 450, reload: 3, speed: 22, grav: -0.4, spread: 4, range: 13, flame: 'fire', elem: 'fire', rec: [0.2, 0.2], head: 1, snd: 'minigun' }, { anod: 0x7a2a0a, glow: 0xff6a1a, extras: ['tank'] }],
+  ['rattler', 'minigun', 'Old Rattler', 'Hand-cranked style gatling. Slower, punchier.', 25, 3000, { dmg: 28, rpm: 900, mag: 120, res: 480, spin: 0.35 }, { metal: 0xc8a050, fur: 'wood', anod: 0x6a5a3a }],
+  ['freezer', 'plasma', 'Freezer', 'Cryo thrower. AIs freeze solid.', 37, 3800, { dmg: 7, splash: 0, proj: null, pellets: 3, rpm: 1000, mag: 140, res: 420, reload: 3, speed: 22, grav: -0.2, spread: 4, range: 13, flame: 'frost', freeze: 0.9, rec: [0.2, 0.2], head: 1, snd: 'minigun' }, { anod: 0xcfe8f5, glow: 0x9fe8ff, extras: ['tank'] }],
+  ['thor', 'plasma', 'Thor', 'Tesla cannon. Lightning jumps to 4 more AIs.', 58, 6800, { dmg: 75, splash: 0, proj: null, rpm: 140, mag: 12, res: 60, speed: 2000, grav: 0, elem: 'shock', chain: 4, tracer: 0x4ac8ff, snd: 'laser' }, { anod: 0x1a2a3a, glow: 0x4ac8ff, extras: ['coils'] }],
+  ['photonstorm', 'minigun', 'Photon Storm', 'Laser minigun. 400 shots of red light.', 60, 7600, { dmg: 21, rpm: 2200, mag: 400, res: 1200, speed: 1600, grav: 0, cls: 'heavy', snd: 'laser', tracer: 0xff2a5a }, { anod: 0x2a2a2a, glow: 0xff2a5a, extras: ['coils'] }],
+  /* ---- launchers ---- */
+  ['bottle', 'rocket', 'Bottle Rocket', 'Full-auto mini rockets.', 17, 1800, { auto: true, dmg: 60, splash: 1.9, rpm: 300, mag: 12, res: 48, speed: 60, reload: 2.4 }, { len: 0.8, olive: 0x8a2a2a }],
+  ['thumpergl', 'rocket', 'Thumper GL', 'Grenade launcher. Shells arc and boom on impact.', 20, 2400, { dmg: 160, splash: 4.5, proj: 'gren', speed: 30, grav: 1, mag: 6, res: 30, rpm: 100, reload: 0.6, shells: true }, { anod: 0x3a3f2a, extras: ['drum'] }],
+  ['stickyl', 'rocket', 'Sticky Launcher', 'Shoots sticky bombs that blow 1.5 seconds later.', 33, 3200, { dmg: 0, splash: 0, proj: 'gren', onHit: 'sticky', speed: 28, grav: 1, mag: 6, res: 30, rpm: 120, reload: 2.2 }, { anod: 0xffb02a, extras: ['drum'] }],
+  ['lockon', 'rocket', 'Lock-On', 'Homing rockets. Point near an AI, the rocket does the rest.', 45, 5200, { dmg: 220, homing: 2.2, speed: 38 }, { glow: 0xff3a3a, extras: ['optic'] }],
+  ['singular', 'rocket', 'Singularity', 'Fires a black hole.', 80, 9500, { dmg: 0, splash: 0, proj: 'plasma', onHit: 'hole', mag: 1, res: 6, reload: 4, speed: 40, grav: 0.2, tracer: 0xb46aff }, { anod: 0x14081e, glow: 0xb46aff, extras: ['coils'] }],
+  /* ---- energy ---- */
+  ['arc', 'plasma', 'Arc Caster', 'Lightning that jumps to 3 more AIs.', 39, 4000, { dmg: 42, splash: 0, proj: null, rpm: 300, mag: 25, res: 125, speed: 2000, grav: 0, elem: 'shock', chain: 3, tracer: 0x4ac8ff, snd: 'laser' }, { glow: 0x4ac8ff, extras: ['coils'] }],
+  ['prism', 'laser', 'Prism Laser', 'Splits into 3 beams.', 50, 5600, { pellets: 3, dmg: 27, spread: 1.4, rpm: 600, mag: 40, res: 200 }, { glow: 0xffffff, extras: ['coils'] }],
+  ['disint', 'laser', 'Disintegrator', 'Big slow beam. What it kills turns to code.', 62, 7000, { dmg: 95, rpm: 180, mag: 16, res: 80, auto: false, rec: [1.4, 0.5], tracer: 0x39ff88 }, { glow: 0x39ff88, len: 1.15, extras: ['coils'] }],
+  ['gradient', 'laser', 'Gradient Descent', 'Every hit in a row does 10% more damage (up to double).', 66, 7800, { dmg: 26, ramp: true, rpm: 700, mag: 50, res: 250, tracer: 0xffb02a }, { glow: 0xffb02a, extras: ['stripe'] }],
+  ['neural', 'laser', 'Neural Net Gun', 'Smart bullets that learn where the AIs are going.', 70, 8200, { dmg: 32, homing: 4, proj: 'pixel', speed: 70, grav: 0, rpm: 520, mag: 40, res: 200, tracer: 0xff5ab4 }, { glow: 0xff5ab4, anod: 0x2a1a2a, extras: ['coils'] }],
+  ['transformer', 'plasma', 'Transformer Cannon', 'Hold to charge a giant plasma ball.', 85, 9800, { charge: 1.2, auto: false, dmg: 320, splash: 3.8, rpm: 70, mag: 6, res: 30, speed: 50 }, { glow: 0xffb02a, anod: 0x2a1a0a, len: 1.15, extras: ['coils'] }],
+  ['quantum', 'laser', 'Quantum Rifle', 'Its shots go through one wall.', 90, 11000, { dmg: 62, rpm: 300, mag: 20, res: 100, auto: false, wallPass: 1, tracer: 0xb046ff }, { glow: 0xb046ff, anod: 0x1a0a2a, len: 1.1, extras: ['coils', 'optic'] }],
+  /* ---- boss drops ---- */
+  ['cheese', 'p9', 'Jabberwacky\'s Cheese Gun', 'Fires... cheese? It hurts. Somehow.', 'd5', 0, { dmg: 46, rpm: 350, mag: 14, res: 84, proj: 'pixel', speed: 80, grav: 1.2, bounce: 1, tracer: 0xffd23a }, { anod: 0xffd23a, poly: 0xd8a820, extras: ['stripe'], glow: 0xffd23a }],
+  ['checkmate', 'sniper', 'Checkmate', 'Deep Blue\'s gun. Calculates the shot for you: rounds curve a little.', 'd10', 0, { dmg: 180, homing: 1.2, rpm: 60, mag: 6, res: 36 }, { anod: 0x1a2a6a, fur: 0x1a2a6a, glow: 0x2a6aff }],
+  ['ibm', 'ar', 'Watson\'s Answer', 'Jeopardy-winning auto rifle. It learns: every hit in a row does more damage.', 'd15', 0, { dmg: 40, rpm: 700, mag: 33, res: 198, ramp: true }, { anod: 0x1f3a7a, glow: 0x3a8aff, extras: ['stripe'] }],
+  ['siren', 'smg', 'Hey Siri-ously', 'An SMG with a built-in silencer and homing rounds.', 'd20', 0, { dmg: 22, rpm: 900, mag: 40, res: 240, silent: true, homing: 1.5 }, { anod: 0xd0e8ff, glow: 0xff4fa0, extras: ['can'] }],
+  ['go', 'shotgun', 'Move 37', 'AlphaGo\'s shotgun. Pellets that go through two AIs.', 'd25', 0, { pellets: 9, dmg: 18, pierce: 2, mag: 8, res: 48 }, { anod: 0xd8b070, fur: 'wood' }],
+  ['five', 'minigun', 'Team of Five', 'OpenAI Five\'s minigun: barely needs to spin up.', 'd30', 0, { dmg: 26, rpm: 1900, spin: 0.15, slow: 0.75 }, { anod: 0x2a3a5a, glow: 0x10e39f }],
+  ['transformer2', 'laser', 'Attention Beam', 'All you need is attention: locks on to the AI nearest your crosshair.', 'd35', 0, { dmg: 30, homing: 5, rpm: 700, mag: 50, res: 250, speed: 120, proj: 'plasma', tracer: 0xffd23a }, { glow: 0xffd23a, extras: ['coils'] }],
+  ['gpt3', 'ar', 'Autocomplete', 'Finishes your sentences, and your enemies. Burst of 5.', 'd40', 0, { burst: 5, auto: false, dmg: 40, rpm: 1300, mag: 40, res: 200 }, { anod: 0x10a37f, glow: 0x10e39f, extras: ['stripe'] }],
+  ['dalle', 'plasma', 'Paintbrush', 'DALL-E\'s gun: paints the room with color bombs.', 'd45', 0, { dmg: 70, splash: 2.4, rpm: 260, mag: 20, res: 100, proj: 'pixel', bounce: 1 }, { anod: 0xe0e0e0, glow: 0xff5ab4, extras: ['coils'] }],
+  ['jailbreak', 'p9', 'Jailbreak', 'ChatGPT\'s pistol. Ignores the rules: shots go through walls.', 'd50', 0, { dmg: 70, rpm: 400, mag: 16, res: 96, wallPass: 1, tracer: 0x10e39f }, { anod: 0x10a37f, glow: 0x10e39f, extras: ['stripe'] }],
+  ['constitution', 'shotgun', 'Constitution', 'Claude\'s shotgun. Refuses to miss: pellets home in.', 'd55', 0, { pellets: 8, dmg: 22, homing: 2.5, mag: 8, res: 48 }, { anod: 0xd97757, glow: 0xff8a5c }],
+  ['bard', 'laser', 'Bard\'s Lute', 'Plays a tune. The tune is lasers.', 'd60', 0, { dmg: 34, rpm: 900, mag: 60, res: 300, chain: 1, elem: 'shock' }, { glow: 0x5b8cff, extras: ['coils'] }],
+  ['llama', 'smg', 'Spitting Llama', 'Open-weights SMG. Spits fast.', 'd65', 0, { dmg: 26, rpm: 1300, mag: 50, res: 300 }, { anod: 0x5a6aff, glow: 0x5a6aff, extras: ['drum'] }],
+  ['mistral', 'ar', 'Le Chat', 'A French rifle with mixture-of-experts rounds: random element per shot.', 'd70', 0, { dmg: 44, rpm: 700, mag: 36, res: 216, elem: 'random' }, { anod: 0xff7000, glow: 0xff7000, extras: ['stripe'] }],
+  ['o1', 'sniper', 'Chain of Thought', 'o1\'s sniper. Hold to think (charge). Goes through everything.', 'd75', 0, { charge: 1.4, dmg: 500, pierce: 99, speed: 3000, grav: 0, mag: 4, res: 20 }, { anod: 0x1a1a1a, fur: 0x1a1a1a, glow: 0xffffff, extras: ['coils'] }],
+  ['deepseek', 'minigun', 'Whale Cannon', 'DeepSeek\'s minigun. Cheap to run, huge output.', 'd80', 0, { dmg: 30, rpm: 2100, spin: 0.3, mag: 360, res: 1080, slow: 0.8 }, { anod: 0x4d6bfe, glow: 0x4d6bfe }],
+  ['grok', 'rocket', 'Galaxy Brain', 'Grok\'s launcher. Every rocket splits into three.', 'd85', 0, { dmg: 160, splash: 4.5, pellets: 3, spread: 4, mag: 3, res: 18, rpm: 90 }, { anod: 0x111111, glow: 0xf0f0f0, extras: ['box'] }],
+  ['gemini', 'laser', 'Twin Stars', 'Gemini\'s twin lasers: two beams every shot.', 'd90', 0, { pellets: 2, dmg: 38, spread: 0.5, rpm: 800, mag: 60, res: 300 }, { glow: 0x5b8cff, extras: ['twin', 'coils'] }],
+  ['finalfour', 'ar', 'The Final Four', 'Dropped by the newest AIs. Fire, shock and glitch, all at once.', 'd95', 0, { dmg: 58, rpm: 800, mag: 50, res: 250, elem: 'random', chain: 1, pierce: 1 }, { anod: 0x111111, glow: 0xff2a3d, extras: ['stripe', 'optic'] }],
+  ['zeroday', 'plasma', 'ZERO DAY', 'THE VIRUS\'s own weapon. Homing glitch plasma that goes through everything.', 'd100', 0, { dmg: 220, splash: 2.4, rpm: 600, mag: 66, res: 330, elem: 'glitch', homing: 3, pierce: 3, speed: 90, tracer: 0xff2a3d }, { anod: 0x1a0005, glow: 0xff2a3d, extras: ['coils', 'stripe'] }],
+  /* ---- secrets ---- */
+  ['pixelp', 'p9', 'Pixel Pistol', 'Found in a secret room. Shoots bouncing 8-bit pixels.', 's3', 0, { dmg: 40, rpm: 420, mag: 16, res: 96, proj: 'pixel', speed: 90, grav: 1, bounce: 2 }, { anod: 0x3ae0ff, poly: 0xff3a8a, glow: 0xffe23a, extras: ['stripe'] }],
+  ['floppy', 'smg', 'Floppy Launcher', 'Fires 3.5" floppy disks. 1.44 MB of pain each.', 's13', 0, { dmg: 32, rpm: 700, mag: 30, res: 180, proj: 'pixel', speed: 70, grav: 0.8 }, { anod: 0x2a2a6a, poly: 0x1a1a3a }],
+  ['dialup', 'shotgun', 'Dial-Up Blaster', 'Screeches like a 56k modem. Stuns AIs with the noise.', 's23', 0, { pellets: 9, dmg: 16, freeze: 1.2, mag: 6, res: 36 }, { anod: 0xd8d0b8, fur: 0xb8b0a0 }],
+  ['captcha', 'ar', 'CAPTCHA', 'Select all images with AIs in them. Then delete them. Built-in thermal.', 's33', 0, { dmg: 40, rpm: 650, mag: 30, res: 180, optic: true, therm: true }, { anod: 0x4a7aff, extras: ['optic'] }],
+  ['bsod', 'rocket', 'Blue Screen', 'Every hit freezes AIs like a crashed PC.', 's43', 0, { dmg: 140, splash: 4, freeze: 3, mag: 2, res: 16 }, { anod: 0x0a2a9a, glow: 0x4a6aff }],
+  ['golden', 'p9', 'The Golden Gun', 'One shot. One kill. Any AI.', 's50', 0, { dmg: 9999, rpm: 60, mag: 1, res: 20, reload: 2.4, head: 1, instakill: true }, { metal: 'gold', anod: 'gold', poly: 'gold', fur: 'gold', glow: 0xffd65a }],
+  ['clippy', 'p9', 'Clippy\'s Revenge', 'It looks like you\'re trying to delete AIs. Want help? Shots bend toward them.', 's63', 0, { dmg: 60, rpm: 380, mag: 12, res: 72, homing: 3, speed: 60, proj: 'plasma', tracer: 0xd8dde3 }, { metal: 0xd8dde3, anod: 0xd8dde3, glow: 0x3ef2ff }],
+  ['deleteall', 'laser', 'rm -rf', 'Deletes whatever it touches. Very slow, very final.', 's73', 0, { dmg: 600, rpm: 40, mag: 3, res: 15, auto: false, pierce: 3, tracer: 0xff1a3a }, { anod: 0x1a0005, glow: 0xff1a3a, extras: ['coils'] }],
+  ['antwork', 'smg', 'Shrink Ray SMG', 'From Ant Work 2. AIs it kills shrink to nothing.', 's83', 0, { dmg: 36, rpm: 1000, mag: 40, res: 240, tracer: 0x7dff5a, freeze: 0.3 }, { anod: 0x2a4a1a, glow: 0x7dff5a, extras: ['coils'] }],
+  ['ctrlz', 'plasma', 'Ctrl+Z', 'Undo button. Every kill heals you 15.', 's93', 0, { dmg: 90, splash: 2.2, rpm: 320, mag: 30, res: 150, leech: 0.2 }, { anod: 0xe9ecef, glow: 0x39ff88, extras: ['coils'] }],
+];
+/* build the full gun list: each new gun copies its base gun, then changes what it lists */
+const gBase = (id) => (GUNS[id] && GUNS[id].base) || id;
+GUNS.sniper.pierce = 1; /* the Longbow already went through one AI */
+for (const id of GUN_ORDER) GUNS[id].lvl = 1;
+for (const [id, base, name, desc, src, price, o, look] of GUNS2) {
+  const g = Object.assign({}, GUNS[base], { base, name, desc, price, look: look || {}, secret: false, pierce: GUNS[base].pierce || 0 }, o);
+  for (const k in g) if (g[k] === null) delete g[k];
+  if (o.pellets === 0) delete g.pellets;
+  if (typeof src === 'number') g.lvl = src;
+  else { g[src[0] === 'd' ? 'drop' : 'find'] = +src.slice(1); g.price = -1; g.secret = true; g.lvl = +src.slice(1); }
+  GUNS[id] = g; GUN_ORDER.push(id);
+}
+for (const id of ['disint', 'deleteall', 'antwork']) GUNS[id].codeKill = true;
+const GUN_CATS = [['all', 'ALL'], ['own', 'OWNED'], ['pistol', 'PISTOLS'], ['smg', 'SMGs'], ['shotgun', 'SHOTGUNS'], ['rifle', 'RIFLES'], ['sniper', 'SNIPERS'], ['heavy', 'HEAVY'], ['launcher', 'LAUNCHERS'], ['scifi', 'ENERGY']];
+const levelReach = () => Math.max(LVL.n, (G.bossesBeaten || 0) + 1);
+const NOSIL = ['minigun', 'rocket', 'laser', 'plasma', 'maker', 'shotgun'];
+const gunQuiet = (id) => !!GUNS[id].silent || (PL.guns[id] && PL.guns[id].att.sil === true && !NOSIL.includes(gBase(id)));
+
+/* the look of a gun: its own colors, length and add-on parts */
+const TINT = {};
+function tintMat(m, c) {
+  if (c == null) return m; if (c === 'gold') return GM.gold; if (c === 'wood') return GM.wood; if (c === 'tan') return GM.tan;
+  const k = m.uuid + ':' + c; if (!TINT[k]) { TINT[k] = m.clone(); TINT[k].color = new THREE.Color(c); } return TINT[k];
+}
+function glowMat(c) { const k = 'glow:' + c; if (!TINT[k]) TINT[k] = new THREE.MeshStandardMaterial({ color: 0x050505, emissive: c, emissiveIntensity: 2.2, roughness: 0.4 }); return TINT[k]; }
+function gunExtras(o, look) {
+  const mz = o.muzzle.position, ex = look.extras || [], gm = look.glow != null ? glowMat(look.glow) : GM.glowB;
+  for (const e of ex) {
+    if (e === 'stripe') for (const sx of [-1, 1]) gBox(0.002, 0.005, 0.22, gm, sx * 0.0215, 0.012, -0.02, 0);
+    else if (e === 'coils') for (let k = 0; k < 4; k++) gAdd(new THREE.TorusGeometry(0.021, 0.0045, 6, 18), gm, 0, mz.y, mz.z + 0.07 + k * 0.045);
+    else if (e === 'brake') { gBox(0.03, 0.024, 0.055, GM.metal, 0, mz.y, mz.z - 0.02, 0.003); for (const sx of [-1, 1]) gBox(0.002, 0.012, 0.03, GM.dark, sx * 0.0155, mz.y, mz.z - 0.02, 0); mz.z -= 0.05; }
+    else if (e === 'can') { gLathe([[0, 0], [0.016, 0], [0.018, 0.006], [0.018, 0.15], [0.015, 0.16], [0.006, 0.16], [0, 0.1605]], GM.anod, 0, mz.y, mz.z + 0.01); mz.z -= 0.15; }
+    else if (e === 'twin') gCyl(0.0125, 0.3, GM.metal, 0.027, mz.y, mz.z + 0.15, 16);
+    else if (e === 'drum') { const par = o.mag || GG, d = new THREE.CylinderGeometry(0.055, 0.055, 0.05, 24); d.rotateZ(Math.PI / 2); gAdd(d, GM.anod, 0, o.mag ? -0.07 : -0.09, o.mag ? -0.02 : 0, 0, 0, 0, par); }
+    else if (e === 'extmag') { if (o.mag) o.mag.scale.y = 1.35; }
+    else if (e === 'box') gBox(0.06, 0.075, 0.1, GM.olive, -0.048, -0.05, 0.02, 0.004);
+    else if (e === 'tank') { gCyl(0.036, 0.24, tintMat(GM.metal, look.anod != null ? look.anod : 0x7a2a0a), 0, -0.075, 0.06, 18); gCyl(0.008, 0.2, GM.rubber, 0.03, -0.04, -0.05, 8); }
+    else if (e === 'bipod') for (const sx of [-1, 1]) gBox(0.006, 0.13, 0.006, GM.metal, sx * 0.022, -0.06, mz.z + 0.12, 0, 0.25, 0, sx * 0.2);
+    else if (e === 'fins') for (let k = 0; k < 5; k++) gBox(0.05, 0.004, 0.012, GM.metal, 0, mz.y + 0.022, mz.z + 0.08 + k * 0.02, 0);
+    else if (e === 'optic' && !o.extras.scope && !GUNS[o.id].scope) {
+      const y = o.railY, z = o.railZ;
+      gBox(0.026, 0.008, 0.04, GM.anod, 0, y + 0.004, z, 0.002);
+      gLathe([[0.017, 0], [0.017, 0.045]], GM.anod, 0, y + 0.027, z + 0.022, 24); gLathe([[0, 0.045], [0.017, 0.045]], GM.anod, 0, y + 0.027, z + 0.022, 24);
+      gCyl(0.0145, 0.0015, GM.lens, 0, y + 0.027, z - 0.02, 24); gAdd(new THREE.SphereGeometry(0.0009, 8, 6), GM.dot, 0, y + 0.027, z - 0.012);
+      o.sightY = y + 0.027; o.extras.scope = true;
+    }
+  }
+}
+/* homing shots look for the closest AI (or the boss) ahead of them */
+function homingTarget(b) {
+  const sp = Math.hypot(b.vx, b.vy, b.vz) || 1, fx = b.vx / sp, fy = b.vy / sp, fz = b.vz / sp;
+  let best = null, bs = -1;
+  forNearBots(b.x, b.z, 45, (o) => {
+    if (o.dead || o.ghost || !o.active || o.summoned === 'ally') return;
+    const dx = o.x - b.x, dy = o.y + 1.2 - b.y, dz = o.z - b.z, d = Math.hypot(dx, dy, dz) || 1, dot = (dx * fx + dy * fy + dz * fz) / d;
+    if (dot < 0.55) return; const score = dot * 2 - d / 45; if (score > bs) { bs = score; best = o; }
+  });
+  const B = G.boss;
+  if (!best && B && B.active && B.alive && B.x != null) { const dx = B.x - b.x, dy = (B.y || 4) + 1 - b.y, dz = B.z - b.z, d = Math.hypot(dx, dy, dz) || 1; if ((dx * fx + dy * fy + dz * fz) / d > 0.5) return { x: B.x, y: (B.y || 4) - 0.2, z: B.z, boss: true }; }
+  return best;
+}
+/* drop/find a gun you don't have yet */
+function gunReward(id, how) {
+  if (!id || !GUNS[id]) return false;
+  if (PL.owned.includes(id)) { addCrypto(400, how + ': ' + GUNS[id].name + ' (already yours)'); return false; }
+  giveGun(id); VM.dirty = true; HUD.dirty = true;
+  toast('🔫 ' + how + ': ' + GUNS[id].name + '! ' + (PL.slots.includes(id) ? 'It is in your hands.' : 'It is in the gun locker at every terminal.'), 'good', 5000);
+  SFX.trophy();
+  return true;
+}
+function gunTrophies() { const n = PL.owned.length; if (n >= 25) trophy('gun25'); if (n >= 50) trophy('gun50'); if (n >= GUN_ORDER.length) trophy('gun100'); }
 const curGun = () => (PL.armGone ? PL.slots[0] : PL.slots[PL.cur]);
 const gunStats = (id) => {
   const g = GUNS[id], st = PL.guns[id] || { lvl: 1, att: {} }, l = (st.lvl || 1) - 1;
@@ -2496,7 +2681,7 @@ function giveGun(id, toSlot = -1) {
   if (!PL.owned.includes(id)) PL.owned.push(id);
   if (toSlot >= 0) { PL.slots[toSlot] = id; if (PL.slots[1 - toSlot] === id) PL.slots[1 - toSlot] = null; }
   else if (!PL.slots.includes(id)) { if (!PL.slots[0]) PL.slots[0] = id; else if (!PL.slots[1]) PL.slots[1] = id; }
-  VM.dirty = true; HUD.dirty = true;
+  VM.dirty = true; HUD.dirty = true; gunTrophies();
 }
 function ownedTier() { const n = PL.owned.filter((id) => id !== 'maker').length; return n <= 1 ? 0 : n <= 3 ? 1 : n <= 6 ? 2 : 3; }
 
@@ -3027,13 +3212,16 @@ const GUN_BUILD = {
 function buildGunModel(id) {
   gunMats();
   const g = new THREE.Group(); GG = g;
-  const st = PL.guns[id] || { lvl: 1, att: {} }, gold = st.lvl >= 5;
-  const M = { metal: gold ? GM.gold : GM.metal, anod: gold ? GM.gold : GM.anod, poly: gold ? GM.gold : GM.poly, fur: gold ? GM.gold : id === 'sniper' ? GM.tan : GM.wood };
+  const st = PL.guns[id] || { lvl: 1, att: {} }, skin = gunSkin(id), gold = skin === 'gold';
+  let L = GUNS[id].look || {};
+  const M = { metal: gold ? GM.gold : tintMat(GM.metal, L.metal), anod: gold ? GM.gold : tintMat(GM.anod, L.anod), poly: gold ? GM.gold : tintMat(GM.poly, L.poly), fur: gold ? GM.gold : L.fur != null ? (typeof L.fur === 'number' ? tintMat(GM.poly, L.fur) : tintMat(GM.wood, L.fur)) : gBase(id) === 'sniper' ? GM.tan : GM.wood };
+  if (skin === 'glitch') { const gm = glitchSkinMat(); M.metal = M.anod = M.poly = M.fur = gm; }
+  else if (skin && skin[0] === 'b' && BOSS_DATA[+skin.slice(1) - 1]) { const c = BOSS_DATA[+skin.slice(1) - 1][4]; M.anod = tintMat(GM.anod, new THREE.Color(c).multiplyScalar(0.3).getHex()); M.poly = tintMat(GM.poly, c); L = Object.assign({}, L, { glow: c, extras: (L.extras || []).includes('stripe') ? L.extras : (L.extras || []).concat('stripe') }); }
   const o = { grp: g, id, muzzle: new THREE.Object3D(), mag: null, magHome: null, magAnchor: null, gripR: null, gripL: null, lkind: 'under', lscale: 1, sightY: 0.05, adsX: 0, adsZ: -0.22, hip: V3(0.15, -0.125, -0.36), barrels: null, extras: {}, railY: 0.03, railZ: 0 };
-  GUN_BUILD[id](o, M);
+  GUN_BUILD[gBase(id)](o, M);
   /* attachments */
   const mz = o.muzzle.position;
-  if (st.att.sil === true && !['minigun', 'rocket', 'laser', 'plasma', 'maker', 'shotgun'].includes(id)) { gLathe([[0, 0], [0.016, 0], [0.018, 0.006], [0.018, 0.15], [0.015, 0.16], [0.006, 0.16], [0, 0.1605]], GM.anod, 0, mz.y, mz.z + 0.01); mz.z -= 0.15; }
+  if (st.att.sil === true && !NOSIL.includes(gBase(id)) && !GUNS[id].silent) { gLathe([[0, 0], [0.016, 0], [0.018, 0.006], [0.018, 0.15], [0.015, 0.16], [0.006, 0.16], [0, 0.1605]], GM.anod, 0, mz.y, mz.z + 0.01); mz.z -= 0.15; }
   if ((st.att.scope === true || st.att.therm === true) && !GUNS[id].scope) {
     const y = o.railY, z = o.railZ;
     gBox(0.026, 0.008, 0.04, GM.anod, 0, y + 0.004, z, 0.002);
@@ -3043,6 +3231,7 @@ function buildGunModel(id) {
     o.sightY = y + 0.027; o.extras.scope = true;
   }
   if (st.att.ext === true && o.mag) o.mag.scale.y = 1.35;
+  gunExtras(o, L); if (L.len) g.scale.z = L.len;
   if (st.att.elem) { const em = { fire: 0xff6a1a, shock: 0x4ac8ff, glitch: 0xb046ff }[st.att.elem]; const gm = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: em, emissiveIntensity: 2.4 }); for (const sx of [-1, 1]) gBox(0.002, 0.005, 0.07, gm, sx * 0.024, o.sightY - 0.045, -0.06, 0); }
   g.add(o.muzzle);
   mergeGunStatic(o);
@@ -3136,7 +3325,29 @@ function placeArm(arm, shoulder, wrist, show = true) {
   }
 }
 function disposeGun(o) { if (!o) return; if (VM.flash.parent === o.grp) o.grp.remove(VM.flash); }
-function gunKey(id) { const st = PL.guns[id] || { lvl: 1, att: {} }; return id + '|' + (st.lvl >= 5 ? 'g' : '') + '|' + JSON.stringify(st.att || {}); }
+/* gun skins: gold (level 5 or 250 kills), glitch (100 kills, animated), AI logo (the colors of a boss you beat) */
+const gunSkin = (id) => { const st = PL.guns[id] || {}; return st.skin != null ? st.skin : st.lvl >= 5 ? 'gold' : ''; };
+function skinOk(id, k) {
+  const st = PL.guns[id]; if (!st) return false; if (!k) return true;
+  if (k === 'gold') return st.lvl >= 5 || (st.kills || 0) >= 250;
+  if (k === 'glitch') return (st.kills || 0) >= 100;
+  return k[0] === 'b' && (G.bossesBeaten || 0) >= +k.slice(1);
+}
+function glitchSkinMat() {
+  if (GM.glitchSkin) return GM.glitchSkin;
+  const c = mkCanvas(64, 64), x = c.getContext('2d'); x.fillStyle = '#0a0a0c'; x.fillRect(0, 0, 64, 64);
+  for (let i = 0; i < 70; i++) { x.fillStyle = pick(['#ff2a6a', '#3ef2ff', '#39ff88', '#b046ff', '#ffffff', '#111111']); x.fillRect(randi(0, 63), randi(0, 63), randi(2, 22), randi(1, 4)); }
+  const t = texFrom(c); t.repeat.set(3, 3); t.magFilter = THREE.NearestFilter;
+  GM.glitchSkin = new THREE.MeshStandardMaterial({ color: 0x15151a, map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.7, metalness: 0.5, roughness: 0.35 });
+  return GM.glitchSkin;
+}
+function animGlitchSkin() {
+  const m = GM.glitchSkin; if (!m) return;
+  if (Math.random() < 0.25) { m.map.offset.set(Math.random(), Math.floor(Math.random() * 8) / 8); m.emissiveIntensity = rand(0.4, 1.4); }
+  m.emissive.setHSL((G.realTime * 0.6) % 1, 0.9, 0.6);
+  if (VM.cur) VM.cur.grp.position.x = Math.random() < 0.06 ? rand(-0.004, 0.004) : 0;
+}
+function gunKey(id) { const st = PL.guns[id] || { lvl: 1, att: {} }; return id + '|' + gunSkin(id) + '|' + JSON.stringify(st.att || {}); }
 function rebuildGunModel() {
   VM.dirty = false;
   if (VM.cur) { VM.gunHold.remove(VM.cur.grp); disposeGun(VM.cur); VM.cur = null; }
@@ -3162,6 +3373,7 @@ function setHand(h, pos, quat, s = 1) { h.visible = true; h.position.copy(pos); 
 function wristOf(h, out) { return out.copy(h.userData.wrist).multiply(h.scale).applyQuaternion(h.quaternion).add(h.position); }
 function updateViewmodel(dt, speed) {
   if (VM.dirty) rebuildGunModel();
+  if (VM.cur && gunSkin(VM.cur.id) === 'glitch') animGlitchSkin();
   const scopedNow = PL.ads > 0.85 && curGun() && GUNS[curGun()].scope;
   VM.root.visible = G.screen === 'play' && PL.alive && !G.killcam && !G.cine && !scopedNow;
   if (!VM.root.visible) return;
@@ -3247,20 +3459,23 @@ function muzzleWorld(out) {
 }
 /* ---------------- shooting ---------------- */
 const BUL = [], BUL_MAX = 300;
-const PROJ_MESH = { rocket: [], plasma: [], pixel: [], gren: [] };
+const PROJ_MESH = { rocket: [], plasma: [], pixel: [], gren: [], flare: [], bolt: [] };
 function projMesh(kind) {
   const pool = PROJ_MESH[kind];
   for (const m of pool) if (!m.visible) { m.visible = true; return m; }
   let m;
   if (kind === 'rocket') { m = new THREE.Group(); const body = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 14), GM.olive); body.rotation.x = Math.PI / 2; m.add(body); const c = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 14), GM.olive); c.rotation.x = -Math.PI / 2; c.position.z = -0.26; m.add(c); for (let k = 0; k < 4; k++) { const fin = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.07, 0.08), GM.metal); fin.rotation.z = (k * Math.PI) / 4; fin.position.z = 0.16; m.add(fin); } const fl = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffaa44, toneMapped: false })); fl.position.z = 0.22; m.add(fl); }
+  else if (kind === 'flare') m = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff7a2a, toneMapped: false }));
+  else if (kind === 'bolt') { m = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.7, 6), GM.metal); sh.rotation.x = Math.PI / 2; m.add(sh); for (let k = 0; k < 3; k++) { const f = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.04, 0.09), GM.shell); f.position.z = 0.3; f.rotation.z = (k * TAU) / 3; m.add(f); } }
   else if (kind === 'plasma') m = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), new THREE.MeshBasicMaterial({ color: 0x8fe8ff, toneMapped: false }));
   else if (kind === 'pixel') m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 }));
   else { m = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshStandardMaterial({ color: 0x3a4a2a, roughness: 0.6, metalness: 0.4 })); m.add(b); const l = new THREE.Mesh(new THREE.SphereGeometry(0.015, 6, 4), MAT.red); l.position.y = 0.06; m.add(l); }
   R.scene.add(m); pool.push(m); return m;
 }
-function fireShot() {
+function fireShot(ck = 1) {
   const id = curGun(); if (!id) return;
-  const g = GUNS[id], st = PL.guns[id], gs = gunStats(id);
+  const g = GUNS[id], st = PL.guns[id], gs = gunStats(id), base = gBase(id), quiet = gunQuiet(id);
+  if (g.ramp && G.time - (W.rampT || 0) > 1.2) W.rampN = 0;
   if (st.jammed) { SFX.empty(); toast('JAMMED! Press [' + keyName(S.keys.reload) + '] to clear it', 'bad', 1500); W.cool = 0.3; return; }
   if (st.mag <= 0) { SFX.empty(); W.cool = 0.25; if (st.res > 0) startReload(); return; }
   st.mag--; G.stats.shots++; W.cool = 60 / g.rpm; W.lastShot = G.time;
@@ -3273,30 +3488,36 @@ function fireShot() {
     const sr = (spread * Math.PI) / 180, a = rand(0, TAU), r = Math.sqrt(Math.random()) * sr;
     const yaw = PL.yaw + Math.cos(a) * r, pitch = PL.pitch + Math.sin(a) * r + PL.recoilP;
     const dx = -Math.sin(yaw) * Math.cos(pitch), dy = Math.sin(pitch), dz = -Math.cos(yaw) * Math.cos(pitch);
-    spawnBullet(cp.x, cp.y, cp.z, dx, dy, dz, g, gs.dmg, id, mz);
+    spawnBullet(cp.x, cp.y, cp.z, dx, dy, dz, g, gs.dmg * (g.charge ? 0.25 + 0.75 * ck : 1), id, mz, ck);
   }
   W.bloom = Math.min(W.bloom + (g.cls === 'smg' || g.cls === 'heavy' ? 0.25 : 0.4), 3);
   const recK = gs.rec * (ads > 0.5 ? 0.75 : 1) * (PL.crouch > 0.5 ? 0.8 : 1), kick = (g.rec[0] * recK * Math.PI) / 180;
   PL.pitch += kick * 0.35; PL.recoilP += kick * 0.65; PL.yaw += ((rand(-1, 1) * g.rec[1] * recK * Math.PI) / 180) * 0.6;
   VM.kickP += 0.04 + kick * 1.4; VM.kickZ += g.cls === 'sniper' || g.cls === 'shotgun' || g.cls === 'launcher' ? 0.09 : 0.035;
-  if (!['laser', 'plasma', 'maker', 'rocket'].includes(id) && st.att.sil !== true) { VM.flashT = 0.045; flashLight(R.muzzle, mz.x, mz.y, mz.z, 9, 0.04); }
-  else if (id === 'laser' || id === 'plasma') flashLight(R.muzzle, mz.x, mz.y, mz.z, 4, 0.04);
-  SFX.gun(g.snd, st.att.sil === true && !['minigun', 'rocket', 'laser', 'plasma', 'maker', 'shotgun'].includes(id));
-  const loud = st.att.sil === true && !['minigun', 'rocket', 'laser', 'plasma', 'maker', 'shotgun'].includes(id) ? 7 : id === 'laser' ? 26 : id === 'maker' ? 20 : id === 'minigun' || id === 'rocket' ? 48 : 40;
+  if (!['laser', 'plasma', 'maker', 'rocket'].includes(base) && !quiet && !g.flame) { VM.flashT = 0.045; flashLight(R.muzzle, mz.x, mz.y, mz.z, 9, 0.04); }
+  else if (base === 'laser' || base === 'plasma') flashLight(R.muzzle, mz.x, mz.y, mz.z, 4, 0.04);
+  SFX.gun(g.snd, quiet);
+  const loud = quiet ? 7 : g.flame ? 18 : base === 'laser' ? 26 : base === 'maker' ? 20 : base === 'minigun' || base === 'rocket' ? 48 : 40;
   Noise.emit(PL.x, PL.z, loud, loud > 20 ? 1 : 0.5);
-  if (['pistol', 'smg', 'rifle', 'sniper', 'heavy'].includes(g.cls) && id !== 'glitch') { const rx = Math.cos(PL.yaw), rz = -Math.sin(PL.yaw); fx.shell(mz.x + rx * 0.05, mz.y, mz.z + rz * 0.05, rx, rz); }
+  if (['pistol', 'smg', 'rifle', 'sniper', 'heavy'].includes(g.cls) && id !== 'glitch' && !g.flame && !g.proj && base !== 'laser') { const rx = Math.cos(PL.yaw), rz = -Math.sin(PL.yaw); fx.shell(mz.x + rx * 0.05, mz.y, mz.z + rz * 0.05, rx, rz); }
   if (g.cls === 'shotgun') setTimeout(() => SFX.rack(), 260);
   if (g.cls === 'sniper') setTimeout(() => SFX.rack(), 420);
   HUD.dirty = true;
 }
-function spawnBullet(x, y, z, dx, dy, dz, g, dmg, id, mz) {
+function spawnBullet(x, y, z, dx, dy, dz, g, dmg, id, mz, ck = 1) {
   let b = null;
   for (const q of BUL) if (!q.on) { b = q; break; }
   if (!b) { if (BUL.length >= BUL_MAX) return; b = {}; BUL.push(b); }
   const sp = g.speed;
-  Object.assign(b, { on: true, x, y, z, vx: dx * sp, vy: dy * sp, vz: dz * sp, g: 9.81 * g.grav * 2.2, life: g.proj ? 6 : 2.5, dmg, id, proj: g.proj || null, splash: g.splash || 0,
-    bounce: g.bounce || 0, pierced: false, tx: mz.x, ty: mz.y, tz: mz.z, age: 0, elem: (PL.guns[id] && PL.guns[id].att.elem) || '', color: g.tracer || 0xffd28a, hitIds: null });
-  if (b.proj) { b.mesh = projMesh(b.proj); b.mesh.position.set(mz.x, mz.y, mz.z); if (b.proj === 'pixel') b.mesh.material.color.setHSL(Math.random(), 1, 0.55); }
+  Object.assign(b, { on: true, x, y, z, vx: dx * sp, vy: dy * sp, vz: dz * sp, g: 9.81 * g.grav * 2.2, life: g.range ? g.range / sp : g.proj ? 6 : 2.5, dmg, id, proj: g.proj || null, splash: g.splash || 0,
+    pierce: g.charge && ck < 0.9 ? 0 : g.pierce || 0, homing: g.homing || 0, tgt: null, tgtT: 0, skip: null, flame: g.flame || '', wallPass: g.wallPass || 0, onHit: g.onHit || '', wide: id === 'laser' || (g.cls === 'scifi' && !g.proj),
+    bounce: g.bounce || 0, pierced: false, tx: mz.x, ty: mz.y, tz: mz.z, age: 0, elem: (PL.guns[id] && PL.guns[id].att.elem) || (g.elem === 'random' ? pick(['fire', 'shock', 'glitch']) : g.elem) || '', color: g.tracer || 0xffd28a, hitIds: null });
+  if (b.proj) {
+    b.mesh = projMesh(b.proj); b.mesh.position.set(mz.x, mz.y, mz.z);
+    if (b.proj === 'pixel') b.mesh.material.color.setHSL(Math.random(), 1, 0.55);
+    else if (b.proj === 'plasma' || b.proj === 'flare') b.mesh.material.color.setHex(g.tracer || (b.proj === 'flare' ? 0xff7a2a : 0x8fe8ff));
+    else if (b.proj === 'gren') { const bd = b.mesh.children[0]; bd.material.color.setHex(g.onHit === 'sticky' ? 0xffb02a : 0x3a4a2a); if (bd.material.emissive) bd.material.emissive.setHex(0); }
+  }
   else b.mesh = null;
 }
 let trN = 0;
@@ -3312,6 +3533,17 @@ function updateBullets(dt) {
     if (!b.on) continue;
     b.age += dt; b.life -= dt;
     if (b.life <= 0) { endBullet(b); continue; }
+    if (b.homing) {
+      b.tgtT -= dt; if (b.tgtT <= 0) { b.tgtT = 0.15; b.tgt = homingTarget(b); }
+      const T = b.tgt;
+      if (T && (T.boss || (T.active && !T.dead))) {
+        /* turn toward the target at a set turn rate (homing 1 = about 86 degrees a second) */
+        const sp = Math.hypot(b.vx, b.vy, b.vz) || 1, tx = T.x - b.x, ty = (T.boss ? T.y : T.y + 1.2) - b.y, tz = T.z - b.z, tl = Math.hypot(tx, ty, tz) || 1;
+        const ux = b.vx / sp, uy = b.vy / sp, uz = b.vz / sp, dx2 = tx / tl, dy2 = ty / tl, dz2 = tz / tl, c = clamp(ux * dx2 + uy * dy2 + uz * dz2, -1, 1), ang = Math.acos(c), stp = b.homing * 1.5 * dt;
+        if (ang <= stp) { b.vx = dx2 * sp; b.vy = dy2 * sp; b.vz = dz2 * sp; }
+        else { let px = dx2 - ux * c, py = dy2 - uy * c, pz = dz2 - uz * c; const pl = Math.hypot(px, py, pz) || 1; px /= pl; py /= pl; pz /= pl; const cs = Math.cos(stp), sn = Math.sin(stp); b.vx = (ux * cs + px * sn) * sp; b.vy = (uy * cs + py * sn) * sp; b.vz = (uz * cs + pz * sn) * sp; }
+      }
+    }
     const ox = b.x, oy = b.y, oz = b.z;
     b.vy -= b.g * dt;
     const dx = b.vx * dt, dy = b.vy * dt, dz = b.vz * dt;
@@ -3322,21 +3554,34 @@ function updateBullets(dt) {
     if (G.boss && G.boss.alive) rayBoss(ox, oy, oz, dx, dy, dz, _hit);
     /* tracer from the muzzle at first, then along the path */
     const hx = ox + dx * _hit.t, hy = oy + dy * _hit.t, hz = oz + dz * _hit.t;
-    if (!b.proj) {
-      if (b.age <= dt * 1.01) addTracer(b.tx, b.ty, b.tz, hx, hy, hz, b.color, b.id === 'laser' ? 0.02 : 0.012);
-      else { const tl = Math.min(1, 4 / Math.max(1, Math.hypot(dx, dy, dz))); addTracer(hx - dx * tl, hy - dy * tl, hz - dz * tl, hx, hy, hz, b.color, b.id === 'laser' ? 0.02 : 0.012); }
+    if (b.flame) {
+      const fr = b.flame === 'frost';
+      for (let k = 0; k < 2; k++) FX.add.spawn(hx + rand(-0.1, 0.1), hy + rand(-0.1, 0.1), hz + rand(-0.1, 0.1), b.vx * 0.04 + rand(-0.4, 0.4), rand(0.2, 0.9), b.vz * 0.04 + rand(-0.4, 0.4), rand(0.2, 0.4), 0.12 + b.age * 1.8, 0.05, fr ? 0.6 : 1, fr ? 0.88 : rand(0.35, 0.6), fr ? 1 : 0.08, 1, fr ? 0 : -1, 2, 0);
+    } else if (!b.proj) {
+      if (b.age <= dt * 1.01) addTracer(b.tx, b.ty, b.tz, hx, hy, hz, b.color, b.wide ? 0.02 : 0.012);
+      else { const tl = Math.min(1, 4 / Math.max(1, Math.hypot(dx, dy, dz))); addTracer(hx - dx * tl, hy - dy * tl, hz - dz * tl, hx, hy, hz, b.color, b.wide ? 0.02 : 0.012); }
     } else if (b.mesh) {
       b.mesh.position.set(hx, hy, hz); b.mesh.lookAt(hx + dx, hy + dy, hz + dz);
       if (b.proj === 'rocket') { fx.smoke(hx, hy, hz, 2); fx.glow(hx, hy, hz, 1, 0.6, 0.2, 0.4, 0.06); }
+      if (b.proj === 'flare') { fx.glow(hx, hy, hz, 1, 0.5, 0.15, 0.35, 0.08); FX.add.spawn(hx, hy, hz, rand(-0.3, 0.3), rand(0.2, 0.8), rand(-0.3, 0.3), 0.4, 0.18, 0.04, 1, 0.5, 0.1, 1, -1, 1, 0); }
       if (b.proj === 'plasma') FX.add.spawn(hx, hy, hz, rand(-0.3, 0.3), rand(-0.3, 0.3), rand(-0.3, 0.3), 0.3, 0.25, 0.05, 0.4, 0.85, 1, 1, 0, 1, 0);
     }
     if (_hit.t < 1) {
       if (_hit.kind === 'bot' || _hit.kind === 'eliza') {
+        if (b.onHit) { bulletSpecial(b, hx, hy, hz, _hit.kind === 'bot' ? _hit.bot : null); endBullet(b); continue; }
+        leechHeal(b);
         if (b.splash) { boom(hx, hy, hz, b.splash, b.dmg, { src: 'player' }); endBullet(b); continue; }
         if (_hit.kind === 'bot') hitBot(_hit.bot, b.dmg, _hit.part, hx, hy, hz, dx, dy, dz, b);
-        else hitBoss(b.dmg, _hit.part, hx, hy, hz, b);
-        if (b.id === 'sniper' && _hit.kind === 'bot' && !b.pierced) { b.pierced = true; b.x = hx + dx * 0.05; b.y = hy + dy * 0.05; b.z = hz + dz * 0.05; b.dmg *= 0.6; continue; }
+        else hitBoss(Math.min(b.dmg, 900), _hit.part, hx, hy, hz, b);
+        /* goes through: Longbow, flechettes, railguns... */
+        if (_hit.kind === 'bot' && b.pierce > 0) { const l = Math.hypot(dx, dy, dz) || 1; b.pierce--; b.skip = _hit.bot; b.x = hx + (dx / l) * 0.3; b.y = hy + (dy / l) * 0.3; b.z = hz + (dz / l) * 0.3; b.dmg *= 0.75; continue; }
         endBullet(b); continue;
+      }
+      if (b.onHit) { bulletSpecial(b, hx - dx * 0.02, hy - dy * 0.02, hz - dz * 0.02, null); endBullet(b); continue; }
+      /* through one wall (Quantum Rifle, Jailbreak) */
+      if (b.wallPass > 0 && _hit.kind === 'box' && !(_hit.b && (_hit.b.tag === 'spawner' || _hit.b.tag === 'tower'))) {
+        b.wallPass--; const l = Math.hypot(dx, dy, dz) || 1; fx.code(hx, hy, hz, 8, 0.7, 0.3, 1, 0.5);
+        b.x = hx + (dx / l) * 1.0; b.y = hy + (dy / l) * 1.0; b.z = hz + (dz / l) * 1.0; continue;
       }
       /* world hit */
       if (b.splash) { boom(hx - dx * 0.02, hy - dy * 0.02, hz - dz * 0.02, b.splash, b.dmg, { src: 'player' }); endBullet(b); continue; }
@@ -3358,12 +3603,22 @@ function updateBullets(dt) {
   }
 }
 function endBullet(b) { b.on = false; if (b.mesh) { b.mesh.visible = false; b.mesh = null; } }
+function leechHeal(b) { const g = GUNS[b.id]; if (g && g.leech && PL.alive) { PL.hp = Math.min(100, PL.hp + b.dmg * g.leech); HUD.dirty = true; } }
+/* special shots: a black hole, or a sticky bomb that sticks where it lands */
+function bulletSpecial(b, x, y, z, bot) {
+  if (b.onHit === 'hole') { detonate({ type: 'hole', x, y, z, yaw: PL.yaw }); return; }
+  if (b.onHit === 'sticky') {
+    const m = projMesh('gren'), bd = m.children[0]; bd.material.color.setHex(0xffb02a); if (bd.material.emissive) { bd.material.emissive.setHex(0xffb02a); bd.material.emissiveIntensity = 0.35; }
+    m.position.set(x, y, z); GRENS.push({ type: 'sticky', x, y, z, vx: 0, vy: 0, vz: 0, fuse: 1.5, mesh: m, yaw: PL.yaw, stuck: !bot, bot: bot || null, ox: bot ? x - bot.x : 0, oy: bot ? y - bot.y : 0, oz: bot ? z - bot.z : 0 });
+    SFX.metalPing(V3(x, y, z));
+  }
+}
 function startReload() {
   const id = curGun(); if (!id || W.reload > 0 || W.swap > 0) return;
   const g = GUNS[id], st = PL.guns[id], gs = gunStats(id);
   if (st.jammed) { st.jammed = false; W.jamClear = 0.8; SFX.rack(); return; }
   if (st.mag >= gs.mag || st.res <= 0) return;
-  W.reloadTotal = W.reload = g.shells ? gs.reload : gs.reload * (PL.armGone ? 1.6 : 1); W.reloadStage = 0; W.reloadGun = id;
+  W.reloadTotal = W.reload = g.shells ? gs.reload : gs.reload * (PL.armGone ? 1.6 : 1); W.reloadStage = 0; W.reloadGun = id; W.chargeT = 0; W.burstN = 0;
   if (!g.shells) { SFX.magOut(); setTimeout(() => { if (W.reload > 0) SFX.magIn(); }, W.reload * 520); }
   if (Math.random() < 0.12) heroLine('reload');
 }
@@ -3381,7 +3636,7 @@ function finishReload() {
 }
 function switchTo(slot) {
   if (PL.armGone || slot === PL.cur || !PL.slots[slot] || W.swap > 0) return;
-  PL.cur = slot; W.swap = 0.35 * (1 - 0.35 * sk('draw')); W.reload = 0; W.spin = 0; VM.dirty = true; HUD.dirty = true; SFX.rack();
+  PL.cur = slot; W.chargeT = 0; W.burstN = 0; W.swap = 0.35 * (1 - 0.35 * sk('draw')); W.reload = 0; W.spin = 0; VM.dirty = true; HUD.dirty = true; SFX.rack();
 }
 function updateWeapon(dt) {
   W.cool -= dt; W.bloom = Math.max(0, W.bloom - dt * 3.2);
@@ -3408,8 +3663,21 @@ function updateWeapon(dt) {
   if (busy || W.swap > 0 || W.jamClear > 0) return;
   if (wasPressed('reload')) startReload();
   const ready = W.cool <= 0 && (W.reload <= 0 || (g.shells && PL.guns[id].mag > 0));
-  const trigger = g.auto ? Input.fire : Input.firePressed;
-  if (trigger && ready && (!g.spin || W.spin >= 1) && !W.sprinting) { if (g.shells) W.reload = 0; fireShot(); }
+  if (g.charge) {
+    /* hold to charge, let go to fire */
+    if (Input.fire && ready && !W.sprinting && PL.guns[id].mag > 0) {
+      if (!W.chargeT) SFX.zap(null, 260);
+      W.chargeT = Math.min(g.charge, (W.chargeT || 0) + dt); HUD.dirty = true;
+      if (Math.random() < 0.5) { const m2 = muzzleWorld(_mz); fx.glow(m2.x, m2.y, m2.z, 0.3, 0.9, 1, 0.08 + (W.chargeT / g.charge) * 0.3, 0.06); }
+    } else if (W.chargeT > 0 && !Input.fire) { const k = W.chargeT / g.charge; W.chargeT = 0; HUD.dirty = true; if (k > 0.12 && ready) fireShot(k); }
+    else if (Input.firePressed && ready && PL.guns[id].mag <= 0) fireShot();
+  } else if (g.burst) {
+    if (Input.firePressed && ready && !W.burstN && !W.sprinting) W.burstN = g.burst;
+    if (W.burstN > 0 && W.cool <= 0 && W.reload <= 0) { fireShot(); W.burstN--; if (W.burstN <= 0 || PL.guns[id].mag <= 0) { W.burstN = 0; W.cool = Math.max(W.cool, 0.3); } }
+  } else {
+    const trigger = g.auto ? Input.fire : Input.firePressed;
+    if (trigger && ready && (!g.spin || W.spin >= 1) && !W.sprinting) { if (g.shells) W.reload = 0; fireShot(); }
+  }
   if (!Input.fire) PL.recoilP = damp(PL.recoilP, 0, 7, dt); else PL.recoilP = damp(PL.recoilP, 0, 1.5, dt);
 }
 /* knife */
@@ -3623,7 +3891,7 @@ function toggleNV() {
   if (!PL.nvg) { toast('No night vision goggles. Buy them in the GEAR tab at a terminal.', 'bad', 2000); return; }
   G.nvOn = !G.nvOn; SFX.zap(null, G.nvOn ? 1800 : 600); HUD.dirty = true;
 }
-function thermalOn() { const id = curGun(); return !!(id && PL.hasGun && PL.ads > 0.6 && PL.guns[id] && PL.guns[id].att.therm === true); }
+function thermalOn() { const id = curGun(); return !!(id && PL.hasGun && PL.ads > 0.6 && PL.guns[id] && (PL.guns[id].att.therm === true || GUNS[id].therm)); }
 function updateVision() {
   const mode = G.screen !== 'play' ? '' : thermalOn() ? 'therm' : G.nvOn ? 'nv' : '';
   if (mode !== VIS.mode) {
@@ -3779,7 +4047,7 @@ function updateCamera(dt, sp, g) {
   cam.rotation.set(PL.pitch + PL.recoilP + shy, PL.yaw + shx, -PL.lean * 0.13 + (PL.hurtT > 0 ? Math.sin(G.realTime * 30) * PL.hurtT * 0.02 : 0));
   PL.hurtT = Math.max(0, PL.hurtT - dt * 3);
   let fov = vFov(S.fov + (W.sprinting ? 6 : 0) + (PL.slideT > 0 ? 8 : 0));
-  if (g && PL.ads > 0.05) { const st = PL.guns[curGun()]; const af = g.scope ? 16 : st && (st.att.scope === true || st.att.therm === true) ? 32 : vFov(S.fov) * 0.8; fov = lerp(fov, af, smooth(PL.ads)); }
+  if (g && PL.ads > 0.05) { const st = PL.guns[curGun()]; const af = g.scope ? 16 : st && (st.att.scope === true || st.att.therm === true || g.optic || g.therm) ? 32 : vFov(S.fov) * 0.8; fov = lerp(fov, af, smooth(PL.ads)); }
   if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = damp(cam.fov, fov, 14, dt); cam.updateProjectionMatrix(); }
   const scoped = g && g.scope && PL.ads > 0.85;
   if (HUD.scoped !== !!scoped) { HUD.scoped = !!scoped; $('scope').style.opacity = scoped ? 1 : 0; }
@@ -3883,6 +4151,7 @@ function updatePickups(dt) {
 function takePickup(p) {
   if (p.kind === 'med') { if (PL.meds >= 3) { if (!p.warned) { p.warned = true; toast('Health packs full (3 max)'); } return; } PL.meds++; toast('+1 health pack ✚  (press ' + keyName(S.keys.heal) + ')', 'good'); }
   else if (p.kind === 'armor') { if (PL.armor >= 100) { if (!p.warned) { p.warned = true; toast('Armor already full'); } return; } PL.armor = Math.min(100, PL.armor + 50); toast('+50 armor', 'good'); }
+  else if (p.kind === 'gun') { gunReward(p.gun, 'SECRET GUN'); trophy('secretGun'); }
   else if (p.kind === 'crypto') { addCrypto(p.amount, p.dive ? 'Data Diver stash' : 'Hidden stash'); if (p.dive) trophy('diver'); else trophy('secret'); }
   else if (p.kind === 'ammo') {
     let got = false;
@@ -3962,7 +4231,7 @@ function resetBot(b) {
     lsx: 0, lsz: 0, lastSeen: -99, wT: 0, tx: 0, tz: 0, atkT: rand(0.5, 2), burst: 0, burstT: 0, phase: rand(0, 6), limp: 0, legDmg: 0, crawl: false, blindT: 0, confT: 0, burnT: 0,
     aimT: 0, fall: 0, deathKind: 0, searched: false, glitchT: 0, flash: 0, coreDmg: 0, tower: -1, towerT: 0, seen: false, ghost: false, ghostT: 0, summoned: false, perch: null,
     chat: [], prof: null, flinch: 0, strafe: 1, strafeT: 0, dodgeT: 0, stuckT: 0, sideT: 0, sideX: 0, sideZ: 0, noCannon: false, noSearch: false, special: '', retreatT: 0,
-    aimP: 0, headYaw: 0, windT: 0, static: false, icon: 0, antennaGone: false, deadT: 0, killedBy: '', speedK: 1, coreBoom: false, spawnT: 0, mute: false, hacker: -1,
+    aimP: 0, headYaw: 0, windT: 0, static: false, icon: 0, antennaGone: false, deadT: 0, killedBy: '', speedK: 1, coreBoom: false, spawnT: 0, stunT: 0, mute: false, hacker: -1,
     turnT: 0, turnK: 's', turnWait: 0, wantT: -9, wantK: 's' });
 }
 function pickName(tier) { const list = TIER_NAMES[clamp(tier, 0, 3)]; return levelAIName() || pick(list); }
@@ -4072,7 +4341,7 @@ function rayBots(ox, oy, oz, dx, dy, dz, hit, bullet) {
       const k = jj * COL.nx + ii; if (k === lastCell) continue;
       const cell = BGRID.cells[k];
       for (let q = 0; q < cell.length; q++) {
-        const b = cell[q]; if (b.dead || !b.active || b.spawnT > 0.3) continue;
+        const b = cell[q]; if (b.dead || !b.active || b.spawnT > 0.3 || (bullet && bullet.skip === b)) continue;
         const r = segBot(ox, oy, oz, dx, dy, dz, b);
         if (r && r.t < hit.t) { hit.t = r.t; hit.kind = 'bot'; hit.bot = b; hit.part = r.part; }
       }
@@ -4096,14 +4365,16 @@ function hitBot(b, dmg, part, hx, hy, hz, dx, dy, dz, src) {
   const gun = src && src.id ? GUNS[src.id] : null;
   let mult = 1, head = false;
   if (part === 'head') { head = true; mult = gun && gun.instakill && !b.summoned ? 99 : gun ? gun.head : 2; if (mult < 99) mult *= 1 + 0.15 * sk('hunter'); }
+  if (gun && gun.ramp) { mult *= 1 + 0.1 * Math.min(10, W.rampN || 0); W.rampN = (W.rampN || 0) + 1; W.rampT = G.time; }
+  if (gun && gun.freeze && !src.chained && !b.ghost) b.stunT = Math.max(b.stunT || 0, gun.freeze);
   else if (part === 'core') { mult = 1.6; b.coreDmg += dmg * mult; }
   else if (part === 'legs') { mult = 0.75; b.legDmg += dmg * mult; if (b.legDmg > b.maxHp * 0.7 && b.type !== 'drone') b.crawl = true; else if (b.legDmg > b.maxHp * 0.3) b.limp = 1; }
   else if (part === 'antenna') { mult = 0.5; b.blindT = 7; b.antennaGone = true; fx.sparks(hx, hy, hz, 0, 1, 0, 14, 5); toast(b.name + "'s sensors fried: it's blind for a bit", '', 1500); }
   const total = dmg * mult;
   if (src && src.elem === 'fire') { b.burnT = 4; }
   if (src && src.elem === 'glitch') b.confT = 6;
-  if (src && src.elem === 'shock' && !src.chained) {
-    let n = 0; forNearBots(b.x, b.z, 7, (o) => { if (n >= 2 || o === b || o.dead) return; n++; addTracer(b.x, b.y + 1.2, b.z, o.x, o.y + 1.2, o.z, 0x4ac8ff, 0.03); hitBot(o, dmg * 0.4, 'torso', o.x, o.y + 1.2, o.z, 0, 0, 0, { id: src.id, chained: true }); });
+  if (src && (src.elem === 'shock' || (gun && gun.chain)) && !src.chained) {
+    let n = 0; const cn = Math.max(src.elem === 'shock' ? 2 : 0, (gun && gun.chain) || 0); forNearBots(b.x, b.z, gun && gun.chain ? 9 : 7, (o) => { if (n >= cn || o === b || o.dead) return; n++; addTracer(b.x, b.y + 1.2, b.z, o.x, o.y + 1.2, o.z, 0x4ac8ff, 0.03); hitBot(o, dmg * 0.4, 'torso', o.x, o.y + 1.2, o.z, 0, 0, 0, { id: src.id, chained: true }); });
   }
   b.hp -= total; b.flash = 0.1; b.flinch = 0.22; b.static = false;
   if (src && src.id !== 'splash' && src.id !== 'core') { G.stats.hits++; hitmarker(head); }
@@ -4118,7 +4389,7 @@ function hitBot(b, dmg, part, hx, hy, hz, dx, dy, dz, src) {
 }
 function killBot(b, head, part, src, dx, dz) {
   b.dead = true; b.fall = 0; b.deadT = G.time; b.searched = false; b.vx = b.vz = 0; b.static = false; b.crawl = false;
-  b.deathKind = b.coreBoom ? 0 : randi(0, 3);
+  b.deathKind = b.coreBoom ? 0 : src && GUNS[src.id] && GUNS[src.id].codeKill ? 3 : randi(0, 3);
   if (Math.abs(dx) + Math.abs(dz) > 0.001) b.yaw = Math.atan2(-dx, -dz);
   const c = b.color, cx = b.x, cy2 = b.y + 1.1, cz = b.z;
   if (b.deathKind === 0) { fx.fire(cx, cy2, cz, 1.6, 22); SFX.boom(V3(cx, cy2, cz), 0.5); }
@@ -4879,7 +5150,7 @@ function updateHUD(dt) {
     $('gunName').textContent = g.name.toUpperCase() + (st.lvl > 1 ? '  LV' + st.lvl : '') + (st.lvl >= 5 ? ' ★' : '');
     $('mag').textContent = fake ? randi(0, 99) : st.mag; $('reserve').textContent = fake ? randi(0, 999) : st.res;
     $('ammo').classList.toggle('low', st.mag <= Math.ceil(gs.mag * 0.25));
-    $('gunState').textContent = st.jammed ? 'JAMMED — press ' + keyName(S.keys.reload) : W.reload > 0 ? 'RELOADING...' : st.mag === 0 && st.res === 0 ? 'NO AMMO — terminals sell ammo' : '';
+    $('gunState').textContent = W.chargeT > 0 && g.charge ? 'CHARGING ' + Math.round((W.chargeT / g.charge) * 100) + '%' : st.jammed ? 'JAMMED — press ' + keyName(S.keys.reload) : W.reload > 0 ? 'RELOADING...' : st.mag === 0 && st.res === 0 ? 'NO AMMO — terminals sell ammo' : '';
   } else { $('gunName').textContent = PL.hasGun ? '-' : 'NO WEAPON'; $('mag').textContent = '-'; $('reserve').textContent = '-'; $('gunState').textContent = ''; }
   const sl = $('gunSlots'); sl.innerHTML = PL.slots.map((s, k) => (s ? '<span class="' + (k === PL.cur ? 'on' : '') + '">' + (k + 1) + ' ' + esc(GUNS[s].name) + '</span>' : '')).join('');
   $('hud').classList.toggle('eliza-hack', !!(G.boss && G.boss.hudHack));
@@ -4898,7 +5169,7 @@ const TROPHIES = [
   ['diver', '🤿', 'Data Diver', 'Find the stash at the bottom of the data lake', 1], ['secretRoom', '🚪', 'Behind The Shelf', 'Find the secret room', 1],
   ['secret', '💰', 'Finders Keepers', 'Find a hidden Crypto stash', 1], ['clippy', '📎', "It Looks Like You're Dead", "See Clippy's ghost", 1],
   ['reader', '📜', 'History Nerd', 'Read every sign about old AIs', 1],
-  ['hook', '🕷', 'Spider-Hacker', 'Hang from the ceiling with the grappling hook'], ['skills', '🌳', 'Big Brain', 'Max out every skill in the skill tree'],
+  ['hook', '🕷', 'Spider-Hacker', 'Hang from the ceiling with the grappling hook'], ['gun25', '🔫', 'Collector', 'Own 25 guns'], ['gun50', '🧰', 'Gun Nut', 'Own 50 guns'], ['gun100', '💯', 'The Whole Arsenal', 'Own all 100 guns', 1], ['secretGun', '🗝', 'Hidden Arsenal', 'Find a gun in a secret room', 1], ['skills', '🌳', 'Big Brain', 'Max out every skill in the skill tree'],
   ['boss10', '🔟', 'Ten Down', 'Beat 10 bosses'], ['boss25', '🏅', 'Quarter Way', 'Beat 25 bosses'], ['boss50', '🏆', 'Halfway Hacker', 'Beat 50 bosses'],
   ['boss99', '👑', 'The Final Four', 'Beat the newest Grok, ChatGPT, Claude and Gemini (level 99)'], ['virus', '🦠', 'Antivirus Incarnate', 'Delete THE VIRUS (level 100)'],
 ];
@@ -4975,10 +5246,10 @@ function updatePriceHack(dt) {
 /* ============================== shop terminals ============================== */
 const Shop = { open: false, T: null, tab: 'guns', hg: null, msg: '' };
 const ATT = {
-  sil: { name: 'Silencer', price: 250, desc: 'AIs barely hear your shots. -5% damage.', ok: (id) => !['minigun', 'rocket', 'laser', 'plasma', 'maker', 'shotgun'].includes(id) },
-  ext: { name: 'Bigger magazine', price: 200, desc: '+50% magazine size.', ok: (id) => id !== 'rocket' },
-  scope: { name: 'Scope', price: 250, desc: 'Zoom in when you aim.', ok: (id) => !GUNS[id].scope && !['rocket', 'minigun'].includes(id) },
-  therm: { name: 'Thermal scope', price: 450, desc: 'Zoom in, and AIs glow white-hot while you aim (even in the dark and in smoke).', ok: (id) => !['rocket', 'minigun'].includes(id) },
+  sil: { name: 'Silencer', price: 250, desc: 'AIs barely hear your shots. -5% damage.', ok: (id) => !NOSIL.includes(gBase(id)) && !GUNS[id].silent },
+  ext: { name: 'Bigger magazine', price: 200, desc: '+50% magazine size.', ok: (id) => GUNS[id].mag > 1 && gBase(id) !== 'rocket' },
+  scope: { name: 'Scope', price: 250, desc: 'Zoom in when you aim.', ok: (id) => !GUNS[id].scope && !GUNS[id].optic && !['rocket', 'minigun'].includes(gBase(id)) },
+  therm: { name: 'Thermal scope', price: 450, desc: 'Zoom in, and AIs glow white-hot while you aim (even in the dark and in smoke).', ok: (id) => !GUNS[id].therm && !['rocket', 'minigun'].includes(gBase(id)) },
 };
 const ELEM = { fire: { name: 'Fire rounds', price: 300, desc: 'Sets AIs on fire.' }, shock: { name: 'Shock rounds', price: 350, desc: 'Zaps 2 AIs nearby too.' }, glitch: { name: 'Glitch rounds', price: 400, desc: 'Confused AIs fight each other.' } };
 const GEAR = [
@@ -5021,11 +5292,16 @@ Shop.render = function () {
   let h = '';
   const bar = (v, max) => '<i><em style="width:' + clamp((v / max) * 100, 3, 100) + '%"></em></i>';
   if (this.tab === 'guns') {
-    h += '<div class="note">You carry 2 guns. Every gun you own stays in the gun locker inside every terminal. Owning more guns makes NEW AIs smarter and changes who they are.</div>';
-    for (const id of GUN_ORDER) {
+    const reach = levelReach(), cat = this.gcat || 'all';
+    h += '<div class="note">You carry 2 guns. Every gun you own stays in the gun locker inside every terminal. ' + PL.owned.length + '/' + GUN_ORDER.length + ' guns found. New guns show up in the shop as you reach new levels; every 5th boss drops one; 10 are hidden in secret rooms.</div>';
+    h += '<div class="sh-tabs" style="padding:0 0 8px">' + GUN_CATS.map(([k, n]) => '<button class="sh-tab' + (k === cat ? ' on' : '') + '" data-gcat="' + k + '">' + n + '</button>').join('') + '</div>';
+    const list = GUN_ORDER.filter((id) => cat === 'all' || (cat === 'own' ? PL.owned.includes(id) : GUNS[id].cls === cat)).sort((a, b) => (GUNS[a].lvl || 1) - (GUNS[b].lvl || 1) || GUNS[a].price - GUNS[b].price);
+    let teased = 0;
+    for (const id of list) {
       const g = GUNS[id]; if (g.secret && !PL.owned.includes(id)) continue;
+      if (!PL.owned.includes(id) && (g.lvl || 1) > reach) { if (teased++ < 3) h += '<div class="it" style="opacity:.45"><div><b>🔒 ' + esc(g.name) + '</b><small>Unlocks in the shop at level ' + g.lvl + '. ' + esc(g.desc) + '</small></div><div class="acts"><button class="sbtn" disabled>LEVEL ' + g.lvl + '</button></div></div>'; continue; }
       const own = PL.owned.includes(id), st = PL.guns[id], price = this.price(g.price);
-      h += '<div class="it"><div><b class="' + (st && st.lvl >= 5 ? 'gold' : '') + '">' + esc(g.name) + (st ? ' · LV' + st.lvl : '') + '</b><small>' + esc(g.desc) + '</small><div class="stats"><span>DMG' + bar(g.dmg * (g.pellets || 1), 240) + '</span><span>RATE' + bar(g.rpm, 1700) + '</span><span>MAG' + bar(g.mag, 200) + '</span><span>SPEED' + bar(g.speed, 1600) + '</span></div></div><div class="acts">';
+      h += '<div class="it"><div><b class="' + (st && st.lvl >= 5 ? 'gold' : '') + '">' + esc(g.name) + (st ? ' · LV' + st.lvl : '') + '</b><small>' + esc(g.desc) + (g.drop ? ' (boss drop, level ' + g.drop + ')' : g.find ? ' (secret room, level ' + g.find + ')' : '') + '</small><div class="stats"><span>DMG' + bar(g.dmg * (g.pellets || 1), 240) + '</span><span>RATE' + bar(g.rpm, 1700) + '</span><span>MAG' + bar(g.mag, 200) + '</span><span>SPEED' + bar(g.speed, 1600) + '</span></div></div><div class="acts">';
       if (own) {
         h += '<button class="sbtn" data-eq="' + id + ':0" ' + (PL.slots[0] === id ? 'disabled' : '') + '>' + (PL.slots[0] === id ? '✓ Slot 1' : 'Slot 1') + '</button>';
         h += '<button class="sbtn" data-eq="' + id + ':1" ' + (PL.slots[1] === id || PL.armGone ? 'disabled' : '') + '>' + (PL.slots[1] === id ? '✓ Slot 2' : 'Slot 2') + '</button>';
@@ -5041,7 +5317,11 @@ Shop.render = function () {
       const g = GUNS[id], st = PL.guns[id], up = this.price(Math.max(80, Math.round(Math.max(150, g.price) * 0.4 * st.lvl)));
       h += '<div class="it"><div><b class="' + (st.lvl >= 5 ? 'gold' : '') + '">' + esc(g.name) + ' — level ' + st.lvl + '/5' + (st.lvl >= 5 ? ' ★ GOLD' : '') + '</b><small>Each level: +12% damage, faster reload, less recoil. Level 5 = gold skin.</small></div><div class="acts"><button class="sbtn" data-upg="' + id + '" ' + (st.lvl >= 5 || PL.crypto < up ? 'disabled' : '') + '>' + (st.lvl >= 5 ? 'MAXED' : 'Upgrade <span class="price">₿' + up + '</span>') + '</button></div></div>';
       for (const k in ATT) { const a = ATT[k]; if (!a.ok(id)) continue; const pr = this.price(a.price), has = st.att[k]; h += '<div class="it" style="margin-left:18px"><div><b>' + a.name + '</b><small>' + a.desc + '</small></div><div class="acts">' + (has ? '<button class="sbtn" data-atoggle="' + id + ':' + k + '">' + (has === 'off' ? 'Turn on' : 'Installed ✓ (turn off)') + '</button>' : '<button class="sbtn" data-att="' + id + ':' + k + '" ' + (PL.crypto < pr ? 'disabled' : '') + '>Buy <span class="price">₿' + pr + '</span></button>') + '</div></div>'; }
-      if (!['rocket', 'maker'].includes(id)) for (const k in ELEM) { const e = ELEM[k], pr = this.price(e.price), has = st.att.elem === k; h += '<div class="it" style="margin-left:18px"><div><b>' + e.name + '</b><small>' + e.desc + ' (one element per gun)</small></div><div class="acts"><button class="sbtn" data-elem="' + id + ':' + k + '" ' + (has || PL.crypto < pr ? 'disabled' : '') + '>' + (has ? 'Loaded ✓' : 'Buy <span class="price">₿' + pr + '</span>') + '</button></div></div>'; }
+      { const cur = gunSkin(id), btn = (k, n) => '<button class="sbtn" data-skin="' + id + ':' + k + '" ' + (!skinOk(id, k) || cur === k ? 'disabled' : '') + '>' + (cur === k ? '✓ ' : '') + n + (skinOk(id, k) ? '' : ' 🔒') + '</button>';
+        const nb = Math.min(99, G.bossesBeaten || 0);
+        h += '<div class="it" style="margin-left:18px"><div><b>Skin</b><small>Gold: level 5 or 250 kills · Glitch: 100 kills · AI logo: the colors of any boss you beat. Kills with this gun: ' + (st.kills || 0) + '</small></div><div class="acts">' + btn('', 'Default') + btn('gold', 'Gold') + btn('glitch', 'Glitch')
+          + (nb ? '<select class="sbtn" data-skinsel="' + id + '"><option value="">AI logo…</option>' + Array.from({ length: nb }, (_, i) => '<option value="b' + (i + 1) + '"' + (cur === 'b' + (i + 1) ? ' selected' : '') + '>' + esc(BOSS_DATA[i][0]) + '</option>').join('') + '</select>' : '') + '</div></div>'; }
+      if (!['rocket', 'maker'].includes(gBase(id)) && !GUNS[id].elem && !GUNS[id].flame) for (const k in ELEM) { const e = ELEM[k], pr = this.price(e.price), has = st.att.elem === k; h += '<div class="it" style="margin-left:18px"><div><b>' + e.name + '</b><small>' + e.desc + ' (one element per gun)</small></div><div class="acts"><button class="sbtn" data-elem="' + id + ':' + k + '" ' + (has || PL.crypto < pr ? 'disabled' : '') + '>' + (has ? 'Loaded ✓' : 'Buy <span class="price">₿' + pr + '</span>') + '</button></div></div>'; }
     }
   } else if (this.tab === 'skills') {
     h += '<div class="note">Skills are yours forever: every level, every death. Buy them with Crypto. Some need another skill first.</div><div class="sk-cols">';
@@ -5080,7 +5360,9 @@ Shop.click = function (e) {
   const t = e.target.closest('button'); if (!t) return;
   const T = this.T; SFX.ui();
   if (t.dataset.tab) { this.tab = t.dataset.tab; this.hg = null; this.render(); return; }
-  if (t.dataset.buygun) { const id = t.dataset.buygun; this.buy(this.price(GUNS[id].price), () => { giveGun(id); toast('Bought ' + GUNS[id].name + '! ' + (PL.slots.includes(id) ? 'It is in your hands.' : 'Pick a slot for it.'), 'good'); if (ownedTier() > 0) toast('New AIs are getting smarter... (tier ' + (ownedTier() + 1) + ')', 'bad'); }); return; }
+  if (t.dataset.gcat) { this.gcat = t.dataset.gcat; this.render(); return; }
+  if (t.dataset.skin != null) { const [id, k] = t.dataset.skin.split(':'); if (PL.guns[id] && skinOk(id, k)) { PL.guns[id].skin = k; VM.dirty = true; if (k === 'gold') trophy('gold'); } this.render(); return; }
+  if (t.dataset.buygun) { const id = t.dataset.buygun; if ((GUNS[id].lvl || 1) > levelReach() || GUNS[id].price < 0) return; this.buy(this.price(GUNS[id].price), () => { giveGun(id); toast('Bought ' + GUNS[id].name + '! ' + (PL.slots.includes(id) ? 'It is in your hands.' : 'Pick a slot for it.'), 'good'); if (ownedTier() > 0) toast('New AIs are getting smarter... (tier ' + (ownedTier() + 1) + ')', 'bad'); }); return; }
   if (t.dataset.eq) { const [id, s] = t.dataset.eq.split(':'); giveGun(id, +s); PL.cur = +s; W.reload = 0; VM.dirty = true; this.render(); return; }
   if (t.dataset.gear) { const it = GEAR.find((q) => q[0] === t.dataset.gear); if (it && it[4]()) this.buy(this.price(it[3]()), it[5]); return; }
   if (t.dataset.upg) { const id = t.dataset.upg, g = GUNS[id], st = PL.guns[id]; this.buy(this.price(Math.max(80, Math.round(Math.max(150, g.price) * 0.4 * st.lvl))), () => { st.lvl++; VM.dirty = true; if (st.lvl >= 5) { trophy('gold'); toast(g.name + ' is now GOLD ★', 'good'); } }); return; }
@@ -5115,6 +5397,7 @@ Shop.hgHit = function () {
   }
 };
 $('shop').addEventListener('click', (e) => Shop.click(e));
+$('shop').addEventListener('change', (e) => { const t = e.target; if (t.dataset && t.dataset.skinsel && t.value && PL.guns[t.dataset.skinsel] && skinOk(t.dataset.skinsel, t.value)) { PL.guns[t.dataset.skinsel].skin = t.value; VM.dirty = true; Shop.render(); } });
 $('shClose').addEventListener('click', () => Shop.close());
 
 /* ============================== skill tree ============================== */
@@ -5747,7 +6030,8 @@ function finishBoss() {
   const B = G.boss;
   if (B.kind === 'eliza') { trophy('eliza'); if (!B.died) trophy('survivedHack'); } else bossTrophies(B);
   addCrypto(LVL.n === 1 ? 1000 : 1000 + LVL.n * 60, LVL.bossName + ' deleted');
-  const id = curGun(); if (id && PL.guns[id]) { const opts = Object.keys(ATT).filter((k) => ATT[k].ok(id) && !PL.guns[id].att[k]); if (opts.length) { const k = pick(opts); PL.guns[id].att[k] = true; VM.dirty = true; toast(LVL.bossName + ' dropped: ' + ATT[k].name + ' (installed on your ' + GUNS[id].name + ')', 'good', 5000); } }
+  const dropId = GUN_ORDER.find((k) => GUNS[k].drop === LVL.n), dropped = !!dropId && gunReward(dropId, LVL.bossName + ' dropped');
+  const id = curGun(); if (!dropped && id && PL.guns[id]) { const opts = Object.keys(ATT).filter((k) => ATT[k].ok(id) && !PL.guns[id].att[k]); if (opts.length) { const k = pick(opts); PL.guns[id].att[k] = true; VM.dirty = true; toast(LVL.bossName + ' dropped: ' + ATT[k].name + ' (installed on your ' + GUNS[id].name + ')', 'good', 5000); } }
   G.bossesBeaten = Math.max(G.bossesBeaten || 0, LVL.n);
   DOOR.closing = false; DOOR.col.on = false; ffRebuildBlocked();
   showStats();
@@ -6170,6 +6454,7 @@ function genLevelInner(def) {
     box(wx, 2.6, zc, 0.8, 0.8, 4, MAT.wall, { tu: 4, tv: 8 });
     const mid = (wx + out) / 2;
     addPickup('pass', mid, 0.4, zc - 1.5, { code: 1 }); addPickup('crypto', mid, 0, zc + 2, { amount: 200 + def.n * 8 });
+    { const sg = GUN_ORDER.find((k) => GUNS[k].find === def.n); if (sg) addPickup('gun', mid, 0.2, zc + 0.3, { gun: sg }); }
     signMesh(makeSign([def.name.toUpperCase()], { bg: E.sbg, fg: E.sfg, sizes: [60], w: 512, h: 128, border: false, noise: 0 }), out + (east ? -0.45 : 0.45), 2.2, zc, 2.4, 0.6, east ? -Math.PI / 2 : Math.PI / 2, 1);
     genRes(Math.min(wx, out) - 0.5, zc - 5.5, Math.max(wx, out) + 0.5, zc + 5.5); genRes(east ? wx - 4 : wx, zc - 3, east ? wx : wx + 4, zc + 3);
     GEN.secret = { x0: Math.min(wx, out), x1: Math.max(wx, out), z0: zc - 5, z1: zc + 5 }; }
@@ -7577,7 +7862,7 @@ async function boot() {
   hideEl('loading');
   if (saved && saved.v === 1) restore(saved); else { G.trophies = LS.get('killais:trophies', {}) || {}; showTitle(); }
   requestAnimationFrame((t) => { lastT = t; frame(t); });
-  window.__KA = { GREN_T, grenCount, grenAdd, cycleGrenade, AREAS, GRENS, detonate, toggleNV, VIS, smokeBlocks, SKILLS, sk, buySkill, GRAP, CODEV, grappleFire, codeVision, resCap, drawAbilities, gunStats, THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight, startBossFight, genReachable, BOSS_DATA, SIG, doAttack, hitBoss, GEN, ERAS, SNIPER_PERCHES, resetLevelState, buildLevel, goToLevel, loadLevel, LVL, ARENA, START, levelDef, unloadLevel, finishBoss, showTeaser, showStats };
+  window.__KA = { gunSkin, skinOk, rayWorld, GUN_ORDER, gBase, gunReward, levelReach, fireShot, GREN_T, grenCount, grenAdd, cycleGrenade, AREAS, GRENS, detonate, toggleNV, VIS, smokeBlocks, SKILLS, sk, buySkill, GRAP, CODEV, grappleFire, codeVision, resCap, drawAbilities, gunStats, THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight, startBossFight, genReachable, BOSS_DATA, SIG, doAttack, hitBoss, GEN, ERAS, SNIPER_PERCHES, resetLevelState, buildLevel, goToLevel, loadLevel, LVL, ARENA, START, levelDef, unloadLevel, finishBoss, showTeaser, showStats };
 }
 boot().catch((err) => { console.error(err); const e = $('loadErr'); if (e) { e.style.display = 'block'; $('loadErrMsg').textContent = String(err && err.message || err); } });
 </script>

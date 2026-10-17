@@ -328,6 +328,11 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 - **Attachments:** scopes/zoom, silencers, bigger magazines, elemental rounds (fire, shock, glitch). From **shop terminals** and **boss drops**.
 - **Gun skins:** gold (earned with lots of kills, or by maxing the gun's upgrade level), glitch (animated, corrupted), AI-logo (themed after bosses you beat).
 - **Outfits:** bought at the shop AND unlocked with trophies. **Secret trophies give the coolest outfits.**
+- **Built: all 100 guns.** The 11 first guns plus 89 more, each built on one of the base gun bodies with its own stats, colors, length and add-ons (drum mags, barrel shrouds, glowing coils, bipods, silencer cans, fuel tanks...):
+  - 8 kinds, with a filter in the shop: pistols, SMGs, shotguns, rifles, snipers, heavy, launchers, energy
+  - **Shop guns** show up as you reach new levels (the shop teases the next 3 locked ones). **Every 5th boss drops its own gun** (Jabberwacky's Cheese Gun, Deep Blue's Checkmate, ChatGPT's Jailbreak, Claude's Constitution, Gemini's Twin Stars... and ZERO DAY from THE VIRUS). **10 secret guns** sit in secret rooms (levels 3, 13, 23... 93), like the Pixel Pistol, The Golden Gun and rm -rf.
+  - Gun tricks: burst fire, hold-to-charge railguns, shots that go through AIs, homing shots, flamethrowers and a cryo thrower, freezing darts, chain lightning, life steal, damage that ramps up, a black hole gun, a sticky bomb launcher, shots through walls, built-in silencers, scopes and elements
+- **Built: skins.** In the UPGRADES tab: Gold (level 5 or 250 kills), Glitch (100 kills, animated and corrupted), AI logo (the colors of any boss you beat).
 
 ## 11. Skill Tree
 
@@ -408,7 +413,7 @@ What the first build should have:
 7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
 8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** (Dr. Sbaitso) and "to be continued"
 
-**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook, all 9 grenades and the vision gear**. **Not built yet:** 3 save slots (it autosaves 1), sidekicks, the trophy room, vehicles (hoverbike, tank), Insane mode, the energy sword, the other 90 guns.
+**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook, all 9 grenades, the vision gear, all 100 guns and gun skins**. **Not built yet:** 3 save slots (it autosaves 1), sidekicks, the trophy room, vehicles (hoverbike, tank), Insane mode, the energy sword.
 
 ## Still Open
 
