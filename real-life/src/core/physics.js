@@ -192,6 +192,26 @@ export class PhysicsWorld {
     return { body, collider: col };
   }
 
+  /** A box that code moves (cars): the player bumps into it, it pushes nothing. */
+  addKinematicBox(size, position, opts = {}) {
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(position.x, position.y, position.z));
+    const desc = RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2)
+      .setTranslation(0, size.y / 2, 0)
+      .setFriction(opts.friction ?? 0.6)
+      .setCollisionGroups(opts.groups ?? GROUPS.vehicle);
+    const collider = this.world.createCollider(desc, body);
+    if (opts.owner) this.setOwner(collider, opts.owner);
+    return {
+      body,
+      collider,
+      move(p, yaw) {
+        body.setNextKinematicTranslation({ x: p.x, y: p.y, z: p.z });
+        const h = yaw / 2;
+        body.setNextKinematicRotation({ x: 0, y: Math.sin(h), z: 0, w: Math.cos(h) });
+      },
+    };
+  }
+
   removeBody(body) {
     this.synced = this.synced.filter((s) => s.body !== body);
     this.world.removeRigidBody(body);

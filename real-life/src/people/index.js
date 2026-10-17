@@ -20,6 +20,8 @@ import { me } from '../life/me.js';
 import { buildNav } from './nav.js';
 import { Npc } from './npc.js';
 import { makeResidents, makeWalker, plan } from './residents.js';
+import { CAR_MODELS } from '../world/traffic.js';
+import { MAPLE, CURB, FAMILY_LOT } from '../world/layout.js';
 
 save.registerSlice('people', {
   create() {
@@ -31,8 +33,9 @@ const _v = new THREE.Vector3();
 const FAR = 55; // metres: past this, walking is skipped (you can't really see them)
 
 export class People {
-  constructor({ world, player, hud, life }) {
+  constructor({ world, player, hud, life, traffic = null }) {
     this.world = world;
+    this.traffic = traffic;
     this.player = player;
     this.hud = hud;
     this.life = life;
@@ -50,6 +53,7 @@ export class People {
     this.rng = new Rng(clock.dayIndex * 31 + 7);
     this._houses = new Map(world.town.houses.filter((h) => !h.family).map((h) => [h.lot.id, h]));
     this._spots = this._homeSpots();
+    if (traffic) this._parkCars(traffic);
     this._lastPlanAt = -1e9;
     this._planAcc = 0;
     this._said = new Map(); // npc id -> last line key (no repeating every minute)
@@ -101,6 +105,40 @@ export class People {
     const len = dir.length();
     const hit = this.world.physics.raycast(eye, dir.divideScalar(len), len - 0.4, { exclude: this.player.controller.collider });
     return !hit;
+  }
+
+  /** Step out of the driver's door (left side of the parked car). */
+  _outOfCar(n) {
+    const car = this.traffic?.parked.get(n.rec.car);
+    if (!car) return;
+    const y = car.home.yaw;
+    const f = new THREE.Vector3(Math.sin(y), 0, Math.cos(y));
+    n.pos.copy(car.home.at).add(new THREE.Vector3(f.z, 0, -f.x).multiplyScalar(car.size.x / 2 + 0.45)).setY(car.home.at.y);
+    n.yaw = Math.atan2(-f.z, f.x);
+  }
+
+  /** Every household's car(s) in its driveway; the people who drive to work get one. */
+  _parkCars(traffic) {
+    const wealth = save.life.family.house.wealth;
+    const famModel = { poor: 'NormalCar1', working: 'NormalCar2', middle: 'SUV', rich: 'SportsCar', veryrich: 'SportsCar2' }[wealth] || 'SUV';
+    const gd = this.world.home.garageDoor;
+    const drivers = this.npcs.filter((n) => n.rec.family && n.rec.role !== 'sibling' && n.rec.job !== 'retired');
+    const two = drivers.length > 1 && ['middle', 'rich', 'veryrich'].includes(wealth);
+    const spots = two ? [gd.cx - 1.35, gd.cx + 1.35] : [gd.cx - 1.35]; // leave the middle free to walk past
+    spots.forEach((x, i) => {
+      const id = `car-home-${i}`;
+      traffic.park(id, { model: i === 0 ? famModel : wealth === 'veryrich' ? 'SUV' : 'NormalCar2', color: ['#2f4f6f', '#8a8d91'][i], at: new THREE.Vector3(x, CURB, FAMILY_LOT.zf + 3.6), faceYaw: Math.PI, curb: new THREE.Vector3(x, CURB, -MAPLE.half - 0.1) });
+      if (drivers[i]) drivers[i].rec.car = id;
+    });
+    for (const [lotId, h] of this._houses) {
+      if (h.house.garageX == null) continue;
+      const side = h.lot.side;
+      const owner = this.npcs.find((n) => n.rec.home === lotId && n.rec.role === 'adult' && n.rec.job !== 'retired');
+      const id = `car-${lotId}`;
+      const k = lotId.charCodeAt(1) + lotId.length;
+      traffic.park(id, { model: CAR_MODELS[k % 5], color: ['#b8bcc2', '#1d1f24', '#8b1e22', '#1f3f73', '#d9d4c7', '#2f5d3a'][k % 6], at: new THREE.Vector3(h.house.garageX, CURB, side * 13.2), faceYaw: side < 0 ? Math.PI : 0, curb: new THREE.Vector3(h.house.garageX, CURB, side * (MAPLE.half + 0.1)) });
+      if (owner) owner.rec.car = id;
+    }
   }
 
   // ------------------------------------------------------------------------------- planning
@@ -189,9 +227,27 @@ export class People {
           n.appearAt(h.navDoor);
           n.goTo(this._exitNode(n, p.exit, p.why), { kind: 'leave', where: p.at });
         } else if (!snap && seen && from !== 'home' && from !== 'init' && p.at === 'home') {
+          if (n.rec.car && n.cameFrom === 'driveway' && this.traffic && !this.traffic.parkedCarOf(n.rec.car)) {
+            if (!n.waitingCar) {
+              n.waitingCar = true;
+              this.traffic.arrive(n.rec.car, () => {
+                n.waitingCar = false;
+                n.appearAt(h.navDriveway ?? h.navDoor);
+                this._outOfCar(n);
+                n.goTo(h.navDoor, { kind: 'leave', where: 'home' });
+              });
+            }
+            return;
+          }
+          if (n.rec.car) this.traffic?.restore(n.rec.car);
           if (this._enterNear(n, this._exitNode(n, n.cameFrom, n.cameWhy), h.navDoor)) n.goTo(h.navDoor, { kind: 'leave', where: 'home' });
           else n.away = p.at;
-        } else n.away = p.at;
+        } else {
+          // Off-screen comings and goings still move the car (gone while they're at work).
+          if (n.rec.car && p.at !== 'home' && p.exit === 'driveway') this.traffic?.hide(n.rec.car);
+          if (n.rec.car && p.at === 'home') this.traffic?.restore(n.rec.car);
+          n.away = p.at;
+        }
         n.cameFrom = p.exit;
         n.cameWhy = p.why;
         return;
@@ -200,6 +256,7 @@ export class People {
       n.cameWhy = p.why;
       if (snap || !n.body?.root.visible) {
         if (!snap && n.rec.family) bus.emit('family:left', { npc: n, why: p.why });
+        if (n.rec.car && p.exit === 'driveway') this.traffic?.hide(n.rec.car);
         return n.setAway(p.at);
       }
       // Walk out (front door / driveway / store doors), then disappear.
@@ -212,6 +269,24 @@ export class People {
     const target = this._targetNode(n, act);
     if (target == null) return;
     if (n.away) {
+      // Coming home by car: the car pulls into the driveway first, then they get out.
+      if (n.rec.car && (n.cameFrom || n.lastExit) === 'driveway' && this.traffic) {
+        const entry = this._entryNode(n);
+        const near = !snap && this.nav.nodes[entry].p.distanceTo(this.player.position) < FAR;
+        if (near && !this.traffic.parkedCarOf(n.rec.car)) {
+          if (n.waitingCar) return;
+          n.waitingCar = true;
+          this.traffic.arrive(n.rec.car, () => {
+            n.waitingCar = false;
+            if (!n.away) return;
+            n.appearAt(entry);
+            this._outOfCar(n);
+            n.planKey = null; // re-plan: walks in to whatever they should be doing now
+          });
+          return;
+        }
+        this.traffic.restore(n.rec.car);
+      }
       if (snap) n.appearAt(target);
       else if (!this._enterNear(n, this._entryNode(n), target, act)) snap = true;
     }
@@ -374,6 +449,8 @@ export class People {
     if (!act) return;
     const S = this.world.town.stores;
     if (act.kind === 'leave') {
+      // Reached the driveway: get in the car and drive off.
+      if (n.rec.car && act.where !== 'home' && this.nav.nodes[n.goal]?.p.distanceTo(this.traffic?.parkedCarOf(n.rec.car)?.home.at || new THREE.Vector3(1e9, 0, 0)) < 6) this.traffic.depart(n.rec.car);
       n.setAway(act.where);
       if (n.rec.transient) n._dead = true;
       return;

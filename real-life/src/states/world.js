@@ -28,6 +28,8 @@ import { School } from '../life/school.js';
 import { Phone } from '../ui/phone.js';
 import { Radio } from '../life/radio.js';
 import { openPause } from '../ui/pause.js';
+import { Traffic } from '../world/traffic.js';
+import { assets } from '../gfx/assets.js';
 
 export class WorldState {
   constructor(engine) {
@@ -50,7 +52,9 @@ export class WorldState {
     this.player = new Player(e, world, { look: life.character.look, age: Math.max(1, clock.age), spawn: sp.pos, yaw: sp.yaw, name: life.character.name });
     this.hud = new Hud(e.uiRoot);
     this.life = new Life({ engine: e, world, player: this.player, hud: this.hud });
-    this.people = new People({ world, player: this.player, hud: this.hud, life: this.life });
+    await assets.preload(Traffic.assets());
+    this.traffic = new Traffic(world);
+    this.people = new People({ world, player: this.player, hud: this.hud, life: this.life, traffic: this.traffic });
     this.life.people = this.people;
     this.life.chores = new Chores(this.life);
     this.life.rules = new Rules(this.life);
@@ -60,6 +64,7 @@ export class WorldState {
     this.phone = new Phone({ engine: e, world, player: this.player, hud: this.hud, life: this.life, people: this.people, talk: this.talk });
     this.life.phone = this.phone;
     this.radio = new Radio(this.life);
+    this.ready = true;
     if (params.wake) {
       // First morning as a big kid: you wake up in your own bed.
       const bed = world.home.spots.find((s) => s.kind === 'bed' && s.owner === 'you');
@@ -82,7 +87,7 @@ export class WorldState {
 
   update(dt) {
     const p = this.player;
-    if (!p) return;
+    if (!p || !this.ready) return; // enter() is still loading
     if (input.pressed('menu')) {
       if (panelOpen()) closeTopPanel();
       else if (this.phone.isOpen) this.phone.close();
@@ -94,6 +99,7 @@ export class WorldState {
     this.life.update(dt);
     p.update(dt);
     this.people.update(dt);
+    this.traffic.update(dt, { viewer: p.position, people: this.people.npcs });
     this.talk.update(dt);
     this.life.rules.update(dt);
     this.life.lemonade.update(dt);
@@ -121,6 +127,7 @@ export class WorldState {
     this.life?.lemonade?.dispose();
     this.life?.school?.dispose();
     this.people?.dispose();
+    this.traffic?.dispose();
     this.life?.dispose();
     this.hud?.dispose();
     this.player?.dispose();
