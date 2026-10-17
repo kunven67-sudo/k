@@ -8,10 +8,11 @@ Writes the atlas to fnf2/build/own/shared/images/characters/wrath-normal/
 and the character data to fnf2/build/own/preload/data/characters/.
 Everything is in picture pixels; the character json scales it to game size.
 """
-import argparse, colorsys, json, os, sys
+import argparse, colorsys, json, math, os, sys
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 from scipy import ndimage
+from scipy.spatial import ConvexHull
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -96,7 +97,7 @@ def build_parts():
     parts['sleeve'] = P.over(pn.result(), sl)
 
     # -- mouths for singing (drawn to match: thick black line, dark inside, pink tongue)
-    for nm, spec in MOUTHS.items(): parts['mouth_' + nm] = draw_mouth(W, H, **spec)
+    for nm, spec in MOUTHS.items(): parts['mouth_' + nm] = draw_mouth(W, H, **(spec if nm == 'miss' else big(**spec)))
 
     return rgba, parts
 
@@ -245,7 +246,139 @@ def pose(*ds):
     return out
 
 
-# pose keys: (frame, pose) - poses give bones {rot, sx, sy, skx, dx, dy}; values hold until the next key (Animate on twos)
+# ---------------------------------------------------------------- the bendy mic arm (rap poses)
+# In the drawing the mic arm hangs down by his side. For rapping it becomes an upper arm + forearm
+# drawn like the sweater sleeve, bent by 2-bone IK so the mic can go to his mouth or out at BF.
+SWEATER, SWEATER_SHADE = '#fcdc6c', '#e8a85c'
+ARM_S = (448, 522)                     # shoulder joint (body px)
+ARM_L1, ARM_L2 = 118, 120              # upper arm, forearm
+WRIST_REST = (560, 650)                # where the hand meets the sleeve in the drawing
+ELBOW_OUT = (1.0, 0.7)                 # elbows bend out to the side and down
+
+
+def capsule(ox, oy, L, r0, r1, n=18):
+    d = math.asin(max(-0.9, min(0.9, (r1 - r0) / L)))
+    pts = []
+    for i in range(n + 1):                                   # right end (r1), round the front
+        t = -(math.pi / 2 + d) + (math.pi + 2 * d) * i / n
+        pts.append((ox + L + r1 * math.cos(t), oy + r1 * math.sin(t)))
+    for i in range(n + 1):                                   # left end (r0), round the back
+        t = (math.pi / 2 + d) + (math.pi - 2 * d) * i / n
+        pts.append((ox + r0 * math.cos(t), oy + r0 * math.sin(t)))
+    return pts
+
+
+def draw_tube(L, r0, r1, cuff=False, creases=()):
+    """A sweater sleeve piece lying along +x from its joint. -> (rgba, joint x, joint y)"""
+    pad = 10
+    H = int(2 * max(r0, r1) + 2 * pad); W = int(L + r0 + r1 + 2 * pad)
+    ox, oy = r0 + pad, H / 2
+    shape = capsule(ox, oy, L, r0, r1)
+    m = P.Paint(W, H); m.poly(shape, (255, 255, 255, 255)); mask = np.array(m.img)[..., 3]
+    p = P.Paint(W, H)
+    p.poly(shape, SWEATER)
+    # shade on the underside, like the drawing's sleeve
+    r = lambda x: r0 + (r1 - r0) * min(1, max(0, (x - ox) / L))
+    xs = np.linspace(ox - r0, ox + L + r1, 30)
+    p.poly([(x, oy + 0.28 * r(x)) for x in xs] + [(xs[-1], H), (xs[0], H)], SWEATER_SHADE)
+    if cuff:
+        cx = ox + L - r1 * 0.35
+        p.poly([(cx, 0), (W, 0), (W, H), (cx, H)], SWEATER)
+        p.poly([(cx, oy + 0.28 * r1), (W, oy + 0.28 * r1), (W, H), (cx, H)], SWEATER_SHADE)
+    big = np.array(p.img); big[..., 3] = np.minimum(big[..., 3], mask)
+    p.img = Image.fromarray(big, 'RGBA'); p.d = P.ImageDraw.Draw(p.img)
+    if cuff:
+        cx = ox + L - r1 * 0.35
+        p.line(P.bez((cx + 6, oy - r1 * 0.92), (cx - 8, oy), (cx + 6, oy + r1 * 0.92)), 6)
+    for t, off, ln in creases:
+        x = ox + L * t; y = oy + off * r(x)
+        p.line(P.bez((x - ln / 2, y - 4), (x, y + 6), (x + ln / 2, y - 2)), 5.5)
+    p.line(shape + [shape[0]], 9)
+    return p.result(), ox, oy
+
+
+def ik(S, T, L1, L2, pref=ELBOW_OUT):
+    dx, dy = T[0] - S[0], T[1] - S[1]
+    d = max(abs(L1 - L2) + 1, min(L1 + L2 - 0.5, math.hypot(dx, dy)))
+    a = math.atan2(dy, dx)
+    b = math.acos(max(-1, min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))))
+    cands = [(S[0] + L1 * math.cos(a + s * b), S[1] + L1 * math.sin(a + s * b)) for s in (1, -1)]
+    E = max(cands, key=lambda e: (e[0] - S[0]) * pref[0] + (e[1] - S[1]) * pref[1])
+    au = math.atan2(E[1] - S[1], E[0] - S[0])
+    af = math.atan2(T[1] - E[1], T[0] - E[0])
+    Wt = (E[0] + L2 * math.cos(af), E[1] + L2 * math.sin(af))
+    return E, Wt, au, af
+
+
+
+
+def R(deg): r = math.radians(deg); return P.M(math.cos(r), math.sin(r), -math.sin(r), math.cos(r))
+
+
+def hand_at(Wt, af, turn, tuck=18, limit=65):
+    """The fist on the end of the forearm. A wrist bends: the mic stays roughly upright (within
+    `limit` degrees), the fist turns toward the arm, and it's mirrored when the arm comes in from
+    the right (mic across the chest). The forearm's end tucks under the fist."""
+    a = math.degrees(af)
+    flip = abs(((a + 180) % 360) - 180) > 100          # forearm pointing left -> wrist on the fist's right
+    th = (a + 180 if flip else a)
+    th = ((th + 180) % 360) - 180
+    th = max(-limit, min(limit, th)) + turn
+    px, py = Wt[0] + tuck * math.cos(af), Wt[1] + tuck * math.sin(af)
+    m = P.mmul(P.T(px, py), R(th))
+    if flip: m = P.mmul(m, P.M(-1, 0, 0, 1))
+    return P.mmul(m, P.T(-WRIST_REST[0], -WRIST_REST[1]))
+
+
+# ---------------------------------------------------------------- eyelids (focused for rapping, worried for misses)
+EYES = {'L': (232, 262, 326, 366), 'R': (368, 258, 437, 360)}
+LIDS = {
+    'focus': {'L': ((234, 297), (326, 316)), 'R': ((366, 314), (438, 292))},
+    'worry': {'L': ((234, 316), (326, 300)), 'R': ((366, 300), (438, 316))},
+}
+
+
+def draw_lids(rgba, kind):
+    H, W = rgba.shape[:2]
+    rgb = rgba[..., :3].astype(int)
+    out = P.Paint(W, H)
+    paint = np.zeros((H, W, 4), np.uint8)
+    for e, (x0, y0, x1, y1) in EYES.items():
+        box = np.zeros((H, W), bool); box[y0:y1, x0:x1] = True
+        # the eye = convex hull of its white (that takes in the iris too, never the hair above)
+        ys, xs = np.nonzero(box & (rgb.min(2) > 215))
+        hull = ConvexHull(np.c_[xs, ys])
+        m = Image.new('L', (W, H), 0)
+        ImageDraw.Draw(m).polygon([(float(xs[i]), float(ys[i])) for i in hull.vertices], fill=255)
+        inner = ndimage.binary_dilation(np.array(m) > 0, iterations=3) & box
+        inner &= ~((rgb[..., 2] > 150) & (rgb[..., 2] > rgb[..., 0] + 60))      # bright blue = hair
+        (ax, ay), (bx, by) = LIDS[kind][e]
+        yy, xx = np.mgrid[0:H, 0:W]
+        lid_y = ay + (by - ay) * (xx - ax) / (bx - ax)
+        cover = inner & (yy < lid_y)
+        paint[cover] = P.hexrgb(SKIN) + (255,)
+        xs = np.nonzero(inner.any(0))[0]
+        lx0, lx1 = xs.min() - 3, xs.max() + 3
+        f = lambda x: ay + (by - ay) * (x - ax) / (bx - ax)
+        out.line([(lx0, f(lx0)), ((lx0 + lx1) / 2, f((lx0 + lx1) / 2) + 2), (lx1, f(lx1))], 8)
+    return P.over(paint, out.result())
+
+
+# ---------------------------------------------------------------- poses
+def lean(dx, body=None):
+    """Lean from the ankles: the pants skew so their top moves dx, the body rides along."""
+    b = dict(body or {}); b['dx'] = b.get('dx', 0) + dx
+    return dict(pants=dict(skx=math.degrees(math.atan(-dx / PANTS_LEN))), body=b)
+
+
+def big(top=None, bot=None, teeth=0, tongue=None, k=1.15, c=(335, 392)):
+    sc = lambda p: (c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k)
+    t = tongue and (sc(tongue[:2])[0], sc(tongue[:2])[1], tongue[2] * k, tongue[3] * k)
+    return dict(top=[sc(p) for p in top], bot=[sc(p) for p in bot], teeth=teeth * k, tongue=t)
+
+
+# pose keys: (frame, pose) - bones {rot, sx, sy, skx, dx, dy}; 'ik' = (wrist target in body px, extra hand turn);
+# 'lids' = eyelid look. Values hold until the next key (Animate on twos).
 def anims():
     A = {}
     A['Idle'] = (14, 'smile', [
@@ -255,43 +388,76 @@ def anims():
         (6, dict(head=dict(dy=1, rot=-0.5), arm=dict(rot=-1), wrist=dict(rot=-1))),
         (8, dict()),
     ])
-    LEFT = [pose(dict(root=dict(dx=-46, skx=6), body=dict(rot=-4), head=dict(rot=-7, dx=-6), arm=dict(rot=-22), wrist=dict(rot=-22))),
-            pose(dict(root=dict(dx=-38, skx=5), body=dict(rot=-3), head=dict(rot=-5, dx=-4), arm=dict(rot=-18), wrist=dict(rot=-17)))]
-    RIGHT = [pose(dict(root=dict(dx=46, skx=-6), body=dict(rot=4), head=dict(rot=7, dx=5), arm=dict(rot=12), wrist=dict(rot=-20))),
-             pose(dict(root=dict(dx=38, skx=-5), body=dict(rot=3), head=dict(rot=5, dx=3), arm=dict(rot=9), wrist=dict(rot=-14)))]
-    UP = [pose(legs(1.08, 0.96, dict(sx=0.97, sy=1.06)), dict(head=dict(rot=-10, dy=-16), arm=dict(rot=-20), wrist=dict(rot=-32))),
-          pose(legs(1.05, 0.975, dict(sx=0.985, sy=1.035)), dict(head=dict(rot=-8, dy=-11), arm=dict(rot=-17), wrist=dict(rot=-27)))]
-    DOWN = [pose(legs(0.8, 1.09, dict(sx=1.05, sy=0.92)), dict(head=dict(rot=5, dy=20), arm=dict(rot=16), wrist=dict(rot=10))),
-            pose(legs(0.85, 1.06, dict(sx=1.03, sy=0.95)), dict(head=dict(rot=4, dy=14), arm=dict(rot=13), wrist=dict(rot=8)))]
-    for lab, keys, mouth in (('Left', LEFT, 'oh'), ('Down', DOWN, 'ah'), ('Up', UP, 'aa'), ('Right', RIGHT, 'ee')):
-        A[lab] = (8, mouth, [(0, keys[0]), (2, keys[1])])
-        # miss: same pose, pulled back with a flinch, tinted like BF's misses
-        flinch = P.mix_pose(keys[1], {}, 0.35)
-        hurt = P.mix_pose(flinch, dict(head=dict(rot=-6 if lab != 'Left' else 6, dy=10), body=dict(sy=0.97)), 1)
-        A[lab + ' Miss'] = (24, 'miss', [(0, hurt), (2, P.mix_pose(hurt, dict(head=dict(dy=6)), 0.5)), (4, flinch)])
+    S = {
+        # mic pulled across to his mouth, hard lean left
+        'Left': [dict(pose(lean(-40, dict(rot=-7)), dict(head=dict(rot=-12, dx=-16, dy=6))), ik=((418, 584), -14)),
+                 dict(pose(lean(-32, dict(rot=-5.5)), dict(head=dict(rot=-9, dx=-11, dy=4))), ik=((424, 592), -11))],
+        # deep squat, mic low in front
+        'Down': [dict(pose(legs(0.74, 1.1, dict(sx=1.06, sy=0.9, rot=3)), dict(head=dict(rot=8, dy=26, dx=4))), ik=((588, 676), -24)),
+                 dict(pose(legs(0.8, 1.07, dict(sx=1.04, sy=0.93, rot=2)), dict(head=dict(rot=6, dy=20, dx=3))), ik=((584, 672), -20))],
+        # stretch up, head thrown back, mic held up high
+        'Up': [dict(pose(legs(1.1, 0.95, dict(sx=0.97, sy=1.06, rot=-2)), dict(head=dict(rot=-14, dy=-26, dx=6))), ik=((548, 438), 0)),
+               dict(pose(legs(1.07, 0.965, dict(sx=0.98, sy=1.04, rot=-1.5)), dict(head=dict(rot=-11, dy=-20, dx=5))), ik=((550, 448), 2))],
+        # leaning in at BF, mic thrust out
+        'Right': [dict(pose(lean(40, dict(rot=7)), dict(head=dict(rot=11, dx=16, dy=4))), ik=((662, 548), 14)),
+                  dict(pose(lean(32, dict(rot=5.5)), dict(head=dict(rot=8, dx=12, dy=3))), ik=((654, 556), 10))],
+    }
+    mouths = {'Left': 'oh', 'Down': 'ah', 'Up': 'aa', 'Right': 'ee'}
+    for lab, (hit, hold) in S.items():
+        A[lab] = (8, mouths[lab], [(0, dict(hit, lids='focus')), (2, dict(hold, lids='focus'))])
+        # miss: the pose caught short, head flinches, purple like BF's misses
+        (tx, ty), hr = hold['ik']
+        flinch = {k: dict(v) for k, v in hold.items() if k not in ('ik',)}
+        flinch['head'] = dict(flinch.get('head', {})); flinch['head']['rot'] = flinch['head'].get('rot', 0) + (8 if lab == 'Left' else -8)
+        flinch['head']['dy'] = flinch['head'].get('dy', 0) + 12
+        flinch['body'] = dict(flinch.get('body', {})); flinch['body']['sy'] = flinch['body'].get('sy', 1) * 0.97
+        hurt = dict(flinch, ik=((tx + 10, ty + 26), hr + 16), lids='worry')
+        settle = dict(flinch, ik=((tx + 6, ty + 16), hr + 8), lids='worry')
+        A[lab + ' Miss'] = (24, 'miss', [(0, hurt), (4, settle)])
     A['Hey'] = (26, 'hey', [
-        (0, pose(legs(1.04, 0.98, dict(sy=1.03)), dict(head=dict(rot=4, dy=-10), arm=dict(rot=-26), wrist=dict(rot=-40)))),
-        (2, pose(legs(1.02, 0.99, dict(sy=1.015)), dict(head=dict(rot=3, dy=-7), arm=dict(rot=-23), wrist=dict(rot=-36)))),
-        (4, dict(head=dict(rot=3, dy=-6), arm=dict(rot=-22), wrist=dict(rot=-34))),
+        (0, dict(pose(legs(1.05, 0.98, dict(sy=1.03)), dict(head=dict(rot=5, dy=-12))), ik=((604, 372), -8))),
+        (2, dict(pose(legs(1.025, 0.99, dict(sy=1.015)), dict(head=dict(rot=4, dy=-9))), ik=((600, 382), -6))),
+        (4, dict(pose(legs(1.015, 0.995), dict(head=dict(rot=4, dy=-8))), ik=((598, 386), -5))),
     ])
     return A
 
 
 ORDER = ('shoes', 'pants', 'sleeve', 'torso', 'head', 'MOUTH', 'hand')
+ORDER_RAP = ('shoes', 'pants', 'torso', 'uparm', 'forearm', 'head', 'MOUTH', 'LIDS', 'hand')
 
 
 def frames_for(rig, slots, spec, miss):
     n, mouth, keys = spec
     out = []
+    t = '_miss' if miss else ''
     for f in range(n):
         k = max(i for i, (kf, _) in enumerate(keys) if kf <= f)
-        Wd = rig.world(keys[k][1])
-        t = '_miss' if miss else ''
+        key = keys[k][1]
+        bones = {b: v for b, v in key.items() if b not in ('ik', 'lids')}
+        Wd = rig.world(bones)
         fr = []
-        for nm in ORDER:
-            nm = 'mouth_' + mouth if nm == 'MOUTH' else nm
-            bone, x0, y0, extra = slots[nm]
-            fr.append((nm + t, P.mmul(Wd[bone], P.mmul(P.T(x0, y0), extra))))
+        if 'ik' in key:
+            (target, hand_turn) = key['ik']
+            E, Wt, au, af = ik(ARM_S, target, ARM_L1, ARM_L2)
+            B = Wd['body']
+            place = {
+                'uparm': P.mmul(B, P.mmul(P.T(*ARM_S), R(math.degrees(au)))),
+                'forearm': P.mmul(B, P.mmul(P.T(*E), R(math.degrees(af)))),
+                'hand': P.mmul(B, hand_at(Wt, af, hand_turn)),
+            }
+            for nm in ORDER_RAP:
+                if nm == 'LIDS':
+                    if not key.get('lids'): continue
+                    nm = 'lids_' + key['lids']
+                nm = 'mouth_' + mouth if nm == 'MOUTH' else nm
+                bone, x0, y0, extra = slots[nm]
+                base = place[nm] if nm in place else Wd[bone]
+                fr.append((nm + t, P.mmul(base, P.mmul(P.T(x0, y0), extra))))
+        else:
+            for nm in ORDER:
+                nm = 'mouth_' + mouth if nm == 'MOUTH' else nm
+                bone, x0, y0, extra = slots[nm]
+                fr.append((nm + t, P.mmul(Wd[bone], P.mmul(P.T(x0, y0), extra))))
         out.append(fr)
     return out
 
@@ -307,6 +473,13 @@ def build():
         c, x0, y0 = P.crop_alpha(im)
         bone = {'torso': 'body', 'sleeve': 'arm', 'hand': 'wrist', 'pants': 'pants'}.get(nm, 'head')
         sprites[nm] = c; slots[nm] = (bone, x0, y0, P.M())
+    for nm, (L, r0, r1, cuff, cr) in {'uparm': (ARM_L1, 40, 43, False, ((0.62, 0.15, 30),)),
+                                       'forearm': (ARM_L2, 43, 50, True, ((0.12, -0.3, 26), (0.3, 0.2, 30)))}.items():
+        im, ox, oy = draw_tube(L, r0, r1, cuff, cr)
+        sprites[nm] = im; slots[nm] = (None, 0, 0, P.T(-ox, -oy))
+    for kind in LIDS:
+        c, x0, y0 = P.crop_alpha(draw_lids(rgba, kind))
+        sprites['lids_' + kind] = c; slots['lids_' + kind] = ('head', x0, y0, P.M())
     c, x0, y0 = P.crop_alpha(bf_shoes())
     sprites['shoes'] = c
     slots['shoes'] = ('shoes', 0, 0, P.mmul(P.T(SHOE_X + x0 * SHOE_K, SHOE_Y + y0 * SHOE_K), P.M(SHOE_K, 0, 0, SHOE_K)))
@@ -393,7 +566,6 @@ if __name__ == '__main__':
                 t = render(sprites, frames[fi]); t.thumbnail((360, 380)); tiles.append((lab + ' ' + str(fi), t))
         cols = 9; tw, th = tiles[0][1].size
         sheet = Image.new('RGB', (cols * tw, -(-len(tiles) // cols) * (th + 16)), (60, 60, 70))
-        from PIL import ImageDraw
         dr = ImageDraw.Draw(sheet)
         for k, (lab, t) in enumerate(tiles):
             x, y = (k % cols) * tw, (k // cols) * (th + 16)
