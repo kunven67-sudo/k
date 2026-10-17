@@ -190,6 +190,8 @@ export class Player {
     if (!this.locked && input.pressed('interact') && this.focus) {
       const r = this.focus.it.use?.(this);
       bus.emit('player:used', { it: this.focus.it, result: r });
+    } else if (!this.locked && input.pressed('use') && this.focus?.it.useAlt) {
+      this.focus.it.useAlt(this);
     }
   }
 

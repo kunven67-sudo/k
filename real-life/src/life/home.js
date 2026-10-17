@@ -168,7 +168,7 @@ export class Home {
       this.hud.toast("You don't need to go.");
       return;
     }
-    audio.play?.('home.flush', { position: s.at });
+    audio.play?.('toilet.flush', { position: s.at });
     me.set('bladder', 1);
     me.data.flags.dirtyHands = true;
     this._passTime(3);
@@ -176,7 +176,8 @@ export class Home {
   }
 
   shower() {
-    audio.play?.('home.shower', { gain: 0.7 });
+    const water = audio.play?.('water.run', { gain: 0.6 });
+    setTimeout(() => water?.stop?.(0.6), 2600);
     me.set('hygiene', 1);
     me.restore('energy', 0.05);
     me.data.flags.dirtyHands = false;

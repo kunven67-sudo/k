@@ -19,6 +19,7 @@ import './sfx/phone.js';
 import './sfx/ambience.js';
 import './sfx/city.js';
 import './sfx/splash.js';
+import './sfx/store.js';
 import { music } from './music/index.js';
 
 export { music, catalog, SURFACES };

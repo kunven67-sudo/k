@@ -214,6 +214,14 @@ export class Engine {
     this.states.set(name, StateClass);
   }
 
+  /** 0..1 blur (tired, sick, drunk). Uses the film pass when post FX are on, else a cheap CSS blur. */
+  setBlur(v) {
+    v = Math.max(0, Math.min(1, v || 0));
+    FilmShader.uniforms.uBlur.value = v;
+    const css = !this.filmPass.enabled && v > 0.04 ? `blur(${(v * 2.2).toFixed(2)}px)` : '';
+    if (this.canvas.style.filter !== css) this.canvas.style.filter = css;
+  }
+
   async fade(toBlack, ms = 600) {
     this.fadeEl.style.setProperty('--fade-ms', `${ms}ms`);
     this.fadeEl.classList.toggle('on', toBlack);
