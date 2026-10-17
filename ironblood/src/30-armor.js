@@ -136,7 +136,9 @@ function buildArmor(model, opt) {
   }
   if (opt.player) {
     // hood over the helmet and onto the shoulders
-    put('Head', shell(0.152, 0, 1.70, 0.045, 1, 1.12, 1.08, Math.PI * 1.25, Math.PI * 0.62, -0.25, 0).rotateY(Math.PI * 0.375).translate(0, 0, 0), C);
+    const hood = new THREE.SphereGeometry(0.152, 20, 12, -0.45, Math.PI + 0.9, 0, Math.PI * 0.64);
+    hood.scale(1, 1.12, 1.08); hood.translate(0, 1.70, 0.045);
+    put('Head', hood, C);
     put('Spine2', [cylBetween([0, 1.43, 0.05], [0, 1.58, 0.06], 0.25, 0.13, 20, true)], C);
   }
   // --- neck + torso ---
@@ -160,7 +162,7 @@ function buildArmor(model, opt) {
     for (let k = 0; k < 3; k++) pd.push(shell(0.105 - k * 0.012, s * (0.2 + k * 0.03), 1.49 - k * 0.025, 0.06, 1.05, 0.9, 1.1, Math.PI * 2, Math.PI / 2, 0, -s * (0.35 + k * 0.25)));
     put(side + 'Arm', pd, plate || T === 0 ? M : L);
     put(side + 'Arm', cylBetween([s * 0.22, 1.48, 0.06], [s * 0.43, 1.48, 0.06], 0.056, 0.05), plate ? M : L);
-    put(side + 'ForeArm', shell(0.055, s * 0.44, 1.48, 0.07, 1, 1, 1, Math.PI * 2, Math.PI * 0.7, -Math.PI / 2, 0), M); // couter
+    put(side + 'ForeArm', shell(0.055, s * 0.44, 1.48, 0.07, 1, 1, 1, Math.PI * 2, Math.PI * 0.7, Math.PI / 2, 0), M); // couter
     put(side + 'ForeArm', cylBetween([s * 0.45, 1.48, 0.06], [s * 0.665, 1.48, 0.06], 0.048, 0.042), plate ? M : L);
     put(side + 'Hand', [boxAt(0.12, 0.055, 0.095, s * 0.75, 1.475, 0.065), cylBetween([s * 0.66, 1.48, 0.06], [s * 0.70, 1.48, 0.06], 0.06, 0.05, 12, true)], plate ? M : L);
   }
@@ -168,7 +170,7 @@ function buildArmor(model, opt) {
   for (const s of [-1, 1]) {
     const side = s < 0 ? 'Left' : 'Right';
     put(side + 'UpLeg', cylBetween([s * 0.1, 0.99, 0.0], [s * 0.1, 0.62, -0.01], 0.08, 0.064), plate ? M : C);
-    put(side + 'Leg', shell(0.066, s * 0.1, 0.58, -0.035, 1, 1, 1, Math.PI * 2, Math.PI * 0.7, Math.PI / 2, 0), M); // poleyn
+    put(side + 'Leg', shell(0.066, s * 0.1, 0.58, -0.035, 1, 1, 1, Math.PI * 2, Math.PI * 0.7, -Math.PI / 2, 0), M); // poleyn
     put(side + 'Leg', cylBetween([s * 0.1, 0.56, -0.01], [s * 0.1, 0.15, 0.025], 0.058, 0.047), T === 0 ? L : M);
     put(side + 'Foot', boxAt(0.1, 0.075, 0.25, s * 0.105, 0.06, -0.05, 0.08), T === 0 ? L : M);
   }
@@ -210,6 +212,10 @@ class Cape {
     this.mesh = new THREE.Mesh(geo, clothMat(color, U));
     this.mesh.castShadow = true; this.mesh.frustumCulled = false;
     this.ready = false;
+    // anchor offsets in the spine bone's space, taken at bind pose (model still at the origin)
+    model.updateMatrixWorld(true);
+    const inv = this.anchorBone.matrixWorld.clone().invert();
+    this.local = this.anchors().map(v => v.applyMatrix4(inv));
   }
   anchors() {
     // shoulder line in the bone's space, behind the back
@@ -221,12 +227,6 @@ class Cape {
     return out;
   }
   update(dt, root, colliders) {
-    if (!this.local) {
-      // anchor offsets relative to the spine bone (bind pose)
-      this.model.updateMatrixWorld(true);
-      const inv = this.anchorBone.matrixWorld.clone().invert();
-      this.local = this.anchors().map(v => v.applyMatrix4(this.model.matrixWorld.clone().invert()).applyMatrix4(this.model.matrixWorld).applyMatrix4(inv));
-    }
     const W = this.W, H = this.H, seg = this.len / (H - 1);
     const anchorsW = this.local.map(v => v.clone().applyMatrix4(this.anchorBone.matrixWorld));
     if (!this.ready) {
