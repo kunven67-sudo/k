@@ -14,7 +14,7 @@ export function buildLighting(ctx, house) {
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.left = -7; sun.shadow.camera.right = 7; sun.shadow.camera.top = 7; sun.shadow.camera.bottom = -7;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 40;
-  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+  sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.01;
   sun.shadow.radius = 3;
   sun.target.position.set(4, 0, 2.5);
   scene.add(sun, sun.target);
@@ -47,11 +47,11 @@ export function buildLighting(ctx, house) {
     const r = { on: room === 'hallway' ? false : false, lights: [], glows: [], key: room };
     for (const [x, z] of list) {
       const l = new THREE.SpotLight(0xffe6c7, 0, 12, 1.35, 0.95, 2);
-      l.position.set(x, H - 0.08, z);
+      l.position.set(x, room === 'bedroom' ? 2.03 : H - 0.08, z); // bedroom: under the fan's light kit
       l.target.position.set(x, 0, z + 0.001);
       l.castShadow = room === 'bedroom' || room === 'kitchen';
       l.shadow.mapSize.set(1024, 1024);
-      l.shadow.bias = -0.0006; l.shadow.normalBias = 0.03; l.shadow.radius = 4;
+      l.shadow.bias = -0.0004; l.shadow.normalBias = 0.012; l.shadow.radius = 4;
       l.shadow.camera.near = 0.1; l.shadow.camera.far = 8;
       scene.add(l, l.target);
       // the bedroom has a ceiling fan with its own light kit; others get a flush dome light

@@ -14,7 +14,15 @@ page.on('pageerror', e => logs.push(`[pageerror] ${e.message}\n${e.stack || ''}`
 await page.goto('http://localhost:8765' + urlPath);
 try { await page.waitForFunction(() => window.__ready === true, null, { timeout: +to }); }
 catch (e) { logs.push('[shot] timeout waiting for __ready'); }
-await page.screenshot({ path: out });
+const t0 = Date.now();
+const data = await page.evaluate(async (frames) => {
+  const g = window.__game; if (!g || !g.snap) return null;
+  window.__pause = true;
+  for (let i = 0; i < frames; i++) { const now = performance.now(); g.update(1 / 30); }
+  const t = performance.now(); const d = g.snap(); return { d, ms: performance.now() - t };
+}, +(process.env.FRAMES || 2)).catch(e => { logs.push('[shot] ' + e.message); return null; });
+if (data) { (await import('node:fs')).writeFileSync(out, Buffer.from(data.d.split(',')[1], 'base64')); logs.push(`[shot] frame ${data.ms.toFixed(0)} ms, total ${Date.now() - t0} ms`); }
+else await page.screenshot({ path: out });
 console.log(logs.join('\n'));
 await browser.close();
 server.close();

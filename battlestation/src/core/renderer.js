@@ -60,7 +60,7 @@ export class Renderer {
       this.composer.addPass(this.ao);
     }
     if (p.bloom) {
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.22, 0.55, 0.92);
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.16, 0.4, 0.95);
       this.composer.addPass(this.bloom);
     }
     this.composer.addPass(new OutputPass());

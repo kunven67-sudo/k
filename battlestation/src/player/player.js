@@ -66,6 +66,39 @@ export class Player {
     this.g.audio.play('chair.ogg', { pos: chair.group.position.clone().add(new THREE.Vector3(0, 0.5, 0)), vol: 0.45, rate: 1.1 });
   }
 
+  lookAround() { this.seatLook.yaw = 0; this.seatLook.pitch = -0.1; this.trans = { t: 0, dur: 0.45, from: this.camPose() }; this.setState('look'); }
+  backToPc() { this.trans = { t: 0, dur: 0.45, from: this.camPose() }; this.setState('sit'); }
+
+  // out of bed: swing your legs out and stand up next to the nightstand
+  getUp() {
+    if (this.state !== 'bed') return;
+    this.trans = { t: 0, dur: 1.6, from: this.camPose() };
+    this.pos.set(1.9, 0, 3.35);
+    this.yaw = 0.55; this.pitch = -0.2; this.bodyYaw = this.yaw;
+    this.setState('walk');
+  }
+
+  lieDown() {
+    this.trans = { t: 0, dur: 1.4, from: this.camPose() };
+    this.seatLook.yaw = 0; this.seatLook.pitch = 0;
+    this.setState('bed');
+  }
+
+  sitCouch() {
+    this.trans = { t: 0, dur: 0.9, from: this.camPose() };
+    this.seatLook.yaw = 0; this.seatLook.pitch = -0.05;
+    this.setState('couch');
+    this.g.audio.play('chair.ogg', { pos: new THREE.Vector3(this.g.bedroom.sofaSeat.x, 0.4, this.g.bedroom.sofaSeat.z), vol: 0.3, rate: 0.7 });
+  }
+
+  leaveCouch() {
+    const s = this.g.bedroom.sofaSeat;
+    this.trans = { t: 0, dur: 0.8, from: this.camPose() };
+    this.pos.set(s.x + 0.55, 0, s.z - 0.45);
+    this.yaw = -Math.PI / 2 + 0.6; this.pitch = -0.1; this.bodyYaw = this.yaw;
+    this.setState('walk');
+  }
+
   camPose() { const c = this.g.camera; return { p: c.position.clone(), q: c.quaternion.clone(), fov: c.fov }; }
 
   // ------------------------------------------------------------------ per frame
@@ -76,6 +109,7 @@ export class Player {
     else if (this.state === 'look') this.updateLook(dt, d);
     else if (this.state === 'sit') this.updateSit(dt, d);
     else if (this.state === 'bed') this.updateBed(dt, d);
+    else if (this.state === 'couch') this.updateLook(dt, d, 1.5, 0.9);
     this.pose(dt);
     this.camera(dt);
     void g;
@@ -122,10 +156,10 @@ export class Player {
     this.g.pcMouse?.(d.dx, d.dy, d.wheel);
   }
 
-  updateLook(dt, d) {
-    const sens = 0.0022;
-    this.seatLook.yaw = THREE.MathUtils.clamp(this.seatLook.yaw - d.dx * sens, -2.2, 2.2);
-    this.seatLook.pitch = THREE.MathUtils.clamp(this.seatLook.pitch - d.dy * sens, -1.3, 1.1);
+  updateLook(dt, d, yawLim = 2.2, pitchUp = 1.1) {
+    const sens = (this.g.settings?.sens ?? 1) * 0.0022;
+    this.seatLook.yaw = THREE.MathUtils.clamp(this.seatLook.yaw - d.dx * sens, -yawLim, yawLim);
+    this.seatLook.pitch = THREE.MathUtils.clamp(this.seatLook.pitch - d.dy * sens, -1.3, pitchUp);
   }
 
   updateBed(dt, d) {
@@ -161,6 +195,14 @@ export class Player {
       // clavicles forward a touch (reaching for keyboard/mouse)
       this.hands.update(dt, yaw);
       void bodyY;
+    } else if (this.state === 'couch') {
+      const s = this.g.bedroom.sofaSeat;
+      const yaw = s.yaw; // avatar faces +x (the TV)
+      placeRoot(av, new THREE.Vector3(s.x, s.y + 0.08, s.z), yaw);
+      sitLegs(av, yaw, 0);
+      spineAndHead(av, yaw, -0.08, this.lookDir(), 0.85);
+      hangArms(av, yaw, 0, 0);
+      for (const side of ['l', 'r']) av.relaxFingers(side, 0.45);
     } else if (this.state === 'bed') {
       const b = this.g.bed;
       lieDown(av, b.pelvis, b.headDir);
@@ -192,6 +234,7 @@ export class Player {
       const axis = new THREE.Vector3().crossVectors(up, toes).normalize();
       return up.applyAxisAngle(axis, -this.seatLook.pitch + 0.15).applyAxisAngle(b.headDir, this.seatLook.yaw).normalize();
     }
+    if (this.state === 'couch') return this.dir(-Math.PI / 2 + this.seatLook.yaw, this.seatLook.pitch - 0.05); // looking at the TV (+x)
     // seated: yaw around the desk direction (world -x)
     const base = -Math.PI / 2 + Math.PI; // camera yaw that looks at -x
     return this.dir(base + this.seatLook.yaw, this.seatLook.pitch - 0.1);

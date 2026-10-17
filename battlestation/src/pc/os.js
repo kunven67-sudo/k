@@ -121,8 +121,13 @@ export class OS {
     this.state = s;
     this.stateT = 0;
     this.dirty = true;
-    if (s === 'post') this.g.onPcPower?.(true);
-    if (s === 'desktop' && !this.welcomed) { this.welcomed = true; setTimeout(() => this.notify('Welcome', `Signed in as ${this.user.name}.`), 1200); }
+    if (s === 'post') { this.g.onPcPower?.(true); this.loginDone = false; }
+    if (s === 'desktop' && !this.loginDone) {
+      this.loginDone = true;
+      // the apps you had open on your real PC start up again, sitting on the taskbar
+      for (const it of this.openAtLogin || []) { const w = this.launch(it); if (w) { w.min = true; if (this.focus === w) this.focus = null; } }
+      if (!this.welcomed) { this.welcomed = true; setTimeout(() => this.notify('Welcome', `Signed in as ${this.user.name}.`), 1200); }
+    }
   }
 
   bsod(code = 'VIDEO_TDR_FAILURE') { this.windows = []; this.menu = null; this.bsodCode = code; this.dirtyShutdown = true; this.go('bsod'); }
@@ -242,13 +247,17 @@ export class OS {
     g.shadowColor = 'rgba(0,0,0,0.35)'; g.shadowBlur = 12;
     if (this.state === 'lock') {
       font(g, 150, 600);
-      g.fillText(now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M/i, ''), d.w / 2, 260);
+      g.fillText(now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: this.theme.clock24 === undefined ? undefined : !this.theme.clock24 }).replace(/\s?[AP]M/i, ''), d.w / 2, 260);
       font(g, 30, 400);
       g.fillText(now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }), d.w / 2, 310);
       font(g, 16, 400); g.fillText('Press any key or click to sign in', d.w / 2, d.h - 60);
     } else {
       g.shadowBlur = 0;
-      g.drawImage(icon('user', 180), d.w / 2 - 90, d.h / 2 - 230);
+      if (this.user.pic && !this.user.picImg) { const im = new Image(); im.onload = () => { this.dirty = true; }; im.src = 'data:image/jpeg;base64,' + this.user.pic; this.user.picImg = im; }
+      if (this.user.picImg?.complete && this.user.picImg.naturalWidth) {
+        g.save(); g.beginPath(); g.arc(d.w / 2, d.h / 2 - 140, 90, 0, Math.PI * 2); g.clip();
+        g.drawImage(this.user.picImg, d.w / 2 - 90, d.h / 2 - 230, 180, 180); g.restore();
+      } else g.drawImage(icon('user', 180), d.w / 2 - 90, d.h / 2 - 230);
       font(g, 32, 600); g.fillText(this.user.name, d.w / 2, d.h / 2 + 5);
       const b = this.signBtn = { x: d.w / 2 - 70, y: d.h / 2 + 40, w: 140, h: 36 };
       fillRR(g, b.x, b.y, b.w, b.h, 6, inside(this.cursor.x, this.cursor.y, b.x, b.y, b.w, b.h) ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.2)');
@@ -401,7 +410,7 @@ export class OS {
     // system tray: net, volume, clock
     const now = new Date();
     font(g, 12, 400); g.fillStyle = this.theme.dark ? '#fff' : '#111'; g.textAlign = 'right';
-    g.fillText(now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), d.w - 14, y + 21);
+    g.fillText(now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: this.theme.clock24 === undefined ? undefined : !this.theme.clock24 }), d.w - 14, y + 21);
     g.fillText(now.toLocaleDateString(), d.w - 14, y + 38);
     const tx = d.w - 160;
     this.trayBox = { x: tx, y, w: 70, h: TB };
@@ -842,9 +851,10 @@ export class OS {
     } else if (this.state === 'boot' || this.state === 'welcome') kind = 'busy';
     const visible = !['off', 'sleep', 'post', 'bsod', 'shutting'].includes(this.state) && !(this.state === 'boot') && !(this.capture && this.windows.includes(this.capture));
     if (kind !== this._kind) { this._kind = kind; this.g.pcCursorKind?.(kind); }
+    const [hx, hy] = this.hot || [1, 1]; // the image's click point (middle for the crosshair)
     for (const d of this.displays) {
       const on = visible && inside(c.x, c.y, d.x, d.y, d.w, d.h);
-      d.mon.setCursor(c.x - d.x, c.y - d.y, on);
+      d.mon.setCursor(c.x - d.x - hx, c.y - d.y - hy, on);
     }
   }
 }

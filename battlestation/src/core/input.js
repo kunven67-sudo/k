@@ -60,6 +60,7 @@ export class Input {
     if (!this.enabled) return;
     // Let the browser keep a few keys for itself.
     if (['F5', 'F11', 'F12'].includes(e.code) && !e.ctrlKey) return;
+    if (e.code === 'F1') e.preventDefault(); // the game menu, not the browser's help page
     if (this.locked || document.fullscreenElement) e.preventDefault();
     if (down) this.keys.add(e.code); else this.keys.delete(e.code);
     this.emitKey(e, down);

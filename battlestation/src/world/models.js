@@ -18,9 +18,60 @@ export async function model(name) {
       o.castShadow = true; o.receiveShadow = true;
       const m = o.material;
       if (m && m.map) m.map.anisotropy = 8;
+      // the scans' glass shares the opaque body texture, so it would hide what's behind it
+      if (m && /glass/i.test(m.name)) { o.material = glassMat(); o.castShadow = false; }
     }
   });
   return s;
+}
+
+let _glass;
+export function glassMat() {
+  return _glass ||= new THREE.MeshStandardMaterial({ name: 'glass', color: 0xffffff, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false, envMapIntensity: 1.6 });
+}
+
+// Real-time clock hands on a scanned clock. Works out where each hand points right now so we
+// can turn it to any time: hands turn clockwise around the face normal seen from the front.
+export function clockHands(root, names, pivot, normal) {
+  const hands = [];
+  root.updateMatrixWorld(true);
+  for (const [key, name] of Object.entries(names)) {
+    const node = root.getObjectByName(name);
+    if (!node) continue;
+    const parent = node.parent;
+    const inv = new THREE.Matrix4().copy(parent.matrixWorld).invert();
+    // farthest vertex from the pivot = the tip
+    let best = 0; const tip = new THREE.Vector3(), v = new THREE.Vector3();
+    node.traverse(o => {
+      if (!o.isMesh) return;
+      const p = o.geometry.attributes.position;
+      for (let i = 0; i < p.count; i += 1) {
+        v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
+        const d = v.clone().sub(pivot); d.addScaledVector(normal, -d.dot(normal));
+        if (d.lengthSq() > best) { best = d.lengthSq(); tip.copy(d); }
+      }
+    });
+    const up = new THREE.Vector3(0, 1, 0), right = up.clone().cross(normal);
+    const a0 = Math.atan2(tip.dot(right), tip.dot(up));
+    // rotate around the pivot: wrap the hand in a pivot group
+    const pg = new THREE.Group();
+    pg.position.copy(pivot);
+    parent.add(pg);
+    node.position.sub(pivot);
+    pg.add(node);
+    hands.push({ key, pg, a0 });
+  }
+  const q = new THREE.Quaternion();
+  return {
+    set(date) {
+      const s = date.getSeconds() + date.getMilliseconds() / 1000, m = date.getMinutes() + s / 60, h = (date.getHours() % 12) + m / 60;
+      const ang = { hour: h / 12, minute: m / 60, second: Math.floor(s) / 60 };
+      for (const hd of hands) {
+        const a = ang[hd.key] * Math.PI * 2;
+        hd.pg.quaternion.copy(q.setFromAxisAngle(normal, -(a - hd.a0)));
+      }
+    },
+  };
 }
 
 export async function gltfRaw(name) {

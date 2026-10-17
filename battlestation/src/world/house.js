@@ -102,8 +102,9 @@ export async function buildHouse(ctx) {
       W: [r.x0, r.z1, 0, -1, r.z1 - r.z0], E: [r.x1, r.z0, 0, 1, r.z1 - r.z0],
     };
     for (const [side, [ox, oz, dx, dz, len]] of Object.entries(sides)) {
-      const inset = 0.002;
-      const g = wallFace(ox + (-dz) * inset, oz + dx * inset, dx, dz, len, H, holes[name][side]);
+      // inset from the structure, and a few mm longer/taller so the corners + ceiling edge overlap (no seams)
+      const inset = 0.002, e = 0.004;
+      const g = wallFace(ox + (-dz) * inset - dx * e, oz + dx * inset - dz * e, dx, dz, len + 2 * e, H + 0.015, holes[name][side].map(o => ({ ...o, x0: o.x0 + e, x1: o.x1 + e })));
       if (!g) continue;
       let mat = m;
       if (name === 'bedroom' && side === 'W') { mat = plaster.clone(); mat.color.set(r.accent); }

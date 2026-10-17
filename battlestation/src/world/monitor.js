@@ -6,10 +6,10 @@ import { paint, smudgeTex } from './materials.js';
 // whose picture comes from the in-game PC (a canvas). The cursor is drawn by the screen shader
 // so moving the mouse never has to re-upload the whole picture.
 export function buildMonitor(o) {
-  const { inches = 27, res = [1600, 900], name = 'monitor' } = o;
+  const { inches = 27, res = [1600, 900], name = 'monitor', bezel = 0.0065, chinH = 0.016 } = o;
   const diag = inches * 0.0254;
   const sw = diag * 16 / Math.hypot(16, 9), sh = diag * 9 / Math.hypot(16, 9);
-  const bez = 0.0065, chin = 0.016, depth = 0.018;
+  const bez = bezel, chin = chinH, depth = o.depth ?? 0.018;
   const g = new THREE.Group();
   g.name = name;
   const shell = paint(0x0e0f11, 0.48, 0.05, { roughnessMap: smudgeTex() });
@@ -21,13 +21,15 @@ export function buildMonitor(o) {
   const hump = mesh(box(W * 0.62, Hh * 0.62, 0.03, 0.012), back, { parent: g });
   hump.position.set(0, -0.02, -depth / 2 - 0.012);
   // stand
-  const standMat = paint(0x1a1b1e, 0.38, 0.6);
-  const neck = mesh(box(0.05, 0.36, 0.022, 0.006), standMat, { parent: g });
-  neck.position.set(0, -0.13, -0.065);
-  neck.rotation.x = -0.08;
-  const foot = mesh(slab(0.26, 0.2, 0.008, 0.03, 0.002), standMat, { parent: g });
-  foot.position.set(0, -sh / 2 - chin - 0.11 - 0.008, -0.05);
-  g.userData.footY = foot.position.y;
+  if (o.stand !== false) {
+    const standMat = paint(0x1a1b1e, 0.38, 0.6);
+    const neck = mesh(box(0.05, 0.36, 0.022, 0.006), standMat, { parent: g });
+    neck.position.set(0, -0.13, -0.065);
+    neck.rotation.x = -0.08;
+    const foot = mesh(slab(0.26, 0.2, 0.008, 0.03, 0.002), standMat, { parent: g });
+    foot.position.set(0, -sh / 2 - chin - 0.11 - 0.008, -0.05);
+    g.userData.footY = foot.position.y;
+  }
 
   // screen
   const canvas = document.createElement('canvas');
@@ -131,7 +133,6 @@ export function makeCursor(kind = 'arrow') {
   } else if (kind === 'cross') {
     g.strokeStyle = '#000'; g.lineWidth = 3; g.beginPath(); g.moveTo(16, 4); g.lineTo(16, 28); g.moveTo(4, 16); g.lineTo(28, 16); g.stroke();
     g.strokeStyle = '#fff'; g.lineWidth = 1.2; g.stroke();
-    // hotspot is the center: shift the drawing up-left so the arrow-style top-left anchor lands in the middle
   } else if (kind === 'busy') {
     g.beginPath(); g.moveTo(1, 1); g.lineTo(1, 18); g.lineTo(5, 14.5); g.lineTo(8, 21); g.lineTo(11, 20); g.lineTo(8, 13.5); g.lineTo(13, 13.5); g.closePath();
     g.fillStyle = '#fff'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = '#000'; g.stroke();

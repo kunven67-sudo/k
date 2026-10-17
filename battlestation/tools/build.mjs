@@ -10,7 +10,7 @@ fs.mkdirSync('dist', { recursive: true });
 const result = await esbuild.build({
   entryPoints: ['src/main.js'], bundle: true, format: 'iife', target: 'es2022',
   minify: !devOnly, sourcemap: devOnly ? 'inline' : false, write: false, legalComments: 'none',
-  define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
+  define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning', loader: { '.ps1': 'text' },
 });
 const code = result.outputFiles[0].text;
 fs.writeFileSync('dist/bundle.js', code);

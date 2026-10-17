@@ -36,6 +36,11 @@ kbd { font: 600 11px/1 var(--ui); padding: 3px 6px; border: 1px solid var(--line
 #xhair { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 0 2px rgba(0,0,0,.8); }
 #prompt { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); font-size: 14px; text-shadow: 0 1px 3px rgba(0,0,0,.9); white-space: nowrap; }
 #prompt kbd { margin-right: 6px; }
+#prompt .hold { margin: 8px auto 0; width: 220px; font-size: 12px; color: var(--dim); text-align: center; }
+#prompt .hold i { display: block; height: 3px; margin-top: 5px; background: var(--ink); border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+#fps { position: absolute; right: 12px; top: 10px; font: 600 12px/1 ui-monospace, Consolas, monospace; color: #cfe; text-shadow: 0 1px 2px #000; }
+#hint { position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%); font-size: 15px; text-shadow: 0 1px 4px rgba(0,0,0,.95); opacity: 0; transition: opacity .6s; white-space: nowrap; }
+#hint.on { opacity: 1; }
 #toast { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); padding: 9px 16px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); font-size: 14px; opacity: 0; transition: opacity .3s; max-width: 80vw; text-align: center; }
 #toast.on { opacity: 1; }
 #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 30; transition: opacity .5s; }
@@ -96,8 +101,9 @@ ol.steps b { color: var(--ink); }
   <div class="keys">
     <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk</span><span><kbd>Mouse</kbd> look</span>
     <span><kbd>E</kbd> / <kbd>Click</kbd> use</span><span><kbd>Shift</kbd> walk faster</span>
-    <span><kbd>Ctrl</kbd> crouch</span><span><kbd>Esc</kbd> menu</span>
+    <span><kbd>Ctrl</kbd> crouch</span><span><kbd>F1</kbd> menu</span>
   </div>
+  <p style="margin-top:22px">At the PC your real mouse and keyboard ARE the in-game ones. To get up, push the mouse past the top of the screen.</p>
 </div></div>
 <div id="hud">
   <div id="xhair"></div>
@@ -105,6 +111,7 @@ ol.steps b { color: var(--ink); }
   <div id="seatbar"></div>
   <img id="vcursor" alt="">
   <div id="toast"></div>
+  <div id="hint"></div>
 </div>
 <div id="lids"></div>
 <div id="fade"></div>
