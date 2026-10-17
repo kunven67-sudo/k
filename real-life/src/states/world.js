@@ -23,6 +23,7 @@ import { People } from '../people/index.js';
 import { Chores } from '../life/chores.js';
 import { Talk } from '../talk/index.js';
 import { Rules } from '../life/rules.js';
+import { LemonadeStand } from '../life/lemonade.js';
 
 export class WorldState {
   constructor(engine) {
@@ -47,6 +48,7 @@ export class WorldState {
     this.life.people = this.people;
     this.life.chores = new Chores(this.life);
     this.life.rules = new Rules(this.life);
+    this.life.lemonade = new LemonadeStand(this.life);
     this.talk = new Talk({ world, player: this.player, hud: this.hud, life: this.life, people: this.people });
     this.camOverride = params.cam ? params.cam.split(',').map(Number) : null;
     e.setView(world.scene, this.player.camera);
@@ -66,6 +68,7 @@ export class WorldState {
     this.people.update(dt);
     this.talk.update(dt);
     this.life.rules.update(dt);
+    this.life.lemonade.update(dt);
     if (this.camOverride) {
       const [x, y, z, yaw, pitch] = this.camOverride;
       p.camera.position.set(x, y, z);
@@ -85,6 +88,7 @@ export class WorldState {
     this.talk?.dispose();
     this.life?.chores?.dispose();
     this.life?.rules?.dispose();
+    this.life?.lemonade?.dispose();
     this.people?.dispose();
     this.life?.dispose();
     this.hud?.dispose();

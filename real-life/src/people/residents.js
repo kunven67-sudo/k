@@ -124,6 +124,17 @@ export function makeResidents(life) {
   return out;
 }
 
+/** Someone from another street passing through (jogger, dog walker, out for a walk). */
+export function makeWalker(seed) {
+  const r = new Rng(seed);
+  const sex = r.pick(['f', 'm']);
+  const age = r.chance(0.15) ? 13 + r.int(0, 4) : 19 + r.int(0, 55);
+  const kind = age < 18 ? 'teen' : r.pick(['walk', 'walk', 'jog', 'dog', 'phone']);
+  const look = randomLook(r, { sex, age });
+  if (kind === 'jog') look.outfit = { ...look.outfit, top: 'tshirt', bottom: 'shorts', shoes: 'sneakers' };
+  return { id: `walker-${seed}`, transient: true, role: 'walker', walk: kind, name: r.pick(FIRST[sex]), last: r.pick(LAST), sex, age, look, job: r.pick(JOBS).job, traits: traits(r), home: 'elsewhere', startAway: 'elsewhere' };
+}
+
 /**
  * What someone should be doing right now. Returns { at, act } where at is:
  *   'home' (inside their own house, no body), 'work', 'offsite', 'world' + node/spot targets.

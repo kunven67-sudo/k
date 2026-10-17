@@ -19,7 +19,7 @@ import { settings } from '../core/settings.js';
 import { me } from '../life/me.js';
 import { buildNav } from './nav.js';
 import { Npc } from './npc.js';
-import { makeResidents, plan } from './residents.js';
+import { makeResidents, makeWalker, plan } from './residents.js';
 
 save.registerSlice('people', {
   create() {
@@ -72,6 +72,7 @@ export class People {
 
   memory(npc) {
     const id = npc.id || npc;
+    if (npc.rec?.transient) return (npc._mem ||= { opinion: 0, met: false, talks: 0, facts: {}, said: [], lastTalk: -1, asks: {} });
     return (this.d.mem[id] ||= { opinion: npc.rec?.family ? 55 : 0, met: !!npc.rec?.family, talks: 0, facts: {}, said: [], lastTalk: -1, asks: {} });
   }
 
@@ -126,9 +127,43 @@ export class People {
     };
   }
 
+  /** People from other streets walking through Maple St (more after school, evenings, weekends). */
+  _walkers() {
+    const h = clock.hourFloat;
+    const wd = clock.weekday;
+    const weekend = wd === 0 || wd === 6;
+    let want = h < 6.5 || h > 21.5 ? 0 : h < 9 ? 1 : h < 15 ? (weekend ? 3 : 1) : h < 19.5 ? 3 : 2;
+    if (weekend) want += 1;
+    if ((this.world.weather?.rain || 0) > 0.3) want = Math.floor(want / 3);
+    if (clock.season === 'winter') want = Math.floor(want * 0.6);
+    want = Math.round(want * (settings.get('peopleCount') ?? 1));
+    const live = this.npcs.filter((n) => n.rec.transient);
+    if (live.length >= want) return;
+    // Every few minutes someone new turns onto Maple from Elm or comes up from the park.
+    const seed = clock.dayIndex * 1440 + Math.floor(clock.minutes);
+    if (seed % 6 !== 0) return;
+    const rec = makeWalker(seed);
+    const n = new Npc(this.world, this.nav, rec);
+    n.noticesPlayer = false;
+    const ends = this.nav.nodes.filter((x) => x.tag === 'walk' && Math.abs(x.p.x) > 55 && x.p.x < 64);
+    const west = ends.filter((x) => x.p.x < 0);
+    const east = ends.filter((x) => x.p.x > 0);
+    const fromWest = seed % 12 === 0;
+    const a = (fromWest ? west : east)[seed % Math.max(1, (fromWest ? west : east).length)];
+    const b = (fromWest ? east : west)[(seed >> 3) % Math.max(1, (fromWest ? east : west).length)];
+    if (!a || !b) return;
+    n.appearAt(a.id);
+    n.hurry = rec.walk === 'jog';
+    n.walkTarget = b.id;
+    n.goTo(b.id, { kind: 'leave', where: 'gone' });
+    this.npcs.push(n);
+  }
+
   _replan(snap = false) {
+    this._walkers();
     const ctx = this._ctx();
     for (const n of this.npcs) {
+      if (n.rec.transient) continue;
       let p = plan(n.rec, clock, ctx);
       if (p.act?.kind === 'shop' && n.shopDone === clock.dayIndex) p = { at: 'home' };
       if (p.act?.kind === 'cook' && n.rec.family) this._mealTalk(n, p);
@@ -283,7 +318,7 @@ export class People {
       if (n.away) continue;
       n.update(dt, viewer, this.player);
       // Walking off somewhere far from you: they're gone once you couldn't see them anyway.
-      if (n.activity?.kind === 'leave' && n.pos.distanceTo(viewer) > FAR + 5 && !n.arrived) {
+      if (n.activity?.kind === 'leave' && n.pos.distanceTo(viewer) > FAR + 5 && !n.arrived && !n.rec.transient) {
         n.setAway(n.activity.where);
         continue;
       }
@@ -291,6 +326,10 @@ export class People {
       vis.push(n);
     }
     this._spacing(vis, dt);
+    if (this.npcs.some((n) => n._dead)) {
+      for (const n of this.npcs) if (n._dead) n.dispose();
+      this.npcs = this.npcs.filter((n) => !n._dead);
+    }
   }
 
   /** People standing around don't stand inside each other (or inside you): small push apart. */
@@ -319,12 +358,20 @@ export class People {
     }
   }
 
+  /** After a detour (buying lemonade, talking): carry on with what they were doing. */
+  resume(n) {
+    if (n.away) return;
+    if (n.rec.transient) n.goTo(n.walkTarget, { kind: 'leave', where: 'gone' });
+    else n.planKey = null;
+  }
+
   _arrived(n, dt) {
     const act = n.activity;
     if (!act) return;
     const S = this.world.town.stores;
     if (act.kind === 'leave') {
       n.setAway(act.where);
+      if (n.rec.transient) n._dead = true;
       return;
     }
     // Wandering kinds: pause (real seconds), then pick the next place.
