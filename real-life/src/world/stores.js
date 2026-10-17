@@ -16,6 +16,8 @@ import { byStore, PRODUCT } from '../life/products.js';
 import { CURB, STORES } from './layout.js';
 import { Rng } from '../core/rng.js';
 import { audio } from '../core/audio.js';
+import { fitOut } from './storefit.js';
+import { cartRow, basketStack } from './cart.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -71,7 +73,7 @@ function buildStore(world, B, root, def) {
   const style = {
     grocery: { ext: mat('stucco', { color: 0xd8cdb8, dirt: 0.3 }), band: mat('metal-painted', { color: 0x1a5fb4, wear: 0.1 }), sign: ['#1a5fb4', '#ffc220'], floor: mat('tile-floor', { color: 0xe9e7e2, count: 2, grout: 0xc9c6c0 }) },
     electronics: { ext: mat('metal-painted', { color: 0x1d3c78, wear: 0.15, dirt: 0.2 }), band: mat('metal-painted', { color: 0x0e2550, wear: 0.1 }), sign: ['#0a2a66', '#ffe000'], floor: mat('tile-floor', { color: 0x9a9da3, count: 2, grout: 0x777a80 }) },
-    furniture: { ext: mat('metal-painted', { color: 0x0058a3, wear: 0.1, dirt: 0.15 }), band: mat('metal-painted', { color: 0xffda1a, wear: 0.05 }), sign: ['#0058a3', '#ffda1a'], floor: mat('concrete', { wear: 0.15, dirt: 0.15 }) },
+    furniture: { ext: mat('metal-painted', { color: 0x0058a3, wear: 0.1, dirt: 0.15 }), band: mat('metal-painted', { color: 0xffda1a, wear: 0.05 }), sign: ['#0058a3', '#ffda1a'], floor: polished(mat('concrete', { wear: 0.15, dirt: 0.15 }), 0.38) },
   }[def.id];
   const inner = mat('paint', { color: def.id === 'electronics' ? 0x2b2e35 : 0xf2f0ea });
   const block = mat('concrete', { wear: 0.4, dirt: 0.5 });
@@ -89,13 +91,10 @@ function buildStore(world, B, root, def) {
   // Facade band + parapet + roof.
   B.box(x0 - 0.2, H - 0.6, zc, 0.12, 1.4, W + 0.4, style.band, { collide: false });
   B.box((x0 + x1) / 2, H + 0.05, zc, x1 - x0 + 0.3, 0.1, W + 0.3, block, { collide: false });
-  // Floor + ceiling.
+  // Floor (polished: real store floors shine), then the ceiling, lights and wall trim.
   B.slab(x0 + 0.15, z0 + 0.15, x1 - 0.15, z1 - 0.15, FY, style.floor, { thick: 0.1 });
-  const ceil = mat('paint', { color: def.id === 'electronics' ? 0x1c1d21 : 0x3a3c40 });
-  B.slab(x0 + 0.15, z0 + 0.15, x1 - 0.15, z1 - 0.15, H - 0.3, null, { thick: 0.05, under: ceil, collide: false });
-  // Light panels (emissive) in rows.
-  const panel = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.6, roughness: 1 });
-  for (let x = x0 + 3; x < x1 - 2; x += 4) for (let z = z0 + 3; z < z1 - 2; z += 4) B.box(x, H - 0.34, z, 1.2, 0.04, 0.3, panel, { collide: false, shadow: false });
+  const decorFrom = root.children.length; // everything added from here on hides with the shelves when you're far away
+  fitOut(B, root, def);
   // Storefront glass panes + mullions.
   const glass = mat('glass', { dirt: 0.15 });
   const pane = (zA, zB, y0, y1) => {
@@ -154,6 +153,8 @@ function buildStore(world, B, root, def) {
   finishTags(S, root);
   // Registers.
   for (const r of S.registers) register(ctx, r);
+  const decor = root.children.slice(decorFrom).filter((o) => !(S.productMeshes || []).includes(o));
+  (S.productMeshes ||= []).push(...decor);
   S.entrance = new THREE.Vector3(x0 + 2.5, FY, doorZ);
   S.outside = new THREE.Vector3(x0 - 2.5, CURB, doorZ);
   return S;
@@ -171,8 +172,14 @@ function groceryLayout(ctx, def) {
   const produce = byStore('grocery').filter((p) => p.aisle === 'Produce');
   const tables = [];
   for (let i = 0; i < 4; i++) tables.push({ x: x0 + 3.5 + (i % 2) * 3.2, z: zc + 4.5 + Math.floor(i / 2) * 3.2 });
-  produce.forEach((p, i) => produceTable(ctx, tables[i % 4], p, i >= 4 ? 1 : 0, Math.floor(i / 4)));
-  for (const t of tables) B.box(t.x, FY + 0.38, t.z, 2.4, 0.76, 1.6, mat('wood', { color: 0x6b4a2e, varnish: 0.5 }), {});
+  // Each table holds 4 crates; every crate gets a product (the popular ones twice).
+  for (let k = 0; k < 16; k++) produceTable(ctx, tables[Math.floor(k / 4)], produce[k % produce.length], k % 2, Math.floor(k / 2) % 2);
+  const stand = mat('wood', { color: 0x8a6544, varnish: 0.4, wear: 0.3 });
+  const base = mat('rubber', { color: 0x1e1f21 });
+  for (const t of tables) {
+    B.box(t.x, FY + 0.43, t.z, 2.4, 0.66, 1.6, [stand, stand, stand, null, stand, stand], {});
+    B.box(t.x, FY + 0.05, t.z, 2.3, 0.1, 1.5, base, { collide: false, shadow: false });
+  }
   // Bakery display near produce.
   const bakery = byStore('grocery').filter((p) => p.aisle === 'Bakery');
   wallRun(ctx, { x: x0 + 11, z: z1 - 0.25 }, { x: x0 + 1.2, z: z1 - 0.25 }, Math.PI, bakery, { levels: [0.15, 0.6, 1.05, 1.5] });
@@ -193,10 +200,10 @@ function groceryLayout(ctx, def) {
   coolerRun(ctx, x1 - 0.8, z0 + 1.5, z1 - 1.5, cold);
   // Basket stack + carts by the door.
   ctx.S.baskets = new THREE.Vector3(x0 + 1.5, FY, zc - 2.2);
-  B.model('market', 'shopping-basket', { x: x0 + 1.5, y: FY, z: zc - 2.2, scale: 2.2, collide: 'none' });
-  B.model('market', 'shopping-basket', { x: x0 + 1.5, y: FY + 0.2, z: zc - 2.2, scale: 2.2, collide: 'none' });
-  B.model('market', 'shopping-basket', { x: x0 + 1.5, y: FY + 0.4, z: zc - 2.2, scale: 2.2, collide: 'box' });
-  for (let i = 0; i < 4; i++) B.model('market', 'shopping-cart', { x: x0 + 1.0 + i * 0.32, y: FY, z: zc + 2.4, rotY: Math.PI / 2, scale: 2.25, collide: i === 0 ? [1.4, 1, 0.7] : 'none' });
+  basketStack(ctx.root, x0 + 1.5, FY, zc - 2.2, 5);
+  B.collider(x0 + 1.5, FY + 0.3, zc - 2.2, 0.5, 0.6, 0.4);
+  cartRow(ctx.root, [0, 1, 2, 3, 4].map((i) => ({ x: x0 + 1.0 + i * 0.3, y: FY, z: zc + 2.4, rotY: Math.PI })));
+  B.collider(x0 + 1.6, FY + 0.5, zc + 2.4, 2.1, 1.0, 0.6);
   aisleSigns(ctx, gz.map((z, i) => ({ x: (ax0 + ax1) / 2, z: z + 2.4, text: aisles[i] })));
 }
 
@@ -225,11 +232,15 @@ function electronicsLayout(ctx, def) {
   const aisles = [['Gaming'], ['Computers', 'Phones & Audio'], ['PC Parts']];
   gz.forEach((zz, i) => {
     const list = byStore('electronics').filter((p) => aisles[i].includes(p.aisle));
-    gondola(ctx, x0 + 9, x1 - 4, zz, list, aisles[i][0], { locked: i === 2 });
+    gondola(ctx, x0 + 9, x1 - 4, zz, list, aisles[i][0], { locked: i === 2, endcaps: ['w'] });
   });
   aisleSigns(ctx, gz.map((zz, i) => ({ x: (x0 + 9 + x1 - 4) / 2, z: zz + 2.25, text: aisles[i].join(' + ') })));
   // Blue shirt service desk near the door.
-  B.box(x0 + 3, FY + 0.5, z1 - 3, 2.4, 1.0, 0.8, mat('metal-painted', { color: 0x0e2550 }), {});
+  B.box(x0 + 3, FY + 0.5, z1 - 3, 2.4, 1.0, 0.8, [mat('metal-painted', { color: 0x0e2550 }), mat('metal-painted', { color: 0x0e2550 }), null, null, mat('metal-painted', { color: 0x0e2550 }), mat('metal-painted', { color: 0x0e2550 })], {});
+  B.box(x0 + 3, FY + 1.015, z1 - 3, 2.5, 0.03, 0.9, mat('plastic', { color: 0x2b2d31 }), { collide: false });
+  B.box(x0 + 3, FY + 0.6, z1 - 3.41, 2.4, 0.06, 0.02, mat('plastic', { color: 0xffe000 }), { collide: false, shadow: false });
+  posScreen(root, x0 + 2.4, FY + 1.25, z1 - 2.85, 0);
+  posScreen(root, x0 + 3.6, FY + 1.25, z1 - 2.85, 0);
   S.serviceDesk = new THREE.Vector3(x0 + 3, FY, z1 - 2.2);
 }
 
@@ -241,37 +252,114 @@ function furnitureLayout(ctx, def) {
   // Showroom vignettes: low partition walls + furniture with price tags. Buying big items =
   // order at the register for delivery (a real kid can't carry a sofa home).
   const part = mat('paint', { color: 0xf5f2ea });
+  // Room sets laid out like real ones. Each item: lx = across the room (side wall at +3),
+  // ld = distance out from the back wall, face = which way its front points, y = sits on top
+  // of something. s = +1: back wall on the -z side; s = -1: back wall on the +z side (the room
+  // opens toward the middle walkway either way).
   const rooms = [
-    { x: x0 + 12, z: z0 + 4, items: ['bed-single', 'nightstand', 'dresser-low', 'rug-round', 'desk-lamp'] },
-    { x: x0 + 20, z: z0 + 4, items: ['sofa', 'coffee-table', 'floor-lamp', 'plant-big', 'rug'] },
-    { x: x0 + 12, z: z1 - 5, items: ['bed-bunk', 'dresser', 'plant-small', 'shelf-small'] },
-    { x: x0 + 20, z: z1 - 5, items: ['desk', 'gaming-chair', 'bookshelf', 'chair', 'stool'] },
-    { x: x0 + 27, z: zc, items: ['sofa-l', 'armchair', 'bed-king', 'curtains'] },
+    { x: x0 + 12, z: z0 + 4, s: 1, items: [
+      { id: 'bed-single', lx: -0.6, ld: 1.0, face: 'out' },
+      { id: 'nightstand', lx: 0.25, ld: 0.26, face: 'out' },
+      { id: 'desk-lamp', lx: 0.25, ld: 0.26, face: 'out', y: 0.41 },
+      { id: 'rug-round', lx: -0.6, ld: 2.45, face: 'out', rug: true },
+      { id: 'dresser-low', lx: 2.7, ld: 2.4, face: 'west' },
+    ] },
+    { x: x0 + 20, z: z0 + 4, s: 1, items: [
+      { id: 'sofa', lx: -0.4, ld: 0.58, face: 'out' },
+      { id: 'rug', lx: -0.4, ld: 2.05, face: 'east', rug: true },
+      { id: 'coffee-table', lx: -0.4, ld: 2.05, face: 'out' },
+      { id: 'floor-lamp', lx: 1.15, ld: 0.3, face: 'out' },
+      { id: 'plant-big', lx: 2.65, ld: 0.35, face: 'out' },
+    ] },
+    { x: x0 + 12, z: z1 - 5, s: -1, items: [
+      { id: 'bed-bunk', lx: -1.85, ld: 1.03, face: 'out' },
+      { id: 'dresser', lx: 0.9, ld: 0.3, face: 'out' },
+      { id: 'plant-small', lx: 1.35, ld: 0.3, face: 'out', y: 1.03 },
+      { id: 'shelf-small', lx: 2.84, ld: 2.4, face: 'west', y: 1.35 },
+    ] },
+    { x: x0 + 20, z: z1 - 5, s: -1, items: [
+      { id: 'desk', lx: -0.6, ld: 0.41, face: 'out' },
+      { id: 'gaming-chair', lx: -0.6, ld: 1.2, face: 'in' },
+      { id: 'bookshelf', lx: 2.79, ld: 1.3, face: 'west' },
+      { id: 'chair', lx: 1.2, ld: 2.9, face: 'west' },
+      { id: 'stool', lx: -2.3, ld: 0.4, face: 'out' },
+    ] },
+    // A small studio apartment set (IKEO loves those): corner sofa, king bed, curtains.
+    { x: x0 + 23, z: zc, s: 1, items: [
+      { id: 'sofa-l', lx: -1.5, ld: 1.1, face: 'out' },
+      { id: 'curtains', lx: -1.5, ld: 0.13, face: 'out' },
+      { id: 'bed-king', lx: 1.99, ld: 1.12, face: 'west' },
+      { id: 'armchair', lx: 0.4, ld: 3.7, face: 'in' },
+    ] },
   ];
-  for (const r of rooms) {
-    // Two partition walls make an open-sided "room".
-    B.box(r.x, FY + 1.2, r.z - 2.6, 6, 2.4, 0.1, part, {});
-    B.box(r.x + 3, FY + 1.2, r.z, 0.1, 2.4, 5.2, part, {});
-    B.box(r.x, FY + 0.005, r.z, 6, 0.01, 5.2, mat('wood-floor', { color: 0xc49a6c, wear: 0.05 }), { collide: false, shadow: false });
-    r.items.forEach((id, i) => {
-      const p = PRODUCT[id];
-      if (!p) return;
-      const px = r.x - 2 + (i % 3) * 1.9;
-      const pz = r.z - 1.4 + Math.floor(i / 3) * 2.1;
-      const yaw = Math.PI / 2;
-      if (p.pack.shape === 'model') {
-        const isRug = id.startsWith('rug');
-        B.model(p.pack.kit, p.pack.model, { x: px, y: FY + (isRug ? 0.008 : 0), z: pz, rotY: yaw, collide: isRug ? 'none' : 'box' });
+  // Every room set gets its own wall finish + floor, like a real showroom.
+  const looks = [
+    { wall: mat('wallpaper', { color: 0xd9e2e6, color2: 0xb8c7cf, pattern: 'stripe', wear: 0.02, dirt: 0.02 }), floor: mat('wood-floor', { color: 0xd8b48a, wear: 0.03 }) },
+    { wall: mat('paint', { color: 0x5f7a6a, dirt: 0.02 }), floor: mat('wood-floor', { color: 0x9a6b45, wear: 0.03 }) },
+    { wall: mat('paint', { color: 0xe8c9a8, dirt: 0.02 }), floor: mat('carpet', { color: 0x8c96a3 }) },
+    { wall: mat('paint', { color: 0x30384a, dirt: 0.02 }), floor: mat('wood-floor', { color: 0x6e4d33, wear: 0.03 }) },
+    { wall: mat('wallpaper', { color: 0xefe6d6, color2: 0xd8c8ae, pattern: 'damask', wear: 0.02, dirt: 0.02 }), floor: mat('wood-floor', { color: 0xc49a6c, wear: 0.05 }) },
+  ];
+  const cord = mat('rubber', { color: 0x111111 });
+  const shade = mat('metal-painted', { color: 0x222326, wear: 0.05 }).clone();
+  shade.side = THREE.DoubleSide;
+  const bulb = new THREE.MeshStandardMaterial({ color: 0xfff4dc, emissive: 0xffe2b0, emissiveIntensity: 2.2 });
+  const tagPole = mat('steel', { wear: 0.1 });
+  rooms.forEach((r, ri) => {
+    const look = looks[ri % looks.length];
+    const s = r.s;
+    const bz = r.z - s * 2.6; // back wall line
+    // Two partition walls make an open-sided "room": room side finished, back side plain.
+    const backFaces = s > 0 ? [part, part, part, null, look.wall, part] : [part, part, part, null, part, look.wall];
+    B.box(r.x, FY + 1.2, bz, 6, 2.4, 0.1, backFaces, {});
+    B.box(r.x + 3, FY + 1.2, r.z, 0.1, 2.4, 5.2, [part, look.wall, part, null, part, part], {});
+    B.box(r.x, FY + 0.005, r.z, 6, 0.01, 5.2, look.floor, { collide: false, shadow: false });
+    // Baseboard along the finished walls.
+    B.box(r.x, FY + 0.05, bz + s * 0.06, 5.9, 0.1, 0.02, part, { collide: false, shadow: false });
+    B.box(r.x + 2.94, FY + 0.05, r.z, 0.02, 0.1, 5.1, part, { collide: false, shadow: false });
+    // Pendant lamp hanging over the room set.
+    B.box(r.x, (FY + 2.6 + H) / 2, r.z, 0.012, H - FY - 2.6, 0.012, cord, { collide: false, shadow: false });
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.32, 0.3, 18, 1, true), shade);
+    lamp.position.set(r.x, FY + 2.45, r.z);
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), bulb);
+    glow.position.set(r.x, FY + 2.36, r.z);
+    ctx.root.add(lamp, glow);
+    const outYaw = s > 0 ? 0 : Math.PI;
+    const yawOf = { out: outYaw, in: outYaw + Math.PI, west: -Math.PI / 2, east: Math.PI / 2 };
+    for (const it of r.items) {
+      const p = PRODUCT[it.id];
+      if (!p) continue;
+      const px = r.x + it.lx;
+      const pz = bz + s * it.ld;
+      const yaw = yawOf[it.face];
+      const py = FY + (it.y || 0) + (it.rug ? 0.008 : 0);
+      if (p.pack.shape === 'model') B.model(p.pack.kit, p.pack.model, { x: px, y: py, z: pz, rotY: yaw, collide: it.rug || it.y ? 'none' : 'box' });
+      const [w, h, d] = p.pack.size;
+      const fx = Math.sin(yaw);
+      const fz = Math.cos(yaw);
+      const ext = it.face === 'west' || it.face === 'east' ? [d, w] : [w, d];
+      // Yellow price tag on a little floor stand at the front corner of the item.
+      if (!it.y && !it.rug) {
+        // f = the item's front, (fz, -fx) = its right hand side.
+        const tagX = px + fx * (d / 2 + 0.18) + fz * Math.max(0, w / 2 - 0.15);
+        const tagZ = pz + fz * (d / 2 + 0.18) - fx * Math.max(0, w / 2 - 0.15);
+        B.box(tagX, FY + 0.38, tagZ, 0.025, 0.76, 0.025, tagPole, { collide: false, shadow: false });
+        priceTag(ctx.root, tagX + fx * 0.02, FY + 0.88, tagZ + fz * 0.02, yaw, p, true);
+      } else {
+        priceTag(ctx.root, px + fx * (d / 2 + 0.02), py + Math.min(h, 0.3) + 0.12, pz + fz * (d / 2 + 0.02), yaw, p, true);
       }
-      const tagPos = new THREE.Vector3(px - 0.7, FY + 0.9, pz);
-      priceTag(ctx.root, tagPos.x, tagPos.y, tagPos.z, -Math.PI / 2, p, true);
-      S.slots.push(makeSlot(ctx, p, { box: new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(px, FY + 0.6, pz), new THREE.Vector3(1.4, 1.2, 1.4)), display: true }));
-    });
-  }
+      S.slots.push(makeSlot(ctx, p, { box: new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(px, py + Math.max(h, 0.3) / 2, pz), new THREE.Vector3(ext[0] + 0.2, Math.max(h, 0.3) + 0.1, ext[1] + 0.2)), display: true }));
+    }
+  });
+  // The painted walkway with arrows that leads you through the showroom.
+  const laneZ = Math.round(zc / 1.6 - 0.5) * 1.6 + 0.8; // lines up with the texture's edge lines
+  B.box((x0 + 8 + x0 + 19.5) / 2, FY + 0.004, laneZ, 11.5, 0.006, 1.6, walkwayMat(), { collide: false, shadow: false });
   // Self-serve warehouse: tall racks of flat-pack boxes along the back.
   const rack = mat('metal-painted', { color: 0xf2a900, wear: 0.3 });
+  let bay = 1;
   for (let z = z0 + 2; z < z1 - 2; z += 3.2) {
     B.box(x1 - 1.0, FY + 2, z, 1.6, 4, 0.08, rack, {});
+    binSign(ctx.root, x1 - 1.82, FY + 2.0, z + 0.05, bay++);
     for (const y of [0.1, 1.4, 2.7]) {
       B.box(x1 - 1.0, FY + y, z + 1.6, 1.6, 0.06, 3.2, rack, { collide: false });
       for (let k = 0; k < 2; k++) {
@@ -288,33 +376,90 @@ function furnitureLayout(ctx, def) {
 
 // ---------------------------------------------------------------------------------- shelving
 
-/** Double-sided gondola running along x at z, stocked on both sides. */
+/** Double-sided gondola running along x at z, stocked on both sides, with end caps. */
 function gondola(ctx, xa, xb, z, products, label, opts = {}) {
   const { B } = ctx;
   const metal = mat('metal-painted', { color: 0xe8e8e8, wear: 0.15, dirt: 0.15 });
+  const kick = mat('metal-painted', { color: 0x3a3d42, wear: 0.25, dirt: 0.3 });
+  const strip = mat('plastic', { color: 0xc9ced4, wear: 0.1, dirt: 0.15 });
   const len = xb - xa;
   const cx = (xa + xb) / 2;
   const levels = [0.14, 0.55, 0.96, 1.37, 1.78];
-  B.box(cx, FY + 1.05, z, len, 2.1, 0.06, metal, {}); // back panel
-  B.box(cx, FY + 0.07, z, len, 0.14, 1.2, metal, { collide: false }); // base
+  B.box(cx, FY + 1.05, z, len, 2.1, 0.06, pegboardMat(), {}); // pegboard back panel
+  B.box(cx, FY + 0.07, z, len, 0.14, 1.2, [kick, kick, metal, null, kick, kick], { collide: false }); // base deck + kick plate
   B.collider(cx, FY + 1.05, z, len, 2.1, 1.1);
-  for (const y of levels.slice(1)) for (const side of [-1, 1]) B.box(cx, FY + y - 0.02, z + side * 0.3, len, 0.03, 0.56, metal, { collide: false, shadow: false });
+  for (const y of levels.slice(1)) for (const side of [-1, 1]) {
+    B.box(cx, FY + y - 0.02, z + side * 0.3, len, 0.03, 0.56, metal, { collide: false, shadow: false });
+    // Price channel on the shelf lip (the grey strip every price tag clips into).
+    B.box(cx, FY + y - 0.035, z + side * 0.606, len, 0.045, 0.012, strip, { collide: false, shadow: false });
+  }
+  // Uprights every 1.2 m (real gondolas come in 4 ft sections), end panels.
+  for (let x = xa + 1.2; x < xb - 0.3; x += 1.2) B.box(x, FY + 1.05, z, 0.04, 2.1, 0.1, metal, { collide: false, shadow: false });
   for (const xx of [xa, xb]) B.box(xx, FY + 1.05, z, 0.05, 2.1, 1.2, metal, { collide: false });
+  // Overstock cases on top, like every real store.
+  const rng = ctx.rng;
+  const card = mat('cardboard', {});
+  for (let x = xa + 0.5; x < xb - 0.5; x += 0.7 + rng.next() * 0.9) {
+    if (rng.next() < 0.3) continue;
+    const w = 0.35 + rng.next() * 0.3;
+    const h = 0.2 + rng.next() * 0.25;
+    const d = 0.3 + rng.next() * 0.35;
+    B.box(x, FY + 2.1 + h / 2, z + (rng.next() - 0.5) * 0.4, w, h, d, card, { rotY: (rng.next() - 0.5) * 0.3, collide: false });
+    if (rng.next() < 0.35) B.box(x, FY + 2.1 + h + 0.12, z, w * 0.9, 0.24, d * 0.9, card, { rotY: (rng.next() - 0.5) * 0.4, collide: false });
+  }
   // Split products across the two sides.
   const half = Math.ceil(products.length / 2);
   stockRun(ctx, { x: xa, z: z - 0.04 }, { x: xb, z: z - 0.04 }, Math.PI, products.slice(0, half).length ? products.slice(0, half) : products, { levels, locked: opts.locked });
   stockRun(ctx, { x: xb, z: z + 0.04 }, { x: xa, z: z + 0.04 }, 0, products.slice(half).length ? products.slice(half) : products, { levels, locked: opts.locked });
-  if (opts.locked) {
-    // Locked glass case doors on both sides (real stores lock GPUs + consoles up).
-    const g = mat('glass', { dirt: 0.05 });
-    for (const side of [-1, 1]) {
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(len, 1.75), g);
-      pane.position.set(cx, FY + 1.15, z + side * 0.6);
-      pane.rotation.y = side === 1 ? 0 : Math.PI;
-      ctx.root.add(pane);
+  // End caps: a short shelf on each end with the aisle's featured items + a header card.
+  for (const end of opts.endcaps || ['w', 'e']) {
+    if (opts.locked || !products.length) break;
+    const west = end === 'w';
+    const ex = west ? xa - 0.03 : xb + 0.03;
+    const yaw = west ? -Math.PI / 2 : Math.PI / 2;
+    const featured = products.filter((_, i) => i % 3 === (west ? 0 : 1)).slice(0, 4);
+    const a = { x: ex, z: west ? z + 0.58 : z - 0.58 };
+    const b = { x: ex, z: west ? z - 0.58 : z + 0.58 };
+    const ecLevels = [0.14, 0.62, 1.1, 1.58];
+    const ox = ex + (west ? -0.21 : 0.21);
+    for (const y of ecLevels) {
+      B.box(ox, FY + y - 0.02, z, 0.42, 0.03, 1.16, metal, { collide: false, shadow: false });
+      B.box(ex + (west ? -0.426 : 0.426), FY + y - 0.035, z, 0.012, 0.045, 1.16, strip, { collide: false, shadow: false });
     }
+    B.box(ox, FY + 0.07, z, 0.42, 0.14, 1.16, [kick, kick, metal, null, kick, kick], { collide: false });
+    for (const s of [-1, 1]) B.box(ox, FY + 1.05, z + s * 0.58, 0.42, 2.1, 0.03, metal, { collide: false, shadow: false });
+    B.collider(ox, FY + 1.05, z, 0.42, 2.1, 1.18);
+    stockRun(ctx, a, b, yaw, featured.length ? featured : products.slice(0, 3), { levels: ecLevels, depth: 0.42 });
+    endcapHeader(ctx.root, ex + (west ? -0.2 : 0.2), FY + 2.3, z, yaw, label, ctx.S.def.id);
   }
-  void label;
+}
+
+/** The printed card on top of an end cap: aisle name + a deal banner in the store colours. */
+function endcapHeader(root, x, y, z, yaw, label, storeId) {
+  const [bg, fg] = { grocery: ['#1a5fb4', '#ffc220'], electronics: ['#0a2a66', '#ffe000'], furniture: ['#0058a3', '#ffda1a'] }[storeId];
+  const deal = ['LOW PRICE', 'NEW!', 'HOT DEAL', 'SAVE NOW'][label.length % 4];
+  const tex = canvasTexture(`endcap-${storeId}-${label}`, 512, 160, (c, w, h) => {
+    c.fillStyle = bg;
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = fg;
+    c.fillRect(0, h * 0.62, w, h * 0.38);
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillStyle = '#ffffff';
+    let px = 56;
+    do c.font = `bold ${px--}px Inter, Arial, sans-serif`;
+    while (px > 20 && c.measureText(label.toUpperCase()).width > w - 36);
+    c.fillText(label.toUpperCase(), w / 2, h * 0.32);
+    c.fillStyle = bg;
+    c.font = '900 42px Inter, Arial, sans-serif';
+    c.fillText(deal, w / 2, h * 0.81);
+  });
+  const face = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55 });
+  const edge = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.6 });
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.375, 0.02), [edge, edge, edge, edge, face, edge]);
+  m.position.set(x, y, z);
+  m.rotation.y = yaw;
+  root.add(m);
 }
 
 /** Single-sided wall shelf; a->b is the back edge (against the wall), products face `yaw`. */
@@ -358,28 +503,52 @@ function coolerRun(ctx, x, za, zb, products) {
   pane.rotation.y = -Math.PI / 2;
   root.add(pane);
   for (let z = za; z <= zb + 0.01; z += 0.8) B.box(x - 0.48, FY + 1.1, z, 0.04, 2.0, 0.05, body, { collide: false, shadow: false });
+  // Long pull handles on every door + the kick plate under the doors.
+  const handle = mat('aluminum', { wear: 0.2, dirt: 0.1 });
+  for (let z = za + 0.68; z < zb; z += 0.8) {
+    B.box(x - 0.53, FY + 1.15, z, 0.025, 1.0, 0.025, handle, { collide: false, shadow: false });
+    for (const dy of [-0.48, 0.48]) B.box(x - 0.505, FY + 1.15 + dy, z, 0.05, 0.02, 0.02, handle, { collide: false, shadow: false });
+  }
+  B.box(x - 0.49, FY + 0.06, cz, 0.03, 0.12, len, mat('steel', { wear: 0.3, dirt: 0.3 }), { collide: false, shadow: false });
 }
 
-/** Produce on a sloped table: piles of a model product. */
+/** One black produce crate on a display table, heaped with a product (a real mound, 2-3 layers). */
 function produceTable(ctx, t, p, side, row) {
-  const n = 22;
-  const list = [];
-  const rng = ctx.rng;
-  const [w, , d] = p.pack.size;
-  for (let i = 0; i < n; i++) {
-    const cols = Math.max(2, Math.floor(1.0 / Math.max(w, d)));
-    const cx = t.x - 1.1 + (side ? 1.2 : 0) + (i % cols) * Math.max(w, 0.09) * 1.05 + 0.08;
-    const cz = t.z - 0.7 + row * 0.75 + Math.floor(i / cols) * Math.max(d, 0.09) * 1.05 + 0.08;
-    if (cz > t.z - 0.7 + row * 0.75 + 0.7) break;
-    list.push({ pos: new THREE.Vector3(cx, FY + 0.77 + (rng.next() < 0.3 ? 0.04 : 0), cz), rotY: rng.range(0, 6.28) });
+  const { B, rng } = ctx;
+  const cx = t.x - 0.6 + side * 1.2;
+  const cz = t.z - 0.4 + row * 0.8;
+  const crate = mat('plastic', { color: 0x1d1f1c, wear: 0.2, dirt: 0.3 });
+  const y0 = FY + 0.76;
+  B.box(cx, y0 + 0.01, cz, 1.14, 0.02, 0.76, crate, { collide: false, shadow: false });
+  for (const s of [-1, 1]) {
+    B.box(cx + s * 0.56, y0 + 0.07, cz, 0.02, 0.14, 0.76, crate, { collide: false, shadow: false });
+    B.box(cx, y0 + 0.07, cz + s * 0.37, 1.14, 0.14, 0.02, crate, { collide: false, shadow: false });
   }
-  const box = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(t.x - 0.5 + (side ? 1.2 : 0), FY + 0.9, t.z - 0.35 + row * 0.75), new THREE.Vector3(1.2, 0.4, 0.75));
+  const [w, h, d] = p.pack.size;
+  const sx = w * 1.04 + 0.004;
+  const sz = d * 1.04 + 0.004;
+  const cols = Math.max(1, Math.floor(1.06 / sx));
+  const rows = Math.max(1, Math.floor(0.68 / sz));
+  const list = [];
+  for (let layer = 0; layer < 2 && list.length < 80; layer++) {
+    const c = cols - layer;
+    const r = rows - layer;
+    if (c < 1 || r < 1 || (layer > 0 && c * r < 2)) break;
+    for (let i = 0; i < c; i++)
+      for (let j = 0; j < r; j++) {
+        const x = cx - ((c - 1) * sx) / 2 + i * sx + (rng.next() - 0.5) * sx * 0.15;
+        const z = cz - ((r - 1) * sz) / 2 + j * sz + (rng.next() - 0.5) * sz * 0.15;
+        const rot = p.pack.shape === 'model' ? rng.range(0, 6.28) : (rng.next() - 0.5) * 0.4;
+        list.push({ pos: new THREE.Vector3(x, y0 + 0.02 + layer * h * 0.72, z), rotY: rot });
+      }
+  }
+  const box = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(cx, y0 + 0.2, cz), new THREE.Vector3(1.14, 0.4, 0.76));
   ctx.S.slots.push(makeSlot(ctx, p, { units: list, box }));
-  priceTag(ctx.root, t.x - 1.2, FY + 0.6, t.z - 0.35 + row * 0.75 + (side ? 0 : 0), -Math.PI / 2, p);
+  priceTag(ctx.root, cx + (side ? 0.585 : -0.585), y0 + 0.07, cz, side ? Math.PI / 2 : -Math.PI / 2, p);
 }
 
 /** Fill a shelf run with product blocks (packed facings, restocked across levels). */
-function stockRun(ctx, a, b, yaw, products, { levels, depthRows = 2, locked = false } = {}) {
+function stockRun(ctx, a, b, yaw, products, { levels, depthRows = 2, locked = false, depth = 0.56 } = {}) {
   if (!products.length) return;
   const len = Math.hypot(b.x - a.x, b.z - a.z);
   const dir = new THREE.Vector3((b.x - a.x) / len, 0, (b.z - a.z) / len);
@@ -403,22 +572,22 @@ function stockRun(ctx, a, b, yaw, products, { levels, depthRows = 2, locked = fa
       const blockW = Math.min(len - u - 0.02, facings * (w + 0.008));
       const fits = Math.max(1, Math.floor(blockW / (w + 0.008)));
       const units = [];
-      const deep = Math.max(1, Math.min(depthRows, Math.floor(0.5 / Math.max(d, 0.05))));
+      const deep = Math.max(1, Math.min(depthRows, Math.floor((depth - 0.06) / Math.max(d, 0.05))));
       for (let k = 0; k < deep; k++) {
         for (let f = 0; f < fits; f++) {
           const along = u + f * (w + 0.008) + w / 2;
           // Front row at the shelf lip, more rows behind it.
-          const out = 0.52 - d / 2 - k * (d + 0.01);
+          const out = depth - 0.04 - d / 2 - k * (d + 0.01);
           const pos = new THREE.Vector3(a.x + dir.x * along + n.x * out, FY + levels[li], a.z + dir.z * along + n.z * out);
           units.push({ pos, rotY: yaw });
         }
       }
       const mid = u + blockW / 2;
-      const center = new THREE.Vector3(a.x + dir.x * mid + n.x * 0.28, FY + levels[li] + h / 2, a.z + dir.z * mid + n.z * 0.28);
-      const box = new THREE.Box3().setFromCenterAndSize(center, new THREE.Vector3(Math.abs(dir.x) * blockW + Math.abs(n.x) * 0.55 + 0.02, h + 0.04, Math.abs(dir.z) * blockW + Math.abs(n.z) * 0.55 + 0.02));
+      const center = new THREE.Vector3(a.x + dir.x * mid + n.x * depth / 2, FY + levels[li] + h / 2, a.z + dir.z * mid + n.z * depth / 2);
+      const box = new THREE.Box3().setFromCenterAndSize(center, new THREE.Vector3(Math.abs(dir.x) * blockW + Math.abs(n.x) * (depth - 0.01) + 0.02, h + 0.04, Math.abs(dir.z) * blockW + Math.abs(n.z) * (depth - 0.01) + 0.02));
       ctx.S.slots.push(makeSlot(ctx, p, { units, box, locked }));
       // Shelf price tag under the block.
-      priceTag(ctx.root, a.x + dir.x * (u + 0.1) + n.x * 0.565, FY + levels[li] - 0.035, a.z + dir.z * (u + 0.1) + n.z * 0.565, yaw, p, false, true);
+      priceTag(ctx.root, a.x + dir.x * (u + 0.1) + n.x * (depth + 0.016), FY + levels[li] - 0.035, a.z + dir.z * (u + 0.1) + n.z * (depth + 0.016), yaw, p, false, true);
       u += blockW + 0.03;
     }
   }
@@ -473,13 +642,111 @@ export function setUnitVisible(slot, unit, visible) {
 
 // --------------------------------------------------------------------------------- bits
 
+/**
+ * A real checkout lane along x: you walk in from the back (+x) on the +z side, unload onto the
+ * belt (grocery), the cashier scans on the -z side, bags go on the carousel at the front (-x).
+ */
 function register(ctx, r) {
-  const { B } = ctx;
-  B.model('market', 'cash-register', { x: r.x, y: FY, z: r.z, rotY: Math.PI / 2, scale: 1.6 });
+  const { B, root, S } = ctx;
+  const grocery = S.def.id === 'grocery';
+  const lane = S.registers.indexOf(r) + 1;
+  const [colA] = { grocery: [0x1a5fb4], electronics: [0x0e2550], furniture: [0x0058a3] }[S.def.id];
+  const panel = mat('plastic', { color: colA, wear: 0.15, dirt: 0.2 });
+  const kick = mat('rubber', { color: 0x222225 });
+  const top = mat('steel', { wear: 0.25, dirt: 0.1 });
+  const dark = mat('plastic', { color: 0x1b1c1f, wear: 0.1 });
+  const xa = r.x - 1.0;
+  const xb = r.x + 1.6;
+  const cx = (xa + xb) / 2;
+  const cz = r.z;
+  // Counter body: coloured panels, black kick base, brushed steel top.
+  B.box(cx, FY + 0.47, cz, xb - xa, 0.82, 0.76, [panel, panel, null, null, panel, panel], { collide: false });
+  B.box(cx, FY + 0.04, cz, xb - xa - 0.04, 0.08, 0.72, kick, { collide: false, shadow: false });
+  B.box(cx, FY + 0.895, cz, xb - xa + 0.04, 0.03, 0.8, top, { collide: false });
+  B.collider(cx, FY + 0.45, cz, xb - xa, 0.9, 0.8);
+  if (grocery) {
+    // Conveyor belt with aluminium side rails + a divider bar lying on it.
+    B.box(r.x + 0.85, FY + 0.915, cz + 0.02, 1.4, 0.015, 0.48, mat('rubber', { color: 0x161617 }), { collide: false, shadow: false });
+    for (const s of [-1, 1]) B.box(r.x + 0.85, FY + 0.93, cz + 0.02 + s * 0.27, 1.44, 0.04, 0.04, mat('aluminum', { wear: 0.2 }), { collide: false, shadow: false });
+    B.box(r.x + 1.15, FY + 0.95, cz + 0.02, 0.04, 0.04, 0.42, mat('plastic', { color: 0x2a6fd0 }), { collide: false, shadow: false });
+  }
+  // Flatbed scanner: dark glass with the red laser line glowing through it.
+  B.box(r.x - 0.05, FY + 0.912, cz - 0.05, 0.36, 0.006, 0.34, mat('glass', { color: 0x10161a, tint: 0.9 }), { collide: false, shadow: false });
+  B.box(r.x - 0.05, FY + 0.916, cz - 0.05, 0.3, 0.002, 0.012, new THREE.MeshBasicMaterial({ color: 0xff2a1a }), { collide: false, shadow: false });
+  B.box(r.x - 0.05, FY + 1.05, cz - 0.27, 0.32, 0.28, 0.06, dark, { collide: false });
+  // Cash drawer + POS screen facing the cashier.
+  B.box(r.x - 0.55, FY + 0.82, cz - 0.42, 0.42, 0.12, 0.12, dark, { collide: false, shadow: false });
+  B.box(r.x - 0.55, FY + 1.05, cz - 0.2, 0.03, 0.3, 0.03, mat('aluminum', {}), { collide: false, shadow: false });
+  posScreen(root, r.x - 0.55, FY + 1.28, cz - 0.2, -Math.PI);
+  // Card reader on a stalk on the customer side.
+  B.box(r.x - 0.35, FY + 1.0, cz + 0.33, 0.03, 0.2, 0.03, mat('aluminum', {}), { collide: false, shadow: false });
+  B.box(r.x - 0.35, FY + 1.13, cz + 0.33, 0.1, 0.16, 0.05, dark, { rotY: 0, collide: false, shadow: false });
+  B.box(r.x - 0.35, FY + 1.15, cz + 0.358, 0.07, 0.07, 0.002, new THREE.MeshBasicMaterial({ color: 0x5fb8ff }), { collide: false, shadow: false });
+  // Bagging carousel (grocery) / bag hooks.
+  const pole = mat('steel', { wear: 0.1 });
+  B.box(xa + 0.3, FY + 1.1, cz, 0.04, 0.4, 0.04, pole, { collide: false, shadow: false });
+  const bag = mat('plastic', { color: 0xf2f2ef, wear: 0 });
+  for (let k = 0; k < (grocery ? 3 : 1); k++) {
+    const a = (k / 3) * Math.PI * 2;
+    B.box(xa + 0.3 + Math.cos(a) * 0.17, FY + 1.06, cz + Math.sin(a) * 0.17, 0.26, 0.3, 0.2, bag, { rotY: -a, collide: false, shadow: false });
+  }
+  // Lane light pole with the lit lane number at the back end.
+  B.box(xb - 0.06, FY + 1.6, cz - 0.32, 0.05, 1.4, 0.05, pole, { collide: false, shadow: false });
+  laneLight(root, xb - 0.06, FY + 2.45, cz - 0.32, lane, S.def.id);
   r.customer = new THREE.Vector3(r.x - 0.2, FY, r.z + 1.0);
   r.cashier = new THREE.Vector3(r.x - 0.2, FY, r.z - 0.95);
-  r.box = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(r.x, FY + 0.9, r.z + 0.2), new THREE.Vector3(1.6, 0.8, 1.2));
-  r.store = ctx.S;
+  r.laneBack = new THREE.Vector3(xb + 1.0, FY, r.z + 1.0);
+  r.laneFront = new THREE.Vector3(xa - 0.6, FY, r.z + 1.0);
+  r.box = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(r.x - 0.1, FY + 0.9, r.z + 0.2), new THREE.Vector3(1.6, 0.8, 1.2));
+  r.store = S;
+}
+
+function posScreen(root, x, y, z, yaw) {
+  const tex = canvasTexture('pos-screen', 256, 192, (c, w, h) => {
+    c.fillStyle = '#eef2f6';
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = '#1a5fb4';
+    c.fillRect(0, 0, w, 26);
+    c.fillStyle = '#fff';
+    c.font = 'bold 15px Inter, Arial';
+    c.fillText('REGISTER OPEN', 10, 18);
+    c.fillStyle = '#333';
+    c.font = '13px Inter, Arial';
+    for (let i = 0; i < 5; i++) c.fillRect(10, 40 + i * 18, 120 + ((i * 37) % 50), 7);
+    const keys = ['#2e7d32', '#c62828', '#f9a825', '#1565c0'];
+    for (let i = 0; i < 8; i++) {
+      c.fillStyle = keys[i % 4];
+      c.fillRect(150 + (i % 2) * 50, 36 + Math.floor(i / 2) * 36, 44, 30);
+    }
+    c.fillStyle = '#111';
+    c.font = 'bold 22px Inter, Arial';
+    c.fillText('TOTAL  $0.00', 10, 178);
+  });
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.26, 0.04), new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5 }));
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.22), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+  scr.position.z = 0.021;
+  g.add(body, scr);
+  g.position.set(x, y, z);
+  g.rotation.set(-0.25, yaw, 0, 'YXZ');
+  root.add(g);
+}
+
+function laneLight(root, x, y, z, n, storeId) {
+  const bg = { grocery: '#1a5fb4', electronics: '#0a2a66', furniture: '#0058a3' }[storeId];
+  const tex = canvasTexture(`lane-${storeId}-${n}`, 128, 128, (c, w, h) => {
+    c.fillStyle = bg;
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = '900 92px Inter, Arial';
+    c.fillText(String(n), w / 2, h / 2 + 4);
+  });
+  const face = new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.6, roughness: 0.5 });
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.18, 20), [face, new THREE.MeshStandardMaterial({ color: 0x222222 }), new THREE.MeshStandardMaterial({ color: 0x222222 })]);
+  m.position.set(x, y, z);
+  root.add(m);
 }
 
 function aisleSigns(ctx, list) {
@@ -695,6 +962,80 @@ function demoScreen(root, x, y, z, w, h, yaw, seed) {
       tex.needsUpdate = true;
     },
   };
+}
+
+let _walk = null;
+function walkwayMat() {
+  if (_walk) return _walk;
+  // Light grey lane with white edge lines and an arrow every 3 m (pointing deeper into the store).
+  const tex = canvasTexture('walkway', 512, 128, (c, w, h) => {
+    c.fillStyle = '#a8abae';
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = '#e4e4de';
+    c.fillRect(0, 4, w, 6);
+    c.fillRect(0, h - 10, w, 6);
+    c.beginPath();
+    c.moveTo(w * 0.35, h * 0.3);
+    c.lineTo(w * 0.55, h * 0.3);
+    c.lineTo(w * 0.55, h * 0.18);
+    c.lineTo(w * 0.68, h * 0.5);
+    c.lineTo(w * 0.55, h * 0.82);
+    c.lineTo(w * 0.55, h * 0.7);
+    c.lineTo(w * 0.35, h * 0.7);
+    c.closePath();
+    c.fill();
+  }, { repeat: true });
+  _walk = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5 });
+  _walk.userData.tileMeters = 1.6;
+  return _walk;
+}
+
+/** Yellow aisle/bay sign on a warehouse rack (where you find your flat-pack box). */
+function binSign(root, x, y, z, bay) {
+  const tex = canvasTexture(`bin-${bay}`, 128, 160, (c, w, h) => {
+    c.fillStyle = '#ffda1a';
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = '#111';
+    c.textAlign = 'center';
+    c.font = 'bold 22px Inter, Arial';
+    c.fillText('AISLE', w / 2, 30);
+    c.font = '900 64px Inter, Arial';
+    c.fillText(String(20 + bay), w / 2, 92);
+    c.font = 'bold 22px Inter, Arial';
+    c.fillText(`BIN ${String(bay * 3).padStart(2, '0')}`, w / 2, 136);
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.4), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+  m.position.set(x, y, z);
+  m.rotation.y = -Math.PI / 2;
+  root.add(m);
+}
+
+let _peg = null;
+function pegboardMat() {
+  if (_peg) return _peg;
+  // Painted steel pegboard: rows of punched holes every 2.5 cm (1 inch, like the real thing).
+  const tex = canvasTexture('pegboard', 128, 128, (c, w, h) => {
+    c.fillStyle = '#e4e4e2';
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = '#5d5f62';
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) c.fillRect(x * 16 + 6, y * 16 + 6, 4, 4);
+  }, { repeat: true });
+  _peg = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0.2 });
+  _peg.userData.tileMeters = 0.2;
+  return _peg;
+}
+
+const _pol = new Map();
+/** Same floor, sealed + polished (lower roughness, picks up the ceiling lights). */
+function polished(m, roughness) {
+  let p = _pol.get(m.uuid);
+  if (!p) {
+    p = m.clone();
+    p.roughness = roughness;
+    p.userData = { ...m.userData };
+    _pol.set(m.uuid, p);
+  }
+  return p;
 }
 
 let _fp = null;

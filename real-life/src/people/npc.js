@@ -142,7 +142,9 @@ export class Npc {
         // Height follows the next node (stairs/porch steps/curbs).
         this.pos.y += (target.y - this.pos.y) * Math.min(1, dt * 6);
         moving = step > 0.0005;
-        if (dist < 0.12) this.pathI++;
+        // Waypoints on the way are passed when close (people round corners, and three people
+        // squeezing through the same door can't all stand on one spot); the last one is exact.
+        if (dist < (this.pathI < this.path.length - 1 && !node.door ? 0.3 : 0.12)) this.pathI++;
       }
     }
     this.speed = moving ? this.walkSpeed() : 0;

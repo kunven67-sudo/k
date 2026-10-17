@@ -421,6 +421,7 @@ export class People {
       for (let j = 0; j < list.length; j++) {
         if (i === j) continue;
         const b = list[j];
+        if (moving && b.speed > 0) continue; // two people walking just pass each other
         _v.copy(a.pos).sub(b._seatPos || b.pos);
         _v.y = 0;
         const d = _v.length();

@@ -145,23 +145,36 @@ export function buildNav(world) {
     S.navOutside = out;
     // Inside: a loop through the store + each register (customer + cashier side).
     const { x0, x1, z0, z1 } = S.def;
-    const loop = [
-      nav.add(V(x0 + 6, S.entrance.y, (z0 + z1) / 2), { tag: 'store', store: S.id }),
-      nav.add(V(x0 + 6, S.entrance.y, z0 + 2.4), { tag: 'store', store: S.id }),
-      nav.add(V(x1 - 3.2, S.entrance.y, z0 + 2.4), { tag: 'store', store: S.id }),
-      nav.add(V(x1 - 3.2, S.entrance.y, z1 - 2.4), { tag: 'store', store: S.id }),
-      nav.add(V(x0 + 6, S.entrance.y, z1 - 2.4), { tag: 'store', store: S.id }),
-    ];
+    // Loop corners sit in the open walkways: between the checkouts/produce and the aisles, and
+    // (IKEO) down the middle between the room sets, so nobody walks through a table or a bed.
+    const zc = (z0 + z1) / 2;
+    const corners = {
+      grocery: [[x0 + 9.6, zc], [x0 + 9.6, z0 + 2.4], [x1 - 3.2, z0 + 2.4], [x1 - 3.2, z1 - 2.4], [x0 + 9.6, z1 - 2.4]],
+      electronics: [[x0 + 7.3, zc], [x0 + 7.3, z0 + 2.4], [x1 - 3.2, z0 + 2.4], [x1 - 3.2, z1 - 2.4], [x0 + 7.3, z1 - 2.4]],
+      furniture: [[x0 + 7.5, zc], [x0 + 8.5, z0 + 7.8], [x0 + 27, z0 + 7.8], [x0 + 27, z1 - 8.8], [x0 + 8.5, z1 - 8.8]],
+    }[S.id];
+    const loop = corners.map(([x, z]) => nav.add(V(x, S.entrance.y, z), { tag: 'store', store: S.id }));
     nav.chain([...loop, loop[0]]);
     nav.link(inn, loop[0]);
     S.navLoop = loop;
-    for (const r of S.registers) {
+    // Checkout lanes: in from the back end of the lane, out past the bagging end to the doors.
+    // The back ends share a walkway behind the counters that leads up to the store loop.
+    let prevBack = null;
+    const lanes = [...S.registers].sort((a, b) => b.z - a.z);
+    for (const r of lanes) {
       r.navCustomer = nav.add(r.customer, { tag: 'store', store: S.id });
       r.navCashier = nav.add(r.cashier, { tag: 'store', store: S.id, staff: true });
-      nav.link(r.navCustomer, loop[0]);
-      nav.link(r.navCustomer, inn);
-      const back = nav.add(V(r.cashier.x + 1.4, r.cashier.y, r.cashier.z), { tag: 'store', store: S.id, staff: true });
-      nav.chain([r.navCashier, back, loop[0]]);
+      const back = nav.add(r.laneBack, { tag: 'store', store: S.id });
+      const front = nav.add(r.laneFront, { tag: 'store', store: S.id });
+      nav.chain([back, r.navCustomer, front, inn]);
+      if (prevBack == null) {
+        const spine = nav.add(V(r.laneBack.x, S.entrance.y, (z0 + z1) / 2), { tag: 'store', store: S.id });
+        nav.chain([back, spine, loop[0]]);
+      } else nav.link(back, prevBack);
+      prevBack = back;
+      // Staff walk round the back end of their own counter.
+      const staff = nav.add(V(r.laneBack.x, r.cashier.y, r.cashier.z), { tag: 'store', store: S.id, staff: true });
+      nav.chain([r.navCashier, staff, back]);
     }
   }
 
