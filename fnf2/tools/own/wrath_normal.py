@@ -82,6 +82,12 @@ def build_parts():
     pn.line([(239, 330), (239, 432)], 8.5)
     pn.line([(354, 330), (354, 456)], 7)
     parts['torso'] = P.under(parts['torso'], pn.result())
+    # one flat neck colour under the chin: the old top edge would show as a line when the head lifts
+    t = parts['torso']; nk = t[330:439, 249:348]
+    nk[nk[..., 3] > 0] = P.hexrgb(NECK_C) + (255,)
+    low = t[438:505, 249:350]                               # down to the collar: orange skin only (not collar/ink)
+    lc = low[..., :3].astype(int)
+    low[(low[..., 3] > 0) & (lc[..., 2] < 150) & (lc.max(2) > 90)] = P.hexrgb(NECK_C) + (255,)
 
     # -- sleeve: carries on to the left under the sweater (shows when the arm swings)
     sl = parts['sleeve']
@@ -97,7 +103,7 @@ def build_parts():
     parts['sleeve'] = P.over(pn.result(), sl)
 
     # -- mouths for singing (drawn to match: thick black line, dark inside, pink tongue)
-    for nm, spec in MOUTHS.items(): parts['mouth_' + nm] = draw_mouth(W, H, **(spec if nm == 'miss' else big(**spec)))
+    for nm, spec in MOUTHS.items(): parts['mouth_' + nm] = draw_mouth(W, H, **spec)
 
     return rgba, parts
 
@@ -109,13 +115,14 @@ def _ell(cx, cy, rx, ry, n=40):
 
 
 MOUTHS = {
-    # top lip (left -> right) and bottom lip (right -> left) as bezier controls
-    'ee': dict(top=[(281, 377), (305, 386), (360, 385), (392, 371)], bot=[(392, 371), (378, 401), (312, 407), (281, 377)], teeth=8, tongue=(338, 404, 22, 9)),
-    'ah': dict(top=[(287, 379), (310, 383), (356, 383), (381, 378)], bot=[(381, 378), (378, 412), (296, 413), (287, 379)], teeth=0, tongue=(334, 407, 25, 10)),
-    'aa': dict(top=[(293, 372), (315, 375), (352, 373), (375, 369)], bot=[(375, 369), (380, 420), (292, 423), (293, 372)], teeth=7, tongue=(334, 412, 23, 11)),
-    'oh': dict(top=[(299, 386), (301, 366), (336, 365), (340, 386)], bot=[(340, 386), (340, 410), (300, 410), (299, 386)], teeth=0, tongue=(320, 404, 13, 6)),
-    'miss': dict(top=[(292, 396), (308, 377), (358, 376), (378, 395)], bot=[(378, 395), (360, 402), (310, 403), (292, 396)], teeth=6, tongue=None),
-    'hey': dict(top=[(281, 374), (310, 378), (362, 377), (392, 371)], bot=[(392, 371), (386, 418), (290, 420), (281, 374)], teeth=8, tongue=(337, 410, 27, 11)),
+    # top lip (left -> right) and bottom lip (right -> left) as bezier controls. Rapping mouths are
+    # open shouts: the top lip arches up so the corners sit low (never a grin), no teeth.
+    'oh': dict(top=[(298, 388), (299, 364), (340, 363), (342, 388)], bot=[(342, 388), (342, 414), (298, 414), (298, 388)], tongue=(320, 407, 14, 6)),
+    'ah': dict(top=[(290, 388), (306, 374), (364, 374), (380, 388)], bot=[(380, 388), (376, 418), (294, 418), (290, 388)], tongue=(335, 411, 24, 9)),
+    'aa': dict(top=[(298, 380), (310, 366), (360, 366), (372, 380)], bot=[(372, 380), (376, 428), (294, 428), (298, 380)], tongue=(335, 420, 22, 10)),
+    'ee': dict(top=[(282, 388), (300, 375), (370, 375), (388, 388)], bot=[(388, 388), (378, 408), (292, 408), (282, 388)], tongue=(335, 403, 26, 7)),
+    'hey': dict(top=[(282, 384), (300, 368), (370, 368), (388, 384)], bot=[(388, 384), (384, 424), (286, 424), (282, 384)], tongue=(335, 416, 30, 10)),
+    'miss': dict(top=[(292, 398), (308, 379), (358, 378), (378, 397)], bot=[(378, 397), (360, 404), (310, 405), (292, 398)]),
 }
 
 
@@ -268,7 +275,7 @@ def capsule(ox, oy, L, r0, r1, n=18):
     return pts
 
 
-def draw_tube(L, r0, r1, cuff=False, creases=()):
+def draw_tube(L, r0, r1):
     """A sweater sleeve piece lying along +x from its joint. -> (rgba, joint x, joint y)"""
     pad = 10
     H = int(2 * max(r0, r1) + 2 * pad); W = int(L + r0 + r1 + 2 * pad)
@@ -281,18 +288,8 @@ def draw_tube(L, r0, r1, cuff=False, creases=()):
     r = lambda x: r0 + (r1 - r0) * min(1, max(0, (x - ox) / L))
     xs = np.linspace(ox - r0, ox + L + r1, 30)
     p.poly([(x, oy + 0.28 * r(x)) for x in xs] + [(xs[-1], H), (xs[0], H)], SWEATER_SHADE)
-    if cuff:
-        cx = ox + L - r1 * 0.35
-        p.poly([(cx, 0), (W, 0), (W, H), (cx, H)], SWEATER)
-        p.poly([(cx, oy + 0.28 * r1), (W, oy + 0.28 * r1), (W, H), (cx, H)], SWEATER_SHADE)
     big = np.array(p.img); big[..., 3] = np.minimum(big[..., 3], mask)
     p.img = Image.fromarray(big, 'RGBA'); p.d = P.ImageDraw.Draw(p.img)
-    if cuff:
-        cx = ox + L - r1 * 0.35
-        p.line(P.bez((cx + 6, oy - r1 * 0.92), (cx - 8, oy), (cx + 6, oy + r1 * 0.92)), 6)
-    for t, off, ln in creases:
-        x = ox + L * t; y = oy + off * r(x)
-        p.line(P.bez((x - ln / 2, y - 4), (x, y + 6), (x + ln / 2, y - 2)), 5.5)
     p.line(shape + [shape[0]], 9)
     return p.result(), ox, oy
 
@@ -369,12 +366,6 @@ def lean(dx, body=None):
     """Lean from the ankles: the pants skew so their top moves dx, the body rides along."""
     b = dict(body or {}); b['dx'] = b.get('dx', 0) + dx
     return dict(pants=dict(skx=math.degrees(math.atan(-dx / PANTS_LEN))), body=b)
-
-
-def big(top=None, bot=None, teeth=0, tongue=None, k=1.15, c=(335, 392)):
-    sc = lambda p: (c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k)
-    t = tongue and (sc(tongue[:2])[0], sc(tongue[:2])[1], tongue[2] * k, tongue[3] * k)
-    return dict(top=[sc(p) for p in top], bot=[sc(p) for p in bot], teeth=teeth * k, tongue=t)
 
 
 # pose keys: (frame, pose) - bones {rot, sx, sy, skx, dx, dy}; 'ik' = (wrist target in body px, extra hand turn);
@@ -473,9 +464,9 @@ def build():
         c, x0, y0 = P.crop_alpha(im)
         bone = {'torso': 'body', 'sleeve': 'arm', 'hand': 'wrist', 'pants': 'pants'}.get(nm, 'head')
         sprites[nm] = c; slots[nm] = (bone, x0, y0, P.M())
-    for nm, (L, r0, r1, cuff, cr) in {'uparm': (ARM_L1, 40, 43, False, ((0.62, 0.15, 30),)),
-                                       'forearm': (ARM_L2, 43, 50, True, ((0.12, -0.3, 26), (0.3, 0.2, 30)))}.items():
-        im, ox, oy = draw_tube(L, r0, r1, cuff, cr)
+    # plain FNF-style sleeves: flat colour, one shade, thick outline (no wrinkles)
+    for nm, (L, r0, r1) in {'uparm': (ARM_L1, 40, 43), 'forearm': (ARM_L2, 43, 50)}.items():
+        im, ox, oy = draw_tube(L, r0, r1)
         sprites[nm] = im; slots[nm] = (None, 0, 0, P.T(-ox, -oy))
     for kind in LIDS:
         c, x0, y0 = P.crop_alpha(draw_lids(rgba, kind))
