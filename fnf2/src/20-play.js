@@ -48,7 +48,7 @@
   const P = G.screens.play = {
     enter(params) {
       this.params = params = Object.assign({ mode: 'freeplay', songs: ['tutorial'], songIndex: 0, diff: 'normal', variation: null, week: null, weekStats: null, deaths: 0 }, params);
-      this.ready = false; this.failed = null; this.cutscene = null;
+      this.ready = false; this.failed = null; this.cutscene = null; this.blackIn = params.blackIn || 0; params.blackIn = 0;
       this.song = G.Songs.build(params.songs[params.songIndex], params.diff, params.variation);
       if (!this.song) { this.failed = 'Missing chart: ' + params.songs[params.songIndex] + ' (' + params.diff + ')'; return; }
       this.setupWorld();
@@ -181,6 +181,7 @@
     // -------------------------------------------------- per-frame
     update(dt) {
       if (this.failed || !this.ready) return;
+      if (this.blackIn > 0) this.blackIn -= dt;
       if (this.cutscene) { this.cutscene.update(dt); if (this.cutscene.done) { this.cutscene = null; this.startCountdown(); } return; }
       if (this.gameOver) { this.updateGameOver(dt); return; }
       if (this.paused) { this.updatePause(dt); return; }
@@ -524,21 +525,73 @@
       if (type === 'down') { this._touch[id] = lane; this.press(lane); }
       else if (type === 'up' && this._touch[id] != null) { this.release(this._touch[id]); delete this._touch[id]; }
     },
-    // -------------------------------------------------- pause menu
+    // -------------------------------------------------- pause menu (V-Slice PauseSubState)
     openPause() {
       if (this.paused || !this.audio) return;
       this.paused = true; this.audio.pause();
       for (let i = 0; i < 4; i++) if (this.keys[i]) this.release(i);
-      const items = ['Resume', 'Restart Song', 'Change Difficulty', this.practice ? 'Disable Practice Mode' : 'Enable Practice Mode', 'Exit to Menu'];
-      this.pauseMenu = { sel: 0, t: 0, items: items.map((s, i) => { const a = new G.Alphabet(s, true, 0, 0); a.isMenuItem = true; a.targetY = i; a.startPosition = { x: 90, y: G.H * 0.48 - 30 }; a.x = 90; a.y = G.H * 0.48 + i * 156; return a; }), mode: 'main' };
-      this.layoutPause();
-      G.audio.music.play('shared/music/breakfast/breakfast.ogg', { loop: true, vol: 0, bpm: 160 });
-      G.audio.music.setVolume(0.5, 3);
+      const art = this.song.artist || 'Unknown', chr = this.song.charter || 'Unknown';
+      const meta = [this.song.name, 'Artist: ' + art, 'Difficulty: ' + ((G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff).replace(/\b\w+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()), '', 'PRACTICE MODE'];
+      this.pauseMenu = { sel: 0, t: 0, mode: 'main', items: [], meta, art, chr, artistT: 0, artistA: 1, artistIsCharter: false, offHold: 0, offFast: false };
+      this.pauseEntries('main');
+      // breakfast starts somewhere in its first half and fades in over 5 seconds, like the real one
+      const pico = this.bf && this.bf.id.startsWith('pico');
+      const path = pico ? 'shared/music/breakfast-pico/breakfast-pico.ogg' : 'shared/music/breakfast/breakfast.ogg';
+      G.audio.music.play(path, { loop: true, vol: 0.75, fadeIn: 5, bpm: 160, restart: true, randomStart: 0.5 });
     },
-    layoutPause() { const pm = this.pauseMenu; pm.items.forEach((a, i) => { a.targetY = i - pm.sel; a.alpha = i === pm.sel ? 1 : 0.6; }); },
-    updatePause(dt) { const pm = this.pauseMenu; pm.t += dt; for (const a of pm.items) a.update(dt); },
+    // (re)build the list: new texts start up in the corner, invisible, then fly to their spots
+    pauseEntries(mode) {
+      const pm = this.pauseMenu;
+      let labels;
+      if (mode === 'diff') {
+        const player = this.song.chars.player.startsWith('pico') ? 'pico' : 'bf';
+        pm.diffs = G.Songs.difficulties(this.song.id, player);
+        labels = pm.diffs.map(d => G.DIFF_INFO[d.diff].name).concat(['Back']);
+      } else labels = ['Resume', 'Restart Song', 'Change Difficulty', this.practice ? 'Disable Practice Mode' : 'Enable Practice Mode', 'Exit to Menu'];
+      pm.mode = mode; pm.sel = 0;
+      pm.items = labels.map((s, i) => { const a = new G.Alphabet(s, true, 0, 70 * i + 30); a.alpha = 0; a.tw = null; return a; });
+      this.layoutPause();
+    },
+    layoutPause() {
+      const pm = this.pauseMenu;
+      pm.items.forEach((a, i) => {
+        const d = (i - pm.sel) * 1.3;
+        a.alpha = i === pm.sel ? 1 : 0.6;
+        a.tw = { x0: a.x, y0: a.y, x1: d * 20 + 90, y1: d * 120 + G.H * 0.48, t: 0 };
+      });
+    },
+    updatePause(dt) {
+      const pm = this.pauseMenu; pm.t += dt;
+      for (const a of pm.items) {
+        a.update(dt);
+        const w = a.tw; if (!w) continue;
+        w.t = Math.min(1, w.t + dt / 0.33); const k = G.ease.quartOut(w.t);
+        a.x = G.lerp(w.x0, w.x1, k); a.y = G.lerp(w.y0, w.y1, k);
+      }
+      // "Artist:" and "Charter:" swap every 15 seconds (0.75s fade out, swap, 0.75s fade in)
+      pm.artistT += dt;
+      const fadeAt = 0.1 + 1.8 + 15;
+      if (pm.artistT > fadeAt) {
+        const f = pm.artistT - fadeAt;
+        if (f < 0.75) pm.artistA = 1 - G.ease.quartOut(f / 0.75);
+        else if (f < 1.5) { if (!pm.swapped) { pm.swapped = true; pm.artistIsCharter = !pm.artistIsCharter; } pm.artistA = G.ease.quartOut((f - 0.75) / 0.75); }
+        else { pm.artistA = 1; pm.artistT = 0.1 + 1.8; pm.swapped = false; }
+      }
+      // hold SHIFT + UP/DOWN to change the global offset (slow first, then fast after half a second)
+      const I = G.input, up = I.isDown('ui_up'), dn = I.isDown('ui_down');
+      if (I.isDown('shift') && (up || dn)) {
+        pm.offHold += dt;
+        if (pm.offFast) G.settings.offset = (G.settings.offset || 0) + (up ? 1 : -1) * dt * 30;
+        else if (pm.offHold > 0.5) { pm.offFast = true; pm.offHold = 0; }
+        G.settings.offset = G.clamp(G.settings.offset || 0, -1500, 1500);
+      } else { if (pm.offFast || pm.offHold) G.saveSettings(); pm.offHold = 0; pm.offFast = false; }
+    },
     pauseAction(a, repeat) {
       const pm = this.pauseMenu;
+      if ((a === 'ui_up' || a === 'ui_down') && G.input.isDown('shift')) {
+        if (!repeat) { G.settings.offset = G.clamp(Math.round(G.settings.offset || 0) + (a === 'ui_up' ? 1 : -1), -1500, 1500); G.saveSettings(); }
+        return true;
+      }
       if (a === 'ui_up' || a === 'ui_down') { pm.sel = (pm.sel + (a === 'ui_up' ? -1 : 1) + pm.items.length) % pm.items.length; G.sfx('scroll', { vol: 0.4 }); this.layoutPause(); return true; }
       if (a === 'accept' && !repeat) { this.pauseChoose(); return true; }
       if (a === 'back' && !repeat) { if (pm.mode === 'diff') this.backToPauseMain(); else this.resume(); return true; }
@@ -551,32 +604,22 @@
     pauseChoose() {
       const pm = this.pauseMenu, label = pm.items[pm.sel].text;
       if (pm.mode === 'diff') {
-        if (label === 'BACK') { this.backToPauseMain(); return; }
+        if (/^back$/i.test(label)) { this.backToPauseMain(); return; }
         const d = pm.diffs[pm.sel];
         G.setScreen('play', Object.assign({}, this.params, { diff: d.diff, variation: d.variation, weekStats: null }));
         return;
       }
       if (label === 'Resume') this.resume();
       else if (label === 'Restart Song') this.restart();
-      else if (label === 'Change Difficulty') {
-        const player = this.song.chars.player.startsWith('pico') ? 'pico' : 'bf';
-        pm.diffs = G.Songs.difficulties(this.song.id, player);
-        pm.items = pm.diffs.map(d => G.DIFF_INFO[d.diff].name).concat(['BACK']).map((s, i) => { const a = new G.Alphabet(s, true, 90, 0); a.isMenuItem = true; a.startPosition = { x: 90, y: G.H * 0.48 - 30 }; a.y = G.H * 0.48 + i * 156; return a; });
-        pm.mode = 'diff'; pm.sel = 0; this.layoutPause();
-      } else if (/Practice/.test(label)) {
+      else if (label === 'Change Difficulty') this.pauseEntries('diff');
+      else if (/Practice/.test(label)) {
         this.practice = !this.practice; G.settings.practice = this.practice; G.saveSettings();
-        pm.items[pm.sel].setText(this.practice ? 'Disable Practice Mode' : 'Enable Practice Mode');
+        this.pauseEntries('main');
       } else if (label === 'Exit to Menu') this.exitToMenu();
     },
-    backToPauseMain() { this.openPauseNoStop(); },
-    openPauseNoStop() { // rebuild main pause list without touching audio
-      const items = ['Resume', 'Restart Song', 'Change Difficulty', this.practice ? 'Disable Practice Mode' : 'Enable Practice Mode', 'Exit to Menu'];
-      this.paused = true;
-      this.pauseMenu = { sel: 0, t: 0, items: items.map((s, i) => { const a = new G.Alphabet(s, true, 90, 0); a.isMenuItem = true; a.startPosition = { x: 90, y: G.H * 0.48 - 30 }; a.y = G.H * 0.48 + i * 156; return a; }), mode: 'main' };
-      this.layoutPause();
-    },
+    backToPauseMain() { this.pauseEntries('main'); },
     resume() { this.paused = false; this.pauseMenu = null; G.audio.music.stop(0.1); this.audio.resume(); },
-    restart() { G.audio.music.stop(0); G.setScreen('play', Object.assign({}, this.params, { weekStats: this.params.weekStats, noCutscene: true }), { instant: false }); },
+    restart(fromDeath) { G.audio.music.stop(0); G.setScreen('play', Object.assign({}, this.params, { weekStats: this.params.weekStats, noCutscene: true, blackIn: fromDeath ? 1 : 0 }), { instant: !!fromDeath }); },
     exitToMenu() {
       G.audio.music.stop(0);
       if (this.audio) this.audio.stop();
@@ -597,20 +640,22 @@
       const dd = bf.deathData || {};
       const co = dd.cameraOffsets || [0, 0];
       const mid = { x: bf.x + bf.width / 2, y: bf.y + bf.height / 2 };
-      this.gameOver = { t: 0, phase: 'intro', fade: 0, pico, zoom0: this.cam.zoom, zoom1: dd.cameraZoom || 1, target: { x: mid.x + co[0], y: mid.y + co[1] } };
+      // like V-Slice: zoom to the stage zoom x the character's death zoom, follow at half the normal rate
+      this.gameOver = { t: 0, phase: 'intro', fade: 0, pico, zoom0: this.cam.zoom, zoom1: (this.stageZoom || 1) * (dd.cameraZoom || 1), target: { x: mid.x + co[0], y: mid.y + co[1] } };
       this.camTween = null;
       this.cam.follow(this.gameOver.target.x, this.gameOver.target.y);
-      this.cam.followRate = 0.01;
+      this.cam.followRate = 0.02;
       this.hud.alpha = 0;
     },
     updateGameOver(dt) {
       const go = this.gameOver; go.t += dt;
       const bf = this.bf;
       bf.update(dt);
-      this.cam.zoom = G.lerp(this.cam.zoom, go.zoom1, 1 - Math.pow(0.1, dt));
+      this.cam.zoom = G.lerp(go.zoom1, this.cam.zoom, Math.pow(0.01, dt / 0.5));
       this.cam.update(dt);
       if (go.phase === 'intro' && bf.finished) { go.phase = 'loop'; bf.playAnim('deathLoop', true); G.audio.music.play('shared/music/gameplay/gameover/gameOver' + (go.pico ? '-pico' : '') + '.ogg', { loop: true, bpm: 100 }); }
-      if (go.phase === 'confirm') { go.ct += dt; if (go.ct > 0.7) go.fade = Math.min(1, (go.ct - 0.7) / 2); if (go.ct > 2.8 && !go.left) { go.left = true; this.restart(); } }
+      // retry: wait (confirm jingle length / 7), fade to black over 2s, then the song starts over and fades in
+      if (go.phase === 'confirm') { go.ct += dt; const w = go.pico ? 2.703 / 7 : 7.21 / 7; if (go.ct > w) go.fade = Math.min(1, (go.ct - w) / 2); if (go.ct > w + 2 && !go.left) { go.left = true; this.restart(true); } }
       if (go.phase === 'exit') { go.ct += dt; go.fade = Math.min(1, go.ct / 0.5); }
     },
     gameOverAction(a) {
@@ -668,6 +713,7 @@
       // HUD
       if (this.hud.alpha > 0.01) { ctx.save(); ctx.globalAlpha = this.hud.alpha; this.drawHUD(ctx); ctx.restore(); }
       if (this.paused) this.drawPause(ctx);
+      if (this.blackIn > 0) { G.setScreenT(ctx); ctx.globalAlpha = Math.min(1, this.blackIn); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
     },
     songLabel() {
       const dn = (G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff;
@@ -790,12 +836,23 @@
     drawPause(ctx) {
       const pm = this.pauseMenu;
       G.setScreenT(ctx);
-      ctx.globalAlpha = Math.min(0.6, pm.t * 1.5 + (pm.t > 0 ? 0 : 0.6)); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.6 * G.ease.quartOut(Math.min(1, pm.t / 0.8)); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1;
       for (const a of pm.items) a.draw(ctx, null);
-      const diff = (G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff;
-      const lines = [this.song.name, diff, 'Blue balled: ' + (this.params.deaths || 0)];
-      if (this.practice) lines.push('PRACTICE MODE');
-      lines.forEach((s, i) => { const a = Math.min(1, Math.max(0, pm.t * 3 - i * 0.3)); G.vcr(ctx, s, G.W - 20, 15 + i * 32 + (1 - a) * -10, { align: 'right', size: 32, alpha: a, outline: 0 }); });
+      // top right: song, artist/charter, difficulty, deaths, practice; each one drifts down 5px as it fades in
+      const lines = pm.meta.slice();
+      lines[1] = pm.artistIsCharter ? 'Charter: ' + pm.chr : 'Artist: ' + pm.art;
+      lines[3] = (this.params.deaths || 0) + ' Blue Balls';
+      const show = [0, 1, 2, 3].concat(this.practice ? [4] : []);
+      show.forEach((li, i) => {
+        const k = G.ease.quartOut(G.clamp((pm.t - 0.1 * (i + 1)) / 1.8, 0, 1));
+        G.vcr(ctx, lines[li], G.W - 20, 15 + li * 32 + 5 * k, { align: 'right', size: 32, alpha: k * (li === 1 ? pm.artistA : 1), outline: 0 });
+      });
+      // bottom right: the offset
+      const k = G.ease.quartOut(G.clamp((pm.t - 0.6) / 1.8, 0, 1));
+      const oy = G.H - 16 * 2 - 40 + 5 * k;
+      G.vcr(ctx, 'Global Offset: ' + Math.round(G.settings.offset || 0) + 'ms', G.W - 10, oy, { align: 'right', size: 16, alpha: k, outline: 0 });
+      G.vcr(ctx, 'Hold SHIFT-UP/DOWN,', G.W - 10, oy + 20, { align: 'right', size: 16, alpha: k, outline: 0 });
+      G.vcr(ctx, 'to change the offset.', G.W - 10, oy + 36, { align: 'right', size: 16, alpha: k, outline: 0 });
     },
     drawGameOver(ctx) {
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);

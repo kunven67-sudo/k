@@ -60,12 +60,13 @@ G.audio = (function () {
         const t = ctx.currentTime;
         if (o.fadeIn) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(M.vol, t + o.fadeIn); } else g.gain.value = M.vol;
         // offset/end in seconds: start partway in, and loop only that part (freeplay song previews)
-        const off = Math.max(0, Math.min(buf.duration - 0.05, o.offset || 0));
+        // randomStart: start somewhere in the first part but still loop the whole track (pause music)
+        const off = o.randomStart ? Math.random() * buf.duration * o.randomStart : Math.max(0, Math.min(buf.duration - 0.05, o.offset || 0));
         const end = o.end && o.end > off + 1 ? Math.min(o.end, buf.duration) : 0;
-        if (M.loop && (off || end)) { src.loopStart = off; src.loopEnd = end || buf.duration; }
+        if (M.loop && !o.randomStart && (off || end)) { src.loopStart = off; src.loopEnd = end || buf.duration; }
         if (o.onEnd) src.onended = () => { if (M.src === src) { M.src = null; M.id = null; o.onEnd(); } };
         src.start(t, off); M.src = src; M.gain = g; M.start = t - off; M.dur = buf.duration;
-        M.loopA = M.loop ? off : 0; M.loopB = M.loop ? (end || buf.duration) : buf.duration;
+        M.loopA = M.loop && !o.randomStart ? off : 0; M.loopB = M.loop ? (end || buf.duration) : buf.duration;
       });
     },
     stop(fade) {

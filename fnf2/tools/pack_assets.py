@@ -72,7 +72,7 @@ PACKS = {
         'shared/sounds/missnote1.ogg', 'shared/sounds/missnote2.ogg', 'shared/sounds/missnote3.ogg',
         'shared/sounds/gameplay/countdown/funkin/*.ogg', 'shared/sounds/gameplay/gameover/fnf_loss_sfx.ogg', 'shared/sounds/gameplay/gameover/fnf_loss_sfx-pico.ogg',
         'shared/music/gameplay/gameover/gameOver.ogg', 'shared/music/gameplay/gameover/gameOverEnd.ogg', 'shared/music/gameplay/gameover/gameOver-pico.ogg', 'shared/music/gameplay/gameover/gameOverEnd-pico.ogg',
-        'preload/music/freakyMenu/freakyMenu.ogg', 'shared/music/breakfast/breakfast.ogg',
+        'preload/music/freakyMenu/freakyMenu.ogg', 'shared/music/breakfast/breakfast.ogg', 'shared/music/breakfast-pico/breakfast-pico.ogg',
         # songs
         'songs/tutorial/Inst.ogg', 'songs/tutorial/Voices-bf.ogg', 'songs/tutorial/Voices-gf.ogg',
         *[f'songs/{s}/{f}.ogg' for s in SONGS_EARLY for f in ['Inst', 'Voices-bf', 'Voices-dad', 'Inst-erect', 'Voices-bf-erect', 'Voices-dad-erect', 'Inst-pico', 'Voices-pico-playable-pico', 'Voices-dad-pico']],
