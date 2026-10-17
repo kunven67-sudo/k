@@ -310,6 +310,7 @@ class Fighter {
       this.bleed += dmg * (o.stab ? 0.035 : 0.025) * (o.cut || 1);
       gore.blood(at, o.dir, Math.min(60, 8 + dmg * 0.9), 2 + dmg * 0.05);
       this.blood = Math.min(1, this.blood + dmg * 0.006);
+      if ((k === 'chest' || k === 'belly') && !o.stab && dmg > 26 && settings.gore >= 2) gore.gash(this, k, at);
     }
     if (o.from) o.from.blood = Math.min(1, o.from.blood + (stopped ? 0 : dmg * 0.004));
     // reactions
