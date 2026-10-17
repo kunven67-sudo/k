@@ -731,6 +731,52 @@ def lanes(notes):
 JUMP = {0: 3, 3: 0, 1: 2, 2: 1}                 # the other arrow of a two-arrow jump
 
 
+# the eye's tricks on Normal + Hard (Easy is just the song):
+#   'glitch' = a note that jumps between lanes on the way up and lands in its real lane in time
+#   'fake'   = a decoy arrow that breaks apart before it reaches you (can't be hit)
+#   'eye'    = his eye in your lane: DON'T hit it (missing it is fine)
+# Only in places where they can't hide a real note: a lane stays free half a beat around them.
+S2_BF = [(40, 44), (48, 52), (52, 56), (60, 64)]          # stage 2, where BF sings (+ the trade)
+SPECIALS = {'normal': {'eye': 8, 'fake': 6, 'glitch_every': 5}, 'hard': {'eye': 16, 'fake': 14, 'glitch_every': 3}}
+
+
+def specials(lst, diff):
+    cfg, rng = SPECIALS[diff], np.random.default_rng({'normal': 3, 'hard': 7}[diff])
+    ms = BEAT * 1000
+    bf = [q for q in lst if q['d'] < 4]
+    def free(t, lane, gap):
+        return not any(q['d'] == lane and q['t'] - gap <= t <= q['t'] + q.get('l', 0) + gap for q in bf)
+    def quiet(t, gap): return not any(abs(q['t'] - t) < gap for q in bf)
+    # glitch notes: every Nth of BF's stage-2 notes + all of his notes in the stutter bars
+    stutter = [(T(bar, beat) * 1000, T(bar, beat + beats) * 1000) for bar, beat, beats, _ in GLITCHES]
+    n = 0
+    for q in bf:
+        if not any(T(a) * 1000 <= q['t'] < T(b) * 1000 for a, b in S2_BF):
+            if any(t0 - 1 <= q['t'] <= t1 for t0, t1 in stutter): q['k'] = 'glitch'
+            continue
+        n += 1
+        if n % cfg['glitch_every'] == 0 or any(t0 - 1 <= q['t'] <= t1 for t0, t1 in stutter): q['k'] = 'glitch'
+    # spots for the eyes + fakes: on the 8ths between BF's notes, a lane nobody uses for half a beat
+    spots = []
+    for a, b in S2_BF:
+        for h in range((b - a) * 8):
+            t = round(T(a, h / 2) * 1000, 2)
+            if not quiet(t, ms * 0.24): continue
+            lanes = [l for l in range(4) if free(t, l, ms * 0.5)]
+            near = [q for q in bf if abs(q['t'] - t) < ms * 1.5]          # only while BF is singing
+            if lanes and near: spots.append((t, lanes))
+    want = cfg['eye'] + cfg['fake']
+    pick = sorted(rng.choice(len(spots), size=min(want, len(spots)), replace=False)) if spots else []
+    kinds = ['eye'] * cfg['eye'] + ['fake'] * cfg['fake']; rng.shuffle(kinds)
+    last = -1e9
+    for i, k in zip(pick, kinds):
+        t, lanes = spots[i]
+        if t - last < ms: continue                                         # never two tricks right after each other
+        lst.append({'t': t, 'd': int(rng.choice(lanes)), 'k': k}); last = t
+    lst.sort(key=lambda q: (q['t'], q['d']))
+    return lst
+
+
 def chart(notes):
     lanes(notes)
     out = {'easy': [], 'normal': [], 'hard': []}
@@ -754,6 +800,7 @@ def chart(notes):
         if on8 and x['beat'] - last_easy[x['who']] >= 0.75 - 1e-6:
             out['easy'].append(nt); last_easy[x['who']] = x['beat']
     for k in out: out[k].sort(key=lambda q: (q['t'], q['d']))
+    for k in ('normal', 'hard'): out[k] = specials([dict(q) for q in out[k]], k)
     events = [{'t': 0, 'e': 'FocusCamera', 'v': 1}]
     for bar, who in CAMERA[1:]: events.append({'t': round(T(bar) * 1000, 2), 'e': 'FocusCamera', 'v': who})
     events.append({'t': round(T(SNAP, 2) * 1000, 2), 'e': 'WrathSnap', 'v': {}})

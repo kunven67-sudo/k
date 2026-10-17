@@ -26,6 +26,7 @@
     ['Downscroll', 'bool', () => S().downscroll, v => S().downscroll = v, 'Notes move down toward the strumline at the bottom of the screen.'],
     ['Middlescroll', 'bool', () => S().middlescroll, v => S().middlescroll = v, 'Your arrows sit in the middle and the opponent arrows are hidden.'],
     ['Ghost Tapping', 'bool', () => S().ghostTapping, v => S().ghostTapping = v, 'Pressing a key when there is no note does not count as a miss.'],
+    ['Modcharts', 'bool', () => S().modcharts !== false, v => S().modcharts = v, 'Songs can move, swap + spin your arrows and add trick notes. Off = just the song.'],
     ['Flashing Lights', 'bool', () => S().flashing, v => S().flashing = v, 'When disabled, flashing effects are dampened.'],
     ['Camera Zooms', 'bool', () => S().camZoom, v => S().camZoom = v, 'When enabled, the camera bounces on the beat during songs.'],
     ['Note Splashes', 'bool', () => S().noteSplashes, v => S().noteSplashes = v, 'Show a splash when you hit a SICK note.'],

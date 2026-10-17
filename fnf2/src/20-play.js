@@ -43,6 +43,9 @@
     s.playA = function (n, force) { this.play(n, force); centerOffsets(this); if (n === 'confirm') { this.offset.x -= 13; this.offset.y -= 13; } };
     return s;
   }
+  // special notes (modcharts): 'fake' = a decoy that vanishes before it gets to you (can't be hit),
+  // 'eye' = a trap you must NOT hit (missing it is fine), 'glitch' = a normal note that looks broken
+  const isReal = n => n.kind !== 'fake' && n.kind !== 'eye';
   function centerOffsets(s) { s.offset.x = (s.frameW - s.width) * 0.5; s.offset.y = (s.frameH - s.height) * 0.5; s.origin.x = s.frameW / 2; s.origin.y = s.frameH / 2; }
 
   // ---------------------------------------------------------------- PlayState
@@ -67,6 +70,8 @@
       });
     },
     leave() { if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); },
+    // the song is running: the main loop must never hold the screen for pictures still loading
+    live() { return this.ready && this.started && !this.cutscene && !this.paused && !this.gameOver; },
     // -------------------------------------------------- world: stage + characters + cameras
     setupWorld() {
       const s = this.song;
@@ -117,7 +122,8 @@
       ];
       for (const L of this.lines) for (let i = 0; i < 4; i++) {
         const s = makeStrum(i, L.player);
-        s.x = L.x + i * SPACING + INITIAL_OFFSET; s.y = L.y;
+        s.x = s.bx = L.x + i * SPACING + INITIAL_OFFSET; s.y = s.by = L.y;
+        s.mx = s.my = s.ma = 0; s.mal = 1;                  // modchart offset / angle / alpha
         L.strums.push(s);
       }
       const speedSet = st.speedType === 'const' ? st.speedValue : st.speedType === 'mult' ? this.song.speed * st.speedValue : this.song.speed;
@@ -127,9 +133,15 @@
       this.hbBg.y = this.down ? G.H * 0.1 : G.H * 0.9; this.hbBg.screenCenter('x');
       this.iconP1 = this.makeIcon(this.bf, true);
       this.iconP2 = this.makeIcon(this.dad, false);
+      // ask for every gameplay sheet now (splashes + hold covers are big): they load before the song starts,
+      // not on your first SICK in the middle of it
+      for (const sh of [NS.notes, NS.strum, NS.splash, NS.cover(0), NS.cover(1), NS.cover(2), NS.cover(3)]) if (sh && sh.img) G.A.warmNow([sh.img]);
       this.popups = [];
       this.splashes = []; this.covers = [];
       this.countdownSpr = null;
+      // a song's own modchart (moving arrows, special notes, battle effects)
+      this.mod = G.settings.modcharts !== false && G.Modcharts && G.Modcharts[this.song.id] || null;
+      if (this.mod && this.mod.setup) try { this.mod.setup(this); } catch (e) { G.reportError(e, 'modchart'); this.mod = null; }
     },
     swapDad(c) {
       this.stage.addCharacter(c, 'dad');
@@ -144,6 +156,7 @@
     resetRun() {
       const s = this.song;
       this.notes = s.notes.map((n, i) => ({ i, t: n.t, lane: n.d % 4, line: n.d >= 4 ? 0 : 1, len: n.l, kind: n.k, hit: false, missed: false, holdEnd: n.t + n.l, holding: false, dropped: false, done: false, holdLeft: n.l }));
+      if (!this.mod) this.notes = this.notes.filter(isReal);           // modcharts off: no tricks, just the song
       this.evIdx = 0;
       this.health = 1; this.score = 0; this.misses = 0; this.combo = 0; this.maxCombo = 0;
       this.tally = { killer: 0, sick: 0, good: 0, bad: 0, shit: 0, miss: 0, total: 0 };
@@ -157,11 +170,12 @@
       this.botplay = !!G.settings.botplay; this.practice = !!G.settings.practice;
       this.popups = []; this.splashes = []; this.covers = [];
       this.vocalsOn = true;
-      for (const L of this.lines) for (const s2 of L.strums) { s2.playA('static', true); s2.confirmHold = -1; }
+      for (const L of this.lines) for (const s2 of L.strums) { s2.playA('static', true); s2.confirmHold = -1; s2.mx = s2.my = s2.ma = 0; s2.mal = 1; s2.x = s2.bx; s2.y = s2.by; s2.angle = 0; s2.alpha = 1; }
       this.snap = null; if (this.hud) this.hud.alpha = 1;
       if (this.dadForms) { this.dadForms[0]._locked = false; if (this.dad !== this.dadForms[0]) this.swapDad(this.dadForms[0]); else this.stage.chars.dad = this.dad; }
       this.iconP1.scale = this.iconP2.scale = 1;
       if (this.sfx && this.sfx.reset) this.sfx.reset(this);
+      if (this.mod && this.mod.reset) this.mod.reset(this);
     },
     // -------------------------------------------------- countdown
     startCountdown() {
@@ -201,8 +215,10 @@
       this.stage.update(dt);
       if (this.sfx && this.sfx.update) this.sfx.update(this, dt);
       this.updateCamera(dt);
+      if (this.mod && this.mod.update) this.mod.update(this, dt);
       for (const L of this.lines) for (const s of L.strums) {
         s.update(dt); centerOffsets(s); if (s.animName === 'confirm') { s.offset.x -= 13; s.offset.y -= 13; }
+        s.x = s.bx + s.mx; s.y = s.by + s.my; s.angle = s.ma; s.alpha = s.mal;
         if (s.confirmHold >= 0) { s.confirmHold += dt; if (s.confirmHold >= 0.15) { s.confirmHold = -1; s.playA('static', true); } }
         if (s.player && s.animName === 'confirm' && s.finished && !this.botplay) { if (this.keys[s.dir]) s.playA('press', true); }
       }
@@ -227,6 +243,7 @@
     onBeat(beat) {
       this.iconP1.scale = this.iconP2.scale = 1.2;
       if (beat >= 0 && this.sfx && this.sfx.beat) this.sfx.beat(this, beat);
+      if (beat >= 0 && this.mod && this.mod.beat) this.mod.beat(this, beat);
       if (beat >= 0 && G.settings.camZoom && this.zoomRate > 0 && beat % this.zoomRate === 0 && this.camZoom * this.bopMul < 1.35 * this.stageZoom) {
         this.bopMul = this.bopIntensity; this.hudZoom += this.hudBopIntensity;
       }
@@ -265,6 +282,7 @@
     handleEvent(e) {
       const v = e.v;
       if (this.sfx && this.sfx.event) this.sfx.event(this, e.e, v);
+      if (this.mod && this.mod.event) this.mod.event(this, e.e, v);
       for (const c of [this.gf, this.dad, this.bf]) if (c && c.script && c.script.onEvent) c.script.onEvent(c, e.e, v);
       switch (e.e) {
         case 'FocusCamera': {
@@ -319,6 +337,7 @@
       this.botHolding = false;
       for (const n of this.notes) {
         if (n.done) continue;
+        if (!isReal(n)) { if (pos - n.t > HIT_WINDOW) n.done = true; continue; }     // decoys + traps just go by
         const L = this.lines[n.line];
         if (!L.player || bot) {
           // opponent (and botplay) hit notes exactly on time
@@ -367,14 +386,16 @@
       this.keys[lane] = true;
       const pos = this.songPos - (G.settings.offset || 0);
       const s = this.lines[1].strums[lane];
-      let best = null;
+      let best = null, trap = null;
       for (const n of this.notes) {
-        if (n.done || n.hit || n.missed || n.line !== 1 || n.lane !== lane) continue;
+        if (n.done || n.hit || n.missed || n.line !== 1 || n.lane !== lane || n.kind === 'fake') continue;
         const diff = n.t - pos;
-        if (Math.abs(diff) <= HIT_WINDOW && (!best || n.t < best.t)) best = n;
+        if (n.kind === 'eye') { if (Math.abs(diff) <= 110 && (!trap || n.t < trap.t)) trap = n; }    // a real note always wins
+        else if (Math.abs(diff) <= HIT_WINDOW && (!best || n.t < best.t)) best = n;
         if (diff > HIT_WINDOW) break;
       }
       if (best) { best.hit = true; best.holding = best.len > 0; this.playerHit(best, pos - best.t, false); }
+      else if (trap) { trap.hit = true; trap.done = true; s.playA('press', true); this.hitTrap(trap); }
       else {
         s.playA('press', true);
         if (!G.settings.ghostTapping) this.ghostMiss(lane);
@@ -405,6 +426,14 @@
       if (this.gf && this.gf.anims['combo' + this.combo]) this.gf.playAnim('combo' + this.combo, true);
       if (n.len > 0) this.startCover(n);
       if (G.settings.hitsound > 0) G.sfx('preload/sounds/scrollMenu.ogg', { vol: G.settings.hitsound * 0.7 });
+    },
+    // you hit a note you shouldn't have (GLARE's eye notes): health + combo gone, the song decides the rest
+    hitTrap(n) {
+      this.health -= 0.35; this.score -= 150;
+      this.breakCombo();
+      if (this.audio) this.audio.setVolume('p', 0);
+      this.bf.sing(n.lane, true);
+      if (this.mod && this.mod.trap) this.mod.trap(this, n);
     },
     holdTick(n, dt) {
       this.health = Math.min(H.max, this.health + H.holdPerSec * dt);
@@ -456,8 +485,8 @@
       const v = Math.floor(Math.random() * 2);
       sp.addAnim('s', SPLASH[DIRL[lane]][v], 24 + Math.floor(Math.random() * 5) - 2, false);
       sp.play('s', true); sp.updateHitbox();
-      const L = this.lines[1];
-      sp.x = L.x + lane * SPACING + INITIAL_OFFSET + 25; sp.y = L.y - INITIAL_OFFSET - 5;
+      const S = this.lines[1].strums[lane];
+      sp.x = S.x + 25; sp.y = S.y - INITIAL_OFFSET - 5;
       sp.offset.x = sp.width * 0.3; sp.offset.y = sp.height * 0.3;
       sp.alpha = 0.8;
       this.splashes.push(sp);
@@ -675,7 +704,7 @@
       if (this.audio) this.audio.stop();
       const p = this.params, s = this.song;
       const acc = this.accN ? this.accSum / this.accN : 0;
-      const stats = { score: Math.round(this.score), misses: this.misses, maxCombo: this.maxCombo, tally: Object.assign({}, this.tally), acc, totalNotes: this.notes.filter(n => n.line === 1).length };
+      const stats = { score: Math.round(this.score), misses: this.misses, maxCombo: this.maxCombo, tally: Object.assign({}, this.tally), acc, totalNotes: this.notes.filter(n => n.line === 1 && isReal(n)).length };
       const cheated = this.botplay || this.practice;
       // V-Slice style tallies + rank (results screen, freeplay rank badges + clear %)
       const tl = this.tally, sick = (tl.killer || 0) + tl.sick;
@@ -710,10 +739,12 @@
         else s.draw(ctx, this.cam);
       }
       if (this.sfx && this.sfx.drawOver) this.sfx.drawOver(ctx, this);
+      if (this.mod && this.mod.drawWorld) this.mod.drawWorld(ctx, this);
       this.cam.drawFX(ctx);
       if (this.cutscene) { this.cutscene.draw(ctx); return; }
       // HUD
       if (this.hud.alpha > 0.01) { ctx.save(); ctx.globalAlpha = this.hud.alpha; this.drawHUD(ctx); ctx.restore(); }
+      if (this.mod && this.mod.drawTop) this.mod.drawTop(ctx, this);
       if (this.paused) this.drawPause(ctx);
       if (this.blackIn > 0) { G.setScreenT(ctx); ctx.globalAlpha = Math.min(1, this.blackIn); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
     },
@@ -735,21 +766,26 @@
           if (n.missed && !n.dropped && this.songPos > n.holdEnd) continue;
           this.drawHold(ctx, L, n, holdImg);
         }
-        // note heads
+        // note heads (they follow their strum: modcharts move, spin + fade the strums)
+        const li = this.lines.indexOf(L);
         for (const n of this.notes) {
-          if (n.line !== this.lines.indexOf(L) || n.hit || n.done) continue;
-          const y = L.y - INITIAL_OFFSET + this.noteY(n.t);
-          if (y > G.H + 50 || y < -200) { if ((n.t - this.songPos) * PX_PER_MS * this.scrollSpeed > G.H + 200) break; continue; }
-          const frames = G.Sparrow.byPrefix(notesSheet, 'note' + DIR[n.lane]);
-          const f = frames[0]; if (!f) continue;
+          if (n.line !== li || n.hit || n.done) continue;
+          const S = L.strums[n.lane];
+          const y = S.y - INITIAL_OFFSET + this.noteY(n.t);
+          if (y > G.H + 120 || y < -260) { if ((n.t - this.songPos) * PX_PER_MS * this.scrollSpeed > G.H + 300) break; continue; }
+          const f = G.Sparrow.byPrefix(notesSheet, 'note' + DIR[n.lane])[0]; if (!f) continue;
           const w = f.fw * 0.7;
-          const x = L.x + n.lane * SPACING - (w - STRUM_SIZE) / 2 - NUDGE;
-          ctx.save(); ctx.translate(x, y); ctx.scale(0.7, 0.7);
-          if (n.missed) ctx.globalAlpha = 0.3;
+          const x = S.x - INITIAL_OFFSET - (w - STRUM_SIZE) / 2 - NUDGE;
+          if (this.mod && this.mod.drawNote && this.mod.drawNote(ctx, this, n, L, x, y, f, notesSheet)) continue;
+          ctx.save(); ctx.translate(x, y);
+          if (S.angle) { const c = f.fw * 0.35; ctx.translate(c, c); ctx.rotate(S.angle * Math.PI / 180); ctx.translate(-c, -c); }
+          ctx.scale(0.7, 0.7);
+          ctx.globalAlpha *= (n.missed ? 0.3 : 1) * S.alpha;
           G.Sparrow.draw(ctx, notesSheet, f); ctx.restore();
         }
-        for (const cv of this.covers) if (cv.line === this.lines.indexOf(L)) {
-          cv.x = L.x + cv.lane * SPACING + STRUM_SIZE / 2 - cv.width / 2 - 12; cv.y = L.y + INITIAL_OFFSET + STRUM_SIZE / 2 - 96;
+        for (const cv of this.covers) if (cv.line === li) {
+          const S = L.strums[cv.lane];
+          cv.x = S.x - INITIAL_OFFSET + STRUM_SIZE / 2 - cv.width / 2 - 12; cv.y = S.y + INITIAL_OFFSET + STRUM_SIZE / 2 - 96;
           cv.draw(ctx, hud);
         }
       }
@@ -809,17 +845,17 @@
     // one sustain trail: tiled hold piece + end cap from NOTE_hold_assets (8 columns)
     drawHold(ctx, L, n, img) {
       if (!img) return;
-      const colW = img.width / 8, zoom = 0.7, w = colW * zoom;
-      const x = L.x + n.lane * SPACING + STRUM_SIZE / 2 - w / 2;
+      const colW = img.width / 8, zoom = 0.7, w = colW * zoom, S = L.strums[n.lane];
+      const x = S.x - INITIAL_OFFSET + STRUM_SIZE / 2 - w / 2;
       let startT = n.t, endT = n.holdEnd;
       if (n.hit && n.holding) startT = Math.max(startT, this.songPos);
       if (endT <= startT) return;
-      const y0 = L.y - INITIAL_OFFSET + STRUM_SIZE / 2 + this.noteY(startT);
+      const y0 = S.y - INITIAL_OFFSET + STRUM_SIZE / 2 + this.noteY(startT);
       const len = (endT - startT) * PX_PER_MS * this.scrollSpeed;
       const capH = img.height * zoom * 0.4;
       const bodyH = Math.max(0, len - capH);
       ctx.save();
-      ctx.globalAlpha = n.dropped || n.missed ? 0.3 : 1;
+      ctx.globalAlpha *= (n.dropped || n.missed ? 0.3 : 1) * S.alpha;
       ctx.translate(x, y0);
       if (this.down) ctx.scale(1, -1);
       // body: hold piece column tiled vertically

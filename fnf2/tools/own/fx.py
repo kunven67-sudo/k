@@ -8,6 +8,9 @@ git-ignored build/own folder, never the repo):
   fx/dust         Weekend 1's spray paint explosion smoke ring, recoloured to dust, flattened onto the
                   ground (footsteps, landings, the trash can clang)
 
+  fx/eye-note     WRATH's void eye (tools/own/wrath_eye.py) at arrow size: GLARE's DON'T-HIT notes
+  sounds/wrath-battle/glitch.ogg + eye-stare.ogg   FNF's TV static + Week 2 thunder, cut and layered
+
   python3 tools/own/fx.py
 """
 import os, re, sys
@@ -87,6 +90,34 @@ def dust(rgb, al):
     return out, al
 
 
+def eye_note():
+    """The void eye (spikes + eyeball + red ring iris) shrunk to the size of an FNF arrow."""
+    d = os.path.join(ROOT, 'build', 'own', 'shared', 'images', 'characters', 'wrath-eye')
+    m = __import__('json').load(open(os.path.join(d, 'meta.json')))['looks']['void']
+    back = Image.open(os.path.join(d, m['back'] + '.png')).convert('RGBA')
+    iris = Image.open(os.path.join(d, m['iris'] + '.png')).convert('RGBA')
+    cx, cy = m['irisAt']
+    back.alpha_composite(iris, (int(round(cx - iris.width / 2)), int(round(cy - iris.height / 2))))
+    back = back.crop(back.getbbox())
+    w = 200; back = back.resize((w, round(back.height * w / back.width)), Image.LANCZOS)
+    back.save(os.path.join(OUT, 'eye-note.png'))
+
+
+def sounds():
+    import subprocess
+    sd = os.path.join(ROOT, 'build', 'own', 'shared', 'sounds', 'wrath-battle'); os.makedirs(sd, exist_ok=True)
+    static = os.path.join(FA, 'preload', 'sounds', 'static loop.ogg')
+    thunder = os.path.join(FA, 'week2', 'sounds', 'thunder_1.ogg')
+    run = lambda *a: subprocess.run(['ffmpeg', '-v', 'error', '-y', *a], check=True)
+    # a short burst of TV static (teleports, glitch notes)
+    run('-i', static, '-af', 'atrim=0.3:0.48,afade=t=in:d=0.01,afade=t=out:st=0.08:d=0.1,volume=0.8', '-c:a', 'libvorbis', '-q:a', '5', os.path.join(sd, 'glitch.ogg'))
+    # the eye stares at you: static cutting out over a deep, slowed thunder roll
+    run('-i', static, '-i', thunder, '-filter_complex',
+        '[0]atrim=1.2:1.9,afade=t=out:st=0.25:d=0.45,volume=0.55[a];'
+        '[1]asetrate=44100*0.7,aresample=44100,atrim=0:2.4,afade=t=out:st=1.2:d=1.2,volume=1.3[b];'
+        '[a][b]amix=inputs=2:normalize=0', '-c:a', 'libvorbis', '-q:a', '5', os.path.join(sd, 'eye-stare.ogg'))
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     w1 = os.path.join(FA, 'weekend1', 'images')
@@ -99,6 +130,8 @@ def main():
     keep = ['explosion round 1 short%04d' % i for i in range(5, 13)]
     recolour(os.path.join(w1, 'spraypaintExplosionEZ.png'), os.path.join(w1, 'spraypaintExplosionEZ.xml'), os.path.join(OUT, 'dust'), dust,
              keep=keep, scale=0.22, squash=0.5)
+    eye_note()
+    sounds()
     print('wrote', sorted(os.listdir(OUT)))
 
 

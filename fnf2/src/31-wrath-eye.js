@@ -74,6 +74,7 @@
     D: { dx: 6, dy: 85, rot: 3, sx: 1.04, sy: 0.95, px: 0.15, py: 1, ps: 0.88 },
     U: { dx: -6, dy: -95, rot: -3, sx: 0.97, sy: 1.04, px: 0.15, py: -1, ps: 0.88 },
     R: { dx: 72, dy: -6, rot: 8, sx: 1.06, sy: 0.95, px: 1, py: 0, ps: 0.88 },
+    stare: { dx: 0, dy: -20, rot: 0, sx: 1.12, sy: 1.12, px: 0, py: 0, ps: 1.45 },     // you hit one of his eye notes
   };
   const KEYS = Object.keys(POSE.idle);
   const FRAME = { w: 1000, h: 1000 }, REST = [500, 470];
@@ -89,7 +90,7 @@
       for (const d of ['LEFT', 'DOWN', 'UP', 'RIGHT']) { own('sing' + d, 8); own('sing' + d + 'miss', 10); }
       ch._key = 'e' + Math.random();
       ch._p = Object.assign({}, POSE.idle); ch._tgt = POSE.idle; ch._hit = 0;
-      ch._look = 'void'; ch._glitch = 0; ch._purple = 0; ch._shake = 0; ch._bop = 0; ch._glowP = 0;
+      ch._look = 'void'; ch._stare = 0; ch._glitch = 0; ch._purple = 0; ch._shake = 0; ch._bop = 0; ch._glowP = 0;
       ch._t = Math.random() * 10;
       ch._drops = []; ch._splats = []; ch._dropT = 0.5; ch._puddle = 0; ch._burst = -1;
       const play = ch.play.bind(ch);
@@ -105,18 +106,20 @@
       } catch (e) {}
     },
     setLook(ch, look) { if (ch._look !== look) { ch._look = look; ch._glitch = 0.09; } },
+    // he stares right at you (GLARE's eye notes): looks straight out, iris wide, a bit closer
+    stare(ch, dur) { ch._stare = dur; ch._look = 'redring'; ch._glitch = 0.12; ch._shake = Math.max(ch._shake, 0.25); },
     onAnim(ch, name) {
       const m = /^sing(LEFT|DOWN|UP|RIGHT)(miss)?/.exec(name);
       if (m) {
         const d = ['LEFT', 'DOWN', 'UP', 'RIGHT'].indexOf(m[1]);
         ch._tgt = POSE['LDUR'[d]]; ch._miss = !!m[2]; ch._hit = 1; ch._glowP = 1;
-        this.setLook(ch, BY_DIR[d]);
+        if (!(ch._stare > 0)) this.setLook(ch, BY_DIR[d]);
         for (const k of KEYS) ch._p[k] = G.lerp(ch._p[k], ch._tgt[k], 0.7);   // FNF poses hit on the first frame
         if (ch._miss) { ch._purple = 1; ch._shake = 0.35; } else ch._purple = 0;
         if (GOO && d === 1 && !ch._miss) this.release(ch, 2);
       } else {
         ch._tgt = POSE.idle; ch._miss = false;
-        if (name === 'idle') { ch._bop = 1; this.setLook(ch, 'void'); }
+        if (name === 'idle') { ch._bop = 1; if (!(ch._stare > 0)) this.setLook(ch, 'void'); }
       }
     },
     // long notes hit harder: camera shake
@@ -134,7 +137,8 @@
     },
     update(ch, dt) {
       ch._t += dt;
-      const p = ch._p, tg = ch._tgt;
+      const p = ch._p, tg = ch._stare > 0 ? POSE.stare : ch._tgt;
+      ch._stare = Math.max(0, ch._stare - dt);
       ch._hit = Math.max(0, ch._hit - dt * 9);
       const rate = tg === POSE.idle ? 7 : 26;
       for (const k of KEYS) { const goal = tg === POSE.idle ? tg[k] : tg[k] + (tg[k] - POSE.idle[k]) * 0.12 * ch._hit; p[k] = G.damp(p[k], goal, rate, dt); }

@@ -76,7 +76,7 @@ G.DFJK_BINDS = {
 };
 G.DEFAULT_SETTINGS = {
   // gameplay
-  downscroll: false, middlescroll: false, ghostTapping: true,
+  downscroll: false, middlescroll: false, ghostTapping: true, modcharts: true,
   speedType: 'chart',   // 'chart' | 'mult' | 'const'
   speedValue: 1,        // multiplier (mult) or fixed speed (const), 0.5 - 4
   songSpeed: 1,         // playback rate 0.5 - 2 (pitch is kept)
@@ -749,8 +749,11 @@ G.loop = function () {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
     for (const img of G.A.fresh.splice(0)) try { ctx.drawImage(img, 0, 0, 1, 1); } catch (e) {}
   }
-  if (busy) { try { if (G.audio && G.audio.update) G.audio.update(dt); } catch (e) {} G.updateTransition(dt); requestAnimationFrame(G.loop); return; }
-  if (G.A._after.length) for (const fn of G.A._after.splice(0)) try { fn(); } catch (e) { G.reportError(e, 'afterLoad'); }
+  // ...but never while a song is playing: the music doesn't wait, so freezing would make you miss notes
+  // (a picture that isn't ready yet just isn't drawn for a frame or two)
+  const live = G.screen && G.screen.live && G.screen.live();
+  if (busy && !live) { try { if (G.audio && G.audio.update) G.audio.update(dt); } catch (e) {} G.updateTransition(dt); requestAnimationFrame(G.loop); return; }
+  if (!busy && G.A._after.length) for (const fn of G.A._after.splice(0)) try { fn(); } catch (e) { G.reportError(e, 'afterLoad'); }
   try {
     if (G.audio && G.audio.update) G.audio.update(dt);
     if (G.screen && G.screen.update) G.screen.update(dt);
