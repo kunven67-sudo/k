@@ -171,14 +171,15 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
 .spot.q{color:var(--amber)}.spot.x{color:var(--red)}
 .dmgn{position:absolute;transform:translate(-50%,-50%);font-weight:800;font-size:16px;color:#fff;text-shadow:0 0 3px #000,0 0 6px #000}
 .dmgn.h{color:var(--red);font-size:20px}
-#objective{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);padding:6px 14px;font-size:13px;max-width:70vw;text-align:center;border-radius:3px}
+#topc{position:absolute;top:12px;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+#objective{background:var(--panel);border:1px solid var(--line);padding:6px 14px;font-size:13px;max-width:70vw;text-align:center;border-radius:3px}
 #objective:empty{display:none}
-#virusTag{position:absolute;top:118px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(150,0,20,.75);border:1px solid var(--red);padding:4px 12px;font-size:13px;font-weight:800;letter-spacing:.08em;border-radius:3px;animation:vtag .5s steps(2) infinite}
+#virusTag{color:#fff;background:rgba(150,0,20,.75);border:1px solid var(--red);padding:4px 12px;font-size:13px;font-weight:800;letter-spacing:.08em;border-radius:3px;animation:vtag .5s steps(2) infinite}
 #virusTag:empty{display:none}
 @keyframes vtag{50%{background:rgba(60,0,10,.75)}}
 #objective .tt{color:var(--cyan);font-size:11px;letter-spacing:.2em;display:block}
-#bossbar{position:absolute;top:58px;left:50%;transform:translateX(-50%);width:min(620px,80vw);text-align:center}
-.bb-name{font-family:var(--logo);font-size:22px;letter-spacing:.2em;color:var(--green);text-shadow:0 0 12px var(--green)}
+#bossbar{width:min(620px,80vw);text-align:center}
+.bb-name{font-family:var(--logo);font-size:clamp(15px,3.4vw,22px);letter-spacing:.2em;color:var(--green);text-shadow:0 0 12px var(--green)}
 .bb-track{height:12px;border:1px solid var(--green);background:rgba(0,0,0,.6);padding:2px;margin-top:3px}
 #bbFill{height:100%;width:100%;background:linear-gradient(90deg,#0f8a43,var(--green));box-shadow:0 0 12px var(--green)}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:8px 10px;position:relative}
@@ -312,7 +313,9 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
 #fakegame{position:fixed;inset:0;z-index:46;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono)}
 #fgCanvas{width:min(720px,94vw);height:auto;border:3px solid #fff;image-rendering:pixelated;background:#000}
 #fgText{margin-top:14px;font-size:18px;color:#fff;min-height:24px;text-align:center}
-#stats,#teaser{position:fixed;inset:0;z-index:47;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse,#06140c,#000)}
+/* small screens (phones sideways): smaller side panels, so the objective + boss bar fit between them */
+@media (max-width:900px),(max-height:500px){.hud-tl{transform:scale(.75);transform-origin:0 0}.hud-br{transform:scale(.75);transform-origin:100% 100%}#minimap{width:124px;height:124px}#crypto{font-size:20px}#topc{top:8px;gap:4px}#objective{font-size:11px;padding:4px 10px;max-width:max(150px,calc(100vw - 430px))}#objective .tt{font-size:9px}#bossbar{width:max(200px,calc(100vw - 430px))}#hud.flip-hud .hud-tl{transform:translateX(187.5px) scale(-.75,.75)}}
+#stats,#teaser{position:fixed;inset:0;z-index:47;display:flex;align-items:safe center;justify-content:center;overflow-y:auto;background:radial-gradient(ellipse,#06140c,#000)}
 .st-box{width:min(640px,94vw);text-align:center;font-family:var(--mono)}
 .st-title{font-family:var(--logo);font-size:clamp(36px,7vw,64px);color:var(--green);letter-spacing:.06em;text-shadow:0 0 20px rgba(57,255,136,.6)}
 .st-sub{color:#9fdcb7;margin-bottom:18px}
@@ -320,6 +323,10 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
 #stGrid div{background:rgba(57,255,136,.06);border:1px solid rgba(57,255,136,.25);padding:10px 12px}
 #stGrid small{display:block;color:#7fb896;font-size:11px;letter-spacing:.12em}
 #stGrid b{font-size:22px;color:#fff}
+#stRun{color:#7fb896;font-size:12px;margin:-12px 0 16px}
+#stRun:empty{display:none}
+.st-box{padding:12px 0}
+@media (max-height:520px){.st-title{font-size:clamp(26px,5vw,40px)}.st-sub{margin-bottom:8px}#stGrid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:5px;margin-bottom:10px}#stGrid div{padding:5px 8px}#stGrid b{font-size:16px}#stats .big-btn{padding:10px 28px;font-size:17px}#stRun{margin:-4px 0 8px;font-size:11px}}
 #teaser{background:#000;flex-direction:column}
 #tzCanvas{position:absolute;inset:0;width:100%;height:100%}
 #tzBtns{position:absolute;bottom:8vh;left:0;right:0;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
@@ -383,9 +390,9 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
   <div id="nametag"><div class="nt-n" id="ntName"></div><div class="nt-s" id="ntSub"></div><div class="nt-b"><i id="ntBar"></i></div></div>
   <div id="spots"></div>
   <div id="dmgnums"></div>
-  <div id="objective"></div>
-  <div id="virusTag"></div>
+  <div id="topc"><div id="objective"></div>
   <div id="bossbar" class="hidden"><div class="bb-name" id="bbName">ELIZA</div><div class="bb-track"><div id="bbFill"></div></div></div>
+  <div id="virusTag"></div></div>
   <div class="hud-tl panel" data-title="VITALS.SYS">
     <div class="stat"><span class="lbl">HP</span><div class="bar hp"><div id="hpFill"></div></div><span id="hpNum">100</span></div>
     <div class="stat"><span class="lbl">ARM</span><div class="bar ar"><div id="arFill"></div></div><span id="arNum">0</span></div>
@@ -434,7 +441,7 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
 <div id="cine" class="hidden"><div class="lb top"></div><div class="lb bot"></div><div id="cineSub"></div><button id="skipBtn">Skip ▶▶</button></div>
 <div id="fade"></div>
 <div id="fakegame" class="hidden"><canvas id="fgCanvas" width="320" height="200"></canvas><div id="fgText"></div></div>
-<div id="stats" class="hidden"><div class="st-box"><div class="st-title">LEVEL 1 COMPLETE</div><div class="st-sub">ELIZA (1966) has been deleted</div><div id="stGrid"></div><button class="big-btn" id="stNext">Continue ▶</button></div></div>
+<div id="stats" class="hidden"><div class="st-box"><div class="st-title">LEVEL 1 COMPLETE</div><div class="st-sub">ELIZA (1966) has been deleted</div><div id="stGrid"></div><div id="stRun"></div><button class="big-btn" id="stNext">Continue ▶</button></div></div>
 <div id="teaser" class="hidden"><canvas id="tzCanvas"></canvas><div id="tzBtns" class="hidden"><button class="big-btn alt" id="tzRoam">Keep exploring level 1</button><button class="big-btn" id="tzMenu">Back to desktop</button></div></div>
 
 <!-- touch controls -->
@@ -495,7 +502,7 @@ const damp = (a, b, k, dt) => lerp(a, b, 1 - Math.exp(-k * dt));
 const TAU = Math.PI * 2;
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fmtTime = (s) => { s = Math.max(0, Math.floor(s)); const m = Math.floor(s / 60); return m + ':' + String(s % 60).padStart(2, '0'); };
+const fmtTime = (s) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
 const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
 const smooth = (t) => t * t * (3 - 2 * t);
 const approach = (v, t, d) => (v < t ? Math.min(t, v + d) : Math.max(t, v - d));
@@ -1954,6 +1961,8 @@ function crtTerminal(x, y, z, rot) {
   for (let i = 0; i < p.count; i++) { const u = p.getX(i) / 0.17, v = p.getY(i) / 0.13; p.setZ(i, 0.018 * (1 - u * u * 0.6) * (1 - v * v * 0.6)); }
   sg.computeVertexNormals(); part(MAT.crt, sg, x, z, rot, 0, y + 0.25, 0.158);
   part(MAT.crtCase, rbox(0.46, 0.035, 0.17, 0.01), x, z, rot, 0, y + 0.02, 0.32, 0.06);
+  /* generated levels have hundreds of these: one keyboard block there instead of 48 keys */
+  if (GEN.lod) { part(MAT.keys, new THREE.BoxGeometry(0.38, 0.016, 0.125), x, z, rot, 0, y + 0.05, 0.325, 0.06); return; }
   for (let r = 0; r < 4; r++) for (let q = 0; q < 12; q++) part(r === 3 && q > 2 && q < 9 ? MAT.keysLight : MAT.keys, new THREE.BoxGeometry(0.027, 0.014, 0.026), x, z, rot, -0.17 + q * 0.031, y + 0.045 + r * 0.004, 0.37 - r * 0.031, 0.06);
 }
 function officeChair(x, z, rot) {
@@ -1965,7 +1974,7 @@ function officeChair(x, z, rot) {
   for (let k = 0; k < 5; k++) {
     const a = (k / 5) * TAU, lx = Math.sin(a) * 0.15, lz = Math.cos(a) * 0.15, g = new THREE.BoxGeometry(0.04, 0.03, 0.3); g.rotateY(a);
     part(MAT.metalDark, g, x, z, rot, lx, 0.08, lz);
-    part(MAT.rubber, new THREE.SphereGeometry(0.028, 8, 6), x, z, rot, Math.sin(a) * 0.29, 0.028, Math.cos(a) * 0.29);
+    part(MAT.rubber, GEN.lod ? new THREE.BoxGeometry(0.05, 0.05, 0.05) : new THREE.SphereGeometry(0.028, 8, 6), x, z, rot, Math.sin(a) * 0.29, 0.028, Math.cos(a) * 0.29);
   }
 }
 function crtDesk(x, z, rot = 0, chair = true) {
@@ -5454,7 +5463,7 @@ function levelDef(n) {
   n = clamp(n | 0, 1, LAST_LEVEL);
   const d = BOSS_DATA[n - 1], era = n === 1 ? 0 : eraOf(d[1], n);
   return { n, name: d[0], year: d[1], maker: d[2], look: d[3], color: d[4], sig: d[5], intro: d[6], taunts: [d[7], d[8]], p2: d[9], blurb: d[10], era,
-    title: n === 1 ? 'THE LAB' : n === LAST_LEVEL ? 'THE VIRUS' : (d[0] + "'s " + ERAS[era].place).toUpperCase(), seed: n * 7919 + 1301 };
+    title: n === 1 ? 'THE LAB' : n === LAST_LEVEL ? 'THE VIRUS' : (/\(newest\)/i.test(d[0]) ? 'the newest ' + d[0].replace(/ \(newest\)/i, '') : d[0]).toUpperCase() + "'S " + ERAS[era].place.toUpperCase(), seed: n * 7919 + 1301 };
 }
 /* the regular AIs on a level are older/dumber versions of the bosses that came before it */
 function levelAIName() { if (LVL.n <= 1 || Math.random() < 0.35) return null; const lo = Math.max(1, LVL.n - 14); return BOSS_DATA[randi(lo, LVL.n - 1) - 1][0]; }
@@ -5529,7 +5538,7 @@ function applyEra(e) {
 }
 
 /* ---------- era props ---------- */
-const GEN = { res: [], walls: [], rng: null };
+const GEN = { res: [], walls: [], rng: null, lod: false };
 const genFree = (x0, z0, x1, z1) => GEN.res.every((r) => x1 < r[0] || x0 > r[2] || z1 < r[1] || z0 > r[3]);
 const genRes = (x0, z0, x1, z1) => GEN.res.push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)]);
 const colRot = (x, z, rot, w, d, h, tag) => { const s = Math.abs(Math.sin(rot)) > 0.5, rw = s ? d : w, rd = s ? w : d; return addCol(x - rw / 2, 0, z - rd / 2, x + rw / 2, h, z + rd / 2, tag || null); };
@@ -5623,11 +5632,11 @@ function fillRoom(rm, style) {
   if (rm.kind === 'storage') { scatter(10, 1.4, (x, z) => { crate(x, z); if (Math.random() < 0.5) crate(x + 1.2, z); if (Math.random() < 0.35) crate(x, z, 1.2, 1.2); }); scatter(3, 0.6, (x, z) => filingCabinet(x, z, randi(0, 3) * (Math.PI / 2))); return; }
   switch (style) {
     case 'mainframe': if (Math.random() < 0.65) rows(5.5, mainframeRow); else { grid(2.4, 3.6, (x, z) => crtDesk(x, z, randi(0, 3) * (Math.PI / 2))); scatter(2, 1.2, (x, z) => linePrinter(x, z, randi(0, 1) * Math.PI)); } break;
-    case 'beige': if (Math.random() < 0.4) rows(5.5, mainframeRow, 4, 7); else { grid(2.4, 3.4, (x, z) => beigePCDesk(x, z, randi(0, 3) * (Math.PI / 2))); scatter(2, 1.2, (x, z) => linePrinter(x, z, 0)); scatter(3, 0.5, (x, z) => filingCabinet(x, z, Math.PI / 2)); } break;
-    case 'cubicles': grid(2.8, 3.2, (x, z) => cubicle(x, z, randi(0, 3) * (Math.PI / 2))); scatter(3, 0.5, plant); scatter(1, 0.4, waterCooler); scatter(1, 1, (x, z) => copier(x, z, 0)); break;
+    case 'beige': if (Math.random() < 0.4) rows(5.5, mainframeRow, 4, 7); else { grid(2.4, 4, (x, z) => beigePCDesk(x, z, randi(0, 3) * (Math.PI / 2))); scatter(2, 1.2, (x, z) => linePrinter(x, z, 0)); scatter(3, 0.5, (x, z) => filingCabinet(x, z, Math.PI / 2)); } break;
+    case 'cubicles': grid(2.8, 3.8, (x, z) => cubicle(x, z, randi(0, 3) * (Math.PI / 2))); scatter(3, 0.5, plant); scatter(1, 0.4, waterCooler); scatter(1, 1, (x, z) => copier(x, z, 0)); break;
     case 'openoffice':
       if (Math.random() < 0.25) { rows(5, (a, b, z) => rackRow(a, b, z, false), 3, 6); break; }
-      grid(3.4, 3.2, (x, z) => { openDesk(x - 0.8, z - 0.45, 0); openDesk(x + 0.8, z - 0.45, 0); openDesk(x - 0.8, z + 0.45, Math.PI); openDesk(x + 0.8, z + 0.45, Math.PI); });
+      grid(3.4, 4.6, (x, z) => { openDesk(x - 0.8, z - 0.45, 0); openDesk(x + 0.8, z - 0.45, 0); openDesk(x - 0.8, z + 0.45, Math.PI); openDesk(x + 0.8, z + 0.45, Math.PI); });
       scatter(4, 0.5, plant); scatter(2, 1.2, (x, z) => whiteboard(x, z, rand(0, TAU))); break;
     case 'racks': rows(4.6, (a, b, z) => rackRow(a, b, z, false)); scatter(2, 1.4, (x, z) => coolingUnit(x, z, randi(0, 3) * (Math.PI / 2))); break;
     case 'gpu': rows(5, (a, b, z) => rackRow(a, b, z, true)); scatter(2, 1.4, (x, z) => coolingUnit(x, z, randi(0, 3) * (Math.PI / 2))); break;
@@ -5639,8 +5648,8 @@ function fillRoom(rm, style) {
 
 /* ---------- the level ---------- */
 function genLevel(def, attempt = 0) {
-  const rng = mulberry(def.seed + attempt * 101), mr = Math.random; Math.random = rng;
-  try { genLevelInner(def); } finally { Math.random = mr; }
+  const rng = mulberry(def.seed + attempt * 101), mr = Math.random; Math.random = rng; GEN.lod = true;
+  try { genLevelInner(def); } finally { Math.random = mr; GEN.lod = false; }
   /* every important spot must be reachable on foot from the start, or we try another layout */
   if (attempt < 5 && !genReachable()) { console.warn('level ' + def.n + ' layout ' + attempt + ' had an unreachable spot, trying another'); unloadLevel(); LVL.n = def.n; genLevel(def, attempt + 1); }
 }
@@ -5822,7 +5831,7 @@ const SIG = {
   twins: ['clones', { n: 1 }], sparks: ['charge', { t: 3 }], predict: ['fan', { lead: true }], gem: ['ring', {}], tiny: ['teleport', { fast: true }], retrieve: ['pull', { t: 3 }],
   opus: ['beam', {}], artifacts: ['summon', { type: 'drone', name: 'ARTIFACT', n: 3 }], qwen: ['minigun', {}], think: ['charge', { t: 4 }], cheap: ['summon', { type: 'rusher', name: 'CHEAP COPY', n: 6 }],
   flash: ['teleport', { fast: true }], hybrid: ['charge', { t: 2.5 }], bigbrain: ['charge', { t: 3.5 }], slam: ['slam', {}], agents: ['summon', { type: 'grunt', name: 'SUB-AGENT', n: 3 }],
-  moon: ['rain', { obj: 'moon' }], router: ['minigun', {}], final: ['charge', { t: 3 }], virus: ['hack', { flip: 4, popups: 3 }],
+  omni: ['ring', { n: 24 }], moon: ['rain', { obj: 'moon' }], router: ['minigun', {}], final: ['charge', { t: 3 }], virus: ['hack', { flip: 4, popups: 3 }],
 };
 const FINAL_FOUR = [['GROK', 0xf0f0f0], ['CHATGPT', 0x10a37f], ['CLAUDE', 0xd97757], ['GEMINI', 0x8ab4ff]];
 
@@ -6205,13 +6214,14 @@ function updateGen(dt) {
 /* ---------- THE VIRUS (level 100): rewrites the room, deletes your arm, brings the Final Four ---------- */
 function virusPhase(E, ph, quiet) {
   if (ph === 2) {
-    if (!quiet) { PL.armGone = true; VM.dirty = true; toast('⚠ THE VIRUS DELETED YOUR ARM. One gun only, until the next phase.', 'bad', 5000); }
+    if (!PL.slots[0]) { PL.slots[0] = PL.slots[1]; PL.slots[1] = null; } PL.cur = 0; W.swap = 0; W.reload = 0; PL.armGone = true; VM.dirty = true; HUD.dirty = true;
+    if (!quiet) toast('⚠ THE VIRUS DELETED YOUR ARM. One gun only, until the next phase.', 'bad', 5000);
     if (!E.walls) { E.walls = []; for (let k = 0; k < 4; k++) { const mesh = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 0.5), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff2040, emissiveIntensity: 1.5, transparent: true, opacity: 0.55 })); mesh.userData.noEnv = true; lvAdd(mesh); E.walls.push({ mesh, on: false, t: k * 2.4 }); } }
     for (const w of E.walls) { w.on = true; w.mesh.visible = true; }
     if (!quiet) toast('⚠ THE VIRUS IS REWRITING THE MAP: firewalls!', 'bad', 3500);
   }
   if (ph === 3) {
-    if (!quiet) { PL.armGone = false; VM.dirty = true; toast('Your arm grew back. Finish it!', 'good', 3500); }
+    PL.armGone = false; VM.dirty = true; HUD.dirty = true; if (!quiet) toast('Your arm grew back. Finish it!', 'good', 3500);
     FINAL_FOUR.forEach(([nm, c], i) => { const b = spawnBot('grunt', -15 + i * 10, -95, { summoned: true, state: 'alert', base: nm, name: nm + ' (NEWEST)', color: c, tier: 3, hpMul: 3 }); if (b) E.summonAlive++; });
     G.hackFx.static = 1.2;
   }
@@ -6229,18 +6239,18 @@ function updateVirus(E, dt) {
 async function levelIntroCard() {
   const def = LVL.def || levelDef(LVL.n), E2 = ERAS[LVL.era] || ERAS[0];
   const c = $('tzCanvas'), x = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight;
-  const W2 = c.width, H = c.height, big = Math.min(90, W2 / 9), small = Math.max(16, Math.min(30, W2 / 30));
+  const W2 = c.width, H = c.height, big = Math.min(90, W2 / 9, H / 6), small = Math.max(14, Math.min(30, W2 / 30, H / 24)), mw = W2 * 0.94;
   const lines = [def.intro], col = '#' + new THREE.Color(def.color).getHexString();
   let shown = '';
   const draw = () => {
     x.fillStyle = '#000'; x.fillRect(0, 0, W2, H); x.fillStyle = E2.sbg; x.globalAlpha = 0.18; x.fillRect(0, 0, W2, H); x.globalAlpha = 1;
-    x.textAlign = 'center'; x.fillStyle = '#ff2a3d'; x.font = 'bold ' + big + 'px Impact, Arial Black, sans-serif'; x.fillText('LEVEL ' + LVL.n, W2 / 2, H * 0.24);
-    x.fillStyle = col; x.font = 'bold ' + Math.round(big * 0.6) + 'px Impact, Arial Black, sans-serif'; x.fillText(def.name.toUpperCase(), W2 / 2, H * 0.36);
-    x.fillStyle = '#ddd'; x.font = small + 'px monospace'; x.fillText(def.maker + ' · ' + def.year + ' · ' + LVL.title, W2 / 2, H * 0.43);
+    x.textAlign = 'center'; x.fillStyle = '#ff2a3d'; x.font = 'bold ' + big + 'px Impact, Arial Black, sans-serif'; x.fillText('LEVEL ' + LVL.n, W2 / 2, H * 0.24, mw);
+    x.fillStyle = col; x.font = 'bold ' + Math.round(big * 0.6) + 'px Impact, Arial Black, sans-serif'; x.fillText(def.name.toUpperCase(), W2 / 2, H * 0.36, mw);
+    x.fillStyle = '#ddd'; x.font = small + 'px monospace'; x.fillText(def.maker + ' · ' + def.year + ' · ' + LVL.title, W2 / 2, H * 0.43, mw);
+    if (LVL.n >= LAST_LEVEL) { x.fillStyle = '#ff2a3d'; x.font = 'bold ' + small + 'px monospace'; x.fillText('THE FINAL LEVEL', W2 / 2, H * 0.49, mw); }
     x.fillStyle = '#fff'; x.font = 'bold ' + small + 'px monospace';
     const words = shown.split(' '), rows = ['']; for (const w of words) { if ((rows[rows.length - 1] + ' ' + w).length > Math.floor(W2 / (small * 0.62))) rows.push(w); else rows[rows.length - 1] = (rows[rows.length - 1] + ' ' + w).trim(); }
     rows.forEach((r, i) => x.fillText(r, W2 / 2, H * 0.56 + i * small * 1.5));
-    if (LVL.n >= LAST_LEVEL) { x.fillStyle = '#ff2a3d'; x.fillText('THE FINAL LEVEL', W2 / 2, H * 0.8); }
   };
   draw(); SFX.boom(null, 0.5);
   for (const l of lines) for (const ch of l) { shown += ch; draw(); if (ch !== ' ') SFX.key(); await wait(0.03); }
@@ -6251,14 +6261,14 @@ async function levelIntroCard() {
 async function showEnding() {
   G.screen = 'teaser'; G.ended = true; showEl('teaser'); hideEl('tzBtns'); Music.set('off');
   const c = $('tzCanvas'), x = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight; const W2 = c.width, H = c.height;
-  const rows = ['THE VIRUS HAS BEEN DELETED.', '', 'All 100 AIs: deleted.', 'The file is clean. The screen goes dark...', '...and you wake up at your desk.', '', 'You never typed "make a game" again.', '', 'THANKS FOR PLAYING KILL AIs'];
+  const lh = Math.min(44, (H * 0.66) / 9), rows = ['THE VIRUS HAS BEEN DELETED.', '', 'All 100 AIs: deleted.', 'The file is clean. The screen goes dark...', '...and you wake up at your desk.', '', 'You never typed "make a game" again.', '', 'THANKS FOR PLAYING KILL AIs'];
   for (let i = 0; i <= rows.length; i++) {
     x.fillStyle = '#000'; x.fillRect(0, 0, W2, H); x.textAlign = 'center';
-    rows.slice(0, i).forEach((r, k) => { x.fillStyle = k === 0 ? '#39ff88' : k === rows.length - 1 ? '#ff2a3d' : '#fff'; x.font = (k === 0 || k === rows.length - 1 ? 'bold ' : '') + Math.max(16, Math.min(32, W2 / 28)) + 'px monospace'; x.fillText(r, W2 / 2, H * 0.2 + k * 44); });
+    rows.slice(0, i).forEach((r, k) => { x.fillStyle = k === 0 ? '#39ff88' : k === rows.length - 1 ? '#ff2a3d' : '#fff'; x.font = (k === 0 || k === rows.length - 1 ? 'bold ' : '') + Math.round(Math.min(32, W2 / 28, lh * 0.72)) + 'px monospace'; x.fillText(r, W2 / 2, H * 0.12 + k * lh, W2 * 0.94); });
     SFX.key(); await wait(0.6);
   }
   trophy('virus');
-  $('tzRoam').textContent = 'Back to desktop'; $('tzMenu').textContent = 'Back to desktop'; showEl('tzBtns');
+  $('tzRoam').textContent = 'Keep exploring level ' + LVL.n; $('tzMenu').textContent = 'Back to desktop'; showEl('tzBtns');
 }
 
 /* ============================ the level boss ============================ */
@@ -6270,7 +6280,7 @@ function resetBoss() { const B = G.boss; if (!B || B.done) return; if (B.kind ==
 function updateDoor(dt) { if (DOOR.open && DOOR.mesh) { const target = DOOR.closing ? DOOR.y0 : DOOR.y0 + 7.1; DOOR.mesh.position.y = damp(DOOR.mesh.position.y, target, 2.2, dt); } }
 function updateBoss(dt) { updateDoor(dt); const B = G.boss; if (!B) return; if (B.kind === 'eliza') updateEliza(dt); else updateGen(dt); }
 function bossSetDone() { const E = G.boss; if (!E) return; E.done = true; E.alive = false; E.active = false; if (E.kind === 'eliza') { E.fallT = 1; E.grp.position.y = 2.2; E.grp.rotation.set(0.5, E.yaw, 0.25); E.screen.material.emissiveIntensity = 0.05; } else genSetDone(E); }
-function bossPhaseQuiet(ph) { const E = G.boss; if (!E) return; if (E.kind === 'eliza') { E.phase = 2; E.hudHack = true; } else genSetPhase(E, ph, true); }
+function bossPhaseQuiet(ph) { const E = G.boss; if (!E) return; if (E.kind === 'eliza') { E.phase = 2; E.hudHack = true; } else for (let p = 2; p <= ph; p++) genSetPhase(E, p, true); }
 function bossTrophies() { const n = LVL.n; if (n >= 10) trophy('boss10'); if (n >= 25) trophy('boss25'); if (n >= 50) trophy('boss50'); if (n >= 99) trophy('boss99'); if (n >= 100) trophy('virus'); }
 /* back to the start of the fight (new game / level reset) */
 function resetBossState() {
@@ -6343,7 +6353,7 @@ async function loadLevel(n) {
 async function goToLevel(n) {
   G.screen = 'loading'; G.cine = false; G.killcam = null;
   await loadLevel(n);
-  resetLevelState();
+  resetLevelState(); G.lv0 = Object.assign({}, G.stats); /* the stats screen shows this level only */
   Object.assign(PL, { x: START.x, y: 0, z: START.z, vx: 0, vy: 0, vz: 0, yaw: START.yaw, pitch: 0, onGround: true, crouch: 0, slideT: 0, lean: 0, hp: 100, alive: true, invuln: 2, swim: false, under: false, gooT: 0, peakY: 0,
     checkpoint: -1, passcodes: [false, false, false], controlLock: false, lookLock: false, armGone: false, hasGun: PL.hasGun || PL.owned.length > 0 });
   Object.assign(W, { reload: 0, swap: 0, spin: 0, knife: 0, heal: 0, gren: 0, search: 0, rip: 0 });
@@ -6708,9 +6718,10 @@ function showStats() {
   document.querySelector('#stats .st-sub').textContent = LVL.bossName + ' (' + LVL.bossYear + ') has been deleted';
   $('stNext').textContent = LVL.n >= LAST_LEVEL ? 'The end ▶' : 'Next: level ' + (LVL.n + 1) + ' ▶'; hideEl('hud'); $('touch').classList.add('hidden'); if (document.pointerLockElement) document.exitPointerLock();
   Music.set('menu');
-  const s = G.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
-  const rows = [['TIME', fmtTime(s.time)], ['AIs DELETED', s.kills], ['HEADSHOTS', s.headshots], ['ACCURACY', acc + '%'], ['BEST STREAK', s.bestStreak], ['CRYPTO EARNED', '₿' + s.earned], ['DEATHS', s.deaths], ['BODIES SEARCHED', s.searched], ['CHATS', s.chats], ['TROPHIES', Object.keys(G.trophies).length + '/' + TROPHIES.length]];
+  const s = G.stats, s0 = G.lv0 || STATS0(), d = (k) => Math.max(0, (s[k] || 0) - (s0[k] || 0)), acc = d('shots') ? Math.round((d('hits') / d('shots')) * 100) : 0;
+  const rows = [['TIME', fmtTime(d('time'))], ['AIs DELETED', d('kills')], ['HEADSHOTS', d('headshots')], ['ACCURACY', acc + '%'], ['BEST STREAK', s.bestStreak], ['CRYPTO EARNED', '₿' + d('earned')], ['DEATHS', d('deaths')], ['BODIES SEARCHED', d('searched')], ['CHATS', d('chats')], ['TROPHIES', Object.keys(G.trophies).length + '/' + TROPHIES.length]];
   $('stGrid').innerHTML = rows.map(([k, v]) => '<div><small>' + k + '</small><b>' + esc(v) + '</b></div>').join('');
+  $('stRun').textContent = LVL.n > 1 ? 'Whole run: ' + (G.bossesBeaten || LVL.n) + ' bosses · ' + s.kills + ' AIs deleted · ' + fmtTime(s.time) + ' · ' + s.deaths + ' deaths' : '';
   showEl('stats');
 }
 $('stNext').addEventListener('click', () => { SFX.ui(); hideEl('stats'); if (LVL.n >= LAST_LEVEL) showEnding(); else goToLevel(LVL.n + 1).then(() => showTeaser()); });
@@ -6723,8 +6734,8 @@ async function showTeaser() {
   let shown = '';
   const draw = (red) => {
     x.fillStyle = red ? '#2a0006' : '#0000aa'; x.fillRect(0, 0, W2, H);
-    x.fillStyle = red ? '#ff3a4e' : '#ffffff'; x.font = 'bold ' + Math.max(16, Math.min(34, W2 / 30)) + 'px monospace'; x.textAlign = 'left';
-    shown.split('\n').forEach((l, i) => x.fillText(l, W2 * 0.08, H * 0.2 + i * 46));
+    x.fillStyle = red ? '#ff3a4e' : '#ffffff'; x.font = 'bold ' + Math.round(Math.max(13, Math.min(34, W2 / 30, H / 13))) + 'px monospace'; x.textAlign = 'left';
+    shown.split('\n').forEach((l, i) => x.fillText(l, W2 * 0.08, H * 0.14 + i * Math.min(46, H / 10), W2 * 0.86));
   };
   for (const l of lines) { for (const ch of l) { shown += ch; draw(false); if (ch !== ' ') SFX.key(); await wait(0.035); } shown += '\n'; await wait(0.2); }
   Speech.speak('Hello, I am Doctor Sbaitso. I am here to help you. Say whatever is in your mind freely.', VOICES.sbaitso, { interrupt: true });
@@ -6736,7 +6747,7 @@ async function showTeaser() {
   SFX.boom(null, 0.6);
   showEl('tzBtns');
 }
-$('tzRoam').addEventListener('click', () => { SFX.ui(); hideEl('teaser'); if (G.ended) { G.ended = false; showTitle(); return; } enterPlay(); toast('LEVEL ' + LVL.n + ' · ' + LVL.title + ' · find 3 passcode pieces, destroy 3 AI compilers, then delete ' + LVL.bossName, '', 6000); });
+$('tzRoam').addEventListener('click', () => { SFX.ui(); hideEl('teaser'); G.ended = false; enterPlay(); toast('LEVEL ' + LVL.n + ' · ' + LVL.title, '', 4000); });
 $('tzMenu').addEventListener('click', () => { SFX.ui(); hideEl('teaser'); G.ended = false; showTitle(); });
 
 /* ============================ menus + windows ============================ */
@@ -6974,7 +6985,7 @@ function serialize() {
     sp: SPAWNERS.map((s2) => Math.max(0, Math.round(s2.hp))), spr: SPAWNERS.map((s2) => s2.reserve), tw: TOWERS.map((t) => [t.alive ? 1 : 0, t.hacked ? 1 : 0, Math.round(t.hp)]), terms: TERMS.map((T) => [T.discount ? 1 : 0, Math.round(T.hackCd || 0)]),
     bots: BOTS.filter((b) => b.active && !b.ghost && !b.summoned && !b.scripted && !(b.dead && b.searched)).map((b) => [TYPES.indexOf(b.type), b.tier, b.name, b.base, r2(b.x), r2(b.y), r2(b.z), r2(b.yaw), Math.round(b.hp), b.dead ? 1 : 0, Math.max(0, STATES.indexOf(b.state)), b.noCannon ? 1 : 0, b.noSearch ? 1 : 0, r2(b.home.x), r2(b.home.z), b === CLIP.grunt ? 1 : 0, b.color.getHex()]),
     boss: { hp: Math.round(G.boss.hp), phase: G.boss.phase, done: G.boss.done, active: G.boss.active }, beaten: G.bossesBeaten || 0,
-    stats: G.stats, said: G.saidWords.slice(-6), endRoam: G.endRoam, bonus: !!G.bonusUnlocked, hackerT: Math.round(G.hackerTimer),
+    stats: G.stats, lv0: G.lv0, said: G.saidWords.slice(-6), endRoam: G.endRoam, bonus: !!G.bonusUnlocked, hackerT: Math.round(G.hackerTimer),
   };
   return s;
 }
@@ -7019,7 +7030,7 @@ function applyGame(g) {
   G.bossesBeaten = g.beaten != null ? g.beaten : e.done ? LVL.n : LVL.n - 1;
   if (e.done) bossSetDone();
   else if (DOOR.open && inArena(PL.x, PL.z) && PL.z < DOOR.z - 3 && e.active) { startBossFight(); E.hp = e.hp || E.maxHp; if (e.phase >= 2) bossPhaseQuiet(e.phase); }
-  G.stats = Object.assign(STATS0(), g.stats || {}); G.saidWords = g.said || []; G.endRoam = !!g.endRoam; G.bonusUnlocked = !!g.bonus; G.hackerTimer = g.hackerT || 150;
+  G.stats = Object.assign(STATS0(), g.stats || {}); G.lv0 = Object.assign(STATS0(), g.lv0 || {}); G.saidWords = g.said || []; G.endRoam = !!g.endRoam; G.bonusUnlocked = !!g.bonus; G.hackerTimer = g.hackerT || 150;
   G.bestStreak = G.stats.bestStreak || 0;
   ffRebuildBlocked(); updateDoorLeds(); HUD.dirty = true; VM.dirty = true;
 }
@@ -7048,7 +7059,7 @@ function resetWorld(pop = true) {
     alive: true, invuln: 0, swim: false, under: false, gooT: 0, peakY: 0, recoilP: 0, ads: 0, guns: {}, owned: [], slots: [null, null], cur: 0, checkpoint: -1, hasGun: false, armGone: false,
     passcodes: [false, false, false], controlLock: false, lookLock: false });
   Object.assign(W, { cool: 0, reload: 0, swap: 0, spin: 0, jamClear: 0, bloom: 0, knife: 0, heal: 0, gren: 0, search: 0, rip: 0 });
-  G.stats = STATS0(); G.streak = 0; G.bestStreak = 0; G.headStreak = 0; G.endRoam = false; G.saidWords = []; G.bonusUnlocked = false; G.bossesBeaten = 0;
+  G.stats = STATS0(); G.lv0 = STATS0(); G.streak = 0; G.bestStreak = 0; G.headStreak = 0; G.endRoam = false; G.saidWords = []; G.bonusUnlocked = false; G.bossesBeaten = 0;
   G.hackFx = { nextStatic: 10, nextPop: 12, nextFake: 8, nextCtl: 30, flip: 0, lag: 0, fakeHud: 0, static: 0 };
   if (pop) populate();
   VM.dirty = true; HUD.dirty = true;
@@ -7061,7 +7072,7 @@ function restore(s) {
   if (scr === 'intro') { playIntro(); return; }
   if (scr === 'clippy') { enterPlay(); clippyScene(); return; }
   if (scr === 'stats' || scr === 'killcam') { if (scr === 'killcam') { G.boss.done = true; } showStats(); return; }
-  if (scr === 'teaser') { showTeaser(); return; }
+  if (scr === 'teaser') { if (LVL.n >= LAST_LEVEL && G.boss && G.boss.done) showEnding(); else showTeaser(); return; }
   G.frozen = !Touch.on && !IS_TOUCH;
   enterPlay();
   if (scr === 'shop' && PL.checkpoint >= 0 && Math.hypot(TERMS[PL.checkpoint].x - PL.x, TERMS[PL.checkpoint].z - PL.z) < 4) { G.frozen = false; Shop.openAt(TERMS[PL.checkpoint]); }

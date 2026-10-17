@@ -1,6 +1,6 @@
 # KILL AIs — Game Design Notes
 
-Every answer locked in during the design chat. **v1 is built:** `kill-ais/kill-ais.html` (one file, open it in a browser).
+Every answer locked in during the design chat. **Built:** `kill-ais/kill-ais.html` (one file, open it in a browser). **All 100 levels and all 100 bosses are playable.**
 
 Items marked *(designer's choice)* are ones the answer was "whatever makes it cool", so the builder picks.
 
@@ -75,6 +75,8 @@ Items marked *(designer's choice)* are ones the answer was "whatever makes it co
 
 - **A boss at the end of every level**, so 100 bosses.
 - Every boss is a **different, smarter AI with a real AI name**, going from the oldest/dumbest to the smartest.
+- **Boss engine (levels 2-100):** 10 body types (old CRT monitor, Dr. Sbaitso's blue DOS screen, mainframe cabinet, glowing assistant orb, glitchy avatar head, big furry creature (Bonzi, the llamas, Gopher, Chinchilla), giant robot, floating company logo, a Go board, and THE VIRUS). 18 attacks: bullet fans, rings, floor lasers to jump over, walls of text with a gap, homing orbs, things falling from the sky, summons, ground slams, teleports, fake clones, shields that block (some reflect), going invisible ([MASK]), "THINKING..." charge-ups you hide from behind a pillar, dashes, pulling you in, rapid fire, mines, and HUD/control hacks. Each boss has its own special move from the list (Deep Blue drops chess pieces and pawns, AlphaGo drops Go stones, Alexa drops Prime boxes, Galactica drops fake papers, OpenAI Five brings 4 teammates, AlphaStar zerg-rushes, Eugene Goostman makes copies of himself, ChatGPT's refusal shield, the thinking models charge up, BERT goes [MASK], Tay turns evil in phase 2...). Phase 2 at half health; the Final Four and THE VIRUS also get a phase 3.
+- **THE VIRUS (level 100):** in phase 2 it deletes your arm (one gun only) and sends burning firewalls sweeping around the room; in phase 3 your arm grows back and it brings the newest Grok, ChatGPT, Claude and Gemini. Beat it to see the ending.
 - Fill the 100 with **old/obscure real AIs** (ELIZA, Cleverbot…) and **older versions of today's AIs** (GPT-1, GPT-2…).
 - **Level 1 boss: ELIZA** (1966, the oldest and dumbest chatbot).
   - Looks like a **giant floating old monitor with a green-text face**.
@@ -236,6 +238,11 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
 ## 6. Levels & Maps
 
 - **100 levels.** Each is a **big map you explore**, with the boss at the end.
+- **How the levels are made:** level 1 (ELIZA's lab) is hand-built. Levels 2-100 are built by a level generator from a fixed seed, so each level always has the same map. Every map is 5 x 4 rooms joined by doorways (some walls are left out to make big halls), the start in the south and the boss room behind a keypad door in the north. Every level has 3 shop terminals, 3 AI compilers, alarm towers, 3 passcode pieces (one in a secret room behind a fake shelf, one on a high control booth, one at the bottom of a data lake or hidden in a far corner), plus health, armor and goo. The generator checks that you can walk to everything.
+- **Each level looks like its boss's era:** 1960s computer lab, 1980s computer room (beige), 1990s office (cubicles, carpet), tech campus (white desks, flat screens), server farm (rack rows), GPU cluster (dark, neon green, liquid cooling), AI core (black, glowing monoliths, holograms), and THE VIRUS (level 100, red).
+- **Difficulty climbs with the levels:** regular AIs get more health and damage, aim better, and are named after the older AIs that came before the level's boss. Bosses get more health and faster attacks. Crypto rewards go up too.
+- After a boss: stats screen (that level's numbers, plus a line with your whole-run totals), then the next level's intro card (the boss's name, year, maker and first line). Your guns, Crypto and hack level come with you. The save remembers your level.
+- After THE VIRUS: the ending, then keep exploring level 100 or go back to the desktop.
 - Maps are **mostly flat with a few high spots**.
 - **Difficulty: Hard.** Beat the game to unlock **Insane mode**. Beat Insane → a **really insane outfit** with **all buffs** (can't be hacked + double damage + super speed) and a **super rare trophy**.
 - **Hidden stuff:** secret rooms, hidden Crypto stashes, easter eggs about real AIs, hidden trophies.
@@ -387,7 +394,7 @@ What the first build should have:
 7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
 8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** (Dr. Sbaitso) and "to be continued"
 
-**Built so far:** all 8 of the above. **Not in v1 yet:** 3 save slots (v1 autosaves 1), sidekicks, the skill tree and grapple, the trophy room, vision gear, the extra grenades, the energy sword, the other 90 guns and 99 bosses.
+**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **Not built yet:** 3 save slots (it autosaves 1), sidekicks, the skill tree and grapple, the trophy room, vehicles (hoverbike, tank), Insane mode, vision gear, the extra grenades, the energy sword, the other 90 guns.
 
 ## Still Open
 
