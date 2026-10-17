@@ -403,7 +403,7 @@ function buildChunk(cx, cz) {
   const count = Math.round(CHUNK * CHUNK * Q.grass);
   const mesh = new THREE.InstancedMesh(bladeGeo, grassMat, count);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
-  const g1 = new THREE.Color(0x46612a), g2 = new THREE.Color(0x6f8a3a), dry = new THREE.Color(0x9a9256);
+  const g1 = new THREE.Color(0x34501c), g2 = new THREE.Color(0x587a2a), dry = new THREE.Color(0x8a8a48);
   let n = 0;
   // sample the surface on a coarse grid so placement stays fast
   const W = {}; const wAt = (x, z) => { const k = Math.round(x) + ',' + Math.round(z); return W[k] ?? (W[k] = grassWeight(Math.round(x), Math.round(z))); };
@@ -418,7 +418,7 @@ function buildChunk(cx, cz) {
     const hgt = (0.32 + r() * 0.4) * tall;
     m4.compose(v.set(x, terrainH(x, z) - 0.02, z), q, s.set(1, hgt, 1));
     mesh.setMatrixAt(n, m4);
-    c.copy(g1).lerp(g2, r()).lerp(dry, Math.max(0, vnoise(x * 0.02 + 40, z * 0.02)) * 0.45 + r() * 0.08);
+    c.copy(g1).lerp(g2, r()).lerp(dry, Math.max(0, vnoise(x * 0.02 + 40, z * 0.02)) * 0.22 + r() * 0.05);
     mesh.setColorAt(n, c);
     n++;
   }

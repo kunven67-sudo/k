@@ -113,7 +113,7 @@ function plant(name, vi, key, mats, opts = {}) {
         geo = new THREE.BufferGeometry();
         for (const k in p.geo.attributes) geo.setAttribute(k, p.geo.attributes[k]);
         geo.setIndex(p.geo.index);
-        geo.setDrawRange(0, Math.floor(p.geo.index.count * 0.3 / 3) * 3);
+        geo.setDrawRange(0, Math.floor(p.geo.index.count * 0.6 / 3) * 3);
       }
       list.push({ geo, mat: p.mat });
     }
