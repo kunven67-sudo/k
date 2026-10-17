@@ -1,0 +1,12 @@
+{
+  "name": "portal-gun",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Portal Gun: an unofficial Rick and Morty fan game. Builds into one self-contained HTML file.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}
