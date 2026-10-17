@@ -198,7 +198,7 @@ export function buildKeyboard(ctx) {
       else c.set(kb.rgb);
       if (kb.pressed.has(k.code)) c.lerp(_white, 0.6);
     }
-    glowMat.opacity = on ? 0.28 : 0;
+    glowMat.opacity = on ? 0.07 : 0;
     if (on) glowMat.color.setHSL((0.6 - t * 0.08) % 1 + 1, 0.9, 0.5);
   };
   kb.keyWorld = (code, out = new THREE.Vector3()) => {

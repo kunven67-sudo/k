@@ -157,10 +157,12 @@ export class Hands {
     shift.y = 0;
     // wrist sits behind the home row, a bit above the keys
     const center = homePos.index.clone().lerp(homePos.ring, 0.5);
-    const wrist = center.clone().addScaledVector(fwd, -0.098).addScaledVector(right, s * 0.012).add(new THREE.Vector3(0, 0.038, 0)).add(shift);
+    // real typing: wrist ~15 cm behind the fingertips, a little above the keys, so fingers curl down
+    const wrist = center.clone().addScaledVector(fwd, -0.168).addScaledVector(right, s * 0.015).add(new THREE.Vector3(0, 0.022, 0)).add(shift);
     for (const f of NAMES) if (![...this.held.values()].some(h => h.hand === side && h.finger === f)) tips[f].add(shift);
-    const handFwd = center.clone().add(shift).sub(wrist).setY(0).normalize().add(new THREE.Vector3(0, -0.18, 0)).normalize();
-    const back = up.clone().addScaledVector(right, s * -0.25).normalize();
+    const handFwd = center.clone().add(shift).sub(wrist).setY(0).normalize().add(new THREE.Vector3(0, 0.05, 0)).normalize();
+    // pinky side rolls down a bit, thumb side up (how hands really sit on a keyboard)
+    const back = up.clone().addScaledVector(right, s * 0.2).normalize();
     return { wrist, fwd: handFwd, back, tips };
   }
 
@@ -184,9 +186,25 @@ export class Hands {
     }
     const wrist = L(new THREE.Vector3(0.006, 0.026, 0.118));
     const mf = new THREE.Vector3(0, 0, -1).applyQuaternion(g.getWorldQuaternion(new THREE.Quaternion()));
-    const handFwd = mf.clone().add(new THREE.Vector3(0, -0.28, 0)).normalize();
-    const back = up.clone().addScaledVector(right, 0.32).normalize();
+    // wrist rests low on the pad, the hand rises over the mouse hump
+    const handFwd = mf.clone().add(new THREE.Vector3(0, 0.14, 0)).normalize();
+    const back = up.clone().addScaledVector(right, 0.28).normalize();
     return { wrist, fwd: handFwd, back, tips };
+  }
+
+  debugDots(side, tips) {
+    if (!this.dots) this.dots = {};
+    for (const f of NAMES) {
+      const k = side + f;
+      if (!this.dots[k]) {
+        this.dots[k] = new THREE.Mesh(new THREE.SphereGeometry(0.003, 8, 6), new THREE.MeshBasicMaterial({ color: f === 'index' ? 0xff0000 : f === 'thumb' ? 0x00ff00 : 0xffff00, depthTest: false }));
+        this.dots[k].renderOrder = 99;
+        this.av.root.parent.add(this.dots[k]);
+        const t = new THREE.Mesh(new THREE.SphereGeometry(0.003, 8, 6), new THREE.MeshBasicMaterial({ color: 0x00ffff, depthTest: false }));
+        t.renderOrder = 99; this.av.root.parent.add(t); this.dots[k + 'tip'] = t;
+      }
+      this.dots[k].position.copy(tips[f]);
+    }
   }
 
   placeHand(side, pose, fwd, right, up, dt) {
@@ -198,10 +216,13 @@ export class Hands {
     const pole = right.clone().multiplyScalar(s * 0.75).add(new THREE.Vector3(0, -0.55, 0)).addScaledVector(fwd, -0.2);
     av.armIK(side, this.wrist[side], pole);
     av.orientHand(side, pose.fwd, pose.back);
+    if (window.__game?.params.get('dbg')) this.debugDots(side, pose.tips);
     for (const f of NAMES) {
       const key = side + f;
       const r = av.solveFinger(side, f, pose.tips[f], this.guess[key]);
       this.guess[key] = r.p;
+      (this.err || (this.err = {}))[key] = r.err;
+      if (this.dots?.[key + 'tip']) this.dots[key + 'tip'].position.copy(av.tipFor(side, f, r.p.s, r.p.c1, r.p.c2));
     }
   }
 }

@@ -204,6 +204,8 @@ export class Player {
     let target;
     if (pc && pc.cursorWorld) target = pc.cursorWorld(0.3);
     else target = this.g.desk.monitors[0].screen.getWorldPosition(new THREE.Vector3());
+    // aim a bit below the screen middle so your hands + keyboard are in view too
+    target.y -= this.g.settings?.seatLow ?? 0.13;
     return target.sub(eye).normalize();
   }
 
@@ -221,7 +223,7 @@ export class Player {
     } else if (this.state === 'sit') {
       const look = this.screenLook();
       q.setFromRotationMatrix(new THREE.Matrix4().lookAt(eye, eye.clone().add(look), new THREE.Vector3(0, 1, 0)));
-      fov = this.g.settings?.seatFov ?? 52;
+      fov = this.g.settings?.seatFov ?? 60;
     } else {
       const look = this.lookDir();
       const up = this.state === 'bed' ? this.g.bed.headDir.clone() : new THREE.Vector3(0, 1, 0);

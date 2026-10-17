@@ -52,7 +52,7 @@ export class Game {
     this.progress(0.3, 'Setting up your desk');
     this.desk = await buildDesk(this);
     this.progress(0.35, 'Making you');
-    this.settings = { sens: 1, seatFov: 52 };
+    this.settings = { sens: 1, seatFov: 60, seatLow: 0.13 };
     this.bed = { pelvis: new THREE.Vector3(1.15, 0.62, 3.75), headDir: new THREE.Vector3(0, 0, 1) };
     this.player = new Player(this);
     await this.player.init();

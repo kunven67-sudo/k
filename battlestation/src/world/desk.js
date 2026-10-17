@@ -176,7 +176,7 @@ export async function buildDesk(ctx) {
 
   // ---- the chair -------------------------------------------------------------------------
   D.chair = await buildChair(ctx);
-  D.chair.group.position.copy(toWorld(0, 0.52));
+  D.chair.group.position.copy(toWorld(0, 0.4));
   D.chair.group.rotation.y = DESK_ROT;
   D.chair.basePos = D.chair.group.position.clone();
   ctx.scene.add(D.chair.group);

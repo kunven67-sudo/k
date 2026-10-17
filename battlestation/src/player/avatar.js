@@ -240,14 +240,14 @@ export class Avatar {
     const [b1, b2, b3] = this.fingerBones(side, f);
     const handW = b1.parent.matrixWorld;
     const r1 = this.rest[b1.name].q, r2 = this.rest[b2.name].q, r3 = this.rest[b3.name].q;
-    const sign = this.flex(side, f);
-    const q1 = _qa.copy(r1).multiply(_qx.setFromEuler(_e.set(sign * c1, 0, spread)));
+    const sg = this.flex(side, f);
+    const q1 = _qa.copy(r1).multiply(_qx.setFromEuler(_e.set(sg.s1 * c1, 0, spread)));
     _m.compose(b1.position, q1, _one);
     _m2.multiplyMatrices(handW, _m);
-    const q2 = _qb.copy(r2).multiply(_qx.setFromEuler(_e.set(sign * c2, 0, 0)));
+    const q2 = _qb.copy(r2).multiply(_qx.setFromEuler(_e.set(sg.s2 * c2, 0, 0)));
     _m.compose(b2.position, q2, _one);
     _m2.multiply(_m);
-    const q3 = _qc.copy(r3).multiply(_qx.setFromEuler(_e.set(sign * c2 * (f === 'thumb' ? 0.9 : 0.72), 0, 0)));
+    const q3 = _qc.copy(r3).multiply(_qx.setFromEuler(_e.set(sg.s3 * c2 * (f === 'thumb' ? 0.9 : 0.72), 0, 0)));
     _m.compose(b3.position, q3, _one);
     _m2.multiply(_m);
     return _tip.set(0, TIP[f], 0).applyMatrix4(_m2);
@@ -255,49 +255,74 @@ export class Avatar {
 
   applyFinger(side, f, spread, c1, c2) {
     const [b1, b2, b3] = this.fingerBones(side, f);
-    const sign = this.flex(side, f);
-    b1.quaternion.copy(this.rest[b1.name].q).multiply(_qx.setFromEuler(_e.set(sign * c1, 0, spread)));
-    b2.quaternion.copy(this.rest[b2.name].q).multiply(_qx.setFromEuler(_e.set(sign * c2, 0, 0)));
-    b3.quaternion.copy(this.rest[b3.name].q).multiply(_qx.setFromEuler(_e.set(sign * c2 * (f === 'thumb' ? 0.9 : 0.72), 0, 0)));
+    const sg = this.flex(side, f);
+    b1.quaternion.copy(this.rest[b1.name].q).multiply(_qx.setFromEuler(_e.set(sg.s1 * c1, 0, spread)));
+    b2.quaternion.copy(this.rest[b2.name].q).multiply(_qx.setFromEuler(_e.set(sg.s2 * c2, 0, 0)));
+    b3.quaternion.copy(this.rest[b3.name].q).multiply(_qx.setFromEuler(_e.set(sg.s3 * c2 * (f === 'thumb' ? 0.9 : 0.72), 0, 0)));
     b1.updateMatrixWorld(true);
   }
 
-  // which way around local X curls the finger toward the palm (worked out once from the rest pose)
+  // Which way around local X curls each joint toward the palm. Each bone in this rig has its own
+  // axes, so every joint is tested on its own from the rest pose (once, then cached).
   flex(side, f) {
     const k = side + f;
-    if (this.flexSign[k] !== undefined) return this.flexSign[k];
-    const [b1] = this.fingerBones(side, f);
+    if (this.flexSign[k]) return this.flexSign[k];
+    const [b1, b2, b3] = this.fingerBones(side, f);
     const hand = b1.parent;
     hand.updateMatrixWorld(true);
-    const palm = this.handFrame[side].back.clone().negate().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()));
-    if (f === 'thumb') { const fw = this.handFrame[side].fwd.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion())); palm.add(fw.multiplyScalar(0.5)).normalize(); }
-    this.flexSign[k] = 1;
-    const t0 = this.tipFor(side, f, 0, 0, 0).clone();
-    const t1 = this.tipFor(side, f, 0, 0.4, 0.4).clone();
-    this.flexSign[k] = t1.sub(t0).dot(palm) > 0 ? 1 : -1;
+    const hq = hand.getWorldQuaternion(new THREE.Quaternion());
+    const palm = this.handFrame[side].back.clone().negate().applyQuaternion(hq);
+    if (f === 'thumb') palm.add(this.handFrame[side].fwd.clone().applyQuaternion(hq).multiplyScalar(0.5)).normalize();
+    // child position of a bone after rotating it by +a around its local X, in world space
+    const test = (b, a) => {
+      const q0 = b.quaternion.clone();
+      const p0 = this.tipWorldOf(b);
+      b.quaternion.copy(this.rest[b.name].q).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(a, 0, 0)));
+      b.updateMatrixWorld(true);
+      const p1 = this.tipWorldOf(b);
+      b.quaternion.copy(q0); b.updateMatrixWorld(true);
+      return p1.sub(p0).dot(palm) > 0 ? 1 : -1;
+    };
+    this.flexSign[k] = { s1: test(b1, 0.3), s2: test(b2, 0.3), s3: test(b3, 0.3) };
     return this.flexSign[k];
+  }
+
+  // world position of the far end of a finger bone (its child, or the fingertip)
+  tipWorldOf(b) {
+    const child = b.children.find(c => c.isBone);
+    if (child) return child.getWorldPosition(new THREE.Vector3());
+    const f = FINGERS.find(n => b.name.startsWith(n));
+    return b.localToWorld(new THREE.Vector3(0, TIP[f] || 0.02, 0));
   }
 
   // Solve one finger so its tip lands on target (world). Returns the remaining error in meters.
   solveFinger(side, f, target, guess) {
     const p = guess || { s: 0, c1: 0.3, c2: 0.5 };
-    const lim = f === 'thumb' ? { s: [-0.6, 0.6], c1: [-0.4, 1.0], c2: [-0.2, 1.2] } : { s: [-0.3, 0.3], c1: [-0.25, 1.4], c2: [0, 1.6] };
-    let best = this.tipFor(side, f, p.s, p.c1, p.c2).distanceTo(target);
-    let step = 0.25;
-    for (let it = 0; it < 7; it++) {
+    // the rest pose already has a slight curl, so a little negative = straight finger
+    const lim = f === 'thumb' ? { s: [-0.6, 0.6], c1: [-0.4, 1.0], c2: [-0.25, 1.2] } : { s: [-0.3, 0.3], c1: [-0.35, 1.4], c2: [-0.22, 1.6] };
+    // cost = how far the tip is from the target + a small push toward a natural curl
+    // (knuckle and middle joint bending together, no claw / no hyperextended knuckle)
+    const cost = () => {
+      const d = this.tipFor(side, f, p.s, p.c1, p.c2).distanceTo(target);
+      return { d, c: d + 0.003 * Math.abs(p.c1 - 0.55 * p.c2) + 0.002 * Math.abs(p.s) };
+    };
+    let cur = cost();
+    let step = 0.3;
+    for (let it = 0; it < 14; it++) {
       let improved = false;
       for (const key of ['c1', 'c2', 's']) {
         for (const dir of [1, -1]) {
           const old = p[key];
           p[key] = THREE.MathUtils.clamp(old + dir * step, lim[key][0], lim[key][1]);
-          const e = this.tipFor(side, f, p.s, p.c1, p.c2).distanceTo(target);
-          if (e < best - 1e-5) { best = e; improved = true; break; }
+          const e = cost();
+          if (e.c < cur.c - 1e-6) { cur = e; improved = true; break; }
           p[key] = old;
         }
       }
       if (!improved) step *= 0.5;
-      if (best < 0.0015) break;
+      if (step < 0.004) break;
     }
+    const best = cur.d;
     this.applyFinger(side, f, p.s, p.c1, p.c2);
     return { err: best, p };
   }
