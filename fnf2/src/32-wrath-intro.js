@@ -46,8 +46,10 @@
   }
 
   // ---------------------------------------------------------------- the cutscene
+  // the first intro is being remade (own place, HyperManiac GF, a real walking scene): off until it's ready
+  const INTRO_ON = false;
   G.Cutscenes = G.Cutscenes || {};
-  G.Cutscenes.glare = {
+  if (INTRO_ON) G.Cutscenes.glare = {
     create(P) {
       const st = P.stage;
       const cs = Object.create(Scene);
