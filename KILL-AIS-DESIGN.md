@@ -327,6 +327,11 @@ Roughly sorted by how smart each AI is. Each level's map looks like its boss's e
   - Hacking skills
   - Movement skills (grapple, slide…)
 - Health and armor are **shop only**, not in the skill tree.
+- **Built:** a SKILLS tab in every terminal with 17 skills in 3 branches (some need another skill first):
+  - Gun: Fast hands (reload), Steady aim (recoil), Headhunter (headshot damage), Bullet time+ (longer headshot slow-mo), Quick draw (swap), Deep pockets (more ammo)
+  - Hacking: Fast fingers (hack towers faster), Code vision (press B: see every AI through walls as glowing code), Tower hijack (hacked alarm towers shoot AIs), Firewall (deaths sometimes don't hack you), Price cracker (easier price hack)
+  - Movement: Grappling hook (press Z: zip to walls, machines, ceilings; hang, jump off), Longer cable, Fast winch, Slide master, Marathon (sprint), Soft landing (fall damage)
+  - Skills stay forever (every level, every death) and are saved. New Game wipes them.
 
 ## 12. Trophies
 
@@ -394,7 +399,7 @@ What the first build should have:
 7. A **medium level 1 map** (about a 5 minute walk) in the 1960s computer-lab style
 8. After beating ELIZA: a **stats screen** (kills, headshots, Crypto, time, trophies), then a **level 2 teaser** (Dr. Sbaitso) and "to be continued"
 
-**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **Not built yet:** 3 save slots (it autosaves 1), sidekicks, the skill tree and grapple, the trophy room, vehicles (hoverbike, tank), Insane mode, vision gear, the extra grenades, the energy sword, the other 90 guns.
+**Built so far:** all 8 of the above, **plus all 100 levels and all 100 bosses**. **plus the skill tree, grappling hook and code vision**. **Not built yet:** 3 save slots (it autosaves 1), sidekicks, the trophy room, vehicles (hoverbike, tank), Insane mode, vision gear, the extra grenades, the energy sword, the other 90 guns.
 
 ## Still Open
 

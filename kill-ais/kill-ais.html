@@ -202,6 +202,9 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
 .hud-bl{position:absolute;left:14px;bottom:14px}
 #crypto{font-size:28px;font-weight:800;color:var(--amber);text-shadow:0 0 12px rgba(255,194,58,.5)}
 #streak{font-size:14px;color:#fff;min-height:18px}
+#abil{display:flex;gap:12px;font-size:12px;color:#7fb896;margin-top:2px}#abil span.rdy{color:var(--cyan)}
+#codevis{position:fixed;inset:0;z-index:24;pointer-events:none;opacity:0;transition:opacity .25s;background:repeating-linear-gradient(0deg,rgba(57,255,136,.07) 0 2px,transparent 2px 4px),radial-gradient(ellipse at center,transparent 55%,rgba(0,60,20,.45))}
+#codevis.on{opacity:1}
 .hud-br{position:absolute;right:14px;bottom:14px;text-align:right;min-width:220px;padding-top:20px}
 #gunName{font-size:13px;letter-spacing:.12em;color:#9fd8ee}
 #ammo{font-size:44px;font-weight:800;line-height:1}
@@ -286,6 +289,14 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
 .stats i{display:inline-block;width:60px;height:5px;background:rgba(255,255,255,.1);vertical-align:middle;margin-left:4px}
 .stats i em{display:block;height:100%;background:var(--green)}
 .gold{color:#ffd65a!important}
+.sk-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sk-col h4{margin:0 0 6px;color:var(--green);letter-spacing:.14em;font-size:13px}
+.sk{border:1px solid rgba(57,255,136,.22);background:rgba(57,255,136,.03);padding:8px;margin-bottom:6px;position:relative}
+.sk.need{margin-left:14px}.sk.need::before{content:'';position:absolute;left:-10px;top:-7px;height:50%;border-left:1px solid #2c8f55;border-bottom:1px solid #2c8f55;width:8px}
+.sk.lock{opacity:.45}
+.sk b{color:#fff;font-size:13px}.sk small{display:block;color:#7fb896;font-size:11px;margin:3px 0 5px}
+.sk .pips{margin-bottom:5px}.sk .pips i{display:inline-block;width:14px;height:5px;margin-right:3px;background:rgba(255,255,255,.12)}.sk .pips i.on{background:var(--green)}
+@media (max-width:700px){.sk-cols{grid-template-columns:1fr}}
 #hackGame{text-align:center;padding:20px}
 #hgTrack{position:relative;height:40px;border:2px solid var(--green);margin:20px auto;width:min(600px,90%);background:#000}
 #hgZone{position:absolute;top:0;bottom:0;background:rgba(57,255,136,.35);border-left:2px solid var(--green);border-right:2px solid var(--green)}
@@ -401,7 +412,7 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
   </div>
   <canvas id="minimap" width="200" height="200"></canvas>
   <div id="killfeed"></div>
-  <div class="hud-bl"><div id="crypto">₿ 0</div><div id="streak"></div></div>
+  <div class="hud-bl"><div id="crypto">₿ 0</div><div id="streak"></div><div id="abil"></div></div>
   <div class="hud-br panel" data-title="WEAPON.EXE"><div id="gunName">-</div><div id="ammo"><span id="mag">-</span><span class="sep">/</span><span id="reserve">-</span></div><div id="gunState"></div><div id="gunSlots"></div></div>
   <div id="prompt"></div>
   <div id="holdbar" class="hidden"><div id="holdFill"></div></div>
@@ -412,6 +423,7 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
 
 <!-- glitch layers -->
 <canvas id="static" width="256" height="144"></canvas>
+<div id="codevis"></div>
 <div id="popups"></div>
 <div id="flash"></div>
 
@@ -458,6 +470,8 @@ pre.readme{font-family:var(--mono);font-size:13px;white-space:pre-wrap;margin:0;
   <button class="tb2 sm" id="tSwap" data-a="swap">SWAP</button>
   <button class="tb2 sm" id="tKnife" data-a="knife">KNIFE</button>
   <button class="tb2 sm" id="tGren" data-a="grenade">GREN</button>
+  <button class="tb2 sm hidden" id="tHook" data-a="grapple">HOOK</button>
+  <button class="tb2 sm hidden" id="tCode" data-a="codevis">CODE</button>
   <button class="tb2 sm" id="tHeal" data-a="heal">HEAL</button>
   <button class="tb2 sm" id="tLeanL" data-a="leanL">◀LEAN</button>
   <button class="tb2 sm" id="tLeanR" data-a="leanR">LEAN▶</button>
@@ -524,6 +538,7 @@ const KEY_ACTIONS = [
   ['use', 'Use / search / shop', 'KeyF'], ['slot1', 'Gun slot 1', 'Digit1'], ['slot2', 'Gun slot 2', 'Digit2'],
   ['swap', 'Swap guns', 'KeyX'], ['knife', 'Knife', 'KeyV'], ['grenade', 'Throw grenade', 'KeyG'],
   ['heal', 'Use health pack', 'KeyH'], ['chat', 'Chat with closest AI', 'KeyT'],
+  ['grapple', 'Grappling hook (skill)', 'KeyZ'], ['codevis', 'Code vision (skill)', 'KeyB'],
 ];
 const SET_KEY = 'killais:settings:v1';
 const DEFAULTS = {
@@ -687,7 +702,7 @@ function layoutTouch() {
   const place = (id, rx, by, size) => { const el = $(id); el.style.right = rx * s + 'px'; el.style.bottom = by * s + 'px'; if (size) { el.style.width = el.style.height = size * s + 'px'; } };
   place('tFire', 26, 120, 86); place('tAim', 128, 150, 62); place('tJump', 28, 26, 66); place('tCrouch', 108, 40, 62);
   place('tReload', 190, 70, 56); place('tSprint', 210, 150, 56); place('tUse', 120, 230, 56);
-  place('tSwap', 26, 230, 48); place('tKnife', 26, 290, 48); place('tGren', 84, 290, 48); place('tHeal', 142, 290, 48);
+  place('tSwap', 26, 230, 48); place('tKnife', 26, 290, 48); place('tGren', 84, 290, 48); place('tHeal', 142, 290, 48); place('tHook', 200, 290, 48); place('tCode', 258, 290, 48);
   place('tLeanL', 200, 230, 48); place('tLeanR', 258, 230, 48); place('tChat', W / s - 120, H / s - 70, 48); place('tMenu', W / s - 64, H / s - 70, 48);
 }
 addEventListener('touchstart', () => { if (!Touch.inited && !matchMedia('(pointer: fine)').matches) initTouch(); }, { passive: true });
@@ -984,7 +999,7 @@ const PL = {
   hp: 100, armor: 0, hack: 0, crypto: 0, meds: 0, frags: 0, alive: true, invuln: 0, swim: false, under: false, gooT: 0,
   peakY: 0, stepAcc: 0, recoilP: 0, recoilY: 0, ads: 0, bob: 0, hurtT: 0, lastHurt: 0, regenBlock: 0,
   guns: {}, owned: [], slots: [null, null], cur: 0, checkpoint: -1, hasGun: false, armGone: false,
-  passcodes: [false, false, false], controlLock: false, lookLock: false,
+  passcodes: [false, false, false], controlLock: false, lookLock: false, skills: {},
 };
 const STATS0 = () => ({ kills: 0, headshots: 0, shots: 0, hits: 0, earned: 0, deaths: 0, time: 0, bestStreak: 0, chats: 0, searched: 0 });
 G.stats = STATS0();
@@ -2466,7 +2481,7 @@ const gunStats = (id) => {
   const g = GUNS[id], st = PL.guns[id] || { lvl: 1, att: {} }, l = (st.lvl || 1) - 1;
   return {
     dmg: g.dmg * (1 + 0.12 * l) * (st.att.sil === true ? 0.95 : 1), mag: st.att.ext === true && g.mag > 1 ? Math.round(g.mag * 1.5) : g.mag,
-    reload: g.reload * (1 - 0.06 * l), rec: (1 - 0.08 * l), spread: g.spread,
+    reload: g.reload * (1 - 0.06 * l) * (1 - 0.12 * sk('hands')), rec: (1 - 0.08 * l) * (1 - 0.12 * sk('steady')), spread: g.spread,
   };
 };
 function giveGun(id, toSlot = -1) {
@@ -3359,7 +3374,7 @@ function finishReload() {
 }
 function switchTo(slot) {
   if (PL.armGone || slot === PL.cur || !PL.slots[slot] || W.swap > 0) return;
-  PL.cur = slot; W.swap = 0.35; W.reload = 0; W.spin = 0; VM.dirty = true; HUD.dirty = true; SFX.rack();
+  PL.cur = slot; W.swap = 0.35 * (1 - 0.35 * sk('draw')); W.reload = 0; W.spin = 0; VM.dirty = true; HUD.dirty = true; SFX.rack();
 }
 function updateWeapon(dt) {
   W.cool -= dt; W.bloom = Math.max(0, W.bloom - dt * 3.2);
@@ -3465,7 +3480,7 @@ function updatePlayer(dt) {
   const wantAds = Input.aim && !!g && W.reload <= 0 && W.swap <= 0 && W.knife <= 0 && !Chat.open;
   PL.ads = damp(PL.ads, wantAds ? 1 : 0, 14, dt);
   W.sprinting = !Chat.open && !PL.controlLock && isDown('sprint') && mz < -0.3 && PL.onGround && !crouchKey && PL.slideT <= 0 && !Input.fire && PL.ads < 0.3 && !PL.swim;
-  let speed = W.sprinting ? 7.2 : 4.6;
+  let speed = W.sprinting ? 7.2 * (1 + 0.08 * sk('legs')) : 4.6;
   if (PL.crouch > 0.5 && PL.slideT <= 0) speed = 2.3;
   if (PL.ads > 0.5) speed = Math.min(speed, 3.0);
   if (g && g.slow) speed *= g.slow;
@@ -3473,9 +3488,9 @@ function updatePlayer(dt) {
   if (PL.legHurt > 0) speed *= 0.7;
   /* slide */
   const hs = Math.hypot(PL.vx, PL.vz);
-  if (wasPressed('crouch') && W.sprinting && PL.onGround && hs > 5) { PL.slideT = 1.0; const k = 9.8 / hs; PL.vx *= k; PL.vz *= k; SFX.slide(); Noise.emit(PL.x, PL.z, 8, 0.5); }
+  if (wasPressed('crouch') && W.sprinting && PL.onGround && hs > 5) { PL.slideT = 1.0 + 0.3 * sk('slide'); const k = (9.8 * (1 + 0.15 * sk('slide'))) / hs; PL.vx *= k; PL.vz *= k; SFX.slide(); Noise.emit(PL.x, PL.z, 8, 0.5); }
   if (PL.slideT > 0) {
-    PL.slideT -= dt; const f = Math.exp(-1.7 * dt); PL.vx *= f; PL.vz *= f;
+    PL.slideT -= dt; const f = Math.exp(-1.7 * (1 - 0.2 * sk('slide')) * dt); PL.vx *= f; PL.vz *= f;
     PL.vx += wx * 2 * dt; PL.vz += wz * 2 * dt;
     if (Math.hypot(PL.vx, PL.vz) < 3.3 || (!crouchKey && !Touch.btn.crouch && PL.slideT < 0.75)) PL.slideT = 0;
   } else {
@@ -3498,8 +3513,9 @@ function updatePlayer(dt) {
     if (!Chat.open && isDown('jump')) vyT = 2.6; else if (!Chat.open && crouchKey) vyT = -2.4;
     PL.vy = damp(PL.vy, vyT, 4, dt);
     if (!PL.wasSwim) { SFX.splash(); fx.splash(PL.x, LAKE.surf, PL.z, 16); trophy('swimmer'); }
-  } else PL.vy -= 17 * dt;
+  } else if (!grappling()) PL.vy -= 17 * dt;
   PL.wasSwim = PL.swim;
+  grappleMove(dt);
   /* horizontal move + collisions */
   const p = { x: PL.x + PL.vx * dt, z: PL.z + PL.vz * dt };
   if (PL.y < -0.4 && !inLake(p.x, p.z)) {
@@ -3515,7 +3531,7 @@ function updatePlayer(dt) {
     if (!PL.onGround) {
       const drop = PL.peakY - gnd;
       if (!PL.swim && !inLake(PL.x, PL.z)) {
-        if (drop > 4.5) { hurt((drop - 4.5) * 14 * (PL.crouch > 0.5 ? 0.5 : 1), null, 'fall'); heroLine('fall'); }
+        if (drop > 4.5) { hurt((drop - 4.5) * 14 * (PL.crouch > 0.5 ? 0.5 : 1) * (1 - 0.4 * sk('land')), null, 'fall'); heroLine('fall'); }
         if (drop > 0.6) { SFX.land(clamp(drop / 4, 0.4, 1.2)); Noise.emit(PL.x, PL.z, 8, 0.5); PL.landDip = Math.min(0.12, drop * 0.03); }
       }
     }
@@ -3595,14 +3611,14 @@ function die(src, cause) {
   if (!PL.alive) return;
   PL.alive = false; G.stats.deaths++; G.deaths++;
   const lost = Math.floor(PL.crypto / 2); PL.crypto -= lost;
-  PL.hack = clamp(PL.hack + 1, 0, 6);
+  G.firewallSaved = Math.random() < 0.35 * sk('firewall'); if (!G.firewallSaved) PL.hack = clamp(PL.hack + 1, 0, 6);
   G.lastHacker = src && src.name ? src.name : cause === 'fall' ? 'GRAVITY' : 'THE VIRUS';
   if (G.boss && G.boss.active && G.boss.phase === 2) G.boss.died = true;
   Chat.close(); W.reload = 0; W.knife = 0; W.heal = 0; Input.fire = false;
   $('death').classList.remove('hidden');
   $('death').querySelector('.dt-title').textContent = cause === 'trap' ? 'YOU TYPED IT' : 'HACKED';
   $('dtBy').textContent = cause === 'trap' ? G.lastHacker + ' made you a "game". It was a virus.' : cause === 'fall' ? 'You fell. Gravity is not an AI, but it still won.' : 'Hacked by ' + G.lastHacker;
-  $('dtLoss').textContent = (lost ? '-₿' + lost + ' (half your Crypto) · ' : '') + 'Hack level ' + PL.hack + ' — the glitches get worse every time you die';
+  $('dtLoss').textContent = (lost ? '-₿' + lost + ' (half your Crypto) · ' : '') + (G.firewallSaved ? '🛡 Your firewall blocked the hack this time · hack level ' + PL.hack : 'Hack level ' + PL.hack + ' — the glitches get worse every time you die');
   SFX.glitch(1.6); setTimeout(() => SFX.glitch(1), 300); heroLine('die');
   G.respawnT = 3.4; HUD.dirty = true;
   if (cause === 'trap') trophy('trapped');
@@ -3611,7 +3627,7 @@ function respawn() {
   const T = PL.checkpoint >= 0 ? TERMS[PL.checkpoint] : null;
   PL.x = T ? T.front.x + Math.sin(T.rot) * 1.5 : START.x; PL.z = T ? T.front.z + Math.cos(T.rot) * 1.5 : START.z; PL.y = 0;
   PL.yaw = T ? T.rot + Math.PI : START.yaw; PL.pitch = 0; PL.vx = PL.vy = PL.vz = 0; PL.onGround = true; PL.peakY = 0;
-  PL.hp = 100; PL.alive = true; PL.invuln = 3; PL.armGone = false; PL.slideT = 0; PL.swim = false;
+  PL.hp = 100; PL.alive = true; PL.invuln = 3; PL.armGone = false; PL.slideT = 0; PL.swim = false; grappleRelease(true);
   $('death').classList.add('hidden');
   R.camera.rotation.z = 0;
   /* push AIs away from where you respawn */
@@ -3632,7 +3648,7 @@ function findInteract() {
   for (const T of TERMS) if (Math.hypot(T.x - PL.x, T.z - PL.z) < 2.6 && look(T.x, T.z, 2.6, 0.1)) return { key: 'term' + T.i, label: 'Use ' + T.name + ' (shop · save · pause)', act: () => Shop.openAt(T) };
   if (!DOOR.open && DOOR.mesh && look(DOOR.padX, DOOR.padZ, 2.8, 0.2) && PL.z > DOOR.z) return { key: 'pad', label: doorReady() ? 'Enter the passcode' : 'Keypad: ' + doorStatus(), act: tryDoor };
   if (LV.secret && !LV.secret.open && look(LV.secret.ix, LV.secret.iz, 2.3, 0.6) && LV.secret.side(PL.x, PL.z)) return { key: 'secret', label: 'Push the weird shelf', act: openSecret };
-  for (const T of TOWERS) if (T.alive && !T.hacked && look(T.x, T.z, 2.6, 0.3)) return { key: 'tw' + T.i, label: 'Hack the alarm tower', hold: 2.4, act: () => hackTower(T), anim: 'search' };
+  for (const T of TOWERS) if (T.alive && !T.hacked && look(T.x, T.z, 2.6, 0.3)) return { key: 'tw' + T.i, label: 'Hack the alarm tower', hold: 2.4 * (1 - 0.35 * sk('fingers')), act: () => hackTower(T), anim: 'search' };
   let best = null, bd = 2.4;
   forNearBots(PL.x, PL.z, 3, (b) => { if (!b.dead || b.searched || b.fall < 0.95 || b.ghost || b.noSearch) return; const d = Math.hypot(b.x - PL.x, b.z - PL.z); if (d < bd && look(b.x, b.z, 2.4, 0.2)) { bd = d; best = b; } });
   if (best) return { key: 'b' + best.i, label: 'Search ' + best.name, hold: 0.8, act: () => searchBody(best), anim: 'search' };
@@ -3671,7 +3687,7 @@ function takePickup(p) {
   else if (p.kind === 'crypto') { addCrypto(p.amount, p.dive ? 'Data Diver stash' : 'Hidden stash'); if (p.dive) trophy('diver'); else trophy('secret'); }
   else if (p.kind === 'ammo') {
     let got = false;
-    for (const id of PL.owned) { const st = PL.guns[id], g = GUNS[id]; if (!st || !g) continue; const cap = Math.round(g.res * 1.5); if (st.res < cap) { st.res = Math.min(cap, st.res + g.mag * 2); got = true; } }
+    for (const id of PL.owned) { const st = PL.guns[id], g = GUNS[id]; if (!st || !g) continue; const cap = Math.round(g.res * 1.5 * (1 + 0.25 * sk('pockets'))); if (st.res < cap) { st.res = Math.min(cap, st.res + g.mag * 2); got = true; } }
     if (!got) { if (!p.warned) { p.warned = true; toast('Ammo already full'); } return; }
     p.warned = false; toast('+ammo for all your guns', 'good');
   }
@@ -3880,7 +3896,7 @@ function hitBot(b, dmg, part, hx, hy, hz, dx, dy, dz, src) {
   if (b.ghost) { fx.code(b.x, 1.2, b.z, 30, 1, 0.2, 0.3); SFX.glitch(0.6); b.active = false; b.ghost = false; toast("It wasn't real. You're getting hacked...", 'bad', 1600); return; }
   const gun = src && src.id ? GUNS[src.id] : null;
   let mult = 1, head = false;
-  if (part === 'head') { head = true; mult = gun && gun.instakill && !b.summoned ? 99 : gun ? gun.head : 2; }
+  if (part === 'head') { head = true; mult = gun && gun.instakill && !b.summoned ? 99 : gun ? gun.head : 2; if (mult < 99) mult *= 1 + 0.15 * sk('hunter'); }
   else if (part === 'core') { mult = 1.6; b.coreDmg += dmg * mult; }
   else if (part === 'legs') { mult = 0.75; b.legDmg += dmg * mult; if (b.legDmg > b.maxHp * 0.7 && b.type !== 'drone') b.crawl = true; else if (b.legDmg > b.maxHp * 0.3) b.limp = 1; }
   else if (part === 'antenna') { mult = 0.5; b.blindT = 7; b.antennaGone = true; fx.sparks(hx, hy, hz, 0, 1, 0, 14, 5); toast(b.name + "'s sensors fried: it's blind for a bit", '', 1500); }
@@ -3929,7 +3945,7 @@ function killBot(b, head, part, src, dx, dz) {
   if (G.streak >= 10) trophy('streak10');
   killfeed((head ? '🎯 ' : '☠ ') + b.name + (head ? ' — HEADSHOT' : part === 'core' ? ' — CORE' : ''));
   SFX.kill();
-  if (head && G.slowCd <= 0 && G.screen === 'play') { G.slowT = 0.6; G.slowCd = 2.2; SFX.whoosh(); say('announcer', 'HEADSHOT', { label: false, silent: false, hold: 900, vol: 0.9 }); }
+  if (head && G.slowCd <= 0 && G.screen === 'play') { G.slowT = sk('slowmo') ? 1.2 : 0.6; G.slowCd = sk('slowmo') ? 1.4 : 2.2; SFX.whoosh(); say('announcer', 'HEADSHOT', { label: false, silent: false, hold: 900, vol: 0.9 }); }
 }
 function alertBot(b) {
   if (b.dead || b.ghost) return;
@@ -4219,7 +4235,7 @@ function searchBody(b) {
   const loot = [];
   const cr = randi(4, 12) + b.tier * 3; addCrypto(cr, null); loot.push('₿' + cr);
   const id = curGun();
-  if (id && Math.random() < 0.7) { const g = GUNS[id], amt = Math.max(1, Math.round(gunStats(id).mag * rand(0.4, 0.9))); PL.guns[id].res = Math.min(g.res * 2, PL.guns[id].res + amt); loot.push(amt + ' ammo'); }
+  if (id && Math.random() < 0.7) { const g = GUNS[id], amt = Math.max(1, Math.round(gunStats(id).mag * rand(0.4, 0.9))); PL.guns[id].res = Math.min(Math.round(g.res * 2 * (1 + 0.25 * sk('pockets'))), PL.guns[id].res + amt); loot.push(amt + ' ammo'); }
   if (Math.random() < 0.18 && PL.meds < 3) { PL.meds++; loot.push('health pack'); }
   if (Math.random() < 0.12) { PL.armor = Math.min(100, PL.armor + 25); loot.push('25 armor'); }
   if (Math.random() < 0.08 && PL.frags < 4) { PL.frags++; loot.push('grenade'); }
@@ -4246,6 +4262,7 @@ function updateTowers(dt) {
   let any = null;
   for (const T of TOWERS) {
     if (T.cdT > 0) T.cdT -= dt;
+    if (T.hacked && T.alive && sk('hijack')) updateHijack(T, dt);
     if (T.alarmT > 0) { T.alarmT -= dt; any = T; T.mat.emissiveIntensity = 1.5 + Math.sin(G.time * 12) * 1.5; T.dome.rotation.y += dt * 8; if (T.alarmT <= 0) T.mat.emissiveIntensity = 0.6; }
   }
   G.alarm = any;
@@ -4680,6 +4697,7 @@ const TROPHIES = [
   ['diver', '🤿', 'Data Diver', 'Find the stash at the bottom of the data lake', 1], ['secretRoom', '🚪', 'Behind The Shelf', 'Find the secret room', 1],
   ['secret', '💰', 'Finders Keepers', 'Find a hidden Crypto stash', 1], ['clippy', '📎', "It Looks Like You're Dead", "See Clippy's ghost", 1],
   ['reader', '📜', 'History Nerd', 'Read every sign about old AIs', 1],
+  ['hook', '🕷', 'Spider-Hacker', 'Hang from the ceiling with the grappling hook'], ['skills', '🌳', 'Big Brain', 'Max out every skill in the skill tree'],
   ['boss10', '🔟', 'Ten Down', 'Beat 10 bosses'], ['boss25', '🏅', 'Quarter Way', 'Beat 25 bosses'], ['boss50', '🏆', 'Halfway Hacker', 'Beat 50 bosses'],
   ['boss99', '👑', 'The Final Four', 'Beat the newest Grok, ChatGPT, Claude and Gemini (level 99)'], ['virus', '🦠', 'Antivirus Incarnate', 'Delete THE VIRUS (level 100)'],
 ];
@@ -4762,7 +4780,7 @@ const ATT = {
 };
 const ELEM = { fire: { name: 'Fire rounds', price: 300, desc: 'Sets AIs on fire.' }, shock: { name: 'Shock rounds', price: 350, desc: 'Zaps 2 AIs nearby too.' }, glitch: { name: 'Glitch rounds', price: 400, desc: 'Confused AIs fight each other.' } };
 const GEAR = [
-  ['ammo', 'Ammo refill (both guns)', 'Fills the reserve ammo of the guns you carry.', () => 20 + PL.slots.filter(Boolean).reduce((s, id) => s + Math.round(Math.max(0, GUNS[id].price) * 0.05), 0), () => PL.slots.some((id) => id && PL.guns[id].res < GUNS[id].res * (PL.guns[id].att.ext === true ? 1.5 : 1)), () => { for (const id of PL.slots) if (id) PL.guns[id].res = Math.round(GUNS[id].res * (PL.guns[id].att.ext === true ? 1.5 : 1)); }],
+  ['ammo', 'Ammo refill (both guns)', 'Fills the reserve ammo of the guns you carry.', () => 20 + PL.slots.filter(Boolean).reduce((s, id) => s + Math.round(Math.max(0, GUNS[id].price) * 0.05), 0), () => PL.slots.some((id) => id && PL.guns[id].res < resCap(id)), () => { for (const id of PL.slots) if (id) PL.guns[id].res = resCap(id); }],
   ['med', 'Health pack', 'Heals 50. Carry up to 3. Press ' + keyName(S.keys.heal) + ' to use.', () => 60, () => PL.meds < 3, () => { PL.meds++; }],
   ['armor', 'Armor plate (+50)', 'Armor takes 2/3 of the damage until it breaks.', () => 80, () => PL.armor < 100, () => { PL.armor = Math.min(100, PL.armor + 50); }],
   ['frag', 'Frag grenade', 'Big boom. Carry up to 4. Press ' + keyName(S.keys.grenade) + '.', () => 50, () => PL.frags < 4, () => { PL.frags++; }],
@@ -4795,7 +4813,7 @@ Shop.render = function () {
   if (T.hackedBy >= 0) { hk.classList.remove('hidden'); hk.textContent = '!! PRICES HACKED BY ' + (BOTS[T.hackedBy].name || '???') + ' — everything costs double. Kill it to fix (red skull on the minimap).'; }
   else if (T.discount) { hk.classList.remove('hidden'); hk.textContent = 'You hacked this terminal: 25% OFF everything.'; hk.style.background = '#0f3d24'; }
   else hk.classList.add('hidden');
-  const tabs = [['guns', 'GUNS'], ['gear', 'GEAR'], ['upg', 'UPGRADES'], ['hack', 'HACK PRICES'], ['troph', 'TROPHIES'], ['menu', 'PAUSE MENU']];
+  const tabs = [['guns', 'GUNS'], ['gear', 'GEAR'], ['upg', 'UPGRADES'], ['skills', 'SKILLS'], ['hack', 'HACK PRICES'], ['troph', 'TROPHIES'], ['menu', 'PAUSE MENU']];
   $('shTabs').innerHTML = tabs.map(([k, n]) => '<button class="sh-tab' + (k === this.tab ? ' on' : '') + '" data-tab="' + k + '">' + n + '</button>').join('');
   let h = '';
   const bar = (v, max) => '<i><em style="width:' + clamp((v / max) * 100, 3, 100) + '%"></em></i>';
@@ -4822,6 +4840,20 @@ Shop.render = function () {
       for (const k in ATT) { const a = ATT[k]; if (!a.ok(id)) continue; const pr = this.price(a.price), has = st.att[k]; h += '<div class="it" style="margin-left:18px"><div><b>' + a.name + '</b><small>' + a.desc + '</small></div><div class="acts">' + (has ? '<button class="sbtn" data-atoggle="' + id + ':' + k + '">' + (has === 'off' ? 'Turn on' : 'Installed ✓ (turn off)') + '</button>' : '<button class="sbtn" data-att="' + id + ':' + k + '" ' + (PL.crypto < pr ? 'disabled' : '') + '>Buy <span class="price">₿' + pr + '</span></button>') + '</div></div>'; }
       if (!['rocket', 'maker'].includes(id)) for (const k in ELEM) { const e = ELEM[k], pr = this.price(e.price), has = st.att.elem === k; h += '<div class="it" style="margin-left:18px"><div><b>' + e.name + '</b><small>' + e.desc + ' (one element per gun)</small></div><div class="acts"><button class="sbtn" data-elem="' + id + ':' + k + '" ' + (has || PL.crypto < pr ? 'disabled' : '') + '>' + (has ? 'Loaded ✓' : 'Buy <span class="price">₿' + pr + '</span>') + '</button></div></div>'; }
     }
+  } else if (this.tab === 'skills') {
+    h += '<div class="note">Skills are yours forever: every level, every death. Buy them with Crypto. Some need another skill first.</div><div class="sk-cols">';
+    for (const [br, title] of SKILL_BRANCHES) {
+      h += '<div class="sk-col"><h4>' + title + '</h4>';
+      for (const id in SKILLS) {
+        const s = SKILLS[id]; if (s[0] !== br) continue;
+        const lv = sk(id), max = s[3], locked = !!s[6] && !sk(s[6]), cost = this.price(skillCost(id));
+        h += '<div class="sk' + (s[6] ? ' need' : '') + (locked ? ' lock' : '') + '"><b>' + s[2] + ' ' + esc(s[1]) + '</b><small>' + esc(skillDesc(id)) + (locked ? ' (needs ' + esc(SKILLS[s[6]][1]) + ')' : '') + '</small><div class="pips">' + Array.from({ length: max }, (_, i) => '<i class="' + (i < lv ? 'on' : '') + '"></i>').join('') + '</div>';
+        h += lv >= max ? '<button class="sbtn" disabled>MAXED</button>' : '<button class="sbtn" data-skill="' + id + '" ' + (locked || PL.crypto < cost ? 'disabled' : '') + '>' + (lv ? 'Level ' + (lv + 1) : 'Unlock') + ' <span class="price">₿' + cost + '</span></button>';
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';
   } else if (this.tab === 'hack') {
     const cd = Math.ceil(T.hackCd || 0);
     h += '<div id="hackGame"><div class="note">Hack this terminal for 25% off everything. Press <b>SPACE</b> (or the button) when the cursor is inside the green zone, 3 times in a row. If you fail, the terminal screams and every AI nearby comes running.</div>';
@@ -4849,6 +4881,7 @@ Shop.click = function (e) {
   if (t.dataset.eq) { const [id, s] = t.dataset.eq.split(':'); giveGun(id, +s); PL.cur = +s; W.reload = 0; VM.dirty = true; this.render(); return; }
   if (t.dataset.gear) { const it = GEAR.find((q) => q[0] === t.dataset.gear); if (it && it[4]()) this.buy(this.price(it[3]()), it[5]); return; }
   if (t.dataset.upg) { const id = t.dataset.upg, g = GUNS[id], st = PL.guns[id]; this.buy(this.price(Math.max(80, Math.round(Math.max(150, g.price) * 0.4 * st.lvl))), () => { st.lvl++; VM.dirty = true; if (st.lvl >= 5) { trophy('gold'); toast(g.name + ' is now GOLD ★', 'good'); } }); return; }
+  if (t.dataset.skill) { const id = t.dataset.skill, s = SKILLS[id]; if (s && sk(id) < s[3] && !(s[6] && !sk(s[6]))) this.buy(this.price(skillCost(id)), () => buySkill(id)); return; }
   if (t.dataset.att) { const [id, k] = t.dataset.att.split(':'); this.buy(this.price(ATT[k].price), () => { PL.guns[id].att[k] = true; VM.dirty = true; if (k === 'ext') { /* nothing else */ } }); return; }
   if (t.dataset.atoggle) { const [id, k] = t.dataset.atoggle.split(':'); const st = PL.guns[id]; st.att[k] = st.att[k] === 'off' ? true : 'off'; VM.dirty = true; this.render(); return; }
   if (t.dataset.elem) { const [id, k] = t.dataset.elem.split(':'); this.buy(this.price(ELEM[k].price), () => { PL.guns[id].att.elem = k; VM.dirty = true; }); return; }
@@ -4858,7 +4891,7 @@ Shop.click = function (e) {
   if (t.dataset.act === 'quit') { this.close(); quitToDesktop(); return; }
 };
 /* the hack-the-prices mini-game */
-Shop.hgStart = function () { this.hg = { pos: 0, dir: 1, speed: 0.9, round: 0, z0: rand(0.2, 0.65), zw: 0.24, last: performance.now() }; this.render(); this.hgLoop(); };
+Shop.hgStart = function () { this.hg = { pos: 0, dir: 1, speed: 0.9, round: 0, z0: rand(0.2, 0.65), zw: 0.24 * (sk('cracker') ? 1.4 : 1), last: performance.now() }; this.render(); this.hgLoop(); };
 Shop.hgLoop = function () {
   if (!this.hg || !this.open || this.tab !== 'hack') return;
   const h = this.hg, now = performance.now(), dt = Math.min(0.05, (now - h.last) / 1000); h.last = now;
@@ -4880,6 +4913,182 @@ Shop.hgHit = function () {
 };
 $('shop').addEventListener('click', (e) => Shop.click(e));
 $('shClose').addEventListener('click', () => Shop.close());
+
+/* ============================== skill tree ============================== */
+/* bought with Crypto at any terminal (SKILLS tab). id: [branch, name, icon, max level, cost per level, what it does, needs this skill first] */
+const SKILLS = {
+  hands: ['gun', 'Fast hands', '⚡', 3, 300, 'Reload 12% faster per level.'],
+  steady: ['gun', 'Steady aim', '🎯', 3, 350, 'Recoil 12% lower per level.', 'hands'],
+  hunter: ['gun', 'Headhunter', '💀', 2, 600, 'Headshots on AIs do 15% more damage per level.', 'steady'],
+  slowmo: ['gun', 'Bullet time+', '⏱', 1, 900, 'Headshot slow-mo lasts twice as long and comes back faster.', 'hunter'],
+  draw: ['gun', 'Quick draw', '🔁', 2, 250, 'Swap guns 35% faster per level.'],
+  pockets: ['gun', 'Deep pockets', '🎒', 2, 400, 'Carry 25% more reserve ammo per level.', 'draw'],
+  fingers: ['hack', 'Fast fingers', '⌨', 2, 300, 'Hack alarm towers 35% faster per level.'],
+  code: ['hack', 'Code vision', '👁', 2, 800, 'Press [{codevis}]: see every AI through walls as glowing code. 6s (level 2: 10s and a shorter wait).', 'fingers'],
+  hijack: ['hack', 'Tower hijack', '📡', 1, 1100, 'Alarm towers you hack start shooting the AIs near them.', 'code'],
+  firewall: ['hack', 'Firewall', '🛡', 2, 450, 'Each death has a 35% chance per level to NOT raise your hack level.'],
+  cracker: ['hack', 'Price cracker', '💲', 1, 500, 'The green zone in the terminal price hack is 40% wider.', 'firewall'],
+  grapple: ['move', 'Grappling hook', '🪝', 1, 1200, 'Press [{grapple}]: shoot a hook at walls, shelves, machines or the ceiling and zip there. Hang on, then jump off (or press it again to let go).'],
+  cable: ['move', 'Longer cable', '📏', 2, 500, 'Hook range 30m, then 45m, then 60m.', 'grapple'],
+  winch: ['move', 'Fast winch', '⚙', 2, 600, 'Pull 25% faster per level and shoot the hook again sooner.', 'grapple'],
+  slide: ['move', 'Slide master', '🛹', 2, 300, 'Slides go 15% faster and last longer per level.'],
+  legs: ['move', 'Marathon', '🏃', 2, 350, 'Sprint 8% faster per level.', 'slide'],
+  land: ['move', 'Soft landing', '🪂', 2, 400, 'Fall damage 40% lower per level.', 'slide'],
+};
+const SKILL_BRANCHES = [['gun', 'GUN SKILLS'], ['hack', 'HACKING'], ['move', 'MOVEMENT']];
+const sk = (id) => (PL.skills && PL.skills[id]) || 0;
+const skillCost = (id) => SKILLS[id][4] * (sk(id) + 1);
+const skillDesc = (id) => SKILLS[id][5].replace('{grapple}', keyName(S.keys.grapple)).replace('{codevis}', keyName(S.keys.codevis));
+function buySkill(id) {
+  const s = SKILLS[id]; if (!s || sk(id) >= s[3] || (s[6] && !sk(s[6]))) return false;
+  PL.skills[id] = sk(id) + 1;
+  if (id === 'grapple') toast('🪝 Grappling hook unlocked! Press ' + (Touch.on ? 'HOOK' : '[' + keyName(S.keys.grapple) + ']') + ' to use it.', 'good', 4500);
+  if (id === 'code') toast('👁 Code vision unlocked! Press ' + (Touch.on ? 'CODE' : '[' + keyName(S.keys.codevis) + ']') + ' to see AIs through walls.', 'good', 4500);
+  if (Object.keys(SKILLS).every((k) => sk(k) >= SKILLS[k][3])) trophy('skills');
+  HUD.dirty = true; ABIL.hudT = 0;
+  return true;
+}
+/* how much reserve ammo a gun can hold */
+const resCap = (id, extra = 1) => Math.round(GUNS[id].res * (PL.guns[id] && PL.guns[id].att.ext === true ? 1.5 : 1) * extra * (1 + 0.25 * sk('pockets')));
+
+/* ---------- abilities: grappling hook + code vision ---------- */
+const ABIL = { hudT: 0, hud: '' };
+const GRAP = { st: 'off', t: 0, fly: 0, cd: 0, x: 0, y: 0, z: 0, sx: 0, sy: 0, sz: 0, hangT: 0, cable: null, hook: null };
+const CODEV = { t: 0, cd: 0, mesh: null };
+const _gv = new THREE.Vector3(), _gq = new THREE.Quaternion(), _gm = new THREE.Matrix4(), _gs = new THREE.Vector3();
+function initAbilities() {
+  /* the cable: a thin steel line from your left wrist to the hook */
+  const cg = new THREE.CylinderGeometry(0.009, 0.009, 1, 6); cg.rotateX(Math.PI / 2); cg.translate(0, 0, 0.5);
+  GRAP.cable = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ color: 0x9aa3ab, metalness: 0.9, roughness: 0.35 }));
+  GRAP.cable.visible = false; GRAP.cable.frustumCulled = false; R.scene.add(GRAP.cable);
+  const hook = new THREE.Group(), steel = new THREE.MeshStandardMaterial({ color: 0x5c656e, metalness: 1, roughness: 0.3 });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 8), steel); shaft.rotation.x = Math.PI / 2; hook.add(shaft);
+  for (let k = 0; k < 3; k++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.14), steel); const a = (k / 3) * TAU; p.position.set(Math.cos(a) * 0.05, Math.sin(a) * 0.05, -0.1); p.rotation.set(-Math.sin(a) * 0.7, Math.cos(a) * 0.7, 0); hook.add(p); }
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 4), new THREE.MeshBasicMaterial({ color: 0x3ef2ff, toneMapped: false })); led.position.z = 0.08; hook.add(led);
+  hook.visible = false; R.scene.add(hook); GRAP.hook = hook;
+  /* code vision: every AI drawn as a glowing green wireframe, seen through walls */
+  const vg = new THREE.CapsuleGeometry(0.42, 1.0, 3, 8);
+  CODEV.mesh = new THREE.InstancedMesh(vg, new THREE.MeshBasicMaterial({ color: 0x39ff88, wireframe: true, transparent: true, opacity: 0.55, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }), MAX_BOTS + 1);
+  CODEV.mesh.count = 0; CODEV.mesh.renderOrder = 999; CODEV.mesh.frustumCulled = false; R.scene.add(CODEV.mesh);
+}
+const grappling = () => GRAP.st === 'pull' || GRAP.st === 'hang';
+function grappleRange() { return 30 + 15 * sk('cable'); }
+function grappleRelease(quiet) {
+  if (GRAP.st === 'off') return;
+  const was = GRAP.st; GRAP.st = 'off'; GRAP.cable.visible = false; GRAP.hook.visible = false;
+  GRAP.cd = was === 'miss' ? 0.5 : 1.2 * (1 - 0.3 * sk('winch'));
+  if (!quiet) SFX.rack();
+}
+function grappleFire() {
+  if (!sk('grapple')) { toast('No grappling hook yet. Buy it in the SKILLS tab at a terminal.', 'bad', 2200); return; }
+  if (GRAP.st !== 'off') { grappleRelease(); return; }
+  if (GRAP.cd > 0 || PL.swim) return;
+  if (PL.armGone) { toast('THE VIRUS deleted your hook arm. No grapple until it grows back.', 'bad', 2000); return; }
+  const cp = R.camera.position, pitch = PL.pitch + PL.recoilP, cy = Math.cos(pitch);
+  const dx = -Math.sin(PL.yaw) * cy, dy = Math.sin(pitch), dz = -Math.cos(PL.yaw) * cy, rg = grappleRange();
+  const h = rayWorld(cp.x, cp.y, cp.z, dx * rg, dy * rg, dz * rg, 'glass');
+  wristPos(_gv); GRAP.sx = _gv.x; GRAP.sy = _gv.y; GRAP.sz = _gv.z; GRAP.t = 0;
+  SFX.whoosh();
+  if (!h || h.kind === 'floor' || h.kind === 'water') {
+    /* nothing to grab: the hook flies out to full length and comes back */
+    GRAP.st = 'miss'; GRAP.x = cp.x + dx * rg * 0.6; GRAP.y = cp.y + dy * rg * 0.6; GRAP.z = cp.z + dz * rg * 0.6; GRAP.fly = 0.32;
+    return;
+  }
+  const d = h.t * rg - 0.06;
+  GRAP.x = cp.x + dx * d; GRAP.y = cp.y + dy * d; GRAP.z = cp.z + dz * d; GRAP.nx = h.n[0]; GRAP.ny = h.n[1]; GRAP.nz = h.n[2];
+  GRAP.st = 'fly'; GRAP.fly = Math.max(0.06, d / 110);
+}
+function wristPos(v) { return R.camera.localToWorld(v.set(-0.2, -0.24, -0.38)); }
+/* called from updatePlayer after normal movement: the hook pulls you, or holds you while you hang */
+function grappleMove(dt) {
+  if (GRAP.st === 'off' || GRAP.st === 'fly' || GRAP.st === 'miss') return;
+  if (!PL.alive || PL.controlLock || Chat.open || G.cine || PL.swim) { grappleRelease(true); return; }
+  const cx = PL.x, cy = PL.y + 1.1, cz = PL.z, dx = GRAP.x - cx, dy = GRAP.y - cy, dz = GRAP.z - cz, d = Math.hypot(dx, dy, dz) || 1;
+  GRAP.t += dt; PL.onGround = false; PL.peakY = PL.y; PL.slideT = 0;
+  if (GRAP.st === 'pull') {
+    const sp = 19 * (1 + 0.25 * sk('winch')), k = 7;
+    PL.vx = damp(PL.vx, (dx / d) * sp, k, dt); PL.vy = damp(PL.vy, (dy / d) * sp + 1.2, k, dt); PL.vz = damp(PL.vz, (dz / d) * sp, k, dt);
+    if (d < 1.8) { GRAP.st = 'hang'; GRAP.hangT = 0; SFX.land(0.5); shake(0.12); }
+    else if (GRAP.t > 3.5 || (GRAP.t > 0.4 && Math.hypot(PL.vx, PL.vy, PL.vz) < 1.2)) { GRAP.st = 'hang'; GRAP.hangT = 0; } /* stuck on something: just hang there */
+    if (GRAP.st === 'hang' && GRAP.ny < -0.5 && GRAP.y > 5 && PL.y > 1.5) trophy('hook');
+  } else {
+    /* hanging: a soft spring keeps you about 1.6m from the hook */
+    GRAP.hangT += dt;
+    const f = (d - 1.6) * 6; PL.vx = damp(PL.vx, (dx / d) * f, 8, dt); PL.vy = damp(PL.vy, (dy / d) * f, 8, dt); PL.vz = damp(PL.vz, (dz / d) * f, 8, dt);
+    if (wasPressed('jump')) {
+      /* jump off: up and the way you're looking */
+      grappleRelease(true); PL.vy = 6.2; PL.vx += -Math.sin(PL.yaw) * 3.5; PL.vz += -Math.cos(PL.yaw) * 3.5; SFX.jump();
+    } else if (wasPressed('crouch') || GRAP.hangT > 10) grappleRelease();
+  }
+}
+function updateAbilities(dt) {
+  if (GRAP.cd > 0) GRAP.cd -= dt;
+  if (CODEV.cd > 0) CODEV.cd -= dt;
+  const live = G.screen === 'play' && PL.alive && !G.cine && !Chat.open && !PL.controlLock;
+  if (live && wasPressed('grapple')) grappleFire();
+  if (live && wasPressed('codevis')) codeVision();
+  /* the hook flying out (or coming back after a miss) */
+  if (GRAP.st === 'fly' || GRAP.st === 'miss') {
+    GRAP.t += dt;
+    if (GRAP.st === 'fly' && GRAP.t >= GRAP.fly) { GRAP.st = 'pull'; GRAP.t = 0; SFX.metalPing(V3(GRAP.x, GRAP.y, GRAP.z)); fx.sparks(GRAP.x, GRAP.y, GRAP.z, GRAP.nx, GRAP.ny, GRAP.nz, 8, 4); Noise.emit(PL.x, PL.z, 6, 0.4); }
+    else if (GRAP.st === 'miss' && GRAP.t >= GRAP.fly * 2) grappleRelease(true);
+  }
+  if (!PL.alive && GRAP.st !== 'off') grappleRelease(true);
+  /* code vision timer */
+  if (CODEV.t > 0) { CODEV.t -= dt; if (CODEV.t <= 0) { CODEV.t = 0; CODEV.mesh.count = 0; $('codevis').classList.remove('on'); } }
+  /* HUD line for the abilities (5 times a second) */
+  ABIL.hudT -= dt;
+  if (ABIL.hudT <= 0) {
+    ABIL.hudT = 0.2;
+    let h = '';
+    if (sk('grapple')) h += '<span class="' + (GRAP.cd > 0 ? '' : 'rdy') + '">🪝 ' + (Touch.on ? 'HOOK' : keyName(S.keys.grapple)) + ' ' + (GRAP.st !== 'off' ? 'ON' : GRAP.cd > 0 ? Math.ceil(GRAP.cd) + 's' : 'ready') + '</span>';
+    if (sk('code')) h += '<span class="' + (CODEV.cd > 0 ? '' : 'rdy') + '">👁 ' + (Touch.on ? 'CODE' : keyName(S.keys.codevis)) + ' ' + (CODEV.t > 0 ? Math.ceil(CODEV.t) + 's ON' : CODEV.cd > 0 ? Math.ceil(CODEV.cd) + 's' : 'ready') + '</span>';
+    if (h !== ABIL.hud) { ABIL.hud = h; $('abil').innerHTML = h; }
+    if (Touch.on) { $('tHook').classList.toggle('hidden', !sk('grapple')); $('tCode').classList.toggle('hidden', !sk('code')); }
+  }
+}
+/* drawn every frame (also while paused, so the cable doesn't lag behind the camera) */
+function drawAbilities() {
+  if (GRAP.st !== 'off') {
+    R.camera.updateMatrixWorld(); wristPos(_gv);
+    let hx = GRAP.x, hy = GRAP.y, hz = GRAP.z;
+    if (GRAP.st === 'fly' || GRAP.st === 'miss') { const p = GRAP.st === 'fly' ? GRAP.t / GRAP.fly : 1 - Math.abs(GRAP.t / GRAP.fly - 1); hx = lerp(_gv.x, GRAP.x, p); hy = lerp(_gv.y, GRAP.y, p); hz = lerp(_gv.z, GRAP.z, p); }
+    const dx = hx - _gv.x, dy = hy - _gv.y, dz = hz - _gv.z, len = Math.hypot(dx, dy, dz) || 0.01;
+    GRAP.cable.position.copy(_gv); GRAP.cable.scale.set(1, 1, len); GRAP.cable.lookAt(hx, hy, hz); GRAP.cable.visible = true;
+    GRAP.hook.position.set(hx, hy, hz); GRAP.hook.lookAt(hx + dx, hy + dy, hz + dz); GRAP.hook.visible = true;
+  }
+  if (CODEV.t > 0) {
+    let n = 0; const m = CODEV.mesh;
+    for (const b of BOTS) {
+      if (!b.active || b.dead || b.ghost || n >= MAX_BOTS) continue;
+      if ((b.x - PL.x) ** 2 + (b.z - PL.z) ** 2 > 80 * 80) continue;
+      _gm.compose(_gs.set(b.x, b.y + (b.type === 'drone' ? 0.3 : 0.92), b.z), _gq.identity(), _gv.set(b.type === 'drone' ? 0.8 : 1, b.type === 'drone' ? 0.5 : 1, b.type === 'drone' ? 0.8 : 1));
+      m.setMatrixAt(n++, _gm);
+    }
+    const B = G.boss;
+    if (B && B.active && B.alive && B.x != null) { _gm.compose(_gs.set(B.x, (B.y || 4) + 1, B.z), _gq.identity(), _gv.set(5, 4, 5)); m.setMatrixAt(n++, _gm); }
+    m.count = n; m.instanceMatrix.needsUpdate = true;
+    m.material.opacity = 0.4 + Math.sin(G.realTime * 18) * 0.12;
+  }
+}
+function codeVision() {
+  if (!sk('code')) { toast('No code vision yet. Buy it in the SKILLS tab at a terminal.', 'bad', 2200); return; }
+  if (CODEV.t > 0 || CODEV.cd > 0) return;
+  CODEV.t = sk('code') >= 2 ? 10 : 6; CODEV.cd = (sk('code') >= 2 ? 32 : 45) + CODEV.t;
+  $('codevis').classList.add('on'); SFX.glitch(0.6); SFX.zap(null, 600);
+}
+function resetAbilities() { grappleRelease(true); GRAP.cd = 0; CODEV.t = 0; CODEV.cd = 0; if (CODEV.mesh) CODEV.mesh.count = 0; $('codevis').classList.remove('on'); }
+/* hacked alarm towers shoot AIs (Tower hijack skill) */
+function updateHijack(T, dt) {
+  T.shotT = (T.shotT || 0) - dt; if (T.shotT > 0) return;
+  T.shotT = 0.55;
+  let best = null, bd = 24 * 24;
+  forNearBots(T.x, T.z, 24, (b) => { if (b.dead || b.ghost || b.summoned === 'ally') return; const d = (b.x - T.x) ** 2 + (b.z - T.z) ** 2; if (d < bd && losClear(T.x, 4.4, T.z, b.x, b.y + 1.2, b.z)) { bd = d; best = b; } });
+  if (!best) { T.shotT = 1; return; }
+  addTracer(T.x, 4.4, T.z, best.x, best.y + 1.2, best.z, 0x3ec0ff, 0.035);
+  SFX.zap(V3(T.x, 4.4, T.z), 1800);
+  hitBot(best, 20, 'torso', best.x, best.y + 1.2, best.z, best.x - T.x, 0, best.z - T.z, { id: 'splash', tower: true });
+}
 
 /* ============================ chat + real AI ============================ */
 const Chat = { open: false, bot: null, busy: false, typing: null };
@@ -6979,7 +7188,7 @@ function serialize() {
   s.game = {
     t: r2(G.time),
     p: { x: r2(PL.x), y: r2(PL.y), z: r2(PL.z), yaw: r2(PL.yaw), pitch: r2(PL.pitch), hp: r2(PL.hp), armor: r2(PL.armor), hack: PL.hack, crypto: PL.crypto, meds: PL.meds, frags: PL.frags,
-      slots: PL.slots, cur: PL.cur, guns: PL.guns, owned: PL.owned, checkpoint: PL.checkpoint, hasGun: PL.hasGun, passcodes: PL.passcodes, crouch: r2(PL.crouch), alive: PL.alive },
+      slots: PL.slots, cur: PL.cur, guns: PL.guns, owned: PL.owned, checkpoint: PL.checkpoint, hasGun: PL.hasGun, passcodes: PL.passcodes, crouch: r2(PL.crouch), alive: PL.alive, skills: PL.skills },
     clip: { stage: CLIP.stage, done: CLIP.done, ripReady: CLIP.ripReady },
     door: DOOR.open, secret: !!(LV.secret && LV.secret.open), level: LVL.n, picks: LV.pickups.filter((p) => p.taken).map((p) => p.id), easter: LV.easter.map((e) => (e.read ? 1 : 0)),
     sp: SPAWNERS.map((s2) => Math.max(0, Math.round(s2.hp))), spr: SPAWNERS.map((s2) => s2.reserve), tw: TOWERS.map((t) => [t.alive ? 1 : 0, t.hacked ? 1 : 0, Math.round(t.hp)]), terms: TERMS.map((T) => [T.discount ? 1 : 0, Math.round(T.hackCd || 0)]),
@@ -7003,7 +7212,7 @@ function applyGame(g) {
   G.inGame = true; G.time = g.t || 0;
   const p = g.p || {};
   Object.assign(PL, { x: p.x ?? START.x, y: p.y || 0, z: p.z ?? START.z, yaw: p.yaw || 0, pitch: p.pitch || 0, hp: p.hp ?? 100, armor: p.armor || 0, hack: p.hack || 0, crypto: p.crypto || 0, meds: p.meds || 0, frags: p.frags || 0,
-    slots: p.slots || [null, null], cur: p.cur || 0, guns: p.guns || {}, owned: p.owned || [], checkpoint: p.checkpoint ?? -1, hasGun: !!p.hasGun, passcodes: p.passcodes || [false, false, false], crouch: p.crouch || 0 });
+    slots: p.slots || [null, null], cur: p.cur || 0, guns: p.guns || {}, owned: p.owned || [], checkpoint: p.checkpoint ?? -1, hasGun: !!p.hasGun, passcodes: p.passcodes || [false, false, false], crouch: p.crouch || 0, skills: Object.assign({}, p.skills || {}) });
   if (p.alive === false || PL.hp <= 0) { PL.hp = 100; const T = PL.checkpoint >= 0 ? TERMS[PL.checkpoint] : null; if (T) { PL.x = T.front.x; PL.z = T.front.z; } else { PL.x = START.x; PL.z = START.z; } PL.y = 0; }
   for (const id in PL.guns) PL.guns[id].att = Object.assign({ sil: false, ext: false, scope: false, elem: '' }, PL.guns[id].att || {});
   const c = g.clip || {}; CLIP.stage = c.stage || 0; CLIP.done = !!c.done; CLIP.ripReady = !!c.ripReady;
@@ -7049,7 +7258,7 @@ function resetLevelState() {
   resetBossState();
   G.alarm = null; G.alarmCdT = 0; G.towerWarnT = 0; G.killcam = null; G.slowT = 0; G.timeScale = 1; G.cine = false; G.cineKind = ''; G.hackerTimer = 150; G.trashT = 30; G.time = 0; G.frozen = false; G.paused = false;
   $('death').classList.add('hidden'); $('hud').classList.remove('eliza-hack');
-  Chat.close(); if (Shop.open) Shop.close();
+  Chat.close(); if (Shop.open) Shop.close(); resetAbilities();
   ffRebuildBlocked(); updateDoorLeds();
 }
 function resetWorld(pop = true) {
@@ -7057,7 +7266,7 @@ function resetWorld(pop = true) {
   Object.assign(CLIP, { stage: 0, done: false, ripReady: false, grunt: null, dead: false, ghostT: 0 }); CLIP.mesh.visible = false; CLIP.ghost.visible = false;
   Object.assign(PL, { x: START.x, y: 0, z: START.z, vx: 0, vy: 0, vz: 0, yaw: START.yaw, pitch: 0, onGround: true, crouch: 0, slideT: 0, lean: 0, hp: 100, armor: 0, hack: 0, crypto: 0, meds: 1, frags: 1,
     alive: true, invuln: 0, swim: false, under: false, gooT: 0, peakY: 0, recoilP: 0, ads: 0, guns: {}, owned: [], slots: [null, null], cur: 0, checkpoint: -1, hasGun: false, armGone: false,
-    passcodes: [false, false, false], controlLock: false, lookLock: false });
+    passcodes: [false, false, false], controlLock: false, lookLock: false, skills: {} });
   Object.assign(W, { cool: 0, reload: 0, swap: 0, spin: 0, jamClear: 0, bloom: 0, knife: 0, heal: 0, gren: 0, search: 0, rip: 0 });
   G.stats = STATS0(); G.lv0 = STATS0(); G.streak = 0; G.bestStreak = 0; G.headStreak = 0; G.endRoam = false; G.saidWords = []; G.bonusUnlocked = false; G.bossesBeaten = 0;
   G.hackFx = { nextStatic: 10, nextPop: 12, nextFake: 8, nextCtl: 30, flip: 0, lag: 0, fakeHud: 0, static: 0 };
@@ -7089,7 +7298,7 @@ function tick(rdt, draw) {
   const paused = G.paused || G.sysPaused || G.frozen || document.hidden;
   if (G.screen === 'play') {
     if (!paused) step(rdt * G.timeScale, rdt);
-    if (draw) { FX.tracers.count = trN; FX.tracers.instanceMatrix.needsUpdate = true; if (FX.tracers.instanceColor) FX.tracers.instanceColor.needsUpdate = true; renderScene(R.scene, R.camera); }
+    if (draw) { drawAbilities(); FX.tracers.count = trN; FX.tracers.instanceMatrix.needsUpdate = true; if (FX.tracers.instanceColor) FX.tracers.instanceColor.needsUpdate = true; renderScene(R.scene, R.camera); }
     trN = 0;
   } else if (G.screen === 'cine') {
     updateIntro(rdt);
@@ -7112,7 +7321,7 @@ async function sim(sec, dt = 1 / 30) {
 }
 function step(dt, rdt) {
   G.time += dt; G.stats.time += rdt;
-  updateActions();
+  updateActions(); updateAbilities(dt);
   if (G.killcam) updateKillcam(rdt); else updatePlayer(dt);
   updateWeapon(dt);
   updateBullets(dt); updateGrenades(dt);
@@ -7149,7 +7358,7 @@ async function boot() {
   let saved = null; try { saved = GameSystem.load(); } catch (e) { saved = null; }
   const lv0 = saved && saved.v === 1 && saved.game ? clamp((saved.game.level | 0) || 1, 1, LAST_LEVEL) : 1;
   buildTextures(); buildMaterials(); setLoad(30); await nextFrame();
-  initFX(); initBody(); initViewmodel(); initBotRender(); buildClippy(); setLoad(46); await nextFrame();
+  initFX(); initBody(); initViewmodel(); initBotRender(); initAbilities(); buildClippy(); setLoad(46); await nextFrame();
   buildLevel(lv0); setLoad(72); await nextFrame();
   R.camera.position.set(START.x, 1.6, START.z);
   try { R.renderer.compile(R.scene, R.camera); } catch (e) { /* ignore */ }
@@ -7161,7 +7370,7 @@ async function boot() {
   hideEl('loading');
   if (saved && saved.v === 1) restore(saved); else { G.trophies = LS.get('killais:trophies', {}) || {}; showTitle(); }
   requestAnimationFrame((t) => { lastT = t; frame(t); });
-  window.__KA = { THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight, startBossFight, genReachable, BOSS_DATA, SIG, doAttack, hitBoss, GEN, ERAS, SNIPER_PERCHES, resetLevelState, buildLevel, goToLevel, loadLevel, LVL, ARENA, START, levelDef, unloadLevel, finishBoss, showTeaser, showStats };
+  window.__KA = { SKILLS, sk, buySkill, GRAP, CODEV, grappleFire, codeVision, resCap, drawAbilities, gunStats, THREE, sim, BRC, BR, triggerAlarm, compileBot, POP, TURN, ALARM, applyPreset, PRESETS, rootPose, buildGunModel, GUN_BUILD, HANDS, captureEnv, Input, Touch, Noise, hurt, killBot, hitBot, BUL, EB, updateObjective, G, PL, BOTS, S, TERMS, SPAWNERS, TOWERS, DOOR, CLIP, Shop, Chat, startNewGame, enterPlay, skipCine, giveGun, spawnBot, hitEliza, serialize, restore, resetWorld, showTitle, trophy, die, LV, W, GUNS, VM, R, FX, Intro, AIBrain, onLostFocus, resumeFight, tryDoor, ripCannon, startElizaFight, startBossFight, genReachable, BOSS_DATA, SIG, doAttack, hitBoss, GEN, ERAS, SNIPER_PERCHES, resetLevelState, buildLevel, goToLevel, loadLevel, LVL, ARENA, START, levelDef, unloadLevel, finishBoss, showTeaser, showStats };
 }
 boot().catch((err) => { console.error(err); const e = $('loadErr'); if (e) { e.style.display = 'block'; $('loadErrMsg').textContent = String(err && err.message || err); } });
 </script>
