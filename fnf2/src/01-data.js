@@ -1,6 +1,6 @@
 // FNF 2 - game data. The real weeks/songs come from FNF's own level files
 // (preload/data/levels/*.json); this lists their order + our extras.
-G.WEEK_ORDER = ['tutorial', 'week1', 'week2', 'week3', 'week4', 'week5', 'week6', 'week7', 'weekend1'];
+G.WEEK_ORDER = ['tutorial', 'week1', 'week2', 'week3', 'week4', 'week5', 'week6', 'week7', 'weekend1', 'wrath'];
 G.availableWeeks = () => G.WEEK_ORDER.filter(id => { const L = G.A.json('preload/data/levels/' + id + '.json'); return L && L.songs.some(s => G.Songs.meta(s)); });
 G.CREDITS = [
   { head: 'FNF 2 (private copy)' },
