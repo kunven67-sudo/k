@@ -86,7 +86,30 @@ class AudioEngine {
       bird: many(() => S.birdChirp(ac), 6),
       ring: [S.ringing(ac)],
       debris: many(() => S.noiseBurst(ac, 0.12, 2500, 40), 4),
+      shotPistol: many(() => S.gunshot(ac, 'pistol'), 3),
+      shotRifle: many(() => S.gunshot(ac, 'rifle'), 3),
+      shotShotgun: many(() => S.gunshot(ac, 'shotgun'), 2),
+      shotSniper: many(() => S.gunshot(ac, 'sniper'), 2),
+      magOut: [S.mech(ac, 'magOut')], magIn: [S.mech(ac, 'magIn')], slide: [S.mech(ac, 'slide')],
+      pump: [S.mech(ac, 'pump')], bolt: [S.mech(ac, 'bolt')], dry: [S.mech(ac, 'dry')], shellIn: [S.mech(ac, 'shell')], select: [S.mech(ac, 'select')],
+      casing: many(() => S.casingTink(ac), 4),
+      ricochet: many(() => S.ricochet(ac), 3),
+      flesh: many(() => S.fleshHit(ac), 3),
+      heartbeat: [S.heartbeat(ac)],
+      rip: [S.rip(ac)],
+      pills: [S.pills(ac)],
     };
+    // indoor reverb send + outdoor echo send (gunshots/explosions use these)
+    this.reverb = ac.createConvolver();
+    this.reverb.buffer = S.roomIR(ac);
+    this.reverbSend = ac.createGain(); this.reverbSend.gain.value = 0;
+    this.reverbSend.connect(this.reverb); this.reverb.connect(this.fxBus);
+    this.echoSend = ac.createGain(); this.echoSend.gain.value = 0.35;
+    const d1 = ac.createDelay(3); d1.delayTime.value = 0.85;
+    const d2 = ac.createDelay(3); d2.delayTime.value = 1.6;
+    const elp = ac.createBiquadFilter(); elp.type = 'lowpass'; elp.frequency.value = 900;
+    const g1 = ac.createGain(); g1.gain.value = 0.35; const g2 = ac.createGain(); g2.gain.value = 0.18;
+    this.echoSend.connect(elp); elp.connect(d1); elp.connect(d2); d1.connect(g1); d2.connect(g2); g1.connect(this.fxBus); g2.connect(this.fxBus);
     // Real recordings dropped into assets/sounds/<name>_N.ogg replace the generated ones.
     for (const key of Object.keys(ASSETS)) {
       const m = key.match(/^sounds\/([a-zA-Z]+)(?:_\d+)?\.(ogg|mp3|wav)$/);
@@ -120,13 +143,23 @@ class AudioEngine {
   }
 
   // Play a sound from the bank. pos = world position (null = 2D, e.g. your own footsteps).
-  play(name, { pos = null, vol = 1, rate = 1, ref = 4, bus = 'fx', delay = true, loop = false } = {}) {
+  // Indoors (under a roof) gunshots boom with reverb; outdoors they crack and echo off the hills.
+  setIndoor(indoor) {
+    if (!this.ready || this.indoor === indoor) return;
+    this.indoor = indoor;
+    const t = this.ac.currentTime;
+    this.reverbSend.gain.setTargetAtTime(indoor ? 0.9 : 0.05, t, 0.2);
+    this.echoSend.gain.setTargetAtTime(indoor ? 0.05 : 0.35, t, 0.2);
+  }
+
+  play(name, { pos = null, vol = 1, rate = 1, ref = 4, bus = 'fx', delay = true, loop = false, space = false } = {}) {
     // while the context is suspended (before you click Play) sounds would pile up and all fire at once
     if (!this.ready || this.ac.state !== 'running') return null;
     const list = this.bank[name];
     if (!list?.length) return null;
     // voice limit: when lots of debris is clattering, drop the quiet sounds
-    if (!loop && this.voices >= 40 && vol < 0.6) return null;
+    if (!loop && this.voices >= 24 && vol < 0.7) return null;
+    if (!loop && this.voices >= 48) return null;
     const ac = this.ac;
     const src = ac.createBufferSource();
     src.buffer = pick(list);
@@ -157,6 +190,7 @@ class AudioEngine {
     }
     node.connect(g);
     g.connect(bus === 'music' ? this.musicBus : bus === 'amb' ? this.ambBus : this.fxBus);
+    if (space) { g.connect(this.reverbSend); g.connect(this.echoSend); }
     src.start(when);
     this.voices = (this.voices || 0) + 1;
     src.onended = () => { this.voices--; };
@@ -185,7 +219,7 @@ class AudioEngine {
   explosion(pos, power, fuel) {
     const k = Math.cbrt(power);
     const big = power > 1.5 || fuel;
-    this.play(big ? 'explosionBig' : 'explosion', { pos, vol: Math.min(2.5, 0.8 + k * 0.9), ref: 8 + k * 10, rate: rnd(0.9, 1.05) / Math.max(0.8, Math.pow(k, 0.15)) });
+    this.play(big ? 'explosionBig' : 'explosion', { pos, space: true, vol: Math.min(2.5, 0.8 + k * 0.9), ref: 8 + k * 10, rate: rnd(0.9, 1.05) / Math.max(0.8, Math.pow(k, 0.15)) });
     // a little debris rain after
     for (let i = 0; i < Math.min(8, 3 + k * 3); i++) setTimeout(() => this.play(pick(['debris', 'concrete', 'wood', 'metalLight']), { pos, vol: 0.25, ref: 4 }), 400 + Math.random() * 1500);
   }

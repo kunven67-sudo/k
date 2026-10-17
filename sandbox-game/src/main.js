@@ -237,10 +237,15 @@ function hookGameEvents() {
   ctx.onExplosion = (pos, power, fuel) => { audio.explosion(pos, power, fuel); hint('slowmo', 'Press T for slow motion'); };
   ctx.onPlayerBlast = (d, radius) => { if (d < radius * 0.55) audio.earRinging(Math.min(1, 1.2 - d / (radius * 0.55))); };
   ctx.onImpact = (e, part, dv, point) => {
+    // Only real hits make noise: resting/stacked objects produce small contact impulses every step,
+    // which used to turn into nonstop rattling.
     const now = performance.now();
-    if (dv < 1.6 || now - (e.lastSnd || 0) < 90) return;
+    if (dv < 2.2 || now - (e.lastSnd || 0) < 260) return;
+    const p = e.position();
+    const moved = p.distanceTo(e.prevPos) / (1 / 60);
+    if (moved < 0.8 && dv < 6) return;
     e.lastSnd = now;
-    audio.impact(part.mat, point || e.position(), (dv - 1) / 6);
+    audio.impact(part.mat, point || p, Math.min(1, (dv - 1.5) / 7));
   };
   ctx.onBreak = (mat, pos, size) => audio.breakSound(mat, pos, size);
   ctx.onLand = (impact) => { if (impact > 2.5) audio.play('land', { vol: Math.min(1, impact / 9) }); };

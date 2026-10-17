@@ -248,3 +248,116 @@ export function ringing(ctx) {
 }
 
 export function setSampleRate(sr) { SR = sr; }
+
+// ---------------------------------------------------------------- guns
+// kind: pistol | rifle | shotgun | sniper
+export function gunshot(ctx, kind) {
+  const P = {
+    pistol:  { len: 0.9, crack: 1.0, body: 220, bodyDecay: 30, tail: 5.5, sub: 0 },
+    rifle:   { len: 1.2, crack: 1.4, body: 160, bodyDecay: 22, tail: 4.0, sub: 0.3 },
+    shotgun: { len: 1.4, crack: 0.9, body: 95,  bodyDecay: 14, tail: 3.0, sub: 0.8 },
+    sniper:  { len: 1.8, crack: 1.6, body: 120, bodyDecay: 16, tail: 2.4, sub: 0.6 },
+  }[kind];
+  return buf(ctx, P.len, (L, R, n) => {
+    const bodyF = lp(alphaFor(P.body * 6)), bodyG = lp(alphaFor(P.body * 6));
+    const tailF = lp(alphaFor(1400)), tailG = lp(alphaFor(1400));
+    const boom = resonator(P.body, 0.04);
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      // supersonic crack: very short broadband transient
+      const crack = (Math.random() * 2 - 1) * Math.exp(-t * 900) * P.crack;
+      const x1 = Math.random() * 2 - 1, x2 = Math.random() * 2 - 1;
+      const bodyEnv = Math.exp(-t * P.bodyDecay);
+      const tailEnv = Math.exp(-t * P.tail) * Math.min(1, t / 0.01);
+      const sub = Math.sin(2 * Math.PI * (60 - 20 * t) * t) * Math.exp(-t * 12) * P.sub;
+      const b = boom((Math.random() * 2 - 1) * Math.exp(-t * 400)) * 0.15;
+      L[i] = crack + bodyF(x1) * 2.2 * bodyEnv + tailF(x1) * 0.9 * tailEnv + sub + b;
+      R[i] = crack * 0.95 + bodyG(x2) * 2.2 * bodyEnv + tailG(x2) * 0.9 * tailEnv + sub + b;
+    }
+  });
+}
+
+// short metallic mechanism noises: mag out/in, slide, pump, bolt
+export function mech(ctx, kind) {
+  const spec = {
+    magOut: [[0, 2600, 0.05], [0.04, 900, 0.08]],
+    magIn: [[0, 1800, 0.04], [0.025, 3400, 0.03], [0.05, 700, 0.06]],
+    slide: [[0, 2200, 0.06], [0.12, 3000, 0.05]],
+    pump: [[0, 1400, 0.09], [0.22, 1900, 0.07]],
+    bolt: [[0, 2600, 0.04], [0.15, 1600, 0.06], [0.42, 2200, 0.05], [0.55, 3000, 0.04]],
+    dry: [[0, 3800, 0.02]],
+    shell: [[0, 1500, 0.05], [0.06, 2400, 0.03]],
+    select: [[0, 3200, 0.02]],
+  }[kind];
+  const len = spec[spec.length - 1][0] + 0.25;
+  return buf(ctx, len, (L, R, n) => {
+    const ev = spec.map(([t0, f, d]) => ({ t0, r: resonator(f * rnd(0.95, 1.05), d), r2: resonator(f * 2.3, d * 0.5) }));
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      let y = 0;
+      for (const e of ev) {
+        const dt = t - e.t0;
+        const ex = dt >= 0 && dt < 0.004 ? (Math.random() * 2 - 1) : 0;
+        y += e.r(ex) * 0.6 + e.r2(ex) * 0.3;
+      }
+      L[i] = y; R[i] = y;
+    }
+  });
+}
+
+export function casingTink(ctx) {
+  const f = rnd(4200, 6500);
+  return buf(ctx, 0.35, (L, R, n) => {
+    const r1 = resonator(f, 0.08), r2 = resonator(f * 1.47, 0.05);
+    for (let i = 0; i < n; i++) { const t = i / SR; const ex = (Math.random() * 2 - 1) * Math.exp(-t * 3000); const second = t > 0.09 && t < 0.092 ? (Math.random() * 2 - 1) * 0.5 : 0; const y = r1(ex + second) + r2(ex + second) * 0.5; L[i] = y; R[i] = y; }
+  });
+}
+
+export function ricochet(ctx) {
+  const f0 = rnd(2200, 3600);
+  return buf(ctx, 0.7, (L, R, n) => {
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      const f = f0 * (1 - t * 0.9);
+      ph += (2 * Math.PI * f) / SR;
+      const y = Math.sin(ph + Math.sin(t * 90) * 0.4) * Math.exp(-t * 4) * Math.min(1, t / 0.01) + (Math.random() * 2 - 1) * Math.exp(-t * 300) * 0.6;
+      L[i] = y * (1 - t); R[i] = y * (0.4 + t);
+    }
+  });
+}
+
+export function fleshHit(ctx) {
+  return buf(ctx, 0.3, (L, R, n) => {
+    const f = lp(alphaFor(600)), r = resonator(rnd(70, 110), 0.05);
+    for (let i = 0; i < n; i++) { const t = i / SR; const x = (Math.random() * 2 - 1) * Math.exp(-t * 60); const y = f(x) * 2 + r(x * 0.3) * 0.4 + (Math.random() * 2 - 1) * Math.exp(-t * 25) * 0.15; L[i] = y; R[i] = y; }
+  });
+}
+
+export function heartbeat(ctx) {
+  return buf(ctx, 0.9, (L, R, n) => {
+    const r = resonator(48, 0.06), r2 = resonator(60, 0.05);
+    for (let i = 0; i < n; i++) { const t = i / SR; const ex = (t < 0.01 ? (Math.random() * 2 - 1) : 0) + (t > 0.24 && t < 0.25 ? (Math.random() * 2 - 1) * 0.7 : 0); const y = r(ex) + r2(ex) * 0.6; L[i] = y; R[i] = y; }
+  });
+}
+
+export function rip(ctx, len = 0.6) {
+  return buf(ctx, len, (L, R, n) => {
+    const f = lp(alphaFor(3500));
+    for (let i = 0; i < n; i++) { const t = i / SR; const crackle = Math.random() < 0.3 ? 1 : 0.2; const y = f((Math.random() * 2 - 1) * crackle) * Math.sin(Math.PI * t / len); L[i] = y; R[i] = y; }
+  });
+}
+
+export function pills(ctx) {
+  return buf(ctx, 0.5, (L, R, n) => {
+    const hits = Array.from({ length: 14 }, () => ({ t0: Math.random() * 0.35, r: resonator(rnd(2500, 4500), 0.01) }));
+    for (let i = 0; i < n; i++) { const t = i / SR; let y = 0; for (const h of hits) { const dt = t - h.t0; y += h.r(dt >= 0 && dt < 0.002 ? Math.random() * 2 - 1 : 0); } L[i] = y; R[i] = y; }
+  });
+}
+
+// Simple room impulse response for indoor reverb
+export function roomIR(ctx, seconds = 0.7) {
+  return buf(ctx, seconds, (L, R, n) => {
+    for (let i = 0; i < n; i++) { const t = i / SR; const e = Math.exp(-t * 7); L[i] = (Math.random() * 2 - 1) * e; R[i] = (Math.random() * 2 - 1) * e; }
+  });
+}
