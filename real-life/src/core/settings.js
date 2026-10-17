@@ -47,6 +47,7 @@ const KEY = 'reallife.settings.v1';export const DEFAULT_SETTINGS = Object.freeze
   claudeKey: '',
   claudeModel: 'claude-haiku-5-5',
   aiDailyLimit: 1.0, // dollars per real day for the Claude key
+  aiKeySwitched: false, // one-time: a saved key switched the brain to Claude
   localAiUrl: 'http://localhost:11434',
   localAiModel: 'llama3.2',
   // Accessibility

@@ -16,7 +16,7 @@ import { music } from '../audio/music/index.js';
 import { me } from '../life/me.js';
 import { priceText } from '../life/products.js';
 import { think } from '../talk/brain.js';
-import { aiReply } from '../talk/ai.js';
+import { aiReply, brainMode } from '../talk/ai.js';
 import { settings } from '../core/settings.js';
 import { openSettings } from './settings.js';
 import { MAPLE, ELM, LOTS, PARK, PLAZA, SCHOOL, STORES, CULDESAC } from '../world/layout.js';
@@ -283,7 +283,8 @@ export class Phone {
     // They read it and answer like they would in person (but they can't hand you money over text).
     const ctx = this.talk._ctx(n);
     ctx.texting = true;
-    let reply = settings.get('aiBrain') !== 'builtin' ? await aiReply(n, `(by text message) ${text}`, ctx) : null;
+    let reply = brainMode() !== 'builtin' ? await aiReply(n, `(by text message) ${text}`, ctx) : null;
+    if (reply?.fail) reply = null; // (the reason shows when you talk face to face)
     if (!reply) reply = think(n, text, ctx);
     const busy = n.activity?.kind === 'sleep' ? 9e9 : n.away ? 25 : 6;
     if (busy > 1e8) return; // asleep: they'll see it in the morning (no reply tonight)

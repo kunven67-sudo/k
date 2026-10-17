@@ -7,7 +7,7 @@ import { settings, DEFAULT_SETTINGS } from '../core/settings.js';
 import { bus } from '../core/events.js';
 import { input, DEFAULT_BINDINGS, ACTION_LABELS } from '../core/input.js';
 import { openPanel } from './panel.js';
-import { aiStatus } from '../talk/ai.js';
+import { aiStatus, brainMode, CLAUDE_MODELS } from '../talk/ai.js';
 
 injectStyle('settings', `
 .rl-panel.settings { width: min(640px, 94vw); }
@@ -75,8 +75,8 @@ const TABS = [
       ['voices', 'Voices', 'seg', ['babble', 'spoken'], 'Babble = made-up talking like the Sims. Spoken = your computer reads the lines out loud.'],
       ['swearFilter', 'Swear filter', 'toggle'],
       ['aiBrain', 'Talking brain', 'seg', ['builtin', 'claude', 'local'], 'Built-in works offline. Claude = your own API key (understands anything). Local = a free AI on your PC (Ollama).'],
-      ['claudeKey', 'Claude API key', 'password', null, 'Stays on this computer. Get one at console.anthropic.com.'],
-      ['claudeModel', 'Claude model', 'text'],
+      ['claudeKey', 'Claude API key', 'password', null, 'Paste it and people use Claude right away. Stays on this computer. Get one at console.anthropic.com.'],
+      ['claudeModel', 'Claude model', 'seg', CLAUDE_MODELS, 'Haiku = fast + cheap (best for talking). Sonnet / Opus = smarter, slower, costs more.'],
       ['aiDailyLimit', 'Daily spending limit ($)', 'number', { min: 0.1, max: 50, step: 0.1 }],
       ['localAiUrl', 'Local AI address', 'text'],
       ['localAiModel', 'Local AI model', 'text'],
@@ -104,14 +104,21 @@ export function openSettings({ onClose } = {}) {
     const def = TABS.find((t) => t.id === tab);
     const tabs = el('div', { class: 'st-tabs' }, TABS.map((t) => el('button', { class: t.id === tab ? 'on' : '', onclick: () => ((tab = t.id), render()) }, [t.id])));
     const rows = def.rows.map((r) => control(r, render));
-    if (def.id === 'People') {
-      const st = aiStatus();
-      rows.push(el('p', { class: 'rl-note' }, [settings.get('aiBrain') === 'builtin' ? 'Using the built-in brain.' : st.ok ? `Ready: ${st.mode === 'claude' ? 'Claude' : 'local AI'} brain.` : `Not ready: ${st.why || 'check the settings above'} (falls back to the built-in brain).`]));
-    }
+    if (def.id === 'People') rows.push(el('p', { class: 'rl-note st-brain' }, [brainNote()]));
     if (def.keys) rows.push(...keyRows(render));
     p.setBody([tabs, ...rows]);
   };
   render();
+  // Typing/pasting in a box saves as you go: keep the brain buttons + status line in step
+  // without re-rendering (that would steal focus from the box you're typing in).
+  const off = bus.on('settings:changed', ({ key }) => {
+    if (key !== 'claudeKey' && key !== 'aiBrain' && key !== 'claudeModel') return;
+    for (const b of p.el.querySelectorAll('.st-seg button[data-k]')) b.classList.toggle('on', settings.get(b.dataset.k) === b.dataset.v);
+    const n = p.el.querySelector('.st-brain');
+    if (n) n.textContent = brainNote();
+  });
+  const close = p.close.bind(p);
+  p.close = (...a) => (off(), close(...a));
   p.setButtons([
     { text: 'Reset to defaults', onClick: () => (settings.reset(), render()) },
     { text: 'Done', kind: 'go', onClick: () => p.close() },
@@ -119,12 +126,18 @@ export function openSettings({ onClose } = {}) {
   return p;
 }
 
+function brainNote() {
+  const st = aiStatus();
+  if (brainMode() === 'builtin') return 'Using the built-in brain.';
+  return st.ok ? `Ready: ${st.mode === 'claude' ? 'Claude' : 'local AI'} brain.` : `Not ready: ${st.why || 'check the settings above'} (falls back to the built-in brain).`;
+}
+
 function control([key, label, kind, opt, help], rerender) {
   const v = settings.get(key);
   const lab = el('div', { class: 'lab' }, [label, help ? el('small', {}, [help]) : null]);
   let ctl;
   if (kind === 'toggle') ctl = el('button', { class: `st-tog ${v ? 'on' : ''}`, onclick: () => (settings.set(key, !settings.get(key)), rerender()) });
-  else if (kind === 'seg') ctl = el('div', { class: 'st-seg' }, opt.map((o) => el('button', { class: o === v ? 'on' : '', onclick: () => (settings.set(key, o), rerender()) }, [o === 'builtin' ? 'built-in' : o])));
+  else if (kind === 'seg') ctl = el('div', { class: 'st-seg' }, opt.map((o) => el('button', { class: o === v ? 'on' : '', 'data-k': key, 'data-v': o, onclick: () => (settings.set(key, o), rerender()) }, [o === 'builtin' ? 'built-in' : o])));
   else if (kind === 'slider') {
     const val = el('span', { class: 'val' }, [opt.fmt(v)]);
     const r = el('input', { type: 'range', min: opt.min, max: opt.max, step: opt.step, value: v });
@@ -136,6 +149,8 @@ function control([key, label, kind, opt, help], rerender) {
   } else {
     const inp = el('input', { type: kind, value: v ?? '', ...(opt || {}), autocomplete: 'off', spellcheck: 'false' });
     inp.addEventListener('change', () => settings.set(key, kind === 'number' ? Math.max(opt?.min ?? 0, +inp.value || DEFAULT_SETTINGS[key]) : inp.value.trim()));
+    // Text boxes save while you type/paste (closing Settings right after pasting never fires 'change').
+    if (kind !== 'number') inp.addEventListener('input', () => settings.set(key, inp.value.trim()));
     inp.addEventListener('keydown', (e) => e.stopPropagation());
     ctl = inp;
   }

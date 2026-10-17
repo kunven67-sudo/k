@@ -15,7 +15,7 @@ import { el, injectStyle } from '../core/util.js';
 import { openPanel } from '../ui/panel.js';
 import { me } from '../life/me.js';
 import { think, relation } from './brain.js';
-import { aiReply, aiStatus } from './ai.js';
+import { aiReply, aiStatus, brainMode } from './ai.js';
 import { speak } from './voice.js';
 
 injectStyle('talk', `
@@ -99,7 +99,7 @@ export class Talk {
     this.meter = el('span', { class: 'talk-meter' });
     this._meter();
     const st = aiStatus();
-    const brain = settings.get('aiBrain') === 'builtin' ? '' : st.ok ? (st.mode === 'claude' ? ' · Claude brain' : ' · Local AI brain') : ' · built-in brain';
+    const brain = brainMode() === 'builtin' ? '' : st.ok ? (st.mode === 'claude' ? ' · Claude brain' : ' · Local AI brain') : ' · built-in brain';
     this.panel = openPanel({
       title: mem.met || rel !== 'adult' ? (rel === 'parent' ? npc.rec.call : npc.rec.name) : 'Someone',
       sub: '',
@@ -182,7 +182,12 @@ export class Talk {
     const ctx = this._ctx(npc);
     const typing = this._add('them typing', '...');
     let reply = null;
-    if (settings.get('aiBrain') !== 'builtin') reply = await aiReply(npc, text, ctx);
+    if (brainMode() !== 'builtin') reply = await aiReply(npc, text, ctx);
+    if (reply?.fail) {
+      // Say once, plainly, why the Claude brain isn't answering (then the built-in one does).
+      this._note(reply.fail);
+      reply = null;
+    }
     if (!reply) {
       await new Promise((r) => setTimeout(r, 350 + Math.min(900, text.length * 12)));
       reply = think(npc, text, ctx);

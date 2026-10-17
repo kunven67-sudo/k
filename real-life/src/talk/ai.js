@@ -10,10 +10,17 @@
 import { settings } from '../core/settings.js';
 import { clock } from '../core/clock.js';
 import { relation } from './brain.js';
+import { bus } from '../core/events.js';
 
 const SPEND_KEY = 'reallife.aiSpend.v1';
-// Rough price per million tokens (input / output) for budgeting the daily limit.
-const PRICE = { in: 1, out: 5 };
+// The models the game knows how to call (price per million tokens, input / output, for the
+// daily $ limit). Anything else typed in Settings falls back to the first one.
+const MODELS = {
+  'claude-haiku-5-5': { in: 0.1, out: 0.5 },
+  'claude-sonnet-5-5': { in: 2, out: 10 },
+  'claude-opus-5-5': { in: 4, out: 20 },
+};
+export const CLAUDE_MODELS = Object.keys(MODELS);
 
 function spendToday() {
   try {
@@ -33,11 +40,29 @@ function addSpend(usd) {
   }
 }
 
+const claudeKey = () => String(settings.get('claudeKey') || '').trim();
+
+/** Which brain talks (Settings > People > Talking brain). */
+export function brainMode() {
+  return settings.get('aiBrain') || 'builtin';
+}
+
+// Pasting a key switches the talking brain to Claude (people used to paste a key and keep the
+// built-in brain without noticing the switch). Saves that already have a key get switched once.
+bus.on('settings:changed', ({ key, value }) => {
+  if (key === 'claudeKey' && String(value || '').trim() && settings.get('aiBrain') === 'builtin') settings.set('aiBrain', 'claude');
+});
+if (claudeKey() && settings.get('aiBrain') === 'builtin' && !settings.get('aiKeySwitched')) {
+  settings.set('aiBrain', 'claude');
+  settings.set('aiKeySwitched', true);
+}
+
 export function aiStatus() {
-  const mode = settings.get('aiBrain');
+  const mode = brainMode();
   if (mode === 'claude') {
-    if (!settings.get('claudeKey')) return { ok: false, why: 'No Claude API key in Settings.' };
-    if (spendToday() >= (settings.get('aiDailyLimit') || 1)) return { ok: false, why: "Today's AI spending limit is used up." };
+    if (!claudeKey()) return { ok: false, mode, why: 'No Claude API key in Settings.' };
+    if (!claudeKey().startsWith('sk-ant-')) return { ok: false, mode, why: 'That does not look like a Claude API key (they start with sk-ant-).' };
+    if (spendToday() >= (settings.get('aiDailyLimit') || 1)) return { ok: false, mode, why: "Today's AI spending limit is used up." };
   }
   return { ok: mode === 'claude' || mode === 'local', mode };
 }
@@ -73,7 +98,7 @@ function systemPrompt(npc, ctx) {
       : `Never sexual content. Romance stays non-explicit.`,
     `Mild swearing is fine only if your personality swears a lot and you're talking to an adult. Use parody brands only (Walmort, Best Bye, IKEO, Pepsy, McDanny's).`,
     `Decide like a real person with your personality and opinion would. You can say no. Asking repeatedly annoys people.`,
-    `Answer ONLY with JSON: {"say": "...", "mood": "neutral|happy|sad|angry|scared", "opinion_change": -10..10, "action": null | {"type":"money","amount":N} | {"type":"permit","key":"outside|store|stayup|screens|sweets|misc","hours":N} | {"type":"chore","id":"dishes|trash|bed"} | {"type":"snack"} | {"type":"allowance"} | {"type":"end"}}`,
+    `Fill in the reply form: "say" = your spoken line; "mood" = how you feel now; "opinion_change" = -10..10; "action" = what you DO: "none", "money" (amount = dollars you hand over), "permit" (key = outside|store|stayup|screens|sweets|misc, hours = how long), "chore" (id = dishes|trash|bed: you give the player that chore), "snack" (you give them a snack), "allowance" (you pay what you owe), "end" (you walk away / end the chat). Unused fields: 0 or "".`,
     `Only give money/permission/chores if YOU would actually do that right now. "end" = you walk away / end the chat.`,
     recent ? `Recent conversation:\n${recent}` : '',
   ]
@@ -81,38 +106,119 @@ function systemPrompt(npc, ctx) {
     .join('\n');
 }
 
+// The reply form Claude must fill in (structured outputs: always valid JSON in this shape).
+const REPLY_SCHEMA = {
+  type: 'object',
+  properties: {
+    say: { type: 'string' },
+    mood: { type: 'string', enum: ['neutral', 'happy', 'sad', 'angry', 'scared'] },
+    opinion_change: { type: 'integer' },
+    action: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['none', 'money', 'permit', 'chore', 'snack', 'allowance', 'end'] },
+        amount: { type: 'number' },
+        key: { type: 'string' },
+        hours: { type: 'number' },
+        id: { type: 'string' },
+      },
+      required: ['type', 'amount', 'key', 'hours', 'id'],
+      additionalProperties: false,
+    },
+  },
+  required: ['say', 'mood', 'opinion_change', 'action'],
+  additionalProperties: false,
+};
+
 function parse(textOut) {
   const m = textOut.match(/\{[\s\S]*\}/);
-  if (!m) return { say: textOut.trim().slice(0, 300) };
+  if (!m) return textOut.trim() ? { say: textOut.trim().slice(0, 300) } : null;
   try {
     const j = JSON.parse(m[0]);
-    if (typeof j.say !== 'string') return null;
-    return { say: j.say.slice(0, 400), mood: j.mood, opinion: Math.max(-10, Math.min(10, +j.opinion_change || 0)), act: j.action && typeof j.action === 'object' ? j.action : null };
+    if (typeof j.say !== 'string' || !j.say.trim()) return null;
+    const act = j.action && typeof j.action === 'object' && j.action.type && j.action.type !== 'none' ? j.action : null;
+    return { say: j.say.slice(0, 400), mood: j.mood, opinion: Math.max(-10, Math.min(10, +j.opinion_change || 0)), act };
   } catch {
     return null;
   }
 }
 
+/** What went wrong, in words a player understands (shown once in the chat). */
+function claudeError(status, body) {
+  const msg = body?.error?.message || '';
+  if (status === 401) return 'Claude said your API key is not valid. Copy it again from console.anthropic.com (Settings > People).';
+  if (status === 403) return `Claude refused the key: ${msg || 'no permission for this model.'}`;
+  if (status === 402 || /credit|billing|balance/i.test(msg)) return 'Your Claude account has no credits left. Add credits at console.anthropic.com > Billing.';
+  if (status === 404) return `Claude doesn't know that model name. Using ${CLAUDE_MODELS[0]} from now on.`;
+  if (status === 429) return 'Claude says too many messages too fast. Wait a few seconds.';
+  if (status === 529 || status >= 500) return 'Claude is busy right now. Try again in a bit.';
+  return `Claude error ${status}: ${msg || 'bad request'}`;
+}
+
+let _lastErr = '';
+
 export async function aiReply(npc, text, ctx) {
   const st = aiStatus();
-  if (!st.ok) return null;
+  if (!st.ok) {
+    if (st.mode === 'claude' && st.why && st.why !== _lastErr) {
+      _lastErr = st.why;
+      return { fail: st.why };
+    }
+    return null;
+  }
   const sys = systemPrompt(npc, ctx);
   try {
     if (st.mode === 'claude') {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': settings.get('claudeKey'),
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({ model: settings.get('claudeModel') || 'claude-haiku-5-5', max_tokens: 220, system: sys, messages: [{ role: 'user', content: text.slice(0, 600) }] }),
-      });
-      if (!res.ok) throw new Error(`Claude ${res.status}`);
-      const j = await res.json();
-      addSpend(((j.usage?.input_tokens || 800) * PRICE.in + (j.usage?.output_tokens || 80) * PRICE.out) / 1e6);
-      return parse(j.content?.map((c) => c.text || '').join('') || '');
+      let model = String(settings.get('claudeModel') || '').trim();
+      if (!MODELS[model]) model = CLAUDE_MODELS[0];
+      const body = {
+        model,
+        max_tokens: 1024,
+        system: sys,
+        messages: [{ role: 'user', content: text.slice(0, 600) }],
+        output_config: { format: { type: 'json_schema', schema: REPLY_SCHEMA } },
+      };
+      // One spoken line doesn't need deep thinking: Haiku can switch it off (default effort is
+      // fine for that); Sonnet and Opus can't, so they think at low effort instead.
+      if (model === 'claude-haiku-5-5') body.thinking = { type: 'disabled' };
+      else body.output_config.effort = 'low';
+      const call = (b) =>
+        fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-api-key': claudeKey(),
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify(b),
+        });
+      let res;
+      let j;
+      try {
+        res = await call(body);
+        j = await res.json().catch(() => null);
+        // If the reply form or the thinking switch is ever rejected, ask once more the plain way
+        // (the prompt still asks for the same fields; parse() copes with plain text too).
+        if (res.status === 400 && /output_config|format|schema|thinking|effort/i.test(j?.error?.message || '')) {
+          console.warn('[talk] Claude rejected the request shape, retrying plain:', j?.error?.message);
+          res = await call({ model, max_tokens: 2048, system: `${sys}\nReply with the form as one JSON object.`, messages: body.messages });
+          j = await res.json().catch(() => null);
+        }
+      } catch {
+        return { fail: "Couldn't reach Claude (no internet, or something is blocking api.anthropic.com)." };
+      }
+      if (!res.ok) {
+        if (res.status === 404) settings.set('claudeModel', CLAUDE_MODELS[0]);
+        console.warn('[talk] Claude', res.status, j?.error);
+        return { fail: claudeError(res.status, j) };
+      }
+      _lastErr = '';
+      const price = MODELS[model];
+      addSpend(((j.usage?.input_tokens || 800) * price.in + (j.usage?.output_tokens || 80) * price.out) / 1e6);
+      if (j.stop_reason === 'refusal') return null; // the built-in brain answers instead
+      const out = (j.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('');
+      return parse(out);
     }
     const url = (settings.get('localAiUrl') || 'http://localhost:11434').replace(/\/$/, '');
     const res = await fetch(`${url}/api/chat`, {

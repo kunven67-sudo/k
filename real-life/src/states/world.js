@@ -88,6 +88,13 @@ export class WorldState {
       bus.on('settings:changed', ({ key, value }) => key === 'grass' && this.grass.setEnabled(value !== false)),
       bus.on('door:locked', ({ door }) => this.hud.toast(`${door.name} is locked.`)),
       bus.on('me:cash', ({ amount, why }) => amount > 0 && why && why !== 'piggy' && this.hud.toast(`+$${amount.toFixed(2)}`)),
+      // Esc while the mouse is locked: the browser unlocks the mouse and usually swallows the
+      // key, so losing the lock in the middle of playing is what opens the pause menu.
+      bus.on('input:pointerlock', (locked) => {
+        if (locked || !input.wantPointerLock || !this.ready || panelOpen() || this.phone?.isOpen) return;
+        this._autoPauseAt = performance.now();
+        openPause({ engine: this.engine, onQuit: () => this.engine.go('menu') });
+      }),
     ];
   }
 
@@ -98,7 +105,9 @@ export class WorldState {
   update(dt) {
     const p = this.player;
     if (!p || !this.ready) return; // enter() is still loading
-    if (input.pressed('menu')) {
+    // (The same Esc can also arrive as a key a moment after it unlocked the mouse: don't let it
+    // close the pause menu it just opened.)
+    if (input.pressed('menu') && !(performance.now() - (this._autoPauseAt || 0) < 500)) {
       if (panelOpen()) closeTopPanel();
       else if (this.phone.isOpen) this.phone.close();
       else openPause({ engine: this.engine, onQuit: () => this.engine.go('menu') });
