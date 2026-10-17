@@ -273,7 +273,7 @@ G.Sprite = class {
     if (!force && this.cur === a && !this.finished) return true;
     this.cur = a; this.animName = name; this.t = 0; this.fi = reversed ? a.n - 1 : 0; this.rev = !!reversed; this.finished = false;
     if (a.kind === 'sparrow') { const f = a.frames[this.fi]; this.frameW = f.fw; this.frameH = f.fh; }
-    else { const b = G.Atlas.bounds(a.atlas, a.tl); this.frameW = b.w; this.frameH = b.h; }
+    else if (a.kind === 'atlas') { const b = G.Atlas.bounds(a.atlas, a.tl); this.frameW = b.w; this.frameH = b.h; }
     if (this.useAnimOffsets) this._ao = this.animOffsets[name] || [0, 0];
     return true;
   }
@@ -321,7 +321,8 @@ G.Sprite = class {
       const b = G.Atlas.bounds(a.atlas, a.tl);
       ctx.translate(-b.x, -b.y);
       G.Atlas.draw(ctx, a.atlas, a.tl, a.frames[this.fi]);
-    } else if (this.sheet && this.sheet.frames[0]) G.Sparrow.draw(ctx, this.sheet, this.sheet.frames[0]);
+    } else if (a && a.kind === 'own') { if (this.fx && this.fx.draw) this.fx.draw(this, ctx); }
+    else if (this.sheet && this.sheet.frames[0]) G.Sparrow.draw(ctx, this.sheet, this.sheet.frames[0]);
     else if (this.img) ctx.drawImage(this.img, 0, 0);
     else if (this.solid) { ctx.fillStyle = this.solid; ctx.fillRect(0, 0, this.frameW, this.frameH); }
   }

@@ -296,7 +296,7 @@
       s.playA('confirm', true); s.confirmHold = n.len > 0 ? -1 : 0;
       const suffix = n.kind === 'alt' ? '-alt' : '';
       if (n.kind === 'hey') this.dad.playAnim('hey', true);
-      else this.dad.sing(n.lane, false, suffix);
+      else { this.dad.lastNote = n; this.dad.sing(n.lane, false, suffix); }
       if (this.audio) this.audio.setVolume('o', 1);
     },
     // player pressed a lane

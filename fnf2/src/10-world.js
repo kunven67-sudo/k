@@ -36,7 +36,8 @@ G.Character = class extends G.Sprite {
     const rt = d.renderType || 'sparrow';
     const main = G.A.imagePath(d.assetPath || '');
     const isAtlas = rt === 'animateatlas' || rt === 'multianimateatlas';
-    if (isAtlas) this.loadAtlas(main); else this.loadSparrow(main);
+    if (rt === 'own') { /* drawn live by its fx (e.g. 31-wrath-eye.js) */ }
+    else if (isAtlas) this.loadAtlas(main); else this.loadSparrow(main);
     // multi* characters: each animation may come from its own sheet/atlas
     const srcFor = a => {
       if (!a.assetPath || (rt !== 'multisparrow' && rt !== 'multianimateatlas')) return null;
@@ -98,6 +99,7 @@ G.Character = class extends G.Sprite {
   // per-frame: hold timers + "-hold" follow-up animations (BaseCharacter.onUpdate)
   tick(dt, stepSec, holdingNote) {
     this.update(dt);
+    if (this.fx && this.fx.update) this.fx.update(this, dt);
     if (this.isDead) return;
     if (this.finished && !this.animName.endsWith('-hold') && this.anims[this.animName + '-hold']) this.play(this.animName + '-hold');
     if (this.isSinging()) {
