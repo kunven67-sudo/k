@@ -125,7 +125,7 @@ function parseTimeline(tl, name) {
       frames.push({ i: fi, du, label: F.N || F.name || null, els });
       frameCount = Math.max(frameCount, fi + du);
     }
-    layers.push({ name: L.LN || L.Layer_name, type: L.LT || L.Layer_type || null, frames });
+    layers.push({ name: L.LN || L.Layer_name, type: L.LT || L.Layer_type || null, clipBy: L.Clpb || L.Clipped_by || null, frames });
   }
   // keyframe lookup tables
   for (const L of layers) {
@@ -209,43 +209,68 @@ G.Atlas = {
     try { this._draw(ctx, atlas, tl, frame); } finally { this._depth--; }
   },
   _draw(ctx, atlas, tl, frame) {
-    const layers = tl.layers, LT = atlas.layerTint, LF = atlas.layerFrames;
+    const layers = tl.layers;
+    let done = null;
     for (let li = layers.length - 1; li >= 0; li--) {
       const L = layers[li];
-      if (L.type === 'Clp' || L.type === 'Clipper') continue;
-      const k = frame < L.at.length ? L.at[frame] : -1;
-      if (k < 0) continue;
-      const F = L.frames[k];
-      const lt = LT && LT[L.name], lf = LF && LF[L.name], oldT = this._tint;
-      if (lt) this._tint = lt;
-      let ei = 0;
-      for (const e of F.els) {
-        const m = e.m;
-        ctx.save();
-        ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
-        if (e.n != null) {
-          const s = atlas.sprites[e.n];
-          if (s) {
-            if (s.rot) { ctx.transform(0, -1, 1, 0, 0, s.w); }
-            if (this._tint) ctx.drawImage(this.tintPiece(s, this._tint), 0, 0);
-            else ctx.drawImage(G.srcImg(s.img), s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
-          }
-        } else {
-          const swap = atlas.swaps[e.s];
-          if (swap) { if (e.a !== 1) ctx.globalAlpha *= e.a; ctx.drawImage(swap.img, swap.x || 0, swap.y || 0, swap.w || swap.img.width, swap.h || swap.img.height); ctx.restore(); ei++; continue; }
-          const sym = atlas.symbols[e.s];
-          if (sym) {
-            if (e.a !== 1) ctx.globalAlpha *= e.a;
-            if (e.b) ctx.globalCompositeOperation = e.b;
-            const sf = lf ? Math.max(0, Math.min(sym.frameCount - 1, lf(ei, sym.frameCount))) : this.subFrame(e, frame - F.i, sym.frameCount);
-            this._draw(ctx, atlas, sym, sf);
-          }
-        }
-        ctx.restore();
-        ei++;
+      if (L.type === 'Clp' || L.type === 'Clipper') continue;                 // a mask: only used by the layers it cuts
+      if (L.clipBy) {
+        // masked layers: drawn into a buffer, cut by the mask's shape, then onto the canvas
+        if (done && done.has(L.clipBy)) continue;
+        (done || (done = new Set())).add(L.clipBy);
+        const mask = layers.find(x => x.name === L.clipBy);
+        if (!mask) { this._layer(ctx, atlas, L, frame); continue; }
+        const W = ctx.canvas.width, H = ctx.canvas.height, d = this._depth;
+        const pool = this._bufs || (this._bufs = []);
+        let b = pool[d]; if (!b || b.canvas.width !== W || b.canvas.height !== H) { const cv = G.makeCanvas(W, H); b = pool[d] = cv.getContext('2d'); }
+        const m = ctx.getTransform();
+        b.setTransform(1, 0, 0, 1, 0, 0); b.globalAlpha = 1; b.globalCompositeOperation = 'source-over'; b.clearRect(0, 0, W, H);
+        b.setTransform(m);
+        this._depth++;
+        try {
+          for (let lj = layers.length - 1; lj >= 0; lj--) if (layers[lj].clipBy === L.clipBy) this._layer(b, atlas, layers[lj], frame);
+          b.globalCompositeOperation = 'destination-in'; this._layer(b, atlas, mask, frame); b.globalCompositeOperation = 'source-over';
+        } finally { this._depth--; }
+        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(b.canvas, 0, 0); ctx.restore();
+        continue;
       }
-      this._tint = oldT;
+      this._layer(ctx, atlas, L, frame);
     }
+  },
+  _layer(ctx, atlas, L, frame) {
+    const LT = atlas.layerTint, LF = atlas.layerFrames;
+    const k = frame < L.at.length ? L.at[frame] : -1;
+    if (k < 0) return;
+    const F = L.frames[k];
+    const lt = LT && LT[L.name], lf = LF && LF[L.name], oldT = this._tint;
+    if (lt) this._tint = lt;
+    let ei = 0;
+    for (const e of F.els) {
+      const m = e.m;
+      ctx.save();
+      ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      if (e.n != null) {
+        const s = atlas.sprites[e.n];
+        if (s) {
+          if (s.rot) { ctx.transform(0, -1, 1, 0, 0, s.w); }
+          if (this._tint) ctx.drawImage(this.tintPiece(s, this._tint), 0, 0);
+          else ctx.drawImage(G.srcImg(s.img), s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
+        }
+      } else {
+        const swap = atlas.swaps[e.s];
+        if (swap) { if (e.a !== 1) ctx.globalAlpha *= e.a; ctx.drawImage(swap.img, swap.x || 0, swap.y || 0, swap.w || swap.img.width, swap.h || swap.img.height); ctx.restore(); ei++; continue; }
+        const sym = atlas.symbols[e.s];
+        if (sym) {
+          if (e.a !== 1) ctx.globalAlpha *= e.a;
+          if (e.b) ctx.globalCompositeOperation = e.b;
+          const sf = lf ? Math.max(0, Math.min(sym.frameCount - 1, lf(ei, sym.frameCount))) : this.subFrame(e, frame - F.i, sym.frameCount);
+          this._draw(ctx, atlas, sym, sf);
+        }
+      }
+      ctx.restore();
+      ei++;
+    }
+    this._tint = oldT;
   },
   // bounding box of one frame (in timeline space), accumulated into r
   boundsFrame(atlas, tl, frame, M, r) {

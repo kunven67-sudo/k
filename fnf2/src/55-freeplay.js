@@ -841,14 +841,18 @@
       // songs
       this.allSongs = buildSongs(this.player);
       this.sel = 0; this.list = []; this.caps = [];
-      // back from the results screen (under the stickers): no intro, everything already in place (forceSkipIntro)
-      const skip = !!(p.fromResults && G.stickers);
+      // back from the results screen (under the stickers) or the character select: no intro, everything
+      // already in place (forceSkipIntro / fromCharSelect)
+      const fromCS = !!p.fromCharSelect;
+      const skip = !!(p.fromResults && G.stickers) || fromCS;
+      this.cs = { dj: 0, bg: 0, diff: 0, top: 0, letters: 0, score: 0, arrows: 0, caps: 0, grad: 720, fade: 1 };
       this.generate(this.filterFor(this.letters.current()), false, skip);
       if (skip) {
         this.tw.cancel(this); this.card.skipIntro();
         this.overlayX = this.bgX; this.overhangY = -100; this.hintY = 18;
         this.dj.play('idle', true);
         this.onIntroDone();
+        if (fromCS) this.enterFromCharSel();
       } else {
         // intro: wait for the DJ, then everything else pops in
         this.dj.onIntroDone = () => this.onIntroDone();
@@ -1062,9 +1066,35 @@
       if (this.state !== 'idle') return;
       this.state = 'switch';
       G.sfx('confirm', { vol: 0.5 });
-      if (G.screens.charSelect) { this.dj.play('charSelect'); this.tw.after(0.45, () => G.setScreen('charSelect', { from: 'freeplay', rankMode: this.rankMode })); return; }
+      if (G.screens.charSelect) {
+        this.dj.play('charSelect');
+        const delay = ((this.dj.data && this.dj.data.charSelect) || {}).transitionDelay || 0.25;
+        this.tw.after(delay, () => this.toCharSelect());
+        return;
+      }
       const go = () => { G.settings.player = this.player === 'pico' ? 'bf' : 'pico'; G.saveSettings && G.saveSettings(); this.enter({ rankMode: this.rankMode }); };
       if (this.dj.play('charSelect')) this.tw.after(0.45, go); else go();
+    },
+    // FreeplayState.transitionToCharSelect / enterFromCharSel: everything slides up (backIn) while the
+    // camera fades to blue, the gradient sweeps up; coming back, it all drops back in (expoOut)
+    CS_MOVE: { dj: -175, bg: -100, diff: -270, top: -300, letters: -270, score: -270, arrows: -270, caps: -250 },
+    toCharSelect() {
+      const C = this.cs, T = {};
+      for (const k in this.CS_MOVE) T[k] = this.CS_MOVE[k];
+      this.tw.to(C, T, 0.8, E.fxBackIn);
+      this.tw.to(C, { grad: 0 }, 0.8, E.fxBackIn, { delay: 0.1 });
+      this.tw.to(C, { fade: 0 }, 0.8, E.quadIn);
+      for (const d of this.dots) this.tw.to(d, { alpha: 0 }, 0.3, E.quartOut);
+      G.audio.music.setVolume(0, 0.9);
+      this.tw.after(0.9, () => { G.audio.music.stop(0); G.setScreen('charSelect', { from: 'freeplay', character: this.player, rankMode: this.rankMode }, { instant: true }); });
+    },
+    enterFromCharSel() {
+      const C = this.cs;
+      for (const k in this.CS_MOVE) C[k] = this.CS_MOVE[k];
+      const T = {}; for (const k in this.CS_MOVE) T[k] = 0;
+      this.tw.to(C, T, 0.8 * 1.2, E.expoOut);
+      C.grad = 0; this.tw.to(C, { grad: 720 }, 1.5 * 1.2, E.expoOut);
+      C.fade = 0; this.tw.to(C, { fade: 1 }, 0.8, E.quadIn);
     },
     pressArrow(i) { const a = this.selArrows[i]; a.pressT = 2 / 24; },
     onAction(a, down, repeat) {
@@ -1318,13 +1348,15 @@
       G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
       if (R && !R.pending) { G.screenZoom = R.funny; G.screenOff.x = R.sx || 0; G.screenOff.y = R.sy || 0; }
+      const C = this.cs || {}, oy = G.screenOff.y, at = k => { G.screenOff.y = oy + (C[k] || 0); G.setScreenT(ctx); };
       this.card.draw(ctx);
-      this.dj.draw(ctx);
+      at('dj'); this.dj.draw(ctx); at('bg');
       G.setScreenT(ctx);
       const bg = this.bgImg, s = bg ? (H + 1) / bg.height : 1, bw = bg ? bg.width * s : 0;
       const slant = (x0) => { ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0 + bw, 0); ctx.lineTo(x0 + bw, H + 1); ctx.lineTo(x0 + 90 * s, H + 1); ctx.closePath(); };
       if (this.overlayVis) { ctx.save(); slant(this.overlayX); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore(); }
       // difficulty
+      at('diff');
       if (this.diffVis) {
         if (this.diffOld) this.drawDiffSprite(ctx, this.diffOld);
         this.drawDiffSprite(ctx, this.diffSpr);
@@ -1334,6 +1366,7 @@
         if (dot) this.dots.forEach((d, i) => { if (d.alpha > 0) ctx.drawImage(tint(dot, d.color, 'dot' + i), Math.round(gx + 30 * (i % 8) - 75), 170 + 30 * Math.floor(i / 8)); });
       }
       // background art on the right
+      at('bg');
       if (bg && this.bgVis) {
         ctx.save(); slant(this.bgX); ctx.clip();
         ctx.drawImage(bg, this.bgX, 0, bw, H + 1);
@@ -1342,11 +1375,13 @@
         ctx.restore();
       }
       // capsules
+      at('caps');
       for (const c of this.caps) if (!c.inRank) c.draw(ctx);
-      G.setScreenT(ctx);
+      G.screenOff.y = oy; G.setScreenT(ctx);
       this.album.draw(ctx);
       G.setScreenT(ctx);
       // high score + clear %
+      at('score');
       if (this.textsVis) {
         this.hs.draw(ctx, null); G.setScreenT(ctx);
         this.drawScore(ctx);
@@ -1357,8 +1392,10 @@
         const ox = pct.length === 3 ? 10 : pct.length === 1 ? -24 : 0;
         t.x = W - 95 - ox; t.y = 87; t.draw(ctx, null); G.setScreenT(ctx);
       }
+      at('letters');
       this.letters.draw(ctx);
       // difficulty arrows
+      at('arrows');
       if (this.diffVis) for (const a of this.selArrows) {
         if (a.pressT > 0) {
           const f = a.cur && a.cur.frames[a.fi];
@@ -1367,6 +1404,7 @@
         G.setScreenT(ctx);
       }
       // top bar
+      at('top');
       ctx.fillStyle = '#000'; ctx.fillRect(0, this.overhangY, W, 164);
       if (this.textsVis) {
         const fpImg = textImg(this.rankMode ? 'RANK MODE' : 'FREEPLAY', G.FONT.vcr, 48, '#FFFFFF', this.stroke ? { stroke: 2 } : null);
@@ -1378,7 +1416,14 @@
       const hint = textImg(this.rankMode ? 'Press [ E ] to edit a rank' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, '#5F5F5F');
       ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
       if (G.touchMode && this.textsVis) G.text(ctx, '<---', 8, 72, { font: 'vcr', size: 40, baseline: 'top' });
+      G.screenOff.y = oy; G.setScreenT(ctx);
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }
+      // character select transition: the camera's blue fade + the gradient sweeping over
+      if (C.fade != null && C.fade < 0.999) {
+        const f = Math.max(0, C.fade); ctx.save(); ctx.globalCompositeOperation = 'multiply';
+        ctx.fillStyle = 'rgb(' + Math.round(255 * f * f) + ',' + Math.round(255 * f * f) + ',' + Math.round(255 * f) + ')'; ctx.fillRect(0, 0, W, H); ctx.restore();
+      }
+      if (C.grad != null && C.grad < 720) { const tg = IMG('freeplay/transitionGradient'); if (tg) ctx.drawImage(tg, 0, C.grad, W, tg.height); }
       if (R) { if (R.pending) { G.screenZoom = 1; G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); } else this.drawRankCam(ctx); }
       G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
       if (this.editor) { G.setScreenT(ctx); this.editor.draw(ctx); }
