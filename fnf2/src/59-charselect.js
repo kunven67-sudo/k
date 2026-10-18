@@ -23,9 +23,11 @@
   // real: the gameplay character + what it does: select (picked), win / lose (after a rank), hey (to the character
   // select), die / retry (game over), results per rank; dj = its freeplay spot. freeplay = its backing card.
   Object.assign(G.PLAYERS, {
-    darnell: real('darnell', { name: 'Darnell', pos: 5, nametag: 'darnell', icon: 'darnell', gf: { asset: CS + 'neneChill', viz: true },
-      real: { char: 'darnell', flip: true, scale: 0.7, select: 'lightCan', win: 'laugh', lose: 'pissed', hey: 'kickCan', die: 'pissed', retry: 'laugh', dj: { x: 196, y: 708, k: 0.78 } },
-      freeplay: { text1: 'DARNELL', text2: 'LIGHT IT UP AND KICK IT BACK', text3: 'WATCH YOUR HEAD', colors: ['#DCD0FF', '#B49CFF', '#F1EAFF', '#6F4BD8', '#FFFFFF', '#4B2FA8', '#8A63E8', '#7A55E0'] } }),
+    // Darnell = a full player from the mod "Darnell's Mixtape" (tools/own/darnell_mix.py): his own character select
+    // animation, his friends on the speakers, DJ, songs, results
+    // ownChar: FNF's own songs where he's the opponent (Weekend 1) are his too, played swapped as swapChar (the mod's
+    // playable Darnell: real misses, death + retry)
+    darnell: { id: 'darnell', name: 'Darnell', pos: 5, chill: CS + 'darnellChill', gf: { asset: CS + 'friendsChill', viz: false }, nametag: 'darnell', icon: 'darnell', ownChar: 'darnell', swapChar: 'darnell-player' },
     nene: real('nene', { name: 'Nene', pos: 1, nametag: 'nene', icon: 'nene', gf: { asset: CS + 'gfChill', viz: false },
       real: { char: 'nene', flip: false, scale: 0.62, select: 'combo50', win: 'combo200', lose: 'raiseKnife', hey: 'combo50', die: 'raiseKnife', retry: 'combo50', dj: { x: 190, y: 712, k: 0.48 } },
       freeplay: { text1: 'NENE', text2: 'CUTE BUT SHE BRINGS A KNIFE', text3: 'DO NOT TOUCH HER A-BOT', colors: ['#FFD4E9', '#FF9CC8', '#FFF0F7', '#E8418A', '#FFFFFF', '#C02468', '#FF5FA2', '#F04C93'] } }),

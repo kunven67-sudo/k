@@ -3,7 +3,7 @@
 G.stickers = {
   active: false, phase: null, list: [], t: 0,
   packFor(player) {
-    const P = G.A.json('preload/data/players/' + (player === 'pico' ? 'pico' : 'bf') + '.json') || {};
+    const P = G.A.json('preload/data/players/' + player + '.json') || G.A.json('preload/data/players/bf.json') || {};
     const pack = G.A.json('preload/data/stickerpacks/' + (P.stickerPack || 'standard-bf') + '.json') || G.A.json('preload/data/stickerpacks/standard-bf.json');
     return ((pack && pack.stickers) || []).map(s => G.A.image('shared/images/' + s + '.png')).filter(Boolean);
   },

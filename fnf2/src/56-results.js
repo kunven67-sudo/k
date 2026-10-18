@@ -173,7 +173,7 @@
       const st = p.stats || {};
       const T = this.tallies = st.tallies || this.toTallies(st);
       this.rank = p.forceRank || G.Rank.calc(T) || 'SHIT';   // RANK MODE picks its own rank
-      this.player = String(p.player || 'bf').startsWith('pico') ? 'pico' : 'bf';
+      this.player = G.playerOf(p.player || 'bf');
       const pdata = (G.A.json('preload/data/players/' + this.player + '.json') || {}).results || {};
       this.musicName = (pdata.music || {})[this.rank] || 'resultsNORMAL';
       // characters for this rank (safe versions)

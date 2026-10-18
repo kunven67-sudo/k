@@ -46,6 +46,15 @@ G.Character = class extends G.Sprite {
       return G.Atlas.load(p);
     };
     addAnims(this, d.animations, srcFor);
+    // (mods sometimes leave an animation's assetPath out although it lives in one of the character's other
+    // atlases, like Darnell's Mixtape's miss poses: look for it there, like the real engine finds it)
+    if (rt === 'multianimateatlas' || rt === 'multisparrow') {
+      const others = [...new Set((d.animations || []).filter(a => a.assetPath).map(a => a.assetPath))];
+      for (const a of d.animations || []) {
+        if (this.anims[a.name] || a.assetPath) continue;
+        for (const ap of others) { addAnims(this, [Object.assign({}, a, { assetPath: ap })], srcFor); if (this.anims[a.name]) break; }
+      }
+    }
     this.setBaseScale(this.baseScale);
     this.healthIcon = Object.assign({ id: id, flipX: false, isPixel: false }, d.healthIcon || {});
     this.deathData = d.death || {};

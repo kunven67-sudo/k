@@ -123,7 +123,9 @@
       this.gf = s.chars.gf ? mk(s.chars.gf, 'gf', 'gf') : null;
       // (a swapped Weekend 1 song: FNF's own opponent Pico, already set up to face right)
       this.dad = mk(s.swap && s.chars.opponent === 'pico-playable' ? 'pico' : s.chars.opponent, 'dad', 'dad');
-      this.bf = mk(this.playAs ? this.playAs.real.char : s.chars.player, 'bf', 'bf');
+      // (a full player singing a song swapped uses its own playable version: Darnell's Mixtape's darnell-player)
+      const PP = s.swap && G.PLAYERS && G.PLAYERS[G.settings.player], swapChar = PP && !PP.real && PP.swapChar;
+      this.bf = mk(this.playAs ? this.playAs.real.char : swapChar || s.chars.player, 'bf', 'bf');
       if (this.playAs && this.playAs.real.flip === false) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
       // their atlas box is much bigger than what they draw (Darnell stood half off the screen): put the feet
       // of what's really drawn where BF's feet go (Nene's A-Bot is already built around her spot)
@@ -136,7 +138,7 @@
       }
       // whoever stands mirrored on the other side (Tankman on the right, BF on the left) swaps their LEFT and RIGHT
       // poses, like FNF's own mirrored characters do, so every pose still points the way its arrow does
-      if (s.swap) { this.bf.swapLR = !!this.bf.flipX; this.dad.swapLR = !!this.dad.flipX && this.dad.id !== 'pico'; }
+      if (s.swap) { this.bf.swapLR = !!this.bf.flipX && !swapChar; this.dad.swapLR = !!this.dad.flipX && this.dad.id !== 'pico'; }
       // tutorial: GF is the opponent, standing at GF's spot
       if (s.chars.opponent === s.chars.gf && this.gf) { this.dad.x = this.gf.x; this.dad.y = this.gf.y; this.dad.camFocus = Object.assign({}, this.gf.camFocus); this.stage.chars.gf = null; this.gf = null; this.dad.zIndex = 100; }
       // WRATH: the giant eye (stage 2) is made up front so the swap at the eye-open never hitches
@@ -624,8 +626,9 @@
       this.pauseMenu = { sel: 0, t: 0, mode: 'main', items: [], meta, art, chr, artistT: 0, artistA: 1, artistIsCharter: false, offHold: 0, offFast: false };
       this.pauseEntries('main');
       // breakfast starts somewhere in its first half and fades in over 5 seconds, like the real one
-      const pico = this.bf && this.bf.id.startsWith('pico');
-      const path = pico ? 'shared/music/breakfast-pico/breakfast-pico.ogg' : 'shared/music/breakfast/breakfast.ogg';
+      // each player's own pause music (breakfast-pico, breakfast-darnell...)
+      const pid = this.bf ? G.playerOf(this.bf.id) : 'bf', own = 'shared/music/breakfast-' + pid + '/breakfast-' + pid + '.ogg';
+      const path = pid !== 'bf' && G.A.has(own) ? own : 'shared/music/breakfast/breakfast.ogg';
       G.audio.music.play(path, { loop: true, vol: 0.75, fadeIn: 5, bpm: 160, restart: true, randomStart: 0.5 });
     },
     // (re)build the list: new texts start up in the corner, invisible, then fly to their spots
@@ -633,8 +636,7 @@
       const pm = this.pauseMenu;
       let labels;
       if (mode === 'diff') {
-        const player = this.song.chars.player.startsWith('pico') ? 'pico' : 'bf';
-        pm.diffs = G.Songs.difficulties(this.song.id, player);
+        pm.diffs = G.Songs.difficulties(this.song.id, G.playerOf(this.song.chars.player));
         labels = pm.diffs.map(d => G.DIFF_INFO[d.diff].name).concat(['Back']);
       } else labels = ['Resume', 'Restart Song', 'Change Difficulty', this.practice ? 'Disable Practice Mode' : 'Enable Practice Mode', 'Exit to Menu'];
       pm.mode = mode; pm.sel = 0;
@@ -723,15 +725,18 @@
       this.params.deaths = (this.params.deaths || 0) + 1;
       const bf = this.bf;
       bf.isDead = true;
-      const pico = bf.id.startsWith('pico');
-      G.sfx(pico ? 'deathPico' : 'death');
+      // each player's own game over sound + music (-pico, -darnell...)
+      const pid = G.playerOf(bf.id), pico = pid === 'pico';
+      const suffix = pid !== 'bf' && G.A.has('shared/music/gameplay/gameover/gameOver-' + pid + '.ogg') ? '-' + pid : '';
+      const lossSfx = 'shared/sounds/gameplay/gameover/fnf_loss_sfx-' + pid + '.ogg';
+      G.sfx(pico ? 'deathPico' : suffix && G.A.has(lossSfx) ? lossSfx : 'death');
       // new players have no death animations: their own "oh no" one, held
       if (!bf.playAnim('firstDeath', true) && this.playAs) bf.playAnim(this.playAs.real.die, true);
       const dd = bf.deathData || {};
       const co = dd.cameraOffsets || [0, 0];
       const mid = { x: bf.x + bf.width / 2, y: bf.y + bf.height / 2 };
       // like V-Slice: zoom to the stage zoom x the character's death zoom, follow at half the normal rate
-      this.gameOver = { t: 0, phase: 'intro', fade: 0, pico, zoom0: this.cam.zoom, zoom1: (this.stageZoom || 1) * (dd.cameraZoom || 1), target: { x: mid.x + co[0], y: mid.y + co[1] } };
+      this.gameOver = { t: 0, phase: 'intro', fade: 0, pico, suffix, zoom0: this.cam.zoom, zoom1: (this.stageZoom || 1) * (dd.cameraZoom || 1), target: { x: mid.x + co[0], y: mid.y + co[1] } };
       this.camTween = null;
       this.cam.follow(this.gameOver.target.x, this.gameOver.target.y);
       this.cam.followRate = 0.02;
@@ -743,7 +748,7 @@
       bf.update(dt);
       this.cam.zoom = G.lerp(go.zoom1, this.cam.zoom, Math.pow(0.01, dt / 0.5));
       this.cam.update(dt);
-      if (go.phase === 'intro' && bf.finished) { go.phase = 'loop'; bf.playAnim('deathLoop', true); G.audio.music.play('shared/music/gameplay/gameover/gameOver' + (go.pico ? '-pico' : '') + '.ogg', { loop: true, bpm: 100 }); }
+      if (go.phase === 'intro' && bf.finished) { go.phase = 'loop'; bf.playAnim('deathLoop', true); G.audio.music.play('shared/music/gameplay/gameover/gameOver' + go.suffix + '.ogg', { loop: true, bpm: 100 }); }
       // retry: wait (confirm jingle length / 7), fade to black over 2s, then the song starts over and fades in
       if (go.phase === 'confirm') { go.ct += dt; const w = go.pico ? 2.703 / 7 : 7.21 / 7; if (go.ct > w) go.fade = Math.min(1, (go.ct - w) / 2); if (go.ct > w + 2 && !go.left) { go.left = true; this.restart(true); } }
       if (go.phase === 'exit') { go.ct += dt; go.fade = Math.min(1, go.ct / 0.5); }
@@ -754,7 +759,7 @@
         go.phase = 'confirm'; go.ct = 0;
         if (!this.bf.playAnim('deathConfirm', true) && this.playAs) this.bf.playAnim(this.playAs.real.retry, true);
         G.audio.music.stop(0);
-        G.audio.music.play('shared/music/gameplay/gameover/gameOverEnd' + (go.pico ? '-pico' : '') + '.ogg', { loop: false });
+        G.audio.music.play('shared/music/gameplay/gameover/gameOverEnd' + go.suffix + '.ogg', { loop: false });
       } else if (a === 'back' && go.phase !== 'confirm' && go.phase !== 'exit') { go.phase = 'exit'; go.ct = 0; G.audio.music.stop(0.3); this.exitToMenu(); }
     },
     // -------------------------------------------------- end of song

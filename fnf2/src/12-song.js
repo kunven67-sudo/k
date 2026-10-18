@@ -8,6 +8,16 @@ G.DIFF_INFO = {
 };
 G.DIFF_ORDER = ['easy', 'normal', 'hard', 'erect', 'nightmare'];
 
+// which playable character a song variation belongs to: the player whose ownedChars has its player character
+// (preload/data/players/*.json: 'pico-playable' -> pico, 'darnell-player' -> darnell), anything else -> bf
+G.PLAYER_IDS = ['bf', 'pico', 'darnell'];
+G.playerOf = function (charId) {
+  if (!charId) return 'bf';
+  if (G.PLAYER_IDS.includes(charId)) return charId;
+  for (const id of G.PLAYER_IDS) { const d = G.A.json('preload/data/players/' + id + '.json'); if (d && (d.ownedChars || []).includes(charId)) return id; }
+  return String(charId).startsWith('pico') ? 'pico' : 'bf';
+};
+
 G.Songs = {
   meta(id, variation) {
     const v = !variation || variation === 'default' ? '' : '-' + variation;
@@ -20,28 +30,30 @@ G.Songs = {
   // the songs a new player (Darnell, Tankman, Nene: 59-charselect.js) really sang in: the ones where they're the
   // opponent. Played SWAPPED: their part becomes yours, sung with their real recorded voice.
   ownSong(id, player) {
-    const P = G.realPlayer && G.realPlayer(player), m = P && this.meta(id);
-    return !!(m && P.real && (m.playData.characters || {}).opponent === P.real.char);
+    const P = G.PLAYERS && G.PLAYERS[player], ch = P && (P.real ? P.real.char : P.ownChar), m = ch && this.meta(id);
+    return !!(m && (m.playData.characters || {}).opponent === ch);
   },
   // every playable (difficulty, variation) combo for a song + player character
-  // player: 'bf' (default/erect variations), 'pico' (pico variation), or a new player (their own songs, swapped)
+  // player: 'bf' (default/erect variations), 'pico' (pico variation), 'darnell' (his mixes), plus the songs a
+  // new player really sang in (played swapped)
   difficulties(id, player) {
     const out = [];
     const base = this.meta(id);
     if (!base) return out;
-    if (G.realPlayer && G.realPlayer(player)) {
-      if (!this.ownSong(id, player) || !this.chart(id) || !this.hasAudio(id, 'default', base)) return out;
+    // a song this player really sang in as the opponent: played swapped (stand-in players only get these)
+    if (this.ownSong(id, player)) {
+      if (!this.chart(id) || !this.hasAudio(id, 'default', base)) return out;
       for (const d of base.playData.difficulties || []) out.push({ diff: d, variation: 'default', swap: true });
       out.sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));
       return out;
     }
+    if (G.realPlayer && G.realPlayer(player)) return out;
     const vars = ['default'].concat(base.playData.songVariations || []);
     for (const v of vars) {
       const m = v === 'default' ? base : this.meta(id, v);
       if (!m || !this.chart(id, v)) continue;
       const pl = m.playData.characters.player || 'bf';
-      const isPico = pl.startsWith('pico');
-      if ((player === 'pico') !== isPico) continue;
+      if (G.playerOf(pl) !== (player || 'bf')) continue;
       for (const d of m.playData.difficulties || []) if (this.hasAudio(id, v, m)) out.push({ diff: d, variation: v });
     }
     out.sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));

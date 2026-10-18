@@ -721,8 +721,8 @@
       this.visible = true;
       const d = G.A.json('preload/data/ui/freeplay/albums/' + id + '.json');
       if (!d) return;
-      const art = IMG(d.albumArtAsset);
-      if (this.art.atlas && art) this.art.atlas.swaps['album art placeholder'] = { img: art, x: 16, y: 16 };
+      // (big covers decode on demand: until it's ready the placeholder shows, update() swaps it in)
+      this.pendingArt = d.albumArtAsset; this.useArt();
       const off = d.albumTitleOffsets || [0, 0];
       const t = new G.Sprite(W - 355 + off[0], 500 + off[1]).loadSparrow('preload/images/' + d.albumTitleAsset);
       t.addAnim('idle', 'idle0', 24, true); t.addAnim('switch', 'switch0', 24, false);
@@ -742,7 +742,14 @@
       const cur = n <= 0 ? 15 : this.diff - 1;
       if (cur !== this.curBlock) { this.curBlock = cur; this.starF = cur * 100; }
     }
+    useArt() {
+      const art = this.pendingArt && IMG(this.pendingArt);
+      if (!art) return;
+      if (this.art.atlas) this.art.atlas.swaps['album art placeholder'] = { img: art, x: 16, y: 16 };
+      this.pendingArt = null;
+    }
     update(dt) {
+      if (this.pendingArt) this.useArt();
       this.art.update(dt); if (this.title) this.title.update(dt);
       // stars: loop inside this difficulty's 100-frame block
       this.starT += dt;
@@ -765,7 +772,8 @@
   // ---------------------------------------------------------------- song list
   function buildSongs(player) {
     const out = [];
-    const own = G.realPlayer && G.realPlayer(player);
+    // (players who sing their own FNF songs swapped: the stand-ins + Darnell's Weekend 1)
+    const own = (G.realPlayer && G.realPlayer(player)) || (G.PLAYERS && G.PLAYERS[player] && G.PLAYERS[player].ownChar);
     for (const wid of (G.availableWeeks ? G.availableWeeks() : [])) {
       // Week 7 is BF's like in real FNF (Tankman sings it swapped from his own list); Weekend 1 waits for Pico's week
       if (!own && wid === 'weekend1') continue;
@@ -796,7 +804,9 @@
       // in their real voice), shown in BF's freeplay style
       const sp = G.settings.player;
       this.realP = G.realPlayer ? G.realPlayer(sp) : null;
-      this.player = sp === 'pico' ? 'pico' : this.realP ? sp : 'bf';
+      // full players have their own data like FNF's BF + Pico (DJ, songs, card...): Pico, Darnell (his mod)
+      const full = !this.realP && sp && sp !== 'bf' && G.A.json('preload/data/players/' + sp + '.json');
+      this.player = this.realP || full ? sp : 'bf';
       this.songsAs = this.player;
       const style = G.A.json('preload/data/ui/freeplay/styles/' + (this.realP ? 'bf' : this.player) + '.json') || {};
       this.style = style;

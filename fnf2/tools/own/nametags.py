@@ -6,7 +6,7 @@ around everything. The new ones are made the same way from FNF's own hand-inked 
 menu_word.py, K built from the R): the letters take the character's colour, their ink outline turns black,
 then the white outline goes around the whole word.
 
-  DARNELL (purple), NENE (pink), TANKMAN (army green)
+  NENE (pink), TANKMAN (army green)   (Darnell's comes with his mod: darnell_mix.py)
     -> preload/images/charSelect/<name>Nametag.png
 
   python3 tools/own/nametags.py
@@ -42,7 +42,6 @@ def split_l(letter, kind):
 mw.SPECIAL['L'] = split_l
 OUT = os.path.join(mw.ROOT, 'build', 'own', 'preload', 'images', 'charSelect')
 TAGS = {
-    'darnell': ('DARNELL', (138, 99, 232)),
     'nene': ('NENE', (255, 95, 162)),
     'tankman': ('TANKMAN', (150, 168, 70)),
 }
