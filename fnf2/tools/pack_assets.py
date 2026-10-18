@@ -59,6 +59,7 @@ PACKS = {
         'preload/music/stayFunky/*.ogg', 'preload/music/stayFunky/*.json', 'preload/sounds/CS_*.ogg', 'preload/sounds/static loop.ogg', 'videos/videos/introSelect.mp4',
         'shared/images/characters/darnell/*', 'shared/images/characters/tankman/basic/*', 'shared/images/characters/tankman/extra-animations/*',
         'preload/data/characters/darnell.json', 'preload/data/characters/tankman.json',
+        'preload/images/icons/icon-darnell.png', 'preload/images/icons/icon-tankman.png',
         'preload/data/ui/freeplay/albums/*.json', 'preload/data/ui/freeplay/styles/*.json', 'fonts/YoureGone-Regular.otf', 'fonts/pixel.otf', 'week6/sounds/pixelText.ogg', 'shared/sounds/clickText.ogg',
         'preload/music/freeplayRandom/freeplayRandom.ogg', 'preload/music/freeplayRandom/freeplayRandom-metadata.json',
         *[f'shared/music/results{r}{p}/*' for r in ['SHIT', 'NORMAL', 'EXCELLENT', 'PERFECT'] for p in ['', '-pico']],

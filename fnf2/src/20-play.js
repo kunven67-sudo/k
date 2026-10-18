@@ -124,6 +124,15 @@
       this.dad = mk(s.chars.opponent, 'dad', 'dad');
       this.bf = mk(this.playAs ? this.playAs.real.char : s.chars.player, 'bf', 'bf');
       if (this.playAs && this.playAs.real.flip === false) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
+      // their atlas box is much bigger than what they draw (Darnell stood half off the screen): put the feet
+      // of what's really drawn where BF's feet go (Nene's A-Bot is already built around her spot)
+      if (this.playAs && !this.bf.nene && G.visBox) {
+        const pos = ((this.stage.data.characters || {}).bf || {}).position, vb = G.visBox(this.bf);
+        if (pos && vb) {
+          const dx = pos[0] - vb.cx, dy = pos[1] - vb.bottom, b = this.bf;
+          b.x += dx; b.y += dy; b.originalPosition = { x: b.x, y: b.y }; b.camFocus.x += dx; b.camFocus.y += dy;
+        }
+      }
       // tutorial: GF is the opponent, standing at GF's spot
       if (s.chars.opponent === s.chars.gf && this.gf) { this.dad.x = this.gf.x; this.dad.y = this.gf.y; this.dad.camFocus = Object.assign({}, this.gf.camFocus); this.stage.chars.gf = null; this.gf = null; this.dad.zIndex = 100; }
       // WRATH: the giant eye (stage 2) is made up front so the swap at the eye-open never hitches

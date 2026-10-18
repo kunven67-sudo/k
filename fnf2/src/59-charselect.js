@@ -189,6 +189,7 @@
     }
   }
   G.RealFig = RealFig;
+  G.visBox = visBox;
   G.realPlayer = id => { const P = G.PLAYERS[id]; return P && P.real ? P : null; };
 
   // ---------------------------------------------------------------- character select: chilling on the right
