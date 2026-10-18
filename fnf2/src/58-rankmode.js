@@ -93,7 +93,8 @@
       this.fp = fp; this.s = s;
       this.d = s.diffs.find(x => x.diff === fp.diff) || s.diffs[0];
       this.diff = fp.diff;
-      this.key = s.id + (this.d.variation !== 'default' ? '-' + this.d.variation : '');
+      this.as = fp.realP ? '-as-' + fp.player : '';      // the new players keep their own ranks
+      this.key = s.id + (this.d.variation !== 'default' ? '-' + this.d.variation : '') + this.as;
       this.info = RM.chartInfo(s.id, this.d.variation, this.diff);
       this.old = RM.get(this.key, this.diff);
       this.v = this.old ? RM.fromRec(this.old) : RM.fill('PERFECT', this.info);
@@ -175,7 +176,7 @@
         let n = 0;
         for (const s of fp.allSongs) {
           const d = s.diffs.find(x => x.diff === this.diff); if (!d) continue;
-          const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '');
+          const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '') + this.as;
           if (key === this.key) continue;
           const info = RM.chartInfo(s.id, d.variation, this.diff);
           RM.set(key, this.diff, RM.toRec(RM.fill(v.rank, info), info)); n++;

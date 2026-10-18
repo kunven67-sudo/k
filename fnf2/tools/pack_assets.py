@@ -147,13 +147,13 @@ def tight_sparrow(png, xml):
             return png, xml
     return base + '.png', base + '.xml'
 
-def to_mp3(src, voices):
+def to_mp3(src, voices, kbps=None):
     def f():
         args = ['ffmpeg', '-v', 'error', '-i', src]
-        if voices: args += ['-ac', '1', '-b:a', '64k']
+        if voices: args += ['-ac', '1', '-b:a', '%dk' % (kbps or 64)]
         else: args += ['-ac', '2', '-b:a', '96k']
         return run(args + ['-f', 'mp3', '-'])
-    return conv_cached(src, 'mp3v64' if voices else 'mp3i96', f)
+    return conv_cached(src, ('mp3v%d' % (kbps or 64)) if voices else 'mp3i96', f)
 
 # Animate atlases: keep only what the player reads (matrix as a 6-number MX, names, frames),
 # drop decomposed matrices / transformation points and round the numbers
@@ -228,7 +228,8 @@ def main():
         elif ext in ('.ogg', '.mp3'):
             if ext == '.mp3' and os.path.exists(src[:-4] + '.ogg'): continue
             voices = '/Voices' in rel
-            data = 'data:audio/mpeg;base64,' + base64.b64encode(to_mp3(src, voices)).decode()
+            # (the new players' changed voices: a smaller mono mp3, they're only a stand-in until their own songs)
+            data = 'data:audio/mpeg;base64,' + base64.b64encode(to_mp3(src, voices, 40 if '/Voices-as-' in rel else None)).decode()
             rel = rel[:-4] + '.ogg'   # the game always asks for .ogg names
         elif ext in ('.ttf', '.otf'):
             data = 'data:font/ttf;base64,' + base64.b64encode(open(src, 'rb').read()).decode()

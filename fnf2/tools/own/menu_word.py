@@ -28,6 +28,9 @@ LETTERS = {
 }
 
 
+# letters that need more than a plain cut: ch -> fn(letter, kind) (other tools add to it)
+SPECIAL = {}
+
 # idle letters FNF drew too small/squashed: drawn from the selected letter's shape instead (scale)
 FROM_SELECTED = {'A': 0.66}
 
@@ -156,6 +159,7 @@ def build_word(word, kind, fi):
     cache = {}
     def letter(ch):
         if ch == 'K': return make_k(letter('R'), kind)
+        if ch in SPECIAL: return SPECIAL[ch](letter, kind)
         name, idx = LETTERS[ch]
         if ch in FROM_SELECTED and kind == 'idle':
             fs = unique_frames(name, 'selected')

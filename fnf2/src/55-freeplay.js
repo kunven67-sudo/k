@@ -202,14 +202,16 @@
   class Card {
     constructor(fp, player) {
       this.fp = fp; this.tw = fp.tw;
-      const data = (G.A.json('preload/data/players/' + player + '.json') || {}).freeplayDJ || {};
+      const data = (G.A.json('preload/data/players/' + player + '.json') || {}).freeplayDJ || (G.PLAYERS && G.PLAYERS[player] && G.PLAYERS[player].freeplay) || {};
       const t1 = data.text1 || 'BOYFRIEND', t2 = data.text2 || 'HOT BLOODED IN MORE WAYS THAN ONE', t3 = data.text3 || 'PROTECT YO NUTS';
+      // card colours: back before / after the intro, the 4 text rows, the bar (new players bring their own)
+      const C = this.cols = data.colors || ['#FFD4E9', '#FFD863', '#FFF383', '#FF9963', '#FFFFFF', '#FEA400', '#FEDA00', '#FFD400'];
       this.pink = IMG('freeplay/pinkBack');
       const pw = this.pink ? this.pink.width : 524;
       this.pw = pw;
-      this.pinkX = -pw; this.color = '#FFD4E9';
+      this.pinkX = -pw; this.color = C[0];
       this.orangeVis = false;
-      this.orange = G.cached('fp-orange', pw, 75, c => { c.fillStyle = '#FEDA00'; c.fillRect(0, 0, pw, 75); if (this.pink) { c.globalCompositeOperation = 'destination-in'; c.drawImage(this.pink, 0, 0); } });
+      this.orange = G.cached('fp-orange' + C[6], pw, 75, c => { c.fillStyle = C[6]; c.fillRect(0, 0, pw, 75); if (this.pink) { c.globalCompositeOperation = 'destination-in'; c.drawImage(this.pink, 0, 0); } });
       this.glow = { a: 0, vis: false }; this.glowDark = { a: 0, vis: false };
       this.cardGlow = { a: 1, s: 1, vis: false };
       this.cg2 = { a: 0, vis: false }; this.cg1 = { a: 0, vis: false }; this.ctext = { a: 0, vis: false };
@@ -218,18 +220,18 @@
       const S = (y, txt, wid, bold, size, color, speed) => { const r = new ScrollText(y, txt, wid, bold, size); r.color = color; r.speed = speed; return r; };
       // order = draw order in BoyfriendCard.onCreate
       this.rows = [
-        S(160, t2, W, true, 43, '#FFF383', 6.8),     // moreWays
-        S(220, t1, W / 2, false, 60, '#FF9963', -3.8), // funnyScroll
-        S(285, t3, W / 2, true, 43, '#FFFFFF', 3.5),  // txtNuts
-        S(335, t1, W / 2, false, 60, '#FF9963', -3.8), // funnyScroll2
-        S(397, t2, W, true, 43, '#FFF383', 6.8),     // moreWays2
-        S(440 + 10, t1, W / 2, false, 60, '#FEA400', -3.8), // funnyScroll3
+        S(160, t2, W, true, 43, C[2], 6.8),     // moreWays
+        S(220, t1, W / 2, false, 60, C[3], -3.8), // funnyScroll
+        S(285, t3, W / 2, true, 43, C[4], 3.5),  // txtNuts
+        S(335, t1, W / 2, false, 60, C[3], -3.8), // funnyScroll2
+        S(397, t2, W, true, 43, C[2], 6.8),     // moreWays2
+        S(440 + 10, t1, W / 2, false, 60, C[5], -3.8), // funnyScroll3
       ];
       this.tw.to(this, { pinkX: 0 }, 0.6, E.quartOut);
     }
     skipIntro() { this.tw.cancel(this); this.pinkX = 0; }
     introDone() {
-      this.color = '#FFD863';
+      this.color = this.cols[1];
       this.orangeVis = true;
       this.cardGlow.vis = true; this.cardGlow.a = 1; this.cardGlow.s = 1;
       this.tw.to(this.cardGlow, { a: 0, s: 1.2 }, 0.45, E.sineOut);
@@ -264,7 +266,7 @@
     draw(ctx) {
       G.setScreenT(ctx);
       if (this.pink) ctx.drawImage(tint(this.pink, this.color, 'pinkBack'), Math.round(this.pinkX), 0);
-      if (this.orangeVis) { ctx.drawImage(this.orange, 84, 440); ctx.fillStyle = '#FFD400'; ctx.fillRect(0, 440, 100, 75); }
+      if (this.orangeVis) { ctx.drawImage(this.orange, 84, 440); ctx.fillStyle = this.cols[7]; ctx.fillRect(0, 440, 100, 75); }
       const add = (img, x, y, a) => { if (img && a > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(1, a); ctx.drawImage(img, x, y); ctx.restore(); } };
       if (this.cg2.vis) add(IMG('freeplay/confirmGlow2'), -30, 240, this.cg2.a);
       if (this.cg1.vis) add(IMG('freeplay/confirmGlow'), -30, 240, this.cg1.a);
@@ -784,8 +786,12 @@
       p = p || {};
       this.tw = new Tw();
       this.rankMode = !!p.rankMode; this.editor = null;   // RANK MODE: the same menu, fake ranks + scores (58-rankmode.js)
-      this.player = G.settings.player === 'pico' ? 'pico' : 'bf';
-      const style = G.A.json('preload/data/ui/freeplay/styles/' + this.player + '.json') || {};
+      // the new players (Darnell, Nene, Tankman: 59-charselect.js) sing BF's songs, in BF's freeplay style
+      const sp = G.settings.player;
+      this.realP = G.realPlayer ? G.realPlayer(sp) : null;
+      this.player = sp === 'pico' ? 'pico' : this.realP ? sp : 'bf';
+      this.songsAs = this.realP ? 'bf' : this.player;
+      const style = G.A.json('preload/data/ui/freeplay/styles/' + this.songsAs + '.json') || {};
       this.style = style;
       this.glowCol = (style.capsuleTextColors && style.capsuleTextColors[0]) || '#00ccff';
       this.fav = G.save.favorites = G.save.favorites || {};
@@ -796,7 +802,7 @@
       this.rankFx = p.fromResults && p.playRankAnim && p.rank ? { pending: true, fade: 1, bgA: 0, zoom: 1, funny: 1, vigA: 0, shakeT: 0 } : null;
       // card, DJ
       this.card = this.player === 'pico' ? new PicoCard(this) : new Card(this, this.player);
-      this.dj = new DJ(this.player);
+      this.dj = this.realP ? new G.RealDJ(this.player) : new DJ(this.player);
       // background art (cut on a slant) + the black panel that slides in first
       this.bgImg = IMG(style.bgAsset || 'freeplay/freeplayBGweek1-bf') || IMG('freeplay/freeplayBGweek1-bf');
       this.bgX = this.card.pw * 0.74; this.bgVis = false; this.bgColor = '#000000';
@@ -839,7 +845,7 @@
       this.swipe = new G.Swipe();
       this.beat = new G.MenuBeat(); this.lastBeat = -1;
       // songs
-      this.allSongs = buildSongs(this.player);
+      this.allSongs = buildSongs(this.songsAs);
       this.sel = 0; this.list = []; this.caps = [];
       // back from the results screen (under the stickers) or the character select: no intro, everything
       // already in place (forceSkipIntro / fromCharSelect)
@@ -863,7 +869,7 @@
     },
     listAllDiffs() {
       const set = new Set();
-      for (const s of buildSongs(this.player)) for (const d of s.diffs) set.add(d.diff);
+      for (const s of buildSongs(this.songsAs)) for (const d of s.diffs) set.add(d.diff);
       const l = G.DIFF_ORDER.filter(d => set.has(d));
       return l.length ? l : ['easy', 'normal', 'hard'];
     },
@@ -925,7 +931,7 @@
     },
     // a song's saved result (in RANK MODE: the fake one, kept apart from the real ones)
     recFor(s, d) {
-      const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '');
+      const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '') + (this.realP ? '-as-' + this.player : '');
       return this.rankMode && G.RankMode ? G.RankMode.get(key, this.diff) : G.getScore(key, this.diff, 'bf');
     },
     // ------------------------------------------------------------ selection

@@ -17,6 +17,22 @@
     bf: { id: 'bf', name: 'Boyfriend', pos: 4, chill: CS + 'bfChill', gf: { asset: CS + 'gfChill', viz: false }, nametag: 'boyfriend', icon: 'bf' },
     pico: { id: 'pico', name: 'Pico', pos: 3, chill: CS + 'picoChill', gf: { asset: CS + 'neneChill', viz: true }, nametag: 'pico', icon: 'pico' },
   });
+  // new players FNF never drew character-select art for: they chill with their REAL gameplay animations
+  // (real = the gameplay character, flip = face left like BF, select = what they do when picked)
+  const real = (id, o) => Object.assign({ id, makeChill: () => new RealChill(id, o.real) }, o);
+  // real: the gameplay character + what it does: select (picked), win / lose (after a rank), hey (to the character
+  // select), die / retry (game over), results per rank; dj = its freeplay spot. freeplay = its backing card.
+  Object.assign(G.PLAYERS, {
+    darnell: real('darnell', { name: 'Darnell', pos: 5, nametag: 'darnell', icon: 'darnell', gf: { asset: CS + 'neneChill', viz: true },
+      real: { char: 'darnell', flip: true, scale: 0.7, select: 'lightCan', win: 'laugh', lose: 'pissed', hey: 'kickCan', die: 'pissed', retry: 'laugh', dj: { x: 196, y: 708, k: 0.78 } },
+      freeplay: { text1: 'DARNELL', text2: 'LIGHT IT UP AND KICK IT BACK', text3: 'WATCH YOUR HEAD', colors: ['#DCD0FF', '#B49CFF', '#F1EAFF', '#6F4BD8', '#FFFFFF', '#4B2FA8', '#8A63E8', '#7A55E0'] } }),
+    nene: real('nene', { name: 'Nene', pos: 1, nametag: 'nene', icon: 'nene', gf: { asset: CS + 'gfChill', viz: false },
+      real: { char: 'nene', flip: false, scale: 0.62, select: 'combo50', win: 'combo200', lose: 'raiseKnife', hey: 'combo50', die: 'raiseKnife', retry: 'combo50', dj: { x: 190, y: 712, k: 0.48 } },
+      freeplay: { text1: 'NENE', text2: 'CUTE BUT SHE BRINGS A KNIFE', text3: 'DO NOT TOUCH HER A-BOT', colors: ['#FFD4E9', '#FF9CC8', '#FFF0F7', '#E8418A', '#FFFFFF', '#C02468', '#FF5FA2', '#F04C93'] } }),
+    tankman: real('tankman', { name: 'Tankman', pos: 7, nametag: 'tankman', icon: 'tankman', gf: { asset: CS + 'gfChill', viz: false },
+      real: { char: 'tankman', flip: true, scale: 0.62, select: 'hehPrettyGood', win: 'laugh', lose: 'ugh', hey: 'beat it', die: 'augh', retry: 'hehPrettyGood', dj: { x: 196, y: 708, k: 0.7 } },
+      freeplay: { text1: 'TANKMAN', text2: 'HEH, PRETTY GOOD', text3: 'UGH', colors: ['#E3EACB', '#BCC97E', '#F6F8E6', '#5C6B22', '#FFFFFF', '#3E4A12', '#8C9E42', '#7D8F38'] } }),
+  });
   const LOCK_COLORS = ['#31F2A5', '#20ECCD', '#24D9E8', '#20ECCD', '#20C8D4', '#209BDD', '#209BDD', '#2362C9', '#243FB9'];
 
   // ---------------------------------------------------------------- an Animate atlas sprite (FunkinSprite + texture atlas)
@@ -117,6 +133,148 @@
     update(dt) { if (this.custom) this.custom.update(dt); else super.update(dt); }
     draw(ctx, cam) { if (!this.visible) return; if (this.custom) this.custom.draw(ctx, cam); else super.draw(ctx, cam); }
   }
+
+  // ---------------------------------------------------------------- new players: a gameplay character as a "figure"
+  // (character select, freeplay DJ spot, results). Drawn scaled around the bottom-middle of what it really draws.
+  // the box of what a character really draws on its current frame (scale 1), in its own space
+  function visBox(ch) {
+    const a = ch.cur; if (!a || a.kind !== 'atlas') return null;
+    const b = G.Atlas.bounds(a.atlas, a.tl), r = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 };
+    G.Atlas.boundsFrame(a.atlas, a.tl, a.frames[ch.fi] != null ? a.frames[ch.fi] : a.frames[0], [1, 0, 0, 1, 0, 0], r);
+    if (r.x1 < r.x0) return null;
+    let sx = ch.x - ch.offset.x, sy = ch.y - ch.offset.y;
+    if (ch.useAnimOffsets) { sx -= (ch._ao[0] - ch.globalOffsets[0]) * ch.scale.x; sy -= (ch._ao[1] - ch.globalOffsets[1]) * ch.scale.y; }
+    const mid = (r.x0 + r.x1) / 2 - b.x;
+    return { cx: ch.flipX ? sx + ch.frameW - mid : sx + mid, bottom: sy + r.y1 - b.y, top: sy + r.y0 - b.y };
+  }
+  class RealFig {
+    constructor(R) {
+      this.R = R;
+      const ch = this.ch = new G.Character(R.char, 'bf');
+      ch.flipX = !!R.flip;
+      ch.place([0, 0], 1);
+      // extra sprites the character's script adds (Nene's A-Bot speaker + its eyes + visualizer)
+      this.extras = [];
+      const stage = { addExtra: (s, owner) => { s.owner = owner; this.extras.push(s); } };
+      if (ch.script && ch.script.attach) ch.script.attach(ch, stage);
+      if (ch.nene) ch.nene.an = G.audio && G.audio.musicAnalyser;   // the A-Bot bars dance to the menu music
+      this.list = [ch].concat(this.extras).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+      // where they stand: the bottom-middle of their idle drawing (an atlas' timeline box is often much bigger
+      // than the character), or of the big thing they sit on (Nene's A-Bot)
+      const box = visBox(ch);
+      this.cx = box ? box.cx : 0; this.floor = box ? box.bottom : 0; this.top = box ? box.top : -400;
+      for (const e of this.extras) if (e.atlas) { const b = G.Atlas.bounds(e.atlas); if (e.y + b.h > this.floor) { this.floor = e.y + b.h; this.cx = e.x + b.w / 2; } }
+      this.at = { cam: null, x: 0, y: 0, k: 1, stretch: 1 };
+      this.pcam = { apply: (ctx, sfx, sfy) => {
+        const a = this.at;
+        if (a.cam) a.cam.apply(ctx, sfx, sfy); else G.setScreenT(ctx);
+        ctx.translate(a.x, a.y); ctx.scale(a.k * a.stretch, a.k); ctx.translate(-this.cx, -this.floor);
+      } };
+    }
+    // a one-off animation (held on its last frame) or back to dancing
+    anim(name) { const ch = this.ch; ch._locked = false; const ok = !!name && ch.playAnim(name, true); if (ok) ch._locked = true; else ch.dance(true); return ok; }
+    dance() { this.ch._locked = false; this.ch.dance(true); }
+    get finished() { return this.ch.finished; }
+    update(dt, stepSec) { this.ch.tick(dt, stepSec || 0.15, false); }
+    // smear = [stretch, direction]: stretched + see-through copies trailing behind (fast slides)
+    draw(ctx, cam, x, y, k, smear) {
+      const a = this.at; a.cam = cam; a.y = y; a.k = k; a.stretch = 1;
+      for (const s of this.list) {
+        if (smear && smear[0] > 1.01) {
+          a.stretch = smear[0];
+          for (let g = 2; g >= 1; g--) { a.x = x + smear[1] * g * 40; s.alpha = 0.22; s.draw(ctx, this.pcam); }
+          a.x = x; s.alpha = 0.85; s.draw(ctx, this.pcam); s.alpha = 1; a.stretch = 1;
+        } else { a.x = x; s.draw(ctx, this.pcam); }
+      }
+    }
+  }
+  G.RealFig = RealFig;
+  G.realPlayer = id => { const P = G.PLAYERS[id]; return P && P.real ? P : null; };
+
+  // ---------------------------------------------------------------- character select: chilling on the right
+  // The slide in / out copy bfChill's frames (24 fps): in from the right with a smear, a little overshoot, settle;
+  // out = a step left, then smeared off. [screen px, smear stretch]
+  const SLIDE_IN = [[321, 1.75], [167, 1.4], [-24, 1], [-24, 1], [-3, 1], [-3, 1], [-5, 1], [-5, 1]];
+  const SLIDE_OUT = [[-23, 1], [-71, 1.7]];
+  const FEET = { x: 955, y: 612 };             // where BF + Pico stand
+  class RealChill {
+    constructor(id, R) {
+      this.id = id; this.R = R; this.fig = new RealFig(R);
+      this.name = null; this.fi = 0; this.t = 0; this.finished = true; this.once = []; this.visible = true;
+    }
+    play(n) {
+      this.name = n; this.fi = 0; this.t = 0; this.finished = false; this.visible = true;
+      if (n === 'select') this.fig.anim(this.R.select); else this.fig.dance();
+      return true;
+    }
+    update(dt) {
+      this.t += dt;
+      while (this.t >= 1 / 24) {
+        this.t -= 1 / 24; this.fi++;
+        if (this.name === 'slidein' && this.fi >= SLIDE_IN.length) { this.name = 'idle'; this.fi = 0; }
+        if (this.name === 'slideout' && this.fi >= SLIDE_OUT.length && !this.finished) {
+          this.fi = SLIDE_OUT.length - 1; this.finished = true; this.visible = false;
+          const once = this.once.splice(0); for (const f of once) f('slideout');
+        }
+      }
+      this.fig.update(dt, 15 / 90);
+      // idle / select / deselect are "finished" when the character's animation is
+      if (this.name !== 'slidein' && this.name !== 'slideout') this.finished = this.fig.finished;
+    }
+    draw(ctx, cam) {
+      if (!this.visible) return;
+      const slide = this.name === 'slidein' ? SLIDE_IN[Math.min(this.fi, SLIDE_IN.length - 1)] : this.name === 'slideout' ? SLIDE_OUT[Math.min(this.fi, SLIDE_OUT.length - 1)] : null;
+      this.fig.draw(ctx, cam, FEET.x + (slide ? slide[0] : 0) + (this.R.dx || 0), FEET.y + (this.R.dy || 0), this.R.scale || 0.7,
+        slide ? [slide[1], this.name === 'slidein' ? 1 : -1] : null);
+    }
+  }
+
+  // ---------------------------------------------------------------- freeplay: the DJ spot (FreeplayDJ stand-in)
+  // Same jobs as the real DJs: intro (pops up from the bottom), idle (bops on the menu music's beat), confirm,
+  // fist pump / loss after a new rank, the jump to the character select.
+  class RealDJ {
+    constructor(id) {
+      const P = G.PLAYERS[id]; this.P = P; this.R = P.real; this.fig = new RealFig(P.real);
+      const D = this.D = Object.assign({ x: 200, y: 706, k: (P.real.scale || 0.7) * 1.1 }, P.real.dj || {});
+      this.data = { charSelect: { transitionDelay: 0.3 } };
+      this.cur = true; this.name = ''; this.finished = false; this.onIntroDone = null; this.lastBeat = -1; this.introT = 0; this.rise = 0;
+      this.play('intro');
+    }
+    has(n) { return ['intro', 'idle', 'confirm', 'fistPump', 'loss', 'charSelect'].includes(n); }
+    play(name) {
+      this.name = name; this.finished = false; this.pumpIntro = false;
+      const R = this.R;
+      if (name === 'intro') { this.introT = 0; this.rise = 1; this.fig.dance(); }
+      else if (name === 'idle') this.fig.dance();
+      else if (name === 'confirm') this.fig.anim(R.select);
+      else if (name === 'fistPump') this.fig.anim(R.win || R.select);
+      else if (name === 'loss') this.fig.anim(R.lose);
+      else if (name === 'charSelect') this.fig.anim(R.hey || R.select);
+      return true;
+    }
+    update(dt) {
+      if (this.name === 'intro') {
+        this.introT += dt;
+        const k = Math.min(1, this.introT / 0.42);
+        this.rise = 1 - G.ease.backOut(k);
+        if (k >= 1) { this.rise = 0; this.play('idle'); const f = this.onIntroDone; this.onIntroDone = null; if (f) f(); }
+      }
+      // bops on the beat of whatever is playing (like the real DJs' idles)
+      const M = G.audio.music.current(), bpm = (M && M.bpm) || 102, b = Math.floor(G.audio.music.time() / (60000 / bpm));
+      if (b !== this.lastBeat) { this.lastBeat = b; if ((this.name === 'idle' || this.name === 'intro' || this.pumpIntro) && (this.fig.finished || !this.fig.ch._locked)) this.fig.dance(); }
+      this.fig.update(dt, 15 / bpm);
+      if ((this.name === 'fistPump' || this.name === 'loss') && this.fig.finished && !this.finished) { this.finished = true; this.tw = 0.6; }
+      if (this.tw != null) { this.tw -= dt; if (this.tw <= 0) { this.tw = null; this.play('idle'); } }
+    }
+    // results -> freeplay: bop while the rank comes in, then celebrate (or sulk)
+    fistPumpIntro(bad) { this.name = 'idle'; this.pumpIntro = true; this.fig.dance(); }
+    fistPump(bad) { this.play(bad ? 'loss' : 'fistPump'); }
+    draw(ctx) {
+      const D = this.D;
+      this.fig.draw(ctx, null, D.x, D.y + this.rise * 460, D.k, null);
+    }
+  }
+  G.RealDJ = RealDJ;
 
   // ---------------------------------------------------------------- who bops on the speakers (CharSelectGF)
   class GF extends AS {

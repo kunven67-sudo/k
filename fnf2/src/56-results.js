@@ -182,6 +182,9 @@
         if (ad.filter && ad.filter !== 'both' && ad.filter !== 'safe') continue;
         const c = this.makeChar(ad); if (c) this.chars.push(c);
       }
+      // the new players (59-charselect.js) have no results art: they show up big with their own moves
+      const RP = G.realPlayer && G.realPlayer(p.player);
+      if (RP) this.chars = [this.makeReal(RP)];
       // static pieces
       this.soundSystem = sparrowAnim('soundSystem', 'sound system');
       this.resultsAnim = sparrowAnim('results', 'results instance 1');
@@ -236,6 +239,11 @@
       const sick = (t.killer || 0) + (t.sick || 0);
       const hit = sick + (t.good || 0) + (t.bad || 0) + (t.shit || 0);
       return { sick, good: t.good || 0, bad: t.bad || 0, shit: t.shit || 0, missed: t.miss != null ? t.miss : (st.misses || 0), maxCombo: st.maxCombo || 0, totalNotesHit: hit, totalNotes: st.totalNotes || (hit + (t.miss || 0)) };
+    },
+    // a new player: pops up from the bottom on the right, does their win / ok / lose move, then bops along
+    makeReal(RP) {
+      const R = RP.real, fig = new G.RealFig(R), rs = R.results || {};
+      return { kind: 'real', fig, R, z: 500, delay: 0, vis: false, t: 0, x: rs.x || 900, y: rs.y || 700, k: rs.k || (R.scale || 0.7) * 1.3, beat: -1, done: false };
     },
     makeChar(ad) {
       const off = ad.offsets || [0, 0];
@@ -313,6 +321,12 @@
       for (const c of this.chars) {
         this.tw.after(c.delay, () => {
           if (c.kind === 'sparrow') { c.a.play(); return; }
+          if (c.kind === 'real') {
+            c.vis = true; c.t = 0;
+            const R = c.R, rk = this.rank;
+            c.fig.anim(rk === 'SHIT' ? R.lose : rk === 'GOOD' || rk === 'GREAT' ? R.select : R.win);
+            return;
+          }
           c.s.visible = true;
           if (c.random) {
             const r = Math.random(), lab = r < 0.05 && c.s.anims['intro fat gf'] ? 'intro fat gf' : r < 0.25 && c.s.anims['intro cass'] ? 'intro cass' : 'intro';
@@ -373,7 +387,17 @@
       this.t += dt;
       this.tw.update(dt);
       for (const a of [this.soundSystem, this.resultsAnim, this.ratingsPopin, this.scorePopin, this.highscoreNew]) if (a) a.update(dt);
-      for (const c of this.chars) { if (c.kind === 'sparrow') c.a.update(dt); else c.s.update(dt); }
+      for (const c of this.chars) {
+        if (c.kind === 'sparrow') c.a.update(dt);
+        else if (c.kind === 'real') {
+          c.t += dt;
+          const M = G.audio.music.current(), bpm = (M && M.bpm) || 100, b = Math.floor(G.audio.music.time() / (60000 / bpm));
+          // after their move: a loser keeps sulking, everyone else bops on the music's beat
+          if (c.vis && c.fig.finished && b !== c.beat && this.rank !== 'SHIT') c.fig.dance();
+          c.beat = b;
+          c.fig.update(dt, 15 / bpm);
+        } else c.s.update(dt);
+      }
       for (const d of this.digits) d.update(dt, this.tw);
       if (this.rankRows) for (const r of this.rankRows) r.x += r.vx * dt;
       if (this.rankVert) { const v = this.rankVert; v.t += dt; v.y += v.vy * dt; }
@@ -404,6 +428,7 @@
       if (this.clearBig) list.push({ z: 450, d: () => this.clearBig.draw(ctx) });
       for (const c of this.chars) list.push({ z: c.z, d: () => {
         if (c.kind === 'sparrow') { if (c.a.visible) { const f = c.a.frame(); if (f) drawFrame(ctx, c.a.sheet, f, c.x, c.y); } }
+        else if (c.kind === 'real') { if (c.vis) { const k = Math.min(1, c.t / 0.45); c.fig.draw(ctx, null, c.x, c.y + (1 - G.ease.backOut(k)) * 520, c.k, null); G.setScreenT(ctx); } }
         else if (c.s.visible) { c.s.draw(ctx, null); G.setScreenT(ctx); }
       } });
       if (this.rankVert && this.rankVert.img) list.push({ z: 990, d: () => {

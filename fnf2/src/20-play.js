@@ -55,6 +55,13 @@
       this.ready = false; this.failed = null; this.cutscene = null; this.blackIn = params.blackIn || 0; params.blackIn = 0;
       this.song = G.Songs.build(params.songs[params.songIndex], params.diff, params.variation);
       if (!this.song) { this.failed = 'Missing chart: ' + params.songs[params.songIndex] + ' (' + params.diff + ')'; return; }
+      // a new player (Darnell / Nene / Tankman, 59-charselect.js) sings BF's part in freeplay, in their own voice
+      // (BF's track changed into theirs by tools/own/voices_as.py)
+      this.playAs = params.mode === 'freeplay' && G.realPlayer && /^bf/.test(this.song.chars.player) ? G.realPlayer(G.settings.player) : null;
+      if (this.playAs) for (const v of this.song.voices) if (v.who === 'p') {
+        const p2 = v.path.replace(/Voices-bf(-[a-z]+)?\.ogg$/, (m, suf) => 'Voices-as-' + this.playAs.id + (suf || '') + '.ogg');
+        if (p2 !== v.path && G.A.has(p2)) v.path = p2;
+      }
       this.setupWorld();
       this.setupHUD();
       this.resetRun();
@@ -115,7 +122,8 @@
       const mk = (id, slot, fallback) => { let cid = id; if (!G.A.json('preload/data/characters/' + cid + '.json')) cid = fallback; if (!cid) return null; const c = new G.Character(cid, slot); this.stage.addCharacter(c, slot); return c; };
       this.gf = s.chars.gf ? mk(s.chars.gf, 'gf', 'gf') : null;
       this.dad = mk(s.chars.opponent, 'dad', 'dad');
-      this.bf = mk(s.chars.player, 'bf', 'bf');
+      this.bf = mk(this.playAs ? this.playAs.real.char : s.chars.player, 'bf', 'bf');
+      if (this.playAs && this.playAs.real.flip === false) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
       // tutorial: GF is the opponent, standing at GF's spot
       if (s.chars.opponent === s.chars.gf && this.gf) { this.dad.x = this.gf.x; this.dad.y = this.gf.y; this.dad.camFocus = Object.assign({}, this.gf.camFocus); this.stage.chars.gf = null; this.gf = null; this.dad.zIndex = 100; }
       // WRATH: the giant eye (stage 2) is made up front so the swap at the eye-open never hitches
@@ -703,7 +711,8 @@
       bf.isDead = true;
       const pico = bf.id.startsWith('pico');
       G.sfx(pico ? 'deathPico' : 'death');
-      bf.playAnim('firstDeath', true);
+      // new players have no death animations: their own "oh no" one, held
+      if (!bf.playAnim('firstDeath', true) && this.playAs) bf.playAnim(this.playAs.real.die, true);
       const dd = bf.deathData || {};
       const co = dd.cameraOffsets || [0, 0];
       const mid = { x: bf.x + bf.width / 2, y: bf.y + bf.height / 2 };
@@ -729,7 +738,7 @@
       const go = this.gameOver;
       if (a === 'accept' && (go.phase === 'loop' || go.phase === 'intro')) {
         go.phase = 'confirm'; go.ct = 0;
-        this.bf.playAnim('deathConfirm', true);
+        if (!this.bf.playAnim('deathConfirm', true) && this.playAs) this.bf.playAnim(this.playAs.real.retry, true);
         G.audio.music.stop(0);
         G.audio.music.play('shared/music/gameplay/gameover/gameOverEnd' + (go.pico ? '-pico' : '') + '.ogg', { loop: false });
       } else if (a === 'back' && go.phase !== 'confirm' && go.phase !== 'exit') { go.phase = 'exit'; go.ct = 0; G.audio.music.stop(0.3); this.exitToMenu(); }
@@ -754,7 +763,7 @@
       // V-Slice style tallies + rank (results screen, freeplay rank badges + clear %)
       const tl = this.tally, sick = (tl.killer || 0) + tl.sick;
       stats.tallies = { sick, good: tl.good, bad: tl.bad, shit: tl.shit, missed: tl.miss, maxCombo: this.maxCombo, totalNotesHit: sick + tl.good + tl.bad + tl.shit, totalNotes: stats.totalNotes };
-      const scoreKey = s.id + (s.variation !== 'default' ? '-' + s.variation : '');
+      const scoreKey = s.id + (s.variation !== 'default' ? '-' + s.variation : '') + (this.playAs ? '-as-' + this.playAs.id : '');
       const prev = G.getScore(scoreKey, p.diff, 'bf');
       const prevRank = prev ? (prev.rank || null) : null;
       let isNewHighscore = false;

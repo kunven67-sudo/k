@@ -22,9 +22,9 @@ G.CharScripts = {};
   // FFT levels for the 7 bars (funkin.vis SpectralAnalyzer: 7 bars, -65..-25 dB, 10..22000 Hz)
   let bins = null;
   function levels(state) {
-    const an = G.audio && G.audio.analyser;
+    const an = state.an || (G.audio && G.audio.analyser);     // (state.an: the character select's menu music)
     const out = state.levels || (state.levels = new Array(7).fill(0));
-    if (!an || !G.audio.songPlaying) { for (let i = 0; i < 7; i++) out[i] = Math.max(0, out[i] - 0.1); return out; }
+    if (!an || (!state.an && !G.audio.songPlaying)) { for (let i = 0; i < 7; i++) out[i] = Math.max(0, out[i] - 0.1); return out; }
     if (!bins || bins.length !== an.frequencyBinCount) bins = new Float32Array(an.frequencyBinCount);
     an.getFloatFrequencyData(bins);
     const hz = G.audio.ctx.sampleRate / an.fftSize, lo = Math.log(10), hi = Math.log(22000);
@@ -32,7 +32,7 @@ G.CharScripts = {};
       const f0 = Math.exp(lo + (hi - lo) * b / 7), f1 = Math.exp(lo + (hi - lo) * (b + 1) / 7);
       let db = -Infinity;
       for (let k = Math.max(1, Math.floor(f0 / hz)); k <= Math.min(bins.length - 1, Math.ceil(f1 / hz)); k++) if (bins[k] > db) db = bins[k];
-      const target = G.clamp((db + 65) / 40, 0, 1);
+      const target = G.clamp((db + (state.an ? 72 : 65)) / 40, 0, 1);   // (menu music is measured after the volume knobs)
       // bars move at most 0.1 per frame, like the original analyzer's maxDelta
       out[b] += G.clamp(target - out[b], -0.1, 0.1);
     }
