@@ -356,8 +356,8 @@ def main():
                 if os.path.basename(rel) == 'Animation.json': j = slim_atlas(j)
                 data = json.dumps(j, separators=(',', ':'))
             except Exception: data = open(src, encoding='utf-8-sig').read()
-        elif ext == '.mp4':
-            data = 'data:video/mp4;base64,' + base64.b64encode(open(src, 'rb').read()).decode()
+        elif ext in ('.mp4', '.webm'):
+            data = 'data:video/' + ext[1:] + ';base64,' + base64.b64encode(open(src, 'rb').read()).decode()
         elif ext in ('.xml', '.txt', '.srt'):
             data = open(src, encoding='utf-8-sig').read()
         else:
@@ -367,9 +367,18 @@ def main():
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     with open(a.out, 'w') as f:
         f.write('/* PRIVATE BUILD: Friday Night Funkin\' assets (c) The Funkin\' Crew Inc. Not for public distribution. */\n')
-        f.write('window.__FNF_ASSETS = ')
-        json.dump(out, f, separators=(',', ':'))
-        f.write(';\n')
+        # in pieces of ~96 MB, each its own <script> in the built page: one script's text is one JS string, and
+        # Chrome can't make a string much over 512 MB (the whole pack is bigger than that now)
+        f.write('window.__FNF_ASSETS = {};\n')
+        part, size = {}, 0
+        def flush():
+            f.write('/*FNF-CHUNK*/\nObject.assign(window.__FNF_ASSETS, ')
+            json.dump(part, f, separators=(',', ':'))
+            f.write(');\n')
+        for k, v in out.items():
+            if part and size + len(v) > 96 * 1048576: flush(); part, size = {}, 0
+            part[k] = v; size += len(v)
+        if part: flush()
     print(f'packed {len(out)} files, {total / 1048576:.1f} MB -> {a.out}')
 
 if __name__ == '__main__':

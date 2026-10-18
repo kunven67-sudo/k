@@ -1236,7 +1236,14 @@
       const parts = id.split('-'); let name = '', best = null;
       for (let i = 0; i < parts.length; i++) { name += (i ? '-' : '') + parts[i]; if (G.A.has('preload/images/freeplay/icons/' + name + 'pixel.png')) best = name; }
       let res = null;
-      if (best) {
+      if (best && !G.A.has('preload/images/freeplay/icons/' + best + 'pixel.xml')) {
+        // a plain picture (no XML): one still frame, no confirm animation (mods ship these)
+        const img = G.A.image('preload/images/freeplay/icons/' + best + 'pixel.png');
+        if (img) {
+          const f = { name: 'idle0000', x: 0, y: 0, w: img.width, h: img.height, ox: 0, oy: 0, fw: img.width, fh: img.height, rot: false };
+          res = { sheet: { kind: 'sparrow', img, imgs: [img], frames: [f] }, idle: [f], confirm: null, 'confirm-hold': null, fh: img.height };
+        }
+      } else if (best) {
         const sh = SP('freeplay/icons/' + best + 'pixel');
         if (sh) {
           const idle = G.Sparrow.byPrefix(sh, 'idle'), conf = G.Sparrow.byPrefix(sh, 'confirm'), hold = G.Sparrow.byPrefix(sh, 'confirm-hold');

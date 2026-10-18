@@ -43,7 +43,9 @@ for (const f of files) {
     '\n</script>\n';
 }
 
-const assetTag = (!args.includes('--no-assets') && fs.existsSync(assetsFile)) ? '<script id="fnf-assets">\n' + fs.readFileSync(assetsFile, 'utf8').replace(/<\/script/gi, '<\\/script') + '\n</script>\n' : '';
+// the pack comes in pieces (tools/pack_assets.py): one <script> each, so no single script text gets too big for the browser
+const assetTag = (!args.includes('--no-assets') && fs.existsSync(assetsFile)) ? fs.readFileSync(assetsFile, 'utf8').split('/*FNF-CHUNK*/')
+  .map(part => '<script class="fnf-assets">\n' + part.replace(/<\/script/gi, '<\\/script') + '\n</script>\n').join('') : '';
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>

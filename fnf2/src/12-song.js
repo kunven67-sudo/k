@@ -5,8 +5,9 @@
 G.DIFF_INFO = {
   easy: { name: 'EASY', variation: 'default' }, normal: { name: 'NORMAL', variation: 'default' }, hard: { name: 'HARD', variation: 'default' },
   erect: { name: 'ERECT', variation: 'erect' }, nightmare: { name: 'NIGHTMARE', variation: 'erect' },
+  og: { name: 'OG', variation: 'og' },   // mods: the song as it was in the original mod (VS Garcello)
 };
-G.DIFF_ORDER = ['easy', 'normal', 'hard', 'erect', 'nightmare'];
+G.DIFF_ORDER = ['easy', 'normal', 'hard', 'erect', 'nightmare', 'og'];
 
 // which playable character a song variation belongs to: the player whose ownedChars has its player character
 // (preload/data/players/*.json: 'pico-playable' -> pico, 'darnell-player' -> darnell), anything else -> bf

@@ -120,8 +120,8 @@
     const S = {
       P, steps, k: -1, t: 0, black: 0, white: 0, done: false, cam: { z: P.cam.zoom, x: null, y: null, tw: null },
       begin() { P.hud.alpha = 0; this.go(); return this; },
-      go() { this.k++; this.t = 0; this.dlg = null; const s = this.steps[this.k]; if (!s) { this.finish(); return; } if (s.enter) s.enter(this); },
-      finish() { if (this.done) return; this.done = true; P.hud.alpha = 1; P.cam.zoom = P.camZoom; if (this.after) this.after(this); },
+      go() { const prev = this.steps[this.k]; if (prev && prev.leave) prev.leave(this); this.k++; this.t = 0; this.dlg = null; const s = this.steps[this.k]; if (!s) { this.finish(); return; } if (s.enter) s.enter(this); },
+      finish() { if (this.done) return; const cur = this.steps[this.k]; if (cur && cur.leave) cur.leave(this); this.done = true; P.hud.alpha = 1; P.cam.zoom = P.camZoom; if (this.after) this.after(this); },
       update(dt) {
         world(this, dt);
         if (this.done) return;
@@ -147,6 +147,7 @@
     };
     return S.begin();
   }
+  G.Scene = Scene;   // other mods' cutscenes use the same step runner (39-conversation.js)
   // the opening of the first two songs: black, fading away (Week 6's school intro), then the talking
   const fromBlack = { enter(S) { S.black = 1; }, dur: 2, update(S) { S.black = Math.max(0, 1 - S.t / 2); } };
   const talk = (id, opt) => ({ enter(S) { S.black = 0; S.dlg = Dialogue(conv(id), opt); } });

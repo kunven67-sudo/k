@@ -1,6 +1,6 @@
 // FNF 2 - game data. The real weeks/songs come from FNF's own level files
 // (preload/data/levels/*.json); this lists their order + our extras.
-G.WEEK_ORDER = ['tutorial', 'week1', 'week2', 'week3', 'week4', 'week5', 'week6', 'week7', 'weekend1', 'wrath', 'sky', 'nenesongs'];
+G.WEEK_ORDER = ['tutorial', 'week1', 'week2', 'week3', 'week4', 'week5', 'week6', 'week7', 'weekend1', 'wrath', 'sky', 'weekg', 'nenesongs'];
 // weeks packed only for the new players' own songs (Tankman: Week 7, Darnell: Weekend 1) until those weeks are
 // built properly for BF / Pico (their stage scripts + cutscenes): hidden from Story Mode and BF/Pico's freeplay.
 // nenesongs = Nene's own songs from mods (tools/own/nene.py), only ever played as Nene
@@ -22,6 +22,17 @@ G.CREDITS = [
   { name: 'Alexander0110', role: 'Owner of Sky' },
   { name: 'Dra9onSlayer5', role: 'Owner of Sky' },
   { name: 'Rermega', role: 'V-Slice port of VS Sky (stage + layout numbers)' },
+  { head: 'VS Garcello' },
+  { name: 'Atsuover', role: "Smoke 'Em Out Struggle: art, animation + music" },
+  { name: 'Rageminer', role: "Smoke 'Em Out Struggle: music" },
+  { name: 'Clover', role: 'Voice of Garcello + coding' },
+  { name: 'Dyl', role: 'Second art + animation' },
+  { name: 'Greeny3483', role: 'V-Slice port (Pico mixes, Erect stages)' },
+  { name: 'Pink Lemonade', role: 'Headache (Pico Mix)' },
+  { name: 'Plantgamer09', role: 'Nerves (Pico Mix)' },
+  { name: 'Requazar', role: 'Release + Fading (Pico Mix)' },
+  { name: 'InterstellarNuggo', role: 'Release Erect' },
+  { name: 'kirbiro + AppleHair', role: 'Freeplay icons for the port' },
   { head: 'Nene' },
   { name: 'ZenUnique', role: 'Playable Nene: her singing sprites' },
   { name: 'Fletch Legacy', role: 'Girls Night: After Hours (music)' },

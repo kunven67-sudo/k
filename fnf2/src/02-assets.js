@@ -193,4 +193,4 @@ G.assetsReady = (async function () {
 })();
 G.HAS_FNF = Object.keys(G.A.raw).length > 0;
 // the asset <script> tag's own text (the whole ~110 MB pack a second time) isn't needed once it has run
-(function () { const el = document.getElementById('fnf-assets'); if (el) el.remove(); try { delete window.__FNF_ASSETS; } catch (e) { window.__FNF_ASSETS = null; } })();
+(function () { for (const el of document.querySelectorAll('#fnf-assets, script.fnf-assets')) el.remove(); try { delete window.__FNF_ASSETS; } catch (e) { window.__FNF_ASSETS = null; } })();

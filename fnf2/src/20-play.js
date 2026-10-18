@@ -225,6 +225,7 @@
     },
     resetRun() {
       const s = this.song;
+      this.hideHealth = false; this.strumShift = 0;
       this.notes = s.notes.map((n, i) => ({ i, t: n.t, lane: n.d % 4, line: n.d >= 4 ? 0 : 1, len: n.l, kind: n.k, hit: false, missed: false, holdEnd: n.t + n.l, holding: false, dropped: false, done: false, holdLeft: n.l }));
       if (!this.mod) this.notes = this.notes.filter(isReal);           // modcharts off: no tricks, just the song
       this.evIdx = 0;
@@ -291,7 +292,7 @@
       if (this.mod && this.mod.update) this.mod.update(this, dt);
       for (const L of this.lines) for (const s of L.strums) {
         s.update(dt); centerOffsets(s); if (s.animName === 'confirm') { s.offset.x -= 13; s.offset.y -= 13; }
-        s.x = s.bx + s.mx; s.y = s.by + s.my; s.angle = s.ma; s.alpha = s.mal;
+        s.x = s.bx + s.mx; s.y = s.by + s.my + (this.strumShift || 0); s.angle = s.ma; s.alpha = s.mal;
         if (s.confirmHold >= 0) { s.confirmHold += dt; if (s.confirmHold >= 0.15) { s.confirmHold = -1; s.playA('static', true); } }
         if (s.player && s.animName === 'confirm' && s.finished && !this.botplay) { if (this.keys[s.dir]) s.playA('press', true); }
       }
@@ -308,6 +309,7 @@
     onStep(step) {
       this.stage.onStep(step);
       for (const c of [this.gf, this.dad, this.bf]) if (c) { const n = Math.round(c.danceEvery * 4) || 4; if (((step % n) + n) % n === 0) c.dance(false); }
+      if (step >= 0 && this.sfx && this.sfx.step) this.sfx.step(this, step);
       if (step % 4 === 0) {
         const beat = step / 4;
         if (beat < 0) this.countdownBeat(beat);
@@ -852,6 +854,7 @@
       // HUD
       if (this.hud.alpha > 0.01) { ctx.save(); ctx.globalAlpha = this.hud.alpha; this.drawHUD(ctx); ctx.restore(); }
       if (this.mod && this.mod.drawTop) this.mod.drawTop(ctx, this);
+      if (this.sfx && this.sfx.drawTop) this.sfx.drawTop(ctx, this);
       if (this.paused) this.drawPause(ctx);
       if (this.blackIn > 0) { G.setScreenT(ctx); ctx.globalAlpha = Math.min(1, this.blackIn); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
     },
@@ -899,11 +902,12 @@
       for (const sp of this.splashes) sp.draw(ctx, hud);
       // health bar
       const bg = this.hbBg;
+      if (!this.hideHealth) {   // (stage cinematics hide the bar, icons + score)
       bg.draw(ctx, hud);
       hud.apply(ctx);
       const bx = bg.x + 4, by = bg.y + 4, bw = bg.width - 8, bh = bg.height - 8;
       const p = G.clamp(this.health / 2, 0, 1);
-      ctx.fillStyle = '#FF0000'; ctx.fillRect(bx, by, bw * (1 - p), bh);
+      ctx.fillStyle = (this.dad && this.dad.data && this.dad.data.hpColor) || '#FF0000'; ctx.fillRect(bx, by, bw * (1 - p), bh);   // (mods can paint the opponent's side)
       ctx.fillStyle = '#66FF33'; ctx.fillRect(bx + bw * (1 - p), by, bw * p, bh);
       // icons (150x150 frames: normal | losing)
       const split = bg.x + bg.width * (1 - p);
@@ -914,6 +918,7 @@
       const fc = this.misses === 0 ? (this.tally.bad + this.tally.shit === 0 ? (this.tally.good === 0 ? 'SFC' : 'GFC') : 'FC') : this.misses < 10 ? 'SDCB' : 'Clear';
       const rate = this.accN ? ratingName(acc) + ' (' + (acc * 100).toFixed(2) + '%) - ' + fc : '?';
       G.vcr(ctx, 'Score: ' + Math.round(this.score) + ' | Misses: ' + this.misses + ' | Rating: ' + rate, G.W / 2, bg.y + 30, { align: 'center', size: 20, outline: 1.5 });
+      }
       if (this.botplay) G.vcr(ctx, 'BOTPLAY', G.W / 2, this.down ? G.H - 120 : 90, { align: 'center', size: 32 });
       if (this.practice) G.vcr(ctx, 'PRACTICE MODE', G.W / 2, this.down ? G.H - 160 : 130, { align: 'center', size: 22, alpha: 0.8 });
       // time bar (Psych)
@@ -943,6 +948,7 @@
       const frame = losing && ic.img.width >= 300 ? 1 : 0;
       const s = ic.scale;
       ctx.save();
+      if (ic.alpha != null) ctx.globalAlpha *= ic.alpha;
       ctx.translate(x + 75, cy);
       ctx.scale(ic.flip ? -s : s, s);
       ctx.imageSmoothingEnabled = !ic.pixel;
