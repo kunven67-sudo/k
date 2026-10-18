@@ -53,8 +53,20 @@ const ui = (() => {
   function update(dt) {
     const f = player;
     bar('hpBar', f.hp, f.maxHp); bar('arBar', f.armorHp, 100); bar('stBar', f.stamina, 100);
+    { const el = $('mpBar'); el.querySelector('i').style.width = Math.max(0, magic.mana / magic.max * 100) + '%'; el.querySelector('b').textContent = Math.floor(magic.mana) + ' / ' + Math.floor(magic.max); }
+    { const el = $('exBar'); el.style.display = magic.exh > 1 ? 'block' : 'none'; el.querySelector('i').style.width = Math.min(100, magic.exh) + '%'; }
+    hbT -= dt; if (hbT <= 0) { hbT = 0.25; hotbar(); }
+    $('aimDot').style.display = cast.on || (magic.bar[magic.sel] && !lockTarget && f.castAfter > 0) ? 'block' : 'none';
+    const tint = $('fxTint');
+    const burnK = f.burning > 0 ? 0.35 : 0, exK = Math.max(0, magic.exh - 55) / 45;
+    tint.style.opacity = Math.min(1, burnK + exK * 0.8);
+    tint.style.background = burnK ? 'radial-gradient(ellipse at center, transparent 45%, rgba(255,110,20,.55) 100%)' : 'radial-gradient(ellipse at center, transparent 40%, rgba(70,20,110,.6) 100%)';
     const st = [];
     if (f.bleed > 0.05) st.push(`<span class="bleed">BLEEDING</span>`);
+    if (f.burning > 0) st.push(`<span class="bleed">ON FIRE</span>`);
+    if (f.frozen > 0) st.push('FROZEN');
+    if ((f.wet || 0) > 0) st.push('<span style="opacity:.7">WET</span>');
+    if (f.shieldHp > 0) st.push('BARRIER ' + Math.ceil(f.shieldHp));
     if (f.legMult < 0.8) st.push('LIMPING');
     if (f.spdMult < 0.8) st.push('SWORD ARM HURT');
     if (bandaging > 0) st.push(`BANDAGING ${Math.round((1 - bandaging / 2.5) * 100)}%`);
@@ -125,8 +137,44 @@ const ui = (() => {
     const hurt = 1 - f.hp / f.maxHp;
     $('vignette').style.background = `radial-gradient(ellipse at center, transparent ${60 - hurt * 25}%, rgba(110,0,0,${Math.max(0, hurt - 0.35) * 1.2}) 100%)`;
   }
+  // the spell bar along the bottom
+  let hbT = 0;
+  const ICON = {
+    fire: '<path d="M12 2c2 4 6 6 6 11a6 6 0 0 1-12 0c0-3 2-4 2-7 1 2 2 3 3 3-1-3 0-5 1-7z"/>',
+    water: '<path d="M12 2c3 5 7 9 7 13a7 7 0 0 1-14 0c0-4 4-8 7-13z"/>',
+    wind: '<path d="M3 8h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 18h8" fill="none" stroke-width="2.2"/>',
+    earth: '<path d="M3 20l5-9 4 5 3-4 6 8z"/>',
+    lightning: '<path d="M13 2L5 14h6l-2 8 9-13h-6z"/>',
+    heal: '<path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z"/>',
+    blood: '<path d="M12 3c3 5 6 8 6 12a6 6 0 0 1-12 0c0-4 3-7 6-12z"/><path d="M12 10v9" stroke="#300" stroke-width="2"/>',
+    arcane: '<circle cx="12" cy="12" r="8" fill="none" stroke-width="2"/><path d="M12 4v16M4 12h16" fill="none" stroke-width="1.4"/>',
+    summon: '<path d="M7 21V10l5-6 5 6v11h-3v-5h-4v5z"/>',
+  };
+  function hotbar() {
+    const el = $('hotbar');
+    el.innerHTML = magic.bar.map((id, i) => {
+      if (!id) return `<div class="hs${magic.sel === i ? ' on' : ''}"><i>${i + 1}</i></div>`;
+      const s = SPELL[id], col = SCHOOL[s.school].css, cost = Math.round(spellCost(s, false, 1));
+      const locked = magic.max < RANK_MANA[s.rank], low = !locked && magic.mana < cost;
+      return `<div class="hs${magic.sel === i ? ' on' : ''}"><i>${i + 1}</i><em>${cost}</em><svg viewBox="0 0 24 24" fill="${col}" stroke="${col}">${ICON[s.school]}</svg><b style="color:${col}">${s.name}</b>${low ? `<div class="lo" style="height:${Math.round((1 - magic.mana / cost) * 100)}%"></div>` : ''}${locked ? '<div class="lk"></div>' : ''}</div>`;
+    }).join('');
+  }
+  function chant(on) {
+    $('chantBox').style.display = on ? 'block' : 'none';
+    if (!on) return;
+    const s = cast.spell;
+    $('chantText').innerHTML = cast.chantless ? `<span class="on">${s.name}</span>` : cast.words.map(w => `<span>${w}</span>`).join(' ');
+    $('chantMeta').textContent = (cast.chantless ? 'CHANTLESS  ' : '') + s.name.toUpperCase() + '  |  ' + RANKS[s.rank].toUpperCase() + '  |  ' + Math.round(spellCost(s, cast.chantless, 1)) + ' MANA' + (magic.mic && SR ? '  |  SAY IT' : '');
+  }
+  function chantProgress(k, c) {
+    $('chantRing').querySelector('i').style.width = Math.round(k * 100) + '%';
+    if (!c.chantless) { const spans = $('chantText').children, n = Math.ceil(k * spans.length); for (let i = 0; i < spans.length; i++) spans[i].className = i < n ? 'on' : ''; }
+    if (c.spell.charge && c.t > c.need) $('chantMeta').textContent = c.spell.name.toUpperCase() + '  |  POWER ' + c.power.toFixed(1) + '  |  ' + Math.round(spellCost(c.spell, c.chantless, c.power)) + ' MANA';
+    $('chantRing').querySelector('i').style.background = k >= 1 ? '#fff4c8' : '#e8d39a';
+  }
+  function chantSaid(t) { const spans = $('chantText').children; for (const sp of spans) sp.className = 'on'; $('chantMeta').textContent = 'YOU SAID: "' + t.trim().slice(0, 60) + '"'; }
   return {
-    update, weaponCard,
+    update, weaponCard, hotbar, chant, chantProgress, chantSaid,
     message(t, dur = 1.5) { $('msg').textContent = t; $('msg').style.opacity = 1; msgT = dur; },
     sub(t, dur = 2) { $('sub').textContent = t; $('sub').style.opacity = 1; subT = dur; },
     damageNumber(p, n, cut) {
@@ -159,6 +207,12 @@ function bindSettings() {
   $('sDmgNums').value = String(settings.dmgNums); $('sDmgNums').onchange = (e) => { settings.dmgNums = +e.target.value; saveSettings(); };
   $('sBrain').value = settings.brain; $('sBrain').onchange = (e) => { settings.brain = e.target.value; settings.brainAsked = 1; saveSettings(); if (settings.brain === 'ai') loadBrain(); };
   $('sHard').value = String(settings.hard); $('sHard').onchange = (e) => { settings.hard = +e.target.value; saveSettings(); };
+  $('sMic').value = String(magic.mic ? 1 : 0); $('sMic').onchange = (e) => {
+    magic.mic = +e.target.value; saveMagic(true);
+    if (magic.mic && !SR) { magic.mic = 0; e.target.value = '0'; alert('Your browser cannot turn speech into words. Use Chrome or Edge, or hold R to chant instead.'); return; }
+    if (magic.mic) navigator.mediaDevices && navigator.mediaDevices.getUserMedia({ audio: true }).then(st => st.getTracks().forEach(t => t.stop())).catch(() => { magic.mic = 0; e.target.value = '0'; saveMagic(true); });
+    else micStop();
+  };
 }
 bindSettings();
 let pauseFromTitle = false;
@@ -176,7 +230,7 @@ $('resumeBtn').onclick = () => {
 $('titleSettings').onclick = () => openPause(true);
 addEventListener('keydown', (e) => {
   if (e.code !== 'Escape') return;
-  if (shopOpen) closeShop(); else if (talk) endTalk();
+  if (shopOpen) closeShop(); else if (talk) endTalk(); else if (bookOpen) closeBook();
 });
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== renderer.domElement && playing && player.alive && !paused && !uiOpen && !cutscene && !passedOut) openPause(false);

@@ -41,11 +41,14 @@ function angleLerp(a, b, t) { let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math
 function stepFighter(f, dt, wish, speed, face, turnRate = 10) {
   if (f.down) return;
   const inWater = f.pos.y < WATER_Y - 0.15;
-  let target = speed * (inWater ? 0.55 : 1);
+  const gfx = groundFx(f.pos.x, f.pos.z);
+  let target = speed * (inWater ? 0.55 : 1) * (1 - gfx.mud * 0.65);
+  if (f.frozen > 0) { target = 0; f.dodge = 0; }
+  const icy = gfx.frost > 0.45 || (iceSheets.length && f.pos.y < WATER_Y + 0.1 && f.pos.y > WATER_Y);
   if (f.dodge > 0) {
     f.vel.x = f.dodgeDir.x * 7.2 * (f.dodge / 0.45 + 0.3); f.vel.z = f.dodgeDir.z * 7.2 * (f.dodge / 0.45 + 0.3);
   } else {
-    const acc = f.grounded ? 11 : 2.5;
+    const acc = f.grounded ? (icy ? 1.3 : 11) : 2.5;
     f.vel.x += (wish.x * target - f.vel.x) * Math.min(1, acc * dt);
     f.vel.z += (wish.z * target - f.vel.z) * Math.min(1, acc * dt);
   }
@@ -53,8 +56,10 @@ function stepFighter(f, dt, wish, speed, face, turnRate = 10) {
   collideFighter(f);
   const g = groundH(f.pos.x, f.pos.z);
   if (f.grounded) {
-    if (f.pos.y - g > 0.35) { f.grounded = false; f.vy = 0; } else f.pos.y = g;
+    if (f.pos.y - g > 0.35) { f.grounded = false; f.vy = 0; } else f.pos.y = g - gfx.mud * 0.28;
   }
+  // running hard on ice: sometimes your feet go out from under you
+  if (icy && f.grounded && f.speed > 4 && Math.random() < dt * 0.5) { knockDown(f, f.vel.x * 0.8, 1.5, f.vel.z * 0.8, 1.1); sfx.thud(f.pos, 1); }
   if (!f.grounded) {
     f.vy -= 17 * dt; f.pos.y += f.vy * dt;
     if (f.pos.y <= g) { f.pos.y = g; f.vy = 0; f.grounded = true; f.onLand && f.onLand(); sfx.step(f.pos, 'dirt', true, 1.4); }
@@ -67,6 +72,7 @@ function stepFighter(f, dt, wish, speed, face, turnRate = 10) {
 }
 // stamina, bleeding, timers shared by everyone
 function tickVitals(f, dt) {
+  magicStatus(f, dt);
   if (f.stagger > 0) f.stagger -= dt;
   if (f.recoil > 0) f.recoil -= dt;
   if (f.dodge > 0) f.dodge -= dt;
@@ -136,6 +142,16 @@ function pickTarget(f) {
 function updateKnight(f, dt) {
   const ai = f.ai;
   if (!f.alive) return;
+  if (f.knock) { updateKnock(f, dt); return; }
+  if (f.lift) return;
+  if (f.mage && !f.down) { updateMage(f, dt); return; }
+  // on fire: panic, run, scream
+  if (f.burning > 1.2 && !f.down && f.alive) {
+    ai.panicT = (ai.panicT || 0) - dt;
+    if (ai.panicT <= 0) { ai.panicT = 0.8 + Math.random(); ai.panicA = Math.random() * 6.28; }
+    stepFighter(f, dt, _wish.set(Math.sin(ai.panicA), 0, Math.cos(ai.panicA)), 4.2 * f.legMult, ai.panicA, 6);
+    return;
+  }
   ai.pickT = (ai.pickT || 0) - dt;
   if (ai.pickT <= 0 || !ai.target || !ai.target.alive || ai.target.inside) { ai.pickT = 0.6 + Math.random() * 0.4; ai.target = pickTarget(f); }
   const P = ai.target || player;
@@ -211,12 +227,12 @@ function updateKnight(f, dt) {
     if (ai.blockT > 0) { ai.blockT -= dt; if (ai.blockT <= 0) f.blocking = false; }
     // only two people swing at the same person at once, the rest circle and wait
     if (ai.cd <= 0 && !f.attack && !f.blocking && f.canAct() && (P.tokens || 0) < 2 && P.alive) {
-      const dirs = ['R', 'L', 'U', 'S', 'R', 'L', 'D'];
       const kind = f.tier === 2 && Math.random() < 0.3 ? 'heavy' : 'light';
-      if (f.startAttack(dirs[Math.floor(Math.random() * dirs.length)], kind)) { ai.attacking = P; P.tokens = (P.tokens || 0) + 1; f.attack.dur *= 1.15; }
+      if (f.startAttack(ai.nextDir || 'R', kind)) { ai.attacking = P; P.tokens = (P.tokens || 0) + 1; f.attack.dur *= 1.15; ai.nextDir = null; }
       ai.cd = 0.7 + Math.random() * 1.6 - Math.min(2, f.tier) * 0.15;
     }
   }
+  if (!ai.nextDir) { const dirs = ['R', 'L', 'U', 'S', 'R', 'L', 'D']; ai.nextDir = dirs[Math.floor(Math.random() * dirs.length)]; }
   if (ai.attacking && !f.attack) { ai.attacking.tokens = Math.max(0, (ai.attacking.tokens || 1) - 1); ai.attacking = false; }
   if (!f.canAct()) { speed *= 0.2; }
   if (f.stagger > 0) wish.multiplyScalar(0);
@@ -242,7 +258,7 @@ function updateSpawns(dt) {
     }
   }
   // corpses: keep the 10 newest
-  const dead = fighters.filter(f => !f.alive && !f.isPlayer);
+  const dead = fighters.filter(f => !f.alive && !f.isPlayer && !f.keep);
   if (dead.length > 10) removeFighter(dead[0]);
 }
 function removeFighter(f) {

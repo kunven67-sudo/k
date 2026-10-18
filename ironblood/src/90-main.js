@@ -18,6 +18,7 @@ function checkReady() {
   worldStarted = true;
   player = createPlayer();
   initVillage();
+  initLegends();
   for (const c of CAMPS.slice(0, 5)) { const n = 2 + Math.floor(Math.random() * 2); for (let i = 0; i < n; i++) spawnKnight(c); c.respawn = 45; }
   ui.weaponCard();
   captureSkyEnv(sunDir, true);
@@ -33,6 +34,8 @@ $('playBtn').onclick = () => {
   requestLock();
   ui.message('IRONBLOOD', 1.8);
   setTimeout(() => ui.sub('Knights are camped around the fields. Move the mouse while you click to pick your swing.', 5), 1200);
+  ui.hotbar();
+  if (!magic.intro) { magic.intro = 1; saveMagic(true); setTimeout(() => { ui.message('MAGIC', 1.6); ui.sub('You still remember the one spell your mother taught you: Water Ball. Hold R to chant it, let go to cast. G opens your spellbook.', 7); }, 7000); }
 };
 $('respawnBtn').onclick = () => {
   $('death').style.display = 'none';
@@ -44,6 +47,7 @@ $('respawnBtn').onclick = () => {
 const clock = new THREE.Clock();
 let animTick = 0;
 initTalk();
+initCastBox();
 let fpsAcc = 0, fpsFrames = 0, elapsed = 0, deathShown = false, deathT = 0, titleOrbit = 0;
 const capeCols = [{ x: 0, y: 0, z: 0, r: 0.21 }, { x: 0, y: 0, z: 0, r: 0.2 }, { x: 0, y: 0, z: 0, r: 0.12 }, { x: 0, y: 0, z: 0, r: 0.12 }];
 const _cv = new THREE.Vector3();
@@ -65,6 +69,7 @@ function frame() {
       for (const f of fighters) if (f.ai) { tickVitals(f, dt); updateKnight(f, dt); if (!f.alive || f.down) f.updateFall(dt); }
       for (const f of fighters) updateAttack(f, dt);
       updateVillage(dt);
+      updateVillageMagic(dt);
       updateSpawns(realDt);
     }
     animTick++;
@@ -84,6 +89,8 @@ function frame() {
       }
     }
     if (live) updateScene(dt);
+    updateMagic(dt, realDt, elapsed);
+    updateLegends(dt, realDt);
     gore.update(dt);
     // death screen
     if (!player.alive && playing) {
@@ -105,6 +112,7 @@ function frame() {
   captureSkyEnv(sunDir, false);
   animateLife(dt, elapsed, player.pos);
   updateWeather(realDt, wt);
+  updateMagicWorld(dt, realDt, wt);
   updateFires(realDt, wt, lightK.night);
   clothUniforms.uTime.value = wt;
   if (natureReady) updateNature(realDt, wt);
@@ -116,7 +124,7 @@ function frame() {
   for (const f of fighters) if (f.ai && f.alive && f.ai.alert && f.pos.distanceTo(player.pos) < 30) { inFight = true; break; }
   updateMusic(inFight && player.alive);
   if (window.__camOv) { camera.position.copy(window.__camOv.p); camera.lookAt(window.__camOv.t); } // test shots only
-  else if (playing && worldStarted) { updateCamera(realDt); cameraFx(elapsed); }
+  else if (playing && worldStarted) { updateCamera(realDt); cameraFx(elapsed); eyeCamera(); }
   else {
     // title screen: slow drift around the field
     titleOrbit += realDt * 0.05;
@@ -140,3 +148,5 @@ window.__V = { villagers, vsave, openTalk, say, startRaid, startScene, endTalk, 
 window.__W = { SQUARE, CASTLE, BRIDGE, BATTLE_X, FORTRESS, groundH };
 window.__dbg = () => ({ modelReady, natureReady, texDone, texPending, worldStarted, scans: scansLoaded + '/' + SCANS.length, cells: natureCells.size, inst: [...natureCells.values()].flat().reduce((a, m) => a + m.count, 0), fps: $('fps').textContent });
 window.__R = { renderer, composer, camera };
+window.__solid = (x, z, pad) => solidAt(x, z, pad); window.__clear = (x, z, r) => !circles.some(c => (c.x - x) ** 2 + (c.z - z) ** 2 < r * r) && riverDist(x, z) > 25 && slopeAt(x, z) < 0.2;
+window.__M = { get elapsed() { return elapsed; }, magic, SPELL, castSpell, learnSpell, cast, startChant, releaseChant, spawnMage, CAMPS, ignite, igniteDisc, burning, freezeWater, iceSheets, knockDown, mfx, projs, effects, wind, get lockTarget() { return lockTarget; }, set lockTarget(v) { lockTarget = v; } };

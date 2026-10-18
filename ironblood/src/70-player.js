@@ -79,7 +79,7 @@ addEventListener('mousedown', (e) => {
   if (!player.alive) return;
   if (e.button === 0) { mouse.l = true; mouse.lDown = performance.now(); attackPressed(swingDir()); }
   if (e.button === 1) { e.preventDefault(); attackPressed('S'); }
-  if (e.button === 2) { mouse.r = true; if (player.canAct() && !player.attack && player.hasSword) { player.blocking = true; player.blockStart = now(); } }
+  if (e.button === 2) { mouse.r = true; if (player.canAct() && !player.attack && player.hasSword && !cast.on) { player.blocking = true; player.blockStart = now(); } }
 });
 addEventListener('mouseup', (e) => {
   if (e.button === 0) { mouse.l = false; if (player.attack && player.attack.hold) player.attack.hold = false; }
@@ -97,7 +97,7 @@ function swingDir() {
 }
 function attackPressed(dir) {
   const f = player;
-  if (bandaging > 0) return;
+  if (bandaging > 0 || cast.on) return;
   let kind = 'light';
   if (!f.grounded) { kind = 'slam'; dir = 'U'; }
   else if (f.speed > 4.5) kind = 'run';
@@ -204,6 +204,8 @@ function updatePlayer(dt) {
   const f = player;
   tickVitals(f, dt);
   if (!f.alive) { f.updateFall(dt); return; }
+  if (f.knock) { updateKnock(f, dt); return; }
+  if (f.lift) return;
   if (lockTarget && (!lockTarget.alive || lockTarget.pos.distanceTo(f.pos) > 25)) lockTarget = null;
   const w = playing && !paused && !uiOpen && !cutscene && !passedOut ? moveWish() : new THREE.Vector3();
   // ale makes you weave about
@@ -216,6 +218,7 @@ function updatePlayer(dt) {
   if (f.blocking) speed = Math.min(speed, 1.3);
   if (f.attack && f.attack.kind !== 'run' && f.attack.kind !== 'slam') speed *= 0.35;
   if (bandaging > 0) speed = Math.min(speed, 1.0);
+  if (cast.on) speed *= cast.chantless ? 0.8 : 0.5;
   speed *= f.legMult;
   if (!f.canAct() && f.dodge <= 0) speed *= 0.25;
   // face where you move, or the locked target, or where you swing
@@ -242,7 +245,7 @@ function updatePlayer(dt) {
 function playerDied() {
   stats.deaths++;
   onPlayerDeathVillage();
-  if (settings.hard) { stats.str = 0; stats.spd = 0; stats.strXp = 0; stats.spdXp = 0; stats.kills = 0; stats.sword = 'arming'; }
+  if (settings.hard) { stats.str = 0; stats.spd = 0; stats.strXp = 0; stats.spdXp = 0; stats.kills = 0; stats.sword = 'arming'; magic.max = 20; magic.mastery = {}; magic.chantless = 0; saveMagic(true); }
   saveStats();
 }
 function respawnPlayer() {
@@ -250,6 +253,7 @@ function respawnPlayer() {
   removeFighter(old);
   player = createPlayer();
   bandages = 6; bandaging = 0; lockTarget = null;
+  magic.exh = 0; magic.mana = Math.max(magic.mana, magic.max * 0.5); magic.eyeOn = false; cast.on = false; ui.chant(false);
   // nearby enemies forget you for a moment
   for (const o of fighters) if (o.ai) { o.ai.alert = false; o.ai.shouted = false; }
 }

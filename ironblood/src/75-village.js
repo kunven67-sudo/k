@@ -57,6 +57,10 @@ const PERSONAS = [
   { id: 'piers', name: 'Piers', age: 50, sex: 'm', title: 'the drunk', home: 'h7', work: 'tavern', evening: 'tavern', pitch: 0.84,
     outfit: { top: DYE.grey, legs: DYE.brown, hood: true, hoodColor: DYE.grey },
     desc: 'always drunk, rambling, funny, once a soldier, tells wild stories that are sometimes true', likes: ['ale', 'mead', 'drink', 'story', 'war'], dislikes: ['water', 'sober', 'priest'], addr: 'lad', oath: 'Hic.' },
+  { id: 'ulric', name: 'Ulric', age: 67, sex: 'm', title: 'the wandering mage', home: 'tavern', work: 'square', evening: 'tavern', shop: 'magic', pitch: 0.78,
+    outfit: { dress: true, top: DYE.woad, legs: DYE.dark, hood: true, hoodColor: 0x23304a, cloak: true },
+    desc: 'an old traveling mage of the Water school who has stopped in Ashford, patient teacher, dry humor, sells lessons; warns that running out of mana makes you faint; says the most dangerous being alive is @@DRAGON_SHORT@@, a silver-haired man who walks the north mountains, and that you must never talk to him; calls @@MANGOD@@ a liar who whispers sweet help in dreams; has heard of a hungry demon empress with horns who wanders at night and grants demon eyes to those who feed her',
+    likes: ['magic', 'mana', 'spell', 'book', 'learn', 'study', 'water', 'chant', 'tea', 'student'], dislikes: ['lazy', 'arrogant', 'reckless', 'fire'], addr: 'young one', oath: 'Hm hm.' },
 ];
 const PERSONA = Object.fromEntries(PERSONAS.map(p => [p.id, p]));
 
@@ -65,6 +69,7 @@ const ITEMS = {
   bread: { name: 'Bread', heal: 10 }, stew: { name: 'Bowl of stew', heal: 25 }, draught: { name: 'Healing draught', heal: 50, stopBleed: true },
   honeycake: { name: 'Honey cake', heal: 6, gift: true }, flowers: { name: 'Wildflowers', gift: true }, ribbon: { name: 'Silk ribbon', gift: true },
   comb: { name: 'Carved comb', gift: true }, perfume: { name: 'Rose perfume', gift: true }, ring: { name: 'Silver ring', gift: true },
+  manadraught: { name: 'Mana draught', mana: 45 },
 };
 const vsave = { coins: 30, items: {}, goods: [], owned: ['arming'], armorLvl: 0, edge: 0, day: 1, anger: {}, people: {}, ally: null };
 try { Object.assign(vsave, JSON.parse(localStorage.getItem('ironblood.village') || '{}')); } catch (e) {}
@@ -182,6 +187,15 @@ function updateVillager(f, dt) {
   if (f.ai) return; // fighting: the knight brain drives them
   tickVitals(f, dt);
   if (!f.alive) return;
+  if (f.knock) { updateKnock(f, dt); return; }
+  if (f.lift) return;
+  if (f.burning > 1 && !f.down) {
+    // on fire: run for the river screaming
+    if (v.mode === 'talk') endTalk();
+    const rp = RIVER.reduce((b, p) => { const d = Math.hypot(p[0] - f.pos.x, p[1] - f.pos.z); return d < b.d ? { d, p } : b; }, { d: 1e9, p: null }).p;
+    walkTo(f, rp[0], rp[1], 4.8, dt);
+    return;
+  }
   if (f.down) { f.updateFall(dt); if (Math.random() < dt * 0.5) sfx.voice(f.pos, 'hurt', f.voicePitch); return; }
   const h = hourNow();
   // knights close by: armed villagers fight, the rest run home and bar the door

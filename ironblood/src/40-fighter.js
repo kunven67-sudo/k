@@ -7,8 +7,11 @@ const deathHooks = [], hitHooks = [];
 function hostile(a, b) {
   if (a === b) return false;
   const A = a.team, B = b.team;
+  if (A === 'god' || B === 'god') return false;
   if (A === 'knight') return B !== 'knight';
   if (B === 'knight') return true;
+  if (A === 'ally') return B === 'villager' && !!b.angryAtYou;
+  if (B === 'ally') return A === 'villager' && !!a.angryAtYou;
   if (A === 'you') return B === 'villager';
   if (B === 'you') return A === 'villager' && !!a.angryAtYou;
   return false;
@@ -186,14 +189,14 @@ class Fighter {
   get dmgMult() { return 1 + this.heat * 0.05 + (this.isPlayer ? stats.str * 0.025 + vsave.edge * 0.05 : 0); }
   get spdMult() {
     const arm = this.parts.ruarm.gone || this.parts.rfarm.gone ? 0.5 : 0.65 + 0.35 * Math.min(this.parts.ruarm.hp / this.parts.ruarm.max, this.parts.rfarm.hp / this.parts.rfarm.max);
-    return (1 + this.heat * 0.03 + (this.isPlayer ? stats.spd * 0.012 : 0)) * Math.max(0.5, arm);
+    return (1 + this.heat * 0.03 + (this.isPlayer ? stats.spd * 0.012 : 0)) * Math.max(0.5, arm) * (this.frozen > 0 ? 0.5 : 1);
   }
   get legMult() {
     const l = Math.min(this.parts.lthigh.hp / this.parts.lthigh.max, this.parts.lshin.hp / this.parts.lshin.max);
     const r = Math.min(this.parts.rthigh.hp / this.parts.rthigh.max, this.parts.rshin.hp / this.parts.rshin.max);
     return 0.45 + 0.55 * Math.max(0, Math.min(l, r));
   }
-  canAct() { return this.alive && !this.down && this.stagger <= 0 && this.recoil <= 0 && this.dodge <= 0; }
+  canAct() { return this.alive && !this.down && this.stagger <= 0 && this.recoil <= 0 && this.dodge <= 0 && !this.knock && !this.lift; }
   startAttack(dir, kind = 'light') {
     if (!this.canAct() || this.attack || !this.hasSword) return false;
     const cost = (kind === 'heavy' ? 24 : 13) * Math.sqrt(this.sword.weight);
@@ -266,6 +269,12 @@ class Fighter {
     const up = _v1.set(0, 1, 0), right = _vr.set(-1, 0, 0).applyQuaternion(this.root.quaternion);
     if (Math.abs(cp.yaw) > 0.001) rotateBoneWorld(this.b.Spine1, up, cp.yaw * 0.6);
     if (Math.abs(cp.pitch) > 0.001) rotateBoneWorld(this.b.Spine, right, -cp.pitch * 0.7);
+    if (this.castAim && !this.hasSword && !this.noArms && !this.parts.luarm.gone && !this.parts.lfarm.gone) {
+      const sh = this.b.LeftArm.getWorldPosition(_vt3);
+      _vt.copy(this.castAim).sub(sh); const dl = _vt.length() || 1;
+      _vt.multiplyScalar(Math.min(0.58, dl) / dl).add(sh); _vt.y -= 0.04;
+      solveArm(this.b.LeftArm, this.b.LeftForeArm, this.b.LeftHand, _vt, _vp.set(0.9, -1, -0.4).applyQuaternion(this.root.quaternion));
+    }
     if (!this.hasSword || this.noArms) return;
     // hands go where the swing path says
     this.handW = this.handW || new THREE.Vector3();
@@ -279,7 +288,13 @@ class Fighter {
       _vt.addScaledVector(_vt2, -0.07);
       solveArm(this.b.RightArm, this.b.RightForeArm, this.b.RightHand, _vt, poleR);
     }
-    if (this.twoHanded && !this.parts.luarm.gone && !this.parts.lfarm.gone) {
+    if (this.castAim && !this.parts.luarm.gone && !this.parts.lfarm.gone) {
+      const sh = this.b.LeftArm.getWorldPosition(_vt3);
+      _vt.copy(this.castAim).sub(sh); const dl = _vt.length() || 1;
+      _vt.multiplyScalar(Math.min(0.58, dl) / dl).add(sh);
+      _vt.y -= 0.04;
+      solveArm(this.b.LeftArm, this.b.LeftForeArm, this.b.LeftHand, _vt, _vp.set(0.9, -1, -0.4).applyQuaternion(this.root.quaternion));
+    } else if (this.twoHanded && !this.parts.luarm.gone && !this.parts.lfarm.gone) {
       const poleL = _vp.set(0.7, -1, -0.2).applyQuaternion(this.root.quaternion);
       _vt.copy(this.handW).addScaledVector(this.bladeW, -0.11);
       _vt2.copy(_vt).sub(this.b.LeftArm.getWorldPosition(_vt3)).normalize();
@@ -313,9 +328,19 @@ class Fighter {
   }
   // ---- taking a hit ----
   takeHit(k, raw, o) {
-    if (!this.alive) return;
+    if (!this.alive || this.invuln) return;
     const P = PARTS[k], part = this.parts[k];
     if (part.gone) return;
+    if (this.shieldHp > 0 && !o.through) {
+      const a = Math.min(this.shieldHp, raw);
+      this.shieldHp -= a; raw -= a;
+      if (this.shield) this.shield.material.uniforms.uHit.value = 1;
+      sfx.shieldHit && sfx.shieldHit(o.point || this.pos);
+      if (this.shieldHp <= 0) dropShield(this);
+      if (raw <= 0.5) { if (o.from) o.from.recoil = Math.max(o.from.recoil, 0.2); return; }
+    }
+    if (this.frozen > 0 && (o.power || 1) >= 1.3) { raw *= 1.3; this.frozen = 0.01; }
+    if (this.spirit) o = Object.assign({}, o, { noBlood: true, blunt: false });
     const pierce = Math.min(0.95, (o.pierce || 0) + (o.stab ? 0.3 : 0));
     let armor = this.T.armor[P.key];
     if (this.isPlayer) armor = Math.min(0.92, armor * (0.35 + 0.65 * (this.armorHp / 100)) + vsave.armorLvl * 0.06);
@@ -328,8 +353,14 @@ class Fighter {
     part.wounds++;
     this.lastHitBy = o.from;
     const at = o.point;
-    if (stopped) { sfx.armorHit(at); gore.sparks(at, o.dir); }
-    else {
+    if (stopped && !o.noBlood) { sfx.armorHit(at); gore.sparks(at, o.dir); }
+    else if (o.noBlood) { this.bleed += o.blunt ? dmg * 0.004 : 0; }
+    else if (o.blunt) {
+      sfx.thud(at, Math.min(1.5, dmg / 20)); if (dmg > 18) sfx.crack(at);
+      this.bleed += dmg * 0.008;
+      gore.blood(at, o.dir, Math.min(25, dmg * 0.4), 1.5 + dmg * 0.03);
+      this.blood = Math.min(1, this.blood + dmg * 0.003);
+    } else {
       (o.stab ? sfx.stab : sfx.cut).call(sfx, at, Math.min(1.4, dmg / 25));
       this.bleed += dmg * (o.stab ? 0.035 : 0.025) * (o.cut || 1);
       gore.blood(at, o.dir, Math.min(60, 8 + dmg * 0.9), 2 + dmg * 0.05);
@@ -349,11 +380,20 @@ class Fighter {
     // cut through: only when the part is destroyed by an edge (stabs don't take limbs off)
     if (part.hp <= 0) {
       part.hp = 0;
-      if (P.sever && !o.stab && settings.gore > 0) this.sever(P.sever, o);
-      if (k === 'head' || k === 'neck') return this.die(o, k === 'neck' ? 'beheaded' : 'skull split');
-      if (k === 'chest' || k === 'belly') return this.die(o, 'cut open');
+      if (o.blunt || o.noBlood) {
+        // crushed, burned or shocked: bones break, nothing comes off
+        if (!part.broken && P.side) { part.broken = true; if (o.blunt) { sfx.crack(at); sfx.crack(at); }
+          if (k === 'ruarm' || k === 'rfarm') { this.dropSword(); if (this.isPlayer) ui.message('YOUR SWORD ARM IS BROKEN', 2); }
+          if (P.leg) { this.goDown(); if (this.isPlayer) ui.message('YOUR LEG IS BROKEN', 2); } }
+        if (k === 'head' || k === 'neck') return this.die(o, o.how || (o.blunt ? 'skull crushed' : 'killed'));
+        if (k === 'chest' || k === 'belly') return this.die(o, o.how || (o.blunt ? 'chest caved in' : 'killed'));
+      } else {
+        if (P.sever && !o.stab && settings.gore > 0) this.sever(P.sever, o);
+        if (k === 'head' || k === 'neck') return this.die(o, k === 'neck' ? 'beheaded' : 'skull split');
+        if (k === 'chest' || k === 'belly') return this.die(o, 'cut open');
+      }
     }
-    if (this.hp <= 0) this.die(o, 'killed');
+    if (this.hp <= 0) this.die(o, o.how || 'killed');
   }
   sever(boneName, o) {
     if (this.severed.includes(boneName)) return;
@@ -440,10 +480,10 @@ class Fighter {
     setTimeout(() => sfx.thud(this.pos, 1.2), 650);
     this.dropSword();
     // torso cut open: ribs show, organs spill out
-    const torso = o && (o.part === 'chest' || o.part === 'belly') && !o.stab;
+    const torso = o && (o.part === 'chest' || o.part === 'belly') && !o.stab && !o.blunt && !o.noBlood && !o.burn;
     if (torso && settings.gore >= 2) gore.openTorso(this, o);
     else if (o && o.stab && (o.part === 'chest' || o.part === 'belly') && settings.gore >= 2) gore.openTorso(this, o, true);
-    gore.pool(this);
+    if (!o || !o.burn) gore.pool(this);
     if (o && o.from) o.from.onKill && o.from.onKill(this, how);
     for (const h of deathHooks) h(this, (o && o.from) || this.lastHitBy, how);
   }

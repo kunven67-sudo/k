@@ -35,7 +35,7 @@ function updateSky(dt = 0) {
   scene.fog.color.copy(_fc);
   scene.fog.density = 0.0018 + war * 0.009 + snowy * 0.003 + night * 0.0015;
   // weather follows where you are
-  weather.rain += (war - weather.rain) * Math.min(1, dt * 0.5);
+  weather.rain += (Math.max(war, weather.storm || 0) - weather.rain) * Math.min(1, dt * ((weather.storm || 0) > war ? 0.9 : 0.5));
   weather.snow += (snowy - weather.snow) * Math.min(1, dt * 0.5);
   terrainUniforms.uWet.value = Math.min(0.9, weather.rain * 0.95);
   for (const w of windowsLitMats()) w.emissiveIntensity = night * 1.6;

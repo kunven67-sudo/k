@@ -20,7 +20,7 @@ function clothPBR(kind, color, U) {
 const FACES = {};
 let facesReady = false;
 function loadFaces(L, done) {
-  loadGLB(L, ASSET_BASE + 'faces.glb', (gltf) => {
+  loadGLB(L, ASSET_BASE + 'faces2.glb', (gltf) => {
     for (const g of gltf.scene.children[0] ? (gltf.scene.children[0].name === 'faces' ? gltf.scene.children[0].children : gltf.scene.children) : []) {
       g.traverse(o => { if (o.isMesh) { o.castShadow = true; const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { m.envMapIntensity = 0.6; if (m.name.endsWith('_skin')) { m.roughness = 0.58; } } } });
       FACES[g.name] = g;

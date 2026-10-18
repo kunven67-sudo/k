@@ -114,6 +114,45 @@
   .srow b { display: block; font-size: 14px; } .srow small { color: var(--dim); font-size: 11px; }
   .srow em { font-style: normal; color: #e2c77a; font-weight: 700; text-align: right; font-size: 13px; }
   #fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+  #mpBar i { background: linear-gradient(#4f8ff0, #24489a); }
+  #exBar { height: 6px; display: none; } #exBar i { background: linear-gradient(#b05ae0, #5a2280); }
+  #hotbar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 5px; }
+  .hs { width: 54px; height: 54px; border-radius: 5px; background: rgba(10,10,14,.62); border: 1px solid rgba(255,255,255,.14); position: relative; overflow: hidden; text-align: center; }
+  .hs.on { border-color: #e8d39a; box-shadow: 0 0 10px rgba(232,211,154,.35); }
+  .hs i { position: absolute; left: 4px; top: 2px; font-style: normal; font-size: 10px; color: var(--dim); }
+  .hs b { position: absolute; left: 0; right: 0; bottom: 3px; font-size: 9px; font-weight: 700; letter-spacing: .02em; line-height: 1.05; padding: 0 2px; }
+  .hs em { position: absolute; right: 4px; top: 2px; font-style: normal; font-size: 9px; color: #9fc2ff; }
+  .hs svg { position: absolute; left: 50%; top: 12px; width: 24px; height: 24px; margin-left: -12px; }
+  .hs .lk { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+  .hs .lo { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(40,90,200,.28); }
+  #chantBox { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); width: min(720px, calc(100% - 40px)); text-align: center; display: none; }
+  #chantText { font-family: Cinzel, serif; font-size: 17px; line-height: 1.5; text-shadow: 0 1px 4px #000; color: rgba(232,226,214,.35); }
+  #chantText span.on { color: #ffe9b0; text-shadow: 0 0 10px rgba(255,210,120,.6), 0 1px 3px #000; }
+  #chantMeta { font-size: 11px; letter-spacing: .14em; color: var(--dim); margin-top: 4px; }
+  #chantRing { width: 160px; height: 4px; background: rgba(255,255,255,.15); margin: 6px auto 0; border-radius: 2px; overflow: hidden; }
+  #chantRing i { display: block; height: 100%; width: 0; background: #e8d39a; }
+  #castBox { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); display: none; gap: 8px; align-items: center; background: rgba(14,13,12,.9); border: 1px solid rgba(226,199,122,.3); border-radius: 6px; padding: 8px 10px; pointer-events: auto; }
+  #castBox label { font-family: Cinzel, serif; font-size: 13px; color: #e2c77a; }
+  #castIn { width: 380px; background: #1d1b19; color: var(--bright); border: 1px solid #4a4236; border-radius: 4px; padding: 7px 9px; font-size: 14px; outline: none; font-family: Cinzel, serif; }
+  #book { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100% - 32px)); height: min(640px, calc(100% - 50px)); }
+  #bookHead { font-size: 12px; color: var(--dim); margin-top: 4px; }
+  #bookHead b { color: #e2c77a; }
+  #bookRows { flex: 1; overflow-y: auto; padding: 4px 16px 10px; }
+  .bsch { font-family: Cinzel, serif; font-weight: 800; font-size: 14px; letter-spacing: .1em; margin: 12px 0 4px; }
+  .brow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 4px; cursor: pointer; border: 1px solid transparent; }
+  .brow:hover { background: rgba(255,255,255,.04); }
+  .brow.pick { border-color: #e8d39a; background: rgba(232,211,154,.08); }
+  .brow.unk { opacity: .5; cursor: default; }
+  .brow small { color: var(--dim); font-size: 11px; } .brow .bd { color: rgba(232,226,214,.75); }
+  .brow em { font-style: normal; color: #9fc2ff; font-size: 11px; white-space: nowrap; }
+  #bookBar { display: flex; gap: 5px; flex-wrap: wrap; padding: 8px 14px 4px; border-top: 1px solid rgba(255,255,255,.08); }
+  .slotb { flex: 1; min-width: 70px; cursor: pointer; font-size: 11px; font-weight: 700; color: var(--bright); background: #1d1b19; border: 1px solid #4a4236; border-radius: 4px; padding: 6px 4px; }
+  .slotb i { font-style: normal; color: var(--dim); margin-right: 4px; } .slotb.on { border-color: #e8d39a; }
+  #bookHint { font-size: 11px; color: var(--dim); padding: 4px 14px 12px; }
+  #aimDot { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,240,200,.85); box-shadow: 0 0 6px rgba(255,220,150,.8); display: none; }
+  #fxTint { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+  @media (max-width: 1350px) { #hotbar { bottom: 78px; } .hs { width: 46px; height: 46px; } .hs b { font-size: 8px; } .hs svg { top: 9px; width: 20px; height: 20px; margin-left: -10px; } #chantBox { bottom: 136px; } #castBox { bottom: 190px; } }
+  @media (max-width: 1100px) { #hotbar { bottom: 150px; } #chantBox { bottom: 206px; } #castBox { bottom: 260px; } }
 </style>
 </head>
 <body>
@@ -132,12 +171,17 @@
   <div id="reticle"></div>
   <svg id="dir" viewBox="-23 -23 46 46"></svg>
   <div id="lock"><div class="ln" id="lockName"></div><div class="lh" id="lockHp"></div><svg id="lockBody" viewBox="0 0 60 120"></svg></div>
+  <div id="aimDot"></div>
+  <div id="hotbar"></div>
+  <div id="chantBox"><div id="chantText"></div><div id="chantRing"><i></i></div><div id="chantMeta"></div></div>
   <div id="msg"></div>
   <div id="sub"></div>
   <div class="bl">
     <div class="bar" id="hpBar"><i></i><span>HEALTH</span><b></b></div>
     <div class="bar" id="arBar"><i></i><span>ARMOR</span><b></b></div>
     <div class="bar" id="stBar"><i></i><span>STAMINA</span><b></b></div>
+    <div class="bar" id="mpBar"><i></i><span>MANA</span><b></b></div>
+    <div class="bar" id="exBar"><i></i></div>
     <div id="status"></div>
   </div>
   <svg id="selfBody" viewBox="0 0 60 120"></svg>
@@ -148,6 +192,14 @@
   </div>
 </div>
 <div id="vignette"></div>
+<div id="fxTint"></div>
+<div id="castBox"><label>Cast</label><input id="castIn" maxlength="300" placeholder="Type a spell or its whole chant, then Enter" autocomplete="off"></div>
+<div class="panel" id="book">
+  <div class="phead"><div class="pn">Spellbook</div><div id="bookHead"></div></div>
+  <div id="bookRows"></div>
+  <div id="bookBar"></div>
+  <div id="bookHint"></div>
+</div>
 <div id="fade"></div>
 <div class="panel" id="talk">
   <div class="phead"><div class="pn" id="talkName"></div><div class="pt" id="talkTitle"></div><div class="pr" id="talkRel"></div></div>
@@ -180,6 +232,9 @@
     <span><b>F</b></span><span>Finisher</span><span><b>B</b></span><span>Bandage</span>
     <span><b>X</b></span><span>Switch sword</span><span><b>Esc</b></span><span>Pause / settings</span>
     <span><b>E</b></span><span>Talk / trade / search bodies</span><span><b>H</b></span><span>Eat or drink a draught</span>
+    <span><b>Hold R</b></span><span>Chant the spell (let go to cast)</span><span><b>Shift + R</b></span><span>Cast without words</span>
+    <span><b>1 - 8</b></span><span>Pick a spell</span><span><b>Enter</b></span><span>Type a spell</span>
+    <span><b>G</b></span><span>Spellbook</span><span><b>N</b></span><span>Drink a mana draught</span>
   </div>
 </div>
 
@@ -194,6 +249,7 @@
     <div class="row"><label>Mouse speed</label><input type="range" id="sSens" min="20" max="250"><em></em></div>
     <div class="row"><label>Damage numbers</label><select id="sDmgNums"><option value="1">On</option><option value="0">Off</option></select><em></em></div>
     <div class="row"><label>Village brain</label><select id="sBrain"><option value="ai">AI in the game (about 900 MB once)</option><option value="builtin">Built-in (no download)</option></select><em></em></div>
+    <div class="row"><label>Speak spells (mic)</label><select id="sMic"><option value="0">Off (hold R to chant)</option><option value="1">On: say the spell while holding R</option></select><em></em></div>
     <div class="row"><label>Hardcore</label><select id="sHard"><option value="0">Off (respawn at the barn)</option><option value="1">On (death resets your strength)</option></select><em></em></div>
     <div class="center"><button class="btn" id="resumeBtn">RESUME</button></div>
   </div>

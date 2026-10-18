@@ -8,5 +8,5 @@ dry_branches_medium_01, fern_02, grass_medium_01, grass_medium_02, moss_01, rock
 namaqualand_boulder_02, stone_fire_pit, wooden_crate_01, kite_shield, large_castle_door.
 Ground/building textures and the HDRI sky are loaded straight from Poly Haven at runtime.
 
-faces.glb: villager and player faces built from the MakeHuman base mesh, face-shape targets and high-poly eyes
+faces2.glb: villager, player and legend faces built from the MakeHuman base mesh, face-shape targets and high-poly eyes
 (MakeHuman, **CC0**, makehumancommunity.org). Skin, lips, brows and stubble are painted by IRONBLOOD's own baker.
