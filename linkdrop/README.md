@@ -18,7 +18,7 @@ Paste a TikTok link, get the video. A phone-first web app in one HTML file.
 | File | What it is |
 | --- | --- |
 | `index.html` | The whole app. Works on its own. |
-| `manifest.webmanifest`, `sw.js`, `icon-*.png` | Only needed to install it as an app and get the TikTok Share button. |
+| `manifest.json`, `sw.js`, `icon-*.png` | Only needed to install it as an app and get the TikTok Share button. |
 
 ## How it gets the video
 

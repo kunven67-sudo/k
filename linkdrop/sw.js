@@ -1,7 +1,7 @@
 // LINKDROP service worker: keeps the app itself working offline-ish.
 // It only touches LINKDROP's own files, never the TikTok downloads.
 const CACHE = 'linkdrop-v1';
-const SHELL = ['./index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(() => {}));
