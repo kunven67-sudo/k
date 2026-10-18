@@ -43,6 +43,7 @@ G.CharScripts = {};
     init(ch) {
       ch.nene = { state: 'DEFAULT', pupil: 'RIGHT', blink: 3, danced: false };
       const N = ch.nene;
+      if (ch.noAbot) { N.viz = []; return; }       // (mods sit her somewhere else: Tabi's Pico mix has her at a table)
       N.abot = atlasSprite(ABOT + 'abotSystem');
       N.eyes = atlasSprite(ABOT + 'systemEyes');
       N.whites = new G.Sprite(0, 0).makeSolid(160, 60, '#FFFFFF');
@@ -61,6 +62,7 @@ G.CharScripts = {};
     },
     attach(ch, stage) {
       const N = ch.nene;
+      if (!N.abot) return;
       const ax = ch.x - 95 + ch.globalOffsets[0] * ch.scale.x, ay = ch.y + 384 + ch.globalOffsets[1] * ch.scale.y;
       const put = (s, x, y, z) => { s.x = x; s.y = y; s.zIndex = z; s.scroll.x = ch.scroll.x; s.scroll.y = ch.scroll.y; stage.addExtra(s, ch); };
       const z = ch.zIndex - 10;
@@ -74,7 +76,7 @@ G.CharScripts = {};
     dance(ch, force) {
       const N = ch.nene;
       // A-Bot bumps on every dance (frame 1 on: frame 0 is a still frame)
-      if (N.abot.atlas) { N.abot.play('all', true); N.abot.fi = 1; N.abot.paused = false; }
+      if (N.abot && N.abot.atlas) { N.abot.play('all', true); N.abot.fi = 1; N.abot.paused = false; }
       // let a combo cheer / laugh finish
       if (!force && ['combo50', 'drop70', 'combo200'].includes(ch.animName) && !ch.finished) return;
       switch (N.state) {
@@ -89,15 +91,15 @@ G.CharScripts = {};
     },
     tick(ch, dt) {
       const N = ch.nene, hp = ch.playHealth != null ? ch.playHealth : 1;
-      N.abot.update(dt);
+      if (N.abot) N.abot.update(dt);
       // pupils: slide between "looking left" (frame 17) and "looking right" (frame 30)
-      if (N.eyes.atlas && N.eyes.moving) {
+      if (N.eyes && N.eyes.atlas && N.eyes.moving) {
         N.eyes.paused = false; N.eyes.update(dt); N.eyes.paused = true;
         if (N.pupil === 'RIGHT' && N.eyes.fi >= 17) { N.pupil = 'LEFT'; N.eyes.moving = false; N.eyes.fi = 17; }
         else if (N.pupil === 'LEFT' && N.eyes.fi >= 30) { N.pupil = 'RIGHT'; N.eyes.moving = false; N.eyes.fi = 30; }
       }
       // visualizer bars (frame 5 = smallest, 0 = tallest)
-      const lv = levels(N), muted = !G.settings.vol || G.settings.vol.master === 0 || G.settings.vol.music === 0;
+      const lv = N.viz.length ? levels(N) : null, muted = !G.settings.vol || G.settings.vol.master === 0 || G.settings.vol.music === 0;
       N.viz.forEach((v, i) => {
         let f = muted ? 0 : Math.round(lv[i] * 6);
         v.visible = f > 0;
@@ -121,7 +123,7 @@ G.CharScripts = {};
     onEvent(ch, kind, v) {
       if (kind !== 'FocusCamera') return;
       let c = v != null && typeof v === 'object' ? v.char : v; c = +c;
-      const N = ch.nene; if (!N.eyes.atlas) return;
+      const N = ch.nene; if (!N.eyes || !N.eyes.atlas) return;
       if (c === 0) { N.eyes.play('all', true); N.eyes.fi = 17; N.pupil = 'LEFT'; N.eyes.moving = true; N.eyes.paused = true; }       // look right at the player
       else if (c === 1) { N.eyes.play('all', true); N.eyes.fi = 0; N.pupil = 'RIGHT'; N.eyes.moving = true; N.eyes.paused = true; } // look left at the opponent
     },

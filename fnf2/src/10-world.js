@@ -170,6 +170,7 @@ G.Stage = class {
       spr.angle = p.angle || 0; spr.zIndex = p.zIndex || 0;
       spr.flipX = !!p.flipX; spr.flipY = !!p.flipY;
       if (p.blend) spr.blend = { add: 'lighter', multiply: 'multiply', screen: 'screen', overlay: 'overlay', lighten: 'lighten', darken: 'darken' }[String(p.blend).toLowerCase()] || null;
+      if (p.color) { const c = String(p.color).replace(/^#/, '').slice(-6).toLowerCase(); if (/^[0-9a-f]{6}$/.test(c) && c !== 'ffffff') spr.tint = 'mul:#' + c; }   // (FlxSprite.color)
       spr.name = p.name;
       if (animated) {
         spr.useAnimOffsets = true;

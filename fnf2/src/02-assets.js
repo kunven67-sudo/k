@@ -180,7 +180,10 @@ G.FONT.gone = "'YoureGone', 'VCR', sans-serif";
 G.FONT.pixel = "'PixelArial', 'VCR', monospace";
 G.assetsReady = (async function () {
   // FNF's own fonts: VCR (HUD/menus) and 5by7 (freeplay)
-  for (const [file, name] of [['fonts/vcr.ttf', 'VCR'], ['fonts/5by7.ttf', '5by7'], ['fonts/5by7_b.ttf', '5by7b'], ['fonts/YoureGone-Regular.otf', 'YoureGone'], ['fonts/pixel.otf', 'PixelArial']]) {
+  const known = [['fonts/vcr.ttf', 'VCR'], ['fonts/5by7.ttf', '5by7'], ['fonts/5by7_b.ttf', '5by7b'], ['fonts/YoureGone-Regular.otf', 'YoureGone'], ['fonts/pixel.otf', 'PixelArial']];
+  // mods bring their own fonts (fonts/mods/<name>.ttf|otf): they're registered under their file name
+  for (const k in G.A.raw) if (/^fonts\/mods\/.+\.(ttf|otf)$/i.test(k)) known.push([k, k.slice(11).replace(/\.(ttf|otf)$/i, '')]);
+  for (const [file, name] of known) {
     const f = G.A.raw[file];
     if (!f) continue;
     try {

@@ -34,6 +34,23 @@ G.audio = (function () {
       src.connect(g); g.connect(bus.sfx); src.start();
     });
   };
+  // a sound you can stop again (voice lines in cutscenes): -> { stop(fade) }
+  A.voice = function (path, o) {
+    o = o || {};
+    const h = { src: null, g: null, stopped: false, stop(fade) {
+      this.stopped = true; if (!this.src) return;
+      const t = ctx.currentTime;
+      if (fade) { this.g.gain.cancelScheduledValues(t); this.g.gain.setValueAtTime(this.g.gain.value, t); this.g.gain.linearRampToValueAtTime(0.0001, t + fade); try { this.src.stop(t + fade + 0.05); } catch (e) {} }
+      else try { this.src.stop(); } catch (e) {}
+    } };
+    G.A.audio(path).then(buf => {
+      if (!buf || h.stopped) return;
+      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = !!o.loop;
+      const g = ctx.createGain(); g.gain.value = o.vol == null ? 1 : o.vol;
+      src.connect(g); g.connect(o.bus === 'music' ? bus.music : bus.sfx); src.start(); h.src = src; h.g = g;
+    });
+    return h;
+  };
   // short names used around the game
   const SFX = {
     fav: 'preload/sounds/fav.ogg', unfav: 'preload/sounds/unfav.ogg',

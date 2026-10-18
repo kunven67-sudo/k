@@ -16,7 +16,12 @@ G.srcImg = (function () {
     let c = m.get(f);
     if (!c) {
       if (img.complete === false || img.naturalWidth === 0) return img;   // not decoded yet: don't bake an empty copy
-      c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.filter = f; x.drawImage(img, 0, 0); m.set(f, c);
+      c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d');
+      if (f.startsWith('mul:')) {   // FlxSprite.color: the picture multiplied by a colour (mods tint characters this way)
+        x.drawImage(img, 0, 0); x.globalCompositeOperation = 'multiply'; x.fillStyle = f.slice(4); x.fillRect(0, 0, c.width, c.height);
+        x.globalCompositeOperation = 'destination-in'; x.drawImage(img, 0, 0);
+      } else { x.filter = f; x.drawImage(img, 0, 0); }
+      m.set(f, c);
     }
     return c;
   };
@@ -421,7 +426,9 @@ G.Sprite = class {
     if (this.alpha < 1) ctx.globalAlpha *= this.alpha;
     if (this.blend) ctx.globalCompositeOperation = this.blend;
     ctx.imageSmoothingEnabled = this.antialias;
-    this.drawContent(ctx);
+    // (tint = FlxSprite.color on one sprite: a filter such as 'mul:#4956cc', unless a bigger one is already on)
+    if (this.tint && !G.imgFilter) { G.imgFilter = this.tint; try { this.drawContent(ctx); } finally { G.imgFilter = null; } }
+    else this.drawContent(ctx);
     ctx.restore();
     ctx.imageSmoothingEnabled = true;
   }
@@ -450,7 +457,7 @@ G.FCam = class {
   update(dt) {
     // Flixel LOCKON lerp is framerate dependent: lerp = rate * 60 * dt per frame
     const k = 1 - Math.pow(1 - this.followRate, dt * 60);
-    this.x += (this.tx - this.x) * k; this.y += (this.ty - this.y) * k;
+    this.x += (this.tx + (this.offX || 0) - this.x) * k; this.y += (this.ty + (this.offY || 0) - this.y) * k;   // (offX/offY = FlxCamera.targetOffset)
     if (this.shakeT > 0) { this.shakeT -= dt; const m = this.shakeI * G.W; this.sx = (Math.random() * 2 - 1) * m * this.zoom; this.sy = (Math.random() * 2 - 1) * m * this.zoom; if (this.shakeT <= 0) { this.shakeI = 0; this.sx = this.sy = 0; } }
     if (this.flashA > 0) this.flashA = Math.max(0, this.flashA - dt / this.flashD);
   }
@@ -460,6 +467,11 @@ G.FCam = class {
     const q = G.q, z = this.zoom;
     const scx = this.x - G.W / 2, scy = this.y - G.H / 2;
     const ox = G.W / 2 - z * (scx * sfx + G.W / 2) + this.sx, oy = G.H / 2 - z * (scy * sfy + G.H / 2) + this.sy;
+    if (this.angle) {   // (FlxCamera.angle: the whole view turns around the middle of the screen)
+      const a = this.angle * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), cx = G.W / 2, cy = G.H / 2;
+      ctx.setTransform(q * z * c, q * z * s, -q * z * s, q * z * c, q * (cx + c * (ox - cx) - s * (oy - cy)), q * (cy + s * (ox - cx) + c * (oy - cy)));
+      return;
+    }
     ctx.setTransform(q * z, 0, 0, q * z, q * ox, q * oy);
   }
   drawFX(ctx) {
@@ -471,6 +483,11 @@ G.HudCam = class {
   constructor() { this.zoom = 1; this.alpha = 1; this.sx = 0; this.sy = 0; this.shakeI = 0; this.shakeT = 0; this.angle = 0; }
   apply(ctx) {
     const q = G.q, z = this.zoom;
+    if (this.angle) {   // (the HUD turns around the middle of the screen)
+      const r = this.angle * Math.PI / 180, c = Math.cos(r), sn = Math.sin(r), cx = G.W / 2, cy = G.H / 2;
+      ctx.setTransform(q * z * c, q * z * sn, -q * z * sn, q * z * c, q * (cx - z * (c * cx - sn * cy) + this.sx), q * (cy - z * (sn * cx + c * cy) + this.sy));
+      return;
+    }
     ctx.setTransform(q * z, 0, 0, q * z, q * (G.W / 2 * (1 - z) + this.sx), q * (G.H / 2 * (1 - z) + this.sy));
   }
   shake(i, d) { this.shakeI = Math.max(this.shakeI, i); this.shakeT = Math.max(this.shakeT, d); }

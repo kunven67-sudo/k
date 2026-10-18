@@ -1,6 +1,6 @@
 // FNF 2 - game data. The real weeks/songs come from FNF's own level files
 // (preload/data/levels/*.json); this lists their order + our extras.
-G.WEEK_ORDER = ['tutorial', 'week1', 'week2', 'week3', 'week4', 'week5', 'week6', 'week7', 'weekend1', 'wrath', 'sky', 'weekg', 'nenesongs'];
+G.WEEK_ORDER = ['tutorial', 'week1', 'week2', 'week3', 'week4', 'week5', 'week6', 'week7', 'weekend1', 'wrath', 'sky', 'weekg', 'tabi', 'tabi-bonus', 'nenesongs'];
 // weeks packed only for the new players' own songs (Tankman: Week 7, Darnell: Weekend 1) until those weeks are
 // built properly for BF / Pico (their stage scripts + cutscenes): hidden from Story Mode and BF/Pico's freeplay.
 // nenesongs = Nene's own songs from mods (tools/own/nene.py), only ever played as Nene
@@ -33,6 +33,19 @@ G.CREDITS = [
   { name: 'Requazar', role: 'Release + Fading (Pico Mix)' },
   { name: 'InterstellarNuggo', role: 'Release Erect' },
   { name: 'kirbiro + AppleHair', role: 'Freeplay icons for the port' },
+  { head: 'VS Tabi' },
+  { name: 'Homskiy', role: 'Made the original Tabi mod' },
+  { name: 'Ascenti, LegoGodzilla702, SlinkyRaccoon, DonutVA', role: 'Tabi Revival: directors' },
+  { name: '19GST, Aiden-Does-Stuff, Azuwure, BoruIDK, CjArtz', role: 'Tabi Revival: art' },
+  { name: 'Elemenopii, Josee/Randominc, Kyng, LolipopSpooky, Redpanzee, ReneXThree', role: 'Tabi Revival: art' },
+  { name: 'CharaWhy, eden_essence, Leebert, Mamon, Noichi, SicOn, TheOnlyVolume, Rareblin', role: 'Tabi Revival: music' },
+  { name: 'WizardMantis441, Vechett', role: 'Tabi Revival: code' },
+  { name: 'Aus_si, Flootena, Blam_Daylight, Roman Bear', role: 'Tabi Revival: charts' },
+  { name: 'TimeLime', role: 'Tabi Revival: writing' },
+  { name: 'DonutVA, Novasaur, CyanVA', role: 'Tabi Revival: voices' },
+  { name: 'AGDoesThings', role: 'Tabi Revival: video' },
+  { name: 'SangMareZG', role: 'V-Slice port (Pico mix, extra art)' },
+  { name: 'Boloxd', role: 'Note camera script' },
   { head: 'Nene' },
   { name: 'ZenUnique', role: 'Playable Nene: her singing sprites' },
   { name: 'Fletch Legacy', role: 'Girls Night: After Hours (music)' },

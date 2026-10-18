@@ -22,25 +22,51 @@
   };
   const easeFn = (name, dir) => { const k = (name || 'linear') + (dir || ''); return EASES[k] || EASES[name] || EASES.linear; };
 
-  // ---------------------------------------------------------------- note style (FNF "funkin" style)
-  const NS = {
-    get notes() { return G.Sparrow.load('shared/images/notes'); },
-    get strum() { return G.Sparrow.load('shared/images/noteStrumline'); },
-    get splash() { return G.Sparrow.load('shared/images/noteSplashes'); },
-    cover(i) { return G.Sparrow.load('shared/images/holdCover' + COLOR[i]); },
-    get hold() { return G.A.image('shared/images/NOTE_hold_assets.png') || G.A.image('preload/images/NOTE_hold_assets.png'); },
-  };
+  // ---------------------------------------------------------------- note styles
+  // FNF's own "funkin" style, or a song's noteStyle (V-Slice data/notestyles/<id>.json: mods bring their own arrows,
+  // strums, holds + splashes, each with its own scale/offsets). Missing parts fall back to funkin.
+  function makeNS(id) {
+    const j = id && id !== 'funkin' ? G.A.json('preload/data/notestyles/' + id + '.json') : null, A = (j && j.assets) || {};
+    const path = p => G.A.imagePath(p);
+    const N = {
+      id: j ? id : 'funkin',
+      notesPath: A.note ? path(A.note.assetPath) : 'shared/images/notes',
+      notePre: d => A.note ? A.note.data[DIRL[d]].prefix : 'note' + DIR[d],
+      noteScale: A.note && A.note.scale != null ? A.note.scale : 0.7,
+      strumPath: A.noteStrumline ? path(A.noteStrumline.assetPath) : 'shared/images/noteStrumline',
+      strumPre: (d, k) => A.noteStrumline ? (A.noteStrumline.data[DIRL[d] + k] || {}).prefix : { Static: 'static', Press: 'press', Confirm: 'confirm', ConfirmHold: 'confirmHold' }[k] + DIR[d] + (k === 'ConfirmHold' ? '' : '0'),
+      strumScale: A.noteStrumline && A.noteStrumline.scale != null ? A.noteStrumline.scale : 0.7,
+      strumOff: (A.noteStrumline && A.noteStrumline.offsets) || [0, 0],
+      holdPath: A.holdNote ? path(A.holdNote.assetPath) + '.png' : null,
+      holdScale: A.holdNote && A.holdNote.scale != null ? A.holdNote.scale : 0.7,
+      splashPath: A.noteSplash ? path(A.noteSplash.assetPath) : 'shared/images/noteSplashes',
+      splashPre: d => A.noteSplash ? (A.noteSplash.data[DIRL[d] + 'Splashes'] || []).map(x => x.prefix) : SPLASH[DIRL[d]],
+      splashOff: (A.noteSplash && A.noteSplash.offsets) || [25, -5],
+      splashAlpha: A.noteSplash && A.noteSplash.alpha != null ? A.noteSplash.alpha : 0.8,
+      splashBlend: A.noteSplash && A.noteSplash.data && A.noteSplash.data.blendMode === 'add' ? 'lighter' : null,
+      splashOn: !(A.noteSplash && A.noteSplash.data && A.noteSplash.data.enabled === false),
+      coversOn: !(A.holdNoteCover && A.holdNoteCover.data && A.holdNoteCover.data.enabled === false),
+      get notes() { return G.Sparrow.load(this.notesPath); },
+      get strum() { return G.Sparrow.load(this.strumPath); },
+      get splash() { return this.splashOn ? G.Sparrow.load(this.splashPath) : null; },
+      cover(i) { return this.coversOn ? G.Sparrow.load('shared/images/holdCover' + COLOR[i]) : null; },
+      get hold() { return (this.holdPath && G.A.image(this.holdPath)) || G.A.image('shared/images/NOTE_hold_assets.png') || G.A.image('preload/images/NOTE_hold_assets.png'); },
+    };
+    return N;
+  }
+  let NS = makeNS('funkin');
   function makeStrum(i, player) {
     const s = new G.Sprite(0, 0);
-    s.loadSparrow('shared/images/noteStrumline');
-    s.addAnim('static', 'static' + DIR[i] + '0', 24, false);
-    s.addAnim('press', 'press' + DIR[i] + '0', 24, false);
-    s.addAnim('confirm', 'confirm' + DIR[i] + '0', 24, false);
-    s.addAnim('confirm-hold', 'confirmHold' + DIR[i], 24, true) || s.addAnim('confirm-hold', 'confirm' + DIR[i] + '0', 24, true);
-    s.scale.x = s.scale.y = 0.7;
+    s.loadSparrow(NS.strumPath);
+    s.addAnim('static', NS.strumPre(i, 'Static'), 24, false);
+    s.addAnim('press', NS.strumPre(i, 'Press'), 24, false);
+    s.addAnim('confirm', NS.strumPre(i, 'Confirm'), 24, false);
+    s.addAnim('confirm-hold', NS.strumPre(i, 'ConfirmHold') || '', 24, true) || s.addAnim('confirm-hold', NS.strumPre(i, 'Confirm'), 24, true);
+    s.scale.x = s.scale.y = NS.strumScale;
     s.play('static', true); s.updateHitbox();
     s.dir = i; s.player = player; s.confirmHold = -1;
-    s.playA = function (n, force) { this.play(n, force); centerOffsets(this); if (n === 'confirm') { this.offset.x -= 13; this.offset.y -= 13; } };
+    const so = NS.strumOff;
+    s.playA = function (n, force) { this.play(n, force); centerOffsets(this); if (n === 'confirm') { this.offset.x -= 13; this.offset.y -= 13; } this.offset.x -= so[0]; this.offset.y -= so[1]; };
     return s;
   }
   // special notes (modcharts): 'fake' = a decoy that vanishes before it gets to you (can't be hit),
@@ -190,6 +216,7 @@
         { player: false, x: this.middle ? -9999 : 48, y, strums: [] },
         { player: true, x: this.middle ? G.W / 2 - SPACING * 2 : G.W / 2 + 48, y, strums: [] },
       ];
+      NS = makeNS(this.song.noteStyle);
       for (const L of this.lines) for (let i = 0; i < 4; i++) {
         const s = makeStrum(i, L.player);
         s.x = s.bx = L.x + i * SPACING + INITIAL_OFFSET; s.y = s.by = L.y;
@@ -374,7 +401,7 @@
         }
         case 'PlayAnimation': {
           const map = { bf: this.bf, boyfriend: this.bf, player: this.bf, dad: this.dad, opponent: this.dad, gf: this.gf, girlfriend: this.gf };
-          const c = map[v.target]; if (c) { c.playAnim(v.anim, !!v.force); if (c.isSinging && !c.animName.startsWith('sing')) c.holdTimer = 0; }
+          const c = map[v.target || 'bf']; if (c) { c.playAnim(v.anim, !!v.force); if (c.isSinging && !c.animName.startsWith('sing')) c.holdTimer = 0; }
           break;
         }
         case 'ZoomCamera': {
@@ -457,6 +484,7 @@
       else if (!this.dad._locked) { this.dad.lastNote = n; this.dad.sing(n.lane, false, suffix); }
       if (this.audio) this.audio.setVolume('o', 1);
       this.nudgeCam(1, n.lane);
+      if (this.sfx && this.sfx.oppHit) this.sfx.oppHit(this, n);
     },
     // mod stages (movecam.lua / alleynene.lua): the camera leans 20px the way each note on the side it's
     // looking at points, quicker (camera speed x3), and goes back 1 second after the last one
@@ -512,7 +540,9 @@
       if (r === 'bad' || r === 'shit') { if (this.combo >= 10 && G.settings.comboPopups !== false) this.popCombo(0); this.combo = 0; }
       else { this.combo++; this.maxCombo = Math.max(this.maxCombo, this.combo); }
       if (r === 'sick' || r === 'killer') this.splash(n.lane);
-      if (G.settings.comboPopups !== false) { this.popRating(r === 'killer' ? 'sick' : r); if (this.combo >= 10) this.popCombo(this.combo); }
+      // (a mod's own HUD can show the rating + combo its way)
+      if (G.settings.comboPopups !== false && !(this.sfx && this.sfx.popups && this.sfx.popups(this, r === 'killer' ? 'sick' : r, this.combo))) { this.popRating(r === 'killer' ? 'sick' : r); if (this.combo >= 10) this.popCombo(this.combo); }
+      if (this.sfx && this.sfx.playerHit) this.sfx.playerHit(this, n, r);
       const suffix = n.kind === 'alt' ? '-alt' : '', ka = kindAnim(this.bf, n.kind);
       if (n.kind === 'hey') this.bf.playAnim('hey', true); else if (ka) { this.bf.playAnim(ka, true); this.bf.holdTimer = 0; } else this.bf.sing(n.lane, false, suffix);
       if (this.audio) this.audio.setVolume('p', 1);
@@ -573,15 +603,15 @@
       this.combo = 0;
     },
     splash(lane) {
-      if (!G.settings.noteSplashes) return;
-      const sp = new G.Sprite(0, 0); sp.loadSparrow('shared/images/noteSplashes');
-      const v = Math.floor(Math.random() * 2);
-      sp.addAnim('s', SPLASH[DIRL[lane]][v], 24 + Math.floor(Math.random() * 5) - 2, false);
+      if (!G.settings.noteSplashes || !NS.splashOn) return;
+      const sp = new G.Sprite(0, 0); sp.loadSparrow(NS.splashPath);
+      const pre = NS.splashPre(lane), v = Math.floor(Math.random() * pre.length);
+      if (!sp.addAnim('s', pre[v], 24 + Math.floor(Math.random() * 5) - 2, false)) return;
       sp.play('s', true); sp.updateHitbox();
-      const S = this.lines[1].strums[lane];
-      sp.x = S.x + 25; sp.y = S.y - INITIAL_OFFSET - 5;
+      const S = this.lines[1].strums[lane], so = NS.splashOff;
+      sp.x = S.x + so[0]; sp.y = S.y - INITIAL_OFFSET + so[1];
       sp.offset.x = sp.width * 0.3; sp.offset.y = sp.height * 0.3;
-      sp.alpha = 0.8;
+      sp.alpha = NS.splashAlpha; sp.blend = NS.splashBlend;
       this.splashes.push(sp);
     },
     startCover(n) {
@@ -762,14 +792,15 @@
       const pid = G.playerOf(bf.id), pico = pid === 'pico';
       const suffix = pid !== 'bf' && G.A.has('shared/music/gameplay/gameover/gameOver-' + pid + '.ogg') ? '-' + pid : '';
       const lossSfx = 'shared/sounds/gameplay/gameover/fnf_loss_sfx-' + pid + '.ogg';
-      G.sfx(pico ? 'deathPico' : suffix && G.A.has(lossSfx) ? lossSfx : 'death');
+      const ov = (this.sfx && this.sfx.gameOver) || null;   // (a mod stage's own game over sound + music: Genocide)
+      G.sfx(ov && ov.sfx ? ov.sfx : pico ? 'deathPico' : suffix && G.A.has(lossSfx) ? lossSfx : 'death');
       // new players have no death animations: their own "oh no" one, held
       if (!bf.playAnim('firstDeath', true) && this.playAs) bf.playAnim(this.playAs.real.die, true);
       const dd = bf.deathData || {};
       const co = dd.cameraOffsets || [0, 0];
       const mid = { x: bf.x + bf.width / 2, y: bf.y + bf.height / 2 };
       // like V-Slice: zoom to the stage zoom x the character's death zoom, follow at half the normal rate
-      this.gameOver = { t: 0, phase: 'intro', fade: 0, pico, suffix, zoom0: this.cam.zoom, zoom1: (this.stageZoom || 1) * (dd.cameraZoom || 1), target: { x: mid.x + co[0], y: mid.y + co[1] } };
+      this.gameOver = { t: 0, phase: 'intro', fade: 0, pico, suffix, music: ov && ov.music, end: ov && ov.end, zoom0: this.cam.zoom, zoom1: (this.stageZoom || 1) * (dd.cameraZoom || 1), target: { x: mid.x + co[0], y: mid.y + co[1] } };
       this.camTween = null;
       this.cam.follow(this.gameOver.target.x, this.gameOver.target.y);
       this.cam.followRate = 0.02;
@@ -781,7 +812,7 @@
       bf.update(dt);
       this.cam.zoom = G.lerp(go.zoom1, this.cam.zoom, Math.pow(0.01, dt / 0.5));
       this.cam.update(dt);
-      if (go.phase === 'intro' && bf.finished) { go.phase = 'loop'; bf.playAnim('deathLoop', true); G.audio.music.play('shared/music/gameplay/gameover/gameOver' + go.suffix + '.ogg', { loop: true, bpm: 100 }); }
+      if (go.phase === 'intro' && bf.finished) { go.phase = 'loop'; bf.playAnim('deathLoop', true); G.audio.music.play(go.music || 'shared/music/gameplay/gameover/gameOver' + go.suffix + '.ogg', { loop: true, bpm: 100 }); }
       // retry: wait (confirm jingle length / 7), fade to black over 2s, then the song starts over and fades in
       if (go.phase === 'confirm') { go.ct += dt; const w = go.pico ? 2.703 / 7 : 7.21 / 7; if (go.ct > w) go.fade = Math.min(1, (go.ct - w) / 2); if (go.ct > w + 2 && !go.left) { go.left = true; this.restart(true); } }
       if (go.phase === 'exit') { go.ct += dt; go.fade = Math.min(1, go.ct / 0.5); }
@@ -792,7 +823,7 @@
         go.phase = 'confirm'; go.ct = 0;
         if (!this.bf.playAnim('deathConfirm', true) && this.playAs) this.bf.playAnim(this.playAs.real.retry, true);
         G.audio.music.stop(0);
-        G.audio.music.play('shared/music/gameplay/gameover/gameOverEnd' + go.suffix + '.ogg', { loop: false });
+        G.audio.music.play(go.end || 'shared/music/gameplay/gameover/gameOverEnd' + go.suffix + '.ogg', { loop: false });
       } else if (a === 'back' && go.phase !== 'confirm' && go.phase !== 'exit') { go.phase = 'exit'; go.ct = 0; G.audio.music.stop(0.3); this.exitToMenu(); }
     },
     // -------------------------------------------------- end of song
@@ -840,13 +871,8 @@
       if (!this.ready) { G.vcr(ctx, 'Loading...', G.W - 20, G.H - 50, { align: 'right', size: 32 }); return; }
       if (this.gameOver) { this.drawGameOver(ctx); return; }
       // world
-      for (const s of this.stage.ordered()) {
-        const o = s.owner || s;
-        const slot = o === this.bf ? 'bf' : o === this.dad ? 'dad' : o === this.gf ? 'gf' : null;
-        const f = slot && this.charFilter[slot];
-        if (f) { G.imgFilter = f; try { s.draw(ctx, this.cam); } finally { G.imgFilter = null; } }
-        else s.draw(ctx, this.cam);
-      }
+      if (this.sfx && this.sfx.drawWorld) this.sfx.drawWorld(ctx, this, cam => this.drawWorld(ctx, cam));
+      else this.drawWorld(ctx, this.cam);
       if (this.sfx && this.sfx.drawOver) this.sfx.drawOver(ctx, this);
       if (this.mod && this.mod.drawWorld) this.mod.drawWorld(ctx, this);
       this.cam.drawFX(ctx);
@@ -857,6 +883,15 @@
       if (this.sfx && this.sfx.drawTop) this.sfx.drawTop(ctx, this);
       if (this.paused) this.drawPause(ctx);
       if (this.blackIn > 0) { G.setScreenT(ctx); ctx.globalAlpha = Math.min(1, this.blackIn); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
+    },
+    drawWorld(ctx, cam) {
+      for (const s of this.stage.ordered()) {
+        const o = s.owner || s;
+        const slot = o === this.bf ? 'bf' : o === this.dad ? 'dad' : o === this.gf ? 'gf' : null;
+        const f = slot && this.charFilter[slot];
+        if (f) { G.imgFilter = f; try { s.draw(ctx, cam); } finally { G.imgFilter = null; } }
+        else s.draw(ctx, cam);
+      }
     },
     songLabel() {
       const dn = (G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff;
@@ -883,13 +918,13 @@
           const S = L.strums[n.lane];
           const y = S.y - INITIAL_OFFSET + this.noteY(n.t);
           if (y > G.H + 120 || y < -260) { if ((n.t - this.songPos) * PX_PER_MS * this.scrollSpeed > G.H + 300) break; continue; }
-          const f = G.Sparrow.byPrefix(notesSheet, 'note' + DIR[n.lane])[0]; if (!f) continue;
-          const w = f.fw * 0.7;
+          const f = G.Sparrow.byPrefix(notesSheet, NS.notePre(n.lane))[0]; if (!f) continue;
+          const ns = NS.noteScale, w = f.fw * ns;
           const x = S.x - INITIAL_OFFSET - (w - STRUM_SIZE) / 2 - NUDGE;
           if (this.mod && this.mod.drawNote && this.mod.drawNote(ctx, this, n, L, x, y, f, notesSheet)) continue;
           ctx.save(); ctx.translate(x, y);
-          if (S.angle) { const c = f.fw * 0.35; ctx.translate(c, c); ctx.rotate(S.angle * Math.PI / 180); ctx.translate(-c, -c); }
-          ctx.scale(0.7, 0.7);
+          if (S.angle) { const c = f.fw * ns / 2; ctx.translate(c, c); ctx.rotate(S.angle * Math.PI / 180); ctx.translate(-c, -c); }
+          ctx.scale(ns, ns);
           ctx.globalAlpha *= (n.missed ? 0.3 : 1) * S.alpha;
           G.Sparrow.draw(ctx, notesSheet, f); ctx.restore();
         }
@@ -902,7 +937,8 @@
       for (const sp of this.splashes) sp.draw(ctx, hud);
       // health bar
       const bg = this.hbBg;
-      if (!this.hideHealth) {   // (stage cinematics hide the bar, icons + score)
+      if (this.sfx && this.sfx.drawHealth && this.sfx.drawHealth(ctx, this)) { /* a mod's own health bar + score */ }
+      else if (!this.hideHealth) {   // (stage cinematics hide the bar, icons + score)
       bg.draw(ctx, hud);
       hud.apply(ctx);
       const bx = bg.x + 4, by = bg.y + 4, bw = bg.width - 8, bh = bg.height - 8;
@@ -913,11 +949,7 @@
       const split = bg.x + bg.width * (1 - p);
       this.drawIcon(ctx, this.iconP1, split - 26, bg.y + bg.height / 2, this.health < 0.4);
       this.drawIcon(ctx, this.iconP2, split - (150 - 26), bg.y + bg.height / 2, this.health > 1.6);
-      // Psych-style score line
-      const acc = this.accN ? this.accSum / this.accN : 0;
-      const fc = this.misses === 0 ? (this.tally.bad + this.tally.shit === 0 ? (this.tally.good === 0 ? 'SFC' : 'GFC') : 'FC') : this.misses < 10 ? 'SDCB' : 'Clear';
-      const rate = this.accN ? ratingName(acc) + ' (' + (acc * 100).toFixed(2) + '%) - ' + fc : '?';
-      G.vcr(ctx, 'Score: ' + Math.round(this.score) + ' | Misses: ' + this.misses + ' | Rating: ' + rate, G.W / 2, bg.y + 30, { align: 'center', size: 20, outline: 1.5 });
+      G.vcr(ctx, this.scoreLine(), G.W / 2, bg.y + 30, { align: 'center', size: 20, outline: 1.5 });
       }
       if (this.botplay) G.vcr(ctx, 'BOTPLAY', G.W / 2, this.down ? G.H - 120 : 90, { align: 'center', size: 32 });
       if (this.practice) G.vcr(ctx, 'PRACTICE MODE', G.W / 2, this.down ? G.H - 160 : 130, { align: 'center', size: 22, alpha: 0.8 });
@@ -942,6 +974,13 @@
         ctx.globalAlpha = 0.7; ctx.fillStyle = '#000'; G.roundRect(ctx, G.W - 110, 20, 88, 70, 14); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(G.W - 82, 36, 10, 38); ctx.fillRect(G.W - 62, 36, 10, 38); ctx.globalAlpha = 1;
       }
     },
+    // Psych-style score line
+    scoreLine() {
+      const acc = this.accN ? this.accSum / this.accN : 0;
+      const fc = this.misses === 0 ? (this.tally.bad + this.tally.shit === 0 ? (this.tally.good === 0 ? 'SFC' : 'GFC') : 'FC') : this.misses < 10 ? 'SDCB' : 'Clear';
+      const rate = this.accN ? ratingName(acc) + ' (' + (acc * 100).toFixed(2) + '%) - ' + fc : '?';
+      return 'Score: ' + Math.round(this.score) + ' | Misses: ' + this.misses + ' | Rating: ' + rate;
+    },
     drawIcon(ctx, ic, x, cy, losing) {
       if (!ic.img) return;
       const fw = ic.img.width >= 300 ? 150 : ic.img.width, fh = ic.img.height;
@@ -958,7 +997,7 @@
     // one sustain trail: tiled hold piece + end cap from NOTE_hold_assets (8 columns)
     drawHold(ctx, L, n, img) {
       if (!img) return;
-      const colW = img.width / 8, zoom = 0.7, w = colW * zoom, S = L.strums[n.lane];
+      const colW = img.width / 8, zoom = NS.holdScale, w = colW * zoom, S = L.strums[n.lane];
       const x = S.x - INITIAL_OFFSET + STRUM_SIZE / 2 - w / 2;
       let startT = n.t, endT = n.holdEnd;
       if (n.hit && n.holding) startT = Math.max(startT, this.songPos);
