@@ -75,7 +75,7 @@ G.Character = class extends G.Sprite {
   }
   isSinging() { return this.animName.startsWith('sing') && !this.animName.endsWith('-end'); }
   dance(force) {
-    if (this.isDead) return;
+    if (this.isDead || this._locked) return;          // (locked = a special animation must play out)
     if (this.script && this.script.dance) { this.script.dance(this, force); return; }
     if (!force) {
       if (this.isSinging()) return;
@@ -94,7 +94,7 @@ G.Character = class extends G.Sprite {
     return true;
   }
   sing(dir, miss, suffix) {
-    const n = 'sing' + ['LEFT', 'DOWN', 'UP', 'RIGHT'][dir] + (miss ? 'miss' : '') + (suffix || '');
+    const n = 'sing' + ['LEFT', 'DOWN', 'UP', 'RIGHT'][dir] + (miss ? 'miss' : '') + (suffix || this.singSuffix || '');
     this.holdTimer = 0;
     if (!this.playAnim(n, true) && miss) this.playAnim('sing' + ['LEFT', 'DOWN', 'UP', 'RIGHT'][dir], true);
     if (this.fx && this.fx.onSing) this.fx.onSing(this, dir, miss);

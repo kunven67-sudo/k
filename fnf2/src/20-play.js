@@ -164,7 +164,7 @@
       this.cond = new G.SongConductor(s.timeChanges);
       this.songPos = -this.cond.crochet * 5;
       this.cond.reset(this.songPos);
-      this.ended = false; this.dead = false; this.paused = false; this.pauseMenu = null; this.gameOver = null;
+      this.ended = false; this.endCut = false; this.dead = false; this.paused = false; this.pauseMenu = null; this.gameOver = null;
       this.countBeat = -99; this.started = false;
       this.keys = [false, false, false, false];
       this.botplay = !!G.settings.botplay; this.practice = !!G.settings.practice;
@@ -197,7 +197,7 @@
     update(dt) {
       if (this.failed || !this.ready) return;
       if (this.blackIn > 0) this.blackIn -= dt;
-      if (this.cutscene) { this.cutscene.update(dt); if (this.cutscene.done) { this.cutscene = null; this.startCountdown(); } return; }
+      if (this.cutscene) { this.cutscene.update(dt); if (this.cutscene.done) { const c = this.cutscene; this.cutscene = null; if (c.isEnd) this.endSong(); else this.startCountdown(); } return; }
       if (this.gameOver) { this.updateGameOver(dt); return; }
       if (this.paused) { this.updatePause(dt); return; }
       const prev = this.songPos;
@@ -702,6 +702,15 @@
     endSong() {
       this.ended = true;
       if (this.audio) this.audio.stop();
+      // a song's own ending cutscene plays first (same rule as the intro ones: not after a retry)
+      if (!this.endCut) {
+        this.endCut = true;
+        const cs = G.Cutscenes && G.Cutscenes[this.song.id];
+        if (cs && cs.createEnd && !this.params.deaths && !this.params.noCutscene) {
+          let sc = null; try { sc = cs.createEnd(this); } catch (e) { G.reportError(e, 'end cutscene'); }
+          if (sc) { sc.isEnd = true; this.cutscene = sc; return; }
+        }
+      }
       const p = this.params, s = this.song;
       const acc = this.accN ? this.accSum / this.accN : 0;
       const stats = { score: Math.round(this.score), misses: this.misses, maxCombo: this.maxCombo, tally: Object.assign({}, this.tally), acc, totalNotes: this.notes.filter(n => n.line === 1 && isReal(n)).length };
@@ -719,7 +728,7 @@
         const ws = p.weekStats || { score: 0, misses: 0, maxCombo: 0, tally: { killer: 0, sick: 0, good: 0, bad: 0, shit: 0, miss: 0, total: 0 }, accSum: 0, accN: 0, totalNotes: 0 };
         ws.score += stats.score; ws.misses += stats.misses; ws.maxCombo = Math.max(ws.maxCombo, stats.maxCombo); ws.totalNotes += stats.totalNotes;
         for (const k in ws.tally) ws.tally[k] += stats.tally[k] || 0; ws.accSum += this.accSum; ws.accN += this.accN;
-        if (p.songIndex + 1 < p.songs.length) { G.setScreen('play', Object.assign({}, p, { songIndex: p.songIndex + 1, weekStats: ws })); return; }
+        if (p.songIndex + 1 < p.songs.length) { G.setScreen('play', Object.assign({}, p, { songIndex: p.songIndex + 1, weekStats: ws, deaths: 0 })); return; }
         const weekBest = !cheated && !!p.week && G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
         G.setScreen(G.screens.results ? 'results' : 'storyMenu', { mode: 'story', week: p.week, diff: p.diff, newBest: weekBest, stats: Object.assign({}, ws, { acc: ws.accN ? ws.accSum / ws.accN : 0 }), title: (G.A.json('preload/data/levels/' + p.week + '.json') || {}).name || p.week, player: this.bf.id });
       } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, title: s.name, player: this.bf.id, prevRank, isNewHighscore, cheated });

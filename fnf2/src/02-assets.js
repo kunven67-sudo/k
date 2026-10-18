@@ -104,9 +104,10 @@ G.FONT.vcr = "'VCR', 'FNFVcr', 'Courier New', monospace";
 G.FONT.f5 = "'5by7', 'VCR', monospace";
 G.FONT.f5b = "'5by7b', '5by7', 'VCR', monospace";
 G.FONT.gone = "'YoureGone', 'VCR', sans-serif";
+G.FONT.pixel = "'PixelArial', 'VCR', monospace";
 G.assetsReady = (async function () {
   // FNF's own fonts: VCR (HUD/menus) and 5by7 (freeplay)
-  for (const [file, name] of [['fonts/vcr.ttf', 'VCR'], ['fonts/5by7.ttf', '5by7'], ['fonts/5by7_b.ttf', '5by7b'], ['fonts/YoureGone-Regular.otf', 'YoureGone']]) {
+  for (const [file, name] of [['fonts/vcr.ttf', 'VCR'], ['fonts/5by7.ttf', '5by7'], ['fonts/5by7_b.ttf', '5by7b'], ['fonts/YoureGone-Regular.otf', 'YoureGone'], ['fonts/pixel.otf', 'PixelArial']]) {
     const f = G.A.raw[file];
     if (!f) continue;
     try {
