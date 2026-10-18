@@ -86,6 +86,7 @@ G.DEFAULT_SETTINGS = {
   // visuals
   noteSplashes: true, camZoom: true, flashing: true, fps: false,
   quality: 'auto',      // 'auto' | 'high' | 'low'
+  fpsCap: '60',         // '60' | '120' | '144' | '240' | 'max' (drawing faster than the screen just burns the GPU)
   timeBar: 'name',      // 'name' | 'left' | 'elapsed' | 'off'
   comboPopups: true,
   naughty: true,        // FNF's 'Naughtyness' (off = the clean versions of scenes)
@@ -163,7 +164,10 @@ G.resize = function () {
   const dpr = window.devicePixelRatio || 1;
   let q = fit * dpr;
   const qual = G.settings.quality;
-  const cap = qual === 'low' ? 0.75 : qual === 'high' ? 2 : 1.5 * G.autoQ;
+  // auto draws at most 1280x720 (the game's own size; the browser stretches it to the window). On a
+  // 1080p screen that's 2.25x fewer pixels to fill than drawing at full size, and it drops further
+  // by itself when the game lags. High = full screen sharpness for strong PCs.
+  const cap = qual === 'low' ? 0.6667 : qual === 'high' ? 2 : 1 * G.autoQ;
   q = G.clamp(q, 0.4, cap);
   G.q = q;
   const cw = Math.round(G.W * q), ch = Math.round(G.H * q);
@@ -226,17 +230,22 @@ G.makeCanvas = function (w, h) {
   return c;
 };
 G._cache = new Map();
-// G.cached(key, w, h, fn(ctx, w, h)) -> canvas (rendered once, reused)
+G._cacheBytes = 0; G.CACHE_BUDGET = 160e6;
+// G.cached(key, w, h, fn(ctx, w, h)) -> canvas (rendered once, reused). Least recently used ones go
+// when the cache is over budget (it used to keep every tinted copy / text picture ever made).
 G.cached = function (key, w, h, fn) {
   let c = G._cache.get(key);
-  if (c) return c;
+  if (c) { if (G._cache.size > 64) { G._cache.delete(key); G._cache.set(key, c); } return c; }
   c = G.makeCanvas(w, h);
   const cx = c.getContext('2d');
   fn(cx, w, h);
-  if (!(G.A && G.A.busy())) G._cache.set(key, c);   // a picture it used may not be decoded yet: build it again next time
+  if (!(G.A && G.A.busy())) {   // a picture it used may not be decoded yet: build it again next time
+    c._bytes = c.width * c.height * 4; G._cache.set(key, c); G._cacheBytes += c._bytes;
+    if (G._cacheBytes > G.CACHE_BUDGET) for (const [k, v] of G._cache) { if (G._cacheBytes <= G.CACHE_BUDGET * 0.8 || k === key) break; G._cache.delete(k); G._cacheBytes -= v._bytes || 0; }
+  }
   return c;
 };
-G.uncache = function (prefix) { for (const k of Array.from(G._cache.keys())) if (k.startsWith(prefix)) G._cache.delete(k); };
+G.uncache = function (prefix) { for (const k of Array.from(G._cache.keys())) if (k.startsWith(prefix)) { G._cacheBytes -= G._cache.get(k)._bytes || 0; G._cache.delete(k); } };
 
 // ------------------------------------------------------------------ fonts
 // window.__FNF_FONTS is filled by the build (base64 TTFs). Names used everywhere:
@@ -685,6 +694,7 @@ G.setScreen = function (name, params, opts) {
 };
 G._switch = function (name, params) {
   if (G.screen && G.screen.leave) try { G.screen.leave(); } catch (e) { G.reportError(e, 'leave ' + G.screenName); }
+  if (G.A && G.A.newScreen) G.A.newScreen();
   G.screen = G.screens[name]; G.screenName = name;
   if (G.screen.enter) try { G.screen.enter(params || {}); } catch (e) { G.reportError(e, 'enter ' + name); }
 };
@@ -730,6 +740,14 @@ G.fps = 60; G._fpsAcc = 0; G._fpsN = 0; G._lowFpsTime = 0;
 G._last = performance.now();
 G.loop = function () {
   const now = performance.now();
+  // framerate cap: on 120/144 Hz screens the browser asks for a frame 2-3x more often than needed
+  const capFps = G.settings.fpsCap === 'max' ? 0 : (+G.settings.fpsCap || 60);
+  if (capFps > 0) {
+    const step = 1000 / capFps;
+    G._capAcc = (G._capAcc || 0) + (now - (G._capLast || now)); G._capLast = now;
+    if (G._capAcc < step - 1) { requestAnimationFrame(G.loop); return; }
+    G._capAcc = Math.min(G._capAcc - step, step);
+  }
   let dt = (now - G._last) / 1000; G._last = now;
   if (dt > 0.1) dt = 0.1; if (dt < 0) dt = 0;
   G.dt = dt; G.time += dt; G.frame++;
@@ -738,8 +756,9 @@ G.loop = function () {
     G.fps = Math.round(G._fpsN / G._fpsAcc); G._fpsAcc = 0; G._fpsN = 0;
     // auto quality: drop render resolution if we're struggling for a while
     if (G.settings.quality === 'auto' && !document.hidden) {
-      if (G.fps < 45) G._lowFpsTime += 0.5; else G._lowFpsTime = Math.max(0, G._lowFpsTime - 0.25);
-      if (G._lowFpsTime >= 3 && G.autoQ > 0.55) { G.autoQ = Math.max(0.55, G.autoQ - 0.15); G._lowFpsTime = 0; G.resize(); }
+      const want = Math.min(55, (G.settings.fpsCap === 'max' ? 60 : +G.settings.fpsCap || 60) - 5);
+      if (G.fps < want) G._lowFpsTime += 0.5; else G._lowFpsTime = Math.max(0, G._lowFpsTime - 0.25);
+      if (G._lowFpsTime >= 2 && G.autoQ > 0.6) { G.autoQ = Math.max(0.6, G.autoQ - 0.1); G._lowFpsTime = 0; G.resize(); }
     }
   }
   const ctx = G.ctx;
@@ -754,6 +773,7 @@ G.loop = function () {
   const live = G.screen && G.screen.live && G.screen.live();
   if (busy && !live) { try { if (G.audio && G.audio.update) G.audio.update(dt); } catch (e) {} G.updateTransition(dt); requestAnimationFrame(G.loop); return; }
   if (!busy && G.A._after.length) for (const fn of G.A._after.splice(0)) try { fn(); } catch (e) { G.reportError(e, 'afterLoad'); }
+  if (!busy && G.A._releaseAt && now > G.A._releaseAt) { G.A._releaseAt = 0; try { G.A.releaseUnused(); } catch (e) { G.reportError(e, 'release'); } }
   try {
     if (G.audio && G.audio.update) G.audio.update(dt);
     if (G.screen && G.screen.update) G.screen.update(dt);

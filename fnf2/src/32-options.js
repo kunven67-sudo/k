@@ -42,7 +42,8 @@
     ['Music Volume', 'num', () => S().vol.music, v => S().vol.music = v, 'Volume of the instrumentals + menu music.', [0, 1, 0.05, 2]],
     ['Vocals Volume', 'num', () => S().vol.vocals, v => S().vol.vocals = v, 'Volume of the singing.', [0, 1, 0.05, 2]],
     ['SFX Volume', 'num', () => S().vol.sfx, v => S().vol.sfx = v, 'Volume of menu sounds and misses.', [0, 1, 0.05, 2]],
-    ['Quality', 'enum', () => S().quality, v => { S().quality = v; G.autoQ = 1; G.resize(); }, 'Auto lowers the resolution when the game lags.', ['auto', 'high', 'low']],
+    ['Quality', 'enum', () => S().quality, v => { S().quality = v; G.autoQ = 1; G.resize(); }, 'Auto: 720p, lower by itself when it lags. High: full screen sharpness (strong PCs). Low: fastest.', ['auto', 'high', 'low']],
+    ['Framerate', 'enum', () => S().fpsCap, v => { S().fpsCap = v; }, 'Highest frames per second. 60 is smooth and easy on your PC.', ['60', '120', '144', '240', 'max']],
   ];
   const fmt = (row) => {
     const v = row[2]();

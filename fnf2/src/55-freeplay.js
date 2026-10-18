@@ -1165,7 +1165,7 @@
       const m = G.Songs.meta(s.id, d.variation) || s.meta;
       const pd = m.playData || {};
       const bpm = (m.timeChanges && m.timeChanges[0] && m.timeChanges[0].bpm) || 100;
-      G.audio.music.play(G.Songs.instPath(s.id, m, d.variation), { loop: true, bpm, vol: 0.7, fadeIn: 2, restart: true, offset: (pd.previewStart || 0) / 1000, end: (pd.previewEnd || 15000) / 1000 });
+      G.audio.music.play(G.Songs.instPath(s.id, m, d.variation), { loop: true, clip: true, bpm, vol: 0.7, fadeIn: 2, restart: true, offset: (pd.previewStart || 0) / 1000, end: (pd.previewEnd || 15000) / 1000 });
     },
     leave() { this.went = false; this.tw && this.tw.clear(); },
     // ------------------------------------------------------------ draw

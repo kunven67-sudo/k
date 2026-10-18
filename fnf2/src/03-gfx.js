@@ -25,7 +25,7 @@ G.Sparrow = {
   cache: new Map(),
   // base = "shared/images/notes" (no extension)
   load(base) {
-    if (this.cache.has(base)) return this.cache.get(base);
+    if (this.cache.has(base)) { const sh = this.cache.get(base); if (sh) G.A.touch(sh.img); return sh; }
     const xml = G.A.text(base + '.xml'), img = G.A.image(base + '.png');
     let sheet = null;
     if (xml && img) {
@@ -50,6 +50,8 @@ G.Sparrow = {
     this.cache.set(base, sheet);
     return sheet;
   },
+  // a picture was let go (G.A.releaseUnused): the next load makes a fresh sheet
+  forget(img) { for (const [k, sh] of this.cache) if (sh && sh.img === img) this.cache.delete(k); },
   // frames whose name is prefix + a frame number, in order (FNF/Flixel addByPrefix)
   byPrefix(sheet, prefix, indices) {
     const list = sheet.frames.filter(f => f.name.startsWith(prefix) && /^\d*$/.test(f.name.slice(prefix.length).replace(/\.png$/, '')));
@@ -123,13 +125,14 @@ G.Atlas = {
   cache: new Map(),
   // base = "shared/images/characters/bf" (folder with Animation.json + spritemap1.json/png ...)
   load(base) {
-    if (this.cache.has(base)) return this.cache.get(base);
+    if (this.cache.has(base)) { const at = this.cache.get(base); if (at) for (const im of at.imgs) G.A.touch(im); return at; }
     const anim = G.A.json(base + '/Animation.json');
     if (!anim) { this.cache.set(base, null); return null; }
-    const sprites = {};
+    const sprites = {}, imgs = [];
     for (let i = 1; i < 10; i++) {
       const sj = G.A.json(base + '/spritemap' + i + '.json'), img = G.A.image(base + '/spritemap' + i + '.png');
       if (!sj || !img) break;
+      imgs.push(img);
       for (const s of sj.ATLAS.SPRITES) { const S = s.SPRITE; sprites[S.name] = { img, x: S.x, y: S.y, w: S.w, h: S.h, rot: !!S.rotated }; }
     }
     const AN = anim.AN || anim.ANIMATION;
@@ -143,12 +146,13 @@ G.Atlas = {
     // the main symbol's placement on the Animate stage (used when a sprite applies the stage matrix, e.g. freeplay DJs)
     const sti = AN.STI || AN.StageInstance; const stiSI = sti && (sti.SI || sti.SYMBOL_Instance);
     const stage = stiSI ? readMatrix(stiSI) : [1, 0, 0, 1, 0, 0];
-    const atlas = { kind: 'atlas', base, sprites, symbols, main, labels, stage, fps: md.FRT || md.framerate || 24, _bounds: new Map(), swaps: {} };
+    const atlas = { kind: 'atlas', base, sprites, imgs, symbols, main, labels, stage, fps: md.FRT || md.framerate || 24, _bounds: new Map(), swaps: {} };
     // the main symbol also lives in the dictionary for nested lookups
     if (!symbols[main.name]) symbols[main.name] = main;
     this.cache.set(base, atlas);
     return atlas;
   },
+  forget(img) { for (const [k, at] of this.cache) if (at && at.imgs.includes(img)) this.cache.delete(k); },
   // FunkinSprite.scaleElement: grow the first element of a symbol (frame 0) by `scale` (added to the matrix)
   scaleElement(atlas, symbol, scale, posOff) {
     const sym = atlas && atlas.symbols[symbol]; if (!sym) return;

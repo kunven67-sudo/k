@@ -53,8 +53,19 @@ G.audio = (function () {
       this.stop(o.fadeOutOld || 0);
       M.id = path; M.bpm = o.bpm || 102; M.loop = o.loop !== false; M.vol = o.vol == null ? 1 : o.vol;
       const token = M.token = {};
-      G.A.audio(path).then(buf => {
+      // clip: only the offset..end part is kept decoded (freeplay previews), it loops on its own
+      const clip = o.clip && o.end > (o.offset || 0) + 1;
+      (clip ? G.A.audioClip(path, o.offset || 0, o.end) : G.A.audio(path)).then(buf => {
         if (!buf || M.token !== token) return;
+        if (clip) {
+          const src = ctx.createBufferSource(); src.buffer = buf; src.loop = M.loop;
+          const g = ctx.createGain(); src.connect(g); g.connect(bus.music);
+          const t = ctx.currentTime, off = o.offset || 0;
+          if (o.fadeIn) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(M.vol, t + o.fadeIn); } else g.gain.value = M.vol;
+          src.start(t, 0); M.src = src; M.gain = g; M.start = t - off; M.dur = off + buf.duration;
+          M.loopA = off; M.loopB = off + buf.duration;
+          return;
+        }
         const src = ctx.createBufferSource(); src.buffer = buf; src.loop = M.loop;
         const g = ctx.createGain(); src.connect(g); g.connect(bus.music);
         const t = ctx.currentTime;
@@ -91,6 +102,7 @@ G.audio = (function () {
 
   // ---- songs: {inst, voices:[{path, who:'p'|'o'}]} -> handle
   A.song = async function (def) {
+    G.A.pinSong([def.inst].concat((def.voices || []).map(v => v.path)));
     const inst = await G.A.audio(def.inst);
     const vbufs = await Promise.all((def.voices || []).map(v => G.A.audio(v.path)));
     const tracks = [];

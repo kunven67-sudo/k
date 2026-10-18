@@ -69,7 +69,8 @@
         if (!this.cutscene) this.startCountdown();
       });
     },
-    leave() { if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); },
+    // the stage + characters go with the screen (their pictures can be freed while you're in the menus)
+    leave() { if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); this.stage = null; this.bf = this.dad = this.gf = null; this.cutscene = null; },
     // the song is running: the main loop must never hold the screen for pictures still loading
     live() { return this.ready && this.started && !this.cutscene && !this.paused && !this.gameOver; },
     // -------------------------------------------------- world: stage + characters + cameras

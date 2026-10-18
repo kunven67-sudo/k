@@ -43,7 +43,7 @@ for (const f of files) {
     '\n</script>\n';
 }
 
-const assetTag = (!args.includes('--no-assets') && fs.existsSync(assetsFile)) ? '<script>\n' + fs.readFileSync(assetsFile, 'utf8').replace(/<\/script/gi, '<\\/script') + '\n</script>\n' : '';
+const assetTag = (!args.includes('--no-assets') && fs.existsSync(assetsFile)) ? '<script id="fnf-assets">\n' + fs.readFileSync(assetsFile, 'utf8').replace(/<\/script/gi, '<\\/script') + '\n</script>\n' : '';
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
