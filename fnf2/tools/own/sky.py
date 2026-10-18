@@ -147,7 +147,7 @@ def main():
         diffs = [d for d in ('easy', 'normal', 'hard') if d in notes]
         meta = {'version': '2.2.4', 'songName': name, 'artist': 'bbpanzu', 'charter': 'bbpanzu', 'offsets': {},
                 'playData': {'difficulties': diffs, 'characters': {'player': 'bf', 'girlfriend': gf, 'opponent': opp, 'playerVocals': ['bf'], 'opponentVocals': []},
-                             'stage': stage, 'noteStyle': 'funkin', 'ratings': dict(zip(('easy', 'normal', 'hard'), rt)), 'previewStart': 0, 'previewEnd': 15000},
+                             'stage': stage, 'noteStyle': 'funkin', 'album': 'skyVolume1', 'ratings': dict(zip(('easy', 'normal', 'hard'), rt)), 'previewStart': 0, 'previewEnd': 15000},
                 'timeChanges': [{'t': 0, 'b': 0, 'bpm': bpm, 'bt': [4, 4, 4, 4]}],
                 'generatedBy': 'FNF 2 - tools/own/sky.py (from the original VS Sky charts)'}
         chart = {'version': '2.0.0', 'scrollSpeed': speeds, 'events': events, 'notes': notes, 'generatedBy': meta['generatedBy']}
@@ -181,6 +181,11 @@ def main():
         shutil.copyfile(os.path.join(I, 'icons', 'icon-%s.png' % src), out('preload', 'images', 'icons', 'icon-%s.png' % cid))
         pixel_icon(os.path.join(I, 'freeplay', 'icons', src + 'pixel.png'), out('preload', 'images', 'freeplay', 'icons', cid + 'pixel'))
     shutil.copyfile(os.path.join(I, 'storymenu', 'weeksky.png'), out('preload', 'images', 'storymenu', 'titles', 'sky.png'))
+    # freeplay album (the port's "vs Sky Volume 1" cover + title)
+    for n in ('skyVolume1.png', 'skyVolume1-text.png', 'skyVolume1-text.xml'):
+        shutil.copyfile(os.path.join(I, 'freeplay', 'albumRoll', n), out('preload', 'images', 'freeplay', 'albumRoll', n))
+    jdump({'version': '1.0.0', 'name': 'vs Sky Volume 1', 'artists': ['bbpanzu'], 'albumArtAsset': 'freeplay/albumRoll/skyVolume1',
+           'albumTitleAsset': 'freeplay/albumRoll/skyVolume1-text'}, 'preload', 'data', 'ui', 'freeplay', 'albums', 'skyVolume1.json')
     sm = os.path.join(A, 'images', 'campaign_menu_UI_characters')
     repack(sm + '.png', sm + '.xml', out('preload', 'images', 'storymenu', 'props', 'sky'), keep=['sky idle'], scale=1.0)
     level = {'version': '1.0.0', 'name': 'Sky by @bfswifeforever', 'titleAsset': 'storymenu/titles/sky', 'visible': True,
