@@ -60,6 +60,9 @@ function frame() {
   if (finisherCam > 0) finisherCam -= realDt;
   const live = playing && !paused && worldStarted;
   const dt = live ? realDt * scale : 0;
+  // tests can run the world several steps per drawn frame (fast-forward)
+  const reps = live && window.__steps ? window.__steps : 1;
+  for (let rep = 0; rep < reps; rep++) {
   clockNow += dt;
   if (live) { elapsed += dt; dayT = (dayT + dt / DAY_SECONDS) % 1; }
 
@@ -79,6 +82,7 @@ function frame() {
       const far = !f.isPlayer && f.alive && f.pos.distanceToSquared(camera.position) > 45 * 45;
       if (far && f.animatedOnce && (animTick + f.animSlot) % 3) { f.skipDt = (f.skipDt || 0) + dt; continue; }
       if (live || !f.animatedOnce) { f.animate(live ? dt + (f.skipDt || 0) : 0.016); f.skipDt = 0; f.animatedOnce = true; }
+      if (f.staff) placeStaff(f);
       f.armor.uniforms.uBlood.value = f.blood;
       if (f.cape && live) {
         f.b.Spine1.getWorldPosition(_cv); Object.assign(capeCols[0], { x: _cv.x, y: _cv.y, z: _cv.z });
@@ -103,6 +107,7 @@ function frame() {
       }
     }
   }
+  }
   checkReady();
   updateGrass(player.pos.x, player.pos.z, false);
   const wt = elapsed + performance.now() * 0.0002;
@@ -112,7 +117,7 @@ function frame() {
   captureSkyEnv(sunDir, false);
   animateLife(dt, elapsed, player.pos);
   updateWeather(realDt, wt);
-  updateMagicWorld(dt, realDt, wt);
+  updateMagicWorld(dt * reps, realDt, wt);
   updateFires(realDt, wt, lightK.night);
   clothUniforms.uTime.value = wt;
   if (natureReady) updateNature(realDt, wt);
@@ -148,5 +153,6 @@ window.__V = { villagers, vsave, openTalk, say, startRaid, startScene, endTalk, 
 window.__W = { SQUARE, CASTLE, BRIDGE, BATTLE_X, FORTRESS, groundH };
 window.__dbg = () => ({ modelReady, natureReady, texDone, texPending, worldStarted, scans: scansLoaded + '/' + SCANS.length, cells: natureCells.size, inst: [...natureCells.values()].flat().reduce((a, m) => a + m.count, 0), fps: $('fps').textContent });
 window.__R = { renderer, composer, camera };
+window.__pause = (v) => { paused = v; }; window.__riverDist = (x, z) => riverDist(x, z); window.__houses = VHOUSES;
 window.__solid = (x, z, pad) => solidAt(x, z, pad); window.__clear = (x, z, r) => !circles.some(c => (c.x - x) ** 2 + (c.z - z) ** 2 < r * r) && riverDist(x, z) > 25 && slopeAt(x, z) < 0.2;
 window.__M = { get elapsed() { return elapsed; }, magic, SPELL, castSpell, learnSpell, cast, startChant, releaseChant, spawnMage, CAMPS, ignite, igniteDisc, burning, freezeWater, iceSheets, knockDown, mfx, projs, effects, wind, get lockTarget() { return lockTarget; }, set lockTarget(v) { lockTarget = v; } };

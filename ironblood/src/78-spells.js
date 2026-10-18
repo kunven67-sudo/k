@@ -75,13 +75,13 @@ function updateLights(dt) {
 // ---- projectiles: fireballs, stone bullets, water, ice spears ----
 const projs = [];
 function shoot(o) { o.life = o.life ?? 4; o.t = 0; o.prev = o.pos.clone(); if (o.mesh) { scene.add(o.mesh); o.mesh.position.copy(o.pos); } projs.push(o); if (o.light) o.lightRef = flash(o.pos, o.light, o.lightI || 18, 99, o); return o; }
-function endProj(o) { o.dead = true; if (o.mesh) { scene.remove(o.mesh); } }
+function endProj(o, why) { o.dead = true; if (o.mesh) { scene.remove(o.mesh); } if (window.__projLog) window.__projLog.push({ why, at: o.pos.toArray().map(v => +v.toFixed(2)), t: +o.t.toFixed(2) }); }
 function updateProjs(dt) {
   for (let i = projs.length - 1; i >= 0; i--) {
     const o = projs[i];
     if (o.dead) { projs.splice(i, 1); continue; }
     o.t += dt; o.life -= dt;
-    if (o.life <= 0) { if (o.onEnd) o.onEnd(o.pos); endProj(o); continue; }
+    if (o.life <= 0) { if (o.onEnd) o.onEnd(o.pos); endProj(o, 'timeout'); continue; }
     const steps = Math.max(1, Math.ceil(o.vel.length() * dt / 0.22));
     const h = dt / steps;
     for (let s = 0; s < steps && !o.dead; s++) {
@@ -94,16 +94,16 @@ function updateProjs(dt) {
         const k = partAt(f, o.pos, o.r);
         if (!k) continue;
         if (f.invuln) { godShrug(f, o.pos); endProj(o); break; }
-        o.onFighter(f, k, o.pos.clone(), o); if (!o.pierce) { endProj(o); } else o.pierce--; break;
+        o.onFighter(f, k, o.pos.clone(), o); if (!o.pierce) { endProj(o, 'hit ' + f.name + ' ' + k); } else o.pierce--; break;
       }
       if (o.dead) break;
       // the ground, the river, walls and tree trunks
       const g = groundH(o.pos.x, o.pos.z);
-      if (o.pos.y < WATER_Y && g < WATER_Y - 0.1) { (o.onWater || o.onGround)(o.pos.clone().setY(WATER_Y), o); endProj(o); break; }
-      if (o.pos.y <= g) { o.pos.y = g + 0.02; o.onGround(o.pos.clone(), o); endProj(o); break; }
+      if (o.pos.y < WATER_Y && g < WATER_Y - 0.1) { (o.onWater || o.onGround)(o.pos.clone().setY(WATER_Y), o); endProj(o, 'water'); break; }
+      if (o.pos.y <= g) { o.pos.y = g + 0.02; o.onGround(o.pos.clone(), o); endProj(o, 'ground'); break; }
       const b = solidAt(o.pos.x, o.pos.z, 0.05);
-      if (b && o.pos.y > b.h0 && o.pos.y < Math.min(b.h1, g + 30)) { o.onGround(o.pos.clone(), o, b); endProj(o); break; }
-      for (const c of circles) { if (c.r < 0.12) continue; const dx = o.pos.x - c.x, dz = o.pos.z - c.z; if (dx * dx + dz * dz < (c.r + o.r) ** 2 && o.pos.y < g + 7) { o.onGround(o.pos.clone(), o, c); endProj(o); break; } }
+      if (b && o.pos.y > b.h0 && o.pos.y < Math.min(b.h1, g + 30)) { o.onGround(o.pos.clone(), o, b); endProj(o, 'wall ' + (b.tag || '')); break; }
+      for (const c of circles) { if (c.r < 0.12) continue; const dx = o.pos.x - c.x, dz = o.pos.z - c.z; if (dx * dx + dz * dz < (c.r + o.r) ** 2 && o.pos.y < g + 7) { o.onGround(o.pos.clone(), o, c); endProj(o, 'trunk'); break; } }
     }
     if (o.dead) continue;
     if (o.mesh) {
@@ -127,6 +127,17 @@ const iceMatS = new THREE.MeshStandardMaterial({ color: 0xd8f0ff, roughness: 0.0
 const bloodMat = new THREE.MeshStandardMaterial({ color: 0x5a0606, roughness: 0.15, metalness: 0.2, emissive: 0x6a0404, emissiveIntensity: 1.4 });
 const glowMat = (c) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), toneMapped: true });
 const coreGeo = new THREE.SphereGeometry(1, 16, 12);
+// a ball of fire: tongues of flame peeling off the surface and trailing behind it
+function fireShell(o, r, n) {
+  const back = _ps1.copy(o.vel).normalize().multiplyScalar(-1);
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * 6.28, b = Math.acos(Math.random() * 2 - 1);
+    const x = Math.sin(b) * Math.cos(a) * r, y = Math.cos(b) * r, z = Math.sin(b) * Math.sin(a) * r;
+    const hot = Math.random();
+    mfx.emit(true, 1, o.pos.x + x, o.pos.y + y, o.pos.z + z, back.x * 2 + x * 2, back.y * 2 + 0.8 + y * 2, back.z * 2 + z * 2, 0.18 + Math.random() * 0.16, r * (1.1 + Math.random() * 0.8), r * 0.3, 1.6 + hot * 0.7, 0.45 + hot * 0.4, 0.07 + hot * 0.08, 0.85, -0.5, 1, Math.random() * 6.28, (Math.random() - 0.5) * 3);
+  }
+  mfx.emit(true, 0, o.pos.x, o.pos.y, o.pos.z, 0, 0, 0, 0.06, r * 3.2, r * 3.2, 0.9, 0.35, 0.06, 0.55);
+}
 
 // ---- what each spell does (works for you and for enemy mages) ----
 // c = { caster, from (palm), dir, aim (point), target, power, player }
@@ -157,10 +168,10 @@ const SPELLS = [
   // ---------------- fire ----------------
   { id: 'fireball', name: 'Fireball', school: 'fire', rank: 0, cost: 6, chant: 'Flame that warms the world, gather in my hand and burn. Fireball!', desc: 'A ball of fire. Burns people, sets dry grass and thatch alight.',
     cast(c) {
-      const m = new THREE.Mesh(coreGeo, glowMat([4, 1.6, 0.4])); m.scale.setScalar(0.17 * Math.sqrt(c.power));
+      const m = new THREE.Mesh(coreGeo, glowMat([2.4, 0.75, 0.12])); m.scale.setScalar(0.1 * Math.sqrt(c.power));
       shoot({ caster: c.caster, pos: c.from.clone(), vel: c.dir.clone().multiplyScalar(26), r: 0.18, grav: 0.8, mesh: m, light: SCHOOL.fire.c, lightI: 14,
         onFighter: (f, k, p) => fireballHit(c, false)(p), onGround: fireballHit(c, false), onWater: (p) => { mfx.burst.smoke(p.x, p.y + 0.2, p.z, 6, 0.8, 0.75); sfx.hiss && sfx.hiss(p); },
-        trail: (o, dt) => { if (Math.random() < 0.9) mfx.emit(true, 1, o.pos.x, o.pos.y, o.pos.z, (Math.random() - 0.5) * 0.5, 0.6, (Math.random() - 0.5) * 0.5, 0.3, 0.45, 0.1, 3.2, 1.2, 0.3, 0.9); if (Math.random() < 0.5) mfx.emit(false, 4, o.pos.x, o.pos.y, o.pos.z, 0, 0.5, 0, 1.2, 0.25, 0.9, 0.15, 0.14, 0.13, 0.35); } });
+        trail: (o, dt) => { fireShell(o, 0.22, 3); if (Math.random() < 0.6) mfx.emit(false, 4, o.pos.x, o.pos.y, o.pos.z, 0, 0.5, 0, 1.2, 0.2, 0.8, 0.12, 0.11, 0.1, 0.4); } });
       sfx.whoosh && sfx.whoosh(c.from, 0.8);
     } },
   { id: 'burningplace', name: 'Burning Place', school: 'fire', rank: 1, cost: 16, aimGround: true, chant: 'Flames, take root in the earth and burn all that stands upon it. Burning Place!', desc: 'The ground itself catches fire where you point. It spreads with the wind.',
@@ -176,10 +187,10 @@ const SPELLS = [
     } },
   { id: 'greatfireball', name: 'Great Fireball', school: 'fire', rank: 2, cost: 40, chant: 'Great flame of the sun, gather into one and turn my enemies to ash. Great Fireball!', desc: 'A huge, slow fireball. Explodes, throws people, sets everything around on fire.',
     cast(c) {
-      const m = new THREE.Mesh(coreGeo, glowMat([5, 2, 0.5])); m.scale.setScalar(0.55);
+      const m = new THREE.Mesh(coreGeo, glowMat([2.6, 0.8, 0.14])); m.scale.setScalar(0.32);
       shoot({ caster: c.caster, pos: c.from.clone().addScaledVector(c.dir, 0.6), vel: c.dir.clone().multiplyScalar(15), r: 0.55, grav: 1.2, life: 6, mesh: m, light: SCHOOL.fire.c, lightI: 40,
         onFighter: (f, k, p) => fireballHit(c, true)(p), onGround: fireballHit(c, true), onWater: (p) => { mfx.burst.smoke(p.x, p.y + 0.3, p.z, 30, 2.5, 0.8); mfx.burst.water(p.x, p.y, p.z, 40, 6); sfx.hiss && sfx.hiss(p); },
-        trail: (o) => { for (let k = 0; k < 3; k++) mfx.emit(true, 1, o.pos.x + (Math.random() - 0.5) * 0.7, o.pos.y + (Math.random() - 0.5) * 0.7, o.pos.z + (Math.random() - 0.5) * 0.7, (Math.random() - 0.5), 1, (Math.random() - 0.5), 0.4, 1.1, 0.2, 3.4, 1.2, 0.3, 0.9); mfx.emit(false, 4, o.pos.x, o.pos.y + 0.3, o.pos.z, 0, 0.8, 0, 1.8, 0.6, 2.2, 0.14, 0.13, 0.12, 0.4); } });
+        trail: (o) => { fireShell(o, 0.6, 8); mfx.emit(false, 4, o.pos.x, o.pos.y + 0.3, o.pos.z, 0, 0.8, 0, 1.8, 0.6, 2.2, 0.12, 0.11, 0.1, 0.45); } });
       sfx.whoosh && sfx.whoosh(c.from, 1.6);
     } },
   // ---------------- water + ice ----------------
@@ -278,12 +289,12 @@ const SPELLS = [
         if (burning.has(bmCell(p.x, p.z))) fire = Math.min(1, fire + dt * 0.8);
         if (fire > 0.3) igniteDisc(p.x, p.z, 1.6, c.caster, 0.5);
         // the funnel: dust and wind going round and up, fire if it ate a blaze
-        for (let k = 0; k < 7; k++) {
-          const h = Math.random() * 14, a = e.t * 9 + Math.random() * 6.28, rr = (0.5 + h * 0.22) * fade;
+        for (let k = 0; k < 16; k++) {
+          const h = Math.pow(Math.random(), 0.8) * 16, a = e.t * 9 + Math.random() * 6.28, rr = (0.4 + h * 0.2 + h * h * 0.006) * fade;
           const x = p.x + Math.cos(a) * rr, z = p.z + Math.sin(a) * rr;
           const tv = 7 + h, vx = -Math.sin(a) * tv, vz = Math.cos(a) * tv;
           if (fire > 0.3 && Math.random() < fire) mfx.emit(true, 1, x, gy + h, z, vx * 0.4, 3, vz * 0.4, 0.5, 1.4, 0.4, 3.2, 1.2, 0.3, 0.8);
-          else mfx.emit(false, Math.random() < 0.7 ? 5 : 4, x, gy + h, z, vx * 0.3, 2.5, vz * 0.3, 0.7, 0.8 + h * 0.08, 2 + h * 0.15, 0.5, 0.46, 0.4, 0.38);
+          else { const c = 0.3 + Math.random() * 0.12; mfx.emit(false, Math.random() < 0.6 ? 5 : 4, x, gy + h, z, vx * 0.3, 2.5, vz * 0.3, 0.8, 0.9 + h * 0.09, 2.2 + h * 0.16, c, c * 0.92, c * 0.82, 0.62); }
         }
         if (Math.random() < dt * 8) mfx.burst.dust(p.x, gy, p.z, 3, 1, [0.4, 0.36, 0.3], 5);
         paintDisc(p.x, p.z, 1.2, 0, 0.05);
@@ -519,6 +530,7 @@ function chainShock(c, from, first, dmg, jumps, sky) {
     src = to; cur = next; d *= 0.7;
   }
 }
+const _bm4 = new THREE.Matrix4();
 // a jagged bolt of light between two points (with little side branches)
 function bolt(a, b, col, width, dur, branches) {
   const g = new THREE.Group();
@@ -530,10 +542,7 @@ function bolt(a, b, col, width, dur, branches) {
     for (let i = 0; i < pts.length - 1; i++) {
       const s = pts[i], e = pts[i + 1], m = s.clone().lerp(e, 0.5), L = s.distanceTo(e);
       const q = new THREE.Mesh(new THREE.PlaneGeometry(w, L), mat);
-      q.position.copy(m); q.lookAt(camera.position); const up = e.clone().sub(s).normalize();
-      // keep the strip along the segment, facing the camera
-      const toCam = camera.position.clone().sub(m).normalize(), x = new THREE.Vector3().crossVectors(up, toCam).normalize(), z = new THREE.Vector3().crossVectors(x, up);
-      q.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, up, z));
+      q.position.copy(m); q.userData.up = e.clone().sub(s).normalize();
       g.add(q);
     }
     return pts;
@@ -543,13 +552,16 @@ function bolt(a, b, col, width, dur, branches) {
   if (branches) for (let k = 0; k < 6; k++) { const s = pts[1 + Math.floor(Math.random() * (pts.length - 2))]; const e = s.clone().add(V3((Math.random() - 0.5) * 16, -8 - Math.random() * 12, (Math.random() - 0.5) * 16)); line(s, e, width * 0.5, 5, 0.8); }
   else line(a, b, width * 0.5, n, 0.8);
   scene.add(g);
-  addEffect({ dur, update(dt, e) { mat.opacity = (1 - e.t / e.dur) * (Math.random() < 0.3 ? 0.4 : 1); }, end() { scene.remove(g); g.traverse(o => o.geometry && o.geometry.dispose()); mat.dispose(); } });
+  // every strip runs along its piece of the bolt and turns its face to the camera
+  const face = () => { for (const q of g.children) { const up = q.userData.up, toCam = _ps1.copy(camera.position).sub(q.position).normalize(), x = _ps2.crossVectors(up, toCam).normalize(), z = _ps3.crossVectors(x, up); q.quaternion.setFromRotationMatrix(_bm4.makeBasis(x, up, z)); } };
+  face();
+  addEffect({ dur, update(dt, e) { face(); mat.opacity = (1 - e.t / e.dur) * (Math.random() < 0.3 ? 0.4 : 1); }, end() { scene.remove(g); g.traverse(o => o.geometry && o.geometry.dispose()); mat.dispose(); } });
 }
 // a ghostly knight from the other side
 const ghostMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   uniforms: { uT: { value: 0 }, uA: { value: 1 } },
-  vertexShader: '#include <common>\n#include <skinning_pars_vertex>\nvarying vec3 vN; varying vec3 vV; varying vec3 vW; void main(){ #include <beginnormal_vertex>\n#include <skinbase_vertex>\n#include <skinnormal_vertex>\n#include <begin_vertex>\n#include <skinning_vertex>\n vec4 wp = modelMatrix * vec4(transformed, 1.0); vW = wp.xyz; vN = normalize(mat3(modelMatrix) * objectNormal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }',
+  vertexShader: '#include <common>\n#include <skinning_pars_vertex>\nvarying vec3 vN; varying vec3 vV; varying vec3 vW;\nvoid main(){\n#include <beginnormal_vertex>\n#include <skinbase_vertex>\n#include <skinnormal_vertex>\n#include <begin_vertex>\n#include <skinning_vertex>\n vec4 wp = modelMatrix * vec4(transformed, 1.0); vW = wp.xyz; vN = normalize(mat3(modelMatrix) * objectNormal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }',
   fragmentShader: 'uniform float uT; uniform float uA; varying vec3 vN; varying vec3 vV; varying vec3 vW; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), vV)), 1.8); float band = 0.6 + 0.4 * sin(vW.y * 18.0 - uT * 5.0); gl_FragColor = vec4(vec3(0.35, 1.2, 1.9) * (0.12 + f * 1.1) * band * uA, 1.0); }',
 });
 function summonSpirit(c) {
@@ -622,14 +634,14 @@ function manaPassOut() {
   }
   passedOut = 1;
   endTalk(); closeShop();
-  fadeTo(1, 1.2, () => {
+  fadeTo(1, 1.2, () => maybeDream(() => {
     dayT = (dayT + 2 / 24) % 1;
     const inTown = Math.hypot(player.pos.x - SQUARE.x, player.pos.z - SQUARE.z) < 45;
     const lost = Math.floor(vsave.coins * (inTown ? 0.1 + Math.random() * 0.15 : 0.3 + Math.random() * 0.4));
     addCoins(-lost);
     magic.exh = 35; magic.mana = magic.max * 0.25;
     setTimeout(() => fadeTo(0, 2.5, () => { passedOut = 0; ui.sub('You wake up on the ground. Your head is splitting.' + (lost > 0 ? ' Someone took ' + money(lost) + ' while you were out.' : ''), 5); }), 900);
-  });
+  }));
 }
 
 // ---- casting: hold R to chant, Shift+R to cast without words, Enter to type it, or just say it ----
@@ -638,14 +650,15 @@ const circleTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 256;
   const g = c.getContext('2d'); g.translate(128, 128);
   g.strokeStyle = '#fff'; g.fillStyle = '#fff';
-  g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 118, 0, 7); g.stroke();
-  g.lineWidth = 1.5; g.beginPath(); g.arc(0, 0, 104, 0, 7); g.stroke(); g.beginPath(); g.arc(0, 0, 62, 0, 7); g.stroke();
+  g.shadowColor = '#fff'; g.shadowBlur = 6;
+  g.lineWidth = 5; g.beginPath(); g.arc(0, 0, 118, 0, 7); g.stroke();
+  g.lineWidth = 2.5; g.beginPath(); g.arc(0, 0, 104, 0, 7); g.stroke(); g.beginPath(); g.arc(0, 0, 62, 0, 7); g.stroke();
   // runes around the ring
   const r = mulberry32(4);
   g.font = 'bold 15px serif';
-  for (let i = 0; i < 24; i++) { g.save(); g.rotate(i / 24 * Math.PI * 2); g.translate(0, -111); g.beginPath(); for (let k = 0; k < 3; k++) { g.moveTo((r() - 0.5) * 9, (r() - 0.5) * 9); g.lineTo((r() - 0.5) * 9, (r() - 0.5) * 9); } g.lineWidth = 1.6; g.stroke(); g.restore(); }
+  for (let i = 0; i < 24; i++) { g.save(); g.rotate(i / 24 * Math.PI * 2); g.translate(0, -111); g.beginPath(); for (let k = 0; k < 3; k++) { g.moveTo((r() - 0.5) * 9, (r() - 0.5) * 9); g.lineTo((r() - 0.5) * 9, (r() - 0.5) * 9); } g.lineWidth = 2.4; g.stroke(); g.restore(); }
   // two squares make a star
-  for (const a of [0, Math.PI / 4]) { g.save(); g.rotate(a); g.lineWidth = 2; g.strokeRect(-74, -74, 148, 148); g.restore(); }
+  for (const a of [0, Math.PI / 4]) { g.save(); g.rotate(a); g.lineWidth = 3; g.strokeRect(-74, -74, 148, 148); g.restore(); }
   g.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.lineTo(Math.cos(a) * 62, Math.sin(a) * 62); } g.closePath(); g.stroke();
   const t = new THREE.CanvasTexture(c); return t;
 })();
@@ -680,7 +693,7 @@ function startChant(chantless, spellId) {
   if (magic.max < RANK_MANA[s.rank]) { ui.sub('Your mana is ' + Math.floor(magic.max) + '. ' + s.name + ' is ' + RANKS[s.rank] + ' magic and needs ' + RANK_MANA[s.rank] + '.', 3); sfx.ui(200); return; }
   if (!f.alive || f.down || f.knock || f.lift || f.attack || bandaging > 0 || passedOut) return;
   cast.on = true; cast.spell = s; cast.t = 0; cast.chantless = chantless; cast.said = false; cast.power = 1; cast.voiceT = 0;
-  cast.need = chantless ? 0.18 : CHANT_T[s.rank] * (1 - Math.min(0.4, (magic.mastery[id] || 0) * 0.004));
+  cast.need = chantless ? 0.08 : CHANT_T[s.rank] * (1 - Math.min(0.4, (magic.mastery[id] || 0) * 0.004));
   cast.words = s.chant.split(' ');
   f.blocking = false;
   if (!chantless) sfx.chant(f.pos, s.chant, f.voicePitch, cast.need);
@@ -730,7 +743,7 @@ function castSpell(f, s, o = {}) {
   f.castAfter = 0.4;
   s.cast({ caster: f, from, dir, aim, target: ai.target, power: o.power || 1, player: isP, chantless: o.chantless });
   const c = SCHOOL[s.school].c;
-  mfx.burst.glow(from.x, from.y, from.z, 0.7, c[0], c[1], c[2], 0.25);
+  mfx.burst.glow(from.x, from.y, from.z, 0.35, c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 0.2);
 }
 // you can learn a spell just by watching a mage cast it, a few times, close up
 function watchMagic(f, s) {
@@ -771,8 +784,8 @@ function updateCasting(dt) {
       if (s.charge && cast.t > cast.need) { const want = Math.min(2.6, 1 + (cast.t - cast.need) * 0.9); const extra = spellCost(s, cast.chantless, want) - spellCost(s, cast.chantless, cast.power); if (magic.mana + magic.max * 0.15 > extra) cast.power = want; }
       const k = Math.min(1, cast.t / cast.need);
       const col = SCHOOL[s.school].c;
-      C.material.color.setRGB(col[0] * 0.5, col[1] * 0.5, col[2] * 0.5);
-      C.material.opacity = 0.25 + 0.75 * k;
+      C.material.color.setRGB(col[0] * 0.8, col[1] * 0.8, col[2] * 0.8);
+      C.material.opacity = 0.35 + 0.65 * k;
       C.scale.setScalar((0.25 + 0.35 * k) * (s.charge ? 0.8 + cast.power * 0.25 : 1));
       C.position.copy(f.b.LeftHand.getWorldPosition(V3())).addScaledVector(dir, 0.18);
       C.lookAt(C.position.clone().add(dir)); C.rotateZ(cast.t * 2);
@@ -908,5 +921,5 @@ Object.assign(sfx, {
 // ---- per frame ----
 function updateMagic(dt, realDt, t) {
   if (dt > 0) { updateCasting(dt); updateProjs(dt); updateEffects(dt); updateSummons(dt, t); }
-  updateLights(realDt);
+  updateLights(dt);
 }

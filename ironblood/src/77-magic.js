@@ -24,7 +24,10 @@ const mfx = (() => {
     void main() {
       vec4 mv = viewMatrix * vec4(aPos, 1.0);
       float c = cos(aRot), s = sin(aRot);
-      mv.xy += vec2(position.x * c - position.y * s, position.x * s + position.y * c) * aSize;
+      vec2 q = position.xy;
+      if (abs(aTile - 1.0) < 0.5) q.y = q.y * 1.8 + 0.35; // flames are tall and grow up from their base
+      if (abs(aTile - 7.0) < 0.5) q.y *= 2.2;
+      mv.xy += vec2(q.x * c - q.y * s, q.x * s + q.y * c) * aSize;
       gl_Position = projectionMatrix * mv;
       float tx = mod(aTile, 4.0), ty = floor(aTile / 4.0);
       vUv = vec2((tx + uv.x) / 4.0, 1.0 - (ty + 1.0 - uv.y) / 2.0);
@@ -150,8 +153,8 @@ terrainUniforms.tBurn = { value: burnTex };
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.11, 0.07) * (0.8 + gn * 0.4), mudK * 0.92);
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.83, 0.93) * (0.85 + gn * 0.25), frost * 0.88);
       blendR = mix(blendR, 0.97, burnt * 0.7); blendR = mix(blendR, 0.12, mudK); blendR = mix(blendR, 0.09, frost);
-      float fireGlow = gfx.g * (0.75 + 0.25 * sin(uFireT * 9.0 + vW.x * 1.7 + vW.y * 2.3)) * smoothstep(0.35, 0.65, gn + 0.25);`)
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += vec3(1.6, 0.42, 0.08) * fireGlow * 1.4;');
+      float fireGlow = gfx.g * (0.6 + 0.4 * sin(uFireT * 9.0 + vW.x * 1.7 + vW.y * 2.3)) * smoothstep(0.5, 0.75, gn + 0.1);`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += vec3(1.6, 0.42, 0.08) * fireGlow * 0.7;');
   };
   terrainMat.customProgramCacheKey = () => 'terrain6fx';
   const prevG = grassMat.onBeforeCompile;
@@ -198,7 +201,7 @@ function ignite(x, z, by, strength = 1) {
   bmData[c * 4 + 1] = 255; bmDirty = true; fieldUniforms.uFxOn.value = 1;
   // a burning house
   const h = houseAt(x, z);
-  if (h && !burningHouses.has(h) && !raid.burning.some(b => b.house === h)) { burningHouses.add(h); burnHouse(h); onHouseFire(h, by); setTimeout(() => burningHouses.delete(h), 150000); }
+  if (h && !burningHouses.has(h) && !raid.burning.some(b => b.house === h)) { burningHouses.add(h); burnHouse(h, by && by.isPlayer ? 'you' : by && by.team === 'knight' ? 'raid' : 'wild'); onHouseFire(h, by); setTimeout(() => burningHouses.delete(h), 150000); }
   return true;
 }
 function igniteDisc(x, z, rad, by, chance = 1) {
@@ -243,7 +246,7 @@ function updateBurning(dt) {
     b.t += dt;
     const x = cellX(c), z = cellZ(c);
     const o = c * 4;
-    bmData[o] = Math.min(255, Math.max(bmData[o], Math.round(b.t / b.dur * 255)));
+    bmData[o] = Math.min(255, Math.max(bmData[o], Math.round((0.35 + 0.65 * b.t / b.dur) * 255)));
     if (b.t >= b.dur || rain > 0.65 && Math.random() < dt * 0.4) {
       burning.delete(c); bmData[o + 1] = 0; bmData[o] = 255; fuelCache[c] = 0; bmDirty = true; continue;
     }
@@ -252,8 +255,8 @@ function updateBurning(dt) {
     if (dc < 120 * 120) {
       const y = terrainH(x, z);
       const k = dc < 40 * 40 ? 1 : 0.35, life = Math.sin(Math.min(1, b.t / b.dur) * Math.PI);
-      if (Math.random() < dt * 11 * k * (0.3 + life)) mfx.burst.fire(x + (Math.random() - 0.5) * BMS, y + 0.02, z + (Math.random() - 0.5) * BMS, 1, 0.4, 1.2 + life, 0.4 + life * 0.5);
-      if (Math.random() < dt * 0.9 * k) mfx.burst.smoke(x, y + 1.4, z, 1, 1.0 + life, 0.13);
+      if (Math.random() < dt * 5.5 * k * (0.3 + life)) mfx.burst.fire(x + (Math.random() - 0.5) * BMS, y + 0.02, z + (Math.random() - 0.5) * BMS, 1, 0.4, 1.2 + life, 0.4 + life * 0.5);
+      if (Math.random() < dt * 0.3 * k) mfx.burst.smoke(x, y + 1.2, z, 1, 0.8 + life * 0.7, 0.14);
       if (Math.random() < dt * 0.6 * k) mfx.burst.sparks(x, y + 0.6, z, 2, 3.5, 1.4, 0.4, 2.5);
       if (dc < 30 * 30) near++;
     }
@@ -268,7 +271,7 @@ function updateBurning(dt) {
       if (burning.has(nc) || bmData[nc * 4] > 200) continue;
       const len = Math.hypot(di, dj), dot = (di * wind.x + dj * wind.z) / len;
       const wk = 1 + 2.6 * Math.max(0, dot) - 0.75 * Math.max(0, -dot) * (wind.s / 1.25);
-      const p = cellFuel(nc) * 0.2 * wk * (1 - rain * 0.85) * (over ? 0.25 : 1) / len;
+      const p = cellFuel(nc) * 0.09 * wk * (1 - rain * 0.85) * (over ? 0.25 : 1) / len;
       if (Math.random() < p) ignite(cellX(nc), cellZ(nc), b.by);
     }
   }
@@ -353,6 +356,7 @@ function setOnFire(f, secs, by) {
 const _mb = new THREE.Vector3();
 const BURN_BONES = ['Spine1', 'Spine2', 'LeftArm', 'RightArm', 'LeftUpLeg', 'RightUpLeg', 'Head', 'LeftForeArm', 'RightForeArm'];
 function magicStatus(f, dt) {
+  if (!f.isPlayer && f.castAfter > 0) { f.castAfter -= dt; if (f.castAfter <= 0 && !(f.mage && f.mage.chant)) f.castAim = null; }
   if (f.burning > 0) {
     f.burning -= dt * ((f.wet || 0) > 0 ? 6 : 1) * (f.dodge > 0 ? 3 : 1);
     if (f.pos.y < WATER_Y - 0.2) { f.burning = 0; f.wet = 30; mfx.burst.smoke(f.pos.x, WATER_Y + 0.3, f.pos.z, 6, 0.8, 0.75); }
@@ -519,7 +523,7 @@ function updateMagicWorld(dt, realDt, t) {
   if (dt > 0) { updateBurning(dt); updateIce(dt); updateFields(dt); }
   for (const s of iceSheets) s.mesh.material.map.offset.set(s.x * 0.01, s.z * 0.01);
   for (const f of fighters) if (f.shield) { f.shield.material.uniforms.uT.value = t; f.shield.material.uniforms.uHit.value *= Math.pow(0.02, realDt); }
-  mfx.update(realDt);
+  mfx.update(dt);
   bmUpT -= realDt;
   if (bmDirty && bmUpT <= 0) { burnTex.needsUpdate = true; bmDirty = false; bmUpT = 0.2; }
 }

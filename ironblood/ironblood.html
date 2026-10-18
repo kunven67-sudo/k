@@ -193,6 +193,7 @@
 </div>
 <div id="vignette"></div>
 <div id="fxTint"></div>
+<div id="legendTint" style="position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s"></div>
 <div id="castBox"><label>Cast</label><input id="castIn" maxlength="300" placeholder="Type a spell or its whole chant, then Enter" autocomplete="off"></div>
 <div class="panel" id="book">
   <div class="phead"><div class="pn">Spellbook</div><div id="bookHead"></div></div>
@@ -4499,12 +4500,12 @@ function endRaid(beaten) {
   setTimeout(() => { for (const v of villagers) if (v.alive && v.vill.mode === 'fight' && !v.angryAtYou) toLife(v); }, 8000);
   vSave();
 }
-function burnHouse(h) {
+function burnHouse(h, cause) {
   const top = { x: h.x, y: terrainH(h.x, h.z) + 5.2, z: h.z };
   const fires = [];
   for (let i = 0; i < 3; i++) fires.push(addFire(h.x + (Math.random() - 0.5) * h.w * 0.6, top.y - 0.8 + Math.random(), h.z + (Math.random() - 0.5) * h.d * 0.6, 1.6 + Math.random() * 0.8));
   raid.burning.push({ house: h, fires, top, t: 90 + Math.random() * 60 });
-  for (const v of villagers) if (v.alive && SPOTS[v.vill.p.home] === h && v.inside) { setInside(v, false); toFlee(v); v.vill.mode = 'flee'; v.vill.fleeT = 40; v.pos.set(h.door.x, groundH(h.door.x, h.door.z), h.door.z); v.vill.st.opinion = clampO(v.vill.st.opinion - 3); remember(v.vill.st, 'raiders burned my house because of the dark knight\'s killing'); }
+  for (const v of villagers) if (v.alive && SPOTS[v.vill.p.home] === h && v.inside) { setInside(v, false); toFlee(v); v.vill.mode = 'flee'; v.vill.fleeT = 40; v.pos.set(h.door.x, groundH(h.door.x, h.door.z), h.door.z); v.vill.st.opinion = clampO(v.vill.st.opinion - 3); remember(v.vill.st, cause === 'you' ? 'my house burned down in the dark knight\'s fire' : cause === 'wild' ? 'my house caught fire and burned' : 'raiders burned my house because of the dark knight\'s killing'); }
   sfx.thud(new THREE.Vector3(h.x, top.y, h.z), 1.5);
 }
 // smoke from burning roofs
@@ -5234,7 +5235,10 @@ const mfx = (() => {
     void main() {
       vec4 mv = viewMatrix * vec4(aPos, 1.0);
       float c = cos(aRot), s = sin(aRot);
-      mv.xy += vec2(position.x * c - position.y * s, position.x * s + position.y * c) * aSize;
+      vec2 q = position.xy;
+      if (abs(aTile - 1.0) < 0.5) q.y = q.y * 1.8 + 0.35; // flames are tall and grow up from their base
+      if (abs(aTile - 7.0) < 0.5) q.y *= 2.2;
+      mv.xy += vec2(q.x * c - q.y * s, q.x * s + q.y * c) * aSize;
       gl_Position = projectionMatrix * mv;
       float tx = mod(aTile, 4.0), ty = floor(aTile / 4.0);
       vUv = vec2((tx + uv.x) / 4.0, 1.0 - (ty + 1.0 - uv.y) / 2.0);
@@ -5360,8 +5364,8 @@ terrainUniforms.tBurn = { value: burnTex };
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.11, 0.07) * (0.8 + gn * 0.4), mudK * 0.92);
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.83, 0.93) * (0.85 + gn * 0.25), frost * 0.88);
       blendR = mix(blendR, 0.97, burnt * 0.7); blendR = mix(blendR, 0.12, mudK); blendR = mix(blendR, 0.09, frost);
-      float fireGlow = gfx.g * (0.75 + 0.25 * sin(uFireT * 9.0 + vW.x * 1.7 + vW.y * 2.3)) * smoothstep(0.35, 0.65, gn + 0.25);`)
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += vec3(1.6, 0.42, 0.08) * fireGlow * 1.4;');
+      float fireGlow = gfx.g * (0.6 + 0.4 * sin(uFireT * 9.0 + vW.x * 1.7 + vW.y * 2.3)) * smoothstep(0.5, 0.75, gn + 0.1);`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += vec3(1.6, 0.42, 0.08) * fireGlow * 0.7;');
   };
   terrainMat.customProgramCacheKey = () => 'terrain6fx';
   const prevG = grassMat.onBeforeCompile;
@@ -5408,7 +5412,7 @@ function ignite(x, z, by, strength = 1) {
   bmData[c * 4 + 1] = 255; bmDirty = true; fieldUniforms.uFxOn.value = 1;
   // a burning house
   const h = houseAt(x, z);
-  if (h && !burningHouses.has(h) && !raid.burning.some(b => b.house === h)) { burningHouses.add(h); burnHouse(h); onHouseFire(h, by); setTimeout(() => burningHouses.delete(h), 150000); }
+  if (h && !burningHouses.has(h) && !raid.burning.some(b => b.house === h)) { burningHouses.add(h); burnHouse(h, by && by.isPlayer ? 'you' : by && by.team === 'knight' ? 'raid' : 'wild'); onHouseFire(h, by); setTimeout(() => burningHouses.delete(h), 150000); }
   return true;
 }
 function igniteDisc(x, z, rad, by, chance = 1) {
@@ -5453,7 +5457,7 @@ function updateBurning(dt) {
     b.t += dt;
     const x = cellX(c), z = cellZ(c);
     const o = c * 4;
-    bmData[o] = Math.min(255, Math.max(bmData[o], Math.round(b.t / b.dur * 255)));
+    bmData[o] = Math.min(255, Math.max(bmData[o], Math.round((0.35 + 0.65 * b.t / b.dur) * 255)));
     if (b.t >= b.dur || rain > 0.65 && Math.random() < dt * 0.4) {
       burning.delete(c); bmData[o + 1] = 0; bmData[o] = 255; fuelCache[c] = 0; bmDirty = true; continue;
     }
@@ -5462,8 +5466,8 @@ function updateBurning(dt) {
     if (dc < 120 * 120) {
       const y = terrainH(x, z);
       const k = dc < 40 * 40 ? 1 : 0.35, life = Math.sin(Math.min(1, b.t / b.dur) * Math.PI);
-      if (Math.random() < dt * 11 * k * (0.3 + life)) mfx.burst.fire(x + (Math.random() - 0.5) * BMS, y + 0.02, z + (Math.random() - 0.5) * BMS, 1, 0.4, 1.2 + life, 0.4 + life * 0.5);
-      if (Math.random() < dt * 0.9 * k) mfx.burst.smoke(x, y + 1.4, z, 1, 1.0 + life, 0.13);
+      if (Math.random() < dt * 5.5 * k * (0.3 + life)) mfx.burst.fire(x + (Math.random() - 0.5) * BMS, y + 0.02, z + (Math.random() - 0.5) * BMS, 1, 0.4, 1.2 + life, 0.4 + life * 0.5);
+      if (Math.random() < dt * 0.3 * k) mfx.burst.smoke(x, y + 1.2, z, 1, 0.8 + life * 0.7, 0.14);
       if (Math.random() < dt * 0.6 * k) mfx.burst.sparks(x, y + 0.6, z, 2, 3.5, 1.4, 0.4, 2.5);
       if (dc < 30 * 30) near++;
     }
@@ -5478,7 +5482,7 @@ function updateBurning(dt) {
       if (burning.has(nc) || bmData[nc * 4] > 200) continue;
       const len = Math.hypot(di, dj), dot = (di * wind.x + dj * wind.z) / len;
       const wk = 1 + 2.6 * Math.max(0, dot) - 0.75 * Math.max(0, -dot) * (wind.s / 1.25);
-      const p = cellFuel(nc) * 0.2 * wk * (1 - rain * 0.85) * (over ? 0.25 : 1) / len;
+      const p = cellFuel(nc) * 0.09 * wk * (1 - rain * 0.85) * (over ? 0.25 : 1) / len;
       if (Math.random() < p) ignite(cellX(nc), cellZ(nc), b.by);
     }
   }
@@ -5563,6 +5567,7 @@ function setOnFire(f, secs, by) {
 const _mb = new THREE.Vector3();
 const BURN_BONES = ['Spine1', 'Spine2', 'LeftArm', 'RightArm', 'LeftUpLeg', 'RightUpLeg', 'Head', 'LeftForeArm', 'RightForeArm'];
 function magicStatus(f, dt) {
+  if (!f.isPlayer && f.castAfter > 0) { f.castAfter -= dt; if (f.castAfter <= 0 && !(f.mage && f.mage.chant)) f.castAim = null; }
   if (f.burning > 0) {
     f.burning -= dt * ((f.wet || 0) > 0 ? 6 : 1) * (f.dodge > 0 ? 3 : 1);
     if (f.pos.y < WATER_Y - 0.2) { f.burning = 0; f.wet = 30; mfx.burst.smoke(f.pos.x, WATER_Y + 0.3, f.pos.z, 6, 0.8, 0.75); }
@@ -5729,7 +5734,7 @@ function updateMagicWorld(dt, realDt, t) {
   if (dt > 0) { updateBurning(dt); updateIce(dt); updateFields(dt); }
   for (const s of iceSheets) s.mesh.material.map.offset.set(s.x * 0.01, s.z * 0.01);
   for (const f of fighters) if (f.shield) { f.shield.material.uniforms.uT.value = t; f.shield.material.uniforms.uHit.value *= Math.pow(0.02, realDt); }
-  mfx.update(realDt);
+  mfx.update(dt);
   bmUpT -= realDt;
   if (bmDirty && bmUpT <= 0) { burnTex.needsUpdate = true; bmDirty = false; bmUpT = 0.2; }
 }
@@ -5810,13 +5815,13 @@ function updateLights(dt) {
 // ---- projectiles: fireballs, stone bullets, water, ice spears ----
 const projs = [];
 function shoot(o) { o.life = o.life ?? 4; o.t = 0; o.prev = o.pos.clone(); if (o.mesh) { scene.add(o.mesh); o.mesh.position.copy(o.pos); } projs.push(o); if (o.light) o.lightRef = flash(o.pos, o.light, o.lightI || 18, 99, o); return o; }
-function endProj(o) { o.dead = true; if (o.mesh) { scene.remove(o.mesh); } }
+function endProj(o, why) { o.dead = true; if (o.mesh) { scene.remove(o.mesh); } if (window.__projLog) window.__projLog.push({ why, at: o.pos.toArray().map(v => +v.toFixed(2)), t: +o.t.toFixed(2) }); }
 function updateProjs(dt) {
   for (let i = projs.length - 1; i >= 0; i--) {
     const o = projs[i];
     if (o.dead) { projs.splice(i, 1); continue; }
     o.t += dt; o.life -= dt;
-    if (o.life <= 0) { if (o.onEnd) o.onEnd(o.pos); endProj(o); continue; }
+    if (o.life <= 0) { if (o.onEnd) o.onEnd(o.pos); endProj(o, 'timeout'); continue; }
     const steps = Math.max(1, Math.ceil(o.vel.length() * dt / 0.22));
     const h = dt / steps;
     for (let s = 0; s < steps && !o.dead; s++) {
@@ -5829,16 +5834,16 @@ function updateProjs(dt) {
         const k = partAt(f, o.pos, o.r);
         if (!k) continue;
         if (f.invuln) { godShrug(f, o.pos); endProj(o); break; }
-        o.onFighter(f, k, o.pos.clone(), o); if (!o.pierce) { endProj(o); } else o.pierce--; break;
+        o.onFighter(f, k, o.pos.clone(), o); if (!o.pierce) { endProj(o, 'hit ' + f.name + ' ' + k); } else o.pierce--; break;
       }
       if (o.dead) break;
       // the ground, the river, walls and tree trunks
       const g = groundH(o.pos.x, o.pos.z);
-      if (o.pos.y < WATER_Y && g < WATER_Y - 0.1) { (o.onWater || o.onGround)(o.pos.clone().setY(WATER_Y), o); endProj(o); break; }
-      if (o.pos.y <= g) { o.pos.y = g + 0.02; o.onGround(o.pos.clone(), o); endProj(o); break; }
+      if (o.pos.y < WATER_Y && g < WATER_Y - 0.1) { (o.onWater || o.onGround)(o.pos.clone().setY(WATER_Y), o); endProj(o, 'water'); break; }
+      if (o.pos.y <= g) { o.pos.y = g + 0.02; o.onGround(o.pos.clone(), o); endProj(o, 'ground'); break; }
       const b = solidAt(o.pos.x, o.pos.z, 0.05);
-      if (b && o.pos.y > b.h0 && o.pos.y < Math.min(b.h1, g + 30)) { o.onGround(o.pos.clone(), o, b); endProj(o); break; }
-      for (const c of circles) { if (c.r < 0.12) continue; const dx = o.pos.x - c.x, dz = o.pos.z - c.z; if (dx * dx + dz * dz < (c.r + o.r) ** 2 && o.pos.y < g + 7) { o.onGround(o.pos.clone(), o, c); endProj(o); break; } }
+      if (b && o.pos.y > b.h0 && o.pos.y < Math.min(b.h1, g + 30)) { o.onGround(o.pos.clone(), o, b); endProj(o, 'wall ' + (b.tag || '')); break; }
+      for (const c of circles) { if (c.r < 0.12) continue; const dx = o.pos.x - c.x, dz = o.pos.z - c.z; if (dx * dx + dz * dz < (c.r + o.r) ** 2 && o.pos.y < g + 7) { o.onGround(o.pos.clone(), o, c); endProj(o, 'trunk'); break; } }
     }
     if (o.dead) continue;
     if (o.mesh) {
@@ -5862,6 +5867,17 @@ const iceMatS = new THREE.MeshStandardMaterial({ color: 0xd8f0ff, roughness: 0.0
 const bloodMat = new THREE.MeshStandardMaterial({ color: 0x5a0606, roughness: 0.15, metalness: 0.2, emissive: 0x6a0404, emissiveIntensity: 1.4 });
 const glowMat = (c) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), toneMapped: true });
 const coreGeo = new THREE.SphereGeometry(1, 16, 12);
+// a ball of fire: tongues of flame peeling off the surface and trailing behind it
+function fireShell(o, r, n) {
+  const back = _ps1.copy(o.vel).normalize().multiplyScalar(-1);
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * 6.28, b = Math.acos(Math.random() * 2 - 1);
+    const x = Math.sin(b) * Math.cos(a) * r, y = Math.cos(b) * r, z = Math.sin(b) * Math.sin(a) * r;
+    const hot = Math.random();
+    mfx.emit(true, 1, o.pos.x + x, o.pos.y + y, o.pos.z + z, back.x * 2 + x * 2, back.y * 2 + 0.8 + y * 2, back.z * 2 + z * 2, 0.18 + Math.random() * 0.16, r * (1.1 + Math.random() * 0.8), r * 0.3, 1.6 + hot * 0.7, 0.45 + hot * 0.4, 0.07 + hot * 0.08, 0.85, -0.5, 1, Math.random() * 6.28, (Math.random() - 0.5) * 3);
+  }
+  mfx.emit(true, 0, o.pos.x, o.pos.y, o.pos.z, 0, 0, 0, 0.06, r * 3.2, r * 3.2, 0.9, 0.35, 0.06, 0.55);
+}
 
 // ---- what each spell does (works for you and for enemy mages) ----
 // c = { caster, from (palm), dir, aim (point), target, power, player }
@@ -5892,10 +5908,10 @@ const SPELLS = [
   // ---------------- fire ----------------
   { id: 'fireball', name: 'Fireball', school: 'fire', rank: 0, cost: 6, chant: 'Flame that warms the world, gather in my hand and burn. Fireball!', desc: 'A ball of fire. Burns people, sets dry grass and thatch alight.',
     cast(c) {
-      const m = new THREE.Mesh(coreGeo, glowMat([4, 1.6, 0.4])); m.scale.setScalar(0.17 * Math.sqrt(c.power));
+      const m = new THREE.Mesh(coreGeo, glowMat([2.4, 0.75, 0.12])); m.scale.setScalar(0.1 * Math.sqrt(c.power));
       shoot({ caster: c.caster, pos: c.from.clone(), vel: c.dir.clone().multiplyScalar(26), r: 0.18, grav: 0.8, mesh: m, light: SCHOOL.fire.c, lightI: 14,
         onFighter: (f, k, p) => fireballHit(c, false)(p), onGround: fireballHit(c, false), onWater: (p) => { mfx.burst.smoke(p.x, p.y + 0.2, p.z, 6, 0.8, 0.75); sfx.hiss && sfx.hiss(p); },
-        trail: (o, dt) => { if (Math.random() < 0.9) mfx.emit(true, 1, o.pos.x, o.pos.y, o.pos.z, (Math.random() - 0.5) * 0.5, 0.6, (Math.random() - 0.5) * 0.5, 0.3, 0.45, 0.1, 3.2, 1.2, 0.3, 0.9); if (Math.random() < 0.5) mfx.emit(false, 4, o.pos.x, o.pos.y, o.pos.z, 0, 0.5, 0, 1.2, 0.25, 0.9, 0.15, 0.14, 0.13, 0.35); } });
+        trail: (o, dt) => { fireShell(o, 0.22, 3); if (Math.random() < 0.6) mfx.emit(false, 4, o.pos.x, o.pos.y, o.pos.z, 0, 0.5, 0, 1.2, 0.2, 0.8, 0.12, 0.11, 0.1, 0.4); } });
       sfx.whoosh && sfx.whoosh(c.from, 0.8);
     } },
   { id: 'burningplace', name: 'Burning Place', school: 'fire', rank: 1, cost: 16, aimGround: true, chant: 'Flames, take root in the earth and burn all that stands upon it. Burning Place!', desc: 'The ground itself catches fire where you point. It spreads with the wind.',
@@ -5911,10 +5927,10 @@ const SPELLS = [
     } },
   { id: 'greatfireball', name: 'Great Fireball', school: 'fire', rank: 2, cost: 40, chant: 'Great flame of the sun, gather into one and turn my enemies to ash. Great Fireball!', desc: 'A huge, slow fireball. Explodes, throws people, sets everything around on fire.',
     cast(c) {
-      const m = new THREE.Mesh(coreGeo, glowMat([5, 2, 0.5])); m.scale.setScalar(0.55);
+      const m = new THREE.Mesh(coreGeo, glowMat([2.6, 0.8, 0.14])); m.scale.setScalar(0.32);
       shoot({ caster: c.caster, pos: c.from.clone().addScaledVector(c.dir, 0.6), vel: c.dir.clone().multiplyScalar(15), r: 0.55, grav: 1.2, life: 6, mesh: m, light: SCHOOL.fire.c, lightI: 40,
         onFighter: (f, k, p) => fireballHit(c, true)(p), onGround: fireballHit(c, true), onWater: (p) => { mfx.burst.smoke(p.x, p.y + 0.3, p.z, 30, 2.5, 0.8); mfx.burst.water(p.x, p.y, p.z, 40, 6); sfx.hiss && sfx.hiss(p); },
-        trail: (o) => { for (let k = 0; k < 3; k++) mfx.emit(true, 1, o.pos.x + (Math.random() - 0.5) * 0.7, o.pos.y + (Math.random() - 0.5) * 0.7, o.pos.z + (Math.random() - 0.5) * 0.7, (Math.random() - 0.5), 1, (Math.random() - 0.5), 0.4, 1.1, 0.2, 3.4, 1.2, 0.3, 0.9); mfx.emit(false, 4, o.pos.x, o.pos.y + 0.3, o.pos.z, 0, 0.8, 0, 1.8, 0.6, 2.2, 0.14, 0.13, 0.12, 0.4); } });
+        trail: (o) => { fireShell(o, 0.6, 8); mfx.emit(false, 4, o.pos.x, o.pos.y + 0.3, o.pos.z, 0, 0.8, 0, 1.8, 0.6, 2.2, 0.12, 0.11, 0.1, 0.45); } });
       sfx.whoosh && sfx.whoosh(c.from, 1.6);
     } },
   // ---------------- water + ice ----------------
@@ -6013,12 +6029,12 @@ const SPELLS = [
         if (burning.has(bmCell(p.x, p.z))) fire = Math.min(1, fire + dt * 0.8);
         if (fire > 0.3) igniteDisc(p.x, p.z, 1.6, c.caster, 0.5);
         // the funnel: dust and wind going round and up, fire if it ate a blaze
-        for (let k = 0; k < 7; k++) {
-          const h = Math.random() * 14, a = e.t * 9 + Math.random() * 6.28, rr = (0.5 + h * 0.22) * fade;
+        for (let k = 0; k < 16; k++) {
+          const h = Math.pow(Math.random(), 0.8) * 16, a = e.t * 9 + Math.random() * 6.28, rr = (0.4 + h * 0.2 + h * h * 0.006) * fade;
           const x = p.x + Math.cos(a) * rr, z = p.z + Math.sin(a) * rr;
           const tv = 7 + h, vx = -Math.sin(a) * tv, vz = Math.cos(a) * tv;
           if (fire > 0.3 && Math.random() < fire) mfx.emit(true, 1, x, gy + h, z, vx * 0.4, 3, vz * 0.4, 0.5, 1.4, 0.4, 3.2, 1.2, 0.3, 0.8);
-          else mfx.emit(false, Math.random() < 0.7 ? 5 : 4, x, gy + h, z, vx * 0.3, 2.5, vz * 0.3, 0.7, 0.8 + h * 0.08, 2 + h * 0.15, 0.5, 0.46, 0.4, 0.38);
+          else { const c = 0.3 + Math.random() * 0.12; mfx.emit(false, Math.random() < 0.6 ? 5 : 4, x, gy + h, z, vx * 0.3, 2.5, vz * 0.3, 0.8, 0.9 + h * 0.09, 2.2 + h * 0.16, c, c * 0.92, c * 0.82, 0.62); }
         }
         if (Math.random() < dt * 8) mfx.burst.dust(p.x, gy, p.z, 3, 1, [0.4, 0.36, 0.3], 5);
         paintDisc(p.x, p.z, 1.2, 0, 0.05);
@@ -6254,6 +6270,7 @@ function chainShock(c, from, first, dmg, jumps, sky) {
     src = to; cur = next; d *= 0.7;
   }
 }
+const _bm4 = new THREE.Matrix4();
 // a jagged bolt of light between two points (with little side branches)
 function bolt(a, b, col, width, dur, branches) {
   const g = new THREE.Group();
@@ -6265,10 +6282,7 @@ function bolt(a, b, col, width, dur, branches) {
     for (let i = 0; i < pts.length - 1; i++) {
       const s = pts[i], e = pts[i + 1], m = s.clone().lerp(e, 0.5), L = s.distanceTo(e);
       const q = new THREE.Mesh(new THREE.PlaneGeometry(w, L), mat);
-      q.position.copy(m); q.lookAt(camera.position); const up = e.clone().sub(s).normalize();
-      // keep the strip along the segment, facing the camera
-      const toCam = camera.position.clone().sub(m).normalize(), x = new THREE.Vector3().crossVectors(up, toCam).normalize(), z = new THREE.Vector3().crossVectors(x, up);
-      q.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, up, z));
+      q.position.copy(m); q.userData.up = e.clone().sub(s).normalize();
       g.add(q);
     }
     return pts;
@@ -6278,13 +6292,16 @@ function bolt(a, b, col, width, dur, branches) {
   if (branches) for (let k = 0; k < 6; k++) { const s = pts[1 + Math.floor(Math.random() * (pts.length - 2))]; const e = s.clone().add(V3((Math.random() - 0.5) * 16, -8 - Math.random() * 12, (Math.random() - 0.5) * 16)); line(s, e, width * 0.5, 5, 0.8); }
   else line(a, b, width * 0.5, n, 0.8);
   scene.add(g);
-  addEffect({ dur, update(dt, e) { mat.opacity = (1 - e.t / e.dur) * (Math.random() < 0.3 ? 0.4 : 1); }, end() { scene.remove(g); g.traverse(o => o.geometry && o.geometry.dispose()); mat.dispose(); } });
+  // every strip runs along its piece of the bolt and turns its face to the camera
+  const face = () => { for (const q of g.children) { const up = q.userData.up, toCam = _ps1.copy(camera.position).sub(q.position).normalize(), x = _ps2.crossVectors(up, toCam).normalize(), z = _ps3.crossVectors(x, up); q.quaternion.setFromRotationMatrix(_bm4.makeBasis(x, up, z)); } };
+  face();
+  addEffect({ dur, update(dt, e) { face(); mat.opacity = (1 - e.t / e.dur) * (Math.random() < 0.3 ? 0.4 : 1); }, end() { scene.remove(g); g.traverse(o => o.geometry && o.geometry.dispose()); mat.dispose(); } });
 }
 // a ghostly knight from the other side
 const ghostMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   uniforms: { uT: { value: 0 }, uA: { value: 1 } },
-  vertexShader: '#include <common>\n#include <skinning_pars_vertex>\nvarying vec3 vN; varying vec3 vV; varying vec3 vW; void main(){ #include <beginnormal_vertex>\n#include <skinbase_vertex>\n#include <skinnormal_vertex>\n#include <begin_vertex>\n#include <skinning_vertex>\n vec4 wp = modelMatrix * vec4(transformed, 1.0); vW = wp.xyz; vN = normalize(mat3(modelMatrix) * objectNormal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }',
+  vertexShader: '#include <common>\n#include <skinning_pars_vertex>\nvarying vec3 vN; varying vec3 vV; varying vec3 vW;\nvoid main(){\n#include <beginnormal_vertex>\n#include <skinbase_vertex>\n#include <skinnormal_vertex>\n#include <begin_vertex>\n#include <skinning_vertex>\n vec4 wp = modelMatrix * vec4(transformed, 1.0); vW = wp.xyz; vN = normalize(mat3(modelMatrix) * objectNormal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }',
   fragmentShader: 'uniform float uT; uniform float uA; varying vec3 vN; varying vec3 vV; varying vec3 vW; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), vV)), 1.8); float band = 0.6 + 0.4 * sin(vW.y * 18.0 - uT * 5.0); gl_FragColor = vec4(vec3(0.35, 1.2, 1.9) * (0.12 + f * 1.1) * band * uA, 1.0); }',
 });
 function summonSpirit(c) {
@@ -6357,14 +6374,14 @@ function manaPassOut() {
   }
   passedOut = 1;
   endTalk(); closeShop();
-  fadeTo(1, 1.2, () => {
+  fadeTo(1, 1.2, () => maybeDream(() => {
     dayT = (dayT + 2 / 24) % 1;
     const inTown = Math.hypot(player.pos.x - SQUARE.x, player.pos.z - SQUARE.z) < 45;
     const lost = Math.floor(vsave.coins * (inTown ? 0.1 + Math.random() * 0.15 : 0.3 + Math.random() * 0.4));
     addCoins(-lost);
     magic.exh = 35; magic.mana = magic.max * 0.25;
     setTimeout(() => fadeTo(0, 2.5, () => { passedOut = 0; ui.sub('You wake up on the ground. Your head is splitting.' + (lost > 0 ? ' Someone took ' + money(lost) + ' while you were out.' : ''), 5); }), 900);
-  });
+  }));
 }
 
 // ---- casting: hold R to chant, Shift+R to cast without words, Enter to type it, or just say it ----
@@ -6373,14 +6390,15 @@ const circleTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 256;
   const g = c.getContext('2d'); g.translate(128, 128);
   g.strokeStyle = '#fff'; g.fillStyle = '#fff';
-  g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 118, 0, 7); g.stroke();
-  g.lineWidth = 1.5; g.beginPath(); g.arc(0, 0, 104, 0, 7); g.stroke(); g.beginPath(); g.arc(0, 0, 62, 0, 7); g.stroke();
+  g.shadowColor = '#fff'; g.shadowBlur = 6;
+  g.lineWidth = 5; g.beginPath(); g.arc(0, 0, 118, 0, 7); g.stroke();
+  g.lineWidth = 2.5; g.beginPath(); g.arc(0, 0, 104, 0, 7); g.stroke(); g.beginPath(); g.arc(0, 0, 62, 0, 7); g.stroke();
   // runes around the ring
   const r = mulberry32(4);
   g.font = 'bold 15px serif';
-  for (let i = 0; i < 24; i++) { g.save(); g.rotate(i / 24 * Math.PI * 2); g.translate(0, -111); g.beginPath(); for (let k = 0; k < 3; k++) { g.moveTo((r() - 0.5) * 9, (r() - 0.5) * 9); g.lineTo((r() - 0.5) * 9, (r() - 0.5) * 9); } g.lineWidth = 1.6; g.stroke(); g.restore(); }
+  for (let i = 0; i < 24; i++) { g.save(); g.rotate(i / 24 * Math.PI * 2); g.translate(0, -111); g.beginPath(); for (let k = 0; k < 3; k++) { g.moveTo((r() - 0.5) * 9, (r() - 0.5) * 9); g.lineTo((r() - 0.5) * 9, (r() - 0.5) * 9); } g.lineWidth = 2.4; g.stroke(); g.restore(); }
   // two squares make a star
-  for (const a of [0, Math.PI / 4]) { g.save(); g.rotate(a); g.lineWidth = 2; g.strokeRect(-74, -74, 148, 148); g.restore(); }
+  for (const a of [0, Math.PI / 4]) { g.save(); g.rotate(a); g.lineWidth = 3; g.strokeRect(-74, -74, 148, 148); g.restore(); }
   g.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.lineTo(Math.cos(a) * 62, Math.sin(a) * 62); } g.closePath(); g.stroke();
   const t = new THREE.CanvasTexture(c); return t;
 })();
@@ -6415,7 +6433,7 @@ function startChant(chantless, spellId) {
   if (magic.max < RANK_MANA[s.rank]) { ui.sub('Your mana is ' + Math.floor(magic.max) + '. ' + s.name + ' is ' + RANKS[s.rank] + ' magic and needs ' + RANK_MANA[s.rank] + '.', 3); sfx.ui(200); return; }
   if (!f.alive || f.down || f.knock || f.lift || f.attack || bandaging > 0 || passedOut) return;
   cast.on = true; cast.spell = s; cast.t = 0; cast.chantless = chantless; cast.said = false; cast.power = 1; cast.voiceT = 0;
-  cast.need = chantless ? 0.18 : CHANT_T[s.rank] * (1 - Math.min(0.4, (magic.mastery[id] || 0) * 0.004));
+  cast.need = chantless ? 0.08 : CHANT_T[s.rank] * (1 - Math.min(0.4, (magic.mastery[id] || 0) * 0.004));
   cast.words = s.chant.split(' ');
   f.blocking = false;
   if (!chantless) sfx.chant(f.pos, s.chant, f.voicePitch, cast.need);
@@ -6465,7 +6483,7 @@ function castSpell(f, s, o = {}) {
   f.castAfter = 0.4;
   s.cast({ caster: f, from, dir, aim, target: ai.target, power: o.power || 1, player: isP, chantless: o.chantless });
   const c = SCHOOL[s.school].c;
-  mfx.burst.glow(from.x, from.y, from.z, 0.7, c[0], c[1], c[2], 0.25);
+  mfx.burst.glow(from.x, from.y, from.z, 0.35, c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 0.2);
 }
 // you can learn a spell just by watching a mage cast it, a few times, close up
 function watchMagic(f, s) {
@@ -6506,8 +6524,8 @@ function updateCasting(dt) {
       if (s.charge && cast.t > cast.need) { const want = Math.min(2.6, 1 + (cast.t - cast.need) * 0.9); const extra = spellCost(s, cast.chantless, want) - spellCost(s, cast.chantless, cast.power); if (magic.mana + magic.max * 0.15 > extra) cast.power = want; }
       const k = Math.min(1, cast.t / cast.need);
       const col = SCHOOL[s.school].c;
-      C.material.color.setRGB(col[0] * 0.5, col[1] * 0.5, col[2] * 0.5);
-      C.material.opacity = 0.25 + 0.75 * k;
+      C.material.color.setRGB(col[0] * 0.8, col[1] * 0.8, col[2] * 0.8);
+      C.material.opacity = 0.35 + 0.65 * k;
       C.scale.setScalar((0.25 + 0.35 * k) * (s.charge ? 0.8 + cast.power * 0.25 : 1));
       C.position.copy(f.b.LeftHand.getWorldPosition(V3())).addScaledVector(dir, 0.18);
       C.lookAt(C.position.clone().add(dir)); C.rotateZ(cast.t * 2);
@@ -6643,7 +6661,7 @@ Object.assign(sfx, {
 // ---- per frame ----
 function updateMagic(dt, realDt, t) {
   if (dt > 0) { updateCasting(dt); updateProjs(dt); updateEffects(dt); updateSummons(dt, t); }
-  updateLights(realDt);
+  updateLights(dt);
 }
 // ---------- magic, part 3: enemy mages, learning, your spellbook ----------
 
@@ -6670,10 +6688,8 @@ function spawnMage(camp, at, tier) {
   staff.add(new THREE.Mesh(staffGeo, staffMat));
   const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), new THREE.MeshStandardMaterial({ color: 0x9fd8ff, emissive: new THREE.Color(SCHOOL[M.spells[0] === 'fireball' ? 'fire' : 'water'].css), emissiveIntensity: 1.6, roughness: 0.1 }));
   gem.position.y = 1.18; staff.add(gem);
-  staff.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.armor = true; } });
-  scene.add(staff); bone(f.model, 'RightHand').attach(staff);
-  staff.position.set(0, 0, 0); staff.rotation.set(Math.PI / 2, 0, 0);
-  staff.updateMatrixWorld(true);
+  staff.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
+  scene.add(staff);
   f.staff = staff;
   f.mage = { tier, max: M.max, mana: M.max, spells: M.spells, chant: null, cd: 1 + Math.random() * 2, next: null, circle: makeCircle(), keep: 11 + Math.random() * 5 };
   f.purse = M.purse + Math.floor(Math.random() * M.purse);
@@ -6707,7 +6723,15 @@ function pickMageSpell(f) {
   const pool = ok.length ? ok : attacks;
   return { s: pool[Math.floor(Math.random() * pool.length)] };
 }
-const _mw = new THREE.Vector3();
+const _mw = new THREE.Vector3(), _sq = new THREE.Quaternion(), _sx = new THREE.Vector3(1, 0, 0);
+// the staff stands upright in his fist, leaning forward a little
+function placeStaff(f) {
+  if (!f.staff || f.staffDropped) return;
+  f.b.RightHand.getWorldPosition(f.staff.position);
+  f.staff.position.y -= 0.02;
+  f.staff.quaternion.setFromAxisAngle(_mw.set(0, 1, 0), f.facing);
+  f.staff.quaternion.multiply(_sq.setFromAxisAngle(_sx, 0.12));
+}
 function updateMage(f, dt) {
   const ai = f.ai, M = f.mage;
   M.mana = Math.min(M.max, M.mana + dt * 2.2);
@@ -6779,9 +6803,14 @@ function updateMage(f, dt) {
   stepFighter(f, dt, wish, speed, face, 7);
 }
 // a dead mage's spell dies with him
-deathHooks.push((v) => { if (v.mage) { v.mage.chant = null; v.mage.circle.visible = false; v.castAim = null; } });
+deathHooks.push((v) => {
+  if (!v.mage) return;
+  v.mage.chant = null; v.mage.circle.visible = false; v.castAim = null;
+  // the staff falls out of his hand
+  if (v.staff && !v.staffDropped) { v.staffDropped = true; const g = new THREE.Group(); g.position.copy(v.staff.position); g.quaternion.copy(v.staff.quaternion); scene.remove(v.staff); g.add(v.staff); v.staff.position.set(0, 0, 0); v.staff.quaternion.identity(); scene.add(g); v.staffGroup = g; gore.piece(g, new THREE.Vector3((Math.random() - 0.5) * 2, 1.2, (Math.random() - 0.5) * 2), new THREE.Vector3(Math.random() * 4, Math.random() * 4, Math.random() * 4), 0.03, new THREE.Vector3(0, 1, 0), 0, false, true); }
+});
 const removeFighter0 = removeFighter;
-removeFighter = function (f) { if (f.mage) { scene.remove(f.mage.circle); if (f.staff && f.staff.parent) f.staff.parent.remove(f.staff); } removeFighter0(f); };
+removeFighter = function (f) { if (f.mage) { scene.remove(f.mage.circle); if (f.staff && f.staff.parent) f.staff.parent.remove(f.staff); if (f.staffGroup) scene.remove(f.staffGroup); } removeFighter0(f); };
 // the staff falls with him, the book is in his robe
 const lootBody0 = lootBody;
 lootBody = function (o) {
@@ -7213,7 +7242,7 @@ const saga = (() => {
     uiOpen = true;
     if (document.pointerLockElement) document.exitPointerLock();
   }
-  function close() { if (!el) return; el.style.display = 'none'; clearInterval(typing); uiOpen = false; if (!cutscene && player.alive) requestLock(); if (onDone) { const f = onDone; onDone = null; f(); } }
+  function close() { if (!el) return; el.style.display = 'none'; clearInterval(typing); uiOpen = false; if (!legendBusy) cutscene = false; if (!cutscene && player.alive) requestLock(); if (onDone) { const f = onDone; onDone = null; f(); } }
   return { say, close, ensure, get open() { return el && el.style.display === 'block'; } };
 })();
 addEventListener('keydown', (e) => { if (e.code === 'Escape' && saga.open && !legendBusy) saga.close(); });
@@ -7254,7 +7283,7 @@ groundH = function (x, z) { const h = groundH1(x, z); for (const l of ledges) if
 // ---- the Dragon God ----
 let dragon = null, dragonCurseT = 0, dragonTalkT = 0;
 function spawnDragon() {
-  const f = new Fighter({ tier: 4, team: 'god', outfit: { sex: 'm', dress: true, top: 0xe2e0dc, legs: 0x1a1a1e, hood: true, hoodColor: 0xdedcd8, cloak: true, face: 'dragon', boots: 0x161616 }, body: 0xd8d4cc, sword: null, scale: 1.07, name: 'Varo, the Pale Dragon' });
+  const f = new Fighter({ tier: 4, team: 'god', outfit: { sex: 'm', dress: true, top: 0xa9a69f, legs: 0x1a1a1e, hood: true, hoodColor: 0x9d9a93, cloak: true, belt: true, face: 'dragon', boots: 0x161616 }, body: 0xd8d4cc, sword: null, scale: 1.07, name: 'Varo, the Pale Dragon' });
   f.invuln = true; f.voicePitch = 0.68; f.legend = 'dragon';
   f.pos.set(LEDGE.x + 1.2, LEDGE.top, LEDGE.z + 1.5);
   f.facing = Math.PI * 0.95; // looking south over the valley
@@ -7264,30 +7293,58 @@ function spawnDragon() {
   f.onMagic = () => { if (!legendBusy && player.alive) dragonKill(Math.random() < 0.5 ? 'hand' : 'tap', 'You raised a hand against me.'); };
   dragon = f;
 }
-// silver bangs falling into the hood opening
+// hair falling out of the hood: thin curved ribbons of strands, thicker at the root
+function strandGeo(L, w, bend, twist) {
+  const n = 6, pos = [], idx = [], uv = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, y = -t * L, z = Math.sin(t * Math.PI * 0.6) * bend, x = Math.sin(t * 2.2) * twist;
+    const hw = w * (1 - t * 0.85) * 0.5;
+    pos.push(x - hw, y, z, x + hw, y, z); uv.push(0, t, 1, t);
+    if (i < n) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+const hairTex = (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d'), r = mulberry32(8);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 128);
+  for (let i = 0; i < 70; i++) { const x = r() * 64, sh = 150 + r() * 105; g.strokeStyle = `rgb(${sh},${sh},${sh})`; g.lineWidth = 0.6 + r() * 1.4; g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + (r() - 0.5) * 6, 40, x + (r() - 0.5) * 6, 90, x + (r() - 0.5) * 8, 128); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
 function addHairBangs(f, color, len) {
   const face = f.armor.face; if (!face) return;
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.15 });
-  const g = new THREE.Group();
-  for (let i = 0; i < 13; i++) {
-    const x = -0.075 + i * 0.0125 + (Math.random() - 0.5) * 0.006;
-    const L = (0.06 + Math.random() * 0.05) * len * (1 - Math.abs(x) * 3);
-    const c = new THREE.ConeGeometry(0.009 + Math.random() * 0.004, L, 4);
-    c.translate(0, -L / 2, 0);
-    const m = new THREE.Mesh(c, mat);
-    m.position.set(x, 0.07, 0.022 - Math.abs(x) * 0.5);
-    m.rotation.set(-0.35 - Math.random() * 0.2, 0, x * 2.6 + (Math.random() - 0.5) * 0.25);
+  const mat = new THREE.MeshStandardMaterial({ color, map: hairTex, roughness: 0.38, metalness: 0.1, side: THREE.DoubleSide });
+  const g = new THREE.Group(), r = mulberry32(color & 0xffff);
+  // the fringe over the forehead
+  for (let i = 0; i < 22; i++) {
+    const x = -0.072 + i * 0.0068 + (r() - 0.5) * 0.004;
+    const L = (0.055 + r() * 0.05) * len * (1 - Math.abs(x) * 2.2);
+    const m = new THREE.Mesh(strandGeo(L, 0.012 + r() * 0.006, 0.012 + r() * 0.01, (r() - 0.5) * 0.008), mat);
+    m.position.set(x, 0.072 - Math.abs(x) * 0.12, 0.03 - x * x * 7);
+    m.rotation.set(-0.15 - r() * 0.15, x * -1.2, x * 1.4 + (r() - 0.5) * 0.2);
     g.add(m);
   }
-  // the side locks over the ears
-  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const L = 0.13 * len; const c = new THREE.ConeGeometry(0.012, L, 4); c.translate(0, -L / 2, 0); const m = new THREE.Mesh(c, mat); m.position.set(s * (0.068 + k * 0.006), 0.05, 0.0 - k * 0.012); m.rotation.set(-0.1, 0, s * 0.12); g.add(m); }
+  // locks falling past the cheeks
+  for (const s of [-1, 1]) for (let k = 0; k < 4; k++) {
+    const L = (0.12 + r() * 0.06) * len;
+    const m = new THREE.Mesh(strandGeo(L, 0.016, 0.01, s * 0.006), mat);
+    m.position.set(s * (0.064 + k * 0.004), 0.06 - k * 0.006, 0.012 - k * 0.012);
+    m.rotation.set(-0.08, s * 0.5, s * (0.08 + k * 0.03));
+    g.add(m);
+  }
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.armor = true; } });
   face.add(g);
 }
 // glowing eyes for things that are not quite human
 function goldEyes(f, color) {
   const face = f.armor.face; if (!face) return;
-  face.traverse(o => { if (o.isMesh && Array.isArray(o.material) && o.material[0] && o.material[0].name === 'eye') { const m = o.material[0].clone(); m.emissive = new THREE.Color(color); m.emissiveMap = m.map; m.emissiveIntensity = 1.6; m.color.set(color).lerp(new THREE.Color(0xffffff), 0.3); o.material = [m, o.material[1]]; } });
+  // the loader splits the eyes into one mesh per material: find the one painted with the iris
+  face.traverse(o => {
+    if (!o.isMesh) return;
+    const ms = Array.isArray(o.material) ? o.material : [o.material];
+    const out = ms.map(mm => { if (mm.name !== 'eye') return mm; const m = mm.clone(); m.emissive = new THREE.Color(color); m.emissiveMap = m.map; m.emissiveIntensity = 1.4; m.color.set(color).lerp(new THREE.Color(0xffffff), 0.35); return m; });
+    o.material = Array.isArray(o.material) ? out : out[0];
+  });
 }
 function updateDragon(dt) {
   if (!dragon) return;
@@ -7302,14 +7359,14 @@ function updateDragon(dt) {
     dragonCurseT -= dt;
     if (dragonCurseT <= 0) { dragonCurseT = 0.7 + d / 20; sfx.heartbeat(); }
     shake(Math.max(0, (16 - d) / 16) * 0.04);
-    const tint = document.getElementById('fxTint');
+    const tint = document.getElementById('legendTint');
     tint.style.background = 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,.75) 100%)';
     tint.style.opacity = Math.min(0.85, (16 - d) / 12);
     if (!legend.warned) { legend.warned = 1; saveLegend(); ui.sub('Every part of your body is screaming at you to run.', 4.5); }
-  }
+    f.cursed = true;
+  } else if (!legendBusy && f.cursed) { document.getElementById('legendTint').style.opacity = 0; f.cursed = false; }
   // you attacked him
   if (P.alive && !legendBusy && P.attack && d < 2.6 && P.attack.t > P.attack.dur * 0.3) dragonKill('catch', '');
-  if (d < 14 && magic.eyeOn && magic.eye === 'foresight') eyeChaos(f, dt);
 }
 function talkDragon() {
   const f = dragon;
@@ -7319,7 +7376,7 @@ function talkDragon() {
   f.facing = Math.atan2(player.pos.x - f.pos.x, player.pos.z - f.pos.z); f.root.rotation.y = f.facing;
   const v = { pos: f.pos, pitch: 0.62 };
   saga.say('Silver-haired man', '......', [{ t: '...', fn: () => {
-    saga.say('Silver-haired man', 'Do you know the the Smiling God?', [
+    saga.say('Silver-haired man', 'Do you know the Smiling God?', [
       { t: 'Yes.', fn: () => { saga.close(); dragonKill('hand', 'Then die.'); } },
       { t: 'No.', fn: () => answerNo() },
       { t: 'Who is that?', fn: () => answerNo() },
@@ -7377,7 +7434,7 @@ function dragonKill(kind, line) {
       if (through && !f._hit) {
         f._hit = true; sfx.stab(c); sfx.crack(c); shake(1);
         if (settings.gore > 0) { gore.blood(c.clone().addScaledVector(back, 0.25), back, 120, 5); gore.blood(c, fwd, 30, 2); for (let i = 0; i < 3; i++) gore.stain(c.x + back.x * (1 + i * 0.4), groundH(c.x, c.z) + 0.015, c.z + back.z * (1 + i * 0.4), 0.6); }
-        P.blood = 1; P.stagger = 3;
+        P.blood = Math.max(P.blood, 0.45); P.stagger = 3;
         sfx.voice(P.pos, 'scream', P.voicePitch);
       }
       if (t > 1.0 && !f._pull) {
@@ -7398,7 +7455,7 @@ function dragonKill(kind, line) {
   function finish() {
     legendScene = null;
     if (P.alive) { P.lastHitBy = f; P.hp = 0; P.die({ from: f, part: 'chest', noBlood: true }, 'heart torn out'); }
-    setTimeout(() => { sceneCam = null; cutscene = false; legendBusy = false; f.noArms = false; f.castAim = null; f._tapped = f._cough = f._hit = f._pull = false; if (f._heart) { f._heart.parent.remove(f._heart); f._heart = null; } f.pos.copy(start); f.facing = Math.PI * 0.95; f.root.rotation.y = f.facing; }, 2200);
+    setTimeout(() => { document.getElementById('legendTint').style.opacity = 0; f.cursed = false; sceneCam = null; cutscene = false; legendBusy = false; f.noArms = false; f.castAim = null; f._tapped = f._cough = f._hit = f._pull = false; if (f._heart) { f._heart.parent.remove(f._heart); f._heart = null; } f.pos.copy(start); f.facing = Math.PI * 0.95; f.root.rotation.y = f.facing; }, 2200);
   }
 }
 let legendScene = null;
@@ -7455,20 +7512,20 @@ function maybeDream(done) {
     legend.advice = spot; saveLegend();
     placeAdvice(spot);
     magic.manGod = (magic.manGod || 0) + 1; saveMagic(true);
-    saga.say('the Smiling God', 'Listen well! Tomorrow, go to ' + spot.where + '. Someone died there with ' + (spot.book ? 'a book of ' + SPELL[spot.book].name : 'a fat purse of gold') + '. It is yours! See? I only want to help you.', [{ t: 'Wake up', fn: end }], { voice: V, dream: true });
+    saga.say('Smiling God', 'Listen well! Tomorrow, go to ' + spot.where + '. Someone died there with ' + (spot.book ? 'a book of ' + SPELL[spot.book].name : 'a fat purse of gold') + '. It is yours! See? I only want to help you.', [{ t: 'Wake up', fn: end }], { voice: V, dream: true });
   };
   if (!magic.manGod) {
     saga.say('???', 'Hello there! Don\'t be scared. This is a dream, you know.', [{ t: 'Who are you?', fn: () => {
-      saga.say('the Smiling God', 'Me? I am the the Smiling God. I like to help people like you. Will you listen to my advice?', [
+      saga.say('Smiling God', 'Me? I am the Smiling God. I like to help people like you. Will you listen to my advice?', [
         { t: 'I\'ll listen.', fn: advice },
-        { t: 'What do you want from me?', fn: () => saga.say('the Smiling God', 'Nothing at all! Isn\'t that nice? So... will you listen?', [{ t: 'I\'ll listen.', fn: advice }, { t: 'No. I don\'t trust you.', fn: refuse }], { voice: V, dream: true }) },
+        { t: 'What do you want from me?', fn: () => saga.say('Smiling God', 'Nothing at all! Isn\'t that nice? So... will you listen?', [{ t: 'I\'ll listen.', fn: advice }, { t: 'No. I don\'t trust you.', fn: refuse }], { voice: V, dream: true }) },
         { t: 'No. I don\'t trust you.', fn: refuse },
       ], { voice: V, dream: true });
     } }], { voice: V, dream: true });
   } else {
-    saga.say('the Smiling God', 'Hello again, my friend! I have more good advice for you. Will you listen?', [{ t: 'Tell me.', fn: advice }, { t: 'Leave me alone.', fn: refuse }], { voice: V, dream: true });
+    saga.say('Smiling God', 'Hello again, my friend! I have more good advice for you. Will you listen?', [{ t: 'Tell me.', fn: advice }, { t: 'Leave me alone.', fn: refuse }], { voice: V, dream: true });
   }
-  function refuse() { saga.say('the Smiling God', 'Aww. That\'s a shame. Well... I\'ll be around.', [{ t: 'Wake up', fn: end }], { voice: V, dream: true }); }
+  function refuse() { saga.say('Smiling God', 'Aww. That\'s a shame. Well... I\'ll be around.', [{ t: 'Wake up', fn: end }], { voice: V, dream: true }); }
 }
 const ADVICE_SPOTS = [
   { where: 'the ruins on the eastern battlefield', x: () => BATTLE_X + 40, z: () => 30 },
@@ -7490,7 +7547,7 @@ function placeAdvice(spot) {
   camp.members = camp.members.filter(m => m !== f);
   f.pos.set(x, groundH(x, z), z);
   f.fallDir = -1; f.fallT = 1; f.ai = null; f.keep = true; f.alive = false; f.down = true;
-  f.mage.circle.visible = false;
+  f.mage.circle.visible = false; if (f.staff) { scene.remove(f.staff); f.staffDropped = true; }
   f.book = spot.book; f.purse = spot.book ? 20 : 300 + Math.floor(Math.random() * 300);
   f.name = 'Dead traveler';
   f.alive = true; f.down = false; f.animate(0.4); f.alive = false; f.down = true;
@@ -7508,6 +7565,8 @@ function spawnEmpress() {
   addHairBangs(f, 0x6a3a9a, 1.6);
   goldEyes(f, 0xb06aff);
   f.onMagic = () => empressOffended('Fuhahaha! That tickles!');
+  // a faint violet glow follows her around at night
+  f.aura = new THREE.PointLight(0xa060ff, 0, 5, 2); scene.add(f.aura);
   setInside(f, true);
   empress = f;
 }
@@ -7517,11 +7576,11 @@ function addHorns(f) {
   for (const s of [-1, 1]) {
     // a horn that curls back and out, getting thinner
     const pts = [], rings = 14, segs = 10, pos = [], idx = [];
-    for (let i = 0; i <= rings; i++) { const t = i / rings, a = t * 2.3; pts.push(new THREE.Vector3(s * (0.055 + Math.sin(a) * 0.05 * t + t * 0.03), 0.1 + Math.sin(a * 0.8) * 0.07, -0.02 - (1 - Math.cos(a)) * 0.05)); }
+    for (let i = 0; i <= rings; i++) { const t = i / rings, a = t * 2.4; pts.push(new THREE.Vector3(s * (0.06 + Math.sin(a) * 0.075 * t + t * 0.05), 0.1 + Math.sin(a * 0.8) * 0.12, -0.01 - (1 - Math.cos(a)) * 0.07)); }
     for (let i = 0; i <= rings; i++) {
       const t = i / rings, p = pts[i], q = pts[Math.min(rings, i + 1)], pp = pts[Math.max(0, i - 1)];
       const dir = q.clone().sub(pp).normalize(), n1 = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(1, 0, 0)).normalize(), n2 = new THREE.Vector3().crossVectors(dir, n1);
-      const r = 0.016 * (1 - t * 0.92) * (1 + 0.08 * Math.sin(t * 40));
+      const r = 0.024 * (1 - t * 0.9) * (1 + 0.08 * Math.sin(t * 40));
       for (let k = 0; k <= segs; k++) { const a = k / segs * 6.283; pos.push(p.x + (n1.x * Math.cos(a) + n2.x * Math.sin(a)) * r, p.y + (n1.y * Math.cos(a) + n2.y * Math.sin(a)) * r, p.z + (n1.z * Math.cos(a) + n2.z * Math.sin(a)) * r); }
       if (i < rings) for (let k = 0; k < segs; k++) { const a = i * (segs + 1) + k, b = a + segs + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
     }
@@ -7536,6 +7595,8 @@ function updateEmpress(dt) {
   if (empAngryUntil > clockNow) { if (!f.inside) setInside(f, true); return; }
   if (night && f.inside && !legendBusy) { setInside(f, false); const s = EMP_SPOT(); f.pos.set(s.x, groundH(s.x, s.z), s.z); f.facing = Math.random() * 6.28; }
   if (!night && !f.inside && !legendBusy && !saga.open) { smokePuff(f.pos); setInside(f, true); }
+  f.aura.intensity = f.inside ? 0 : 2.2;
+  if (!f.inside) f.aura.position.set(f.pos.x, f.pos.y + 1.2, f.pos.z);
   if (f.inside) return;
   // she wanders a few steps, looking for food, and hums
   f.wT = (f.wT || 0) - dt;
@@ -7614,13 +7675,13 @@ function eyeScene(kind) {
     if (t > 1.2 && !f._poked) {
       f._poked = true;
       sfx.voice(P.pos, 'scream', P.voicePitch); sfx.stab(eye); shake(0.8);
-      const tint = document.getElementById('fxTint'); tint.style.background = 'radial-gradient(ellipse at 35% 45%, rgba(255,255,255,.95) 0%, rgba(160,0,0,.85) 35%, rgba(60,0,0,.9) 100%)'; tint.style.opacity = 1;
+      const tint = document.getElementById('legendTint'); tint.style.background = 'radial-gradient(ellipse at 35% 45%, rgba(255,255,255,.95) 0%, rgba(160,0,0,.85) 35%, rgba(60,0,0,.9) 100%)'; tint.style.opacity = 1;
       if (settings.gore > 0) gore.blood(eye, fwd, 6, 0.6);
     }
     if (t > 1.2 && t < 3.5 && Math.random() < 0.05) sfx.heartbeat();
     if (t > 4.2) {
       legendScene = null;
-      const tint = document.getElementById('fxTint'); tint.style.opacity = 0;
+      const tint = document.getElementById('legendTint'); tint.style.opacity = 0;
       magic.eye = kind; magic.eyeOn = false; saveMagic(true);
       P.helmet(true); sceneCam = null; cutscene = false; legendBusy = false; f._poked = false;
       ui.message(EYE_NAMES[kind].toUpperCase(), 3);
@@ -7687,6 +7748,7 @@ function updateEye(dt, realDt) {
   if (magic.exh >= 100) { magic.eyeOn = false; manaPassOut(); return; }
   if (magic.eye !== 'foresight') return;
   const P = player;
+  if (dragon && dragon.pos.distanceTo(P.pos) < 14) { eyeChaos(dragon, dt); return; }
   const list = fighters.filter(f => f.ai && f.alive && f.ai.alert && f.ai.target === P && !f.down && f.pos.distanceTo(P.pos) < 32).sort((a, b) => a.pos.distanceTo(P.pos) - b.pos.distanceTo(P.pos)).slice(0, ghostPool.length);
   let gi = 0;
   for (const f of list) {
@@ -7810,6 +7872,7 @@ function updateLegends(dt, realDt) {
   updateDragon(dt); updateEmpress(dt); updateEye(dt, realDt);
   if (legend.advice && player.pos.distanceTo(new THREE.Vector3(legend.advice.x, player.pos.y, legend.advice.z)) < 6) { legend.advice = null; saveLegend(); }
 }
+window.__L = { LEDGE, get dragon() { return dragon; }, get empress() { return empress; }, talkDragon, talkEmpress, saga, maybeDream, eyeScene, dragonKill, legend };
 
 // ---------- startup: build the world, generate the forests, load the knights ----------
 buildWorld();
@@ -7872,6 +7935,9 @@ function frame() {
   if (finisherCam > 0) finisherCam -= realDt;
   const live = playing && !paused && worldStarted;
   const dt = live ? realDt * scale : 0;
+  // tests can run the world several steps per drawn frame (fast-forward)
+  const reps = live && window.__steps ? window.__steps : 1;
+  for (let rep = 0; rep < reps; rep++) {
   clockNow += dt;
   if (live) { elapsed += dt; dayT = (dayT + dt / DAY_SECONDS) % 1; }
 
@@ -7891,6 +7957,7 @@ function frame() {
       const far = !f.isPlayer && f.alive && f.pos.distanceToSquared(camera.position) > 45 * 45;
       if (far && f.animatedOnce && (animTick + f.animSlot) % 3) { f.skipDt = (f.skipDt || 0) + dt; continue; }
       if (live || !f.animatedOnce) { f.animate(live ? dt + (f.skipDt || 0) : 0.016); f.skipDt = 0; f.animatedOnce = true; }
+      if (f.staff) placeStaff(f);
       f.armor.uniforms.uBlood.value = f.blood;
       if (f.cape && live) {
         f.b.Spine1.getWorldPosition(_cv); Object.assign(capeCols[0], { x: _cv.x, y: _cv.y, z: _cv.z });
@@ -7915,6 +7982,7 @@ function frame() {
       }
     }
   }
+  }
   checkReady();
   updateGrass(player.pos.x, player.pos.z, false);
   const wt = elapsed + performance.now() * 0.0002;
@@ -7924,7 +7992,7 @@ function frame() {
   captureSkyEnv(sunDir, false);
   animateLife(dt, elapsed, player.pos);
   updateWeather(realDt, wt);
-  updateMagicWorld(dt, realDt, wt);
+  updateMagicWorld(dt * reps, realDt, wt);
   updateFires(realDt, wt, lightK.night);
   clothUniforms.uTime.value = wt;
   if (natureReady) updateNature(realDt, wt);
@@ -7960,6 +8028,7 @@ window.__V = { villagers, vsave, openTalk, say, startRaid, startScene, endTalk, 
 window.__W = { SQUARE, CASTLE, BRIDGE, BATTLE_X, FORTRESS, groundH };
 window.__dbg = () => ({ modelReady, natureReady, texDone, texPending, worldStarted, scans: scansLoaded + '/' + SCANS.length, cells: natureCells.size, inst: [...natureCells.values()].flat().reduce((a, m) => a + m.count, 0), fps: $('fps').textContent });
 window.__R = { renderer, composer, camera };
+window.__pause = (v) => { paused = v; }; window.__riverDist = (x, z) => riverDist(x, z); window.__houses = VHOUSES;
 window.__solid = (x, z, pad) => solidAt(x, z, pad); window.__clear = (x, z, r) => !circles.some(c => (c.x - x) ** 2 + (c.z - z) ** 2 < r * r) && riverDist(x, z) > 25 && slopeAt(x, z) < 0.2;
 window.__M = { get elapsed() { return elapsed; }, magic, SPELL, castSpell, learnSpell, cast, startChant, releaseChant, spawnMage, CAMPS, ignite, igniteDisc, burning, freezeWater, iceSheets, knockDown, mfx, projs, effects, wind, get lockTarget() { return lockTarget; }, set lockTarget(v) { lockTarget = v; } };
 </script>

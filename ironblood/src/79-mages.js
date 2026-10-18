@@ -23,10 +23,8 @@ function spawnMage(camp, at, tier) {
   staff.add(new THREE.Mesh(staffGeo, staffMat));
   const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), new THREE.MeshStandardMaterial({ color: 0x9fd8ff, emissive: new THREE.Color(SCHOOL[M.spells[0] === 'fireball' ? 'fire' : 'water'].css), emissiveIntensity: 1.6, roughness: 0.1 }));
   gem.position.y = 1.18; staff.add(gem);
-  staff.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.armor = true; } });
-  scene.add(staff); bone(f.model, 'RightHand').attach(staff);
-  staff.position.set(0, 0, 0); staff.rotation.set(Math.PI / 2, 0, 0);
-  staff.updateMatrixWorld(true);
+  staff.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
+  scene.add(staff);
   f.staff = staff;
   f.mage = { tier, max: M.max, mana: M.max, spells: M.spells, chant: null, cd: 1 + Math.random() * 2, next: null, circle: makeCircle(), keep: 11 + Math.random() * 5 };
   f.purse = M.purse + Math.floor(Math.random() * M.purse);
@@ -60,7 +58,15 @@ function pickMageSpell(f) {
   const pool = ok.length ? ok : attacks;
   return { s: pool[Math.floor(Math.random() * pool.length)] };
 }
-const _mw = new THREE.Vector3();
+const _mw = new THREE.Vector3(), _sq = new THREE.Quaternion(), _sx = new THREE.Vector3(1, 0, 0);
+// the staff stands upright in his fist, leaning forward a little
+function placeStaff(f) {
+  if (!f.staff || f.staffDropped) return;
+  f.b.RightHand.getWorldPosition(f.staff.position);
+  f.staff.position.y -= 0.02;
+  f.staff.quaternion.setFromAxisAngle(_mw.set(0, 1, 0), f.facing);
+  f.staff.quaternion.multiply(_sq.setFromAxisAngle(_sx, 0.12));
+}
 function updateMage(f, dt) {
   const ai = f.ai, M = f.mage;
   M.mana = Math.min(M.max, M.mana + dt * 2.2);
@@ -132,9 +138,14 @@ function updateMage(f, dt) {
   stepFighter(f, dt, wish, speed, face, 7);
 }
 // a dead mage's spell dies with him
-deathHooks.push((v) => { if (v.mage) { v.mage.chant = null; v.mage.circle.visible = false; v.castAim = null; } });
+deathHooks.push((v) => {
+  if (!v.mage) return;
+  v.mage.chant = null; v.mage.circle.visible = false; v.castAim = null;
+  // the staff falls out of his hand
+  if (v.staff && !v.staffDropped) { v.staffDropped = true; const g = new THREE.Group(); g.position.copy(v.staff.position); g.quaternion.copy(v.staff.quaternion); scene.remove(v.staff); g.add(v.staff); v.staff.position.set(0, 0, 0); v.staff.quaternion.identity(); scene.add(g); v.staffGroup = g; gore.piece(g, new THREE.Vector3((Math.random() - 0.5) * 2, 1.2, (Math.random() - 0.5) * 2), new THREE.Vector3(Math.random() * 4, Math.random() * 4, Math.random() * 4), 0.03, new THREE.Vector3(0, 1, 0), 0, false, true); }
+});
 const removeFighter0 = removeFighter;
-removeFighter = function (f) { if (f.mage) { scene.remove(f.mage.circle); if (f.staff && f.staff.parent) f.staff.parent.remove(f.staff); } removeFighter0(f); };
+removeFighter = function (f) { if (f.mage) { scene.remove(f.mage.circle); if (f.staff && f.staff.parent) f.staff.parent.remove(f.staff); if (f.staffGroup) scene.remove(f.staffGroup); } removeFighter0(f); };
 // the staff falls with him, the book is in his robe
 const lootBody0 = lootBody;
 lootBody = function (o) {

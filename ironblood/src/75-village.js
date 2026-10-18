@@ -59,7 +59,7 @@ const PERSONAS = [
     desc: 'always drunk, rambling, funny, once a soldier, tells wild stories that are sometimes true', likes: ['ale', 'mead', 'drink', 'story', 'war'], dislikes: ['water', 'sober', 'priest'], addr: 'lad', oath: 'Hic.' },
   { id: 'ulric', name: 'Ulric', age: 67, sex: 'm', title: 'the wandering mage', home: 'tavern', work: 'square', evening: 'tavern', shop: 'magic', pitch: 0.78,
     outfit: { dress: true, top: DYE.woad, legs: DYE.dark, hood: true, hoodColor: 0x23304a, cloak: true },
-    desc: 'an old traveling mage of the Water school who has stopped in Ashford, patient teacher, dry humor, sells lessons; warns that running out of mana makes you faint; says the most dangerous being alive is @@DRAGON_SHORT@@, a silver-haired man who walks the north mountains, and that you must never talk to him; calls @@MANGOD@@ a liar who whispers sweet help in dreams; has heard of a hungry demon empress with horns who wanders at night and grants demon eyes to those who feed her',
+    desc: 'an old traveling mage of the Water school who has stopped in Ashford, patient teacher, dry humor, sells lessons; warns that running out of mana makes you faint; says the most dangerous being alive is @@DRAGON_SHORT@@, a silver-haired man who walks the north mountains, and that you must never talk to him; calls the @@MANGOD@@ a liar who whispers sweet help in dreams; has heard of a hungry demon empress with horns who wanders at night and grants demon eyes to those who feed her',
     likes: ['magic', 'mana', 'spell', 'book', 'learn', 'study', 'water', 'chant', 'tea', 'student'], dislikes: ['lazy', 'arrogant', 'reckless', 'fire'], addr: 'young one', oath: 'Hm hm.' },
 ];
 const PERSONA = Object.fromEntries(PERSONAS.map(p => [p.id, p]));
@@ -423,12 +423,12 @@ function endRaid(beaten) {
   setTimeout(() => { for (const v of villagers) if (v.alive && v.vill.mode === 'fight' && !v.angryAtYou) toLife(v); }, 8000);
   vSave();
 }
-function burnHouse(h) {
+function burnHouse(h, cause) {
   const top = { x: h.x, y: terrainH(h.x, h.z) + 5.2, z: h.z };
   const fires = [];
   for (let i = 0; i < 3; i++) fires.push(addFire(h.x + (Math.random() - 0.5) * h.w * 0.6, top.y - 0.8 + Math.random(), h.z + (Math.random() - 0.5) * h.d * 0.6, 1.6 + Math.random() * 0.8));
   raid.burning.push({ house: h, fires, top, t: 90 + Math.random() * 60 });
-  for (const v of villagers) if (v.alive && SPOTS[v.vill.p.home] === h && v.inside) { setInside(v, false); toFlee(v); v.vill.mode = 'flee'; v.vill.fleeT = 40; v.pos.set(h.door.x, groundH(h.door.x, h.door.z), h.door.z); v.vill.st.opinion = clampO(v.vill.st.opinion - 3); remember(v.vill.st, 'raiders burned my house because of the dark knight\'s killing'); }
+  for (const v of villagers) if (v.alive && SPOTS[v.vill.p.home] === h && v.inside) { setInside(v, false); toFlee(v); v.vill.mode = 'flee'; v.vill.fleeT = 40; v.pos.set(h.door.x, groundH(h.door.x, h.door.z), h.door.z); v.vill.st.opinion = clampO(v.vill.st.opinion - 3); remember(v.vill.st, cause === 'you' ? 'my house burned down in the dark knight\'s fire' : cause === 'wild' ? 'my house caught fire and burned' : 'raiders burned my house because of the dark knight\'s killing'); }
   sfx.thud(new THREE.Vector3(h.x, top.y, h.z), 1.5);
 }
 // smoke from burning roofs

@@ -45,7 +45,7 @@ const saga = (() => {
     uiOpen = true;
     if (document.pointerLockElement) document.exitPointerLock();
   }
-  function close() { if (!el) return; el.style.display = 'none'; clearInterval(typing); uiOpen = false; if (!cutscene && player.alive) requestLock(); if (onDone) { const f = onDone; onDone = null; f(); } }
+  function close() { if (!el) return; el.style.display = 'none'; clearInterval(typing); uiOpen = false; if (!legendBusy) cutscene = false; if (!cutscene && player.alive) requestLock(); if (onDone) { const f = onDone; onDone = null; f(); } }
   return { say, close, ensure, get open() { return el && el.style.display === 'block'; } };
 })();
 addEventListener('keydown', (e) => { if (e.code === 'Escape' && saga.open && !legendBusy) saga.close(); });
@@ -86,7 +86,7 @@ groundH = function (x, z) { const h = groundH1(x, z); for (const l of ledges) if
 // ---- the Dragon God ----
 let dragon = null, dragonCurseT = 0, dragonTalkT = 0;
 function spawnDragon() {
-  const f = new Fighter({ tier: 4, team: 'god', outfit: { sex: 'm', dress: true, top: 0xe2e0dc, legs: 0x1a1a1e, hood: true, hoodColor: 0xdedcd8, cloak: true, face: 'dragon', boots: 0x161616 }, body: 0xd8d4cc, sword: null, scale: 1.07, name: '@@DRAGON@@' });
+  const f = new Fighter({ tier: 4, team: 'god', outfit: { sex: 'm', dress: true, top: 0xa9a69f, legs: 0x1a1a1e, hood: true, hoodColor: 0x9d9a93, cloak: true, belt: true, face: 'dragon', boots: 0x161616 }, body: 0xd8d4cc, sword: null, scale: 1.07, name: '@@DRAGON@@' });
   f.invuln = true; f.voicePitch = 0.68; f.legend = 'dragon';
   f.pos.set(LEDGE.x + 1.2, LEDGE.top, LEDGE.z + 1.5);
   f.facing = Math.PI * 0.95; // looking south over the valley
@@ -96,30 +96,58 @@ function spawnDragon() {
   f.onMagic = () => { if (!legendBusy && player.alive) dragonKill(Math.random() < 0.5 ? 'hand' : 'tap', 'You raised a hand against me.'); };
   dragon = f;
 }
-// silver bangs falling into the hood opening
+// hair falling out of the hood: thin curved ribbons of strands, thicker at the root
+function strandGeo(L, w, bend, twist) {
+  const n = 6, pos = [], idx = [], uv = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, y = -t * L, z = Math.sin(t * Math.PI * 0.6) * bend, x = Math.sin(t * 2.2) * twist;
+    const hw = w * (1 - t * 0.85) * 0.5;
+    pos.push(x - hw, y, z, x + hw, y, z); uv.push(0, t, 1, t);
+    if (i < n) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+const hairTex = (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d'), r = mulberry32(8);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 128);
+  for (let i = 0; i < 70; i++) { const x = r() * 64, sh = 150 + r() * 105; g.strokeStyle = `rgb(${sh},${sh},${sh})`; g.lineWidth = 0.6 + r() * 1.4; g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + (r() - 0.5) * 6, 40, x + (r() - 0.5) * 6, 90, x + (r() - 0.5) * 8, 128); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
 function addHairBangs(f, color, len) {
   const face = f.armor.face; if (!face) return;
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.15 });
-  const g = new THREE.Group();
-  for (let i = 0; i < 13; i++) {
-    const x = -0.075 + i * 0.0125 + (Math.random() - 0.5) * 0.006;
-    const L = (0.06 + Math.random() * 0.05) * len * (1 - Math.abs(x) * 3);
-    const c = new THREE.ConeGeometry(0.009 + Math.random() * 0.004, L, 4);
-    c.translate(0, -L / 2, 0);
-    const m = new THREE.Mesh(c, mat);
-    m.position.set(x, 0.07, 0.022 - Math.abs(x) * 0.5);
-    m.rotation.set(-0.35 - Math.random() * 0.2, 0, x * 2.6 + (Math.random() - 0.5) * 0.25);
+  const mat = new THREE.MeshStandardMaterial({ color, map: hairTex, roughness: 0.38, metalness: 0.1, side: THREE.DoubleSide });
+  const g = new THREE.Group(), r = mulberry32(color & 0xffff);
+  // the fringe over the forehead
+  for (let i = 0; i < 22; i++) {
+    const x = -0.072 + i * 0.0068 + (r() - 0.5) * 0.004;
+    const L = (0.055 + r() * 0.05) * len * (1 - Math.abs(x) * 2.2);
+    const m = new THREE.Mesh(strandGeo(L, 0.012 + r() * 0.006, 0.012 + r() * 0.01, (r() - 0.5) * 0.008), mat);
+    m.position.set(x, 0.072 - Math.abs(x) * 0.12, 0.03 - x * x * 7);
+    m.rotation.set(-0.15 - r() * 0.15, x * -1.2, x * 1.4 + (r() - 0.5) * 0.2);
     g.add(m);
   }
-  // the side locks over the ears
-  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const L = 0.13 * len; const c = new THREE.ConeGeometry(0.012, L, 4); c.translate(0, -L / 2, 0); const m = new THREE.Mesh(c, mat); m.position.set(s * (0.068 + k * 0.006), 0.05, 0.0 - k * 0.012); m.rotation.set(-0.1, 0, s * 0.12); g.add(m); }
+  // locks falling past the cheeks
+  for (const s of [-1, 1]) for (let k = 0; k < 4; k++) {
+    const L = (0.12 + r() * 0.06) * len;
+    const m = new THREE.Mesh(strandGeo(L, 0.016, 0.01, s * 0.006), mat);
+    m.position.set(s * (0.064 + k * 0.004), 0.06 - k * 0.006, 0.012 - k * 0.012);
+    m.rotation.set(-0.08, s * 0.5, s * (0.08 + k * 0.03));
+    g.add(m);
+  }
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.armor = true; } });
   face.add(g);
 }
 // glowing eyes for things that are not quite human
 function goldEyes(f, color) {
   const face = f.armor.face; if (!face) return;
-  face.traverse(o => { if (o.isMesh && Array.isArray(o.material) && o.material[0] && o.material[0].name === 'eye') { const m = o.material[0].clone(); m.emissive = new THREE.Color(color); m.emissiveMap = m.map; m.emissiveIntensity = 1.6; m.color.set(color).lerp(new THREE.Color(0xffffff), 0.3); o.material = [m, o.material[1]]; } });
+  // the loader splits the eyes into one mesh per material: find the one painted with the iris
+  face.traverse(o => {
+    if (!o.isMesh) return;
+    const ms = Array.isArray(o.material) ? o.material : [o.material];
+    const out = ms.map(mm => { if (mm.name !== 'eye') return mm; const m = mm.clone(); m.emissive = new THREE.Color(color); m.emissiveMap = m.map; m.emissiveIntensity = 1.4; m.color.set(color).lerp(new THREE.Color(0xffffff), 0.35); return m; });
+    o.material = Array.isArray(o.material) ? out : out[0];
+  });
 }
 function updateDragon(dt) {
   if (!dragon) return;
@@ -134,14 +162,14 @@ function updateDragon(dt) {
     dragonCurseT -= dt;
     if (dragonCurseT <= 0) { dragonCurseT = 0.7 + d / 20; sfx.heartbeat(); }
     shake(Math.max(0, (16 - d) / 16) * 0.04);
-    const tint = document.getElementById('fxTint');
+    const tint = document.getElementById('legendTint');
     tint.style.background = 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,.75) 100%)';
     tint.style.opacity = Math.min(0.85, (16 - d) / 12);
     if (!legend.warned) { legend.warned = 1; saveLegend(); ui.sub('Every part of your body is screaming at you to run.', 4.5); }
-  }
+    f.cursed = true;
+  } else if (!legendBusy && f.cursed) { document.getElementById('legendTint').style.opacity = 0; f.cursed = false; }
   // you attacked him
   if (P.alive && !legendBusy && P.attack && d < 2.6 && P.attack.t > P.attack.dur * 0.3) dragonKill('catch', '');
-  if (d < 14 && magic.eyeOn && magic.eye === 'foresight') eyeChaos(f, dt);
 }
 function talkDragon() {
   const f = dragon;
@@ -209,7 +237,7 @@ function dragonKill(kind, line) {
       if (through && !f._hit) {
         f._hit = true; sfx.stab(c); sfx.crack(c); shake(1);
         if (settings.gore > 0) { gore.blood(c.clone().addScaledVector(back, 0.25), back, 120, 5); gore.blood(c, fwd, 30, 2); for (let i = 0; i < 3; i++) gore.stain(c.x + back.x * (1 + i * 0.4), groundH(c.x, c.z) + 0.015, c.z + back.z * (1 + i * 0.4), 0.6); }
-        P.blood = 1; P.stagger = 3;
+        P.blood = Math.max(P.blood, 0.45); P.stagger = 3;
         sfx.voice(P.pos, 'scream', P.voicePitch);
       }
       if (t > 1.0 && !f._pull) {
@@ -230,7 +258,7 @@ function dragonKill(kind, line) {
   function finish() {
     legendScene = null;
     if (P.alive) { P.lastHitBy = f; P.hp = 0; P.die({ from: f, part: 'chest', noBlood: true }, 'heart torn out'); }
-    setTimeout(() => { sceneCam = null; cutscene = false; legendBusy = false; f.noArms = false; f.castAim = null; f._tapped = f._cough = f._hit = f._pull = false; if (f._heart) { f._heart.parent.remove(f._heart); f._heart = null; } f.pos.copy(start); f.facing = Math.PI * 0.95; f.root.rotation.y = f.facing; }, 2200);
+    setTimeout(() => { document.getElementById('legendTint').style.opacity = 0; f.cursed = false; sceneCam = null; cutscene = false; legendBusy = false; f.noArms = false; f.castAim = null; f._tapped = f._cough = f._hit = f._pull = false; if (f._heart) { f._heart.parent.remove(f._heart); f._heart = null; } f.pos.copy(start); f.facing = Math.PI * 0.95; f.root.rotation.y = f.facing; }, 2200);
   }
 }
 let legendScene = null;
@@ -287,20 +315,20 @@ function maybeDream(done) {
     legend.advice = spot; saveLegend();
     placeAdvice(spot);
     magic.manGod = (magic.manGod || 0) + 1; saveMagic(true);
-    saga.say('@@MANGOD@@', 'Listen well! Tomorrow, go to ' + spot.where + '. Someone died there with ' + (spot.book ? 'a book of ' + SPELL[spot.book].name : 'a fat purse of gold') + '. It is yours! See? I only want to help you.', [{ t: 'Wake up', fn: end }], { voice: V, dream: true });
+    saga.say('@@MANGOD_NAME@@', 'Listen well! Tomorrow, go to ' + spot.where + '. Someone died there with ' + (spot.book ? 'a book of ' + SPELL[spot.book].name : 'a fat purse of gold') + '. It is yours! See? I only want to help you.', [{ t: 'Wake up', fn: end }], { voice: V, dream: true });
   };
   if (!magic.manGod) {
     saga.say('???', 'Hello there! Don\'t be scared. This is a dream, you know.', [{ t: 'Who are you?', fn: () => {
-      saga.say('@@MANGOD@@', 'Me? I am the @@MANGOD@@. I like to help people like you. Will you listen to my advice?', [
+      saga.say('@@MANGOD_NAME@@', 'Me? I am the @@MANGOD@@. I like to help people like you. Will you listen to my advice?', [
         { t: 'I\'ll listen.', fn: advice },
-        { t: 'What do you want from me?', fn: () => saga.say('@@MANGOD@@', 'Nothing at all! Isn\'t that nice? So... will you listen?', [{ t: 'I\'ll listen.', fn: advice }, { t: 'No. I don\'t trust you.', fn: refuse }], { voice: V, dream: true }) },
+        { t: 'What do you want from me?', fn: () => saga.say('@@MANGOD_NAME@@', 'Nothing at all! Isn\'t that nice? So... will you listen?', [{ t: 'I\'ll listen.', fn: advice }, { t: 'No. I don\'t trust you.', fn: refuse }], { voice: V, dream: true }) },
         { t: 'No. I don\'t trust you.', fn: refuse },
       ], { voice: V, dream: true });
     } }], { voice: V, dream: true });
   } else {
-    saga.say('@@MANGOD@@', 'Hello again, my friend! I have more good advice for you. Will you listen?', [{ t: 'Tell me.', fn: advice }, { t: 'Leave me alone.', fn: refuse }], { voice: V, dream: true });
+    saga.say('@@MANGOD_NAME@@', 'Hello again, my friend! I have more good advice for you. Will you listen?', [{ t: 'Tell me.', fn: advice }, { t: 'Leave me alone.', fn: refuse }], { voice: V, dream: true });
   }
-  function refuse() { saga.say('@@MANGOD@@', 'Aww. That\'s a shame. Well... I\'ll be around.', [{ t: 'Wake up', fn: end }], { voice: V, dream: true }); }
+  function refuse() { saga.say('@@MANGOD_NAME@@', 'Aww. That\'s a shame. Well... I\'ll be around.', [{ t: 'Wake up', fn: end }], { voice: V, dream: true }); }
 }
 const ADVICE_SPOTS = [
   { where: 'the ruins on the eastern battlefield', x: () => BATTLE_X + 40, z: () => 30 },
@@ -322,7 +350,7 @@ function placeAdvice(spot) {
   camp.members = camp.members.filter(m => m !== f);
   f.pos.set(x, groundH(x, z), z);
   f.fallDir = -1; f.fallT = 1; f.ai = null; f.keep = true; f.alive = false; f.down = true;
-  f.mage.circle.visible = false;
+  f.mage.circle.visible = false; if (f.staff) { scene.remove(f.staff); f.staffDropped = true; }
   f.book = spot.book; f.purse = spot.book ? 20 : 300 + Math.floor(Math.random() * 300);
   f.name = 'Dead traveler';
   f.alive = true; f.down = false; f.animate(0.4); f.alive = false; f.down = true;
@@ -340,6 +368,8 @@ function spawnEmpress() {
   addHairBangs(f, 0x6a3a9a, 1.6);
   goldEyes(f, 0xb06aff);
   f.onMagic = () => empressOffended('Fuhahaha! That tickles!');
+  // a faint violet glow follows her around at night
+  f.aura = new THREE.PointLight(0xa060ff, 0, 5, 2); scene.add(f.aura);
   setInside(f, true);
   empress = f;
 }
@@ -349,11 +379,11 @@ function addHorns(f) {
   for (const s of [-1, 1]) {
     // a horn that curls back and out, getting thinner
     const pts = [], rings = 14, segs = 10, pos = [], idx = [];
-    for (let i = 0; i <= rings; i++) { const t = i / rings, a = t * 2.3; pts.push(new THREE.Vector3(s * (0.055 + Math.sin(a) * 0.05 * t + t * 0.03), 0.1 + Math.sin(a * 0.8) * 0.07, -0.02 - (1 - Math.cos(a)) * 0.05)); }
+    for (let i = 0; i <= rings; i++) { const t = i / rings, a = t * 2.4; pts.push(new THREE.Vector3(s * (0.06 + Math.sin(a) * 0.075 * t + t * 0.05), 0.1 + Math.sin(a * 0.8) * 0.12, -0.01 - (1 - Math.cos(a)) * 0.07)); }
     for (let i = 0; i <= rings; i++) {
       const t = i / rings, p = pts[i], q = pts[Math.min(rings, i + 1)], pp = pts[Math.max(0, i - 1)];
       const dir = q.clone().sub(pp).normalize(), n1 = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(1, 0, 0)).normalize(), n2 = new THREE.Vector3().crossVectors(dir, n1);
-      const r = 0.016 * (1 - t * 0.92) * (1 + 0.08 * Math.sin(t * 40));
+      const r = 0.024 * (1 - t * 0.9) * (1 + 0.08 * Math.sin(t * 40));
       for (let k = 0; k <= segs; k++) { const a = k / segs * 6.283; pos.push(p.x + (n1.x * Math.cos(a) + n2.x * Math.sin(a)) * r, p.y + (n1.y * Math.cos(a) + n2.y * Math.sin(a)) * r, p.z + (n1.z * Math.cos(a) + n2.z * Math.sin(a)) * r); }
       if (i < rings) for (let k = 0; k < segs; k++) { const a = i * (segs + 1) + k, b = a + segs + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
     }
@@ -368,6 +398,8 @@ function updateEmpress(dt) {
   if (empAngryUntil > clockNow) { if (!f.inside) setInside(f, true); return; }
   if (night && f.inside && !legendBusy) { setInside(f, false); const s = EMP_SPOT(); f.pos.set(s.x, groundH(s.x, s.z), s.z); f.facing = Math.random() * 6.28; }
   if (!night && !f.inside && !legendBusy && !saga.open) { smokePuff(f.pos); setInside(f, true); }
+  f.aura.intensity = f.inside ? 0 : 2.2;
+  if (!f.inside) f.aura.position.set(f.pos.x, f.pos.y + 1.2, f.pos.z);
   if (f.inside) return;
   // she wanders a few steps, looking for food, and hums
   f.wT = (f.wT || 0) - dt;
@@ -446,13 +478,13 @@ function eyeScene(kind) {
     if (t > 1.2 && !f._poked) {
       f._poked = true;
       sfx.voice(P.pos, 'scream', P.voicePitch); sfx.stab(eye); shake(0.8);
-      const tint = document.getElementById('fxTint'); tint.style.background = 'radial-gradient(ellipse at 35% 45%, rgba(255,255,255,.95) 0%, rgba(160,0,0,.85) 35%, rgba(60,0,0,.9) 100%)'; tint.style.opacity = 1;
+      const tint = document.getElementById('legendTint'); tint.style.background = 'radial-gradient(ellipse at 35% 45%, rgba(255,255,255,.95) 0%, rgba(160,0,0,.85) 35%, rgba(60,0,0,.9) 100%)'; tint.style.opacity = 1;
       if (settings.gore > 0) gore.blood(eye, fwd, 6, 0.6);
     }
     if (t > 1.2 && t < 3.5 && Math.random() < 0.05) sfx.heartbeat();
     if (t > 4.2) {
       legendScene = null;
-      const tint = document.getElementById('fxTint'); tint.style.opacity = 0;
+      const tint = document.getElementById('legendTint'); tint.style.opacity = 0;
       magic.eye = kind; magic.eyeOn = false; saveMagic(true);
       P.helmet(true); sceneCam = null; cutscene = false; legendBusy = false; f._poked = false;
       ui.message(EYE_NAMES[kind].toUpperCase(), 3);
@@ -519,6 +551,7 @@ function updateEye(dt, realDt) {
   if (magic.exh >= 100) { magic.eyeOn = false; manaPassOut(); return; }
   if (magic.eye !== 'foresight') return;
   const P = player;
+  if (dragon && dragon.pos.distanceTo(P.pos) < 14) { eyeChaos(dragon, dt); return; }
   const list = fighters.filter(f => f.ai && f.alive && f.ai.alert && f.ai.target === P && !f.down && f.pos.distanceTo(P.pos) < 32).sort((a, b) => a.pos.distanceTo(P.pos) - b.pos.distanceTo(P.pos)).slice(0, ghostPool.length);
   let gi = 0;
   for (const f of list) {
@@ -642,3 +675,4 @@ function updateLegends(dt, realDt) {
   updateDragon(dt); updateEmpress(dt); updateEye(dt, realDt);
   if (legend.advice && player.pos.distanceTo(new THREE.Vector3(legend.advice.x, player.pos.y, legend.advice.z)) < 6) { legend.advice = null; saveLegend(); }
 }
+window.__L = { LEDGE, get dragon() { return dragon; }, get empress() { return empress; }, talkDragon, talkEmpress, saga, maybeDream, eyeScene, dragonKill, legend };
