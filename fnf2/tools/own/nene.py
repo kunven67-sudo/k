@@ -116,6 +116,7 @@ def characters():
     d = psych_to_vslice(cj, 'shared:characters/nene-playable', NENE_SCALE, (dj, 'shared:characters/nene-playable-dead', dy))
     d['name'] = 'Nene'; d['healthIcon'] = {'id': 'nene'}; d['healthColor'] = '#F16AA5'
     d['script'] = ''            # no A-Bot: that's the speaker Nene (nene.hxc)
+    d['mirrorPoses'] = True     # drawn for the player's side: as the opponent (Darnell's After Hours) LEFT/RIGHT swap
     d['death'] = {'cameraOffsets': [0, -40]}
     jdump(d, 'preload', 'data', 'characters', 'nene-playable.json')
 
@@ -312,8 +313,8 @@ def songs():
                   open(out('preload', 'data', 'songs', sid, sid + '-chart.json'), 'w'))
         cnt = {k: sum(1 for n in v if n['d'] < 4) for k, v in notes.items()}
         print(sid, 'bpm', bpm, 'player notes', cnt, 'speed', speeds)
-    # a level only the new players' freeplay uses (like Week 7 for Tankman)
-    jdump({'version': '1.0.0', 'name': "NENE'S NIGHT", 'titleAsset': 'storymenu/titles/weekend1', 'visible': False, 'props': [], 'capsule': {'name': 'GIRLS NIGHT'}, 'players': ['nene'],
+    # a level only Nene's freeplay uses (+ Darnell: After Hours is his song too, he's its player in the Girls Night mod)
+    jdump({'version': '1.0.0', 'name': "NENE'S NIGHT", 'titleAsset': 'storymenu/titles/weekend1', 'visible': False, 'props': [], 'capsule': {'name': 'GIRLS NIGHT'}, 'players': ['nene', 'darnell'],
            'background': '#F16AA5', 'songs': [s[0] for s in SONGS]}, 'preload', 'data', 'levels', 'nenesongs.json')
 
 

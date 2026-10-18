@@ -125,7 +125,8 @@
       this.dad = mk(s.swap && s.chars.opponent === 'pico-playable' ? 'pico' : s.chars.opponent, 'dad', 'dad');
       // (a full player singing a song swapped uses its own playable version: Darnell's Mixtape's darnell-player;
       //  a stand-in player sings as their song version when the song has one: Nene's singing sheet, not the A-Bot one)
-      const PP = s.swap && G.PLAYERS && G.PLAYERS[G.settings.player], swapChar = PP && !PP.real && PP.swapChar;
+      //  (also in a song made for them: Darnell in After Hours)
+      const PP = G.PLAYERS && G.PLAYERS[G.settings.player], swapChar = PP && !PP.real && PP.swapChar && (s.swap || s.chars.player === PP.ownChar) ? PP.swapChar : null;
       const own = this.playAs && (this.playAs.real.songChar && s.chars.player === this.playAs.real.songChar ? s.chars.player : this.playAs.real.char);
       this.bf = mk(own || swapChar || s.chars.player, 'bf', 'bf');
       if (this.playAs && this.playAs.real.flip === false && this.bf.nene) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
@@ -147,6 +148,8 @@
       // whoever stands mirrored on the other side (Tankman on the right, BF on the left) swaps their LEFT and RIGHT
       // poses, like FNF's own mirrored characters do, so every pose still points the way its arrow does
       if (s.swap) { this.bf.swapLR = !!this.bf.flipX && !swapChar; this.dad.swapLR = !!this.dad.flipX && this.dad.id !== 'pico'; }
+      // (a player-side drawing turned round to be the opponent: Nene's singing sheet when Darnell plays After Hours)
+      else if (this.dad.data.mirrorPoses && this.dad.flipX) this.dad.swapLR = true;
       // tutorial: GF is the opponent, standing at GF's spot
       if (s.chars.opponent === s.chars.gf && this.gf) { this.dad.x = this.gf.x; this.dad.y = this.gf.y; this.dad.camFocus = Object.assign({}, this.gf.camFocus); this.stage.chars.gf = null; this.gf = null; this.dad.zIndex = 100; }
       // WRATH: the giant eye (stage 2) is made up front so the swap at the eye-open never hitches
