@@ -148,6 +148,85 @@ def tight_sparrow(png, xml):
             return png, xml
     return base + '.png', base + '.xml'
 
+PAGE = 2048
+def paged_sparrow(png, xml):
+    """A big Sparrow sheet split into small pages (max PAGE x PAGE), every animation's frames kept together.
+    Chrome keeps every picture a song draws on the graphics card; one giant sheet (Sky's angry sheet was
+    8192x8192 = 268 MB) means a huge upload whenever it's pushed out of memory, and a 2 GB card fills up fast.
+    Small pages are cheap to move around and only the pages in use have to stay.
+    -> (xml path, [page png paths]) or None if the sheet is small enough already.
+    Frame i of the XML gets page="n" (n > 0) when it's on page n (page n = <name>~n.png)."""
+    from PIL import Image
+    import re
+    W, H = Image.open(png).size
+    if W * H * 4 <= 24e6 and max(W, H) <= 4096: return None
+    st1, st2 = os.stat(png), os.stat(xml)
+    key = hashlib.sha1(f'{png}|{st1.st_size}|{st1.st_mtime}|{xml}|{st2.st_size}|{st2.st_mtime}|pages{PAGE}v1'.encode()).hexdigest()
+    d = os.path.join(CACHE, 'pages', key)
+    if os.path.exists(os.path.join(d, 'sheet.xml')):
+        return os.path.join(d, 'sheet.xml'), sorted((os.path.join(d, f) for f in os.listdir(d) if f.endswith('.png')), key=lambda p: int(re.findall(r'(\d+)\.png$', p)[0]))
+    sys.path.insert(0, os.path.join(ROOT, 'tools', 'own'))
+    from repack_sparrow import frames_of
+    img = Image.open(png).convert('RGBA')
+    text = open(xml, encoding='utf-8-sig').read()
+    frames = frames_of(text)
+    # one picture per unique region, grouped by animation (name without its frame number)
+    regions, order = {}, []
+    for f in frames:
+        k = (int(f['x']), int(f['y']), int(f['width']), int(f['height']), f['rot'])
+        if k not in regions:
+            cut = img.crop((k[0], k[1], k[0] + k[2], k[1] + k[3]))
+            if f['rot']: cut = cut.transpose(Image.ROTATE_90)
+            regions[k] = {'img': cut, 'anim': re.sub(r'\d+(\.png)?$', '', f['name'])}
+            order.append(k)
+    groups = {}
+    for k in order: groups.setdefault(regions[k]['anim'], []).append(k)
+    pages = []   # each: {'shelves': [[y, h, x]], 'h': used height, 'w': used width, 'items': [(k, x, y)]}
+    pad = 2
+    def place(pg, w, h):
+        for sh in pg['shelves']:
+            if h <= sh[1] and sh[2] + w <= PAGE: x = sh[2]; sh[2] += w + pad; return x, sh[0]
+        y = pg['h']
+        if y + h > PAGE or w > PAGE: return None
+        pg['shelves'].append([y, h, w + pad]); pg['h'] = y + h + pad
+        return 0, y
+    def new_page():
+        pages.append({'shelves': [], 'h': 0, 'w': 0, 'items': []}); return pages[-1]
+    for name, ks in groups.items():
+        ks = sorted(ks, key=lambda k: -regions[k]['img'].height)
+        # the whole animation on the current page if it fits, else start a fresh one
+        trial = None
+        if pages:
+            import copy
+            trial = copy.deepcopy({kk: v for kk, v in pages[-1].items() if kk != 'items'})
+            for k in ks:
+                if place(trial, *regions[k]['img'].size) is None: trial = None; break
+        pg = pages[-1] if trial is not None else new_page()
+        for k in ks:
+            w, h = regions[k]['img'].size
+            at = place(pg, w, h)
+            if at is None: pg = new_page(); at = place(pg, w, h)
+            if at is None:   # one frame bigger than a page: a page of its own, just that size
+                pg['shelves'].append([0, h, PAGE]); pg['h'] = h + pad; at = (0, 0)
+            pg['items'].append((k, at[0], at[1])); pg['w'] = max(pg['w'], at[0] + w)
+    os.makedirs(d, exist_ok=True)
+    where, outs = {}, []
+    for n, pg in enumerate(pages):
+        sheet = Image.new('RGBA', (max(1, pg['w']), max(1, pg['h'] - pad)), (0, 0, 0, 0))
+        for k, x, y in pg['items']: sheet.paste(regions[k]['img'], (x, y)); where[k] = (n, x, y)
+        p = os.path.join(d, 'page%d.png' % n); sheet.save(p); outs.append(p)
+    lines = ['<?xml version="1.0" encoding="utf-8"?>', '<TextureAtlas imagePath="sheet.png">']
+    esc = lambda s: s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+    for f in frames:
+        k = (int(f['x']), int(f['y']), int(f['width']), int(f['height']), f['rot'])
+        n, x, y = where[k]; w, h = regions[k]['img'].size
+        if f['rot'] and f['fx'] == 0 and f['fy'] == 0 and (f['fw'], f['fh']) == (f['width'], f['height']): f['fw'], f['fh'] = w, h
+        lines.append('  <SubTexture name="%s" x="%d" y="%d" width="%d" height="%d" frameX="%g" frameY="%g" frameWidth="%g" frameHeight="%g"%s/>' % (
+            esc(f['name']), x, y, w, h, -f['fx'], -f['fy'], f['fw'], f['fh'], ' page="%d"' % n if n else ''))
+    lines.append('</TextureAtlas>')
+    open(os.path.join(d, 'sheet.xml'), 'w').write('\n'.join(lines) + '\n')
+    return os.path.join(d, 'sheet.xml'), outs
+
 def to_mp3(src, voices, kbps=None):
     def f():
         args = ['ffmpeg', '-v', 'error', '-i', src]
@@ -220,6 +299,17 @@ def main():
                 saved += (s0[0] * s0[1] - s1[0] * s1[1]) * 4
                 srcs[rel], srcs[rel[:-4] + '.xml'] = p2, x2
     print(f'tight sheets saved {saved / 1e6:.0f} MB of decoded pictures')
+    # big sheets -> small pages (sheet.png = page 0, sheet~1.png = page 1, ...)
+    npaged = 0
+    for rel in list(srcs):
+        if rel.endswith('.png') and rel[:-4] + '.xml' in srcs:
+            r = paged_sparrow(srcs[rel], srcs[rel[:-4] + '.xml'])
+            if not r: continue
+            x2, pages = r
+            srcs[rel[:-4] + '.xml'] = x2; srcs[rel] = pages[0]
+            for n, p in enumerate(pages[1:], 1): srcs[rel[:-4] + '~%d.png' % n] = p
+            npaged += 1
+    print(f'{npaged} big sheets split into pages of max {PAGE}x{PAGE}')
     out = {}
     total = 0
     for rel, src in sorted(srcs.items()):

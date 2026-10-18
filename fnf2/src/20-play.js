@@ -188,7 +188,7 @@
       this.iconP2 = this.makeIcon(this.dad, false);
       // ask for every gameplay sheet now (splashes + hold covers are big): they load before the song starts,
       // not on your first SICK in the middle of it
-      for (const sh of [NS.notes, NS.strum, NS.splash, NS.cover(0), NS.cover(1), NS.cover(2), NS.cover(3)]) if (sh && sh.img) G.A.warmNow([sh.img]);
+      for (const sh of [NS.notes, NS.strum, NS.splash, NS.cover(0), NS.cover(1), NS.cover(2), NS.cover(3)]) if (sh) G.A.warmNow(sh.imgs || [sh.img]);
       this.popups = [];
       this.splashes = []; this.covers = [];
       this.countdownSpr = null;

@@ -18,7 +18,7 @@
     const out = new Set();
     const add = a => {
       if (!a) return;
-      if (a.sheet && a.sheet.img) out.add(a.sheet.img);
+      if (a.sheet) for (const im of a.sheet.imgs || [a.sheet.img]) if (im) out.add(im);
       if (a.atlas) for (const k in a.atlas.sprites) out.add(a.atlas.sprites[k].img);
     };
     add(sp); for (const k in sp.anims || {}) add(sp.anims[k]);

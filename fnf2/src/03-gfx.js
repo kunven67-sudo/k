@@ -27,7 +27,7 @@ G.texturesOf = function (sp, out) {
   if (!sp) return out;
   const add = a => {
     if (!a) return;
-    if (a.sheet && a.sheet.img) out.add(a.sheet.img);
+    if (a.sheet) for (const im of a.sheet.imgs || [a.sheet.img]) if (im) out.add(im);
     if (a.atlas) for (const im of a.atlas.imgs || []) out.add(im);
   };
   add(sp); for (const k in sp.anims || {}) add(sp.anims[k]);
@@ -38,9 +38,10 @@ G.Sparrow = {
   cache: new Map(),
   // base = "shared/images/notes" (no extension)
   load(base) {
-    if (this.cache.has(base)) { const sh = this.cache.get(base); if (sh) G.A.touch(sh.img); return sh; }
+    if (this.cache.has(base)) { const sh = this.cache.get(base); if (sh) for (const im of sh.imgs) G.A.touch(im); return sh; }
     const xml = G.A.text(base + '.xml'), img = G.A.image(base + '.png');
     let sheet = null;
+    const imgs = [img];
     if (xml && img) {
       // Tolerant parse (like Flixel's): FNF sheets contain frame names such as "<0000"
       // and "&0000", which are invalid XML and make a strict DOMParser stop halfway.
@@ -56,15 +57,18 @@ G.Sparrow = {
         const f = { name: g('name'), x: num('x'), y: num('y'), w: num('width'), h: num('height'), rot: g('rotated') === 'true' };
         if (g('frameX') != null) { f.ox = -num('frameX'); f.oy = -num('frameY'); f.fw = num('frameWidth'); f.fh = num('frameHeight'); }
         else { f.ox = 0; f.oy = 0; f.fw = f.rot ? f.h : f.w; f.fh = f.rot ? f.w : f.h; }
+        // big sheets are split into small pages by the packer: page n lives in <base>~n.png
+        const pg = g('page') ? +g('page') : 0;
+        if (pg) { f.img = imgs[pg] || (imgs[pg] = G.A.image(base + '~' + pg + '.png')); }
         frames.push(f);
       }
-      sheet = { kind: 'sparrow', img, frames, base };
+      sheet = { kind: 'sparrow', img, imgs: imgs.filter(Boolean), frames, base };
     }
     this.cache.set(base, sheet);
     return sheet;
   },
   // a picture was let go (G.A.releaseUnused): the next load makes a fresh sheet
-  forget(img) { for (const [k, sh] of this.cache) if (sh && sh.img === img) this.cache.delete(k); },
+  forget(img) { for (const [k, sh] of this.cache) if (sh && sh.imgs.includes(img)) this.cache.delete(k); },
   // frames whose name is prefix + a frame number, in order (FNF/Flixel addByPrefix)
   byPrefix(sheet, prefix, indices) {
     const list = sheet.frames.filter(f => f.name.startsWith(prefix) && /^\d*$/.test(f.name.slice(prefix.length).replace(/\.png$/, '')));
@@ -74,7 +78,7 @@ G.Sparrow = {
   },
   draw(ctx, sheet, f) {
     if (!f) return;
-    const img = G.srcImg(sheet.img);
+    const img = G.srcImg(f.img || sheet.img);
     if (!f.rot) { ctx.drawImage(img, f.x, f.y, f.w, f.h, f.ox, f.oy, f.w, f.h); return; }
     // stored rotated 90deg: draw region rotated back (Flixel ANGLE_NEG_90)
     ctx.save(); ctx.translate(f.ox, f.oy); ctx.transform(0, -1, 1, 0, 0, f.w);

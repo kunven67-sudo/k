@@ -100,6 +100,10 @@ def pixel_icon(src, dst_base):
     sheet.save(dst_base + '.png'); open(dst_base + '.xml', 'w').write('\n'.join(xml) + '\n')
 
 
+SKY_SHEETS = ('sky_assets', 'sky_annoyed_assets', 'sky_mad_assets')
+SKY_SCALE = 0.8
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--src', default='/home/user/ref/mods/sky/x/bin')
@@ -110,8 +114,12 @@ def main():
     os.makedirs(out('shared', 'images', 'sky', 'x'), exist_ok=True)
     D = lambda *p: out('shared', 'images', 'sky', *p)
 
-    # characters: lossless (the packer trims + de-duplicates them); backgrounds half size (soft art)
-    for n in ('sky_assets', 'sky_annoyed_assets', 'sky_mad_assets', 'gf', 'port', 'port_an', 'port_mad', 'bfport', 'gfport', 'dia'):
+    # Sky's own sheets at 80% (she's drawn at 90% on a 1280x720 screen, so it looks the same): the angry one
+    # alone was 8192x8192 = 268 MB on the graphics card, the main cause of the lag in her songs.
+    # Everything else lossless (the packer trims + de-duplicates sheets and splits big ones into pages);
+    # backgrounds half size (soft art)
+    for n in SKY_SHEETS: repack(os.path.join(IMG, n + '.png'), os.path.join(IMG, n + '.xml'), D(n), scale=SKY_SCALE)
+    for n in ('gf', 'port', 'port_an', 'port_mad', 'bfport', 'gfport', 'dia'):
         for e in ('.png', '.xml'): shutil.copyfile(os.path.join(IMG, n + e), D(n + e))
     for n in ('bg_normal', 'bg_annoyed', 'bg_manifest', 'floorManifest'):
         repack(os.path.join(IMG, n + '.png'), os.path.join(IMG, n + '.xml'), D(n), scale=0.5)
@@ -124,6 +132,10 @@ def main():
         d = json.load(open(os.path.join(P, src + '.json')))
         d['assetPath'] = 'shared:sky/' + sheet
         d['healthIcon'] = {'id': icon}; d['healthColor'] = col
+        if sheet in SKY_SHEETS:   # smaller sheet drawn bigger; the engine scales animation offsets too, so they shrink back
+            d['scale'] = (d.get('scale') or 1) / SKY_SCALE
+            for an in d.get('animations', []):
+                if an.get('offsets'): an['offsets'] = [round(v * SKY_SCALE, 2) for v in an['offsets']]
         if cid.startswith('sky'): d['cameraOffsets'] = [0, 0]
         jdump(d, 'preload', 'data', 'characters', cid + '.json')
 

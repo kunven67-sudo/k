@@ -242,7 +242,7 @@
         const dist = Math.abs(P.noteY(n.t)), V = 330, gone = 190;
         if (dist < gone) return true;
         if (dist < V) {
-          const q = (V - dist) / (V - gone), img = G.srcImg(sheet.img);
+          const q = (V - dist) / (V - gone), img = G.srcImg(f.img || sheet.img);
           if (!n._broke) { n._broke = true; G.sfx(SND + 'glitch.ogg', { vol: 0.22 }); }
           for (let s = 0; s < 3; s++) {                                   // three slices sliding apart
             const sy = f.fh * s / 3, sh = f.fh / 3, off = (s - 1) * 26 * q + (s === 1 ? 0 : (Math.random() - 0.5) * 8 * q);
