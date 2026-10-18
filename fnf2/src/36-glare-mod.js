@@ -28,6 +28,9 @@
   const env = (B, b0, b1) => smooth((B - T(b0)) / 1) * smooth((T(b1) - B) / 1);
   const hash = n => { n = (n ^ 61) ^ (n >>> 16); n = n + (n << 3); n = n ^ (n >>> 4); n = Math.imul(n, 0x27d4eb2d); return (n ^ (n >>> 15)) >>> 0; };
 
+  const GHOST_F = 'brightness(0.55) sepia(1) saturate(9) hue-rotate(-50deg)';
+  const TP_F = ['brightness(0.6) sepia(1) saturate(9) hue-rotate(-50deg)', 'brightness(0.8) sepia(1) saturate(7) hue-rotate(140deg)'];
+  const NS_NOTES = () => G.Sparrow.load('shared/images/notes');
   // the 4 arrow heads + a red and a cyan copy of each (RGB split on glitchy notes)
   let tinted = null;
   function tints(sheet) {
@@ -63,6 +66,16 @@
       });
       P.stage.chars.dad = P.dad;
       if (P.dadForms) g.home = { x: P.dadForms[0].originalPosition.x, y: P.dadForms[0].originalPosition.y };
+    },
+    // the teleport / ghost colour copies of WRATH + the creepy BF pictures, made before the song starts
+    prepare(P, tex) {
+      const W = P.dadForms && P.dadForms[0]; if (!W) return;
+      for (const f of [GHOST_F, TP_F[0], TP_F[1]]) {
+        G.imgFilter = f;
+        try { for (const im of G.texturesOf(W)) { const c = G.srcImg(im); if (c && c !== im) tex.add(c); } } finally { G.imgFilter = null; }
+      }
+      const sh = NS_NOTES(); if (sh) { const tz = tints(sh); if (tz) for (const t of tz) if (t) { tex.add(t.norm); tex.add(t.red); tex.add(t.cyan); } }
+      const ei = G.A.image(FXI + 'eye-note.png'); if (ei) tex.add(ei);
     },
     reset(P) {
       const g = P.glare; if (!g) return;
@@ -183,13 +196,13 @@
       if (g.ghost && P.dadForms) {
         const W = P.dadForms[0], k = 1 - g.ghost.t / 0.3, ox = W.x, oy = W.y;
         W.x = g.ghost.x; W.y = g.ghost.y;
-        G.imgFilter = 'brightness(0.55) sepia(1) saturate(9) hue-rotate(-50deg)';
+        G.imgFilter = GHOST_F;
         ctx.save(); ctx.globalAlpha = 0.5 * k;
         try { W.draw(ctx, P.cam); } finally { G.imgFilter = null; ctx.restore(); W.x = ox; W.y = oy; }
       }
       if (g.tp && P.dadForms) {                                        // red/cyan split while he teleports
         const W = P.dadForms[0], ox = W.x;
-        for (const [dx, f] of [[-12, 'brightness(0.6) sepia(1) saturate(9) hue-rotate(-50deg)'], [12, 'brightness(0.8) sepia(1) saturate(7) hue-rotate(140deg)']]) {
+        for (const [dx, f] of [[-12, TP_F[0]], [12, TP_F[1]]]) {
           W.x = ox + dx; G.imgFilter = f; ctx.save(); ctx.globalAlpha = 0.35; ctx.globalCompositeOperation = 'screen';
           try { W.draw(ctx, P.cam); } finally { G.imgFilter = null; ctx.restore(); }
         }

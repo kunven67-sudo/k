@@ -21,6 +21,19 @@ G.srcImg = (function () {
     return c;
   };
 })();
+// every picture a sprite can draw (its sheet / atlas pictures, every animation's, a plain image)
+G.texturesOf = function (sp, out) {
+  out = out || new Set();
+  if (!sp) return out;
+  const add = a => {
+    if (!a) return;
+    if (a.sheet && a.sheet.img) out.add(a.sheet.img);
+    if (a.atlas) for (const im of a.atlas.imgs || []) out.add(im);
+  };
+  add(sp); for (const k in sp.anims || {}) add(sp.anims[k]);
+  if (sp.img) out.add(sp.img);
+  return out;
+};
 G.Sparrow = {
   cache: new Map(),
   // base = "shared/images/notes" (no extension)

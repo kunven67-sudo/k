@@ -62,12 +62,47 @@
       G.audio.preload(['miss1', 'miss2', 'miss3', 'intro3', 'intro2', 'intro1', 'introGo']);
       G.audio.song({ inst: this.song.inst, voices: this.song.voices, rate: G.settings.songSpeed }).then(h => {
         if (G.screen !== this) return;
-        this.audio = h; this.ready = true;
+        this.audio = h;
+        // every picture decoded first, then everything the song will draw gets ready (no hitch the first time
+        // something shows up mid-song), then it starts
+        G.A.afterLoad(() => { if (G.screen !== this || !this.stage) return; this.prepare(); this.begin(params); });
+      });
+    },
+    begin(params) {
+      {
+        this.ready = true;
         // a song's own intro cutscene (first try only)
         const cs = G.Cutscenes && G.Cutscenes[this.song.id];
         if (cs && !params.deaths && !params.noCutscene) { try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
         if (!this.cutscene) this.startCountdown();
-      });
+      }
+    },
+    // Lag spikes come from work done the FIRST time something is drawn: the graphics card gets each picture
+    // the first time it's used, tinted copies (stage lights, glitch effects) are made the first time they're
+    // needed, and an animation's size is measured the first time it plays. All of that happens here, while
+    // the song is still loading, instead of in the middle of the song.
+    prepare() {
+      const t0 = performance.now();
+      const chars = [this.bf, this.dad, this.gf].concat(this.dadForms || []).concat((this.glare && this.glare.creepy) || []).filter(Boolean);
+      const tex = new Set();
+      for (const p of this.stage.props) G.texturesOf(p, tex);
+      for (const e of this.stage.extras || []) G.texturesOf(e, tex);
+      for (const c of chars) {
+        G.texturesOf(c, tex);
+        for (const k in c.anims || {}) { const a = c.anims[k]; if (a.kind === 'atlas') G.Atlas.bounds(a.atlas, a.tl); }
+      }
+      // the stage's colour tints on the characters (Erect stages)
+      for (const slot of ['bf', 'dad', 'gf']) {
+        const f = this.charFilter && this.charFilter[slot], c = this[slot]; if (!f || !c) continue;
+        G.imgFilter = f; try { for (const im of G.texturesOf(c)) G.srcImg(im); } finally { G.imgFilter = null; }
+      }
+      if (this.mod && this.mod.prepare) try { this.mod.prepare(this, tex); } catch (e) { G.reportError(e, 'mod prepare'); }
+      if (this.sfx && this.sfx.prepare) try { this.sfx.prepare(this, tex); } catch (e) { G.reportError(e, 'fx prepare'); }
+      // hand every picture to the graphics card now (a 1 pixel draw uploads the whole texture)
+      const ctx = G.ctx; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 0.01;
+      for (const im of tex) { try { if (im && (im.width || im.naturalWidth)) ctx.drawImage(im, 0, 0, 1, 1); } catch (e) {} }
+      ctx.restore();
+      this.prepMs = Math.round(performance.now() - t0);
     },
     // the stage + characters go with the screen (their pictures can be freed while you're in the menus)
     leave() { if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); this.stage = null; this.bf = this.dad = this.gf = null; this.cutscene = null; },

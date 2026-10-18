@@ -758,8 +758,10 @@ G.loop = function () {
     if (G.settings.quality === 'auto' && !document.hidden) {
       const want = Math.min(55, (G.settings.fpsCap === 'max' ? 60 : +G.settings.fpsCap || 60) - 5);
       if (G.fps < want) G._lowFpsTime += 0.5; else G._lowFpsTime = Math.max(0, G._lowFpsTime - 0.25);
-      if (G._lowFpsTime >= 2 && G.autoQ > 0.6) { G.autoQ = Math.max(0.6, G.autoQ - 0.1); G._lowFpsTime = 0; G.resize(); }
+      if (G._lowFpsTime >= 2 && G.autoQ > 0.6) { G.autoQ = Math.max(0.6, G.autoQ - 0.1); G._lowFpsTime = 0; G._qPending = true; }
     }
+    // changing the resolution is a hitch of its own: never in the middle of a song (between songs / on pause)
+    if (G._qPending && !(G.screen && G.screen.live && G.screen.live())) { G._qPending = false; G.resize(); }
   }
   const ctx = G.ctx;
   // big pictures still decoding: hold the screen (keep the last frame up), then hand them to the GPU
