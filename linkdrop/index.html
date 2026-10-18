@@ -1,0 +1,1336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c0c0e">
+<meta name="description" content="Paste a TikTok link, get the video.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LINKDROP">
+<title>LINKDROP</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c0c0e'/%3E%3Crect x='22' y='7' width='20' height='27' rx='10' fill='none' stroke='%23f3f3f5' stroke-width='5'/%3E%3Cpath d='M32 22v24' stroke='%230c0c0e' stroke-width='11'/%3E%3Cpath d='M32 22v24M23 37l9 9 9-9' fill='none' stroke='%23ffcf3a' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M14 46v5a4 4 0 0 0 4 4h28a4 4 0 0 0 4-4v-5' fill='none' stroke='%23f3f3f5' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0c0c0e; --s1:#151518; --s2:#1d1d21; --s3:#26262b; --line:#2b2b31;
+  --tx:#f3f3f5; --mu:#a1a1ab; --dim:#6e6e78;
+  --ac:#ffcf3a; --ac2:#ffe27f; --ink:#1b1500;
+  --ok:#46d483; --bad:#ff5b61; --blue:#5aa9ff;
+  --r:14px; --sb:env(safe-area-inset-bottom,0px); --st:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%;min-height:100vh;min-height:100dvh;padding-bottom:calc(74px + var(--sb));overflow-x:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+a{color:var(--ac)}
+[hidden]{display:none!important}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px}
+svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:rgba(12,12,14,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding-top:var(--st)}
+.top .wrap{display:flex;align-items:center;gap:10px;height:56px}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--tx)}
+.logo svg{width:30px;height:30px}
+.word{font-weight:850;font-size:20px;letter-spacing:-.03em;line-height:1}
+.word b{color:var(--ac);font-weight:850}
+.net{margin-left:auto;font-size:12px;font-weight:600;color:var(--mu);display:flex;align-items:center;gap:6px}
+.net i{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.net.off i{background:var(--bad)}
+
+/* banners */
+.banner{margin:12px 0 0;padding:11px 13px;border-radius:12px;background:var(--s2);border:1px solid var(--line);font-size:13.5px;color:var(--mu);display:flex;gap:10px;align-items:flex-start}
+.banner strong{color:var(--tx)}
+.banner.warn{border-color:#5a4a16;background:#1d1a0f}
+.banner.bad{border-color:#5a2226;background:#1f1012}
+.banner .grow{flex:1}
+.banner button{color:var(--ac);font-weight:700;white-space:nowrap}
+
+/* composer */
+.composer{margin-top:14px;background:var(--s1);border:1px solid var(--line);border-radius:18px;padding:12px}
+textarea{display:block;width:100%;min-height:76px;max-height:200px;resize:none;background:transparent;border:0;outline:0;color:var(--tx);font-size:16px;line-height:1.4;font-family:inherit;padding:2px 2px 8px}
+textarea::placeholder{color:var(--dim)}
+.row{display:flex;gap:10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:12px;font-weight:700;font-size:15px;background:var(--s3);color:var(--tx);transition:transform .08s,background .15s}
+.btn:active{transform:scale(.97)}
+.btn.ac{background:var(--ac);color:var(--ink)}
+.btn.ac:active{background:var(--ac2)}
+.btn.big{flex:1;min-height:52px;font-size:16px;letter-spacing:.02em}
+.btn.sm{min-height:36px;padding:0 12px;font-size:13.5px;border-radius:10px}
+.btn.ghost{background:transparent;border:1px solid var(--line)}
+.btn.danger{color:var(--bad)}
+
+/* format picker */
+.lbl{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:16px 2px 8px}
+.seg{display:flex;background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;min-height:40px;border-radius:9px;font-size:13.5px;font-weight:650;color:var(--mu);padding:0 4px;line-height:1.15}
+.seg button[aria-checked=true]{background:var(--s3);color:var(--tx);box-shadow:inset 0 0 0 1px #3a3a42}
+.seg.fmt button[aria-checked=true]{background:var(--ac);color:var(--ink);box-shadow:none}
+.seg button small{display:block;font-size:10.5px;font-weight:600;opacity:.7}
+
+/* batch bar */
+.batch{margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.batch .count{font-size:13.5px;color:var(--mu);margin-right:auto;font-weight:600}
+.batch .count b{color:var(--tx)}
+
+/* queue cards */
+.list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.card{position:relative;display:flex;gap:12px;background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:10px}
+.card.new{animation:pop .22s ease-out}
+.card.flash{animation:flash .7s}
+@keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes flash{0%,100%{border-color:var(--line)}30%{border-color:var(--ac)}}
+.thumb{position:relative;flex:none;width:72px;height:96px;border-radius:10px;overflow:hidden;background:var(--s3)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .tag{position:absolute;left:4px;bottom:4px;font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:5px;background:rgba(0,0,0,.72);color:#fff}
+.thumb .play{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.25)}
+.thumb .play svg{width:28px;height:28px;fill:#fff;stroke:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
+.card.has-file .thumb .play{display:flex}
+.meta{flex:1;min-width:0;display:flex;flex-direction:column;padding-right:26px}
+.ttl{font-weight:650;font-size:14.5px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.ttl.muted{color:var(--mu);font-weight:600}
+.sub{font-size:12.5px;color:var(--mu);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{height:5px;border-radius:5px;background:var(--s3);margin-top:9px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--ac);border-radius:5px;transition:width .2s}
+.bar.indet i{width:35%!important;animation:indet 1.1s linear infinite}
+@keyframes indet{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
+.card.ready .bar i,.card.saved .bar i{background:var(--ok)}
+.card.error .bar i{background:var(--bad);width:100%!important}
+.st{font-size:12.5px;color:var(--mu);margin-top:5px;min-height:17px}
+.card.error .st{color:#ff9a9e}
+.card.saved .st{color:var(--ok)}
+.note{font-size:12px;color:var(--ac2);margin-top:2px}
+.acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.acts:empty{display:none}
+.x{position:absolute;top:6px;right:6px;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+.x:active{background:var(--s3)}
+
+/* empty state */
+.how{margin-top:18px;padding:16px;border:1px dashed var(--line);border-radius:18px;color:var(--mu);font-size:14px}
+.how h3{margin:0 0 10px;font-size:15px;color:var(--tx)}
+.how ol{margin:0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:10px}
+.how li{counter-increment:s;display:flex;gap:10px;align-items:flex-start}
+.how li::before{content:counter(s);flex:none;width:22px;height:22px;border-radius:50%;background:var(--s3);color:var(--tx);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.how .fine{margin-top:12px;font-size:12.5px;color:var(--dim)}
+
+/* history */
+.search{display:flex;align-items:center;gap:8px;margin-top:14px;background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:0 12px;color:var(--dim)}
+.search input{flex:1;min-width:0;height:44px;background:transparent;border:0;outline:0;color:var(--tx);font-size:16px;font-family:inherit}
+.hhead{display:flex;align-items:center;justify-content:space-between;margin:14px 2px 0;font-size:13px;color:var(--mu)}
+.hcard{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.hrow{display:flex;gap:12px;padding:10px;width:100%;text-align:left;align-items:center}
+.hrow .thumb{width:54px;height:72px;border-radius:8px}
+.pills{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.pill{font-size:10.5px;font-weight:700;padding:2px 6px;border-radius:5px;background:var(--s3);color:var(--mu);text-transform:uppercase;letter-spacing:.03em}
+.hacts{display:none;gap:8px;flex-wrap:wrap;padding:0 10px 12px 76px}
+.hcard.open .hacts{display:flex}
+.hacts .div{flex-basis:100%;height:0}
+
+/* settings */
+.set{margin-top:14px;background:var(--s1);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.srow{padding:14px;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.srow .h{display:flex;align-items:center;gap:12px}
+.srow .t{font-weight:650;flex:1}
+.srow .d{font-size:12.5px;color:var(--mu);margin-top:4px}
+.srow .seg{margin-top:10px}
+.srow .stat{font-size:12px;margin-top:6px;color:var(--dim)}
+.srow .stat.ok{color:var(--ok)}
+.tog{position:relative;width:50px;height:30px;border-radius:30px;background:var(--s3);flex:none;transition:background .15s}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#d9d9de;transition:transform .15s}
+.tog[aria-checked=true]{background:var(--ac)}
+.tog[aria-checked=true]::after{transform:translateX(20px);background:#fff}
+.about{margin:18px 2px 6px;font-size:12.5px;color:var(--dim);line-height:1.5}
+
+/* tab bar */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(14,14,17,.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:var(--sb)}
+.tabs .wrap{display:flex;height:62px;padding:0 8px}
+.tabs button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11.5px;font-weight:650;color:var(--dim);position:relative}
+.tabs button svg{width:23px;height:23px}
+.tabs button[aria-selected=true]{color:var(--tx)}
+.tabs button[aria-selected=true] svg{color:var(--ac)}
+.badge{position:absolute;top:7px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--ac);color:var(--ink);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:calc(84px + var(--sb));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:50;background:#f3f3f5;color:#111;font-weight:650;font-size:14px;padding:10px 16px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.45);transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.bad{background:var(--bad);color:#fff}
+
+/* viewer */
+.viewer{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column;padding:calc(var(--st) + 10px) 12px calc(var(--sb) + 12px)}
+.viewer .vt{display:flex;align-items:center;gap:10px;color:#ddd;font-size:14px;min-height:40px}
+.viewer .vt span{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.viewer .vbody{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:auto}
+.viewer video{max-width:100%;max-height:100%;border-radius:10px;background:#000}
+.viewer audio{width:100%;max-width:420px}
+.viewer .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;width:100%;align-self:flex-start}
+.viewer .grid img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;display:block;background:#111}
+.cover-art{width:180px;height:240px;border-radius:14px;object-fit:cover;display:block;margin:0 auto 18px}
+@media (min-width:700px){ .thumb{width:84px;height:112px} }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#" id="logoLink" aria-label="LINKDROP">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <rect x="22" y="7" width="20" height="27" rx="10" fill="none" stroke="#f3f3f5" stroke-width="5"/>
+        <path d="M32 22v24" stroke="#0c0c0e" stroke-width="11"/>
+        <path d="M32 22v24M23 37l9 9 9-9" fill="none" stroke="#ffcf3a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14 46v5a4 4 0 0 0 4 4h28a4 4 0 0 0 4-4v-5" fill="none" stroke="#f3f3f5" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+      <span class="word">LINK<b>DROP</b></span>
+    </a>
+    <div class="net" id="net"><i></i><span>Online</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- DROP -->
+  <section id="tab-drop">
+    <div class="banner bad" id="inAppBanner" hidden>
+      <div class="grow"><strong>Open this in Chrome or Safari.</strong> You're inside an app's browser, and those block downloads. Tap the ··· menu and pick "Open in browser".</div>
+    </div>
+    <div class="banner warn" id="clipHint" hidden>
+      <div class="grow"><strong>Copied a TikTok link?</strong> Tap PASTE and it starts.</div>
+      <button id="clipHintPaste">PASTE</button>
+    </div>
+
+    <div class="composer">
+      <textarea id="box" rows="3" placeholder="Paste TikTok links here. One or a whole bunch." autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="btn ac big" id="pasteBtn"><svg class="i" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="4" rx="1.5"/><path d="M16 5h1.5A2.5 2.5 0 0 1 20 7.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5v-11A2.5 2.5 0 0 1 6.5 5H8"/></svg>PASTE</button>
+        <button class="btn big" id="dropBtn" disabled><svg class="i" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></svg>DROP</button>
+      </div>
+    </div>
+
+    <div class="lbl">What to save</div>
+    <div class="seg fmt" id="fmtSeg" role="radiogroup" aria-label="What to save">
+      <button role="radio" data-v="hd">HD<small>no watermark</small></button>
+      <button role="radio" data-v="sd">Video<small>no watermark</small></button>
+      <button role="radio" data-v="wm">Video<small>watermark</small></button>
+      <button role="radio" data-v="mp3">MP3<small>sound only</small></button>
+    </div>
+
+    <div class="batch" id="batch" hidden>
+      <div class="count" id="batchCount"></div>
+      <button class="btn sm ac" id="startAll" hidden>Start all</button>
+      <button class="btn sm ac" id="saveAll" hidden>Save all</button>
+      <button class="btn sm" id="zipAll" hidden>ZIP all</button>
+      <button class="btn sm ghost" id="clearDone" hidden>Clear done</button>
+    </div>
+
+    <ul class="list" id="queue"></ul>
+
+    <div class="how" id="how">
+      <h3>How it works</h3>
+      <ol>
+        <li><span>In TikTok tap <b>Share</b>, then <b>Copy link</b>.</span></li>
+        <li><span>Come back here and tap <b>PASTE</b>. Copied a bunch? Paste them all in the box at once.</span></li>
+        <li><span>It downloads and saves to your phone. Everything you got shows in <b>History</b>.</span></li>
+        <li><span>If your phone asks "Download multiple files?", tap <b>Allow</b> so a bunch of links can save in one go.</span></li>
+      </ol>
+      <div class="fine" id="howExtra"></div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="tab-history" hidden>
+    <label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input id="hSearch" type="search" placeholder="Search history" autocomplete="off"></label>
+    <div class="hhead"><span id="hCount"></span><button class="btn sm ghost danger" id="hClear" hidden>Clear history</button></div>
+    <ul class="list" id="hList"></ul>
+    <div class="how" id="hEmpty"><h3>Nothing here yet</h3>Every TikTok you download shows up here with its picture, so you can grab it again later in a different type.</div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="tab-settings" hidden>
+    <div class="set" id="setList"></div>
+    <div class="set" id="installBox">
+      <div class="srow">
+        <div class="h"><div class="t">Put LINKDROP on your home screen</div><button class="btn sm ac" id="installBtn" hidden>Install</button></div>
+        <div class="d" id="installText"></div>
+      </div>
+    </div>
+    <p class="about">LINKDROP uses the free <a href="https://www.tikwm.com" target="_blank" rel="noopener">tikwm.com</a> service to find the video file behind a TikTok link, then downloads it straight to this phone. Nothing gets uploaded anywhere, and your history stays on this phone. Only save videos you're allowed to keep, like your own or ones the creator lets people download.</p>
+  </section>
+
+</main>
+
+<nav class="tabs" role="tablist">
+  <div class="wrap">
+    <button role="tab" data-tab="drop" aria-selected="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg>Drop<span class="badge" id="dropBadge" hidden></span></button>
+    <button role="tab" data-tab="history" aria-selected="false"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>History</button>
+    <button role="tab" data-tab="settings" aria-selected="false"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings</button>
+  </div>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="viewer" id="viewer" hidden>
+  <div class="vt"><span id="vTitle"></span><button class="btn sm" id="vSave">Save</button><button class="btn sm" id="vClose">Close</button></div>
+  <div class="vbody" id="vBody"></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- basics ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const API = 'https://www.tikwm.com/api/';
+const API_GAP = 1150;           // the free API allows about one call per second
+const MAX_DOWNLOADS = 2;
+const HISTORY_MAX = 500;
+const ua = navigator.userAgent;
+const isIOS = /iP(hone|od|ad)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isAndroid = /Android/i.test(ua);
+const inAppBrowser = /musical_ly|BytedanceWebview|Instagram|FBAN|FBAV|Snapchat|Line\//i.test(ua);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('linkdrop.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('linkdrop.' + k, JSON.stringify(v)); return true; } catch { return false; } },
+};
+
+const DEFAULTS = { format: 'hd', autoStart: true, autoSave: true, saveMode: 'auto', autoPaste: true, names: 'author-title', photos: 'zip', history: true };
+const S = Object.assign({}, DEFAULTS, store.get('settings', {}));
+if (!['hd', 'sd', 'wm', 'mp3'].includes(S.format)) S.format = 'hd';
+const saveSettings = () => store.set('settings', S);
+
+const FMT_NAME = { hd: 'HD video', sd: 'Video', wm: 'Video + watermark', mp3: 'Sound' };
+
+const ICON = {
+  save: '<svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  play: '<svg class="i" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+  retry: '<svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5"/></svg>',
+  open: '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg>',
+  copy: '<svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/></svg>',
+  trash: '<svg class="i" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/></svg>',
+  x: '<svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  bigplay: '<svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+};
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function mb(n) { if (!n) return '0 MB'; if (n < 1048576) return Math.max(1, Math.round(n / 1024)) + ' KB'; return (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB'; }
+function dur(s) { s = Math.round(s || 0); if (!s) return ''; const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+function when(t) {
+  const d = new Date(t), now = new Date();
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return 'Today ' + time;
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Yesterday ' + time;
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+}
+
+/* ---------- toast ---------- */
+let toastTimer = 0;
+function toast(msg, bad = false, ms = 2600) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('bad', !!bad);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+/* ---------- links ---------- */
+const LINK_RE = /(?:https?:\/\/)?(?:[a-z0-9-]+\.)*tiktok\.com\/[^\s<>"'`]+/gi;
+function extractLinks(text) {
+  const links = [];
+  let other = 0;
+  for (const m of String(text || '').matchAll(LINK_RE)) {
+    let u = m[0].replace(/[)\],.;:!?}>]+$/, '');
+    if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    let url;
+    try { url = new URL(u); } catch { continue; }
+    if (!/(^|\.)tiktok\.com$/i.test(url.hostname)) continue;
+    const p = url.pathname;
+    const short = /^(vm|vt)\./i.test(url.hostname) || /^\/t\/\w+/.test(p);
+    const post = /\/(video|photo|v)\/\d+/.test(p);
+    if (!short && !post) { other++; continue; }
+    url.hash = '';
+    if (!short) url.search = '';
+    url.protocol = 'https:';
+    const clean = url.toString();
+    if (!links.includes(clean)) links.push(clean);
+  }
+  return { links, other };
+}
+function postIdOf(url) { const m = /\/(?:video|photo|v)\/(\d+)/.exec(url); return m ? m[1] : ''; }
+function canonUrl(info) { return `https://www.tiktok.com/@${info.author || 'user'}/${info.isPhoto ? 'photo' : 'video'}/${info.id}`; }
+
+/* ---------- the API ---------- */
+let lastApiAt = 0;
+let apiChain = Promise.resolve();
+function apiCall(url) {
+  const run = apiChain.then(async () => {
+    const wait = lastApiAt + API_GAP - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastApiAt = Date.now();
+    return apiOnce(url);
+  });
+  apiChain = run.catch(() => {});
+  return run;
+}
+function fail(kind, msg) { const e = new Error(msg || kind); e.kind = kind; return e; }
+async function apiOnce(url) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const res = await fetch(API + '?hd=1&url=' + encodeURIComponent(url), { signal: ctl.signal, referrerPolicy: 'no-referrer', cache: 'no-store', credentials: 'omit' });
+    if (res.status === 429) throw fail('limit');
+    if (!res.ok) throw fail('net', 'HTTP ' + res.status);
+    let j;
+    try { j = await res.json(); } catch { throw fail('net', 'bad reply'); }
+    if (j && j.code === 0 && j.data) return j.data;
+    const msg = String((j && j.msg) || '');
+    if (/limit|too many|frequen|wait/i.test(msg)) throw fail('limit', msg);
+    throw fail('notfound', msg);
+  } catch (e) {
+    if (e.name === 'AbortError') throw fail('net', 'timeout');
+    if (!e.kind) e.kind = 'net';
+    throw e;
+  } finally { clearTimeout(timer); }
+}
+async function getInfo(url, it) {
+  let delay = 1500;
+  for (let i = 0; ; i++) {
+    if (it.removed) throw fail('removed');
+    try { return await apiCall(url); }
+    catch (e) {
+      const tries = e.kind === 'notfound' ? 1 : 4;
+      if (i >= tries) throw e;
+      if (e.kind === 'limit') setStatus(it, 'The free service is busy, waiting a sec...');
+      await sleep(delay);
+      delay = Math.min(delay * 1.8, 8000);
+    }
+  }
+}
+
+function abs(u) {
+  if (!u || typeof u !== 'string') return '';
+  if (u.startsWith('//')) return 'https:' + u;
+  if (u.startsWith('/')) return 'https://www.tikwm.com' + u;
+  return u;
+}
+function imgUrl(x) {
+  if (typeof x === 'string') return x;
+  if (!x || typeof x !== 'object') return '';
+  return x.url || (x.url_list && x.url_list[0]) || (x.display_image && x.display_image.url_list && x.display_image.url_list[0]) || (x.imageURL && x.imageURL.urlList && x.imageURL.urlList[0]) || '';
+}
+function normInfo(d) {
+  const a = d.author || {};
+  const mi = d.music_info || {};
+  const images = Array.isArray(d.images) ? d.images.map(imgUrl).map(abs).filter(Boolean) : [];
+  return {
+    id: String(d.id || d.aweme_id || d.video_id || ''),
+    title: String(d.title || '').trim(),
+    author: String(a.unique_id || ''),
+    nick: String(a.nickname || ''),
+    cover: abs(d.cover || d.origin_cover || d.ai_dynamic_cover),
+    duration: +d.duration || 0,
+    play: abs(d.play), hd: abs(d.hdplay), wm: abs(d.wmplay),
+    size: +d.size || 0, hdSize: +d.hd_size || 0, wmSize: +d.wm_size || 0,
+    music: abs(d.music || mi.play),
+    images, isPhoto: images.length > 0,
+  };
+}
+function sources(info, fmt) {
+  const proxy = k => info.id ? `https://www.tikwm.com/video/media/${k}/${info.id}.mp4` : '';
+  let list;
+  if (fmt === 'mp3') list = [info.music];
+  else if (fmt === 'wm') list = [info.wm, proxy('wmplay'), info.play, proxy('play')];
+  else if (fmt === 'sd') list = [info.play, proxy('play')];
+  else list = [info.hd, proxy('hdplay'), info.play, proxy('play')];
+  return [...new Set(list.filter(Boolean))];
+}
+
+/* ---------- downloading ---------- */
+async function fetchBlob(url, onProg, signal, min = 2048) {
+  const res = await fetch(url, { signal, referrerPolicy: 'no-referrer', cache: 'no-store', credentials: 'omit' });
+  if (!res.ok) throw fail('blocked', 'HTTP ' + res.status);
+  const type = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (/^text\/|json/.test(type)) throw fail('blocked', 'not a file');
+  const total = +res.headers.get('content-length') || 0;
+  let blob;
+  if (res.body && res.body.getReader) {
+    const rd = res.body.getReader();
+    const chunks = [];
+    let got = 0;
+    for (;;) {
+      const { done, value } = await rd.read();
+      if (done) break;
+      chunks.push(value);
+      got += value.byteLength;
+      if (onProg) onProg(got, total);
+    }
+    blob = new Blob(chunks, { type });
+  } else {
+    blob = await res.blob();
+    if (onProg) onProg(blob.size, blob.size);
+  }
+  if (blob.size < min) throw fail('blocked', 'empty file');
+  return blob;
+}
+function extOf(type, fallback) {
+  const map = { 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/webp': 'webp', 'image/png': 'png', 'image/heic': 'heic', 'image/avif': 'avif' };
+  return map[type] || fallback;
+}
+// emojis in file names confuse some gallery/file apps, so they go (letters from any language stay)
+const EMOJI_RE = (() => {
+  try { return new RegExp('\\p{Extended_Pictographic}|\\p{Emoji_Modifier}|\\p{Regional_Indicator}|[\\u200d\\ufe0e\\ufe0f\\u20e3]', 'gu'); }
+  catch { return /[\ud800-\udfff☀-➿‍︎️⃣]/g; }
+})();
+function cleanName(s) {
+  return String(s || '')
+    .replace(EMOJI_RE, ' ')
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/[\\/:*?"<>|“”\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+function shortTitle(t) {
+  let s = cleanName(String(t || '').replace(/#[^\s#]+/g, ' ').replace(/@[\w.]+/g, ' '));
+  if (s.length > 60) s = s.slice(0, 60).replace(/\s+\S*$/, '');
+  return s;
+}
+function baseName(info) {
+  const t = shortTitle(info.title);
+  const a = cleanName(info.author);
+  let n;
+  if (S.names === 'id') n = 'tiktok_' + info.id;
+  else if (S.names === 'title') n = t || 'tiktok_' + info.id;
+  else n = [a && '@' + a, t].filter(Boolean).join(' - ') || 'tiktok_' + info.id;
+  return n.slice(0, 90).replace(/[ .]+$/, '') || 'tiktok';
+}
+
+async function download(it, signal) {
+  const info = it.info, fmt = it.format;
+  const base = baseName(info);
+  it.files = [];
+  it.note = '';
+  if (info.isPhoto && fmt !== 'mp3') {
+    const n = info.images.length;
+    for (let i = 0; i < n; i++) {
+      const b = await fetchBlob(info.images[i], (g, t) => progress(it, (i + (t ? g / t : .5)) / n, 0, 0), signal, 256);
+      it.files.push({ blob: b, name: `${base} (${String(i + 1).padStart(2, '0')}).${extOf(b.type, 'jpg')}` });
+    }
+    if (info.music) {
+      try {
+        const a = await fetchBlob(info.music, null, signal);
+        it.files.push({ blob: a, name: `${base} (sound).${a.type === 'video/mp4' ? 'm4a' : extOf(a.type, 'mp3')}`, audio: true });
+      } catch (e) { if (e.name === 'AbortError') throw e; }
+    }
+    it.note = `Slideshow: ${n} photo${n > 1 ? 's' : ''}${it.files.some(f => f.audio) ? ' + the sound' : ''}`;
+    return;
+  }
+  const srcs = sources(info, fmt);
+  if (!srcs.length) throw fail(fmt === 'mp3' ? 'nosound' : 'nofile');
+  let last;
+  for (const u of srcs) {
+    try {
+      const b = await fetchBlob(u, (g, t) => progress(it, t ? g / t : -1, g, t), signal);
+      const ext = fmt === 'mp3' ? (b.type === 'video/mp4' ? 'm4a' : extOf(b.type, 'mp3')) : extOf(b.type, 'mp4');
+      it.files = [{ blob: b, name: `${base}${fmt === 'mp3' ? ' (sound)' : ''}.${ext}` }];
+      it.srcUrl = u;
+      if (fmt === 'hd' && !info.hd) it.note = 'TikTok has no HD copy of this one, so you got normal quality.';
+      if (fmt === 'wm' && (!info.wm || !info.wmSize || info.wm === info.play)) it.note = 'TikTok gave no watermark copy, so you got the clean one.';
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      last = e;
+    }
+  }
+  it.srcUrl = srcs[0];
+  throw last && last.kind ? last : fail('blocked');
+}
+
+/* ---------- queue ---------- */
+const items = [];
+let seq = 0;
+const slots = { n: 0, waiting: [] };
+function takeSlot() {
+  if (slots.n < MAX_DOWNLOADS) { slots.n++; return Promise.resolve(); }
+  return new Promise(r => slots.waiting.push(r));
+}
+function freeSlot() {
+  const next = slots.waiting.shift();
+  if (next) next(); else slots.n--;
+}
+const BUSY = ['queued', 'finding', 'waiting', 'downloading'];
+
+function addLinks(text, { quiet = false } = {}) {
+  const { links, other } = extractLinks(text);
+  if (!links.length) {
+    if (!quiet) toast(other ? "That's a TikTok profile or sound link. Copy a video link instead." : "No TikTok link in there.", true);
+    return 0;
+  }
+  const fresh = [];
+  let dupes = 0;
+  for (const url of links) {
+    const pid = postIdOf(url);
+    const twin = items.find(o => !o.removed && o.format === S.format && o.status !== 'error' &&
+      (o.url === url || (pid && (o.pid === pid || (o.info && o.info.id === pid)))));
+    if (twin) { dupes++; flash(twin); continue; }
+    const it = { key: ++seq, url, pid, format: S.format, status: S.autoStart ? 'queued' : 'idle', info: null, files: null, prog: 0, got: 0, total: 0, note: '', error: '' };
+    items.push(it);
+    fresh.push(it);
+  }
+  const anchor = $('#queue').firstChild;
+  for (const it of fresh) {
+    buildCard(it);
+    $('#queue').insertBefore(it.el, anchor);
+    draw(it);
+  }
+  if (fresh.length) {
+    if (S.autoStart) fresh.forEach(run);
+    if (!quiet || fresh.length > 1) toast(fresh.length === 1 ? (S.autoStart ? 'Got it, downloading' : 'Added. Tap Start') : `Added ${fresh.length} links`);
+  } else if (dupes && !quiet) toast(dupes === 1 ? 'That one is already in your list' : 'Those are already in your list');
+  refresh();
+  return fresh.length;
+}
+
+async function run(it) {
+  if (it.removed) return;
+  it.ctl = new AbortController();
+  const signal = it.ctl.signal;
+  it.status = 'finding'; it.error = ''; it.note = ''; it.prog = 0; it.got = 0; it.total = 0;
+  draw(it); refresh();
+  try {
+    if (!it.info || Date.now() - it.infoAt > 5 * 60 * 1000) {
+      const d = await getInfo(it.url, it);
+      if (it.removed) return;
+      it.info = normInfo(d);
+      it.infoAt = Date.now();
+      if (it.info.id) it.pid = it.info.id;
+      const twin = items.find(o => o !== it && !o.removed && o.format === it.format && o.status !== 'error' && o.info && o.info.id === it.info.id);
+      if (twin) { removeItem(it); flash(twin); toast('That one is already in your list'); return; }
+      draw(it, true);
+    }
+    it.status = 'waiting'; draw(it);
+    await takeSlot();
+    try {
+      if (it.removed) return;
+      it.status = 'downloading'; draw(it);
+      await download(it, signal);
+    } finally { freeSlot(); }
+    if (it.removed) return;
+    it.status = 'ready';
+    draw(it, true);
+    addToHistory(it);
+    if (S.autoSave && saveMode() === 'download') await save(it, true);
+    else if (!document.hidden) toast('Ready! Tap SAVE');
+  } catch (e) {
+    if (it.removed || e.name === 'AbortError' || e.kind === 'removed') return;
+    it.status = 'error';
+    it.errKind = e.kind || 'net';
+    it.error = errorText(e, it);
+    draw(it, true);
+  } finally { refresh(); }
+}
+
+function errorText(e, it) {
+  switch (e.kind) {
+    case 'notfound': return "Can't find this TikTok. It's private, deleted, or the link is wrong.";
+    case 'limit': return 'The free service is too busy right now. Wait a minute and tap Retry.';
+    case 'nosound': return "This one has no sound file to save.";
+    case 'nofile': return 'TikTok gave no video file for this one.';
+    case 'blocked': return "TikTok didn't send the file. Tap Retry, or Open file to save it by hand.";
+    default: return navigator.onLine ? "Couldn't reach the TikTok service. Tap Retry." : "You're offline. Connect and tap Retry.";
+  }
+}
+
+function removeItem(it) {
+  it.removed = true;
+  if (it.ctl) it.ctl.abort();
+  it.files = null;
+  if (it.el) { it.el.remove(); it.el = null; }
+  const i = items.indexOf(it);
+  if (i >= 0) items.splice(i, 1);
+  refresh();
+}
+
+function progress(it, frac, got, total) {
+  it.prog = frac; it.got = got; it.total = total;
+  if (!it.raf) it.raf = requestAnimationFrame(() => { it.raf = 0; drawProgress(it); });
+}
+
+/* ---------- saving ---------- */
+function saveMode() { return S.saveMode === 'auto' ? (isIOS ? 'share' : 'download') : S.saveMode; }
+function downloadBlob(blob, name) {
+  const u = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = u; a.download = name; a.rel = 'noopener'; a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 180000);
+}
+function asFiles(files) { return files.map(f => new File([f.blob], f.name, { type: f.blob.type || 'application/octet-stream' })); }
+async function shareFiles(files) {
+  // must be called straight from a tap: no awaits before navigator.share
+  let fs;
+  try { fs = asFiles(files); } catch { return 'nope'; }
+  if (!navigator.canShare || !navigator.share) return 'nope';
+  try { if (!navigator.canShare({ files: fs })) return 'nope'; } catch { return 'nope'; }
+  try { await navigator.share({ files: fs }); return 'done'; }
+  catch (e) { return e && e.name === 'AbortError' ? 'cancel' : 'nope'; }
+}
+function shareable(it) { return (it.files || []).filter(f => !(f.audio && it.info && it.info.isPhoto && it.format !== 'mp3')); }
+
+async function save(it, auto = false) {
+  const files = it.files || [];
+  if (!files.length) return;
+  if (saveMode() === 'share' && !auto) {
+    const r = await shareFiles(shareable(it));
+    if (r === 'done') { markSaved(it, 'Saved'); return; }
+    if (r === 'cancel') return;
+  }
+  if (files.length > 1 && S.photos === 'zip') {
+    const z = await makeZip(files);
+    downloadBlob(z, baseName(it.info) + '.zip');
+  } else {
+    for (let i = 0; i < files.length; i++) {
+      downloadBlob(files[i].blob, files[i].name);
+      if (i < files.length - 1) await sleep(400);
+    }
+  }
+  markSaved(it, isIOS ? 'Saved to Files > Downloads' : 'Saved to your Downloads');
+}
+function markSaved(it, text) {
+  it.status = 'saved';
+  it.savedText = text;
+  draw(it, true);
+  refresh();
+  toast(text);
+}
+
+async function saveAll() {
+  const ready = items.filter(i => i.status === 'ready');
+  if (!ready.length) return;
+  if (saveMode() === 'share') {
+    const files = ready.flatMap(shareable);
+    const r = await shareFiles(files);
+    if (r === 'done') { ready.forEach(i => { i.status = 'saved'; i.savedText = 'Saved'; draw(i, true); }); refresh(); toast(`Saved ${ready.length}`); return; }
+    if (r === 'cancel') return;
+  }
+  for (const it of ready) { await save(it); await sleep(400); }
+}
+async function zipAll() {
+  const done = items.filter(i => i.status === 'ready' || i.status === 'saved');
+  const files = done.flatMap(i => i.files || []);
+  if (!files.length) return;
+  const total = files.reduce((s, f) => s + f.blob.size, 0);
+  if (total > 400 * 1048576 && !confirm(`That ZIP would be ${mb(total)}. Big files can crash a phone browser. Make it anyway?`)) return;
+  toast('Making the ZIP...');
+  const z = await makeZip(files);
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+  downloadBlob(z, `LINKDROP ${stamp}.zip`);
+  done.forEach(i => { if (i.status === 'ready') { i.status = 'saved'; i.savedText = 'Saved in the ZIP'; draw(i, true); } });
+  refresh();
+  toast(`ZIP with ${files.length} file${files.length > 1 ? 's' : ''} saved`);
+}
+
+/* ---------- zip (no compression, videos don't shrink anyway) ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+async function makeZip(files) {
+  const enc = new TextEncoder();
+  const d = new Date();
+  const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  const used = new Set();
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    let name = f.name, k = 2;
+    while (used.has(name.toLowerCase())) { name = f.name.replace(/(\.[^.]*)?$/, m => ` (${k})${m}`); k++; }
+    used.add(name.toLowerCase());
+    const data = new Uint8Array(await f.blob.arrayBuffer());
+    const nm = enc.encode(name);
+    const crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, time, true); lh.setUint16(12, date, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, nm.length, true); lh.setUint16(28, 0, true);
+    parts.push(lh.buffer, nm, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+    ch.setUint16(12, time, true); ch.setUint16(14, date, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, nm.length, true);
+    ch.setUint16(30, 0, true); ch.setUint16(32, 0, true); ch.setUint16(34, 0, true); ch.setUint16(36, 0, true); ch.setUint32(38, 0, true); ch.setUint32(42, offset, true);
+    central.push(ch.buffer, nm);
+    offset += 30 + nm.length + data.length;
+    await sleep(0);
+  }
+  const cdSize = central.reduce((s, p) => s + p.byteLength, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(4, 0, true); end.setUint16(6, 0, true);
+  end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true); end.setUint16(20, 0, true);
+  return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
+}
+
+/* ---------- queue cards ---------- */
+function buildCard(it) {
+  const li = document.createElement('li');
+  li.className = 'card new';
+  li.addEventListener('animationend', () => { it.fresh = false; li.classList.remove('new'); }, { once: true });
+  it.fresh = true;
+  li.innerHTML = `
+    <button class="thumb" aria-label="Watch"><img alt="" referrerpolicy="no-referrer" hidden><span class="tag" hidden></span><span class="play">${ICON.bigplay}</span></button>
+    <div class="meta">
+      <div class="ttl muted"></div>
+      <div class="sub"></div>
+      <div class="bar"><i></i></div>
+      <div class="st"></div>
+      <div class="note" hidden></div>
+      <div class="acts"></div>
+    </div>
+    <button class="x" aria-label="Remove">${ICON.x}</button>`;
+  it.el = li;
+  it.r = { img: $('img', li), tag: $('.tag', li), ttl: $('.ttl', li), sub: $('.sub', li), bar: $('.bar', li), fill: $('.bar i', li), st: $('.st', li), note: $('.note', li), acts: $('.acts', li) };
+  it.r.img.onerror = () => { it.r.img.hidden = true; };
+  $('.thumb', li).onclick = () => { if (it.files && it.files.length) openViewer(it); };
+  $('.x', li).onclick = () => removeItem(it);
+  it.r.acts.onclick = e => {
+    const b = e.target.closest('button[data-a]');
+    if (!b) return;
+    const a = b.dataset.a;
+    if (a === 'save') save(it);
+    else if (a === 'play') openViewer(it);
+    else if (a === 'retry' || a === 'start') { it.info = a === 'retry' ? null : it.info; run(it); }
+    else if (a === 'tiktok') window.open(it.info ? canonUrl(it.info) : it.url, '_blank', 'noopener');
+    else if (a === 'file') window.open(it.srcUrl, '_blank', 'noopener');
+  };
+}
+function setStatus(it, text) { if (it.r) it.r.st.textContent = text; }
+function drawProgress(it) {
+  if (!it.r || it.status !== 'downloading') return;
+  const known = it.prog >= 0;
+  it.r.bar.classList.toggle('indet', !known);
+  if (known) it.r.fill.style.width = Math.min(100, it.prog * 100).toFixed(1) + '%';
+  let t = 'Downloading';
+  if (it.total) t += ` ${mb(it.got)} / ${mb(it.total)} · ${Math.floor(it.prog * 100)}%`;
+  else if (it.got) t += ` ${mb(it.got)}`;
+  else if (known && it.prog > 0) t += ` ${Math.floor(it.prog * 100)}%`;
+  it.r.st.textContent = t;
+}
+function draw(it, full) {
+  if (!it.r) return;
+  const r = it.r, info = it.info, s = it.status;
+  it.el.className = 'card ' + s + (it.files && it.files.length ? ' has-file' : '') + (it.fresh ? ' new' : '');
+  if (full || !r.drawn) {
+    r.drawn = true;
+    if (info) {
+      const t = shortTitle(info.title) || (info.isPhoto ? 'TikTok slideshow' : 'TikTok video');
+      r.ttl.textContent = t;
+      r.ttl.classList.remove('muted');
+      const bits = [info.author ? '@' + info.author : '', info.isPhoto && it.format !== 'mp3' ? 'Photos' : FMT_NAME[it.format]];
+      r.sub.textContent = bits.filter(Boolean).join(' · ');
+      if (info.cover && r.img.dataset.src !== info.cover) { r.img.dataset.src = info.cover; r.img.src = info.cover; r.img.hidden = false; }
+      const tag = info.isPhoto ? `${info.images.length} pics` : dur(info.duration);
+      r.tag.textContent = tag; r.tag.hidden = !tag;
+    } else {
+      r.ttl.textContent = it.url.replace(/^https:\/\/(www\.)?/, '');
+      r.sub.textContent = FMT_NAME[it.format];
+    }
+  }
+  r.bar.classList.toggle('indet', s === 'finding' || s === 'queued' || s === 'waiting');
+  if (s === 'ready' || s === 'saved') r.fill.style.width = '100%';
+  else if (s !== 'downloading') r.fill.style.width = '0%';
+  const size = it.files ? it.files.reduce((a, f) => a + f.blob.size, 0) : 0;
+  const st = {
+    idle: 'Waiting for you. Tap Start.',
+    queued: 'In line...',
+    finding: 'Finding the video...',
+    waiting: 'Up next...',
+    ready: `Ready · ${mb(size)}`,
+    saved: `${it.savedText || 'Saved'} · ${mb(size)}`,
+    error: it.error,
+  }[s];
+  if (s === 'downloading') drawProgress(it); else r.st.textContent = st || '';
+  r.note.textContent = it.note || '';
+  r.note.hidden = !it.note || s === 'error';
+  let acts = '';
+  if (s === 'idle') acts = `<button class="btn sm ac" data-a="start">${ICON.save}Start</button>`;
+  else if (s === 'ready') acts = `<button class="btn sm ac" data-a="save">${ICON.save}SAVE</button><button class="btn sm" data-a="play">${ICON.play}Watch</button>`;
+  else if (s === 'saved') acts = `<button class="btn sm" data-a="save">${ICON.save}Save again</button><button class="btn sm" data-a="play">${ICON.play}Watch</button>`;
+  else if (s === 'error') acts = `<button class="btn sm ac" data-a="retry">${ICON.retry}Retry</button>` + (it.srcUrl ? `<button class="btn sm" data-a="file">${ICON.open}Open file</button>` : '') + `<button class="btn sm" data-a="tiktok">${ICON.open}TikTok</button>`;
+  if (r.actsKey !== acts) { r.acts.innerHTML = acts; r.actsKey = acts; }
+  if (s === 'ready' && saveMode() === 'share') {
+    const b = r.acts.querySelector('[data-a=save]');
+    if (b) b.innerHTML = ICON.save + (it.info && it.info.isPhoto && it.format !== 'mp3' ? 'SAVE PHOTOS' : 'SAVE');
+  }
+}
+function flash(it) {
+  if (!it.el) return;
+  it.el.classList.remove('flash'); void it.el.offsetWidth; it.el.classList.add('flash');
+  it.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function refresh() {
+  const live = items;
+  const busy = live.filter(i => BUSY.includes(i.status)).length;
+  const done = live.filter(i => i.status === 'ready' || i.status === 'saved');
+  const ready = live.filter(i => i.status === 'ready').length;
+  const idle = live.filter(i => i.status === 'idle').length;
+  const errs = live.filter(i => i.status === 'error').length;
+  $('#batch').hidden = !live.length;
+  $('#how').hidden = !!live.length;
+  let txt = `<b>${done.length}</b> of ${live.length} done`;
+  if (busy) txt += ` · ${busy} working`;
+  if (errs) txt += ` · ${errs} failed`;
+  $('#batchCount').innerHTML = txt;
+  $('#startAll').hidden = !idle;
+  $('#saveAll').hidden = ready < 2 && !(ready === 1 && live.length > 1);
+  $('#saveAll').textContent = ready > 1 ? `Save all ${ready}` : 'Save';
+  const fileCount = done.reduce((a, i) => a + (i.files ? i.files.length : 0), 0);
+  $('#zipAll').hidden = fileCount < 2;
+  $('#clearDone').hidden = !live.some(i => i.status === 'saved' || i.status === 'error');
+  const badge = busy + ready + idle;
+  $('#dropBadge').hidden = !badge;
+  $('#dropBadge').textContent = badge;
+}
+
+/* ---------- viewer ---------- */
+let viewerUrls = [];
+let viewerItem = null;
+function openViewer(it) {
+  const files = it.files || [];
+  if (!files.length) return;
+  closeViewer();
+  viewerItem = it;
+  const body = $('#vBody');
+  body.innerHTML = '';
+  $('#vTitle').textContent = it.r ? it.r.ttl.textContent : '';
+  const url = b => { const u = URL.createObjectURL(b); viewerUrls.push(u); return u; };
+  const pics = files.filter(f => /^image\//.test(f.blob.type) || /\.(jpe?g|png|webp|heic|avif)$/i.test(f.name));
+  const media = files.filter(f => !pics.includes(f));
+  if (pics.length) {
+    const g = document.createElement('div');
+    g.className = 'grid';
+    for (const p of pics) { const im = new Image(); im.src = url(p.blob); im.alt = ''; g.appendChild(im); }
+    body.appendChild(g);
+    if (media[0]) { const a = document.createElement('audio'); a.controls = true; a.src = url(media[0].blob); a.style.marginTop = '12px'; g.after(a); body.style.flexDirection = 'column'; }
+  } else if (media[0]) {
+    const f = media[0];
+    const isAudio = /^audio\//.test(f.blob.type) || /\.(mp3|m4a|aac|ogg)$/i.test(f.name);
+    if (isAudio) {
+      const wrap = document.createElement('div');
+      wrap.style.width = '100%';
+      if (it.info && it.info.cover) { const im = new Image(); im.className = 'cover-art'; im.referrerPolicy = 'no-referrer'; im.src = it.info.cover; im.alt = ''; wrap.appendChild(im); }
+      const a = document.createElement('audio'); a.controls = true; a.autoplay = true; a.src = url(f.blob); a.style.display = 'block'; a.style.margin = '0 auto';
+      wrap.appendChild(a);
+      body.appendChild(wrap);
+    } else {
+      const v = document.createElement('video');
+      v.controls = true; v.autoplay = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.src = url(f.blob);
+      body.appendChild(v);
+    }
+  }
+  $('#viewer').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+function closeViewer() {
+  const v = $('#viewer');
+  v.hidden = true;
+  $('#vBody').querySelectorAll('video,audio').forEach(m => { try { m.pause(); } catch {} });
+  $('#vBody').innerHTML = '';
+  $('#vBody').style.flexDirection = '';
+  viewerUrls.forEach(u => URL.revokeObjectURL(u));
+  viewerUrls = [];
+  viewerItem = null;
+  document.body.style.overflow = '';
+}
+$('#vClose').onclick = closeViewer;
+$('#vSave').onclick = () => { if (viewerItem) save(viewerItem); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#viewer').hidden) closeViewer(); });
+
+/* ---------- history ---------- */
+const idb = (() => {
+  let dbp = null;
+  function open() {
+    if (!dbp) dbp = new Promise((res, rej) => {
+      if (!window.indexedDB) return rej(new Error('no idb'));
+      const r = indexedDB.open('linkdrop', 1);
+      r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('history')) r.result.createObjectStore('history', { keyPath: 'id' }); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+      r.onblocked = () => rej(new Error('blocked'));
+    });
+    return dbp;
+  }
+  function tx(mode, fn) {
+    return open().then(db => new Promise((res, rej) => {
+      const t = db.transaction('history', mode);
+      const req = fn(t.objectStore('history'));
+      t.oncomplete = () => res(req ? req.result : undefined);
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    }));
+  }
+  return {
+    all: () => tx('readonly', s => s.getAll()),
+    put: rec => tx('readwrite', s => s.put(rec)),
+    del: id => tx('readwrite', s => s.delete(id)),
+    clear: () => tx('readwrite', s => s.clear()),
+  };
+})();
+let hist = [];
+let histMode = 'idb';
+let histReady = false;
+async function loadHistory() {
+  try { hist = await idb.all(); }
+  catch { histMode = 'ls'; hist = store.get('history', []); }
+  if (!Array.isArray(hist)) hist = [];
+  hist.sort((a, b) => b.at - a.at);
+  histReady = true;
+  renderHistory();
+}
+function persist(rec, removedIds = []) {
+  if (histMode === 'idb') {
+    const jobs = [];
+    if (rec) jobs.push(idb.put(rec));
+    removedIds.forEach(id => jobs.push(idb.del(id)));
+    Promise.all(jobs).catch(() => { histMode = 'ls'; persist(); });
+  } else if (!store.set('history', hist)) {
+    // localStorage full: drop the pictures of the oldest half and try again
+    hist.slice(Math.floor(hist.length / 2)).forEach(h => { h.thumb = ''; });
+    store.set('history', hist);
+  }
+}
+async function makeThumb(url) {
+  if (!url) return '';
+  try {
+    const blob = await fetchBlob(url, null, undefined, 64);
+    const im = await new Promise((res, rej) => {
+      const u = URL.createObjectURL(blob);
+      const i = new Image();
+      i.onload = () => { res(i); setTimeout(() => URL.revokeObjectURL(u), 0); };
+      i.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); };
+      i.src = u;
+    });
+    const W = 120, H = 160;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    const k = Math.max(W / im.naturalWidth, H / im.naturalHeight);
+    const w = im.naturalWidth * k, h = im.naturalHeight * k;
+    g.drawImage(im, (W - w) / 2, (H - h) / 2, w, h);
+    return c.toDataURL('image/jpeg', 0.72);
+  } catch { return ''; }
+}
+async function addToHistory(it) {
+  if (!S.history || !it.info || !it.info.id) return;
+  const info = it.info;
+  const old = hist.find(h => h.id === info.id);
+  const rec = {
+    id: info.id,
+    url: canonUrl(info),
+    title: info.title,
+    author: info.author,
+    nick: info.nick,
+    duration: info.duration,
+    photos: info.isPhoto ? info.images.length : 0,
+    fmts: [...new Set([...(old ? old.fmts || [] : []), it.format])],
+    size: (it.files || []).reduce((a, f) => a + f.blob.size, 0),
+    at: Date.now(),
+    thumb: old && old.thumb ? old.thumb : '',
+  };
+  if (!rec.thumb) rec.thumb = await makeThumb(info.cover);
+  if (!S.history) return;
+  const i = hist.findIndex(h => h.id === rec.id);
+  if (i >= 0) hist.splice(i, 1);
+  hist.unshift(rec);
+  const dropped = hist.length > HISTORY_MAX ? hist.splice(HISTORY_MAX).map(h => h.id) : [];
+  persist(rec, dropped);
+  renderHistory();
+}
+let openHist = '';
+function renderHistory() {
+  if (!histReady) return;
+  const q = $('#hSearch').value.trim().toLowerCase();
+  const list = q ? hist.filter(h => (h.title + ' ' + h.author + ' ' + h.nick).toLowerCase().includes(q)) : hist;
+  $('#hCount').textContent = hist.length ? (q ? `${list.length} of ${hist.length}` : `${hist.length} saved`) : '';
+  $('#hClear').hidden = !hist.length;
+  $('#hEmpty').hidden = !!hist.length;
+  const ul = $('#hList');
+  if (!list.length) {
+    ul.innerHTML = hist.length ? '<li class="how">Nothing matches that search.</li>' : '';
+    return;
+  }
+  ul.innerHTML = list.slice(0, 200).map(h => {
+    const title = shortTitle(h.title) || (h.photos ? 'TikTok slideshow' : 'TikTok video');
+    const tag = h.photos ? `${h.photos} pics` : dur(h.duration);
+    const fm = h.photos ? [['hd', 'Photos'], ['mp3', 'MP3']] : [['hd', 'HD'], ['sd', 'Video'], ['wm', 'Watermark'], ['mp3', 'MP3']];
+    return `<li class="hcard${openHist === h.id ? ' open' : ''}" data-id="${esc(h.id)}">
+      <button class="hrow" data-a="toggle">
+        <span class="thumb">${h.thumb ? `<img src="${esc(h.thumb)}" alt="">` : ''}${tag ? `<span class="tag">${esc(tag)}</span>` : ''}</span>
+        <span class="meta" style="padding-right:0">
+          <span class="ttl">${esc(title)}</span>
+          <span class="sub">${esc([h.author ? '@' + h.author : '', when(h.at)].filter(Boolean).join(' · '))}</span>
+          <span class="pills">${(h.fmts || []).map(f => `<span class="pill">${esc(f === 'hd' && h.photos ? 'photos' : ({ hd: 'HD', sd: 'video', wm: 'watermark', mp3: 'mp3' }[f] || f))}</span>`).join('')}${h.size ? `<span class="pill">${mb(h.size)}</span>` : ''}</span>
+        </span>
+      </button>
+      <div class="hacts">
+        ${fm.map(([v, l]) => `<button class="btn sm ac" data-a="get" data-f="${v}">${ICON.save}${l}</button>`).join('')}
+        <span class="div"></span>
+        <button class="btn sm" data-a="copy">${ICON.copy}Copy link</button>
+        <button class="btn sm" data-a="open">${ICON.open}TikTok</button>
+        <button class="btn sm ghost danger" data-a="del">${ICON.trash}Delete</button>
+      </div>
+    </li>`;
+  }).join('') + (list.length > 200 ? `<li class="how">Showing the newest 200. Search to find older ones.</li>` : '');
+}
+$('#hList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-a]');
+  const li = e.target.closest('.hcard');
+  if (!b || !li) return;
+  const h = hist.find(x => x.id === li.dataset.id);
+  if (!h) return;
+  const a = b.dataset.a;
+  if (a === 'toggle') {
+    openHist = openHist === h.id ? '' : h.id;
+    document.querySelectorAll('#hList .hcard.open').forEach(x => { if (x !== li) x.classList.remove('open'); });
+    li.classList.toggle('open', openHist === h.id);
+  } else if (a === 'get') {
+    const keep = S.format;
+    S.format = b.dataset.f;
+    const n = addLinks(h.url, { quiet: true });
+    S.format = keep;
+    showTab('drop');
+    toast(n ? 'Getting it again' : 'Already in your list');
+    if (!n) { const twin = items.find(o => o.info && o.info.id === h.id && o.format === b.dataset.f); if (twin) flash(twin); }
+  } else if (a === 'copy') {
+    try { await navigator.clipboard.writeText(h.url); lastClip = h.url; store.set('lastClip', lastClip); toast('Link copied'); }
+    catch { prompt('Copy this link:', h.url); }
+  } else if (a === 'open') window.open(h.url, '_blank', 'noopener');
+  else if (a === 'del') {
+    hist = hist.filter(x => x.id !== h.id);
+    persist(null, [h.id]);
+    renderHistory();
+    toast('Removed from history');
+  }
+});
+$('#hSearch').addEventListener('input', renderHistory);
+$('#hClear').onclick = () => {
+  if (!confirm('Clear your whole download history? Your saved videos stay on your phone.')) return;
+  hist = [];
+  if (histMode === 'idb') idb.clear().catch(() => {}); else store.set('history', []);
+  renderHistory();
+  toast('History cleared');
+};
+
+/* ---------- clipboard ---------- */
+let lastClip = store.get('lastClip', '');
+async function clipState() {
+  if (!navigator.clipboard || !navigator.clipboard.readText) return 'none';
+  try { return (await navigator.permissions.query({ name: 'clipboard-read' })).state; }
+  catch { return 'unknown'; }
+}
+async function pasteFromClipboard() {
+  if (!navigator.clipboard || !navigator.clipboard.readText) { pasteFallback(); return; }
+  let text;
+  try { text = await navigator.clipboard.readText(); }
+  catch { pasteFallback(); return; }
+  $('#clipHint').hidden = true;
+  if (!text || !text.trim()) { toast('Your clipboard is empty. Copy a TikTok link first.', true); return; }
+  rememberClip(text);
+  addLinks(text);
+  updateClipStatus();
+}
+function pasteFallback() {
+  const box = $('#box');
+  box.focus();
+  toast(isIOS ? 'Tap the box, then tap Paste' : 'Long-press the box and tap Paste', false, 3200);
+}
+function rememberClip(text) { lastClip = text.trim().slice(0, 4000); store.set('lastClip', lastClip); }
+let clipBusy = false;
+let hintTimer = 0;
+async function autoClip() {
+  if (!S.autoPaste || document.hidden || clipBusy) return;
+  clipBusy = true;
+  try {
+    const st = await clipState();
+    if (st === 'granted') {
+      let text = '';
+      try { text = await navigator.clipboard.readText(); } catch { return; }
+      if (!text || text.trim().slice(0, 4000) === lastClip) return;
+      if (!extractLinks(text).links.length) return;
+      rememberClip(text);
+      const n = addLinks(text, { quiet: true });
+      if (n) toast(n === 1 ? 'Grabbed the link you copied' : `Grabbed ${n} links you copied`);
+    } else if (st !== 'none' && st !== 'denied') {
+      $('#clipHint').hidden = false;
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(() => { $('#clipHint').hidden = true; }, 9000);
+    }
+  } finally { clipBusy = false; }
+}
+let clipTimer = 0;
+function scheduleAutoClip() { clearTimeout(clipTimer); clipTimer = setTimeout(autoClip, 250); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleAutoClip(); });
+window.addEventListener('focus', scheduleAutoClip);
+
+/* ---------- composer ---------- */
+const box = $('#box');
+function syncDrop() { $('#dropBtn').disabled = !box.value.trim(); }
+function dropBox() {
+  const text = box.value;
+  if (!text.trim()) return;
+  const n = addLinks(text);
+  if (n || extractLinks(text).links.length) { box.value = ''; autosize(); }
+  syncDrop();
+}
+function autosize() { box.style.height = 'auto'; box.style.height = Math.min(200, Math.max(76, box.scrollHeight)) + 'px'; }
+box.addEventListener('input', () => { autosize(); syncDrop(); });
+box.addEventListener('paste', () => setTimeout(() => {
+  autosize(); syncDrop();
+  if (S.autoStart && extractLinks(box.value).links.length) dropBox();
+}, 0));
+box.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); dropBox(); } });
+$('#dropBtn').onclick = dropBox;
+$('#pasteBtn').onclick = pasteFromClipboard;
+$('#clipHintPaste').onclick = pasteFromClipboard;
+
+function drawFmt() {
+  document.querySelectorAll('#fmtSeg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.v === S.format)));
+}
+$('#fmtSeg').addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]');
+  if (!b) return;
+  S.format = b.dataset.v; saveSettings(); drawFmt(); renderSettings();
+});
+
+$('#startAll').onclick = () => items.filter(i => i.status === 'idle').forEach(run);
+$('#saveAll').onclick = saveAll;
+$('#zipAll').onclick = zipAll;
+$('#clearDone').onclick = () => { items.filter(i => i.status === 'saved' || i.status === 'error').forEach(removeItem); };
+
+/* ---------- tabs ---------- */
+function showTab(name) {
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  ['drop', 'history', 'settings'].forEach(t => { $('#tab-' + t).hidden = t !== name; });
+  if (name === 'settings') { renderSettings(); updateClipStatus(); }
+  if (name === 'history') renderHistory();
+  window.scrollTo(0, 0);
+}
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) showTab(b.dataset.tab); });
+$('#logoLink').onclick = e => { e.preventDefault(); showTab('drop'); };
+
+/* ---------- settings ---------- */
+const SETTINGS = [
+  { k: 'format', t: 'Default type', type: 'seg', opts: [['hd', 'HD'], ['sd', 'Video'], ['wm', 'Watermark'], ['mp3', 'MP3']] },
+  { k: 'autoStart', t: 'Start right away', d: 'Downloads start the second a link gets added.', type: 'tog' },
+  { k: 'autoSave', t: 'Save by itself', d: () => isIOS ? "iPhone needs one tap on SAVE (Apple rule), so this can't skip that." : 'When a download finishes it goes straight into your Downloads.', type: 'tog' },
+  { k: 'saveMode', t: 'How to save', type: 'seg', opts: [['auto', 'Auto'], ['download', 'Downloads'], ['share', 'Share menu']], d: () => 'Share menu lets you pick "Save Video" so it lands in your Photos / Gallery. Auto = ' + (isIOS ? 'Share menu on this iPhone.' : 'Downloads on this phone.') },
+  { k: 'autoPaste', t: 'Grab copied links', d: 'When you come back to LINKDROP it checks what you copied and adds TikTok links by itself.', type: 'tog', stat: true },
+  { k: 'names', t: 'File names', type: 'seg', opts: [['author-title', '@name - title'], ['title', 'Title'], ['id', 'TikTok ID']] },
+  { k: 'photos', t: 'Photo slideshows', type: 'seg', opts: [['zip', 'One ZIP'], ['separate', 'Separate files']], d: 'How slideshow pictures get saved (the Share menu always saves them one by one to Photos).' },
+  { k: 'history', t: 'Keep history', d: 'Remembers what you downloaded, with a little picture. Stays on this phone only.', type: 'tog' },
+];
+function renderSettings() {
+  $('#setList').innerHTML = SETTINGS.map(o => {
+    const d = typeof o.d === 'function' ? o.d() : o.d;
+    if (o.type === 'tog') return `<div class="srow"><div class="h"><div class="t">${esc(o.t)}</div><button class="tog" role="switch" aria-label="${esc(o.t)}" aria-checked="${!!S[o.k]}" data-k="${o.k}"></button></div>${d ? `<div class="d">${esc(d)}</div>` : ''}${o.stat ? '<div class="stat" id="clipStat"></div>' : ''}</div>`;
+    return `<div class="srow"><div class="t">${esc(o.t)}</div>${d ? `<div class="d">${esc(d)}</div>` : ''}<div class="seg" role="radiogroup">${o.opts.map(([v, l]) => `<button role="radio" aria-checked="${S[o.k] === v}" data-k="${o.k}" data-v="${v}">${esc(l)}</button>`).join('')}</div></div>`;
+  }).join('');
+}
+$('#setList').addEventListener('click', e => {
+  const b = e.target.closest('button[data-k]');
+  if (!b) return;
+  const k = b.dataset.k;
+  if (b.classList.contains('tog')) S[k] = !S[k]; else S[k] = b.dataset.v;
+  saveSettings();
+  renderSettings();
+  updateClipStatus();
+  if (k === 'format') drawFmt();
+  if (k === 'saveMode') items.forEach(i => draw(i));
+  if (k === 'autoPaste' && !S.autoPaste) $('#clipHint').hidden = true;
+});
+async function updateClipStatus() {
+  const el = document.getElementById('clipStat');
+  if (!el) return;
+  const st = await clipState();
+  const t = { granted: ['Allowed. It works by itself.', 'ok'], prompt: ['Tap PASTE once and tap Allow. After that it works by itself.', ''], denied: ['Blocked in your browser settings. Use the PASTE button.', ''], unknown: [isIOS ? 'iPhones always need a tap on PASTE. A banner reminds you when you come back.' : 'Tap PASTE once and allow it.', ''], none: ["This browser can't read the clipboard. Use PASTE in the box.", ''] }[st] || ['', ''];
+  el.textContent = t[0];
+  el.className = 'stat' + (t[1] ? ' ' + t[1] : '');
+}
+
+/* ---------- install / share-to ---------- */
+let installEvt = null;
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('#installBtn').hidden = false; drawInstall(); });
+window.addEventListener('appinstalled', () => { installEvt = null; $('#installBtn').hidden = true; toast('Installed!'); drawInstall(); });
+$('#installBtn').onclick = async () => {
+  if (!installEvt) return;
+  installEvt.prompt();
+  try { await installEvt.userChoice; } catch {}
+  installEvt = null; $('#installBtn').hidden = true;
+};
+function drawInstall() {
+  let t;
+  if (standalone) t = isAndroid ? 'Installed. In TikTok tap Share, then tap LINKDROP (find it under "More" the first time) and it starts downloading.' : "It's on your home screen.";
+  else if (isIOS) t = 'In Safari tap the Share button, then "Add to Home Screen". It opens like a real app.';
+  else if (installEvt) t = 'Tap Install. After that you can share straight from TikTok: Share > LINKDROP, and it starts downloading.';
+  else if (isAndroid) t = 'In Chrome tap ⋮ then "Add to Home screen" / "Install app". After that TikTok\'s Share menu shows LINKDROP.';
+  else t = 'Open this page on your phone to put it on your home screen.';
+  $('#installText').textContent = t;
+  $('#howExtra').textContent = standalone && isAndroid
+    ? 'Faster: in TikTok tap Share > LINKDROP.'
+    : 'Tip: put LINKDROP on your home screen (Settings tab) so it opens like an app.';
+}
+
+/* links handed to us in the address (share menu, shortcuts, bookmarks) */
+function takeLinksFromAddress() {
+  const parts = [];
+  try {
+    const q = new URLSearchParams(location.search);
+    ['url', 'text', 'title', 'link'].forEach(k => { if (q.get(k)) parts.push(q.get(k)); });
+    if (location.hash.length > 1) {
+      const h = new URLSearchParams(location.hash.slice(1));
+      ['url', 'text', 'link'].forEach(k => { if (h.get(k)) parts.push(h.get(k)); });
+    }
+  } catch {}
+  if (!parts.length) return;
+  try { history.replaceState(null, '', location.pathname); } catch {}
+  const text = parts.join(' ');
+  if (extractLinks(text).links.length) { rememberClip(text); addLinks(text); }
+  else toast("That share didn't have a TikTok video link in it.", true);
+}
+
+/* ---------- network ---------- */
+function drawNet() {
+  const on = navigator.onLine;
+  $('#net').classList.toggle('off', !on);
+  $('#net span').textContent = on ? 'Online' : 'Offline';
+}
+window.addEventListener('online', () => { drawNet(); items.filter(i => i.status === 'error' && i.errKind === 'net').forEach(run); });
+window.addEventListener('offline', drawNet);
+window.addEventListener('beforeunload', e => {
+  if (items.some(i => BUSY.includes(i.status) || i.status === 'ready')) { e.preventDefault(); e.returnValue = ''; }
+});
+
+/* ---------- start ---------- */
+$('#inAppBanner').hidden = !inAppBrowser;
+drawNet();
+drawFmt();
+renderSettings();
+drawInstall();
+refresh();
+loadHistory();
+takeLinksFromAddress();
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+window.LINKDROP = { items, extractLinks, makeZip, S };
+})();
+</script>
+</body>
+</html>
