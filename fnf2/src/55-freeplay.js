@@ -765,7 +765,11 @@
   // ---------------------------------------------------------------- song list
   function buildSongs(player) {
     const out = [];
+    const own = G.realPlayer && G.realPlayer(player);
     for (const wid of (G.availableWeeks ? G.availableWeeks() : [])) {
+      // Week 7 is BF's like in real FNF (Tankman sings it swapped from his own list); Weekend 1 waits for Pico's week
+      if (!own && wid === 'weekend1') continue;
+      if (!own && wid === 'week7' && player !== 'bf') continue;
       const L = G.A.json('preload/data/levels/' + wid + '.json'); if (!L) continue;
       for (const sid of L.songs) {
         const m = G.Songs.meta(sid); if (!m) continue;
@@ -774,7 +778,9 @@
         const ratings = {};
         for (const d of diffs) { const mm = G.Songs.meta(sid, d.variation) || m; ratings[d.diff] = ((mm.playData.ratings || {})[d.diff]) || 0; }
         const dm = G.Songs.meta(sid, diffs[0].variation) || m;
-        out.push({ id: sid, name: m.songName || sid, week: wid, opp: (dm.playData.characters || {}).opponent || 'dad', bpm: Math.round((dm.timeChanges && dm.timeChanges[0] && dm.timeChanges[0].bpm) || 100), diffs, ratings, meta: m });
+        const ch = dm.playData.characters || {};
+        // (swapped: the one you battle is the song's own player)
+        out.push({ id: sid, name: m.songName || sid, week: wid, opp: (diffs[0].swap ? ch.player : ch.opponent) || 'dad', bpm: Math.round((dm.timeChanges && dm.timeChanges[0] && dm.timeChanges[0].bpm) || 100), diffs, ratings, meta: m });
       }
     }
     return out;
@@ -786,12 +792,13 @@
       p = p || {};
       this.tw = new Tw();
       this.rankMode = !!p.rankMode; this.editor = null;   // RANK MODE: the same menu, fake ranks + scores (58-rankmode.js)
-      // the new players (Darnell, Nene, Tankman: 59-charselect.js) sing BF's songs, in BF's freeplay style
+      // the new players (Darnell, Nene, Tankman: 59-charselect.js) get the songs they really sang in (played swapped,
+      // in their real voice), shown in BF's freeplay style
       const sp = G.settings.player;
       this.realP = G.realPlayer ? G.realPlayer(sp) : null;
       this.player = sp === 'pico' ? 'pico' : this.realP ? sp : 'bf';
-      this.songsAs = this.realP ? 'bf' : this.player;
-      const style = G.A.json('preload/data/ui/freeplay/styles/' + this.songsAs + '.json') || {};
+      this.songsAs = this.player;
+      const style = G.A.json('preload/data/ui/freeplay/styles/' + (this.realP ? 'bf' : this.player) + '.json') || {};
       this.style = style;
       this.glowCol = (style.capsuleTextColors && style.capsuleTextColors[0]) || '#00ccff';
       this.fav = G.save.favorites = G.save.favorites || {};
@@ -1023,7 +1030,7 @@
       }
       if (this.rankMode && G.RankMode) { G.RankMode.open(this); return; }
       const s = cap.s, d = s.diffs.find(x => x.diff === this.diff) || s.diffs[0];
-      this.pending = { id: s.id, diff: d.diff, variation: d.variation };
+      this.pending = { id: s.id, diff: d.diff, variation: d.variation, swap: !!d.swap };
       this.state = 'confirm'; this.confirmT = 0;
       G.sfx('confirm');
       this.dj.play('confirm');
@@ -1037,7 +1044,7 @@
           onComplete: () => {
             if (this.went) return; this.went = true;
             G.audio.music.stop(0);
-            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, week: null, deaths: 0 }, { instant: true });
+            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, swap: this.pending.swap, week: null, deaths: 0 }, { instant: true });
           },
         });
       });

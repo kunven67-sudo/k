@@ -127,3 +127,27 @@ G.CharScripts = {};
     },
   };
 })();
+
+// ------------------------------------------------------------------ Pico on the speaker (Stress, pico-speaker.hxc)
+// Stress has a hidden 'picospeaker' chart: every note is a shot. Left/down = shoot1 or 2, up/right = shoot3 or 4,
+// each followed by its looping -hold pose until the next shot.
+G.CharScripts['pico-speaker'] = {
+  attach(ch) { ch._shots = null; ch._shot = 0; },
+  dance(ch, force) { if (!ch._shooting || force) { ch._shooting = false; ch.playAnim('idle', true); } },
+  tick(ch) {
+    const P = G.screens.play;
+    if (!P || !P.song || G.screen !== P) return;
+    if (!ch._shots) {
+      const c = G.Songs.chart(P.song.id, P.song.variation);
+      ch._shots = ((c && c.notes && c.notes.picospeaker) || []).map(n => ({ t: n.t, d: n.d })).sort((a, b) => a.t - b.t);
+      ch._shot = 0;
+    }
+    const pos = P.songPos;
+    if (ch._shot > 0 && pos < ch._shots[ch._shot - 1].t - 50) ch._shot = 0;         // restarted
+    while (ch._shot < ch._shots.length && ch._shots[ch._shot].t <= pos) {
+      const n = ch._shots[ch._shot++];
+      const a = 'shoot' + ((n.d % 4) < 2 ? 1 + (Math.random() < 0.5 ? 0 : 1) : 3 + (Math.random() < 0.5 ? 0 : 1));
+      ch._shooting = true; ch.playAnim(a, true);
+    }
+  },
+};

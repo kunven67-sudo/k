@@ -1,6 +1,7 @@
 // FNF 2 - boot: wait for fonts + the decoded FNF assets, then open the first screen
 Promise.all([G.fontsReady, G.assetsReady]).then(() => {
   const q = G.query;
+  if (q.player) G.settings.player = q.player;
   if (q.dev === 'stage') return G.start('devStage', q);
   if (q.dev === 'char') return G.start('devChar', q);
   if (q.dev === 'atlas') return G.start('devAtlas', q);
@@ -13,7 +14,7 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
   }
   if (q.bot) G.settings.botplay = q.bot === '1';
   if (q.down) G.settings.downscroll = q.down === '1';
-  if (q.dev === 'song' && G.screens.play) return G.start('play', { mode: 'freeplay', songs: [q.id || 'tutorial'], diff: q.diff || 'normal', variation: q.variation || 'default', week: null });
+  if (q.dev === 'song' && G.screens.play) return G.start('play', { mode: 'freeplay', songs: [q.id || 'tutorial'], diff: q.diff || 'normal', variation: q.variation || 'default', swap: q.swap === '1', week: null });
   if (!G.HAS_FNF) { G.start('noAssets', {}); return; }
   G.start(G.screens.title ? 'title' : 'devStage', {});
 });

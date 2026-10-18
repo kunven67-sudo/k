@@ -46,6 +46,10 @@
   // special notes (modcharts): 'fake' = a decoy that vanishes before it gets to you (can't be hit),
   // 'eye' = a trap you must NOT hit (missing it is fine), 'glitch' = a normal note that looks broken
   const isReal = n => n.kind !== 'fake' && n.kind !== 'eye';
+  // a note kind that is one of the singer's own animations plays it instead of a sing pose (Tankman's "ugh" in Ugh,
+  // "heh, pretty good" in Stress, Darnell lighting / kicking / kneeing his can in 2hot)
+  const KIND_ANIM = { 'weekend-1-lightcan': 'lightCan', 'weekend-1-kickcan': 'kickCan', 'weekend-1-kneecan': 'kneeCan' };
+  const kindAnim = (c, k) => { if (!c || !k) return null; const a = KIND_ANIM[k] || k; return c.anims && c.anims[a] ? a : null; };
   function centerOffsets(s) { s.offset.x = (s.frameW - s.width) * 0.5; s.offset.y = (s.frameH - s.height) * 0.5; s.origin.x = s.frameW / 2; s.origin.y = s.frameH / 2; }
 
   // ---------------------------------------------------------------- PlayState
@@ -53,15 +57,11 @@
     enter(params) {
       this.params = params = Object.assign({ mode: 'freeplay', songs: ['tutorial'], songIndex: 0, diff: 'normal', variation: null, week: null, weekStats: null, deaths: 0 }, params);
       this.ready = false; this.failed = null; this.cutscene = null; this.blackIn = params.blackIn || 0; params.blackIn = 0;
-      this.song = G.Songs.build(params.songs[params.songIndex], params.diff, params.variation);
+      this.song = G.Songs.build(params.songs[params.songIndex], params.diff, params.variation, params.swap);
       if (!this.song) { this.failed = 'Missing chart: ' + params.songs[params.songIndex] + ' (' + params.diff + ')'; return; }
-      // a new player (Darnell / Nene / Tankman, 59-charselect.js) sings BF's part in freeplay, in their own voice
-      // (BF's track changed into theirs by tools/own/voices_as.py)
-      this.playAs = params.mode === 'freeplay' && G.realPlayer && /^bf/.test(this.song.chars.player) ? G.realPlayer(G.settings.player) : null;
-      if (this.playAs) for (const v of this.song.voices) if (v.who === 'p') {
-        const p2 = v.path.replace(/Voices-bf(-[a-z]+)?\.ogg$/, (m, suf) => 'Voices-as-' + this.playAs.id + (suf || '') + '.ogg');
-        if (p2 !== v.path && G.A.has(p2)) v.path = p2;
-      }
+      // a new player (Darnell / Tankman / Nene, 59-charselect.js) plays the songs they really sang in, swapped:
+      // their part is yours, in their real recorded voice, and the old player raps against them
+      this.playAs = params.mode === 'freeplay' && this.song.swap && G.realPlayer ? G.realPlayer(G.settings.player) : null;
       this.setupWorld();
       this.setupHUD();
       this.resetRun();
@@ -121,7 +121,8 @@
       this.stage = new G.Stage(s.stage);
       const mk = (id, slot, fallback) => { let cid = id; if (!G.A.json('preload/data/characters/' + cid + '.json')) cid = fallback; if (!cid) return null; const c = new G.Character(cid, slot); this.stage.addCharacter(c, slot); return c; };
       this.gf = s.chars.gf ? mk(s.chars.gf, 'gf', 'gf') : null;
-      this.dad = mk(s.chars.opponent, 'dad', 'dad');
+      // (a swapped Weekend 1 song: FNF's own opponent Pico, already set up to face right)
+      this.dad = mk(s.swap && s.chars.opponent === 'pico-playable' ? 'pico' : s.chars.opponent, 'dad', 'dad');
       this.bf = mk(this.playAs ? this.playAs.real.char : s.chars.player, 'bf', 'bf');
       if (this.playAs && this.playAs.real.flip === false) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
       // their atlas box is much bigger than what they draw (Darnell stood half off the screen): put the feet
@@ -133,6 +134,9 @@
           b.x += dx; b.y += dy; b.originalPosition = { x: b.x, y: b.y }; b.camFocus.x += dx; b.camFocus.y += dy;
         }
       }
+      // whoever stands mirrored on the other side (Tankman on the right, BF on the left) swaps their LEFT and RIGHT
+      // poses, like FNF's own mirrored characters do, so every pose still points the way its arrow does
+      if (s.swap) { this.bf.swapLR = !!this.bf.flipX; this.dad.swapLR = !!this.dad.flipX && this.dad.id !== 'pico'; }
       // tutorial: GF is the opponent, standing at GF's spot
       if (s.chars.opponent === s.chars.gf && this.gf) { this.dad.x = this.gf.x; this.dad.y = this.gf.y; this.dad.camFocus = Object.assign({}, this.gf.camFocus); this.stage.chars.gf = null; this.gf = null; this.dad.zIndex = 100; }
       // WRATH: the giant eye (stage 2) is made up front so the swap at the eye-open never hitches
@@ -144,7 +148,7 @@
       }
       this.applyStageFX();
       // a song's own stage effects (setup / reset / update / beat / event / drawOver)
-      this.sfx = (G.SongFX && G.SongFX[s.id]) || null;
+      this.sfx = (G.SongFX && G.SongFX[s.id]) || (G.StageFX && G.StageFX[s.stage]) || null;
       if (this.sfx && this.sfx.setup) try { this.sfx.setup(this); } catch (e) { G.reportError(e, 'song fx'); this.sfx = null; }
       this.stageZoom = this.stage.zoom;
       this.cam = new G.FCam(this.stageZoom);
@@ -428,8 +432,9 @@
     oppHit(n) {
       const s = this.lines[0].strums[n.lane];
       s.playA('confirm', true); s.confirmHold = n.len > 0 ? -1 : 0;
-      const suffix = n.kind === 'alt' ? '-alt' : '';
+      const suffix = n.kind === 'alt' ? '-alt' : '', ka = kindAnim(this.dad, n.kind);
       if (n.kind === 'hey') this.dad.playAnim('hey', true);
+      else if (!this.dad._locked && ka) { this.dad.playAnim(ka, true); this.dad.holdTimer = 0; }
       else if (!this.dad._locked) { this.dad.lastNote = n; this.dad.sing(n.lane, false, suffix); }
       if (this.audio) this.audio.setVolume('o', 1);
     },
@@ -473,8 +478,8 @@
       else { this.combo++; this.maxCombo = Math.max(this.maxCombo, this.combo); }
       if (r === 'sick' || r === 'killer') this.splash(n.lane);
       if (G.settings.comboPopups !== false) { this.popRating(r === 'killer' ? 'sick' : r); if (this.combo >= 10) this.popCombo(this.combo); }
-      const suffix = n.kind === 'alt' ? '-alt' : '';
-      if (n.kind === 'hey') this.bf.playAnim('hey', true); else this.bf.sing(n.lane, false, suffix);
+      const suffix = n.kind === 'alt' ? '-alt' : '', ka = kindAnim(this.bf, n.kind);
+      if (n.kind === 'hey') this.bf.playAnim('hey', true); else if (ka) { this.bf.playAnim(ka, true); this.bf.holdTimer = 0; } else this.bf.sing(n.lane, false, suffix);
       if (this.audio) this.audio.setVolume('p', 1);
       if (this.gf && this.gf.anims['combo' + this.combo]) this.gf.playAnim('combo' + this.combo, true);
       if (n.len > 0) this.startCover(n);

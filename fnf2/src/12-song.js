@@ -17,12 +17,24 @@ G.Songs = {
     const v = !variation || variation === 'default' ? '' : '-' + variation;
     return G.A.json('preload/data/songs/' + id + '/' + id + '-chart' + v + '.json');
   },
+  // the songs a new player (Darnell, Tankman, Nene: 59-charselect.js) really sang in: the ones where they're the
+  // opponent. Played SWAPPED: their part becomes yours, sung with their real recorded voice.
+  ownSong(id, player) {
+    const P = G.realPlayer && G.realPlayer(player), m = P && this.meta(id);
+    return !!(m && P.real && (m.playData.characters || {}).opponent === P.real.char);
+  },
   // every playable (difficulty, variation) combo for a song + player character
-  // player: 'bf' (default/erect variations) or 'pico' (pico variation)
+  // player: 'bf' (default/erect variations), 'pico' (pico variation), or a new player (their own songs, swapped)
   difficulties(id, player) {
     const out = [];
     const base = this.meta(id);
     if (!base) return out;
+    if (G.realPlayer && G.realPlayer(player)) {
+      if (!this.ownSong(id, player) || !this.chart(id) || !this.hasAudio(id, 'default', base)) return out;
+      for (const d of base.playData.difficulties || []) out.push({ diff: d, variation: 'default', swap: true });
+      out.sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));
+      return out;
+    }
     const vars = ['default'].concat(base.playData.songVariations || []);
     for (const v of vars) {
       const m = v === 'default' ? base : this.meta(id, v);
@@ -44,10 +56,12 @@ G.Songs = {
     const v = !variation || variation === 'default' ? '' : '-' + variation;
     const c = m.playData.characters;
     const out = [];
+    // a character's own track, else the base character's (bf-holding-gf -> bf, pico-playable -> pico)
     const add = (list, who, fallback) => {
       for (const ch of (list && list.length ? list : [fallback])) {
-        const p = 'songs/' + id + '/Voices-' + ch + v + '.ogg';
-        if (G.A.has(p)) out.push({ path: p, who });
+        const names = [ch]; for (let n = ch; n.includes('-');) names.push(n = n.slice(0, n.lastIndexOf('-')));
+        const p = names.map(n => 'songs/' + id + '/Voices-' + n + v + '.ogg').find(q => G.A.has(q));
+        if (p) out.push({ path: p, who });
       }
     };
     add(c.playerVocals, 'p', c.player);
@@ -55,22 +69,37 @@ G.Songs = {
     return out;
   },
   hasAudio(id, v, m) { return G.A.has(this.instPath(id, m, v)); },
-  // full song description for PlayState
-  build(id, diff, variation) {
+  // full song description for PlayState. swap = you sing the opponent's part (their notes, their real voice,
+  // standing on the player's side); everything that points at "player" / "opponent" swaps with it
+  build(id, diff, variation, swap) {
     variation = variation || (G.DIFF_INFO[diff] || {}).variation || 'default';
     const m = this.meta(id, variation), c = this.chart(id, variation);
     if (!m || !c) return null;
-    const notes = (c.notes[diff] || []).map(n => ({ t: n.t, d: n.d, l: n.l || 0, k: n.k || '' })).sort((a, b) => a.t - b.t);
+    const notes = (c.notes[diff] || []).map(n => ({ t: n.t, d: swap ? (n.d + 4) % 8 : n.d, l: n.l || 0, k: n.k || '' })).sort((a, b) => a.t - b.t);
     const speed = (c.scrollSpeed && (c.scrollSpeed[diff] != null ? c.scrollSpeed[diff] : c.scrollSpeed.default)) || 1;
     const tc = (m.timeChanges || [{ t: 0, bpm: 100 }]).map(x => ({ t: x.t, bpm: x.bpm, b: x.b || 0 }));
     const pd = m.playData;
+    let events = (c.events || []).slice().sort((a, b) => a.t - b.t);
+    let chars = { player: pd.characters.player || 'bf', gf: pd.characters.girlfriend || 'gf', opponent: pd.characters.opponent || 'dad' };
+    let voices = this.voicePaths(id, m, variation);
+    if (swap) {
+      const flipChar = v => (v === 0 ? 1 : v === 1 ? 0 : v);
+      const flipTarget = { bf: 'dad', boyfriend: 'dad', player: 'opponent', dad: 'bf', opponent: 'player' };
+      events = events.map(e => {
+        const v = e.v;
+        if (e.e === 'FocusCamera') return Object.assign({}, e, { v: v != null && typeof v === 'object' ? Object.assign({}, v, { char: flipChar(v.char == null ? 0 : v.char) }) : flipChar(v == null ? 0 : v) });
+        if (e.e === 'PlayAnimation' && v && flipTarget[v.target]) return Object.assign({}, e, { v: Object.assign({}, v, { target: flipTarget[v.target] }) });
+        return e;
+      });
+      chars = { player: chars.opponent, gf: chars.gf, opponent: chars.player };
+      voices = voices.map(x => ({ path: x.path, who: x.who === 'p' ? 'o' : 'p' }));
+    }
     return {
-      id, diff, variation, name: m.songName || id, artist: m.artist || '', charter: m.charter || '',
+      id, diff, variation, swap: !!swap, name: m.songName || id, artist: m.artist || '', charter: m.charter || '',
       timeChanges: tc, bpm: tc[0].bpm, speed,
-      notes, events: (c.events || []).slice().sort((a, b) => a.t - b.t),
-      chars: { player: pd.characters.player || 'bf', gf: pd.characters.girlfriend || 'gf', opponent: pd.characters.opponent || 'dad' },
+      notes, events, chars,
       stage: pd.stage || 'mainStage', noteStyle: pd.noteStyle || 'funkin',
-      inst: this.instPath(id, m, variation), voices: this.voicePaths(id, m, variation),
+      inst: this.instPath(id, m, variation), voices,
       offsets: m.offsets || {},
     };
   },

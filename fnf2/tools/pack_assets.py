@@ -21,6 +21,7 @@ CACHE = os.path.expanduser('~/.cache/fnf2/conv')
 
 # ---------------------------------------------------------------- what to pack
 SONGS_EARLY = ['bopeebo', 'fresh', 'dadbattle']
+OWN_SONGS = ['ugh', 'guns', 'stress', 'darnell', 'lit-up', '2hot']   # Tankman's 3, then Darnell's 3
 CHARS_EARLY = ['bf', 'bf-death', 'gf', 'dad', 'pico/basic-animations', 'pico/playable-animations', 'pico/death']
 PACKS = {
     'early': [
@@ -63,6 +64,15 @@ PACKS = {
         'preload/data/ui/freeplay/albums/*.json', 'preload/data/ui/freeplay/styles/*.json', 'fonts/YoureGone-Regular.otf', 'fonts/pixel.otf', 'week6/sounds/pixelText.ogg', 'shared/sounds/clickText.ogg',
         'preload/music/freeplayRandom/freeplayRandom.ogg', 'preload/music/freeplayRandom/freeplayRandom-metadata.json',
         *[f'shared/music/results{r}{p}/*' for r in ['SHIT', 'NORMAL', 'EXCELLENT', 'PERFECT'] for p in ['', '-pico']],
+        # Week 7 + Weekend 1: the songs Tankman and Darnell really sang in (played swapped as them: 12-song.js)
+        'preload/data/levels/week7.json', 'preload/data/levels/weekend1.json',
+        'preload/data/stages/tankmanBattlefield.json', 'preload/data/stages/phillyStreets.json',
+        *[f'preload/data/songs/{s}/{s}-{k}.json' for s in OWN_SONGS for k in ('chart', 'metadata')],
+        *[f'songs/{s}/{f}.ogg' for s in OWN_SONGS[:3] for f in ('Inst', 'Voices-bf', 'Voices-tankman')],
+        *[f'songs/{s}/{f}.ogg' for s in OWN_SONGS[3:] for f in ('Inst', 'Voices-pico', 'Voices-darnell')],
+        'week7/images/*.png', 'week7/images/*.xml', 'weekend1/images/phillyStreets/*', 'weekend1/images/SpraycanPile.png',
+        'shared/images/characters/bfAndGF.*', 'shared/images/characters/gfTankmen.*', 'shared/images/characters/pico-speaker/*',
+        *[f'preload/data/characters/{c}.json' for c in ('bf-holding-gf', 'pico-speaker', 'gf-tankmen')],
         # results screen (safe versions only: no "hearts" naughty layer)
         *[f'shared/images/resultScreen/{d}{e}' for d in ['', 'clearPercent/', 'rankText/', 'results-bf/resultsEXCELLENT/', 'results-bf/resultsGOOD/', 'results-bf/resultsGOOD/bf/',
           'results-bf/resultsGREAT/bf/', 'results-bf/resultsGREAT/gf/', 'results-bf/resultsPERFECT/bed/', 'results-bf/resultsPERFECT/tickleFight/', 'results-bf/resultsSHIT/',
@@ -319,8 +329,7 @@ def main():
         elif ext in ('.ogg', '.mp3'):
             if ext == '.mp3' and os.path.exists(src[:-4] + '.ogg'): continue
             voices = '/Voices' in rel
-            # (the new players' changed voices: a smaller mono mp3, they're only a stand-in until their own songs)
-            data = 'data:audio/mpeg;base64,' + base64.b64encode(to_mp3(src, voices, 40 if '/Voices-as-' in rel else None)).decode()
+            data = 'data:audio/mpeg;base64,' + base64.b64encode(to_mp3(src, voices)).decode()
             rel = rel[:-4] + '.ogg'   # the game always asks for .ogg names
         elif ext in ('.ttf', '.otf'):
             data = 'data:font/ttf;base64,' + base64.b64encode(open(src, 'rb').read()).decode()

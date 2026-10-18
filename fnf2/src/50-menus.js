@@ -362,7 +362,7 @@ G.screens.storyMenu = {
   enter() {
     G.menuMusic.start(0);
     this.beat = new G.MenuBeat();
-    this.levels = (G.availableWeeks ? G.availableWeeks() : ['tutorial', 'week1']).map(id => ({ id, data: G.A.json('preload/data/levels/' + id + '.json') })).filter(l => l.data && l.data.visible !== false); // visible:false = freeplay only (for now)
+    this.levels = (G.availableWeeks ? G.availableWeeks() : ['tutorial', 'week1']).map(id => ({ id, data: G.A.json('preload/data/levels/' + id + '.json') })).filter(l => l.data && l.data.visible !== false && !(G.OWN_SONG_WEEKS && G.OWN_SONG_WEEKS.has(l.id))); // visible:false = freeplay only (for now)
     this.player = G.settings.player === 'pico' ? 'pico' : 'bf';
     this.sel = G.clamp(this.sel, 0, this.levels.length - 1);
     // week titles under the yellow band
