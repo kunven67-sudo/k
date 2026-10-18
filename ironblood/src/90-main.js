@@ -153,6 +153,6 @@ window.__V = { villagers, vsave, openTalk, say, startRaid, startScene, endTalk, 
 window.__W = { SQUARE, CASTLE, BRIDGE, BATTLE_X, FORTRESS, groundH };
 window.__dbg = () => ({ modelReady, natureReady, texDone, texPending, worldStarted, scans: scansLoaded + '/' + SCANS.length, cells: natureCells.size, inst: [...natureCells.values()].flat().reduce((a, m) => a + m.count, 0), fps: $('fps').textContent });
 window.__R = { renderer, composer, camera };
-window.__pause = (v) => { paused = v; }; window.__riverDist = (x, z) => riverDist(x, z); window.__houses = VHOUSES;
+window.__pause = (v) => { paused = v; }; window.__book = () => openBook(); window.__riverDist = (x, z) => riverDist(x, z); window.__houses = VHOUSES;
 window.__solid = (x, z, pad) => solidAt(x, z, pad); window.__clear = (x, z, r) => !circles.some(c => (c.x - x) ** 2 + (c.z - z) ** 2 < r * r) && riverDist(x, z) > 25 && slopeAt(x, z) < 0.2;
 window.__M = { get elapsed() { return elapsed; }, magic, SPELL, castSpell, learnSpell, cast, startChant, releaseChant, spawnMage, CAMPS, ignite, igniteDisc, burning, freezeWater, iceSheets, knockDown, mfx, projs, effects, wind, get lockTarget() { return lockTarget; }, set lockTarget(v) { lockTarget = v; } };

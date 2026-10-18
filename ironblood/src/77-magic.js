@@ -149,7 +149,8 @@ terrainUniforms.tBurn = { value: burnTex };
       vec4 gfx = texture2D(tBurn, (vW + ${HALF.toFixed(1)}) / ${(HALF * 2).toFixed(1)});
       float gn = texture2D(tN[0], vW * 0.31).r;
       float burnt = smoothstep(0.2, 0.75, gfx.r + (gn - 0.5) * 0.35), frost = smoothstep(0.15, 0.6, gfx.b + (gn - 0.5) * 0.3), mudK = smoothstep(0.15, 0.6, gfx.a + (gn - 0.5) * 0.25);
-      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.1 + vec3(0.022, 0.02, 0.018), burnt * 0.93);
+      vec3 charCol = mix(vec3(0.011, 0.010, 0.009), vec3(0.15, 0.145, 0.14), smoothstep(0.6, 0.82, gn) * 0.8);
+      diffuseColor.rgb = mix(diffuseColor.rgb, charCol, burnt * 0.96);
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.11, 0.07) * (0.8 + gn * 0.4), mudK * 0.92);
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.83, 0.93) * (0.85 + gn * 0.25), frost * 0.88);
       blendR = mix(blendR, 0.97, burnt * 0.7); blendR = mix(blendR, 0.12, mudK); blendR = mix(blendR, 0.09, frost);
@@ -255,7 +256,7 @@ function updateBurning(dt) {
     if (dc < 120 * 120) {
       const y = terrainH(x, z);
       const k = dc < 40 * 40 ? 1 : 0.35, life = Math.sin(Math.min(1, b.t / b.dur) * Math.PI);
-      if (Math.random() < dt * 5.5 * k * (0.3 + life)) mfx.burst.fire(x + (Math.random() - 0.5) * BMS, y + 0.02, z + (Math.random() - 0.5) * BMS, 1, 0.4, 1.2 + life, 0.4 + life * 0.5);
+      if (Math.random() < dt * 5.5 * k * (0.3 + life)) mfx.burst.fire(x + (Math.random() - 0.5) * BMS, y + 0.02, z + (Math.random() - 0.5) * BMS, 1, 0.4, 1.2 + life, 0.55 + life * 0.6);
       if (Math.random() < dt * 0.3 * k) mfx.burst.smoke(x, y + 1.2, z, 1, 0.8 + life * 0.7, 0.14);
       if (Math.random() < dt * 0.6 * k) mfx.burst.sparks(x, y + 0.6, z, 2, 3.5, 1.4, 0.4, 2.5);
       if (dc < 30 * 30) near++;
@@ -309,7 +310,7 @@ const iceMat = (() => {
   g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 1.2;
   for (let i = 0; i < 26; i++) { let x = r() * 256, y = r() * 256; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r() - 0.5) * 60; y += (r() - 0.5) * 60; g.lineTo(x, y); } g.stroke(); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 4); t.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.MeshStandardMaterial({ map: t, color: 0xdcecf6, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.88, polygonOffset: true, polygonOffsetFactor: -2 });
+  return new THREE.MeshStandardMaterial({ map: t, color: 0x9fbfd6, roughness: 0.06, metalness: 0.15, envMapIntensity: 1.6, transparent: true, opacity: 0.72, polygonOffset: true, polygonOffsetFactor: -2 });
 })();
 function freezeWater(x, z, rad) {
   if (riverDist(x, z) > 11 + rad) return null;
@@ -329,7 +330,7 @@ groundH = function (x, z) {
 function updateIce(dt) {
   for (let i = iceSheets.length - 1; i >= 0; i--) {
     const s = iceSheets[i]; s.t -= dt;
-    if (s.t < 8) { s.mesh.material.opacity = 0.88 * Math.max(0, s.t / 8); if (Math.random() < dt * 2) sfx.iceCrack && sfx.iceCrack(new THREE.Vector3(s.x, 0, s.z)); }
+    if (s.t < 8) { s.mesh.material.opacity = 0.72 * Math.max(0, s.t / 8); if (Math.random() < dt * 2) sfx.iceCrack && sfx.iceCrack(new THREE.Vector3(s.x, 0, s.z)); }
     if (s.t <= 0) { scene.remove(s.mesh); s.mesh.geometry.dispose(); iceSheets.splice(i, 1); for (const f of fighters) if (f.alive && (f.pos.x - s.x) ** 2 + (f.pos.z - s.z) ** 2 < s.r2 && f.pos.y < 0.3) { mfx.burst.water(f.pos.x, WATER_Y, f.pos.z, 20, 3); f.grounded = false; f.vy = -1; } }
   }
 }
@@ -516,9 +517,29 @@ function dropShield(f) {
   sfx.shieldBreak && sfx.shieldBreak(f.pos);
 }
 
+// ---- burning houses: flames climb out of the roof, black smoke pours up ----
+function updateHouseFires(dt) {
+  const cam = camera.position;
+  for (const b of raid.burning) {
+    const h = b.house, d = Math.hypot(h.x - cam.x, h.z - cam.z);
+    if (d > 160) continue;
+    const k = d < 50 ? 1 : 0.4, life = Math.min(1, b.t / 20); // dies down at the end
+    const c = Math.cos(h.ry), sn = Math.sin(h.ry);
+    for (let i = 0; i < 4; i++) if (Math.random() < dt * 26 * k * life) {
+      const u = (Math.random() - 0.5) * h.w * 0.9, v = (Math.random() - 0.5) * h.d * 0.9;
+      const x = h.x + u * c + v * sn, z = h.z - u * sn + v * c;
+      const roof = b.top.y - 1.6 + (1 - Math.abs(v) / (h.d * 0.5)) * 1.8;
+      mfx.burst.fire(x, roof, z, 1, 0.5, 3, 1.9 + Math.random() * 1.6);
+    }
+    if (Math.random() < dt * 5 * k * life) mfx.burst.smoke(h.x + (Math.random() - 0.5) * h.w * 0.6, b.top.y + 1, h.z + (Math.random() - 0.5) * h.d * 0.6, 1, 2.2, 0.07);
+    if (Math.random() < dt * 3 * k * life) mfx.burst.sparks(h.x, b.top.y, h.z, 4, 4, 1.5, 0.4, 5);
+  }
+}
+
 // ---- one call per frame ----
 function updateMagicWorld(dt, realDt, t) {
   updateWind(realDt, t);
+  if (dt > 0) updateHouseFires(dt);
   fieldUniforms.uFireT.value = t;
   if (dt > 0) { updateBurning(dt); updateIce(dt); updateFields(dt); }
   for (const s of iceSheets) s.mesh.material.map.offset.set(s.x * 0.01, s.z * 0.01);

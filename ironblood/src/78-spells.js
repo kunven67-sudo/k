@@ -126,7 +126,26 @@ const waterMat = new THREE.MeshStandardMaterial({ color: 0x2a6cb8, roughness: 0.
 const iceMatS = new THREE.MeshStandardMaterial({ color: 0xd8f0ff, roughness: 0.05, metalness: 0.05, transparent: true, opacity: 0.86, emissive: 0x3a7ab0, emissiveIntensity: 0.9 });
 const bloodMat = new THREE.MeshStandardMaterial({ color: 0x5a0606, roughness: 0.15, metalness: 0.2, emissive: 0x6a0404, emissiveIntensity: 1.4 });
 const glowMat = (c) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), toneMapped: true });
-const coreGeo = new THREE.SphereGeometry(1, 16, 12);
+const coreGeo = new THREE.SphereGeometry(1, 24, 16);
+// a living ball of fire: churning noise, white-hot inside, red and ragged at the edge
+const fireCoreMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  uniforms: { uT: { value: 0 } },
+  vertexShader: 'varying vec3 vP; varying vec3 vN; varying vec3 vV; void main(){ vP = position; vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+  fragmentShader: `uniform float uT; varying vec3 vP; varying vec3 vN; varying vec3 vV;
+    float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    float n3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y), mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+    float fbm(vec3 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * n3(p); p = p * 2.07 + 1.3; a *= 0.5; } return s; }
+    void main(){
+      float n = fbm(vP * 3.2 + vec3(0.0, -uT * 3.0, uT * 0.7));
+      float fr = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 1.4);
+      float heat = clamp(1.15 - fr * 1.25 + (n - 0.5) * 1.1, 0.0, 1.0);
+      vec3 col = mix(vec3(0.7, 0.08, 0.01), vec3(2.0, 0.62, 0.1), smoothstep(0.15, 0.55, heat));
+      col = mix(col, vec3(2.8, 2.1, 1.1), smoothstep(0.72, 1.0, heat));
+      gl_FragColor = vec4(col * smoothstep(0.02, 0.35, heat), 1.0);
+    }`,
+});
 // a ball of fire: tongues of flame peeling off the surface and trailing behind it
 function fireShell(o, r, n) {
   const back = _ps1.copy(o.vel).normalize().multiplyScalar(-1);
@@ -134,9 +153,9 @@ function fireShell(o, r, n) {
     const a = Math.random() * 6.28, b = Math.acos(Math.random() * 2 - 1);
     const x = Math.sin(b) * Math.cos(a) * r, y = Math.cos(b) * r, z = Math.sin(b) * Math.sin(a) * r;
     const hot = Math.random();
-    mfx.emit(true, 1, o.pos.x + x, o.pos.y + y, o.pos.z + z, back.x * 2 + x * 2, back.y * 2 + 0.8 + y * 2, back.z * 2 + z * 2, 0.18 + Math.random() * 0.16, r * (1.1 + Math.random() * 0.8), r * 0.3, 1.6 + hot * 0.7, 0.45 + hot * 0.4, 0.07 + hot * 0.08, 0.85, -0.5, 1, Math.random() * 6.28, (Math.random() - 0.5) * 3);
+    mfx.emit(true, 1, o.pos.x + x, o.pos.y + y, o.pos.z + z, back.x * 2 + x * 2, back.y * 2 + 0.8 + y * 2, back.z * 2 + z * 2, 0.16 + Math.random() * 0.14, r * (0.7 + Math.random() * 0.6), r * 0.2, 1.6 + hot * 0.7, 0.45 + hot * 0.4, 0.07 + hot * 0.08, 0.85, -0.5, 1, Math.random() * 6.28, (Math.random() - 0.5) * 3);
   }
-  mfx.emit(true, 0, o.pos.x, o.pos.y, o.pos.z, 0, 0, 0, 0.06, r * 3.2, r * 3.2, 0.9, 0.35, 0.06, 0.55);
+  mfx.emit(true, 0, o.pos.x, o.pos.y, o.pos.z, 0, 0, 0, 0.06, r * 2.6, r * 2.6, 0.7, 0.26, 0.05, 0.45);
 }
 
 // ---- what each spell does (works for you and for enemy mages) ----
@@ -168,7 +187,7 @@ const SPELLS = [
   // ---------------- fire ----------------
   { id: 'fireball', name: 'Fireball', school: 'fire', rank: 0, cost: 6, chant: 'Flame that warms the world, gather in my hand and burn. Fireball!', desc: 'A ball of fire. Burns people, sets dry grass and thatch alight.',
     cast(c) {
-      const m = new THREE.Mesh(coreGeo, glowMat([2.4, 0.75, 0.12])); m.scale.setScalar(0.1 * Math.sqrt(c.power));
+      const m = new THREE.Mesh(coreGeo, fireCoreMat); m.scale.setScalar(0.16 * Math.sqrt(c.power));
       shoot({ caster: c.caster, pos: c.from.clone(), vel: c.dir.clone().multiplyScalar(26), r: 0.18, grav: 0.8, mesh: m, light: SCHOOL.fire.c, lightI: 14,
         onFighter: (f, k, p) => fireballHit(c, false)(p), onGround: fireballHit(c, false), onWater: (p) => { mfx.burst.smoke(p.x, p.y + 0.2, p.z, 6, 0.8, 0.75); sfx.hiss && sfx.hiss(p); },
         trail: (o, dt) => { fireShell(o, 0.22, 3); if (Math.random() < 0.6) mfx.emit(false, 4, o.pos.x, o.pos.y, o.pos.z, 0, 0.5, 0, 1.2, 0.2, 0.8, 0.12, 0.11, 0.1, 0.4); } });
@@ -187,10 +206,10 @@ const SPELLS = [
     } },
   { id: 'greatfireball', name: 'Great Fireball', school: 'fire', rank: 2, cost: 40, chant: 'Great flame of the sun, gather into one and turn my enemies to ash. Great Fireball!', desc: 'A huge, slow fireball. Explodes, throws people, sets everything around on fire.',
     cast(c) {
-      const m = new THREE.Mesh(coreGeo, glowMat([2.6, 0.8, 0.14])); m.scale.setScalar(0.32);
+      const m = new THREE.Mesh(coreGeo, fireCoreMat); m.scale.setScalar(0.5);
       shoot({ caster: c.caster, pos: c.from.clone().addScaledVector(c.dir, 0.6), vel: c.dir.clone().multiplyScalar(15), r: 0.55, grav: 1.2, life: 6, mesh: m, light: SCHOOL.fire.c, lightI: 40,
         onFighter: (f, k, p) => fireballHit(c, true)(p), onGround: fireballHit(c, true), onWater: (p) => { mfx.burst.smoke(p.x, p.y + 0.3, p.z, 30, 2.5, 0.8); mfx.burst.water(p.x, p.y, p.z, 40, 6); sfx.hiss && sfx.hiss(p); },
-        trail: (o) => { fireShell(o, 0.6, 8); mfx.emit(false, 4, o.pos.x, o.pos.y + 0.3, o.pos.z, 0, 0.8, 0, 1.8, 0.6, 2.2, 0.12, 0.11, 0.1, 0.45); } });
+        trail: (o) => { fireShell(o, 0.45, 5); o.mesh.rotation.y += 0.05; mfx.emit(false, 4, o.pos.x, o.pos.y + 0.3, o.pos.z, 0, 0.8, 0, 1.8, 0.6, 2.2, 0.12, 0.11, 0.1, 0.45); } });
       sfx.whoosh && sfx.whoosh(c.from, 1.6);
     } },
   // ---------------- water + ice ----------------
@@ -920,6 +939,7 @@ Object.assign(sfx, {
 
 // ---- per frame ----
 function updateMagic(dt, realDt, t) {
+  fireCoreMat.uniforms.uT.value = t;
   if (dt > 0) { updateCasting(dt); updateProjs(dt); updateEffects(dt); updateSummons(dt, t); }
   updateLights(dt);
 }
