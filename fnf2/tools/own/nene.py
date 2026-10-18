@@ -313,7 +313,7 @@ def songs():
         cnt = {k: sum(1 for n in v if n['d'] < 4) for k, v in notes.items()}
         print(sid, 'bpm', bpm, 'player notes', cnt, 'speed', speeds)
     # a level only the new players' freeplay uses (like Week 7 for Tankman)
-    jdump({'version': '1.0.0', 'name': "NENE'S NIGHT", 'titleAsset': 'storymenu/titles/weekend1', 'visible': False, 'props': [], 'capsule': {'name': 'GIRLS NIGHT'},
+    jdump({'version': '1.0.0', 'name': "NENE'S NIGHT", 'titleAsset': 'storymenu/titles/weekend1', 'visible': False, 'props': [], 'capsule': {'name': 'GIRLS NIGHT'}, 'players': ['nene'],
            'background': '#F16AA5', 'songs': [s[0] for s in SONGS]}, 'preload', 'data', 'levels', 'nenesongs.json')
 
 

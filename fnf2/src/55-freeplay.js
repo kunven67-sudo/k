@@ -779,6 +779,7 @@
       if (!own && (wid === 'weekend1' || wid === 'nenesongs')) continue;
       if (!own && wid === 'week7' && player !== 'bf') continue;
       const L = G.A.json('preload/data/levels/' + wid + '.json'); if (!L) continue;
+      if (L.players && !L.players.includes(player)) continue;          // (a level only some players get: Nene's songs)
       for (const sid of L.songs) {
         const m = G.Songs.meta(sid); if (!m) continue;
         const diffs = G.Songs.difficulties(sid, player);
