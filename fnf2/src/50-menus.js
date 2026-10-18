@@ -210,6 +210,7 @@ G.screens.mainMenu = {
     { name: 'freeplay', go: () => G.setScreen(G.screens.freeplay ? 'freeplay' : 'mainMenu', {}) },
     { name: 'options', go: () => G.setScreen(G.screens.options ? 'options' : 'mainMenu', { from: 'mainMenu' }) },
     { name: 'credits', go: () => G.setScreen(G.screens.credits ? 'credits' : 'mainMenu', {}) },
+    { name: 'rankmode', go: () => G.setScreen(G.screens.freeplay ? 'freeplay' : 'mainMenu', { rankMode: true }) },
   ],
   sel: 0,
   enter() {

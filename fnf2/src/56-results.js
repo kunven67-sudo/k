@@ -172,7 +172,7 @@
       this.t = 0; this.busy = false;
       const st = p.stats || {};
       const T = this.tallies = st.tallies || this.toTallies(st);
-      this.rank = G.Rank.calc(T) || 'SHIT';
+      this.rank = p.forceRank || G.Rank.calc(T) || 'SHIT';   // RANK MODE picks its own rank
       this.player = String(p.player || 'bf').startsWith('pico') ? 'pico' : 'bf';
       const pdata = (G.A.json('preload/data/players/' + this.player + '.json') || {}).results || {};
       this.musicName = (pdata.music || {})[this.rank] || 'resultsNORMAL';
@@ -199,7 +199,7 @@
       this.titleVis = false; this.moving = false;
       this.diff = { x: 555, y: 0 }; this.song = { x: 0, y: 0 };
       this.clearSmall = new ClearPct(W / 2 + 300, H / 2 - 100, 100, true); this.clearSmall.visible = false;
-      this.clearTarget = Math.floor(G.Rank.completion(T) * 100);
+      this.clearTarget = p.forceClear != null ? Math.max(0, Math.min(100, Math.floor(p.forceClear))) : Math.floor(G.Rank.completion(T) * 100);
       this.clearSmall.num = this.clearTarget;
       this.timerThenSongName(1.0, false);
       // score (10 digits; FlxSpriteGroup(35,305) + ScoreNum(35+65i, 305) -> 70+65i, 610)
@@ -360,6 +360,7 @@
       const go = () => {
         const inst = { instant: !!G.stickers };
         if (p.mode === 'story') G.setScreen('storyMenu', {}, inst);
+        else if (p.mode === 'rank') G.setScreen('freeplay', { rankMode: true, fromResults: true, rank: this.rank, oldRank: p.prevRank || null, songId: p.song, diff: p.diff, variation: p.variation, playRankAnim: true }, inst);
         else {
           const better = !p.cheated && G.Rank.better(this.rank, p.prevRank);
           G.setScreen('freeplay', { fromResults: true, rank: this.rank, oldRank: p.prevRank || null, songId: p.song, diff: p.diff, variation: p.variation, playRankAnim: better }, inst);

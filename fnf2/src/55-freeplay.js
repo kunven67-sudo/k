@@ -783,6 +783,7 @@
     enter(p) {
       p = p || {};
       this.tw = new Tw();
+      this.rankMode = !!p.rankMode; this.editor = null;   // RANK MODE: the same menu, fake ranks + scores (58-rankmode.js)
       this.player = G.settings.player === 'pico' ? 'pico' : 'bf';
       const style = G.A.json('preload/data/ui/freeplay/styles/' + this.player + '.json') || {};
       this.style = style;
@@ -915,8 +916,13 @@
     albumFor() { const s = this.song(); if (!s) return null; const d = s.diffs.find(x => x.diff === this.diff) || s.diffs[0]; const m = G.Songs.meta(s.id, d.variation) || s.meta; return (m.playData && m.playData.album) || 'volume1'; },
     rankFor(s) {
       const d = s.diffs.find(x => x.diff === this.diff); if (!d) return null;
-      const rec = G.getScore(s.id + (d.variation !== 'default' ? '-' + d.variation : ''), this.diff, 'bf');
+      const rec = this.recFor(s, d);
       return rec && rec.rank ? rec.rank : null;
+    },
+    // a song's saved result (in RANK MODE: the fake one, kept apart from the real ones)
+    recFor(s, d) {
+      const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '');
+      return this.rankMode && G.RankMode ? G.RankMode.get(key, this.diff) : G.getScore(key, this.diff, 'bf');
     },
     // ------------------------------------------------------------ selection
     changeSelection(change, silent) {
@@ -951,7 +957,7 @@
       const s = this.song();
       if (!s) { this.score = 0; this.clear = 0; return; }
       const d = s.diffs.find(x => x.diff === this.diff) || s.diffs[0];
-      const rec = G.getScore(s.id + (d.variation !== 'default' ? '-' + d.variation : ''), this.diff, 'bf');
+      const rec = this.recFor(s, d);
       this.score = rec ? rec.score : 0;
       this.clear = rec ? (rec.clear != null ? rec.clear : (rec.acc || 0)) : 0;
     },
@@ -1005,6 +1011,7 @@
         cap = real[Math.floor(Math.random() * real.length)];
         this.sel = this.caps.indexOf(cap); this.changeSelection(0, true);
       }
+      if (this.rankMode && G.RankMode) { G.RankMode.open(this); return; }
       const s = cap.s, d = s.diffs.find(x => x.diff === this.diff) || s.diffs[0];
       this.pending = { id: s.id, diff: d.diff, variation: d.variation };
       this.state = 'confirm'; this.confirmT = 0;
@@ -1055,12 +1062,13 @@
       if (this.state !== 'idle') return;
       this.state = 'switch';
       G.sfx('confirm', { vol: 0.5 });
-      if (G.screens.charSelect) { this.dj.play('charSelect'); this.tw.after(0.45, () => G.setScreen('charSelect', { from: 'freeplay' })); return; }
-      const go = () => { G.settings.player = this.player === 'pico' ? 'bf' : 'pico'; G.saveSettings && G.saveSettings(); this.enter({}); };
+      if (G.screens.charSelect) { this.dj.play('charSelect'); this.tw.after(0.45, () => G.setScreen('charSelect', { from: 'freeplay', rankMode: this.rankMode })); return; }
+      const go = () => { G.settings.player = this.player === 'pico' ? 'bf' : 'pico'; G.saveSettings && G.saveSettings(); this.enter({ rankMode: this.rankMode }); };
       if (this.dj.play('charSelect')) this.tw.after(0.45, go); else go();
     },
     pressArrow(i) { const a = this.selArrows[i]; a.pressT = 2 / 24; },
     onAction(a, down, repeat) {
+      if (this.editor) return this.editor.onAction(a, down, repeat);
       if (!down) { if (a === 'ui_up' || a === 'ui_down') { this.spam.on = false; this.spam.t = 0; } return; }
       if (this.state !== 'idle') return;
       if (a === 'ui_up' || a === 'ui_down') { if (repeat) return; this.changeSelection(a === 'ui_up' ? -1 : 1); this.spam.t = 0; this.spam.on = false; this.spam.dir = a === 'ui_up' ? -1 : 1; }
@@ -1069,19 +1077,24 @@
       else if (a === 'accept' && !repeat) this.confirm();
       else if (a === 'back' && !repeat) this.back();
       else if (a === 'tab' && !repeat) this.switchPlayer();
-      else if (a === 'debug7' && !repeat && this.song() && G.screens.editor) G.setScreen('editor', { songId: this.song().id, diff: this.diff, from: 'freeplay' });
+      else if (a === 'debug7' && !repeat && !this.rankMode && this.song() && G.screens.editor) G.setScreen('editor', { songId: this.song().id, diff: this.diff, from: 'freeplay' });
     },
     onKey(code, down, repeat) {
+      if (this.editor) return this.editor.onKey(code, down, repeat);
       if (!down || repeat || this.state !== 'idle') return false;
       if (code === 'KeyF') { this.toggleFav(); return true; }
+      // RANK MODE: E = edit the rank (the letter filter moves to Q / R)
+      if (this.rankMode && code === 'KeyE') { if (this.song()) { if (G.RankMode) G.RankMode.open(this); } else this.confirm(); return true; }
+      if (this.rankMode && code === 'KeyR') { this.changeLetter(1); return true; }
       if (code === 'KeyQ') { this.changeLetter(-1); return true; }
       if (code === 'KeyE') { this.changeLetter(1); return true; }
       if (code === 'Home') { this.changeSelection(-this.sel); return true; }
       if (code === 'End') { this.changeSelection(this.caps.length - 1 - this.sel); return true; }
       return false;
     },
-    onWheel(dir) { if (this.state === 'idle') this.changeSelection(dir); },
+    onWheel(dir) { if (this.editor) { this.editor.onWheel(dir); return; } if (this.state === 'idle') this.changeSelection(dir); },
     onPointer(type, x, y) {
+      if (this.editor) { this.editor.onPointer(type, x, y); return; }
       if (this.state !== 'idle') return;
       const sw = this.swipe.handle(type, x, y); if (!sw) return;
       if (sw.dir === 'up') { this.changeSelection(1); return; }
@@ -1104,6 +1117,7 @@
       this.t += dt;
       this.tw.update(dt);
       this.dj.update(dt);
+      if (this.editor) this.editor.update(dt);
       const R = this.rankFx;
       if (R) {
         if (R.sparks) R.sparks.t += dt;
@@ -1355,18 +1369,19 @@
       // top bar
       ctx.fillStyle = '#000'; ctx.fillRect(0, this.overhangY, W, 164);
       if (this.textsVis) {
-        const fpImg = textImg('FREEPLAY', G.FONT.vcr, 48, '#FFFFFF', this.stroke ? { stroke: 2 } : null);
+        const fpImg = textImg(this.rankMode ? 'RANK MODE' : 'FREEPLAY', G.FONT.vcr, 48, '#FFFFFF', this.stroke ? { stroke: 2 } : null);
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, fpImg._tw + 16, fpImg.height + 16 - fpImg._pad * 2);
         ctx.drawImage(fpImg, 8 - fpImg._pad, 8 - fpImg._pad);
         const ost = textImg(this.album.id === null && this.song() ? 'OFFICIAL OST' : 'OFFICIAL OST', G.FONT.vcr, 48, '#FFFFFF', { stroke: 2 });
         ctx.drawImage(ost, W - 8 - ost._tw - ost._pad, 8 - ost._pad);
       }
-      const hint = textImg('Press [ TAB ] to change characters', G.FONT.f5, 32, '#5F5F5F');
+      const hint = textImg(this.rankMode ? 'Press [ E ] to edit a rank' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, '#5F5F5F');
       ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
       if (G.touchMode && this.textsVis) G.text(ctx, '<---', 8, 72, { font: 'vcr', size: 40, baseline: 'top' });
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }
       if (R) { if (R.pending) { G.screenZoom = 1; G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); } else this.drawRankCam(ctx); }
       G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
+      if (this.editor) { G.setScreenT(ctx); this.editor.draw(ctx); }
     },
     drawDiffSprite(ctx, d) {
       const base = 'freeplay/freeplay' + d.id;
