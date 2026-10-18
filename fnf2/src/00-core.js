@@ -154,6 +154,18 @@ G.DIFFS = [
 G.diffIndex = id => Math.max(0, G.DIFFS.findIndex(d => d.id === id));
 
 // ------------------------------------------------------------------ canvas
+// is the browser drawing with the graphics card? (WebGL tells us which renderer it got: a software one
+// like SwiftShader / Microsoft Basic Render means hardware acceleration is off and everything lags)
+G.gpu = (function () {
+  try {
+    const c = document.createElement('canvas'), gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+    if (!gl) return { name: 'none', soft: true };
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+    return { name, soft: /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name) };
+  } catch (e) { return { name: '?', soft: false }; }
+})();
 G.canvas = document.getElementById('game');
 G.ctx = G.canvas.getContext('2d', { alpha: false });
 G.q = 1;            // canvas pixels per game pixel
@@ -167,7 +179,7 @@ G.resize = function () {
   // auto draws at most 1280x720 (the game's own size; the browser stretches it to the window). On a
   // 1080p screen that's 2.25x fewer pixels to fill than drawing at full size, and it drops further
   // by itself when the game lags. High = full screen sharpness for strong PCs.
-  const cap = qual === 'low' ? 0.6667 : qual === 'high' ? 2 : 1 * G.autoQ;
+  const cap = qual === 'low' ? 0.6667 : qual === 'high' ? 2 : (G.gpu && G.gpu.soft ? 0.6667 : 1) * G.autoQ;
   q = G.clamp(q, 0.4, cap);
   G.q = q;
   const cw = Math.round(G.W * q), ch = Math.round(G.H * q);
@@ -751,9 +763,11 @@ G.loop = function () {
   let dt = (now - G._last) / 1000; G._last = now;
   if (dt > 0.1) dt = 0.1; if (dt < 0) dt = 0;
   G.dt = dt; G.time += dt; G.frame++;
+  G._worst = Math.max(G._worst || 0, dt * 1000);
   G._fpsAcc += dt; G._fpsN++;
   if (G._fpsAcc >= 0.5) {
     G.fps = Math.round(G._fpsN / G._fpsAcc); G._fpsAcc = 0; G._fpsN = 0;
+    G.worstMs = Math.round(G._worst || 0); G._worst = 0;
     // auto quality: drop render resolution if we're struggling for a while
     if (G.settings.quality === 'auto' && !document.hidden) {
       const want = Math.min(55, (G.settings.fpsCap === 'max' ? 60 : +G.settings.fpsCap || 60) - 5);
@@ -797,7 +811,8 @@ G.drawOverlay = function (ctx, dt) {
   G.setScreenT(ctx);
   ctx.globalAlpha = 1;
   if (G.settings.fps) {
-    G.text(ctx, 'FPS: ' + G.fps, 10, 22, { font: 'vcr', size: 22, outline: 2 });
+    G.text(ctx, 'FPS: ' + G.fps + '   slowest frame: ' + (G.worstMs || 0) + ' ms', 10, 22, { font: 'vcr', size: 22, outline: 2, color: (G.worstMs || 0) > 50 ? '#ff6060' : '#ffffff' });
+    G.text(ctx, (G.gpu && G.gpu.soft ? 'NO GRAPHICS CARD: ' : 'GPU: ') + (G.gpu ? G.gpu.name : '?').replace(/^ANGLE \((.*)\)$/, '$1').slice(0, 60), 10, 44, { font: 'vcr', size: 16, outline: 2, color: G.gpu && G.gpu.soft ? '#ff6060' : '#c8c8c8' });
   }
   let y = 60;
   for (const t of G.toasts) {

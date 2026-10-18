@@ -13,6 +13,8 @@ G.audio = (function () {
   A.bus = bus;
   // the song's instrumental also feeds an analyser (Nene's A-Bot visualizer bars)
   A.analyser = ctx.createAnalyser(); A.analyser.fftSize = 1024; A.analyser.smoothingTimeConstant = 0.5;
+  // ...and the menu music feeds one too (Nene's visualizer in the character select)
+  A.musicAnalyser = ctx.createAnalyser(); A.musicAnalyser.fftSize = 512; A.musicAnalyser.smoothingTimeConstant = 0.1; bus.music.connect(A.musicAnalyser);
   A.applyVolumes = function () {
     const v = G.settings.vol;
     master.gain.value = v.master; bus.music.gain.value = v.music; bus.vocals.gain.value = v.vocals; bus.sfx.gain.value = v.sfx;
@@ -123,13 +125,20 @@ G.audio = (function () {
           if (posMs >= 0) s.start(now, posMs / 1000); else s.start(now - posMs / 1000 / this.rate, 0);
           tr.src = s; tr.gain = g;
         }
-        this.paused = false; A.songPlaying = true;
+        this.paused = false; A.songPlaying = true; this._raw = null; this._out = null;
       },
       _stopNodes() { A.songPlaying = false; for (const tr of tracks) { if (tr.src) { try { tr.src.stop(); } catch (e) {} tr.src.disconnect(); tr.src = null; } } },
       play(posMs) { this.ended = false; this._play(posMs || 0); },
+      // the audio clock moves in little jumps (bigger ones on some PCs), so between jumps the song keeps going
+      // on the normal clock: notes scroll smoothly instead of stuttering
       time() {
         if (this.paused) return this.pos;
-        const t = (ctx.currentTime - this.t0) * 1000 * this.rate - A.latency();
+        const raw = (ctx.currentTime - this.t0) * 1000 * this.rate - A.latency(), now = performance.now();
+        if (raw !== this._raw) { this._raw = raw; this._rawAt = now; }
+        let t = this._raw + (now - this._rawAt) * this.rate;
+        if (t > raw + 40) t = raw + 40;                                          // never far ahead of the music
+        if (this._out != null && t < this._out && this._out - t < 40) t = this._out;   // never a tiny step backwards
+        this._out = t;
         if (t >= this.length && !this.ended) this.ended = true;
         return t;
       },
@@ -139,7 +148,8 @@ G.audio = (function () {
       stop() { this._stopNodes(); this.paused = true; },
       // FNF: player vocals mute on a miss, come back on the next hit
       setVolume(who, v) {
-        for (const tr of tracks) if (tr.who === who) { tr.vol = v; if (tr.gain) { const t = ctx.currentTime; tr.gain.gain.cancelScheduledValues(t); tr.gain.gain.setValueAtTime(tr.gain.gain.value, t); tr.gain.gain.linearRampToValueAtTime(v, t + 0.01); } }
+        // (only when it really changes: it used to add volume changes to the audio on every single note hit)
+        for (const tr of tracks) if (tr.who === who && tr.vol !== v) { tr.vol = v; if (tr.gain) { const t = ctx.currentTime; tr.gain.gain.cancelScheduledValues(t); tr.gain.gain.setValueAtTime(tr.gain.gain.value, t); tr.gain.gain.linearRampToValueAtTime(v, t + 0.01); } }
       },
       hasVoices: tracks.some(t => t.who !== 'inst'),
     };

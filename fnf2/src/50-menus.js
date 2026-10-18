@@ -234,6 +234,8 @@ G.screens.mainMenu = {
     this.state = 'idle'; this.flick = 0; this.exitT = 0;
     this.select(this.sel, true);
     this.swipe = new G.Swipe();
+    // the browser isn't using the graphics card: say so once (that alone makes everything lag)
+    this.gpuWarn = !!(G.gpu && G.gpu.soft && !G._gpuWarned); G._gpuWarned = true;
   },
   // AtlasMenuItem "centered": x,y is the middle of the current frame
   setAnim(s, a) { s.play(a, true); s.updateHitbox(); s.x = s.cx; s.y = s.cy; s.offset.x = s.origin.x; s.offset.y = s.origin.y; },
@@ -255,6 +257,7 @@ G.screens.mainMenu = {
     G.setScreen('title', { skipIntro: true });
   },
   onAction(a, down, repeat) {
+    if (this.gpuWarn) { if (down && !repeat && (a === 'accept' || a === 'back')) { this.gpuWarn = false; G.sfx('confirm', { vol: 0.5 }); } return true; }
     if (!down || this.state !== 'idle') return;
     if (a === 'ui_up' || a === 'ui_down') { G.sfx('scroll', { vol: 0.4 }); this.select(this.sel + (a === 'ui_up' ? -1 : 1)); }
     else if (a === 'accept' && !repeat) this.accept();
@@ -262,6 +265,7 @@ G.screens.mainMenu = {
   },
   onWheel(dir) { if (this.state === 'idle') { G.sfx('scroll', { vol: 0.4 }); this.select(this.sel + dir); } },
   onPointer(type, x, y) {
+    if (this.gpuWarn) { if (type === 'down') this.gpuWarn = false; return; }
     if (this.state !== 'idle' || type !== 'down') return;
     // tap an item: first tap selects, tap the selected one confirms (like FNF mobile)
     for (const s of this.items) {
@@ -296,6 +300,24 @@ G.screens.mainMenu = {
     this.magenta.draw(ctx, this.cam);
     for (const s of this.items) s.draw(ctx, this.cam);
     G.vcr(ctx, 'FNF 2 v1.0', 5, G.H - 22, { size: 16, outline: 1.5 });
+    if (this.gpuWarn) {
+      G.setScreenT(ctx); ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, G.W, G.H);
+      const L = [
+        ['YOUR BROWSER IS NOT USING YOUR GRAPHICS CARD', 34, '#ff5a5a'],
+        ['That is why FNF 2 lags and spikes. To fix it:', 26, '#ffffff'],
+        ['', 14, '#fff'],
+        ['Chrome / Edge:  Settings  >  System', 26, '#ffe14d'],
+        ['turn ON  "Use graphics acceleration when available"', 26, '#ffe14d'],
+        ['then press RELAUNCH', 26, '#ffe14d'],
+        ['', 14, '#fff'],
+        ['Still on? Update your NVIDIA driver, then check chrome://gpu', 22, '#cfcfcf'],
+        ['(it should say "Hardware accelerated" next to Canvas)', 22, '#cfcfcf'],
+        ['', 18, '#fff'],
+        ['Press ENTER to keep going', 24, '#ffffff'],
+      ];
+      let y = 150; for (const [t, sz, col] of L) { if (t) G.vcr(ctx, t, G.W / 2, y, { size: sz, align: 'center', color: col, outline: 2 }); y += sz + 14; }
+      G.vcr(ctx, 'Renderer: ' + G.gpu.name.slice(0, 80), G.W / 2, G.H - 40, { size: 16, align: 'center', color: '#8a8a8a', outline: 1 });
+    }
   },
 };
 

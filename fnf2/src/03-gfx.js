@@ -180,20 +180,45 @@ G.Atlas = {
   },
   // which frame of a symbol to show for an instance placed on a keyframe
   subFrame(e, local, count) {
-    if (e.st === 'MC') return 0;                               // movie clips: first frame only (Animate preview mode)
+    if (e.st === 'MC') return this._swf ? (this._swf + e.ff) % Math.max(1, count) : 0;   // movie clips: first frame (Animate preview), or playing on their own (swfMode)
     if (e.lp === 'SF') return Math.min(e.ff, count - 1);
     const f = e.ff + local;
     if (e.lp === 'PO') return Math.min(f, count - 1);
     return count > 0 ? f % count : 0;
   },
+  // extras some atlases need (FNF's character select):
+  //   atlas.swf = true        movie clips keep playing by themselves (flixel-animate swfMode)
+  //   atlas.layerTint[name]   that layer (and everything inside it) drawn in one solid colour (a colour transform)
+  //   atlas.layerFrames[name] (elementIndex) -> which frame each element of that layer shows (Nene's visualizer bars)
+  _tint: null, _swf: 0,
+  tintPiece(s, col) {
+    let m = s._tints; if (!m) m = s._tints = new Map();
+    let c = m.get(col);
+    if (!c) {
+      c = G.makeCanvas(s.w, s.h); const x = c.getContext('2d');
+      x.drawImage(G.srcImg(s.img), s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
+      x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, s.w, s.h);
+      if (s.img.complete !== false && s.img.naturalWidth !== 0) m.set(col, c);
+    }
+    return c;
+  },
+  _depth: 0,
   draw(ctx, atlas, tl, frame) {
-    const layers = tl.layers;
+    if (this._depth === 0) { this._swf = atlas.swf ? Math.floor(G.time * (atlas.fps || 24)) + 1 : 0; this._tint = null; }
+    this._depth++;
+    try { this._draw(ctx, atlas, tl, frame); } finally { this._depth--; }
+  },
+  _draw(ctx, atlas, tl, frame) {
+    const layers = tl.layers, LT = atlas.layerTint, LF = atlas.layerFrames;
     for (let li = layers.length - 1; li >= 0; li--) {
       const L = layers[li];
       if (L.type === 'Clp' || L.type === 'Clipper') continue;
       const k = frame < L.at.length ? L.at[frame] : -1;
       if (k < 0) continue;
       const F = L.frames[k];
+      const lt = LT && LT[L.name], lf = LF && LF[L.name], oldT = this._tint;
+      if (lt) this._tint = lt;
+      let ei = 0;
       for (const e of F.els) {
         const m = e.m;
         ctx.save();
@@ -202,20 +227,24 @@ G.Atlas = {
           const s = atlas.sprites[e.n];
           if (s) {
             if (s.rot) { ctx.transform(0, -1, 1, 0, 0, s.w); }
-            ctx.drawImage(G.srcImg(s.img), s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
+            if (this._tint) ctx.drawImage(this.tintPiece(s, this._tint), 0, 0);
+            else ctx.drawImage(G.srcImg(s.img), s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
           }
         } else {
           const swap = atlas.swaps[e.s];
-          if (swap) { if (e.a !== 1) ctx.globalAlpha *= e.a; ctx.drawImage(swap.img, swap.x || 0, swap.y || 0, swap.w || swap.img.width, swap.h || swap.img.height); ctx.restore(); continue; }
+          if (swap) { if (e.a !== 1) ctx.globalAlpha *= e.a; ctx.drawImage(swap.img, swap.x || 0, swap.y || 0, swap.w || swap.img.width, swap.h || swap.img.height); ctx.restore(); ei++; continue; }
           const sym = atlas.symbols[e.s];
           if (sym) {
             if (e.a !== 1) ctx.globalAlpha *= e.a;
             if (e.b) ctx.globalCompositeOperation = e.b;
-            this.draw(ctx, atlas, sym, this.subFrame(e, frame - F.i, sym.frameCount));
+            const sf = lf ? Math.max(0, Math.min(sym.frameCount - 1, lf(ei, sym.frameCount))) : this.subFrame(e, frame - F.i, sym.frameCount);
+            this._draw(ctx, atlas, sym, sf);
           }
         }
         ctx.restore();
+        ei++;
       }
+      this._tint = oldT;
     }
   },
   // bounding box of one frame (in timeline space), accumulated into r
