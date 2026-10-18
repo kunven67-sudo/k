@@ -776,7 +776,7 @@
     const own = (G.realPlayer && G.realPlayer(player)) || (G.PLAYERS && G.PLAYERS[player] && G.PLAYERS[player].ownChar);
     for (const wid of (G.availableWeeks ? G.availableWeeks() : [])) {
       // Week 7 is BF's like in real FNF (Tankman sings it swapped from his own list); Weekend 1 waits for Pico's week
-      if (!own && wid === 'weekend1') continue;
+      if (!own && (wid === 'weekend1' || wid === 'nenesongs')) continue;
       if (!own && wid === 'week7' && player !== 'bf') continue;
       const L = G.A.json('preload/data/levels/' + wid + '.json'); if (!L) continue;
       for (const sid of L.songs) {

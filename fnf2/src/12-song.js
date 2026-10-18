@@ -31,7 +31,9 @@ G.Songs = {
   // opponent. Played SWAPPED: their part becomes yours, sung with their real recorded voice.
   ownSong(id, player) {
     const P = G.PLAYERS && G.PLAYERS[player], ch = P && (P.real ? P.real.char : P.ownChar), m = ch && this.meta(id);
-    return !!(m && (m.playData.characters || {}).opponent === ch);
+    const opp = m && (m.playData.characters || {}).opponent;
+    // (a stand-in player can have a song version of themselves: Nene's own songs are sung by nene-playable)
+    return !!(m && (opp === ch || (P.real && P.real.songChar && opp === P.real.songChar)));
   },
   // every playable (difficulty, variation) combo for a song + player character
   // player: 'bf' (default/erect variations), 'pico' (pico variation), 'darnell' (his mixes), plus the songs a
@@ -92,7 +94,7 @@ G.Songs = {
     const tc = (m.timeChanges || [{ t: 0, bpm: 100 }]).map(x => ({ t: x.t, bpm: x.bpm, b: x.b || 0 }));
     const pd = m.playData;
     let events = (c.events || []).slice().sort((a, b) => a.t - b.t);
-    let chars = { player: pd.characters.player || 'bf', gf: pd.characters.girlfriend || 'gf', opponent: pd.characters.opponent || 'dad' };
+    let chars = { player: pd.characters.player || 'bf', gf: pd.characters.girlfriend != null ? pd.characters.girlfriend : 'gf', opponent: pd.characters.opponent || 'dad' };   // ('' = no GF)
     let voices = this.voicePaths(id, m, variation);
     if (swap) {
       const flipChar = v => (v === 0 ? 1 : v === 1 ? 0 : v);

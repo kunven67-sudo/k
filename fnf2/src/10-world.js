@@ -62,7 +62,9 @@ G.Character = class extends G.Sprite {
     // our own characters can bring live tricks (30-own-chars.js), e.g. WRATH's changing eye
     this.fx = d.fx && G.OwnFX && G.OwnFX[d.fx] || null;
     if (this.fx && this.fx.init) this.fx.init(this);
-    this.script = (G.CharScripts && (G.CharScripts[id] || G.CharScripts[id.split('-')[0]])) || null;
+    // (data "script": "" = none: Nene's singing version is not the one on the A-Bot)
+    const sid = d.script !== undefined ? d.script : id;
+    this.script = (sid && G.CharScripts && (G.CharScripts[sid] || G.CharScripts[sid.split('-')[0]])) || null;
     if (this.script && this.script.init) this.script.init(this);
     this.dance(true);
     this.updateHitbox();

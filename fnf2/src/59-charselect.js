@@ -29,7 +29,7 @@
     // playable Darnell: real misses, death + retry)
     darnell: { id: 'darnell', name: 'Darnell', pos: 5, chill: CS + 'darnellChill', gf: { asset: CS + 'friendsChill', viz: false }, nametag: 'darnell', icon: 'darnell', ownChar: 'darnell', swapChar: 'darnell-player' },
     nene: real('nene', { name: 'Nene', pos: 1, nametag: 'nene', icon: 'nene', gf: { asset: CS + 'gfChill', viz: false },
-      real: { char: 'nene', flip: false, scale: 0.62, select: 'combo50', win: 'combo200', lose: 'raiseKnife', hey: 'combo50', die: 'raiseKnife', retry: 'combo50', dj: { x: 190, y: 712, k: 0.48 } },
+      real: { char: 'nene', songChar: 'nene-playable', flip: false, scale: 0.62, select: 'combo50', win: 'combo200', lose: 'raiseKnife', hey: 'combo50', die: 'raiseKnife', retry: 'combo50', dj: { x: 190, y: 712, k: 0.48 } },
       freeplay: { text1: 'NENE', text2: 'CUTE BUT SHE BRINGS A KNIFE', text3: 'DO NOT TOUCH HER A-BOT', colors: ['#FFD4E9', '#FF9CC8', '#FFF0F7', '#E8418A', '#FFFFFF', '#C02468', '#FF5FA2', '#F04C93'] } }),
     tankman: real('tankman', { name: 'Tankman', pos: 7, nametag: 'tankman', icon: 'tankman', gf: { asset: CS + 'gfChill', viz: false },
       real: { char: 'tankman', flip: true, scale: 0.62, select: 'hehPrettyGood', win: 'laugh', lose: 'ugh', hey: 'beat it', die: 'augh', retry: 'hehPrettyGood', dj: { x: 196, y: 708, k: 0.7 } },
@@ -139,15 +139,25 @@
   // ---------------------------------------------------------------- new players: a gameplay character as a "figure"
   // (character select, freeplay DJ spot, results). Drawn scaled around the bottom-middle of what it really draws.
   // the box of what a character really draws on its current frame (scale 1), in its own space
+  // where a character's drawing really is (atlas: its symbols' box; Sparrow: the frame's trimmed pixels),
+  // in world space, the way Sprite.draw puts it there (anim offsets, scale about the origin, flip)
   function visBox(ch) {
-    const a = ch.cur; if (!a || a.kind !== 'atlas') return null;
-    const b = G.Atlas.bounds(a.atlas, a.tl), r = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 };
-    G.Atlas.boundsFrame(a.atlas, a.tl, a.frames[ch.fi] != null ? a.frames[ch.fi] : a.frames[0], [1, 0, 0, 1, 0, 0], r);
-    if (r.x1 < r.x0) return null;
+    const a = ch.cur; if (!a) return null;
+    let x0, x1, y0, y1;
+    if (a.kind === 'atlas') {
+      const b = G.Atlas.bounds(a.atlas, a.tl), r = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 };
+      G.Atlas.boundsFrame(a.atlas, a.tl, a.frames[ch.fi] != null ? a.frames[ch.fi] : a.frames[0], [1, 0, 0, 1, 0, 0], r);
+      if (r.x1 < r.x0) return null;
+      x0 = r.x0 - b.x; x1 = r.x1 - b.x; y0 = r.y0 - b.y; y1 = r.y1 - b.y;
+    } else if (a.kind === 'sparrow') {
+      const f = a.frames[ch.fi] || a.frames[0]; if (!f) return null;
+      x0 = f.ox; y0 = f.oy; x1 = f.ox + (f.rot ? f.h : f.w); y1 = f.oy + (f.rot ? f.w : f.h);
+    } else return null;
     let sx = ch.x - ch.offset.x, sy = ch.y - ch.offset.y;
     if (ch.useAnimOffsets) { sx -= (ch._ao[0] - ch.globalOffsets[0]) * ch.scale.x; sy -= (ch._ao[1] - ch.globalOffsets[1]) * ch.scale.y; }
-    const mid = (r.x0 + r.x1) / 2 - b.x;
-    return { cx: ch.flipX ? sx + ch.frameW - mid : sx + mid, bottom: sy + r.y1 - b.y, top: sy + r.y0 - b.y };
+    const X = px => sx + ch.origin.x + ((ch.flipX ? ch.frameW - px : px) - ch.origin.x) * ch.scale.x;
+    const Y = py => sy + ch.origin.y + (py - ch.origin.y) * ch.scale.y;
+    return { cx: X((x0 + x1) / 2), bottom: Y(y1), top: Y(y0) };
   }
   class RealFig {
     constructor(R) {

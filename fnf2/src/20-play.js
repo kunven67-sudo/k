@@ -123,19 +123,27 @@
       this.gf = s.chars.gf ? mk(s.chars.gf, 'gf', 'gf') : null;
       // (a swapped Weekend 1 song: FNF's own opponent Pico, already set up to face right)
       this.dad = mk(s.swap && s.chars.opponent === 'pico-playable' ? 'pico' : s.chars.opponent, 'dad', 'dad');
-      // (a full player singing a song swapped uses its own playable version: Darnell's Mixtape's darnell-player)
+      // (a full player singing a song swapped uses its own playable version: Darnell's Mixtape's darnell-player;
+      //  a stand-in player sings as their song version when the song has one: Nene's singing sheet, not the A-Bot one)
       const PP = s.swap && G.PLAYERS && G.PLAYERS[G.settings.player], swapChar = PP && !PP.real && PP.swapChar;
-      this.bf = mk(this.playAs ? this.playAs.real.char : swapChar || s.chars.player, 'bf', 'bf');
-      if (this.playAs && this.playAs.real.flip === false) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
+      const own = this.playAs && (this.playAs.real.songChar && s.chars.player === this.playAs.real.songChar ? s.chars.player : this.playAs.real.char);
+      this.bf = mk(own || swapChar || s.chars.player, 'bf', 'bf');
+      if (this.playAs && this.playAs.real.flip === false && this.bf.nene) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
       // their atlas box is much bigger than what they draw (Darnell stood half off the screen): put the feet
-      // of what's really drawn where BF's feet go (Nene's A-Bot is already built around her spot)
-      if (this.playAs && !this.bf.nene && G.visBox) {
-        const pos = ((this.stage.data.characters || {}).bf || {}).position, vb = G.visBox(this.bf);
+      // of what's really drawn where BF's feet go (Nene's A-Bot is already built around her spot).
+      // Stages imported from mods mark their spots as 'feet' for everyone (the mod's characters were other sizes).
+      const SC = this.stage.data.characters || {};
+      for (const [slot, c] of [['bf', this.bf], ['dad', this.dad], ['gf', this.gf]]) {
+        if (!c || !G.visBox || !(SC[slot] && SC[slot].feet || (slot === 'bf' && this.playAs && !c.nene))) continue;
+        const pos = SC[slot] && SC[slot].position, vb = G.visBox(c);
         if (pos && vb) {
-          const dx = pos[0] - vb.cx, dy = pos[1] - vb.bottom, b = this.bf;
-          b.x += dx; b.y += dy; b.originalPosition = { x: b.x, y: b.y }; b.camFocus.x += dx; b.camFocus.y += dy;
+          const dx = pos[0] - vb.cx, dy = pos[1] - vb.bottom;
+          c.x += dx; c.y += dy; c.originalPosition = { x: c.x, y: c.y }; c.camFocus.x += dx; c.camFocus.y += dy;
         }
       }
+      // ...and the mod's own camera spots
+      for (const [slot, c] of [['bf', this.bf], ['dad', this.dad], ['gf', this.gf]]) if (c && SC[slot] && SC[slot].camera) c.camFocus = { x: SC[slot].camera[0], y: SC[slot].camera[1] };
+      this.noteCam = this.stage.data.noteCam ? { px: this.stage.data.noteCam, t: 0, base: null, side: 1 } : null;
       // whoever stands mirrored on the other side (Tankman on the right, BF on the left) swaps their LEFT and RIGHT
       // poses, like FNF's own mirrored characters do, so every pose still points the way its arrow does
       if (s.swap) { this.bf.swapLR = !!this.bf.flipX && !swapChar; this.dad.swapLR = !!this.dad.flipX && this.dad.id !== 'pico'; }
@@ -224,6 +232,8 @@
       this.songPos = -this.cond.crochet * 5;
       this.cond.reset(this.songPos);
       this.ended = false; this.endCut = false; this.dead = false; this.paused = false; this.pauseMenu = null; this.gameOver = null;
+      if (this.noteCam) { this.noteCam.t = 0; this.noteCam.base = null; this.noteCam.side = 1; }
+      if (this.cam) this.cam.followRate = 0.04;
       this.countBeat = -99; this.started = false;
       this.keys = [false, false, false, false];
       this.botplay = !!G.settings.botplay; this.practice = !!G.settings.practice;
@@ -273,6 +283,7 @@
       for (const c of [this.gf, this.dad, this.bf]) if (c) { c.playHealth = this.health; c.tick(dt, stepSec, c === this.bf ? holding : false); }
       this.stage.update(dt);
       if (this.sfx && this.sfx.update) this.sfx.update(this, dt);
+      this.updateNoteCam(dt);
       this.updateCamera(dt);
       if (this.mod && this.mod.update) this.mod.update(this, dt);
       for (const L of this.lines) for (const s of L.strums) {
@@ -348,6 +359,7 @@
           let ch = v != null && typeof v === 'object' ? v.char : v; if (ch == null) ch = 0;
           let x = (v && v.x) || 0, y = (v && v.y) || 0;
           const tgt = ch === 0 ? this.bf : ch === 1 ? this.dad : ch === 2 ? (this.gf || this.dad) : null;
+          if (this.noteCam) { const nc = this.noteCam; nc.side = ch; if (nc.t > 0) { nc.t = 0; nc.base = null; this.cam.followRate = 0.04; } }
           if (tgt) { x += tgt.camFocus.x; y += tgt.camFocus.y; }
           const ease = (v && v.ease) || 'CLASSIC';
           if (ease === 'CLASSIC') { this.camTween = null; this.cam.follow(x, y); }
@@ -439,6 +451,21 @@
       else if (!this.dad._locked && ka) { this.dad.playAnim(ka, true); this.dad.holdTimer = 0; }
       else if (!this.dad._locked) { this.dad.lastNote = n; this.dad.sing(n.lane, false, suffix); }
       if (this.audio) this.audio.setVolume('o', 1);
+      this.nudgeCam(1, n.lane);
+    },
+    // mod stages (movecam.lua / alleynene.lua): the camera leans 20px the way each note on the side it's
+    // looking at points, quicker (camera speed x3), and goes back 1 second after the last one
+    nudgeCam(side, lane) {
+      const nc = this.noteCam; if (!nc || nc.side !== side || this.camTween || this.gameOver) return;
+      if (!nc.base) nc.base = { x: this.cam.tx, y: this.cam.ty };
+      const d = [[-1, 0], [0, 1], [0, -1], [1, 0]][lane];
+      this.cam.follow(nc.base.x + d[0] * nc.px, nc.base.y + d[1] * nc.px);
+      this.cam.followRate = 0.12; nc.t = 1;
+    },
+    updateNoteCam(dt) {
+      const nc = this.noteCam; if (!nc || nc.t <= 0) return;
+      nc.t -= dt;
+      if (nc.t <= 0) { if (nc.base) this.cam.follow(nc.base.x, nc.base.y); nc.base = null; this.cam.followRate = 0.04; }
     },
     // player pressed a lane
     press(lane) {
@@ -471,6 +498,7 @@
       s.playA('confirm', true); s.confirmHold = auto ? 0 : -1;
       const r = auto ? 'sick' : judge(diffMs);
       const pts = auto ? 500 : scorePBOT1(diffMs);
+      this.nudgeCam(0, n.lane);
       this.score += pts;
       this.health = Math.min(H.max, this.health + (H[r] || 0));
       this.tally[r]++; this.tally.total++;

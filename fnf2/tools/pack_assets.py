@@ -121,7 +121,8 @@ def conv_cached(src, kind, fn):
         return open(p, 'rb').read()
     data = fn()
     os.makedirs(CACHE, exist_ok=True)
-    open(p, 'wb').write(data)
+    tmp = p + '.%d.tmp' % os.getpid()          # written whole, then renamed: a parallel pack never reads half a file
+    open(tmp, 'wb').write(data); os.replace(tmp, p)
     return data
 
 def to_webp(src):
@@ -237,6 +238,14 @@ def paged_sparrow(png, xml):
     open(os.path.join(d, 'sheet.xml'), 'w').write('\n'.join(lines) + '\n')
     return os.path.join(d, 'sheet.xml'), outs
 
+def warm(job):
+    rel, src = job
+    ext = os.path.splitext(rel)[1].lower()
+    try:
+        if ext == '.png': to_webp(src)
+        elif ext == '.ogg' or (ext == '.mp3' and not os.path.exists(src[:-4] + '.ogg')): to_mp3(src, '/Voices' in rel)
+    except Exception as e: print('warm failed', rel, e, file=sys.stderr)
+
 def to_mp3(src, voices, kbps=None):
     def f():
         args = ['ffmpeg', '-v', 'error', '-i', src]
@@ -270,6 +279,8 @@ def main():
     ap.add_argument('--pack', default='early')
     ap.add_argument('--out', default=os.path.join(ROOT, 'build', 'assets.js'))
     ap.add_argument('--fetch', action='store_true')
+    ap.add_argument('--warm', action='store_true', help='only fill the conversion cache (from the end of the list)')
+    ap.add_argument('--jobs', type=int, default=0)
     ap.add_argument('--own', default=os.path.join(ROOT, 'build', 'own'), help='our own characters made by tools/own/*.py (same folder layout as the assets)')
     a = ap.parse_args()
     pats = PACKS[a.pack]
@@ -320,6 +331,12 @@ def main():
             for n, p in enumerate(pages[1:], 1): srcs[rel[:-4] + '~%d.png' % n] = p
             npaged += 1
     print(f'{npaged} big sheets split into pages of max {PAGE}x{PAGE}')
+    # convert on every core first (the slow part: WebP + mp3), the loop below then reads the cache
+    from concurrent.futures import ProcessPoolExecutor
+    jobs = [(rel, src) for rel, src in sorted(srcs.items()) if os.path.splitext(rel)[1].lower() in ('.png', '.ogg', '.mp3')]
+    if a.warm: jobs.reverse()
+    with ProcessPoolExecutor(a.jobs or os.cpu_count()) as ex: list(ex.map(warm, jobs, chunksize=4))
+    if a.warm: print('warmed', len(jobs)); return
     out = {}
     total = 0
     for rel, src in sorted(srcs.items()):
