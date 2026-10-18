@@ -825,9 +825,12 @@
         for (const k in ws.tally) ws.tally[k] += stats.tally[k] || 0; ws.accSum += this.accSum; ws.accN += this.accN;
         if (p.songIndex + 1 < p.songs.length) { G.setScreen('play', Object.assign({}, p, { songIndex: p.songIndex + 1, weekStats: ws, deaths: 0 })); return; }
         const weekBest = !cheated && !!p.week && G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
-        G.setScreen(G.screens.results ? 'results' : 'storyMenu', { mode: 'story', week: p.week, diff: p.diff, newBest: weekBest, stats: Object.assign({}, ws, { acc: ws.accN ? ws.accSum / ws.accN : 0 }), title: (G.A.json('preload/data/levels/' + p.week + '.json') || {}).name || p.week, player: this.bf.id });
-      } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, title: s.name, player: this.bf.id, prevRank, isNewHighscore, cheated });
+        G.setScreen(G.screens.results ? 'results' : 'storyMenu', { mode: 'story', week: p.week, diff: p.diff, newBest: weekBest, stats: Object.assign({}, ws, { acc: ws.accN ? ws.accSum / ws.accN : 0 }), title: (G.A.json('preload/data/levels/' + p.week + '.json') || {}).name || p.week, player: this.resultsPlayer() });
+      } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, title: s.name, player: this.resultsPlayer(), prevRank, isNewHighscore, cheated });
     },
+    // who the results screen shows: the player you picked (Nene sings her own songs as 'nene-playable', a sprite
+    // the results screen doesn't know, so it fell back to BF + GF), else the character that sang
+    resultsPlayer() { return this.playAs ? this.playAs.id : this.bf.id; },
     // -------------------------------------------------- drawing
     draw(ctx) {
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
