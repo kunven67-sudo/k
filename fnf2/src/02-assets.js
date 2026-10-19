@@ -328,6 +328,8 @@ G.Packs = {
       const m = /^(.+)\.head\.js$/.exec(k); if (!m || (this.all[m[1]] && this.all[m[1]].src === 'folder')) continue;
       const blob = await this.idb('get', k), meta = blob && await this.readMeta(blob);
       this.all[m[1]] = Object.assign(this.all[m[1]] || {}, meta || { id: m[1] }, { src: 'saved' });
+      // only half of it saved (no body): its songs couldn't load, so it stays out until the body is loaded too
+      if (!keys.includes(m[1] + '.body.js')) { this.all[m[1]].missingBody = true; continue; }
       if (!blob || !this.isOn(m[1])) continue;
       const url = URL.createObjectURL(blob); await this.loadScript(url); URL.revokeObjectURL(url);
     }

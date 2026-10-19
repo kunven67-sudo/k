@@ -299,7 +299,7 @@
           const a = new G.Alphabet(p.name || p.id, true, 60, y); a.scale = Math.min(0.62, 760 / Math.max(1, a.width)); a.alpha = sel ? 1 : 0.6; a.draw(ctx, null);
           G.setScreenT(ctx);
           G.vcr(ctx, on ? 'ON' : 'OFF', G.W - 60, y + 6, { size: 40, align: 'right', color: on ? '#7CFF7C' : '#FF7070', alpha: sel ? 1 : 0.7, outline: 3 });
-          G.vcr(ctx, (p.credit ? p.credit + '   ' : '') + (p.bodyMB ? (p.headMB + p.bodyMB).toFixed(0) + ' MB' : '') + (p.src === 'saved' ? '   (saved in this browser)' : ''), 60, y + 58, { size: 18, alpha: sel ? 0.95 : 0.55, outline: 2, maxWidth: G.W - 260 });
+          G.vcr(ctx, (p.credit ? p.credit + '   ' : '') + (p.bodyMB ? (p.headMB + p.bodyMB).toFixed(0) + ' MB' : '') + (p.missingBody ? '   (half saved: LOAD PACKS its .body.js file too)' : p.src === 'saved' ? '   (saved in this browser)' : ''), 60, y + 58, { size: 18, alpha: sel ? 0.95 : 0.55, outline: 2, maxWidth: G.W - 260 });
         });
         const ly = top + this.mods.length * gap + 10, la = new G.Alphabet('LOAD PACKS', true, 0, ly); la.scale = 0.7; la.x = (G.W - la.width * 0.7) / 2; la.alpha = this.sel === this.mods.length ? 1 : 0.6; la.draw(ctx, null);
         G.setScreenT(ctx);
