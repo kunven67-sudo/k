@@ -156,6 +156,9 @@ G.diffIndex = id => Math.max(0, G.DIFFS.findIndex(d => d.id === id));
 // ------------------------------------------------------------------ canvas
 // is the browser drawing with the graphics card? (WebGL tells us which renderer it got: a software one
 // like SwiftShader / Microsoft Basic Render means hardware acceleration is off and everything lags)
+// a phone or tablet (touch screen, mobile browser): smaller pictures, phone controls
+G.phone = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.userAgentData && navigator.userAgentData.mobile) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+G.isTouchDevice = G.phone || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
 G.gpu = (function () {
   try {
     const c = document.createElement('canvas'), gl = c.getContext('webgl') || c.getContext('experimental-webgl');

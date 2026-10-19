@@ -131,11 +131,40 @@
       }
       if (this.mod && this.mod.prepare) try { this.mod.prepare(this, tex); } catch (e) { G.reportError(e, 'mod prepare'); }
       if (this.sfx && this.sfx.prepare) try { this.sfx.prepare(this, tex); } catch (e) { G.reportError(e, 'fx prepare'); }
-      // hand every picture to the graphics card now (a 1 pixel draw uploads the whole texture)
+      // ...and every other picture this screen asked for (notes, splashes, ratings, icons, the mod's own)
+      for (const img of G.A._img.values()) if (G.A._touch.get(img) === G.A._gen) tex.add(img);
+      this.fitTextures(chars, tex);
+      // park every picture on the graphics card now (drawImage swaps a picture for its canvas copy: G.Pin)
       const ctx = G.ctx; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 0.01;
       for (const im of tex) { try { if (im && (im.width || im.naturalWidth)) ctx.drawImage(im, 0, 0, 1, 1); } catch (e) {} }
       ctx.restore();
-      this.prepMs = Math.round(performance.now() - t0);
+      this.prepMs = Math.round(performance.now() - t0); this.pinMB = Math.round(G.Pin.bytes / 1e6);
+    },
+    // How many pixels each stage/character picture really needs on the graphics card: a picture drawn at 60%
+    // (sprite scale x the closest the camera zooms in this song) doesn't need a full size copy. Some mod
+    // songs use 500+ MB of pictures, a lot for a 2 GB card that Discord + the other tabs share. On Auto the
+    // copies also have to fit a budget; High always keeps them full size.
+    fitTextures(chars, tex) {
+      const q = G.settings.quality;
+      if (q === 'high') return;
+      let zMax = this.stageZoom || 1;
+      for (const ev of this.song.events || []) if (ev.e === 'ZoomCamera' && ev.v) zMax = Math.max(zMax, (ev.v.zoom || 1) * (ev.v.mode === 'direct' ? 1 : this.stageZoom || 1));
+      const need = new Map(), see = (sp, s) => { for (const im of G.texturesOf(sp)) if (im instanceof HTMLImageElement) need.set(im, Math.max(need.get(im) || 0, s)); };
+      const sz = sp => Math.max(Math.abs(sp.scale && sp.scale.x || 1), Math.abs(sp.scale && sp.scale.y || 1));
+      const zq = zMax * 1.15 * Math.min(1, G.q);      // camera bops + a little room
+      for (const p of this.stage.props) see(p, sz(p) * zq);
+      for (const e of this.stage.extras || []) see(e, sz(e) * zq);
+      for (const c of chars) see(c, sz(c) * zq);
+      // everything else this song draws (notes, ratings, the mod's own effects) stays as big as it is
+      const px = im => im.naturalWidth * im.naturalHeight * 4;
+      let world = 0, other = 0;
+      for (const [im, k] of need) world += px(im) * Math.min(1, k) ** 2;
+      for (const im of tex) if (im instanceof HTMLImageElement && !need.has(im)) other += px(im);
+      // squeezed further when the stage + characters don't fit what's left of the budget
+      const budget = G.phone ? 160e6 : q === 'low' ? 200e6 : 380e6, room = Math.max(budget * 0.3, budget - other);
+      const squeeze = world > room ? Math.sqrt(room / world) : 1;
+      for (const [im, k] of need) G.Pin.fit(im, Math.max(G.phone ? 0.35 : 0.5, Math.min(1, k) * squeeze));
+      this.texMB = Math.round((world * squeeze * squeeze + other) / 1e6);
     },
     // the stage + characters go with the screen (their pictures can be freed while you're in the menus)
     leave() { if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); this.stage = null; this.bf = this.dad = this.gf = null; this.cutscene = null; },

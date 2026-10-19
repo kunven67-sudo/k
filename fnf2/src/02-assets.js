@@ -63,6 +63,7 @@ G.A = {
       freed += img.width * img.height * 4;
     }
     for (const [p, w] of this._weak) if (!w.deref()) this._weak.delete(p);
+    if (G.Pin) G.Pin.releaseUnused(this._gen);
     return freed;
   },
   pending: new Set(),

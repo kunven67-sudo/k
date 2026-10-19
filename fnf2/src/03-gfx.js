@@ -2,6 +2,71 @@
 // sprite, Flixel's camera math and FNF's Alphabet text. Behaviour follows
 // HaxeFlixel + the Funkin' engine so offsets/positions from FNF's data files work as-is.
 
+// ------------------------------------------------------------------ pictures parked on the graphics card
+// Chrome keeps the decoded pixels of <img> pictures in a cache with a size limit. When it's full it throws
+// pictures out, and the next time one is drawn it's decoded from its WebP file again: 40-200 ms each,
+// in the middle of a song (the random lag spikes, worst in mod songs with big sheets). And a picture first
+// drawn small is decoded small, then decoded again when it's drawn full size.
+// A canvas copy lives on the graphics card and is never decoded again, so every big picture is copied into
+// a canvas once (when it's decoded, or the first time it's drawn) and every drawImage uses the copy.
+// Copies the current screen doesn't draw are let go a few seconds after a screen change (G.A.releaseUnused).
+G.Pin = {
+  map: new Map(), want: new WeakMap(), bytes: 0, on: true, MIN: 256 * 256,
+  _draw: CanvasRenderingContext2D.prototype.drawImage,
+  // copies can be smaller than the picture (k < 1): a picture only ever drawn at 60% size doesn't need
+  // more pixels than that on the card. Phones + Low quality: half size (a quarter of the memory).
+  baseK() { return G.phone || (G.settings && G.settings.quality === 'low') ? 0.5 : 1; },
+  get(img) {
+    let c = this.map.get(img);
+    if (!c) {
+      if (!this.on || img.complete === false || !img.naturalWidth || img.naturalWidth * img.naturalHeight < this.MIN) return img;
+      const w = this.want.get(img);
+      c = this.make(img, Math.min(w == null ? 1 : w, this.baseK()));
+      if (!c) return img;
+    }
+    c._g = G.A ? G.A._gen : 0;
+    return c;
+  },
+  make(img, k) {
+    const w = img.naturalWidth, h = img.naturalHeight, cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    const x = c.getContext('2d');
+    if (!x) return null;
+    if (cw === w && ch === h) this._draw.call(x, img, 0, 0);
+    else { x.imageSmoothingQuality = 'high'; this._draw.call(x, img, 0, 0, cw, ch); }
+    c._kx = cw / w; c._ky = ch / h; c._full = cw === w && ch === h;
+    this.map.set(img, c); this.bytes += cw * ch * 4;
+    return c;
+  },
+  // how big this picture's copy should be (play.prepare() works it out from how big it's drawn on screen);
+  // a copy already made at another size is made again
+  fit(img, k) {
+    k = Math.max(0.25, Math.min(1, Math.ceil(k * 8 - 0.01) / 8));
+    this.want.set(img, k);
+    const c = this.map.get(img);
+    if (c && Math.abs(c._kx - Math.min(k, this.baseK())) > 0.02) this.drop(img);
+  },
+  drop(img) { const c = this.map.get(img); if (!c) return; this.map.delete(img); this.bytes -= c.width * c.height * 4; c.width = c.height = 0; },
+  // copies not drawn since the screen changed
+  releaseUnused(gen) { let n = 0; for (const [img, c] of this.map) if (c._g !== gen) { this.drop(img); n++; } return n; },
+  clear() { for (const img of [...this.map.keys()]) this.drop(img); },
+};
+// the graphics card was reset (driver update, crash): every copy on it is blank now, make new ones
+if (G.canvas) G.canvas.addEventListener('contextrestored', () => G.Pin.clear());
+// every drawImage of a picture draws its copy instead (source rectangles scaled to a smaller copy)
+(function () {
+  const draw = G.Pin._draw;
+  CanvasRenderingContext2D.prototype.drawImage = function (img, a, b, c, d, e, f, g, h) {
+    if (!(img instanceof HTMLImageElement)) return draw.apply(this, arguments);
+    const p = G.Pin.get(img);
+    if (p === img || p._full) { arguments[0] = p; return draw.apply(this, arguments); }
+    const n = arguments.length;
+    if (n >= 9) return draw.call(this, p, a * p._kx, b * p._ky, c * p._kx, d * p._ky, e, f, g, h);
+    if (n >= 5) return draw.call(this, p, a, b, c, d);
+    return draw.call(this, p, a, b, img.naturalWidth, img.naturalHeight);
+  };
+})();
+
 // ------------------------------------------------------------------ Sparrow (XML) sheets
 // Colour filters (Erect stage tints) are baked into a copy of each source texture once,
 // instead of running ctx.filter on every sprite piece every frame (that was very slow).
