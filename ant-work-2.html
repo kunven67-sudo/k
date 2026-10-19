@@ -1935,7 +1935,7 @@ const LV_UPDATERS_PENDING=[];
    ================================================================ */
 const HUMANS=[];
 /* ---- skin: wrapped diffuse with a warm terminator (cheap subsurface look) ---- */
-function skinify(m,tint=[1,.46,.36],wrap=.4){
+function skinify(m,tint=[1,.66,.56],wrap=.3){
   const t=tint.map(v=>v.toFixed(3)).join(',');
   m.onBeforeCompile=sh=>{
     sh.fragmentShader=sh.fragmentShader.replace('#include <lights_physical_pars_fragment>',
@@ -2093,7 +2093,7 @@ function irisTex(hex,alien){
   TEXCACHE[key]=t; return t;
 }
 /* ---------- body profiles (lathe, radius vs height) ---------- */
-const TORSO_P=[[0,-.03],[.148,-.03],[.155,.04],[.148,.12],[.145,.2],[.158,.28],[.175,.36],[.18,.42],[.168,.47],[.13,.51],[.07,.535],[0,.54]];
+const TORSO_P=[[0,-.03],[.148,-.03],[.155,.04],[.148,.12],[.145,.2],[.158,.28],[.175,.36],[.183,.42],[.18,.46],[.158,.5],[.118,.53],[.082,.552],[.064,.566],[0,.57]];
 const HIPS_P=[[0,-.16],[.09,-.155],[.148,-.11],[.165,-.04],[.162,.02],[.15,.065],[0,.065]];
 const UPPER_P=[[0,-.30],[.037,-.29],[.043,-.25],[.048,-.15],[.054,-.06],[.051,-.01],[.03,.02],[0,.025]];
 const FORE_P=[[0,-.268],[.027,-.262],[.031,-.2],[.04,-.09],[.043,-.02],[.03,.012],[0,.015]];
@@ -2132,7 +2132,7 @@ function makeHuman(o={}){
   const opt=Object.assign({skin:0xe8b894,shirt:0x3b6ea5,pants:0x3a4a6a,shoes:0x2a2522,hair:0x3b2a1a,hairStyle:'short',beard:false,eye:0x4a3020,
     build:1,height:1,name:'?',voice:'Jim',sleeves:'short',alien:false,accent:0x7dffe8,denim:true,head:{},collar:true,apron:null,hood:false},o);
   const g=new THREE.Group(); g.name=opt.name;
-  const skinM=skinify(new THREE.MeshPhysicalMaterial({color:col(opt.skin),roughness:opt.alien?.35:.52,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.35,.35),clearcoat:opt.alien?.3:0,clearcoatRoughness:.4,emissive:col(opt.skin),emissiveIntensity:opt.skinGlow||0}),opt.sss||(opt.alien?[.4,.8,1]:[1,.46,.36]));
+  const skinM=skinify(new THREE.MeshPhysicalMaterial({color:col(opt.skin),roughness:opt.alien?.35:.52,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.35,.35),clearcoat:opt.alien?.3:0,clearcoatRoughness:.4,emissive:col(opt.skin),emissiveIntensity:opt.skinGlow||0}),opt.sss||(opt.alien?[.4,.8,1]:[1,.66,.56]));
   const shirtM=opt.alien?new THREE.MeshPhysicalMaterial({color:col(opt.shirt),roughness:.35,metalness:.4,clearcoat:.6,clearcoatRoughness:.2}):new THREE.MeshPhysicalMaterial({color:col(opt.shirt),roughness:.88,map:T.cloth.map,normalMap:T.cloth.normalMap,normalScale:new THREE.Vector2(.6,.6),sheen:col(0x222222)});
   const pantsM=opt.alien?new THREE.MeshPhysicalMaterial({color:col(opt.pants),roughness:.4,metalness:.3,clearcoat:.4}):new THREE.MeshPhysicalMaterial({color:col(opt.pants),roughness:.9,map:opt.denim?T.denim.map:T.cloth.map,normalMap:opt.denim?T.denim.normalMap:T.cloth.normalMap,normalScale:new THREE.Vector2(.8,.8),sheen:col(0x1a1a1a)});
   const shoeM=new THREE.MeshStandardMaterial({color:col(opt.shoes),roughness:.55,normalMap:T.rubber.normalMap});
@@ -2174,9 +2174,9 @@ function makeHuman(o={}){
     for(const sd of [-1,1]) chest.add(mesh(GC('string',()=>new THREE.CylinderGeometry(.003,.003,.14,5)),mat(0xeeeeee),sd*.03,.4,.105,false)); }
   if(opt.apron){ const ap=mesh(GC('apron',()=>{ const s=new THREE.Shape(); s.moveTo(-.12,.46); s.lineTo(.12,.46); s.lineTo(.17,.1); s.lineTo(.18,-.42); s.lineTo(-.18,-.42); s.lineTo(-.17,.1); s.closePath(); return new THREE.ExtrudeGeometry(s,{depth:.004,bevelEnabled:false}); }),new THREE.MeshStandardMaterial({color:col(opt.apron),roughness:.8,map:T.cloth.map}),0,0,.112,false); chest.add(ap); J.apron=ap; }
   if(opt.alien){ chest.add(mesh(GC('aEmb',()=>new THREE.CircleGeometry(.035,20)),glowM,0,.32,.113,false)); chest.add(mesh(GC('aSeam',()=>new THREE.BoxGeometry(.008,.3,.004)),glowM,0,.12,.109,false)); }
-  const neck=mesh(GC('neck4',()=>new THREE.CylinderGeometry(.05,.06,.11,16)),skinM,0,.57,-.005); chest.add(neck);
+  const neck=mesh(GC('neck5',()=>new THREE.CylinderGeometry(.056,.064,.12,18)),skinM,0,.57,-.008); chest.add(neck);
   // --- head ---
-  const headJ=new THREE.Group(); headJ.position.set(0,.6,.005); chest.add(headJ); J.head=headJ;
+  const headJ=new THREE.Group(); headJ.position.set(0,.6,.005); headJ.scale.setScalar(1.08); chest.add(headJ); J.head=headJ;  // a touch bigger: the old heads looked tiny on the body
   const HP=Object.assign({rx:.074,ry:.104,rz:.093,jaw:.3,alien:opt.alien},opt.head);
   if(opt.alien) Object.assign(HP,{rx:.072,ry:.11,rz:.09,jaw:.45});
   const faceM=skinify(new THREE.MeshPhysicalMaterial({color:0xffffff,map:faceTex(opt.skin,{stubbleAmt:opt.beard?0:(opt.stubble||0),alien:opt.alien,blush:opt.blush,lip:opt.lip}),normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.3,.3),roughness:opt.alien?.3:.55,clearcoat:opt.alien?.4:0,clearcoatRoughness:.35,morphTargets:true}),opt.alien?[.4,.8,1]:[1,.46,.36]);
@@ -2186,7 +2186,7 @@ function makeHuman(o={}){
   // mouth interior + teeth (hidden behind the lips until the jaw opens)
   if(!opt.alien){
     const mp=HPt(0,-.39,.92);
-    head.add(mesh(GC('cavity',()=>{ const s=new THREE.SphereGeometry(.024,14,10); s.scale(1.25,.7,.75); return s; }),mat(0x3a0e12,{roughness:.6}),0,mp.y,mp.z-.02,false));
+    head.add(mesh(GC('cavity2',()=>{ const s=new THREE.SphereGeometry(.024,14,10); s.scale(.8,.6,.7); return s; }),mat(0x3a0e12,{roughness:.6}),0,mp.y,mp.z-.027,false));  // narrower + further back: it poked out at the mouth corners
     head.add(mesh(GC('teethU',()=>{ const t=new THREE.TorusGeometry(.02,.0038,6,16,Math.PI); t.rotateX(Math.PI/2); t.rotateY(Math.PI); t.scale(1,1.3,.7); return t; }),mat(0xf0ebe0,{roughness:.25}),0,mp.y+.004,mp.z-.021,false));
     const jawG=new THREE.Group(); jawG.position.set(0,-.01,-.02); head.add(jawG);
     jawG.add(mesh(GC('teethL',()=>{ const t=new THREE.TorusGeometry(.018,.0034,6,16,Math.PI); t.rotateX(Math.PI/2); t.rotateY(Math.PI); t.scale(1,1.2,.7); return t; }),mat(0xeee8dc,{roughness:.3}),0,mp.y+.004,mp.z-.001,false));
@@ -2253,7 +2253,7 @@ function makeHuman(o={}){
   function arm(side){
     const sh=new THREE.Group(); sh.position.set(side*.2*bw,.45,0); chest.add(sh);
     const sleeveM=shirtM, longS=opt.sleeves==='long'||opt.alien;
-    sh.add(mesh(GC('shoulder4'+bw,()=>{ const s=new THREE.SphereGeometry(.062*bw,16,12); s.scale(1,.9,1); return s; }),sleeveM,0,0,0));
+    sh.add(mesh(GC('shoulder6'+side+bw,()=>{ const s=new THREE.SphereGeometry(.055*bw,16,12); s.scale(1,.78,1.08); s.translate(-side*.022,-.004,0); return s; }),sleeveM,0,0,0));
     if(longS) sh.add(mesh(lathe('upper',UPPER_P,14),sleeveM));
     else { sh.add(mesh(lathe('upperS',UPPER_P,14),skinM)); sh.add(mesh(GC('sleeve4',()=>{ const c=new THREE.CylinderGeometry(.056,.066,.15,16,1,true); c.translate(0,-.06,0); return c; }),sleeveM,0,0,0)); }
     const el=new THREE.Group(); el.position.y=-.295; sh.add(el);
@@ -2459,7 +2459,7 @@ function holdProp(h,prop,side='R',pos,rot){ const hold=side==='R'?h.userData.hol
 
 /* ---------- character presets ---------- */
 function makeJim(o={}){ return makeHuman(Object.assign({name:'Jim',voice:'Jim',skin:0xecc0a0,shirt:0xd9a441,pants:0x3a4a6a,shoes:0x6b4a2a,hair:0x7a4a22,hairStyle:'spiky',beard:true,eye:0x3a6a3a,mood:'happy',build:1.04,head:{rx:.076,ry:.104,rz:.094,jaw:.26,nose:1.15,chin:1.1},seed:5,browThick:.004},o)); }
-function makeYou(o={}){ return makeHuman(Object.assign({name:'You',voice:'You',skin:0xe2b08c,shirt:0x2f4d6e,pants:0x2e3440,shoes:0x2a2a2e,hair:0x2a1c12,hairStyle:'short',eye:0x4a3020,sleeves:'long',hood:true,collar:false,stubble:.35,head:{rx:.073,ry:.103,rz:.092,jaw:.3,nose:.95}},o)); }
+function makeYou(o={}){ return makeHuman(Object.assign({name:'You',voice:'You',skin:0xe2b08c,shirt:0x2f4d6e,pants:0x2e3440,shoes:0x2a2a2e,hair:0x2a1c12,hairStyle:'short',eye:0x4a3020,sleeves:'long',hood:true,collar:false,stubble:.14,head:{rx:.073,ry:.103,rz:.092,jaw:.3,nose:.95}},o)); }
 function makeSteve(o={}){ return makeHuman(Object.assign({name:'Steve',voice:'Steve',skin:0x5fd648,skinGlow:.09,sss:[.5,1,.45],shirt:0x2a2f28,pants:0x1c211c,shoes:0x111111,hairStyle:'bald',eye:0x101010,sleeves:'long',collar:false,denim:false,build:.95,height:1.05,head:{rx:.072,ry:.108,rz:.095,jaw:.36,nose:.7,chin:1.2,lips:.6},blush:0,lip:0x5a8a4a},o)); }
 function makeAlien(o={}){ const pal=pick([[0x5fb8e8,0x5a2fa0,0xff7af0],[0x6ae0b0,0x1c4a7a,0xffe066],[0xb08ae0,0x2a5a4a,0x7dffe8],[0xe08a6a,0x3a1a5a,0x7dffb0]]); return makeHuman(Object.assign({name:'Alien',voice:'Alien',alien:true,skin:pal[0],shirt:pal[1],pants:0x1a1c30,shoes:0x2a2a4a,accent:pal[2],sleeves:'long',hairStyle:'bald',denim:false,collar:false,build:.92,height:rand(.92,1.05)},o)); }
 
@@ -3042,6 +3042,7 @@ function updateViewModel(dt,t){
   if(VM.slapT>0){ onL=true; VM.armL=Math.max(VM.armL||0,.9); VM.slapT-=dt; const k=1-VM.slapT/.5; const s=k<.4?k/.4:1-(k-.4)/.6; lp=[lerp(-.34,-.12,s),lerp(-.3,-.46,s),lerp(-.42,-.52,s)]; lr=[lerp(.1,.9,s),-.9+s*.4,-.2]; lf=.05; }
   // punch
   if(VM.punchT>0){ onR=true; VM.armR=Math.max(VM.armR||0,.9); VM.punchT-=dt; const k=Math.sin(Math.PI*(1-VM.punchT/.28)); rp=[lerp(rp[0],.05,k),lerp(rp[1],-.14,k),lerp(rp[2],-.82,k)]; rr=[rr[0]+k*.2,rr[1],rr[2]]; rf=lerp(rf,1,Math.min(1,k*3)); }
+  if(VM.waveT>0){ onR=true; VM.armR=Math.max(VM.armR||0,.9); VM.waveT-=dt; const k=Math.min(1,VM.waveT*3,(2.6-VM.waveT)*3), s=Math.sin(VM.t*8); rp=[lerp(rp[0],.24+s*.05,k),lerp(rp[1],-.12,k),lerp(rp[2],-.5,k)]; rr=[lerp(rr[0],1.35,k),lerp(rr[1],-.15,k),lerp(rr[2],-.25+s*.45,k)]; rf=lerp(rf,0,k); }
   if(VM.chopT>0){ onR=true; VM.armR=Math.max(VM.armR||0,.9); VM.chopT-=dt; const k=1-VM.chopT/.35; const up=k<.35?k/.35:1-(k-.35)/.65; rp=[.08,lerp(-.1,-.3,1-up)+(k<.35?.1*up:0),-.62]; rr=[lerp(-.9,.6,1-up),-.2,-1.4]; rf=0; }
   // photo camera: tucked away while you swim, both hands bring it up to shoot
   VM.cam.visible=!!P.item&&(P.item==='camera'||P.item==='net')&&!P.carry&&((VM.raiseK||0)>.05||!P.swim);
@@ -3068,7 +3069,7 @@ function updateViewModel(dt,t){
 /* blocky arms (after XXX5 turns everything into blocks) */
 function setVMBlocky(on){
   if(!VM.arms) return; VM.blocky=on;
-  if(on && !VM.blockArms){ const hx=h=>'#'+col(h).getHexString();
+  if(on && !VM.blockArms){ const hx=h=>'#'+new THREE.Color(h).getHexString();
     const skin=new THREE.MeshBasicMaterial({map:flatTex(hx(0xd8a880),.97,6)}), shirt=new THREE.MeshBasicMaterial({map:flatTex(hx(0x2f4d6e),.94,12)});
     skin.color.setScalar(.85); shirt.color.setScalar(.85);
     VM.blockMats={skin,shirt,skinMap:skin.map,shirtMap:shirt.map};
@@ -4842,7 +4843,8 @@ function animateDustMite(m,t,dt){
   U.chel.forEach(c=>{ c.rotation.y=c.userData.sd*ch; c.rotation.x=-ch*.3; }); U.palps.forEach((p,i)=>p.rotation.x=Math.sin(t*6+i)*.25*(.3+U.talk));
   U.head.rotation.x=Math.sin(t*1.7)*.05-U.talk*Math.sin(t*9)*.06; U.head.rotation.y=Math.sin(t*.6)*.12;
   U.legs.forEach(L=>{ const w=Math.sin(t*1.5+L.i*.8+(L.sd>0?1:0))*.06; L.root.rotation.y=L.base+w; L.segs[1].rotation.x=.9+Math.sin(t*1.2+L.i)*.05;
-    if(L.i===0 && U.talk>.1) { L.segs[1].rotation.x=.9-U.talk*(.35+Math.sin(t*5+L.sd)*.25); } });
+    if(L.i===0 && U.talk>.1) { L.segs[1].rotation.x=.9-U.talk*(.35+Math.sin(t*5+L.sd)*.25); }
+    if(L.i===0 && L.sd>0 && U.wave) { L.segs[1].rotation.x=-.2+Math.sin(t*9)*.3; L.root.rotation.y=L.base+Math.sin(t*9)*.35; } });
 }
 /* ---------- Naegleria fowleri: a pinkish amoeba with a big lobe, granules, and "food cups" ---------- */
 function makeNaegleria(){
@@ -6993,12 +6995,12 @@ function grassBlockMats(){ const side=blockMat('grassSide'), top=blockMat('grass
 const FOLK=[];
 function blockFaceTex(o){ return canvasTex(8,8,(x)=>{ x.fillStyle=o.skinHex; x.fillRect(0,0,8,8); x.fillStyle=o.hairHex; x.fillRect(0,0,8,2); x.fillRect(0,2,1,1); x.fillRect(7,2,1,1);
   x.fillStyle='#ffffff'; x.fillRect(1,3,2,1); x.fillRect(5,3,2,1); x.fillStyle=o.eyeHex||'#3a2a8a'; x.fillRect(2,3,1,1); x.fillRect(5,3,1,1);
-  x.fillStyle=o.mouthHex||'#7a3a2a'; x.fillRect(3,5,2,1); if(o.beard){ x.fillStyle=o.hairHex; x.fillRect(1,5,1,2); x.fillRect(6,5,1,2); x.fillRect(2,6,4,1); } },null,{nearest:true}); }
+  x.fillStyle=o.mouthHex||'#94584a'; x.fillRect(3,5,2,1); if(o.beard){ x.fillStyle=o.hairHex; x.fillRect(1,5,1,2); x.fillRect(6,5,1,2); x.fillRect(2,6,4,1); } },null,{nearest:true}); }
 function flatTex(hex,shade=.85,n=40){ return canvasTex(8,8,(x)=>{ x.fillStyle=hex; x.fillRect(0,0,8,8); const c=new THREE.Color().setHex(parseInt(hex.slice(1),16));  // plain sRGB numbers (col() is linear and made the speckles dark blotches)
  for(let i=0;i<n;i++){ const k=rand(shade,1.1); x.fillStyle=`rgb(${Math.min(255,c.r*255*k)|0},${Math.min(255,c.g*255*k)|0},${Math.min(255,c.b*255*k)|0})`; x.fillRect(Math.random()*8|0,Math.random()*8|0,1,1); } },null,{nearest:true}); }
 function makeBlockPerson(o={}){
   const opt=Object.assign({skin:0xd8a880,shirt:0x3a7ad8,pants:0x2a3a6a,hair:0x4a2e1a,shoes:0x2a2a2a,name:'?',voice:'Jim',beard:false},o);
-  const hx=h=>'#'+col(h).getHexString();
+  const hx=h=>'#'+new THREE.Color(h).getHexString();  // the real sRGB colour (col() is linear and made everyone too dark)
   const g=new THREE.Group(); g.name=opt.name;
   const S=new THREE.MeshStandardMaterial({map:flatTex(hx(opt.skin),.97,6),roughness:.85});
   const F=new THREE.MeshStandardMaterial({map:blockFaceTex({skinHex:hx(opt.skin),hairHex:hx(opt.hair),beard:opt.beard}),roughness:.85});
@@ -8495,7 +8497,7 @@ async function finalAftermath(){
   await wait(1.2);
   await tweenVal(k=>{ FX.blackout=k; },2.4);
   FX.desat=0; FX.dof=0; jim.userData.A.mode=null; bob2.userData.A.mode=null; bob2.rotation.order='XYZ'; bob2.rotation.set(0,0,0);
-  showTBC('MARS SHIFT','A1'); unlock('marsEnd');
+  await marsToClone();
 }
 
 </script>
@@ -8928,9 +8930,7 @@ async function takeShard(){
   for(let i=0;i<6;i++) later(i*.35,()=>SFX.ding2());
   for(let i=0;i<10;i++) T.glow.burst(V3(rand(-100,100),rand(20,60),rand(-120,60)),{color:pick([0xffe066,0xff7af0,0x6dffd8,0xc86aff]),count:40,speed:12,size:1,life:1.8,grav:4});
   await wait(4.6); T.cheer=false;
-  playMusic(null,2); await tweenVal(k=>{ FX.blackout=k; },1.4);
-  $('visor').classList.remove('show');
-  showTBC('THE TINYVERSE','B1');
+  await tinyGoHome();
 }
 
 
@@ -9041,25 +9041,7 @@ const TEASERS={
     await tweenVal(k=>{ X.jeff.position.z=lerp(-8,-14,k); },2.4);
     SFX.bark(); say('And Jeff...?',2.6); await wait(2.4);
   },
-  A:async()=>{
-    // 1) the shrink ray, with a purple shard in it
-    const L=await enterLevel('lab',{pos:V3(0,0,3)}); L.jim.visible=true; L.jim.position.set(1.4,0,-1.2); L.jim.rotation.y=-1.2; setMood(L.jim,'happy'); setPose(L.jim,'type',0);
-    if(!L.teaseShard){ const m=new THREE.MeshPhysicalMaterial({color:col(0xc86aff),roughness:.05,clearcoat:1,emissive:col(0x9a3aff),emissiveIntensity:2.2,transparent:true,opacity:.9}); L.teaseShard=mesh(new THREE.OctahedronGeometry(.12,0),m,0,1.6,-1.8,false); L.teaseShard.scale.set(.7,2.2,.7); L.scene.add(L.teaseShard); }
-    L.teaseShard.visible=true; if(L.bigLarry) L.bigLarry.visible=false;
-    letterbox(true); camFollow(t=>({pos:V3(Math.sin(t*.3)*3,1.7,-1.8+Math.cos(t*.3)*3),look:V3(0,1.6,-1.8)}),44); playMusic('lab',.5);
-    await fade(0,.6); say('Jim fixes the shrink ray.',2.8);
-    for(let i=0;i<10;i++){ L.teaseShard.rotation.y+=.6; await wait(.28); } clearPose(L.jim);
-    // 2) Mite Town: Larry waves
-    await fade(1,.35); L.teaseShard.visible=false;
-    const M=await enterLevel('mitetown',{pos:V3(0,40,160)}); M.tard.visible=false; M.nervous=M.panic=M.cheer=false; M.larry.position.set(0,12,110); M.larry.rotation.y=Math.PI;
-    camShot(V3(30,34,200),V3(0,16,110),{dur:0,fov:40}); playMusic('larry',.5); await fade(0,.35);
-    say('Goodbye, Larry?',2.6); M.larry.userData.talking=true; await wait(2.8); M.larry.userData.talking=false;
-    // 3) going home: white light, up and up
-    await fade(1,.35);
-    const L2=await enterLevel('lab',{pos:V3(0,0,3)}); L2.jim.visible=true; L2.jim.position.set(.3,0,1.4); L2.jim.rotation.y=Math.PI;
-    camFollow(t=>({pos:V3(0,.1+t*.5,-1.8),look:V3(.3,1.4+t*.1,1.4)}),55); await fade(0,.35);
-    SFX.grow(); flashWhite(.8,1.2); say('Going home.',2.6); await wait(2.8);
-  }
+  A:async()=>{}   // growing back + bye Larry are in the game now: only the COMING SOON card
 };
 async function playTeaser(chapter,other){
   const fn=TEASERS[WORLD.path]; if(!fn){ showTBC(chapter,other,{noTeaser:true}); return; }
@@ -9072,6 +9054,232 @@ async function playTeaser(chapter,other){
     await fade(1,.4); playMusic(null,1); SFX.titleSlam(); $('csChap').textContent=chapter; $('comingSoon').style.display='flex'; await fade(0,.3);
     await wait(3.4); end();
   });
+}
+
+</script>
+<script>
+/* ===== 58_clone.js ===== */
+/* ================================================================
+   THE OTHER YOU — both normal endings end in the Dome Sweet Dome on
+   Mars. The Mars Shift you (blocky, XXX5 turned Earth into blocks) and
+   the Tinyverse you (a normal person) meet. Ant Work 3 starts here.
+   ================================================================ */
+/* "Are you... me?" — the user's own recording goes here (changed so it isn't
+   their voice; the same voice for both of you, with an echo). Until it comes,
+   the black screen is silent. */
+const CLONE_VOICE={buf:null};
+function playCloneVoice(){
+  if(!AU.ok||!CLONE_VOICE.buf) return 0;
+  const t0=ACtx.currentTime+.05, s=ACtx.createBufferSource(); s.buffer=CLONE_VOICE.buf;
+  const dry=ACtx.createGain(); dry.gain.value=.9; s.connect(dry); dry.connect(voiceBus);
+  // a soft echo that fades quickly, plus a big dark room
+  const dl=ACtx.createDelay(2); dl.delayTime.value=.32; const fb=ACtx.createGain(); fb.gain.value=.32; const lp=ACtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1800; const wet=ACtx.createGain(); wet.gain.value=.5;
+  s.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(wet); wet.connect(voiceBus); wet.connect(revIn);
+  s.start(t0); setTimeout(()=>{ try{ dl.disconnect(); wet.disconnect(); }catch(e){} },(CLONE_VOICE.buf.duration+4)*1000);
+  return CLONE_VOICE.buf.duration+1.4;
+}
+
+/* the other you, in each look */
+function otherYou(lv,blocky){
+  if(blocky){ if(!lv.youBlock){ lv.youBlock=makeBlockPerson({name:'You',voice:'You',skin:0xe2b08c,shirt:0x2f4d6e,pants:0x2e3440,hair:0x2a1c12,shoes:0x2a2a2e}); lv.youBlock.userData.level=lv.name; lv.scene.add(lv.youBlock); } return lv.youBlock; }
+  if(!lv.youHuman){ lv.youHuman=makeYou(); lv.youHuman.userData.level=lv.name; lv.scene.add(lv.youHuman); } return lv.youHuman;
+}
+on('tick',()=>{ const L=LEVELS.bighouse; if(LV===L&&L.youBlock&&L.youBlock.visible) animateBlockPerson(L.youBlock,G.dt||.016,G.time); });
+
+/* the house door: the Dome Sweet Dome on Crater Lane */
+function domeDoor(){ const M=LEVELS.mars; const h=M.houses.find(q=>q.price===100); return h.door; }
+/* Mars, quiet: no bugs, nobody to talk to, only your way to the house */
+function quietMars(M){
+  const F=F_(); F.day=3; F.paid=true; F.cooked=true; F.boughtBig=false; F.boughtHouse=false; F.goHome=false; F.houseHunt=false; F.day3Buy=false; F.day2Convert=false; F.shiftOver=true;
+  for(const b of M.bugs) M.scene.remove(b); M.bugs.length=0; F.bugsOn=false;
+  if(M.steve) M.steve.visible=false;
+  M.jim.visible=false; M.jim.userData.A.path=null; M.jim.userData.A.sleep=false; clearPose(M.jim,0);
+  if(!M.cloneSetup){ M.cloneSetup=true; addInteract(M,{pos:domeDoor().clone().add(V3(0,1.1,0)),label:'Go inside',reach:2.6,aim:false,when:()=>!!F_().toClone,act:()=>runStory(()=>meetClone(F_().toClone))}); }
+}
+/* walk to the house yourself, then go in */
+async function walkToDome(path){
+  const F=F_(); F.toClone=path;
+  objective('Go into the big house'); setMarker(()=>domeDoor().clone().add(V3(0,2.4,0)),'Dome Sweet Dome','m');
+  PLAYER.free();
+}
+
+/* ---------- MARS SHIFT: after the cabin, straight to your house on Mars ---------- */
+async function marsToClone(){
+  const M=await enterLevel('mars',{pos:V3(19.5,0,16.5),yaw:Math.PI*.3});
+  quietMars(M); hideSay();
+  M.rocket.visible=true; M.rocket.position.set(22,marsHeight(22,12)+1.1,12); setRocketFlame(M.rocket,0);
+  PLAYER.fly=false; PLAYER.swim=false; PLAYER.scale=PLAYER.targetScale=1; PLAYER.eye=1.64; PLAYER.roll=0; PLAYER.item=null; PLAYER.carry=null; vmCarry(null);
+  setVM(true); setVMBlocky(true); setVMSuit(false); crosshair(true); hudVisible(true); showCash(false); showCoins(false); objective(null);
+  lookAtPoint(domeDoor().clone().add(V3(0,1.6,0)),0);
+  playMusic(null); setAmbience([['marsWind',.07]]);
+  await tweenVal(k=>{ FX.blackout=1-k; },1.6);
+  walkToDome('B');
+}
+
+/* ---------- THE MEETING ---------- */
+async function meetClone(path){
+  const F=F_(); if(F.cloneMet) return; F.cloneMet=true; F.toClone=null; PLAYER.lock(); objective(null); setMarker(null); hideSay();
+  sfxAt(PLAYER.pos,()=>SFX.alienDoor(),2); await fade(1,.7);
+  const H=await enterLevel('bighouse',{pos:V3(0,0,8.2),yaw:0});
+  H.setNight(false); F.sleeping=true;
+  // the other you: from the other story (Mars Shift you is blocky, the Tinyverse you isn't)
+  const other=otherYou(H,path==='A');
+  for(const o of [H.youBlock,H.youHuman]) if(o) o.visible=false;
+  other.visible=true; other.position.set(0,0,3.4); other.rotation.set(0,Math.PI,0);
+  const A=other.userData.A; A.look=null; A.path=null; A.mode=null; if(A.faceYaw!==undefined) A.faceYaw=Math.PI; if(other.userData.J) setMood(other,'neutral');
+  playMusic(null,1.5); setAmbience([['alienHome',.015]]);
+  PLAYER.eye=1.64; lookAtPoint(V3(0,1.5,0),0);
+  sfxAt(V3(0,1,9),()=>SFX.alienDoor(),2);
+  await fade(0,1);
+  // walk in yourself; they're looking out the big window
+  PLAYER.free();
+  const t0=G.time; await waitUntil(()=>Math.hypot(PLAYER.pos.x-other.position.x,PLAYER.pos.z-other.position.z)<3||G.time-t0>7);
+  PLAYER.lock(); PLAYER.vel.set(0,0,0);
+  // if you just stood at the door, you take a few slow steps in
+  { const d=Math.hypot(PLAYER.pos.x-other.position.x,PLAYER.pos.z-other.position.z); if(d>2.3){ const p0=PLAYER.pos.clone(), to=other.position.clone().add(p0.clone().sub(other.position).setY(0).normalize().multiplyScalar(2.1)); lookAtPoint(other.position.clone().add(V3(0,1.5,0)),.8); await tweenVal(k=>{ PLAYER.pos.x=lerp(p0.x,to.x,k); PLAYER.pos.z=lerp(p0.z,to.z,k); },Math.min(3,(d-2.1)*.75),x=>x); } }
+  const head=()=>other.position.clone().add(V3(0,1.58,0));
+  lookAtPoint(head(),.8);
+  // they hear you and turn around
+  SFX.heartbeat(.6); await wait(.5);
+  const r0=other.rotation.y, r1=Math.atan2(PLAYER.pos.x-other.position.x,PLAYER.pos.z-other.position.z);
+  await tweenVal(k=>{ const y=angLerp(r0,r1,smooth(k)); other.rotation.y=y; if(A.faceYaw!==undefined) A.faceYaw=y; },1.3);
+  A.look='player'; SFX.heartbeat(.8);
+  lookAtPoint(head(),.6); await tweenVal(k=>{ PLAYER.fovKick=-14*smooth(k); },2.4);
+  // black. "Are you... me?"
+  FX.blackout=1; PLAYER.fovKick=0; hudVisible(false); setAmbience([]);
+  await wait(.9);
+  const v=playCloneVoice(); await wait(v||2.2);
+  await wait(.8);
+  other.visible=false; hudVisible(true);
+  if(path==='B'){ unlock('marsEnd'); showTBC('MARS SHIFT','A1'); }
+  else showTBC('THE TINYVERSE','B1');
+}
+
+/* ---------- THE TINYVERSE: say bye to Larry, grow back, Jim flies you to Mars ---------- */
+async function tinyGoHome(){
+  const T=LEVELS.mitetown, F=F_();
+  // 1) say bye to Larry (no words)
+  T.larry.visible=true; T.larry.userData.wave=false;
+  if(!T.byeSetup){ T.byeSetup=true; addInteract(T,{obj:T.larry,offset:V3(0,14,0),label:'Wave bye to Larry',reach:60,d3:true,aim:false,when:()=>!!F_().byeLarry,act:()=>runStory(waveLarry)}); }
+  F.byeLarry=true; objective('Say bye to Larry'); setMarker(()=>T.larry.position.clone().add(V3(0,18,0)),'Larry');
+  playMusic('larry',1.5); PLAYER.free();
+}
+async function waveLarry(){
+  const T=LEVELS.mitetown, F=F_(), L=T.larry; if(!F.byeLarry) return; F.byeLarry=false; PLAYER.lock(); objective(null); setMarker(null);
+  // float back a little so you can see all of him
+  { const away=PLAYER.pos.clone().sub(L.position); if(away.length()<1) away.set(0,0,1); away.normalize(); const p0=PLAYER.pos.clone(), p1=L.position.clone().addScaledVector(away,62).add(V3(0,8,0));
+    await tweenVal(k=>{ PLAYER.pos.lerpVectors(p0,p1,smooth(k)); lookAtPoint(L.position.clone().add(V3(0,10,0)),0); },1.2); }
+  VM.forceShow=true; VM.waveT=2.6; await wait(.5);
+  L.userData.wave=true; await wait(2.8); L.userData.wave=false; VM.forceShow=false;
+  await wait(1.2);
+  // 2) up in the lab, Jim fixes the shrink ray with the shard
+  await fade(1,.6); playMusic(null,1);
+  $('visor').classList.remove('show');
+  const Lb=await enterLevel('lab',{pos:V3(0,0,-1.8),yaw:Math.PI});
+  const jim=Lb.jim; jim.visible=true; jim.userData.A.path=null; jim.position.set(1.4,0,-1.2); jim.rotation.y=-1.2; jim.userData.A.look=null; setMood(jim,'happy'); setPose(jim,'type',0);
+  const sh=labShard(Lb); sh.visible=true; Lb.charge=0; Lb.beam.material.opacity=0;
+  letterbox(true); camFollow(t=>({pos:V3(Math.sin(.4+t*.25)*3.2,1.75,-1.8+Math.cos(.4+t*.25)*3.2),look:V3(0,1.5,-1.8)}),44);
+  await fade(0,.6);
+  for(let i=0;i<10;i++){ sh.rotation.y+=.6; await wait(.24); }
+  clearPose(jim); setPose(jim,'press'); SFX.rayCharge(2.4); SFX.bigButton&&SFX.bigButton();
+  await tweenVal(k=>{ Lb.charge=k*.8; Lb.beam.material.opacity=k*.22; sh.rotation.y+=.2; },2.4);
+  clearPose(jim);
+  await fade(1,.5); letterbox(false); camRelease(0);
+  // 3) back down in Mite Town: the ray's light comes down. Swim into it.
+  await enterLevel('mitetown',{pos:PLAYER_TINY_POS.clone()});
+  PLAYER.pos.copy(PLAYER_TINY_POS); PLAYER.fly=true; $('visor').classList.add('show');
+  const spot=PLAYER.pos.clone().add(V3(30,0,-55)); spot.y=0;
+  if(!T.homeBeam){ const g=new THREE.CylinderGeometry(9,9,800,40,1,true); T.homeBeam=mesh(g,new THREE.MeshBasicMaterial({color:col(0x7dffff),transparent:true,opacity:.16,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,fog:false}),0,0,0,false); T.scene.add(T.homeBeam); }
+  T.homeBeam.visible=true; T.homeBeam.position.set(spot.x,PLAYER.pos.y,spot.z);
+  lookAtPoint(spot.clone().setY(PLAYER.pos.y),0); SFX.beam();
+  await fade(0,.6);
+  objective('Swim into the light'); setMarker(()=>T.homeBeam.position,'The light');
+  PLAYER.free();
+  await waitUntil(()=>Math.hypot(PLAYER.pos.x-T.homeBeam.position.x,PLAYER.pos.z-T.homeBeam.position.z)<8.5);
+  PLAYER.lock(); objective(null); setMarker(null);
+  SFX.rayFire&&SFX.rayFire(); lookAtPoint(PLAYER.pos.clone().add(V3(0,60,-5)),1.2);
+  await tweenVal(k=>{ FX.whiteout=k*k; },1.4);
+  T.homeBeam.visible=false;
+  await growBackInLab();
+}
+const PLAYER_TINY_POS=V3(0,30,150);
+function labShard(Lb){ if(!Lb.teaseShard){ const m=new THREE.MeshPhysicalMaterial({color:col(0xc86aff),roughness:.05,clearcoat:1,emissive:col(0x9a3aff),emissiveIntensity:2.2,transparent:true,opacity:.9}); Lb.teaseShard=mesh(new THREE.OctahedronGeometry(.12,0),m,0,1.6,-1.8,false); Lb.teaseShard.scale.set(.7,2.2,.7); Lb.scene.add(Lb.teaseShard); } return Lb.teaseShard; }
+/* 4) you grow back, big, on the shrink-ray platform */
+async function growBackInLab(){
+  const Lb=await enterLevel('lab',{pos:V3(0,0,-1.8),yaw:Math.PI});
+  const jim=Lb.jim; jim.visible=true; jim.userData.A.path=null; jim.position.set(-1.4,0,.2); jim.rotation.y=Math.PI*.8; jim.userData.A.look='player'; setMood(jim,'happy'); clearPose(jim,0);
+  labShard(Lb).visible=true; Lb.beam.material.opacity=.5; Lb.charge=.8;
+  $('visor').classList.remove('show');
+  PLAYER.fly=false; PLAYER.swim=false; PLAYER.item=null; PLAYER.carry=null; vmCarry(null); setVMBlocky(false); setVMSuit(true); setVM(true);
+  PLAYER.pos.set(0,0,-1.8); PLAYER.y=.24; PLAYER.scale=PLAYER.targetScale=.006; lookAtPoint(V3(0,5,-1.8),0);
+  SFX.grow(); SFX.shrinkWarp&&SFX.shrinkWarp(); FX.glitch=.3;
+  await tweenVal(k=>{ FX.whiteout=1-k; PLAYER.targetScale=PLAYER.scale=lerp(.006,1,easeOut(k)); PLAYER.fovKick=(1-k)*25; },3,x=>x);
+  FX.glitch=0; PLAYER.fovKick=0; shake(.4);
+  await tweenVal(k=>{ Lb.charge=.8*(1-k); Lb.beam.material.opacity=.5*(1-k); },1);
+  lookAtPoint(jim.position.clone().add(V3(0,1.6,0)),1); await wait(1.4);
+  // you take the suit off
+  await fade(1,.4); SFX.suitOn&&SFX.suitOn(); setVMSuit(false); await wait(.8); await fade(0,.5);
+  // 5) up the ladder, Jim goes first
+  folkWalkHuman(jim,[V3(-5.4,0,3.2),Lb.ladderBottom.clone()]).then(()=>{ jim.visible=false; });
+  objective("Go up the ladder"); setMarker(()=>Lb.ladderBottom.clone().add(V3(0,1.6,0)),'Ladder','m');
+  if(!Lb.upSetup){ Lb.upSetup=true; addInteract(Lb,{pos:Lb.ladderBottom.clone().add(V3(0,1,0)),label:'Climb up the ladder',reach:2,aim:false,when:()=>!!F_().climbUp,act:()=>runStory(climbUpToStand)}); }
+  F_().climbUp=true; PLAYER.free();
+}
+function folkWalkHuman(h,pts){ return walkTo(h,pts,1.3); }
+async function climbUpToStand(){
+  const F=F_(); if(!F.climbUp) return; F.climbUp=false; PLAYER.lock(); objective(null); setMarker(null);
+  lookAtPoint(PLAYER.pos.clone().add(V3(0,5,-1)),.5);
+  for(let i=0;i<5;i++){ SFX.ladder(); PLAYER.y+=.4; await wait(.3); }
+  await fade(1,.4);
+  // 6) outside: Jim's rocket next to his stand
+  const S=await enterLevel('stand',{pos:S_LADDER.clone(),yaw:Math.PI});
+  S.hatch.target=1; S.hatch.open=1; S.hatchPassable=true; S.hatchLight.intensity=2.5;
+  if(!S.rocket2){ S.rocket2=makeRocket(); S.scene.add(S.rocket2); colCircle(S.col,ROCKET_STAND.x,ROCKET_STAND.z,1.7); addInteract(S,{obj:S.rocket2,offset:V3(0,1.4,1.4),label:"Get in Jim's rocket",reach:3.6,aim:false,when:()=>!!F_().getInRocket,act:()=>runStory(flyToMars)}); }
+  S.rocket2.visible=true; S.rocket2.position.set(ROCKET_STAND.x,1.1,ROCKET_STAND.z); setRocketFlame(S.rocket2,0);
+  const jim=S.jim; jim.visible=true; jim.userData.A.path=null; jim.position.set(ROCKET_STAND.x-1.6,0,ROCKET_STAND.z+1.8); jim.userData.A.look='player'; setMood(jim,'happy'); clearPose(jim,0);
+  PLAYER.pos.copy(S.ladderTop); PLAYER.y=-1.6; PLAYER.eye=1.64; PLAYER.yaw=Math.PI;
+  playMusic('jim',1.5); await fade(0,.6);
+  for(let i=0;i<4;i++){ SFX.ladder(); PLAYER.y=Math.min(0,PLAYER.y+.4); await wait(.3); } PLAYER.y=0;
+  lookAtPoint(S.rocket2.position.clone().add(V3(0,2,0)),1); await wait(1);
+  F.getInRocket=true; objective("Get in Jim's rocket"); setMarker(()=>S.rocket2.position.clone().add(V3(0,3.2,0)),"Jim's rocket",'m');
+  PLAYER.free();
+}
+const S_LADDER=V3(0,0,-5.2), ROCKET_STAND=V3(13,0,-14);
+/* 7) Jim flies you to Mars */
+async function flyToMars(){
+  const F=F_(); if(!F.getInRocket) return; F.getInRocket=false; PLAYER.lock(); objective(null); setMarker(null);
+  const S=LEVELS.stand, R=S.rocket2;
+  await fade(1,.4); S.jim.visible=false;
+  letterbox(true); camShot(V3(ROCKET_STAND.x-9,2.2,ROCKET_STAND.z+10),R.position.clone().add(V3(0,3,0)),{dur:0,fov:48});
+  await fade(0,.4);
+  SFX.ignite&&SFX.ignite(); setRocketFlame(R,1); setAmbience([['rocket',.5]]); shake(.4); playMusic('fly',1);
+  await wait(1);
+  await tweenVal(k=>{ R.position.y=1.1+k*k*90; },3.2,x=>x);
+  await tweenVal(k=>{ FX.whiteout=k; },.6);
+  const Sp=await enterLevel('space',{pos:V3(0,0,0)},{keepMusic:true});
+  Sp.rx=0; Sp.speed=60; camFollow(t=>({pos:V3(Sp.rx-20+t*2,7,30),look:V3(Sp.rx,0,0)}),44);
+  await tweenVal(k=>{ FX.whiteout=1-k; },.7);
+  await wait(3.6);
+  camFollow(t=>({pos:V3(Sp.rx-16,3,-9),look:V3(Sp.rx+60,0,0)}),55); invalidateMotion();
+  await tweenVal(k=>{ Sp.speed=lerp(60,1300,easeIn(k)); },3);
+  await tweenVal(k=>{ FX.whiteout=k; },.6);
+  // land on Mars, right by Crater Lane
+  const M=await enterLevel('mars',{pos:V3(19.5,0,16.5),yaw:Math.PI*.3},{keepMusic:true});
+  quietMars(M);
+  const land=V3(22,marsHeight(22,12)+1.1,12), MR=M.rocket; MR.visible=true; MR.position.set(land.x,land.y+60,land.z); setRocketFlame(MR,1);
+  camShot(V3(8,3,-4),land.clone().add(V3(0,6,0)),{dur:0,fov:50});
+  await tweenVal(k=>{ FX.whiteout=1-k; },.6);
+  await tweenVal(k=>{ MR.position.y=land.y+60*(1-easeOut(k)); setRocketFlame(MR,1-k*.6); },3.4);
+  setRocketFlame(MR,0); SFX.moonThud&&SFX.moonThud(); shake(.3); ambVol('rocket',0);
+  for(let i=0;i<4;i++) M.soft.burst(V3(land.x,land.y-.8,land.z),{color:0xd8a070,count:25,speed:7,size:1.4,life:2.6,grav:.2,up:.1,grow:3,drag:1.3,alpha:.45});
+  await wait(1.4);
+  await fade(1,.4); camRelease(0); letterbox(false);
+  // Jim (this story's Jim) stays by his rocket
+  const jim=M.jim; jim.visible=true; jim.userData.A.path=null; jim.position.set(19.6,marsHeight(19.6,14.2),14.2); jim.rotation.y=-.6; jim.userData.A.look='player'; setMood(jim,'happy'); clearPose(jim,0);
+  PLAYER.pos.set(18.6,0,16.6); PLAYER.eye=1.64; lookAtPoint(domeDoor().clone().add(V3(0,1.6,0)),0);
+  playMusic(null,1.5); setAmbience([['marsWind',.07]]);
+  await fade(0,.6);
+  walkToDome('A');
 }
 
 </script>
