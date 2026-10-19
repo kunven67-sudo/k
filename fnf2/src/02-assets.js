@@ -9,7 +9,7 @@ G.A = {
   _img: new Map(),     // path -> HTMLImageElement (decoded)
   _json: new Map(),
   _buf: new Map(),     // path -> Promise<AudioBuffer>
-  has(p) { return p in this.raw; },
+  has(p) { return p in this.raw || G.Packs.owner.has(p); },
   text(p) { const v = this.raw[p]; return typeof v === 'string' && !v.startsWith('data:') ? v : null; },
   json(p) {
     // our own characters are made on first use from a real one (15-forge.js)
@@ -42,21 +42,39 @@ G.A = {
       const w = this._weak.get(p), old = w && w.deref();
       if (old) { img = old; this._img.set(p, old); }
     }
-    if (img) { this._touch.set(img, this._gen); return img; }
-    return this.raw[p] && p.endsWith('.png') ? this._load(p) : null;
+    if (img) { this.touch(img); return img; }
+    if (this.raw[p]) return p.endsWith('.png') ? this._load(p) : null;
+    // a picture in a mod pack's body that isn't loaded yet: the body loads, then it decodes (the screen waits)
+    const pk = G.Packs.owner.get(p);
+    return pk && p.endsWith('.png') ? this._loadPacked(p, pk) : null;
+  },
+  _loadPacked(p, pk) {
+    const img = new Image(), d = pk.body[p];
+    if (d && d[1]) { img.width = d[1]; img.height = d[2]; }
+    img._pack = pk;
+    this._img.set(p, img); this._touch.set(img, this._gen); this._weak.delete(p); pk.used = this._gen;
+    const pr = G.Packs.needBody(pk).then(ok => {
+      if (!ok || !this.raw[p]) return;
+      img.src = this.raw[p];
+      return img.decode ? img.decode() : new Promise(r => { img.onload = r; });
+    }).catch(() => {}).then(() => { this.pending.delete(pr); this.fresh.push(img); });
+    this.pending.add(pr);
+    return img;
   },
   // Memory: only pictures under 2 MB (once decoded) are decoded at boot (~110 MB, menus + UI). Bigger
   // ones decode when a screen asks for them (the screen waits). A few seconds after every screen change,
   // big pictures that screen never asked for are let go, so memory doesn't keep growing with every
   // stage you visit (it used to hold 370 MB at boot and climb past 1 GB).
-  HEAVY: 2e6,
+  HEAVY: G.phone ? 0.6e6 : 2e6,
+  // big ones that are always ready anyway (the loading screen has to show right away; the arrows are in every song)
+  KEEP: new Set(['preload/images/funkay.png', 'shared/images/noteStrumline.png', 'shared/images/notes.png']),     // (phones decode even less at boot: they have much less memory)
   _gen: 0, _touch: new WeakMap(), _weak: new Map(), _releaseAt: 0,
-  touch(img) { if (img) this._touch.set(img, this._gen); },
+  touch(img) { if (img) { this._touch.set(img, this._gen); if (img._pack) img._pack.used = this._gen; } },   // (a mod pack's picture: the pack is in use too)
   newScreen() { this._gen++; this._releaseAt = performance.now() + 2500; },
   releaseUnused() {
     let freed = 0;
     for (const [p, img] of this._img) {
-      if (this._touch.get(img) === this._gen || img.width * img.height * 4 < this.HEAVY) continue;
+      if (this._touch.get(img) === this._gen || img.width * img.height * 4 < this.HEAVY || img._keep) continue;
       this._img.delete(p); this._weak.set(p, new WeakRef(img));
       if (G.Sparrow && G.Sparrow.forget) G.Sparrow.forget(img);
       if (G.Atlas && G.Atlas.forget) G.Atlas.forget(img);
@@ -64,6 +82,7 @@ G.A = {
     }
     for (const [p, w] of this._weak) if (!w.deref()) this._weak.delete(p);
     if (G.Pin) G.Pin.releaseUnused(this._gen);
+    G.Packs.releaseUnused(this._gen);
     return freed;
   },
   pending: new Set(),
@@ -99,8 +118,9 @@ G.A = {
     for (const p in this.raw) {
       if (!p.endsWith('.png') || this._img.has(p)) continue;
       const d = this.dims(p);
-      if (d && d[0] * d[1] * 4 >= this.HEAVY) continue;
-      this._load(p); n++;
+      if (d && d[0] * d[1] * 4 >= this.HEAVY && !this.KEEP.has(p)) continue;
+      const img = this._load(p); n++;
+      if (this.KEEP.has(p)) img._keep = true;
     }
     const all = [...this.pending];
     let done = 0;
@@ -111,12 +131,16 @@ G.A = {
   // budget: when it's over, the tracks used longest ago go (the song being played + the menu music are
   // pinned, little sounds always stay). Before this every song you previewed or played stayed decoded
   // forever, and memory filled up until everything lagged.
-  AUDIO_BUDGET: 280e6,
+  AUDIO_BUDGET: G.phone ? 140e6 : 280e6,
   _use: new Map(), _size: new Map(), _pinned: new Set(['preload/music/freakyMenu/freakyMenu.ogg']),
   audio(p) {
     this._use.set(p, performance.now());
     if (this._buf.has(p)) return this._buf.get(p);
     const data = this.raw[p];
+    if (!data && G.Packs.owner.has(p)) {   // in a mod pack's body: load the body first
+      const pk = G.Packs.owner.get(p); pk.used = this._gen;
+      return G.Packs.needBody(pk).then(ok => ok && this.raw[p] ? this.audio(p) : null);
+    }
     if (!data || !G.audio || !G.audio.ctx) return Promise.resolve(null);
     const b64 = data.slice(data.indexOf(',') + 1);
     const bin = atob(b64); const u8 = new Uint8Array(bin.length);
@@ -138,6 +162,9 @@ G.A = {
     const key = p + '#' + from + ':' + to;
     this._use.set(key, performance.now());
     if (this._buf.has(key)) return this._buf.get(key);
+    // a mod song that isn't loaded: its pack has the preview part cut out already (no need to load the whole mod)
+    const pv = !this.raw[p] && G.Packs.preview(p, from, to);
+    if (pv) { const pr = this.audio(pv); this._buf.set(key, pr); pr.then(b => { if (b && this._buf.get(key) === pr) { this._size.set(key, b.length * b.numberOfChannels * 4); this.trimAudio(); } }); return pr; }
     const had = this._buf.has(p);
     const pr = this.audio(p).then(full => {
       if (!full) return null;
@@ -173,6 +200,141 @@ G.A = {
     return p;
   },
 };
+// ------------------------------------------------------------------ mod packs
+// Every mod is its own pack: two files in the packs/ folder next to the game.
+//   <id>.head.js  small: the mod's data (songs, charts, stages, characters, dialogue, weeks), its small pictures
+//                 (icons, freeplay + character select art), fonts and a short preview of every song. Read when the
+//                 game starts, so its songs are in freeplay + story mode.
+//   <id>.body.js  big: the mod's pictures, music and videos. Only read when something of the mod is needed (you
+//                 play one of its songs...), and let go again a few seconds after you leave (memory).
+// packs/index.js lists them. Phones and the Game System app can't read a folder: Options > Mods > Load Packs
+// keeps the files in the browser (IndexedDB) instead. Mods can be switched off (Options > Mods).
+G.Packs = {
+  all: {},              // id -> {id, name, credit, src: 'folder' | 'saved', head: true when it's in, body: {path: [bytes, w, h]}, bodyLoaded}
+  owner: new Map(),     // a body file's path -> its pack
+  previews: new Map(),  // 'songs/x/Inst.ogg' -> [from, to] (seconds): the preview cut into the head as path + '#preview'
+  folder: [],           // what packs/index.js lists
+  keep: G.phone ? 0 : 1,   // how many packs not in use stay loaded (PC: the last one, so playing it again is instant)
+  settings() { return G.store.get('fnf2.packs', {}) || {}; },
+  isOn(id) { return this.settings()[id] !== false; },
+  setOn(id, on) { const s = this.settings(); s[id] = !!on; G.store.set('fnf2.packs', s); },
+  has(id) { return !!(this.all[id] && this.all[id].head); },
+  loadingNow: null,
+  loadScript(src) {
+    return new Promise(res => {
+      const el = document.createElement('script'); el.src = src; el.async = true;
+      el.onload = () => { el.remove(); res(true); }; el.onerror = () => { el.remove(); res(false); };
+      document.head.appendChild(el);
+    });
+  },
+  // ---- the head scripts call these
+  register(meta, head) {
+    if (this.all[meta.id] && this.all[meta.id].head) return;   // (the folder one wins over a saved copy)
+    const p = this.all[meta.id] = Object.assign(this.all[meta.id] || {}, meta, { head: true, bodyLoaded: false, src: this._src || 'folder' });
+    Object.assign(G.A.raw, head);
+    for (const k in p.body) this.owner.set(k, p);
+    for (const k in p.previews || {}) this.previews.set(k, p.previews[k]);
+    // its weeks go after the others in story mode + freeplay
+    for (const w of p.weeks || []) if (G.WEEK_ORDER && !G.WEEK_ORDER.includes(w)) G.WEEK_ORDER.push(w);
+  },
+  gotBody(id, files) {
+    const p = this.all[id]; if (!p) return;
+    Object.assign(G.A.raw, files); p.bodyKeys = Object.keys(files); p.bodyLoaded = true;
+  },
+  // ---- body: loaded when one of its files is asked for
+  needBody(p) {
+    if (p.bodyLoaded) return Promise.resolve(true);
+    if (p.loading) return p.loading;
+    this.loadingNow = p; p.loadT0 = performance.now();
+    p.loading = (async () => {
+      let src = 'packs/' + p.id + '.body.js', blob = null;
+      if (p.src === 'saved') { blob = await this.idb('get', p.id + '.body.js'); if (!blob) { p.loading = null; return false; } src = URL.createObjectURL(blob); }
+      const ok = await this.loadScript(src);
+      if (blob) URL.revokeObjectURL(src);
+      p.loading = null; if (this.loadingNow === p) this.loadingNow = null;
+      if (!ok || !p.bodyLoaded) G.toast && G.toast('Could not load ' + (p.name || p.id) + ' (its pack file is missing)', '#ff7070');
+      return ok && p.bodyLoaded;
+    })();
+    return p.loading;
+  },
+  unloadBody(p) {
+    for (const k of p.bodyKeys || []) {
+      delete G.A.raw[k];
+      const img = G.A._img.get(k);
+      if (img) { G.A._img.delete(k); if (G.Pin) G.Pin.drop(img); if (G.Sparrow && G.Sparrow.forget) G.Sparrow.forget(img); if (G.Atlas && G.Atlas.forget) G.Atlas.forget(img); }
+      G.A._weak.delete(k);
+      if (!G.A._pinned.has(k)) { G.A._buf.delete(k); G.A._size.delete(k); }
+    }
+    p.bodyKeys = null; p.bodyLoaded = false;
+  },
+  // packs this screen didn't use: let go (PC keeps the last one used)
+  releaseUnused(gen) {
+    const idle = Object.values(this.all).filter(p => p.bodyLoaded && !p.loading && p.used !== gen).sort((a, b) => (b.used || 0) - (a.used || 0));
+    for (const p of idle.slice(this.keep)) this.unloadBody(p);
+  },
+  preview(path, from, to) {
+    const w = this.previews.get(path);
+    return w && Math.abs(w[0] - from) < 0.05 && Math.abs(w[1] - to) < 0.05 && G.A.raw[path + '#preview'] ? path + '#preview' : null;
+  },
+  // ---- saved packs (phones / Game System): IndexedDB 'fnf2-packs', file name -> Blob
+  _db: null,
+  idb(op, key, val) {
+    return new Promise(res => {
+      try {
+        const go = db => {
+          const tx = db.transaction('files', op === 'get' || op === 'keys' ? 'readonly' : 'readwrite'), st = tx.objectStore('files');
+          const r = op === 'get' ? st.get(key) : op === 'keys' ? st.getAllKeys() : op === 'put' ? st.put(val, key) : st.delete(key);
+          r.onsuccess = () => res(op === 'put' || op === 'del' ? true : r.result); r.onerror = () => res(null);
+        };
+        if (this._db) return go(this._db);
+        const rq = indexedDB.open('fnf2-packs', 1);
+        rq.onupgradeneeded = () => rq.result.createObjectStore('files');
+        rq.onsuccess = () => { this._db = rq.result; go(this._db); };
+        rq.onerror = () => res(null);
+      } catch (e) { res(null); }
+    });
+  },
+  // the first line of every pack file says what it is: /*FNF-PACK {"id":..,"name":..,"part":"head"|"body"}*/
+  async readMeta(blob) {
+    try { const t = await blob.slice(0, 600).text(), m = /^\/\*FNF-PACK (\{.*?\})\*\//.exec(t); return m ? JSON.parse(m[1]) : null; } catch (e) { return null; }
+  },
+  // Options > Mods > Load Packs: pick the pack files (any number), they're kept in the browser
+  async save(files) {
+    const done = [];
+    for (const f of files) {
+      const m = await this.readMeta(f);
+      if (!m || !m.id || !/^(head|body)$/.test(m.part)) continue;
+      if (await this.idb('put', m.id + '.' + m.part + '.js', f)) done.push(m);
+    }
+    return done;
+  },
+  async forget(id) { await this.idb('del', id + '.head.js'); await this.idb('del', id + '.body.js'); },
+  async boot() {
+    // 1. the packs/ folder next to the game (PC)
+    window.FNF_PACK_INDEX = list => { this.folder = list || []; };
+    window.FNF_PACK = (meta, head) => this.register(meta, head);
+    window.FNF_PACK_BODY = (id, files) => this.gotBody(id, files);
+    if (await this.loadScript('packs/index.js')) {
+      this._src = 'folder';
+      for (const e of this.folder) {
+        this.all[e.id] = Object.assign(this.all[e.id] || {}, e, { src: 'folder' });
+        if (this.isOn(e.id)) await this.loadScript('packs/' + e.id + '.head.js');
+      }
+    }
+    // 2. packs kept in the browser
+    const keys = await this.idb('keys');
+    this._src = 'saved';
+    for (const k of keys || []) {
+      const m = /^(.+)\.head\.js$/.exec(k); if (!m || (this.all[m[1]] && this.all[m[1]].src === 'folder')) continue;
+      const blob = await this.idb('get', k), meta = blob && await this.readMeta(blob);
+      this.all[m[1]] = Object.assign(this.all[m[1]] || {}, meta || { id: m[1] }, { src: 'saved' });
+      if (!blob || !this.isOn(m[1])) continue;
+      const url = URL.createObjectURL(blob); await this.loadScript(url); URL.revokeObjectURL(url);
+    }
+    this._src = null;
+  },
+};
+
 // FNF's real VCR font (falls back to VT323 from the base build)
 G.FONT.vcr = "'VCR', 'FNFVcr', 'Courier New', monospace";
 G.FONT.f5 = "'5by7', 'VCR', monospace";
@@ -180,6 +342,9 @@ G.FONT.f5b = "'5by7b', '5by7', 'VCR', monospace";
 G.FONT.gone = "'YoureGone', 'VCR', sans-serif";
 G.FONT.pixel = "'PixelArial', 'VCR', monospace";
 G.assetsReady = (async function () {
+  try { await G.Packs.boot(); } catch (e) { G.reportError(e, 'packs'); }
+  // anything read before the packs came in (and maybe found missing, or overridden by a pack since) is read again
+  G.A._json.clear(); if (G.Sparrow) G.Sparrow.cache.clear(); if (G.Atlas) G.Atlas.cache.clear();
   // FNF's own fonts: VCR (HUD/menus) and 5by7 (freeplay)
   const known = [['fonts/vcr.ttf', 'VCR'], ['fonts/5by7.ttf', '5by7'], ['fonts/5by7_b.ttf', '5by7b'], ['fonts/YoureGone-Regular.otf', 'YoureGone'], ['fonts/pixel.otf', 'PixelArial']];
   // mods bring their own fonts (fonts/mods/<name>.ttf|otf): they're registered under their file name

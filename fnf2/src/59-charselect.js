@@ -27,7 +27,7 @@
     // animation, his friends on the speakers, DJ, songs, results
     // ownChar: FNF's own songs where he's the opponent (Weekend 1) are his too, played swapped as swapChar (the mod's
     // playable Darnell: real misses, death + retry)
-    darnell: { id: 'darnell', name: 'Darnell', pos: 5, chill: CS + 'darnellChill', gf: { asset: CS + 'friendsChill', viz: false }, nametag: 'darnell', icon: 'darnell', ownChar: 'darnell', swapChar: 'darnell-player' },
+    darnell: { id: 'darnell', pack: 'darnell', name: 'Darnell', pos: 5, chill: CS + 'darnellChill', gf: { asset: CS + 'friendsChill', viz: false }, nametag: 'darnell', icon: 'darnell', ownChar: 'darnell', swapChar: 'darnell-player' },
     nene: real('nene', { name: 'Nene', pos: 1, nametag: 'nene', icon: 'nene', gf: { asset: CS + 'gfChill', viz: false },
       real: { char: 'nene', songChar: 'nene-playable', flip: false, scale: 0.62, select: 'combo50', win: 'combo200', lose: 'raiseKnife', hey: 'combo50', die: 'raiseKnife', retry: 'combo50', dj: { x: 190, y: 712, k: 0.48 } },
       freeplay: { text1: 'NENE', text2: 'CUTE BUT SHE BRINGS A KNIFE', text3: 'DO NOT TOUCH HER A-BOT', colors: ['#FFD4E9', '#FF9CC8', '#FFF0F7', '#E8418A', '#FFFFFF', '#C02468', '#FF5FA2', '#F04C93'] } }),

@@ -19,7 +19,7 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-OWN = os.path.join(ROOT, 'build', 'own')
+OWN = os.environ.get('FNF_OWN') or os.path.join(ROOT, 'build', 'mods', 'sky')   # this mod's pack folder (tools/pack_assets.py --packs)
 sys.path.insert(0, HERE)
 from repack_sparrow import repack
 

@@ -48,7 +48,7 @@ G.Pin = {
   },
   drop(img) { const c = this.map.get(img); if (!c) return; this.map.delete(img); this.bytes -= c.width * c.height * 4; c.width = c.height = 0; },
   // copies not drawn since the screen changed
-  releaseUnused(gen) { let n = 0; for (const [img, c] of this.map) if (c._g !== gen) { this.drop(img); n++; } return n; },
+  releaseUnused(gen) { let n = 0; for (const [img, c] of this.map) if (c._g !== gen && !img._keep) { this.drop(img); n++; } return n; },
   clear() { for (const img of [...this.map.keys()]) this.drop(img); },
 };
 // the graphics card was reset (driver update, crash): every copy on it is blank now, make new ones

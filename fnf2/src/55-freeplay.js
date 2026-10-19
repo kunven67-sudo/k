@@ -1163,7 +1163,7 @@
       for (let i = this.caps.length - 1; i >= 0; i--) {
         if (this.caps[i].hit(x, y)) { if (i === this.sel) this.confirm(); else this.changeSelection(i - this.sel); return; }
       }
-      if (G.input.touchMode && x < 380 && y > 250) this.switchPlayer();   // tapping the DJ = character select (touch only, like V-Slice)
+      if (G.touchMode && x < 380 && y > 250) this.switchPlayer();   // tapping the DJ = character select (touch only, like V-Slice)
     },
     onBlur() { this.spam.on = false; this.spam.t = 0; },
     // ------------------------------------------------------------ update
@@ -1444,9 +1444,8 @@
         const ost = textImg(this.album.id === null && this.song() ? 'OFFICIAL OST' : 'OFFICIAL OST', G.FONT.vcr, 48, '#FFFFFF', { stroke: 2 });
         ctx.drawImage(ost, W - 8 - ost._tw - ost._pad, 8 - ost._pad);
       }
-      const hint = textImg(this.rankMode ? 'Press [ E ] to edit a rank' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, '#5F5F5F');
+      const hint = textImg(this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, '#5F5F5F');
       ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
-      if (G.touchMode && this.textsVis) G.text(ctx, '<---', 8, 72, { font: 'vcr', size: 40, baseline: 'top' });
       G.screenOff.y = oy; G.setScreenT(ctx);
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }
       // character select transition: the camera's blue fade + the gradient sweeping over

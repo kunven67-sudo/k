@@ -13,7 +13,7 @@ is a personal copy for the owner only.
 Images become WebP, audio becomes MP3 (voices mono), text/json/xml stay text.
 Converted files are cached in ~/.cache/fnf2/conv so rebuilds are fast.
 """
-import argparse, base64, fnmatch, hashlib, json, os, subprocess, sys
+import argparse, base64, fnmatch, hashlib, json, os, re, subprocess, sys
 from io import BytesIO
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -41,6 +41,8 @@ PACKS = {
         # menus / ui
         'preload/images/alphabet.*', 'preload/images/fonts/*.png', 'preload/images/fonts/*.xml', 'preload/images/logoBumpin.*', 'preload/images/gfDanceTitle.*', 'preload/images/title-screen-text/*',
         'preload/images/menuBG.png', 'preload/images/menuBGMagenta.png', 'preload/images/menuDesat.png', 'preload/images/newgrounds_logo.png',
+        'preload/images/backButton.*', 'preload/images/pauseButton.*', 'preload/images/pauseCircle.png',   # FNF mobile's buttons
+        'preload/images/funkay.png',   # the loading screen
         'preload/images/mainmenu/storymode.*', 'preload/images/mainmenu/freeplay.*', 'preload/images/mainmenu/options.*', 'preload/images/mainmenu/credits.*',
         'preload/images/storymenu/titles/tutorial.png', 'preload/images/storymenu/titles/week1.png',
         'preload/images/storymenu/props/bf.*', 'preload/images/storymenu/props/gf.*', 'preload/images/storymenu/props/dad.*', 'preload/images/storymenu/props/pico-player.*',
@@ -273,6 +275,151 @@ def slim_atlas(o):
     if isinstance(o, float): return round(o, 4)
     return o
 
+def convert(srcs, jobs=0, warm_only=False):
+    """{rel path: source file} -> {rel path: packed data} (pictures WebP data URLs, audio MP3, text as text)."""
+    # Sparrow sheets: use the tight copy (same pixels, much less memory)
+    saved = 0
+    for rel in list(srcs):
+        if rel.endswith('.png') and rel[:-4] + '.xml' in srcs:
+            p2, x2 = tight_sparrow(srcs[rel], srcs[rel[:-4] + '.xml'])
+            if p2 != srcs[rel]:
+                from PIL import Image
+                s0, s1 = Image.open(srcs[rel]).size, Image.open(p2).size
+                saved += (s0[0] * s0[1] - s1[0] * s1[1]) * 4
+                srcs[rel], srcs[rel[:-4] + '.xml'] = p2, x2
+    print(f'tight sheets saved {saved / 1e6:.0f} MB of decoded pictures')
+    # big sheets -> small pages (sheet.png = page 0, sheet~1.png = page 1, ...)
+    npaged = 0
+    for rel in list(srcs):
+        if rel.endswith('.png') and rel[:-4] + '.xml' in srcs:
+            r = paged_sparrow(srcs[rel], srcs[rel[:-4] + '.xml'])
+            if not r: continue
+            x2, pages = r
+            srcs[rel[:-4] + '.xml'] = x2; srcs[rel] = pages[0]
+            for n, p in enumerate(pages[1:], 1): srcs[rel[:-4] + '~%d.png' % n] = p
+            npaged += 1
+    print(f'{npaged} big sheets split into pages of max {PAGE}x{PAGE}')
+    # convert on every core first (the slow part: WebP + mp3), the loop below then reads the cache
+    from concurrent.futures import ProcessPoolExecutor
+    jl = [(rel, src) for rel, src in sorted(srcs.items()) if os.path.splitext(rel)[1].lower() in ('.png', '.ogg', '.mp3')]
+    if warm_only: jl.reverse()
+    with ProcessPoolExecutor(jobs or os.cpu_count()) as ex: list(ex.map(warm, jl, chunksize=4))
+    if warm_only: print('warmed', len(jl)); return None
+    out = {}
+    for rel, src in sorted(srcs.items()):
+        ext = os.path.splitext(rel)[1].lower()
+        if ext == '.png':
+            data = 'data:image/webp;base64,' + base64.b64encode(to_webp(src)).decode()
+        elif ext in ('.ogg', '.mp3'):
+            if ext == '.mp3' and os.path.exists(src[:-4] + '.ogg'): continue
+            voices = '/Voices' in rel
+            data = 'data:audio/mpeg;base64,' + base64.b64encode(to_mp3(src, voices)).decode()
+            rel = rel[:-4] + '.ogg'   # the game always asks for .ogg names
+        elif ext in ('.ttf', '.otf'):
+            data = 'data:font/ttf;base64,' + base64.b64encode(open(src, 'rb').read()).decode()
+        elif ext == '.json':
+            try:
+                j = json.load(open(src, encoding='utf-8-sig'))
+                if os.path.basename(rel) == 'Animation.json': j = slim_atlas(j)
+                data = json.dumps(j, separators=(',', ':'))
+            except Exception: data = open(src, encoding='utf-8-sig').read()
+        elif ext in ('.mp4', '.webm'):
+            data = 'data:video/' + ext[1:] + ';base64,' + base64.b64encode(open(src, 'rb').read()).decode()
+        elif ext in ('.xml', '.txt', '.srt'):
+            data = open(src, encoding='utf-8-sig').read()
+        else:
+            continue
+        out[rel] = data
+    return out
+
+def write_chunked(f, var_assign, out):
+    """Object.assign pieces of ~96 MB, each its own <script> in the built page (one script's text is one JS string,
+    and Chrome can't make a string much over 512 MB)."""
+    part, size = {}, 0
+    def flush():
+        f.write('/*FNF-CHUNK*/\n' + var_assign)
+        json.dump(part, f, separators=(',', ':'))
+        f.write(');\n')
+    for k, v in out.items():
+        if part and size + len(v) > 96 * 1048576: flush(); part, size = {}, 0
+        part[k] = v; size += len(v)
+    if part: flush()
+
+# ---------------------------------------------------------------- mod packs (fnf2/build/packs, see G.Packs in src/02-assets.js)
+PACK_INFO = {
+    'garcello': {'name': 'VS Garcello', 'credit': 'atsuover + Rageminer (original), Greeny3483 (V-Slice port)'},
+    'tabi': {'name': 'VS Tabi', 'credit': 'Homskiy + team (original), SangMareZG (V-Slice port)'},
+    'sky': {'name': 'VS Sky', 'credit': 'bbpanzu'},
+    'nene': {'name': "Nene's songs (Girls Night + Girls' Night Out)", 'credit': 'Girls Night team, Pico Day 2023 team, ZenUnique (playable Nene)'},
+    'darnell': {'name': "Darnell's Mixtape", 'credit': 'Vegie15 + team'},
+}
+# small pictures the menus need right away (icons, freeplay capsules, album art, character select) live in the head
+HEAD_PICS = ('preload/images/icons/', 'preload/images/freeplay/', 'preload/images/charSelect/', 'preload/images/storymenu/', 'preload/images/mainmenu/')
+
+def preview_cut(src, start, end):
+    """The part of a song freeplay previews (start..end seconds), as an mp3."""
+    st = os.stat(src)
+    key = hashlib.sha1(f'{src}|{st.st_size}|{st.st_mtime}|{start:.3f}|{end:.3f}|preview1'.encode()).hexdigest()
+    p = os.path.join(CACHE, 'preview', key)
+    if not os.path.exists(p):
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, 'wb').write(run(['ffmpeg', '-v', 'error', '-ss', '%.3f' % start, '-t', '%.3f' % max(0.5, end - start), '-i', src, '-ac', '2', '-b:a', '96k', '-f', 'mp3', '-']))
+    return open(p, 'rb').read()
+
+def make_pack(pid, root, out_dir, jobs):
+    from PIL import Image
+    srcs = {}
+    for d, _, fs in os.walk(root):
+        for f in fs:
+            rel = os.path.relpath(os.path.join(d, f), root).replace(os.sep, '/')
+            srcs[rel] = os.path.join(d, f)
+    orig = dict(srcs)
+    out = convert(dict(srcs), jobs)
+    head, body, sizes = {}, {}, {}
+    for rel, data in out.items():
+        ext = os.path.splitext(rel)[1].lower()
+        small_pic = ext == '.png' and (rel.startswith(HEAD_PICS) or len(data) < 160000)
+        if ext in ('.json', '.xml', '.txt', '.srt', '.ttf', '.otf') or small_pic: head[rel] = data; continue
+        body[rel] = data
+        if ext == '.png':
+            w = h = 0
+            try:
+                im = Image.open(BytesIO(base64.b64decode(data[data.index(',') + 1:]))); w, h = im.size
+            except Exception: pass
+            sizes[rel] = [len(data), w, h]
+        else: sizes[rel] = [len(data), 0, 0]
+    # freeplay previews: every song's preview part cut out into the head
+    previews = {}
+    for rel in list(out):
+        m = re.match(r'preload/data/songs/([^/]+)/\1-metadata(-[^.]+)?\.json$', rel)
+        if not m: continue
+        try: meta = json.loads(out[rel])
+        except Exception: continue
+        pd = meta.get('playData', {}); ins = (pd.get('characters') or {}).get('instrumental') or ''
+        inst = f'songs/{m.group(1)}/Inst' + ('-' + ins if ins else '') + '.ogg'
+        if inst not in body or inst in previews: continue
+        src = orig.get(inst) or orig.get(inst[:-4] + '.mp3')
+        if not src: continue
+        a, b2 = (pd.get('previewStart') or 0) / 1000, (pd.get('previewEnd') or 15000) / 1000
+        head[inst + '#preview'] = 'data:audio/mpeg;base64,' + base64.b64encode(preview_cut(src, a, b2)).decode()
+        previews[inst] = [round(a, 3), round(b2, 3)]
+    weeks = []
+    for rel in sorted(head):
+        m = re.match(r'preload/data/levels/([^/]+)\.json$', rel)
+        if m: weeks.append(m.group(1))
+    info = dict(PACK_INFO.get(pid, {'name': pid}), id=pid)
+    meta = dict(info, weeks=weeks, body=sizes, previews=previews)
+    hb, bb = sum(len(v) for v in head.values()), sum(len(v) for v in body.values())
+    os.makedirs(out_dir, exist_ok=True)
+    tag = lambda part: '/*FNF-PACK ' + json.dumps(dict(id=pid, name=info['name'], part=part)) + '*/\n'
+    note = "/* PRIVATE BUILD: art + music belong to their makers (see the credits). Not for public distribution. */\n"
+    with open(os.path.join(out_dir, pid + '.head.js'), 'w') as f:
+        f.write(tag('head') + note + 'FNF_PACK(' + json.dumps(meta, separators=(',', ':')) + ',' + json.dumps(head, separators=(',', ':')) + ');\n')
+    with open(os.path.join(out_dir, pid + '.body.js'), 'w') as f:
+        f.write(tag('body') + note + 'FNF_PACK_BODY(' + json.dumps(pid) + ',' + json.dumps(body, separators=(',', ':')) + ');\n')
+    print(f'pack {pid}: head {len(head)} files {hb / 1048576:.1f} MB, body {len(body)} files {bb / 1048576:.1f} MB, weeks {weeks}')
+    return dict(info, headMB=round(hb / 1048576, 1), bodyMB=round(bb / 1048576, 1))
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--src', default=os.environ.get('FNF_ASSETS', os.path.expanduser('~/.cache/fnf2/funkin.assets')))
@@ -282,7 +429,24 @@ def main():
     ap.add_argument('--warm', action='store_true', help='only fill the conversion cache (from the end of the list)')
     ap.add_argument('--jobs', type=int, default=0)
     ap.add_argument('--own', default=os.path.join(ROOT, 'build', 'own'), help='our own characters made by tools/own/*.py (same folder layout as the assets)')
+    ap.add_argument('--packs', nargs='*', help='make the mod packs (build/mods/<id> -> build/packs/<id>.head.js + .body.js) instead; no ids = all')
     a = ap.parse_args()
+    if a.packs is not None:
+        mods = os.path.join(ROOT, 'build', 'mods'); out_dir = os.path.join(ROOT, 'build', 'packs')
+        ids = a.packs or sorted(d for d in os.listdir(mods) if os.path.isdir(os.path.join(mods, d)))
+        for pid in ids: make_pack(pid, os.path.join(mods, pid), out_dir, a.jobs)
+        # the list of every pack that's there (index.js)
+        index = []
+        for f in sorted(os.listdir(out_dir)):
+            m = re.match(r'(.+)\.head\.js$', f)
+            if not m: continue
+            pid = m.group(1)
+            hb, bb = os.path.getsize(os.path.join(out_dir, f)), os.path.getsize(os.path.join(out_dir, pid + '.body.js'))
+            index.append(dict(PACK_INFO.get(pid, {'name': pid}), id=pid, headMB=round(hb / 1048576, 1), bodyMB=round(bb / 1048576, 1)))
+        with open(os.path.join(out_dir, 'index.js'), 'w') as f:
+            f.write('/* FNF 2 mod packs in this folder */\nFNF_PACK_INDEX(' + json.dumps(index, indent=1) + ');\n')
+        print('index:', [e['id'] for e in index])
+        return
     pats = PACKS[a.pack]
     if a.fetch:
         if not os.path.isdir(os.path.join(a.src, '.git')):
@@ -309,76 +473,14 @@ def main():
             for f in fs:
                 rel = os.path.relpath(os.path.join(d, f), a.own).replace(os.sep, '/')
                 srcs[rel] = os.path.join(d, f)
-    # Sparrow sheets: use the tight copy (same pixels, much less memory)
-    saved = 0
-    for rel in list(srcs):
-        if rel.endswith('.png') and rel[:-4] + '.xml' in srcs:
-            p2, x2 = tight_sparrow(srcs[rel], srcs[rel[:-4] + '.xml'])
-            if p2 != srcs[rel]:
-                from PIL import Image
-                s0, s1 = Image.open(srcs[rel]).size, Image.open(p2).size
-                saved += (s0[0] * s0[1] - s1[0] * s1[1]) * 4
-                srcs[rel], srcs[rel[:-4] + '.xml'] = p2, x2
-    print(f'tight sheets saved {saved / 1e6:.0f} MB of decoded pictures')
-    # big sheets -> small pages (sheet.png = page 0, sheet~1.png = page 1, ...)
-    npaged = 0
-    for rel in list(srcs):
-        if rel.endswith('.png') and rel[:-4] + '.xml' in srcs:
-            r = paged_sparrow(srcs[rel], srcs[rel[:-4] + '.xml'])
-            if not r: continue
-            x2, pages = r
-            srcs[rel[:-4] + '.xml'] = x2; srcs[rel] = pages[0]
-            for n, p in enumerate(pages[1:], 1): srcs[rel[:-4] + '~%d.png' % n] = p
-            npaged += 1
-    print(f'{npaged} big sheets split into pages of max {PAGE}x{PAGE}')
-    # convert on every core first (the slow part: WebP + mp3), the loop below then reads the cache
-    from concurrent.futures import ProcessPoolExecutor
-    jobs = [(rel, src) for rel, src in sorted(srcs.items()) if os.path.splitext(rel)[1].lower() in ('.png', '.ogg', '.mp3')]
-    if a.warm: jobs.reverse()
-    with ProcessPoolExecutor(a.jobs or os.cpu_count()) as ex: list(ex.map(warm, jobs, chunksize=4))
-    if a.warm: print('warmed', len(jobs)); return
-    out = {}
-    total = 0
-    for rel, src in sorted(srcs.items()):
-        ext = os.path.splitext(rel)[1].lower()
-        if ext == '.png':
-            data = 'data:image/webp;base64,' + base64.b64encode(to_webp(src)).decode()
-        elif ext in ('.ogg', '.mp3'):
-            if ext == '.mp3' and os.path.exists(src[:-4] + '.ogg'): continue
-            voices = '/Voices' in rel
-            data = 'data:audio/mpeg;base64,' + base64.b64encode(to_mp3(src, voices)).decode()
-            rel = rel[:-4] + '.ogg'   # the game always asks for .ogg names
-        elif ext in ('.ttf', '.otf'):
-            data = 'data:font/ttf;base64,' + base64.b64encode(open(src, 'rb').read()).decode()
-        elif ext == '.json':
-            try:
-                j = json.load(open(src, encoding='utf-8-sig'))
-                if os.path.basename(rel) == 'Animation.json': j = slim_atlas(j)
-                data = json.dumps(j, separators=(',', ':'))
-            except Exception: data = open(src, encoding='utf-8-sig').read()
-        elif ext in ('.mp4', '.webm'):
-            data = 'data:video/' + ext[1:] + ';base64,' + base64.b64encode(open(src, 'rb').read()).decode()
-        elif ext in ('.xml', '.txt', '.srt'):
-            data = open(src, encoding='utf-8-sig').read()
-        else:
-            continue
-        out[rel] = data
-        total += len(data)
+    out = convert(srcs, a.jobs, a.warm)
+    if out is None: return
+    total = sum(len(v) for v in out.values())
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     with open(a.out, 'w') as f:
         f.write('/* PRIVATE BUILD: Friday Night Funkin\' assets (c) The Funkin\' Crew Inc. Not for public distribution. */\n')
-        # in pieces of ~96 MB, each its own <script> in the built page: one script's text is one JS string, and
-        # Chrome can't make a string much over 512 MB (the whole pack is bigger than that now)
         f.write('window.__FNF_ASSETS = {};\n')
-        part, size = {}, 0
-        def flush():
-            f.write('/*FNF-CHUNK*/\nObject.assign(window.__FNF_ASSETS, ')
-            json.dump(part, f, separators=(',', ':'))
-            f.write(');\n')
-        for k, v in out.items():
-            if part and size + len(v) > 96 * 1048576: flush(); part, size = {}, 0
-            part[k] = v; size += len(v)
-        if part: flush()
+        write_chunked(f, 'Object.assign(window.__FNF_ASSETS, ', out)
     print(f'packed {len(out)} files, {total / 1048576:.1f} MB -> {a.out}')
 
 if __name__ == '__main__':

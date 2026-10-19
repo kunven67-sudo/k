@@ -21,7 +21,7 @@ import glob, json, os, shutil, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 MOD = sys.argv[1] if len(sys.argv) > 1 else '/home/user/ref/mods/garcellovs/x'
-OWN = os.path.join(ROOT, 'build', 'own')
+OWN = os.environ.get('FNF_OWN') or os.path.join(ROOT, 'build', 'mods', 'garcello')   # this mod's pack folder (tools/pack_assets.py --packs)
 SONGS = ['headache', 'nerves', 'release', 'fading']
 CHARS = ['garcello', 'garcellotired', 'garcellodead', 'garcelloghosty']
 STAGES = ['strangeAlley', 'strangeAlleySmokey', 'strangeAlleyMorning',

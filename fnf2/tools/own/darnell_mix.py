@@ -19,7 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 FA = os.environ.get('FA', '/home/user/ref/fa')
 MOD = sys.argv[1] if len(sys.argv) > 1 else "/home/user/ref/mods/darnellmix/x/Darnell's Mixtape 1.0.36"
-OWN = os.path.join(ROOT, 'build', 'own')
+OWN = os.environ.get('FNF_OWN') or os.path.join(ROOT, 'build', 'mods', 'darnell')   # this mod's pack folder (tools/pack_assets.py --packs)
 SONGS = ['tutorial', 'bopeebo', 'fresh', 'dadbattle']
 
 FILES = [

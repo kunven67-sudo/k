@@ -4,14 +4,44 @@
   const PURPLE = '#EA71FD';
   // shared menu bits (back button on phones)
   G.ui = G.ui || {};
-  G.ui.backBtn = G.ui.backBtn || { x: 18, y: 18, w: 84, h: 64 };
-  G.ui.drawBack = G.ui.drawBack || function (ctx) {
-    if (!G.touchMode) return;
-    const b = G.ui.backBtn; G.setScreenT(ctx); ctx.save(); ctx.globalAlpha = 0.85;
-    G.roundRect(ctx, b.x, b.y, b.w, b.h, 16); ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(b.x + 26, b.y + b.h / 2); ctx.lineTo(b.x + 50, b.y + 16); ctx.lineTo(b.x + 50, b.y + b.h - 16); ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
+  // (phones: the real FNF mobile back button in the corner does 'back' now, 60-mobile.js)
+  G.ui.drawBack = function () {};
+  G.ui.hitBack = () => false;
+  // Save data: everything the game keeps (scores, ranks, settings, rank mode, mods on/off) in one file you can
+  // download and load again (on another browser, another PC, after clearing the browser)
+  G.SaveData = {
+    dump() {
+      const data = {};
+      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('fnf2.')) data[k] = localStorage.getItem(k); }
+      return { game: 'FNF 2', v: 1, made: new Date().toISOString(), data };
+    },
+    download() {
+      const d = new Date(), pad = n => String(n).padStart(2, '0');
+      const name = 'FNF 2 save ' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + '.' + pad(d.getMinutes()) + '.json';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(this.dump(), null, 1)], { type: 'application/json' }));
+      a.download = name; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      return name;
+    },
+    // asks for the file (has to run from a click / key press), writes it over the save, then the game restarts
+    load(done) {
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+      inp.onchange = () => {
+        const f = inp.files && inp.files[0]; if (!f) { done(false, 'no file picked'); return; }
+        f.text().then(t => {
+          let o = null; try { o = JSON.parse(t); } catch (e) {}
+          if (!o || o.game !== 'FNF 2' || !o.data || typeof o.data !== 'object') { done(false, 'that is not an FNF 2 save file'); return; }
+          const keys = Object.keys(o.data).filter(k => k.startsWith('fnf2.') && typeof o.data[k] === 'string');
+          if (!keys.length) { done(false, 'that save file is empty'); return; }
+          for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith('fnf2.') && !(k in o.data)) localStorage.removeItem(k); }
+          for (const k of keys) localStorage.setItem(k, o.data[k]);
+          done(true, o.made);
+        }, () => done(false, 'could not read the file'));
+      };
+      inp.click();
+    },
   };
-  G.ui.hitBack = G.ui.hitBack || ((x, y) => { const b = G.ui.backBtn; return G.touchMode && x >= b.x - 10 && x <= b.x + b.w + 10 && y >= b.y - 10 && y <= b.y + b.h + 10; });
   function drawDesat(ctx, color, sy) {
     G.setScreenT(ctx);
     ctx.fillStyle = color; ctx.fillRect(0, 0, G.W, G.H);
@@ -42,6 +72,7 @@
     ['Music Volume', 'num', () => S().vol.music, v => S().vol.music = v, 'Volume of the instrumentals + menu music.', [0, 1, 0.05, 2]],
     ['Vocals Volume', 'num', () => S().vol.vocals, v => S().vol.vocals = v, 'Volume of the singing.', [0, 1, 0.05, 2]],
     ['SFX Volume', 'num', () => S().vol.sfx, v => S().vol.sfx = v, 'Volume of menu sounds and misses.', [0, 1, 0.05, 2]],
+    ['Phone controls', 'enum', () => S().touchScheme || 'arrows', v => { S().touchScheme = v; }, 'Arrows: tap your arrows at the bottom of the screen, like FNF mobile. Lanes: the screen is split into 4 tall lanes.', ['arrows', 'lanes']],
     ['Quality', 'enum', () => S().quality, v => { S().quality = v; G.autoQ = 1; G.resize(); }, 'Auto: 720p, lower by itself when it lags. High: full screen sharpness (strong PCs). Low: fastest.', ['auto', 'high', 'low']],
     ['Framerate', 'enum', () => S().fpsCap, v => { S().fpsCap = v; }, 'Highest frames per second. 60 is smooth and easy on your PC.', ['60', '120', '144', '240', 'max']],
   ];
@@ -59,9 +90,39 @@
       this.swipe = new G.Swipe();
       this.buildMain();
     },
+    MAIN: [['PREFERENCES', 'buildPrefs'], ['CONTROLS', 'buildControls'], ['INPUT OFFSETS', 'buildOffsets'], ['MODS', 'buildMods'], ['SAVE DATA', 'buildSave'], ['EXIT', 'exit']],
     buildMain(sel) {
       this.page = 'main'; this.sel = sel || 0;
-      this.items = ['PREFERENCES', 'CONTROLS', 'INPUT OFFSETS', 'EXIT'].map((s, i) => { const a = new G.Alphabet(s, true, 0, 0); a.x = (G.W - a.width) / 2; a.y = 120 + i * 120 + (G.H - 4 * 120) / 2 - 60; return a; });
+      const n = this.MAIN.length, gap = Math.min(120, (G.H - 100) / n);
+      this.items = this.MAIN.map(([s], i) => { const a = new G.Alphabet(s, true, 0, 0); a.x = (G.W - a.width) / 2; a.y = (G.H - n * gap) / 2 + i * gap; return a; });
+    },
+    buildSave() { this.page = 'save'; this.sel = 0; this.saveMsg = null; },
+    // ---------- mods: every pack (ON / OFF), + load packs on phones (kept in the browser)
+    buildMods() {
+      this.page = 'mods'; this.sel = 0; this.modMsg = null; this.modsChanged = this.modsChanged || false;
+      this.mods = Object.values(G.Packs.all).sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+    },
+    modRows() { return this.mods.length + 1; },     // the packs, then LOAD PACKS
+    modAction(i, d) {
+      if (i < this.mods.length) {
+        const p = this.mods[i]; G.Packs.setOn(p.id, !G.Packs.isOn(p.id)); this.modsChanged = true; G.sfx('scroll');
+        this.modMsg = { ok: true, text: (p.name || p.id) + ' is ' + (G.Packs.isOn(p.id) ? 'ON' : 'OFF') + '. The game restarts when you leave this page.' };
+        return;
+      }
+      // pick pack files (.head.js + .body.js, any number at once): they're kept in this browser
+      G.sfx('confirm');
+      const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.accept = '.js,text/javascript,application/javascript';
+      inp.onchange = async () => {
+        const files = [...(inp.files || [])]; if (!files.length) return;
+        this.modMsg = { ok: true, text: 'Saving ' + files.length + ' file(s)...' };
+        const got = await G.Packs.save(files);
+        if (!got.length) { this.modMsg = { ok: false, text: 'Those are not FNF 2 pack files (they end in .head.js / .body.js)' }; G.sfx('cancel'); return; }
+        const names = [...new Set(got.map(m => m.name || m.id))];
+        const half = got.filter(m => !got.some(o => o.id === m.id && o.part !== m.part) && !(G.Packs.all[m.id] && G.Packs.all[m.id].src)).map(m => (m.name || m.id) + ' (' + (m.part === 'head' ? 'body' : 'head') + ' missing)');
+        this.modMsg = { ok: !half.length, text: 'Saved: ' + names.join(', ') + (half.length ? '. Also pick: ' + half.join(', ') : '. The game restarts when you leave this page.') };
+        this.modsChanged = true;
+      };
+      inp.click();
     },
     buildPrefs() {
       this.page = 'prefs'; this.sel = 0; this.camY = 0;
@@ -102,13 +163,26 @@
     onAction(a, down) {
       if (!down) return;
       if (this.page === 'main') {
-        if (a === 'ui_up' || a === 'ui_down') { this.sel = (this.sel + (a === 'ui_up' ? -1 : 1) + 4) % 4; G.sfx('scroll'); }
-        else if (a === 'accept') { G.sfx('confirm'); [() => this.buildPrefs(), () => this.buildControls(), () => this.buildOffsets(), () => this.exit()][this.sel](); }
+        const n = this.MAIN.length;
+        if (a === 'ui_up' || a === 'ui_down') { this.sel = (this.sel + (a === 'ui_up' ? -1 : 1) + n) % n; G.sfx('scroll'); }
+        else if (a === 'accept') { const fn = this.MAIN[this.sel][1]; if (fn !== 'exit') G.sfx('confirm'); this[fn](); }
         else if (a === 'back') this.exit();
         return;
       }
+      if (a === 'back' && this.page === 'mods' && this.modsChanged) { G.sfx('cancel'); save(); this.modMsg = { ok: true, text: 'Restarting...' }; setTimeout(() => location.reload(), 400); return true; }
       // back to the main list with the same item still picked (like FNF)
-      if (a === 'back' && !this.cal) { G.sfx('cancel'); save(); this.buildMain({ prefs: 0, controls: 1, offsets: 2 }[this.page] || 0); return true; }
+      if (a === 'back' && !this.cal) { G.sfx('cancel'); save(); this.buildMain(Math.max(0, this.MAIN.findIndex(m => m[1] === { prefs: 'buildPrefs', controls: 'buildControls', offsets: 'buildOffsets', mods: 'buildMods', save: 'buildSave' }[this.page]))); return true; }
+      if (this.page === 'mods') {
+        const n = this.modRows();
+        if (a === 'ui_up' || a === 'ui_down') { this.sel = (this.sel + (a === 'ui_up' ? -1 : 1) + n) % n; G.sfx('scroll'); }
+        else if (a === 'accept' || ((a === 'ui_left' || a === 'ui_right') && this.sel < this.mods.length)) this.modAction(this.sel);
+        return;
+      }
+      if (this.page === 'save') {
+        if (a === 'ui_up' || a === 'ui_down') { this.sel = 1 - this.sel; G.sfx('scroll'); }
+        else if (a === 'accept') this.saveAction();
+        return;
+      }
       if (this.page === 'prefs') {
         const r = this.rows[this.sel];
         if (a === 'ui_up' || a === 'ui_down') { this.sel = (this.sel + (a === 'ui_up' ? -1 : 1) + this.rows.length) % this.rows.length; G.sfx('scroll'); }
@@ -141,9 +215,28 @@
       else if (s.dir === 'left') this.onAction('ui_left', true); else if (s.dir === 'right') this.onAction('ui_right', true);
       else if (s.dir === 'tap') {
         if (this.cal) { this.calTap(); return; }
-        if (this.page === 'main') { for (let i = 0; i < this.items.length; i++) if (Math.abs(s.y - this.items[i].y - 35) < 55) { if (i === this.sel) this.onAction('accept', true); else { this.sel = i; G.sfx('scroll'); } return; } }
+        if (this.page === 'main') { for (let i = 0; i < this.items.length; i++) if (Math.abs(s.y - this.items[i].y - 35) < 48) { if (i === this.sel) this.onAction('accept', true); else { this.sel = i; G.sfx('scroll'); } return; } }
+        else if (this.page === 'mods') {
+          const n = this.modRows(), top = 100, gap = Math.min(100, (G.H - 130 - top) / Math.max(1, n));
+          const i = Math.floor((s.y - top + 10) / gap); if (i >= 0 && i < n) { if (i === this.sel) this.modAction(i); else { this.sel = i; G.sfx('scroll'); } }
+        }
+        else if (this.page === 'save') { const i = s.y < 270 ? 0 : s.y < 410 ? 1 : -1; if (i >= 0) { if (i === this.sel) this.saveAction(); else { this.sel = i; G.sfx('scroll'); } } }
         else if (this.page === 'prefs') { const i = Math.round((s.y + this.camY - 35) / 120); if (i >= 0 && i < this.rows.length) { if (i === this.sel) { const r = this.rows[i]; if (r.row[1] === 'bool') this.onAction('accept', true); else this.nudge(r.row, s.x > G.W / 2 ? 1 : -1); } else { this.sel = i; G.sfx('scroll'); } } }
         else this.onAction('accept', true);
+      }
+    },
+    saveAction() {
+      if (this.sel === 0) {
+        save();
+        try { const name = G.SaveData.download(); G.sfx('confirm'); this.saveMsg = { ok: true, text: 'Saved to your Downloads: ' + name }; }
+        catch (e) { this.saveMsg = { ok: false, text: 'Could not download the save: ' + e.message }; }
+      } else {
+        G.sfx('confirm');
+        G.SaveData.load((ok, info) => {
+          if (!ok) { G.sfx('cancel'); this.saveMsg = { ok: false, text: 'Could not load: ' + info }; return; }
+          this.saveMsg = { ok: true, text: 'Save loaded! The game restarts now...' };
+          setTimeout(() => location.reload(), 1500);
+        });
       }
     },
     exit() { G.sfx('cancel'); save(); G.setScreen(this.from === 'pause' ? 'play' : 'mainMenu', {}); },
@@ -196,6 +289,32 @@
           }
         });
         G.vcr(ctx, 'LEFT/RIGHT pick slot - ENTER rebind - ESC back', G.W / 2, G.H - 40, { size: 22, align: 'center' });
+      } else if (this.page === 'mods') {
+        G.setScreenT(ctx);
+        const n = this.modRows(), top = 100, gap = Math.min(100, (G.H - 130 - top) / Math.max(1, n));
+        const t = new G.Alphabet('MODS', true, 0, 12); t.scale = 0.75; t.x = (G.W - t.width * 0.75) / 2; t.draw(ctx, null);
+        if (!this.mods.length) G.vcr(ctx, 'No mod packs yet. Put the packs folder next to the game, or LOAD PACKS below.', G.W / 2, top + 10, { size: 24, align: 'center', maxWidth: G.W - 60 });
+        this.mods.forEach((p, i) => {
+          const y = top + i * gap, on = G.Packs.isOn(p.id), sel = i === this.sel;
+          const a = new G.Alphabet(p.name || p.id, true, 60, y); a.scale = Math.min(0.62, 760 / Math.max(1, a.width)); a.alpha = sel ? 1 : 0.6; a.draw(ctx, null);
+          G.setScreenT(ctx);
+          G.vcr(ctx, on ? 'ON' : 'OFF', G.W - 60, y + 6, { size: 40, align: 'right', color: on ? '#7CFF7C' : '#FF7070', alpha: sel ? 1 : 0.7, outline: 3 });
+          G.vcr(ctx, (p.credit ? p.credit + '   ' : '') + (p.bodyMB ? (p.headMB + p.bodyMB).toFixed(0) + ' MB' : '') + (p.src === 'saved' ? '   (saved in this browser)' : ''), 60, y + 58, { size: 18, alpha: sel ? 0.95 : 0.55, outline: 2, maxWidth: G.W - 260 });
+        });
+        const ly = top + this.mods.length * gap + 10, la = new G.Alphabet('LOAD PACKS', true, 0, ly); la.scale = 0.7; la.x = (G.W - la.width * 0.7) / 2; la.alpha = this.sel === this.mods.length ? 1 : 0.6; la.draw(ctx, null);
+        G.setScreenT(ctx);
+        ctx.globalAlpha = 0.6; ctx.fillStyle = '#000'; ctx.fillRect(0, G.H - 110, G.W, 110); ctx.globalAlpha = 1;
+        const info = this.sel < this.mods.length ? 'ENTER: switch this mod ON / OFF (OFF = its songs are not in the game).' : 'Phones: pick the pack files (.head.js + .body.js). They stay saved in this browser.';
+        G.vcr(ctx, info, G.W / 2, G.H - 94, { size: 22, align: 'center', outline: 0, maxWidth: G.W - 40 });
+        if (this.modMsg) G.vcr(ctx, this.modMsg.text, G.W / 2, G.H - 54, { size: 22, align: 'center', outline: 0, maxWidth: G.W - 40, color: this.modMsg.ok ? '#7CFF7C' : '#FF7070' });
+      } else if (this.page === 'save') {
+        G.setScreenT(ctx);
+        ['DOWNLOAD SAVE', 'LOAD SAVE'].forEach((t, i) => { const a = new G.Alphabet(t, true, 0, 200 + i * 140); a.x = (G.W - a.width) / 2; a.alpha = i === this.sel ? 1 : 0.6; a.draw(ctx, null); });
+        G.setScreenT(ctx);
+        const info = this.sel === 0 ? 'Makes a file with all your scores, ranks, settings and rank mode. Keep it safe!' : 'Pick a save file you downloaded before. It replaces the save you have now.';
+        ctx.globalAlpha = 0.6; ctx.fillStyle = '#000'; ctx.fillRect(0, G.H - 120, G.W, 120); ctx.globalAlpha = 1;
+        G.vcr(ctx, info, G.W / 2, G.H - 102, { size: 24, align: 'center', outline: 0, maxWidth: G.W - 40 });
+        if (this.saveMsg) G.vcr(ctx, this.saveMsg.text, G.W / 2, G.H - 58, { size: 24, align: 'center', outline: 0, maxWidth: G.W - 40, color: this.saveMsg.ok ? '#7CFF7C' : '#FF7070' });
       } else if (this.page === 'offsets') {
         G.setScreenT(ctx);
         const a = new G.Alphabet('OFFSET: ' + (S().offset || 0) + 'MS', true, 0, 160); a.x = (G.W - a.width) / 2; a.draw(ctx, null);

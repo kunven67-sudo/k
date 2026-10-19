@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 MOD = sys.argv[1] if len(sys.argv) > 1 else '/home/user/ref/mods/tabivs/x/Vs Tabi Revival'
 OFFICIAL = sys.argv[2] if len(sys.argv) > 2 else '/home/user/ref/mods/tabi/x/1vs-tabi'
-OWN = os.path.join(ROOT, 'build', 'own')
+OWN = os.environ.get('FNF_OWN') or os.path.join(ROOT, 'build', 'mods', 'tabi')   # this mod's pack folder (tools/pack_assets.py --packs)
 
 FILES = [
     'data/characters/*.json', 'images/characters/*',
@@ -119,7 +119,48 @@ def main():
         p = D('levels', lv + '.json'); L = load(p); L['visible'] = lv == 'tabi'
         if lv == 'tabi-bonus': L['capsule'] = {'name': 'TABI BONUS'}   # (the freeplay capsule's week label)
         save(L, p)
+    difficulties()
     print('tabi:', n, 'files')
+
+
+def spaced(notes, gap):
+    """Thinning for a chart that isn't on the beat grid (My Battle's Pico mix): on each side, a note only when the
+    last one kept was at least `gap` ms before, one note at a time (the longest hold of a chord)."""
+    out = []
+    for side in (0, 1):
+        groups = {}
+        for n in notes:
+            if (n['d'] >= 4) == bool(side): groups.setdefault(round(n['t']), []).append(n)
+        last = -1e9
+        for t in sorted(groups):
+            if t - last < gap - 5: continue
+            out.append(sorted(groups[t], key=lambda n: (-n.get('l', 0), n['d']))[0]); last = t
+    return sorted(out, key=lambda q: (q['t'], q['d']))
+
+
+def difficulties():
+    """The mod has one chart per song (called 'normal'). In FNF 2 that chart is HARD; NORMAL + EASY are made from it
+    (normal: no 16th runs, few jumps; easy: a beat or more between notes, no jumps), like Nene's songs (nene.py)."""
+    from nene import thin
+    D = lambda *p: os.path.join(OWN, 'preload', 'data', *p)
+    for cp in sorted(glob.glob(D('songs', '*', '*-chart*.json'))):
+        mp = cp.replace('-chart', '-metadata')
+        if not os.path.exists(mp): continue
+        C, M = load(cp), load(mp)
+        hard = C['notes'].get('hard') or C['notes'].get('normal') or []
+        if not hard: continue
+        bpm = (M.get('timeChanges') or [{'bpm': 100}])[0]['bpm']
+        beat = 60000 / bpm
+        on_grid = sum(abs(n['t'] / beat * 4 - round(n['t'] / beat * 4)) < 0.08 for n in hard) / len(hard)
+        if on_grid > 0.6: C['notes'] = {'easy': thin(hard, bpm, 'easy'), 'normal': thin(hard, bpm, 'normal'), 'hard': hard}
+        else: C['notes'] = {'easy': spaced(hard, beat), 'normal': spaced(hard, beat / 2), 'hard': hard}   # (off the grid: by spacing)
+        ss = C.get('scrollSpeed') or {}; sp = ss.get('hard') or ss.get('normal') or ss.get('default') or 2
+        C['scrollSpeed'] = {'default': sp, 'easy': round(sp * 0.85, 2), 'normal': round(sp * 0.92, 2), 'hard': sp}
+        pd = M['playData']; r = (pd.get('ratings') or {}); r = r.get('hard') or r.get('normal') or 5
+        pd['difficulties'] = ['easy', 'normal', 'hard']
+        pd['ratings'] = {'easy': max(1, round(r * 0.35)), 'normal': max(1, round(r * 0.6)), 'hard': r}
+        save(C, cp); save(M, mp)
+        print('  ', os.path.basename(cp), {k: len(v) for k, v in C['notes'].items()})
 
 
 if __name__ == '__main__':

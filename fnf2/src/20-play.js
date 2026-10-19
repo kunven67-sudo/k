@@ -168,6 +168,8 @@
     },
     // the stage + characters go with the screen (their pictures can be freed while you're in the menus)
     leave() { if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); this.stage = null; this.bf = this.dad = this.gf = null; this.cutscene = null; },
+    // still loading (its music decoding, pictures, the mod pack): the loading screen stays up
+    loadingNow() { return !this.ready; },
     // the song is running: the main loop must never hold the screen for pictures still loading
     live() { return this.ready && this.started && !this.cutscene && !this.paused && !this.gameOver; },
     // -------------------------------------------------- world: stage + characters + cameras
@@ -245,10 +247,27 @@
         { player: false, x: this.middle ? -9999 : 48, y, strums: [] },
         { player: true, x: this.middle ? G.W / 2 - SPACING * 2 : G.W / 2 + 48, y, strums: [] },
       ];
+      // Phones: FNF mobile's "Arrows" controls (V-Slice PlayState.initNoteHitbox): your arrows big at the bottom,
+      // spread out so a thumb fits each one, notes falling down to them; the opponent's arrows tiny in the top
+      // left corner; health bar at the top. You tap the arrows themselves (Options > Phone controls: Lanes = the
+      // old 4 tall columns).
+      this.phoneArrows = !!G.touchMode && st.touchScheme !== 'lanes';
+      if (this.phoneArrows) {
+        this.down = true; this.middle = false;
+        const sc = 0.5625 * 1.95, gap = 0.5625 * 2.8;                 // strumline scale 1.097, note spacing 1.575
+        const P = this.lines[1], O = this.lines[0];
+        P.sc = sc; P.spF = gap / sc; P.ys = 1 / sc;
+        P.y = (G.H - STRUM_SIZE * sc) * 0.95 - 24; P.x = G.W / 2 - 1.5 * SPACING * gap - STRUM_SIZE / 2 * sc;
+        O.sc = 0.4; O.x = 48 - 30; O.y = 24 * 0.3;
+      }
       NS = makeNS(this.song.noteStyle);
+      for (const L of this.lines) {
+        // a scaled strumline draws through its own camera: the HUD camera + a zoom around the line's corner
+        if (L.sc && L.sc !== 1) { const hud = this.hud; L.cam = { apply(ctx) { hud.apply(ctx); ctx.transform(L.sc, 0, 0, L.sc, L.x * (1 - L.sc), L.y * (1 - L.sc)); } }; }
+      }
       for (const L of this.lines) for (let i = 0; i < 4; i++) {
         const s = makeStrum(i, L.player);
-        s.x = s.bx = L.x + i * SPACING + INITIAL_OFFSET; s.y = s.by = L.y;
+        s.x = s.bx = L.x + i * SPACING * (L.spF || 1) + INITIAL_OFFSET; s.y = s.by = L.y;
         s.mx = s.my = s.ma = 0; s.mal = 1;                  // modchart offset / angle / alpha
         L.strums.push(s);
       }
@@ -700,13 +719,23 @@
       if (this.cutscene) { if (type === 'down') this.cutscene.onAction(y < 90 && x > G.W - 160 ? 'back' : 'accept', true, false); return; }
       if (this.gameOver) { if (type === 'down') this.gameOverAction(y < 120 && x < 140 ? 'back' : 'accept'); return; }
       if (!G.touchMode) return;
-      // pause button top-right
-      if (type === 'down' && x > G.W - 130 && y < 110) { this.openPause(); return; }
-      // 4 hitbox columns
-      const lane = Math.max(0, Math.min(3, Math.floor(x / (G.W / 4))));
+      // pause button top-right (FNF mobile's own)
+      const pb = this.pauseBtn;
+      if (pb ? pb.pointer(type, x, y, id) : (type === 'down' && x > G.W - 130 && y < 110 && (this.openPause(), true))) return;
       this._touch = this._touch || {};
-      if (type === 'down') { this._touch[id] = lane; this.press(lane); }
-      else if (type === 'up' && this._touch[id] != null) { this.release(this._touch[id]); delete this._touch[id]; }
+      if (type === 'up' || type === 'cancel') { if (this._touch[id] != null) { this.release(this._touch[id]); delete this._touch[id]; } return; }
+      if (type !== 'down') return;
+      let lane;
+      if (this.phoneArrows) {
+        // FNF mobile: each arrow is a button, a tall box around it (from a bit above the arrow to the bottom of the
+        // screen); the two outer ones reach the edges of the screen
+        const L = this.lines[1], sc = L.sc || 1, top = L.y - 220 * sc;
+        if (y < top) return;
+        let best = 1e9;
+        for (let i = 0; i < 4; i++) { const S = L.strums[i], cx = L.x + (S.x - INITIAL_OFFSET + STRUM_SIZE / 2 - L.x) * sc, d = Math.abs(x - cx); if (d < best) { best = d; lane = i; } }
+      } else lane = Math.max(0, Math.min(3, Math.floor(x / (G.W / 4))));     // 4 tall lanes
+      if (this._touch[id] != null) this.release(this._touch[id]);
+      this._touch[id] = lane; this.press(lane);
     },
     // -------------------------------------------------- pause menu (V-Slice PauseSubState)
     openPause() {
@@ -897,7 +926,7 @@
     draw(ctx) {
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
       if (this.failed) { G.vcr(ctx, this.failed, G.W / 2, G.H / 2 - 20, { align: 'center', size: 28 }); G.vcr(ctx, 'Press ESC', G.W / 2, G.H / 2 + 24, { align: 'center', size: 22 }); return; }
-      if (!this.ready) { G.vcr(ctx, 'Loading...', G.W - 20, G.H - 50, { align: 'right', size: 32 }); return; }
+      if (!this.ready) { if (!(G.Loading && G.Loading.frame(ctx, G.dt))) G.vcr(ctx, 'Loading...', G.W - 20, G.H - 50, { align: 'right', size: 32 }); return; }
       if (this.gameOver) { this.drawGameOver(ctx); return; }
       // world
       if (this.sfx && this.sfx.drawWorld) this.sfx.drawWorld(ctx, this, cam => this.drawWorld(ctx, cam));
@@ -932,9 +961,10 @@
       const notesSheet = NS.notes, holdImg = NS.hold;
       for (const L of this.lines) {
         if (L.x < -1000) continue;
-        for (const s of L.strums) s.draw(ctx, hud);
+        const lc = L.cam || hud, ys = L.ys || 1;
+        for (const s of L.strums) s.draw(ctx, lc);
         // hold trails (behind the note heads, over the strums)
-        hud.apply(ctx);
+        lc.apply(ctx);
         for (const n of this.notes) {
           if (n.line !== this.lines.indexOf(L) || n.len <= 0 || n.done && !n.holding) continue;
           if (n.missed && !n.dropped && this.songPos > n.holdEnd) continue;
@@ -945,7 +975,7 @@
         for (const n of this.notes) {
           if (n.line !== li || n.hit || n.done) continue;
           const S = L.strums[n.lane];
-          const y = S.y - INITIAL_OFFSET + this.noteY(n.t);
+          const y = S.y - INITIAL_OFFSET + this.noteY(n.t) * ys;
           if (y > G.H + 120 || y < -260) { if ((n.t - this.songPos) * PX_PER_MS * this.scrollSpeed > G.H + 300) break; continue; }
           const f = G.Sparrow.byPrefix(notesSheet, NS.notePre(n.lane))[0]; if (!f) continue;
           const ns = NS.noteScale, w = f.fw * ns;
@@ -960,10 +990,10 @@
         for (const cv of this.covers) if (cv.line === li) {
           const S = L.strums[cv.lane];
           cv.x = S.x - INITIAL_OFFSET + STRUM_SIZE / 2 - cv.width / 2 - 12; cv.y = S.y + INITIAL_OFFSET + STRUM_SIZE / 2 - 96;
-          cv.draw(ctx, hud);
+          cv.draw(ctx, lc);
         }
       }
-      for (const sp of this.splashes) sp.draw(ctx, hud);
+      for (const sp of this.splashes) sp.draw(ctx, this.lines[1].cam || hud);
       // health bar
       const bg = this.hbBg;
       if (this.sfx && this.sfx.drawHealth && this.sfx.drawHealth(ctx, this)) { /* a mod's own health bar + score */ }
@@ -980,12 +1010,13 @@
       this.drawIcon(ctx, this.iconP2, split - (150 - 26), bg.y + bg.height / 2, this.health > 1.6);
       G.vcr(ctx, this.scoreLine(), G.W / 2, bg.y + 30, { align: 'center', size: 20, outline: 1.5 });
       }
-      if (this.botplay) G.vcr(ctx, 'BOTPLAY', G.W / 2, this.down ? G.H - 120 : 90, { align: 'center', size: 32 });
-      if (this.practice) G.vcr(ctx, 'PRACTICE MODE', G.W / 2, this.down ? G.H - 160 : 130, { align: 'center', size: 22, alpha: 0.8 });
+      const by = this.phoneArrows ? 230 : this.down ? G.H - 120 : 90;
+      if (this.botplay) G.vcr(ctx, 'BOTPLAY', G.W / 2, by, { align: 'center', size: 32 });
+      if (this.practice) G.vcr(ctx, 'PRACTICE MODE', G.W / 2, by + (this.phoneArrows ? 40 : this.down ? -40 : 40), { align: 'center', size: 22, alpha: 0.8 });
       // time bar (Psych)
       if (G.settings.timeBar !== 'off') {
         // always at the top: in downscroll the arrows own the bottom of the screen
-        const ty = 19, tw = 400, tx = G.W / 2 - tw / 2;
+        const ty = this.phoneArrows ? 170 : 19, tw = 400, tx = G.W / 2 - tw / 2;     // (phones: the health bar + icons own the top)
         const prog = G.clamp(this.songPos / this.audio.length, 0, 1);
         ctx.fillStyle = '#000'; ctx.fillRect(tx - 4, ty - 4, tw + 8, 19);
         ctx.fillStyle = '#fff'; ctx.fillRect(tx, ty, tw * prog, 11);
@@ -999,9 +1030,21 @@
       if (G.touchMode) {
         G.setScreenT(ctx);
         const cols = ['#C24B99', '#00FFFF', '#12FA05', '#F9393F'];
-        for (let i = 0; i < 4; i++) { ctx.globalAlpha = this.keys[i] ? 0.28 : 0.08; ctx.fillStyle = cols[i]; ctx.fillRect(i * G.W / 4, 0, G.W / 4, G.H); }
-        ctx.globalAlpha = 0.7; ctx.fillStyle = '#000'; G.roundRect(ctx, G.W - 110, 20, 88, 70, 14); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(G.W - 82, 36, 10, 38); ctx.fillRect(G.W - 62, 36, 10, 38); ctx.globalAlpha = 1;
+        if (!this.phoneArrows) for (let i = 0; i < 4; i++) { ctx.globalAlpha = this.keys[i] ? 0.28 : 0.08; ctx.fillStyle = cols[i]; ctx.fillRect(i * G.W / 4, 0, G.W / 4, G.H); }
+        const pb = this.pauseBtn || (this.pauseBtn = this.makePauseButton());
+        if (pb) {
+          const cir = G.A.image('preload/images/pauseCircle.png'), s = pb.spr, cx = s.x + pb.w / 2, cy = s.y + pb.h / 2;
+          if (cir) { ctx.globalAlpha = 0.1; ctx.drawImage(cir, cx - cir.width * 0.84 / 2, cy - cir.height * 0.8 / 2, cir.width * 0.84, cir.height * 0.8); ctx.globalAlpha = 1; }
+          pb.update(G.dt); pb.draw(ctx);
+        } else { ctx.globalAlpha = 0.7; ctx.fillStyle = '#000'; G.roundRect(ctx, G.W - 110, 20, 88, 70, 14); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(G.W - 82, 36, 10, 38); ctx.fillRect(G.W - 62, 36, 10, 38); ctx.globalAlpha = 1; }
       }
+    },
+    // FNF mobile's pause button (V-Slice PlayState.initPauseSprites): 80% size, 35 px from the top right corner
+    makePauseButton() {
+      if (!G.TouchButton || !G.A.has('preload/images/pauseButton.png')) return null;
+      const b = new G.TouchButton('preload/images/pauseButton', 0, 35, 0.8, () => { if (this.started && !this.paused && !this.gameOver) this.openPause(); }, { prefix: 'pause', rest: 1, instant: true, confirmFrom: 6, confirmTo: 33 });
+      b.spr.x = G.W - b.w - 35;
+      return b;
     },
     // Psych-style score line
     scoreLine() {
@@ -1031,8 +1074,8 @@
       let startT = n.t, endT = n.holdEnd;
       if (n.hit && n.holding) startT = Math.max(startT, this.songPos);
       if (endT <= startT) return;
-      const y0 = S.y - INITIAL_OFFSET + STRUM_SIZE / 2 + this.noteY(startT);
-      const len = (endT - startT) * PX_PER_MS * this.scrollSpeed;
+      const y0 = S.y - INITIAL_OFFSET + STRUM_SIZE / 2 + this.noteY(startT) * (L.ys || 1);
+      const len = (endT - startT) * PX_PER_MS * this.scrollSpeed * (L.ys || 1);
       const capH = img.height * zoom * 0.4;
       const bodyH = Math.max(0, len - capH);
       ctx.save();

@@ -182,7 +182,8 @@ G.resize = function () {
   // auto draws at most 1280x720 (the game's own size; the browser stretches it to the window). On a
   // 1080p screen that's 2.25x fewer pixels to fill than drawing at full size, and it drops further
   // by itself when the game lags. High = full screen sharpness for strong PCs.
-  const cap = qual === 'low' ? 0.6667 : qual === 'high' ? 2 : (G.gpu && G.gpu.soft ? 0.6667 : 1) * G.autoQ;
+  // (phones: 960x540 at most on Auto, their graphics chips fill pixels much slower than a PC's)
+  const cap = qual === 'low' ? 0.6667 : qual === 'high' ? 2 : (G.gpu && G.gpu.soft ? 0.6667 : G.phone ? 0.75 : 1) * G.autoQ;
   q = G.clamp(q, 0.4, cap);
   G.q = q;
   const cw = Math.round(G.W * q), ch = Math.round(G.H * q);
@@ -638,6 +639,7 @@ G.input = {
     }
     G.touchMode = false;
     const scr = G.screen;
+    if (G.Loading && G.Loading.shown && G.Loading.key(acts, down, repeat)) return;   // the loading screen's little game
     if (G.trans.active && down) return; // ignore presses mid transition
     if (scr && scr.onKey) { try { if (scr.onKey(code, down, repeat, e) === true) return; } catch (err) { G.reportError(err, 'onKey'); } }
     if (I.blockKeys) return;
@@ -664,7 +666,9 @@ G.input = {
     else if (type === 'move' && G.input.pointers[e.pointerId]) G.input.pointers[e.pointerId] = p;
     else if (type === 'up') delete G.input.pointers[e.pointerId];
     const scr = G.screen;
+    if (G.Loading && G.Loading.shown && G.Loading.pointer(type, p.x, p.y, e.pointerId)) return;
     if (G.trans.active && type === 'down') return;
+    if (G.mobileUI && G.mobileUI.pointer(type, p.x, p.y, e.pointerId)) return;   // the phone back button (60-mobile.js)
     if (scr && scr.onPointer) { try { scr.onPointer(type, p.x, p.y, e.pointerId, e); } catch (err) { G.reportError(err, 'onPointer'); } }
   }
   G.canvas.addEventListener('pointerdown', e => { e.preventDefault(); try { G.canvas.setPointerCapture(e.pointerId); } catch (x) {} ptr('down', e); });
@@ -790,7 +794,13 @@ G.loop = function () {
   // ...but never while a song is playing: the music doesn't wait, so freezing would make you miss notes
   // (a picture that isn't ready yet just isn't drawn for a frame or two)
   const live = G.screen && G.screen.live && G.screen.live();
-  if (busy && !live) { try { if (G.audio && G.audio.update) G.audio.update(dt); } catch (e) {} G.updateTransition(dt); requestAnimationFrame(G.loop); return; }
+  if (busy && !live) {
+    try { if (G.audio && G.audio.update) G.audio.update(dt); } catch (e) {}
+    G.updateTransition(dt);
+    // a while of waiting: the loading screen (+ its little game) instead of a frozen picture
+    if (G.Loading) try { if (G.Loading.frame(ctx, dt)) G.drawOverlay(ctx, dt); } catch (e) { G.reportError(e, 'loading'); }
+    requestAnimationFrame(G.loop); return;
+  }
   if (!busy && G.A._after.length) for (const fn of G.A._after.splice(0)) try { fn(); } catch (e) { G.reportError(e, 'afterLoad'); }
   if (!busy && G.A._releaseAt && now > G.A._releaseAt) { G.A._releaseAt = 0; try { G.A.releaseUnused(); } catch (e) { G.reportError(e, 'release'); } }
   try {
@@ -805,12 +815,14 @@ G.loop = function () {
   try { if (G.screen && G.screen.draw) G.screen.draw(ctx); } catch (e) { G.reportError(e, 'draw ' + G.screenName); }
   G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  if (G.Loading && !(G.screen && G.screen.loadingNow && G.screen.loadingNow())) { G.Loading.done(); G.Loading.overlay(ctx, dt); }
   G.drawTransition(ctx);
   if (G.stickers && G.stickers.active) { try { G.stickers.update(dt); G.stickers.draw(ctx); } catch (e) { G.reportError(e, 'stickers'); G.stickers.active = false; } }
   G.drawOverlay(ctx, dt);
   requestAnimationFrame(G.loop);
 };
 G.drawOverlay = function (ctx, dt) {
+  if (G.mobileUI) try { G.mobileUI.draw(ctx, dt); } catch (e) { G.reportError(e, 'mobile ui'); }
   G.setScreenT(ctx);
   ctx.globalAlpha = 1;
   if (G.settings.fps) {
