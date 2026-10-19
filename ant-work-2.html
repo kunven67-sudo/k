@@ -1142,7 +1142,7 @@ function loadVoices(){ if(!HAS_TTS) return; try{ const vs=speechSynthesis.getVoi
 if(HAS_TTS){ loadVoices(); try{ speechSynthesis.onvoiceschanged=loadVoices; }catch(e){} }
 const VOICE_PROFILES={
   Jim:{g:'m',i:0,pitch:1.15,rate:1.06,babble:190},
-  You:{g:'m',i:4,pitch:1.0,rate:1.08,babble:150},
+  You:{g:'m',i:4,pitch:1.0,rate:1.08,babble:150,prefer:/James Online/i},   // Jay = Microsoft James (Edge), when this device has it
   Alien:{g:'f',i:1,pitch:1.6,rate:1.0,babble:320},
   Seller:{g:'m',i:2,pitch:1.45,rate:.98,babble:260},
   Converter:{g:'m',i:3,pitch:.7,rate:.92,babble:120},
@@ -1150,7 +1150,7 @@ const VOICE_PROFILES={
   Steve:{g:'m',i:1,pitch:.55,rate:.9,babble:90},
   Larry:{g:'m',i:5,pitch:1.4,rate:1.04,babble:250}
 };
-function voiceFor(p){ const pool=p.g==='f'?VOICES.female:VOICES.male, list=pool.length?pool:VOICES.all; return list.length?list[p.i%list.length]:null; }
+function voiceFor(p){ if(p.prefer){ const v=VOICES.all.find(q=>p.prefer.test(q.name)); if(v) return v; } const pool=p.g==='f'?VOICES.female:VOICES.male, list=pool.length?pool:VOICES.all; return list.length?list[p.i%list.length]:null; }
 const VOICE={speaking:false,token:0,lastEnd:0};
 /* speak a line; calls onEnd when finished (or right away if voices are off). returns true if TTS used */
 function speakLine(who,text,onEnd){
