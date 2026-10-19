@@ -141,8 +141,14 @@ G.Sparrow = {
   forget(img) { for (const [k, sh] of this.cache) if (sh && sh.imgs.includes(img)) this.cache.delete(k); },
   // frames whose name is prefix + a frame number, in order (FNF/Flixel addByPrefix)
   byPrefix(sheet, prefix, indices) {
-    const list = sheet.frames.filter(f => f.name.startsWith(prefix) && /^\d*$/.test(f.name.slice(prefix.length).replace(/\.png$/, '')));
+    let list = sheet.frames.filter(f => f.name.startsWith(prefix) && /^\d*$/.test(f.name.slice(prefix.length).replace(/\.png$/, '')));
     list.sort((a, b) => (parseInt(a.name.slice(prefix.length)) || 0) - (parseInt(b.name.slice(prefix.length)) || 0));
+    // nothing with just a number after the prefix: every frame that STARTS with it, like Flixel does (mods exported from
+    // Animate name frames 'tabiidle instance 10000'), in order of the number at the end
+    if (!list.length) {
+      const num = f => { const m = /(\d+)(\.png)?$/.exec(f.name); return m ? +m[1] : 0; };
+      list = sheet.frames.filter(f => f.name.startsWith(prefix)).sort((a, b) => num(a) - num(b));
+    }
     if (!indices) return list;
     return indices.map(i => list[i]).filter(Boolean);
   },

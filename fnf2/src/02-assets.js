@@ -27,7 +27,7 @@ G.A = {
     const libs = lib ? [lib === 'default' ? 'preload' : lib] : (dir ? [dir, 'shared', 'preload'] : ['shared', 'preload']);
     for (const l of libs) {
       const base = l + '/images/' + key;
-      if (this.raw[base + '.png'] || this.raw[base + '.xml'] || this.raw[base + '/Animation.json']) return base;
+      if (this.has(base + '.png') || this.raw[base + '.xml'] || this.raw[base + '/Animation.json']) return base;   // (has: also a mod pack picture not loaded yet)
     }
     return (libs[0] || 'shared') + '/images/' + key;
   },

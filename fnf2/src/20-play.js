@@ -722,26 +722,44 @@
       // pause button top-right (FNF mobile's own)
       const pb = this.pauseBtn;
       if (pb ? pb.pointer(type, x, y, id) : (type === 'down' && x > G.W - 130 && y < 110 && (this.openPause(), true))) return;
-      this._touch = this._touch || {};
-      if (type === 'up' || type === 'cancel') { if (this._touch[id] != null) { this.release(this._touch[id]); delete this._touch[id]; } return; }
-      if (type !== 'down') return;
-      let lane;
-      if (this.phoneArrows) {
-        // FNF mobile: each arrow is a button, a tall box around it (from a bit above the arrow to the bottom of the
-        // screen); the two outer ones reach the edges of the screen
-        const L = this.lines[1], sc = L.sc || 1, top = L.y - 220 * sc;
-        if (y < top) return;
-        let best = 1e9;
-        for (let i = 0; i < 4; i++) { const S = L.strums[i], cx = L.x + (S.x - INITIAL_OFFSET + STRUM_SIZE / 2 - L.x) * sc, d = Math.abs(x - cx); if (d < best) { best = d; lane = i; } }
-      } else lane = Math.max(0, Math.min(3, Math.floor(x / (G.W / 4))));     // 4 tall lanes
-      if (this._touch[id] != null) this.release(this._touch[id]);
-      this._touch[id] = lane; this.press(lane);
+      // Each finger is tracked: it can SLIDE from one arrow to the next (sliding onto an arrow presses it, like FNF
+      // mobile), so arrows next to each other don't need two fingers. A see-through circle shows where each finger is.
+      const T = this._touch = this._touch || {}, POS = this._tpos = this._tpos || {};
+      const others = (l) => Object.keys(T).some(k => k != id && T[k] === l);
+      if (type === 'up' || type === 'cancel') {
+        delete POS[id];
+        if (id in T) { const l = T[id]; delete T[id]; if (l != null && !others(l)) this.release(l); }
+        return;
+      }
+      if (type === 'move' && !(id in T)) return;               // (a finger that didn't start on the arrows)
+      if (type !== 'down' && type !== 'move') return;
+      POS[id] = { x, y };
+      const lane = this.laneAt(x, y), old = id in T ? T[id] : null;
+      if (type === 'down' && lane == null) return;              // (a tap above the arrows does nothing)
+      if (lane === old) return;
+      T[id] = lane;
+      if (old != null && !others(old)) this.release(old);
+      if (lane == null) return;                                 // slid off the arrows: let go until it comes back
+      if (others(lane)) this.release(lane);                     // (another finger is on it: this one counts as a new press)
+      this.press(lane);
+    },
+    // which arrow a finger at (x, y) is on (null = none)
+    laneAt(x, y) {
+      if (!this.phoneArrows) return Math.max(0, Math.min(3, Math.floor(x / (G.W / 4))));     // 4 tall lanes
+      // FNF mobile: each arrow is a button, a tall box around it (from a bit above the arrow to the bottom of the
+      // screen); the two outer ones reach the edges of the screen
+      const L = this.lines[1], sc = L.sc || 1;
+      if (y < L.y - 220 * sc) return null;
+      let best = 1e9, lane = null;
+      for (let i = 0; i < 4; i++) { const S = L.strums[i], cx = L.x + (S.x - INITIAL_OFFSET + STRUM_SIZE / 2 - L.x) * sc, d = Math.abs(x - cx); if (d < best) { best = d; lane = i; } }
+      return lane;
     },
     // -------------------------------------------------- pause menu (V-Slice PauseSubState)
     openPause() {
       if (this.paused || !this.audio) return;
       this.paused = true; this.audio.pause();
       for (let i = 0; i < 4; i++) if (this.keys[i]) this.release(i);
+      this._touch = {}; this._tpos = {};
       const art = this.song.artist || 'Unknown', chr = this.song.charter || 'Unknown';
       const meta = [this.song.name, 'Artist: ' + art, 'Difficulty: ' + ((G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff).replace(/\b\w+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()), '', 'PRACTICE MODE'];
       this.pauseMenu = { sel: 0, t: 0, mode: 'main', items: [], meta, art, chr, artistT: 0, artistA: 1, artistIsCharter: false, offHold: 0, offFast: false };
@@ -1031,6 +1049,13 @@
         G.setScreenT(ctx);
         const cols = ['#C24B99', '#00FFFF', '#12FA05', '#F9393F'];
         if (!this.phoneArrows) for (let i = 0; i < 4; i++) { ctx.globalAlpha = this.keys[i] ? 0.28 : 0.08; ctx.fillStyle = cols[i]; ctx.fillRect(i * G.W / 4, 0, G.W / 4, G.H); }
+        // a soft circle under every finger on the arrows (so you see where you are while sliding)
+        for (const k in this._tpos || {}) {
+          const p = this._tpos[k], on = this._touch && this._touch[k] != null;
+          ctx.globalAlpha = on ? 0.3 : 0.15; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, 46, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = on ? 0.7 : 0.35; ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
         const pb = this.pauseBtn || (this.pauseBtn = this.makePauseButton());
         if (pb) {
           const cir = G.A.image('preload/images/pauseCircle.png'), s = pb.spr, cx = s.x + pb.w / 2, cy = s.y + pb.h / 2;

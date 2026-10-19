@@ -73,7 +73,7 @@ PACKS = {
         *[f'songs/{s}/{f}.ogg' for s in OWN_SONGS[:3] for f in ('Inst', 'Voices-bf', 'Voices-tankman')],
         *[f'songs/{s}/{f}.ogg' for s in OWN_SONGS[3:] for f in ('Inst', 'Voices-pico', 'Voices-darnell')],
         'week7/images/*.png', 'week7/images/*.xml', 'weekend1/images/phillyStreets/*', 'weekend1/images/SpraycanPile.png',
-        'shared/images/characters/bfAndGF.*', 'shared/images/characters/gfTankmen.*', 'shared/images/characters/pico-speaker/*',
+        'shared/images/characters/bfAndGF.*', 'shared/images/characters/bfHoldingGF-DEAD.*', 'shared/images/characters/gfTankmen.*', 'shared/images/characters/pico-speaker/*',
         *[f'preload/data/characters/{c}.json' for c in ('bf-holding-gf', 'pico-speaker', 'gf-tankmen')],
         # results screen (safe versions only: no "hearts" naughty layer)
         *[f'shared/images/resultScreen/{d}{e}' for d in ['', 'clearPercent/', 'rankText/', 'results-bf/resultsEXCELLENT/', 'results-bf/resultsGOOD/', 'results-bf/resultsGOOD/bf/',
