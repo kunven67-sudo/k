@@ -795,8 +795,17 @@
     return out;
   }
 
+  // Freeplay's "finders" (on top of the letters + favorites + random): M cycles a group (recently played, FNF's own,
+  // FNF 2's own, each mod), shown top right where it says OFFICIAL OST; / opens a search box (phone keyboard too)
+  const BASE_WEEKS = ['tutorial', 'week1', 'week2', 'week3', 'week4', 'week5', 'week6', 'week7', 'weekend1'];
+  function groups() {
+    const g = [{ id: 'all', label: 'OFFICIAL OST' }, { id: 'recent', label: 'RECENTLY PLAYED' }, { id: 'fnf', label: 'FNF', weeks: BASE_WEEKS }, { id: 'own', label: 'FNF 2 ORIGINALS', weeks: ['wrath'] }];
+    for (const p of Object.values(G.Packs.all)) if (p.head && (p.weeks || []).length) g.push({ id: 'pack:' + p.id, label: (p.name || p.id).split(' (')[0].toUpperCase(), weeks: p.weeks });
+    return g;
+  }
+
   const FP = G.screens.freeplay = {
-    remember: { id: null, diff: 'normal', letter: 2 },
+    remember: { id: null, diff: 'normal', letter: 2, group: 'all' },
     enter(p) {
       p = p || {};
       this.tw = new Tw();
@@ -924,6 +933,12 @@
       let songs = this.allSongs.slice();
       if (filter && filter.type === 'fav') songs = songs.filter(s => this.fav[s.id]).sort((a, b) => a.name.localeCompare(b.name));
       else if (filter && filter.type === 're') { const re = new RegExp('^[' + filter.data + '].*', 'i'); songs = songs.filter(s => re.test(s.name)).sort((a, b) => a.name.localeCompare(b.name)); }
+      // the group (M) + the search box (/)
+      const grp = this.group();
+      if (grp.id === 'recent') { const rec = G.save.recent || []; songs = songs.filter(s => rec.includes(s.id)).sort((a, b) => rec.indexOf(a.id) - rec.indexOf(b.id)); }
+      else if (grp.weeks) songs = songs.filter(s => grp.weeks.includes(s.week));
+      const q = (this.search || '').trim().toLowerCase();
+      if (q) songs = songs.filter(s => s.name.toLowerCase().includes(q) || String(s.id).includes(q.replace(/\s+/g, '-')));
       songs = songs.filter(s => s.diffs.some(d => d.diff === this.diff));
       const ids = songs.map(s => s.id).join(',');
       if (keepIfSame && ids === this.listIds) { if (!noJumpIn) for (const c of this.caps) { c.x = W; c.initJumpIn(false); } return; }
@@ -941,6 +956,29 @@
       if (noJumpIn) for (const c of this.caps) { c.x = c.tx; c.y = c.ty; }
     },
     song() { return this.list[this.sel] || null; },
+    group() { const g = groups(); return g.find(x => x.id === this.remember.group) || g[0]; },
+    changeGroup(dir) {
+      // (groups with nothing for this character are skipped: Nene's songs are only hers)
+      const rec = G.save.recent || [], has = x => x.id === 'all' || this.allSongs.some(s => x.id === 'recent' ? rec.includes(s.id) : x.weeks.includes(s.week));
+      const g = groups().filter(has), i = Math.max(0, g.findIndex(x => x.id === this.remember.group));
+      this.remember.group = g[(i + dir + g.length) % g.length].id;
+      G.sfx('scroll', { vol: 0.6 });
+      this.generate(this.filterFor(this.letters.current()), true, false);
+    },
+    // the search box: a real text box over the hint line (so a phone's keyboard comes up), the list follows as you type
+    openSearch() {
+      if (this.searchEl) { this.searchEl.focus(); return; }
+      const el = this.searchEl = document.createElement('input');
+      el.type = 'search'; el.placeholder = 'type a song name...'; el.value = this.search || ''; el.autocomplete = 'off'; el.spellcheck = false;
+      const r = G.canvas.getBoundingClientRect(), k = r.width / W;
+      Object.assign(el.style, { position: 'fixed', left: (r.left + 390 * k) + 'px', top: (r.top + 12 * k) + 'px', width: (420 * k) + 'px', height: (40 * k) + 'px',
+        font: Math.round(26 * k) + 'px VCR, monospace', color: '#fff', background: '#000', border: Math.max(1, 2 * k) + 'px solid #fff', borderRadius: (6 * k) + 'px', padding: '0 ' + (8 * k) + 'px', zIndex: 20, outline: 'none' });
+      el.addEventListener('input', () => { this.search = el.value; this.generate(this.filterFor(this.letters.current()), true, true); });
+      el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') { if (e.key === 'Escape') { this.search = ''; this.generate(this.filterFor(this.letters.current()), true, true); } this.closeSearch(); e.preventDefault(); } });
+      el.addEventListener('blur', () => setTimeout(() => this.closeSearch(), 0));
+      document.body.appendChild(el); el.focus();
+    },
+    closeSearch() { const el = this.searchEl; if (!el) return; this.searchEl = null; el.remove(); G.canvas.focus(); },
     albumFor() { const s = this.song(); if (!s) return null; const d = s.diffs.find(x => x.diff === this.diff) || s.diffs[0]; const m = G.Songs.meta(s.id, d.variation) || s.meta; return (m.playData && m.playData.album) || 'volume1'; },
     rankFor(s) {
       const d = s.diffs.find(x => x.diff === this.diff); if (!d) return null;
@@ -1042,6 +1080,7 @@
       if (this.rankMode && G.RankMode) { G.RankMode.open(this); return; }
       const s = cap.s, d = s.diffs.find(x => x.diff === this.diff) || s.diffs[0];
       this.pending = { id: s.id, diff: d.diff, variation: d.variation, swap: !!d.swap };
+      G.save.recent = [s.id].concat((G.save.recent || []).filter(x => x !== s.id)).slice(0, 30); G.saveData();
       this.state = 'confirm'; this.confirmT = 0;
       G.sfx('confirm');
       this.dj.play('confirm');
@@ -1133,10 +1172,12 @@
       else if (a === 'tab' && !repeat) this.switchPlayer();
       else if (a === 'debug7' && !repeat && !this.rankMode && this.song() && G.screens.editor) G.setScreen('editor', { songId: this.song().id, diff: this.diff, from: 'freeplay' });
     },
-    onKey(code, down, repeat) {
+    onKey(code, down, repeat, e) {
       if (this.editor) return this.editor.onKey(code, down, repeat);
       if (!down || repeat || this.state !== 'idle') return false;
       if (code === 'KeyF') { this.toggleFav(); return true; }
+      if (code === 'KeyM') { this.changeGroup(G.input.isDown('shift') ? -1 : 1); return true; }
+      if (code === 'Slash' || code === 'NumpadDivide') { if (e && e.preventDefault) e.preventDefault(); this.openSearch(); return true; }   // (the / itself isn't typed into the box)
       // RANK MODE: E = edit the rank (the letter filter moves to Q / R)
       if (this.rankMode && code === 'KeyE') { if (this.song()) { if (G.RankMode) G.RankMode.open(this); } else this.confirm(); return true; }
       if (this.rankMode && code === 'KeyR') { this.changeLetter(1); return true; }
@@ -1157,6 +1198,8 @@
       if (sw.dir === 'right' && y < 160 && x > 380 && x < 820) { this.changeLetter(-1); return; }
       if (sw.dir !== 'tap') return;
       if (y < 64 && x < 280) { this.back(); return; }
+      if (y < 60 && x > 380 && x < 820) { this.openSearch(); return; }
+      if (y < 64 && x > 860) { this.changeGroup(1); return; }
       if (y > 60 && y < 170 && x < 90) { this.pressArrow(0); this.changeDiff(-1); return; }
       if (y > 60 && y < 170 && x > 300 && x < 390) { this.pressArrow(1); this.changeDiff(1); return; }
       if (y > 64 && y < 150 && x > 380 && x < 820) { this.changeLetter(x < 600 ? -1 : 1); return; }
@@ -1221,7 +1264,7 @@
       const bpm = (m.timeChanges && m.timeChanges[0] && m.timeChanges[0].bpm) || 100;
       G.audio.music.play(G.Songs.instPath(s.id, m, d.variation), { loop: true, clip: true, bpm, vol: 0.7, fadeIn: 2, restart: true, offset: (pd.previewStart || 0) / 1000, end: (pd.previewEnd || 15000) / 1000 });
     },
-    leave() { this.went = false; this.tw && this.tw.clear(); },
+    leave() { this.went = false; this.tw && this.tw.clear(); this.closeSearch(); },
     // ------------------------------------------------------------ draw
     drawNum(ctx, sheet, d, x, y, alpha) {
       if (!sheet) return;
@@ -1441,11 +1484,11 @@
         const fpImg = textImg(this.rankMode ? 'RANK MODE' : 'FREEPLAY', G.FONT.vcr, 48, '#FFFFFF', this.stroke ? { stroke: 2 } : null);
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, fpImg._tw + 16, fpImg.height + 16 - fpImg._pad * 2);
         ctx.drawImage(fpImg, 8 - fpImg._pad, 8 - fpImg._pad);
-        const ost = textImg(this.album.id === null && this.song() ? 'OFFICIAL OST' : 'OFFICIAL OST', G.FONT.vcr, 48, '#FFFFFF', { stroke: 2 });
+        const ost = textImg(this.group().label, G.FONT.vcr, 48, '#FFFFFF', { stroke: 2 });
         ctx.drawImage(ost, W - 8 - ost._tw - ost._pad, 8 - ost._pad);
       }
-      const hint = textImg(this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, '#5F5F5F');
-      ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
+      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
+      if (!this.searchEl) ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
       G.screenOff.y = oy; G.setScreenT(ctx);
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }
       // character select transition: the camera's blue fade + the gradient sweeping over
