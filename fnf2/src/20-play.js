@@ -51,6 +51,16 @@
       get splash() { return this.splashOn ? G.Sparrow.load(this.splashPath) : null; },
       cover(i) { return this.coversOn ? G.Sparrow.load('shared/images/holdCover' + COLOR[i]) : null; },
       get hold() { return (this.holdPath && G.A.image(this.holdPath)) || G.A.image('shared/images/NOTE_hold_assets.png') || G.A.image('preload/images/NOTE_hold_assets.png'); },
+      // ratings, combo digits + countdown pictures (V-Slice judgementSick / comboNumber0 / countdownTwo...): a scale of
+      // 0 hides them (a mod drawing its own), no asset = FNF's
+      pop(key, dflt, dScale) {
+        const a = A[key]; if (!a || !a.assetPath) return a && a.assetPath === null ? null : { path: dflt, scale: dScale };
+        if (a.scale === 0) return null;
+        return { path: path(a.assetPath) + '.png', scale: a.scale != null ? a.scale : dScale };
+      },
+      judge(r) { return this.pop('judgement' + r[0].toUpperCase() + r.slice(1), 'preload/images/ui/popup/funkin/' + r + '.png', 0.65); },
+      digit(d) { return this.pop('comboNumber' + d, 'preload/images/ui/popup/funkin/num' + d + '.png', 0.45); },
+      count(k) { return this.pop({ ready: 'countdownTwo', set: 'countdownOne', go: 'countdownGo' }[k], 'shared/images/ui/countdown/funkin/' + k + '.png', 1); },
     };
     return N;
   }
@@ -116,7 +126,7 @@
     // the song is still loading, instead of in the middle of the song.
     prepare() {
       const t0 = performance.now();
-      const chars = [this.bf, this.dad, this.gf].concat(this.dadForms || []).concat((this.glare && this.glare.creepy) || []).filter(Boolean);
+      const chars = [this.bf, this.dad, this.gf].concat(this.dadForms || []).concat((this.glare && this.glare.creepy) || []).concat(this.swapChars || []).filter(Boolean);
       const tex = new Set();
       for (const p of this.stage.props) G.texturesOf(p, tex);
       for (const e of this.stage.extras || []) G.texturesOf(e, tex);
@@ -149,6 +159,8 @@
       if (q === 'high') return;
       let zMax = this.stageZoom || 1;
       for (const ev of this.song.events || []) if (ev.e === 'ZoomCamera' && ev.v) zMax = Math.max(zMax, (ev.v.zoom || 1) * (ev.v.mode === 'direct' ? 1 : this.stageZoom || 1));
+      for (const ev of this.song.events || []) if (ev.e === 'Set Cam Zoom' && ev.v) zMax = Math.max(zMax, parseFloat(ev.v.value1) || 0);   // (Psych mods: the zoom itself)
+      if (this.sfx && this.sfx.maxZoom) zMax = Math.max(zMax, this.sfx.maxZoom(this) || 0);                                            // (a song's cutscene camera)
       const need = new Map(), see = (sp, s) => { for (const im of G.texturesOf(sp)) if (im instanceof HTMLImageElement) need.set(im, Math.max(need.get(im) || 0, s)); };
       const sz = sp => Math.max(Math.abs(sp.scale && sp.scale.x || 1), Math.abs(sp.scale && sp.scale.y || 1));
       const zq = zMax * 1.15 * Math.min(1, G.q);      // camera bops + a little room
@@ -201,6 +213,10 @@
       }
       // ...and the mod's own camera spots
       for (const [slot, c] of [['bf', this.bf], ['dad', this.dad], ['gf', this.gf]]) if (c && SC[slot] && SC[slot].camera) c.camFocus = { x: SC[slot].camera[0], y: SC[slot].camera[1] };
+      // ...or Psych Engine's way (sprite corner + camera on the middle: VS Whitty's port), and the characters the song's
+      // Change Character events swap in, made now
+      for (const [slot, c] of [['bf', this.bf], ['dad', this.dad], ['gf', this.gf]]) if (c && SC[slot] && SC[slot].raw && G.ModChars) G.ModChars.place(c, SC[slot]);
+      this.swapChars = G.ModChars ? G.ModChars.prepare(this) : [];
       this.noteCam = this.stage.data.noteCam ? { px: this.stage.data.noteCam, t: 0, base: null, side: 1 } : null;
       // whoever stands mirrored on the other side (Tankman on the right, BF on the left) swaps their LEFT and RIGHT
       // poses, like FNF's own mirrored characters do, so every pose still points the way its arrow does
@@ -226,7 +242,12 @@
       this.camZoom = this.stageZoom; this.bopMul = 1; this.hudZoom = 1;
       this.zoomRate = 4; this.bopIntensity = 1.015; this.hudBopIntensity = 0.03;
       this.camTween = null; this.zoomTween = null;
-      const f = this.dad.camFocus; this.cam.focus(f.x, f.y);
+      this.startCam();
+    },
+    // where the camera is when the song starts: on the opponent, or where the stage says (Psych stages: on you / a spot)
+    startCam() {
+      const cs = this.stage.data.camStart, f = cs === 'bf' && this.bf ? this.bf.camFocus : Array.isArray(cs) ? { x: cs[0], y: cs[1] } : this.dad.camFocus;
+      this.cam.focus(f.x, f.y);
     },
     // Erect stages tint the characters (AdjustColorShader in the original) -> CSS filters on the sprite buffer
     applyStageFX() {
@@ -261,6 +282,10 @@
         O.sc = 0.4; O.x = 48 - 30; O.y = 24 * 0.3;
       }
       NS = makeNS(this.song.noteStyle);
+      // (a mod's own rating / combo / countdown pictures: asked for now, so they're ready before the song)
+      for (const r of ['sick', 'good', 'bad', 'shit']) { const j = NS.judge(r); if (j) G.A.image(j.path); }
+      for (let d = 0; d < 10; d++) { const j = NS.digit(d); if (j) G.A.image(j.path); }
+      for (const k of ['ready', 'set', 'go']) { const j = NS.count(k); if (j) G.A.image(j.path); }
       for (const L of this.lines) {
         // a scaled strumline draws through its own camera: the HUD camera + a zoom around the line's corner
         if (L.sc && L.sc !== 1) { const hud = this.hud; L.cam = { apply(ctx) { hud.apply(ctx); ctx.transform(L.sc, 0, 0, L.sc, L.x * (1 - L.sc), L.y * (1 - L.sc)); } }; }
@@ -318,7 +343,9 @@
       this.botplay = !!G.settings.botplay; this.practice = !!G.settings.practice;
       this.popups = []; this.splashes = []; this.covers = [];
       this.vocalsOn = true;
-      for (const L of this.lines) for (const s2 of L.strums) { s2.playA('static', true); s2.confirmHold = -1; s2.mx = s2.my = s2.ma = 0; s2.mal = 1; s2.x = s2.bx; s2.y = s2.by; s2.angle = 0; s2.alpha = 1; }
+      for (const L of this.lines) for (const s2 of L.strums) { s2.playA('static', true); s2.confirmHold = -1; s2.mx = s2.my = s2.ma = 0; s2.mal = 1; s2.x = s2.bx; s2.y = s2.by; s2.angle = 0; s2.alpha = 1; s2.visible = true; }
+      if (G.ModEvents) G.ModEvents._reset(this);
+      if (this.cam && this.started === false && this.stage && this.stage.data.camStart) this.startCam();
       this.snap = null; if (this.hud) this.hud.alpha = 1;
       if (this.dadForms) { this.dadForms[0]._locked = false; if (this.dad !== this.dadForms[0]) this.swapDad(this.dadForms[0]); else this.stage.chars.dad = this.dad; }
       this.iconP1.scale = this.iconP2.scale = 1;
@@ -335,8 +362,10 @@
       const steps = { [-4]: ['intro3', null], [-3]: ['intro2', 'ready'], [-2]: ['intro1', 'set'], [-1]: ['introGo', 'go'] }[b];
       if (!steps) return;
       G.sfx(steps[0], { vol: 0.6 });
-      if (steps[1]) {
-        const s = new G.Sprite(0, 0).loadImage('shared/images/ui/countdown/funkin/' + steps[1] + '.png');
+      const cp = steps[1] && NS.count(steps[1]);
+      if (cp && G.A.image(cp.path)) {
+        const s = new G.Sprite(0, 0).loadImage(cp.path);
+        if (cp.scale !== 1) { s.scale.x = s.scale.y = cp.scale; s.updateHitbox(); }
         s.screenCenter(); s.born = this.songPos; s.y0 = s.y;
         this.countdownSpr = s;
       }
@@ -383,7 +412,7 @@
     },
     onStep(step) {
       this.stage.onStep(step);
-      for (const c of [this.gf, this.dad, this.bf]) if (c) { const n = Math.round(c.danceEvery * 4) || 4; if (((step % n) + n) % n === 0) c.dance(false); }
+      for (const c of [this.gf, this.dad, this.bf]) if (c && !(c.noDanceUntil > this.songPos)) { const n = Math.round(c.danceEvery * 4) || 4; if (((step % n) + n) % n === 0) c.dance(false); }
       if (step >= 0 && this.sfx && this.sfx.step) this.sfx.step(this, step);
       if (step % 4 === 0) {
         const beat = step / 4;
@@ -394,6 +423,7 @@
       this.iconP1.scale = this.iconP2.scale = 1.2;
       if (beat >= 0 && this.sfx && this.sfx.beat) this.sfx.beat(this, beat);
       if (beat >= 0 && this.mod && this.mod.beat) this.mod.beat(this, beat);
+      if (beat >= 0 && G.ModEvents) G.ModEvents._beat(this, beat);
       if (beat >= 0 && G.settings.camZoom && this.zoomRate > 0 && beat % this.zoomRate === 0 && this.camZoom * this.bopMul < 1.35 * this.stageZoom) {
         this.bopMul = this.bopIntensity; this.hudZoom += this.hudBopIntensity;
       }
@@ -436,6 +466,7 @@
       for (const c of [this.gf, this.dad, this.bf]) if (c && c.script && c.script.onEvent) c.script.onEvent(c, e.e, v);
       switch (e.e) {
         case 'FocusCamera': {
+          if (this.camForced) break;                  // (Camera Follow Pos holds the camera)
           let ch = v != null && typeof v === 'object' ? v.char : v; if (ch == null) ch = 0;
           let x = (v && v.x) || 0, y = (v && v.y) || 0;
           const tgt = ch === 0 ? this.bf : ch === 1 ? this.dad : ch === 2 ? (this.gf || this.dad) : null;
@@ -480,6 +511,7 @@
           }
           break;
         case 'SetCameraBop': this.zoomRate = v.rate != null ? v.rate : 4; this.bopIntensity = 1 + ((v.intensity != null ? v.intensity : 1) * 0.015); this.hudBopIntensity = (v.intensity != null ? v.intensity : 1) * 0.03; break;
+        default: { const h = G.ModEvents && G.ModEvents[e.e]; if (h && e.e[0] !== '_') h(this, v || {}, e); }   // (Psych mods' events: 16-mod-events.js)
       }
     },
     // -------------------------------------------------- notes
@@ -645,6 +677,7 @@
       this.bf.sing(lane, true);
     },
     breakCombo() {
+      if (this.sfx && this.sfx.comboBreak) this.sfx.comboBreak(this);
       if (this.gf && this.combo >= 70 && this.gf.anims.drop70) this.gf.playAnim('drop70', true);
       else if (this.gf && this.combo >= 5 && this.gf.anims.sad) this.gf.playAnim('sad', true);
       if (this.combo >= 10 && G.settings.comboPopups !== false) this.popCombo(0);
@@ -673,8 +706,8 @@
     },
     // -------------------------------------------------- popups (rating + combo digits, on the HUD camera)
     popRating(r) {
-      const img = G.A.image('preload/images/ui/popup/funkin/' + r + '.png'); if (!img) return;
-      const s = new G.Sprite(0, 0).loadImage(img); s.scale.x = s.scale.y = 0.65; s.updateHitbox();
+      const jp = NS.judge(r), img = jp && G.A.image(jp.path); if (!img) return;
+      const s = new G.Sprite(0, 0).loadImage(img); s.scale.x = s.scale.y = jp.scale; s.updateHitbox();
       s.x = G.W * 0.474 - s.width / 2; s.y = G.H * 0.45 - 60 - s.height / 2;
       s.vy = -(140 + Math.random() * 35); s.vx = -Math.random() * 10; s.ay = 550; s.life = this.cond.crochet / 1000 + 0.2; s.fadeAt = this.cond.crochet / 1000;
       this.popups.push(s);
@@ -685,8 +718,8 @@
       while (digits.length < 3) digits.push(0);
       let loop = 1;
       for (const d of digits) {
-        const img = G.A.image('preload/images/ui/popup/funkin/num' + d + '.png'); if (!img) continue;
-        const s = new G.Sprite(0, 0).loadImage(img); s.scale.x = s.scale.y = 0.45; s.updateHitbox();
+        const dp = NS.digit(d), img = dp && G.A.image(dp.path); if (!img) continue;
+        const s = new G.Sprite(0, 0).loadImage(img); s.scale.x = s.scale.y = dp.scale; s.updateHitbox();
         s.x = G.W * 0.507 - 36 * loop - 65; s.y = G.H * 0.44;
         s.ay = 250 + Math.random() * 50; s.vy = -(130 + Math.random() * 20); s.vx = Math.random() * 10 - 5;
         s.fadeAt = this.cond.crochet * 2 / 1000; s.life = s.fadeAt + 0.2;

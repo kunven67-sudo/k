@@ -9,13 +9,14 @@ run() {   # run <pack id> <import tool>
   rm -rf "build/mods/$1"
   FNF_OWN="$PWD/build/mods/$1" python3 "tools/own/$2.py" && python3 tools/pack_assets.py --packs "$1"
 }
-for id in ${*:-garcello tabi sky nene darnell}; do
+for id in ${*:-garcello tabi sky nene darnell whitty}; do
   case $id in
     garcello) run garcello garcello ;;
     tabi) run tabi tabi ;;
     sky) run sky sky ;;
     nene) run nene nene ;;
     darnell) run darnell darnell_mix ;;
+    whitty) run whitty whitty ;;
     *) echo "no such pack: $id"; exit 1 ;;
   esac
 done
