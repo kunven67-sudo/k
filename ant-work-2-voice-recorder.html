@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ant Work 2 - Voice Recorder</title>
+<style>
+  :root{--bg:#0d0b08;--panel:#1a1610;--line:#3a3020;--gold:#ffcc33;--gold2:#c89a1e;--text:#f2ead8;--dim:#a89c84;--red:#ff4a3a;}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#2a2214 0%,var(--bg) 65%);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;justify-content:center;padding:28px 16px}
+  main{width:100%;max-width:620px}
+  h1{margin:0;font-size:34px;letter-spacing:1px;color:var(--gold);text-shadow:0 3px 0 #5a4410}
+  h1 span{color:#fff}
+  .sub{color:var(--dim);margin:4px 0 22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .line{font-size:28px;font-weight:800;text-align:center;margin:6px 0 4px;color:#fff}
+  .hint{color:var(--dim);font-size:14px;text-align:center}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:14px}
+  button{font:inherit;font-weight:700;border-radius:10px;border:1px solid var(--line);background:#241e14;color:var(--text);padding:11px 18px;cursor:pointer}
+  button:hover{border-color:var(--gold2)}
+  button:disabled{opacity:.4;cursor:default}
+  .rec{background:var(--red);border-color:var(--red);color:#fff;min-width:200px;font-size:18px}
+  .rec.on{background:#5a1410;border-color:var(--red);animation:pulse 1s infinite}
+  @keyframes pulse{50%{box-shadow:0 0 0 8px rgba(255,74,58,.18)}}
+  .gold{background:var(--gold);border-color:var(--gold);color:#1a1206}
+  canvas{width:100%;height:90px;display:block;background:#0a0806;border-radius:10px;border:1px solid var(--line)}
+  .count{font-size:64px;font-weight:900;text-align:center;color:var(--gold);height:76px}
+  .takes{list-style:none;margin:0;padding:0}
+  .takes li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+  @media (max-width:520px){ .takes li{flex-wrap:wrap} .takes .name{flex:1 1 100% !important;width:100%} .takes button{flex:1 1 0} }
+  .takes li:first-child{border-top:0}
+  .takes .name{flex:1}
+  .takes .name b{display:block}
+  .takes .name small{color:var(--dim)}
+  .takes button{padding:8px 12px;font-size:14px}
+  .star{color:var(--gold)}
+  ol{margin:8px 0 0;padding-left:20px;color:var(--dim)}
+  ol li{margin:4px 0}
+  .err{color:var(--red);text-align:center;margin-top:10px;min-height:1em}
+</style>
+</head>
+<body>
+<main>
+  <h1>ANT WORK <span>2</span></h1>
+  <div class="sub">Voice recorder for the big house scene</div>
+
+  <div class="card">
+    <div class="hint">Say this, the way Jay would say it:</div>
+    <div class="line">"Are you... me?"</div>
+    <div class="hint">Slow. Quiet. Like you can't believe what you're seeing.</div>
+    <div class="count" id="count"></div>
+    <canvas id="wave" width="1200" height="180"></canvas>
+    <div class="row">
+      <button class="rec" id="recBtn">Record</button>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card">
+    <b>Your takes</b>
+    <ul class="takes" id="takes"><li><span class="name" style="color:var(--dim)">No takes yet. Record a few and pick your best one.</span></li></ul>
+  </div>
+
+  <div class="card">
+    <b>How to send it</b>
+    <ol>
+      <li>Record a few takes (up to 8). Press Play to listen.</li>
+      <li>Press Save on the best one. It downloads a file called <b>are-you-me.wav</b>.</li>
+      <li>Drag that file into the chat with Claude.</li>
+    </ol>
+    <div class="hint" style="margin-top:10px;text-align:left">Tips: quiet room, phone or mic about a hand away from your mouth. Don't worry about your voice: Claude changes it to sound like Jay, and puts the echo on.</div>
+  </div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const wave=$('wave'), wx=wave.getContext('2d');
+let ctx=null, stream=null, srcNode=null, proc=null, chunks=[], recording=false, takes=[], playing=null, liveLevel=new Float32Array(240), lvI=0;
+const MAX_SEC=8, MAX_TAKES=8;
+
+function drawIdle(){
+  wx.fillStyle='#0a0806'; wx.fillRect(0,0,wave.width,wave.height);
+  wx.strokeStyle='#3a3020'; wx.lineWidth=2; wx.beginPath(); wx.moveTo(0,wave.height/2); wx.lineTo(wave.width,wave.height/2); wx.stroke();
+}
+function drawLive(){
+  drawIdle(); const n=liveLevel.length, w=wave.width/n, h=wave.height;
+  wx.fillStyle='#ff4a3a';
+  for(let i=0;i<n;i++){ const v=liveLevel[(lvI+i)%n]; const bh=Math.max(2,v*h*.95); wx.fillRect(i*w,(h-bh)/2,Math.max(1,w-2),bh); }
+}
+function drawTake(t,progress){
+  drawIdle(); const d=t.data, h=wave.height, W=wave.width, step=Math.max(1,Math.floor(d.length/W));
+  for(let x=0;x<W;x++){ let m=0; for(let i=x*step;i<(x+1)*step&&i<d.length;i++){ const a=Math.abs(d[i]); if(a>m) m=a; }
+    const bh=Math.max(1,m*h*.95); wx.fillStyle=(progress!=null&&x/W<progress)?'#ffcc33':'#8a7a5a'; wx.fillRect(x,(h-bh)/2,1,bh); }
+}
+drawIdle();
+
+async function ensureMic(){
+  if(stream) return true;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ $('err').textContent="This browser can't use the microphone here. Open this file in Chrome or Edge."; return false; }
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true,channelCount:1}});
+    ctx=new (window.AudioContext||window.webkitAudioContext)();
+    srcNode=ctx.createMediaStreamSource(stream);
+    proc=ctx.createScriptProcessor(2048,1,1);
+    proc.onaudioprocess=e=>{ const d=e.inputBuffer.getChannelData(0); let m=0; for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>m) m=a; }
+      liveLevel[lvI]=Math.min(1,m*1.6); lvI=(lvI+1)%liveLevel.length;
+      if(recording){ chunks.push(new Float32Array(d)); if(chunks.length*2048/ctx.sampleRate>=MAX_SEC) stopRec(); drawLive(); } };
+    const mute=ctx.createGain(); mute.gain.value=0; srcNode.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+    $('err').textContent=''; return true;
+  }catch(e){ $('err').textContent="The microphone was blocked. Allow it (the icon in the address bar) and press Record again."; return false; }
+}
+
+async function startRec(){
+  if(takes.length>=MAX_TAKES){ $('err').textContent='That is 8 takes. Delete one to record another.'; return; }
+  if(!await ensureMic()) return;
+  if(ctx.state==='suspended') await ctx.resume();
+  stopPlay();
+  const btn=$('recBtn'); btn.disabled=true;
+  for(const n of ['3','2','1']){ $('count').textContent=n; await new Promise(r=>setTimeout(r,650)); }
+  $('count').textContent='';
+  chunks=[]; recording=true; btn.disabled=false; btn.textContent='Stop'; btn.classList.add('on');
+}
+function stopRec(){
+  if(!recording) return; recording=false;
+  const btn=$('recBtn'); btn.textContent='Record'; btn.classList.remove('on');
+  let len=0; for(const c of chunks) len+=c.length; const all=new Float32Array(len); let o=0; for(const c of chunks){ all.set(c,o); o+=c.length; }
+  const data=trim(all,ctx.sampleRate);
+  if(data.length<ctx.sampleRate*.3){ $('err').textContent="Didn't hear anything. Try again a bit louder."; drawIdle(); return; }
+  const t={id:Date.now(),data,rate:ctx.sampleRate,best:takes.length===0};
+  takes.push(t); renderTakes(); drawTake(t);
+}
+/* cut the silence at the start and end, keep a little air */
+function trim(d,rate){
+  let peak=0; for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>peak) peak=a; }
+  const th=Math.max(.02,peak*.08); let a=0, b=d.length-1;
+  while(a<d.length&&Math.abs(d[a])<th) a++; while(b>a&&Math.abs(d[b])<th) b--;
+  a=Math.max(0,a-Math.floor(rate*.15)); b=Math.min(d.length-1,b+Math.floor(rate*.3));
+  const out=d.slice(a,b+1); const g=peak>0?Math.min(4,.9/peak):1; for(let i=0;i<out.length;i++) out[i]*=g;
+  const f=Math.floor(rate*.01); for(let i=0;i<f&&i<out.length;i++){ out[i]*=i/f; out[out.length-1-i]*=i/f; }
+  return out;
+}
+function stopPlay(){ if(playing){ try{ playing.src.stop(); }catch(e){} cancelAnimationFrame(playing.raf); playing=null; renderTakes(); } }
+function play(t){
+  stopPlay(); if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)();
+  const buf=ctx.createBuffer(1,t.data.length,t.rate); buf.copyToChannel?buf.copyToChannel(t.data,0):buf.getChannelData(0).set(t.data);
+  const s=ctx.createBufferSource(); s.buffer=buf; s.connect(ctx.destination); const t0=ctx.currentTime; s.start();
+  playing={src:s,id:t.id,raf:0};
+  const tick=()=>{ const p=(ctx.currentTime-t0)/buf.duration; drawTake(t,Math.min(1,p)); if(p<1&&playing&&playing.id===t.id) playing.raf=requestAnimationFrame(tick); };
+  s.onended=()=>{ if(playing&&playing.id===t.id){ playing=null; drawTake(t); renderTakes(); } };
+  tick(); renderTakes();
+}
+function wav(t){
+  const n=t.data.length, buf=new ArrayBuffer(44+n*2), v=new DataView(buf);
+  const w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,t.rate,true); v.setUint32(28,t.rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){ const s=Math.max(-1,Math.min(1,t.data[i])); v.setInt16(44+i*2,s<0?s*0x8000:s*0x7fff,true); }
+  return new Blob([buf],{type:'audio/wav'});
+}
+function save(t){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(wav(t)); a.download='are-you-me.wav'; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
+}
+function renderTakes(){
+  const ul=$('takes'); ul.innerHTML='';
+  if(!takes.length){ ul.innerHTML='<li><span class="name" style="color:var(--dim)">No takes yet. Record a few and pick your best one.</span></li>'; return; }
+  takes.forEach((t,i)=>{
+    const li=document.createElement('li');
+    const isPlay=playing&&playing.id===t.id;
+    li.innerHTML=`<span class="name"><b>Take ${i+1}${t.best?' <span class="star">(best)</span>':''}</b><small>${(t.data.length/t.rate).toFixed(1)} seconds</small></span>`;
+    const mk=(label,fn,cls)=>{ const b=document.createElement('button'); b.textContent=label; if(cls) b.className=cls; b.onclick=fn; li.appendChild(b); };
+    mk(isPlay?'Stop':'Play',()=>isPlay?stopPlay():play(t));
+    mk('Best',()=>{ takes.forEach(q=>q.best=false); t.best=true; renderTakes(); });
+    mk('Save',()=>save(t),'gold');
+    mk('Delete',()=>{ if(playing&&playing.id===t.id) stopPlay(); takes=takes.filter(q=>q!==t); if(takes.length&&!takes.some(q=>q.best)) takes[0].best=true; renderTakes(); drawIdle(); });
+    ul.appendChild(li);
+  });
+}
+$('recBtn').onclick=()=>recording?stopRec():startRec();
+document.addEventListener('keydown',e=>{ if(e.code==='Space'&&e.target===document.body){ e.preventDefault(); recording?stopRec():startRec(); } });
+</script>
+</body>
+</html>
