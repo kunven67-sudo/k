@@ -43,9 +43,22 @@ for (const f of files) {
     '\n</script>\n';
 }
 
-// the pack comes in pieces (tools/pack_assets.py): one <script> each, so no single script text gets too big for the browser
-const assetTag = (!args.includes('--no-assets') && fs.existsSync(assetsFile)) ? fs.readFileSync(assetsFile, 'utf8').split('/*FNF-CHUNK*/')
-  .map(part => '<script class="fnf-assets">\n' + part.replace(/<\/script/gi, '<\\/script') + '\n</script>\n').join('') : '';
+// the pack comes in pieces (tools/pack_assets.py): one <script> each, so no single script text gets too big for the browser.
+// --split: the pieces go into files next to the game (fnf2-data/1.js ...: each under 100 MB, so the build fits on
+// GitHub); a phone that only has the game file reads them out of the zip once (99-main.js noAssets)
+const split = args.includes('--split');
+const chunks = (!args.includes('--no-assets') && fs.existsSync(assetsFile)) ? fs.readFileSync(assetsFile, 'utf8').split('/*FNF-CHUNK*/') : [];
+let assetTag = '';
+if (split && chunks.length) {
+  const dir = path.join(path.dirname(out), 'fnf2-data');
+  fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
+  const parts = chunks.slice(1), n = parts.length;
+  parts.forEach((part, i) => fs.writeFileSync(path.join(dir, (i + 1) + '.js'),
+    '/*FNF-DATA ' + JSON.stringify({ n: i + 1, of: n }) + '*/\n/* PRIVATE BUILD: Friday Night Funkin\' assets (c) The Funkin\' Crew Inc. Not for public distribution. */\n' +
+    part + '\nwindow.__FNF_DATA_OK = (window.__FNF_DATA_OK || 0) + 1;\n'));
+  assetTag = '<script>window.__FNF_ASSETS = window.__FNF_ASSETS || {}; window.__FNF_DATA_N = ' + n + ';</script>\n' +
+    parts.map((_, i) => '<script src="fnf2-data/' + (i + 1) + '.js"></script>\n').join('');
+} else assetTag = chunks.map(part => '<script class="fnf-assets">\n' + part.replace(/<\/script/gi, '<\\/script') + '\n</script>\n').join('');
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>

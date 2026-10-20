@@ -26,13 +26,39 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
   if (q.bot) G.settings.botplay = q.bot === '1';
   if (q.down) G.settings.downscroll = q.down === '1';
   if (q.dev === 'song' && G.screens.play) return G.start('play', { mode: q.story === '1' ? 'story' : 'freeplay', songs: [q.id || 'tutorial'], diff: q.diff || 'normal', variation: q.variation || (G.DIFF_INFO[q.diff] || {}).variation || 'default', swap: q.swap === '1', week: null, noCutscene: q.cs === '0' });
-  if (!G.HAS_FNF) { G.start('noAssets', {}); return; }
+  if (!G.HAS_FNF || G.dataMissing) { G.start('noAssets', {}); return; }
   G.start(G.screens.title ? 'title' : 'devStage', {});
 });
+// no FNF data: either a code-only build, or the game file was opened without its fnf2-data folder (a phone that
+// downloaded just the game file). Then the zip it came in is picked once: everything is read out of it and kept
+// in the browser (G.Packs.save), and the game starts again.
 G.screens.noAssets = {
+  enter() { this.msg = null; this.busy = false; },
+  pick() {
+    if (!G.dataMissing || this.busy) return;
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip,application/x-zip-compressed';
+    inp.onchange = async () => {
+      const files = [...(inp.files || [])]; if (!files.length) return;
+      this.busy = true; this.msg = 'Taking everything out of the zip... (a minute or two, keep this open)';
+      const got = await G.Packs.save(files);
+      this.busy = false;
+      if (G.Packs.savedData >= (window.__FNF_DATA_N || 1)) { this.msg = 'Done! Starting the game... (' + got.length + ' mod files too)'; setTimeout(() => location.reload(), 800); }
+      else this.msg = 'That zip doesn\'t have the FNF 2 data in it. Pick the zip you downloaded from GitHub.';
+    };
+    inp.click();
+  },
+  onAction(a, down) { if (down && a === 'accept') this.pick(); return true; },
+  onPointer(type) { if (type === 'down') this.pick(); },
   draw(ctx) {
     G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
-    G.vcr(ctx, 'This build has no FNF assets packed in.', G.W / 2, 320, { align: 'center', size: 30 });
-    G.vcr(ctx, 'Run tools/pack_assets.py, then tools/build.js', G.W / 2, 370, { align: 'center', size: 24 });
+    if (!G.dataMissing) {
+      G.vcr(ctx, 'This build has no FNF assets packed in.', G.W / 2, 320, { align: 'center', size: 30 });
+      G.vcr(ctx, 'Run tools/pack_assets.py, then tools/build.js', G.W / 2, 370, { align: 'center', size: 24 });
+      return;
+    }
+    G.vcr(ctx, 'FNF 2 needs its files one time.', G.W / 2, 250, { align: 'center', size: 34 });
+    G.vcr(ctx, 'TAP HERE and pick the FNF 2 zip you downloaded', G.W / 2, 330, { align: 'center', size: 28, color: '#FFE45C' });
+    G.vcr(ctx, '(you don\'t have to unzip it)', G.W / 2, 370, { align: 'center', size: 22 });
+    if (this.msg) G.vcr(ctx, this.msg, G.W / 2, 460, { align: 'center', size: 22, color: '#9CF' });
   },
 };

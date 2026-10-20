@@ -411,15 +411,24 @@ def make_pack(pid, root, out_dir, jobs):
         m = re.match(r'preload/data/levels/([^/]+)\.json$', rel)
         if m: weeks.append(m.group(1))
     info = dict(PACK_INFO.get(pid, {'name': pid}), id=pid)
-    meta = dict(info, weeks=weeks, body=sizes, previews=previews)
+    # the body in parts of at most ~90 MB each (GitHub takes no single file over 100 MB): <id>.body.js, <id>.body2.js...
+    parts, cur, size = [], {}, 0
+    for k, v in body.items():
+        if cur and size + len(v) > 90 * 1048576: parts.append(cur); cur, size = {}, 0
+        cur[k] = v; size += len(v)
+    if cur or not parts: parts.append(cur)
+    meta = dict(info, weeks=weeks, body=sizes, previews=previews, bodyParts=len(parts))
     hb, bb = sum(len(v) for v in head.values()), sum(len(v) for v in body.values())
     os.makedirs(out_dir, exist_ok=True)
-    tag = lambda part: '/*FNF-PACK ' + json.dumps(dict(id=pid, name=info['name'], part=part)) + '*/\n'
+    tag = lambda part, **x: '/*FNF-PACK ' + json.dumps(dict(id=pid, name=info['name'], part=part, **x)) + '*/\n'
     note = "/* PRIVATE BUILD: art + music belong to their makers (see the credits). Not for public distribution. */\n"
     with open(os.path.join(out_dir, pid + '.head.js'), 'w') as f:
-        f.write(tag('head') + note + 'FNF_PACK(' + json.dumps(meta, separators=(',', ':')) + ',' + json.dumps(head, separators=(',', ':')) + ');\n')
-    with open(os.path.join(out_dir, pid + '.body.js'), 'w') as f:
-        f.write(tag('body') + note + 'FNF_PACK_BODY(' + json.dumps(pid) + ',' + json.dumps(body, separators=(',', ':')) + ');\n')
+        f.write(tag('head', parts=len(parts)) + note + 'FNF_PACK(' + json.dumps(meta, separators=(',', ':')) + ',' + json.dumps(head, separators=(',', ':')) + ');\n')
+    for old in os.listdir(out_dir):
+        if re.match(re.escape(pid) + r'\.body\d*\.js$', old): os.remove(os.path.join(out_dir, old))
+    for i, part in enumerate(parts, 1):
+        with open(os.path.join(out_dir, pid + '.body' + (str(i) if i > 1 else '') + '.js'), 'w') as f:
+            f.write(tag('body', n=i, of=len(parts)) + note + 'FNF_PACK_BODY(' + json.dumps(pid) + ',' + json.dumps(part, separators=(',', ':')) + f',{i},{len(parts)});\n')
     print(f'pack {pid}: head {len(head)} files {hb / 1048576:.1f} MB, body {len(body)} files {bb / 1048576:.1f} MB, weeks {weeks}')
     return dict(info, headMB=round(hb / 1048576, 1), bodyMB=round(bb / 1048576, 1))
 
@@ -444,7 +453,8 @@ def main():
             m = re.match(r'(.+)\.head\.js$', f)
             if not m: continue
             pid = m.group(1)
-            hb, bb = os.path.getsize(os.path.join(out_dir, f)), os.path.getsize(os.path.join(out_dir, pid + '.body.js'))
+            hb = os.path.getsize(os.path.join(out_dir, f))
+            bb = sum(os.path.getsize(os.path.join(out_dir, g)) for g in os.listdir(out_dir) if re.match(re.escape(pid) + r'\.body\d*\.js$', g))
             index.append(dict(PACK_INFO.get(pid, {'name': pid}), id=pid, headMB=round(hb / 1048576, 1), bodyMB=round(bb / 1048576, 1)))
         with open(os.path.join(out_dir, 'index.js'), 'w') as f:
             f.write('/* FNF 2 mod packs in this folder */\nFNF_PACK_INDEX(' + json.dumps(index, indent=1) + ');\n')

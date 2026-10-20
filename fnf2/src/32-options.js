@@ -109,14 +109,14 @@
         this.modMsg = { ok: true, text: (p.name || p.id) + ' is ' + (G.Packs.isOn(p.id) ? 'ON' : 'OFF') + '. The game restarts when you leave this page.' };
         return;
       }
-      // pick pack files (.head.js + .body.js, any number at once): they're kept in this browser
+      // pick pack files (.head.js + .body.js, any number at once) or the update's whole zip: they're kept in this browser
       G.sfx('confirm');
-      const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.accept = '.js,text/javascript,application/javascript';
+      const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.accept = '.js,.zip,text/javascript,application/javascript,application/zip,application/x-zip-compressed';
       inp.onchange = async () => {
         const files = [...(inp.files || [])]; if (!files.length) return;
-        this.modMsg = { ok: true, text: 'Saving ' + files.length + ' file(s)...' };
+        this.modMsg = { ok: true, text: files.some(f => /\.zip$/i.test(f.name)) ? 'Taking the mods out of the zip... (this can take a minute)' : 'Saving ' + files.length + ' file(s)...' };
         const got = await G.Packs.save(files);
-        if (!got.length) { this.modMsg = { ok: false, text: 'Those are not FNF 2 pack files (they end in .head.js / .body.js)' }; G.sfx('cancel'); return; }
+        if (!got.length) { this.modMsg = { ok: false, text: 'No FNF 2 packs in there (pick the update zip, or files ending in .head.js / .body.js)' }; G.sfx('cancel'); return; }
         const names = [...new Set(got.map(m => m.name || m.id))];
         const half = got.filter(m => !got.some(o => o.id === m.id && o.part !== m.part) && !(G.Packs.all[m.id] && G.Packs.all[m.id].src)).map(m => (m.name || m.id) + ' (' + (m.part === 'head' ? 'body' : 'head') + ' missing)');
         this.modMsg = { ok: !half.length, text: 'Saved: ' + names.join(', ') + (half.length ? '. Also pick: ' + half.join(', ') : '. The game restarts when you leave this page.') };
