@@ -137,6 +137,11 @@ def main():
     for lv, label in (('weekbonus1-2', 'WHITTY BONUS'), ('weekbonus3', 'WHITTY BONUS'), ('weekhungry', 'WHITTY BONUS'),
                       ('zweekbonus3-hqr', 'HIGH QUALITY'), ('zweekhungry-hqr', 'HIGH QUALITY')):
         p = D('levels', lv + '.json'); L = load(p); L['capsule'] = {'name': label}; save(L, p)
+    # Faucet + Faucet (HQ) are in no week in the port (nowhere to pick them): they go with Hungry, the other bonus song
+    for lv, sid in (('weekhungry', 'faucet'), ('zweekhungry-hqr', 'faucet-(hq)')):
+        p = D('levels', lv + '.json'); L = load(p)
+        if sid not in L['songs']: L['songs'].append(sid)
+        save(L, p)
     n += og(D)
     n += erect(D)
     print('whitty:', n, 'files')

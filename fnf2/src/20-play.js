@@ -1035,7 +1035,9 @@
       const dn = (G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff;
       return this.song.name.toLowerCase().includes(String(dn).toLowerCase()) ? this.song.name : this.song.name + ' (' + dn + ')';
     },
-    noteY(t) { const d = (t - this.songPos) * PX_PER_MS * this.scrollSpeed; return this.down ? -d : d; },
+    // (a line can have its own speed: V-Slice's ScrollSpeed event can change one strumline only)
+    lineSpeed(L) { return L && L.scroll != null ? L.scroll : this.scrollSpeed; },
+    noteY(t, L) { const d = (t - this.songPos) * PX_PER_MS * this.lineSpeed(L); return this.down ? -d : d; },
     // a mod note kind's own picture (animated, looping), placed like V-Slice's Strumline + the FlxSprite.offset its
     // note kind script gives it (drawn with the line's camera already on)
     drawKindNote(ctx, n, K, S) {
@@ -1049,7 +1051,7 @@
       const s = N.noteScale, L = this.lines[n.line];
       const off = (this.down && K.offDown) || K.off, flip = this.down && K.flipDown;
       let x = S.x - INITIAL_OFFSET - (f0.fw * s - STRUM_SIZE) / 2 - NUDGE;
-      let y = S.y - INITIAL_OFFSET + this.noteY(n.t) * (L.ys || 1);
+      let y = S.y - INITIAL_OFFSET + this.noteY(n.t, L) * (L.ys || 1);
       if (off) { if (off[0] != null) x += 0.5 * f0.fw * (1 - s) - off[0]; y += 0.5 * f0.fh * (1 - s) - off[1]; }
       ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
       if (S.angle) { ctx.translate(f0.fw / 2, f0.fh / 2); ctx.rotate(S.angle * Math.PI / 180); ctx.translate(-f0.fw / 2, -f0.fh / 2); }
@@ -1077,7 +1079,7 @@
         for (const n of this.notes) {
           if (n.line !== li || n.hit || n.done) continue;
           const S = L.strums[n.lane];
-          const y = S.y - INITIAL_OFFSET + this.noteY(n.t) * ys;
+          const y = S.y - INITIAL_OFFSET + this.noteY(n.t, L) * ys;
           if (y > G.H + 120 || y < -260) { if ((n.t - this.songPos) * PX_PER_MS * this.scrollSpeed > G.H + 300) break; continue; }
           const K = kindOf(n);
           if (K && K.style && this.drawKindNote(ctx, n, K, S)) continue;
@@ -1190,8 +1192,8 @@
       let startT = n.t, endT = n.holdEnd;
       if (n.hit && n.holding) startT = Math.max(startT, this.songPos);
       if (endT <= startT) return;
-      const y0 = S.y - INITIAL_OFFSET + STRUM_SIZE / 2 + this.noteY(startT) * (L.ys || 1);
-      const len = (endT - startT) * PX_PER_MS * this.scrollSpeed * (L.ys || 1);
+      const y0 = S.y - INITIAL_OFFSET + STRUM_SIZE / 2 + this.noteY(startT, L) * (L.ys || 1);
+      const len = (endT - startT) * PX_PER_MS * this.lineSpeed(L) * (L.ys || 1);
       const capH = img.height * zoom * 0.4;
       const bodyH = Math.max(0, len - capH);
       ctx.save();

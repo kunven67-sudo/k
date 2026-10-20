@@ -17,11 +17,17 @@
 //   ColoredApple             value1 = seconds, value2 = zoom (optional): the stage goes black + the singers turn into
 //                            flat silhouettes + the health bar fades; the next one turns it back
 //   Change Scroll Speed      value1 = times the chart speed, value2 = seconds to get there (Psych built-in)
+// and V-Slice's own:
+//   ScrollSpeed              {scroll, duration (steps), ease, strumline: player|opponent|both, absolute (false = times the
+//                            chart speed)}: each strumline can have its own speed (Madness ERECT)
 // Psych-era stages put characters by the corner of their sprite and aim the camera at their middle; stage files carry
 // that as characters.<slot>.raw [x, y] + camMid [dx, dy] (+ camSign -1 = the character's camera offset turned around).
 (function () {
   const num = (v, d) => { const n = parseFloat(v); return isNaN(n) ? d : n; };   // (Std.parseFloat: '670s' = 670)
   const sineInOut = t => -(Math.cos(Math.PI * t) - 1) / 2;
+  const EASE = { linear: t => t, sineIn: t => 1 - Math.cos(t * Math.PI / 2), sineOut: t => Math.sin(t * Math.PI / 2), sineInOut,
+    quadIn: t => t * t, quadOut: t => 1 - (1 - t) * (1 - t), quadInOut: t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2,
+    expoOut: t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t), expoIn: t => t <= 0 ? 0 : Math.pow(2, 10 * t - 10) };
   const SLOTS = { bf: 'bf', boyfriend: 'bf', player: 'bf', 0: 'bf', dad: 'dad', opponent: 'dad', 1: 'dad', gf: 'gf', girlfriend: 'gf', 2: 'gf' };
 
   G.ModChars = {
@@ -158,6 +164,18 @@
       const to = (P.baseScrollSpeed || P.scrollSpeed) * num(v.value1, 1), d = num(v.value2, 0);
       if (d <= 0) { P.scrollSpeed = to; P.speedTween = null; } else P.speedTween = { t: 0, dur: d, from: P.scrollSpeed, to };
     },
+    ScrollSpeed(P, v) {
+      const st = G.settings; if (st.speedType === 'const') return;             // (your own fixed speed wins)
+      let to = num(v.scroll, 1); if (v.absolute === false) to *= P.song.speed || 1;
+      if (st.speedType === 'mult') to *= st.speedValue;
+      const lines = v.strumline === 'both' ? [0, 1] : v.strumline === 'opponent' ? [0] : [1];
+      const dur = v.ease === 'INSTANT' ? 0 : num(v.duration, 4) * P.cond.stepCrochet / 1000, ease = EASE[v.ease] || EASE.linear;
+      P.lineSpeedTw = (P.lineSpeedTw || []).filter(w => { if (lines.includes(w.i)) { P.lines[w.i].scroll = w.to; return false; } return true; });
+      for (const i of lines) {
+        const L = P.lines[i]; if (!L) continue;
+        if (dur <= 0) L.scroll = to; else P.lineSpeedTw.push({ i, t: 0, dur, from: P.lineSpeed(L), to, ease });
+      }
+    },
     // every frame: the silhouette fade, scroll speed tweens, the mods' HUD parts
     _update(P, dt) {
       const A = P.apple;
@@ -168,6 +186,7 @@
       }
       const T = P.speedTween;
       if (T) { T.t += dt; const k = Math.min(1, T.t / T.dur); P.scrollSpeed = T.from + (T.to - T.from) * k; if (k >= 1) P.speedTween = null; }
+      if (P.lineSpeedTw && P.lineSpeedTw.length) P.lineSpeedTw = P.lineSpeedTw.filter(w => { w.t += dt; const k = Math.min(1, w.t / w.dur); P.lines[w.i].scroll = w.from + (w.to - w.from) * w.ease(k); return k < 1; });
     },
     _step(P, step) {
       const B = P.camBeat;
@@ -199,6 +218,6 @@
       if (b && b.every !== 4 && b.every > 0 && beat % b.every === 0) G.ModEvents['Add Camera Zoom'](P, { value1: 0.015 * b.amt, value2: 0.03 * b.amt });
       if (P.charDance) for (const c of [P.dad, P.bf]) if (c && c.animName === 'idle' + (c.idleSuffix || '')) c.playAnim(c.animName, true);
     },
-    _reset(P) { P.boom = null; P.camForced = null; P.charDance = false; P.camBeat = null; P.apple = null; P.speedTween = null; G.ModChars.reset(P); },
+    _reset(P) { P.boom = null; P.camForced = null; P.charDance = false; P.camBeat = null; P.apple = null; P.speedTween = null; P.lineSpeedTw = null; for (const L of P.lines || []) L.scroll = null; G.ModChars.reset(P); },
   };
 })();

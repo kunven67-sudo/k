@@ -8,6 +8,9 @@
 //   Expurgation        EX Tricky climbs out of the ground (every try), halo notes, clones, floor spikes, the signs that
 //                      cover your arrows, the HP gremlin that drags your health away, the energy wall
 // All the songs: the static + red words when Tricky sings, the sign falling on BF when you die.
+// Madness ERECT (ChuckySkullHead's remix): the static + words, BF's own game over, no cutscenes.
+// Pico mixes (angelkireina): Pico vs Tricky on the same stages, Nene on the speaker, split voices, the mod's signs + HP
+// gremlin (drags your health to a set amount, can't be stopped), white flashes, Pico's burp, Tricky's game over tune.
 // Fire notes + halo notes are note kinds (G.NoteKinds, 20-play.js). Mechanics are kept, a bit easier (FNF 2 rule): fire
 // takes 0.35 health (mod: 0.45), a halo takes half the bar (mod: you die), the gremlin leaves you 10% more.
 // Art, songs, charts + videos come from the mod (tools/own/tricky.py, private build only).
@@ -56,7 +59,7 @@
   const EX_LINES = ["YOU AREN'T HANK", 'WHERE IS HANK', 'HANK???', 'WHO ARE YOU', 'WHERE AM I', "THIS ISN'T RIGHT", 'MIDGET', 'SYSTEM UNRESPONSIVE', "WHY CAN'T I KILL?????"];
   const MISS_LINES = ['TERRIBLE', 'WASTE', 'MISS CALCULTED', 'PREDICTED', 'FAILURE', 'DISGUSTING', 'ABHORRENT', 'FORESEEN', 'CONTEMPTIBLE', 'PROGNOSTICATE', 'DISPICABLE', 'REPREHENSIBLE'];
   const SPOOK = { 'improbable-outset': [2, LINES], madness: [20, LINES], hellclown: [45, []], expurgation: [60, EX_LINES] };
-  const tk = P => P.tk || (P.tk = { on: false, step: 0, at: 0, text: null, staticOn: false, manual: false });
+  const tk = P => P.tk || (P.tk = { on: false, step: 0, at: 0, text: null, staticOn: false, manual: false, dim: false });
   // (Tricky's line at a random spot by him, or a set spot in the cutscenes; no lines = just the static)
   function spook(P, lines, x, y, manual) {
     const T = tk(P);
@@ -70,7 +73,9 @@
     if (T.on && !T.manual && s > T.step + 3) { T.on = false; T.text = null; T.staticOn = false; }
   }
   function drawSpook(ctx, P) {
-    const T = P.tk; if (!T || !T.on) return;
+    const T = P.tk; if (!T) return;
+    if (T.dim && !T.staticOn) staticPic(ctx, 0.2);     // (the Pico mix's 'static V2': faint, until your next hit)
+    if (!T.on) return;
     if (T.text && T.text.a > 0) {
       // red Impact 128 in the world, shaking (angle -5..5 every frame, around its middle like FlxText)
       P.cam.apply(ctx, 1, 1);
@@ -81,13 +86,14 @@
       ctx.globalAlpha *= T.text.a; ctx.fillStyle = '#ff0000'; ctx.fillText(T.text.s, -w / 2 + 2, -h / 2 + 2);
       ctx.restore();
     }
-    if (T.staticOn) {
-      // TrickyStatic: 3 frames of 320x180 at 8x, 24 fps, a new random see-through every frame
-      const img = G.A.image(IMG + 'bgs/TrickyStatic.png'); if (!img) return;
-      G.setScreenT(ctx); ctx.save(); ctx.globalAlpha = rnd(0.1, 0.5);
-      const fi = Math.floor(performance.now() / (1000 / 24)) % 3;
-      ctx.drawImage(G.srcImg(img), 0, fi * 180, 320, 180, (G.W - 2560) / 2, (G.H - 1440) / 2, 2560, 1440); ctx.restore();
-    }
+    if (T.staticOn) staticPic(ctx, rnd(0.1, 0.5));      // (a new random see-through every frame)
+  }
+  // TrickyStatic: 3 frames of 320x180 at 8x, 24 fps
+  function staticPic(ctx, a) {
+    const img = G.A.image(IMG + 'bgs/TrickyStatic.png'); if (!img) return;
+    G.setScreenT(ctx); ctx.save(); ctx.globalAlpha = a;
+    const fi = Math.floor(performance.now() / (1000 / 24)) % 3;
+    ctx.drawImage(G.srcImg(img), 0, fi * 180, 320, 180, (G.W - 2560) / 2, (G.H - 1440) / 2, 2560, 1440); ctx.restore();
   }
 
   // ================================================================ in the songs
@@ -98,24 +104,31 @@
   };
   const cutImgs = id => { const out = []; for (const p of CUTSHEETS[id] || []) { const sh = G.Sparrow.load(IMG + p); if (sh) out.push(...(sh.imgs || [sh.img])); } return out.filter(Boolean); };
   const wantsCut = P => !P.params.noCutscene && (P.song.id === 'expurgation' || !P.params.deaths);
-  function songFX(id, more) {
-    const [chance, lines] = SPOOK[id];
+  // o: gameOver (null = the player's own), split (two vocal tracks: nothing to bring back), cut (false = no cutscene)
+  function songFX(id, more, o) {
+    o = o || {};
+    const [chance, lines] = SPOOK[id], cut = P => o.cut !== false && wantsCut(P);
     const fx = {
-      gameOver: GAMEOVER,
-      setup(P) { P.tk = null; if (wantsCut(P)) cutImgs(id); G.A.image(IMG + 'bgs/TrickyStatic.png'); if (more.setup) more.setup(P); },
-      prepare(P, tex) { if (wantsCut(P)) for (const im of cutImgs(id)) tex.add(im); if (more.prepare) more.prepare(P, tex); },
+      gameOver: o.gameOver !== undefined ? o.gameOver : GAMEOVER,
+      setup(P) { P.tk = null; if (cut(P)) cutImgs(id); G.A.image(IMG + 'bgs/TrickyStatic.png'); if (more.setup) more.setup(P); },
+      prepare(P, tex) { if (cut(P)) for (const im of cutImgs(id)) tex.add(im); if (more.prepare) more.prepare(P, tex); },
       reset(P) { P.tk = null; if (more.reset) more.reset(P); },
       step(P, s) { spookStep(P, s); if (more.step) more.step(P, s); },
       beat(P, b) { if (more.beat) more.beat(P, b); },
       // one vocal track (TrickyVocalVolumeSetter): Tricky singing brings it back after your miss
       oppHit(P, n) {
-        if (P.audio) P.audio.setVolume('p', 1);
+        if (P.audio && !o.split) P.audio.setVolume('p', 1);
         if (Math.random() * 100 < chance && !tk(P).on) spook(P, lines);
       },
       miss(P, n) { if (id === 'madness' && Math.random() < 0.1 && !tk(P).on) spook(P, MISS_LINES); if (more.miss) more.miss(P, n); },
-      playerHit(P, n, r) { if (more.playerHit) more.playerHit(P, n, r); },
+      playerHit(P, n, r) { if (P.tk) P.tk.dim = false; if (more.playerHit) more.playerHit(P, n, r); },
       update(P, dt) { if (more.update) more.update(P, dt); },
-      event(P, e, v) { if (more.event) more.event(P, e, v); },
+      event(P, e, v) {
+        // (the Pico mixes: a white flash over value1 seconds; faint static + its sound until your next hit)
+        if (e === 'tricky.whiteflash') { if (flashOn()) P.cam.flash('#ffffff', parseFloat(v.value1) || 0.5); }
+        else if (e === 'tricky.staticV2') { tk(P).dim = true; G.sfx(SND + 'staticSound.ogg'); }
+        if (more.event) more.event(P, e, v);
+      },
       drawOver(ctx, P) { if (!P.cutscene) drawSpook(ctx, P); },
       drawTop(ctx, P) { if (more.drawTop) more.drawTop(ctx, P); },
     };
@@ -128,7 +141,7 @@
   };
 
   // ---- Expurgation (auditorHell.hxc, exTricky.hxc, ExpurgationSign/Gremlin.hxc, expurgation.hxc)
-  const expurgation = {
+  const expurgationFX = auto => ({
     setup(P) {
       const X = P.ex = { clones: [], signs: [], grem: null, auto: 0 };
       for (let i = 0; i < 2; i++) {
@@ -163,7 +176,7 @@
       X.signs = X.signs.filter(s => !s.finished);
       updateGremlin(P, dt);
       // the gremlin comes by himself every 25 s while your health is high (until step 2400)
-      if (P.started) {
+      if (auto && P.started) {
         X.auto += dt;
         if (X.auto >= 25) { X.auto -= 25; if ((P.cond.lastStep || 0) < 2400 && P.health >= 1.5) gremlin(P, 40, 3, false); }
       }
@@ -171,6 +184,7 @@
     event(P, e, v) {
       if (e === 'tricky.ExpurgationSignEvent') sign(P, +v.type || 0, !!v.flipX);
       else if (e === 'tricky.ExpurgationGremlinEvent') gremlin(P, +v.hpToTake || 1, +v.duration || 1, !!v.persist);
+      else if (e === 'tricky.HPGremlinTo') { const to = Math.min(2, (+v.to || 1) + GREMLIN_EASE / 50); if (P.health > to) gremlin(P, 0, +v.duration || 1, true, to); }
     },
     playerHit(P, n, r) { const g = P.ex.grem; if (!g) return; if (r === 'bad') g.dmg += 60; if (r === 'shit') g.dmg += 200; if (r === 'bad' || r === 'shit') g.stop = true; },
     miss(P) { const g = P.ex.grem; if (g) { g.dmg += 75; g.stop = true; } },
@@ -182,14 +196,14 @@
       for (const s of X.signs) s.draw(ctx, hud);
       if (X.grem) X.grem.spr.draw(ctx, hud);
     },
-  };
+  });
   // (playerStrumline.x + getXPos(3): where your RIGHT arrow's column starts)
   const notesX = P => P.lines[1].strums[3].x - INIT;
   function sign(P, type, flip) {
     const s = sprite('mechanics/Sign_Post_Mechanic', 0, 0, 0.67);
-    if (!s.addAnim('sign', 'Signature Stop Sign ' + [1, 3, 4][type], 24, false)) return;
+    if (!s.addAnim('sign', 'Signature Stop Sign ' + [1, 3, 4, 2][type], 24, false)) return;
     const sx = notesX(P) - 400;
-    if (type === 0) { s.x = sx; s.y = -300; } else if (type === 1) { s.x = sx - 130; s.y = P.down ? -395 : -980; } else { s.x = sx - 420; s.y = -145; }
+    if (type === 0 || type === 3) { s.x = sx; s.y = -300; } else if (type === 1) { s.x = sx - 130; s.y = P.down ? -395 : -980; } else { s.x = sx - 420; s.y = -145; }
     s.angle = -90; s.flipX = flip; s.play('sign', true);
     P.ex.signs.push(s);
   }
@@ -198,7 +212,8 @@
     const bg = P.hbBg, bx = bg.x + 4, bw = bg.width - 8;
     return { bgY: bg.y, icon: bg.x + bg.width * (1 - G.clamp(P.health / 2, 0, 1)) - 26, at: h => bx + bw * (1 - G.clamp(h / 2, 0, 1)) - 26 - 75 };
   }
-  function gremlin(P, pct, dur, persist) {
+  // pct = the % of your health he leaves you (the port), or abs = the health he drags you to (the Pico mix)
+  function gremlin(P, pct, dur, persist, abs) {
     if (P.health < 1.5 && !persist) return;
     pct = Math.min(100, pct + GREMLIN_EASE);
     const g = sprite('mechanics/HP GREMLIN', 0, 0, 0.76);
@@ -209,7 +224,7 @@
     const B = bar(P);
     g.x = B.icon; g.y = B.bgY - 325;
     if (P.down) { g.flipY = true; g.y -= 150; }
-    const start = P.health, to = pct / 100 * start;
+    const start = P.health, to = abs != null ? abs : pct / 100 * start;
     P.ex.grem = { spr: g, phase: 'come', t: 0, start, to, dur, persist, dmg: 0, stop: false, x0: g.x, x1: B.icon - 140, x2: B.at(to) };
     G.sfx(SND + 'expurgation/GremlinWoosh.ogg');
     g.play('come', true);
@@ -238,7 +253,15 @@
   G.SongFX['improbable-outset'] = songFX('improbable-outset', {});
   G.SongFX.madness = songFX('madness', {});
   G.SongFX.hellclown = songFX('hellclown', hellclown);
-  G.SongFX.expurgation = songFX('expurgation', expurgation);
+  G.SongFX.expurgation = songFX('expurgation', expurgationFX(true));
+  // Madness ERECT: BF's own game over, two vocal tracks
+  G.SongFX['madness@erect'] = songFX('madness', {}, { gameOver: null, split: true, cut: false });
+  // the Pico mixes: Pico's own death with the mod's Tricky game over tune
+  const PICO_GO = { music: 'shared/music/gameplay/gameover/tikygameOver.ogg', end: 'shared/music/gameplay/gameover/tikygameOverEnd.ogg' };
+  G.SongFX['improbable-outset@pico'] = songFX('improbable-outset', {}, { gameOver: PICO_GO, split: true, cut: false });
+  G.SongFX['madness@pico'] = songFX('madness', {}, { gameOver: PICO_GO, split: true, cut: false });
+  G.SongFX['hellclown@pico'] = songFX('hellclown', hellclown, { gameOver: PICO_GO, split: true, cut: false });
+  G.SongFX['expurgation@pico'] = songFX('expurgation', expurgationFX(false), { gameOver: PICO_GO, split: true });
 
   // ================================================================ the cutscenes
   // a video on black (VideoCutscene.play), the mod's mp4s as WebM
@@ -450,6 +473,9 @@
   G.Cutscenes.madness = { create: scene('madness', [video('HankFuckingShootsTricky')]), createEnd: scene('madness', [trickman]) };
   G.Cutscenes.hellclown = { create: scene('hellclown', [video('HELLCLOWN_ENGADGED')]), createEnd: P => isStory(P) ? G.Scene(P, [video('TricksterMan')]) : null };
   G.Cutscenes.expurgation = { always: true, create: scene('expurgation', [exEnter]) };
+  // (the remixes have none, except EX Tricky climbing out in the Pico mix too)
+  G.Cutscenes['madness@erect'] = {}; G.Cutscenes['improbable-outset@pico'] = {}; G.Cutscenes['madness@pico'] = {};
+  G.Cutscenes['expurgation@pico'] = { always: true, create: scene('expurgation', [exEnter]) };
 
   // ================================================================ the story menu: the jaws close on the clown week
   // (StoryConfirmMouth.hxc: swipe, clink on frame 10; they stay shut, Improbable Outset opens them)
