@@ -116,7 +116,7 @@
         this.ready = true;
         // a song's own intro cutscene (first try only)
         const cs = G.Cutscenes && (G.Cutscenes[this.song.id + '@' + this.song.variation] || G.Cutscenes[this.song.id]);
-        if (cs && !params.deaths && !params.noCutscene) { try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
+        if (cs && cs.create && !params.deaths && !params.noCutscene) { try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
         if (!this.cutscene) this.startCountdown();
       }
     },

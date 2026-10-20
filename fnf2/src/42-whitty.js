@@ -517,6 +517,11 @@
       }
     },
   };
+  // the story-mode end picture is loaded with the song (asked for only when the song ends, the screen would wait on it)
+  const ENDPIC = pic => ({
+    setup(P) { if (isStory(P) && !P.params.noCutscene) G.A.image(IMG + pic + '.png'); },
+    prepare(P, tex) { if (isStory(P) && !P.params.noCutscene) { const im = G.A.image(IMG + pic + '.png'); if (im) tex.add(im); } },
+  });
   // the HQ alleys have their own game over sound, the Beta Mix BF his own game over music
   const HQDEATH = { gameOver: { sfx: 'shared/sounds/gameplay/gameover/fnf_loss_sfx-hqr.ogg' } };
   const JAMDEATH = { gameOver: { music: 'shared/music/gameplay/gameover/gameOver-hqr.ogg' } };
@@ -538,11 +543,11 @@
   F['lo-fight-(hq)'] = combine(ZOOM15, CUT('lo-fight-(hq)'), GAGS, HQDEATH);
   F.overhead = combine(HIDDEN, CUT('overhead'), GAGS);
   F['overhead-(hq)'] = combine(HIDDEN, CUT('overhead-(hq)'), GAGS, HQDEATH);
-  F.ballistic = combine(ZOOM15, CUT('ballistic'), CAMLOCK, RED, GAGS);
+  F.ballistic = combine(ZOOM15, CUT('ballistic'), CAMLOCK, RED, GAGS, ENDPIC('jabaited'));
   F['ballistic-remix'] = combine(CAMLOCK, RED, GAGS);
   F['ballistic-(hq)'] = combine(ZOOM15, CUT('ballistic-(hq)'), CAMLOCK, RED, GAGS, HQHUD, HQDEATH);
   F['ballistic-(beta-mix)'] = combine(CAMLOCK, RED, GAGS, JAMDEATH);
-  F.underground = combine(CLUB, GAGS);
+  F.underground = combine(CLUB, GAGS, ENDPIC('the'));
   F['underground-(hq)'] = combine(CLUB, GAGS);
   F['underground-(in-game-mix)'] = combine(CLUB, GAGS);
   F['low-rise'] = combine(LOWRISE, GAGS);
