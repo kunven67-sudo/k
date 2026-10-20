@@ -49,11 +49,12 @@ def ogg(src, dst):
 
 
 # ---------------------------------------------------------------- charts (legacy FNF -> V-Slice)
-def convert(src_dir, sid):
+def convert(src_dir, sid, only=None):
+    # only = the difficulties to read (the camera events come from the first one read)
     notes, speeds, events, bpm = {}, {}, None, None
     for diff, suffix in (('easy', '-easy'), ('normal', ''), ('hard', '-hard')):
         p = os.path.join(src_dir, sid + suffix + '.json')
-        if not os.path.exists(p): continue
+        if not os.path.exists(p) or (only and diff not in only): continue
         s = json.load(open(p))['song']
         bpm = s['bpm']; speeds[diff] = s.get('speed', 1)
         step = 60000 / bpm / 4

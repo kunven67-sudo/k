@@ -474,8 +474,8 @@
       if (who === 'Dad' && P.dad) P.dad.noDanceUntil = P.songPos + 20000;
     },
   };
-  // Overhead: every arrow hidden at first (the events bring them in)
-  const HIDDEN = { reset(P) { for (const L of P.lines) for (const s of L.strums) s.visible = false; } };
+  // Overhead: every arrow hidden at first (the events bring them in; the OG chart has none, so it keeps its arrows)
+  const HIDDEN = { reset(P) { if (!(P.song.events || []).some(e => e.e === 'Toggle Strums Visibility')) return; for (const L of P.lines) for (const s of L.strums) s.visible = false; } };
   // Ballistic HQ (ballistic-(hq).hxc): pixel ratings + a combo bar sliding in from the left
   const HQHUD = {
     setup(P) { G.Sparrow.load(IMG + 'ui/popup/hm/hmratings'); G.A.image(IMG + 'ui/popup/hm/backthing.png'); },

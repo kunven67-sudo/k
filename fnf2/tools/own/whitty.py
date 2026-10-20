@@ -16,14 +16,23 @@ the git-ignored mod pack folder build/mods/whitty (never the repo; credits in fn
 The port's stage scripts put the characters by their sprite corner (like Psych Engine did) and aim the camera at their
 middle; that goes into the stage files here as 'raw' spots + 'camMid' offsets (20-play.js places them that way).
 
+The OG difficulty = the songs as they were in the original 2021 mod (the Kade Engine build, GameBanana file 586687):
+its Lo-Fight + Overhead charts (same music as the port) and its later Ballistic remake (200 BPM, its own music; the
+port's Ballistic is the first 2021 one, which that build kept as "Ballistic-Old"). One 'og' difficulty each = the 2021
+HARD chart, like Garcello's OG.
+
   python3 tools/own/whitty.py [port folder]
 """
-import glob, json, os, shutil, sys
+import copy, filecmp, glob, json, os, shutil, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 MOD = sys.argv[1] if len(sys.argv) > 1 else '/home/user/ref/mods/whittyvs/x/VSWhittyDefinitiveEdition'
 OWN = os.environ.get('FNF_OWN') or os.path.join(ROOT, 'build', 'mods', 'whitty')   # this mod's pack folder (tools/pack_assets.py --packs)
+LEGACY = os.environ.get('WHITTY_LEGACY', '/home/user/ref/mods/whitty/x/assets')        # the original 2021 build
+GARCELLO = os.environ.get('GARCELLO_PORT', '/home/user/ref/mods/garcellovs/x')         # its OG difficulty labels
+OG_SONGS = ('lo-fight', 'overhead', 'ballistic')
+OG_ART = ('images/storymenu/difficulties/og.png', 'images/freeplay/freeplayog.png', 'shared/images/resultScreen/diff_og.png')
 
 # the mod's own menus (title logo, menu backgrounds, freeplay card) would replace FNF 2's: not taken
 SKIP = {'images/logoBumpin.png', 'images/logoBumpin.xml', 'images/gfDanceTitle.png', 'images/gfDanceTitle.xml',
@@ -114,7 +123,42 @@ def main():
     for lv, label in (('weekbonus1-2', 'WHITTY BONUS'), ('weekbonus3', 'WHITTY BONUS'), ('weekhungry', 'WHITTY BONUS'),
                       ('zweekbonus3-hqr', 'HIGH QUALITY'), ('zweekhungry-hqr', 'HIGH QUALITY')):
         p = D('levels', lv + '.json'); L = load(p); L['capsule'] = {'name': label}; save(L, p)
+    n += og(D)
     print('whitty:', n, 'files')
+
+
+def og(D):
+    """The 2021 versions as an 'og' variation of the port's songs (same characters, stage, cutscenes)."""
+    if not os.path.isdir(LEGACY): print('  no 2021 build at', LEGACY, '- OG skipped'); return 0
+    from sky import convert
+    n = 0
+    for sid in OG_SONGS:
+        notes, speeds, events, bpm = convert(os.path.join(LEGACY, 'data', sid), sid, only=('hard',))
+        mp = D('songs', sid, sid + '-metadata.json'); base = load(mp)
+        m = copy.deepcopy(base); pd = m['playData']
+        m['songName'] = base['songName'] + ' (OG)'
+        m['timeChanges'] = [{'t': 0, 'bpm': bpm}]
+        pd['songVariations'] = []; pd['difficulties'] = ['og']
+        pd['ratings'] = {'og': (base['playData'].get('ratings') or {}).get('hard', 5)}
+        player = pd['characters']['player']
+        songs = os.path.join(OWN, 'songs', sid)
+        ins, voc = os.path.join(LEGACY, 'songs', sid, 'Inst.ogg'), os.path.join(LEGACY, 'songs', sid, 'Voices.ogg')
+        if filecmp.cmp(ins, os.path.join(songs, 'Inst.ogg'), shallow=False) and filecmp.cmp(voc, os.path.join(songs, 'Voices-%s.ogg' % player), shallow=False):
+            pd['characters']['instrumental'] = ''; pd['vocalsVariation'] = ''        # same music: no second copy
+        else:
+            pd['characters']['instrumental'] = 'og'
+            shutil.copyfile(ins, os.path.join(songs, 'Inst-og.ogg')); shutil.copyfile(voc, os.path.join(songs, 'Voices-%s-og.ogg' % player)); n += 2
+        sp = speeds.get('hard', 2)
+        save({'version': '2.0.0', 'scrollSpeed': {'default': sp, 'og': sp}, 'events': events, 'notes': {'og': notes['hard']},
+              'generatedBy': 'FNF 2 whitty.py (VS Whitty 2021 Kade build)'}, D('songs', sid, sid + '-chart-og.json'))
+        save(m, D('songs', sid, sid + '-metadata-og.json'))
+        bd = base['playData']; bd['songVariations'] = [v for v in bd.get('songVariations', []) if v != 'og'] + ['og']; save(base, mp)
+        n += 2
+        print('   og', sid, bpm, 'bpm', len(notes['hard']), 'notes', 'own music' if pd['characters']['instrumental'] else 'same music')
+    for rel in OG_ART:
+        dst = os.path.join(OWN, 'preload', rel) if not rel.startswith('shared/') else os.path.join(OWN, rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True); shutil.copyfile(os.path.join(GARCELLO, rel), dst); n += 1
+    return n
 
 
 if __name__ == '__main__':

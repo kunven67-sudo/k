@@ -68,7 +68,9 @@ G.Songs = {
     return 'songs/' + id + '/Inst' + suf + '.ogg';
   },
   voicePaths(id, m, variation) {
-    const v = !variation || variation === 'default' ? '' : '-' + variation;
+    // (vocalsVariation: a variation sung over the base vocal tracks, e.g. a mod's OG chart of the same recording)
+    const vv = m.playData.vocalsVariation != null ? m.playData.vocalsVariation : variation;
+    const v = !vv || vv === 'default' ? '' : '-' + vv;
     const c = m.playData.characters;
     const out = [];
     // a character's own track, else the base character's (bf-holding-gf -> bf, pico-playable -> pico)
