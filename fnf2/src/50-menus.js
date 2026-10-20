@@ -93,6 +93,7 @@ G.screens.title = {
     this.gf.addAnim('danceLeft', 'gfDance', 24, false, [30, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
     this.gf.addAnim('danceRight', 'gfDance', 24, false, [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]);
     this.gf.play('danceRight', true); this.danceLeft = false;
+    this.buddy = G.titleBuddy ? G.titleBuddy(this.gf) : null;
     const tt = G.touchMode ? 'preload/images/title-screen-text-mobile' : 'preload/images/title-screen-text';
     this.enterText = new G.Sprite(G.touchMode ? 50 : 100, G.H * 0.8).loadAtlas(G.A.has(tt + '/Animation.json') ? tt : 'preload/images/title-screen-text');
     this.enterText.addAnim('idle', 'Idle', 24, true); this.enterText.addAnim('press', 'Confirm', 24, false);
@@ -142,12 +143,14 @@ G.screens.title = {
     this.logo.play('bump', true); this.logoBumpT = 0;
     this.danceLeft = !this.danceLeft;
     this.gf.play(this.danceLeft ? 'danceRight' : 'danceLeft', true);
+    if (this.buddy && b % 2 === 0) this.buddy.gf.play('idle', true);
   },
   update(dt) {
     this.t += dt;
     if (G.audioRunning()) { if (!this.heardAudio) this.heardAt = this.t; this.heardAudio = true; }
     this.beat.update(b => this.onBeat(b));
     this.logo.update(dt); this.gf.update(dt); this.enterText.update(dt);
+    if (this.buddy) this.buddy.gf.update(dt);
     this.logoBumpT = (this.logoBumpT || 0) + dt;
     if (this.flashA > 0) this.flashA = Math.max(0, this.flashA - dt / this.flashD);
     if (this.transitioning) { this.transT += dt; if (this.transT >= 2 && !this.left) this.goMain(); }
@@ -182,7 +185,7 @@ G.screens.title = {
     } else {
       this.logo.draw(ctx, null);
       this.draw2(ctx);
-      this.gf.draw(ctx, null);
+      if (this.buddy && this.buddy.ready()) this.buddy.draw(ctx); else this.gf.draw(ctx, null);
       this.enterText.draw(ctx, null);
     }
     if (this.flashA > 0) { G.setScreenT(ctx); ctx.globalAlpha = this.flashA; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
@@ -216,7 +219,10 @@ G.screens.mainMenu = {
   enter() {
     G.menuMusic.start(0);
     this.cam = new G.FCam(1); this.cam.followRate = 0.06;
-    this.bg = new G.Sprite(0, 0).loadImage('preload/images/menuBG.png');
+    // (a picked player gets the menu in their colour: FNF's desaturated menu picture, tinted)
+    const mc = G.menuColor ? G.menuColor(G.settings.player) : null;
+    this.bg = new G.Sprite(0, 0).loadImage(mc ? 'preload/images/menuDesat.png' : 'preload/images/menuBG.png');
+    if (mc) this.bg.tint = 'mul:' + mc;
     this.bg.setGraphicSize(Math.floor(G.W * 1.2)); this.bg.updateHitbox(); this.bg.screenCenter();
     this.bg.scroll.x = 0; this.bg.scroll.y = 0.17;
     this.magenta = new G.Sprite(0, 0).loadImage('preload/images/menuBGMagenta.png');

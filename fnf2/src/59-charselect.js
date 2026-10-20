@@ -43,6 +43,42 @@
   // Cassandra on the speakers, DJ, card, mixes, results, death. Without the pack she's the stand-in above.
   G.PLAYERS.nene = { id: 'nene', pack: 'nenemix', name: 'Nene', pos: 1, chill: CS + 'neneplayerChill', gf: { asset: CS + 'dipshitCass', viz: false },
     nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene };
+  // the main menu in the picked player's colour (BF keeps FNF's yellow)
+  const MENU_COLORS = { pico: '#8FA4F2', darnell: '#A483EE', nene: '#F592C4', tankman: '#BAC47E' };
+  G.menuColor = pid => (pid && pid !== 'bf' && G.PLAYERS[pid] && (G.PLAYERS[pid].menuColor || MENU_COLORS[pid])) || null;
+  // the title screen: the picked player's buddy (whoever bops on their character select speakers) dances in GF's
+  // place. BF (and players whose buddy IS GF) keep the real title GF.
+  G.titleBuddy = function (gf) {
+    const pid = G.settings.player, P = pid !== 'bf' && G.PLAYERS[pid], asset = P && P.gf && P.gf.asset;
+    if (!asset || asset === CS + 'gfChill' || P.gf.make || !G.A.has(asset + '/Animation.json')) return null;
+    const bud = new AS(asset, 0, 0, { stage: true, swf: true });
+    bud.play('idle', true);
+    // where the buddy's feet go: the bottom middle of the title GF
+    const vb = G.visBox ? G.visBox(gf) : null;
+    const tx = vb ? vb.cx : G.W * 0.4 + 330, ty = vb ? vb.bottom : G.H * 0.07 + 650;
+    let place = null;
+    const box = a => {      // the atlas' box on screen (its stage matrix applied)
+      const b = G.Atlas.bounds(a.atlas), m = a.atlas.stage, xs = [], ys = [];
+      for (const [x, y] of [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]]) { xs.push(m[0] * x + m[2] * y + m[4] + a.x); ys.push(m[1] * x + m[3] * y + m[5] + a.y); }
+      return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+    };
+    return {
+      gf: bud,
+      ready() { return !!(bud.atlas && bud.cur); },
+      draw(ctx) {
+        if (!place) {
+          // (the buddy alone: Nene brings her A-Bot, the rest stand; their feet go where the title GF's speakers end,
+          //  a little right of her so the logo's 2 stays clear)
+          const b = box(bud), h = b.y1 - b.y0, L = 760, R = G.W - 8;    // (L: right of the logo's 2)
+          let k = Math.min(1.1, (vb ? (vb.bottom - vb.top) * 0.86 : 560) / h, (R - L) / (b.x1 - b.x0));
+          let ox = tx + 70 - k * (b.x0 + b.x1) / 2;
+          ox += Math.max(0, L - (ox + k * b.x0)); ox -= Math.max(0, ox + k * b.x1 - R);
+          place = { k, ox, oy: ty - 10 - k * b.y1 };
+        }
+        bud.draw(ctx, { apply: c => { G.setScreenT(c); c.translate(place.ox, place.oy); c.scale(place.k, place.k); } });
+      },
+    };
+  };
   const LOCK_COLORS = ['#31F2A5', '#20ECCD', '#24D9E8', '#20ECCD', '#20C8D4', '#209BDD', '#209BDD', '#2362C9', '#243FB9'];
 
   // ---------------------------------------------------------------- an Animate atlas sprite (FunkinSprite + texture atlas)

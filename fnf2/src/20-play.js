@@ -1228,6 +1228,15 @@
         const k = G.ease.quartOut(G.clamp((pm.t - 0.1 * (i + 1)) / 1.8, 0, 1));
         G.vcr(ctx, lines[li], G.W - 20, 15 + li * 32 + 5 * k, { align: 'right', size: 32, alpha: k * (li === 1 ? pm.artistA : 1), outline: 0 });
       });
+      // bottom right, above the offset: who you're playing as (their icon, bobbing, + their name)
+      const kp = G.ease.quartOut(G.clamp((pm.t - 0.5) / 1.8, 0, 1));
+      if (this.iconP1 && kp > 0) {
+        const pid = this.bf ? G.playerOf(this.bf.id) : 'bf', PP = G.PLAYERS && G.PLAYERS[pid];
+        const ic = Object.assign({}, this.iconP1, { scale: 0.8 + 0.03 * Math.sin(pm.t * 4) });
+        ctx.save(); ctx.globalAlpha = kp; this.drawIcon(ctx, ic, G.W - 150, G.H - 150 + 5 * kp, false); ctx.restore();
+        G.vcr(ctx, 'PLAYING AS', G.W - 150, G.H - 178 + 5 * kp, { align: 'right', size: 16, alpha: kp, outline: 0 });
+        G.vcr(ctx, ((PP && PP.name) || 'Boyfriend').toUpperCase(), G.W - 150, G.H - 160 + 5 * kp, { align: 'right', size: 32, alpha: kp, outline: 0 });
+      }
       // bottom right: the offset
       const k = G.ease.quartOut(G.clamp((pm.t - 0.6) / 1.8, 0, 1));
       const oy = G.H - 16 * 2 - 40 + 5 * k;
