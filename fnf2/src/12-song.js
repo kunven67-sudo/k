@@ -43,6 +43,13 @@ G.Songs = {
     const out = [];
     const base = this.meta(id);
     if (!base) return out;
+    // a song made for anybody (video songs): every player sings it as themselves
+    if (base.playData.anyPlayer) {
+      if (!this.chart(id) || !this.hasAudio(id, 'default', base)) return out;
+      for (const d of base.playData.difficulties || []) out.push({ diff: d, variation: 'default' });
+      out.sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));
+      return out;
+    }
     // a song this player really sang in as the opponent: played swapped (stand-in players only get these)
     if (this.ownSong(id, player)) {
       if (!this.chart(id) || !this.hasAudio(id, 'default', base)) return out;
@@ -121,6 +128,7 @@ G.Songs = {
       stage: pd.stage || 'mainStage', noteStyle: pd.noteStyle || 'funkin',
       inst: this.instPath(id, m, variation), voices,
       offsets: m.offsets || {},
+      video: pd.video || null, anyPlayer: !!pd.anyPlayer,
     };
   },
 };

@@ -72,6 +72,7 @@
     ['Music Volume', 'num', () => S().vol.music, v => S().vol.music = v, 'Volume of the instrumentals + menu music.', [0, 1, 0.05, 2]],
     ['Vocals Volume', 'num', () => S().vol.vocals, v => S().vol.vocals = v, 'Volume of the singing.', [0, 1, 0.05, 2]],
     ['SFX Volume', 'num', () => S().vol.sfx, v => S().vol.sfx = v, 'Volume of menu sounds and misses.', [0, 1, 0.05, 2]],
+    ['Video Songs', 'enum', () => S().videoSongs || 'video', v => { S().videoSongs = v; }, 'Songs made from a video. VIDEO: the video plays behind the arrows. CHARACTERS: your picked player sings on a stage instead.', ['video', 'characters']],
     ['Phone controls', 'enum', () => S().touchScheme || 'arrows', v => { S().touchScheme = v; }, 'Arrows: tap your arrows at the bottom of the screen, like FNF mobile. Lanes: the screen is split into 4 tall lanes.', ['arrows', 'lanes']],
     ['Quality', 'enum', () => S().quality, v => { S().quality = v; G.autoQ = 1; G.resize(); }, 'Auto: 720p, lower by itself when it lags. High: full screen sharpness (strong PCs). Low: fastest.', ['auto', 'high', 'low']],
     ['Framerate', 'enum', () => S().fpsCap, v => { S().fpsCap = v; }, 'Highest frames per second. 60 is smooth and easy on your PC.', ['60', '120', '144', '240', 'max']],

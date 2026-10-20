@@ -188,7 +188,7 @@
       this.texMB = Math.round((world * squeeze * squeeze + other) / 1e6);
     },
     // the stage + characters go with the screen (their pictures can be freed while you're in the menus)
-    leave() { if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); this.stage = null; this.bf = this.dad = this.gf = null; this.cutscene = null; },
+    leave() { if (this.sfx && this.sfx.leave) try { this.sfx.leave(this); } catch (e) {} if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); this.stage = null; this.bf = this.dad = this.gf = null; this.cutscene = null; },
     // still loading (its music decoding, pictures, the mod pack): the loading screen stays up
     loadingNow() { return !this.ready; },
     // the song is running: the main loop must never hold the screen for pictures still loading
@@ -206,7 +206,8 @@
       //  (also in a song made for them: Darnell in After Hours)
       const PP = G.PLAYERS && G.PLAYERS[G.settings.player], swapChar = PP && !PP.real && PP.swapChar && (s.swap || s.chars.player === PP.ownChar) ? PP.swapChar : null;
       const own = this.playAs && (this.playAs.real.songChar && s.chars.player === this.playAs.real.songChar ? s.chars.player : this.playAs.real.char);
-      this.bf = mk(own || swapChar || s.chars.player, 'bf', 'bf');
+      const anyChar = s.anyPlayer && G.playerChar ? G.playerChar(G.settings.player) : null;   // (a song made for anybody)
+      this.bf = mk(anyChar || own || swapChar || s.chars.player, 'bf', 'bf');
       if (this.playAs && this.playAs.real.flip === false && this.bf.nene) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
       // their atlas box is much bigger than what they draw (Darnell stood half off the screen): put the feet
       // of what's really drawn where BF's feet go (Nene's A-Bot is already built around her spot).
@@ -243,7 +244,7 @@
       }
       this.applyStageFX();
       // a song's own stage effects (setup / reset / update / beat / event / drawOver)
-      this.sfx = (G.SongFX && (G.SongFX[s.id + '@' + s.variation] || G.SongFX[s.id])) || (G.StageFX && G.StageFX[s.stage]) || null;
+      this.sfx = (G.SongFX && (G.SongFX[s.id + '@' + s.variation] || G.SongFX[s.id])) || (s.video && G.VideoSongFX) || (G.StageFX && G.StageFX[s.stage]) || null;
       if (this.sfx && this.sfx.setup) try { this.sfx.setup(this); } catch (e) { G.reportError(e, 'song fx'); this.sfx = null; }
       this.stageZoom = this.stage.zoom;
       this.cam = new G.FCam(this.stageZoom);
