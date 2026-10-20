@@ -3,7 +3,12 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
   // players that come in a mod pack that isn't there (or is switched off) aren't in character select
   for (const id in G.PLAYERS || {}) {
     const pk = G.PLAYERS[id].pack;
-    if (pk && !G.Packs.has(pk)) { delete G.PLAYERS[id]; if (G.PLAYER_IDS) G.PLAYER_IDS = G.PLAYER_IDS.filter(x => x !== id); if (G.settings.player === id) G.settings.player = 'bf'; }
+    if (pk && !G.Packs.has(pk)) {
+      const fb = G.PLAYERS[id].fallback;
+      if (G.PLAYER_IDS) G.PLAYER_IDS = G.PLAYER_IDS.filter(x => x !== id);
+      if (fb) { G.PLAYERS[id] = fb; continue; }
+      delete G.PLAYERS[id]; if (G.settings.player === id) G.settings.player = 'bf';
+    }
   }
   const q = G.query;
   if (q.player) G.settings.player = q.player;

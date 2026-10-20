@@ -88,7 +88,7 @@
       const O = P.swapOrig; if (!O) return;
       for (const slot of ['bf', 'dad', 'gf']) {
         const o = O[slot]; if (!o) continue;
-        if (P[slot] !== o) { const cur = P[slot]; this.put(P, slot, o, cur); if (o.rawSpot) { o.x = o.rawSpot.raw[0]; o.y = o.rawSpot.raw[1]; this.focus(o, o.rawSpot); } }
+        if (P[slot] && P[slot] !== o) { const cur = P[slot]; this.put(P, slot, o, cur); if (o.rawSpot) { o.x = o.rawSpot.raw[0]; o.y = o.rawSpot.raw[1]; this.focus(o, o.rawSpot); } }
         o.danceEvery = o.data && o.data.danceEvery != null ? o.data.danceEvery : 1;
         o.noDanceUntil = 0;
         if (o.rawSpot) o.visible = !o.rawSpot.hidden;

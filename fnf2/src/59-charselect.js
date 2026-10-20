@@ -35,6 +35,10 @@
       real: { char: 'tankman', flip: true, scale: 0.62, select: 'hehPrettyGood', win: 'laugh', lose: 'ugh', hey: 'beat it', die: 'augh', retry: 'hehPrettyGood', dj: { x: 196, y: 708, k: 0.7 } },
       freeplay: { text1: 'TANKMAN', text2: 'HEH, PRETTY GOOD', text3: 'UGH', colors: ['#E3EACB', '#BCC97E', '#F6F8E6', '#5C6B22', '#FFFFFF', '#3E4A12', '#8C9E42', '#7D8F38'] } }),
   });
+  // Tankman = a full player from the mod "Playable Tankman" (tools/own/tankman_play.py): his own character select
+  // animation, Steve on the speakers, DJ, card, songs, results, game over. Without the pack he's the stand-in above.
+  G.PLAYERS.tankman = { id: 'tankman', pack: 'tankman', name: 'Tankman', pos: 7, chill: CS + 'tankmanChill', gf: { asset: CS + 'steveChill', viz: false },
+    nametag: 'tankmanplay', icon: 'tankman', ownChar: 'tankman', swapChar: 'tankman-playable', fallback: G.PLAYERS.tankman };
   const LOCK_COLORS = ['#31F2A5', '#20ECCD', '#24D9E8', '#20ECCD', '#20C8D4', '#209BDD', '#209BDD', '#2362C9', '#243FB9'];
 
   // ---------------------------------------------------------------- an Animate atlas sprite (FunkinSprite + texture atlas)

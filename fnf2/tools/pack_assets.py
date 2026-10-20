@@ -353,6 +353,7 @@ PACK_INFO = {
     'nene': {'name': "Nene's songs (Girls Night + Girls' Night Out)", 'credit': 'Girls Night team, Pico Day 2023 team, ZenUnique (playable Nene)'},
     'darnell': {'name': "Darnell's Mixtape", 'credit': 'Vegie15 + team'},
     'whitty': {'name': 'VS Whitty', 'credit': 'Sock.clip, Nateanimate, KadeDev + team (original), jarekboho (V-Slice port), SiIvaGunner (HQ songs), ChuckySkullHead + team (Whitty ERECT)'},
+    'tankman': {'name': 'Playable Tankman', 'credit': 'Adamatik, PugSquad, Kawai Nuka-Cola, Skellix, JakeOfficial, Pumkin, Shroomii, Camiiix3 + team'},
     'tricky': {'name': 'VS Tricky', 'credit': 'Banbuds, Rozebud, KadeDev, Cval, YingYang48, JADS, Moro + team (original), thisaintcub, PurSnake + LeonidKosherny (V-Slice port), ChuckySkullHead (Madness Erect), angelkireina (Pico mixes)'},
 }
 # small pictures the menus need right away (icons, freeplay capsules, album art, character select) live in the head

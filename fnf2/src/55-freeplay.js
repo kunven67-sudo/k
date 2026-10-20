@@ -119,12 +119,28 @@
       this.onIntroDone = null;
       if (!this.play('intro')) this.play('idle', true);
     }
-    has(name) { return !!(this.atlas && this.atlas.labels[this.prefix[name]]); }
+    // a mod DJ can name its animations by SYMBOL instead of frame label (FlxAnimate's play(symbol), e.g. Playable
+    // Tankman): that symbol plays on its own, placed where the main timeline first shows it
+    lab(name) {
+      const A = this.atlas, p = this.prefix[name];
+      if (!A || !p) return null;
+      if (A.labels[p]) return A.labels[p];
+      const sym = A.symbols[p];
+      if (!sym || sym === A.main) return null;
+      this._sym = this._sym || {};
+      if (!this._sym[p]) {
+        let m = [1, 0, 0, 1, 0, 0];
+        found: for (const L of A.main.layers) for (const F of L.frames) for (const e of F.els) if (e.s === p) { m = e.m; break found; }
+        this._sym[p] = { start: 0, len: sym.frameCount, tl: sym, m };
+      }
+      return this._sym[p];
+    }
+    has(name) { return !!this.lab(name); }
     play(name, loop, from) {
-      const lab = this.atlas && this.atlas.labels[this.prefix[name]];
+      const lab = this.lab(name);
       if (!lab) return false;
       if (name !== 'fistPump' && name !== 'loss') this.pumpIntro = null;
-      this.cur = { start: lab.start, len: lab.len, loop: !!loop, loopFrom: 0 }; this.name = name; this.fi = Math.min(from || 0, lab.len - 1); this.t = 0; this.finished = false;
+      this.cur = { start: lab.start, len: lab.len, loop: !!loop, loopFrom: 0, tl: lab.tl || null, m: lab.m || null }; this.name = name; this.fi = Math.min(from || 0, lab.len - 1); this.t = 0; this.finished = false;
       if (name !== 'idle') this.afk = 0;
       return true;
     }
@@ -163,7 +179,9 @@
       G.setScreenT(ctx);
       const m = this.atlas.stage;
       ctx.save(); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
-      G.Atlas.draw(ctx, this.atlas, this.atlas.main, this.cur.start + this.fi);
+      const c = this.cur;
+      if (c.tl) { const k = c.m; ctx.transform(k[0], k[1], k[2], k[3], k[4], k[5]); G.Atlas.draw(ctx, this.atlas, c.tl, this.fi); }
+      else G.Atlas.draw(ctx, this.atlas, this.atlas.main, c.start + this.fi);
       ctx.restore();
     }
   }
@@ -372,6 +390,29 @@
       if (this.confVis && this.conf.cur) { this.conf.draw(ctx, null); G.setScreenT(ctx); }
       const cg = IMG('freeplay/cardGlow');
       if (cg && this.cardGlow.vis && this.cardGlow.a > 0) drawF(ctx, cg, null, -30, -30, { sx: this.cardGlow.s, orX: cg.width / 2, orY: cg.height / 2, alpha: this.cardGlow.a, blend: 'lighter' });
+    }
+  }
+
+  // ---------------------------------------------------------------- Tankman's backing card (Playable Tankman's backcard-tankman
+  // script): sky, clouds, mountains, Steve's tank rolling by with a chunky jitter, then the ground. His scene covers the
+  // base card (pink back, glows) like in the mod.
+  class TankmanCard extends Card {
+    constructor(fp, player) { super(fp, player); this.rows = []; this.steve = { x: -800, y: -100, a: 0 }; this.t = 0; }
+    update(dt) {
+      super.update(dt);
+      const s = this.steve; s.x += 50 * dt; if (s.x > W + 200) s.x = -800;
+      this.t += dt;
+      const k = Math.floor((Math.sin(this.t * 8) + Math.sin(this.t * 22) * 0.5) * 3) * 1.5;
+      s.y = -100 + k; s.a = Math.floor(Math.sin(this.t * 18) * 2);
+    }
+    draw(ctx) {
+      G.setScreenT(ctx);
+      const P = n => IMG('freeplay/tankman/' + n), sky = P('sky'), clouds = P('clouds'), mo = P('mo');
+      // (the three still layers drawn once into one picture)
+      if (sky && clouds && mo) ctx.drawImage(G.cached('fp-tank-back', W, H, c => { c.drawImage(sky, -300, -200); c.drawImage(clouds, -350, -280); c.drawImage(mo, -300, -280); }), 0, 0);
+      const st = P('steve'), s = this.steve;
+      if (st) { ctx.save(); ctx.translate(s.x + st.width * 0.3, s.y + st.height * 0.3); ctx.rotate(s.a * Math.PI / 180); ctx.scale(0.6, 0.6); ctx.drawImage(st, -st.width / 2, -st.height / 2); ctx.restore(); }
+      const gr = P('ground'); if (gr) ctx.drawImage(gr, -870, -10);
     }
   }
 
@@ -828,7 +869,7 @@
       // a new/better rank: the rank camera starts black and plays the slam once the DJ intro is done
       this.rankFx = p.fromResults && p.playRankAnim && p.rank ? { pending: true, fade: 1, bgA: 0, zoom: 1, funny: 1, vigA: 0, shakeT: 0 } : null;
       // card, DJ
-      this.card = this.player === 'pico' ? new PicoCard(this) : new Card(this, this.player);
+      this.card = this.player === 'pico' ? new PicoCard(this) : this.player === 'tankman' && !this.realP && IMG('freeplay/tankman/sky') ? new TankmanCard(this, this.player) : new Card(this, this.player);
       this.dj = this.realP ? new G.RealDJ(this.player) : new DJ(this.player);
       // background art (cut on a slant) + the black panel that slides in first
       this.bgImg = IMG(style.bgAsset || 'freeplay/freeplayBGweek1-bf') || IMG('freeplay/freeplayBGweek1-bf');

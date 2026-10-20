@@ -11,7 +11,7 @@ G.DIFF_ORDER = ['easy', 'normal', 'hard', 'erect', 'nightmare', 'og'];
 
 // which playable character a song variation belongs to: the player whose ownedChars has its player character
 // (preload/data/players/*.json: 'pico-playable' -> pico, 'darnell-player' -> darnell), anything else -> bf
-G.PLAYER_IDS = ['bf', 'pico', 'darnell'];
+G.PLAYER_IDS = ['bf', 'pico', 'darnell', 'tankman'];
 G.playerOf = function (charId) {
   if (!charId) return 'bf';
   if (G.PLAYER_IDS.includes(charId)) return charId;
@@ -52,6 +52,9 @@ G.Songs = {
     }
     if (G.realPlayer && G.realPlayer(player)) return out;
     const vars = ['default'].concat(base.playData.songVariations || []);
+    // (a player's mod pack brings its own variation of a song without patching the song's metadata: two packs
+    // patching the same file would hide each other's)
+    for (const pid of G.PLAYER_IDS) if (!vars.includes(pid) && this.meta(id, pid)) vars.push(pid);
     for (const v of vars) {
       const m = v === 'default' ? base : this.meta(id, v);
       if (!m || !this.chart(id, v)) continue;
