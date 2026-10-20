@@ -412,6 +412,7 @@ G.screens.storyMenu = {
     const n = this.levels.length;
     this.sel = (this.sel + ch + n) % n;
     const L = this.level().data;
+    { const fx = G.StoryFX && G.StoryFX[this.level().id]; if (fx && fx.hover) try { fx.hover(this); } catch (e) {} }   // (its pictures get ready)
     // background colour tween (0.9s quartOut)
     const col = (L.background || '#F9CF51').startsWith('#') ? L.background : '#F9CF51';
     if (!first && col !== this.bgColor) { this.bgFrom = this.curBg(); this.bgT = 0; }
@@ -453,6 +454,9 @@ G.screens.storyMenu = {
     G.sfx('confirm');
     this.titles[this.sel].flashing = true;
     for (const p of this.props) if (p.anims.confirm) p.play('confirm', true);
+    // (a mod's own week pick: Tricky's jaws close over the screen)
+    this.fx = G.StoryFX && G.StoryFX[this.level().id] || null;
+    if (this.fx && this.fx.select) try { this.fx.select(this); } catch (e) { G.reportError(e, 'story fx'); this.fx = null; }
   },
   startWeek() {
     const L = this.level();
@@ -506,12 +510,13 @@ G.screens.storyMenu = {
     }
     this.scoreLerp = Math.abs(this.scoreLerp - this.highScore) < 1 ? this.highScore : G.smoothLerp(this.scoreLerp, this.highScore, dt, 0.307);
     if (this.selected) {
+      if (this.fx && this.fx.update) this.fx.update(this, dt);
       this.selT += dt;
       if (this.selT >= 1) this.fade = Math.min(1, (this.selT - 1) / 0.2);
       if (this.selT >= 1.2 && !this.started) { this.started = true; this.startWeek(); }
     }
   },
-  leave() { this.started = false; this.selected = false; this.leaving = false; this.fade = 0; for (const t of this.titles || []) { t.flashing = false; t.cyan = false; } },
+  leave() { this.started = false; this.selected = false; this.leaving = false; this.fade = 0; this.fx = null; for (const t of this.titles || []) { t.flashing = false; t.cyan = false; } },
   draw(ctx) {
     G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
     // week titles (behind the black bar + band, like zIndex 15)
@@ -538,6 +543,7 @@ G.screens.storyMenu = {
     G.text(ctx, 'LEVEL SCORE: ' + G.fmtMoney(this.scoreLerp), 10, 10, { font: 'vcr', size: 32, baseline: 'top' });
     G.text(ctx, this.level().data.name || '', G.W - 10, 10, { font: 'vcr', size: 32, baseline: 'top', align: 'right', alpha: 0.7 });
     G.text(ctx, 'TAB: switch to ' + (this.player === 'pico' ? 'BOYFRIEND' : 'PICO'), G.W - 10, G.H - 30, { font: 'vcr', size: 18, align: 'right', alpha: 0.6 });
-    if (this.fade > 0) { ctx.globalAlpha = this.fade; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
+    if (this.selected && this.fx && this.fx.draw) { this.fx.draw(this, ctx); G.setScreenT(ctx); }
+    if (this.fade > 0 && !(this.selected && this.fx && this.fx.noFade)) { ctx.globalAlpha = this.fade; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
   },
 };

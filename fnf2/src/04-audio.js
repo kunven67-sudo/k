@@ -34,7 +34,7 @@ G.audio = (function () {
       src.connect(g); g.connect(bus.sfx); src.start();
     });
   };
-  // a sound you can stop again (voice lines in cutscenes): -> { stop(fade) }
+  // a sound you can stop again (voice lines in cutscenes, loops): -> { stop(fade) }; o = {vol, loop, fadeIn (s), bus}
   A.voice = function (path, o) {
     o = o || {};
     const h = { src: null, g: null, stopped: false, stop(fade) {
@@ -46,7 +46,8 @@ G.audio = (function () {
     G.A.audio(path).then(buf => {
       if (!buf || h.stopped) return;
       const src = ctx.createBufferSource(); src.buffer = buf; src.loop = !!o.loop;
-      const g = ctx.createGain(); g.gain.value = o.vol == null ? 1 : o.vol;
+      const g = ctx.createGain(), vol = o.vol == null ? 1 : o.vol; g.gain.value = vol;
+      if (o.fadeIn) { const t = ctx.currentTime; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + o.fadeIn); }   // (FlxSound.fadeIn)
       src.connect(g); g.connect(o.bus === 'music' ? bus.music : bus.sfx); src.start(); h.src = src; h.g = g;
     });
     return h;

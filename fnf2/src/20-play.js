@@ -43,6 +43,7 @@
       splashPre: d => A.noteSplash ? (A.noteSplash.data[DIRL[d] + 'Splashes'] || []).map(x => x.prefix) : SPLASH[DIRL[d]],
       splashOff: (A.noteSplash && A.noteSplash.offsets) || [25, -5],
       splashAlpha: A.noteSplash && A.noteSplash.alpha != null ? A.noteSplash.alpha : 0.8,
+      splashScale: A.noteSplash && A.noteSplash.scale != null ? A.noteSplash.scale : 1,
       splashBlend: A.noteSplash && A.noteSplash.data && A.noteSplash.data.blendMode === 'add' ? 'lighter' : null,
       splashOn: !(A.noteSplash && A.noteSplash.data && A.noteSplash.data.enabled === false),
       coversOn: !(A.holdNoteCover && A.holdNoteCover.data && A.holdNoteCover.data.enabled === false),
@@ -81,10 +82,17 @@
   }
   // special notes (modcharts): 'fake' = a decoy that vanishes before it gets to you (can't be hit),
   // 'eye' = a trap you must NOT hit (missing it is fine), 'glitch' = a normal note that looks broken
-  const isReal = n => n.kind !== 'fake' && n.kind !== 'eye';
+  // Mods' own note kinds: G.NoteKinds[kind] = { style: a data/notestyles id (its sheet, arrow names, scale + splash),
+  // off / offDown: [x, y] = the FlxSprite.offset the mod gives it (up/downscroll; null x = centred), flipDown: upside down
+  // on downscroll, swapDown: the up + down pictures swap on downscroll, fps, trap: true = YOU must not hit it (missing it is
+  // fine and it isn't counted; the opponent sings it like any note), hit(P, n) = what hitting it does }
+  G.NoteKinds = G.NoteKinds || {};
+  const kindOf = n => (n.kind && G.NoteKinds[n.kind]) || null;
+  const isTrap = n => n.kind === 'eye' || !!(kindOf(n) && kindOf(n).trap);
+  const isReal = n => n.kind !== 'fake' && n.kind !== 'eye' && !(n.line === 1 && kindOf(n) && kindOf(n).trap);
   // a note kind that is one of the singer's own animations plays it instead of a sing pose (Tankman's "ugh" in Ugh,
   // "heh, pretty good" in Stress, Darnell lighting / kicking / kneeing his can in 2hot)
-  const KIND_ANIM = { 'weekend-1-lightcan': 'lightCan', 'weekend-1-kickcan': 'kickCan', 'weekend-1-kneecan': 'kneeCan' };
+  const KIND_ANIM = { 'weekend-1-lightcan': 'lightCan', 'weekend-1-kickcan': 'kickCan', 'weekend-1-kneecan': 'kneeCan', exHank: 'Hank' };
   const kindAnim = (c, k) => { if (!c || !k) return null; const a = KIND_ANIM[k] || k; return c.anims && c.anims[a] ? a : null; };
   function centerOffsets(s) { s.offset.x = (s.frameW - s.width) * 0.5; s.offset.y = (s.frameH - s.height) * 0.5; s.origin.x = s.frameW / 2; s.origin.y = s.frameH / 2; }
 
@@ -116,7 +124,7 @@
         this.ready = true;
         // a song's own intro cutscene (first try only)
         const cs = G.Cutscenes && (G.Cutscenes[this.song.id + '@' + this.song.variation] || G.Cutscenes[this.song.id]);
-        if (cs && cs.create && !params.deaths && !params.noCutscene) { try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
+        if (cs && cs.create && (!params.deaths || cs.always) && !params.noCutscene) { try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
         if (!this.cutscene) this.startCountdown();
       }
     },
@@ -307,6 +315,11 @@
       // ask for every gameplay sheet now (splashes + hold covers are big): they load before the song starts,
       // not on your first SICK in the middle of it
       for (const sh of [NS.notes, NS.strum, NS.splash, NS.cover(0), NS.cover(1), NS.cover(2), NS.cover(3)]) if (sh) G.A.warmNow(sh.imgs || [sh.img]);
+      // (+ the mod note kinds this chart has: their arrows + splash)
+      for (const k of new Set(this.song.notes.map(n => n.k))) {
+        const K = k && G.NoteKinds[k]; if (!K || !K.style) continue;
+        const N = this.kindStyle(K); for (const sh of [N.notes, N.splash]) if (sh) G.A.warmNow(sh.imgs || [sh.img]);
+      }
       this.popups = [];
       this.splashes = []; this.covers = [];
       this.countdownSpr = null;
@@ -328,7 +341,7 @@
       const s = this.song;
       this.hideHealth = false; this.strumShift = 0;
       this.notes = s.notes.map((n, i) => ({ i, t: n.t, lane: n.d % 4, line: n.d >= 4 ? 0 : 1, len: n.l, kind: n.k, hit: false, missed: false, holdEnd: n.t + n.l, holding: false, dropped: false, done: false, holdLeft: n.l }));
-      if (!this.mod) this.notes = this.notes.filter(isReal);           // modcharts off: no tricks, just the song
+      if (!this.mod) this.notes = this.notes.filter(n => n.kind !== 'fake' && n.kind !== 'eye');   // modcharts off: no tricks, just the song (a mod's own note kinds stay: they ARE its song)
       this.evIdx = 0;
       this.health = 1; this.score = 0; this.misses = 0; this.combo = 0; this.maxCombo = 0;
       this.tally = { killer: 0, sick: 0, good: 0, bad: 0, shit: 0, miss: 0, total: 0 };
@@ -596,7 +609,7 @@
       for (const n of this.notes) {
         if (n.done || n.hit || n.missed || n.line !== 1 || n.lane !== lane || n.kind === 'fake') continue;
         const diff = n.t - pos;
-        if (n.kind === 'eye') { if (Math.abs(diff) <= 110 && (!trap || n.t < trap.t)) trap = n; }    // a real note always wins
+        if (isTrap(n)) { if (Math.abs(diff) <= 110 && (!trap || n.t < trap.t)) trap = n; }    // a real note always wins
         else if (Math.abs(diff) <= HIT_WINDOW && (!best || n.t < best.t)) best = n;
         if (diff > HIT_WINDOW) break;
       }
@@ -638,6 +651,8 @@
     },
     // you hit a note you shouldn't have (GLARE's eye notes): health + combo gone, the song decides the rest
     hitTrap(n) {
+      const K = kindOf(n);
+      if (K && K.hit) { K.hit(this, n); return; }
       this.health -= 0.35; this.score -= 150;
       this.breakCombo();
       if (this.audio) this.audio.setVolume('p', 0);
@@ -673,6 +688,7 @@
       if (this.audio) this.audio.setVolume('p', 0);
       G.sfx('miss' + (1 + Math.floor(Math.random() * 3)), { vol: 0.5 + Math.random() * 0.1 });
       this.bf.sing(n.lane, true);
+      if (this.sfx && this.sfx.miss) this.sfx.miss(this, n);
     },
     // pressing with no note there (ghost tapping off): like V-Slice, -4% health and -10 score,
     // a quiet miss sound + miss pose, but it doesn't count as a miss or break the combo
@@ -689,18 +705,23 @@
       if (this.combo >= 10 && G.settings.comboPopups !== false) this.popCombo(0);
       this.combo = 0;
     },
-    splash(lane) {
-      if (!G.settings.noteSplashes || !NS.splashOn) return;
-      const sp = new G.Sprite(0, 0); sp.loadSparrow(NS.splashPath);
-      const pre = NS.splashPre(lane), v = Math.floor(Math.random() * pre.length);
+    // ns = another note style's splash (a note kind's own: its scale + offsets the V-Slice way, Strumline.playNoteSplash)
+    splash(lane, ns) {
+      const N = ns || NS;
+      if (!G.settings.noteSplashes || !N.splashOn) return;
+      const sp = new G.Sprite(0, 0); sp.loadSparrow(N.splashPath);
+      const pre = N.splashPre(lane), v = Math.floor(Math.random() * pre.length);
       if (!sp.addAnim('s', pre[v], 24 + Math.floor(Math.random() * 5) - 2, false)) return;
+      if (ns) sp.scale.x = sp.scale.y = N.splashScale;
       sp.play('s', true); sp.updateHitbox();
-      const S = this.lines[1].strums[lane], so = NS.splashOff;
-      sp.x = S.x + so[0]; sp.y = S.y - INITIAL_OFFSET + so[1];
+      const S = this.lines[1].strums[lane], so = N.splashOff;
+      if (ns) { sp.x = S.x + so[0] * N.splashScale; sp.y = S.y - INITIAL_OFFSET + so[1] * N.splashScale; }
+      else { sp.x = S.x + so[0]; sp.y = S.y - INITIAL_OFFSET + so[1]; }
       sp.offset.x = sp.width * 0.3; sp.offset.y = sp.height * 0.3;
-      sp.alpha = NS.splashAlpha; sp.blend = NS.splashBlend;
+      sp.alpha = N.splashAlpha; sp.blend = N.splashBlend;
       this.splashes.push(sp);
     },
+    kindStyle(K) { return K._ns || (K._ns = makeNS(K.style)); },
     startCover(n) {
       const sheet = NS.cover(n.lane); if (!sheet) return;
       const cv = new G.Sprite(0, 0); cv.loadSparrow('shared/images/holdCover' + COLOR[n.lane]);
@@ -1015,6 +1036,28 @@
       return this.song.name.toLowerCase().includes(String(dn).toLowerCase()) ? this.song.name : this.song.name + ' (' + dn + ')';
     },
     noteY(t) { const d = (t - this.songPos) * PX_PER_MS * this.scrollSpeed; return this.down ? -d : d; },
+    // a mod note kind's own picture (animated, looping), placed like V-Slice's Strumline + the FlxSprite.offset its
+    // note kind script gives it (drawn with the line's camera already on)
+    drawKindNote(ctx, n, K, S) {
+      const N = this.kindStyle(K), sheet = N.notes; if (!sheet) return false;
+      const lane = K.swapDown && this.down ? [0, 2, 1, 3][n.lane] : n.lane;
+      if (K._sheet !== sheet) { K._sheet = sheet; K._fr = {}; }   // (frame lists belong to that copy of the sheet)
+      const fr = K._fr, key = N.notePre(lane);
+      const list = fr[key] || (fr[key] = G.Sparrow.byPrefix(sheet, key));
+      if (!list.length) return false;
+      const f = list[Math.floor((this.songPos + 1e6) * (K.fps || 24) / 1000) % list.length], f0 = list[0];
+      const s = N.noteScale, L = this.lines[n.line];
+      const off = (this.down && K.offDown) || K.off, flip = this.down && K.flipDown;
+      let x = S.x - INITIAL_OFFSET - (f0.fw * s - STRUM_SIZE) / 2 - NUDGE;
+      let y = S.y - INITIAL_OFFSET + this.noteY(n.t) * (L.ys || 1);
+      if (off) { if (off[0] != null) x += 0.5 * f0.fw * (1 - s) - off[0]; y += 0.5 * f0.fh * (1 - s) - off[1]; }
+      ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+      if (S.angle) { ctx.translate(f0.fw / 2, f0.fh / 2); ctx.rotate(S.angle * Math.PI / 180); ctx.translate(-f0.fw / 2, -f0.fh / 2); }
+      if (flip) { ctx.translate(0, f0.fh); ctx.scale(1, -1); }
+      ctx.globalAlpha *= S.alpha;
+      G.Sparrow.draw(ctx, sheet, f); ctx.restore();
+      return true;
+    },
     drawHUD(ctx) {
       const hud = this.hud;
       const notesSheet = NS.notes, holdImg = NS.hold;
@@ -1036,6 +1079,8 @@
           const S = L.strums[n.lane];
           const y = S.y - INITIAL_OFFSET + this.noteY(n.t) * ys;
           if (y > G.H + 120 || y < -260) { if ((n.t - this.songPos) * PX_PER_MS * this.scrollSpeed > G.H + 300) break; continue; }
+          const K = kindOf(n);
+          if (K && K.style && this.drawKindNote(ctx, n, K, S)) continue;
           const f = G.Sparrow.byPrefix(notesSheet, NS.notePre(n.lane))[0]; if (!f) continue;
           const ns = NS.noteScale, w = f.fw * ns;
           const x = S.x - INITIAL_OFFSET - (w - STRUM_SIZE) / 2 - NUDGE;
