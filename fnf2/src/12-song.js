@@ -11,7 +11,7 @@ G.DIFF_ORDER = ['easy', 'normal', 'hard', 'erect', 'nightmare', 'og'];
 
 // which playable character a song variation belongs to: the player whose ownedChars has its player character
 // (preload/data/players/*.json: 'pico-playable' -> pico, 'darnell-player' -> darnell), anything else -> bf
-G.PLAYER_IDS = ['bf', 'pico', 'darnell', 'tankman'];
+G.PLAYER_IDS = ['bf', 'pico', 'darnell', 'tankman', 'nene'];
 G.playerOf = function (charId) {
   if (!charId) return 'bf';
   if (G.PLAYER_IDS.includes(charId)) return charId;
@@ -32,9 +32,9 @@ G.Songs = {
   // opponent. Played SWAPPED: their part becomes yours, sung with their real recorded voice.
   ownSong(id, player) {
     const P = G.PLAYERS && G.PLAYERS[player], ch = P && (P.real ? P.real.char : P.ownChar), m = ch && this.meta(id);
-    const opp = m && (m.playData.characters || {}).opponent;
-    // (a stand-in player can have a song version of themselves: Nene's own songs are sung by nene-playable)
-    return !!(m && (opp === ch || (P.real && P.real.songChar && opp === P.real.songChar)));
+    const opp = m && (m.playData.characters || {}).opponent, sc = P && (P.real ? P.real.songChar : P.songChar);
+    // (a player can have a song version of themselves: Nene's own songs are sung by nene-playable)
+    return !!(m && (opp === ch || (sc && opp === sc)));
   },
   // every playable (difficulty, variation) combo for a song + player character
   // player: 'bf' (default/erect variations), 'pico' (pico variation), 'darnell' (his mixes), plus the songs a

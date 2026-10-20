@@ -39,6 +39,10 @@
   // animation, Steve on the speakers, DJ, card, songs, results, game over. Without the pack he's the stand-in above.
   G.PLAYERS.tankman = { id: 'tankman', pack: 'tankman', name: 'Tankman', pos: 7, chill: CS + 'tankmanChill', gf: { asset: CS + 'steveChill', viz: false },
     nametag: 'tankmanplay', icon: 'tankman', ownChar: 'tankman', swapChar: 'tankman-playable', fallback: G.PLAYERS.tankman };
+  // Nene = a full player from the mod "NENE MIXES" (tools/own/nene_mix.py): her own character select animation,
+  // Cassandra on the speakers, DJ, card, mixes, results, death. Without the pack she's the stand-in above.
+  G.PLAYERS.nene = { id: 'nene', pack: 'nenemix', name: 'Nene', pos: 1, chill: CS + 'neneplayerChill', gf: { asset: CS + 'dipshitCass', viz: false },
+    nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene };
   const LOCK_COLORS = ['#31F2A5', '#20ECCD', '#24D9E8', '#20ECCD', '#20C8D4', '#209BDD', '#209BDD', '#2362C9', '#243FB9'];
 
   // ---------------------------------------------------------------- an Animate atlas sprite (FunkinSprite + texture atlas)

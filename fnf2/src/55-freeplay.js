@@ -416,6 +416,51 @@
     }
   }
 
+  // ---------------------------------------------------------------- Nene's backing card (NENE MIXES' backcard-nene script):
+  // the pink back slides in, then her picture + gradient, two layers of sketches drifting up, and now and then a seal
+  class NeneCard extends Card {
+    constructor(fp, player) {
+      super(fp, player); this.rows = [];
+      const P = n => IMG('freeplay/nenecard/' + n);
+      this.bg = P('bg'); this.grad = P('grad'); this.sk = P('sketches');
+      this.k = this.bg ? this.bg.width / 511 : 1;
+      this.a = 0; this.skB = { y: 0 }; this.skF = { y: Math.random() * 600 - 300 };
+      this.seal = new G.Sprite(-330, 325).loadSparrow('preload/images/freeplay/nenecard/seal');
+      this.seal.addAnim('y', 'SEAL ANIM', 24, false); this.seal.scale.x = this.seal.scale.y = this.k;
+      this.seal.flipX = Math.random() < 0.5; this.seal.visible = false;
+      this.seal.onFinish = () => { this.sealT = 10 + Math.random() * 10; this.seal.visible = false; };
+      this.sealT = -1;
+    }
+    introDone() { this.tw.to(this, { a: 1 }, 0.15, E.sineOut); this.sealT = 3 + Math.random() * 3; }
+    confirm() {}
+    update(dt) {
+      super.update(dt);
+      this.skB.y -= 30 * dt; this.skF.y -= 50 * dt;
+      if (this.sealT > 0 && (this.sealT -= dt) <= 0) { this.seal.flipX = !this.seal.flipX; this.seal.visible = true; this.seal.play('y', true); this.sealT = -1; }
+      this.seal.update(dt);
+    }
+    draw(ctx) {
+      G.setScreenT(ctx);
+      if (this.pink) ctx.drawImage(tint(this.pink, this.color, 'pinkBack'), Math.round(this.pinkX), 0);
+      if (this.a <= 0) return;
+      ctx.save(); ctx.globalAlpha = this.a;
+      if (this.bg) ctx.drawImage(this.bg, 0, 0, this.bg.width * 1.05, this.bg.height);
+      // (FlxBackdrop repeating on Y)
+      const strip = (o, s, alpha) => {
+        if (!this.sk) return;
+        const h = this.sk.height * s, w = this.sk.width * s;
+        let y = o.y % h; if (y > 0) y -= h;
+        ctx.globalAlpha = this.a * alpha;
+        for (; y < H; y += h) ctx.drawImage(this.sk, -5, y, w, h);
+      };
+      strip(this.skB, 1.2 * this.k, 0.4); strip(this.skF, 1.1 * this.k, 1);
+      ctx.globalAlpha = this.a;
+      if (this.grad) ctx.drawImage(this.grad, 0, 40);
+      ctx.restore();
+      if (this.seal.visible && this.seal.cur) { this.seal.alpha = this.a; this.seal.draw(ctx, null); G.setScreenT(ctx); }
+    }
+  }
+
   // ---------------------------------------------------------------- capsule title (CapsuleText: white 5by7 + cyan glow)
   function capTitle(name, glowCol, mode) {
     // mode: 'w' = white text with its glow filter, 'b' = blurred glow copy, 'f' = flicker white
@@ -869,7 +914,7 @@
       // a new/better rank: the rank camera starts black and plays the slam once the DJ intro is done
       this.rankFx = p.fromResults && p.playRankAnim && p.rank ? { pending: true, fade: 1, bgA: 0, zoom: 1, funny: 1, vigA: 0, shakeT: 0 } : null;
       // card, DJ
-      this.card = this.player === 'pico' ? new PicoCard(this) : this.player === 'tankman' && !this.realP && IMG('freeplay/tankman/sky') ? new TankmanCard(this, this.player) : new Card(this, this.player);
+      this.card = this.player === 'pico' ? new PicoCard(this) : this.player === 'tankman' && !this.realP && IMG('freeplay/tankman/sky') ? new TankmanCard(this, this.player) : this.player === 'nene' && !this.realP && IMG('freeplay/nenecard/bg') ? new NeneCard(this, this.player) : new Card(this, this.player);
       this.dj = this.realP ? new G.RealDJ(this.player) : new DJ(this.player);
       // background art (cut on a slant) + the black panel that slides in first
       this.bgImg = IMG(style.bgAsset || 'freeplay/freeplayBGweek1-bf') || IMG('freeplay/freeplayBGweek1-bf');
