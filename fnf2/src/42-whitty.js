@@ -375,12 +375,13 @@
   ]);
 
   // a cutscene's big pictures are loaded with the song and let go of (graphics card) once it's over
+  // ('alphabet' = the talk box's typed letters: a 4 MB sheet, so it isn't ready from boot)
   const SHEETS = {
-    'lo-fight': ['whittyCutscene', 'speech_bubble', 'dialogue/whiteog_dialogue', 'dialogue/whiteog_pissed_dialogue', 'dialogue/bf_dialogue'],
-    'lo-fight-(hq)': ['hqr/whittyCutscene', 'speech_bubble', 'dialogue/whiteog_dialogue', 'dialogue/whiteog_pissed_dialogue', 'dialogue/bf_dialogue'],
-    overhead: ['speech_bubble', 'dialogue/whiteog_pissed_dialogue', 'dialogue/bf_dialogue'],
-    'overhead-(hq)': ['speech_bubble', 'dialogue/talk_portraits', 'dialogue/bf_dialogue'],
-    ballistic: ['cuttinDeezeBalls', 'speech_bubble', 'dialogue/whiteog_balls_dialogue', 'dialogue/bf_dialogue'],
+    'lo-fight': ['whittyCutscene', 'speech_bubble', 'alphabet', 'dialogue/whiteog_dialogue', 'dialogue/whiteog_pissed_dialogue', 'dialogue/bf_dialogue'],
+    'lo-fight-(hq)': ['hqr/whittyCutscene', 'speech_bubble', 'alphabet', 'dialogue/whiteog_dialogue', 'dialogue/whiteog_pissed_dialogue', 'dialogue/bf_dialogue'],
+    overhead: ['speech_bubble', 'alphabet', 'dialogue/whiteog_pissed_dialogue', 'dialogue/bf_dialogue'],
+    'overhead-(hq)': ['speech_bubble', 'alphabet', 'dialogue/talk_portraits', 'dialogue/bf_dialogue'],
+    ballistic: ['cuttinDeezeBalls', 'speech_bubble', 'alphabet', 'dialogue/whiteog_balls_dialogue', 'dialogue/bf_dialogue'],
     'ballistic-(hq)': ['hqr/cuttinDeezeBalls', 'dialogue/whittyall', 'dialogue/bfall'],
   };
   const imgsOf = id => { const out = []; for (const n of SHEETS[id] || []) { const sh = G.Sparrow.load(IMG + n); if (sh) out.push(...(sh.imgs || [])); } return out; };
