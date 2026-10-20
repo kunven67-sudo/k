@@ -461,7 +461,8 @@
     },
     update(P, dt) {
       runTweens(P.wh.tw, dt);
-      for (const L of P.lines) for (const s of L.strums) if (s.bob) { s.y = s.by + s.bob.y; if (!s.bob.y) s.bob = null; }
+      // (through the strum's offset: the play screen puts every strum at base + offset after the song FX run)
+      for (const L of P.lines) for (const s of L.strums) if (s.bob) { s.my = s.bob.y; if (!s.bob.y) s.bob = null; }
     },
   };
   // Low-Rise: a swap points the camera at Whitty again

@@ -10,6 +10,13 @@
 //   Play Animation           value1 = animation, value2 = bf / gf / dad (or 1 / 2 / 0)
 //   Change Character         value1 = bf|0, dad|1, gf|2, value2 = character id: swapped where the old one stood
 //   Screen Shake             value1 = seconds, value2 = strength (game + HUD)
+// and the custom events Psych mods ship most (Whitty-ERECT has them all):
+//   SetCamZoom               value1 = zoom, value2 = seconds to tween (sine in-out), empty = the camera eases there
+//   CamBeat                  value1 = bops per section (empty / 0 = off), value2 = how strong (1)
+//   Camera Flash             value1 = 'camGame, forced', value2 = 'RRGGBB, seconds' (or 'r, g, b, seconds')
+//   ColoredApple             value1 = seconds, value2 = zoom (optional): the stage goes black + the singers turn into
+//                            flat silhouettes + the health bar fades; the next one turns it back
+//   Change Scroll Speed      value1 = times the chart speed, value2 = seconds to get there (Psych built-in)
 // Psych-era stages put characters by the corner of their sprite and aim the camera at their middle; stage files carry
 // that as characters.<slot>.raw [x, y] + camMid [dx, dy] (+ camSign -1 = the character's camera offset turned around).
 (function () {
@@ -31,7 +38,8 @@
       const f0 = c.sheet && c.sheet.frames && c.sheet.frames[0];
       const w = f0 ? f0.fw * Math.abs(c.scale.x) : c.width, h = f0 ? f0.fh * Math.abs(c.scale.y) : c.height;
       const m = spot.camMid || [0, 0], co = c.cameraOffsets || [0, 0], go = c.globalOffsets || [0, 0], sg = spot.camSign || 1;
-      c.camFocus = { x: c.x + w / 2 + m[0] + sg * co[0] + go[0], y: c.y + h / 2 + m[1] + co[1] + go[1] };
+      const gx = go[0] * Math.abs(c.scale.x), gy = go[1] * Math.abs(c.scale.y);     // (drawn x the sheet's scale)
+      c.camFocus = { x: c.x + w / 2 + m[0] + sg * co[0] + gx, y: c.y + h / 2 + m[1] + co[1] + gy };
     },
     // every character the song's Change Character events want, made up front (no hitch when they swap in)
     prepare(P) {
@@ -121,11 +129,76 @@
       if (d > 0 && i !== 0) { P.cam.shake(i, d); P.hud.shake(i, d); }
     },
     // ---- every beat (Cam Boom Speed + onBeat)
+    SetCamZoom(P, v) {
+      const z = num(v.value1, NaN); if (isNaN(z)) return;
+      const d = num(v.value2, NaN);
+      // (empty seconds: Psych sets defaultCamZoom and the camera's zoom lerp eases there in about a third of a second)
+      P.zoomTween = { t: 0, dur: isNaN(d) || d <= 0 ? 0.35 : d, z0: P.camZoom, z1: z, ease: isNaN(d) || d <= 0 ? (t => 1 - (1 - t) * (1 - t)) : sineInOut };
+    },
+    CamBeat(P, v) {
+      const per = num(v.value1, 0);
+      P.camBeat = per > 0 ? { every: Math.max(1, Math.round(16 / per)), amt: num(v.value2, 1) || 1 } : null;
+    },
+    'Camera Flash'(P, v) {
+      if (G.settings.flashing === false) return;
+      const parts = String(v.value2 || '').split(',').map(x => x.trim()).filter(Boolean);
+      let col = '#FFFFFF', dur = 1;
+      if (parts.length >= 4) { col = 'rgb(' + parts.slice(0, 3).join(',') + ')'; dur = num(parts[3], 1); }
+      else if (parts.length) { col = '#' + parts[0].replace('#', ''); dur = num(parts[1], 1); }
+      P.cam.flash(col, dur || 1);
+    },
+    ColoredApple(P, v) {
+      const A = P.apple = P.apple || { k: 0, on: false };
+      let d = num(v.value1, 0); if (d <= 0) d = 0.1;
+      A.on = !A.on; A.from = A.k; A.to = A.on ? 1 : 0; A.t = 0; A.dur = d;
+      const z = num(v.value2, NaN);
+      if (!isNaN(z)) P.zoomTween = { t: 0, dur: d, z0: P.camZoom, z1: z, ease: sineInOut };
+    },
+    'Change Scroll Speed'(P, v) {
+      const to = (P.baseScrollSpeed || P.scrollSpeed) * num(v.value1, 1), d = num(v.value2, 0);
+      if (d <= 0) { P.scrollSpeed = to; P.speedTween = null; } else P.speedTween = { t: 0, dur: d, from: P.scrollSpeed, to };
+    },
+    // every frame: the silhouette fade, scroll speed tweens, the mods' HUD parts
+    _update(P, dt) {
+      const A = P.apple;
+      if (A && A.dur) {
+        A.t += dt; const k = Math.min(1, A.t / A.dur); A.k = A.from + (A.to - A.from) * k;
+        P.hudParts.health.apple = 1 - A.k;
+        if (k >= 1) A.dur = 0;
+      }
+      const T = P.speedTween;
+      if (T) { T.t += dt; const k = Math.min(1, T.t / T.dur); P.scrollSpeed = T.from + (T.to - T.from) * k; if (k >= 1) P.speedTween = null; }
+    },
+    _step(P, step) {
+      const B = P.camBeat;
+      if (B && step >= 0 && step % B.every === 0 && P.cam.zoom < 1.35 && G.settings.camZoom !== false) { P.bopMul += 0.015 * B.amt; P.hudZoom += 0.03 * B.amt; }
+    },
+    // ColoredApple: the world with the stage behind the singers covered in black and the singers as flat silhouettes
+    // (drawn through one screen-sized canvas instead of baking white copies of their huge sheets)
+    _appleWorld(ctx, P) {
+      const A = P.apple, k = A.k, cols = P.appleColors || {};
+      let oc = this._appleCanvas;
+      if (!oc || oc.width !== ctx.canvas.width || oc.height !== ctx.canvas.height) { oc = this._appleCanvas = document.createElement('canvas'); oc.width = ctx.canvas.width; oc.height = ctx.canvas.height; }
+      const ox = oc.getContext('2d');
+      let black = false;
+      for (const s of P.stage.ordered()) {
+        const o = s.owner || s, slot = o === P.bf ? 'bf' : o === P.dad ? 'dad' : o === P.gf ? 'gf' : null;
+        if (!slot) { s.draw(ctx, P.cam); continue; }
+        if (!black) { black = true; G.setScreenT(ctx); ctx.globalAlpha = k; ctx.fillStyle = '#000'; ctx.fillRect(-G.W, -G.H, G.W * 3, G.H * 3); ctx.globalAlpha = 1; }
+        if (k < 0.999) s.draw(ctx, P.cam);
+        if (!s.visible || s.alpha <= 0) continue;
+        ox.setTransform(1, 0, 0, 1, 0, 0); ox.globalCompositeOperation = 'source-over'; ox.globalAlpha = 1; ox.clearRect(0, 0, oc.width, oc.height);
+        s.draw(ox, P.cam);
+        ox.setTransform(1, 0, 0, 1, 0, 0); ox.globalAlpha = 1; ox.globalCompositeOperation = 'source-in';
+        ox.fillStyle = cols[slot] || (o.data && o.data.hpColor) || '#FFFFFF'; ox.fillRect(0, 0, oc.width, oc.height);
+        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = k; ctx.drawImage(oc, 0, 0); ctx.restore();
+      }
+    },
     _beat(P, beat) {
       const b = P.boom;
       if (b && b.every !== 4 && b.every > 0 && beat % b.every === 0) G.ModEvents['Add Camera Zoom'](P, { value1: 0.015 * b.amt, value2: 0.03 * b.amt });
       if (P.charDance) for (const c of [P.dad, P.bf]) if (c && c.animName === 'idle' + (c.idleSuffix || '')) c.playAnim(c.animName, true);
     },
-    _reset(P) { P.boom = null; P.camForced = null; P.charDance = false; G.ModChars.reset(P); },
+    _reset(P) { P.boom = null; P.camForced = null; P.charDance = false; P.camBeat = null; P.apple = null; P.speedTween = null; G.ModChars.reset(P); },
   };
 })();

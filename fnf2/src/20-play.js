@@ -115,7 +115,7 @@
       {
         this.ready = true;
         // a song's own intro cutscene (first try only)
-        const cs = G.Cutscenes && G.Cutscenes[this.song.id];
+        const cs = G.Cutscenes && (G.Cutscenes[this.song.id + '@' + this.song.variation] || G.Cutscenes[this.song.id]);
         if (cs && !params.deaths && !params.noCutscene) { try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
         if (!this.cutscene) this.startCountdown();
       }
@@ -159,7 +159,8 @@
       if (q === 'high') return;
       let zMax = this.stageZoom || 1;
       for (const ev of this.song.events || []) if (ev.e === 'ZoomCamera' && ev.v) zMax = Math.max(zMax, (ev.v.zoom || 1) * (ev.v.mode === 'direct' ? 1 : this.stageZoom || 1));
-      for (const ev of this.song.events || []) if (ev.e === 'Set Cam Zoom' && ev.v) zMax = Math.max(zMax, parseFloat(ev.v.value1) || 0);   // (Psych mods: the zoom itself)
+      for (const ev of this.song.events || []) if ((ev.e === 'Set Cam Zoom' || ev.e === 'SetCamZoom') && ev.v) zMax = Math.max(zMax, parseFloat(ev.v.value1) || 0);
+      for (const ev of this.song.events || []) if (ev.e === 'ColoredApple' && ev.v) zMax = Math.max(zMax, parseFloat(ev.v.value2) || 0);   // (Psych mods: the zoom itself)
       if (this.sfx && this.sfx.maxZoom) zMax = Math.max(zMax, this.sfx.maxZoom(this) || 0);                                            // (a song's cutscene camera)
       const need = new Map(), see = (sp, s) => { for (const im of G.texturesOf(sp)) if (im instanceof HTMLImageElement) need.set(im, Math.max(need.get(im) || 0, s)); };
       const sz = sp => Math.max(Math.abs(sp.scale && sp.scale.x || 1), Math.abs(sp.scale && sp.scale.y || 1));
@@ -234,7 +235,7 @@
       }
       this.applyStageFX();
       // a song's own stage effects (setup / reset / update / beat / event / drawOver)
-      this.sfx = (G.SongFX && G.SongFX[s.id]) || (G.StageFX && G.StageFX[s.stage]) || null;
+      this.sfx = (G.SongFX && (G.SongFX[s.id + '@' + s.variation] || G.SongFX[s.id])) || (G.StageFX && G.StageFX[s.stage]) || null;
       if (this.sfx && this.sfx.setup) try { this.sfx.setup(this); } catch (e) { G.reportError(e, 'song fx'); this.sfx = null; }
       this.stageZoom = this.stage.zoom;
       this.cam = new G.FCam(this.stageZoom);
@@ -297,7 +298,7 @@
         L.strums.push(s);
       }
       const speedSet = st.speedType === 'const' ? st.speedValue : st.speedType === 'mult' ? this.song.speed * st.speedValue : this.song.speed;
-      this.scrollSpeed = speedSet / (st.songSpeed || 1) * (st.songSpeed || 1);
+      this.scrollSpeed = this.baseScrollSpeed = speedSet / (st.songSpeed || 1) * (st.songSpeed || 1);
       // health bar (healthBar.png + fill), icons
       this.hbBg = new G.Sprite(0, 0).loadImage('shared/images/healthBar.png');
       this.hbBg.y = this.down ? G.H * 0.1 : G.H * 0.9; this.hbBg.screenCenter('x');
@@ -344,6 +345,8 @@
       this.popups = []; this.splashes = []; this.covers = [];
       this.vocalsOn = true;
       for (const L of this.lines) for (const s2 of L.strums) { s2.playA('static', true); s2.confirmHold = -1; s2.mx = s2.my = s2.ma = 0; s2.mal = 1; s2.x = s2.bx; s2.y = s2.by; s2.angle = 0; s2.alpha = 1; s2.visible = true; }
+      // (what a mod's song script fades: 'all' = the whole HUD, on top of hud.alpha, which the cutscenes + WRATH's snap own)
+      this.hudParts = { all: 1, health: { alpha: 1, dy: 0, apple: 1 }, time: { alpha: 1, dy: 0 } };
       if (G.ModEvents) G.ModEvents._reset(this);
       if (this.cam && this.started === false && this.stage && this.stage.data.camStart) this.startCam();
       this.snap = null; if (this.hud) this.hud.alpha = 1;
@@ -383,6 +386,7 @@
       const jpos = this.songPos - (G.settings.offset || 0);
       this.cond.update(this.songPos, st => this.onStep(st), bt => this.onBeat(bt));
       this.processEvents();
+      if (G.ModEvents) G.ModEvents._update(this, dt);
       this.updateSnap(dt);
       this.updateNotes(jpos, dt);
       // characters, stage, cameras
@@ -418,6 +422,7 @@
         const beat = step / 4;
         if (beat < 0) this.countdownBeat(beat);
       }
+      if (G.ModEvents) G.ModEvents._step(this, step);
     },
     onBeat(beat) {
       this.iconP1.scale = this.iconP2.scale = 1.2;
@@ -560,6 +565,7 @@
       s.playA('confirm', true); s.confirmHold = n.len > 0 ? -1 : 0;
       const suffix = n.kind === 'alt' ? '-alt' : '', ka = kindAnim(this.dad, n.kind);
       if (n.kind === 'hey') this.dad.playAnim('hey', true);
+      else if (n.kind === 'No Animation') { /* (Psych note type: the singer doesn't pose) */ }
       else if (!this.dad._locked && ka) { this.dad.playAnim(ka, true); this.dad.holdTimer = 0; }
       else if (!this.dad._locked) { this.dad.lastNote = n; this.dad.sing(n.lane, false, suffix); }
       if (this.audio) this.audio.setVolume('o', 1);
@@ -624,7 +630,7 @@
       if (G.settings.comboPopups !== false && !(this.sfx && this.sfx.popups && this.sfx.popups(this, r === 'killer' ? 'sick' : r, this.combo))) { this.popRating(r === 'killer' ? 'sick' : r); if (this.combo >= 10) this.popCombo(this.combo); }
       if (this.sfx && this.sfx.playerHit) this.sfx.playerHit(this, n, r);
       const suffix = n.kind === 'alt' ? '-alt' : '', ka = kindAnim(this.bf, n.kind);
-      if (n.kind === 'hey') this.bf.playAnim('hey', true); else if (ka) { this.bf.playAnim(ka, true); this.bf.holdTimer = 0; } else this.bf.sing(n.lane, false, suffix);
+      if (n.kind === 'hey') this.bf.playAnim('hey', true); else if (n.kind === 'No Animation') { /* (Psych note type) */ } else if (ka) { this.bf.playAnim(ka, true); this.bf.holdTimer = 0; } else this.bf.sing(n.lane, false, suffix);
       if (this.audio) this.audio.setVolume('p', 1);
       if (this.gf && this.gf.anims['combo' + this.combo]) this.gf.playAnim('combo' + this.combo, true);
       if (n.len > 0) this.startCover(n);
@@ -942,7 +948,7 @@
       // a song's own ending cutscene plays first (same rule as the intro ones: not after a retry)
       if (!this.endCut) {
         this.endCut = true;
-        const cs = G.Cutscenes && G.Cutscenes[this.song.id];
+        const cs = G.Cutscenes && (G.Cutscenes[this.song.id + '@' + this.song.variation] || G.Cutscenes[this.song.id]);
         if (cs && cs.createEnd && !this.params.deaths && !this.params.noCutscene) {
           let sc = null; try { sc = cs.createEnd(this); } catch (e) { G.reportError(e, 'end cutscene'); }
           if (sc) { sc.isEnd = true; this.cutscene = sc; return; }
@@ -980,14 +986,16 @@
       if (!this.ready) { if (!(G.Loading && G.Loading.frame(ctx, G.dt))) G.vcr(ctx, 'Loading...', G.W - 20, G.H - 50, { align: 'right', size: 32 }); return; }
       if (this.gameOver) { this.drawGameOver(ctx); return; }
       // world
-      if (this.sfx && this.sfx.drawWorld) this.sfx.drawWorld(ctx, this, cam => this.drawWorld(ctx, cam));
+      if (this.apple && this.apple.k > 0.004 && G.ModEvents) G.ModEvents._appleWorld(ctx, this);
+      else if (this.sfx && this.sfx.drawWorld) this.sfx.drawWorld(ctx, this, cam => this.drawWorld(ctx, cam));
       else this.drawWorld(ctx, this.cam);
       if (this.sfx && this.sfx.drawOver) this.sfx.drawOver(ctx, this);
       if (this.mod && this.mod.drawWorld) this.mod.drawWorld(ctx, this);
       this.cam.drawFX(ctx);
       if (this.cutscene) { this.cutscene.draw(ctx); return; }
       // HUD
-      if (this.hud.alpha > 0.01) { ctx.save(); ctx.globalAlpha = this.hud.alpha; this.drawHUD(ctx); ctx.restore(); }
+      const hudA = this.hud.alpha * this.hudParts.all;
+      if (hudA > 0.01) { ctx.save(); ctx.globalAlpha = hudA; this.drawHUD(ctx); ctx.restore(); }
       if (this.mod && this.mod.drawTop) this.mod.drawTop(ctx, this);
       if (this.sfx && this.sfx.drawTop) this.sfx.drawTop(ctx, this);
       if (this.paused) this.drawPause(ctx);
@@ -1048,7 +1056,9 @@
       // health bar
       const bg = this.hbBg;
       if (this.sfx && this.sfx.drawHealth && this.sfx.drawHealth(ctx, this)) { /* a mod's own health bar + score */ }
-      else if (!this.hideHealth) {   // (stage cinematics hide the bar, icons + score)
+      else if (!this.hideHealth && this.hudParts.health.alpha * this.hudParts.health.apple > 0.004) {   // (stage cinematics hide the bar, icons + score)
+      const hp = this.hudParts.health, by0 = bg.y; bg.y += hp.dy;
+      ctx.save(); ctx.globalAlpha *= hp.alpha * hp.apple;
       bg.draw(ctx, hud);
       hud.apply(ctx);
       const bx = bg.x + 4, by = bg.y + 4, bw = bg.width - 8, bh = bg.height - 8;
@@ -1060,20 +1070,23 @@
       this.drawIcon(ctx, this.iconP1, split - 26, bg.y + bg.height / 2, this.health < 0.4);
       this.drawIcon(ctx, this.iconP2, split - (150 - 26), bg.y + bg.height / 2, this.health > 1.6);
       G.vcr(ctx, this.scoreLine(), G.W / 2, bg.y + 30, { align: 'center', size: 20, outline: 1.5 });
+      ctx.restore(); bg.y = by0;
       }
       const by = this.phoneArrows ? 230 : this.down ? G.H - 120 : 90;
       if (this.botplay) G.vcr(ctx, 'BOTPLAY', G.W / 2, by, { align: 'center', size: 32 });
       if (this.practice) G.vcr(ctx, 'PRACTICE MODE', G.W / 2, by + (this.phoneArrows ? 40 : this.down ? -40 : 40), { align: 'center', size: 22, alpha: 0.8 });
       // time bar (Psych)
-      if (G.settings.timeBar !== 'off') {
+      if (G.settings.timeBar !== 'off' && this.hudParts.time.alpha > 0.004) {
         // always at the top: in downscroll the arrows own the bottom of the screen
-        const ty = this.phoneArrows ? 170 : 19, tw = 400, tx = G.W / 2 - tw / 2;     // (phones: the health bar + icons own the top)
+        const ty = (this.phoneArrows ? 170 : 19) + this.hudParts.time.dy, tw = 400, tx = G.W / 2 - tw / 2;
+        ctx.save(); ctx.globalAlpha *= this.hudParts.time.alpha;     // (phones: the health bar + icons own the top)
         const prog = G.clamp(this.songPos / this.audio.length, 0, 1);
         ctx.fillStyle = '#000'; ctx.fillRect(tx - 4, ty - 4, tw + 8, 19);
         ctx.fillStyle = '#fff'; ctx.fillRect(tx, ty, tw * prog, 11);
         const left = Math.max(0, (this.audio.length - this.songPos) / 1000);
         const txt = G.settings.timeBar === 'left' ? G.fmtTime(left) : G.settings.timeBar === 'elapsed' ? G.fmtTime(Math.max(0, this.songPos / 1000)) : this.songLabel();
         G.vcr(ctx, txt, G.W / 2, ty - 6, { align: 'center', size: 22, outline: 2 });
+        ctx.restore();
       }
       for (const s of this.popups) s.draw(ctx, hud);
       if (this.countdownSpr) this.countdownSpr.draw(ctx, hud);
