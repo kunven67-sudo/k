@@ -336,7 +336,9 @@ G.Packs = {
     try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) {}
     const list = [];
     for (const f of files) {
-      if (/\.zip$/i.test(f.name || '')) { try { list.push(...await this.unzip(f)); } catch (e) { G.reportError(e, 'unzip ' + f.name); } }
+      // (a zip by what's inside, not its name: phones can save it as 'main', 'main.zip.download', ...)
+      const zip = /\.zip$/i.test(f.name || '') || await f.slice(0, 4).text().then(t => t === 'PK\x03\x04').catch(() => false);
+      if (zip) { try { list.push(...await this.unzip(f)); } catch (e) { G.reportError(e, 'unzip ' + f.name); } }
       else list.push(f);
     }
     for (const f of list) {

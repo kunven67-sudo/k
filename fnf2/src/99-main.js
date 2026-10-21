@@ -33,22 +33,36 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
 // downloaded just the game file). Then the zip it came in is picked once: everything is read out of it and kept
 // in the browser (G.Packs.save), and the game starts again.
 G.screens.noAssets = {
-  enter() { this.msg = null; this.busy = false; },
-  pick() {
-    if (!G.dataMissing || this.busy) return;
-    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip,application/x-zip-compressed';
-    inp.onchange = async () => {
-      const files = [...(inp.files || [])]; if (!files.length) return;
-      this.busy = true; this.msg = 'Taking everything out of the zip... (a minute or two, keep this open)';
-      const got = await G.Packs.save(files);
-      this.busy = false;
-      if (G.Packs.savedData >= (window.__FNF_DATA_N || 1)) { this.msg = 'Done! Starting the game... (' + got.length + ' mod files too)'; setTimeout(() => location.reload(), 800); }
-      else this.msg = 'That zip doesn\'t have the FNF 2 data in it. Pick the zip you downloaded from GitHub.';
-    };
-    inp.click();
+  // the private zip on GitHub (you're logged in on your phone, so tapping this downloads it)
+  ZIP: 'https://github.com/kunven67-sudo/fnf2-private/archive/refs/heads/main.zip',
+  enter() {
+    this.msg = null; this.busy = false;
+    if (!G.dataMissing) return;
+    // real page buttons (not drawn ones): a phone always lets a real link download and a real file box open
+    const d = this.box = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:0;right:0;bottom:6%;display:flex;gap:4vw;justify-content:center;z-index:20;font:bold 5vmin monospace';
+    const btn = (txt, bg) => { const e = document.createElement(bg ? 'a' : 'label'); e.textContent = txt;
+      e.style.cssText = 'padding:3vmin 5vmin;border-radius:2vmin;color:#000;cursor:pointer;text-decoration:none;user-select:none;background:' + (bg || '#FFE45C'); return e; };
+    const get = btn('1  GET THE ZIP', '#9CF'); get.href = this.ZIP; get.target = '_blank'; get.rel = 'noopener';
+    get.onclick = () => { this.msg = 'Downloading... when it\'s done, come back here and tap PICK THE ZIP'; };
+    const pick = btn('2  PICK THE ZIP');
+    const inp = document.createElement('input'); inp.type = 'file'; inp.style.display = 'none';
+    inp.onchange = () => this.got([...(inp.files || [])]);
+    pick.appendChild(inp);
+    d.append(get, pick); document.body.appendChild(d);
   },
+  leave() { if (this.box) this.box.remove(); this.box = null; },
+  async got(files) {
+    if (!files.length || this.busy) return;
+    this.busy = true; this.msg = 'Taking everything out of the zip... (a minute or two, keep this open)';
+    const got = await G.Packs.save(files);
+    this.busy = false;
+    if (G.Packs.savedData >= (window.__FNF_DATA_N || 1)) { this.msg = 'Done! Starting the game... (' + got.length + ' mod files too)'; setTimeout(() => location.reload(), 800); }
+    else this.msg = 'That\'s not the FNF 2 zip. Tap GET THE ZIP, let it download, then PICK THE ZIP.';
+  },
+  // (keyboard on PC: Enter opens the file box too)
+  pick() { const inp = this.box && this.box.querySelector('input'); if (inp && !this.busy) inp.click(); },
   onAction(a, down) { if (down && a === 'accept') this.pick(); return true; },
-  onPointer(type) { if (type === 'down') this.pick(); },
   draw(ctx) {
     G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
     if (!G.dataMissing) {
@@ -57,10 +71,10 @@ G.screens.noAssets = {
       return;
     }
     // (big: on a phone this is the only thing to read)
-    G.vcr(ctx, 'FNF 2 needs its files one time.', G.W / 2, 220, { align: 'center', size: 48 });
-    G.vcr(ctx, 'TAP ANYWHERE', G.W / 2, 330, { align: 'center', size: 64, color: '#FFE45C' });
-    G.vcr(ctx, 'and pick the FNF 2 zip you downloaded', G.W / 2, 400, { align: 'center', size: 36, color: '#FFE45C' });
-    G.vcr(ctx, '(it\'s in Downloads, you don\'t have to unzip it)', G.W / 2, 450, { align: 'center', size: 28 });
-    if (this.msg) G.vcr(ctx, this.msg, G.W / 2, 540, { align: 'center', size: 28, color: '#9CF' });
+    G.vcr(ctx, 'FNF 2 needs its files one time.', G.W / 2, 170, { align: 'center', size: 48 });
+    G.vcr(ctx, '1. GET THE ZIP  (it downloads)', G.W / 2, 270, { align: 'center', size: 38, color: '#9CF' });
+    G.vcr(ctx, '2. PICK THE ZIP  (from Downloads)', G.W / 2, 330, { align: 'center', size: 38, color: '#FFE45C' });
+    G.vcr(ctx, 'don\'t unzip it, just pick it', G.W / 2, 385, { align: 'center', size: 28 });
+    if (this.msg) G.vcr(ctx, this.msg, G.W / 2, 460, { align: 'center', size: 26, color: '#FFFFFF' });
   },
 };
