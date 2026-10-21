@@ -41,9 +41,10 @@ if os.path.exists('plate2_opp.npy'):
     p2 = np.load('plate2_opp.npy'); n2 = np.load('plate2_opp_n.npy')
     bx0, by0 = 10 - CX0, 60 - CY0
     sub = (slice(by0, by0 + p2.shape[0]), slice(bx0, bx0 + p2.shape[1]))
-    ok = n2 >= 3
+    ok = n2 >= 5                       # (seen fewer times = probably still a bit of her: painted in instead)
     o = out[sub]; o[ok] = p2[ok]; out[sub] = o
-    h = hole[sub]; h[ok] = 0; hole[sub] = h
+    inside = ch[sub]                    # where her poses ever were
+    h = hole[sub]; h[ok] = 0; h[~ok & inside] = 1; hole[sub] = h
 img = cv2.inpaint(out.astype(np.uint8), hole, 6, cv2.INPAINT_TELEA)
 cv2.imwrite('stage_ref.png', img)
 os.makedirs('stage', exist_ok=True)

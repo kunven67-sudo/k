@@ -5,8 +5,8 @@ import cv2, numpy as np, json, glob, re, os
 os.chdir('/tmp/claude-0/nf')
 st = cv2.imread('stage/stage.png').astype(np.float32)
 P = json.load(open('stage/stage.json')); CX0, CY0 = P['x0'], P['y0']
-LIT = np.array([5, 62, 90], np.float32)                     # the flash adds this (BGR), measured on the floor + sky
-lit = np.clip(st + LIT, 0, 255)
+LIT = np.array([1.04, 2.0, 2.0], np.float32)                # the flash multiplies the stage (BGR), measured on the floor + sky
+lit = np.clip(st * LIT, 0, 255)
 BOX = {'opp': (10, 60, 460, 492), 'plr': (640, 240, 960, 520)}
 JOBS = {'opp': {'idle': 360, 'left': 2384, 'down': 2672, 'up': 2744, 'right': 3075},
         'plr': {'idle': 3702, 'left': 3677, 'down': 3666, 'up': 901, 'right': 3213}}

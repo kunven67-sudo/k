@@ -28,7 +28,7 @@ LAG = 0.048            # what's on screen in the video is 48 ms behind its sound
 K = 2                  # world = the video's reference frame (the 90 s shot) x 2
 BOX = {'opp': (10, 60, 460, 492), 'plr': (640, 240, 960, 520)}   # each girl's cut-out box (reference px)
 OPP, PLR = 'nightly-opp', 'nightly-player'
-LIGHT = (90, 62, 5)    # RGB the beat flash adds to the stage
+LIGHT = (2.0, 2.0, 1.04)    # the beat flash: RGB of the stage x this (black stays black, the lavender ramp goes white)
 FLASH_BEATS = [[48, 63], [128, 191]]
 
 
@@ -214,9 +214,9 @@ def stage():
     p = json.load(open(os.path.join(WORK, 'stage', 'stage.json')))
     shutil.copyfile(os.path.join(WORK, 'stage', 'stage.png'), out('shared', 'images', 'stages', 'nightly', 'street.png'))
     # the lights: in two parts of the song the stage flashes bright on every beat (the girls don't): a lit copy of
-    # the stage fades in over it (46-jordus.js); the flash adds this much (measured on the floor + the sky)
-    a = np.asarray(Image.open(os.path.join(WORK, 'stage', 'stage.png')).convert('RGB')).astype(np.int16)
-    lit = np.clip(a + np.array(LIGHT, np.int16), 0, 255).astype(np.uint8)
+    # the stage fades in over it (46-jordus.js); measured on the floor + the sky
+    a = np.asarray(Image.open(os.path.join(WORK, 'stage', 'stage.png')).convert('RGB')).astype(np.float32)
+    lit = np.clip(a * np.array(LIGHT, np.float32), 0, 255).astype(np.uint8)
     Image.fromarray(lit).save(out('shared', 'images', 'stages', 'nightly', 'street-lit.png'))
     pos = lambda who: [round((BOX[who][0] + BOX[who][2]) / 2 * K, 1), BOX[who][3] * K]
     json.dump(dict(version='1.0.0', name='Nightly street', cameraZoom=0.625,
@@ -282,7 +282,7 @@ def metadata(length):
              generatedBy='FNF 2 - tools/own/jordus.py', timeChanges=[dict(t=0, b=0, bpm=125, n=4, d=4, bt=[4, 4, 4, 4])])
     json.dump(m, open(out('preload', 'data', 'songs', SID, SID + '-metadata.json'), 'w'), indent=1)
     json.dump(dict(version='1.0.0', name="NIGHTLY FUNKIN'", titleAsset='storymenu/titles/tutorial', visible=False, props=[],
-                   background='#2b1d5c', capsule=dict(name="NIGHTLY FUNKIN'"), songs=[SID]),
+                   background='#2b1d5c', capsule=dict(name='NIGHTLY'), songs=[SID]),
               open(out('preload', 'data', 'levels', 'nightly.json'), 'w'), indent=1)
 
 
