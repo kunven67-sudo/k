@@ -278,7 +278,8 @@ def death():
     D = os.path.join(WORK, 'death'); box = json.load(open(os.path.join(D, 'box.json')))
     frames = []
     for anim in ('firstDeath', 'deathLoop', 'deathConfirm'):
-        for i, p in enumerate(sorted(glob.glob(os.path.join(D, anim + '_*.png')))):
+        num = lambda p: int(p.rsplit('_', 1)[1][:-4])            # (firstDeath_100 comes after _99, not after _10)
+        for i, p in enumerate(sorted(glob.glob(os.path.join(D, anim + '_*.png')), key=num)):
             frames.append((anim, i, Image.open(p).convert('RGBA')))
     uniq, refs = {}, []
     for anim, i, im in frames:
