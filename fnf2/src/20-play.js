@@ -1230,8 +1230,9 @@
       });
       // bottom right, above the offset: who you're playing as (their icon, bobbing, + their name)
       const kp = G.ease.quartOut(G.clamp((pm.t - 0.5) / 1.8, 0, 1));
-      if (this.iconP1 && kp > 0) {
-        const pid = this.bf ? G.playerOf(this.bf.id) : 'bf', PP = G.PLAYERS && G.PLAYERS[pid];
+      const pid = this.bf ? G.playerOf(this.bf.id) : 'bf', PP = G.PLAYERS && G.PLAYERS[pid];
+      // (a song's own singer who isn't one of the players, like the girl in Jordus: no name to show)
+      if (this.iconP1 && kp > 0 && (pid !== 'bf' || !this.bf || /^bf/.test(this.bf.id))) {
         const ic = Object.assign({}, this.iconP1, { scale: 0.8 + 0.03 * Math.sin(pm.t * 4) });
         ctx.save(); ctx.globalAlpha = kp; this.drawIcon(ctx, ic, G.W - 150, G.H - 150 + 5 * kp, false); ctx.restore();
         G.vcr(ctx, 'PLAYING AS', G.W - 150, G.H - 178 + 5 * kp, { align: 'right', size: 16, alpha: kp, outline: 0 });
