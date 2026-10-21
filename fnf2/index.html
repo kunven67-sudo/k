@@ -271,9 +271,17 @@ G.Camera = class {
 };
 
 // offscreen canvases + memoised renders
+// A phone can wipe canvases: low on graphics memory, or the game was in the background (another app, the file
+// picker, the lock screen). A canvas drawn once and kept (song names, glows, tinted copies, picture copies) then
+// stays blank for good: the song names in Freeplay went missing that way. Every kept canvas remembers the
+// 'generation' it was made in; a wipe starts a new generation and kept canvases get drawn again.
+G.gfxGen = 0;
+G.gfxLost = function () { G.gfxGen++; };
 G.makeCanvas = function (w, h) {
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h));
+  c._gen = G.gfxGen;
+  c.addEventListener('contextlost', G.gfxLost); c.addEventListener('contextrestored', G.gfxLost);
   return c;
 };
 G._cache = new Map();
@@ -282,10 +290,20 @@ G._cacheBytes = 0; G.CACHE_BUDGET = 160e6;
 // when the cache is over budget (it used to keep every tinted copy / text picture ever made).
 G.cached = function (key, w, h, fn) {
   let c = G._cache.get(key);
-  if (c) { if (G._cache.size > 64) { G._cache.delete(key); G._cache.set(key, c); } return c; }
+  if (c) {
+    if (c._gen !== G.gfxGen) { c._gen = G.gfxGen; c._remake(c); }   // (wiped on a phone: painted again, same canvas)
+    if (G._cache.size > 64) { G._cache.delete(key); G._cache.set(key, c); }
+    return c;
+  }
   c = G.makeCanvas(w, h);
   const cx = c.getContext('2d');
   fn(cx, w, h);
+  // (also when something kept this canvas itself and draws it after a wipe: see the drawImage hook in 03-gfx.js)
+  c._remake = cv => {
+    const x = cv.getContext('2d');
+    if (x.reset) x.reset(); else { x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.filter = 'none'; x.clearRect(0, 0, cv.width, cv.height); }
+    fn(x, w, h);
+  };
   if (!(G.A && G.A.busy())) {   // a picture it used may not be decoded yet: build it again next time
     c._bytes = c.width * c.height * 4; G._cache.set(key, c); G._cacheBytes += c._bytes;
     if (G._cacheBytes > G.CACHE_BUDGET) for (const [k, v] of G._cache) { if (G._cacheBytes <= G.CACHE_BUDGET * 0.8 || k === key) break; G._cache.delete(k); G._cacheBytes -= v._bytes || 0; }
@@ -688,6 +706,9 @@ G.input = {
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && G.screen && G.screen.onBlur) try { G.screen.onBlur(); } catch (e) { G.reportError(e, 'onBlur'); }
+    // (back from the background on a phone: canvases may have been wiped, draw the kept ones again)
+    if (document.hidden) G._wasHidden = true;
+    else if (G._wasHidden && (G.phone || G.isTouchDevice)) { G._wasHidden = false; G.gfxLost(); }
   });
   function ptr(type, e) {
     if (G.audio && G.audio.unlock) G.audio.unlock();
@@ -968,6 +989,8 @@ G.A = {
 
   _img: new Map(),     // path -> HTMLImageElement (decoded)
   _json: new Map(),
+  // data files the game makes itself (WRATH's eye): kept apart, the cache above is emptied once the mod packs are in
+  made: {},
   _buf: new Map(),     // path -> Promise<AudioBuffer>
   has(p) { return p in this.raw || G.Packs.owner.has(p); },
   text(p) { const v = this.raw[p]; return typeof v === 'string' && !v.startsWith('data:') ? v : null; },
@@ -975,6 +998,7 @@ G.A = {
     // our own characters are made on first use from a real one (15-forge.js)
     if (p.startsWith('preload/data/characters/') && G.OWN && G.Forge) { const id = p.slice(24, -5); if (G.OWN[id] && !G.Forge.built[id]) G.Forge.ensure(id); }
     if (this._json.has(p)) return this._json.get(p);
+    if (this.made[p]) return this.made[p];
     const t = this.text(p); let v = null;
     if (t != null) { try { v = JSON.parse(t); } catch (e) { G.reportError(e, 'json ' + p); } }
     this._json.set(p, v); return v;
@@ -1415,6 +1439,7 @@ G.Pin = {
   baseK() { return G.phone || (G.settings && G.settings.quality === 'low') ? 0.5 : 1; },
   get(img) {
     let c = this.map.get(img);
+    if (c && c._gen !== G.gfxGen) { this.drop(img); c = null; }     // (a phone wiped it: copy the picture again)
     if (!c) {
       if (!this.on || img.complete === false || !img.naturalWidth || img.naturalWidth * img.naturalHeight < this.MIN) return img;
       const w = this.want.get(img);
@@ -1426,7 +1451,7 @@ G.Pin = {
   },
   make(img, k) {
     const w = img.naturalWidth, h = img.naturalHeight, cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
-    const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    const c = G.makeCanvas(cw, ch);
     const x = c.getContext('2d');
     if (!x) return null;
     if (cw === w && ch === h) this._draw.call(x, img, 0, 0);
@@ -1449,12 +1474,16 @@ G.Pin = {
   clear() { for (const img of [...this.map.keys()]) this.drop(img); },
 };
 // the graphics card was reset (driver update, crash): every copy on it is blank now, make new ones
-if (G.canvas) G.canvas.addEventListener('contextrestored', () => G.Pin.clear());
+if (G.canvas) { G.canvas.addEventListener('contextlost', G.gfxLost); G.canvas.addEventListener('contextrestored', () => { G.gfxLost(); G.Pin.clear(); }); }
 // every drawImage of a picture draws its copy instead (source rectangles scaled to a smaller copy)
 (function () {
   const draw = G.Pin._draw;
   CanvasRenderingContext2D.prototype.drawImage = function (img, a, b, c, d, e, f, g, h) {
-    if (!(img instanceof HTMLImageElement)) return draw.apply(this, arguments);
+    if (!(img instanceof HTMLImageElement)) {
+      // (a kept canvas that knows how to paint itself again: a phone wiped it, so it does that now)
+      if (img && img._remake && img._gen !== G.gfxGen) { img._gen = G.gfxGen; try { img._remake(img); } catch (err) {} }
+      return draw.apply(this, arguments);
+    }
     const p = G.Pin.get(img);
     if (p === img || p._full) { arguments[0] = p; return draw.apply(this, arguments); }
     const n = arguments.length;
@@ -1476,9 +1505,10 @@ G.srcImg = (function () {
     if (!f || !img) return img;
     let m = cache.get(img); if (!m) { m = new Map(); cache.set(img, m); }
     let c = m.get(f);
+    if (c && c._gen !== G.gfxGen) c = null;   // (wiped on a phone: bake it again)
     if (!c) {
       if (img.complete === false || img.naturalWidth === 0) return img;   // not decoded yet: don't bake an empty copy
-      c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d');
+      c = G.makeCanvas(img.width, img.height); const x = c.getContext('2d');
       if (f.startsWith('mul:')) {   // FlxSprite.color: the picture multiplied by a colour (mods tint characters this way)
         x.drawImage(img, 0, 0); x.globalCompositeOperation = 'multiply'; x.fillStyle = f.slice(4); x.fillRect(0, 0, c.width, c.height);
         x.globalCompositeOperation = 'destination-in'; x.drawImage(img, 0, 0);
@@ -1671,6 +1701,7 @@ G.Atlas = {
   tintPiece(s, col) {
     let m = s._tints; if (!m) m = s._tints = new Map();
     let c = m.get(col);
+    if (c && c._gen !== G.gfxGen) c = null;
     if (!c) {
       c = G.makeCanvas(s.w, s.h); const x = c.getContext('2d');
       x.drawImage(G.srcImg(s.img), s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);
@@ -2879,6 +2910,11 @@ G.SongConductor = class {
   // repaint an image -> canvas. rects = [{x,y,w,h,rules}] get their own rules (for those pixels only),
   // every other pixel uses `rules`. Rules may set {alpha} (0 = erase) or {keep:true} (leave as is).
   function recolor(img, rules, rects) {
+    const c = recolor1(img, rules, rects);
+    c._remake = cv => { const n = recolor1(img, rules, rects), x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); x.drawImage(n, 0, 0); };
+    return c;
+  }
+  function recolor1(img, rules, rects) {
     const W = img.width, H = img.height;
     const c = G.makeCanvas(W, H), x = c.getContext('2d', { willReadFrequently: true });
     x.drawImage(img, 0, 0);
@@ -3832,11 +3868,22 @@ G.SongConductor = class {
       nc.t -= dt;
       if (nc.t <= 0) { if (nc.base) this.cam.follow(nc.base.x, nc.base.y); nc.base = null; this.cam.followRate = 0.04; }
     },
+    // WHEN the key / finger went down, in song time (like FNF's PreciseInputManager): the moment of the press itself,
+    // not the last frame. A phone draws fewer frames and hands the touch over a bit later, which made every hit
+    // count late there.
+    pressTime(e) {
+      const A = this.audio;
+      if (!A || A.paused || !this.started) return this.songPos;
+      let t = A.time();
+      const ago = e && e.timeStamp ? performance.now() - e.timeStamp : 0;
+      if (ago > 0 && ago < 120) t -= ago * (A.rate || 1);
+      return t;
+    },
     // player pressed a lane
-    press(lane) {
+    press(lane, e) {
       if (this.botplay || !this.started) return;
       this.keys[lane] = true;
-      const pos = this.songPos - (G.settings.offset || 0);
+      const pos = this.pressTime(e) - (G.settings.offset || 0);
       const s = this.lines[1].strums[lane];
       let best = null, trap = null;
       for (const n of this.notes) {
@@ -3995,19 +4042,19 @@ G.SongConductor = class {
       }
     },
     // -------------------------------------------------- input
-    onAction(a, down, repeat) {
+    onAction(a, down, repeat, e) {
       if (this.failed) { if (down && (a === 'back' || a === 'accept')) this.exitToMenu(); return; }
       if (this.gameOver) { if (down && !repeat) return this.gameOverAction(a); return; }
       if (this.paused) { if (down) return this.pauseAction(a, repeat); return; }
       if (this.cutscene) { this.cutscene.onAction(a, down, repeat); return true; }
       const m = /^note(\d)$/.exec(a);
-      if (m) { if (repeat) return; if (down) this.press(+m[1]); else this.release(+m[1]); return; }
+      if (m) { if (repeat) return; if (down) this.press(+m[1], e); else this.release(+m[1]); return; }
       if (!down || repeat) return;
       if (a === 'pause' && this.started) { this.openPause(); return true; }
       if (a === 'reset' && this.started && !this.paused) this.health = 0;
     },
     onBlur() { if (this.started && !this.paused && !this.gameOver && !this.ended) this.openPause(); },
-    onPointer(type, x, y, id) {
+    onPointer(type, x, y, id, e) {
       if (this.paused) { if (type === 'down') this.pausePointer(x, y); return; }
       if (this.cutscene) { if (type === 'down') this.cutscene.onAction(y < 90 && x > G.W - 160 ? 'back' : 'accept', true, false); return; }
       if (this.gameOver) { if (type === 'down') this.gameOverAction(y < 120 && x < 140 ? 'back' : 'accept'); return; }
@@ -4034,7 +4081,7 @@ G.SongConductor = class {
       if (old != null && !others(old)) this.release(old);
       if (lane == null) return;                                 // slid off the arrows: let go until it comes back
       if (others(lane)) this.release(lane);                     // (another finger is on it: this one counts as a new press)
-      this.press(lane);
+      this.press(lane, e);
     },
     // which arrow a finger at (x, y) is on (null = none)
     laneAt(x, y) {
@@ -4593,7 +4640,7 @@ G.SongConductor = class {
   function composeEye(st, key) {
     const m = META(), L = m && m.looks[st.look]; if (!L) return null;
     const sig = st.look + '|' + st.px.toFixed(2) + '|' + st.py.toFixed(2) + '|' + st.ps.toFixed(2) + '|' + (st.purple > 0 ? st.purple.toFixed(2) : 0);
-    if (lastKey[key] && lastKey[key].sig === sig) return lastKey[key].E;
+    if (lastKey[key] && lastKey[key].sig === sig && lastKey[key].gen === G.gfxGen) return lastKey[key].E;
     const back = img(L.back), iris = img(L.iris), mask = img(L.mask);
     if (!back || !iris || !mask) return null;
     const [w, h] = L.size;
@@ -4616,12 +4663,12 @@ G.SongConductor = class {
       c.globalCompositeOperation = 'source-over';
     }
     const E = { cv: c.canvas, L };
-    lastKey[key] = { sig, E };
+    lastKey[key] = { sig, E, gen: G.gfxGen };
     return E;
   }
   const glowCache = {};
   function glowArt(col) {
-    if (glowCache[col]) return glowCache[col];
+    if (glowCache[col] && glowCache[col]._gen === G.gfxGen) return glowCache[col];
     const cv = G.makeCanvas(256, 256), c = cv.getContext('2d');
     const g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
     g.addColorStop(0, G.rgba(col, 0.9)); g.addColorStop(0.35, G.rgba(col, 0.38)); g.addColorStop(1, G.rgba(col, 0));
@@ -4788,7 +4835,7 @@ G.SongConductor = class {
 
   // ---------------------------------------------------------------- character data + health icon
   const DATA = { version: '1.0.0', name: 'WRATH', renderType: 'own', fx: 'wrathEye', scale: 1, singTime: 6, danceEvery: 1, offsets: [-40, 0], cameraOffsets: [-200, 150], healthIcon: { id: 'wrath-eye' }, animations: [] };
-  if (G.A && G.A._json) G.A._json.set('preload/data/characters/wrath-eye.json', DATA);
+  if (G.A) G.A.made['preload/data/characters/wrath-eye.json'] = DATA;
   // health icon (fine / losing), made from the eye once the art has loaded
   function makeIcon() {
     const cv = G.makeCanvas(300, 150), c = cv.getContext('2d');
@@ -4800,7 +4847,7 @@ G.SongConductor = class {
     });
     return cv;
   }
-  if (G.assetsReady && G.A && G.A._img) G.assetsReady.then(() => { try { if (META()) G.A._img.set('preload/images/icons/icon-wrath-eye.png', makeIcon()); } catch (e) { G.reportError && G.reportError(e, 'wrath eye icon'); } });
+  if (G.assetsReady && G.A && G.A._img) G.assetsReady.then(() => { try { if (META()) { const ic = makeIcon(); ic._remake = cv => { const n = makeIcon(), x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); x.drawImage(n, 0, 0); }; G.A._img.set('preload/images/icons/icon-wrath-eye.png', ic); } } catch (e) { G.reportError && G.reportError(e, 'wrath eye icon'); } });
 })();
 
 }catch(e){if(window.G&&G.reportError)G.reportError(e,"load 31-wrath-eye.js");else console.error(e);}})();
@@ -6263,7 +6310,7 @@ G.SongConductor = class {
   // the 4 arrow heads + a red and a cyan copy of each (RGB split on glitchy notes)
   let tinted = null;
   function tints(sheet) {
-    if (tinted) return tinted;
+    if (tinted && tinted.gen === G.gfxGen) return tinted;
     const img = G.srcImg(sheet.img); if (!img || !img.width || (img.complete === false)) return null;
     tinted = ['Left', 'Down', 'Up', 'Right'].map(d => {
       const f = G.Sparrow.byPrefix(sheet, 'note' + d)[0]; if (!f) return null;
@@ -6275,6 +6322,7 @@ G.SongConductor = class {
       };
       return { norm: mk(null), red: mk('rgba(255,30,60,0.85)'), cyan: mk('rgba(0,230,255,0.85)') };
     });
+    tinted.gen = G.gfxGen;
     return tinted;
   }
 
@@ -10221,7 +10269,7 @@ G.screens.storyMenu = {
     if (!img) return null;
     if (!color || color.toUpperCase() === '#FFFFFF') return img;
     let b = tintBufs.get(key);
-    if (!b) { b = { c: G.makeCanvas(img.width, img.height), color: null }; tintBufs.set(key, b); }
+    if (!b || b.c._gen !== G.gfxGen) { b = { c: G.makeCanvas(img.width, img.height), color: null }; tintBufs.set(key, b); }
     if (b.color !== color) {
       const c = b.c.getContext('2d'); c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, img.width, img.height);
       c.drawImage(img, 0, 0); c.globalCompositeOperation = 'multiply'; c.fillStyle = color; c.fillRect(0, 0, img.width, img.height);
