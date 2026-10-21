@@ -1,4 +1,4 @@
-"""Last pass on the cut-out frames. A pixel that matches the stage at that exact spot (in that frame's light) is
+"""Last pass on the cut-out frames (v2). A pixel that matches the stage at that exact spot (in that frame's light) is
 stage - but only when it is reachable from OUTSIDE her through other stage-matching pixels. Anything inside her
 outlines stays (white soles over the white ramp, black clothes over a black wall used to get punched out, and in
 the game those holes showed whatever stage is there = glitchy).  -> out_clean/<who>/<name>.png"""
@@ -8,7 +8,7 @@ st = cv2.imread('stage/stage.png').astype(np.float32)
 P = json.load(open('stage/stage.json')); CX0, CY0 = P['x0'], P['y0']
 LIT = np.array([1.04, 2.0, 2.0], np.float32)
 lit = np.clip(st * LIT, 0, 255)
-BOX = {'opp': (10, 60, 460, 492), 'plr': (640, 240, 960, 520)}
+BOX = {'opp': (10, 60, 460, 492), 'plr': (560, 230, 980, 530)}
 JOBS = {'opp': {'idle': 360, 'left': 2384, 'down': 456, 'up': 392, 'right': 3075},
         'plr': {'idle': 3702, 'left': 3677, 'down': 3666, 'up': 592, 'right': 1233}}
 from lightstate import light
@@ -91,17 +91,38 @@ for who in ('opp', 'plr'):
         rim = cv2.dilate(stage.astype(np.uint8), np.ones((3, 3), np.uint8), iterations=3) > 0
         stage |= rim & (d < T) & (dark == 0) & (al > 0)
         al[stage] = 0
+        purple_gone = np.zeros(al.shape, bool)
+        if who == 'opp':
+            # she never wears purple / lavender: big purple pieces (or ones touching the outside) are the floor and
+            # the ramp seen between her legs and arms. They'd stay dark when the stage flashes, so they go and the
+            # stage shows there. (small purple bits on her jacket are the flash's tint on her: they stay)
+            hsv = cv2.cvtColor(a[..., :3], cv2.COLOR_BGR2HSV); hh, ss, vv = [hsv[..., c].astype(int) for c in range(3)]
+            pm = ((hh >= 118) & (hh <= 160) & (ss >= 45) & (vv >= 120) & (al > 0)).astype(np.uint8)
+            n3, lab3, st3, _ = cv2.connectedComponentsWithStats(pm, 8)
+            near_out = cv2.dilate((al == 0).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+            for c3 in range(1, n3):
+                comp = lab3 == c3; area = st3[c3, cv2.CC_STAT_AREA]
+                if area >= 300 or (area >= 30 and (comp & near_out).any()):
+                    g3 = cv2.dilate(comp.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+                    al[g3] = 0; purple_gone |= g3
         m = (al > 128).astype(np.uint8)
         m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         n, lab, sts, _ = cv2.connectedComponentsWithStats(m, 8)
         if n > 1:
             big = sts[1:, cv2.CC_STAT_AREA].max()
             m = np.isin(lab, [k for k in range(1, n) if sts[k, cv2.CC_STAT_AREA] > 0.02 * big]).astype(np.uint8)
+            if who == 'plr':
+                # (pieces floating apart from her are left over from the arrows' streaks above her head: they go)
+                bi = 1 + int(np.argmax(sts[1:, cv2.CC_STAT_AREA]))
+                near = cv2.dilate((lab == bi).astype(np.uint8), np.ones((25, 25), np.uint8)) > 0
+                for k in range(1, n):
+                    if k != bi and not (near & (lab == k)).any(): m[lab == k] = 0
         # holes inside her (fully enclosed transparent bits) get filled back from the raw cut
         inv = (1 - m).astype(np.uint8)
         n2, lab2, sts2, _ = cv2.connectedComponentsWithStats(inv, 4)
         border = set(np.unique(np.concatenate([lab2[0], lab2[-1], lab2[:, 0], lab2[:, -1]])))
         holes = np.isin(lab2, [k for k in range(1, n2) if k not in border and sts2[k, cv2.CC_STAT_AREA] < 4000]) & (a[..., 3] > 128)
+        if who == 'opp': holes &= ~purple_gone
         m[holes] = 1
         al = np.where(m > 0, np.maximum(al, np.where(holes, a[..., 3], 0)), 0).astype(np.uint8)
         al = np.minimum(al, (cv2.GaussianBlur(m.astype(np.float32), (3, 3), 0.7) * 255).astype(np.uint8))

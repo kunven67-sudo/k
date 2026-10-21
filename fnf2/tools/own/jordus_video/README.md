@@ -37,3 +37,17 @@ Run in this order (each one writes what the next reads):
    flashing parts) and from camera shots that show the player's whole body (the black bar cut her off before).
 10. `death_frames.py`: the end of the video is the mod's game over (shocked, skeleton flash, blue, the pink '?' of
     smoke looping, the smoke going on retry): its frames at game-screen size + its shock sound + its music loop.
+11. The second fix pass (the user: "looks buggy, like glitches"), found by looking at the game next to the video:
+    - The player stood MIRRORED in the game: FNF turns whoever is on the player's side round (BF is drawn facing
+      the other way), so her character file says `flipX` (jordus.py). Everything stuck to her landed on the wrong
+      side of the stage.
+    - The scrolling arrows were cut out WITH her (they fly over her in every shot): `arrows.py` knows where every
+      arrow is on every frame (from the chart), `fillarrows.py` paints those spots from the frames of the same
+      pose where they were clear (frames grouped by how alike they are: never from another moment of the pose).
+    - `pickpose.py <lane>`: every note of a lane, how much arrow sits on her in its first frames, is her whole body
+      on screen, do the lights flash. Her LEFT (0:09) and DOWN (0:57) come from shots that show all of her.
+    - Her LEFT hand went past the edge of her box: the box is bigger now (`padplr.py` moved the older cuts in).
+    - The opponent's DOWN is a handstand: in the close-ups her head was under the black bar, so it's cut from a
+      wide shot (1:43). Her UP lost bits of her navy cap after its 7th frame, so it holds there.
+    - `cleanup.py`: the opponent never wears purple, so big purple pieces (the floor and the ramp between her legs)
+      go: they didn't light up with the stage. Pieces of the player floating apart from her go too.

@@ -27,7 +27,7 @@ PAD = 0.085            # silence put in front so beat 0 is at 0 (the video start
 END = 127.2            # the song's own sound ends here (video time); the game over comes after (death())
 LAG = 0.048            # what's on screen in the video is 48 ms behind its sound (notes + camera)
 K = 2                  # world = the video's reference frame (the 90 s shot) x 2
-BOX = {'opp': (10, 60, 460, 492), 'plr': (640, 240, 960, 520)}   # each girl's cut-out box (reference px)
+BOX = {'opp': (10, 60, 460, 492), 'plr': (560, 230, 980, 530)}   # each girl's cut-out box (reference px)
 OPP, PLR = 'nightly-opp', 'nightly-player'
 LIGHT = (2.0, 2.0, 1.04)    # the beat flash: RGB of the stage x this (black stays black, the lavender ramp goes white)
 FLASH_BEATS = [[48, 63], [128, 191]]
@@ -106,11 +106,15 @@ def camera():
 # which cut-out frames make each animation (out/<who>/<anim>_<nn>.png, 30 fps like the video), from where
 ANIMS = {
     # (her idle: one bounce of her loop, played on every beat; RIGHT starts on its cut's 3rd frame; UP/DOWN were cut
-    # from where the pose starts, at moments the stage lights don't flash, so no lit stage sticks to her; her LEFT
-    # only ever happens while they flash: the lit frames (3-5) are skipped)
-    'opp': dict(idle=('idle', 2, 14), singLEFT=('left', [2, 6, 7, 8], None), singDOWN=('down', 0, 15), singUP=('up', 0, 14), singRIGHT=('right', 2, 17)),
-    # (hers: one bop, every 2 beats like in the video; poses start on the note's frame)
-    'plr': dict(idle=('idle', 9, 21), singLEFT=('left', 1, 13), singDOWN=('down', 1, 8), singUP=('up', 1, 9), singRIGHT=('right', 1, 9)),
+    # from wide shots where the stage lights don't flash and her whole body shows (her DOWN is a handstand: in the
+    # close-ups her head was under the black bar); after their first 7 / 9 frames the cut-out lost bits of her navy
+    # cap (it's the buildings' colour) or the next move starts, so the pose holds there; her LEFT only ever happens
+    # while the lights flash: the lit frames (3-5) are skipped)
+    'opp': dict(idle=('idle', 2, 14), singLEFT=('left', [2, 6, 7, 8], None), singDOWN=('down', 0, 9), singUP=('up', 0, 7), singRIGHT=('right', 2, 17)),
+    # (hers: one bop, every 2 beats like in the video; poses start on the note's frame. LEFT + DOWN come from shots
+    # that show her whole body with no arrows over her; UP's last frames were taken after the camera moved; the
+    # arrows that flew over her in the others were painted out from the frames next to them, fillarrows.py)
+    'plr': dict(idle=('idle', 9, 21), singLEFT=('left', 1, 7), singDOWN=('down', 1, 7), singUP=('up', [1, 2, 3, 4, 5, 6], None), singRIGHT=('right', 1, 9)),
 }
 
 
@@ -162,7 +166,7 @@ def misses_and_death():
     for anim, (src, a, b) in ANIMS['plr'].items():
         if not anim.startswith('sing'): continue
         ims = []
-        for k, n in enumerate(range(a, min(b, a + 5))):
+        for k, n in enumerate((a if isinstance(a, list) else list(range(a, b)))[:5]):
             im = Image.open(os.path.join(WORK, 'out_clean', 'plr', f'{src}_{n:02d}.png')).convert('RGBA')
             r, g, bl, al = im.split()
             tint = Image.merge('RGB', (r, g, bl))
@@ -193,9 +197,11 @@ def characters():
         for a, n in counts.items():
             fps = 30 if not a.startswith('death') else 24
             anims.append(dict(name=a, prefix=a + '_', frameRate=fps, looped=a == 'deathLoop', offsets=[0, 0]))
+        # (FNF turns whoever stands on the player's side round, since BF is drawn facing the other way: flipX on the
+        #  player = she stays exactly as the video shows her, so the stage bits on her land on the same stage)
         d = dict(version='1.0.0', name='Nightly Funkin\' ' + ('opponent' if who == 'opp' else 'player'), renderType='sparrow',
                  assetPath='characters/nightly/' + name, scale=1, singTime=4, danceEvery=dance, isPixel=False,
-                 offsets=[0, 0], cameraOffsets=[0, 0], flipX=False, startingAnimation='idle', animations=anims,
+                 offsets=[0, 0], cameraOffsets=[0, 0], flipX=who == 'plr', startingAnimation='idle', animations=anims,
                  healthIcon=dict(id=cid, isPixel=False, offsets=[0, 0], scale=1),
                  death=dict(cameraOffsets=[0, -40], cameraZoom=1.1, preTransitionDelay=0))
         json.dump(d, open(out('preload', 'data', 'characters', cid + '.json'), 'w'), indent=1)

@@ -3,8 +3,8 @@ sys.argv = [sys.argv[0]] + sys.argv[1:]
 from sprite_cut import cut
 who = sys.argv[1]
 JOBS = {
- 'opp': {'idle': (360, 30), 'left': (2384, 10), 'down': (456, 15), 'up': (392, 14), 'right': (3075, 17)},
- 'plr': {'idle': (3702, 40), 'left': (3677, 13), 'down': (3666, 8), 'up': (592, 9), 'right': (1233, 9)},
+ 'opp': {'idle': (360, 30), 'left': (2384, 10), 'down': (3106, 15), 'up': (392, 14), 'right': (3075, 17)},
+ 'plr': {'idle': (3702, 40), 'left': (268, 13), 'down': (1708, 8), 'up': (592, 9), 'right': (1233, 9)},
 }[who]
 only = sys.argv[2].split(',') if len(sys.argv) > 2 else list(JOBS)
 for anim in only:

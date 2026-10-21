@@ -6,7 +6,9 @@ from esrgan import upscale_fast as upscale
 from rembg import new_session, remove
 os.chdir('/tmp/claude-0/nf')
 exec(open('goggles.py').read().split("X0, Y0, X1, Y1")[0])      # cam + H_at
-BOX = {'opp': (10, 60, 460, 492), 'plr': (640, 240, 960, 520)}
+BOX = {'opp': (10, 60, 460, 492), 'plr': (560, 230, 980, 530)}
+# (the stage plates were made for the first, smaller boxes: they get placed into the bigger box)
+PLATE_BOX = {'opp': (10, 60, 460, 492), 'plr': (640, 240, 960, 520)}
 K = 2   # output scale vs ref coords
 import onnxruntime as ort
 from rembg.sessions.birefnet_general_lite import BiRefNetSessionGeneralLite
@@ -19,9 +21,12 @@ def cut(who, f, name, dbg=False):
     X0, Y0, X1, Y1 = BOX[who]; W, Hh = X1 - X0, Y1 - Y0
     img = frame(f); H = H_at(f)
     plate = np.load(f'plate_{who}.npy'); pfrac = np.load(f'plate_{who}_frac.npy'); pdev = np.load(f'plate_{who}_dev.npy')
-    if plate.shape[:2] != (Hh, W):     # (box grew after the plate was made: no stage check there)
-        e, w = max(0, Hh - plate.shape[0]), max(0, W - plate.shape[1])
-        plate = np.pad(plate, ((0, e), (0, w), (0, 0)))[:Hh, :W]; pfrac = np.pad(pfrac, ((0, e), (0, w)))[:Hh, :W]; pdev = np.pad(pdev, ((0, e), (0, w)))[:Hh, :W]
+    if plate.shape[:2] != (Hh, W):     # (box grew after the plate was made: no stage check outside the old box)
+        px0, py0 = PLATE_BOX[who][0] - X0, PLATE_BOX[who][1] - Y0
+        def place(a):
+            o = np.zeros((Hh, W) + a.shape[2:], a.dtype); h, w = min(a.shape[0], Hh - py0), min(a.shape[1], W - px0)
+            o[py0:py0 + h, px0:px0 + w] = a[:h, :w]; return o
+        plate, pfrac, pdev = place(plate), place(pfrac), place(pdev)
     T = (np.array([[1, 0, -X0], [0, 1, -Y0], [0, 0, 1]]) @ H)                      # frame -> box (ref px)
     # native warp for the mask
     nat = cv2.warpAffine(img, T[:2], (W, Hh), flags=cv2.INTER_LINEAR)
