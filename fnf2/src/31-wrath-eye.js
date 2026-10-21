@@ -30,7 +30,7 @@
   function composeEye(st, key) {
     const m = META(), L = m && m.looks[st.look]; if (!L) return null;
     const sig = st.look + '|' + st.px.toFixed(2) + '|' + st.py.toFixed(2) + '|' + st.ps.toFixed(2) + '|' + (st.purple > 0 ? st.purple.toFixed(2) : 0);
-    if (lastKey[key] && lastKey[key].sig === sig) return lastKey[key].E;
+    if (lastKey[key] && lastKey[key].sig === sig && lastKey[key].gen === G.gfxGen) return lastKey[key].E;
     const back = img(L.back), iris = img(L.iris), mask = img(L.mask);
     if (!back || !iris || !mask) return null;
     const [w, h] = L.size;
@@ -53,12 +53,12 @@
       c.globalCompositeOperation = 'source-over';
     }
     const E = { cv: c.canvas, L };
-    lastKey[key] = { sig, E };
+    lastKey[key] = { sig, E, gen: G.gfxGen };
     return E;
   }
   const glowCache = {};
   function glowArt(col) {
-    if (glowCache[col]) return glowCache[col];
+    if (glowCache[col] && glowCache[col]._gen === G.gfxGen) return glowCache[col];
     const cv = G.makeCanvas(256, 256), c = cv.getContext('2d');
     const g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
     g.addColorStop(0, G.rgba(col, 0.9)); g.addColorStop(0.35, G.rgba(col, 0.38)); g.addColorStop(1, G.rgba(col, 0));
@@ -225,7 +225,7 @@
 
   // ---------------------------------------------------------------- character data + health icon
   const DATA = { version: '1.0.0', name: 'WRATH', renderType: 'own', fx: 'wrathEye', scale: 1, singTime: 6, danceEvery: 1, offsets: [-40, 0], cameraOffsets: [-200, 150], healthIcon: { id: 'wrath-eye' }, animations: [] };
-  if (G.A && G.A._json) G.A._json.set('preload/data/characters/wrath-eye.json', DATA);
+  if (G.A) G.A.made['preload/data/characters/wrath-eye.json'] = DATA;
   // health icon (fine / losing), made from the eye once the art has loaded
   function makeIcon() {
     const cv = G.makeCanvas(300, 150), c = cv.getContext('2d');
@@ -237,5 +237,5 @@
     });
     return cv;
   }
-  if (G.assetsReady && G.A && G.A._img) G.assetsReady.then(() => { try { if (META()) G.A._img.set('preload/images/icons/icon-wrath-eye.png', makeIcon()); } catch (e) { G.reportError && G.reportError(e, 'wrath eye icon'); } });
+  if (G.assetsReady && G.A && G.A._img) G.assetsReady.then(() => { try { if (META()) { const ic = makeIcon(); ic._remake = cv => { const n = makeIcon(), x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); x.drawImage(n, 0, 0); }; G.A._img.set('preload/images/icons/icon-wrath-eye.png', ic); } } catch (e) { G.reportError && G.reportError(e, 'wrath eye icon'); } });
 })();

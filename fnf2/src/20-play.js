@@ -600,11 +600,22 @@
       nc.t -= dt;
       if (nc.t <= 0) { if (nc.base) this.cam.follow(nc.base.x, nc.base.y); nc.base = null; this.cam.followRate = 0.04; }
     },
+    // WHEN the key / finger went down, in song time (like FNF's PreciseInputManager): the moment of the press itself,
+    // not the last frame. A phone draws fewer frames and hands the touch over a bit later, which made every hit
+    // count late there.
+    pressTime(e) {
+      const A = this.audio;
+      if (!A || A.paused || !this.started) return this.songPos;
+      let t = A.time();
+      const ago = e && e.timeStamp ? performance.now() - e.timeStamp : 0;
+      if (ago > 0 && ago < 120) t -= ago * (A.rate || 1);
+      return t;
+    },
     // player pressed a lane
-    press(lane) {
+    press(lane, e) {
       if (this.botplay || !this.started) return;
       this.keys[lane] = true;
-      const pos = this.songPos - (G.settings.offset || 0);
+      const pos = this.pressTime(e) - (G.settings.offset || 0);
       const s = this.lines[1].strums[lane];
       let best = null, trap = null;
       for (const n of this.notes) {
@@ -763,19 +774,19 @@
       }
     },
     // -------------------------------------------------- input
-    onAction(a, down, repeat) {
+    onAction(a, down, repeat, e) {
       if (this.failed) { if (down && (a === 'back' || a === 'accept')) this.exitToMenu(); return; }
       if (this.gameOver) { if (down && !repeat) return this.gameOverAction(a); return; }
       if (this.paused) { if (down) return this.pauseAction(a, repeat); return; }
       if (this.cutscene) { this.cutscene.onAction(a, down, repeat); return true; }
       const m = /^note(\d)$/.exec(a);
-      if (m) { if (repeat) return; if (down) this.press(+m[1]); else this.release(+m[1]); return; }
+      if (m) { if (repeat) return; if (down) this.press(+m[1], e); else this.release(+m[1]); return; }
       if (!down || repeat) return;
       if (a === 'pause' && this.started) { this.openPause(); return true; }
       if (a === 'reset' && this.started && !this.paused) this.health = 0;
     },
     onBlur() { if (this.started && !this.paused && !this.gameOver && !this.ended) this.openPause(); },
-    onPointer(type, x, y, id) {
+    onPointer(type, x, y, id, e) {
       if (this.paused) { if (type === 'down') this.pausePointer(x, y); return; }
       if (this.cutscene) { if (type === 'down') this.cutscene.onAction(y < 90 && x > G.W - 160 ? 'back' : 'accept', true, false); return; }
       if (this.gameOver) { if (type === 'down') this.gameOverAction(y < 120 && x < 140 ? 'back' : 'accept'); return; }
@@ -802,7 +813,7 @@
       if (old != null && !others(old)) this.release(old);
       if (lane == null) return;                                 // slid off the arrows: let go until it comes back
       if (others(lane)) this.release(lane);                     // (another finger is on it: this one counts as a new press)
-      this.press(lane);
+      this.press(lane, e);
     },
     // which arrow a finger at (x, y) is on (null = none)
     laneAt(x, y) {

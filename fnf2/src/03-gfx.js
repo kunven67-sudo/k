@@ -18,6 +18,7 @@ G.Pin = {
   baseK() { return G.phone || (G.settings && G.settings.quality === 'low') ? 0.5 : 1; },
   get(img) {
     let c = this.map.get(img);
+    if (c && c._gen !== G.gfxGen) { this.drop(img); c = null; }     // (a phone wiped it: copy the picture again)
     if (!c) {
       if (!this.on || img.complete === false || !img.naturalWidth || img.naturalWidth * img.naturalHeight < this.MIN) return img;
       const w = this.want.get(img);
@@ -29,7 +30,7 @@ G.Pin = {
   },
   make(img, k) {
     const w = img.naturalWidth, h = img.naturalHeight, cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
-    const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    const c = G.makeCanvas(cw, ch);
     const x = c.getContext('2d');
     if (!x) return null;
     if (cw === w && ch === h) this._draw.call(x, img, 0, 0);
@@ -52,12 +53,16 @@ G.Pin = {
   clear() { for (const img of [...this.map.keys()]) this.drop(img); },
 };
 // the graphics card was reset (driver update, crash): every copy on it is blank now, make new ones
-if (G.canvas) G.canvas.addEventListener('contextrestored', () => G.Pin.clear());
+if (G.canvas) { G.canvas.addEventListener('contextlost', G.gfxLost); G.canvas.addEventListener('contextrestored', () => { G.gfxLost(); G.Pin.clear(); }); }
 // every drawImage of a picture draws its copy instead (source rectangles scaled to a smaller copy)
 (function () {
   const draw = G.Pin._draw;
   CanvasRenderingContext2D.prototype.drawImage = function (img, a, b, c, d, e, f, g, h) {
-    if (!(img instanceof HTMLImageElement)) return draw.apply(this, arguments);
+    if (!(img instanceof HTMLImageElement)) {
+      // (a kept canvas that knows how to paint itself again: a phone wiped it, so it does that now)
+      if (img && img._remake && img._gen !== G.gfxGen) { img._gen = G.gfxGen; try { img._remake(img); } catch (err) {} }
+      return draw.apply(this, arguments);
+    }
     const p = G.Pin.get(img);
     if (p === img || p._full) { arguments[0] = p; return draw.apply(this, arguments); }
     const n = arguments.length;
@@ -79,9 +84,10 @@ G.srcImg = (function () {
     if (!f || !img) return img;
     let m = cache.get(img); if (!m) { m = new Map(); cache.set(img, m); }
     let c = m.get(f);
+    if (c && c._gen !== G.gfxGen) c = null;   // (wiped on a phone: bake it again)
     if (!c) {
       if (img.complete === false || img.naturalWidth === 0) return img;   // not decoded yet: don't bake an empty copy
-      c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d');
+      c = G.makeCanvas(img.width, img.height); const x = c.getContext('2d');
       if (f.startsWith('mul:')) {   // FlxSprite.color: the picture multiplied by a colour (mods tint characters this way)
         x.drawImage(img, 0, 0); x.globalCompositeOperation = 'multiply'; x.fillStyle = f.slice(4); x.fillRect(0, 0, c.width, c.height);
         x.globalCompositeOperation = 'destination-in'; x.drawImage(img, 0, 0);
@@ -274,6 +280,7 @@ G.Atlas = {
   tintPiece(s, col) {
     let m = s._tints; if (!m) m = s._tints = new Map();
     let c = m.get(col);
+    if (c && c._gen !== G.gfxGen) c = null;
     if (!c) {
       c = G.makeCanvas(s.w, s.h); const x = c.getContext('2d');
       x.drawImage(G.srcImg(s.img), s.x, s.y, s.w, s.h, 0, 0, s.w, s.h);

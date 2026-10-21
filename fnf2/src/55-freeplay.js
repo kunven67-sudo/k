@@ -75,7 +75,7 @@
     if (!img) return null;
     if (!color || color.toUpperCase() === '#FFFFFF') return img;
     let b = tintBufs.get(key);
-    if (!b) { b = { c: G.makeCanvas(img.width, img.height), color: null }; tintBufs.set(key, b); }
+    if (!b || b.c._gen !== G.gfxGen) { b = { c: G.makeCanvas(img.width, img.height), color: null }; tintBufs.set(key, b); }
     if (b.color !== color) {
       const c = b.c.getContext('2d'); c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, img.width, img.height);
       c.drawImage(img, 0, 0); c.globalCompositeOperation = 'multiply'; c.fillStyle = color; c.fillRect(0, 0, img.width, img.height);

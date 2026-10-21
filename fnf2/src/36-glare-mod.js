@@ -34,7 +34,7 @@
   // the 4 arrow heads + a red and a cyan copy of each (RGB split on glitchy notes)
   let tinted = null;
   function tints(sheet) {
-    if (tinted) return tinted;
+    if (tinted && tinted.gen === G.gfxGen) return tinted;
     const img = G.srcImg(sheet.img); if (!img || !img.width || (img.complete === false)) return null;
     tinted = ['Left', 'Down', 'Up', 'Right'].map(d => {
       const f = G.Sparrow.byPrefix(sheet, 'note' + d)[0]; if (!f) return null;
@@ -46,6 +46,7 @@
       };
       return { norm: mk(null), red: mk('rgba(255,30,60,0.85)'), cyan: mk('rgba(0,230,255,0.85)') };
     });
+    tinted.gen = G.gfxGen;
     return tinted;
   }
 

@@ -74,6 +74,11 @@
   // repaint an image -> canvas. rects = [{x,y,w,h,rules}] get their own rules (for those pixels only),
   // every other pixel uses `rules`. Rules may set {alpha} (0 = erase) or {keep:true} (leave as is).
   function recolor(img, rules, rects) {
+    const c = recolor1(img, rules, rects);
+    c._remake = cv => { const n = recolor1(img, rules, rects), x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); x.drawImage(n, 0, 0); };
+    return c;
+  }
+  function recolor1(img, rules, rects) {
     const W = img.width, H = img.height;
     const c = G.makeCanvas(W, H), x = c.getContext('2d', { willReadFrequently: true });
     x.drawImage(img, 0, 0);

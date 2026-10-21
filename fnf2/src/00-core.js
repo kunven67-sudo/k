@@ -240,9 +240,17 @@ G.Camera = class {
 };
 
 // offscreen canvases + memoised renders
+// A phone can wipe canvases: low on graphics memory, or the game was in the background (another app, the file
+// picker, the lock screen). A canvas drawn once and kept (song names, glows, tinted copies, picture copies) then
+// stays blank for good: the song names in Freeplay went missing that way. Every kept canvas remembers the
+// 'generation' it was made in; a wipe starts a new generation and kept canvases get drawn again.
+G.gfxGen = 0;
+G.gfxLost = function () { G.gfxGen++; };
 G.makeCanvas = function (w, h) {
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h));
+  c._gen = G.gfxGen;
+  c.addEventListener('contextlost', G.gfxLost); c.addEventListener('contextrestored', G.gfxLost);
   return c;
 };
 G._cache = new Map();
@@ -251,10 +259,20 @@ G._cacheBytes = 0; G.CACHE_BUDGET = 160e6;
 // when the cache is over budget (it used to keep every tinted copy / text picture ever made).
 G.cached = function (key, w, h, fn) {
   let c = G._cache.get(key);
-  if (c) { if (G._cache.size > 64) { G._cache.delete(key); G._cache.set(key, c); } return c; }
+  if (c) {
+    if (c._gen !== G.gfxGen) { c._gen = G.gfxGen; c._remake(c); }   // (wiped on a phone: painted again, same canvas)
+    if (G._cache.size > 64) { G._cache.delete(key); G._cache.set(key, c); }
+    return c;
+  }
   c = G.makeCanvas(w, h);
   const cx = c.getContext('2d');
   fn(cx, w, h);
+  // (also when something kept this canvas itself and draws it after a wipe: see the drawImage hook in 03-gfx.js)
+  c._remake = cv => {
+    const x = cv.getContext('2d');
+    if (x.reset) x.reset(); else { x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.filter = 'none'; x.clearRect(0, 0, cv.width, cv.height); }
+    fn(x, w, h);
+  };
   if (!(G.A && G.A.busy())) {   // a picture it used may not be decoded yet: build it again next time
     c._bytes = c.width * c.height * 4; G._cache.set(key, c); G._cacheBytes += c._bytes;
     if (G._cacheBytes > G.CACHE_BUDGET) for (const [k, v] of G._cache) { if (G._cacheBytes <= G.CACHE_BUDGET * 0.8 || k === key) break; G._cache.delete(k); G._cacheBytes -= v._bytes || 0; }
@@ -657,6 +675,9 @@ G.input = {
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && G.screen && G.screen.onBlur) try { G.screen.onBlur(); } catch (e) { G.reportError(e, 'onBlur'); }
+    // (back from the background on a phone: canvases may have been wiped, draw the kept ones again)
+    if (document.hidden) G._wasHidden = true;
+    else if (G._wasHidden && (G.phone || G.isTouchDevice)) { G._wasHidden = false; G.gfxLost(); }
   });
   function ptr(type, e) {
     if (G.audio && G.audio.unlock) G.audio.unlock();
