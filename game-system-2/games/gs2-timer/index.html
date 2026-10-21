@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timer</title>
+<style>
+  :root {
+    --bg: #090807; --panel: #15110c; --hi: #221a12; --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.16);
+    --text: #fff5ea; --muted: #b3a08a; --acc: #ff8a3d; --acc2: #ffcc33; --good: #3dffa0; --bad: #ff3d6e;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button, input { font-family: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .app { display: flex; flex-direction: column; height: 100%; }
+  .tabs { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,138,61,.08), transparent); }
+  .tab { flex: 1; border: 1px solid var(--line2); background: none; border-radius: 12px; padding: 9px 6px; font-size: 13.5px; font-weight: 700; color: var(--muted); display: inline-flex; justify-content: center; align-items: center; gap: 7px; }
+  .tab.on { background: var(--acc); border-color: var(--acc); color: #1a0d00; box-shadow: 0 0 16px rgba(255,138,61,.35); }
+  .tab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px var(--good); }
+  .page { flex: 1; overflow-y: auto; padding: 14px; }
+  .btn { border: 1px solid var(--line2); background: var(--panel); border-radius: 11px; padding: 8px 14px; font-size: 13.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s; white-space: nowrap; }
+  .btn:hover { background: var(--hi); }
+  .btn.primary { background: var(--acc); color: #1a0d00; border-color: var(--acc); box-shadow: 0 0 14px rgba(255,138,61,.35); }
+  .btn.big { padding: 12px 26px; font-size: 16px; border-radius: 14px; }
+  .btn.danger:hover { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .icon { width: 36px; height: 36px; padding: 0; border-radius: 10px; border: 1px solid transparent; background: none; color: var(--muted); display: inline-grid; place-items: center; }
+  .icon:hover { background: rgba(255,255,255,.07); color: var(--text); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .new { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+  .new h2, .card h2 { margin: 0; font-size: 13px; letter-spacing: .14em; color: var(--muted); font-weight: 800; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line2); background: none; border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 700; color: var(--text); }
+  .chip:hover { border-color: var(--acc); color: var(--acc); }
+  .hms { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .hms label { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); font-weight: 700; }
+  .hms input { width: 64px; text-align: center; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; background: rgba(0,0,0,.35); border: 1px solid var(--line2); border-radius: 12px; padding: 6px 4px; }
+  .hms .colon { font-size: 26px; font-weight: 800; color: var(--muted); margin-top: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; }
+  input.txt { flex: 1; min-width: 140px; background: rgba(0,0,0,.35); border: 1px solid var(--line2); border-radius: 11px; padding: 9px 11px; font-size: 14px; }
+  .timers { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .tm { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; position: relative; }
+  .tm.done { border-color: var(--acc); animation: flash 1s ease-in-out infinite; }
+  @keyframes flash { 50% { box-shadow: 0 0 26px rgba(255,138,61,.55); } }
+  .ring { position: relative; width: 150px; height: 150px; }
+  .ring svg { width: 150px; height: 150px; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 9; }
+  .ring .bgc { stroke: rgba(255,255,255,.07); }
+  .ring .fg { stroke: var(--acc); stroke-linecap: round; transition: stroke-dashoffset .25s linear; filter: drop-shadow(0 0 6px rgba(255,138,61,.6)); }
+  .tm.pause .ring .fg { stroke: var(--muted); filter: none; }
+  .ring .time { position: absolute; inset: 0; display: grid; place-items: center; font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .tm .lbl { font-weight: 700; font-size: 14px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tm .sub { font-size: 12px; color: var(--muted); }
+  .tm .acts { display: flex; gap: 4px; }
+  .tm .x { position: absolute; right: 6px; top: 6px; }
+  .none { color: var(--muted); text-align: center; padding: 20px; font-size: 14px; line-height: 1.6; }
+  /* stopwatch */
+  .sw { display: flex; flex-direction: column; align-items: center; gap: 18px; padding-top: 14px; }
+  .sw-time { font-size: clamp(44px, 12vw, 86px); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; text-shadow: 0 0 30px rgba(255,138,61,.35); }
+  .sw-time small { font-size: .5em; color: var(--muted); }
+  .laps { width: min(460px, 100%); display: flex; flex-direction: column; gap: 4px; }
+  .lap { display: flex; justify-content: space-between; padding: 8px 12px; border-radius: 10px; background: var(--panel); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .lap span:first-child { color: var(--muted); }
+  .lap.best { color: var(--good); } .lap.worst { color: #ff8aa8; }
+  /* alarms */
+  .alarm { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .alarm .t { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 120px; }
+  .alarm.off .t, .alarm.off .info { opacity: .45; }
+  .alarm .info { flex: 1; min-width: 0; }
+  .alarm .info b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .alarm .info span { font-size: 12px; color: var(--muted); }
+  .switch { position: relative; width: 46px; height: 26px; flex: none; }
+  .switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .switch i { position: absolute; inset: 0; border-radius: 20px; background: rgba(255,255,255,.14); transition: background .2s; pointer-events: none; }
+  .switch i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .switch input:checked + i { background: var(--acc); }
+  .switch input:checked + i::after { transform: translateX(20px); }
+  .days { display: flex; gap: 4px; flex-wrap: wrap; }
+  .day { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line2); background: none; font-weight: 800; font-size: 12px; color: var(--muted); }
+  .day.on { background: var(--acc); border-color: var(--acc); color: #1a0d00; }
+  input[type=time] { background: rgba(0,0,0,.35); border: 1px solid var(--line2); border-radius: 12px; padding: 6px 10px; font-size: 24px; font-weight: 800; color-scheme: dark; }
+  .banner { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: rgba(255,204,51,.08); border: 1px solid rgba(255,204,51,.3); font-size: 13px; margin-bottom: 12px; }
+  .banner span { flex: 1; }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(16px); opacity: 0; pointer-events: none; background: #241a10; border: 1px solid var(--line2); padding: 9px 14px; border-radius: 22px; font-size: 13px; transition: all .2s; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 9; }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+  @media (max-width: 480px) {
+    .alarm .t { font-size: 24px; min-width: 92px; }
+    .hms input { width: 54px; font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="tabs" role="tablist">
+    <button class="tab" data-tab="timer" role="tab"></button>
+    <button class="tab" data-tab="sw" role="tab"></button>
+    <button class="tab" data-tab="alarm" role="tab"></button>
+  </nav>
+  <main class="page" id="page"></main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(function () {
+  'use strict';
+  var GS = window.GameSystem;
+  var host = !!(GS && GS.timers);
+  var KEY = 'gs2-timer';
+  var store = GS || {
+    load: function () { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } },
+    autoSave: function (fn) { function w() { try { localStorage.setItem(KEY, JSON.stringify(fn())); } catch (e) { /* full */ } } setInterval(w, 2000); window.addEventListener('pagehide', w); }
+  };
+  var ICON = {
+    timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/>',
+    sw: '<circle cx="12" cy="14" r="7"/><path d="M12 11v3M10 3h4M18.5 7.5l1.5-1.5"/>',
+    alarm: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+    play: '<path d="M7 4.5v15l13-7.5z" fill="currentColor" stroke="none"/>',
+    pause: '<rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/>',
+    restart: '<path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>'
+  };
+  function svg(n) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[n] || '') + '</svg>'; }
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  /* saved: which tab, the last custom time, the stopwatch (keeps running while the app is closed) */
+  var state = { tab: 'timer', h: 0, m: 5, s: 0, label: '', sw: { run: false, start: 0, acc: 0, laps: [] } };
+  var saved = store.load && store.load();
+  if (saved && typeof saved === 'object') {
+    if (['timer', 'sw', 'alarm'].indexOf(saved.tab) >= 0) state.tab = saved.tab;
+    ['h', 'm', 's'].forEach(function (k) { if (typeof saved[k] === 'number') state[k] = saved[k]; });
+    if (saved.sw && typeof saved.sw === 'object') {
+      state.sw.run = !!saved.sw.run; state.sw.start = Number(saved.sw.start) || 0; state.sw.acc = Number(saved.sw.acc) || 0;
+      state.sw.laps = Array.isArray(saved.sw.laps) ? saved.sw.laps.filter(function (x) { return typeof x === 'number'; }).slice(0, 200) : [];
+    }
+  }
+  if (store.autoSave) store.autoSave(function () { return state; }, 2);
+
+  var data = { timers: [], alarms: [], ringing: [], offset: 0 };
+  async function refresh() {
+    if (!host) return;
+    try {
+      var r = await GS.timers.list();
+      data.timers = r.timers || []; data.alarms = r.alarms || []; data.ringing = r.ringing || [];
+      data.offset = (r.now || Date.now()) - Date.now();
+    } catch (e) { toast(e.message || String(e)); }
+    render();
+  }
+  function now() { return Date.now() + data.offset; }
+  function leftOf(t) { return t.state === 'run' && t.end ? Math.max(0, t.end - now()) : t.left; }
+
+  function clock(ms, withTenths) {
+    var neg = ms < 0; ms = Math.abs(ms);
+    var total = Math.floor(ms / 1000);
+    var hh = Math.floor(total / 3600), mm = Math.floor(total % 3600 / 60), ss = total % 60;
+    var out = (hh ? hh + ':' + String(mm).padStart(2, '0') : String(mm)) + ':' + String(ss).padStart(2, '0');
+    if (withTenths) out += '<small>.' + String(Math.floor(ms % 1000 / 10)).padStart(2, '0') + '</small>';
+    return (neg ? '-' : '') + out;
+  }
+  function ceilClock(ms) { return clock(Math.ceil(ms / 1000) * 1000); }
+
+  /* ---------------- tabs ---------------- */
+  document.querySelector('.tabs').addEventListener('click', function (e) {
+    var t = e.target.closest('.tab');
+    if (!t) return;
+    state.tab = t.dataset.tab;
+    render();
+  });
+  function paintTabs() {
+    var running = data.timers.some(function (t) { return t.state === 'run'; });
+    var alarmsOn = data.alarms.some(function (a) { return a.on; });
+    document.querySelectorAll('.tab').forEach(function (t) {
+      var n = t.dataset.tab;
+      t.classList.toggle('on', n === state.tab);
+      t.setAttribute('aria-selected', n === state.tab);
+      var dot = (n === 'timer' && running) || (n === 'sw' && state.sw.run) || (n === 'alarm' && alarmsOn);
+      t.innerHTML = svg(n) + { timer: 'Timer', sw: 'Stopwatch', alarm: 'Alarms' }[n] + (dot ? '<i class="dot"></i>' : '');
+    });
+  }
+
+  /* ---------------- render ---------------- */
+  function render() {
+    paintTabs();
+    var page = $('page');
+    var keep = page.scrollTop;
+    /* typing in a box while a timer finishes? keep your cursor where it was */
+    var a = document.activeElement;
+    var focus = a && a.id && page.contains(a) && /INPUT/.test(a.tagName) ? { id: a.id, s: a.selectionStart, e: a.selectionEnd } : null;
+    if (state.tab === 'timer') renderTimers(page);
+    else if (state.tab === 'sw') renderSw(page);
+    else renderAlarms(page);
+    page.scrollTop = keep;
+    if (focus) restoreFocus(focus);
+  }
+  function restoreFocus(f) {
+    var el = $(f.id);
+    if (!el) { setTimeout(function () { var x = $(f.id); if (x) restoreFocus(f); }, 30); return; }
+    el.focus();
+    try { if (f.s != null) el.setSelectionRange(f.s, f.e); } catch (e) { /* number/time boxes can't */ }
+  }
+
+  function noHost() { return host ? '' : '<div class="banner"><span>Open Timer inside Game System so timers can ring over your games.</span></div>'; }
+
+  function renderTimers(page) {
+    var presets = [[30, '30 s'], [60, '1 min'], [180, '3 min'], [300, '5 min'], [600, '10 min'], [900, '15 min'], [1200, '20 min'], [1800, '30 min'], [3600, '1 hour']];
+    var html = noHost() + '<section class="card new"><h2>NEW TIMER</h2>' +
+      '<div class="presets">' + presets.map(function (p) { return '<button class="chip" data-preset="' + p[0] + '">' + p[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="hms">' +
+      '<label>hours<input id="in-h" type="number" min="0" max="99" inputmode="numeric" value="' + state.h + '"></label><span class="colon">:</span>' +
+      '<label>min<input id="in-m" type="number" min="0" max="59" inputmode="numeric" value="' + state.m + '"></label><span class="colon">:</span>' +
+      '<label>sec<input id="in-s" type="number" min="0" max="59" inputmode="numeric" value="' + state.s + '"></label></div>' +
+      '<div class="row"><input class="txt" id="in-label" maxlength="40" placeholder="Name (optional), like Pizza or Homework" value="' + esc(state.label) + '"><button class="btn primary big" id="b-start">' + svg('play') + 'Start</button></div></section>';
+    if (!data.timers.length) html += '<div class="none">No timers running. Pick a time above.<br>Timers keep going if you close this app, and they ring over your games.</div>';
+    else {
+      html += '<div class="timers">' + data.timers.map(function (t) {
+        var l = leftOf(t);
+        var C = 2 * Math.PI * 64;
+        var frac = t.dur ? l / t.dur : 0;
+        var ringing = data.ringing.indexOf('timer:' + t.id) >= 0;
+        return '<div class="card tm ' + t.state + (t.state === 'done' ? ' done' : '') + '" data-id="' + t.id + '">' +
+          '<button class="icon x" data-a="remove" aria-label="Delete timer" title="Delete">' + svg('x') + '</button>' +
+          '<div class="ring"><svg viewBox="0 0 150 150"><circle class="bgc" cx="75" cy="75" r="64"/><circle class="fg" cx="75" cy="75" r="64" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - frac)).toFixed(1) + '"/></svg>' +
+          '<div class="time" data-time>' + (t.state === 'done' ? 'Done' : ceilClock(l)) + '</div></div>' +
+          '<div class="lbl">' + esc(t.label || 'Timer') + '</div>' +
+          '<div class="sub">' + (t.state === 'run' ? 'Ends at ' + new Date(t.end - data.offset).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : t.state === 'pause' ? 'Paused' : ringing ? 'Ringing!' : 'Finished') + '</div>' +
+          '<div class="acts">' +
+          (t.state === 'run' ? '<button class="btn" data-a="pause">' + svg('pause') + 'Pause</button>' : t.state === 'pause' ? '<button class="btn primary" data-a="resume">' + svg('play') + 'Go</button>' : '') +
+          '<button class="btn" data-a="plus">+1 min</button>' +
+          '<button class="icon" data-a="restart" aria-label="Start over" title="Start over">' + svg('restart') + '</button></div></div>';
+      }).join('') + '</div>';
+    }
+    page.innerHTML = html;
+    ['h', 'm', 's'].forEach(function (k) {
+      $('in-' + k).addEventListener('input', function () { state[k] = Math.max(0, Math.min(k === 'h' ? 99 : 59, Math.floor(Number(this.value) || 0))); });
+      $('in-' + k).addEventListener('keydown', function (e) { if (e.key === 'Enter') start(); });
+    });
+    $('in-label').addEventListener('input', function () { state.label = this.value; });
+    $('in-label').addEventListener('keydown', function (e) { if (e.key === 'Enter') start(); });
+    $('b-start').addEventListener('click', start);
+  }
+  async function start(ms) {
+    if (typeof ms !== 'number') ms = ((state.h * 60 + state.m) * 60 + state.s) * 1000;
+    if (ms < 1000) { toast('Pick a time first'); return; }
+    if (!host) { toast('Open Timer inside Game System'); return; }
+    try { await GS.timers.add({ ms: ms, label: state.label }); state.label = ''; toast('Timer started'); }
+    catch (e) { toast(e.message || String(e)); }
+    refresh();
+  }
+  $('page').addEventListener('click', async function (e) {
+    var p = e.target.closest('[data-preset]');
+    if (p) { start(Number(p.dataset.preset) * 1000); return; }
+    var b = e.target.closest('[data-a]');
+    if (!b) return;
+    var a = b.dataset.a;
+    /* the stopwatch works even outside Game System */
+    if (a === 'sw-go') { swGo(); return; }
+    if (a === 'sw-lap') { swLap(); return; }
+    if (!host) return;
+    var card = b.closest('[data-id]');
+    var id = card && card.dataset.id;
+    try {
+      if (a === 'pause') await GS.timers.pause(id);
+      else if (a === 'resume') await GS.timers.resume(id);
+      else if (a === 'plus') await GS.timers.addTime(id, 60000);
+      else if (a === 'restart') await GS.timers.restart(id);
+      else if (a === 'remove') await GS.timers.remove(id);
+      else if (a === 'al-del') await GS.timers.removeAlarm(id);
+      else if (a === 'notify') { var r = await GS.timers.notify(); toast(r === 'granted' ? 'Notifications are on' : 'Notifications are off'); }
+    } catch (err) { toast(err.message || String(err)); }
+    refresh();
+  });
+
+  /* ---------------- stopwatch ---------------- */
+  function swTime() { return state.sw.acc + (state.sw.run ? Date.now() - state.sw.start : 0); }
+  function renderSw(page) {
+    var laps = state.sw.laps;
+    var diffs = laps.map(function (t, i) { return t - (i ? laps[i - 1] : 0); });
+    var best = diffs.length > 1 ? Math.min.apply(null, diffs) : -1, worst = diffs.length > 1 ? Math.max.apply(null, diffs) : -1;
+    page.innerHTML = '<div class="sw"><div class="sw-time" id="sw-time">' + clock(swTime(), true) + '</div>' +
+      '<div class="row"><button class="btn big ' + (state.sw.run ? '' : 'primary') + '" data-a="sw-go">' + svg(state.sw.run ? 'pause' : 'play') + (state.sw.run ? 'Stop' : (swTime() ? 'Go on' : 'Start')) + '</button>' +
+      '<button class="btn big" data-a="sw-lap" ' + (!state.sw.run && !swTime() ? 'disabled' : '') + '>' + svg(state.sw.run ? 'flag' : 'restart') + (state.sw.run ? 'Lap' : 'Reset') + '</button></div>' +
+      '<div class="laps">' + diffs.map(function (d, i) { return { d: d, i: i }; }).reverse().map(function (x) {
+        return '<div class="lap' + (x.d === best ? ' best' : x.d === worst ? ' worst' : '') + '"><span>Lap ' + (x.i + 1) + '</span><span>' + clock(x.d, true) + '</span><span>' + clock(laps[x.i], true) + '</span></div>';
+      }).join('') + '</div></div>';
+  }
+  function swGo() {
+    if (state.sw.run) { state.sw.acc += Date.now() - state.sw.start; state.sw.run = false; }
+    else { state.sw.start = Date.now(); state.sw.run = true; }
+    render();
+  }
+  function swLap() {
+    if (state.sw.run) { state.sw.laps.push(swTime()); if (state.sw.laps.length > 200) state.sw.laps.shift(); }
+    else { state.sw = { run: false, start: 0, acc: 0, laps: [] }; }
+    render();
+  }
+
+  /* ---------------- alarms ---------------- */
+  var DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  var DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var newDays = [];
+  var newAlarm = { time: '', label: '' };   /* what you're typing (kept when the page redraws) */
+  function nice(hm) { return new Date(2000, 0, 1, Number(hm.slice(0, 2)), Number(hm.slice(3, 5))).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+  function daysText(d) {
+    if (!d.length) return 'Once';
+    if (d.length === 7) return 'Every day';
+    if (d.join() === '1,2,3,4,5') return 'School days (Mon to Fri)';
+    if (d.join() === '0,6') return 'Weekends';
+    return d.map(function (n) { return DAY_NAMES[n]; }).join(', ');
+  }
+  function inText(t) {
+    if (!t) return '';
+    var m = Math.max(1, Math.round((t - now()) / 60000));
+    return 'rings in ' + (m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min');
+  }
+  async function renderAlarms(page) {
+    var notif = host ? await GS.timers.notifyState().catch(function () { return 'unsupported'; }) : 'unsupported';
+    var d = new Date(Date.now() + 60000);
+    var def = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    var html = noHost() + (notif === 'default' ? '<div class="banner"><span>Want a notification when Game System is in the background?</span><button class="btn" data-a="notify">Allow</button></div>' : '') +
+      '<section class="card new"><h2>NEW ALARM</h2><div class="row"><input type="time" id="al-time" value="' + (newAlarm.time || def) + '" aria-label="Alarm time">' +
+      '<input class="txt" id="al-label" maxlength="40" placeholder="Name (optional)" value="' + esc(newAlarm.label) + '"></div>' +
+      '<div class="row"><div class="days" id="al-days">' + DAYS.map(function (x, i) { return '<button class="day' + (newDays.indexOf(i) >= 0 ? ' on' : '') + '" data-day="' + i + '" aria-label="' + DAY_NAMES[i] + '" aria-pressed="' + (newDays.indexOf(i) >= 0) + '">' + x + '</button>'; }).join('') + '</div>' +
+      '<span class="grow" id="al-days-text" style="font-size:12px;color:var(--muted)">' + daysText(newDays.slice().sort()) + '</span><button class="btn primary" id="al-add">' + svg('plus') + 'Add alarm</button></div></section>';
+    if (!data.alarms.length) html += '<div class="none">No alarms yet. They ring over your games, even if this app is closed (Game System has to be open).</div>';
+    html += data.alarms.map(function (a) {
+      return '<div class="card alarm' + (a.on ? '' : ' off') + '" data-id="' + a.id + '"><div class="t">' + nice(a.time) + '</div>' +
+        '<div class="info"><b>' + esc(a.label || 'Alarm') + '</b><span>' + daysText(a.days) + (a.on && a.next ? ' · ' + inText(a.next) : '') + '</span></div>' +
+        '<label class="switch" title="On / off"><input type="checkbox" data-toggle ' + (a.on ? 'checked' : '') + ' aria-label="Alarm on"><i></i></label>' +
+        '<button class="icon" data-a="al-del" aria-label="Delete alarm" title="Delete">' + svg('x') + '</button></div>';
+    }).join('');
+    if (state.tab !== 'alarm') return;
+    page.innerHTML = html;
+    /* picking days only changes the buttons (the time and name you typed stay) */
+    $('al-days').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-day]');
+      if (!b) return;
+      var n = Number(b.dataset.day);
+      var i = newDays.indexOf(n);
+      if (i >= 0) newDays.splice(i, 1); else newDays.push(n);
+      b.classList.toggle('on', i < 0);
+      b.setAttribute('aria-pressed', i < 0);
+      $('al-days-text').textContent = daysText(newDays.slice().sort());
+    });
+    $('al-time').addEventListener('input', function () { newAlarm.time = this.value; });
+    $('al-label').addEventListener('input', function () { newAlarm.label = this.value; });
+    $('al-add').addEventListener('click', async function () {
+      if (!host) { toast('Open Timer inside Game System'); return; }
+      try {
+        var a = await GS.timers.addAlarm({ time: $('al-time').value, label: $('al-label').value, days: newDays });
+        newDays = [];
+        newAlarm = { time: '', label: '' };
+        toast('Alarm set for ' + nice(a.time));
+      } catch (e) { toast(e.message || String(e)); }
+      refresh();
+    });
+    page.querySelectorAll('[data-toggle]').forEach(function (cb) {
+      cb.addEventListener('change', async function () {
+        var id = cb.closest('[data-id]').dataset.id;
+        try { await GS.timers.editAlarm(id, { on: cb.checked }); } catch (e) { toast(e.message || String(e)); }
+        refresh();
+      });
+    });
+  }
+
+  /* live numbers without redrawing everything */
+  setInterval(function () {
+    if (state.tab === 'sw') { var el = $('sw-time'); if (el && state.sw.run) el.innerHTML = clock(swTime(), true); }
+    else if (state.tab === 'timer') {
+      var C = 2 * Math.PI * 64;
+      data.timers.forEach(function (t) {
+        if (t.state !== 'run') return;
+        var card = document.querySelector('.tm[data-id="' + t.id + '"]');
+        if (!card) return;
+        var l = leftOf(t);
+        card.querySelector('[data-time]').textContent = ceilClock(l);
+        card.querySelector('.fg').setAttribute('stroke-dashoffset', (C * (1 - (t.dur ? l / t.dur : 0))).toFixed(1));
+        if (l <= 0) setTimeout(refresh, 600);
+      });
+    }
+  }, 100);
+  window.addEventListener('keydown', function (e) {
+    if (state.tab !== 'sw' || /INPUT|TEXTAREA/.test((document.activeElement || {}).tagName || '')) return;
+    if (e.key === ' ') { e.preventDefault(); swGo(); }
+    else if (e.key === 'l' || e.key === 'L' || e.key === 'Enter') { e.preventDefault(); swLap(); }
+  });
+
+  var toastT = 0;
+  function toast(msg) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove('show'); }, 2400); }
+
+  window.addEventListener('gs2timers', refresh);
+  refresh();
+  if (!host) render();
+})();
+</script>
+</body>
+</html>
