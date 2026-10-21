@@ -19,13 +19,14 @@ cap = cv2.VideoCapture('v.mp4'); f = -1
 W, Hh = CX1 - CX0, CY1 - CY0
 stack, vals = [], []
 br = np.load('bright.npy')
+import sys; sys.path.insert(0, '/tmp/claude-0/nf'); from lightstate import light
 while True:
     ok, img = cap.read(); f += 1
     if not ok: break
-    if f % 12 or f not in Hs or br[f] < 40: continue
+    if f % 8 or f not in Hs or br[f] < 40 or light(f) > 0.08: continue      # (normal light only: the flash goes on top in the game)
     T = (np.array([[1, 0, -CX0], [0, 1, -CY0], [0, 0, 1]]) @ Hs[f])[:2]
     # notes: mask the 4 lane columns over the whole height too
-    v = VALID.copy(); v[:, 590:965] = 0
+    v = VALID
     stack.append(cv2.warpAffine(img, T, (W, Hh), flags=cv2.INTER_AREA))
     vals.append(cv2.warpAffine(v, T, (W, Hh), flags=cv2.INTER_NEAREST))
 S = np.stack(stack); V = np.stack(vals).astype(bool)

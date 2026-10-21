@@ -7,10 +7,11 @@ exec(open('goggles.py').read().split("X0, Y0, X1, Y1")[0])      # cam + H_at
 P = json.load(open('pano.json')); CX0, CY0, CX1, CY1 = P['x0'], P['y0'], P['x1'], P['y1']
 W, Hh = CX1 - CX0, CY1 - CY0
 pano = np.load('pano.npy'); cnt = np.load('pano_cnt.npy')
-BOX = {'opp': (10, 60, 390, 492), 'plr': (640, 240, 960, 520)}
+BOX = {'opp': (10, 60, 460, 492), 'plr': (640, 240, 960, 520)}
 JOBS = {'opp': {'idle': 360, 'left': 2384, 'down': 2672, 'up': 2744, 'right': 3075},
         'plr': {'idle': 3702, 'left': 3677, 'down': 3666, 'up': 901, 'right': 3213}}
 cap = cv2.VideoCapture('v.mp4')
+sys.path.insert(0, '/tmp/claude-0/nf'); from lightstate import light
 union = np.zeros((Hh, W), bool)
 acc = np.zeros((Hh, W, 3), np.float64); n = np.zeros((Hh, W), np.float64)
 for who in ('opp', 'plr'):
@@ -27,7 +28,7 @@ for who in ('opp', 'plr'):
         wimg = cv2.warpAffine(img, T, (W, Hh), flags=cv2.INTER_AREA)
         BAR = np.zeros((576, 1024), np.uint8); BAR[86:490] = 1; BAR[0:160, 570:1010] = 0; BAR[:, 590:965] = 0
         v = cv2.warpAffine(BAR, T, (W, Hh), flags=cv2.INTER_NEAREST) > 0
-        use = v & ~m
+        use = v & ~m & (light(f) < 0.08)
         acc[use] += wimg[use]; n[use] += 1
 # both girls' boxes: union of every pose she takes = where the mode could be her
 ch = union.copy()
@@ -35,6 +36,14 @@ fill = ch & (n >= 2)
 out = pano.copy()
 out[fill] = (acc[fill] / n[fill][:, None])
 hole = ((ch & (n < 2)) | (cnt == 0)).astype(np.uint8)
+# behind HER: the clean stage made from ~100 frames where she wasn't there (plate2.py), box (10, 60)-(390, 492)
+if os.path.exists('plate2_opp.npy'):
+    p2 = np.load('plate2_opp.npy'); n2 = np.load('plate2_opp_n.npy')
+    bx0, by0 = 10 - CX0, 60 - CY0
+    sub = (slice(by0, by0 + p2.shape[0]), slice(bx0, bx0 + p2.shape[1]))
+    ok = n2 >= 3
+    o = out[sub]; o[ok] = p2[ok]; out[sub] = o
+    h = hole[sub]; h[ok] = 0; hole[sub] = h
 img = cv2.inpaint(out.astype(np.uint8), hole, 6, cv2.INPAINT_TELEA)
 cv2.imwrite('stage_ref.png', img)
 os.makedirs('stage', exist_ok=True)

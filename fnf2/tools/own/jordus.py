@@ -26,8 +26,10 @@ PAD = 0.085            # silence put in front so beat 0 is at 0 (the video start
 END = 127.2            # the song's own sound ends here (video time); the ending clip comes after
 LAG = 0.048            # what's on screen in the video is 48 ms behind its sound (notes + camera)
 K = 2                  # world = the video's reference frame (the 90 s shot) x 2
-BOX = {'opp': (10, 60, 390, 492), 'plr': (640, 240, 960, 520)}   # each girl's cut-out box (reference px)
+BOX = {'opp': (10, 60, 460, 492), 'plr': (640, 240, 960, 520)}   # each girl's cut-out box (reference px)
 OPP, PLR = 'nightly-opp', 'nightly-player'
+LIGHT = (90, 62, 5)    # RGB the beat flash adds to the stage
+FLASH_BEATS = [[48, 63], [128, 191]]
 
 
 def out(*p):
@@ -94,7 +96,7 @@ def camera():
             while dark[g + 1]: g += 1
             blk.append([round(T(f / 30 - LAG), 3), round(T((g + 1) / 30 - LAG), 3)]); f = g
         f += 1
-    json.dump(dict(path=path, blackouts=blk, card=[round(T(2.0 - LAG), 3), round(T(6.9 - LAG), 3)]),
+    json.dump(dict(path=path, blackouts=blk, card=[round(T(2.0 - LAG), 3), round(T(6.9 - LAG), 3)], lights=FLASH_BEATS),
               open(out('preload', 'data', 'songs', SID, SID + '-camera.json'), 'w'))
     return len(path), blk
 
@@ -102,8 +104,10 @@ def camera():
 # ---------------------------------------------------------------- the girls
 # which cut-out frames make each animation (out/<who>/<anim>_<nn>.png, 30 fps like the video), from where
 ANIMS = {
-    'opp': dict(idle=('idle', 0, 30), singLEFT=('left', 1, 10), singDOWN=('down', 1, 17), singUP=('up', 1, 16), singRIGHT=('right', 1, 17)),
-    'plr': dict(idle=('idle', 0, 40), singLEFT=('left', 1, 13), singDOWN=('down', 1, 8), singUP=('up', 1, 10), singRIGHT=('right', 1, 8)),
+    # (her idle: one bounce of her loop, played on every beat; each pose starts on its cut's 3rd frame)
+    'opp': dict(idle=('idle', 2, 14), singLEFT=('left', 2, 9), singDOWN=('down', 2, 17), singUP=('up', 2, 16), singRIGHT=('right', 2, 17)),
+    # (hers: one bop, every 2 beats like in the video; poses start on the note's frame)
+    'plr': dict(idle=('idle', 9, 21), singLEFT=('left', 1, 13), singDOWN=('down', 1, 8), singUP=('up', 1, 8), singRIGHT=('right', 1, 8)),
 }
 
 
@@ -114,7 +118,7 @@ def atlas(who, name, extra=None):
     frames = []                                        # (anim prefix, index, image)
     for anim, (src, a, b) in ANIMS[who].items():
         for i, n in enumerate(range(a, b)):
-            p = os.path.join(WORK, 'out', who, f'{src}_{n:02d}.png')
+            p = os.path.join(WORK, 'out_clean', who, f'{src}_{n:02d}.png')
             if os.path.exists(p): frames.append((anim, i, Image.open(p).convert('RGBA')))
     for anim, ims in (extra or {}).items():
         for i, im in enumerate(ims): frames.append((anim, i, im))
@@ -156,7 +160,7 @@ def misses_and_death():
         if not anim.startswith('sing'): continue
         ims = []
         for k, n in enumerate(range(a, min(b, a + 5))):
-            im = Image.open(os.path.join(WORK, 'out', 'plr', f'{src}_{n:02d}.png')).convert('RGBA')
+            im = Image.open(os.path.join(WORK, 'out_clean', 'plr', f'{src}_{n:02d}.png')).convert('RGBA')
             r, g, bl, al = im.split()
             tint = Image.merge('RGB', (r, g, bl))
             tint = ImageChops.multiply(tint, Image.new('RGB', im.size, (150, 140, 255)))
@@ -179,7 +183,7 @@ def misses_and_death():
 
 def characters():
     res = {}
-    for who, cid, name, dance in (('opp', OPP, 'opp', 2), ('plr', PLR, 'player', 1)):
+    for who, cid, name, dance in (('opp', OPP, 'opp', 1), ('plr', PLR, 'player', 2)):
         extra = misses_and_death() if who == 'plr' else None
         counts, (FW, FH) = atlas(who, name, extra)
         anims = []
@@ -209,14 +213,57 @@ def stage():
     from PIL import Image
     p = json.load(open(os.path.join(WORK, 'stage', 'stage.json')))
     shutil.copyfile(os.path.join(WORK, 'stage', 'stage.png'), out('shared', 'images', 'stages', 'nightly', 'street.png'))
+    # the lights: in two parts of the song the stage flashes bright on every beat (the girls don't): a lit copy of
+    # the stage fades in over it (46-jordus.js); the flash adds this much (measured on the floor + the sky)
+    a = np.asarray(Image.open(os.path.join(WORK, 'stage', 'stage.png')).convert('RGB')).astype(np.int16)
+    lit = np.clip(a + np.array(LIGHT, np.int16), 0, 255).astype(np.uint8)
+    Image.fromarray(lit).save(out('shared', 'images', 'stages', 'nightly', 'street-lit.png'))
     pos = lambda who: [round((BOX[who][0] + BOX[who][2]) / 2 * K, 1), BOX[who][3] * K]
     json.dump(dict(version='1.0.0', name='Nightly street', cameraZoom=0.625,
                    props=[dict(name='street', assetPath='stages/nightly/street', position=[p['x0'] * K, p['y0'] * K],
-                               scale=[K / p['k'], K / p['k']], scroll=[1, 1], zIndex=0)],
+                               scale=[K / p['k'], K / p['k']], scroll=[1, 1], zIndex=0),
+                          dict(name='lights', assetPath='stages/nightly/street-lit', position=[p['x0'] * K, p['y0'] * K],
+                               scale=[K / p['k'], K / p['k']], scroll=[1, 1], zIndex=1, alpha=0)],
                    characters=dict(bf=dict(position=pos('plr'), zIndex=300, cameraOffsets=[0, 0]),
                                    dad=dict(position=pos('opp'), zIndex=200, cameraOffsets=[0, 0]),
                                    gf=dict(position=[1024, 900], zIndex=100))),
               open(out('preload', 'data', 'stages', 'nightlyStreet.json'), 'w'), indent=1)
+
+
+# ---------------------------------------------------------------- freeplay album (its own cover, not FNF's Volume 1)
+def album():
+    """cover: both girls on their street (their own cut-out frames, the stage picture); title: the mod's name"""
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    st = Image.open(os.path.join(WORK, 'stage', 'stage.png')).convert('RGBA'); p = json.load(open(os.path.join(WORK, 'stage', 'stage.json')))
+    # (stage picture px = (ref - origin) * 2) -> a square around the middle of the street
+    cx, cy = (512 - p['x0']) * 2, (300 - p['y0']) * 2
+    cover = st.crop((cx - 520, cy - 430, cx + 520, cy + 610)).convert('RGBA')
+    def put(who, src, k, x, y):
+        im = Image.open(os.path.join(WORK, 'out_clean', who, src + '.png')).convert('RGBA')
+        im = im.resize((int(im.width * k), int(im.height * k)), Image.LANCZOS)
+        cover.alpha_composite(im, (int(x), int(y)))
+    put('opp', 'up_08', 1.15, -60, 40); put('plr', 'idle_20', 1.35, 330, 330)
+    cover = cover.resize((262, 262), Image.LANCZOS)
+    cover.save(out('preload', 'images', 'freeplay', 'albumRoll', 'nightly.png'))
+    # the title: two lines, chunky, white with a dark purple outline + shadow (like FNF's album titles)
+    W_, H_ = 234, 142
+    f = ImageFont.truetype('/usr/share/fonts/opentype/inter/Inter-ExtraBold.otf', 46)
+    t = Image.new('RGBA', (W_, H_), (0, 0, 0, 0)); d = ImageDraw.Draw(t)
+    for i, line in enumerate(("NIGHTLY", "FUNKIN'")):
+        w = d.textlength(line, font=f); x, y = (W_ - w) / 2, 14 + i * 56
+        d.text((x + 4, y + 5), line, font=f, fill=(20, 8, 46, 255), stroke_width=6, stroke_fill=(20, 8, 46, 255))
+        d.text((x, y), line, font=f, fill=(255, 255, 255, 255), stroke_width=6, stroke_fill=(52, 24, 112, 255))
+    t = t.rotate(4, resample=Image.BICUBIC)
+    sheet = Image.new('RGBA', (W_ * 2, H_), (0, 0, 0, 0)); sheet.paste(t, (0, 0)); sheet.paste(t, (W_, 0))
+    sheet.save(out('preload', 'images', 'freeplay', 'albumRoll', 'nightly-text.png'))
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>', f'<TextureAtlas imagePath="nightly-text.png" width="{W_ * 2}" height="{H_}">']
+    xml += [f'  <SubTexture name="idle{i:04d}" x="0" y="0" width="{W_}" height="{H_}"/>' for i in range(1)]
+    xml += [f'  <SubTexture name="switch{i:04d}" x="{W_}" y="0" width="{W_}" height="{H_}"/>' for i in range(1, 5)]
+    xml.append('</TextureAtlas>')
+    open(out('preload', 'images', 'freeplay', 'albumRoll', 'nightly-text.xml'), 'w').write('\n'.join(xml))
+    json.dump(dict(version='1.0.0', name="Nightly Funkin'", artists=["Nightly Funkin'"], albumArtAsset='freeplay/albumRoll/nightly',
+                   albumTitleAsset='freeplay/albumRoll/nightly-text', albumTitleOffsets=[8, 0]),
+              open(out('preload', 'data', 'ui', 'freeplay', 'albums', 'nightly.json'), 'w'), indent=1)
 
 
 # ---------------------------------------------------------------- the ending clip
@@ -230,7 +277,7 @@ def metadata(length):
     m = dict(version='2.2.4', songName='Jordus', artist="Nightly Funkin'", charter='FNF 2 (from the video)', offsets={},
              playData=dict(difficulties=['easy', 'normal', 'hard'],
                            characters=dict(player=PLR, girlfriend='', opponent=OPP, instrumental='', playerVocals=[PLR], opponentVocals=[]),
-                           stage='nightlyStreet', noteStyle='funkin', ratings=dict(easy=3, normal=6, hard=9), album='volume1',
+                           stage='nightlyStreet', noteStyle='funkin', ratings=dict(easy=3, normal=6, hard=9), album='nightly',
                            previewStart=int(T(61.4) * 1000), previewEnd=int(T(76.4) * 1000)),
              generatedBy='FNF 2 - tools/own/jordus.py', timeChanges=[dict(t=0, b=0, bpm=125, n=4, d=4, bt=[4, 4, 4, 4])])
     json.dump(m, open(out('preload', 'data', 'songs', SID, SID + '-metadata.json'), 'w'), indent=1)
@@ -246,7 +293,7 @@ def main():
     print('camera points, blackouts', *camera())
     metadata(length)
     print('animation frames', characters())
-    icons(); stage(); ending()
+    icons(); stage(); album(); ending()
     print('jordus: done ->', OWN)
 
 

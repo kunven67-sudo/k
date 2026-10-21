@@ -21,8 +21,11 @@
   G.SongFX.jordus = {
     setup(P) {
       const d = G.A.json('preload/data/songs/jordus/jordus-camera.json') || {};
-      P.jor = { path: d.path || null, blackouts: d.blackouts || [], card: d.card || [2.0, 6.9] };
+      P.jor = { path: d.path || null, blackouts: d.blackouts || [], card: d.card || [2.0, 6.9], lights: d.lights || [],
+        lit: (P.stage.props || []).find(p => p.name === 'lights') || null };
     },
+    // (the pictures get sized for the closest the camera ever gets)
+    maxZoom(P) { const p = P.jor && P.jor.path; let z = 0; if (p) for (const c of p) z = Math.max(z, c[3]); return z; },
     reset(P) {
       // the mod only shows your arrows (theirs are hidden, notes and all)
       if (P.lines && P.lines[0]) P.lines[0].x = -9999;
@@ -31,7 +34,14 @@
     },
     update(P) {
       const J = P.jor;
-      if (!J || !J.path || P.gameOver) return;
+      if (!J) return;
+      // the lights: in two parts of the song the stage flashes bright on every beat (on, a moment, then fades)
+      if (J.lit) {
+        const cr = P.cond.crochet, b = Math.floor(P.songPos / cr), t = (P.songPos - b * cr) / 1000;
+        const on = !P.gameOver && J.lights.some(r => b >= r[0] && b <= r[1]);
+        J.lit.alpha = on ? (t < 0.2 ? 1 : Math.max(0, 1 - (t - 0.2) / 0.13)) : 0;
+      }
+      if (!J.path || P.gameOver) return;
       const c = camAt(J.path, Math.max(0, P.songPos) / 1000);
       P.camTween = null;
       P.cam.focus(c[1], c[2]);
