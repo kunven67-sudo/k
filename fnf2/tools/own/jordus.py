@@ -10,7 +10,8 @@ What tools/own/jordus_video/*.py read out of the video first (into WORK, see its
   camera    the mod's camera, tracked frame by frame (who it follows, how close, its bops): replayed in the game
   art       both girls cut out of the frames (an anime upscaler + a cut-out model + the stage behind them),
             the health icons off the health bar, the whole stage stitched from every camera angle
-  ending    the short clip after the song (the gas mask + the pink question mark), TikTok mark blacked out
+  game over the end of the video IS the mod's game over (shocked, skeleton flash, blue, the pink '?' of smoke):
+            its frames + sound + music loop make the death screen
 
   python3 tools/own/jordus.py
 """
@@ -23,7 +24,7 @@ WORK = os.environ.get('FNF_JORDUS_WORK', '/tmp/claude-0/nf')
 OWN = os.environ.get('FNF_OWN') or os.path.join(ROOT, 'build', 'mods', 'jordus')
 SID = 'jordus'
 PAD = 0.085            # silence put in front so beat 0 is at 0 (the video starts 1/16 after a beat)
-END = 127.2            # the song's own sound ends here (video time); the ending clip comes after
+END = 127.2            # the song's own sound ends here (video time); the game over comes after (death())
 LAG = 0.048            # what's on screen in the video is 48 ms behind its sound (notes + camera)
 K = 2                  # world = the video's reference frame (the 90 s shot) x 2
 BOX = {'opp': (10, 60, 460, 492), 'plr': (640, 240, 960, 520)}   # each girl's cut-out box (reference px)
@@ -104,10 +105,12 @@ def camera():
 # ---------------------------------------------------------------- the girls
 # which cut-out frames make each animation (out/<who>/<anim>_<nn>.png, 30 fps like the video), from where
 ANIMS = {
-    # (her idle: one bounce of her loop, played on every beat; each pose starts on its cut's 3rd frame)
-    'opp': dict(idle=('idle', 2, 14), singLEFT=('left', 2, 9), singDOWN=('down', 2, 17), singUP=('up', 2, 16), singRIGHT=('right', 2, 17)),
+    # (her idle: one bounce of her loop, played on every beat; RIGHT starts on its cut's 3rd frame; UP/DOWN were cut
+    # from where the pose starts, at moments the stage lights don't flash, so no lit stage sticks to her; her LEFT
+    # only ever happens while they flash: the lit frames (3-5) are skipped)
+    'opp': dict(idle=('idle', 2, 14), singLEFT=('left', [2, 6, 7, 8], None), singDOWN=('down', 0, 15), singUP=('up', 0, 14), singRIGHT=('right', 2, 17)),
     # (hers: one bop, every 2 beats like in the video; poses start on the note's frame)
-    'plr': dict(idle=('idle', 9, 21), singLEFT=('left', 1, 13), singDOWN=('down', 1, 8), singUP=('up', 1, 8), singRIGHT=('right', 1, 8)),
+    'plr': dict(idle=('idle', 9, 21), singLEFT=('left', 1, 13), singDOWN=('down', 1, 8), singUP=('up', 1, 9), singRIGHT=('right', 1, 9)),
 }
 
 
@@ -117,7 +120,7 @@ def atlas(who, name, extra=None):
     X0, Y0, X1, Y1 = BOX[who]; FW, FH = (X1 - X0) * K, (Y1 - Y0) * K
     frames = []                                        # (anim prefix, index, image)
     for anim, (src, a, b) in ANIMS[who].items():
-        for i, n in enumerate(range(a, b)):
+        for i, n in enumerate(a if isinstance(a, list) else range(a, b)):
             p = os.path.join(WORK, 'out_clean', who, f'{src}_{n:02d}.png')
             if os.path.exists(p): frames.append((anim, i, Image.open(p).convert('RGBA')))
     for anim, ims in (extra or {}).items():
@@ -266,11 +269,44 @@ def album():
               open(out('preload', 'data', 'ui', 'freeplay', 'albums', 'nightly.json'), 'w'), indent=1)
 
 
-# ---------------------------------------------------------------- the ending clip
-def ending():
-    run(['ffmpeg', '-y', '-ss', '131.0', '-to', '146.9', '-i', os.path.join(WORK, 'v.mp4'),
-         '-vf', 'drawbox=x=820:y=450:w=204:h=126:color=black:t=fill,drawbox=x=0:y=0:w=1024:h=576:color=black:t=fill:enable=lt(t\\,2.45)',
-         '-c:v', 'libvpx-vp9', '-b:v', '900k', '-row-mt', '1', '-c:a', 'libopus', '-b:a', '128k', out('videos', 'jordus-end.webm')])
+# ---------------------------------------------------------------- the game over (the end of the video)
+def death():
+    """the end of the video is the mod's GAME OVER (the player is shocked, skeleton flash, turns blue, a pink '?' of
+    smoke loops over her; on retry the smoke goes and she sits up): its frames (jordus_video/death_frames.py, at
+    game-screen size) become one sheet drawn on the screen (46-jordus.js), with its own shock sound + music loop"""
+    from PIL import Image
+    D = os.path.join(WORK, 'death'); box = json.load(open(os.path.join(D, 'box.json')))
+    frames = []
+    for anim in ('firstDeath', 'deathLoop', 'deathConfirm'):
+        for i, p in enumerate(sorted(glob.glob(os.path.join(D, anim + '_*.png')))):
+            frames.append((anim, i, Image.open(p).convert('RGBA')))
+    uniq, refs = {}, []
+    for anim, i, im in frames:
+        bb = im.getchannel('A').point(lambda v: 255 if v > 4 else 0).getbbox() or (0, 0, 1, 1)
+        cut = im.crop(bb); h = hashlib.md5(cut.tobytes() + bytes(str(bb), 'ascii')).hexdigest()
+        if h not in uniq: uniq[h] = (cut, bb)
+        refs.append((anim, i, h))
+    order = sorted(uniq, key=lambda h: -uniq[h][0].height)
+    x = y = sh = 0; W = 4096; pos = {}
+    for h in order:
+        im = uniq[h][0]
+        if x + im.width > W: x = 0; y += sh + 2; sh = 0
+        pos[h] = (x, y); x += im.width + 2; sh = max(sh, im.height)
+    sheet = Image.new('RGBA', (W, y + sh), (0, 0, 0, 0))
+    for h, (px, py) in pos.items(): sheet.paste(uniq[h][0], (px, py))
+    png = out('shared', 'images', 'characters', 'nightly', 'death.png'); sheet.save(png, optimize=True)
+    xml = ['<?xml version="1.0" encoding="utf-8"?>', '<TextureAtlas imagePath="death.png">']
+    for anim, i, h in refs:
+        im, bb = uniq[h]; px, py = pos[h]
+        # (frames are the whole 1280x720 screen: the box sits where it sat in the video)
+        xml.append(f'  <SubTexture name="{anim}_{i:04d}" x="{px}" y="{py}" width="{im.width}" height="{im.height}" '
+                   f'frameX="{-(box["x"] + bb[0])}" frameY="{-(box["y"] + bb[1])}" frameWidth="1280" frameHeight="720"/>')
+    xml.append('</TextureAtlas>')
+    open(png[:-4] + '.xml', 'w').write('\n'.join(xml))
+    for src, dst in (('sfx.wav', ('shared', 'sounds', 'jordus', 'death.ogg')), ('loop.wav', ('shared', 'music', 'jordus', 'gameOver.ogg'))):
+        run(['ffmpeg', '-y', '-i', os.path.join(D, src), '-af', 'afade=t=out:st=3.9:d=0.15' if src == 'sfx.wav' else 'anull',
+             '-c:a', 'libvorbis', '-q:a', '6', out(*dst)])
+    return len(refs), len(uniq)
 
 
 def metadata(length):
@@ -293,7 +329,8 @@ def main():
     print('camera points, blackouts', *camera())
     metadata(length)
     print('animation frames', characters())
-    icons(); stage(); album(); ending()
+    icons(); stage(); album()
+    print('death frames (all, different)', *death())
     print('jordus: done ->', OWN)
 
 

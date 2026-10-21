@@ -1,7 +1,7 @@
 // FNF 2 - Jordus (Nightly Funkin'), rebuilt from a gameplay video (tools/own/jordus.py). What the video showed:
 // the mod's camera (replayed from the video frame by frame: who it follows, how close, its bops), its black letterbox
-// bars, the opponent's arrows hidden (only yours show), the NOW PLAYING card at the start, two blackouts, and a short
-// ending clip after the song.
+// bars, the NOW PLAYING card at the start, two blackouts, and its game over (the end of the video: the player is
+// shocked, turns blue, a pink '?' of smoke loops over her). Her arrows were hidden in the mod; here they show.
 (function () {
   G.SongFX = G.SongFX || {};
   const CARD = 'NOW PLAYING: NIGHTLY FUNKIN - JORDUS';
@@ -23,12 +23,13 @@
       const d = G.A.json('preload/data/songs/jordus/jordus-camera.json') || {};
       P.jor = { path: d.path || null, blackouts: d.blackouts || [], card: d.card || [2.0, 6.9], lights: d.lights || [],
         lit: (P.stage.props || []).find(p => p.name === 'lights') || null };
+      // (the game over's frames + sounds load with the song, so dying never waits for them)
+      const go = G.SongFX.jordus.gameOver;
+      G.Sparrow.load(go.sheet); G.audio.preload([go.sfx, go.music]);
     },
     // (the pictures get sized for the closest the camera ever gets)
     maxZoom(P) { const p = P.jor && P.jor.path; let z = 0; if (p) for (const c of p) z = Math.max(z, c[3]); return z; },
     reset(P) {
-      // the mod only shows your arrows (theirs are hidden, notes and all)
-      if (P.lines && P.lines[0]) P.lines[0].x = -9999;
       P.zoomRate = 0;                   // (the bops are in the replayed camera already)
       if (P.jor && P.jor.path) { const c = camAt(P.jor.path, 0); P.cam.focus(c[1], c[2]); P.camZoom = c[3]; }
     },
@@ -91,26 +92,16 @@
     },
   };
 
-  // after the song: the mod's ending clip (the blue guy in the gas mask, the pink smoke question mark)
-  const clip = path => ({
-    enter(S) {
-      S.black = 0;
-      const src = G.A.raw[path];
-      if (!src) { S.vidDone = true; return; }
-      const v = document.createElement('video'); v.src = src; v.playsInline = true; v.preload = 'auto';
-      v.volume = Math.min(1, (G.settings.vol.master || 1) * (G.settings.vol.sfx == null ? 1 : G.settings.vol.sfx));
-      v.onended = () => { S.vidDone = true; }; v.onerror = () => { S.vidDone = true; };
-      const pr = v.play(); if (pr && pr.catch) pr.catch(() => { v.muted = true; v.play().catch(() => { S.vidDone = true; }); });
-      S.video = v; S.vidDone = false;
+  // the game over: the mod's own, on the screen (frames from the end of the video), its shock sound + music loop
+  G.SongFX.jordus.gameOver = {
+    sfx: 'shared/sounds/jordus/death.ogg', music: 'shared/music/jordus/gameOver.ogg', sheet: 'shared/images/characters/nightly/death',
+    sprite() {
+      const s = new G.Sprite(0, 0).loadSparrow(this.sheet);
+      if (!s.sheet) return null;
+      s.addAnim('firstDeath', 'firstDeath_', 30, false);
+      s.addAnim('deathLoop', 'deathLoop_', 30, true);
+      s.addAnim('deathConfirm', 'deathConfirm_', 30, false);
+      return s;
     },
-    update(S) { if ((S.t > 3 && S.video && S.video.readyState < 2) || S.vidDone) S.go(); },
-    draw(S, ctx) {
-      G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
-      const v = S.video;
-      if (v && v.readyState >= 2) { const s = Math.min(G.W / v.videoWidth, G.H / v.videoHeight), w = v.videoWidth * s, h = v.videoHeight * s; ctx.drawImage(v, (G.W - w) / 2, (G.H - h) / 2, w, h); }
-    },
-    leave(S) { if (S.video) { try { S.video.pause(); } catch (e) {} S.video = null; } },
-  });
-  G.Cutscenes = G.Cutscenes || {};
-  G.Cutscenes.jordus = { createEnd: P => G.A.raw['videos/jordus-end.webm'] ? G.Scene(P, [clip('videos/jordus-end.webm')]) : null };
+  };
 })();

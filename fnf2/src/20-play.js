@@ -931,13 +931,16 @@
       const lossSfx = 'shared/sounds/gameplay/gameover/fnf_loss_sfx-' + pid + '.ogg';
       const ov = (this.sfx && this.sfx.gameOver) || null;   // (a mod stage's own game over sound + music: Genocide)
       G.sfx(ov && ov.sfx ? ov.sfx : pico ? 'deathPico' : suffix && G.A.has(lossSfx) ? lossSfx : 'death');
+      // (a song can bring its own whole game over, drawn on the screen instead of the player: Jordus)
+      const spr = ov && ov.sprite ? ov.sprite(this) : null;
+      if (spr) spr.play('firstDeath', true);
       // new players have no death animations: their own "oh no" one, held
-      if (!bf.playAnim('firstDeath', true) && this.playAs) bf.playAnim(this.playAs.real.die, true);
+      else if (!bf.playAnim('firstDeath', true) && this.playAs) bf.playAnim(this.playAs.real.die, true);
       const dd = bf.deathData || {};
       const co = dd.cameraOffsets || [0, 0];
       const mid = { x: bf.x + bf.width / 2, y: bf.y + bf.height / 2 };
       // like V-Slice: zoom to the stage zoom x the character's death zoom, follow at half the normal rate
-      this.gameOver = { t: 0, phase: 'intro', fade: 0, pico, suffix, music: ov && ov.music, end: ov && ov.end, zoom0: this.cam.zoom, zoom1: (this.stageZoom || 1) * (dd.cameraZoom || 1), target: { x: mid.x + co[0], y: mid.y + co[1] } };
+      this.gameOver = { t: 0, phase: 'intro', fade: 0, pico, suffix, spr, music: ov && ov.music, end: ov && ov.end, zoom0: this.cam.zoom, zoom1: (this.stageZoom || 1) * (dd.cameraZoom || 1), target: { x: mid.x + co[0], y: mid.y + co[1] } };
       this.camTween = null;
       this.cam.follow(this.gameOver.target.x, this.gameOver.target.y);
       this.cam.followRate = 0.02;
@@ -945,11 +948,11 @@
     },
     updateGameOver(dt) {
       const go = this.gameOver; go.t += dt;
-      const bf = this.bf;
-      bf.update(dt);
+      const bf = this.bf, ch = go.spr || bf;
+      ch.update(dt);
       this.cam.zoom = G.lerp(go.zoom1, this.cam.zoom, Math.pow(0.01, dt / 0.5));
       this.cam.update(dt);
-      if (go.phase === 'intro' && bf.finished) { go.phase = 'loop'; bf.playAnim('deathLoop', true); G.audio.music.play(go.music || 'shared/music/gameplay/gameover/gameOver' + go.suffix + '.ogg', { loop: true, bpm: 100 }); }
+      if (go.phase === 'intro' && ch.finished) { go.phase = 'loop'; if (go.spr) go.spr.play('deathLoop', true); else bf.playAnim('deathLoop', true); G.audio.music.play(go.music || 'shared/music/gameplay/gameover/gameOver' + go.suffix + '.ogg', { loop: true, bpm: 100 }); }
       // retry: wait (confirm jingle length / 7), fade to black over 2s, then the song starts over and fades in
       if (go.phase === 'confirm') { go.ct += dt; const w = go.pico ? 2.703 / 7 : 7.21 / 7; if (go.ct > w) go.fade = Math.min(1, (go.ct - w) / 2); if (go.ct > w + 2 && !go.left) { go.left = true; this.restart(true); } }
       if (go.phase === 'exit') { go.ct += dt; go.fade = Math.min(1, go.ct / 0.5); }
@@ -958,7 +961,8 @@
       const go = this.gameOver;
       if (a === 'accept' && (go.phase === 'loop' || go.phase === 'intro')) {
         go.phase = 'confirm'; go.ct = 0;
-        if (!this.bf.playAnim('deathConfirm', true) && this.playAs) this.bf.playAnim(this.playAs.real.retry, true);
+        if (go.spr) go.spr.play('deathConfirm', true);
+        else if (!this.bf.playAnim('deathConfirm', true) && this.playAs) this.bf.playAnim(this.playAs.real.retry, true);
         G.audio.music.stop(0);
         G.audio.music.play(go.end || 'shared/music/gameplay/gameover/gameOverEnd' + go.suffix + '.ogg', { loop: false });
       } else if (a === 'back' && go.phase !== 'confirm' && go.phase !== 'exit') { go.phase = 'exit'; go.ct = 0; G.audio.music.stop(0.3); this.exitToMenu(); }
@@ -1247,8 +1251,8 @@
     },
     drawGameOver(ctx) {
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
-      this.bf.draw(ctx, this.cam);
       const go = this.gameOver;
+      if (go.spr) go.spr.draw(ctx, null); else this.bf.draw(ctx, this.cam);
       if (go.fade > 0) { G.setScreenT(ctx); ctx.globalAlpha = go.fade; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
     },
   };

@@ -24,3 +24,16 @@ Run in this order (each one writes what the next reads):
    cutting closer only ate her). BiRefNet runs with the onnxruntime memory arena OFF (it leaks: OOM in ~22 frames).
 6. `icons.py`: the health icons off the health bar (outline rebuilt, the bar removed).
 7. `panorama.py` -> `stage_build.py`: the whole stage from every camera angle, filled under the girls, upscaled.
+8. `stage_fix.py`: where nobody ever saw the stage (always behind the player) the paint-in was a smear with her
+   ghost legs in it: rebuilt from the stage's own lines (black above the floor line, the floor rows, the real ramp
+   copied along its slant, the blue wall mirrored); three little shoe ghosts behind the opponent painted out.
+9. `cleanup.py`: the last pass on every cut-out frame. A pixel that matches the stage at its spot goes, but only
+   when the outside reaches it through other stage-matching pixels without crossing her black outline (inside
+   her outlines nothing goes: the first version punched holes through the player's sunglasses, the opponent's
+   black clothes and white soles, and the game showed the stage through them). "Matches" = closest of the plain
+   stage, the stage lit by the beat flash, the stage fitted to that frame tile by tile, and the stage's colour
+   groups re-coloured to that frame (the flash makes the navy wall much bluer than the floor).
+   Poses are cut from moments the lights don't flash where the song has them (her LEFT only ever comes in the
+   flashing parts) and from camera shots that show the player's whole body (the black bar cut her off before).
+10. `death_frames.py`: the end of the video is the mod's game over (shocked, skeleton flash, blue, the pink '?' of
+    smoke looping, the smoke going on retry): its frames at game-screen size + its shock sound + its music loop.
