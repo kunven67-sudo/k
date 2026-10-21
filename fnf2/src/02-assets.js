@@ -332,6 +332,8 @@ G.Packs = {
   async save(files) {
     const done = [];
     this.savedData = 0;
+    // (ask the browser to keep it for good: a phone low on space could clear a site's data otherwise)
+    try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) {}
     const list = [];
     for (const f of files) {
       if (/\.zip$/i.test(f.name || '')) { try { list.push(...await this.unzip(f)); } catch (e) { G.reportError(e, 'unzip ' + f.name); } }

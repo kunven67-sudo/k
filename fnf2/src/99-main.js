@@ -56,9 +56,11 @@ G.screens.noAssets = {
       G.vcr(ctx, 'Run tools/pack_assets.py, then tools/build.js', G.W / 2, 370, { align: 'center', size: 24 });
       return;
     }
-    G.vcr(ctx, 'FNF 2 needs its files one time.', G.W / 2, 250, { align: 'center', size: 34 });
-    G.vcr(ctx, 'TAP HERE and pick the FNF 2 zip you downloaded', G.W / 2, 330, { align: 'center', size: 28, color: '#FFE45C' });
-    G.vcr(ctx, '(you don\'t have to unzip it)', G.W / 2, 370, { align: 'center', size: 22 });
-    if (this.msg) G.vcr(ctx, this.msg, G.W / 2, 460, { align: 'center', size: 22, color: '#9CF' });
+    // (big: on a phone this is the only thing to read)
+    G.vcr(ctx, 'FNF 2 needs its files one time.', G.W / 2, 220, { align: 'center', size: 48 });
+    G.vcr(ctx, 'TAP ANYWHERE', G.W / 2, 330, { align: 'center', size: 64, color: '#FFE45C' });
+    G.vcr(ctx, 'and pick the FNF 2 zip you downloaded', G.W / 2, 400, { align: 'center', size: 36, color: '#FFE45C' });
+    G.vcr(ctx, '(it\'s in Downloads, you don\'t have to unzip it)', G.W / 2, 450, { align: 'center', size: 28 });
+    if (this.msg) G.vcr(ctx, this.msg, G.W / 2, 540, { align: 'center', size: 28, color: '#9CF' });
   },
 };
