@@ -53,7 +53,8 @@
   const save = () => { G.saveSettings(); if (G.audio) G.audio.applyVolumes(); };
   // preference rows: [label, type, get, set, desc, extra]
   const PREFS = [
-    ['Downscroll', 'bool', () => S().downscroll, v => S().downscroll = v, 'Notes move down toward the strumline at the bottom of the screen.'],
+    // (PC only: on a phone your tap arrows always sit at the bottom, Phone controls below)
+    ['Arrow Position', 'enum', () => S().downscroll ? 'bottom' : 'top', v => { S().downscroll = v === 'bottom'; }, 'PC: where your arrows sit during a song. TOP = notes fly up to them, like normal FNF. BOTTOM = notes fall down to them (downscroll).', ['top', 'bottom'], 'pc'],
     ['Middlescroll', 'bool', () => S().middlescroll, v => S().middlescroll = v, 'Your arrows sit in the middle and the opponent arrows are hidden.'],
     ['Ghost Tapping', 'bool', () => S().ghostTapping, v => S().ghostTapping = v, 'Pressing a key when there is no note does not count as a miss.'],
     ['Modcharts', 'bool', () => S().modcharts !== false, v => S().modcharts = v, 'Songs can move, swap + spin your arrows and add trick notes. Off = just the song.'],
@@ -132,7 +133,8 @@
     },
     buildPrefs() {
       this.page = 'prefs'; this.sel = 0; this.camY = 0;
-      this.rows = PREFS.map((r, i) => {
+      // (a row tagged 'pc' only shows on a computer, never on a phone)
+      this.rows = PREFS.filter(r => !(r[6] === 'pc' && G.touchMode)).map((r, i) => {
         const a = new G.Alphabet(r[0], true, 120, 120 * i);
         const cb = new G.Sprite(0, 0).loadSparrow('preload/images/checkboxThingie');
         cb.addAnim('off', 'Check Box unselected', 24, false); cb.addAnim('on', 'Check Box Selected Static', 24, false); cb.addAnim('turnOn', 'Check Box selecting animation', 24, false);

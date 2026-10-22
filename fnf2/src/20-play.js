@@ -2,7 +2,7 @@
 // trails, splashes, hold covers, PBOT1 scoring, health, combo popups, countdown,
 // camera focus/bops, song events, pause menu, game over. Uses FNF's real assets.
 (function () {
-  const PX_PER_MS = 0.45, HIT_WINDOW = 160, STRUM_SIZE = 104, SPACING = 112, INITIAL_OFFSET = -0.275 * STRUM_SIZE, NUDGE = 2;
+  const PX_PER_MS = 0.45, HIT_WINDOW = 160, STRUM_SIZE = 104, SPACING = 112, INITIAL_OFFSET = -0.275 * STRUM_SIZE, NUDGE = 2, STRUM_FRAME_H = 161;
   const DIR = ['Left', 'Down', 'Up', 'Right'], DIRL = ['left', 'down', 'up', 'right'], COLOR = ['Purple', 'Blue', 'Green', 'Red'];
   const SPLASH = { left: ['note impact 1 purple0', 'note impact 2 purple0'], down: ['note impact 1  blue0', 'note impact 2 blue0'], up: ['note impact 1 green0', 'note impact 2 green0'], right: ['note impact 1 red0', 'note impact 2 red0'] };
   const H = { max: 2, killer: 0.04, sick: 0.03, good: 0.015, bad: 0, shit: -0.02, miss: -0.08, holdPerSec: 0.12 };
@@ -89,7 +89,8 @@
   G.NoteKinds = G.NoteKinds || {};
   const kindOf = n => (n.kind && G.NoteKinds[n.kind]) || null;
   const isTrap = n => n.kind === 'eye' || !!(kindOf(n) && kindOf(n).trap);
-  const isReal = n => n.kind !== 'fake' && n.kind !== 'eye' && !(n.line === 1 && kindOf(n) && kindOf(n).trap);
+  // 'talk' = people TALKING in a video song: shown at 50% on the side of whoever talks, plays by itself, never counts
+  const isReal = n => n.kind !== 'fake' && n.kind !== 'eye' && n.kind !== 'talk' && !(n.line === 1 && kindOf(n) && kindOf(n).trap);
   // a note kind that is one of the singer's own animations plays it instead of a sing pose (Tankman's "ugh" in Ugh,
   // "heh, pretty good" in Stress, Darnell lighting / kicking / kneeing his can in 2hot)
   const KIND_ANIM = { 'weekend-1-lightcan': 'lightCan', 'weekend-1-kickcan': 'kickCan', 'weekend-1-kneecan': 'kneeCan', exHank: 'Hank' };
@@ -273,7 +274,9 @@
     setupHUD() {
       const st = G.settings;
       this.down = !!st.downscroll; this.middle = !!st.middlescroll;
-      const y = this.down ? G.H - STRUM_SIZE - 24 : 24;
+      // (downscroll like PlayState.initStrumlines: FlxG.height - strumline.height - 24, the strumline being as tall as
+      // a static arrow's whole frame: 230 x 0.7 = 161, so the arrows sit as far from the bottom as they do from the top)
+      const y = this.down ? G.H - STRUM_FRAME_H - 24 : 24;
       // (wide phone screens: both lines move in a bit, PlayState.initStrumlines' cutoutSize)
       const cut = G.CUT / 2.5;
       this.lines = [
@@ -548,6 +551,7 @@
       this.botHolding = false;
       for (const n of this.notes) {
         if (n.done) continue;
+        if (n.kind === 'talk') { if (pos >= n.t) { n.hit = n.done = true; this.talkHit(n); } continue; }
         if (!isReal(n)) { if (pos - n.t > HIT_WINDOW) n.done = true; continue; }     // decoys + traps just go by
         const L = this.lines[n.line];
         if (!L.player || bot) {
@@ -588,6 +592,12 @@
         }
         if (n.dropped && pos > n.holdEnd) n.done = true;
       }
+    },
+    // a talk note reaching its arrow: the arrow lights up, the one talking on the left 'sings' it (in a video song
+    // nobody stands there), the right side's (your side) are only the arrow: no score, health, combo or pose
+    talkHit(n) {
+      if (n.line === 0) { this.oppHit(n); return; }
+      const s = this.lines[1].strums[n.lane]; s.playA('confirm', true); s.confirmHold = 0;
     },
     oppHit(n) {
       const s = this.lines[0].strums[n.lane];
@@ -635,7 +645,7 @@
       const s = this.lines[1].strums[lane];
       let best = null, trap = null;
       for (const n of this.notes) {
-        if (n.done || n.hit || n.missed || n.line !== 1 || n.lane !== lane || n.kind === 'fake') continue;
+        if (n.done || n.hit || n.missed || n.line !== 1 || n.lane !== lane || n.kind === 'fake' || n.kind === 'talk') continue;
         const diff = n.t - pos;
         if (isTrap(n)) { if (Math.abs(diff) <= 110 && (!trap || n.t < trap.t)) trap = n; }    // a real note always wins
         else if (Math.abs(diff) <= HIT_WINDOW && (!best || n.t < best.t)) best = n;
@@ -1184,7 +1194,7 @@
           ctx.save(); ctx.translate(x, y);
           if (S.angle) { const c = f.fw * ns / 2; ctx.translate(c, c); ctx.rotate(S.angle * Math.PI / 180); ctx.translate(-c, -c); }
           ctx.scale(ns, ns);
-          ctx.globalAlpha *= (n.missed ? 0.3 : 1) * S.alpha;
+          ctx.globalAlpha *= (n.missed ? 0.3 : n.kind === 'talk' ? 0.5 : 1) * S.alpha;
           G.Sparrow.draw(ctx, notesSheet, f); ctx.restore();
         }
         for (const cv of this.covers) if (cv.line === li) {

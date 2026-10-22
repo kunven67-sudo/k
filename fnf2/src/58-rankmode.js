@@ -25,7 +25,7 @@
     // how many notes YOU hit in that chart (the opponent's don't count, nor fakes / don't-hit notes) + hold time
     chartInfo(id, variation, diff) {
       const c = G.Songs.chart(id, variation);
-      const ns = ((c && c.notes && c.notes[diff]) || []).filter(n => n.d < 4 && n.k !== 'fake' && n.k !== 'eye');
+      const ns = ((c && c.notes && c.notes[diff]) || []).filter(n => n.d < 4 && n.k !== 'fake' && n.k !== 'eye' && n.k !== 'talk');
       return { notes: ns.length || 300, holdMs: ns.reduce((a, n) => a + (n.l || 0), 0) };
     },
     // every number for a run that would really get this rank (same maths as the results screen)

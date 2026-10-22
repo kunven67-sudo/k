@@ -2,25 +2,28 @@
 
 A video song plays a video behind the arrows instead of a stage (Options > Video songs = Characters puts your
 picked player on a stage made from the video instead). You sing every sung line; whenever the people in the
-video TALK, arrows play by themselves on the other side.
+video TALK, see-through arrows play by themselves on the side of whoever talks (zombie = left, robot = right).
 
   Into Our Lives   two TikToks by kip.zig (Minecraft animation, the user's picks in fnf2/private/):
                    video-song-5.mp4 = the zombie + the robot talking about trying "that FNF stuff" over the beat,
-                   video-song-4.mp4 = the whole song. Both are the same beat (clip 4 = clip 5 + 3.0824 s), so the
-                   talk plays first, then the song comes in from its quiet intro.
+                   video-song-4.mp4 = the whole song. Both are the same beat (clip 4 = clip 5 + 3.0801 s).
+                   The talk clip plays up to J_TALK (an 8th after the robot's last word), then the song clip
+                   carries on from a point a whole number of bars earlier, so the groove never skips.
 
 What it does:
-  video   the sharp part of the TikTok frame (576x324 at y 350; the blurred bars + the TikTok name are cut off).
-          The first ~5 s of both clips have the TikTok logo ON the picture, so those seconds show the clean frames
-          right after it (same shot), slowed down to fill the gap. Joined, upscaled to 960x540, WebM.
-  audio   demucs (htdemucs) splits voices from the beat: Inst = the beat, Voices-talk = the talk (other side),
-          Voices-player = the singing (yours: goes quiet on a miss).
-  chart   notes from the vocals: syllable onsets (librosa), pitch (pYIN) -> lanes follow the melody inside each
-          phrase, long held notes -> holds, snapped to the beat grid (16ths or triplets) when close.
-          HARD = every syllable, NORMAL + EASY thinned. The talk's notes are the same on every difficulty.
+  video   the sharp part of the TikTok frame (576x324 at y 350; the blurred bars + the TikTok name are cut off),
+          every frame at its real time (no slowing down). Where the TikTok logo sits ON the picture (first ~5 s
+          of each clip) it is painted out (a mask of the logo found over many frames + inpainting).
+          Upscaled to 960x540, WebM.
+  audio   demucs (htdemucs) splits voices from the beat: Inst = the beat, Voices-talk = the talk,
+          Voices-player = the singing (yours: goes quiet on a miss). Joined with a short crossfade.
+  chart   notes from the vocals: syllable starts (librosa onsets, backtracked), pitch (pYIN) -> lanes follow the
+          melody inside each phrase, long held notes -> holds, snapped to the 155 BPM grid (16ths or triplets).
+          HARD = every syllable, NORMAL + EASY thinned. Talk notes (kind 'talk') are the same on every
+          difficulty: drawn at 50%, hit by themselves, never scored.
   extras  a stage picture from the video (Characters mode), health/freeplay icons from the robot's face.
 
-  python3 tools/own/video_song.py
+  python3 tools/own/video_song.py            (--video = only the video, --chart = only the notes)
 """
 import json, os, shutil, subprocess, sys
 import numpy as np
@@ -34,13 +37,31 @@ WORK = os.environ.get('VS_WORK', '/tmp/claude-0/vs')
 
 SID = 'into-our-lives'
 V_TALK, V_SONG = os.path.join(PRIV, 'video-song-5.mp4'), os.path.join(PRIV, 'video-song-4.mp4')
-BEAT = 0.580667                  # 103.33 bpm (autocorrelation over the whole song)
-OFF = 3.0824                     # song clip time = talk clip time + OFF
-J_TALK, J_SONG = 19.62, 3.30     # the talk ends here (talk clip) -> the song comes in from here (song clip)
-SONG_GRID0 = 0.0232              # first beat of the song clip's grid
-CLEAN_FROM = 5.0                 # the TikTok logo is on the picture before this (both clips)
+# the beat: 155 BPM (the hats run in 16ths of it; 103.3 was a dotted-quarter pulse and put notes on a wrong grid).
+# Bars of the song clip start at 0.0 s (kick + snare pattern), so on the joined timeline the first bar starts
+# right at the start too.
+BPM = 155.0
+BEAT = 60 / BPM
+BAR = 4 * BEAT
+SONG_GRID0 = -0.002              # a bar line of the song clip
+OFF = 3.0801                     # song clip time = talk clip time + OFF (cross-correlation of the two beats)
+# the talk ends (the robot's "...I guess I'll try") at 14.92 s of the talk clip; cut on the next 8th, then go back
+# exactly 9 bars in the song clip: same place in the bar, so the groove never trips, and the song comes in from its
+# intro (the singing starts ~5.05 s of the song clip)
+J_TALK = 15.1136
+J_SONG = J_TALK + OFF - 9 * BAR
+# who talks (talk clip seconds): the ZOMBIE (left, higher voice ~300 Hz) and the ROBOT (right, lower ~190 Hz)
+TALK_LINES = [
+    (0.00, 2.18, 'L'),    # zombie: "Hey, people really like that FNF stuff. You want to try it out?"
+    (2.20, 2.72, 'R'),    # robot: "I don't know."
+    (3.20, 6.45, 'L'),    # zombie shows how: "hey, hey, hey..."
+    (7.10, 9.48, 'R'),    # robot: "Sounds stupid when you try it. Why do I have to do it?"
+    (9.50, 12.06, 'L'),   # zombie: "Come on, since I did it, you have to do it. I don't want to look like an idiot alone."
+    (12.40, 14.95, 'R'),  # robot: "I don't even want to, but I guess I'll try."
+]
+LOGO_UNTIL = 5.05                # the TikTok logo sits on the picture until here (both clips)
+LOGO_BOX = (10, 110, 160, 90)    # x, y, w, h of the logo + name inside the band
 BAND = (0, 350, 576, 324)        # x, y, w, h of the sharp picture inside the 576x1024 TikTok frame
-FIRST_TALK_ARROWS = 7.0          # the first line ("people really like that FNF stuff") gets no arrows
 SR = 44100
 
 
@@ -84,83 +105,137 @@ def fade(a, n, out_=True):
 
 
 def audio(S):
-    """Inst + the two voice tracks on the combined timeline (talk, then the song)."""
-    jt, js = int(J_TALK * SR), int(J_SONG * SR)
-    xf = int(0.12 * SR)
-    inst = np.concatenate([fade(S['inst5'][:jt], xf), fade(S['inst4'][js:], int(0.03 * SR), False)])
-    talk = np.concatenate([fade(S['voc5'][:jt], int(0.04 * SR)), np.zeros_like(S['voc4'][js:])])
-    sing = np.concatenate([np.zeros_like(S['voc5'][:jt]), S['voc4'][js:]])
+    """Inst + the two voice tracks on the joined timeline (the talk, then the song from its intro). The cut is a
+    short crossfade on an 8th, 9 bars apart in the music, so it sounds like one take."""
+    jt, js, xf = int(round(J_TALK * SR)), int(round(J_SONG * SR)), int(0.03 * SR)
+    h = xf // 2
+    up = np.sin(np.linspace(0, np.pi / 2, xf))[:, None]; down = np.cos(np.linspace(0, np.pi / 2, xf))[:, None]
+    a, b = S['inst5'][:jt + h], S['inst4'][js - h:]
+    inst = np.concatenate([a[:-xf], a[-xf:] * down + b[:xf] * up, b[xf:]])
+    talk = S['voc5'][:jt].copy(); n = int(0.08 * SR); talk[-n:] *= np.linspace(1, 0, n)[:, None]
+    talk = np.concatenate([talk, np.zeros((len(inst) - len(talk), 2), np.float32)])
+    sing = np.concatenate([np.zeros((jt, 2), np.float32), S['voc4'][js:]])[:len(inst)]
     d = out('songs', SID, 'x')
-    for name, a in (('Inst', inst), ('Voices-talk', talk), ('Voices-player', sing)):
-        w = os.path.join(WORK, name + '.wav'); sf.write(w, a, SR)
-        run(['ffmpeg', '-y', '-i', w, '-c:a', 'libvorbis', '-q:a', '6', os.path.join(os.path.dirname(d), name + '.ogg')])
+    for name, w in (('Inst', inst), ('Voices-talk', talk), ('Voices-player', sing)):
+        f = os.path.join(WORK, name + '.wav'); sf.write(f, w, SR)
+        run(['ffmpeg', '-y', '-i', f, '-c:a', 'libvorbis', '-q:a', '6', os.path.join(os.path.dirname(d), name + '.ogg')])
     return len(inst) / SR
 
 
 # ---------------------------------------------------------------- video
-def video(total):
-    """the sharp picture of both clips, the logo seconds replaced by the clean ones slowed down, 960x540 WebM."""
+def logo_mask():
+    """the TikTok logo + @name: the pixels that look like the logo (white letters, its cyan/red edges) in EVERY one of
+    12 frames from both clips (the picture under it changes, the logo doesn't), grown a little for the soft edges."""
+    import cv2
     x, y, w, h = BAND
-    crop, scale = f'crop={w}:{h}:{x}:{y}', 'scale=960:540:flags=lanczos,setsar=1'
-    tmp = os.path.join(WORK, 'vparts'); os.makedirs(tmp, exist_ok=True)
-    # talk: the clean 5.0-19.62 s stretched over 0-19.62 s; song: clean 5.0-6.65 s over 3.30-6.65 s, then as it is
-    parts = [
-        (V_TALK, CLEAN_FROM, J_TALK, J_TALK),
-        (V_SONG, CLEAN_FROM, 6.65, 6.65 - J_SONG),
-        (V_SONG, 6.65, None, None),
-    ]
-    files = []
-    for i, (src, a, b, dur) in enumerate(parts):
-        f = os.path.join(tmp, f'p{i}.mp4')
-        cmd = ['ffmpeg', '-y', '-ss', str(a)] + (['-to', str(b)] if b else []) + ['-i', src, '-an']
-        if dur:
-            k = dur / (b - a)
-            vf = f'{crop},setpts={k:.6f}*PTS,minterpolate=fps=30:mi_mode=mci:mc_mode=aobmc:me_mode=bidir,{scale}'
-        else:
-            vf = f'{crop},fps=30,{scale}'
-        run(cmd + ['-vf', vf, '-c:v', 'libx264', '-crf', '12', '-preset', 'fast', f])
-        files.append(f)
-    lst = os.path.join(tmp, 'list.txt')
-    open(lst, 'w').write(''.join(f"file '{f}'\n" for f in files))
-    joined = os.path.join(tmp, 'joined.mp4')
-    run(['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', lst, '-c', 'copy', joined])
+    hs = []
+    for src in (V_SONG, V_TALK):
+        for t in (0.3, 1.2, 2.1, 3.0, 3.9, 4.8):
+            f = os.path.join(WORK, f'lg_{os.path.basename(src)}_{t}.png')
+            run(['ffmpeg', '-y', '-ss', str(t), '-i', src, '-frames:v', '1', '-vf', f'crop={w}:{h}:{x}:{y}', f])
+            hs.append(cv2.cvtColor(cv2.imread(f), cv2.COLOR_BGR2HSV).astype(np.int16))
+    H, S, V = (np.stack([q[..., i] for q in hs]) for i in range(3))
+    bgr = np.stack([cv2.cvtColor(q.astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32) for q in hs])
+    white = (V.min(0) > 165) & (S.max(0) < 70)
+    # the music-note icon's cyan + red edges: coloured and the same in every frame
+    col = (bgr.std(0).mean(2) < 26) & (S.mean(0) > 55) & (V.mean(0) > 70)
+    glyph = np.zeros_like(white); glyph[116:168, 12:62] = True
+    m = (white | (col & glyph)).astype(np.uint8) * 255
+    lx, ly, lw, lh = LOGO_BOX
+    box = np.zeros_like(m); box[ly:ly + lh, lx:lx + lw] = 1
+    return cv2.dilate(m * box, np.ones((3, 3), np.uint8), iterations=2)
+
+
+def frame_mask(f, base):
+    """the logo mask + whatever is cyan or red around the music-note icon in THIS frame (its soft coloured glow)."""
+    import cv2
+    hsv = cv2.cvtColor(f, cv2.COLOR_BGR2HSV).astype(np.int16); H, S, V = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    cr = ((np.abs(H - 88) < 16) | (H > 150) | (H < 10)) & (S > 45) & (V > 60)
+    g = np.zeros(cr.shape, bool); g[112:172, 8:66] = True
+    m = base.copy(); m[cv2.dilate((cr & g).astype(np.uint8), np.ones((3, 3), np.uint8), iterations=2) > 0] = 255
+    return m
+
+
+def frames(src, start, dur):
+    """the sharp band of a clip, 30 frames a second from start, as RGB arrays."""
+    x, y, w, h = BAND
+    p = subprocess.Popen(['ffmpeg', '-v', 'error', '-ss', f'{start:.4f}', '-t', f'{dur:.4f}', '-i', src, '-an',
+                          '-vf', f'crop={w}:{h}:{x}:{y},fps=30', '-f', 'rawvideo', '-pix_fmt', 'bgr24', '-'], stdout=subprocess.PIPE)
+    n = w * h * 3
+    while True:
+        b = p.stdout.read(n)
+        if len(b) < n: break
+        yield np.frombuffer(b, np.uint8).reshape(h, w, 3)
+    p.wait()
+
+
+def video(total):
+    """real frames all the way (nothing slowed down, so the picture matches the sound): the talk clip up to the cut,
+    then the song clip from its intro; the logo seconds painted out (inpainting), 960x540 WebM."""
+    import cv2
+    x, y, w, h = BAND
+    mask = logo_mask()
     dst = out('videos', SID + '.webm')
-    run(['ffmpeg', '-y', '-i', joined, '-t', f'{total:.3f}', '-c:v', 'libvpx-vp9', '-b:v', '1300k', '-crf', '33',
-         '-row-mt', '1', '-deadline', 'good', '-cpu-used', '4', '-an', dst])
+    enc = subprocess.Popen(['ffmpeg', '-y', '-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'bgr24', '-s', f'{w}x{h}', '-r', '30', '-i', '-',
+                            '-vf', 'scale=960:540:flags=lanczos,setsar=1', '-c:v', 'libvpx-vp9', '-b:v', '1300k', '-crf', '33',
+                            '-row-mt', '1', '-deadline', 'good', '-cpu-used', '4', '-an', dst], stdin=subprocess.PIPE)
+    n_talk = int(round(J_TALK * 30))
+    k = 0
+    # (each output frame k shows time k/30 of the joined timeline)
+    for src, start, count, clip_t0 in ((V_TALK, 0.0, n_talk, 0.0), (V_SONG, J_SONG + (n_talk / 30 - J_TALK), None, None)):
+        t_src0 = start
+        for i, f in enumerate(frames(src, start, (count / 30 + 0.2) if count else total - k / 30 + 0.5)):
+            if count is not None and i >= count: break
+            if k >= int(total * 30): break
+            if t_src0 + i / 30 < LOGO_UNTIL: f = cv2.inpaint(f, frame_mask(f, mask), 4, cv2.INPAINT_TELEA)
+            enc.stdin.write(np.ascontiguousarray(f).tobytes()); k += 1
+    enc.stdin.close(); enc.wait()
     return dst
 
 
 # ---------------------------------------------------------------- chart
-def vocal_notes(y, t0, t1, shift, sr=22050, min_gap=0.11, rel_db=-30):
-    """syllables of a vocal stem between t0 and t1 (clip time), as combined-timeline notes with pitch + length."""
+def vocal_notes(y, t0, t1, shift, sr=22050, min_gap=0.085, rel_db=-27):
+    """syllables of a vocal stem between t0 and t1 (clip time), as joined-timeline notes with pitch + length. A note
+    sits where its syllable STARTS (onset backtracked to the energy rise), like a charter would put it. Quiet bits
+    (breaths, demucs leftovers) under rel_db of the loud parts are skipped."""
     import librosa
     seg = y[int(t0 * SR):int(t1 * SR)]
     seg = librosa.resample(seg.mean(1) if seg.ndim > 1 else seg, orig_sr=SR, target_sr=sr)
-    hop = 256
-    ons = librosa.onset.onset_detect(y=seg, sr=sr, hop_length=hop, backtrack=False, units='frames', delta=0.06, wait=2)
+    hop = 128
+    env = librosa.onset.onset_strength(y=seg, sr=sr, hop_length=hop)
+    ons = librosa.onset.onset_detect(onset_envelope=env, sr=sr, hop_length=hop, backtrack=True, units='frames', delta=0.07, wait=4)
     rms = librosa.feature.rms(y=seg, frame_length=1024, hop_length=hop)[0]
     thr = np.percentile(rms[rms > 0], 95) * (10 ** (rel_db / 20))
     f0, voiced, _ = librosa.pyin(seg, fmin=70, fmax=1000, sr=sr, frame_length=2048, hop_length=hop)
     fps = sr / hop
+    # a sung note coming back in after a little gap (a new syllable on a long run the onset finder slid over)
+    extra = [i for i in range(8, len(voiced) - 8)
+             if voiced[i] and not voiced[i - 8:i].any() and rms[i:i + 8].max() > thr * 4
+             and not np.any(np.abs(ons - i) < 0.12 * fps)]
+    ons = np.array(sorted(set(int(o) for o in ons) | set(extra)))
     notes, last = [], -1e9
     for k, fr in enumerate(ons):
-        if rms[fr:fr + 4].max() < thr: continue
+        if rms[fr:fr + 8].max() < thr: continue
         t = fr / fps
         if t - last < min_gap: continue
         nxt = ons[k + 1] if k + 1 < len(ons) else len(rms)
-        # voiced run from the onset (a held syllable stays voiced)
+        # how long it is sung: from the first voiced frame (a consonant can come first), through tiny breaks
         e = fr
-        while e < len(voiced) - 1 and (voiced[e] or voiced[e + 1]) and rms[e] > thr * 0.5: e += 1
-        p = f0[fr:fr + 8]; p = p[~np.isnan(p)]
+        while e < min(fr + 12, len(voiced) - 1) and not voiced[e]: e += 1
+        gap_ = 0
+        while e < len(voiced) - 1 and rms[e] > thr * 0.5 and gap_ <= 8:
+            gap_ = 0 if voiced[e] else gap_ + 1; e += 1
+        e -= gap_
+        p = f0[fr:fr + 16]; p = p[~np.isnan(p)]
         pitch = float(np.median(12 * np.log2(p / 440))) if len(p) else None
-        notes.append(dict(t=t + t0 + shift, len=(min(e, nxt) - fr) / fps, pitch=pitch, gap=(nxt - fr) / fps))
+        notes.append(dict(t=t + t0 + shift, len=max(0, min(e, nxt) - fr) / fps, pitch=pitch, gap=(nxt - fr) / fps))
         last = t
     return notes
 
 
 def snap(t, grid0):
-    """onto the beat grid when close: 16ths first, then triplets (8th/16th)."""
-    for div, tol in ((4, 0.04), (6, 0.03)):
+    """onto the beat grid when close: 16ths first, then 16th triplets."""
+    for div, tol in ((4, 0.036), (6, 0.02)):
         step = BEAT / div; q = grid0 + round((t - grid0) / step) * step
         if abs(q - t) <= tol: return q
     return t
@@ -202,39 +277,44 @@ def to_chart(notes, side, hold_min):
 
 
 def thin(notes, min_gap, hold_min):
-    out, last = [], -1e9
+    """fewer notes for easier charts: none closer than min_gap; a long held note always stays (it is the line you
+    hear most), the quick note just before it goes instead."""
+    out = []
     for n in notes:
-        if n['t'] - last < min_gap: continue
-        out.append(n); last = n['t']
+        if out and n['t'] - out[-1]['t'] < min_gap:
+            if n['len'] >= 0.8 and out[-1]['len'] < 0.8 and (len(out) < 2 or n['t'] - out[-2]['t'] >= min_gap): out[-1] = n
+            continue
+        out.append(n)
     return out, hold_min
 
 
 def chart(S):
-    talk = vocal_notes(S['voc5'], FIRST_TALK_ARROWS, J_TALK - 0.02, 0, min_gap=0.14)
+    """your notes = every sung syllable of the song; the talk = notes on the side of whoever talks (zombie left,
+    robot right), kind 'talk': 50% see-through, they play by themselves and never count."""
+    talk = []
+    for a, b, side in TALK_LINES:
+        ns = lanes(vocal_notes(S['voc5'], a, min(b + 0.05, J_TALK), 0, min_gap=0.13))
+        for n in ns: n['side'] = side
+        talk += ns
     sing = vocal_notes(S['voc4'], J_SONG, len(S['voc4']) / SR, J_TALK - J_SONG)
     g0 = c_from_song(SONG_GRID0)
     for n in sing: n['t'] = snap(n['t'], g0)
-    talk, sing = lanes(talk), lanes(sing)
-    notes, speed = {}, {'easy': 1.7, 'normal': 2.1, 'hard': 2.5}
-    for diff, (gap, hold) in {'easy': (0.42, 0.55), 'normal': (0.21, 0.42), 'hard': (0.0, 0.34)}.items():
+    sing = lanes(sing)
+    notes, speed = {}, {'easy': 1.8, 'normal': 2.2, 'hard': 2.6}
+    tk = [dict(t=round(n['t'] * 1000, 2), d=(4 if n['side'] == 'L' else 0) + n['lane'], k='talk') for n in talk]
+    for diff, (gap, hold) in {'easy': (0.36, 0.5), 'normal': (0.18, 0.38), 'hard': (0.0, 0.3)}.items():
         s, h = thin(sing, gap, hold)
-        tk, _ = thin(talk, 0.3 if diff == 'easy' else 0.0, 9)
-        notes[diff] = sorted(to_chart(s, 'player', h) + to_chart(tk, 'opp', 9), key=lambda q: (q['t'], q['d']))
+        notes[diff] = sorted(to_chart(s, 'player', h) + tk, key=lambda q: (q['t'], q['d']))
     events = [dict(t=0, e='FocusCamera', v=dict(char=0))]
     json.dump(dict(version='2.0.0', scrollSpeed=speed, events=events, notes=notes, generatedBy='FNF 2 - tools/own/video_song.py'),
               open(out('preload', 'data', 'songs', SID, SID + '-chart.json'), 'w'))
-    return {d: sum(1 for q in v if q['d'] < 4) for d, v in notes.items()}, len(talk)
+    return {d: sum(1 for q in v if q.get('k') != 'talk') for d, v in notes.items()}, len(tk)
 
 
 def metadata(total):
-    # beats: the talk clip's grid, one quick beat at the join, then the song clip's grid
-    a0 = (SONG_GRID0 - OFF) % BEAT
-    last_a = a0 + int((J_TALK - a0) / BEAT) * BEAT
-    g0 = c_from_song(SONG_GRID0); first_b = g0 + np.ceil((last_a + 0.05 - g0) / BEAT) * BEAT
-    bpm = round(60 / BEAT, 4)
-    tc = [dict(t=round(a0 * 1000, 3), b=0, bpm=bpm, bt=[4, 4, 4, 4]),
-          dict(t=round(last_a * 1000, 3), bpm=round(60 / (first_b - last_a), 4), bt=[4, 4, 4, 4]),
-          dict(t=round(first_b * 1000, 3), bpm=bpm, bt=[4, 4, 4, 4])]
+    # one tempo: the joined timeline keeps the song's bars (the cut is whole bars), the first bar line ~15 ms in
+    t0 = (J_TALK - J_SONG + SONG_GRID0) % BAR
+    tc = [dict(t=round(t0 * 1000, 3), b=0, bpm=BPM, bt=[4, 4, 4, 4])]
     m = dict(version='2.2.4', songName='Into Our Lives', artist='kip.zig', charter='FNF 2', offsets={},
              playData=dict(difficulties=['easy', 'normal', 'hard'],
                            characters=dict(player='bf', girlfriend='', opponent='kip-talk', instrumental='', playerVocals=['player'], opponentVocals=['talk']),
@@ -304,6 +384,10 @@ def pictures():
 
 def main():
     if '--pictures' in sys.argv: pictures(); return
+    if '--chart' in sys.argv:       # (just the notes again)
+        print('player notes', chart(stems())); return
+    if '--video' in sys.argv:       # (just the video again: the length comes from the built Inst)
+        print('video', video(sf.info(os.path.join(OWN, 'songs', SID, 'Inst.ogg')).duration)); return
     if os.path.isdir(OWN): shutil.rmtree(OWN)
     S = stems()
     total = audio(S)
