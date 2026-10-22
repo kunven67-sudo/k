@@ -24,8 +24,7 @@
       P.jor = { path: d.path || null, blackouts: d.blackouts || [], card: d.card || [2.0, 6.9], lights: d.lights || [],
         lit: (P.stage.props || []).find(p => p.name === 'lights') || null };
       // (the game over's frames + sounds load with the song, so dying never waits for them)
-      const go = G.SongFX.jordus.gameOver;
-      G.Sparrow.load(go.sheet); G.audio.preload([go.sfx, go.music]);
+      G.SongFX.jordus.gameOver.preload();
     },
     // (the pictures get sized for the closest the camera ever gets)
     maxZoom(P) { const p = P.jor && P.jor.path; let z = 0; if (p) for (const c of p) z = Math.max(z, c[3]); return z; },
@@ -108,6 +107,7 @@
   // the game over: the mod's own, on the screen (frames from the end of the video), its shock sound + music loop
   G.SongFX.jordus.gameOver = {
     sfx: 'shared/sounds/jordus/death.ogg', music: 'shared/music/jordus/gameOver.ogg', sheet: 'shared/images/characters/nightly/death',
+    preload() { G.Sparrow.load(this.sheet); G.audio.preload([this.sfx, this.music]); },
     sprite() {
       const s = new G.Sprite(0, 0).loadSparrow(this.sheet);
       if (!s.sheet) return null;

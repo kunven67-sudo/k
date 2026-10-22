@@ -14,8 +14,10 @@ G.DIFF_ORDER = ['easy', 'normal', 'hard', 'erect', 'nightmare', 'og'];
 G.PLAYER_IDS = ['bf', 'pico', 'darnell', 'tankman', 'nene'];
 G.playerOf = function (charId) {
   if (!charId) return 'bf';
-  if (G.PLAYER_IDS.includes(charId)) return charId;
+  if (G.PLAYER_IDS.includes(charId) || (G.PLAYERS && G.PLAYERS[charId])) return charId;
   for (const id of G.PLAYER_IDS) { const d = G.A.json('preload/data/players/' + id + '.json'); if (d && (d.ownedChars || []).includes(charId)) return id; }
+  // (new players made from a gameplay character: the Jordus girl is 'nightly' when nightly-player sings)
+  for (const id in G.PLAYERS || {}) { const R = G.PLAYERS[id].real; if (R && (R.char === charId || R.songChar === charId)) return id; }
   return String(charId).startsWith('pico') ? 'pico' : 'bf';
 };
 
@@ -57,7 +59,16 @@ G.Songs = {
       out.sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));
       return out;
     }
-    if (G.realPlayer && G.realPlayer(player)) return out;
+    // a song made for a new player (she's the song's own player: the Jordus girl in Jordus): played as it is
+    const RP = G.realPlayer && G.realPlayer(player);
+    if (RP) {
+      const pc = (base.playData.characters || {}).player;
+      if (pc && (pc === RP.real.char || pc === RP.real.songChar) && this.chart(id) && this.hasAudio(id, 'default', base)) {
+        for (const d of base.playData.difficulties || []) out.push({ diff: d, variation: 'default' });
+        out.sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));
+      }
+      return out;
+    }
     const vars = ['default'].concat(base.playData.songVariations || []);
     // (a player's mod pack brings its own variation of a song without patching the song's metadata: two packs
     // patching the same file would hide each other's)

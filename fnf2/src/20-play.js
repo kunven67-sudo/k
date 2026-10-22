@@ -247,6 +247,8 @@
       // a song's own stage effects (setup / reset / update / beat / event / drawOver)
       this.sfx = (G.SongFX && (G.SongFX[s.id + '@' + s.variation] || G.SongFX[s.id])) || (s.video && G.VideoSongFX) || (G.StageFX && G.StageFX[s.stage]) || null;
       if (this.sfx && this.sfx.setup) try { this.sfx.setup(this); } catch (e) { G.reportError(e, 'song fx'); this.sfx = null; }
+      // (the player's own game over loads with the song too, so dying never waits for it)
+      { const PG = G.PLAYERS && G.PLAYERS[G.playerOf(this.bf && this.bf.id)]; const go = PG && PG.gameOver && PG.gameOver(); if (go && go.preload) try { go.preload(); } catch (e) {} }
       this.stageZoom = this.stage.zoom;
       this.cam = new G.FCam(this.stageZoom);
       this.hud = new G.HudCam();
@@ -1013,7 +1015,9 @@
       const pid = G.playerOf(bf.id), pico = pid === 'pico';
       const suffix = pid !== 'bf' && G.A.has('shared/music/gameplay/gameover/gameOver-' + pid + '.ogg') ? '-' + pid : '';
       const lossSfx = 'shared/sounds/gameplay/gameover/fnf_loss_sfx-' + pid + '.ogg';
-      const ov = (this.sfx && this.sfx.gameOver) || null;   // (a mod stage's own game over sound + music: Genocide)
+      // (a mod stage's own game over sound + music: Genocide; or the player's own whole game over: the Jordus girl)
+      const PG = G.PLAYERS && G.PLAYERS[pid] && G.PLAYERS[pid].gameOver;
+      const ov = (this.sfx && this.sfx.gameOver) || (PG && PG()) || null;
       G.sfx(ov && ov.sfx ? ov.sfx : pico ? 'deathPico' : suffix && G.A.has(lossSfx) ? lossSfx : 'death');
       // (a song can bring its own whole game over, drawn on the screen instead of the player: Jordus)
       const spr = ov && ov.sprite ? ov.sprite(this) : null;
@@ -1365,7 +1369,15 @@
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
       const go = this.gameOver;
       // (a game over made of whole-screen pictures sits in the middle of a wide phone screen)
-      if (go.spr) { G.screenOff.x += G.CUT / 2; go.spr.draw(ctx, null); G.screenOff.x -= G.CUT / 2; } else this.bf.draw(ctx, this.cam);
+      if (go.spr) {
+        G.screenOff.x += G.CUT / 2; go.spr.draw(ctx, null);
+        // retry: she lights up (FNF's retry glow: BF flashes bright on deathConfirm), fading as the screen goes dark
+        if (go.phase === 'confirm') {
+          const k = Math.max(0, 1 - go.ct / 1.2) * (0.55 + 0.45 * Math.abs(Math.sin(go.ct * 9)));
+          if (k > 0.01) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= k; go.spr.draw(ctx, null); go.spr.draw(ctx, null); ctx.restore(); }
+        }
+        G.screenOff.x -= G.CUT / 2;
+      } else this.bf.draw(ctx, this.cam);
       if (go.fade > 0) { G.setScreenT(ctx); ctx.globalAlpha = go.fade; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
       go.age = (go.age || 0) + G.dt;
       if (go.backBtn && G.touchMode && go.phase !== 'confirm' && go.phase !== 'exit') { G.setScreenT(ctx); go.backBtn.update(G.dt); go.backBtn.draw(ctx); }

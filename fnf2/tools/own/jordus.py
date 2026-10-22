@@ -118,6 +118,26 @@ ANIMS = {
 }
 
 
+# the cap girl's idle (+ some RIGHT frames) came out of the video with a flat black block stuck to her hip: a piece of
+# the dark building behind her (pure 0,0,0, while her own black clothes have a little shine), always in the same spot
+# of the box. On her own stage it hid in the dark, anywhere else (Character Select) it showed. Cut it off along her
+# thigh + shin (her edge, frame coords) and the block's own edges; only near-black pixels go, so her red stripes stay.
+BLOCK_POLY = [(745, 380), (720, 400), (680, 425), (640, 455), (576, 580), (582, 596), (710, 560), (900, 562), (900, 358),
+              (750, 358)]
+
+
+def drop_block(im):
+    from PIL import Image, ImageDraw
+    a = np.array(im); al = a[..., 3] > 0; mc = a[..., :3].max(-1)
+    if a.shape[0] < 560 or a.shape[1] < 900: return im
+    if (al[400:500, -12:] & (mc[400:500, -12:] < 12)).mean() <= 0.8: return im      # (no block in this frame)
+    m = Image.new('L', (a.shape[1], a.shape[0]), 0); ImageDraw.Draw(m).polygon(BLOCK_POLY, fill=255)
+    cut = (np.array(m) > 0) & (mc < 14) & al
+    a[cut, 3] = 0
+    a[330:360, 785:900, 3] = 0                          # (+ the navy window ledge on top of it)
+    return Image.fromarray(a)
+
+
 def atlas(who, name, extra=None):
     """one sparrow sheet: every frame trimmed, same frames shared, frameX/Y keep them all lined up (the box)"""
     from PIL import Image
@@ -126,7 +146,7 @@ def atlas(who, name, extra=None):
     for anim, (src, a, b) in ANIMS[who].items():
         for i, n in enumerate(a if isinstance(a, list) else range(a, b)):
             p = os.path.join(WORK, 'out_clean', who, f'{src}_{n:02d}.png')
-            if os.path.exists(p): frames.append((anim, i, Image.open(p).convert('RGBA')))
+            if os.path.exists(p): frames.append((anim, i, drop_block(Image.open(p).convert('RGBA')) if who == 'opp' else Image.open(p).convert('RGBA')))
     for anim, ims in (extra or {}).items():
         for i, im in enumerate(ims): frames.append((anim, i, im))
     uniq, refs = {}, []
@@ -159,9 +179,10 @@ def atlas(who, name, extra=None):
 
 
 def misses_and_death():
-    """the player never missed in the video: her misses = her poses in FNF's miss purple, a little shake;
+    """the player never missed in the video: her misses = her poses in FNF's miss purple (mostly grey, then purple,
+    like BF's miss frames: a light tint was hard to see on her purple stage) + a flinch shake;
     her death = her down miss held dark, then lit up white for the retry"""
-    from PIL import Image, ImageChops
+    from PIL import Image, ImageChops, ImageOps
     extra = {}
     for anim, (src, a, b) in ANIMS['plr'].items():
         if not anim.startswith('sing'): continue
@@ -169,9 +190,10 @@ def misses_and_death():
         for k, n in enumerate((a if isinstance(a, list) else list(range(a, b)))[:5]):
             im = Image.open(os.path.join(WORK, 'out_clean', 'plr', f'{src}_{n:02d}.png')).convert('RGBA')
             r, g, bl, al = im.split()
-            tint = Image.merge('RGB', (r, g, bl))
-            tint = ImageChops.multiply(tint, Image.new('RGB', im.size, (150, 140, 255)))
-            sh = [6, -5, 3, -2, 0][k]
+            rgb = Image.merge('RGB', (r, g, bl))
+            tint = Image.blend(rgb, ImageOps.grayscale(rgb).convert('RGB'), 0.8)
+            tint = ImageChops.multiply(tint, Image.new('RGB', im.size, (170, 140, 255)))
+            sh = [12, -9, 6, -3, 0][k]
             frame = Image.new('RGBA', im.size, (0, 0, 0, 0)); frame.paste(Image.merge('RGBA', (*tint.split(), al)), (sh, 0))
             ims.append(frame)
         extra[anim + 'miss'] = ims
@@ -214,7 +236,16 @@ def icons():
     for cid in (OPP, PLR):
         shutil.copyfile(os.path.join(WORK, 'icons', 'icon-' + cid + '.png'), out('preload', 'images', 'icons', 'icon-' + cid + '.png'))
         im = Image.open(os.path.join(WORK, 'icons', 'icon-' + cid + '.png')).crop((0, 0, 150, 150))
-        im.resize((32, 32), Image.LANCZOS).resize((64, 64), Image.NEAREST).save(out('preload', 'images', 'freeplay', 'icons', cid + 'pixel.png'))
+        # (FNF's pixel icons: tiny pixel art in a 50x50 frame that the game doubles; a 64 px one showed twice as big)
+        px = im.resize((38, 38), Image.LANCZOS)
+        a = px.getchannel('A').point(lambda v: 255 if v > 110 else 0); px.putalpha(a)
+        frame = Image.new('RGBA', (50, 50), (0, 0, 0, 0)); frame.paste(px, (6, 10), px)
+        # (a 1 px black line all round, like FNF's pixel icons: the 150 px icon's thin outline gets lost when shrunk)
+        from PIL import ImageFilter
+        ring = frame.getchannel('A').filter(ImageFilter.MaxFilter(3))
+        under = Image.new('RGBA', (50, 50), (0, 0, 0, 255)); under.putalpha(ring)
+        frame = Image.alpha_composite(under, frame)
+        frame.save(out('preload', 'images', 'freeplay', 'icons', cid + 'pixel.png'))
 
 
 # ---------------------------------------------------------------- the stage
@@ -325,11 +356,15 @@ def metadata(length):
              generatedBy='FNF 2 - tools/own/jordus.py', timeChanges=[dict(t=0, b=0, bpm=125, n=4, d=4, bt=[4, 4, 4, 4])])
     json.dump(m, open(out('preload', 'data', 'songs', SID, SID + '-metadata.json'), 'w'), indent=1)
     json.dump(dict(version='1.0.0', name="NIGHTLY FUNKIN'", titleAsset='storymenu/titles/tutorial', visible=False, props=[],
-                   background='#2b1d5c', capsule=dict(name='NIGHTLY'), songs=[SID]),
+                   background='#2b1d5c', capsule=dict(name='NIGHTLY'), songs=[SID], players=['nightly']),   # (her song: only in HER list)
               open(out('preload', 'data', 'levels', 'nightly.json'), 'w'), indent=1)
 
 
 def main():
+    if '--chars' in sys.argv:       # (just the two girls' sheets + character files again)
+        print('animation frames', characters()); return
+    if '--icons' in sys.argv:       # (just the health + pixel icons again)
+        icons(); return
     if os.path.isdir(OWN): shutil.rmtree(OWN)
     length = audio(); print('song', round(length, 2), 's')
     print('notes (yours per difficulty, hers)', *chart())

@@ -43,6 +43,46 @@
   // Cassandra on the speakers, DJ, card, mixes, results, death. Without the pack she's the stand-in above.
   G.PLAYERS.nene = { id: 'nene', pack: 'nenemix', name: 'Nene', pos: 1, chill: CS + 'neneplayerChill', gf: { asset: CS + 'dipshitCass', viz: false },
     nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene };
+  // the Jordus girl (Nightly Funkin', rebuilt from a video: tools/own/jordus.py): her real gameplay animations do
+  // everything (character select, DJ spot, results), Jordus is in HER list (+ the songs anyone can sing), and the
+  // mod's own death screen is her game over in every song. Only there when the jordus pack is.
+  const NIGHTLY = { name: 'JORDUS', col: '#E8513A' };
+  // her buddy on the speakers: the cap girl she battles in Jordus, bopping + posing with her real moves from the song
+  const capGirl = () => {
+    const fig = new RealFig({ char: 'nightly-opp', flip: false });
+    return { id: 'nightly', name: 'idle', fig, visible: true,
+      play(n) { this.name = n; if (n === 'confirm') fig.anim('singUP'); else fig.dance(); return true; },
+      update(dt) { fig.update(dt, 15 / 90); },
+      draw(ctx, cam) { fig.draw(ctx, cam, 335, 614, 0.47, null); } };
+  };
+  G.PLAYERS.nightly = real('nightly', { pack: 'jordus', name: NIGHTLY.name, pos: 2, icon: 'nightly-player', gf: { make: capGirl },
+    nametagImg: () => G.boldNametag(NIGHTLY.name, NIGHTLY.col), menuColor: '#F08A78',
+    gameOver: () => G.SongFX && G.SongFX.jordus && G.SongFX.jordus.gameOver,
+    real: { char: 'nightly-player', flip: true, scale: 1.1, select: 'singLEFT', win: 'singUP', lose: 'singDOWNmiss', hey: 'singRIGHT', die: 'singLEFTmiss', retry: 'singLEFT', dj: { x: 200, y: 706, k: 1.0 } },
+    freeplay: { text1: NIGHTLY.name, text2: "NIGHTLY FUNKIN'", text3: 'SHADES ON, LIGHTS OUT', colors: ['#FFD9D2', '#FF9F8C', '#FFF1EE', '#D8432E', '#FFFFFF', '#A82A1E', '#FF6E57', '#F0553E'] } });
+  // a nametag for a player FNF never lettered, like the real ones (letters in the player's colour, a black ink
+  // line, a white rim round the word): from FNF's bold menu alphabet, which has every letter (the hand-inked main
+  // menu letters nametags.py uses have no J, U, G, H...)
+  G.boldNametag = function (word, col) {
+    const a = new G.Alphabet(word, true, 0, 0), R = 7, pad = R + 2;
+    const w = Math.ceil(a.width) + pad * 2, h = Math.ceil(a.height) + pad * 2;
+    return G.cached('boldtag:' + word + col, w, h, c => {
+      // the word once (each letter is its own picture: cutting with them one by one would keep only the last)
+      const Wd = G.makeCanvas(w, h);
+      a.x = pad; a.y = pad; a.draw(Wd.getContext('2d'), { apply: x => x.setTransform(1, 0, 0, 1, 0, 0) });
+      // white letters -> the colour (multiply keeps the shading + the black ink)
+      const L = G.makeCanvas(w, h), lx = L.getContext('2d');
+      lx.drawImage(Wd, 0, 0);
+      lx.globalCompositeOperation = 'multiply'; lx.fillStyle = col; lx.fillRect(0, 0, w, h);
+      lx.globalCompositeOperation = 'destination-in'; lx.drawImage(Wd, 0, 0);
+      // the white rim: the word's shape in white, pushed out all round
+      const S = G.makeCanvas(w, h), sx = S.getContext('2d');
+      sx.drawImage(Wd, 0, 0);
+      sx.globalCompositeOperation = 'source-in'; sx.fillStyle = '#FFFFFF'; sx.fillRect(0, 0, w, h);
+      for (let i = 0; i < 24; i++) { const t = i / 24 * Math.PI * 2; c.drawImage(S, Math.round(Math.cos(t) * R), Math.round(Math.sin(t) * R)); }
+      c.drawImage(L, 0, 0);
+    });
+  };
   // the main menu in the picked player's colour (BF keeps FNF's yellow)
   const MENU_COLORS = { pico: '#8FA4F2', darnell: '#A483EE', nene: '#F592C4', tankman: '#BAC47E' };
   G.menuColor = pid => (pid && pid !== 'bf' && G.PLAYERS[pid] && (G.PLAYERS[pid].menuColor || MENU_COLORS[pid])) || null;
