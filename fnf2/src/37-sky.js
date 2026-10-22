@@ -84,6 +84,8 @@
         const k = this.fadeOut >= 0 ? Math.max(0, 1 - this.fadeOut / 0.6) : 1;
         G.setScreenT(ctx);
         ctx.save(); ctx.globalAlpha = 0.75 * this.back * k; ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, G.W, G.H); ctx.restore();
+        // (the mod's box + portraits are made for 1280 wide: in the middle of a wide phone screen)
+        G.screenOff.x += G.CUT / 2; G.setScreenT(ctx);
         ctx.save(); ctx.globalAlpha *= k;
         if (this.cur && this.box.animName === 'idle') this.cur.draw(ctx, null);
         this.box.draw(ctx, null);
@@ -98,6 +100,7 @@
           });
         }
         ctx.restore();
+        G.screenOff.x -= G.CUT / 2; G.setScreenT(ctx);
       },
     };
     return d.start();
@@ -211,7 +214,7 @@
         enter(S) { S.black = 0; S.pic = G.A.image(IMG + pick[0] + '.png'); G.audio.music.play(MUS + pick[1] + '.ogg', { loop: false, vol: 1, restart: true }); },
         dur: 10.4, skippable: true,
         update(S) { S.picA = S.t < 10 ? Math.min(1, S.t / 2) : Math.max(0, 1 - (S.t - 10) / 0.4); },
-        draw(S, ctx) { if (S.pic) { G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.save(); ctx.globalAlpha = S.picA || 0; ctx.drawImage(G.srcImg(S.pic), 0, 0, G.W, G.H); ctx.restore(); } },
+        draw(S, ctx) { if (S.pic) { G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); G.drawFit(ctx, G.srcImg(S.pic), S.picA || 0); } },
       }, { enter(S) { S.black = 1; G.audio.music.stop(0.3); }, dur: 0.1 }]);
     },
   };

@@ -139,13 +139,14 @@ window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document
 // code needs). Missing on this phone: a little box on the title screen with the same two buttons as the first time.
 G.phoneUpdate = {
   ZIP: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/fnf2-phone-update.zip',
-  NEED: ['mobile'],
-  missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && this.NEED.some(id => !G.Packs.has(id)); },
+  NEED: { mobile: 2 },   // (pack -> the version the code needs: v2 = + the PRO MODE menu word)
+  old(id) { return !G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]; },
+  missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },
   show() {
     if (this.box || this.closed || !this.missing()) return;
     const d = this.box = document.createElement('div');
     d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
-    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: the real FNF mobile buttons (small download)';
+    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: PRO MODE + the real FNF mobile buttons (small download)';
     const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
     const get = btn('1  GET IT', '#9CF', 'a'); get.href = this.ZIP; get.target = '_blank'; get.rel = 'noopener';
@@ -156,7 +157,7 @@ G.phoneUpdate = {
       const files = [...(inp.files || [])]; if (!files.length) return;
       msg.textContent = 'Taking it out of the zip...';
       const got = await G.Packs.save(files);
-      if (got.some(m => this.NEED.includes(m.id))) { msg.textContent = 'Done! Starting again...'; setTimeout(() => location.reload(), 600); }
+      if (got.some(m => m.id in this.NEED)) { msg.textContent = 'Done! Starting again...'; setTimeout(() => location.reload(), 600); }
       else msg.textContent = 'That is not the phone update zip. Tap GET IT, then PICK IT.';
     };
     const x = btn('LATER', '#888', 'span'); x.onclick = () => { this.closed = true; this.hide(); };

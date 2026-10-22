@@ -382,7 +382,7 @@
         else if (p.mode === 'rank') G.setScreen('freeplay', { rankMode: true, fromResults: true, rank: this.rank, oldRank: p.prevRank || null, songId: p.song, diff: p.diff, variation: p.variation, playRankAnim: true }, inst);
         else {
           const better = !p.cheated && G.Rank.better(this.rank, p.prevRank);
-          G.setScreen('freeplay', { fromResults: true, rank: this.rank, oldRank: p.prevRank || null, songId: p.song, diff: p.diff, variation: p.variation, playRankAnim: better }, inst);
+          G.setScreen('freeplay', { fromResults: true, proMode: !!p.pro, rank: this.rank, oldRank: p.prevRank || null, songId: p.song, diff: p.diff, variation: p.variation, playRankAnim: better }, inst);
         }
       };
       if (G.stickers) G.stickers.cover(this.player, go); else go();

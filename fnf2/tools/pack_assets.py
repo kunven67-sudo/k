@@ -357,7 +357,7 @@ PACK_INFO = {
     'jordus': {'name': "Nightly Funkin' (Jordus)", 'credit': "the Nightly Funkin' team (song, characters, stage); rebuilt from a gameplay video"},
     'videosongs': {'name': 'Video Songs', 'credit': 'kip.zig (the Minecraft animation + song of Into Our Lives)'},
     'tankman': {'name': 'Playable Tankman', 'credit': 'Adamatik, PugSquad, Kawai Nuka-Cola, Skellix, JakeOfficial, Pumkin, Shroomii, Camiiix3 + team'},
-    'mobile': {'name': 'FNF mobile pictures', 'credit': "The Funkin' Crew (FNF mobile)", 'core': True},
+    'mobile': {'name': 'FNF mobile pictures', 'credit': "The Funkin' Crew (FNF mobile)", 'core': True, 'v': 2},
     'tricky': {'name': 'VS Tricky', 'credit': 'Banbuds, Rozebud, KadeDev, Cval, YingYang48, JADS, Moro + team (original), thisaintcub, PurSnake + LeonidKosherny (V-Slice port), ChuckySkullHead (Madness Erect), angelkireina (Pico mixes)'},
 }
 # small pictures the menus need right away (icons, freeplay capsules, album art, character select) live in the head

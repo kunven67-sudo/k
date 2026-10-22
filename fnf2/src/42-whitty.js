@@ -370,7 +370,7 @@
       enter(S) { S.pic = G.A.image(IMG + pic + '.png'); },
       skippable: true,
       update(S) { S.black = Math.max(0, 1 - S.t); },
-      draw(S, ctx) { G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); if (S.pic) ctx.drawImage(G.srcImg(S.pic), 0, 0, G.W, G.H); },
+      draw(S, ctx) { G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); if (S.pic) G.drawFit(ctx, G.srcImg(S.pic)); },
     },
   ]);
 

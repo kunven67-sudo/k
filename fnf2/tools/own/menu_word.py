@@ -7,8 +7,9 @@ the letters are put back together into a new word. Letters FNF never drew are bu
 (K = the R's stem + its leg, plus the leg flipped up for the top arm).
 
   RANK MODE -> preload/images/mainmenu/rankmode.png/.xml ('rankmode idle' x9, 'rankmode selected' x3)
+  PRO MODE  -> preload/images/mainmenu/promode.png/.xml (same)
 
-  python3 tools/own/menu_word.py
+  python3 tools/own/menu_word.py [rankmode,promode]
 """
 import os, re
 import numpy as np
@@ -25,6 +26,7 @@ OUT = os.path.join(ROOT, 'build', 'own', 'preload', 'images', 'mainmenu')
 LETTERS = {
     'R': ('freeplay', 1), 'A': ('freeplay', -2), 'N': ('options', -2),
     'M': ('storymode', 5), 'O': ('storymode', 6), 'D': ('storymode', 7), 'E': ('storymode', 8),
+    'P': ('freeplay', 4),
 }
 
 
@@ -32,7 +34,7 @@ LETTERS = {
 SPECIAL = {}
 
 # idle letters FNF drew too small/squashed: drawn from the selected letter's shape instead (scale)
-FROM_SELECTED = {'A': 0.66}
+FROM_SELECTED = {'A': 0.66, 'P': 0.72}
 
 
 def frames(name):
@@ -247,11 +249,15 @@ def write_sheet(name, anims):
     open(os.path.join(OUT, name + '.xml'), 'w').write('\n'.join(lines) + '\n')
 
 
-def main():
-    idle = [build_word('RANK MODE', 'idle', i) for i in range(3)]
-    sel = [build_word('RANK MODE', 'selected', i) for i in range(3)]
-    write_sheet('rankmode', [('rankmode idle', idle, 3), ('rankmode selected', sel, 1)])
-    print('wrote', os.path.join(OUT, 'rankmode.png'), idle[0].size, sel[0].size)
+def main(words=(('RANK MODE', 'rankmode'), ('PRO MODE', 'promode'))):
+    import sys
+    out = sys.argv[1] if len(sys.argv) > 1 else None
+    for word, name in words:
+        if out and name not in out.split(','): continue
+        idle = [build_word(word, 'idle', i) for i in range(3)]
+        sel = [build_word(word, 'selected', i) for i in range(3)]
+        write_sheet(name, [(name + ' idle', idle, 3), (name + ' selected', sel, 1)])
+        print('wrote', os.path.join(OUT, name + '.png'), idle[0].size, sel[0].size)
 
 
 if __name__ == '__main__':

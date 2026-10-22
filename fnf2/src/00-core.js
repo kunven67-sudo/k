@@ -225,6 +225,15 @@ G.screenZoom = 1; G.screenOff = { x: 0, y: 0 };
 // a screen made for 1280 wide (base1280: true) is drawn in the middle of a wider phone screen: while it runs, G.W is
 // 1280 and every transform moves over by G.ox (like FNF mobile's states that add gameCutoutSize / 2 to everything)
 G.ox = 0;
+// a full-screen picture or video that keeps its shape on a wide phone (VideoCutscene: fit + centre, black at the sides)
+G.drawFit = function (ctx, img, alpha) {
+  const w0 = img.videoWidth || img.naturalWidth || img.width, h0 = img.videoHeight || img.naturalHeight || img.height;
+  if (!w0 || !h0) return;
+  const k = Math.min(G.W / w0, G.H / h0), w = w0 * k, h = h0 * k;
+  if (alpha != null) { ctx.save(); ctx.globalAlpha *= alpha; }
+  ctx.drawImage(img, (G.W - w) / 2, (G.H - h) / 2, w, h);
+  if (alpha != null) ctx.restore();
+};
 G.in1280 = function (fn) {
   const scr = G.screen;
   if (!scr || !scr.base1280 || !G.CUT) return fn();

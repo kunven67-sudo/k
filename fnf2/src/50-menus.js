@@ -221,6 +221,7 @@ G.screens.mainMenu = {
     { name: 'options', go: () => G.setScreen(G.screens.options ? 'options' : 'mainMenu', { from: 'mainMenu' }) },
     { name: 'credits', go: () => G.setScreen(G.screens.credits ? 'credits' : 'mainMenu', {}) },
     { name: 'rankmode', go: () => G.setScreen(G.screens.freeplay ? 'freeplay' : 'mainMenu', { rankMode: true }) },
+    { name: 'promode', go: () => G.setScreen(G.screens.freeplay ? 'freeplay' : 'mainMenu', { proMode: true }), need: 'preload/images/mainmenu/promode.png' },
   ],
   sel: 0,
   enter() {
@@ -239,14 +240,15 @@ G.screens.mainMenu = {
     // the menu doesn't scroll to the picked item (it all fits), it leans a little when you tilt the phone
     this.touch = !!G.touchMode;
     this.optBtn = null; this.optFade = 1;
-    let list = this.ITEMS;
+    let list = this.ITEMS.filter(it => !it.need || G.A.has(it.need));     // (PRO MODE's word comes with the phone update / packs)
     if (this.touch && G.TouchButton && G.A.has('preload/images/mainmenu/optionsButton.png')) {
       list = list.filter(it => it.name !== 'options');
       const go = this.ITEMS.find(it => it.name === 'options').go;
       this.optBtn = new G.TouchButton('preload/images/mainmenu/optionsButton', 35, G.H - 210, 0.7, () => { this.state = 'leaving'; go(); }, { prefix: 'options', rest: 1, holdFrame: 3, confirmFrom: 4, confirmTo: 17 });
     }
     if (this.touch) { this.bg.scroll.x = 0.17; this.magenta.scroll.x = 0.17; }
-    const n = list.length, spacing = 160, top = (G.H - spacing * (n - 1)) / 2;
+    // (phones: the camera doesn't scroll, so a longer list moves closer together to fit)
+    const n = list.length, spacing = this.touch ? Math.min(160, (G.H - 140) / Math.max(1, n - 1)) : 160, top = (G.H - spacing * (n - 1)) / 2;
     this.items = list.map((it, i) => {
       const s = new G.Sprite(0, 0).loadSparrow('preload/images/mainmenu/' + it.name);
       s.addAnim('idle', it.name + ' idle', 24, true); s.addAnim('selected', it.name + ' selected', 24, true);

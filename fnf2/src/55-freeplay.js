@@ -921,6 +921,7 @@
       this.tw = new Tw();
       this.tp = null; this.flickV = 0; this.selF = 0; this.diffDrag = 0; this.dragOff = 0;
       this.rankMode = !!p.rankMode; this.editor = null;   // RANK MODE: the same menu, fake ranks + scores (58-rankmode.js)
+      this.proMode = !!p.proMode && !this.rankMode;        // PRO MODE: the same menu, songs played the pro way, own scores
       // the new players (Darnell, Nene, Tankman: 59-charselect.js) get the songs they really sang in (played swapped,
       // in their real voice), shown in BF's freeplay style
       const sp = G.settings.player;
@@ -1099,7 +1100,7 @@
     // a song's saved result (in RANK MODE: the fake one, kept apart from the real ones)
     recFor(s, d) {
       const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '') + (this.realP ? '-as-' + this.player : '');
-      return this.rankMode && G.RankMode ? G.RankMode.get(key, this.diff) : G.getScore(key, this.diff, 'bf');
+      return this.rankMode && G.RankMode ? G.RankMode.get(key, this.diff) : G.getScore((this.proMode ? 'pro:' : '') + key, this.diff, 'bf');
     },
     // ------------------------------------------------------------ selection
     changeSelection(change, silent) {
@@ -1207,7 +1208,7 @@
           onComplete: () => {
             if (this.went) return; this.went = true;
             G.audio.music.stop(0);
-            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, swap: this.pending.swap, week: null, deaths: 0 }, { instant: true });
+            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, swap: this.pending.swap, week: null, deaths: 0 , pro: this.proMode}, { instant: true });
           },
         });
       });
@@ -1248,7 +1249,7 @@
         this.tw.after(delay, () => this.toCharSelect());
         return;
       }
-      const go = () => { G.settings.player = this.player === 'pico' ? 'bf' : 'pico'; G.saveSettings && G.saveSettings(); this.enter({ rankMode: this.rankMode }); };
+      const go = () => { G.settings.player = this.player === 'pico' ? 'bf' : 'pico'; G.saveSettings && G.saveSettings(); this.enter({ rankMode: this.rankMode, proMode: this.proMode }); };
       if (this.dj.play('charSelect')) this.tw.after(0.45, go); else go();
     },
     // FreeplayState.transitionToCharSelect / enterFromCharSel: everything slides up (backIn) while the
@@ -1262,7 +1263,7 @@
       this.tw.to(C, { fade: 0 }, 0.8, E.quadIn);
       for (const d of this.dots) this.tw.to(d, { alpha: 0 }, 0.3, E.quartOut);
       G.audio.music.setVolume(0, 0.9);
-      this.tw.after(0.9, () => { G.audio.music.stop(0); G.setScreen('charSelect', { from: 'freeplay', character: this.player, rankMode: this.rankMode }, { instant: true }); });
+      this.tw.after(0.9, () => { G.audio.music.stop(0); G.setScreen('charSelect', { from: 'freeplay', character: this.player, rankMode: this.rankMode, proMode: this.proMode }, { instant: true }); });
     },
     enterFromCharSel() {
       const C = this.cs;
@@ -1678,13 +1679,13 @@
       at('top');
       ctx.fillStyle = '#000'; ctx.fillRect(0, this.overhangY, W, 164);
       if (this.textsVis) {
-        const fpImg = textImg(this.rankMode ? 'RANK MODE' : 'FREEPLAY', G.FONT.vcr, 48, '#FFFFFF', this.stroke ? { stroke: 2 } : null);
+        const fpImg = textImg(this.rankMode ? 'RANK MODE' : this.proMode ? 'PRO MODE' : 'FREEPLAY', G.FONT.vcr, 48, '#FFFFFF', this.stroke ? { stroke: 2 } : null);
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, fpImg._tw + 16, fpImg.height + 16 - fpImg._pad * 2);
         ctx.drawImage(fpImg, 8 - fpImg._pad, 8 - fpImg._pad);
         const ost = textImg(this.group().label, G.FONT.vcr, 48, '#FFFFFF', { stroke: 2 });
         ctx.drawImage(ost, W - 8 - ost._tw - ost._pad, 8 - ost._pad);
       }
-      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
+      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : this.proMode ? (G.touchMode ? 'Tap your arrows like crazy, you can\'t miss' : 'Mash your note keys, you can\'t miss') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
       if (!this.searchEl) ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
       G.screenOff.y = oy; G.setScreenT(ctx);
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }

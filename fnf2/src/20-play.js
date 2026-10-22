@@ -363,6 +363,8 @@
       this.countBeat = -99; this.started = false;
       this.keys = [false, false, false, false];
       this.botplay = !!G.settings.botplay; this.practice = !!G.settings.practice;
+      // PRO MODE: any of your note keys / arrows hits the next note coming, always SICK (own scores, botplay off)
+      this.pro = !!this.params.pro; if (this.pro) this.botplay = false;
       this.popups = []; this.splashes = []; this.covers = [];
       this.vocalsOn = true;
       for (const L of this.lines) for (const s2 of L.strums) { s2.playA('static', true); s2.confirmHold = -1; s2.mx = s2.my = s2.ma = 0; s2.mal = 1; s2.x = s2.bx; s2.y = s2.by; s2.angle = 0; s2.alpha = 1; s2.visible = true; }
@@ -412,7 +414,7 @@
       this.updateNotes(jpos, dt);
       // characters, stage, cameras
       const stepSec = this.cond.stepCrochet / 1000;
-      const holding = this.keys.some(k => k) || this.botHolding;
+      const holding = (!this.pro && this.keys.some(k => k)) || this.botHolding;
       for (const c of [this.gf, this.dad, this.bf]) if (c) { c.playHealth = this.health; c.tick(dt, stepSec, c === this.bf ? holding : false); }
       this.stage.update(dt);
       if (this.sfx && this.sfx.update) this.sfx.update(this, dt);
@@ -423,7 +425,7 @@
         s.update(dt); centerOffsets(s); if (s.animName === 'confirm') { s.offset.x -= 13; s.offset.y -= 13; }
         s.x = s.bx + s.mx; s.y = s.by + s.my + (this.strumShift || 0); s.angle = s.ma; s.alpha = s.mal;
         if (s.confirmHold >= 0) { s.confirmHold += dt; if (s.confirmHold >= 0.15) { s.confirmHold = -1; s.playA('static', true); } }
-        if (s.player && s.animName === 'confirm' && s.finished && !this.botplay) { if (this.keys[s.dir]) s.playA('press', true); }
+        if (s.player && s.animName === 'confirm' && s.finished && !this.botplay && !this.pro) { if (this.keys[s.dir]) s.playA('press', true); }
       }
       this.splashes = this.splashes.filter(sp => { sp.update(dt); return !sp.finished; });
       this.covers = this.covers.filter(cv => { cv.update(dt); if (cv.ending && cv.finished) return false; return true; });
@@ -568,6 +570,12 @@
           continue;
         }
         // player notes
+        if (this.pro && n.proQ && !n.hit && !n.missed && pos >= n.t) { n.hit = true; n.holding = n.len > 0; n.proHold = true; this.playerHit(n, 0, true); }
+        if (this.pro && n.hit && n.holding && n.proHold) {
+          if (pos >= n.holdEnd) { n.holding = false; n.done = true; this.finishHold(n); }
+          else { this.botHolding = true; this.holdTick(n, dt); }
+          continue;
+        }
         if (!n.hit && !n.missed && pos - n.t > HIT_WINDOW) { n.missed = true; this.noteMiss(n); if (n.len <= 0) n.done = true; }
         if (n.missed && pos > n.holdEnd + HIT_WINDOW) n.done = true;
         if (n.hit && n.holding) {
@@ -622,6 +630,7 @@
     press(lane, e) {
       if (this.botplay || !this.started) return;
       this.keys[lane] = true;
+      if (this.pro) { this.proPress(this.pressTime(e) - (G.settings.offset || 0)); return; }
       const pos = this.pressTime(e) - (G.settings.offset || 0);
       const s = this.lines[1].strums[lane];
       let best = null, trap = null;
@@ -642,7 +651,28 @@
     release(lane) {
       this.keys[lane] = false;
       const s = this.lines[1].strums[lane];
-      if (!this.botplay) s.playA('static', true);
+      if (!this.botplay && !this.pro) s.playA('static', true);
+    },
+    // PRO MODE press: whatever lane you hit, the next note that isn't taken yet gets taken. One a bit late is hit
+    // right now; else the next one coming (up to a second early is fine) waits and is hit the moment it reaches its
+    // arrow, together with the notes of the same chord + a run packed tighter than 90ms right after it (16th/32nd
+    // runs, trills: nobody mashes that fast). Traps + fake arrows are never taken. Nothing to take = nothing happens.
+    proPress(pos) {
+      let first = null;
+      for (const n of this.notes) {
+        if (n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n)) continue;
+        if (n.t - pos > 1000) break;
+        if (pos - n.t > HIT_WINDOW) continue;
+        first = n; break;
+      }
+      if (!first) return;
+      let last = first.t;
+      for (const n of this.notes) {
+        if (n.t < first.t || n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n)) continue;
+        if (n.t - last > 90) break;
+        n.proQ = true; last = n.t;
+        if (n.t <= pos) { n.hit = true; n.holding = n.len > 0; n.proHold = true; this.playerHit(n, 0, true); }
+      }
     },
     playerHit(n, diffMs, auto) {
       const s = this.lines[1].strums[n.lane];
@@ -687,7 +717,7 @@
     },
     finishHold(n) {
       const s = this.lines[1].strums[n.lane];
-      if (this.botplay) { s.confirmHold = 0; } else s.playA(this.keys[n.lane] ? 'press' : 'static', true);
+      if (this.botplay || this.pro) { s.confirmHold = 0; } else s.playA(this.keys[n.lane] ? 'press' : 'static', true);
       const cv = this.covers.find(c => c.note === n); if (cv) { if (cv.hasAnim('end')) { cv.play('end', true); cv.ending = true; } else this.covers.splice(this.covers.indexOf(cv), 1); }
       this.score = Math.round(this.score);
     },
@@ -955,7 +985,7 @@
     exitToMenu() {
       G.audio.music.stop(0);
       if (this.audio) this.audio.stop();
-      G.setScreen(this.params.mode === 'story' ? 'storyMenu' : 'freeplay', {});
+      G.setScreen(this.params.mode === 'story' ? 'storyMenu' : 'freeplay', { proMode: !!this.pro });
     },
     // -------------------------------------------------- game over
     die() {
@@ -1043,7 +1073,7 @@
       // V-Slice style tallies + rank (results screen, freeplay rank badges + clear %)
       const tl = this.tally, sick = (tl.killer || 0) + tl.sick;
       stats.tallies = { sick, good: tl.good, bad: tl.bad, shit: tl.shit, missed: tl.miss, maxCombo: this.maxCombo, totalNotesHit: sick + tl.good + tl.bad + tl.shit, totalNotes: stats.totalNotes };
-      const scoreKey = s.id + (s.variation !== 'default' ? '-' + s.variation : '') + (this.playAs ? '-as-' + this.playAs.id : '');
+      const scoreKey = (this.pro ? 'pro:' : '') + s.id + (s.variation !== 'default' ? '-' + s.variation : '') + (this.playAs ? '-as-' + this.playAs.id : '');
       const prev = G.getScore(scoreKey, p.diff, 'bf');
       const prevRank = prev ? (prev.rank || null) : null;
       let isNewHighscore = false;
@@ -1054,9 +1084,9 @@
         ws.score += stats.score; ws.misses += stats.misses; ws.maxCombo = Math.max(ws.maxCombo, stats.maxCombo); ws.totalNotes += stats.totalNotes;
         for (const k in ws.tally) ws.tally[k] += stats.tally[k] || 0; ws.accSum += this.accSum; ws.accN += this.accN;
         if (p.songIndex + 1 < p.songs.length) { G.setScreen('play', Object.assign({}, p, { songIndex: p.songIndex + 1, weekStats: ws, deaths: 0 })); return; }
-        const weekBest = !cheated && !!p.week && G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
+        const weekBest = !cheated && !this.pro && !!p.week && G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
         G.setScreen(G.screens.results ? 'results' : 'storyMenu', { mode: 'story', week: p.week, diff: p.diff, newBest: weekBest, stats: Object.assign({}, ws, { acc: ws.accN ? ws.accSum / ws.accN : 0 }), title: (G.A.json('preload/data/levels/' + p.week + '.json') || {}).name || p.week, player: this.resultsPlayer() });
-      } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, title: s.name, player: this.resultsPlayer(), prevRank, isNewHighscore, cheated });
+      } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, title: s.name, player: this.resultsPlayer(), prevRank, isNewHighscore, cheated, pro: this.pro });
     },
     // who the results screen shows: the player you picked (Nene sings her own songs as 'nene-playable', a sprite
     // the results screen doesn't know, so it fell back to BF + GF), else the character that sang

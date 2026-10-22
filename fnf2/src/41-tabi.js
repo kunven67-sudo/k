@@ -257,7 +257,7 @@
       const T = P.tabi;
       // each side's arrows a bit closer together, in the middle of its half of the screen (the HUD is made after
       // the stage, so this happens here, once)
-      if (!T.laid && !P.middle) for (const L of P.lines) {
+      if (!T.laid && !P.middle && !P.phoneArrows) for (const L of P.lines) {     // (not with the phone arrows: they keep FNF mobile's layout)
         const sp = L.strums[1].bx - L.strums[0].bx, io = L.strums[0].bx - L.x;
         L.x = G.W * (L.player ? 0.75 : 0.25) - 4 * sp * 0.975 / 2;
         L.strums.forEach((s, i) => { s.x = s.bx = L.x + i * sp * 0.975 + io; });

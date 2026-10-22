@@ -30,7 +30,7 @@
       if (S.t >= 8) return;
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
       if (!S.pic || S.picA <= 0) return;
-      ctx.save(); ctx.globalAlpha = S.picA; ctx.drawImage(G.srcImg(S.pic), 0, 0, G.W, G.H); ctx.restore();
+      G.drawFit(ctx, G.srcImg(S.pic), S.picA);
     },
   });
 
@@ -58,7 +58,7 @@
       if (!S.vidBlack) return;
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
       const v = S.video;
-      if (v && v.readyState >= 2) ctx.drawImage(v, 0, 0, G.W, G.H);
+      if (v && v.readyState >= 2) G.drawFit(ctx, v);
     },
     leave(S) { if (S.video) { try { S.video.pause(); } catch (e) {} S.video = null; } },
   };

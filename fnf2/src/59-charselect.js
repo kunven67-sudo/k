@@ -472,7 +472,7 @@
       p = p || {};
       this.tw = new G.Tw();
       this.from = p.from || 'freeplay';
-      this.rankMode = !!p.rankMode;
+      this.rankMode = !!p.rankMode; this.proMode = !!p.proMode;
       this.remembered = p.character || G.settings.player || 'bf';
       if (!G.PLAYERS[this.remembered]) this.remembered = 'bf';
       // the grid: which player sits where
@@ -618,7 +618,7 @@
           if (this.went) return; this.went = true;
           G.audio.music.stop(0);
           if (!back && pick && pick !== 'locked') { G.settings.player = pick; G.saveSettings(); }
-          G.setScreen('freeplay', { fromCharSelect: true, rankMode: this.rankMode, character: G.settings.player }, { instant: true });
+          G.setScreen('freeplay', { fromCharSelect: true, rankMode: this.rankMode, proMode: this.proMode, character: G.settings.player }, { instant: true });
         },
       });
     },

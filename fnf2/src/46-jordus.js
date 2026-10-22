@@ -31,7 +31,7 @@
     maxZoom(P) { const p = P.jor && P.jor.path; let z = 0; if (p) for (const c of p) z = Math.max(z, c[3]); return z; },
     reset(P) {
       P.zoomRate = 0;                   // (the bops are in the replayed camera already)
-      if (P.jor && P.jor.path) { const c = camAt(P.jor.path, 0); P.cam.focus(c[1], c[2]); P.camZoom = c[3]; }
+      if (P.jor && P.jor.path) { const c = camAt(P.jor.path, 0), v = this.fit(P, c[1], c[2], c[3]); P.cam.focus(v[0], v[1]); P.camZoom = v[2]; }
     },
     update(P) {
       const J = P.jor;
@@ -45,8 +45,21 @@
       if (!J.path || P.gameOver) return;
       const c = camAt(J.path, Math.max(0, P.songPos) / 1000);
       P.camTween = null;
-      P.cam.focus(c[1], c[2]);
-      P.camZoom = c[3];
+      const v = this.fit(P, c[1], c[2], c[3]);
+      P.cam.focus(v[0], v[1]);
+      P.camZoom = v[2];
+    },
+    // the replayed camera was made for a 1280 wide screen and the stage is only as big as the video showed it:
+    // a wider screen (phones) would see past its edges (black). Zoom in just enough + slide back inside.
+    fit(P, x, y, z) {
+      if (!P.jor.box) { const s = (P.stage.props || []).find(p => p.name === 'street'); if (s && s.width > 0) P.jor.box = { l: s.x, r: s.x + s.width, t: s.y, b: s.y + s.height }; }
+      const st = P.jor.box;
+      if (!st) return [x, y, z];
+      const vis = G.H - 2 * BAR;
+      z = Math.max(z, G.W / (st.r - st.l), vis / (st.b - st.t));
+      const hw = G.W / 2 / z, hh = vis / 2 / z;
+      x = G.clamp(x, st.l + hw, st.r - hw); y = G.clamp(y, st.t + hh, st.b - hh);
+      return [x, y, z];
     },
     // the bars + the card: over the stage, under the HUD (like the mod)
     drawOver(ctx, P) {

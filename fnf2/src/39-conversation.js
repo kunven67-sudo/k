@@ -40,8 +40,8 @@
   }
   const animOffsets = d => { const o = {}; for (const a of d.animations || []) o[a.name] = a.offsets || [0, 0]; return o; };
 
-  function Speaker(id) {
-    const d = json('speakers', id); if (!d) return null;
+  function Speaker(id, js) {
+    const d = (js || json)('speakers', id); if (!d) return null;
     const sp = plain(d.assetPath, d); if (!sp) return null;
     const f0 = sp.sheet.frames[0], off = d.offsets || [0, 0], ao = animOffsets(d);
     const bx = (G.W - f0.fw) / 2 + off[0], by = (G.H - f0.fh) / 2 + off[1];
@@ -53,8 +53,8 @@
   }
 
   let measure = null;
-  function DialogueBox(id) {
-    const d = json('boxes', id); if (!d) return null;
+  function DialogueBox(id, js) {
+    const d = (js || json)('boxes', id); if (!d) return null;
     const sp = plain(d.assetPath, d); if (!sp) return null;
     const off = d.offsets || [0, 0], ao = animOffsets(d), T = Object.assign({ offsets: [0, 0], width: 300, size: 32, color: '#000000', shadowWidth: 0 }, d.text || {});
     const gx = G.W / 2 + off[0], gy = G.H / 2 + off[1];   // (the group is still empty when FNF centres it)
@@ -120,6 +120,9 @@
   // one conversation: states Opening (box pops in) -> Speaking (typing) -> Idle (waiting for ENTER) -> ... -> Ending
   G.Conversation = function (id, opt) {
     opt = opt || {};
+    // (speakers + boxes come from the same mod as the conversation)
+    const pack = G.Packs && G.Packs.packOf(D + 'conversations/' + id + '.json');
+    const json = (kind, i) => pack ? G.Packs.jsonIn(pack, D + kind + '/' + i + '.json') : G.A.json(D + kind + '/' + i + '.json');
     const data = json('conversations', id);
     const C = {
       done: false, state: 'start', entry: 0, line: 0, alpha: 1, back: 0, outT: -1, speakers: {}, boxes: {}, speaker: null, box: null,
@@ -136,7 +139,7 @@
       openBox() {
         const E = this.E, bid = E.box || '';
         if (!this.box || this.box.id !== bid) {
-          this.box = this.boxes[bid] || (this.boxes[bid] = DialogueBox(bid));
+          this.box = this.boxes[bid] || (this.boxes[bid] = DialogueBox(bid, json));
           if (this.box) { this.box.onDone = () => { this.state = 'idle'; }; this.box.lines = []; this.box.shown = 0; this.box.full = ''; this.box.len = 0; }
         }
         if (this.box && E.boxAnimation) this.box.play(E.boxAnimation);
@@ -144,7 +147,7 @@
       },
       showSpeaker() {
         const E = this.E, sid = E.speaker || '';
-        if (!this.speaker || this.speaker.id !== sid) this.speaker = sid ? (this.speakers[sid] || (this.speakers[sid] = Speaker(sid))) : null;
+        if (!this.speaker || this.speaker.id !== sid) this.speaker = sid ? (this.speakers[sid] || (this.speakers[sid] = Speaker(sid, json))) : null;
         if (this.speaker && E.speakerAnimation) this.speaker.play(E.speakerAnimation);
       },
       text() { return (this.E.text || [])[this.line] || ''; },

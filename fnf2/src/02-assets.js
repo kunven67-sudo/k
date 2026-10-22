@@ -215,6 +215,7 @@ G.A = {
 G.Packs = {
   all: {},              // id -> {id, name, credit, src: 'folder' | 'saved', head: true when it's in, body: {path: [bytes, w, h]}, bodyLoaded}
   owner: new Map(),     // a body file's path -> its pack
+  heads: new Map(),     // a head file's path -> every pack that brings it (two mods can both have 'speakers/bf.json')
   previews: new Map(),  // 'songs/x/Inst.ogg' -> [from, to] (seconds): the preview cut into the head as path + '#preview'
   folder: [],           // what packs/index.js lists
   keep: G.phone ? 0 : 1,   // how many packs not in use stay loaded (PC: the last one, so playing it again is instant)
@@ -235,6 +236,8 @@ G.Packs = {
     if (this.all[meta.id] && this.all[meta.id].head) return;   // (the folder one wins over a saved copy)
     const p = this.all[meta.id] = Object.assign(this.all[meta.id] || {}, meta, { head: true, bodyLoaded: false, src: this._src || 'folder' });
     Object.assign(G.A.raw, head);
+    p.headFiles = head;
+    for (const k in head) { const l = this.heads.get(k); if (l) l.push(meta.id); else this.heads.set(k, [meta.id]); }
     for (const k in p.body) this.owner.set(k, p);
     for (const k in p.previews || {}) this.previews.set(k, p.previews[k]);
     // its weeks go after the others in story mode + freeplay
@@ -248,6 +251,16 @@ G.Packs = {
     if (p._parts >= (n || 1)) p.bodyLoaded = true;
   },
   partName(id, k) { return id + '.body' + (k > 1 ? k : '') + '.js'; },
+  // which pack a head file came from (the first one that has it), and a json read from one pack's own copy
+  // (a mod's talking scene uses its own speakers, not another mod's file with the same name)
+  packOf(path) { const l = this.heads.get(path); return l ? l[0] : null; },
+  jsonIn(id, path) {
+    const p = id && this.all[id], t = p && p.headFiles && p.headFiles[path];
+    if (typeof t !== 'string' || t.startsWith('data:')) return G.A.json(path);
+    p._json = p._json || new Map();
+    if (!p._json.has(path)) { let v = null; try { v = JSON.parse(t); } catch (e) {} p._json.set(path, v); }
+    return p._json.get(path);
+  },
   // ---- body: loaded when one of its files is asked for
   needBody(p) {
     if (p.bodyLoaded) return Promise.resolve(true);
