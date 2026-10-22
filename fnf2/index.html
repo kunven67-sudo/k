@@ -10611,7 +10611,7 @@ G.screens.storyMenu = {
   // ---------------------------------------------------------------- the DJ (Animate atlas placed with its stage matrix)
   class DJ {
     constructor(player) {
-      this.data = (G.A.json('preload/data/players/' + player + '.json') || {}).freeplayDJ || {};
+      this.data = (G.A.json('preload/data/players/' + player + '.json') || {}).freeplayDJ || (G.PLAYERS && G.PLAYERS[player] && G.PLAYERS[player].djData) || {};
       this.atlas = G.Atlas.load(G.A.imagePath(this.data.assetPath || 'freeplay/freeplay-boyfriend', 'preload'));
       this.prefix = {};
       for (const a of this.data.animations || []) this.prefix[a.name] = a.prefix;
@@ -11429,7 +11429,7 @@ G.screens.storyMenu = {
       this.rankFx = p.fromResults && p.playRankAnim && p.rank ? { pending: true, fade: 1, bgA: 0, zoom: 1, funny: 1, vigA: 0, shakeT: 0 } : null;
       // card, DJ
       this.card = this.player === 'pico' ? new PicoCard(this) : this.player === 'tankman' && !this.realP && IMG('freeplay/tankman/sky') ? new TankmanCard(this, this.player) : this.player === 'nene' && !this.realP && IMG('freeplay/nenecard/bg') ? new NeneCard(this, this.player) : new Card(this, this.player);
-      this.dj = this.realP ? new G.RealDJ(this.player) : new DJ(this.player);
+      this.dj = this.realP && !this.realP.djData ? new G.RealDJ(this.player) : new DJ(this.player);
       // background art (cut on a slant) + the black panel that slides in first
       this.bgImg = IMG(style.bgAsset || 'freeplay/freeplayBGweek1-bf') || IMG('freeplay/freeplayBGweek1-bf');
       this.bgX = this.card.pw * 0.74; this.bgVis = false; this.bgColor = '#000000';
@@ -12389,7 +12389,7 @@ G.screens.storyMenu = {
       const T = this.tallies = st.tallies || this.toTallies(st);
       this.rank = p.forceRank || G.Rank.calc(T) || 'SHIT';   // RANK MODE picks its own rank
       this.player = G.playerOf(p.player || 'bf');
-      const pdata = (G.A.json('preload/data/players/' + this.player + '.json') || {}).results || {};
+      const pdata = (G.A.json('preload/data/players/' + this.player + '.json') || {}).results || (G.PLAYERS && G.PLAYERS[this.player] && G.PLAYERS[this.player].results) || {};
       this.musicName = (pdata.music || {})[this.rank] || 'resultsNORMAL';
       // characters for this rank (safe versions)
       this.chars = [];
@@ -12402,7 +12402,7 @@ G.screens.storyMenu = {
       }
       // the new players (59-charselect.js) have no results art: they show up big with their own moves
       const RP = G.realPlayer && G.realPlayer(p.player);
-      if (RP) this.chars = [this.makeReal(RP)];
+      if (RP && !RP.results) this.chars = [this.makeReal(RP)];
       // static pieces
       this.soundSystem = sparrowAnim('soundSystem', 'sound system');
       this.resultsAnim = sparrowAnim('results', 'results instance 1');
@@ -12475,6 +12475,8 @@ G.screens.storyMenu = {
       const asset = sc.asset || String(ad.assetPath || '').replace(/^shared:/, '').replace(/^resultScreen\//, '');
       const s = new G.Sprite(off[0] + CUT / 2, off[1]).loadAtlas('shared/images/resultScreen/' + asset);
       if (!s.atlas) return null;
+      // (stagePos: drawn where it sits on its Animate stage, our own results art)
+      if (ad.stagePos) { const b = G.Atlas.bounds(s.atlas); s.x = b.x + CUT / 2; s.y = b.y; }
       for (const [name, k] of (sc.flashes || [])) G.Atlas.scaleElement(s.atlas, name, k, 500);
       s.scale.x = s.scale.y = ad.scale || 1;
       s.addAnim('', s.atlas.main.name, 24, false);
@@ -13208,23 +13210,32 @@ G.stickers = {
   // Cassandra on the speakers, DJ, card, mixes, results, death. Without the pack she's the stand-in above.
   G.PLAYERS.nene = { id: 'nene', pack: 'nenemix', name: 'Nene', pos: 1, chill: CS + 'neneplayerChill', gf: { asset: CS + 'dipshitCass', viz: false },
     nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene };
-  // the Jordus girl (Nightly Funkin', rebuilt from a video: tools/own/jordus.py): her real gameplay animations do
-  // everything (character select, DJ spot, results), Jordus is in HER list (+ the songs anyone can sing), and the
-  // mod's own death screen is her game over in every song. Only there when the jordus pack is.
+  // the Jordus girl (Nightly Funkin', rebuilt from a video: tools/own/jordus.py + jordus_rig.py): her own character
+  // select animation (she chills on her purple amp: bops, kicks her legs, pops her shades on when picked), the cap
+  // girl she battles on the speakers spot (her real idle, sitting on a navy amp), her gameplay moves for the DJ spot
+  // + results, Jordus in HER list (+ the songs anyone can sing), and the mod's own death screen as her game over in
+  // every song. Only there when the jordus pack is.
   const NIGHTLY = { name: 'JORDUS', col: '#E8513A' };
-  // her buddy on the speakers: the cap girl she battles in Jordus, bopping + posing with her real moves from the song
-  const capGirl = () => {
-    const fig = new RealFig({ char: 'nightly-opp', flip: false });
-    return { id: 'nightly', name: 'idle', fig, visible: true,
-      play(n) { this.name = n; if (n === 'confirm') fig.anim('singUP'); else fig.dance(); return true; },
-      update(dt) { fig.update(dt, 15 / 90); },
-      draw(ctx, cam) { fig.draw(ctx, cam, 335, 614, 0.47, null); } };
-  };
-  G.PLAYERS.nightly = real('nightly', { pack: 'jordus', name: NIGHTLY.name, pos: 2, icon: 'nightly-player', gf: { make: capGirl },
+  G.PLAYERS.nightly = real('nightly', { pack: 'jordus', name: NIGHTLY.name, pos: 2, icon: 'nightly-player',
+    chill: CS + 'nightlyChill', gf: { asset: CS + 'capChill', viz: false },
     nametagImg: () => G.boldNametag(NIGHTLY.name, NIGHTLY.col), menuColor: '#F08A78',
     gameOver: () => G.SongFX && G.SongFX.jordus && G.SongFX.jordus.gameOver,
     real: { char: 'nightly-player', flip: true, scale: 1.1, select: 'singLEFT', win: 'singUP', lose: 'singDOWNmiss', hey: 'singRIGHT', die: 'singLEFTmiss', retry: 'singLEFT', dj: { x: 200, y: 706, k: 1.0 } },
     freeplay: { text1: NIGHTLY.name, text2: "NIGHTLY FUNKIN'", text3: 'SHADES ON, LIGHTS OUT', colors: ['#FFD9D2', '#FF9F8C', '#FFF1EE', '#D8432E', '#FFFFFF', '#A82A1E', '#FF6E57', '#F0553E'] } });
+  // (her character select is a real Animate atlas, like BF's: not the gameplay stand-in)
+  delete G.PLAYERS.nightly.makeChill;
+  // her freeplay DJ (behind her amp at the DJ spot) + her results screen, one animation per rank (jordus_rig.py)
+  G.PLAYERS.nightly.djData = { assetPath: 'freeplay/nightlyDJ', useAnimatePosition: true, charSelect: { transitionDelay: 0.35 },
+    fistPump: { introStartFrame: 0, introEndFrame: 4, loopStartFrame: 4, loopEndFrame: -1, introBadStartFrame: 0, introBadEndFrame: 4, loopBadStartFrame: 4, loopBadEndFrame: -1 },
+    animations: [['intro', 'Intro'], ['idle', 'Idle'], ['idleEasterEgg', 'AFK'], ['confirm', 'Confirm'], ['fistPump', 'Fist Pump'], ['loss', 'Fist Pump Loss'], ['charSelect', 'To Character Select']].map(([name, prefix]) => ({ name, prefix, animType: 'framelabel' })) };
+  G.PLAYERS.nightly.results = {
+    music: { PERFECT_GOLD: 'resultsPERFECT', PERFECT: 'resultsPERFECT', EXCELLENT: 'resultsEXCELLENT', GREAT: 'resultsNORMAL', GOOD: 'resultsNORMAL', SHIT: 'resultsSHIT' },
+    perfect: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/perfect', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
+    excellent: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/excellent', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
+    great: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/great', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
+    good: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/good', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
+    loss: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/loss', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }] };
+  G.PLAYERS.nightly.results.perfectGold = G.PLAYERS.nightly.results.perfect;
   // a nametag for a player FNF never lettered, like the real ones (letters in the player's colour, a black ink
   // line, a white rim round the word): from FNF's bold menu alphabet, which has every letter (the hand-inked main
   // menu letters nametags.py uses have no J, U, G, H...)
@@ -14116,15 +14127,15 @@ window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document
 // code needs). Missing on this phone: a little box on the title screen with the same two buttons as the first time.
 G.phoneUpdate = {
   ZIP: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/fnf2-phone-update.zip',
-  NEED: { mobile: 2, videosongs: 2, jordus: 2 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
-            // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player)
+  NEED: { mobile: 2, videosongs: 2, jordus: 4 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
+            // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player, v3 = her own animations)
   old(id) { return !G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]; },
   missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },
   show() {
     if (this.box || this.closed || !this.missing()) return;
     const d = this.box = document.createElement('div');
     d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
-    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: the Jordus girl playable + Into Our Lives remade + PRO MODE';
+    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: JORDUS fixed (moves like real FNF now) + Into Our Lives remade + PRO MODE';
     const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
     const get = btn('1  GET IT', '#9CF', 'a'); get.href = this.ZIP; get.target = '_blank'; get.rel = 'noopener';
