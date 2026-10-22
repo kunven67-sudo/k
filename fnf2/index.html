@@ -2743,8 +2743,10 @@ G.DIFF_ORDER = ['easy', 'normal', 'hard', 'erect', 'nightmare', 'og'];
 G.PLAYER_IDS = ['bf', 'pico', 'darnell', 'tankman', 'nene'];
 G.playerOf = function (charId) {
   if (!charId) return 'bf';
-  if (G.PLAYER_IDS.includes(charId)) return charId;
+  if (G.PLAYER_IDS.includes(charId) || (G.PLAYERS && G.PLAYERS[charId])) return charId;
   for (const id of G.PLAYER_IDS) { const d = G.A.json('preload/data/players/' + id + '.json'); if (d && (d.ownedChars || []).includes(charId)) return id; }
+  // (new players made from a gameplay character: the Jordus girl is 'nightly' when nightly-player sings)
+  for (const id in G.PLAYERS || {}) { const R = G.PLAYERS[id].real; if (R && (R.char === charId || R.songChar === charId)) return id; }
   return String(charId).startsWith('pico') ? 'pico' : 'bf';
 };
 
@@ -2786,7 +2788,16 @@ G.Songs = {
       out.sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));
       return out;
     }
-    if (G.realPlayer && G.realPlayer(player)) return out;
+    // a song made for a new player (she's the song's own player: the Jordus girl in Jordus): played as it is
+    const RP = G.realPlayer && G.realPlayer(player);
+    if (RP) {
+      const pc = (base.playData.characters || {}).player;
+      if (pc && (pc === RP.real.char || pc === RP.real.songChar) && this.chart(id) && this.hasAudio(id, 'default', base)) {
+        for (const d of base.playData.difficulties || []) out.push({ diff: d, variation: 'default' });
+        out.sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));
+      }
+      return out;
+    }
     const vars = ['default'].concat(base.playData.songVariations || []);
     // (a player's mod pack brings its own variation of a song without patching the song's metadata: two packs
     // patching the same file would hide each other's)
@@ -3576,6 +3587,8 @@ G.SongConductor = class {
       // a song's own stage effects (setup / reset / update / beat / event / drawOver)
       this.sfx = (G.SongFX && (G.SongFX[s.id + '@' + s.variation] || G.SongFX[s.id])) || (s.video && G.VideoSongFX) || (G.StageFX && G.StageFX[s.stage]) || null;
       if (this.sfx && this.sfx.setup) try { this.sfx.setup(this); } catch (e) { G.reportError(e, 'song fx'); this.sfx = null; }
+      // (the player's own game over loads with the song too, so dying never waits for it)
+      { const PG = G.PLAYERS && G.PLAYERS[G.playerOf(this.bf && this.bf.id)]; const go = PG && PG.gameOver && PG.gameOver(); if (go && go.preload) try { go.preload(); } catch (e) {} }
       this.stageZoom = this.stage.zoom;
       this.cam = new G.FCam(this.stageZoom);
       this.hud = new G.HudCam();
@@ -4342,7 +4355,9 @@ G.SongConductor = class {
       const pid = G.playerOf(bf.id), pico = pid === 'pico';
       const suffix = pid !== 'bf' && G.A.has('shared/music/gameplay/gameover/gameOver-' + pid + '.ogg') ? '-' + pid : '';
       const lossSfx = 'shared/sounds/gameplay/gameover/fnf_loss_sfx-' + pid + '.ogg';
-      const ov = (this.sfx && this.sfx.gameOver) || null;   // (a mod stage's own game over sound + music: Genocide)
+      // (a mod stage's own game over sound + music: Genocide; or the player's own whole game over: the Jordus girl)
+      const PG = G.PLAYERS && G.PLAYERS[pid] && G.PLAYERS[pid].gameOver;
+      const ov = (this.sfx && this.sfx.gameOver) || (PG && PG()) || null;
       G.sfx(ov && ov.sfx ? ov.sfx : pico ? 'deathPico' : suffix && G.A.has(lossSfx) ? lossSfx : 'death');
       // (a song can bring its own whole game over, drawn on the screen instead of the player: Jordus)
       const spr = ov && ov.sprite ? ov.sprite(this) : null;
@@ -4694,7 +4709,15 @@ G.SongConductor = class {
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
       const go = this.gameOver;
       // (a game over made of whole-screen pictures sits in the middle of a wide phone screen)
-      if (go.spr) { G.screenOff.x += G.CUT / 2; go.spr.draw(ctx, null); G.screenOff.x -= G.CUT / 2; } else this.bf.draw(ctx, this.cam);
+      if (go.spr) {
+        G.screenOff.x += G.CUT / 2; go.spr.draw(ctx, null);
+        // retry: she lights up (FNF's retry glow: BF flashes bright on deathConfirm), fading as the screen goes dark
+        if (go.phase === 'confirm') {
+          const k = Math.max(0, 1 - go.ct / 1.2) * (0.55 + 0.45 * Math.abs(Math.sin(go.ct * 9)));
+          if (k > 0.01) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= k; go.spr.draw(ctx, null); go.spr.draw(ctx, null); ctx.restore(); }
+        }
+        G.screenOff.x -= G.CUT / 2;
+      } else this.bf.draw(ctx, this.cam);
       if (go.fade > 0) { G.setScreenT(ctx); ctx.globalAlpha = go.fade; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
       go.age = (go.age || 0) + G.dt;
       if (go.backBtn && G.touchMode && go.phase !== 'confirm' && go.phase !== 'exit') { G.setScreenT(ctx); go.backBtn.update(G.dt); go.backBtn.draw(ctx); }
@@ -9727,8 +9750,7 @@ G.SongConductor = class {
       P.jor = { path: d.path || null, blackouts: d.blackouts || [], card: d.card || [2.0, 6.9], lights: d.lights || [],
         lit: (P.stage.props || []).find(p => p.name === 'lights') || null };
       // (the game over's frames + sounds load with the song, so dying never waits for them)
-      const go = G.SongFX.jordus.gameOver;
-      G.Sparrow.load(go.sheet); G.audio.preload([go.sfx, go.music]);
+      G.SongFX.jordus.gameOver.preload();
     },
     // (the pictures get sized for the closest the camera ever gets)
     maxZoom(P) { const p = P.jor && P.jor.path; let z = 0; if (p) for (const c of p) z = Math.max(z, c[3]); return z; },
@@ -9811,6 +9833,7 @@ G.SongConductor = class {
   // the game over: the mod's own, on the screen (frames from the end of the video), its shock sound + music loop
   G.SongFX.jordus.gameOver = {
     sfx: 'shared/sounds/jordus/death.ogg', music: 'shared/music/jordus/gameOver.ogg', sheet: 'shared/images/characters/nightly/death',
+    preload() { G.Sparrow.load(this.sheet); G.audio.preload([this.sfx, this.music]); },
     sprite() {
       const s = new G.Sprite(0, 0).loadSparrow(this.sheet);
       if (!s.sheet) return null;
@@ -13185,6 +13208,46 @@ G.stickers = {
   // Cassandra on the speakers, DJ, card, mixes, results, death. Without the pack she's the stand-in above.
   G.PLAYERS.nene = { id: 'nene', pack: 'nenemix', name: 'Nene', pos: 1, chill: CS + 'neneplayerChill', gf: { asset: CS + 'dipshitCass', viz: false },
     nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene };
+  // the Jordus girl (Nightly Funkin', rebuilt from a video: tools/own/jordus.py): her real gameplay animations do
+  // everything (character select, DJ spot, results), Jordus is in HER list (+ the songs anyone can sing), and the
+  // mod's own death screen is her game over in every song. Only there when the jordus pack is.
+  const NIGHTLY = { name: 'JORDUS', col: '#E8513A' };
+  // her buddy on the speakers: the cap girl she battles in Jordus, bopping + posing with her real moves from the song
+  const capGirl = () => {
+    const fig = new RealFig({ char: 'nightly-opp', flip: false });
+    return { id: 'nightly', name: 'idle', fig, visible: true,
+      play(n) { this.name = n; if (n === 'confirm') fig.anim('singUP'); else fig.dance(); return true; },
+      update(dt) { fig.update(dt, 15 / 90); },
+      draw(ctx, cam) { fig.draw(ctx, cam, 335, 614, 0.47, null); } };
+  };
+  G.PLAYERS.nightly = real('nightly', { pack: 'jordus', name: NIGHTLY.name, pos: 2, icon: 'nightly-player', gf: { make: capGirl },
+    nametagImg: () => G.boldNametag(NIGHTLY.name, NIGHTLY.col), menuColor: '#F08A78',
+    gameOver: () => G.SongFX && G.SongFX.jordus && G.SongFX.jordus.gameOver,
+    real: { char: 'nightly-player', flip: true, scale: 1.1, select: 'singLEFT', win: 'singUP', lose: 'singDOWNmiss', hey: 'singRIGHT', die: 'singLEFTmiss', retry: 'singLEFT', dj: { x: 200, y: 706, k: 1.0 } },
+    freeplay: { text1: NIGHTLY.name, text2: "NIGHTLY FUNKIN'", text3: 'SHADES ON, LIGHTS OUT', colors: ['#FFD9D2', '#FF9F8C', '#FFF1EE', '#D8432E', '#FFFFFF', '#A82A1E', '#FF6E57', '#F0553E'] } });
+  // a nametag for a player FNF never lettered, like the real ones (letters in the player's colour, a black ink
+  // line, a white rim round the word): from FNF's bold menu alphabet, which has every letter (the hand-inked main
+  // menu letters nametags.py uses have no J, U, G, H...)
+  G.boldNametag = function (word, col) {
+    const a = new G.Alphabet(word, true, 0, 0), R = 7, pad = R + 2;
+    const w = Math.ceil(a.width) + pad * 2, h = Math.ceil(a.height) + pad * 2;
+    return G.cached('boldtag:' + word + col, w, h, c => {
+      // the word once (each letter is its own picture: cutting with them one by one would keep only the last)
+      const Wd = G.makeCanvas(w, h);
+      a.x = pad; a.y = pad; a.draw(Wd.getContext('2d'), { apply: x => x.setTransform(1, 0, 0, 1, 0, 0) });
+      // white letters -> the colour (multiply keeps the shading + the black ink)
+      const L = G.makeCanvas(w, h), lx = L.getContext('2d');
+      lx.drawImage(Wd, 0, 0);
+      lx.globalCompositeOperation = 'multiply'; lx.fillStyle = col; lx.fillRect(0, 0, w, h);
+      lx.globalCompositeOperation = 'destination-in'; lx.drawImage(Wd, 0, 0);
+      // the white rim: the word's shape in white, pushed out all round
+      const S = G.makeCanvas(w, h), sx = S.getContext('2d');
+      sx.drawImage(Wd, 0, 0);
+      sx.globalCompositeOperation = 'source-in'; sx.fillStyle = '#FFFFFF'; sx.fillRect(0, 0, w, h);
+      for (let i = 0; i < 24; i++) { const t = i / 24 * Math.PI * 2; c.drawImage(S, Math.round(Math.cos(t) * R), Math.round(Math.sin(t) * R)); }
+      c.drawImage(L, 0, 0);
+    });
+  };
   // the main menu in the picked player's colour (BF keeps FNF's yellow)
   const MENU_COLORS = { pico: '#8FA4F2', darnell: '#A483EE', nene: '#F592C4', tankman: '#BAC47E' };
   G.menuColor = pid => (pid && pid !== 'bf' && G.PLAYERS[pid] && (G.PLAYERS[pid].menuColor || MENU_COLORS[pid])) || null;
@@ -14053,15 +14116,15 @@ window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document
 // code needs). Missing on this phone: a little box on the title screen with the same two buttons as the first time.
 G.phoneUpdate = {
   ZIP: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/fnf2-phone-update.zip',
-  NEED: { mobile: 2, videosongs: 2 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu word,
-                                        // videosongs v2 = Into Our Lives remade: real-time video, talk on the sides)
+  NEED: { mobile: 2, videosongs: 2, jordus: 2 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
+            // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player)
   old(id) { return !G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]; },
   missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },
   show() {
     if (this.box || this.closed || !this.missing()) return;
     const d = this.box = document.createElement('div');
     d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
-    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: Into Our Lives remade + PRO MODE + the real FNF mobile buttons';
+    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: the Jordus girl playable + Into Our Lives remade + PRO MODE';
     const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
     const get = btn('1  GET IT', '#9CF', 'a'); get.href = this.ZIP; get.target = '_blank'; get.rel = 'noopener';
