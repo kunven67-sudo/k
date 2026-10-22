@@ -147,7 +147,7 @@ G.phoneUpdate = {
     if (this.box || this.closed || !this.missing()) return;
     const d = this.box = document.createElement('div');
     d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
-    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: JORDUS with her own animations + Into Our Lives remade + PRO MODE';
+    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: JORDUS fixed (moves like real FNF now) + Into Our Lives remade + PRO MODE';
     const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
     const get = btn('1  GET IT', '#9CF', 'a'); get.href = this.ZIP; get.target = '_blank'; get.rel = 'noopener';

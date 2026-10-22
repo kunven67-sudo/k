@@ -357,7 +357,7 @@ def idle_finish(pp):
     dome(pp['head'], 210, skip=[(486, 512)])
     seal_bottom(pp['torso'], range(476, 531))
     underlay(pp['torso'], pp['head'][..., 3] > 0, reach=7)          # (more would show as a hump when her head dips)
-    underlay(pp['torso'], pp['arm'][..., 3] > 0, reach=14)
+    underlay(pp['torso'], pp['arm'][..., 3] > 0, reach=24)
 
 
 # --- the "picked" drawing (video frame down_03)
@@ -448,7 +448,7 @@ def sel_finish(pp):
     dome(pp['head'], 212, skip=[(424, 452)])
     seal_bottom(pp['torso'], range(300, 600))
     underlay(pp['torso'], pp['head'][..., 3] > 0, reach=7)
-    underlay(pp['torso'], pp['armL'][..., 3] > 0, reach=14)
+    underlay(pp['torso'], pp['armL'][..., 3] > 0, reach=24)
     underlay(pp['armR'], (pp['head'][..., 3] > 0) | (pp['torso'][..., 3] > 0), reach=12)
 
 
@@ -579,7 +579,7 @@ class Part:
 D = {
     'idle': dict(HEM=(432, 505), bones={'torso': (432, 505), 'head': (430, 398), 'ahoge': (495, 224), 'arm': (365, 445), 'armback': (512, 442)},
                  parts={'armback': 'armback', 'torso': 'torso', 'head': 'head', 'ahoge': 'ahoge', 'arm': 'arm'}, legs=(410, 462)),
-    'sel': dict(HEM=(452, 524), bones={'torso': (452, 524), 'head': (438, 442), 'ahoge': (431, 223), 'arm': (372, 455), 'armback': (528, 440)},
+    'sel': dict(HEM=(452, 524), bones={'torso': (452, 524), 'head': (438, 442), 'ahoge': (431, 223), 'arm': (372, 455), 'armback': (486, 402)},
                 parts={'armback': 'armR', 'torso': 'torso', 'head': 'head', 'ahoge': 'ahoge', 'arm': 'armL'}, legs=(428, 478)),
 }
 LK = 0.60                    # BF's leg art -> her drawing px
@@ -695,7 +695,7 @@ def picked(g, lift=0.0):
 def meh(k=1.0):
     """let down (after a deselect): head tilts away, mic droops, the ahoge flops a bit"""
     return {'torso': {'dy': 2 * k, 'rot': -0.8 * k}, 'head': {'dy': 6 * k, 'rot': -5 * k, 'dx': -2 * k},
-            'ahoge': {'rot': -9 * k}, 'arm': {'rot': 9 * k, 'dy': 7 * k}, 'armback': {'rot': 3 * k}}
+            'ahoge': {'rot': -9 * k}, 'arm': {'rot': 5 * k, 'dy': 4 * k}, 'armback': {'rot': 2 * k}}
 
 
 def slump(k, sway=0.0, deep=1.0):
@@ -859,11 +859,14 @@ def cap_chill():
         x, y, w, h = map(int, (x, y, w, h)); fx = int(fx or 0); fy = int(fy or 0)
         full = Image.new('RGBA', (int(fw or w), int(fh or h))); full.paste(sheet.crop((x, y, x + w, y + h)), (-fx, -fy))
         a = np.array(full); al = a[..., 3] > 40
-        # thin strays (the skate ramp's edges) go, everything thick stays
-        op = cv2.morphologyEx(al.astype(np.uint8), cv2.MORPH_OPEN, np.ones((7, 7), np.uint8)) > 0
-        a[..., 3] = np.where(cv2.dilate(op.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0, a[..., 3], 0)
-        n, cc, st, _ = cv2.connectedComponentsWithStats((a[..., 3] > 40).astype(np.uint8), 8)
-        a[..., 3] = np.where(cc == 1 + np.argmax(st[1:, cv2.CC_STAT_AREA]), a[..., 3], 0)
+        # thin strays (the skate ramp's edges) go; her thin bits (fingers) are joined to her, so they stay
+        op = cv2.morphologyEx(al.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
+        n, cc, st, _ = cv2.connectedComponentsWithStats(op.astype(np.uint8), 8)
+        body = cc == 1 + np.argmax(st[1:, cv2.CC_STAT_AREA])
+        near = cv2.dilate(body.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
+        n, cc, st, _ = cv2.connectedComponentsWithStats(al.astype(np.uint8), 8)
+        keep = [j for j in range(1, n) if (near & (cc == j)).any() and st[j, cv2.CC_STAT_AREA] >= 30]
+        a[..., 3] = np.where(np.isin(cc, keep) & (cv2.dilate(op.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0), a[..., 3], 0)
         return a
     base = frame(0)
     CK, STORE = 0.56, 0.62
@@ -872,10 +875,7 @@ def cap_chill():
     for i in range(12):
         a = frame(i)
         (dx, dy), _ = cv2.phaseCorrelate(base[..., 3].astype(np.float32), a[..., 3].astype(np.float32))   # (her bounce)
-        # the ramp's ledge hid the lower right of her rear: filled back in (her pants are flat black)
-        H, W = a.shape[:2]
-        m = P.poly_mask((H, W), [(744 + dx, 368 + dy), (752 + dx, 392 + dy), (752 + dx, 420 + dy), (744 + dx, 452 + dy), (628 + dx, 452 + dy), (640 + dx, 436 + dy), (700 + dx, 412 + dy)])
-        a[m & (a[..., 3] < 200)] = (8, 8, 14, 255)
+        # (the ramp's ledge hid the lower right of her rear: jordus.py rounds it back in, drop_block)
         c, x0, y0 = crop(a); h, w = c.shape[:2]
         sprites['cap%02d' % i] = np.array(Image.fromarray(c).resize((max(1, round(w * STORE)), max(1, round(h * STORE))), Image.LANCZOS))
         ph.append((x0, y0))

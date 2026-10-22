@@ -134,7 +134,73 @@ def drop_block(im):
     m = Image.new('L', (a.shape[1], a.shape[0]), 0); ImageDraw.Draw(m).polygon(BLOCK_POLY, fill=255)
     cut = (np.array(m) > 0) & (mc < 14) & al
     a[cut, 3] = 0
-    a[330:360, 785:900, 3] = 0                          # (+ the navy window ledge on top of it)
+    a[330:364, 766:900, 3] = 0                          # (+ the navy window ledge on top of it)
+    # that cut left a straight diagonal edge on her rear: a round hip there instead (her pants are flat black)
+    import sys; sys.path.insert(0, os.path.dirname(HERE)); import puppet as P
+    S = 4
+    curve = P.smooth([(736, 356), (760, 374), (770, 402), (761, 431), (738, 451), (702, 467), (662, 479), (626, 497)], 10)
+    hip = Image.new('L', (a.shape[1] * S, a.shape[0] * S), 0)
+    ImageDraw.Draw(hip).polygon([(x * S, y * S) for x, y in curve + [(600, 497), (600, 356)]], fill=255)
+    h = np.asarray(hip.resize((a.shape[1], a.shape[0]), Image.LANCZOS)).astype(np.float32) / 255
+    al0 = a[..., 3].astype(np.float32) / 255
+    add = h * (1 - al0)
+    rgb = a[..., :3].astype(np.float32) * al0[..., None] + np.array((8, 8, 14), np.float32) * add[..., None]
+    an = al0 + add
+    on = add > 0                                        # (only there: the video's colour stays under the rest)
+    a[on, :3] = (rgb[on] / np.maximum(an[on][:, None], 1e-4)).clip(0, 255).astype(np.uint8)
+    a[on, 3] = (an[on] * 255).clip(0, 255).astype(np.uint8)
+    return Image.fromarray(a)
+
+
+def fill_glove(im):
+    """in some frames the cut-out lost the white inside her right glove (a bright light behind it in the video): only
+    its ink outline was left. The video's own white is still there under it: inside the glove's outline (its hull)
+    the white comes back"""
+    import cv2
+    from PIL import Image
+    a = np.array(im); al = a[..., 3]
+    ink = (al > 100) & (a[..., :3].max(-1) < 90)
+    zone = np.zeros(al.shape, bool); zone[228:350, 742:900] = True
+    pts = np.argwhere(ink & zone)
+    if len(pts) < 200: return im
+    hull = np.zeros(al.shape, np.uint8); cv2.fillConvexPoly(hull, cv2.convexHull(pts[:, ::-1].astype(np.int32)), 1)
+    fill = (hull > 0) & (al < 60) & (a[..., :3].min(-1) > 140)        # (its white, and its lilac shade)
+    n, cc, st, _ = cv2.connectedComponentsWithStats(fill.astype(np.uint8), 8)
+    for j in range(1, n):
+        if st[j, 4] < 15: fill[cc == j] = False
+    if fill.sum() < 150: return im          # (a whole glove already)
+    a[fill, 3] = 255
+    return Image.fromarray(a)
+
+
+def drop_wall(im, poly):
+    """the wall's navy stuck under her glove in one frame: navy goes, her ink + glove stay"""
+    from PIL import Image, ImageDraw
+    a = np.array(im); rgb = a[..., :3].astype(int)
+    m = Image.new('L', (a.shape[1], a.shape[0]), 0); ImageDraw.Draw(m).polygon(poly, fill=255)
+    inside = np.array(m) > 0
+    navy = inside & (rgb[..., 2] - rgb[..., 0] > 25) & (rgb[..., 2] > 40) & (rgb[..., :3].min(-1) < 120)
+    a[navy, 3] = 0
+    import cv2           # (+ the thin bits of its edge that are left)
+    solid = cv2.morphologyEx((a[..., 3] > 40).astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0
+    a[inside & ~(cv2.dilate(solid.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0), 3] = 0
+    return Image.fromarray(a)
+
+
+def drop_sign(im):
+    """a grey-mauve sign on the wall behind her right arm stuck to it in some frames: it goes"""
+    import cv2
+    from PIL import Image
+    a = np.array(im); rgb = a[..., :3].astype(int); mx, mn = rgb.max(-1), rgb.min(-1)
+    m = (a[..., 3] > 30) & (mx - mn < 50) & (mx > 60) & (mx < 200) & (rgb[..., 0] >= rgb[..., 1] - 4)
+    m[:, :600] = False; m[260:] = False; m[:190] = False
+    n, cc, st, _ = cv2.connectedComponentsWithStats(m.astype(np.uint8), 8)
+    for j in range(1, n):
+        if st[j, 4] >= 25 and st[j, 0] >= 630: a[cc == j, 3] = 0
+    # (and the thin ink of its frame, left standing on her arm)
+    zone = np.zeros(m.shape, bool); zone[185:250, 625:770] = True
+    solid = cv2.morphologyEx((a[..., 3] > 40).astype(np.uint8), cv2.MORPH_OPEN, np.ones((7, 7), np.uint8)) > 0
+    a[zone & ~(cv2.dilate(solid.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0), 3] = 0
     return Image.fromarray(a)
 
 
@@ -146,7 +212,12 @@ def atlas(who, name, extra=None):
     for anim, (src, a, b) in ANIMS[who].items():
         for i, n in enumerate(a if isinstance(a, list) else range(a, b)):
             p = os.path.join(WORK, 'out_clean', who, f'{src}_{n:02d}.png')
-            if os.path.exists(p): frames.append((anim, i, drop_block(Image.open(p).convert('RGBA')) if who == 'opp' else Image.open(p).convert('RGBA')))
+            if os.path.exists(p):
+                im = Image.open(p).convert('RGBA')
+                if who == 'opp':
+                    im = fill_glove(drop_sign(drop_block(im)))
+                    if src == "idle" and n == 9: im = drop_wall(im, [(738, 300), (752, 294), (800, 294), (800, 364), (738, 364)])
+                frames.append((anim, i, im))
     for anim, ims in (extra or {}).items():
         for i, im in enumerate(ims): frames.append((anim, i, im))
     uniq, refs = {}, []
