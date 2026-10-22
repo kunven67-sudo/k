@@ -127,7 +127,7 @@
   // ---------------------------------------------------------------- the DJ (Animate atlas placed with its stage matrix)
   class DJ {
     constructor(player) {
-      this.data = (G.A.json('preload/data/players/' + player + '.json') || {}).freeplayDJ || {};
+      this.data = (G.A.json('preload/data/players/' + player + '.json') || {}).freeplayDJ || (G.PLAYERS && G.PLAYERS[player] && G.PLAYERS[player].djData) || {};
       this.atlas = G.Atlas.load(G.A.imagePath(this.data.assetPath || 'freeplay/freeplay-boyfriend', 'preload'));
       this.prefix = {};
       for (const a of this.data.animations || []) this.prefix[a.name] = a.prefix;
@@ -945,7 +945,7 @@
       this.rankFx = p.fromResults && p.playRankAnim && p.rank ? { pending: true, fade: 1, bgA: 0, zoom: 1, funny: 1, vigA: 0, shakeT: 0 } : null;
       // card, DJ
       this.card = this.player === 'pico' ? new PicoCard(this) : this.player === 'tankman' && !this.realP && IMG('freeplay/tankman/sky') ? new TankmanCard(this, this.player) : this.player === 'nene' && !this.realP && IMG('freeplay/nenecard/bg') ? new NeneCard(this, this.player) : new Card(this, this.player);
-      this.dj = this.realP ? new G.RealDJ(this.player) : new DJ(this.player);
+      this.dj = this.realP && !this.realP.djData ? new G.RealDJ(this.player) : new DJ(this.player);
       // background art (cut on a slant) + the black panel that slides in first
       this.bgImg = IMG(style.bgAsset || 'freeplay/freeplayBGweek1-bf') || IMG('freeplay/freeplayBGweek1-bf');
       this.bgX = this.card.pw * 0.74; this.bgVis = false; this.bgColor = '#000000';

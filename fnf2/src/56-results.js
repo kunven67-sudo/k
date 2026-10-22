@@ -175,7 +175,7 @@
       const T = this.tallies = st.tallies || this.toTallies(st);
       this.rank = p.forceRank || G.Rank.calc(T) || 'SHIT';   // RANK MODE picks its own rank
       this.player = G.playerOf(p.player || 'bf');
-      const pdata = (G.A.json('preload/data/players/' + this.player + '.json') || {}).results || {};
+      const pdata = (G.A.json('preload/data/players/' + this.player + '.json') || {}).results || (G.PLAYERS && G.PLAYERS[this.player] && G.PLAYERS[this.player].results) || {};
       this.musicName = (pdata.music || {})[this.rank] || 'resultsNORMAL';
       // characters for this rank (safe versions)
       this.chars = [];
@@ -188,7 +188,7 @@
       }
       // the new players (59-charselect.js) have no results art: they show up big with their own moves
       const RP = G.realPlayer && G.realPlayer(p.player);
-      if (RP) this.chars = [this.makeReal(RP)];
+      if (RP && !RP.results) this.chars = [this.makeReal(RP)];
       // static pieces
       this.soundSystem = sparrowAnim('soundSystem', 'sound system');
       this.resultsAnim = sparrowAnim('results', 'results instance 1');
@@ -261,6 +261,8 @@
       const asset = sc.asset || String(ad.assetPath || '').replace(/^shared:/, '').replace(/^resultScreen\//, '');
       const s = new G.Sprite(off[0] + CUT / 2, off[1]).loadAtlas('shared/images/resultScreen/' + asset);
       if (!s.atlas) return null;
+      // (stagePos: drawn where it sits on its Animate stage, our own results art)
+      if (ad.stagePos) { const b = G.Atlas.bounds(s.atlas); s.x = b.x + CUT / 2; s.y = b.y; }
       for (const [name, k] of (sc.flashes || [])) G.Atlas.scaleElement(s.atlas, name, k, 500);
       s.scale.x = s.scale.y = ad.scale || 1;
       s.addAnim('', s.atlas.main.name, 24, false);

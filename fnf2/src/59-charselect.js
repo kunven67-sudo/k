@@ -43,23 +43,32 @@
   // Cassandra on the speakers, DJ, card, mixes, results, death. Without the pack she's the stand-in above.
   G.PLAYERS.nene = { id: 'nene', pack: 'nenemix', name: 'Nene', pos: 1, chill: CS + 'neneplayerChill', gf: { asset: CS + 'dipshitCass', viz: false },
     nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene };
-  // the Jordus girl (Nightly Funkin', rebuilt from a video: tools/own/jordus.py): her real gameplay animations do
-  // everything (character select, DJ spot, results), Jordus is in HER list (+ the songs anyone can sing), and the
-  // mod's own death screen is her game over in every song. Only there when the jordus pack is.
+  // the Jordus girl (Nightly Funkin', rebuilt from a video: tools/own/jordus.py + jordus_rig.py): her own character
+  // select animation (she chills on her purple amp: bops, kicks her legs, pops her shades on when picked), the cap
+  // girl she battles on the speakers spot (her real idle, sitting on a navy amp), her gameplay moves for the DJ spot
+  // + results, Jordus in HER list (+ the songs anyone can sing), and the mod's own death screen as her game over in
+  // every song. Only there when the jordus pack is.
   const NIGHTLY = { name: 'JORDUS', col: '#E8513A' };
-  // her buddy on the speakers: the cap girl she battles in Jordus, bopping + posing with her real moves from the song
-  const capGirl = () => {
-    const fig = new RealFig({ char: 'nightly-opp', flip: false });
-    return { id: 'nightly', name: 'idle', fig, visible: true,
-      play(n) { this.name = n; if (n === 'confirm') fig.anim('singUP'); else fig.dance(); return true; },
-      update(dt) { fig.update(dt, 15 / 90); },
-      draw(ctx, cam) { fig.draw(ctx, cam, 335, 614, 0.47, null); } };
-  };
-  G.PLAYERS.nightly = real('nightly', { pack: 'jordus', name: NIGHTLY.name, pos: 2, icon: 'nightly-player', gf: { make: capGirl },
+  G.PLAYERS.nightly = real('nightly', { pack: 'jordus', name: NIGHTLY.name, pos: 2, icon: 'nightly-player',
+    chill: CS + 'nightlyChill', gf: { asset: CS + 'capChill', viz: false },
     nametagImg: () => G.boldNametag(NIGHTLY.name, NIGHTLY.col), menuColor: '#F08A78',
     gameOver: () => G.SongFX && G.SongFX.jordus && G.SongFX.jordus.gameOver,
     real: { char: 'nightly-player', flip: true, scale: 1.1, select: 'singLEFT', win: 'singUP', lose: 'singDOWNmiss', hey: 'singRIGHT', die: 'singLEFTmiss', retry: 'singLEFT', dj: { x: 200, y: 706, k: 1.0 } },
     freeplay: { text1: NIGHTLY.name, text2: "NIGHTLY FUNKIN'", text3: 'SHADES ON, LIGHTS OUT', colors: ['#FFD9D2', '#FF9F8C', '#FFF1EE', '#D8432E', '#FFFFFF', '#A82A1E', '#FF6E57', '#F0553E'] } });
+  // (her character select is a real Animate atlas, like BF's: not the gameplay stand-in)
+  delete G.PLAYERS.nightly.makeChill;
+  // her freeplay DJ (behind her amp at the DJ spot) + her results screen, one animation per rank (jordus_rig.py)
+  G.PLAYERS.nightly.djData = { assetPath: 'freeplay/nightlyDJ', useAnimatePosition: true, charSelect: { transitionDelay: 0.35 },
+    fistPump: { introStartFrame: 0, introEndFrame: 4, loopStartFrame: 4, loopEndFrame: -1, introBadStartFrame: 0, introBadEndFrame: 4, loopBadStartFrame: 4, loopBadEndFrame: -1 },
+    animations: [['intro', 'Intro'], ['idle', 'Idle'], ['idleEasterEgg', 'AFK'], ['confirm', 'Confirm'], ['fistPump', 'Fist Pump'], ['loss', 'Fist Pump Loss'], ['charSelect', 'To Character Select']].map(([name, prefix]) => ({ name, prefix, animType: 'framelabel' })) };
+  G.PLAYERS.nightly.results = {
+    music: { PERFECT_GOLD: 'resultsPERFECT', PERFECT: 'resultsPERFECT', EXCELLENT: 'resultsEXCELLENT', GREAT: 'resultsNORMAL', GOOD: 'resultsNORMAL', SHIT: 'resultsSHIT' },
+    perfect: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/perfect', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
+    excellent: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/excellent', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
+    great: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/great', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
+    good: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/good', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
+    loss: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/loss', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }] };
+  G.PLAYERS.nightly.results.perfectGold = G.PLAYERS.nightly.results.perfect;
   // a nametag for a player FNF never lettered, like the real ones (letters in the player's colour, a black ink
   // line, a white rim round the word): from FNF's bold menu alphabet, which has every letter (the hand-inked main
   // menu letters nametags.py uses have no J, U, G, H...)
