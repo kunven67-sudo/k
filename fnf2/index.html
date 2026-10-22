@@ -3331,7 +3331,7 @@ G.SongConductor = class {
 // trails, splashes, hold covers, PBOT1 scoring, health, combo popups, countdown,
 // camera focus/bops, song events, pause menu, game over. Uses FNF's real assets.
 (function () {
-  const PX_PER_MS = 0.45, HIT_WINDOW = 160, STRUM_SIZE = 104, SPACING = 112, INITIAL_OFFSET = -0.275 * STRUM_SIZE, NUDGE = 2;
+  const PX_PER_MS = 0.45, HIT_WINDOW = 160, STRUM_SIZE = 104, SPACING = 112, INITIAL_OFFSET = -0.275 * STRUM_SIZE, NUDGE = 2, STRUM_FRAME_H = 161;
   const DIR = ['Left', 'Down', 'Up', 'Right'], DIRL = ['left', 'down', 'up', 'right'], COLOR = ['Purple', 'Blue', 'Green', 'Red'];
   const SPLASH = { left: ['note impact 1 purple0', 'note impact 2 purple0'], down: ['note impact 1  blue0', 'note impact 2 blue0'], up: ['note impact 1 green0', 'note impact 2 green0'], right: ['note impact 1 red0', 'note impact 2 red0'] };
   const H = { max: 2, killer: 0.04, sick: 0.03, good: 0.015, bad: 0, shit: -0.02, miss: -0.08, holdPerSec: 0.12 };
@@ -3418,7 +3418,8 @@ G.SongConductor = class {
   G.NoteKinds = G.NoteKinds || {};
   const kindOf = n => (n.kind && G.NoteKinds[n.kind]) || null;
   const isTrap = n => n.kind === 'eye' || !!(kindOf(n) && kindOf(n).trap);
-  const isReal = n => n.kind !== 'fake' && n.kind !== 'eye' && !(n.line === 1 && kindOf(n) && kindOf(n).trap);
+  // 'talk' = people TALKING in a video song: shown at 50% on the side of whoever talks, plays by itself, never counts
+  const isReal = n => n.kind !== 'fake' && n.kind !== 'eye' && n.kind !== 'talk' && !(n.line === 1 && kindOf(n) && kindOf(n).trap);
   // a note kind that is one of the singer's own animations plays it instead of a sing pose (Tankman's "ugh" in Ugh,
   // "heh, pretty good" in Stress, Darnell lighting / kicking / kneeing his can in 2hot)
   const KIND_ANIM = { 'weekend-1-lightcan': 'lightCan', 'weekend-1-kickcan': 'kickCan', 'weekend-1-kneecan': 'kneeCan', exHank: 'Hank' };
@@ -3602,7 +3603,9 @@ G.SongConductor = class {
     setupHUD() {
       const st = G.settings;
       this.down = !!st.downscroll; this.middle = !!st.middlescroll;
-      const y = this.down ? G.H - STRUM_SIZE - 24 : 24;
+      // (downscroll like PlayState.initStrumlines: FlxG.height - strumline.height - 24, the strumline being as tall as
+      // a static arrow's whole frame: 230 x 0.7 = 161, so the arrows sit as far from the bottom as they do from the top)
+      const y = this.down ? G.H - STRUM_FRAME_H - 24 : 24;
       // (wide phone screens: both lines move in a bit, PlayState.initStrumlines' cutoutSize)
       const cut = G.CUT / 2.5;
       this.lines = [
@@ -3877,6 +3880,7 @@ G.SongConductor = class {
       this.botHolding = false;
       for (const n of this.notes) {
         if (n.done) continue;
+        if (n.kind === 'talk') { if (pos >= n.t) { n.hit = n.done = true; this.talkHit(n); } continue; }
         if (!isReal(n)) { if (pos - n.t > HIT_WINDOW) n.done = true; continue; }     // decoys + traps just go by
         const L = this.lines[n.line];
         if (!L.player || bot) {
@@ -3917,6 +3921,12 @@ G.SongConductor = class {
         }
         if (n.dropped && pos > n.holdEnd) n.done = true;
       }
+    },
+    // a talk note reaching its arrow: the arrow lights up, the one talking on the left 'sings' it (in a video song
+    // nobody stands there), the right side's (your side) are only the arrow: no score, health, combo or pose
+    talkHit(n) {
+      if (n.line === 0) { this.oppHit(n); return; }
+      const s = this.lines[1].strums[n.lane]; s.playA('confirm', true); s.confirmHold = 0;
     },
     oppHit(n) {
       const s = this.lines[0].strums[n.lane];
@@ -3964,7 +3974,7 @@ G.SongConductor = class {
       const s = this.lines[1].strums[lane];
       let best = null, trap = null;
       for (const n of this.notes) {
-        if (n.done || n.hit || n.missed || n.line !== 1 || n.lane !== lane || n.kind === 'fake') continue;
+        if (n.done || n.hit || n.missed || n.line !== 1 || n.lane !== lane || n.kind === 'fake' || n.kind === 'talk') continue;
         const diff = n.t - pos;
         if (isTrap(n)) { if (Math.abs(diff) <= 110 && (!trap || n.t < trap.t)) trap = n; }    // a real note always wins
         else if (Math.abs(diff) <= HIT_WINDOW && (!best || n.t < best.t)) best = n;
@@ -4513,7 +4523,7 @@ G.SongConductor = class {
           ctx.save(); ctx.translate(x, y);
           if (S.angle) { const c = f.fw * ns / 2; ctx.translate(c, c); ctx.rotate(S.angle * Math.PI / 180); ctx.translate(-c, -c); }
           ctx.scale(ns, ns);
-          ctx.globalAlpha *= (n.missed ? 0.3 : 1) * S.alpha;
+          ctx.globalAlpha *= (n.missed ? 0.3 : n.kind === 'talk' ? 0.5 : 1) * S.alpha;
           G.Sparrow.draw(ctx, notesSheet, f); ctx.restore();
         }
         for (const cv of this.covers) if (cv.line === li) {
@@ -5065,7 +5075,8 @@ G.SongConductor = class {
   const save = () => { G.saveSettings(); if (G.audio) G.audio.applyVolumes(); };
   // preference rows: [label, type, get, set, desc, extra]
   const PREFS = [
-    ['Downscroll', 'bool', () => S().downscroll, v => S().downscroll = v, 'Notes move down toward the strumline at the bottom of the screen.'],
+    // (PC only: on a phone your tap arrows always sit at the bottom, Phone controls below)
+    ['Arrow Position', 'enum', () => S().downscroll ? 'bottom' : 'top', v => { S().downscroll = v === 'bottom'; }, 'PC: where your arrows sit during a song. TOP = notes fly up to them, like normal FNF. BOTTOM = notes fall down to them (downscroll).', ['top', 'bottom'], 'pc'],
     ['Middlescroll', 'bool', () => S().middlescroll, v => S().middlescroll = v, 'Your arrows sit in the middle and the opponent arrows are hidden.'],
     ['Ghost Tapping', 'bool', () => S().ghostTapping, v => S().ghostTapping = v, 'Pressing a key when there is no note does not count as a miss.'],
     ['Modcharts', 'bool', () => S().modcharts !== false, v => S().modcharts = v, 'Songs can move, swap + spin your arrows and add trick notes. Off = just the song.'],
@@ -5144,7 +5155,8 @@ G.SongConductor = class {
     },
     buildPrefs() {
       this.page = 'prefs'; this.sel = 0; this.camY = 0;
-      this.rows = PREFS.map((r, i) => {
+      // (a row tagged 'pc' only shows on a computer, never on a phone)
+      this.rows = PREFS.filter(r => !(r[6] === 'pc' && G.touchMode)).map((r, i) => {
         const a = new G.Alphabet(r[0], true, 120, 120 * i);
         const cb = new G.Sprite(0, 0).loadSparrow('preload/images/checkboxThingie');
         cb.addAnim('off', 'Check Box unselected', 24, false); cb.addAnim('on', 'Check Box Selected Static', 24, false); cb.addAnim('turnOn', 'Check Box selecting animation', 24, false);
@@ -12767,7 +12779,7 @@ G.stickers = {
     // how many notes YOU hit in that chart (the opponent's don't count, nor fakes / don't-hit notes) + hold time
     chartInfo(id, variation, diff) {
       const c = G.Songs.chart(id, variation);
-      const ns = ((c && c.notes && c.notes[diff]) || []).filter(n => n.d < 4 && n.k !== 'fake' && n.k !== 'eye');
+      const ns = ((c && c.notes && c.notes[diff]) || []).filter(n => n.d < 4 && n.k !== 'fake' && n.k !== 'eye' && n.k !== 'talk');
       return { notes: ns.length || 300, holdMs: ns.reduce((a, n) => a + (n.l || 0), 0) };
     },
     // every number for a run that would really get this rank (same maths as the results screen)
@@ -14041,14 +14053,15 @@ window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document
 // code needs). Missing on this phone: a little box on the title screen with the same two buttons as the first time.
 G.phoneUpdate = {
   ZIP: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/fnf2-phone-update.zip',
-  NEED: { mobile: 2 },   // (pack -> the version the code needs: v2 = + the PRO MODE menu word)
+  NEED: { mobile: 2, videosongs: 2 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu word,
+                                        // videosongs v2 = Into Our Lives remade: real-time video, talk on the sides)
   old(id) { return !G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]; },
   missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },
   show() {
     if (this.box || this.closed || !this.missing()) return;
     const d = this.box = document.createElement('div');
     d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
-    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: PRO MODE + the real FNF mobile buttons (small download)';
+    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: Into Our Lives remade + PRO MODE + the real FNF mobile buttons';
     const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
     const get = btn('1  GET IT', '#9CF', 'a'); get.href = this.ZIP; get.target = '_blank'; get.rel = 'noopener';
