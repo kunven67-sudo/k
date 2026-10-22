@@ -467,6 +467,7 @@
 
   // ---------------------------------------------------------------- the screen
   const S = G.screens.charSelect = {
+    base1280: true,     // (wide phone screens: the whole stage sits in the middle, CharSelectSubState's cutoutSize)
     enter(p) {
       p = p || {};
       this.tw = new G.Tw();
@@ -716,7 +717,7 @@
     leave() { this.tw && this.tw.clear(); if (this.video) { try { this.video.pause(); } catch (e) {} this.video = null; } if (this.staticOn) { this.staticOn = false; G.audio.sfxLoop && G.audio.sfxLoop('static', null); } },
     // ------------------------------------------------------------ draw
     draw(ctx) {
-      G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+      G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(-G.ox, 0, W + 2 * G.ox, H);
       if (this.video) {
         const v = this.video;
         if (v.readyState >= 2) { const s = Math.max(W / (v.videoWidth || W), H / (v.videoHeight || H)); const vw = (v.videoWidth || W) * s, vh = (v.videoHeight || H) * s; ctx.drawImage(v, (W - vw) / 2, (H - vh) / 2, vw, vh); }
@@ -740,13 +741,13 @@
       if (this.fade < 0.999) {
         const f = Math.max(0, this.fade);
         G.setScreenT(ctx); ctx.save(); ctx.globalCompositeOperation = 'multiply';
-        ctx.fillStyle = 'rgb(' + Math.round(255 * f * f) + ',' + Math.round(255 * f * f) + ',' + Math.round(255 * f) + ')'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = 'rgb(' + Math.round(255 * f * f) + ',' + Math.round(255 * f * f) + ',' + Math.round(255 * f) + ')'; ctx.fillRect(-G.ox, 0, W + 2 * G.ox, H);
         ctx.restore();
       }
       // the transition gradient (freeplay's, flipped, sweeping up)
       const tg = G.A.image('preload/images/freeplay/transitionGradient.png');
-      if (tg && this.grad.y > -720) { G.setScreenT(ctx); ctx.save(); ctx.translate(0, this.grad.y + 720); ctx.scale(1, -1); ctx.drawImage(tg, 0, 0, W, tg.height); ctx.restore(); }
-      if (this.flashA > 0) { G.setScreenT(ctx); ctx.fillStyle = 'rgba(255,255,255,' + this.flashA + ')'; ctx.fillRect(0, 0, W, H); }
+      if (tg && this.grad.y > -720) { G.setScreenT(ctx); ctx.save(); ctx.translate(0, this.grad.y + 720); ctx.scale(1, -1); ctx.drawImage(tg, -G.ox, 0, W + 2 * G.ox, tg.height); ctx.restore(); }
+      if (this.flashA > 0) { G.setScreenT(ctx); ctx.fillStyle = 'rgba(255,255,255,' + this.flashA + ')'; ctx.fillRect(-G.ox, 0, W + 2 * G.ox, H); }
     },
     drawIcons(ctx) {
       G.setScreenT(ctx);

@@ -11,6 +11,7 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
     }
   }
   const q = G.query;
+  if (q.touch === '1') G.touchMode = true;      // (tests: as if the screen was touched)
   if (q.player) G.settings.player = q.player;
   if (q.dev === 'stage') return G.start('devStage', q);
   if (q.dev === 'char') return G.start('devChar', q);
@@ -22,7 +23,6 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
     return G.start('results', { mode: 'freeplay', diff: q.diff || 'hard', title: q.title || 'Bopeebo', player: q.player || 'bf', newBest: q.best === '1',
       stats: { score: +(q.score || 312840), maxCombo: mk[0] - 3, totalNotes: n, tally: { killer: 0, sick: mk[0], good: mk[1], bad: mk[2], shit: mk[3], miss: mk[4] } } });
   }
-  if (q.touch === '1') G.touchMode = true;      // (tests: as if the screen was touched)
   if (q.bot) G.settings.botplay = q.bot === '1';
   if (q.down) G.settings.downscroll = q.down === '1';
   if (q.dev === 'song' && G.screens.play) return G.start('play', { mode: q.story === '1' ? 'story' : 'freeplay', songs: [q.id || 'tutorial'], diff: q.diff || 'normal', variation: q.variation || (G.DIFF_INFO[q.diff] || {}).variation || 'default', swap: q.swap === '1', week: null, noCutscene: q.cs === '0' });

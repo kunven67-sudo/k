@@ -74,6 +74,7 @@
     ['SFX Volume', 'num', () => S().vol.sfx, v => S().vol.sfx = v, 'Volume of menu sounds and misses.', [0, 1, 0.05, 2]],
     ['Video Songs', 'enum', () => S().videoSongs || 'video', v => { S().videoSongs = v; }, 'Songs made from a video. VIDEO: the video plays behind the arrows. CHARACTERS: your picked player sings on a stage instead.', ['video', 'characters']],
     ['Phone controls', 'enum', () => S().touchScheme || 'arrows', v => { S().touchScheme = v; }, 'Arrows: tap your arrows at the bottom of the screen, like FNF mobile. Lanes: the screen is split into 4 tall lanes.', ['arrows', 'lanes']],
+    ['App mode', 'bool', () => !!S().appMode, v => { S().appMode = v; if (G.appMode) { if (v) G.appMode.enter(); else G.appMode.exit(); } }, 'Phones: FNF 2 fills the whole screen (no browser bars) and stays sideways, like the FNF app. Tip: add it to your home screen too.'],
     ['Quality', 'enum', () => S().quality, v => { S().quality = v; G.autoQ = 1; G.resize(); }, 'Auto: 720p, lower by itself when it lags. High: full screen sharpness (strong PCs). Low: fastest.', ['auto', 'high', 'low']],
     ['Framerate', 'enum', () => S().fpsCap, v => { S().fpsCap = v; }, 'Highest frames per second. 60 is smooth and easy on your PC.', ['60', '120', '144', '240', 'max']],
   ];
@@ -91,7 +92,9 @@
       this.swipe = new G.Swipe();
       this.buildMain();
     },
-    MAIN: [['PREFERENCES', 'buildPrefs'], ['CONTROLS', 'buildControls'], ['INPUT OFFSETS', 'buildOffsets'], ['MODS', 'buildMods'], ['SAVE DATA', 'buildSave'], ['EXIT', 'exit']],
+    MAIN_ALL: [['PREFERENCES', 'buildPrefs'], ['CONTROLS', 'buildControls'], ['INPUT OFFSETS', 'buildOffsets'], ['MODS', 'buildMods'], ['SAVE DATA', 'buildSave'], ['EXIT', 'exit']],
+    // (FNF mobile: no CONTROLS without a keyboard, and the back button in the corner instead of EXIT)
+    get MAIN() { return G.touchMode ? this.MAIN_ALL.filter(m => m[1] !== 'buildControls' && m[1] !== 'exit') : this.MAIN_ALL; },
     buildMain(sel) {
       this.page = 'main'; this.sel = sel || 0;
       const n = this.MAIN.length, gap = Math.min(120, (G.H - 100) / n);
@@ -101,7 +104,7 @@
     // ---------- mods: every pack (ON / OFF), + load packs on phones (kept in the browser)
     buildMods() {
       this.page = 'mods'; this.sel = 0; this.modMsg = null; this.modsChanged = this.modsChanged || false;
-      this.mods = Object.values(G.Packs.all).sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+      this.mods = Object.values(G.Packs.all).filter(p => !p.core).sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
     },
     modRows() { return this.mods.length + 1; },     // the packs, then LOAD PACKS
     modAction(i, d) {

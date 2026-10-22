@@ -5,6 +5,9 @@
 const G = window.G = window.G || {};
 G.VERSION = '2.0.0';
 G.W = 1280; G.H = 720;
+// phones: the game gets as wide as the screen, like FNF mobile's FullScreenScaleMode (16:9 up to 20:9 = 1280 to
+// 1600 wide, always 720 tall). G.CUT = how much wider than 1280 it is right now (FNF's gameCutoutSize.x).
+G.BASE_W = 1280; G.CUT = 0;
 
 // ------------------------------------------------------------------ math
 G.clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -173,6 +176,18 @@ G.canvas = document.getElementById('game');
 G.ctx = G.canvas.getContext('2d', { alpha: false });
 G.q = 1;            // canvas pixels per game pixel
 G.autoQ = 1;        // auto-quality multiplier (drops when FPS is low)
+// the width the screen would like (it only changes between screens: G.applyW, so a screen never changes size
+// while it's open). PCs stay 1280; ?wide=1600 tries it on a PC.
+G.wantW = function () {
+  const iw = window.innerWidth, ih = window.innerHeight;
+  if (G.query && G.query.wide) return G.clamp(+G.query.wide || 1280, 1280, 1600);
+  if (!G.isTouchDevice || iw <= ih) return G.W;               // (upright: the turn-your-phone card is up anyway)
+  return G.clamp(Math.round(720 * iw / ih), 1280, 1600);
+};
+G.applyW = function () {
+  const w = G.wantW();
+  if (w !== G.W) { G.W = w; G.CUT = w - G.BASE_W; G.resize(); }
+};
 G.resize = function () {
   const iw = window.innerWidth, ih = window.innerHeight;
   const fit = Math.min(iw / G.W, ih / G.H);
@@ -197,10 +212,19 @@ window.addEventListener('resize', () => G.resize());
 // transform helpers. All drawing happens in 1280x720 game space.
 // screen-wide camera zoom/offset a menu can set while it draws (freeplay rank camera, shakes)
 G.screenZoom = 1; G.screenOff = { x: 0, y: 0 };
+// a screen made for 1280 wide (base1280: true) is drawn in the middle of a wider phone screen: while it runs, G.W is
+// 1280 and every transform moves over by G.ox (like FNF mobile's states that add gameCutoutSize / 2 to everything)
+G.ox = 0;
+G.in1280 = function (fn) {
+  const scr = G.screen;
+  if (!scr || !scr.base1280 || !G.CUT) return fn();
+  const w = G.W; G.W = G.BASE_W; G.ox = G.CUT / 2;
+  try { return fn(); } finally { G.W = w; G.ox = 0; }
+};
 G.setScreenT = function (ctx, zoom) {
   // HUD space; optional zoom about the screen centre (FNF camHUD bop)
   const q = G.q, z = (zoom || 1) * (G.screenZoom || 1), o = G.screenOff;
-  ctx.setTransform(q * z, 0, 0, q * z, q * (G.W / 2) * (1 - z) + q * o.x, q * (G.H / 2) * (1 - z) + q * o.y);
+  ctx.setTransform(q * z, 0, 0, q * z, q * (G.W / 2) * (1 - z) + q * (o.x + G.ox), q * (G.H / 2) * (1 - z) + q * o.y);
 };
 G.Camera = class {
   constructor(x, y, zoom) { this.x = x || G.W / 2; this.y = y || G.H / 2; this.zoom = zoom || 1; this.angle = 0; this.sx = 0; this.sy = 0; this.shakeI = 0; this.shakeT = 0; }
@@ -217,14 +241,14 @@ G.Camera = class {
   apply(ctx, sf) {
     if (sf == null) sf = 1;
     const q = G.q, z = this.zoom;
-    const tx = G.W / 2 - this.x * sf * z + this.sx, ty = G.H / 2 - this.y * sf * z + this.sy;
+    const tx = G.W / 2 - this.x * sf * z + this.sx + G.ox, ty = G.H / 2 - this.y * sf * z + this.sy;
     if (this.angle) {
       const c = Math.cos(this.angle) * z, s = Math.sin(this.angle) * z;
       ctx.setTransform(q * c, q * s, -q * s, q * c, 0, 0);
       // rotate about screen centre
       const cx = G.W / 2, cy = G.H / 2;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(q, q); ctx.translate(cx + this.sx, cy + this.sy); ctx.rotate(this.angle); ctx.scale(z, z);
+      ctx.scale(q, q); ctx.translate(cx + this.sx + G.ox, cy + this.sy); ctx.rotate(this.angle); ctx.scale(z, z);
       ctx.translate(-this.x * sf, -this.y * sf);
       return;
     }
@@ -659,10 +683,10 @@ G.input = {
     const scr = G.screen;
     if (G.Loading && G.Loading.shown && G.Loading.key(acts, down, repeat)) return;   // the loading screen's little game
     if (G.trans.active && down) return; // ignore presses mid transition
-    if (scr && scr.onKey) { try { if (scr.onKey(code, down, repeat, e) === true) return; } catch (err) { G.reportError(err, 'onKey'); } }
+    if (scr && scr.onKey) { try { if (G.in1280(() => scr.onKey(code, down, repeat, e)) === true) return; } catch (err) { G.reportError(err, 'onKey'); } }
     if (I.blockKeys) return;
     // a screen returns true when it used the key, so a key bound to two actions (Enter = accept + pause) only fires once
-  if (scr && scr.onAction) for (const a of acts) { try { if (scr.onAction(a, down, repeat, e) === true) break; } catch (err) { G.reportError(err, 'onAction ' + a); } }
+  if (scr && scr.onAction) for (const a of acts) { try { if (G.in1280(() => scr.onAction(a, down, repeat, e)) === true) break; } catch (err) { G.reportError(err, 'onAction ' + a); } }
   }
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));
@@ -690,7 +714,7 @@ G.input = {
     if (G.Loading && G.Loading.shown && G.Loading.pointer(type, p.x, p.y, e.pointerId)) return;
     if (G.trans.active && type === 'down') return;
     if (G.mobileUI && G.mobileUI.pointer(type, p.x, p.y, e.pointerId)) return;   // the phone back button (60-mobile.js)
-    if (scr && scr.onPointer) { try { scr.onPointer(type, p.x, p.y, e.pointerId, e); } catch (err) { G.reportError(err, 'onPointer'); } }
+    if (scr && scr.onPointer) { try { const x = scr.base1280 ? p.x - G.CUT / 2 : p.x; G.in1280(() => scr.onPointer(type, x, p.y, e.pointerId, e)); } catch (err) { G.reportError(err, 'onPointer'); } }
   }
   G.canvas.addEventListener('pointerdown', e => { e.preventDefault(); try { G.canvas.setPointerCapture(e.pointerId); } catch (x) {} ptr('down', e); });
   G.canvas.addEventListener('pointermove', e => ptr('move', e));
@@ -736,7 +760,8 @@ G._switch = function (name, params) {
   if (G.screen && G.screen.leave) try { G.screen.leave(); } catch (e) { G.reportError(e, 'leave ' + G.screenName); }
   if (G.A && G.A.newScreen) G.A.newScreen();
   G.screen = G.screens[name]; G.screenName = name;
-  if (G.screen.enter) try { G.screen.enter(params || {}); } catch (e) { G.reportError(e, 'enter ' + name); }
+  G.applyW();
+  if (G.screen.enter) try { G.in1280(() => G.screen.enter(params || {})); } catch (e) { G.reportError(e, 'enter ' + name); }
 };
 G.drawTransition = function (ctx) {
   const T = G.trans;
@@ -826,14 +851,14 @@ G.loop = function () {
   if (!busy && G.A._releaseAt && now > G.A._releaseAt) { G.A._releaseAt = 0; try { G.A.releaseUnused(); } catch (e) { G.reportError(e, 'release'); } }
   try {
     if (G.audio && G.audio.update) G.audio.update(dt);
-    if (G.screen && G.screen.update) G.screen.update(dt);
+    if (G.screen && G.screen.update) G.in1280(() => G.screen.update(dt));
   } catch (e) { G.reportError(e, 'update ' + G.screenName); }
   G.updateTransition(dt);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.canvas.width, G.canvas.height);
   G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
-  try { if (G.screen && G.screen.draw) G.screen.draw(ctx); } catch (e) { G.reportError(e, 'draw ' + G.screenName); }
+  try { if (G.screen && G.screen.draw) G.in1280(() => G.screen.draw(ctx)); } catch (e) { G.reportError(e, 'draw ' + G.screenName); }
   G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   if (G.Loading && !(G.screen && G.screen.loadingNow && G.screen.loadingNow())) { G.Loading.done(); G.Loading.overlay(ctx, dt); }
@@ -871,6 +896,7 @@ G.query = (function () { const o = {}; new URLSearchParams(location.search).forE
 // started by 99-main.js once every module has loaded
 G.start = function (firstScreen, params) {
   const boot = document.getElementById('boot'); if (boot) boot.remove();
+  G.W = G.wantW(); G.CUT = G.W - G.BASE_W;
   G.resize();
   G.setScreen(firstScreen, params, { instant: true });
   requestAnimationFrame(G.loop);

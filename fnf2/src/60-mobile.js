@@ -94,3 +94,77 @@ G.mobileUI = {
     G.mobileUI.back();
   });
 })();
+
+// ---------------------------------------------------------------- phones: sideways only, app mode, the phone update
+// FNF mobile only runs sideways. Held upright, a card asks you to turn the phone (and a song pauses).
+(function () {
+  if (!G.isTouchDevice) return;
+  const card = document.createElement('div');
+  card.id = 'turnPhone';
+  card.style.cssText = 'position:fixed;inset:0;z-index:50;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6vh;color:#fff;font:bold 6vw VCR,monospace;text-align:center';
+  card.innerHTML = '<div style="width:22vw;height:38vw;border:1.6vw solid #fff;border-radius:3.5vw;animation:fnf2turn 2s ease-in-out infinite"></div><div>TURN YOUR PHONE<br>SIDEWAYS</div>';
+  const st = document.createElement('style');
+  st.textContent = '@keyframes fnf2turn{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}';
+  document.head.appendChild(st); document.body.appendChild(card);
+  const check = () => {
+    const up = window.innerHeight > window.innerWidth * 1.05;
+    card.style.display = up ? 'flex' : 'none';
+    if (up && !G._upright && G.screen && G.screen.onBlur) try { G.screen.onBlur(); } catch (e) {}
+    G._upright = up;
+  };
+  window.addEventListener('resize', check); window.addEventListener('orientationchange', check);
+  setTimeout(check, 0);
+})();
+
+// App mode (Options > Preferences): full screen, no browser bars, locked sideways, like the FNF app. A browser only
+// allows full screen right after a tap, so it's asked for again on the next tap whenever it was left (back swipe...)
+G.appMode = {
+  want() { return !!(G.settings && G.settings.appMode) && G.isTouchDevice; },
+  installed() { try { return matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches; } catch (e) { return false; } },
+  enter() {
+    const d = document.documentElement;
+    if (!document.fullscreenElement && d.requestFullscreen) {
+      d.requestFullscreen({ navigationUI: 'hide' }).then(() => this.lock(), () => {});
+    } else this.lock();
+  },
+  lock() { try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} },
+  exit() {
+    try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  },
+};
+window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document.fullscreenElement && !G.appMode.installed()) G.appMode.enter(); }, true);
+
+// The phone's update: new pictures for the phone version come in a small zip next to the big one (packs that the
+// code needs). Missing on this phone: a little box on the title screen with the same two buttons as the first time.
+G.phoneUpdate = {
+  ZIP: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/fnf2-phone-update.zip',
+  NEED: ['mobile'],
+  missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && this.NEED.some(id => !G.Packs.has(id)); },
+  show() {
+    if (this.box || this.closed || !this.missing()) return;
+    const d = this.box = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
+    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: the real FNF mobile buttons (small download)';
+    const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin';
+    const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
+    const get = btn('1  GET IT', '#9CF', 'a'); get.href = this.ZIP; get.target = '_blank'; get.rel = 'noopener';
+    get.onclick = () => { msg.textContent = 'Downloading... then come back and tap PICK IT'; };
+    const pick = btn('2  PICK IT', '#FFE45C', 'label');
+    const inp = document.createElement('input'); inp.type = 'file'; inp.style.display = 'none'; pick.appendChild(inp);
+    inp.onchange = async () => {
+      const files = [...(inp.files || [])]; if (!files.length) return;
+      msg.textContent = 'Taking it out of the zip...';
+      const got = await G.Packs.save(files);
+      if (got.some(m => this.NEED.includes(m.id))) { msg.textContent = 'Done! Starting again...'; setTimeout(() => location.reload(), 600); }
+      else msg.textContent = 'That is not the phone update zip. Tap GET IT, then PICK IT.';
+    };
+    const x = btn('LATER', '#888', 'span'); x.onclick = () => { this.closed = true; this.hide(); };
+    // (taps on the box don't reach the game under it)
+    d.addEventListener('pointerdown', e => e.stopPropagation());
+    row.append(get, pick, x); d.append(msg, row); document.body.appendChild(d);
+  },
+  hide() { if (this.box) this.box.remove(); this.box = null; },
+  tick() { if (G.screenName === 'title' && !G.trans.active) this.show(); else this.hide(); },
+};
+setInterval(() => { try { G.phoneUpdate.tick(); } catch (e) {} }, 500);

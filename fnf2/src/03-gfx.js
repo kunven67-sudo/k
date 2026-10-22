@@ -547,10 +547,10 @@ G.FCam = class {
     const ox = G.W / 2 - z * (scx * sfx + G.W / 2) + this.sx, oy = G.H / 2 - z * (scy * sfy + G.H / 2) + this.sy;
     if (this.angle) {   // (FlxCamera.angle: the whole view turns around the middle of the screen)
       const a = this.angle * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), cx = G.W / 2, cy = G.H / 2;
-      ctx.setTransform(q * z * c, q * z * s, -q * z * s, q * z * c, q * (cx + c * (ox - cx) - s * (oy - cy)), q * (cy + s * (ox - cx) + c * (oy - cy)));
+      ctx.setTransform(q * z * c, q * z * s, -q * z * s, q * z * c, q * (cx + c * (ox - cx) - s * (oy - cy) + G.ox), q * (cy + s * (ox - cx) + c * (oy - cy)));
       return;
     }
-    ctx.setTransform(q * z, 0, 0, q * z, q * ox, q * oy);
+    ctx.setTransform(q * z, 0, 0, q * z, q * (ox + G.ox), q * oy);
   }
   drawFX(ctx) {
     if (this.flashA > 0) { G.setScreenT(ctx); ctx.globalAlpha = this.flashA; ctx.fillStyle = this.flashC; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
@@ -563,10 +563,10 @@ G.HudCam = class {
     const q = G.q, z = this.zoom;
     if (this.angle) {   // (the HUD turns around the middle of the screen)
       const r = this.angle * Math.PI / 180, c = Math.cos(r), sn = Math.sin(r), cx = G.W / 2, cy = G.H / 2;
-      ctx.setTransform(q * z * c, q * z * sn, -q * z * sn, q * z * c, q * (cx - z * (c * cx - sn * cy) + this.sx), q * (cy - z * (sn * cx + c * cy) + this.sy));
+      ctx.setTransform(q * z * c, q * z * sn, -q * z * sn, q * z * c, q * (cx - z * (c * cx - sn * cy) + this.sx + G.ox), q * (cy - z * (sn * cx + c * cy) + this.sy));
       return;
     }
-    ctx.setTransform(q * z, 0, 0, q * z, q * (G.W / 2 * (1 - z) + this.sx), q * (G.H / 2 * (1 - z) + this.sy));
+    ctx.setTransform(q * z, 0, 0, q * z, q * (G.W / 2 * (1 - z) + this.sx + G.ox), q * (G.H / 2 * (1 - z) + this.sy));
   }
   shake(i, d) { this.shakeI = Math.max(this.shakeI, i); this.shakeT = Math.max(this.shakeT, d); }
   update(dt) { if (this.shakeT > 0) { this.shakeT -= dt; const m = this.shakeI * G.W; this.sx = (Math.random() * 2 - 1) * m; this.sy = (Math.random() * 2 - 1) * m; if (this.shakeT <= 0) { this.shakeI = 0; this.sx = this.sy = 0; } } }

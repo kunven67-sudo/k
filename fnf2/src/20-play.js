@@ -274,9 +274,11 @@
       const st = G.settings;
       this.down = !!st.downscroll; this.middle = !!st.middlescroll;
       const y = this.down ? G.H - STRUM_SIZE - 24 : 24;
+      // (wide phone screens: both lines move in a bit, PlayState.initStrumlines' cutoutSize)
+      const cut = G.CUT / 2.5;
       this.lines = [
-        { player: false, x: this.middle ? -9999 : 48, y, strums: [] },
-        { player: true, x: this.middle ? G.W / 2 - SPACING * 2 : G.W / 2 + 48, y, strums: [] },
+        { player: false, x: this.middle ? -9999 : 48 + cut, y, strums: [] },
+        { player: true, x: this.middle ? G.W / 2 - SPACING * 2 : G.W / 2 + 48 + cut / 2, y, strums: [] },
       ];
       // Phones: FNF mobile's "Arrows" controls (V-Slice PlayState.initNoteHitbox): your arrows big at the bottom,
       // spread out so a thumb fits each one, notes falling down to them; the opponent's arrows tiny in the top
@@ -285,11 +287,16 @@
       this.phoneArrows = !!G.touchMode && st.touchScheme !== 'lanes';
       if (this.phoneArrows) {
         this.down = true; this.middle = false;
-        const sc = 0.5625 * 1.95, gap = 0.5625 * 2.8;                 // strumline scale 1.097, note spacing 1.575
+        const amp = (G.W / G.H) / (1280 / 720);
+        const sc = (G.H / G.W) * 1.95 * amp, gap = (G.H / G.W) * 2.8 * amp;   // strumline scale 1.097, note spacing 1.575
         const P = this.lines[1], O = this.lines[0];
-        P.sc = sc; P.spF = gap / sc; P.ys = 1 / sc;
-        P.y = (G.H - STRUM_SIZE * sc) * 0.95 - 24; P.x = G.W / 2 - 1.5 * SPACING * gap - STRUM_SIZE / 2 * sc;
-        O.sc = 0.4; O.x = 48 - 30; O.y = 24 * 0.3;
+        // Strumline.getXPos in arrow mode: the left two and the right two are pulled apart a bit, a thumb each
+        const S = SPACING * gap * sc, pos = 35 * amp, off = [-2 * pos, -2 * pos + S, pos + 2 * S, pos + 3 * S];
+        P.sc = sc; P.ys = 1 / sc;
+        P.y = (G.H - STRUM_SIZE * sc) * 0.95 - 24; P.x = (G.W - 4 * S) / 2 + 48;
+        // (strums are placed in the line's own zoomed space: x on screen = P.x + (local - P.x) * sc)
+        P.lx = off.map(o => P.x + (o + INITIAL_OFFSET) / sc);
+        O.sc = 0.4 * amp; O.x = 48 + cut - 30; O.y = 24 * 0.3;
       }
       NS = makeNS(this.song.noteStyle);
       // (a mod's own rating / combo / countdown pictures: asked for now, so they're ready before the song)
@@ -302,7 +309,7 @@
       }
       for (const L of this.lines) for (let i = 0; i < 4; i++) {
         const s = makeStrum(i, L.player);
-        s.x = s.bx = L.x + i * SPACING * (L.spF || 1) + INITIAL_OFFSET; s.y = s.by = L.y;
+        s.x = s.bx = L.lx ? L.lx[i] : L.x + i * SPACING + INITIAL_OFFSET; s.y = s.by = L.y;
         s.mx = s.my = s.ma = 0; s.mal = 1;                  // modchart offset / angle / alpha
         L.strums.push(s);
       }
@@ -787,7 +794,7 @@
     },
     onBlur() { if (this.started && !this.paused && !this.gameOver && !this.ended) this.openPause(); },
     onPointer(type, x, y, id, e) {
-      if (this.paused) { if (type === 'down') this.pausePointer(x, y); return; }
+      if (this.paused) { this.pausePointer(type, x, y); return; }
       if (this.cutscene) { if (type === 'down') this.cutscene.onAction(y < 90 && x > G.W - 160 ? 'back' : 'accept', true, false); return; }
       if (this.gameOver) { if (type === 'down') this.gameOverAction(y < 120 && x < 140 ? 'back' : 'accept'); return; }
       if (!G.touchMode) return;
@@ -830,6 +837,8 @@
     openPause() {
       if (this.paused || !this.audio) return;
       this.paused = true; this.audio.pause();
+      if (this.pauseBtn && G.touchMode && this.pauseBtn.spr.animName !== 'confirm') { this.pauseBtn.spr.play('confirm', true); this.pauseBtn.spr.alpha = 1; }
+      if (navigator.vibrate && G.touchMode) try { navigator.vibrate(50); } catch (e) {}
       for (let i = 0; i < 4; i++) if (this.keys[i]) this.release(i);
       this._touch = {}; this._tpos = {};
       const art = this.song.artist || 'Unknown', chr = this.song.charter || 'Unknown';
@@ -851,14 +860,22 @@
         labels = pm.diffs.map(d => G.DIFF_INFO[d.diff].name).concat(['Back']);
       } else labels = ['Resume', 'Restart Song', 'Change Difficulty', this.practice ? 'Disable Practice Mode' : 'Enable Practice Mode', 'Exit to Menu'];
       pm.mode = mode; pm.sel = 0;
-      pm.items = labels.map((s, i) => { const a = new G.Alphabet(s, true, 0, 70 * i + 30); a.alpha = 0; a.tw = null; return a; });
-      this.layoutPause();
+      // phones (FNF mobile's PauseSubState): a fixed list down the left, each one sliding in from x 110 to 150, the
+      // picked one gives a little kick; song info at the bottom right instead of the top
+      pm.mobile = !!G.touchMode;
+      pm.items = labels.map((s, i) => {
+        const a = new G.Alphabet(s, true, pm.mobile ? 110 : 0, pm.mobile ? 105 * i + 150 : 70 * i + 30); a.alpha = 0; a.tw = null;
+        if (pm.mobile) a.tw = { x0: 110, y0: a.y, x1: 150, y1: a.y, t: 0, dur: 0.4 * (i + 1), ease: G.ease.expoOut };
+        return a;
+      });
+      this.layoutPause(true);
     },
-    layoutPause() {
+    layoutPause(first) {
       const pm = this.pauseMenu;
       pm.items.forEach((a, i) => {
-        const d = (i - pm.sel) * 1.3;
         a.alpha = i === pm.sel ? 1 : 0.6;
+        if (pm.mobile) { if (!first && i === pm.sel) a.tw = { x0: 165, y0: a.y, x1: 150, y1: a.y, t: 0, dur: 0.2, ease: G.ease.fxBackInOut || G.ease.quadInOut }; return; }
+        const d = (i - pm.sel) * 1.3;
         a.tw = { x0: a.x, y0: a.y, x1: d * 20 + 90, y1: d * 120 + G.H * 0.48, t: 0 };
       });
     },
@@ -867,7 +884,7 @@
       for (const a of pm.items) {
         a.update(dt);
         const w = a.tw; if (!w) continue;
-        w.t = Math.min(1, w.t + dt / 0.33); const k = G.ease.quartOut(w.t);
+        w.t = Math.min(1, w.t + dt / (w.dur || 0.33)); const k = (w.ease || G.ease.quartOut)(w.t);
         a.x = G.lerp(w.x0, w.x1, k); a.y = G.lerp(w.y0, w.y1, k);
       }
       // "Artist:" and "Charter:" swap every 15 seconds (0.75s fade out, swap, 0.75s fade in)
@@ -894,14 +911,27 @@
         if (!repeat) { G.settings.offset = G.clamp(Math.round(G.settings.offset || 0) + (a === 'ui_up' ? 1 : -1), -1500, 1500); G.saveSettings(); }
         return true;
       }
-      if (a === 'ui_up' || a === 'ui_down') { pm.sel = (pm.sel + (a === 'ui_up' ? -1 : 1) + pm.items.length) % pm.items.length; G.sfx('scroll', { vol: 0.4 }); this.layoutPause(); return true; }
+      if (a === 'ui_up' || a === 'ui_down') { pm.sel = (pm.sel + (a === 'ui_up' ? -1 : 1) + pm.items.length) % pm.items.length; G.sfx('scroll', { vol: 0.4 }); this.layoutPause(); return true; }   // (keys still wrap round)
       if (a === 'accept' && !repeat) { this.pauseChoose(); return true; }
       if (a === 'back' && !repeat) { if (pm.mode === 'diff') this.backToPauseMain(); else this.resume(); return true; }
       return false;
     },
-    pausePointer(x, y) {
+    // a tap on an entry: the picked one = do it, another one = pick it (TouchUtil.pressAction: a quick tap that
+    // didn't swipe, on the finger coming up)
+    pausePointer(type, x, y) {
       const pm = this.pauseMenu;
-      for (let i = 0; i < pm.items.length; i++) { const it = pm.items[i]; if (y >= it.y - 10 && y <= it.y + 80 && x < it.x + it.width + 60) { if (i === pm.sel) this.pauseChoose(); else { pm.sel = i; this.layoutPause(); G.sfx('scroll', { vol: 0.4 }); } return; } }
+      if (type === 'down') { pm.tap = { x, y, t: performance.now() }; return; }
+      if (type !== 'up' || !pm.tap) return;
+      const t = pm.tap; pm.tap = null;
+      if (Math.abs(x - t.x) > 30 || Math.abs(y - t.y) > 30 || performance.now() - t.t > 400) return;
+      for (let i = 0; i < pm.items.length; i++) {
+        const it = pm.items[i];
+        if (y >= it.y - 10 && y <= it.y + 80 && x >= it.x - 40 && x < it.x + it.width + 60) {
+          if (i === pm.sel) { if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {} this.pauseChoose(); }
+          else { pm.sel = i; this.layoutPause(); G.sfx('scroll', { vol: 0.4 }); if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {} }
+          return;
+        }
+      }
     },
     pauseChoose() {
       const pm = this.pauseMenu, label = pm.items[pm.sel].text;
@@ -1166,7 +1196,8 @@
         }
         ctx.globalAlpha = 1;
         const pb = this.pauseBtn || (this.pauseBtn = this.makePauseButton());
-        if (pb) {
+        if (pb && this.paused) {}
+        else if (pb) {
           const cir = G.A.image('preload/images/pauseCircle.png'), s = pb.spr, cx = s.x + pb.w / 2, cy = s.y + pb.h / 2;
           if (cir) { ctx.globalAlpha = 0.1; ctx.drawImage(cir, cx - cir.width * 0.84 / 2, cy - cir.height * 0.8 / 2, cir.width * 0.84, cir.height * 0.8); ctx.globalAlpha = 1; }
           pb.update(G.dt); pb.draw(ctx);
@@ -1233,26 +1264,38 @@
       const pm = this.pauseMenu;
       G.setScreenT(ctx);
       ctx.globalAlpha = 0.6 * G.ease.quartOut(Math.min(1, pm.t / 0.8)); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1;
+      // phones: the pause button plays its press + a circle pulses out from it
+      if (pm.mobile && this.pauseBtn) {
+        const pb = this.pauseBtn, s = pb.spr, cir = G.A.image('preload/images/pauseCircle.png'), cx = s.x + pb.w / 2, cy = s.y + pb.h / 2;
+        const ck = Math.min(1, pm.t / 0.4), sc = 1.4 + (0.8 - 1.4) * (G.ease.fxBackInOut || G.ease.quadInOut)(ck), ca = 0.4 * (1 - G.ease.quartOut(Math.min(1, pm.t / 0.6)));
+        if (cir && ca > 0) { ctx.globalAlpha = ca; ctx.drawImage(cir, cx - cir.width * 0.84 * sc / 2, cy - cir.height * 0.8 * sc / 2, cir.width * 0.84 * sc, cir.height * 0.8 * sc); ctx.globalAlpha = 1; }
+        pb.update(G.dt); pb.draw(ctx); G.setScreenT(ctx);
+      }
       for (const a of pm.items) a.draw(ctx, null);
       // top right: song, artist/charter, difficulty, deaths, practice; each one drifts down 5px as it fades in
+      // (phones: at the bottom right, drifting up)
       const lines = pm.meta.slice();
       lines[1] = pm.artistIsCharter ? 'Charter: ' + pm.chr : 'Artist: ' + pm.art;
       lines[3] = (this.params.deaths || 0) + ' Blue Balls';
       const show = [0, 1, 2, 3].concat(this.practice ? [4] : []);
+      const top = pm.mobile ? G.H - 155 - (this.practice ? 30 : 0) : 15, dir = pm.mobile ? -5 : 5;
       show.forEach((li, i) => {
         const k = G.ease.quartOut(G.clamp((pm.t - 0.1 * (i + 1)) / 1.8, 0, 1));
-        G.vcr(ctx, lines[li], G.W - 20, 15 + li * 32 + 5 * k, { align: 'right', size: 32, alpha: k * (li === 1 ? pm.artistA : 1), outline: 0 });
+        G.vcr(ctx, lines[li], G.W - 20, top + li * 32 + dir * k, { align: 'right', size: 32, alpha: k * (li === 1 ? pm.artistA : 1), outline: 0 });
       });
       // bottom right, above the offset: who you're playing as (their icon, bobbing, + their name)
       const kp = G.ease.quartOut(G.clamp((pm.t - 0.5) / 1.8, 0, 1));
       const pid = this.bf ? G.playerOf(this.bf.id) : 'bf', PP = G.PLAYERS && G.PLAYERS[pid];
       // (a song's own singer who isn't one of the players, like the girl in Jordus: no name to show)
+      // (phones: in the middle of the right side, between the pause button and the song info)
+      const py = pm.mobile ? -200 : 0;
       if (this.iconP1 && kp > 0 && (pid !== 'bf' || !this.bf || /^bf/.test(this.bf.id))) {
         const ic = Object.assign({}, this.iconP1, { scale: 0.8 + 0.03 * Math.sin(pm.t * 4) });
-        ctx.save(); ctx.globalAlpha = kp; this.drawIcon(ctx, ic, G.W - 150, G.H - 150 + 5 * kp, false); ctx.restore();
-        G.vcr(ctx, 'PLAYING AS', G.W - 150, G.H - 178 + 5 * kp, { align: 'right', size: 16, alpha: kp, outline: 0 });
-        G.vcr(ctx, ((PP && PP.name) || 'Boyfriend').toUpperCase(), G.W - 150, G.H - 160 + 5 * kp, { align: 'right', size: 32, alpha: kp, outline: 0 });
+        ctx.save(); ctx.globalAlpha = kp; this.drawIcon(ctx, ic, G.W - 150, G.H - 150 + py + 5 * kp, false); ctx.restore();
+        G.vcr(ctx, 'PLAYING AS', G.W - 150, G.H - 178 + py + 5 * kp, { align: 'right', size: 16, alpha: kp, outline: 0 });
+        G.vcr(ctx, ((PP && PP.name) || 'Boyfriend').toUpperCase(), G.W - 150, G.H - 160 + py + 5 * kp, { align: 'right', size: 32, alpha: kp, outline: 0 });
       }
+      if (pm.mobile) return;      // (no offset text on phones)
       // bottom right: the offset
       const k = G.ease.quartOut(G.clamp((pm.t - 0.6) / 1.8, 0, 1));
       const oy = G.H - 16 * 2 - 40 + 5 * k;

@@ -2,7 +2,23 @@
 // CapsuleText, LetterSort, DifficultyDot, AlbumRoll, BoyfriendCard) with the real assets.
 // Positions, timings and tweens follow the engine source so it looks + moves like the real one.
 (function () {
-  const W = 1280, H = 720;
+  // W = the screen's width (wider on phones). Like FNF mobile, the wider screen is shared out: the card stretches by
+  // CUTOUT_WIDTH (= the extra width / 1.5), the DJ side moves over by 44% of it, the song list by 75% of it, and the
+  // right side (score, album) keeps to the right edge. All set when Freeplay opens.
+  let W = 1280, CW = 0, DJX = 0, SGX = 0;
+  const H = 720;
+  // BitmapUtil.scalePartByWidth: the left half of a picture stretched by `add`, the right half (the torn edge) kept
+  function stretch(img, add) {
+    if (!img || add <= 0) return img;
+    if (img.complete === false || img.naturalWidth === 0) return null;     // (still decoding: not this frame)
+    const half = img.width / 2, sw = Math.ceil(half + add);
+    const id = img._fpid || (img._fpid = ++stretch.n);
+    return G.cached('fpstretch:' + id + ':' + add, Math.ceil(img.width + add), img.height, c => {
+      c.drawImage(img, 0, 0, half, img.height, 0, 0, sw, img.height);
+      c.drawImage(img, half, 0, img.width - half, img.height, sw, 0, img.width - half, img.height);
+    });
+  }
+  stretch.n = 0;
   const IMG = p => G.A.image('preload/images/' + p + '.png');
   const SP = p => G.Sparrow.load('preload/images/' + p);
   const E = G.ease;
@@ -224,16 +240,15 @@
       const t1 = data.text1 || 'BOYFRIEND', t2 = data.text2 || 'HOT BLOODED IN MORE WAYS THAN ONE', t3 = data.text3 || 'PROTECT YO NUTS';
       // card colours: back before / after the intro, the 4 text rows, the bar (new players bring their own)
       const C = this.cols = data.colors || ['#FFD4E9', '#FFD863', '#FFF383', '#FF9963', '#FFFFFF', '#FEA400', '#FEDA00', '#FFD400'];
-      this.pink = IMG('freeplay/pinkBack');
-      const pw = this.pink ? this.pink.width : 524;
+      this.pinkSrc = IMG('freeplay/pinkBack');
+      const pw = this.pinkSrc ? Math.ceil(this.pinkSrc.width + CW) : 524;
       this.pw = pw;
       this.pinkX = -pw; this.color = C[0];
       this.orangeVis = false;
-      this.orange = G.cached('fp-orange' + C[6], pw, 75, c => { c.fillStyle = C[6]; c.fillRect(0, 0, pw, 75); if (this.pink) { c.globalCompositeOperation = 'destination-in'; c.drawImage(this.pink, 0, 0); } });
       this.glow = { a: 0, vis: false }; this.glowDark = { a: 0, vis: false };
       this.cardGlow = { a: 1, s: 1, vis: false };
       this.cg2 = { a: 0, vis: false }; this.cg1 = { a: 0, vis: false }; this.ctext = { a: 0, vis: false };
-      this.yeah = new G.Sprite(-320, 120).loadAtlas(G.A.imagePath('freeplay/backing-text-yeah', 'preload'));
+      this.yeah = new G.Sprite(DJX - 320, 120).loadAtlas(G.A.imagePath('freeplay/backing-text-yeah', 'preload'));
       if (this.yeah.atlas) this.yeah.addAnim('go', this.yeah.atlas.main.name, 24, false);
       const S = (y, txt, wid, bold, size, color, speed) => { const r = new ScrollText(y, txt, wid, bold, size); r.color = color; r.speed = speed; return r; };
       // order = draw order in BoyfriendCard.onCreate
@@ -246,6 +261,12 @@
         S(440 + 10, t1, W / 2, false, 60, C[5], -3.8), // funnyScroll3
       ];
       this.tw.to(this, { pinkX: 0 }, 0.6, E.quartOut);
+    }
+    get pink() { return stretch(this.pinkSrc, CW); }
+    // the orange bar, cut to the card's shape (alphaMaskFlxSprite)
+    get orange() {
+      const pk = this.pink, C = this.cols; if (!pk) return null;
+      return G.cached('fp-orange' + C[6] + ':' + pk.width, pk.width, 75, c => { c.fillStyle = C[6]; c.fillRect(0, 0, pk.width, 75); c.globalCompositeOperation = 'destination-in'; c.drawImage(pk, 0, 0); });
     }
     skipIntro() { this.tw.cancel(this); this.pinkX = 0; }
     introDone() {
@@ -283,19 +304,19 @@
     update(dt) { for (const r of this.rows) r.update(dt); this.yeah.update(dt); }
     draw(ctx) {
       G.setScreenT(ctx);
-      if (this.pink) ctx.drawImage(tint(this.pink, this.color, 'pinkBack'), Math.round(this.pinkX), 0);
-      if (this.orangeVis) { ctx.drawImage(this.orange, 84, 440); ctx.fillStyle = this.cols[7]; ctx.fillRect(0, 440, 100, 75); }
+      if (this.pink) ctx.drawImage(tint(this.pink, this.color, 'pinkBack' + this.pw), Math.round(this.pinkX), 0);
+      if (this.orangeVis && this.orange) { ctx.drawImage(this.orange, 84, 440); ctx.fillStyle = this.cols[7]; ctx.fillRect(0, 440, 100, 75); }
       const add = (img, x, y, a) => { if (img && a > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(1, a); ctx.drawImage(img, x, y); ctx.restore(); } };
-      if (this.cg2.vis) add(IMG('freeplay/confirmGlow2'), -30, 240, this.cg2.a);
-      if (this.cg1.vis) add(IMG('freeplay/confirmGlow'), -30, 240, this.cg1.a);
-      if (this.ctext.vis) add(IMG('freeplay/glowingText'), -8, 115, this.ctext.a);
+      if (this.cg2.vis) add(IMG('freeplay/confirmGlow2'), DJX - 30, 240, this.cg2.a);
+      if (this.cg1.vis) add(IMG('freeplay/confirmGlow'), DJX - 30, 240, this.cg1.a);
+      if (this.ctext.vis) add(IMG('freeplay/glowingText'), DJX - 8, 115, this.ctext.a);
       if (this.yeah.cur) this.yeah.draw(ctx, null);
       G.setScreenT(ctx);
       for (const r of this.rows) r.draw(ctx);
       const bg = IMG('freeplay/beatglow');
-      if (bg && this.glowDark.vis && this.glowDark.a > 0) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = this.glowDark.a; ctx.drawImage(bg, -300, 330); ctx.restore(); }
-      if (this.glow.vis) add(bg, -300, 330, this.glow.a);
-      const cg = IMG('freeplay/cardGlow');
+      if (bg && this.glowDark.vis && this.glowDark.a > 0) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = this.glowDark.a; ctx.drawImage(bg, DJX - 300, 330); ctx.restore(); }
+      if (this.glow.vis) add(bg, DJX - 300, 330, this.glow.a);
+      const cg = stretch(IMG('freeplay/cardGlow'), CW);
       if (cg && this.cardGlow.vis && this.cardGlow.a > 0) drawF(ctx, cg, null, -30, -30, { sx: this.cardGlow.s, orX: cg.width / 2, orY: cg.height / 2, alpha: this.cardGlow.a, blend: 'lighter' });
     }
   }
@@ -324,18 +345,18 @@
   class PicoCard {
     constructor(fp) {
       this.fp = fp; this.tw = fp.tw;
-      this.pink = IMG('freeplay/pinkBack');
-      this.pw = this.pink ? this.pink.width : 524;
+      this.pinkSrc = IMG('freeplay/pinkBack');
+      this.pw = this.pinkSrc ? Math.ceil(this.pinkSrc.width + CW) : 524;
       this.pinkX = -this.pw; this.color = '#FFD4E9';
       const P = n => IMG('freeplay/backingCards/pico/' + n);
       this.back = new Backdrop(P('lowerLoop'), 200, 20, 110); this.back.flipX = true; this.back.alpha = 0.39;
       this.lower = new Backdrop(P('lowerLoop'), 406, 20, -110);
-      this.blueBar = P('blueBar'); this.barVis = false;
+      this.blueBarSrc = P('blueBar'); this.barVis = false;
       this.top = new Backdrop(null, 80, 20, -220); this.top.sheet = SP('freeplay/backingCards/pico/topLoop'); if (this.top.sheet) this.top.play('base', 'base');
       this.middle = new Backdrop(P('middleLoop'), 346, 15, 220);
       this.glowImg = P('glow'); this.glow = { a: 0, vis: false }; this.glowDark = { a: 0, vis: false };
       this.cardGlow = { a: 1, s: 1, vis: false };
-      this.conf = new G.Sprite(-120, 55).loadAtlas(G.A.imagePath('freeplay/backingCards/pico/pico-confirm', 'preload'));
+      this.conf = new G.Sprite(DJX - 120, 55).loadAtlas(G.A.imagePath('freeplay/backingCards/pico/pico-confirm', 'preload'));
       if (this.conf.atlas) {
         for (const n of ['backplate flat blue', 'pink back', 'black flash', 'white flash', 'blue flash', 'blue flash 2', 'pink flash']) G.Atlas.scaleElement(this.conf.atlas, n, 2, 100);
         this.conf.addAnim('go', this.conf.atlas.main.name, 24, false);
@@ -344,6 +365,8 @@
       this.rows = [];
       this.tw.to(this, { pinkX: 0 }, 0.6, E.quartOut);
     }
+    get pink() { return stretch(this.pinkSrc, CW); }
+    get blueBar() { return stretch(this.blueBarSrc, CW); }
     skipIntro() { this.tw.cancel(this); this.pinkX = 0; }
     introDone() {
       this.color = '#98A2F3';
@@ -381,14 +404,14 @@
     }
     draw(ctx) {
       G.setScreenT(ctx);
-      if (this.pink) ctx.drawImage(tint(this.pink, this.color, 'pinkBackPico'), Math.round(this.pinkX), 0);
+      if (this.pink) ctx.drawImage(tint(this.pink, this.color, 'pinkBackPico' + this.pw), Math.round(this.pinkX), 0);
       this.back.draw(ctx); this.lower.draw(ctx);
       if (this.barVis && this.blueBar) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.4; ctx.drawImage(this.blueBar, 0, 239); ctx.restore(); }
       this.top.draw(ctx); this.middle.draw(ctx);
-      if (this.glowImg && this.glowDark.vis && this.glowDark.a > 0) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = Math.min(1, this.glowDark.a); ctx.drawImage(this.glowImg, -300, 330); ctx.restore(); }
-      if (this.glowImg && this.glow.vis && this.glow.a > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(1, this.glow.a); ctx.drawImage(this.glowImg, -300, 330); ctx.restore(); }
+      if (this.glowImg && this.glowDark.vis && this.glowDark.a > 0) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = Math.min(1, this.glowDark.a); ctx.drawImage(this.glowImg, DJX - 300, 330); ctx.restore(); }
+      if (this.glowImg && this.glow.vis && this.glow.a > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(1, this.glow.a); ctx.drawImage(this.glowImg, DJX - 300, 330); ctx.restore(); }
       if (this.confVis && this.conf.cur) { this.conf.draw(ctx, null); G.setScreenT(ctx); }
-      const cg = IMG('freeplay/cardGlow');
+      const cg = stretch(IMG('freeplay/cardGlow'), CW);
       if (cg && this.cardGlow.vis && this.cardGlow.a > 0) drawF(ctx, cg, null, -30, -30, { sx: this.cardGlow.s, orX: cg.width / 2, orY: cg.height / 2, alpha: this.cardGlow.a, blend: 'lighter' });
     }
   }
@@ -441,7 +464,7 @@
     }
     draw(ctx) {
       G.setScreenT(ctx);
-      if (this.pink) ctx.drawImage(tint(this.pink, this.color, 'pinkBack'), Math.round(this.pinkX), 0);
+      if (this.pink) ctx.drawImage(tint(this.pink, this.color, 'pinkBack' + this.pw), Math.round(this.pinkX), 0);
       if (this.a <= 0) return;
       ctx.save(); ctx.globalAlpha = this.a;
       if (this.bg) ctx.drawImage(this.bg, 0, 0, this.bg.width * 1.05, this.bg.height);
@@ -549,7 +572,7 @@
           this.jumpT = 0;
           const xf = XF[this.jumpI];
           this.sx = xf * 0.8; this.sy = 0.8 / xf;
-          this.tx = intendedX(this.index - this.curSel);
+          this.tx = intendedX(this.index - this.curSel) + SGX;
           this.jumpI++;
         } else if (this.jumpI === XF.length) this.jumping = false;
       }
@@ -713,7 +736,7 @@
   const LETTER_ANIM = LETTER_REGEX.map(s => s.replace('-', ''));
   class LetterSort {
     constructor(fp) {
-      this.fp = fp; this.x = 400; this.y = 75; this.visible = false;
+      this.fp = fp; this.x = 400 + SGX; this.y = 75; this.visible = false;
       this.sel = 2;
       this.letters = [];
       const base = G.A.imagePath('freeplay/sortedLetters', 'preload');
@@ -894,7 +917,9 @@
     remember: { id: null, diff: 'normal', letter: 2, group: 'all' },
     enter(p) {
       p = p || {};
+      W = G.W; CW = G.CUT / 1.5; DJX = CW * 0.44; SGX = CW * 0.75;
       this.tw = new Tw();
+      this.tp = null; this.flickV = 0; this.selF = 0; this.diffDrag = 0; this.dragOff = 0;
       this.rankMode = !!p.rankMode; this.editor = null;   // RANK MODE: the same menu, fake ranks + scores (58-rankmode.js)
       // the new players (Darnell, Nene, Tankman: 59-charselect.js) get the songs they really sang in (played swapped,
       // in their real voice), shown in BF's freeplay style
@@ -938,7 +963,7 @@
       this.scoreVis = false;
       // difficulty
       this.selArrows = [0, 1].map(i => {
-        const s = new G.Sprite(i ? 325 : 20, 70).loadSparrow('preload/images/' + (style.selectorAsset || 'freeplay/freeplaySelector/freeplaySelector'));
+        const s = new G.Sprite((i ? 325 : 20) + DJX, 70).loadSparrow('preload/images/' + (style.selectorAsset || 'freeplay/freeplaySelector/freeplaySelector'));
         if (!s.sheet) s.loadSparrow('preload/images/freeplay/freeplaySelector');
         s.addAnim('shine', 'arrow pointer loop', 24, true); s.play('shine'); s.flipX = !!i; s.pressT = 0;
         return s;
@@ -993,7 +1018,7 @@
       this.album.setAlbum(this.albumFor());
       this.bgVis = true;
       this.tw.color(this, 'bgColor', '#000000', '#FFFFFF', 0.6, E.expoOut, { onComplete: () => { this.overlayVis = false; } });
-      this.diffVis = true; this.tw.to(this.diffSpr, { x: 90 }, 0.6, E.quartOut);
+      this.diffVis = true; this.tw.to(this.diffSpr, { x: 90 + DJX }, 0.6, E.quartOut);
       this.letters.visible = true;
       this.tw.after(1 / 24, () => {
         this.textsVis = true; this.scoreVis = true; this.clear = this.clearShown = 0;
@@ -1092,8 +1117,10 @@
         const ci = m + 1 - this.sel;
         let yOff = 0; if (ci < 0) yOff += 50; else if (ci > 4) yOff -= 10;
         c.ty = c.intendedY(ci) - yOff;
-        c.tx = intendedX(ci);
+        c.tx = intendedX(ci) + SGX;
+        if (ci < 0) c.ty -= 100;            // (another 100 for good measure)
       });
+      this.selF = this.sel;
       if (this.state === 'idle') { this.previewT = 0.25; this.previewing = null; G.audio.music.setVolume(0, 0.05); }
       this.refreshAlbum();
     },
@@ -1121,11 +1148,11 @@
       if (list[i] === this.diff) return;
       // old sprite slides out, new one slides in from the other side
       this.diffOld = { id: this.diff, x: this.diffSpr.x, offY: 0, alpha: 1 };
-      this.tw.to(this.diffOld, { x: change > 0 ? -320 : 500 }, 0.2, E.circInOut, { onComplete: () => { this.diffOld = null; } });
+      this.tw.to(this.diffOld, { x: (change > 0 ? -320 : 500) + DJX }, 0.2, E.circInOut, { onComplete: () => { this.diffOld = null; } });
       this.diff = list[i]; this.remember.diff = this.diff;
       this.tw.cancel(this.diffSpr);
-      this.diffSpr = { id: this.diff, x: change > 0 ? 500 : -320, offY: 5, alpha: 0.5 };
-      this.tw.to(this.diffSpr, { x: 90 }, 0.2, E.circInOut);
+      this.diffSpr = { id: this.diff, x: (change > 0 ? 500 : -320) + DJX, offY: 5, alpha: 0.5 };
+      this.tw.to(this.diffSpr, { x: 90 + DJX }, 0.2, E.circInOut);
       const ds = this.diffSpr; this.tw.after(1 / 24, () => { ds.alpha = 1; ds.offY = 0; });
       G.sfx('scroll', { vol: 0.4 });
       // the list only shows songs that have this difficulty
@@ -1274,25 +1301,107 @@
       return false;
     },
     onWheel(dir) { if (this.editor) { this.editor.onWheel(dir); return; } if (this.state === 'idle') this.changeSelection(dir); },
-    onPointer(type, x, y) {
+    // ------------------------------------------------------------ touch (FreeplayState's FEATURE_TOUCH_CONTROLS parts)
+    // One finger at a time, like TouchUtil.touch. Drag the list (60 px = one song), flick it and it keeps going,
+    // tap a song to pick it / tap the picked one to play it, swipe the picked one left or right (or drag the
+    // difficulty) to change difficulty, hold the picked one for half a second to favorite it, tap the DJ to change
+    // characters. The top bar keeps FNF 2's extras: FREEPLAY = back, the middle = search / letters, right = group.
+    onPointer(type, x, y, id) {
       if (this.editor) { this.editor.onPointer(type, x, y); return; }
-      if (this.state !== 'idle') return;
-      const sw = this.swipe.handle(type, x, y); if (!sw) return;
-      if (sw.dir === 'up') { this.changeSelection(1); return; }
-      if (sw.dir === 'down') { this.changeSelection(-1); return; }
-      if (sw.dir === 'left' && y < 160 && x > 380 && x < 820) { this.changeLetter(1); return; }
-      if (sw.dir === 'right' && y < 160 && x > 380 && x < 820) { this.changeLetter(-1); return; }
-      if (sw.dir !== 'tap') return;
-      if (y < 64 && x < 280) { this.back(); return; }
-      if (y < 60 && x > 380 && x < 820) { this.openSearch(); return; }
-      if (y < 64 && x > 860) { this.changeGroup(1); return; }
-      if (y > 60 && y < 170 && x < 90) { this.pressArrow(0); this.changeDiff(-1); return; }
-      if (y > 60 && y < 170 && x > 300 && x < 390) { this.pressArrow(1); this.changeDiff(1); return; }
-      if (y > 64 && y < 150 && x > 380 && x < 820) { this.changeLetter(x < 600 ? -1 : 1); return; }
-      for (let i = this.caps.length - 1; i >= 0; i--) {
-        if (this.caps[i].hit(x, y)) { if (i === this.sel) this.confirm(); else this.changeSelection(i - this.sel); return; }
+      const now = performance.now();
+      if (type === 'down') {
+        if ((this.tp && G.input.pointers[this.tp.id]) || this.state !== 'idle') return;
+        const cap = this.caps[this.sel];
+        this.flickV = 0;
+        this.tp = { id, sx: x, sy: y, x, y, t0: now, lt: now, vy: 0, moved: false, swiped: false, dragged: false,
+          top: y < 160 && !this.onDiffArrow(x, y) && !this.onDiff(x, y),
+          onSel: !!(cap && cap.hit(x, y)),
+          onArea: x >= SGX + 380 - 300 && x <= SGX + 380 + CW + 590 && y >= 150,     // (capsuleHitbox, reaching left over the capsules)
+          dragDiff: this.onDiff(x, y) };
+        if (this.tp.dragDiff) this.tp.onArea = false;
+        return;
       }
-      if (G.touchMode && x < 380 && y > 250) this.switchPlayer();   // tapping the DJ = character select (touch only, like V-Slice)
+      const T = this.tp; if (!T || id !== T.id) return;
+      if (type === 'move') {
+        const dy = y - T.y, dtm = Math.max(1, now - T.lt);
+        T.vy = T.vy * 0.6 + (dy / dtm * 1000) * 0.4; T.x = x; T.y = y; T.lt = now;
+        if (Math.abs(x - T.sx) > 20 || Math.abs(y - T.sy) > 20) T.moved = true;
+        if (this.state !== 'idle' || T.top) return;
+        if (T.dragDiff) {
+          this.diffDrag = x - T.sx;
+          // (FlxTouch.justMovedLeft/Right: past the 60px swipe line)
+          if (Math.abs(this.diffDrag) >= 60) { this.changeDiff(this.diffDrag > 0 ? 1 : -1); T.sx = x; this.diffDrag = 0; T.dragDiff = false; }
+          return;
+        }
+        if (T.onSel && !T.swiped && !T.dragged && Math.abs(x - T.sx) >= 60 && Math.abs(x - T.sx) > Math.abs(y - T.sy)) {
+          T.swiped = true; T.onSel = false; this.changeDiff(x < T.sx ? -1 : 1); return;
+        }
+        if (T.onArea && !T.swiped && Math.abs(dy) >= 2 && (T.dragged || Math.abs(y - T.sy) > 12)) {
+          T.dragged = true; T.onSel = false;
+          this.scrollF(this.selF - dy / 60);
+        }
+        return;
+      }
+      if (type !== 'up') return;
+      this.tp = null; this.diffDrag = 0;
+      if (this.state !== 'idle') return;
+      const quick = now - T.t0 <= 250 && !T.moved;
+      if (T.top) {
+        const dx = x - T.sx;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(y - T.sy) && x > SGX + 380 && x < SGX + 820) { this.changeLetter(dx < 0 ? 1 : -1); return; }
+        if (!quick) return;
+        if (y < 64 && x < 280) { this.back(); return; }
+        if (y < 60 && x > SGX + 380 && x < SGX + 820) { this.openSearch(); return; }
+        if (y < 64 && x > W - 420) { this.changeGroup(1); return; }
+        if (y > 64 && y < 150 && x > SGX + 380 && x < SGX + 820) { this.changeLetter(x < SGX + 600 ? -1 : 1); return; }
+        return;
+      }
+      if (T.dragged) {
+        // let go while moving: it keeps going and slows down (the flick), then snaps to the song it stops on
+        const v = -T.vy / 60;
+        if (Math.abs(v) > 3 && now - T.lt < 80) this.flickV = Math.max(-40, Math.min(40, v));
+        else this.changeSelection(0, true);
+        return;
+      }
+      if (!quick || T.swiped) return;
+      if (this.onDiffArrow(x, y) === 0) { this.pressArrow(0); this.changeDiff(-1); return; }
+      if (this.onDiffArrow(x, y) === 1) { this.pressArrow(1); this.changeDiff(1); return; }
+      for (let i = this.caps.length - 1; i >= 0; i--) {
+        const c = this.caps[i];
+        if (c.y < -160 || c.y > H || !c.hit(x, y)) continue;
+        if (i === this.sel) this.confirm();
+        else { G.sfx('scroll', { vol: 0.4 }); this.changeSelection(i - this.sel, true); if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {} }
+        return;
+      }
+      if (x >= DJX && x <= DJX + 400 && y >= 320) this.switchPlayer();     // (djHitbox: tapping the DJ = character select)
+    },
+    // the touch areas of the difficulty arrows (0 left, 1 right) and of the difficulty itself
+    onDiffArrow(x, y) { if (!this.diffVis || y < 50 || y > 170) return null; if (x >= DJX && x < DJX + 85) return 0; if (x > DJX + 300 && x < DJX + 395) return 1; return null; },
+    onDiff(x, y) { return this.diffVis && y >= 60 && y <= 165 && x >= DJX + 85 && x <= DJX + 300; },
+    // updateSongsScroll: the list follows a selection 'between' songs while you drag
+    scrollF(f) {
+      const n = this.caps.length; if (!n) return;
+      this.selF = Math.max(0, Math.min(n - 1, f));
+      const prev = this.sel; this.sel = Math.round(this.selF);
+      this.caps.forEach((c, m) => {
+        c.curSel = this.selF; c.setSelected(m === this.sel);
+        const ci = m + 1 - this.selF;
+        c.ty = c.intendedY(ci); c.tx = intendedX(ci) + SGX;
+        if (m + 1 + 0.5 < this.selF) c.ty -= 100;
+      });
+      if (this.sel !== prev) { G.sfx('scroll', { vol: 0.4 }); if (navigator.vibrate) try { navigator.vibrate(5); } catch (e) {} }
+    },
+    // every frame: the flick slowing down, holding the picked song = favorite
+    touchUpdate(dt) {
+      if (this.flickV) {
+        if (this.tp || this.state !== 'idle') { this.flickV = 0; return; }
+        const before = this.selF;
+        this.scrollF(this.selF + this.flickV * dt);
+        this.flickV *= Math.exp(-3.2 * dt);
+        if (Math.abs(this.flickV) < 1.2 || this.selF === before) { this.flickV = 0; this.changeSelection(0, true); }
+      }
+      const T = this.tp;
+      if (T && T.onSel && !T.moved && !T.swiped && performance.now() - T.t0 >= 500 && this.state === 'idle') { T.onSel = false; T.held = true; this.toggleFav(); }
     },
     onBlur() { this.spam.on = false; this.spam.t = 0; },
     // ------------------------------------------------------------ update
@@ -1300,6 +1409,7 @@
       this.t += dt;
       this.tw.update(dt);
       this.dj.update(dt);
+      this.touchUpdate(dt);
       if (this.editor) this.editor.update(dt);
       const R = this.rankFx;
       if (R) {
@@ -1421,7 +1531,7 @@
       if (fr.oldRank) { cap.fakeRank = fr.oldRank; cap.fakeA = 1; R.sparksColor = RANK_COLOR[fr.oldRank] || '#FFFFFF'; }
       else { cap.fakeRank = null; cap.fakeA = 0; }
       cap.lerp = false; cap.inRank = true; cap.rankHide = true;
-      R.orig = { x: intendedX(1), y: cap.intendedY(1) };
+      R.orig = { x: intendedX(1) + SGX, y: cap.intendedY(1) };
       R.zoom = 1.85; this.tw.to(R, { zoom: 1.8 }, 0.6, E.sineIn);
       R.funny = 1.15; this.tw.to(R, { funny: 1.1 }, 0.6, E.sineIn);
       cap.x = W / 2 - cap.cw / 2; cap.y = H / 2 - cap.ch / 2;
@@ -1510,7 +1620,7 @@
       if (R && !R.pending) { G.screenZoom = R.funny; G.screenOff.x = R.sx || 0; G.screenOff.y = R.sy || 0; }
       const C = this.cs || {}, oy = G.screenOff.y, at = k => { G.screenOff.y = oy + (C[k] || 0); G.setScreenT(ctx); };
       this.card.draw(ctx);
-      at('dj'); this.dj.draw(ctx); at('bg');
+      at('dj'); G.screenOff.x += DJX; this.dj.draw(ctx); G.screenOff.x -= DJX; at('bg');
       G.setScreenT(ctx);
       const bg = this.bgImg, s = bg ? (H + 1) / bg.height : 1, bw = bg ? bg.width * s : 0;
       const slant = (x0) => { ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0 + bw, 0); ctx.lineTo(x0 + bw, H + 1); ctx.lineTo(x0 + 90 * s, H + 1); ctx.closePath(); };
@@ -1519,10 +1629,11 @@
       at('diff');
       if (this.diffVis) {
         if (this.diffOld) this.drawDiffSprite(ctx, this.diffOld);
-        this.drawDiffSprite(ctx, this.diffSpr);
+        this.dragOff = sl(this.dragOff || 0, this.tp && this.tp.dragDiff ? this.diffDrag || 0 : 0, G.dt || 0.016, this.tp && this.tp.dragDiff ? 0.2 : 0.4);
+        const ds = this.diffSpr, x0 = ds.x; ds.x += this.dragOff; this.drawDiffSprite(ctx, ds); ds.x = x0;
       }
       if (this.dotsVis) {
-        const dot = IMG('freeplay/seperator'), n = this.dots.length, gx = 260 - 14.7 * (Math.min(n, 8) - 1);
+        const dot = IMG('freeplay/seperator'), n = this.dots.length, gx = DJX + 260 - 14.7 * (Math.min(n, 8) - 1);
         if (dot) this.dots.forEach((d, i) => { if (d.alpha > 0) ctx.drawImage(tint(dot, d.color, 'dot' + i), Math.round(gx + 30 * (i % 8) - 75), 170 + 30 * Math.floor(i / 8)); });
       }
       // background art on the right

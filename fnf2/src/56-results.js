@@ -1,7 +1,7 @@
 // FNF 2 - Results screen, rebuilt from the Funkin' engine's V-Slice ResultState (+ ResultScore,
 // TallyCounter, ClearPercentCounter, Scoring ranks) with the real assets and timings.
 (function () {
-  const W = 1280, H = 720;
+  let W = 1280, CUT = 0; const H = 720;     // (W: the screen's width, wider on phones: ResultState's gameCutoutSize bits)
   const IMG = p => G.A.image('shared/images/resultScreen/' + p + '.png');
   const SP = p => G.Sparrow.load('shared/images/resultScreen/' + p);
   const E = G.ease;
@@ -107,7 +107,7 @@
   // the black top bar: a black slab rotated -3.8 degrees (BitmapUtil.createResultsBar)
   function topBar() {
     const w = Math.ceil(W * 1.011), h = Math.ceil(w / 8.7);
-    return G.cached('rstopbar', w, h, c => { c.beginPath(); c.rect(0, 0, w - 15, h); c.clip(); c.translate(-15, 0); c.rotate(-3.8 * Math.PI / 180); c.fillStyle = '#000'; c.fillRect(0, 0, w, h); });
+    return G.cached('rstopbar' + w, w, h, c => { c.beginPath(); c.rect(0, 0, w - 15, h); c.clip(); c.translate(-15, 0); c.rotate(-3.8 * Math.PI / 180); c.fillStyle = '#000'; c.fillRect(0, 0, w, h); });
   }
 
   // ---------------------------------------------------------------- ClearPercentCounter
@@ -168,6 +168,7 @@
   G.screens.results = {
     enter(p) {
       this.p = p = p || {};
+      W = G.W; CUT = G.CUT;
       this.tw = new G.Tw();
       this.t = 0; this.busy = false;
       const st = p.stats || {};
@@ -243,7 +244,7 @@
     // a new player: pops up from the bottom on the right, does their win / ok / lose move, then bops along
     makeReal(RP) {
       const R = RP.real, fig = new G.RealFig(R), rs = R.results || {};
-      return { kind: 'real', fig, R, z: 500, delay: 0, vis: false, t: 0, x: rs.x || 900, y: rs.y || 700, k: rs.k || (R.scale || 0.7) * 1.3, beat: -1, done: false };
+      return { kind: 'real', fig, R, z: 500, delay: 0, vis: false, t: 0, x: (rs.x || 900) + CUT / 2, y: rs.y || 700, k: rs.k || (R.scale || 0.7) * 1.3, beat: -1, done: false };
     },
     makeChar(ad) {
       const off = ad.offsets || [0, 0];
@@ -251,11 +252,11 @@
         const path = String(ad.assetPath || '').replace(/^shared:/, '').replace(/^resultScreen\//, '');
         const a = sparrowAnim(path, null); if (!a) return null;
         if (ad.loopFrame != null) a.onDone = () => a.play(ad.loopFrame);
-        return { kind: 'sparrow', a, x: off[0], y: off[1], z: ad.zIndex || 500, delay: ad.delay || 0 };
+        return { kind: 'sparrow', a, x: off[0] + CUT / 2, y: off[1], z: ad.zIndex || 500, delay: ad.delay || 0 };
       }
       const sc = SCRIPTS[ad.scriptClass] || {};
       const asset = sc.asset || String(ad.assetPath || '').replace(/^shared:/, '').replace(/^resultScreen\//, '');
-      const s = new G.Sprite(off[0], off[1]).loadAtlas('shared/images/resultScreen/' + asset);
+      const s = new G.Sprite(off[0] + CUT / 2, off[1]).loadAtlas('shared/images/resultScreen/' + asset);
       if (!s.atlas) return null;
       for (const [name, k] of (sc.flashes || [])) G.Atlas.scaleElement(s.atlas, name, k, 500);
       s.scale.x = s.scale.y = ad.scale || 1;
@@ -293,7 +294,7 @@
     startTally() {
       this.bgFlash.vis = true; this.bgFlash.a = 1; this.tw.to(this.bgFlash, { a: 0 }, 5 / 24);
       const target = this.clearTarget;
-      const c = this.clearBig = new ClearPct(W / 2 + 190, H / 2 - 70, Math.max(0, target - 36), false);
+      const c = this.clearBig = new ClearPct(W / 2 + 190 + CUT / 2, H / 2 - 70, Math.max(0, target - 36), false);
       let last = c.num;
       this.tw.to(c, { num: target }, 58 / 24, E.quartOut, {
         onUpdate: () => { c.num = Math.round(c.num); if (c.num !== last) { last = c.num; G.sfx('scroll'); } },
@@ -362,7 +363,11 @@
     },
     // ------------------------------------------------------------ input
     onAction(a, down) { if (down && (a === 'accept' || a === 'pause')) this.exit(); },
-    onPointer(type) { if (type === 'down') this.exit(); },
+    // (TouchUtil.pressAction: a quick tap, counted when the finger comes up)
+    onPointer(type, x, y) {
+      if (type === 'down') { this.tap = { x, y, t: performance.now() }; return; }
+      if (type === 'up' && this.tap) { const t = this.tap; this.tap = null; if (Math.abs(x - t.x) < 40 && Math.abs(y - t.y) < 40 && performance.now() - t.t < 400) this.exit(); }
+    },
     exit() {
       if (this.busy) return;
       this.busy = true;
@@ -452,7 +457,7 @@
       const anim = (a, x, y) => { if (a && a.visible) { const f = a.frame(); if (f) drawFrame(ctx, a.sheet, f, x, y); } };
       list.push({ z: 1100, d: () => anim(this.soundSystem, -15, -180) });
       list.push({ z: 1200, d: () => {
-        anim(this.resultsAnim, W - 1480, -10);
+        anim(this.resultsAnim, W - 1480 - CUT / 2, -10);
         anim(this.ratingsPopin, -135, 135);
         anim(this.scorePopin, -180, 515);
         anim(this.highscoreNew, 44, 557);

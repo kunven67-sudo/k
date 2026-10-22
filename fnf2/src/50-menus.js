@@ -87,15 +87,18 @@ G.screens.title = {
     const pairs = txt.split('\n').map(s => s.trim()).filter(Boolean).map(s => s.split('--'));
     this.wacky = pairs[Math.floor(Math.random() * pairs.length)] || ['', ''];
     // sprites (positions from TitleState)
-    this.logo = new G.Sprite(-150, -100).loadSparrow('preload/images/logoBumpin');
+    // (wide phone screens: everything moves over, TitleState's gameCutoutSize bits)
+    const cut = G.CUT;
+    this.logo = new G.Sprite(-150 + cut / 2.5, -100).loadSparrow('preload/images/logoBumpin');
     this.logo.addAnim('bump', 'logo bumpin', 24, false); this.logo.play('bump', true); this.logo.updateHitbox();
-    this.gf = new G.Sprite(G.W * 0.4, G.H * 0.07).loadSparrow('preload/images/gfDanceTitle');
+    this.gf = new G.Sprite(G.BASE_W * 0.4 + cut / 2.5, G.H * 0.07).loadSparrow('preload/images/gfDanceTitle');
     this.gf.addAnim('danceLeft', 'gfDance', 24, false, [30, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
     this.gf.addAnim('danceRight', 'gfDance', 24, false, [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]);
     this.gf.play('danceRight', true); this.danceLeft = false;
     this.buddy = G.titleBuddy ? G.titleBuddy(this.gf) : null;
-    const tt = G.touchMode ? 'preload/images/title-screen-text-mobile' : 'preload/images/title-screen-text';
-    this.enterText = new G.Sprite(G.touchMode ? 50 : 100, G.H * 0.8).loadAtlas(G.A.has(tt + '/Animation.json') ? tt : 'preload/images/title-screen-text');
+    // phones: FNF mobile's own "TAP TO START" art, a bit more to the left
+    const mob = G.isTouchDevice && G.A.has('preload/images/title-screen-text-mobile/Animation.json');
+    this.enterText = new G.Sprite((mob ? 50 : 100) + cut / 2, G.H * 0.8).loadAtlas(mob ? 'preload/images/title-screen-text-mobile' : 'preload/images/title-screen-text');
     this.enterText.addAnim('idle', 'Idle', 24, true); this.enterText.addAnim('press', 'Confirm', 24, false);
     this.enterText.play('idle', true);
     this.ng = new G.Sprite(0, G.H * 0.52).loadImage('preload/images/newgrounds_logo.png');
@@ -168,7 +171,11 @@ G.screens.title = {
   goMain() { if (this.left) return; this.left = true; G.setScreen('mainMenu', {}); },
   leave() { this.left = false; },
   onAction(a, down, repeat) { if (down && !repeat && a === 'accept') this.accept(); },
-  onPointer(type) { if (type === 'down') this.accept(); },
+  // (FNF mobile: a tap counts when the finger comes up, and not after a swipe)
+  onPointer(type, x, y) {
+    if (type === 'down') { this.tapAt = { x, y }; if (!this.heardAudio) this.accept(); return; }
+    if (type === 'up' && this.tapAt) { const t = this.tapAt; this.tapAt = null; if (Math.abs(x - t.x) < 60 && Math.abs(y - t.y) < 60) this.accept(); }
+  },
   draw(ctx) {
     G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
     if (!this.skipped) {
@@ -228,20 +235,42 @@ G.screens.mainMenu = {
     this.magenta = new G.Sprite(0, 0).loadImage('preload/images/menuBGMagenta.png');
     this.magenta.setGraphicSize(Math.floor(this.bg.width)); this.magenta.updateHitbox();
     this.magenta.x = this.bg.x; this.magenta.y = this.bg.y; this.magenta.scroll.x = 0; this.magenta.scroll.y = 0.17; this.magenta.visible = false;
-    const n = this.ITEMS.length, spacing = 160, top = (G.H - spacing * (n - 1)) / 2;
-    this.items = this.ITEMS.map((it, i) => {
+    // FNF mobile (touch, no keyboard): OPTIONS leaves the list and becomes a button in the bottom left corner,
+    // the menu doesn't scroll to the picked item (it all fits), it leans a little when you tilt the phone
+    this.touch = !!G.touchMode;
+    this.optBtn = null; this.optFade = 1;
+    let list = this.ITEMS;
+    if (this.touch && G.TouchButton && G.A.has('preload/images/mainmenu/optionsButton.png')) {
+      list = list.filter(it => it.name !== 'options');
+      const go = this.ITEMS.find(it => it.name === 'options').go;
+      this.optBtn = new G.TouchButton('preload/images/mainmenu/optionsButton', 35, G.H - 210, 0.7, () => { this.state = 'leaving'; go(); }, { prefix: 'options', rest: 1, holdFrame: 3, confirmFrom: 4, confirmTo: 17 });
+    }
+    if (this.touch) { this.bg.scroll.x = 0.17; this.magenta.scroll.x = 0.17; }
+    const n = list.length, spacing = 160, top = (G.H - spacing * (n - 1)) / 2;
+    this.items = list.map((it, i) => {
       const s = new G.Sprite(0, 0).loadSparrow('preload/images/mainmenu/' + it.name);
       s.addAnim('idle', it.name + ' idle', 24, true); s.addAnim('selected', it.name + ' selected', 24, true);
-      s.cx = G.W / 2; s.cy = top + spacing * i; s.scroll.x = 0; s.scroll.y = 0.4;
-      s.def = it; s.i = i;
+      s.cx = G.W / 2; s.cy = top + spacing * i; s.scroll.x = this.touch ? 0.4 : 0; s.scroll.y = 0.4;
+      s.def = it; s.i = i; s.bump = 1;
       this.setAnim(s, 'idle');
       return s;
     });
+    if (this.sel >= this.items.length) this.sel = 0;
+    this.gyro = { x: 0, y: 0 };
+    if (this.touch && !this._gyroOn) {
+      this._gyroOn = true;
+      // (FlxG.gyroscope: how fast the phone turns; the menu pans against it and drifts back)
+      window.addEventListener('devicemotion', e => {
+        const r = e.rotationRate; if (!r || G.screen !== this || !this.touch) return;
+        const k = Math.PI / 180;
+        this.gyro.x += (r.alpha || 0) * k * -1.25; this.gyro.y += (r.beta || 0) * k * -1.25;
+      });
+    }
     this.state = 'idle'; this.flick = 0; this.exitT = 0;
     this.select(this.sel, true);
     this.swipe = new G.Swipe();
     // the browser isn't using the graphics card: say so once (that alone makes everything lag)
-    this.gpuWarn = !!(G.gpu && G.gpu.soft && !G._gpuWarned); G._gpuWarned = true;
+    this.gpuWarn = !!(G.gpu && G.gpu.soft && !G._gpuWarned && !G.isTouchDevice); G._gpuWarned = true;
   },
   // AtlasMenuItem "centered": x,y is the middle of the current frame
   setAnim(s, a) { s.play(a, true); s.updateHitbox(); s.x = s.cx; s.y = s.cy; s.offset.x = s.origin.x; s.offset.y = s.origin.y; },
@@ -249,6 +278,7 @@ G.screens.mainMenu = {
     this.sel = (i + this.items.length) % this.items.length;
     this.items.forEach(s => this.setAnim(s, s.i === this.sel ? 'selected' : 'idle'));
     const s = this.items[this.sel];
+    if (this.touch) { if (snap) this.cam.focus(G.W / 2, G.H / 2); return; }     // (phones: the camera stays on the middle)
     if (snap) this.cam.focus(G.W / 2, s.cy); else this.cam.follow(G.W / 2, s.cy);
   },
   accept() {
@@ -270,21 +300,37 @@ G.screens.mainMenu = {
     else if (a === 'back' && !repeat) this.back();
   },
   onWheel(dir) { if (this.state === 'idle') { G.sfx('scroll', { vol: 0.4 }); this.select(this.sel + dir); } },
-  onPointer(type, x, y) {
+  onPointer(type, x, y, id) {
     if (this.gpuWarn) { if (type === 'down') this.gpuWarn = false; return; }
-    if (this.state !== 'idle' || type !== 'down') return;
-    // tap an item: first tap selects, tap the selected one confirms (like FNF mobile)
+    if (this.optBtn && this.state === 'idle' && this.optBtn.pointer(type, x, y, id)) return;
+    if (this.state !== 'idle' || type !== 'down' || (this.optBtn && this.optBtn.busy)) return;
+    // tap an item: first tap picks it (a little squish), tapping the picked one again goes in (a little pop),
+    // like FNF mobile's MenuList
     for (const s of this.items) {
-      const sy = this.screenY(s);
-      if (Math.abs(y - sy) < 70 && Math.abs(x - G.W / 2) < s.width / 2 + 30) {
-        if (s.i === this.sel) this.accept(); else { G.sfx('scroll', { vol: 0.4 }); this.select(s.i); }
+      const sx = this.screenX(s), sy = this.screenY(s);
+      if (Math.abs(y - sy) < s.height / 2 && Math.abs(x - sx) < s.width / 2) {
+        if (s.i === this.sel) { s.bump = 1.1; this.bumps(s); if (navigator.vibrate) try { navigator.vibrate(20); } catch (e) {} this.accept(); }
+        else { G.sfx('scroll', { vol: 0.4 }); this.select(s.i); s.bump = 0.94; this.bumps(s); if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {} }
         return;
       }
     }
   },
+  bumps(s) { s.bumpFrom = s.bump; s.bumpT = 0; },
+  screenX(s) { return (s.cx - (this.cam.x - G.W / 2) * s.scroll.x); },
   screenY(s) { return (s.cy - (this.cam.y - G.H / 2) * s.scroll.y); },
   update(dt) {
-    for (const s of this.items) s.update(dt);
+    for (const s of this.items) {
+      s.update(dt);
+      if (s.bumpT != null) { s.bumpT += dt; const k = Math.min(1, s.bumpT / 0.3); s.bump = s.bumpFrom + (1 - s.bumpFrom) * G.ease.backOut(k); if (k >= 1) { s.bump = 1; s.bumpT = null; } }
+      s.scale.x = s.scale.y = s.bump || 1;
+    }
+    if (this.touch) {
+      // the gyro pan drifts back to the middle (smoothLerpPrecision 2.5 s)
+      const g = this.gyro, k = Math.pow(0.01, dt / 2.5);
+      g.x *= k; g.y *= k;
+      this.cam.follow(G.W / 2 - g.x, G.H / 2 - g.y);
+    }
+    if (this.optBtn) { this.optBtn.update(dt); if (this.state !== 'idle' && !this.optBtn.busy) this.optFade = Math.max(0, this.optFade - dt / 0.4); }
     this.cam.update(dt);
     if (this.state === 'flicker') {
       this.flick += dt;
@@ -306,6 +352,7 @@ G.screens.mainMenu = {
     this.magenta.draw(ctx, this.cam);
     for (const s of this.items) s.draw(ctx, this.cam);
     G.vcr(ctx, 'FNF 2 v1.0', 5, G.H - 22, { size: 16, outline: 1.5 });
+    if (this.optBtn && this.optFade > 0) { G.setScreenT(ctx); ctx.save(); ctx.globalAlpha = this.optFade; this.optBtn.draw(ctx); ctx.restore(); }
     if (this.gpuWarn) {
       G.setScreenT(ctx); ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, G.W, G.H);
       const L = [
@@ -416,7 +463,7 @@ G.screens.storyMenu = {
   },
   changeLevel(ch, first) {
     const n = this.levels.length;
-    this.sel = (this.sel + ch + n) % n;
+    this.sel = G.touchMode ? G.clamp(this.sel + ch, 0, n - 1) : (this.sel + ch + n) % n;     // (touch: no wrapping round)
     const L = this.level().data;
     { const fx = G.StoryFX && G.StoryFX[this.level().id]; if (fx && fx.hover) try { fx.hover(this); } catch (e) {} }   // (its pictures get ready)
     // background colour tween (0.9s quartOut)
@@ -440,7 +487,7 @@ G.screens.storyMenu = {
       // player switch: show our chosen player in the middle slot
       if (this.player === 'pico' && /props\/bf$/.test(pd.assetPath)) d = Object.assign({}, pd, { assetPath: 'storymenu/props/pico-player' });
       const s = G.makeProp(d);
-      s.x = (pd.offsets ? pd.offsets[0] : 0) + G.W * 0.25 * i;
+      s.x = (pd.offsets ? pd.offsets[0] : 0) + G.W * 0.25 * i + G.CUT / 4;      // (+ a quarter of a wide phone's extra width)
       return s;
     });
   },
@@ -487,20 +534,42 @@ G.screens.storyMenu = {
     else if (a === 'back' && !repeat) { this.leaving = true; G.sfx('cancel'); G.setScreen('mainMenu', {}); }
   },
   onWheel(dir) { if (!this.selected) { this.changeLevel(dir); G.sfx('scroll', { vol: 0.4 }); } },
+  // FNF mobile's story menu: every 100px your finger moves up = the week before, down = the next week; sideways =
+  // difficulty; tap a week to pick it, tap the picked week to play; the arrows change the difficulty. (FNF 2: tapping
+  // the characters switches BF / Pico)
   onPointer(type, x, y) {
-    if (this.selected || this.leaving) return;
-    const sw = this.swipe.handle(type, x, y);
-    if (!sw) return;
-    if (sw.dir === 'up') { this.changeLevel(1); G.sfx('scroll', { vol: 0.4 }); }
-    else if (sw.dir === 'down') { this.changeLevel(-1); G.sfx('scroll', { vol: 0.4 }); }
-    else if (sw.dir === 'tap') {
-      if (x > this.arrows.l.x - 20 && x < this.arrows.l.x + 60 && Math.abs(y - 510) < 60) this.changeDiff(-1);
-      else if (x > this.arrows.r.x - 30 && Math.abs(y - 510) < 60) this.changeDiff(1);
-      else if (y < 120 && x > G.W - 260) { this.leaving = true; G.sfx('cancel'); G.setScreen('mainMenu', {}); }
-      else if (y > 100 && y < 456 && x > G.W * 0.25 && x < G.W * 0.75) this.togglePlayer();
-      else if (y > 456) this.select();
+    if (this.selected || this.leaving) { this.tp = null; return; }
+    if (type === 'down') { this.tp = { sx: x, sy: y, t0: performance.now(), swiped: false, moved: false }; this.pressArrowAt(x, y, true); return; }
+    const T = this.tp; if (!T) return;
+    if (type === 'move') {
+      if (Math.abs(x - T.sx) > 20 || Math.abs(y - T.sy) > 20) T.moved = true;
+      const dy = y - T.sy, dx = x - T.sx;
+      if (Math.abs(dy) >= 100) { this.changeLevel(dy < 0 ? -1 : 1); G.sfx('scroll', { vol: 0.4 }); T.sy = y; T.sx = x; T.swiped = true; }
+      else if (Math.abs(dx) >= 100 && Math.abs(dy) < 40) { this.changeDiff(dx > 0 ? 1 : -1); T.sx = x; T.sy = y; T.swiped = true; }
+      return;
     }
+    if (type !== 'up') return;
+    this.tp = null; this.arrows.l.play('idle', true); this.arrows.r.play('idle', true);
+    if (T.swiped || T.moved || performance.now() - T.t0 > 300) return;
+    const arr = this.arrowAt(x, y);
+    if (arr) { this.changeDiff(arr); return; }
+    for (let i = 0; i < this.titles.length; i++) {
+      const t = this.titles[i]; if (!t.img) continue;
+      const tx = (G.W - t.img.width) / 2;
+      if (x >= tx && x <= tx + t.img.width && y >= t.y && y <= t.y + t.img.height && y > 456) {
+        if (i === this.sel) this.select(); else { this.changeLevel(i - this.sel); G.sfx('scroll', { vol: 0.4 }); }
+        return;
+      }
+    }
+    if (y > 100 && y < 456 && x > G.W * 0.25 && x < G.W * 0.75) this.togglePlayer();
   },
+  arrowAt(x, y) {
+    if (Math.abs(y - 510) > 60) return 0;
+    if (x > this.arrows.l.x - 20 && x < this.arrows.l.x + 70) return -1;
+    if (x > this.arrows.r.x - 30 && x < this.arrows.r.x + 70) return 1;
+    return 0;
+  },
+  pressArrowAt(x, y) { const a = this.arrowAt(x, y); if (a) (a < 0 ? this.arrows.l : this.arrows.r).play('press', true); },
   update(dt) {
     this.beat.update(b => { for (const p of this.props) if (p.danceEvery > 0 && b % Math.max(1, Math.round(p.danceEvery)) === 0) p.dance(); });
     for (const p of this.props) p.update(dt);
@@ -548,7 +617,7 @@ G.screens.storyMenu = {
     G.setScreenT(ctx);
     G.text(ctx, 'LEVEL SCORE: ' + G.fmtMoney(this.scoreLerp), 10, 10, { font: 'vcr', size: 32, baseline: 'top' });
     G.text(ctx, this.level().data.name || '', G.W - 10, 10, { font: 'vcr', size: 32, baseline: 'top', align: 'right', alpha: 0.7 });
-    G.text(ctx, 'TAB: switch to ' + (this.player === 'pico' ? 'BOYFRIEND' : 'PICO'), G.W - 10, G.H - 30, { font: 'vcr', size: 18, align: 'right', alpha: 0.6 });
+    if (!G.touchMode) G.text(ctx, 'TAB: switch to ' + (this.player === 'pico' ? 'BOYFRIEND' : 'PICO'), G.W - 10, G.H - 30, { font: 'vcr', size: 18, align: 'right', alpha: 0.6 });
     if (this.selected && this.fx && this.fx.draw) { this.fx.draw(this, ctx); G.setScreenT(ctx); }
     if (this.fade > 0 && !(this.selected && this.fx && this.fx.noFade)) { ctx.globalAlpha = this.fade; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
   },
