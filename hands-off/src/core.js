@@ -146,7 +146,7 @@
     return lap ? base + ' ' + ['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][Math.min(lap - 1, 8)] + (lap > 9 ? '+' : '') : base;
   }
 
-  const LOOKS = ['CHROME', 'SIGNAL', 'HORIZON', 'MELT', 'ORBIT', 'COLLAPSE'];
+  const LOOKS = ['EVENT HORIZON', 'PILLARS', 'RINGED GIANT', 'PULSAR', 'QUASAR', 'COLLISION'];
   function worldOf(level) { return Math.floor(level / WORLD_LEVELS); }
   function worldName(w) {
     const lap = Math.floor(w / LOOKS.length);
@@ -227,7 +227,7 @@
     }
     if (raw.tro && typeof raw.tro === 'object') for (const id in raw.tro) if (TRO[id] && raw.tro[id]) s.tro[id] = num(raw.tro[id], now) || now;
     if (raw.set && typeof raw.set === 'object') {
-      s.set.quality = ['auto', 'low', 'high', 'insane'].indexOf(raw.set.quality) >= 0 ? raw.set.quality : 'auto';
+      s.set.quality = ['auto', 'low', 'high', 'max', 'insane'].indexOf(raw.set.quality) >= 0 ? raw.set.quality : 'auto';
       s.set.music = num(raw.set.music, 0.7, 0, 1);
       s.set.sfx = num(raw.set.sfx, 0.8, 0, 1);
       s.set.flashes = raw.set.flashes !== false;

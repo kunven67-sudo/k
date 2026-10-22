@@ -82,7 +82,7 @@ eq(evil.set.quality, 'auto', 'bad quality'); eq(evil.set.music, 0.7, 'bad volume
 // money names
 eq(H.moneyName(0), 'FLUX', 'first money name');
 ok(H.moneyName(24) !== H.moneyName(0) && / II$/.test(H.moneyName(24)), 'money names lap with numbers');
-eq(H.worldName(0), 'CHROME', 'world 0'); eq(H.worldName(6), 'CHROME 2', 'world 6');
+eq(H.worldName(0), 'EVENT HORIZON', 'world 0'); eq(H.worldName(6), 'EVENT HORIZON 2', 'world 6');
 
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

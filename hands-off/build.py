@@ -5,7 +5,7 @@ import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'src')
 OUT = os.path.join(HERE, 'dist', 'hands-off.html')
-SCRIPTS = ['core.js', 'gfx.js', 'glyphs.js', 'audio.js', 'main.js']
+SCRIPTS = ['core.js', 'gfx.js', 'gfx2-shaders.js', 'gfx2.js', 'glyphs.js', 'audio.js', 'main.js']
 
 
 def read(name):
@@ -13,8 +13,18 @@ def read(name):
         return f.read()
 
 
+def samples_js():
+    # real recorded sounds, baked in as base64 so the game stays one file
+    import base64, glob
+    out = {}
+    for f in sorted(glob.glob(os.path.join(HERE, 'assets', 'sfx', '*.mp3'))):
+        out[os.path.splitext(os.path.basename(f))[0]] = base64.b64encode(open(f, 'rb').read()).decode('ascii')
+    body = ',\n'.join('  %s: "%s"' % (k, v) for k, v in out.items())
+    return '/* recorded sounds (CC0, see assets/sfx/CREDITS.md) */\nwindow.HOSAMPLES = {\n' + body + '\n};'
+
+
 def main():
-    parts = []
+    parts = ['<script>\n' + samples_js() + '\n</script>']
     for name in SCRIPTS:
         if not os.path.exists(os.path.join(SRC, name)):
             print('skip (missing):', name)

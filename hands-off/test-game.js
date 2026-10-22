@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const HO = require('./src/core.js');
 
-const FILE = 'file://' + path.join(__dirname, 'dist', 'hands-off.html');
+const FILE = 'file://' + path.join(__dirname, 'dist', 'hands-off.html') + (process.env.OLD ? '?old' : '');
 const SHOTS = path.join(__dirname, 'shots');
 fs.mkdirSync(SHOTS, { recursive: true });
 let pass = 0, fail = 0;
@@ -169,13 +169,13 @@ async function more(browser) {
   // the computer freezes for 3.5s (sleep / display off): no reset, just re-arm
   await sleep(600);
   await page.evaluate(() => { const e = performance.now() + 3500; while (performance.now() < e) {} });
-  await page.waitForFunction(() => window.__HO_DEBUG.state === 'arming', null, { timeout: 5000 });
+  await page.waitForFunction(() => window.__HO_DEBUG.state === 'arming', null, { timeout: 15000, polling: 100 });
   ok(await page.evaluate(() => !!window.__HO_DEBUG.save.run), 'a 3.5s freeze re-arms instead of resetting');
   await page.mouse.move(300, 300); await page.mouse.move(340, 320);
   ok(await st(page) === 'arming', 'the wake-up wiggle after a freeze is not a reset');
   await waitState(page, 'live');
-  // PUSH button
-  await sleep(2600);
+  // PUSH button (wait until it's really there: slow test machines run the game clock slower)
+  await page.waitForFunction(() => window.__HO_DEBUG.pushAlpha > 0.7, null, { timeout: 30000, polling: 100 });
   const vp = page.viewportSize();
   const push = await page.evaluate(() => { const L = window.__HO_DEBUG; return null; });
   await page.mouse.click(vp.width - 60, vp.height - 60);

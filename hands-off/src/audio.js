@@ -50,6 +50,56 @@
     s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
   }
   function limited(name, ms) { const n = performance.now(); if (last[name] && n - last[name] < ms) return true; last[name] = n; return false; }
+  const bursts = {};
+  function limitedN(name, ms, n) { // no more than n in any ms window
+    const now = performance.now(), a = bursts[name] || (bursts[name] = []);
+    while (a.length && now - a[0] > ms) a.shift();
+    if (a.length >= n) return true;
+    a.push(now); return false;
+  }
+
+  // ---------- recorded sounds (real glass, CC0) ----------
+  const bufs = {};
+  function loadSamples() {
+    const S = root.HOSAMPLES || {};
+    for (const k in S) {
+      try {
+        const bin = atob(S[k]), u = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+        const p = ctx.decodeAudioData(u.buffer, (b) => { bufs[k] = b; }, () => {});
+        if (p && p.catch) p.catch(() => {});
+      } catch (e) { /* one bad sound never stops the rest */ }
+    }
+  }
+  function play(name, t, o) {
+    const b = bufs[name];
+    if (!b) return false;
+    o = o || {};
+    const s = ctx.createBufferSource(); s.buffer = b; s.playbackRate.value = o.rate || 1;
+    let node = s;
+    if (o.lp) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; node.connect(f); node = f; }
+    const gn = g(o.gain === undefined ? 1 : o.gain);
+    node.connect(gn);
+    let out = gn;
+    if (o.pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, o.pan)); gn.connect(p); out = p; }
+    out.connect(o.dest || sfxBus);
+    if (o.verb) gn.connect(g(o.verb, verbSend));
+    s.start(t);
+    return true;
+  }
+  const pickOf = (a) => a[Math.floor(Math.random() * a.length)];
+  // the deep movie horn: detuned saws, a filter that opens and closes, a bit of grit
+  function braam(t, f0, dur, amt) {
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2.2;
+    f.frequency.setValueAtTime(140, t); f.frequency.exponentialRampToValueAtTime(2000, t + 0.28); f.frequency.exponentialRampToValueAtTime(240, t + dur);
+    const sh = ctx.createWaveShaper(); sh.curve = curve((x) => Math.tanh(x * 2.6));
+    const e = g(0); f.connect(sh); sh.connect(e); e.connect(sfxBus); e.connect(g(0.5, verbSend));
+    e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.32 * amt, t + 0.07); e.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    for (const [m, det] of [[1, -9], [1, 8], [1.5, -5], [2, 6], [0.5, 0]]) {
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f0 * m; o.detune.value = det;
+      o.connect(f); o.start(t); o.stop(t + dur + 0.05);
+    }
+  }
 
   // ---------- setup ----------
   function init() {
@@ -74,6 +124,7 @@
       verb = ctx.createConvolver(); verb.buffer = impulse(2.6);
       verbSend = g(0.22); verbSend.connect(verb); verb.connect(master);
       startDrone();
+      loadSamples();
       nextStep = ctx.currentTime + 0.12;
       timer = setInterval(schedule, 25);
     } catch (e) { ctx = null; }
@@ -246,11 +297,26 @@
     },
     nope(t) { tone('square', 92, t, 0.002, 0.14, 0.14, sfxBus); tone('square', 87, t + 0.07, 0.002, 0.12, 0.12, sfxBus); },
     crack(t) {
+      play(pickOf(['glass_hit_01', 'glass_hit_02']), t, { rate: 1.2 + Math.random() * 0.35, gain: 0.75, verb: 0.2 });
       hiss(t, 0.09, 0.9, 'highpass', 2500, 0.8, sfxBus);
       for (let i = 0; i < 7; i++) tone('sine', 2500 + Math.random() * 4500, t + i * 0.012 + Math.random() * 0.02, 0.001, 0.06, 0.18, sfxBus);
       tone('sine', 140, t, 0.001, 0.2, 0.5, sfxBus, 50);
     },
-    shatter(t) {
+    shatter(t, o) {
+      if (play('glass_breaking', t, { gain: 1, verb: 0.35 })) {
+        play('glass_breaking_06', t + 0.03, { gain: 0.6, pan: -0.4, rate: 1.05 });
+        play('glass_breaking_03', t + 0.06, { gain: 0.5, pan: 0.45, rate: 0.95 });
+        tone('sine', 120, t, 0.001, 0.6, 0.9, sfxBus, 32);
+        if (o && o.big) {
+          // time slows down: the same crash, stretched out and far away, then it all comes back at full speed
+          play('glass_breaking', t + 0.12, { rate: 0.32, gain: 0.45, lp: 2600, verb: 0.9 });
+          play('glass_breaking_04', t + 0.42, { rate: 0.4, gain: 0.25, lp: 3000, verb: 0.9, pan: 0.3 });
+          hiss(t + 0.1, 1.4, 0.12, 'bandpass', 900, 0.7, verbSend, 200);
+          tone('sine', 46, t + 0.1, 0.4, 1.2, 0.35, sfxBus, 38);
+          hiss(t + 1.2, 0.4, 0.28, 'highpass', 700, 0.7, sfxBus, 7000);
+        }
+        return;
+      }
       hiss(t, 0.7, 0.9, 'highpass', 1800, 0.6, sfxBus);
       hiss(t, 1.2, 0.35, 'bandpass', 5000, 1.5, verbSend);
       for (let i = 0; i < 46; i++) {
@@ -272,6 +338,7 @@
     milestone(t, o) {
       const tier = (o && o.tier) || 1;
       duckUntil = t + 0.12;
+      braam(t, rootHz(world) * (tier % 2 ? 1 : 0.84), 1.9, 1);
       tone('sine', 62, t, 0.002, 1.6, 1, sfxBus, 30);
       tone('sine', 124, t, 0.002, 0.5, 0.35, sfxBus, 60);
       hiss(t, 1.4, 0.45, 'highpass', 6000, 0.7, verbSend);
@@ -279,9 +346,10 @@
       const base = 440 * Math.pow(2, ((tier * 7) % 12) / 12);
       [0, 3, 7, 12, 15, 19].forEach((s, i) => tone('triangle', base * midiRatio(s), t + 0.04 + i * 0.045, 0.002, 0.5, 0.09, verbSend));
     },
-    world(t) {
+    world(t, o) {
       hiss(t, 1.4, 0.35, 'bandpass', 400, 2, sfxBus, 9000);
       tone('sine', 50, t + 1.1, 0.002, 2.2, 0.9, sfxBus, 28);
+      braam(t + 1.1, rootHz((o && o.w) || world) * 0.75, 2.6, 1.2);
       for (const f of [65.4, 98, 130.8, 155.6]) tone('sawtooth', f, t + 1.1, 0.01, 2, 0.08, verbSend);
       hiss(t + 1.1, 2, 0.4, 'highpass', 4000, 0.6, verbSend);
     },
@@ -302,6 +370,16 @@
       if (o && o.name === 'freeze') { tone('sine', 880, t, 0.002, 0.6, 0.1, sfxBus, 40, 0.5); }
     },
     ui(t) { tone('sine', 520, t, 0.002, 0.06, 0.08, sfxBus); },
+    // a shard landing on the floor: real glass, pitched by how small it is, louder the harder it hits
+    tinkle(t, o) {
+      if (limitedN('tinkle', 260, 10)) return;
+      const v = (o && o.v) || 0.5, size = (o && o.size) || 0.05;
+      const name = v > 1.6 ? pickOf(['glass_breaking_02', 'glass_breaking_05', 'glass_falling_01']) : v > 0.8 ? pickOf(['glass_falling_01', 'glass_falling_03', 'glass_falling_04', 'glass_hit_01']) : pickOf(['glass_hit_01', 'glass_hit_02', 'glass_falling_03']);
+      if (!play(name, t + Math.random() * 0.01, { rate: (size < 0.03 ? 1.35 : size < 0.07 ? 1.12 : 0.95) * (0.9 + Math.random() * 0.25), gain: Math.min(0.7, 0.1 + v * 0.28), pan: (o && o.pan) || 0, verb: 0.25 }))
+        tone('sine', 2500 + Math.random() * 4000, t, 0.001, 0.08, 0.05 * Math.min(1, v), sfxBus);
+    },
+    // a bead of mercury snapping off the blob
+    drip(t) { if (limited('drip', 900)) return; tone('sine', 480 + Math.random() * 220, t, 0.002, 0.07, 0.04, verbSend, 1500, 0.04); },
   };
   function sfx(name, o) {
     if (!ctx || ctx.state !== 'running' || sfxVol <= 0.001) return;

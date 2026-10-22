@@ -36,7 +36,26 @@
   };
 
   // ---------------------------------------------------------------- renderer + HUD canvas
-  const R = window.HOGFX ? window.HOGFX.create(el.gl) : { ok: false, error: 'renderer missing' };
+  // the real renderer (WebGL2: light bending, 3D chrome, real glass) first; the old one if this device can't run it
+  let R = null;
+  function freshCanvas() { const c = el.gl.cloneNode(false); el.gl.replaceWith(c); el.gl = c; return c; }
+  function oldRenderer(fresh) { return window.HOGFX ? window.HOGFX.create(fresh ? freshCanvas() : el.gl) : { ok: false, error: 'renderer missing' }; }
+  if (window.HOGFX2 && !/[?&]old\b/.test(location.search)) {
+    R = window.HOGFX2.create(el.gl);
+    if (!R.ok) R = oldRenderer(true);
+  } else R = oldRenderer(false);
+  const useReal = () => !!(R.real && R.ok && R.ready);
+  const rq = (q) => (R.real ? q : q === 'max' ? 'insane' : q);
+  function hookReal() {
+    if (!R.real) return;
+    R.onShardHit = (v, size, pan) => AU.sfx('tinkle', { v, size, pan });
+    R.onSplash = () => AU.sfx('drip');
+  }
+  hookReal();
+  function realFailed() { // the real shaders didn't build on this GPU: switch to the old renderer for good
+    R = oldRenderer(true);
+    if (R.ok) R.setQuality(rq(save.set.quality));
+  }
   const hud = document.createElement('canvas');
   const hx = hud.getContext('2d');
   hud.setAttribute('aria-hidden', 'true');
@@ -44,7 +63,7 @@
   document.body.appendChild(hud);
   let use2d = null;
   function applyFallback() {
-    const want = !R.ok;
+    const want = !R.ok || (R.real && !R.ready);
     if (want === use2d) return;
     use2d = want;
     hud.style.display = use2d ? 'block' : 'none';
@@ -99,7 +118,7 @@
     save = H.parse(lsGet(KEY)) || save; // the other tab saved last
     runClock = save.savedAt;
     awayReport = catchUp();
-    if (R.ok) R.setQuality(save.set.quality);
+    if (R.ok) R.setQuality(rq(save.set.quality));
     applyVolumes();
     goMenu();
   }
@@ -246,6 +265,7 @@
     if (!inGame()) return;
     if (state === 'pending') pend = null;
     if (state === 'reset') rs = null;
+    if (R.real) R.shatterStop();
     clearShatter();
     saveNow();
     setState('exit');
@@ -443,7 +463,7 @@
     pend = {
       t: 0, reason, mod: !!(extra && extra.mod), key: extra && extra.name, esc: !!(extra && extra.esc),
       ix, iy, cursor: hasPos && (reason === 'mouse' || reason === 'click' || reason === 'push' || reason === 'bait' || reason === 'error'),
-      cracks: makeCracks(ix, iy), old: [], crackT: 0, last: 0, more: 0, commit: false,
+      cracks: makeCracks(ix, iy), old: [], crackT: 0, last: 0, more: 0, commit: false, runT: save.run ? save.run.t : 0,
       frozen: liveVals(),
     };
     setState('pending');
@@ -484,7 +504,7 @@
     rec.resets++;
     const lost = { log: r.logC, maxLog: r.maxLog, level: r.level, world: H.worldOf(r.level), t: r.t, tier: r.maxTier, money: H.moneyName(r.maxTier), ups: r.ups };
     [[1, 'reset1'], [10, 'reset10'], [50, 'reset50'], [100, 'reset100']].forEach(([n, id]) => { if (rec.resets >= n) grant(id); });
-    if (r.t < 1) grant('flinch');
+    if (Math.min(r.t, p.runT === undefined ? r.t : p.runT) < 1) grant('flinch');   // the first twitch counts, not when the glass gives
     if (r.maxLog >= 2) { const f = r.maxLog / 3 - Math.floor(r.maxLog / 3 + 1e-12); if (f >= 0.88) grant('close'); }
     const tro = { push: 'push', bait: 'bait', error: 'error', key: 'keys', touch: 'touch', scroll: 'scroll', pad: 'pad' }[p.reason];
     if (tro) grant(tro);
@@ -499,7 +519,12 @@
       ix: p.ix, iy: p.iy, cursor: p.cursor,
     };
     setState('reset');
-    if (!quick) { buildShards(p); AU.sfx('shatter'); AU.sfx('rewind'); }
+    if (!quick && useReal()) {
+      R.shatterStart({ w: sh.w, h: sh.h, ix: p.ix, iy: p.iy, angles: p.cracks.angles, crackCanvas: el.shatter });
+      clearShatter();
+      rs.real = true; rs.slamAt = R.SHATTER.slamAt; rs.endAt = R.SHATTER.endAt; rs.rewAt = R.SHATTER.rewStart;
+      AU.sfx('shatter', { big: true });
+    } else if (!quick) { buildShards(p); AU.sfx('shatter'); AU.sfx('rewind'); }
     else { fx.shake = Math.max(fx.shake, 0.8); AU.sfx('nope'); }
     announce(rs.title + ' ' + line + ' Everything reset.');
     // the next run starts clean
@@ -507,6 +532,7 @@
   }
   function updReset(dt) {
     rs.t += dt;
+    if (rs.real && !rs.rewSaid && rs.t >= rs.rewAt) { rs.rewSaid = true; AU.sfx('rewind'); }
     if (!rs.slammed && rs.t >= rs.slamAt) {
       rs.slammed = true; rs.slamT = 0;
       fx.shake = Math.max(fx.shake, 1); fx.glitch = 1;
@@ -514,11 +540,11 @@
       AU.sfx('slam');
     }
     if (rs.slammed) rs.slamT += dt;
-    if (rs.t >= rs.endAt) { rs = null; clearShatter(); startArming({ again: true }); }
+    if (rs.t >= rs.endAt) { rs = null; clearShatter(); if (R.real) R.shatterStop(); startArming({ again: true }); }
   }
 
   // ---------------------------------------------------------------- effects state
-  const fx = { pulse: 0, shock: 1, flash: 0, flashCol: [1, 1, 1], shake: 0, glitch: 0, hue: 0, spin: 0, mix: [0.85, 0.55, 0.8], baseGlitch: 0.05, melt: 0, folds: 0 };
+  const fx = { pulse: 0, shock: 1, flash: 0, flashCol: [1, 1, 1], shake: 0, glitch: 0, hue: 0, hs: 0, spin: 0, mix: [0.85, 0.55, 0.8], baseGlitch: 0.05, melt: 0, folds: 0 };
   let sceneT = 0, stillNow = 0.45, growNow = 0, numPop = 0, pushPress = 0, pushAlpha = 0;
   let bigWord = null, morph = null, worldSweep = null;
   function flashesOK() { return save.set.flashes && !reduced; }
@@ -536,6 +562,7 @@
     bigWord = { text: (H.tierName(tier) || '').toUpperCase(), t: 0 };
     morph = { from: H.moneyName(Math.max(0, tier - 1)), to: H.moneyName(tier), fi: Math.max(0, tier - 1), ti: tier, t: 0 };
     numPop = 1;
+    if (R.real) R.kick('milestone', 1);
     if (LY) burst(LY.cx, LY.cy, 150, tier);
     const name = H.tierName(tier);
     feedPush('1 ' + name.toUpperCase() + (count > 1 ? '  (+' + (count - 1) + ')' : ''), 'MONEY IS NOW ' + H.moneyName(tier), C.cyan, { money: tier });
@@ -545,6 +572,7 @@
   }
   function worldFx(w) {
     worldSweep = { w, name: H.worldName(w), t: 0 };
+    if (R.real) R.dive(w);
     fx.glitch = 1; fx.shock = 0; fx.pulse = Math.max(fx.pulse, 0.7);
     feedPush('WORLD ' + (w + 1), H.worldName(w), C.magenta, null);
     AU.sfx('world', { w });
@@ -561,12 +589,13 @@
     const u = H.upgrade(ks[ks.length - 1]);
     feedPush('+ ' + u.name, upDesc(u), KIND_COL[u.kind], { sigil: u }, 'up', ks.length);
     AU.sfx('buy', { kind: u.kind });
+    if (R.real) R.kick('buy');
   }
   function onStep(out) {
     if (!(state === 'live' || state === 'pending' || state === 'arming')) return;
     if (out.milestones.length) milestoneFx(out.milestones[out.milestones.length - 1], out.milestones.length);
     if (out.bought.length) boughtFx(out.bought);
-    if (out.levels) { levelPing = 1; if (out.levels > 1 || save.run.level % 5 === 0) AU.sfx('level'); }
+    if (out.levels) { levelPing = 1; if (out.levels > 1 || save.run.level % 5 === 0) AU.sfx('level'); if (R.real) R.kick('level'); }
   }
   let levelPing = 0;
   function worldCheck() {
@@ -742,7 +771,7 @@
     if (ev.cur) {
       ev.cur.t += dt;
       const en = evEnv();
-      if (ev.cur.name === 'huestorm') fx.hue += dt * 1.6 * en;
+      if (ev.cur.name === 'huestorm') { fx.hue += dt * 1.6 * en; fx.hs += dt * 2.4 * en; }
       if (ev.cur.name === 'spin') fx.spin += dt * 5 * en;
       if (ev.cur.t >= ev.cur.dur) endEvent();
       return;
@@ -787,6 +816,7 @@
       fx.hueBase = look.hue;
     }
     fx.hue += dt * 0.004;
+    if (!evIs('huestorm')) fx.hs = lerp(fx.hs, Math.round(fx.hs / TAU) * TAU, 1 - Math.exp(-dt * 2));
     fx.pulse *= Math.exp(-dt * 2.2);
     fx.shock = Math.min(1, fx.shock + dt * 0.8);
     fx.flash *= Math.exp(-dt * 4.5);
@@ -996,8 +1026,9 @@
     L.numW = c.measureText(v.num).width;
     if (LY) LY.numW = L.numW;
     const split = fx.glitch * 0.03 + (state === 'pending' ? 0.04 : 0);
-    // milestone: the giant word behind the number
-    if (bigWord && bigWord.text) {
+    const real3d = useReal();
+    // milestone: the giant word behind the number (the 3D version does the camera pull-back + star burst instead)
+    if (bigWord && bigWord.text && !useReal()) {
       const e = bigWord.t / 1.8;
       const bs = fitFont(c, bigWord.text, 900, FD, L.numSize * 1.9, L.W * 0.98) * (0.85 + 0.35 * eOut(e));
       c.globalAlpha = (1 - e) * 0.32 * alpha;
@@ -1006,7 +1037,11 @@
       c.fillStyle = C.magenta; c.fillText(bigWord.text, cx + bs * 0.03, cy);
       c.globalAlpha = 1;
     }
-    chromeText(c, scr(v.num, state === 'pending' ? 0.18 : 0), cx, cy, size, alpha, split);
+    if (real3d) {
+      R.setNumber({ text: v.num, cx, cy, size, alpha, hot: numPop * 0.6 + fx.glitch * 0.2, mode: state === 'pending' || evIs('freeze') ? 'freeze' : 'live', wobble: state === 'pending' ? 1 : 0 });
+      L.numW = Math.max(L.numW, R.numberWidth());
+      if (LY) LY.numW = L.numW;
+    } else chromeText(c, scr(v.num, state === 'pending' ? 0.18 : 0), cx, cy, size, alpha, split);
     // illion word
     const wy = cy + size * 0.68;
     let ws = 0;
@@ -1296,12 +1331,15 @@
     const e = ws.t / 2.4;
     const a = Math.sin(Math.PI * clamp(e, 0, 1));
     // the big title sweeps through BEHIND the number, see-through, so nothing gets covered
+    // (in 3D the dive is the show, so only the name label stays)
     const title = 'WORLD ' + (ws.w + 1);
-    const s = fitFont(c, title, 900, FD, L.numSize * 1.6, L.W * 0.95);
-    const x = lerp(L.W * 1.25, -L.W * 0.25, e * 0.35 + sstep(e) * 0.65);
-    for (let i = 4; i >= 0; i--) {
-      c.globalAlpha = a * (i ? 0.06 : 0.3);
-      text(c, title, x + i * s * 0.3, L.cy, font(900, s, FD), i ? C.magenta : '#ffffff', 'center', 'middle');
+    if (!useReal()) {
+      const s = fitFont(c, title, 900, FD, L.numSize * 1.6, L.W * 0.95);
+      const x = lerp(L.W * 1.25, -L.W * 0.25, e * 0.35 + sstep(e) * 0.65);
+      for (let i = 4; i >= 0; i--) {
+        c.globalAlpha = a * (i ? 0.06 : 0.3);
+        text(c, title, x + i * s * 0.3, L.cy, font(900, s, FD), i ? C.magenta : '#ffffff', 'center', 'middle');
+      }
     }
     // its name gets a clean spot above the number
     const ns = Math.max(12, 18 * L.S);
@@ -1332,7 +1370,7 @@
     if (!v) return;
     drawBands(c, L);
     drawRing(c, L);
-    drawScrim(c, L, alpha);
+    if (!useReal()) drawScrim(c, L, alpha);
     drawWorldSweep(c, L);
     drawParticles(c, L);
     drawNumberBlock(c, L, v, alpha);
@@ -1424,14 +1462,16 @@
     drawTopLeft(c, L, null);
     drawTopRight(c, L, null);
     const s = Math.max(11, 14 * L.S);
+    if (rs.real && !rs.slammed && t < rs.rewAt) return;   // the glass is in pieces: nothing on it
     if (!rs.quick && !rs.slammed) {
       // rewind: everything rolls back to zero
-      const e = sstep(t / 1.6);
+      const e = rs.real ? sstep((t - rs.rewAt) / (rs.slamAt - rs.rewAt - 0.05)) : sstep(t / 1.6);
       const dl = lost.log === H.ZERO || e > 0.97 ? H.ZERO : lost.log * (1 - e);
       const p = H.parts(dl);
       const num = p.word.length > 26 ? H.short(dl) : p.num;
       const size = fitFont(c, num, 900, FD, L.numSize, L.W * 0.86);
-      chromeText(c, num, L.cx, L.cy, size, 1, 0.03 + 0.03 * Math.sin(t * 40));
+      if (useReal()) R.setNumber({ text: num, cx: L.cx, cy: L.cy, size, alpha: 1, mode: 'rewind' });
+      else chromeText(c, num, L.cx, L.cy, size, 1, 0.03 + 0.03 * Math.sin(t * 40));
       if (p.word && p.word.length <= 26) text(c, p.word.toUpperCase(), L.cx, L.cy + size * 0.68, font(800, L.numSize * 0.26, FD), C.ink, 'center', 'middle');
       const blink = Math.floor(t * 4) % 2 === 0;
       if (blink) {
@@ -1513,6 +1553,7 @@
   }
 
   function drawHud(c, L) {
+    if (R.real) R.setNumber(null);
     scrAmt = evIs('scramble') ? 0.45 * evEnv() : 0;
     scrSeed = Math.floor(sceneT * 12);
     if (state === 'live' || state === 'pending') drawLiveHud(c, L, 1);
@@ -1591,6 +1632,13 @@
         for (const rg of cr.rings) { c.beginPath(); rg.forEach((p, i) => (i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]))); c.stroke(); }
         c.globalAlpha = 1;
       }
+    }
+    // light splitting inside the break: a faint rainbow fringe either side of each crack
+    c.lineWidth = 1 * dpr;
+    for (const [dx, col] of [[1.4, 'rgba(120,220,255,0.35)'], [-1.4, 'rgba(255,150,210,0.3)']]) {
+      c.save(); c.translate(dx * dpr, dx * 0.5 * dpr); c.strokeStyle = col;
+      for (const ln of cr.lines) strokeCrack(c, ln, prog);
+      c.restore();
     }
     // white dust at the hit point
     const g = c.createRadialGradient(cr.x, cr.y, 0, cr.x, cr.y, 26 * dpr);
@@ -1704,12 +1752,13 @@
   function uniforms() {
     const en = evEnv();
     const inv = evIs('invert') && flashesOK() ? (ev.cur.t < 1.1 ? (Math.sin(ev.cur.t * 22) > 0.2 ? 1 : 0) : en > 0.5 ? 1 : 0) : 0;
-    const rewind = state === 'reset' && rs && !rs.quick ? clamp(1 - (rs.t - 1.5) / 0.4, 0, 1) : 0;
+    let rewind = state === 'reset' && rs && !rs.quick ? clamp(1 - (rs.t - 1.5) / 0.4, 0, 1) : 0;
+    if (rs && rs.real) rewind = clamp((rs.t - rs.rewAt) / 0.1, 0, 1) * clamp((rs.slamAt + 0.05 - rs.t) / 0.15, 0, 1);
     let glitch = fx.baseGlitch + stillNow * 0.05 + fx.glitch * 0.6 + (evIs('glitchstorm') ? 0.85 * en : 0) + (state === 'pending' ? 0.35 : 0);
     if (reduced) glitch *= 0.5;
     const beat = AU.beat();
     const fakeBeat = Math.exp(-((sceneT * 2.33) % 1) * 6) * (0.25 + 0.5 * clamp(stillNow / 1.5, 0, 1));
-    return {
+    const u = {
       u_time: sceneT, u_still: stillNow, u_mix: fx.mix, u_hue: (fx.hueBase || 0) + fx.hue, u_folds: evIs('kaleido') && en > 0.05 ? 6 : fx.folds,
       u_pulse: fx.pulse, u_grow: growNow, u_beat: beat === null || beat === undefined ? fakeBeat : beat, u_spin: fx.spin,
       u_glitch: clamp(glitch, 0, 1.4), u_lens: [0.5, LY ? LY.cyUv : 0.535, fx.mix[2] * (0.35 + 0.3 * growNow)], u_shock: [0.5, LY ? LY.cyUv : 0.535, fx.shock],
@@ -1717,6 +1766,19 @@
       u_flip: evIs('flip') ? en : 0, u_mirror: evIs('mirror') ? en : 0, u_melt: fx.melt + (evIs('melt') ? 0.9 * en : 0),
       u_invert: inv, u_uiWarp: 0.45 + (ev.cur ? 0.4 * en : 0), u_scan: 0.22 + stillNow * 0.1, u_shake: reduced ? fx.shake * 0.25 : fx.shake,
     };
+    if (R.real) {
+      // the world you're in (the one you lost stays up until the roast lands)
+      u.u_world = rs && !rs.slammed ? rs.lost.world : save.run ? H.worldOf(save.run.level) : 0;
+      u.u_timeScale = timeScale();
+      u.u_shatterT = rs && rs.real ? rs.t : 0;
+      u.u_uiOn = rs && rs.real && rs.t < rs.rewAt ? 0 : 1;
+      u.u_hue = fx.hs;
+      u.u_lens = [0.5, LY ? LY.cyUv : 0.535, 0.2];
+      u.u_scan = 0.12 + stillNow * 0.06;
+      u.u_glitch = clamp(glitch * 0.8, 0, 1.3);
+      u.u_flashOK = flashesOK();
+    }
+    return u;
   }
   function render(ts, dtMs) {
     applyFallback();
@@ -1729,13 +1791,13 @@
     const t0 = performance.now();
     drawHud(hx, LY);
     const t1 = performance.now();
-    if (!use2d) {
-      R.uploadUI(hud);
-      R.draw(uniforms(), dtMs);
-    }
+    if (R.real && R.failed) { realFailed(); applyFallback(); }
+    if (R.ok && !use2d) R.uploadUI(hud);
+    if (R.ok) R.draw(uniforms(), dtMs);
+    applyFallback();
     const t2 = performance.now();
     perf.hud += t1 - t0; perf.gl += t2 - t1; perf.n++;
-    if (pend && pend.commit && state === 'pending') { makeSnap(); commitReset(); }
+    if (pend && pend.commit && state === 'pending') { if (!useReal()) makeSnap(); commitReset(); }
     const dt = lastRender ? Math.min(0.1, (ts - lastRender) / 1000) : 0.016;
     lastRender = ts;
     drawShatter(dt);
@@ -1851,7 +1913,7 @@
     const b = e.target.closest('button[data-q]');
     if (!b) return;
     save.set.quality = b.dataset.q;
-    if (R.ok) R.setQuality(save.set.quality);
+    if (R.ok) R.setQuality(rq(save.set.quality));
     refreshSettings(); saveNow();
   });
   el.music.addEventListener('input', () => { save.set.music = clamp(+el.music.value / 100, 0, 1); applyVolumes(); });
@@ -1888,11 +1950,13 @@
     const li = $('ruleLeave');
     if (li) li.textContent = 'Leaving is safe: tap the tiny X in the corner, close the tab, or let your phone sleep. It keeps counting while it\'s closed.';
   }
-  if (R.ok) R.setQuality(save.set.quality);
+  // PCs get the real thing at full power; phones pick their own quality
+  if (!coarse && save.set.quality === 'auto' && !lsGet('handsoff.real.v1')) { save.set.quality = 'max'; lsSet('handsoff.real.v1', '1'); }
+  if (R.ok) R.setQuality(rq(save.set.quality));
   applyVolumes();
   if (!tryOwn()) setState('lock');
   else { awayReport = catchUp(); goMenu(); }
   requestAnimationFrame(frame);
   // test hook: lets the browser tests look inside without touching anything
-  window.__HO_DEBUG = { get state() { return state; }, get save() { return save; }, get pend() { return pend; }, get rs() { return rs; }, get ev() { return ev; }, get tempt() { return tempt; }, get sweep() { return worldSweep; }, get welcome() { return welcome; }, startEvent, R, perf };
+  window.__HO_DEBUG = { get state() { return state; }, get save() { return save; }, get pend() { return pend; }, get rs() { return rs; }, get ev() { return ev; }, get tempt() { return tempt; }, get sweep() { return worldSweep; }, get welcome() { return welcome; }, get pushAlpha() { return pushAlpha; }, startEvent, R, perf };
 })();
