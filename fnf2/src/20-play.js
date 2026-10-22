@@ -796,7 +796,7 @@
     onPointer(type, x, y, id, e) {
       if (this.paused) { this.pausePointer(type, x, y); return; }
       if (this.cutscene) { if (type === 'down') this.cutscene.onAction(y < 90 && x > G.W - 160 ? 'back' : 'accept', true, false); return; }
-      if (this.gameOver) { if (type === 'down') this.gameOverAction(y < 120 && x < 140 ? 'back' : 'accept'); return; }
+      if (this.gameOver) { this.gameOverPointer(type, x, y, id); return; }
       if (!G.touchMode) return;
       // pause button top-right (FNF mobile's own)
       const pb = this.pauseBtn;
@@ -997,6 +997,21 @@
       // retry: wait (confirm jingle length / 7), fade to black over 2s, then the song starts over and fades in
       if (go.phase === 'confirm') { go.ct += dt; const w = go.pico ? 2.703 / 7 : 7.21 / 7; if (go.ct > w) go.fade = Math.min(1, (go.ct - w) / 2); if (go.ct > w + 2 && !go.left) { go.left = true; this.restart(true); } }
       if (go.phase === 'exit') { go.ct += dt; go.fade = Math.min(1, go.ct / 0.5); }
+    },
+    // phones (FNF mobile's GameOverSubState): the back button in the bottom right corner; a quick tap anywhere else
+    // = retry, but only after the first second (so a tap meant for the song doesn't skip the death)
+    gameOverPointer(type, x, y, id) {
+      const go = this.gameOver;
+      if (G.touchMode) {
+        if (!go.backBtn && G.TouchButton && G.A.has('preload/images/backButton.png')) go.backBtn = new G.TouchButton('preload/images/backButton', G.W - 230, G.H - 200, 0.7, () => this.gameOverAction('back'), { prefix: 'back', rest: 1, confirmFrom: 6, confirmTo: 23 });
+        if (go.backBtn && go.backBtn.pointer(type, x, y, id)) { go.tap = null; return; }
+      } else if (type === 'down') { this.gameOverAction(y < 120 && x < 140 ? 'back' : 'accept'); return; }
+      if (type === 'down') { go.tap = { x, y, t: performance.now() }; return; }
+      if (type === 'up' && go.tap) {
+        const t = go.tap; go.tap = null;
+        if ((go.age || 0) < 1 || Math.abs(x - t.x) > 40 || Math.abs(y - t.y) > 40 || performance.now() - t.t > 400) return;
+        this.gameOverAction('accept');
+      }
     },
     gameOverAction(a) {
       const go = this.gameOver;
@@ -1306,8 +1321,11 @@
     drawGameOver(ctx) {
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
       const go = this.gameOver;
-      if (go.spr) go.spr.draw(ctx, null); else this.bf.draw(ctx, this.cam);
+      // (a game over made of whole-screen pictures sits in the middle of a wide phone screen)
+      if (go.spr) { G.screenOff.x += G.CUT / 2; go.spr.draw(ctx, null); G.screenOff.x -= G.CUT / 2; } else this.bf.draw(ctx, this.cam);
       if (go.fade > 0) { G.setScreenT(ctx); ctx.globalAlpha = go.fade; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
+      go.age = (go.age || 0) + G.dt;
+      if (go.backBtn && G.touchMode && go.phase !== 'confirm' && go.phase !== 'exit') { G.setScreenT(ctx); go.backBtn.update(G.dt); go.backBtn.draw(ctx); }
     },
   };
 })();

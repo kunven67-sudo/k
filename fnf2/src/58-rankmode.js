@@ -278,7 +278,7 @@
       const fp = this.fp, v = this.v;
       ctx.save();
       ctx.globalAlpha = a;
-      ctx.fillStyle = 'rgba(0,0,0,0.62)'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(0,0,0,0.62)'; ctx.fillRect(-G.CUT / 2, 0, W + G.CUT, H);
       const sc = 0.94 + 0.06 * a, ph = this.panelH();
       ctx.translate(W / 2, PY + ph / 2); ctx.scale(sc, sc); ctx.translate(-W / 2, -(PY + ph / 2));
       // the box (like freeplay's clear % box: black, rounded, white edge)
@@ -377,6 +377,6 @@
     const t = this._rankToast; if (!t || this.editor) return;
     G.setScreenT(ctx);
     const a = Math.min(1, t.t / 0.5, (3 - t.t) / 0.2);
-    G.text(ctx, t.msg, W / 2 + 120, H - 40, { font: G.FONT.f5b, size: 30, color: t.color, baseline: 'middle', align: 'center', alpha: a, outline: 3, outlineColor: '#000' });
+    G.text(ctx, t.msg, G.W / 2 + 120, H - 40, { font: G.FONT.f5b, size: 30, color: t.color, baseline: 'middle', align: 'center', alpha: a, outline: 3, outlineColor: '#000' });
   };
 })();

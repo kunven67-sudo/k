@@ -1307,7 +1307,7 @@
     // difficulty) to change difficulty, hold the picked one for half a second to favorite it, tap the DJ to change
     // characters. The top bar keeps FNF 2's extras: FREEPLAY = back, the middle = search / letters, right = group.
     onPointer(type, x, y, id) {
-      if (this.editor) { this.editor.onPointer(type, x, y); return; }
+      if (this.editor) { this.editor.onPointer(type, x - G.CUT / 2, y); return; }     // (the edit box sits in the middle of a wide screen)
       const now = performance.now();
       if (type === 'down') {
         if ((this.tp && G.input.pointers[this.tp.id]) || this.state !== 'idle') return;
@@ -1696,7 +1696,7 @@
       if (C.grad != null && C.grad < 720) { const tg = IMG('freeplay/transitionGradient'); if (tg) ctx.drawImage(tg, 0, C.grad, W, tg.height); }
       if (R) { if (R.pending) { G.screenZoom = 1; G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); } else this.drawRankCam(ctx); }
       G.screenZoom = 1; G.screenOff.x = G.screenOff.y = 0;
-      if (this.editor) { G.setScreenT(ctx); this.editor.draw(ctx); }
+      if (this.editor) { G.setScreenT(ctx); ctx.translate(G.CUT / 2, 0); this.editor.draw(ctx); }
     },
     drawDiffSprite(ctx, d) {
       const base = 'freeplay/freeplay' + d.id;

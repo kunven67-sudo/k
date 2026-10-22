@@ -14,6 +14,8 @@ const out = path.resolve(opt('out', path.join(ROOT, 'build', 'fnf2.html')));
 const assetsFile = opt('assets', path.join(ROOT, 'build', 'assets.js'));
 const only = opt('only', null);
 const minify = args.includes('--min');
+// --web: the play page on GitHub Pages (its app icon + manifest, for 'add to home screen')
+const web = args.includes('--web');
 
 const fontDir = path.join(ROOT, 'assets', 'fonts');
 const fonts = {
@@ -66,6 +68,8 @@ const html = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+${web ? '<link rel="manifest" href="manifest.webmanifest">\n<link rel="icon" href="icon-192.png">' : ''}
 <title>FNF 2 (private copy)</title>
 <style>
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden;

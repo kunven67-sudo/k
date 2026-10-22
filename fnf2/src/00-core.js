@@ -207,7 +207,17 @@ G.resize = function () {
   G.canvas.style.height = Math.floor(G.H * fit) + 'px';
   G.ctx.imageSmoothingEnabled = true;
 };
-window.addEventListener('resize', () => G.resize());
+window.addEventListener('resize', () => {
+  G.resize();
+  // a phone turned sideways (or full screen came on): simple menus are laid out again at the new width straight away,
+  // the rest (songs, freeplay...) take it on the next screen change
+  clearTimeout(G._rw);
+  G._rw = setTimeout(() => {
+    const n = G.screenName;
+    if (!G.screen || G.wantW() === G.W || !['title', 'noAssets', 'mainMenu', 'storyMenu', 'options', 'credits'].includes(n) || (G.trans && G.trans.active)) return;
+    G._switch(n, Object.assign({}, G._lastParams || {}, n === 'title' ? { skipIntro: G.screens.title.skipped } : {}));
+  }, 350);
+});
 
 // transform helpers. All drawing happens in 1280x720 game space.
 // screen-wide camera zoom/offset a menu can set while it draws (freeplay rank camera, shakes)
@@ -759,7 +769,7 @@ G.setScreen = function (name, params, opts) {
 G._switch = function (name, params) {
   if (G.screen && G.screen.leave) try { G.screen.leave(); } catch (e) { G.reportError(e, 'leave ' + G.screenName); }
   if (G.A && G.A.newScreen) G.A.newScreen();
-  G.screen = G.screens[name]; G.screenName = name;
+  G.screen = G.screens[name]; G.screenName = name; G._lastParams = params;
   G.applyW();
   if (G.screen.enter) try { G.in1280(() => G.screen.enter(params || {})); } catch (e) { G.reportError(e, 'enter ' + name); }
 };
