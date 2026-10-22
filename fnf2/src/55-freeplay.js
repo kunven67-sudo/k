@@ -145,9 +145,14 @@
       if (!sym || sym === A.main) return null;
       this._sym = this._sym || {};
       if (!this._sym[p]) {
-        let m = [1, 0, 0, 1, 0, 0];
-        found: for (const L of A.main.layers) for (const F of L.frames) for (const e of F.els) if (e.s === p) { m = e.m; break found; }
-        this._sym[p] = { start: 0, len: sym.frameCount, tl: sym, m };
+        let m = [1, 0, 0, 1, 0, 0], own = false;
+        // (an older-FNF mod DJ (no useAnimatePosition, offsets per animation, e.g. Playable Tankman): its idle symbol
+        // sits at the DJ spot (640, 366), the other animations move by how much their offsets differ from the idle's
+        // (measured: this puts the mod's booth exactly where BF's is))
+        const ad = (this.data.animations || []).find(a => a.name === name), idl = (this.data.animations || []).find(a => a.name === 'idle');
+        if (!this.data.useAnimatePosition && ad && ad.offsets) { const io = (idl && idl.offsets) || ad.offsets; m = [1, 0, 0, 1, 640 + io[0] - ad.offsets[0], 366 + io[1] - ad.offsets[1]]; own = true; }
+        else found: for (const L of A.main.layers) for (const F of L.frames) for (const e of F.els) if (e.s === p) { m = e.m; break found; }
+        this._sym[p] = { start: 0, len: sym.frameCount, tl: sym, m, own };
       }
       return this._sym[p];
     }
@@ -156,7 +161,7 @@
       const lab = this.lab(name);
       if (!lab) return false;
       if (name !== 'fistPump' && name !== 'loss') this.pumpIntro = null;
-      this.cur = { start: lab.start, len: lab.len, loop: !!loop, loopFrom: 0, tl: lab.tl || null, m: lab.m || null }; this.name = name; this.fi = Math.min(from || 0, lab.len - 1); this.t = 0; this.finished = false;
+      this.cur = { start: lab.start, len: lab.len, loop: !!loop, loopFrom: 0, tl: lab.tl || null, m: lab.m || null, own: !!lab.own }; this.name = name; this.fi = Math.min(from || 0, lab.len - 1); this.t = 0; this.finished = false;
       if (name !== 'idle') this.afk = 0;
       return true;
     }
@@ -193,9 +198,8 @@
     draw(ctx) {
       if (!this.cur || !this.atlas) return;
       G.setScreenT(ctx);
-      const m = this.atlas.stage;
-      ctx.save(); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
-      const c = this.cur;
+      const m = this.atlas.stage, c = this.cur;
+      ctx.save(); if (!c.own) ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       if (c.tl) { const k = c.m; ctx.transform(k[0], k[1], k[2], k[3], k[4], k[5]); G.Atlas.draw(ctx, this.atlas, c.tl, this.fi); }
       else G.Atlas.draw(ctx, this.atlas, this.atlas.main, c.start + this.fi);
       ctx.restore();
@@ -1685,7 +1689,7 @@
         const ost = textImg(this.group().label, G.FONT.vcr, 48, '#FFFFFF', { stroke: 2 });
         ctx.drawImage(ost, W - 8 - ost._tw - ost._pad, 8 - ost._pad);
       }
-      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : this.proMode ? (G.touchMode ? 'Tap your arrows like crazy, you can\'t miss' : 'Mash your note keys, you can\'t miss') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
+      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : this.proMode ? (G.settings.proKeys === 'any' ? (G.touchMode ? 'Tap your arrows like crazy, you can\'t miss' : 'Mash your note keys, you can\'t miss') : (G.touchMode ? 'Tap the right arrows, early is fine, all SICK' : 'Hit the right keys, early is fine, all SICK')) : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
       if (!this.searchEl) ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
       G.screenOff.y = oy; G.setScreenT(ctx);
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }

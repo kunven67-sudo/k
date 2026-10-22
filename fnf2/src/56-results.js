@@ -179,7 +179,10 @@
       this.musicName = (pdata.music || {})[this.rank] || 'resultsNORMAL';
       // characters for this rank (safe versions)
       this.chars = [];
-      for (const ad of (pdata[RANK_ANIMS[this.rank]] || [])) {
+      // (a mod that only shipped a 'PLACEHOLDER' picture for a rank (NENE MIXES' perfect) shows its next best rank)
+      let rl = pdata[RANK_ANIMS[this.rank]] || [];
+      if (rl.some(ad => /placeholder/i.test(ad.assetPath || ''))) rl = pdata.excellent || pdata.great || [];
+      for (const ad of rl) {
         if (ad.filter && ad.filter !== 'both' && ad.filter !== 'safe') continue;
         const c = this.makeChar(ad); if (c) this.chars.push(c);
       }

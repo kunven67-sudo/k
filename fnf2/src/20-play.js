@@ -630,7 +630,7 @@
     press(lane, e) {
       if (this.botplay || !this.started) return;
       this.keys[lane] = true;
-      if (this.pro) { this.proPress(this.pressTime(e) - (G.settings.offset || 0)); return; }
+      if (this.pro) { this.proPress(this.pressTime(e) - (G.settings.offset || 0), lane); return; }
       const pos = this.pressTime(e) - (G.settings.offset || 0);
       const s = this.lines[1].strums[lane];
       let best = null, trap = null;
@@ -653,14 +653,17 @@
       const s = this.lines[1].strums[lane];
       if (!this.botplay && !this.pro) s.playA('static', true);
     },
-    // PRO MODE press: whatever lane you hit, the next note that isn't taken yet gets taken. One a bit late is hit
-    // right now; else the next one coming (up to a second early is fine) waits and is hit the moment it reaches its
-    // arrow, together with the notes of the same chord + a run packed tighter than 90ms right after it (16th/32nd
-    // runs, trills: nobody mashes that fast). Traps + fake arrows are never taken. Nothing to take = nothing happens.
-    proPress(pos) {
+    // PRO MODE press. FOUR KEYS (default): like freeplay, each arrow needs its own key, but timing doesn't matter:
+    // the next note in that lane is taken. ANY KEY (Options > Pro Mode keys): any of your note keys takes the next
+    // note in any lane. A taken note a bit late is hit right now; else it waits (up to a second early is fine) and is
+    // hit the moment it reaches its arrow, together with the notes right after it packed tighter than 90ms (any key:
+    // the same chord + 16th/32nd runs; four keys: jacks in that lane), since nobody mashes that fast. Always SICK.
+    // Traps + fake arrows are never taken. Nothing to take = nothing happens.
+    proPress(pos, lane) {
+      const one = G.settings.proKeys === 'any' ? -1 : lane;
       let first = null;
       for (const n of this.notes) {
-        if (n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n)) continue;
+        if (n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n) || (one >= 0 && n.lane !== one)) continue;
         if (n.t - pos > 1000) break;
         if (pos - n.t > HIT_WINDOW) continue;
         first = n; break;
@@ -668,7 +671,7 @@
       if (!first) return;
       let last = first.t;
       for (const n of this.notes) {
-        if (n.t < first.t || n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n)) continue;
+        if (n.t < first.t || n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n) || (one >= 0 && n.lane !== one)) continue;
         if (n.t - last > 90) break;
         n.proQ = true; last = n.t;
         if (n.t <= pos) { n.hit = true; n.holding = n.len > 0; n.proHold = true; this.playerHit(n, 0, true); }

@@ -61,6 +61,7 @@
     ['Camera Zooms', 'bool', () => S().camZoom, v => S().camZoom = v, 'When enabled, the camera bounces on the beat during songs.'],
     ['Note Splashes', 'bool', () => S().noteSplashes, v => S().noteSplashes = v, 'Show a splash when you hit a SICK note.'],
     ['Combo Popups', 'bool', () => S().comboPopups !== false, v => S().comboPopups = v, 'Show SICK!! / GOOD and combo numbers when you hit notes.'],
+    ['Pro Mode keys', 'enum', () => S().proKeys === 'any' ? 'any' : 'four', v => { S().proKeys = v; }, 'PRO MODE (main menu). FOUR: hit the right key for each arrow (your 4 note keys), early is fine, every hit is SICK. ANY: any one of your note keys hits the next note.', ['four', 'any']],
     ['Botplay', 'bool', () => S().botplay, v => S().botplay = v, 'The game plays for you. Scores are not saved.'],
     ['Practice Mode', 'bool', () => S().practice, v => S().practice = v, 'You cannot die. Scores are not saved.'],
     ['FPS Counter', 'bool', () => S().fps, v => S().fps = v, 'Show the frames per second in the corner.'],
