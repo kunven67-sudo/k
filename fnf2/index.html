@@ -259,6 +259,15 @@ G.screenZoom = 1; G.screenOff = { x: 0, y: 0 };
 // a screen made for 1280 wide (base1280: true) is drawn in the middle of a wider phone screen: while it runs, G.W is
 // 1280 and every transform moves over by G.ox (like FNF mobile's states that add gameCutoutSize / 2 to everything)
 G.ox = 0;
+// a full-screen picture or video that keeps its shape on a wide phone (VideoCutscene: fit + centre, black at the sides)
+G.drawFit = function (ctx, img, alpha) {
+  const w0 = img.videoWidth || img.naturalWidth || img.width, h0 = img.videoHeight || img.naturalHeight || img.height;
+  if (!w0 || !h0) return;
+  const k = Math.min(G.W / w0, G.H / h0), w = w0 * k, h = h0 * k;
+  if (alpha != null) { ctx.save(); ctx.globalAlpha *= alpha; }
+  ctx.drawImage(img, (G.W - w) / 2, (G.H - h) / 2, w, h);
+  if (alpha != null) ctx.restore();
+};
 G.in1280 = function (fn) {
   const scr = G.screen;
   if (!scr || !scr.base1280 || !G.CUT) return fn();
@@ -1235,6 +1244,7 @@ G.A = {
 G.Packs = {
   all: {},              // id -> {id, name, credit, src: 'folder' | 'saved', head: true when it's in, body: {path: [bytes, w, h]}, bodyLoaded}
   owner: new Map(),     // a body file's path -> its pack
+  heads: new Map(),     // a head file's path -> every pack that brings it (two mods can both have 'speakers/bf.json')
   previews: new Map(),  // 'songs/x/Inst.ogg' -> [from, to] (seconds): the preview cut into the head as path + '#preview'
   folder: [],           // what packs/index.js lists
   keep: G.phone ? 0 : 1,   // how many packs not in use stay loaded (PC: the last one, so playing it again is instant)
@@ -1255,6 +1265,8 @@ G.Packs = {
     if (this.all[meta.id] && this.all[meta.id].head) return;   // (the folder one wins over a saved copy)
     const p = this.all[meta.id] = Object.assign(this.all[meta.id] || {}, meta, { head: true, bodyLoaded: false, src: this._src || 'folder' });
     Object.assign(G.A.raw, head);
+    p.headFiles = head;
+    for (const k in head) { const l = this.heads.get(k); if (l) l.push(meta.id); else this.heads.set(k, [meta.id]); }
     for (const k in p.body) this.owner.set(k, p);
     for (const k in p.previews || {}) this.previews.set(k, p.previews[k]);
     // its weeks go after the others in story mode + freeplay
@@ -1268,6 +1280,16 @@ G.Packs = {
     if (p._parts >= (n || 1)) p.bodyLoaded = true;
   },
   partName(id, k) { return id + '.body' + (k > 1 ? k : '') + '.js'; },
+  // which pack a head file came from (the first one that has it), and a json read from one pack's own copy
+  // (a mod's talking scene uses its own speakers, not another mod's file with the same name)
+  packOf(path) { const l = this.heads.get(path); return l ? l[0] : null; },
+  jsonIn(id, path) {
+    const p = id && this.all[id], t = p && p.headFiles && p.headFiles[path];
+    if (typeof t !== 'string' || t.startsWith('data:')) return G.A.json(path);
+    p._json = p._json || new Map();
+    if (!p._json.has(path)) { let v = null; try { v = JSON.parse(t); } catch (e) {} p._json.set(path, v); }
+    return p._json.get(path);
+  },
   // ---- body: loaded when one of its files is asked for
   needBody(p) {
     if (p.bodyLoaded) return Promise.resolve(true);
@@ -3670,6 +3692,8 @@ G.SongConductor = class {
       this.countBeat = -99; this.started = false;
       this.keys = [false, false, false, false];
       this.botplay = !!G.settings.botplay; this.practice = !!G.settings.practice;
+      // PRO MODE: any of your note keys / arrows hits the next note coming, always SICK (own scores, botplay off)
+      this.pro = !!this.params.pro; if (this.pro) this.botplay = false;
       this.popups = []; this.splashes = []; this.covers = [];
       this.vocalsOn = true;
       for (const L of this.lines) for (const s2 of L.strums) { s2.playA('static', true); s2.confirmHold = -1; s2.mx = s2.my = s2.ma = 0; s2.mal = 1; s2.x = s2.bx; s2.y = s2.by; s2.angle = 0; s2.alpha = 1; s2.visible = true; }
@@ -3719,7 +3743,7 @@ G.SongConductor = class {
       this.updateNotes(jpos, dt);
       // characters, stage, cameras
       const stepSec = this.cond.stepCrochet / 1000;
-      const holding = this.keys.some(k => k) || this.botHolding;
+      const holding = (!this.pro && this.keys.some(k => k)) || this.botHolding;
       for (const c of [this.gf, this.dad, this.bf]) if (c) { c.playHealth = this.health; c.tick(dt, stepSec, c === this.bf ? holding : false); }
       this.stage.update(dt);
       if (this.sfx && this.sfx.update) this.sfx.update(this, dt);
@@ -3730,7 +3754,7 @@ G.SongConductor = class {
         s.update(dt); centerOffsets(s); if (s.animName === 'confirm') { s.offset.x -= 13; s.offset.y -= 13; }
         s.x = s.bx + s.mx; s.y = s.by + s.my + (this.strumShift || 0); s.angle = s.ma; s.alpha = s.mal;
         if (s.confirmHold >= 0) { s.confirmHold += dt; if (s.confirmHold >= 0.15) { s.confirmHold = -1; s.playA('static', true); } }
-        if (s.player && s.animName === 'confirm' && s.finished && !this.botplay) { if (this.keys[s.dir]) s.playA('press', true); }
+        if (s.player && s.animName === 'confirm' && s.finished && !this.botplay && !this.pro) { if (this.keys[s.dir]) s.playA('press', true); }
       }
       this.splashes = this.splashes.filter(sp => { sp.update(dt); return !sp.finished; });
       this.covers = this.covers.filter(cv => { cv.update(dt); if (cv.ending && cv.finished) return false; return true; });
@@ -3875,6 +3899,12 @@ G.SongConductor = class {
           continue;
         }
         // player notes
+        if (this.pro && n.proQ && !n.hit && !n.missed && pos >= n.t) { n.hit = true; n.holding = n.len > 0; n.proHold = true; this.playerHit(n, 0, true); }
+        if (this.pro && n.hit && n.holding && n.proHold) {
+          if (pos >= n.holdEnd) { n.holding = false; n.done = true; this.finishHold(n); }
+          else { this.botHolding = true; this.holdTick(n, dt); }
+          continue;
+        }
         if (!n.hit && !n.missed && pos - n.t > HIT_WINDOW) { n.missed = true; this.noteMiss(n); if (n.len <= 0) n.done = true; }
         if (n.missed && pos > n.holdEnd + HIT_WINDOW) n.done = true;
         if (n.hit && n.holding) {
@@ -3929,6 +3959,7 @@ G.SongConductor = class {
     press(lane, e) {
       if (this.botplay || !this.started) return;
       this.keys[lane] = true;
+      if (this.pro) { this.proPress(this.pressTime(e) - (G.settings.offset || 0)); return; }
       const pos = this.pressTime(e) - (G.settings.offset || 0);
       const s = this.lines[1].strums[lane];
       let best = null, trap = null;
@@ -3949,7 +3980,28 @@ G.SongConductor = class {
     release(lane) {
       this.keys[lane] = false;
       const s = this.lines[1].strums[lane];
-      if (!this.botplay) s.playA('static', true);
+      if (!this.botplay && !this.pro) s.playA('static', true);
+    },
+    // PRO MODE press: whatever lane you hit, the next note that isn't taken yet gets taken. One a bit late is hit
+    // right now; else the next one coming (up to a second early is fine) waits and is hit the moment it reaches its
+    // arrow, together with the notes of the same chord + a run packed tighter than 90ms right after it (16th/32nd
+    // runs, trills: nobody mashes that fast). Traps + fake arrows are never taken. Nothing to take = nothing happens.
+    proPress(pos) {
+      let first = null;
+      for (const n of this.notes) {
+        if (n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n)) continue;
+        if (n.t - pos > 1000) break;
+        if (pos - n.t > HIT_WINDOW) continue;
+        first = n; break;
+      }
+      if (!first) return;
+      let last = first.t;
+      for (const n of this.notes) {
+        if (n.t < first.t || n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n)) continue;
+        if (n.t - last > 90) break;
+        n.proQ = true; last = n.t;
+        if (n.t <= pos) { n.hit = true; n.holding = n.len > 0; n.proHold = true; this.playerHit(n, 0, true); }
+      }
     },
     playerHit(n, diffMs, auto) {
       const s = this.lines[1].strums[n.lane];
@@ -3994,7 +4046,7 @@ G.SongConductor = class {
     },
     finishHold(n) {
       const s = this.lines[1].strums[n.lane];
-      if (this.botplay) { s.confirmHold = 0; } else s.playA(this.keys[n.lane] ? 'press' : 'static', true);
+      if (this.botplay || this.pro) { s.confirmHold = 0; } else s.playA(this.keys[n.lane] ? 'press' : 'static', true);
       const cv = this.covers.find(c => c.note === n); if (cv) { if (cv.hasAnim('end')) { cv.play('end', true); cv.ending = true; } else this.covers.splice(this.covers.indexOf(cv), 1); }
       this.score = Math.round(this.score);
     },
@@ -4262,7 +4314,7 @@ G.SongConductor = class {
     exitToMenu() {
       G.audio.music.stop(0);
       if (this.audio) this.audio.stop();
-      G.setScreen(this.params.mode === 'story' ? 'storyMenu' : 'freeplay', {});
+      G.setScreen(this.params.mode === 'story' ? 'storyMenu' : 'freeplay', { proMode: !!this.pro });
     },
     // -------------------------------------------------- game over
     die() {
@@ -4350,7 +4402,7 @@ G.SongConductor = class {
       // V-Slice style tallies + rank (results screen, freeplay rank badges + clear %)
       const tl = this.tally, sick = (tl.killer || 0) + tl.sick;
       stats.tallies = { sick, good: tl.good, bad: tl.bad, shit: tl.shit, missed: tl.miss, maxCombo: this.maxCombo, totalNotesHit: sick + tl.good + tl.bad + tl.shit, totalNotes: stats.totalNotes };
-      const scoreKey = s.id + (s.variation !== 'default' ? '-' + s.variation : '') + (this.playAs ? '-as-' + this.playAs.id : '');
+      const scoreKey = (this.pro ? 'pro:' : '') + s.id + (s.variation !== 'default' ? '-' + s.variation : '') + (this.playAs ? '-as-' + this.playAs.id : '');
       const prev = G.getScore(scoreKey, p.diff, 'bf');
       const prevRank = prev ? (prev.rank || null) : null;
       let isNewHighscore = false;
@@ -4361,9 +4413,9 @@ G.SongConductor = class {
         ws.score += stats.score; ws.misses += stats.misses; ws.maxCombo = Math.max(ws.maxCombo, stats.maxCombo); ws.totalNotes += stats.totalNotes;
         for (const k in ws.tally) ws.tally[k] += stats.tally[k] || 0; ws.accSum += this.accSum; ws.accN += this.accN;
         if (p.songIndex + 1 < p.songs.length) { G.setScreen('play', Object.assign({}, p, { songIndex: p.songIndex + 1, weekStats: ws, deaths: 0 })); return; }
-        const weekBest = !cheated && !!p.week && G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
+        const weekBest = !cheated && !this.pro && !!p.week && G.submitWeekScore(p.week, p.diff, 'bf', ws.score);
         G.setScreen(G.screens.results ? 'results' : 'storyMenu', { mode: 'story', week: p.week, diff: p.diff, newBest: weekBest, stats: Object.assign({}, ws, { acc: ws.accN ? ws.accSum / ws.accN : 0 }), title: (G.A.json('preload/data/levels/' + p.week + '.json') || {}).name || p.week, player: this.resultsPlayer() });
-      } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, title: s.name, player: this.resultsPlayer(), prevRank, isNewHighscore, cheated });
+      } else G.setScreen(G.screens.results ? 'results' : 'freeplay', { mode: 'freeplay', song: s.id, diff: p.diff, variation: s.variation, stats, title: s.name, player: this.resultsPlayer(), prevRank, isNewHighscore, cheated, pro: this.pro });
     },
     // who the results screen shows: the player you picked (Nene sings her own songs as 'nene-playable', a sprite
     // the results screen doesn't know, so it fell back to BF + GF), else the character that sang
@@ -6742,6 +6794,8 @@ G.SongConductor = class {
         const k = this.fadeOut >= 0 ? Math.max(0, 1 - this.fadeOut / 0.6) : 1;
         G.setScreenT(ctx);
         ctx.save(); ctx.globalAlpha = 0.75 * this.back * k; ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, G.W, G.H); ctx.restore();
+        // (the mod's box + portraits are made for 1280 wide: in the middle of a wide phone screen)
+        G.screenOff.x += G.CUT / 2; G.setScreenT(ctx);
         ctx.save(); ctx.globalAlpha *= k;
         if (this.cur && this.box.animName === 'idle') this.cur.draw(ctx, null);
         this.box.draw(ctx, null);
@@ -6756,6 +6810,7 @@ G.SongConductor = class {
           });
         }
         ctx.restore();
+        G.screenOff.x -= G.CUT / 2; G.setScreenT(ctx);
       },
     };
     return d.start();
@@ -6869,7 +6924,7 @@ G.SongConductor = class {
         enter(S) { S.black = 0; S.pic = G.A.image(IMG + pick[0] + '.png'); G.audio.music.play(MUS + pick[1] + '.ogg', { loop: false, vol: 1, restart: true }); },
         dur: 10.4, skippable: true,
         update(S) { S.picA = S.t < 10 ? Math.min(1, S.t / 2) : Math.max(0, 1 - (S.t - 10) / 0.4); },
-        draw(S, ctx) { if (S.pic) { G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.save(); ctx.globalAlpha = S.picA || 0; ctx.drawImage(G.srcImg(S.pic), 0, 0, G.W, G.H); ctx.restore(); } },
+        draw(S, ctx) { if (S.pic) { G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); G.drawFit(ctx, G.srcImg(S.pic), S.picA || 0); } },
       }, { enter(S) { S.black = 1; G.audio.music.stop(0.3); }, dur: 0.1 }]);
     },
   };
@@ -7021,8 +7076,8 @@ G.SongConductor = class {
   }
   const animOffsets = d => { const o = {}; for (const a of d.animations || []) o[a.name] = a.offsets || [0, 0]; return o; };
 
-  function Speaker(id) {
-    const d = json('speakers', id); if (!d) return null;
+  function Speaker(id, js) {
+    const d = (js || json)('speakers', id); if (!d) return null;
     const sp = plain(d.assetPath, d); if (!sp) return null;
     const f0 = sp.sheet.frames[0], off = d.offsets || [0, 0], ao = animOffsets(d);
     const bx = (G.W - f0.fw) / 2 + off[0], by = (G.H - f0.fh) / 2 + off[1];
@@ -7034,8 +7089,8 @@ G.SongConductor = class {
   }
 
   let measure = null;
-  function DialogueBox(id) {
-    const d = json('boxes', id); if (!d) return null;
+  function DialogueBox(id, js) {
+    const d = (js || json)('boxes', id); if (!d) return null;
     const sp = plain(d.assetPath, d); if (!sp) return null;
     const off = d.offsets || [0, 0], ao = animOffsets(d), T = Object.assign({ offsets: [0, 0], width: 300, size: 32, color: '#000000', shadowWidth: 0 }, d.text || {});
     const gx = G.W / 2 + off[0], gy = G.H / 2 + off[1];   // (the group is still empty when FNF centres it)
@@ -7101,6 +7156,9 @@ G.SongConductor = class {
   // one conversation: states Opening (box pops in) -> Speaking (typing) -> Idle (waiting for ENTER) -> ... -> Ending
   G.Conversation = function (id, opt) {
     opt = opt || {};
+    // (speakers + boxes come from the same mod as the conversation)
+    const pack = G.Packs && G.Packs.packOf(D + 'conversations/' + id + '.json');
+    const json = (kind, i) => pack ? G.Packs.jsonIn(pack, D + kind + '/' + i + '.json') : G.A.json(D + kind + '/' + i + '.json');
     const data = json('conversations', id);
     const C = {
       done: false, state: 'start', entry: 0, line: 0, alpha: 1, back: 0, outT: -1, speakers: {}, boxes: {}, speaker: null, box: null,
@@ -7117,7 +7175,7 @@ G.SongConductor = class {
       openBox() {
         const E = this.E, bid = E.box || '';
         if (!this.box || this.box.id !== bid) {
-          this.box = this.boxes[bid] || (this.boxes[bid] = DialogueBox(bid));
+          this.box = this.boxes[bid] || (this.boxes[bid] = DialogueBox(bid, json));
           if (this.box) { this.box.onDone = () => { this.state = 'idle'; }; this.box.lines = []; this.box.shown = 0; this.box.full = ''; this.box.len = 0; }
         }
         if (this.box && E.boxAnimation) this.box.play(E.boxAnimation);
@@ -7125,7 +7183,7 @@ G.SongConductor = class {
       },
       showSpeaker() {
         const E = this.E, sid = E.speaker || '';
-        if (!this.speaker || this.speaker.id !== sid) this.speaker = sid ? (this.speakers[sid] || (this.speakers[sid] = Speaker(sid))) : null;
+        if (!this.speaker || this.speaker.id !== sid) this.speaker = sid ? (this.speakers[sid] || (this.speakers[sid] = Speaker(sid, json))) : null;
         if (this.speaker && E.speakerAnimation) this.speaker.play(E.speakerAnimation);
       },
       text() { return (this.E.text || [])[this.line] || ''; },
@@ -7224,7 +7282,7 @@ G.SongConductor = class {
       if (S.t >= 8) return;
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
       if (!S.pic || S.picA <= 0) return;
-      ctx.save(); ctx.globalAlpha = S.picA; ctx.drawImage(G.srcImg(S.pic), 0, 0, G.W, G.H); ctx.restore();
+      G.drawFit(ctx, G.srcImg(S.pic), S.picA);
     },
   });
 
@@ -7252,7 +7310,7 @@ G.SongConductor = class {
       if (!S.vidBlack) return;
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
       const v = S.video;
-      if (v && v.readyState >= 2) ctx.drawImage(v, 0, 0, G.W, G.H);
+      if (v && v.readyState >= 2) G.drawFit(ctx, v);
     },
     leave(S) { if (S.video) { try { S.video.pause(); } catch (e) {} S.video = null; } },
   };
@@ -7640,7 +7698,7 @@ G.SongConductor = class {
       const T = P.tabi;
       // each side's arrows a bit closer together, in the middle of its half of the screen (the HUD is made after
       // the stage, so this happens here, once)
-      if (!T.laid && !P.middle) for (const L of P.lines) {
+      if (!T.laid && !P.middle && !P.phoneArrows) for (const L of P.lines) {     // (not with the phone arrows: they keep FNF mobile's layout)
         const sp = L.strums[1].bx - L.strums[0].bx, io = L.strums[0].bx - L.x;
         L.x = G.W * (L.player ? 0.75 : 0.25) - 4 * sp * 0.975 / 2;
         L.strums.forEach((s, i) => { s.x = s.bx = L.x + i * sp * 0.975 + io; });
@@ -8405,7 +8463,7 @@ G.SongConductor = class {
       enter(S) { S.pic = G.A.image(IMG + pic + '.png'); },
       skippable: true,
       update(S) { S.black = Math.max(0, 1 - S.t); },
-      draw(S, ctx) { G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); if (S.pic) ctx.drawImage(G.srcImg(S.pic), 0, 0, G.W, G.H); },
+      draw(S, ctx) { G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); if (S.pic) G.drawFit(ctx, G.srcImg(S.pic)); },
     },
   ]);
 
@@ -9654,7 +9712,7 @@ G.SongConductor = class {
     maxZoom(P) { const p = P.jor && P.jor.path; let z = 0; if (p) for (const c of p) z = Math.max(z, c[3]); return z; },
     reset(P) {
       P.zoomRate = 0;                   // (the bops are in the replayed camera already)
-      if (P.jor && P.jor.path) { const c = camAt(P.jor.path, 0); P.cam.focus(c[1], c[2]); P.camZoom = c[3]; }
+      if (P.jor && P.jor.path) { const c = camAt(P.jor.path, 0), v = this.fit(P, c[1], c[2], c[3]); P.cam.focus(v[0], v[1]); P.camZoom = v[2]; }
     },
     update(P) {
       const J = P.jor;
@@ -9668,8 +9726,21 @@ G.SongConductor = class {
       if (!J.path || P.gameOver) return;
       const c = camAt(J.path, Math.max(0, P.songPos) / 1000);
       P.camTween = null;
-      P.cam.focus(c[1], c[2]);
-      P.camZoom = c[3];
+      const v = this.fit(P, c[1], c[2], c[3]);
+      P.cam.focus(v[0], v[1]);
+      P.camZoom = v[2];
+    },
+    // the replayed camera was made for a 1280 wide screen and the stage is only as big as the video showed it:
+    // a wider screen (phones) would see past its edges (black). Zoom in just enough + slide back inside.
+    fit(P, x, y, z) {
+      if (!P.jor.box) { const s = (P.stage.props || []).find(p => p.name === 'street'); if (s && s.width > 0) P.jor.box = { l: s.x, r: s.x + s.width, t: s.y, b: s.y + s.height }; }
+      const st = P.jor.box;
+      if (!st) return [x, y, z];
+      const vis = G.H - 2 * BAR;
+      z = Math.max(z, G.W / (st.r - st.l), vis / (st.b - st.t));
+      const hw = G.W / 2 / z, hh = vis / 2 / z;
+      x = G.clamp(x, st.l + hw, st.r - hw); y = G.clamp(y, st.t + hh, st.b - hh);
+      return [x, y, z];
     },
     // the bars + the card: over the stage, under the HUD (like the mod)
     drawOver(ctx, P) {
@@ -9957,6 +10028,7 @@ G.screens.mainMenu = {
     { name: 'options', go: () => G.setScreen(G.screens.options ? 'options' : 'mainMenu', { from: 'mainMenu' }) },
     { name: 'credits', go: () => G.setScreen(G.screens.credits ? 'credits' : 'mainMenu', {}) },
     { name: 'rankmode', go: () => G.setScreen(G.screens.freeplay ? 'freeplay' : 'mainMenu', { rankMode: true }) },
+    { name: 'promode', go: () => G.setScreen(G.screens.freeplay ? 'freeplay' : 'mainMenu', { proMode: true }), need: 'preload/images/mainmenu/promode.png' },
   ],
   sel: 0,
   enter() {
@@ -9975,14 +10047,15 @@ G.screens.mainMenu = {
     // the menu doesn't scroll to the picked item (it all fits), it leans a little when you tilt the phone
     this.touch = !!G.touchMode;
     this.optBtn = null; this.optFade = 1;
-    let list = this.ITEMS;
+    let list = this.ITEMS.filter(it => !it.need || G.A.has(it.need));     // (PRO MODE's word comes with the phone update / packs)
     if (this.touch && G.TouchButton && G.A.has('preload/images/mainmenu/optionsButton.png')) {
       list = list.filter(it => it.name !== 'options');
       const go = this.ITEMS.find(it => it.name === 'options').go;
       this.optBtn = new G.TouchButton('preload/images/mainmenu/optionsButton', 35, G.H - 210, 0.7, () => { this.state = 'leaving'; go(); }, { prefix: 'options', rest: 1, holdFrame: 3, confirmFrom: 4, confirmTo: 17 });
     }
     if (this.touch) { this.bg.scroll.x = 0.17; this.magenta.scroll.x = 0.17; }
-    const n = list.length, spacing = 160, top = (G.H - spacing * (n - 1)) / 2;
+    // (phones: the camera doesn't scroll, so a longer list moves closer together to fit)
+    const n = list.length, spacing = this.touch ? Math.min(160, (G.H - 140) / Math.max(1, n - 1)) : 160, top = (G.H - spacing * (n - 1)) / 2;
     this.items = list.map((it, i) => {
       const s = new G.Sprite(0, 0).loadSparrow('preload/images/mainmenu/' + it.name);
       s.addAnim('idle', it.name + ' idle', 24, true); s.addAnim('selected', it.name + ' selected', 24, true);
@@ -11287,6 +11360,7 @@ G.screens.storyMenu = {
       this.tw = new Tw();
       this.tp = null; this.flickV = 0; this.selF = 0; this.diffDrag = 0; this.dragOff = 0;
       this.rankMode = !!p.rankMode; this.editor = null;   // RANK MODE: the same menu, fake ranks + scores (58-rankmode.js)
+      this.proMode = !!p.proMode && !this.rankMode;        // PRO MODE: the same menu, songs played the pro way, own scores
       // the new players (Darnell, Nene, Tankman: 59-charselect.js) get the songs they really sang in (played swapped,
       // in their real voice), shown in BF's freeplay style
       const sp = G.settings.player;
@@ -11465,7 +11539,7 @@ G.screens.storyMenu = {
     // a song's saved result (in RANK MODE: the fake one, kept apart from the real ones)
     recFor(s, d) {
       const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '') + (this.realP ? '-as-' + this.player : '');
-      return this.rankMode && G.RankMode ? G.RankMode.get(key, this.diff) : G.getScore(key, this.diff, 'bf');
+      return this.rankMode && G.RankMode ? G.RankMode.get(key, this.diff) : G.getScore((this.proMode ? 'pro:' : '') + key, this.diff, 'bf');
     },
     // ------------------------------------------------------------ selection
     changeSelection(change, silent) {
@@ -11573,7 +11647,7 @@ G.screens.storyMenu = {
           onComplete: () => {
             if (this.went) return; this.went = true;
             G.audio.music.stop(0);
-            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, swap: this.pending.swap, week: null, deaths: 0 }, { instant: true });
+            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, swap: this.pending.swap, week: null, deaths: 0 , pro: this.proMode}, { instant: true });
           },
         });
       });
@@ -11614,7 +11688,7 @@ G.screens.storyMenu = {
         this.tw.after(delay, () => this.toCharSelect());
         return;
       }
-      const go = () => { G.settings.player = this.player === 'pico' ? 'bf' : 'pico'; G.saveSettings && G.saveSettings(); this.enter({ rankMode: this.rankMode }); };
+      const go = () => { G.settings.player = this.player === 'pico' ? 'bf' : 'pico'; G.saveSettings && G.saveSettings(); this.enter({ rankMode: this.rankMode, proMode: this.proMode }); };
       if (this.dj.play('charSelect')) this.tw.after(0.45, go); else go();
     },
     // FreeplayState.transitionToCharSelect / enterFromCharSel: everything slides up (backIn) while the
@@ -11628,7 +11702,7 @@ G.screens.storyMenu = {
       this.tw.to(C, { fade: 0 }, 0.8, E.quadIn);
       for (const d of this.dots) this.tw.to(d, { alpha: 0 }, 0.3, E.quartOut);
       G.audio.music.setVolume(0, 0.9);
-      this.tw.after(0.9, () => { G.audio.music.stop(0); G.setScreen('charSelect', { from: 'freeplay', character: this.player, rankMode: this.rankMode }, { instant: true }); });
+      this.tw.after(0.9, () => { G.audio.music.stop(0); G.setScreen('charSelect', { from: 'freeplay', character: this.player, rankMode: this.rankMode, proMode: this.proMode }, { instant: true }); });
     },
     enterFromCharSel() {
       const C = this.cs;
@@ -12044,13 +12118,13 @@ G.screens.storyMenu = {
       at('top');
       ctx.fillStyle = '#000'; ctx.fillRect(0, this.overhangY, W, 164);
       if (this.textsVis) {
-        const fpImg = textImg(this.rankMode ? 'RANK MODE' : 'FREEPLAY', G.FONT.vcr, 48, '#FFFFFF', this.stroke ? { stroke: 2 } : null);
+        const fpImg = textImg(this.rankMode ? 'RANK MODE' : this.proMode ? 'PRO MODE' : 'FREEPLAY', G.FONT.vcr, 48, '#FFFFFF', this.stroke ? { stroke: 2 } : null);
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, fpImg._tw + 16, fpImg.height + 16 - fpImg._pad * 2);
         ctx.drawImage(fpImg, 8 - fpImg._pad, 8 - fpImg._pad);
         const ost = textImg(this.group().label, G.FONT.vcr, 48, '#FFFFFF', { stroke: 2 });
         ctx.drawImage(ost, W - 8 - ost._tw - ost._pad, 8 - ost._pad);
       }
-      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
+      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : this.proMode ? (G.touchMode ? 'Tap your arrows like crazy, you can\'t miss' : 'Mash your note keys, you can\'t miss') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
       if (!this.searchEl) ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
       G.screenOff.y = oy; G.setScreenT(ctx);
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }
@@ -12473,7 +12547,7 @@ G.screens.storyMenu = {
         else if (p.mode === 'rank') G.setScreen('freeplay', { rankMode: true, fromResults: true, rank: this.rank, oldRank: p.prevRank || null, songId: p.song, diff: p.diff, variation: p.variation, playRankAnim: true }, inst);
         else {
           const better = !p.cheated && G.Rank.better(this.rank, p.prevRank);
-          G.setScreen('freeplay', { fromResults: true, rank: this.rank, oldRank: p.prevRank || null, songId: p.song, diff: p.diff, variation: p.variation, playRankAnim: better }, inst);
+          G.setScreen('freeplay', { fromResults: true, proMode: !!p.pro, rank: this.rank, oldRank: p.prevRank || null, songId: p.song, diff: p.diff, variation: p.variation, playRankAnim: better }, inst);
         }
       };
       if (G.stickers) G.stickers.cover(this.player, go); else go();
@@ -13511,7 +13585,7 @@ G.stickers = {
       p = p || {};
       this.tw = new G.Tw();
       this.from = p.from || 'freeplay';
-      this.rankMode = !!p.rankMode;
+      this.rankMode = !!p.rankMode; this.proMode = !!p.proMode;
       this.remembered = p.character || G.settings.player || 'bf';
       if (!G.PLAYERS[this.remembered]) this.remembered = 'bf';
       // the grid: which player sits where
@@ -13657,7 +13731,7 @@ G.stickers = {
           if (this.went) return; this.went = true;
           G.audio.music.stop(0);
           if (!back && pick && pick !== 'locked') { G.settings.player = pick; G.saveSettings(); }
-          G.setScreen('freeplay', { fromCharSelect: true, rankMode: this.rankMode, character: G.settings.player }, { instant: true });
+          G.setScreen('freeplay', { fromCharSelect: true, rankMode: this.rankMode, proMode: this.proMode, character: G.settings.player }, { instant: true });
         },
       });
     },
@@ -13950,13 +14024,14 @@ window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document
 // code needs). Missing on this phone: a little box on the title screen with the same two buttons as the first time.
 G.phoneUpdate = {
   ZIP: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/fnf2-phone-update.zip',
-  NEED: ['mobile'],
-  missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && this.NEED.some(id => !G.Packs.has(id)); },
+  NEED: { mobile: 2 },   // (pack -> the version the code needs: v2 = + the PRO MODE menu word)
+  old(id) { return !G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]; },
+  missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },
   show() {
     if (this.box || this.closed || !this.missing()) return;
     const d = this.box = document.createElement('div');
     d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
-    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: the real FNF mobile buttons (small download)';
+    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: PRO MODE + the real FNF mobile buttons (small download)';
     const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
     const get = btn('1  GET IT', '#9CF', 'a'); get.href = this.ZIP; get.target = '_blank'; get.rel = 'noopener';
@@ -13967,7 +14042,7 @@ G.phoneUpdate = {
       const files = [...(inp.files || [])]; if (!files.length) return;
       msg.textContent = 'Taking it out of the zip...';
       const got = await G.Packs.save(files);
-      if (got.some(m => this.NEED.includes(m.id))) { msg.textContent = 'Done! Starting again...'; setTimeout(() => location.reload(), 600); }
+      if (got.some(m => m.id in this.NEED)) { msg.textContent = 'Done! Starting again...'; setTimeout(() => location.reload(), 600); }
       else msg.textContent = 'That is not the phone update zip. Tap GET IT, then PICK IT.';
     };
     const x = btn('LATER', '#888', 'span'); x.onclick = () => { this.closed = true; this.hide(); };
@@ -14235,7 +14310,7 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
   }
   if (q.bot) G.settings.botplay = q.bot === '1';
   if (q.down) G.settings.downscroll = q.down === '1';
-  if (q.dev === 'song' && G.screens.play) return G.start('play', { mode: q.story === '1' ? 'story' : 'freeplay', songs: [q.id || 'tutorial'], diff: q.diff || 'normal', variation: q.variation || (G.DIFF_INFO[q.diff] || {}).variation || 'default', swap: q.swap === '1', week: null, noCutscene: q.cs === '0' });
+  if (q.dev === 'song' && G.screens.play) return G.start('play', { mode: q.story === '1' ? 'story' : 'freeplay', songs: [q.id || 'tutorial'], diff: q.diff || 'normal', variation: q.variation || (G.DIFF_INFO[q.diff] || {}).variation || 'default', swap: q.swap === '1', week: null, noCutscene: q.cs === '0', pro: q.pro === '1' });
   if (!G.HAS_FNF || G.dataMissing) { G.start('noAssets', {}); return; }
   G.start(G.screens.title ? 'title' : 'devStage', {});
 });
