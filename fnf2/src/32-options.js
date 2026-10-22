@@ -93,6 +93,7 @@
       this.swipe = new G.Swipe();
       this.buildMain();
     },
+    MOD_GAP: 96,
     MAIN_ALL: [['PREFERENCES', 'buildPrefs'], ['CONTROLS', 'buildControls'], ['INPUT OFFSETS', 'buildOffsets'], ['MODS', 'buildMods'], ['SAVE DATA', 'buildSave'], ['EXIT', 'exit']],
     // (FNF mobile: no CONTROLS without a keyboard, and the back button in the corner instead of EXIT)
     get MAIN() { return G.touchMode ? this.MAIN_ALL.filter(m => m[1] !== 'buildControls' && m[1] !== 'exit') : this.MAIN_ALL; },
@@ -104,7 +105,7 @@
     buildSave() { this.page = 'save'; this.sel = 0; this.saveMsg = null; },
     // ---------- mods: every pack (ON / OFF), + load packs on phones (kept in the browser)
     buildMods() {
-      this.page = 'mods'; this.sel = 0; this.modMsg = null; this.modsChanged = this.modsChanged || false;
+      this.page = 'mods'; this.sel = 0; this.modMsg = null; this.modScroll = null; this.modsChanged = this.modsChanged || false;
       this.mods = Object.values(G.Packs.all).filter(p => !p.core).sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
     },
     modRows() { return this.mods.length + 1; },     // the packs, then LOAD PACKS
@@ -222,8 +223,8 @@
         if (this.cal) { this.calTap(); return; }
         if (this.page === 'main') { for (let i = 0; i < this.items.length; i++) if (Math.abs(s.y - this.items[i].y - 35) < 48) { if (i === this.sel) this.onAction('accept', true); else { this.sel = i; G.sfx('scroll'); } return; } }
         else if (this.page === 'mods') {
-          const n = this.modRows(), top = 100, gap = Math.min(100, (G.H - 130 - top) / Math.max(1, n));
-          const i = Math.floor((s.y - top + 10) / gap); if (i >= 0 && i < n) { if (i === this.sel) this.modAction(i); else { this.sel = i; G.sfx('scroll'); } }
+          const n = this.modRows(), top = 100, gap = this.MOD_GAP;
+          const i = s.y < top - 10 || s.y > G.H - 110 ? -1 : Math.floor((s.y - top + 10 + (this.modScroll || 0)) / gap); if (i >= 0 && i < n) { if (i === this.sel) this.modAction(i); else { this.sel = i; G.sfx('scroll'); } }
         }
         else if (this.page === 'save') { const i = s.y < 270 ? 0 : s.y < 410 ? 1 : -1; if (i >= 0) { if (i === this.sel) this.saveAction(); else { this.sel = i; G.sfx('scroll'); } } }
         else if (this.page === 'prefs') { const i = Math.round((s.y + this.camY - 35) / 120); if (i >= 0 && i < this.rows.length) { if (i === this.sel) { const r = this.rows[i]; if (r.row[1] === 'bool') this.onAction('accept', true); else this.nudge(r.row, s.x > G.W / 2 ? 1 : -1); } else { this.sel = i; G.sfx('scroll'); } } }
@@ -296,18 +297,23 @@
         G.vcr(ctx, 'LEFT/RIGHT pick slot - ENTER rebind - ESC back', G.W / 2, G.H - 40, { size: 22, align: 'center' });
       } else if (this.page === 'mods') {
         G.setScreenT(ctx);
-        const n = this.modRows(), top = 100, gap = Math.min(100, (G.H - 130 - top) / Math.max(1, n));
+        // (a list that scrolls with the selection: every pack keeps a full-size row however many there are)
+        const n = this.modRows(), top = 100, gap = this.MOD_GAP, viewH = G.H - 110 - top;
+        const want = G.clamp(this.sel * gap - viewH / 2 + gap / 2, 0, Math.max(0, n * gap - viewH));
+        this.modScroll = this.modScroll == null ? want : G.lerp(this.modScroll, want, 1 - Math.pow(0.0005, G.dt || 0.016));
         const t = new G.Alphabet('MODS', true, 0, 12); t.scale = 0.75; t.x = (G.W - t.width * 0.75) / 2; t.draw(ctx, null);
+        G.setScreenT(ctx); ctx.save(); ctx.beginPath(); ctx.rect(0, top - 6, G.W, viewH + 6); ctx.clip();
         if (!this.mods.length) G.vcr(ctx, 'No mod packs yet. Put the packs folder next to the game, or LOAD PACKS below.', G.W / 2, top + 10, { size: 24, align: 'center', maxWidth: G.W - 60 });
         this.mods.forEach((p, i) => {
-          const y = top + i * gap, on = G.Packs.isOn(p.id), sel = i === this.sel;
+          const y = top + i * gap - this.modScroll, on = G.Packs.isOn(p.id), sel = i === this.sel;
+          if (y < top - gap || y > G.H) return;
           const a = new G.Alphabet(p.name || p.id, true, 60, y); a.scale = Math.min(0.62, 760 / Math.max(1, a.width)); a.alpha = sel ? 1 : 0.6; a.draw(ctx, null);
           G.setScreenT(ctx);
-          G.vcr(ctx, on ? 'ON' : 'OFF', G.W - 60, y + 6, { size: 40, align: 'right', color: on ? '#7CFF7C' : '#FF7070', alpha: sel ? 1 : 0.7, outline: 3 });
+          G.vcr(ctx, on ? 'ON' : 'OFF', G.W - (G.touchMode ? 240 : 60), y + 6, { size: 40, align: 'right', color: on ? '#7CFF7C' : '#FF7070', alpha: sel ? 1 : 0.7, outline: 3 });
           G.vcr(ctx, (p.credit ? p.credit + '   ' : '') + (p.bodyMB ? (p.headMB + p.bodyMB).toFixed(0) + ' MB' : '') + (p.missingBody ? '   (half saved: LOAD PACKS its .body.js file too)' : p.src === 'saved' ? '   (saved in this browser)' : ''), 60, y + 58, { size: 18, alpha: sel ? 0.95 : 0.55, outline: 2, maxWidth: G.W - 260 });
         });
-        const ly = top + this.mods.length * gap + 10, la = new G.Alphabet('LOAD PACKS', true, 0, ly); la.scale = 0.7; la.x = (G.W - la.width * 0.7) / 2; la.alpha = this.sel === this.mods.length ? 1 : 0.6; la.draw(ctx, null);
-        G.setScreenT(ctx);
+        const ly = top + this.mods.length * gap + 10 - this.modScroll, la = new G.Alphabet('LOAD PACKS', true, 0, ly); la.scale = 0.7; la.x = (G.W - la.width * 0.7) / 2; la.alpha = this.sel === this.mods.length ? 1 : 0.6; la.draw(ctx, null);
+        G.setScreenT(ctx); ctx.restore(); G.setScreenT(ctx);
         ctx.globalAlpha = 0.6; ctx.fillStyle = '#000'; ctx.fillRect(0, G.H - 110, G.W, 110); ctx.globalAlpha = 1;
         const info = this.sel < this.mods.length ? 'ENTER: switch this mod ON / OFF (OFF = its songs are not in the game).' : 'Phones: pick the pack files (.head.js + .body.js). They stay saved in this browser.';
         G.vcr(ctx, info, G.W / 2, G.H - 94, { size: 22, align: 'center', outline: 0, maxWidth: G.W - 40 });
