@@ -139,7 +139,7 @@ window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document
 // code needs). Missing on this phone: a little box on the title screen with the same two buttons as the first time.
 G.phoneUpdate = {
   ZIP: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/fnf2-phone-update.zip',
-  NEED: { mobile: 2, videosongs: 2, jordus: 3 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
+  NEED: { mobile: 2, videosongs: 2, jordus: 4 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
             // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player, v3 = her own animations)
   old(id) { return !G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]; },
   missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },

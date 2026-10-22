@@ -354,7 +354,7 @@ PACK_INFO = {
     'darnell': {'name': "Darnell's Mixtape", 'credit': 'Vegie15 + team'},
     'whitty': {'name': 'VS Whitty', 'credit': 'Sock.clip, Nateanimate, KadeDev + team (original), jarekboho (V-Slice port), SiIvaGunner (HQ songs), ChuckySkullHead + team (Whitty ERECT)'},
     'nenemix': {'name': 'NENE MIXES', 'credit': 'd4rkwinged, PurSnake, Redar13, KerSive, juztexd, geka, Voideeeee, Mio OwO'},
-    'jordus': {'name': "Nightly Funkin' (Jordus)", 'credit': "the Nightly Funkin' team (song, characters, stage); rebuilt from a gameplay video", 'v': 3},
+    'jordus': {'name': "Nightly Funkin' (Jordus)", 'credit': "the Nightly Funkin' team (song, characters, stage); rebuilt from a gameplay video", 'v': 4},
     'videosongs': {'name': 'Video Songs', 'credit': 'kip.zig (the Minecraft animation + song of Into Our Lives)', 'v': 2},
     'tankman': {'name': 'Playable Tankman', 'credit': 'Adamatik, PugSquad, Kawai Nuka-Cola, Skellix, JakeOfficial, Pumkin, Shroomii, Camiiix3 + team'},
     'mobile': {'name': 'FNF mobile pictures', 'credit': "The Funkin' Crew (FNF mobile)", 'core': True, 'v': 2},
