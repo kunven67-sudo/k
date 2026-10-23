@@ -91,12 +91,39 @@ G.srcImg = (function () {
       if (f.startsWith('mul:')) {   // FlxSprite.color: the picture multiplied by a colour (mods tint characters this way)
         x.drawImage(img, 0, 0); x.globalCompositeOperation = 'multiply'; x.fillStyle = f.slice(4); x.fillRect(0, 0, c.width, c.height);
         x.globalCompositeOperation = 'destination-in'; x.drawImage(img, 0, 0);
+      } else if (f.startsWith('adj:')) {   // 'adj:brightness,hue,contrast,saturation' (G.adjustPixels)
+        x.drawImage(img, 0, 0);
+        const d = x.getImageData(0, 0, c.width, c.height);
+        G.adjustPixels(d.data, ...f.slice(4).split(',').map(Number));
+        x.putImageData(d, 0, 0);
       } else { x.filter = f; x.drawImage(img, 0, 0); }
       m.set(f, c);
     }
     return c;
   };
 })();
+// The mods' "adjust color" shader (V-Slice AdjustColorShader / Nightmare Vision's DropShadowShader + ColorMatrixShader
+// setAdjustColor), the same maths on straight (not premultiplied) colours: brightness / 255 added, hue turned, contrast
+// around 0.25, saturation mixed with grey. Fills a whole ImageData once (pictures are baked, never per frame).
+G.adjustPixels = function (a, b, h, c, s) {
+  const br = (b || 0) / 255, ang = (h || 0) * Math.PI / 180, co = Math.cos(ang), si = Math.sin(ang);
+  // (hue: m1 + cos * m2 + sin * m3, rows)
+  const m = [0.213 + co * 0.787 - si * 0.213, 0.715 - co * 0.715 - si * 0.715, 0.072 - co * 0.072 + si * 0.928,
+             0.213 - co * 0.213 + si * 0.143, 0.715 + co * 0.285 + si * 0.140, 0.072 - co * 0.072 - si * 0.283,
+             0.213 - co * 0.213 - si * 0.787, 0.715 - co * 0.715 + si * 0.715, 0.072 + co * 0.928 + si * 0.072];
+  let cv = 1 + (c || 0) / 100;
+  if (cv > 1) cv = (0.00852259 * Math.exp(4.76454 * (cv - 1)) * 1.01 - 0.0086078159) * 10 + 1;
+  let sv = s || 0; if (sv > 0) sv *= 3; sv = 1 + sv / 100;
+  const cl = v => v < 0 ? 0 : v > 1 ? 1 : v;
+  for (let i = 0; i < a.length; i += 4) {
+    if (!a[i + 3]) continue;
+    const r0 = a[i] / 255 + br, g0 = a[i + 1] / 255 + br, b0 = a[i + 2] / 255 + br;
+    let r = m[0] * r0 + m[1] * g0 + m[2] * b0, g = m[3] * r0 + m[4] * g0 + m[5] * b0, bl = m[6] * r0 + m[7] * g0 + m[8] * b0;
+    r = cl((r - 0.25) * cv + 0.25); g = cl((g - 0.25) * cv + 0.25); bl = cl((bl - 0.25) * cv + 0.25);
+    const gr = r * 0.3098039215686275 + g * 0.607843137254902 + bl * 0.0823529411764706;
+    a[i] = cl(gr + (r - gr) * sv) * 255; a[i + 1] = cl(gr + (g - gr) * sv) * 255; a[i + 2] = cl(gr + (bl - gr) * sv) * 255;   // (the array rounds)
+  }
+};
 // every picture a sprite can draw (its sheet / atlas pictures, every animation's, a plain image)
 G.texturesOf = function (sp, out) {
   out = out || new Set();

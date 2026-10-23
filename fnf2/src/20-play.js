@@ -271,7 +271,7 @@
       this.hud = new G.HudCam();
       this.camZoom = this.stageZoom; this.bopMul = 1; this.hudZoom = 1;
       this.zoomRate = 4; this.bopIntensity = 1.015; this.hudBopIntensity = 0.03;
-      this.camTween = null; this.zoomTween = null;
+      this.camTween = null; this.zoomTween = null; this.bopDecay = 1;
       this.startCam();
     },
     // where the camera is when the song starts: on the opponent, or where the stage says (Psych stages: on you / a spot)
@@ -498,7 +498,7 @@
         if (p >= 1) this.camTween = null;
       }
       if (this.zoomTween) { const t = this.zoomTween; t.t += dt; const p = Math.min(1, t.t / t.dur); this.camZoom = t.z0 + (t.z1 - t.z0) * t.ease(p); if (p >= 1) this.zoomTween = null; }
-      const decay = Math.pow(0.05, dt);
+      const decay = Math.pow(0.05, dt * (this.bopDecay || 1));      // (bopDecay: Psych's camZoomingDecay, 1 = normal)
       this.bopMul = 1 + (this.bopMul - 1) * decay;
       this.hudZoom = 1 + (this.hudZoom - 1) * decay;
       this.cam.zoom = this.camZoom * this.bopMul;

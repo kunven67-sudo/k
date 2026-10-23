@@ -78,10 +78,15 @@ def color(v, d='#A1A1A1'):
 
 
 def webm(src, dst, height=720):
-    """A cutscene video as WebM (VP9 + Opus) at most 720 px high: plays in every browser, the mod's mp4s are H.264."""
+    """A cutscene video as WebM (VP9 + Opus) at most 720 px high: plays in every browser, the mod's mp4s are H.264.
+    Above 60 fps it's brought down to 60 (Sussus Toogus' video is 120 fps: twice the decoding for nothing on a phone)."""
     if os.path.exists(dst) and os.path.getmtime(dst) >= os.path.getmtime(src): return
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', src, '-vf', "scale=-2:'min(%d,ih)'" % height, '-c:v', 'libvpx-vp9', '-b:v', '0',
+    r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=r_frame_rate', '-of', 'csv=p=0', src],
+                       capture_output=True, text=True).stdout.strip() or '30/1'
+    n, _, d = r.partition('/'); fps = float(n) / float(d or 1)
+    vf = "scale=-2:'min(%d,ih)'" % height + (',fps=60' if fps > 60.5 else '')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', src, '-vf', vf, '-c:v', 'libvpx-vp9', '-b:v', '0',
                     '-crf', '33', '-row-mt', '1', '-deadline', 'good', '-cpu-used', '2', '-c:a', 'libopus', '-b:a', '128k', dst], check=True)
 
 
@@ -289,8 +294,16 @@ def easier(notes, bpm_changes, level):
 # adds (in front), as FNF 2 props. Psych/Flixel rules: setGraphicSize / scale.set without updateHitbox scale the
 # picture around its middle, the x,y stay where the unscaled picture's corner was; zIndex sorts (default 0, ties keep
 # the order they were added in).
-def prop(name, img, x, y, scroll=(1, 1), scale=1.0, hitbox=False, alpha=1.0, z=0, anims=None, start=None, blend=None, flip=False, extra=None):
-    return dict(name=name, img=img, x=x, y=y, scroll=scroll, scale=scale, hitbox=hitbox, alpha=alpha, z=z, anims=anims, start=start, blend=blend, flip=flip, extra=extra or {})
+def prop(name, img, x, y, scroll=(1, 1), scale=1.0, hitbox=False, alpha=1.0, z=0, anims=None, start=None, blend=None, flip=False, extra=None, gsize=None, indices=None):
+    """gsize = setGraphicSize(Std.int(width * gsize)): the scale that makes, from the picture's real width.
+    indices = {anim: [frame numbers]} (addByIndices)."""
+    return dict(name=name, img=img, x=x, y=y, scroll=scroll, scale=scale, hitbox=hitbox, alpha=alpha, z=z, anims=anims, start=start, blend=blend, flip=flip, extra=extra or {}, gsize=gsize, indices=indices or {})
+
+# layer numbers (zIndex) the FNF 2 way: the mod's zIndex x 1000 + where it was added: the stage script's onLoad
+# sprites first (0..499), then GF / the opponent / you (500 / 510 / 520), then onCreatePost's (600..). Ties keep the
+# order they were added in, like the mod's stable sort.
+def zkey(z, slot):
+    return z * 1000 + slot
 
 STAGES = {
     'polus': dict(
@@ -310,6 +323,51 @@ STAGES = {
         ],
         files=['stages/polus/snow_particles'],
     ),
+    # ---- MIRA HQ, the cafeteria (data/stages/toogus.hx): the walkers + the sax guy are Sussus Toogus' own (song files);
+    #      the black cover for Lights Down's dark parts (loBlack, zIndex 12) is drawn by src/47-impostor.js
+    'toogus': dict(
+        zoom=0.9, bf=(970, 50), gf=(400, 80), dad=(29, 29), cams=((500, 475), (900, 475)), charz={'bf': 20, 'dad': 20, 'gf': 15},
+        back=[
+            prop('bg', 'stages/mira/cafeteria/mirabg', -207, 37, gsize=1.06),
+            prop('fg', 'stages/mira/cafeteria/mirafg', -1649, 49, gsize=1.06),
+            prop('bfvent', 'stages/mira/cafeteria/bf_mira_vent', 70, 200, alpha=0, anims=[('vent', 'bf vent', 24, False)]),
+            prop('table', 'stages/mira/cafeteria/table_bg', -1659, 42, gsize=1.06, z=10),
+            prop('ldspeaker', 'stages/mira/cafeteria/stereo_taken', 400, 385, alpha=0, z=11, anims=[('boom', 'stereo boom', 24, False)]),
+        ],
+    ),
+    # ---- MIRA HQ, the reactor room (data/stages/reactor.hx)
+    'reactor': dict(
+        zoom=0.7, bf=(1950, 750), gf=(1400, 775), dad=(1100, 750), cams=((1725, 1100), (1725, 1100)),
+        back=[
+            prop('wall', 'stages/mira/reactor/wallbgthing', 290, 0, scale=2, hitbox=True),
+            prop('floor', 'stages/mira/reactor/floornew', 0, 762),
+            prop('pillarsY', 'stages/mira/reactor/yellowglita', 875, 890, anims=[('bop', 'Pillars with crewmates instance 1', 24, False)], start='bop'),
+            prop('backbars', 'stages/mira/reactor/backbars', 408, 579),
+            prop('pillarsB', 'stages/mira/reactor/browngeoff', 450, 995, anims=[('bop', 'Pillars with crewmates instance 1', 24, False)], start='bop'),
+            prop('frontpillars', 'stages/mira/reactor/frontpillars', 58, 546),
+            # (no flashing lights: only frames 25-29 of the glow)
+            prop('coreGlow', 'stages/mira/reactor/coreGlow', 1150, 60, scroll=(0.95, 0.95), scale=2.7, hitbox=True,
+                 anims=[('bop', 'reactor core', 24, False), ('bopSafe', 'reactor core', 24, False)], indices={'bopSafe': list(range(25, 30))}, start='bop'),
+            prop('coreRing', 'stages/mira/reactor/coreRing', 1295, 212, scroll=(0.95, 0.95), scale=1.35, hitbox=True, blend='add',
+                 anims=[('ring', 'reactor core ring', 24, True)], start='ring'),
+            prop('coreClaw', 'stages/mira/reactor/coreClaw', 1222, 395, scroll=(0.98, 1.3)),
+        ],
+        front=[
+            prop('lightoverlay', 'stages/mira/reactor/frontblack', 0, 0, scale=4, hitbox=True),
+            prop('mainoverlay', 'stages/mira/reactor/yeahman', 750, 100, blend='add', anims=[('bop', 'Reactor Overlay Top instance 1', 24, True)], start='bop'),
+        ],
+    ),
+    # ---- Ejected (data/stages/ejected.hx): falling past MIRA HQ. The sky + the big cloud bank are props; the
+    #      buildings, the clouds rushing past and the speed lines move every frame (src/47-impostor.js)
+    'ejected': dict(
+        zoom=0.45, bf=(1008.6, 504), gf=(114.4, 78.45), dad=(-1225.75, 440), cams=None, gfScroll=(0.7, 0.7),
+        back=[
+            prop('sky', 'stages/mira/ejected/sky', -2372.25 + 1000, -4181.7 + 656 * 5, scroll=(0, 0), scale=5, hitbox=True),
+            prop('fgCloud', 'stages/mira/ejected/fgClouds', -2660.4, -402, scroll=(0.2, 0.2), scale=2, hitbox=True),
+        ],
+        files=['stages/mira/ejected/buildingA', 'stages/mira/ejected/buildingB', 'stages/mira/ejected/scrollingClouds', 'stages/mira/ejected/speedLines'],
+        extra={'falling': True},
+    ),
 }
 
 
@@ -328,14 +386,15 @@ def stage(pack, sid):
             fw, fh = Image.open(M('images', img + '.png')).size
         else: fw = fh = 0
         s = pr['scale']; x, y = pr['x'], pr['y']
+        if pr['gsize'] and fw: s = int(fw * pr['gsize']) / fw
         if s != 1 and not pr['hitbox']:      # scaled around its middle, the corner didn't move
             x -= fw * (s - 1) / 2; y -= fh * (s - 1) / 2
         q = {'name': pr['name'], 'assetPath': '%s/%s' % (NS, img), 'position': [round(x, 2), round(y, 2)], 'scale': [s, s],
              'scroll': list(pr['scroll']), 'alpha': pr['alpha'],
-             # behind the characters: 0..; the characters: 500/510/520 (gf, dad, bf); in front: 1000 + the zIndex
-             'zIndex': (pr['z'] * 1000 + 1000 + order) if front else (pr['z'] * 1000 + order)}
+             'zIndex': zkey(pr['z'], 600 + order if front else order)}
         if pr['anims']:
-            q['animations'] = [{'name': a[0], 'prefix': a[1], 'frameRate': a[2], 'looped': a[3]} for a in pr['anims']]
+            q['animations'] = [dict({'name': a[0], 'prefix': a[1], 'frameRate': a[2], 'looped': a[3]},
+                                    **({'frameIndices': pr['indices'][a[0]]} if a[0] in pr['indices'] else {})) for a in pr['anims']]
             if pr['start']: q['startingAnimation'] = pr['start']
             if kind == 'atlas': q['animType'] = 'animateatlas'
         if pr['blend']: q['blend'] = pr['blend']
@@ -345,12 +404,16 @@ def stage(pack, sid):
     for pr in S['back']: add(pr, False)
     for pr in S.get('front', []): add(pr, True)
     for img in S.get('files', []): copy_image(pack, img)
-    (dx, dy), (bx, by) = S['cams']
-    chars = {'gf': {'zIndex': 500, 'position': list(S['gf']), 'raw': list(S['gf']), 'scroll': [0.95, 0.95]},
-             'dad': {'zIndex': 510, 'position': list(S['dad']), 'raw': list(S['dad']), 'camera': [dx, dy]},
-             'bf': {'zIndex': 520, 'position': list(S['bf']), 'raw': list(S['bf']), 'camera': [bx, by]}}
+    cz = S.get('charz', {})
+    chars = {'gf': {'zIndex': zkey(cz.get('gf', 0), 500), 'position': list(S['gf']), 'raw': list(S['gf']), 'scroll': list(S.get('gfScroll', (0.95, 0.95)))},
+             'dad': {'zIndex': zkey(cz.get('dad', 0), 510), 'position': list(S['dad']), 'raw': list(S['dad'])},
+             'bf': {'zIndex': zkey(cz.get('bf', 0), 520), 'position': list(S['bf']), 'raw': list(S['bf'])}}
+    if S.get('cams'):          # (camSpecialThing: the camera's fixed spots; without them it follows the characters)
+        (dx, dy), (bx, by) = S['cams']; chars['dad']['camera'] = [dx, dy]; chars['bf']['camera'] = [bx, by]
+    imp = {'stage': sid}
+    imp.update(S.get('extra', {}))
     pack.dump({'version': '1.0.0', 'name': 'VS Impostor: ' + sid, 'cameraZoom': S['zoom'], 'directory': 'shared', 'props': props,
-               'characters': chars, 'impostor': {'stage': sid}}, 'preload', 'data', 'stages', P + sid + '.json')
+               'characters': chars, 'impostor': imp}, 'preload', 'data', 'stages', P + sid + '.json')
     return P + sid
 
 
@@ -407,6 +470,17 @@ WEEKS = {
                    'sussus-moogus': dict(stage='polus', videos=['week1/sussus-moogus'], talk='dialogue.txt', ratings=(2, 3, 5)),
                    'sabotage': dict(stage='polus', videos=['week1/sabotage'], talk='dialogue.txt', ratings=(2, 4, 6)),
                    'meltdown': dict(stage='polus', videos=['week1/meltdown', 'week1/meltdownEnd', 'week1/post-week1'], talk='dialogue.txt', ratings=(3, 5, 7)),
+               }),
+    'w2': dict(pack='impostor-w2', level='imp-week2', week='week2', title='MIRA MANIA', color=None, portrait='green',
+               songs={
+                   # (the walkers + the sax guy: songs/sussus-toogus/script.hx; the sax guy's 8154 x 5444 sheet is
+                   #  packed at 75 %: drawn bigger to match, it stays sharp at the game's size)
+                   'sussus-toogus': dict(stage='toogus', videos=['week2/sussus-toogus'], talk='dialogue.txt', ratings=(2, 4, 6),
+                                         files=['stages/mira/cafeteria/walkers'], small={'stages/mira/cafeteria/cyan_toogus': 0.75}),
+                   # (Lights out swaps in the dark versions: green-dark + BF's own 'dark' variant)
+                   'lights-down': dict(stage='toogus', talk='dialogue.txt', chars=['green-dark', 'bf-dark'], ratings=(3, 5, 7)),
+                   'reactor': dict(stage='reactor', ratings=(3, 5, 7)),
+                   'ejected': dict(stage='ejected', videos=['week2/ejected'], ratings=(3, 6, 8)),
                }),
 }
 SHARED_CHARS = {'bf', 'gf'}
@@ -465,6 +539,17 @@ def song(pack, core, sid, spec, week):
         t = dialogue(pack, sid, spec['talk'])
         if t: data['talk'] = t
     data['videos'] = [v for v in (video(pack, v) for v in spec.get('videos', [])) if v]
+    # the 'task' credits box (scripts/tasksong.hx): info.txt's first line + the next two
+    if os.path.exists(ip):
+        lines = [l.strip() for l in open(ip, encoding='utf-8-sig').read().splitlines() if l.strip()]
+        if lines: data['task'] = [lines[0], '\n'.join(lines[1:3])]
+    for img in spec.get('files', []): copy_image(pack, img)
+    for img, k in spec.get('small', {}).items():
+        from repack_sparrow import repack
+        base = pack.path('shared', 'images', NS, img)
+        if not os.path.exists(base + '.png') or os.path.getmtime(base + '.png') < os.path.getmtime(M('images', img + '.png')):
+            repack(M('images', img + '.png'), M('images', img + '.xml'), base, scale=k); pack.n += 1
+        data.setdefault('small', {})[img] = k
     pack.dump(data, 'preload', 'data', NS, 'songs', sid + '.json')
     cnt = {k: sum(1 for q in v if q['d'] < 4) for k, v in notes.items()}
     print('  ', sid, name, [c['bpm'] for c in tc], 'bpm, your notes', cnt, 'speed', sp, ',', len(events), 'events', ', chars', player, opp, gfid, opp2)
@@ -626,8 +711,12 @@ def week(wid):
     # (+ BF and GF like every FNF week)
     props += [{'assetPath': 'storymenu/props/bf', 'scale': 1.0, 'offsets': [150, 80], 'animations': [{'name': 'idle', 'prefix': 'idle0', 'frameRate': 24}, {'name': 'confirm', 'prefix': 'confirm0', 'frameRate': 24}]},
               {'assetPath': 'storymenu/props/gf', 'scale': 1.0, 'offsets': [200, 80], 'animations': [{'name': 'danceLeft', 'prefix': 'idle0', 'frameIndices': [30, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]}, {'name': 'danceRight', 'prefix': 'idle0', 'frameIndices': [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]}]}]
+    col = W['color']
+    if not col:
+        cj = json5(M('data', 'characters', W['portrait'] + '.json'))
+        col = color(cj.get('healthbar_colour', cj.get('healthbar_colors')))
     pack.dump({'version': '1.0.0', 'name': wj.get('storyName', W['title']), 'titleAsset': 'storymenu/titles/' + W['level'], 'visible': True,
-               'props': props, 'background': W['color'], 'songs': ids, 'capsule': {'name': 'IMPOSTOR'}}, 'preload', 'data', 'levels', W['level'] + '.json')
+               'props': props, 'background': col, 'songs': ids, 'capsule': {'name': 'IMPOSTOR'}}, 'preload', 'data', 'levels', W['level'] + '.json')
     title_png(pack, W['level'], wj.get('storyName', W['title']))
     print('   ', pack.id, pack.n, 'files')
 

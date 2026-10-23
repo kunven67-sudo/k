@@ -8,8 +8,14 @@
 //                flash / Optional Captions events (scripts/utils.hx)
 //   cutscenes    the videos before the songs (Press BACK to skip, captions) + the V4 talk box (RGB box, bubble,
 //                icon, typing, the last line under it), scripts/dialogue.hx
-//   stages       Polus (snow, the lonely speaker, the Meltdown crowd)
-//   songs        Sabotage (GF shows up when Red notices), Meltdown (the ending video, the end of the week video)
+//                the 'task' credits box sliding in at the countdown (scripts/tasksong.hx), HUD Fade
+//   stages       Polus (snow, the lonely speaker, the Meltdown crowd), MIRA HQ's cafeteria (Toogus Sax camera),
+//                the reactor room (pillar crewmates, the core), Ejected (falling past MIRA HQ: buildings, clouds,
+//                speed lines, everyone drifting, the HUD bobbing)
+//   songs        Sabotage (GF shows up when Red notices), Meltdown (the ending video, the end of the week video),
+//                Sussus Toogus (crewmates walking around, the sax guy), Lights Down (the dim vignette, the lights
+//                going out, the ending), Reactor (its camera spots, the story-mode fade in + out), Ejected (the
+//                falling video over the song's start)
 // Pictures, songs, charts + videos come from the mod (tools/own/impostor.py, private build only).
 (function () {
   const IMG = 'shared/images/impostor/', SND = 'preload/sounds/impostor/', MUS = 'preload/music/impostor/', VID = 'videos/videos/impostor/';
@@ -77,7 +83,7 @@
     if (!I || !c || n.kind === 'No Animation' || n.kind === 'hey' || n.kind === 'gfsing') return;
     if (c._locked) return;                         // (stunned: no pose)
     const prev = who === 'dad' ? I.prevAnim.dad : c.animName;
-    if (I.lastHit[who] != null && Math.abs(I.lastHit[who] - n.t) < 3 && ghostsOn(c)) I.ghosts[who][n.lane].fire(prev);
+    if (I.lastHit[who] != null && Math.abs(I.lastHit[who] - n.t) < 3 && ghostsOn(c) && !I.dark) I.ghosts[who][n.lane].fire(prev);
     I.lastHit[who] = n.t; I.holdK[who] = 0;
     if (who === 'dad') I.prevAnim.dad = c.animName;
   }
@@ -115,6 +121,39 @@
     const rank = n ? RANKS.find(r => acc >= r[0] - 1e-9)[1] : 'N/A';
     return 'Score: ' + Math.round(P.score).toLocaleString('en-US') + ' | Misses: ' + P.misses + ' | Accuracy: ' + accT + ' | Rank: ' + rank;
   }
+  // a picture in one flat colour (FlxSprite.setColorTransform(0, 0, 0, 1, r, g, b))
+  const flatCache = new WeakMap();
+  function flat(img, col) {
+    if (!img) return img;
+    let m = flatCache.get(img); if (!m) flatCache.set(img, m = {});
+    let c = m[col]; if (c && c._gen === G.gfxGen) return c;
+    c = G.makeCanvas(img.width, img.height); const x = c.getContext('2d');
+    x.drawImage(img, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, c.width, c.height);
+    c._gen = G.gfxGen; m[col] = c; return c;
+  }
+  // a health icon with the lights out (lights-down.hx hudDarkShader): black inside, its edge light grey (224)
+  const darkCache = new WeakMap();
+  function darkIcon(img) {
+    if (!img || !img.width) return img;
+    let c = darkCache.get(img); if (c && c._gen === G.gfxGen) return c;
+    const W = img.width, H = img.height;
+    c = G.makeCanvas(W, H); const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, W, H), a = d.data, solid = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) solid[i] = a[i * 4 + 3] > 0.12 * 255 ? 1 : 0;     // (threshold .12)
+    const R = 3;
+    for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
+      const i = yy * W + xx; if (!a[i * 4 + 3]) continue;
+      let edge = !solid[i];
+      for (let dy = -R; dy <= R && !edge; dy++) for (let dx = -R; dx <= R; dx++) {
+        if (dx * dx + dy * dy > R * R) continue;
+        const X = xx + dx, Y = yy + dy;
+        if (X < 0 || Y < 0 || X >= W || Y >= H || !solid[Y * W + X]) { edge = true; break; }
+      }
+      const v = edge ? 224 : 0; a[i * 4] = a[i * 4 + 1] = a[i * 4 + 2] = v;
+    }
+    x.putImageData(d, 0, 0); c._gen = G.gfxGen; darkCache.set(img, c);
+    return c;
+  }
   function drawHealth(ctx, P) {
     const hp = P.hudParts.health; if (P.hideHealth || hp.alpha * hp.apple <= 0.004) return true;
     const hud = P.hud; hud.apply(ctx);
@@ -122,16 +161,20 @@
     const img = G.A.image(IMG + 'hud/healthBar.png');
     const w = img ? img.width : 601, h = img ? img.height : 19;
     const x = (G.W - w) / 2, y = (P.phoneArrows ? 0.11 : P.down ? 0.11 : 0.89) * G.H + hp.dy;
-    const p = G.clamp(P.health / 2, 0, 1);
-    // (Psych's Bar: the picture is the frame, the fill sits 3 px inside it)
+    const p = G.clamp(P.health / 2, 0, 1), dark = P.imp.dark;
+    // (Psych's Bar: the picture is the frame, the fill sits 3 px inside it; lights out: black (them) / light grey
+    // (you), the frame grey (setColorTransform 224), the icons dark)
     ctx.fillStyle = '#000'; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = (P.dad && P.dad.data.hpColor) || '#FF0000'; ctx.fillRect(x + 3, y + 3, (w - 6) * (1 - p), h - 6);
-    ctx.fillStyle = (P.bf && P.bf.data.hpColor) || '#66FF33'; ctx.fillRect(x + 3 + (w - 6) * (1 - p), y + 3, (w - 6) * p, h - 6);
-    if (img) ctx.drawImage(img, x, y);
+    ctx.fillStyle = dark ? '#000000' : (P.dad && P.dad.data.hpColor) || '#FF0000'; ctx.fillRect(x + 3, y + 3, (w - 6) * (1 - p), h - 6);
+    ctx.fillStyle = dark ? '#E0E0E0' : (P.bf && P.bf.data.hpColor) || '#66FF33'; ctx.fillRect(x + 3 + (w - 6) * (1 - p), y + 3, (w - 6) * p, h - 6);
+    if (img) ctx.drawImage(dark ? flat(img, '#E0E0E0') : img, x, y);
     // icons: Psych's spots (healthBar.x + width * (1 - percent), - 26 / - 150 + 26; y = bar - 75)
     const split = x + w * (1 - p);
+    const i1 = P.iconP1.img, i2 = P.iconP2.img;
+    if (dark) { P.iconP1.img = darkIcon(i1); P.iconP2.img = darkIcon(i2); }
     P.drawIcon(ctx, P.iconP1, split - 26, y - 75 + 75, P.health < 0.4);
     P.drawIcon(ctx, P.iconP2, split - (150 - 26), y - 75 + 75, P.health > 1.6);
+    P.iconP1.img = i1; P.iconP2.img = i2;
     const col = (P.dad && P.dad.data.hpColor && P.dad.data.hpColor !== '#000000') ? P.dad.data.hpColor : '#FFFFFF';
     // (Psych: scoreTxt at healthBar.y + 40, size 20; the letters' tops land 2 px lower)
     const bop = 1 + 0.075 * (P.imp.scoreBop || 0) / 0.2, ty = y + 37.2;
@@ -199,6 +242,44 @@
     }
   }
 
+  // ================================================================ the 'task' credits box (scripts/tasksong.hx)
+  // The song's name (bold) + who made it, on a see-through white box: slides in from the left when the countdown
+  // starts (1 s quintInOut), stays 2 s, slides back out. On top of everything (the mod's camOther).
+  const quintInOut = t => t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+  const LH = 27.6;            // (24 px Liberation Sans: one line of an FlxText; its box is 4 px taller)
+  function taskStart(P) {
+    const I = P.imp, d = I.data.task; if (!d) return;
+    if (!measure) measure = G.makeCanvas(4, 4).getContext('2d');
+    measure.font = '24px liberbold'; let size = measure.measureText(d[0]).width + 4;
+    measure.font = '24px liber'; for (const l of d[1].split('\n')) size = Math.max(size, measure.measureText(l).width + 4);
+    I.task = { t: 0, size };
+  }
+  function drawTask(ctx, P) {
+    const I = P.imp, T = I.task, d = I.data.task; if (!T || !d || I.taskHidden) return;
+    const size = T.size, out = -(size + 15);
+    let x;
+    if (T.t < 1) x = out + (12 - out) * quintInOut(T.t);
+    else if (T.t < 3) x = 12;
+    else if (T.t < 4) x = 12 + (out - 50) * quintInOut(T.t - 3);
+    else return;
+    G.setScreenT(ctx);
+    const lines = d[1].split('\n'), h = (LH + 4) + (LH * lines.length + 4) + 15;
+    ctx.save(); ctx.globalAlpha = 0.3; ctx.fillStyle = '#fff'; ctx.fillRect(x - 12, 188, size + 24, h); ctx.restore();
+    G.text(ctx, d[0], x + 2, 202, { size: 24, font: 'liberbold', align: 'left', baseline: 'top', outline: 1.25 });
+    lines.forEach((l, i) => G.text(ctx, l, x + 2, 232 + i * LH, { size: 24, font: 'liber', align: 'left', baseline: 'top', outline: 1.25 }));
+  }
+
+  // ================================================================ the game camera's own alpha + fades
+  // (camGame.alpha = 0 hides the world; camGame.fade(colour, seconds, in))
+  function camFade(P, col, dur, fadeIn) { P.imp.fade = { col, dur: Math.max(0.0001, dur), t: 0, fadeIn: !!fadeIn }; }
+  function drawCamCover(ctx, P) {
+    const I = P.imp, F = I.fade;
+    let a = 1 - I.camA, col = '#000';
+    if (F) { const k = Math.min(1, F.t / F.dur); const fa = F.fadeIn ? 1 - k : k; if (fa > a) { a = fa; col = F.col; } }
+    if (a <= 0.002) return;
+    G.setScreenT(ctx); ctx.save(); ctx.globalAlpha = Math.min(1, a); ctx.fillStyle = col; ctx.fillRect(-G.CUT, 0, G.W + G.CUT * 2, G.H); ctx.restore();
+  }
+
   // ================================================================ camera spots + zoom (utils.hx camSpecialThing)
   function setCams(P, dad, bf, zoom) {
     if (dad) P.dad.camFocus = { x: dad[0], y: dad[1] };
@@ -218,6 +299,12 @@
     P.cam.follow(spot.camFocus.x + dx, spot.camFocus.y + dy);
   }
   function applyZoom(P) { const z = P.imp.baseZoom + (P.imp.zoomAdd || 0); P.camZoom = z; P.stageZoom = z; }
+  // defaultCamZoom = z the way Psych gets there: the camera eases (zoom = lerp(default, zoom, e^(-3.125 x decay x t)))
+  function easeZoom(P, z) {
+    const I = P.imp; I.baseZoom = z; P.stageZoom = z + (I.zoomAdd || 0);
+    const r = 3.125 * (P.bopDecay || 1), dur = 4.6 / r, end = 1 - Math.exp(-r * dur);
+    P.zoomTween = { t: 0, dur, z0: P.camZoom, z1: P.stageZoom, ease: k => (1 - Math.exp(-r * dur * k)) / end };
+  }
 
   // the red flash on every Reactor Beep (camOther: over everything; photosensitive = softer, under the HUD)
   function beep(P) {
@@ -230,7 +317,7 @@
   const BASE = {
     setup(P) {
       const I = P.imp = { data: songData(P.song.id) || {}, tw: [], pops: [], lastHit: {}, prevAnim: {}, holdK: {}, ghosts: {},
-        accSum: 0, accN: 0, beepFx: { a: 0 }, caption: null, baseZoom: P.stage.zoom, zoomAdd: 0 };
+        accSum: 0, accN: 0, beepFx: { a: 0 }, caption: null, baseZoom: P.stage.zoom, zoomAdd: 0, camA: 1, fade: null };
       // Psych's zoom bop adds +0.015 to the zoom; FNF 2 multiplies: the same size at this stage's zoom
       P.bopIntensity = 1 + 0.015 / Math.max(0.1, P.stage.zoom); P.hudBopIntensity = 0.03;
       // (the shared pack: game over + pause music, the talk sounds: ready before they're needed)
@@ -248,6 +335,7 @@
       const I = P.imp; if (!I) return;
       I.tw.length = 0; I.pops.length = 0; I.lastHit = {}; I.prevAnim = {}; I.holdK = {}; I.accSum = 0; I.accN = 0; I.beepFx.a = 0; I.caption = null;
       I.scoreBop = 0; I.timeA = 0; I.timeT = -1; I.camWho = null;
+      I.task = null; I.taskHidden = false; I.dark = false; I.camA = 1; I.fade = null;
       I.camZooming = false; P.zoomRate = 0;          // (Psych: the bops start once the opponent sings)
       I.zoomAdd = 0; I.baseZoom = P.stage.zoom; applyZoom(P);
       for (const who of ['bf', 'dad']) for (const g of I.ghosts[who]) { g.spr.alpha = 0; g.tw.length = 0; g.owner = P[who]; }
@@ -274,6 +362,10 @@
       // the time bar shows once the song starts (0.5 s circOut)
       if (I.timeT < 0 && P.started && P.songPos >= 0) I.timeT = 0;
       if (I.timeT >= 0 && I.timeT < 0.5) { I.timeT += dt; const k = Math.min(1, I.timeT / 0.5); I.timeA = Math.sqrt(1 - (k - 1) * (k - 1)); }
+      // the task box: countdown tick 0 (the 'three')
+      if (!I.task && P.started && P.songPos >= -4 * P.cond.crochet) taskStart(P);
+      if (I.task) I.task.t += dt;
+      if (I.fade) I.fade.t += dt;
       leanCam(P);
     },
     oppHit(P, n) {
@@ -289,6 +381,13 @@
       switch (name) {
         case 'FocusCamera': { const ch = v != null && typeof v === 'object' ? v.char : v; I.camWho = ch == null ? 0 : ch; break; }
         case 'Reactor Beep': beep(P); break;
+        case 'HUD Fade': {         // (camHUD alpha to value1 over value2 seconds; empty = 1 s)
+          let a = parseFloat(v1); if (isNaN(a)) a = 1;
+          let d = parseFloat(v2); if (isNaN(d)) d = 1;
+          I.tw = I.tw.filter(w => w.obj !== P.hudParts);
+          if (d > 0) tween(I.tw, P.hudParts, { all: a }, d); else P.hudParts.all = a;
+          break;
+        }
         case 'Set Cams': {
           const c = v1.split(',').map(Number), z = parseFloat(v2);
           setCams(P, [c[0], c[1]], [c[2], c[3]], isNaN(z) ? -1 : z); break;
@@ -310,12 +409,14 @@
       }
     },
     drawHealth, drawTime, popups,
+    drawOver(ctx, P) { drawCamCover(ctx, P); },
     drawTop(ctx, P) {
       const I = P.imp;
       G.setScreenT(ctx);
       for (const s of I.pops) s.draw(ctx, P.hud);
       G.setScreenT(ctx);
       if (I.beepFx.a > 0.002) { ctx.save(); ctx.globalAlpha = I.beepFx.a; ctx.fillStyle = '#b30000'; ctx.fillRect(-G.CUT, 0, G.W + G.CUT * 2, G.H); ctx.restore(); }
+      drawTask(ctx, P);
       if (I.caption) caption(ctx, I.caption.text, I.caption.y);
     },
     gameOver: { sfx: SND + 'fnf_loss_sfx.ogg', music: MUS + 'gameOver.ogg', end: MUS + 'gameOverEnd.ogg', centerArt: true },
@@ -357,7 +458,7 @@
       S.sheet = sheet;
       S.spk = prop(P, 'speaker'); S.dead = prop(P, 'bfdead'); S.crowd = prop(P, 'crowd');
       // snow in front of everybody (zIndex 13 in the script)
-      S.layer = { zIndex: 1013, update() {}, draw: (ctx, cam) => drawSnow(ctx, cam, S) };
+      S.layer = { zIndex: 13 * 1000 + 600, update() {}, draw: (ctx, cam) => drawSnow(ctx, cam, S) };
       P.stage.addExtra(S.layer, null);
     },
     reset(P) {
@@ -436,6 +537,484 @@
     drawTop(ctx, P) { const v = P.melt; if (v) drawVideo(ctx, v, null); },
     leave(P) { if (P.melt) P.melt.stop(); P.melt = null; },
   };
+
+  // ================================================================ WEEK 2: MIRA HQ
+  const MIRA = 'shared:impostor/stages/mira/';
+  // ---- the cafeteria (data/stages/toogus.hx): the black cover for the lights going out (loBlack: zIndex 12, over the
+  //      room + the table, under everybody), the Toogus Sax camera (it drifts right while the sax guy walks past)
+  STAGES.toogus = {
+    setup(P) {
+      const S = P.toogus = { black: 0, sax: null };
+      // (FlxBGSprite: covers the whole view wherever the camera is)
+      P.stage.addExtra({ zIndex: 12 * 1000 + 5, update() {}, draw: (ctx) => {
+        if (S.black <= 0.002) return;
+        G.setScreenT(ctx); ctx.save(); ctx.globalAlpha *= S.black; ctx.fillStyle = '#000'; ctx.fillRect(-G.CUT, 0, G.W + G.CUT * 2, G.H); ctx.restore();
+      } }, null);
+    },
+    reset(P) { const S = P.toogus; S.black = 0; S.sax = null; for (const n of ['bfvent', 'ldspeaker']) { const pr = prop(P, n); if (pr) pr.alpha = 0; } },
+    update(P, dt) {
+      const S = P.toogus, X = S.sax;
+      if (X) {
+        X.t += dt; const k = Math.min(1, X.t / 11);
+        P.camForced = { x: X.x0 + (600 - X.x0) * k, y: X.y0 - 5 * k }; P.cam.follow(P.camForced.x, P.camForced.y);
+        P.imp.baseZoom = X.z0 + (0.82 - X.z0) * E.sineInOut(k); applyZoom(P);
+      }
+    },
+    event(P, name, v) {
+      const S = P.toogus;
+      if (name === 'Toogus Sax') {
+        // (camFollow.x = 400 at once, then tweens to 600 + 5 px up and the zoom to .82 over 11 s)
+        S.sax = { t: 0, x0: 400, y0: P.cam.ty, z0: P.imp.baseZoom }; P.camTween = null;
+      } else if (name === 'Legacy' && String(v.value1) === 'Toogus Sax Out') {
+        S.sax = null; P.camForced = null; easeZoom(P, 0.9);
+      }
+    },
+  };
+
+  // ---- the crewmates walking around (funkin.objects.stageobjects.AmongWalker; the mod's own class, V4's
+  //      WalkingCrewmate remade): each picks a colour none of the others is wearing, comes in from an edge, wanders
+  //      (walks, stops, turns round), walks off at the edges and comes back later as somebody else. They walk
+  //      walkSpeed x 9 px a second; the song's script sends them in, away, back.
+  const WALKER_COLORS = [['yellow', 1], ['blue', 1], ['brown', 1], ['lime', 1], ['white', 1], ['tan', 1], ['foe', 0.06]];
+  class Walker {
+    constructor(range, y, scale, friends) {
+      this.range = range; this.friends = friends;
+      const s = this.spr = new G.Sprite(0, y).loadAtlas(G.A.imagePath(MIRA + 'cafeteria/walkers'));
+      s.scale.x = s.scale.y = scale;
+      for (const [c] of WALKER_COLORS) { s.addAnim(c + ' walk', c + ' walk', 24, true); s.addAnim(c + ' idle', c + ' idle', 24, false); }
+      this.zIndex = 0; this.walkSpeed = 30; this.idle = false; this.right = true; this.hibernating = true; this.alive = true;
+      this.actionTimer = rnd(0.5, 1); this.onAction = []; this.onEnter = []; this.onAway = []; this.color = null;
+      s.visible = false;
+    }
+    get x() { return this.spr.x; } set x(v) { this.spr.x = v; }
+    findFreeColor() {
+      const used = new Set(this.friends.filter(w => w !== this && w.alive && !w.hibernating && w.color).map(w => w.color));   // (nobody twice on screen)
+      const free = WALKER_COLORS.filter(c => !used.has(c[0]));
+      const pool = free.length ? free : WALKER_COLORS;
+      let r = Math.random() * pool.reduce((a, c) => a + c[1], 0);
+      for (const c of pool) { r -= c[1]; if (r <= 0) return c[0]; }
+      return pool[0][0];
+    }
+    swapSkin() { this.color = this.findFreeColor(); this.spr.play(this.color + (this.idle ? ' idle' : ' walk'), true); }
+    fire(list) { const fs = list.splice(0); for (const f of fs) f(); }
+    triggerNextAction() {
+      this.actionTimer = rnd(0.5, 1);                             // (setNewActionTime; a listener can change it)
+      if (this.hibernating) {
+        this.hibernating = false; this.spr.visible = true; this.idle = false;
+        this.right = this.x < (this.range[0] + this.range[1]) / 2;   // (from the edge, inwards)
+        if (!this.color) this.swapSkin();
+        this.fire(this.onEnter);
+      } else {
+        if (Math.random() < 0.2) this.right = Math.random() < 0.5;
+        if (!this.idle && Math.random() < 0.6) this.idle = true; else if (this.idle && Math.random() < 0.5) this.idle = false;
+      }
+      this.walkSpeed = rnd(18, 40);                                // (the song's own onAction listener)
+      this.fire(this.onAction);
+    }
+    update(dt) {
+      if (!this.alive) return;
+      this.actionTimer -= dt;
+      if (this.actionTimer <= 0) this.triggerNextAction();
+      const s = this.spr; s.update(dt);
+      if (this.hibernating || !this.color) return;
+      const walk = this.color + ' walk', idle = this.color + ' idle';
+      if (!this.idle) {
+        if (s.animName !== walk) s.play(walk, true);
+        this.x += (this.right ? 1 : -1) * this.walkSpeed * 9 * dt;
+        s.flipX = !this.right;
+        if (this.x > this.range[1] || this.x < this.range[0]) {      // (walked off: gone until the next action)
+          this.hibernating = true; s.visible = false; this.idle = false;
+          this.x = this.x > this.range[1] ? this.range[1] - 50 : this.range[0] + 50;
+          this.color = null; this.actionTimer = rnd(5, 10);
+          this.fire(this.onAway);
+          if (this.alive) this.swapSkin();          // (V4: somebody new comes back)
+        }
+      } else if (s.animName !== idle && (s.animName !== walk || s.fi % 10 === 9)) { s.play(idle, true); s.flipX = !this.right; }   // (feet together)
+    }
+    beat() { if (this.alive && !this.hibernating && this.idle && this.spr.animName.endsWith(' idle')) this.spr.play(this.color + ' idle', true); }
+    draw(ctx, cam) { if (this.alive) this.spr.draw(ctx, cam); }
+    kill() { this.alive = false; this.spr.visible = false; }
+    revive() { this.alive = true; this.spr.visible = !this.hibernating; }
+  }
+
+  // ---- Sussus Toogus (songs/sussus-toogus/script.hx): six walkers, sent in at the start + 'Crewmates Come In', away
+  //      at 'Crewmates Walk Away' (the sax), back at 'Crewmates Return'; the sax guy dances past, left to right
+  SONGS['sussus-toogus'] = {
+    setup(P) {
+      const W = P.walk = { list: [], timers: [] };
+      for (let i = 0; i < 6; i++) {
+        const w = new Walker([-700, 1700], 500 + i * 20, 0.7 + i * 0.02, W.list);
+        w.zIndex = (i + 2) * 1000 + 6 + i;          // (zIndex i + 2, added after the stage's own sprites)
+        W.list.push(w); P.stage.addExtra(w, null);
+      }
+      // the sax guy: 'Cyan Dancy', scroll 1.2, scale 1.1 (his sheet is packed at 75 %: drawn that much bigger)
+      const k = ((songData('sussus-toogus') || {}).small || {})['stages/mira/cafeteria/cyan_toogus'] || 1;
+      const sx = W.sax = new G.Sprite(0, 0).loadSparrow(G.A.imagePath(MIRA + 'cafeteria/cyan_toogus'));
+      sx.addAnim('bop', 'Cyan Dancy', 24, true); sx.play('bop');
+      sx.scale.x = sx.scale.y = 1.1 / k; sx.scroll = { x: 1.2, y: 1.2 }; sx.zIndex = 600; sx.alpha = 0.001; sx.k = k;
+      P.stage.addExtra(sx, null);
+    },
+    reset(P) {
+      const W = P.walk;
+      for (const w of W.list) {
+        w.alive = true; w.hibernating = true; w.idle = false; w.spr.visible = false; w.color = null; w.onAction.length = w.onEnter.length = w.onAway.length = 0;
+        w.x = Math.random() < 0.5 ? w.range[0] + 50 : w.range[1] - 50; w.actionTimer = 999;
+      }
+      W.timers.length = 0; W.sax.alpha = 0.001;
+      comeIn(P);
+    },
+    update(P, dt) {
+      const W = P.walk;
+      for (let i = 0; i < W.timers.length; i++) { const t = W.timers[i]; t.t -= dt; if (t.t <= 0) { W.timers.splice(i--, 1); t.f(); } }
+      for (const w of W.list) w.update(dt);
+      if (W.sax.alpha >= 1) { W.sax.update(dt); W.sax.x += dt * 15.5 * 9; }
+    },
+    beat(P, b) { for (const w of P.walk.list) w.beat(b); },
+    event(P, name, v) {
+      const W = P.walk;
+      if (name === 'Toogus Sax') {
+        // (setPosition(-550, 275) on a sprite whose picture is smaller than his real one: the same top left corner
+        //  as the full size sheet, scaled around its middle like scale.set)
+        const s = W.sax, fw = s.frameW / s.k, fh = s.frameH / s.k;
+        s.alpha = 1; s.play('bop', true);
+        s.x = -550 + fw / 2 - s.frameW / 2; s.y = 275 + fh / 2 - s.frameH / 2;
+      }
+      if (name !== 'Legacy') return;
+      const k = String(v.value1);
+      if (k === 'Crewmates Come In') comeIn(P);
+      else if (k === 'Crewmates Walk Away') walkAway(P);
+      else if (k === 'Crewmates Return') for (const w of W.list) { w.actionTimer = rnd(0.5, 1); w.revive(); }
+    },
+  };
+  const later = (P, t, f) => P.walk.timers.push({ t, f });
+  function comeIn(P) {
+    for (const w of P.walk.list) later(P, rnd(0.5, 2), () => {
+      w.actionTimer = rnd(0.5, 1);
+      const funny = () => {
+        const to = -700 + rnd(0.2, 0.8) * 2400;
+        w.idle = false; w.right = w.x < to; w.actionTimer = Math.abs((w.x - to) / w.walkSpeed / 9);
+        w.onAction.push(() => { w.idle = true; w.right = w.x < to; w.actionTimer = rnd(5, 10); });
+      };
+      if (w.hibernating) w.onEnter.push(funny); else funny();
+    });
+  }
+  function walkAway(P) {
+    for (const w of P.walk.list) later(P, rnd(0.5, 2), () => {
+      w.actionTimer = 999;
+      if (!w.hibernating) { w.idle = false; w.right = w.x >= -700 + rnd(0.4, 0.6) * 2400; w.onAway.push(() => w.kill()); }
+      else w.kill();
+    });
+  }
+
+  // ---- Lights Down (songs/lights-down/script.hx): a dim purple vignette on the room + everybody (ColorMatrixShader
+  //      setAdjustColor(-80, -20, -50, 20), springing in), the lights going out (BF + Green swap to their dark
+  //      drawings, the room goes black, GF leaves, the HUD goes dark), the ending (Green's live reaction, BF dives into
+  //      the vent, the speaker gets taken)
+  const DIM = 'adj:-80,-20,-50,20';
+  const elasticOut = t => t >= 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t - 0.1) * 2 * Math.PI / 0.4) + 1;   // (FlxEase.elasticOut)
+  SONGS['lights-down'] = {
+    setup(P) {
+      const L = P.ld = { vig: false, dimK: 0, tw: null };
+      // the dark ones, made now (no hitch when the lights go out); the originals stay cached for the way back
+      const cache = (slot, id) => { const k = slot + ':' + id; if (!P.swapCache[k]) { const c = new G.Character(id, slot); P.swapCache[k] = c; P.swapChars.push(c); } };
+      cache('dad', 'imp-green-dark');
+      const dk = P.bf && P.bf.data.impostor && P.bf.data.impostor.flags && P.bf.data.impostor.flags.variants && P.bf.data.impostor.flags.variants.dark;
+      L.bfDark = dk ? 'imp-' + dk : null; if (L.bfDark) cache('bf', L.bfDark);
+      L.orig = { bf: P.bf, dad: P.dad };
+      P.swapCache['bf:' + P.bf.id] = P.bf; P.swapCache['dad:' + P.dad.id] = P.dad;
+    },
+    // (the dim copies of the room + the characters' pictures, baked before the song)
+    prepare(P, tex) {
+      const list = ['bg', 'fg', 'table'].map(n => prop(P, n)).concat([P.ld.orig.bf, P.ld.orig.dad, P.gf]).filter(Boolean);
+      G.imgFilter = DIM;
+      try { for (const sp of list) for (const im of G.texturesOf(sp)) { const c = G.srcImg(im); if (c && c !== im) tex.add(c); } } finally { G.imgFilter = null; }
+    },
+    reset(P) {
+      const L = P.ld; L.vig = false; L.dimK = 0; L.tw = null;
+      if (P.gf) { P.gf.alpha = 1; P.gf.visible = true; }
+      if (P.bf) P.bf.visible = true;
+    },
+    update(P, dt) {
+      const L = P.ld, T = L.tw;
+      if (T) {
+        T.t += dt; const k = Math.min(1, T.t / 0.5);
+        const n = T.from + (1 - T.from) * (flashOn() ? elasticOut(k) : E.sineOut(k));
+        L.dimK = T.on ? n : 1 - n;
+        if (k >= 1) L.tw = null;
+      }
+    },
+    event(P, name, v) {
+      const L = P.ld, I = P.imp, v1 = String(v.value1 == null ? '' : v.value1);
+      const vignette = on => { L.vig = on; L.tw = { t: 0, on, from: flashOn() ? 0.5 : 0 }; };
+      if (name === 'Legacy') {
+        if (v1 === 'Vignette On') vignette(true);
+        else if (v1 === 'Vignette Off') vignette(false);
+        else if (v1 === 'ending') {
+          vignette(false);
+          lights(P, false);
+          P.bf.visible = false; if (P.gf) P.gf.visible = false;
+          BASE.event(P, 'HUD Fade', { value1: '0', value2: '' });
+          if (P.dad) { P.dad.playAnim('liveReaction', true); P.dad.holdTimer = 0; }
+          const vent = prop(P, 'bfvent'), spk = prop(P, 'ldspeaker');
+          if (vent) { vent.alpha = 1; vent.play('vent', true); }
+          if (spk && P.gf && P.gf.data.impostor && P.gf.data.impostor.flags && P.gf.data.impostor.flags.lightsDownSpeaker) { spk.alpha = 1; spk.play('boom', true); }
+        } else if (v1 === 'bye') I.camA = 0;
+      } else if (name === 'Lights out') {
+        if (v1 === '2' || (v1 === '1' && !flashOn())) return;
+        lights(P, true);
+      } else if (name === 'Lights on') {
+        if (v1 === '1' && !flashOn()) return;
+        lights(P, false);
+      }
+    },
+    // the world with the dim on: each dimmed sprite drawn again from its dim copy over itself (k = how far the dim is)
+    drawWorld(ctx, P, normal) {
+      const k = G.clamp(P.ld.dimK, 0, 1);
+      if (k <= 0.001) { normal(P.cam); return; }
+      const dim = new Set(['bg', 'fg', 'table'].map(n => prop(P, n)));
+      if (!P.imp.dark) { dim.add(P.bf); dim.add(P.dad); if (P.gf) dim.add(P.gf); }
+      for (const sp of P.stage.ordered()) {
+        if (!dim.has(sp)) { sp.draw(ctx, P.cam); continue; }
+        if (k < 1) sp.draw(ctx, P.cam);
+        ctx.save(); ctx.globalAlpha *= k; G.imgFilter = DIM;
+        try { sp.draw(ctx, P.cam); } finally { G.imgFilter = null; ctx.restore(); }
+      }
+    },
+  };
+  // the lights (lights-down.hx 'Lights out' / 'Lights on')
+  function lights(P, out) {
+    const I = P.imp, L = P.ld;
+    if (out) {
+      I.dark = true;
+      P.cam.flash(flashOn() ? '#FFFFFF' : '#000000', 0.35);
+      if (P.gf) P.gf.alpha = 0;
+      P.toogus.black = 1;
+      G.ModChars.swap(P, 'dad', 'imp-green-dark');
+      if (L.bfDark) G.ModChars.swap(P, 'bf', L.bfDark);
+    } else {
+      I.dark = false;
+      if (P.gf) P.gf.alpha = 1;
+      P.cam.flash('#000000', 0.35);
+      P.toogus.black = 0;
+      if (P.bf !== L.orig.bf) G.ModChars.swap(P, 'bf', L.orig.bf.id);
+      if (P.dad !== L.orig.dad) G.ModChars.swap(P, 'dad', L.orig.dad.id);
+      if (L.vig) L.tw = { t: 0, on: true, from: flashOn() ? 0.5 : 0 };       // (setVignette(vignette) again)
+    }
+    // (the chord ghosts follow whoever stands there now)
+    for (const who of ['bf', 'dad']) for (const g of I.ghosts[who]) { g.owner = P[who]; g.spr.alpha = 0; g.tw.length = 0; }
+  }
+
+  // ---- the reactor room (data/stages/reactor.hx): the crewmates on the pillars bop every 2 beats (+ on the
+  //      countdown's 'three' + 'one'), the core's glow every 4 (no flashing lights: every 2, only its last frames)
+  STAGES.reactor = {
+    setup(P) { P.reactor = { pre: 0 }; },
+    reset(P) { P.reactor.pre = 0; const g = prop(P, 'coreGlow'); if (g) g.play(flashOn() ? 'bop' : 'bopSafe', true); },
+    update(P) {
+      const R = P.reactor;
+      if (!P.started || P.songPos >= 0) return;
+      const tick = Math.floor((P.songPos + P.cond.crochet * 4) / P.cond.crochet);       // (countdown tick 0..3)
+      if (tick >= 0 && tick <= 3 && tick + 1 > R.pre) { R.pre = tick + 1; if (tick % 2 === 0) for (const n of ['pillarsY', 'pillarsB']) { const pr = prop(P, n); if (pr) pr.play('bop', true); } }
+    },
+    beat(P, b) {
+      if (b % 2 !== 0) return;
+      for (const n of ['pillarsY', 'pillarsB']) { const pr = prop(P, n); if (pr) pr.play('bop', true); }
+      const g = prop(P, 'coreGlow');
+      if (g && (!flashOn() || b % 4 === 0)) g.play(flashOn() ? 'bop' : 'bopSafe', true);
+    },
+  };
+  // ---- Reactor (songs/reactor/reactor.hx): its camera spots; story mode, the first time: from black, the camera
+  //      settling down onto the room; at beat 712 (story, on to Ejected) it fades out drifting off to the right
+  SONGS.reactor = {
+    reset(P) {
+      const I = P.imp;
+      // (the mod: story mode, first time; FNF 2 plays it the first try in freeplay too, like every cutscene)
+      P.rx = { intro: !P.params.deaths && !P.params.noCutscene, go: false, pan: null };
+      setCams(P, [1725, 1100], [1725, 1100], 0.7);
+      P.cam.focus(1725, 1100);
+      if (P.rx.intro) I.camA = 0;
+    },
+    update(P, dt) {
+      const X = P.rx, I = P.imp;
+      if (X.intro && P.started && P.songPos >= 0 && !X.go) {
+        X.go = true; I.camA = 1;
+        // (onSongStart: zoom + .2, scroll y - 400, fade in from black over 2 s, the zoom back over 5 s expoOut)
+        P.cam.y -= 400; P.camZoom += 0.2;
+        P.zoomTween = { t: 0, dur: 5, z0: P.camZoom, z1: P.camZoom - 0.2, ease: t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t) };
+        camFade(P, '#000000', 2, true);
+      }
+      if (X.pan) {
+        X.pan.t += dt; const k = E.sineInOut(Math.min(1, X.pan.t / X.pan.dur));
+        P.camForced = { x: X.pan.x0 + 400 * k, y: X.pan.y0 + 100 * k }; P.cam.focus(P.camForced.x, P.camForced.y);
+        P.camZoom = X.pan.z0 + 0.2 * k;
+      }
+    },
+    beat(P, b) {
+      if (b !== 712 || !isStory(P) || P.rx.pan) return;
+      const c = P.cond.crochet;
+      camFade(P, '#000000', c * 0.024, false);
+      P.rx.pan = { t: 0, dur: c * 0.032, x0: P.cam.x, y0: P.cam.y, z0: P.camZoom };
+      P.zoomTween = null;
+    },
+    event(P, name, v) {
+      if (name !== 'Legacy') return;
+      const S = { base: [[1450, 1150], [1950, 1150], 0.8], mid: [[1725, 1100], [1725, 1100], 0.7], mid2: [[1725, 1100], [1725, 1100], 0.8], mid3: [[1725, 1200], [1725, 1200], 0.9] }[String(v.value1)];
+      if (!S) return;
+      setCams(P, S[0], S[1], -1); easeZoom(P, S[2]);
+    },
+  };
+
+  // ---- Ejected (data/stages/ejected.hx): falling past MIRA HQ. Buildings + clouds rush up past you, speed lines
+  //      stream by, everybody drifts around a little every 0.4 s, the camera shakes, the HUD bobs; a grey adjust on the
+  //      characters; the camera follows whoever sings (no fixed spots), zoomed in on BF (.6), out on Green (.45)
+  const GREY = 'adj:-7,-6,0,-30';
+  const smoothStep = t => t * t * (3 - 2 * t);           // (FlxEase.smoothStepInOut)
+  STAGES.ejected = {
+    setup(P) {
+      for (const k of ['bf', 'gf', 'dad']) P.charFilter[k] = GREY;
+      const J = P.ej = { right: [], mid: [], left: [], near: [], far: [], jit: null };
+      const img = n => G.A.imagePath(MIRA + 'ejected/' + n);
+      let order = 2;     // (after the sky + the cloud bank: the script's onLoad order)
+      const building = (name, x, y) => {
+        const b = new G.Sprite(x, y).loadImage(img(name) + '.png');
+        b.scale.x = b.scale.y = 2; b.updateHitbox(); b.scroll = { x: 0.5, y: 0.5 }; b.zIndex = order++; b.y0 = y;
+        P.stage.addExtra(b, null); return b;
+      };
+      for (let i = 0; i < 2; i++) J.right.push(building('buildingB', 1022.3, -390.45));
+      for (let i = 0; i < 2; i++) J.mid.push(building('buildingA', -76.15, 1398.5));
+      for (let i = 0; i < 2; i++) J.left.push(building('buildingB', -1099.3, 7286.55));
+      // the clouds rushing past (onCreatePost: in front of everybody; not on Low Quality / without flashing lights)
+      J.clouds = G.settings.quality !== 'low' && flashOn();
+      let front = 600;
+      if (J.clouds) {
+        const NEAR = [[-9.65, -224.35, 0.8], [-1342.85, -350.45, 0.6], [1784.65, -957.05, 1.3]];
+        const FAR = [[-1308, -1039.9], [464.3, -890.5], [2458.45, -1085.85], [-666.95, -172.05], [-1616.6, 1016.95], [1714.25, 200.45], [-167.05, 710.25]];
+        const cloud = (i, far) => {
+          const c = new G.Sprite(0, 0).loadSparrow(img('scrollingClouds'));
+          c.addAnim('idle', 'Cloud' + i, 24, false); c.play('idle'); c.zIndex = front++;
+          if (far) c.alpha = 0.5;
+          P.stage.addExtra(c, null); return c;
+        };
+        NEAR.forEach((q, i) => J.near.push(Object.assign(cloud(i, false), { start: q })));
+        FAR.forEach((q, i) => J.far.push(Object.assign(cloud(i, true), { start: q })));
+      }
+      // the speed lines (FlxBackdrop: the picture repeated across the whole view), scale 3, scroll .3, alpha .5
+      J.lines = G.A.image(img('speedLines') + '.png');
+      P.stage.addExtra({ zIndex: front++, update() {}, draw: (ctx, cam) => drawSpeedLines(ctx, cam, P) }, null);
+      // where everybody floats around (their spots; GF: scroll .7)
+      J.base = {}; for (const slot of ['bf', 'gf', 'dad']) if (P[slot]) J.base[slot] = { x: P[slot].x, y: P[slot].y };
+      // the camera spots: getCharacterCameraPos (the middle of the character, 100 px in, 100 px up, + its own offsets)
+      J.cam = {};
+      for (const slot of ['dad', 'bf']) {
+        const c = P[slot]; if (!c) continue;
+        c.dance(true); const vb = G.visBox(c) || { cx: c.x + c.width / 2, top: c.y, bottom: c.y + c.height };
+        const co = c.cameraOffsets || [0, 0], my = (vb.top + vb.bottom) / 2;
+        J.cam[slot] = slot === 'dad' ? { x: vb.cx + 100 + co[0], y: my - 100 + co[1] } : { x: vb.cx - 100 - co[0], y: my - 100 + co[1] };
+      }
+    },
+    reset(P) {
+      const J = P.ej;
+      J.speed = flashOn() ? 9 : 3.3; P.bopDecay = 0.5;
+      J.right.forEach(b => { b.y = b.y0; }); J.mid.forEach(b => { b.y = b.y0; }); J.left.forEach(b => { b.y = b.y0; });
+      J.right[0].y = 6803.1; J.mid[0].y = 8570.5; J.left[0].y = 14050.2;
+      J.nearPass = [11000, 11000, 11000, 11000]; J.farPass = [11000, 11000, 11000, 11000, 11000, 11000, 11000];
+      for (const c of J.near.concat(J.far)) { c.x = c.start[0]; c.y = c.start[1]; c.scale.x = c.scale.y = 1; const sf = c.start[2] || 1; c.scroll = { x: sf, y: sf }; }
+      for (const slot in J.base) if (P[slot]) { P[slot].x = J.base[slot].x; P[slot].y = J.base[slot].y; }
+      J.jit = null;
+      for (const slot of ['dad', 'bf']) if (P[slot] && J.cam[slot]) P[slot].camFocus = Object.assign({}, J.cam[slot]);
+      P.imp.baseZoom = 0.45; applyZoom(P);
+    },
+    update(P, dt) {
+      const J = P.ej, k = Math.min(1, dt * J.speed);
+      // buildings: the left ones ride 5888 below the middle ones, the right ones copy the left ones
+      for (let i = 0; i < 2; i++) J.left[i].y = J.mid[i].y + 5888;
+      for (let i = 0; i < 2; i++) { const b = J.mid[i]; if (b.y < -11759.9) b.y = 3190.5; b.y -= 1300 * k; }
+      for (let i = 0; i < 2; i++) J.right[i].y = J.left[i].y;
+      if (J.clouds) {
+        J.near.forEach((c, i) => {
+          c.y -= J.nearPass[i] * k;
+          if (c.y < -1789.65) { const s = rnd(1.5, 2.2), sf = rnd(1, 1.3); J.nearPass[i] = rnd(1100, 1300); c.scale.x = c.scale.y = s; c.scroll = { x: sf, y: sf }; c.x = rnd(-3578.95, 3259.6); c.y = 2196.15; }
+        });
+        J.far.forEach((c, i) => {
+          c.y -= J.farPass[i] * k;
+          if (c.y < -1614) { const s = rnd(0.2, 0.5), sf = rnd(0.2, 0.4); J.farPass[i] = rnd(1100, 1300); c.scale.x = c.scale.y = s; c.scroll = { x: sf, y: sf }; c.x = rnd(-2737.85, 3485.4); c.y = 1738.6; }
+        });
+      }
+      const fc = prop(P, 'fgCloud'); if (fc && P.audio && P.audio.length) fc.y = -702 + (-902 + 702) * G.clamp(P.songPos / P.audio.length, 0, 1);
+      // everybody drifts to a new spot every 0.4 s (BF + Green +-15, GF +-10)
+      if (!J.jit || J.jit.t >= 0.4) {
+        const to = {};
+        for (const slot in J.base) { const r = slot === 'gf' ? 10 : 15, c = P[slot]; if (c) to[slot] = { x0: c.x, y0: c.y, x1: rnd(J.base[slot].x - r, J.base[slot].x + r), y1: rnd(J.base[slot].y - r, J.base[slot].y + r) }; }
+        J.jit = { t: 0, to };
+      }
+      J.jit.t += dt; const e = smoothStep(Math.min(1, J.jit.t / 0.4));
+      for (const slot in J.jit.to) { const c = P[slot], q = J.jit.to[slot]; if (c) { c.x = q.x0 + (q.x1 - q.x0) * e; c.y = q.y0 + (q.y1 - q.y0) * e; } }
+      if (flashOn() && !P.gameOver) P.cam.shake(0.002, 0.1);
+      // the HUD bobs (camHUD scroll.y + its angle)
+      const t = P.songPos / 1000, bps = P.cond.bpm / 60;
+      P.hud.sy = -Math.sin(t * bps * -1) * 15; P.hud.angle = Math.sin((P.songPos / 1200) * bps * -1) * 1.2;
+    },
+    event(P, name, v) {
+      // (onMoveCamera: zoomed in on BF, out on Green, unless a Legacy event froze it)
+      if (name === 'FocusCamera' && P.ej.zoomOnWho !== false) { const ch = v && typeof v === 'object' ? v.char : v; easeZoom(P, ch === 0 ? 0.6 : 0.45); }
+    },
+  };
+  function drawSpeedLines(ctx, cam, P) {
+    const img = P.ej.lines; if (!img || !img.width) return;
+    const sf = 0.3, z = cam.zoom, w = img.width * 3, h = img.height * 3;
+    const ox = G.W / 2 - z * ((cam.x - G.W / 2) * sf + G.W / 2), oy = G.H / 2 - z * ((cam.y - G.H / 2) * sf + G.H / 2);
+    const x0 = (-G.CUT - ox) / z, x1 = (G.W + G.CUT - ox) / z, y0 = -oy / z, y1 = (G.H - oy) / z;
+    const py = -(P.songPos * 2 * (flashOn() ? 1.75 : 0.75));
+    cam.apply(ctx, sf, sf); ctx.save(); ctx.globalAlpha *= 0.5;
+    for (let y = Math.floor((y0 - py) / h) * h + py; y < y1; y += h) for (let x = Math.floor(x0 / w) * w; x < x1; x += w) ctx.drawImage(img, x, y, w, h);
+    ctx.restore();
+  }
+  // ---- Ejected (songs/ejected/ejected.hx): black + no HUD through the countdown, then the falling video plays over the
+  //      song's start (silent: the song plays), the game + HUD come back with a white flash when it ends; 'just in
+  //      case' (a beat after) puts everything back in case it didn't, flashes again + slides the task box in
+  SONGS.ejected = {
+    reset(P) {
+      const I = P.imp, X = P.ejv || (P.ejv = { el: null });
+      I.camA = 0; P.hudParts.all = 0; I.taskHidden = true; X.done = false;
+      if (X.el) { X.el.pause(); if (X.el.readyState >= 1) X.el.currentTime = 0; }
+    },
+    el(P) {
+      const X = P.ejv; if (X.el || X.failed) return X.el;
+      const src = G.A.raw[VID + 'week2/ejected.webm']; if (!src) return null;
+      const e = X.el = document.createElement('video'); e.src = src; e.muted = true; e.playsInline = true; e.preload = 'auto';
+      e.onerror = () => { X.failed = true; }; e.onended = () => { if (!X.done) end(P); };
+      return e;
+    },
+    update(P) {
+      const X = P.ejv; if (X.done) return;
+      const e = SONGS.ejected.el(P);
+      if (!e || e.readyState < 1) return;
+      const t = Math.max(0, P.songPos / 1000), run = P.started && !P.paused && !P.gameOver && P.songPos > 0;
+      if (run) {
+        if (e.paused) { const pr = e.play(); if (pr && pr.catch) pr.catch(() => {}); }
+        const off = e.currentTime - t;
+        if (Math.abs(off) > 0.15) e.currentTime = t; else e.playbackRate = Math.abs(off) > 0.03 ? (off < 0 ? 1.06 : 0.94) : 1;
+        if (e.duration && t >= e.duration - 0.02) end(P);
+      } else if (!e.paused) e.pause();
+    },
+    event(P, name, v) {
+      if (name !== 'Legacy' || String(v.value1) !== 'just in case') return;
+      const I = P.imp; I.taskHidden = false; taskStart(P);
+      end(P);               // (the script's 'intro != null' is always true here: a second flash)
+    },
+    drawTop(ctx, P) {
+      const X = P.ejv; if (X.done) return;
+      const e = X.el;
+      G.setScreenT(ctx);
+      if (e && e.readyState >= 2 && e.videoWidth) { const h = G.W * e.videoHeight / e.videoWidth; ctx.drawImage(e, 0, (G.H - h) / 2, G.W, h); }
+    },
+    leave(P) { const X = P.ejv; if (X && X.el) { X.el.pause(); X.el.removeAttribute('src'); X.el.load(); X.el = null; } },
+  };
+  function end(P) {
+    const I = P.imp, X = P.ejv;
+    X.done = true; I.camA = 1; P.hudParts.all = 1;
+    P.cam.flash('#FFFFFF', 0.35);
+    if (X.el && !X.el.paused) X.el.pause();
+  }
 
   // ================================================================ videos (FunkinVideoSprite: fit to the screen height)
   function playVideo(path, o) {
@@ -630,12 +1209,13 @@
 
   // ================================================================ cutscenes (story mode in the mod; FNF 2 also plays
   // them the first time in freeplay, like VS Sky)
+  const IN_SONG_VIDEO = { ejected: true };       // (plays over the song itself: SONGS.ejected)
   function cutsceneFor(sid) {
     return {
       create(P) {
         const d = songData(sid); if (!d) return null;
         const steps = [];
-        const intro = (d.videos || []).find(v => v.endsWith('/' + sid));
+        const intro = IN_SONG_VIDEO[sid] ? null : (d.videos || []).find(v => v.endsWith('/' + sid));
         if (intro) steps.push(videoStep(intro));
         if (d.talk && d.talk.length) steps.push(talkStep(sid, d.talk));
         if (!steps.length) return null;
@@ -663,7 +1243,7 @@
   // ================================================================ wire it up
   G.SongFX = G.SongFX || {}; G.Cutscenes = G.Cutscenes || {};
   G.Impostor = { STAGES, SONGS, combine, BASE };
-  const SONG_IDS = ['sussus-moogus', 'sabotage', 'meltdown'];
+  const SONG_IDS = ['sussus-moogus', 'sabotage', 'meltdown', 'sussus-toogus', 'lights-down', 'reactor', 'ejected'];
   for (const sid of SONG_IDS) {
     G.SongFX[sid] = { setup(P) { if (!isImp(P)) return; const st = (P.stage.data.impostor || {}).stage; P.sfx = combine(BASE, STAGES[st], SONGS[sid]); if (P.sfx.setup) P.sfx.setup(P); } };
     G.Cutscenes[sid] = cutsceneFor(sid);
