@@ -1,8 +1,8 @@
-"""gpic: ask Google's picture AI ("Nano Banana", Gemini image models) for pictures, keep trying until one is good,
-then hand them over for a final look.
+"""gpic: ask a picture AI for pictures, keep trying until one is good, then hand them over for a final look.
+Makers: Google's Gemini image models ("Nano Banana") or FLUX on Hugging Face (free ZeroGPU spaces).
 
   python3 tools/own/gpic.py "prompt" [--ref a.png --ref b.png] [--edit pic.png] [-n 4] [--tries 3] [--pass 7]
-                            [--out DIR] [--name NAME] [--model MODEL] [--judge-model MODEL] [--no-judge]
+                            [--out DIR] [--name NAME] [--maker gemini|hf] [--model MODEL] [--judge-model MODEL] [--no-judge]
   python3 tools/own/gpic.py --judge a.png b.jpg ... ["what it should be"]   grade pictures you already have
 
   prompt        what to make (an FNF-style picture by default: --plain leaves the prompt exactly as typed)
@@ -13,6 +13,9 @@ then hand them over for a final look.
   --pass        the judge's score (1-10) a picture needs
   --out         where the pictures go (default fnf2/private/gpic: git-ignored, never in the public repo)
   --judge       only grade the pictures given (e.g. ones made in the Gemini app), no new pictures made
+  --maker       gemini (needs billing) or hf (free with a Hugging Face token). Default: hf when a token is there.
+                hf = FLUX.1 Kontext [dev] when there are --ref/--edit pictures (redraws them: new pose, clean-up;
+                several refs get put side by side into one picture), FLUX.1 [schnell] for a prompt alone
 
 A FREE key can't make pictures: Google gives the free tier 0 picture-model calls ("limit: 0"), only text. The
 judge runs on the free text models, so --judge works on a free key; making pictures needs billing turned on for
@@ -23,7 +26,9 @@ tells: smudges, melted hands, extra fingers, garbled text, mushy outlines, gloss
 again with the judge's notes added to the prompt. At the end there's a contact sheet (all of them numbered, the
 judge's score on each) + a JSON list, so whoever runs it (Claude) takes the last look and picks.
 
-The key: GEMINI_API_KEY (or GOOGLE_API_KEY, or plain `key`) in the environment. Never written anywhere, never printed.
+The keys come from the environment, never written anywhere, never printed: GEMINI_API_KEY (or GOOGLE_API_KEY, or
+plain `key`) for Gemini; HF_TOKEN (or any variable holding an hf_... token) for Hugging Face. Hugging Face gives free
+accounts a small amount of ZeroGPU time a day; without a token the shared cloud address is usually used up already.
 """
 import os, sys, json, time, base64, argparse, re, io, urllib.request, urllib.error
 
@@ -82,6 +87,58 @@ def post(model, body, tries=6):
         except OSError as e:  # URLError, timeouts, connection resets
             if i < tries - 1: time.sleep(wait); wait = min(60, wait * 2); continue
             raise GpicError(0, 'network: %s' % e)
+
+
+HF_KONTEXT = os.environ.get('GPIC_HF_EDIT', 'black-forest-labs/FLUX.1-Kontext-Dev')
+HF_FLUX = os.environ.get('GPIC_HF_MAKE', 'black-forest-labs/FLUX.1-schnell')
+
+
+def hf_token():
+    for n in ('HF_TOKEN', 'HUGGINGFACE_TOKEN', 'HUGGING_FACE_HUB_TOKEN'):
+        if os.environ.get(n): return os.environ[n]
+    for v in os.environ.values():
+        if re.fullmatch(r'hf_[A-Za-z0-9]{20,}', v.strip()): return v.strip()
+    return None
+
+
+_hf = {}
+
+
+def make_hf(prompt, refs, out_dir):
+    """-> (png bytes or None, text). FLUX on Hugging Face ZeroGPU spaces (needs: pip install gradio_client)."""
+    try:
+        from gradio_client import Client, handle_file
+    except ImportError:
+        raise GpicError(0, 'hf maker needs gradio_client: pip install gradio_client')
+    from PIL import Image
+    space = HF_KONTEXT if refs else HF_FLUX
+    if space not in _hf:
+        try:
+            try: _hf[space] = Client(space, token=hf_token(), verbose=False)
+            except TypeError: _hf[space] = Client(space, hf_token=hf_token(), verbose=False)  # older gradio_client
+        except Exception as e: raise GpicError(0, '%s: %s' % (space, str(e)[:200]))
+    try:
+        if refs:
+            ims = [Image.open(p).convert('RGB') for p in refs]
+            if len(ims) > 1:  # Kontext takes one picture: put the refs side by side
+                H = min(1024, max(im.height for im in ims))
+                ims = [im.resize((max(1, im.width * H // im.height), H)) for im in ims]
+                one = Image.new('RGB', (sum(im.width for im in ims), H), (255, 255, 255)); x = 0
+                for im in ims: one.paste(im, (x, 0)); x += im.width
+            else: one = ims[0]
+            src = os.path.join(out_dir, '.kontext-in.png'); one.save(src)
+            r = _hf[space].predict(handle_file(src), prompt, 0, True, 2.5, 28, api_name='/infer')
+        else:
+            r = _hf[space].predict(prompt, 0, True, 1024, 1024, 4, api_name='/infer')
+    except Exception as e:
+        msg = str(e)
+        if 'quota' in msg.lower() or 'runs limit' in msg.lower():
+            raise GpicError(429, 'Hugging Face: out of free GPU time for today%s.' % ('' if hf_token() else
+                            ' (no token: add a free Hugging Face token to the environment)'))
+        return None, msg[:200]
+    path = r[0]['path'] if isinstance(r[0], dict) else r[0]
+    buf = io.BytesIO(); Image.open(path).convert('RGBA').save(buf, 'PNG')
+    return buf.getvalue(), ''
 
 
 def img_part(path):
@@ -144,6 +201,7 @@ def main():
     ap.add_argument('--judge', nargs='+', metavar='PIC')
     ap.add_argument('-n', type=int, default=4); ap.add_argument('--tries', type=int, default=3); ap.add_argument('--pass', dest='need', type=float, default=7)
     ap.add_argument('--out', default=os.path.join(ROOT, 'private', 'gpic')); ap.add_argument('--name')
+    ap.add_argument('--maker', choices=['gemini', 'hf'], default='hf' if hf_token() else 'gemini')
     ap.add_argument('--model', default=MODEL); ap.add_argument('--judge-model', default=','.join(JUDGES))
     ap.add_argument('--no-judge', action='store_true'); ap.add_argument('--plain', action='store_true')
     a = ap.parse_args()
@@ -169,7 +227,7 @@ def main():
     for i in range(a.n):
         prompt, best = base, None
         for t in range(a.tries + 1):
-            try: png, text = make(a.model, prompt, refs)
+            try: png, text = make_hf(prompt, refs, a.out) if a.maker == 'hf' else make(a.model, prompt, refs)
             except GpicError as e: sys.exit('gpic: ' + str(e))
             if png is None:
                 print('  #%d try %d: no picture (%s)' % (i + 1, t + 1, text[:160]), file=sys.stderr); continue
