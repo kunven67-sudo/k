@@ -222,11 +222,11 @@
           c.x += dx; c.y += dy; c.originalPosition = { x: c.x, y: c.y }; c.camFocus.x += dx; c.camFocus.y += dy;
         }
       }
-      // ...and the mod's own camera spots
-      for (const [slot, c] of [['bf', this.bf], ['dad', this.dad], ['gf', this.gf]]) if (c && SC[slot] && SC[slot].camera) c.camFocus = { x: SC[slot].camera[0], y: SC[slot].camera[1] };
       // ...or Psych Engine's way (sprite corner + camera on the middle: VS Whitty's port), and the characters the song's
       // Change Character events swap in, made now
       for (const [slot, c] of [['bf', this.bf], ['dad', this.dad], ['gf', this.gf]]) if (c && SC[slot] && SC[slot].raw && G.ModChars) G.ModChars.place(c, SC[slot]);
+      // ...and the mod's own camera spots (these win over both: VS Impostor's fixed camSpecialThing spots)
+      for (const [slot, c] of [['bf', this.bf], ['dad', this.dad], ['gf', this.gf]]) if (c && SC[slot] && SC[slot].camera) c.camFocus = { x: SC[slot].camera[0], y: SC[slot].camera[1] };
       this.swapChars = G.ModChars ? G.ModChars.prepare(this) : [];
       this.noteCam = this.stage.data.noteCam ? { px: this.stage.data.noteCam, t: 0, base: null, side: 1 } : null;
       // whoever stands mirrored on the other side (Tankman on the right, BF on the left) swaps their LEFT and RIGHT
@@ -893,7 +893,8 @@
       // breakfast starts somewhere in its first half and fades in over 5 seconds, like the real one
       // each player's own pause music (breakfast-pico, breakfast-darnell...)
       const pid = this.bf ? G.playerOf(this.bf.id) : 'bf', own = 'shared/music/breakfast-' + pid + '/breakfast-' + pid + '.ogg';
-      const path = pid !== 'bf' && G.A.has(own) ? own : 'shared/music/breakfast/breakfast.ogg';
+      const modPM = this.sfx && this.sfx.pauseMusic && G.A.has(this.sfx.pauseMusic) ? this.sfx.pauseMusic : null;   // (a mod's own: VS Impostor)
+      const path = modPM || (pid !== 'bf' && G.A.has(own) ? own : 'shared/music/breakfast/breakfast.ogg');
       G.audio.music.play(path, { loop: true, vol: 0.75, fadeIn: 5, bpm: 160, restart: true, randomStart: 0.5 });
     },
     // (re)build the list: new texts start up in the corner, invisible, then fly to their spots
@@ -1231,7 +1232,8 @@
       if (this.botplay) G.vcr(ctx, 'BOTPLAY', G.W / 2, by, { align: 'center', size: 32 });
       if (this.practice) G.vcr(ctx, 'PRACTICE MODE', G.W / 2, by + (this.phoneArrows ? 40 : this.down ? -40 : 40), { align: 'center', size: 22, alpha: 0.8 });
       // time bar (Psych)
-      if (G.settings.timeBar !== 'off' && this.hudParts.time.alpha > 0.004) {
+      if (this.sfx && this.sfx.drawTime && this.sfx.drawTime(ctx, this)) { /* a mod's own time bar (VS Impostor) */ }
+      else if (G.settings.timeBar !== 'off' && this.hudParts.time.alpha > 0.004) {
         // always at the top: in downscroll the arrows own the bottom of the screen
         const ty = (this.phoneArrows ? 170 : 19) + this.hudParts.time.dy, tw = 400, tx = G.W / 2 - tw / 2;
         ctx.save(); ctx.globalAlpha *= this.hudParts.time.alpha;     // (phones: the health bar + icons own the top)

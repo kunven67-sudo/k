@@ -17,6 +17,7 @@ for id in ${*:-garcello tabi sky nene darnell whitty}; do
     nene) run nene nene ;;
     darnell) run darnell darnell_mix ;;
     whitty) run whitty whitty ;;
+    impostor) echo "== impostor"; rm -rf build/mods/impostor build/mods/impostor-w*; python3 tools/own/impostor.py && python3 tools/pack_assets.py --packs impostor impostor-w1 ;;
     *) echo "no such pack: $id"; exit 1 ;;
   esac
 done

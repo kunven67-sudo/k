@@ -357,6 +357,8 @@ PACK_INFO = {
     'jordus': {'name': "Nightly Funkin' (Jordus)", 'credit': "the Nightly Funkin' team (song, characters, stage); rebuilt from a gameplay video", 'v': 4},
     'videosongs': {'name': 'Video Songs', 'credit': 'kip.zig (the Minecraft animation + song of Into Our Lives)', 'v': 2},
     'tankman': {'name': 'Playable Tankman', 'credit': 'Adamatik, PugSquad, Kawai Nuka-Cola, Skellix, JakeOfficial, Pumkin, Shroomii, Camiiix3 + team'},
+    'impostor': {'name': 'VS Impostor: Legacy (shared)', 'credit': 'MOTORFROG, Clowfoe + the VS Impostor team (VS IMPOSTOR: LEGACY)', 'group': 'impostor'},
+    'impostor-w1': {'name': 'VS Impostor: Legacy - Week 1', 'credit': 'MOTORFROG, Clowfoe + the VS Impostor team (VS IMPOSTOR: LEGACY)', 'group': 'impostor'},
     'mobile': {'name': 'FNF mobile pictures', 'credit': "The Funkin' Crew (FNF mobile)", 'core': True, 'v': 2},
     'tricky': {'name': 'VS Tricky', 'credit': 'Banbuds, Rozebud, KadeDev, Cval, YingYang48, JADS, Moro + team (original), thisaintcub, PurSnake + LeonidKosherny (V-Slice port), ChuckySkullHead (Madness Erect), angelkireina (Pico mixes)'},
 }

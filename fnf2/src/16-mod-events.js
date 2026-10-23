@@ -37,6 +37,7 @@
       c.x = spot.raw[0]; c.y = spot.raw[1];
       c.originalPosition = { x: c.x, y: c.y };
       c.rawSpot = spot;
+      if (spot.scroll) c.scroll = { x: spot.scroll[0], y: spot.scroll[1] };     // (Psych: GF at 0.95)
       this.focus(c, spot);
       if (spot.hidden) c.visible = false;
     },
