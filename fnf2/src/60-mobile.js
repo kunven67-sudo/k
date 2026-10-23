@@ -135,36 +135,47 @@ G.appMode = {
 };
 window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document.fullscreenElement && !G.appMode.installed()) G.appMode.enter(); }, true);
 
-// The phone's update: new pictures for the phone version come in a small zip next to the big one (packs that the
+// The phone's update: new pictures for the phone version come in small zips next to the big one (packs that the
 // code needs). Missing on this phone: a little box on the title screen with the same two buttons as the first time.
+// (GitHub takes files up to 100 MB, so the packs are split over a few zips: the box only asks for the ones it needs)
 G.phoneUpdate = {
-  ZIP: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/fnf2-phone-update.zip',
+  BASE: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/',
+  ZIPS: { 'fnf2-phone-update.zip': ['mobile', 'videosongs', 'jordus'], 'fnf2-phone-impostor.zip': ['impostor', 'impostor-w1'],
+    'fnf2-phone-impostor-w2.zip': ['impostor-w2'] },
   NEED: { mobile: 2, videosongs: 2, jordus: 4, impostor: 2, 'impostor-w1': 2, 'impostor-w2': 1 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
             // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player, v3 = her own animations)
-  old(id) { return !G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]; },
+  saved: {},            // (packs picked just now: the zips on GitHub always hold the newest ones)
+  old(id) { return !this.saved[id] && (!G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]); },
   missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },
-  show() {
+  zips() { return Object.keys(this.ZIPS).filter(z => this.ZIPS[z].some(id => id in this.NEED && this.old(id))); },
+  show(note) {
     if (this.box || this.closed || !this.missing()) return;
+    const zips = this.zips();
     const d = this.box = document.createElement('div');
     d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
-    const msg = document.createElement('div'); msg.textContent = 'PHONE UPDATE: JORDUS fixed (moves like real FNF now) + Into Our Lives remade + PRO MODE';
-    const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin';
+    const msg = document.createElement('div'); msg.textContent = note || 'PHONE UPDATE: VS IMPOSTOR week 2 (MIRA MANIA) + week 1 fixes';
+    const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin;flex-wrap:wrap';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
-    const get = btn('1  GET IT', '#9CF', 'a'); get.href = this.ZIP; get.target = '_blank'; get.rel = 'noopener';
-    get.onclick = () => { msg.textContent = 'Downloading... then come back and tap PICK IT'; };
+    const gets = zips.map((z, i) => {
+      const get = btn(zips.length > 1 ? '1  GET ' + (i + 1) : '1  GET IT', '#9CF', 'a'); get.href = this.BASE + z; get.target = '_blank'; get.rel = 'noopener';
+      get.onclick = () => { msg.textContent = 'Downloading... then come back and tap PICK IT' + (zips.length > 1 ? ' (you can pick all of them at once)' : ''); };
+      return get;
+    });
     const pick = btn('2  PICK IT', '#FFE45C', 'label');
-    const inp = document.createElement('input'); inp.type = 'file'; inp.style.display = 'none'; pick.appendChild(inp);
+    const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.style.display = 'none'; pick.appendChild(inp);
     inp.onchange = async () => {
       const files = [...(inp.files || [])]; if (!files.length) return;
       msg.textContent = 'Taking it out of the zip...';
       const got = await G.Packs.save(files);
-      if (got.some(m => m.id in this.NEED)) { msg.textContent = 'Done! Starting again...'; setTimeout(() => location.reload(), 600); }
-      else msg.textContent = 'That is not the phone update zip. Tap GET IT, then PICK IT.';
+      for (const m of got) if (m.part === 'head') this.saved[m.id] = true;
+      if (!this.missing()) { msg.textContent = 'Done! Starting again...'; setTimeout(() => location.reload(), 600); }
+      else if (got.some(m => m.id in this.NEED)) { this.hide(); this.show('Got it! One more: tap GET, then PICK IT'); }
+      else msg.textContent = 'That is not a phone update zip. Tap GET, then PICK IT.';
     };
     const x = btn('LATER', '#888', 'span'); x.onclick = () => { this.closed = true; this.hide(); };
     // (taps on the box don't reach the game under it)
     d.addEventListener('pointerdown', e => e.stopPropagation());
-    row.append(get, pick, x); d.append(msg, row); document.body.appendChild(d);
+    row.append(...gets, pick, x); d.append(msg, row); document.body.appendChild(d);
   },
   hide() { if (this.box) this.box.remove(); this.box = null; },
   tick() { if (G.screenName === 'title' && !G.trans.active) this.show(); else this.hide(); },

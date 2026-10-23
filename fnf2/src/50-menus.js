@@ -612,7 +612,8 @@ G.screens.storyMenu = {
     const songs = (this.level().data.songs || []).map(id => { const m = G.Songs.meta(id); return m ? m.songName : id; });
     const lines = ['TRACKS', ''].concat(songs);
     const tx = G.W / 2 - G.W * 0.33;
-    lines.forEach((s, i) => G.text(ctx, s, tx, 556 + i * 32, { font: 'vcr', size: 32, color: '#E55777', align: 'center', baseline: 'top' }));
+    const ty = Math.min(556, G.H - 10 - lines.length * 32);      // (a week of 4+ songs moves up so the last one isn't cut off)
+    lines.forEach((s, i) => G.text(ctx, s, tx, ty + i * 32, { font: 'vcr', size: 32, color: '#E55777', align: 'center', baseline: 'top' }));
     // difficulty selector
     if (this.arrowsVisible) { this.arrows.l.draw(ctx, null); this.arrows.r.draw(ctx, null); }
     if (this.curDiff) this.curDiff.draw(ctx, null);
