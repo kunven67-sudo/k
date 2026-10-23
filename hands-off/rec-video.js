@@ -24,18 +24,24 @@ function seeded(level) {
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', (e) => errs.push(e.message));
   await page.clock.install({ time: Date.now() });
+  await page.clock.pauseAt(Date.now() + 1000);      // time only moves when we step it (else rAF keeps queuing frames during slow screenshots)
+  await page.addInitScript((fps) => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 1000 / fps); }, FPS);   // one render per video frame
   await page.addInitScript((s) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('handsoff.save.v1', s); localStorage.setItem('handsoff.real.v1', '1'); sessionStorage.setItem('seeded', '1'); } }, seeded(+(process.env.LEVEL || 17)));
   await page.goto('file://' + path.join(__dirname, 'dist', 'hands-off.html'));
   await page.evaluate(async () => { try { await document.fonts.load('900 40px Unbounded'); await document.fonts.load('700 16px "JetBrains Mono"'); } catch (e) {} });
   // let the shaders + sky finish (real time passes, fake clock steps)
   for (let i = 0; i < 600; i++) { await page.clock.runFor(50); const r = await page.evaluate(() => window.__HO_DEBUG && window.__HO_DEBUG.R.ready && window.__HO_DEBUG.state === 'menu'); if (r) break; await new Promise((r) => setTimeout(r, 100)); }
-  for (let i = 0; i < 12; i++) await page.clock.runFor(100);   // sky cube done
+  await page.evaluate(() => { window.__HO_DEBUG.R.flags.noAdapt = true; });   // keep full quality (the fake clock looks slow to it)
+  for (let i = 0; i < 3; i++) await page.clock.runFor(1000 / FPS);
   let n = 0;
   const dt = 1000 / FPS;
   const frame = async () => {
+    const tA = Date.now();
     await page.clock.runFor(dt);
     const t0 = Date.now();
+    if (ONLY) console.log('runFor', t0 - tA, 'ms');
     await page.screenshot({ path: path.join(OUT, String(n).padStart(5, '0') + '.png'), timeout: 600000 });
+    if (ONLY) console.log('shot', Date.now() - t0, 'ms');
     if (n % 30 === 0) console.log('frame', n, (Date.now() - t0) + 'ms', await page.evaluate(() => window.__HO_DEBUG.state));
     n++;
   };

@@ -11,8 +11,8 @@ breaks around you. Touch the mouse, a key, the screen or a controller and everyt
   The run keeps counting while it's closed.
 - Every x1000 is a milestone (the money gets a new name), every 20 levels is a new world.
 - Settings: graphics (Low / Auto / High / Max / Insane), music + sound volume, big flashes on/off.
-  PCs start on Max, phones on Auto. Max lowers the resolution (never the effects) if frames get slow;
-  Insane never does.
+  PCs start on Max, phones on Auto. Max lowers the resolution (never the effects) if frames get slow,
+  first for the space scene, then a bit for the 3D number / metal / glass too; Insane never does.
 
 ## The real renderer (WebGL2)
 

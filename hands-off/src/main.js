@@ -859,7 +859,7 @@
     AU.update(dt, { mode: state, intensity: musicIntensity(r), slow: 1 - timeScale(), world: r ? H.worldOf(r.level) : 0 });
     if (state === 'menu' || state === 'exit') {
       menuTimer += dt;
-      if (menuTimer > 0.5) { menuTimer = 0; if (state === 'menu') refreshRunCard(); else refreshExit(); }
+      if (menuTimer > 0.5) { menuTimer = 0; if (state === 'menu') { refreshRunCard(); refreshRecords(); } else refreshExit(); }
     }
   }
 
@@ -1852,13 +1852,16 @@
       ['RESETS', String(r.resets)],
       ['TIME DOING NOTHING', H.fmtTime(r.totalTime)],
     ];
-    el.records.textContent = '';
-    for (const [k, v] of rows) {
-      const d = document.createElement('div'); d.className = 'rec';
-      const a = document.createElement('dt'); a.textContent = k;
-      const b = document.createElement('dd'); b.textContent = v;
-      d.append(a, b); el.records.appendChild(d);
+    // the run keeps counting on the menu, so this runs twice a second: only touch what changed
+    if (el.records.children.length !== rows.length) {
+      el.records.textContent = '';
+      for (const [k] of rows) {
+        const d = document.createElement('div'); d.className = 'rec';
+        const a = document.createElement('dt'); a.textContent = k;
+        d.append(a, document.createElement('dd')); el.records.appendChild(d);
+      }
     }
+    rows.forEach(([, v], i) => { const dd = el.records.children[i].lastChild; if (dd.textContent !== v) dd.textContent = v; });
   }
   function refreshMenu() {
     refreshRunCard();

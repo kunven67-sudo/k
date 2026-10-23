@@ -328,16 +328,23 @@
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
-    function sizeFinal(w, h) {
-      if (w === fw && h === fh) return;
-      fw = w; fh = h;
-      if (finalTex) { gl.deleteTexture(finalTex); gl.deleteFramebuffer(finalFbo); gl.deleteTexture(snapTex); gl.deleteFramebuffer(snapFbo); gl.deleteTexture(objTex); gl.deleteFramebuffer(objFbo); gl.deleteRenderbuffer(objDepth); }
-      // the number, the mercury, the glass and the dust are drawn at full sharpness
+    // the number, the mercury, the glass and the dust: full sharpness unless a slow card makes MAX drop resolution
+    let ow = 0, oh = 0;
+    function sizeObj(w, h) {
+      if (w === ow && h === oh) return;
+      ow = w; oh = h;
+      if (objTex) { gl.deleteTexture(objTex); gl.deleteFramebuffer(objFbo); gl.deleteRenderbuffer(objDepth); }
       objTex = tex2D(w, h, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, gl.LINEAR);
       objDepth = gl.createRenderbuffer();
       gl.bindRenderbuffer(gl.RENDERBUFFER, objDepth);
       gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, w, h);
       objFbo = fboFor(objTex, objDepth);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+    function sizeFinal(w, h) {
+      if (w === fw && h === fh) return;
+      fw = w; fh = h;
+      if (finalTex) { gl.deleteTexture(finalTex); gl.deleteFramebuffer(finalFbo); gl.deleteTexture(snapTex); gl.deleteFramebuffer(snapFbo); }
       finalTex = tex2D(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR);
       finalFbo = fboFor(finalTex);
       snapTex = tex2D(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.LINEAR);
@@ -1141,6 +1148,9 @@
       const [W, Hh] = R.resize();
       sizeFinal(W, Hh);
       const scale = qv.scale * adapt;
+      const objK = quality === 'insane' ? 1 : Math.max(0.6, Math.min(1, Math.round(adapt / 0.8 * 10) / 10));
+      const OW = Math.max(2, Math.round(W * objK)), OH = Math.max(2, Math.round(Hh * objK));
+      sizeObj(OW, OH);
       const w = Math.max(2, Math.round(W * scale / R.uiScale() * Math.min(window.devicePixelRatio || 1, 1.5)));
       const h = Math.max(2, Math.round(Hh * scale / R.uiScale() * Math.min(window.devicePixelRatio || 1, 1.5)));
       sizeScene(w, h);
@@ -1233,7 +1243,7 @@
 
       // pass 2: the number, the mercury, the glass (they write depth) at full resolution
       gl.bindFramebuffer(gl.FRAMEBUFFER, objFbo);
-      gl.viewport(0, 0, W, Hh);
+      gl.viewport(0, 0, OW, OH);
       gl.clearColor(0, 0, 0, 0); gl.depthMask(true); gl.clearDepth(1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       const O = progs.obj;
@@ -1241,7 +1251,7 @@
       bindCommon(O);
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_CUBE_MAP, probe.t); set(O, 'u_probe', 2);
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, AT.tex); set(O, 'u_atlas', 4);
-      set(O, 'u_res', [W, Hh]); set(O, 'u_camPos', cam.pos); set(O, 'u_camRot', m3f(cam.rot)); set(O, 'u_tanHalf', tanHalf); set(O, 'u_aspect', aspect);
+      set(O, 'u_res', [OW, OH]); set(O, 'u_camPos', cam.pos); set(O, 'u_camRot', m3f(cam.rot)); set(O, 'u_tanHalf', tanHalf); set(O, 'u_aspect', aspect);
       set(O, 'u_time', cam.t); set(O, 'u_proj', [0.02, 600, 0, 0]); set(O, 'u_steps', qv.numSteps);
       numberUniforms(O, W, Hh, tanHalf);
       set(O, 'u_nBalls', merc.n); set(O, 'u_balls', ballsArr);
@@ -1264,7 +1274,7 @@
         gl.bindBuffer(gl.ARRAY_BUFFER, pBuf);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, pData, 0, nPart * 8);
         set(PP, 'u_vp', mat4mul(proj, view));
-        set(PP, 'u_pxScale', Hh / (2 * tanHalf));
+        set(PP, 'u_pxScale', OH / (2 * tanHalf));
         gl.depthFunc(gl.LEQUAL); gl.depthMask(false);
         gl.blendFunc(gl.ONE, gl.ONE);
         gl.drawArrays(gl.POINTS, 0, nPart);
@@ -1341,7 +1351,7 @@
       }
 
       // keep it smooth: MAX drops resolution (never effects) if frames take too long; INSANE never does
-      if (quality !== 'insane' && dtMs > 0) {
+      if (quality !== 'insane' && dtMs > 0 && !R.flags.noAdapt) {
         times.push(dtMs);
         if (times.length >= 40) {
           times.sort((a, b) => a - b);
