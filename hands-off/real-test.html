@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@900&display=swap">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{position:fixed;inset:0;width:100%;height:100%}</style></head>
+<body><canvas id="gl"></canvas>
+<script src="src/gfx2-shaders.js"></script>
+<script src="src/gfx2.js"></script>
+<script>
+const R = HOGFX2.create(document.getElementById('gl'));
+window.R = R;
+const ui = document.createElement('canvas'); ui.width = 4; ui.height = 4;
+window.frame = (u, num, n) => {
+  n = n || 1;
+  for (let i = 0; i < n; i++) {
+    R.uploadUI(ui);
+    if (num) R.setNumber(num); else R.setNumber(null);
+    R.draw(Object.assign({ u_time: 10, u_still: 0.5, u_grow: 0.2, u_beat: 0, u_glitch: 0.02, u_lens: [0.5,0.5,0], u_shock: [0.5,0.5,1], u_rewind: 0, u_flash: 0, u_flashCol: [1,1,1], u_flip: 0, u_mirror: 0, u_melt: 0, u_invert: 0, u_uiWarp: 0.4, u_scan: 0.15, u_shake: 0, u_hue: 0, u_world: 0 }, u), 16);
+  }
+  return { ok: R.ok, ready: R.ready, err: R.error };
+};
+</script></body></html>

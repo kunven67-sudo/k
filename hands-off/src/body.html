@@ -1,0 +1,78 @@
+<canvas id="gl" aria-hidden="true"></canvas>
+<canvas id="shatter" aria-hidden="true"></canvas>
+<div id="fallback" class="fallback" hidden aria-hidden="true"></div>
+
+<main id="menu" class="menu">
+  <div class="menu-inner">
+    <h1 class="logo" aria-label="HANDS OFF">
+      <span class="logo-word" data-text="HANDS">HANDS</span>
+      <span class="logo-word" data-text="OFF">OFF</span>
+    </h1>
+    <p class="tagline">Do nothing. Literally nothing.</p>
+
+    <section class="run-card" id="runCard" hidden>
+      <div class="label">YOUR RUN IS STILL GOING</div>
+      <div class="run-time" id="runTime">00:00</div>
+      <div class="run-gain" id="runGain"></div>
+    </section>
+
+    <div class="actions">
+      <button class="btn primary" id="startBtn" type="button">START</button>
+      <button class="btn" id="tropBtn" type="button">TROPHIES <span class="count" id="tropCount">0</span></button>
+      <button class="btn" id="setBtn" type="button">SETTINGS</button>
+    </div>
+
+    <dl class="records" id="records"></dl>
+
+    <ul class="rules">
+      <li>Once it starts, <b>don't touch anything.</b> Not the mouse, not a key, not the screen.</li>
+      <li>Touch anything and <b>everything you got resets to zero.</b></li>
+      <li id="ruleLeave">Leaving is safe: press <kbd>X</kbd>, close the tab, or just walk away. It keeps counting while it's closed.</li>
+    </ul>
+  </div>
+
+  <section class="panel" id="tropPanel" hidden aria-labelledby="tropTitle">
+    <div class="panel-head"><h2 id="tropTitle">TROPHIES</h2><button class="btn small" type="button" data-close>BACK</button></div>
+    <div class="trophy-grid" id="tropGrid"></div>
+  </section>
+
+  <section class="panel" id="setPanel" hidden aria-labelledby="setTitle">
+    <div class="panel-head"><h2 id="setTitle">SETTINGS</h2><button class="btn small" type="button" data-close>BACK</button></div>
+    <div class="set-row">
+      <span class="set-name">GRAPHICS</span>
+      <div class="seg" id="qualitySeg" role="group" aria-label="Graphics quality">
+        <button type="button" data-q="low">LOW</button><button type="button" data-q="auto">AUTO</button><button type="button" data-q="high">HIGH</button><button type="button" data-q="max">MAX</button><button type="button" data-q="insane">INSANE</button>
+      </div>
+    </div>
+    <label class="set-row" for="musicVol"><span class="set-name">MUSIC</span><input type="range" id="musicVol" min="0" max="100" step="1"></label>
+    <label class="set-row" for="sfxVol"><span class="set-name">SOUND FX</span><input type="range" id="sfxVol" min="0" max="100" step="1"></label>
+    <div class="set-row">
+      <span class="set-name">BIG FLASHES<small>Off = no bright full-screen flashes.</small></span>
+      <button class="switch" id="flashSw" type="button" role="switch" aria-checked="true" aria-label="Big flashes"></button>
+    </div>
+    <div class="set-row">
+      <span class="set-name">DELETE EVERYTHING<small>Records, trophies and your run. No undo.</small></span>
+      <button class="btn small danger" id="wipeBtn" type="button">DELETE</button>
+    </div>
+    <div class="confirm" id="wipeConfirm" hidden>
+      <span>Sure? This can't be undone.</span>
+      <button class="btn small danger" id="wipeYes" type="button">YES, DELETE</button>
+      <button class="btn small" id="wipeNo" type="button">NO</button>
+    </div>
+  </section>
+</main>
+
+<section id="exitScreen" class="exit" hidden aria-live="polite">
+  <div class="exit-title">SAFE EXIT</div>
+  <p>Your run keeps counting while you're gone.<br>You can close this tab now.</p>
+  <p class="exit-run" id="exitRun"></p>
+  <button class="btn" id="backBtn" type="button">BACK TO THE RUN</button>
+</section>
+
+<section id="lockScreen" class="exit" hidden aria-live="polite">
+  <div class="exit-title">OPEN SOMEWHERE ELSE</div>
+  <p>HANDS OFF is running in another tab, so this one stopped to keep your run safe.</p>
+  <button class="btn" id="takeBtn" type="button">PLAY HERE INSTEAD</button>
+</section>
+
+<div id="sr" class="sr-only" aria-live="polite"></div>
