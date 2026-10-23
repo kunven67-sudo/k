@@ -63,7 +63,10 @@ def key():
     k = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY') or os.environ.get('key')
     if not k:
         sys.exit('gpic: no GEMINI_API_KEY in the environment (add it in the environment settings, then start a new session)')
-    return k
+    # the same variable may also hold the Hugging Face token: keep only the Google part
+    m = re.search(r'AIza[0-9A-Za-z_-]{30,}|AQ\.[0-9A-Za-z_.-]{20,}', k)
+    if m: return m.group(0)
+    return re.sub(r'hf_[A-Za-z0-9]{20,}', ' ', k).strip(' \t\r\n,;:=|')
 
 
 def post(model, body, tries=6):
@@ -96,8 +99,9 @@ HF_FLUX = os.environ.get('GPIC_HF_MAKE', 'black-forest-labs/FLUX.1-schnell')
 def hf_token():
     for n in ('HF_TOKEN', 'HUGGINGFACE_TOKEN', 'HUGGING_FACE_HUB_TOKEN'):
         if os.environ.get(n): return os.environ[n]
-    for v in os.environ.values():
-        if re.fullmatch(r'hf_[A-Za-z0-9]{20,}', v.strip()): return v.strip()
+    for v in os.environ.values():  # also finds one pasted next to other keys in the same variable
+        m = re.search(r'(?<![A-Za-z0-9])hf_[A-Za-z0-9]{20,}', v)
+        if m: return m.group(0)
     return None
 
 
