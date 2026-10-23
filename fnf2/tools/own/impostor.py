@@ -49,11 +49,21 @@ def json5(path):
     return json.loads(s)
 
 
+PACKS = []
 class Pack:
     def __init__(self, pid):
-        self.id = pid; self.root = os.path.join(MODS_OUT, pid); self.n = 0
+        self.id = pid; self.root = os.path.join(MODS_OUT, pid); self.n = 0; self.wrote = set()
+        PACKS.append(self)
     def path(self, *p):
-        f = os.path.join(self.root, *p); os.makedirs(os.path.dirname(f), exist_ok=True); return f
+        f = os.path.join(self.root, *p); os.makedirs(os.path.dirname(f), exist_ok=True); self.wrote.add(os.path.normpath(f)); return f
+    def prune(self):
+        """Deletes what an older run left here that this run didn't make (moved to another pack, renamed...)."""
+        gone = 0
+        for d, _, fs in os.walk(self.root):
+            for n in fs:
+                f = os.path.normpath(os.path.join(d, n))
+                if f not in self.wrote: os.remove(f); gone += 1
+        if gone: print('   %s: %d old files removed' % (self.id, gone))
     def put(self, src, *dst):
         d = self.path(*dst)
         if not os.path.exists(d) or os.path.getsize(d) != os.path.getsize(src): shutil.copyfile(src, d); self.n += 1
@@ -437,10 +447,12 @@ def dialogue(pack, sid, fname='dialogue.txt'):
 
 
 DONE_TALKERS = set()
+SHARED_TALKERS = ('bf', 'gf')        # (they talk in every week: in the shared pack, so a week never loads another week)
 def talker(pack, who):
     """A talking portrait (data/dialogue/<who>.json + ui/dialogue/characters/<asset>) + its typing sound."""
     if who in DONE_TALKERS: return
     DONE_TALKERS.add(who)
+    if who in SHARED_TALKERS: pack = CORE
     p = M('data', 'dialogue', who + '.json')
     if not os.path.exists(p): print('   (no talker', who + ')'); return
     tj = json5(p)
@@ -547,6 +559,7 @@ def song(pack, core, sid, spec, week):
     for img, k in spec.get('small', {}).items():
         from repack_sparrow import repack
         base = pack.path('shared', 'images', NS, img)
+        pack.wrote.update(os.path.normpath(base + e) for e in ('.png', '.xml'))     # (repack writes these two)
         if not os.path.exists(base + '.png') or os.path.getmtime(base + '.png') < os.path.getmtime(M('images', img + '.png')):
             repack(M('images', img + '.png'), M('images', img + '.xml'), base, scale=k); pack.n += 1
         data.setdefault('small', {})[img] = k
@@ -754,6 +767,7 @@ def main():
     want = sys.argv[1:] or list(WEEKS)
     CORE = core_pack()
     for wid in want: week(wid)
+    for pk in PACKS: pk.prune()
     print('core', CORE.n, 'files')
 
 
