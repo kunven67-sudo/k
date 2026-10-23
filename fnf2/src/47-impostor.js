@@ -145,8 +145,9 @@
     P.hud.apply(ctx);
     ctx.save(); ctx.globalAlpha *= tp.alpha * (P.imp.timeA != null ? P.imp.timeA : 1);
     // timeTxt at STRUM_X + 640 - 585 = 97 (+10), the bar right under its top (utils.hx modifyGUI)
-    const bx = 97, by = (P.phoneArrows ? 172 : P.down ? G.H - 45 : 23.75) + tp.dy, img = G.A.image(IMG + 'hud/timeBar.png');
-    const w = img ? img.width : 400, h = img ? img.height : 19;
+    // (phones: in the middle under the score, where FNF 2's own time bar goes there)
+    const img = G.A.image(IMG + 'hud/timeBar.png'), w = img ? img.width : 400, h = img ? img.height : 19;
+    const bx = P.phoneArrows ? Math.round((G.W - w) / 2) : 97, by = (P.phoneArrows ? 172 : P.down ? G.H - 45 : 23.75) + tp.dy;
     const prog = P.audio && P.audio.length ? G.clamp(P.songPos / P.audio.length, 0, 1) : 0;
     ctx.fillStyle = '#2e412e'; ctx.fillRect(bx + 3, by + 3, w - 6, h - 6);
     ctx.fillStyle = '#44d844'; ctx.fillRect(bx + 3, by + 3, (w - 6) * prog, h - 6);
@@ -191,8 +192,9 @@
       const age = Math.max(0, (now - s.born) / 1000);
       const sc = s.k0 + (s.k - s.k0) * expoOut(age / 0.5);
       s.scale.x = s.scale.y = sc; s.updateHitbox();
-      if (s.rating) { s.x = (G.W - s.frameW * sc) / 2 + (P.middle ? 440 : 0); s.y = P.down ? G.H - s.frameH * sc - 50 : 55; }
-      else { s.x = s.cx - s.frameW * sc / 2; s.y = P.down ? G.H - s.frameH * sc - 117.5 : 122.5; }
+      // (phones: the big arrows own the bottom, so the middle of the screen like FNF 2's own popups there)
+      if (s.rating) { s.x = (G.W - s.frameW * sc) / 2 + (P.middle ? 440 : 0); s.y = P.phoneArrows ? 205 : P.down ? G.H - s.frameH * sc - 50 : 55; }
+      else { s.x = s.cx - s.frameW * sc / 2; s.y = P.phoneArrows ? 272.5 : P.down ? G.H - s.frameH * sc - 117.5 : 122.5; }
       s.alpha = 1 - expoOut(Math.max(0, age - s.delay) / 0.5);
     }
   }
