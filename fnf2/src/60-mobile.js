@@ -157,11 +157,11 @@ G.phoneUpdate = {
     const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin;flex-wrap:wrap';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
     const gets = zips.map((z, i) => {
-      const get = btn(zips.length > 1 ? '1  GET ' + (i + 1) : '1  GET IT', '#9CF', 'a'); get.href = this.BASE + z; get.target = '_blank'; get.rel = 'noopener';
-      get.onclick = () => { msg.textContent = 'Downloading... then come back and tap PICK IT' + (zips.length > 1 ? ' (you can pick all of them at once)' : ''); };
+      const get = btn(zips.length > 1 ? 'GET PART ' + (i + 1) : '1  GET IT', '#9CF', 'a'); get.href = this.BASE + z; get.target = '_blank'; get.rel = 'noopener';
+      get.onclick = () => { msg.textContent = zips.length > 1 ? 'Downloading... get every part, then tap PICK THEM and pick them all' : 'Downloading... then come back and tap PICK IT'; };
       return get;
     });
-    const pick = btn('2  PICK IT', '#FFE45C', 'label');
+    const pick = btn(zips.length > 1 ? 'PICK THEM' : '2  PICK IT', '#FFE45C', 'label');
     const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.style.display = 'none'; pick.appendChild(inp);
     inp.onchange = async () => {
       const files = [...(inp.files || [])]; if (!files.length) return;
