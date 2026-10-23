@@ -645,7 +645,7 @@ G.stages = {
 G.errors = [];
 G.reportError = function (e, where) {
   const msg = (where ? where + ': ' : '') + (e && e.message ? e.message : String(e));
-  if (G.errors.length < 30 && !G.errors.some(x => x.msg === msg)) G.errors.push({ msg, t: performance.now() });
+  if (G.errors.length < 30 && !G.errors.some(x => x.msg === msg)) G.errors.push({ msg, t: performance.now(), stack: e && e.stack ? String(e.stack).split("\n").slice(0, 6).join(" | ") : "" });
   console.error('[FNF2]', msg, e);
 };
 window.addEventListener('error', ev => G.reportError(ev.error || ev.message, 'global'));

@@ -118,7 +118,8 @@ def copy_image(pack, img):
 
 
 def icon(pack, name):
-    """The health icon 'name' (the mod's icons/icon-<name>.png, any case) -> preload/images/icons/icon-imp-<name>.png."""
+    """The health icon 'name' (the mod's icons/icon-<name>.png, any case) -> preload/images/icons/icon-imp-<name>.png,
+    + a freeplay pixel icon made from it (FNF's: tiny pixel art in a 50x50 frame the game doubles, a 1 px black line)."""
     if not name: return None
     want = ('icon-' + name + '.png').lower()
     for f in os.listdir(M('images', 'icons')):
@@ -126,8 +127,24 @@ def icon(pack, name):
             pack.put(M('images', 'icons', f), 'preload', 'images', 'icons', 'icon-' + P + name + '.png')
             if f.endswith('.png') and os.path.exists(M('images', 'icons', f[:-4] + '.xml')):
                 pack.put(M('images', 'icons', f[:-4] + '.xml'), 'preload', 'images', 'icons', 'icon-' + P + name + '.xml')
+            pixel_icon(pack, M('images', 'icons', f), P + name)
             return P + name
     return None
+
+
+def pixel_icon(pack, src, cid):
+    from PIL import Image, ImageFilter
+    dst = pack.path('preload', 'images', 'freeplay', 'icons', cid + 'pixel.png')
+    if os.path.exists(dst): return
+    im = Image.open(src).convert('RGBA'); im = im.crop((0, 0, min(150, im.width), im.height))
+    bb = im.getchannel('A').getbbox() or (0, 0, im.width, im.height)
+    im = im.crop(bb); k = 38 / max(im.size)
+    px = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
+    a = px.getchannel('A').point(lambda v: 255 if v > 110 else 0); px.putalpha(a)
+    frame = Image.new('RGBA', (50, 50), (0, 0, 0, 0)); frame.paste(px, ((50 - px.width) // 2, 50 - px.height - 3), px)
+    ring = frame.getchannel('A').filter(ImageFilter.MaxFilter(3))
+    under = Image.new('RGBA', (50, 50), (0, 0, 0, 255)); under.putalpha(ring)
+    Image.alpha_composite(under, frame).save(dst)
 
 
 def anim_list(cj, img_kind, extra_offset=(0, 0), asset=None):
@@ -158,13 +175,11 @@ def character(pack, cid):
     d = {'version': '1.0.0', 'name': cid, 'renderType': 'animateatlas' if kind == 'atlas' else 'sparrow',
          'assetPath': 'shared:%s/%s' % (NS, cj['image']), 'scale': s, 'flipX': bool(cj.get('flip_x')),
          'offsets': cj.get('position', [0, 0]), 'cameraOffsets': cj.get('camera_position', [0, 0]),
-         # Psych: back to idle after sing_duration x 1.1 steps (holdTimer > stepCrochet * 0.0011 * singDuration)
-         'singTime': round(cj.get('sing_duration', 4) * 1.1, 3),
+         # (Character.update: back to idle after sing_duration steps: holdTimer >= stepCrotchet * 0.001 * singDuration)
+         'singTime': cj.get('sing_duration', 4),
          'isPixel': bool(cj.get('no_antialiasing')),
          'animations': anim_list(cj, kind)}
-    names = {a['anim'] for a in cj['animations']}
-    de = cj.get('dance_every')
-    d['danceEvery'] = de if de else (1 if 'danceLeft' in names else 2)
+    d['danceEvery'] = cj.get('dance_every', 2)       # (the template's 2 when it's missing)
     ic = icon(pack, cj.get('healthicon'))
     if ic: d['healthIcon'] = {'id': ic}
     d['hpColor'] = color(cj.get('healthbar_colour', cj.get('healthbar_colors')))
@@ -233,7 +248,7 @@ def notes_of(s):
             if sec.get('altAnim') and not player and 'k' not in q: q['k'] = 'alt'
             out.append(q)
         t += (sec.get('sectionBeats') or sec.get('lengthInSteps', 16) / 4) * 60000 / bpm
-    out.sort(key=lambda q: (q['t'], q['d']))
+    out.sort(key=lambda q: q['t'])           # (stable: a double note keeps the chart's order, the chord ghosts use it)
     dd, seen = [], set()
     for q in out:
         k = (round(q['t']), q['d'])
@@ -387,11 +402,11 @@ def video(pack, rel):
 # ---------------------------------------------------------------- the weeks
 # per song: what the scripts swap in or show besides the chart's characters, its videos, talk files
 WEEKS = {
-    'w1': dict(pack='impostor-w1', level='imp-week1', week='week1', title='POLUS PROBLEMS', color='#FF2A2A',
+    'w1': dict(pack='impostor-w1', level='imp-week1', week='week1', title='POLUS PROBLEMS', color='#E2253A', portrait='red',
                songs={
-                   'sussus-moogus': dict(stage='polus', videos=['week1/sussus-moogus'], talk='dialogue.txt'),
-                   'sabotage': dict(stage='polus', videos=['week1/sabotage'], talk='dialogue.txt'),
-                   'meltdown': dict(stage='polus', videos=['week1/meltdown', 'week1/meltdownEnd', 'week1/post-week1'], talk='dialogue.txt'),
+                   'sussus-moogus': dict(stage='polus', videos=['week1/sussus-moogus'], talk='dialogue.txt', ratings=(2, 3, 5)),
+                   'sabotage': dict(stage='polus', videos=['week1/sabotage'], talk='dialogue.txt', ratings=(2, 4, 6)),
+                   'meltdown': dict(stage='polus', videos=['week1/meltdown', 'week1/meltdownEnd', 'week1/post-week1'], talk='dialogue.txt', ratings=(3, 5, 7)),
                }),
 }
 SHARED_CHARS = {'bf', 'gf'}
@@ -437,7 +452,7 @@ def song(pack, core, sid, spec, week):
     meta = {'version': '2.2.4', 'songName': name, 'artist': info.get('composer', ''), 'charter': info.get('charters', info.get('charter', '')),
             'offsets': {}, 'playData': {'difficulties': ['easy', 'normal', 'hard'],
             'characters': {'player': player, 'girlfriend': gfid, 'opponent': opp, 'playerVocals': pv, 'opponentVocals': [opp]},
-            'stage': P + spec['stage'], 'noteStyle': 'funkin', 'album': 'impostor', 'ratings': dict(zip(('easy', 'normal', 'hard'), rt)),
+            'stage': P + spec['stage'], 'noteStyle': spec.get('noteStyle', 'impostor'), 'album': 'impostor', 'ratings': dict(zip(('easy', 'normal', 'hard'), rt)),
             'previewStart': spec.get('preview', (20000, 35000))[0], 'previewEnd': spec.get('preview', (20000, 35000))[1]},
             'timeChanges': tc, 'generatedBy': 'FNF 2 - tools/own/impostor.py (VS IMPOSTOR: LEGACY)'}
     if opp2: meta['playData']['characters']['opponent2'] = opp2
@@ -456,8 +471,119 @@ def song(pack, core, sid, spec, week):
     return sid
 
 
+def album(core):
+    """the freeplay album: the mod's own Legacy logo on its star sky; the title = the logo's 'VS. IMPOSTOR LEGACY'"""
+    from PIL import Image
+    from repack_sparrow import frames_of
+    f = frames_of(open(M('images', 'logoBumpin.xml'), encoding='utf-8-sig').read())[0]
+    sheet = Image.open(M('images', 'logoBumpin.png')).convert('RGBA')
+    logo = sheet.crop((int(f['x']), int(f['y']), int(f['x'] + f['width']), int(f['y'] + f['height'])))
+    stars = Image.open(M('images', 'menu', 'common', 'starBG.png')).convert('RGBA')
+    s = max(262 / stars.width, 262 / stars.height); stars = stars.resize((round(stars.width * s) + 1, round(stars.height * s) + 1), Image.LANCZOS).crop((0, 0, 262, 262))
+    sky = Image.new('RGBA', (262, 262), (10, 10, 32, 255)); sky.alpha_composite(stars)
+    k = 236 / logo.width; lg = logo.resize((236, round(logo.height * k)), Image.LANCZOS)
+    sky.alpha_composite(lg, (13, (262 - lg.height) // 2)); sky.save(core.path('preload', 'images', 'freeplay', 'albumRoll', 'impostor.png'))
+    # (the bottom of the logo: VS. IMPOSTOR + LEGACY)
+    part = logo.crop((0, int(logo.height * 0.66), logo.width, logo.height)); part = part.crop(part.getchannel('A').getbbox())
+    W_, H_ = 234, 142; k = min((W_ - 8) / part.width, (H_ - 8) / part.height)
+    part = part.resize((round(part.width * k), round(part.height * k)), Image.LANCZOS)
+    t = Image.new('RGBA', (W_, H_), (0, 0, 0, 0)); t.alpha_composite(part, ((W_ - part.width) // 2, (H_ - part.height) // 2))
+    sh = Image.new('RGBA', (W_ * 2, H_), (0, 0, 0, 0)); sh.paste(t, (0, 0)); sh.paste(t, (W_, 0))
+    sh.save(core.path('preload', 'images', 'freeplay', 'albumRoll', 'impostor-text.png'))
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>', f'<TextureAtlas imagePath="impostor-text.png" width="{W_ * 2}" height="{H_}">']
+    xml += [f'  <SubTexture name="idle{i:04d}" x="0" y="0" width="{W_}" height="{H_}"/>' for i in range(1)]
+    xml += [f'  <SubTexture name="switch{i:04d}" x="{W_}" y="0" width="{W_}" height="{H_}"/>' for i in range(1, 5)]
+    xml.append('</TextureAtlas>')
+    open(core.path('preload', 'images', 'freeplay', 'albumRoll', 'impostor-text.xml'), 'w').write('\n'.join(xml))
+    core.dump(dict(version='1.0.0', name='VS IMPOSTOR: LEGACY', artists=['The VS Impostor team'], albumArtAsset='freeplay/albumRoll/impostor',
+                   albumTitleAsset='freeplay/albumRoll/impostor-text', albumTitleOffsets=[8, 0]), 'preload', 'data', 'ui', 'freeplay', 'albums', 'impostor.json')
+
+
+# Psych 1.0 / Nightmare Vision default arrow colours (ClientPrefs.arrowRGBdef): base, white highlight, dark outline
+ARROW_RGB = {'left': ('#C24B99', '#FFFFFF', '#3C1F56'), 'down': ('#00FFFF', '#FFFFFF', '#1542B7'),
+             'up': ('#12FA05', '#FFFFFF', '#0A4447'), 'right': ('#F9393F', '#FFFFFF', '#651038')}
+
+def rgb_mix(im, cols):
+    """The RGB shader (RGBShader.hx): colour = r * c1 + g * c2 + b * c3, alpha kept."""
+    import numpy as np
+    from PIL import Image
+    a = np.asarray(im.convert('RGBA')).astype(np.float32) / 255
+    C = np.array([[int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)] for c in cols], np.float32)   # 3 x rgb
+    out = np.clip(a[..., 0:1] * C[0] + a[..., 1:2] * C[1] + a[..., 2:3] * C[2], 0, 1)
+    return Image.fromarray((np.concatenate([out, a[..., 3:4]], -1) * 255 + 0.5).astype(np.uint8), 'RGBA')
+
+
+def noteskin(core):
+    """The mod's arrows (data/noteskins/default.json + images/NOTE_assets, noteSplashes, sustainHold) as an FNF 2 note
+    style 'impostor': every arrow / press / confirm / splash / hold cover coloured per lane the way the shader does
+    (the grey receptors aren't coloured), the holds in FNF's 8-column hold picture."""
+    from PIL import Image
+    from repack_sparrow import frames_of
+    D = lambda *p: core.path('shared', 'images', NS, 'notes', *p)
+    # arrows: one sheet, each lane's frames coloured in place (every frame belongs to one lane)
+    sheet = Image.open(M('images', 'NOTE_assets.png')).convert('RGBA'); xml = open(M('images', 'NOTE_assets.xml'), encoding='utf-8-sig').read()
+    out = sheet.copy()
+    for f in frames_of(xml):
+        lane = f['name'].split(' ')[0]
+        if lane not in ARROW_RGB or 'receptor' in f['name'] or 'hold' in f['name']: continue
+        x, y = int(f['x']), int(f['y']); w, h = (int(f['height']), int(f['width'])) if f['rot'] else (int(f['width']), int(f['height']))
+        out.paste(rgb_mix(sheet.crop((x, y, x + w, y + h)), ARROW_RGB[lane]), (x, y))
+    out.save(D('NOTE_assets.png')); open(D('NOTE_assets.xml'), 'w').write(xml)
+    # holds: FNF's layout (8 columns: lane piece, lane end), the piece tiled, the tail at the end
+    fr = {f['name'].rstrip('0123456789'): f for f in frames_of(xml)}
+    def cut(name):
+        f = fr[name]; x, y = int(f['x']), int(f['y']); return sheet.crop((x, y, x + int(f['width']), y + int(f['height'])))
+    piece, tail = cut('left hold piece'), cut('left hold tail')
+    cw, ch = max(piece.width, tail.width) + 2, 87
+    hold = Image.new('RGBA', (cw * 8, ch), (0, 0, 0, 0))
+    for i, lane in enumerate(('left', 'down', 'up', 'right')):
+        pc, tl = rgb_mix(piece, ARROW_RGB[lane]), rgb_mix(tail, ARROW_RGB[lane])
+        col = Image.new('RGBA', (cw, ch), (0, 0, 0, 0))
+        for yy in range(0, ch, pc.height): col.paste(pc, ((cw - pc.width) // 2, yy))
+        hold.paste(col, (i * 2 * cw, 0))
+        cap = Image.new('RGBA', (cw, ch), (0, 0, 0, 0)); cap.paste(tl, ((cw - tl.width) // 2, 0))
+        hold.paste(cap, ((i * 2 + 1) * cw, 0))
+    hold.save(D('NOTE_hold_assets.png'))
+    # splashes: 'splash 1' + 'splash 2' coloured for each lane, one sheet, frames renamed '<lane> splash 1....'
+    sp = Image.open(M('images', 'noteSplashes.png')).convert('RGBA'); sx = open(M('images', 'noteSplashes.xml'), encoding='utf-8-sig').read()
+    sfr = frames_of(sx); W1, H1 = sp.size
+    big = Image.new('RGBA', (W1, H1 * 4), (0, 0, 0, 0)); lines = []
+    for i, lane in enumerate(('left', 'down', 'up', 'right')):
+        big.paste(rgb_mix(sp, ARROW_RGB[lane]), (0, H1 * i))
+        for f in sfr:
+            lines.append('  <SubTexture name="%s %s" x="%d" y="%d" width="%d" height="%d" frameX="%d" frameY="%d" frameWidth="%d" frameHeight="%d"/>' % (
+                lane, f['name'], f['x'], f['y'] + H1 * i, f['width'], f['height'], -f['fx'], -f['fy'], f['fw'], f['fh']))
+    big.save(D('noteSplashes.png'))
+    open(D('noteSplashes.xml'), 'w').write('<?xml version="1.0" encoding="utf-8"?>\n<TextureAtlas imagePath="noteSplashes.png">\n' + '\n'.join(lines) + '\n</TextureAtlas>\n')
+    # hold covers ('hold splash start / loop / end'), FNF's names per colour (holdCoverStartPurple...)
+    hs = Image.open(M('images', 'sustainHold.png')).convert('RGBA'); hx = open(M('images', 'sustainHold.xml'), encoding='utf-8-sig').read()
+    for lane, colr in zip(('left', 'down', 'up', 'right'), ('Purple', 'Blue', 'Green', 'Red')):
+        rgb_mix(hs, ARROW_RGB[lane]).save(D('holdCover' + colr + '.png'))
+        x2 = hx.replace('imagePath="sustainHold.png"', 'imagePath="holdCover%s.png"' % colr)
+        x2 = x2.replace('name="hold splash start', 'name="holdCoverStart' + colr).replace('name="hold splash loop', 'name="holdCover' + colr).replace('name="hold splash end', 'name="holdCoverEnd' + colr)
+        open(D('holdCover' + colr + '.xml'), 'w').write(x2)
+    L = ('left', 'down', 'up', 'right')
+    # (data/noteskins/default.json: the splash + hold cover animation offsets, the cover's loop speed)
+    skin = json5(M('data', 'noteskins', 'default.json'))
+    spo = skin['noteSplashAnimations'][0][0]['offsets']
+    sus = {a['anim']: a for a in skin['susSplashAnimations'][0]}
+    core.dump({'version': '1.1.0', 'name': 'VS Impostor (Legacy)', 'author': 'The VS Impostor team', 'fallback': 'funkin', 'assets': {
+        'note': {'assetPath': 'shared:%s/notes/NOTE_assets' % NS, 'scale': skin.get('noteScale', 0.7), 'data': {l: {'prefix': l + ' note'} for l in L}},
+        'noteStrumline': {'assetPath': 'shared:%s/notes/NOTE_assets' % NS, 'scale': skin.get('noteScale', 0.7), 'offsets': [0, 0], 'layout': 'psych', 'data': dict(
+            [(l + 'Static', {'prefix': l + ' receptor'}) for l in L] + [(l + 'Press', {'prefix': l + ' press'}) for l in L] +
+            [(l + 'Confirm', {'prefix': l + ' confirm'}) for l in L] + [(l + 'ConfirmHold', {'prefix': l + ' confirm'}) for l in L])},
+        'holdNote': {'assetPath': 'shared:%s/notes/NOTE_hold_assets' % NS, 'scale': 0.7, 'data': {}},
+        'noteSplash': {'assetPath': 'shared:%s/notes/noteSplashes' % NS, 'scale': skin.get('splashScale', 1), 'alpha': skin.get('splashAlpha', 1), 'offsets': spo,
+                       'data': dict((l + 'Splashes', [{'prefix': l + ' splash 1'}, {'prefix': l + ' splash 2'}]) for l in L)},
+        'holdNoteCover': {'assetPath': 'shared:%s/notes/holdCover' % NS, 'scale': skin.get('susSplashScale', 0.7), 'offsets': sus['loop']['offsets'],
+                          'fps': sus['loop'].get('fps', 24), 'data': {}},
+    }}, 'preload', 'data', 'notestyles', 'impostor.json')
+
+
 def core_pack():
     core = Pack('impostor')
+    album(core)
+    noteskin(core)
     for c in SHARED_CHARS: character(core, c)
     # the talk box (scripts/dialogue.hx): box (RGB coloured), bubble, fonts, sounds
     for f in ('dialogueBox.png', 'bubble.png'): core.put(M('images', 'ui', 'dialogue', f), 'shared', 'images', NS, 'ui', 'dialogue', f)
@@ -481,21 +607,56 @@ def week(wid):
     for sid in {spec['stage'] for spec in W['songs'].values()}: stage(pack, sid)
     ids = [song(pack, core, sid, spec, wid) for sid, spec in W['songs'].items()]
     wj = json5(M('data', 'weeks', W['week'] + '.json'))
+    # the story menu: the week's opponent from the mod's own freeplay portraits, on the banner
+    props = []
+    if W.get('portrait'):
+        pp = M('images', 'menu', 'freeplay', 'portraits', W['portrait'] + '.png')
+        if os.path.exists(pp):
+            from PIL import Image
+            im = Image.open(pp).convert('RGBA'); im = im.crop(im.getchannel('A').getbbox())
+            # (FNF's story characters are only their black lines on the band's colour: keep the art's dark lines)
+            import numpy as np
+            a = np.asarray(im).astype(np.float32); lum = a[..., :3] @ np.array([0.299, 0.587, 0.114], np.float32)
+            line = np.clip((34 - lum) / 14, 0, 1) * (a[..., 3] / 255)        # (only the black lines, not the shading)
+            out = np.zeros(a.shape, np.uint8); out[..., 3] = (line * 255).astype(np.uint8)
+            im = Image.fromarray(out, 'RGBA')
+            k = min(1, 300 / im.height); im = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
+            im.save(pack.path('preload', 'images', 'storymenu', 'props', P + W['portrait'] + '.png'))
+            props.append({'assetPath': 'storymenu/props/' + P + W['portrait'], 'scale': 1.0, 'offsets': [60, 80]})
+    # (+ BF and GF like every FNF week)
+    props += [{'assetPath': 'storymenu/props/bf', 'scale': 1.0, 'offsets': [150, 80], 'animations': [{'name': 'idle', 'prefix': 'idle0', 'frameRate': 24}, {'name': 'confirm', 'prefix': 'confirm0', 'frameRate': 24}]},
+              {'assetPath': 'storymenu/props/gf', 'scale': 1.0, 'offsets': [200, 80], 'animations': [{'name': 'danceLeft', 'prefix': 'idle0', 'frameIndices': [30, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]}, {'name': 'danceRight', 'prefix': 'idle0', 'frameIndices': [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]}]}]
     pack.dump({'version': '1.0.0', 'name': wj.get('storyName', W['title']), 'titleAsset': 'storymenu/titles/' + W['level'], 'visible': True,
-               'props': [], 'background': W['color'], 'songs': ids, 'capsule': {'name': 'VS IMPOSTOR'}}, 'preload', 'data', 'levels', W['level'] + '.json')
-    title_png(pack, W['level'], wj.get('weekName', '') + ': ' + wj.get('storyName', W['title']))
+               'props': props, 'background': W['color'], 'songs': ids, 'capsule': {'name': 'IMPOSTOR'}}, 'preload', 'data', 'levels', W['level'] + '.json')
+    title_png(pack, W['level'], wj.get('storyName', W['title']))
     print('   ', pack.id, pack.n, 'files')
 
 
 def title_png(pack, level, text):
-    """The story menu week title (FNF's are white letters with a soft dark outline)."""
-    from PIL import Image, ImageDraw, ImageFont, ImageFilter
-    font = ImageFont.truetype(M('fonts', 'liberbold.ttf'), 62)
+    """The story menu week title, FNF's way: chunky hollow letters (black inside, white outline), each a little tilted,
+    at most 420 px wide so it never runs into the difficulty picker."""
+    from PIL import Image, ImageDraw, ImageFont
+    import random
+    rnd = random.Random(level)
+    font = ImageFont.truetype(os.path.join(ROOT, 'assets', 'fonts', 'Chewy-Regular.ttf'), 120)
     text = text.upper()
-    w = int(font.getlength(text)) + 30
-    im = Image.new('RGBA', (w, 90), (0, 0, 0, 0))
-    ImageDraw.Draw(im).text((15, 10), text, font=font, fill=(255, 255, 255, 255), stroke_width=4, stroke_fill=(40, 20, 60, 255))
-    im.save(pack.path('preload', 'images', 'storymenu', 'titles', level + '.png'))
+    letters = []
+    for ch in text:
+        if ch == ' ': letters.append(None); continue
+        w = int(font.getlength(ch)) + 24
+        im = Image.new('RGBA', (w, 170), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        d.text((12, 12), ch, font=font, fill=(255, 255, 255, 255), stroke_width=8, stroke_fill=(255, 255, 255, 255))   # (the white ring
+        d.text((12, 12), ch, font=font, fill=(0, 0, 0, 255))                                                       #  outside, black inside)
+        letters.append(im.rotate(rnd.uniform(-5, 5), resample=Image.BICUBIC, expand=False))
+    W = sum((l.width - 18) if l else 34 for l in letters) + 40
+    out = Image.new('RGBA', (W, 190), (0, 0, 0, 0)); x = 6
+    for l in letters:
+        if l is None: x += 34; continue
+        out.alpha_composite(l, (x, rnd.randint(0, 8))); x += l.width - 18
+    out = out.crop(out.getchannel('A').getbbox())
+    if out.width > 420: out = out.resize((420, round(out.height * 420 / out.width)), Image.LANCZOS)
+    out.save(pack.path('preload', 'images', 'storymenu', 'titles', level + '.png'))
 
 
 CORE = None

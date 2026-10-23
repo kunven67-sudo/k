@@ -47,10 +47,19 @@
       splashBlend: A.noteSplash && A.noteSplash.data && A.noteSplash.data.blendMode === 'add' ? 'lighter' : null,
       splashOn: !(A.noteSplash && A.noteSplash.data && A.noteSplash.data.enabled === false),
       coversOn: !(A.holdNoteCover && A.holdNoteCover.data && A.holdNoteCover.data.enabled === false),
+      // 'psych' = Psych / Nightmare Vision placing: arrow, note, splash + hold cover all centred on the lane's middle
+      // (FNF's static arrows have their own padding instead), no -13 on the confirm, the cover's own scale + speed
+      layout: (A.noteStrumline && A.noteStrumline.layout) || null,
+      coverScale: A.holdNoteCover && A.holdNoteCover.scale != null ? A.holdNoteCover.scale : 1,
+      coverOff: (A.holdNoteCover && A.holdNoteCover.offsets) || [0, 0],
+      coverFps: (A.holdNoteCover && A.holdNoteCover.fps) || 24,
+      // half the height of a note (where a note's middle is, under its strum)
+      get noteHalfH() { if (this._nhh == null) { const sh = this.notes, f = sh && G.Sparrow.byPrefix(sh, this.notePre(0))[0]; if (!f) return STRUM_SIZE / 2; this._nhh = f.fh * this.noteScale / 2; } return this._nhh; },
       get notes() { return G.Sparrow.load(this.notesPath); },
       get strum() { return G.Sparrow.load(this.strumPath); },
       get splash() { return this.splashOn ? G.Sparrow.load(this.splashPath) : null; },
-      cover(i) { return this.coversOn ? G.Sparrow.load('shared/images/holdCover' + COLOR[i]) : null; },
+      coverPath(i) { return A.holdNoteCover && A.holdNoteCover.assetPath ? path(A.holdNoteCover.assetPath) + COLOR[i] : 'shared/images/holdCover' + COLOR[i]; },
+      cover(i) { return this.coversOn ? G.Sparrow.load(this.coverPath(i)) : null; },
       get hold() { return (this.holdPath && G.A.image(this.holdPath)) || G.A.image('shared/images/NOTE_hold_assets.png') || G.A.image('preload/images/NOTE_hold_assets.png'); },
       // ratings, combo digits + countdown pictures (V-Slice judgementSick / comboNumber0 / countdownTwo...): a scale of
       // 0 hides them (a mod drawing its own), no asset = FNF's
@@ -76,8 +85,12 @@
     s.scale.x = s.scale.y = NS.strumScale;
     s.play('static', true); s.updateHitbox();
     s.dir = i; s.player = player; s.confirmHold = -1;
-    const so = NS.strumOff;
-    s.playA = function (n, force) { this.play(n, force); centerOffsets(this); if (n === 'confirm') { this.offset.x -= 13; this.offset.y -= 13; } this.offset.x -= so[0]; this.offset.y -= so[1]; };
+    let so = NS.strumOff;
+    const psych = NS.layout === 'psych';
+    // (psych: the arrow's middle on the lane's middle, where the notes' middles go)
+    if (psych) so = [so[0] + laneCX(0) - s.width / 2, so[1] + laneCY(0) - s.height / 2];
+    s.fixOff = function () { centerOffsets(this); if (this.animName === 'confirm' && !psych) { this.offset.x -= 13; this.offset.y -= 13; } this.offset.x -= so[0]; this.offset.y -= so[1]; };
+    s.playA = function (n, force) { this.play(n, force); this.fixOff(); };
     return s;
   }
   // special notes (modcharts): 'fake' = a decoy that vanishes before it gets to you (can't be hit),
@@ -95,6 +108,10 @@
   // "heh, pretty good" in Stress, Darnell lighting / kicking / kneeing his can in 2hot)
   const KIND_ANIM = { 'weekend-1-lightcan': 'lightCan', 'weekend-1-kickcan': 'kickCan', 'weekend-1-kneecan': 'kneeCan', exHank: 'Hank' };
   const kindAnim = (c, k) => { if (!c || !k) return null; const a = KIND_ANIM[k] || k; return c.anims && c.anims[a] ? a : null; };
+  // the middle of a lane for a strum at (bx, by): where its notes' middles pass (x as V-Slice centres a note on its strum)
+  const laneCX = bx => bx - INITIAL_OFFSET + STRUM_SIZE / 2 - NUDGE;
+  const laneCY = by => by - INITIAL_OFFSET + NS.noteHalfH;
+  G.NoteGeom = { cx: laneCX, cy: laneCY };
   function centerOffsets(s) { s.offset.x = (s.frameW - s.width) * 0.5; s.offset.y = (s.frameH - s.height) * 0.5; s.origin.x = s.frameW / 2; s.origin.y = s.frameH / 2; }
 
   // ---------------------------------------------------------------- PlayState
@@ -392,8 +409,10 @@
       // beats -4..-1 before the song: THREE, TWO (ready), ONE (set), GO
       const steps = { [-4]: ['intro3', null], [-3]: ['intro2', 'ready'], [-2]: ['intro1', 'set'], [-1]: ['introGo', 'go'] }[b];
       if (!steps) return;
-      G.sfx(steps[0], { vol: 0.6 });
-      const cp = steps[1] && NS.count(steps[1]);
+      // (a mod's own countdown voices + pictures: VS Impostor's are Psych Engine's)
+      const ca = this.sfx && this.sfx.countdownAssets;
+      G.sfx(ca && ca.sound ? ca.sound(steps[0]) : steps[0], { vol: 0.6 });
+      const cp = steps[1] && (ca && ca.image ? { path: ca.image(steps[1]), scale: 1 } : NS.count(steps[1]));
       if (cp && G.A.image(cp.path)) {
         const s = new G.Sprite(0, 0).loadImage(cp.path);
         if (cp.scale !== 1) { s.scale.x = s.scale.y = cp.scale; s.updateHitbox(); }
@@ -427,7 +446,7 @@
       this.updateCamera(dt);
       if (this.mod && this.mod.update) this.mod.update(this, dt);
       for (const L of this.lines) for (const s of L.strums) {
-        s.update(dt); centerOffsets(s); if (s.animName === 'confirm') { s.offset.x -= 13; s.offset.y -= 13; }
+        s.update(dt); s.fixOff();
         s.x = s.bx + s.mx; s.y = s.by + s.my + (this.strumShift || 0); s.angle = s.ma; s.alpha = s.mal;
         if (s.confirmHold >= 0) { s.confirmHold += dt; if (s.confirmHold >= 0.15) { s.confirmHold = -1; s.playA('static', true); } }
         if (s.player && s.animName === 'confirm' && s.finished && !this.botplay && !this.pro) { if (this.keys[s.dir]) s.playA('press', true); }
@@ -691,7 +710,7 @@
     },
     playerHit(n, diffMs, auto) {
       const s = this.lines[1].strums[n.lane];
-      s.playA('confirm', true); s.confirmHold = auto ? 0 : -1;
+      s.playA('confirm', true); s.confirmHold = auto && !(n.len > 0) ? 0 : -1;    // (botplay: a hold keeps its arrow lit to the end)
       const r = auto ? 'sick' : judge(diffMs);
       const pts = auto ? 500 : scorePBOT1(diffMs);
       this.nudgeCam(0, n.lane);
@@ -779,6 +798,8 @@
       if (ns) sp.scale.x = sp.scale.y = N.splashScale;
       sp.play('s', true); sp.updateHitbox();
       const S = this.lines[1].strums[lane], so = N.splashOff;
+      // (NoteSplash: centred on the arrow, then its animation offset)
+      if (N.layout === 'psych') { sp.x = laneCX(S.x) - sp.width / 2 - so[0]; sp.y = laneCY(S.y) - sp.height / 2 - so[1]; sp.alpha = N.splashAlpha; sp.blend = N.splashBlend; this.splashes.push(sp); return; }
       if (ns) { sp.x = S.x + so[0] * N.splashScale; sp.y = S.y - INITIAL_OFFSET + so[1] * N.splashScale; }
       else { sp.x = S.x + so[0]; sp.y = S.y - INITIAL_OFFSET + so[1]; }
       sp.offset.x = sp.width * 0.3; sp.offset.y = sp.height * 0.3;
@@ -788,8 +809,9 @@
     kindStyle(K) { return K._ns || (K._ns = makeNS(K.style)); },
     startCover(n) {
       const sheet = NS.cover(n.lane); if (!sheet) return;
-      const cv = new G.Sprite(0, 0); cv.loadSparrow('shared/images/holdCover' + COLOR[n.lane]);
-      cv.addAnim('start', 'holdCoverStart' + COLOR[n.lane], 24, false); cv.addAnim('hold', 'holdCover' + COLOR[n.lane], 24, true); cv.addAnim('end', 'holdCoverEnd' + COLOR[n.lane], 24, false);
+      const cv = new G.Sprite(0, 0); cv.loadSparrow(NS.coverPath(n.lane));
+      cv.addAnim('start', 'holdCoverStart' + COLOR[n.lane], 24, false); cv.addAnim('hold', 'holdCover' + COLOR[n.lane], NS.coverFps, true); cv.addAnim('end', 'holdCoverEnd' + COLOR[n.lane], 24, false);
+      if (NS.coverScale !== 1) cv.scale.x = cv.scale.y = NS.coverScale;
       cv.play('start', true); cv.updateHitbox();
       cv.onFinish = name => { if (name === 'start') cv.play('hold', true); };
       cv.note = n; cv.lane = n.lane; cv.line = n.line;
@@ -1027,7 +1049,9 @@
       else if (!bf.playAnim('firstDeath', true) && this.playAs) bf.playAnim(this.playAs.real.die, true);
       const dd = bf.deathData || {};
       const co = dd.cameraOffsets || [0, 0];
-      const mid = { x: bf.x + bf.width / 2, y: bf.y + bf.height / 2 };
+      let mid = { x: bf.x + bf.width / 2, y: bf.y + bf.height / 2 };
+      // (Psych's game over: the camera on the middle of the death drawing itself: VS Impostor)
+      if (ov && ov.centerArt && G.visBox && !spr) { const vb = G.visBox(bf); if (vb) mid = { x: vb.cx, y: (vb.top + vb.bottom) / 2 }; }
       // like V-Slice: zoom to the stage zoom x the character's death zoom, follow at half the normal rate
       this.gameOver = { t: 0, phase: 'intro', fade: 0, pico, suffix, spr, music: ov && ov.music, end: ov && ov.end, zoom0: this.cam.zoom, zoom1: (this.stageZoom || 1) * (dd.cameraZoom || 1), target: { x: mid.x + co[0], y: mid.y + co[1] } };
       this.camTween = null;
@@ -1204,7 +1228,8 @@
         }
         for (const cv of this.covers) if (cv.line === li) {
           const S = L.strums[cv.lane];
-          cv.x = S.x - INITIAL_OFFSET + STRUM_SIZE / 2 - cv.width / 2 - 12; cv.y = S.y + INITIAL_OFFSET + STRUM_SIZE / 2 - 96;
+          if (NS.layout === 'psych') { cv.x = laneCX(S.x) - cv.width / 2 - NS.coverOff[0]; cv.y = laneCY(S.y) - cv.height / 2 - NS.coverOff[1]; }
+          else { cv.x = S.x - INITIAL_OFFSET + STRUM_SIZE / 2 - cv.width / 2 - 12; cv.y = S.y + INITIAL_OFFSET + STRUM_SIZE / 2 - 96; }
           cv.draw(ctx, lc);
         }
       }
