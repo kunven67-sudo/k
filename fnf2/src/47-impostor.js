@@ -281,9 +281,11 @@
   }
 
   // ================================================================ camera spots + zoom (utils.hx camSpecialThing)
+  // (utils.hx dadOff / bfOff: the spots belong to the side, so a Change Character keeps them)
   function setCams(P, dad, bf, zoom) {
-    if (dad) P.dad.camFocus = { x: dad[0], y: dad[1] };
-    if (bf) P.bf.camFocus = { x: bf[0], y: bf[1] };
+    const sp = P.imp.spots;
+    if (dad) { sp.dad = { x: dad[0], y: dad[1] }; P.dad.camFocus = Object.assign({}, sp.dad); }
+    if (bf) { sp.bf = { x: bf[0], y: bf[1] }; P.bf.camFocus = Object.assign({}, sp.bf); }
     if (zoom > 0) { P.imp.baseZoom = zoom; applyZoom(P); }
     if (P.camTarget && G.ModEvents && !P.camForced) { const c = P.camTarget === 'bf' ? P.bf : P.dad; if (c && c.camFocus) P.cam.follow(c.camFocus.x, c.camFocus.y); }
   }
@@ -292,11 +294,12 @@
   // BF's spot and leans with GF.
   function leanCam(P) {
     const I = P.imp; if (I.camWho == null || P.camForced || P.camTween || P.gameOver) return;
-    const spot = I.camWho === 1 ? P.dad : P.bf, who = I.camWho === 1 ? P.dad : I.camWho === 2 ? (P.gf || P.bf) : P.bf;
-    if (!spot || !spot.camFocus) return;
+    const side = I.camWho === 1 ? 'dad' : 'bf', who = I.camWho === 1 ? P.dad : I.camWho === 2 ? (P.gf || P.bf) : P.bf;
+    const f = I.spots[side] || (P[side] && P[side].camFocus);
+    if (!f) return;
     let dx = 0, dy = 0;
     if (P.started && P.songPos >= 0 && who) { const d = DRIFT[String(who.animName || '').slice(4).split('-')[0]]; if (d) { dx = d[0] / 2; dy = d[1] / 2; } }
-    P.cam.follow(spot.camFocus.x + dx, spot.camFocus.y + dy);
+    P.cam.follow(f.x + dx, f.y + dy);
   }
   function applyZoom(P) { const z = P.imp.baseZoom + (P.imp.zoomAdd || 0); P.camZoom = z; P.stageZoom = z; }
   // defaultCamZoom = z the way Psych gets there: the camera eases (zoom = lerp(default, zoom, e^(-3.125 x decay x t)))
@@ -316,7 +319,7 @@
   // ================================================================ the base every Impostor song runs on
   const BASE = {
     setup(P) {
-      const I = P.imp = { data: songData(P.song.id) || {}, tw: [], pops: [], lastHit: {}, prevAnim: {}, holdK: {}, ghosts: {},
+      const I = P.imp = { data: songData(P.song.id) || {}, spots: {}, tw: [], pops: [], lastHit: {}, prevAnim: {}, holdK: {}, ghosts: {},
         accSum: 0, accN: 0, beepFx: { a: 0 }, caption: null, baseZoom: P.stage.zoom, zoomAdd: 0, camA: 1, fade: null };
       // Psych's zoom bop adds +0.015 to the zoom; FNF 2 multiplies: the same size at this stage's zoom
       P.bopIntensity = 1 + 0.015 / Math.max(0.1, P.stage.zoom); P.hudBopIntensity = 0.03;
@@ -348,8 +351,8 @@
         st.x = st.bx + (st.mx || 0); st.y = st.by + (st.my || 0);
       }));
       const sc = P.stage.data.characters || {};
-      if (sc.dad && sc.dad.camera) P.dad.camFocus = { x: sc.dad.camera[0], y: sc.dad.camera[1] };
-      if (sc.bf && sc.bf.camera) P.bf.camFocus = { x: sc.bf.camera[0], y: sc.bf.camera[1] };
+      I.spots = {};
+      setCams(P, sc.dad && sc.dad.camera, sc.bf && sc.bf.camera, -1);
     },
     update(P, dt) {
       const I = P.imp; tick(I.tw, dt);
@@ -413,7 +416,8 @@
     drawTop(ctx, P) {
       const I = P.imp;
       G.setScreenT(ctx);
-      for (const s of I.pops) s.draw(ctx, P.hud);
+      const hudA = P.hud.alpha * P.hudParts.all;            // (camHUD: they fade with the HUD)
+      if (hudA > 0.01 && I.pops.length) { ctx.save(); ctx.globalAlpha *= Math.min(1, hudA); for (const s of I.pops) s.draw(ctx, P.hud); ctx.restore(); }
       G.setScreenT(ctx);
       if (I.beepFx.a > 0.002) { ctx.save(); ctx.globalAlpha = I.beepFx.a; ctx.fillStyle = '#b30000'; ctx.fillRect(-G.CUT, 0, G.W + G.CUT * 2, G.H); ctx.restore(); }
       drawTask(ctx, P);
@@ -582,6 +586,7 @@
       const s = this.spr = new G.Sprite(0, y).loadAtlas(G.A.imagePath(MIRA + 'cafeteria/walkers'));
       s.scale.x = s.scale.y = scale;
       for (const [c] of WALKER_COLORS) { s.addAnim(c + ' walk', c + ' walk', 24, true); s.addAnim(c + ' idle', c + ' idle', 24, false); }
+      s.updateHitbox(); s.y = y - s.height;                      // (reloadAtlas: y is where his feet are)
       this.zIndex = 0; this.walkSpeed = 30; this.idle = false; this.right = true; this.hibernating = true; this.alive = true;
       this.actionTimer = rnd(0.5, 1); this.onAction = []; this.onEnter = []; this.onAway = []; this.color = null;
       s.visible = false;
@@ -599,16 +604,17 @@
     fire(list) { const fs = list.splice(0); for (const f of fs) f(); }
     triggerNextAction() {
       this.actionTimer = rnd(0.5, 1);                             // (setNewActionTime; a listener can change it)
+      this.walkSpeed = rnd(18, 40);                                // (the song's own onAction listener)
       if (this.hibernating) {
+        // (coming in: whatever waits for him to come in decides where he walks; the next action is a normal one)
         this.hibernating = false; this.spr.visible = true; this.idle = false;
         this.right = this.x < (this.range[0] + this.range[1]) / 2;   // (from the edge, inwards)
         if (!this.color) this.swapSkin();
         this.fire(this.onEnter);
-      } else {
-        if (Math.random() < 0.2) this.right = Math.random() < 0.5;
-        if (!this.idle && Math.random() < 0.6) this.idle = true; else if (this.idle && Math.random() < 0.5) this.idle = false;
+        return;
       }
-      this.walkSpeed = rnd(18, 40);                                // (the song's own onAction listener)
+      if (Math.random() < 0.2) this.right = Math.random() < 0.5;
+      if (!this.idle && Math.random() < 0.6) this.idle = true; else if (this.idle && Math.random() < 0.5) this.idle = false;
       this.fire(this.onAction);
     }
     update(dt) {
@@ -651,7 +657,8 @@
       const k = ((songData('sussus-toogus') || {}).small || {})['stages/mira/cafeteria/cyan_toogus'] || 1;
       const sx = W.sax = new G.Sprite(0, 0).loadSparrow(G.A.imagePath(MIRA + 'cafeteria/cyan_toogus'));
       sx.addAnim('bop', 'Cyan Dancy', 24, true); sx.play('bop');
-      sx.scale.x = sx.scale.y = 1.1 / k; sx.scroll = { x: 1.2, y: 1.2 }; sx.zIndex = 600; sx.alpha = 0.001; sx.k = k;
+      sx.scale.x = sx.scale.y = 1.1 / k; sx.scroll = { x: 1.2, y: 1.2 }; sx.zIndex = 1e6;   // (song script add(): after the whole stage, over everybody)
+      sx.alpha = 0.001; sx.k = k;
       P.stage.addExtra(sx, null);
     },
     reset(P) {
