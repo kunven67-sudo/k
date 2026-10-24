@@ -162,13 +162,20 @@ def pixel_icon(pack, src, cid):
     Image.alpha_composite(under, frame).save(dst)
 
 
-def anim_list(cj, img_kind, extra_offset=(0, 0), asset=None):
+def num(v):
+    """a number for the json: whole ones stay whole (-12, not -12.0)"""
+    r = round(v, 3); return int(r) if r == int(r) else r
+
+
+def anim_list(cj, img_kind, extra_offset=(0, 0), asset=None, div=1):
+    """div: the character's scale. FNF 2 draws the offsets x the scale, the mod's engine doesn't (scalableOffsets only
+    counts when the scale changes from the json's own): so they go in divided by it."""
     out = []
     for a in cj['animations']:
         name = a['anim']
         if name.endswith('-loop'): name = name[:-5] + '-hold'          # (Psych 1.0 '-loop' follow-ups = FNF's '-hold')
         an = {'name': name, 'prefix': a['name'], 'frameRate': a.get('fps', 24), 'looped': bool(a.get('loop')),
-              'offsets': [round(a['offsets'][0] - extra_offset[0], 2), round(a['offsets'][1] - extra_offset[1], 2)]}
+              'offsets': [num((a['offsets'][0] - extra_offset[0]) / div), num((a['offsets'][1] - extra_offset[1]) / div)]}
         if a.get('indices'): an['frameIndices'] = a['indices']
         if a.get('flipX'): an['flipX'] = True
         if asset: an['assetPath'] = asset
@@ -186,14 +193,15 @@ def character(pack, cid):
     cj = json5(p)
     kind = copy_image(pack, cj['image'])
     s = cj.get('scale', 1)
-    if s != 1: print('   NOTE scale', cid, s)
+    pos = cj.get('position', [0, 0])
     d = {'version': '1.0.0', 'name': cid, 'renderType': 'animateatlas' if kind == 'atlas' else 'sparrow',
          'assetPath': 'shared:%s/%s' % (NS, cj['image']), 'scale': s, 'flipX': bool(cj.get('flip_x')),
-         'offsets': cj.get('position', [0, 0]), 'cameraOffsets': cj.get('camera_position', [0, 0]),
+         # (x the scale when FNF 2 draws them: the mod puts them on unscaled)
+         'offsets': [num(pos[0] / s), num(pos[1] / s)], 'cameraOffsets': cj.get('camera_position', [0, 0]),
          # (Character.update: back to idle after sing_duration steps: holdTimer >= stepCrotchet * 0.001 * singDuration)
          'singTime': cj.get('sing_duration', 4),
          'isPixel': bool(cj.get('no_antialiasing')),
-         'animations': anim_list(cj, kind)}
+         'animations': anim_list(cj, kind, div=s)}
     d['danceEvery'] = cj.get('dance_every', 2)       # (the template's 2 when it's missing)
     ic = icon(pack, cj.get('healthicon'))
     if ic: d['healthIcon'] = {'id': ic}
@@ -208,7 +216,7 @@ def character(pack, cid):
         dk = copy_image(pack, dj['image'])
         dp, bp = dj.get('position', [0, 0]), cj.get('position', [0, 0])
         dasset = 'shared:%s/%s' % (NS, dj['image'])
-        d['animations'] += anim_list(dj, dk, (dp[0] - bp[0], dp[1] - bp[1]), dasset)
+        d['animations'] += anim_list(dj, dk, (dp[0] - bp[0], dp[1] - bp[1]), dasset, div=s)
         d['renderType'] = 'multianimateatlas' if kind == 'atlas' or dk == 'atlas' else 'multisparrow'
         if d['renderType'] == 'multianimateatlas':
             for a in d['animations']:
@@ -216,7 +224,10 @@ def character(pack, cid):
                 a['renderType'] = 'animateatlas' if (atlas_dir(dj['image']) if a['assetPath'] == dasset else kind == 'atlas') else 'sparrow'
         for k in ('gameover_intial_sound', 'gameover_loop_sound', 'gameover_confirm_sound'):
             v = dj.get(k) or cj.get(k)
-            if v: d['impostor'][k] = v
+            if v:
+                d['impostor'][k] = v
+                snd = M('sounds', v + '.ogg') if k == 'gameover_intial_sound' else M('music', v + '.ogg')
+                if os.path.exists(snd): pack.put(snd, 'preload', 'sounds' if k == 'gameover_intial_sound' else 'music', NS, v + '.ogg')
     pack.dump(d, 'preload', 'data', 'characters', P + cid + '.json')
     DONE_CHARS[cid] = P + cid
     return P + cid
@@ -271,10 +282,15 @@ def notes_of(s):
     return dd, ev, tc, old_ev
 
 
+# (Add Camera Zoom adds to the zoom, Set Cam Zoom only sets where the zoom goes back to, Play Animation stops the
+# dancing until it's done: Nightmare Vision's own)
+OWN_EVENTS = {'Add Camera Zoom': 'Imp Add Zoom', 'Set Cam Zoom': 'Imp Set Zoom', 'Play Animation': 'Imp Play Anim'}
+
 def events_of(*songs):
     """Psych 'events' lists ([t, [[name, v1, v2], ...]] or the old [t, name, v1, v2]) -> FNF 2 events, each once."""
     out, seen = [], set()
     def add(t, name, v1, v2):
+        name = OWN_EVENTS.get(name, name)
         k = (round(float(t), 1), name, str(v1), str(v2))
         if k in seen or not name: return
         seen.add(k); out.append({'t': round(float(t), 3), 'e': name, 'v': {'value1': '' if v1 is None else str(v1), 'value2': '' if v2 is None else str(v2)}})
@@ -304,10 +320,11 @@ def easier(notes, bpm_changes, level):
 # adds (in front), as FNF 2 props. Psych/Flixel rules: setGraphicSize / scale.set without updateHitbox scale the
 # picture around its middle, the x,y stay where the unscaled picture's corner was; zIndex sorts (default 0, ties keep
 # the order they were added in).
-def prop(name, img, x, y, scroll=(1, 1), scale=1.0, hitbox=False, alpha=1.0, z=0, anims=None, start=None, blend=None, flip=False, extra=None, gsize=None, indices=None):
+def prop(name, img, x, y, scroll=(1, 1), scale=1.0, hitbox=False, alpha=1.0, z=0, anims=None, start=None, blend=None, flip=False, extra=None, gsize=None, indices=None, hit1=None):
     """gsize = setGraphicSize(Std.int(width * gsize)): the scale that makes, from the picture's real width.
-    indices = {anim: [frame numbers]} (addByIndices)."""
-    return dict(name=name, img=img, x=x, y=y, scroll=scroll, scale=scale, hitbox=hitbox, alpha=alpha, z=z, anims=anims, start=start, blend=blend, flip=flip, extra=extra or {}, gsize=gsize, indices=indices or {})
+    scale = one number or (x, y). indices = {anim: [frame numbers]} (addByIndices). img '#rrggbb' = makeGraphic (a
+    block of colour, scale = its size). hit1 = the scale its last updateHitbox ran at, when it was scaled again after."""
+    return dict(name=name, img=img, x=x, y=y, scroll=scroll, scale=scale, hitbox=hitbox, alpha=alpha, z=z, anims=anims, start=start, blend=blend, flip=flip, extra=extra or {}, gsize=gsize, indices=indices or {}, hit1=hit1)
 
 # layer numbers (zIndex) the FNF 2 way: the mod's zIndex x 1000 + where it was added: the stage script's onLoad
 # sprites first (0..499), then GF / the opponent / you (500 / 510 / 520), then onCreatePost's (600..). Ties keep the
@@ -378,6 +395,70 @@ STAGES = {
         files=['stages/mira/ejected/buildingA', 'stages/mira/ejected/buildingB', 'stages/mira/ejected/scrollingClouds', 'stages/mira/ejected/speedLines'],
         extra={'falling': True},
     ),
+    # ---- the Airship, Yellow's room (data/stages/airship.hx): nine layers, all x2. White sweats in the corner (gone
+    #      in Oversight, where Yellow's body lies there instead). (The Henry Teleporter, story mode Mando / D'low,
+    #      comes with week 9: clicking it leads there.)
+    'airship': dict(
+        zoom=0.6, bf=(700, 110), gf=(135, 140), dad=(-220, 110), cams=((300, 500), (700, 500)),
+        back=[
+            prop('sky', 'stages/airship/mando/fartingSky', -1468, -995, (0.3, 0.3), 2, hitbox=True),
+            prop('backSky', 'stages/airship/mando/backSkyyellow', -1125, 284, (0.4, 0.7), 2, hitbox=True),
+            prop('cloud3', 'stages/airship/mando/yellow cloud 3', 1330, 283, (0.5, 0.8), 2, hitbox=True),
+            prop('cloud2', 'stages/airship/mando/yellow could 2', -837, 304, (0.6, 0.9), 2, hitbox=True),
+            prop('window', 'stages/airship/mando/window', -1387, -1231, scale=2, hitbox=True),
+            prop('cloud1', 'stages/airship/mando/cloudYellow 1', -1541, 242, (0.8, 0.8), 2, hitbox=True),
+            prop('backFloor', 'stages/airship/mando/backDlowFloor', -642, 325, (0.9, 1), 2, hitbox=True),
+            prop('floor', 'stages/airship/mando/DlowFloor', -2440, 336, scale=2, hitbox=True),
+            prop('glow', 'stages/airship/mando/glowYellow', -1113, -1009, scale=2, hitbox=True, blend='add'),
+            prop('whiteAwkward', 'stages/airship/mando/white_awkward', 298, 550,
+                 anims=[('sweat', 'fetal position', 6, True), ('stare', 'white stare', 24, False)], start='sweat'),
+            prop('deadbody', 'stages/airship/mando/YELLOW', -400, 620, alpha=0),
+        ],
+    ),
+    # ---- Danger (data/stages/danger.hx): running on top of the Airship. The clouds, the platform you run on and the
+    #      speed lines are endless strips (FlxBackdrop: 'backdrop' = the gap between the copies) scrolling left every
+    #      frame (src/47-impostor.js); the big cloud drifts by, the scream sky flashes when Black screams.
+    #      (zoom: the stage says 2, the script .3: the camera starts at 2 and eases out once Black sings)
+    'danger': dict(
+        zoom=0.3, bf=(1645, -120), gf=(850, -90), dad=(500, -130), cams=((1634.05, -54.3), (1734.05, -54.3)), charz={'gf': 3, 'bf': 6, 'dad': 9},
+        back=[
+            # (the sky gradient + the pale band under the far clouds go further left than the mod's: a phone's screen is
+            #  wider, they ended inside it; the right ends stay where they were, so a PC sees the same)
+            prop('sky', 'stages/airship/danger/sky', -3500, -897.55, (0, 0), (700, 6), hitbox=True),
+            prop('farCloudBg', '#C0DBFF', -3000, -142.2 + 126 * 2 - 1, (0.1, 0.1), (4500, 1200)),
+            prop('farClouds', 'stages/airship/danger/farthestClouds', 3385.95, -142.2, (0.1, 0.1), 2, hitbox=True, extra={'backdrop': -2}),
+            prop('midClouds', 'stages/airship/danger/backClouds', 3352.4, 76.55, (0.2, 0.2), 2, hitbox=True, extra={'backdrop': -2}),
+            prop('airship', 'stages/airship/danger/airship', 1114.75, -873.05, (0.25, 0.25), 2, hitbox=True),
+            prop('fan', 'stages/airship/danger/airshipFan', 2285.4, 102, (0.27, 0.27), anims=[('idle', 'ala avion instance 1', 24, True)], start='idle'),
+            prop('bigCloud', 'stages/airship/danger/bigCloud', 3507.15, -744.2, (0.4, 0.4), 2, hitbox=True),
+            prop('closeClouds', 'stages/airship/danger/frontClouds', 6092.2, 422.15, (0.3, 0.3), 2, hitbox=True, extra={'backdrop': -3}),
+            prop('screamsky', 'stages/airship/danger/screamsky', 0, -200, scale=12, hit1=4, alpha=0, anims=[('bop', 'scream sky', 24, False)]),
+            prop('platform', 'stages/airship/danger/fgPlatform', -7184.8, 282.25, scale=2, hitbox=True, extra={'backdrop': 0}),
+            # (GF's speaker on wheels, right behind her)
+            prop('gfBoard', 'stages/airship/danger/dangerboards', 850, 550, z=2, anims=[('bop', 'speakerwheel', 24, True)], start='bop'),
+        ],
+        front=[
+            # (added after the characters but on layer 0 like the rest: in front of the platform, behind everyone)
+            prop('speedlines', 'stages/airship/danger/speedlines', -3352.1, -1035.95, (1.3, 1.3), alpha=0.2, extra={'backdrop': 1}),
+        ],
+        extra={'startZoom': 2},
+    ),
+    # ---- Double Kill, the cargo hold (data/stages/cargo.hx + songs/double-kill/double-kill.hx). Black sings from GF's
+    #      spot. The black cover for the dark parts is on layer 0 (behind everyone); the two light overlays are over
+    #      everyone (subtract .51, add .6). The song's own pictures (the airship flashback, the defeat glow, the black
+    #      cover over everything) are made in src/47-impostor.js
+    'cargo': dict(
+        zoom=0.8, bf=(2550, 650), gf=(1550, 600), dad=(1250, 680), cams=((2000, 1050), (2300, 1050)),
+        back=[
+            prop('bg', 'stages/airship/double-kill/cargo', 0, 0, scale=2, hitbox=True),
+            prop('cargoDark', '#000000', -1000, -1000, (0, 0), (1280 * 3, 720 * 3), alpha=0.001),
+        ],
+        front=[
+            prop('mainoverlay', 'stages/airship/double-kill/newoverlay1', 1000, 350, scale=(1.8, 1.6), hitbox=True, alpha=0.51, extra={'blendMode': 'subtract'}),
+            prop('lightoverlay', 'stages/airship/double-kill/newoverlay2', 1000, 350, scale=(1.8, 1.6), hitbox=True, alpha=0.6, blend='add'),
+        ],
+        files=['stages/airship/double-kill/airshipFlashback', 'stages/void/iluminao omaga'],
+    ),
 }
 
 
@@ -389,17 +470,25 @@ def stage(pack, sid):
     def add(pr, front):
         nonlocal order
         img = pr['img']
+        if img.startswith('#'):          # (makeGraphic + setGraphicSize: a block of colour that size)
+            w, h = pr['scale']
+            q = {'name': pr['name'], 'assetPath': img, 'position': [pr['x'], pr['y']], 'scale': [w, h], 'scroll': list(pr['scroll']),
+                 'alpha': pr['alpha'], 'zIndex': zkey(pr['z'], 600 + order if front else order)}
+            q.update(pr['extra']); props.append(q); order += 1
+            return
         kind = copy_image(pack, img)
         if kind == 'sparrow':
             f0 = frames_of(open(M('images', img + '.xml'), encoding='utf-8-sig').read())[0]; fw, fh = f0['fw'], f0['fh']
         elif kind == 'image':
             fw, fh = Image.open(M('images', img + '.png')).size
         else: fw = fh = 0
-        s = pr['scale']; x, y = pr['x'], pr['y']
-        if pr['gsize'] and fw: s = int(fw * pr['gsize']) / fw
-        if s != 1 and not pr['hitbox']:      # scaled around its middle, the corner didn't move
-            x -= fw * (s - 1) / 2; y -= fh * (s - 1) / 2
-        q = {'name': pr['name'], 'assetPath': '%s/%s' % (NS, img), 'position': [round(x, 2), round(y, 2)], 'scale': [s, s],
+        sc = pr['scale']; sx, sy = sc if isinstance(sc, (tuple, list)) else (sc, sc); x, y = pr['x'], pr['y']
+        if pr['gsize'] and fw: sx = sy = int(fw * pr['gsize']) / fw
+        # scaled around its middle: the corner only stays put where its last updateHitbox was (FNF 2 puts the corner)
+        h1 = pr['hit1'] if pr['hit1'] is not None else ((sx, sy) if pr['hitbox'] else (1, 1))
+        h1x, h1y = h1 if isinstance(h1, (tuple, list)) else (h1, h1)
+        if fw: x += fw * (h1x - sx) / 2; y += fh * (h1y - sy) / 2
+        q = {'name': pr['name'], 'assetPath': '%s/%s' % (NS, img), 'position': [round(x, 2), round(y, 2)], 'scale': [sx, sy],
              'scroll': list(pr['scroll']), 'alpha': pr['alpha'],
              'zIndex': zkey(pr['z'], 600 + order if front else order)}
         if pr['anims']:
@@ -494,6 +583,16 @@ WEEKS = {
                    'reactor': dict(stage='reactor', ratings=(3, 5, 7)),
                    'ejected': dict(stage='ejected', videos=['week2/ejected'], ratings=(3, 6, 8)),
                }),
+    'w3': dict(pack='impostor-w3', level='imp-week3', week='week3', title='AIRSHIP ATROCITIES', color=None, portrait='yellow',
+               songs={
+                   'mando': dict(stage='airship', videos=['week3/Mando'], talk='dialogue.txt', ratings=(3, 5, 7)),
+                   # (Yellow dies at the end: her 'dead' icon stands in for the real one)
+                   "d'low": dict(stage='airship', talk='dialogue.txt', icons=['yellow-dead'], ratings=(3, 6, 8)),
+                   'oversight': dict(stage='airship', videos=['week3/oversight'], talk='dialogue.txt', ratings=(3, 5, 8)),
+                   'danger': dict(stage='danger', videos=['week3/danger'], ratings=(4, 6, 9)),
+                   # (White + Black: the icons change with who sings; BF turns into his defeat self at the end)
+                   'double-kill': dict(stage='cargo', chars=['bf-defeat-normal'], icons=['double-kill', 'black', 'white'], ratings=(4, 7, 10)),
+               }),
 }
 SHARED_CHARS = {'bf', 'gf'}
 
@@ -505,7 +604,7 @@ def song(pack, core, sid, spec, week):
     if os.path.exists(ep): extra.append(chart(ep))
     hard, cam, tc, old_ev = notes_of(s)
     evs = events_of(s, *extra)
-    for t, n, v1, v2 in old_ev: evs.append({'t': round(t, 3), 'e': n, 'v': {'value1': str(v1), 'value2': str(v2)}})
+    for t, n, v1, v2 in old_ev: evs.append({'t': round(t, 3), 'e': OWN_EVENTS.get(n, n), 'v': {'value1': str(v1), 'value2': str(v2)}})
     events = sorted(cam + evs, key=lambda e: e['t'])
     # characters: the chart's, the ones Change Character events want
     def ch(cid):
@@ -517,6 +616,7 @@ def song(pack, core, sid, spec, week):
     for e in events:
         if e['e'] == 'Change Character': ch(e['v']['value2'].strip())
     for c in spec.get('chars', []): ch(c)
+    for ic in spec.get('icons', []): icon(pack, ic)
     notes = {'easy': easier(hard, tc, 'easy'), 'normal': easier(hard, tc, 'normal'), 'hard': hard}
     sp = s.get('speed', 2.5)
     speeds = {'default': sp, 'easy': round(sp * 0.85, 2), 'normal': round(sp * 0.92, 2), 'hard': sp}

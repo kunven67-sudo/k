@@ -86,7 +86,9 @@ G.Character = class extends G.Sprite {
   }
   isSinging() { return this.animName.startsWith('sing') && !this.animName.endsWith('-end'); }
   dance(force) {
-    if (this.isDead || this._locked) return;          // (locked = a special animation must play out)
+    // (locked = a special animation must play out; special = Psych's specialAnim: no dancing until it ends or the
+    // character sings again)
+    if (this.isDead || this._locked || this._special) return;
     if (this.script && this.script.dance) { this.script.dance(this, force); return; }
     if (!force) {
       if (this.isSinging()) return;
@@ -101,6 +103,7 @@ G.Character = class extends G.Sprite {
       const base = name.replace(/-(alt|hold|end|censor).*$/, '').replace(/miss$/, '');
       if (this.anims[base]) name = base; else return false;
     }
+    this._special = false;
     this.play(name, force);
     return true;
   }
@@ -117,6 +120,7 @@ G.Character = class extends G.Sprite {
     if (this.fx && this.fx.update) this.fx.update(this, dt);
     if (this.script && this.script.tick) this.script.tick(this, dt);
     if (this.isDead) return;
+    if (this._special && this.finished) { this._special = false; this.dance(true); }
     if (this.finished && !this.animName.endsWith('-hold') && this.anims[this.animName + '-hold']) this.play(this.animName + '-hold');
     if (this.isSinging()) {
       this.holdTimer += dt;

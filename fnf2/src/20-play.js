@@ -586,7 +586,8 @@
             if (pos < n.holdEnd) {
               if (L.player) { this.botHolding = true; this.holdTick(n, dt); }
               else {
-                this.dad.holdTimer = 0; s.confirmHold = -1;
+                for (const c of n.who || [this.dad]) if (c) c.holdTimer = 0;
+                s.confirmHold = -1;
                 if (s.animName === 'confirm' && s.finished) s.playA('confirm-hold', true);
                 else if (s.animName !== 'confirm' && s.animName !== 'confirm-hold') s.playA('confirm', true);
               }
@@ -623,11 +624,17 @@
     oppHit(n) {
       const s = this.lines[0].strums[n.lane];
       s.playA('confirm', true); s.confirmHold = n.len > 0 ? -1 : 0;
-      const suffix = n.kind === 'alt' ? '-alt' : '', ka = kindAnim(this.dad, n.kind);
-      if (n.kind === 'hey') this.dad.playAnim('hey', true);
-      else if (n.kind === 'No Animation') { /* (Psych note type: the singer doesn't pose) */ }
-      else if (!this.dad._locked && ka) { this.dad.playAnim(ka, true); this.dad.holdTimer = 0; }
-      else if (!this.dad._locked) { this.dad.lastNote = n; this.dad.sing(n.lane, false, suffix); }
+      const suffix = n.kind === 'alt' ? '-alt' : '';
+      // (who sings it: the opponent, unless the song says otherwise: Double Kill's two opponents)
+      const singers = n.who = (this.sfx && this.sfx.oppSingers && this.sfx.oppSingers(this, n)) || [this.dad];
+      for (const c of singers) {
+        if (!c) continue;
+        const ka = kindAnim(c, n.kind);
+        if (n.kind === 'hey') c.playAnim('hey', true);
+        else if (n.kind === 'No Animation') { /* (Psych note type: the singer doesn't pose) */ }
+        else if (!c._locked && ka) { c.playAnim(ka, true); c.holdTimer = 0; }
+        else if (!c._locked) { c.lastNote = n; c.sing(n.lane, false, suffix); }
+      }
       if (this.audio) this.audio.setVolume('o', 1);
       this.nudgeCam(1, n.lane);
       if (this.sfx && this.sfx.oppHit) this.sfx.oppHit(this, n);
@@ -1063,6 +1070,7 @@
       const go = this.gameOver; go.t += dt;
       const bf = this.bf, ch = go.spr || bf;
       ch.update(dt);
+      if (this.sfx && this.sfx.gameOverUpdate) this.sfx.gameOverUpdate(this, dt);     // (a song's own game over moves)
       this.cam.zoom = G.lerp(go.zoom1, this.cam.zoom, Math.pow(0.01, dt / 0.5));
       this.cam.update(dt);
       if (go.phase === 'intro' && ch.finished) { go.phase = 'loop'; if (go.spr) go.spr.play('deathLoop', true); else bf.playAnim('deathLoop', true); G.audio.music.play(go.music || 'shared/music/gameplay/gameover/gameOver' + go.suffix + '.ogg', { loop: true, bpm: 100 }); }

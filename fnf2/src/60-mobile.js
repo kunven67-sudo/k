@@ -141,8 +141,8 @@ window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document
 G.phoneUpdate = {
   BASE: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/',
   ZIPS: { 'fnf2-phone-update.zip': ['mobile', 'videosongs', 'jordus'], 'fnf2-phone-impostor.zip': ['impostor', 'impostor-w1'],
-    'fnf2-phone-impostor-w2.zip': ['impostor-w2'] },
-  NEED: { mobile: 2, videosongs: 2, jordus: 4, impostor: 2, 'impostor-w1': 2, 'impostor-w2': 1 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
+    'fnf2-phone-impostor-w2.zip': ['impostor-w2'], 'fnf2-phone-impostor-w3.zip': ['impostor-w3'] },
+  NEED: { mobile: 2, videosongs: 2, jordus: 4, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
             // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player, v3 = her own animations)
   saved: {},            // (packs picked just now: the zips on GitHub always hold the newest ones)
   old(id) { return !this.saved[id] && (!G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]); },
@@ -153,7 +153,7 @@ G.phoneUpdate = {
     const zips = this.zips();
     const d = this.box = document.createElement('div');
     d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
-    const msg = document.createElement('div'); msg.textContent = note || 'PHONE UPDATE: VS IMPOSTOR week 2 (MIRA MANIA) + week 1 fixes';
+    const msg = document.createElement('div'); msg.textContent = note || 'PHONE UPDATE: VS IMPOSTOR week 3 (AIRSHIP ATROCITIES) + week 1-2 fixes';
     const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin;flex-wrap:wrap';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
     const gets = zips.map((z, i) => {
