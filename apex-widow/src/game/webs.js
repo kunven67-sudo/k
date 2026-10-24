@@ -8,7 +8,7 @@ const CAP = 6000; // segments
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3();
 
 // camera-facing thick lines (expanded in the vertex shader), min 1.2 px wide so thin silk still shows
-class WebLines {
+export class WebLines {
   constructor() {
     const g = new THREE.InstancedBufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute([0, -1, 0, 0, 1, 0, 1, -1, 0, 1, 1, 0], 3));

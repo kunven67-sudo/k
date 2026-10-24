@@ -1,7 +1,9 @@
 // The VOSS BIOGENETICS tower: 48 floors, 44 x 44 m, concrete core with 2 elevator shafts, a stairwell and a vent
 // shaft. Playable floors are fully built inside; the rest are locked down (lockdown) and only exist as shell.
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Batch, Kit, SOLID } from './kit.js';
+import { fillTankRoom } from './labprops.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 export const FLOOR_H = 4.2, CEIL_H = 3.0, HALF = 22, FLOORS = 48;
@@ -72,7 +74,7 @@ export function doorLeaf(B, x1, z1, x2, z2, y0, at, w, h, open = 0, mat = 'lamin
 }
 
 // drop ceiling over a rectangle: tile surface + T-bar grid + light panels + diffusers
-export function ceiling(B, x0, z0, x1, z1, y, ctx, { lights = true, lightMat = 'lightPanel', every = 2.4, warm = false, i = 1 } = {}) {
+export function ceiling(B, x0, z0, x1, z1, y, ctx, { lights = true, lightMat = 'lightPanel', every = 2.4, warm = false, i = 1, offFn = null } = {}) {
   B.box(x1 - x0, 0.015, z1 - z0, 'ceiling', (x0 + x1) / 2, y + 0.0075, (z0 + z1) / 2, 'STRUCT');
   for (let x = Math.ceil(x0 / 0.6) * 0.6; x < x1; x += 0.6) B.box(0.024, 0.012, z1 - z0, 'paint', x, y - 0.006, (z0 + z1) / 2, null);
   for (let z = Math.ceil(z0 / 0.6) * 0.6; z < z1; z += 0.6) B.box(x1 - x0, 0.012, 0.024, 'paint', (x0 + x1) / 2, y - 0.006, z, null);
@@ -80,8 +82,9 @@ export function ceiling(B, x0, z0, x1, z1, y, ctx, { lights = true, lightMat = '
   for (let x = x0 + every / 2; x < x1 - 0.6; x += every) for (let z = z0 + every / 2; z < z1 - 0.3; z += every) {
     const lx = Math.round(x / 0.6) * 0.6 + 0.6, lz = Math.round(z / 0.6) * 0.6 + 0.3;
     if (lx + 0.6 > x1 || lz + 0.3 > z1) continue;
-    Kit.troffer(B, lx, y, lz, 1.2, 0.6, true);
-    ctx.lights.push({ p: new THREE.Vector3(lx, y - 0.1, lz), color: warm ? 0xffd8b0 : lightMat === 'lightPanel' ? 0xe8f0ff : 0xffe0b8, i, r: 6 + (y % 4.2 > 3.5 ? 4 : 0) });
+    const on = !(offFn && offFn(lx, lz));        // it's the middle of the night: not every light is on
+    Kit.troffer(B, lx, y, lz, 1.2, 0.6, on);
+    if (on) ctx.lights.push({ p: new THREE.Vector3(lx, y - 0.1, lz), color: warm ? 0xffd8b0 : lightMat === 'lightPanel' ? 0xe8f0ff : 0xffe0b8, i, r: 6 + (y % 4.2 > 3.5 ? 4 : 0) });
   }
   for (let x = x0 + every; x < x1 - 0.6; x += every * 2) for (let z = z0 + every; z < z1 - 0.6; z += every * 2) Kit.vent(B, Math.round(x / 0.6) * 0.6 + 0.3, y, Math.round(z / 0.6) * 0.6 + 0.3);
 }
@@ -214,7 +217,7 @@ function floor48(B, y0, ctx) {
   doorLeaf(B, 0, -22, 0, -8, Y, 4, 1.0, 2.15, 0.25, 'steel');
   doorLeaf(B, -22, 8, 22, 8, Y, 9, 1.0, 2.15, 0.6, 'wood'); // Voss's office
   // ceilings
-  ceilAround(B, Y + H, ctx, { every: 2.4 });
+  ceilAround(B, Y + H, ctx, { every: 2.4, offFn: (x, z) => !(x < 0 && z < -8) && Math.random() < 0.5 });
   // ---------- TANK ROOM (x -22..0, z -22..-8)
   // the specimen bench: your tank sits on it
   Kit.labBench(B, -9, Y, -12.2, Math.PI, 3.0, 0.9);
@@ -251,6 +254,7 @@ function floor48(B, y0, ctx) {
   stool(B, -9.6, Y, -11.0); stool(B, -8.4, Y, -19.6);
   whiteboard(B, -14, Y, -21.9, ctx);
   Kit.wallClock(B, -3.0, Y + 2.4, -8.08, Math.PI);
+  fillTankRoom(B, Y, ctx);
   // ---------- ARCHIVE (x 0..22, z -22..-8): Specimens 1-7 in jars + rows of jars, dim light
   for (let r = 0; r < 3; r++) {
     const sx = 5 + r * 5.5;
@@ -299,7 +303,7 @@ function floor48(B, y0, ctx) {
   );
   ctx.humans.push(
     { role: 'voss', x: -9.25, y: Y, z: -13.05, rot: 0 },
-    { role: 'tech', x: -9, y: Y, z: -19.9, rot: Math.PI, path: [[-9, -19.9], [-14, -19.9], [-14, -14.2], [-5, -14.2], [-5, -19.9]] },
+    { role: 'tech', x: -9, y: Y, z: -19.9, rot: Math.PI, path: [[-9, -19.9], [-11.8, -19.9], [-11.8, -14.6], [-7.8, -14.6], [-7.8, -19.9]] },
   );
 }
 
@@ -308,7 +312,14 @@ function tank(B, x, y, z, ctx) {
   const W = 0.46, D = 0.3, H = 0.3, t = 0.004;
   B.box(W + 0.02, 0.012, D + 0.02, 'blackPlastic', x, y + 0.006, z, 'FURN', 0, 0.003);            // base frame
   B.box(W, 0.012, D, 'soil', x, y + 0.018, z, 'STRUCT');                                            // substrate
-  for (let i = 0; i < 70; i++) B.add(new THREE.DodecahedronGeometry(0.003 + Math.random() * 0.004, 0), 'soil', { p: [x + (Math.random() - 0.5) * W * 0.9, y + 0.025, z + (Math.random() - 0.5) * D * 0.9], r: [Math.random() * 3, Math.random() * 3, 0] }, 'SMALL');
+  // bits of coco fibre + little pebbles (at 4 mm, a 3 mm pebble is a boulder)
+  for (let i = 0; i < 46; i++) {
+    let g = new THREE.IcosahedronGeometry(1, 1); g.deleteAttribute('normal'); g.deleteAttribute('uv'); g = mergeVertices(g);
+    const q = g.attributes.position;
+    for (let k = 0; k < q.count; k++) { const f = 0.8 + Math.random() * 0.35; q.setXYZ(k, q.getX(k) * f, q.getY(k) * f * 0.7, q.getZ(k) * f); }
+    const r = 0.0012 + Math.random() * 0.0022; g.scale(r, r, r); g.computeVertexNormals();
+    B.add(g, Math.random() < 0.5 ? 'soil' : 'concrete', { p: [x + (Math.random() - 0.5) * W * 0.9, y + 0.024 + r * 0.2, z + (Math.random() - 0.5) * D * 0.9], r: [Math.random() * 3, Math.random() * 3, 0] }, 'SMALL');
+  }
   // glass walls: back (+z), sides, front (-z, toward the scientist) split around the crack hole (bottom-left)
   const zf = z - D / 2, zb = z + D / 2;
   B.box(W, H, t, 'glass', x, y + 0.012 + H / 2, zb, 'STRUCT');

@@ -90,7 +90,12 @@ export class Hud {
     this.root.appendChild(d); setTimeout(() => d.remove(), 1000);
   }
   zoneChanged() {}
-  applyToggles() { const s = this.game.settings; this.mini.style.display = s.hudMap === false ? 'none' : ''; this.feedEl.style.display = s.hudFeed === false ? 'none' : ''; }
+  applyToggles() {
+    const h = this.game.settings.hud || {};
+    const vis = (el, on) => { el.style.visibility = on === false ? 'hidden' : ''; };
+    vis(this.mini, h.minimap); vis(this.feedEl, h.feed); vis(this.stat, h.meters); vis(this.size, h.size); vis(this.el.wanted, h.wanted); vis(this.el.wl, h.wanted);
+    vis(this.target, h.near); vis(this.hints, h.kills); vis(this.toastEl, h.kills);
+  }
 
   update(dt) {
     const G = this.game, p = G.player; if (!p) return;

@@ -33,7 +33,7 @@ export class LightPool {
   }
   addFixtures(list) { for (const f of list) this.fixtures.push({ p: f.p.clone(), color: new THREE.Color(f.color ?? 0xffffff), i: f.i ?? 1, r: f.r || this.range, on: f.on !== false }); }
   // brightness per unit of fixture "i" (candela-ish), tuned by eye for exposure 1
-  update(dt, camPos, focus, size, base = 30) {
+  update(dt, camPos, focus, size, base = 9) {
     this.timer -= dt;
     if (this.timer <= 0) {
       this.timer = 0.2;

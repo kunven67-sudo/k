@@ -37,6 +37,7 @@ export function placeLabels(list, parent) {
   for (const L of list) {
     const m = makeLabel(L);
     m.position.set(L.x, L.y, L.z); m.rotation.y = L.rot || 0;
+    m.userData.isLabel = true;
     parent.add(m);
   }
 }

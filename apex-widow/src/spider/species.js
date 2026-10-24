@@ -5,10 +5,10 @@ export const SPECIES = {
   widow: {
     name: 'Black widow', latin: 'Latrodectus mactans',
     blurb: 'Shiny black, red hourglass. Venom 15x stronger than a rattlesnake\'s, and the strongest silk of the house spiders.',
-    carapace: { len: 0.34, wid: 0.29, hgt: 0.14, head: 0.03, color: 0x060405, rough: 0.2, coat: 0.07, pattern: 0 },
+    carapace: { len: 0.34, wid: 0.29, hgt: 0.17, head: 0.045, color: 0x060405, rough: 0.22, coat: 0.1, pattern: 0 },
     abdomen: { len: 0.7, wid: 0.64, hgt: 0.6, color: 0x030202, rough: 0.12, coat: 0.035, pattern: 1, hair: 0.0 },
-    legs: { len: [1.55, 1.05, 0.72, 1.32], thick: 0.86, color: 0x050304, rough: 0.28, band: 0x2a0f08, bandAmt: 0.0, hair: 0.35, hairLen: 0.025, spines: 0.25 },
-    eyes: { n: 8, size: 0.022, layout: 'rows' }, fangs: { size: 1.0, down: false },
+    legs: { len: [1.55, 1.05, 0.72, 1.32], thick: 0.62, color: 0x060405, rough: 0.5, band: 0x2a0f08, bandAmt: 0.25, hair: 0.45, hairLen: 0.022, spines: 0.25 },
+    eyes: { n: 8, size: 0.013, layout: 'rows' }, fangs: { size: 1.0, down: false },
     stance: { height: 0.2, spread: 1.0, abdTilt: 0.12 },
     stats: { speed: 1.0, venom: 1.6, silk: 1.5, armor: 1.0, jump: 0.8 },
   },

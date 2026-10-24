@@ -47,7 +47,7 @@ export class Halvern {
     this.envIn = pm.fromScene(new RoomEnvironment(), 0.03).texture;
     const skyScene = new THREE.Scene(); const sky2 = new Sky(100); skyScene.add(sky2.mesh); sky2.setTime(this.clock);
     this.envOut = pm.fromScene(skyScene, 0, 1, 1000).texture; this.pm = pm; this.skyScene = skyScene; this.sky2 = sky2;
-    S.environment = this.envIn; S.environmentIntensity = 0.55;
+    S.environment = this.envIn; S.environmentIntensity = 0.3;
     // tower core (stairs, shafts) + facade + roof
     hud.loading('Pouring the concrete', 0.25);
     const core = await buildTowerCore(this.mats, S);
@@ -141,6 +141,7 @@ export class Halvern {
     for (const n of [...PLAYABLE, ROOF]) { const y0 = elev(n); if (p.y >= y0 - 0.35 && p.y < y0 + (n === ROOF ? 30 : floorH(n) - 0.3)) return n; }
     return null;
   }
+  canSee(p) { if (!this.visIn) return true; return p.y > this.vis0 && p.y < this.vis1; }
   inside(p) { return Math.abs(p.x) < HALF && Math.abs(p.z) < HALF && p.y > -2 && p.y < elev(ROOF) - 0.3; }
 
   enter(opts = {}) {
@@ -179,11 +180,22 @@ export class Halvern {
       const F = this.floors[k], y0 = elev(+k);
       F.group.visible = !camIn || (cam.y > y0 - 6 && cam.y < y0 + floorH(+k) + 6);
     }
-    this.facade.visible = !this.inside(cam) || true;
+    // what can the camera possibly see? deep inside the tower: only the floor you're on (no city details)
+    const camInT = this.inside(cam);
+    this.visIn = camInT; this.vis0 = cam.y - 6; this.vis1 = cam.y + 6;
+    this.cullT = (this.cullT || 0) - dtReal;
+    if (this.cullT <= 0) {
+      this.cullT = 0.2;
+      const nearFacade = !camInT || Math.max(Math.abs(cam.x), Math.abs(cam.z)) > HALF - 6;
+      const k = G.renderer.size().h * 0.5 / Math.tan(G.camera.fov * Math.PI / 360);
+      if (this.city && this.city.parked) for (const c of this.city.parked) c.visible = nearFacade && 2.6 / Math.max(1, c.position.distanceTo(cam)) * k > 1.2;
+      for (const L of this.core.group.children) if (L.userData.isLabel) L.visible = !camInT || (L.position.y > this.vis0 && L.position.y < this.vis1);
+      if (this.city && this.city.detail) this.city.detail.visible = nearFacade;
+    }
     // inside = office env, outside = sky env
     const inT = this.inside(cam);
     this.scene.environment = inT ? this.envIn : this.envOut;
-    this.scene.environmentIntensity = inT ? 0.55 : 0.4 + day * 0.6;
+    this.scene.environmentIntensity = inT ? 0.3 : 0.25 + day * 0.6;
     if (p) {
       const size = p.s;
       this.pool.update(dt, cam, p.pos, size);

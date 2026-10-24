@@ -7,7 +7,7 @@ import { SpiderRig } from '../spider/rig.js';
 import { clamp, damp } from '../core/util.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion();
-const _m = new THREE.Matrix4();
+const _m = new THREE.Matrix4(), _gv = new THREE.Vector3();
 
 // walking speed in body lengths / second: little spiders scurry, giants lumber (but cover huge ground)
 export function walkBL(sizeM) { return clamp(7.5 * Math.pow(sizeM / 0.004, -0.11), 1.1, 9); }
@@ -46,6 +46,9 @@ export class Player {
   }
 
   get s() { return this.sizeM / this.game.zone.unit; } // size in zone units
+  // gravity the spider feels: real g when small. Big spiders get time scaled to their size (otherwise a 9 km spider
+  // would hang in the air for two minutes per jump), so a jump always looks and feels like a jump.
+  grav(out = _gv) { return out.copy(this.game.zone.gravity).multiplyScalar(Math.max(1, this.sizeM / 2)); }
   get mass() { return this.massK * this.sizeM ** 3; }
 
   buildBody(quality) {
@@ -85,7 +88,7 @@ export class Player {
   update(dt, input, camRig) {
     const G = this.game;
     const s = this.s;
-    const zoneG = G.zone.gravity; // m/s^2 vector in zone units per s^2 (already divided by unit)
+    const zoneG = this.grav(); // zone units per s^2, scaled for big spiders
     this.invuln = Math.max(0, this.invuln - dt);
     if (this.soft > 0) { this.soft = Math.max(0, this.soft - dt / 22); this.applySoft(); }
     // input -> wanted direction on the surface
@@ -198,7 +201,7 @@ export class Player {
     this.airTime += dt;
     this.vel.addScaledVector(g, dt);
     // air drag: tiny things fall slowly (terminal speed grows with sqrt(size)); gliding falls even slower
-    const vtM = (this.powers.glide ? 2.2 : 7) * Math.sqrt(Math.max(this.sizeM, 1e-6)) + 0.6;
+    const vtM = Math.max((this.powers.glide ? 2.2 : 7) * Math.sqrt(Math.max(this.sizeM, 1e-6)) + 0.6, (this.powers.glide ? 6 : 25) * this.sizeM);
     const vt = vtM / G.zone.unit;
     const vs = this.vel.length();
     if (vs > vt) this.vel.multiplyScalar(vt / vs);
@@ -228,7 +231,7 @@ export class Player {
     this.mode = 'ground';
     const impactM = speedZone * G.zone.unit; // m/s
     // real physics: small animals can't get hurt by falling (air drag); big heavy ones break
-    const safe = 9 * Math.pow(Math.max(this.sizeM, 1e-4), -0.35) + 6;
+    const safe = Math.max(9 * Math.pow(Math.max(this.sizeM, 1e-4), -0.35) + 6, 9 * this.sizeM);
     if (impactM > safe) {
       const dmg = (impactM - safe) / safe * 60 * (G.realistic ? 1.6 : 1);
       this.hurt(dmg, 'fell too far');
@@ -323,11 +326,17 @@ export class Player {
       if (input.is('jump')) w.add(camUp); if (input.down.has('ControlLeft')) w.sub(camUp);
     }
     if (w.lengthSq() > 0) w.normalize();
-    const spd = speed * 3.2;
-    this.vel.lerp(w.multiplyScalar(spd), 1 - Math.exp(-3 * dt));
+    // cruise: hold sprint + a direction and you build up to a huge speed (space is big)
+    const cruising = G.controlsOn && input.is('sprint') && w.lengthSq() > 0;
+    this.cruise = cruising ? Math.min(1, (this.cruise || 0) + dt * 0.35) : Math.max(0, (this.cruise || 0) - dt * 1.5);
+    const spd = speed * 3.2 * (1 + this.cruise * this.cruise * (G.zone.cruise || 0));
+    if (this.cruise > 0.05) camRig.fovKick = Math.max(camRig.fovKick, this.cruise * 16);
+    this.vel.lerp(w.multiplyScalar(spd), 1 - Math.exp(-(this.cruise > 0.5 ? 1.5 : 3) * dt));
     // gravity from big bodies near you
     if (G.zone.spaceGravity) this.vel.add(G.zone.spaceGravity(this.pos, s).multiplyScalar(dt));
     this.pos.addScaledVector(this.vel, dt);
+    if (G.zone.spaceCollide) G.zone.spaceCollide(this, dt);
+    if (this.mode !== 'space') return;
     if (this.vel.lengthSq() > 1e-12) this.fwd.lerp(_v.copy(this.vel).normalize(), 1 - Math.exp(-4 * dt)).normalize();
     this.up.lerp(camUp, 1 - Math.exp(-3 * dt)).normalize();
   }
@@ -335,7 +344,7 @@ export class Player {
   jump(toward) {
     const G = this.game, s = this.s;
     if (this.mode !== 'ground') return false;
-    const g = G.zone.gravity.length() || 9.8 / G.zone.unit;
+    const g = this.grav().length() || 9.8 / G.zone.unit * Math.max(1, this.sizeM / 2);
     const hBL = 2.2 * (this.sp.stats.jump || 1) * (1 + 0.1 * this.evo.body);
     const v = Math.sqrt(2 * g * hBL * s);
     let dir = this.fwd.clone();

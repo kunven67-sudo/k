@@ -146,11 +146,11 @@ const CHITIN_EMIT_F = /* glsl */`
 }`;
 
 const chitinUniformsList = [];
-export function makeChitin({ color, rough, coat, part, pattern = 0, patColor = 0xb0100c, patColor2 = 0xe0c090, quality = 'high', micro = 0.14 }) {
+export function makeChitin({ color, rough, coat, part, pattern = 0, patColor = 0xb0100c, patColor2 = 0xe0c090, quality = 'high', micro = 0.14, coatAmt = 1 }) {
   const hi = quality !== 'low';
   const m = new THREE.MeshPhysicalMaterial({
     color: 0xffffff, vertexColors: true, roughness: rough, metalness: 0.0,
-    clearcoat: hi ? 1.0 : 0.0, clearcoatRoughness: coat, ior: 1.5, specularIntensity: 0.45,
+    clearcoat: hi ? coatAmt : 0.0, clearcoatRoughness: coat, ior: 1.5, specularIntensity: 0.45,
     normalMap: getMicroNormal(), normalScale: new THREE.Vector2(micro, micro),
   });
   const u = {
@@ -309,8 +309,8 @@ export function buildSpider(sp, { quality = 'high', hairMul = 1, fear = false } 
   const hairColor = new THREE.Color(Lg.color).lerp(new THREE.Color(0x3a2c22), 0.25).getHex();
   const mats = {
     carapace: makeChitin({ color: C.color, rough: C.rough, coat: C.coat, part: 0, pattern: C.pattern, patColor: C.pattern === 2 ? 0x3a2214 : C.pattern === 5 ? 0x150c05 : 0x1a120c, patColor2: 0xd9b07a, quality }),
-    abdomen: makeChitin({ color: A.color, rough: A.rough, coat: A.coat, part: 1, pattern: A.pattern, patColor: A.pattern === 1 ? 0xb3120d : A.pattern === 5 ? 0x150c05 : 0x2a1a10, quality, micro: A.hair > 0.3 ? 0.2 : 0.05 }),
-    legs: makeChitin({ color: Lg.color, rough: Lg.rough, coat: Math.min(1, C.coat + 0.1), part: 2, pattern: 0, quality }),
+    abdomen: makeChitin({ color: A.color, rough: A.rough, coat: Math.max(A.coat, 0.09), part: 1, pattern: A.pattern, patColor: A.pattern === 1 ? 0xb3120d : A.pattern === 5 ? 0x150c05 : 0x2a1a10, quality, micro: A.hair > 0.3 ? 0.2 : 0.05 }),
+    legs: makeChitin({ color: Lg.color, rough: Math.max(Lg.rough, 0.46), coat: 0.4, coatAmt: 0.3, part: 2, pattern: 0, quality, micro: 0.25 }), // legs are satin (fine hairs), not chrome
     eye: new THREE.MeshPhysicalMaterial({ color: 0x050404, roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, ior: 1.6 }),
   };
   // ---- carapace (cephalothorax shell)
@@ -356,7 +356,7 @@ export function buildSpider(sp, { quality = 'high', hairMul = 1, fear = false } 
   }
   const abMesh = new THREE.Mesh(mergeGeometries(abParts), mats.abdomen);
   const abPivot = new THREE.Group(); abPivot.position.set(0, h + 0.07, -0.07); body.add(abPivot); // hinge at the pedicel
-  abMesh.position.set(0, A.hgt * 0.36 + 0.0, az + 0.07);
+  abMesh.position.set(0, A.hgt * 0.3, az + 0.07);
   abMesh.rotation.x = -sp.stance.abdTilt;
   abMesh.castShadow = true; abMesh.receiveShadow = true;
   abPivot.add(abMesh);

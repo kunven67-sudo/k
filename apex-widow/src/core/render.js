@@ -96,7 +96,7 @@ export class Renderer {
     this.r = new THREE.WebGLRenderer({ canvas, antialias: false, stencil: false, depth: false, powerPreference: 'high-performance', alpha: false });
     this.r.outputColorSpace = THREE.SRGBColorSpace;
     this.r.shadowMap.enabled = true;
-    this.r.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.r.shadowMap.type = THREE.PCFShadowMap;
     this.r.info.autoReset = false;
     this.gpu = '';
     try {

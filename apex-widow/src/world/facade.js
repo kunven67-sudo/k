@@ -62,36 +62,48 @@ export function makeFacadeMaterial({ instanced = true } = {}) {
           vec3 fT = abs(fNn.x) > abs(fNn.z) ? vec3(0.0, 0.0, sign(fNn.x)) : vec3(-sign(fNn.z), 0.0, 0.0);
           float fu = dot(vFW, fT), fv = vFW.y - fBase;
           float bay = fStyle == 1.0 ? 2.6 : fStyle == 2.0 ? 3.0 : 1.5;
-          vec2 cell = floor(vec2(fu / bay, fv / fFH));
-          vec2 f = vec2(fract(fu / bay), fract(fv / fFH));
-          // window opening inside the cell (glass towers = nearly all glass)
+          vec2 g = vec2(fu / bay, fv / fFH);
+          vec2 cell = floor(g);
+          vec2 f = fract(g);
+          // how many window cells fit in one pixel: far away = draw the average look instead of aliasing noise
+          vec2 fwg = max(fwidth(g), vec2(1e-5));
+          float fFar = smoothstep(0.22, 0.75, max(fwg.x, fwg.y));
+          // window opening inside the cell (glass towers = nearly all glass), edges filtered to ~1 pixel
           vec2 w0 = fStyle == 3.0 ? vec2(0.02, 0.01) : fStyle == 0.0 ? vec2(0.03, 0.22) : fStyle == 1.0 ? vec2(0.22, 0.28) : vec2(0.08, 0.3);
           vec2 w1 = fStyle == 3.0 ? vec2(0.98, 0.714) : fStyle == 0.0 ? vec2(0.97, 0.92) : fStyle == 1.0 ? vec2(0.78, 0.82) : vec2(0.92, 0.78);
-          fWin = step(w0.x, f.x) * step(f.x, w1.x) * step(w0.y, f.y) * step(f.y, w1.y) * step(0.0, fv);
+          vec2 ew = min(fwg, vec2(0.2));
+          float wx = smoothstep(w0.x - ew.x, w0.x + ew.x, f.x) * (1.0 - smoothstep(w1.x - ew.x, w1.x + ew.x, f.x));
+          float wy = smoothstep(w0.y - ew.y, w0.y + ew.y, f.y) * (1.0 - smoothstep(w1.y - ew.y, w1.y + ew.y, f.y));
+          fWin = mix(wx * wy, (w1.x - w0.x) * (w1.y - w0.y), fFar) * step(0.0, fv);
+          // offices at night: whole floors tend to be busy or empty (cleaners, late teams), then single rooms
+          float rowH = fh1(vec2(cell.y * 1.37 + fSeed * 3.1, fSeed));
+          float floorFrac = smoothstep(0.3, 0.95, rowH) * (0.45 + 0.55 * uNight);
           float ch = fh1(cell + fSeed * 17.0);
-          float lit = step(0.42 + 0.25 * (1.0 - uNight), ch) * (0.6 + 0.4 * fh1(cell.yx + fSeed));
+          float litNear = step(1.0 - floorFrac, ch) * (0.6 + 0.4 * fh1(cell.yx + fSeed));
+          float lit = mix(litNear, floorFrac * 0.75, fFar);
           if (uLock > 0.5 && fStyle == 3.0) lit = step(0.5, ch) * (0.5 + 0.5 * step(0.5, fract(uTime * 1.3 + ch)));
           vec3 V = normalize(vFW - cameraPosition);
           vec3 rd = vec3(dot(V, fT), V.y, dot(V, -fNn));
           vec3 rsize = vec3(bay * 2.0, fFH * 0.92, 7.0);
           float roomX = fract(cell.x * 0.5) * bay * 2.0;
           vec3 ro = vec3(roomX + f.x * bay, f.y * fFH * 0.92, 0.0);
-          fRoom = room(ro, rd, rsize, ch * 91.7 + fSeed, lit, fIsL);
+          fRoom = fFar > 0.99 ? vec3(0.8, 0.74, 0.62) : mix(room(ro, rd, rsize, ch * 91.7 + fSeed, lit, fIsL), vec3(0.8, 0.74, 0.62), fFar);
+          fIsL *= 1.0 - fFar;
           // blinds
           float bl = fh1(cell * 1.7 + fSeed);
-          if (bl > 0.7 && f.y > mix(w1.y, w0.y, (bl - 0.7) * 2.5)) { fRoom = mix(vec3(0.7, 0.68, 0.62), vec3(0.2), step(0.5, fract(f.y * fFH * 14.0)) * 0.25); fIsL = 0.0; }
+          if (fFar < 0.5 && bl > 0.7 && f.y > mix(w1.y, w0.y, (bl - 0.7) * 2.5)) { fRoom = mix(vec3(0.7, 0.68, 0.62), vec3(0.2), step(0.5, fract(f.y * fFH * 14.0)) * 0.25); fIsL = 0.0; }
           fLit = lit;
           // frame/wall colours
           vec3 wallCol = fStyle == 1.0 ? mix(vec3(0.42, 0.2, 0.14), vec3(0.3, 0.16, 0.12), fh1(floor(vec2(fu * 4.0, fv * 13.0)))) :
                          fStyle == 2.0 ? vec3(0.55, 0.54, 0.5) : fStyle == 3.0 ? vec3(0.05, 0.055, 0.06) : vec3(0.18, 0.2, 0.22);
           // brick mortar lines
-          if (fStyle == 1.0) { vec2 b = vec2(fu * 4.0 + 0.5 * step(0.5, fract(fv * 6.5)), fv * 13.0); vec2 bf = fract(b); if (bf.x < 0.06 || bf.y < 0.1) wallCol = vec3(0.55, 0.52, 0.48); }
+          if (fStyle == 1.0 && fFar < 0.5) { vec2 b = vec2(fu * 4.0 + 0.5 * step(0.5, fract(fv * 6.5)), fv * 13.0); vec2 bf = fract(b); if (bf.x < 0.06 || bf.y < 0.1) wallCol = vec3(0.55, 0.52, 0.48); }
           // spandrel band on glass towers (dark glass between floors)
           if ((fStyle == 0.0 || fStyle == 3.0) && fWin < 0.5) { wallCol = fStyle == 3.0 ? vec3(0.03) : vec3(0.08, 0.1, 0.12); fMetal = 0.6; fRough = 0.25; }
           // mullions
-          if (fWin < 0.5 && (fStyle == 0.0 || fStyle == 3.0) && (f.x < w0.x || f.x > w1.x)) { wallCol = vec3(0.35, 0.37, 0.4); fMetal = 0.9; fRough = 0.35; }
+          if (fFar < 0.5 && fWin < 0.5 && (fStyle == 0.0 || fStyle == 3.0) && (f.x < w0.x || f.x > w1.x)) { wallCol = vec3(0.35, 0.37, 0.4); fMetal = 0.9; fRough = 0.35; }
           diffuseColor.rgb = mix(wallCol, fRoom * (0.15 + 0.85 * lit) * 0.35, fWin);
-          if (fWin > 0.5) { fRough = 0.04; fMetal = 0.0; }
+          fRough = mix(fRough, 0.05, fWin); fMetal = mix(fMetal, 0.0, fWin);
         } else {
           // roof: gravel/membrane with grime
           diffuseColor.rgb = vec3(0.32, 0.32, 0.33) * (0.8 + 0.2 * fh1(floor(vFW.xz * 1.5)));
@@ -101,7 +113,7 @@ export function makeFacadeMaterial({ instanced = true } = {}) {
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
         metalnessFactor = fMetal;`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        totalEmissiveRadiance += fWin * fRoom * fLit * (0.55 + 1.8 * uNight) * (1.0 + fIsL * 3.0);`);
+        totalEmissiveRadiance += fWin * fRoom * fLit * (0.15 + 0.85 * uNight) * (1.0 + fIsL * 1.5);`);
   };
   m.customProgramCacheKey = () => 'facade' + (instanced ? 'I' : '');
   return m;

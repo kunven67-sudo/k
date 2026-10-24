@@ -57,7 +57,12 @@ export class Humans {
   }
   update(dt) {
     const P = this.game.player;
-    for (const h of this.list) if (h.state !== 'gone') h.update(dt, P);
+    const Z = this.zone;
+    for (const h of this.list) {
+      if (h.state === 'gone') continue;
+      h.inner.visible = h.state !== 'eaten' && (!Z.canSee || Z.canSee(h.pos));
+      h.update(dt, P);
+    }
   }
   near(p, r, filter) { return this.list.filter(h => h.state !== 'gone' && h.pos.distanceTo(p) < r && (!filter || filter(h))); }
   nearest(p, r, filter) { let b = null, bd = r; for (const h of this.list) { if (h.state === 'gone' || (filter && !filter(h))) continue; const d = h.pos.distanceTo(p); if (d < bd) { bd = d; b = h; } } return b; }
@@ -90,7 +95,7 @@ export class Human {
     this.root = skClone(sys.src[file]);
     this.root.traverse(n => {
       if (n.isMesh) {
-        n.castShadow = true; n.receiveShadow = true; n.frustumCulled = false;
+        n.castShadow = true; n.receiveShadow = true; n.frustumCulled = true;
         if (/pistol/i.test(n.name)) { n.visible = false; this.gun = n; }
         n.material = tuneMat(n.material, this.def.colors || {});
       }
@@ -161,7 +166,7 @@ export class Human {
     return !hit || hit.obj === this;
   }
   update(dt, P) {
-    this.mixer.update(dt);
+    if (this.inner.visible || (P && this.pos.distanceTo(P.pos) < 12)) this.mixer.update(dt);
     this.cd = Math.max(0, this.cd - dt); this.lineT = Math.max(0, this.lineT - dt);
     if (this.state === 'eaten') return;
     if (this.state === 'paralyzed' || this.state === 'wrapped') { this.venom = Math.max(0, this.venom - dt * 0.4); this.place(); return; }

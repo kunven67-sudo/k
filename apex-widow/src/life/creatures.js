@@ -268,8 +268,8 @@ export class Creatures {
       const px = c.L / Math.max(dc, 1e-6) / Math.tan(fov / 2) * H * 0.5;
       // far + tiny = sleep (cheap), but anything near the player keeps thinking
       const near = P ? c.pos.distanceTo(P.pos) < Math.max(3, P.sizeM * 40) : false;
-      c.root.visible = px > 0.6 || near;
-      if (!near && px < 0.6) { c.sleepT = (c.sleepT || 0) + dt; if (c.sleepT < 0.5) continue; c.update(c.sleepT, null); c.sleepT = 0; continue; }
+      c.root.visible = (px > 0.6 || near) && (!this.zone.canSee || this.zone.canSee(c.pos));
+      if (!near && !c.root.visible) { c.sleepT = (c.sleepT || 0) + dt; if (c.sleepT < 0.5) continue; c.update(c.sleepT, null); c.sleepT = 0; continue; }
       c.update(dt, P);
     }
     // the floors restock (vents, gaps under doors): prey comes back when you aren't looking

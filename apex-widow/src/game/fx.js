@@ -13,7 +13,7 @@ export class Fx {
     this.geo.setAttribute('color', new THREE.BufferAttribute(this.col, 4));
     this.geo.setAttribute('size', new THREE.BufferAttribute(this.size, 1));
     this.mat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, vertexColors: true,
+      transparent: true, depthWrite: false,
       uniforms: { uScale: { value: 600 } },
       vertexShader: /* glsl */`attribute float size; attribute vec4 color; varying vec4 vC; uniform float uScale;
         void main(){ vC = color; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = clamp(size * uScale / max(-mv.z, 1e-6), 0.0, 256.0); }`,

@@ -9,7 +9,7 @@ import { texture, hasAsset } from '../core/assets.js';
 // ------------------------------------------------------------------ materials
 // tex: texture name in assets/tex, size: metres covered by one texture tile
 const MAT_DEFS = {
-  labfloor: { tex: 'labfloor', size: 1.6, color: 0xe8e6e2, rough: 0.6 },
+  labfloor: { tex: 'labfloor', size: 1.6, color: 0xffffff, rough: 0.6, desat: 0.08, bright: 1.75 },
   plaster: { tex: 'plaster', size: 2.4, color: 0xf0eeea, rough: 0.85 },
   plasterGrey: { tex: 'plaster', size: 2.4, color: 0xb8bcc2, rough: 0.85 },
   walltile: { tex: 'walltile', size: 1.2, color: 0xffffff, rough: 0.35 },
@@ -30,6 +30,7 @@ const MAT_DEFS = {
   brushedconcrete: { tex: 'brushedconcrete', size: 3, color: 0xc8c4bc, rough: 0.85 },
   smalltile: { tex: 'smalltile', size: 0.8, color: 0xf4f4f4, rough: 0.3 },
   steel: { color: 0xc9cdd2, rough: 0.28, metal: 1, brushed: true },
+  epoxy: { color: 0x15171a, rough: 0.32 },
   chrome: { color: 0xe8ecf0, rough: 0.08, metal: 1 },
   alu: { color: 0xb8bcc2, rough: 0.35, metal: 1 },
   blackPlastic: { color: 0x141516, rough: 0.45 },
@@ -49,15 +50,15 @@ const MAT_DEFS = {
   paper: { color: 0xf4f2ec, rough: 0.9 },
   cardboard: { color: 0xa88a62, rough: 0.9 },
   black: { color: 0x050505, rough: 0.6 },
-  glass: { color: 0xdfe8ee, rough: 0.04, glass: true, opacity: 0.16 },
+  glass: { color: 0xf2f7f9, rough: 0.03, glass: true, opacity: 0.07 },
   glassGreen: { color: 0xa8c8b0, rough: 0.05, glass: true, opacity: 0.35 },
   glassDark: { color: 0x202830, rough: 0.05, glass: true, opacity: 0.55 },
   liquidBlue: { color: 0x3a8ad8, rough: 0.1, glass: true, opacity: 0.6, emissive: 0x081830 },
   liquidGreen: { color: 0x58e080, rough: 0.1, glass: true, opacity: 0.7, emissive: 0x0a3a14 },
   liquidAmber: { color: 0xc8901a, rough: 0.1, glass: true, opacity: 0.75 },
   formalin: { color: 0xd8d0a0, rough: 0.05, glass: true, opacity: 0.4 },
-  lightPanel: { color: 0xffffff, rough: 0.5, emissive: 0xeef4ff, emissiveI: 3.2 },
-  lightWarm: { color: 0xffffff, rough: 0.5, emissive: 0xffd9a8, emissiveI: 3 },
+  lightPanel: { color: 0xffffff, rough: 0.5, emissive: 0xeef4ff, emissiveI: 1.7 },
+  lightWarm: { color: 0xffffff, rough: 0.5, emissive: 0xffd9a8, emissiveI: 1.6 },
   screen: { color: 0x061018, rough: 0.2, emissive: 0x2a6a8a, emissiveI: 1.4 },
   screenGreen: { color: 0x02120a, rough: 0.2, emissive: 0x1ab060, emissiveI: 1.6 },
   screenOff: { color: 0x050607, rough: 0.12 },
@@ -86,7 +87,7 @@ export class Mats {
     let m;
     if (d.glass) {
       m = new THREE.MeshPhysicalMaterial({ color: d.color, roughness: d.rough, metalness: 0, transparent: true, opacity: d.opacity, depthWrite: false,
-        clearcoat: 1, clearcoatRoughness: 0.02, ior: 1.5, specularIntensity: 1, side: THREE.DoubleSide, envMapIntensity: 1.4 });
+        ior: 1.5, specularIntensity: 1, side: THREE.FrontSide, envMapIntensity: 0.9 });
       if (d.emissive) m.emissive = new THREE.Color(d.emissive);
     } else {
       m = new THREE.MeshStandardMaterial({ color: d.color, roughness: d.rough, metalness: d.metal || 0 });
@@ -103,6 +104,13 @@ export class Mats {
         } catch (e) { /* plain colour fallback */ }
       }
       if (d.brushed) { m.map = brushedTex(); m.roughnessMap = m.map; }
+      // recolour a photo texture (e.g. make beige tiles light grey vinyl)
+      if (d.desat !== undefined && m.map) {
+        const ds = d.desat, br = d.bright || 1;
+        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+          diffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114))), diffuseColor.rgb, ${ds.toFixed(3)}) * ${br.toFixed(3)};`); };
+        m.customProgramCacheKey = () => 'recol' + ds + '_' + br;
+      }
     }
     m.userData.texSize = d.size || 1;
     m.name = key;
@@ -210,7 +218,7 @@ export const Kit = {
   labBench(B, x, y, z, rot = 0, w = 2.4, d = 0.9) {
     const c = Math.cos(rot), s = Math.sin(rot);
     const P = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c];
-    B.box(w, 0.035, d, 'steel', x, y + 0.92, z, 'FURN', rot, 0.006);
+    B.box(w, 0.035, d, 'epoxy', x, y + 0.92, z, 'FURN', rot, 0.006);
     B.box(w - 0.04, 0.84, d - 0.06, 'whitePlastic', x, y + 0.45, z, 'FURN', rot, 0.012);
     // cabinet doors + handles
     for (let i = 0; i < Math.floor(w / 0.6); i++) {

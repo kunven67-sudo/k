@@ -100,7 +100,7 @@ export class Game {
   closest(p, maxD, size) { return this.zone ? this.zone.collision.closest(p, maxD, size) : null; }
 
   // ------------------------------------------------------------------ run lifecycle
-  async newRun({ species = 'widow', difficulty } = {}) {
+  async newRun({ species = 'widow', difficulty, skipIntro = false } = {}) {
     if (difficulty) { this.settings.difficulty = difficulty; saveSettings(this.settings); }
     deleteRun();
     this.stats = this.freshStats();
@@ -114,6 +114,27 @@ export class Game {
     await this.enterZone('halvern', { start: true });
     this.hud.loading(null);
     this.story.play('injection');
+    if (skipIntro) this.story.endCut();
+  }
+
+  // dev/test: jump to a world at a size (metres)
+  async debugJump(zoneId, sizeM) {
+    const p = this.player; if (!p) return;
+    if (sizeM > 0) { p.sizeM = p.targetSize = sizeM; }
+    this.story.flags.escaped = true;
+    if (zoneId !== this.zone.id) await this.enterZone(zoneId, { from: this.zone.id });
+    this.startPlay();
+  }
+
+  // everything you eat goes in this run's list and the bestiary (which survives death)
+  recordEat(kind, def) {
+    this.stats.eatenList[kind] = (this.stats.eatenList[kind] || 0) + 1;
+    const B = this.meta.bestiary;
+    const e = B[kind] || (B[kind] = { name: def.name, latin: def.latin || '', fact: def.fact || '', count: 0, first: Date.now() });
+    e.count++;
+    this.meta.totalEaten++;
+    if (!e.toldNew) { e.toldNew = true; this.hud.toast('New in your bestiary: ' + def.name, 2.2); }
+    clearTimeout(this._metaT); this._metaT = setTimeout(() => saveMeta(this.meta), 1500);
   }
 
   async continueRun() {
@@ -183,12 +204,19 @@ export class Game {
 
   trophy(id, title) {
     if (this.meta.trophies[id]) return;
-    this.meta.trophies[id] = Date.now(); saveMeta(this.meta);
+    this.meta.trophies[id] = { t: title, at: Date.now() }; saveMeta(this.meta);
     this.hud.trophy(title);
   }
 
   // ------------------------------------------------------------------ main loop
   start() {
+    // test mode: the page steps the game itself (window.__advance) instead of running on real time
+    if (this.q.get('manual')) {
+      window.__advance = (sec, dt = 1 / 30) => { const n = Math.max(1, Math.round(sec / dt)); for (let i = 0; i < n; i++) this.tick(dt, i === n - 1); };
+      window.__render = () => this.tick(1e-4, true);
+      this.tick(1 / 60, true);
+      return;
+    }
     let last = performance.now();
     const frame = () => {
       requestAnimationFrame(frame);
@@ -200,7 +228,7 @@ export class Game {
     requestAnimationFrame(frame);
   }
 
-  tick(dtReal) {
+  tick(dtReal, draw = true) {
     // slow motion (danger sense, deaths, big moments)
     let ts = this.timeScale;
     if (this.slowmo > 0) { this.slowmo -= dtReal; ts *= 0.25; }
@@ -231,7 +259,9 @@ export class Game {
         // depth of field: strong macro blur when tiny, gentle tilt-shift when huge
         const sm = p.sizeM;
         const macro = sm < 0.05 ? 1 : sm < 0.5 ? 0.6 : sm < 50 ? 0.25 : sm < 5e3 ? 0.55 : 0.2;
-        this.renderer.setDOF(this.zone.dof === false ? 0 : macro, this.cam.curDist, s * (sm < 0.05 ? 2.2 : 4.5));
+        const focusD = this.cam.mode === 'cinematic' ? this.camera.position.distanceTo(p.pos) : this.cam.curDist;
+        if (this.dofOverride) this.renderer.setDOF(...this.dofOverride);
+        else this.renderer.setDOF(this.zone.dof === false ? 0 : macro, focusD, s * (sm < 0.05 ? 2.2 : 4.5));
         if (this.renderer.aoPass) this.renderer.aoPass.configuration.aoRadius = s * 0.9;
         this.renderer.grade.uniforms.get('vision').value += ((p.vision ? 1 : 0) - this.renderer.grade.uniforms.get('vision').value) * Math.min(1, dtReal * 6);
       }
@@ -242,6 +272,7 @@ export class Game {
     }
     this.audio.update(dtReal);
     // render
+    if (!draw) { inp.endFrame(); return; }
     if (this.state === 'menu' && this.menuScene) {
       this.renderer.setView(this.menuScene.scene, this.menuScene.camera);
       this.renderer.render(dtReal);

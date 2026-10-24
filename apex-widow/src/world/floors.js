@@ -30,7 +30,7 @@ const D = (at, w = 1.0) => ({ at, w, h: 2.15 });
 // ------------------------------------------------------------------ 47 ANIMAL LAB
 FLOOR_BUILDERS[47] = (B, Y, ctx) => {
   finish(B, 'smalltile', Y);
-  ceilAround(B, Y + H, ctx, { every: 2.4 });
+  ceilAround(B, Y + H, ctx, { every: 2.4, offFn: () => Math.random() < 0.35 });
   // doors: rooms open onto the ring corridor
   ringWalls(B, Y, { sw: [D(6)], se: [D(5)], nw: [D(6)], ne: [D(5)], w: [D(7.7)], e: [D(7.7)], s: [D(4)], n: [D(16)] }, 'walltile');
   // the doors themselves (some closed: crawl under, some propped open)
@@ -124,7 +124,7 @@ FLOOR_BUILDERS[47] = (B, Y, ctx) => {
 // ------------------------------------------------------------------ 31 OFFICES
 FLOOR_BUILDERS[31] = (B, Y, ctx) => {
   finish(B, 'carpet', Y);
-  ceilAround(B, Y + H, ctx, { every: 2.4, warm: false });
+  ceilAround(B, Y + H, ctx, { every: 2.4, warm: false, offFn: () => Math.random() < 0.6 });
   // meeting rooms along the east facade: glass walls
   for (let i = 0; i < 3; i++) {
     const z0 = -20 + i * 7, z1 = z0 + 6;
@@ -186,7 +186,7 @@ FLOOR_BUILDERS[31] = (B, Y, ctx) => {
 // ------------------------------------------------------------------ 20 CAFETERIA + GYM
 FLOOR_BUILDERS[20] = (B, Y, ctx) => {
   finish(B, 'terrazzo', Y);
-  ceilAround(B, Y + H, ctx, { every: 2.4, warm: true });
+  ceilAround(B, Y + H, ctx, { every: 2.4, warm: true, offFn: () => Math.random() < 0.45 });
   // kitchen (north-east) behind a serving line, gym (south-east) behind glass
   wall(B, 9, 8, 22, 8, Y, H, 'walltile', 0.12, [D(3, 1.2)]);
   wall(B, 9, 8, 9, 22, Y, H, 'walltile', 0.12, [D(1.5, 1.2)]);
@@ -249,7 +249,7 @@ FLOOR_BUILDERS[9] = (B, Y, ctx) => {
   B.box(0.04, RF, RING.z1 - RING.z0, 'alu', RING.x0, Y + RF / 2, 0, 'STRUCT'); B.box(0.04, RF, RING.z1 - RING.z0, 'alu', RING.x1, Y + RF / 2, 0, 'STRUCT');
   B.box(RING.x1 - RING.x0, RF, 0.04, 'alu', 0, Y + RF / 2, RING.z0, 'STRUCT'); B.box(RING.x1 - RING.x0, RF, 0.04, 'alu', 0, Y + RF / 2, RING.z1, 'STRUCT');
   for (const sgn of [-1, 1]) for (let k = 0; k < 3; k++) { const h = RF * (k + 1) / 3; B.box(1.4, h, 0.3, 'diamond', 0, Y + h / 2, sgn * (RING.z1 - 0.15 - (2 - k) * 0.3), 'STRUCT'); }
-  ceilAround(B, Y + H, ctx, { every: 3.0 });
+  ceilAround(B, Y + H, ctx, { every: 3.0, offFn: () => Math.random() < 0.3 });
   // rows of racks (west + east halls), hot aisle containment roofs, cable trays
   const Yr = Y + RF;
   for (const side of [-1, 1]) for (let row = 0; row < 4; row++) {
