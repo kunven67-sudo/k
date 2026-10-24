@@ -1144,6 +1144,9 @@
       const rec = this.recFor(s, d);
       this.score = rec ? rec.score : 0;
       this.clear = rec ? (rec.clear != null ? rec.clear : (rec.acc || 0)) : 0;
+      // who you'd battle on this difficulty (the death counter: 'DEATHS vs WHITTY: 12' under the score)
+      const m = d && G.Songs.meta(s.id, d.variation || 'default'), ch = m && m.playData && m.playData.characters;
+      this.vsWho = G.deathWho((ch && (d.swap ? ch.player : ch.opponent)) || s.opp || 'dad');
     },
     changeDiff(change) {
       const list = this.allDiffs;
@@ -1667,6 +1670,9 @@
         t.text = pct;
         const ox = pct.length === 3 ? 10 : pct.length === 1 ? -24 : 0;
         t.x = W - 95 - ox; t.y = 87; t.draw(ctx, null); G.setScreenT(ctx);
+        // deaths against who you'd battle (Options > Death Counter)
+        if (this.scoreVis && this.vsWho && !this.rankMode && G.settings.deathCounter !== false)
+          G.vcr(ctx, 'DEATHS vs ' + this.vsWho + ': ' + G.deathsVs(this.vsWho), W - 353, 186, { size: 22, outline: 2, maxWidth: 340 });
       }
       at('letters');
       this.letters.draw(ctx);

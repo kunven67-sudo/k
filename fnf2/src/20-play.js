@@ -405,6 +405,8 @@
     startCountdown() {
       this.audio.play(this.songPos);
       this.started = true;
+      // 'VS WHITTY / DEATHS: 12' slides in for the countdown (or ~2.4 s when a song has none), then away
+      this.vsCard = this.vsWho && G.settings.deathCounter !== false ? { t: 0, dur: Math.max(2.4, -Math.min(0, this.songPos) / 1000) } : null;
     },
     countdownBeat(b) {
       // beats -4..-1 before the song: THREE, TWO (ready), ONE (set), GO
@@ -429,6 +431,7 @@
       if (this.cutscene) { this.cutscene.update(dt); if (this.cutscene.done) { const c = this.cutscene; this.cutscene = null; if (c.isEnd) this.endSong(); else this.startCountdown(); } return; }
       if (this.gameOver) { this.updateGameOver(dt); return; }
       if (this.paused) { this.updatePause(dt); return; }
+      if (this.vsCard && (this.vsCard.t += dt) > this.vsCard.dur) this.vsCard = null;
       const prev = this.songPos;
       this.songPos = this.audio.time();
       if (this.songPos < prev - 50 && prev > 0) this.songPos = prev; // never jump back
@@ -1187,6 +1190,7 @@
       // HUD
       const hudA = this.hud.alpha * this.hudParts.all;
       if (hudA > 0.01) { ctx.save(); ctx.globalAlpha = hudA; this.drawHUD(ctx); ctx.restore(); }
+      if (this.vsCard) this.drawVsCard(ctx);    // (over the HUD at full strength: some mods fade the HUD in)
       if (this.mod && this.mod.drawTop) this.mod.drawTop(ctx, this);
       if (this.sfx && this.sfx.drawTop) this.sfx.drawTop(ctx, this);
       if (this.paused) this.drawPause(ctx);
@@ -1449,6 +1453,22 @@
       const bg = this.hbBg, x = (bg ? bg.x : (G.W - 601) / 2) - 16, y = (bg ? bg.y + bg.height / 2 : G.H * 0.9) + (hp ? hp.dy : 0);
       this.hud.apply(ctx);
       G.vcr(ctx, this.deathLine(), x, y, { size: 17, outline: 2, align: 'right', baseline: 'middle', alpha: 0.9 * a, maxWidth: x - 12 });
+    },
+    // the card before the battle: a black bar slides in from the left with who you face + your deaths against them
+    drawVsCard(ctx) {
+      const C = this.vsCard, inK = G.ease.quartOut(Math.min(1, C.t / 0.35)), outK = G.ease.quartIn(G.clamp((C.t - (C.dur - 0.4)) / 0.4, 0, 1));
+      const n = G.deathsVs(this.vsWho);
+      G.setScreenT(ctx);
+      const top = 'VS ' + this.vsWho, sub = 'DEATHS: ' + n;
+      const w = Math.max(G.measure(ctx, top, 46, 'vcr'), G.measure(ctx, sub, 26, 'vcr')) + 170, h = 96;
+      const x = -w + (w + 0) * inK - (w + 40) * outK, y = Math.round(G.H * 0.62 - h / 2);
+      ctx.save();
+      ctx.globalAlpha = 0.82; ctx.fillStyle = '#000'; ctx.fillRect(x, y, w, h);
+      ctx.globalAlpha = 1; ctx.fillStyle = (this.dad && this.dad.data && this.dad.data.hpColor) || '#FF0000'; ctx.fillRect(x, y + h - 5, w, 5);
+      if (this.iconP2 && this.iconP2.img) { const ic = Object.assign({}, this.iconP2, { scale: 0.62, flip: false }); this.drawIcon(ctx, ic, x + w - 130, y + h / 2 - 2, false); }
+      G.vcr(ctx, top, x + 22, y + 12, { size: 46, outline: 2 });
+      G.vcr(ctx, sub, x + 24, y + 58, { size: 26, outline: 2, color: n ? '#FF7A7A' : '#C8C8C8' });
+      ctx.restore();
     },
     onKey(code, down, repeat) {
       // Z = death counter on/off (only when Z is not one of your note keys)

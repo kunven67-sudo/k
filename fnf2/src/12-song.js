@@ -35,7 +35,8 @@ G.deathWho = function (c) {
     [/^nene/, 'NENE'], [/^pico/, 'PICO'], [/^bf/, 'BOYFRIEND'],
   ];
   for (const [re, name] of R) if (re.test(id)) return name;
-  const nm = String((c.data && c.data.name) || c.name || id).replace(/\s*\(.*?\)\s*/g, ' ').trim();
+  const cj = typeof c === 'string' ? G.A.json('preload/data/characters/' + id + '.json') : null;
+  const nm = String((c.data && c.data.name) || c.name || (cj && cj.name) || id).replace(/\s*\(.*?\)\s*/g, ' ').trim();
   return (nm || id).toUpperCase();
 };
 // deaths against one character, kept forever in the save
