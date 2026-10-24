@@ -1,0 +1,1 @@
+{"name":"apex-widow","private":true,"type":"module","scripts":{"build":"node tools/build.mjs"},"dependencies":{"esbuild":"^0.24.0","three":"^0.170.0"}}
