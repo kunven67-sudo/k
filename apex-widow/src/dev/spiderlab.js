@@ -73,6 +73,7 @@ export async function spiderLab(canvas, q) {
     else if (camMode === 'side') { cam.position.set(sp0.x + S * 3.2, sp0.y + S * 0.35, sp0.z); cam.lookAt(sp0.x, sp0.y + S * 0.2, sp0.z); }
     else if (camMode === 'top') { cam.position.set(sp0.x + S * 0.01, sp0.y + S * 3.4, sp0.z); cam.lookAt(sp0.x, sp0.y, sp0.z); }
     else if (camMode === 'under') { cam.position.set(sp0.x + S * 0.6, sp0.y + S * 0.02, sp0.z - S * 0.3); cam.lookAt(sp0.x, sp0.y + S * 0.15, sp0.z); }
+    else if (camMode === 'profile') { const f = new THREE.Vector3(0, 0, 1).applyQuaternion(spider.quaternion); const sd = new THREE.Vector3(f.z, 0, -f.x); cam.position.copy(sp0).addScaledVector(sd, S * 2.6).add(new THREE.Vector3(0, S * 0.45, 0)).addScaledVector(f, S * 0.2); cam.lookAt(sp0.x - f.x * S * 0.1, sp0.y + S * 0.2, sp0.z - f.z * S * 0.1); }
     else if (camMode === 'face') { const f = new THREE.Vector3(0, 0, 1).applyQuaternion(spider.quaternion); cam.position.copy(sp0).addScaledVector(f, S * 1.0).add(new THREE.Vector3(0, S * 0.35, 0)).addScaledVector(new THREE.Vector3(-f.z, 0, f.x), S * 0.4); cam.lookAt(sp0.x + f.x * S * 0.3, sp0.y + S * 0.25, sp0.z + f.z * S * 0.3); }
     cam.near = S * 0.05; cam.far = S * 400; cam.updateProjectionMatrix();
     R.setDOF(+(q.get('dof') || 0.6), cam.position.distanceTo(sp0), S * 1.6);

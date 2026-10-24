@@ -142,7 +142,7 @@ async function music() {
     if (fs.existsSync(out)) continue;
     try {
       const raw = await get(`https://incompetech.com/music/royalty-free/mp3-royaltyfree/${encodeURIComponent(t)}.mp3`, `${RAW}/music/${k}.mp3`);
-      execSync(`ffmpeg -y -loglevel error -i "${raw}" -ac 2 -ar 44100 -c:a libopus -b:a 72k "${out}"`);
+      execSync(`ffmpeg -y -loglevel error -i "${raw}" -ac 2 -ar 48000 -c:a libopus -b:a 72k "${out}"`);
       console.log('music', k, t);
     } catch (e) { console.log('music FAILED', k, t, e.message); }
   }
