@@ -2034,7 +2034,8 @@ G.Sprite = class {
 };
 
 // ------------------------------------------------------------------ Flixel camera
-// x,y = the world point at the screen centre (FlxCamera.scroll + half the screen).
+// x,y = the world point at the screen centre (FlxCamera.scroll + half the screen). px,py = where the camera sits on
+// the screen (FlxCamera.x / y: the whole picture moves that many pixels).
 G.FCam = class {
   constructor(zoom) { this.x = G.W / 2; this.y = G.H / 2; this.zoom = zoom || 1; this.tx = this.x; this.ty = this.y; this.followRate = 0.04; this.shakeI = 0; this.shakeT = 0; this.sx = 0; this.sy = 0; this.alpha = 1; this.flashA = 0; this.flashC = '#fff'; this.flashD = 1; this.fadeA = 0; }
   focus(x, y) { this.x = this.tx = x; this.y = this.ty = y; }
@@ -2056,10 +2057,10 @@ G.FCam = class {
     const ox = G.W / 2 - z * (scx * sfx + G.W / 2) + this.sx, oy = G.H / 2 - z * (scy * sfy + G.H / 2) + this.sy;
     if (this.angle) {   // (FlxCamera.angle: the whole view turns around the middle of the screen)
       const a = this.angle * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), cx = G.W / 2, cy = G.H / 2;
-      ctx.setTransform(q * z * c, q * z * s, -q * z * s, q * z * c, q * (cx + c * (ox - cx) - s * (oy - cy) + G.ox), q * (cy + s * (ox - cx) + c * (oy - cy)));
+      ctx.setTransform(q * z * c, q * z * s, -q * z * s, q * z * c, q * (cx + c * (ox - cx) - s * (oy - cy) + G.ox + (this.px || 0)), q * (cy + s * (ox - cx) + c * (oy - cy) + (this.py || 0)));
       return;
     }
-    ctx.setTransform(q * z, 0, 0, q * z, q * (ox + G.ox), q * oy);
+    ctx.setTransform(q * z, 0, 0, q * z, q * (ox + G.ox + (this.px || 0)), q * (oy + (this.py || 0)));
   }
   drawFX(ctx) {
     if (this.flashA > 0) { G.setScreenT(ctx); ctx.globalAlpha = this.flashA; ctx.fillStyle = this.flashC; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
@@ -2072,10 +2073,10 @@ G.HudCam = class {
     const q = G.q, z = this.zoom;
     if (this.angle) {   // (the HUD turns around the middle of the screen)
       const r = this.angle * Math.PI / 180, c = Math.cos(r), sn = Math.sin(r), cx = G.W / 2, cy = G.H / 2;
-      ctx.setTransform(q * z * c, q * z * sn, -q * z * sn, q * z * c, q * (cx - z * (c * cx - sn * cy) + this.sx + G.ox), q * (cy - z * (sn * cx + c * cy) + this.sy));
+      ctx.setTransform(q * z * c, q * z * sn, -q * z * sn, q * z * c, q * (cx - z * (c * cx - sn * cy) + this.sx + G.ox + (this.px || 0)), q * (cy - z * (sn * cx + c * cy) + this.sy + (this.py || 0)));
       return;
     }
-    ctx.setTransform(q * z, 0, 0, q * z, q * (G.W / 2 * (1 - z) + this.sx + G.ox), q * (G.H / 2 * (1 - z) + this.sy));
+    ctx.setTransform(q * z, 0, 0, q * z, q * (G.W / 2 * (1 - z) + this.sx + G.ox + (this.px || 0)), q * (G.H / 2 * (1 - z) + this.sy + (this.py || 0)));
   }
   shake(i, d) { this.shakeI = Math.max(this.shakeI, i); this.shakeT = Math.max(this.shakeT, d); }
   update(dt) { if (this.shakeT > 0) { this.shakeT -= dt; const m = this.shakeI * G.W; this.sx = (Math.random() * 2 - 1) * m; this.sy = (Math.random() * 2 - 1) * m; if (this.shakeT <= 0) { this.shakeI = 0; this.sx = this.sy = 0; } } }
@@ -2464,7 +2465,9 @@ G.Character = class extends G.Sprite {
   }
   isSinging() { return this.animName.startsWith('sing') && !this.animName.endsWith('-end'); }
   dance(force) {
-    if (this.isDead || this._locked) return;          // (locked = a special animation must play out)
+    // (locked = a special animation must play out; special = Psych's specialAnim: no dancing until it ends or the
+    // character sings again)
+    if (this.isDead || this._locked || this._special) return;
     if (this.script && this.script.dance) { this.script.dance(this, force); return; }
     if (!force) {
       if (this.isSinging()) return;
@@ -2479,6 +2482,7 @@ G.Character = class extends G.Sprite {
       const base = name.replace(/-(alt|hold|end|censor).*$/, '').replace(/miss$/, '');
       if (this.anims[base]) name = base; else return false;
     }
+    this._special = false;
     this.play(name, force);
     return true;
   }
@@ -2495,6 +2499,7 @@ G.Character = class extends G.Sprite {
     if (this.fx && this.fx.update) this.fx.update(this, dt);
     if (this.script && this.script.tick) this.script.tick(this, dt);
     if (this.isDead) return;
+    if (this._special && this.finished) { this._special = false; this.dance(true); }
     if (this.finished && !this.animName.endsWith('-hold') && this.anims[this.animName + '-hold']) this.play(this.animName + '-hold');
     if (this.isSinging()) {
       this.holdTimer += dt;
@@ -3954,7 +3959,8 @@ G.SongConductor = class {
             if (pos < n.holdEnd) {
               if (L.player) { this.botHolding = true; this.holdTick(n, dt); }
               else {
-                this.dad.holdTimer = 0; s.confirmHold = -1;
+                for (const c of n.who || [this.dad]) if (c) c.holdTimer = 0;
+                s.confirmHold = -1;
                 if (s.animName === 'confirm' && s.finished) s.playA('confirm-hold', true);
                 else if (s.animName !== 'confirm' && s.animName !== 'confirm-hold') s.playA('confirm', true);
               }
@@ -3991,11 +3997,17 @@ G.SongConductor = class {
     oppHit(n) {
       const s = this.lines[0].strums[n.lane];
       s.playA('confirm', true); s.confirmHold = n.len > 0 ? -1 : 0;
-      const suffix = n.kind === 'alt' ? '-alt' : '', ka = kindAnim(this.dad, n.kind);
-      if (n.kind === 'hey') this.dad.playAnim('hey', true);
-      else if (n.kind === 'No Animation') { /* (Psych note type: the singer doesn't pose) */ }
-      else if (!this.dad._locked && ka) { this.dad.playAnim(ka, true); this.dad.holdTimer = 0; }
-      else if (!this.dad._locked) { this.dad.lastNote = n; this.dad.sing(n.lane, false, suffix); }
+      const suffix = n.kind === 'alt' ? '-alt' : '';
+      // (who sings it: the opponent, unless the song says otherwise: Double Kill's two opponents)
+      const singers = n.who = (this.sfx && this.sfx.oppSingers && this.sfx.oppSingers(this, n)) || [this.dad];
+      for (const c of singers) {
+        if (!c) continue;
+        const ka = kindAnim(c, n.kind);
+        if (n.kind === 'hey') c.playAnim('hey', true);
+        else if (n.kind === 'No Animation') { /* (Psych note type: the singer doesn't pose) */ }
+        else if (!c._locked && ka) { c.playAnim(ka, true); c.holdTimer = 0; }
+        else if (!c._locked) { c.lastNote = n; c.sing(n.lane, false, suffix); }
+      }
       if (this.audio) this.audio.setVolume('o', 1);
       this.nudgeCam(1, n.lane);
       if (this.sfx && this.sfx.oppHit) this.sfx.oppHit(this, n);
@@ -4431,6 +4443,7 @@ G.SongConductor = class {
       const go = this.gameOver; go.t += dt;
       const bf = this.bf, ch = go.spr || bf;
       ch.update(dt);
+      if (this.sfx && this.sfx.gameOverUpdate) this.sfx.gameOverUpdate(this, dt);     // (a song's own game over moves)
       this.cam.zoom = G.lerp(go.zoom1, this.cam.zoom, Math.pow(0.01, dt / 0.5));
       this.cam.update(dt);
       if (go.phase === 'intro' && ch.finished) { go.phase = 'loop'; if (go.spr) go.spr.play('deathLoop', true); else bf.playAnim('deathLoop', true); G.audio.music.play(go.music || 'shared/music/gameplay/gameover/gameOver' + go.suffix + '.ogg', { loop: true, bpm: 100 }); }
@@ -9986,13 +9999,14 @@ G.SongConductor = class {
   // (PlayField.characterSing: runs for every note a side hits; the opponent's pose is already on when this runs,
   // yours comes right after, so the opponent's pose from its last note is kept here)
   function chordHit(P, n, who) {
-    const I = P.imp, c = who === 'dad' ? P.dad : P.bf;
+    const I = P.imp, c = P[who];
     if (!I || !c || n.kind === 'No Animation' || n.kind === 'hey' || n.kind === 'gfsing') return;
     if (c._locked) return;                         // (stunned: no pose)
-    const prev = who === 'dad' ? I.prevAnim.dad : c.animName;
-    if (I.lastHit[who] != null && Math.abs(I.lastHit[who] - n.t) < 3 && ghostsOn(c) && !I.dark) I.ghosts[who][n.lane].fire(prev);
+    const prev = who === 'bf' ? c.animName : I.prevAnim[who];
+    const gh = I.ghosts[who] && I.ghosts[who][n.lane];
+    if (gh && I.lastHit[who] != null && Math.abs(I.lastHit[who] - n.t) < 3 && ghostsOn(c) && !I.dark) gh.fire(prev);
     I.lastHit[who] = n.t; I.holdK[who] = 0;
-    if (who === 'dad') I.prevAnim.dad = c.animName;
+    if (who !== 'bf') I.prevAnim[who] = c.animName;
   }
   // ================================================================ Psych holds: characters without V-Slice holds
   // (vslice_sustains false) take their pose again on every piece of a hold: a piece every step after the head
@@ -10004,17 +10018,19 @@ G.SongConductor = class {
       const k = Math.floor((P.songPos - n.t) / st + 1e-6);
       if (k >= 1 && k <= Math.round(n.len / st) && (n._pk || 0) < k) { n._pk = k; const sn = P.lines[n.line] && P.lines[n.line].strums[n.lane]; if (sn) sn.playA('confirm', true); }
     }
-    for (const who of ['dad', 'bf']) {
+    for (const who of ['dad', 'bf', 'gf']) {
       const c = P[who]; if (!c || !c.data.impostor || c.data.impostor.vsliceSustains || c._locked) continue;
-      const line = who === 'dad' ? 0 : 1;
-      const hold = P.notes.find(n => n.line === line && n.hit && n.len > 0 && !n.done && !n.dropped && P.songPos < n.t + n.len + st && (line === 0 || n.holding || P.botplay));
+      const line = who === 'bf' ? 1 : 0;
+      // (an opponent's hold: only the one(s) who sang it)
+      const mine = n => line === 1 || (n.who ? n.who.includes(c) : who === 'dad');
+      const hold = P.notes.find(n => n.line === line && n.hit && n.len > 0 && !n.done && !n.dropped && P.songPos < n.t + n.len + st && (line === 0 || n.holding || P.botplay) && mine(n));
       if (!hold) continue;
       const k = Math.floor((P.songPos - hold.t) / st + 1e-6), kmax = Math.round(hold.len / st);
       if (k < 1 || k > kmax || I.holdK[who] >= k) continue;
       I.holdK[who] = k;
       if (hold.kind === 'No Animation' || hold.kind === 'hey') continue;
       c.sing(hold.lane, false, hold.kind === 'alt' ? '-alt' : '');
-      if (who === 'dad') I.prevAnim.dad = c.animName;
+      if (who !== 'bf') I.prevAnim[who] = c.animName;
     }
   }
 
@@ -10065,6 +10081,8 @@ G.SongConductor = class {
     const hp = P.hudParts.health; if (P.hideHealth || hp.alpha * hp.apple <= 0.004) return true;
     const hud = P.hud; hud.apply(ctx);
     ctx.save(); ctx.globalAlpha *= hp.alpha * hp.apple;
+    const barA = P.imp.barA == null ? 1 : P.imp.barA, a0 = ctx.globalAlpha;
+    ctx.globalAlpha = a0 * barA;
     const img = G.A.image(IMG + 'hud/healthBar.png');
     const w = img ? img.width : 601, h = img ? img.height : 19;
     const x = (G.W - w) / 2, y = (P.phoneArrows ? 0.11 : P.down ? 0.11 : 0.89) * G.H + hp.dy;
@@ -10072,7 +10090,8 @@ G.SongConductor = class {
     // (Psych's Bar: the picture is the frame, the fill sits 3 px inside it; lights out: black (them) / light grey
     // (you), the frame grey (setColorTransform 224), the icons dark)
     ctx.fillStyle = '#000'; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = dark ? '#000000' : (P.dad && P.dad.data.hpColor) || '#FF0000'; ctx.fillRect(x + 3, y + 3, (w - 6) * (1 - p), h - 6);
+    const oppCol = P.imp.oppCol || (P.dad && P.dad.data.hpColor);
+    ctx.fillStyle = dark ? '#000000' : oppCol || '#FF0000'; ctx.fillRect(x + 3, y + 3, (w - 6) * (1 - p), h - 6);
     ctx.fillStyle = dark ? '#E0E0E0' : (P.bf && P.bf.data.hpColor) || '#66FF33'; ctx.fillRect(x + 3 + (w - 6) * (1 - p), y + 3, (w - 6) * p, h - 6);
     if (img) ctx.drawImage(dark ? flat(img, '#E0E0E0') : img, x, y);
     // icons: Psych's spots (healthBar.x + width * (1 - percent), - 26 / - 150 + 26; y = bar - 75)
@@ -10080,11 +10099,15 @@ G.SongConductor = class {
     const i1 = P.iconP1.img, i2 = P.iconP2.img;
     if (dark) { P.iconP1.img = darkIcon(i1); P.iconP2.img = darkIcon(i2); }
     P.drawIcon(ctx, P.iconP1, split - 26, y - 75 + 75, P.health < 0.4);
-    P.drawIcon(ctx, P.iconP2, split - (150 - 26), y - 75 + 75, P.health > 1.6);
+    // (a stand-in icon that doesn't bop, a little further left: d'low.hx fakeIcon at barCenter - 75 - 52)
+    if (P.imp.fakeIcon) P.drawIcon(ctx, P.imp.fakeIcon, split - 127, y - 75 + 75, false);
+    else P.drawIcon(ctx, P.iconP2, split - (150 - 26), y - 75 + 75, P.health > 1.6);
     P.iconP1.img = i1; P.iconP2.img = i2;
-    const col = (P.dad && P.dad.data.hpColor && P.dad.data.hpColor !== '#000000') ? P.dad.data.hpColor : '#FFFFFF';
-    // (Psych: scoreTxt at healthBar.y + 40, size 20; the letters' tops land 2 px lower)
-    const bop = 1 + 0.075 * (P.imp.scoreBop || 0) / 0.2, ty = y + 37.2;
+    ctx.globalAlpha = a0;
+    const col = (oppCol && oppCol !== '#000000') ? oppCol : '#FFFFFF';
+    // (Psych: scoreTxt at healthBar.y + 40, size 20; the letters' tops land 2 px lower; Double Kill's end on
+    // downscroll: at the top, FlxG.height x .06)
+    const bop = 1 + 0.075 * (P.imp.scoreBop || 0) / 0.2, ty = P.imp.scoreTop ? G.H * 0.06 + 2 : y + 37.2;
     if (bop !== 1) { ctx.translate(G.W / 2, ty + 11); ctx.scale(bop, bop); ctx.translate(-G.W / 2, -(ty + 11)); }
     G.vcr(ctx, scoreText(P), G.W / 2, ty, { align: 'center', size: 20.4, outline: 1.25, color: col });
     ctx.restore();
@@ -10112,6 +10135,7 @@ G.SongConductor = class {
   // at y 55, the numbers x .33 at 122.5 with -30 padding; they pop in at .47 / .35, settle in 0.5 s (expoOut), then fade in
   // 0.5 s (expoOut) after stepCrotchet x 0.01 s; middlescroll moves them 440 px right)
   const expoOut = t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  const circOut = t => Math.sqrt(1 - (t - 1) * (t - 1)), sineIn = t => 1 - Math.cos(t * Math.PI / 2);
   function popups(P, r, combo) {
     const I = P.imp, img = G.A.image(IMG + 'hud/' + r + '.png'); if (!img) return true;
     I.accSum += ACC_W[r] != null ? ACC_W[r] : 1; I.accN++;
@@ -10201,7 +10225,8 @@ G.SongConductor = class {
   // BF's spot and leans with GF.
   function leanCam(P) {
     const I = P.imp; if (I.camWho == null || P.camForced || P.camTween || P.gameOver) return;
-    const side = I.camWho === 1 ? 'dad' : 'bf', who = I.camWho === 1 ? P.dad : I.camWho === 2 ? (P.gf || P.bf) : P.bf;
+    const side = I.camWho === 1 ? 'dad' : 'bf';
+    const who = I.camTarget ? P[I.camTarget] : I.camWho === 1 ? P.dad : I.camWho === 2 ? (P.gf || P.bf) : P.bf;
     const f = I.spots[side] || (P[side] && P[side].camFocus);
     if (!f) return;
     let dx = 0, dy = 0;
@@ -10209,10 +10234,22 @@ G.SongConductor = class {
     P.cam.follow(f.x + dx, f.y + dy);
   }
   function applyZoom(P) { const z = P.imp.baseZoom + (P.imp.zoomAdd || 0); P.camZoom = z; P.stageZoom = z; }
-  // defaultCamZoom = z the way Psych gets there: the camera eases (zoom = lerp(default, zoom, e^(-3.125 x decay x t)))
+  // Psych's zoom bop adds 0.015 x camZoomingMult to the zoom (0.03 x to the HUD); FNF 2 multiplies: the same size
+  // at the zoom the camera has right now (worked out on every beat, right before the bop)
+  function bopSize(P) {
+    const I = P.imp, m = I.bopMult == null ? 1 : I.bopMult;
+    P.bopIntensity = 1 + 0.015 * m / Math.max(0.1, P.camZoom || P.stage.zoom); P.hudBopIntensity = 0.03 * m;
+  }
+  // how fast the zoom goes back (camZoomingDecay, 1 = normal). The mod's engine: zoom = decayLerp(zoom, default,
+  // 6.25 x decay, elapsed) = e^(-6.25 x decay x t) of the way left (checked in the exe: 6.25, not Psych's 3.125);
+  // FNF 2's bop shrinks by 0.05^(t x bopDecay)
+  function zoomDecay(P, k) { P.imp.zoomDecay = k; P.bopDecay = k * 6.25 / -Math.log(0.05); }
+  // defaultCamZoom = z: eases there, or once camZooming is on (before that the camera's zoom stays)
+  function setZoom(P, z) { const I = P.imp; if (I.camZooming) easeZoom(P, z); else { I.baseZoom = z; P.stageZoom = z + (I.zoomAdd || 0); } }
+  // defaultCamZoom = z the way the mod gets there: the camera eases (e^(-6.25 x decay x t) of the way left)
   function easeZoom(P, z) {
     const I = P.imp; I.baseZoom = z; P.stageZoom = z + (I.zoomAdd || 0);
-    const r = 3.125 * (P.bopDecay || 1), dur = 4.6 / r, end = 1 - Math.exp(-r * dur);
+    const r = 6.25 * (I.zoomDecay || 1), dur = 4.6 / r, end = 1 - Math.exp(-r * dur);
     P.zoomTween = { t: 0, dur, z0: P.camZoom, z1: P.stageZoom, ease: k => (1 - Math.exp(-r * dur * k)) / end };
   }
 
@@ -10220,7 +10257,7 @@ G.SongConductor = class {
   function beep(P) {
     const I = P.imp; I.tw = I.tw.filter(w => w.obj !== I.beepFx);
     if (!flashOn()) { I.beepFx.a = 0; tween(I.tw, I.beepFx, { a: 0.15 }, 0.2, E.sineOut, () => tween(I.tw, I.beepFx, { a: 0 }, 0.4, E.quadInOut)); I.beepFx.under = true; }
-    else { I.beepFx.a = 0.3; I.beepFx.under = false; tween(I.tw, I.beepFx, { a: 0 }, 1 / 3); }
+    else { I.beepFx.a = 0.3; I.beepFx.under = false; tween(I.tw, I.beepFx, { a: 0 }, 1 / (I.beepFade || 3)); }   // (reactorFade)
   }
 
   // ================================================================ the base every Impostor song runs on
@@ -10228,8 +10265,7 @@ G.SongConductor = class {
     setup(P) {
       const I = P.imp = { data: songData(P.song.id) || {}, spots: {}, tw: [], pops: [], lastHit: {}, prevAnim: {}, holdK: {}, ghosts: {},
         accSum: 0, accN: 0, beepFx: { a: 0 }, caption: null, baseZoom: P.stage.zoom, zoomAdd: 0, camA: 1, fade: null };
-      // Psych's zoom bop adds +0.015 to the zoom; FNF 2 multiplies: the same size at this stage's zoom
-      P.bopIntensity = 1 + 0.015 / Math.max(0.1, P.stage.zoom); P.hudBopIntensity = 0.03;
+      bopSize(P);
       // (the shared pack: game over + pause music, the talk sounds: ready before they're needed)
       const core = G.Packs && G.Packs.all && G.Packs.all.impostor; if (core && !core.bodyLoaded) G.Packs.needBody(core);
       // (asked for now: the song waits for the pictures, the sounds are decoded before they're needed)
@@ -10239,7 +10275,7 @@ G.SongConductor = class {
       for (const n of ['gameOver', 'gameOverEnd']) G.A.audio(MUS + n + '.ogg');
       if (P.gf) { const sc = (P.stage.data.characters.gf || {}).scroll; if (sc) P.gf.scroll = { x: sc[0], y: sc[1] }; }
       // (four ghosts each, one per arrow; drawn right behind their singer)
-      for (const who of ['bf', 'dad']) { I.ghosts[who] = [0, 1, 2, 3].map(() => new Ghost(P[who])); for (const g of I.ghosts[who]) P.stage.addExtra(g, P[who]); }
+      for (const who of ['bf', 'dad', 'gf']) { I.ghosts[who] = P[who] ? [0, 1, 2, 3].map(() => new Ghost(P[who])) : []; for (const g of I.ghosts[who]) P.stage.addExtra(g, P[who]); }
     },
     reset(P) {
       const I = P.imp; if (!I) return;
@@ -10247,8 +10283,12 @@ G.SongConductor = class {
       I.scoreBop = 0; I.timeA = 0; I.timeT = -1; I.camWho = null;
       I.task = null; I.taskHidden = false; I.dark = false; I.camA = 1; I.fade = null;
       I.camZooming = false; P.zoomRate = 0;          // (Psych: the bops start once the opponent sings)
+      I.bopRate = 4; I.bopMult = 1; bopSize(P); zoomDecay(P, 1);
+      I.twist = null; I.twTw = [];
+      for (const c of [P.cam, P.hud]) { c.angle = 0; c.px = c.py = 0; }
       I.zoomAdd = 0; I.baseZoom = P.stage.zoom; applyZoom(P);
-      for (const who of ['bf', 'dad']) for (const g of I.ghosts[who]) { g.spr.alpha = 0; g.tw.length = 0; g.owner = P[who]; }
+      for (const who of ['bf', 'dad', 'gf']) for (const g of I.ghosts[who]) { g.spr.alpha = 0; g.tw.length = 0; g.owner = P[who]; }
+      I.oppCol = null; I.fakeIcon = null; I.camTarget = null; I.beepFade = 3;
       // the arrows where the mod has them (ModManager.getCenterX / getStrumX / getBaseY: each arrow's middle at
       // 112 px steps around x 321 (opponent) / 953 (you), y 106 from the top or bottom)
       if (!P.middle && !P.phoneArrows && G.NoteGeom) P.lines.forEach((L, li) => L.strums.forEach((st, i) => {
@@ -10260,10 +10300,13 @@ G.SongConductor = class {
       const sc = P.stage.data.characters || {};
       I.spots = {};
       setCams(P, sc.dad && sc.dad.camera, sc.bf && sc.bf.camera, -1);
+      // (the stage file's zoom when the script wants another: the camera starts there + eases once camZooming is on)
+      const sz = P.stage.data.impostor && P.stage.data.impostor.startZoom;
+      if (sz) { P.camZoom = sz; P.zoomTween = null; }
     },
     update(P, dt) {
-      const I = P.imp; tick(I.tw, dt);
-      for (const who of ['bf', 'dad']) for (const g of I.ghosts[who]) g.update(dt);
+      const I = P.imp; tick(I.tw, dt); tick(I.twTw, dt);
+      for (const who of ['bf', 'dad', 'gf']) for (const g of I.ghosts[who]) g.update(dt);
       if (P.covers) P.covers = P.covers.filter(cv => cv.line !== 0 || !cv.note || P.songPos < cv.note.holdEnd);
       psychHolds(P);
       updatePops(P);
@@ -10276,16 +10319,40 @@ G.SongConductor = class {
       if (!I.task && P.started && P.songPos >= -4 * P.cond.crochet) taskStart(P);
       if (I.task) I.task.t += dt;
       if (I.fade) I.fade.t += dt;
+      if (I.camZooming && !P.zoomTween) { const z = I.baseZoom + (I.zoomAdd || 0); P.camZoom = z + (P.camZoom - z) * Math.exp(-6.25 * (I.zoomDecay || 1) * dt); }
       leanCam(P);
     },
     oppHit(P, n) {
       const I = P.imp;
-      if (!I.camZooming) { I.camZooming = true; P.zoomRate = 4; }
-      chordHit(P, n, 'dad');
+      if (!I.camZooming) {
+        I.camZooming = true; P.zoomRate = I.bopRate;
+        // (the zoom only eases to where it should be once camZooming is on: Danger starts at the stage's 2)
+        if (Math.abs(P.camZoom - (I.baseZoom + (I.zoomAdd || 0))) > 1e-4) easeZoom(P, I.baseZoom);
+      }
+      for (const c of n.who || [P.dad]) chordHit(P, n, c === P.gf ? 'gf' : c === P.bf ? 'bf' : 'dad');
       // (PlayField.spawnSusSplash: the opponent's holds get the cover too, gone when the hold ends)
       if (n.len > 0 && G.settings.noteSplashes !== false && P.startCover) P.startCover(n);
     },
     playerHit(P, n) { chordHit(P, n, 'bf'); if (!P.botplay) P.imp.scoreBop = 0.2; },
+    beat(P, beat) {
+      bopSize(P);
+      // Camera Twist (utils.hx onBeatHit): every beat both cameras snap to +-intensity2 degrees (one way, then the
+      // other), ease to +-intensity in 2 steps (circOut) and slide the other way that many pixels over the beat
+      const T = P.imp.twist; if (!T) return;
+      const sh = beat % 2 === 0 ? 1 : -1, st = P.cond.stepCrochet / 1000;
+      for (const c of [P.hud, P.cam]) {
+        c.angle = sh * T.i2;
+        tween(P.imp.twTw, c, { angle: sh * T.i1 }, st * 2, circOut);
+        tween(P.imp.twTw, c, { px: -sh * T.i1 }, st * 4, E.linear);
+      }
+    },
+    step(P, step) {
+      // (and the HUD hops up 6 x intensity2 px on every beat, back down on the half beat)
+      const T = P.imp.twist; if (!T) return;
+      const st = P.cond.stepCrochet / 1000;
+      if (step % 4 === 0) tween(P.imp.twTw, P.hud, { py: -6 * T.i2 }, st * 2, circOut);
+      if (step % 4 === 2) tween(P.imp.twTw, P.hud, { py: 0 }, st * 2, sineIn);
+    },
     event(P, name, v) {
       const I = P.imp, v1 = String(v.value1 == null ? '' : v.value1), v2 = String(v.value2 == null ? '' : v.value2);
       switch (name) {
@@ -10298,9 +10365,21 @@ G.SongConductor = class {
           if (d > 0) tween(I.tw, P.hudParts, { all: a }, d); else P.hudParts.all = a;
           break;
         }
-        case 'Set Cams': {
+        case 'Set Cams': {          // (camSpecialThing: the zoom eases there)
           const c = v1.split(',').map(Number), z = parseFloat(v2);
-          setCams(P, [c[0], c[1]], [c[2], c[3]], isNaN(z) ? -1 : z); break;
+          setCams(P, [c[0], c[1]], [c[2], c[3]], -1); if (z > 0) easeZoom(P, z); break;
+        }
+        case 'Imp Play Anim': {     // (Play Animation: the pose, then no dancing until it's done)
+          const k = v2.trim().toLowerCase(), n = parseInt(k, 10);
+          const c = k === 'bf' || k === 'boyfriend' || n === 1 ? P.bf : k === 'gf' || k === 'girlfriend' || n === 2 ? P.gf : P.dad;
+          if (c && c.playAnim(v1, true)) { c.holdTimer = 0; c._special = true; }
+          break;
+        }
+        case 'Imp Set Zoom': { const z = parseFloat(v1); if (!isNaN(z)) setZoom(P, z); break; }   // (Set Cam Zoom: defaultCamZoom)
+        case 'Imp Add Zoom': {      // (Add Camera Zoom: + to the zoom, + to the HUD's, under 1.35)
+          if (G.settings.camZoom === false || P.cam.zoom >= 1.35) break;
+          let a = parseFloat(v1), b = parseFloat(v2); if (isNaN(a)) a = 0.015; if (isNaN(b)) b = 0.03;
+          P.bopMul += a / Math.max(0.1, P.camZoom); P.hudZoom += b; break;
         }
         case 'Reset Cams': { const sc = P.stage.data.characters || {}; setCams(P, sc.dad && sc.dad.camera, sc.bf && sc.bf.camera, -1); break; }
         case 'Insta Cam Zoom': {
@@ -10315,7 +10394,19 @@ G.SongConductor = class {
           else I.caption = { text: v1, y: v2.trim() ? parseInt(v2, 10) : null };
           break;
         }
-        case 'Alter Camera Bop': { const a = parseInt(v1, 10), b = parseFloat(v2); P.zoomRate = isNaN(a) ? 4 : a; if (!isNaN(b)) { P.bopIntensity = 1 + 0.015 * b / Math.max(0.1, P.stage.zoom); P.hudBopIntensity = 0.03 * b; } break; }
+        case 'Alter Camera Bop': {     // (value1 = how big (camZoomingMult), value2 = every how many beats (0 = 4))
+          const m = parseFloat(v1), r = parseInt(v2, 10);
+          I.bopMult = isNaN(m) ? 1 : m; I.bopRate = isNaN(r) || r === 0 ? 4 : r;
+          if (I.camZooming) P.zoomRate = I.bopRate;
+          bopSize(P); break;
+        }
+        case 'Camera Twist': {
+          let a = parseFloat(v1), b = parseFloat(v2); if (isNaN(a)) a = 0; if (isNaN(b)) b = 0;
+          I.twist = b === 0 ? null : { i1: a, i2: b };
+          // (off: the turn goes back in 1 s; whatever slide / hop is on its way still finishes)
+          if (!I.twist) for (const c of [P.hud, P.cam]) tween(I.twTw, c, { angle: 0 }, 1, E.sineInOut);
+          break;
+        }
       }
     },
     drawHealth, drawTime, popups,
@@ -10330,7 +10421,9 @@ G.SongConductor = class {
       drawTask(ctx, P);
       if (I.caption) caption(ctx, I.caption.text, I.caption.y);
     },
-    gameOver: { sfx: SND + 'fnf_loss_sfx.ogg', music: MUS + 'gameOver.ogg', end: MUS + 'gameOverEnd.ogg', centerArt: true },
+    // (the death character's own sound when it has one: BF's defeat self in Double Kill)
+    gameOver: { get sfx() { const P = G.screens.play, a = P && P.bf && P.bf.data.impostor && P.bf.data.impostor.gameover_intial_sound; return a && G.A.has(SND + a + '.ogg') ? SND + a + '.ogg' : SND + 'fnf_loss_sfx.ogg'; },
+      music: MUS + 'gameOver.ogg', end: MUS + 'gameOverEnd.ogg', centerArt: true },
     pauseMusic: MUS + 'breakfast.ogg',
     countdownAssets: { sound: n => SND + n + '.ogg', image: n => IMG + 'hud/' + n + '.png' },
   };
@@ -10349,11 +10442,11 @@ G.SongConductor = class {
   function combine(...parts) {
     parts = parts.filter(Boolean);
     const o = {};
-    for (const k of ['setup', 'reset', 'update', 'beat', 'step', 'event', 'oppHit', 'playerHit', 'miss', 'drawOver', 'drawTop', 'leave']) {
+    for (const k of ['setup', 'reset', 'update', 'beat', 'step', 'event', 'oppHit', 'playerHit', 'miss', 'drawOver', 'drawTop', 'leave', 'gameOverUpdate']) {
       const fns = parts.map(p => p[k]).filter(Boolean);
       if (fns.length) o[k] = (...a) => { for (const f of fns) f(...a); };
     }
-    for (const k of ['popups', 'drawHealth', 'drawTime', 'drawWorld', 'gameOver', 'pauseMusic', 'countdownAssets', 'maxZoom', 'prepare']) { const p = parts.slice().reverse().find(q => q[k]); if (p) o[k] = p[k]; }
+    for (const k of ['popups', 'drawHealth', 'drawTime', 'drawWorld', 'gameOver', 'pauseMusic', 'countdownAssets', 'maxZoom', 'prepare', 'oppSingers']) { const p = parts.slice().reverse().find(q => q[k]); if (p) o[k] = p[k]; }
     return o;
   }
 
@@ -10827,7 +10920,7 @@ G.SongConductor = class {
     },
     reset(P) {
       const J = P.ej;
-      J.speed = flashOn() ? 9 : 3.3; P.bopDecay = 0.5;
+      J.speed = flashOn() ? 9 : 3.3; zoomDecay(P, 0.5);
       J.right.forEach(b => { b.y = b.y0; }); J.mid.forEach(b => { b.y = b.y0; }); J.left.forEach(b => { b.y = b.y0; });
       J.right[0].y = 6803.1; J.mid[0].y = 8570.5; J.left[0].y = 14050.2;
       J.nearPass = [11000, 11000, 11000, 11000]; J.farPass = [11000, 11000, 11000, 11000, 11000, 11000, 11000];
@@ -10929,6 +11022,327 @@ G.SongConductor = class {
     P.cam.flash('#FFFFFF', 0.35);
     if (X.el && !X.el.paused) X.el.pause();
   }
+
+  // ================================================================ WEEK 3: THE AIRSHIP
+  const AIR = 'shared:impostor/stages/airship/';
+  const quartIn = t => t * t * t * t, quartOut = t => 1 - Math.pow(1 - t, 4), quadIn = t => t * t;
+  const circInOut = t => t < 0.5 ? (1 - Math.sqrt(1 - 4 * t * t)) / 2 : (Math.sqrt(1 - Math.pow(-2 * t + 2, 2)) + 1) / 2;
+  // a character that goes in for another mid-song, made before the song (no hitch when it swaps in)
+  function cacheChar(P, slot, id) {
+    const k = slot + ':' + id; if (!P.swapCache || P.swapCache[k] || !G.A.json('preload/data/characters/' + id + '.json')) return;
+    const c = new G.Character(id, slot); P.swapCache[k] = c; P.swapChars.push(c);
+  }
+  const iconImg = name => G.A.image('preload/images/icons/icon-imp-' + name + '.png');
+  // an endless strip (FlxBackdrop, X only): the picture again and again side by side across the whole view, `gap` px
+  // between the copies. It still sits in the stage's layers like any prop.
+  function backdrop(spr, gap) {
+    const draw1 = spr.draw.bind(spr);
+    spr.gap = gap; spr.x0 = spr.x;
+    spr.period = () => spr.frameW * Math.abs(spr.scale.x) + spr.gap;
+    spr.draw = (ctx, cam) => {
+      if (!spr.visible || spr.alpha <= 0 || !cam) return;
+      const w = spr.period(); if (w < 2) return;
+      const z = cam.zoom, sf = spr.scroll.x;
+      const ox = G.W / 2 - z * ((cam.x - G.W / 2) * sf + G.W / 2);
+      // (a copy more on each side: the camera shakes + turns)
+      const x0 = (-G.CUT - ox) / z - w, x1 = (G.W + G.CUT - ox) / z + w, bx = spr.x;
+      for (let x = bx + Math.floor((x0 - bx) / w) * w; x < x1; x += w) { spr.x = x; draw1(ctx, cam); }
+      spr.x = bx;
+    };
+    // moves it left, kept within one copy of where it started (the same picture, no numbers running away)
+    spr.slide = d => { const w = spr.period(); spr.x -= d; if (w > 1) while (spr.x < spr.x0 - w) spr.x += w; };
+  }
+  // BlendMode.SUBTRACT (the canvas has none): dst - src = 1 - ((1 - dst) + src): flip the colours, add, flip back
+  function subtractDraw(spr) {
+    const draw1 = spr.draw.bind(spr);
+    const flip = ctx => { G.setScreenT(ctx); ctx.save(); ctx.globalCompositeOperation = 'difference'; ctx.fillStyle = '#fff'; ctx.fillRect(-G.CUT - 2, -2, G.W + G.CUT * 2 + 4, G.H + 4); ctx.restore(); };
+    spr.draw = (ctx, cam) => {
+      if (!spr.visible || spr.alpha <= 0.002) return;
+      flip(ctx); spr.blend = 'lighter'; try { draw1(ctx, cam); } finally { spr.blend = null; flip(ctx); }
+    };
+  }
+  // the props a stage file marks: endless strips ('backdrop'), subtract ('blendMode')
+  function specialProps(P) {
+    for (const d of P.stage.data.props || []) {
+      const s = prop(P, d.name); if (!s) continue;
+      if (d.backdrop != null) backdrop(s, d.backdrop);
+      if (d.blendMode === 'subtract') subtractDraw(s);
+    }
+  }
+
+  // ---- the Airship, Yellow's room (data/stages/airship.hx): White sweats in the corner; in Oversight he's gone and
+  //      Yellow's body lies there instead
+  STAGES.airship = {
+    reset(P) {
+      const dead = P.song.id === 'oversight', w = prop(P, 'whiteAwkward'), d = prop(P, 'deadbody');
+      if (w) { w.visible = !dead; w.play('sweat', true); }
+      if (d) d.alpha = dead ? 1 : 0;
+    },
+  };
+  // ---- Mando (songs/mando/mando.hx): the zoom + the camera spots at a few beats
+  SONGS.mando = {
+    beat(P, b) {
+      if (b === 32 || b === 96) setZoom(P, 0.7);
+      else if (b === 128) setCams(P, [350, 547.5], [650, 547.5], -1);
+      else if (b === 192) setZoom(P, 0.8);
+      else if (b === 196) setZoom(P, 0.9);
+      else if (b === 200) { setCams(P, [300, 500], [700, 500], -1); setZoom(P, 0.6); }
+    },
+  };
+  // ---- D'low (songs/d'low/d'low.hx): the camera twists + bops (utils.hx events), then Yellow dies at the very end:
+  //      her death, her dead icon standing in for hers (it doesn't bop), BF + GF scared, the camera between them
+  SONGS["d'low"] = {
+    setup(P) { iconImg('yellow-dead'); },
+    reset(P) { for (const c of [P.dad, P.bf, P.gf]) if (c) c._locked = false; },
+    event(P, name, v) {
+      if (name !== 'Legacy' || String(v.value1) !== 'dlow death') return;
+      const I = P.imp, img = iconImg('yellow-dead');
+      if (img && !G.settings.hideHud) I.fakeIcon = { img, player: false, scale: 1, flip: P.iconP2.flip, pixel: false };
+      if (P.dad) { P.dad.playAnim('death', true); P.dad._locked = true; }
+      setCams(P, [450, 500], [450, 500], -1); setZoom(P, 0.7);
+      const scare = (c, list) => { if (!c) return; const a = list.find(n => c.anims[n]); if (a) { c.playAnim(a, true); c._locked = true; } };
+      scare(P.bf, ['yellowReaction', 'scared']);
+      scare(P.gf, ['yellowReaction', 'scared', 'sad']);
+    },
+  };
+
+  // ---- the runners' legs (data/characters/danger.hx + bf-running.hx): a second copy of the character on its 'legs'
+  //      animation right behind it, its frame locked to the beat (one run every 2 beats). The body bobs with the legs'
+  //      frame; while idle (BF: on any looping pose) the body shows the legs' frame too, so they stay in step
+  const LEG_Y = {
+    'imp-danger': [13, 7, -3, -1, -1, 2, 7, 9, 7, 2, 0, 0, 3, 1, 3, 7, 13],
+    'imp-bf-running': [7, 7, 4, 4, -5, -5, -7, -7, -3, -3, 7, 7, 4, 4, -5, -5, -7, -7, -3, -3],
+  };
+  const LEG_Y_MAD = [-8, -3, 5, 2, -8, -13, -16, -14, -9, -4, 5, -4, -9, -10];
+  const syncFrame = s => { const a = s.cur; if (a && a.kind === 'sparrow') { const f = a.frames[s.fi]; s.frameW = f.fw; s.frameH = f.fh; } };
+  function legsScript(isBf) {
+    return {
+      attach(ch, stage) {
+        const L = ch._legs = new G.Sprite(0, 0);
+        L.anims = ch.anims; L.animOffsets = ch.animOffsets; L.globalOffsets = ch.globalOffsets; L.useAnimOffsets = true;
+        L.scale = ch.scale; L.origin = ch.origin; L.offset = ch.offset; L.scroll = ch.scroll; L.antialias = ch.antialias;
+        L.atlas = ch.atlas; L.sheet = ch.sheet; L.zIndex = ch.zIndex - 0.6; L.legAnim = 'legs';
+        L.play('legs', true);
+        const draw1 = L.draw.bind(L);
+        L.draw = (ctx, cam) => { if (ch.visible && !ch.isDead && ch.alpha > 0) { L.alpha = ch.alpha; draw1(ctx, cam); } };
+        stage.addExtra(L, ch);
+      },
+      tick(ch) {
+        const P = G.screens.play, L = ch._legs, op = ch.originalPosition;
+        if (!L || !op || !P || !P.cond || G.screen !== P) return;
+        L.zIndex = ch.zIndex - 0.6; L.scroll = ch.scroll; L.flipX = ch.flipX; L.x = op.x; L.y = op.y;
+        if (ch.isDead) { ch.y = op.y; return; }
+        // (BF: his miss legs while he's on a miss pose; Black: the fast ones once he's mad)
+        const want = isBf ? (/miss/.test(ch.animName) ? 'legs-miss' : 'legs') : (ch._madLegs ? 'legs-mad' : 'legs');
+        if (L.legAnim !== want && ch.anims[want]) { L.legAnim = want; L.play(want, true); }
+        const a = L.cur; if (!a) return;
+        const beat = P.songPos / P.cond.crochet, k = (((beat % 2) + 2) % 2) / 2;
+        L.fi = Math.min(a.n - 1, Math.floor(k * a.n)); syncFrame(L);
+        const idle = ch.animName.startsWith('idle');
+        if (ch.cur && (isBf ? ch.cur.loop : idle)) { ch.fi = Math.min(L.fi, ch.cur.n - 1); syncFrame(ch); }
+        const ys = isBf ? LEG_Y['imp-bf-running'] : idle ? null : ch.singSuffix === '-mad' ? LEG_Y_MAD : LEG_Y['imp-danger'];
+        ch.y = op.y + ((ys && ys[L.fi]) || 0);
+      },
+    };
+  }
+  G.CharScripts['imp-danger'] = legsScript(false);
+  G.CharScripts['imp-bf-running'] = legsScript(true);
+
+  // ---- Danger (data/stages/danger.hx + songs/danger/script.hx): running on top of the Airship. Every strip scrolls
+  //      left (clouds slow, the platform under your feet + the speed lines fast), the big cloud drifts past + comes back
+  //      somewhere new, the camera always shakes a little + bobs, the HUD sways. Black screams (the sky flashes), turns
+  //      mad (his fast legs), GF + her speaker roll off and everything speeds up.
+  const DANGER_CAMS = {
+    1: [[1634.05, -54.3], [1634.05, -54.3], 0.3], 64: [[800, 150], [1200, 150], 0.4], 96: [[700, 150], [1200, 150], 0.6],
+    128: [[800, 150], [1200, 150], 0.4], 144: [[800, 150], [1200, 150], 0.5], 152: [[800, 150], [1200, 150], 0.6],
+    154: [[600, 150], [600, 150], 0.6], 156: [[450, 150], [450, 150], 0.8], 158: [[450, 150], [450, 150], 0.6],
+    160: [[800, 150], [1200, 150], 0.4], 192: [[700, 150], [1200, 150], 0.6], 256: [[800, 150], [1200, 150], 0.4],
+    288: [[700, 150], [1200, 150], 0.6], 320: [[1634.05, -54.3], [1634.05, -54.3], 0.3], 384: [[700, 150], [1200, 150], 0.6],
+  };
+  STAGES.danger = {
+    setup(P) {
+      specialProps(P);
+      P.danger = { tw: [], strips: [['farClouds', 7], ['midClouds', 13], ['closeClouds', 50], ['platform', 300], ['speedlines', 350]] };
+      const big = prop(P, 'bigCloud'); if (big) { big.x0 = big.x; big.y0 = big.y; }
+      const gb = prop(P, 'gfBoard'); if (gb) gb.x0 = gb.x;
+    },
+    reset(P) {
+      const D = P.danger;
+      D.tw.length = 0; D.speed = flashOn() ? 9 : 7; D.bigSpeed = 10; D.scream = false; D.go = null;
+      for (const [n] of D.strips) { const s = prop(P, n); if (s && s.x0 != null) s.x = s.x0; }
+      const big = prop(P, 'bigCloud'); if (big) { big.x = big.x0; big.y = big.y0; }
+      const gb = prop(P, 'gfBoard'); if (gb) { gb.x = gb.x0; gb.visible = true; }
+      const ss = prop(P, 'screamsky'); if (ss) ss.alpha = 0;
+      if (P.gf && P.gf.originalPosition) { P.gf.x = P.gf.originalPosition.x; P.gf.visible = true; }
+      if (P.dad) { P.dad._madLegs = false; P.dad.singSuffix = ''; P.dad.idleSuffix = ''; P.dad._special = false; }
+      P.hud.sy = 0;
+    },
+    update(P, dt) {
+      const D = P.danger; tick(D.tw, dt);
+      const d = dt * D.speed * (G.settings.songSpeed || 1);
+      for (const [n, v] of D.strips) { const s = prop(P, n); if (s && s.slide) s.slide(d * v); }
+      const big = prop(P, 'bigCloud');
+      if (big) {
+        big.x -= d * D.bigSpeed;
+        if (big.x < -4163.7) { big.x = rnd(3931.5, 4824.05); big.y = rnd(-1087.5, -307.35); D.bigSpeed = rnd(7, 15); }
+      }
+      if (!D.scream) P.cam.shake(0.0008, 0.01);
+      const bps = P.cond.bpm / 60;
+      P.cam.py = Math.sin((P.songPos / 280) * bps) * 2 - 2;
+      P.hud.sy = -Math.sin((P.songPos / 300) * bps * -1) * 0.6;
+      P.hud.angle = Math.sin((P.songPos / 350) * bps * -1) * 0.6;
+    },
+    // (onGameOverStart: the camera zooms to .65 over 8 s, half a second in)
+    gameOverUpdate(P, dt) {
+      const D = P.danger, go = P.gameOver; if (!D.go) D.go = { t: 0, z0: go.zoom1 };
+      D.go.t += dt; const k = G.clamp((D.go.t - 0.5) / 8, 0, 1);
+      go.zoom1 = D.go.z0 + (0.65 - D.go.z0) * expoOut(k);
+    },
+    event(P, name, v) {
+      if (name !== 'Legacy') return;
+      const D = P.danger, k = String(v.value1), ss = prop(P, 'screamsky');
+      if (k === 'scream danger') {
+        D.scream = true;
+        if (ss) { ss.alpha = 1; ss.play('bop', true); }
+        if (P.dad) { P.dad.playAnim('scream2', true); P.dad._special = true; P.dad.singSuffix = P.dad.idleSuffix = '-mad'; }
+      } else if (k === 'unscream danger') {
+        if (P.dad) P.dad._madLegs = true;
+        D.scream = false;
+        if (ss) tween(D.tw, ss, { alpha: 0 }, 0.6, quartOut);
+      } else if (k === 'bye gf') {
+        if (P.gf) tween(D.tw, P.gf, { x: P.gf.x - 3500 }, 4, quartIn, () => { P.gf.visible = false; });
+        const gb = prop(P, 'gfBoard'); if (gb) tween(D.tw, gb, { x: gb.x - 3500 }, 4, quartIn, () => { gb.visible = false; });
+        tween(D.tw, D, { speed: flashOn() ? 14 : 9 }, 5, quadIn);
+      }
+    },
+  };
+  SONGS.danger = {
+    beat(P, b) {
+      const c = DANGER_CAMS[b]; if (!c) return;
+      if (b === 158) P.cam.shake(0.01, P.cond.stepCrochet / 1000 * 4);
+      setCams(P, c[0], c[1], -1); setZoom(P, c[2]);
+    },
+  };
+
+  // ---- Double Kill (data/stages/cargo.hx + songs/double-kill/double-kill.hx): White + Black. 'Opponent Two' hands the
+  //      opponent's notes to Black (his icon + colour), 'Both Opponents' to both of them (the double icon); his own
+  //      'Opponent 2 Sing' / 'Both Opponents Sing' notes too. Black on the camera's lean for his parts. Starts black,
+  //      no HUD, the zoom pulling in, until the first flash. The dark parts (everyone but you fades), the Airship
+  //      flashback, then BF turns into his defeat self in the dark, the glow, the end: red, everyone gone.
+  STAGES.cargo = { setup(P) { specialProps(P); } };
+  SONGS['double-kill'] = {
+    setup(P) {
+      const K = P.dk = { tw: [] };
+      cacheChar(P, 'bf', 'imp-bf-defeat-normal');
+      if (P.bf) P.swapCache['bf:' + P.bf.id] = P.bf;
+      G.A.audio(SND + 'stage/defeat_kill_sfx.ogg');
+      for (const n of ['white', 'black', 'double-kill']) iconImg(n);
+      // (the song script's own pictures: added after the whole stage, over everybody)
+      const air = K.air = sprite(G.A.imagePath(AIR + 'double-kill/airshipFlashback') + '.png', 2200, 800);
+      air.scale.x = air.scale.y = 1.3; air.zIndex = 1e6;          // (setGraphicSize after updateHitbox: grows round its middle)
+      const glow = K.glow = sprite(G.A.imagePath('shared:impostor/stages/void/iluminao omaga') + '.png', 900, 350);
+      glow.scale.x = glow.scale.y = 4; glow.updateHitbox(); glow.blend = 'lighter'; glow.zIndex = 1e6 + 1;
+      // (cargoDarkFG: a black block twice the screen at scroll 0: it covers the whole view)
+      K.fg = { zIndex: 1e6 + 2, alpha: 1, update() {}, draw(ctx) { if (this.alpha <= 0.002) return; G.setScreenT(ctx); ctx.save(); ctx.globalAlpha = Math.min(1, this.alpha); ctx.fillStyle = '#000'; ctx.fillRect(-G.CUT - 2, -2, G.W + G.CUT * 2 + 4, G.H + 4); ctx.restore(); } };
+      for (const s of [air, glow, K.fg]) P.stage.addExtra(s, null);
+      const m = prop(P, 'mainoverlay'); if (m) K.main0 = { y: m.y, sy: m.scale.y };
+    },
+    reset(P) {
+      const K = P.dk, I = P.imp;
+      K.tw.length = 0; K.two = K.both = K.darken = K.showAir = false; K.zt = null;
+      K.air.alpha = 0.001; K.glow.alpha = 0.001; K.glow.visible = true; K.fg.alpha = 1;
+      const m = prop(P, 'mainoverlay'), l = prop(P, 'lightoverlay'), cd = prop(P, 'cargoDark');
+      if (m) { m.alpha = 0.51; m.flipY = false; m.y = K.main0.y; m.scale.y = K.main0.sy; }
+      if (l) l.alpha = 0.6;
+      if (cd) cd.alpha = 0.001;
+      for (const c of [P.dad, P.gf, P.bf]) if (c) { c.alpha = 1; c.visible = true; }
+      I.beepFade = 1; I.barA = 1; I.scoreTop = false;
+      P.hudParts.all = 0;                                         // (camHUD.visible = false until the flash)
+      const w = iconImg('white'); if (w) P.iconP2.img = w;
+    },
+    oppSingers(P, n) {
+      const K = P.dk;
+      if (n.kind === 'opp2') return [P.gf];
+      if (K.both || n.kind === 'oppboth') return [P.dad, P.gf];
+      if (K.two) return [P.gf];
+      return [P.dad];
+    },
+    update(P, dt) {
+      const K = P.dk, I = P.imp; tick(K.tw, dt);
+      const lerp = (a, b, r) => a + Math.min(1, Math.max(0, r)) * (b - a);
+      // (the first 1.2 s: the black lifts a little, the zoom pulls in to 1)
+      if (P.started && P.songPos >= 0 && P.songPos < 1200) { K.fg.alpha -= dt / 5; P.zoomTween = null; P.camZoom = lerp(P.camZoom, 1, dt * 3); }
+      if (K.darken) {
+        const cd = prop(P, 'cargoDark'), m = prop(P, 'mainoverlay'), l = prop(P, 'lightoverlay'), r = dt * 1.4;
+        if (cd) cd.alpha = lerp(cd.alpha, 1, r);
+        for (const c of [P.dad, P.gf]) if (c) c.alpha = lerp(c.alpha, 0.001, r);
+        if (m) m.alpha = lerp(m.alpha, 0.001, r); if (l) l.alpha = lerp(l.alpha, 0.001, r);
+      }
+      if (K.showAir) K.air.alpha = lerp(K.air.alpha, 0.45, dt * 0.1);
+      if (K.zt) { const z = K.zt; z.t += dt; const e = z.ease(Math.min(1, z.t / z.dur)); I.baseZoom = z.z0 + (z.z1 - z.z0) * e; P.stageZoom = I.baseZoom + (I.zoomAdd || 0); if (z.t >= z.dur) K.zt = null; }
+    },
+    event(P, name, v) {
+      const K = P.dk, I = P.imp, v1 = String(v.value1 == null ? '' : v.value1).trim();
+      const zoomTo = (z, beats, ease) => { K.zt = { t: 0, dur: P.cond.crochet / 1000 * beats, z0: I.baseZoom, z1: z, ease: ease || E.linear }; };
+      if (name === 'flash') { K.fg.alpha = 0; P.hudParts.all = 1; return; }
+      if (name === 'Opponent Two') {
+        K.two = parseInt(v1, 10) === 1;
+        if (!K.both) { const c = K.two ? P.gf : P.dad; I.oppCol = c && c.data.hpColor; const im = iconImg(K.two ? 'black' : 'white'); if (im) P.iconP2.img = im; }
+        return;
+      }
+      if (name === 'Both Opponents') {
+        K.both = parseInt(v1, 10) === 1;
+        const im = iconImg(K.both ? 'double-kill' : K.two ? 'black' : 'white'); if (im) P.iconP2.img = im;
+        return;
+      }
+      if (name !== 'Legacy') return;
+      const m = prop(P, 'mainoverlay'), l = prop(P, 'lightoverlay'), cd = prop(P, 'cargoDark');
+      switch (v1) {
+        case 'black': I.camTarget = 'gf'; break;
+        case 'not black': I.camTarget = null; break;
+        case 'wmc': setCams(P, [2150, 1050], [2150, 1050], -1); break;
+        case 'nc': case 'ncy': setCams(P, [2000, 1050], [2300, 1050], -1); break;
+        case '356': setCams(P, null, [2750, 1150], -1); setZoom(P, 1.1); break;
+        case '420': setCams(P, null, [2300, 1050], -1); setZoom(P, 0.8); break;
+        case '552': setCams(P, [1650, 1180], null, -1); setZoom(P, 1.2); break;
+        case '556': setCams(P, [2000, 1050], null, -1); setZoom(P, 0.8); break;
+        case 'darken': K.darken = true; P.cam.flash('#000000', 0.55); break;
+        case 'airship': K.showAir = true; break;
+        case 'brighten':
+          K.showAir = K.darken = false; K.air.alpha = 0.001; if (cd) cd.alpha = 0.001;
+          for (const c of [P.dad, P.gf]) if (c) c.alpha = 1;
+          if (l) l.alpha = 0.6; if (m) m.alpha = 0.51;
+          break;
+        case 'gonnakill': {
+          const d = P.cond.crochet * 0.004;
+          zoomTo(1, 4, E.sineInOut);
+          tween(K.tw, K.fg, { alpha: 1 }, d);
+          tween(K.tw, I, { barA: 0 }, d, circInOut);            // (the time bar, the health bar + the icons)
+          tween(K.tw, P.hudParts.time, { alpha: 0 }, d, circInOut);
+          break;
+        }
+        case 'readykill':
+          if (P.bf && P.bf.id !== 'imp-bf-defeat-normal') { G.ModChars.swap(P, 'bf', 'imp-bf-defeat-normal'); for (const g of I.ghosts.bf) { g.owner = P.bf; g.spr.alpha = 0; } }
+          zoomTo(0.8, 16, expoOut);
+          if (P.down) I.scoreTop = true;
+          K.glow.alpha = 0.1; if (l) l.alpha = 0; if (cd) cd.alpha = 1; if (P.dad) P.dad.alpha = 0;
+          K.fg.alpha = 1; tween(K.tw, K.fg, { alpha: 0 }, 2.75);
+          if (m) { m.flipY = true; m.scale.y *= 3; m.y += 1200; }
+          break;
+        case 'ending':
+          zoomTo(0.6, 64);
+          tween(K.tw, K.glow, { alpha: 1 }, P.cond.crochet * 0.004 * 20, E.sineInOut);
+          if (m) tween(K.tw, m.scale, { y: m.scale.y * 2 }, P.cond.crochet * 0.004 * 24, E.sineInOut);
+          break;
+        case 'endingcam': setCams(P, [2220, 1050], [2220, 1050], -1); break;
+        case 'kill':
+          P.cam.flash('#FF0000', 2.75);
+          for (const c of [P.gf, P.bf]) if (c) c.visible = false;
+          K.glow.visible = false; P.hudParts.all = 0;
+          break;
+      }
+    },
+  };
 
   // ================================================================ videos (FunkinVideoSprite: fit to the screen height)
   function playVideo(path, o) {
@@ -11129,7 +11543,7 @@ G.SongConductor = class {
       create(P) {
         const d = songData(sid); if (!d) return null;
         const steps = [];
-        const intro = IN_SONG_VIDEO[sid] ? null : (d.videos || []).find(v => v.endsWith('/' + sid));
+        const intro = IN_SONG_VIDEO[sid] ? null : (d.videos || []).find(v => v.toLowerCase().endsWith('/' + sid));
         if (intro) steps.push(videoStep(intro));
         if (d.talk && d.talk.length) steps.push(talkStep(sid, d.talk));
         if (!steps.length) return null;
@@ -11157,7 +11571,8 @@ G.SongConductor = class {
   // ================================================================ wire it up
   G.SongFX = G.SongFX || {}; G.Cutscenes = G.Cutscenes || {};
   G.Impostor = { STAGES, SONGS, combine, BASE };
-  const SONG_IDS = ['sussus-moogus', 'sabotage', 'meltdown', 'sussus-toogus', 'lights-down', 'reactor', 'ejected'];
+  const SONG_IDS = ['sussus-moogus', 'sabotage', 'meltdown', 'sussus-toogus', 'lights-down', 'reactor', 'ejected',
+    'mando', "d'low", 'oversight', 'danger', 'double-kill'];
   for (const sid of SONG_IDS) {
     G.SongFX[sid] = { setup(P) { if (!isImp(P)) return; const st = (P.stage.data.impostor || {}).stage; P.sfx = combine(BASE, STAGES[st], SONGS[sid]); if (P.sfx.setup) P.sfx.setup(P); } };
     G.Cutscenes[sid] = cutsceneFor(sid);
@@ -15449,8 +15864,8 @@ window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document
 G.phoneUpdate = {
   BASE: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/',
   ZIPS: { 'fnf2-phone-update.zip': ['mobile', 'videosongs', 'jordus'], 'fnf2-phone-impostor.zip': ['impostor', 'impostor-w1'],
-    'fnf2-phone-impostor-w2.zip': ['impostor-w2'] },
-  NEED: { mobile: 2, videosongs: 2, jordus: 4, impostor: 2, 'impostor-w1': 2, 'impostor-w2': 1 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
+    'fnf2-phone-impostor-w2.zip': ['impostor-w2'], 'fnf2-phone-impostor-w3.zip': ['impostor-w3'] },
+  NEED: { mobile: 2, videosongs: 2, jordus: 4, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
             // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player, v3 = her own animations)
   saved: {},            // (packs picked just now: the zips on GitHub always hold the newest ones)
   old(id) { return !this.saved[id] && (!G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]); },
@@ -15461,7 +15876,7 @@ G.phoneUpdate = {
     const zips = this.zips();
     const d = this.box = document.createElement('div');
     d.style.cssText = 'position:fixed;left:50%;bottom:4%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.88);border:.5vmin solid #fff;border-radius:2vmin;padding:2.5vmin 4vmin;color:#fff;font:bold 4vmin VCR,monospace;text-align:center;max-width:92vw';
-    const msg = document.createElement('div'); msg.textContent = note || 'PHONE UPDATE: VS IMPOSTOR week 2 (MIRA MANIA) + week 1 fixes';
+    const msg = document.createElement('div'); msg.textContent = note || 'PHONE UPDATE: VS IMPOSTOR week 3 (AIRSHIP ATROCITIES) + week 1-2 fixes';
     const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:3vmin;justify-content:center;margin-top:2vmin;flex-wrap:wrap';
     const btn = (txt, bg, tag) => { const e = document.createElement(tag); e.textContent = txt; e.style.cssText = 'padding:2vmin 4vmin;border-radius:1.5vmin;color:#000;text-decoration:none;cursor:pointer;background:' + bg; return e; };
     const gets = zips.map((z, i) => {
