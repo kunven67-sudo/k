@@ -90,7 +90,7 @@ G.mobileUI = {
   window.addEventListener('popstate', () => {
     try { history.pushState({ fnf2: 1 }, ''); } catch (e) {}
     const scr = G.screen; if (!scr) return;
-    if (G.screenName === 'play') { if (scr.paused) scr.onAction('back', true, false); else if (scr.openPause && scr.started && !scr.gameOver) scr.openPause(); else scr.onAction('back', true, false); return; }
+    if (G.screenName === 'play') { if (scr.paused) scr.onAction('back', true, false); else if (scr.openPause && (scr.started || (scr.cutscene && !scr.cutscene.done)) && !scr.gameOver) scr.openPause(); else scr.onAction('back', true, false); return; }
     G.mobileUI.back();
   });
 })();

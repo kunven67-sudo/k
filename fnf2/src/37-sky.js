@@ -145,7 +145,7 @@
         G.setScreenT(ctx);
         if (this.white > 0) { ctx.fillStyle = 'rgba(255,255,255,' + this.white.toFixed(3) + ')'; ctx.fillRect(0, 0, G.W, G.H); }
         if (this.black > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.black.toFixed(3) + ')'; ctx.fillRect(0, 0, G.W, G.H); }
-        if (!this.done) G.vcr(ctx, 'Press BACK to Skip', G.W - 20, G.H - 30, { size: 16, align: 'right', outline: 2 });
+        if (!this.done && !G.touchMode) G.vcr(ctx, 'Press BACK to Skip', G.W - 20, G.H - 30, { size: 16, align: 'right', outline: 2 });   // (phones: the pause button)
       },
     };
     return S.begin();

@@ -206,7 +206,7 @@
       this.texMB = Math.round((world * squeeze * squeeze + other) / 1e6);
     },
     // the stage + characters go with the screen (their pictures can be freed while you're in the menus)
-    leave() { if (this.sfx && this.sfx.leave) try { this.sfx.leave(this); } catch (e) {} if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); this.stage = null; this.bf = this.dad = this.gf = null; this.cutscene = null; },
+    leave() { this.killCutFreeze(); if (this.sfx && this.sfx.leave) try { this.sfx.leave(this); } catch (e) {} if (this.audio) this.audio.stop(); this.audio = null; G.audio.music.stop(0.1); this.stage = null; this.bf = this.dad = this.gf = null; this.cutscene = null; },
     // still loading (its music decoding, pictures, the mod pack): the loading screen stays up
     loadingNow() { return !this.ready; },
     // the song is running: the main loop must never hold the screen for pictures still loading
@@ -219,6 +219,7 @@
       this.gf = s.chars.gf ? mk(s.chars.gf, 'gf', 'gf') : null;
       // (a swapped Weekend 1 song: FNF's own opponent Pico, already set up to face right)
       this.dad = mk(s.swap && s.chars.opponent === 'pico-playable' ? 'pico' : s.chars.opponent, 'dad', 'dad');
+      this.vsWho = G.deathWho(this.dad);   // (the death counter counts against who the song starts with)
       // (a full player singing a song swapped uses its own playable version: Darnell's Mixtape's darnell-player;
       //  a stand-in player sings as their song version when the song has one: Nene's singing sheet, not the A-Bot one)
       //  (also in a song made for them: Darnell in After Hours)
@@ -424,6 +425,7 @@
     update(dt) {
       if (this.failed || !this.ready) return;
       if (this.blackIn > 0) this.blackIn -= dt;
+      if (this.cutscene && this.paused) { this.updatePause(dt); return; }
       if (this.cutscene) { this.cutscene.update(dt); if (this.cutscene.done) { const c = this.cutscene; this.cutscene = null; if (c.isEnd) this.endSong(); else this.startCountdown(); } return; }
       if (this.gameOver) { this.updateGameOver(dt); return; }
       if (this.paused) { this.updatePause(dt); return; }
@@ -866,10 +868,17 @@
       if (a === 'pause' && this.started) { this.openPause(); return true; }
       if (a === 'reset' && this.started && !this.paused) this.health = 0;
     },
-    onBlur() { if (this.started && !this.paused && !this.gameOver && !this.ended) this.openPause(); },
+    onBlur() { if (this.cutscene && !this.paused && !this.cutscene.done) { this.openPause(); return; } if (this.started && !this.paused && !this.gameOver && !this.ended) this.openPause(); },
     onPointer(type, x, y, id, e) {
       if (this.paused) { this.pausePointer(type, x, y); return; }
-      if (this.cutscene) { if (type === 'down') this.cutscene.onAction(y < 90 && x > G.W - 160 ? 'back' : 'accept', true, false); return; }
+      if (this.cutscene) {
+        // (FNF mobile: the pause button shows during cutscenes too -> RESUME / SKIP / RESTART / EXIT; a tap anywhere
+        //  else = next line)
+        const pb = G.touchMode ? (this.pauseBtn || (this.pauseBtn = this.makePauseButton())) : null;
+        if (pb ? pb.pointer(type, x, y, id) : (G.touchMode && type === 'down' && x > G.W - 130 && y < 110 && (this.openPause(), true))) return;
+        if (type === 'down') this.cutscene.onAction('accept', true, false);
+        return;
+      }
       if (this.gameOver) { this.gameOverPointer(type, x, y, id); return; }
       if (!G.touchMode) return;
       // pause button top-right (FNF mobile's own)
@@ -910,14 +919,17 @@
     // -------------------------------------------------- pause menu (V-Slice PauseSubState)
     openPause() {
       if (this.paused || !this.audio) return;
-      this.paused = true; this.audio.pause();
+      // a cutscene: its sounds + video stop right where they are (RESUME carries on from there)
+      const cut = this.cutscene && !this.cutscene.done ? (this.cutscene.dlg ? 'talk' : 'video') : null;
+      this.paused = true;
+      if (cut) this.cutFreeze = G.audio.freeze ? G.audio.freeze() : null; else this.audio.pause();
       if (this.pauseBtn && G.touchMode && this.pauseBtn.spr.animName !== 'confirm') { this.pauseBtn.spr.play('confirm', true); this.pauseBtn.spr.alpha = 1; }
       if (navigator.vibrate && G.touchMode) try { navigator.vibrate(50); } catch (e) {}
       for (let i = 0; i < 4; i++) if (this.keys[i]) this.release(i);
       this._touch = {}; this._tpos = {};
       const art = this.song.artist || 'Unknown', chr = this.song.charter || 'Unknown';
       const meta = [this.song.name, 'Artist: ' + art, 'Difficulty: ' + ((G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff).replace(/\b\w+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()), '', 'PRACTICE MODE'];
-      this.pauseMenu = { sel: 0, t: 0, mode: 'main', items: [], meta, art, chr, artistT: 0, artistA: 1, artistIsCharter: false, offHold: 0, offFast: false };
+      this.pauseMenu = { sel: 0, t: 0, mode: 'main', items: [], meta, art, chr, artistT: 0, artistA: 1, artistIsCharter: false, offHold: 0, offFast: false, cut };
       this.pauseEntries('main');
       // breakfast starts somewhere in its first half and fades in over 5 seconds, like the real one
       // each player's own pause music (breakfast-pico, breakfast-darnell...)
@@ -933,6 +945,11 @@
       if (mode === 'diff') {
         pm.diffs = G.Songs.difficulties(this.song.id, G.playerOf(this.song.chars.player));
         labels = pm.diffs.map(d => G.DIFF_INFO[d.diff].name).concat(['Back']);
+      } else if (pm.cut) {
+        // (FNF's PAUSE_MENU_ENTRIES_VIDEO_CUTSCENE / _CONVERSATION; an ending can't be started over)
+        const w = pm.cut === 'talk' ? 'Dialogue' : 'Cutscene';
+        const C = this.cutscene, st = C && C.steps && C.steps[C.k], noSkip = st && st.back === false;   // (a video the mod won't let you skip)
+        labels = ['Resume'].concat(noSkip ? [] : ['Skip ' + w]).concat(C && C.isEnd ? [] : ['Restart ' + w]).concat(['Exit to Menu']);
       } else labels = ['Resume', 'Restart Song', 'Change Difficulty', this.practice ? 'Disable Practice Mode' : 'Enable Practice Mode', 'Exit to Menu'];
       pm.mode = mode; pm.sel = 0;
       // phones (FNF mobile's PauseSubState): a fixed list down the left, each one sliding in from x 110 to 150, the
@@ -1017,6 +1034,8 @@
         return;
       }
       if (label === 'Resume') this.resume();
+      else if (/^Skip (Cutscene|Dialogue)$/.test(label)) { this.resume(); if (this.cutscene && !this.cutscene.done) this.cutscene.onAction('back', true, false); }
+      else if (/^Restart (Cutscene|Dialogue)$/.test(label)) { this.killCutFreeze(); G.audio.music.stop(0); G.setScreen('play', Object.assign({}, this.params, { weekStats: this.params.weekStats, noCutscene: false })); }
       else if (label === 'Restart Song') this.restart();
       else if (label === 'Change Difficulty') this.pauseEntries('diff');
       else if (/Practice/.test(label)) {
@@ -1025,9 +1044,17 @@
       } else if (label === 'Exit to Menu') this.exitToMenu();
     },
     backToPauseMain() { this.pauseEntries('main'); },
-    resume() { this.paused = false; this.pauseMenu = null; G.audio.music.stop(0.1); this.audio.resume(); },
+    resume() {
+      const cut = this.pauseMenu && this.pauseMenu.cut;
+      this.paused = false; this.pauseMenu = null;
+      if (cut) { if (this.cutFreeze) G.audio.unfreeze(this.cutFreeze); else G.audio.music.stop(0.1); this.cutFreeze = null; if (this.pauseBtn) { this.pauseBtn.spr.play('idle', true); this.pauseBtn.spr.alpha = this.pauseBtn.rest; } return; }
+      G.audio.music.stop(0.1); this.audio.resume();
+    },
+    // (leaving while a cutscene is frozen: its sounds stop for good)
+    killCutFreeze() { if (this.cutFreeze && G.audio.unfreeze) G.audio.unfreeze(this.cutFreeze, true); this.cutFreeze = null; },
     restart(fromDeath) { G.audio.music.stop(0); G.setScreen('play', Object.assign({}, this.params, { weekStats: this.params.weekStats, noCutscene: true, blackIn: fromDeath ? 1 : 0 }), { instant: !!fromDeath }); },
     exitToMenu() {
+      this.killCutFreeze();
       G.audio.music.stop(0);
       if (this.audio) this.audio.stop();
       G.setScreen(this.params.mode === 'story' ? 'storyMenu' : 'freeplay', { proMode: !!this.pro });
@@ -1037,7 +1064,9 @@
       if (this.gameOver) return;
       this.dead = true;
       this.audio.stop();
-      G.save.deaths = (G.save.deaths || 0) + 1; G.saveData();
+      G.save.deaths = (G.save.deaths || 0) + 1;
+      if (this.vsWho) { const D = G.save.deathsVs = G.save.deathsVs || {}; D[this.vsWho] = (D[this.vsWho] || 0) + 1; }
+      G.saveData();
       this.params.deaths = (this.params.deaths || 0) + 1;
       const bf = this.bf;
       bf.isDead = true;
@@ -1154,7 +1183,7 @@
       if (this.sfx && this.sfx.drawOver) this.sfx.drawOver(ctx, this);
       if (this.mod && this.mod.drawWorld) this.mod.drawWorld(ctx, this);
       this.cam.drawFX(ctx);
-      if (this.cutscene) { this.cutscene.draw(ctx); return; }
+      if (this.cutscene) { this.cutscene.draw(ctx); this.drawCutPause(ctx); return; }
       // HUD
       const hudA = this.hud.alpha * this.hudParts.all;
       if (hudA > 0.01) { ctx.save(); ctx.globalAlpha = hudA; this.drawHUD(ctx); ctx.restore(); }
@@ -1278,6 +1307,7 @@
         G.vcr(ctx, txt, G.W / 2, ty - 6, { align: 'center', size: 22, outline: 2 });
         ctx.restore();
       }
+      this.drawDeaths(ctx);
       for (const s of this.popups) s.draw(ctx, hud);
       if (this.countdownSpr) this.countdownSpr.draw(ctx, hud);
       // touch controls
@@ -1304,7 +1334,7 @@
     // FNF mobile's pause button (V-Slice PlayState.initPauseSprites): 80% size, 35 px from the top right corner
     makePauseButton() {
       if (!G.TouchButton || !G.A.has('preload/images/pauseButton.png')) return null;
-      const b = new G.TouchButton('preload/images/pauseButton', 0, 35, 0.8, () => { if (this.started && !this.paused && !this.gameOver) this.openPause(); }, { prefix: 'pause', rest: 1, instant: true, confirmFrom: 6, confirmTo: 33 });
+      const b = new G.TouchButton('preload/images/pauseButton', 0, 35, 0.8, () => { if (!this.paused && !this.gameOver && (this.started || this.cutscene)) this.openPause(); }, { prefix: 'pause', rest: 1, instant: true, confirmFrom: 6, confirmTo: 33 });
       b.spr.x = G.W - b.w - 35;
       return b;
     },
@@ -1357,6 +1387,15 @@
       ctx.drawImage(img, cap * colW, srcH * 0.0, colW, srcH * 0.9, 0, bodyH, w, srcH * 0.9 * zoom);
       ctx.restore();
     },
+    // a cutscene on a phone: the pause button in its corner; paused: the pause menu over the frozen picture
+    drawCutPause(ctx) {
+      if (this.paused && this.pauseMenu) { this.drawPause(ctx); return; }
+      if (!G.touchMode) return;
+      G.setScreenT(ctx);
+      const pb = this.pauseBtn || (this.pauseBtn = this.makePauseButton());
+      if (pb) { pb.update(G.dt); pb.draw(ctx); }
+      else { ctx.globalAlpha = 0.7; ctx.fillStyle = '#000'; G.roundRect(ctx, G.W - 110, 20, 88, 70, 14); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(G.W - 82, 36, 10, 38); ctx.fillRect(G.W - 62, 36, 10, 38); ctx.globalAlpha = 1; }
+    },
     drawPause(ctx) {
       const pm = this.pauseMenu;
       G.setScreenT(ctx);
@@ -1373,7 +1412,7 @@
       // (phones: at the bottom right, drifting up)
       const lines = pm.meta.slice();
       lines[1] = pm.artistIsCharter ? 'Charter: ' + pm.chr : 'Artist: ' + pm.art;
-      lines[3] = (this.params.deaths || 0) + ' Blue Balls';
+      lines[3] = pm.cut === 'talk' ? 'Dialogue Paused' : pm.cut ? 'Video Paused' : (this.params.deaths || 0) + ' Blue Balls';
       const show = [0, 1, 2, 3].concat(this.practice ? [4] : []);
       const top = pm.mobile ? G.H - 155 - (this.practice ? 30 : 0) : 15, dir = pm.mobile ? -5 : 5;
       show.forEach((li, i) => {
@@ -1400,6 +1439,24 @@
       G.vcr(ctx, 'Hold SHIFT-UP/DOWN,', G.W - 10, oy + 20, { align: 'right', size: 16, alpha: k, outline: 0 });
       G.vcr(ctx, 'to change the offset.', G.W - 10, oy + 36, { align: 'right', size: 16, alpha: k, outline: 0 });
     },
+    // DEATHS vs WHITTY: 12 (a small line in a corner; Options > Death Counter, Z on PC)
+    deathLine() { return 'DEATHS vs ' + this.vsWho + ': ' + G.deathsVs(this.vsWho); },
+    drawDeaths(ctx) {
+      if (G.settings.deathCounter === false || !this.vsWho) return;
+      const hp = this.hudParts && this.hudParts.health, a = this.hideHealth ? 0 : hp ? hp.alpha * hp.apple : 1;
+      if (a <= 0.004) return;
+      // (left of the health bar, level with it: the score line sits under the bar, the arrows above / below it)
+      const bg = this.hbBg, x = (bg ? bg.x : (G.W - 601) / 2) - 16, y = (bg ? bg.y + bg.height / 2 : G.H * 0.9) + (hp ? hp.dy : 0);
+      this.hud.apply(ctx);
+      G.vcr(ctx, this.deathLine(), x, y, { size: 17, outline: 2, align: 'right', baseline: 'middle', alpha: 0.9 * a, maxWidth: x - 12 });
+    },
+    onKey(code, down, repeat) {
+      // Z = death counter on/off (only when Z is not one of your note keys)
+      if (code !== 'KeyZ' || !down || repeat || this.paused || this.gameOver || this.cutscene) return;
+      if (G.input.actionsFor(code).some(x => /^note\d$/.test(x))) return;
+      G.settings.deathCounter = G.settings.deathCounter === false; G.saveSettings();
+      return true;
+    },
     drawGameOver(ctx) {
       G.setScreenT(ctx); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H);
       const go = this.gameOver;
@@ -1413,6 +1470,7 @@
         }
         G.screenOff.x -= G.CUT / 2;
       } else this.bf.draw(ctx, this.cam);
+      if (G.settings.deathCounter !== false && this.vsWho && go.phase !== 'exit') { G.setScreenT(ctx); G.vcr(ctx, this.deathLine(), G.W / 2, G.H - 64, { align: 'center', size: 28, outline: 3, alpha: Math.min(1, (go.age || 0) * 2) }); }
       if (go.fade > 0) { G.setScreenT(ctx); ctx.globalAlpha = go.fade; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, G.W, G.H); ctx.globalAlpha = 1; }
       go.age = (go.age || 0) + G.dt;
       if (go.backBtn && G.touchMode && go.phase !== 'confirm' && go.phase !== 'exit') { G.setScreenT(ctx); go.backBtn.update(G.dt); go.backBtn.draw(ctx); }

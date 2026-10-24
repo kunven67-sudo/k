@@ -88,6 +88,7 @@ G.DEFAULT_SETTINGS = {
   botplay: false, practice: false,
   // visuals
   noteSplashes: true, camZoom: true, flashing: true, fps: false,
+  deathCounter: true,   // 'DEATHS vs WHITTY: 12' in a corner during songs (Z turns it off on PC)
   quality: 'auto',      // 'auto' | 'high' | 'low'
   fpsCap: '60',         // '60' | '120' | '144' | '240' | 'max' (drawing faster than the screen just burns the GPU)
   timeBar: 'name',      // 'name' | 'left' | 'elapsed' | 'off'

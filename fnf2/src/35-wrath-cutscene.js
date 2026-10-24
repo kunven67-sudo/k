@@ -582,7 +582,7 @@
       if (this.dim > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.dim.toFixed(3) + ')'; ctx.fillRect(0, 0, G.W, G.H); }
       if (this.box.visible) this.box.draw(ctx, null);
       if (this.line && this.box.visible && !this.box.animName.endsWith('Open')) this.text.draw(ctx, null);
-      if (!this.done) G.vcr(ctx, 'Press BACK to Skip', G.W - 20, G.H - 30, { size: 16, align: 'right', outline: 2 });
+      if (!this.done && !G.touchMode) G.vcr(ctx, 'Press BACK to Skip', G.W - 20, G.H - 30, { size: 16, align: 'right', outline: 2 });
       if (this.black > 0) { G.setScreenT(ctx); ctx.fillStyle = 'rgba(0,0,0,' + this.black.toFixed(3) + ')'; ctx.fillRect(0, 0, G.W, G.H); }
     },
   };

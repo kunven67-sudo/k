@@ -23,13 +23,57 @@ G.audio = (function () {
   A.unlock = function () { if (ctx.state !== 'running') ctx.resume().catch(() => {}); };
   A.latency = () => ((ctx.outputLatency || 0) + (ctx.baseLatency || 0)) * 1000;
 
+  // ---- every sound goes through its own little volume knob, so a cutscene can be FROZEN (phone pause button:
+  // its music, voices + sounds stop where they are and carry on from there on Resume)
+  const live = new Set();
+  function mkSrc() {
+    const s = ctx.createBufferSource(), pg = ctx.createGain(), con = s.connect.bind(s);
+    s._pg = pg; s.connect = d => { con(pg); return pg.connect(d); };
+    const st = s.start.bind(s);
+    s.start = (...a) => { live.add(s); s.addEventListener('ended', () => live.delete(s)); return st(...a); };
+    return s;
+  }
+  // videos (cutscenes) too: every <video> that plays is remembered while it plays
+  const media = new Set();
+  try {
+    const play0 = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () { media.add(this); return play0.apply(this, arguments); };
+  } catch (e) {}
+  // freeze everything playing right now (the song's own tracks are paused by the song); the menu's sounds after it
+  // play normally. The music channel is set aside, so the pause menu can use it.
+  A.freeze = function () {
+    const t = ctx.currentTime, tok = { t, srcs: [], vids: [], music: Object.assign({}, M) };
+    for (const s of live) {
+      const r = s.playbackRate.value;
+      s._pg.gain.cancelScheduledValues(t); s._pg.gain.setValueAtTime(s._pg.gain.value, t); s._pg.gain.linearRampToValueAtTime(0, t + 0.03);
+      s.playbackRate.cancelScheduledValues(t); s.playbackRate.setValueAtTime(r, t); s.playbackRate.setValueAtTime(0, t + 0.03);
+      tok.srcs.push({ s, r });
+    }
+    for (const v of media) { if (!v.paused && !v.ended) { try { v.pause(); } catch (e) {} tok.vids.push(v); } else if (v.ended || !v.isConnected && v.paused) media.delete(v); }
+    M.src = null; M.gain = null; M.id = null; M.token = null;
+    return tok;
+  };
+  // ...and back on (kill = stop them for good instead: leaving the song)
+  A.unfreeze = function (tok, kill) {
+    if (!tok || tok.done) return; tok.done = true;
+    const t = ctx.currentTime;
+    for (const { s, r } of tok.srcs) {
+      if (kill) { try { s.stop(); } catch (e) {} continue; }
+      s.playbackRate.cancelScheduledValues(t); s.playbackRate.setValueAtTime(r, t);
+      s._pg.gain.cancelScheduledValues(t); s._pg.gain.setValueAtTime(0, t); s._pg.gain.linearRampToValueAtTime(1, t + 0.05);
+    }
+    for (const v of tok.vids) { if (kill) continue; try { const p = v.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+    A.music.stop(kill ? 0 : 0.1);
+    if (!kill && tok.music.src) { Object.assign(M, tok.music); M.start += t - tok.t; }   // (its clock skips the paused time)
+  };
+
   // ---- sound effects (path = packed asset path, e.g. "preload/sounds/scrollMenu.ogg")
   A.sfx = function (path, o) {
     o = o || {};
     if (!path.includes('/')) path = SFX[path] || path;
     G.A.audio(path).then(buf => {
       if (!buf) return;
-      const src = ctx.createBufferSource(); src.buffer = buf;
+      const src = mkSrc(); src.buffer = buf;
       const g = ctx.createGain(); g.gain.value = o.vol == null ? 1 : o.vol;
       src.connect(g); g.connect(bus.sfx); src.start();
     });
@@ -45,7 +89,7 @@ G.audio = (function () {
     } };
     G.A.audio(path).then(buf => {
       if (!buf || h.stopped) return;
-      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = !!o.loop;
+      const src = mkSrc(); src.buffer = buf; src.loop = !!o.loop;
       const g = ctx.createGain(), vol = o.vol == null ? 1 : o.vol; g.gain.value = vol;
       if (o.fadeIn) { const t = ctx.currentTime; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + o.fadeIn); }   // (FlxSound.fadeIn)
       src.connect(g); g.connect(o.bus === 'music' ? bus.music : bus.sfx); src.start(); h.src = src; h.g = g;
@@ -78,7 +122,7 @@ G.audio = (function () {
       (clip ? G.A.audioClip(path, o.offset || 0, o.end) : G.A.audio(path)).then(buf => {
         if (!buf || M.token !== token) return;
         if (clip) {
-          const src = ctx.createBufferSource(); src.buffer = buf; src.loop = M.loop;
+          const src = mkSrc(); src.buffer = buf; src.loop = M.loop;
           const g = ctx.createGain(); src.connect(g); g.connect(bus.music);
           const t = ctx.currentTime, off = o.offset || 0;
           if (o.fadeIn) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(M.vol, t + o.fadeIn); } else g.gain.value = M.vol;
@@ -86,7 +130,7 @@ G.audio = (function () {
           M.loopA = off; M.loopB = off + buf.duration;
           return;
         }
-        const src = ctx.createBufferSource(); src.buffer = buf; src.loop = M.loop;
+        const src = mkSrc(); src.buffer = buf; src.loop = M.loop;
         const g = ctx.createGain(); src.connect(g); g.connect(bus.music);
         const t = ctx.currentTime;
         if (o.fadeIn) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(M.vol, t + o.fadeIn); } else g.gain.value = M.vol;
@@ -139,7 +183,7 @@ G.audio = (function () {
         for (const tr of tracks) {
           const g = ctx.createGain(); g.gain.value = tr.vol; g.connect(tr.bus);
           if (tr.who === 'inst') g.connect(A.analyser);
-          const s = ctx.createBufferSource(); s.buffer = tr.buf; s.playbackRate.value = this.rate; s.connect(g);
+          const s = mkSrc(); s.buffer = tr.buf; s.playbackRate.value = this.rate; s.connect(g);
           if (posMs >= 0) s.start(now, posMs / 1000); else s.start(now - posMs / 1000 / this.rate, 0);
           tr.src = s; tr.gain = g;
         }

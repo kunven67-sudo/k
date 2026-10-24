@@ -1462,7 +1462,7 @@
         drawVideo(ctx, S.V, '#000');
         const t = S.V.el ? S.V.el.currentTime : 0, c = S.caps.find(x => t >= x[0] && t < x[1]);
         if (c) caption(ctx, c[2]);
-        if (opt.canSkip !== false && S.skipA > 0.01) { G.setScreenT(ctx); G.text(ctx, 'Press BACK to skip', 15, G.H - 15 * 0.75 - 6, { size: 25, font: 'liberbold', align: 'left', outline: 2, alpha: S.skipA }); }
+        if (opt.canSkip !== false && S.skipA > 0.01 && !G.touchMode) { G.setScreenT(ctx); G.text(ctx, 'Press BACK to skip', 15, G.H - 15 * 0.75 - 6, { size: 25, font: 'liberbold', align: 'left', outline: 2, alpha: S.skipA }); }
       },
       leave(S) { if (S.V) S.V.stop(); S.V = null; S.noSkipText = false; },
       back: opt.canSkip !== false,

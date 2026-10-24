@@ -84,7 +84,7 @@ ${web ? '<link rel="manifest" href="manifest.webmanifest">\n<link rel="icon" hre
 <div id="boot">Loading...</div>
 <script>
 ${fontJs}</script>
-${assetTag}${scripts}</body>
+${assetTag}${scripts}${web ? "<script>\n// (works with no internet: web/sw.js keeps this page on the phone)\nif ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});\n</script>\n" : ''}</body>
 </html>
 `;
 fs.mkdirSync(path.dirname(out), { recursive: true });

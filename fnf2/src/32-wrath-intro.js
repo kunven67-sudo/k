@@ -211,7 +211,7 @@
       for (const k of ['wrath', 'gf', 'bf']) if (p[k] && p[k].alpha > 0) p[k].draw(ctx, null);
       if (this.box.visible) this.box.draw(ctx, null);
       if (this.phase === 'talk' && this.box.visible && !this.box.animName.endsWith('Open')) this.alpha.draw(ctx, null);
-      if (this.phase === 'talk' || this.phase === 'walk') G.vcr(ctx, 'Press BACK to Skip', W() - 20, H() - 30, { size: 16, align: 'right', outline: 2 });
+      if ((this.phase === 'talk' || this.phase === 'walk') && !G.touchMode) G.vcr(ctx, 'Press BACK to Skip', W() - 20, H() - 30, { size: 16, align: 'right', outline: 2 });
       if (this.black > 0) { G.setScreenT(ctx); ctx.fillStyle = 'rgba(0,0,0,' + this.black.toFixed(3) + ')'; ctx.fillRect(0, 0, W(), H()); }
     },
   };

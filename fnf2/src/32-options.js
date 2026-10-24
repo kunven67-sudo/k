@@ -65,6 +65,7 @@
     ['Pro Mode keys', 'enum', () => S().proKeys === 'any' ? 'any' : 'four', v => { S().proKeys = v; }, 'PRO MODE (main menu). FOUR: hit the right key for each arrow (your 4 note keys), early is fine, every hit is SICK. ANY: any one of your note keys hits the next note.', ['four', 'any']],
     ['Botplay', 'bool', () => S().botplay, v => S().botplay = v, 'The game plays for you. Scores are not saved.'],
     ['Practice Mode', 'bool', () => S().practice, v => S().practice = v, 'You cannot die. Scores are not saved.'],
+    ['Death Counter', 'bool', () => S().deathCounter !== false, v => S().deathCounter = v, 'Shows how many times you died against who you are rapping with (DEATHS vs WHITTY: 12). On PC the Z key turns it on/off during a song.'],
     ['FPS Counter', 'bool', () => S().fps, v => S().fps = v, 'Show the frames per second in the corner.'],
     ['Time Bar', 'enum', () => S().timeBar, v => S().timeBar = v, 'What the bar at the top shows during a song.', ['name', 'left', 'elapsed', 'off']],
     ['Scroll Speed', 'enum', () => S().speedType, v => S().speedType = v, 'Chart = the song\'s own speed. Mult = multiplied. Const = always the same.', ['chart', 'mult', 'const']],

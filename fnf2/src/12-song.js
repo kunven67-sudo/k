@@ -21,6 +21,26 @@ G.playerOf = function (charId) {
   return String(charId).startsWith('pico') ? 'pico' : 'bf';
 };
 
+// who you are rapping against, for the death counter ("DEATHS vs WHITTY: 12"): every form of one character
+// (Whitty, Whitty Crazy, Whitty HQ...) adds up under one name
+G.deathWho = function (c) {
+  if (!c) return '???';
+  const id = String(c.id || c);
+  const R = [
+    [/^imp-red/, 'RED'], [/^imp-green/, 'GREEN'], [/^imp-yellow/, 'YELLOW'], [/^imp-white/, 'WHITE'], [/^imp-(danger|black)/, 'BLACK'],
+    [/^whit(t|$|-|bonkers)/i, 'WHITTY'], [/^4_fuck$/, 'NITTY GRITTY'], [/^(testis|hunger)$/, 'JULIAN'],
+    [/^garcello/, 'GARCELLO'], [/^tabi/, 'TABI'], [/tricky/i, 'TRICKY'], [/^sky/, 'SKY'], [/^wrath/, 'WRATH'],
+    [/^nightly-opp/, 'THE CAP GIRL'], [/^nightly/, 'JORDUS'], [/^kip/, 'ZOMBIE + ROBOT'],
+    [/^dad$/, 'DADDY DEAREST'], [/^(gf|geef)/, 'GIRLFRIEND'], [/^darnell/, 'DARNELL'], [/^tankman/, 'TANKMAN'],
+    [/^nene/, 'NENE'], [/^pico/, 'PICO'], [/^bf/, 'BOYFRIEND'],
+  ];
+  for (const [re, name] of R) if (re.test(id)) return name;
+  const nm = String((c.data && c.data.name) || c.name || id).replace(/\s*\(.*?\)\s*/g, ' ').trim();
+  return (nm || id).toUpperCase();
+};
+// deaths against one character, kept forever in the save
+G.deathsVs = function (who) { const d = G.save.deathsVs || {}; return d[who] || 0; };
+
 G.Songs = {
   meta(id, variation) {
     const v = !variation || variation === 'default' ? '' : '-' + variation;
