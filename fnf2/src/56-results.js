@@ -181,7 +181,9 @@
       this.chars = [];
       // (a mod that only shipped a 'PLACEHOLDER' picture for a rank (NENE MIXES' perfect) shows its next best rank)
       let rl = pdata[RANK_ANIMS[this.rank]] || [];
-      if (rl.some(ad => /placeholder/i.test(ad.assetPath || ''))) rl = pdata.excellent || pdata.great || [];
+      //  (only a picture literally called resultsPLACEHOLDER: Darnell's Mixtape keeps its real art in folders named
+      //  'P-placeholder', 'resultLOSS-placeholder'...)
+      if (rl.some(ad => /(^|[\/:])results?PLACEHOLDER$/i.test(ad.assetPath || ''))) rl = pdata.excellent || pdata.great || [];
       for (const ad of rl) {
         if (ad.filter && ad.filter !== 'both' && ad.filter !== 'safe') continue;
         const c = this.makeChar(ad); if (c) this.chars.push(c);
