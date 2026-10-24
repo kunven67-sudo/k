@@ -111,7 +111,7 @@ export class Game {
     this.player.sizeM = 0.004;
     this.wanted.reset(); this.babies.reset(); this.story.reset(); this.growth.reset();
     this.hud.loading('Specimen 8', 0.1);
-    await this.enterZone('tower', { start: true });
+    await this.enterZone('halvern', { start: true });
     this.hud.loading(null);
     this.story.play('injection');
   }
@@ -127,7 +127,7 @@ export class Game {
     this.settings.difficulty = r.difficulty || this.settings.difficulty;
     this.wanted.reset(); this.babies.reset(r.babies || 0); this.story.reset(r.story);
     this.hud.loading('Waking up in your lair', 0.2);
-    await this.enterZone(r.zone || 'tower', { lair: r.lair });
+    await this.enterZone(r.zone || 'halvern', { lair: r.lair });
     this.hud.loading(null);
     this.startPlay();
   }

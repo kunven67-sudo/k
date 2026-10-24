@@ -72,7 +72,7 @@ export function doorLeaf(B, x1, z1, x2, z2, y0, at, w, h, open = 0, mat = 'lamin
 }
 
 // drop ceiling over a rectangle: tile surface + T-bar grid + light panels + diffusers
-function ceiling(B, x0, z0, x1, z1, y, ctx, { lights = true, lightMat = 'lightPanel', every = 2.4, warm = false } = {}) {
+export function ceiling(B, x0, z0, x1, z1, y, ctx, { lights = true, lightMat = 'lightPanel', every = 2.4, warm = false, i = 1 } = {}) {
   B.box(x1 - x0, 0.015, z1 - z0, 'ceiling', (x0 + x1) / 2, y + 0.0075, (z0 + z1) / 2, 'STRUCT');
   for (let x = Math.ceil(x0 / 0.6) * 0.6; x < x1; x += 0.6) B.box(0.024, 0.012, z1 - z0, 'paint', x, y - 0.006, (z0 + z1) / 2, null);
   for (let z = Math.ceil(z0 / 0.6) * 0.6; z < z1; z += 0.6) B.box(x1 - x0, 0.012, 0.024, 'paint', (x0 + x1) / 2, y - 0.006, z, null);
@@ -81,7 +81,7 @@ function ceiling(B, x0, z0, x1, z1, y, ctx, { lights = true, lightMat = 'lightPa
     const lx = Math.round(x / 0.6) * 0.6 + 0.6, lz = Math.round(z / 0.6) * 0.6 + 0.3;
     if (lx + 0.6 > x1 || lz + 0.3 > z1) continue;
     Kit.troffer(B, lx, y, lz, 1.2, 0.6, true);
-    ctx.lights.push({ p: new THREE.Vector3(lx, y - 0.1, lz), color: warm ? 0xffd8b0 : lightMat === 'lightPanel' ? 0xe8f0ff : 0xffe0b8, i: 1 });
+    ctx.lights.push({ p: new THREE.Vector3(lx, y - 0.1, lz), color: warm ? 0xffd8b0 : lightMat === 'lightPanel' ? 0xe8f0ff : 0xffe0b8, i, r: 6 + (y % 4.2 > 3.5 ? 4 : 0) });
   }
   for (let x = x0 + every; x < x1 - 0.6; x += every * 2) for (let z = z0 + every; z < z1 - 0.6; z += every * 2) Kit.vent(B, Math.round(x / 0.6) * 0.6 + 0.3, y, Math.round(z / 0.6) * 0.6 + 0.3);
 }
@@ -147,8 +147,7 @@ export function buildCore(B, ctx) {
       B.box(1.1, 0.3, 0.42, 'concrete', S.door, y0 - 0.15, C.z0 + 0.2, 'STRUCT'); // threshold to the shaft
       B.box(1.1, 0.02, 0.42, 'steel', S.door, y0 + 0.01, C.z0 + 0.2, null);
       if (play) {
-        for (const sd of [-1, 1]) B.box(0.54, 2.18, 0.04, 'steel', S.door + sd * 0.278, y0 + 0.012 + 1.09, zf, 'FURN', 0, 0.004);
-        B.box(1.3, 0.12, 0.06, 'steel', S.door, y0 + 2.3, zf, 'STRUCT');
+        B.box(1.3, 0.12, 0.06, 'steel', S.door, y0 + 2.3, zf, 'STRUCT'); // (the sliding leaves are live objects: elevator.js)
         B.box(0.09, 0.18, 0.03, 'steel', S.door + 0.85, y0 + 1.1, zf - 0.005, 'SMALL', 0, 0.006);
         B.box(0.024, 0.024, 0.01, 'ledBlue', S.door + 0.85, y0 + 1.14, zf - 0.024, null);
         ctx.liftDoors.push({ shaft: S.id, n, x: S.door, y: y0, z: zf });
@@ -201,7 +200,7 @@ function stairs(B, n, y0, ctx) {
 function floor48(B, y0, ctx) {
   const Y = y0, H = CEIL_H;
   // floors: lab tiles everywhere, parquet in Voss's office
-  B.box(44, 0.02, 44, 'labfloor', 0, Y + 0.01, 0, 'STRUCT');
+  finish(B, 'labfloor', Y);
   B.box(16, 0.004, 14, 'parquet', -14, Y + 0.022, 15, 'STRUCT');
   // partitions
   wall(B, -22, -8, -9, -8, Y, H, 'plaster', 0.12, [{ at: 9, w: 1.2, h: 2.15 }]);           // tank room north wall (door to corridor)
@@ -215,13 +214,13 @@ function floor48(B, y0, ctx) {
   doorLeaf(B, 0, -22, 0, -8, Y, 4, 1.0, 2.15, 0.25, 'steel');
   doorLeaf(B, -22, 8, 22, 8, Y, 9, 1.0, 2.15, 0.6, 'wood'); // Voss's office
   // ceilings
-  ceiling(B, -22, -22, 22, 22, Y + H, ctx, { every: 2.4 });
+  ceilAround(B, Y + H, ctx, { every: 2.4 });
   // ---------- TANK ROOM (x -22..0, z -22..-8)
   // the specimen bench: your tank sits on it
   Kit.labBench(B, -9, Y, -12.2, Math.PI, 3.0, 0.9);
   const TB = { x: -9.2, y: Y + 0.9375, z: -12.25 };       // bench top centre
   tank(B, TB.x, TB.y, TB.z, ctx);
-  ctx.start = { pos: new THREE.Vector3(TB.x - 0.08, TB.y + 0.027, TB.z + 0.02), up: new THREE.Vector3(0, 1, 0), fwd: new THREE.Vector3(0, 0, 1) };
+  ctx.start = { pos: new THREE.Vector3(TB.x + 0.02, TB.y + 0.03, TB.z + 0.03), up: new THREE.Vector3(0, 1, 0), fwd: new THREE.Vector3(0, 0, -1) };
   // stuff on the bench around the tank
   Kit.microscope(B, -7.9, TB.y, -12.35, Math.PI);
   Kit.beaker(B, -10.3, TB.y, -12.0, 0.04, 0.11, 'liquidGreen'); Kit.beaker(B, -10.45, TB.y, -12.25, 0.03, 0.09, 'liquidBlue');
@@ -299,8 +298,8 @@ function floor48(B, y0, ctx) {
     { kind: 'moth', x: 0, y: Y + 2.8, z: 6.5, n: 2, r: 5 },
   );
   ctx.humans.push(
-    { role: 'voss', x: -10.5, y: Y, z: -11.1, rot: Math.PI, path: [[-10.5, -11.1], [-15.5, -11.6], [-12, -6.5], [-1, -6.5]] },
-    { role: 'tech', x: -9, y: Y, z: -19.6, rot: 0, path: [[-9, -19.6], [-14, -19.6], [-14, -10], [-9, -10]] },
+    { role: 'voss', x: -9.25, y: Y, z: -13.05, rot: 0 },
+    { role: 'tech', x: -9, y: Y, z: -19.9, rot: Math.PI, path: [[-9, -19.9], [-14, -19.9], [-14, -14.2], [-5, -14.2], [-5, -19.9]] },
   );
 }
 
@@ -310,27 +309,29 @@ function tank(B, x, y, z, ctx) {
   B.box(W + 0.02, 0.012, D + 0.02, 'blackPlastic', x, y + 0.006, z, 'FURN', 0, 0.003);            // base frame
   B.box(W, 0.012, D, 'soil', x, y + 0.018, z, 'STRUCT');                                            // substrate
   for (let i = 0; i < 70; i++) B.add(new THREE.DodecahedronGeometry(0.003 + Math.random() * 0.004, 0), 'soil', { p: [x + (Math.random() - 0.5) * W * 0.9, y + 0.025, z + (Math.random() - 0.5) * D * 0.9], r: [Math.random() * 3, Math.random() * 3, 0] }, 'SMALL');
-  // glass walls: back, sides, front split around the crack hole (bottom-left of the front pane)
-  B.box(W, H, t, 'glass', x, y + 0.012 + H / 2, z - D / 2, 'STRUCT');
+  // glass walls: back (+z), sides, front (-z, toward the scientist) split around the crack hole (bottom-left)
+  const zf = z - D / 2, zb = z + D / 2;
+  B.box(W, H, t, 'glass', x, y + 0.012 + H / 2, zb, 'STRUCT');
   B.box(t, H, D, 'glass', x - W / 2, y + 0.012 + H / 2, z, 'STRUCT');
   B.box(t, H, D, 'glass', x + W / 2, y + 0.012 + H / 2, z, 'STRUCT');
-  const hole = { x0: x - W / 2 + 0.03, x1: x - W / 2 + 0.085, h: 0.045 }; // the crack opening (a 4 mm spider fits easily)
-  B.box(hole.x0 - (x - W / 2), H, t, 'glass', (x - W / 2 + hole.x0) / 2, y + 0.012 + H / 2, z + D / 2, 'STRUCT');
-  B.box(x + W / 2 - hole.x1, H, t, 'glass', (hole.x1 + x + W / 2) / 2, y + 0.012 + H / 2, z + D / 2, 'STRUCT');
-  B.box(hole.x1 - hole.x0, H - hole.h, t, 'glass', (hole.x0 + hole.x1) / 2, y + 0.012 + hole.h + (H - hole.h) / 2, z + D / 2, 'STRUCT');
-  ctx.crack = { x: (hole.x0 + hole.x1) / 2, y: y + 0.012 + hole.h * 0.6, z: z + D / 2 + 0.003, w: hole.x1 - hole.x0, h: hole.h };
+  const hole = { x0: x + W / 2 - 0.085, x1: x + W / 2 - 0.03, h: 0.045 }; // the crack opening (a 4 mm spider fits easily)
+  B.box(hole.x0 - (x - W / 2), H, t, 'glass', (x - W / 2 + hole.x0) / 2, y + 0.012 + H / 2, zf, 'STRUCT');
+  B.box(x + W / 2 - hole.x1, H, t, 'glass', (hole.x1 + x + W / 2) / 2, y + 0.012 + H / 2, zf, 'STRUCT');
+  B.box(hole.x1 - hole.x0, H - hole.h, t, 'glass', (hole.x0 + hole.x1) / 2, y + 0.012 + hole.h + (H - hole.h) / 2, zf, 'STRUCT');
+  // until the cutscene cracks it, a glass patch fills the hole (a live object: see halvern.js)
+  ctx.crack = { x: (hole.x0 + hole.x1) / 2, y: y + 0.012, z: zf, w: hole.x1 - hole.x0, h: hole.h, t };
   // black frame edges
   for (const [ex, ez] of [[-W / 2, -D / 2], [W / 2, -D / 2], [-W / 2, D / 2], [W / 2, D / 2]]) B.box(0.01, H, 0.01, 'blackPlastic', x + ex, y + 0.012 + H / 2, z + ez, 'SMALL');
-  B.box(W + 0.02, 0.01, 0.012, 'blackPlastic', x, y + H + 0.012, z - D / 2, 'SMALL'); B.box(W + 0.02, 0.01, 0.012, 'blackPlastic', x, y + H + 0.012, z + D / 2, 'SMALL');
-  // mesh lid (the holes are too small even for you)
-  B.box(W + 0.02, 0.006, D + 0.02, 'darkmetal', x, y + H + 0.02, z, 'STRUCT');
+  B.box(W + 0.02, 0.01, 0.012, 'blackPlastic', x, y + H + 0.012, zf, 'SMALL'); B.box(W + 0.02, 0.01, 0.012, 'blackPlastic', x, y + H + 0.012, zb, 'SMALL');
+  // mesh lid: a live object too (the scientist lifts it)
+  ctx.lid = { x, y: y + H + 0.02, z, w: W + 0.02, d: D + 0.02 };
   // twig, cork hide, water dish
   B.add(new THREE.CylinderGeometry(0.006, 0.009, 0.32, 7), 'wood', { p: [x + 0.06, y + 0.07, z - 0.02], r: [0.15, 0.4, 1.12] }, 'SMALL');
   B.add(new THREE.CylinderGeometry(0.05, 0.055, 0.08, 14, 1, true, 0, Math.PI), 'cardboard', { p: [x + 0.13, y + 0.03, z + 0.06], r: [0, 0.6, Math.PI / 2] }, 'SMALL');
   B.add(new THREE.CylinderGeometry(0.03, 0.026, 0.012, 18), 'whitePlastic', { p: [x - 0.13, y + 0.028, z - 0.07] }, 'SMALL');
   B.add(new THREE.CylinderGeometry(0.026, 0.026, 0.002, 18), 'liquidBlue', { p: [x - 0.13, y + 0.033, z - 0.07] }, null);
   // the label card taped on the front
-  ctx.labels.push({ text: 'SPECIMEN 8', x: x + 0.12, y: y + 0.22, z: z + D / 2 + 0.004, rot: 0, small: true, card: true });
+  ctx.labels.push({ text: 'SPECIMEN 8', x: x - 0.12, y: y + 0.22, z: z - D / 2 - 0.004, rot: Math.PI, small: true, card: true });
   ctx.tank = { x, y, z, W, D, H };
 }
 
@@ -358,7 +359,7 @@ function serumRack(B, x, y, z, ctx) {
   }
   ctx.lights.push({ p: new THREE.Vector3(x + 0.2, y + 1.0, z), color: 0x60ffa0, i: 0.25 });
 }
-function fumeHood(B, x, y, z) {
+export function fumeHood(B, x, y, z) {
   B.box(1.8, 0.9, 0.85, 'whitePlastic', x, y + 0.45, z, 'FURN', 0, 0.01);
   B.box(1.8, 0.03, 0.85, 'black', x, y + 0.915, z, 'FURN');
   B.box(1.8, 1.2, 0.05, 'whitePlastic', x, y + 1.53, z - 0.4, 'FURN');
@@ -367,7 +368,7 @@ function fumeHood(B, x, y, z) {
   B.box(1.7, 0.8, 0.01, 'glass', x, y + 1.6, z + 0.4, null);
   B.box(1.6, 0.02, 0.6, 'lightPanel', x, y + 2.11, z, null);
 }
-function supplies(B, x, y, z, w, h) {
+export function supplies(B, x, y, z, w, h) {
   for (let lv = 0; lv < 5; lv++) for (let i = 0; i < 6; i++) {
     const zz = z - w / 2 + 0.2 + i * (w - 0.4) / 5, yy = y + 0.12 + lv * (h - 0.15) / 4;
     if (Math.random() < 0.25) continue;
@@ -375,12 +376,12 @@ function supplies(B, x, y, z, w, h) {
     else Kit.jar(B, x, yy + 0.01, zz, 0.05, 0.14, ['liquidAmber', 'formalin', 'liquidBlue'][i % 3]);
   }
 }
-function stool(B, x, y, z) {
+export function stool(B, x, y, z) {
   B.cyl(0.18, 0.18, 0.05, 'blackPlastic', x, y + 0.62, z, 'FURN', 20);
   B.cyl(0.02, 0.02, 0.55, 'chrome', x, y + 0.33, z, 'PROP', 10);
   for (let i = 0; i < 5; i++) { const a = i * 1.2566; B.add(new THREE.BoxGeometry(0.03, 0.03, 0.26), 'blackPlastic', { p: [x + Math.sin(a) * 0.12, y + 0.05, z + Math.cos(a) * 0.12], r: [0, a, 0] }, 'PROP'); }
 }
-function whiteboard(B, x, y, z, ctx) {
+export function whiteboard(B, x, y, z, ctx) {
   B.box(2.4, 1.2, 0.02, 'whitePlastic', x, y + 1.5, z, 'FURN');
   B.box(2.44, 1.24, 0.015, 'alu', x, y + 1.5, z - 0.01, null);
   B.box(1.0, 0.03, 0.05, 'alu', x, y + 0.88, z + 0.03, 'SMALL');
@@ -403,7 +404,7 @@ function deadSpecimen(B, x, y, z, i) {
     B.add(new THREE.TorusGeometry(s * 0.5, s * 0.06, 6, 10, Math.PI * 1.2), 'specimen', { p: [x + Math.sin(a) * s * 0.5, y, z + Math.cos(a) * s * 0.5 + s * 0.3], r: [Math.PI / 2, a, 0] }, null);
   }
 }
-function bookcase(B, x, y, z, rot, w) {
+export function bookcase(B, x, y, z, rot, w) {
   Kit.shelf(B, x, y, z, rot, w, 2.2, 0.35, 6, 'wood');
   for (let lv = 0; lv < 5; lv++) {
     let o = -w / 2 + 0.05;
@@ -416,12 +417,12 @@ function bookcase(B, x, y, z, rot, w) {
     }
   }
 }
-function sofa(B, x, y, z, rot) {
+export function sofa(B, x, y, z, rot) {
   B.box(2.1, 0.42, 0.9, 'leather', x, y + 0.21, z, 'FURN', rot, 0.06);
   B.box(2.1, 0.5, 0.2, 'leather', x - Math.sin(rot) * 0.36, y + 0.62, z - Math.cos(rot) * 0.36, 'FURN', rot, 0.06);
   for (const sd of [-1, 1]) B.box(0.2, 0.62, 0.9, 'leather', x + Math.cos(rot) * sd * 1.0, y + 0.31, z - Math.sin(rot) * sd * 1.0, 'FURN', rot, 0.06);
 }
-function terrarium(B, x, y, z) {
+export function terrarium(B, x, y, z) {
   B.box(0.8, 0.8, 0.45, 'darkPlastic', x, y + 0.4, z, 'FURN', Math.PI / 2, 0.02);
   B.box(0.75, 0.45, 0.42, 'glass', x, y + 1.03, z, null, Math.PI / 2);
   B.box(0.74, 0.04, 0.4, 'soil', x, y + 0.83, z, 'FURN', Math.PI / 2);
@@ -453,7 +454,7 @@ function vaultRacks(B, Y, ctx) {
 export async function buildFloor(n, mats, parent) {
   const B = new Batch(mats);
   const y0 = elev(n);
-  const ctx = { n, y0, lights: [], labels: [], notes: [], vials: [], spawns: [], humans: [], screens: [], boards: [], zones: [], panes: [], start: null };
+  const ctx = { n, y0, lights: [], labels: [], notes: [], vials: [], spawns: [], humans: [], screens: [], boards: [], zones: [], panes: [], signs: [], start: null };
   shell(B, n, y0, ctx);
   if (n === 48) floor48(B, y0, ctx);
   else if (FLOOR_BUILDERS[n]) FLOOR_BUILDERS[n](B, y0, ctx);
@@ -462,8 +463,15 @@ export async function buildFloor(n, mats, parent) {
   const meshes = await B.build(g);
   return { n, y0, group: g, meshes, batch: B, ctx };
 }
-function lockedFloor(B, y0, ctx) {
-  B.box(44, 0.02, 44, 'concreteFloor', 0, y0 + 0.01, 0, 'STRUCT');
-  B.box(44, 0.02, 44, 'concrete', 0, y0 + FLOOR_H - 0.31, 0, 'STRUCT');
+function lockedFloor(B, y0, ctx) { finish(B, 'concreteFloor', y0); }
+
+// the core (shafts, stairs, core walls) for every floor at once
+export async function buildTowerCore(mats, parent) {
+  const B = new Batch(mats);
+  const ctx = { labels: [], liftDoors: [], coreLights: [] };
+  buildCore(B, ctx);
+  const g = new THREE.Group(); g.name = 'towerCore';
+  const meshes = await B.build(g);
+  return { group: g, meshes, batch: B, ctx };
 }
 export const FLOOR_BUILDERS = {}; // filled by floors.js (47, 31, 20, 9, 1)

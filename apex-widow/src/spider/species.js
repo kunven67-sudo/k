@@ -102,6 +102,27 @@ export const SPECIES = {
     stance: { height: 0.2, spread: 0.9, abdTilt: -0.05 },
     stats: { speed: 1.2, venom: 0.7, silk: 0.8, armor: 0.9, jump: 2.4 },
   },
+  // ---- not playable: other spiders you meet
+  cellar: {
+    name: 'Cellar spider', latin: 'Pholcus phalangioides', npc: true,
+    blurb: 'Tiny body, legs six times as long. Hunts other spiders, even black widows, and shakes its web to blur itself.',
+    carapace: { len: 0.36, wid: 0.34, hgt: 0.12, head: 0.0, color: 0xc8b48a, rough: 0.5, coat: 0.5, pattern: 0 },
+    abdomen: { len: 0.66, wid: 0.3, hgt: 0.3, color: 0x9a8a6a, rough: 0.6, coat: 0.5, pattern: 0, hair: 0.1 },
+    legs: { len: [6.2, 4.6, 3.4, 4.4], thick: 0.32, color: 0xb8a47c, rough: 0.5, band: 0x6a5232, bandAmt: 0.5, hair: 0.05, hairLen: 0.01, spines: 0.0 },
+    eyes: { n: 8, size: 0.03, layout: 'cluster' }, fangs: { size: 0.6, down: false },
+    stance: { height: 0.6, spread: 1.0, abdTilt: -0.15 },
+    stats: { speed: 1.3, venom: 0.8, silk: 1.0, armor: 0.6, jump: 0.5 },
+  },
+  wolf: {
+    name: 'Wolf spider', latin: 'Hogna carolinensis', npc: true,
+    blurb: 'A big fast hunter with huge night-shining eyes. Runs prey down instead of using a web.',
+    carapace: { len: 0.45, wid: 0.36, hgt: 0.17, head: 0.05, color: 0x4a3a2a, rough: 0.8, coat: 0.8, pattern: 2 },
+    abdomen: { len: 0.55, wid: 0.4, hgt: 0.36, color: 0x3a2c20, rough: 0.85, coat: 0.85, pattern: 3, hair: 0.9 },
+    legs: { len: [1.35, 1.25, 1.15, 1.55], thick: 1.2, color: 0x4a3828, rough: 0.8, band: 0x2a1c12, bandAmt: 0.35, hair: 0.9, hairLen: 0.04, spines: 0.4 },
+    eyes: { n: 8, size: 0.03, layout: 'cluster' }, fangs: { size: 1.1, down: false },
+    stance: { height: 0.18, spread: 1.0, abdTilt: 0.0 },
+    stats: { speed: 1.6, venom: 1.0, silk: 0.4, armor: 1.2, jump: 1.2 },
+  },
 };
 
 // powers you steal by eating things. They stack, and every one changes how you look.
