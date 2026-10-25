@@ -50,6 +50,11 @@ def json5(path):
 
 
 PACKS = []
+def pack_of(pid):
+    for pk in PACKS:
+        if pk.id == pid: return pk
+    return Pack(pid)
+
 class Pack:
     def __init__(self, pid):
         self.id = pid; self.root = os.path.join(MODS_OUT, pid); self.n = 0; self.wrote = set()
@@ -459,7 +464,72 @@ STAGES = {
         ],
         files=['stages/airship/double-kill/airshipFlashback', 'stages/void/iluminao omaga'],
     ),
+    # ---- Defeat, the void (data/stages/defeat.hx): the DEFEAT letters pulse, the bodies + the edge glows show up when
+    #      BF gets scared (Defeat Fade), the old V1 look for the flashback part (Defeat Retro); the red screen at the
+    #      end + Black's kill before the game over are in src/47-impostor.js. No GF; Black in front of BF.
+    'defeat': dict(
+        zoom=0.6, bf=(994, 106), gf=(400, 100), dad=(210, 100), cams=((750, 500), (750, 500)), charz={'dad': 1, 'bf': 0},
+        frames={'stages/void/deadBG': ('stages/void/props', 'deadBG'), 'stages/void/deadFG': ('stages/void/props', 'deadFG')},
+        back=[
+            prop('defeatthing', 'stages/void/defeatpulse', 225, 380, (0.8, 0.8), gsize=4, alpha=0.4),
+            prop('old_defeat', 'stages/void/defeatfnf', 250, 125, gsize=2, alpha=0),
+            prop('bodies2', 'stages/void/idontknwo', -500, 50, (0.5, 0.5), gsize=1.3, alpha=0),
+            prop('bodies', 'stages/void/deadBG', -4800, -900, (0.9, 0.9), gsize=1.3, hit1=5, alpha=0),
+            prop('edgeglow1', 'stages/void/edgeglow', -1000, -720, (0, 0), 1.6, hitbox=True, blend='add', z=4, alpha=0),
+            prop('edgeglow2', 'stages/void/edgeglow', -1000, 720, (0, 0), 1.6, hitbox=True, blend='add', z=4, alpha=0),
+            prop('subtract', 'stages/void/subtract', -700, -500, (0, 0), 4, hitbox=True, z=2, alpha=0, extra={'blendMode': 'subtract'}),
+        ],
+        front=[
+            prop('bodiesfront', 'stages/void/deadFG', -3770, -250, (1.5, 1.2), gsize=1.5, hit1=5, z=2, alpha=0),
+            prop('lightoverlay', 'stages/void/iluminao omaga', -500, -200, scale=4, hitbox=True, blend='add', z=3, alpha=0.6),
+        ],
+    ),
+    # ---- Finale (data/stages/finalem.hx): the void + its light first, the flashbacks of weeks 1-3 over the camera, then
+    #      at the drop the ruined room (BG + FG) comes in and Black turns into the parasite. Black in front of BF, the
+    #      room's front bits in front of both. The black bars, the black over everything at the start, the flashback
+    #      fades are in src/47-impostor.js.
+    'finalem': dict(
+        zoom=0.8, bf=(1250, 540), gf=(1000, 100), dad=(0, 530), cams=((750, 800), (750, 800)), charz={'dad': 1, 'bf': 0},
+        frames={'stages/void/finale/' + n: ('stages/void/finale/props', n) for n in ('bg', 'dark', 'dead', 'fore', 'lamp', 'splat')},
+        back=[
+            prop('defeatthing', 'stages/void/finale/defeat', -400, 2000, (0.8, 0.8), gsize=1.3),
+            prop('mainoverlayDK', 'stages/void/defeatfnf', 250, 475, gsize=4, hit1=4, alpha=0),
+            prop('bg0', '#0D0A1B', -600, -400, scale=(3000, 2000), alpha=0),
+            prop('bg1', 'stages/void/finale/dead', 800, -270, (0.8, 0.8), 1.3, alpha=0),
+            prop('bg2', 'stages/void/finale/bg', -790, -530, (0.9, 0.9), 1.3, alpha=0),
+        ],
+        front=[
+            prop('splat', 'stages/void/finale/splat', 370, 1200, scale=1.3, z=2, alpha=0),
+            prop('lamp', 'stages/void/finale/lamp', 990, -380, scale=1.3, z=2, alpha=0),
+            prop('fore', 'stages/void/finale/fore', -750, 160, scale=1.3, z=2, alpha=0),
+            prop('dark', 'stages/void/finale/dark', -950, -160, scale=1.3, blend='multiply', z=2, alpha=0),
+            prop('finaleLight', 'stages/void/finale/light', -230, -200, (0.8, 0.8), 4.4, hit1=4, blend='add', z=2, alpha=0,
+                 anims=[('bop', 'light', 24, False)], start='bop'),
+            prop('flashback', 'stages/void/finale/finaleFlashback', -290, -160, (0, 0), gsize=1.6, z=3, alpha=0,
+                 anims=[('moog', 'finaleFlashback moog', 24, False), ('toog', 'finaleFlashback toog', 24, False), ('doog', 'finaleFlashback doog', 24, False)], start='moog'),
+            prop('lightoverlay', 'stages/void/iluminao omaga', -550, 250, scale=4, hitbox=True, blend='add', z=4),
+        ],
+        extra={'startZoom': 0.4},
+    ),
 }
+
+
+FRAME_DIR = os.path.join(ROOT, 'build', 'cache', 'impostor-frames')
+def sheet_frame(sheet, frame):
+    """loadFromSheet(sheet, frame): that one frame (its whole frame box) as its own picture -> its file"""
+    from PIL import Image
+    from repack_sparrow import frames_of
+    out = os.path.join(FRAME_DIR, sheet + '-' + frame + '.png')
+    src = M('images', sheet + '.png')
+    if os.path.exists(out) and os.path.getmtime(out) >= os.path.getmtime(src): return out
+    fr = [f for f in frames_of(open(M('images', sheet + '.xml'), encoding='utf-8-sig').read()) if f['name'].rstrip('0123456789') == frame or f['name'] == frame][0]
+    im = Image.open(src).convert('RGBA')
+    x, y, w, h = int(fr['x']), int(fr['y']), int(fr['width']), int(fr['height'])
+    cut = im.crop((x, y, x + w, y + h))
+    if fr['rot']: cut = cut.transpose(Image.ROTATE_90)
+    full = Image.new('RGBA', (int(fr['fw']), int(fr['fh'])), (0, 0, 0, 0)); full.paste(cut, (int(fr['fx']), int(fr['fy'])))
+    os.makedirs(os.path.dirname(out), exist_ok=True); full.save(out)
+    return out
 
 
 def stage(pack, sid):
@@ -467,6 +537,7 @@ def stage(pack, sid):
     from PIL import Image
     from repack_sparrow import frames_of
     props, order = [], 0
+    frames = S.get('frames', {})          # (picture name -> (sheet, frame): a frame of a sheet on its own)
     def add(pr, front):
         nonlocal order
         img = pr['img']
@@ -476,8 +547,12 @@ def stage(pack, sid):
                  'alpha': pr['alpha'], 'zIndex': zkey(pr['z'], 600 + order if front else order)}
             q.update(pr['extra']); props.append(q); order += 1
             return
-        kind = copy_image(pack, img)
-        if kind == 'sparrow':
+        if img in frames:
+            src = sheet_frame(*frames[img]); pack.put(src, 'shared', 'images', NS, img + '.png'); kind = 'image'
+            fw, fh = Image.open(src).size
+        else: kind = copy_image(pack, img)
+        if img in frames: pass
+        elif kind == 'sparrow':
             f0 = frames_of(open(M('images', img + '.xml'), encoding='utf-8-sig').read())[0]; fw, fh = f0['fw'], f0['fh']
         elif kind == 'image':
             fw, fh = Image.open(M('images', img + '.png')).size
@@ -593,6 +668,25 @@ WEEKS = {
                    # (White + Black: the icons change with who sings; BF turns into his defeat self at the end)
                    'double-kill': dict(stage='cargo', chars=['bf-defeat-normal'], icons=['double-kill', 'black', 'white'], ratings=(4, 7, 10)),
                }),
+    # (Defeat + Finale: two story weeks, one pack. Before Defeat you pick how many misses you get (the dummies); dying
+    #  = Black's kill first, then BF's defeat game over (1 in 10: the 'balls' one), the old V1 one in the flashback.)
+    'w4': dict(pack='impostor-w4', level='imp-week4', week='week4', title='DEFEAT', color='#B300FF', portrait='black',
+               songs={
+                   'defeat': dict(stage='defeat', ratings=(4, 7, 9),
+                                  chars=['bf-defeat-scared', 'blackold', 'bf', 'bf-defeat-dead', 'bf-defeat-dead-balls', 'bf-defeat-dead-retro', 'bf-defeat-dead-balls-retro'],
+                                  icons=['blackOG'], files=['menu/freeplay/miss/dummypostor%d' % i for i in range(1, 7)] + ['menu/freeplay/miss/missAmountArrow'],
+                                  sounds=['kill', 'stage/defeat_kill_sfx', 'stage/defeat_kill_sfx-retro', 'stage/defeat_kill_ballz_sfx', 'stage/defeat_kill_ballz_sfx-retro',
+                                          'stage/defeat_prekill_sfx', 'stage/defeat_prekill_sfx_v3'],
+                                  music=['blackPause']),
+               }),
+    # (the finale video: in the mod it comes after Identity Crisis (not here yet); FNF 2 plays it before Finale. Story mode:
+    #  the credits roll after the song.)
+    'w4f': dict(pack='impostor-w4', level='imp-finale', week='week4Finale', title='FINALE', color='#FF1266', portrait='blackp',
+                songs={
+                    'finale': dict(stage='finalem', videos=['finale'], ratings=(5, 7, 10), chars=['blackparasite'],
+                                   files=['ui/finale/healthbarBG', 'ui/finale/insideRED', 'ui/finale/insideBLUE', 'icons/icon-blackFinale'],
+                                   music=['blackPause'], credits=True),
+                }),
 }
 SHARED_CHARS = {'bf', 'gf'}
 
@@ -656,6 +750,9 @@ def song(pack, core, sid, spec, week):
         lines = [l.strip() for l in open(ip, encoding='utf-8-sig').read().splitlines() if l.strip()]
         if lines: data['task'] = [lines[0], '\n'.join(lines[1:3])]
     for img in spec.get('files', []): copy_image(pack, img)
+    for snd in spec.get('sounds', []): pack.put(M('sounds', snd + '.ogg'), 'preload', 'sounds', NS, snd + '.ogg')
+    for mu in spec.get('music', []): pack.put(M('music', mu + '.ogg'), 'preload', 'music', NS, mu + '.ogg')
+    if spec.get('credits'): credits_roll(pack)
     for img, k in spec.get('small', {}).items():
         from repack_sparrow import repack
         base = pack.path('shared', 'images', NS, img)
@@ -667,6 +764,52 @@ def song(pack, core, sid, spec, week):
     cnt = {k: sum(1 for q in v if q['d'] < 4) for k, v in notes.items()}
     print('  ', sid, name, [c['bpm'] for c in tc], 'bpm, your notes', cnt, 'speed', sp, ',', len(events), 'events', ', chars', player, opp, gfid, opp2)
     return sid
+
+
+def credits_roll(pack):
+    """The credits roll after Finale (scripts/substates/CreditsRollSubState.hx): its song, the pictures, the names
+    (the script's own list), the icons with the outline2 shader's white ring baked in."""
+    import numpy as np
+    from PIL import Image
+    src = open(M('scripts', 'substates', 'CreditsRollSubState.hx'), encoding='utf-8-sig').read()
+    body = src[src.index('var credits:Array<CreditInfo> = ['):]
+    body = body[:body.index('];')]
+    out = []
+    for m in re.finditer(r'\{([^{}]*)\}', body, re.S):
+        e = {}
+        for k, v in re.findall(r"(\w+):\s*('(?:[^'\\]|\\.)*'|-?[\d.]+)", m.group(1)):
+            e[k] = v[1:-1].replace("\\'", "'") if v.startswith("'") else float(v)
+        if e: out.append(e)
+    pack.dump(out, 'preload', 'data', NS, 'credits.json')
+    for f in ('rollBorder', 'disc', 'backRow', 'victoryGlow', 'shadow', 'motorfrog', 'innersloth', 'black'):
+        copy_image(pack, 'credits/' + f)
+    for f in os.listdir(M('images', 'credits', 'roll')):
+        if f.endswith('.png'): pack.put(M('images', 'credits', 'roll', f), 'shared', 'images', NS, 'credits', 'roll', f)
+    copy_image(pack, 'credits/roll/black')
+    # the icons: outline2.frag = a 3 px white ring (12 directions, their alpha / 3), the picture over it
+    def outline(sp, dp):
+        a = np.asarray(Image.open(sp).convert('RGBA')).astype(np.float32) / 255
+        pad = 4; H, W = a.shape[:2]
+        A = np.zeros((H + 2 * pad, W + 2 * pad), np.float32); A[pad:pad + H, pad:pad + W] = a[..., 3]
+        otl = np.zeros((H, W), np.float32); d = np.array([1.0, 0.0])
+        for i in range(12):
+            d = np.array([d[0] * 0.866 - d[1] * 0.5, d[0] * 0.5 + d[1] * 0.866])
+            dx, dy = int(round(d[0] * 3)), int(round(d[1] * 3))
+            otl = np.minimum(otl + A[pad + dy:pad + dy + H, pad + dx:pad + dx + W] / 3, 1)
+        al = a[..., 3:4]
+        rgb = (1 - al) * otl[..., None] + a[..., :3] * al            # (mix(vec4(1) * otl, tex, tex.a), premultiplied)
+        alpha = (1 - al[..., 0]) * otl + al[..., 0]
+        rgb = np.where(alpha[..., None] > 1e-4, rgb / np.maximum(alpha[..., None], 1e-4), 0)
+        os.makedirs(os.path.dirname(dp), exist_ok=True)
+        Image.fromarray((np.dstack([rgb, alpha]) * 255 + 0.5).astype(np.uint8), 'RGBA').save(dp)
+    for d, _, fs in os.walk(M('images', 'credits', 'icons')):
+        for f in fs:
+            if not f.endswith('.png'): continue
+            rel = os.path.relpath(os.path.join(d, f), M('images', 'credits', 'icons'))
+            dp = pack.path('shared', 'images', NS, 'credits', 'icons', rel)
+            if not os.path.exists(dp) or os.path.getmtime(dp) < os.path.getmtime(os.path.join(d, f)): outline(os.path.join(d, f), dp); pack.n += 1
+    pack.put(M('music', 'sussusEndus.ogg'), 'preload', 'music', NS, 'sussusEndus.ogg')
+    pack.put(M('fonts', 'impact.ttf'), 'fonts', 'mods', 'impact.ttf')
 
 
 def album(core):
@@ -801,7 +944,7 @@ def week(wid):
     W = WEEKS[wid]
     print('==', wid, W['title'])
     core = CORE
-    pack = Pack(W['pack'])
+    pack = pack_of(W['pack'])
     for sid in {spec['stage'] for spec in W['songs'].values()}: stage(pack, sid)
     ids = [song(pack, core, sid, spec, wid) for sid, spec in W['songs'].items()]
     wj = json5(M('data', 'weeks', W['week'] + '.json'))
