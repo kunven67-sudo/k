@@ -106,13 +106,13 @@ G.settings = (function () {
   const saved = G.store.get('fnf2.settings', {}) || {};
   const s = JSON.parse(JSON.stringify(G.DEFAULT_SETTINGS));
   for (const k in saved) {
-    if (!(k in s)) continue;
+    if (!(k in s) || k === 'botplay' || k === 'practice') continue;   // these two never come back on by themselves (scores would stop saving)
     if (k === 'vol' || k === 'binds' || k === 'seenMechanics') Object.assign(s[k], saved[k]);
     else s[k] = saved[k];
   }
   return s;
 })();
-G.saveSettings = () => G.store.set('fnf2.settings', G.settings);
+G.saveSettings = () => G.store.set('fnf2.settings', Object.assign({}, G.settings, { botplay: false, practice: false }));
 G.resetSettings = function () {
   const keep = { player: G.settings.player, seenMechanics: G.settings.seenMechanics };
   G.settings = Object.assign(JSON.parse(JSON.stringify(G.DEFAULT_SETTINGS)), keep);
