@@ -70,7 +70,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); 
     <path id="xhL" d="M -7 -15 A 16.5 16.5 0 0 0 -7 15 L -5.5 12 A 13.2 13.2 0 0 1 -5.5 -12 Z" fill="var(--blue)" stroke="var(--blue)" stroke-width="1.2"/>
     <path id="xhR" d="M 7 -15 A 16.5 16.5 0 0 1 7 15 L 5.5 12 A 13.2 13.2 0 0 0 5.5 -12 Z" fill="var(--orange)" stroke="var(--orange)" stroke-width="1.2"/>
   </svg>
-  <div id="tool"><span id="tlName" class="on">1 · Rift caster</span><span>1–7 · Tools</span><span>Q · Spawn</span><span>X · Delete</span></div>
+  <div id="tool"><span id="tlName" class="on">1 · Rift caster</span><span>1–8 · Tools</span><span>Q · Spawn</span><span>X · Delete</span></div>
   <div id="hint"></div>
   <div id="toast"></div>
 </div>
@@ -94,8 +94,8 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); 
     <p>A hangar full of junk and a gun that tears holes in space. Spawn anything, throw it through rifts, blow it up, launch yourself across the room. Momentum survives every rift.</p>
     <div class="keys" id="keysDesk">
       <kbd>W A S D</kbd><span>Move · <b>Space</b> jump · <b>Shift</b> sprint</span>
-      <kbd>1 – 7</kbd><span>Rift caster · Gravity glove · Rifle · Shotgun · Grenade launcher · Singularity · Freeze ray (or mouse wheel)</span>
-      <kbd>Clicks</kbd><span>Caster: <b style="color:var(--blue)">rift A</b> / <b style="color:var(--orange)">rift B</b> · Glove: grab+launch / blast · Freeze: freeze / thaw all</span>
+      <kbd>1 – 8</kbd><span>Rift caster · Gravity glove · Rifle · Shotgun · Grenade launcher · Singularity · Freeze ray · Katana (or mouse wheel)</span>
+      <kbd>Clicks</kbd><span>Caster: <b style="color:var(--blue)">rift A</b> / <b style="color:var(--orange)">rift B</b> · Glove: grab+launch / blast · Katana: side slash / down slash</span>
       <kbd>Q</kbd><span>Spawn menu · <b>Z</b> spawn the last item again</span>
       <kbd>E · X</kbd><span>Pick up / drop · delete what you look at</span>
       <kbd>R</kbd><span>Reset the map</span>
@@ -116,6 +116,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); 
       <button class="btn" id="tgSlow">Slow motion: off</button>
       <button class="btn" id="clearAll">Clear objects</button>
       <button class="btn" id="closeRifts">Close rifts</button>
+      <button class="btn" id="tgGore">Gore: on</button>
     </div>
   </div>
 </div>
@@ -395,10 +396,11 @@ const ITEMS = {
   cone: { name: 'Traffic cone', icon: '🔺', ext: [0.22, 0.36, 0.22], mass: 2, rest: 0.2, tips: true, make: coneMesh },
   tv: { name: 'Old TV', icon: '📺', ext: [0.42, 0.34, 0.36], mass: 14, rest: 0.05, splat: 11, splatCol: [0xaee9ff, 0x888888], make: tvMesh },
   dummy: { name: 'Mannequin', icon: '🧍', ext: [0.3, 0.9, 0.3], mass: 70, rest: 0.05, tips: true, make: dummyMesh },
-  rag: { name: 'Ragdoll', icon: '🤸', rag: true, ext: [0.3, 0.9, 0.3] },
+  rag: { name: 'Crash dummy', icon: '🤸', rag: true, ext: [0.3, 0.9, 0.3] },
   grenade: { name: 'Grenade', icon: '💣', hidden: true, ball: true, ext: [0.12, 0.12, 0.12], mass: 1, rest: 0.35, explosive: true, make: () => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 14), std({ color: 0x3d4a2a, roughness: 0.6, metalness: 0.3 })); const l = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), std({ color: 0x000000, emissive: 0xff2020, emissiveIntensity: 3 })); l.position.y = 0.11; m.add(l); return m; } },
   car: { name: 'Car', icon: '🚗', ext: [0.95, 0.72, 2.12], mass: 150, rest: 0.05, make: carMesh },
-  bot: { name: 'Walker bot', icon: '🤖', npc: true, ext: [0.3, 0.9, 0.3] },
+  person: { name: 'Person', icon: '🧍', npc: true, style: 'person', ext: [0.3, 0.9, 0.3] },
+  bot: { name: 'Walker bot', icon: '🤖', npc: true, style: 'robot', ext: [0.3, 0.9, 0.3] },
   plank: { name: 'Plank', icon: '🪵', hidden: true, ext: [0.5, 0.05, 0.11], mass: 3, rest: 0.2, make: () => new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 0.22), MAT.wood) },
   pad: { name: 'Launch pad', icon: '⏫', gadget: true },
 };
@@ -448,28 +450,115 @@ function placePad(p) {
 }
 function removePad(pad) { pads = pads.filter(x => x !== pad); levelGroup.remove(pad.mesh); const j = rayMeshes.indexOf(pad.mesh); if (j >= 0) rayMeshes.splice(j, 1); }
 
-// ---------- ragdolls (verlet) ----------
-let rags = [], ragAcc = 0;
+// ---------- ragdolls (verlet, dismemberable) ----------
+let rags = [], ragAcc = 0, ragId = 0, goreOn = true;
 const RH = 1 / 120;
-const RAG_P = [[0, 1.68, 0], [0, 1.47, 0], [0, 0.98, 0], [-0.21, 1.42, 0], [0.21, 1.42, 0], [-0.25, 1.14, 0], [0.25, 1.14, 0], [-0.27, 0.86, 0.02], [0.27, 0.86, 0.02], [-0.11, 0.92, 0], [0.11, 0.92, 0], [-0.12, 0.5, 0.01], [0.12, 0.5, 0.01], [-0.12, 0.08, 0], [0.12, 0.08, 0]];
-const RAG_S = [[0, 1], [0, 3], [0, 4], [1, 3], [1, 4], [3, 4], [1, 2], [3, 9], [4, 10], [3, 10], [4, 9], [9, 10], [2, 9], [2, 10], [3, 5], [5, 7], [4, 6], [6, 8], [9, 11], [11, 13], [10, 12], [12, 14]];
-const RAG_L = [[3, 5, 0.06], [5, 7, 0.05], [4, 6, 0.06], [6, 8, 0.05], [9, 11, 0.08], [11, 13, 0.065], [10, 12, 0.08], [12, 14, 0.065], [0, 1, 0.045]];
 const YUP = new V3(0, 1, 0);
-function spawnRag(x, y, z, yaw = 0, mat = MAT.dummy) {
-  const g = new THREE.Group(), cy = Math.cos(yaw), sy = Math.sin(yaw), p = [], q = [];
-  for (const [px, py, pz] of RAG_P) { const v = new V3(x + px * cy + pz * sy, y + py, z - px * sy + pz * cy); p.push(v); q.push(v.clone()); }
-  const rag = { p, q, g, rest: RAG_S.map(([a, b]) => p[a].distanceTo(p[b])), ext: new V3(0.07, 0.07, 0.07), pel: p[2].clone() };
-  rag.limbs = RAG_L.map(([a, b, r]) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.88, 1, 12), mat); g.add(m); return { a, b, m }; });
-  rag.head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 14), mat); g.add(rag.head);
-  rag.torso = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1, 0.22), mat); g.add(rag.torso);
-  rag.joints = [3, 4, 5, 6, 9, 10, 11, 12].map(i => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.068, 12, 8), MAT.joint); g.add(m); return { i, m }; });
+// points: each body segment owns its own points; joints pin segment ends together and can be cut
+const RP = [[0, 1.76, 0], [0, 1.5, 0], [0, 1.47, 0], [0, 1.12, 0], [-0.2, 1.41, 0], [0.2, 1.41, 0], [0, 1.12, 0], [0, 0.84, 0], [-0.1, 0.9, 0], [0.1, 0.9, 0],
+  [-0.2, 1.41, 0], [-0.24, 1.13, 0], [-0.24, 1.13, 0], [-0.26, 0.86, 0.03], [0.2, 1.41, 0], [0.24, 1.13, 0], [0.24, 1.13, 0], [0.26, 0.86, 0.03],
+  [-0.1, 0.9, 0], [-0.11, 0.48, 0.01], [-0.11, 0.48, 0.01], [-0.11, 0.06, 0], [0.1, 0.9, 0], [0.11, 0.48, 0.01], [0.11, 0.48, 0.01], [0.11, 0.06, 0]];
+const RSEG = [['head', [0, 1]], ['chest', [2, 3, 4, 5]], ['abd', [6, 7, 8, 9]], ['uarm', [10, 11]], ['farm', [12, 13]], ['uarm', [14, 15]], ['farm', [16, 17]], ['thigh', [18, 19]], ['shin', [20, 21]], ['thigh', [22, 23]], ['shin', [24, 25]]];
+const RJ = [['neck', 1, 2, [0, 3, 0.25]], ['waist', 3, 6, [2, 7, 0.35]], ['lsh', 4, 10], ['rsh', 5, 14], ['lel', 11, 12], ['rel', 15, 16], ['lhip', 8, 18], ['rhip', 9, 22], ['lkn', 19, 20], ['rkn', 23, 24]];
+const SKIN = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac, 0x6b4226], HAIR = [0x1b1410, 0x4a2e1a, 0x8a6a3a, 0xd9c27a, 0x2b2b2b, 0x7a2e12], PANTS = [0x2f4a6d, 0x3b3f45, 0xa8936a, 0x1f1f22, 0x4d5d3a];
+const matCache = {};
+const cm = (hex, rough) => matCache[hex + '_' + rough] || (matCache[hex + '_' + rough] = std({ color: hex, roughness: rough }));
+const pick = (a) => a[(Math.random() * a.length) | 0];
+function randPal() { return { skin: pick(SKIN), hair: pick(HAIR), shirt: new THREE.Color().setHSL(Math.random(), 0.4 + Math.random() * 0.35, 0.28 + Math.random() * 0.32).getHex(), pants: pick(PANTS), shoe: pick([0x222222, 0xeeeeee, 0x5a3a22]) }; }
+function styleMats(style, pal) {
+  if (style === 'person') return { head: cm(pal.skin, 0.6), chest: cm(pal.shirt, 0.85), abd: cm(pal.pants, 0.85), uarm: cm(pal.shirt, 0.85), farm: cm(pal.skin, 0.6), thigh: cm(pal.pants, 0.85), shin: cm(pal.pants, 0.85), hair: cm(pal.hair, 0.9), shoe: cm(pal.shoe, 0.5), hand: cm(pal.skin, 0.6) };
+  const m = style === 'robot' ? MAT.robot : MAT.dummy;
+  return { head: m, chest: m, abd: m, uarm: m, farm: m, thigh: m, shin: m, hair: MAT.joint, shoe: MAT.joint, hand: MAT.joint };
+}
+const EYE_MAT = std({ color: 0x15100c, roughness: 0.2 });
+const woundMat = std({ color: 0x5a0000, roughness: 0.25 }), woundGeo = new THREE.SphereGeometry(0.06, 10, 8);
+function segMesh(type, M, style) {
+  if (type === 'head') {
+    const h = new THREE.Group(), sk = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 16), M.head); sk.scale.set(1, 1.12, 1.05); h.add(sk);
+    if (style === 'person') {
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.128, 18, 12, 0, Math.PI * 2, 0, 1.25), M.hair); hair.position.set(0, 0.02, 0.012); hair.scale.set(1, 1.12, 1.06); h.add(hair);
+      for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), EYE_MAT); e.position.set(sx * 0.042, 0.015, -0.112); h.add(e); }
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), M.head); nose.position.set(0, -0.015, -0.126); h.add(nose);
+    } else if (style === 'robot') { const v = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.02), MAT.visor); v.position.set(0, 0.02, -0.122); h.add(v); }
+    return h;
+  }
+  if (type === 'chest') return new THREE.Mesh(new THREE.BoxGeometry(0.38, 1, 0.22), M.chest);
+  if (type === 'abd') return new THREE.Mesh(new THREE.BoxGeometry(0.33, 1, 0.2), M.abd);
+  const R = { uarm: 0.062, farm: 0.05, thigh: 0.085, shin: 0.066 }[type];
+  return new THREE.Mesh(new THREE.CylinderGeometry(R, R * 0.85, 1, 12), M[type]);
+}
+function spawnRag(x, y, z, yaw = 0, style = 'dummy', pal = null) {
+  if (style === 'person' && !pal) pal = randPal();
+  const M = styleMats(style, pal), g = new THREE.Group(), cy = Math.cos(yaw), sy = Math.sin(yaw), p = [], q = [], cons = [];
+  for (const [px, py, pz] of RP) { const v = new V3(x + px * cy + pz * sy, y + py, z - px * sy + pz * cy); p.push(v); q.push(v.clone()); }
+  const addC = (a, b, k = 1, joint = null, brace = false) => cons.push({ a, b, len: p[a].distanceTo(p[b]), k, joint, brace });
+  const segs = RSEG.map(([type, pts]) => {
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) addC(pts[i], pts[j]);
+    const seg = { type, pts: [...pts], hp: type === 'head' ? 30 : (type === 'chest' || type === 'abd') ? 90 : 45, mesh: segMesh(type, M, style), right: new V3(cy, 0, -sy) };
+    g.add(seg.mesh);
+    if (type === 'farm') { seg.extra = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), M.hand); g.add(seg.extra); }
+    if (type === 'shin') { seg.extra = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.13), M.shoe); g.add(seg.extra); }
+    return seg;
+  });
+  for (const [name, a, b, br] of RJ) { addC(a, b, 1, name); if (br) addC(br[0], br[1], br[2], name, true); }
+  const rag = { id: ++ragId, p, q, cons, segs, g, style, pal, frozen: false, wounds: [], bleed: [], ext: new V3(0.07, 0.07, 0.07), pel: p[3].clone(), core: 3 };
   g.traverse(c => { c.frustumCulled = false; if (c.isMesh) c.castShadow = c.receiveShadow = true; });
   g.userData.rag = rag; levelGroup.add(g); rayMeshes.push(g); rags.push(rag);
-  if (rags.length > 14) removeRag(rags[0]);
+  if (rags.length > 90) removeRag(rags[0]);
   return rag;
 }
 function removeRag(r) { rags = rags.filter(x => x !== r); levelGroup.remove(r.g); const j = rayMeshes.indexOf(r.g); if (j >= 0) rayMeshes.splice(j, 1); if (PL.heldRag && PL.heldRag.rag === r) PL.heldRag = null; }
 function ragPush(r, at, vel, rad) { for (let i = 0; i < r.p.length; i++) { const d = r.p[i].distanceTo(at), w = Math.exp(-d * d / (rad * rad)); r.q[i].addScaledVector(vel, -w * RH); } }
+// splits a body into separate pieces once its joints no longer connect them
+function splitRag(r) {
+  const n = r.p.length, par = [...Array(n).keys()], f = (i) => par[i] === i ? i : (par[i] = f(par[i]));
+  for (const c of r.cons) par[f(c.a)] = f(c.b);
+  const groups = new Map(); for (let i = 0; i < n; i++) { const k = f(i); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); }
+  if (groups.size < 2) return;
+  const hold = PL.heldRag && PL.heldRag.rag === r ? PL.heldRag.i : -1;
+  if (hold >= 0) PL.heldRag = null;
+  for (const pts of groups.values()) {
+    const map = new Map(pts.map((o, i) => [o, i])), g = new THREE.Group();
+    const nr = { id: r.id, p: pts.map(i => r.p[i]), q: pts.map(i => r.q[i]), cons: r.cons.filter(c => map.has(c.a)).map(c => ({ ...c, a: map.get(c.a), b: map.get(c.b) })),
+      segs: r.segs.filter(sg => map.has(sg.pts[0])).map(sg => ({ ...sg, pts: sg.pts.map(i => map.get(i)) })), g, style: r.style, pal: r.pal, frozen: r.frozen, torn: r.torn,
+      wounds: r.wounds.filter(w => map.has(w.i)).map(w => ({ i: map.get(w.i), m: w.m })), bleed: r.bleed.filter(b => map.has(b.i)).map(b => ({ i: map.get(b.i), t: b.t })), ext: r.ext, pel: r.p[pts[0]].clone(), core: 0 };
+    for (const sg of nr.segs) { g.add(sg.mesh); if (sg.extra) g.add(sg.extra); }
+    for (const w of nr.wounds) g.add(w.m);
+    g.userData.rag = nr; levelGroup.add(g); rayMeshes.push(g); rags.push(nr);
+    if (map.has(hold)) PL.heldRag = { rag: nr, i: map.get(hold) };
+  }
+  rags = rags.filter(x => x !== r); levelGroup.remove(r.g); const j = rayMeshes.indexOf(r.g); if (j >= 0) rayMeshes.splice(j, 1);
+}
+function breakJoint(r, name) {
+  const pins = r.cons.filter(c => c.joint === name && !c.brace); if (!pins.length) return false;
+  r.cons = r.cons.filter(c => c.joint !== name);
+  const person = r.style === 'person';
+  for (const c of pins) for (const i of [c.a, c.b]) {
+    const m = new THREE.Mesh(woundGeo, person ? woundMat : MAT.joint); m.frustumCulled = false; m.position.copy(r.p[i]); r.g.add(m); r.wounds.push({ i, m });
+    if (person) { r.bleed.push({ i, t: 3 + Math.random() * 2.5 }); blood(r.p[i], new V3(0, 2.5, 0), 16, 1); } else burst(r.p[i], 0xffd080, 14, 3);
+  }
+  sfx.gore(person); if (person) alarm(r.p[0]);
+  splitRag(r); return true;
+}
+function breakById(id, name) { const h = rags.find(x => x.id === id && x.cons.some(c => c.joint === name && !c.brace)); return h ? breakJoint(h, name) : false; }
+function nearestJoint(r, seg, at) {
+  let best = null, bd = 1e9;
+  for (const c of r.cons) if (c.joint && !c.brace && (seg.pts.includes(c.a) || seg.pts.includes(c.b))) { const d = r.p[c.a].distanceToSquared(at); if (d < bd) { bd = d; best = c.joint; } }
+  return best;
+}
+function goreHit(r, hit, dir, power) {
+  if (!r.frozen) ragPush(r, hit.point, dir.clone().multiplyScalar(power * 0.9), 0.35);
+  let bi = 0, bd = 1e9; r.p.forEach((pt, i) => { const d = pt.distanceToSquared(hit.point); if (d < bd) { bd = d; bi = i; } });
+  const seg = r.segs.find(sg => sg.pts.includes(bi));
+  if (r.style === 'person') {
+    blood(hit.point, dir.clone().multiplyScalar(-2).add(new V3(0, 1.5, 0)), Math.round(power * 0.9), 0.6);
+    blood(hit.point, dir.clone().multiplyScalar(5), Math.round(power * 0.7), 0.4);
+    const w = new THREE.Raycaster(hit.point, dir, 0, 4).intersectObjects(rayMeshes, true).find(h => ownerOf(h.object).static);
+    if (w && goreOn) bloodDecal(w.point, w.face.normal.clone().transformDirection(w.object.matrixWorld), 0.35 + power * 0.03);
+    r.bleed.push({ i: bi, t: 1.5 });
+  } else burst(hit.point, r.style === 'robot' ? 0xffd080 : 0xf2c200, 10, 3);
+  if (seg) { seg.hp -= power * 2; if (seg.hp <= 0) { seg.hp = 25; const j = nearestJoint(r, seg, hit.point); if (j) breakJoint(r, j); } }
+}
 function pushOut(p, mn, mx, R) {
   if (p.x < mn.x - R || p.x > mx.x + R || p.y < mn.y - R || p.y > mx.y + R || p.z < mn.z - R || p.z > mx.z + R) return 0;
   let best = 1e9, k = 'y', v = 0;
@@ -478,6 +567,7 @@ function pushOut(p, mn, mx, R) {
 }
 const ragT = new V3();
 function updateRags(dt) {
+  for (const r of rags) { for (const bl of r.bleed) { bl.t -= dt; if (bl.t > 0 && Math.random() < Math.min(1, bl.t * 0.6)) blood(r.p[bl.i], tv2.set((Math.random() - 0.5) * 1.5, 1 + Math.random() * 1.8, (Math.random() - 0.5) * 1.5), 1, 0.4); } if (r.bleed.length) r.bleed = r.bleed.filter(b => b.t > 0); }
   ragAcc = Math.min(ragAcc + dt, RH * 6);
   const hold = PL.heldRag; if (hold) heldTarget(ragT);
   while (ragAcc >= RH) {
@@ -488,12 +578,12 @@ function updateRags(dt) {
       for (let i = 0; i < r.p.length; i++) { const p = r.p[i], q = r.q[i]; const vx = (p.x - q.x) * 0.997, vy = (p.y - q.y) * 0.997, vz = (p.z - q.z) * 0.997; q.copy(p); p.x += vx; p.y += vy - g; p.z += vz; }
       const held = hold && hold.rag === r;
       for (let it = 0; it < 6; it++) {
-        for (let k = 0; k < RAG_S.length; k++) {
-          const a = r.p[RAG_S[k][0]], b = r.p[RAG_S[k][1]];
-          tv.copy(b).sub(a); const L = tv.length() || 1e-6, d = (L - r.rest[k]) / L * 0.5;
-          a.addScaledVector(tv, d); b.addScaledVector(tv, -d);
+        for (const c of r.cons) {
+          const a = r.p[c.a], b = r.p[c.b]; tv.copy(b).sub(a); const L = tv.length();
+          if (c.len === 0) { a.addScaledVector(tv, 0.5); b.addScaledVector(tv, -0.5); continue; }
+          const d = (L - c.len) / (L || 1e-6) * 0.5 * c.k; a.addScaledVector(tv, d); b.addScaledVector(tv, -d);
         }
-        if (held) { r.p[hold.i].lerp(ragT, 0.5); }
+        if (held) r.p[hold.i].lerp(ragT, 0.5);
       }
       for (let i = 0; i < r.p.length; i++) {
         const p = r.p[i], q = r.q[i], ign = holeBoxes(p, r.ext);
@@ -510,28 +600,67 @@ function updateRags(dt) {
           q.addScaledVector(PL.vel, -RH * 0.7);
         }
       }
-      const P = crossing(r.pel, r.p[2], false);
+      const P = crossing(r.pel, r.p[r.core], false);
       if (P) { for (let i = 0; i < r.p.length; i++) { r.p[i].applyMatrix4(P.toOther); r.q[i].applyMatrix4(P.toOther); } if (held) PL.heldRag = null; burst(P.other.c, P.other.color, 10, 2, P.other.n); }
-      r.pel.copy(r.p[2]);
-      if (r.p[2].y < -40) removeRag(r);
+      r.pel.copy(r.p[r.core]);
+      if (r.p[r.core].y < -40) removeRag(r);
     }
   }
 }
 const rb = new THREE.Matrix4(), ru = new V3(), rr = new V3(), rf = new V3();
 function renderRags() {
   for (const r of rags) {
-    for (const l of r.limbs) {
-      const a = r.p[l.a], b = r.p[l.b]; tv.copy(b).sub(a); const L = tv.length() || 1e-4;
-      l.m.position.copy(a).addScaledVector(tv, 0.5); l.m.scale.y = L + 0.04; l.m.quaternion.setFromUnitVectors(YUP, tv.divideScalar(L));
+    const P = r.p, chest = r.segs.find(sg => sg.type === 'chest');
+    for (const sg of r.segs) {
+      if (sg.type === 'chest' || sg.type === 'abd') {
+        const [top, bot, l, rt] = sg.pts;
+        ru.copy(P[top]).sub(P[bot]); const L = ru.length() || 1e-4; ru.divideScalar(L);
+        rr.copy(P[rt]).sub(P[l]); rr.addScaledVector(ru, -rr.dot(ru)); if (rr.lengthSq() < 1e-8) rr.copy(sg.right); rr.normalize(); sg.right.copy(rr);
+        rf.crossVectors(rr, ru); rb.makeBasis(rr, ru, rf); sg.mesh.quaternion.setFromRotationMatrix(rb);
+        sg.mesh.position.copy(P[top]).add(P[bot]).multiplyScalar(0.5); sg.mesh.scale.y = L + (sg.type === 'chest' ? 0.1 : 0.06);
+      } else if (sg.type === 'head') {
+        ru.copy(P[sg.pts[0]]).sub(P[sg.pts[1]]).normalize();
+        rr.copy(chest ? chest.right : sg.right); rr.addScaledVector(ru, -rr.dot(ru)); if (rr.lengthSq() < 1e-8) rr.set(1, 0, 0); rr.normalize(); sg.right.copy(rr);
+        rf.crossVectors(rr, ru); rb.makeBasis(rr, ru, rf); sg.mesh.quaternion.setFromRotationMatrix(rb);
+        sg.mesh.position.copy(P[sg.pts[0]]).add(P[sg.pts[1]]).multiplyScalar(0.5);
+      } else {
+        const a = P[sg.pts[0]], b = P[sg.pts[1]]; tv.copy(b).sub(a); const L = tv.length() || 1e-4;
+        sg.mesh.position.copy(a).addScaledVector(tv, 0.5); sg.mesh.scale.y = L + 0.04; sg.mesh.quaternion.setFromUnitVectors(YUP, tv.divideScalar(L));
+        if (sg.extra) { sg.extra.position.copy(b); sg.extra.quaternion.copy(sg.mesh.quaternion); }
+      }
     }
-    r.head.position.copy(r.p[0]);
-    for (const j of r.joints) j.m.position.copy(r.p[j.i]);
-    const sh = tv.copy(r.p[3]).add(r.p[4]).multiplyScalar(0.5), hp = tv2.copy(r.p[9]).add(r.p[10]).multiplyScalar(0.5);
-    ru.copy(sh).sub(hp); const L = ru.length() || 1e-4; ru.divideScalar(L);
-    rr.copy(r.p[4]).sub(r.p[3]); rr.addScaledVector(ru, -rr.dot(ru)).normalize(); rf.crossVectors(rr, ru);
-    rb.makeBasis(rr, ru, rf); r.torso.quaternion.setFromRotationMatrix(rb);
-    r.torso.position.copy(sh).add(hp).multiplyScalar(0.5); r.torso.scale.y = L + 0.12;
+    for (const w of r.wounds) w.m.position.copy(P[w.i]);
   }
+}
+// people run from gunfire and explosions
+function alarm(at) { for (const n of npcs) if (n.style === 'person' && n.pos.distanceTo(at) < 28) { const dx = n.pos.x - at.x, dz = n.pos.z - at.z; n.yaw = Math.atan2(-dx, -dz) + (Math.random() - 0.5) * 0.8; n.panic = 4 + Math.random() * 3; } }
+
+// ---------- katana ----------
+let swing = 0, swingV = false;
+function slash(vertical) {
+  fireCd = 0.32; swing = 1; swingV = vertical; sfx.swish(); alarm(PL.pos);
+  const eye = PL.pos.clone().add(EYEV), f = forward(new V3());
+  const n = (vertical ? new V3(1, 0, 0) : new V3(0, 1, 0)).applyEuler(camera.rotation);
+  const reach = (pt) => { tv.copy(pt).sub(eye); const d = tv.length(); return d < 3.2 && tv.dot(f) > d * 0.35; };
+  for (const w of npcs.slice()) if (reach(w.pos) || reach(tv2.copy(w.pos).add(EYEV))) ragdollify(w, f.clone().multiplyScalar(2));
+  let gore = false;
+  for (const r of rags.slice()) {
+    if (!rags.includes(r)) continue;
+    const cands = [];
+    for (const c of r.cons) if (c.joint && !c.brace && reach(r.p[c.a])) cands.push({ j: c.joint, d: Math.abs(tv.copy(r.p[c.a]).sub(eye).dot(n)) });
+    if (!cands.length) continue;
+    let cut = cands.filter(c => c.d < 0.2).map(c => c.j);
+    if (!cut.length) { const m = cands.reduce((a, b) => a.d < b.d ? a : b); if (m.d < 0.45) cut = [m.j]; }
+    const id = r.id;
+    for (const j of new Set(cut)) if (breakById(id, j)) gore = gore || r.style === 'person';
+    for (const pc of rags) if (pc.id === id && !pc.frozen) for (let i = 0; i < pc.p.length; i++) { const side = Math.sign(tv.copy(pc.p[i]).sub(eye).dot(n)) || 1; pc.q[i].addScaledVector(n, -side * 2.2 * RH).addScaledVector(f, -1.5 * RH); }
+  }
+  for (const b of bodies) if (b !== PL.held && reach(b.pos)) {
+    b.vel.addScaledVector(f, 7 / Math.sqrt(b.mass / 5)); if (b.frozen) setFrozen(b, false);
+    if (b.def.death === 'break' || b.def.death === 'splat') b.dead = b.def.death; else if (b.def.splat) b.dead = 'splat';
+    burst(b.pos, 0xffffff, 8, 2);
+  }
+  if (gore) shake = Math.min(1, shake + 0.15);
 }
 
 // ---------- guns ----------
@@ -552,8 +681,8 @@ function hitEffects(hit, dir, power) {
     if (b.def.explosive) b.dead = 'explode'; else if (b.def.hp) { b.hp = (b.hp ?? b.def.hp) - power * 2.2; if (b.hp <= 0) b.dead = b.def.death; } else if (b.def.splat) b.dead = 'splat';
     if (b.frozen) { burst(hit.point, 0xbfefff, 8, 2); b.vel.set(0, 0, 0); }
     burst(hit.point, 0xffd080, 8, 3);
-  } else if (u.npc) { ragdollify(u.npc, dir.clone().multiplyScalar(power * 0.5)); burst(hit.point, 0xffd080, 10, 3); }
-  else if (u.rag) { if (!u.rag.frozen) ragPush(u.rag, hit.point, dir.clone().multiplyScalar(power * 0.9), 0.35); burst(hit.point, 0xf2c200, 10, 3); }
+  } else if (u.npc) { goreHit(ragdollify(u.npc, dir.clone().multiplyScalar(power * 0.5)), hit, dir, power); }
+  else if (u.rag) goreHit(u.rag, hit, dir, power);
   else if (u.static) {
     const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
     decal(hit.point, n); burst(hit.point, 0xffc070, 8, 4, n); burst(hit.point, 0x9a958c, 6, 1.5, n);
@@ -563,7 +692,7 @@ function fireRifle() {
   fireCd = 0.095; recoil = 0.55; shake = Math.min(1, shake + 0.07); sfx.shot();
   PL.pitch = Math.min(1.55, PL.pitch + 0.006);
   const dir = forward(new V3()).add(new V3((Math.random() - 0.5) * 0.012, (Math.random() - 0.5) * 0.012, (Math.random() - 0.5) * 0.012)).normalize();
-  const tip = gunTip(); burst(tip, 0xffd27a, 6, 1.5); boomLight.position.copy(tip); boomLight.intensity = Math.max(boomLight.intensity, 2.2);
+  alarm(PL.pos); const tip = gunTip(); burst(tip, 0xffd27a, 6, 1.5); boomLight.position.copy(tip); boomLight.intensity = Math.max(boomLight.intensity, 2.2);
   const ray = new THREE.Raycaster(PL.pos.clone().add(EYEV), dir, 0, 250);
   const hit = ray.intersectObjects(rayMeshes, true).find(h => { const u = ownerOf(h.object); return !(u.static && !u.static.enabled) && !(u.body && u.body === PL.held); });
   if (!hit) return;
@@ -577,34 +706,34 @@ function fireLauncher() {
   burst(gunTip(), 0xff8a3a, 14, 3);
 }
 
-// ---------- walker bots ----------
+// ---------- walkers (people and robots) ----------
 let npcs = [];
-function spawnNPC(x, y, z, yaw = Math.random() * 6.28) {
-  const g = new THREE.Group(), add = (geo, m, x, y, z, par = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); par.add(o); return o; };
-  add(new THREE.BoxGeometry(0.42, 0.56, 0.24), MAT.robot, 0, 0.32, 0);
-  add(new THREE.BoxGeometry(0.27, 0.26, 0.26), MAT.robot, 0, 0.79, 0);
-  add(new THREE.BoxGeometry(0.22, 0.06, 0.02), MAT.visor, 0, 0.81, -0.135);
-  add(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 8), MAT.joint, 0, 0.64, 0);
-  add(new THREE.BoxGeometry(0.3, 0.2, 0.06), MAT.joint, 0, 0.36, 0.14);
-  const limb = (x, y, len, r) => { const pv = new THREE.Group(); pv.position.set(x, y, 0); g.add(pv); add(new THREE.CylinderGeometry(r, r * 0.85, len, 10), MAT.robot, 0, -len / 2, 0, pv); add(new THREE.SphereGeometry(r * 1.2, 10, 8), MAT.joint, 0, 0, 0, pv); return pv; };
-  const legs = [limb(-0.11, 0.02, 0.9, 0.075), limb(0.11, 0.02, 0.9, 0.075)], arms = [limb(-0.27, 0.56, 0.62, 0.055), limb(0.27, 0.56, 0.62, 0.055)];
+function spawnNPC(x, y, z, yaw = Math.random() * 6.28, style = 'robot', pal = null) {
+  if (style === 'person' && !pal) pal = randPal();
+  const M = styleMats(style, pal), g = new THREE.Group(), add = (geo, m, x, y, z, par = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); par.add(o); return o; };
+  add(new THREE.BoxGeometry(0.38, 0.38, 0.22), M.chest, 0, 0.39, 0);
+  add(new THREE.BoxGeometry(0.33, 0.3, 0.2), M.abd, 0, 0.07, 0);
+  const head = segMesh('head', M, style); head.position.set(0, 0.73, 0); g.add(head);
+  const limb = (x, y, parts) => { const pv = new THREE.Group(); pv.position.set(x, y, 0); g.add(pv); let yy = 0; for (const [len, r, m] of parts) { add(new THREE.CylinderGeometry(r, r * 0.88, len, 10), m, 0, yy - len / 2, 0, pv); yy -= len; } return { pv, end: yy }; };
+  const arms = [-1, 1].map(sx => { const a = limb(sx * 0.22, 0.51, [[0.28, 0.062, M.uarm], [0.27, 0.05, M.farm]]); add(new THREE.SphereGeometry(0.055, 10, 8), M.hand, 0, a.end - 0.03, 0, a.pv); return a.pv; });
+  const legs = [-1, 1].map(sx => { const l = limb(sx * 0.1, 0.0, [[0.42, 0.085, M.thigh], [0.42, 0.066, M.shin]]); add(new THREE.BoxGeometry(0.11, 0.08, 0.2), M.shoe, 0, l.end - 0.02, -0.04, l.pv); return l.pv; });
   g.traverse(c => { c.frustumCulled = false; if (c.isMesh) c.castShadow = c.receiveShadow = true; });
-  const n = { pos: new V3(x, y, z), vel: new V3(), ext: new V3(0.3, 0.9, 0.3), min: new V3(), max: new V3(), yaw, t: 0, turn: 0, idle: false, phase: 0, legs, arms, mesh: g, enabled: true };
+  const n = { pos: new V3(x, y, z), vel: new V3(), ext: new V3(0.3, 0.9, 0.3), min: new V3(), max: new V3(), yaw, t: 0, turn: 0, idle: false, phase: 0, panic: 0, legs, arms, mesh: g, enabled: true, style, pal };
   n.npc = n; g.userData.npc = n; levelGroup.add(g); rayMeshes.push(g); npcs.push(n); syncBox(n);
   return n;
 }
 function removeNPC(n) { npcs = npcs.filter(x => x !== n); levelGroup.remove(n.mesh); const j = rayMeshes.indexOf(n.mesh); if (j >= 0) rayMeshes.splice(j, 1); }
 function ragdollify(n, v) {
   removeNPC(n);
-  const r = spawnRag(n.pos.x, n.pos.y - 0.9, n.pos.z, n.yaw, MAT.robot);
+  const r = spawnRag(n.pos.x, n.pos.y - 0.9, n.pos.z, n.yaw, n.style, n.pal);
   for (const q of r.q) q.addScaledVector(v, -RH);
   sfx.thud(8); return r;
 }
 function updateNPCs(dt) {
   for (const n of npcs.slice()) {
-    n.t -= dt; if (n.t <= 0) { n.t = 1.5 + Math.random() * 3; n.turn = (Math.random() - 0.5) * 1.6; n.idle = Math.random() < 0.25; }
-    n.yaw += n.turn * dt;
-    const sp = n.idle ? 0 : 1.7;
+    if (n.panic > 0) n.panic -= dt;
+    else { n.t -= dt; if (n.t <= 0) { n.t = 1.5 + Math.random() * 3; n.turn = (Math.random() - 0.5) * 1.6; n.idle = Math.random() < 0.25; } n.yaw += n.turn * dt; }
+    const sp = n.panic > 0 ? 4.8 : n.idle ? 0 : 1.6;
     n.vel.x = -Math.sin(n.yaw) * sp; n.vel.z = -Math.cos(n.yaw) * sp;
     n.vel.y = Math.max(n.vel.y - G * gravScale * dt, -45);
     if (waters.length && inWater(n.pos)) { n.vel.y += G * gravScale * 1.1 * dt; n.vel.y *= 1 - 2 * dt; }
@@ -621,9 +750,11 @@ function updateNPCs(dt) {
     let hitBy = null;
     for (const b of bodies) if (b !== PL.held && b.vel.lengthSq() > 49 && overlaps(n.pos, tv.copy(n.ext).addScalar(0.15), b)) { hitBy = b; break; }
     if (hitBy) { ragdollify(n, hitBy.vel.clone().multiplyScalar(0.7)); continue; }
-    n.phase += dt * sp * 4;
-    n.legs[0].rotation.x = Math.sin(n.phase) * 0.6; n.legs[1].rotation.x = -Math.sin(n.phase) * 0.6;
-    n.arms[0].rotation.x = -Math.sin(n.phase) * 0.45; n.arms[1].rotation.x = Math.sin(n.phase) * 0.45;
+    n.phase += dt * (sp * 3.2 + (sp ? 1.5 : 0));
+    const sw = Math.min(1, sp / 2.5) * 0.65;
+    n.legs[0].rotation.x = Math.sin(n.phase) * sw; n.legs[1].rotation.x = -Math.sin(n.phase) * sw;
+    n.arms[0].rotation.x = -Math.sin(n.phase) * sw * (n.panic > 0 ? 1.8 : 0.8); n.arms[1].rotation.x = Math.sin(n.phase) * sw * (n.panic > 0 ? 1.8 : 0.8);
+    n.arms[0].rotation.z = n.panic > 0 ? -0.5 : 0; n.arms[1].rotation.z = n.panic > 0 ? 0.5 : 0;
     n.mesh.position.copy(n.pos); n.mesh.rotation.y = n.yaw;
     if (n.pos.y < -40) removeNPC(n);
   }
@@ -655,6 +786,12 @@ function updateHoles(dt) {
       if (L < 0.9) { burst(h.pos, 0xb07aff, 12, 3); removeBody(b); continue; }
       b.vel.addScaledVector(tv.normalize(), 110 / (L + 1) * dt); b.vel.multiplyScalar(1 - 0.5 * dt);
     }
+    for (const r of rags.slice()) {
+      if (!rags.includes(r)) continue;
+      const dd = r.p[r.core].distanceTo(h.pos);
+      if (dd < 1) { removeRag(r); burst(h.pos, 0xb07aff, 10, 3); continue; }
+      if (dd < 3 && !r.torn) { r.torn = true; for (const j of new Set(r.cons.filter(c => c.joint && !c.brace).map(c => c.joint))) breakById(r.id, j); }
+    }
     for (const r of rags) if (!r.frozen) for (let i = 0; i < r.p.length; i++) { tv.copy(h.pos).sub(r.p[i]); const L = tv.length(); if (L < 18) r.q[i].addScaledVector(tv.normalize(), -90 / (L + 1) * dt * RH * 60); }
     for (const n of npcs.slice()) if (n.pos.distanceTo(h.pos) < 12) ragdollify(n, tv.copy(h.pos).sub(n.pos).normalize().multiplyScalar(6));
     tv.copy(h.pos).sub(PL.pos); const L = tv.length();
@@ -683,7 +820,7 @@ function thawAll() { for (const b of bodies) if (b.frozen) setFrozen(b, false); 
 
 // ---------- shotgun ----------
 function fireShotgun() {
-  fireCd = 0.85; recoil = 1.8; shake = Math.min(1, shake + 0.25); sfx.shotgun(); PL.pitch = Math.min(1.55, PL.pitch + 0.04);
+  alarm(PL.pos); fireCd = 0.85; recoil = 1.8; shake = Math.min(1, shake + 0.25); sfx.shotgun(); PL.pitch = Math.min(1.55, PL.pitch + 0.04);
   const tip = gunTip(); burst(tip, 0xffd27a, 14, 2.5); boomLight.position.copy(tip); boomLight.intensity = Math.max(boomLight.intensity, 4);
   const eye = PL.pos.clone().add(EYEV), f = forward(new V3());
   for (let i = 0; i < 9; i++) {
@@ -756,6 +893,13 @@ function explode(at) {
   }
   for (const n of npcs.slice()) { const d = n.pos.clone().sub(at), L = d.length(); if (L < 7) ragdollify(n, d.normalize().multiplyScalar((1 - L / 7) * 22).add(new V3(0, 8, 0))); }
   for (const r of rags) for (let i = 0; i < r.p.length; i++) { const d = r.p[i].clone().sub(at), L = d.length(); if (L > 7) continue; const k = (1 - L / 7) * 24; r.q[i].addScaledVector(d.normalize(), -k * RH); r.q[i].y -= k * 0.45 * RH; }
+  for (const r of rags.slice()) {
+    if (!rags.includes(r)) continue;
+    const js = new Set(r.cons.filter(c => c.joint && !c.brace && r.p[c.a].distanceTo(at) < 3.6 * Math.random() * 1.3).map(c => c.joint));
+    for (const j of js) breakById(r.id, j);
+    if (js.size && r.style === 'person') for (let k = 0; k < 3; k++) blood(at.clone().add(new V3(0, 0.5, 0)), new V3((Math.random() - 0.5) * 8, 4 + Math.random() * 4, (Math.random() - 0.5) * 8), 12, 1.2);
+  }
+  alarm(at);
   const d = PL.pos.clone().sub(at), L = d.length();
   if (L < 6.5) { PL.vel.addScaledVector(d.normalize(), (1 - L / 6.5) * 20); PL.vel.y += (1 - L / 6.5) * 8; PL.grounded = false; }
 }
@@ -929,6 +1073,11 @@ part(shotgun, new THREE.BoxGeometry(0.085, 0.09, 0.22), gm, 0, -0.01, -0.02);
 part(shotgun, new THREE.BoxGeometry(0.07, 0.065, 0.3), gwood, 0, -0.035, -0.3);
 part(shotgun, new THREE.BoxGeometry(0.06, 0.11, 0.32), gwood, 0, -0.06, 0.22, -0.15);
 shotgun.visible = false; shotgun.scale.setScalar(0.62); gunScene.add(shotgun);
+const blade = new THREE.Group(), bladePivot = new THREE.Group(); blade.add(bladePivot);
+part(bladePivot, new THREE.CylinderGeometry(0.018, 0.02, 0.24, 10), gpoly, 0, -0.1, 0);
+part(bladePivot, new THREE.CylinderGeometry(0.045, 0.045, 0.012, 18), std({ color: 0xb08d57, metalness: 1, roughness: 0.3 }), 0, 0.025, 0);
+part(bladePivot, new THREE.BoxGeometry(0.008, 0.78, 0.042), std({ color: 0xe8ecef, metalness: 1, roughness: 0.1, envMapIntensity: 1.8 }), 0, 0.42, 0);
+blade.visible = false; blade.scale.setScalar(0.85); gunScene.add(blade);
 rifle.visible = launcher.visible = false; rifle.scale.setScalar(0.62); launcher.scale.setScalar(0.6); gunScene.add(rifle, launcher);
 
 // ---------- lights ----------
@@ -966,6 +1115,49 @@ function updateParticles(dt) {
   }
   pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
 }
+// blood
+const BMAX = 1200, bGeo = new THREE.BufferGeometry(), bPos = new Float32Array(BMAX * 3);
+bGeo.setAttribute('position', new THREE.BufferAttribute(bPos, 3));
+const bPts = new THREE.Points(bGeo, new THREE.PointsMaterial({ color: 0x8a0000, size: 0.06, map: dotTex, transparent: true, depthWrite: false }));
+bPts.frustumCulled = false; scene.add(bPts);
+const bParts = []; for (let i = 0; i < BMAX; i++) bParts.push({ p: new V3(0, -999, 0), v: new V3(), life: 0 });
+let bNext = 0;
+function blood(at, dir, n, spread) {
+  if (!goreOn) return;
+  for (let i = 0; i < n; i++) { const q = bParts[bNext++ % BMAX]; q.p.copy(at); q.v.copy(dir).multiplyScalar(0.4 + Math.random() * 0.8); q.v.x += (Math.random() - 0.5) * spread * 3; q.v.y += (Math.random() - 0.5) * spread * 3; q.v.z += (Math.random() - 0.5) * spread * 3; q.life = 1.2 + Math.random(); }
+}
+const splatMats = [0, 1, 2].map(k => new THREE.MeshStandardMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, roughness: 0.22, map: canvasTex(128, (g, s) => {
+  const r = rng(300 + k); g.fillStyle = 'rgba(105,0,0,0.93)';
+  for (let i = 0; i < 14; i++) { const a = r() * 6.28, d = r() * s * 0.26, rad = s * (0.06 + r() * 0.13); g.beginPath(); g.arc(s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, rad, 0, 7); g.fill(); }
+  for (let i = 0; i < 12; i++) { const a = r() * 6.28, d = s * (0.3 + r() * 0.16); g.beginPath(); g.arc(s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, 2 + r() * 5, 0, 7); g.fill(); }
+}) }));
+const splatGeo = new THREE.PlaneGeometry(1, 1);
+function bloodDecal(pt, n, size) {
+  const m = new THREE.Mesh(splatGeo, splatMats[(Math.random() * 3) | 0]), sz = size || (0.2 + Math.random() * 0.45);
+  m.scale.set(sz, sz, 1); m.position.copy(pt).addScaledVector(n, 0.004 + Math.random() * 0.003); m.lookAt(tv2.copy(m.position).add(n)); m.rotateZ(Math.random() * 6);
+  m.frustumCulled = false; levelGroup.add(m); decals.push(m); if (decals.length > 280) levelGroup.remove(decals.shift());
+}
+const bPrev = new V3();
+function updateBlood(dt) {
+  let budget = 6;
+  for (let i = 0; i < BMAX; i++) {
+    const q = bParts[i];
+    if (q.life > 0) {
+      q.life -= dt; q.v.y -= G * dt; bPrev.copy(q.p); q.p.addScaledVector(q.v, dt);
+      for (const s of statics) {
+        if (!s.enabled || q.p.x < s.min.x || q.p.x > s.max.x || q.p.y < s.min.y || q.p.y > s.max.y || q.p.z < s.min.z || q.p.z > s.max.z) continue;
+        let n;
+        if (bPrev.y >= s.max.y) { n = FN.py; q.p.y = s.max.y; } else if (bPrev.x <= s.min.x) { n = FN.nx; q.p.x = s.min.x; } else if (bPrev.x >= s.max.x) { n = FN.px; q.p.x = s.max.x; }
+        else if (bPrev.z <= s.min.z) { n = FN.nz; q.p.z = s.min.z; } else if (bPrev.z >= s.max.z) { n = FN.pz; q.p.z = s.max.z; } else { n = FN.ny; q.p.y = s.min.y; }
+        if (budget > 0 && Math.random() < 0.3) { budget--; bloodDecal(q.p, n); }
+        q.life = 0; break;
+      }
+    }
+    bPos[i * 3] = q.p.x; bPos[i * 3 + 1] = q.life > 0 ? q.p.y : -999; bPos[i * 3 + 2] = q.p.z;
+  }
+  bGeo.attributes.position.needsUpdate = true;
+}
+
 // shot tracer
 const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 6, 1, true), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
 tracer.visible = false; scene.add(tracer); let tracerLife = 0;
@@ -1017,6 +1209,8 @@ const sfx = {
   freeze: () => { tone('sine', 1400, 2600, 0.25, 0.08); noise(0.35, 0.15, 6000, 2500, 2); },
   hole: () => { tone('sine', 90, 35, 1.4, 0.3); noise(1.2, 0.2, 150, 1400, 0.5); },
   shotgun: () => { noise(0.35, 0.8, 1800, 140, 0.6); tone('square', 120, 32, 0.16, 0.2); },
+  gore: (person) => { noise(0.22, person ? 0.45 : 0.3, person ? 700 : 2400, person ? 180 : 600, 1.4); if (person) noise(0.12, 0.25, 2600, 900, 2, 0.03); },
+  swish: () => noise(0.2, 0.22, 700, 4200, 2.5),
   shot: () => { noise(0.14, 0.5, 2600, 280, 0.8); tone('square', 170, 45, 0.09, 0.12); },
   launch: () => { tone('sawtooth', 200, 900, 0.18, 0.1); noise(0.25, 0.25, 600, 3000, 1); },
   pad: () => { tone('square', 180, 1200, 0.3, 0.1); noise(0.4, 0.25, 500, 2500, 1); },
@@ -1114,7 +1308,7 @@ const LEVELS = [
       S(-3, 0, -18, 3, 0.02, -6, false, { mat: std({ color: 0xc8995a, roughness: 0.25, metalness: 0, envMapIntensity: 1.2 }) });
       let n = 0; for (let r = 0; r < 4; r++) for (let c = 0; c <= r; c++) { spawnBody('pin', (c - r / 2) * 0.5, 0.41, -16 + -r * 0.45); n++; }
       spawnBody('bowl', 0, 0.25, -8);
-      spawnNPC(-2, 0.95, 0); spawnNPC(3, 0.95, -2); spawnNPC(-10, 0.95, 8); spawnRag(4, 0, 2, 0); spawnRag(5.5, 0, 2.6, 0.6); spawnRag(-14, 4, -2, 1.2); spawnBody('dummy', 7, 0.9, 3);
+      spawnNPC(-2, 0.95, 0, 0, 'person'); spawnNPC(3, 0.95, -2, 1, 'person'); spawnNPC(-6, 0.95, 10, 2, 'person'); spawnNPC(-10, 0.95, 8, 3, 'robot'); spawnRag(4, 0, 2, 0); spawnRag(5.5, 0, 2.6, 0.6); spawnRag(-14, 4, -2, 1.2); spawnBody('dummy', 7, 0.9, 3);
       for (let i = 0; i < 4; i++) spawnBody('cone', -12 + i * 1.5, 0.37, 12);
       spawnBody('melon', -6, 0.3, 10); spawnBody('melon', -5.2, 0.3, 10.4); spawnBody('tv', -14, 4.4, 0);
       spawnBody('beach', 2, 0.5, 12); spawnBody('tire', 10, 0.17, 8); spawnBody('tire', 10, 0.5, 8); spawnBody('ball', -2, 0.35, 12);
@@ -1148,7 +1342,7 @@ const LEVELS = [
       [[0, 0], [1.05, 0], [2.1, 0], [0.5, 1], [1.55, 1], [1.05, 2]].forEach(([x, y]) => spawnBody('crate', 4 + x, 0.5 + y, 8));
       for (let i = 0; i < 5; i++) spawnBody('barrel', 30 + (i % 3) * 0.8, 0.48, 10 + (i > 2 ? 0.8 : 0));
       spawnBody('beach', 10, 0.5, 2); spawnBody('beach', 6, 0.5, 0); spawnBody('tire', 12, 0.17, 4); spawnBody('crate', 24, 2, -18);
-      for (let i = 0; i < 5; i++) spawnNPC(-10 + i * 5, 0.95, 18 + (i % 2) * 4);
+      for (let i = 0; i < 6; i++) spawnNPC(-10 + i * 4, 0.95, 18 + (i % 2) * 4, i, i < 5 ? 'person' : 'robot');
       spawnRag(15, -0.35, -10, 0.3);
       placePad(new V3(0, 0, 20)); placePad(new V3(-26, 0, -30));
       sign(-15, 3.4, -37.97, 0, 'QY', 'QUARRY');
@@ -1169,7 +1363,7 @@ function loadLevel(i) {
   levelGroup = new THREE.Group(); scene.add(levelGroup);
   statics = []; bodies = []; buttons = []; doors = []; triggers = []; rayMeshes = []; pads = []; rags = []; decals = []; PL.heldRag = null; level.tick = null;
   clearPortals();
-  npcs = []; holes = []; waters = [];
+  npcs = []; holes = []; waters = []; for (const q of bParts) q.life = 0;
   if (level.outdoor) { scene.fog = new THREE.Fog(0xc6d8e6, 90, 520); hemi.color.set(0xcfe4ff); hemi.groundColor.set(0x56602f); hemi.intensity = 0.7; sun.intensity = 2.1; sun.color.set(0xfff0d8); scene.background.set(0xc6d8e6); }
   else { scene.fog = null; hemi.color.set(0xe6edf5); hemi.groundColor.set(0x3a3f46); hemi.intensity = 0.35; sun.intensity = 1.25; sun.color.set(0xfff6ea); scene.background.set(0x07090b); }
   level.build();
@@ -1399,7 +1593,7 @@ function tryGrab(range = 3.2) {
   if (PL.held || PL.heldRag) { dropHeld(); return; }
   const r = aimHit(range, true);
   if (r && r.u.body) { PL.held = r.u.body; if (PL.held.frozen) setFrozen(PL.held, false); sfx.grab(); return true; }
-  if (r && r.u.npc) { PL.heldRag = { rag: ragdollify(r.u.npc, new V3()), i: 1 }; sfx.grab(); return true; }
+  if (r && r.u.npc) { PL.heldRag = { rag: ragdollify(r.u.npc, new V3()), i: 2 }; sfx.grab(); return true; }
   if (r && r.u.body && r.u.body.frozen) setFrozen(r.u.body, false);
   if (r && r.u.rag) { r.u.rag.frozen = false; let bi = 0, bd = 1e9; r.u.rag.p.forEach((p, i) => { const d = p.distanceTo(r.h.point); if (d < bd) { bd = d; bi = i; } }); PL.heldRag = { rag: r.u.rag, i: bi }; sfx.grab(); return true; }
 }
@@ -1409,17 +1603,17 @@ function throwHeld(speed = 11) {
   if (PL.heldRag) { const r = PL.heldRag.rag; PL.heldRag = null; for (const q of r.q) q.addScaledVector(f, -speed * 0.8 * RH); sfx.drop(); return; }
   const b = PL.held; if (!b) return; PL.held = null; b.vel.copy(f.multiplyScalar(speed * Math.min(1.4, Math.sqrt(25 / b.mass)))).addScaledVector(PL.vel, 0.5); sfx.drop();
 }
-const TOOLS = ['Rift caster', 'Gravity glove', 'Rivet rifle', 'Shotgun', 'Grenade launcher', 'Singularity', 'Freeze ray'];
-const CORE = [0, 0xffc23a, 0, 0, 0, 0x9a4dff, 0x8fe3ff];
+const TOOLS = ['Rift caster', 'Gravity glove', 'Rivet rifle', 'Shotgun', 'Grenade launcher', 'Singularity', 'Freeze ray', 'Katana'];
+const CORE = [0, 0xffc23a, 0, 0, 0, 0x9a4dff, 0x8fe3ff, 0];
 function setTool(t) {
   tool = t; $('tlName').textContent = (t + 1) + ' · ' + TOOLS[t];
   gunCoreMat.emissive.set(t === 0 ? portals[0].color : CORE[t]);
-  gun.visible = t === 0 || t === 1 || t === 5 || t === 6; rifle.visible = t === 2; shotgun.visible = t === 3; launcher.visible = t === 4;
+  gun.visible = t === 0 || t === 1 || t === 5 || t === 6; rifle.visible = t === 2; shotgun.visible = t === 3; launcher.visible = t === 4; blade.visible = t === 7;
 }
 function primary() {
   if (state !== 'play') return; initAudio();
   if (tool === 0) return firePortal(0);
-  if (tool >= 2) { if (fireCd > 0) return; return [, , fireRifle, fireShotgun, fireLauncher, fireHole, freezeAimed][tool](); }
+  if (tool >= 2) { if (fireCd > 0) return; return [, , fireRifle, fireShotgun, fireLauncher, fireHole, freezeAimed, () => slash(false)][tool](); }
   recoil = 1;
   if (PL.held || PL.heldRag) { throwHeld(30); sfx.launch(); return; }
   if (tryGrab(11)) burst(PL.held ? PL.held.pos : PL.heldRag.rag.p[PL.heldRag.i], 0xffc23a, 14, 2);
@@ -1427,6 +1621,7 @@ function primary() {
 function secondary() {
   if (state !== 'play') return; initAudio();
   if (tool === 0) return firePortal(1);
+  if (tool === 7) { if (fireCd <= 0) slash(true); return; }
   if (tool === 2 || tool === 3) return;
   if (tool === 4) { let n = 0; for (const b of bodies) if (b.kind === 'grenade') { b.dead = 'explode'; n++; } if (!n) toast('No grenades out', 0.8); return; }
   if (tool === 5) { for (const h of holes) h.life = Math.min(h.life, 0.3); return; }
@@ -1439,7 +1634,7 @@ function secondary() {
 function deleteAimed() {
   const r = aimHit(40, false); if (!r) return;
   if (r.u.body) { burst(r.u.body.pos, 0xffffff, 24, 3); removeBody(r.u.body); sfx.fizzle(); }
-  else if (r.u.rag) { burst(r.u.rag.p[2], 0xffffff, 24, 3); removeRag(r.u.rag); sfx.fizzle(); }
+  else if (r.u.rag) { burst(r.u.rag.p[0], 0xffffff, 24, 3); removeRag(r.u.rag); sfx.fizzle(); }
   else if (r.u.npc) { burst(r.u.npc.pos, 0xffffff, 24, 3); removeNPC(r.u.npc); sfx.fizzle(); }
   else if (r.u.pad) { burst(r.u.pad.pos, 0x19e3d6, 24, 3); removePad(r.u.pad); sfx.fizzle(); }
 }
@@ -1452,7 +1647,7 @@ function spawnItem(id) {
     if (!hit || hit.face.normal.y < 0.7) { toast('Aim at the floor', 1.2); return; }
     placePad(hit.point.clone()); sfx.open(0); burst(hit.point, 0x19e3d6, 30, 3); return;
   }
-  if (def.npc) { const d = hit ? Math.min(hit.distance - 0.8, 4) : 4; const q = eye.clone().addScaledVector(f, Math.max(1.5, d)); spawnNPC(q.x, PL.pos.y + 0.05, q.z, PL.yaw + Math.PI); burst(q, 0xffffff, 20, 2.5); sfx.grab(); return; }
+  if (def.npc) { const d = hit ? Math.min(hit.distance - 0.8, 4) : 4; const q = eye.clone().addScaledVector(f, Math.max(1.5, d)); spawnNPC(q.x, PL.pos.y + 0.05, q.z, PL.yaw + Math.PI, def.style); burst(q, 0xffffff, 20, 2.5); sfx.grab(); return; }
   if (def.rag) { const d = hit ? Math.min(hit.distance - 0.6, 3) : 3; const q = eye.clone().addScaledVector(f, Math.max(1.2, d)); spawnRag(q.x, Math.max(q.y - 0.9, PL.pos.y - 0.9), q.z, PL.yaw + Math.PI); burst(q, 0xffffff, 20, 2.5); sfx.grab(); return; }
   const dist = hit ? Math.min(hit.distance - 1 - def.ext[0], 3.5) : 3.5;
   const p = eye.addScaledVector(f, Math.max(1.2 + Math.max(def.ext[0], def.ext[2]), dist));
@@ -1576,6 +1771,10 @@ function updateCamera() {
   gun.position.set(0.28 + Math.cos(PL.bob) * 0.012, -0.25 + Math.abs(Math.sin(PL.bob)) * 0.012 - PL.landDip * 0.3, -0.66 + recoil * 0.08);
   gun.rotation.x = recoil * 0.15;
   rifle.position.copy(gun.position); rifle.rotation.copy(gun.rotation); launcher.position.copy(gun.position); launcher.rotation.copy(gun.rotation); shotgun.position.copy(gun.position); shotgun.rotation.copy(gun.rotation);
+  swing = Math.max(0, swing - 1 / 60 / 0.22); const sw = 1 - swing;
+  blade.position.set(0.3 - (swing > 0 && !swingV ? sw * 0.45 : 0), -0.3 - (swing > 0 && swingV ? sw * 0.12 : 0), -0.5);
+  if (swing > 0) { if (swingV) bladePivot.rotation.set(0.6 - sw * 2.4, 0, -0.15); else bladePivot.rotation.set(-1.25, 0, 1.3 - sw * 2.8); }
+  else bladePivot.rotation.set(-0.45, 0, -0.3);
 }
 function render() {
   renderer.shadowMap.needsUpdate = true;
@@ -1620,7 +1819,7 @@ function frame(t) {
   if (state === 'play') { updatePlayer(dt); updateBodies(dt); updateNPCs(dt); updateHoles(dt); updateWorld(dt); }
   else if (state === 'complete' || state === 'dead') updateBodies(dt);
   else if (state === 'menu') { PL.yaw += dt * 0.08; }
-  if (state !== 'menu' && state !== 'paused' && state !== 'spawn') updateRags(dt);
+  if (state !== 'menu' && state !== 'paused' && state !== 'spawn') { updateRags(dt); updateBlood(dt); }
   renderRags();
   boomLight.intensity *= Math.pow(0.002, rdt); shake *= Math.pow(0.02, rdt);
   fireCd -= rdt;
@@ -1661,7 +1860,7 @@ addEventListener('keydown', (e) => {
   if (state !== 'play') return;
   if (e.code === 'Space') { jumpQueued = true; e.preventDefault(); }
   if (e.code === 'KeyE' || e.code === 'KeyF') tryGrab();
-  if (/^Digit[1-7]$/.test(e.code)) setTool(+e.code[5] - 1);
+  if (/^Digit[1-8]$/.test(e.code)) setTool(+e.code[5] - 1);
   if (e.code === 'KeyX') deleteAimed();
   if (e.code === 'KeyZ') spawnItem(lastItem);
   if (e.code === 'KeyR') loadLevel(levelIdx);
@@ -1675,7 +1874,7 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button === 0) primary(); else if (e.button === 2) secondary();
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-addEventListener('wheel', (e) => { if (state === 'play') setTool((tool + (e.deltaY > 0 ? 1 : 6)) % 7); }, { passive: true });
+addEventListener('wheel', (e) => { if (state === 'play') setTool((tool + (e.deltaY > 0 ? 1 : 7)) % 8); }, { passive: true });
 addEventListener('mousedown', (e) => { mouseHeld[e.button] = true; });
 addEventListener('mouseup', (e) => { mouseHeld[e.button] = false; });
 function toggleSpawn() {
@@ -1691,6 +1890,7 @@ for (const [id, def] of Object.entries(ITEMS)) {
 $('tgGrav').addEventListener('click', () => { gravScale = gravScale === 1 ? 0.3 : 1; $('tgGrav').textContent = 'Low gravity: ' + (gravScale < 1 ? 'on' : 'off'); });
 $('tgSlow').addEventListener('click', () => { timeScale = timeScale === 1 ? 0.3 : 1; $('tgSlow').textContent = 'Slow motion: ' + (timeScale < 1 ? 'on' : 'off'); });
 $('clearAll').addEventListener('click', () => { for (const b of bodies.slice()) removeBody(b); for (const r of rags.slice()) removeRag(r); for (const n of npcs.slice()) removeNPC(n); for (const h of holes) levelGroup.remove(h.m); holes = []; for (const p of pads.slice()) removePad(p); toggleSpawn(); toast('Cleared', 1); });
+$('tgGore').addEventListener('click', () => { goreOn = !goreOn; $('tgGore').textContent = 'Gore: ' + (goreOn ? 'on' : 'off'); });
 $('closeRifts').addEventListener('click', () => { clearPortals(); toggleSpawn(); });
 addEventListener('mousemove', (e) => {
   if (state !== 'play' || isTouch || !(locked() || lockFailed)) return;
@@ -1723,7 +1923,7 @@ addEventListener('touchmove', (e) => {
 function endTouch(e) { for (const t of e.changedTouches) { if (t.identifier === stickId) { stickId = null; touchMove.x = touchMove.y = 0; knob.style.transform = ''; } if (t.identifier === lookId) lookId = null; } }
 addEventListener('touchend', endTouch); addEventListener('touchcancel', endTouch);
 const tbtn = (id, fn) => $(id).addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
-tbtn('tBlue', primary); tbtn('tOrange', secondary); tbtn('tSpawn', toggleSpawn); tbtn('tTool', () => setTool((tool + 1) % 7)); tbtn('tJump', () => { jumpQueued = true; }); tbtn('tGrab', () => tryGrab());
+tbtn('tBlue', primary); tbtn('tOrange', secondary); tbtn('tSpawn', toggleSpawn); tbtn('tTool', () => setTool((tool + 1) % 8)); tbtn('tJump', () => { jumpQueued = true; }); tbtn('tGrab', () => tryGrab());
 
 // boot: show chamber 01 behind the menu
 loadLevel(2); state = 'menu'; setTool(0); $('hint').style.opacity = 0; $('toast').style.opacity = 0;
