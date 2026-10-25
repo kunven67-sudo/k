@@ -14281,7 +14281,9 @@ G.screens.storyMenu = {
       this.chars = [];
       // (a mod that only shipped a 'PLACEHOLDER' picture for a rank (NENE MIXES' perfect) shows its next best rank)
       let rl = pdata[RANK_ANIMS[this.rank]] || [];
-      if (rl.some(ad => /placeholder/i.test(ad.assetPath || ''))) rl = pdata.excellent || pdata.great || [];
+      //  (only a picture literally called resultsPLACEHOLDER: Darnell's Mixtape keeps its real art in folders named
+      //  'P-placeholder', 'resultLOSS-placeholder'...)
+      if (rl.some(ad => /(^|[\/:])results?PLACEHOLDER$/i.test(ad.assetPath || ''))) rl = pdata.excellent || pdata.great || [];
       for (const ad of rl) {
         if (ad.filter && ad.filter !== 'both' && ad.filter !== 'safe') continue;
         const c = this.makeChar(ad); if (c) this.chars.push(c);
@@ -15120,7 +15122,8 @@ G.stickers = {
     excellent: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/excellent', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
     great: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/great', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
     good: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/good', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
-    loss: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/loss', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }] };
+    // (loss: her real shocked face from the mod's game over, zapped then shaking; the frames carry their own spot)
+    loss: [{ renderType: 'sparrow', assetPath: 'shared:resultScreen/results-nightly/lossShock', zIndex: 500, loopFrame: 10 }] };
   G.PLAYERS.nightly.results.perfectGold = G.PLAYERS.nightly.results.perfect;
   // a nametag for a player FNF never lettered, like the real ones (letters in the player's colour, a black ink
   // line, a white rim round the word): from FNF's bold menu alphabet, which has every letter (the hand-inked main
@@ -16016,8 +16019,8 @@ G.phoneUpdate = {
   BASE: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/',
   ZIPS: { 'fnf2-phone-update.zip': ['mobile', 'videosongs', 'jordus'], 'fnf2-phone-impostor.zip': ['impostor', 'impostor-w1'],
     'fnf2-phone-impostor-w2.zip': ['impostor-w2'], 'fnf2-phone-impostor-w3.zip': ['impostor-w3'] },
-  NEED: { mobile: 2, videosongs: 2, jordus: 4, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
-            // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player, v3 = her own animations)
+  NEED: { mobile: 2, videosongs: 2, jordus: 5, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
+            // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player, v3 = her own animations, v5 = the shocked LOSS results)
   saved: {},            // (packs picked just now: the zips on GitHub always hold the newest ones)
   old(id) { return !this.saved[id] && (!G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]); },
   missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },
