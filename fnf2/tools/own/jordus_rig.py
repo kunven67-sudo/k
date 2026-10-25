@@ -21,7 +21,8 @@ Writes (all Animate atlases, stage px like FNF's):
   preload/images/charSelect/capChill       idle / confirm / deselect  (like gfChill)
   preload/images/freeplay/nightlyDJ        Intro / Idle / Confirm / Fist Pump / Fist Pump Loss / AFK /
                                             To Character Select  (like freeplay-boyfriend)
-  shared/images/resultScreen/results-nightly/<rank>   perfect / excellent / great / good / loss: intro + 'loop'
+  shared/images/resultScreen/results-nightly/<rank>   perfect / excellent / great / good: intro + 'loop'
+  shared/images/resultScreen/results-nightly/lossShock   LOSS: a Sparrow sheet of her real shocked frames (game over)
   preload/images/freeplay/icons/nightly-playerpixel + nightly-opppixel   pixel face icons (capsules, grid)
 
 Needs FNF's own assets checkout (FNF_ASSETS, default /home/user/ref/fa) and a jordus.py build (the cap girl's frames).
@@ -39,7 +40,7 @@ import bench_cut as B
 import nene_icons as N
 
 SRC = os.path.join(ROOT, 'private', 'jordus', 'src')
-MOD = os.path.join(ROOT, 'build', 'mods', 'jordus')
+MOD = os.environ.get('JORDUS_MOD', os.path.join(ROOT, 'build', 'mods', 'jordus'))
 FA = os.environ.get('FNF_ASSETS', '/home/user/ref/fa')
 CS = os.path.join(FA, 'preload', 'images', 'charSelect')
 cv2.setRNGSeed(7)
@@ -831,19 +832,77 @@ def results(rig):
             p, body = picked(g, lift=10)
             out.append(E('sel', p, body))
         return twos(out)
-    def sad():
-        out = []
-        for g in range(50):
-            k = track([(0, 0, 'lin'), (10, 1, 'out')], g); sway = math.sin(max(0, g - 10) * 2 * math.pi / 40) * k
-            out.append(E('idle', slump(k, sway)))
-        out = twos(out)
-        return out[:10], out[10:]
+    # (loss: loss_shock below, her real shocked frames)
     ranks = {'perfect': (popin(), bounce(24, 16, 12)), 'excellent': (popin(), bounce(28, 8, 14)),
-             'great': (bops(4, 1.3), bops(28, 1.3)), 'good': (bops(4), bops(28)), 'loss': sad()}
+             'great': (bops(4, 1.3), bops(28, 1.3)), 'good': (bops(4), bops(28))}
     out = {}
     for r, (a, b) in ranks.items():
         T = Timeline(); T.add('intro', a); T.add('loop', b); out[r] = T
     return out
+
+
+# ---------------------------------------------------------------- results LOSS: her real shocked face (the mod's game over)
+# The mod's game over (jordus.py: characters/nightly/death, frames on a 1280x720 screen) has her getting zapped: gritted
+# teeth (27 33 35 29), then the big shocked face, eyes wide + mouth open (30 31), in the white shock burst. The loss
+# screen plays the zap, then she sits there shaking in shock (30/31 like the video), zapped again now and then.
+LOSS_INTRO = [27, 27, 33, 33, 29, 29, 35, 35, 33, 33]
+LOSS_LOOP = [30, 30, 31, 31] * 12 + [33, 33, 34, 34, 35, 35, 29, 29]
+LOSS_K, LOSS_AT = 1.38, (1012, 716)          # (bigger than in the game over; the burst's centre / her shoes' bottom)
+
+
+def sparrow_frames(png, xml):
+    """{name: (RGBA array on its full frame box)} of a Sparrow sheet, its pages too (page n = <sheet>~n.png)"""
+    import re
+    txt = open(xml).read(); pages, out = {}, {}
+    for m in re.finditer(r'<SubTexture ([^>]*)/>', txt):
+        a = dict(re.findall(r'(\w+)="([^"]*)"', m.group(1)))
+        pg = a.get('page')
+        if pg not in pages: pages[pg] = Image.open(png if pg in (None, '0') else png[:-4] + '~%s.png' % pg).convert('RGBA')
+        x, y, w, h = (int(a[k]) for k in ('x', 'y', 'width', 'height'))
+        full = Image.new('RGBA', (int(a.get('frameWidth', w)), int(a.get('frameHeight', h))))
+        full.paste(pages[pg].crop((x, y, x + w, y + h)), (-int(a.get('frameX', 0)), -int(a.get('frameY', 0))))
+        out[a['name']] = full
+    return out
+
+
+def loss_shock(out_png):
+    """-> results-nightly/lossShock.png + .xml: a Sparrow sheet whose frames sit on the 1280x720 results screen"""
+    d = os.path.join(MOD, 'shared', 'images', 'characters', 'nightly')
+    fr = sparrow_frames(os.path.join(d, 'death.png'), os.path.join(d, 'death.xml'))
+    used = sorted(set(LOSS_INTRO + LOSS_LOOP))
+    src = {i: fr['firstDeath_%04d' % i] for i in used}
+    # one place for all of them (each keeps the video's own little shake): the union box of her + the burst
+    box = None
+    for im in src.values():
+        b = im.getbbox(); box = b if box is None else (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+    a30 = np.array(src[30]).astype(int)              # (her navy shoes: blue clearly over red; the burst's grey edge isn't)
+    shoes = max(np.nonzero((a30[..., 3] > 200) & (a30[..., 2] - a30[..., 0] > 25) & (a30[..., :3].max(2) < 170))[0])
+    cx = (box[0] + box[2]) / 2
+    pics, pos = {}, {}
+    for i, im in src.items():
+        b = im.getbbox(); c = im.crop(b)
+        w, h = round(c.width * LOSS_K), round(c.height * LOSS_K)
+        pics[i] = np.array(c.resize((w, h), Image.LANCZOS))
+        pos[i] = (round(LOSS_AT[0] + (b[0] - cx) * LOSS_K), round(LOSS_AT[1] + (b[1] - shoes) * LOSS_K))
+    # sheet: each drawing once, the animation lists them in play order (same x/y for repeats)
+    W = 2048; x = y = rowh = 0; at = {}
+    for i in used:
+        h, w = pics[i].shape[:2]
+        if x + w > W: x, y, rowh = 0, y + rowh + 2, 0
+        at[i] = (x, y); x += w + 2; rowh = max(rowh, h)
+    sheet = Image.new('RGBA', (W, y + rowh))
+    for i in used: sheet.paste(Image.fromarray(pics[i]), at[i])
+    sheet = sheet.crop((0, 0, max(at[i][0] + pics[i].shape[1] for i in used), sheet.height))
+    os.makedirs(os.path.dirname(out_png), exist_ok=True)
+    sheet.save(out_png)
+    lines = ['<?xml version="1.0" encoding="utf-8"?>', '<TextureAtlas imagePath="%s">' % os.path.basename(out_png)]
+    for n, i in enumerate(LOSS_INTRO + LOSS_LOOP):
+        h, w = pics[i].shape[:2]
+        lines.append('  <SubTexture name="loss shock%04d" x="%d" y="%d" width="%d" height="%d" frameX="%d" frameY="%d" frameWidth="1280" frameHeight="720"/>'
+                     % (n, at[i][0], at[i][1], w, h, -pos[i][0], -pos[i][1]))
+    lines.append('</TextureAtlas>')
+    open(out_png[:-4] + '.xml', 'w').write('\n'.join(lines) + '\n')
+    print('loss shock:', len(LOSS_INTRO + LOSS_LOOP), 'frames, loop from', len(LOSS_INTRO), 'sheet', sheet.size)
 
 
 # ---------------------------------------------------------------- the cap girl on the speakers spot (like gfChill)
@@ -1025,7 +1084,13 @@ def icons(rig):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--preview', help='also write a contact sheet of every animation here')
+    ap.add_argument('--loss-only', action='store_true', help='only the results LOSS (needs just the death sheet)')
     a = ap.parse_args()
+    rn = os.path.join(MOD, 'shared', 'images', 'resultScreen', 'results-nightly')
+    loss_shock(os.path.join(rn, 'lossShock.png'))
+    if os.path.isdir(os.path.join(rn, 'loss')):      # (the old slumped loss atlas)
+        import shutil; shutil.rmtree(os.path.join(rn, 'loss'))
+    if a.loss_only: return
     cent = palette()
     idle = cut_parts('idle_20', IDLE_OUTER, IDLE_POLY, IDLE_ORDER, idle_fix, cent, idle_post, idle_finish)
     sel = cut_parts('down_03', SEL_OUTER, SEL_POLY, SEL_ORDER, sel_fix, cent, sel_post, sel_finish)

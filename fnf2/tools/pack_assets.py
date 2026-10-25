@@ -354,7 +354,7 @@ PACK_INFO = {
     'darnell': {'name': "Darnell's Mixtape", 'credit': 'Vegie15 + team'},
     'whitty': {'name': 'VS Whitty', 'credit': 'Sock.clip, Nateanimate, KadeDev + team (original), jarekboho (V-Slice port), SiIvaGunner (HQ songs), ChuckySkullHead + team (Whitty ERECT)'},
     'nenemix': {'name': 'NENE MIXES', 'credit': 'd4rkwinged, PurSnake, Redar13, KerSive, juztexd, geka, Voideeeee, Mio OwO'},
-    'jordus': {'name': "Nightly Funkin' (Jordus)", 'credit': "the Nightly Funkin' team (song, characters, stage); rebuilt from a gameplay video", 'v': 4},
+    'jordus': {'name': "Nightly Funkin' (Jordus)", 'credit': "the Nightly Funkin' team (song, characters, stage); rebuilt from a gameplay video", 'v': 5},
     'videosongs': {'name': 'Video Songs', 'credit': 'kip.zig (the Minecraft animation + song of Into Our Lives)', 'v': 2},
     'tankman': {'name': 'Playable Tankman', 'credit': 'Adamatik, PugSquad, Kawai Nuka-Cola, Skellix, JakeOfficial, Pumkin, Shroomii, Camiiix3 + team'},
     'impostor': {'name': 'VS Impostor: Legacy (shared)', 'credit': 'MOTORFROG, Clowfoe + the VS Impostor team (VS IMPOSTOR: LEGACY)', 'group': 'impostor', 'v': 2},
@@ -376,6 +376,20 @@ def preview_cut(src, start, end):
         os.makedirs(os.path.dirname(p), exist_ok=True)
         open(p, 'wb').write(run(['ffmpeg', '-v', 'error', '-ss', '%.3f' % start, '-t', '%.3f' % max(0.5, end - start), '-i', src, '-ac', '2', '-b:a', '96k', '-f', 'mp3', '-']))
     return open(p, 'rb').read()
+
+def write_index(out_dir):
+    """the list of every pack that's there (index.js)"""
+    index = []
+    for f in sorted(os.listdir(out_dir)):
+        m = re.match(r'(.+)\.head\.js$', f)
+        if not m: continue
+        pid = m.group(1)
+        hb = os.path.getsize(os.path.join(out_dir, f))
+        bb = sum(os.path.getsize(os.path.join(out_dir, g)) for g in os.listdir(out_dir) if re.match(re.escape(pid) + r'\.body\d*\.js$', g))
+        index.append(dict(PACK_INFO.get(pid, {'name': pid}), id=pid, headMB=round(hb / 1048576, 1), bodyMB=round(bb / 1048576, 1)))
+    with open(os.path.join(out_dir, 'index.js'), 'w') as f:
+        f.write('/* FNF 2 mod packs in this folder */\nFNF_PACK_INDEX(' + json.dumps(index, indent=1) + ');\n')
+    print('index:', [e['id'] for e in index])
 
 def make_pack(pid, root, out_dir, jobs):
     from PIL import Image
@@ -455,18 +469,7 @@ def main():
         mods = os.path.join(ROOT, 'build', 'mods'); out_dir = os.path.join(ROOT, 'build', 'packs')
         ids = a.packs or sorted(d for d in os.listdir(mods) if os.path.isdir(os.path.join(mods, d)))
         for pid in ids: make_pack(pid, os.path.join(mods, pid), out_dir, a.jobs)
-        # the list of every pack that's there (index.js)
-        index = []
-        for f in sorted(os.listdir(out_dir)):
-            m = re.match(r'(.+)\.head\.js$', f)
-            if not m: continue
-            pid = m.group(1)
-            hb = os.path.getsize(os.path.join(out_dir, f))
-            bb = sum(os.path.getsize(os.path.join(out_dir, g)) for g in os.listdir(out_dir) if re.match(re.escape(pid) + r'\.body\d*\.js$', g))
-            index.append(dict(PACK_INFO.get(pid, {'name': pid}), id=pid, headMB=round(hb / 1048576, 1), bodyMB=round(bb / 1048576, 1)))
-        with open(os.path.join(out_dir, 'index.js'), 'w') as f:
-            f.write('/* FNF 2 mod packs in this folder */\nFNF_PACK_INDEX(' + json.dumps(index, indent=1) + ');\n')
-        print('index:', [e['id'] for e in index])
+        write_index(out_dir)
         return
     pats = PACKS[a.pack]
     if a.fetch:

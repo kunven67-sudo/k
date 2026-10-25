@@ -67,7 +67,8 @@
     excellent: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/excellent', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
     great: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/great', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
     good: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/good', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }],
-    loss: [{ renderType: 'animateatlas', assetPath: 'shared:resultScreen/results-nightly/loss', zIndex: 500, stagePos: true, loopFrameLabel: 'loop' }] };
+    // (loss: her real shocked face from the mod's game over, zapped then shaking; the frames carry their own spot)
+    loss: [{ renderType: 'sparrow', assetPath: 'shared:resultScreen/results-nightly/lossShock', zIndex: 500, loopFrame: 10 }] };
   G.PLAYERS.nightly.results.perfectGold = G.PLAYERS.nightly.results.perfect;
   // a nametag for a player FNF never lettered, like the real ones (letters in the player's colour, a black ink
   // line, a white rim round the word): from FNF's bold menu alphabet, which has every letter (the hand-inked main
