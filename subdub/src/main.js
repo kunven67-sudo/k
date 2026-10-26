@@ -48,7 +48,27 @@ function setStatus(text, kind = '') {
   if (!done) showSetup(); else { setStatus('Ready', 'ok'); goHome(); }
 })();
 
-function getTranslate() { translate ??= new Translate({ call: async (m, a) => (await engine.start('asr')).call(m, a) }); return translate; }
+function getTranslate() {
+  if (!translate) {
+    translate = new Translate({ call: async (m, a) => (await engine.start('asr')).call(m, a) });
+    translate.addEventListener('needs', (e) => askForLanguage(e.detail.lang));
+  }
+  return translate;
+}
+const langName = (code) => { try { return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || code; } catch { return code; } };
+// A language showed up that the browser can translate better than the backup, but it needs one click to download it.
+function askForLanguage(lang) {
+  const name = langName(lang);
+  const close = () => box.remove();
+  const btn = h('button', { class: 'bigbtn small', onclick: async () => {
+    btn.disabled = true; btn.textContent = 'Getting it…';
+    const ok = await translate.getLanguage(lang, (p) => { btn.textContent = `Getting it… ${Math.round(p.loaded * 100)}%`; }).catch(() => false);
+    toast(ok ? `${name} now uses Edge's translator.` : `Couldn't get it, ${name} keeps using the backup translator.`, !ok);
+    close();
+  } }, `Get ${name}`);
+  const box = h('div', { class: 'langask' }, h('span', {}, h('b', {}, `${name} spotted. `), 'Your browser has a better translator for it (free, one time).'), btn, h('button', { class: 'x', 'aria-label': 'Not now', onclick: close }, icon('x')));
+  document.body.append(box);
+}
 
 // ---------- setup ----------
 const PARTS = [
@@ -273,6 +293,8 @@ async function openFile(file) {
       engine.start('eyes').then((eyes) => {
         if (closed) return;
         watch = new SubWatch({ eyes, translate: getTranslate(), video, clock: () => video.currentTime, settings: S });
+        window.__subdubWatch = watch; // (for tests)
+        watch.addEventListener('error', (e) => console.warn('subtitle reader:', e.detail));
         watch.addEventListener('sub', (e) => {
           const s = e.detail;
           if (s.lang === 'en' || !s.en) return;
@@ -387,6 +409,7 @@ async function startLive() {
   showCastButton(cast);
   let panel = castPanel({ cast, engine }); castBody.append(panel);
   let watch = null, pip = null, synced = null, closed = false;
+  const subBubbles = new WeakMap();
   current = {
     close: () => { closed = true; live.stop(); watch?.stop(); synced?.close(); pip?.close(); panel.destroy?.(); el.remove(); cast.save().catch(() => {}); },
     showCast: () => castBody.scrollIntoView({ behavior: 'smooth' }),
@@ -405,7 +428,7 @@ async function startLive() {
     const l = e.detail, c = cast.byId(l.charId);
     dTr.className = 'dot';
     if (l.keep && l.why !== 'english') return;
-    addBubble(h('div', { class: 'bubble', style: { '--c': c?.color } }, h('span', { class: 'tag' }, `${c?.name || ''} · ${l.keep ? 'English' : l.lang}`), h('span', { class: 'en' }, l.en), l.keep ? null : h('span', { class: 'src' }, l.src)));
+    addBubble(h('div', { class: 'bubble', style: { '--c': c?.color } }, h('span', { class: 'tag' }, `${c?.name || ''} · ${l.keep ? 'English' : langName(l.lang)}`), h('span', { class: 'en' }, l.en), l.keep ? null : h('span', { class: 'src' }, l.src)));
     pip?.show(l.en, c?.color);
   });
   live.addEventListener('speak', (e) => {
@@ -421,7 +444,13 @@ async function startLive() {
       watch.addEventListener('sub', (ev) => {
         const s = ev.detail;
         live.addSubtitle(s); synced?.addSubtitle(s);
-        if (s.lang !== 'en' && s.en) { addBubble(h('div', { class: 'bubble sub' }, h('span', { class: 'tag' }, `Subtitle · ${s.lang}`), h('span', { class: 'en' }, s.en), h('span', { class: 'src' }, s.text))); pip?.show(s.en, null, true); }
+        if (s.lang !== 'en' && s.en) {
+          // a better read of a subtitle we already showed: update its bubble
+          const old = subBubbles.get(s);
+          if (old) { old.querySelector('.en').textContent = s.en; old.querySelector('.src').textContent = s.text; }
+          else { const b = h('div', { class: 'bubble sub' }, h('span', { class: 'tag' }, `Subtitle · ${langName(s.lang)}`), h('span', { class: 'en' }, s.en), h('span', { class: 'src' }, s.text)); subBubbles.set(s, b); addBubble(b); }
+          pip?.show(s.en, null, true);
+        }
       });
       watch.start();
     }

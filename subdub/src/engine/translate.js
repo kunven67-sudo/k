@@ -5,8 +5,8 @@ import { guessLang } from './langid.js';
 const withTimeout = (p, ms, fallback) => Promise.race([p, new Promise(r => setTimeout(() => r(fallback), ms))]);
 const BUILTIN_CODE = { zh: 'zh', 'zh-Hant': 'zh-Hant' };
 
-export class Translate {
-  constructor(asr) { this.asr = asr; this.builtin = new Map(); this.state = {}; this.detector = null; this.memo = new Map(); }
+export class Translate extends EventTarget {
+  constructor(asr) { super(); this.asr = asr; this.builtin = new Map(); this.state = {}; this.detector = null; this.memo = new Map(); }
   get hasApi() { return typeof self.Translator !== 'undefined'; }
   // Can the browser translate this language by itself? ('available' | 'downloadable' | 'no')
   async check(lang) {
@@ -15,6 +15,12 @@ export class Translate {
     return a === 'available' ? 'available' : (a === 'downloadable' || a === 'downloading') ? 'downloadable' : 'no';
   }
   // Must be called from a click (the browser only downloads its translator after a user gesture).
+  // after the click: forget backup translations of this language so new lines use the better one
+  async getLanguage(lang, onProgress) {
+    const st = await this.prepare([lang], onProgress);
+    if (st[lang] === 'builtin') for (const k of [...this.memo.keys()]) if (k.startsWith(lang + '|')) this.memo.delete(k);
+    return st[lang] === 'builtin';
+  }
   async prepare(langs, onProgress) {
     const tasks = langs.map(async (lang) => {
       const st = await this.check(lang);
@@ -39,11 +45,14 @@ export class Translate {
     if (this.memo.has(key)) return this.memo.get(key);
     let out = null;
     let t = this.builtin.get(lang);
-    if (!t && this.hasApi && this.state[lang] !== 'backup' && lang !== 'auto') {
+    if (!t && this.hasApi && this.state[lang] !== 'backup' && this.state[lang] !== 'asked' && lang !== 'auto') {
       // try once quietly (works if the language pack is already on this PC)
       const st = await this.check(lang);
       if (st === 'available') { t = await Translator.create({ sourceLanguage: BUILTIN_CODE[lang] || lang, targetLanguage: 'en' }).catch(() => null); if (t) { this.builtin.set(lang, t); this.state[lang] = 'builtin'; } }
-      else this.state[lang] = 'backup';
+      else if (st === 'downloadable') {
+        // the browser can get this language but needs a click for it: ask once (backup translator meanwhile)
+        if (this.state[lang] !== 'asked') { this.state[lang] = 'asked'; this.dispatchEvent(new CustomEvent('needs', { detail: { lang } })); }
+      } else this.state[lang] = 'backup';
     }
     if (t) { try { out = await withTimeout(t.translate(text), 8000, null); } catch { out = null; } }
     if (!out) {

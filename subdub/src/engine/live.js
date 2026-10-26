@@ -226,7 +226,7 @@ export class LiveDub extends EventTarget {
     return at;
   }
   // ---- English subtitles seen on screen (from the subtitle reader) ----
-  addSubtitle(sub) { this.subs.push(sub); if (this.subs.length > 30) this.subs.shift(); }
+  addSubtitle(sub) { if (this.subs.includes(sub)) return; this.subs.push(sub); if (this.subs.length > 30) this.subs.shift(); }
   _subtitleFor(a, b) {
     const hits = this.subs.filter(x => x.lang === 'en' && Math.min(b, x.e ?? x.s + 4) - Math.max(a, x.s) > 0.3);
     return hits.length ? hits.map(x => x.text).join(' ') : null;

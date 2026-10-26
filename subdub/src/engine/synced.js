@@ -276,7 +276,7 @@ export class SyncedLive {
     while (this.caps.length > 12) this.caps.shift();
     this.late = Math.max(0, at - (tIn + this.D));
   }
-  addSubtitle(s) { this.subs.push(s); while (this.subs.length > 30) this.subs.shift(); }
+  addSubtitle(s) { if (this.subs.includes(s)) return; this.subs.push(s); while (this.subs.length > 30) this.subs.shift(); }
 
   // ---------- screen ----------
   _ui() {

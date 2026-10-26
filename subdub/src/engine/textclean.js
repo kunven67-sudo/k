@@ -62,3 +62,19 @@ export function looksEnglish(text) {
   const hits = words.filter(w => EN_WORDS.has(w)).length;
   return words.length <= 2 ? hits === words.length : hits / words.length >= 0.3;
 }
+
+// Two reads of the same text (give or take a few misread letters / spaces)?
+export function sameText(a, b) {
+  const n = (t) => t.replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase();
+  a = n(a); b = n(b);
+  if (!a || !b) return a === b;
+  const lim = Math.max(1, Math.round(Math.max(a.length, b.length) * 0.2));
+  if (Math.abs(a.length - b.length) > lim) return false;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length] <= lim;
+}

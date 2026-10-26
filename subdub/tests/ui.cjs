@@ -66,6 +66,16 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const name = path.basename(clip || 'x', path.extname(clip || 'x'));
   if (mode === 'file') {
     await page.setInputFiles('.home input[type=file]', clip);
+    if (process.env.TICKS) await page.evaluate(() => { window.__debugTicks = true; });
+    page.evaluate(() => {
+      const hook = () => { const w = window.__subdubWatch; if (!w) return setTimeout(hook, 300);
+        const tick = w.tick.bind(w); let n = 0; w.debug = !!window.__debugTicks;
+        w.tick = async function () { return tick(); };
+        w.addEventListener('sub', (e) => console.log('SUBDUB sub', e.detail.s.toFixed(1), e.detail.lang, e.detail.text, '=>', e.detail.en));
+        const close = w._close.bind(w); w._close = (t) => close(t);
+        const orig = w.eyes.call.bind(w.eyes); w.eyes.call = async (m, a) => { const r = await orig(m, a); if (m === 'read') console.log('SUBDUB read', w.clock().toFixed(1), JSON.stringify(r.map(l => [l.text, +l.conf.toFixed(2), l.kind, Math.round(l.box.y2 - l.box.y), Math.round((l.box.x + l.box.x2) / 2)]))); return r; };
+      }; hook();
+    });
     const t0 = Date.now();
     let shot = 0;
     while (Date.now() - t0 < +secs * 1000) {

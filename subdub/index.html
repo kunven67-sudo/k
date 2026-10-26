@@ -105,6 +105,9 @@ main { position: relative; overflow: auto; }
 .synccount { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 22px var(--body); color: var(--dim); }
 .synccount[hidden], .syncnote[hidden] { display: none; }
 .syncnote { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); padding: 10px 14px; border-radius: 12px; background: rgba(20,20,28,.92); border: 1px solid var(--line); font-size: 14px; }
+.langask { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: flex; align-items: center; gap: 12px; max-width: min(560px, 92vw); padding: 12px 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.45); font-size: 14px; }
+.langask .x { background: none; border: 0; color: var(--dim); padding: 4px; } .langask .x svg { width: 18px; height: 18px; }
+.bigbtn.small { padding: 8px 14px; font-size: 14px; white-space: nowrap; }
 .iconbtn:disabled { opacity: .45; cursor: not-allowed; }
 .wait .box { padding: 18px 22px; border-radius: 14px; background: rgba(20,20,28,.92); border: 1px solid var(--line); text-align: center; min-width: 300px; }
 .controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 30px 16px 12px; background: linear-gradient(transparent, rgba(0,0,0,.85)); display: flex; flex-direction: column; gap: 8px; opacity: 0; transition: opacity .2s; }
