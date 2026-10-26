@@ -43,6 +43,42 @@ serve({
     if (wantEnglish && lang !== 'en' && sentences.length) english = (await w.run(feats, { lang, task: 'translate', duration })).map(s => s.text).join(' ');
     return { lang, p: settled.p, top: top.slice(0, 3), sentences, english, ms: performance.now() - t0 };
   },
+  // Language of each line, with the small quick model (so the big one can read many lines in one go).
+  async detectEach({ clips, prior = null }, emit) {
+    const w = await getWhisper('fast', emit);
+    const out = [];
+    for (const c of clips) out.push(await w.detect(await w.encode(c), prior));
+    return out;
+  },
+  // Several lines in the same language, read in ONE pass (Whisper always works on 30 s, so this is much faster
+  // than one pass per line). Lines are glued with short silences; each sentence goes back to its own line.
+  async hearBatch({ clips, tier = 'good', lang, gap = 0.8 }, emit) {
+    const w = await getWhisper(tier, emit);
+    const G = Math.round(gap * 16000), offs = [];
+    const audio = new Float32Array(clips.reduce((s, c) => s + c.length + G, 0));
+    let o = 0;
+    for (const c of clips) { offs.push(o / 16000); audio.set(c, o); o += c.length + G; }
+    const duration = audio.length / 16000;
+    const sents = await w.run(await w.encode(audio), { lang, task: 'transcribe', duration });
+    const per = clips.map(() => []);
+    for (const st of sents) {
+      let best = -1, bo = 0;
+      clips.forEach((c, i) => { const ov = Math.min(offs[i] + c.length / 16000, st.b) - Math.max(offs[i], st.a); if (ov > bo) { bo = ov; best = i; } });
+      if (best < 0) { // fell in a gap: closest line
+        let bd = Infinity;
+        clips.forEach((c, i) => { const d = Math.abs(offs[i] + c.length / 32000 - (st.a + st.b) / 2); if (d < bd) { bd = d; best = i; } });
+      }
+      const len = clips[best].length / 16000, a = Math.max(0, Math.min(len, st.a - offs[best]));
+      per[best].push({ a, b: Math.max(a, Math.min(len, st.b - offs[best])), text: st.text });
+    }
+    return per;
+  },
+  // The show's main language from up to 30 s of talking (stuck together): much surer than one short line.
+  async detectLang({ audio, tier = 'good' }, emit) {
+    const w = await getWhisper(tier, emit);
+    const feats = await w.encode(audio.length > 16000 * 30 ? audio.subarray(0, 16000 * 30) : audio);
+    return w.detect(feats, null);
+  },
   // Backup translation (Marian opus-mt). texts: array of sentences in `lang`.
   async translate({ texts, lang }, emit) {
     const id = MODELS.mt[lang] || MODELS.mt['*'];

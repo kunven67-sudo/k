@@ -38,6 +38,7 @@ export class SyncedLive {
     live.sink = this; live.setMuted(true);
     this.applySettings();
     this._ui();
+    window.__subdubSynced = this; // (for tests)
     this._startVideo().catch((e) => this._note('Picture problem: ' + e.message));
     this.raf = requestAnimationFrame(() => this._frame());
   }
@@ -124,10 +125,13 @@ export class SyncedLive {
       const cfg = { ...c, width: W, height: H, bitrate: Math.round(W * H * 4), framerate: 30, latencyMode: 'realtime' };
       const ok = await VideoEncoder.isConfigSupported(cfg).catch(() => null);
       if (!ok?.supported) continue;
+      // must be able to unsqueeze it again too (some browsers can only do one direction)
+      const back = await VideoDecoder.isConfigSupported({ codec: c.codec, codedWidth: W, codedHeight: H }).catch(() => null);
+      if (!back?.supported) continue;
       let decCfg = null;
       this.enc = new VideoEncoder({
         output: (chunk, meta) => {
-          if (meta?.decoderConfig) decCfg = { ...meta.decoderConfig, hardwareAcceleration: 'prefer-hardware' };
+          if (meta?.decoderConfig) decCfg = { ...meta.decoderConfig };
           if (!decCfg) decCfg = { codec: c.codec, codedWidth: W, codedHeight: H };
           this.chunks.push({ t: chunk.timestamp / 1e6, key: chunk.type === 'key', chunk, cfg: decCfg });
           // keep only what's still to be shown (+ a little)
@@ -156,7 +160,7 @@ export class SyncedLive {
         try { this.dec?.close(); } catch {}
         this.dec = new VideoDecoder({
           output: (f) => { this.frames.push({ t: f.timestamp / 1e6, img: f }); this._dropOldFrames(); },
-          error: () => { this.decReady = false; },
+          error: (e) => { this.decReady = false; this.decErrors = (this.decErrors || 0) + 1; if (this.decErrors === 5) this._note('Picture problem: ' + e.message); },
         });
         this.dec.configure(c.cfg); this.decCfg = c.cfg; this.decReady = true;
       } else if (c.cfg !== this.decCfg) { this.dec.configure(c.cfg); this.decCfg = c.cfg; if (!c.key) { this.decReady = false; continue; } }

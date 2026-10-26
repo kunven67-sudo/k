@@ -52,9 +52,33 @@ export class Translate {
       out = (await this.asr.call('translate', { texts: parts, lang })).join(' ');
     }
     out = out.replace(/\s+/g, ' ').trim();
+    // the backup translator sometimes gets stuck repeating itself: cut the loop, and never run far longer than the original
+    out = collapseRepeats(out);
+    const cap = Math.max(40, text.length * (/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(text) ? 6 : 2.2));
+    if (out.length > cap) out = out.slice(0, out.lastIndexOf(' ', cap) > 10 ? out.lastIndexOf(' ', cap) : cap).replace(/[,;:\s]+$/, '') + '…';
     // translators like to wrap short lines in quotes: drop them unless the original had quotes too
     if (!/["“”「」『』]/.test(text)) out = out.replace(/^["“”'「『]+|["“”'」』]+$/g, '').trim();
     this.memo.set(key, out);
     return out;
   }
+}
+
+// "no, no, no, no, no..." -> "no, no..." (a word or short phrase repeated 3+ times in a row keeps 2)
+export function collapseRepeats(str) {
+  const w = str.split(' '), key = (a) => a.join(' ').toLowerCase().replace(/[^\p{L}\p{N}' ]/gu, '');
+  for (let n = 1; n <= 4; n++) {
+    for (let i = 0; i + n * 3 <= w.length; i++) {
+      const unit = key(w.slice(i, i + n));
+      if (!unit.trim()) continue;
+      let k = 1;
+      while (i + (k + 1) * n <= w.length && key(w.slice(i + k * n, i + (k + 1) * n)) === unit) k++;
+      if (k >= 3) {
+        const last = w[i + k * n - 1], j = i + 2 * n - 1;
+        w.splice(i + 2 * n, (k - 2) * n);
+        w[j] = w[j].replace(/[,;]$/, '');
+        if (!/[.!?…]$/.test(w[j])) w[j] += /[.!?…]$/.test(last) ? last.slice(-1) : '…';
+      }
+    }
+  }
+  return w.join(' ').replace(/[,;]\s*$/, '.');
 }

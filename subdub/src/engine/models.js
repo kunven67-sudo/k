@@ -20,9 +20,10 @@ export const MODELS = {
     th: { repo: 'PaddlePaddle/th_PP-OCRv5_mobile_rec_onnx', mb: 8 },
   },
   whisper: {
-    fast: { id: 'onnx-community/whisper-base', gpu: 'q4', cpu: 'q8', mb: { gpu: 142, cpu: 77 } },
-    good: { id: 'onnx-community/whisper-small', gpu: 'q4', cpu: 'q8', mb: { gpu: 299, cpu: 249 } },
-    best: { id: 'onnx-community/whisper-large-v3-turbo', gpu: 'q4', cpu: 'q8', mb: { gpu: 759, cpu: 1085 } },
+    // graphics card: full-precision encoder (q4 encoders lose accuracy on cards) + 4-bit decoder
+    fast: { id: 'onnx-community/whisper-base', gpu: { encoder_model: 'fp32', decoder_model_merged: 'q4' }, cpu: 'q8', mb: { gpu: 150, cpu: 77 } },
+    good: { id: 'onnx-community/whisper-small', gpu: { encoder_model: 'fp32', decoder_model_merged: 'q4' }, cpu: 'q8', mb: { gpu: 470, cpu: 249 } },
+    best: { id: 'onnx-community/whisper-large-v3-turbo', gpu: { encoder_model: 'fp16', decoder_model_merged: 'q4' }, cpu: 'q8', mb: { gpu: 1400, cpu: 1085 } },
   },
   tts: { id: 'onnx-community/Kokoro-82M-v1.0-ONNX', gpu: 'fp32', cpu: 'q8', mb: { gpu: 326, cpu: 92 } },
   // backup translators when the browser has no built-in Translator

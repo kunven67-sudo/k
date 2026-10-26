@@ -39,15 +39,20 @@ export class Engine extends EventTarget {
     this.rpc[name] = r;
     return r;
   }
-  threads() { return Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 1)); }
+  // Share the CPU instead of every brain grabbing all cores (their threads spin while waiting, so too many
+  // threads in total makes everything slower). The speech reader is on the critical path and gets the most.
+  threads(name) {
+    const n = navigator.hardwareConcurrency || 4;
+    const share = { asr: 0.5, tts: 0.3, sep: 0.2, listen: 0.12, eyes: 0.1 }[name] ?? 0.2;
+    return Math.max(1, Math.min(name === 'asr' ? 8 : 4, Math.round(n * share)));
+  }
   // Start one brain. Falls back from graphics card to CPU if the card refuses.
   async start(name, opts = {}) {
     if (this.ready[name]) return this.ready[name];
     this.ready[name] = (async () => {
       this.gpu ??= await detectGpu();
       const useGpu = opts.gpu ?? (this.gpu.ok && ['asr', 'tts', 'sep'].includes(name) && this.settings?.useGpu !== false);
-      const th = this.threads();
-      const threads = name === 'listen' || name === 'eyes' ? Math.min(2, th) : th;
+      const threads = this.threads(name);
       let r = this._spawn(name);
       try {
         await r.call('init', { threads, gpu: useGpu });
@@ -67,7 +72,7 @@ export class Engine extends EventTarget {
   // Total first-time download for the standard set (MB)
   static setupSizeMB(gpu) {
     const m = MODELS, k = gpu ? 'gpu' : 'cpu';
-    return Math.round(m.vad.mb + m.gender.mb + m.speaker.mb + m.sep.fast.mb + m.ocrDet.mb + m.ocrRec.main.mb + m.whisper.good.mb[k] + m.tts.mb[k] + 27 /* runtime */);
+    return Math.round(m.vad.mb + m.gender.mb + m.speaker.mb + m.sep.fast.mb + m.ocrDet.mb + m.ocrRec.main.mb + m.whisper.good.mb[k] + m.whisper.fast.mb[k] + m.tts.mb[k] + 27 /* runtime */);
   }
   static clearDownloads() { return modelCache.clear(); }
 }

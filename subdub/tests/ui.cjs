@@ -74,6 +74,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       log('file', JSON.stringify(st).slice(0, 300));
       await page.screenshot({ path: path.join(OUT, `${name}-file-${shot++}.png`) });
     }
+    log('stats', await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(window.__subdubFile?.stats || {}).map(([k, v]) => [k, Math.round(v)])))));
     await page.click('.tabs button:nth-child(2)');
     await sleep(800);
     const lines = await page.$$eval('.lineitem', els => els.map(e => e.innerText.replace(/\n+/g, ' | ')));
@@ -102,6 +103,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       if (synced) {
         const px = await page.evaluate(() => { const c = document.querySelector('.synccv'); if (!c || !c.width) return null; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let s = 0; for (let i = 0; i < d.length; i += 4 * 97) s += d[i] + d[i + 1] + d[i + 2]; return { w: c.width, h: c.height, bright: s / (d.length / (4 * 97)) }; });
         log('synced canvas', JSON.stringify(px));
+        log('synced state', JSON.stringify(await page.evaluate(() => { const y = window.__subdubSynced; if (!y) return null; return { chunks: y.chunks.length, frames: y.frames.length, enc: y.enc?.state, dec: y.dec?.state, decErrors: y.decErrors, pieces: y.pieces.length, sepMs: Math.round(y.lastSepMs || 0), slow: y.slow, late: y.late, caps: y.caps.length, note: y.noteEl.hidden ? '' : y.noteEl.textContent, playT: +y.playTime().toFixed(2) }; })));
       }
     }
   }

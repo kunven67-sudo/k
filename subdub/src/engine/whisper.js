@@ -7,7 +7,7 @@ export class Whisper {
     const progress_callback = (p) => p.status === 'progress' && onProgress?.({ url: (p.name ? p.name + '/' : '') + p.file, loaded: p.loaded, total: p.total });
     const [processor, model] = await Promise.all([
       AutoProcessor.from_pretrained(id, { progress_callback }),
-      WhisperForConditionalGeneration.from_pretrained(id, { device, dtype: { encoder_model: dtype, decoder_model_merged: dtype }, progress_callback }),
+      WhisperForConditionalGeneration.from_pretrained(id, { device, dtype: typeof dtype === 'object' ? dtype : { encoder_model: dtype, decoder_model_merged: dtype }, progress_callback }),
     ]);
     // let generate() reuse an encoder output we already computed
     if (!model.forward_params.includes('encoder_outputs')) model.forward_params = [...model.forward_params, 'encoder_outputs'];

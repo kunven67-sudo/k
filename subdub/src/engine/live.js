@@ -5,6 +5,7 @@ import { resample, semitones, rms, fadeEdges } from '../lib/resample.js';
 import { VAD_HOP } from '../lib/vad.js';
 import { looksEnglish } from './textclean.js';
 import { isNonverbal } from './nonverbal.js';
+import { hearRound } from './hearround.js';
 
 const RING = 16000 * 60; // one minute of 16 kHz audio
 
@@ -91,6 +92,8 @@ export class LiveDub extends EventTarget {
     if (this.t0 === null) this.t0 = t - pcm.length / 16000;
     for (let i = 0; i < pcm.length; i++) this.ring[(this.ringEnd + i) % RING] = pcm[i];
     this.ringEnd += pcm.length;
+    if (!this.e.listen) return;   // brains still loading: keep the sound, start finding voices once they're up
+    if (this.vadOff === undefined) this.vadOff = (this.ringEnd - pcm.length) / 16000;
     this._vadChain = (this._vadChain || Promise.resolve()).then(() => this._vad(pcm)).catch(e => this.emit('error', e));
   }
   _timeOf(sample) { return this.t0 + sample / 16000; }
@@ -99,7 +102,7 @@ export class LiveDub extends EventTarget {
     this.vadPos ??= 0; // in 512-sample windows
     const on = 0.5, off = 0.35, hop = VAD_HOP;
     for (const p of probs) {
-      const t = this.vadPos * hop; this.vadPos++;
+      const t = this.vadOff + this.vadPos * hop; this.vadPos++;
       if (!this.cur) {
         if (p >= on) {
           this.cur = { s: t, last: t };
@@ -134,7 +137,7 @@ export class LiveDub extends EventTarget {
     if (!audio) return;
     this.queue.push({ seg, audio, heardAt: performance.now() });
     // if we fall far behind, drop the oldest lines (live must stay live)
-    while (this.queue.length > 4) this.queue.shift();
+    while (this.queue.length > 8) this.queue.shift();
     this._work();
   }
   _leadLang() {
@@ -148,18 +151,23 @@ export class LiveDub extends EventTarget {
     this.busy = true;
     try {
       while (this.queue.length && this.running) {
-        const job = this.queue.shift();
-        await this._doLine(job).catch(e => this.emit('error', e));
+        // everything that's waiting (up to ~26 s of talking) is read in one pass of the big model
+        const jobs = [];
+        let tot = 0;
+        while (this.queue.length && (!jobs.length || tot + this.queue[0].audio.length / 16000 <= 26)) { const j = this.queue.shift(); jobs.push(j); tot += j.audio.length / 16000 + 0.8; }
+        await this._doRound(jobs).catch(e => this.emit('error', e));
       }
     } finally { this.busy = false; }
   }
-  async _doLine({ seg, audio, heardAt }) {
-    const dur = seg.e - seg.s, tIn = this._timeOf(seg.s * 16000);
-    const lead = this._leadLang();
-    const [info, heard] = await Promise.all([
-      this.e.listen.call('analyze', { audio }),
-      this.e.asr.call('hear', { audio, tier: this.settings.liveModel || 'good', prior: lead ? { [lead]: 4 } : null, showLang: lead, force: this.settings.forceLang || (lead && dur < 1.2 ? lead : null) }),
+  async _doRound(jobs) {
+    const [infos, heards] = await Promise.all([
+      Promise.all(jobs.map(j => this.e.listen.call('analyze', { audio: j.audio }))),
+      hearRound(this.e.asr, jobs.map(j => j.audio), { tier: this.settings.liveModel || 'good', lead: this._leadLang(), showLang: this.showLang, force: this.settings.forceLang || null }),
     ]);
+    for (let i = 0; i < jobs.length && this.running; i++) await this._doLine(jobs[i], infos[i], heards[i]).catch(e => this.emit('error', e));
+  }
+  async _doLine({ seg, audio, heardAt }, info, heard) {
+    const dur = seg.e - seg.s, tIn = this._timeOf(seg.s * 16000);
     if (!this.running) return;
     if (heard.lang !== 'en') { this.langVotes[heard.lang] = (this.langVotes[heard.lang] || 0) + dur; const tot = Object.values(this.langVotes).reduce((a, b) => a + b, 0); const b = Object.entries(this.langVotes).sort((x, y) => y[1] - x[1])[0]; if (tot > 15 && b[1] / tot > 0.6) this.showLang = b[0]; }
     const ch = this.cast.match(info, tIn);

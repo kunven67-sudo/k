@@ -6,6 +6,7 @@
 import { resample, semitones, rms, fadeEdges } from '../lib/resample.js';
 import { looksEnglish } from './textclean.js';
 import { isNonverbal } from './nonverbal.js';
+import { hearRound } from './hearround.js';
 
 export const PIECE = 30;     // seconds of audio handled at once
 const SR = 44100;            // soundtrack rate used for separating + mixing
@@ -19,6 +20,8 @@ export class FileDub extends EventTarget {
     this.lines = []; this.pieces = []; this.stopped = false; this.playhead = 0;
     this.showLang = null; this.langVotes = {};
     this.subs = null;          // English subtitle lines from the file, if it has them
+    this.stats = {};           // time spent per step (ms), for tuning
+    this.cps = 15;             // English letters per second the voices say at normal speed (learned)
   }
   emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }
 
@@ -65,7 +68,9 @@ export class FileDub extends EventTarget {
       const a = Math.max(0, Math.floor((p.s - m) * SR)), b = Math.min(this.n, Math.ceil((p.e + m) * SR));
       const L = new Float32Array(b - a), R = new Float32Array(b - a);
       for (let i = a; i < b; i++) { L[i - a] = this.oL[i] / 32767; R[i - a] = this.oR[i] / 32767; }
+      const tC = performance.now();
       const v = await this.e.sep.call('separate', { L, R }, [L.buffer, R.buffer]);
+      this._t('cutVoices', tC);
       const s0 = Math.floor(p.s * SR), s1 = Math.min(this.n, Math.floor(p.e * SR));
       const mono = new Float32Array(s1 - s0);
       for (let i = s0; i < s1; i++) {
@@ -113,29 +118,42 @@ export class FileDub extends EventTarget {
     const segs = await this.e.listen.call('vadSegments', { audio, offset: from, opts: { minSilence: 0.3, maxLen: 14 } });
     // take lines that START in this piece (lines starting later belong to the next piece)
     const mine = segs.filter(([a]) => a >= from - 0.01 && (a < p.e || last));
+    if (!this.showLang && !this.settings.forceLang && !this.langProbed) await this._probeLang(segs);
     // everything before the first line is ready already (music only); then it grows line by line
     p.doneUntil = mine.length ? Math.max(p.s, mine[0][0] - 0.05) : p.e;
     this.emit('progress', this.progress());
-    for (let k = 0; k < mine.length; k++) {
-      const [a, b] = mine[k];
+    // lines are read in rounds (one pass of the big model each); the very first round is small so you can start sooner
+    for (let k = 0; k < mine.length;) {
       if (this.stopped) return;
-      if (!this.lines.some(l => l.s < b && l.e > a && l.seg)) await this._dubSegment(a, b); // (skip lines a previous piece did)
-      p.doneUntil = Math.min(p.e, k + 1 < mine.length ? mine[k + 1][0] - 0.05 : p.e);
-      this.emit('progress', this.progress());
+      const cap = this.readyUntil() < 1 ? 8 : 26, round = [];
+      let tot = 0;
+      while (k < mine.length && (!round.length || tot + mine[k][1] - mine[k][0] <= cap)) {
+        const [a, b] = mine[k++];
+        if (this.lines.some(l => l.s < b && l.e > a && l.seg)) continue; // a previous piece did it already
+        if (b - a < 0.25) continue;
+        round.push([a, b]); tot += b - a + 0.8;
+      }
+      if (round.length) {
+        const clips = round.map(([a, b]) => this.voice16.slice(Math.floor(a * 16000), Math.floor(b * 16000)));
+        const lead = this._leadLang();
+        const heards = await hearRound(this.e.asr, clips, { tier: this.settings.fileModel || 'good', lead, showLang: this.showLang, force: this.settings.forceLang || null, stats: this.stats });
+        for (let i = 0; i < round.length; i++) {
+          if (this.stopped) return;
+          await this._dubSegment(round[i][0], round[i][1], heards[i]);
+          p.doneUntil = Math.min(p.e, round[i + 1] ? round[i + 1][0] - 0.05 : k < mine.length ? mine[k][0] - 0.05 : p.e);
+          this.emit('progress', this.progress());
+        }
+      }
+      p.doneUntil = Math.min(p.e, k < mine.length ? mine[k][0] - 0.05 : p.e);
     }
     p.lines = 'done';
     this.emit('progress', this.progress());
   }
 
   // one speech segment -> one or more dub lines (split where the speaker changes)
-  async _dubSegment(a, b) {
+  async _dubSegment(a, b, heard) {
     const clip = this.voice16.slice(Math.floor(a * 16000), Math.floor(b * 16000));
     if (clip.length < 16000 * 0.25) return;
-    const lead = this._leadLang();
-    const prior = lead ? { [lead]: this.showLang ? 6 : 3 } : null;
-    // very short lines can't be told apart reliably: they are in the show's language
-    const force = this.settings.forceLang || (lead && b - a < 1.2 ? lead : null);
-    const heard = await this.e.asr.call('hear', { audio: clip, tier: this.settings.fileModel || 'good', prior, showLang: lead, force });
     this._voteLang(heard.lang, b - a);
     let sents = heard.sentences.length ? heard.sentences : [{ a: 0, b: b - a, text: '' }];
     // who says each sentence?
@@ -143,7 +161,9 @@ export class FileDub extends EventTarget {
     for (const s of sents) {
       const sa = Math.max(0, s.a), sb = Math.min(b - a, Math.max(s.b, s.a + 0.3));
       const piece = clip.subarray(Math.floor(sa * 16000), Math.floor(sb * 16000));
+      const tA = performance.now();
       const info = await this.e.listen.call('analyze', { audio: piece.length > 16000 * 0.4 || sents.length === 1 ? piece : clip });
+      this._t('analyze', tA);
       const ch = this.cast.match(info, a + sa);
       const g = groups.at(-1);
       if (g && g.ch === ch) { g.texts.push(s.text); g.b = sb; g.loud.push(rms(piece)); }
@@ -163,11 +183,15 @@ export class FileDub extends EventTarget {
       else if (isNonverbal(text)) { line.keep = true; line.why = 'sound'; }
       this._insert(line);
       if (!line.keep) {
+        const tT = performance.now();
         line.en = this._subtitleFor(line.s, line.e) || await this.tr.toEnglish(text, heard.lang);
+        this._t('translate', tT);
         if (isNonverbal(text, line.en)) { line.keep = true; line.why = 'sound'; }
       }
       if (!line.keep && line.en) {
+        const tS = performance.now();
         await this.speakLine(line, Math.max(...g.loud));
+        this._t('voice', tS);
         const prev = this._prevDub(line);
         if (prev && prev.s + prev.dur > line.s + 0.25) { await this.speakLine(prev); this.emit('line', prev); }
       }
@@ -180,6 +204,21 @@ export class FileDub extends EventTarget {
     for (let k = i - 1; k >= 0; k--) if (this.lines[k].audio && !this.lines[k].keep) return this.lines[k];
     return null;
   }
+  // listen to ~25 s of talking at once to learn the show's language before the first lines
+  async _probeLang(segs) {
+    let n = 0; const parts = [];
+    for (const [a, b] of segs) { if (n > 25) break; parts.push(this.voice16.subarray(Math.floor(a * 16000), Math.floor(b * 16000))); n += b - a; }
+    if (n < 6) return;   // not enough talking here yet: try again on the next piece
+    this.langProbed = true;
+    const audio = new Float32Array(parts.reduce((s, x) => s + x.length + 1600, 0));
+    let o = 0; for (const x of parts) { audio.set(x, o); o += x.length + 1600; }
+    try {
+      const top = await this.e.asr.call('detectLang', { audio, tier: this.settings.fileModel || 'good' });
+      const [lang, pr] = top[0];
+      if (lang !== 'en' && pr > 0.5) { this.langVotes[lang] = (this.langVotes[lang] || 0) + 8 * pr; if (pr > 0.8) this.showLang = lang; }
+    } catch (e) { this.emit('error', e); }
+  }
+  _t(k, t0) { this.stats[k] = (this.stats[k] || 0) + performance.now() - t0; }
   _leadLang() {
     if (this.showLang) return this.showLang;
     const best = Object.entries(this.langVotes).sort((x, y) => y[1] - x[1])[0];
@@ -209,14 +248,18 @@ export class FileDub extends EventTarget {
     const next = this.lines.find(l => l.s > line.s + 0.05 && !l.keep);
     const slot = Math.max(0.5, Math.min((next ? next.s : this.duration) - line.s - 0.08, (line.e - line.s) + 1.0));
     const ratio = semitones(v.shift || 0);
-    // first try: guess the speed from the text length (about 15 letters a second)
-    let speed = Math.min(1.45, Math.max(0.9, (line.en.length / 15) / slot));
+    // guess the speed from the text length, using how fast the voices really talked so far (learned as we go),
+    // so the line only has to be made a second time when the guess was clearly off
+    const len = line.en.length;
+    let speed = Math.min(1.45, Math.max(0.9, len / (this.cps * slot)));
     let r = await this.e.tts.call('speak', { text: line.en, mix: v.mix, speed: speed / ratio });
     let dur = r.audio.length / r.sr / ratio;
-    if (dur > slot * 1.06 && speed < 1.45) {
+    if (len >= 8) this.cps = this.cps * 0.8 + 0.2 * Math.min(25, Math.max(8, len / (dur * speed)));
+    if (dur > slot * 1.12 && speed < 1.45) {
       speed = Math.min(1.5, speed * dur / slot);
       r = await this.e.tts.call('speak', { text: line.en, mix: v.mix, speed: speed / ratio });
       dur = r.audio.length / r.sr / ratio;
+      this.stats.remade = (this.stats.remade || 0) + 1;
     }
     const out = fadeEdges(resample(r.audio, r.sr * ratio, SR), SR);
     // match the loudness of the original voice (but keep it clear)

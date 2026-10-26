@@ -108,7 +108,7 @@ function showSetup() {
     try {
       await engine.start('listen'); done('listen');
       await Promise.all([
-        engine.start('asr').then(a => a.call('load', { tier: S.liveModel })).then(() => done('asr')),
+        engine.start('asr').then(a => Promise.all([a.call('load', { tier: S.liveModel }), a.call('load', { tier: 'fast' })])).then(() => done('asr')),
         engine.start('tts').then(() => done('tts')),
         engine.start('sep').then(() => done('sep')),
         engine.start('eyes').then(() => done('eyes')),
@@ -207,6 +207,7 @@ async function openFile(file) {
 
   const dub = new FileDub({ engine: {}, cast, translate: getTranslate(), settings: S });
   dub.screenSubs = [];
+  window.__subdubFile = dub; // (for tests)
   let rl = null;
   const renderLinesSoon = () => { clearTimeout(rl); rl = setTimeout(renderLines, 300); };
   let player = null, watch = null, panel = null, closed = false;
