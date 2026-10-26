@@ -1,0 +1,13 @@
+<!doctype html><html><body><pre id=o></pre><script type=module>
+import { WorkerRPC } from '../src/engine/rpc.js';
+const q = new URLSearchParams(location.search), log = m => document.getElementById('o').textContent += m + '\n';
+const r = new WorkerRPC(new Worker('../w-sep.js', { type: 'module' }));
+await r.call('init', { threads: +(q.get('t') || 4), gpu: false });
+log('coi ' + crossOriginIsolated);
+const n = 44100 * 12, L = new Float32Array(n).map(() => (Math.random() - 0.5) * 0.1), R = L.slice();
+r.on('sepProgress', f => log('prog ' + f.toFixed(2) + ' ' + (performance.now() - t).toFixed(0)));
+const t = performance.now();
+await r.call('separate', { L, R });
+log('12s audio separated in ' + ((performance.now() - t) / 1000).toFixed(1) + 's');
+document.title = 'DONE';
+</script></body></html>
