@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:#000}canvas{width:100%;height:100%;display:block}</style></head>
+<body><canvas id="c"></canvas><canvas id="ui" style="display:none"></canvas>
+<script src="src/gfx.js"></script>
+<script>
+const R = HOGFX.create(document.getElementById('c'));
+window.glr = R;
+const ui = document.getElementById('ui');
+function drawUI(w, h, txt){ ui.width = w; ui.height = h; const x = ui.getContext('2d'); x.clearRect(0,0,w,h);
+  x.font = '900 ' + Math.round(h*0.12) + 'px sans-serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillStyle='#fff';
+  x.shadowColor='rgba(0,0,0,.8)'; x.shadowBlur=20; x.fillText(txt, w/2, h*0.5); R.uploadUI(ui); }
+window.frame = (u, txt) => { const [w,h] = R.resize(); drawUI(w,h,txt||'421.6'); R.draw(Object.assign({u_time: 3, u_still: 0.3, u_mix:[1,0.3,0.4], u_hue:0, u_folds:0, u_pulse:0, u_grow:0.3, u_beat:0, u_spin:0,
+  u_glitch:0.1, u_lens:[0.5,0.535,0.4], u_shock:[0.5,0.5,1], u_rewind:0, u_flash:0, u_flashCol:[1,1,1], u_flip:0, u_mirror:0, u_melt:0, u_invert:0, u_uiWarp:0.5, u_scan:0.3, u_shake:0}, u), 16); };
+</script></body></html>

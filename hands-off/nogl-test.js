@@ -1,0 +1,21 @@
+const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const path = require('path');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+(async () => {
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--disable-gpu', '--disable-software-rasterizer', '--disable-webgl', '--disable-3d-apis'] });
+  const p = await b.newPage({ viewport: { width: 1280, height: 720 } });
+  const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+  await p.goto('file://' + path.join(__dirname, 'dist', 'hands-off.html'));
+  await p.waitForFunction(() => window.__HO_DEBUG && window.__HO_DEBUG.state === 'menu');
+  console.log('webgl ok?', await p.evaluate(() => window.__HO_DEBUG.R.ok));
+  await p.click('#startBtn');
+  await p.waitForFunction(() => window.__HO_DEBUG.state === 'live', null, { timeout: 20000 });
+  await sleep(4000);
+  await p.screenshot({ path: 'shots/nogl-live.png' });
+  await p.mouse.move(600, 300); await p.mouse.move(640, 320);
+  await p.waitForFunction(() => window.__HO_DEBUG.state === 'reset', null, { timeout: 5000 });
+  await sleep(300);
+  await p.screenshot({ path: 'shots/nogl-shatter.png' });
+  console.log('state after touch', await p.evaluate(() => window.__HO_DEBUG.state), 'errors', errs.length ? errs : 'none');
+  await b.close();
+})();
