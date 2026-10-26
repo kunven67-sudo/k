@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A phone with "casting" waves on both sides. Fits inside the adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M47,31h14a4,4 0,0 1,4 4v38a4,4 0,0 1,-4 4H47a4,4 0,0 1,-4 -4V35a4,4 0,0 1,4 -4z" />
+    <path
+        android:fillColor="#FF0B0F1A"
+        android:pathData="M46.5,36h15v32h-15z" />
+    <path
+        android:fillColor="#FF22D3EE"
+        android:pathData="M51,46l8,6 -8,6z" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M68.74,43.67A18,18 0,0 1,68.74 64.33M74.48,39.66A25,25 0,0 1,74.48 68.34M39.26,43.67A18,18 0,0 0,39.26 64.33M33.52,39.66A25,25 0,0 0,33.52 68.34" />
+</vector>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Only visible for a split second before Compose draws; matches the app background. -->
+    <style name="Theme.BroCast" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bc_background</item>
+        <item name="android:colorBackground">@color/bc_background</item>
+    </style>
+</resources>
