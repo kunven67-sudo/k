@@ -69,11 +69,12 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const t0 = Date.now();
     let shot = 0;
     while (Date.now() - t0 < +secs * 1000) {
-      await sleep(15000);
+      await sleep(+(process.env.STEP || 15000));
       const st = await page.evaluate(() => ({ prog: document.querySelector('.prog')?.textContent, t: document.querySelector('video')?.currentTime, paused: document.querySelector('video')?.paused, wait: !document.querySelector('.wait')?.hidden, caps: document.querySelector('.caps')?.innerText }));
       log('file', JSON.stringify(st).slice(0, 300));
       await page.screenshot({ path: path.join(OUT, `${name}-file-${shot++}.png`) });
     }
+    log('screen subs', await page.evaluate(() => JSON.stringify((window.__subdubFile?.screenSubs || []).map(s => [+s.s.toFixed(1), s.lang, s.text, s.en]))));
     log('stats', await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(window.__subdubFile?.stats || {}).map(([k, v]) => [k, Math.round(v)])))));
     await page.click('.tabs button:nth-child(2)');
     await sleep(800);

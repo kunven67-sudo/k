@@ -4,10 +4,10 @@
 // and clean voice-remover pieces on top whenever the computer keeps up).
 import { resample } from '../lib/resample.js';
 import { h, icon } from '../ui/dom.js';
+import { coverEl } from '../ui/cover.js';
 
 const SEP_SR = 44100;
-const PIECE = 6;      // seconds of sound cleaned at a time
-const PAD = 1.0;      // extra sound on each side so the voice remover has context
+const PAD = 0.75;     // extra sound on each side so the voice remover has context
 const XF = 0.02;      // crossfade between clean pieces
 
 export class SyncedLive {
@@ -184,11 +184,18 @@ export class SyncedLive {
     const b = this.buf; b.L.push(L); b.R.push(R); b.n += n;
     // drop sound older than we'll ever need
     while (b.L.length > 1 && b.t0 + b.L[0].length / sr < this.nextS - PAD - 0.5) { b.t0 += b.L[0].length / sr; b.n -= b.L[0].length; b.L.shift(); b.R.shift(); }
+    // piece length: as long as possible while still finishing before it has to play (sound waits PIECE + PAD,
+    // then the voice remover needs its time)
+    const PIECE = this.piece();
     if (this.sepBusy || tEnd < this.nextS + PIECE + PAD) return;
     // fell behind (computer busy)? skip to the newest piece we can still finish in time
     const need = (this.lastSepMs || 1500) / 1000 + 0.4;
     if (this.nextS + this.D - this.ctx.currentTime < need) this.nextS = Math.max(this.nextS, tEnd - PAD - PIECE);
     this._clean(this.nextS, this.nextS + PIECE).catch(() => {});
+  }
+  piece() {
+    const need = (this.lastSepMs || 1500) / 1000;
+    return Math.max(2, Math.min(6, this.D - PAD - need * 1.3 - 0.8));
   }
   _slice(a, b) {
     const sr = this.sr, buf = this.buf, i0 = Math.round((a - buf.t0) * sr), len = Math.round((b - a) * sr);
@@ -316,18 +323,18 @@ export class SyncedLive {
     this.capsEl.textContent = ''; this.coversEl.textContent = '';
     const S = this.settings;
     if (S.showCaps && S.mode !== 'original') {
-      for (const c of this.caps) if (now >= c.at && now <= c.end) this.capsEl.append(h('div', { class: 'cap' }, h('span', { class: 'who', style: { background: c.color || '#fff' } }), c.text));
       const r = this.el.getBoundingClientRect(), vw = this.cv.width, vh = this.cv.height;
+      let bottomCover = false;
       if (vw && vh) {
-        const sc = Math.min(r.width / vw, r.height / vh), ox = (r.width - vw * sc) / 2, oy = (r.height - vh * sc) / 2;
         for (const s of this.subs) {
           if (!s.en || s.lang === 'en' || !s.box) continue;
           const e = Math.max(s.e ?? s.s, s.s + 1.2);
           if (t < s.s || t > e + 0.2) continue;
-          const b = s.box;
-          this.coversEl.append(h('div', { class: 'cover', style: { left: ox + (b.x - 0.02) * vw * sc + 'px', top: oy + (b.y - 0.01) * vh * sc + 'px', width: (b.w + 0.04) * vw * sc + 'px', minHeight: (b.h + 0.02) * vh * sc + 'px', fontSize: Math.max(16, b.h * vh * sc * 0.42) + 'px' } }, s.en));
+          this.coversEl.append(coverEl(s.box, r, vw, vh, s.en));
+          if (s.box.y > 0.5) bottomCover = true;
         }
       }
+      if (!bottomCover) for (const c of this.caps) if (now >= c.at && now <= c.end) this.capsEl.append(h('div', { class: 'cap' }, h('span', { class: 'who', style: { background: c.color || '#fff' } }), c.text));
     }
     this.lagEl.textContent = this.late > 0.4 ? ` · English ${this.late.toFixed(1)} s late (computer busy)` : '';
   }

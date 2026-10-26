@@ -2,6 +2,7 @@
 import { h, $, icon, fmtTime, fmtMB, toast } from './ui/dom.js';
 import { mountLogo } from './ui/logo.js';
 import { castPanel } from './ui/castpanel.js';
+import { coverEl } from './ui/cover.js';
 import { loadSettings, saveSettings, openSettings } from './ui/settings.js';
 import { Engine, detectGpu } from './engine/engine.js';
 import { MODELS } from './engine/models.js';
@@ -331,13 +332,13 @@ async function openFile(file) {
     timeEl.textContent = `${fmtTime(t)} / ${fmtTime(d)}`;
     caps.textContent = ''; covers.textContent = '';
     if (S.showCaps && S.mode !== 'original' && player) {
-      for (const l of player.captionsAt(t)) {
-        if (l.isSub) {
-          // a foreign subtitle burned into the picture: cover it with the English
-          const r = stage.getBoundingClientRect(), vw = video.videoWidth, vh = video.videoHeight;
-          const sc = Math.min(r.width / vw, r.height / vh), ox = (r.width - vw * sc) / 2, oy = (r.height - vh * sc) / 2;
-          covers.append(h('div', { class: 'cover', style: { left: ox + (l.box.x - 0.02) * vw * sc + 'px', top: oy + (l.box.y - 0.01) * vh * sc + 'px', width: (l.box.w + 0.04) * vw * sc + 'px', minHeight: (l.box.h + 0.02) * vh * sc + 'px', fontSize: Math.max(16, l.box.h * vh * sc * 0.42) + 'px' } }, l.en));
-        } else {
+      const now = player.captionsAt(t), subs = now.filter(l => l.isSub);
+      // a foreign subtitle burned into the picture: cover it with the English (in its own spot)
+      for (const l of subs) covers.append(coverEl(l.box, stage.getBoundingClientRect(), video.videoWidth, video.videoHeight, l.en));
+      // while a subtitle at the bottom is covered, the cover already says it: no second caption on top of it
+      if (!subs.some(l => l.box.y > 0.5)) {
+        for (const l of now) {
+          if (l.isSub) continue;
           const c = cast.byId(l.charId);
           caps.append(h('div', { class: 'cap' }, h('span', { class: 'who', style: { background: c?.color || '#fff' } }), l.en));
         }
