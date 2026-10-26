@@ -36,6 +36,7 @@ const HINTS = {
   drop: ['X', 'Drop down on a silk line. W climbs back up.'],
   molt: ['M', 'Molt when your skin is full. You come out bigger.'],
   lair: ['L', 'Spin a lair. Rest there (R) to save.'],
+  fly: ['SPACE', 'You are flying. WASD + Space/Ctrl to move, hold Shift to cruise. Touch anything big to land on it.'],
 };
 
 export class Story {
@@ -149,6 +150,7 @@ export class Story {
   posted(h) { const G = this.game; G.hud.feed('@' + h.name.split(' ')[0].toLowerCase() + '_' + Math.floor(Math.random() * 99), pick(['ok WHAT is this spider. floor ' + (h.floor || '?') + ' at VOSS', 'this thing is NOT normal', 'black widow??? the size of my HAND???', 'they told us the lab was empty']), Math.floor(200 + Math.random() * 90000)); }
   news() {
     const G = this.game, p = G.player; if (!p || !this.flags.escaped) return;
+    if (G.zone && G.zone.newsLines) { G.hud.feed('NEWS', pick(G.zone.newsLines(p)), null, true); return; }
     const m = p.sizeM;
     if (m < 0.03) return;
     const lines = m < 0.3 ? ['Reports of a large spider at VOSS Biogenetics tower. Company says: "routine pest control."', 'Night staff evacuated from two floors of the VOSS tower downtown.'] :

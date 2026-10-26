@@ -267,13 +267,15 @@ export class Player {
     if (boost) { this.vel.multiplyScalar(1.15); this.vel.addScaledVector(this.game.zone.gravity, -0.12); }
     this.startFall();
   }
-  zipTo(point, normal) {
-    this.zipT = { from: this.pos.clone(), to: point.clone(), n: normal.clone(), t: 0, dur: Math.max(0.18, Math.min(0.9, this.pos.distanceTo(point) / (this.s * 40))) };
+  zipTo(point, normal, body = null) {
+    // a line to something that moves (the Moon, a ship) follows it, so you land where you aimed
+    this.zipT = { from: this.pos.clone(), to: point.clone(), n: normal.clone(), t: 0, dur: Math.max(0.18, Math.min(this.game.zone.space ? 2.4 : 0.9, this.pos.distanceTo(point) / (this.s * 40))), body, off: body ? point.clone().sub(body.pos) : null };
     this.mode = 'zip';
     this.game.webs.line(point, this, 'zip');
   }
   _zip(dt, s) {
     const Z = this.zipT; Z.t += dt / Z.dur;
+    if (Z.body && Z.body.state !== 'eaten') Z.to.copy(Z.body.pos).add(Z.off);
     const e = Math.min(1, Z.t); const k = e * e * (3 - 2 * e);
     this.pos.lerpVectors(Z.from, Z.to, k);
     this.fwd.copy(Z.to).sub(Z.from).normalize();

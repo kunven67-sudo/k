@@ -50,7 +50,7 @@ export class Game {
     this.timeScale = 1; this.slowmo = 0;
     this.stats = this.freshStats();
     this.applySettings();
-    this.input.onLockChange = (l) => { if (!l && this.state === 'play' && !this.menus.open) this.pause(); };
+    this.input.onLockChange = (l) => { if (!l && this.state === 'play' && !this.menus.open && !this.q.get('manual')) this.pause(); };
     window.__game = this;
   }
 
@@ -80,6 +80,7 @@ export class Game {
   async enterZone(id, opts = {}) {
     const old = this.zone;
     const z = await this.getZone(id);
+    this.hud.loading(null);
     if (old && old !== z) old.exit && old.exit();
     this.zone = z;
     if (!this.fill) { this.fill = new THREE.PointLight(0xc8d4ff, 0, 1, 2); }

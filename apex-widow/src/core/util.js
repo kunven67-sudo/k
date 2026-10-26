@@ -36,8 +36,8 @@ export function sizeText(m) {
   if (m < 0.01) return (m * 1000).toFixed(1) + ' mm';
   if (m < 1) return (m * 100).toFixed(m < 0.1 ? 1 : 0) + ' cm';
   if (m < 1000) return m.toFixed(m < 10 ? 1 : 0) + ' m';
-  if (m < 1e8) return (m / 1000).toFixed(m < 1e4 ? 1 : 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' km';
-  if (m < 0.05 * LY) return (m / AU).toFixed(m < 10 * AU ? 2 : 0) + ' AU';
+  if (m < 3e9) return (m / 1000).toFixed(m < 1e4 ? 1 : 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' km';
+  if (m < 0.05 * LY) return (m / AU).toFixed(m < 0.1 * AU ? 3 : m < 10 * AU ? 2 : 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' AU';
   if (m < 1e6 * LY) return (m / LY).toFixed(m < 10 * LY ? 2 : 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' light years';
   if (m < 1e9 * LY) return (m / LY / 1e6).toFixed(1) + ' million light years';
   return (m / LY / 1e9).toFixed(1) + ' billion light years';

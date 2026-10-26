@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { CollisionWorld } from '../core/collide.js';
 import { clamp, rand, sizeText } from '../core/util.js';
 
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _m4 = new THREE.Matrix4();
 let BID = 1;
 
 // game mass of something L metres across (density 1 = same as your body)
@@ -73,6 +73,7 @@ export class Body {
     this.dotColor = new THREE.Color(def.color ?? 0xffffff);
     this.dotBright = def.glow ?? 0.6;
     this.update0 = opts.update || null;
+    this.disc = !!def.disc;
   }
   get alive() { return this.state !== 'dead' && this.state !== 'eaten'; }
   get helpless() {
@@ -82,6 +83,12 @@ export class Body {
     return this.stuck > 0;
   }
   get R() { return this.L * 0.5; }
+  // how far a point is from this thing's surface (flat ones, like cities and storms, are discs facing 'up')
+  surfDist(p) {
+    if (!this.disc) return p.distanceTo(this.pos) - this.L * 0.5;
+    _v.subVectors(p, this.pos); const h = _v.dot(this.up); const r = Math.sqrt(Math.max(0, _v.lengthSq() - h * h));
+    return Math.hypot(Math.max(0, r - this.L * 0.5), h);
+  }
   hurt(dmg, venom = 0) {
     if (!this.alive) return;
     if (this.def.passive && !this.def.burn) { this.hp -= dmg * 0.5; if (this.hp <= 0) this.hp = 1; return; } // rocks don't die from bites, you eat them
@@ -103,6 +110,7 @@ export class Body {
   update(dt, P) {
     this.t += dt;
     if (this.state === 'eaten') return;
+    this.prevPos = this.prevPos || this.pos.clone(); this.prevPos.copy(this.pos);
     if (this.stuck > 0) this.stuck = Math.max(0, this.stuck - dt * 0.05);
     if (this.orbit && !this.wrapped && this.stuck <= 0 && this.state !== 'dead') {
       const O = this.orbit; O.a += O.w * dt;
@@ -198,10 +206,34 @@ export class SpaceZone {
   }
   get creatures() { return this.bodies; }
   async build() {}
-  baseScene({ ambient = 0.02 } = {}) {
+  baseScene({ ambient = 0.02, glow = null } = {}) {
     const S = this.scene;
     this.bodies = new SpaceBodies(this);
     this.amb = new THREE.AmbientLight(0x8090b0, ambient); S.add(this.amb);
+    this.makeEnv(glow);
+  }
+  // reflections for glossy things (your shell): black space, a hot sun, a soft glow from whatever is below you.
+  // Built once with the sun on +X and "below" on -Y, then turned every frame to match the real sun + ground.
+  makeEnv(glow) {
+    const envScene = new THREE.Scene();
+    envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide, uniforms: { uG: { value: new THREE.Color(glow ?? 0x000000) } },
+      vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `varying vec3 vD; uniform vec3 uG; void main(){ vec3 d = normalize(vD); float s = max(d.x, 0.0);
+        vec3 c = vec3(0.006, 0.007, 0.012) + uG * (1.0 - smoothstep(-0.95, 0.15, d.y)) * 0.55;
+        float s2 = s * s; float s4 = s2 * s2;
+        c += vec3(1.0, 0.92, 0.8) * (smoothstep(0.985, 0.995, s) * 40.0 + s4 * s4 * 0.5);
+        gl_FragColor = vec4(c, 1.0); }`,
+    })));
+    const pm = new THREE.PMREMGenerator(this.game.renderer.r);
+    this.env = pm.fromScene(envScene, 0.02).texture; pm.dispose();
+    this.scene.environment = this.env; this.scene.environmentIntensity = 1;
+  }
+  aimEnv(sunDir, upDir) {
+    const X = _v.copy(sunDir).normalize(), Yv = _v2.copy(upDir).addScaledVector(X, -upDir.dot(X));
+    if (Yv.lengthSq() < 1e-8) Yv.set(0, 1, 0).addScaledVector(X, -X.y);
+    Yv.normalize(); const Z = _v3.crossVectors(X, Yv);
+    _m4.makeBasis(X, Yv, Z); this.scene.environmentRotation.setFromRotationMatrix(_m4);
   }
   // put the player somewhere sensible when arriving from the zone below
   placePlayer(pos, up) {
@@ -250,7 +282,11 @@ export class SpaceZone {
       if (p.mode === 'ground' && !this.ground && G.state === 'play') p.mode = 'space';
     }
     this.bodies.update(dt);
+    // standing on (or hanging off) something that moves = you move with it
+    const gb = this.ground;
+    if (p && gb && gb.prevPos && gb.state !== 'eaten' && p.mode !== 'space' && p.mode !== 'zip') { _v.subVectors(gb.pos, gb.prevPos); p.pos.add(_v); if (p.rope && p.rope.anchor) p.rope.anchor.add(_v); }
     this.heat(dt);
+    this.drawLabels();
   }
   // stars burn you up close until they're wrapped in silk
   heat(dt) {

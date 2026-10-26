@@ -121,15 +121,22 @@ export class Hud {
     const A = G.actions, fr = A.feeding ? A.feeding.t : (A.lock && A.valid(A.lock) ? A.lock : A.frontTarget ? A.frontTarget(1.4) : null);
     const aim = A.aim;
     let t = fr; if (!t && aim) t = aim.kind === 'creature' ? { type: 'c', c: aim.c } : aim.kind === 'human' ? { type: 'h', h: aim.h } : null;
+    // the planet you're standing on only gets a panel once you can actually bite it
+    if (t && t.type === 'c' && t.c.def.walk && t.c.def.minEater && p.sizeM < t.c.def.minEater) t = null;
     if (t && A.valid(t)) {
       const isC = t.type === 'c', hp = isC ? t.c.hp : t.h.hp, mx = isC ? t.c.maxHp : 100;
       const state = isC ? (t.c.state === 'dead' ? 'DEAD' : t.c.wrapped ? 'WRAPPED' : t.c.state === 'paralyzed' ? 'PARALYZED' : t.c.stuck > 0 ? 'WEBBED' : t.c.mode === 'hunt' ? 'HUNTING YOU' : '') : (t.h.state === 'wrapped' ? 'WRAPPED' : t.h.state === 'paralyzed' ? 'PARALYZED' : t.h.noticed ? 'HAS SEEN YOU' : '');
       const near = A.frontTarget && A.frontTarget(1.4);
       const close = near && ((near.type === 'c' && t.type === 'c' && near.c === t.c) || (near.type === 'h' && t.type === 'h' && near.h === t.h));
       let act = '';
-      if (close) act = A.helpless(t) ? `<span class="key">E</span>${(!(isC && t.c.def.chunk) && A.tMass(t) / p.mass > 0.6 && !(isC ? t.c.wrapped : t.h.state === 'wrapped')) ? 'WRAP' : 'EAT'}` : '<span class="key">LMB</span>BITE';
+      const chunkC = isC && t.c.def.chunk;
+      if (close) act = A.helpless(t) ? `<span class="key">E</span>${(!chunkC && A.tMass(t) / p.mass > 0.6 && !(isC ? t.c.wrapped : t.h.state === 'wrapped')) ? 'WRAP' : 'EAT'}` : '<span class="key">LMB</span>BITE';
+      if (close && chunkC && t.c.def.minEater && p.sizeM < t.c.def.minEater) act = `<span style="opacity:.65">too big to bite until you're ${sizeText(t.c.def.minEater)}</span>`;
       const lt = isC ? t.c.def.latin : t.h.role === 'voss' ? 'the man who made you' : '';
-      this.target.innerHTML = `<div class="nm">${isC ? t.c.def.name : t.h.name}</div><div class="lt">${lt}</div><div class="bar" style="width:160px;margin:6px auto 2px"><i style="width:${clamp(hp / mx, 0, 1) * 100}%;background:#ff3b30"></i></div><div class="lbl" style="font-size:11px">${Math.max(0, Math.ceil(hp))} / ${Math.ceil(mx)}</div><div class="st">${state}</div><div class="act">${act}</div>`;
+      // huge things you eat a bite at a time show how much is left, not health
+      const frac = chunkC ? t.c.mass / (t.c.mass0 || (t.c.mass0 = t.c.mass)) : hp / mx;
+      const lbl = chunkC ? `${sizeText(t.c.L * Z.unit)} across &middot; ${Math.max(1, Math.ceil(frac * 100))}% left` : `${Math.max(0, Math.ceil(hp))} / ${Math.ceil(mx)}`;
+      this.target.innerHTML = `<div class="nm">${isC ? t.c.def.name : t.h.name}</div><div class="lt">${lt || ''}</div><div class="bar" style="width:160px;margin:6px auto 2px"><i style="width:${clamp(frac, 0, 1) * 100}%;background:${chunkC ? '#e8c060' : '#ff3b30'}"></i></div><div class="lbl" style="font-size:11px">${lbl}</div><div class="st">${state}</div><div class="act">${act}</div>`;
       this.target.style.opacity = 1;
     } else if (aim && aim.kind === 'surface' && aim.dist < G.cam.curDist + p.s * 45) { this.target.innerHTML = '<div class="act" style="opacity:.6"><span class="key">F</span>line</div>'; this.target.style.opacity = 1; }
     else this.target.style.opacity = 0;

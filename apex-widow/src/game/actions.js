@@ -1,15 +1,16 @@
 // What your buttons do: bite, eat, wrap, web shot, web zip / swing, drop line, jump / pounce, dodge, lock on,
 // hunter vision, molt, make a lair, rest, powers, inspect cam.
 import * as THREE from 'three';
-import { clamp } from '../core/util.js';
+import { clamp, sizeText } from '../core/util.js';
 
 const _v = new THREE.Vector3(), _d = new THREE.Vector3();
 
 export class Actions {
   constructor(game) { this.game = game; this.biteCD = 0; this.feeding = null; this.lock = null; this.aim = null; this.hold = 0; }
   // crosshair ray (camera centre) -> first thing it hits (creature / human / surface)
-  aimRay(maxBL = 60) {
+  aimRay(maxBL) {
     const G = this.game, p = G.player, s = p.s;
+    maxBL = maxBL || G.zone.aimBL || 60;
     const o = G.camera.position.clone(), d = new THREE.Vector3(0, 0, -1).applyQuaternion(G.camera.quaternion);
     const far = G.cam.curDist + s * maxBL;
     const Z = G.zone;
@@ -29,7 +30,7 @@ export class Actions {
     const reach = s * 0.75 * reachMul;
     let best = null, bd = Infinity;
     if (this.lock && this.valid(this.lock)) { const tp = this.tPos(this.lock); if (tp.distanceTo(head) < reach + this.tRad(this.lock)) return this.lock; }
-    if (Z.creatures) for (const c of Z.creatures.near(head, reach + 2 * s)) { const d = c.pos.distanceTo(head) - c.L * 0.5; if (d < reach && d < bd) { bd = d; best = { type: 'c', c }; } }
+    if (Z.creatures) for (const c of Z.creatures.near(head, reach + 2 * s)) { const d = c.surfDist ? c.surfDist(head) : c.pos.distanceTo(head) - c.L * 0.5; if (d < reach && d < bd) { bd = d; best = { type: 'c', c }; } }
     if (Z.humans && p.sizeM > 0.02) for (const h of Z.humans.near(head, reach + 1.5)) { const hp = h.pos.clone(); hp.y = clamp(head.y, h.pos.y, h.pos.y + h.height * (h.helpless ? 0.3 : 1)); const d = hp.distanceTo(head) - 0.25; if (d < reach && d < bd) { bd = d; best = { type: 'h', h }; } }
     return best;
   }
@@ -139,6 +140,7 @@ export class Actions {
     const ratio = this.tMass(t) / p.mass;
     if (t.type === 'h' && p.sizeM < 0.25) { G.hud.toast('Too big for you to wrap. Grow first.', 1.8); return; }
     const chunk = t.type === 'c' && t.c.def.chunk;
+    if (t.type === 'c' && t.c.def.minEater && p.sizeM < t.c.def.minEater) { G.hud.toast(`Your fangs can't get through ${t.c.def.name === 'Earth' ? 'the crust' : 'it'} yet. Grow to ${sizeText(t.c.def.minEater)} first (eat cities, storms, volcanoes).`, 2.6); return; }
     // big prey gets wrapped first (real widows wrap anything that could fight back). Huge things (buildings, planets)
     // are eaten a bite at a time instead.
     const needWrap = !chunk && ratio > 0.6 && !(t.type === 'c' ? t.c.wrapped : t.h.state === 'wrapped');
@@ -162,7 +164,7 @@ export class Actions {
     const G = this.game, p = G.player, F = this.feeding;
     const moving = I.is('forward') || I.is('back') || I.is('left') || I.is('right') || I.hit('jump');
     if (!I.is('eat') && F.prog > 0.15 && !F.auto) F.auto = true; // a tap starts it, it keeps going
-    if (moving || !this.valid(F.t) || p.mode !== 'ground') { this.stopFeed(); return; }
+    if (moving || !this.valid(F.t) || (p.mode !== 'ground' && p.mode !== 'space')) { this.stopFeed(); return; }
     F.prog += dt / F.dur;
     const t = F.t;
     if (t.type === 'c') { t.c.eatenFrac = F.prog; if (!F.chunk) t.c.root.scale.setScalar(t.c.L * (1 - 0.35 * F.prog)); }
@@ -173,6 +175,7 @@ export class Actions {
       G.growth.feed(F.mass, t);
       if (F.chunk && t.c.mass > F.mass * 1.02) {
         // a bite out of something huge: it gets smaller, you keep going (E again)
+        if (t.c.onBite) t.c.onBite(F.mass, p);
         const gone = t.c.takeChunk(F.mass);
         if (!gone) { G.hud.toast('You tear a huge piece off the ' + t.c.def.name.toLowerCase() + '. E to keep eating.', 2); return; }
         G.recordEat(t.c.kind, t.c.def); if (this.lock === t) this.lock = null; return;
@@ -190,12 +193,12 @@ export class Actions {
     const a = this.aim;
     if (a.kind !== 'surface' || p.silk < 0.04) { G.hud.hint && G.hud.hint('zipFail', 'Aim at a wall, ceiling or anything solid to shoot a line (F).'); return; }
     const d = a.point.distanceTo(p.pos);
-    if (d > s * 45) { G.hud.toast('Too far for a line.', 1); return; }
+    if (d > s * (G.zone.zipBL || 45)) { G.hud.toast('Too far for a line.', 1); return; }
     p.silk -= 0.04;
     // anchor above you + you're in the air or near an edge = swing; otherwise zip straight to it
     const above = a.point.clone().sub(p.pos).dot(G.zone.gravity.clone().negate().normalize()) > s * 2;
     if (above && (p.mode === 'air' || I_isSprint(G))) p.swingFrom(a.point);
-    else p.zipTo(a.point, a.normal);
+    else p.zipTo(a.point, a.normal, a.hit && a.hit.body);
   }
 }
 function I_isSprint(G) { return G.input.is('sprint'); }

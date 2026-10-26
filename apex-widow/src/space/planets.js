@@ -14,45 +14,85 @@ float pnN(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
              mix(mix(pnH(i + vec3(0,0,1)), pnH(i + vec3(1,0,1)), f.x), mix(pnH(i + vec3(0,1,1)), pnH(i + vec3(1,1,1)), f.x), f.y), f.z); }
 float pnF(vec3 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { s += a * pnN(p); p *= 2.07; a *= 0.5; } return s; }`;
 
+const BUMP = /* glsl */`
+vec3 earthBump(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) {
+  vec3 vSigmaX = normalize(dFdx(surf_pos)); vec3 vSigmaY = normalize(dFdy(surf_pos));
+  vec3 R1 = cross(vSigmaY, surf_norm); vec3 R2 = cross(surf_norm, vSigmaX);
+  float fDet = dot(vSigmaX, R1) * faceDirection;
+  vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2);
+  return normalize(abs(fDet) * surf_norm - vGrad);
+}`;
+
 // ------------------------------------------------------------------ Earth
 // Day map + night city lights + shiny oceans + clouds + cloud shadows + blue atmosphere at the edge.
 // Close up (when you're 10 km long and the planet is 12,742 km wide) extra noise detail keeps the ground sharp
 // and the night side gets real-looking clusters of street lights.
-export async function makeEarth(R, { segments = 128, detail = true } = {}) {
+export async function makeEarth(R, { segments = 128, detail = true, cloudH = 0.006, atmoH = 0.045 } = {}) {
   const [day, night, spec, nrm, clouds] = await Promise.all([tex('earth_day'), tex('earth_night'), tex('earth_spec', false), tex('earth_nrm', false), tex('earth_clouds', false)]);
   const group = new THREE.Group(); group.name = 'earth';
-  const uni = { uSun: { value: new THREE.Vector3(1, 0, 0) }, tNight: { value: night }, tSpec: { value: spec }, tClouds: { value: clouds }, uCloudRot: { value: 0 }, uR: { value: R }, uDetail: { value: detail ? 1 : 0 }, uCamDist: { value: R * 3 } };
-  const mat = new THREE.MeshStandardMaterial({ map: day, normalMap: nrm, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.85, metalness: 0 });
+  const uni = { uSun: { value: new THREE.Vector3(1, 0, 0) }, tNight: { value: night }, tSpec: { value: spec }, tClouds: { value: clouds }, uCloudRot: { value: 0 }, uR: { value: R }, uDetail: { value: detail ? 1 : 0 }, uCamDist: { value: R * 3 }, uC: { value: new THREE.Vector3() }, uAtmo: { value: atmoH } };
+  const mat = new THREE.MeshStandardMaterial({ map: day, normalMap: nrm, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.85, metalness: 0, envMapIntensity: 0 });
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uni);
     sh.vertexShader = 'varying vec3 vEN; varying vec3 vEP;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vEN = normalize(mat3(modelMatrix) * normal); vEP = position;');
-    sh.fragmentShader = 'varying vec3 vEN; varying vec3 vEP; uniform vec3 uSun; uniform sampler2D tNight; uniform sampler2D tSpec; uniform sampler2D tClouds; uniform float uCloudRot; uniform float uR; uniform float uDetail; uniform float uCamDist;\n' + NOISE + '\n' +
+    sh.fragmentShader = 'varying vec3 vEN; varying vec3 vEP; uniform vec3 uSun; uniform sampler2D tNight; uniform sampler2D tSpec; uniform sampler2D tClouds; uniform float uCloudRot; uniform float uR; uniform float uDetail; uniform float uCamDist; uniform vec3 uC; uniform float uAtmo;\n' + NOISE + BUMP + '\n' +
       sh.fragmentShader
         .replace('#include <map_fragment>', `#include <map_fragment>
           float eCl = texture2D(tClouds, vec2(fract(vMapUv.x + uCloudRot), vMapUv.y)).g;
           vec3 eDir = normalize(vEP);
           // detail: a few octaves of noise sized to how close the camera is (none from far away)
           float near = uDetail * (1.0 - smoothstep(0.02, 0.6, uCamDist / uR));
+          // (each layer of noise fades out where it gets smaller than a pixel, or it shimmers)
+          float eFw = length(fwidth(eDir));
+          float eA1 = 1.0 - smoothstep(0.12, 0.5, eFw * 900.0 * 8.0), eA2 = 1.0 - smoothstep(0.12, 0.5, eFw * 7000.0 * 8.0);
           if (near > 0.001) {
-            float f1 = pnF(eDir * 900.0), f2 = pnF(eDir * 7000.0);
+            float f1 = mix(0.5, pnF(eDir * 900.0), eA1), f2 = mix(0.5, pnF(eDir * 7000.0), eA2);
             float land = 1.0 - texture2D(tSpec, vMapUv).g;
             diffuseColor.rgb *= mix(1.0, 0.72 + 0.5 * f1 * (0.6 + 0.8 * f2), near * land);
             diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.92, 1.0, 1.06), near * (1.0 - land) * f2);
           }
           diffuseColor.rgb *= 1.0 - 0.45 * eCl;`)
         .replace('#include <roughnessmap_fragment>', `float roughnessFactor = mix(0.92, 0.38, texture2D(tSpec, vMapUv).g);`)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+          // close up: hills + ridges from noise (bump from screen-space derivatives, works on any size of planet)
+          float nearB = uDetail * (1.0 - smoothstep(0.01, 0.25, uCamDist / uR));
+          if (nearB > 0.001) {
+            vec3 bD = normalize(vEP);
+            float bFw = length(fwidth(bD));
+            float bA1 = 1.0 - smoothstep(0.1, 0.45, bFw * 1300.0 * 8.0), bA2 = 1.0 - smoothstep(0.1, 0.45, bFw * 9000.0 * 8.0);
+            float bH = pnF(bD * 1300.0) * 0.65 * bA1 + pnF(bD * 9000.0) * 0.35 * bA2;
+            float bLand = 1.0 - texture2D(tSpec, vMapUv).g;
+            normal = earthBump(-vViewPosition, normal, vec2(dFdx(bH), dFdy(bH)) * 2.6 * nearB * bLand, faceDirection);
+          }`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           float eNdl = dot(normalize(vEN), normalize(uSun));
           float eDark = 1.0 - smoothstep(-0.22, 0.06, eNdl);
           vec3 eLights = texture2D(tNight, vMapUv).rgb;
+          eLights = mix(eLights, smoothstep(vec3(0.18), vec3(0.95), eLights), uDetail * (1.0 - smoothstep(0.02, 0.4, uCamDist / uR))); // close up: no blurry halos
           float nearL = uDetail * (1.0 - smoothstep(0.02, 0.4, uCamDist / uR));
-          if (nearL > 0.001) { float c = pnF(normalize(vEP) * 5200.0); eLights *= mix(1.0, 0.25 + 2.4 * smoothstep(0.45, 0.75, c), nearL); }
+          // close up the night map is a blur (10 km per pixel), so: much dimmer, broken into clusters + points of light
+          if (nearL > 0.001) {
+            vec3 lD = normalize(vEP); float lFw = length(fwidth(lD));
+            float lA = 1.0 - smoothstep(0.12, 0.5, lFw * 5200.0 * 8.0), lB = 1.0 - smoothstep(0.12, 0.5, lFw * 26000.0 * 8.0);
+            float c = pnF(lD * 5200.0), c2 = pnN(lD * 26000.0);
+            float pts = mix(1.0, smoothstep(0.62, 0.8, c2) * 3.0, lB);
+            eLights *= mix(1.0, 0.28, nearL) * mix(1.0, (0.1 + 1.6 * smoothstep(0.5, 0.78, c)) * pts, nearL * lA);
+          }
           totalEmissiveRadiance += eLights * eLights * vec3(1.0, 0.82, 0.55) * 5.0 * eDark * (1.0 - 0.75 * eCl);`)
         .replace('#include <opaque_fragment>', `
-          vec3 eV = normalize(cameraPosition - vWorldPosition0);
-          float eF = 1.0 - clamp(dot(normalize(vEN), eV), 0.0, 1.0);
+          // aerial perspective: haze = how much air is between the camera and this bit of ground
+          // (works from orbit, where only the rim is hazy, and standing on it, where the far ground fades into blue)
+          vec3 hRo = cameraPosition - uC; vec3 hRd = vWorldPosition0 - cameraPosition; float hDist = length(hRd); hRd /= max(hDist, 1e-6);
+          float hRa = uR * (1.0 + uAtmo);
+          float hB = dot(hRo, hRd); float hC = dot(hRo, hRo) - hRa * hRa; float hDisc = hB * hB - hC;
+          float hIn = 0.0;
+          if (hC > 0.0) hIn = hDisc > 0.0 ? max(0.0, -hB - sqrt(max(hDisc, 0.0))) : hDist;
+          float hSeg = max(0.0, hDist - hIn);
+          float haze = 1.0 - exp(-hSeg / (uR * 0.24));
           float eLit = clamp(eNdl * 0.8 + 0.35, 0.0, 1.0);
-          outgoingLight = mix(outgoingLight, vec3(0.32, 0.55, 1.0) * 1.4 * eLit, eF * eF * eF * 0.75 * eLit);
+          float dusk = 1.0 - smoothstep(0.0, 0.32, abs(eNdl));
+          vec3 hCol = mix(vec3(0.34, 0.56, 1.0), vec3(1.0, 0.55, 0.32), dusk * 0.6) * 1.25;
+          outgoingLight = mix(outgoingLight, hCol * eLit, haze * (0.45 + 0.4 * eLit));
           #include <opaque_fragment>`);
     // world position for the rim (three only exposes it with some features on)
     sh.vertexShader = 'varying vec3 vWorldPosition0;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vWorldPosition0 = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -63,10 +103,27 @@ export async function makeEarth(R, { segments = 128, detail = true } = {}) {
   surface.receiveShadow = true; surface.castShadow = false;
   group.add(surface);
   // clouds: a thin shell a bit above the ground, lit by the sun, dark at night
-  const cmat = new THREE.MeshStandardMaterial({ color: 0xffffff, alphaMap: clouds, transparent: true, depthWrite: false, roughness: 1, metalness: 0 });
-  const cl = new THREE.Mesh(new THREE.SphereGeometry(R * 1.006, segments, segments / 2), cmat);
+  const cmat = new THREE.MeshStandardMaterial({ color: 0xffffff, alphaMap: clouds, transparent: true, depthWrite: false, roughness: 1, metalness: 0, envMapIntensity: 0 });
+  cmat.onBeforeCompile = (sh) => {
+    sh.uniforms.uR = uni.uR; sh.uniforms.uDetail = uni.uDetail; sh.uniforms.uCamDist = uni.uCamDist;
+    sh.vertexShader = 'varying vec3 vCP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vCP = position;');
+    sh.fragmentShader = 'varying vec3 vCP; uniform float uR; uniform float uDetail; uniform float uCamDist;\n' + NOISE + '\n' + sh.fragmentShader.replace('#include <alphamap_fragment>', `#include <alphamap_fragment>
+      float cNear = uDetail * (1.0 - smoothstep(0.01, 0.3, uCamDist / uR));
+      if (cNear > 0.001) {
+        vec3 cD = normalize(vCP);
+        float cFw = length(fwidth(cD));
+        float puff = mix(0.5, pnF(cD * 2200.0), 1.0 - smoothstep(0.12, 0.5, cFw * 2200.0 * 8.0)) * 0.6 + mix(0.5, pnF(cD * 11000.0), 1.0 - smoothstep(0.12, 0.5, cFw * 11000.0 * 8.0)) * 0.4;
+        float a0 = diffuseColor.a;
+        // thin cloud -> broken puffs, thick cloud stays solid
+        float a1 = smoothstep(0.62 - a0 * 0.55, 0.9 - a0 * 0.45, puff + a0 * 0.35);
+        diffuseColor.a = mix(a0, a0 * a1 * 1.25, cNear);
+        diffuseColor.rgb *= mix(1.0, 0.82 + 0.25 * puff, cNear);
+      }`);
+  };
+  cmat.customProgramCacheKey = () => 'earth-clouds-v1';
+  const cl = new THREE.Mesh(new THREE.SphereGeometry(R * (1 + cloudH), segments, segments / 2), cmat);
   cl.receiveShadow = true; group.add(cl);
-  const atmo = makeAtmosphere(R, R * 1.045, new THREE.Color(0.3, 0.56, 1.0), 1.4);
+  const atmo = makeAtmosphere(R, R * (1 + atmoH), new THREE.Color(0.3, 0.56, 1.0), 1.4);
   group.add(atmo.mesh);
   return {
     group, surface, clouds: cl, atmo, uni, R,
@@ -75,24 +132,42 @@ export async function makeEarth(R, { segments = 128, detail = true } = {}) {
       atmo.uni.uSun.value.copy(sunDirWorld);
       cl.rotation.y += dt * 0.004;
       uni.uCloudRot.value = -cl.rotation.y / (Math.PI * 2) + surface.rotation.y / (Math.PI * 2);
-      if (camPos) { const w = new THREE.Vector3(); group.getWorldPosition(w); uni.uCamDist.value = Math.max(0, camPos.distanceTo(w) - R * group.scale.x); }
+      if (camPos) {
+        const w = new THREE.Vector3(), sc = new THREE.Vector3(); group.getWorldPosition(w); group.getWorldScale(sc);
+        uni.uR.value = R * sc.x; uni.uCamDist.value = Math.max(0, camPos.distanceTo(w) - R * sc.x); uni.uC.value.copy(w);
+      }
     },
   };
 }
 
 // glow shell around a planet (drawn from the inside so it rims the planet), brighter on the day side
 export function makeAtmosphere(R, Ra, color, power = 1) {
-  const uni = { uSun: { value: new THREE.Vector3(1, 0, 0) }, uColor: { value: color.clone() }, uK: { value: Math.sqrt(Math.max(0, 1 - (R / Ra) * (R / Ra))) }, uPow: { value: power } };
+  const uni = { uSun: { value: new THREE.Vector3(1, 0, 0) }, uColor: { value: color.clone() }, uK: { value: Math.sqrt(Math.max(0, 1 - (R / Ra) * (R / Ra))) }, uPow: { value: power }, uRaL: { value: Ra }, uRatio: { value: R / Ra } };
   const mat = new THREE.ShaderMaterial({
     uniforms: uni, side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    vertexShader: /* glsl */`varying vec3 vN; varying vec3 vW; void main(){ vN = normalize(mat3(modelMatrix) * normal); vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
-    fragmentShader: /* glsl */`varying vec3 vN; varying vec3 vW; uniform vec3 uSun; uniform vec3 uColor; uniform float uK; uniform float uPow;
+    vertexShader: /* glsl */`varying vec3 vN; varying vec3 vW; varying vec3 vC; varying float vRa; uniform float uRaL;
+      void main(){ vN = normalize(mat3(modelMatrix) * normal); vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz;
+        vC = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz; vRa = length((modelMatrix * vec4(uRaL, 0.0, 0.0, 0.0)).xyz);
+        gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: /* glsl */`varying vec3 vN; varying vec3 vW; varying vec3 vC; varying float vRa; uniform vec3 uSun; uniform vec3 uColor; uniform float uK; uniform float uPow; uniform float uRatio;
       void main(){
         vec3 V = normalize(cameraPosition - vW); vec3 N = normalize(vN);
-        float x = clamp(-dot(N, V), 0.0, 1.0);                 // 0 at the outer edge, uK where the ray grazes the planet
-        float a = smoothstep(0.0, max(uK, 0.001), x);
         float sun = clamp(dot(N, normalize(uSun)) * 0.75 + 0.45, 0.0, 1.0);
         vec3 c = mix(uColor, vec3(1.0, 0.55, 0.3), (1.0 - sun) * sun * 1.2);
+        vec3 ro = cameraPosition - vC; float camR = length(ro);
+        if (camR < vRa) {
+          // inside the air: glow = how much air the view ray goes through (horizon = long path = bright band)
+          // (where the view ray hits the planet, the planet is drawn in front of this, so no test needed)
+          float tExit = length(vW - cameraPosition);
+          float thick = max(vRa - vRa * uRatio, 1e-6);
+          float a = 1.0 - exp(-tExit / thick * 0.13);
+          a *= a;
+          vec3 sc = mix(c, vec3(0.62, 0.8, 1.0), a * 0.35);
+          gl_FragColor = vec4(sc * a * sun * uPow, 1.0);
+          return;
+        }
+        float x = clamp(-dot(N, V), 0.0, 1.0);                 // 0 at the outer edge, uK where the ray grazes the planet
+        float a = smoothstep(0.0, max(uK, 0.001), x);
         gl_FragColor = vec4(c * a * a * sun * uPow, 1.0);
       }`,
   });
@@ -120,7 +195,7 @@ export async function makePlanet(name, R) {
   const d = PLANET_DATA[name];
   const map = await tex(d.tex);
   const g = new THREE.Group(); g.name = name;
-  const mat = new THREE.MeshStandardMaterial({ map, roughness: d.rough, metalness: 0 });
+  const mat = new THREE.MeshStandardMaterial({ map, roughness: d.rough, metalness: 0, envMapIntensity: 0 });
   // gas giants: soft banding moves a little (they spin fast)
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(R, 96, 48), mat);
   mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh);
@@ -134,7 +209,7 @@ export async function makePlanet(name, R) {
     const pos = rg.attributes.position, uv = rg.attributes.uv;
     for (let i = 0; i < pos.count; i++) { const r = Math.hypot(pos.getX(i), pos.getY(i)); uv.setXY(i, (r - r0) / (r1 - r0), 0.5); }
     rt.wrapS = rt.wrapT = THREE.ClampToEdgeWrapping;
-    const rm = new THREE.MeshStandardMaterial({ map: rt, alphaMap: rt, transparent: true, side: THREE.DoubleSide, roughness: 1, depthWrite: false });
+    const rm = new THREE.MeshStandardMaterial({ map: rt, alphaMap: rt, transparent: true, side: THREE.DoubleSide, roughness: 1, depthWrite: false, envMapIntensity: 0 });
     const ring = new THREE.Mesh(rg, rm); ring.rotation.x = -Math.PI / 2; ring.receiveShadow = true; ring.castShadow = true;
     g.add(ring); g.userData.ring = ring;
   }

@@ -9,7 +9,7 @@ import { clamp, rand, pick, sizeText, asBig } from '../core/util.js';
 export const MOLT_NEED = 0.22;
 
 // what eating something gives you (kind -> power)
-const POWER_FROM = { armytruck: 'armor', destroyer: 'armor', newsheli: 'glide', pigeon: 'glide', giantroach: 'armor', rat: null, gecko: null, server: 'electric', cryo: 'frost', car: 'armor', tank: 'armor', bird: 'glide', heli: 'glide', jet: 'glide', reactor: 'rad', nuke: 'rad', star: 'stars', sun: 'stars', blackhole: 'void', alien: 'alien', volcano: 'fire', gasstation: 'fire' };
+const POWER_FROM = { hurricane: 'electric', iceshelf: 'frost', vossorbital: 'electric', armytruck: 'armor', destroyer: 'armor', newsheli: 'glide', pigeon: 'glide', giantroach: 'armor', rat: null, gecko: null, server: 'electric', cryo: 'frost', car: 'armor', tank: 'armor', bird: 'glide', heli: 'glide', jet: 'glide', reactor: 'rad', nuke: 'rad', star: 'stars', sun: 'stars', blackhole: 'void', alien: 'alien', volcano: 'fire', gasstation: 'fire' };
 
 export class Growth {
   constructor(game) { this.game = game; this.reset(); }
@@ -18,7 +18,7 @@ export class Growth {
   feed(mass, target) {
     const G = this.game, p = G.player;
     const r = mass / p.mass;
-    const gain = Math.log(1 + 0.4 * Math.min(r, 2.5)) / 3;
+    const gain = Math.log(1 + 0.4 * Math.min(r, 2.5)) / 3 * (G.zone && G.zone.growMul || 1);
     p.targetSize = (p.targetSize || p.sizeM) * Math.exp(gain * 0.4);
     p.moltStore = (p.moltStore || 0) + gain * 0.6;
     p.hunger = Math.min(1, p.hunger + clamp(r * 0.9, 0.02, 1));
@@ -56,7 +56,7 @@ export class Growth {
     const ab = p.body.userData.abMesh; if (ab) { const k = 0.85 + 0.25 * p.hunger + 0.15 * clamp((p.moltStore || 0) / MOLT_NEED, 0, 1); ab.scale.setScalar(k); }
     p.molt = clamp((p.moltStore || 0) / MOLT_NEED, 0, 1);
     // outgrow the zone -> the camera pulls out to the next one
-    const z = G.zone; if (z && p.sizeM > OUTGROW[z.id] && G.state === 'play' && !G.story.transitioning) { const i = ZONE_ORDER.indexOf(z.id); if (ZONE_ORDER[i + 1]) G.story.transition(ZONE_ORDER[i + 1]); }
+    const z = G.zone; if (z && (z.outgrown ? z.outgrown(p) : p.sizeM > OUTGROW[z.id]) && G.state === 'play' && !G.story.transitioning) { const i = ZONE_ORDER.indexOf(z.id); if (ZONE_ORDER[i + 1]) G.story.transition(ZONE_ORDER[i + 1]); }
   }
 
   tryMolt() {
