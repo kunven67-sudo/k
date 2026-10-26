@@ -135,7 +135,10 @@ export class LiveDub extends EventTarget {
   _line(seg) {
     const audio = this._audioOf(seg);
     if (!audio) return;
-    this.queue.push({ seg, audio, heardAt: performance.now() });
+    // for reading: the line with 0.4 s of real sound around it (whatever of it is already here)
+    const l = Math.min(0.4, seg.s), have = this.ringEnd / 16000 - seg.e, r = Math.max(0, Math.min(0.4, have));
+    const padded = this._audioOf({ s: seg.s - l, e: seg.e + r }) || audio;
+    this.queue.push({ seg, audio, padded, pads: padded === audio ? [0, 0] : [l, r], heardAt: performance.now() });
     // if we fall far behind, drop the oldest lines (live must stay live)
     while (this.queue.length > 8) this.queue.shift();
     this._work();
@@ -154,7 +157,7 @@ export class LiveDub extends EventTarget {
         // everything that's waiting (up to ~26 s of talking) is read in one pass of the big model
         const jobs = [];
         let tot = 0;
-        while (this.queue.length && (!jobs.length || tot + this.queue[0].audio.length / 16000 <= 26)) { const j = this.queue.shift(); jobs.push(j); tot += j.audio.length / 16000 + 0.8; }
+        while (this.queue.length && (!jobs.length || tot + this.queue[0].padded.length / 16000 <= 26)) { const j = this.queue.shift(); jobs.push(j); tot += j.padded.length / 16000; }
         await this._doRound(jobs).catch(e => this.emit('error', e));
       }
     } finally { this.busy = false; }
@@ -162,7 +165,7 @@ export class LiveDub extends EventTarget {
   async _doRound(jobs) {
     const [infos, heards] = await Promise.all([
       Promise.all(jobs.map(j => this.e.listen.call('analyze', { audio: j.audio }))),
-      hearRound(this.e.asr, jobs.map(j => j.audio), { tier: this.settings.liveModel || 'good', lead: this._leadLang(), showLang: this.showLang, force: this.settings.forceLang || null }),
+      hearRound(this.e.asr, jobs.map(j => j.padded), { pads: jobs.map(j => j.pads), tier: this.settings.liveModel || 'good', lead: this._leadLang(), showLang: this.showLang, force: this.settings.forceLang || null }),
     ]);
     for (let i = 0; i < jobs.length && this.running; i++) await this._doLine(jobs[i], infos[i], heards[i]).catch(e => this.emit('error', e));
   }

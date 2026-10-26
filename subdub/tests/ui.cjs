@@ -20,7 +20,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   });
   const page = ctx.pages()[0] || await ctx.newPage();
   const errors = [];
-  page.on('console', (m) => { const t = m.text(); if (m.type() === 'error' || /SUBDUB|Problem|failed/i.test(t)) { log('console.' + m.type(), t.slice(0, 300)); if (m.type() === 'error') errors.push(t); } });
+  page.on('console', (m) => { const t = m.text(); if (m.type() === 'error' || m.type() === 'warning' || /SUBDUB|Problem|failed/i.test(t)) { log('console.' + m.type(), t.slice(0, 300)); if (m.type() === 'error') errors.push(t); } });
   page.on('pageerror', (e) => { log('PAGEERROR', e.message); errors.push(e.message); });
   if (mode === 'live') {
     // fake getDisplayMedia: a hidden video playing the clip, captured like a browser tab

@@ -51,27 +51,30 @@ serve({
     return out;
   },
   // Several lines in the same language, read in ONE pass (Whisper always works on 30 s, so this is much faster
-  // than one pass per line). Lines are glued with short silences; each sentence goes back to its own line.
-  async hearBatch({ clips, tier = 'good', lang, gap = 0.8 }, emit) {
+  // than one pass per line). Each clip carries a little of its own real surrounding sound (pads, seconds) and they
+  // are joined straight up: made-up gaps (silence, hiss) look like the end of the audio to Whisper and it stops.
+  async hearBatch({ clips, pads = null, tier = 'good', lang, debug = false }, emit) {
     const w = await getWhisper(tier, emit);
-    const G = Math.round(gap * 16000), offs = [];
-    const audio = new Float32Array(clips.reduce((s, c) => s + c.length + G, 0));
+    const offs = [], core = [];
+    const audio = new Float32Array(clips.reduce((s, c) => s + c.length, 0));
     let o = 0;
-    for (const c of clips) { offs.push(o / 16000); audio.set(c, o); o += c.length + G; }
+    clips.forEach((c, i) => {
+      const [l, r] = pads?.[i] || [0, 0], len = c.length / 16000;
+      offs.push(o / 16000); core.push([o / 16000 + l, o / 16000 + len - r]);
+      audio.set(c, o); o += c.length;
+    });
     const duration = audio.length / 16000;
     const sents = await w.run(await w.encode(audio), { lang, task: 'transcribe', duration });
     const per = clips.map(() => []);
     for (const st of sents) {
+      // the line this sentence overlaps most (or the closest one)
       let best = -1, bo = 0;
-      clips.forEach((c, i) => { const ov = Math.min(offs[i] + c.length / 16000, st.b) - Math.max(offs[i], st.a); if (ov > bo) { bo = ov; best = i; } });
-      if (best < 0) { // fell in a gap: closest line
-        let bd = Infinity;
-        clips.forEach((c, i) => { const d = Math.abs(offs[i] + c.length / 32000 - (st.a + st.b) / 2); if (d < bd) { bd = d; best = i; } });
-      }
-      const len = clips[best].length / 16000, a = Math.max(0, Math.min(len, st.a - offs[best]));
-      per[best].push({ a, b: Math.max(a, Math.min(len, st.b - offs[best])), text: st.text });
+      core.forEach(([a, b], i) => { const ov = Math.min(b, st.b) - Math.max(a, st.a); if (ov > bo) { bo = ov; best = i; } });
+      if (best < 0) { let bd = Infinity; core.forEach(([a, b], i) => { const d = Math.abs((a + b) / 2 - (st.a + st.b) / 2); if (d < bd) { bd = d; best = i; } }); }
+      const [ca, cb] = core[best], a = Math.max(0, Math.min(cb - ca, st.a - ca));
+      per[best].push({ a, b: Math.max(a, Math.min(cb - ca, st.b - ca)), text: st.text });
     }
-    return per;
+    return debug ? { per, sents, offs, duration } : per;
   },
   // The show's main language from up to 30 s of talking (stuck together): much surer than one short line.
   async detectLang({ audio, tier = 'good' }, emit) {

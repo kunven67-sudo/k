@@ -127,16 +127,18 @@ export class FileDub extends EventTarget {
       if (this.stopped) return;
       const cap = this.readyUntil() < 1 ? 8 : 26, round = [];
       let tot = 0;
-      while (k < mine.length && (!round.length || tot + mine[k][1] - mine[k][0] <= cap)) {
+      while (k < mine.length && (!round.length || tot + mine[k][1] - mine[k][0] + 0.8 <= cap)) {
         const [a, b] = mine[k++];
         if (this.lines.some(l => l.s < b && l.e > a && l.seg)) continue; // a previous piece did it already
         if (b - a < 0.25) continue;
         round.push([a, b]); tot += b - a + 0.8;
       }
       if (round.length) {
-        const clips = round.map(([a, b]) => this.voice16.slice(Math.floor(a * 16000), Math.floor(b * 16000)));
+        // each line with 0.4 s of its real surrounding sound (Whisper reads joined lines best that way)
+        const pads = round.map(([a, b]) => [Math.min(0.4, a), Math.min(0.4, this.duration - b)]);
+        const clips = round.map(([a, b], i) => this.voice16.slice(Math.floor((a - pads[i][0]) * 16000), Math.floor((b + pads[i][1]) * 16000)));
         const lead = this._leadLang();
-        const heards = await hearRound(this.e.asr, clips, { tier: this.settings.fileModel || 'good', lead, showLang: this.showLang, force: this.settings.forceLang || null, stats: this.stats });
+        const heards = await hearRound(this.e.asr, clips, { pads, tier: this.settings.fileModel || 'good', lead, showLang: this.showLang, force: this.settings.forceLang || null, stats: this.stats });
         for (let i = 0; i < round.length; i++) {
           if (this.stopped) return;
           await this._dubSegment(round[i][0], round[i][1], heards[i]);
