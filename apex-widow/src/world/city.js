@@ -213,10 +213,74 @@ export class City {
     S.add(im); this.bim = im; this.blds = blds;
     // ---------- the VOSS plaza (granite) with planters + street lamps around the tower block
     await this.buildPlaza();
+    // ---------- street lamps along every street (the nearest ones are real lights)
+    this.buildLamps();
     // ---------- harbor water + the bridge + far shore
     this.buildWater(); this.buildBridge();
     // fog / haze
     this.scene.fog = new THREE.FogExp2(0x101418, 0.00055);
+  }
+
+  // street lamps: posts drawn near the camera (instanced), a warm glowing dot for every lamp in the city, and every
+  // lamp is a fixture so the light pool lights the street wherever you are
+  buildLamps() {
+    const L = [];
+    for (let i = -NB; i <= NB; i++) for (let j = -NB; j <= NB; j++) {
+      const cx = i * PITCH, cz = j * PITCH;
+      if (cx + BLOCK / 2 > SHORE || (i === 0 && j === 0)) continue;
+      for (const e of [-1, 1]) for (const k of [-30, 0, 30]) {
+        L.push({ x: cx + k, z: cz + e * 44.3, ox: 0, oz: e * 1.2, rot: e > 0 ? 0 : Math.PI });
+        L.push({ x: cx + e * 44.3, z: cz + k, ox: e * 1.2, oz: 0, rot: e > 0 ? Math.PI / 2 : -Math.PI / 2 });
+      }
+    }
+    this.lamps = L;
+    for (const l of L) this.fixtures.push({ p: new THREE.Vector3(l.x + l.ox, CURB + 7.1, l.z + l.oz), color: 0xffb070, i: 7, r: 32 });
+    const poleG = mergeAll([
+      (() => { const g = new THREE.CylinderGeometry(0.07, 0.11, 7.5, 8); g.translate(0, CURB + 3.75, 0); return g; })(),
+      (() => { const g = new THREE.BoxGeometry(0.1, 0.08, 1.3); g.translate(0, CURB + 7.45, 0.6); return g; })(),
+      (() => { const g = new THREE.BoxGeometry(0.28, 0.12, 0.5); g.translate(0, CURB + 7.35, 1.2); return g; })(),
+    ]);
+    const headG = new THREE.BoxGeometry(0.22, 0.02, 0.42); headG.translate(0, CURB + 7.28, 1.2);
+    const poleM = new THREE.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.5, metalness: 0.6 });
+    const headM = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffc890, emissiveIntensity: 3 });
+    this.lampPole = new THREE.InstancedMesh(poleG, poleM, 700); this.lampHead = new THREE.InstancedMesh(headG, headM, 700);
+    for (const m of [this.lampPole, this.lampHead]) { m.count = 0; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = true; this.scene.add(m); }
+    // far away: warm glowing dots
+    const pos = new Float32Array(L.length * 3);
+    L.forEach((l, k) => pos.set([l.x + l.ox, CURB + 7.25, l.z + l.oz], k * 3));
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pm = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uH: { value: 800 } },
+      vertexShader: /* glsl */`uniform float uH; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; float d = -mv.z; gl_PointSize = clamp(uH * 0.9 / max(d, 1.0), 1.5, 10.0); vA = clamp((d - 60.0) / 120.0, 0.0, 1.0); }`,
+      fragmentShader: /* glsl */`varying float vA; void main(){ vec2 c = gl_PointCoord - 0.5; float r = length(c) * 2.0; float a = 1.0 - smoothstep(0.0, 1.0, r); gl_FragColor = vec4(vec3(1.0, 0.72, 0.42) * a * a * 2.5 * vA, 1.0); }`,
+    });
+    this.lampDots = new THREE.Points(g, pm); this.lampDots.frustumCulled = false; this.scene.add(this.lampDots);
+    this.lampT = 0;
+  }
+  updateLamps(dt) {
+    const cam = this.zone.game.camera.position;
+    this.lampT -= dt; if (this.lampT > 0) return; this.lampT = 0.5;
+    const R2 = 380 * 380, M = new THREE.Matrix4(); let n = 0;
+    for (const l of this.lamps) {
+      const dx = l.x - cam.x, dz = l.z - cam.z; if (dx * dx + dz * dz > R2 || n >= 700) continue;
+      M.makeRotationY(l.rot); M.setPosition(l.x, 0, l.z);
+      this.lampPole.setMatrixAt(n, M); this.lampHead.setMatrixAt(n, M); n++;
+    }
+    this.lampPole.count = this.lampHead.count = n;
+    this.lampPole.instanceMatrix.needsUpdate = true; this.lampHead.instanceMatrix.needsUpdate = true;
+    this.lampDots.material.uniforms.uH.value = this.zone.game.renderer.size().h;
+  }
+
+  // a building got bitten: lower it (instance matrix + collision box), or remove it
+  setBuilding(b) {
+    const M = new THREE.Matrix4().makeScale(b.w, Math.max(0.01, b.h), b.d); M.setPosition(b.x, b.y0, b.z);
+    this.bim.setMatrixAt(b.index, M); this.bim.instanceMatrix.needsUpdate = true;
+    b.box.max.y = b.y0 + b.h;
+  }
+  removeBuilding(b) {
+    b.gone = true; b.box.gone = true;
+    const M = new THREE.Matrix4().makeScale(0, 0, 0); this.bim.setMatrixAt(b.index, M); this.bim.instanceMatrix.needsUpdate = true;
   }
 
   async buildPlaza() {
@@ -239,7 +303,7 @@ export class City {
       B.box(Math.abs(ox) + 0.12, 0.08, Math.abs(oz) + 0.12, 'darkmetal', x + ox / 2, CURB + 7.45, z + oz / 2, 'PROP');
       B.box(0.5, 0.12, 0.28, 'darkmetal', x + ox, CURB + 7.35, z + oz, 'PROP');
       B.box(0.42, 0.02, 0.22, 'lightWarm', x + ox, CURB + 7.28, z + oz, null);
-      this.fixtures.push({ p: new THREE.Vector3(x + ox, CURB + 7.1, z + oz), color: 0xffb070, i: 1.6, r: 22 });
+      this.fixtures.push({ p: new THREE.Vector3(x + ox, CURB + 7.1, z + oz), color: 0xffb070, i: 7, r: 32 });
     }
     // hydrants, trash cans, a mailbox, newspaper boxes, bus stop shelter on the south street
     for (const [x, z] of [[-40, -44.3], [40, 44.3]]) { B.cyl(0.13, 0.15, 0.6, 'paintRed', x, CURB + 0.3, z, 'SMALL', 12); B.add(new THREE.SphereGeometry(0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 'paintRed', { p: [x, CURB + 0.6, z] }, 'SMALL'); }
@@ -357,6 +421,7 @@ export class City {
   }
 
   update(dt, dtReal) {
+    if (this.lampPole) this.updateLamps(dtReal);
     if (this.waterU) this.waterU.uT.value += dtReal;
     if (this.groundU) this.groundU.uWet.value = this.rain;
     const s = this.zone.game.player ? this.zone.game.player.sizeM : 0.004;

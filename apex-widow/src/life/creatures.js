@@ -23,6 +23,10 @@ export const KINDS = {
   mouse:      { name: 'House mouse', latin: 'Mus musculus', L: 0.085, mass: 2e-2, speed: 1.4, hp: 60, move: 'walk', bite: 10, huntRatio: 0.3, fact: 'Squeezes through a gap the size of a pencil.' },
   rat:        { name: 'Brown rat', latin: 'Rattus norvegicus', L: 0.22, mass: 3e-1, speed: 2.2, hp: 160, move: 'walk', bite: 24, huntRatio: 0.3, fact: 'Swims, climbs, chews through concrete. Lab rats escape a lot.' },
   giantroach: { name: 'Specimen R-2', latin: 'Gromphadorhina portentosa (VOSS mod.)', L: 0.09, mass: 3e-2, speed: 0.25, hp: 220, move: 'walk', climb: true, bite: 16, huntRatio: 0.9, boss: true, fact: 'A hissing cockroach dosed with your serum. Armoured. Angry.' },
+  pigeon:     { name: 'Rock pigeon', latin: 'Columba livia', L: 0.32, mass: 0.35, speed: 6, hp: 70, move: 'fly', perch: 0.9, bite: 6, huntRatio: 0.06, city: true, fact: 'Lives on every street on Earth. Pecks up anything small that moves, spiders included.' },
+  cat:        { name: 'Alley cat', latin: 'Felis catus', L: 0.46, mass: 4.5, speed: 4.5, hp: 260, move: 'walk', bite: 30, huntRatio: 0.6, jump: 1.2, city: true, fact: 'Kills billions of small animals a year. Plays with a spider before it eats it.' },
+  dog:        { name: 'Stray dog', latin: 'Canis familiaris', L: 0.75, mass: 22, speed: 6, hp: 520, move: 'walk', bite: 45, huntRatio: 0.45, city: true, fact: 'Barks, chases, bites. Brave right up until you are bigger than it.' },
+  raccoon:    { name: 'Raccoon', latin: 'Procyon lotor', L: 0.6, mass: 7, speed: 3.5, hp: 300, move: 'walk', bite: 32, huntRatio: 0.5, climb: false, city: true, fact: 'Opens trash cans, doors and coolers. Eats anything it can hold, you included.' },
   cellar:     { name: 'Cellar spider', latin: 'Pholcus phalangioides', L: 0.008, mass: 2e-5, speed: 0.12, hp: 10, move: 'spider', species: 'cellar', bite: 6, huntRatio: 1.6, fact: 'Hunts other spiders, black widows included, from its messy web.' },
 };
 
@@ -229,7 +233,7 @@ export class Creature {
 }
 
 function cause(kind) {
-  return { cellar: 'caught by a cellar spider', centipede: 'eaten by a house centipede', gecko: 'eaten by a gecko', mouse: 'eaten by a mouse', rat: 'eaten by a rat', giantroach: 'crushed by Specimen R-2', ant: 'swarmed by ants' }[kind] || 'eaten by a ' + KINDS[kind].name.toLowerCase();
+  return { pigeon: 'pecked up by a pigeon', cat: 'caught by an alley cat', dog: 'bitten in half by a stray dog', raccoon: 'eaten by a raccoon', cellar: 'caught by a cellar spider', centipede: 'eaten by a house centipede', gecko: 'eaten by a gecko', mouse: 'eaten by a mouse', rat: 'eaten by a rat', giantroach: 'crushed by Specimen R-2', ant: 'swarmed by ants' }[kind] || 'eaten by a ' + KINDS[kind].name.toLowerCase();
 }
 
 export class Creatures {

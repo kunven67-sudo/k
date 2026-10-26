@@ -157,6 +157,7 @@ export class Player {
     const cand = new THREE.Vector3().copy(this.pos).add(step);
     // 2) stay on the surface under us
     const down = G.probe(_v.copy(cand).addScaledVector(this.up, s * 0.45), _v2.copy(this.up).negate(), s * 1.0, s);
+    this.groundBox = down ? down.box || null : null;
     if (down) {
       this.pos.copy(down.point);
       this.up.lerp(down.normal, 1 - Math.exp(-22 * dt)).normalize();

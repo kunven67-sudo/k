@@ -138,8 +138,10 @@ export class Actions {
     if (!this.helpless(t)) { G.hud.toast(`${this.tName(t)} is still fighting. Bite it, or web it first.`, 1.8); return; }
     const ratio = this.tMass(t) / p.mass;
     if (t.type === 'h' && p.sizeM < 0.25) { G.hud.toast('Too big for you to wrap. Grow first.', 1.8); return; }
-    // big prey gets wrapped first (real widows wrap anything that could fight back)
-    const needWrap = ratio > 0.6 && !(t.type === 'c' ? t.c.wrapped : t.h.state === 'wrapped');
+    const chunk = t.type === 'c' && t.c.def.chunk;
+    // big prey gets wrapped first (real widows wrap anything that could fight back). Huge things (buildings, planets)
+    // are eaten a bite at a time instead.
+    const needWrap = !chunk && ratio > 0.6 && !(t.type === 'c' ? t.c.wrapped : t.h.state === 'wrapped');
     if (needWrap) {
       if (p.silk < 0.15) { G.hud.toast('Not enough silk to wrap it.', 1.5); return; }
       p.silk -= 0.15;
@@ -150,8 +152,9 @@ export class Actions {
       return;
     }
     // feed: bigger meals take longer
-    const dur = clamp(0.8 + 2.2 * Math.sqrt(ratio), 0.8, 9);
-    this.feeding = { t, dur, prog: 0, mass: this.tMass(t) };
+    const mass = chunk ? Math.min(this.tMass(t), p.mass * 2.5) : this.tMass(t);
+    const dur = clamp(0.8 + 2.2 * Math.sqrt(mass / p.mass), 0.8, 9);
+    this.feeding = { t, dur, prog: 0, mass, chunk };
     G.audio.slurpStart();
     if (ratio < 0.05) G.audio.crunch();
   }
@@ -162,12 +165,18 @@ export class Actions {
     if (moving || !this.valid(F.t) || p.mode !== 'ground') { this.stopFeed(); return; }
     F.prog += dt / F.dur;
     const t = F.t;
-    if (t.type === 'c') { t.c.eatenFrac = F.prog; t.c.root.scale.setScalar(t.c.L * (1 - 0.35 * F.prog)); }
+    if (t.type === 'c') { t.c.eatenFrac = F.prog; if (!F.chunk) t.c.root.scale.setScalar(t.c.L * (1 - 0.35 * F.prog)); }
     else t.h.eatenFrac = F.prog;
     p.rig.excite = 1; p.rig.biting = 0.6 + Math.sin(G.time * 18) * 0.3;
     if (F.prog >= 1) {
       this.stopFeed();
       G.growth.feed(F.mass, t);
+      if (F.chunk && t.c.mass > F.mass * 1.02) {
+        // a bite out of something huge: it gets smaller, you keep going (E again)
+        const gone = t.c.takeChunk(F.mass);
+        if (!gone) { G.hud.toast('You tear a huge piece off the ' + t.c.def.name.toLowerCase() + '. E to keep eating.', 2); return; }
+        G.recordEat(t.c.kind, t.c.def); if (this.lock === t) this.lock = null; return;
+      }
       if (t.type === 'c') { t.c.remove(); for (const c of G.webs.cocoons) if (c.target === t.c) c.mesh.removeFromParent(); G.recordEat(t.c.kind, t.c.def); }
       else { t.h.consumed(); for (const c of G.webs.cocoons) if (c.target === t.h) { c.mesh.scale.multiplyScalar(0.7); c.empty = true; } G.recordEat('human', { name: 'Human', latin: 'Homo sapiens' }); G.stats.humans++; G.story.firstHuman && G.story.firstHuman(t.h); }
       if (this.lock === t) this.lock = null;

@@ -50,7 +50,7 @@ vUnit = unit; vHair = aHair; vLocal = position;`;
 const CHITIN_PARS_F = /* glsl */`
 varying vec3 vUnit; varying float vHair; varying vec3 vLocal;
 uniform float uPart; uniform float uPattern; uniform vec3 uPatColor; uniform vec3 uPatColor2; uniform float uSoft; uniform float uHeat;
-uniform float uTime; uniform float uElec; uniform float uLava; uniform float uRad; uniform float uStars; uniform float uVoid; uniform float uFrost; uniform float uAlien;
+uniform float uTime; uniform vec3 uRimCol; uniform float uElec; uniform float uLava; uniform float uRad; uniform float uStars; uniform float uVoid; uniform float uFrost; uniform float uAlien;
 float awH(vec3 p){ p = fract(p * 0.3183099 + .1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float awN(vec3 x){ vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(awH(i), awH(i + vec3(1,0,0)), f.x), mix(awH(i + vec3(0,1,0)), awH(i + vec3(1,1,0)), f.x), f.y),
@@ -142,10 +142,16 @@ const CHITIN_EMIT_F = /* glsl */`
     E += vec3(2.4, 1.2, 3.4) * ring * top * uVoid * 2.5;
   }
   if (uHeat > 0.01) E += vec3(2.2, 0.6, 0.15) * uHeat * (0.6 + 0.4 * notHair);
+  // rim light: a thin bright edge so a black spider still reads in the dark (like a movie night shot)
+  float rimV = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+  E += uRimCol * rimV * rimV * rimV * (0.6 + 0.4 * notHair);
   totalEmissiveRadiance += E;
 }`;
 
 const chitinUniformsList = [];
+const RIM = { value: new THREE.Color(0, 0, 0) };
+// one rim colour for every spider (the game sets it from how dark it is around you)
+export function setRim(r, g, b) { RIM.value.setRGB(r, g, b); }
 export function makeChitin({ color, rough, coat, part, pattern = 0, patColor = 0xb0100c, patColor2 = 0xe0c090, quality = 'high', micro = 0.14, coatAmt = 1 }) {
   const hi = quality !== 'low';
   const m = new THREE.MeshPhysicalMaterial({
@@ -155,7 +161,7 @@ export function makeChitin({ color, rough, coat, part, pattern = 0, patColor = 0
   });
   const u = {
     uPart: { value: part }, uPattern: { value: pattern }, uPatColor: { value: new THREE.Color(patColor) }, uPatColor2: { value: new THREE.Color(patColor2) },
-    uSoft: { value: 0 }, uHeat: { value: 0 }, uTime: { value: 0 },
+    uSoft: { value: 0 }, uHeat: { value: 0 }, uTime: { value: 0 }, uRimCol: RIM,
     uElec: { value: 0 }, uLava: { value: 0 }, uRad: { value: 0 }, uStars: { value: 0 }, uVoid: { value: 0 }, uFrost: { value: 0 }, uAlien: { value: 0 },
   };
   m.userData.u = u;

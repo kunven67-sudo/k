@@ -15,6 +15,7 @@ import { placeLabels, makeNote, makeVial, Screen, makeBoard, BOARD_48 } from './
 import { City } from './city.js';
 import { Creatures } from '../life/creatures.js';
 import { Humans } from '../life/humans.js';
+import { CityLife } from './citylife.js';
 
 const _v = new THREE.Vector3();
 
@@ -81,6 +82,9 @@ export class Halvern {
     this.humans = new Humans(this);
     await this.humans.load();
     for (const n of Object.keys(this.floors)) this.spawnFloorLife(+n);
+    hud.loading('Traffic, people, pigeons', 0.9);
+    this.life = new CityLife(this);
+    await this.life.build();
     hud.loading('Done', 1);
   }
 
@@ -141,6 +145,7 @@ export class Halvern {
     for (const n of [...PLAYABLE, ROOF]) { const y0 = elev(n); if (p.y >= y0 - 0.35 && p.y < y0 + (n === ROOF ? 30 : floorH(n) - 0.3)) return n; }
     return null;
   }
+  rimAmount(cam) { const day = this.sky ? this.sky.dayAmount : 0; return this.inside(cam) ? 0.12 : 0.55 * (1 - day) + 0.1; }
   canSee(p) { if (!this.visIn) return true; return p.y > this.vis0 && p.y < this.vis1; }
   inside(p) { return Math.abs(p.x) < HALF && Math.abs(p.z) < HALF && p.y > -2 && p.y < elev(ROOF) - 0.3; }
 
@@ -206,6 +211,7 @@ export class Halvern {
     this.city.update(dt, dtReal);
     this.creatures.update(dt);
     this.humans.update(dt);
+    this.life.update(dt);
     // pickups
     if (p) for (const it of this.items) {
       if (it.taken) continue;

@@ -9,7 +9,7 @@ import { clamp, rand, pick, sizeText, asBig } from '../core/util.js';
 export const MOLT_NEED = 0.22;
 
 // what eating something gives you (kind -> power)
-const POWER_FROM = { giantroach: 'armor', rat: null, gecko: null, server: 'electric', cryo: 'frost', car: 'armor', tank: 'armor', bird: 'glide', heli: 'glide', jet: 'glide', reactor: 'rad', nuke: 'rad', star: 'stars', sun: 'stars', blackhole: 'void', alien: 'alien', volcano: 'fire', gasstation: 'fire' };
+const POWER_FROM = { armytruck: 'armor', destroyer: 'armor', newsheli: 'glide', pigeon: 'glide', giantroach: 'armor', rat: null, gecko: null, server: 'electric', cryo: 'frost', car: 'armor', tank: 'armor', bird: 'glide', heli: 'glide', jet: 'glide', reactor: 'rad', nuke: 'rad', star: 'stars', sun: 'stars', blackhole: 'void', alien: 'alien', volcano: 'fire', gasstation: 'fire' };
 
 export class Growth {
   constructor(game) { this.game = game; this.reset(); }

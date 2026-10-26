@@ -290,6 +290,106 @@ function rodent(o) {
   } };
 }
 
+// ------------------------------------------------------------------ four-legged mammals: cat, dog, raccoon
+// body length 1 = nose to rump (tail extra). Fur texture + sheen, real proportions per animal.
+function quad(o) {
+  const root = new THREE.Group();
+  const fur = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: furTex(o.fur), roughness: 0.95, sheen: 1, sheenRoughness: 0.55, sheenColor: new THREE.Color(o.fur).multiplyScalar(1.5) });
+  const dark = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: furTex(o.dark || 0x202020), roughness: 0.95, sheen: 0.6, sheenColor: new THREE.Color(o.dark || 0x303030) });
+  const nose = mat('quadnose' + (o.nose || 0x201818), { color: o.nose || 0x201818, roughness: 0.35, clearcoat: 0.6 });
+  const eyeM = mat('quadeye' + o.eye, { color: o.eye || 0x8a7a20, roughness: 0.02, clearcoat: 1, emissive: new THREE.Color(o.eye || 0x8a7a20).multiplyScalar(0.12) });
+  const H = o.legH; // shoulder height (body lengths)
+  // torso: a lathe along +Z, chest deeper than the waist
+  const prof = [[0, -0.5], [0.1, -0.47], [0.15, -0.38], [0.16, -0.2], [o.chest * 0.85, 0.0], [o.chest, 0.18], [o.chest * 0.9, 0.3], [0.08, 0.36]].map(([r, z]) => new THREE.Vector2(r, z));
+  const tg = new THREE.LatheGeometry(prof, 20); tg.rotateX(Math.PI / 2); tg.scale(o.wide || 0.85, 1, 1); tg.translate(0, H + 0.02, -0.1);
+  const body = new THREE.Mesh(tg, fur); root.add(body);
+  // neck + head
+  const head = new THREE.Group(); head.position.set(0, H + 0.1, 0.3); root.add(head);
+  head.add(new THREE.Mesh(seg(V(0, -0.06, -0.08), V(0, 0.04, 0.06), o.neck || 0.08, (o.neck || 0.08) * 0.85, 10), fur));
+  const skull = new THREE.Mesh(ell(o.headW, o.headW * 0.9, o.headL * 0.55, 0, 0.08, 0.1, 18, 12), fur); head.add(skull);
+  const snout = new THREE.Mesh(ell(o.headW * 0.55, o.headW * 0.5, o.snout, 0, 0.05, 0.1 + o.headL * 0.45, 14, 10), o.mask ? dark : fur); head.add(snout);
+  const ns = new THREE.Mesh(ell(0.022, 0.016, 0.014, 0, 0.065, 0.1 + o.headL * 0.45 + o.snout * 0.95), nose); head.add(ns);
+  for (const sd of [-1, 1]) {
+    const e = new THREE.Mesh(ell(0.022, 0.02, 0.012, sd * o.headW * 0.55, 0.12, 0.1 + o.headL * 0.35), eyeM); head.add(e);
+    if (o.mask) head.add(new THREE.Mesh(ell(0.06, 0.035, 0.03, sd * o.headW * 0.5, 0.12, 0.1 + o.headL * 0.3), dark));
+    // ears: tall triangles (cat), rounded (raccoon), floppy (dog)
+    const eg = new THREE.ConeGeometry(o.earW, o.earH, 6); eg.translate(0, o.earH / 2, 0);
+    const ear = new THREE.Mesh(eg, o.mask ? dark : fur); ear.position.set(sd * o.headW * 0.62, 0.15, 0.06);
+    ear.rotation.set(o.floppy ? 1.9 : -0.1, 0, sd * (o.floppy ? -0.35 : -0.25)); head.add(ear);
+  }
+  if (o.whiskers) {
+    const wp = []; for (const sd of [-1, 1]) for (let i = 0; i < 4; i++) wp.push(sd * 0.03, 0.05, 0.1 + o.headL * 0.45 + o.snout * 0.8, sd * (0.16 + Math.random() * 0.05), 0.04 + (i - 1.5) * 0.02, 0.1 + o.headL * 0.45 + o.snout * 0.6);
+    const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3));
+    head.add(new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.5 })));
+  }
+  // legs: upper + lower + paw, front pair under the chest, hind pair with the backward hock
+  const legs = [];
+  for (const [z, i, hind] of [[0.2, 0, false], [-0.38, 1, true]]) for (const side of [-1, 1]) {
+    const pv = new THREE.Group(); pv.position.set(side * o.chest * 0.55, H, z);
+    const knee = hind ? V(side * 0.01, -H * 0.45, 0.07) : V(side * 0.005, -H * 0.5, -0.01);
+    const ankle = hind ? V(side * 0.01, -H * 0.82, -0.05) : V(side * 0.005, -H * 0.9, 0.0);
+    const gg = mergeGeometries([seg(V(0, 0.03, 0), knee, o.legR * 1.5, o.legR * 1.1, 8), seg(knee, ankle, o.legR, o.legR * 0.8, 8), seg(ankle, V(side * 0.005, -H + 0.012, 0.02), o.legR * 0.8, o.legR * 0.7, 8), ell(o.legR * 1.2, o.legR * 0.6, o.legR * 1.6, side * 0.005, -H + o.legR * 0.55, 0.035, 10, 6)]);
+    pv.add(new THREE.Mesh(gg, o.socks ? dark : fur)); root.add(pv);
+    legs.push({ pivot: pv, side, i, phase: (i === 0 ? 0 : Math.PI) + (side > 0 ? Math.PI * 0.5 : 0), swing: 0.55 });
+  }
+  // tail
+  const tp = []; for (let k = 0; k <= 10; k++) tp.push(V(0, H + 0.04 + Math.sin(k / 10 * Math.PI) * o.tailUp, -0.58 - k * o.tail / 10));
+  const tailG = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(tp), 16, o.tailR, 7);
+  const tail = new THREE.Mesh(tailG, fur);
+  const tailPivot = new THREE.Group(); tailPivot.position.set(0, H + 0.04, -0.58); tail.position.set(0, -(H + 0.04), 0.58); tailPivot.add(tail); root.add(tailPivot);
+  if (o.rings) for (let k = 1; k <= 5; k++) { const r = new THREE.Mesh(new THREE.TorusGeometry(o.tailR * 1.02, o.tailR * 0.35, 6, 12), dark); r.position.copy(tp[k * 2 - 1]).sub(V(0, H + 0.04, -0.58)); r.rotation.x = Math.PI / 2; tailPivot.add(r); }
+  return { root, body, legs, head, tail: tailPivot, anim(t, speed, mode) {
+    const run = speed > 0.01;
+    const f = 5 + speed * 9;
+    for (const L of legs) L.pivot.rotation.x = Math.sin(t * f + L.phase) * (run ? 0.6 : 0.02);
+    body.position.y = run ? Math.abs(Math.sin(t * f)) * 0.02 : Math.sin(t * 1.6) * 0.004; // breathing
+    head.rotation.x = run ? -0.1 : Math.sin(t * 0.7) * 0.12; head.rotation.y = run ? 0 : Math.sin(t * 0.43) * 0.35;
+    tailPivot.rotation.y = Math.sin(t * (run ? 7 : (o.wag || 1.5))) * (o.wag ? 0.5 : 0.25);
+    if (mode === 'hiss') { head.rotation.x = -0.3; body.position.y = 0.03; }
+  } };
+}
+
+// ------------------------------------------------------------------ pigeon: walks with the head bob, flies off in a clatter
+function pigeon() {
+  const root = new THREE.Group();
+  const grey = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: furTex(0x8a8e96), roughness: 0.85, sheen: 0.8, sheenColor: new THREE.Color(0xb0b4bc) });
+  const neckM = new THREE.MeshPhysicalMaterial({ color: 0x5a6070, roughness: 0.4, iridescence: 1, iridescenceIOR: 1.45, iridescenceThicknessRange: [250, 600], sheen: 1, sheenColor: new THREE.Color(0x40a070) });
+  const pinkM = mat('pigeonfeet', { color: 0xc86a6a, roughness: 0.6 });
+  const eyeM = mat('pigeoneye', { color: 0xd86a10, roughness: 0.05, clearcoat: 1 });
+  const body = new THREE.Mesh(ell(0.2, 0.2, 0.38, 0, 0.3, -0.02), grey); root.add(body);
+  const head = new THREE.Group(); head.position.set(0, 0.42, 0.24); root.add(head);
+  head.add(new THREE.Mesh(seg(V(0, -0.14, -0.06), V(0, 0.0, 0.02), 0.12, 0.08, 10), neckM));
+  head.add(new THREE.Mesh(ell(0.08, 0.08, 0.09, 0, 0.04, 0.05), grey));
+  head.add(new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.08, 6).rotateX(Math.PI / 2).translate(0, 0.03, 0.17), mat('pigeonbeak', { color: 0x2a2a2a, roughness: 0.4 })));
+  for (const sd of [-1, 1]) head.add(new THREE.Mesh(ell(0.018, 0.018, 0.012, sd * 0.06, 0.06, 0.09), eyeM));
+  const wings = [];
+  for (const sd of [-1, 1]) {
+    const pv = new THREE.Group(); pv.position.set(sd * 0.16, 0.38, 0.05);
+    const wg = new THREE.SphereGeometry(1, 12, 8); wg.scale(0.3, 0.03, 0.42); wg.translate(sd * 0.22, 0, -0.12);
+    const w = new THREE.Mesh(wg, grey); pv.add(w);
+    for (const zz of [-0.22, -0.32]) { const bar = new THREE.Mesh(ell(0.05, 0.031, 0.02, sd * 0.1, 0.0, zz), mat('pigeonbar', { color: 0x2a2c30, roughness: 0.8 })); pv.add(bar); }
+    root.add(pv); wings.push({ m: pv, side: sd });
+  }
+  const tailG = new THREE.SphereGeometry(1, 10, 6); tailG.scale(0.12, 0.02, 0.22); tailG.translate(0, 0.26, -0.48);
+  root.add(new THREE.Mesh(tailG, mat('pigeontail', { color: 0x40444c, roughness: 0.8 })));
+  const legs = [];
+  for (const sd of [-1, 1]) { const pv = new THREE.Group(); pv.position.set(sd * 0.07, 0.15, 0.0); pv.add(new THREE.Mesh(mergeGeometries([seg(V(0, 0, 0), V(0, -0.14, 0.02), 0.014, 0.012, 6), ell(0.03, 0.008, 0.05, 0, -0.145, 0.04, 8, 4)]), pinkM)); root.add(pv); legs.push({ pivot: pv, side: sd, i: 0, phase: sd > 0 ? 0 : Math.PI, swing: 0.5 }); }
+  return { root, body, legs, wings, head, anim(t, speed, mode) {
+    if (mode === 'fly') {
+      for (const w of wings) { w.m.rotation.z = w.side * Math.sin(t * 28) * 0.9; }
+      for (const L of legs) L.pivot.rotation.x = 0.9;
+      head.position.z = 0.24;
+    } else {
+      for (const w of wings) w.m.rotation.z = 0;
+      const run = speed > 0.005;
+      for (const L of legs) L.pivot.rotation.x = Math.sin(t * 9 + L.phase) * (run ? 0.6 : 0);
+      // the famous head bob: thrust forward, hold still while the body catches up
+      head.position.z = 0.24 + (run ? (Math.sin(t * 9) > 0 ? 0.06 : -0.02) : Math.max(0, Math.sin(t * 4.0)) * 0.03 * (Math.sin(t * 0.7) > 0.6 ? 1 : 0));
+      head.rotation.x = run ? 0 : Math.max(0, Math.sin(t * 2.1)) * 0.6 * (Math.sin(t * 0.33) > 0.4 ? 1 : 0); // pecking
+    }
+  } };
+}
+
 export const MODELS = {
   fruitfly: () => fly({ body: 0xb8914c, eye: 0xd8160c, wingLen: 0.8 }),
   housefly: () => fly({ body: 0x4a4a4e, eye: 0x8a2a14, stripes: true, wingLen: 0.7 }),
@@ -299,4 +399,8 @@ export const MODELS = {
   mealworm: worm, ant, silverfish, centipede, gecko,
   mouse: () => rodent({ fur: 0x8a7a6a, ear: 0.07, tail: 0.75 }),
   rat: () => rodent({ fur: 0x5a4c40, ear: 0.055, tail: 0.95 }),
+  pigeon,
+  cat: () => quad({ fur: [0x2a2624, 0x8a6a48, 0x9a9690, 0x1a1a1a][Math.floor(Math.random() * 4)], dark: 0x1a1816, legH: 0.42, chest: 0.13, headW: 0.11, headL: 0.2, snout: 0.05, earW: 0.045, earH: 0.09, neck: 0.07, legR: 0.025, tail: 0.75, tailR: 0.025, tailUp: 0.25, eye: 0x9ab020, whiskers: true, nose: 0xc87a7a }),
+  dog: () => quad({ fur: [0x8a6a40, 0x2a2420, 0xc8b090, 0x5a4a3a][Math.floor(Math.random() * 4)], dark: 0x2a2018, legH: 0.6, chest: 0.17, headW: 0.12, headL: 0.26, snout: 0.13, earW: 0.06, earH: 0.12, neck: 0.1, legR: 0.035, tail: 0.38, tailR: 0.03, tailUp: 0.2, eye: 0x3a2410, floppy: true, wag: 9 }),
+  raccoon: () => quad({ fur: 0x7a7470, dark: 0x1a1a1c, legH: 0.32, chest: 0.17, wide: 1.0, headW: 0.12, headL: 0.2, snout: 0.09, earW: 0.04, earH: 0.06, neck: 0.1, legR: 0.03, tail: 0.5, tailR: 0.06, tailUp: 0.05, eye: 0x101010, mask: true, rings: true, socks: true, whiskers: true }),
 };

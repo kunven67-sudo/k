@@ -20,6 +20,7 @@ const ROLE = {
   receptionist: { file: 'f-formal', h: 1.68, colors: {}, pers: ['scared', 'curious'] },
   hazmat:       { file: 'm-worker', h: 1.8, colors: { Worker_Vest: 0xd8c018, Worker_Yellow: 0xe0c820, Skin: 0xc8b878 }, pers: 'catch' },
   swat:         { file: 'm-swat', h: 1.84, colors: {}, pers: 'guard', gun: true },
+  police:       { file: ['m-suit', 'f-suit'], h: [1.8, 1.7], colors: { Suit: 0x14213a, Grey: 0x1a2232, Tie: 0x0a0a10, White: 0x8a96aa }, pers: 'guard', gun: true },
   soldier:      { file: 'f-soldier', h: 1.72, colors: {}, pers: 'guard', gun: true },
   citizen:      { file: ['m-casual-2', 'm-casual-hoodie', 'f-casual', 'f-formal', 'm-suit', 'f-suit', 'm-adventurer'], h: [1.77, 1.65], pers: ['scared', 'scared', 'curious', 'brave'] },
 };
@@ -87,7 +88,7 @@ export class Human {
     const hs = [].concat(this.def.h); this.height = (this.sex === 'f' ? hs[hs.length - 1] : hs[0]) * rand(0.96, 1.04);
     this.name = this.def.name || pick(NAMES);
     this.pers = Array.isArray(this.def.pers) ? pick(this.def.pers) : this.def.pers;
-    this.floor = o.floor; this.y0 = o.y; this.path = o.path ? o.path.map(([x, z]) => new THREE.Vector3(x, o.y, z)) : null; this.pathI = 0;
+    this.floor = o.floor; this.y0 = o.y; this.outside = !!o.outside; this.path = o.path ? o.path.map(([x, z]) => new THREE.Vector3(x, o.y, z)) : null; this.pathI = 0;
     this.pos = new THREE.Vector3(o.x, o.y, o.z); this.yaw = o.rot || 0;
     this.home = this.pos.clone(); this.sit = !!o.sit;
     this.hp = 100; this.venom = 0; this.state = this.path ? 'walk' : 'work'; this.timer = rand(2, 8);
@@ -224,6 +225,12 @@ export class Human {
       case 'flee': {
         this.timer -= dt;
         const away = toP ? toP.clone().negate() : new THREE.Vector3(0, 0, -1);
+        if (this.outside) {
+          if (!alive || dP > Math.max(40, P.sizeM * 25) || this.timer < 0) { this.leave(); break; }
+          face = away.normalize(); speed = 4.6; this.play('Run');
+          if (Math.random() < dt * 0.4) this.say('scared');
+          break;
+        }
         // run toward the elevator lobby / stairs, away from you
         const exit = new THREE.Vector3(this.pos.z > 0 ? 7.1 : -3.5, this.pos.y, this.pos.z > 0 ? 6.3 : -6.3);
         const dir = exit.sub(this.pos); dir.y = 0;

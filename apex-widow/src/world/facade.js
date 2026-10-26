@@ -12,7 +12,7 @@ export function makeFacadeMaterial({ instanced = true } = {}) {
     sh.uniforms.uNight = FACADE.night; sh.uniforms.uTime = FACADE.time; sh.uniforms.uLock = FACADE.lockdown;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
-        attribute vec4 aBld; varying vec4 vBld; varying vec3 vFW; varying vec3 vFN;`)
+        attribute vec4 aBld; flat varying vec4 vBld; varying vec3 vFW; varying vec3 vFN;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 fW = vec4(transformed, 1.0);
         vec3 fN = objectNormal;
@@ -23,7 +23,7 @@ export function makeFacadeMaterial({ instanced = true } = {}) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform float uNight; uniform float uTime; uniform float uLock;
-        varying vec4 vBld; varying vec3 vFW; varying vec3 vFN;
+        flat varying vec4 vBld; varying vec3 vFW; varying vec3 vFN;
         float fh1(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
         // one fake room behind a window. ro = point on the glass in room space, rd = view dir in room space
         vec3 room(vec3 ro, vec3 rd, vec3 size, float h, float lit, out float isLight) {
@@ -55,7 +55,7 @@ export function makeFacadeMaterial({ instanced = true } = {}) {
           return c * (1.0 - fog * 0.35);
         }`)
       .replace('#include <map_fragment>', `#include <map_fragment>
-        float fStyle = vBld.x, fSeed = vBld.y, fFH = max(vBld.z, 2.8), fBase = vBld.w;
+        float fStyle = floor(vBld.x + 0.5), fSeed = floor(vBld.y * 16.0 + 0.5) / 16.0, fFH = max(vBld.z, 2.8), fBase = vBld.w;
         vec3 fNn = normalize(vFN);
         float fWin = 0.0; vec3 fRoom = vec3(0.0); float fLit = 0.0; float fMetal = 0.0; float fRough = 0.8; float fIsL = 0.0;
         if (abs(fNn.y) < 0.5) {
@@ -80,6 +80,7 @@ export function makeFacadeMaterial({ instanced = true } = {}) {
           float floorFrac = smoothstep(0.3, 0.95, rowH) * (0.45 + 0.55 * uNight);
           float ch = fh1(cell + fSeed * 17.0);
           float litNear = step(1.0 - floorFrac, ch) * (0.6 + 0.4 * fh1(cell.yx + fSeed));
+          if (cell.y < 0.5 && fStyle != 3.0) { litNear = step(0.25, ch) * 1.2; floorFrac = 0.8; }
           float lit = mix(litNear, floorFrac * 0.75, fFar);
           if (uLock > 0.5 && fStyle == 3.0) lit = step(0.5, ch) * (0.5 + 0.5 * step(0.5, fract(uTime * 1.3 + ch)));
           vec3 V = normalize(vFW - cameraPosition);
@@ -113,7 +114,10 @@ export function makeFacadeMaterial({ instanced = true } = {}) {
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
         metalnessFactor = fMetal;`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        totalEmissiveRadiance += fWin * fRoom * fLit * (0.15 + 0.85 * uNight) * (1.0 + fIsL * 1.5);`);
+        // every room has its own colour of light: warm lamps, cold office tubes, a TV glow
+        float fTemp = fh1(vec2(fSeed * 7.0, floor((vFW.y - fBase) / max(vBld.z, 2.8)) + floor(dot(vFW, abs(fNn.x) > abs(fNn.z) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)) / 6.0) * 3.0));
+        vec3 fTint = fTemp < 0.45 ? vec3(1.0, 0.78, 0.52) : fTemp < 0.9 ? vec3(0.86, 0.92, 1.0) : vec3(0.55, 0.7, 1.0);
+        totalEmissiveRadiance += fWin * fRoom * fTint * fLit * (0.08 + 0.5 * uNight) * (1.0 + fIsL * 1.2);`);
   };
   m.customProgramCacheKey = () => 'facade' + (instanced ? 'I' : '');
   return m;

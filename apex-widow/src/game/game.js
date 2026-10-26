@@ -17,7 +17,7 @@ import { Story } from './story.js';
 import { Wanted } from './wanted.js';
 import { Babies } from './babies.js';
 import { ZONES, ZONE_ORDER } from '../world/zones.js';
-import { chitinTick } from '../spider/body.js';
+import { chitinTick, setRim } from '../spider/body.js';
 import { clamp, sizeText } from '../core/util.js';
 
 export class Game {
@@ -82,6 +82,8 @@ export class Game {
     const z = await this.getZone(id);
     if (old && old !== z) old.exit && old.exit();
     this.zone = z;
+    if (!this.fill) { this.fill = new THREE.PointLight(0xc8d4ff, 0, 1, 2); }
+    if (this.fill.parent !== z.scene) z.scene.add(this.fill);
     this.renderer.setView(z.scene, this.camera);
     if (this.player) this.player.attach(z.scene);
     z.enter(opts);
@@ -256,6 +258,11 @@ export class Game {
         const s = p.s;
         const focus = new THREE.Vector3().copy(p.pos).addScaledVector(p.up, s * 0.3);
         this.cam.update(dtReal, focus, p.up, s * this.settings.camDist, (o, d, far) => this.probe(o, d, far, s), this.zone.view || {});
+        // fill light just above the camera (a photographer's trick: the spider never vanishes into the dark)
+        if (this.fill) { this.fill.position.copy(this.camera.position).addScaledVector(p.up, s * 1.5); this.fill.distance = s * 40; this.fill.intensity = (this.zone.fill ?? 0.6) * s * s * 9; }
+        // rim strength: strong outside at night, gentle in lit rooms, cool blue-white
+        const dark = this.zone.rimAmount ? this.zone.rimAmount(this.camera.position) : 0.3;
+        setRim(0.32 * dark, 0.4 * dark, 0.55 * dark);
         // depth of field: strong macro blur when tiny, gentle tilt-shift when huge
         const sm = p.sizeM;
         const macro = sm < 0.05 ? 1 : sm < 0.5 ? 0.6 : sm < 50 ? 0.25 : sm < 5e3 ? 0.55 : 0.2;

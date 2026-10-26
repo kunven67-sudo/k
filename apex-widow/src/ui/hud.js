@@ -127,7 +127,7 @@ export class Hud {
       const near = A.frontTarget && A.frontTarget(1.4);
       const close = near && ((near.type === 'c' && t.type === 'c' && near.c === t.c) || (near.type === 'h' && t.type === 'h' && near.h === t.h));
       let act = '';
-      if (close) act = A.helpless(t) ? `<span class="key">E</span>${(A.tMass(t) / p.mass > 0.6 && !(isC ? t.c.wrapped : t.h.state === 'wrapped')) ? 'WRAP' : 'EAT'}` : '<span class="key">LMB</span>BITE';
+      if (close) act = A.helpless(t) ? `<span class="key">E</span>${(!(isC && t.c.def.chunk) && A.tMass(t) / p.mass > 0.6 && !(isC ? t.c.wrapped : t.h.state === 'wrapped')) ? 'WRAP' : 'EAT'}` : '<span class="key">LMB</span>BITE';
       const lt = isC ? t.c.def.latin : t.h.role === 'voss' ? 'the man who made you' : '';
       this.target.innerHTML = `<div class="nm">${isC ? t.c.def.name : t.h.name}</div><div class="lt">${lt}</div><div class="bar" style="width:160px;margin:6px auto 2px"><i style="width:${clamp(hp / mx, 0, 1) * 100}%;background:#ff3b30"></i></div><div class="lbl" style="font-size:11px">${Math.max(0, Math.ceil(hp))} / ${Math.ceil(mx)}</div><div class="st">${state}</div><div class="act">${act}</div>`;
       this.target.style.opacity = 1;

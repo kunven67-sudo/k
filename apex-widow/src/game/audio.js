@@ -154,6 +154,12 @@ export class Audio {
       case 'spray': this.noiseBurst({ dur: 0.4, f: 7000, q: 0.5, type: 'highpass', vol: 0.25 * vol, pan, bus: 'world' }); break;
       case 'crash': this.noiseBurst({ dur: 1.4, f: 500, q: 0.5, type: 'lowpass', vol: 1.0 * vol, pan, bus: 'world', verb: 0.8 }); this.tone({ f: 50, f2: 25, dur: 1.2, vol: 0.8 * vol, pan, bus: 'world' }); break;
       case 'alarm': this.tone({ f: 740, f2: 990, dur: 0.6, type: 'square', vol: 0.06 * vol, bus: 'world', verb: 0.6 }); break;
+      case 'carAlarm': for (let i = 0; i < 6; i++) this.tone({ f: i % 2 ? 880 : 660, dur: 0.22, type: 'square', vol: 0.05 * vol, pan, at: i * 0.25, bus: 'world', verb: 0.3 }); break;
+      case 'cannon': this.noiseBurst({ dur: 1.6, f: 300, q: 0.6, type: 'lowpass', vol: 1.0 * vol, pan, bus: 'world', verb: 0.9 }); this.tone({ f: 45, f2: 22, dur: 1.4, vol: 0.9 * vol, pan, bus: 'world' }); break;
+      case 'missile': this.tone({ f: 1800, f2: 300, dur: 1.4, type: 'sawtooth', vol: 0.04 * vol, pan, bus: 'world', verb: 0.4 }); this.noiseBurst({ dur: 1.5, f: 2500, q: 0.4, type: 'bandpass', vol: 0.35 * vol, pan, bus: 'world' }); break;
+      case 'explosion': this.noiseBurst({ dur: 2.2, f: 650, q: 0.5, type: 'lowpass', vol: 1.0 * vol, pan, bus: 'world', verb: 1.0 }); this.tone({ f: 60, f2: 20, dur: 1.8, vol: 1.0 * vol, pan, bus: 'world' }); break;
+      case 'bark': for (let i = 0; i < 2; i++) { this.noiseBurst({ dur: 0.12, f: 900, q: 2, type: 'bandpass', vol: 0.5 * vol, pan, at: i * 0.28, bus: 'world' }); this.tone({ f: 320, f2: 220, dur: 0.12, type: 'sawtooth', vol: 0.12 * vol, pan, at: i * 0.28, bus: 'world' }); } break;
+      case 'coo': this.tone({ f: 230, f2: 180, dur: 0.6, type: 'sine', vol: 0.06 * vol, pan, bus: 'world', verb: 0.3 }); break;
       default: break;
     }
   }
