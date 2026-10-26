@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' cv:; script-src 'self'; style-src 'self' 'unsafe-inline'">
+<title>voice</title>
+<style>
+  html,body{margin:0;background:transparent;overflow:hidden;font-family:"Segoe UI",system-ui,sans-serif}
+  .bubble{position:absolute;left:4px;top:4px;right:4px;display:flex;gap:10px;align-items:center;padding:12px 16px;border-radius:16px;
+    background:rgba(14,12,30,.92);color:#fff;border:2px solid #7c5cff;box-shadow:0 0 18px rgba(124,92,255,.55);transform-origin:top left;animation:pop .16s ease-out}
+  .bubble.confirm{border-color:#ffd166;box-shadow:0 0 18px rgba(255,209,102,.6)}
+  .bubble.done{border-color:#36e07a;box-shadow:0 0 18px rgba(54,224,122,.5)}
+  .bubble.cancel,.bubble.error{border-color:#ff4d6d;box-shadow:0 0 18px rgba(255,77,109,.5)}
+  .icon{font-size:26px}
+  .text{font-size:17px;font-weight:700;line-height:1.2}
+  .hint{font-size:12px;opacity:.75;margin-top:2px}
+  @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+<div class="bubble" id="b"><div class="icon" id="i">🎤</div><div><div class="text" id="t"></div><div class="hint" id="h"></div></div></div>
+<script src="hud.js"></script>

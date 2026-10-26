@@ -1,0 +1,68 @@
+name: Torture Humans assets (CC0 downloads)
+
+# Downloads the free CC0 textures, HDRIs and models the game uses from Poly Haven
+# and stores them on the "th-assets" branch (the dev sandbox can't reach polyhaven.com).
+on:
+  push:
+    paths:
+      - 'torture-humans/tools/fetch_polyhaven.py'
+      - 'torture-humans/tools/assets-manifest.json'
+      - '.github/workflows/th-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: th-assets
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download from Poly Haven
+        run: python torture-humans/tools/fetch_polyhaven.py torture-humans/tools/assets-manifest.json "$RUNNER_TEMP/assets"
+
+      - name: Show what was fetched
+        run: |
+          du -sh "$RUNNER_TEMP/assets"/* | sort -h
+          python -c "import json;d=json.load(open('$RUNNER_TEMP/assets/index.json'));print({k:len(v) for k,v in d.items()})"
+
+      - name: Commit to th-assets branch
+        run: |
+          cd "$RUNNER_TEMP/assets"
+          cat > README.md <<'MD'
+          # Torture Humans: downloaded CC0 assets
+          From Poly Haven (https://polyhaven.com), license CC0. Made by .github/workflows/th-assets.yml; don't edit by hand.
+          MD
+          git init -q -b th-assets
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config http.postBuffer 524288000
+          REMOTE="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          push() { for i in 1 2 3 4; do git push -q $1 "$REMOTE" th-assets && return 0; sleep $((i * 10)); done; return 1; }
+          # one big push times out (HTTP 408): commit and push in batches of ~150 MB
+          git add README.md index.json catalog.json
+          git commit -qm "CC0 assets from Poly Haven (${GITHUB_SHA::7}): index"
+          push -f
+          batch=(); size=0
+          flush() {
+            [ ${#batch[@]} -eq 0 ] && return 0
+            git add -- "${batch[@]}"
+            git commit -qm "CC0 assets: ${batch[0]} … (${#batch[@]} items)"
+            push
+            batch=(); size=0
+          }
+          for d in hdri/* textures/* models/*; do
+            [ -e "$d" ] || continue
+            batch+=("$d"); size=$((size + $(du -sk "$d" | cut -f1)))
+            [ $size -gt 150000 ] && flush
+          done
+          flush

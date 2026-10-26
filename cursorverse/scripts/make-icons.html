@@ -1,0 +1,23 @@
+<!doctype html><meta charset=utf-8><body style="margin:0;background:transparent">
+<script type=module>
+import { CURSOR_MAP } from '../src/shared/cursor-library.mjs';
+import { renderFrame } from '../src/shared/cursor-render.mjs';
+function icon(S) {
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const x = c.getContext('2d');
+  const r = S * 0.22;
+  x.beginPath(); x.roundRect(S*0.04, S*0.04, S*0.92, S*0.92, r);
+  const g = x.createLinearGradient(0, 0, S, S);
+  g.addColorStop(0, '#2b0f5e'); g.addColorStop(0.55, '#7a1fa2'); g.addColorStop(1, '#ff2bd6');
+  x.fillStyle = g; x.fill();
+  x.lineWidth = Math.max(1, S*0.03); x.strokeStyle = '#00e5ff'; x.stroke();
+  const cur = document.createElement('canvas'); cur.width = cur.height = S;
+  const cx = cur.getContext('2d');
+  cx.translate(Math.round(S*0.2), Math.round(S*0.12));
+  renderFrame(cx, CURSOR_MAP.get('neon-cyan'), { glow: { enabled: true, color: '#00e5ff', size: 8 } }, 0, Math.round(S*0.78));
+  x.drawImage(cur, 0, 0);
+  return c.toDataURL('image/png');
+}
+window.__icons = { 16: icon(16), 32: icon(32), 48: icon(48), 64: icon(64), 128: icon(128), 256: icon(256), 512: icon(512) };
+document.title = 'done';
+</script>
