@@ -68,7 +68,6 @@ export class LightPool {
         if (u.cur <= 0) { u.cur = 0; u.fix = u.want; if (u.fix) { L.position.copy(u.fix.p); L.color.copy(u.fix.color); L.distance = u.fix.r; } }
       } else if (u.fix) u.cur = Math.min(1, u.cur + dt * 3);
       L.intensity = u.fix ? u.cur * u.fix.i * base * this.master * fl : 0;
-      L.visible = L.intensity > 0.001;
     }
     const S = this.spot, su = S.userData;
     if (su.fix !== su.next) {
@@ -85,7 +84,6 @@ export class LightPool {
       S.shadow.camera.updateProjectionMatrix();
       S.intensity = su.cur * su.fix.i * base * this.master * fl;
     } else S.intensity = 0;
-    S.visible = S.intensity > 0.001;
   }
   dispose() { for (const L of this.lights) L.removeFromParent(); this.spot.removeFromParent(); this.spot.target.removeFromParent(); this.spot.shadow.dispose && this.spot.shadow.dispose(); }
 }

@@ -23,7 +23,12 @@ export class Fx {
     this.parts = []; // {p, v, life, max, size, grow, col:[r,g,b,a], drag, grav}
     this.rain = null; this.shards = [];
   }
-  attach(scene) { if (this.points.parent !== scene) scene.add(this.points); this.scene = scene; }
+  attach(scene) {
+    if (this.points.parent !== scene) scene.add(this.points); this.scene = scene;
+    // one muzzle-flash light that lives in the scene forever (adding/removing lights makes the GPU recompile everything)
+    if (!this.flash) { this.flash = new THREE.PointLight(0xffb060, 0, 6, 2); this.flashT = 0; }
+    if (this.flash.parent !== scene) scene.add(this.flash);
+  }
   add(p, v, life, size, col, opts = {}) {
     if (this.parts.length >= MAX) this.parts.shift();
     this.parts.push({ p: p.clone(), v: v.clone(), life, max: life, size, grow: opts.grow || 0, col, drag: opts.drag ?? 1.5, grav: opts.grav ?? 0 });
@@ -43,8 +48,7 @@ export class Fx {
   }
   muzzle(p, yaw) {
     for (let i = 0; i < 6; i++) this.add(p, new THREE.Vector3(Math.sin(yaw) * rand(2, 6), rand(-0.5, 0.5), Math.cos(yaw) * rand(2, 6)), rand(0.04, 0.09), 0.12, [1.0, 0.75, 0.35, 1.0], { grow: 0.3, drag: 4 });
-    const L = new THREE.PointLight(0xffb060, 30, 6, 2); L.position.copy(p); this.scene && this.scene.add(L);
-    setTimeout(() => L.removeFromParent(), 60);
+    if (this.flash) { this.flash.position.copy(p); this.flashT = 0.06; }
   }
   ricochet(p) { for (let i = 0; i < 8; i++) this.add(p, new THREE.Vector3(rand(-2, 2), rand(0, 3), rand(-2, 2)), rand(0.1, 0.3), 0.02, [1, 0.8, 0.4, 1], { grav: 9.8, drag: 0.5 }); }
   sparks(p, s, n = 12, col = [1, 0.75, 0.3, 1]) { for (let i = 0; i < n; i++) this.add(p, new THREE.Vector3(rand(-1, 1), rand(0, 1.5), rand(-1, 1)).multiplyScalar(s * 6), rand(0.2, 0.6), s * 0.15, col, { grav: 9.8 / (this.game.zone ? this.game.zone.unit : 1), drag: 0.6 }); }
@@ -79,6 +83,7 @@ export class Fx {
     const Z = G.zone;
     if (Z && Z.city && Z.city.steam) for (const s of Z.city.steam) if (Math.random() < dt * 3 && s.distanceTo(G.camera.position) < 200) this.steam(s, 1);
     this.updateRain(dt);
+    if (this.flash) { this.flashT = Math.max(0, this.flashT - dt); this.flash.intensity = this.flashT > 0 ? 30 : 0; }
   }
   // rain: a box of streaks that follows the camera (outside only)
   updateRain(dt) {
