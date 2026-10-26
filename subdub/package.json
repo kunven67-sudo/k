@@ -1,0 +1,19 @@
+{
+  "name": "subdub",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SUBDUB: translate foreign anime subtitles and speech to English, with an English dub voice per character",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "dev": "node tools/serve.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.1",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
+    "phonemizer": "1.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
