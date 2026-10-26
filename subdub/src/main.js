@@ -169,7 +169,7 @@ function goHome() {
       h('h1', {}, 'Any language in, ', h('em', {}, 'English'), ' out.'),
       h('p', {}, 'SUBDUB reads subtitles you can\'t read and turns foreign talking into English, with a girl voice for girls and a boy voice for boys. Their real voices get cut out, the music stays.')),
     h('div', { class: 'tiles' },
-      h('div', { class: 'tile live' },
+      h('div', { class: 'tile livetile' },
         tileArt('tv'),
         h('div', { class: 'subtitle-demo' }, '¿Qué pasó?'),
         h('h2', {}, 'Watch live'),
@@ -400,10 +400,9 @@ async function startLive() {
     h('div', { class: 'livebox' },
       h('div', { class: 'livehead' }, h('i', { class: 'dot ok' }), h('span', { class: 'what' }, live.title || 'Your pick'), h('span', { class: 'spacer', style: { flex: 1 } }), lag),
       ...warn.filter(w => w.textContent),
+      h('div', { class: 'livebtns' }, btnBar, btnSync, btnStop, h('span', { style: { flex: 1 } }), h('div', { class: 'lights' }, lHear, lTr, lSay)),
       h('div', { class: 'preview' }, preview),
-      feed,
-      h('div', { class: 'lights' }, lHear, lTr, lSay),
-      h('div', { class: 'livebtns' }, btnBar, btnSync, btnStop)),
+      feed),
     h('div', { class: 'side livebox' }, h('div', { class: 'tabs' }, h('button', { class: 'on' }, 'Characters')), castBody));
   main.append(el);
   showCastButton(cast);

@@ -95,7 +95,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     log('cast:', cast.join(' || ').slice(0, 600));
   }
   if (mode === 'live') {
-    await page.click('.tile.live .go');
+    await page.click('.tile.livetile .go');
     await page.waitForSelector('.live', { timeout: 60000 });
     const t0 = Date.now();
     const syncAt = (+secs * 0.4) * 1000;

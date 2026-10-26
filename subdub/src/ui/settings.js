@@ -34,7 +34,7 @@ export function openSettings(s, { onChange, onClearDownloads, gpuInfo }) {
       row('Caption size', '', range('capSize', 18, 54, 1)),
       row('Show captions', 'English text on the video', check('showCaps')),
       row('Show\'s language', 'Leave on "find out" unless it keeps guessing wrong', h('select', { onchange: (e) => set('forceLang', e.target.value) }, LANGS.map(([v, l]) => h('option', { value: v, selected: s.forceLang === v }, l)))),
-      row('Speech reader (videos)', 'Best is much more accurate but a 760 MB download and slower', seg('fileModel', [['fast', 'Fast'], ['good', 'Good'], ['best', 'Best']])),
+      row('Speech reader (videos)', 'Best is much more accurate, but a big extra download (about 1 GB) and slower', seg('fileModel', [['fast', 'Fast'], ['good', 'Good'], ['best', 'Best']])),
       row('Speech reader (live)', 'Fast keeps up better on slower PCs', seg('liveModel', [['fast', 'Fast'], ['good', 'Good']])),
       row('Read subtitles on screen', 'Translates subtitles that aren\'t in English', check('readSubs')),
       row('Also read the top of the screen', 'Signs and second subtitles', check('readTop')),
