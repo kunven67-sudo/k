@@ -22,6 +22,8 @@ import javax.imageio.ImageIO
  *   --jpeg-only       act like a phone whose video encoder doesn't work (pictures only)
  *   --pause-every S   every S seconds, stop sending pictures for --pause-for seconds (a still screen)
  *   --pause-for S     (default 4)
+ *   --source FILE     stream this video file (looped) instead of the test picture (video mode)
+ *   --size WxH        picture size (default 720x1280, a portrait phone)
  *
  * By default it sends H.264 video made by ffmpeg (needs ffmpeg on the PATH), and switches to
  * JPEG pictures while a browser that can't play the video is watching, like the real phone.
@@ -39,10 +41,12 @@ fun main(args: Array<String>) {
     val jpegOnly = "--jpeg-only" in args
     val pauseEvery = opt("--pause-every")?.toLong()
     val pauseFor = opt("--pause-for")?.toLong() ?: 4L
+    val source = opt("--source")
+    val size = opt("--size")?.split('x')?.map(String::toInt)
 
     val hub = FrameHub()
     val video = VideoHub()
-    val encoder = if (jpegOnly) null else FakeEncoder(video, fps)
+    val encoder = if (jpegOnly) null else FakeEncoder(video, fps, source)
     video.keyFrameRequester = { encoder?.keyRequests?.incrementAndGet() }
     val pinConfig = pin?.let { PinConfig(it, "dev-salt") }
     val server = StreamServer(hub, audioHub = audio, videoHub = video, pinConfig = { pinConfig }, deviceName = "Dev Phone")
@@ -60,7 +64,11 @@ fun main(args: Array<String>) {
         val elapsed = System.currentTimeMillis() - started
         if (!hub.isLive && elapsed >= liveAfter * 1000) hub.setLive(true)
         val landscape = rotateEvery != null && (elapsed / 1000 / rotateEvery) % 2 == 1L
-        val (w, h) = if (landscape) 1280 to 720 else 720 to 1280
+        val (w, h) = when {
+            size != null -> size[0] to size[1]
+            landscape -> 1280 to 720
+            else -> 720 to 1280
+        }
         val paused = pauseEvery != null && elapsed / 1000 >= pauseEvery && (elapsed / 1000) % pauseEvery < pauseFor
         // Like the phone: video unless a browser that needs pictures is watching.
         val useVideo = encoder != null && hub.isLive && !server.jpegViewerActive()
@@ -145,7 +153,7 @@ private fun render(frameNo: Int, w: Int, h: Int): ByteArray {
  * Stands in for the phone's hardware encoder: ffmpeg makes a moving H.264 test picture in real
  * time, and every frame goes to the [VideoHub]. Changing [size] restarts it, like a rotation.
  */
-private class FakeEncoder(private val hub: VideoHub, private val fps: Int) {
+private class FakeEncoder(private val hub: VideoHub, private val fps: Int, private val source: String?) {
     val keyRequests = java.util.concurrent.atomic.AtomicLong()
 
     @Volatile
@@ -165,12 +173,17 @@ private class FakeEncoder(private val hub: VideoHub, private val fps: Int) {
         stop()
         width = w
         height = h
+        val input = if (source != null) {
+            listOf("-stream_loop", "-1", "-re", "-i", source, "-vf", "scale=$w:$h,fps=$fps")
+        } else {
+            listOf("-re", "-f", "lavfi", "-i", "testsrc2=size=${w}x$h:rate=$fps")
+        }
         val p = ProcessBuilder(
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-re",
-            "-f", "lavfi", "-i", "testsrc2=size=${w}x$h:rate=$fps",
-            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-profile:v", "high",
+            listOf("ffmpeg", "-hide_banner", "-loglevel", "error") + input + listOf(
+            "-an", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-profile:v", "high",
             "-pix_fmt", "yuv420p", "-g", "$fps", "-bf", "0", "-x264-params", "aud=1:repeat-headers=1",
             "-f", "h264", "-",
+            ),
         ).redirectError(ProcessBuilder.Redirect.DISCARD).start()
         process = p
         Thread({ pump(p, w, h) }, "dev-encoder").apply { isDaemon = true; start() }

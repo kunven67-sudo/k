@@ -65,7 +65,9 @@
   .error { min-height: 32px; margin: 18px 0 0; font-size: 22px; color: #FF7A93; }
 
   #bar {
-    position: fixed; left: 0; right: 0; bottom: 32px; z-index: 2; text-align: center;
+    /* At the top: subtitles live at the bottom, and translators reading this tab (SUBDUB) shouldn't
+       mistake the buttons for one. */
+    position: fixed; left: 0; right: 0; top: 24px; z-index: 2; text-align: center;
     opacity: 0; -webkit-transition: opacity .35s; transition: opacity .35s; pointer-events: none;
   }
   #bar.show { opacity: 1; pointer-events: auto; }
@@ -87,7 +89,7 @@
   #soundBtn.off { color: #9AA4BF; }
 
   #soundHint {
-    position: fixed; left: 0; right: 0; top: 28px; z-index: 2; text-align: center; pointer-events: none;
+    position: fixed; left: 0; right: 0; top: 104px; z-index: 2; text-align: center; pointer-events: none;
   }
   #soundHint span {
     display: inline-block; font-size: 22px; font-weight: 700; padding: 14px 26px; border-radius: 999px;

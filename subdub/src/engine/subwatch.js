@@ -110,6 +110,14 @@ export class SubWatch extends EventTarget {
         const bw = l.box.x2 - l.box.x, bh = l.box.y2 - l.box.y, cx = (l.box.x + l.box.x2) / 2;
         return bh > PH_ * 0.025 && bh < PH_ * 0.14 && l.conf > 0.6 && Math.abs(cx - RW / 2) < RW * 0.3 && bw > RW * 0.04;
       });
+      // text in the black bar under the picture (a player's buttons, a status line) while a subtitle sits
+      // inside the picture: not part of the subtitle. (Text only under the picture, like a movie's
+      // subtitles in its black bar, still counts.)
+      if (box.y + box.h < H && lines.length > 1) {
+        const picBottom = (box.y + box.h - band.y) * zoom;
+        const inside = lines.filter(l => l.box.y < picBottom - 2);
+        if (inside.length) lines = inside;
+      }
       // two subtitles at once (e.g. Chinese on top, English under it): the English one can already be
       // read, so only the other one is the subtitle to translate
       if (lines.length > 1) {
