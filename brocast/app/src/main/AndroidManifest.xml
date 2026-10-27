@@ -15,6 +15,12 @@
          going in the background needs a "microphone" service type. The mic itself is never used. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Lets the app offer to remove BroCast 1.0 (it can't be updated in place). Android still asks you first. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
+    <queries>
+        <package android:name="com.brocast.app" />
+    </queries>
 
     <application
         android:allowBackup="false"

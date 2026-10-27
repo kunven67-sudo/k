@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Intent
+import android.content.pm.PackageInfo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
@@ -228,7 +229,7 @@ class MainActivitySoundTest {
         compose.onNodeWithText("Fix it").performClick()
         val settingsIntent = shadowOf(compose.activity).nextStartedActivity
         assertEquals(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, settingsIntent.action)
-        assertEquals("package:com.brocast.app", settingsIntent.dataString)
+        assertEquals("package:${app.packageName}", settingsIntent.dataString)
         compose.onRoot().captureRoboImage("build/screenshots/6-no-sound-permission.png")
 
         live(SoundStatus.FAILED)
@@ -391,5 +392,79 @@ class AutoStartTest {
                 assertEquals(null, shadowOf(activity).lastRequestedPermission)
             }
         }
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w411dp-h915dp-xxhdpi")
+class VersionTwoTest {
+    init {
+        MainActivity.autoStart = false
+    }
+
+    @get:Rule
+    val compose = createAndroidComposeRule<MainActivity>()
+
+    private val app: Application get() = ApplicationProvider.getApplicationContext()
+
+    @After
+    fun reset() {
+        ShareState.set(ShareStatus.Idle())
+    }
+
+    @Test
+    fun offersToRemoveTheOldBroCast() {
+        compose.onNodeWithText("🧹  Remove the old BroCast").assertDoesNotExist()
+        shadowOf(app.packageManager).installPackage(PackageInfo().apply { packageName = MainActivity.OLD_PACKAGE })
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("👋 The old BroCast is still on your phone").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/screenshots/7-old-app.png")
+        compose.onNodeWithText("🧹  Remove the old BroCast").performClick()
+        val intent = shadowOf(app).nextStartedActivity
+        assertEquals(Intent.ACTION_DELETE, intent.action)
+        assertEquals("package:com.brocast.app", intent.dataString)
+    }
+
+    @Test
+    fun liveCardSaysVideoOrPictures() {
+        compose.runOnUiThread {
+            ShareState.set(ShareStatus.Live(8080, listOf("192.168.1.23"), 1, listOf("192.168.1.5"), 30, null, false, video = true))
+        }
+        compose.onNodeWithText("🎬 Sending smooth video").performScrollTo().assertIsDisplayed()
+        compose.runOnUiThread {
+            ShareState.set(ShareStatus.Live(8080, listOf("192.168.1.23"), 1, listOf("192.168.1.5"), 12, null, false, video = false))
+        }
+        compose.onNodeWithText("🖼️ Sending pictures (a screen that can't play the video is watching)").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun newIdAndName() {
+        assertEquals("com.brocast.live", app.packageName)
+        assertEquals("BroCast 2", app.getString(R.string.app_name))
+    }
+
+    @Test
+    fun videoSizesSuitEncoders() {
+        // Phone screens in both directions, all three quality levels.
+        for ((w, h) in listOf(1080 to 2400, 2400 to 1080, 1440 to 3200, 720 to 1600, 1080 to 1920)) {
+            for (q in Quality.entries) {
+                val (vw, vh) = VideoEncoder.sizeFor(w, h, q.videoLongSide)
+                assertEquals(0, vw % 16)
+                assertEquals(0, vh % 16)
+                assertTrue("$vw x $vh fits ${q.videoLongSide}", maxOf(vw, vh) <= q.videoLongSide)
+                // Same shape (within the rounding to 16).
+                assertTrue(kotlin.math.abs(vw.toDouble() / vh - w.toDouble() / h) < 0.03)
+            }
+        }
+        assertEquals(1920 to 864, VideoEncoder.sizeFor(2400, 1080, 1920))
+        assertEquals(16 to 16, VideoEncoder.sizeFor(1, 1, 1920))
+    }
+
+    @Test
+    fun qualityLevelsGoUp() {
+        val q = Quality.entries
+        assertTrue(q.zipWithNext().all { (a, b) -> b.videoBitrate > a.videoBitrate && b.videoFps >= a.videoFps })
+        assertTrue(q.all { it.videoBitrate in 1_000_000..20_000_000 && it.videoFps in 24..60 })
     }
 }

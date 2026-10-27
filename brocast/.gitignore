@@ -5,3 +5,4 @@ local.properties
 *.apk
 # The release signing key is private: kept outside this repo.
 *.jks
+release-key.properties

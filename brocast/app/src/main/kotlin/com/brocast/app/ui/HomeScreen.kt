@@ -81,6 +81,8 @@ fun HomeScreen(
     onPinEnabledChange: (Boolean) -> Unit,
     onNewPin: () -> Unit,
     onCopy: (String) -> Unit,
+    oldAppInstalled: Boolean = false,
+    onRemoveOldApp: () -> Unit = {},
 ) {
     Box(
         Modifier
@@ -105,6 +107,10 @@ fun HomeScreen(
         ) {
             Header()
             Spacer(Modifier.height(22.dp))
+            if (oldAppInstalled) {
+                OldAppCard(onRemoveOldApp)
+                Spacer(Modifier.height(14.dp))
+            }
 
             val sharing = status is ShareStatus.Live || status is ShareStatus.Starting
             when (status) {
@@ -246,6 +252,20 @@ private fun BigButton(text: String, brush: Brush, onClick: () -> Unit) {
         ) {
             Text(text, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+@Composable
+private fun OldAppCard(onRemove: () -> Unit) {
+    BroCard(border = BorderStroke(1.dp, BroColors.Cyan.copy(alpha = 0.5f))) {
+        CardTitle("👋 The old BroCast is still on your phone")
+        Spacer(Modifier.height(6.dp))
+        Body(
+            "This new one sends real video, so it doesn't freeze on videos anymore. Remove the old one so " +
+                "you don't open it by mistake (Android asks you to confirm).",
+        )
+        Spacer(Modifier.height(16.dp))
+        BigButton("🧹  Remove the old BroCast", BrandGradient, onRemove)
     }
 }
 
@@ -405,6 +425,15 @@ private fun LiveCard(
             Body(live.viewerAddresses.joinToString(), size = 12)
         }
         Spacer(Modifier.height(10.dp))
+        Body(
+            if (live.video) {
+                "🎬 Sending smooth video"
+            } else {
+                "🖼️ Sending pictures (a screen that can't play the video is watching)"
+            },
+            size = 13,
+        )
+        Spacer(Modifier.height(4.dp))
         SoundLine(live.sound, onFixSoundPermission)
         if (live.noPicture) {
             Spacer(Modifier.height(10.dp))

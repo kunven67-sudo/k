@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -11,20 +12,30 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.brocast.app"
+        // 2.0 got a new id: 1.0 was signed with a key that's gone, so it can't be updated in place.
+        applicationId = "com.brocast.live"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
     }
 
+    // The release key is private and never goes in the repo: put brocast-release.jks and
+    // release-key.properties (storePassword=...) in app/ to sign real releases (every update must use
+    // the same key). Without them, release builds are signed with the debug key.
+    val releaseKey = file("brocast-release.jks")
+    val keyProps = Properties().apply {
+        file("release-key.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+    }
     signingConfigs {
-        create("release") {
-            // Kept in the project on purpose so every rebuild can update the installed app.
-            storeFile = file("brocast-release.jks")
-            storePassword = "brocast-bro"
-            keyAlias = "brocast"
-            keyPassword = "brocast-bro"
+        val pass = keyProps.getProperty("storePassword")
+        if (releaseKey.exists() && pass != null) {
+            create("release") {
+                storeFile = releaseKey
+                storePassword = pass
+                keyAlias = "brocast"
+                keyPassword = pass
+            }
         }
     }
 
@@ -33,7 +44,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 

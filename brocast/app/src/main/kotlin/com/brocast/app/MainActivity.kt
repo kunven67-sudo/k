@@ -39,6 +39,9 @@ class MainActivity : ComponentActivity() {
         /** Tests turn this off so they can check the Start button on its own. */
         @VisibleForTesting
         var autoStart = true
+
+        /** BroCast 1.0. Its signing key is gone, so 2.0 is a separate app and offers to remove it. */
+        const val OLD_PACKAGE = "com.brocast.app"
     }
 
     private lateinit var settings: ShareSettings
@@ -47,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private var pin by mutableStateOf("")
     private var soundEnabled by mutableStateOf(true)
     private var wifiAddresses by mutableStateOf(listOf<String>())
+    private var oldAppInstalled by mutableStateOf(false)
 
     private val captureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data
@@ -112,6 +116,8 @@ class MainActivity : ComponentActivity() {
                     },
                     onNewPin = { pin = settings.newPin() },
                     onCopy = ::copyToClipboard,
+                    oldAppInstalled = oldAppInstalled,
+                    onRemoveOldApp = ::removeOldApp,
                 )
             }
         }
@@ -119,6 +125,36 @@ class MainActivity : ComponentActivity() {
         // Opening BroCast from the home screen starts sharing right away: tap the icon,
         // tap Android's "Start", done. (Not on rotation, or when opened from the notification.)
         if (savedInstanceState == null && autoStart && intent?.action == Intent.ACTION_MAIN) onStartClicked()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        oldAppInstalled = isInstalled(OLD_PACKAGE)
+    }
+
+    private fun isInstalled(packageName: String): Boolean = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.getPackageInfo(packageName, 0)
+        }
+        true
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
+    }
+
+    // Android shows its own "Uninstall this app?" box; the card goes away once it's gone (onResume).
+    private fun removeOldApp() {
+        try {
+            startActivity(Intent(Intent.ACTION_DELETE, Uri.fromParts("package", OLD_PACKAGE, null)))
+        } catch (e: ActivityNotFoundException) {
+            try {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", OLD_PACKAGE, null)))
+            } catch (e2: ActivityNotFoundException) {
+                Toast.makeText(this, "Hold the old BroCast icon and pick Uninstall", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun onStartClicked() {
