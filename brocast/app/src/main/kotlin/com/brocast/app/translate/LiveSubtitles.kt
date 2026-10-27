@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Point
 import android.graphics.Rect
+import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -30,6 +31,7 @@ import kotlin.math.roundToInt
  * original instead.
  */
 class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
+    private val audio = context.getSystemService(AudioManager::class.java)
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "BroCast-subtitles") }
     private val ocr = SubtitleOcr()
@@ -50,11 +52,12 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
 
     /** A short line for the app's screen, like "Spanish → English". */
     @Volatile
-    var note: String = "Looking for subtitles… 👀"
+    var note: String = LOOKING
         private set
 
     // ---- capture thread
     private var lastOfferAt = 0L
+    private var playing = true
     private var prevSignature: BooleanArray? = null
     private var lastReadAt = 0L
     private var boxAt = 0L
@@ -89,6 +92,23 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
         val now = SystemClock.uptimeMillis()
         if (now - lastOfferAt < OFFER_EVERY_MS || busy.get()) return
         lastOfferAt = now
+        // Only while a show is playing. Otherwise text near the bottom of the screen is a chat or the
+        // keyboard: a box there would block taps on it.
+        val nowPlaying = audio?.isMusicActive ?: true
+        if (nowPlaying != playing) {
+            playing = nowPlaying
+            if (!nowPlaying) {
+                prevSignature = null
+                onWorker {
+                    current = null
+                    hide()
+                    note = WAITING
+                }
+            } else {
+                onWorker { if (note == WAITING) note = LOOKING }
+            }
+        }
+        if (!nowPlaying) return
         val w = frame.width
         val h = frame.height
         val pic = pictureArea(frame, now)
@@ -212,6 +232,7 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
         current = next
         if (lang == null || lang == "en") {
             // Already English (or can't tell): nothing to cover.
+            if (lang == "en") note = "These subtitles are already English 👍"
             hide()
             return
         }
@@ -318,6 +339,8 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
 
     private companion object {
         const val TAG = "BroCast"
+        const val LOOKING = "Looking for subtitles… 👀"
+        const val WAITING = "Waiting for a video to play ▶️"
         const val OFFER_EVERY_MS = 300L
         const val GONE_AFTER_MS = 600L
         const val SAME_PICTURE = 25

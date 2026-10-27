@@ -50,9 +50,14 @@ class SubtitleTranslator(private val onStatus: (String) -> Unit = {}) {
             emptyList()
         }.filter { it.languageTag != "und" }
         // Short lines get mixed up (Spanish read as Galician...) and every new language is a 30 MB
-        // download, so the show's usual language wins whenever it's one of the guesses.
-        if (usual != null && guesses.any { it.languageTag.substringBefore('-') == usual }) return usual
+        // download, so the show's usual language wins when it's a close guess. A clearly different
+        // language (a new show) still wins.
         val best = guesses.maxByOrNull { it.confidence }
+        if (usual != null && best != null &&
+            guesses.any { it.languageTag.substringBefore('-') == usual && it.confidence >= best.confidence * 0.35f }
+        ) {
+            return usual
+        }
         if (best != null && best.confidence >= 0.4f) return best.languageTag.substringBefore('-')
         return usual ?: SubtitleText.guessLanguage(text)
     }
