@@ -29,11 +29,13 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import com.brocast.app.translate.LiveSubtitles
+import com.brocast.app.translate.SubtitleVoice
 import com.brocast.core.AudioHub
 import com.brocast.core.FrameHub
 import com.brocast.core.PinConfig
 import com.brocast.core.StreamServer
 import com.brocast.core.VideoHub
+import com.brocast.core.VoicePitch
 import java.io.IOException
 
 /**
@@ -57,6 +59,9 @@ class ScreenShareService : Service() {
         /** SUBDUB on the phone, while it's on. Set on the main thread, read by the capture thread. */
         @Volatile
         var subtitles: LiveSubtitles? = null
+
+        /** Reads the English out loud, while that's on. */
+        var voice: SubtitleVoice? = null
         var lastFrames = 0L
         var addresses: List<String> = emptyList()
         var ticks = 0
@@ -84,7 +89,11 @@ class ScreenShareService : Service() {
             }
             ACTION_SET_TRANSLATE -> {
                 val s = session
-                if (s == null) stopSelf() else setTranslate(s, intent.getBooleanExtra(EXTRA_ON, false))
+                if (s == null) {
+                    stopSelf()
+                } else {
+                    setTranslate(s, intent.getBooleanExtra(EXTRA_ON, false), intent.getBooleanExtra(EXTRA_VOICES, true))
+                }
             }
             else -> if (session == null) stopSelf()
         }
@@ -206,7 +215,7 @@ class ScreenShareService : Service() {
             SystemClock.elapsedRealtime(),
         )
         session = newSession
-        setTranslate(newSession, settings.translateEnabled)
+        setTranslate(newSession, settings.translateEnabled, settings.voicesEnabled)
         capturer.start()
 
         main.removeCallbacks(ticker)
@@ -225,13 +234,33 @@ class ScreenShareService : Service() {
         stopSelf()
     }
 
-    /** SUBDUB on the phone on or off (it needs "display over other apps" for the English box). */
-    private fun setTranslate(s: Session, on: Boolean) {
+    /**
+     * SUBDUB on the phone on or off (it needs "display over other apps" for the English box), and
+     * the English [voices] with it.
+     */
+    private fun setTranslate(s: Session, on: Boolean, voices: Boolean) {
         if (on && s.subtitles == null && Settings.canDrawOverlays(this)) {
             s.subtitles = LiveSubtitles(this) { realScreenSize() }
         } else if (!on) {
             s.subtitles?.close()
             s.subtitles = null
+        }
+        val subs = s.subtitles
+        if (subs != null && voices) {
+            val voice = s.voice ?: SubtitleVoice(this).also { s.voice = it }
+            // Guy or girl voice: hear how high the show's voices are (needs the sound capture).
+            val hub = s.audioHub
+            val pitch = if (hub != null) VoicePitch(hub.sampleRate, hub.channels) else null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Our own English is in the captured sound too: don't measure it.
+                s.audio?.tap = pitch?.let { p -> { pcm: ByteArray -> if (voice.speaking) p.clear() else p.feed(pcm) } }
+            }
+            subs.onNewEnglish = { english -> voice.say(english, pitch?.recentPitch()) }
+        } else {
+            subs?.onNewEnglish = null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) s.audio?.tap = null
+            s.voice?.close()
+            s.voice = null
         }
     }
 
@@ -239,6 +268,8 @@ class ScreenShareService : Service() {
         s.capturer.release()
         s.subtitles?.close()
         s.subtitles = null
+        s.voice?.close()
+        s.voice = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) s.audio?.release()
         s.server.stop()
         s.hub.close()
@@ -411,6 +442,7 @@ class ScreenShareService : Service() {
         private const val ACTION_SET_QUALITY = "com.brocast.app.action.SET_QUALITY"
         private const val ACTION_SET_TRANSLATE = "com.brocast.app.action.SET_TRANSLATE"
         private const val EXTRA_ON = "on"
+        private const val EXTRA_VOICES = "voices"
         private const val EXTRA_RESULT_CODE = "result_code"
         private const val EXTRA_DATA = "data"
         private const val EXTRA_QUALITY = "quality"
@@ -452,14 +484,15 @@ class ScreenShareService : Service() {
             }
         }
 
-        /** English subtitles on the phone on or off, right away if sharing. */
-        fun setTranslate(context: Context, on: Boolean) {
+        /** English subtitles (and [voices]) on the phone on or off, right away if sharing. */
+        fun setTranslate(context: Context, on: Boolean, voices: Boolean) {
             if (ShareState.status.value !is ShareStatus.Live) return
             try {
                 context.startService(
                     Intent(context, ScreenShareService::class.java)
                         .setAction(ACTION_SET_TRANSLATE)
-                        .putExtra(EXTRA_ON, on),
+                        .putExtra(EXTRA_ON, on)
+                        .putExtra(EXTRA_VOICES, voices),
                 )
             } catch (e: RuntimeException) {
                 Log.w(TAG, "Couldn't switch the subtitles", e)

@@ -26,6 +26,10 @@ class AudioCapturer(private val projection: MediaProjection, private val hub: Au
     private var record: AudioRecord? = null
     private var thread: Thread? = null
 
+    /** Also gets every 20 ms of sound (capture thread), e.g. to hear how high the voices are. */
+    @Volatile
+    var tap: ((ByteArray) -> Unit)? = null
+
     /** Starts capturing. Returns null when it worked, otherwise a short reason why not. */
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun start(): String? {
@@ -94,7 +98,10 @@ class AudioCapturer(private val projection: MediaProjection, private val hub: Au
                     else -> filled += n
                 }
             }
-            if (filled == chunkBytes) hub.publish(chunk)
+            if (filled == chunkBytes) {
+                hub.publish(chunk)
+                tap?.invoke(chunk)
+            }
         }
         hub.setLive(false)
     }

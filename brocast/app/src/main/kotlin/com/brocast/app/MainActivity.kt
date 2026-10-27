@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
     private var wifiAddresses by mutableStateOf(listOf<String>())
     private var oldAppInstalled by mutableStateOf(false)
     private var translateEnabled by mutableStateOf(false)
+    private var voicesEnabled by mutableStateOf(true)
     private var overlayAllowed by mutableStateOf(false)
 
     private val captureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -82,6 +83,7 @@ class MainActivity : ComponentActivity() {
         pin = settings.pin
         soundEnabled = settings.soundEnabled
         translateEnabled = settings.translateEnabled
+        voicesEnabled = settings.voicesEnabled
         overlayAllowed = Settings.canDrawOverlays(this)
 
         setContent {
@@ -125,6 +127,12 @@ class MainActivity : ComponentActivity() {
                     translateEnabled = translateEnabled,
                     overlayAllowed = overlayAllowed,
                     onTranslateChange = ::changeTranslate,
+                    voicesEnabled = voicesEnabled,
+                    onVoicesChange = {
+                        voicesEnabled = it
+                        settings.voicesEnabled = it
+                        ScreenShareService.setTranslate(this, translateEnabled && overlayAllowed, it)
+                    },
                     onAllowOverlay = ::openOverlaySettings,
                 )
             }
@@ -140,14 +148,14 @@ class MainActivity : ComponentActivity() {
         oldAppInstalled = isInstalled(OLD_PACKAGE)
         // Back from Android's "display over other apps" page: subtitles start if it's allowed now.
         overlayAllowed = Settings.canDrawOverlays(this)
-        ScreenShareService.setTranslate(this, translateEnabled && overlayAllowed)
+        ScreenShareService.setTranslate(this, translateEnabled && overlayAllowed, voicesEnabled)
     }
 
     private fun changeTranslate(on: Boolean) {
         translateEnabled = on
         settings.translateEnabled = on
         if (on && !Settings.canDrawOverlays(this)) openOverlaySettings()
-        ScreenShareService.setTranslate(this, on && Settings.canDrawOverlays(this))
+        ScreenShareService.setTranslate(this, on && Settings.canDrawOverlays(this), voicesEnabled)
     }
 
     // Android's own page with the "Allow display over other apps" switch for BroCast.

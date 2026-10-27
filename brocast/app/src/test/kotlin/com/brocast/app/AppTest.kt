@@ -456,6 +456,11 @@ class VersionTwoTest {
         compose.onNodeWithText("Allow").assertDoesNotExist()
         compose.onNodeWithText("A single app", substring = true).performScrollTo().assertIsDisplayed()
         compose.onRoot().captureRoboImage("build/screenshots/9-subtitles-on.png")
+        // English voices: on by default, its own switch right under it.
+        assertTrue(ShareSettings(app).voicesEnabled)
+        compose.onNodeWithText("🗣️ Say them out loud too").performScrollTo().assertIsDisplayed()
+        compose.onAllNodes(isToggleable())[1].performScrollTo().performClick()
+        assertFalse(ShareSettings(app).voicesEnabled)
         compose.onAllNodes(isToggleable())[0].performScrollTo().performClick()
         assertFalse(ShareSettings(app).translateEnabled)
         compose.onNodeWithText("A single app", substring = true).assertDoesNotExist()
@@ -470,6 +475,21 @@ class VersionTwoTest {
         }
         compose.onNodeWithText("💬 English subtitles: Spanish → English ✅").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("🖼️ Sending pictures (English subtitles are on)").assertExists()
+    }
+
+    @Test
+    fun englishVoicesAreToldApartByName() {
+        val genderOf = com.brocast.app.translate.SubtitleVoice.Companion::genderOf
+        assertEquals(true, genderOf("en-us-x-sfg-local"))
+        assertEquals(true, genderOf("en-us-x-tpf-network"))
+        assertEquals(false, genderOf("en-us-x-iom-local"))
+        assertEquals(false, genderOf("en-gb-x-rjs-local"))
+        assertEquals(true, genderOf("en-US-SMTf00"))
+        assertEquals(false, genderOf("en-US-SMTm00"))
+        assertEquals(true, genderOf("English Female"))
+        assertEquals(false, genderOf("English male 2"))
+        assertEquals(null, genderOf("en-us-x-abc-local"))
+        assertEquals(null, genderOf("en-US-language"))
     }
 
     @Test

@@ -87,6 +87,8 @@ fun HomeScreen(
     overlayAllowed: Boolean = false,
     onTranslateChange: (Boolean) -> Unit = {},
     onAllowOverlay: () -> Unit = {},
+    voicesEnabled: Boolean = true,
+    onVoicesChange: (Boolean) -> Unit = {},
 ) {
     Box(
         Modifier
@@ -131,7 +133,10 @@ fun HomeScreen(
             }
 
             Spacer(Modifier.height(14.dp))
-            TranslateCard(translateEnabled, overlayAllowed, live = status is ShareStatus.Live, onTranslateChange, onAllowOverlay)
+            TranslateCard(
+                translateEnabled, overlayAllowed, live = status is ShareStatus.Live, onTranslateChange, onAllowOverlay,
+                voicesEnabled, onVoicesChange,
+            )
             Spacer(Modifier.height(14.dp))
             SoundCard(soundEnabled, soundSupported, locked = sharing, onSoundEnabledChange)
             Spacer(Modifier.height(14.dp))
@@ -478,6 +483,8 @@ private fun TranslateCard(
     live: Boolean,
     onEnabledChange: (Boolean) -> Unit,
     onAllow: () -> Unit,
+    voices: Boolean,
+    onVoicesChange: (Boolean) -> Unit,
 ) {
     BroCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -506,7 +513,24 @@ private fun TranslateCard(
                 TextButton(onClick = onAllow) { Text("Allow") }
             }
         } else if (enabled) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("🗣️ Say them out loud too", color = BroColors.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Body(
+                        "An English guy or girl voice, picked by how high the voice in the show is (that part uses the " +
+                            "Sound switch below). The show gets a bit quieter while it talks.",
+                        size = 13,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(
+                    checked = voices,
+                    onCheckedChange = onVoicesChange,
+                    colors = SwitchDefaults.colors(checkedTrackColor = BroColors.Primary),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
             Body(
                 "💡 When Android asks what to share, pick \"A single app\" and choose the app you watch on: " +
                     "the English then sits right on the subtitle. (With the entire screen it goes just above it.)",

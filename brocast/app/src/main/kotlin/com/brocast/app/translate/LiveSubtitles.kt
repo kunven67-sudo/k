@@ -44,6 +44,10 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
     @Volatile
     private var recheck = false
 
+    /** Gets each new English line (worker thread), e.g. to read it out loud. */
+    @Volatile
+    var onNewEnglish: ((String) -> Unit)? = null
+
     /** A short line for the app's screen, like "Spanish → English". */
     @Volatile
     var note: String = "Looking for subtitles… 👀"
@@ -222,6 +226,7 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
         while (ownEnglish.size > 4) ownEnglish.removeFirst()
         note = "${SubtitleTranslator.name(lang)} → English ✅"
         post(next)
+        onNewEnglish?.invoke(english)
     }
 
     private fun post(s: Shown) {

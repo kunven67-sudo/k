@@ -53,6 +53,11 @@ class ShareSettings(context: Context) {
         get() = prefs.getBoolean(KEY_TRANSLATE, false)
         set(value) = prefs.edit { putBoolean(KEY_TRANSLATE, value) }
 
+    /** Read the English subtitles out loud too. */
+    var voicesEnabled: Boolean
+        get() = prefs.getBoolean(KEY_VOICES, true)
+        set(value) = prefs.edit { putBoolean(KEY_VOICES, value) }
+
     var askedForNotifications: Boolean
         get() = prefs.getBoolean(KEY_ASKED_NOTIFICATIONS, false)
         set(value) = prefs.edit { putBoolean(KEY_ASKED_NOTIFICATIONS, value) }
@@ -81,6 +86,7 @@ class ShareSettings(context: Context) {
         const val KEY_ASKED_NOTIFICATIONS = "asked_notifications"
         const val KEY_SOUND = "sound"
         const val KEY_TRANSLATE = "translate"
+        const val KEY_VOICES = "voices"
         val OBVIOUS_PINS = setOf("1234", "4321", "0123", "1212", "6969", "1004", "2580", "0852")
     }
 }

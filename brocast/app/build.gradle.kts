@@ -18,6 +18,11 @@ android {
         targetSdk = 36
         versionCode = 2
         versionName = "2.0"
+        // Phones are ARM. The subtitle reader + translator ship native code per chip type, so the
+        // rest is left out (113 MB -> about half). An emulator build: -Pbrocast.abis=x86_64
+        ndk {
+            abiFilters += (findProperty("brocast.abis") as String? ?: "arm64-v8a,armeabi-v7a").split(',')
+        }
     }
 
     // The release key is private and never goes in the repo: put brocast-release.jks and
