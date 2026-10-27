@@ -341,7 +341,7 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
         const val TAG = "BroCast"
         const val LOOKING = "Looking for subtitles… 👀"
         const val WAITING = "Waiting for a video to play ▶️"
-        const val OFFER_EVERY_MS = 300L
+        const val OFFER_EVERY_MS = 250L
         const val GONE_AFTER_MS = 600L
         const val SAME_PICTURE = 25
         const val SW = 160

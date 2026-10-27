@@ -286,7 +286,7 @@ class ScreenShareService : Service() {
 
     private fun tick() {
         val s = session ?: return
-        val frames = s.hub.framesPublished + s.video.framesPublished
+        val frames = s.hub.framesPublished + s.video.framesPublished + s.capturer.framesRead
         val fps = (frames - s.lastFrames).toInt().coerceAtLeast(0)
         s.lastFrames = frames
         if (s.ticks % 3 == 0) s.addresses = NetUtils.lanAddresses()

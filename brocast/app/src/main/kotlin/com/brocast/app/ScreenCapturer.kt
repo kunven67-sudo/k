@@ -75,6 +75,11 @@ class ScreenCapturer(
     var isVideo = false
         private set
 
+    /** Frames that only went to the subtitle reader (no TV wanted pictures). */
+    @Volatile
+    var framesRead = 0L
+        private set
+
     // ---- Only touched on the capture thread from here on.
     private var quality = initialQuality
     private var mode = Mode.PICTURES
@@ -273,7 +278,7 @@ class ScreenCapturer(
         markSwitch()
     }
 
-    private fun totalFrames() = hub.framesPublished + (video?.framesPublished ?: 0L)
+    private fun totalFrames() = hub.framesPublished + (video?.framesPublished ?: 0L) + framesRead
 
     private fun markSwitch() {
         switchedAt = SystemClock.uptimeMillis()
@@ -387,6 +392,7 @@ class ScreenCapturer(
                     Log.w(TAG, "Subtitle reader failed", e)
                 }
             }
+            if (!toTv && subtitles != null) framesRead++
             if (toTv) {
                 jpeg.reset()
                 if (bmp.compress(Bitmap.CompressFormat.JPEG, quality.jpegQuality, jpeg)) {
@@ -394,7 +400,7 @@ class ScreenCapturer(
                 }
             }
         }
-        // No TV wants pictures: a few a second are plenty for reading subtitles.
+        // No TV wants pictures: about 3 a second are plenty for reading subtitles.
         nextFrameAt = started + if (toTv || subtitles == null) quality.frameIntervalMs else READ_ONLY_INTERVAL_MS
     }
 
@@ -488,7 +494,7 @@ class ScreenCapturer(
         const val MODE_CHECK_MS = 500L
         const val STALE_VIDEO_MS = 3_000L
         const val NUDGE_AFTER_MS = 1_000L
-        const val READ_ONLY_INTERVAL_MS = 150L
+        const val READ_ONLY_INTERVAL_MS = 300L
         const val MAX_ENCODER_RESTARTS = 3
     }
 }
