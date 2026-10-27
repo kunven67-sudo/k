@@ -44,8 +44,12 @@ class ScreenCapturer(
     private val video: VideoHub?,
     initialQuality: Quality,
     private val listener: Listener,
-    /** True while a browser that can only show pictures is watching. */
+    /** True while pictures are needed: a browser that can only show pictures, or [subtitleReader]. */
     private val picturesWanted: () -> Boolean = { false },
+    /** SUBDUB on the phone while it's on: gets the picture-mode frames to read subtitles from. */
+    private val subtitleReader: () -> ((Bitmap) -> Unit)? = { null },
+    /** False while no browser wants JPEG pictures: frames then only go to [subtitleReader]. */
+    private val jpegNeeded: () -> Boolean = { true },
 ) {
     interface Listener {
         /** Android (or the user, from the status bar) ended the capture. Called on the capture thread. */
@@ -86,6 +90,11 @@ class ScreenCapturer(
     private var contentHeight = 0
     private var videoBroken = video == null
     private var encoderRestarts = 0
+
+    // A still screen makes no new frames, so after a switch the TVs could wait for one: see checkMode.
+    private var switchedAt = 0L
+    private var framesAtSwitch = 0L
+    private var nudged = false
 
     /** False when Android 14+ shares a single app: then that app's size matters, not the screen's. */
     private var followDisplay = true
@@ -163,6 +172,7 @@ class ScreenCapturer(
                 // Video first: a TV checking in between must not see "live" before it knows it's video.
                 video?.setLive(mode == Mode.VIDEO)
                 hub.setLive(true)
+                markSwitch()
                 handler.postDelayed(modeCheck, MODE_CHECK_MS)
             } catch (e: Exception) {
                 Log.e(TAG, "Capture failed to start", e)
@@ -260,6 +270,15 @@ class ScreenCapturer(
         }
         video?.setLive(mode == Mode.VIDEO)
         if (mode == Mode.VIDEO) handler.removeCallbacks(processFrame)
+        markSwitch()
+    }
+
+    private fun totalFrames() = hub.framesPublished + (video?.framesPublished ?: 0L)
+
+    private fun markSwitch() {
+        switchedAt = SystemClock.uptimeMillis()
+        framesAtSwitch = totalFrames()
+        nudged = false
     }
 
     private fun checkMode() {
@@ -269,11 +288,25 @@ class ScreenCapturer(
             rebuild(wanted)
             return
         }
+        // Subtitle reading switched on or off: sharper or normal pictures.
+        if (mode == Mode.PICTURES) applySize()
         // Video mode with TVs watching but no frame for a while: nudge the encoder for a fresh one.
         val v = video
         val enc = encoder
         if (mode == Mode.VIDEO && v != null && enc != null && v.clientCount > 0 && v.millisSinceLastFrame > STALE_VIDEO_MS) {
             enc.requestKeyFrame()
+        }
+        // Nothing made since starting / switching, because the screen is still: Android only draws
+        // the mirror when something changes, so the TV would sit on "Loading". Resizing the mirror a
+        // hair makes Android draw it right away.
+        val vd = virtualDisplay
+        val someoneWaits = mode == Mode.PICTURES || (v?.clientCount ?: 0) > 0
+        if (vd != null && !nudged && someoneWaits && totalFrames() == framesAtSwitch &&
+            SystemClock.uptimeMillis() - switchedAt > NUDGE_AFTER_MS
+        ) {
+            nudged = true
+            vd.resize(mirrorWidth, mirrorHeight - 2, densityDpi)
+            handler.postDelayed({ if (!released && virtualDisplay === vd) vd.resize(mirrorWidth, mirrorHeight, densityDpi) }, 150)
         }
     }
 
@@ -308,7 +341,9 @@ class ScreenCapturer(
     private fun pictureSize(): Pair<Int, Int> {
         val cw = contentWidth.coerceAtLeast(2)
         val ch = contentHeight.coerceAtLeast(2)
-        val scale = min(1.0, quality.maxLongSide.toDouble() / max(cw, ch))
+        // Reading subtitles wants sharp text: at least 1920 on the long side (or the screen's own size).
+        val longSide = if (subtitleReader() != null) max(quality.maxLongSide, 1920) else quality.maxLongSide
+        val scale = min(1.0, longSide.toDouble() / max(cw, ch))
         val w = ((cw * scale).roundToInt() / 2 * 2).coerceAtLeast(2)
         val h = ((ch * scale).roundToInt() / 2 * 2).coerceAtLeast(2)
         return w to h
@@ -342,13 +377,25 @@ class ScreenCapturer(
         } finally {
             image.close()
         }
+        val toTv = jpegNeeded()
+        val subtitles = subtitleReader()
         if (bmp != null) {
-            jpeg.reset()
-            if (bmp.compress(Bitmap.CompressFormat.JPEG, quality.jpegQuality, jpeg)) {
-                hub.publish(jpeg.toByteArray(), bmp.width, bmp.height)
+            if (subtitles != null) {
+                try {
+                    subtitles(bmp)
+                } catch (e: RuntimeException) {
+                    Log.w(TAG, "Subtitle reader failed", e)
+                }
+            }
+            if (toTv) {
+                jpeg.reset()
+                if (bmp.compress(Bitmap.CompressFormat.JPEG, quality.jpegQuality, jpeg)) {
+                    hub.publish(jpeg.toByteArray(), bmp.width, bmp.height)
+                }
             }
         }
-        nextFrameAt = started + quality.frameIntervalMs
+        // No TV wants pictures: a few a second are plenty for reading subtitles.
+        nextFrameAt = started + if (toTv || subtitles == null) quality.frameIntervalMs else READ_ONLY_INTERVAL_MS
     }
 
     private fun copyToBitmap(image: Image): Bitmap? {
@@ -440,6 +487,8 @@ class ScreenCapturer(
         const val TAG = "BroCast"
         const val MODE_CHECK_MS = 500L
         const val STALE_VIDEO_MS = 3_000L
+        const val NUDGE_AFTER_MS = 1_000L
+        const val READ_ONLY_INTERVAL_MS = 150L
         const val MAX_ENCODER_RESTARTS = 3
     }
 }

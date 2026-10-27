@@ -83,6 +83,10 @@ fun HomeScreen(
     onCopy: (String) -> Unit,
     oldAppInstalled: Boolean = false,
     onRemoveOldApp: () -> Unit = {},
+    translateEnabled: Boolean = false,
+    overlayAllowed: Boolean = false,
+    onTranslateChange: (Boolean) -> Unit = {},
+    onAllowOverlay: () -> Unit = {},
 ) {
     Box(
         Modifier
@@ -126,6 +130,8 @@ fun HomeScreen(
                 is ShareStatus.Live -> LiveCard(status, onStop, onCopy, onFixSoundPermission)
             }
 
+            Spacer(Modifier.height(14.dp))
+            TranslateCard(translateEnabled, overlayAllowed, live = status is ShareStatus.Live, onTranslateChange, onAllowOverlay)
             Spacer(Modifier.height(14.dp))
             SoundCard(soundEnabled, soundSupported, locked = sharing, onSoundEnabledChange)
             Spacer(Modifier.height(14.dp))
@@ -426,13 +432,17 @@ private fun LiveCard(
         }
         Spacer(Modifier.height(10.dp))
         Body(
-            if (live.video) {
-                "🎬 Sending smooth video"
-            } else {
-                "🖼️ Sending pictures (a screen that can't play the video is watching)"
+            when {
+                live.video -> "🎬 Sending smooth video"
+                live.translate != null -> "🖼️ Sending pictures (English subtitles are on)"
+                else -> "🖼️ Sending pictures (a screen that can't play the video is watching)"
             },
             size = 13,
         )
+        if (live.translate != null) {
+            Spacer(Modifier.height(4.dp))
+            Body("💬 English subtitles: ${live.translate}", color = BroColors.Good, size = 13)
+        }
         Spacer(Modifier.height(4.dp))
         SoundLine(live.sound, onFixSoundPermission)
         if (live.noPicture) {
@@ -457,6 +467,58 @@ private fun SoundLine(sound: SoundStatus, onFixPermission: () -> Unit) {
                 Body("🔇 No sound: Android's \"record audio\" permission is off.", color = BroColors.Warn)
             }
             TextButton(onClick = onFixPermission) { Text("Fix it") }
+        }
+    }
+}
+
+@Composable
+private fun TranslateCard(
+    enabled: Boolean,
+    allowed: Boolean,
+    live: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    onAllow: () -> Unit,
+) {
+    BroCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                CardTitle("💬 English subtitles on this phone")
+                Spacer(Modifier.height(4.dp))
+                Body(
+                    "Reads the subtitles of whatever's playing (Spanish, Portuguese, Japanese, Chinese, Korean " +
+                        "and lots more) and puts English right over them.",
+                    size = 14,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(
+                checked = enabled,
+                onCheckedChange = onEnabledChange,
+                colors = SwitchDefaults.colors(checkedTrackColor = BroColors.Primary),
+            )
+        }
+        if (enabled && !allowed) {
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    WarnBox("Android needs one OK first: turn on \"Display over other apps\" for BroCast 2.")
+                }
+                TextButton(onClick = onAllow) { Text("Allow") }
+            }
+        } else if (enabled) {
+            Spacer(Modifier.height(8.dp))
+            Body(
+                "💡 When Android asks what to share, pick \"A single app\" and choose the app you watch on: " +
+                    "the English then sits right on the subtitle. (With the entire screen it goes just above it.)",
+                size = 13,
+            )
+            Spacer(Modifier.height(4.dp))
+            Body(
+                "📥 Each language downloads once (about 30 MB), then it works offline. " +
+                    "While this is on, a TV watching gets pictures instead of video.",
+                size = 13,
+            )
+            if (!live) Body("Turns on when you start sharing ▶️", size = 12)
         }
     }
 }

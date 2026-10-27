@@ -37,6 +37,8 @@ sealed interface ShareStatus {
         val sound: SoundStatus = SoundStatus.OFF,
         /** True when the picture goes out as video (false: picture by picture, for an older TV). */
         val video: Boolean = true,
+        /** English subtitles on this phone: what it's doing ("Spanish → English"), null when off. */
+        val translate: String? = null,
     ) : ShareStatus
 
     data class Failed(val message: String) : ShareStatus

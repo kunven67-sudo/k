@@ -48,6 +48,11 @@ class ShareSettings(context: Context) {
         get() = prefs.getBoolean(KEY_SOUND, true)
         set(value) = prefs.edit { putBoolean(KEY_SOUND, value) }
 
+    /** SUBDUB on the phone: cover foreign subtitles with English while sharing. */
+    var translateEnabled: Boolean
+        get() = prefs.getBoolean(KEY_TRANSLATE, false)
+        set(value) = prefs.edit { putBoolean(KEY_TRANSLATE, value) }
+
     var askedForNotifications: Boolean
         get() = prefs.getBoolean(KEY_ASKED_NOTIFICATIONS, false)
         set(value) = prefs.edit { putBoolean(KEY_ASKED_NOTIFICATIONS, value) }
@@ -75,6 +80,7 @@ class ShareSettings(context: Context) {
         const val KEY_SALT = "salt"
         const val KEY_ASKED_NOTIFICATIONS = "asked_notifications"
         const val KEY_SOUND = "sound"
+        const val KEY_TRANSLATE = "translate"
         val OBVIOUS_PINS = setOf("1234", "4321", "0123", "1212", "6969", "1004", "2580", "0852")
     }
 }

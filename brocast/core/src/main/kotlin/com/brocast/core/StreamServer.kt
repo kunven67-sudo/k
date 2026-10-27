@@ -9,6 +9,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
+import java.net.SocketTimeoutException
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
@@ -136,13 +137,21 @@ class StreamServer(
         pollers.clear()
     }
 
+    /** True while any browser is getting JPEG pictures (MJPEG stream or single frames). */
+    fun pictureViewerActive(): Boolean {
+        val now = monotonicMs()
+        return streams.isNotEmpty() || pollers.values.any { now - it.lastSeen < VIEWER_TIMEOUT_MS }
+    }
+
     /**
      * True while a browser is watching the MJPEG picture (one that can't play H.264). The phone
      * then sends JPEG pictures instead of video.
      */
     fun jpegViewerActive(): Boolean {
         val now = monotonicMs()
-        if (streams.values.any { it.needsJpeg && now - maxOf(it.startedAt, it.lastWriteAt) < VIEWER_TIMEOUT_MS }) return true
+        // An open picture stream counts even while it waits for its first picture (a still screen
+        // makes none): dead ones are noticed and dropped by the stream loop itself.
+        if (streams.values.any { it.needsJpeg }) return true
         return pollers.values.any { it.needsJpeg && now - it.lastSeen < VIEWER_TIMEOUT_MS }
     }
 
@@ -332,7 +341,12 @@ class StreamServer(
                     if (Thread.currentThread().isInterrupted || hub.isClosed) break
                     // Screen hasn't changed for a while: resend the last picture. That keeps
                     // the connection alive and lets us notice when the TV has gone away.
-                    frame = hub.latest() ?: continue
+                    frame = hub.latest()
+                    if (frame == null) {
+                        // No picture yet to send: check the TV is still there some other way.
+                        if (!stillConnected(socket)) break
+                        continue
+                    }
                 }
                 info.writing {
                     out.write(frame.jpeg)
@@ -441,6 +455,33 @@ class StreamServer(
             ),
         )
         return true
+    }
+
+    /**
+     * Is the browser on the other end of [socket] still there? Browsers send nothing more after
+     * asking for a stream, so a quick read either times out (still there) or finds the connection
+     * closed. Used while there's nothing to write that would tell us.
+     */
+    private fun stillConnected(socket: Socket): Boolean {
+        val old = try {
+            socket.soTimeout
+        } catch (e: SocketException) {
+            return false
+        }
+        return try {
+            socket.soTimeout = 1
+            socket.getInputStream().read() != -1
+        } catch (e: SocketTimeoutException) {
+            true
+        } catch (e: IOException) {
+            false
+        } finally {
+            try {
+                socket.soTimeout = old
+            } catch (e: SocketException) {
+                // closed meanwhile
+            }
+        }
     }
 
     private fun singleFrame(req: HttpRequest, ip: String, out: OutputStream, head: Boolean) {

@@ -470,6 +470,33 @@ class VideoServerTest {
     }
 
     @Test
+    fun oldTvWaitingOnAStillScreenKeepsPicturesOn() {
+        // Found on a real (emulated) Android: the phone switched to pictures for an old TV, the screen
+        // was still so no picture came, and after 6 s the phone thought the TV was gone.
+        val hub = FrameHub()
+        val server = StreamServer(hub)
+        val port = server.start(0)
+        try {
+            hub.setLive(true)
+            val s = Socket("127.0.0.1", port)
+            s.getOutputStream().write("GET /stream.mjpeg?cid=oldtv HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n".toByteArray())
+            assertEquals(200, readHead(BufferedInputStream(s.getInputStream())).first)
+            Thread.sleep(8_000)
+            assertTrue(server.jpegViewerActive(), "still waiting for its first picture: still watching")
+            s.close()
+            var waited = 0
+            while (server.jpegViewerActive() && waited < 6_000) {
+                Thread.sleep(100)
+                waited += 100
+            }
+            assertFalse(server.jpegViewerActive(), "gone once it hangs up")
+        } finally {
+            server.stop()
+            hub.close()
+        }
+    }
+
+    @Test
     fun stuckConnectionGetsClosed() {
         // A TV that vanished without a goodbye: it stops reading, the phone's writes get stuck.
         val video = VideoHub(maxQueueFrames = 10_000, maxQueueBytes = Long.MAX_VALUE / 4)
