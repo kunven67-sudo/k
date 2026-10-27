@@ -188,7 +188,8 @@
   var canVideo = !forcedMode && !!(MSE && MSE.isTypeSupported && window.WebSocket && window.ArrayBuffer &&
     MSE.isTypeSupported('video/mp4; codecs="avc1.42E01F"') && typeof vid.play === 'function');
   var picture = '';          // what's on now: 'video' or 'jpeg'
-  var videoBroken = false;   // this browser's video player kept failing: pictures from now on
+  var videoBroken = false;   // the video player kept failing: pictures for a while, then video gets another go
+  var videoRetryAt = 0, videoRetryWait = 60000;
 
   var phase = '';            // '', 'wait', 'pin', 'live'
   var sid = null;            // phone session id; changes when sharing restarts
@@ -287,6 +288,12 @@
     }
 
     // The phone sends video unless some screen that can't play it is watching.
+    if (videoBroken && now() > videoRetryAt) {
+      // Time to give video another go. The picture connection said "this screen needs pictures";
+      // reconnect without that, so the phone can switch back to video.
+      videoBroken = false;
+      if (streamOn && picture === 'jpeg') stopStream();
+    }
     var want = canVideo && !videoBroken && s.video === 'h264' ? 'video' : 'jpeg';
     if (streamOn && want !== picture) stopStream();
     if (!streamOn) {
@@ -593,7 +600,7 @@
   function onVisibility() {
     if (leaving) return;
     if (isHidden()) { if (!hiddenSince) hiddenSince = now(); }
-    else { hiddenSince = 0; scheduleStatus(0); }
+    else { hiddenSince = 0; vLastMove = now(); scheduleStatus(0); }
   }
   document.addEventListener('visibilitychange', onVisibility, false);
   document.addEventListener('webkitvisibilitychange', onVisibility, false);
@@ -614,6 +621,7 @@
   function videoStart() {
     vLastData = vLastMove = now();
     vLastTime = -1;
+    vWsTries = 0;
     videoOpenSource();
     videoConnect();
     clearInterval(vTimer);
@@ -785,6 +793,8 @@
       if (ct > 0 && vid.readyState >= 2) markFrame();
     }
     // Pictures are arriving but the player hasn't moved for a while: it's stuck, start it over.
+    // (Not in a background tab: browsers pause videos there on purpose.)
+    if (isHidden()) vLastMove = t;
     if (b && b.length && b.end(b.length - 1) - ct > 0.5 && t - vLastMove > 2500 && t - vSeekedAt > 1500) {
       videoReset('stuck');
       return;
@@ -836,9 +846,15 @@
     videoConnect();
   }
 
+  // (for tests: skip the wait before trying video again)
+  window.BroCastRetryNow = function () { videoRetryAt = 0; scheduleStatus(0); };
+
   function videoGiveUp() {
     if (videoBroken) return;
     videoBroken = true;
+    // Try video again later (it may have been a bad moment), waiting longer each time it fails.
+    videoRetryAt = now() + videoRetryWait;
+    videoRetryWait = Math.min(videoRetryWait * 2, 30 * 60000);
     if (streamOn && picture === 'video') { stopStream(); scheduleStatus(0); }
   }
 

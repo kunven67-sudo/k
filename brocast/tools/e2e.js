@@ -468,7 +468,10 @@ async function videoTests(browser) {
   console.log('19) Video player keeps failing -> falls back to pictures, never a black screen');
   phone = await startPhone(['--video']);
   const broken = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-  await broken.addInitScript(() => { SourceBuffer.prototype.appendBuffer = function () { throw new Error('decoder broke'); }; });
+  await broken.addInitScript(() => {
+    window.__realAppend = SourceBuffer.prototype.appendBuffer;
+    SourceBuffer.prototype.appendBuffer = function () { throw new Error('decoder broke'); };
+  });
   page = await broken.newPage();
   page.errors = [];
   page.on('pageerror', (e) => page.errors.push(String(e)));
@@ -477,6 +480,10 @@ async function videoTests(browser) {
   ok(await page.evaluate(() => window.BroCastVideo.resets) >= 3, 'after trying the video player a few times');
   const b1 = await page.evaluate(pictureHash); await sleep(700); const b2 = await page.evaluate(pictureHash);
   ok(b1 !== b2, 'pictures move');
+  // Later on it gives the video another go (here: right away, by moving the retry time).
+  await page.evaluate(() => { SourceBuffer.prototype.appendBuffer = window.__realAppend; });
+  await page.evaluate(() => { window.BroCastRetryNow && window.BroCastRetryNow(); });
+  ok(await waitFor(page, showingVideo, 20000), 'and switches back to video once the player works again');
   ok(page.errors.length === 0, 'no JS errors: ' + JSON.stringify(page.errors));
   await broken.close();
   await stopPhone(phone);
@@ -547,6 +554,18 @@ async function videoTests(browser) {
   await sleep(4000);
   const ap2 = await page.evaluate(() => window.BroCastVideo.appended);
   ok(ap2 - ap1 > 60, `still receiving while hidden (${ap2 - ap1} frames in 4 s)`);
+  // A browser pausing the video in a background tab must not count as "stuck".
+  await page.evaluate(() => document.getElementById('vid').pause());
+  await sleep(5000);
+  const hid = (await page.evaluate(vinfo)).stats;
+  ok(hid.resets === 0, 'a paused background video is not treated as stuck: ' + JSON.stringify(hid));
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  ok(await waitFor(page, () => { const v = document.getElementById('vid'); return !v.paused && v.buffered.length && v.buffered.end(v.buffered.length - 1) - v.currentTime < 0.8; }, 6000),
+    'back in front: plays again, right at live');
   ok(page.errors.length === 0, 'no JS errors: ' + JSON.stringify(page.errors));
   await ctx.close();
   await stopPhone(phone);

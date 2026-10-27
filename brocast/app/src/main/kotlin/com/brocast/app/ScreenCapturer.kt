@@ -160,8 +160,9 @@ class ScreenCapturer(
                     surface, null, handler,
                 ) ?: throw IllegalStateException("No virtual display")
                 displayManager.registerDisplayListener(displayListener, handler)
-                hub.setLive(true)
+                // Video first: a TV checking in between must not see "live" before it knows it's video.
                 video?.setLive(mode == Mode.VIDEO)
+                hub.setLive(true)
                 handler.postDelayed(modeCheck, MODE_CHECK_MS)
             } catch (e: Exception) {
                 Log.e(TAG, "Capture failed to start", e)
