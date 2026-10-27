@@ -512,6 +512,28 @@ async function videoTests(browser) {
   await ctx.close();
   await stopPhone(phone);
 
+  console.log('23) Translate button opens SUBDUB ready for this tab');
+  phone = await startPhone(['--video']);
+  ({ ctx, page } = await newTv(browser, phone.url));
+  await ctx.route('https://kunven67-sudo.github.io/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<title>SUBDUB</title>' }));
+  ok(await waitFor(page, showingVideo, 15000), 'video shows');
+  await page.mouse.move(600, 600);
+  ok(await page.evaluate(() => document.getElementById('trBtn').style.display !== 'none'), 'Translate button in the bar (PC browser)');
+  const [sub] = await Promise.all([ctx.waitForEvent('page'), page.click('#trBtn')]);
+  ok(sub.url() === 'https://kunven67-sudo.github.io/k/subdub/?from=brocast', 'opens SUBDUB in BroCast mode: ' + sub.url());
+  await page.bringToFront();
+  ok((await videoMoves(page, 1200)).moved, 'video keeps playing');
+  ok(page.errors.length === 0, 'no JS errors: ' + JSON.stringify(page.errors));
+  await ctx.close();
+  // A smart TV doesn't get the button (SUBDUB needs a computer).
+  const tv = await browser.newContext({ userAgent: 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0 TV Safari/537.36' });
+  const tp = await tv.newPage();
+  await tp.goto(phone.url);
+  await waitFor(tp, showingVideo, 15000);
+  ok(await tp.evaluate(() => document.getElementById('trBtn').style.display === 'none'), 'no Translate button on a TV');
+  await tv.close();
+  await stopPhone(phone);
+
   console.log('22) Tab in the background keeps playing (sound keeps going, screen recorders keep working)');
   phone = await startPhone(['--video']);
   ({ ctx, page } = await newTv(browser, phone.url));

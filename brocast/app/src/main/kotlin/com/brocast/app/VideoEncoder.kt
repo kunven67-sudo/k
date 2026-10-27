@@ -37,6 +37,10 @@ class VideoEncoder private constructor(
     @Volatile
     private var released = false
 
+    /** While muted, finished frames are thrown away (a new encoder is taking over). */
+    @Volatile
+    var muted = false
+
     private val callback = object : MediaCodec.Callback() {
         override fun onInputBufferAvailable(codec: MediaCodec, index: Int) = Unit // input comes from the surface
 
@@ -44,7 +48,7 @@ class VideoEncoder private constructor(
             if (released) return
             try {
                 val buffer = codec.getOutputBuffer(index)
-                if (buffer != null && info.size > 0) {
+                if (buffer != null && info.size > 0 && !muted) {
                     val data = ByteArray(info.size)
                     buffer.position(info.offset)
                     buffer.limit(info.offset + info.size)
@@ -67,7 +71,7 @@ class VideoEncoder private constructor(
             // Some encoders hand over the SPS/PPS only here, as csd-0 / csd-1.
             val sps = format.getByteBuffer("csd-0")
             val pps = format.getByteBuffer("csd-1")
-            if (sps != null && pps != null && !released) configureHub(withStartCode(sps) + withStartCode(pps))
+            if (sps != null && pps != null && !released && !muted) configureHub(withStartCode(sps) + withStartCode(pps))
         }
 
         override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {

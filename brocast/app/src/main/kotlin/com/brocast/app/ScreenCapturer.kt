@@ -76,6 +76,9 @@ class ScreenCapturer(
     private var mode = Mode.PICTURES
     private var virtualDisplay: VirtualDisplay? = null
     private var reader: ImageReader? = null
+
+    // Read from other threads too (key frame requests from the web server).
+    @Volatile
     private var encoder: VideoEncoder? = null
     private var mirrorWidth = 0
     private var mirrorHeight = 0
@@ -237,9 +240,12 @@ class ScreenCapturer(
         val oldReader = reader
         encoder = null
         reader = null
+        // From here on only the new encoder's frames may reach the TVs (old ones would show as garbage).
+        oldEncoder?.muted = true
         val surface = prepare(target) ?: prepare(Mode.PICTURES)
         if (surface == null) {
             // Nothing new worked: keep what we had.
+            oldEncoder?.muted = false
             encoder = oldEncoder
             reader = oldReader
             return

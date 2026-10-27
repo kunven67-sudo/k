@@ -24,6 +24,8 @@ let translate = null;
 let current = null;         // active screen controller (has .close())
 const SETUP_KEY = 'subdub-setup-done-v1';
 const BASIC_LANGS = ['ja', 'ko', 'zh', 'es', 'pt'];
+// Opened from BroCast's Translate button: the anime is in the BroCast tab.
+const FROM_BROCAST = new URLSearchParams(location.search).get('from') === 'brocast';
 
 mountLogo($('#logo'));
 $('#logo').addEventListener('click', () => goHome());
@@ -164,7 +166,13 @@ function goHome() {
   for (const ev of ['dragenter', 'dragover']) fileTile.addEventListener(ev, (e) => { e.preventDefault(); fileTile.classList.add('drag'); });
   for (const ev of ['dragleave', 'drop']) fileTile.addEventListener(ev, () => fileTile.classList.remove('drag'));
   fileTile.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) openFile(f); });
+  const brocast = FROM_BROCAST ? h('div', { class: 'brocast' },
+    h('div', {},
+      h('h2', {}, 'Translate BroCast'),
+      h('p', {}, 'Your phone is showing on this PC in the BroCast tab. Click the button, click the BroCast tab in the box that pops up, then Share. Subtitles in other languages show up in English, and talking gets dubbed.')),
+    h('button', { class: 'go', onclick: () => startLive({ tab: true }) }, icon('tv'), 'Pick the BroCast tab')) : null;
   const el = h('div', { class: 'home screen' },
+    brocast,
     h('div', { class: 'hero' },
       h('h1', {}, 'Any language in, ', h('em', {}, 'English'), ' out.'),
       h('p', {}, 'SUBDUB reads subtitles you can\'t read and turns foreign talking into English, with a girl voice for girls and a boy voice for boys. Their real voices get cut out, the music stays.')),
@@ -372,12 +380,12 @@ async function openFile(file) {
 }
 
 // ---------- live mode ----------
-async function startLive() {
+async function startLive({ tab = false } = {}) {
   // ask what to share first (the browser needs the click for this)
   const cast = new Cast('live');
   const live = new LiveDub({ engine: {}, cast, translate: getTranslate(), settings: S, workletUrl: new URL('tap.worklet.js', location.href).href });
   let stream;
-  try { stream = await live.start(); }
+  try { stream = await live.start({ tab }); }
   catch (e) { if (e.name !== 'NotAllowedError') toast('Could not start: ' + e.message, true); return; }
   close();
   const showKey = showKeyFrom(live.title);

@@ -82,8 +82,8 @@
   @-webkit-keyframes pulse { 50% { opacity: .25; } }
   @keyframes pulse { 50% { opacity: .25; } }
   #devName { color: #9AA4BF; margin-right: 18px; }
-  #fsBtn, #soundBtn { font-size: 20px; padding: 12px 24px; }
-  #soundBtn { background: #1C2438; margin-right: 8px; }
+  #fsBtn, #soundBtn, #trBtn { font-size: 20px; padding: 12px 24px; }
+  #soundBtn, #trBtn { background: #1C2438; margin-right: 8px; }
   #soundBtn.off { color: #9AA4BF; }
 
   #soundHint {
@@ -106,7 +106,7 @@
     .btn { font-size: 21px; padding: 13px 28px; }
     #barInner { font-size: 16px; }
     #devName { display: none; }
-    #fsBtn, #soundBtn { font-size: 16px; padding: 10px 16px; }
+    #fsBtn, #soundBtn, #trBtn { font-size: 16px; padding: 10px 16px; }
     #soundHint span { font-size: 17px; padding: 11px 18px; }
   }
 </style>
@@ -158,7 +158,7 @@
 
 <div id="soundHint" style="display:none"><span>Press OK or click anywhere to turn on sound</span></div>
 
-<div id="bar"><div id="barInner"><span class="live"><i></i>LIVE</span><span id="devName"></span><button class="btn" id="soundBtn" type="button" style="display:none">Sound on</button><button class="btn" id="fsBtn" type="button">Full screen</button></div></div>
+<div id="bar"><div id="barInner"><span class="live"><i></i>LIVE</span><span id="devName"></span><button class="btn" id="soundBtn" type="button" style="display:none">Sound on</button><button class="btn" id="trBtn" type="button" style="display:none" title="Subtitles in other languages to English, with SUBDUB">Translate</button><button class="btn" id="fsBtn" type="button">Full screen</button></div></div>
 
 <noscript><p style="position:fixed;top:40%;width:100%;text-align:center;font-size:24px;z-index:9">This page needs JavaScript turned on.</p></noscript>
 
@@ -171,7 +171,7 @@
   var img = $('screen'), overlay = $('overlay'), waitCard = $('waitCard'), pinCard = $('pinCard'),
       waitMsg = $('waitMsg'), waitHint = $('waitHint'), pinInput = $('pinInput'), pinBtn = $('pinBtn'),
       pinError = $('pinError'), bar = $('bar'), fsBtn = $('fsBtn'), devName = $('devName'), awake = $('awake'),
-      soundBtn = $('soundBtn'), soundHint = $('soundHint'), vid = $('vid');
+      soundBtn = $('soundBtn'), soundHint = $('soundHint'), vid = $('vid'), trBtn = $('trBtn');
   var docEl = document.documentElement;
   var URLs = window.URL || window.webkitURL;
   var BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -983,6 +983,18 @@
       closeSound();
     }
     updateSoundUi();
+    showBar();
+  };
+
+  /*
+   * Translate: opens SUBDUB (subtitles in other languages -> English, foreign talking -> English
+   * voices) ready to pick this tab. SUBDUB needs Edge or Chrome on a computer, so only those get the button.
+   */
+  var SUBDUB_URL = 'https://kunven67-sudo.github.io/k/subdub/?from=brocast';
+  var ua = navigator.userAgent;
+  if (!TV_UA.test(ua) && /(Chrome|Edg)\//.test(ua) && !/Mobile|Android|CrOS/.test(ua)) trBtn.style.display = '';
+  trBtn.onclick = function () {
+    try { window.open(SUBDUB_URL, 'subdub'); } catch (e) { location.href = SUBDUB_URL; }
     showBar();
   };
 

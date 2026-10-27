@@ -23,10 +23,11 @@ export class LiveDub extends EventTarget {
   }
   emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }
 
-  async start() {
+  // tab: open the browser's picker on its list of tabs (e.g. coming from BroCast's Translate button)
+  async start({ tab = false } = {}) {
     const s = this.settings;
     this.stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: { ideal: 30 }, width: { ideal: 1920 } },
+      video: { frameRate: { ideal: 30 }, width: { ideal: 1920 }, ...(tab ? { displaySurface: 'browser' } : {}) },
       audio: { suppressLocalAudioPlayback: true, restrictOwnAudio: true, echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 },
       systemAudio: 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', preferCurrentTab: false, monitorTypeSurfaces: 'include',
     });
