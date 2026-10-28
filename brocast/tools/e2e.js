@@ -519,6 +519,67 @@ async function videoTests(browser) {
   await ctx.close();
   await stopPhone(phone);
 
+  console.log('24) English from the phone: shown over the subtitle, said with a guy/girl voice, show ducked');
+  phone = await startPhone(['--video', '--subs']);
+  ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  // A stand-in for the computer's voices that records what gets said.
+  await ctx.addInitScript(() => {
+    const said = [];
+    window.__said = said;
+    const voices = [
+      { name: 'Microsoft David - English (United States)', lang: 'en-US' },
+      { name: 'Microsoft Guy Online (Natural) - English (United States)', lang: 'en-US' },
+      { name: 'Microsoft Jenny Online (Natural) - English (United States)', lang: 'en-US' },
+      { name: 'Microsoft Denise Online (Natural) - French (France)', lang: 'fr-FR' },
+    ];
+    window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+    const fake = {
+      speaking: false,
+      getVoices: () => voices,
+      cancel() {},
+      speak(u) {
+        said.push({ text: u.text, voice: u.voice && u.voice.name, rate: u.rate });
+        setTimeout(() => u.onend && u.onend(), 1200);
+      },
+    };
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, get: () => fake });
+  });
+  page = await ctx.newPage();
+  page.errors = [];
+  page.on('pageerror', (e) => page.errors.push(String(e)));
+  await page.goto(phone.url);
+  ok(await waitFor(page, showingVideo, 15000), 'video shows up');
+  ok(await waitFor(page, () => document.getElementById('en').style.display === 'block', 9000), 'English box shows up');
+  const box = await page.evaluate(() => {
+    const e = document.getElementById('en').getBoundingClientRect();
+    const v = document.getElementById('vid');
+    const vw = innerWidth, vh = innerHeight, s = Math.min(vw / v.videoWidth, vh / v.videoHeight);
+    const w = v.videoWidth * s, h = v.videoHeight * s, ox = (vw - w) / 2, oy = (vh - h) / 2;
+    return { text: document.getElementById('en').textContent, cx: (e.left + e.right) / 2, cy: (e.top + e.bottom) / 2,
+      want: { cx: ox + 0.5 * w, cy: oy + 0.83 * h }, left: e.left, right: e.right, ox, w };
+  });
+  ok(Math.abs(box.cx - box.want.cx) < 8 && Math.abs(box.cy - box.want.cy) < 12, 'sits right on the original subtitle: ' + JSON.stringify(box));
+  ok(box.left >= box.ox - 1 && box.right <= box.ox + box.w + 1, 'stays inside the picture');
+  await page.screenshot({ path: OUT + '/24-english.png' });
+  ok(await waitFor(page, () => window.__said.length >= 2, 12000), 'lines are said out loud');
+  ok(await page.evaluate(() => /sword/.test(window.__said[0].text)), 'the very first line is said too');
+  const said = await page.evaluate(() => window.__said);
+  ok(said.every((x) => x.voice && x.voice.includes('Online (Natural)')), 'natural voices: ' + JSON.stringify(said));
+  const guy = said.find((x) => /sword|train/.test(x.text)), girl = said.find((x) => /came back/.test(x.text));
+  ok(guy && /Guy/.test(guy.voice) && girl && /Jenny/.test(girl.voice), 'guy voice for the low voice, girl voice for the high one');
+  ok(await page.evaluate(() => document.getElementById('trBtn').style.display === 'none' && document.getElementById('vcBtn').style.display === ''),
+    'Translate button hidden (the phone translates), Voice button there');
+  // Line 3 is already drawn into the picture (whole-screen sharing): said, but no second box.
+  ok(await waitFor(page, () => window.__said.some((x) => /train/.test(x.text)), 12000), 'third line said');
+  ok(await page.evaluate(() => document.getElementById('en').style.display === 'none'), 'no box over English that is already in the picture');
+  await page.evaluate(() => document.getElementById('vcBtn').click());
+  const before = await page.evaluate(() => window.__said.length);
+  await sleep(4500);
+  ok(await page.evaluate((n) => window.__said.length === n, before), 'Voice off: nothing more is said');
+  ok(page.errors.length === 0, 'no JS errors: ' + JSON.stringify(page.errors));
+  await ctx.close();
+  await stopPhone(phone);
+
   console.log('23) Translate button opens SUBDUB ready for this tab');
   phone = await startPhone(['--video']);
   ({ ctx, page } = await newTv(browser, phone.url));

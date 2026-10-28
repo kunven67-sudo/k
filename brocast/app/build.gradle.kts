@@ -16,8 +16,8 @@ android {
         applicationId = "com.brocast.live"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "2.1"
         // Phones are ARM. The subtitle reader + translator ship native code per chip type, so the
         // rest is left out (113 MB -> about half). An emulator build: -Pbrocast.abis=x86_64
         ndk {

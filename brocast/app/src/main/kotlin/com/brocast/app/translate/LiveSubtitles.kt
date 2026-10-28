@@ -46,9 +46,22 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
     @Volatile
     private var recheck = false
 
-    /** Gets each new English line (worker thread), e.g. to read it out loud. */
+    /**
+     * An English line as shown: [left]..[bottom] is where the original subtitle is, as 0..1 of the
+     * screen. [inPicture]: the screen recording includes the English box (whole-screen sharing).
+     */
+    class English(val text: String, val left: Float, val top: Float, val right: Float, val bottom: Float, val inPicture: Boolean)
+
+    /** Hears about the English lines (worker thread), e.g. to say them or show them on the TV/PC. */
+    interface Listener {
+        /** [isNew]: a new line; false: the same line moved. */
+        fun onEnglish(english: English, isNew: Boolean)
+
+        fun onGone()
+    }
+
     @Volatile
-    var onNewEnglish: ((String) -> Unit)? = null
+    var listener: Listener? = null
 
     /** A short line for the app's screen, like "Spanish → English". */
     @Volatile
@@ -87,6 +100,7 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
      * The newest frame of the shared screen ([frame] belongs to the caller: whatever's needed is
      * copied right away). Cheap when nothing changed; the reading happens on another thread.
      */
+    @Synchronized // frames come from the video reader or the picture reader (one at a time, but either)
     fun offer(frame: Bitmap) {
         if (closed) return
         val now = SystemClock.uptimeMillis()
@@ -246,19 +260,25 @@ class LiveSubtitles(context: Context, private val screenSize: () -> Point) {
         ownEnglish.addLast(english)
         while (ownEnglish.size > 4) ownEnglish.removeFirst()
         note = "${SubtitleTranslator.name(lang)} → English ✅"
-        post(next)
-        onNewEnglish?.invoke(english)
+        post(next, isNew = true)
     }
 
-    private fun post(s: Shown) {
+    private fun post(s: Shown, isNew: Boolean = false) {
         val english = s.english ?: return
         val cover = SubtitleOverlay.Cover(english, Rect(s.rect), recordingSeesOverlay, s.lines)
         val screen = s.screen
         main.post { if (!closed) overlay.show(cover, screen.x, screen.y) }
+        val w = screen.x.coerceAtLeast(1).toFloat()
+        val h = screen.y.coerceAtLeast(1).toFloat()
+        listener?.onEnglish(
+            English(english, s.rect.left / w, s.rect.top / h, s.rect.right / w, s.rect.bottom / h, recordingSeesOverlay),
+            isNew,
+        )
     }
 
     private fun hide() {
         main.post { if (!closed) overlay.show(null, 0, 0) }
+        listener?.onGone()
     }
 
     // ---------------------------------------------------------------- capture thread helpers
