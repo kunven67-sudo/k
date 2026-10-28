@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>BroCast</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 108 108'%3E%3Crect width='108' height='108' rx='26' fill='%237C5CFF'/%3E%3Cpath d='M47 31h14a4 4 0 0 1 4 4v38a4 4 0 0 1-4 4H47a4 4 0 0 1-4-4V35a4 4 0 0 1 4-4z' fill='white'/%3E%3C/svg%3E">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #000; color: #EEF2FF;
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.idle, body.idle * { cursor: none !important; }
+
+  #awake { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background: #000; pointer-events: none; }
+  #screen, #vid {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: none;
+    object-fit: contain; background: #000; -webkit-user-select: none; user-select: none;
+  }
+
+  #overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 3; padding: 24px;
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+    background: #0B0F1A;
+    background: radial-gradient(circle at 25% 15%, #2a1f5c 0%, #0B0F1A 58%);
+  }
+  .card { text-align: center; width: 100%; max-width: 760px; margin: 0 auto; }
+  .logo { display: block; width: 112px; height: 112px; margin: 0 auto 22px; }
+  h1 { font-size: 60px; line-height: 1.1; margin: 0 0 6px; font-weight: 800; letter-spacing: -1px; color: #fff; }
+  .grad { color: #A78BFA; }
+  @supports (-webkit-background-clip: text) {
+    .grad { background: linear-gradient(90deg, #A78BFA, #22D3EE); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  }
+  .msg { font-size: 32px; font-weight: 700; margin: 18px 0 4px; }
+  .hint { font-size: 22px; line-height: 1.5; color: #9AA4BF; margin: 10px 0 0; }
+  .hint b { color: #EEF2FF; }
+
+  .dots { height: 28px; margin: 20px 0 6px; }
+  .dots span {
+    display: inline-block; width: 14px; height: 14px; margin: 0 6px; border-radius: 50%; background: #7C5CFF;
+    -webkit-animation: bounce 1.2s infinite ease-in-out; animation: bounce 1.2s infinite ease-in-out;
+  }
+  .dots span:nth-child(2) { background: #4F9DF5; -webkit-animation-delay: .15s; animation-delay: .15s; }
+  .dots span:nth-child(3) { background: #22D3EE; -webkit-animation-delay: .3s; animation-delay: .3s; }
+  @-webkit-keyframes bounce { 0%, 80%, 100% { -webkit-transform: scale(.5); opacity: .4; } 40% { -webkit-transform: scale(1); opacity: 1; } }
+  @keyframes bounce { 0%, 80%, 100% { transform: scale(.5); opacity: .4; } 40% { transform: scale(1); opacity: 1; } }
+
+  #pinInput {
+    display: block; margin: 26px auto 22px; width: 320px; max-width: 90%; padding: 12px 0 12px 22px;
+    font-size: 60px; font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 22px; text-align: center;
+    color: #fff; background: #141A2A; border: 3px solid #3B4566; border-radius: 20px; outline: none;
+  }
+  #pinInput:focus { border-color: #22D3EE; }
+  .btn {
+    font-family: inherit; font-size: 26px; font-weight: 700; color: #fff; background: #7C5CFF;
+    border: 0; border-radius: 999px; padding: 16px 36px; cursor: pointer;
+  }
+  .btn:focus { outline: 4px solid #22D3EE; outline-offset: 4px; }
+  .btn:disabled { opacity: .6; }
+  .error { min-height: 32px; margin: 18px 0 0; font-size: 22px; color: #FF7A93; }
+
+  #bar {
+    /* At the top: subtitles live at the bottom, and translators reading this tab (SUBDUB) shouldn't
+       mistake the buttons for one. */
+    position: fixed; left: 0; right: 0; top: 24px; z-index: 2; text-align: center;
+    opacity: 0; -webkit-transition: opacity .35s; transition: opacity .35s; pointer-events: none;
+  }
+  #bar.show { opacity: 1; pointer-events: auto; }
+  #barInner {
+    display: inline-block; white-space: nowrap; font-size: 20px; padding: 8px 8px 8px 24px;
+    background: rgba(11, 15, 26, .88); border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px;
+  }
+  #barInner > * { vertical-align: middle; }
+  .live { color: #FF4D6D; font-weight: 800; letter-spacing: 1px; margin-right: 16px; }
+  .live i {
+    display: inline-block; width: 12px; height: 12px; margin-right: 8px; border-radius: 50%; background: #FF4D6D;
+    -webkit-animation: pulse 1.4s infinite; animation: pulse 1.4s infinite;
+  }
+  @-webkit-keyframes pulse { 50% { opacity: .25; } }
+  @keyframes pulse { 50% { opacity: .25; } }
+  #devName { color: #9AA4BF; margin-right: 18px; }
+  #fsBtn, #soundBtn, #trBtn { font-size: 20px; padding: 12px 24px; }
+  #soundBtn, #trBtn { background: #1C2438; margin-right: 8px; }
+  #soundBtn.off { color: #9AA4BF; }
+
+  #soundHint {
+    position: fixed; left: 0; right: 0; top: 104px; z-index: 2; text-align: center; pointer-events: none;
+  }
+  #soundHint span {
+    display: inline-block; font-size: 22px; font-weight: 700; padding: 14px 26px; border-radius: 999px;
+    background: rgba(124, 92, 255, .92); color: #fff; box-shadow: 0 6px 30px rgba(0, 0, 0, .45);
+    -webkit-animation: nudge 2s infinite; animation: nudge 2s infinite;
+  }
+  @-webkit-keyframes nudge { 0%, 100% { -webkit-transform: scale(1); } 50% { -webkit-transform: scale(1.05); } }
+  @keyframes nudge { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+  @media (max-width: 700px), (max-height: 520px) {
+    .logo { width: 76px; height: 76px; margin-bottom: 14px; }
+    h1 { font-size: 40px; }
+    .msg { font-size: 23px; }
+    .hint { font-size: 17px; }
+    #pinInput { font-size: 44px; letter-spacing: 16px; padding-left: 16px; }
+    .btn { font-size: 21px; padding: 13px 28px; }
+    #barInner { font-size: 16px; }
+    #devName { display: none; }
+    #fsBtn, #soundBtn, #trBtn { font-size: 16px; padding: 10px 16px; }
+    #soundHint span { font-size: 17px; padding: 11px 18px; }
+  }
+</style>
+</head>
+<body>
+<video id="awake" muted loop playsinline preload="none" aria-hidden="true"></video>
+<img id="screen" alt="Phone screen">
+<video id="vid" muted playsinline disablepictureinpicture disableremoteplayback aria-label="Phone screen"></video>
+
+<div id="overlay">
+  <div class="card" id="waitCard">
+    <svg class="logo" viewBox="0 0 108 108" aria-hidden="true">
+      <defs>
+        <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#22D3EE"/>
+        </linearGradient>
+      </defs>
+      <rect width="108" height="108" rx="26" fill="url(#lg)"/>
+      <path d="M47 31h14a4 4 0 0 1 4 4v38a4 4 0 0 1-4 4H47a4 4 0 0 1-4-4V35a4 4 0 0 1 4-4z" fill="#fff"/>
+      <path d="M46.5 36h15v32h-15z" fill="#0B0F1A"/>
+      <path d="M51 46l8 6-8 6z" fill="#22D3EE"/>
+      <g fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round">
+        <path d="M68.74 43.67A18 18 0 0 1 68.74 64.33"/>
+        <path d="M74.48 39.66A25 25 0 0 1 74.48 68.34"/>
+        <path d="M39.26 43.67A18 18 0 0 0 39.26 64.33"/>
+        <path d="M33.52 39.66A25 25 0 0 0 33.52 68.34"/>
+      </g>
+    </svg>
+    <h1><span class="grad">BroCast</span></h1>
+    <p class="msg" id="waitMsg">Connecting to your phone&hellip;</p>
+    <div class="dots"><span></span><span></span><span></span></div>
+    <p class="hint" id="waitHint">Hang tight.</p>
+  </div>
+
+  <form class="card" id="pinCard" style="display:none" autocomplete="off" novalidate>
+    <svg class="logo" viewBox="0 0 108 108" aria-hidden="true">
+      <rect width="108" height="108" rx="26" fill="#1C2438"/>
+      <path d="M38 50h32a4 4 0 0 1 4 4v22a4 4 0 0 1-4 4H38a4 4 0 0 1-4-4V54a4 4 0 0 1 4-4z" fill="#22D3EE"/>
+      <path d="M42 50V42a12 12 0 0 1 24 0v8" fill="none" stroke="#A78BFA" stroke-width="6" stroke-linecap="round"/>
+      <path d="M54 59a4 4 0 0 1 2 7.5V71h-4v-4.5A4 4 0 0 1 54 59z" fill="#0B0F1A"/>
+    </svg>
+    <h1>Enter the PIN</h1>
+    <p class="hint">It's shown in the <b>BroCast</b> app on your phone.</p>
+    <input id="pinInput" type="tel" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="PIN">
+    <button class="btn" type="submit" id="pinBtn">Let me in</button>
+    <p class="error" id="pinError"></p>
+  </form>
+</div>
+
+<div id="soundHint" style="display:none"><span>Press OK or click anywhere to turn on sound</span></div>
+
+<div id="bar"><div id="barInner"><span class="live"><i></i>LIVE</span><span id="devName"></span><button class="btn" id="soundBtn" type="button" style="display:none">Sound on</button><button class="btn" id="trBtn" type="button" style="display:none" title="Subtitles in other languages to English, with SUBDUB">Translate</button><button class="btn" id="fsBtn" type="button">Full screen</button></div></div>
+
+<noscript><p style="position:fixed;top:40%;width:100%;text-align:center;font-size:24px;z-index:9">This page needs JavaScript turned on.</p></noscript>
+
+<script>
+/* Written in plain ES5 on purpose: smart TV browsers can be years behind desktop ones. */
+(function () {
+  'use strict';
+
+  function $(id) { return document.getElementById(id); }
+  var img = $('screen'), overlay = $('overlay'), waitCard = $('waitCard'), pinCard = $('pinCard'),
+      waitMsg = $('waitMsg'), waitHint = $('waitHint'), pinInput = $('pinInput'), pinBtn = $('pinBtn'),
+      pinError = $('pinError'), bar = $('bar'), fsBtn = $('fsBtn'), devName = $('devName'), awake = $('awake'),
+      soundBtn = $('soundBtn'), soundHint = $('soundHint'), vid = $('vid'), trBtn = $('trBtn');
+  var docEl = document.documentElement;
+  var URLs = window.URL || window.webkitURL;
+  var BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  var TV_UA = /SMART-TV|SmartTV|Tizen|Web0S|webOS|NetCast|BRAVIA|AFT[A-Z]|CrKey|GoogleTV|Android TV|HbbTV|VIDAA|Hisense|Roku|PhilipsTV|Opera TV|NetTV|Viera/i;
+
+  var query = parseQuery(location.search);
+  var forcedMode = query.mode === 'poll' || query.mode === 'mjpeg';
+  var mode = query.mode === 'poll' ? 'poll' : 'mjpeg';
+  var cid = randomId();
+
+  // Real video (H.264 through the browser's video player) when the browser can play it: about ten
+  // times less Wi-Fi than pictures, so the stream keeps up with fast-moving stuff like anime.
+  var MSE = window.MediaSource || window.WebKitMediaSource;
+  var canVideo = !forcedMode && !!(MSE && MSE.isTypeSupported && window.WebSocket && window.ArrayBuffer &&
+    MSE.isTypeSupported('video/mp4; codecs="avc1.42E01F"') && typeof vid.play === 'function');
+  var picture = '';          // what's on now: 'video' or 'jpeg'
+  var videoBroken = false;   // the video player kept failing: pictures for a while, then video gets another go
+  var videoRetryAt = 0, videoRetryWait = 60000;
+
+  var phase = '';            // '', 'wait', 'pin', 'live'
+  var sid = null;            // phone session id; changes when sharing restarts
+  var statusTimer = null, statusFails = 0, everConnected = false;
+  var streamOn = false, streamStart = 0, gotFrame = false, badChecks = 0, streamErrorAt = 0, restarts = [];
+  var pollGen = 0, pollSeq = 0, pollActivity = 0, shownUrl = null, oldUrl = null;
+  var pinBusy = false, barShownOnce = false, barTimer = null, idleTimer = null;
+  var frameW = 0, frameH = 0;
+  var hasObjectFit = 'objectFit' in docEl.style;
+
+  function now() { return new Date().getTime(); }
+  function shown() { return picture === 'video' ? vid : img; }
+  function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
+  function isHidden() { return !!(document.hidden || document.webkitHidden); }
+
+  function randomId() {
+    var chars = 'abcdefghijklmnopqrstuvwxyz0123456789', s = '';
+    for (var i = 0; i < 16; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
+    return s;
+  }
+
+  function parseQuery(q) {
+    var out = {};
+    q.replace(/^\?/, '').split('&').forEach(function (pair) {
+      if (!pair) return;
+      var i = pair.indexOf('=');
+      try {
+        out[decodeURIComponent(i < 0 ? pair : pair.slice(0, i))] =
+          decodeURIComponent((i < 0 ? '' : pair.slice(i + 1)).replace(/\+/g, ' '));
+      } catch (e) { /* ignore bad escapes */ }
+    });
+    return out;
+  }
+
+  function request(url, opts, done) {
+    var x = new XMLHttpRequest(), finished = false;
+    function finish(code) { if (!finished) { finished = true; done(code, x); } }
+    try {
+      x.open('GET', url, true);
+      if (opts.blob) x.responseType = 'blob';
+      x.timeout = opts.timeout || 5000;
+      x.onload = function () { finish(x.status); };
+      x.onerror = x.ontimeout = x.onabort = function () { finish(0); };
+      x.send();
+    } catch (e) {
+      setTimeout(function () { finish(0); }, 0);
+    }
+  }
+
+  function parseJson(x) {
+    try { return JSON.parse(x.responseText); } catch (e) { return null; }
+  }
+
+  /* ------------------------------------------------------------ status loop */
+
+  function scheduleStatus(ms) {
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(checkStatus, ms);
+  }
+
+  function checkStatus() {
+    request('/status?cid=' + cid + '&t=' + now(), { timeout: 4000 }, function (code, x) {
+      var s = code === 200 ? parseJson(x) : null;
+      onStatus(s && s.app === 'BroCast' ? s : null);
+      scheduleStatus(phase === 'live' ? 2000 : 1500);
+    });
+  }
+
+  function onStatus(s) {
+    if (!s) {
+      statusFails++;
+      // One blip is fine; two misses in a row means the phone is really gone.
+      if (statusFails >= 2 || !everConnected) {
+        stopStream();
+        showWait("Can't reach your phone",
+          'Make sure BroCast says LIVE on your phone, and that this screen is on the same Wi-Fi.');
+      }
+      return;
+    }
+    statusFails = 0;
+    everConnected = true;
+    setText(devName, s.name || '');
+    if (sid !== null && s.sid !== sid) { stopStream(); restarts = []; }
+    sid = s.sid;
+
+    if (s.pinRequired && !s.authorized) { stopStream(); showPin(); return; }
+    if (!s.live) {
+      stopStream();
+      showWait('Waiting for your phone', 'Open BroCast on your phone and tap Start sharing.');
+      return;
+    }
+    if (hiddenTooLong()) { stopStream(); return; }
+    soundAvailable = !!s.audio;
+    if (s.width && s.height && (s.width !== frameW || s.height !== frameH)) {
+      frameW = s.width; frameH = s.height; fitImage();
+    }
+
+    // The phone sends video unless some screen that can't play it is watching.
+    if (videoBroken && now() > videoRetryAt) {
+      // Time to give video another go. The picture connection said "this screen needs pictures";
+      // reconnect without that, so the phone can switch back to video.
+      videoBroken = false;
+      if (streamOn && picture === 'jpeg') stopStream();
+    }
+    var want = canVideo && !videoBroken && s.video === 'h264' ? 'video' : 'jpeg';
+    if (streamOn && want !== picture) stopStream();
+    if (!streamOn) {
+      startStream(want);
+    } else if (picture === 'video') {
+      videoStatus(s);
+    } else if (mode === 'mjpeg') {
+      if (s.frames > 0) markFrame();
+      if (streamErrorAt > streamStart) {
+        restartStream();
+      } else if (s.hasFrame && now() - streamStart > 4000) {
+        badChecks = s.streaming ? 0 : badChecks + 1;
+        if (badChecks >= 2) restartStream();
+      }
+    } else if (now() - pollActivity > 15000) {
+      restartStream();
+    }
+    if (!gotFrame && now() - streamStart > 1200) showWait('Phone found!', 'Loading the picture…');
+    if (soundAvailable && soundOn) openSound(); else closeSound();
+    updateSoundUi();
+  }
+
+  /* ------------------------------------------------------------ picture */
+
+  function startStream(kind) {
+    streamOn = true;
+    streamStart = pollActivity = now();
+    badChecks = 0;
+    picture = kind || 'jpeg';
+    if (picture === 'video') {
+      videoStart();
+    } else if (mode === 'mjpeg') {
+      img.src = '/stream.mjpeg?cid=' + cid + (canVideo && !videoBroken ? '&v=1' : '') + '&t=' + now();
+    } else {
+      pollGen++;
+      pollSeq = 0;
+      pollNext(pollGen);
+    }
+  }
+
+  function stopStream() {
+    if (!streamOn) return;
+    streamOn = false;
+    gotFrame = false;
+    pollGen++;
+    videoStop();
+    img.src = BLANK;            // also closes the MJPEG connection
+    img.style.display = 'none';
+    releaseUrls();
+    hideBar();
+    if (phase === 'live') phase = '';
+    try { awake.pause(); } catch (e) { /* ignore */ }
+    closeSound();
+    updateSoundUi();
+  }
+
+  // Reconnect without hiding the current picture.
+  function restartStream() {
+    var t = now();
+    restarts.push(t);
+    restarts = restarts.filter(function (r) { return t - r < 60000; });
+    if (mode === 'mjpeg' && !forcedMode && restarts.length >= 3) mode = 'poll';
+    streamOn = false;
+    pollGen++;
+    startStream('jpeg');
+  }
+
+  function pollNext(gen) {
+    if (gen !== pollGen || !streamOn || mode !== 'poll') return;
+    request('/frame.jpg?cid=' + cid + '&after=' + pollSeq + (canVideo && !videoBroken ? '&v=1' : '') + '&t=' + now(), { timeout: 10000, blob: true }, function (code, x) {
+      if (gen !== pollGen || !streamOn) return;
+      pollActivity = now();
+      if (code === 200 && x.response) {
+        var seq = parseInt(x.getResponseHeader('X-Frame-Seq'), 10);
+        if (!isNaN(seq)) pollSeq = seq;
+        if (oldUrl) URLs.revokeObjectURL(oldUrl);
+        oldUrl = shownUrl;
+        shownUrl = URLs.createObjectURL(x.response);
+        img.src = shownUrl;     // img.onload asks for the next one
+      } else if (code === 204) {
+        pollNext(gen);
+      } else {
+        setTimeout(function () { pollNext(gen); }, code === 0 ? 1000 : 1500);
+      }
+    });
+  }
+
+  function releaseUrls() {
+    if (oldUrl) URLs.revokeObjectURL(oldUrl);
+    if (shownUrl) URLs.revokeObjectURL(shownUrl);
+    oldUrl = shownUrl = null;
+  }
+
+  img.onload = function () {
+    if (!streamOn || img.src === BLANK) return;
+    if (mode === 'poll') {
+      if (oldUrl) { URLs.revokeObjectURL(oldUrl); oldUrl = null; }
+      pollActivity = now();
+      markFrame();
+      pollNext(pollGen);
+    } else {
+      markFrame();
+    }
+  };
+
+  img.onerror = function () {
+    if (!streamOn || img.src === BLANK) return;
+    if (mode === 'poll') {
+      var gen = pollGen;
+      setTimeout(function () { pollNext(gen); }, 300);
+    } else {
+      // Let the status check decide: phone gone -> wait screen; phone fine -> reconnect.
+      streamErrorAt = now();
+      scheduleStatus(300);
+    }
+  };
+
+  function markFrame() {
+    if (!streamOn || gotFrame) return;
+    gotFrame = true;
+    phase = 'live';
+    shown().style.display = 'block';
+    overlay.style.display = 'none';
+    document.title = 'BroCast • Live';
+    fitImage();
+    keepAwake();
+    armIdle();
+    updateSoundUi();
+    if (!barShownOnce) {
+      barShownOnce = true;
+      showBar(5000);
+      try { fsBtn.focus(); } catch (e) { /* ignore */ }
+    }
+  }
+
+  // Only for browsers without CSS object-fit (very old TVs).
+  function fitImage() {
+    if (hasObjectFit) return;
+    var el = shown();
+    var iw = picture === 'video' ? vid.videoWidth : frameW || img.naturalWidth;
+    var ih = picture === 'video' ? vid.videoHeight : frameH || img.naturalHeight;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    if (!iw || !ih || !vw || !vh) return;
+    var scale = Math.min(vw / iw, vh / ih), w = Math.round(iw * scale), h = Math.round(ih * scale);
+    el.style.width = w + 'px';
+    el.style.height = h + 'px';
+    el.style.left = Math.round((vw - w) / 2) + 'px';
+    el.style.top = Math.round((vh - h) / 2) + 'px';
+  }
+
+  /* ------------------------------------------------------------ screens */
+
+  function showWait(msg, hint) {
+    phase = 'wait';
+    overlay.style.display = '';
+    waitCard.style.display = '';
+    pinCard.style.display = 'none';
+    setText(waitMsg, msg);
+    setText(waitHint, hint);
+    document.title = 'BroCast';
+    document.body.className = '';
+  }
+
+  function showPin() {
+    var entering = phase !== 'pin';
+    phase = 'pin';
+    overlay.style.display = '';
+    waitCard.style.display = 'none';
+    pinCard.style.display = '';
+    document.title = 'BroCast';
+    document.body.className = '';
+    if (entering) {
+      pinInput.value = '';
+      setText(pinError, '');
+      setTimeout(function () { try { pinInput.focus(); } catch (e) { /* ignore */ } }, 50);
+    }
+  }
+
+  function submitPin() {
+    var pin = pinInput.value.replace(/\D/g, '');
+    if (pin.length !== 4) { setText(pinError, 'The PIN has 4 digits.'); return; }
+    if (pinBusy) return;
+    pinBusy = true;
+    pinBtn.disabled = true;
+    setText(pinError, 'Checking…');
+    request('/auth?pin=' + pin + '&t=' + now(), { timeout: 6000 }, function (code, x) {
+      pinBusy = false;
+      pinBtn.disabled = false;
+      var r = parseJson(x) || {};
+      if (code === 200 && r.ok) {
+        setText(pinError, '');
+        try { pinInput.blur(); } catch (e) { /* ignore */ }
+        scheduleStatus(0);
+        return;
+      }
+      pinInput.value = '';
+      if (code === 429) {
+        setText(pinError, 'Too many wrong tries. Wait ' + (r.retryIn || 60) + ' seconds, then try again.');
+      } else if (code === 401) {
+        var left = r.attemptsLeft;
+        setText(pinError, 'Wrong PIN. ' + left + (left === 1 ? ' try' : ' tries') + ' left.');
+        try { pinInput.focus(); } catch (e) { /* ignore */ }
+      } else {
+        setText(pinError, "Couldn't reach your phone. Try again.");
+      }
+    });
+  }
+
+  pinCard.onsubmit = function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+    submitPin();
+    return false;
+  };
+  pinInput.oninput = function () {
+    var v = pinInput.value.replace(/\D/g, '').slice(0, 4);
+    if (v !== pinInput.value) pinInput.value = v;
+    if (v.length === 4) submitPin();
+  };
+
+  /* ------------------------------------------------------------ full screen + controls */
+
+  function fsElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement ||
+      document.webkitCurrentFullScreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;
+  }
+  var requestFs = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.webkitRequestFullScreen ||
+    docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+  var exitFs = document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen ||
+    document.mozCancelFullScreen || document.msExitFullscreen;
+
+  function toggleFullscreen() {
+    var result;
+    try {
+      if (fsElement()) { if (exitFs) result = exitFs.call(document); }
+      else if (requestFs) { result = requestFs.call(docEl); }
+    } catch (e) { /* not allowed right now */ }
+    if (result && typeof result.then === 'function') result.then(null, function () {});
+  }
+
+  function onFullscreenChange() {
+    setText(fsBtn, fsElement() ? 'Exit full screen' : 'Full screen');
+    fitImage();
+  }
+
+  ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(function (name) {
+    document.addEventListener(name, onFullscreenChange, false);
+  });
+  if (!requestFs) fsBtn.style.display = 'none';
+  fsBtn.onclick = function () { toggleFullscreen(); showBar(); };
+  img.ondblclick = vid.ondblclick = toggleFullscreen;
+
+  function showBar(ms) {
+    if (phase !== 'live') return;
+    bar.className = 'show';
+    clearTimeout(barTimer);
+    barTimer = setTimeout(hideBar, ms || 3000);
+  }
+
+  function hideBar() {
+    clearTimeout(barTimer);
+    bar.className = '';
+  }
+
+  // Hides the mouse pointer over the picture after a few quiet seconds.
+  function armIdle() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () { if (phase === 'live') document.body.className = 'idle'; }, 3000);
+  }
+
+  function poke() {
+    document.body.className = '';
+    armIdle();
+    showBar();
+    if (phase === 'live' && awake.paused) keepAwake();
+  }
+
+  document.addEventListener('mousemove', poke, false);
+  document.addEventListener('touchstart', poke, false);
+  document.addEventListener('click', unlockSound, false);
+  document.addEventListener('touchend', unlockSound, false);
+  document.addEventListener('keydown', function (e) {
+    unlockSound();
+    var key = e.key, code = e.keyCode;
+    if (phase === 'live') {
+      var isF = key === 'f' || key === 'F' || code === 70;
+      var isEnter = key === 'Enter' || code === 13;
+      var onButton = document.activeElement && document.activeElement.tagName === 'BUTTON';
+      if (isF || (isEnter && !onButton)) {
+        toggleFullscreen();
+        if (e.preventDefault) e.preventDefault();
+      }
+    }
+    poke();
+  }, false);
+
+  window.addEventListener('resize', fitImage, false);
+
+  // Background tab: keep going (the sound keeps playing, and apps that record this tab, like a
+  // translator, keep getting the picture). Only after a long time hidden does it stop, to save Wi-Fi.
+  // Skipped while the page is closing, because the browser is tearing it down anyway.
+  var leaving = false, hiddenSince = 0;
+  var HIDDEN_LIMIT = 15 * 60 * 1000;
+  function hiddenTooLong() { return isHidden() && hiddenSince && now() - hiddenSince > HIDDEN_LIMIT; }
+  function onVisibility() {
+    if (leaving) return;
+    if (isHidden()) { if (!hiddenSince) hiddenSince = now(); }
+    else { hiddenSince = 0; vLastMove = now(); scheduleStatus(0); }
+  }
+  document.addEventListener('visibilitychange', onVisibility, false);
+  document.addEventListener('webkitvisibilitychange', onVisibility, false);
+  window.addEventListener('pagehide', function () { leaving = true; }, false);
+  window.addEventListener('pageshow', function (e) {
+    leaving = false;
+    // Restored from the back/forward cache: the old connection is gone, so start fresh.
+    if (e && e.persisted) { stopStream(); scheduleStatus(0); }
+  }, false);
+
+  /* ------------------------------------------------------------ video (H.264 over a WebSocket) */
+
+  var ms = null, sb = null, vws = null, vUrl = null, vq = [], vqBytes = 0, vCodec = '', vTimer = null;
+  var vLastData = 0, vLastMove = 0, vLastTime = -1, vLag = 0.15, vSeekedAt = 0, vPhoneFrames = -1, vPhoneFramesAt = 0;
+  var vResets = [], vLastTrim = 0, vWsTries = 0;
+  var vstats = window.BroCastVideo = { messages: 0, bytes: 0, appended: 0, resets: 0, reconnects: 0, jumps: 0, lag: 0 };
+
+  function videoStart() {
+    vLastData = vLastMove = now();
+    vLastTime = -1;
+    vWsTries = 0;
+    videoOpenSource();
+    videoConnect();
+    clearInterval(vTimer);
+    vTimer = setInterval(videoTick, 250);
+  }
+
+  function videoStop() {
+    clearInterval(vTimer);
+    vTimer = null;
+    videoDisconnect();
+    videoCloseSource();
+    vid.style.display = 'none';
+  }
+
+  function videoOpenSource() {
+    videoCloseSource();
+    var m;
+    try { m = new MSE(); } catch (e) { videoGiveUp(); return; }
+    ms = m;
+    m.addEventListener('sourceopen', function () { if (ms === m) videoPump(); }, false);
+    vUrl = URLs.createObjectURL(m);
+    vid.src = vUrl;
+  }
+
+  function videoCloseSource() {
+    sb = null;
+    vCodec = '';
+    vq = [];
+    vqBytes = 0;
+    if (ms) {
+      var m = ms;
+      ms = null;
+      try { if (m.readyState === 'open') m.endOfStream(); } catch (e) { /* ignore */ }
+    }
+    if (vUrl) {
+      try { vid.removeAttribute('src'); vid.load(); } catch (e) { /* ignore */ }
+      try { URLs.revokeObjectURL(vUrl); } catch (e) { /* ignore */ }
+      vUrl = null;
+    }
+  }
+
+  function videoConnect() {
+    videoDisconnect();
+    var sock;
+    try {
+      sock = new WebSocket('ws://' + location.host + '/video?cid=' + cid);
+    } catch (e) {
+      videoGiveUp();
+      return;
+    }
+    sock.binaryType = 'arraybuffer';
+    vLastData = now();
+    sock.onmessage = function (e) {
+      if (vws !== sock) return;
+      vLastData = now();
+      vstats.messages++;
+      if (typeof e.data === 'string') {
+        var m = null;
+        try { m = JSON.parse(e.data); } catch (err) { /* ignore */ }
+        if (m && m.type === 'init' && m.codec) vq.push({ init: m });
+        if (m && m.type === 'hello') vWsTries = 0;
+        videoPump();
+        return;
+      }
+      vstats.bytes += e.data.byteLength;
+      vq.push(e.data);
+      vqBytes += e.data.byteLength;
+      // The video player isn't taking anything in: start it over.
+      if (vq.length > 400 || vqBytes > 16000000) { videoReset('queue'); return; }
+      videoPump();
+    };
+    sock.onclose = function () {
+      if (vws !== sock) return;
+      vws = null;
+      // Dropped (Wi-Fi blip, phone restarted sharing...): the next check reconnects.
+      vWsTries++;
+      if (vWsTries >= 4) videoGiveUp(); else scheduleStatus(300);
+    };
+    sock.onerror = function () { /* onclose follows */ };
+    vws = sock;
+  }
+
+  function videoDisconnect() {
+    if (!vws) return;
+    var s = vws;
+    vws = null;
+    try { s.close(); } catch (e) { /* ignore */ }
+  }
+
+  function videoPump() {
+    if (!ms || ms.readyState !== 'open') return;
+    while (vq.length) {
+      var item = vq[0];
+      if (item.init) {
+        var type = 'video/mp4; codecs="' + item.init.codec + '"';
+        if (!sb) {
+          try {
+            if (!MSE.isTypeSupported(type)) { videoGiveUp(); return; }
+            sb = ms.addSourceBuffer(type);
+          } catch (e) { videoReset('add'); return; }
+          sb.addEventListener('updateend', videoPump, false);
+          sb.addEventListener('error', function () { videoReset('buffer'); }, false);
+          vCodec = item.init.codec;
+        } else if (item.init.codec !== vCodec) {
+          if (sb.updating) return;
+          if (!sb.changeType) { videoReset('codec'); return; }
+          try { sb.changeType(type); } catch (e) { videoReset('codec'); return; }
+          vCodec = item.init.codec;
+        }
+        vq.shift();
+        continue;
+      }
+      if (!sb || sb.updating) return;
+      vq.shift();
+      vqBytes -= item.byteLength;
+      try {
+        sb.appendBuffer(item);
+        vstats.appended++;
+      } catch (e) {
+        if (e && e.name === 'QuotaExceededError') { videoTrim(true); videoReset('full'); }
+        else videoReset('append');
+        return;
+      }
+      return; // carries on from 'updateend'
+    }
+  }
+
+  // Forget video that has already been shown, so memory doesn't fill up over a long movie.
+  function videoTrim(force) {
+    if (!sb || sb.updating || !vid.buffered.length) return;
+    var t = vid.currentTime, start = vid.buffered.start(0);
+    if (force || (t - start > 30 && now() - vLastTrim > 5000)) {
+      vLastTrim = now();
+      try { sb.remove(0, Math.max(0.1, t - 10)); } catch (e) { /* try again later */ }
+    }
+  }
+
+  // Runs 4 times a second: keeps the picture right at the live edge and notices when it's stuck.
+  function videoTick() {
+    if (!streamOn || picture !== 'video') return;
+    var t = now(), b = vid.buffered, ct = vid.currentTime;
+    if (b && b.length) {
+      var end = b.end(b.length - 1), start = b.start(b.length - 1), inside = false;
+      for (var i = 0; i < b.length; i++) if (ct >= b.start(i) - 0.04 && ct <= b.end(i) + 0.02) inside = true;
+      var lag = end - ct;
+      if (!inside || lag > 1.0) {
+        // In a gap (frames were skipped to catch up) or too far behind: jump to the newest picture.
+        var target = Math.max(start, end - 0.1);
+        if (Math.abs(target - ct) > 0.05 && t - vSeekedAt > 400) {
+          vSeekedAt = t;
+          vstats.jumps++;
+          try { vid.currentTime = target; } catch (e) { /* ignore */ }
+          lag = end - target;
+          vLag = lag;
+        }
+        setRate(1);
+      } else if (lag > 0.4) {
+        setRate(1.15);   // quietly catch up
+      } else if (lag < 0.2) {
+        setRate(1);
+      }
+      vLag = vLag * 0.7 + Math.max(0, Math.min(lag, 1)) * 0.3;
+      vstats.lag = Math.round(vLag * 1000);
+      if (vid.paused && vid.readyState >= 2) playVideo();
+    }
+    if (ct !== vLastTime) {
+      vLastTime = ct;
+      vLastMove = t;
+      if (ct > 0 && vid.readyState >= 2) markFrame();
+    }
+    // Pictures are arriving but the player hasn't moved for a while: it's stuck, start it over.
+    // (Not in a background tab: browsers pause videos there on purpose.)
+    if (isHidden()) vLastMove = t;
+    if (b && b.length && b.end(b.length - 1) - ct > 0.5 && t - vLastMove > 2500 && t - vSeekedAt > 1500) {
+      videoReset('stuck');
+      return;
+    }
+    // Nothing at all for a long time (not even the phone's "still here" note): the connection is dead.
+    if (t - vLastData > 6000) { videoReconnect('silent'); return; }
+    videoTrim(false);
+  }
+
+  function setRate(r) { if (vid.playbackRate !== r) { try { vid.playbackRate = r; } catch (e) { /* ignore */ } } }
+
+  function playVideo() {
+    try {
+      var p = vid.play();
+      if (p && typeof p.then === 'function') p.then(null, function () {});
+    } catch (e) { /* ignore */ }
+  }
+
+  // Called with every status reply (every 2 s).
+  function videoStatus(s) {
+    var t = now();
+    if (!vws) { videoConnect(); return; }
+    // The phone is making new pictures, but none reach us: this connection is stuck.
+    if (typeof s.vframes === 'number' && s.vframes !== vPhoneFrames) {
+      vPhoneFrames = s.vframes;
+      vPhoneFramesAt = t;
+    }
+    var phoneBusy = typeof s.vage === 'number' && s.vage >= 0 && s.vage < 1500;
+    if (phoneBusy && t - vLastData > 2500 && t - vPhoneFramesAt < 2500) videoReconnect('stalled');
+  }
+
+  // New connection, same player: the picture stays up while it reconnects.
+  function videoReconnect(why) {
+    vstats.reconnects++;
+    vLastData = now();
+    videoConnect();
+  }
+
+  // Start the player over (it got stuck or errored). Too many in a minute: use pictures instead.
+  function videoReset(why) {
+    var t = now();
+    vstats.resets++;
+    vResets.push(t);
+    vResets = vResets.filter(function (r) { return t - r < 60000; });
+    if (vResets.length >= 4) { videoGiveUp(); return; }
+    vLastData = vLastMove = t;
+    vLastTime = -1;
+    videoOpenSource();
+    videoConnect();
+  }
+
+  // (for tests: skip the wait before trying video again)
+  window.BroCastRetryNow = function () { videoRetryAt = 0; scheduleStatus(0); };
+
+  function videoGiveUp() {
+    if (videoBroken) return;
+    videoBroken = true;
+    // Try video again later (it may have been a bad moment), waiting longer each time it fails.
+    videoRetryAt = now() + videoRetryWait;
+    videoRetryWait = Math.min(videoRetryWait * 2, 30 * 60000);
+    if (streamOn && picture === 'video') { stopStream(); scheduleStatus(0); }
+  }
+
+  vid.addEventListener('error', function () { if (streamOn && picture === 'video' && vUrl) videoReset('error'); }, false);
+  vid.addEventListener('loadedmetadata', fitImage, false);
+  vid.addEventListener('resize', fitImage, false);
+
+  /* ------------------------------------------------------------ sound */
+
+  var AudioCtx = window.AudioContext || window.webkitAudioContext;
+  var canPlaySound = !!(AudioCtx && window.WebSocket && window.Int16Array && window.ArrayBuffer);
+  var soundAvailable = false;            // the phone is sending sound
+  var soundOn = readPref('brocast-sound') !== 'off';
+  var actx = null, gainNode = null, ws = null;
+  var fmt = { rate: 48000, channels: 2 };
+  var playHead = 0;
+  // Sound plays ~0.1 s after it arrives: enough to ride out Wi-Fi hiccups, small enough to match the
+  // picture. Video shows up a little later than pictures (the player keeps a small buffer), so the
+  // sound waits that much longer to stay in sync with the mouths.
+  var TARGET_LEAD = 0.1, MIN_LEAD = 0.02;
+  function soundLead() {
+    if (picture !== 'video' || phase !== 'live') return TARGET_LEAD;
+    return Math.max(TARGET_LEAD, Math.min(0.6, vLag + 0.05));
+  }
+  var stats = window.BroCastStats = { chunks: 0, played: 0, skipped: 0, lead: 0, peak: 0 };
+
+  function readPref(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } }
+  function writePref(key, value) { try { window.localStorage.setItem(key, value); } catch (e) { /* private mode */ } }
+
+  function soundRunning() { return !!actx && (actx.state === undefined || actx.state === 'running'); }
+
+  function ensureAudioContext() {
+    if (actx || !canPlaySound) return actx;
+    try {
+      actx = new AudioCtx();
+      gainNode = actx.createGain ? actx.createGain() : actx.createGainNode();
+      gainNode.connect(actx.destination);
+      if (actx.addEventListener) actx.addEventListener('statechange', updateSoundUi, false);
+    } catch (e) {
+      actx = null;
+      canPlaySound = false;
+    }
+    return actx;
+  }
+
+  // Must run inside a click / key press: that's the only time browsers let a page start sound.
+  function unlockSound() {
+    if (picture === 'video' && streamOn && vid.paused) playVideo();
+    if (!soundAvailable || !soundOn || !canPlaySound) return;
+    var c = ensureAudioContext();
+    if (c && c.state === 'suspended' && c.resume) {
+      var p = c.resume();
+      if (p && typeof p.then === 'function') p.then(updateSoundUi, function () {});
+    }
+    updateSoundUi();
+  }
+
+  // Called on every status check while the picture is on, so a dropped connection simply
+  // reopens on the next check (and nothing retries while the phone is gone).
+  function openSound() {
+    if (ws || !canPlaySound) return;
+    ensureAudioContext();
+    var sock;
+    try {
+      sock = new WebSocket('ws://' + location.host + '/audio?cid=' + cid);
+    } catch (e) {
+      return;
+    }
+    sock.binaryType = 'arraybuffer';
+    sock.onmessage = function (e) {
+      if (ws !== sock) return;
+      if (typeof e.data === 'string') {
+        var m = null;
+        try { m = JSON.parse(e.data); } catch (err) { /* ignore */ }
+        if (m && m.type === 'format' && m.rate > 0 && m.channels > 0) { fmt.rate = m.rate; fmt.channels = m.channels; }
+        return;
+      }
+      playChunk(e.data);
+    };
+    sock.onclose = function () { if (ws === sock) ws = null; };
+    sock.onerror = function () { /* onclose follows */ };
+    ws = sock;
+  }
+
+  function closeSound() {
+    playHead = 0;
+    if (ws) {
+      var s = ws;
+      ws = null;
+      try { s.close(); } catch (e) { /* ignore */ }
+    }
+  }
+
+  function playChunk(data) {
+    stats.chunks++;
+    if (!soundOn || !soundRunning() || !data || data.byteLength < 2) return;
+    var ch = fmt.channels;
+    var samples = new Int16Array(data, 0, data.byteLength >> 1);
+    var frames = Math.floor(samples.length / ch);
+    if (!frames) return;
+    var t = actx.currentTime, lead = playHead - t, want = soundLead();
+    if (lead > want + 0.12) { stats.skipped++; return; }      // way behind the picture: drop a bit to catch up
+    if (lead < MIN_LEAD || lead < want - 0.12) playHead = t + want; // ran dry, or the picture got much slower
+    // A little off: play 2% faster or slower until it lines up again (too small to hear).
+    var speed = lead > want + 0.03 ? 1.02 : lead < want - 0.03 ? 0.98 : 1;
+    var buffer = actx.createBuffer(ch, frames, fmt.rate), peak = 0;
+    for (var c = 0; c < ch; c++) {
+      var channel = buffer.getChannelData(c);
+      for (var i = 0, j = c; i < frames; i++, j += ch) {
+        var v = samples[j] / 32768;
+        channel[i] = v;
+        if (v > peak) peak = v; else if (-v > peak) peak = -v;
+      }
+    }
+    var src = actx.createBufferSource();
+    src.buffer = buffer;
+    if (speed !== 1 && src.playbackRate) src.playbackRate.value = speed; else speed = 1;
+    src.connect(gainNode);
+    if (src.start) src.start(playHead); else src.noteOn(playHead);
+    playHead += frames / fmt.rate / speed;
+    stats.played++;
+    stats.lead = playHead - t;
+    stats.peak = peak;
+  }
+
+  function updateSoundUi() {
+    var usable = soundAvailable && canPlaySound;
+    soundBtn.style.display = usable ? '' : 'none';
+    setText(soundBtn, soundOn ? 'Sound on' : 'Sound off');
+    soundBtn.className = soundOn ? 'btn' : 'btn off';
+    soundHint.style.display = usable && soundOn && phase === 'live' && !soundRunning() ? '' : 'none';
+    if (gainNode) gainNode.gain.value = soundOn ? 1 : 0;
+  }
+
+  soundBtn.onclick = function () {
+    soundOn = !soundOn;
+    writePref('brocast-sound', soundOn ? 'on' : 'off');
+    if (soundOn) {
+      if (streamOn && soundAvailable) openSound();
+      unlockSound();
+    } else {
+      closeSound();
+    }
+    updateSoundUi();
+    showBar();
+  };
+
+  /*
+   * Translate: opens SUBDUB (subtitles in other languages -> English, foreign talking -> English
+   * voices) ready to pick this tab. SUBDUB needs Edge or Chrome on a computer, so only those get the button.
+   */
+  var SUBDUB_URL = 'https://kunven67-sudo.github.io/k/subdub/?from=brocast';
+  var ua = navigator.userAgent;
+  if (!TV_UA.test(ua) && /(Chrome|Edg)\//.test(ua) && !/Mobile|Android|CrOS/.test(ua)) trBtn.style.display = '';
+  trBtn.onclick = function () {
+    try { window.open(SUBDUB_URL, 'subdub'); } catch (e) { location.href = SUBDUB_URL; }
+    showBar();
+  };
+
+  /*
+   * Best effort to stop a PC monitor from going to sleep while you watch: a tiny black muted
+   * video loops behind the picture. Skipped on TVs, which don't need it.
+   */
+  function keepAwake() {
+    if (TV_UA.test(navigator.userAgent) || !awake || typeof awake.play !== 'function') return;
+    try {
+      if (!awake.getAttribute('src')) {
+        awake.muted = true;
+        awake.setAttribute('src', '/keepawake.mp4');
+      }
+      var p = awake.play();
+      if (p && typeof p.then === 'function') p.then(null, function () {});
+    } catch (e) { /* ignore */ }
+  }
+
+  showWait('Connecting to your phone…', 'Hang tight.');
+  checkStatus();
+})();
+</script>
+</body>
+</html>

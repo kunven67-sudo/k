@@ -68,6 +68,12 @@ main { position: relative; overflow: auto; }
 .tile .go { margin-top: auto; display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; padding: 12px 18px; border-radius: 12px; border: 0; font-weight: 700; color: #141414; background: var(--yellow); }
 .tile.file .go { background: #fff; }
 .tile .art { position: absolute; right: -10px; top: -10px; opacity: .7; pointer-events: none; z-index: 0; }
+.brocast { display: flex; align-items: center; gap: 24px; margin: 0 0 28px; padding: 22px 26px; border-radius: 20px; border: 1px solid var(--yellow); background: linear-gradient(90deg, #22201a, var(--bg2)); }
+.brocast h2 { margin: 0 0 6px; font: 800 26px/1.1 var(--head); }
+.brocast p { margin: 0; color: var(--dim); max-width: 640px; }
+.brocast .go { flex: none; display: inline-flex; align-items: center; gap: 10px; padding: 14px 20px; border-radius: 12px; border: 0; font-weight: 700; color: #141414; background: var(--yellow); }
+.brocast .go svg { width: 20px; height: 20px; flex: none; }
+@media (max-width: 760px) { .brocast { flex-direction: column; align-items: stretch; } }
 .tile.drag { border-color: var(--yellow); background: #1f1d12; }
 .subtitle-demo { font: 800 20px/1.2 var(--body); color: #fff; text-shadow: 0 0 2px #000, 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; }
 .notes { margin-top: 26px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }

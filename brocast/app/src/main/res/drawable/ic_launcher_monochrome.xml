@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon version (Android 13+): single colour, screen cut out of the phone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M47,31h14a4,4 0,0 1,4 4v38a4,4 0,0 1,-4 4H47a4,4 0,0 1,-4 -4V35a4,4 0,0 1,4 -4zM46.5,36v32h15v-32z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M51,46l8,6 -8,6z" />
+    <path
+        android:strokeColor="#FF000000"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M68.74,43.67A18,18 0,0 1,68.74 64.33M74.48,39.66A25,25 0,0 1,74.48 68.34M39.26,43.67A18,18 0,0 0,39.26 64.33M33.52,39.66A25,25 0,0 0,33.52 68.34" />
+</vector>
