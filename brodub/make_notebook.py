@@ -11,8 +11,9 @@ CELL = r'''#@title ▶ BroDub: press the play button
 use_google_drive = False #@param {type:"boolean"}
 #@markdown ☝️ For big videos or a lot of episodes: tick this, put the videos in Google Drive in a folder called **BroDub**, and the English ones show up in **BroDub/English**.
 
-import os, subprocess, sys, threading
+import json, os, secrets, subprocess, sys, threading, urllib.request
 from pathlib import Path
+from IPython.display import HTML, display
 
 ENGINE = __ENGINE__
 VIDEO = {".mp4", ".mkv", ".webm", ".mov", ".avi", ".m4v", ".ts", ".flv", ".3gp"}
@@ -22,6 +23,19 @@ if "GPU" not in subprocess.run("nvidia-smi -L", shell=True, capture_output=True,
     raise SystemExit("😵 Google didn't give a free GPU this time (they run out sometimes). Wait a bit and press ▶ again.")
 
 Path("/content/brodub.py").write_text(ENGINE, encoding="utf-8")
+
+# Phone ping when it's done (ntfy.sh: free, no account). A new secret name every run.
+PING = "brodub-" + secrets.token_hex(8)
+display(HTML(f'<a href="https://ntfy.sh/{PING}" target="_blank" style="display:inline-block;margin:6px 0;'
+             'padding:12px 18px;border-radius:10px;background:#7c3aed;color:#fff;font:600 16px sans-serif;'
+             'text-decoration:none">🔔 Tap me + allow notifications: your phone pings you when it\'s done</a>'))
+
+def ping(title, message, tag):
+    body = json.dumps({"topic": PING, "title": title, "message": message, "tags": [tag], "priority": 4}).encode()
+    try:
+        urllib.request.urlopen(urllib.request.Request("https://ntfy.sh/", data=body, method="POST"), timeout=15)
+    except Exception:
+        pass  # no ping is no reason to fail the dub
 
 def setup():
     if Path(ENV, "ready").exists():
@@ -67,6 +81,7 @@ if not Path(ENV, "ready").exists():
     print("⏳ Getting the AI ready (only the first time, about 3 min)...")
 worker.join()
 if setup.error:
+    ping("BroDub broke", "Setting up failed. Open Colab and send Claude a screenshot.", "x")
     raise SystemExit("😵 Setting up failed:\n" + setup.error)
 
 env = dict(os.environ)
@@ -84,10 +99,14 @@ for line in run.stdout:
 if run.wait():
     errlog.close()
     print(open("/content/brodub-log.txt").read()[-3000:])
+    ping("BroDub broke", "Something went wrong. Open Colab and send Claude a screenshot.", "x")
     raise SystemExit("😵 Something broke. Send Claude a screenshot of this box.")
 
 made = [out_dir / f"{v.stem} (English dub).mp4" for v in videos]
 made = [m for m in made if m.exists()]
+names = ", ".join(m.name for m in made)
+ping("Your English video is ready", (f"In Google Drive > BroDub > English: {names}" if use_google_drive
+                                     else f"Open Colab, it's downloading: {names}"), "popcorn")
 if use_google_drive:
     print(f"🍿 Done! Your English videos are in Google Drive > BroDub > English ({len(made)} new)")
 else:
