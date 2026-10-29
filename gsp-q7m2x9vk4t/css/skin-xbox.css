@@ -1,0 +1,224 @@
+/* ===== Xbox Series X|S / Xbox One look for EVERY screen (body[data-skin="xbox"]): Library (My games & apps),
+   Settings, Saved Data, pop-ups, notifications (bottom middle, like Xbox), game page, power, and the quick menu over
+   games (= the Xbox Guide on the left).
+   Xbox rules: Segoe UI, flat dark grey boxes with small corners, the highlighted thing gets a GREEN glowing frame,
+   check boxes instead of switches, titles like "Settings  Look and sound" (where you are in grey). ===== */
+body[data-skin="xbox"] {
+  --font: 'Segoe UI Variable Text', 'Segoe UI', 'GS Segoe', 'Inter';
+  --xg: #2ca02c;                                   /* the green of the frame */
+  --xg-glow: rgba(44, 160, 44, .7);
+  --xframe: 0 0 0 3px var(--xg), 0 0 16px 3px var(--xg-glow);
+  --xbox-bg: #1d1d1d; --xbox-box: #2d2d2d; --xbox-box-2: #383838;
+  --text: #fff; --text-2: rgba(255,255,255,.75); --text-3: rgba(255,255,255,.5);
+  --glow: var(--xg-glow);
+  --side: 4.2vw;
+}
+@keyframes xbfocus { from { box-shadow: 0 0 0 3px var(--xg), 0 0 6px 1px var(--xg-glow); } }
+
+/* Library, Settings, Saved Data: the plain dark Xbox page (the home keeps the console's own background) */
+body[data-skin="xbox"]:not([data-screen="home"]) .bg-shade, body[data-skin="xbox"]:not([data-screen="home"]) .bg.plain .bg-shade { background: var(--xbox-bg); }
+body[data-skin="xbox"]:not([data-screen="home"]) .bg-art { opacity: 0 !important; }
+body[data-skin="xbox"]:not([data-screen="home"]) .bg-holiday { opacity: .5; }
+
+/* ---------- top of a page: a big light title, nothing else fancy ---------- */
+body[data-skin="xbox"] .topbar { height: 96px; }
+body[data-skin="xbox"]:not(.console-home) #screens { top: 96px; }
+body[data-skin="xbox"] .tab { font-size: calc(30px * var(--fs)); font-weight: 300; color: #fff; padding: 4px 10px; margin-left: -10px; border-radius: 4px; font-family: 'Segoe UI Variable Display', 'Segoe UI', var(--font); }
+body[data-skin="xbox"] .tab.on::after { display: none; }
+body[data-skin="xbox"] .tab svg { display: none; }
+body[data-skin="xbox"] .tab span span:first-child { display: none !important; }
+body[data-skin="xbox"] .tab.focus { box-shadow: var(--xframe); background: rgba(255,255,255,.08); }
+body[data-skin="xbox"] .top-right { gap: 6px; }
+body[data-skin="xbox"] .icon-btn { width: 50px; height: 44px; border-radius: 4px; color: #fff; }
+body[data-skin="xbox"] .icon-btn svg { width: 24px; height: 24px; stroke-width: 1.6; }
+body[data-skin="xbox"] .icon-btn:hover { background: rgba(255,255,255,.12); }
+body[data-skin="xbox"] .icon-btn.focus { background: rgba(255,255,255,.14); color: #fff; box-shadow: var(--xframe); }
+body[data-skin="xbox"] .avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; margin: 0 6px 0 10px; color: #fff;
+  background: radial-gradient(circle at 35% 30%, #3fbf3f, #0e6a0e 75%); box-shadow: 0 0 0 2px rgba(255,255,255,.15); }
+body[data-skin="xbox"] .avatar svg { width: 22px; height: 22px; stroke-width: 1.6; }
+body[data-skin="xbox"] .clock { font-size: calc(18px * var(--fs)); font-weight: 400; min-width: 0; margin-left: 4px; }
+body[data-skin="xbox"] .holiday-chip { top: 33px; border-radius: 3px; font-weight: 400; letter-spacing: 0; }
+
+/* ---------- button hints: round A / B / Y / Xbox buttons in their colors ---------- */
+body[data-skin="xbox"] .hints { gap: 24px; bottom: 24px; font-size: calc(15px * var(--fs)); color: #fff; }
+body[data-skin="xbox"] .key { border-radius: 3px; background: rgba(255,255,255,.14); box-shadow: none; font-weight: 600; }
+body[data-skin="xbox"] .key.pad { width: 26px; height: 26px; border-radius: 50%; background: #3a3a3a; color: #fff; font-size: 13px; }
+body[data-skin="xbox"] .hint:nth-child(1) .key.pad { background: #107c10; }
+body[data-skin="xbox"] .hint:nth-child(2) .key.pad { background: #d1322a; }
+body[data-skin="xbox"] .hint:nth-child(3) .key.pad { background: #d9a400; color: #111; }
+
+/* ---------- My games & apps (Library) ---------- */
+body[data-skin="xbox"] .lib-head h2 { display: none; }
+body[data-skin="xbox"] .lib-head { gap: 20px; }
+body[data-skin="xbox"] .lib-head .chips { gap: 4px; }
+body[data-skin="xbox"] .lib-head .chips .chip { height: 40px; padding: 0 14px; border-radius: 4px; background: none; font-size: calc(16px * var(--fs)); font-weight: 400; color: rgba(255,255,255,.7); box-shadow: none; }
+body[data-skin="xbox"] .lib-head .chips .chip.on { color: #fff; background: none; font-weight: 600; box-shadow: inset 0 -3px 0 var(--xg); border-radius: 4px 4px 0 0; }
+body[data-skin="xbox"] .lib-head .chips .chip.focus { box-shadow: var(--xframe); background: rgba(255,255,255,.1); color: #fff; border-radius: 4px; }
+body[data-skin="xbox"] .lib-search, body[data-skin="xbox"] .search-box, body[data-skin="xbox"] .field { border-radius: 4px; background-color: var(--xbox-box); border: 0; }
+body[data-skin="xbox"] .lib-search:focus, body[data-skin="xbox"] .search-box:focus, body[data-skin="xbox"] .field:focus,
+body[data-skin="xbox"] .lib-search.focus, body[data-skin="xbox"] .search-box.focus, body[data-skin="xbox"] .field.focus { box-shadow: var(--xframe); background-color: var(--xbox-box-2); }
+body[data-skin="xbox"] .lib-play { height: 44px; min-width: 150px; }
+body[data-skin="xbox"] .chips .chip { border-radius: 4px; background: var(--xbox-box); color: #fff; font-weight: 400; }
+body[data-skin="xbox"] .chips .chip.on { background: #fff; color: #111; }
+body[data-skin="xbox"] .chips .chip.focus { box-shadow: var(--xframe); }
+body[data-skin="xbox"] .grid { gap: 12px; grid-template-columns: repeat(auto-fill, minmax(clamp(120px, 9.6vw, 190px), 1fr)); }
+body[data-skin="xbox"] .gcell { background: var(--xbox-box); border-radius: 4px; }
+body[data-skin="xbox"] .gcell .art { border-radius: 4px 4px 0 0; box-shadow: none; }
+body[data-skin="xbox"] .gcell .name { margin: 0; padding: 9px 10px 1px; font-size: calc(14px * var(--fs)); font-weight: 400; color: #fff; }
+body[data-skin="xbox"] .gcell .sub { padding: 0 10px 9px; font-size: calc(12px * var(--fs)); }
+body[data-skin="xbox"] .gcell.sel { box-shadow: var(--xframe); background: var(--xbox-box-2); z-index: 1; }
+body[data-skin="xbox"] .gcell.sel .art { transform: none; box-shadow: none; }
+body[data-skin="xbox"] .gcell .badge { border-radius: 3px; background: #107c10; color: #fff; }
+body[data-skin="xbox"] .gcell.folder .art { background: #262626; border-radius: 4px 4px 0 0; }
+body[data-skin="xbox"] .gcell.folder .mini { border-radius: 2px; }
+body[data-skin="xbox"] .gcell.folder .count { border-radius: 3px; }
+body[data-skin="xbox"] .section-title button { border-radius: 4px; background: var(--xbox-box); }
+body[data-skin="xbox"] .section-title button.focus { box-shadow: var(--xframe); color: #fff; }
+
+/* ---------- Settings + Saved Data: plain list on the left, grey boxes with the value under the name ---------- */
+body[data-skin="xbox"] .split { inset: 0 var(--side) 80px; grid-template-columns: minmax(260px, 22vw) minmax(0, 46vw); gap: 3vw; }
+body[data-skin="xbox"] .side, body[data-skin="xbox"] .main-panel { background: none; box-shadow: none; backdrop-filter: none; border-radius: 0; }
+body[data-skin="xbox"] .side { padding: 4px; }
+body[data-skin="xbox"] .side h2 { display: none; }
+body[data-skin="xbox"] .side-item { min-height: 48px; padding: 8px 14px; border-radius: 4px; gap: 14px; color: #fff; font-size: calc(17px * var(--fs)); }
+body[data-skin="xbox"] .side-item .t { font-weight: 400; }
+body[data-skin="xbox"] .side-item svg { width: 22px; height: 22px; stroke-width: 1.5; }
+body[data-skin="xbox"] .side-item.on { background: var(--xbox-box); }
+body[data-skin="xbox"] .side-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+body[data-skin="xbox"] .side-item.focus { background: var(--xbox-box-2); color: #fff; box-shadow: var(--xframe); animation: xbfocus .14s ease-out; }
+body[data-skin="xbox"] .side-item .thumb { border-radius: 2px; }
+body[data-skin="xbox"] .main-panel { padding: 4px 4px 30px; }
+body[data-skin="xbox"] .main-panel h3 { font-size: calc(22px * var(--fs)); font-weight: 600; margin: 4px 0 14px; }
+body[data-skin="xbox"] .main-panel .lead { font-size: calc(15px * var(--fs)); }
+body[data-skin="xbox"] .set { min-height: 64px; padding: 12px 16px; border-radius: 4px; background: var(--xbox-box); gap: 18px; }
+body[data-skin="xbox"] .set + .set { margin-top: 8px; }
+body[data-skin="xbox"] .set .t { font-weight: 400; font-size: calc(17px * var(--fs)); }
+body[data-skin="xbox"] .set .d { font-size: calc(14px * var(--fs)); color: rgba(255,255,255,.65); }
+body[data-skin="xbox"] .set:hover { background: var(--xbox-box-2); }
+body[data-skin="xbox"] .set.focus { background: var(--xbox-box-2); box-shadow: var(--xframe); animation: xbfocus .14s ease-out; }
+body[data-skin="xbox"] .set .where { letter-spacing: .02em; text-transform: none; font-weight: 600; color: var(--xg); }
+/* Xbox uses check boxes, not switches */
+body[data-skin="xbox"] .switch { width: 26px; height: 26px; border-radius: 3px; background: none; box-shadow: inset 0 0 0 2px #fff; }
+body[data-skin="xbox"] .switch::after { top: 5px; left: 9px; width: 6px; height: 12px; border-radius: 0; background: none; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); box-shadow: none; opacity: 0; }
+body[data-skin="xbox"] .switch.on { background: #107c10; box-shadow: inset 0 0 0 2px #107c10; }
+body[data-skin="xbox"] .switch.on::after { transform: rotate(45deg); opacity: 1; }
+body[data-skin="xbox"] .slider { height: 4px; border-radius: 0; background: rgba(255,255,255,.35); }
+body[data-skin="xbox"] .slider::-webkit-slider-thumb { width: 12px; height: 26px; border-radius: 2px; }
+body[data-skin="xbox"] .facts .fact, body[data-skin="xbox"] .gp-stat, body[data-skin="xbox"] .bp-drive { background: var(--xbox-box); border-radius: 4px; }
+body[data-skin="xbox"] .fact .k, body[data-skin="xbox"] .gp-stat .l, body[data-skin="xbox"] .cgroup, body[data-skin="xbox"] .tm-cols { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: calc(14px * var(--fs)); color: rgba(255,255,255,.7); }
+body[data-skin="xbox"] .fact .v, body[data-skin="xbox"] .gp-stat .v { font-weight: 400; }
+body[data-skin="xbox"] .save-hero .pic { border-radius: 4px; }
+body[data-skin="xbox"] .list-row, body[data-skin="xbox"] .tm-row, body[data-skin="xbox"] .bp-file, body[data-skin="xbox"] .bo-row { background: var(--xbox-box); border-radius: 4px; }
+body[data-skin="xbox"] .bp-file.focus, body[data-skin="xbox"] .bo-row.focus, body[data-skin="xbox"] .bp-file:hover, body[data-skin="xbox"] .bo-row:hover { background: var(--xbox-box-2); box-shadow: var(--xframe); }
+body[data-skin="xbox"] .bo-check { border-radius: 3px; box-shadow: inset 0 0 0 2px #fff; }
+body[data-skin="xbox"] .bo-check.on { background: #107c10; box-shadow: none; }
+body[data-skin="xbox"] .bp-bar { border-radius: 0; height: 6px; }
+body[data-skin="xbox"] .bp-bar i { background: #107c10; border-radius: 0; }
+body[data-skin="xbox"] .progress { border-radius: 0; height: 6px; }
+body[data-skin="xbox"] .progress i { background: #107c10; border-radius: 0; }
+
+/* ---------- buttons: flat grey boxes, the highlighted one gets the green frame ---------- */
+body[data-skin="xbox"] .btn { height: 44px; padding: 0 20px; border-radius: 4px; background: var(--xbox-box-2); color: #fff; font-weight: 400; font-size: calc(16px * var(--fs)); }
+body[data-skin="xbox"] .btn:hover { background: #454545; }
+body[data-skin="xbox"] .btn.primary { background: #107c10; color: #fff; }
+body[data-skin="xbox"] .btn.primary:hover { background: #138a13; }
+body[data-skin="xbox"] .btn.danger { background: var(--xbox-box-2); color: #fff; }
+body[data-skin="xbox"] .btn.focus { box-shadow: var(--xframe); }
+body[data-skin="xbox"] .set .btn { background: rgba(255,255,255,.1); }
+body[data-skin="xbox"] .play-btn { border-radius: 4px; }
+body[data-skin="xbox"] .play-btn.focus { box-shadow: var(--xframe); }
+body[data-skin="xbox"] .bo-mini, body[data-skin="xbox"] .toast .tbtn { border-radius: 3px; }
+
+/* ---------- pop-ups: a dark grey box, title in light type, buttons stacked full width ---------- */
+body[data-skin="xbox"] .modal-wrap { background: rgba(0,0,0,.7); backdrop-filter: none; }
+body[data-skin="xbox"] .modal { background: #262626; border-radius: 4px; padding: 30px 34px 28px; box-shadow: 0 20px 60px rgba(0,0,0,.6); animation: xbpop .16s ease-out; }
+@keyframes xbpop { from { opacity: 0; transform: translateY(14px); } }
+body[data-skin="xbox"] .modal h2 { font-family: 'Segoe UI Variable Display', 'Segoe UI', var(--font); font-size: calc(26px * var(--fs)); font-weight: 300; letter-spacing: 0; margin-bottom: 12px; }
+body[data-skin="xbox"] .modal .lead { color: rgba(255,255,255,.8); font-size: calc(16px * var(--fs)); }
+body[data-skin="xbox"] .modal .actions { flex-direction: column-reverse; align-items: stretch; gap: 8px; margin-top: 26px; }
+body[data-skin="xbox"] .modal .actions .btn { justify-content: flex-start; height: 48px; font-size: calc(17px * var(--fs)); }
+body[data-skin="xbox"] .menu-list { gap: 6px; }
+body[data-skin="xbox"] .menu-item { min-height: 52px; padding: 10px 16px; border-radius: 4px; background: var(--xbox-box); font-weight: 400; font-size: calc(17px * var(--fs)); }
+body[data-skin="xbox"] .menu-item svg { color: #fff; stroke-width: 1.5; }
+body[data-skin="xbox"] .menu-item:hover { background: var(--xbox-box-2); }
+body[data-skin="xbox"] .menu-item.focus { background: var(--xbox-box-2); color: #fff; box-shadow: var(--xframe); animation: xbfocus .14s ease-out; }
+body[data-skin="xbox"] .menu-item.focus svg { color: #fff; }
+body[data-skin="xbox"] .menu-item.focus .d { color: rgba(255,255,255,.6); }
+body[data-skin="xbox"] .menu-item.danger { color: #fff; }
+body[data-skin="xbox"] .menu-item.on { color: #fff; box-shadow: inset 4px 0 0 var(--xg); }
+body[data-skin="xbox"] .menu-item .d { color: rgba(255,255,255,.55); font-weight: 400; }
+/* Power: big square buttons in a row, like the Xbox's power screen */
+body[data-skin="xbox"] .m-power .modal { width: min(940px, 92vw); }
+body[data-skin="xbox"] .m-power .menu-list { flex-direction: row; flex-wrap: wrap; gap: 10px; }
+body[data-skin="xbox"] .m-power .menu-item { flex: 1 1 150px; min-height: 150px; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 16px; font-size: calc(16px * var(--fs)); }
+body[data-skin="xbox"] .m-power .menu-item svg { width: 32px; height: 32px; }
+body[data-skin="xbox"] .m-power .menu-item .d { display: none; }
+body[data-skin="xbox"] .choice, body[data-skin="xbox"] .style-card, body[data-skin="xbox"] .style-card .style-pic, body[data-skin="xbox"] .big-opt { border-radius: 4px; }
+body[data-skin="xbox"] .choice.focus, body[data-skin="xbox"] .choice.on, body[data-skin="xbox"] .big-opt.focus, body[data-skin="xbox"] .style-card.focus, body[data-skin="xbox"] .cm-stage.focus, body[data-skin="xbox"] .gp-tag.focus { box-shadow: var(--xframe); transform: none; }
+body[data-skin="xbox"] .big-opt { background: var(--xbox-box); }
+body[data-skin="xbox"] .big-opt svg { color: #fff; }
+body[data-skin="xbox"] .big-opt .t, body[data-skin="xbox"] .style-name { font-weight: 600; }
+
+/* ---------- notifications: bottom middle, a dark pill with a round green icon (like Xbox toasts) ---------- */
+body[data-skin="xbox"] .toasts { top: auto; bottom: 34px; right: 50%; transform: translateX(50%); width: 470px; flex-direction: column-reverse; }
+body[data-skin="xbox"] .toast { border-radius: 40px; padding: 10px 18px 10px 10px; background: rgba(32,32,32,.97); box-shadow: 0 10px 34px rgba(0,0,0,.55); backdrop-filter: none; animation: xbtoast .3s cubic-bezier(.2,.8,.2,1); font-size: calc(15px * var(--fs)); }
+@keyframes xbtoast { from { opacity: 0; transform: translateY(30px); } }
+body[data-skin="xbox"] .toast.out { animation: xbtoastout .25s ease forwards; }
+@keyframes xbtoastout { to { opacity: 0; transform: translateY(30px); } }
+body[data-skin="xbox"] .toast .ic { width: 46px; height: 46px; border-radius: 50%; background: #107c10; color: #fff !important; }
+body[data-skin="xbox"] .toast .thumb { border-radius: 24px 6px 6px 24px; }
+body[data-skin="xbox"] .toast .ic svg { width: 22px; height: 22px; }
+body[data-skin="xbox"] .toast .tt { font-weight: 600; }
+body[data-skin="xbox"] .toast .ts { color: rgba(255,255,255,.75); }
+body[data-skin="xbox"] .toast .tbtn { background: rgba(255,255,255,.14); border-radius: 20px; }
+
+/* ---------- game page: full screen like an Xbox game page ---------- */
+body[data-skin="xbox"] .modal-wrap:has(.gp-box) { background: var(--xbox-bg); }
+body[data-skin="xbox"] .modal.gp-box { width: 100vw; max-width: none; height: 100vh; max-height: 100vh; padding: 0; border-radius: 0; background: var(--xbox-bg); scrollbar-width: none; animation: xbpop .2s ease-out; }
+body[data-skin="xbox"] .gp-hero { min-height: 58vh; padding: 0 var(--side) 4vh; }
+body[data-skin="xbox"] .gp-bg { inset: 0; filter: brightness(.75); }
+body[data-skin="xbox"] .gp-hero::after { background: linear-gradient(0deg, var(--xbox-bg) 0%, rgba(29,29,29,.4) 40%, transparent 70%), linear-gradient(90deg, rgba(29,29,29,.8), transparent 55%); }
+body[data-skin="xbox"] .gp-cover { width: 13vw; aspect-ratio: 1; border-radius: 4px; }
+body[data-skin="xbox"] .gp-main h1 { font-family: 'Segoe UI Variable Display', 'Segoe UI', var(--font); font-weight: 600; }
+body[data-skin="xbox"] .gp-stats, body[data-skin="xbox"] .gp .cgroup, body[data-skin="xbox"] .gp-shots { padding-left: var(--side); padding-right: var(--side); }
+body[data-skin="xbox"] .gp-tag { border-radius: 3px; font-weight: 400; }
+
+/* ---------- starting a game: the game's splash (its art in the middle of a black screen) ---------- */
+body[data-skin="xbox"] .launch .zoom { border-radius: 4px; }
+body[data-skin="xbox"] .launch .zoom.full { left: 50% !important; top: 46% !important; width: 34vw !important; height: 34vw !important; transform: translate(-50%, -50%); filter: none; border-radius: 4px; }
+body[data-skin="xbox"] .launch .lname { display: none; }
+body[data-skin="xbox"] .launch .lspin { bottom: 9vh; border-color: rgba(255,255,255,.15); border-top-color: #fff; }
+
+body[data-skin="xbox"] .dz-card { border-radius: 4px; border: 2px dashed rgba(255,255,255,.4); background: #262626; }
+body[data-skin="xbox"] .dz-title { font-weight: 300; }
+
+/* ---------- quick menu over games = the Xbox Guide (a panel on the left) ---------- */
+body.ov[data-skin="xbox"] .qm-dim { background: rgba(0,0,0,.45); }
+body.ov[data-skin="xbox"] .qm-top { top: 0; left: 0; right: auto; width: 500px; height: 74px; padding: 0 26px; z-index: 2; }
+body.ov[data-skin="xbox"] .qm-title { font-size: 16px; font-weight: 600; color: #fff; }
+body.ov[data-skin="xbox"] .qm-panel { top: 0; bottom: 0; right: auto; width: 500px; padding: 82px 22px 22px; background: #1f1f1f; box-shadow: 10px 0 40px rgba(0,0,0,.5); overflow-y: auto; animation: xbguide .2s cubic-bezier(.2,.8,.2,1); }
+@keyframes xbguide { from { transform: translateX(-40px); opacity: 0; } }
+body.ov[data-skin="xbox"] .qm-cards { flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 18px; padding: 4px; overflow: visible; }
+body.ov[data-skin="xbox"] .qcard { width: auto !important; height: 64px; border-radius: 4px; background-color: var(--xbox-box); background-size: 64px 64px; background-position: left center; box-shadow: none; }
+body.ov[data-skin="xbox"] .qcard::before { display: none; }
+body.ov[data-skin="xbox"] .qcard .ql { left: 80px; right: 14px; top: 50%; bottom: auto; transform: translateY(-50%); }
+body.ov[data-skin="xbox"] .qcard .qk { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12px; color: rgba(255,255,255,.65); }
+body.ov[data-skin="xbox"] .qcard .qn { font-size: 16px; font-weight: 400; }
+body.ov[data-skin="xbox"] .qcard.small { display: block; }
+body.ov[data-skin="xbox"] .qcard.small > span { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); }
+body.ov[data-skin="xbox"] .qcard.small svg { width: 28px; height: 28px; color: #fff; stroke-width: 1.5; }
+body.ov[data-skin="xbox"] .qcard.small .ql { text-align: left; }
+body.ov[data-skin="xbox"] .qcard.focus { transform: none; box-shadow: var(--xframe); background-color: var(--xbox-box-2); }
+body.ov[data-skin="xbox"] .qm-ctrls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 4px; }
+body.ov[data-skin="xbox"] .qctrl { width: auto; height: 96px; border-radius: 4px; background: var(--xbox-box); box-shadow: none; align-items: flex-start; justify-content: space-between; padding: 14px; font-size: 14px; font-weight: 400; color: #fff; }
+body.ov[data-skin="xbox"] .qctrl svg { width: 26px; height: 26px; color: #fff; stroke-width: 1.5; }
+body.ov[data-skin="xbox"] .qctrl.on { background: #107c10; }
+body.ov[data-skin="xbox"] .qctrl.focus { background: var(--xbox-box-2); color: #fff; transform: none; box-shadow: var(--xframe); }
+body.ov[data-skin="xbox"] .qctrl.on.focus { background: #138a13; }
+body.ov[data-skin="xbox"] .qctrl.focus svg, body.ov[data-skin="xbox"] .qctrl.danger svg, body.ov[data-skin="xbox"] .qctrl.danger.focus svg { color: #fff; }
+body.ov[data-skin="xbox"] .qm-sub { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 4px; margin-top: 14px; }
+body[data-skin="xbox"] .lib-head .chips .chip.on.focus { box-shadow: var(--xframe), inset 0 -3px 0 var(--xg); background: rgba(255,255,255,.1); border-radius: 4px; }
+body[data-skin="xbox"] .gp-main h1.logo { font-size: calc(clamp(40px, 4.4vw, 84px) * var(--logo-size, 1)); line-height: 1.04; text-shadow: 0 3px 22px rgba(0,0,0,.6); }
+/* the Xbox loading circle is a ring of dots */
+body[data-skin="xbox"] .launch .lspin { width: 40px; height: 40px; margin-left: -20px; border: 4px dotted #fff; border-top-color: #fff; opacity: 0; animation: spin 1.4s linear infinite; }
+body[data-skin="xbox"] .launch.show .lspin { opacity: .9; }

@@ -1,0 +1,410 @@
+/* ===== Console home styles ===== */
+/* PlayStation: Sony's SST isn't free, Nunito Sans is the closest (wide letters, one-loop g, straight y tail) */
+@font-face { font-family: 'GS PS'; src: url('../fonts/nunito-sans-latin-300-normal.woff2') format('woff2'); font-weight: 300; }
+@font-face { font-family: 'GS PS'; src: url('../fonts/nunito-sans-latin-400-normal.woff2') format('woff2'); font-weight: 400 500; }
+@font-face { font-family: 'GS PS'; src: url('../fonts/nunito-sans-latin-600-normal.woff2') format('woff2'); font-weight: 600 900; }
+/* Xbox uses Windows' own Segoe UI; where it's missing (the phone) Open Sans, its closest free cousin */
+@font-face { font-family: 'GS Segoe'; src: url('../fonts/open-sans-latin-300-normal.woff2') format('woff2'); font-weight: 300; }
+@font-face { font-family: 'GS Segoe'; src: url('../fonts/open-sans-latin-400-normal.woff2') format('woff2'); font-weight: 400 500; }
+@font-face { font-family: 'GS Segoe'; src: url('../fonts/open-sans-latin-600-normal.woff2') format('woff2'); font-weight: 600 900; }
+@font-face { font-family: 'GS XMB'; src: url('../fonts/m-plus-1p-latin-300-normal.woff2') format('woff2'); font-weight: 300; }
+@font-face { font-family: 'GS XMB'; src: url('../fonts/m-plus-1p-latin-400-normal.woff2') format('woff2'); font-weight: 400 900; }
+@font-face { font-family: 'GS Round'; src: url('../fonts/m-plus-rounded-1c-latin-400-normal.woff2') format('woff2'); font-weight: 400 500; }
+@font-face { font-family: 'GS Round'; src: url('../fonts/m-plus-rounded-1c-latin-700-normal.woff2') format('woff2'); font-weight: 600 900; }
+@font-face { font-family: 'GS Switch'; src: url('../fonts/biz-udpgothic-latin-400-normal.woff2') format('woff2'); font-weight: 400 500; }
+@font-face { font-family: 'GS Switch'; src: url('../fonts/biz-udpgothic-latin-700-normal.woff2') format('woff2'); font-weight: 600 900; }
+@font-face { font-family: 'GS DC'; src: url('../fonts/exo-2-latin-500-normal.woff2') format('woff2'); font-weight: 400 600; }
+@font-face { font-family: 'GS DC'; src: url('../fonts/exo-2-latin-700-italic.woff2') format('woff2'); font-weight: 700 900; font-style: italic; }
+
+body[data-style="ps5"], body[data-style="ps4"] { --font: 'GS PS'; --glow: rgba(120, 175, 255, .55); }
+body[data-style="ps3"], body[data-style="psp"], body[data-style="ps2"] { --font: 'GS XMB'; --glow: rgba(150, 200, 255, .5); }
+body[data-style="xbox"], body[data-style="xboxone"], body[data-style="x360nxe"], body[data-style="x360blades"] { --font: 'Segoe UI Variable Text', 'Segoe UI', 'GS Segoe', 'Inter'; --glow: rgba(16, 180, 16, .45); }
+body[data-style="wii"], body[data-style="3ds"] { --font: 'GS Round'; --glow: rgba(0, 195, 227, .55); }
+body[data-style="switch"] { --font: 'GS Switch'; --glow: rgba(113, 219, 236, .55); }
+body[data-style="steam"] { --font: 'Inter'; --glow: rgba(26, 159, 255, .5); }
+body[data-style="dreamcast"] { --font: 'GS DC'; --glow: rgba(255, 140, 30, .55); }
+
+/* console homes cover the whole window (their own top areas) */
+body.console-home .topbar, body.console-home .hints { display: none; }
+body.console-home #screens { top: 0; }
+.home-layout { position: absolute; inset: 0; overflow: hidden; }
+.cart { position: absolute; inset: 0; background: #1a1d24 center / cover no-repeat; border-radius: inherit; }
+.cnoart { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 10px; font-weight: 700; font-size: 14px; line-height: 1.2; color: rgba(255,255,255,.85); background: linear-gradient(150deg, #2a2f3b, #15171d); border-radius: inherit; }
+
+/* ---------- PS5 (own layout, PS5 tuning) ---------- */
+body[data-style="ps5"] .bg-shade { background:
+  linear-gradient(90deg, rgba(3,6,14,.92) 0%, rgba(3,6,14,.55) 40%, rgba(3,6,14,.1) 75%),
+  linear-gradient(0deg, rgba(3,6,14,.95) 0%, rgba(3,6,14,.3) 45%, rgba(3,6,14,0) 65%, rgba(3,6,14,.7) 100%); }
+body[data-style="ps5"] .tile { border-radius: 12px; }
+body[data-style="ps5"] .tile.ring .art { box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(255,255,255,.18), 0 20px 50px rgba(0,0,0,.55); }
+body[data-style="ps5"] .tile-label { font-weight: 400; font-size: 18px; }
+body[data-style="ps5"] .hero-title { font-weight: 300; letter-spacing: -.01em; }
+body[data-style="ps5"] .hero-kicker { display: none; }
+body[data-style="ps5"] .play-btn { border-radius: 14px; min-width: 240px; height: 54px; font-weight: 600; }
+body[data-style="ps5"] .round-btn { border-radius: 14px; }
+
+/* ---------- PS4 ---------- */
+.ps4 { position: absolute; inset: 0; color: #fff; }
+.ps4-waves { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ps4-top { position: absolute; top: 4.5vh; left: 6vw; right: 4vw; display: flex; justify-content: space-between; align-items: flex-start; }
+.ps4-func { display: flex; gap: 1.1vw; }
+.ps4-fbtn { position: relative; width: 3.4vw; height: 3.4vw; min-width: 44px; min-height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); color: rgba(255,255,255,.75); transition: background .15s, transform .15s; }
+.ps4-fbtn svg { width: 46%; height: 46%; }
+.ps4-fbtn .ps4-flabel { position: absolute; top: 112%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 14px; opacity: 0; transition: opacity .15s; }
+.ps4-fbtn.focus { background: rgba(255,255,255,.9); color: #0a3a7a; transform: scale(1.12); box-shadow: 0 0 22px rgba(160,210,255,.6); }
+.ps4-fbtn.focus .ps4-flabel { opacity: 1; }
+.ps4-clock { font-size: 22px; font-weight: 300; }
+.ps4-title { position: absolute; left: 6vw; top: 30vh; font-size: 34px; font-weight: 300; text-shadow: 0 2px 14px rgba(0,0,0,.4); }
+.ps4-row { position: absolute; left: 6vw; right: 0; top: 37vh; height: 17vw; }
+.ps4-track { display: flex; align-items: flex-end; gap: 12px; transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+.ps4-probe { position: absolute; width: 11vw; height: 1px; visibility: hidden; }
+.ps4-tile { position: relative; flex: none; width: 11vw; height: 11vw; border-radius: 4px; background: rgba(255,255,255,.08); transition: width .18s, height .18s, box-shadow .18s; box-shadow: 0 8px 26px rgba(0,0,0,.35); }
+.ps4-tile .cart { border-radius: 4px; }
+.ps4-tile.sel { width: 15vw; height: 15vw; }
+.ps4-tile.ring { box-shadow: 0 0 0 3px rgba(255,255,255,.95), 0 0 30px rgba(140,200,255,.65), 0 14px 40px rgba(0,0,0,.45); }
+.ps4-tile.lib .cart { display: grid; place-items: center; background: rgba(255,255,255,.1); }
+.ps4-tile.lib svg { width: 34%; height: 34%; }
+.ps4-start { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 14px 10px; font-size: 18px; background: linear-gradient(0deg, rgba(0,0,0,.75), transparent); border-radius: 0 0 4px 4px; opacity: 0; transition: opacity .18s; }
+.ps4-tile.sel .ps4-start { opacity: 1; }
+.ps4-badge { position: absolute; top: 8px; left: 8px; font-size: 12px; padding: 2px 8px; background: rgba(0,0,0,.6); border-radius: 3px; }
+.ps4-info { position: absolute; left: 6vw; top: calc(37vh + 15vw + 22px); font-size: 17px; color: rgba(255,255,255,.75); }
+
+/* ---------- PS3 / PSP XMB ---------- */
+.xmb { position: absolute; inset: 0; color: #fff; font-family: 'GS XMB', sans-serif; }
+.xmb-waves { position: absolute; inset: 0; width: 100%; height: 100%; }
+.xmb-clock { position: absolute; right: 5vw; top: 5vh; font-size: 20px; font-weight: 300; letter-spacing: .04em; text-shadow: 0 1px 6px rgba(0,0,0,.35); }
+.xmb-bar { position: absolute; left: 22vw; top: 26vh; display: flex; gap: 34px; transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+.xmb-cat { width: 7vw; min-width: 90px; text-align: center; opacity: .55; transition: opacity .2s, transform .2s; cursor: default; }
+.xmb-cat svg { width: 4.6vw; height: 4.6vw; min-width: 56px; min-height: 56px; filter: drop-shadow(0 2px 8px rgba(0,0,0,.35)); stroke-width: 1.4; }
+.xmb-cname { font-size: 16px; margin-top: 8px; opacity: 0; transition: opacity .2s; }
+.xmb-cat.on { opacity: 1; transform: scale(1.12); }
+.xmb-cat.on .xmb-cname { opacity: 1; }
+.xmb-list { position: absolute; left: 22vw; top: 0; bottom: 0; right: 0; pointer-events: none; }
+.xmb-above { position: absolute; left: 0; bottom: calc(100vh - 26vh + 16px); display: flex; flex-direction: column; justify-content: flex-end; }
+.xmb-below { position: absolute; left: 0; top: calc(26vh + 7vw + 54px); display: flex; flex-direction: column; }
+.xmb-item { pointer-events: auto; display: flex; align-items: center; gap: 22px; padding: 7px 0; opacity: .7; transition: opacity .15s; }
+.xmb-item .xmb-pic { position: relative; width: 7vw; min-width: 90px; aspect-ratio: 16/9; background: rgba(0,0,0,.25) center / cover no-repeat; flex: none; box-shadow: 0 2px 10px rgba(0,0,0,.3); }
+.xmb-item .xmb-pic.ic { display: grid; place-items: center; background: none; box-shadow: none; }
+.xmb-item .xmb-pic.ic svg { width: 46%; height: 70%; stroke-width: 1.4; }
+.xmb-item.sel { opacity: 1; padding: 12px 0; }
+.xmb-item.sel .xmb-pic { width: 13vw; min-width: 160px; box-shadow: 0 0 0 1px rgba(255,255,255,.5), 0 6px 26px rgba(0,0,0,.4); }
+.xmb-name { font-size: 20px; text-shadow: 0 1px 6px rgba(0,0,0,.4); }
+.xmb-item.sel .xmb-name { font-size: 26px; }
+.xmb-sub { font-size: 14px; opacity: .8; margin-top: 4px; }
+.xmb.psp .xmb-bar, .xmb.psp .xmb-list { left: 16vw; }
+.xmb.psp .xmb-cat svg { width: 4vw; height: 4vw; }
+.xmb.psp .xmb-name { font-size: 18px; }
+.xmb.psp .xmb-item.sel .xmb-name { font-size: 22px; }
+
+/* ---------- PS2 ---------- */
+.ps2 { position: absolute; inset: 0; color: #dfe9ff; background: radial-gradient(120% 90% at 50% 120%, #0a2d6b 0%, #020814 55%, #000 100%); font-family: 'GS XMB', sans-serif; perspective: 900px; }
+.ps2-towers { position: absolute; inset: 0; transform-style: preserve-3d; }
+.ps2-tower { position: absolute; bottom: 0; width: 3vw; background: repeating-linear-gradient(0deg, rgba(90,150,255,.18) 0 18px, rgba(90,150,255,.04) 18px 22px); box-shadow: 0 0 30px rgba(80,140,255,.25); filter: blur(.4px); transform: rotateX(8deg); animation: ps2tower 9s ease-in-out infinite alternate; opacity: .55; }
+@keyframes ps2tower { from { transform: translateY(6%) scaleY(.9); opacity: .35; } to { transform: translateY(0) scaleY(1.05); opacity: .7; } }
+.ps2-fog { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.65), transparent 40%, rgba(0,0,0,.5)); }
+.ps2-head { position: absolute; top: 5vh; left: 6vw; right: 6vw; display: flex; justify-content: space-between; align-items: center; }
+.ps2-browser { font-size: 34px; font-weight: 300; letter-spacing: .12em; color: #a9c7ff; text-shadow: 0 0 18px rgba(80,140,255,.8); }
+.ps2-tools { display: flex; gap: 10px; }
+.ps2-tool { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 4px; font-size: 14px; color: #9fb8e8; background: rgba(40,80,160,.18); box-shadow: inset 0 0 0 1px rgba(120,170,255,.25); }
+.ps2-tool svg { width: 16px; height: 16px; }
+.ps2-tool.focus, .ps2-tool:hover { color: #fff; background: rgba(60,120,255,.4); box-shadow: inset 0 0 0 1px rgba(160,200,255,.8), 0 0 18px rgba(80,150,255,.6); }
+.ps2-titlebox { position: absolute; top: 14vh; left: 6vw; padding: 12px 20px; min-width: 32vw; background: linear-gradient(90deg, rgba(30,70,160,.45), rgba(30,70,160,0)); border-left: 2px solid rgba(140,190,255,.8); }
+.ps2-t1 { font-size: 24px; color: #fff; }
+.ps2-t2 { font-size: 14px; color: #9fb8e8; margin-top: 4px; }
+.ps2-grid { position: absolute; top: 28vh; left: 6vw; right: 6vw; bottom: 4vh; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(11vw, 1fr)); gap: 4vh 2.5vw; align-content: start; padding: 10px; scrollbar-width: none; }
+.ps2-cell { text-align: center; transform-style: preserve-3d; animation: ps2spin 7s ease-in-out infinite alternate; }
+@keyframes ps2spin { from { transform: rotateY(-14deg); } to { transform: rotateY(14deg); } }
+.ps2-icon { position: relative; width: 9vw; height: 9vw; margin: 0 auto; background: #0c1630 center / cover no-repeat; border-radius: 6px; box-shadow: 0 0 0 1px rgba(120,170,255,.35), 0 10px 30px rgba(0,0,0,.6); transition: transform .2s, box-shadow .2s; }
+.ps2-cell.lib .ps2-icon { display: grid; place-items: center; color: #9fb8e8; }
+.ps2-cell.lib .ps2-icon svg { width: 40%; height: 40%; }
+.ps2-name { margin-top: 10px; font-size: 13px; color: #8aa3d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps2-cell.picked .ps2-icon { box-shadow: 0 0 0 2px rgba(170,210,255,.9), 0 0 34px 6px rgba(70,140,255,.6); transform: scale(1.12) translateZ(30px); }
+.ps2-cell.picked .ps2-name { color: #fff; }
+.ps2-cell.sel { animation-duration: 2.4s; }
+
+/* ---------- Xbox Series / One ---------- */
+/* the 2023 Xbox Home: top bar (you, quick-access icons, clock), room for the background, games row, wide cards row */
+.xb { position: absolute; inset: 0; color: #fff; font-family: var(--font), sans-serif; }
+.xb-top { position: absolute; top: 4.6vh; left: 4.2vw; right: 4.2vw; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.xb-me { display: flex; align-items: center; gap: 12px; }
+.xb-avatar { width: 46px; height: 46px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #3fbf3f, #0e6a0e 75%); display: grid; place-items: center; box-shadow: 0 0 0 2px rgba(255,255,255,.15); }
+.xb-avatar svg { width: 26px; height: 26px; stroke-width: 1.6; }
+.xb-gt { font-size: 16px; font-weight: 600; }
+.xb-gs { font-size: 13px; opacity: .85; display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+.xb-g { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #fff; color: #111; font-size: 9px; font-weight: 800; }
+.xb-quick { display: flex; gap: 6px; }
+.xb-qbtn { position: relative; width: 50px; height: 44px; border-radius: 4px; display: grid; place-items: center; color: #fff; transition: background .12s, box-shadow .12s; }
+.xb-qbtn svg { width: 24px; height: 24px; stroke-width: 1.6; }
+.xb-qbtn:hover { background: rgba(255,255,255,.12); }
+.xb-qbtn.focus { background: rgba(255,255,255,.14); box-shadow: 0 0 0 3px #2ca02c, 0 0 14px 2px rgba(44,160,44,.65); }
+.xb-qtip { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 14px; padding: 4px 10px; border-radius: 3px; background: rgba(30,30,30,.95); opacity: 0; pointer-events: none; transition: opacity .12s; }
+.xb-qbtn.focus .xb-qtip { opacity: 1; }
+.xb-clock { justify-self: end; font-size: 18px; font-weight: 400; }
+.xb-rows { position: absolute; left: 4.2vw; right: 0; top: 44vh; bottom: 3vh; }
+.xb-row { display: flex; gap: .7vw; overflow: hidden; padding: 8px; margin: -8px; }
+.xb-row.games { height: calc(13.4vw + 16px); align-items: flex-end; }
+.xb-tile { position: relative; flex: none; width: 8.4vw; height: 8.4vw; border-radius: 4px; overflow: hidden; background: #222; transition: transform .12s, box-shadow .12s; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+.xb-tile.big { width: 13.4vw; height: 13.4vw; }
+.xb-tile .cart { border-radius: 4px; }
+.xb-tile.focus { box-shadow: 0 0 0 3px #2ca02c, 0 0 18px 3px rgba(44,160,44,.7), 0 12px 30px rgba(0,0,0,.5); z-index: 2; overflow: visible; }
+.xb-tname { position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 10px 8px; font-size: 15px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: linear-gradient(0deg, rgba(0,0,0,.85), transparent); border-radius: 0 0 4px 4px; opacity: 0; transition: opacity .12s; }
+.xb-tile.focus .xb-tname { opacity: 1; }
+.xb-badge { position: absolute; top: 8px; right: 8px; padding: 2px 8px; font-size: 12px; font-weight: 600; background: #107c10; border-radius: 3px; }
+.xb-row.sys { margin-top: calc(1.8vh - 8px); height: calc(10.6vw + 16px); }
+.xb-stile { position: relative; flex: none; width: 19.6vw; border-radius: 4px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; background: rgba(32,32,32,.88); font-size: 17px; font-weight: 400; transition: box-shadow .12s, background .12s; }
+.xb-stile svg { width: 34px; height: 34px; stroke-width: 1.4; align-self: center; margin-top: 8%; opacity: .95; }
+.xb-stile.focus { background: rgba(48,48,48,.92); box-shadow: 0 0 0 3px #2ca02c, 0 0 18px 3px rgba(44,160,44,.7); z-index: 2; }
+.xb-empty { padding: 40px; opacity: .7; }
+body[data-style="xboxone"] .xb-badge { background: #0e7a0d; }
+body[data-style="xbox"] .bg-shade, body[data-style="xboxone"] .bg-shade { background: linear-gradient(0deg, rgba(10,10,10,.95) 0%, rgba(10,10,10,.55) 55%, rgba(10,10,10,.35) 100%), linear-gradient(90deg, rgba(10,10,10,.7), transparent 60%); }
+
+/* ---------- Xbox 360 NXE ---------- */
+.nxe { position: absolute; inset: 0; color: #fff; font-family: var(--font), sans-serif; overflow: hidden; }
+.nxe-sky { --chan: #4f9a1c; position: absolute; inset: 0; background: radial-gradient(70% 60% at 70% 30%, color-mix(in srgb, var(--chan) 70%, #fff 10%), transparent 70%), radial-gradient(90% 80% at 20% 90%, color-mix(in srgb, var(--chan) 55%, #000), transparent), linear-gradient(160deg, color-mix(in srgb, var(--chan) 45%, #000), #0a0f0a); transition: background .4s; }
+.nxe-stage { position: absolute; inset: 0; perspective: 1200px; }
+.nxe-lane { position: absolute; left: 0; right: 0; top: 24vh; height: 50vh; transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .35s; opacity: .35; transform-style: preserve-3d; }
+.nxe-lane.on { opacity: 1; }
+.nxe-cname { position: absolute; left: 6vw; top: -9vh; font-size: 44px; font-weight: 300; letter-spacing: -.01em; text-shadow: 0 2px 16px rgba(0,0,0,.4); }
+.nxe-deck { position: absolute; left: 12vw; top: 0; width: 36vw; height: 20.25vw; transform-style: preserve-3d; }
+.nxe-card { position: absolute; inset: 0; border-radius: 4px; overflow: hidden; background: rgba(0,0,0,.4); box-shadow: 0 16px 40px rgba(0,0,0,.5); transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .3s; transform-origin: left center; }
+.nxe-lane.on .nxe-card:first-child { box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 20px 50px rgba(0,0,0,.6); }
+.nxe-sys { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; background: linear-gradient(160deg, rgba(255,255,255,.18), rgba(255,255,255,.04)); font-size: 22px; }
+.nxe-sys svg { width: 54px; height: 54px; }
+.nxe-badge { position: absolute; left: 10px; bottom: 10px; padding: 3px 9px; font-size: 12px; background: rgba(0,0,0,.6); border-radius: 3px; }
+.nxe-info { position: absolute; left: 12vw; top: calc(20.25vw + 18px); }
+.nxe-t { font-size: 24px; font-weight: 600; }
+.nxe-s { font-size: 15px; opacity: .8; margin-top: 4px; }
+.nxe-clock { position: absolute; right: 5vw; top: 5vh; font-size: 20px; }
+
+/* ---------- Xbox 360 Blades ---------- */
+.bl { position: absolute; inset: 0; background: radial-gradient(90% 70% at 50% 0%, #2a3b2a, #050805 70%); color: #fff; font-family: var(--font), sans-serif; overflow: hidden; }
+.bl-glow { position: absolute; inset: -20%; background: radial-gradient(40% 30% at 60% 40%, rgba(120,200,60,.25), transparent 70%); }
+.bl-tabs { position: absolute; top: 8vh; left: 6vw; right: 6vw; display: flex; gap: 6px; }
+.bl-tab { padding: 10px 26px 12px; border-radius: 10px 10px 0 0; font-size: 17px; font-weight: 600; text-transform: lowercase; letter-spacing: .02em; opacity: .55; cursor: default; transition: opacity .15s, transform .15s; }
+.bl-tab.g { background: linear-gradient(#7bc142, #4b8a1d); }
+.bl-tab.a { background: linear-gradient(#57a6e0, #2e6aa4); }
+.bl-tab.m { background: linear-gradient(#9a7fd6, #5b3f9c); }
+.bl-tab.s { background: linear-gradient(#b8bec6, #6d747c); }
+.bl-tab.on { opacity: 1; transform: translateY(2px); }
+.bl-body { position: absolute; top: calc(8vh + 44px); left: 6vw; right: 6vw; bottom: 8vh; }
+.bl-panel { position: absolute; inset: 0; border-radius: 0 16px 16px 16px; padding: 3vh 3vw; box-shadow: 0 20px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.35); }
+.bl-panel.g { background: linear-gradient(170deg, #79bf3d 0%, #3d7a14 45%, #1f4a08 100%); }
+.bl-panel.a { background: linear-gradient(170deg, #5aa9e2 0%, #2a6aa6 45%, #133a63 100%); }
+.bl-panel.m { background: linear-gradient(170deg, #9c82d8 0%, #5b3f9c 45%, #2d1d55 100%); }
+.bl-panel.s { background: linear-gradient(170deg, #c3c8cf 0%, #707780 45%, #383d44 100%); }
+.bl-panel.in-r { animation: blIn .32s cubic-bezier(.2,.8,.2,1); }
+.bl-panel.in-l { animation: blIn2 .32s cubic-bezier(.2,.8,.2,1); }
+@keyframes blIn { from { transform: translateX(8%) rotateY(-6deg); opacity: .4; } }
+@keyframes blIn2 { from { transform: translateX(-8%) rotateY(6deg); opacity: .4; } }
+.bl-title { font-size: 56px; font-weight: 300; letter-spacing: -.02em; opacity: .9; margin-bottom: 2vh; text-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.bl-split { display: grid; grid-template-columns: minmax(240px, 34%) 1fr; gap: 3vw; height: calc(100% - 90px); }
+.bl-menu { overflow-y: auto; scrollbar-width: none; }
+.bl-item { padding: 10px 16px; font-size: 19px; border-radius: 6px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.bl-item.on { background: rgba(255,255,255,.92); color: #1d3a0c; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.bl-panel.a .bl-item.on { color: #0f2e52; }
+.bl-panel.m .bl-item.on { color: #2d1d55; }
+.bl-panel.s .bl-item.on { color: #2b2f35; }
+.bl-right { display: flex; flex-direction: column; gap: 14px; }
+.bl-pic { position: relative; width: 100%; max-width: 640px; aspect-ratio: 16/9; border-radius: 8px; background: rgba(0,0,0,.25); box-shadow: 0 0 0 4px rgba(255,255,255,.85), 0 16px 40px rgba(0,0,0,.4); overflow: hidden; }
+.bl-ic { position: absolute; inset: 0; display: grid; place-items: center; }
+.bl-ic svg { width: 26%; height: 40%; }
+.bl-desc { font-size: 16px; opacity: .9; }
+
+/* ---------- Nintendo Switch (Basic Black) ---------- */
+.sw { position: absolute; inset: 0; background: #2d2d2d; color: #fff; font-family: 'GS Switch', sans-serif; }
+.sw-top { position: absolute; top: 4vh; left: 4.5vw; right: 4.5vw; display: flex; justify-content: space-between; align-items: center; }
+.sw-user { width: 56px; height: 56px; border-radius: 50%; background: #e60012; display: grid; place-items: center; box-shadow: 0 0 0 3px #2d2d2d, 0 0 0 5px rgba(255,255,255,.25); }
+.sw-user svg { width: 30px; height: 30px; }
+.sw-status { display: flex; align-items: center; gap: 16px; font-size: 22px; }
+.sw-wifi svg { width: 22px; height: 22px; }
+.sw-batt { width: 34px; height: 16px; border: 2px solid #fff; border-radius: 4px; position: relative; }
+.sw-batt::after { content: ''; position: absolute; right: -5px; top: 3px; width: 3px; height: 6px; background: #fff; border-radius: 1px; }
+.sw-batt i { position: absolute; inset: 2px; right: 30%; background: #fff; border-radius: 1px; }
+.sw-rowwrap { position: absolute; left: 4.5vw; right: 0; top: max(22vh, 122px); }
+.sw-name { position: absolute; top: -40px; font-size: 22px; color: #4fd2ee; white-space: nowrap; transition: left .2s; }
+.sw-row { overflow: visible; height: 22vw; }
+.sw-track { display: flex; gap: 14px; transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+.sw-tile { position: relative; flex: none; width: 21vw; height: 21vw; border-radius: 2px; background: #3c3c3c; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.sw-tile .cart { border-radius: 2px; }
+.sw-tile.focus { box-shadow: 0 0 0 3px #2d2d2d, 0 0 0 8px #71dbec; animation: swpulse 1.2s ease-in-out infinite; }
+@keyframes swpulse { 50% { box-shadow: 0 0 0 3px #2d2d2d, 0 0 0 8px #b4f5fc; } }
+.sw-tile.lib { display: grid; place-content: center; justify-items: center; gap: 12px; background: #3c3c3c; }
+.sw-lib svg { width: 64px; height: 64px; }
+.sw-libt { font-size: 20px; }
+.sw-badge { position: absolute; left: 10px; bottom: 10px; padding: 3px 10px; border-radius: 99px; font-size: 13px; background: rgba(0,0,0,.6); }
+.sw-btnwrap { position: absolute; left: 0; right: 0; top: calc(22vh + 21vw + 5vh); text-align: center; }
+.sw-btns { display: inline-flex; gap: 2.4vw; }
+.sw-btn { width: 4.4vw; height: 4.4vw; min-width: 58px; min-height: 58px; border-radius: 50%; background: #464646; display: grid; place-items: center; transition: transform .14s, box-shadow .14s; }
+.sw-btn svg { width: 48%; height: 48%; }
+/* each button keeps its own color (like the Switch's own round buttons), whatever is shown */
+.sw-btn.c-lib svg { color: #ff4554; } .sw-btn.c-add svg { color: #ff8a00; } .sw-btn.c-saved svg { color: #0ab9e6; } .sw-btn.c-shots svg { color: #46c94a; } .sw-btn.c-settings svg { color: #c7c7c7; } .sw-btn.c-power svg { color: #c7c7c7; }
+.sw-btn.focus { box-shadow: 0 0 0 3px #2d2d2d, 0 0 0 7px #71dbec; animation: swpulse2 1.2s ease-in-out infinite; }
+@keyframes swpulse2 { 50% { box-shadow: 0 0 0 3px #2d2d2d, 0 0 0 7px #b4f5fc; } }
+.sw-blabel { margin-top: 18px; font-size: 18px; color: #4fd2ee; min-height: 24px; }
+.sw-bottom { position: absolute; left: 4.5vw; right: 4.5vw; bottom: 0; height: 9vh; border-top: 1px solid rgba(255,255,255,.35); display: flex; justify-content: space-between; align-items: center; }
+.sw-ctl { display: inline-flex; gap: 3px; }
+.sw-ctl i { width: 12px; height: 24px; border-radius: 6px 0 0 6px; background: #0ab9e6; }
+.sw-ctl i + i { border-radius: 0 6px 6px 0; background: #ff4554; }
+.sw-hint { font-size: 18px; }
+.sw-hint b { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #fff; color: #2d2d2d; font-size: 14px; margin-right: 6px; }
+
+/* ---------- Wii ---------- */
+.wii { position: absolute; inset: 0; background: #fff repeating-linear-gradient(0deg, #f4f4f4 0 2px, #fff 2px 4px); color: #4b4b4b; font-family: 'GS Round', sans-serif; cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='48' viewBox='0 0 40 48'><path d='M12 3c2.4 0 4 1.7 4 4v12l2-.6c1.5-.4 3 .3 3.6 1.6 1.4-.8 3.3-.4 4.1 1 1.6-.7 3.5.1 4.1 1.8l2.7 8.4c1.6 5-1 10.2-6 11.6l-6.3 1.8c-4.2 1.2-8.7-.6-10.9-4.4L3.6 30.5c-.9-1.6-.3-3.6 1.4-4.4 1.4-.7 3-.3 4 .8L8 7c0-2.3 1.6-4 4-4z' fill='white' stroke='%2334beed' stroke-width='2.4' stroke-linejoin='round'/><text x='19' y='38' font-family='Arial' font-weight='bold' font-size='11' fill='%2334beed'>1</text></svg>") 12 3, default; }
+.wii-page { position: absolute; left: 7vw; right: 7vw; top: 6vh; bottom: 24vh; }
+.wii-grid { width: 100%; height: 100%; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 1fr); gap: 2.2vh 1.6vw; }
+.wii-grid.slide-r { animation: wiiR .35s cubic-bezier(.2,.8,.2,1); }
+.wii-grid.slide-l { animation: wiiL .35s cubic-bezier(.2,.8,.2,1); }
+@keyframes wiiR { from { transform: translateX(30%); opacity: .2; } }
+@keyframes wiiL { from { transform: translateX(-30%); opacity: .2; } }
+.wii-ch { position: relative; border-radius: 22px; background: #fff; box-shadow: inset 0 0 0 4px #d6d6d6, 0 2px 6px rgba(0,0,0,.08); overflow: hidden; transition: transform .14s, box-shadow .14s; }
+.wii-ch .cart { inset: 6px; border-radius: 16px; }
+.wii-ch.empty { background: repeating-linear-gradient(90deg, #f6f6f6 0 3px, #efefef 3px 6px); box-shadow: inset 0 0 0 4px #e3e3e3; }
+.wii-ch.focus { transform: scale(1.06); box-shadow: inset 0 0 0 4px #34beed, 0 0 22px rgba(52,190,237,.55); z-index: 2; }
+.wii-ch.disc { background: linear-gradient(180deg, #fafafa, #e9e9e9); }
+.wii-discart { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; }
+.wii-disc { width: 5.4vw; height: 5.4vw; border-radius: 50%; background: radial-gradient(circle, #fff 0 14%, #cfd6dc 15% 18%, #e9eef2 19% 60%, #b9c4cd 61% 100%); box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+.wii-dlabel { font-size: 15px; color: #6b6b6b; }
+.wii-arrow { position: absolute; top: 38vh; width: 4.5vw; height: 8vh; color: #34beed; display: grid; place-items: center; }
+.wii-arrow svg { width: 80%; height: 80%; stroke-width: 3; }
+.wii-arrow.l { left: 1.2vw; }
+.wii-arrow.r { right: 1.2vw; transform: scaleX(-1); }
+.wii-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 22vh; color: #d3d6d9; }
+.wii-curve { position: absolute; inset: 0; }
+.wii-curve svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 -2px 6px rgba(0,0,0,.08)); }
+.wii-time { position: absolute; left: 50%; top: 4.5vh; transform: translateX(-50%); text-align: center; }
+.wii-clock { font-size: 8vh; line-height: 1; color: #9a9ea3; letter-spacing: .04em; font-weight: 500; }
+.wii-date { font-size: 2.6vh; color: #8b8f93; margin-top: 1vh; }
+.wii-round { position: absolute; bottom: 4vh; width: 11vh; height: 11vh; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, #e8eaec); box-shadow: 0 0 0 5px #fff, 0 0 0 7px #cfd3d6, 0 4px 12px rgba(0,0,0,.12); color: #9a9ea3; display: grid; place-items: center; font-size: 3.6vh; font-weight: 700; transition: transform .14s, box-shadow .14s; }
+.wii-round svg { width: 42%; height: 42%; }
+.wii-b { left: 6vw; }
+.wii-m { right: 6vw; }
+.wii-round.focus { transform: scale(1.08); box-shadow: 0 0 0 5px #fff, 0 0 0 8px #34beed, 0 0 22px rgba(52,190,237,.5); color: #34beed; }
+.wii-preview { position: absolute; inset: 0; background: #fff; display: grid; grid-template-rows: 1fr auto auto; justify-items: center; padding: 6vh 8vw 7vh; animation: wiiOpen .32s cubic-bezier(.2,.8,.2,1); z-index: 5; }
+@keyframes wiiOpen { from { transform: scale(.4); opacity: 0; } }
+.wii-pv-art { position: relative; width: min(100%, 110vh); aspect-ratio: 16/9; align-self: center; background: #eee center / cover no-repeat; border-radius: 26px; box-shadow: 0 0 0 6px #d6d6d6; overflow: hidden; }
+.wii-pv-name { margin-top: 3vh; font-size: 30px; color: #555; text-align: center; }
+.wii-pv-name small { display: block; font-size: 16px; color: #999; margin-top: 4px; }
+.wii-pv-btns { display: flex; gap: 6vw; margin-top: 4vh; }
+.wii-pbtn { min-width: 22vw; height: 9vh; border-radius: 99px; background: linear-gradient(#fff, #eef0f2); box-shadow: 0 0 0 4px #cfd3d6, 0 4px 10px rgba(0,0,0,.1); font-size: 3.4vh; color: #34a8d8; font-weight: 700; transition: transform .14s, box-shadow .14s; }
+.wii-pbtn.focus, .wii-pbtn:hover { transform: scale(1.05); box-shadow: 0 0 0 4px #34beed, 0 0 22px rgba(52,190,237,.5); }
+
+/* ---------- 3DS / DS ---------- */
+.ds { position: absolute; inset: 0; background: linear-gradient(#e9ecef, #cfd5db); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; font-family: 'GS Round', sans-serif; color: #333; }
+.ds-screen { position: relative; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 10px #2a2d33, 0 0 0 12px #44484f, 0 18px 40px rgba(0,0,0,.35); }
+.ds-screen.top { width: min(64vw, 72vh); aspect-ratio: 5 / 3; }
+.ds-screen.bottom { width: min(50vw, 56vh); aspect-ratio: 4 / 3; background: linear-gradient(#f7f8f9, #e6e9ec); }
+.ds-hinge { width: min(66vw, 76vh); height: 4.5vh; }
+.ds-topbar { position: absolute; top: 0; left: 0; right: 0; height: 28px; display: flex; justify-content: space-between; align-items: center; padding: 0 12px; font-size: 13px; color: #fff; background: rgba(0,0,0,.35); z-index: 2; }
+.ds-topart { position: absolute; inset: 0; background: #222 center / cover no-repeat; display: grid; place-items: center; }
+.ds-sysbig svg { width: 90px; height: 90px; color: #fff; }
+.ds-screen.top:has(.ds-sysbig) .ds-topart { background: linear-gradient(160deg, #6fc3ff, #2f7fd6); }
+.ds-banner { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px; background: rgba(255,255,255,.92); border-top: 3px solid #f2c200; }
+.ds-bn { font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-bs { font-size: 13px; color: #777; margin-top: 2px; }
+.ds-tools { display: flex; justify-content: center; gap: 10px; padding: 8px; background: rgba(0,0,0,.06); }
+.ds-tool { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; color: #555; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.ds-tool svg { width: 20px; height: 20px; }
+.ds-tool.focus { box-shadow: 0 0 0 3px #f2c200; color: #000; }
+.ds-grid { position: absolute; top: 50px; left: 0; right: 0; bottom: 0; padding: 10px 12px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; align-content: start; overflow-y: auto; scrollbar-width: none; }
+.ds-icon { position: relative; aspect-ratio: 1; border-radius: 8px; background: #ddd center / cover no-repeat; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+.ds-icon .cnoart { font-size: 9px; padding: 3px; }
+.ds-icon.lib { display: grid; place-items: center; background: #fff; color: #555; }
+.ds-icon.lib svg { width: 50%; height: 50%; }
+.ds-icon.focus { box-shadow: 0 0 0 3px #f2c200, 0 0 12px rgba(242,194,0,.6); transform: scale(1.06); }
+
+/* ---------- Steam Big Picture ---------- */
+.st { position: absolute; inset: 0; background: linear-gradient(180deg, #1b2838 0%, #0e141b 100%); color: #dcdedf; font-family: 'Inter', sans-serif; }
+.st-top { position: absolute; top: 0; left: 0; right: 0; height: 8vh; padding: 0 3vw; display: flex; justify-content: space-between; align-items: center; z-index: 3; }
+.st-nav { display: flex; gap: 28px; font-size: 18px; font-weight: 600; color: #8f98a0; }
+.st-nav span { cursor: default; }
+.st-nav span.on { color: #fff; }
+.st-right { display: flex; align-items: center; gap: 16px; }
+.st-tools { display: flex; gap: 8px; }
+.st-tool { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #c7d5e0; background: rgba(255,255,255,.06); }
+.st-tool svg { width: 20px; height: 20px; }
+.st-tool.focus, .st-tool:hover { background: #fff; color: #1b2838; }
+.st-clock { font-size: 18px; font-weight: 600; color: #fff; }
+.st-hero { position: absolute; top: 8vh; left: 0; right: 0; height: 52vh; overflow: hidden; }
+.st-heroart { position: absolute; inset: 0; background: #0e141b center / cover no-repeat; mask-image: linear-gradient(0deg, transparent 0%, #000 45%); }
+.st-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(14,20,27,.92) 0%, rgba(14,20,27,.4) 45%, transparent 75%); }
+.st-herobox { position: absolute; left: 3vw; bottom: 4vh; z-index: 2; }
+.st-name { font-size: 46px; font-weight: 800; color: #fff; letter-spacing: -.01em; text-shadow: 0 2px 16px rgba(0,0,0,.5); max-width: 60vw; }
+.st-actions { display: flex; align-items: center; gap: 22px; margin-top: 18px; }
+.st-play { height: 52px; padding: 0 34px; border-radius: 4px; background: linear-gradient(90deg, #75b022, #588a1b); color: #fff; font-size: 19px; font-weight: 800; display: inline-flex; align-items: center; gap: 12px; letter-spacing: .04em; text-transform: uppercase; box-shadow: 0 6px 22px rgba(0,0,0,.4); }
+.st-play svg { width: 20px; height: 20px; }
+.st-play:hover { filter: brightness(1.12); }
+.st-stats { font-size: 15px; color: #acb2b8; }
+.st-rowtitle { position: absolute; left: 3vw; top: calc(60vh + 2vh); font-size: 16px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: .08em; }
+.st-row { position: absolute; left: 0; right: 0; top: calc(60vh + 6vh); bottom: 2vh; overflow-x: auto; overflow-y: hidden; padding: 6px 3vw; scrollbar-width: none; }
+.st-track { display: flex; gap: 14px; height: 100%; align-items: flex-start; }
+.st-cap { position: relative; flex: none; width: 15vw; aspect-ratio: 2/3; max-height: 100%; border-radius: 4px; overflow: hidden; background: #2a3f5a; box-shadow: 0 6px 18px rgba(0,0,0,.45); transition: transform .14s, box-shadow .14s; }
+.st-cap .cart { border-radius: 4px; }
+.st-cap.lib { display: grid; place-content: center; justify-items: center; gap: 10px; font-weight: 700; color: #c7d5e0; }
+.st-cap.lib svg { width: 46px; height: 46px; }
+.st-cap.picked { box-shadow: 0 0 0 2px rgba(255,255,255,.4), 0 10px 26px rgba(0,0,0,.5); }
+.st-cap.focus { transform: scale(1.05); box-shadow: 0 0 0 3px #fff, 0 12px 30px rgba(0,0,0,.6); }
+
+/* ---------- Dreamcast ---------- */
+.dc { position: absolute; inset: 0; background: radial-gradient(90% 80% at 50% 40%, #1d4fa6 0%, #0b2a66 55%, #061633 100%); color: #fff; font-family: 'GS DC', sans-serif; overflow: hidden; }
+.dc-swirl { position: absolute; left: 50%; top: 44%; width: 70vh; height: 70vh; transform: translate(-50%, -50%); border-radius: 50%; background: conic-gradient(from 0deg, rgba(255,120,20,.0), rgba(255,120,20,.35), rgba(255,120,20,0) 40%); -webkit-mask: radial-gradient(circle, transparent 38%, #000 39% 46%, transparent 47%); mask: radial-gradient(circle, transparent 38%, #000 39% 46%, transparent 47%); animation: dcspin 14s linear infinite; opacity: .8; }
+@keyframes dcspin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.dc-menu { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); display: grid; grid-template-columns: 1fr 1fr; gap: 4vh 4vw; }
+.dc-opt { width: 26vw; height: 18vh; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,.95), rgba(220,228,240,.92)); color: #1b3f86; display: flex; align-items: center; gap: 2vw; padding: 0 2.4vw; font-size: 34px; font-weight: 700; font-style: italic; box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .14s, box-shadow .14s; }
+.dc-oic { width: 9vh; height: 9vh; border-radius: 50%; background: #1b3f86; color: #fff; display: grid; place-items: center; flex: none; }
+.dc-oic svg { width: 50%; height: 50%; }
+.dc-opt.focus { transform: scale(1.06); box-shadow: 0 0 0 5px #ff8a1e, 0 0 34px rgba(255,138,30,.7); }
+.dc-opt.focus .dc-oic { background: #ff8a1e; }
+.dc-foot { position: absolute; left: 0; right: 0; bottom: 4vh; display: flex; justify-content: center; gap: 4vw; font-size: 22px; font-weight: 500; color: #cfe0ff; letter-spacing: .06em; }
+.dc-games { position: absolute; inset: 6vh 6vw 12vh; }
+.dc-gtitle { padding: 14px 22px; border-radius: 10px; background: linear-gradient(90deg, #ff8a1e, #f05a00); font-size: 28px; font-weight: 700; font-style: italic; }
+.dc-gtitle small { display: block; font-size: 14px; font-weight: 500; font-style: normal; opacity: .9; margin-top: 2px; }
+.dc-grid { margin-top: 3vh; display: grid; grid-template-columns: repeat(auto-fill, minmax(12vw, 1fr)); gap: 2.4vh 1.6vw; max-height: calc(100% - 140px); overflow-y: auto; scrollbar-width: none; padding: 8px; }
+.dc-cell { position: relative; aspect-ratio: 1; border-radius: 12px; background: rgba(255,255,255,.12); box-shadow: 0 6px 16px rgba(0,0,0,.35); transition: transform .14s, box-shadow .14s; overflow: hidden; }
+.dc-cell .cart { border-radius: 12px; }
+.dc-cell.lib { display: grid; place-items: center; }
+.dc-cell.lib svg { width: 36%; height: 36%; }
+.dc-cell.focus { transform: scale(1.06); box-shadow: 0 0 0 4px #ff8a1e, 0 0 26px rgba(255,138,30,.6); }
+.dc-back { position: absolute; left: 0; bottom: -7vh; display: inline-flex; align-items: center; gap: 8px; font-size: 18px; color: #cfe0ff; }
+.dc-back svg { width: 18px; height: 18px; }
+
+/* ===== Boot screens for the console styles ===== */
+.cboot { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; animation: cbIn .9s .25s ease forwards; }
+@keyframes cbIn { to { opacity: 1; } }
+.cboot .w { font-family: var(--font), sans-serif; text-align: center; }
+.cboot.ps .w { font-family: 'GS PS', sans-serif; font-weight: 300; font-size: 64px; letter-spacing: .16em; color: #fff; text-shadow: 0 0 40px rgba(130,170,255,.6); }
+.cboot.ps4 { background: radial-gradient(60% 50% at 50% 55%, #0d5bbd, #031a3d 70%, #000); }
+.cboot.ps3 .w, .cboot.psp .w { font-family: 'GS XMB', sans-serif; font-weight: 300; letter-spacing: .3em; font-size: 44px; color: #fff; }
+.cboot.ps2 { background: radial-gradient(70% 60% at 50% 80%, #0b3a8a, #000 70%); }
+.cboot.ps2 .w { font-family: 'GS XMB', sans-serif; font-weight: 300; letter-spacing: .4em; font-size: 40px; color: #b8d0ff; text-shadow: 0 0 30px rgba(80,140,255,.9); }
+.cboot.xb { background: radial-gradient(40% 40% at 50% 50%, rgba(16,180,16,.55), #000 70%); }
+.cboot.xb .w { font-family: 'Segoe UI', sans-serif; font-weight: 800; font-size: 72px; letter-spacing: .14em; color: #fff; }
+.cboot.sw { background: #e60012; animation: cbIn .2s ease forwards; }
+.cboot.sw .w { display: flex; align-items: center; gap: 16px; color: #fff; font-family: 'GS Switch', sans-serif; font-weight: 700; font-size: 50px; }
+.cboot.sw .jc { display: inline-flex; gap: 6px; }
+.cboot.sw .jc i { width: 34px; height: 64px; border: 6px solid #fff; border-radius: 22px 0 0 22px; animation: jcl .5s .2s cubic-bezier(.2,.8,.2,1) both; }
+.cboot.sw .jc i + i { border-radius: 0 22px 22px 0; background: #fff; animation-name: jcr; }
+@keyframes jcl { from { transform: translateY(-60px); } }
+@keyframes jcr { from { transform: translateY(60px); } }
+.cboot.wii { background: #fff; }
+.cboot.wii .w { font-family: 'GS Round', sans-serif; font-weight: 700; font-size: 110px; color: #9a9ea3; letter-spacing: -.02em; }
+.cboot.ds { background: #fff; }
+.cboot.ds .w { font-family: 'GS Round', sans-serif; font-weight: 700; font-size: 54px; color: #555; }
+.cboot.st { background: radial-gradient(60% 60% at 50% 50%, #1b4f8a, #0b1724 70%); }
+.cboot.st .w { font-family: 'Inter', sans-serif; font-weight: 800; letter-spacing: .3em; font-size: 54px; color: #fff; }
+.cboot.dc { background: #fff; }
+.cboot.dc .w { font-family: 'GS DC', sans-serif; font-style: italic; font-weight: 700; font-size: 70px; color: #1b3f86; display: flex; align-items: center; gap: 18px; }
+.cboot.dc .sw2 { width: 80px; height: 80px; border-radius: 50%; border: 10px solid #ff6a00; border-right-color: transparent; animation: dcspin2 1.2s linear infinite; }
+@keyframes dcspin2 { to { transform: rotate(360deg); } }
+.reduce-motion .ps2-cell, .reduce-motion .ps2-tower, .reduce-motion .dc-swirl, .reduce-motion .sw-tile.focus, .reduce-motion .sw-btn.focus { animation: none !important; }
+.st-cname { position: absolute; left: 0; right: 0; bottom: 0; padding: 40% 8px 10px; text-align: center; font-size: 1.35vw; line-height: 1.05; color: #fff; letter-spacing: .02em; background: linear-gradient(transparent, rgba(0,0,0,.7)); text-shadow: 0 2px 8px rgba(0,0,0,.8); overflow-wrap: anywhere; border-radius: inherit; }
+
+/* the consoles' own home backgrounds (shown when you're not on a game, or always: Settings > Background) */
+body[data-style="ps5"] .bg.plain .bg-shade { background:
+  radial-gradient(60% 55% at 80% 12%, rgba(52, 104, 214, .42), transparent 68%),
+  radial-gradient(55% 45% at 12% 100%, rgba(22, 58, 150, .38), transparent 72%),
+  radial-gradient(40% 30% at 55% 55%, rgba(80, 130, 255, .10), transparent 70%),
+  linear-gradient(162deg, #0c1836 0%, #060b1c 55%, #020309 100%); }
+body[data-style="xbox"] .bg.plain .bg-shade, body[data-style="xboxone"] .bg.plain .bg-shade { background:
+  radial-gradient(70% 60% at 88% 6%, rgba(16, 124, 16, .30), transparent 62%),
+  radial-gradient(50% 45% at 6% 96%, rgba(16, 124, 16, .14), transparent 70%),
+  linear-gradient(180deg, #202325 0%, #141617 55%, #0b0c0d 100%); }

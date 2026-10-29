@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Game System 3</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'">
+<meta name="viewport" content="width=1100, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="img/icon-192.png">
+<link rel="apple-touch-icon" href="img/icon-192.png">
+<style>
+  /* boot screen first, before anything else loads, so the window is never blank */
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #boot { position: fixed; inset: 0; z-index: 100; background: #000; display: grid; place-items: center; cursor: none; }
+  #boot.gone { opacity: 0; transition: opacity .6s ease; pointer-events: none; }
+</style>
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/skin-ps5.css">
+<link rel="stylesheet" href="css/skin-xbox.css">
+<link rel="stylesheet" href="css/skin-switch.css">
+<link rel="stylesheet" href="css/skin-ps4.css">
+<link rel="stylesheet" href="phone/phone.css">
+</head>
+<body>
+<div id="boot" aria-label="Game System 3 is starting">
+  <div class="boot-sweep"></div>
+  <div class="boot-mark">
+    <div class="boot-word"><span>GAME</span><span>SYSTEM</span></div>
+    <div class="boot-three">3</div>
+  </div>
+</div>
+
+<div id="app" class="app" hidden>
+  <div id="bg" class="bg"><div class="bg-art"></div><div class="bg-art next"></div><div class="bg-shade"></div><div class="bg-holiday"><i></i><i></i><i></i></div></div>
+
+  <header class="topbar">
+    <nav class="tabs" id="tabs"></nav>
+    <div class="holiday-chip" id="holiday" hidden></div>
+    <div class="top-right">
+      <button class="icon-btn" id="btn-add" data-nav="top" title="Add games"></button>
+      <button class="icon-btn" id="btn-search" data-nav="top" title="Search"></button>
+      <button class="icon-btn" id="btn-settings" data-nav="top" title="Settings"></button>
+      <button class="icon-btn" id="btn-power" data-nav="top" title="Power: quit, rest, restart"></button>
+      <button class="avatar" id="avatar" title="Power: quit, rest, restart"></button>
+      <div class="clock" id="clock"></div>
+    </div>
+  </header>
+
+  <main id="screens">
+    <section class="screen" id="home"></section>
+    <section class="screen" id="library" hidden></section>
+    <section class="screen" id="saved" hidden></section>
+    <section class="screen" id="settings" hidden></section>
+  </main>
+
+  <div class="hints" id="hints"></div>
+  <div id="launch" class="launch" hidden></div>
+  <div id="dropzone" class="dropzone" hidden><div class="dz-card"><div class="dz-icon"></div><div class="dz-title">Drop to add</div><div class="dz-sub">.html files, .zip files or game folders</div></div></div>
+  <div id="modals"></div>
+  <div id="toasts" class="toasts"></div>
+</div>
+<div class="rotate"><i></i>Turn your phone sideways</div>
+<script src="phone/gs.js"></script>
+<script src="phone/receive.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

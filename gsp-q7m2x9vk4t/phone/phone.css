@@ -1,0 +1,10 @@
+/* Game System 3 on the phone: same looks, laid out sideways like a handheld; the PC-only buttons are gone */
+body.phone #btn-add, body.phone #btn-power, body.phone .hints, body.phone #dropzone { display: none !important; }
+body.phone { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+/* held upright: ask to turn it (the consoles' screens are wide) */
+.rotate { display: none; }
+@media (orientation: portrait) {
+  .rotate { position: fixed; inset: 0; z-index: 99998; display: grid; place-content: center; justify-items: center; gap: 40px; background: #06070a; color: #fff; font: 600 72px/1.2 system-ui, sans-serif; text-align: center; padding: 60px; }
+  .rotate i { display: block; width: 180px; height: 300px; border: 12px solid #fff; border-radius: 36px; animation: turn 2.4s ease-in-out infinite; }
+  @keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+}
