@@ -1,0 +1,193 @@
+/* ===== PS4 look for EVERY screen (body[data-skin="ps4"]): Library, Settings, Saved Data, pop-ups, notifications
+   (top left, like a PS4), game page, power, and the quick menu over games (= the PS4 Quick Menu on the left).
+   PS4 rules (colors picked off Sony's PS4 manual screenshots): the blue theme behind everything, dark navy see-through
+   panels, thin lines between rows, the highlighted thing gets a white outline, check boxes, SST-style light type. ===== */
+body[data-skin="ps4"] {
+  --font: 'GS PS';
+  --p4-panel: rgba(10, 30, 91, .82); --p4-panel-2: rgba(19, 39, 98, .9); --p4-line: rgba(160, 190, 255, .18);
+  --p4-frame: 0 0 0 2px #fff, 0 0 14px rgba(170, 210, 255, .55);
+  --text: #fff; --text-2: rgba(255,255,255,.75); --text-3: rgba(255,255,255,.5);
+  --glow: rgba(170, 210, 255, .55);
+  --side: 5vw;
+}
+/* the PS4 blue theme behind Library, Settings and Saved Data */
+body[data-skin="ps4"]:not([data-screen="home"]) .bg-shade, body[data-skin="ps4"] .bg.plain .bg-shade { background:
+  radial-gradient(90% 60% at 30% 25%, rgba(70, 110, 200, .55), transparent 70%),
+  radial-gradient(120% 40% at 60% 105%, rgba(120, 170, 255, .28), transparent 70%),
+  linear-gradient(160deg, #1b3d9f 0%, #2149ab 45%, #0b2480 100%); }
+body[data-skin="ps4"]:not([data-screen="home"]) .bg-art { opacity: 0 !important; }
+body[data-skin="ps4"]:not([data-screen="home"]) .bg-holiday { opacity: .5; }
+
+/* ---------- top: the page name in light type, clock on the right ---------- */
+body[data-skin="ps4"] .topbar { height: 90px; }
+body[data-skin="ps4"]:not(.console-home) #screens { top: 90px; }
+body[data-skin="ps4"] .tab { font-size: calc(30px * var(--fs)); font-weight: 300; color: #fff; padding: 4px 10px; margin-left: -10px; }
+body[data-skin="ps4"] .tab.on::after { display: none; }
+body[data-skin="ps4"] .tab span span:first-child { display: none !important; }
+body[data-skin="ps4"] .tab.focus { box-shadow: var(--p4-frame); background: rgba(255,255,255,.1); }
+body[data-skin="ps4"] .top-right { gap: 10px; }
+body[data-skin="ps4"] .icon-btn { width: 46px; height: 46px; color: #fff; border-radius: 50%; background: rgba(255,255,255,.08); }
+body[data-skin="ps4"] .icon-btn svg { width: 22px; height: 22px; stroke-width: 1.5; }
+body[data-skin="ps4"] .icon-btn:hover { background: rgba(255,255,255,.18); }
+body[data-skin="ps4"] .icon-btn.focus { background: rgba(255,255,255,.92); color: #0a3a7a; box-shadow: 0 0 22px rgba(160,210,255,.6); transform: scale(1.08); }
+body[data-skin="ps4"] .avatar { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 3px; color: #fff; background: linear-gradient(160deg, #4f86e8, #1b3d9f); box-shadow: 0 0 0 1px rgba(255,255,255,.3); }
+body[data-skin="ps4"] .avatar svg { width: 22px; height: 22px; stroke-width: 1.6; }
+body[data-skin="ps4"] .clock { font-size: calc(22px * var(--fs)); font-weight: 300; min-width: 0; margin-left: 8px; }
+body[data-skin="ps4"] .holiday-chip { top: 30px; border-radius: 2px; font-weight: 400; letter-spacing: 0; }
+
+body[data-skin="ps4"] .hints { gap: 24px; bottom: 24px; font-size: calc(15px * var(--fs)); color: #fff; }
+body[data-skin="ps4"] .key { border-radius: 3px; background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
+body[data-skin="ps4"] .key.pad { border-radius: 50%; background: rgba(0,0,0,.35); }
+
+/* ---------- Library: a grid of square tiles, name under each, white outline on the picked one ---------- */
+body[data-skin="ps4"] .lib-head h2 { display: none; }
+body[data-skin="ps4"] .lib-head .chips { gap: 2px; }
+body[data-skin="ps4"] .lib-head .chips .chip { height: 42px; padding: 0 16px; border-radius: 0; background: var(--p4-panel); font-size: calc(16px * var(--fs)); font-weight: 400; color: rgba(255,255,255,.8); box-shadow: none; }
+body[data-skin="ps4"] .lib-head .chips .chip.on { color: #fff; background: rgba(60, 100, 200, .7); }
+body[data-skin="ps4"] .lib-head .chips .chip.focus { box-shadow: var(--p4-frame); color: #fff; z-index: 1; }
+body[data-skin="ps4"] .lib-search, body[data-skin="ps4"] .search-box, body[data-skin="ps4"] .field { border-radius: 2px; background-color: var(--p4-panel); border: 1px solid rgba(255,255,255,.3); }
+body[data-skin="ps4"] .lib-search:focus, body[data-skin="ps4"] .search-box:focus, body[data-skin="ps4"] .field:focus,
+body[data-skin="ps4"] .lib-search.focus, body[data-skin="ps4"] .search-box.focus, body[data-skin="ps4"] .field.focus { border-color: #fff; box-shadow: 0 0 14px rgba(170,210,255,.5); }
+body[data-skin="ps4"] .chips .chip { border-radius: 2px; background: var(--p4-panel); color: #fff; font-weight: 400; }
+body[data-skin="ps4"] .chips .chip.on { background: rgba(255,255,255,.88); color: #0a2a6a; }
+body[data-skin="ps4"] .chips .chip.focus { box-shadow: var(--p4-frame); }
+body[data-skin="ps4"] .grid { gap: 26px 10px; grid-template-columns: repeat(auto-fill, minmax(clamp(120px, 9.5vw, 180px), 1fr)); }
+body[data-skin="ps4"] .gcell .art { border-radius: 2px; box-shadow: 0 6px 18px rgba(0,0,30,.4); }
+body[data-skin="ps4"] .gcell .name { font-size: calc(14px * var(--fs)); font-weight: 400; color: rgba(255,255,255,.85); }
+body[data-skin="ps4"] .gcell.sel .art { transform: scale(1.06); box-shadow: 0 0 0 3px #fff, 0 0 24px rgba(170,210,255,.7), 0 14px 34px rgba(0,0,30,.5); }
+body[data-skin="ps4"] .gcell.sel .name { color: #fff; }
+body[data-skin="ps4"] .gcell .badge, body[data-skin="ps4"] .gcell.folder .count { border-radius: 2px; }
+body[data-skin="ps4"] .gcell.folder .art { background: var(--p4-panel); }
+body[data-skin="ps4"] .section-title button { border-radius: 2px; background: var(--p4-panel); }
+body[data-skin="ps4"] .section-title button.focus { box-shadow: var(--p4-frame); color: #fff; }
+
+/* ---------- Settings + Saved Data: navy panels, rows with thin lines, icons on the left ---------- */
+body[data-skin="ps4"] .split { inset: 0 var(--side) 80px; grid-template-columns: minmax(270px, 24vw) 1fr; gap: 14px; }
+body[data-skin="ps4"] .side, body[data-skin="ps4"] .main-panel { background: var(--p4-panel); border-radius: 0; box-shadow: none; backdrop-filter: none; }
+body[data-skin="ps4"] .side { padding: 10px 10px; }
+body[data-skin="ps4"] .side h2 { display: none; }
+body[data-skin="ps4"] .side-item { min-height: 52px; padding: 8px 14px; border-radius: 0; gap: 16px; color: #fff; font-size: calc(18px * var(--fs)); font-weight: 300; }
+body[data-skin="ps4"] .side-item .t { font-weight: 300; }
+body[data-skin="ps4"] .side-item svg { width: 24px; height: 24px; stroke-width: 1.6; }
+body[data-skin="ps4"] .side-item.on { background: rgba(80, 120, 220, .35); }
+body[data-skin="ps4"] .side-item:hover { background: rgba(255,255,255,.08); }
+body[data-skin="ps4"] .side-item.focus { background: rgba(255,255,255,.12); color: #fff; box-shadow: var(--p4-frame); }
+body[data-skin="ps4"] .side-item .thumb { border-radius: 2px; }
+body[data-skin="ps4"] .main-panel { padding: 18px 24px 30px; }
+body[data-skin="ps4"] .main-panel h3 { font-size: calc(26px * var(--fs)); font-weight: 300; margin: 0 0 10px; }
+body[data-skin="ps4"] .set { position: relative; min-height: 64px; padding: 12px 16px; border-radius: 0; gap: 20px; box-shadow: inset 0 -1px 0 var(--p4-line); }
+body[data-skin="ps4"] .set + .set { margin-top: 0; }
+body[data-skin="ps4"] .set .t { font-weight: 300; font-size: calc(19px * var(--fs)); }
+body[data-skin="ps4"] .set .d { font-size: calc(14px * var(--fs)); color: rgba(255,255,255,.65); }
+body[data-skin="ps4"] .set:hover { background: rgba(255,255,255,.06); }
+body[data-skin="ps4"] .set.focus { background: rgba(255,255,255,.12); box-shadow: var(--p4-frame); }
+body[data-skin="ps4"] .set .where { text-transform: none; letter-spacing: 0; font-weight: 400; color: #9cc3ff; }
+/* PS4 uses check boxes */
+body[data-skin="ps4"] .switch { width: 26px; height: 26px; border-radius: 2px; background: rgba(0,0,0,.25); box-shadow: inset 0 0 0 2px #fff; }
+body[data-skin="ps4"] .switch::after { top: 4px; left: 9px; width: 6px; height: 12px; border-radius: 0; background: none; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); box-shadow: none; opacity: 0; }
+body[data-skin="ps4"] .switch.on { background: #1f71f5; }
+body[data-skin="ps4"] .switch.on::after { transform: rotate(45deg); opacity: 1; }
+body[data-skin="ps4"] .slider { height: 4px; border-radius: 0; background: rgba(255,255,255,.4); }
+body[data-skin="ps4"] .facts .fact, body[data-skin="ps4"] .gp-stat, body[data-skin="ps4"] .bp-drive { background: rgba(255,255,255,.06); border-radius: 0; }
+body[data-skin="ps4"] .fact .k, body[data-skin="ps4"] .gp-stat .l, body[data-skin="ps4"] .cgroup, body[data-skin="ps4"] .tm-cols { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: calc(14px * var(--fs)); color: rgba(255,255,255,.65); }
+body[data-skin="ps4"] .fact .v, body[data-skin="ps4"] .gp-stat .v { font-weight: 300; }
+body[data-skin="ps4"] .save-hero .pic { border-radius: 2px; }
+body[data-skin="ps4"] .list-row, body[data-skin="ps4"] .tm-row, body[data-skin="ps4"] .bp-file, body[data-skin="ps4"] .bo-row { background: none; border-radius: 0; box-shadow: inset 0 -1px 0 var(--p4-line); }
+body[data-skin="ps4"] .bp-file.focus, body[data-skin="ps4"] .bo-row.focus, body[data-skin="ps4"] .bp-file:hover, body[data-skin="ps4"] .bo-row:hover { background: rgba(255,255,255,.12); box-shadow: var(--p4-frame); }
+body[data-skin="ps4"] .bo-check { border-radius: 2px; }
+body[data-skin="ps4"] .bo-check.on { background: #1f71f5; }
+body[data-skin="ps4"] .bp-bar { border-radius: 0; }
+body[data-skin="ps4"] .bp-bar i, body[data-skin="ps4"] .progress i { background: #6fb0ff; border-radius: 0; }
+
+/* ---------- buttons: dark boxes with a thin light edge, white outline when highlighted ---------- */
+body[data-skin="ps4"] .btn { height: 44px; padding: 0 22px; border-radius: 2px; background: rgba(0, 15, 60, .55); box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); color: #fff; font-weight: 400; font-size: calc(16px * var(--fs)); }
+body[data-skin="ps4"] .btn:hover { background: rgba(255,255,255,.12); }
+body[data-skin="ps4"] .btn.primary, body[data-skin="ps4"] .btn.danger { background: rgba(120, 130, 150, .45); color: #fff; }
+body[data-skin="ps4"] .btn.focus { background: rgba(255,255,255,.18); box-shadow: var(--p4-frame); }
+body[data-skin="ps4"] .play-btn { border-radius: 2px; }
+body[data-skin="ps4"] .bo-mini, body[data-skin="ps4"] .toast .tbtn { border-radius: 2px; }
+
+/* ---------- pop-ups: a dark navy panel, light title, buttons in a row ---------- */
+body[data-skin="ps4"] .modal-wrap { background: rgba(0, 8, 40, .62); backdrop-filter: none; }
+body[data-skin="ps4"] .modal { background: rgba(12, 32, 92, .97); border-radius: 0; padding: 30px 36px 28px; box-shadow: 0 0 0 1px rgba(160,190,255,.2), 0 24px 70px rgba(0,0,20,.6); animation: p4pop .2s ease-out; }
+@keyframes p4pop { from { opacity: 0; transform: scale(.98); } }
+body[data-skin="ps4"] .modal h2 { font-size: calc(28px * var(--fs)); font-weight: 300; letter-spacing: 0; }
+body[data-skin="ps4"] .modal .lead { color: rgba(255,255,255,.82); font-size: calc(16px * var(--fs)); }
+body[data-skin="ps4"] .modal .actions { justify-content: center; gap: 14px; }
+body[data-skin="ps4"] .modal .actions .btn { min-width: 200px; justify-content: center; }
+body[data-skin="ps4"] .menu-list { gap: 0; }
+body[data-skin="ps4"] .menu-item { min-height: 54px; padding: 10px 16px; border-radius: 0; font-weight: 300; font-size: calc(18px * var(--fs)); gap: 16px; box-shadow: inset 0 -1px 0 var(--p4-line); }
+body[data-skin="ps4"] .menu-item svg { color: #fff; width: 24px; height: 24px; stroke-width: 1.6; }
+body[data-skin="ps4"] .menu-item:hover { background: rgba(255,255,255,.08); }
+body[data-skin="ps4"] .menu-item.focus { background: rgba(255,255,255,.12); color: #fff; box-shadow: var(--p4-frame); }
+body[data-skin="ps4"] .menu-item.focus svg { color: #fff; }
+body[data-skin="ps4"] .menu-item.focus .d { color: rgba(255,255,255,.65); }
+body[data-skin="ps4"] .menu-item.danger { color: #fff; }
+body[data-skin="ps4"] .menu-item.on { color: #9cc3ff; }
+body[data-skin="ps4"] .menu-item .d { color: rgba(255,255,255,.55); font-weight: 400; font-size: calc(14px * var(--fs)); }
+/* Power: the PS4 Quick Menu's power list, on the left */
+body[data-skin="ps4"] .modal-wrap.m-power { place-items: stretch start; }
+body[data-skin="ps4"] .m-power .modal { width: 440px; max-height: none; height: 100vh; padding: 46px 22px 22px; animation: p4side .2s ease-out; }
+@keyframes p4side { from { transform: translateX(-30px); opacity: 0; } }
+body[data-skin="ps4"] .m-power .menu-item .d { display: none; }
+body[data-skin="ps4"] .choice, body[data-skin="ps4"] .style-card, body[data-skin="ps4"] .style-card .style-pic, body[data-skin="ps4"] .big-opt { border-radius: 2px; }
+body[data-skin="ps4"] .choice.focus, body[data-skin="ps4"] .choice.on, body[data-skin="ps4"] .big-opt.focus, body[data-skin="ps4"] .style-card.focus, body[data-skin="ps4"] .cm-stage.focus, body[data-skin="ps4"] .gp-tag.focus { box-shadow: var(--p4-frame); }
+body[data-skin="ps4"] .big-opt { background: rgba(255,255,255,.06); }
+body[data-skin="ps4"] .big-opt svg { color: #fff; }
+body[data-skin="ps4"] .big-opt .t, body[data-skin="ps4"] .style-name { font-weight: 400; }
+
+/* ---------- notifications: top LEFT, like a PS4 ---------- */
+body[data-skin="ps4"] .toasts { top: 22px; left: 22px; right: auto; width: 420px; }
+body[data-skin="ps4"] .toast { border-radius: 0; padding: 12px 14px; background: rgba(10, 30, 91, .95); box-shadow: 0 0 0 1px rgba(160,190,255,.25), 0 10px 30px rgba(0,0,30,.5); backdrop-filter: none; animation: p4toast .3s ease-out; font-size: calc(15px * var(--fs)); }
+@keyframes p4toast { from { opacity: 0; transform: translateX(-30px); } }
+body[data-skin="ps4"] .toast.out { animation: p4toastout .25s ease forwards; }
+@keyframes p4toastout { to { opacity: 0; transform: translateX(-30px); } }
+body[data-skin="ps4"] .toast .ic { width: 44px; height: 44px; border-radius: 2px; background: rgba(255,255,255,.12); color: #fff !important; }
+body[data-skin="ps4"] .toast .tt { font-weight: 400; }
+body[data-skin="ps4"] .toast .ts { color: rgba(255,255,255,.75); }
+body[data-skin="ps4"] .toast .tbtn { background: rgba(255,255,255,.14); }
+
+/* ---------- game page: the PS4 content screen (navy panels on the game's art) ---------- */
+body[data-skin="ps4"] .modal.gp-box { padding: 0; border-radius: 0; background: rgba(10, 30, 91, .96); }
+body[data-skin="ps4"] .gp-hero::after { background: linear-gradient(transparent 30%, rgba(10, 30, 91, .96)); }
+body[data-skin="ps4"] .gp-cover { border-radius: 2px; }
+body[data-skin="ps4"] .gp-main h1 { font-weight: 300; }
+body[data-skin="ps4"] .gp-tag { border-radius: 2px; font-weight: 400; }
+
+body[data-skin="ps4"] .launch .lname { font-weight: 300; }
+body[data-skin="ps4"] .launch .lname small { text-transform: none; letter-spacing: 0; font-weight: 400; }
+body[data-skin="ps4"] .launch .zoom { border-radius: 2px; }
+body[data-skin="ps4"] .dz-card { border-radius: 0; border: 2px dashed rgba(255,255,255,.5); background: rgba(10,30,91,.9); }
+body[data-skin="ps4"] .dz-title { font-weight: 300; }
+
+/* ---------- quick menu over games = the PS4 Quick Menu (a list on the left, power list next to it) ---------- */
+body.ov[data-skin="ps4"] .qm-dim { background: rgba(0, 8, 40, .45); }
+body.ov[data-skin="ps4"] .qm-top { top: 0; left: 0; right: auto; width: 440px; height: 92px; padding: 0 30px; z-index: 2; }
+body.ov[data-skin="ps4"] .qm-title { font-size: 30px; font-weight: 300; color: #fff; }
+body.ov[data-skin="ps4"] .qm-title::before { content: 'Quick Menu'; }
+body.ov[data-skin="ps4"] .qm-title { font-size: 0; }
+body.ov[data-skin="ps4"] .qm-title::before { font-size: 30px; }
+body.ov[data-skin="ps4"] .qm-top .clock { font-size: 20px; font-weight: 300; }
+body.ov[data-skin="ps4"] .qm-panel { top: 0; bottom: 0; right: auto; width: 440px; padding: 96px 20px 22px; background: rgba(10, 30, 91, .95); box-shadow: 1px 0 0 rgba(160,190,255,.2); overflow: visible; animation: p4side .2s ease-out; }
+body.ov[data-skin="ps4"] .qm-cards { flex-direction: column; align-items: stretch; gap: 0; margin-bottom: 0; padding: 0; overflow: visible; }
+body.ov[data-skin="ps4"] .qcard { width: auto !important; height: 52px; border-radius: 0; background-color: transparent; background-size: 34px 34px; background-position: 14px center; box-shadow: none; }
+body.ov[data-skin="ps4"] .qcard::before { display: none; }
+body.ov[data-skin="ps4"] .qcard .ql { left: 64px; right: 14px; top: 50%; bottom: auto; transform: translateY(-50%); }
+body.ov[data-skin="ps4"] .qcard .qk { display: none; }
+body.ov[data-skin="ps4"] .qcard .qn { font-size: 18px; font-weight: 300; margin: 0; }
+body.ov[data-skin="ps4"] .qcard.small { display: block; }
+body.ov[data-skin="ps4"] .qcard.small > span { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); }
+body.ov[data-skin="ps4"] .qcard.small svg { width: 26px; height: 26px; color: #fff; }
+body.ov[data-skin="ps4"] .qcard.small .ql { text-align: left; }
+body.ov[data-skin="ps4"] .qcard.focus { transform: none; background-color: rgba(255,255,255,.12); box-shadow: var(--p4-frame); }
+body.ov[data-skin="ps4"] .qm-ctrls { flex-direction: column; flex-wrap: nowrap; gap: 0; margin-top: 10px; padding-top: 10px; box-shadow: 0 -1px 0 var(--p4-line); }
+body.ov[data-skin="ps4"] .qctrl { width: auto; height: 52px; border-radius: 0; background: none; box-shadow: none; flex-direction: row; justify-content: flex-start; gap: 20px; padding: 0 18px; font-size: 18px; font-weight: 300; color: #fff; }
+body.ov[data-skin="ps4"] .qctrl svg { width: 26px; height: 26px; color: #fff; stroke-width: 1.6; }
+body.ov[data-skin="ps4"] .qctrl.on { background: rgba(80, 120, 220, .35); }
+body.ov[data-skin="ps4"] .qctrl.focus { background: rgba(255,255,255,.12); color: #fff; transform: none; box-shadow: var(--p4-frame); }
+body.ov[data-skin="ps4"] .qctrl.focus svg, body.ov[data-skin="ps4"] .qctrl.danger svg, body.ov[data-skin="ps4"] .qctrl.danger.focus svg { color: #fff; }
+body.ov[data-skin="ps4"] .qm-sub { position: absolute; left: 440px; top: 96px; width: 360px; flex-direction: column; gap: 0; margin: 0 0 0 14px; padding: 10px; background: rgba(19, 39, 98, .96); box-shadow: 0 0 0 1px rgba(160,190,255,.2); }
+/* starting a game: the game's start picture fills the screen, PS4 loading circle bottom right */
+body[data-skin="ps4"] .launch .zoom.full { filter: brightness(.9); transform: none; }
+body[data-skin="ps4"] .launch .lname { display: none; }
+body[data-skin="ps4"] .launch .lspin { left: auto; right: 5vw; bottom: 7vh; margin: 0; width: 38px; height: 38px; border-width: 3px; border-color: rgba(255,255,255,.2); border-top-color: #fff; border-right-color: #fff; }
