@@ -151,7 +151,9 @@ class MainActivityTest {
 
     @Test
     fun startAsksForNotificationsOnceThenOpensCapturePrompt() {
-        compose.onNodeWithText("▶  Start sharing").performClick()
+        // English subtitles off: this is about the plain TV sharing questions.
+        compose.onAllNodes(isToggleable())[0].performScrollTo().performClick()
+        compose.onNodeWithText("▶  Start sharing").performScrollTo().performClick()
         val shadow = shadowOf(compose.activity)
         // Android 13+: first tap asks for the notification permission (for the Stop button).
         val request = shadow.lastRequestedPermission
@@ -204,8 +206,9 @@ class MainActivitySoundTest {
         assertFalse(ShareSettings(app).soundEnabled)
         compose.onNodeWithText("record audio", substring = true).assertDoesNotExist()
 
-        // Sound off -> only the notification question.
-        compose.onNodeWithText("▶  Start sharing").performClick()
+        // Sound off -> only the notification question (English subtitles off too, they'd ask their own first).
+        compose.onAllNodes(isToggleable())[0].performScrollTo().performClick()
+        compose.onNodeWithText("▶  Start sharing").performScrollTo().performClick()
         val request = shadowOf(compose.activity).lastRequestedPermission!!
         assertEquals(listOf(Manifest.permission.POST_NOTIFICATIONS), request.requestedPermissions.toList())
     }
@@ -370,8 +373,33 @@ class AutoStartTest {
     }
 
     @Test
+    fun englishFirstGetsAndroidsOkThenCarriesOnByItself() {
+        MainActivity.autoStart = true
+        shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)
+        val launch = Intent(app, MainActivity::class.java).setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        androidx.test.core.app.ActivityScenario.launch<MainActivity>(launch).use { scenario ->
+            scenario.onActivity { activity ->
+                // First: Android's "display over other apps" switch, not the sharing prompt yet.
+                val first = shadowOf(activity).nextStartedActivityForResult
+                assertEquals(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, first.intent.action)
+                assertEquals(null, shadowOf(activity).nextStartedActivityForResult)
+            }
+            // Switched on, back in BroCast: the sharing prompt comes up without touching anything.
+            org.robolectric.shadows.ShadowSettings.setCanDrawOverlays(true)
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.STARTED)
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            scenario.onActivity { activity ->
+                val next = shadowOf(activity).nextStartedActivityForResult
+                assertNotNull(next)
+                assertTrue(next.intent.action != android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+            }
+        }
+    }
+
+    @Test
     fun openingFromHomeScreenStartsSharingRightAway() {
         MainActivity.autoStart = true
+        ShareSettings(app).translateEnabled = false
         shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)
         val launch = Intent(app, MainActivity::class.java).setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         androidx.test.core.app.ActivityScenario.launch<MainActivity>(launch).use { scenario ->
@@ -439,24 +467,23 @@ class VersionTwoTest {
     }
 
     @Test
-    fun englishSubtitlesSwitchAsksForTheOverlayPermission() {
-        compose.onNodeWithText("💬 English subtitles on this phone").performScrollTo().assertIsDisplayed()
-        compose.onAllNodes(isToggleable())[0].performScrollTo().performClick()
+    fun englishSubtitlesAreOnAndAskForTheOverlayPermission() {
+        // On from the start; Android's "display over other apps" OK is still missing.
         assertTrue(ShareSettings(app).translateEnabled)
-        // Android's "display over other apps" page for this app.
+        compose.onNodeWithText("💬 English subtitles on this phone").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Allow").performScrollTo().performClick()
         val intent = shadowOf(compose.activity).nextStartedActivity
         assertEquals(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, intent.action)
         assertEquals("package:${app.packageName}", intent.dataString)
-        compose.onNodeWithText("Allow").performScrollTo().assertIsDisplayed()
         compose.onRoot().captureRoboImage("build/screenshots/8-subtitles-permission.png")
 
-        // Allowed: back in the app, the tips show instead.
+        // Allowed: the tips, the voice switch and "which app" show instead.
         org.robolectric.shadows.ShadowSettings.setCanDrawOverlays(true)
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Allow").assertDoesNotExist()
         compose.onNodeWithText("A single app", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("📺 Which app do you watch on?").performScrollTo().assertIsDisplayed()
         compose.onRoot().captureRoboImage("build/screenshots/9-subtitles-on.png")
-        // English voices: on by default, its own switch right under it.
         assertTrue(ShareSettings(app).voicesEnabled)
         compose.onNodeWithText("🗣️ Say them out loud too").performScrollTo().assertIsDisplayed()
         compose.onAllNodes(isToggleable())[1].performScrollTo().performClick()
@@ -467,6 +494,35 @@ class VersionTwoTest {
     }
 
     @Test
+    fun pickingTheAnimeAppOnce() {
+        org.robolectric.shadows.ShadowSettings.setCanDrawOverlays(true)
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        fun fakeApp(pkg: String, label: String) = android.content.pm.ResolveInfo().apply {
+            nonLocalizedLabel = label
+            activityInfo = android.content.pm.ActivityInfo().apply {
+                packageName = pkg
+                name = "$pkg.Main"
+                applicationInfo = android.content.pm.ApplicationInfo().apply { packageName = pkg }
+            }
+        }
+        val pm = shadowOf(app.packageManager)
+        pm.addResolveInfoForIntent(home, fakeApp("com.example.notes", "Notes"))
+        pm.addResolveInfoForIntent(home, fakeApp("com.crunchyroll.crunchyroid", "Crunchyroll"))
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Pick it").performScrollTo().performClick()
+        compose.onNodeWithText("Which app do you watch on? 🍿").assertIsDisplayed()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Crunchyroll").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(androidx.compose.ui.test.isRoot()).let { roots ->
+            roots[roots.fetchSemanticsNodes().size - 1].captureRoboImage("build/screenshots/10-app-picker.png")
+        }
+        compose.onNodeWithText("Crunchyroll").assertIsDisplayed()
+        compose.onNodeWithText("Crunchyroll").performClick()
+        assertEquals("com.crunchyroll.crunchyroid", ShareSettings(app).watchApp)
+        compose.onNodeWithText("Which app do you watch on? 🍿").assertDoesNotExist()
+        compose.onNodeWithText("📺 Opens Crunchyroll when you start").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
     fun liveCardShowsTheSubtitleLanguage() {
         compose.runOnUiThread {
             ShareState.set(
@@ -474,7 +530,7 @@ class VersionTwoTest {
             )
         }
         compose.onNodeWithText("💬 English subtitles: Spanish → English ✅").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("🖼️ Sending pictures (English subtitles are on)").assertExists()
+        compose.onNodeWithText("🖼️ Sending pictures (a screen that can't play the video is watching)").assertExists()
     }
 
     @Test

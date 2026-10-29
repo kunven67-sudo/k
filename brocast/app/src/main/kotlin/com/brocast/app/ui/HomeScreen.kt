@@ -89,6 +89,8 @@ fun HomeScreen(
     onAllowOverlay: () -> Unit = {},
     voicesEnabled: Boolean = true,
     onVoicesChange: (Boolean) -> Unit = {},
+    watchAppLabel: String? = null,
+    onChangeWatchApp: () -> Unit = {},
 ) {
     Box(
         Modifier
@@ -122,11 +124,11 @@ fun HomeScreen(
             when (status) {
                 is ShareStatus.Idle -> {
                     status.note?.let { NoteCard(it) }
-                    StartCard(wifiAddresses.isEmpty(), onStart)
+                    StartCard(wifiAddresses.isEmpty(), translateEnabled, onStart)
                 }
                 is ShareStatus.Failed -> {
                     ErrorCard(status.message)
-                    StartCard(wifiAddresses.isEmpty(), onStart)
+                    StartCard(wifiAddresses.isEmpty(), translateEnabled, onStart)
                 }
                 ShareStatus.Starting -> StartingCard()
                 is ShareStatus.Live -> LiveCard(status, onStop, onCopy, onFixSoundPermission)
@@ -135,7 +137,7 @@ fun HomeScreen(
             Spacer(Modifier.height(14.dp))
             TranslateCard(
                 translateEnabled, overlayAllowed, live = status is ShareStatus.Live, onTranslateChange, onAllowOverlay,
-                voicesEnabled, onVoicesChange,
+                voicesEnabled, onVoicesChange, watchAppLabel, onChangeWatchApp,
             )
             Spacer(Modifier.height(14.dp))
             SoundCard(soundEnabled, soundSupported, locked = sharing, onSoundEnabledChange)
@@ -226,12 +228,19 @@ private fun Body(text: String, color: Color = BroColors.Muted, size: Int = 15) {
 }
 
 @Composable
-private fun StartCard(noWifi: Boolean, onStart: () -> Unit) {
+private fun StartCard(noWifi: Boolean, english: Boolean, onStart: () -> Unit) {
     BroCard {
         CardTitle("Ready when you are 😎")
         Spacer(Modifier.height(6.dp))
-        Body("Put your phone and your TV or PC on the same Wi-Fi, then hit the big button.")
-        AnimatedVisibility(noWifi) {
+        Body(
+            if (english) {
+                "Hit the big button: your anime app opens with English subtitles 🍿 Want it on your PC too? Open " +
+                    "\"Watch BroCast on PC\" there."
+            } else {
+                "Put your phone and your TV or PC on the same Wi-Fi, then hit the big button."
+            },
+        )
+        AnimatedVisibility(noWifi && !english) {
             Column {
                 Spacer(Modifier.height(12.dp))
                 WarnBox(
@@ -439,7 +448,6 @@ private fun LiveCard(
         Body(
             when {
                 live.video -> "🎬 Sending smooth video"
-                live.translate != null -> "🖼️ Sending pictures (English subtitles are on)"
                 else -> "🖼️ Sending pictures (a screen that can't play the video is watching)"
             },
             size = 13,
@@ -485,6 +493,8 @@ private fun TranslateCard(
     onAllow: () -> Unit,
     voices: Boolean,
     onVoicesChange: (Boolean) -> Unit,
+    watchApp: String?,
+    onChangeWatchApp: () -> Unit,
 ) {
     BroCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -513,7 +523,18 @@ private fun TranslateCard(
                 TextButton(onClick = onAllow) { Text("Allow") }
             }
         } else if (enabled) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    Body(
+                        if (watchApp != null) "📺 Opens $watchApp when you start" else "📺 Which app do you watch on?",
+                        color = BroColors.Text,
+                        size = 14,
+                    )
+                }
+                TextButton(onClick = onChangeWatchApp) { Text(if (watchApp != null) "Change" else "Pick it") }
+            }
+            Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("🗣️ Say them out loud too", color = BroColors.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -538,8 +559,8 @@ private fun TranslateCard(
             )
             Spacer(Modifier.height(4.dp))
             Body(
-                "📥 Each language downloads once (about 30 MB), then it works offline. " +
-                    "While this is on, a TV watching gets pictures instead of video.",
+                "📥 Each language downloads once (about 30 MB), then it works offline. Watching on your PC? " +
+                    "The English and the voice show up there too.",
                 size = 13,
             )
             if (!live) Body("Turns on when you start sharing ▶️", size = 12)

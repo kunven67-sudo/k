@@ -30,10 +30,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import com.brocast.app.translate.LiveSubtitles
 import com.brocast.app.translate.SubtitleVoice
+import com.brocast.app.translate.VideoFrameTap
 import com.brocast.core.AudioHub
 import com.brocast.core.FrameHub
 import com.brocast.core.PinConfig
 import com.brocast.core.StreamServer
+import com.brocast.core.SubtitleBoard
 import com.brocast.core.VideoHub
 import com.brocast.core.VoicePitch
 import java.io.IOException
@@ -54,6 +56,7 @@ class ScreenShareService : Service() {
         val sound: SoundStatus,
         val pin: String?,
         val wifiLocks: List<WifiManager.WifiLock>,
+        val board: SubtitleBoard,
         val startedAt: Long,
     ) {
         /** SUBDUB on the phone, while it's on. Set on the main thread, read by the capture thread. */
@@ -62,6 +65,9 @@ class ScreenShareService : Service() {
 
         /** Reads the English out loud, while that's on. */
         var voice: SubtitleVoice? = null
+
+        /** Feeds the subtitle reader from the video, while subtitles are on. */
+        var videoTap: VideoFrameTap? = null
         var lastFrames = 0L
         var addresses: List<String> = emptyList()
         var ticks = 0
@@ -145,7 +151,10 @@ class ScreenShareService : Service() {
         val hub = FrameHub()
         val video = VideoHub()
         val audioHub = if (sound == SoundStatus.ON) AudioHub() else null
-        val server = StreamServer(hub, audioHub = audioHub, videoHub = video, pinConfig = { pinConfig }, deviceName = deviceName())
+        val board = SubtitleBoard()
+        val server = StreamServer(
+            hub, audioHub = audioHub, videoHub = video, pinConfig = { pinConfig }, deviceName = deviceName(), subtitles = board,
+        )
         try {
             server.start(StreamServer.DEFAULT_PORT)
         } catch (e: IOException) {
@@ -186,12 +195,12 @@ class ScreenShareService : Service() {
                 main.post { if (session === newSession) endSession(ShareStatus.Failed(message)) }
             }
         }
-        // Video normally. Pictures while a browser that can't play video is watching, or while
-        // SUBDUB on the phone reads subtitles (it needs the pictures; TVs then get pictures too).
+        // Video normally; pictures while a browser that can't play video is watching. The subtitle
+        // reader reads the video (VideoFrameTap), or the pictures in picture mode.
         val subtitlesOn = { newSession.subtitles }
         val capturer = ScreenCapturer(
             this, projection, hub, video, settings.quality, listener,
-            picturesWanted = { subtitlesOn() != null || server.jpegViewerActive() },
+            picturesWanted = { server.jpegViewerActive() },
             subtitleReader = { subtitlesOn()?.let { subs -> subs::offer } },
             jpegNeeded = { subtitlesOn() == null || server.pictureViewerActive() },
         )
@@ -211,7 +220,7 @@ class ScreenShareService : Service() {
             }
         }
         newSession = Session(
-            hub, video, server, capturer, audioHub, audio, sound, pinConfig?.pin, acquireWifiLocks(),
+            hub, video, server, capturer, audioHub, audio, sound, pinConfig?.pin, acquireWifiLocks(), board,
             SystemClock.elapsedRealtime(),
         )
         session = newSession
@@ -236,35 +245,70 @@ class ScreenShareService : Service() {
 
     /**
      * SUBDUB on the phone on or off (it needs "display over other apps" for the English box), and
-     * the English [voices] with it.
+     * the English [voices] with it. The English also goes to the TV/PC page ([Session.board]).
      */
     private fun setTranslate(s: Session, on: Boolean, voices: Boolean) {
         if (on && s.subtitles == null && Settings.canDrawOverlays(this)) {
             s.subtitles = LiveSubtitles(this) { realScreenSize() }
+            // Read from the smooth video, so TVs keep getting video (picture mode feeds the reader itself).
+            val tap = VideoFrameTap(sink = { frame -> s.subtitles?.offer(frame) }, needKeyFrame = s.capturer::requestKeyFrame)
+            s.videoTap = tap
+            s.video.tap = tap
         } else if (!on) {
+            s.video.tap = null
+            s.videoTap?.close()
+            s.videoTap = null
             s.subtitles?.close()
             s.subtitles = null
+            s.board.clear()
         }
-        val subs = s.subtitles
-        if (subs != null && voices) {
-            val voice = s.voice ?: SubtitleVoice(this).also { s.voice = it }
+        val subs = s.subtitles ?: return stopVoices(s)
+        var pitch: VoicePitch? = null
+        var voice: SubtitleVoice? = null
+        if (voices) {
+            val v = s.voice ?: SubtitleVoice(this).also { s.voice = it }
+            voice = v
             // Guy or girl voice: hear how high the show's voices are (needs the sound capture).
             val hub = s.audioHub
-            val pitch = if (hub != null) VoicePitch(hub.sampleRate, hub.channels) else null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Our own English is in the captured sound too: don't measure it.
-                s.audio?.tap = pitch?.let { p -> { pcm: ByteArray -> if (voice.speaking) p.clear() else p.feed(pcm) } }
+            if (hub != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val p = VoicePitch(hub.sampleRate, hub.channels)
+                pitch = p
+                // The phone's own English is in the captured sound too: don't measure it.
+                s.audio?.tap = { pcm: ByteArray -> if (v.speaking) p.clear() else p.feed(pcm) }
             }
-            subs.onNewEnglish = { english -> voice.say(english, pitch?.recentPitch()) }
         } else {
-            subs?.onNewEnglish = null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) s.audio?.tap = null
-            s.voice?.close()
-            s.voice = null
+            stopVoices(s)
+        }
+        subs.listener = object : LiveSubtitles.Listener {
+            private var high: Boolean? = null
+
+            override fun onEnglish(english: LiveSubtitles.English, isNew: Boolean) {
+                if (isNew) {
+                    val hz = pitch?.recentPitch()
+                    if (hz != null) high = hz > VoicePitch.HIGH_VOICE_HZ
+                    // Watching on a TV/PC: that one says it (a phone talking too would echo).
+                    if (s.server.viewerStats().count == 0) voice?.say(english.text, hz)
+                }
+                s.board.show(
+                    english.text, english.left, english.top, english.right, english.bottom,
+                    english.inPicture, high, speak = isNew && voices,
+                )
+            }
+
+            override fun onGone() = s.board.clear()
         }
     }
 
+    private fun stopVoices(s: Session) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) s.audio?.tap = null
+        s.voice?.close()
+        s.voice = null
+    }
+
     private fun teardown(s: Session) {
+        s.video.tap = null
+        s.videoTap?.close()
+        s.videoTap = null
         s.capturer.release()
         s.subtitles?.close()
         s.subtitles = null
