@@ -51,6 +51,22 @@
       if (/^(show more|show full( message)?|read more|see more)$/i.test(b.textContent.trim())) { try { b.click(); } catch (e) {} }
     }
   };
+  // Chat sites hide parts of a long chat behind "Load later messages" / "Load earlier messages".
+  // Keep pressing those until none are left, so the whole chat is on the page.
+  const LOAD = /^(load|show|view) (earlier|later|older|newer|previous|more)( messages)?\b/i;
+  const loaders = () => [...document.querySelectorAll('button,[role="button"],a')]
+    .filter(b => !box.contains(b) && !b.disabled && b.getClientRects().length && LOAD.test((b.innerText || b.textContent).trim()));
+  let clicks = 0;
+  const loadAll = async () => {
+    for (let calm = 0, i = 0; calm < 3 && i < 3000 && !stopped; i++) {
+      const bs = loaders();
+      if (!bs.length) { calm++; await sleep(700); continue; }
+      calm = 0;
+      for (const b of bs) { try { b.click(); clicks++; } catch (e) {} }
+      msg.textContent = 'Loading the whole chat... (pressed Load ' + clicks + (clicks === 1 ? ' time)' : ' times)');
+      await sleep(1300);
+    }
+  };
   const read = () => root.innerText.split('\n').map(s => s.replace(/\s+$/, ''));
   // Joins what was on screen before with what's on screen now, without repeats.
   const merge = (A, N) => {
@@ -72,13 +88,15 @@
   };
   const words = A => A.join(' ').split(/\s+/).filter(Boolean).length;
 
-  // 1) all the way up, letting older messages load in
+  // 1) load every hidden part, then all the way up, letting older messages load in
+  await loadAll();
   let lastH = -1, still = 0;
   for (let i = 0; i < 400 && still < 4 && !stopped; i++) {
     go(0);
     await sleep(500);
     if (sc.scrollHeight === lastH && sc.scrollTop <= 1) still++; else { still = 0; lastH = sc.scrollHeight; }
   }
+  await loadAll();
 
   // 2) quick check: if the whole chat is already drawn, top and bottom read the same = grab it in one go
   msg.textContent = 'Reading the chat...';
@@ -97,6 +115,7 @@
   for (let step = 0; step < 6000 && !stopped && !whole; step++) {
     expand();
     await sleep(step ? 320 : 700);
+    if (loaders().length) { await loadAll(); msg.textContent = 'Reading the chat...'; }
     A = merge(A, read());
     const max = sc.scrollHeight - sc.clientHeight;
     fill.style.width = Math.round(max > 0 ? Math.min(1, sc.scrollTop / max) * 100 : 100) + '%';
