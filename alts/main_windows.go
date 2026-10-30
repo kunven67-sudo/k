@@ -21,6 +21,9 @@ import (
 //go:embed ui/index.html
 var uiHTML string
 
+//go:embed ui/grab.js
+var grabJS string
+
 const (
 	appName    = "ALTS"
 	mainClass  = "ALTS.Main"
@@ -572,6 +575,8 @@ func (a *App) nav(what string) {
 		comCall(v.wv, wvReload)
 	case "home":
 		v.c.Navigate(newChatURL)
+	case "grab":
+		v.c.Eval(grabJS) // copies the whole open chat (a box shows up in the page)
 	}
 	if !a.full() {
 		v.c.Focus()
@@ -600,6 +605,9 @@ func (a *App) accel(fromUI bool) func(uint) bool {
 				d = -1
 			}
 			a.enqueue(cmd{T: "cycle", Dir: d})
+			return true
+		case ctrl && shift && !alt && vk == 'G':
+			a.enqueue(cmd{T: "nav", A: "grab"})
 			return true
 		}
 		if !fromUI {

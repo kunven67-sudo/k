@@ -11,8 +11,10 @@ each one stays logged in on its own.
 - Right-click an account (or its `...` button) to rename it, change its color, move it, put it to
   sleep (closes it to free memory, stays logged in) or delete it (wipes its saved login from this PC,
   the Claude account itself is not touched).
+- **Grab** (under the arrows, or `Ctrl+Shift+G`): scrolls the open chat top to bottom and copies all of
+  it, so you can paste it into a chat on another account. Also saves it as a file if you want.
 - Keys: `Ctrl+1`..`Ctrl+8` jump to an account, `Ctrl+9` the last one, `Ctrl+Tab` / `Ctrl+Shift+Tab`
-  next / previous, `Alt+Left` / `Alt+Right` back / forward, `F5` reload.
+  next / previous, `Alt+Left` / `Alt+Right` back / forward, `F5` reload, `Ctrl+Shift+G` grab.
 - Links to other websites open in your normal browser. Claude, Google / Apple login, payments and
   connecting GitHub stay inside the account they belong to.
 - Remembers the window size and the last account you used.
@@ -36,4 +38,4 @@ The icon, version info and DPI manifest live in `winres/`. After changing them, 
 `go-winres make --arch amd64` (from `github.com/tc-hib/go-winres`) to update `rsrc_windows_amd64.syso`.
 
 Code: `accounts.go` (the account list, tested), `main_windows.go` (window + one WebView2 per account),
-`win32_windows.go` (Windows calls), `ui/index.html` (the side list).
+`win32_windows.go` (Windows calls), `ui/index.html` (the side list), `ui/grab.js` (Grab).
