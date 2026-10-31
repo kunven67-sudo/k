@@ -28,10 +28,16 @@ type Place struct {
 }
 
 type Settings struct {
-	Accounts []Account `json:"accounts"`
-	Last     string    `json:"last"`
-	Place    *Place    `json:"place,omitempty"`
+	Accounts   []Account `json:"accounts"`
+	Last       string    `json:"last"`
+	Place      *Place    `json:"place,omitempty"`
+	Eyes       *bool     `json:"eyes,omitempty"`       // screen pictures go with your messages (on unless turned off)
+	MemoryRepo string    `json:"memoryRepo,omitempty"` // saved chats also go to this GitHub repo (owner/name)
 }
+
+func (s *Settings) eyesOn() bool { return s.Eyes == nil || *s.Eyes }
+
+var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$`)
 
 type loadState int
 

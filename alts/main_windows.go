@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -24,6 +26,9 @@ var uiHTML string
 //go:embed ui/grab.js
 var grabJS string
 
+//go:embed ui/page.js
+var pageJS string
+
 const (
 	appName    = "ALTS"
 	mainClass  = "ALTS.Main"
@@ -32,6 +37,7 @@ const (
 	newChatURL = "https://claude.ai/new"
 	sideW      = 84 // side list width in normal (96 dpi) pixels, same as #side in the UI
 	wmCmd      = wmApp + 1
+	wmRun      = wmApp + 2
 )
 
 // ICoreWebView2 / ICoreWebView2Controller / event args vtable spots (IUnknown's 3 included).
@@ -80,6 +86,16 @@ type App struct {
 	closing             bool
 	queue               []cmd
 	keep                []any // handlers WebView2 still points at
+
+	eye         eyes
+	eyesOn      atomic.Bool // copy of the setting the Eyes thread can read
+	recording   atomic.Bool
+	counts      map[string]countInfo
+	usage       map[string]usageInfo
+	pendingCont map[string]string // account id -> what to put in its new chat (Continue)
+	cont        *contState
+	runMu       sync.Mutex
+	runQ        []func() // work from other threads, run by the message loop
 }
 
 var app *App
@@ -113,7 +129,8 @@ func main() {
 		return
 	}
 
-	a := &App{base: base, cfg: filepath.Join(base, "alts.json"), views: map[string]*view{}}
+	a := &App{base: base, cfg: filepath.Join(base, "alts.json"), views: map[string]*view{},
+		counts: map[string]countInfo{}, usage: map[string]usageInfo{}, pendingCont: map[string]string{}}
 	app = a
 	st, state := loadSettings(a.cfg)
 	switch state {
@@ -132,8 +149,11 @@ func main() {
 	}
 	a.st = st
 	a.save()
+	a.eyesOn.Store(a.st.eyesOn())
 
 	a.makeWindows()
+	pRegisterHotKey.Call(a.main, hotRecord, 0x0001|0x0002|0x4000, '5') // Ctrl+Alt+5 (no repeat) = record 5 seconds
+	go a.eyesLoop()
 	if !a.startUI() {
 		pShowWindow.Call(a.main, swHide)
 		if msgBox("ALTS needs Microsoft Edge WebView2 to show web pages. It's free from Microsoft and most PCs already have it.\n\nPress OK to open the download page.", mbOKCancel|mbIconError) == idOK {
@@ -301,19 +321,30 @@ func (a *App) push() {
 		return
 	}
 	type item struct {
-		ID      string `json:"id"`
-		Name    string `json:"name"`
-		Color   string `json:"color"`
-		Loaded  bool   `json:"loaded"`
-		Loading bool   `json:"loading"`
+		ID      string     `json:"id"`
+		Name    string     `json:"name"`
+		Color   string     `json:"color"`
+		Loaded  bool       `json:"loaded"`
+		Loading bool       `json:"loading"`
+		Usage   *usageInfo `json:"usage,omitempty"`
 	}
 	out := struct {
-		Accounts []item `json:"accounts"`
-		Active   string `json:"active"`
-		Wide     bool   `json:"wide"`
-	}{Accounts: []item{}, Active: a.active, Wide: a.full()}
+		Accounts []item     `json:"accounts"`
+		Active   string     `json:"active"`
+		Wide     bool       `json:"wide"`
+		Eyes     bool       `json:"eyes"`
+		Repo     string     `json:"repo"`
+		Count    *countInfo `json:"count,omitempty"`
+	}{Accounts: []item{}, Active: a.active, Wide: a.full(), Eyes: a.st.eyesOn(), Repo: a.st.MemoryRepo}
 	for _, acc := range a.st.Accounts {
-		out.Accounts = append(out.Accounts, item{acc.ID, acc.Name, acc.Color, a.views[acc.ID] != nil, a.loading == acc.ID})
+		it := item{acc.ID, acc.Name, acc.Color, a.views[acc.ID] != nil, a.loading == acc.ID, nil}
+		if u, ok := a.usage[acc.ID]; ok {
+			it.Usage = &u
+		}
+		out.Accounts = append(out.Accounts, it)
+	}
+	if c, ok := a.counts[a.active]; ok {
+		out.Count = &c
 	}
 	b, _ := json.Marshal(out)
 	a.ui.Eval("window.ALTS&&ALTS.state(" + string(b) + ")")
@@ -337,6 +368,27 @@ func (a *App) onUIMessage(s string) {
 func (a *App) enqueue(c cmd) {
 	a.queue = append(a.queue, c)
 	pPostMessageW.Call(a.main, wmCmd, 0, 0)
+}
+
+// post runs f from the message loop (WebView2 only takes calls from its own thread).
+func (a *App) post(f func()) {
+	a.runMu.Lock()
+	a.runQ = append(a.runQ, f)
+	a.runMu.Unlock()
+	pPostMessageW.Call(a.main, wmRun, 0, 0)
+}
+
+func (a *App) runPosted() {
+	a.runMu.Lock()
+	q := a.runQ
+	a.runQ = nil
+	a.runMu.Unlock()
+	for _, f := range q {
+		if a.closing {
+			return
+		}
+		f()
+	}
 }
 
 func (a *App) drain() {
@@ -403,11 +455,77 @@ func (a *App) do(c cmd) {
 		if opensOutside(c.A) {
 			shellOpen(c.A)
 		}
+	case "tool":
+		a.tool(c.A)
+	case "continue":
+		a.startContinue(c.ID)
+	case "search":
+		a.search(c.A)
+	case "open-saved":
+		if c.A != "" && insideDir(a.savedRoot(), c.A) {
+			shellOpen(c.A)
+		}
+	case "open-folder":
+		a.openFolder("")
+	case "gh-setup":
+		a.ghSetup()
+	case "set-repo":
+		if c.A == "" || repoRe.MatchString(c.A) {
+			a.st.MemoryRepo = c.A
+			a.save()
+			a.push()
+		}
+	}
+}
+
+// tool is one of the chat buttons in the side list.
+func (a *App) tool(what string) {
+	switch what {
+	case "eyes":
+		on := !a.st.eyesOn()
+		a.st.Eyes = &on
+		a.eyesOn.Store(on)
+		a.save()
+		a.push()
+		if on {
+			a.toast("Eyes on: a picture of your screen goes with your next message.")
+		} else {
+			a.toast("Eyes off.")
+		}
+		return
+	case "rec":
+		a.toast("Recording 5 seconds in 3 seconds. Switch to what you want Claude to see.")
+		time.AfterFunc(3*time.Second, func() { a.post(a.record5) })
+		return
+	case "folder":
+		a.openFolder("")
+		return
+	}
+	v := a.views[a.active]
+	if v == nil || !onClaude(v) {
+		a.toast("Open a Claude chat first.")
+		return
+	}
+	switch what {
+	case "save":
+		v.c.Eval("window.__alts&&__alts.save()")
+	case "saveall":
+		v.c.Eval("window.__alts&&__alts.saveAll()")
+	case "pins":
+		v.c.Eval("window.__alts&&__alts.pins()")
+	case "top", "bottom":
+		v.c.Eval("window.__alts&&__alts.jump('" + what + "')")
+	}
+	if !a.full() {
+		v.c.Focus()
 	}
 }
 
 // open switches to an account, starting its browser the first time.
-func (a *App) open(id string) {
+func (a *App) open(id string) { a.openAt(id, homeURL) }
+
+// openAt is open, but a newly started account goes to link instead of the home page.
+func (a *App) openAt(id, link string) {
 	if a.st.find(id) < 0 {
 		return
 	}
@@ -427,6 +545,7 @@ func (a *App) open(id string) {
 	c.SetPermission(edge.CoreWebView2PermissionKindMicrophone, edge.CoreWebView2PermissionStateAllow)
 	c.SetPermission(edge.CoreWebView2PermissionKindClipboardRead, edge.CoreWebView2PermissionStateAllow)
 	c.AcceleratorKeyCallback = a.accel(false)
+	c.MessageCallback = a.onPage(id)
 	a.keep = append(a.keep, c)
 	ok := c.Embed(a.content) // waits (running the message loop) until it's ready
 	a.busy, a.loading = false, ""
@@ -443,8 +562,9 @@ func (a *App) open(id string) {
 			comCall(v.wv, wvAddNewWindowReq, uintptr(unsafe.Pointer(h)), uintptr(unsafe.Pointer(&token)))
 		}
 		a.views[id] = v
+		c.Init(pageJS) // the page helper, in every page from now on (it only works on claude.ai)
 		c.Resize()
-		c.Navigate(homeURL)
+		c.Navigate(link)
 		a.show(id)
 	} else {
 		if prev != nil && !a.full() {
@@ -524,6 +644,9 @@ func (a *App) deleteAccount(id string) {
 	}
 	a.closeView(id)
 	a.st.remove(id)
+	delete(a.counts, id)
+	delete(a.usage, id)
+	delete(a.pendingCont, id)
 	go removeLater(filepath.Join(a.base, "accounts", id))
 	wasActive := a.active == id
 	if wasActive {
@@ -665,6 +788,14 @@ func wndProc(h, m, wp, lp uintptr) uintptr {
 		return 0
 	case wmCmd:
 		a.drain()
+		return 0
+	case wmRun:
+		a.runPosted()
+		return 0
+	case wmHotkey:
+		if wp == hotRecord {
+			a.record5()
+		}
 		return 0
 	case wmClose:
 		a.savePlace()

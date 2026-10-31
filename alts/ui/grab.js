@@ -41,7 +41,9 @@
     const s = e.clientWidth * e.scrollHeight;
     if (s > best) { best = s; sc = e; }
   }
-  if (!sc || (page.scrollHeight - page.clientHeight > 150 && page.clientWidth * page.scrollHeight > best)) sc = page;
+  // the page can look taller than the chat box just because of hidden bits; keep the box if it holds most of the text
+  if (!sc || (page.scrollHeight - page.clientHeight > 150 && page.clientWidth * page.scrollHeight > best &&
+      (sc.innerText || '').length < (document.body.innerText || '').length * 0.5)) sc = page;
   const root = sc === page ? (document.querySelector('main') || document.body) : sc;
   const go = top => sc.scrollTo({ top, behavior: 'instant' });
 
@@ -131,6 +133,9 @@
     go(sc.scrollTop + Math.max(200, sc.clientHeight * 0.8));
   }
   stop.remove();
+
+  // stopped before it got to read anything: take what's on the page right now
+  if (!A.length) A = read();
 
   // 4) ready to copy (copying needs a real click, so it's a button)
   const text = A.join('\n').replace(/\n{3,}/g, '\n\n').trim();
