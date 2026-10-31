@@ -299,9 +299,7 @@ func (a *App) ghSetup() {
 				`if (-not (Test-Path $gh)) { winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements };` +
 				`& $gh auth status -h github.com 2>$null; if ($LASTEXITCODE -ne 0) { & $gh auth login -h github.com -p https -w };` +
 				`Write-Host 'Done. This window closes by itself.' -ForegroundColor Green; Start-Sleep 3`
-			cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
-			cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x00000010} // its own console window
-			cmd.Run()
+			runConsole(script)
 		}
 		if !ghSignedIn() {
 			a.post(func() { a.uiCall("repos", map[string]any{"error": "GitHub sign-in didn't finish. Try again."}) })
