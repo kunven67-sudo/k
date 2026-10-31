@@ -437,7 +437,35 @@
       }
     } catch (e) {}
   }
-  setInterval(usage, 5 * 60 * 1000);
+  setInterval(usage, 60 * 1000); // every minute, so the usage number is never more than a minute behind
+
+  // ---------- no internet: a big red bar you can't miss (stays until it's back) ----------
+  let netBar = null, netOk = true, netT = 0;
+  async function net() {
+    clearTimeout(netT);
+    let ok = navigator.onLine;
+    if (ok) {
+      try { const c = new AbortController(); setTimeout(() => c.abort(), 6000); ok = (await fetch('/favicon.ico?n=' + Date.now(), { cache: 'no-store', signal: c.signal })).ok; } catch (e) { ok = false; }
+    }
+    if (ok !== netOk) {
+      netOk = ok;
+      if (!ok) {
+        netBar = mk('div', { position: 'fixed', left: '50%', top: '12px', transform: 'translateX(-50%)', zIndex: '2147483647', background: '#a11d1d', color: '#fff',
+          font: '600 15px/1.4 ' + FONT, padding: '12px 22px', borderRadius: '999px', boxShadow: '0 10px 34px rgba(0,0,0,.55)', pointerEvents: 'none', textAlign: 'center' },
+          'NO INTERNET: Claude can\'t answer until it\'s back');
+        netBar.dataset.alts = '1';
+        R().append(netBar);
+      } else {
+        if (netBar) netBar.remove();
+        netBar = null;
+        toast('Internet is back');
+      }
+    }
+    netT = setTimeout(net, ok ? 10000 : 4000);
+  }
+  addEventListener('offline', () => { netOk = true; net(); });
+  addEventListener('online', () => net());
+  setTimeout(net, 3000);
 
   window.__alts = { save, saved, saveAll, continueWith, pins, jump, toast };
   const start = () => { send({ t: 'hello' }); usage(); if (readAll()) setTimeout(allNext, 1500); };
