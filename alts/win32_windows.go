@@ -3,9 +3,7 @@
 package main
 
 import (
-	"encoding/base64"
 	"syscall"
-	"unicode/utf16"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -210,19 +208,13 @@ func comCall(obj unsafe.Pointer, idx int, args ...uintptr) uintptr {
 	return r
 }
 
-// runConsole runs a PowerShell script in its own console window that you can see and type into, and
-// waits for it. (Go's exec would send the window's text into nowhere, so it looks blank.)
-func runConsole(script string) error {
-	u := utf16.Encode([]rune(script))
-	b := make([]byte, len(u)*2)
-	for i, c := range u {
-		b[i*2], b[i*2+1] = byte(c), byte(c>>8)
-	}
-	cl := `powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ` + base64.StdEncoding.EncodeToString(b)
+// runVisible runs a program in its own console window that you can see and type into, and waits
+// for it. (Go's exec would send the window's text into nowhere, so it looks blank.)
+func runVisible(cmdline string) error {
 	var si windows.StartupInfo
 	si.Cb = uint32(unsafe.Sizeof(si))
 	var pi windows.ProcessInformation
-	if err := windows.CreateProcess(nil, u16(cl), nil, nil, false, windows.CREATE_NEW_CONSOLE, nil, nil, &si, &pi); err != nil {
+	if err := windows.CreateProcess(nil, u16(cmdline), nil, nil, false, windows.CREATE_NEW_CONSOLE, nil, nil, &si, &pi); err != nil {
 		return err
 	}
 	defer windows.CloseHandle(pi.Thread)

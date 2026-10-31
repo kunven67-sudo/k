@@ -293,13 +293,12 @@ func ghUpload(repo, path string, content []byte, msg string) error {
 // your repos so you can pick where saved chats go.
 func (a *App) ghSetup() {
 	go func() {
-		if ghPath() == "" || !ghSignedIn() {
-			script := `$ErrorActionPreference='Continue'; Write-Host 'ALTS: setting up GitHub for saved chats' -ForegroundColor Cyan;` +
-				`$gh = (Get-Command gh -ErrorAction SilentlyContinue).Source; if (-not $gh) { $gh = Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe' };` +
-				`if (-not (Test-Path $gh)) { winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements };` +
-				`& $gh auth status -h github.com 2>$null; if ($LASTEXITCODE -ne 0) { & $gh auth login -h github.com -p https -w };` +
-				`Write-Host 'Done. This window closes by itself.' -ForegroundColor Green; Start-Sleep 3`
-			runConsole(script)
+		// plain programs in windows you can see: Windows' own installer, then GitHub's sign-in
+		if ghPath() == "" {
+			runVisible("winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements")
+		}
+		if gh := ghPath(); gh != "" && !ghSignedIn() {
+			runVisible(`"` + gh + `" auth login -h github.com -p https -w`)
 		}
 		if !ghSignedIn() {
 			a.post(func() { a.uiCall("repos", map[string]any{"error": "GitHub sign-in didn't finish. Try again."}) })
