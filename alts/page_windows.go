@@ -123,18 +123,6 @@ func (a *App) page(id string, m pageMsg) {
 			a.cont = nil
 			a.toast("Couldn't save the chat, so Continue stopped.")
 		}
-	case "eyes-want":
-		if !a.eyesOn.Load() {
-			return
-		}
-		go func() {
-			files := a.eye.take(time.Now())
-			if len(files) == 0 {
-				return
-			}
-			js := jsCall("eyesGot", map[string]any{"files": files})
-			a.post(func() { a.evalIn(id, js) })
-		}()
 	case "count":
 		a.counts[id] = countInfo{m.Msgs, m.Words, m.More}
 		if id == a.active {
@@ -143,6 +131,7 @@ func (a *App) page(id string, m pageMsg) {
 	case "usage":
 		a.usage[id] = usageInfo{m.S, m.W, m.SR, m.WR}
 		a.push()
+		a.writeUsage()
 	case "open-saved":
 		if m.File != "" && insideDir(a.savedRoot(), m.File) {
 			shellOpen(m.File)
@@ -339,6 +328,50 @@ func (a *App) uiCall(fn string, v any) {
 	}
 	b, _ := json.Marshal(v)
 	a.ui.Eval("window.ALTS&&ALTS." + fn + "(" + string(b) + ")")
+}
+
+// writeUsage leaves your usage where LINK picks it up for Claude (so Claude can pace itself).
+func (a *App) writeUsage() {
+	type acc struct {
+		Name string  `json:"name"`
+		S    float64 `json:"s"`
+		W    float64 `json:"w"`
+		SR   string  `json:"sr"`
+		WR   string  `json:"wr"`
+	}
+	out := struct {
+		Updated  string `json:"updated"`
+		Active   string `json:"active"`
+		Accounts []acc  `json:"accounts"`
+	}{Updated: time.Now().Format(time.RFC3339)}
+	for _, x := range a.st.Accounts {
+		if u, ok := a.usage[x.ID]; ok {
+			out.Accounts = append(out.Accounts, acc{x.Name, u.S, u.W, u.SR, u.WR})
+		}
+		if x.ID == a.active {
+			out.Active = x.Name
+		}
+	}
+	b, _ := json.MarshalIndent(out, "", " ")
+	writeFileAtomic(filepath.Join(a.base, "usage.json"), b)
+}
+
+// tasks reads Claude's task list (notes/tasks.md in the memory repo) for the Tasks box.
+func (a *App) tasks() {
+	repo := a.st.MemoryRepo
+	go func() {
+		res := map[string]any{}
+		if repo == "" {
+			res["error"] = "Connect GitHub first (Saved chats > Set up, pick Claude's memory repo)."
+		} else if out, err := ghRun("api", "repos/"+repo+"/contents/notes/tasks.md", "--jq", ".content"); err != nil {
+			res["error"] = "Couldn't read the task list: " + err.Error()
+		} else if b, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(out))); err != nil { // (Go skips GitHub's line breaks)
+			res["error"] = "The task list looks broken."
+		} else {
+			res["list"] = parseTasks(string(b))
+		}
+		a.post(func() { a.uiCall("tasks", res) })
+	}()
 }
 
 func (a *App) search(q string) {

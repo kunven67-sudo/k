@@ -1,6 +1,6 @@
 // ALTS page helper. Runs in every page of an account, but only does anything on claude.ai:
-// Save chat, Save all, Continue on another account, Eyes (screen pictures with your message),
-// pins, jump to top/bottom, message + word counter and the usage bar.
+// Save chat, Save all, Continue on another account, pins, jump to top/bottom, message + word counter
+// and the usage bar.
 // It talks to ALTS with postMessage; ALTS answers by calling window.__alts.<name>(...).
 // Plain DOM only (no innerHTML, no style attributes) so a strict page can't block it.
 (() => {
@@ -11,8 +11,6 @@
   const FONT = '"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif';
   const mk = (tag, css, txt) => { const e = document.createElement(tag); Object.assign(e.style, css || {}); if (txt != null) e.textContent = txt; return e; };
   const ours = el => !!(el && el.closest && el.closest('[data-alts]'));
-
-  let eyesBox = null, eyesAsked = false; // Eyes (see below)
 
   // ---------- the little box in the corner ----------
   let panel = null;
@@ -306,7 +304,6 @@
     if (!all.length) return null;
     return all.sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom)[0];
   }
-  const boxText = c => c ? (c.tagName === 'TEXTAREA' ? c.value : c.innerText) : '';
   function putText(c, text) {
     c.focus();
     if (c.tagName === 'TEXTAREA') {
@@ -318,11 +315,6 @@
       document.execCommand('insertText', false, text);
     }
   }
-  const b64ToFile = (b64, name, type) => {
-    const bin = atob(b64), u = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-    return new File([u], name, { type });
-  };
   const mediaCount = () => document.querySelectorAll('img[src^="blob:"],img[src^="data:"]').length;
   async function attach(c, files) {
     const before = mediaCount();
@@ -349,29 +341,12 @@
     let c = null;
     for (let i = 0; i < 80 && !c; i++) { c = composer(); if (!c) await sleep(250); }
     if (!c) { toast('Couldn\'t find the chat box. The text is copied: paste it with Ctrl+V.'); try { await navigator.clipboard.writeText(p.text); } catch (e) {} return; }
-    eyesAsked = true; eyesBox = c; // this text isn't you typing, so no Eyes pictures for it
     putText(c, p.text);
     let ok = true;
     if (p.md) ok = await attach(c, [new File([p.md], p.name, { type: 'text/markdown' })]);
     const b = box('Continue');
     b.say(ok ? 'Ready. The old chat is attached. Press Enter to start.' : 'The message is ready, but the file didn\'t attach. ' + (p.saved ? 'It\'s saved on your PC: ' + p.saved : '')).done(ok);
     b.button('OK', true, () => { b.close(); c.focus(); });
-  }
-
-  // ---------- Eyes: screen pictures go with your message ----------
-  document.addEventListener('input', e => {
-    const c = e.target && e.target.closest && e.target.closest('textarea,[contenteditable="true"]');
-    if (!c || ours(c)) return;
-    if (!boxText(c).trim()) { eyesAsked = false; return; }
-    if (!eyesAsked) { eyesAsked = true; eyesBox = c; send({ t: 'eyes-want' }); }
-  }, true);
-  // after you send, the box empties by itself (no input event), so the next message can ask again
-  setInterval(() => { if (eyesAsked && eyesBox && !boxText(eyesBox).trim()) eyesAsked = false; }, 1000);
-  async function eyesGot(p) {
-    const c = eyesBox && eyesBox.isConnected ? eyesBox : composer();
-    if (!c || !p || !p.files || !p.files.length) return;
-    const ok = await attach(c, p.files.map(f => b64ToFile(f.b64, f.name, 'image/jpeg')));
-    if (!ok) toast('Eyes couldn\'t add your screen pictures to the message.');
   }
 
   // ---------- Pins: select text, press Pin ----------
@@ -464,7 +439,7 @@
   }
   setInterval(usage, 5 * 60 * 1000);
 
-  window.__alts = { save, saved, saveAll, continueWith, eyesGot, pins, jump, toast };
+  window.__alts = { save, saved, saveAll, continueWith, pins, jump, toast };
   const start = () => { send({ t: 'hello' }); usage(); if (readAll()) setTimeout(allNext, 1500); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

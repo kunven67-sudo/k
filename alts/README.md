@@ -21,15 +21,14 @@ each one stays logged in on its own.
   - **Saved chats**: search every saved chat, save all the chats in the list at once, open the folder, and
     optionally send saved chats to a GitHub repo you pick (uses the official GitHub CLI; ALTS sets it up).
   - **Pins**: select text in a chat and press Pin; the Pins button lists them and jumps back.
-  - **Eyes** (on by default): when you start typing a message, a picture of your screen (what you were
-    using before ALTS) and a grid of the last minutes go with it. Pictures are kept 10 minutes, only in
-    memory, and only new ones are sent. **5s** / `Ctrl+Alt+5` records 5 seconds of screen for the next
-    message.
+  - **Tasks**: Claude's to-do list (doing / next / done). It lives in Claude's memory on GitHub, so it stays
+    when a chat stops; it refreshes every minute while open.
   - **Top / Bottom**: jump to the start or end of the chat (loading the hidden parts).
   - Under the buttons: how many messages and words the chat has. Under each account: how much of this
-    session's and this week's usage is used (when claude.ai shares it).
+    session's and this week's usage is used (when claude.ai shares it). ALTS also writes that to
+    `%LOCALAPPDATA%\ALTS\usage.json`, where the LINK tray app picks it up so Claude can pace itself.
 - Keys: `Ctrl+1`..`Ctrl+8` jump to an account, `Ctrl+9` the last one, `Ctrl+Tab` / `Ctrl+Shift+Tab`
-  next / previous, `Alt+Left` / `Alt+Right` back / forward, `F5` reload, `Ctrl+Shift+G` copy chat, `Ctrl+Alt+5` record.
+  next / previous, `Alt+Left` / `Alt+Right` back / forward, `F5` reload, `Ctrl+Shift+G` copy chat.
 - Links to other websites open in your normal browser. Claude, Google / Apple login, payments and
   connecting GitHub stay inside the account they belong to.
 - Remembers the window size and the last account you used.
@@ -55,4 +54,4 @@ The icon, version info and DPI manifest live in `winres/`. After changing them, 
 Code: `accounts.go` (the account list, tested), `main_windows.go` (window + one WebView2 per account),
 `win32_windows.go` (Windows calls), `ui/index.html` (the side list), `ui/grab.js` (Copy), `ui/page.js`
 (the helper inside claude.ai pages), `page_windows.go` + `chats.go` (saving, search, Continue, GitHub),
-`eyes.go` + `eyes_windows.go` (Eyes).
+`tasks.go` (the Tasks list).

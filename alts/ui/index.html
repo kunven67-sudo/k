@@ -39,7 +39,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid #7aa7ff; outline-
 #tools .wide { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 4px;
   font-size: 11.5px; font-weight: 600; border: 1px solid var(--line); }
 #tools .wide svg { width: 12px; height: 12px; }
-#tools .rec svg circle { fill: #ef5b5b; stroke: none; }
 #tools button.on { color: var(--text); }
 #tools button.on::after { content: ""; position: absolute; right: 2px; top: 2px; width: 6px; height: 6px; border-radius: 50%;
   background: #3dbe8b; box-shadow: 0 0 0 2px var(--bg); }
@@ -165,6 +164,14 @@ kbd { font: 600 11.5px "Segoe UI", system-ui, sans-serif; background: var(--bg);
 .repo { display: flex; justify-content: space-between; width: 100%; padding: 7px 10px; border-radius: 9px; text-align: left; font-size: 13px; }
 .repo:hover, .repo:focus-visible { background: var(--raise); }
 .repo span { color: var(--faint); font-size: 11.5px; }
+.tasks { max-height: 56vh; overflow-y: auto; margin-top: 4px; }
+.tjob { color: var(--dim); font-size: 12.5px; margin: 2px 0 4px; }
+.trow { display: flex; gap: 10px; align-items: flex-start; padding: 6px 2px; font-size: 13px; }
+.trow i { flex: none; width: 12px; height: 12px; margin-top: 4px; border-radius: 50%; border: 2px solid var(--faint); }
+.trow.doing i { border-color: var(--clay); background: var(--clay); animation: pulse 1.6s ease-in-out infinite; }
+.trow.done i { border-color: #3dbe8b; background: #3dbe8b; }
+.trow.done span { color: var(--dim); }
+@keyframes pulse { 50% { opacity: .35; } }
 </style>
 </head>
 <body>
@@ -189,10 +196,9 @@ kbd { font: 600 11.5px "Segoe UI", system-ui, sans-serif; background: var(--bg);
     <button data-tool="grab" title="Copy this whole chat (Ctrl+Shift+G)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg></button>
     <button data-tool="chats" data-any title="Saved chats: search them, save all, GitHub"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2"/><path d="M3 7v10a2 2 0 0 0 2 2h6"/><circle cx="16.5" cy="15.5" r="3"/><path d="M18.7 17.7L21 20"/></svg></button>
     <button data-tool="pins" title="Pins in this chat (select text, then press Pin)"><svg viewBox="0 0 24 24"><path d="M9 4h6l-1 5 3 3H7l3-3z"/><path d="M12 12v8"/></svg></button>
-    <button data-tool="eyes" data-any title="Eyes: a picture of your screen goes with your message"><svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <button data-tool="tasks" data-any title="Claude's tasks: what it's doing, what's next, what's done"><svg viewBox="0 0 24 24"><path d="M4 6.5l1.5 1.5L8.5 5"/><path d="M4 12.5l1.5 1.5 3-3"/><path d="M4 18.5h4.5"/><path d="M11.5 6.5H20M11.5 12.5H20M11.5 18.5H20"/></svg></button>
     <button data-tool="top" title="Jump to the start of the chat"><svg viewBox="0 0 24 24"><path d="M7 12l5-5 5 5M7 18l5-5 5 5"/></svg></button>
     <button data-tool="bottom" title="Jump to the end of the chat"><svg viewBox="0 0 24 24"><path d="M7 6l5 5 5-5M7 12l5 5 5-5"/></svg></button>
-    <button data-tool="rec" data-any class="wide rec" title="Record 5 seconds of your screen for your next message (Ctrl+Alt+5)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>5s</button>
   </div>
   <div id="count"></div>
   <div id="list"></div>
@@ -282,8 +288,6 @@ function renderList() {
   const awake = S.accounts.some(a => a.id === S.active && a.loaded);
   $("#nav").classList.toggle("off", !awake);
   $("#tools").classList.toggle("off", !awake);
-  $("[data-tool=eyes]").classList.toggle("on", !!S.eyes);
-  $("[data-tool=eyes]").title = "Eyes " + (S.eyes ? "ON" : "off") + ": a picture of your screen goes with your message";
   const c = S.count;
   $("#count").textContent = c && awake ? c.msgs.toLocaleString() + " msgs" + (c.more ? "+" : "") + "\n" + short(c.words) + " words" + (c.more ? "+" : "") : "";
   $("#add").classList.toggle("hint", S.accounts.length === 1);
@@ -348,6 +352,7 @@ function buildModal() {
   if (modal.kind === "help") { buildHelp(card); st.append(card); return; }
   if (modal.kind === "continue") { buildContinue(card); st.append(card); return; }
   if (modal.kind === "chats") { card.classList.add("big"); buildChats(card); st.append(card); return; }
+  if (modal.kind === "tasks") { card.classList.add("big"); buildTasks(card); st.append(card); return; }
 
   const editing = modal.kind === "edit";
   const hd = el("div", "hd");
@@ -477,6 +482,25 @@ function buildChats(card) {
   setTimeout(() => inp.focus(), 30);
 }
 
+let tasksTimer = 0;
+function buildTasks(card) {
+  card.append(el("h2", "", "Claude's tasks"), el("div", "sub", "What Claude is doing, what's next and what's done. It lives in Claude's memory, so it stays even when a chat stops."));
+  const box = el("div", "tasks");
+  box.id = "tasks";
+  box.append(el("div", "note", "Loading..."));
+  card.append(box);
+  const foot = el("div", "foot");
+  const again = el("button", "ghost", "Refresh"), ok = el("button", "primary", "Close");
+  again.onclick = () => send({ t: "tasks" });
+  ok.onclick = closeModal;
+  foot.append(again, ok);
+  card.append(foot);
+  send({ t: "tasks" });
+  clearInterval(tasksTimer);
+  tasksTimer = setInterval(() => { if (modal && modal.kind === "tasks") send({ t: "tasks" }); else clearInterval(tasksTimer); }, 60000);
+  setTimeout(() => ok.focus(), 30);
+}
+
 function doSearch() {
   const q = $("#q").value.trim();
   if (!q) return;
@@ -526,7 +550,7 @@ function buildHelp(card) {
   [["Ctrl+1 ... Ctrl+8", "Jump to account 1 to 8"], ["Ctrl+9", "Jump to the last account"],
    ["Ctrl+Tab", "Next account"], ["Ctrl+Shift+Tab", "Previous account"],
    ["Alt+Left / Alt+Right", "Back / forward"], ["F5", "Reload"], ["Ctrl+Shift+G", "Copy the whole chat"],
-   ["Ctrl+Alt+5", "Record 5 seconds of your screen"], ["Right-click", "Edit an account"]]
+   ["Right-click", "Edit an account"]]
     .forEach(([k, v]) => { const kb = el("div"); k.split(" / ").forEach((p, i) => { if (i) kb.append(" "); kb.append(el("kbd", "", p)); }); keys.append(kb, el("span", "", v)); });
   card.append(keys);
   const tips = el("div", "tips");
@@ -534,7 +558,8 @@ function buildHelp(card) {
    "Log in to each one with a different email.",
    "A green dot means that account is awake in the background. Sleep it (Right-click > Sleep) to free memory.",
    "Save keeps a chat on your PC, looking just like it, with every picture. Continue saves it and starts a new chat on another account with the old one in it.",
-   "Eyes: when you start typing, a picture of your screen (and the last few minutes) goes with your message. Turn it off with the eye button.",
+   "Tasks shows Claude's to-do list. It lives in Claude's memory, so it's still there when a chat stops.",
+   "Screen pictures, bug reports and voice typing are in LINK (the tray app), never in your messages.",
    "Pins: select some text in a chat and press Pin. The pin button shows them all.",
    "If Google login says the browser isn't safe, use Continue with email. It works the same.",
    "Links to other websites open in your normal browser."].forEach(t => tips.append(el("div", "", t)));
@@ -611,6 +636,22 @@ window.ALTS = {
       box.append(b);
     });
   },
+  tasks(r) {
+    const box = $("#tasks");
+    if (!box) return;
+    box.textContent = "";
+    if (r.error) { box.append(el("div", "note", r.error)); return; }
+    const l = r.list;
+    if (l.job) box.append(el("div", "tjob", l.job));
+    [["doing", "Doing now"], ["next", "Next"], ["done", "Done"]].forEach(([k, label]) => {
+      const items = l[k] || [];
+      if (!items.length && k !== "doing") return;
+      box.append(el("div", "lbl", label + (items.length ? " (" + items.length + ")" : "")));
+      if (!items.length) box.append(el("div", "note", "Nothing right now."));
+      items.forEach(t => { const row = el("div", "trow " + k); row.append(el("i"), el("span", "", t)); box.append(row); });
+    });
+    if (l.updated) box.append(el("div", "note", "Updated " + l.updated));
+  },
   repos(r) {
     ghBusy = false;
     ghError = r.error || "";
@@ -643,6 +684,7 @@ $("#tools").addEventListener("click", e => {
   const t = b.dataset.tool;
   if (t === "continue") openModal({ kind: "continue" });
   else if (t === "chats") openModal({ kind: "chats" });
+  else if (t === "tasks") openModal({ kind: "tasks" });
   else if (t === "grab") send({ t: "nav", a: "grab" });
   else send({ t: "tool", a: t });
 });

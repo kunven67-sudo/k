@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -87,9 +86,6 @@ type App struct {
 	queue               []cmd
 	keep                []any // handlers WebView2 still points at
 
-	eye         eyes
-	eyesOn      atomic.Bool // copy of the setting the Eyes thread can read
-	recording   atomic.Bool
 	counts      map[string]countInfo
 	usage       map[string]usageInfo
 	pendingCont map[string]string // account id -> what to put in its new chat (Continue)
@@ -149,11 +145,7 @@ func main() {
 	}
 	a.st = st
 	a.save()
-	a.eyesOn.Store(a.st.eyesOn())
-
 	a.makeWindows()
-	pRegisterHotKey.Call(a.main, hotRecord, 0x0001|0x0002|0x4000, '5') // Ctrl+Alt+5 (no repeat) = record 5 seconds
-	go a.eyesLoop()
 	if !a.startUI() {
 		pShowWindow.Call(a.main, swHide)
 		if msgBox("ALTS needs Microsoft Edge WebView2 to show web pages. It's free from Microsoft and most PCs already have it.\n\nPress OK to open the download page.", mbOKCancel|mbIconError) == idOK {
@@ -332,10 +324,9 @@ func (a *App) push() {
 		Accounts []item     `json:"accounts"`
 		Active   string     `json:"active"`
 		Wide     bool       `json:"wide"`
-		Eyes     bool       `json:"eyes"`
 		Repo     string     `json:"repo"`
 		Count    *countInfo `json:"count,omitempty"`
-	}{Accounts: []item{}, Active: a.active, Wide: a.full(), Eyes: a.st.eyesOn(), Repo: a.st.MemoryRepo}
+	}{Accounts: []item{}, Active: a.active, Wide: a.full(), Repo: a.st.MemoryRepo}
 	for _, acc := range a.st.Accounts {
 		it := item{acc.ID, acc.Name, acc.Color, a.views[acc.ID] != nil, a.loading == acc.ID, nil}
 		if u, ok := a.usage[acc.ID]; ok {
@@ -469,6 +460,8 @@ func (a *App) do(c cmd) {
 		a.openFolder("")
 	case "gh-setup":
 		a.ghSetup()
+	case "tasks":
+		a.tasks()
 	case "set-repo":
 		if c.A == "" || repoRe.MatchString(c.A) {
 			a.st.MemoryRepo = c.A
@@ -481,22 +474,6 @@ func (a *App) do(c cmd) {
 // tool is one of the chat buttons in the side list.
 func (a *App) tool(what string) {
 	switch what {
-	case "eyes":
-		on := !a.st.eyesOn()
-		a.st.Eyes = &on
-		a.eyesOn.Store(on)
-		a.save()
-		a.push()
-		if on {
-			a.toast("Eyes on: a picture of your screen goes with your next message.")
-		} else {
-			a.toast("Eyes off.")
-		}
-		return
-	case "rec":
-		a.toast("Recording 5 seconds in 3 seconds. Switch to what you want Claude to see.")
-		time.AfterFunc(3*time.Second, func() { a.post(a.record5) })
-		return
 	case "folder":
 		a.openFolder("")
 		return
@@ -791,11 +768,6 @@ func wndProc(h, m, wp, lp uintptr) uintptr {
 		return 0
 	case wmRun:
 		a.runPosted()
-		return 0
-	case wmHotkey:
-		if wp == hotRecord {
-			a.record5()
-		}
 		return 0
 	case wmClose:
 		a.savePlace()
