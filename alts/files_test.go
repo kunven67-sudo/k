@@ -17,7 +17,7 @@ func TestFromClaude(t *testing.T) {
 		from       string
 	}{
 		{"https://claude.ai/api/org/files/abc/contents", chat, true, "claude.ai"},
-		{"https://claude.ai/api/x/wiggle/download-file?path=/out/GS3.zip", "https://claude.ai/code/session_1", true, "claude.ai"},
+		{"https://claude.ai/api/x/wiggle/download-file?path=/out/game.zip", "https://claude.ai/code/session_1", true, "claude.ai"},
 		{"https://api.anthropic.com/v1/files/x", chat, true, "api.anthropic.com"},
 		{"https://www.claudeusercontent.com/x.html", chat, true, "www.claudeusercontent.com"},
 		{"blob:https://claude.ai/6f1c-22", chat, true, "claude.ai"},
@@ -61,7 +61,7 @@ func TestZoneFromClaude(t *testing.T) {
 		{"[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=https://claude.ai.evil.com/y.exe\r\n", false},
 		{"[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=http://claude.ai/y.exe\r\n", false},
 		{"[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=https://www.google.com/\r\nHostUrl=about:internet\r\n", false},
-		{"[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=C:\\Users\\bro\\Downloads\\GS3.zip\r\n", false},
+		{"[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=C:\\Users\\me\\Downloads\\Game.zip\r\n", false},
 		{"[ZoneTransfer]\r\nZoneId=3\r\n", false},
 		{"", false},
 	}
@@ -73,7 +73,7 @@ func TestZoneFromClaude(t *testing.T) {
 }
 
 func TestZoneParent(t *testing.T) {
-	if p := zoneParent("[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=C:\\Users\\bro\\Downloads\\GS3.zip\r\n"); p != `C:\Users\bro\Downloads\GS3.zip` {
+	if p := zoneParent("[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=C:\\Users\\me\\Downloads\\Game.zip\r\n"); p != `C:\Users\me\Downloads\Game.zip` {
 		t.Errorf("got %q", p)
 	}
 	if p := zoneParent("[ZoneTransfer]\r\nReferrerUrl=\\\\nas\\share\\a.zip\r\n"); p != `\\nas\share\a.zip` {
@@ -86,15 +86,15 @@ func TestZoneParent(t *testing.T) {
 
 func TestCleanDownloadName(t *testing.T) {
 	cases := map[string]string{
-		"GS3 Setup 3.7.0.exe": "GS3 Setup 3.7.0.exe",
-		"a/b\\c:d?.zip":       "a_b_c_d_.zip",
-		"  PORTBAY.exe  ":     "PORTBAY.exe",
-		"con.txt":             "_con.txt",
-		"NUL":                 "_NUL",
-		"....":                "download",
-		"":                    "download",
-		"notes.":              "notes",
-		"x\x00y.bat":          "x_y.bat",
+		"Game Setup 2.1.0.exe": "Game Setup 2.1.0.exe",
+		"a/b\\c:d?.zip":        "a_b_c_d_.zip",
+		"  Tool.exe  ":         "Tool.exe",
+		"con.txt":              "_con.txt",
+		"NUL":                  "_NUL",
+		"....":                 "download",
+		"":                     "download",
+		"notes.":               "notes",
+		"x\x00y.bat":           "x_y.bat",
 	}
 	for in, want := range cases {
 		if got := cleanDownloadName(in); got != want {
@@ -235,15 +235,15 @@ func TestFixOldIn(t *testing.T) {
 	github := "[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=https://claude.ai/chat/1\r\nHostUrl=https://github.com/x/y.exe\r\n"
 	from := func(zip string) string { return "[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=" + zip + "\r\n" }
 
-	zip := mk("GS3.zip", dl)
+	zip := mk("Game.zip", dl)
 	known := mk("Old Game.zip", dl) // already on the list (downloaded in ALTS, mark already off)
 	mark := map[string]string{
 		zip:                            claude,
-		mk("PORTBAY.exe", dl):          blob,
+		mk("Tool.exe", dl):             blob,
 		mk("random.exe", dl):           github, // only LINKED from a Claude chat: not Claude's
 		mk("cloud only.exe", dl):       claude, // OneDrive placeholder: never touched
-		mk("GS3/game.exe", dl):         from(zip),
-		mk("GS3/sub/data.pak", dl):     from(strings.ToUpper(zip[:1]) + zip[1:]), // case doesn't matter
+		mk("Game/game.exe", dl):        from(zip),
+		mk("Game/sub/data.pak", dl):    from(strings.ToUpper(zip[:1]) + zip[1:]), // case doesn't matter
 		mk("Other/x.exe", dl):          from(filepath.Join(dl, "Somebody else.zip")),
 		mk("Other/7zip copy.exe", dl):  claude, // 7-Zip copies the zip's own note
 		mk("Old/thing.exe", dl):        from(known),
@@ -277,7 +277,7 @@ func TestFixOldIn(t *testing.T) {
 		}
 	}
 	sort.Strings(names)
-	if got := strings.Join(names, ","); got != "GS3.zip,PORTBAY.exe,page.html" {
+	if got := strings.Join(names, ","); got != "Game.zip,Tool.exe,page.html" {
 		t.Errorf("listed %q", got)
 	}
 	if inside != 4 {
@@ -288,7 +288,7 @@ func TestFixOldIn(t *testing.T) {
 			t.Errorf("%s should keep its mark", rel)
 		}
 	}
-	for _, rel := range []string{"GS3.zip", "PORTBAY.exe", "GS3/game.exe", "GS3/sub/data.pak", "Other/7zip copy.exe", "Old/thing.exe"} {
+	for _, rel := range []string{"Game.zip", "Tool.exe", "Game/game.exe", "Game/sub/data.pak", "Other/7zip copy.exe", "Old/thing.exe"} {
 		if !cleared[filepath.Join(dl, filepath.FromSlash(rel))] {
 			t.Errorf("%s should lose its mark", rel)
 		}
