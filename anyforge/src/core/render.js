@@ -8,7 +8,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType('local-floor');
 renderer.domElement.id = 'view';
@@ -22,6 +22,7 @@ scene.add(rig);
 
 /* ---------- sun ---------- */
 export const sun = new THREE.DirectionalLight(0xffffff, 3);
+sun.shadow.radius = 2;
 sun.castShadow = true;
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.03;

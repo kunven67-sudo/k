@@ -206,6 +206,7 @@ export const MECH = [
       g.userData.flame = flame;
       return g;
     },
+    density: 400,
     props: [P.input('auto'), P.on(false), P.power(50), P.invert()],
     control: 'analog',
     fixed(p, dt) {

@@ -44,13 +44,24 @@ function plane(w, h, tile, mat, y) {
 }
 
 export function buildWorld() {
-  // grass to the horizon
-  plane(9000, 9000, 6, groundMat('grass', 6, { color: new THREE.Color('#c9d6b0') }), 0);
+  // grass to the horizon, with a real hole where the pad and runway are (no two floors in the same spot = no flicker)
+  const outer = new THREE.Shape([new THREE.Vector2(-4500, -4500), new THREE.Vector2(4500, -4500), new THREE.Vector2(4500, 4500), new THREE.Vector2(-4500, 4500)]);
+  const z = (x, zz) => new THREE.Vector2(x, -zz);
+  outer.holes.push(new THREE.Path([z(-PAD, PAD), z(-PAD, -PAD), z(-15, -PAD), z(-15, -PAD - 600), z(15, -PAD - 600), z(15, -PAD), z(PAD, -PAD), z(PAD, PAD)]));
+  const gg = new THREE.ShapeGeometry(outer);
+  gg.rotateX(-Math.PI / 2);
+  const guv = gg.attributes.uv;
+  for (let i = 0; i < guv.count; i++) guv.setXY(i, guv.getX(i) / 6, guv.getY(i) / 6);
+  gg.computeVertexNormals();
+  const grass = new THREE.Mesh(gg, groundMat('grass', 6, { color: new THREE.Color('#c9d6b0') }));
+  grass.receiveShadow = true;
+  grass.matrixAutoUpdate = false;
+  scene.add(grass);
   // concrete build pad (lifted a hair + polygon offset so it never flickers against the grass)
-  const pad = groundMat('pad', 4, { color: new THREE.Color('#d8d8d8'), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const pad = groundMat('pad', 4, { color: new THREE.Color('#d8d8d8') });
   plane(PAD * 2, PAD * 2, 4, pad, 0.004);
   // runway north of the pad
-  const asphalt = groundMat('asphalt', 5, { color: new THREE.Color('#bdbdbd'), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const asphalt = groundMat('asphalt', 5, { color: new THREE.Color('#bdbdbd') });
   const run = plane(30, 600, 5, asphalt, 0.004);
   run.position.set(0, 0.004, -PAD - 300);
   run.updateMatrix();
@@ -59,12 +70,12 @@ export function buildWorld() {
   const marks = new THREE.Group();
   for (let z = -PAD - 20; z > -PAD - 590; z -= 24) {
     const s = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 10).rotateX(-Math.PI / 2), paint);
-    s.position.set(0, 0.006, z);
+    s.position.set(0, 0.012, z);
     marks.add(s);
   }
   for (const x of [-14, 14]) {
     const s = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 590).rotateX(-Math.PI / 2), paint);
-    s.position.set(x, 0.006, -PAD - 300);
+    s.position.set(x, 0.012, -PAD - 300);
     marks.add(s);
   }
   marks.traverse((o) => { o.receiveShadow = true; });
@@ -72,7 +83,7 @@ export function buildWorld() {
   // pad edge lines
   for (const [x, z, w, h] of [[0, -PAD + 0.2, PAD * 2, 0.4], [0, PAD - 0.2, PAD * 2, 0.4], [-PAD + 0.2, 0, 0.4, PAD * 2], [PAD - 0.2, 0, 0.4, PAD * 2]]) {
     const s = new THREE.Mesh(new THREE.PlaneGeometry(w, h).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xd9b23a, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
-    s.position.set(x, 0.006, z);
+    s.position.set(x, 0.012, z);
     s.receiveShadow = true;
     scene.add(s);
   }

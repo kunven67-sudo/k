@@ -2,13 +2,18 @@
 // (hinges, motors, pistons, springs, wheels) make a second body for their moving half, tied on with a physics joint.
 // When a part breaks off, the body splits into the pieces that are still welded together.
 import * as THREE from 'three';
-import { R, world, owners, track, untrack, G, groups, toV, toQ, fromQ } from '../core/physics.js';
+import { R, world, owners, track, untrack, G, groups, toV, toQ, fromQ, hooks } from '../core/physics.js';
 import { scene } from '../core/render.js';
 import { MATS, partMaterial } from '../core/mats.js';
 import { DEFS } from '../parts/defs.js';
 import { game } from '../game.js';
 
 export const bodies = new Set();
+const byHandle = new Map(); // physics body handle -> build body
+hooks.same = (h1, h2) => {
+  const a = byHandle.get(h1), b = byHandle.get(h2);
+  return !!(a && b && a !== b && constructOf(a).has(b));
+};
 export const partsById = new Map();
 export const wires = new Set(); // { from: part, to: part, line }
 let nextPart = 1, nextBody = 1;
@@ -25,6 +30,7 @@ export function newBody(pos, quat, id) {
   b.rb = world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setRotation(fromQ(quat))
     .setLinearDamping(0.02).setAngularDamping(0.06).setCanSleep(true));
   b.rb.userData = b;
+  byHandle.set(b.rb.handle, b);
   b.group = new THREE.Group();
   b.group.name = 'body' + b.id;
   scene.add(b.group);
@@ -37,6 +43,7 @@ export function destroyBody(b) {
   if (!bodies.has(b)) return;
   for (const p of [...b.parts]) removePart(p, { split: false, keepBody: true });
   for (let i = 0; i < b.rb.numColliders(); i++) owners.delete(b.rb.collider(i).handle);
+  byHandle.delete(b.rb.handle);
   world.removeRigidBody(b.rb);
   untrack(b.tr);
   scene.remove(b.group);
@@ -116,6 +123,7 @@ export function buildColliders(p) {
       .setFriction(friction).setRestitution(s.bounce ?? m.bounce)
       .setCollisionGroups(groups(G.PARTS, 0xffff & ~G.GHOST))
       .setActiveEvents(R.ActiveEvents.CONTACT_FORCE_EVENTS)
+      .setActiveHooks(R.ActiveHooks.FILTER_CONTACT_PAIRS)
       .setContactForceEventThreshold(1e12);
     const c = world.createCollider(d, p.body.rb);
     owners.set(c.handle, { kind: 'part', ref: p });

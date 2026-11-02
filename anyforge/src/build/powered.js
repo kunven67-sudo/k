@@ -64,6 +64,8 @@ export function powerStep(dt, ctx) {
   }
   // 3) everyone else: work out level / active, then run
   const massCache = new Map();
+  const padCache = new Map();
+  for (const p of list) if (p.def.id === 'hover' && !p.dead) { const set = constructOf(p.body); padCache.set(set, (padCache.get(set) || 0) + 1); }
   for (const p of list) {
     if (p.dead || p.def.source) continue;
     const d = p.def;
@@ -77,6 +79,7 @@ export function powerStep(dt, ctx) {
     let ch = p.props.input || 'none';
     if (!massCache.has(set)) massCache.set(set, constructMass(set));
     p.st.constructMass = massCache.get(set);
+    if (d.id === 'hover') p.st.padCount = padCache.get(set) || 1;
     p.st.ctl = input || null;
     p.st.seatQuat = ctl ? worldQuat(ctl.ref, new THREE.Quaternion()) : null;
 

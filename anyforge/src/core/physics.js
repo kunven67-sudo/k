@@ -7,6 +7,15 @@ export let world = null;
 export let events = null;
 export const STEP = 1 / 60;
 export const owners = new Map(); // collider handle -> { kind: 'part'|'human'|'hand'|'ground'|..., ref }
+// pieces of the same build never push on each other (parts that overlap a little would jam hinges and wheels)
+export const hooks = { same: null };
+const physicsHooks = {
+  filterContactPair(c1, c2, b1, b2) {
+    if (hooks.same && hooks.same(b1, b2)) return null;
+    return R.SolverFlags.COMPUTE_IMPULSE;
+  },
+  filterIntersectionPair() { return true; }
+};
 
 // collision groups (membership << 16 | filter)
 export const G = { WORLD: 1, PARTS: 2, HUMAN: 4, HAND: 8, PLAYER: 16, DEBRIS: 32, GHOST: 64 };
@@ -17,7 +26,7 @@ export async function initPhysics() {
   R = RAPIER;
   world = new R.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = STEP;
-  world.numSolverIterations = 6;
+  world.numSolverIterations = 8;
   events = new R.EventQueue(true);
   return world;
 }
@@ -57,7 +66,7 @@ export function stepPhysics(frameDt, fixedUpdate, afterStep) {
   while (acc >= STEP && steps < 4) {
     for (const e of tracked) { e.p0.copy(e.p1); e.q0.copy(e.q1); }
     fixedUpdate(STEP);
-    world.step(events);
+    world.step(events, physicsHooks);
     simTime += STEP;
     for (const e of tracked) {
       const t = e.rb.translation(), r = e.rb.rotation();
