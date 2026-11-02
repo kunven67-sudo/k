@@ -109,6 +109,7 @@ body.wide #toast.show { transform: translate(-50%, 0); }
 #stage { position: fixed; left: 84px; top: 0; right: 0; bottom: 0; display: none; place-items: center;
   background: #0f0f12; padding: 24px; }
 body.wide #stage { display: grid; }
+#stage { overflow-y: auto; place-items: safe center; } /* a tall box scrolls instead of losing its buttons */
 @media (max-width: 200px) { #stage { display: none !important; } }
 .card { width: min(400px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
   padding: 22px; animation: pop .16s ease-out; }
@@ -172,6 +173,46 @@ kbd { font: 600 11.5px "Segoe UI", system-ui, sans-serif; background: var(--bg);
 .trow.done i { border-color: #3dbe8b; background: #3dbe8b; }
 .trow.done span { color: var(--dim); }
 @keyframes pulse { 50% { opacity: .35; } }
+/* Claude's files */
+.safe { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(61,190,139,.08); border: 1px solid rgba(61,190,139,.22); color: var(--dim); font-size: 12.5px; }
+.safe svg { flex: none; width: 18px; height: 18px; margin-top: 1px; fill: none; stroke: #3dbe8b; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round; }
+.safe b { color: var(--text); font-weight: 600; }
+.files { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin-top: 12px;
+  max-height: min(42vh, max(120px, calc(100vh - 390px)));
+  overflow-y: auto; overflow-x: hidden; }
+.frow { min-width: 0; display: flex; align-items: center; gap: 11px; padding: 7px 8px 7px 9px; border-radius: 12px;
+  border: 1px solid transparent; }
+.frow:hover, .frow:focus-visible { background: var(--raise); border-color: var(--line); outline: none; }
+.frow:not(.gone) { cursor: pointer; }
+.fext { flex: none; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  font-size: 9.5px; font-weight: 700; letter-spacing: .05em; background: #26262d; color: var(--dim); }
+.fext.run { background: rgba(217,119,87,.15); color: #e8906f; }
+.fext.pack { background: rgba(79,142,247,.15); color: #7aa7ff; }
+.fext.page { background: rgba(61,190,139,.14); color: #4fd09d; }
+.fmid { flex: 1; min-width: 0; }
+.fname { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fmeta { display: flex; gap: 6px; align-items: center; color: var(--faint); font-size: 11.5px; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; }
+.fmeta > span { flex: none; }
+.fmeta > span:last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fmeta .tag { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; }
+.fmeta .tag svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.tag.ok { color: #3dbe8b; }
+.tag.changed { color: #f2c14e; }
+.tag.gone { color: var(--faint); }
+.frow.gone .fname, .frow.gone .fext { opacity: .5; }
+.facts { display: flex; gap: 4px; flex: none; }
+.facts button { height: 30px; min-width: 30px; padding: 0 8px; border-radius: 9px; display: grid; place-items: center;
+  color: var(--dim); border: 1px solid var(--line); background: var(--panel); font-size: 12px; font-weight: 600; }
+.facts button:hover { background: #2e2e36; color: var(--text); }
+.facts svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.facts .open { color: #141417; background: var(--text); border-color: var(--text); padding: 0 13px; }
+.facts .open:hover { background: #fff; color: #141417; }
+.facts .del.armed { background: var(--red); border-color: var(--red); color: #fff; padding: 0 10px; }
+.fempty { color: var(--dim); text-align: center; padding: 22px 16px; font-size: 12.5px; border: 1px dashed var(--line); border-radius: 12px; }
+#tools .wide.on::after { right: -2px; top: -2px; }
 </style>
 </head>
 <body>
@@ -199,6 +240,7 @@ kbd { font: 600 11.5px "Segoe UI", system-ui, sans-serif; background: var(--bg);
     <button data-tool="tasks" data-any title="Claude's tasks: what it's doing, what's next, what's done"><svg viewBox="0 0 24 24"><path d="M4 6.5l1.5 1.5L8.5 5"/><path d="M4 12.5l1.5 1.5 3-3"/><path d="M4 18.5h4.5"/><path d="M11.5 6.5H20M11.5 12.5H20M11.5 18.5H20"/></svg></button>
     <button data-tool="top" title="Jump to the start of the chat"><svg viewBox="0 0 24 24"><path d="M7 12l5-5 5 5M7 18l5-5 5 5"/></svg></button>
     <button data-tool="bottom" title="Jump to the end of the chat"><svg viewBox="0 0 24 24"><path d="M7 6l5 5 5-5M7 12l5 5 5-5"/></svg></button>
+    <button data-tool="files" data-any class="wide" title="Claude's files: everything Claude sent you, opens with no Windows warning"><svg viewBox="0 0 24 24"><path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5z"/><path d="M13.5 3.5v5h5"/><path d="M9 14.5l2 2 4-4"/></svg>Files</button>
   </div>
   <div id="count"></div>
   <div id="list"></div>
@@ -291,6 +333,9 @@ function renderList() {
   const c = S.count;
   $("#count").textContent = c && awake ? c.msgs.toLocaleString() + " msgs" + (c.more ? "+" : "") + "\n" + short(c.words) + " words" + (c.more ? "+" : "") : "";
   $("#add").classList.toggle("hint", S.accounts.length === 1);
+  const fb = $('[data-tool="files"]');
+  fb.classList.toggle("on", !!S.filesNew && !(modal && modal.kind === "files"));
+  fb.title = S.filesNew ? "Claude's files: a new file came in" : "Claude's files: everything Claude sent you, opens with no Windows warning";
 }
 
 function short(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : n.toLocaleString(); }
@@ -353,6 +398,7 @@ function buildModal() {
   if (modal.kind === "continue") { buildContinue(card); st.append(card); return; }
   if (modal.kind === "chats") { card.classList.add("big"); buildChats(card); st.append(card); return; }
   if (modal.kind === "tasks") { card.classList.add("big"); buildTasks(card); st.append(card); return; }
+  if (modal.kind === "files") { card.classList.add("big"); buildFiles(card); st.append(card); return; }
 
   const editing = modal.kind === "edit";
   const hd = el("div", "hd");
@@ -501,6 +547,155 @@ function buildTasks(card) {
   setTimeout(() => ok.focus(), 30);
 }
 
+// ---------- Claude's files ----------
+let filesList = null, filesNote = "", filesBusy = false;
+const ICON = {
+  shield: '<svg viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.4-3 8-7 9.5-4-1.5-7-5.1-7-9.5V6z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  warn: '<svg viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.5v.1"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M3.5 7A1.5 1.5 0 0 1 5 5.5h4l2 2h8A1.5 1.5 0 0 1 20.5 9v9a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M4.5 7h15M10 4h4M6.5 7l1 12.5h9l1-12.5"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+};
+function svgEl(html) { const s = el("span"); s.innerHTML = html; return s.firstChild; }
+
+function buildFiles(card) {
+  card.append(el("h2", "", "Claude's files"),
+    el("div", "sub", "Everything Claude sent you, downloaded here in ALTS. Double-click one to open it."));
+  const safe = el("div", "safe");
+  safe.append(svgEl(ICON.shield));
+  const st = el("div");
+  st.append(el("b", "", "No \u201cthis could harm your PC\u201d boxes for these."),
+    " Windows knows they came from Claude, so they just open. Files from anywhere else still get checked like normal.");
+  safe.append(st);
+  const box = el("div", "files");
+  box.id = "files";
+  box.append(el("div", "note", "Loading..."));
+  const r1 = el("div", "row");
+  const old = el("button", "", "Fix my old Claude files"), fold = el("button", "", "Open folder");
+  old.id = "fixold";
+  old.title = "Looks in Downloads and on your Desktop for files you got from Claude before, and takes the warning off those too. Nothing else is touched.";
+  old.onclick = () => { if (filesBusy) return; filesBusy = true; filesNote = "Looking through Downloads and your Desktop..."; paintFilesNote(); send({ t: "files-old" }); };
+  fold.onclick = () => send({ t: "files-folder" });
+  r1.append(old, fold);
+  const n = el("div", "note");
+  n.id = "fnote";
+  card.append(safe, box, r1, n);
+  const foot = el("div", "foot");
+  const ok = el("button", "primary", "Close");
+  ok.onclick = closeModal;
+  foot.append(ok);
+  card.append(foot);
+  if (filesList) paintFiles(box);
+  paintFilesNote(card);
+  send({ t: "files" });
+  setTimeout(() => (box.querySelector(".frow:not(.gone)") || ok).focus(), 30);
+}
+
+function paintFilesNote(root = document) {
+  const n = root.querySelector("#fnote");
+  if (n) n.textContent = filesNote;
+  const b = root.querySelector("#fixold");
+  if (b) { b.disabled = filesBusy; b.textContent = filesBusy ? "Looking..." : "Fix my old Claude files"; }
+}
+
+function fileKind(ext) {
+  if (/^(EXE|MSI|BAT|CMD|APK|PS1|VBS|COM|SCR|APPX|MSIX)$/.test(ext)) return "run";
+  if (/^(ZIP|7Z|RAR|TAR|GZ|ISO)$/.test(ext)) return "pack";
+  if (/^(HTML|HTM|PDF|MD|TXT)$/.test(ext)) return "page";
+  return "";
+}
+function fileSize(n) {
+  if (n < 1024) return n + " B";
+  const u = ["KB", "MB", "GB"];
+  let v = n / 1024, i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return (v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)) + " " + u[i];
+}
+function fileWhen(sec) {
+  const d = new Date(sec * 1000), now = new Date();
+  const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(now) - day(d)) / 86400000);
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (diff === 0) return "Today " + time;
+  if (diff === 1) return "Yesterday " + time;
+  return d.toLocaleDateString([], d.getFullYear() === now.getFullYear() ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+}
+
+function paintFiles(box = $("#files")) {
+  if (!box) return;
+  const keep = document.activeElement && document.activeElement.closest && document.activeElement.closest(".frow");
+  const keepId = keep ? keep.dataset.id : "";
+  box.textContent = "";
+  const list = filesList || [];
+  if (!list.length) {
+    box.append(el("div", "fempty", "Nothing here yet. When Claude sends you a file, download it here in ALTS and it shows up in this list, ready to open."));
+    return;
+  }
+  list.forEach(f => {
+    const row = el("div", "frow " + f.state);
+    row.dataset.id = f.id;
+    row.tabIndex = 0;
+    const m = f.name.match(/\.([A-Za-z0-9]{1,5})$/);
+    const ext = m ? m[1].toUpperCase() : "FILE";
+    const badge = el("div", "fext " + fileKind(ext), ext.slice(0, 4));
+    const mid = el("div", "fmid");
+    const nm = el("div", "fname", f.name);
+    nm.title = f.path;
+    const meta = el("div", "fmeta");
+    const tag = el("span", "tag " + f.state);
+    if (f.state === "ok") { tag.append(svgEl(ICON.check), "No warning"); }
+    else if (f.state === "changed") { tag.append(svgEl(ICON.warn), "Changed"); tag.title = "Something changed this file after Claude sent it, so Windows checks it like any other file."; }
+    else { tag.append("Not on your PC anymore"); tag.title = "It was moved or deleted (or Windows Security took it)."; }
+    meta.append(tag);
+    const bits = [];
+    if (f.state !== "gone") bits.push(fileSize(f.size));
+    bits.push(fileWhen(f.added));
+    if (f.account) bits.push(f.account);
+    else if (f.old) bits.push("from before");
+    bits.forEach(b => meta.append(el("span", "", "\u00b7  " + b)));
+    mid.append(nm, meta);
+    const acts = el("div", "facts");
+    if (f.state !== "gone") {
+      const open = el("button", "open", "Open");
+      open.title = "Open it (same as double-clicking it)";
+      open.onclick = e => { e.stopPropagation(); send({ t: "file-open", a: f.id }); };
+      const fold = el("button");
+      fold.append(svgEl(ICON.folder));
+      fold.title = "Show it in its folder";
+      fold.onclick = e => { e.stopPropagation(); send({ t: "file-folder", a: f.id }); };
+      const del = el("button", "del");
+      del.append(svgEl(ICON.trash));
+      del.title = "Delete this file from your PC";
+      let armed = 0;
+      del.onclick = e => {
+        e.stopPropagation();
+        if (!del.classList.contains("armed")) {
+          del.classList.add("armed");
+          del.textContent = "Delete?";
+          clearTimeout(armed);
+          armed = setTimeout(() => { del.classList.remove("armed"); del.textContent = ""; del.append(svgEl(ICON.trash)); }, 3500);
+          return;
+        }
+        clearTimeout(armed);
+        send({ t: "file-delete", a: f.id });
+      };
+      acts.append(open, fold, del);
+    } else {
+      const forget = el("button");
+      forget.append(svgEl(ICON.x));
+      forget.title = "Take it off this list";
+      forget.onclick = e => { e.stopPropagation(); send({ t: "file-forget", a: f.id }); };
+      acts.append(forget);
+    }
+    row.append(badge, mid, acts);
+    row.ondblclick = e => { if (!e.target.closest("button") && f.state !== "gone") send({ t: "file-open", a: f.id }); };
+    row.onkeydown = e => { if (e.key === "Enter" && e.target === row && f.state !== "gone") { e.preventDefault(); e.stopPropagation(); send({ t: "file-open", a: f.id }); } };
+    box.append(row);
+  });
+  if (keepId) { const again = box.querySelector('.frow[data-id="' + keepId + '"]'); if (again) again.focus(); }
+}
+
 function doSearch() {
   const q = $("#q").value.trim();
   if (!q) return;
@@ -559,6 +754,7 @@ function buildHelp(card) {
    "A green dot means that account is awake in the background. Sleep it (Right-click > Sleep) to free memory.",
    "Save keeps a chat on your PC, looking just like it, with every picture. Continue saves it and starts a new chat on another account with the old one in it.",
    "Tasks shows Claude's to-do list. It lives in Claude's memory, so it's still there when a chat stops.",
+   "Files: anything Claude sends you, downloaded here in ALTS, opens with no \u201ccould harm your PC\u201d warning. Files from anywhere else still get checked by Windows.",
    "Screen pictures, bug reports and voice typing are in LINK (the tray app), never in your messages.",
    "Pins: select some text in a chat and press Pin. The pin button shows them all.",
    "If Google login says the browser isn't safe, use Continue with email. It works the same.",
@@ -652,6 +848,17 @@ window.ALTS = {
     });
     if (l.updated) box.append(el("div", "note", "Updated " + l.updated));
   },
+  files(r) {
+    filesList = r.files || [];
+    paintFiles();
+  },
+  filesOld(r) {
+    filesBusy = false;
+    filesNote = r.found || r.inside
+      ? "Fixed " + r.found + " old file" + (r.found === 1 ? "" : "s") + " from Claude" + (r.inside ? " (plus " + r.inside + " file" + (r.inside === 1 ? "" : "s") + " that came out of their zips)" : "") + ". They open with no warning now."
+      : "No old files from Claude found in Downloads or on your Desktop.";
+    paintFilesNote();
+  },
   repos(r) {
     ghBusy = false;
     ghError = r.error || "";
@@ -685,6 +892,7 @@ $("#tools").addEventListener("click", e => {
   if (t === "continue") openModal({ kind: "continue" });
   else if (t === "chats") openModal({ kind: "chats" });
   else if (t === "tasks") openModal({ kind: "tasks" });
+  else if (t === "files") openModal({ kind: "files" });
   else if (t === "grab") send({ t: "nav", a: "grab" });
   else send({ t: "tool", a: t });
 });

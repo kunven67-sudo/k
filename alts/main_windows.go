@@ -55,8 +55,9 @@ const (
 func init() { runtime.LockOSThread() }
 
 type view struct {
-	c  *edge.Chromium
-	wv unsafe.Pointer // the account's ICoreWebView2
+	c    *edge.Chromium
+	wv   unsafe.Pointer // the account's ICoreWebView2
+	set8 unsafe.Pointer // its ICoreWebView2Settings8 (the Safe Lane switches WebView2's SmartScreen box with it)
 }
 
 // cmd is one thing to do, from the side list or a key. They all run from the
@@ -92,6 +93,12 @@ type App struct {
 	cont        *contState
 	runMu       sync.Mutex
 	runQ        []func() // work from other threads, run by the message loop
+
+	files     fileList           // Claude's files (files.go)
+	filesAt   string             // Downloads\Claude files
+	downloads map[*download]bool // files from Claude still coming in
+	dlTaken   map[string]bool    // file names those are going to
+	fixing    bool               // "Fix my old Claude files" is looking
 }
 
 var app *App
@@ -126,8 +133,10 @@ func main() {
 	}
 
 	a := &App{base: base, cfg: filepath.Join(base, "alts.json"), views: map[string]*view{},
-		counts: map[string]countInfo{}, usage: map[string]usageInfo{}, pendingCont: map[string]string{}}
+		counts: map[string]countInfo{}, usage: map[string]usageInfo{}, pendingCont: map[string]string{},
+		downloads: map[*download]bool{}, dlTaken: map[string]bool{}}
 	app = a
+	a.files = loadFiles(a.filesJSON())
 	st, state := loadSettings(a.cfg)
 	switch state {
 	case fileOK:
@@ -326,7 +335,8 @@ func (a *App) push() {
 		Wide     bool       `json:"wide"`
 		Repo     string     `json:"repo"`
 		Count    *countInfo `json:"count,omitempty"`
-	}{Accounts: []item{}, Active: a.active, Wide: a.full(), Repo: a.st.MemoryRepo}
+		FilesNew bool       `json:"filesNew"`
+	}{Accounts: []item{}, Active: a.active, Wide: a.full(), Repo: a.st.MemoryRepo, FilesNew: a.files.New}
 	for _, acc := range a.st.Accounts {
 		it := item{acc.ID, acc.Name, acc.Color, a.views[acc.ID] != nil, a.loading == acc.ID, nil}
 		if u, ok := a.usage[acc.ID]; ok {
@@ -462,6 +472,8 @@ func (a *App) do(c cmd) {
 		a.ghSetup()
 	case "tasks":
 		a.tasks()
+	case "files", "files-folder", "files-old", "file-open", "file-folder", "file-delete", "file-forget":
+		a.fileCmd(c)
 	case "set-repo":
 		if c.A == "" || repoRe.MatchString(c.A) {
 			a.st.MemoryRepo = c.A
@@ -539,7 +551,8 @@ func (a *App) openAt(id, link string) {
 			comCall(v.wv, wvAddNewWindowReq, uintptr(unsafe.Pointer(h)), uintptr(unsafe.Pointer(&token)))
 		}
 		a.views[id] = v
-		c.Init(pageJS) // the page helper, in every page from now on (it only works on claude.ai)
+		a.safeLane(id, v) // before the first page: files from Claude open with no warning
+		c.Init(pageJS)    // the page helper, in every page from now on (it only works on claude.ai)
 		c.Resize()
 		c.Navigate(link)
 		a.show(id)
@@ -612,6 +625,8 @@ func (a *App) closeView(id string) {
 	if ctl := v.c.GetController(); ctl != nil {
 		comCall(unsafe.Pointer(ctl), ctlClose)
 	}
+	comRel(v.set8)
+	v.set8 = nil
 }
 
 func (a *App) deleteAccount(id string) {

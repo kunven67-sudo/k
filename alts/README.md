@@ -24,12 +24,33 @@ each one stays logged in on its own.
   - **Tasks**: Claude's to-do list (doing / next / done). It lives in Claude's memory on GitHub, so it stays
     when a chat stops; it refreshes every minute while open.
   - **Top / Bottom**: jump to the start or end of the chat (loading the hidden parts).
+  - **Files**: every file Claude sent you that you downloaded in ALTS (see *Claude's files* below).
   - Under the buttons: how many messages and words the chat has. Under each account: how much of this
     session's and this week's usage is used (when claude.ai shares it). ALTS also writes that to
     `%LOCALAPPDATA%\ALTS\usage.json`, where the LINK tray app picks it up so Claude can pace itself.
 - Keys: `Ctrl+1`..`Ctrl+8` jump to an account, `Ctrl+9` the last one, `Ctrl+Tab` / `Ctrl+Shift+Tab`
   next / previous, `Alt+Left` / `Alt+Right` back / forward, `F5` reload, `Ctrl+Shift+G` copy chat.
-- Links to other websites open in your normal browser. Claude, Google / Apple login, payments and
+- Links to other websites open in your normal browser.
+
+## Claude's files (no "this could harm your PC" warnings)
+
+Windows marks every download as "from the internet". That mark is what makes it warn: Edge's "this
+file could harm your device", the blue "Windows protected your PC" box, the "Open File - Security
+Warning" box. ALTS takes that mark off **only** for files that come from Claude inside ALTS:
+
+- A download counts as Claude's when the account is on claude.ai and the file comes from Claude's own
+  sites (claude.ai, anthropic.com, Claude's preview sandbox) or is made by the claude.ai page itself.
+- Those go to `Downloads\Claude files`, and the moment they finish ALTS removes the mark, so they open
+  like a file you made yourself. WebView2's own download check is off in ALTS's accounts only; Edge and
+  the rest of Windows keep theirs.
+- ALTS keeps each file's SHA-256 fingerprint. When you open one from **Files** and it isn't exactly what
+  Claude sent anymore, ALTS puts the mark back first, so Windows checks it like any other file.
+- Downloads from anywhere else keep the mark and go where WebView2 always puts them.
+- Windows Security's real virus scan still runs on everything. ALTS never turns it off.
+- **Fix my old Claude files** looks in Downloads and on the Desktop for files you got from Claude before
+  (going by Windows' own note of where each download came from) and takes the mark off those too, plus
+  files that came out of those zips. Nothing else is touched. OneDrive files that aren't on the PC are skipped.
+- The list lives in `%LOCALAPPDATA%\ALTS\files.json`; every download decision is noted in `files.log`. Claude, Google / Apple login, payments and
   connecting GitHub stay inside the account they belong to.
 - Remembers the window size and the last account you used.
 
@@ -54,4 +75,5 @@ The icon, version info and DPI manifest live in `winres/`. After changing them, 
 Code: `accounts.go` (the account list, tested), `main_windows.go` (window + one WebView2 per account),
 `win32_windows.go` (Windows calls), `ui/index.html` (the side list), `ui/grab.js` (Copy), `ui/page.js`
 (the helper inside claude.ai pages), `page_windows.go` + `chats.go` (saving, search, Continue, GitHub),
-`tasks.go` (the Tasks list).
+`tasks.go` (the Tasks list), `files.go` (which files are Claude's, the list, tested) +
+`files_windows.go` (the download hook and the Files box).

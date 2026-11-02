@@ -110,6 +110,7 @@ func (a *App) page(id string, m pageMsg) {
 	}
 	switch m.T {
 	case "hello":
+		v.noSmartScreen() // see files_windows.go
 		if p := a.pendingCont[id]; p != "" {
 			if u, err := url.Parse(sourceOf(v)); err == nil && strings.HasPrefix(u.Path, "/code") {
 				delete(a.pendingCont, id)
