@@ -1,0 +1,6 @@
+Music + sounds (all CC0, from OpenGameArt.org):
+- music_spin.mp3: "Cyberpunk Moonlight Sonata" by Joth
+- music_intense.mp3: "Determined Pursuit (Epic Orchestra Loop)" by Emma_MA
+- music_card.mp3: "Epic Endgame Cinematic" by cynicmusic
+- ding.mp3, ding2.mp3: "4 Metal Dings/Rings" by starninjas
+- impact1.mp3, impact2.mp3: "Impact" (montage sfx)

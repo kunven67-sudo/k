@@ -1,0 +1,2 @@
+AvatarSample_B.vrm (girl) and AvatarSample_C.vrm (boy): VRoid Project sample avatars by pixiv Inc.
+License (inside each file): everyone may use them, commercial use allowed, changes allowed, redistribution allowed, credit not required.

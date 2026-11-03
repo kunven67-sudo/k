@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console Kit Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="gs3-console.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1020; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<!-- the game itself (a stand-in): the kit only changes the menus on top of it -->
+<canvas id="game"></canvas>
+
+<div class="gs3-screen" id="pause">
+  <div class="gs3-panel">
+    <h1 class="gs3-title">Paused</h1>
+    <p class="gs3-sub">Level 3 · Crystal Caves</p>
+    <div class="gs3-menu">
+      <button class="gs3-item" id="resume">Resume</button>
+      <button class="gs3-item">Difficulty <span class="gs3-value">Normal</span></button>
+      <div class="gs3-item">Music <button class="gs3-toggle" aria-pressed="true" aria-label="Music"></button></div>
+      <div class="gs3-item">Volume <input class="gs3-slider" type="range" min="0" max="10" value="7" aria-label="Volume"></div>
+      <button class="gs3-item" id="quit">Quit to title</button>
+    </div>
+  </div>
+</div>
+
+<div class="gs3-screen" id="ask" hidden>
+  <div class="gs3-panel">
+    <h1 class="gs3-title">Quit to title?</h1>
+    <p class="gs3-sub">Your progress in this level is saved.</p>
+    <div class="gs3-row">
+      <button class="gs3-btn" id="no">Cancel</button>
+      <button class="gs3-btn primary" id="yes">Quit</button>
+    </div>
+  </div>
+</div>
+<div id="hints"></div>
+
+<script>
+  /* the stand-in game: a slow starry cave so the menus have something behind them */
+  const c = document.getElementById('game'), x = c.getContext('2d');
+  function size() { c.width = innerWidth; c.height = innerHeight; }
+  size(); addEventListener('resize', size);
+  let t = 0;
+  (function draw() {
+    t += 0.01;
+    const g = x.createLinearGradient(0, 0, 0, c.height);
+    g.addColorStop(0, '#1b2a5a'); g.addColorStop(1, '#3a1d4a');
+    x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+    for (let i = 0; i < 60; i++) {
+      x.fillStyle = 'rgba(160,220,255,' + (0.3 + 0.3 * Math.sin(t * 2 + i)) + ')';
+      x.beginPath(); x.arc((i * 137) % c.width, (i * 89 + t * 20) % c.height, 2 + (i % 3), 0, 7); x.fill();
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  const pause = document.getElementById('pause'), ask = document.getElementById('ask');
+  let menu = GS3Console.nav(pause, { back: function () { /* resume */ } });
+  GS3Console.hints(document.getElementById('hints'), [['ok', 'Select'], ['back', 'Back']]);
+  document.getElementById('quit').addEventListener('click', function () {
+    ask.hidden = false;
+    menu = GS3Console.nav(ask, { back: function () { ask.hidden = true; menu.stop(); menu = GS3Console.nav(pause, {}); } });
+  });
+  document.getElementById('no').addEventListener('click', function () { ask.hidden = true; menu.stop(); menu = GS3Console.nav(pause, {}); });
+  if (/[?&]ask=1/.test(location.search)) document.getElementById('quit').click();
+</script>
+</body>
+</html>

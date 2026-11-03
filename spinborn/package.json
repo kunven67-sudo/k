@@ -1,0 +1,7 @@
+{
+  "name": "spinborn",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node tools/build.mjs", "dev": "node tools/build.mjs --dev" },
+  "devDependencies": { "esbuild": "0.25.12" }
+}
