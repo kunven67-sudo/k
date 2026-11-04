@@ -1,6 +1,7 @@
 // Meme pop-up in front of the wheel (like his edits: the meme covers the wheel), with its sound. Plus the flashbang.
 import * as THREE from 'three';
 import { drawCaption } from './text.js';
+const U = (p) => (globalThis.SB_URL ? globalThis.SB_URL(p) : p); // one-file version: files come from inside the page
 
 export class MemePop {
   constructor({ audio, base = 'assets/memes/', camera }) {
@@ -37,13 +38,13 @@ export class MemePop {
     this.skip = false;
     let tex, aspect = d.aspect || 0.75;
     if (d.video) {
-      this.video.src = this.base + d.file;
+      this.video.src = U(this.base + d.file);
       try { await new Promise((res, rej) => { const t = setTimeout(res, 2500); this.video.oncanplay = () => { clearTimeout(t); res(); }; this.video.onerror = () => { clearTimeout(t); rej(); }; this.video.load(); }); } catch (e) { return; }
       if (this.video.videoWidth) aspect = this.video.videoHeight / this.video.videoWidth;
       this.video.currentTime = 0; this.video.play().catch(() => { });
       tex = this.vtex;
     } else {
-      try { tex = await this.loader.loadAsync(this.base + d.file); tex.colorSpace = THREE.SRGBColorSpace; } catch (e) { return; }
+      try { tex = await this.loader.loadAsync(U(this.base + d.file)); tex.colorSpace = THREE.SRGBColorSpace; } catch (e) { return; }
       aspect = tex.image.height / tex.image.width;
     }
     if (this.mat.map && this.mat.map !== this.vtex) this.mat.map.dispose();

@@ -1,4 +1,5 @@
 // SPINBORN sound: music, wheel clicks, lever, reveal ding + boom, meme sounds, flashbang (bang + ear ring + muffled world).
+const U = (p) => (globalThis.SB_URL ? globalThis.SB_URL(p) : p); // one-file version: files come from inside the page
 export class Audio {
   constructor(base = 'assets/') {
     this.base = base; this.ctx = null; this.buf = new Map(); this.music = null; this.musicName = null;
@@ -20,7 +21,7 @@ export class Audio {
   async load(path) {
     if (this.buf.has(path)) return this.buf.get(path);
     const p = (async () => {
-      try { const r = await fetch(this.base + path); const a = await r.arrayBuffer(); return await this.ctx.decodeAudioData(a); } catch (e) { return null; }
+      try { const r = await fetch(U(this.base + path)); const a = await r.arrayBuffer(); return await this.ctx.decodeAudioData(a); } catch (e) { return null; }
     })();
     this.buf.set(path, p); return p;
   }

@@ -1,4 +1,5 @@
 // Fonts + canvas text helpers (fonts come from the GS3 kit folder, so menus match the console look).
+const U = (p) => (globalThis.SB_URL ? globalThis.SB_URL(p) : p); // one-file version: files come from inside the page
 export const FONT = 'Inter, "Open Sans", "Segoe UI", system-ui, sans-serif';
 export const CAPTION_FONT = '"Open Sans", Inter, "Segoe UI", system-ui, sans-serif';
 
@@ -9,7 +10,7 @@ export async function loadFonts(base = 'gs3kit/fonts/') {
     ['Open Sans', 'open-sans-latin-600-normal.woff2', { weight: '600' }]
   ];
   await Promise.all(list.map(async ([fam, file, d]) => {
-    try { const f = new FontFace(fam, `url(${base}${file})`, d); await f.load(); document.fonts.add(f); } catch (e) { /* system font fallback */ }
+    try { const f = new FontFace(fam, `url(${U(base + file)})`, d); await f.load(); document.fonts.add(f); } catch (e) { /* system font fallback */ }
   }));
 }
 
