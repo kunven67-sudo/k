@@ -5,7 +5,7 @@ and time starts looping. Everything you do (your moves, your voice, your shots) 
 again. Spawn people and crazy gadgets and mess around with yourselves.
 
 ## Play
-- `play/index.html` is the built game (works on GitHub Pages: open it in the Quest browser, press **Play in VR**).
+- `play/index.html` is the built game. Quest link: https://kunven67-sudo.github.io/k/the-mask/play/ (press **Play in VR**).
 - `npm run build -- --onefile "THE MASK.html"` also makes one offline file (PC browser, Game System 3, phone).
 
 ## How it works
