@@ -32,6 +32,19 @@ export async function openVR({ w = 640, h = 400 } = {}) {
   };
   return T;
 }
+// move a hand like a person reaching for something: quickly to above it, settle, then slowly down onto it
+// (a fast hand knocks things over; a slow hand closes around them)
+export function reacher(T, off = [-0.003, 0.044, -0.064]) {
+  const handAt = async (side, wp, q) => { const r = await T.toRoom(wp); await T.ctl(side, [r[0] + off[0], r[1] + off[1], r[2] + off[2]], q); };
+  const approach = async (side, wp, q) => {
+    await handAt(side, [wp[0], wp[1] + 1.6, wp[2]], q); await T.frames(6);
+    for (let i = 3; i >= 0; i--) { await handAt(side, [wp[0], wp[1] + i * 0.4, wp[2]], q); await T.frames(1); }
+    await T.frames(1);
+  };
+  // carry: move a held thing in small steps (a real arm moves, it doesn't teleport)
+  const carry = async (side, from, to, steps = 6) => { for (let i = 1; i <= steps; i++) { const t = i / steps; await handAt(side, from.map((v, k) => v + (to[k] - v) * t)); await T.frames(1); } };
+  return { handAt, approach, carry };
+}
 export async function enterVR(T) {
   await T.page.waitForFunction(() => [...document.querySelectorAll('#menus .gs3-item, #menus button')].some((x) => /Play in VR|in VR/.test(x.textContent)), null, { timeout: 30000 });
   await T.ev(() => { const b = [...document.querySelectorAll('#menus .gs3-item, #menus button')].find((x) => /Play in VR|in VR/.test(x.textContent)); b.click(); });

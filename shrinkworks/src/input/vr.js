@@ -217,13 +217,17 @@ function sizePhysHand(H) {
   // a real hand weighs about 0.5 kg (game mass: 1000 per kg), less when you are small
   const vol = 4 / 3 * Math.PI * r * r * r, mass = 500 * Math.pow(player.scale, 3);
   H.phys.c = world.createCollider(R.ColliderDesc.ball(r).setDensity(mass / vol).setFriction(0.8).setRestitution(0)
-    .setCollisionGroups(groups(G.HAND, G.PARTS | G.DEBRIS)), H.phys.rb);
+    .setCollisionGroups(groups(G.HAND, H.phys.fast ? G.PARTS | G.DEBRIS : 0)), H.phys.rb);
   owners.set(H.phys.c.handle, { kind: 'hand' });
   H.phys.r = r;
 }
 function drivePhysHands(dt) {
+  const k = K();
   for (const H of hands) {
     if (!H.phys || !H.source) continue;
+    // a slow hand passes through things (reaching to grab never shoves the thing away); a fast hand knocks things over
+    const fast = averageVel(H).length() > 1.1 * k;
+    if (H.phys.c && fast !== H.phys.fast) { H.phys.fast = fast; H.phys.c.setCollisionGroups(groups(G.HAND, fast ? G.PARTS | G.DEBRIS : 0)); }
     const rb = H.phys.rb, t = rb.translation();
     const d = _v.set(H.pos.x - t.x, H.pos.y - t.y, H.pos.z - t.z);
     // too far behind your real hand (stuck on something, or you just turned): jump to it
