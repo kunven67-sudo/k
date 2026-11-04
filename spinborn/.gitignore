@@ -1,3 +1,4 @@
 node_modules/
 assets/memes/
 tools/look/*.bundle.js
+tools/launcher/site/

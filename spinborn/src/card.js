@@ -88,7 +88,7 @@ export function drawCard(canvas, C, art) {
     g.font = `700 54px ${SERIF}`; g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,0.92)';
     g.shadowColor = 'rgba(0,0,0,0.8)'; g.shadowBlur = 18; g.fillText(C.title.toUpperCase(), W / 2, 96); g.shadowBlur = 0;
   }
-  if (C.dead) { g.font = `800 120px ${SERIF}`; g.textAlign = 'center'; g.fillStyle = 'rgba(255,40,40,0.85)'; g.fillText('DEAD', W / 2, H * 0.38); }
+  if (C.dead) { g.font = `800 120px ${SERIF}`; g.textAlign = 'center'; g.fillStyle = 'rgba(255,40,40,0.85)'; g.fillText('DEAD', W / 2, H * 0.46); }
 }
 
 export function drawExplain(canvas, C, page = 0) {

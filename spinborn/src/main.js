@@ -7,8 +7,7 @@ import { Audio } from './audio.js';
 import { MemePop, wait } from './meme3d.js';
 import { createBrain, READY_COMMENTS, runScore } from './brain.js';
 import { runFlow, newCharacter, tierLabel } from './flow.js';
-import { Character } from './character.js';
-import { drawCard, drawExplain, cardScene } from './card.js';
+import { drawCard, drawExplain } from './card.js';
 import { loadFonts, drawText, wrap, FONT, roundRect, fmtYears } from './text.js';
 import { Store } from './save.js';
 import { XRInput } from './xr.js';
@@ -141,23 +140,9 @@ function layoutDesk() {
 }
 deskPanel.mesh.position.set(-0.18, 0.955, -0.62); deskPanel.mesh.rotation.x = -Math.PI / 2 + 0.32; scene.add(deskPanel.mesh); layoutDesk();
 
-// ---------------- mirror pedestal ----------------
-const mirrorG = new THREE.Group(); mirrorG.position.set(-2.75, 0, -3.0); mirrorG.rotation.y = 0.55; scene.add(mirrorG);
-const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 0.25, 48), deskMat); ped.position.y = 0.125; mirrorG.add(ped);
-const pedRing = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.015, 8, 64), new THREE.MeshBasicMaterial({ color: 0x8fb0ff, toneMapped: false }));
-pedRing.rotation.x = Math.PI / 2; pedRing.position.y = 0.255; mirrorG.add(pedRing);
-const character = new Character(); character.root.position.y = 0.25; mirrorG.add(character.root);
-mirrorG.visible = false;
-let mirrorBusy = null, mirrorAgain = false;
-function updateMirror(C) {
-  if (!S.mirror && !forceMirror) { mirrorG.visible = false; return; }
-  mirrorG.visible = true;
-  if (mirrorBusy) { mirrorAgain = true; return; }
-  mirrorBusy = character.build(C).then(() => {
-    C.skinHex = character.lookFor(C).skin || '#e8b994';
-    if (xin) xin.dress(C);
-  }).catch(e => console.warn('mirror', e)).finally(() => { mirrorBusy = null; if (mirrorAgain) { mirrorAgain = false; updateMirror(C); } });
-}
+// (no characters: spins only)
+const mirrorG = new THREE.Group();
+function updateMirror() { }
 let forceMirror = false;
 
 // ---------------- meme pop-up ----------------
@@ -261,8 +246,7 @@ async function play(gender) {
   const comment = await askComment();
   C.comment = comment;
   bubble.text = comment || '(no comment)'; bubble.draw(); bubble.show(true);
-  mode = 'spin'; forceMirror = false;
-  mirrorG.visible = S.mirror; if (S.mirror) updateMirror(C);
+  mode = 'spin';
   await io.react({ type: 'comment', text: comment });
   await runFlow(C, io);
   const sc = runScore(C);
@@ -278,36 +262,30 @@ const cardPanel = new Panel({ w: 1.3, h: 1.3 * 1600 / 1080, ppm: 830.77, name: '
 const cardCanvas = document.createElement('canvas'), explainCanvas = document.createElement('canvas');
 cardPanel.render = (g, W, H) => { g.drawImage(cardPanel.page === 0 ? cardCanvas : explainCanvas, 0, 0, W, H); };
 cardPanel.mesh.position.set(0, 1.78, -2.1); scene.add(cardPanel.mesh); cardPanel.show(false);
-let cardRT = null, pendingArt = null;
-async function renderCardArt(C) {
-  const ch = new Character(); await ch.build(C, { pose: C.dead ? 'Death_A_Pose' : pickPose(C) });
-  ch.update(0.5); ch.update(0.5);
-  const { scene: cs, cam } = cardScene(C, ch);
-  return new Promise(res => { pendingArt = { cs, cam, ch, res }; });
-}
-function pickPose(C) { const w = C.weapon || ''; if (C.powers.length && Math.random() < 0.5) return 'Spellcast_Raise'; if (/sword|axe|hammer|blade/i.test(w)) return '2H_Melee_Idle'; return 'Cheer'; }
-function doPendingArt() {
-  if (!pendingArt) return;
-  const { cs, cam, ch, res } = pendingArt; pendingArt = null;
-  if (!cardRT) cardRT = new THREE.WebGLRenderTarget(1080, 1600, { colorSpace: THREE.SRGBColorSpace });
-  const xrOn = renderer.xr.enabled; renderer.xr.enabled = false;
-  renderer.setRenderTarget(cardRT); renderer.render(cs, cam); renderer.setRenderTarget(null);
-  renderer.xr.enabled = xrOn;
-  const px = new Uint8Array(1080 * 1600 * 4); renderer.readRenderTargetPixels(cardRT, 0, 0, 1080, 1600, px);
-  const c = document.createElement('canvas'); c.width = 1080; c.height = 1600; const g = c.getContext('2d'); const img = g.createImageData(1080, 1600);
-  for (let y = 0; y < 1600; y++) img.data.set(px.subarray((1599 - y) * 4320, (1600 - y) * 4320), y * 4320);
-  g.putImageData(img, 0, 0);
-  res(c);
-}
 let cardC = null, explainPages = 1;
+// card background: light rays + stars in the aura color (no character)
+function cardBackground(c) {
+  const W = 1080, H = 1600, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+  const col = c.auraColor && c.auraColor.startsWith('#') ? c.auraColor : c.auraColor === 'rainbow' ? '#ff5fd0' : c.auraColor === 'galaxy' ? '#7a5cff' : '#6a8cff';
+  const k = new THREE.Color(col); const rgba = a => `rgba(${k.r * 255 | 0},${k.g * 255 | 0},${k.b * 255 | 0},${a})`;
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#04050a'); bg.addColorStop(0.5, rgba(0.28)); bg.addColorStop(1, '#030305'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 30; i++) { const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.6, L = 1700; g.fillStyle = rgba(0.13); g.beginPath(); g.moveTo(W / 2, H * 0.55);
+    g.lineTo(W / 2 + Math.cos(a - 0.03) * L, H * 0.55 + Math.sin(a - 0.03) * L); g.lineTo(W / 2 + Math.cos(a + 0.03) * L, H * 0.55 + Math.sin(a + 0.03) * L); g.fill(); }
+  for (let i = 0; i < 500; i++) { g.fillStyle = i % 6 ? 'rgba(255,255,255,' + Math.random() * 0.8 + ')' : rgba(0.9); g.beginPath(); g.arc(Math.random() * W, Math.random() * H, Math.random() * 2.4, 0, 7); g.fill(); }
+  const gl = g.createRadialGradient(W / 2, H * 0.4, 20, W / 2, H * 0.4, 600); gl.addColorStop(0, rgba(0.6)); gl.addColorStop(1, rgba(0)); g.fillStyle = gl; g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = 'source-over';
+  g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,0.95)'; g.font = '800 120px Inter, system-ui, sans-serif'; g.shadowColor = col; g.shadowBlur = 40;
+  g.fillText((c.race || '').toUpperCase(), W / 2, H * 0.3, W - 80); g.shadowBlur = 0;
+  return cv;
+}
 async function showCard(c) {
   mode = 'card'; cardC = c; idleSpin = true;
   audio.playMusic('music_card');
   board.set(c.dead ? 'Your run is over' : 'Your character', c.dead ? c.death : c.worldLabel ? `World: ${c.worldLabel}` : '', '');
-  const art = await renderCardArt(c);
-  drawCard(cardCanvas, c, art); explainPages = drawExplain(explainCanvas, c, 0);
+  drawCard(cardCanvas, c, cardBackground(c)); explainPages = drawExplain(explainCanvas, c, 0);
   cardPanel.page = 0; cardPanel.draw(); cardPanel.show(true);
-  if (inXR()) cardPanel.mesh.position.set(-0.1, 1.5, -1.45); else cardPanel.mesh.position.set(-0.34, 1.6, -0.72);
+  if (inXR()) cardPanel.mesh.position.set(-0.1, 1.5, -1.45); else cardPanel.mesh.position.set(-0.62, 1.72, -1.75);
   bubble.show(false);
   cardMenu();
 }
@@ -321,9 +299,9 @@ function cardMenu() {
     items.push({ label: 'Save the card picture', onClick: () => savePicture() });
     items.push({ label: 'Save the recap as a video', onClick: () => recap(cardC, true) });
   }
-  items.push({ label: 'New character', primary: true, onClick: () => { cardPanel.show(false); genderMenu(); } });
+  items.push({ label: 'Spin a new life', primary: true, onClick: () => { cardPanel.show(false); genderMenu(); } });
   items.push({ label: 'Back to the menu', onClick: () => { cardPanel.show(false); titleMenu(); } });
-  showMenu({ title: cardC.dead ? 'DEAD' : (cardC.title || 'Your character'), sub: cardC.dead ? cardC.death : `${cardC.race}${cardC.worldLabel ? ' · ' + cardC.worldLabel : ''}. The worlds open in Part 2: this character is saved and waits there.`, items, side: true });
+  showMenu({ title: cardC.dead ? 'DEAD' : (cardC.title || 'Your character'), sub: cardC.dead ? cardC.death : `${cardC.race}${cardC.worldLabel ? ' · ' + cardC.worldLabel : ''}. Saved.`, items, side: true });
 }
 let explainPage = 0;
 function savePicture() {
@@ -346,9 +324,6 @@ async function recap(c, record) {
     rec = new MediaRecorder(vs, mime ? { mimeType: mime, videoBitsPerSecond: 6e6 } : undefined); rec.ondataavailable = e => e.data.size && chunks.push(e.data); rec.start(250);
   }
   bubble.text = c.comment || '(no comment)'; bubble.draw(); bubble.show(true);
-  forceMirror = true; mirrorG.visible = true;
-  const C2 = newCharacter(c.gender, c.comment); C2.race = c.race; C2.raceLook = c.raceLook; C2.parents = c.parents; C2.height = c.height; C2.weapon = c.weapon; C2.auraColor = c.auraColor; C2.armor = c.armor;
-  updateMirror(C2);
   for (const e of log) {
     board.set(e.q, '', e.sub, e.gold);
     wheel.setWheel({ id: 'recap', q: e.q, color: e.color, gold: e.gold, slices: e.labels.map(l => ({ label: l })) }, e.w);
@@ -430,20 +405,14 @@ function titleMenu() {
   wheel.setWheel({ id: 'idle', q: 'SPINBORN', color: 'rainbow', slices: 'SPINBORN'.split('').map(ch => ({ label: ch, w: 1 })) }, Array(8).fill(1));
   const n = Store.chars().length;
   const items = [
-    { label: 'New character', primary: true, onClick: () => genderMenu() },
-    { label: 'My characters', value: String(n), onClick: () => charsMenu() },
+    { label: 'Spin a new life', primary: true, onClick: () => genderMenu() },
+    { label: 'My saved runs', value: String(n), onClick: () => charsMenu() },
     { label: 'Settings', onClick: () => settingsMenu(() => titleMenu()) }
   ];
   if (xrSupported && !inXR()) items.splice(1, 0, { label: 'Play in VR', sub: isQuest ? 'Put on the headset view' : 'Needs a VR headset', onClick: () => enterVR() });
   showMenu({ title: 'SPINBORN', sub: 'The wheel decides your race, your powers, your whole life. Then you enter the world.', items });
 }
-function genderMenu() {
-  showMenu({ title: 'Boy or girl?', sub: 'You pick this. The wheels decide everything else.', back: () => titleMenu(), items: [
-    { label: 'Boy', primary: true, onClick: () => { closeMenus(); play('boy'); } },
-    { label: 'Girl', primary: true, onClick: () => { closeMenus(); play('girl'); } },
-    { label: 'Back', onClick: () => titleMenu() }
-  ] });
-}
+function genderMenu() { closeMenus(); play('boy'); }
 function charsMenu() {
   const list = Store.chars();
   const items = list.slice(0, 10).map(c => ({
@@ -451,7 +420,7 @@ function charsMenu() {
     onClick: () => charMenu(c)
   }));
   items.push({ label: 'Back', onClick: () => titleMenu() });
-  showMenu({ title: 'My characters', sub: list.length ? `${list.length} saved` : 'Nothing yet. Make a new character!', items, back: () => titleMenu() });
+  showMenu({ title: 'My saved runs', sub: list.length ? `${list.length} saved` : 'Nothing yet. Spin a new life!', items, back: () => titleMenu() });
 }
 function charMenu(c) {
   showMenu({ title: c.title || c.race, sub: `${c.race} · ${c.dead ? c.death : c.worldLabel || ''}`, back: () => charsMenu(), items: [
@@ -471,8 +440,7 @@ function settingsMenu(back) {
   showMenu({ title: 'Settings', back, items: [
     { label: 'Fast spins', value: onoff(S.fast), onClick: flip('fast') },
     { label: 'Auto spin (no lever)', value: onoff(S.auto), onClick: flip('auto') },
-    { label: 'Watch yourself change (mirror)', value: onoff(S.mirror), onClick: flip('mirror') },
-    { label: 'Point at a slice = % chance', value: onoff(S.chance), onClick: flip('chance') },
+        { label: 'Point at a slice = % chance', value: onoff(S.chance), onClick: flip('chance') },
     { label: 'Flashbang', value: { full: 'Full', soft: 'Soft', off: 'Sound only' }[S.flash], onClick: cycle('flash', ['full', 'soft', 'off']) },
     { label: 'Music', value: vol(S.music), onClick: cycle('music', [0, 0.25, 0.45, 0.7, 1]) },
     { label: 'Sounds', value: vol(S.sfx), onClick: cycle('sfx', [0, 0.35, 0.6, 0.9, 1]) },
@@ -507,7 +475,7 @@ const tmpV = new THREE.Vector3();
 renderer.setAnimationLoop((t, frame) => {
   const nowMs = performance.now(); const dt = Math.min(0.05, (nowMs - lastT) / 1000); lastT = nowMs; const now = nowMs / 1000;
   if (idleSpin && !wheel.spinning) wheel.angle -= dt * 0.25;
-  wheel.update(dt, now); meme.update(dt); character.update(dt);
+  wheel.update(dt, now); meme.update(dt);
   // lever spring back + glow while waiting
   if (!leverGrab) leverAngle = Math.max(0, leverAngle - dt * 2.6);
   leverPivot.rotation.x = leverAngle;
@@ -539,16 +507,17 @@ renderer.setAnimationLoop((t, frame) => {
     renderer.domElement.style.cursor = knobHot || (interact.hot.get('mouse') && interact.hot.get('mouse').button) ? 'pointer' : 'default';
   }
   if (!renderer.xr.isPresenting && !FAKE_XR && !window.__sbFreeze) { camera.position.x = PC_CAM.x + Math.sin(now * 0.3) * 0.03; camera.position.y = PC_CAM.y + Math.sin(now * 0.4) * 0.015; }
-  doPendingArt();
   renderer.render(scene, camera);
 });
 
 // ---------------- boot ----------------
+// PC file: tell the little server inside SPINBORN.exe the game is still open (it closes itself after the tab closes)
+if (location.port === '47819') { const ping = () => fetch('/alive').catch(() => { }); ping(); setInterval(ping, 15000); }
 (async function boot() {
   await loadFonts('gs3kit/fonts/');
   board.draw(); bubble.draw(); layoutDesk(); wheel.drawDisc(-1);
   if (navigator.xr && navigator.xr.isSessionSupported) { try { xrSupported = await navigator.xr.isSessionSupported('immersive-vr'); } catch (e) { } }
   document.getElementById('loading').remove();
   titleMenu();
-  window.__sb = { S, io, board, wheel, meme, brain: () => brain, C: () => C, Store, character, mode: () => mode, pullLever, renderer, scene, camera, mirrorG, updateMirror, newCharacter, showCard, interact };
+  window.__sb = { S, io, board, wheel, meme, brain: () => brain, C: () => C, Store, mode: () => mode, pullLever, renderer, scene, camera, mirrorG, updateMirror, newCharacter, showCard, interact };
 })();
