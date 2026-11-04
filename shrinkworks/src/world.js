@@ -25,7 +25,8 @@ function mats() {
     counter: photoMat('counter', { roughness: 0.32, envMapIntensity: 1.1 }),
     cabinet: photoMat('cabinet', { roughness: 0.85, color: new THREE.Color('#e6ddd2') }),
     floor: photoMat('floor', { roughness: 0.75 }),
-    wall: photoMat('wall', { roughness: 1, color: new THREE.Color('#f1ebe2') }),
+    // painted walls: one even paint color over the real plaster bumps (the plaster photo itself looked dirty brown)
+    wall: new THREE.MeshStandardMaterial({ color: 0xefeae2, roughness: 0.9, normalMap: texSet('wall').normalMap, normalScale: new THREE.Vector2(0.7, 0.7) }),
     ceiling: new THREE.MeshStandardMaterial({ color: 0xf3f1ec, roughness: 0.95, emissive: 0x3a3936 }),
     splash: photoMat('splash', { roughness: 0.25 }),
     steel: partMaterial('alu', '#c9ced3'),
