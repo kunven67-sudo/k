@@ -208,7 +208,7 @@ const SIZE_RAY = {
   mesh: (p) => {
     const k = p.size.y / 0.9;
     const grow = p.props.mode === 'grow', col = grow ? '#36e0ff' : '#b26cff';
-    const beam = new THREE.Mesh(geo.cyl(0.03, 1, 10), beamMaterial(col));
+    const beam = new THREE.Mesh(geo.cyl(0.075, 1, 14), beamMaterial(col)); // ~1.5 cm glowing beam: easy to see in VR
     beam.geometry = beam.geometry.clone().translate(0, 0.5, 0);
     beam.position.y = 0.46; beam.visible = false; beam.renderOrder = 5;
     const lensM = glowMat(col, 1.2);
@@ -260,7 +260,7 @@ const FX_RAY = {
   shapes: (p) => [{ t: 'cyl', hh: p.size.y / 2, r: p.size.x / 2 }],
   mesh: (p) => {
     const k = p.size.y / 0.9, col = FX_COLOR[p.props.mode] || '#4dff88';
-    const beam = new THREE.Mesh(geo.cyl(0.03, 1, 10), beamMaterial(col));
+    const beam = new THREE.Mesh(geo.cyl(0.075, 1, 14), beamMaterial(col)); // ~1.5 cm glowing beam: easy to see in VR
     beam.geometry = beam.geometry.clone().translate(0, 0.5, 0);
     beam.position.y = 0.46; beam.visible = false; beam.renderOrder = 5;
     const lensM = glowMat(col, 1.2);
