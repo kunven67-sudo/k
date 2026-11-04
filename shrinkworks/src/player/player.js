@@ -33,7 +33,10 @@ function makeCollider() {
     cc.setCharacterMass(75000 * s * s * s);
   }
   player.body.setTranslation({ x: player.pos.x, y: player.pos.y + (HALF0 + RAD0) * s, z: player.pos.z }, true);
+  syncColliders();
 }
+// the character controller looks at where your collider is now: after a teleport / resize move it there right away
+function syncColliders() { if (world.propagateModifiedBodyPositionsToColliders) world.propagateModifiedBodyPositionsToColliders(); }
 export function initPlayer() {
   player.body = world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(player.pos.x, player.pos.y + HALF0 + RAD0, player.pos.z));
   const cc = world.createCharacterController(0.12);
@@ -137,6 +140,7 @@ export function teleportPlayer(p) {
   player.pos.copy(p); player.vel.set(0, 0, 0);
   player.teleported = true; // VR: move your play space with you instead of pulling you back under your real head
   player.body.setTranslation({ x: p.x, y: p.y + (HALF0 + RAD0) * player.scale, z: p.z }, true);
+  syncColliders();
 }
 export function knock(v) { player.push.add(v); if (v.y > 2) player.grounded = false; }
 export function playerCenter(out = new THREE.Vector3()) { return out.copy(player.pos).setY(player.pos.y + (HALF0 + RAD0) * player.scale); }

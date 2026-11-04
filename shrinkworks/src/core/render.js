@@ -210,7 +210,8 @@ const _p = new THREE.Vector3();
 let spanNow = 0;
 export function updateSun(focus, scale = 1) {
   const q = QUALITY[qName];
-  const span = Math.max(0.6, Math.min(q.span, q.span * scale * 1.2));
+  // small you sees far: keep shadows out to ~4x your height (at least 25 cm) so the apple next to you still has one
+  const span = Math.max(2.5, Math.min(q.span, q.span * scale * 4));
   if (Math.abs(span - spanNow) > spanNow * 0.08) {
     spanNow = span;
     Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 1, far: 400 });
