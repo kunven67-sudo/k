@@ -1,0 +1,34 @@
+/* THE MASK - page + HUD. Menus use the Game System 3 kit (gs3kit/). */
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0a10; color: #f6edd8; font-family: var(--k-font, system-ui, sans-serif); -webkit-user-select: none; user-select: none; touch-action: none; }
+canvas { display: block; }
+#loading { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; font: 300 46px var(--k-font, sans-serif); letter-spacing: .3em; color: #f1e7d0; background: #0b0a10; z-index: 300; }
+#loading small { display: block; margin-top: 18px; font-size: 15px; letter-spacing: .05em; color: rgba(241,231,208,.6); }
+#hud { position: fixed; left: 20px; top: 16px; z-index: 10; pointer-events: none; font: 600 15px var(--k-font, sans-serif); text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+#loopinfo { color: #9fe8e0; letter-spacing: .04em; }
+#loopinfo.rec { color: #ff5a64; }
+#fps { margin-top: 4px; color: rgba(255,255,255,.6); font-weight: 400; }
+#cross { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 0 3px rgba(0,0,0,.8); z-index: 10; pointer-events: none; transition: transform .12s; }
+#cross.grab { transform: scale(2.2); background: rgba(159,232,224,.95); }
+#hint { position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%); max-width: 80vw; padding: 10px 20px; border-radius: 99px; background: rgba(15,12,18,.72); font: 500 16px var(--k-font, sans-serif); text-align: center; opacity: 0; transition: opacity .3s; z-index: 10; pointer-events: none; }
+#hint.on { opacity: 1; }
+#toast { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); padding: 10px 22px; border-radius: 12px; background: rgba(15,12,18,.8); font: 600 18px var(--k-font, sans-serif); opacity: 0; transition: opacity .25s; z-index: 11; pointer-events: none; }
+#toast.on { opacity: 1; }
+/* menus */
+.gs3-panel.wide { width: min(820px, calc(100vw - 30px)); }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.tabs .gs3-btn { min-width: 0; height: 40px; padding: 0 18px; font-size: 15px; }
+.spawn { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.spawn .head { grid-column: 1 / -1; margin: 10px 0 0; font-weight: 600; }
+.spawn .tile { min-height: 48px; justify-content: center; text-align: center; background: rgba(255,255,255,.06); }
+.gs3-sub.help { margin: 0 0 12px; color: var(--k-text); }
+/* phone */
+#touch { position: fixed; inset: 0; z-index: 20; }
+#touch .stick { position: fixed; width: 120px; height: 120px; left: 40px; bottom: 40px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.18); }
+#touch .stick.on { background: rgba(255,255,255,.14); }
+#touch .knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.35); }
+#touch .tbtns { position: fixed; right: 16px; bottom: 20px; display: grid; grid-template-columns: repeat(3, 68px); gap: 10px; }
+#touch .tbtn { width: 68px; height: 68px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); background: rgba(20,16,22,.5); color: #f6edd8; font: 600 13px var(--k-font, sans-serif); }
+#touch .tbtn.big { background: rgba(44,140,135,.55); }
+#touch .tbtn.on { background: rgba(255,255,255,.35); }
+body.touch #hint { bottom: auto; top: 52px; font-size: 14px; }
+body.touch #hud { top: 12px; }

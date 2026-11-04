@@ -16,7 +16,7 @@ function M() {
 function seg(len, r, mat) { // capsule pointing -Z from its pivot
   const geo = new THREE.CapsuleGeometry(r, Math.max(0.001, len - 2 * r), 2, 7);
   geo.rotateX(-Math.PI / 2); geo.translate(0, 0, -len / 2);
-  const m = new THREE.Mesh(geo, mat); m.castShadow = true; return m;
+  const m = new THREE.Mesh(geo, mat); return m; // (no shadows: saves draw calls in VR)
 }
 
 export function buildHand(side = 'right') {
@@ -24,7 +24,7 @@ export function buildHand(side = 'right') {
   const root = new THREE.Group(); root.name = 'hand-' + side;
   const hand = new THREE.Group(); root.add(hand);
   const palm = new THREE.Mesh(new RoundedBoxGeometry(0.084, 0.032, 0.088, 2, 0.012), m.glove);
-  palm.position.set(0, 0, -0.046); palm.castShadow = true; hand.add(palm);
+  palm.position.set(0, 0, -0.046); hand.add(palm);
   // back-of-hand stitches
   for (const x of [-0.02, 0, 0.02]) {
     const s = new THREE.Mesh(new THREE.BoxGeometry(0.0026, 0.0012, 0.05), m.seam);
@@ -32,7 +32,7 @@ export function buildHand(side = 'right') {
   }
   // cuff
   const cuffGeo = new THREE.CylinderGeometry(0.041, 0.048, 0.056, 10); cuffGeo.rotateX(Math.PI / 2); cuffGeo.scale(1, 0.72, 1);
-  const cuff = new THREE.Mesh(cuffGeo, m.cuff); cuff.position.z = 0.024; cuff.castShadow = true; hand.add(cuff);
+  const cuff = new THREE.Mesh(cuffGeo, m.cuff); cuff.position.z = 0.024; hand.add(cuff);
   const bandGeo = new THREE.TorusGeometry(0.046, 0.0045, 5, 14); bandGeo.scale(1, 0.72, 1);
   const band = new THREE.Mesh(bandGeo, m.cuffD); band.position.z = 0.05; hand.add(band);
   const button = new THREE.Mesh(new THREE.CylinderGeometry(0.0055, 0.0055, 0.004, 8), m.brass);

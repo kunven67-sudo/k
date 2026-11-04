@@ -167,7 +167,7 @@ function buildClock() {
     const a = i / 12 * Math.PI * 2; tick.position.set(Math.sin(a) * 0.0128, Math.cos(a) * 0.0128, 0.0046); tick.rotation.z = -a; clock.add(tick);
   }
   const hand = (len, w, mat, z) => {
-    const pivot = new THREE.Group(); pivot.position.z = z;
+    const pivot = new THREE.Group(); pivot.userData.keep = true; pivot.position.z = z;
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, len, 0.0009), mat); m.position.y = len * 0.42; pivot.add(m);
     clock.add(pivot); return pivot;
   };

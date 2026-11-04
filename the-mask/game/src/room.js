@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { toon, toonify, glowSprite, PAL } from './toon.js';
+import { mergeStatic, emit } from './game.js';
+import { S } from './settings.js';
 
 export const ROOM = { W: 6, D: 7, H: 3, win: { x0: -0.8, x1: 0.8, y0: 0.9, y1: 2.55 } };
 const HW = ROOM.W / 2, HD = ROOM.D / 2;
@@ -253,7 +255,7 @@ function windowPiece() {
     const tie = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.02, 6, 12), toon({ color: PAL.brass }));
     tie.position.set(cx + sx * (w / 2 + 0.26), 1.05, z + 0.2); tie.scale.set(1.3, 0.5, 1); g.add(tie);
   }
-  g.userData.update = (t, dt, flash) => { glassMat.uniforms.time.value = t; glassMat.uniforms.flash.value = flash; rain.userData.update(dt); };
+  g.userData.update = (t, dt, flash) => { glassMat.uniforms.time.value = t; glassMat.uniforms.flash.value = flash; rain.visible = S.rain; if (S.rain) rain.userData.update(dt); };
   return g;
 }
 
@@ -270,7 +272,7 @@ function grandfatherClock() {
   add(new THREE.BoxGeometry(0.36, 0.06, 0.04), woodD, 0, 1.34, 0.16); add(new THREE.BoxGeometry(0.36, 0.06, 0.04), woodD, 0, 0.5, 0.16);
   add(new THREE.BoxGeometry(0.06, 0.84, 0.04), woodD, -0.18, 0.92, 0.16); add(new THREE.BoxGeometry(0.06, 0.84, 0.04), woodD, 0.18, 0.92, 0.16);
   // pendulum
-  const pend = new THREE.Group(); pend.position.set(0, 1.28, 0.12); g.add(pend);
+  const pend = new THREE.Group(); pend.userData.keep = true; pend.position.set(0, 1.28, 0.12); g.add(pend);
   const rod = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.58, 0.01), brassD); rod.position.y = -0.29; pend.add(rod);
   const bob = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.02, 18), brass); bob.rotation.x = Math.PI / 2; bob.position.y = -0.6; pend.add(bob);
   // hood + dial
@@ -284,7 +286,7 @@ function grandfatherClock() {
     const t = add(new THREE.BoxGeometry(big ? 0.022 : 0.011, big ? 0.045 : 0.026, 0.005), big ? tealM : ink, Math.sin(a) * 0.155, 1.79 + Math.cos(a) * 0.155, 0.176);
     t.rotation.z = -a;
   }
-  const mkHand = (len, w, mat, z) => { const p = new THREE.Group(); p.position.set(0, 1.79, z); g.add(p); const m = new THREE.Mesh(new THREE.BoxGeometry(w, len, 0.006), mat); m.position.y = len * 0.4; p.add(m); return p; };
+  const mkHand = (len, w, mat, z) => { const p = new THREE.Group(); p.userData.keep = true; p.position.set(0, 1.79, z); g.add(p); const m = new THREE.Mesh(new THREE.BoxGeometry(w, len, 0.006), mat); m.position.y = len * 0.4; p.add(m); return p; };
   const hourH = mkHand(0.1, 0.02, ink, 0.18), minH = mkHand(0.15, 0.013, ink, 0.186), loopH = mkHand(0.165, 0.007, tealM, 0.192);
   add(new THREE.CylinderGeometry(0.014, 0.014, 0.02, 10), brass, 0, 1.79, 0.19).rotation.x = Math.PI / 2;
   // crown: broken pediment + finials
@@ -317,38 +319,48 @@ export function maskStand() {
 
 /* ---------- furniture (KayKit, CC0) ---------- */
 const loader = new GLTFLoader();
+export function setLoaderManager(m) { loader.manager = m; }
 async function kk(path, s, x, y, z, ry = 0) {
   const gl = await loader.loadAsync(path);
   const o = toonify(gl.scene); o.scale.setScalar(s); o.position.set(x, y, z); o.rotation.y = ry;
   return o;
 }
 
+// what's in the room at the start. dynamic = it can be knocked over / grabbed / thrown (props.js gives it a body)
+export const FURNITURE = [
+  { id: 'rug', file: 'kaykit/rug_oval_A.gltf', s: 0.95, p: [0, 0, -0.5], flat: true },
+  { id: 'table', file: 'kaykit/table_small.gltf', s: 0.76, p: [0, 0, -0.75], dynamic: true },
+  { id: 'armchair', file: 'kaykit/armchair.gltf', s: 0.74, p: [1.75, 0, -2.35], r: -0.75, dynamic: true },
+  { id: 'floorlamp', file: 'kaykit/lamp_standing.gltf', s: 0.7, p: [2.55, 0, -2.95], dynamic: true },
+  { id: 'cabinet', file: 'kaykit/cabinet_medium_decorated.gltf', s: 0.74, p: [3 - 0.4, 0, 0.2], r: -Math.PI / 2, fixed: true },
+  { id: 'shelf', file: 'kaykit/shelf_B_large_decorated.gltf', s: 0.62, p: [1.95, 1.55, -3.5], fixed: true },
+  { id: 'frame1', file: 'kaykit/pictureframe_large_A.gltf', s: 0.75, p: [-3, 1.75, 1.2], r: Math.PI / 2, wall: true },
+  { id: 'frame2', file: 'kaykit/pictureframe_medium.gltf', s: 0.75, p: [-3, 1.6, 2.4], r: Math.PI / 2, wall: true },
+  { id: 'chair', file: 'kaykit/chair_A_wood.gltf', s: 0.74, p: [-0.85, 0, -0.55], r: Math.PI / 2 + 0.25, dynamic: true },
+  { id: 'lamp', file: 'kaykit/lamp_table.gltf', s: 0.36, p: [0.2, 0.76, -0.95], dynamic: true },
+  { id: 'candles', file: 'kk_halloween/candle_triple.gltf', s: 0.3, p: [3 - 0.45, 0.74, 0.15], r: -Math.PI / 2, dynamic: true },
+  { id: 'lantern', file: 'kk_halloween/lantern_hanging.gltf', s: 0.5, p: [-1.7, ROOM.H, 1.6], wall: true },
+  { id: 'pillow', file: 'kaykit/pillow_A.gltf', s: 0.35, p: [-0.12, 0.76, -0.62], r: 0.3, dynamic: true }
+];
+
 export async function buildRoom(scene, base = '') {
   const room = new THREE.Group(); room.name = 'room'; scene.add(room);
   room.add(floor()); room.add(walls());
   const win = windowPiece(); room.add(win);
   const clock = grandfatherClock(); clock.position.set(-HW + 0.22, 0, -1.3); clock.rotation.y = Math.PI / 2; room.add(clock);
+  mergeStatic(clock);
 
-  const K = base + 'assets/kaykit/', HL = base + 'assets/kk_halloween/';
-  const parts = await Promise.all([
-    kk(K + 'rug_oval_A.gltf', 0.95, 0, 0, -0.5),
-    kk(K + 'table_small.gltf', 0.76, 0, 0, -0.75),
-    kk(K + 'armchair.gltf', 0.74, 1.75, 0, -2.35, -0.75),
-    kk(K + 'lamp_standing.gltf', 0.7, 2.55, 0, -2.95),
-    kk(K + 'cabinet_medium_decorated.gltf', 0.74, HW - 0.4, 0, 0.2, -Math.PI / 2),
-    kk(K + 'shelf_B_large_decorated.gltf', 0.62, 1.95, 1.55, -HD),
-    kk(K + 'pictureframe_large_A.gltf', 0.75, -HW, 1.75, 1.2, Math.PI / 2),
-    kk(K + 'pictureframe_medium.gltf', 0.75, -HW, 1.6, 2.4, Math.PI / 2),
-    kk(K + 'chair_A_wood.gltf', 0.74, -0.85, 0, -0.55, Math.PI / 2 + 0.25),
-    kk(K + 'lamp_table.gltf', 0.36, 0.2, 0.76, -0.95),
-    kk(HL + 'candle_triple.gltf', 0.3, HW - 0.45, 0.74, 0.15, -Math.PI / 2),
-    kk(HL + 'lantern_hanging.gltf', 0.5, -1.7, ROOM.H, 1.6),
-    kk(K + 'pillow_A.gltf', 0.35, -0.12, 0.76, -0.62, 0.3)
-  ]);
-  parts[0].scale.y = 0.25; // flat rug so table + chair legs stand on the floor
-  parts.forEach((p) => room.add(p));
+  const A = base + 'assets/';
+  const parts = await Promise.all(FURNITURE.map((f) => kk(A + f.file, f.s, f.p[0], f.p[1], f.p[2], f.r || 0)));
+  const furniture = {};
+  parts.forEach((p, i) => {
+    const f = FURNITURE[i]; p.userData.furniture = f; furniture[f.id] = p;
+    if (f.flat) p.scale.y = f.s * 0.25; // flat rug so table + chair legs stand on the floor
+    if (f.flat || f.wall) p.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+    room.add(p);
+  });
 
-  /* lights */
+  /* lights: always exactly these (adding lights later would make the game stutter while shaders rebuild) */
   scene.add(new THREE.HemisphereLight(0x405585, 0x2a1812, 1.1));
   const moon = new THREE.DirectionalLight(0x8fb0ff, 1.6);
   moon.position.set(-2.2, 4.1, -HD - 5); moon.target.position.set(-0.5, 0, 0.9);
@@ -357,20 +369,28 @@ export async function buildRoom(scene, base = '') {
   moon.shadow.bias = -0.0015; moon.shadow.normalBias = 0.02;
   scene.add(moon, moon.target);
   const lamps = [];
-  const lamp = (color, power, x, y, z, glow, dist = 7) => {
+  // a lamp light that rides along with its furniture (knock the lamp over and the light goes with it)
+  const lamp = (color, power, followId, x, y, z, glow, dist = 7) => {
     const L = new THREE.PointLight(color, power, dist, 1.7); L.position.set(x, y, z); scene.add(L);
     const s = glowSprite(color, glow, 0.55); s.position.set(x, y, z); scene.add(s);
-    lamps.push({ L, s, base: power, seed: Math.random() * 10 });
+    const obj = furniture[followId];
+    obj.updateMatrixWorld(true);
+    const local = obj.worldToLocal(new THREE.Vector3(x, y, z));
+    lamps.push({ L, s, base: power, seed: Math.random() * 10, obj, local });
   };
-  lamp(0xffb36b, 5.5, 0.2, 1.08, -0.95, 0.55);          // table lamp
-  lamp(0xffa75c, 4.5, 2.55, 1.66, -2.95, 0.8);          // standing lamp
-  lamp(0xff9440, 1.4, HW - 0.45, 1.0, 0.18, 0.35, 3); // candles on the cabinet
-  lamp(0xffb062, 1.6, -1.7, ROOM.H - 0.62, 1.6, 0.5, 4); // hanging lantern
+  lamp(0xffb36b, 5.5, 'lamp', 0.2, 1.08, -0.95, 0.55);              // table lamp
+  lamp(0xffa75c, 4.5, 'floorlamp', 2.55, 1.66, -2.95, 0.8);         // standing lamp
+  lamp(0xff9440, 1.4, 'candles', HW - 0.45, 1.0, 0.18, 0.35, 3);    // candles on the cabinet
+  lamp(0xffb062, 1.6, 'lantern', -1.7, ROOM.H - 0.62, 1.6, 0.5, 4); // hanging lantern
 
   let flash = 0, nextFlash = 6;
+  const tmp = new THREE.Vector3();
   const update = (t, dt, date, loopFrac) => {
-    // lightning: rare double flash
-    if (t > nextFlash) { flash = 1; nextFlash = t + 9 + Math.random() * 14; }
+    // lightning: rare double flash, thunder a moment later
+    if (t > nextFlash) {
+      nextFlash = t + 9 + Math.random() * 14;
+      if (S.lightning) { flash = 1; emit('lightning', 0.6 + Math.random() * 0.4); }
+    }
     flash = Math.max(0, flash - dt * 2.4);
     const f2 = flash > 0.5 ? flash : flash * (0.6 + 0.4 * Math.sin(t * 40));
     moon.intensity = 1.6 + f2 * 5;
@@ -378,8 +398,10 @@ export async function buildRoom(scene, base = '') {
     clock.userData.update(t, date, loopFrac);
     for (const l of lamps) {
       const k = 1 + Math.sin(t * 7.3 + l.seed) * 0.03 + Math.sin(t * 13.1 + l.seed * 2) * 0.02;
-      l.L.intensity = l.base * k; l.s.material.opacity = 0.55 * k;
+      const on = l.obj.visible && l.obj.parent ? 1 : 0;
+      l.L.intensity = l.base * k * on; l.s.material.opacity = 0.55 * k * on;
+      l.obj.localToWorld(tmp.copy(l.local)); l.L.position.copy(tmp); l.s.position.copy(tmp);
     }
   };
-  return { room, update, setFlash: (v) => { flash = v; } };
+  return { room, update, furniture, clock, moon, setFlash: (v) => { flash = v; } };
 }

@@ -59,27 +59,32 @@ export function glowSprite(color, size, strength = 1) {
   return s;
 }
 
-// copies of you: same toon look plus a colored rim + slight see-through
+// copies of you: same toon look plus a colored rim + slight see-through. One shader for every copy (the color is a
+// uniform), so a new copy never makes the game hitch while a shader compiles.
 export function ghostify(root, color) {
-  const rim = new THREE.Color(color);
+  const rim = { value: new THREE.Color(color) };
+  const fade = { value: 1 };
   root.traverse((o) => {
     if (!o.isMesh) return;
     const conv = (mm) => {
       const m = mm.clone();
-      m.transparent = true; m.opacity = 0.92; m.depthWrite = true;
-      m.color = (m.color ? m.color.clone() : new THREE.Color(1, 1, 1)).lerp(rim, 0.55);
-      m.emissive = rim.clone().multiplyScalar(0.12);
+      m.transparent = true; m.opacity = 0.93; m.depthWrite = true;
+      m.color = (m.color ? m.color.clone() : new THREE.Color(1, 1, 1)).lerp(rim.value, 0.5);
+      if (!(m.isMeshToonMaterial || m.isMeshLambertMaterial || m.isMeshStandardMaterial || m.isMeshPhongMaterial)) return m; // glows: just tinted
+      m.emissive = rim.value.clone().multiplyScalar(0.12);
       m.onBeforeCompile = (sh) => {
-        sh.uniforms.rimColor = { value: rim };
-        sh.fragmentShader = 'uniform vec3 rimColor;\n' + sh.fragmentShader.replace('#include <dithering_fragment>',
+        sh.uniforms.rimColor = rim; sh.uniforms.ghostFade = fade;
+        sh.fragmentShader = 'uniform vec3 rimColor;\nuniform float ghostFade;\n' + sh.fragmentShader.replace('#include <dithering_fragment>',
           `#include <dithering_fragment>
            float rimF = 1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0);
-           gl_FragColor.rgb += rimColor * smoothstep(0.45, 0.95, rimF) * 0.9;`);
+           gl_FragColor.rgb += rimColor * smoothstep(0.45, 0.95, rimF) * 0.9;
+           gl_FragColor.a *= ghostFade;`);
       };
-      m.customProgramCacheKey = () => 'ghost' + rim.getHexString();
+      m.customProgramCacheKey = () => 'ghost';
       return m;
     };
     o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
   });
+  root.userData.ghost = { rim, fade };
   return root;
 }

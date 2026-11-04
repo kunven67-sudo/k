@@ -1,0 +1,137 @@
+/* Game System 3 console kit: a game's menus look like the console picked in Game System 3 (PS5, Xbox, Switch, PS4)
+   and switch the moment you pick another one. Outside Game System 3 they use Game System 3's own look.
+   Use the classes below in a game's menus (see README.md). Fonts: OFL (Source Sans 3, BIZ UDPGothic, Inter). */
+/* PlayStation: Inter, the closest free font to Sony's SST, sized like Game System 3's */
+@font-face { font-family: 'GS3K PS'; src: url('fonts/inter-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; size-adjust: 96.5%; }
+@font-face { font-family: 'GS3K Switch'; src: url('fonts/biz-udpgothic-latin-400-normal.woff2') format('woff2'); font-weight: 400 500; }
+@font-face { font-family: 'GS3K Switch'; src: url('fonts/biz-udpgothic-latin-700-normal.woff2') format('woff2'); font-weight: 600 900; }
+@font-face { font-family: 'GS3K Segoe'; src: url('fonts/open-sans-latin-300-normal.woff2') format('woff2'); font-weight: 300; }
+@font-face { font-family: 'GS3K Segoe'; src: url('fonts/open-sans-latin-400-normal.woff2') format('woff2'); font-weight: 400 500; }
+@font-face { font-family: 'GS3K Segoe'; src: url('fonts/open-sans-latin-600-normal.woff2') format('woff2'); font-weight: 600 900; }
+@font-face { font-family: 'GS3K Inter'; src: url('fonts/inter-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; }
+
+/* ---------- the look of each console, as variables (canvas games read them with GS3Console.theme()) ---------- */
+:root {
+  --k-font: 'GS3K Inter', 'Segoe UI', system-ui, sans-serif;
+  --k-title-weight: 700;
+  --k-text: #f3f4f7; --k-text2: rgba(243,244,247,.66);
+  --k-dim: rgba(3,4,6,.62);
+  --k-panel: rgba(24,26,32,.96); --k-panel-radius: 22px; --k-panel-line: rgba(255,255,255,.16);
+  --k-item: transparent; --k-item-radius: 14px; --k-line: transparent;
+  --k-btn: rgba(255,255,255,.1); --k-btn-text: #f3f4f7; --k-btn-radius: 99px;
+  --k-focus-bg: #fff; --k-focus-text: #0b0c10; --k-focus-ring: 0 0 0 3px rgba(255,255,255,.85), 0 0 22px rgba(160,196,255,.55);
+  --k-focus-anim: none;
+  --k-accent: #6aa8ff; --k-toggle-off: rgba(255,255,255,.16); --k-check: 0;
+  --k-ok: 'Enter'; --k-back: 'Esc';
+}
+html[data-gs3-look="ps5"] {
+  --k-font: 'GS3K PS', 'Segoe UI', sans-serif; --k-title-weight: 300;
+  --k-text: #fff; --k-text2: rgba(255,255,255,.72);
+  --k-dim: rgba(0,0,0,.66);
+  --k-panel: rgba(30,31,36,.96); --k-panel-radius: 12px; --k-panel-line: transparent;
+  --k-item-radius: 8px; --k-line: rgba(255,255,255,.08);
+  --k-btn: rgba(255,255,255,.16); --k-btn-text: #fff; --k-btn-radius: 999px;
+  --k-focus-bg: rgba(255,255,255,.14); --k-focus-text: #fff; --k-focus-ring: 0 0 0 2px #fff, 0 0 18px 2px rgba(255,255,255,.35);
+  --k-focus-anim: gs3k-ps5 1.8s ease-in-out infinite;
+  --k-accent: #0070d1; --k-toggle-off: rgba(255,255,255,.28);
+}
+html[data-gs3-look="xbox"] {
+  --k-font: 'Segoe UI Variable Text', 'Segoe UI', 'GS3K Segoe', sans-serif; --k-title-weight: 300;
+  --k-text: #fff; --k-text2: rgba(255,255,255,.75);
+  --k-dim: rgba(0,0,0,.7);
+  --k-panel: #262626; --k-panel-radius: 4px; --k-panel-line: transparent;
+  --k-item: #2d2d2d; --k-item-radius: 4px; --k-line: transparent;
+  --k-btn: #383838; --k-btn-text: #fff; --k-btn-radius: 4px;
+  --k-focus-bg: #383838; --k-focus-text: #fff; --k-focus-ring: 0 0 0 3px #2ca02c, 0 0 16px 3px rgba(44,160,44,.7);
+  --k-focus-anim: gs3k-xbox .14s ease-out;
+  --k-accent: #107c10; --k-toggle-off: transparent; --k-check: 1;
+}
+html[data-gs3-look="switch"] {
+  --k-font: 'GS3K Switch', 'Yu Gothic UI', 'Meiryo', sans-serif; --k-title-weight: 400;
+  --k-text: #fff; --k-text2: rgba(255,255,255,.7);
+  --k-dim: rgba(0,0,0,.55);
+  --k-panel: #464646; --k-panel-radius: 10px; --k-panel-line: transparent;
+  --k-item: transparent; --k-item-radius: 0; --k-line: #5c5c5c;
+  --k-btn: #3c3c3c; --k-btn-text: #fff; --k-btn-radius: 6px;
+  --k-focus-bg: #1f2227; --k-focus-text: #fff; --k-focus-ring: inset 0 0 0 3px #71dbec;
+  --k-focus-anim: gs3k-switch 1.2s ease-in-out infinite;
+  --k-accent: #0fe3b5; --k-toggle-off: #6b6b6b;
+}
+html[data-gs3-look="ps4"] {
+  --k-font: 'GS3K PS', 'Segoe UI', sans-serif; --k-title-weight: 300;
+  --k-text: #fff; --k-text2: rgba(255,255,255,.75);
+  --k-dim: rgba(0,8,40,.6);
+  --k-panel: rgba(12,32,92,.97); --k-panel-radius: 0; --k-panel-line: rgba(160,190,255,.2);
+  --k-item: transparent; --k-item-radius: 0; --k-line: rgba(160,190,255,.18);
+  --k-btn: rgba(0,15,60,.55); --k-btn-text: #fff; --k-btn-radius: 2px;
+  --k-focus-bg: rgba(255,255,255,.14); --k-focus-text: #fff; --k-focus-ring: 0 0 0 2px #fff, 0 0 14px rgba(170,210,255,.55);
+  --k-accent: #1f71f5; --k-toggle-off: rgba(0,0,0,.25); --k-check: 1;
+}
+@keyframes gs3k-ps5 { 0%, 100% { box-shadow: 0 0 0 2px #fff, 0 0 10px 1px rgba(255,255,255,.28); } 50% { box-shadow: 0 0 0 2px #fff, 0 0 22px 4px rgba(255,255,255,.5); } }
+@keyframes gs3k-xbox { from { box-shadow: 0 0 0 3px #2ca02c, 0 0 6px 1px rgba(44,160,44,.7); } }
+@keyframes gs3k-switch { 0%, 100% { box-shadow: inset 0 0 0 3px #71dbec; } 50% { box-shadow: inset 0 0 0 3px #b4f5fc; } }
+
+/* ---------- pieces ---------- */
+.gs3-screen, .gs3-screen *, .gs3-panel, .gs3-panel *, .gs3-hints, .gs3-hints * { box-sizing: border-box; }
+.gs3-screen { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: var(--k-dim); font-family: var(--k-font); color: var(--k-text); animation: gs3k-fade .18s ease; }
+.gs3-screen[hidden] { display: none; }
+.gs3-panel { width: min(560px, calc(100vw - 40px)); max-height: calc(100vh - 60px); overflow: auto; padding: 30px 32px; background: var(--k-panel); border-radius: var(--k-panel-radius); box-shadow: 0 0 0 1px var(--k-panel-line), 0 24px 70px rgba(0,0,0,.55); font-family: var(--k-font); color: var(--k-text); animation: gs3k-pop .2s cubic-bezier(.2,.8,.2,1); scrollbar-width: none; }
+.gs3-title { margin: 0 0 6px; font-size: 28px; font-weight: var(--k-title-weight); letter-spacing: 0; }
+.gs3-sub { margin: 0 0 20px; color: var(--k-text2); font-size: 15px; line-height: 1.5; }
+.gs3-menu { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; }
+html[data-gs3-look="xbox"] .gs3-menu { gap: 6px; }
+.gs3-item { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 54px; padding: 10px 18px; border: 0; border-radius: var(--k-item-radius); background: var(--k-item); color: var(--k-text); font: 400 18px var(--k-font); text-align: left; cursor: pointer; box-shadow: inset 0 -1px 0 var(--k-line); transition: background .12s, color .12s; }
+html:not([data-gs3-look]) .gs3-item, html[data-gs3-look=""] .gs3-item { font-weight: 600; font-size: 16px; }
+.gs3-item .gs3-value { margin-left: auto; color: var(--k-text2); font-size: 15px; }
+.gs3-item svg, .gs3-btn svg { width: 22px; height: 22px; flex: none; }
+.gs3-item:hover { background: rgba(255,255,255,.07); }
+.gs3-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-width: 150px; height: 46px; padding: 0 24px; border: 0; border-radius: var(--k-btn-radius); background: var(--k-btn); color: var(--k-btn-text); font: 500 16px var(--k-font); cursor: pointer; transition: background .12s, color .12s; }
+.gs3-btn.primary { background: var(--k-focus-bg); color: var(--k-focus-text); }
+html[data-gs3-look] .gs3-btn.primary { background: var(--k-btn); color: var(--k-btn-text); }
+html[data-gs3-look="xbox"] .gs3-btn.primary { background: #107c10; }
+.gs3-row { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 24px; }
+html[data-gs3-look="xbox"] .gs3-row { flex-direction: column-reverse; align-items: stretch; gap: 8px; }
+html[data-gs3-look="xbox"] .gs3-row .gs3-btn { justify-content: flex-start; }
+html[data-gs3-look="switch"] .gs3-panel:has(> .gs3-row:last-child) { padding-bottom: 0; }
+html[data-gs3-look="switch"] .gs3-panel > .gs3-row:last-child { margin: 26px -32px 0; gap: 0; flex-wrap: nowrap; border-top: 1px solid #6a6a6a; }
+html[data-gs3-look="switch"] .gs3-panel > .gs3-row:last-child .gs3-btn { flex: 1; height: 64px; border-radius: 0; background: none; color: #4fd2ee; font-size: 19px; }
+html[data-gs3-look="switch"] .gs3-panel > .gs3-row:last-child .gs3-btn + .gs3-btn { box-shadow: -1px 0 0 #6a6a6a; }
+html[data-gs3-look="switch"] .gs3-title, html[data-gs3-look="switch"] .gs3-sub { text-align: center; }
+html[data-gs3-look="switch"] .gs3-panel:has(.gs3-menu) .gs3-title, html[data-gs3-look="switch"] .gs3-panel:has(.gs3-menu) .gs3-sub { text-align: left; }
+
+/* the highlight: what a controller / arrow keys are on (the kit adds .gs3-focus), or keyboard focus */
+.gs3-item.gs3-focus, .gs3-btn.gs3-focus, .gs3-toggle.gs3-focus, .gs3-item:focus-visible, .gs3-btn:focus-visible { outline: none; background: var(--k-focus-bg); color: var(--k-focus-text); box-shadow: var(--k-focus-ring); animation: var(--k-focus-anim); position: relative; z-index: 1; }
+html[data-gs3-look="ps5"] .gs3-btn.gs3-focus { background: #fff; color: #000; box-shadow: 0 0 22px 2px rgba(255,255,255,.4); animation: none; }
+html:not([data-gs3-look]) .gs3-item.gs3-focus .gs3-value, html[data-gs3-look=""] .gs3-item.gs3-focus .gs3-value { color: rgba(0,0,0,.55); }
+html[data-gs3-look="switch"] .gs3-panel > .gs3-row:last-child .gs3-btn.gs3-focus { background: #1f2227; }
+
+/* toggles: a switch (PS5, Switch, Game System 3) or a check box (Xbox, PS4) */
+.gs3-toggle { position: relative; flex: none; width: 52px; height: 28px; margin-left: auto; border: 0; border-radius: 99px; background: var(--k-toggle-off); cursor: pointer; transition: background .15s; }
+.gs3-toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.3); transition: transform .15s; }
+.gs3-toggle[aria-pressed="true"] { background: var(--k-accent); }
+.gs3-toggle[aria-pressed="true"]::after { transform: translateX(24px); }
+html[data-gs3-look="xbox"] .gs3-toggle, html[data-gs3-look="ps4"] .gs3-toggle { width: 26px; height: 26px; border-radius: 3px; background: transparent; box-shadow: inset 0 0 0 2px #fff; }
+html[data-gs3-look="xbox"] .gs3-toggle::after, html[data-gs3-look="ps4"] .gs3-toggle::after { top: 4px; left: 9px; width: 6px; height: 12px; border-radius: 0; background: none; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); box-shadow: none; opacity: 0; }
+html[data-gs3-look="xbox"] .gs3-toggle[aria-pressed="true"], html[data-gs3-look="ps4"] .gs3-toggle[aria-pressed="true"] { background: var(--k-accent); box-shadow: inset 0 0 0 2px var(--k-accent); }
+html[data-gs3-look="xbox"] .gs3-toggle[aria-pressed="true"]::after, html[data-gs3-look="ps4"] .gs3-toggle[aria-pressed="true"]::after { opacity: 1; transform: rotate(45deg); }
+.gs3-slider { -webkit-appearance: none; appearance: none; width: 180px; height: 6px; margin-left: auto; border-radius: 99px; background: var(--k-toggle-off); accent-color: var(--k-accent); }
+.gs3-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+html[data-gs3-look="xbox"] .gs3-slider, html[data-gs3-look="ps4"] .gs3-slider { border-radius: 0; height: 4px; background: rgba(255,255,255,.35); }
+html[data-gs3-look="xbox"] .gs3-slider::-webkit-slider-thumb { width: 12px; height: 26px; border-radius: 2px; }
+
+/* button hints at the bottom: the kit draws each console's own buttons */
+.gs3-hints { position: fixed; right: 4vw; bottom: 24px; display: flex; gap: 24px; align-items: center; font: 400 15px var(--k-font); color: var(--k-text); z-index: 101; }
+.gs3-hint { display: inline-flex; align-items: center; gap: 8px; }
+.gs3-key { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 6px; background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); font: 700 12px var(--k-font); color: #fff; }
+.gs3-key svg { width: 15px; height: 15px; }
+html[data-gs3-look="ps5"] .gs3-key, html[data-gs3-look="ps4"] .gs3-key { width: 26px; padding: 0; border-radius: 50%; background: #fff; color: #000; box-shadow: none; }
+html[data-gs3-look="xbox"] .gs3-key { width: 26px; padding: 0; border-radius: 50%; box-shadow: none; font-size: 13px; }
+html[data-gs3-look="xbox"] .gs3-key[data-b="ok"] { background: #107c10; }
+html[data-gs3-look="xbox"] .gs3-key[data-b="back"] { background: #d1322a; }
+html[data-gs3-look="switch"] .gs3-hints { left: 3vw; right: 3vw; bottom: 0; height: 64px; justify-content: flex-end; padding-right: 8px; border-top: 1px solid #d2d2d2; font-size: 18px; }
+html[data-gs3-look="switch"] .gs3-key { width: 26px; padding: 0; border-radius: 50%; background: #fff; color: #2d2d2d; box-shadow: none; font-size: 14px; }
+html[data-gs3-look="switch"] .gs3-hint[data-b="back"] { order: -1; }
+
+@keyframes gs3k-fade { from { opacity: 0; } }
+@keyframes gs3k-pop { from { opacity: 0; transform: scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .gs3-screen, .gs3-panel, .gs3-focus { animation: none !important; } }
