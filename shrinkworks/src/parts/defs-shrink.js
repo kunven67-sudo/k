@@ -250,6 +250,60 @@ const SIZE_RAY = {
   loop: 'beam'
 };
 
+// one ray, many powers: copy things, pin them in the air, let them go, make them float, launch them, erase them
+const FX_MODES = [['clone', 'Clone (copies it)'], ['freeze', 'Freeze (pins it in the air)'], ['unfreeze', 'Unfreeze'], ['float', 'Float (no gravity)'],
+  ['launch', 'Launch (shoves it away)'], ['erase', 'Erase (B = undo)']];
+const FX_COLOR = { clone: '#4dff88', freeze: '#d8f4ff', unfreeze: '#ffd24d', float: '#38d6ff', launch: '#ff8a2a', erase: '#ff3b3b' };
+const FX_RAY = {
+  id: 'fx_ray', name: 'Effect Ray', cat: 'Sci-Fi', desc: 'A beam with a power you pick in its menu: clone, freeze in the air, unfreeze, float, launch or erase whatever it hits. Needs a battery.',
+  size: [0.32, 0.9, 0.32], resize: 'uniform', mat: 'chrome', electric: true,
+  shapes: (p) => [{ t: 'cyl', hh: p.size.y / 2, r: p.size.x / 2 }],
+  mesh: (p) => {
+    const k = p.size.y / 0.9, col = FX_COLOR[p.props.mode] || '#4dff88';
+    const beam = new THREE.Mesh(geo.cyl(0.03, 1, 10), beamMaterial(col));
+    beam.geometry = beam.geometry.clone().translate(0, 0.5, 0);
+    beam.position.y = 0.46; beam.visible = false; beam.renderOrder = 5;
+    const lensM = glowMat(col, 1.2);
+    const g = grp(mk(geo.cyl(0.14, 0.62, 24), partMaterial('steel', '#e8e8e8'), 0, -0.09, 0),
+      mk(geo.cyl(0.16, 0.05, 24), partMaterial('plastic', col), 0, -0.28, 0), mk(geo.cyl(0.16, 0.05, 24), partMaterial('plastic', col), 0, 0.12, 0),
+      mk(geo.cyl(0.1, 0.2, 20, 0.15), M.chrome, 0, 0.34, 0), mk(geo.cyl(0.085, 0.02, 20), lensM, 0, 0.455, 0), beam);
+    g.scale.setScalar(k);
+    g.userData.beam = beam; g.userData.lens = lensM;
+    return g;
+  },
+  props: [P.input('auto'), P.on(false), { k: 'mode', label: 'Power', type: 'choice', options: FX_MODES, def: 'clone', rebuild: true }, P.range(30, 120)],
+  control: 'analog',
+  fixed(p, dt, ctx) {
+    p.st.len = 0;
+    p.st.cool = Math.max(0, (p.st.cool || 0) - dt);
+    if (!p.st.active) { p.st.last = null; return; }
+    const k = p.size.y / 0.9;
+    const from = worldPos(p, _a, _c.set(0, 0.47 * k, 0)), dir = worldUp(p, _b);
+    const range = p.props.range, mode = p.props.mode;
+    const hit = ctx.ray(from, dir, range, p.body);
+    const you = mode === 'launch' ? ctx.rayHitsPlayer(from, dir, hit ? hit.toi : range) : null;
+    p.st.len = you != null ? you : hit ? hit.toi : range;
+    if (p.st.cool > 0) return;
+    if (you != null) { ctx.launchPlayer(dir); p.st.cool = 0.5; return; }
+    if (!hit || !hit.owner || hit.owner.kind !== 'part' || ctx.sameBuild(hit.owner.ref, p)) return;
+    const target = hit.owner.ref;
+    // one zap per thing for freeze / unfreeze / float / erase; clone + launch repeat while you hold the trigger
+    if ((mode !== 'clone' && mode !== 'launch') && p.st.last === target.body) return;
+    p.st.last = target.body;
+    ctx.effect(mode, target, hit.point, dir);
+    p.st.cool = mode === 'clone' ? 0.9 : mode === 'launch' ? 0.35 : 0.2;
+    ctx.fx.sparks(hit.point, 8, 2.5, new THREE.Color(FX_COLOR[mode]).getHex());
+  },
+  frame(p) {
+    const b = p.mesh && p.mesh.userData.beam;
+    if (!b) return;
+    b.visible = !!p.st.active && (p.st.len || 0) > 0;
+    b.scale.set(1, Math.max(0.05, (p.st.len || 0) / (p.size.y / 0.9)), 1);
+    p.mesh.userData.lens.emissiveIntensity = p.st.active ? 4 : 1.2;
+  },
+  loop: 'beam'
+};
+
 const TIME_CORE = {
   id: 'time_core', name: 'Time Core', cat: 'Sci-Fi', desc: 'Messes with time while it is on: Rewind (the world goes back, up to 15 seconds), Slow motion, or Stop time. You are not affected. Needs a battery.',
   size: [0.7, 0.7, 0.7], resize: 'uniform', mat: 'gold', electric: true,
@@ -319,6 +373,6 @@ const SCREEN = {
   props: [CHANNEL, P.on(true)], control: 'toggle'
 };
 
-export const SHRINK = [...REAL.map(realDef), ...TOOLS, ...BATTERIES, HANDLE, SIZE_RAY, TIME_CORE, CAMERA, SCREEN];
+export const SHRINK = [...REAL.map(realDef), ...TOOLS, ...BATTERIES, HANDLE, SIZE_RAY, FX_RAY, TIME_CORE, CAMERA, SCREEN];
 export const ELECTRIC = new Set(['motor', 'piston', 'gyro', 'hover', 'light', 'laser', 'speaker', 'magnet', 'blackhole', 'antigrav', 'forcefield',
-  'tractor', 'portal', 'slowfield', 'size_ray', 'time_core', 'camera', 'screen']);
+  'tractor', 'portal', 'slowfield', 'size_ray', 'fx_ray', 'time_core', 'camera', 'screen']);

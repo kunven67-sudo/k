@@ -81,9 +81,36 @@ export function addPart(body, type, o = {}) {
   return p;
 }
 
+// a part scaled the same amount on every side is a perfect scale model of the normal one: its mesh, collision shapes and
+// joint points are made at the normal size and then scaled (some parts have fixed-size details that would warp otherwise)
+export function evenScale(p) {
+  const d = p.def.size;
+  if (!d || p.def.real) return 1; // real scans scale themselves
+  const rx = p.size.x / d[0], ry = p.size.y / d[1], rz = p.size.z / d[2];
+  if (Math.abs(rx - 1) < 1e-4 && Math.abs(ry - 1) < 1e-4 && Math.abs(rz - 1) < 1e-4) return 1;
+  if (Math.abs(rx - ry) > 2e-3 * rx || Math.abs(rx - rz) > 2e-3 * rx) return 1;
+  return rx;
+}
+export function atNormalSize(p, fn) {
+  const saved = p.size;
+  p.size = new THREE.Vector3(...p.def.size);
+  try { return fn(); } finally { p.size = saved; }
+}
+function scaleShape(s, r) {
+  const o = { ...s };
+  if (s.h) o.h = s.h.map((v) => v * r);
+  if (s.hh != null) o.hh = s.hh * r;
+  if (s.r != null) o.r = s.r * r;
+  if (s.pts) o.pts = s.pts.map((v) => v * r);
+  if (s.p) o.p = s.p.map((v) => v * r);
+  return o;
+}
 export function buildMesh(p) {
   if (p.mesh) { p.body.group.remove(p.mesh); disposeMesh(p.mesh); }
-  const m = p.def.mesh(p, game.meshCtx);
+  const r = evenScale(p);
+  p.meshScale = r;
+  const m = r === 1 ? p.def.mesh(p, game.meshCtx) : atNormalSize(p, () => p.def.mesh(p, game.meshCtx));
+  if (r !== 1) m.scale.multiplyScalar(r);
   m.position.copy(p.pos);
   m.quaternion.copy(p.quat);
   m.traverse((o) => { o.userData.part = p; });
@@ -113,7 +140,9 @@ export function buildColliders(p) {
   p.colliders = [];
   const m = MATS[p.mat] || MATS.steel;
   const density = p.def.density || m.density;
-  for (const s of p.def.shapes(p)) {
+  const r = evenScale(p);
+  const shapes = r === 1 ? p.def.shapes(p) : atNormalSize(p, () => p.def.shapes(p)).map((s) => scaleShape(s, r));
+  for (const s of shapes) {
     const d = shapeDesc(s);
     _v.set(...(s.p || [0, 0, 0])).applyQuaternion(p.quat).add(p.pos);
     _q.copy(p.quat);
@@ -141,7 +170,9 @@ export function rebuildPart(p) {
 /* ---------------- joints ---------------- */
 // where the two halves of a joint part meet, in its own body's space; the axis is the part's up
 export function jointAnchor(P, out = new THREE.Vector3()) {
-  return out.set(0, P.def.joint.at(P), 0).applyQuaternion(P.quat).add(P.pos);
+  const r = evenScale(P);
+  const at = r === 1 ? P.def.joint.at(P) : atNormalSize(P, () => P.def.joint.at(P)) * r;
+  return out.set(0, at, 0).applyQuaternion(P.quat).add(P.pos);
 }
 export function jointAxis(P, out = new THREE.Vector3()) { return out.copy(Y).applyQuaternion(P.quat); }
 
@@ -151,9 +182,11 @@ export function createJointChild(P) {
   const a = jointAnchor(P);
   const { pos, quat } = bodyPose(A);
   const B = newBody(a.clone().applyQuaternion(quat).add(pos), quat);
-  const rs = j.rotorSize(P);
+  const r = evenScale(P);
+  const rs = r === 1 ? j.rotorSize(P) : atNormalSize(P, () => j.rotorSize(P)).map((v) => v * r);
+  const ra = r === 1 ? j.rotorAt(P) : atNormalSize(P, () => j.rotorAt(P)) * r;
   const rotor = addPart(B, j.rotor, {
-    pos: jointAxis(P).multiplyScalar(j.rotorAt(P)), quat: P.quat, size: new THREE.Vector3(...rs), mat: P.mat, color: P.color
+    pos: jointAxis(P).multiplyScalar(ra), quat: P.quat, size: new THREE.Vector3(...rs), mat: P.mat, color: P.color
   });
   const lv = A.rb.linvel(), av = A.rb.angvel();
   B.rb.setLinvel(lv, false); B.rb.setAngvel(av, false);

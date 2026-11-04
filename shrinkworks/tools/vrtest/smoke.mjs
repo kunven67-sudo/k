@@ -1,0 +1,35 @@
+// Smoke test: enter VR, grab the Infinity Battery, lift it, drop it; glue the block to the handle; freeze it in the air.
+import { openVR, enterVR } from './vrlib.mjs';
+const out = process.argv[2] || '.';
+const T = await openVR();
+await enterVR(T);
+const log = (...a) => console.log(...a.map((x) => typeof x === 'string' ? x : JSON.stringify(x)));
+await T.ctl('right', [0.3, 1.0, -0.2]); await T.ctl('left', [-0.3, 1.0, -0.2]); await T.frames(2);
+const off = [-0.003, 0.044, -0.064]; // controller position -> palm, for a controller pointing straight ahead
+const handAt = async (side, wp, q) => { const r = await T.toRoom(wp); await T.ctl(side, [r[0] + off[0], r[1] + off[1], r[2] + off[2]], q); };
+const [bat] = await T.find('battery_inf');
+const b0 = await T.part(bat);
+await handAt('right', b0.pos); await T.frames(2); await T.btn('right', 'squeeze', 1); await T.frames(3);
+await handAt('right', [b0.pos[0] - 3, b0.pos[1] + 3, b0.pos[2]]); await T.frames(12);
+const b1 = await T.part(bat);
+await T.btn('right', 'squeeze', 0); await T.frames(30);
+const b2 = await T.part(bat);
+log('grab + lift', b1.pos[1] > b0.pos[1] + 2 ? 'OK' : 'FAIL', 'drop', b2.pos[1] < b1.pos[1] - 1 ? 'OK' : 'FAIL');
+const [glue] = await T.find('tool_glue'), [blk] = await T.find('block'), [hdl] = await T.find('handle');
+await handAt('left', (await T.part(glue)).pos); await T.frames(2); await T.btn('left', 'squeeze', 1); await T.frames(3);
+await handAt('right', (await T.part(blk)).pos); await T.frames(2); await T.btn('right', 'squeeze', 1); await T.frames(3);
+await handAt('right', [1.5, 11.5, 9.0]); await T.frames(10);
+const bk = await T.part(blk);
+await handAt('left', [bk.pos[0], bk.pos[1], bk.pos[2] + 1.57]); await T.frames(10);
+await T.btn('left', 'trigger', 1); await T.frames(2); await T.btn('left', 'trigger', 0); await T.frames(2);
+await T.btn('left', 'squeeze', 0); await T.frames(2);
+const h1 = await T.part(hdl), b3 = await T.part(blk), hp = (await T.hands())[1].pos;
+const tgt = [h1.pos[0] - (b3.pos[0] - hp[0]), h1.pos[1] + 0.3 - (b3.pos[1] - hp[1]), h1.pos[2] - 0.76 - (b3.pos[2] - hp[2])];
+await handAt('right', tgt); await T.frames(12);
+log('glue', (await T.part(hdl)).body === (await T.part(blk)).body ? 'OK' : 'FAIL');
+await handAt('right', [0, 12.5, 8.5]); await T.frames(8);
+await T.btn('right', 'a-button', 1); await T.frames(2); await T.btn('right', 'a-button', 0); await T.btn('right', 'squeeze', 0); await T.frames(15);
+log('freeze in air', (await T.part(blk)).frozen ? 'OK' : 'FAIL');
+await T.shot(out + '/smoke.jpg');
+console.log(T.logs.filter((l) => !/zero size|GPU stall|too many errors/.test(l)).slice(0, 20).join('\n') || 'no errors');
+await T.browser.close();

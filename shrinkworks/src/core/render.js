@@ -97,6 +97,7 @@ export async function setSky(name) {
   scene.background = s.bg;
   scene.environment = s.env;
   scene.environmentIntensity = cfg.env;
+  envBase = cfg.env;
   if (cfg.sunDir) sunDir.set(...cfg.sunDir).normalize(); else sunDir.copy(s.dir);
   sun.color.set(cfg.sunColor);
   sun.intensity = cfg.sun;
@@ -125,9 +126,13 @@ export function initLightPool(n) {
 let viewScale = 1;
 const FIXED = [];
 export function addFixedLight(l) { l.userData.base = { i: l.intensity, d: l.distance }; FIXED.push(l); scene.add(l); return l; }
+let envBase = 0.8;
 export function setViewScale(k) {
   viewScale = k;
-  for (const l of FIXED) { l.intensity = l.userData.base.i / (k * k); l.distance = l.userData.base.d / k; }
+  // Quest: the two lamp lights are the priciest thing per pixel (x2 eyes): in VR the room light covers for them
+  const xr = renderer.xr.isPresenting;
+  for (const l of FIXED) { l.visible = !xr; l.intensity = l.userData.base.i / (k * k); l.distance = l.userData.base.d / k; }
+  scene.environmentIntensity = envBase + (xr ? 0.18 : 0);
 }
 // wants: [{ pos, color, intensity, range }] -> the nearest ones get real lights, the rest only glow
 const _cam = new THREE.Vector3();
@@ -144,7 +149,7 @@ export function assignLights(wants) {
 
 /* ---------- graphics quality ---------- */
 export const QUALITY = {
-  low: { ratio: 0.75, shadow: 1024, span: 24, shadows: true, lights: 3, aniso: 2, far: 600 },
+  low: { ratio: 0.75, shadow: 1024, span: 24, shadows: true, lights: 2, aniso: 2, far: 600 },
   medium: { ratio: 1, shadow: 2048, span: 30, shadows: true, lights: 5, aniso: 4, far: 600 },
   high: { ratio: 1.25, shadow: 2048, span: 36, shadows: true, lights: 7, aniso: 8, far: 600 },
   ultra: { ratio: 2, shadow: 4096, span: 40, shadows: true, lights: 10, aniso: 16, far: 600 }
@@ -178,14 +183,20 @@ export function onQuality(f) { qualityListeners.push(f); }
 export function qualitySettings() { return QUALITY[qName]; }
 
 // Auto: watch the real frame rate and step down when it drops, step back up when there is lots of room.
-let fpsT = 0, fpsN = 0, goodFor = 0, badFor = 0;
+let fpsT = 0, fpsN = 0, goodFor = 0, badFor = 0, xrBad = 0;
 export let fps = 60;
 export function autoQualityTick(dt) {
   fpsT += dt; fpsN++;
   if (fpsT < 1) return;
   fps = fpsN / fpsT;
   fpsT = 0; fpsN = 0;
-  if (!autoMode || renderer.xr.isPresenting || document.hidden) return;
+  // Quest: if the headset can't keep up for a few seconds, drop the shadows (the most expensive part), never lag
+  if (renderer.xr.isPresenting) {
+    if (fps < 62) xrBad++; else xrBad = 0;
+    if (xrBad >= 4 && sun.castShadow) { sun.castShadow = false; xrBad = 0; }
+    return;
+  }
+  if (!autoMode || document.hidden) return;
   const i = ORDER.indexOf(qName);
   if (fps < 48) { badFor++; goodFor = 0; } else if (fps > 58) { goodFor++; badFor = 0; } else { goodFor = 0; badFor = 0; }
   if (badFor >= 3 && i > 0) { setQuality(ORDER[i - 1], true); badFor = 0; }

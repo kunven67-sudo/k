@@ -277,6 +277,8 @@ function holdFrame(ray) {
   }
 }
 // called every physics step: pull the held point toward where you aim
+// PC: the gadget you hold with the Grab tool fires while you hold Q (like the trigger in VR)
+export function heldBuild() { const h = T.hold; return h && h.body && bodies.has(h.body) ? h.body : null; }
 export function holdStep(dt) {
   const h = T.hold;
   if (!h || !h.target || h.human || !bodies.has(h.body) || h.body.frozen) return;
@@ -368,21 +370,54 @@ const wireMat = new THREE.LineBasicMaterial({ color: 0x5dff7a, transparent: true
 const pending = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), wireMat);
 pending.renderOrder = 21; pending.visible = false; pending.frustumCulled = false;
 scene.add(pending);
-function showWires(on) { wiresShown = on; if (!on) { pending.visible = false; for (const w of wires) if (w.line) w.line.visible = false; } }
+function showWires(on) { wiresShown = on; if (!on) pending.visible = false; }
+// wires are real cables: a thin red rubber cable that hangs between the two parts (always visible, like real wires)
+const CSEG = 14, CRAD = 6;
+const cableMat = new THREE.MeshStandardMaterial({ color: 0xb3231b, roughness: 0.5, metalness: 0.05 });
+const _cp = [], _T = new THREE.Vector3(), _N = new THREE.Vector3(), _B = new THREE.Vector3(), _UP = new THREE.Vector3(0, 1, 0), _X = new THREE.Vector3(1, 0, 0);
+for (let i = 0; i <= CSEG; i++) _cp.push(new THREE.Vector3());
+function makeCable() {
+  const g = new THREE.BufferGeometry(), n = (CSEG + 1) * CRAD;
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  const idx = [];
+  for (let i = 0; i < CSEG; i++) for (let j = 0; j < CRAD; j++) {
+    const a = i * CRAD + j, b = i * CRAD + (j + 1) % CRAD, c = (i + 1) * CRAD + j, d = (i + 1) * CRAD + (j + 1) % CRAD;
+    idx.push(a, b, c, b, d, c);
+  }
+  g.setIndex(idx);
+  const m = new THREE.Mesh(g, cableMat);
+  m.frustumCulled = false; m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function shapeCable(m, a, b, r) {
+  const len = a.distanceTo(b), sag = Math.min(2, len * 0.16 + 0.04);
+  for (let i = 0; i <= CSEG; i++) { const t = i / CSEG; _cp[i].lerpVectors(a, b, t); _cp[i].y -= sag * 4 * t * (1 - t); }
+  const pos = m.geometry.attributes.position.array, nor = m.geometry.attributes.normal.array;
+  for (let i = 0; i <= CSEG; i++) {
+    _T.subVectors(_cp[Math.min(CSEG, i + 1)], _cp[Math.max(0, i - 1)]).normalize();
+    _N.crossVectors(_T, Math.abs(_T.y) > 0.95 ? _X : _UP).normalize();
+    _B.crossVectors(_T, _N);
+    for (let j = 0; j < CRAD; j++) {
+      const ang = (j / CRAD) * Math.PI * 2, c = Math.cos(ang), s = Math.sin(ang);
+      const nx = _N.x * c + _B.x * s, ny = _N.y * c + _B.y * s, nz = _N.z * c + _B.z * s, k = (i * CRAD + j) * 3;
+      pos[k] = _cp[i].x + nx * r; pos[k + 1] = _cp[i].y + ny * r; pos[k + 2] = _cp[i].z + nz * r;
+      nor[k] = nx; nor[k + 1] = ny; nor[k + 2] = nz;
+    }
+  }
+  m.geometry.attributes.position.needsUpdate = true; m.geometry.attributes.normal.needsUpdate = true;
+}
 export function drawWires() {
-  if (!wiresShown) return;
   for (const w of wires) {
-    if (!w.line) {
-      w.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]), wireMat);
-      w.line.frustumCulled = false; w.line.renderOrder = 21;
+    if (!w.line || !w.line.isMesh) {
+      if (w.line && w.line.parent) w.line.parent.remove(w.line);
+      w.line = makeCable();
       scene.add(w.line);
     }
     w.line.visible = true;
     const a = partWorld(w.from, _p), b = partWorld(w.to, _t);
-    const mid = a.clone().add(b).multiplyScalar(0.5); mid.y += 0.3 + a.distanceTo(b) * 0.1;
-    const pos = w.line.geometry.attributes.position;
-    pos.setXYZ(0, a.x, a.y, a.z); pos.setXYZ(1, mid.x, mid.y, mid.z); pos.setXYZ(2, b.x, b.y, b.z);
-    pos.needsUpdate = true;
+    const r = Math.max(0.012, Math.min(0.04, Math.min(w.from.size.x, w.to.size.x) * 0.05));
+    shapeCable(w.line, a, b, r);
   }
 }
 function drawPendingWire(ray, hit) {

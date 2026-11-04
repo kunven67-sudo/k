@@ -15,7 +15,7 @@ import { makeFX } from './fx/particles.js';
 import { DEFS, LIST, CATS } from './parts/defs.js';
 import { worldPos, worldQuat, worldUp } from './parts/rt.js';
 import { bodies, constructOf, destroyBody, serialize, deserialize, partWorld, bodyPose, rebuildPart, removePart, setFrozen,
-  blueprintCenter, topo, wires, partsById, newBody, addPart, createJointChild, constructMass } from './build/core.js';
+  blueprintCenter, topo, wires, partsById, newBody, addPart, createJointChild, constructMass, wire, bumpTopo } from './build/core.js';
 import { powerStep, setController, allActive } from './build/powered.js';
 import { hideGhost } from './build/place.js';
 import { handleContacts, detonate, updateExplosions, updateShards, shatter } from './build/damage.js';
@@ -23,7 +23,7 @@ import { player, initPlayer, movePlayer, updateCamera, sit, standUp, knock, tele
   hurtPlayer, playerCapsule, playerHeight } from './player/player.js';
 import * as pc from './input/pc.js';
 import { T, TOOLS, setTool, pickPart, onToolChange, toolFrame, primary, secondary, wheel, rotate, undo, use, letGo, holdStep,
-  turnHeld, drawWires, holdingThing, recordNew } from './tools/tools.js';
+  turnHeld, drawWires, holdingThing, recordNew, begin, commit, heldBuild } from './tools/tools.js';
 import * as menus from './ui/menus.js';
 import { buildToolbar, markTool, setHints, aimLabel, toast, status, seatHud, hurtFlash } from './ui/hud.js';
 import { makeThumbs, thumbs } from './ui/thumbs.js';
@@ -163,7 +163,36 @@ const ctx = {
     for (const b of made) b.rb.setLinvel(lin, true);
     if (wasHeld && game.vrRegrab) game.vrRegrab();
   },
-  timeRequest(mode, p) { timeReq = timeReq === 'rewind' ? 'rewind' : mode; timeReqPart = p; }
+  timeRequest(mode, p) { timeReq = timeReq === 'rewind' ? 'rewind' : mode; timeReqPart = p; },
+  launchPlayer(dir) { knock(dir.clone().multiplyScalar(60 * Math.max(0.3, Math.sqrt(player.scale))).add(new THREE.Vector3(0, 12 * Math.sqrt(player.scale), 0))); play('field', null, 0.4, 1.6); },
+  // Effect Ray powers
+  effect(mode, part, at, dir) {
+    const set = constructOf(part.body);
+    if (mode === 'freeze') { for (const b of set) { b.rb.setLinvel({ x: 0, y: 0, z: 0 }, false); b.rb.setAngvel({ x: 0, y: 0, z: 0 }, false); setFrozen(b, true); } play('snap', at, 0.5, 1.7); }
+    else if (mode === 'unfreeze') { for (const b of set) setFrozen(b, false); play('snap', at, 0.5, 0.8); }
+    else if (mode === 'float') {
+      for (const b of set) { b.floaty = !b.floaty; b.rb.setGravityScale(b.floaty ? 0 : 1, true); b.rb.setLinearDamping(b.floaty ? 0.6 : 0.02); }
+      play('field', at, 0.4, 1.3);
+    } else if (mode === 'launch') {
+      let m = 0; for (const b of set) m += b.rb.mass();
+      for (const b of set) { if (b.frozen) continue; const s = 70 * b.rb.mass(); b.rb.applyImpulse({ x: dir.x * s, y: dir.y * s + b.rb.mass() * 8, z: dir.z * s }, true); }
+      play('piston', at, 0.6, 0.7);
+    } else if (mode === 'erase') {
+      const a = begin(set);
+      for (const b of [...set]) destroyBody(b);
+      commit(a);
+      play('zap', at, 0.6, 0.6);
+    } else if (mode === 'clone') {
+      if (bodies.size > 260) { toast('Too many things in the kitchen to copy more'); return; }
+      const data = serialize(set);
+      const box = blueprintCenter(data), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+      // the copy pops out next to the original, toward you
+      const off = dir.clone().multiplyScalar(-(Math.max(sz.x, sz.y, sz.z) * 0.6 + 0.2)); off.y = Math.abs(off.y) + sz.y * 0.2;
+      const made = deserialize(data, { xf: { origin: c, pos: c.clone().add(off), quat: new THREE.Quaternion() } });
+      recordNew(made);
+      play('pop', at, 0.6, 1.2);
+    }
+  }
 };
 let timeReq = null, timeReqPart = null;
 game.partCtx = ctx;
@@ -450,7 +479,7 @@ function openControls() {
       { type: 'heading', text: 'Moving' },
       { type: 'keys', rows: [['W A S D', 'Walk'], ['Shift', 'Run'], ['Space', 'Jump (tap twice to fly)'], ['Space / C', 'Fly up / down'], ['[ / ]', 'Shrink / grow you'], ['F', 'Flashlight'], ['T', 'Stop time / start time'], ['Y', 'Slow motion']] },
       { type: 'heading', text: 'Building' },
-      { type: 'keys', rows: [['1 - 8', 'Tools: Build, Grab, Edit, Paint, Wire, Delete, Hand, Size'], ['Tab', 'All parts'], ['Click / Right click', 'Use the tool / its second action'], ['Mouse wheel', 'Part size (Build), side size (Edit), distance (Grab)'], ['R / Shift + R', 'Turn the part'], ['G', 'Grid snap on / off'], ['Z', 'Undo'], ['E', 'Use: sit, press, flip, take the remote']] },
+      { type: 'keys', rows: [['Q (holding with Grab)', 'Fire the gadget you hold (rays, time core, thrusters...)'], ['1 - 8', 'Tools: Build, Grab, Edit, Paint, Wire, Delete, Hand, Size'], ['Tab', 'All parts'], ['Click / Right click', 'Use the tool / its second action'], ['Mouse wheel', 'Part size (Build), side size (Edit), distance (Grab)'], ['R / Shift + R', 'Turn the part'], ['G', 'Grid snap on / off'], ['Z', 'Undo'], ['E', 'Use: sit, press, flip, take the remote']] },
       { type: 'heading', text: 'In a seat' },
       { type: 'keys', rows: [['W / S', 'Wheels forward / back, thrusters that push forward'], ['A / D', 'Turn'], ['Space / C', 'Up / down thrusters'], ['Arrows Up / Down', 'Tilt (with a Gyro)'], ['Q / E', 'Roll (with a Gyro)'], ['1 2 3 4', 'Pistons, motors, sci-fi parts, beams'], ['X', 'Explosives'], ['L', 'Lights'], ['H', 'Horn'], ['V', 'Inside / outside camera'], ['F', 'Get out']] },
       { type: 'heading', text: 'VR (Quest 3)' },
@@ -613,11 +642,13 @@ function openExamples() {
 }
 function spawnBlueprint(data) {
   const box = blueprintCenter(data);
-  const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+  // small you gets gadgets at your size
+  const sc = player.scale < 0.7 ? player.scale : 1;
+  const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()).multiplyScalar(sc);
   const { pos, yaw } = findSpot(size, data.frozen);
-  pos.y += (c.y - box.min.y) + 0.05;
+  pos.y += (c.y - box.min.y) * sc + 0.05 * sc;
   const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-  const made = deserialize(data, { xf: { origin: c, pos, quat: q } });
+  const made = deserialize(data, { xf: { origin: c, pos, quat: q }, scale: sc });
   if (data.frozen) for (const b of made) setFrozen(b, true);
   recordNew(made);
   play('attach', pos, 0.7);
@@ -766,7 +797,7 @@ function frame(t, xrFrame) {
   if (inXR) {
     seatIn = vrFrame(dt, xrFrame, { ray, playing });
   } else if (started) {
-    if (playing && pc.mouse.locked) pcControls(dt);
+    if (playing && (pc.mouse.locked || window.__AF_TEST)) pcControls(dt);
     if (player.seat || player.remote) seatIn = playing && pc.mouse.locked ? seatInput() : { drive: 0, steer: 0, lift: 0, pitch: 0, roll: 0, held: new Set(), edges: new Set() };
     camera.updateMatrixWorld();
     ray.origin.setFromMatrixPosition(camera.matrixWorld);
@@ -793,7 +824,16 @@ function frame(t, xrFrame) {
       pendingEdges = new Set();
     }
     if (inXR && game.vrHoldStep) game.vrHoldStep(sdt, ctx.gravity);
-    else if (sdt > 0) holdStep(sdt);
+    else {
+      if (sdt > 0) holdStep(sdt);
+      const hb = heldBuild();
+      if (hb && playing) {
+        const fire = pc.down('KeyQ');
+        const handle = [...hb.parts].find((q) => q.def.handle) || [...hb.parts][0];
+        if (handle) { handle.st.trig = fire ? 1 : 0; setController(handle, { drive: 0, steer: 0, lift: 0, pitch: 0, roll: 0, held: new Set(fire ? ['k1'] : []), edges: new Set(fire && !game.qWas ? ['k1'] : []), hand: fire ? 1 : 0 }); }
+        game.qWas = fire;
+      }
+    }
     powerStep(sdt, ctx);
   };
   const steps = stepPhysics(dt, control, (sdt) => {
@@ -969,6 +1009,7 @@ function pcControls(dt) {
   if (pc.mouse.rightDown) secondary(ray);
   if (player.dead > 0) { movePlayer(dt, { x: 0, z: 0 }); return; }
   movePlayer(dt, {
+    jet: game.testJet || 0,
     x: (k('KeyD') ? 1 : 0) - (k('KeyA') ? 1 : 0), z: (k('KeyW') ? 1 : 0) - (k('KeyS') ? 1 : 0),
     jump: k('Space'), up: k('Space'), down: k('KeyC') || k('ControlLeft'), sprint: k('ShiftLeft') || k('ShiftRight')
   });
@@ -981,7 +1022,7 @@ function updateFocus() {
 }
 
 game.noPower = (p) => { const now = performance.now(); if (now - (game.noPowerT || 0) > 4000) { game.noPowerT = now; toast(p.def.name + ' has no power: glue a battery onto the build'); } };
-if (__AF_DEV__ || window.__AF_TEST) window.__AF = { game, scene, camera, rig, renderer, player, bodies, T, menus, sun: () => import('./core/render.js'), EXAMPLES, spawnBlueprint: (d) => spawnBlueprint(d), setTimeScale, constructOf, partWorld, partsById, setPlayerScale, starterKit: () => starterKit(), DEFS, world, R: () => R, hist, teleportPlayer };
+if (__AF_DEV__ || window.__AF_TEST) window.__AF = { game, scene, camera, rig, renderer, player, bodies, T, menus, sun: () => import('./core/render.js'), EXAMPLES, spawnBlueprint: (d) => spawnBlueprint(d), setTimeScale, constructOf, partWorld, partsById, setPlayerScale, starterKit: () => starterKit(), DEFS, world, R: () => R, hist, teleportPlayer, wire: (a, b) => { wire(a, b); bumpTopo(); } };
 boot().catch((e) => {
   console.error(e);
   $('loadtext').textContent = 'Something went wrong while loading: ' + (e && e.message ? e.message : e);

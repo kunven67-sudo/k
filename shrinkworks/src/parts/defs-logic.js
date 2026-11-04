@@ -345,7 +345,7 @@ export const LOGIC = [
       const b = p.mesh && p.mesh.userData.beam;
       if (!b) return;
       b.visible = !!p.st.active && p.st.len > 0.1;
-      b.scale.set(1, Math.max(0.1, p.st.len || 0), 1);
+      b.scale.set(1, Math.max(0.1, (p.st.len || 0) / (p.meshScale || 1)), 1);
     }
   },
   {
@@ -428,7 +428,7 @@ export const LOGIC = [
       const b = p.mesh && p.mesh.userData.beam;
       if (!b) return;
       b.visible = !!p.st.active;
-      b.scale.set(1, Math.max(0.05, p.st.len || 0), 1);
+      b.scale.set(1, Math.max(0.05, (p.st.len || 0) / (p.meshScale || 1)), 1);
     }
   },
 

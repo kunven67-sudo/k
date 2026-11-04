@@ -11,8 +11,9 @@ import { assetURL, track } from '../core/assets.js';
 import { player, movePlayer, setPlayerScale, playerHeight, SIZE_MIN, SIZE_MAX } from '../player/player.js';
 import { undo, begin, commit, recordNew } from '../tools/tools.js';
 import { bodies, partsById, constructOf, constructMass, setFrozen, newBody, addPart, glueBodies, wire, unwire, wires, detachPart,
-  breakJoint, rebuildPart, bodyPose, partWorld, bumpTopo, topo, createJointChild } from '../build/core.js';
+  breakJoint, rebuildPart, bodyPose, partWorld, bumpTopo, topo, createJointChild, evenScale, atNormalSize } from '../build/core.js';
 import { setController } from '../build/powered.js';
+import { loop } from '../core/audio.js';
 import { worldPos, worldQuat } from '../parts/rt.js';
 import { DEFS } from '../parts/defs.js';
 import * as menus from '../ui/menus.js';
@@ -28,6 +29,15 @@ const wristCanvas = document.createElement('canvas');
 let wrist = null, wristT = 0;
 let toastPlane = null, toastT = 0;
 const K = () => U * player.scale; // how big your real hands and head are in game units
+// first-time tips (each one shows once, ever)
+let tipsDone = {};
+try { tipsDone = JSON.parse(localStorage.getItem('shrinkworks.tips') || '{}'); } catch (e) { tipsDone = {}; }
+function tip(id, text) {
+  if (tipsDone[id]) return;
+  tipsDone[id] = 1;
+  try { localStorage.setItem('shrinkworks.tips', JSON.stringify(tipsDone)); } catch (e) { /* private window */ }
+  setTimeout(() => game.toast(text), 300);
+}
 
 export function initVR(h) {
   hooks = h;
@@ -62,9 +72,9 @@ export function initVR(h) {
   }
   scene.add(panel.mesh);
   panel.onClose = () => { menus.closeAll(); };
-  wristCanvas.width = 512; wristCanvas.height = 256;
+  wristCanvas.width = 512; wristCanvas.height = 384;
   const wt = new THREE.CanvasTexture(wristCanvas); wt.colorSpace = THREE.SRGBColorSpace;
-  wrist = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.065), new THREE.MeshBasicMaterial({ map: wt, transparent: true, toneMapped: false }));
+  wrist = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.0975), new THREE.MeshBasicMaterial({ map: wt, transparent: true, toneMapped: false }));
   wrist.userData.tex = wt;
   wrist.visible = false;
   wrist.renderOrder = 31;
@@ -81,10 +91,15 @@ export function initVR(h) {
   veil.renderOrder = 50; veil.visible = false;
   camera.add(veil);
   game.vrVeil = veil;
+  const red = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshBasicMaterial({ color: 0xaa0000, transparent: true, opacity: 0, side: THREE.BackSide, depthTest: false }));
+  red.renderOrder = 49; red.visible = false;
+  camera.add(red);
+  game.vrRed = red;
   const pcToast = game.toast;
   game.toast = (msg, ms) => { if (game.inVR) vrToast(msg); else pcToast(msg, ms); };
   menus.onMenuChange(() => { if (game.inVR) placePanel(); });
   game.heldBodies = heldBodies;
+  game.handTouching = handTouching;
   game.vrHands = hands;
   game.vrDots = dots;
   game.vrPanel = panel;
@@ -104,6 +119,7 @@ async function enter() {
     game.inVR = true;
     hooks.start();
     setQuality('low', true); // Quest: keep 72+ fps
+    tip('welcome', 'Grip button = grab. Try the glue bottle on the island');
     session.addEventListener('end', () => {
       vrSession.active = false; game.inVR = false;
       for (const H of hands) dropHeld(H);
@@ -186,8 +202,11 @@ function makeControllerHand(side) {
 }
 
 /* ---------------- physics hands: push and poke things ---------------- */
+// your hand is a real (light) body that chases your controller: it pushes things, but it can't crush a gadget into the
+// counter with infinite force (a kinematic hand would rip glued parts off just by pressing on them)
 function makePhysHand(H) {
-  const rb = world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(0, -50, 0));
+  const rb = world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(0, -50, 0).setGravityScale(0).lockRotations()
+    .setLinearDamping(0).setCcdEnabled(true).setCanSleep(false));
   H.phys = { rb, c: null, r: 0 };
   sizePhysHand(H);
 }
@@ -195,9 +214,37 @@ function sizePhysHand(H) {
   const r = 0.045 * K();
   if (H.phys.c && Math.abs(r - H.phys.r) < H.phys.r * 0.08) return;
   if (H.phys.c) { owners.delete(H.phys.c.handle); world.removeCollider(H.phys.c, false); }
-  H.phys.c = world.createCollider(R.ColliderDesc.ball(r).setDensity(1).setCollisionGroups(groups(G.HAND, G.PARTS | G.DEBRIS)), H.phys.rb);
+  // a real hand weighs about 0.5 kg (game mass: 1000 per kg), less when you are small
+  const vol = 4 / 3 * Math.PI * r * r * r, mass = 500 * Math.pow(player.scale, 3);
+  H.phys.c = world.createCollider(R.ColliderDesc.ball(r).setDensity(mass / vol).setFriction(0.8).setRestitution(0)
+    .setCollisionGroups(groups(G.HAND, G.PARTS | G.DEBRIS)), H.phys.rb);
   owners.set(H.phys.c.handle, { kind: 'hand' });
   H.phys.r = r;
+}
+function drivePhysHands(dt) {
+  for (const H of hands) {
+    if (!H.phys || !H.source) continue;
+    const rb = H.phys.rb, t = rb.translation();
+    const d = _v.set(H.pos.x - t.x, H.pos.y - t.y, H.pos.z - t.z);
+    // too far behind your real hand (stuck on something, or you just turned): jump to it
+    if (d.length() > H.phys.r * 6 || dt <= 0) { rb.setTranslation(H.pos, true); rb.setLinvel({ x: 0, y: 0, z: 0 }, true); continue; }
+    d.multiplyScalar(0.9 / dt);
+    const max = 250 * Math.max(0.1, player.scale);
+    if (d.length() > max) d.setLength(max);
+    // real arm strength: the hand speeds up / slows down only so fast (pushing a heavy thing, it lags behind)
+    const lv = rb.linvel(), dv = _v2.set(d.x - lv.x, d.y - lv.y, d.z - lv.z), cap = 22 * Math.max(0.1, player.scale);
+    if (dv.length() > cap) dv.setLength(cap);
+    rb.setLinvel({ x: lv.x + dv.x, y: lv.y + dv.y, z: lv.z + dv.z }, true);
+  }
+}
+// builds your hands are touching right now (they never break from you pressing on them)
+function handTouching() {
+  const s = new Set();
+  for (const H of hands) {
+    if (!H.phys || !H.phys.c || !H.phys.c.isEnabled()) continue;
+    world.contactPairsWith(H.phys.c, (c2) => { const o = owners.get(c2.handle); if (o && o.kind === 'part') for (const b of constructOf(o.ref.body)) s.add(b); });
+  }
+  return s;
 }
 function pulse(H, v, ms) {
   const gp = H.source && H.source.gamepad;
@@ -213,12 +260,12 @@ function heldBodies() {
   for (const H of hands) if (H.held) { const p = partsById.get(H.held.id); if (p) for (const b of constructOf(p.body)) s.add(b); }
   return s;
 }
-function nearestPart(at, r, exclude) {
+function nearestPart(at, r, exclude, prefer) {
   let best = null, bd = Infinity;
   world.intersectionsWithShape(at, { x: 0, y: 0, z: 0, w: 1 }, new R.Ball(r), (c) => {
     const o = owners.get(c.handle);
     if (o && o.kind === 'part' && !o.ref.dead && o.ref !== exclude && (!exclude || o.ref.body !== exclude.body)) {
-      const d = partWorld(o.ref, _v2).distanceTo(at);
+      const d = partWorld(o.ref, _v2).distanceTo(at) - (prefer && prefer(o.ref) ? 1e6 : 0);
       if (d < bd) { bd = d; best = o.ref; }
     }
     return true;
@@ -230,28 +277,37 @@ function holdPose(H, p) {
   const d = p.def, k = K();
   if (d.gripQ && d.grip) {
     const q = d.gripQ.clone();
-    const g = d.grip(p).clone();
+    const g = scaledPoint(p, d.grip);
     return { pos: g.applyQuaternion(q).negate(), quat: q, snap: true };
   }
   const pq = worldQuat(p, _q2), pp = worldPos(p, _v2);
   const inv = H.quat.clone().invert();
   return { pos: pp.clone().sub(H.pos).applyQuaternion(inv).divideScalar(k), quat: inv.multiply(pq), snap: false, k };
 }
+// a tool's grip / tip point at whatever size the tool is now
+function scaledPoint(p, fn) {
+  const r = evenScale(p);
+  return r === 1 ? fn(p).clone() : atNormalSize(p, () => fn(p).clone()).multiplyScalar(r);
+}
 function tryGrab(H) {
   const k = K();
-  // a handle or tool counts first if it is within reach
-  let p = nearestPart(H.pos, 0.075 * k);
+  // a grip handle or a tool counts first if it is within reach (you hold gadgets by their handle, like real ones)
+  let p = nearestPart(H.pos, 0.075 * k, null, (q) => q.def.handle || q.def.tool);
   if (!p) return false;
   if (p.rotorBase && !p.def.handle) { /* grabbing the moving half of a joint is fine: it is its own body */ }
-  for (const o of hands) if (o !== H && o.held && o.held.id === p.id) dropHeld(o);
   const set = constructOf(p.body);
+  const twoHands = hands.some((o) => o !== H && o.held && partsById.get(o.held.id) && set.has(partsById.get(o.held.id).body));
+  if (twoHands) tip('two', 'Both hands on it: pull apart = bigger, push together = smaller');
   const wasFrozen = [...set].some((b) => b.frozen);
   for (const b of set) if (b.frozen) setFrozen(b, false);
   const pose = holdPose(H, p);
-  H.held = { id: p.id, pose, freeze: wasFrozen, heavy: false };
+  const other = hands.find((o) => o !== H && o.held && partsById.get(o.held.id) && set.has(partsById.get(o.held.id).body));
+  H.held = { id: p.id, pose, freeze: wasFrozen || !!(other && other.held.freeze), heavy: false };
   if (H.phys && H.phys.c) H.phys.c.setEnabled(false);
   pulse(H, 0.35, 30);
   game.sound('soft', H.pos, 0.35, player.scale < 0.3 ? 1.5 : 1);
+  if (p.def.tool === 'glue') tip('glue', 'Trigger squeezes a glue drop onto whatever the nozzle touches');
+  else tip('grab', 'Let go and it drops. Throw it like for real');
   return true;
 }
 function dropHeld(H, throwIt = true) {
@@ -289,6 +345,7 @@ function averageVel(H) {
 const _tp = new THREE.Vector3(), _tq = new THREE.Quaternion(), _bp = new THREE.Vector3(), _bq = new THREE.Quaternion();
 function holdStep(dt, gravity) {
   const k = K();
+  drivePhysHands(dt);
   const driven = new Set();
   for (const H of hands) {
     const h = H.held;
@@ -307,8 +364,19 @@ function holdStep(dt, gravity) {
     // -> where the body has to be (the part sits somewhere on its body)
     _bq.copy(_tq).multiply(_q.copy(p.quat).invert());
     _bp.copy(p.pos).applyQuaternion(_bq).negate().add(_tp);
+    // both hands on the same build: it goes halfway between where each hand wants it
     if (driven.has(b)) continue;
     driven.add(b);
+    const O = hands.find((o) => o !== H && o.held && partsById.get(o.held.id) && partsById.get(o.held.id).body === b);
+    if (O) {
+      const op = partsById.get(O.held.id);
+      const oq = O.quat.clone().multiply(O.held.pose.quat);
+      const ot = O.held.pose.pos.clone().multiplyScalar(O.held.pose.snap ? 1 : k).applyQuaternion(O.quat).add(O.pos);
+      const obq = oq.clone().multiply(op.quat.clone().invert());
+      const obp = op.pos.clone().applyQuaternion(obq).negate().add(ot);
+      _bp.lerp(obp, 0.5);
+      _bq.slerp(obq, 0.5);
+    }
     const set = constructOf(b);
     const mass = constructMass(set);
     const limit = liftLimit();
@@ -319,7 +387,8 @@ function holdStep(dt, gravity) {
     // velocity that gets there this step (gravity pre-cancelled so it does not sag)
     const want = _bp.clone().sub(cur).multiplyScalar(0.92 / Math.max(dt, 1e-3));
     want.y -= gravity * dt * b.rb.gravityScale();
-    const dq = _tq.clone().multiply(cq.clone().invert());
+    // turn the BODY so the part you hold ends up the way your hand holds it (parts can sit at any angle on their body)
+    const dq = _bq.clone().multiply(cq.clone().invert());
     if (dq.w < 0) { dq.x = -dq.x; dq.y = -dq.y; dq.z = -dq.z; dq.w = -dq.w; }
     const ang = 2 * Math.acos(Math.min(1, dq.w)), sn = Math.sqrt(1 - dq.w * dq.w);
     const wantW = sn > 1e-5 ? new THREE.Vector3(dq.x / sn, dq.y / sn, dq.z / sn).multiplyScalar(ang * 0.85 / Math.max(dt, 1e-3)) : new THREE.Vector3();
@@ -328,7 +397,7 @@ function holdStep(dt, gravity) {
     if (wantW.length() > 40) wantW.setLength(40);
     if (dt === 0) {
       // time is stopped (Time Core): you are not, so what you hold still moves with your hand
-      b.rb.setTranslation(_bp, false); b.rb.setRotation(fromQ(_tq.clone().multiply(_q.copy(p.quat).invert())), false);
+      b.rb.setTranslation(_bp, false); b.rb.setRotation(fromQ(_bq), false);
       game.snapBody(b);
     } else if (strong) {
       b.rb.setLinvel(want, true);
@@ -361,11 +430,14 @@ function spawnInHand(type, which) {
   if (!d) return null;
   const H = hands.find((h) => h.side === (which || 'right') && h.source && !h.held) || hands.find((h) => h.source && !h.held);
   const k = K();
+  // small you gets parts made at your size (a 10 cm block would be a building to you), so you can build at any size
+  const sc = player.scale < 0.7 ? player.scale : 1;
+  const size = new THREE.Vector3(...d.size).multiplyScalar(sc);
   // put it in your fist the way you would hold it (tools + handles), or just in front of your palm
-  const stub = { def: d, size: new THREE.Vector3(...d.size), props: Object.fromEntries(d.props.map((x) => [x.k, x.def])) };
+  const stub = { def: d, size, props: Object.fromEntries(d.props.map((x) => [x.k, x.def])) };
   let pose;
-  if (d.gripQ && d.grip) { const q = d.gripQ.clone(); pose = { pos: d.grip(stub).clone().applyQuaternion(q).negate(), quat: q, snap: true }; }
-  else { const r = Math.max(d.size[0], d.size[1], d.size[2]) * 0.5; pose = { pos: new THREE.Vector3(0, 0, -(0.03 + r / k)), quat: new THREE.Quaternion(), snap: false }; }
+  if (d.gripQ && d.grip) { const q = d.gripQ.clone(); pose = { pos: scaledPoint(stub, d.grip).applyQuaternion(q).negate(), quat: q, snap: true }; }
+  else { const r = Math.max(size.x, size.y, size.z) * 0.5; pose = { pos: new THREE.Vector3(0, 0, -(0.03 + r / k)), quat: new THREE.Quaternion(), snap: false }; }
   let at, q;
   if (H) { at = pose.pos.clone().multiplyScalar(pose.snap ? 1 : k).applyQuaternion(H.quat).add(H.pos); q = H.quat.clone().multiply(pose.quat); }
   else {
@@ -373,7 +445,7 @@ function spawnInHand(type, which) {
     at = camera.getWorldPosition(new THREE.Vector3()).addScaledVector(fwd, 0.5 * k); q = new THREE.Quaternion();
   }
   const b = newBody(at, q);
-  const p = addPart(b, type);
+  const p = addPart(b, type, sc !== 1 ? { size } : {});
   if (d.joint) createJointChild(p);
   recordNew([...constructOf(b)]);
   if (H) {
@@ -444,10 +516,11 @@ export function glueStep() {
     if (!res) { game.toast('Those two both swing on joints: glue one of them to something solid first'); continue; }
     commit(a);
     game.sound('attach', at, 0.6);
+    tip('stuck', 'Stuck for good! Glue on a battery and a grip handle = a gadget');
     for (const H of hands) if (H.held) { const hp = partsById.get(H.held.id); if (hp && (hp === d.part || hp === q || hp.body === res)) pulse(H, 0.7, 70); }
   }
 }
-function toolTip(p, out) { return worldPos(p, out, p.def.tip(p).clone()); }
+function toolTip(p, out) { return worldPos(p, out, scaledPoint(p, p.def.tip)); }
 function toolDir(p, out) { return out.set(0, 1, 0).applyQuaternion(worldQuat(p, _q)); }
 
 function useTool(H, p, dt) {
@@ -467,6 +540,7 @@ function useTool(H, p, dt) {
           addDot(o, pt.addScaledVector(n, 0.01 * ts), n, 0.07 * ts);
           game.sound('pop', pt, 0.35, 1.6);
           pulse(H, 0.25, 25);
+          tip('drop', 'Now push another part onto the glue drop');
           H.glueT = 0.3;
         }
       }
@@ -547,25 +621,48 @@ function placePanel() {
   panel.mesh.lookAt(head.x, panel.mesh.position.y, head.z);
   drawMenu(panel, menus.top());
 }
+// the left wrist: your size, your health, and what the buttons do right now
+let hints = [];
 function drawWrist() {
   const g = wristCanvas.getContext('2d');
-  g.clearRect(0, 0, 512, 256);
-  g.fillStyle = 'rgba(12,14,18,.82)';
-  g.beginPath(); g.roundRect ? g.roundRect(0, 0, 512, 256, 34) : g.rect(0, 0, 512, 256); g.fill();
+  g.clearRect(0, 0, 512, 384);
+  g.fillStyle = 'rgba(12,14,18,.84)';
+  g.beginPath(); g.roundRect ? g.roundRect(0, 0, 512, 384, 34) : g.rect(0, 0, 512, 384); g.fill();
   const font = (window.GS3Console && GS3Console.theme().font) || 'sans-serif';
   const h = playerHeight() / U; // meters
   const txt = h >= 1 ? h.toFixed(2) + ' m' : h >= 0.1 ? Math.round(h * 100) + ' cm' : (h * 100).toFixed(1) + ' cm';
-  g.fillStyle = '#9aa3ad'; g.font = '600 30px ' + font; g.textAlign = 'left';
-  g.fillText('YOUR SIZE', 34, 58);
-  g.fillStyle = '#fff'; g.font = '700 74px ' + font;
-  g.fillText(txt, 30, 138);
-  // health bar
-  g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(34, 172, 444, 22);
+  g.fillStyle = '#9aa3ad'; g.font = '600 26px ' + font; g.textAlign = 'left';
+  g.fillText('YOUR SIZE', 34, 50);
+  g.fillStyle = '#fff'; g.font = '700 64px ' + font;
+  g.fillText(txt, 30, 118);
+  g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(34, 142, 444, 18);
   g.fillStyle = player.hp > 50 ? '#5aa339' : player.hp > 25 ? '#f2c230' : '#c8332b';
-  g.fillRect(34, 172, 444 * player.hp / 100, 22);
-  g.fillStyle = '#9aa3ad'; g.font = '600 24px ' + font;
-  g.fillText(player.jet > 0 ? 'JETPACK' : (game.settings.damage ? 'HEALTH' : 'HEALTH (damage off)'), 34, 232);
+  g.fillRect(34, 142, 444 * player.hp / 100, 18);
+  g.fillStyle = '#9aa3ad'; g.font = '600 22px ' + font;
+  g.fillText(player.jet > 0 ? 'JETPACK ON' : (game.settings.damage ? 'HEALTH' : 'HEALTH (damage off)'), 34, 190);
+  g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(34, 206, 444, 2);
+  g.font = '500 25px ' + font; g.fillStyle = '#e9edf2';
+  hints.slice(0, 5).forEach((l, i) => g.fillText(l, 34, 244 + i * 32));
   wrist.userData.tex.needsUpdate = true;
+}
+function hintsFor(L, Rr) {
+  const hp = (H) => H && H.held && partsById.get(H.held.id);
+  const r = hp(Rr), l = hp(L), out = [];
+  const say = (p) => {
+    const t = p.def.tool;
+    if (t === 'glue') return 'Trigger: squeeze a glue drop';
+    if (t === 'wire') return 'Trigger: touch a button, then a motor';
+    if (t === 'cut') return 'Trigger: unglue a part / cut a wire';
+    if (t === 'paint') return 'Trigger: spray paint';
+    const set = constructOf(p.body);
+    for (const b of set) for (const q of b.parts) if (q.def.handle || (q.props.input === 'auto' && (q.def.control || q.def.electric))) return 'Trigger: fire your gadget';
+    return 'Push it on glue to stick it';
+  };
+  if (r) out.push(say(r)); if (l && l !== r) out.push(say(l));
+  if (r && l && r.body === l.body) out.push('Pull hands apart: bigger');
+  if (r || l) out.push('A/X: stays in air   B/Y: its menu');
+  else out.push('Grip: grab    Y: spawn parts', 'Trigger (empty hand): jetpack', 'R stick: turn, down/up = size', 'B: undo    A: sit / use');
+  return out;
 }
 function vrToast(msg) {
   const { c, t } = toastPlane.userData;
@@ -595,7 +692,27 @@ function pinching(H) {
   return j['thumb-tip'].position.distanceTo(j['index-finger-tip'].position) < 0.025;
 }
 const headOff = new THREE.Vector3();
-let lastScale = 1;
+let lastScale = 1, jetLoop = null, jetBuzz = 0, two = null;
+// both hands on the same thing: pull apart to make it bigger, push together to make it smaller
+function twoHandResize(L, Rr) {
+  const a = L && L.held && partsById.get(L.held.id), b = Rr && Rr.held && partsById.get(Rr.held.id);
+  if (!a || !b || a.body !== b.body) { two = null; return; }
+  const d = L.pos.distanceTo(Rr.pos);
+  if (!two || two.body !== a.body) { two = { body: a.body, d0: d, applied: 1 }; return; }
+  const step = d / Math.max(1e-4, two.d0) / two.applied;
+  if (Math.abs(step - 1) < 0.06) return;
+  const set = constructOf(a.body);
+  if (set.size === 1 && a.body.parts.size === 1 && a.def.resize && !a.def.joint) {
+    const ns = a.size.clone().multiplyScalar(step);
+    if (Math.max(ns.x, ns.y, ns.z) > 60 || Math.min(ns.x, ns.y, ns.z) < 0.02) return;
+    a.size.copy(ns); rebuildPart(a); a.body.metaDirty = true;
+  } else game.partCtx.scaleBuild(a, step);
+  two.applied *= step;
+  game.sound('ui_toggle', null, 0.2, step > 1 ? 1.4 : 0.8);
+  pulse(L, 0.2, 20); pulse(Rr, 0.2, 20);
+  const p = partsById.get(Rr.held.id) || a, m = Math.max(p.size.x, p.size.y, p.size.z) / U;
+  game.toast(p.def.name + ': ' + (m >= 1 ? m.toFixed(2) + ' m' : (m * 100).toFixed(m < 0.1 ? 1 : 0) + ' cm'));
+}
 
 export function vrFrame(dt, frame, { ray, playing }) {
   const L = hands.find((h) => h.side === 'left' && h.source), Rr = hands.find((h) => h.side === 'right' && h.source);
@@ -604,6 +721,7 @@ export function vrFrame(dt, frame, { ray, playing }) {
   const k = K();
   rig.scale.setScalar(k);
   if (game.vrVeil) { const o = player.dead > 0 ? Math.min(1, (2.2 - player.dead) * 3) : 0; game.vrVeil.material.opacity = o; game.vrVeil.visible = o > 0.01; }
+  if (game.vrRed) { const o = Math.min(0.45, (game.hurt || 0) * 0.5); game.vrRed.material.opacity = o; game.vrRed.visible = o > 0.01; }
 
   // walking (your real steps count too), turning, shrinking
   if (playing && !player.seat && !player.remote && !menus.isOpen()) {
@@ -649,6 +767,13 @@ export function vrFrame(dt, frame, { ray, playing }) {
     }
     if (player.dead > 0) { mx = mz = jet = 0; }
     movePlayer(dt, { x: mx * game.settings.vrSmoothSpeed / 3, z: mz * game.settings.vrSmoothSpeed / 3, sprint, jet, dx, dz }, headYaw);
+    // jetpack: you hear it and feel it in the hand that pulls the trigger
+    if (jet > 0.05) {
+      if (!jetLoop) jetLoop = loop('loop_thrust');
+      if (jetLoop) jetLoop.set(0.2 + jet * 0.45, player.pos, 1.25 - Math.min(0.5, player.scale * 0.3));
+      jetBuzz -= dt;
+      if (jetBuzz <= 0) { jetBuzz = 0.1; for (const H of hands) if (H.source && !H.held && val(H, 0) > 0.15) pulse(H, 0.12 + jet * 0.25, 90); }
+    } else if (jetLoop) { jetLoop.stop(); jetLoop = null; }
     rig.position.set(player.pos.x - headOff.x, player.pos.y, player.pos.z - headOff.z);
   }
   rig.updateMatrixWorld(true);
@@ -667,7 +792,7 @@ export function vrFrame(dt, frame, { ray, playing }) {
       const a = 2 * Math.acos(Math.min(1, dq.w)), sn = Math.sqrt(1 - dq.w * dq.w);
       if (sn > 1e-4) H.avel.set(dq.x / sn, dq.y / sn, dq.z / sn).multiplyScalar(Math.min(30, a / dt)); else H.avel.set(0, 0, 0);
     }
-    if (H.phys) { sizePhysHand(H); H.phys.rb.setNextKinematicTranslation(H.pos); }
+    if (H.phys) sizePhysHand(H);
     const trig = val(H, 0);
     if (trig > 0.55 && H.trig <= 0.55) H.trigEdge = true;
     H.trig = trig;
@@ -681,7 +806,7 @@ export function vrFrame(dt, frame, { ray, playing }) {
   for (const H of hands) H.overPanel = false;
   if (wrist) wrist.visible = !player.seat;
   wristT -= dt;
-  if (wristT <= 0 && wrist) { wristT = 0.25; drawWrist(); }
+  if (wristT <= 0 && wrist) { wristT = 0.25; hints = hintsFor(L, Rr); drawWrist(); }
 
   // menu open: point and click on the floating panel
   if (menus.isOpen()) {
@@ -725,7 +850,7 @@ export function vrFrame(dt, frame, { ray, playing }) {
     } else if (!hp && H.side === 'right' && edge(H, 4)) useNear(H);
     // B / Y while holding: its menu (settings, size, color, save, delete)
     if (hp && edge(H, 5)) { hooks.openEditor(hp); return null; }
-    if (!hp && H.side === 'left' && edge(H, 5)) { hooks.openParts(); return null; }
+    if (!hp && H.side === 'left' && edge(H, 5)) { hooks.openParts(); tip('menu', 'Point at a part and pull the trigger: it lands in your hand'); return null; }
     if (!hp && H.side === 'right' && edge(H, 5)) undo();
     if (hp && hp.def.tool) useTool(H, hp, dt);
     // laying a wire: show it
@@ -735,6 +860,7 @@ export function vrFrame(dt, frame, { ray, playing }) {
       pos.setXYZ(0, a.x, a.y, a.z); pos.setXYZ(1, b.x, b.y, b.z); pos.needsUpdate = true;
       H.wireLine.visible = true;
     } else H.wireLine.visible = false;
+    if (H === Rr) twoHandResize(L, Rr);
     // poke: buttons and switches react to your fingertip
     H.pokeT -= dt;
     if (!H.held && H.pokeT <= 0) {

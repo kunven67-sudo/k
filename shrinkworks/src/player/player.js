@@ -98,6 +98,8 @@ export function movePlayer(dt, move, headYaw = player.yaw) {
   // knockback / black hole pulls fade out (fast on the ground, slow in the air)
   player.push.multiplyScalar(Math.max(0, 1 - dt * (player.grounded ? 6 : 0.8)));
   const mv = { x: (_d.x + player.push.x) * dt + (move.dx || 0), y: (player.vel.y + player.push.y) * dt, z: (_d.z + player.push.z) * dt + (move.dz || 0) };
+  // going up (jetpack, jump, launched): no snapping back down to the floor
+  if (mv.y > 0.0005 * s) player.cc.disableSnapToGround(); else player.cc.enableSnapToGround(2.5 * s);
   player.cc.computeColliderMovement(player.collider, mv, R.QueryFilterFlags.EXCLUDE_SENSORS, pg());
   const c = player.cc.computedMovement();
   const wasGrounded = player.grounded;
@@ -111,7 +113,7 @@ export function movePlayer(dt, move, headYaw = player.yaw) {
     player.vel.y = 0;
     if (!wasGrounded) game.sound('step', player.pos, Math.min(1, 0.3 + impact * 0.1), s < 0.2 ? 1.6 : 1);
   }
-  if (c.y < mv.y - 0.001 * s && player.vel.y > 0) player.vel.y = 0; // bonked your head
+  if (player.vel.y > 0 && mv.y > 0 && c.y < mv.y * 0.4) player.vel.y = 0; // bonked your head
   if (player.push.y > 0 && c.y < mv.y * 0.5) player.push.y = 0;
   // keep you in the kitchen
   player.pos.x = THREE.MathUtils.clamp(player.pos.x, ROOM.x0 + 1, ROOM.x1 - 1);

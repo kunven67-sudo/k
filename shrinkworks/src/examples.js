@@ -221,6 +221,14 @@ function rayGun(mode) {
   B.part(c, 'battery_aa', [0.24, 0.63, 0.02], null, { q: up(0, 0, 1) });
   return B.done();
 }
+function fxGun(mode) {
+  const B = blueprint();
+  const c = B.body([0, 0.6, 0]);
+  B.part(c, 'handle', [0, 0, 0]);
+  B.part(c, 'fx_ray', [0, 0.71, -0.2], null, { q: up(0, 0, -1), pr: { mode } });
+  B.part(c, 'battery_aa', [0.24, 0.63, 0.02], null, { q: up(0, 0, 1) });
+  return B.done();
+}
 function rewindRemote() {
   const B = blueprint();
   const c = B.body([0, 0.6, 0]);
@@ -275,6 +283,10 @@ function shrinkBooth() {
 const LIST0 = [
   { name: 'Shrink Gun', desc: 'Hold it by the handle, pull the trigger: whatever the beam hits gets smaller.', make: () => rayGun('shrink') },
   { name: 'Grow Gun', desc: 'Same, but things get bigger. Try it on an apple.', make: () => rayGun('grow') },
+  { name: 'Clone Gun', desc: 'Pull the trigger at anything: a copy pops out. Copy a whole gadget, an apple, anything.', make: () => fxGun('clone') },
+  { name: 'Freeze Gun', desc: 'Pins whatever it hits right where it is, even in mid-air. Throw something, then freeze it.', make: () => fxGun('freeze') },
+  { name: 'Launcher Gun', desc: 'Shoves whatever it hits across the kitchen.', make: () => fxGun('launch') },
+  { name: 'Eraser Gun', desc: 'Makes things disappear. B (undo) brings them back.', make: () => fxGun('erase') },
   { name: 'Rewind Remote', desc: 'Hold the trigger: the whole kitchen goes back in time (up to 15 seconds). You do not.', make: rewindRemote },
   { name: 'Slow-Mo Cube', desc: 'Flip its switch: everything moves in slow motion until you flip it back.', make: slowMoGrenade },
   { name: 'Spy Cam', desc: 'A camera on a stand and a screen showing what it sees, live.', make: spyCam },

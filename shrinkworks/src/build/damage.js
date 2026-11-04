@@ -78,6 +78,7 @@ export function handleContacts(time) {
   breaksThisStep = 0;
   // what you hold never breaks in your hand (your hand pushes it hard into whatever is in the way); thrown, it can
   const held = game.heldBodies ? game.heldBodies() : null;
+  const touched = game.handTouching ? game.handTouching() : null;
   events.drainContactForceEvents((e) => {
     const h1 = e.collider1(), h2 = e.collider2(), f = e.totalForceMagnitude();
     const o1 = owners.get(h1), o2 = owners.get(h2);
@@ -87,7 +88,8 @@ export function handleContacts(time) {
         const p = o.ref;
         if (p.dead) continue;
         if (p.def.explosive && p.props.impact && f > Math.max(9000, p.body.rb.mass() * 98.1 * 25)) { game.detonate(p); continue; }
-        if (game.settings.breaking && p.breakAt && f > p.breakAt && !(held && held.has(p.body))) {
+        // your hands push things around but never rip glued parts off (reaching through a gadget fast would break it)
+        if (game.settings.breaking && p.breakAt && f > p.breakAt && !(held && held.has(p.body)) && !(touched && touched.has(p.body)) && !(other && other.kind === 'hand')) {
           // where did it get hit: close enough to use the part's own spot
           breakPart(p);
           continue;
