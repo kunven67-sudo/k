@@ -11,6 +11,7 @@ G.DIFF_INFO = {
   baby: { name: 'BABY', variation: 'default', gen: 'baby' }, insane: { name: 'INSANE', variation: 'default', gen: 'insane' },
   god: { name: 'GOD', variation: 'default', gen: 'god' },
 };
+G.CHAR_SWAP = { geef: 'gf-mix' };
 G.DIFF_ORDER = ['baby', 'easy', 'normal', 'hard', 'insane', 'god', 'erect', 'nightmare', 'og'];
 G.DIFF_COLOR = { baby: '#7FD8FF', insane: '#FF8A1F', god: '#FFD23A' };
 
@@ -220,6 +221,8 @@ G.Songs = {
     const pd = m.playData;
     let events = (c.events || []).slice().sort((a, b) => a.t - b.t);
     let chars = { player: pd.characters.player || 'bf', gf: pd.characters.girlfriend != null ? pd.characters.girlfriend : 'gf', opponent: pd.characters.opponent || 'dad' };   // ('' = no GF)
+    // characters a pack stands in for (tools/own/gfmix.py: Girlfriend Mix REDUX's GF instead of 'geef' in Nene's songs)
+    for (const k of ['player', 'gf', 'opponent']) { const r = G.CHAR_SWAP[chars[k]]; if (r && G.A.json('preload/data/characters/' + r + '.json')) chars[k] = r; }
     let voices = this.voicePaths(id, m, variation);
     if (swap) {
       const flipChar = v => (v === 0 ? 1 : v === 1 ? 0 : v);

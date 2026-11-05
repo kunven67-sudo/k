@@ -18,6 +18,8 @@ for id in ${*:-garcello tabi sky nene darnell whitty}; do
     darnell) run darnell darnell_mix ;;
     whitty) run whitty whitty ;;
     aura) run aura aura ;;
+    gfmix) run gfmix gfmix ;;
+    tankvoice) echo '== tankvoice (needs: node tools/tank_dump.js <dir> first)'; python3 tools/own/tank_voice.py "$TANK_DUMP" && python3 tools/pack_assets.py --packs tankvoice tankvoice-imp tankvoice-mods ;;
     impostor) echo "== impostor"; rm -rf build/mods/impostor build/mods/impostor-w*; python3 tools/own/impostor.py && python3 tools/pack_assets.py --packs impostor impostor-w1 ;;
     *) echo "no such pack: $id"; exit 1 ;;
   esac

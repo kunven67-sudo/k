@@ -362,6 +362,10 @@ PACK_INFO = {
     'impostor-w2': {'name': 'VS Impostor: Legacy - Week 2', 'credit': 'MOTORFROG, Clowfoe + the VS Impostor team (VS IMPOSTOR: LEGACY)', 'group': 'impostor', 'v': 2},
     'impostor-w3': {'name': 'VS Impostor: Legacy - Week 3', 'credit': 'MOTORFROG, Clowfoe + the VS Impostor team (VS IMPOSTOR: LEGACY)', 'group': 'impostor'},
     'aura': {'name': "Aura Funkin': at South America", 'credit': 'Coopey St. Whistler + team (Aura Funkin\': at South America), Hot Mustafa (AURA.lua)'},
+    'tankvoice': {'name': "Tankman's voice (his real singing, every song)", 'credit': "The Funkin' Crew (Tankman's Ugh / Guns / Stress vocals), Adamatik + the Playable Tankman team (his mixes)"},
+    'tankvoice-imp': {'name': "Tankman's voice: VS Impostor", 'credit': "The Funkin' Crew + the Playable Tankman team (his singing), the VS Impostor team (the songs' vocals)"},
+    'tankvoice-mods': {'name': "Tankman's voice: Tricky + Whitty", 'credit': "The Funkin' Crew + the Playable Tankman team (his singing)"},
+    'gfmix': {'name': 'Girlfriend Mix REDUX GF', 'credit': "retr0 (Girlfriend Mix), Ledonic (Psych port, GF_V3) + the Girlfriend Mix REDUX team"},
     'mobile': {'name': 'FNF mobile pictures', 'credit': "The Funkin' Crew (FNF mobile)", 'core': True, 'v': 2},
     'tricky': {'name': 'VS Tricky', 'credit': 'Banbuds, Rozebud, KadeDev, Cval, YingYang48, JADS, Moro + team (original), thisaintcub, PurSnake + LeonidKosherny (V-Slice port), ChuckySkullHead (Madness Erect), angelkireina (Pico mixes)'},
 }

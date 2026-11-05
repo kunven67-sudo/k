@@ -124,6 +124,15 @@
       // a new player (Darnell / Tankman / Nene, 59-charselect.js) plays the songs they really sang in, swapped:
       // their part is yours, in their real recorded voice, and the old player raps against them
       this.playAs = params.mode === 'freeplay' && this.song.swap && G.realPlayer ? G.realPlayer(G.settings.player) : null;
+      // Tankman singing a song with nothing of his own: his voice glued from his real singing instead of BF's
+      // (tools/own/tank_voice.py), + the opponent's lines alone when the song had one vocal track for both
+      if (params.cover && G.settings.player === 'tankman') {
+        const base = 'songs/' + this.song.id + '/Voices-tankcover' + (this.song.variation && this.song.variation !== 'default' ? '-' + this.song.variation : '');
+        if (G.A.has(base + '.ogg')) {
+          const opp = G.A.has(base + '-opp.ogg');
+          this.song.voices = this.song.voices.filter(x => x.who !== 'p' && !(opp && x.who === 'o')).concat([{ path: base + '.ogg', who: 'p' }], opp ? [{ path: base + '-opp.ogg', who: 'o' }] : []);
+        }
+      }
       this.setupWorld();
       this.setupHUD();
       this.resetRun();
@@ -142,7 +151,8 @@
         this.ready = true;
         // a song's own intro cutscene (first try only)
         const cs = G.Cutscenes && (G.Cutscenes[this.song.id + '@' + this.song.variation] || G.Cutscenes[this.song.id]);
-        if (cs && cs.create && (!params.deaths || cs.always) && !params.noCutscene) { try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
+        if (cs && cs.create && (!params.deaths || cs.always) && !params.noCutscene && !params.cover) {   // (a cover player has no lines of their own)
+          try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
         if (!this.cutscene) this.startCountdown();
       }
     },
@@ -1169,7 +1179,7 @@
       if (!this.endCut) {
         this.endCut = true;
         const cs = G.Cutscenes && (G.Cutscenes[this.song.id + '@' + this.song.variation] || G.Cutscenes[this.song.id]);
-        if (cs && cs.createEnd && !this.params.deaths && !this.params.noCutscene) {
+        if (cs && cs.createEnd && !this.params.deaths && !this.params.noCutscene && !this.params.cover) {
           let sc = null; try { sc = cs.createEnd(this); } catch (e) { G.reportError(e, 'end cutscene'); }
           if (sc) { sc.isEnd = true; this.cutscene = sc; return; }
         }
