@@ -3,7 +3,7 @@
 package main
 
 // The Safe Lane on Windows: every download in an account comes through ALTS first. Files from
-// Claude go to Downloads\Claude files and lose Windows' "from the internet" mark the moment they
+// Claude go to your Downloads folder and lose Windows' "from the internet" mark the moment they
 // finish, so they open with no warning. Anything else is left exactly as Windows does it.
 
 import (
@@ -117,12 +117,11 @@ func knownFolder(id *windows.KNOWNFOLDERID, fallback string) string {
 	return ""
 }
 
-// filesDir is Downloads\Claude files.
+// filesDir is your normal Downloads folder (1.5.0: the extra "Claude files" folder is gone,
+// files you already have in there stay where they are and stay in the Files list).
 func (a *App) filesDir() string {
 	if a.filesAt == "" {
-		if d := knownFolder(windows.FOLDERID_Downloads, "Downloads"); d != "" {
-			a.filesAt = filepath.Join(d, filesFolder)
-		}
+		a.filesAt = knownFolder(windows.FOLDERID_Downloads, "Downloads")
 	}
 	return a.filesAt
 }

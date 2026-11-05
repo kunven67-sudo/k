@@ -32,6 +32,30 @@ each one stays logged in on its own.
   next / previous, `Alt+Left` / `Alt+Right` back / forward, `F5` reload, `Ctrl+Shift+G` copy chat.
 - Links to other websites open in your normal browser.
 
+## ALTS Clipboard (Win+V)
+
+Windows' own clipboard history is replaced by ALTS Clipboard. It runs on its own in the background
+(`ALTS.exe --clip`, starts with Windows, keeps working after ALTS closes) and press **Win+V** anywhere:
+
+- **Clipboard**: everything you copied, text and pictures, newest first. Click one (or arrow keys + Enter)
+  and it pastes right into the app you were in. Star = pin (kept forever), x = delete. Keeps the last 200
+  (40 pictures). Password apps that say "don't keep this" are skipped.
+- **Stickers**: funny 3D stickers (Microsoft's Fluent Emoji 3D, MIT license) that paste as pictures,
+  plus your own: copy any picture, open Win+V, press the smiley on it.
+- **Emoji**: every emoji with search ("skull", "fire"...), recent ones on top.
+- Gear: start with Windows on/off, "Copy not working? Check it" (names the app that's holding the clipboard
+  open, which is what breaks copying), clear history, turn it off.
+- Lives in `%LOCALAPPDATA%\ALTS\clip`. `get-stickers.sh` re-downloads the starter stickers + emoji list.
+
+## In the chat box (1.5.0)
+
+Left of the chat box: **emoji + stickers**, **Send later** (saves what you typed; when your usage limit is
+back ALTS makes a sound, pops up and shows them with a Send button), **Fresh chat** (Claude writes a handoff,
+then a new chat starts that already knows what you were doing). Above it: **quick buttons** for things you
+say a lot (+ adds one, right-click removes). A warning shows when a chat gets so long that every message
+costs a lot more usage. Common typos get fixed as you type (Ctrl+Z undoes it), and misspelled words get
+the red line + right-click fixes. The gear at the bottom of the side list switches ALTS's look.
+
 ## Claude's files (no "this could harm your PC" warnings)
 
 Windows marks every download as "from the internet". That mark is what makes it warn: Edge's "this
@@ -40,7 +64,7 @@ Warning" box. ALTS takes that mark off **only** for files that come from Claude 
 
 - A download counts as Claude's when the account is on claude.ai and the file comes from Claude's own
   sites (claude.ai, anthropic.com, Claude's preview sandbox) or is made by the claude.ai page itself.
-- Those go to `Downloads\Claude files`, and the moment they finish ALTS removes the mark, so they open
+- Those go to your normal `Downloads` folder, and the moment they finish ALTS removes the mark, so they open
   like a file you made yourself. WebView2's own download check is off in ALTS's accounts only; Edge and
   the rest of Windows keep theirs.
 - ALTS keeps each file's SHA-256 fingerprint. When you open one from **Files** and it isn't exactly what

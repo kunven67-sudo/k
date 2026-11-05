@@ -8,6 +8,26 @@
   --bg: #131316; --panel: #1b1b20; --raise: #24242b; --line: #2a2a32;
   --text: #ececf1; --dim: #8d8d99; --faint: #5d5d68; --red: #ef5b5b; --clay: #d97757;
 }
+/* looks (Settings > Look) */
+:root[data-theme="midnight"] { --bg: #0b1020; --panel: #121a2e; --raise: #1b2540; --line: #24304d; --dim: #8f9bb8; --faint: #5b6785; --clay: #5b8cff; }
+:root[data-theme="oled"] { --bg: #000; --panel: #0c0c0e; --raise: #18181c; --line: #222226; --dim: #8a8a94; --faint: #55555e; }
+:root[data-theme="neon"] { --bg: #0d0a17; --panel: #160f26; --raise: #22183a; --line: #2f2350; --dim: #a59cc4; --faint: #6a5f8c; --clay: #b46cff; }
+:root[data-theme="forest"] { --bg: #0e1411; --panel: #142019; --raise: #1c2c23; --line: #253a2e; --dim: #8fa89a; --faint: #5a7365; --clay: #3dbe8b; }
+:root[data-theme="sunset"] { --bg: #17100f; --panel: #221614; --raise: #2e1d1a; --line: #3d2722; --dim: #b39a92; --faint: #7a625b; --clay: #ff7a59; }
+:root[data-theme="light"] { --bg: #f4f4f6; --panel: #ffffff; --raise: #e9e9ee; --line: #dcdce3; --text: #18181c; --dim: #5e5e6a; --faint: #8f8f9a; }
+:root[data-theme="light"] .foot .primary, :root[data-theme="light"] #empty button, :root[data-theme="light"] .facts .open { color: #fff; }
+:root[data-theme="light"] .foot .primary:hover, :root[data-theme="light"] .facts .open:hover { background: #33333a; color: #fff; }
+.looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; margin: 6px 0 4px; }
+.look { border: 2px solid var(--line); border-radius: 12px; padding: 8px; text-align: left; transition: transform .1s, border-color .1s; }
+.look:hover { transform: translateY(-2px); }
+.look.on { border-color: var(--clay); }
+.look .sw { height: 46px; border-radius: 8px; display: flex; overflow: hidden; margin-bottom: 6px; }
+.look .sw i { flex: 1; }
+.look .sw i:first-child { flex: 0 0 26%; }
+.look b { font-size: 12px; }
+#look { width: 26px; height: 26px; border-radius: 50%; color: var(--faint); display: grid; place-items: center; }
+#look:hover { background: var(--raise); color: var(--text); }
+#look svg { width: 16px; height: 16px; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
   font: 13px/1.35 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -247,6 +267,7 @@ kbd { font: 600 11.5px "Segoe UI", system-ui, sans-serif; background: var(--bg);
   <div id="foot">
     <button id="add" title="Add an account"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
     <div id="addLbl">Add</div>
+    <button id="look" title="Settings: change how ALTS looks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     <button id="help" title="Keys and tips">?</button>
   </div>
 </div>
@@ -395,6 +416,7 @@ function buildModal() {
   const card = el("div", "card");
   card.dataset.kind = modal.kind;
   if (modal.kind === "help") { buildHelp(card); st.append(card); return; }
+  if (modal.kind === "look") { card.classList.add("big"); buildLook(card); st.append(card); return; }
   if (modal.kind === "continue") { buildContinue(card); st.append(card); return; }
   if (modal.kind === "chats") { card.classList.add("big"); buildChats(card); st.append(card); return; }
   if (modal.kind === "tasks") { card.classList.add("big"); buildTasks(card); st.append(card); return; }
@@ -739,6 +761,39 @@ function paintGh() {
   gh.append(el("div", "", "Saved chats also go to a GitHub repo of yours, so Claude can read them in new chats."), row);
 }
 
+const LOOKS = [["clay", "Clay (normal)", "#131316", "#24242b", "#d97757"], ["midnight", "Midnight", "#0b1020", "#1b2540", "#5b8cff"],
+  ["oled", "Pure black", "#000000", "#18181c", "#d97757"], ["neon", "Neon", "#0d0a17", "#22183a", "#b46cff"],
+  ["forest", "Forest", "#0e1411", "#1c2c23", "#3dbe8b"], ["sunset", "Sunset", "#17100f", "#2e1d1a", "#ff7a59"], ["light", "Light", "#f4f4f6", "#ffffff", "#d97757"]];
+function setLook(k) {
+  if (k && k !== "clay") document.documentElement.dataset.theme = k; else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem("alts-look", k || "clay"); } catch (e) {}
+}
+try { setLook(localStorage.getItem("alts-look") || "clay"); } catch (e) {}
+function buildLook(card) {
+  card.append(el("h2", "", "Settings"));
+  card.append(el("div", "tips", "Look: pick one, it changes right away."));
+  const g = el("div", "looks");
+  const cur = () => document.documentElement.dataset.theme || "clay";
+  LOOKS.forEach(([k, name, bg, raise, acc]) => {
+    const b = el("button", "look" + (cur() === k ? " on" : ""));
+    const sw = el("div", "sw");
+    [bg, raise, acc].forEach(c => { const i = el("i"); i.style.background = c; sw.append(i); });
+    b.append(sw, el("b", "", name));
+    b.onclick = () => { setLook(k); g.querySelectorAll(".look").forEach(x => x.classList.remove("on")); b.classList.add("on"); };
+    g.append(b);
+  });
+  card.append(g);
+  const tips = el("div", "tips");
+  ["Win+V: ALTS Clipboard (everything you copied, pins, stickers, emoji). It runs by itself and starts with Windows; its own settings are under the gear in that box.",
+   "In a chat, left of the chat box: emoji + stickers, \u23F0 Send later, \u21BB Fresh chat. Quick buttons sit above the box (right-click one to remove it)."].forEach(t => tips.append(el("div", "", t)));
+  card.append(tips);
+  const foot = el("div", "foot");
+  const ok = el("button", "primary", "Done");
+  ok.onclick = closeModal;
+  foot.append(ok);
+  card.append(foot);
+}
+
 function buildHelp(card) {
   card.append(el("h2", "", "ALTS keys"));
   const keys = el("div", "keys");
@@ -758,7 +813,11 @@ function buildHelp(card) {
    "Screen pictures, bug reports and voice typing are in LINK (the tray app), never in your messages.",
    "Pins: select some text in a chat and press Pin. The pin button shows them all.",
    "If Google login says the browser isn't safe, use Continue with email. It works the same.",
-   "Links to other websites open in your normal browser."].forEach(t => tips.append(el("div", "", t)));
+   "Links to other websites open in your normal browser.",
+   "Win+V opens ALTS Clipboard: everything you copied (text + pictures), pins, stickers and emoji. Click one and it pastes.",
+   "\u23F0 next to the chat box saves a message for when your limit is back. ALTS pings you (sound + it pops up), you press Send.",
+   "\u21BB Fresh chat: Claude writes a handoff, then a new chat starts that knows what you were doing. Long chats use way more usage.",
+   "The gear at the bottom changes how ALTS looks."].forEach(t => tips.append(el("div", "", t)));
   card.append(tips);
   const foot = el("div", "foot");
   const ok = el("button", "primary", "Got it");
@@ -898,6 +957,7 @@ $("#tools").addEventListener("click", e => {
 });
 $("#add").onclick = () => openModal({ kind: "add" });
 $("#help").onclick = () => openModal({ kind: "help" });
+$("#look").onclick = () => openModal({ kind: "look" });
 document.addEventListener("keydown", e => {
   if (!modal) return;
   if (e.key === "Escape") { e.preventDefault(); closeModal(); }

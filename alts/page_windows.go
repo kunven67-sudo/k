@@ -44,6 +44,8 @@ type pageMsg struct {
 	W       float64 `json:"w"`
 	SR      string  `json:"sr"`
 	WR      string  `json:"wr"`
+	Text    string  `json:"text"`
+	Mine    bool    `json:"mine"`
 }
 
 type countInfo struct {
@@ -139,6 +141,16 @@ func (a *App) page(id string, m pageMsg) {
 		}
 	case "open-folder":
 		a.openFolder(m.File)
+	case "emoji-data":
+		v.c.Eval(jsCall("emojiData", a.emojiData()))
+	case "sticker-get":
+		if b, name := a.stickerBytes(m.File, m.Mine); b != nil {
+			v.c.Eval(jsCall("stickerFile", map[string]string{"name": name, "b64": base64.StdEncoding.EncodeToString(b)}))
+		} else {
+			v.c.Eval(jsCall("stickerFile", nil))
+		}
+	case "ping":
+		a.ping(id, m.Text)
 	}
 }
 

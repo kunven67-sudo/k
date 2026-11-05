@@ -28,6 +28,9 @@ var grabJS string
 //go:embed ui/page.js
 var pageJS string
 
+//go:embed ui/extras.js
+var extrasJS string
+
 const (
 	appName    = "ALTS"
 	mainClass  = "ALTS.Main"
@@ -95,7 +98,7 @@ type App struct {
 	runQ        []func() // work from other threads, run by the message loop
 
 	files     fileList           // Claude's files (files.go)
-	filesAt   string             // Downloads\Claude files
+	filesAt   string             // your Downloads folder
 	downloads map[*download]bool // files from Claude still coming in
 	dlTaken   map[string]bool    // file names those are going to
 	fixing    bool               // "Fix my old Claude files" is looking
@@ -558,6 +561,7 @@ func (a *App) openAt(id, link string) {
 		a.views[id] = v
 		a.safeLane(id, v) // before the first page: files from Claude open with no warning
 		c.Init(pageJS)    // the page helper, in every page from now on (it only works on claude.ai)
+		c.Init(extrasJS)  // chat-box extras: emoji, Send later, quick buttons, Fresh chat, autocorrect
 		c.Resize()
 		c.Navigate(link)
 		a.show(id)

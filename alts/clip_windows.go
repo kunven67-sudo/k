@@ -305,7 +305,8 @@ func (c *clipApp) startUI() {
 
 func (c *clipApp) call(fn string, v any) {
 	if c.ui != nil && c.uiReady {
-		c.ui.Eval(jsCall(fn, v))
+		b, _ := json.Marshal(v)
+		c.ui.Eval("window.clip&&clip." + fn + "(" + string(b) + ")")
 	}
 }
 
@@ -318,7 +319,7 @@ func (c *clipApp) push() {
 			built = append(built, e.Name())
 		}
 	}
-	c.call("clip.load", map[string]any{"items": c.st.Items, "mine": mine, "builtin": built, "start": !c.st.NoStart})
+	c.call("load", map[string]any{"items": c.st.Items, "mine": mine, "builtin": built, "start": !c.st.NoStart})
 }
 
 func (c *clipApp) save() { saveClip(c.json, c.st) }
@@ -431,7 +432,7 @@ func (c *clipApp) do(m clipMsg) {
 		c.save()
 		c.push()
 	case "stuck":
-		c.call("clip.stuck", c.whoHoldsIt())
+		c.call("stuck", c.whoHoldsIt())
 	case "quit":
 		c.autostart(!c.st.NoStart)
 		pDestroyWindow.Call(c.win)
@@ -567,7 +568,7 @@ func (c *clipApp) show() {
 	if c.ui != nil {
 		c.ui.Focus()
 	}
-	c.call("clip.shown", nil)
+	c.call("shown", nil)
 }
 
 func (c *clipApp) hide() {
@@ -578,7 +579,7 @@ func (c *clipApp) hide() {
 // pasteWith puts the thing on the clipboard, goes back to your app and presses Ctrl+V there.
 func (c *clipApp) pasteWith(set func() bool) {
 	if !set() {
-		c.call("clip.toast", "Couldn't put that on the clipboard (another app is holding it).")
+		c.call("toast", "Couldn't put that on the clipboard (another app is holding it).")
 		return
 	}
 	c.hide()

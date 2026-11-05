@@ -78,10 +78,14 @@
   const settle = (quiet = 400, max = 6000) => new Promise(res => {
     let t = setTimeout(done, quiet);
     const hard = setTimeout(done, max);
-    const mo = new MutationObserver(() => { clearTimeout(t); t = setTimeout(done, quiet); });
+    // changes in ALTS's own boxes (the progress text) don't count, or saving waits on itself
+    const mo = new MutationObserver(rs => { if (rs.every(r => ours(r.target.nodeType === 1 ? r.target : r.target.parentElement))) return; clearTimeout(t); t = setTimeout(done, quiet); });
     mo.observe(document.body, { childList: true, subtree: true, characterData: true });
     function done() { mo.disconnect(); clearTimeout(t); clearTimeout(hard); res(); }
   });
+
+  // Saving has a time budget (under a minute): past it, it stops loading/opening more and saves what it has.
+  const late = state => !!(state && state.until && Date.now() > state.until);
 
   // "Load later messages" / "Load earlier messages": keep pressing until none are left.
   const LOAD = /^(load|show|view) (earlier|later|older|newer|previous|more)( messages)?\b/i;
@@ -95,13 +99,13 @@
   });
   async function loadAll(state, which) {
     let clicks = 0;
-    for (let calm = 0, i = 0; calm < 2 && i < 4000 && !state.stop; i++) {
+    for (let calm = 0, i = 0; calm < 2 && i < 4000 && !state.stop && !late(state); i++) {
       const bs = loaders(which);
       if (!bs.length) { calm++; await settle(500, 1500); continue; }
       calm = 0;
       for (const b of bs) { try { b.click(); clicks++; } catch (e) {} }
       if (state.tick) state.tick('Loading the whole chat... (pressed Load ' + clicks + (clicks === 1 ? ' time)' : ' times)'));
-      await settle(350, 8000);
+      await settle(300, 4000);
     }
     return clicks;
   }
@@ -110,13 +114,13 @@
   async function expandAll(root, state) {
     const seen = new WeakSet();
     let opened = 0;
-    for (let round = 0; round < 60 && !state.stop; round++) {
+    for (let round = 0; round < 60 && !state.stop && !late(state); round++) {
       const fresh = [...root.querySelectorAll('[aria-expanded="false"]:not([aria-haspopup])')].filter(b =>
         !seen.has(b) && !ours(b) && b.getClientRects().length && !b.closest('header,nav,aside,[role="menu"],[role="listbox"],[role="toolbar"],form'));
       if (!fresh.length) break;
       for (const b of fresh) { seen.add(b); try { b.click(); opened++; } catch (e) {} }
       if (state.tick) state.tick('Opening folded parts... (' + opened + ')');
-      await settle(300, 5000);
+      await settle(250, 2500);
       if (opened > 5000) break;
     }
     return opened;
@@ -126,22 +130,34 @@
   const toDataURL = blob => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(''); r.readAsDataURL(blob); });
   async function inlineImages(clone, state) {
     const imgs = [...clone.querySelectorAll('img')];
+    const cache = new Map(); // the same picture (icons, avatars) is fetched once
     let done = 0, i = 0;
+    const get = href => {
+      if (!cache.has(href)) cache.set(href, (async () => {
+        try {
+          const ctl = new AbortController();
+          const t = setTimeout(() => ctl.abort(), 8000);
+          const r = await fetch(href, { credentials: 'include', signal: ctl.signal });
+          clearTimeout(t);
+          return r.ok ? await toDataURL(await r.blob()) : '';
+        } catch (e) { return ''; }
+      })());
+      return cache.get(href);
+    };
     const one = async img => {
       const src = img.getAttribute('src') || '';
       img.removeAttribute('srcset');
       img.removeAttribute('loading');
       if (!src || src.startsWith('data:')) return;
-      try {
-        const ctl = new AbortController();
-        const t = setTimeout(() => ctl.abort(), 15000);
-        const r = await fetch(new URL(src, location.href).href, { credentials: 'include', signal: ctl.signal });
-        clearTimeout(t);
-        if (r.ok) { const d = await toDataURL(await r.blob()); if (d) img.setAttribute('src', d); }
-      } catch (e) {}
+      let href = src;
+      try { href = new URL(src, location.href).href; } catch (e) {}
+      img.setAttribute('src', href); // if it can't be put inside the file, it still loads from claude.ai when you're online
+      if (late(state)) return;
+      const d = await get(href);
+      if (d) img.setAttribute('src', d);
     };
     const worker = async () => { while (i < imgs.length && !state.stop) { const img = imgs[i++]; await one(img); done++; if (state.tick && done % 5 === 0) state.tick('Saving pictures... ' + done + ' / ' + imgs.length); } };
-    await Promise.all([worker(), worker(), worker(), worker(), worker(), worker()]);
+    await Promise.all(Array.from({ length: 8 }, worker));
     return imgs.length;
   }
   // fonts and pictures inside the CSS point at claude.ai, so the saved file still finds them when you're online
@@ -203,7 +219,7 @@
   async function save(opts) {
     opts = opts || {};
     if (saving) return;
-    const state = { stop: false };
+    const state = { stop: false, until: Date.now() + (opts.budget || 50000) };
     saving = state;
     const b = opts.quiet ? null : box('Save chat');
     if (b) { b.say('Getting the whole chat...').progress(0.05); b.button('Stop', false, () => { state.stop = true; }); }
@@ -421,7 +437,7 @@
     const t = rootOf(scroller(true)).textContent || '';
     const you = (t.match(/You said:/g) || []).length, claude = (t.match(/Claude responded:/g) || []).length;
     const c = JSON.stringify([you + claude, words(t), loaders().length > 0]);
-    if (c !== lastCount) { lastCount = c; send({ t: 'count', msgs: you + claude, words: words(t), more: loaders().length > 0 }); }
+    if (c !== lastCount) { lastCount = c; send({ t: 'count', msgs: you + claude, words: words(t), more: loaders().length > 0 }); if (window.__alts) window.__alts.lastCount = { msgs: you + claude, words: words(t) }; }
   }, 6000);
   async function usage() {
     try {
@@ -433,7 +449,12 @@
         const j = await r.json();
         const pick = k => j && j[k] && typeof j[k].utilization === 'number' ? j[k] : null;
         const s = pick('five_hour'), w = pick('seven_day');
-        if (s || w) { send({ t: 'usage', s: s ? s.utilization : -1, w: w ? w.utilization : -1, sr: s ? s.resets_at || '' : '', wr: w ? w.resets_at || '' : '' }); return; }
+        if (s || w) {
+          const u = { s: s ? s.utilization : -1, w: w ? w.utilization : -1, sr: s ? s.resets_at || '' : '', wr: w ? w.resets_at || '' : '' };
+          send(Object.assign({ t: 'usage' }, u));
+          if (window.__alts) { window.__alts.lastUsage = u; dispatchEvent(new CustomEvent('alts-usage', { detail: u })); }
+          return;
+        }
       }
     } catch (e) {}
   }
@@ -441,12 +462,17 @@
 
   // ---------- no internet: a big red bar you can't miss (stays until it's back) ----------
   let netBar = null, netOk = true, netT = 0;
+  // Any answer from claude.ai (even an error page) means the internet works. Only "couldn't reach it at all",
+  // twice in a row, counts as no internet. (The old check said "no internet" whenever claude.ai answered with an error.)
+  async function reach() {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), 10000);
+    try { await fetch('/favicon.ico?n=' + Date.now(), { cache: 'no-store', signal: c.signal }); return true; }
+    catch (e) { return false; } finally { clearTimeout(t); }
+  }
   async function net() {
     clearTimeout(netT);
-    let ok = navigator.onLine;
-    if (ok) {
-      try { const c = new AbortController(); setTimeout(() => c.abort(), 6000); ok = (await fetch('/favicon.ico?n=' + Date.now(), { cache: 'no-store', signal: c.signal })).ok; } catch (e) { ok = false; }
-    }
+    let ok = await reach();
+    if (!ok && netOk) { await sleep(3000); ok = await reach(); }
     if (ok !== netOk) {
       netOk = ok;
       if (!ok) {
@@ -463,11 +489,11 @@
     }
     netT = setTimeout(net, ok ? 10000 : 4000);
   }
-  addEventListener('offline', () => { netOk = true; net(); });
+  addEventListener('offline', () => net());
   addEventListener('online', () => net());
   setTimeout(net, 3000);
 
-  window.__alts = { save, saved, saveAll, continueWith, pins, jump, toast };
+  window.__alts = { save, saved, saveAll, continueWith, pins, jump, toast, box, composer, putText, attach, settle, mk, send, FONT, ours, lastUsage: null, lastCount: null };
   const start = () => { send({ t: 'hello' }); usage(); if (readAll()) setTimeout(allNext, 1500); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
