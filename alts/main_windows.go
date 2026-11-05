@@ -104,6 +104,10 @@ type App struct {
 var app *App
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--clip" {
+		runClip()
+		return
+	}
 	if pSetProcessDpiAwareCtx.Find() == nil {
 		pSetProcessDpiAwareCtx.Call(^uintptr(3)) // -4 = per monitor v2 (the manifest says so too)
 	}
@@ -169,6 +173,7 @@ func main() {
 	if first != "" {
 		a.open(first)
 	}
+	startClipHelper() // Win+V clipboard (runs on its own, also after ALTS closes)
 
 	var m msg
 	for {
