@@ -9,7 +9,7 @@
   const RANKS = ['SHIT', 'GOOD', 'GREAT', 'EXCELLENT', 'PERFECT', 'PERFECT_GOLD'];
   const RANK_NAME = { SHIT: 'LOSS', GOOD: 'GOOD', GREAT: 'GREAT', EXCELLENT: 'EXCELLENT', PERFECT: 'PERFECT', PERFECT_GOLD: 'GOLD PERFECT' };
   const RANK_COLOR = { SHIT: '#6044FF', GOOD: '#EF8764', GREAT: '#EAF6FF', EXCELLENT: '#FDCB42', PERFECT: '#FF58B4', PERFECT_GOLD: '#FFB619' };
-  const DIFF_COLOR = { easy: '#58FF79', normal: '#FFE83A', hard: '#FF4A4A', erect: '#C28AFF', nightmare: '#FF3D8B' };
+  const DIFF_COLOR = Object.assign({ easy: '#58FF79', normal: '#FFE83A', hard: '#FF4A4A', erect: '#C28AFF', nightmare: '#FF3D8B' }, G.DIFF_COLOR || {});
   const r = (a, b) => a + Math.random() * (b - a);
 
   const store = G.store.get('fnf2.rankmode', null) || {};

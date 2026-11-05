@@ -225,7 +225,8 @@
       //  (also in a song made for them: Darnell in After Hours)
       const PP = G.PLAYERS && G.PLAYERS[G.settings.player], swapChar = PP && !PP.real && PP.swapChar && (s.swap || s.chars.player === PP.ownChar) ? PP.swapChar : null;
       const own = this.playAs && (this.playAs.real.songChar && s.chars.player === this.playAs.real.songChar ? s.chars.player : this.playAs.real.char);
-      const anyChar = s.anyPlayer && G.playerChar ? G.playerChar(G.settings.player) : null;   // (a song made for anybody)
+      // (a song made for anybody, or a song a player who sings everything takes over: Tankman in BF's place)
+      const anyChar = (s.anyPlayer || this.params.cover) && G.playerChar ? G.playerChar(G.settings.player) : null;
       this.bf = mk(anyChar || own || swapChar || s.chars.player, 'bf', 'bf');
       if (this.playAs && this.playAs.real.flip === false && this.bf.nene) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
       // their atlas box is much bigger than what they draw (Darnell stood half off the screen): put the feet
@@ -712,19 +713,22 @@
         first = n; break;
       }
       if (!first) return;
+      // Options > Pro Mode hits (X on PC): ALL SICK, or GOOD + SICK = right on time is SICK, too early / late is GOOD
+      // (never BAD or SHIT); the notes packed right after it get the same
+      const proR = G.settings.proHits === 'goodsick' && judge(pos - first.t) !== 'sick' ? 'good' : 'sick';
       let last = first.t;
       for (const n of this.notes) {
         if (n.t < first.t || n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n) || (one >= 0 && n.lane !== one)) continue;
         if (n.t - last > 90) break;
-        n.proQ = true; last = n.t;
+        n.proQ = true; n.proR = proR; last = n.t;
         if (n.t <= pos) { n.hit = true; n.holding = n.len > 0; n.proHold = true; this.playerHit(n, 0, true); }
       }
     },
     playerHit(n, diffMs, auto) {
       const s = this.lines[1].strums[n.lane];
       s.playA('confirm', true); s.confirmHold = auto && !(n.len > 0) ? 0 : -1;    // (botplay: a hold keeps its arrow lit to the end)
-      const r = auto ? 'sick' : judge(diffMs);
-      const pts = auto ? 500 : scorePBOT1(diffMs);
+      const r = auto ? (n.proR || 'sick') : judge(diffMs);
+      const pts = auto ? (r === 'good' ? 350 : 500) : scorePBOT1(diffMs);
       this.nudgeCam(0, n.lane);
       this.score += pts;
       this.health = Math.min(H.max, this.health + (H[r] || 0));
@@ -921,16 +925,18 @@
     },
     // -------------------------------------------------- pause menu (V-Slice PauseSubState)
     openPause() {
-      if (this.paused || !this.audio) return;
-      // a cutscene: its sounds + video stop right where they are (RESUME carries on from there)
+      if (this.paused) return;
+      // a cutscene: its sounds + video stop right where they are (RESUME carries on from there). (A cutscene can be
+      // paused before the song's music has even loaded: right when you get in)
       const cut = this.cutscene && !this.cutscene.done ? (this.cutscene.dlg ? 'talk' : 'video') : null;
+      if (!cut && !this.audio) return;
       this.paused = true;
       if (cut) this.cutFreeze = G.audio.freeze ? G.audio.freeze() : null; else this.audio.pause();
       if (this.pauseBtn && G.touchMode && this.pauseBtn.spr.animName !== 'confirm') { this.pauseBtn.spr.play('confirm', true); this.pauseBtn.spr.alpha = 1; }
       if (navigator.vibrate && G.touchMode) try { navigator.vibrate(50); } catch (e) {}
       for (let i = 0; i < 4; i++) if (this.keys[i]) this.release(i);
       this._touch = {}; this._tpos = {};
-      const art = this.song.artist || 'Unknown', chr = this.song.charter || 'Unknown';
+      const art = (this.song && this.song.artist) || 'Unknown', chr = (this.song && this.song.charter) || 'Unknown';
       const meta = [this.song.name, 'Artist: ' + art, 'Difficulty: ' + ((G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff).replace(/\b\w+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()), '', 'PRACTICE MODE'];
       this.pauseMenu = { sel: 0, t: 0, mode: 'main', items: [], meta, art, chr, artistT: 0, artistA: 1, artistIsCharter: false, offHold: 0, offFast: false, cut };
       this.pauseEntries('main');
@@ -1018,12 +1024,14 @@
       if (type === 'down') { pm.tap = { x, y, t: performance.now() }; return; }
       if (type !== 'up' || !pm.tap) return;
       const t = pm.tap; pm.tap = null;
-      if (Math.abs(x - t.x) > 30 || Math.abs(y - t.y) > 30 || performance.now() - t.t > 400) return;
+      if (Math.abs(x - t.x) > 50 || Math.abs(y - t.y) > 50 || performance.now() - t.t > 900) return;
+      // one tap on an entry = it's picked + done right away (RESTART, SKIP... no second tap needed)
       for (let i = 0; i < pm.items.length; i++) {
         const it = pm.items[i];
-        if (y >= it.y - 10 && y <= it.y + 80 && x >= it.x - 40 && x < it.x + it.width + 60) {
-          if (i === pm.sel) { if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {} this.pauseChoose(); }
-          else { pm.sel = i; this.layoutPause(); G.sfx('scroll', { vol: 0.4 }); if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {} }
+        if (y >= it.y - 18 && y <= it.y + 88 && x >= it.x - 60 && x < it.x + it.width + 120) {
+          if (i !== pm.sel) { pm.sel = i; this.layoutPause(); }
+          if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {}
+          this.pauseChoose();
           return;
         }
       }
@@ -1050,8 +1058,11 @@
     resume() {
       const cut = this.pauseMenu && this.pauseMenu.cut;
       this.paused = false; this.pauseMenu = null;
+      // (the pause button stays 'busy' until its press animation ends: resuming fast used to leave it dead, so a
+      //  second tap on it - e.g. to skip the next cutscene part - did nothing)
+      if (this.pauseBtn) { this.pauseBtn.busy = false; this.pauseBtn.held = null; }
       if (cut) { if (this.cutFreeze) G.audio.unfreeze(this.cutFreeze); else G.audio.music.stop(0.1); this.cutFreeze = null; if (this.pauseBtn) { this.pauseBtn.spr.play('idle', true); this.pauseBtn.spr.alpha = this.pauseBtn.rest; } return; }
-      G.audio.music.stop(0.1); this.audio.resume();
+      G.audio.music.stop(0.1); if (this.audio) this.audio.resume();
     },
     // (leaving while a cutscene is frozen: its sounds stop for good)
     killCutFreeze() { if (this.cutFreeze && G.audio.unfreeze) G.audio.unfreeze(this.cutFreeze, true); this.cutFreeze = null; },
@@ -1155,7 +1166,7 @@
       // V-Slice style tallies + rank (results screen, freeplay rank badges + clear %)
       const tl = this.tally, sick = (tl.killer || 0) + tl.sick;
       stats.tallies = { sick, good: tl.good, bad: tl.bad, shit: tl.shit, missed: tl.miss, maxCombo: this.maxCombo, totalNotesHit: sick + tl.good + tl.bad + tl.shit, totalNotes: stats.totalNotes };
-      const scoreKey = (this.pro ? 'pro:' : '') + s.id + (s.variation !== 'default' ? '-' + s.variation : '') + (this.playAs ? '-as-' + this.playAs.id : '');
+      const scoreKey = (this.pro ? 'pro:' : '') + s.id + (s.variation !== 'default' ? '-' + s.variation : '') + (this.playAs ? '-as-' + this.playAs.id : this.params.cover ? '-as-' + G.settings.player : '');
       const prev = G.getScore(scoreKey, p.diff, 'bf');
       const prevRank = prev ? (prev.rank || null) : null;
       let isNewHighscore = false;
@@ -1471,9 +1482,10 @@
       ctx.restore();
     },
     onKey(code, down, repeat) {
-      // Z = death counter on/off (only when Z is not one of your note keys)
-      if (code !== 'KeyZ' || !down || repeat || this.paused || this.gameOver || this.cutscene) return;
+      // Z = death counter on/off, X = PRO MODE hits ALL SICK / GOOD + SICK (only when it's not one of your note keys)
+      if ((code !== 'KeyZ' && !(code === 'KeyX' && this.pro)) || !down || repeat || this.paused || this.gameOver || this.cutscene) return;
       if (G.input.actionsFor(code).some(x => /^note\d$/.test(x))) return;
+      if (code === 'KeyX') { G.toggleProHits(); return true; }
       G.settings.deathCounter = G.settings.deathCounter === false; G.saveSettings();
       return true;
     },

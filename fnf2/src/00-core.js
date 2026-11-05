@@ -101,6 +101,9 @@ G.DEFAULT_SETTINGS = {
   // misc / remembered menu state
   player: 'ace', diff: 1, lastWeek: 0, lastFreeplay: 0,
   seenMechanics: {},
+  // (every option must be listed here, or it's thrown away when the game loads again: Video Songs = CHARACTERS,
+  //  Phone controls, App mode and the Pro Mode ones kept going back to their defaults)
+  videoSongs: 'video', touchScheme: 'arrows', appMode: false, proKeys: 'four', proHits: 'sick',
 };
 G.settings = (function () {
   const saved = G.store.get('fnf2.settings', {}) || {};
@@ -654,6 +657,11 @@ window.addEventListener('unhandledrejection', ev => G.reportError(ev.reason, 'pr
 
 // ------------------------------------------------------------------ toasts
 G.toasts = [];
+// PRO MODE hits: 'sick' = every hit SICK, 'goodsick' = on time SICK, early / late GOOD (never BAD / SHIT). X on PC, Options on phones
+G.toggleProHits = function () {
+  G.settings.proHits = G.settings.proHits === 'goodsick' ? 'sick' : 'goodsick'; G.saveSettings && G.saveSettings();
+  G.toast('PRO MODE: ' + (G.settings.proHits === 'goodsick' ? 'GOOD + SICK (on time = SICK, early / late = GOOD)' : 'ALL SICK'), '#FFE83A');
+};
 G.toast = function (msg, color) { G.toasts.push({ msg, color: color || '#fff', t: 0, life: 2.6 }); if (G.toasts.length > 4) G.toasts.shift(); };
 
 // ------------------------------------------------------------------ input

@@ -38,11 +38,15 @@
   // Tankman = a full player from the mod "Playable Tankman" (tools/own/tankman_play.py): his own character select
   // animation, Steve on the speakers, DJ, card, songs, results, game over. Without the pack he's the stand-in above.
   G.PLAYERS.tankman = { id: 'tankman', pack: 'tankman', name: 'Tankman', pos: 7, chill: CS + 'tankmanChill', gf: { asset: CS + 'steveChill', viz: false },
-    nametag: 'tankmanplay', icon: 'tankman', ownChar: 'tankman', swapChar: 'tankman-playable', fallback: G.PLAYERS.tankman };
+    nametag: 'tankmanplay', icon: 'tankman', ownChar: 'tankman', swapChar: 'tankman-playable', fallback: G.PLAYERS.tankman,
+    everySong: true };   // (every song in the game: the ones he has nothing of his own in = BF's part, sung by him)
   // Nene = a full player from the mod "NENE MIXES" (tools/own/nene_mix.py): her own character select animation,
   // Cassandra on the speakers, DJ, card, mixes, results, death. Without the pack she's the stand-in above.
   G.PLAYERS.nene = { id: 'nene', pack: 'nenemix', name: 'Nene', pos: 1, chill: CS + 'neneplayerChill', gf: { asset: CS + 'dipshitCass', viz: false },
-    nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene };
+    nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene,
+    // (one Nene everywhere: the NENE MIXES one from Guns vs Tankman - tongue out, bloody knife - also sings her own
+    //  songs played swapped, instead of the other mod's Nene with the big knife + mic)
+    swapChar: 'nenemix-playable' };
   // the Jordus girl (Nightly Funkin', rebuilt from a video: tools/own/jordus.py + jordus_rig.py): her own character
   // select animation (she chills on her purple amp: bops, kicks her legs, pops her shades on when picked), the cap
   // girl she battles on the speakers spot (her real idle, sitting on a navy amp), her gameplay moves for the DJ spot

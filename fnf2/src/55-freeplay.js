@@ -899,6 +899,11 @@
         if (!diffs.length) continue;
         const ratings = {};
         for (const d of diffs) { const mm = G.Songs.meta(sid, d.variation) || m; ratings[d.diff] = ((mm.playData.ratings || {})[d.diff]) || 0; }
+        // (FNF 2's own BABY / INSANE / GOD: rated from the song's own)
+        const top = ratings.hard || ratings.normal || ratings.easy || 5;
+        if ('baby' in ratings) ratings.baby = Math.max(1, (ratings.easy || top) - 2);
+        if ('insane' in ratings) ratings.insane = top + 3;
+        if ('god' in ratings) ratings.god = top + 6;
         const dm = G.Songs.meta(sid, diffs[0].variation) || m;
         const ch = dm.playData.characters || {};
         // (swapped: the one you battle is the song's own player)
@@ -1103,7 +1108,7 @@
     },
     // a song's saved result (in RANK MODE: the fake one, kept apart from the real ones)
     recFor(s, d) {
-      const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '') + (this.realP ? '-as-' + this.player : '');
+      const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '') + (this.realP ? '-as-' + this.player : d.cover ? '-as-' + this.player : '');
       return this.rankMode && G.RankMode ? G.RankMode.get(key, this.diff) : G.getScore((this.proMode ? 'pro:' : '') + key, this.diff, 'bf');
     },
     // ------------------------------------------------------------ selection
@@ -1200,7 +1205,7 @@
       }
       if (this.rankMode && G.RankMode) { G.RankMode.open(this); return; }
       const s = cap.s, d = s.diffs.find(x => x.diff === this.diff) || s.diffs[0];
-      this.pending = { id: s.id, diff: d.diff, variation: d.variation, swap: !!d.swap };
+      this.pending = { id: s.id, diff: d.diff, variation: d.variation, swap: !!d.swap, cover: !!d.cover };
       G.save.recent = [s.id].concat((G.save.recent || []).filter(x => x !== s.id)).slice(0, 30); G.saveData();
       this.state = 'confirm'; this.confirmT = 0;
       G.sfx('confirm');
@@ -1215,7 +1220,7 @@
           onComplete: () => {
             if (this.went) return; this.went = true;
             G.audio.music.stop(0);
-            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, swap: this.pending.swap, week: null, deaths: 0 , pro: this.proMode}, { instant: true });
+            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, swap: this.pending.swap, cover: this.pending.cover, week: null, deaths: 0 , pro: this.proMode}, { instant: true });
           },
         });
       });
@@ -1297,6 +1302,7 @@
       if (this.editor) return this.editor.onKey(code, down, repeat);
       if (!down || repeat || this.state !== 'idle') return false;
       if (code === 'KeyF') { this.toggleFav(); return true; }
+      if (this.proMode && code === 'KeyX') { G.toggleProHits(); return true; }      // PRO MODE: ALL SICK <-> GOOD + SICK
       if (code === 'KeyM') { this.changeGroup(G.input.isDown('shift') ? -1 : 1); return true; }
       if (code === 'Slash' || code === 'NumpadDivide') { if (e && e.preventDefault) e.preventDefault(); this.openSearch(); return true; }   // (the / itself isn't typed into the box)
       // RANK MODE: E = edit the rank (the letter filter moves to Q / R)
@@ -1642,7 +1648,9 @@
       }
       if (this.dotsVis) {
         const dot = IMG('freeplay/seperator'), n = this.dots.length, gx = DJX + 260 - 14.7 * (Math.min(n, 8) - 1);
-        if (dot) this.dots.forEach((d, i) => { if (d.alpha > 0) ctx.drawImage(tint(dot, d.color, 'dot' + i), Math.round(gx + 30 * (i % 8) - 75), 170 + 30 * Math.floor(i / 8)); });
+        // (more than 8 difficulties - BABY / INSANE / GOD on top of FNF's - still fit on one row, a bit closer)
+        const nD = this.dots.length, per = nD > 8 ? 11 : 8, sp = nD > 8 ? Math.max(20, Math.min(30, 240 / nD)) : 30;
+        if (dot) this.dots.forEach((d, i) => { if (d.alpha > 0) ctx.drawImage(tint(dot, d.color, 'dot' + i), Math.round(gx + sp * (i % per) - 75), 170 + 30 * Math.floor(i / per)); });
       }
       // background art on the right
       at('bg');
@@ -1671,7 +1679,7 @@
         const ox = pct.length === 3 ? 10 : pct.length === 1 ? -24 : 0;
         t.x = W - 95 - ox; t.y = 87; t.draw(ctx, null); G.setScreenT(ctx);
         // deaths against who you'd battle (Options > Death Counter)
-        if (this.scoreVis && this.vsWho && !this.rankMode && G.settings.deathCounter !== false)
+        if (this.scoreVis && this.vsWho && G.settings.deathCounter !== false)
           G.vcr(ctx, 'DEATHS vs ' + this.vsWho + ': ' + G.deathsVs(this.vsWho), W - 353, 186, { size: 22, outline: 2, maxWidth: 340 });
       }
       at('letters');
@@ -1695,7 +1703,7 @@
         const ost = textImg(this.group().label, G.FONT.vcr, 48, '#FFFFFF', { stroke: 2 });
         ctx.drawImage(ost, W - 8 - ost._tw - ost._pad, 8 - ost._pad);
       }
-      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : this.proMode ? (G.settings.proKeys === 'any' ? (G.touchMode ? 'Tap your arrows like crazy, you can\'t miss' : 'Mash your note keys, you can\'t miss') : (G.touchMode ? 'Tap the right arrows, early is fine, all SICK' : 'Hit the right keys, early is fine, all SICK')) : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
+      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : this.proMode ? (G.settings.proKeys === 'any' ? (G.touchMode ? 'Tap your arrows like crazy, you can\'t miss' : 'Mash your note keys, you can\'t miss') : (G.touchMode ? 'Tap the right arrows, early is fine, all SICK' : 'Hit the right keys, early is fine, all SICK')).replace('all SICK', G.settings.proHits === 'goodsick' ? 'GOOD or SICK' : 'all SICK') + (G.touchMode ? '' : G.settings.proHits === 'goodsick' ? '  [X] all SICK' : '  [X] GOOD + SICK') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
       if (!this.searchEl) ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
       G.screenOff.y = oy; G.setScreenT(ctx);
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }

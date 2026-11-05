@@ -63,6 +63,7 @@
     ['Note Splashes', 'bool', () => S().noteSplashes, v => S().noteSplashes = v, 'Show a splash when you hit a SICK note.'],
     ['Combo Popups', 'bool', () => S().comboPopups !== false, v => S().comboPopups = v, 'Show SICK!! / GOOD and combo numbers when you hit notes.'],
     ['Pro Mode keys', 'enum', () => S().proKeys === 'any' ? 'any' : 'four', v => { S().proKeys = v; }, 'PRO MODE (main menu). FOUR: hit the right key for each arrow (your 4 note keys), early is fine, every hit is SICK. ANY: any one of your note keys hits the next note.', ['four', 'any']],
+    ['Pro Mode hits', 'enum', () => S().proHits === 'goodsick' ? 'good + sick' : 'all sick', v => { S().proHits = v === 'good + sick' ? 'goodsick' : 'sick'; }, 'PRO MODE (main menu). ALL SICK: every hit is SICK. GOOD + SICK: right on time = SICK, too early or late = GOOD, never BAD or SHIT. On PC the X key switches it in Pro Mode.', ['all sick', 'good + sick']],
     ['Botplay', 'bool', () => S().botplay, v => S().botplay = v, 'The game plays for you. Scores are not saved.'],
     ['Practice Mode', 'bool', () => S().practice, v => S().practice = v, 'You cannot die. Scores are not saved.'],
     ['Death Counter', 'bool', () => S().deathCounter !== false, v => S().deathCounter = v, 'Shows how many times you died against who you are rapping with (DEATHS vs WHITTY: 12). On PC the Z key turns it on/off during a song.'],
