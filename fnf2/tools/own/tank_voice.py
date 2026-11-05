@@ -23,7 +23,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-DUMP = sys.argv[1]
+DUMP = sys.argv[1] if __name__ == '__main__' else None
 MODS = os.path.join(ROOT, 'build', 'mods')
 SR = 22050
 CACHE = os.path.join(ROOT, 'build', 'cache', 'tank-voice'); os.makedirs(CACHE, exist_ok=True)
@@ -145,10 +145,10 @@ def own_chart(notes, tc):
     return keep
 
 
-def bake(meta, ref, total_len, SYL, UGH, PRETTY, rnd):
+def bake(meta, ref, total_len, SYL, UGH, PRETTY, rnd, cs=None):
     """his track for one song: ref = BF's singing (the tune), None = no tune to follow"""
     out = np.zeros(total_len, np.float32)
-    cs = own_chart(meta['notes'], meta.get('tc'))
+    cs = cs if cs is not None else own_chart(meta['notes'], meta.get('tc'))
     med = float(np.median([s['p'] for s in SYL]))
     bpm = (meta.get('tc') or [{'bpm': 120}])[0].get('bpm', 120); beat = 60000 / bpm
     last_ids = []
@@ -214,8 +214,10 @@ def write(a, path):
 
 
 def pack_of(sid):
-    m = json.load(open(glob.glob(os.path.join(DUMP, glob.escape(sid) + '__*.json'))[0]))
-    p = ' '.join(m['pv'] + m['ov'])
+    return pack_of_meta(json.load(open(glob.glob(os.path.join(DUMP, glob.escape(sid) + '__*.json'))[0])))
+
+def pack_of_meta(m):
+    sid = m['id']; p = ' '.join(m['pv'] + m['ov'])
     if not m['pv'] and sid in IMP: return 'tankvoice-imp'
     if re.search(r'bftricky|bfhell|bfwhit|whitty|minimum_bf|boof|bf-erect|bf-hqr|bf-jam', p) or sid in ('low-rise',): return 'tankvoice-mods'
     return 'tankvoice'

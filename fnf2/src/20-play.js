@@ -128,6 +128,9 @@
       // (tools/own/tank_voice.py), + the opponent's lines alone when the song had one vocal track for both
       if (params.cover && G.settings.player === 'tankman') {
         const base = 'songs/' + this.song.id + '/Voices-tankcover' + (this.song.variation && this.song.variation !== 'default' ? '-' + this.song.variation : '');
+        // (a Tankman Mix: his own version of the song's music too)
+        const mix = 'songs/' + this.song.id + '/Inst-tankmix' + (this.song.variation && this.song.variation !== 'default' ? '-' + this.song.variation : '') + '.ogg';
+        if (G.A.has(mix)) this.song.inst = mix;
         if (G.A.has(base + '.ogg')) {
           const opp = G.A.has(base + '-opp.ogg');
           this.song.voices = this.song.voices.filter(x => x.who !== 'p' && !(opp && x.who === 'o')).concat([{ path: base + '.ogg', who: 'p' }], opp ? [{ path: base + '-opp.ogg', who: 'o' }] : []);

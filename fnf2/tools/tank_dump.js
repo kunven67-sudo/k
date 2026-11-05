@@ -29,13 +29,13 @@ const OUT = process.argv[2];
       const s = G.Songs.build(e.id, e.diff, e.v, false);
       const pv = s.voices.filter(x => x.who === 'p').map(x => x.path);
       const ov = s.voices.filter(x => x.who === 'o').map(x => x.path);
-      const need = pv.length ? pv : ov; for (const path of need) { const pk = G.Packs.owner.get(path); if (pk && !pk.bodyLoaded) await G.Packs.needBody(pk); }
+      const need = pv.concat(ov, [s.inst]); for (const path of need) { const pk = G.Packs.owner.get(path); if (pk && !pk.bodyLoaded) await G.Packs.needBody(pk); }
       const tc = s.timeChanges || (G.Songs.meta(e.id, e.v) || {}).timeChanges;
-      return { id: e.id, v: e.v, diff: e.diff, tc, pv, ov, notes: s.notes.filter(n => n.d < 4).map(n => [n.t, n.d, n.l || 0, n.k || '']), audio: pv.map(x => G.A.raw[x] || null), oaudio: pv.length ? [] : ov.map(x => G.A.raw[x] || null), onotes: pv.length ? [] : s.notes.filter(n => n.d >= 4).map(n => [n.t, n.d, n.l || 0, n.k || '']) };
+      return { id: e.id, v: e.v, diff: e.diff, tc, pv, ov, notes: s.notes.filter(n => n.d < 4).map(n => [n.t, n.d, n.l || 0, n.k || '']), audio: pv.map(x => G.A.raw[x] || null), oaudio: ov.map(x => G.A.raw[x] || null), inst: s.inst, iaudio: G.A.raw[s.inst] || null, onotes: s.notes.filter(n => n.d >= 4).map(n => [n.t, n.d, n.l || 0, n.k || '']) };
     }, e);
     const base = OUT + '/' + e.id + '__' + e.v;
     r.audio.forEach((a, i) => { if (a) fs.writeFileSync(base + '.p' + i + '.' + (a.slice(0, 30).includes('ogg') ? 'ogg' : 'mp3'), Buffer.from(a.split(',')[1], 'base64')); });
-    r.oaudio.forEach((a, i) => { if (a) fs.writeFileSync(base + '.o' + i + '.' + (a.slice(0, 30).includes('ogg') ? 'ogg' : 'mp3'), Buffer.from(a.split(',')[1], 'base64')); }); delete r.audio; delete r.oaudio; fs.writeFileSync(base + '.json', JSON.stringify(r));
+    r.oaudio.forEach((a, i) => { if (a) fs.writeFileSync(base + '.o' + i + '.' + (a.slice(0, 30).includes('ogg') ? 'ogg' : 'mp3'), Buffer.from(a.split(',')[1], 'base64')); }); if (r.iaudio) fs.writeFileSync(base + '.inst.' + (r.iaudio.slice(0, 30).includes('ogg') ? 'ogg' : 'mp3'), Buffer.from(r.iaudio.split(',')[1], 'base64')); delete r.iaudio; delete r.audio; delete r.oaudio; fs.writeFileSync(base + '.json', JSON.stringify(r));
     console.log(e.id, e.v, e.diff, r.notes.length, r.pv.join(','));
   }
   await b.close();

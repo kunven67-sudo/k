@@ -211,13 +211,15 @@ G.Songs = {
   // them long notes held into the next one, no chords; a line always starts on its first note. Only your plain
   // notes change; the opponent's + trick notes stay.
   // (one note a beat on HARD, every 2 beats on NORMAL, every 4 on EASY: BABY / INSANE / GOD are made from these)
-  ownChart(notes, tc, every) {
-    every = every || 1;
+  // lo = 0: your lanes, 4: the opponent's (Tankman Mixes give them their own part too: tools/own/tank_mix.py)
+  ownChart(notes, tc, every, lo) {
+    every = every || 1; lo = lo || 0;
     const tcs = tc.slice().sort((a, b) => a.t - b.t);
     const beat = t => { let x = tcs[0]; for (const y of tcs) if (y.t <= t) x = y; return 60000 / (x.bpm || 100); };
     const plain = n => !n.k || /^(alt|normal|default|easy|hard|erect|nightmare)$/.test(n.k);
-    const mine = notes.filter(n => n.d < 4 && plain(n)).sort((a, b) => a.t - b.t || a.d - b.d);
-    const rest = notes.filter(n => !(n.d < 4 && plain(n)));
+    const side = n => n.d >= lo && n.d < lo + 4;
+    const mine = notes.filter(n => side(n) && plain(n)).sort((a, b) => a.t - b.t || a.d - b.d);
+    const rest = notes.filter(n => !(side(n) && plain(n)));
     const keep = []; let last = -1e9, prev = -1e9;
     for (const n of mine) {
       if (n.t - prev <= 2) continue;                          // (a chord: its first note)
@@ -241,7 +243,11 @@ G.Songs = {
     const gen = (G.DIFF_INFO[diff] || {}).gen, has = d => c.notes[d] && c.notes[d].length;
     const src = gen ? (gen === 'baby' ? ['easy', 'normal', 'hard'] : ['hard', 'normal', 'easy']).find(has) : diff;
     let raw = (src && c.notes[src]) || [];
-    if (coverPlayer === 'tankman' && !swap) raw = this.ownChart(raw, tc, gen === 'baby' ? 8 : { easy: 4, normal: 2 }[src] || 1);      // (Tankman's own part, his voice follows it)
+    if (coverPlayer === 'tankman' && !swap) {
+      raw = this.ownChart(raw, tc, gen === 'baby' ? 8 : { easy: 4, normal: 2 }[src] || 1);
+      // (a Tankman Mix: the opponent sings their own new part too, the one their voice was made for)
+      if (G.A.has('songs/' + id + '/Inst-tankmix' + (variation !== 'default' ? '-' + variation : '') + '.ogg')) raw = this.ownChart(raw, tc, 1, 4);
+    }      // (Tankman's own part, his voice follows it)
     if (gen) raw = this.genNotes(raw, gen, tc, !!swap, id);
     const notes = raw.map(n => ({ t: n.t, d: swap ? (n.d + 4) % 8 : n.d, l: n.l || 0, k: n.k || '' })).sort((a, b) => a.t - b.t);
     const speed = ((c.scrollSpeed && (c.scrollSpeed[src] != null ? c.scrollSpeed[src] : c.scrollSpeed.default)) || 1) * (gen === 'baby' ? 0.85 : gen === 'insane' ? 1.12 : gen === 'god' ? 1.25 : 1);
