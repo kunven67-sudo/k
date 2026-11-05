@@ -38,7 +38,14 @@ def pack(pid, d, v=None):
         p = os.path.join(d, 'files', k)
         data = ('data:' + mm['mimes'][k] + ';base64,' + base64.b64encode(open(p, 'rb').read()).decode()) if k in mm['mimes'] else open(p).read()
         (head if part == 'head' else body)[k] = data
-        if part == 'body': sizes[k] = [len(data)] + (meta.get('body', {}).get(k, [0, 0, 0])[1:])
+        if part == 'body':
+            wh = [0, 0]
+            if mm['mimes'].get(k, '').startswith('image/'):
+                try:
+                    from PIL import Image
+                    wh = list(Image.open(p).size)
+                except Exception: pass
+            sizes[k] = [len(data)] + wh
     meta['body'] = sizes
     if v is not None: meta['v'] = int(v)
     parts, cur, size = [], {}, 0

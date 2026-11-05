@@ -142,8 +142,8 @@ G.phoneUpdate = {
   BASE: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/',
   ZIPS: { 'fnf2-phone-update.zip': ['mobile', 'videosongs', 'jordus'], 'fnf2-phone-impostor.zip': ['impostor', 'impostor-w1'],
     'fnf2-phone-impostor-w2.zip': ['impostor-w2'], 'fnf2-phone-impostor-w3.zip': ['impostor-w3'] },
-  NEED: { mobile: 3, videosongs: 3, jordus: 5, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1 },   // (pack -> the version the code needs: mobile v3 = + the BABY / INSANE / GOD labels, v2 = + the PRO MODE menu
-            // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), v3 = + the song video's opening shot, jordus v2 = her own player, v3 = her own animations, v5 = the shocked LOSS results)
+  NEED: { mobile: 3, videosongs: 3, jordus: 6, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1 },   // (pack -> the version the code needs: mobile v3 = + the BABY / INSANE / GOD labels, v2 = + the PRO MODE menu
+            // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), v3 = + the song video's opening shot, jordus v2 = her own player, v3 = her own animations, v5 = the shocked LOSS results, v6 = fix pass 3: her idle the same size as her moves + legs, stage lines off both girls)
   saved: {},            // (packs picked just now: the zips on GitHub always hold the newest ones)
   old(id) { return !this.saved[id] && (!G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]); },
   missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },
