@@ -135,6 +135,9 @@ G.DEFAULT_SETTINGS = {
   // misc / remembered menu state
   player: 'ace', diff: 1, lastWeek: 0, lastFreeplay: 0,
   seenMechanics: {},
+  // (every option must be listed here, or it's thrown away when the game loads again: Video Songs = CHARACTERS,
+  //  Phone controls, App mode and the Pro Mode ones kept going back to their defaults)
+  videoSongs: 'video', touchScheme: 'arrows', appMode: false, proKeys: 'four', proHits: 'sick',
 };
 G.settings = (function () {
   const saved = G.store.get('fnf2.settings', {}) || {};
@@ -688,6 +691,11 @@ window.addEventListener('unhandledrejection', ev => G.reportError(ev.reason, 'pr
 
 // ------------------------------------------------------------------ toasts
 G.toasts = [];
+// PRO MODE hits: 'sick' = every hit SICK, 'goodsick' = on time SICK, early / late GOOD (never BAD / SHIT). X on PC, Options on phones
+G.toggleProHits = function () {
+  G.settings.proHits = G.settings.proHits === 'goodsick' ? 'sick' : 'goodsick'; G.saveSettings && G.saveSettings();
+  G.toast('PRO MODE: ' + (G.settings.proHits === 'goodsick' ? 'GOOD + SICK (on time = SICK, early / late = GOOD)' : 'ALL SICK'), '#FFE83A');
+};
 G.toast = function (msg, color) { G.toasts.push({ msg, color: color || '#fff', t: 0, life: 2.6 }); if (G.toasts.length > 4) G.toasts.shift(); };
 
 // ------------------------------------------------------------------ input
@@ -2812,8 +2820,13 @@ G.DIFF_INFO = {
   easy: { name: 'EASY', variation: 'default' }, normal: { name: 'NORMAL', variation: 'default' }, hard: { name: 'HARD', variation: 'default' },
   erect: { name: 'ERECT', variation: 'erect' }, nightmare: { name: 'NIGHTMARE', variation: 'erect' },
   og: { name: 'OG', variation: 'og' },   // mods: the song as it was in the original mod (VS Garcello)
+  // FNF 2's own, made from a song's own chart for every song (G.Songs.genNotes): BABY = easier than EASY,
+  // INSANE + GOD = harder than HARD
+  baby: { name: 'BABY', variation: 'default', gen: 'baby' }, insane: { name: 'INSANE', variation: 'default', gen: 'insane' },
+  god: { name: 'GOD', variation: 'default', gen: 'god' },
 };
-G.DIFF_ORDER = ['easy', 'normal', 'hard', 'erect', 'nightmare', 'og'];
+G.DIFF_ORDER = ['baby', 'easy', 'normal', 'hard', 'insane', 'god', 'erect', 'nightmare', 'og'];
+G.DIFF_COLOR = { baby: '#7FD8FF', insane: '#FF8A1F', god: '#FFD23A' };
 
 // which playable character a song variation belongs to: the player whose ownedChars has its player character
 // (preload/data/players/*.json: 'pico-playable' -> pico, 'darnell-player' -> darnell), anything else -> bf
@@ -2868,7 +2881,18 @@ G.Songs = {
   // every playable (difficulty, variation) combo for a song + player character
   // player: 'bf' (default/erect variations), 'pico' (pico variation), 'darnell' (his mixes), plus the songs a
   // new player really sang in (played swapped)
+  // + BABY / INSANE / GOD for every song that has EASY / NORMAL / HARD (each way it can be played: variation, swapped...)
   difficulties(id, player) {
+    const out = this.baseDifficulties(id, player), add = [];
+    const groups = {};
+    for (const d of out) if (d.diff === 'easy' || d.diff === 'normal' || d.diff === 'hard') { const k = d.variation + '|' + !!d.swap + '|' + !!d.cover; (groups[k] = groups[k] || []).push(d); }
+    for (const k in groups) {
+      const g = groups[k][0];
+      for (const nd of ['baby', 'insane', 'god']) add.push(Object.assign({}, g, { diff: nd }));
+    }
+    return out.concat(add).sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));
+  },
+  baseDifficulties(id, player) {
     const out = [];
     const base = this.meta(id);
     if (!base) return out;
@@ -2908,7 +2932,65 @@ G.Songs = {
       for (const d of m.playData.difficulties || []) if (this.hasAudio(id, v, m)) out.push({ diff: d, variation: v });
     }
     out.sort((a, b) => G.DIFF_ORDER.indexOf(a.diff) - G.DIFF_ORDER.indexOf(b.diff));
+    // a player who can sing EVERY song (Tankman): a song with nothing of his own = BF's part, sung as himself
+    const PE = G.PLAYERS && G.PLAYERS[player];
+    if (!out.length && PE && PE.everySong && player !== 'bf') return this.baseDifficulties(id, 'bf').filter(d => !d.swap).map(d => Object.assign({}, d, { cover: true }));
     return out;
+  },
+  // BABY: at most one note a beat, no chords. INSANE: the gaps inside your singing get 8ths (and some 16ths) + chords
+  // on the beat. GOD: 8ths everywhere you sing + lots of 16ths + more chords. Only your side changes; long rests (the
+  // opponent's turn) stay empty; trick notes (fake, eye, talk...) stay as they are. Same song + mode = same chart.
+  genNotes(src, gen, tc, swap, id) {
+    const lo = swap ? 4 : 0, mine = n => n.d >= lo && n.d < lo + 4;
+    const plain = n => !n.k || n.k === 'alt' || n.k === 'normal';
+    let seed = 2166136261; for (const ch of id + gen) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
+    const rnd = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const tcs = tc.slice().sort((a, b) => a.t - b.t);
+    const at = t => { let x = tcs[0]; for (const y of tcs) if (y.t <= t) x = y; return x; };
+    const step = t => 60000 / (at(t).bpm || 100) / 4;
+    const onBeat = t => { const x = at(t), u = 60000 / (x.bpm || 100), f = ((t - x.t) / u) % 1; return f < 0.04 || f > 0.96; };
+    const other = src.filter(n => !mine(n)).map(n => Object.assign({}, n));
+    const me = src.filter(mine).map(n => Object.assign({}, n)).sort((a, b) => a.t - b.t);
+    if (gen === 'baby') {
+      const out = []; let last = -1e9;
+      for (const n of me) {
+        if (!plain(n)) { out.push(n); continue; }
+        if (n.t - last < step(n.t) * 4 - 2) continue;
+        out.push(n); last = n.t;
+      }
+      return other.concat(out);
+    }
+    const god = gen === 'god';
+    const add = [];
+    const busy = (lane, t, u) => me.concat(add).some(n => n.d === lane && (Math.abs(n.t - t) < u * 0.9 || (n.l > 0 && t > n.t - u * 0.5 && t < n.t + n.l + u * 0.5)));
+    const pick = (t, u, avoid) => {
+      const lanes = [0, 1, 2, 3].map(i => lo + i).filter(l => !busy(l, t, u));
+      const best = lanes.filter(l => !avoid.includes(l));
+      const L = best.length ? best : lanes;
+      return L.length ? L[Math.floor(rnd() * L.length)] : -1;
+    };
+    // the times you sing at (one per chord)
+    const times = []; for (const n of me) if (plain(n) && (!times.length || n.t - times[times.length - 1].t > 1)) times.push(n);
+    for (let i = 0; i + 1 < times.length; i++) {
+      const a = times[i], b = times[i + 1], u = step(a.t), gap = b.t - a.t;
+      if (gap > u * 8 + 2) continue;                     // (a rest: not yours)
+      let prev = a.d;
+      for (let k = 1; a.t + k * u < b.t - u * 0.5; k++) {
+        const eighth = k % 2 === 0, chance = eighth ? (god ? 1 : 0.85) : (god ? 0.55 : (gap <= u * 2 + 2 ? 0.3 : 0.12));
+        if (rnd() >= chance) continue;
+        const t = Math.round((a.t + k * u) * 100) / 100, l = pick(t, u, [prev, b.d]);
+        if (l < 0) continue;
+        add.push({ t, d: l, l: 0, k: '' }); prev = l;
+      }
+    }
+    // chords on the beat
+    for (const n of times) {
+      const u = step(n.t);
+      if (!onBeat(n.t) || rnd() >= (god ? 0.45 : 0.25)) continue;
+      const l = pick(n.t, u, me.filter(x => Math.abs(x.t - n.t) < 2).map(x => x.d));
+      if (l >= 0 && !me.some(x => x.d === l && Math.abs(x.t - n.t) < 2)) add.push({ t: n.t, d: l, l: 0, k: '' });
+    }
+    return other.concat(me, add);
   },
   instPath(id, m, variation) {
     const ins = m.playData.characters.instrumental;
@@ -2940,9 +3022,14 @@ G.Songs = {
     variation = variation || (G.DIFF_INFO[diff] || {}).variation || 'default';
     const m = this.meta(id, variation), c = this.chart(id, variation);
     if (!m || !c) return null;
-    const notes = (c.notes[diff] || []).map(n => ({ t: n.t, d: swap ? (n.d + 4) % 8 : n.d, l: n.l || 0, k: n.k || '' })).sort((a, b) => a.t - b.t);
-    const speed = (c.scrollSpeed && (c.scrollSpeed[diff] != null ? c.scrollSpeed[diff] : c.scrollSpeed.default)) || 1;
     const tc = (m.timeChanges || [{ t: 0, bpm: 100 }]).map(x => ({ t: x.t, bpm: x.bpm, b: x.b || 0 }));
+    // BABY / INSANE / GOD: made from the song's own easiest / hardest chart
+    const gen = (G.DIFF_INFO[diff] || {}).gen, has = d => c.notes[d] && c.notes[d].length;
+    const src = gen ? (gen === 'baby' ? ['easy', 'normal', 'hard'] : ['hard', 'normal', 'easy']).find(has) : diff;
+    let raw = (src && c.notes[src]) || [];
+    if (gen) raw = this.genNotes(raw, gen, tc, !!swap, id);
+    const notes = raw.map(n => ({ t: n.t, d: swap ? (n.d + 4) % 8 : n.d, l: n.l || 0, k: n.k || '' })).sort((a, b) => a.t - b.t);
+    const speed = ((c.scrollSpeed && (c.scrollSpeed[src] != null ? c.scrollSpeed[src] : c.scrollSpeed.default)) || 1) * (gen === 'baby' ? 0.85 : gen === 'insane' ? 1.12 : gen === 'god' ? 1.25 : 1);
     const pd = m.playData;
     let events = (c.events || []).slice().sort((a, b) => a.t - b.t);
     let chars = { player: pd.characters.player || 'bf', gf: pd.characters.girlfriend != null ? pd.characters.girlfriend : 'gf', opponent: pd.characters.opponent || 'dad' };   // ('' = no GF)
@@ -3664,7 +3751,8 @@ G.SongConductor = class {
       //  (also in a song made for them: Darnell in After Hours)
       const PP = G.PLAYERS && G.PLAYERS[G.settings.player], swapChar = PP && !PP.real && PP.swapChar && (s.swap || s.chars.player === PP.ownChar) ? PP.swapChar : null;
       const own = this.playAs && (this.playAs.real.songChar && s.chars.player === this.playAs.real.songChar ? s.chars.player : this.playAs.real.char);
-      const anyChar = s.anyPlayer && G.playerChar ? G.playerChar(G.settings.player) : null;   // (a song made for anybody)
+      // (a song made for anybody, or a song a player who sings everything takes over: Tankman in BF's place)
+      const anyChar = (s.anyPlayer || this.params.cover) && G.playerChar ? G.playerChar(G.settings.player) : null;
       this.bf = mk(anyChar || own || swapChar || s.chars.player, 'bf', 'bf');
       if (this.playAs && this.playAs.real.flip === false && this.bf.nene) this.bf.flipX = false;      // (Nene sits on her A-Bot facing front)
       // their atlas box is much bigger than what they draw (Darnell stood half off the screen): put the feet
@@ -4151,19 +4239,22 @@ G.SongConductor = class {
         first = n; break;
       }
       if (!first) return;
+      // Options > Pro Mode hits (X on PC): ALL SICK, or GOOD + SICK = right on time is SICK, too early / late is GOOD
+      // (never BAD or SHIT); the notes packed right after it get the same
+      const proR = G.settings.proHits === 'goodsick' && judge(pos - first.t) !== 'sick' ? 'good' : 'sick';
       let last = first.t;
       for (const n of this.notes) {
         if (n.t < first.t || n.done || n.hit || n.missed || n.proQ || n.line !== 1 || !isReal(n) || (one >= 0 && n.lane !== one)) continue;
         if (n.t - last > 90) break;
-        n.proQ = true; last = n.t;
+        n.proQ = true; n.proR = proR; last = n.t;
         if (n.t <= pos) { n.hit = true; n.holding = n.len > 0; n.proHold = true; this.playerHit(n, 0, true); }
       }
     },
     playerHit(n, diffMs, auto) {
       const s = this.lines[1].strums[n.lane];
       s.playA('confirm', true); s.confirmHold = auto && !(n.len > 0) ? 0 : -1;    // (botplay: a hold keeps its arrow lit to the end)
-      const r = auto ? 'sick' : judge(diffMs);
-      const pts = auto ? 500 : scorePBOT1(diffMs);
+      const r = auto ? (n.proR || 'sick') : judge(diffMs);
+      const pts = auto ? (r === 'good' ? 350 : 500) : scorePBOT1(diffMs);
       this.nudgeCam(0, n.lane);
       this.score += pts;
       this.health = Math.min(H.max, this.health + (H[r] || 0));
@@ -4360,16 +4451,18 @@ G.SongConductor = class {
     },
     // -------------------------------------------------- pause menu (V-Slice PauseSubState)
     openPause() {
-      if (this.paused || !this.audio) return;
-      // a cutscene: its sounds + video stop right where they are (RESUME carries on from there)
+      if (this.paused) return;
+      // a cutscene: its sounds + video stop right where they are (RESUME carries on from there). (A cutscene can be
+      // paused before the song's music has even loaded: right when you get in)
       const cut = this.cutscene && !this.cutscene.done ? (this.cutscene.dlg ? 'talk' : 'video') : null;
+      if (!cut && !this.audio) return;
       this.paused = true;
       if (cut) this.cutFreeze = G.audio.freeze ? G.audio.freeze() : null; else this.audio.pause();
       if (this.pauseBtn && G.touchMode && this.pauseBtn.spr.animName !== 'confirm') { this.pauseBtn.spr.play('confirm', true); this.pauseBtn.spr.alpha = 1; }
       if (navigator.vibrate && G.touchMode) try { navigator.vibrate(50); } catch (e) {}
       for (let i = 0; i < 4; i++) if (this.keys[i]) this.release(i);
       this._touch = {}; this._tpos = {};
-      const art = this.song.artist || 'Unknown', chr = this.song.charter || 'Unknown';
+      const art = (this.song && this.song.artist) || 'Unknown', chr = (this.song && this.song.charter) || 'Unknown';
       const meta = [this.song.name, 'Artist: ' + art, 'Difficulty: ' + ((G.DIFF_INFO[this.song.diff] || {}).name || this.song.diff).replace(/\b\w+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()), '', 'PRACTICE MODE'];
       this.pauseMenu = { sel: 0, t: 0, mode: 'main', items: [], meta, art, chr, artistT: 0, artistA: 1, artistIsCharter: false, offHold: 0, offFast: false, cut };
       this.pauseEntries('main');
@@ -4457,12 +4550,14 @@ G.SongConductor = class {
       if (type === 'down') { pm.tap = { x, y, t: performance.now() }; return; }
       if (type !== 'up' || !pm.tap) return;
       const t = pm.tap; pm.tap = null;
-      if (Math.abs(x - t.x) > 30 || Math.abs(y - t.y) > 30 || performance.now() - t.t > 400) return;
+      if (Math.abs(x - t.x) > 50 || Math.abs(y - t.y) > 50 || performance.now() - t.t > 900) return;
+      // one tap on an entry = it's picked + done right away (RESTART, SKIP... no second tap needed)
       for (let i = 0; i < pm.items.length; i++) {
         const it = pm.items[i];
-        if (y >= it.y - 10 && y <= it.y + 80 && x >= it.x - 40 && x < it.x + it.width + 60) {
-          if (i === pm.sel) { if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {} this.pauseChoose(); }
-          else { pm.sel = i; this.layoutPause(); G.sfx('scroll', { vol: 0.4 }); if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {} }
+        if (y >= it.y - 18 && y <= it.y + 88 && x >= it.x - 60 && x < it.x + it.width + 120) {
+          if (i !== pm.sel) { pm.sel = i; this.layoutPause(); }
+          if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {}
+          this.pauseChoose();
           return;
         }
       }
@@ -4489,8 +4584,11 @@ G.SongConductor = class {
     resume() {
       const cut = this.pauseMenu && this.pauseMenu.cut;
       this.paused = false; this.pauseMenu = null;
+      // (the pause button stays 'busy' until its press animation ends: resuming fast used to leave it dead, so a
+      //  second tap on it - e.g. to skip the next cutscene part - did nothing)
+      if (this.pauseBtn) { this.pauseBtn.busy = false; this.pauseBtn.held = null; }
       if (cut) { if (this.cutFreeze) G.audio.unfreeze(this.cutFreeze); else G.audio.music.stop(0.1); this.cutFreeze = null; if (this.pauseBtn) { this.pauseBtn.spr.play('idle', true); this.pauseBtn.spr.alpha = this.pauseBtn.rest; } return; }
-      G.audio.music.stop(0.1); this.audio.resume();
+      G.audio.music.stop(0.1); if (this.audio) this.audio.resume();
     },
     // (leaving while a cutscene is frozen: its sounds stop for good)
     killCutFreeze() { if (this.cutFreeze && G.audio.unfreeze) G.audio.unfreeze(this.cutFreeze, true); this.cutFreeze = null; },
@@ -4594,7 +4692,7 @@ G.SongConductor = class {
       // V-Slice style tallies + rank (results screen, freeplay rank badges + clear %)
       const tl = this.tally, sick = (tl.killer || 0) + tl.sick;
       stats.tallies = { sick, good: tl.good, bad: tl.bad, shit: tl.shit, missed: tl.miss, maxCombo: this.maxCombo, totalNotesHit: sick + tl.good + tl.bad + tl.shit, totalNotes: stats.totalNotes };
-      const scoreKey = (this.pro ? 'pro:' : '') + s.id + (s.variation !== 'default' ? '-' + s.variation : '') + (this.playAs ? '-as-' + this.playAs.id : '');
+      const scoreKey = (this.pro ? 'pro:' : '') + s.id + (s.variation !== 'default' ? '-' + s.variation : '') + (this.playAs ? '-as-' + this.playAs.id : this.params.cover ? '-as-' + G.settings.player : '');
       const prev = G.getScore(scoreKey, p.diff, 'bf');
       const prevRank = prev ? (prev.rank || null) : null;
       let isNewHighscore = false;
@@ -4910,9 +5008,10 @@ G.SongConductor = class {
       ctx.restore();
     },
     onKey(code, down, repeat) {
-      // Z = death counter on/off (only when Z is not one of your note keys)
-      if (code !== 'KeyZ' || !down || repeat || this.paused || this.gameOver || this.cutscene) return;
+      // Z = death counter on/off, X = PRO MODE hits ALL SICK / GOOD + SICK (only when it's not one of your note keys)
+      if ((code !== 'KeyZ' && !(code === 'KeyX' && this.pro)) || !down || repeat || this.paused || this.gameOver || this.cutscene) return;
       if (G.input.actionsFor(code).some(x => /^note\d$/.test(x))) return;
+      if (code === 'KeyX') { G.toggleProHits(); return true; }
       G.settings.deathCounter = G.settings.deathCounter === false; G.saveSettings();
       return true;
     },
@@ -5320,6 +5419,7 @@ G.SongConductor = class {
     ['Note Splashes', 'bool', () => S().noteSplashes, v => S().noteSplashes = v, 'Show a splash when you hit a SICK note.'],
     ['Combo Popups', 'bool', () => S().comboPopups !== false, v => S().comboPopups = v, 'Show SICK!! / GOOD and combo numbers when you hit notes.'],
     ['Pro Mode keys', 'enum', () => S().proKeys === 'any' ? 'any' : 'four', v => { S().proKeys = v; }, 'PRO MODE (main menu). FOUR: hit the right key for each arrow (your 4 note keys), early is fine, every hit is SICK. ANY: any one of your note keys hits the next note.', ['four', 'any']],
+    ['Pro Mode hits', 'enum', () => S().proHits === 'goodsick' ? 'good + sick' : 'all sick', v => { S().proHits = v === 'good + sick' ? 'goodsick' : 'sick'; }, 'PRO MODE (main menu). ALL SICK: every hit is SICK. GOOD + SICK: right on time = SICK, too early or late = GOOD, never BAD or SHIT. On PC the X key switches it in Pro Mode.', ['all sick', 'good + sick']],
     ['Botplay', 'bool', () => S().botplay, v => S().botplay = v, 'The game plays for you. Scores are not saved.'],
     ['Practice Mode', 'bool', () => S().practice, v => S().practice = v, 'You cannot die. Scores are not saved.'],
     ['Death Counter', 'bool', () => S().deathCounter !== false, v => S().deathCounter = v, 'Shows how many times you died against who you are rapping with (DEATHS vs WHITTY: 12). On PC the Z key turns it on/off during a song.'],
@@ -13263,6 +13363,11 @@ G.screens.storyMenu = {
         if (!diffs.length) continue;
         const ratings = {};
         for (const d of diffs) { const mm = G.Songs.meta(sid, d.variation) || m; ratings[d.diff] = ((mm.playData.ratings || {})[d.diff]) || 0; }
+        // (FNF 2's own BABY / INSANE / GOD: rated from the song's own)
+        const top = ratings.hard || ratings.normal || ratings.easy || 5;
+        if ('baby' in ratings) ratings.baby = Math.max(1, (ratings.easy || top) - 2);
+        if ('insane' in ratings) ratings.insane = top + 3;
+        if ('god' in ratings) ratings.god = top + 6;
         const dm = G.Songs.meta(sid, diffs[0].variation) || m;
         const ch = dm.playData.characters || {};
         // (swapped: the one you battle is the song's own player)
@@ -13467,7 +13572,7 @@ G.screens.storyMenu = {
     },
     // a song's saved result (in RANK MODE: the fake one, kept apart from the real ones)
     recFor(s, d) {
-      const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '') + (this.realP ? '-as-' + this.player : '');
+      const key = s.id + (d.variation !== 'default' ? '-' + d.variation : '') + (this.realP ? '-as-' + this.player : d.cover ? '-as-' + this.player : '');
       return this.rankMode && G.RankMode ? G.RankMode.get(key, this.diff) : G.getScore((this.proMode ? 'pro:' : '') + key, this.diff, 'bf');
     },
     // ------------------------------------------------------------ selection
@@ -13564,7 +13669,7 @@ G.screens.storyMenu = {
       }
       if (this.rankMode && G.RankMode) { G.RankMode.open(this); return; }
       const s = cap.s, d = s.diffs.find(x => x.diff === this.diff) || s.diffs[0];
-      this.pending = { id: s.id, diff: d.diff, variation: d.variation, swap: !!d.swap };
+      this.pending = { id: s.id, diff: d.diff, variation: d.variation, swap: !!d.swap, cover: !!d.cover };
       G.save.recent = [s.id].concat((G.save.recent || []).filter(x => x !== s.id)).slice(0, 30); G.saveData();
       this.state = 'confirm'; this.confirmT = 0;
       G.sfx('confirm');
@@ -13579,7 +13684,7 @@ G.screens.storyMenu = {
           onComplete: () => {
             if (this.went) return; this.went = true;
             G.audio.music.stop(0);
-            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, swap: this.pending.swap, week: null, deaths: 0 , pro: this.proMode}, { instant: true });
+            G.setScreen('play', { mode: 'freeplay', songs: [this.pending.id], songIndex: 0, diff: this.pending.diff, variation: this.pending.variation, swap: this.pending.swap, cover: this.pending.cover, week: null, deaths: 0 , pro: this.proMode}, { instant: true });
           },
         });
       });
@@ -13661,6 +13766,7 @@ G.screens.storyMenu = {
       if (this.editor) return this.editor.onKey(code, down, repeat);
       if (!down || repeat || this.state !== 'idle') return false;
       if (code === 'KeyF') { this.toggleFav(); return true; }
+      if (this.proMode && code === 'KeyX') { G.toggleProHits(); return true; }      // PRO MODE: ALL SICK <-> GOOD + SICK
       if (code === 'KeyM') { this.changeGroup(G.input.isDown('shift') ? -1 : 1); return true; }
       if (code === 'Slash' || code === 'NumpadDivide') { if (e && e.preventDefault) e.preventDefault(); this.openSearch(); return true; }   // (the / itself isn't typed into the box)
       // RANK MODE: E = edit the rank (the letter filter moves to Q / R)
@@ -14006,7 +14112,9 @@ G.screens.storyMenu = {
       }
       if (this.dotsVis) {
         const dot = IMG('freeplay/seperator'), n = this.dots.length, gx = DJX + 260 - 14.7 * (Math.min(n, 8) - 1);
-        if (dot) this.dots.forEach((d, i) => { if (d.alpha > 0) ctx.drawImage(tint(dot, d.color, 'dot' + i), Math.round(gx + 30 * (i % 8) - 75), 170 + 30 * Math.floor(i / 8)); });
+        // (more than 8 difficulties - BABY / INSANE / GOD on top of FNF's - still fit on one row, a bit closer)
+        const nD = this.dots.length, per = nD > 8 ? 11 : 8, sp = nD > 8 ? Math.max(20, Math.min(30, 240 / nD)) : 30;
+        if (dot) this.dots.forEach((d, i) => { if (d.alpha > 0) ctx.drawImage(tint(dot, d.color, 'dot' + i), Math.round(gx + sp * (i % per) - 75), 170 + 30 * Math.floor(i / per)); });
       }
       // background art on the right
       at('bg');
@@ -14035,7 +14143,7 @@ G.screens.storyMenu = {
         const ox = pct.length === 3 ? 10 : pct.length === 1 ? -24 : 0;
         t.x = W - 95 - ox; t.y = 87; t.draw(ctx, null); G.setScreenT(ctx);
         // deaths against who you'd battle (Options > Death Counter)
-        if (this.scoreVis && this.vsWho && !this.rankMode && G.settings.deathCounter !== false)
+        if (this.scoreVis && this.vsWho && G.settings.deathCounter !== false)
           G.vcr(ctx, 'DEATHS vs ' + this.vsWho + ': ' + G.deathsVs(this.vsWho), W - 353, 186, { size: 22, outline: 2, maxWidth: 340 });
       }
       at('letters');
@@ -14059,7 +14167,7 @@ G.screens.storyMenu = {
         const ost = textImg(this.group().label, G.FONT.vcr, 48, '#FFFFFF', { stroke: 2 });
         ctx.drawImage(ost, W - 8 - ost._tw - ost._pad, 8 - ost._pad);
       }
-      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : this.proMode ? (G.settings.proKeys === 'any' ? (G.touchMode ? 'Tap your arrows like crazy, you can\'t miss' : 'Mash your note keys, you can\'t miss') : (G.touchMode ? 'Tap the right arrows, early is fine, all SICK' : 'Hit the right keys, early is fine, all SICK')) : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
+      const hint = textImg(this.search ? 'SEARCH: ' + this.search : this.rankMode ? (G.touchMode ? 'Tap a song to edit its rank' : 'Press [ E ] to edit a rank') : this.proMode ? (G.settings.proKeys === 'any' ? (G.touchMode ? 'Tap your arrows like crazy, you can\'t miss' : 'Mash your note keys, you can\'t miss') : (G.touchMode ? 'Tap the right arrows, early is fine, all SICK' : 'Hit the right keys, early is fine, all SICK')).replace('all SICK', G.settings.proHits === 'goodsick' ? 'GOOD or SICK' : 'all SICK') + (G.touchMode ? '' : G.settings.proHits === 'goodsick' ? '  [X] all SICK' : '  [X] GOOD + SICK') : G.touchMode ? 'Tap the DJ to change characters' : 'Press [ TAB ] to change characters', G.FONT.f5, 32, this.search ? '#FFFFFF' : '#5F5F5F');
       if (!this.searchEl) ctx.drawImage(hint, Math.round(-40 + (W - 16 - hint.width) / 2), Math.round(this.hintY));
       G.screenOff.y = oy; G.setScreenT(ctx);
       if (this.fadeA > 0) { ctx.fillStyle = 'rgba(0,0,0,' + this.fadeA + ')'; ctx.fillRect(0, 0, W, H); }
@@ -14676,7 +14784,7 @@ G.stickers = {
   const RANKS = ['SHIT', 'GOOD', 'GREAT', 'EXCELLENT', 'PERFECT', 'PERFECT_GOLD'];
   const RANK_NAME = { SHIT: 'LOSS', GOOD: 'GOOD', GREAT: 'GREAT', EXCELLENT: 'EXCELLENT', PERFECT: 'PERFECT', PERFECT_GOLD: 'GOLD PERFECT' };
   const RANK_COLOR = { SHIT: '#6044FF', GOOD: '#EF8764', GREAT: '#EAF6FF', EXCELLENT: '#FDCB42', PERFECT: '#FF58B4', PERFECT_GOLD: '#FFB619' };
-  const DIFF_COLOR = { easy: '#58FF79', normal: '#FFE83A', hard: '#FF4A4A', erect: '#C28AFF', nightmare: '#FF3D8B' };
+  const DIFF_COLOR = Object.assign({ easy: '#58FF79', normal: '#FFE83A', hard: '#FF4A4A', erect: '#C28AFF', nightmare: '#FF3D8B' }, G.DIFF_COLOR || {});
   const r = (a, b) => a + Math.random() * (b - a);
 
   const store = G.store.get('fnf2.rankmode', null) || {};
@@ -15093,11 +15201,15 @@ G.stickers = {
   // Tankman = a full player from the mod "Playable Tankman" (tools/own/tankman_play.py): his own character select
   // animation, Steve on the speakers, DJ, card, songs, results, game over. Without the pack he's the stand-in above.
   G.PLAYERS.tankman = { id: 'tankman', pack: 'tankman', name: 'Tankman', pos: 7, chill: CS + 'tankmanChill', gf: { asset: CS + 'steveChill', viz: false },
-    nametag: 'tankmanplay', icon: 'tankman', ownChar: 'tankman', swapChar: 'tankman-playable', fallback: G.PLAYERS.tankman };
+    nametag: 'tankmanplay', icon: 'tankman', ownChar: 'tankman', swapChar: 'tankman-playable', fallback: G.PLAYERS.tankman,
+    everySong: true };   // (every song in the game: the ones he has nothing of his own in = BF's part, sung by him)
   // Nene = a full player from the mod "NENE MIXES" (tools/own/nene_mix.py): her own character select animation,
   // Cassandra on the speakers, DJ, card, mixes, results, death. Without the pack she's the stand-in above.
   G.PLAYERS.nene = { id: 'nene', pack: 'nenemix', name: 'Nene', pos: 1, chill: CS + 'neneplayerChill', gf: { asset: CS + 'dipshitCass', viz: false },
-    nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene };
+    nametag: 'neneplayer', icon: 'nene', ownChar: 'nene', songChar: 'nene-playable', fallback: G.PLAYERS.nene,
+    // (one Nene everywhere: the NENE MIXES one from Guns vs Tankman - tongue out, bloody knife - also sings her own
+    //  songs played swapped, instead of the other mod's Nene with the big knife + mic)
+    swapChar: 'nenemix-playable' };
   // the Jordus girl (Nightly Funkin', rebuilt from a video: tools/own/jordus.py + jordus_rig.py): her own character
   // select animation (she chills on her purple amp: bops, kicks her legs, pops her shades on when picked), the cap
   // girl she battles on the speakers spot (her real idle, sitting on a navy amp), her gameplay moves for the DJ spot
@@ -16019,8 +16131,8 @@ G.phoneUpdate = {
   BASE: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/',
   ZIPS: { 'fnf2-phone-update.zip': ['mobile', 'videosongs', 'jordus'], 'fnf2-phone-impostor.zip': ['impostor', 'impostor-w1'],
     'fnf2-phone-impostor-w2.zip': ['impostor-w2'], 'fnf2-phone-impostor-w3.zip': ['impostor-w3'] },
-  NEED: { mobile: 2, videosongs: 2, jordus: 5, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1 },   // (pack -> the version the code needs: mobile v2 = + the PRO MODE menu
-            // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), jordus v2 = her own player, v3 = her own animations, v5 = the shocked LOSS results)
+  NEED: { mobile: 3, videosongs: 3, jordus: 6, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1 },   // (pack -> the version the code needs: mobile v3 = + the BABY / INSANE / GOD labels, v2 = + the PRO MODE menu
+            // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), v3 = + the song video's opening shot, jordus v2 = her own player, v3 = her own animations, v5 = the shocked LOSS results, v6 = fix pass 3: her idle the same size as her moves + legs, stage lines off both girls)
   saved: {},            // (packs picked just now: the zips on GitHub always hold the newest ones)
   old(id) { return !this.saved[id] && (!G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]); },
   missing() { return G.isTouchDevice && G.HAS_FNF && !G.dataMissing && Object.keys(this.NEED).some(id => this.old(id)); },
@@ -16314,7 +16426,7 @@ Promise.all([G.fontsReady, G.assetsReady]).then(() => {
   }
   if (q.bot) G.settings.botplay = q.bot === '1';
   if (q.down) G.settings.downscroll = q.down === '1';
-  if (q.dev === 'song' && G.screens.play) return G.start('play', { mode: q.story === '1' ? 'story' : 'freeplay', songs: [q.id || 'tutorial'], diff: q.diff || 'normal', variation: q.variation || (G.DIFF_INFO[q.diff] || {}).variation || 'default', swap: q.swap === '1', week: null, noCutscene: q.cs === '0', pro: q.pro === '1' });
+  if (q.dev === 'song' && G.screens.play) return G.start('play', { mode: q.story === '1' ? 'story' : 'freeplay', songs: [q.id || 'tutorial'], diff: q.diff || 'normal', variation: q.variation || (G.DIFF_INFO[q.diff] || {}).variation || 'default', swap: q.swap === '1', week: null, noCutscene: q.cs === '0', pro: q.pro === '1', cover: q.cover === '1' });
   if (!G.HAS_FNF || G.dataMissing) { G.start('noAssets', {}); return; }
   G.start(G.screens.title ? 'title' : 'devStage', {});
 });
