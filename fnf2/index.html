@@ -2826,6 +2826,7 @@ G.DIFF_INFO = {
   baby: { name: 'BABY', variation: 'default', gen: 'baby' }, insane: { name: 'INSANE', variation: 'default', gen: 'insane' },
   god: { name: 'GOD', variation: 'default', gen: 'god' },
 };
+G.CHAR_SWAP = { geef: 'gf-mix' };
 G.DIFF_ORDER = ['baby', 'easy', 'normal', 'hard', 'insane', 'god', 'erect', 'nightmare', 'og'];
 G.DIFF_COLOR = { baby: '#7FD8FF', insane: '#FF8A1F', god: '#FFD23A' };
 
@@ -3035,6 +3036,8 @@ G.Songs = {
     const pd = m.playData;
     let events = (c.events || []).slice().sort((a, b) => a.t - b.t);
     let chars = { player: pd.characters.player || 'bf', gf: pd.characters.girlfriend != null ? pd.characters.girlfriend : 'gf', opponent: pd.characters.opponent || 'dad' };   // ('' = no GF)
+    // characters a pack stands in for (tools/own/gfmix.py: Girlfriend Mix REDUX's GF instead of 'geef' in Nene's songs)
+    for (const k of ['player', 'gf', 'opponent']) { const r = G.CHAR_SWAP[chars[k]]; if (r && G.A.json('preload/data/characters/' + r + '.json')) chars[k] = r; }
     let voices = this.voicePaths(id, m, variation);
     if (swap) {
       const flipChar = v => (v === 0 ? 1 : v === 1 ? 0 : v);
@@ -3652,6 +3655,15 @@ G.SongConductor = class {
       // a new player (Darnell / Tankman / Nene, 59-charselect.js) plays the songs they really sang in, swapped:
       // their part is yours, in their real recorded voice, and the old player raps against them
       this.playAs = params.mode === 'freeplay' && this.song.swap && G.realPlayer ? G.realPlayer(G.settings.player) : null;
+      // Tankman singing a song with nothing of his own: his voice glued from his real singing instead of BF's
+      // (tools/own/tank_voice.py), + the opponent's lines alone when the song had one vocal track for both
+      if (params.cover && G.settings.player === 'tankman') {
+        const base = 'songs/' + this.song.id + '/Voices-tankcover' + (this.song.variation && this.song.variation !== 'default' ? '-' + this.song.variation : '');
+        if (G.A.has(base + '.ogg')) {
+          const opp = G.A.has(base + '-opp.ogg');
+          this.song.voices = this.song.voices.filter(x => x.who !== 'p' && !(opp && x.who === 'o')).concat([{ path: base + '.ogg', who: 'p' }], opp ? [{ path: base + '-opp.ogg', who: 'o' }] : []);
+        }
+      }
       this.setupWorld();
       this.setupHUD();
       this.resetRun();
@@ -3670,7 +3682,8 @@ G.SongConductor = class {
         this.ready = true;
         // a song's own intro cutscene (first try only)
         const cs = G.Cutscenes && (G.Cutscenes[this.song.id + '@' + this.song.variation] || G.Cutscenes[this.song.id]);
-        if (cs && cs.create && (!params.deaths || cs.always) && !params.noCutscene) { try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
+        if (cs && cs.create && (!params.deaths || cs.always) && !params.noCutscene && !params.cover) {   // (a cover player has no lines of their own)
+          try { this.cutscene = cs.create(this); } catch (e) { G.reportError(e, 'cutscene'); this.cutscene = null; } }
         if (!this.cutscene) this.startCountdown();
       }
     },
@@ -4697,7 +4710,7 @@ G.SongConductor = class {
       if (!this.endCut) {
         this.endCut = true;
         const cs = G.Cutscenes && (G.Cutscenes[this.song.id + '@' + this.song.variation] || G.Cutscenes[this.song.id]);
-        if (cs && cs.createEnd && !this.params.deaths && !this.params.noCutscene) {
+        if (cs && cs.createEnd && !this.params.deaths && !this.params.noCutscene && !this.params.cover) {
           let sc = null; try { sc = cs.createEnd(this); } catch (e) { G.reportError(e, 'end cutscene'); }
           if (sc) { sc.isEnd = true; this.cutscene = sc; return; }
         }
@@ -16356,8 +16369,9 @@ window.addEventListener('pointerdown', () => { if (G.appMode.want() && !document
 G.phoneUpdate = {
   BASE: 'https://github.com/kunven67-sudo/fnf2-private/raw/main/',
   ZIPS: { 'fnf2-phone-update.zip': ['mobile', 'videosongs', 'jordus'], 'fnf2-phone-impostor.zip': ['impostor', 'impostor-w1'],
-    'fnf2-phone-impostor-w2.zip': ['impostor-w2'], 'fnf2-phone-impostor-w3.zip': ['impostor-w3'], 'fnf2-phone-aura.zip': ['aura'] },
-  NEED: { mobile: 3, videosongs: 3, jordus: 6, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1, aura: 1 },   // (pack -> the version the code needs: mobile v3 = + the BABY / INSANE / GOD labels, v2 = + the PRO MODE menu
+    'fnf2-phone-impostor-w2.zip': ['impostor-w2'], 'fnf2-phone-impostor-w3.zip': ['impostor-w3'], 'fnf2-phone-aura.zip': ['aura', 'gfmix'],
+    'fnf2-phone-tankvoice.zip': ['tankvoice', 'tankvoice-imp'], 'fnf2-phone-tankvoice2.zip': ['tankvoice-mods'] },
+  NEED: { mobile: 3, videosongs: 3, jordus: 6, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1, aura: 1, gfmix: 1, tankvoice: 1, 'tankvoice-imp': 1, 'tankvoice-mods': 1 },   // (pack -> the version the code needs: mobile v3 = + the BABY / INSANE / GOD labels, v2 = + the PRO MODE menu
             // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), v3 = + the song video's opening shot, jordus v2 = her own player, v3 = her own animations, v5 = the shocked LOSS results, v6 = fix pass 3: her idle the same size as her moves + legs, stage lines off both girls)
   saved: {},            // (packs picked just now: the zips on GitHub always hold the newest ones)
   old(id) { return !this.saved[id] && (!G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]); },
