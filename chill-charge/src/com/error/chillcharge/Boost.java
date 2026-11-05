@@ -53,12 +53,12 @@ final class Boost {
             setBrightness(c, pct);
             Settings.System.putInt(cr, Settings.System.SCREEN_OFF_TIMEOUT, SLEEP_MS);
         }
-        e.putBoolean("on", true).apply();
+        e.putInt("pct", pct).putBoolean("dim", dim).putBoolean("on", true).apply();
         return kill ? killBackground(c) : 0;
     }
 
     static void setBrightness(Context c, int pct) {
-        if (!canWrite(c)) return;
+        if (!canWrite(c) || !prefs(c).getBoolean("saved", false)) return; // only while boost dimmed it
         int v = Math.max(1, Math.min(255, Math.round(pct * 255f / 100f)));
         Settings.System.putInt(c.getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, v);
     }
@@ -72,7 +72,31 @@ final class Boost {
             Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, p.getInt("oldMode", 0));
             Settings.System.putInt(cr, Settings.System.SCREEN_OFF_TIMEOUT, p.getInt("oldSleep", 30000));
         }
-        p.edit().putBoolean("on", false).putBoolean("saved", false).apply();
+        p.edit().putBoolean("on", false).putBoolean("saved", false).putBoolean("byClaude", false).apply();
+    }
+
+    /** Watts going into the battery right now (0 if not charging). Phones report uA or mA, so guess which. */
+    static double watts(Context c) {
+        Intent b = c.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (b == null || b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) == 0) return 0;
+        BatteryManager bm = c.getSystemService(BatteryManager.class);
+        long cur = Math.abs(bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW));
+        if (cur == Long.MIN_VALUE || cur > 20000000L) return 0;
+        if (cur > 0 && cur < 20000) cur *= 1000;
+        return cur * b.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) / 1e9;
+    }
+
+    /** Reactor energy (Wh your charging fed into it). */
+    static synchronized double addWh(Context c, double wh) {
+        SharedPreferences p = prefs(c);
+        double v = Double.longBitsToDouble(p.getLong("wh", Double.doubleToLongBits(0))) + wh;
+        if (v < 0) v = 0;
+        p.edit().putLong("wh", Double.doubleToLongBits(v)).apply();
+        return v;
+    }
+
+    static synchronized void setWh(Context c, double v) {
+        prefs(c).edit().putLong("wh", Double.doubleToLongBits(v)).apply();
     }
 
     /**

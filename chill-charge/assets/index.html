@@ -12,7 +12,7 @@
   --card: rgba(255,255,255,.045); --line: rgba(255,255,255,.08);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink);
   font-family: "SG", system-ui, sans-serif; overflow-x: hidden; user-select: none; }
 body { background:
   radial-gradient(120% 60% at 50% 0%, #1d1747 0%, transparent 60%),
@@ -102,6 +102,80 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
 .pb svg { width: 20px; height: 20px; fill: var(--ink); }
 .pb.main { background: var(--ink); width: 44px; height: 44px; }
 .pb.main svg { fill: var(--bg); }
+
+/* ---------- tabs ---------- */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 16px; padding: 5px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); }
+.tabs button { font: inherit; font-size: 12px; letter-spacing: .22em; font-weight: 600; color: var(--dim); background: transparent; border: 0; border-radius: 12px; padding: 11px 0; }
+.tabs button.on { background: #221e48; color: var(--ink); }
+.tabs button.hot { color: var(--warm); }
+[data-tab] { display: none; } [data-tab].show { display: block; }
+.head2 { margin: 20px 4px 2px; font-size: 11px; letter-spacing: .24em; color: var(--dim); }
+.mini.warm { background: rgba(255,179,138,.16); color: var(--warm); }
+
+/* ---------- reactor ---------- */
+.reactor { position: relative; margin-top: 14px; height: max(470px, calc(100vh - 250px)); border-radius: 24px; overflow: hidden;
+  border: 1px solid var(--line); background: #02060f; }
+.reactor.shake { animation: rshake .12s linear infinite; }
+@keyframes rshake { 25% { transform: translate(1px,-1px); } 50% { transform: translate(-1px,1px); } 75% { transform: translate(1px,1px); } }
+#rimg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 60%; transition: filter 2s; }
+#rtint { position: absolute; inset: 0; mix-blend-mode: color; opacity: 0; transition: opacity 2s; pointer-events: none;
+  background: radial-gradient(circle at 50% 61%, #ffc23a 0%, #ff7a1a 35%, #e8341c 75%); }
+#rglow { position: absolute; left: 50%; top: 61%; width: 95%; aspect-ratio: 1; transform: translate(-50%,-50%); border-radius: 50%;
+  mix-blend-mode: screen; pointer-events: none; animation: pulse var(--pulse, 4s) ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .55; transform: translate(-50%,-50%) scale(1.08); } }
+#rfx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.rshade { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(2,4,12,.85), transparent 30%, transparent 55%, rgba(2,4,12,.92)); pointer-events: none; }
+.hazard { position: absolute; left: 0; right: 0; top: 0; height: 26px; display: none; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; letter-spacing: .3em; color: #1a0606;
+  background: repeating-linear-gradient(-45deg, #ffb020 0 14px, #1a1208 14px 28px); animation: haz 1s linear infinite; }
+.hazard span { background: #ffb020; padding: 2px 8px; }
+@keyframes haz { to { background-position: 40px 0; } }
+.reactor.hot .hazard { display: flex; }
+.reactor.crit .hazard { animation: haz .4s linear infinite, blink .6s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.rhud { position: absolute; left: 16px; right: 16px; top: 38px; }
+.rstatus { font-size: 26px; font-weight: 700; letter-spacing: .12em; }
+.rrow { display: flex; gap: 18px; margin-top: 8px; font-size: 12px; color: #c9c3ee; letter-spacing: .08em; }
+.rrow b { display: block; font-size: 17px; color: #fff; letter-spacing: 0; margin-top: 2px; font-weight: 600; }
+.rbottom { position: absolute; left: 14px; right: 14px; bottom: 14px; }
+.tierbar { position: relative; height: 10px; border-radius: 10px; background: rgba(255,255,255,.1); overflow: visible; }
+#tierfill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 10px; width: 0;
+  background: linear-gradient(90deg, #59c8ff, #ffcf5a 45%, #ff6a3d 75%, #ff2d55); transition: width 1.5s; box-shadow: 0 0 18px rgba(255,120,60,.6); }
+.tick { position: absolute; top: -4px; width: 2px; height: 18px; background: rgba(255,255,255,.55); }
+.ticklbl { display: grid; grid-template-columns: repeat(4, 1fr); text-align: right; font-size: 9.5px; letter-spacing: .1em; color: #b9b2e6; margin: 8px 0 12px; }
+.ticklbl span.got { color: #ffcf5a; }
+#push { width: 100%; height: 62px; border: 0; border-radius: 18px; font: inherit; font-size: 15px; font-weight: 700; letter-spacing: .2em;
+  color: #fff; background: linear-gradient(100deg, #ff3d3d, #ff8a2b); box-shadow: 0 0 40px -6px rgba(255,80,40,.8); }
+#push:disabled { background: rgba(30,28,60,.85); color: #8f88b8; box-shadow: none; letter-spacing: .08em; font-size: 13px; font-weight: 500; }
+.rrec { margin-top: 10px; text-align: center; font-size: 11.5px; color: #a9a2d6; letter-spacing: .06em; }
+
+/* ---------- full screen layers ---------- */
+.layer { position: fixed; inset: 0; z-index: 20; display: none; background: #000; color: #fff; }
+.layer.show { display: block; }
+#melt video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .6s; }
+#melt .red { position: absolute; inset: 0; background: radial-gradient(circle at 50% 55%, rgba(255,40,20,.55), rgba(60,0,0,.95)); animation: blink .5s steps(2) infinite; }
+#melt .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+#melt .msg { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-weight: 700; letter-spacing: .14em; }
+#melt .msg .big { font-size: 96px; line-height: 1; letter-spacing: 0; }
+#melt .msg .small { font-size: 15px; margin-top: 12px; color: #ffd0c0; }
+body.quake main, body.quake #melt video { animation: quake .09s linear infinite; }
+@keyframes quake { 0% { transform: translate(var(--q),0); } 33% { transform: translate(calc(var(--q) * -1), var(--q)); } 66% { transform: translate(0, calc(var(--q) * -1)); } }
+.result { position: absolute; left: 16px; right: 16px; bottom: calc(26px + env(safe-area-inset-bottom)); max-width: 428px; margin: 0 auto;
+  background: rgba(14,10,20,.86); backdrop-filter: blur(12px); border: 1px solid rgba(255,140,80,.35); border-radius: 22px; padding: 18px;
+  opacity: 0; transform: translateY(20px); transition: .6s; pointer-events: none; }
+.result.show { opacity: 1; transform: none; pointer-events: auto; }
+.result h2 { margin: 0; font-size: 13px; letter-spacing: .28em; color: #ffb38a; }
+.result .y { font-size: 44px; font-weight: 700; margin: 6px 0 2px; }
+.result p { margin: 4px 0; font-size: 13px; color: #d8d2f5; }
+.result button { margin-top: 14px; width: 100%; height: 54px; border: 0; border-radius: 16px; font: inherit; font-weight: 700; letter-spacing: .2em; background: #f1eeff; color: #0a0918; }
+
+#black { cursor: none; }
+#black .ghost { position: absolute; font-size: 13px; color: #2a2840; letter-spacing: .1em; transition: left 2s, top 2s; }
+#test .box { position: absolute; left: 24px; right: 24px; top: 30%; text-align: center; }
+#test .n { font-size: 84px; font-weight: 600; color: #8ef0d8; }
+#test p { color: #8f88b8; font-size: 13px; line-height: 1.6; }
+#test .verdict { font-size: 22px; font-weight: 600; color: #fff; margin-top: 8px; }
+#test button { margin-top: 18px; width: 100%; height: 54px; border: 0; border-radius: 16px; font: inherit; font-weight: 700; letter-spacing: .16em; }
 </style>
 </head>
 <body>
@@ -111,6 +185,9 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
     <div class="brand">CHILL<span>/</span>CHARGE</div>
     <div class="chip" id="plug">NOT PLUGGED IN</div>
   </header>
+
+  <div class="tabs"><button class="on" data-go="charge">CHARGE</button><button data-go="reactor" id="tabR">REACTOR</button></div>
+  <section data-tab="charge" class="show">
 
   <div class="ringwrap" id="ring">
     <div class="glow"></div>
@@ -162,7 +239,82 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
   </div>
 
   <p class="tip" id="tip"></p>
+
+  <div class="head2">MORE TRICKS</div>
+  <div class="panel">
+    <div class="row">
+      <div class="t"><b>Lock screen now</b><span>Screen off = the fastest charging there is</span></div>
+      <button class="mini" id="lockBtn">LOCK</button>
+    </div>
+    <div class="row">
+      <div class="t"><b>Black mode</b><span>Pure black screen, darkest it goes. Double tap to leave</span></div>
+      <button class="mini" id="blackBtn">GO</button>
+    </div>
+    <div class="row">
+      <div class="t"><b>Charger test</b><span id="testTxt">20 s test: is your charger or cable weak?</span></div>
+      <button class="mini" id="testBtn">TEST</button>
+    </div>
+    <div class="row" id="claudeRow">
+      <div class="t"><b>Claude mode</b><span id="claudeTxt">While Claude is open: music + boost + reactor keep going</span></div>
+      <div class="sw" id="swClaude"></div>
+    </div>
+    <div class="row">
+      <div class="t"><b>Send phone info to Error</b><span>Copies your model + charger info and opens Claude. Just paste</span></div>
+      <button class="mini" id="sendBtn">SEND</button>
+    </div>
+  </div>
+  </section>
+
+  <section data-tab="reactor">
+    <div class="reactor" id="reactor">
+      <img id="rimg" src="game/reactor.jpg" alt="">
+      <div id="rtint"></div>
+      <div id="rglow"></div>
+      <canvas id="rfx"></canvas>
+      <div class="rshade"></div>
+      <div class="hazard"><span>WARNING: CORE OVERHEAT</span></div>
+      <div class="rhud">
+        <div class="rstatus" id="rstatus">STABLE</div>
+        <div class="rrow">
+          <div>CORE ENERGY<b id="rwh">0.00 Wh</b></div>
+          <div>CORE TEMP<b id="rtemp">280&deg;C</b></div>
+          <div>FEED<b id="rfeed">--</b></div>
+        </div>
+      </div>
+      <div class="rbottom">
+        <div class="tierbar"><div id="tierfill"></div></div>
+        <div class="ticklbl" id="ticks"></div>
+        <button id="push" disabled>KEEP CHARGING TO FILL THE CORE</button>
+        <div class="rrec" id="rrec">Your real charging feeds the core. Unplugged = nothing goes in.</div>
+      </div>
+    </div>
+  </section>
 </main>
+
+<div class="layer" id="melt">
+  <video id="blast" src="game/blast.webm" muted playsinline preload="auto"></video>
+  <div class="red" id="mred"></div>
+  <div class="msg" id="mmsg"></div>
+  <div class="flash" id="mflash"></div>
+  <div class="result" id="mres">
+    <h2 id="rtitle">MELTDOWN</h2>
+    <div class="y" id="ryield"></div>
+    <p id="rline1"></p><p id="rline2"></p>
+    <button id="rebuild">REBUILD THE REACTOR</button>
+  </div>
+</div>
+<div class="layer" id="black"><div class="ghost" id="ghost"></div></div>
+<div class="layer" id="test"><div class="box">
+  <p id="testHead">Testing your charger. Keep it plugged in and don't touch the phone.</p>
+  <div class="n" id="testN">20</div>
+  <p id="testLive"></p>
+  <div class="verdict" id="testVerdict"></div>
+  <p id="testWhy"></p>
+  <div id="testBtns" style="display:none">
+    <button id="testSend" style="background:#8ef0d8;color:#0a0918">SEND RESULT TO ERROR</button>
+    <button id="testClose" style="background:#221f40;color:#f1eeff">CLOSE</button>
+  </div>
+</div></div>
 
 <div class="toast" id="toast"></div>
 
@@ -179,12 +331,16 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
 <script>
 // ---------- phone link (fake one when opened in a normal browser for testing) ----------
 const P = window.Phone || (() => {
-  let boost = false, lvl = 37, saver = false, canWrite = false, plugged = 1;
+  let boost = false, lvl = 37, saver = false, canWrite = false, plugged = 1, wh = 0, claude = false, usage = false, admin = false;
   setInterval(() => { if (plugged && lvl < 100) lvl += 0.05; }, 1000);
-  window.__fake = { set plugged(v) { plugged = v; if (!v) boost = false; }, set canWrite(v) { canWrite = v; } };
+  window.__fake = { set plugged(v) { plugged = v; if (!v) boost = false; }, set canWrite(v) { canWrite = v; }, set wh(v) { wh = v; } };
   return {
     state: () => JSON.stringify({ level: Math.floor(lvl), scale: 100, plugged, status: plugged ? 2 : 3, temp: 341, volt: 4120,
-      current: plugged ? 2350000 : -400000, left: plugged ? (100 - lvl) * 52000 : -1, saver, canWrite, boost, bright: 120, sdk: 33 }),
+      current: plugged ? 2350000 : -400000, left: plugged ? (100 - lvl) * 52000 : -1, saver, canWrite, boost, bright: 120, sdk: 33,
+      wh, claudeMode: claude, usageOk: usage, adminOk: admin, hasClaude: true }),
+    addWh: d => (wh += d), setWh: v => { wh = v; }, lockNow: () => { admin = true; }, windowDim: () => {}, buzz: () => {},
+    askUsage: () => { usage = true; }, claudeMode: on => { claude = on; },
+    report: t => "CHILL CHARGE PHONE CHECK\nPhone: Test Phone\n" + (t ? "Charger test: " + t + "\n" : ""), sendReport: () => {},
     askWrite: () => { canWrite = true; }, openSaver: () => { saver = !saver; },
     boost: () => { boost = true; return 41; }, brightness: () => {}, stop: () => { boost = false; },
   };
@@ -194,7 +350,7 @@ const $ = id => document.getElementById(id);
 const opts = { kill: true, dim: true };
 try { Object.assign(opts, JSON.parse(localStorage.getItem("opts") || "{}")); } catch (e) {}
 try { const b = localStorage.getItem("bright"); if (b) $("bright").value = b; } catch (e) {}
-let S = {};
+let S = {}, W = 0, WH = 0, melting = false;
 
 function paintSwitches() {
   $("swKill").classList.toggle("on", opts.kill);
@@ -263,6 +419,10 @@ function refresh() {
   if (cur > 0 && cur < 20000) cur *= 1000;
   const w = charging ? cur * (S.volt || 0) / 1e9 : 0;
   $("watts").textContent = charging && w > 0.2 ? w.toFixed(1) + " W" : "--";
+  const now = performance.now(), dt = Math.min(10, (now - (refresh.t || now)) / 1000); refresh.t = now;
+  W = charging ? w : 0;
+  WH = (charging && w > 0 && !melting) ? P.addWh(w * dt / 3600) : (S.wh || 0);
+  paintReactor();
 
   const t = S.temp / 10;
   $("temp").textContent = S.temp ? t.toFixed(0) + "°C" : "--";
@@ -276,6 +436,12 @@ function refresh() {
   $("killTxt").textContent = S.sdk >= 34 ? "Your Android freezes them by itself" : "Stops apps you're not using";
 
   $("allow").classList.toggle("show", opts.dim && !S.canWrite);
+  $("swClaude").classList.toggle("on", !!S.claudeMode);
+  $("claudeTxt").textContent = !S.hasClaude ? "Claude app not found on this phone"
+    : S.claudeMode && !S.usageOk ? "Turn on Usage access for Chill Charge, then come back"
+    : S.claudeMode ? "On: music + boost + reactor run while Claude is open"
+    : "While Claude is open: music + boost + reactor keep going";
+  $("lockBtn").textContent = S.adminOk ? "LOCK" : "SET UP";
 
   const go = $("go");
   go.classList.toggle("on", !!S.boost);
@@ -306,13 +472,14 @@ setTip(tips[tipI++ % tips.length]);
 
 // ---------- music ----------
 const tracks = [
-  { f: "music/t1.ogg", n: "Chill Lofi" },
-  { f: "music/t2.ogg", n: "Lofi Hip Hop" },
-  { f: "music/t3.ogg", n: "A Cup of Tea" },
-  { f: "music/t4.ogg", n: "Cat Caffe" },
-  { f: "music/t5.ogg", n: "Countryside" },
+  { f: "music/t1.ogg", n: "Low Under the Stars" },
+  { f: "music/t2.ogg", n: "End of Things" },
+  { f: "music/t3.ogg", n: "Easy Beginning" },
+  { f: "music/t4.ogg", n: "Autumn Colors" },
+  { f: "music/t5.ogg", n: "Beloved Land" },
+  { f: "music/t6.ogg", n: "Since 2 A.M." },
 ];
-const audio = new Audio(); audio.crossOrigin = "anonymous"; audio.volume = 0.75; audio.preload = "auto";
+const audio = new Audio(); audio.crossOrigin = "anonymous"; audio.volume = 0.7; audio.preload = "auto";
 let ti = Math.floor(Math.random() * tracks.length), ctx = null, an = null, wasPlaying = false;
 function load(i) { ti = (i + tracks.length) % tracks.length; audio.src = tracks[ti].f; $("song").textContent = tracks[ti].n; }
 function hook() {
@@ -330,7 +497,7 @@ audio.onended = () => { load(ti + 1); play(); };
 $("play").onclick = () => audio.paused ? play() : audio.pause();
 $("next").onclick = () => { load(ti + 1); play(); };
 $("prev").onclick = () => { load(ti - 1); play(); };
-window.appPause = () => { wasPlaying = !audio.paused; audio.pause(); };
+window.appPause = () => { wasPlaying = !audio.paused && !melting; audio.pause(); };
 window.appResume = () => { refresh(); if (wasPlaying) play(); };
 load(ti); play();
 // if the browser blocked autoplay, start on the first touch
@@ -376,6 +543,215 @@ function frame(t) {
   }
 }
 requestAnimationFrame(frame);
+
+
+// ---------- tabs ----------
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll("[data-tab]").forEach(x => x.classList.toggle("show", x.dataset.tab === b.dataset.go));
+  scrollTo(0, 0); sizeFx();
+});
+
+// ---------- more tricks ----------
+$("lockBtn").onclick = () => P.lockNow();
+let testResult = "";
+try { testResult = localStorage.getItem("testResult") || ""; } catch (e) {}
+if (testResult) $("testTxt").textContent = "Last test: " + testResult;
+$("sendBtn").onclick = () => { P.sendReport(P.report(testResult)); toast("Copied. In our Claude chat: hold the message box, tap Paste, send."); };
+$("swClaude").parentElement.onclick = () => {
+  if (!S.hasClaude) { toast("Can't find the Claude app on this phone."); return; }
+  const on = !S.claudeMode;
+  if (on && !S.usageOk) { toast("Find Chill Charge in the list and turn on Usage access, then come back."); P.askUsage(); }
+  P.claudeMode(on, +$("bright").value); setTimeout(refresh, 300);
+};
+
+// black mode: double tap to leave
+let ghostT = 0;
+$("blackBtn").onclick = () => {
+  $("black").classList.add("show"); P.windowDim(true); moveGhost(); ghostT = setInterval(moveGhost, 20000);
+};
+function moveGhost() {
+  const g = $("ghost"); g.textContent = `${$("pct").textContent}%  ${$("watts").textContent}`;
+  g.style.left = (10 + Math.random() * (innerWidth - 140)) + "px"; g.style.top = (40 + Math.random() * (innerHeight - 100)) + "px";
+}
+$("black").addEventListener("pointerup", () => {
+  const now = Date.now();
+  if (now - (moveGhost.tap || 0) < 450) { $("black").classList.remove("show"); P.windowDim(false); clearInterval(ghostT); }
+  moveGhost.tap = now;
+});
+
+// charger test: 20 s with the screen as dark as possible, measure the real power going in
+$("testBtn").onclick = () => {
+  if (!S.plugged) { toast("Plug your charger in first."); return; }
+  const L = $("test"); L.classList.add("show"); P.windowDim(true);
+  $("testBtns").style.display = "none"; $("testVerdict").textContent = ""; $("testWhy").textContent = "";
+  $("testHead").textContent = "Testing your charger. Keep it plugged in and don't touch the phone.";
+  let n = 20; const got = [];
+  $("testN").textContent = n;
+  const iv = setInterval(() => {
+    refresh(); if (W > 0) got.push(W);
+    $("testLive").textContent = W > 0 ? `${W.toFixed(1)} W going in` : "";
+    if (!S.plugged) { clearInterval(iv); P.windowDim(false); L.classList.remove("show"); toast("Test stopped: charger got unplugged."); return; }
+    if (--n > 0) { $("testN").textContent = n; return; }
+    clearInterval(iv); P.windowDim(false);
+    got.sort((a, b) => a - b);
+    const peak = got.length ? got[Math.floor(got.length * 0.8)] : 0;
+    const kind = { 1: "wall charger", 2: "USB port", 4: "wireless" }[S.plugged] || "charger";
+    let v, why;
+    if (peak < 3) { v = "WEAK"; why = "That's like a PC USB port or an old 5 W charger. A good wall charger + cable can be 3 to 8 times faster."; }
+    else if (peak < 8) { v = "SLOW"; why = "Normal old-style charger. A fast charger made for your phone would be a lot quicker."; }
+    else if (peak < 15) { v = "GOOD"; why = "Decent fast charging. Keep the phone cool and the screen off to keep it this high."; }
+    else { v = "FAST"; why = "Your charger is strong. If it still feels slow, it's heat or the screen eating the power."; }
+    testResult = `${peak.toFixed(1)} W peak on ${kind} = ${v}`;
+    try { localStorage.setItem("testResult", testResult); } catch (e) {}
+    $("testTxt").textContent = "Last test: " + testResult;
+    $("testHead").textContent = "Done";
+    $("testN").textContent = peak.toFixed(1) + " W";
+    $("testLive").textContent = "";
+    $("testVerdict").textContent = "Your charger: " + v;
+    $("testWhy").textContent = why;
+    $("testBtns").style.display = "block";
+  }, 1000);
+};
+$("testClose").onclick = () => $("test").classList.remove("show");
+$("testSend").onclick = () => { $("test").classList.remove("show"); $("sendBtn").onclick(); };
+
+// ---------- REACTOR ----------
+const TIERS = [
+  { wh: 0.3, name: "MELTDOWN", short: "MELT", secs: 6.5 },
+  { wh: 1.5, name: "BIG MELTDOWN", short: "BIG", secs: 12 },
+  { wh: 4, name: "INSANE", short: "INSANE", secs: 19 },
+  { wh: 10, name: "PLANET CRACKER", short: "PLANET", secs: 26.5 },
+];
+let rec = { n: 0, best: 0 };
+try { rec = Object.assign(rec, JSON.parse(localStorage.getItem("reactor") || "{}")); } catch (e) {}
+// the bar is spaced so each tier gets a quarter
+function barPos(wh) {
+  let prev = 0;
+  for (let i = 0; i < TIERS.length; i++) {
+    if (wh < TIERS[i].wh) return (i + (wh - prev) / (TIERS[i].wh - prev)) / TIERS.length;
+    prev = TIERS[i].wh;
+  }
+  return 1;
+}
+$("ticks").innerHTML = TIERS.map(t => `<span>${t.short}</span>`).join("");
+(function () {
+  const bar = document.querySelector(".tierbar");
+  TIERS.forEach((t, i) => { const k = document.createElement("i"); k.className = "tick"; k.style.left = `calc(${(i + 1) * 25}% - 1px)`; bar.appendChild(k); });
+})();
+const tierOf = wh => { let t = -1; TIERS.forEach((x, i) => { if (wh >= x.wh) t = i; }); return t; };
+const kt = wh => Math.round(wh * 2600);
+const fmtKt = k => k >= 1000 ? (k / 1000).toFixed(k >= 10000 ? 0 : 1) + " MEGATONS" : k + " KILOTONS";
+
+function paintReactor() {
+  const heat = Math.min(1, barPos(WH)), t = tierOf(WH);
+  const img = $("rimg");
+  // cool blue water -> orange-hot core (sepia keeps the real photo's detail, no fake colors)
+  img.style.filter = `brightness(${0.85 + heat * 0.4}) contrast(${1 + heat * 0.25})`;
+  $("rtint").style.opacity = Math.min(0.92, heat * 1.15).toFixed(2);
+  const g = $("rglow");
+  const c1 = heat < 0.4 ? "rgba(90,200,255," : heat < 0.75 ? "rgba(255,190,80," : "rgba(255,70,40,";
+  g.style.background = `radial-gradient(circle, ${c1}${0.18 + heat * 0.32}) 0%, ${c1}0) 40%)`;
+  g.style.setProperty("--pulse", (4 - heat * 3.4).toFixed(2) + "s");
+  const r = $("reactor");
+  r.classList.toggle("hot", heat >= 0.5); r.classList.toggle("crit", heat >= 0.75); r.classList.toggle("shake", heat >= 0.9);
+  $("tabR").classList.toggle("hot", t >= 0);
+  $("rstatus").textContent = t >= 3 ? "BEYOND LIMITS" : heat >= 0.75 ? "CRITICAL" : heat >= 0.5 ? "OVERHEATING" : heat >= 0.25 ? "RUNNING HOT" : W > 0 ? "CHARGING UP" : "STABLE";
+  $("rstatus").style.color = heat >= 0.75 ? "#ff5a4a" : heat >= 0.5 ? "#ffb38a" : heat >= 0.25 ? "#ffcf5a" : "#8ef0d8";
+  $("rwh").textContent = WH.toFixed(WH < 10 ? 2 : 1) + " Wh";
+  $("rtemp").innerHTML = Math.round(280 + heat * heat * 3600 + Math.max(0, WH - 10) * 120) + "&deg;C";
+  $("rfeed").textContent = W > 0 ? "+" + W.toFixed(1) + " W" : "NONE";
+  $("tierfill").style.width = (heat * 100) + "%";
+  document.querySelectorAll("#ticks span").forEach((x, i) => x.classList.toggle("got", i <= t));
+  const push = $("push");
+  push.disabled = t < 0 || melting;
+  if (t < 0) {
+    const need = TIERS[0].wh - WH;
+    push.textContent = W > 0 ? `NEEDS ${need.toFixed(2)} Wh MORE (~${Math.max(1, Math.ceil(need / W * 60))} MIN)` : "PLUG IN TO FEED THE CORE";
+  } else push.textContent = `PUSH IT: ${TIERS[t].name}`;
+  $("rrec").textContent = rec.n ? `Meltdowns: ${rec.n}  ·  Biggest: ${fmtKt(rec.best)}` : "Your real charging feeds the core. Unplugged = nothing goes in.";
+}
+
+// energy flowing up into the core while charging
+const fx = $("rfx"), fg = fx.getContext("2d"); let sparks = [];
+function sizeFx() { const r = fx.getBoundingClientRect(); fx.width = r.width; fx.height = r.height; }
+addEventListener("resize", sizeFx);
+function drawFx(t) {
+  requestAnimationFrame(drawFx);
+  if (document.hidden || !$("reactor").offsetParent || t - (drawFx.l || 0) < 40) return;
+  drawFx.l = t;
+  const w = fx.width, h = fx.height; if (!w) { sizeFx(); return; }
+  fg.clearRect(0, 0, w, h);
+  const cx = w * 0.5, cy = h * 0.61, heat = Math.min(1, barPos(WH));
+  if (W > 0 && sparks.length < 18 + W * 4 && Math.random() < 0.3 + W / 15)
+    sparks.push({ x: Math.random() * w, y: h + 4, k: 0.006 + Math.random() * 0.01 + W / 2500, p: 0 });
+  sparks = sparks.filter(s => s.p < 1);
+  for (const s of sparks) {
+    s.p += s.k;
+    const e = s.p * s.p, x = s.x + (cx - s.x) * e, y = s.y + (cy - s.y) * s.p;
+    fg.globalAlpha = Math.sin(s.p * Math.PI) * 0.9;
+    fg.fillStyle = heat < 0.5 ? "#9fe8ff" : "#ffd27a";
+    fg.beginPath(); fg.arc(x, y, 1.6, 0, 7); fg.fill();
+  }
+  fg.globalAlpha = 1;
+}
+requestAnimationFrame(drawFx);
+
+// ---------- the meltdown ----------
+const sfx = n => { const a = new Audio("game/" + n + ".ogg"); a.volume = 1; return a; };
+const wait = ms => new Promise(r => setTimeout(r, ms));
+$("push").onclick = async () => {
+  const t = tierOf(WH); if (t < 0 || melting) return;
+  melting = true; const tier = TIERS[t], whNow = WH, yieldKt = kt(whNow);
+  const musicWas = !audio.paused; audio.pause();
+  const M = $("melt"), msg = $("mmsg"), vid = $("blast");
+  M.classList.add("show"); $("mred").style.display = "block"; $("mres").classList.remove("show");
+  vid.style.opacity = 0; vid.currentTime = 0;
+  const siren = sfx("siren"), alarm = sfx("alarm"), rumble = sfx("rumble"), boom = sfx("boom");
+  alarm.loop = true; siren.play().catch(() => {}); alarm.play().catch(() => {});
+  document.body.classList.add("quake");
+  const lines = ["SCRAM FAILED", "COOLANT GONE", "CORE " + Math.round(2800 + whNow * 300) + "°C"];
+  for (let i = 0; i < 3; i++) {
+    document.body.style.setProperty("--q", (1 + i) + "px");
+    msg.innerHTML = `<div style="font-size:26px">${lines[i]}</div>`;
+    P.buzz("0,120,80,120"); await wait(1100);
+  }
+  for (let n = 5; n > 0; n--) {
+    document.body.style.setProperty("--q", (3 + (5 - n) * 2) + "px");
+    msg.innerHTML = `<div class="big">${n}</div><div class="small">${tier.name}</div>`;
+    P.buzz("0," + (90 + (5 - n) * 60)); await wait(1000);
+  }
+  // BOOM
+  msg.innerHTML = ""; alarm.pause(); siren.pause(); $("mred").style.display = "none";
+  const fl = $("mflash"); fl.style.transition = "none"; fl.style.opacity = 1;
+  boom.play().catch(() => {}); rumble.play().catch(() => {});
+  P.buzz("0,900,120,700,150,500,200,300");
+  vid.play().catch(() => {}); vid.style.opacity = 1;
+  document.body.style.setProperty("--q", (6 + t * 4) + "px");
+  await wait(120); fl.style.transition = "opacity 1.6s"; fl.style.opacity = 0;
+  // shake fades out
+  const end = performance.now() + tier.secs * 1000;
+  while (performance.now() < end) {
+    const left = (end - performance.now()) / (tier.secs * 1000);
+    document.body.style.setProperty("--q", Math.max(0, (6 + t * 4) * left * left).toFixed(1) + "px");
+    if (left < 0.15) vid.style.opacity = left / 0.15 * 0.55 + 0.45;
+    await wait(200);
+  }
+  document.body.classList.remove("quake");
+  vid.pause();
+  rec.n++; rec.best = Math.max(rec.best, yieldKt);
+  try { localStorage.setItem("reactor", JSON.stringify(rec)); } catch (e) {}
+  $("rtitle").textContent = `${tier.name} #${rec.n}`;
+  $("ryield").textContent = fmtKt(yieldKt);
+  $("rline1").textContent = `Shockwave: ${(Math.cbrt(yieldKt) * 1.9).toFixed(1)} km wide. Your phone fed it ${whNow.toFixed(2)} Wh.`;
+  $("rline2").textContent = yieldKt >= rec.best && rec.n > 1 ? "New biggest blast." : t < 3 ? `Charge to ${TIERS[t + 1].wh} Wh for ${TIERS[t + 1].name}.` : "Max tier. Keep charging past it to grow the blast.";
+  $("mres").classList.add("show");
+  $("rebuild").onclick = () => {
+    rumble.pause(); P.setWh(0); WH = 0; melting = false;
+    M.classList.remove("show"); paintReactor();
+    if (musicWas) play();
+  };
+};
 
 paintSwitches(); refresh();
 setInterval(refresh, 1500);

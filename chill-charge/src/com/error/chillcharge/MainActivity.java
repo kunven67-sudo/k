@@ -1,6 +1,13 @@
 package com.error.chillcharge;
 
 import android.app.Activity;
+import android.app.admin.DevicePolicyManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.ComponentName;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.view.WindowManager;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.AssetFileDescriptor;
@@ -118,6 +125,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        ClaudeService.appVisible = true;
         web.onResume();
         // boost was on but the phone got unplugged while we were closed: put things back
         if (Boost.isOn(this) && !Boost.isCharging(this)) {
@@ -129,6 +137,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        ClaudeService.appVisible = false;
         // music stops when you leave (so it won't play over your anime)
         web.evaluateJavascript("window.appPause&&appPause()", null);
         web.onPause();
@@ -162,7 +171,128 @@ public class MainActivity extends Activity {
                     + ",\"canWrite\":" + Boost.canWrite(MainActivity.this)
                     + ",\"boost\":" + Boost.isOn(MainActivity.this)
                     + ",\"bright\":" + bright
-                    + ",\"sdk\":" + Build.VERSION.SDK_INT + "}";
+                    + ",\"sdk\":" + Build.VERSION.SDK_INT
+                    + ",\"wh\":" + Boost.addWh(MainActivity.this, 0)
+                    + ",\"claudeMode\":" + ClaudeService.isOn(MainActivity.this)
+                    + ",\"usageOk\":" + ClaudeService.usageOk(MainActivity.this)
+                    + ",\"adminOk\":" + adminOk()
+                    + ",\"hasClaude\":" + (getPackageManager().getLaunchIntentForPackage(ClaudeService.CLAUDE) != null)
+                    + "}";
+        }
+
+        private boolean adminOk() {
+            DevicePolicyManager dpm = getSystemService(DevicePolicyManager.class);
+            return dpm.isAdminActive(new ComponentName(MainActivity.this, AdminReceiver.class));
+        }
+
+        /** Screen off right now (fastest charging). First time it asks you to allow screen lock. */
+        @JavascriptInterface
+        public void lockNow() {
+            runOnUiThread(() -> {
+                if (adminOk()) {
+                    getSystemService(DevicePolicyManager.class).lockNow();
+                } else {
+                    Intent i = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+                    i.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, new ComponentName(MainActivity.this, AdminReceiver.class));
+                    i.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                            "Lets the LOCK SCREEN button turn your screen off instantly. That's all it can do.");
+                    startActivity(i);
+                }
+            });
+        }
+
+        /** Black mode: makes THIS screen as dark as the phone allows (only while the app is open). */
+        @JavascriptInterface
+        public void windowDim(boolean on) {
+            runOnUiThread(() -> {
+                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                lp.screenBrightness = on ? 0.01f : WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+                getWindow().setAttributes(lp);
+                if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            });
+        }
+
+        @JavascriptInterface
+        public void buzz(String pattern) {
+            try {
+                String[] a = pattern.split(",");
+                long[] t = new long[a.length];
+                for (int i = 0; i < a.length; i++) t[i] = Long.parseLong(a[i].trim());
+                Vibrator v = getSystemService(Vibrator.class);
+                if (v != null) v.vibrate(VibrationEffect.createWaveform(t, -1));
+            } catch (Exception ignored) { }
+        }
+
+        @JavascriptInterface
+        public double addWh(double wh) { return Boost.addWh(MainActivity.this, wh); }
+
+        @JavascriptInterface
+        public void setWh(double wh) { Boost.setWh(MainActivity.this, wh); }
+
+        @JavascriptInterface
+        public void askUsage() {
+            runOnUiThread(() -> startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)));
+        }
+
+        @JavascriptInterface
+        public void claudeMode(boolean on, int pct) {
+            Boost.prefs(MainActivity.this).edit().putBoolean("claudeMode", on).putInt("pct", pct).apply();
+            Intent i = new Intent(MainActivity.this, ClaudeService.class);
+            if (on) {
+                if (Build.VERSION.SDK_INT >= 33
+                        && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != 0) {
+                    runOnUiThread(() -> requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7));
+                }
+                startForegroundService(i);
+            } else {
+                stopService(i);
+            }
+        }
+
+        /** Everything Error needs to pick the right charger. */
+        @JavascriptInterface
+        public String report(String test) {
+            Intent b = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            BatteryManager bm = getSystemService(BatteryManager.class);
+            StringBuilder r = new StringBuilder("CHILL CHARGE PHONE CHECK\n");
+            r.append("Phone: ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL)
+             .append(" (").append(Build.DEVICE).append(")\n");
+            r.append("Android: ").append(Build.VERSION.RELEASE).append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\n");
+            if (b != null) {
+                int pl = b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
+                r.append("Plugged into: ").append(pl == 1 ? "wall charger" : pl == 2 ? "USB port" : pl == 4 ? "wireless" : pl == 0 ? "nothing" : "other").append("\n");
+                int mc = b.getIntExtra("max_charging_current", -1), mv = b.getIntExtra("max_charging_voltage", -1);
+                if (mc > 0) r.append("Charger max current: ").append(mc > 20000 ? mc / 1000 : mc).append(" mA\n");
+                if (mv > 0) r.append("Charger max voltage: ").append(String.format(java.util.Locale.US, "%.1f", mv > 100000 ? mv / 1e6 : mv / 1e3)).append(" V\n");
+                r.append("Battery: ").append(b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)).append("%, ")
+                 .append(b.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0).append(" C, ")
+                 .append(b.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0)).append(" mV, health ")
+                 .append(b.getIntExtra(BatteryManager.EXTRA_HEALTH, 0)).append(", ")
+                 .append(b.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY)).append("\n");
+                int lvl = b.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
+                int cc = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+                if (cc > 0 && lvl > 5) r.append("Battery size (guess): ").append(cc / 10 / lvl).append(" mAh\n");
+            }
+            r.append("Power in right now: ").append(String.format(java.util.Locale.US, "%.1f", Boost.watts(MainActivity.this))).append(" W\n");
+            if (test != null && !test.isEmpty()) r.append("Charger test: ").append(test).append("\n");
+            return r.toString();
+        }
+
+        /** Copies the phone check and opens Claude so you just paste it. */
+        @JavascriptInterface
+        public void sendReport(String text) {
+            runOnUiThread(() -> {
+                ClipboardManager cm = getSystemService(ClipboardManager.class);
+                cm.setPrimaryClip(ClipData.newPlainText("Phone check", text));
+                Intent open = getPackageManager().getLaunchIntentForPackage(ClaudeService.CLAUDE);
+                if (open != null) {
+                    startActivity(open);
+                } else {
+                    Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text);
+                    startActivity(Intent.createChooser(send, "Send phone check"));
+                }
+            });
         }
 
         @JavascriptInterface
