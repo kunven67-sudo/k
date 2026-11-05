@@ -143,7 +143,7 @@ G.phoneUpdate = {
   ZIPS: { 'fnf2-phone-update.zip': ['mobile', 'videosongs', 'jordus'], 'fnf2-phone-impostor.zip': ['impostor', 'impostor-w1'],
     'fnf2-phone-impostor-w2.zip': ['impostor-w2'], 'fnf2-phone-impostor-w3.zip': ['impostor-w3'], 'fnf2-phone-aura.zip': ['aura', 'gfmix'],
     'fnf2-phone-tankvoice.zip': ['tankvoice', 'tankvoice-imp'], 'fnf2-phone-tankvoice2.zip': ['tankvoice-mods'] },
-  NEED: { mobile: 3, videosongs: 3, jordus: 6, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1, aura: 1, gfmix: 1, tankvoice: 1, 'tankvoice-imp': 1, 'tankvoice-mods': 1 },   // (pack -> the version the code needs: mobile v3 = + the BABY / INSANE / GOD labels, v2 = + the PRO MODE menu
+  NEED: { mobile: 3, videosongs: 3, jordus: 6, impostor: 2, 'impostor-w1': 3, 'impostor-w2': 2, 'impostor-w3': 1, aura: 1, gfmix: 1, tankvoice: 2, 'tankvoice-imp': 2, 'tankvoice-mods': 2 },   // (tankvoice v2 = his own chart's long notes)   // (pack -> the version the code needs: mobile v3 = + the BABY / INSANE / GOD labels, v2 = + the PRO MODE menu
             // word, videosongs v2 = Into Our Lives remade (real-time video, talk on the sides), v3 = + the song video's opening shot, jordus v2 = her own player, v3 = her own animations, v5 = the shocked LOSS results, v6 = fix pass 3: her idle the same size as her moves + legs, stage lines off both girls)
   saved: {},            // (packs picked just now: the zips on GitHub always hold the newest ones)
   old(id) { return !this.saved[id] && (!G.Packs.has(id) || (G.Packs.all[id].v || 1) < this.NEED[id]); },
