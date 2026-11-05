@@ -361,6 +361,7 @@ PACK_INFO = {
     'impostor-w1': {'name': 'VS Impostor: Legacy - Week 1', 'credit': 'MOTORFROG, Clowfoe + the VS Impostor team (VS IMPOSTOR: LEGACY)', 'group': 'impostor', 'v': 3},
     'impostor-w2': {'name': 'VS Impostor: Legacy - Week 2', 'credit': 'MOTORFROG, Clowfoe + the VS Impostor team (VS IMPOSTOR: LEGACY)', 'group': 'impostor', 'v': 2},
     'impostor-w3': {'name': 'VS Impostor: Legacy - Week 3', 'credit': 'MOTORFROG, Clowfoe + the VS Impostor team (VS IMPOSTOR: LEGACY)', 'group': 'impostor'},
+    'aura': {'name': "Aura Funkin': at South America", 'credit': 'Coopey St. Whistler + team (Aura Funkin\': at South America), Hot Mustafa (AURA.lua)'},
     'mobile': {'name': 'FNF mobile pictures', 'credit': "The Funkin' Crew (FNF mobile)", 'core': True, 'v': 2},
     'tricky': {'name': 'VS Tricky', 'credit': 'Banbuds, Rozebud, KadeDev, Cval, YingYang48, JADS, Moro + team (original), thisaintcub, PurSnake + LeonidKosherny (V-Slice port), ChuckySkullHead (Madness Erect), angelkireina (Pico mixes)'},
 }
