@@ -251,7 +251,7 @@ body.quake main, body.quake #melt video { animation: quake .09s linear infinite;
       <button class="mini" id="blackBtn">GO</button>
     </div>
     <div class="row">
-      <div class="t"><b>Charger test</b><span id="testTxt">20 s test: is your charger or cable weak?</span></div>
+      <div class="t"><b>Charger test</b><span id="testTxt">40 s test: is your charger or cable weak?</span></div>
       <button class="mini" id="testBtn">TEST</button>
     </div>
     <div class="row" id="claudeRow">
@@ -337,7 +337,7 @@ const P = window.Phone || (() => {
   return {
     state: () => JSON.stringify({ level: Math.floor(lvl), scale: 100, plugged, status: plugged ? 2 : 3, temp: 341, volt: 4120,
       current: plugged ? 2350000 : -400000, left: plugged ? (100 - lvl) * 52000 : -1, saver, canWrite, boost, bright: 120, sdk: 33,
-      wh, claudeMode: claude, usageOk: usage, adminOk: admin, hasClaude: true }),
+      w: plugged ? 9.7 : 0, measured: true, cc: Math.round(lvl * 45000), wh, claudeMode: claude, usageOk: usage, adminOk: admin, hasClaude: true }),
     addWh: d => (wh += d), setWh: v => { wh = v; }, lockNow: () => { admin = true; }, windowDim: () => {}, buzz: () => {},
     askUsage: () => { usage = true; }, claudeMode: on => { claude = on; },
     report: t => "CHILL CHARGE PHONE CHECK\nPhone: Test Phone\n" + (t ? "Charger test: " + t + "\n" : ""), sendReport: () => {},
@@ -415,10 +415,11 @@ function refresh() {
     : S.left > 0 ? fmtLeft(S.left) : "charging";
 
   // power going in = current x voltage (phones report current in uA or mA, so guess which)
-  let cur = Math.abs(S.current || 0);
-  if (cur > 0 && cur < 20000) cur *= 1000;
-  const w = charging ? cur * (S.volt || 0) / 1e9 : 0;
+  let w = 0;
+  if (typeof S.w === "number") w = charging ? Math.max(0, S.w) : 0;
+  else { let cur = Math.abs(S.current || 0); if (cur > 0 && cur < 20000) cur *= 1000; w = charging ? cur * (S.volt || 0) / 1e9 : 0; }
   $("watts").textContent = charging && w > 0.2 ? w.toFixed(1) + " W" : "--";
+  $("watts").title = S.measured ? "measured" : "";
   const now = performance.now(), dt = Math.min(10, (now - (refresh.t || now)) / 1000); refresh.t = now;
   W = charging ? w : 0;
   WH = (charging && w > 0 && !melting) ? P.addWh(w * dt / 3600) : (S.wh || 0);
@@ -585,8 +586,8 @@ $("testBtn").onclick = () => {
   if (!S.plugged) { toast("Plug your charger in first."); return; }
   const L = $("test"); L.classList.add("show"); P.windowDim(true);
   $("testBtns").style.display = "none"; $("testVerdict").textContent = ""; $("testWhy").textContent = "";
-  $("testHead").textContent = "Testing your charger. Keep it plugged in and don't touch the phone.";
-  let n = 20; const got = [];
+  $("testHead").textContent = "Testing your charger for 40 s. Keep it plugged in and don't touch the phone.";
+  let n = 40; const got = []; const cc0 = S.cc, t0 = Date.now();
   $("testN").textContent = n;
   const iv = setInterval(() => {
     refresh(); if (W > 0) got.push(W);
@@ -595,14 +596,16 @@ $("testBtn").onclick = () => {
     if (--n > 0) { $("testN").textContent = n; return; }
     clearInterval(iv); P.windowDim(false);
     got.sort((a, b) => a - b);
-    const peak = got.length ? got[Math.floor(got.length * 0.8)] : 0;
+    let peak = got.length ? got[Math.floor(got.length * 0.5)] : 0;
+    // most exact: how much the battery's mAh counter went up during the test
+    if (cc0 > 0 && S.cc > cc0) peak = (S.cc - cc0) / 1e6 / ((Date.now() - t0) / 3.6e6) * (S.volt || 3900) / 1000;
     const kind = { 1: "wall charger", 2: "USB port", 4: "wireless" }[S.plugged] || "charger";
     let v, why;
     if (peak < 3) { v = "WEAK"; why = "That's like a PC USB port or an old 5 W charger. A good wall charger + cable can be 3 to 8 times faster."; }
     else if (peak < 8) { v = "SLOW"; why = "Normal old-style charger. A fast charger made for your phone would be a lot quicker."; }
     else if (peak < 15) { v = "GOOD"; why = "Decent fast charging. Keep the phone cool and the screen off to keep it this high."; }
     else { v = "FAST"; why = "Your charger is strong. If it still feels slow, it's heat or the screen eating the power."; }
-    testResult = `${peak.toFixed(1)} W peak on ${kind} = ${v}`;
+    testResult = `${peak.toFixed(1)} W on ${kind} = ${v}`;
     try { localStorage.setItem("testResult", testResult); } catch (e) {}
     $("testTxt").textContent = "Last test: " + testResult;
     $("testHead").textContent = "Done";

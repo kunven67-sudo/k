@@ -167,6 +167,9 @@ public class MainActivity extends Activity {
                     + ",\"status\":" + status + ",\"temp\":" + temp + ",\"volt\":" + volt
                     + ",\"current\":" + (current == Long.MIN_VALUE ? 0 : current)
                     + ",\"left\":" + left
+                    + ",\"w\":" + Boost.watts(MainActivity.this)
+                    + ",\"measured\":" + (Boost.counterWatts(MainActivity.this) >= 0)
+                    + ",\"cc\":" + Boost.counter(MainActivity.this)
                     + ",\"saver\":" + pm.isPowerSaveMode()
                     + ",\"canWrite\":" + Boost.canWrite(MainActivity.this)
                     + ",\"boost\":" + Boost.isOn(MainActivity.this)
@@ -274,7 +277,9 @@ public class MainActivity extends Activity {
                 int cc = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
                 if (cc > 0 && lvl > 5) r.append("Battery size (guess): ").append(cc / 10 / lvl).append(" mAh\n");
             }
-            r.append("Power in right now: ").append(String.format(java.util.Locale.US, "%.1f", Boost.watts(MainActivity.this))).append(" W\n");
+            double cw = Boost.counterWatts(MainActivity.this);
+            r.append("Power in (sensor): ").append(String.format(java.util.Locale.US, "%.1f", Boost.sensorWatts(MainActivity.this))).append(" W\n");
+            r.append("Power in (measured from mAh): ").append(cw >= 0 ? String.format(java.util.Locale.US, "%.1f W", cw) : "not enough data (keep the app open 30 s)").append("\n");
             if (test != null && !test.isEmpty()) r.append("Charger test: ").append(test).append("\n");
             return r.toString();
         }

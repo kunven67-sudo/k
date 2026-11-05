@@ -75,15 +75,52 @@ final class Boost {
         p.edit().putBoolean("on", false).putBoolean("saved", false).putBoolean("byClaude", false).apply();
     }
 
-    /** Watts going into the battery right now (0 if not charging). Phones report uA or mA, so guess which. */
-    static double watts(Context c) {
+    /** Watts from the phone's current sensor (some phones, like Motorola, report this wrong). */
+    static double sensorWatts(Context c) {
         Intent b = c.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         if (b == null || b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) == 0) return 0;
         BatteryManager bm = c.getSystemService(BatteryManager.class);
-        long cur = Math.abs(bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW));
-        if (cur == Long.MIN_VALUE || cur > 20000000L) return 0;
-        if (cur > 0 && cur < 20000) cur *= 1000;
+        long raw = bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW);
+        if (raw == Long.MIN_VALUE || raw == 0) return 0;
+        long cur = Math.abs(raw);
+        if (cur > 20000000L) return 0;
+        if (cur < 20000) cur *= 1000; // phone reports mA instead of uA
         return cur * b.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) / 1e9;
+    }
+
+    // charge counter samples: {time ms, uAh}
+    private static final java.util.ArrayDeque<long[]> samples = new java.util.ArrayDeque<>();
+    private static final long WINDOW_MS = 90000, MIN_SPAN_MS = 25000;
+
+    /** Battery's mAh counter right now in uAh (-1 = phone doesn't have one). */
+    static long counter(Context c) {
+        BatteryManager bm = c.getSystemService(BatteryManager.class);
+        int v = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+        return (v == Integer.MIN_VALUE || v <= 0) ? -1 : v;
+    }
+
+    /** Real power filling the battery, measured from how fast its mAh counter goes up. -1 = not enough data yet. */
+    static synchronized double counterWatts(Context c) {
+        Intent b = c.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (b == null || b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) == 0) { samples.clear(); return -1; }
+        long cc = counter(c);
+        if (cc < 0) return -1;
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (samples.isEmpty() || now - samples.peekLast()[0] >= 2000) samples.addLast(new long[]{now, cc});
+        while (samples.size() > 2 && now - samples.peekFirst()[0] > WINDOW_MS) samples.pollFirst();
+        long[] a = samples.peekFirst(), z = samples.peekLast();
+        long span = z[0] - a[0];
+        if (span < MIN_SPAN_MS) return -1;
+        long d = z[1] - a[1];
+        if (d < 0) { samples.clear(); return -1; } // went down = not really charging, start over
+        double amps = (d / 1e6) / (span / 3.6e6);
+        return amps * b.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) / 1000.0;
+    }
+
+    /** Best guess of watts going into the battery: the mAh counter once it has 25 s of data, else the sensor. */
+    static double watts(Context c) {
+        double w = counterWatts(c);
+        return w >= 0 ? w : sensorWatts(c);
     }
 
     /** Reactor energy (Wh your charging fed into it). */
