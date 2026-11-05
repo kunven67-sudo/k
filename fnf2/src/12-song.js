@@ -206,7 +206,33 @@ G.Songs = {
   hasAudio(id, v, m) { return G.A.has(this.instPath(id, m, v)); },
   // full song description for PlayState. swap = you sing the opponent's part (their notes, their real voice,
   // standing on the player's side); everything that points at "player" / "opponent" swaps with it
-  build(id, diff, variation, swap) {
+  // a player singing BF's part as themselves (Tankman, 'cover'): THEIR OWN chart made from BF's, the way their voice
+  // goes (tools/own/tank_voice.py makes the voice from this very chart, same maths): about one note a beat, most of
+  // them long notes held into the next one, no chords; a line always starts on its first note. Only your plain
+  // notes change; the opponent's + trick notes stay.
+  // (one note a beat on HARD, every 2 beats on NORMAL, every 4 on EASY: BABY / INSANE / GOD are made from these)
+  ownChart(notes, tc, every) {
+    every = every || 1;
+    const tcs = tc.slice().sort((a, b) => a.t - b.t);
+    const beat = t => { let x = tcs[0]; for (const y of tcs) if (y.t <= t) x = y; return 60000 / (x.bpm || 100); };
+    const plain = n => !n.k || /^(alt|normal|default|easy|hard|erect|nightmare)$/.test(n.k);
+    const mine = notes.filter(n => n.d < 4 && plain(n)).sort((a, b) => a.t - b.t || a.d - b.d);
+    const rest = notes.filter(n => !(n.d < 4 && plain(n)));
+    const keep = []; let last = -1e9, prev = -1e9;
+    for (const n of mine) {
+      if (n.t - prev <= 2) continue;                          // (a chord: its first note)
+      const b = beat(n.t);
+      if ((n.t - prev > b * 1.5 && n.t - last >= b * Math.min(every, 2) * 0.98) || n.t - last >= b * every * 0.98) { keep.push({ t: n.t, d: n.d, l: n.l || 0, k: n.k || '' }); last = n.t; }
+      prev = n.t;
+    }
+    for (let i = 0; i < keep.length; i++) {
+      const n = keep[i], b = beat(n.t), gap = i + 1 < keep.length ? keep[i + 1].t - n.t : b * 4;
+      let l = gap <= b * (every + 1.5) ? gap - b * 0.25 : Math.min(Math.max(n.l, b * every), gap - b * 0.5);
+      n.l = l >= b * 0.4 ? Math.round(l) : 0;
+    }
+    return rest.concat(keep).sort((a, b) => a.t - b.t);
+  },
+  build(id, diff, variation, swap, coverPlayer) {
     variation = variation || (G.DIFF_INFO[diff] || {}).variation || 'default';
     const m = this.meta(id, variation), c = this.chart(id, variation);
     if (!m || !c) return null;
@@ -215,6 +241,7 @@ G.Songs = {
     const gen = (G.DIFF_INFO[diff] || {}).gen, has = d => c.notes[d] && c.notes[d].length;
     const src = gen ? (gen === 'baby' ? ['easy', 'normal', 'hard'] : ['hard', 'normal', 'easy']).find(has) : diff;
     let raw = (src && c.notes[src]) || [];
+    if (coverPlayer === 'tankman' && !swap) raw = this.ownChart(raw, tc, gen === 'baby' ? 8 : { easy: 4, normal: 2 }[src] || 1);      // (Tankman's own part, his voice follows it)
     if (gen) raw = this.genNotes(raw, gen, tc, !!swap, id);
     const notes = raw.map(n => ({ t: n.t, d: swap ? (n.d + 4) % 8 : n.d, l: n.l || 0, k: n.k || '' })).sort((a, b) => a.t - b.t);
     const speed = ((c.scrollSpeed && (c.scrollSpeed[src] != null ? c.scrollSpeed[src] : c.scrollSpeed.default)) || 1) * (gen === 'baby' ? 0.85 : gen === 'insane' ? 1.12 : gen === 'god' ? 1.25 : 1);

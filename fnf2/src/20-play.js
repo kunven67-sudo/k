@@ -119,7 +119,7 @@
     enter(params) {
       this.params = params = Object.assign({ mode: 'freeplay', songs: ['tutorial'], songIndex: 0, diff: 'normal', variation: null, week: null, weekStats: null, deaths: 0 }, params);
       this.ready = false; this.failed = null; this.cutscene = null; this.blackIn = params.blackIn || 0; params.blackIn = 0;
-      this.song = G.Songs.build(params.songs[params.songIndex], params.diff, params.variation, params.swap);
+      this.song = G.Songs.build(params.songs[params.songIndex], params.diff, params.variation, params.swap, params.cover ? G.settings.player : null);
       if (!this.song) { this.failed = 'Missing chart: ' + params.songs[params.songIndex] + ' (' + params.diff + ')'; return; }
       // a new player (Darnell / Tankman / Nene, 59-charselect.js) plays the songs they really sang in, swapped:
       // their part is yours, in their real recorded voice, and the old player raps against them

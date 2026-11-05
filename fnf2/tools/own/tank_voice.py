@@ -98,11 +98,11 @@ def bank():
                 ugh.append(audio[a:int(min(nxt, t + 800) * SR / 1000)].copy()); continue
             if k == 'hehPrettyGood':
                 pretty = audio[a:int((t + 2420) * SR / 1000)].copy(); continue      # ("Heh!  Pretty good!": 2.4 s, over his next notes)
-            end = min(nxt - 8, t + max(l + 140, 200), t + 700)
+            end = min(nxt - 8, t + max(l + 160, 200), t + 1500)
             seg = audio[a:int(end * SR / 1000)]
             p = pitch(seg[:int(0.3 * SR)])
             if p is None: continue
-            syl.append({'a': seg.copy(), 'p': p, 'ms': (end - t), 'from': name})
+            syl.append({'a': seg.copy(), 'p': p, 'ms': (end - t), 'hold': l >= 250, 'from': name})
         print('  bank:', name, len(syl), 'notes so far')
     np.savez(cp, syl=np.array(syl, dtype=object), ugh=np.array(ugh, dtype=object), pretty=pretty)
     return syl, ugh, pretty
@@ -122,10 +122,33 @@ def place(out, a, t_ms, gain=1.0):
     e = min(len(out), s + len(a)); out[s:e] += a[:e - s] * gain
 
 
+def own_chart(notes, tc):
+    """Tankman's own part from BF's: the same maths as G.Songs.ownChart (src/12-song.js), so his voice fits his notes"""
+    tcs = sorted(tc or [{'t': 0, 'bpm': 100}], key=lambda x: x['t'])
+    def beat(t):
+        x = tcs[0]
+        for y in tcs:
+            if y['t'] <= t: x = y
+        return 60000 / (x.get('bpm') or 100)
+    plain = lambda k: not k or re.fullmatch(r'alt|normal|default|easy|hard|erect|nightmare', k)
+    mine = sorted([n for n in notes if n[1] < 4 and plain(n[3])], key=lambda n: (n[0], n[1]))
+    keep, last, prev = [], -1e9, -1e9
+    for t, d, l, k in mine:
+        if t - prev <= 2: continue
+        b = beat(t)
+        if t - prev > b * 1.5 or t - last >= b * 0.98: keep.append([t, d, l or 0, k]); last = t
+        prev = t
+    for i, n in enumerate(keep):
+        b = beat(n[0]); gap = keep[i + 1][0] - n[0] if i + 1 < len(keep) else b * 4
+        l = gap - b * 0.25 if gap <= b * 2.5 else min(max(n[2], b), gap - b * 0.5)
+        n[2] = round(l) if l >= b * 0.4 else 0
+    return keep
+
+
 def bake(meta, ref, total_len, SYL, UGH, PRETTY, rnd):
     """his track for one song: ref = BF's singing (the tune), None = no tune to follow"""
     out = np.zeros(total_len, np.float32)
-    cs = chords([tuple(n) for n in meta['notes']])
+    cs = own_chart(meta['notes'], meta.get('tc'))
     med = float(np.median([s['p'] for s in SYL]))
     bpm = (meta.get('tc') or [{'bpm': 120}])[0].get('bpm', 120); beat = 60000 / bpm
     last_ids = []
@@ -133,25 +156,31 @@ def bake(meta, ref, total_len, SYL, UGH, PRETTY, rnd):
     for i, (t, d, l, k) in enumerate(cs):
         prev = cs[i - 1][0] if i else -1e9
         nxt = cs[i + 1][0] if i + 1 < len(cs) else t + 1200
-        want = max(90, min(nxt - t - 10, max(l + 120, 170), 650))
+        want = max(90, min(nxt - t - 10, l + 140)) if l > 0 else max(90, min(nxt - t - 10, 320))
         if nxt - t > beat * 3: lines_end.append((t + want, nxt - t - want))
         # a line starts: sometimes it's an UGH (like his real ones)
         if t - prev > beat * 3 and UGH and rnd.random() < 0.14:
             place(out, fade(UGH[rnd.randrange(len(UGH))]), t - 12); continue
         target = pitch(ref[int(t * SR / 1000):int((t + min(want, 300)) * SR / 1000)]) if ref is not None else None
         if target is not None: target -= 12 * round((target - med) / 12)          # (his range, same tune)
-        long_enough = [j for j, s in enumerate(SYL) if s['ms'] >= min(want, 400) * 0.75] or list(range(len(SYL)))
+        # a long note = one of his real held notes (stretched to fit), a short one = any note of his long enough
+        long_enough = ([j for j, s in enumerate(SYL) if s['hold']] if want > 450 else [j for j, s in enumerate(SYL) if s['ms'] >= want * 0.8]) or list(range(len(SYL)))
         if target is None: score = lambda j: abs(SYL[j]['p'] - med) + rnd.random() * 3
         else: score = lambda j: abs(SYL[j]['p'] - target) + rnd.random() * 0.8
         pick = sorted((j for j in long_enough if j not in last_ids), key=score)[:4]
         j = pick[rnd.randrange(len(pick))] if pick else rnd.randrange(len(SYL))
-        last_ids = (last_ids + [j])[-3:]
+        last_ids = (last_ids + [j])[-8:]
         a = SYL[j]['a']
         if target is not None:
             st = max(-4, min(4, target - SYL[j]['p']))
             if abs(st) > 0.15: a = librosa.effects.pitch_shift(a, sr=SR, n_steps=st, bins_per_octave=12)
-        a = a[:int((want + 12) * SR / 1000)]
-        place(out, fade(a), t - 12)
+        n_want = int((want + 12) * SR / 1000)
+        if len(a) < n_want * 0.9:          # (held longer than he really did: the sound after its start, slowed down)
+            att = int(0.06 * SR); body = a[att:]
+            rate = max(0.3, len(body) / max(1, n_want - att))
+            if len(body) > 2048: a = np.concatenate([a[:att], librosa.effects.time_stretch(body, rate=rate)])
+        a = a[:n_want]
+        place(out, fade(a, fout=0.06 if want > 450 else 0.03), t - 12)
     # "Heh, pretty good": after the longest rest of yours mid-song (if it's long enough), and after your last line
     if PRETTY is not None and len(PRETTY):
         plen = len(PRETTY) * 1000 / SR
