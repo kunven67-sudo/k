@@ -188,6 +188,40 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
 #test p { color: #8f88b8; font-size: 13px; line-height: 1.6; }
 #test .verdict { font-size: 22px; font-weight: 600; color: #fff; margin-top: 8px; }
 #test button { margin-top: 18px; width: 100%; height: 54px; border: 0; border-radius: 16px; font: inherit; font-weight: 700; letter-spacing: .16em; }
+
+/* power bank + research */
+.bankrow { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.bl { display: flex; justify-content: space-between; font-size: 10.5px; letter-spacing: .2em; color: var(--dim); }
+.bl b { font-size: 12px; letter-spacing: 0; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bbar { height: 8px; border-radius: 8px; background: rgba(255,255,255,.08); margin-top: 8px; overflow: hidden; }
+.bbar i { display: block; height: 100%; width: 0; border-radius: 8px; background: linear-gradient(90deg, #5ee0b8, #8ef0d8); transition: width .6s; }
+.bsub { font-size: 11.5px; color: var(--dim); margin-top: 6px; }
+.rgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rlane { min-width: 0; }
+.rhead { font-size: 10px; letter-spacing: .18em; color: var(--dim); margin: 0 2px 6px; }
+.rhead span { color: var(--faint); }
+.rnode { padding: 10px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); min-height: 128px; display: flex; flex-direction: column; }
+.rnode b { font-size: 12.5px; font-weight: 600; line-height: 1.25; }
+.rnode span { font-size: 11px; color: var(--dim); margin-top: 4px; }
+.rnode .rt { font-size: 10.5px; color: #c5b3ff; margin-top: 6px; }
+.rnode.running { border-color: rgba(197,179,255,.5); }
+.rnode.done { opacity: .6; }
+.rgo { margin-top: auto; font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .08em; border: 0; border-radius: 10px; padding: 8px 4px; background: #c5b3ff; color: #0a0918; }
+.rgo:disabled { background: #221f40; color: #6e679a; }
+.rbar { height: 6px; border-radius: 6px; background: rgba(255,255,255,.08); margin-top: auto; overflow: hidden; }
+.rbar i { display: block; height: 100%; width: 0; background: #c5b3ff; transition: width .5s; }
+/* PC link */
+.pconly { display: none; }
+body.pc .phoneonly { display: none !important; }
+body.pc .pconly { display: block; }
+.pcnote { margin-top: 14px; padding: 14px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); font-size: 13px; color: #cfc9f2; line-height: 1.5; }
+@media (min-width: 900px) {
+  body.pc main { max-width: 980px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; align-items: start; }
+  body.pc main > header { grid-column: 1 / -1; }
+  body.pc .tabs { display: none; }
+  body.pc [data-tab] { display: block !important; }
+  body.pc .toast, body.pc .pin { max-width: 600px; }
+}
 </style>
 </head>
 <body>
@@ -227,7 +261,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
     <div class="stat"><i>SAVER</i><b id="saver">--</b></div>
   </div>
 
-  <div class="panel">
+  <div class="panel phoneonly">
     <div class="row">
       <div class="t"><b>Battery saver</b><span id="saverTxt">Android only lets you flip this one yourself</span></div>
       <button class="mini" id="saverBtn">TURN ON</button>
@@ -250,10 +284,15 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
     <button id="go" disabled>PLUG IN FIRST</button>
   </div>
 
-  <p class="tip" id="tip"></p>
+  <p class="tip phoneonly" id="tip"></p>
 
-  <div class="head2">MORE TRICKS</div>
-  <div class="panel">
+  <div class="pcnote pconly" id="pcscreen"></div>
+  <div class="head2 phoneonly">MORE TRICKS</div>
+  <div class="panel phoneonly">
+    <div class="row" id="linkRow">
+      <div class="t"><b>PC link</b><span id="linkTxt">Watch + play on your PC (same Wi-Fi). Then lock your phone</span></div>
+      <div class="sw" id="swLink"></div>
+    </div>
     <div class="row">
       <div class="t"><b>Lock screen now</b><span>Screen off = the fastest charging there is</span></div>
       <button class="mini" id="lockBtn">LOCK</button>
@@ -282,12 +321,14 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
       <div class="lbl">ENERGY</div>
       <div class="bank"><span id="ebank">0</span><small>J</small></div>
       <div class="formula">
-        <div class="fchip real"><i>REAL</i><b id="freal">0 W</b></div><span class="fop">&times;</span>
+        <div class="fchip real"><i id="frealL">REAL</i><b id="freal">0 W</b></div><span class="fop">&times;</span>
         <div class="fchip mult"><i>MULTIPLIER</i><b id="fmult">1x</b></div><span class="fop">=</span>
         <div class="fchip out"><i>GAME WATTS</i><b id="fout">0 W</b></div>
       </div>
       <div class="flowbar off" id="eflow"><i></i></div>
-      <div class="hint" id="ehint">Plug in your charger. Your empire runs on your real charging.</div>
+      <div class="hint" id="ehint"></div>
+      <div class="bankrow"><div class="bl"><span>POWER BANK</span><b id="bankTxt"></b></div>
+        <div class="bbar"><i id="bankFill"></i></div><div class="bsub" id="bankSub"></div></div>
     </div>
 
     <div class="ebar"><div class="head2">BUILD</div>
@@ -297,11 +338,14 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
 
     <div class="ebar"><div class="head2">UPGRADES</div><div class="head2" id="upgCount"></div></div>
     <div class="upgs" id="upgs"></div>
+    <div class="ebar"><div class="head2">RESEARCH</div><div class="head2">ONE AT A TIME</div></div>
+    <div class="rgrid" id="research"></div>
     <div class="estats" id="estats"></div>
   </section>
 
 </main>
 
+<div class="welcome" id="pcbad"><div class="card"><div class="lbl">PC LINK</div><p>This link is old or wrong. Open Chill Charge on your phone, turn on PC link and use the new address it shows.</p></div></div>
 <div class="welcome" id="welcome"><div class="card">
   <div class="lbl">WHILE YOU WERE GONE</div>
   <div class="big" id="wbig"></div>
@@ -335,21 +379,37 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
 
 <script>
 // ---------- phone link (fake one when opened in a normal browser for testing) ----------
-const P = window.Phone || (() => {
-  let boost = false, lvl = 37, saver = false, canWrite = false, plugged = 1, wh = 0, claude = false, usage = false, admin = false;
+const PCMODE = !window.Phone && location.port === "8080";
+const KEY = new URLSearchParams(location.search).get("k") || "";
+let phoneCache = "{}";
+if (PCMODE) {
+  document.body.classList.add("pc");
+  const pull = async () => {
+    try {
+      const r = await fetch(`/api/phone?k=${KEY}`);
+      if (r.status === 403) { $("pcbad").classList.add("show"); return; }
+      phoneCache = await r.text(); $("pcbad").classList.remove("show");
+    } catch (e) { phoneCache = "{}"; }
+  };
+  pull(); setInterval(pull, 1500);
+}
+const P = window.Phone || (PCMODE ? new Proxy({ state: () => phoneCache }, { get: (o, k) => o[k] || (() => 0) }) : (() => {
+  let boost = false, lvl = 37, saver = false, canWrite = false, plugged = 1, wh = 0, claude = false, usage = false, admin = false, link = false;
   setInterval(() => { if (plugged && lvl < 100) lvl += 0.05; }, 1000);
   window.__fake = { set plugged(v) { plugged = v; if (!v) boost = false; }, set canWrite(v) { canWrite = v; }, set wh(v) { wh = v; } };
   return {
     state: () => JSON.stringify({ level: Math.floor(lvl), scale: 100, plugged, status: plugged ? 2 : 3, temp: 341, volt: 4120,
       current: plugged ? 2350000 : -400000, left: plugged ? (100 - lvl) * 52000 : -1, saver, canWrite, boost, bright: 120, sdk: 33,
-      w: plugged ? 9.7 : 0, measured: true, cc: Math.round(lvl * 45000), wh, claudeMode: claude, usageOk: usage, adminOk: admin, hasClaude: true }),
+      w: plugged ? 9.7 : 0, measured: true, cc: Math.round(lvl * 45000), wh, claudeMode: claude, usageOk: usage, adminOk: admin, hasClaude: true, screen: true,
+      link, linkUrl: "http://192.168.1.23:8080/?k=4821" }),
     addWh: d => (wh += d), setWh: v => { wh = v; }, lockNow: () => { admin = true; }, windowDim: () => {}, buzz: () => {},
     askUsage: () => { usage = true; }, claudeMode: on => { claude = on; },
     report: t => "CHILL CHARGE PHONE CHECK\nPhone: Test Phone\n" + (t ? "Charger test: " + t + "\n" : ""), sendReport: () => {},
     askWrite: () => { canWrite = true; }, openSaver: () => { saver = !saver; },
     boost: () => { boost = true; return 41; }, brightness: () => {}, stop: () => { boost = false; },
+    link: on => { link = on; }, copy: () => {},
   };
-})();
+})());
 
 const $ = id => document.getElementById(id);
 const opts = { kill: true, dim: true };
@@ -447,6 +507,12 @@ function refresh() {
     : S.claudeMode ? "On: music + boost run while Claude is open"
     : "While Claude is open: music + boost keep going";
   $("lockBtn").textContent = S.adminOk ? "LOCK" : "SET UP";
+  $("swLink").classList.toggle("on", !!S.link);
+  $("linkTxt").textContent = S.link ? (S.linkUrl ? "On your PC open: " + S.linkUrl : "Connect to Wi-Fi first")
+    : "Watch + play on your PC (same Wi-Fi). Then lock your phone";
+  if (PCMODE) $("pcscreen").innerHTML = !S.level ? "Can't reach your phone. Is PC link still on and the phone on the same Wi-Fi?"
+    : S.screen ? "<b>Phone screen is ON.</b> Lock it for faster charging, this page keeps working."
+    : "<b>Phone is locked.</b> Nice, that's the fast way. Everything here is live.";
 
   const go = $("go");
   go.classList.toggle("on", !!S.boost);
@@ -559,6 +625,10 @@ document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
 
 // ---------- more tricks ----------
 $("lockBtn").onclick = () => P.lockNow();
+$("linkRow").onclick = () => {
+  const on = !S.link; P.link(on);
+  setTimeout(() => { refresh(); if (on && S.linkUrl) { P.copy(S.linkUrl); toast("PC link on. Address copied: " + S.linkUrl + "  Type it into Edge on your PC, then lock your phone."); } }, 900);
+};
 let testResult = "";
 try { testResult = localStorage.getItem("testResult") || ""; } catch (e) {}
 if (testResult) $("testTxt").textContent = "Last test: " + testResult;
@@ -673,122 +743,231 @@ function fmt(n) {
   return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v)) + SUF[e];
 }
 
+const RES = [
+  // POWER lane: multiplies everything
+  { id: "p1", lane: 0, name: "Better Magnets", desc: "Everything x2", k: "m", x: 2, min: 10, cost: 5e3 },
+  { id: "p2", lane: 0, name: "Grid AI", desc: "Everything x3", k: "m", x: 3, min: 60, cost: 5e6 },
+  { id: "p3", lane: 0, name: "Room-Temp Superconductors", desc: "Everything x5", k: "m", x: 5, min: 180, cost: 5e9 },
+  { id: "p4", lane: 0, name: "Fusion Ignition", desc: "Everything x10", k: "m", x: 10, min: 360, cost: 5e12 },
+  { id: "p5", lane: 0, name: "Quantum Grid", desc: "Everything x25", k: "m", x: 25, min: 720, cost: 5e16 },
+  { id: "p6", lane: 0, name: "Singularity", desc: "Everything x200", k: "m", x: 200, min: 1440, cost: 5e21 },
+  // BANK lane: bigger power bank
+  { id: "b1", lane: 1, name: "Bigger Cells", desc: "Bank holds x3", k: "cap", x: 3, min: 20, cost: 2e4 },
+  { id: "b2", lane: 1, name: "Graphene Cells", desc: "Bank holds x3", k: "cap", x: 3, min: 120, cost: 5e7 },
+  { id: "b3", lane: 1, name: "Solid-State Bank", desc: "Bank holds x5", k: "cap", x: 5, min: 300, cost: 5e10 },
+  { id: "b4", lane: 1, name: "Antimatter Storage", desc: "Bank holds x10", k: "cap", x: 10, min: 600, cost: 5e14 },
+  // UNPLUGGED lane: bank makes more
+  { id: "o1", lane: 2, name: "Efficient Inverters", desc: "Unplugged power x3", k: "out", x: 3, min: 30, cost: 5e4 },
+  { id: "o2", lane: 2, name: "Smart Discharge", desc: "Unplugged power x5", k: "out", x: 5, min: 120, cost: 2e8 },
+  { id: "o3", lane: 2, name: "Hyper Inverters", desc: "Unplugged power x10", k: "out", x: 10, min: 360, cost: 1e12 },
+  { id: "o4", lane: 2, name: "Zero-Loss Output", desc: "Unplugged power x25", k: "out", x: 25, min: 720, cost: 1e16 },
+];
+const LANES = ["POWER", "BANK", "UNPLUGGED"];
+const fmtTime = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return h ? `${h}h ${m}m` : m ? `${m}m ${String(x).padStart(2, "0")}s` : `${x}s`; };
+
+// where the save lives: phone app (bridge), PC link (web), or a fake one for testing in a browser
+const GAPI = window.Phone ? {
+  credit: async () => JSON.parse(P.gameCredit()),
+  put: async g => P.gamePut(JSON.stringify(g)),
+} : PCMODE ? {
+  credit: async () => (await fetch(`/api/game?k=${KEY}`)).json(),
+  put: async g => (await fetch(`/api/game?k=${KEY}`, { method: "POST", body: JSON.stringify(g) })).ok,
+} : (() => {
+  let g = {}; try { g = JSON.parse(localStorage.getItem("fakeGame") || "{}"); } catch (e) {}
+  const keep = () => { try { localStorage.setItem("fakeGame", JSON.stringify(g)); } catch (e) {} };
+  return {
+    credit: async () => {
+      const now = Date.now(), dt = g.t ? Math.min(30, (now - g.t) / 1000) : 0, st = JSON.parse(P.state());
+      const wh = st.plugged ? st.w * dt / 3600 : 0;
+      if (wh > 0) { const j = wh * 3600 * (g.m || 1); g.e = (g.e || 0) + j; g.total = (g.total || 0) + j; g.bank = Math.min(g.bankCap || 2, (g.bank || 0) + wh); }
+      else if (!st.plugged && (g.bank || 0) > 0) { const u = Math.min(g.bank, dt / 3600); g.bank -= u; const j = u * 3600 * (g.m || 1) * (g.bankOut || 1); g.e = (g.e || 0) + j; g.total = (g.total || 0) + j; }
+      g.t = now; g.v = (g.v || 0) + 1; keep(); return JSON.parse(JSON.stringify(g));
+    },
+    put: async n => { if ((n.v || 0) !== (g.v || 0)) return false; g = JSON.parse(JSON.stringify(n)); g.v = (g.v || 0) + 1; keep(); return true; },
+  };
+})();
+
 const Emp = (() => {
-  let G = { e: 0, total: 0, n: BLD.map(() => 0), u: {}, bestW: 0, cc: 0, t: 0 };
-  try { const g = JSON.parse(localStorage.getItem("empire1") || "null"); if (g) { G = Object.assign(G, g); G.n = BLD.map((_, i) => g.n?.[i] || 0); } } catch (e) {}
-  const save = () => { try { localStorage.setItem("empire1", JSON.stringify(G)); } catch (e) {} };
-  let qty = "1", built = "";
+  const fresh = () => ({ e: 0, total: 0, n: BLD.map(() => 0), u: {}, bestW: 0, bank: 0, r: { done: {}, cur: null } });
+  let G = Object.assign(fresh(), { v: -1 }), qty = "1", built = "", syncedAt = 0, busy = false, ready = false;
+  const fix = g => { g = Object.assign(fresh(), g); g.n = BLD.map((_, i) => (g.n && g.n[i]) || 0); g.u = g.u || {}; g.r = g.r || { done: {}, cur: null }; g.r.done = g.r.done || {}; return g; };
 
   const bMul = i => UPG.reduce((m, u) => u.bi === i && G.u[u.id] ? m * u.x : m, 1);
-  const gMul = () => UPG.reduce((m, u) => u.bi < 0 && G.u[u.id] ? m * u.x : m, 1);
+  const rMul = k => RES.reduce((m, r) => r.k === k && G.r.done[r.id] ? m * r.x : m, 1);
+  const gMul = () => UPG.reduce((m, u) => u.bi < 0 && G.u[u.id] ? m * u.x : m, 1) * rMul("m");
   const mult = () => (1 + BLD.reduce((s, b, i) => s + G.n[i] * b.mult * bMul(i), 0)) * gMul();
+  const cap = () => 2 * rMul("cap"), out = () => rMul("out");
+  const stamp = g => { g.m = mult(); g.bankCap = cap(); g.bankOut = out(); return g; };
   const price = (i, k) => BLD[i].cost * Math.pow(1.15, G.n[i]) * (Math.pow(1.15, k) - 1) / 0.15;
   const maxK = i => Math.max(0, Math.floor(Math.log(G.e * 0.15 / (BLD[i].cost * Math.pow(1.15, G.n[i])) + 1) / Math.log(1.15)));
   const howMany = i => qty === "max" ? Math.max(1, maxK(i)) : +qty;
   const visible = i => i === 0 || G.n[i] > 0 || G.n[i - 1] > 0;
   const upgOpen = u => !G.u[u.id] && (u.bi >= 0 ? G.n[u.bi] >= u.need : G.total >= u.cost / 4);
+  const resOpen = r => !G.r.done[r.id] && RES.filter(x => x.lane === r.lane).every(x => x === r || G.r.done[x.id] || RES.indexOf(x) > RES.indexOf(r));
+  const onBank = () => !(W > 0) && !S.plugged && G.bank > 0;
+  const rate = () => W > 0 ? W * mult() : onBank() ? 1 * mult() * out() : 0;
+  const shown = () => G.e + rate() * Math.min(5, (Date.now() - syncedAt) / 1000);
+
+  // change the save safely: always on top of the newest copy, retry if someone else saved first
+  async function change(fn) {
+    if (busy) return false; busy = true;
+    try {
+      for (let a = 0; a < 4; a++) {
+        const g = fix(await GAPI.credit()); G = g;
+        if (fn(g) === false) { syncedAt = Date.now(); return false; }
+        stamp(g);
+        if (await GAPI.put(g)) { g.v++; G = g; syncedAt = Date.now(); return true; }
+      }
+      return false;
+    } finally { busy = false; render(); }
+  }
 
   function render() {
-    // building cards
     let h = "";
     BLD.forEach((b, i) => {
       if (visible(i)) {
         h += `<div class="bld" id="bd${i}"><div class="ico" style="--c1:${b.c1};--c2:${b.c2}"><svg viewBox="0 0 24 24">${ICON[b.icon]}</svg></div>
           <div class="t"><b>${b.name}</b><span id="bs${i}"></span></div><div class="n" id="bn${i}"></div>
           <button class="buy" id="bb${i}"></button><i class="prog" id="bp${i}"></i></div>`;
-      } else if (visible(i - 1) && i > 0) {
+      } else if (i > 0 && visible(i - 1)) {
         h += `<div class="bld locked"><div class="ico"><svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg></div>
           <div class="t"><b>???</b><span>Build a ${BLD[i - 1].name} to find out</span></div></div>`;
       }
     });
     $("blds").innerHTML = h;
     BLD.forEach((b, i) => { const x = $("bb" + i); if (x) x.onclick = () => buy(i); });
-    // upgrade cards
     const open = UPG.filter(upgOpen).sort((a, b) => a.cost - b.cost).slice(0, 8);
     $("upgs").innerHTML = open.length ? open.map(u => `<button class="upg" id="up_${u.id}">
       <div class="ico" style="--c1:${u.c1};--c2:${u.c2}"><svg viewBox="0 0 24 24">${ICON[u.icon]}</svg></div>
       <b>${u.name}</b><span>${u.desc}</span><em>${fmt(u.cost)} J</em></button>`).join("")
       : `<div class="empty">Build more to unlock upgrades.</div>`;
     open.forEach(u => $("up_" + u.id).onclick = () => buyUpg(u));
-    const got = Object.keys(G.u).length;
-    $("upgCount").textContent = `${got}/${UPG.length}`;
+    $("upgCount").textContent = `${Object.keys(G.u).length}/${UPG.length}`;
+    // research lanes
+    $("research").innerHTML = LANES.map((ln, li) => {
+      const list = RES.filter(r => r.lane === li);
+      const next = list.find(r => !G.r.done[r.id]);
+      const doneN = list.filter(r => G.r.done[r.id]).length;
+      let body;
+      if (!next) body = `<div class="rnode done"><b>Lane complete</b><span>All ${list.length} researched</span></div>`;
+      else {
+        const cur = G.r.cur && G.r.cur.id === next.id;
+        body = `<div class="rnode${cur ? " running" : ""}" id="rn_${next.id}"><b>${next.name}</b><span>${next.desc}</span>
+          <span class="rt">${cur ? "" : fmtTime(next.min * 60) + "  ·  " + fmt(next.cost) + " J"}</span>
+          ${cur ? `<div class="rbar"><i id="rbar_${next.id}"></i></div><span class="rt" id="rleft_${next.id}"></span>` : `<button class="rgo" id="rgo_${next.id}">RESEARCH</button>`}</div>`;
+      }
+      return `<div class="rlane"><div class="rhead">${ln} <span>${doneN}/${list.length}</span></div>${body}</div>`;
+    }).join("");
+    RES.forEach(r => { const b = $("rgo_" + r.id); if (b) b.onclick = () => startRes(r); });
     built = key();
     paint();
   }
-  const key = () => BLD.map((_, i) => visible(i) ? 1 : 0).join("") + "|" + UPG.filter(upgOpen).map(u => u.id).slice(0, 8).join(",");
+  const key = () => BLD.map((_, i) => visible(i) ? 1 : 0).join("") + "|" + UPG.filter(upgOpen).map(u => u.id).slice(0, 8).join(",")
+    + "|" + JSON.stringify(G.r) + "|" + Object.keys(G.u).length;
 
   function paint() {
-    const m = mult(), w = W, out = w * m;
-    $("ebank").textContent = fmt(G.e);
-    $("freal").textContent = (w > 0 ? w.toFixed(1) : "0") + " W";
-    $("fmult").textContent = fmt(m) + "x";
-    $("fout").textContent = fmt(out) + " W";
-    $("eflow").classList.toggle("off", !(w > 0));
-    $("ehint").classList.toggle("show", !(w > 0));
+    const m = mult(), bank = onBank(), e = shown();
+    $("ebank").textContent = fmt(e);
+    $("frealL").textContent = bank ? "BANK" : "REAL";
+    $("freal").textContent = bank ? "1.0 W" : (W > 0 ? W.toFixed(1) : "0") + " W";
+    $("fmult").textContent = fmt(bank ? m * out() : m) + "x";
+    $("fout").textContent = fmt(rate()) + " W";
+    $("eflow").classList.toggle("off", !(rate() > 0));
+    const hint = $("ehint");
+    hint.textContent = S.plugged ? "Measuring your real charging..." : G.bank > 0 ? "" : "Bank empty. Plug in to power your empire and refill the bank.";
+    hint.classList.toggle("show", !(rate() > 0) && !!hint.textContent);
+    const c = cap();
+    $("bankFill").style.width = Math.min(100, G.bank / c * 100) + "%";
+    $("bankTxt").textContent = `${G.bank.toFixed(2)} / ${fmt(c)} Wh`;
+    $("bankSub").textContent = bank ? `Running on the bank: ${fmtTime(G.bank / 1 * 3600)} left` : S.plugged ? "Charging fills the bank" : G.bank > 0 ? "Unplug to run on the bank" : "Empty";
     BLD.forEach((b, i) => {
       const bb = $("bb" + i); if (!bb) return;
-      const k = howMany(i), c = price(i, k), can = G.e >= c;
-      bb.textContent = `${qty === "1" ? "" : "x" + k + " "}${fmt(c)} J`;
-      bb.disabled = !can;
+      const k = howMany(i), cost = price(i, k), can = e >= cost;
+      bb.textContent = `${qty === "1" ? "" : "x" + k + " "}${fmt(cost)} J`;
+      bb.disabled = !can || busy;
       $("bd" + i).classList.toggle("can", can);
-      $("bp" + i).style.width = Math.min(100, G.e / c * 100) + "%";
+      $("bp" + i).style.width = Math.min(100, e / cost * 100) + "%";
       $("bn" + i).textContent = G.n[i] ? "OWNED " + G.n[i] : "";
       $("bs" + i).textContent = `+${fmt(b.mult * bMul(i) * gMul())}x each`;
     });
-    UPG.forEach(u => { const el = $("up_" + u.id); if (el) el.classList.toggle("can", G.e >= u.cost); });
-    $("estats").innerHTML = `Total energy made: ${fmt(G.total)} J<br>Buildings: ${G.n.reduce((a, b) => a + b, 0)}  ·  Best real charging: ${G.bestW.toFixed(1)} W`;
+    UPG.forEach(u => { const el = $("up_" + u.id); if (el) el.classList.toggle("can", e >= u.cost); });
+    RES.forEach(r => {
+      const b = $("rgo_" + r.id); if (b) { b.disabled = !!G.r.cur || e < r.cost || busy; b.textContent = G.r.cur ? "BUSY" : "RESEARCH"; }
+      if (G.r.cur && G.r.cur.id === r.id && $("rbar_" + r.id)) {
+        const left = (G.r.cur.end - Date.now()) / 1000;
+        $("rbar_" + r.id).style.width = Math.min(100, (1 - left / (r.min * 60)) * 100) + "%";
+        $("rleft_" + r.id).textContent = left > 0 ? fmtTime(left) + " left (keeps going unplugged)" : "Finishing...";
+      }
+    });
+    $("estats").innerHTML = `Total energy made: ${fmt(G.total)} J<br>Buildings: ${G.n.reduce((a, b) => a + b, 0)}  ·  Research: ${Object.keys(G.r.done).length}/${RES.length}  ·  Best real charging: ${G.bestW.toFixed(1)} W`;
   }
 
-  function buy(i) {
-    const k = howMany(i), c = price(i, k);
-    if (G.e < c) return;
-    G.e -= c; G.n[i] += k; save(); P.buzz("0,14");
+  function pop(i, k) {
     const card = $("bd" + i);
     if (card) { const p = document.createElement("i"); p.className = "pop"; p.textContent = "+" + k; card.appendChild(p); setTimeout(() => p.remove(), 900); }
-    render();
   }
-  function buyUpg(u) {
-    if (G.e < u.cost || G.u[u.id]) return;
-    G.e -= u.cost; G.u[u.id] = 1; save(); P.buzz("0,20,40,20");
-    toast(`${u.name}: ${u.desc}`); render();
+  async function buy(i) {
+    let k = 0;
+    const ok = await change(g => { k = howMany(i); const c = price(i, k); if (g.e < c) return false; g.e -= c; g.n[i] += k; });
+    if (ok) { P.buzz("0,14"); pop(i, k); }
+  }
+  async function buyUpg(u) {
+    const ok = await change(g => { if (g.e < u.cost || g.u[u.id]) return false; g.e -= u.cost; g.u[u.id] = 1; });
+    if (ok) { P.buzz("0,20,40,20"); toast(`${u.name}: ${u.desc}`); }
+  }
+  async function startRes(r) {
+    const ok = await change(g => { if (g.r.cur || g.e < r.cost || g.r.done[r.id]) return false; g.e -= r.cost; g.r.cur = { id: r.id, end: Date.now() + r.min * 60000 }; });
+    if (ok) toast(`Researching ${r.name}: ${fmtTime(r.min * 60)}`);
   }
   document.querySelectorAll("#qty button").forEach(b => b.onclick = () => {
     qty = b.dataset.q; document.querySelectorAll("#qty button").forEach(x => x.classList.toggle("on", x === b)); paint();
   });
 
-  // live earning: real watts x multiplier, every 1/4 s
-  let last = Date.now();
-  setInterval(() => {
-    const now = Date.now(), dt = Math.min(1, (now - last) / 1000); last = now;
-    if (W > 0) { const g = W * mult() * dt; G.e += g; G.total += g; }
-    if (key() !== built) render(); else if ($("blds").offsetParent) paint();
-  }, 250);
-  setInterval(save, 3000);
-
-  // charging that happened while the app was closed: read it from the battery's mAh counter
-  function sync() {
-    const now = Date.now();
-    if (W > G.bestW) G.bestW = W;
-    if (S.cc > 0) {
-      if (G.cc > 0 && G.t && now - G.t > 8000 && S.cc > G.cc) {
-        const wh = (S.cc - G.cc) / 1e6 * ((S.volt || 3850) / 1000);
-        const j = wh * 3600 * mult();
-        if (j > 0) {
-          G.e += j; G.total += j;
-          $("wbig").textContent = "+" + fmt(j) + " J";
-          $("wline").textContent = `Your phone charged ${wh.toFixed(2)} Wh while you were away, x${fmt(mult())} multiplier.`;
-          $("welcome").classList.add("show");
-        }
+  // pull the newest save (this also pays out your real charging), finish research, show "while you were gone"
+  async function sync() {
+    if (busy) return;
+    busy = true;
+    let g;
+    try { g = fix(await GAPI.credit()); } catch (e) { busy = false; return; }
+    busy = false;
+    G = g; syncedAt = Date.now();
+    if (!ready) {
+      ready = true;
+      // move an old phone-only save into the shared save (one time)
+      let old = null; try { old = JSON.parse(localStorage.getItem("empire1") || "null"); } catch (e) {}
+      if (old && !G.total && old.total) {
+        await change(n => { n.e = old.e || 0; n.total = old.total || 0; n.n = BLD.map((_, i) => (old.n && old.n[i]) || 0); n.u = old.u || {}; n.bestW = old.bestW || 0; });
+        try { localStorage.removeItem("empire1"); } catch (e) {}
       }
-      G.cc = S.cc;
     }
-    G.t = now; save();
+    let need = Math.abs((G.m || 1) - mult()) > 1e-9 * mult() || G.bankCap !== cap() || G.bankOut !== out();
+    if (G.r.cur && Date.now() >= G.r.cur.end) {
+      const r = RES.find(x => x.id === G.r.cur.id);
+      await change(n => { if (!n.r.cur) return false; n.r.done[n.r.cur.id] = 1; n.r.cur = null; });
+      if (r) toast(`Research done: ${r.name} (${r.desc})`);
+      need = false;
+    }
+    if (W > G.bestW + 0.05) { await change(n => { n.bestW = Math.max(n.bestW || 0, W); }); need = false; }
+    if (G.away && !$("welcome").classList.contains("show")) {
+      const a = G.away;
+      $("wbig").textContent = "+" + fmt(a.j) + " J";
+      $("wline").textContent = a.wh > 0 ? `Your phone charged ${a.wh.toFixed(2)} Wh while you were away (${fmtTime(a.s)}), x${fmt(G.m || 1)} multiplier.`
+        : `Your power bank ran your empire while you were away (${fmtTime(a.s)}).`;
+      $("welcome").classList.add("show");
+      await change(n => { n.away = null; });
+      need = false;
+    }
+    if (need) await change(() => {});
+    if (key() !== built) render();
   }
   $("wok").onclick = () => { $("welcome").classList.remove("show"); $("tabR").click(); };
+  setInterval(() => { if (key() !== built) render(); else paint(); }, 250);
   render();
   return { sync, render };
 })();
 window.Emp = Emp;
+
 
 
 paintSwitches(); refresh();

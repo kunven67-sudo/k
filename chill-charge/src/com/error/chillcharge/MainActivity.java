@@ -148,39 +148,35 @@ public class MainActivity extends Activity {
     class Bridge {
         @JavascriptInterface
         public String state() {
-            Intent b = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-            BatteryManager bm = getSystemService(BatteryManager.class);
-            PowerManager pm = getSystemService(PowerManager.class);
-            int level = -1, scale = 100, plugged = 0, status = 0, temp = 0, volt = 0;
-            if (b != null) {
-                level = b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-                scale = b.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
-                plugged = b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
-                status = b.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
-                temp = b.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0);
-                volt = b.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0);
+            return PhoneState.json(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public String gameGet() { return Game.get(MainActivity.this); }
+
+        @JavascriptInterface
+        public String gameCredit() { return Game.credit(MainActivity.this); }
+
+        @JavascriptInterface
+        public boolean gamePut(String json) { return Game.put(MainActivity.this, json); }
+
+        @JavascriptInterface
+        public void link(boolean on) {
+            Intent i = new Intent(MainActivity.this, LinkService.class);
+            if (on) {
+                if (Build.VERSION.SDK_INT >= 33
+                        && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != 0) {
+                    runOnUiThread(() -> requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7));
+                }
+                startForegroundService(i);
+            } else {
+                stopService(i);
             }
-            long current = bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW);
-            long left = Build.VERSION.SDK_INT >= 28 ? bm.computeChargeTimeRemaining() : -1;
-            int bright = Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, -1);
-            return "{\"level\":" + level + ",\"scale\":" + scale + ",\"plugged\":" + plugged
-                    + ",\"status\":" + status + ",\"temp\":" + temp + ",\"volt\":" + volt
-                    + ",\"current\":" + (current == Long.MIN_VALUE ? 0 : current)
-                    + ",\"left\":" + left
-                    + ",\"w\":" + Boost.watts(MainActivity.this)
-                    + ",\"measured\":" + (Boost.counterWatts(MainActivity.this) >= 0)
-                    + ",\"cc\":" + Boost.counter(MainActivity.this)
-                    + ",\"saver\":" + pm.isPowerSaveMode()
-                    + ",\"canWrite\":" + Boost.canWrite(MainActivity.this)
-                    + ",\"boost\":" + Boost.isOn(MainActivity.this)
-                    + ",\"bright\":" + bright
-                    + ",\"sdk\":" + Build.VERSION.SDK_INT
-                    + ",\"wh\":" + Boost.addWh(MainActivity.this, 0)
-                    + ",\"claudeMode\":" + ClaudeService.isOn(MainActivity.this)
-                    + ",\"usageOk\":" + ClaudeService.usageOk(MainActivity.this)
-                    + ",\"adminOk\":" + adminOk()
-                    + ",\"hasClaude\":" + (getPackageManager().getLaunchIntentForPackage(ClaudeService.CLAUDE) != null)
-                    + "}";
+        }
+
+        @JavascriptInterface
+        public void copy(String text) {
+            runOnUiThread(() -> getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText("Chill Charge", text)));
         }
 
         private boolean adminOk() {
