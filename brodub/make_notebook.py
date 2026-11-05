@@ -7,9 +7,7 @@ HERE = Path(__file__).parent
 ENGINE = (HERE / "brodub.py").read_text(encoding="utf-8")
 
 CELL = r'''#@title ▶ BroDub: press the play button
-#@markdown Pick a video and it comes back in English, with the characters' own voices. About 20-30 min for one 24 min episode.
-use_google_drive = False #@param {type:"boolean"}
-#@markdown ☝️ For big videos or a lot of episodes: tick this, put the videos in Google Drive in a folder called **BroDub**, and the English ones show up in **BroDub/English**.
+#@markdown Press ▶, pick your video, wait ~25 min, get it in English.
 
 import json, os, secrets, subprocess, sys, threading, urllib.request
 from pathlib import Path
@@ -57,17 +55,7 @@ setup.error = None
 worker = threading.Thread(target=setup)
 worker.start()
 
-if use_google_drive:
-    from google.colab import drive
-    drive.mount("/content/drive")
-    folder = Path("/content/drive/MyDrive/BroDub")
-    out_dir = folder / "English"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    videos = sorted(p for p in folder.iterdir() if p.suffix.lower() in VIDEO
-                    and not (out_dir / f"{p.stem} (English dub).mp4").exists())
-    if not videos:
-        raise SystemExit("📂 No new videos in Google Drive > BroDub. Put some there and press ▶ again.")
-else:
+if True:
     from google.colab import files
     Path("/content/in").mkdir(exist_ok=True)
     os.chdir("/content/in")
@@ -105,11 +93,8 @@ if run.wait():
 made = [out_dir / f"{v.stem} (English dub).mp4" for v in videos]
 made = [m for m in made if m.exists()]
 names = ", ".join(m.name for m in made)
-ping("Your English video is ready", (f"In Google Drive > BroDub > English: {names}" if use_google_drive
-                                     else f"Open Colab, it's downloading: {names}"), "popcorn")
-if use_google_drive:
-    print(f"🍿 Done! Your English videos are in Google Drive > BroDub > English ({len(made)} new)")
-else:
+ping("Your English video is ready", f"Open the BroDub page, it's downloading: {names}", "popcorn")
+if True:
     print("🍿 Done! Downloading it now...")
     for m in made:
         files.download(str(m))
@@ -131,7 +116,7 @@ def main():
             {
                 "cell_type": "markdown",
                 "metadata": {"id": "title"},
-                "source": ["# 🎙️ BroDub\n", "Foreign voices ➜ English, in the same character's voice. Runs on Google's free GPU."],
+                "source": ["# 🎙️ BroDub"],
             },
             {
                 "cell_type": "code",
