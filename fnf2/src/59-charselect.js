@@ -38,8 +38,8 @@
   // Tankman = a full player from the mod "Playable Tankman" (tools/own/tankman_play.py): his own character select
   // animation, Steve on the speakers, DJ, card, songs, results, game over. Without the pack he's the stand-in above.
   G.PLAYERS.tankman = { id: 'tankman', pack: 'tankman', name: 'Tankman', pos: 7, chill: CS + 'tankmanChill', gf: { asset: CS + 'steveChill', viz: false },
-    nametag: 'tankmanplay', icon: 'tankman', ownChar: 'tankman', swapChar: 'tankman-playable', fallback: G.PLAYERS.tankman,
-    everySong: true };   // (every song in the game: the ones he has nothing of his own in = BF's part, sung by him)
+    nametag: 'tankmanplay', icon: 'tankman', ownChar: 'tankman', swapChar: 'tankman-playable', fallback: G.PLAYERS.tankman };
+  // (no 'everySong': he only sings songs he really has a version of; BF's part in his voice was chopped up + not his own)
   // Nene = a full player from the mod "NENE MIXES" (tools/own/nene_mix.py): her own character select animation,
   // Cassandra on the speakers, DJ, card, mixes, results, death. Without the pack she's the stand-in above.
   G.PLAYERS.nene = { id: 'nene', pack: 'nenemix', name: 'Nene', pos: 1, chill: CS + 'neneplayerChill', gf: { asset: CS + 'dipshitCass', viz: false },
