@@ -727,6 +727,7 @@
     playerHit(n, diffMs, auto) {
       const s = this.lines[1].strums[n.lane];
       s.playA('confirm', true); s.confirmHold = auto && !(n.len > 0) ? 0 : -1;    // (botplay: a hold keeps its arrow lit to the end)
+      if (!auto) this.learnTiming(diffMs);
       const r = auto ? (n.proR || 'sick') : judge(diffMs);
       const pts = auto ? (r === 'good' ? 350 : 500) : scorePBOT1(diffMs);
       this.nudgeCam(0, n.lane);
@@ -747,6 +748,20 @@
       if (this.gf && this.gf.anims['combo' + this.combo]) this.gf.playAnim('combo' + this.combo, true);
       if (n.len > 0) this.startCover(n);
       if (G.settings.hitsound > 0) G.sfx('preload/sounds/scrollMenu.ogg', { vol: G.settings.hitsound * 0.7 });
+    },
+    // AUTO OFFSET (Options, on by default): every 12 hits, if the middle one of them was more than 15 ms late (or
+    // early), the offset moves most of the way there, so what you hear on time counts as on time. Phones play the
+    // sound later than they report (+ Bluetooth): perfect hits came out BAD / SHIT. Saved right away.
+    learnTiming(diffMs) {
+      if (G.settings.autoOffset === false || this.botplay || this.pro || Math.abs(diffMs) > 150) return;
+      const E = this._timing = this._timing || [];
+      E.push(diffMs);
+      if (E.length < 12) return;
+      const m = E.slice().sort((a, b) => a - b)[6]; E.length = 0;
+      if (Math.abs(m) < 15) return;
+      G.settings.offset = G.clamp(Math.round((G.settings.offset || 0) + m * 0.75), -400, 400);
+      this._offsetMoved = true; G.saveSettings();
+      if (!this._offsetToast) { this._offsetToast = true; G.toast('Timing: your hits were ' + Math.abs(Math.round(m)) + ' ms ' + (m > 0 ? 'late' : 'early') + ' - fixed by itself', '#9CFFB0'); }
     },
     // you hit a note you shouldn't have (GLARE's eye notes): health + combo gone, the song decides the rest
     hitTrap(n) {

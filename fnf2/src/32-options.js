@@ -66,6 +66,7 @@
     ['Pro Mode hits', 'enum', () => S().proHits === 'goodsick' ? 'good + sick' : 'all sick', v => { S().proHits = v === 'good + sick' ? 'goodsick' : 'sick'; }, 'PRO MODE (main menu). ALL SICK: every hit is SICK. GOOD + SICK: right on time = SICK, too early or late = GOOD, never BAD or SHIT. On PC the X key switches it in Pro Mode.', ['all sick', 'good + sick']],
     ['Botplay', 'bool', () => S().botplay, v => S().botplay = v, 'The game plays for you. Scores are not saved.'],
     ['Practice Mode', 'bool', () => S().practice, v => S().practice = v, 'You cannot die. Scores are not saved.'],
+    ['Auto Offset', 'bool', () => S().autoOffset !== false, v => S().autoOffset = v, 'The game learns your timing: when your hits keep landing late or early (phones play the sound late, Bluetooth headphones too), it moves your offset by itself so on-beat hits are SICK.'],
     ['Death Counter', 'bool', () => S().deathCounter !== false, v => S().deathCounter = v, 'Shows how many times you died against who you are rapping with (DEATHS vs WHITTY: 12). On PC the Z key turns it on/off during a song.'],
     ['FPS Counter', 'bool', () => S().fps, v => S().fps = v, 'Show the frames per second in the corner.'],
     ['Time Bar', 'enum', () => S().timeBar, v => S().timeBar = v, 'What the bar at the top shows during a song.', ['name', 'left', 'elapsed', 'off']],

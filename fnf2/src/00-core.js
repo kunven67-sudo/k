@@ -104,6 +104,7 @@ G.DEFAULT_SETTINGS = {
   // (every option must be listed here, or it's thrown away when the game loads again: Video Songs = CHARACTERS,
   //  Phone controls, App mode and the Pro Mode ones kept going back to their defaults)
   videoSongs: 'video', touchScheme: 'arrows', appMode: false, proKeys: 'four', proHits: 'sick',
+  autoOffset: true,     // the game learns your timing (phones play the sound later than they say: hits on the beat came out BAD / SHIT)
 };
 G.settings = (function () {
   const saved = G.store.get('fnf2.settings', {}) || {};
