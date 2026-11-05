@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Chill Charge</title>
+<style>
+@font-face { font-family: "SG"; src: url("font.ttf") format("truetype"); font-weight: 300 700; }
+:root {
+  --bg: #0a0918; --ink: #f1eeff; --dim: #8f88b8; --faint: #4a4470;
+  --mint: #8ef0d8; --violet: #a78bff; --warm: #ffb38a; --hot: #ff6b7a;
+  --card: rgba(255,255,255,.045); --line: rgba(255,255,255,.08);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font-family: "SG", system-ui, sans-serif; overflow-x: hidden; user-select: none; }
+body { background:
+  radial-gradient(120% 60% at 50% 0%, #1d1747 0%, transparent 60%),
+  radial-gradient(80% 50% at 100% 100%, #0f2a33 0%, transparent 70%), var(--bg); }
+#dust { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+main { position: relative; max-width: 460px; margin: 0 auto; padding: 18px 16px 120px; }
+
+header { display: flex; justify-content: space-between; align-items: center; }
+.brand { font-weight: 700; letter-spacing: .32em; font-size: 13px; }
+.brand span { color: var(--mint); }
+.chip { font-size: 11px; letter-spacing: .14em; padding: 6px 10px; border-radius: 99px;
+  border: 1px solid var(--line); color: var(--dim); background: var(--card); }
+.chip.on { color: var(--mint); border-color: rgba(142,240,216,.35); }
+
+.ringwrap { position: relative; width: 268px; height: 268px; margin: 22px auto 6px; }
+.ringwrap > svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+.glow { position: absolute; inset: 30px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(142,240,216,.16), transparent 70%);
+  animation: breathe 5s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.12); opacity: .55; } }
+#flow { stroke-dasharray: 2 22; animation: flow 3.2s linear infinite; opacity: 0; transition: opacity .6s; }
+.charging #flow { opacity: .9; }
+@keyframes flow { to { stroke-dashoffset: -96; } }
+#arc { transition: stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1); }
+.center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.pct { font-size: 76px; font-weight: 600; line-height: 1; letter-spacing: -.03em; }
+.pct small { font-size: 28px; color: var(--dim); font-weight: 400; margin-left: 2px; }
+.sub { margin-top: 10px; font-size: 13px; color: var(--dim); letter-spacing: .04em; text-align: center; }
+.bolt { width: 18px; height: 18px; margin-bottom: 8px; fill: var(--faint); transition: fill .4s; }
+.charging .bolt { fill: var(--mint); filter: drop-shadow(0 0 6px rgba(142,240,216,.7)); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 10px; }
+.stat b { display: block; font-size: 20px; font-weight: 600; margin-top: 4px; }
+.stat i { font-style: normal; font-size: 10px; letter-spacing: .16em; color: var(--dim); }
+.warn { color: var(--warm); } .bad { color: var(--hot); } .good { color: var(--mint); }
+
+.panel { margin-top: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 6px 14px 14px; }
+.row { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.row:last-of-type { border-bottom: 0; }
+.row .t { flex: 1; min-width: 0; }
+.row .t b { display: block; font-size: 15px; font-weight: 500; }
+.row .t span { display: block; font-size: 12px; color: var(--dim); margin-top: 3px; }
+.sw { width: 46px; height: 28px; border-radius: 99px; background: #2a2650; position: relative; flex: none; transition: background .25s; }
+.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #cfc9f2; transition: transform .25s, background .25s; }
+.sw.on { background: rgba(142,240,216,.35); }
+.sw.on::after { transform: translateX(18px); background: var(--mint); }
+.mini { flex: none; font: inherit; font-size: 12px; letter-spacing: .08em; color: var(--ink); background: #2a2650;
+  border: 0; border-radius: 99px; padding: 8px 12px; }
+.mini.ok { background: rgba(142,240,216,.18); color: var(--mint); }
+.slide { padding: 0 0 12px; display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--dim); }
+input[type=range] { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 4px; background: #2a2650; outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--ink);
+  box-shadow: 0 0 0 5px rgba(142,240,216,.18); }
+.allow { margin: 4px 0 8px; padding: 12px; border-radius: 14px; background: rgba(255,179,138,.08);
+  border: 1px solid rgba(255,179,138,.25); font-size: 12.5px; color: var(--warm); display: none; align-items: center; gap: 10px; }
+.allow.show { display: flex; }
+.allow p { margin: 0; flex: 1; }
+
+#go { position: relative; overflow: hidden; width: 100%; margin-top: 10px; height: 62px; border: 0; border-radius: 18px;
+  font: inherit; font-size: 17px; font-weight: 700; letter-spacing: .3em; color: #0a0918;
+  background: linear-gradient(100deg, var(--mint), #b6a4ff); box-shadow: 0 10px 40px -12px rgba(142,240,216,.55); }
+#go:disabled { background: #221f40; color: var(--faint); box-shadow: none; }
+#go.on { background: #12102a; color: var(--mint); border: 1px solid rgba(142,240,216,.4); letter-spacing: .18em; font-size: 14px;
+  box-shadow: 0 0 30px -8px rgba(142,240,216,.4) inset; }
+#go .rip { position: absolute; border-radius: 50%; background: rgba(255,255,255,.5); transform: scale(0); animation: rip .7s ease-out forwards; pointer-events: none; }
+@keyframes rip { to { transform: scale(9); opacity: 0; } }
+
+.tip { margin: 16px 4px 0; font-size: 12.5px; color: var(--dim); line-height: 1.5; min-height: 38px; transition: opacity .5s; }
+.tip b { color: var(--ink); font-weight: 500; }
+
+.toast { position: fixed; z-index: 5; left: 50%; top: calc(14px + env(safe-area-inset-top)); transform: translate(-50%, -20px); opacity: 0; width: calc(100% - 32px); max-width: 428px;
+  background: #1b1838; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 13px;
+  transition: .35s; pointer-events: none; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+.player { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(10,9,24,.97) 60%, rgba(10,9,24,0)); }
+.pin { max-width: 428px; margin: 0 auto; display: flex; align-items: center; gap: 12px; background: rgba(28,25,58,.85);
+  border: 1px solid var(--line); border-radius: 20px; padding: 10px 10px 10px 12px; backdrop-filter: blur(10px); }
+#eq { width: 44px; height: 36px; flex: none; }
+.song { flex: 1; min-width: 0; }
+.song b { display: block; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.song span { font-size: 11px; color: var(--dim); letter-spacing: .12em; }
+.pb { width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; display: grid; place-items: center; flex: none; }
+.pb svg { width: 20px; height: 20px; fill: var(--ink); }
+.pb.main { background: var(--ink); width: 44px; height: 44px; }
+.pb.main svg { fill: var(--bg); }
+</style>
+</head>
+<body>
+<canvas id="dust"></canvas>
+<main>
+  <header>
+    <div class="brand">CHILL<span>/</span>CHARGE</div>
+    <div class="chip" id="plug">NOT PLUGGED IN</div>
+  </header>
+
+  <div class="ringwrap" id="ring">
+    <div class="glow"></div>
+    <svg viewBox="0 0 268 268">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#8ef0d8"/><stop offset="1" stop-color="#a78bff"/>
+        </linearGradient>
+      </defs>
+      <circle cx="134" cy="134" r="116" fill="none" stroke="#1d1a3d" stroke-width="12"/>
+      <circle id="arc" cx="134" cy="134" r="116" fill="none" stroke="url(#g)" stroke-width="12" stroke-linecap="round"
+        stroke-dasharray="728.85" stroke-dashoffset="728.85"/>
+      <circle id="flow" cx="134" cy="134" r="98" fill="none" stroke="#8ef0d8" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <div class="center">
+      <svg class="bolt" viewBox="0 0 24 24"><path d="M13 2 5 14h6l-1 8 9-13h-6z"/></svg>
+      <div class="pct"><span id="pct">--</span><small>%</small></div>
+      <div class="sub" id="sub">plug in your charger</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><i>POWER IN</i><b id="watts">--</b></div>
+    <div class="stat"><i>HEAT</i><b id="temp">--</b></div>
+    <div class="stat"><i>SAVER</i><b id="saver">--</b></div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="t"><b>Battery saver</b><span id="saverTxt">Android only lets you flip this one yourself</span></div>
+      <button class="mini" id="saverBtn">TURN ON</button>
+    </div>
+    <div class="row" data-k="kill">
+      <div class="t"><b>Close background apps</b><span id="killTxt">Stops apps you're not using</span></div>
+      <div class="sw on" id="swKill"></div>
+    </div>
+    <div class="row" data-k="dim">
+      <div class="t"><b>Dim screen + sleep fast</b><span>Screen turns off after 15 s of no touching</span></div>
+      <div class="sw on" id="swDim"></div>
+    </div>
+    <div class="slide" id="slideRow">
+      <span>DIM</span><input type="range" id="bright" min="3" max="60" value="20"><span id="brightVal">20%</span>
+    </div>
+    <div class="allow" id="allow">
+      <p>One time: let Chill Charge change your brightness. Turn on <b>Allow</b> on the next screen, then come back.</p>
+      <button class="mini" id="allowBtn">ALLOW</button>
+    </div>
+    <button id="go" disabled>PLUG IN FIRST</button>
+  </div>
+
+  <p class="tip" id="tip"></p>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="player">
+  <div class="pin">
+    <canvas id="eq" width="88" height="72"></canvas>
+    <div class="song"><b id="song">--</b><span>LO-FI RADIO</span></div>
+    <button class="pb" id="prev"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+    <button class="pb main" id="play"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 4v16l13-8z"/></svg></button>
+    <button class="pb" id="next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+  </div>
+</div>
+
+<script>
+// ---------- phone link (fake one when opened in a normal browser for testing) ----------
+const P = window.Phone || (() => {
+  let boost = false, lvl = 37, saver = false, canWrite = false, plugged = 1;
+  setInterval(() => { if (plugged && lvl < 100) lvl += 0.05; }, 1000);
+  window.__fake = { set plugged(v) { plugged = v; if (!v) boost = false; }, set canWrite(v) { canWrite = v; } };
+  return {
+    state: () => JSON.stringify({ level: Math.floor(lvl), scale: 100, plugged, status: plugged ? 2 : 3, temp: 341, volt: 4120,
+      current: plugged ? 2350000 : -400000, left: plugged ? (100 - lvl) * 52000 : -1, saver, canWrite, boost, bright: 120, sdk: 33 }),
+    askWrite: () => { canWrite = true; }, openSaver: () => { saver = !saver; },
+    boost: () => { boost = true; return 41; }, brightness: () => {}, stop: () => { boost = false; },
+  };
+})();
+
+const $ = id => document.getElementById(id);
+const opts = { kill: true, dim: true };
+try { Object.assign(opts, JSON.parse(localStorage.getItem("opts") || "{}")); } catch (e) {}
+try { const b = localStorage.getItem("bright"); if (b) $("bright").value = b; } catch (e) {}
+let S = {};
+
+function paintSwitches() {
+  $("swKill").classList.toggle("on", opts.kill);
+  $("swDim").classList.toggle("on", opts.dim);
+  $("slideRow").style.display = opts.dim ? "flex" : "none";
+  $("brightVal").textContent = $("bright").value + "%";
+}
+document.querySelectorAll(".row[data-k]").forEach(r => r.addEventListener("click", () => {
+  const k = r.dataset.k; opts[k] = !opts[k];
+  try { localStorage.setItem("opts", JSON.stringify(opts)); } catch (e) {}
+  paintSwitches(); refresh();
+}));
+$("bright").addEventListener("input", () => {
+  $("brightVal").textContent = $("bright").value + "%";
+  try { localStorage.setItem("bright", $("bright").value); } catch (e) {}
+  P.brightness(+$("bright").value);
+});
+$("saverBtn").onclick = () => P.openSaver();
+$("allowBtn").onclick = () => P.askWrite();
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 4200);
+}
+
+$("go").addEventListener("click", e => {
+  const b = $("go"), r = b.getBoundingClientRect(), s = document.createElement("i");
+  s.className = "rip"; s.style.cssText = `left:${e.clientX - r.left - 20}px;top:${e.clientY - r.top - 20}px;width:40px;height:40px`;
+  b.appendChild(s); setTimeout(() => s.remove(), 800);
+  if (S.boost) { P.stop(); toast("Boost off. Brightness and sleep time are back to how they were."); refresh(); return; }
+  const dim = opts.dim && S.canWrite;
+  const n = P.boost(+$("bright").value, dim, opts.kill);
+  const bits = [];
+  if (dim) bits.push(`brightness ${$("bright").value}%, sleeps after 15 s`);
+  if (opts.kill) bits.push(n < 0 ? "background apps: Android already freezes them" : `closed ${n} background apps`);
+  if (!S.saver) bits.push("tap TURN ON for battery saver");
+  toast("Boost on. " + (bits.join(" · ") || "Nothing picked") + ".");
+  $("ring").animate([{ transform: "scale(1)" }, { transform: "scale(1.05)" }, { transform: "scale(1)" }], { duration: 700, easing: "ease-out" });
+  refresh();
+});
+
+function fmtLeft(ms) {
+  const m = Math.round(ms / 60000);
+  if (m < 1) return "almost full";
+  return m < 60 ? `~${m} min to full` : `~${Math.floor(m / 60)} h ${m % 60} min to full`;
+}
+
+function refresh() {
+  try { S = JSON.parse(P.state()); } catch (e) { return; }
+  const pct = S.level >= 0 ? Math.round(S.level * 100 / (S.scale || 100)) : 0;
+  const charging = S.plugged !== 0;
+  const full = S.status === 5 || pct >= 100;
+  $("pct").textContent = S.level >= 0 ? pct : "--";
+  $("arc").style.strokeDashoffset = 728.85 * (1 - pct / 100);
+  $("ring").classList.toggle("charging", charging && !full);
+
+  const plugNames = { 1: "WALL CHARGER", 2: "USB PORT", 4: "WIRELESS", 8: "DOCK" };
+  $("plug").textContent = charging ? (plugNames[S.plugged] || "PLUGGED IN") : "NOT PLUGGED IN";
+  $("plug").classList.toggle("on", charging);
+
+  $("sub").textContent = !charging ? "plug in your charger" : full ? "full, you can unplug"
+    : S.left > 0 ? fmtLeft(S.left) : "charging";
+
+  // power going in = current x voltage (phones report current in uA or mA, so guess which)
+  let cur = Math.abs(S.current || 0);
+  if (cur > 0 && cur < 20000) cur *= 1000;
+  const w = charging ? cur * (S.volt || 0) / 1e9 : 0;
+  $("watts").textContent = charging && w > 0.2 ? w.toFixed(1) + " W" : "--";
+
+  const t = S.temp / 10;
+  $("temp").textContent = S.temp ? t.toFixed(0) + "°C" : "--";
+  $("temp").className = t >= 42 ? "bad" : t >= 37 ? "warn" : "good";
+
+  $("saver").textContent = S.saver ? "ON" : "OFF";
+  $("saver").className = S.saver ? "good" : "";
+  $("saverBtn").textContent = S.saver ? "ON" : "TURN ON";
+  $("saverBtn").classList.toggle("ok", S.saver);
+  $("saverTxt").textContent = S.saver ? "On. Background stuff is slowed down" : "Android only lets you flip this one yourself";
+  $("killTxt").textContent = S.sdk >= 34 ? "Your Android freezes them by itself" : "Stops apps you're not using";
+
+  $("allow").classList.toggle("show", opts.dim && !S.canWrite);
+
+  const go = $("go");
+  go.classList.toggle("on", !!S.boost);
+  go.disabled = !S.boost && !charging;
+  go.textContent = S.boost ? "BOOST ON · TAP TO STOP" : charging ? "BOOST" : "PLUG IN FIRST";
+
+  if (S.temp && t >= 40) setTip(`<b>Your phone is hot (${t.toFixed(0)}°C).</b> Heat makes it charge slower on purpose. Take the case off and keep it out of the sun.`, true);
+}
+
+// ---------- tips (real stuff that makes charging faster) ----------
+const tips = [
+  "<b>Screen off = fastest.</b> The screen eats the most power. If you can, pause the anime for a bit.",
+  "<b>Wall plug beats a PC/USB port.</b> A USB port on a PC only gives around 2.5 to 4.5 W.",
+  "<b>Use the cable that came with it.</b> Cheap cables can block fast charging.",
+  "<b>Take the case off</b> if it gets warm. Hot phones charge slower on purpose.",
+  "<b>Airplane mode</b> is the biggest saver, but your Wi-Fi turns off too unless you turn it back on.",
+  "<b>Charging slows down near 80%.</b> That's normal, it protects the battery.",
+];
+let tipI = Math.floor(Math.random() * tips.length), tipLock = false;
+function setTip(html, lock) {
+  if (tipLock && !lock) return;
+  tipLock = !!lock;
+  const el = $("tip"); el.style.opacity = 0;
+  setTimeout(() => { el.innerHTML = html; el.style.opacity = 1; }, 450);
+}
+setInterval(() => { tipLock = false; setTip(tips[tipI++ % tips.length]); }, 9000);
+setTip(tips[tipI++ % tips.length]);
+
+// ---------- music ----------
+const tracks = [
+  { f: "music/t1.ogg", n: "Chill Lofi" },
+  { f: "music/t2.ogg", n: "Lofi Hip Hop" },
+  { f: "music/t3.ogg", n: "A Cup of Tea" },
+  { f: "music/t4.ogg", n: "Cat Caffe" },
+  { f: "music/t5.ogg", n: "Countryside" },
+];
+const audio = new Audio(); audio.crossOrigin = "anonymous"; audio.volume = 0.75; audio.preload = "auto";
+let ti = Math.floor(Math.random() * tracks.length), ctx = null, an = null, wasPlaying = false;
+function load(i) { ti = (i + tracks.length) % tracks.length; audio.src = tracks[ti].f; $("song").textContent = tracks[ti].n; }
+function hook() {
+  if (ctx) return;
+  try {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaElementSource(audio); an = ctx.createAnalyser(); an.fftSize = 64;
+    src.connect(an); an.connect(ctx.destination);
+  } catch (e) { an = null; }
+}
+function play() { hook(); if (ctx && ctx.state !== "running") ctx.resume(); audio.play().catch(() => {}); }
+audio.onplay = () => $("playIco").innerHTML = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+audio.onpause = () => $("playIco").innerHTML = '<path d="M7 4v16l13-8z"/>';
+audio.onended = () => { load(ti + 1); play(); };
+$("play").onclick = () => audio.paused ? play() : audio.pause();
+$("next").onclick = () => { load(ti + 1); play(); };
+$("prev").onclick = () => { load(ti - 1); play(); };
+window.appPause = () => { wasPlaying = !audio.paused; audio.pause(); };
+window.appResume = () => { refresh(); if (wasPlaying) play(); };
+load(ti); play();
+// if the browser blocked autoplay, start on the first touch
+document.addEventListener("pointerdown", function first() {
+  if (audio.paused && !first.done) { first.done = true; play(); }
+}, { once: true });
+
+// ---------- visuals (light on purpose: this app is about saving power) ----------
+const eq = $("eq"), eg = eq.getContext("2d"), bins = new Uint8Array(32);
+const dust = $("dust"), dg = dust.getContext("2d");
+let motes = [];
+function size() {
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  dust.width = innerWidth * d; dust.height = innerHeight * d; dg.setTransform(d, 0, 0, d, 0, 0);
+  motes = Array.from({ length: 26 }, () => ({ x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+    r: 0.6 + Math.random() * 2.2, s: 0.08 + Math.random() * 0.25, a: 0.15 + Math.random() * 0.45, p: Math.random() * 6 }));
+}
+size(); addEventListener("resize", size);
+let last = 0;
+function frame(t) {
+  requestAnimationFrame(frame);
+  if (document.hidden || t - last < 40) return; // ~25 fps max
+  last = t;
+  dg.clearRect(0, 0, innerWidth, innerHeight);
+  for (const m of motes) {
+    m.y -= m.s; m.x += Math.sin(t / 3000 + m.p) * 0.12;
+    if (m.y < -5) { m.y = innerHeight + 5; m.x = Math.random() * innerWidth; }
+    dg.globalAlpha = m.a * (0.6 + 0.4 * Math.sin(t / 1400 + m.p));
+    dg.fillStyle = m.r > 2 ? "#a78bff" : "#8ef0d8";
+    dg.beginPath(); dg.arc(m.x, m.y, m.r, 0, 7); dg.fill();
+  }
+  dg.globalAlpha = 1;
+  eg.clearRect(0, 0, 88, 72);
+  if (an && !audio.paused) an.getByteFrequencyData(bins); else bins.fill(0);
+  let sum = 0;
+  for (let i = 0; i < 5; i++) {
+    let v = bins[1 + i * 3] / 255;
+    if (!an && !audio.paused) v = 0.3 + 0.3 * Math.sin(t / (260 + i * 70) + i); // fallback wiggle
+    sum += v;
+    const h = 6 + v * 60;
+    eg.fillStyle = i % 2 ? "#a78bff" : "#8ef0d8";
+    eg.beginPath(); eg.roundRect ? eg.roundRect(4 + i * 17, 72 - h, 11, h, 5) : eg.rect(4 + i * 17, 72 - h, 11, h); eg.fill();
+  }
+}
+requestAnimationFrame(frame);
+
+paintSwitches(); refresh();
+setInterval(refresh, 1500);
+</script>
+</body>
+</html>
