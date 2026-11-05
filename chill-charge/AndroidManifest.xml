@@ -57,7 +57,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Plays music, keeps the charging boost and counts charging energy only while the Claude app is open." />
+                android:value="Plays music and keeps the charging boost only while the Claude app is open." />
         </service>
 
         <receiver

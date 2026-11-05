@@ -24,7 +24,7 @@ import android.os.Process;
 
 /**
  * CLAUDE MODE: while the Claude app is open (and the screen is on) this keeps the lo-fi playing,
- * keeps the boost on, and feeds your charging into the reactor. Leave Claude = it all stops.
+ * and keeps the boost on. Leave Claude = it all stops.
  */
 public class ClaudeService extends Service {
     static final String CLAUDE = "com.anthropic.claude";
@@ -73,7 +73,7 @@ public class ClaudeService extends Service {
         Notification n = new Notification.Builder(this, "claude")
                 .setSmallIcon(R.drawable.ic_note)
                 .setContentTitle("Claude mode")
-                .setContentText("Music, boost + reactor run while Claude is open")
+                .setContentText("Music + boost run while Claude is open")
                 .setContentIntent(open)
                 .addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, "Turn off", stop).build())
                 .setOngoing(true)
@@ -121,8 +121,7 @@ public class ClaudeService extends Service {
             Boost.turnOff(this);
         }
 
-        // reactor
-        if (inClaude && charging) Boost.addWh(this, Boost.watts(this) * dt / 3600.0);
+        Boost.watts(this); // keeps the real-watts measurement warm
     }
 
     private void playMusic() {

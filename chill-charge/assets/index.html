@@ -112,63 +112,75 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
 .head2 { margin: 20px 4px 2px; font-size: 11px; letter-spacing: .24em; color: var(--dim); }
 .mini.warm { background: rgba(255,179,138,.16); color: var(--warm); }
 
-/* ---------- reactor ---------- */
-.reactor { position: relative; margin-top: 14px; height: max(470px, calc(100vh - 250px)); border-radius: 24px; overflow: hidden;
-  border: 1px solid var(--line); background: #02060f; }
-.reactor.shake { animation: rshake .12s linear infinite; }
-@keyframes rshake { 25% { transform: translate(1px,-1px); } 50% { transform: translate(-1px,1px); } 75% { transform: translate(1px,1px); } }
-#rimg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 60%; transition: filter 2s; }
-#rtint { position: absolute; inset: 0; mix-blend-mode: color; opacity: 0; transition: opacity 2s; pointer-events: none;
-  background: radial-gradient(circle at 50% 61%, #ffc23a 0%, #ff7a1a 35%, #e8341c 75%); }
-#rglow { position: absolute; left: 50%; top: 61%; width: 95%; aspect-ratio: 1; transform: translate(-50%,-50%); border-radius: 50%;
-  mix-blend-mode: screen; pointer-events: none; animation: pulse var(--pulse, 4s) ease-in-out infinite; }
-@keyframes pulse { 50% { opacity: .55; transform: translate(-50%,-50%) scale(1.08); } }
-#rfx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.rshade { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(2,4,12,.85), transparent 30%, transparent 55%, rgba(2,4,12,.92)); pointer-events: none; }
-.hazard { position: absolute; left: 0; right: 0; top: 0; height: 26px; display: none; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; letter-spacing: .3em; color: #1a0606;
-  background: repeating-linear-gradient(-45deg, #ffb020 0 14px, #1a1208 14px 28px); animation: haz 1s linear infinite; }
-.hazard span { background: #ffb020; padding: 2px 8px; }
-@keyframes haz { to { background-position: 40px 0; } }
-.reactor.hot .hazard { display: flex; }
-.reactor.crit .hazard { animation: haz .4s linear infinite, blink .6s steps(2) infinite; }
-@keyframes blink { 50% { opacity: .35; } }
-.rhud { position: absolute; left: 16px; right: 16px; top: 38px; }
-.rstatus { font-size: 26px; font-weight: 700; letter-spacing: .12em; }
-.rrow { display: flex; gap: 18px; margin-top: 8px; font-size: 12px; color: #c9c3ee; letter-spacing: .08em; }
-.rrow b { display: block; font-size: 17px; color: #fff; letter-spacing: 0; margin-top: 2px; font-weight: 600; }
-.rbottom { position: absolute; left: 14px; right: 14px; bottom: 14px; }
-.tierbar { position: relative; height: 10px; border-radius: 10px; background: rgba(255,255,255,.1); overflow: visible; }
-#tierfill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 10px; width: 0;
-  background: linear-gradient(90deg, #59c8ff, #ffcf5a 45%, #ff6a3d 75%, #ff2d55); transition: width 1.5s; box-shadow: 0 0 18px rgba(255,120,60,.6); }
-.tick { position: absolute; top: -4px; width: 2px; height: 18px; background: rgba(255,255,255,.55); }
-.ticklbl { display: grid; grid-template-columns: repeat(4, 1fr); text-align: right; font-size: 9.5px; letter-spacing: .1em; color: #b9b2e6; margin: 8px 0 12px; }
-.ticklbl span.got { color: #ffcf5a; }
-#push { width: 100%; height: 62px; border: 0; border-radius: 18px; font: inherit; font-size: 15px; font-weight: 700; letter-spacing: .2em;
-  color: #fff; background: linear-gradient(100deg, #ff3d3d, #ff8a2b); box-shadow: 0 0 40px -6px rgba(255,80,40,.8); }
-#push:disabled { background: rgba(30,28,60,.85); color: #8f88b8; box-shadow: none; letter-spacing: .08em; font-size: 13px; font-weight: 500; }
-.rrec { margin-top: 10px; text-align: center; font-size: 11.5px; color: #a9a2d6; letter-spacing: .06em; }
+/* ---------- POWER EMPIRE ---------- */
+.hero { position: relative; margin-top: 14px; border-radius: 24px; padding: 18px 16px 16px; overflow: hidden;
+  background: linear-gradient(160deg, #1b1745 0%, #0f0d26 60%); border: 1px solid rgba(167,139,255,.25); }
+.hero::before { content: ""; position: absolute; inset: -40% -20% auto auto; width: 260px; height: 260px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(142,240,216,.18), transparent 70%); pointer-events: none; }
+.hero .lbl { font-size: 10.5px; letter-spacing: .24em; color: var(--dim); }
+.bank { font-size: 44px; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.bank small { font-size: 18px; color: var(--dim); font-weight: 500; margin-left: 4px; }
+.formula { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; font-variant-numeric: tabular-nums; }
+.fchip { padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.06); border: 1px solid var(--line); }
+.fchip i { display: block; font-style: normal; font-size: 9px; letter-spacing: .18em; color: var(--dim); }
+.fchip b { font-size: 16px; font-weight: 600; }
+.fchip.real b { color: var(--mint); } .fchip.mult b { color: #c5b3ff; } .fchip.out b { color: #ffd27a; }
+.fop { color: var(--dim); font-size: 16px; }
+.hint { margin-top: 12px; font-size: 12px; color: var(--warm); display: none; }
+.hint.show { display: block; }
+.flowbar { position: relative; height: 4px; margin-top: 14px; border-radius: 4px; background: rgba(255,255,255,.07); overflow: hidden; }
+.flowbar i { position: absolute; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, var(--mint), transparent);
+  animation: flowx 1.4s linear infinite; }
+.flowbar.off i { display: none; }
+@keyframes flowx { from { left: -40%; } to { left: 100%; } }
+
+.ebar { display: flex; justify-content: space-between; align-items: center; margin: 20px 4px 8px; }
+.ebar .head2 { margin: 0; }
+.qty { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+.qty button { font: inherit; font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--dim); background: transparent; border: 0; border-radius: 9px; padding: 6px 10px; }
+.qty button.on { background: #2a2650; color: var(--ink); }
+
+.bld { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 8px; border-radius: 18px;
+  background: var(--card); border: 1px solid var(--line); overflow: hidden; transition: transform .12s, border-color .3s; }
+.bld:active { transform: scale(.985); }
+.bld.can { border-color: rgba(142,240,216,.4); }
+.bld.locked { opacity: .45; }
+.bld .prog { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--mint); opacity: .6; transition: width .4s; }
+.ico { flex: none; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center;
+  background: linear-gradient(145deg, var(--c1, #2c2760), var(--c2, #191637)); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
+.ico svg { width: 28px; height: 28px; fill: none; stroke: #fff; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.bld .t { flex: 1; min-width: 0; }
+.bld .t b { display: block; font-size: 15px; font-weight: 600; }
+.bld .t span { display: block; font-size: 11.5px; color: var(--dim); margin-top: 3px; }
+.bld .n { position: absolute; top: 10px; right: 12px; font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.buy { flex: none; min-width: 92px; margin-top: 14px; font: inherit; font-size: 12.5px; font-weight: 700; border: 0; border-radius: 12px; padding: 9px 10px;
+  color: #0a0918; background: var(--mint); font-variant-numeric: tabular-nums; }
+.buy:disabled { background: #221f40; color: #6e679a; }
+.pop { position: absolute; right: 24px; top: 6px; font-size: 13px; font-weight: 700; color: var(--mint); pointer-events: none; animation: popup .9s ease-out forwards; }
+@keyframes popup { to { transform: translateY(-26px); opacity: 0; } }
+
+.upgs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.upg { position: relative; padding: 12px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); text-align: left; font: inherit; color: var(--ink); }
+.upg.can { border-color: rgba(255,210,122,.45); background: rgba(255,210,122,.06); }
+.upg .ico { width: 34px; height: 34px; border-radius: 10px; }
+.upg .ico svg { width: 20px; height: 20px; }
+.upg b { display: block; font-size: 13px; font-weight: 600; margin-top: 8px; }
+.upg span { display: block; font-size: 11px; color: var(--dim); margin-top: 2px; }
+.upg em { display: block; font-style: normal; font-size: 12px; font-weight: 700; margin-top: 8px; color: #ffd27a; font-variant-numeric: tabular-nums; }
+.upg:not(.can) em { color: #6e679a; }
+.empty { font-size: 12px; color: var(--dim); padding: 4px; grid-column: 1 / -1; }
+.estats { margin: 18px 4px 0; font-size: 11.5px; color: var(--dim); line-height: 1.8; }
+.welcome { position: fixed; inset: 0; z-index: 30; display: none; place-items: center; background: rgba(5,4,14,.7); backdrop-filter: blur(6px); padding: 16px; }
+.welcome.show { display: grid; }
+.welcome .card { width: 100%; max-width: 380px; border-radius: 22px; padding: 20px; background: #16133a; border: 1px solid rgba(142,240,216,.35); text-align: center; }
+.welcome .card .lbl { font-size: 11px; letter-spacing: .24em; color: var(--dim); }
+.welcome .card .big { font-size: 34px; font-weight: 700; margin: 8px 0; color: var(--mint); }
+.welcome .card p { font-size: 13px; color: #cfc9f2; margin: 6px 0; }
+.welcome .card button { margin-top: 14px; width: 100%; height: 50px; border: 0; border-radius: 14px; font: inherit; font-weight: 700; letter-spacing: .2em; background: var(--ink); color: var(--bg); }
 
 /* ---------- full screen layers ---------- */
 .layer { position: fixed; inset: 0; z-index: 20; display: none; background: #000; color: #fff; }
 .layer.show { display: block; }
-#melt video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .6s; }
-#melt .red { position: absolute; inset: 0; background: radial-gradient(circle at 50% 55%, rgba(255,40,20,.55), rgba(60,0,0,.95)); animation: blink .5s steps(2) infinite; }
-#melt .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
-#melt .msg { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-weight: 700; letter-spacing: .14em; }
-#melt .msg .big { font-size: 96px; line-height: 1; letter-spacing: 0; }
-#melt .msg .small { font-size: 15px; margin-top: 12px; color: #ffd0c0; }
-body.quake main, body.quake #melt video { animation: quake .09s linear infinite; }
-@keyframes quake { 0% { transform: translate(var(--q),0); } 33% { transform: translate(calc(var(--q) * -1), var(--q)); } 66% { transform: translate(0, calc(var(--q) * -1)); } }
-.result { position: absolute; left: 16px; right: 16px; bottom: calc(26px + env(safe-area-inset-bottom)); max-width: 428px; margin: 0 auto;
-  background: rgba(14,10,20,.86); backdrop-filter: blur(12px); border: 1px solid rgba(255,140,80,.35); border-radius: 22px; padding: 18px;
-  opacity: 0; transform: translateY(20px); transition: .6s; pointer-events: none; }
-.result.show { opacity: 1; transform: none; pointer-events: auto; }
-.result h2 { margin: 0; font-size: 13px; letter-spacing: .28em; color: #ffb38a; }
-.result .y { font-size: 44px; font-weight: 700; margin: 6px 0 2px; }
-.result p { margin: 4px 0; font-size: 13px; color: #d8d2f5; }
-.result button { margin-top: 14px; width: 100%; height: 54px; border: 0; border-radius: 16px; font: inherit; font-weight: 700; letter-spacing: .2em; background: #f1eeff; color: #0a0918; }
-
 #black { cursor: none; }
 #black .ghost { position: absolute; font-size: 13px; color: #2a2840; letter-spacing: .1em; transition: left 2s, top 2s; }
 #test .box { position: absolute; left: 24px; right: 24px; top: 30%; text-align: center; }
@@ -186,7 +198,7 @@ body.quake main, body.quake #melt video { animation: quake .09s linear infinite;
     <div class="chip" id="plug">NOT PLUGGED IN</div>
   </header>
 
-  <div class="tabs"><button class="on" data-go="charge">CHARGE</button><button data-go="reactor" id="tabR">REACTOR</button></div>
+  <div class="tabs"><button class="on" data-go="charge">CHARGE</button><button data-go="empire" id="tabR">EMPIRE</button></div>
   <section data-tab="charge" class="show">
 
   <div class="ringwrap" id="ring">
@@ -255,7 +267,7 @@ body.quake main, body.quake #melt video { animation: quake .09s linear infinite;
       <button class="mini" id="testBtn">TEST</button>
     </div>
     <div class="row" id="claudeRow">
-      <div class="t"><b>Claude mode</b><span id="claudeTxt">While Claude is open: music + boost + reactor keep going</span></div>
+      <div class="t"><b>Claude mode</b><span id="claudeTxt">While Claude is open: music + boost keep going</span></div>
       <div class="sw" id="swClaude"></div>
     </div>
     <div class="row">
@@ -265,44 +277,37 @@ body.quake main, body.quake #melt video { animation: quake .09s linear infinite;
   </div>
   </section>
 
-  <section data-tab="reactor">
-    <div class="reactor" id="reactor">
-      <img id="rimg" src="game/reactor.jpg" alt="">
-      <div id="rtint"></div>
-      <div id="rglow"></div>
-      <canvas id="rfx"></canvas>
-      <div class="rshade"></div>
-      <div class="hazard"><span>WARNING: CORE OVERHEAT</span></div>
-      <div class="rhud">
-        <div class="rstatus" id="rstatus">STABLE</div>
-        <div class="rrow">
-          <div>CORE ENERGY<b id="rwh">0.00 Wh</b></div>
-          <div>CORE TEMP<b id="rtemp">280&deg;C</b></div>
-          <div>FEED<b id="rfeed">--</b></div>
-        </div>
+  <section data-tab="empire">
+    <div class="hero">
+      <div class="lbl">ENERGY</div>
+      <div class="bank"><span id="ebank">0</span><small>J</small></div>
+      <div class="formula">
+        <div class="fchip real"><i>REAL</i><b id="freal">0 W</b></div><span class="fop">&times;</span>
+        <div class="fchip mult"><i>MULTIPLIER</i><b id="fmult">1x</b></div><span class="fop">=</span>
+        <div class="fchip out"><i>GAME WATTS</i><b id="fout">0 W</b></div>
       </div>
-      <div class="rbottom">
-        <div class="tierbar"><div id="tierfill"></div></div>
-        <div class="ticklbl" id="ticks"></div>
-        <button id="push" disabled>KEEP CHARGING TO FILL THE CORE</button>
-        <div class="rrec" id="rrec">Your real charging feeds the core. Unplugged = nothing goes in.</div>
-      </div>
+      <div class="flowbar off" id="eflow"><i></i></div>
+      <div class="hint" id="ehint">Plug in your charger. Your empire runs on your real charging.</div>
     </div>
+
+    <div class="ebar"><div class="head2">BUILD</div>
+      <div class="qty" id="qty"><button class="on" data-q="1">x1</button><button data-q="10">x10</button><button data-q="max">MAX</button></div>
+    </div>
+    <div id="blds"></div>
+
+    <div class="ebar"><div class="head2">UPGRADES</div><div class="head2" id="upgCount"></div></div>
+    <div class="upgs" id="upgs"></div>
+    <div class="estats" id="estats"></div>
   </section>
+
 </main>
 
-<div class="layer" id="melt">
-  <video id="blast" src="game/blast.webm" muted playsinline preload="auto"></video>
-  <div class="red" id="mred"></div>
-  <div class="msg" id="mmsg"></div>
-  <div class="flash" id="mflash"></div>
-  <div class="result" id="mres">
-    <h2 id="rtitle">MELTDOWN</h2>
-    <div class="y" id="ryield"></div>
-    <p id="rline1"></p><p id="rline2"></p>
-    <button id="rebuild">REBUILD THE REACTOR</button>
-  </div>
-</div>
+<div class="welcome" id="welcome"><div class="card">
+  <div class="lbl">WHILE YOU WERE GONE</div>
+  <div class="big" id="wbig"></div>
+  <p id="wline"></p>
+  <button id="wok">COLLECT</button>
+</div></div>
 <div class="layer" id="black"><div class="ghost" id="ghost"></div></div>
 <div class="layer" id="test"><div class="box">
   <p id="testHead">Testing your charger. Keep it plugged in and don't touch the phone.</p>
@@ -350,7 +355,7 @@ const $ = id => document.getElementById(id);
 const opts = { kill: true, dim: true };
 try { Object.assign(opts, JSON.parse(localStorage.getItem("opts") || "{}")); } catch (e) {}
 try { const b = localStorage.getItem("bright"); if (b) $("bright").value = b; } catch (e) {}
-let S = {}, W = 0, WH = 0, melting = false;
+let S = {}, W = 0;
 
 function paintSwitches() {
   $("swKill").classList.toggle("on", opts.kill);
@@ -422,8 +427,7 @@ function refresh() {
   $("watts").title = S.measured ? "measured" : "";
   const now = performance.now(), dt = Math.min(10, (now - (refresh.t || now)) / 1000); refresh.t = now;
   W = charging ? w : 0;
-  WH = (charging && w > 0 && !melting) ? P.addWh(w * dt / 3600) : (S.wh || 0);
-  paintReactor();
+  if (window.Emp) Emp.sync();
 
   const t = S.temp / 10;
   $("temp").textContent = S.temp ? t.toFixed(0) + "°C" : "--";
@@ -440,8 +444,8 @@ function refresh() {
   $("swClaude").classList.toggle("on", !!S.claudeMode);
   $("claudeTxt").textContent = !S.hasClaude ? "Claude app not found on this phone"
     : S.claudeMode && !S.usageOk ? "Turn on Usage access for Chill Charge, then come back"
-    : S.claudeMode ? "On: music + boost + reactor run while Claude is open"
-    : "While Claude is open: music + boost + reactor keep going";
+    : S.claudeMode ? "On: music + boost run while Claude is open"
+    : "While Claude is open: music + boost keep going";
   $("lockBtn").textContent = S.adminOk ? "LOCK" : "SET UP";
 
   const go = $("go");
@@ -498,7 +502,7 @@ audio.onended = () => { load(ti + 1); play(); };
 $("play").onclick = () => audio.paused ? play() : audio.pause();
 $("next").onclick = () => { load(ti + 1); play(); };
 $("prev").onclick = () => { load(ti - 1); play(); };
-window.appPause = () => { wasPlaying = !audio.paused && !melting; audio.pause(); };
+window.appPause = () => { wasPlaying = !audio.paused; audio.pause(); };
 window.appResume = () => { refresh(); if (wasPlaying) play(); };
 load(ti); play();
 // if the browser blocked autoplay, start on the first touch
@@ -550,7 +554,7 @@ requestAnimationFrame(frame);
 document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
   document.querySelectorAll("[data-tab]").forEach(x => x.classList.toggle("show", x.dataset.tab === b.dataset.go));
-  scrollTo(0, 0); sizeFx();
+  scrollTo(0, 0);
 });
 
 // ---------- more tricks ----------
@@ -619,142 +623,173 @@ $("testBtn").onclick = () => {
 $("testClose").onclick = () => $("test").classList.remove("show");
 $("testSend").onclick = () => { $("test").classList.remove("show"); $("sendBtn").onclick(); };
 
-// ---------- REACTOR ----------
-const TIERS = [
-  { wh: 0.3, name: "MELTDOWN", short: "MELT", secs: 6.5 },
-  { wh: 1.5, name: "BIG MELTDOWN", short: "BIG", secs: 12 },
-  { wh: 4, name: "INSANE", short: "INSANE", secs: 19 },
-  { wh: 10, name: "PLANET CRACKER", short: "PLANET", secs: 26.5 },
-];
-let rec = { n: 0, best: 0 };
-try { rec = Object.assign(rec, JSON.parse(localStorage.getItem("reactor") || "{}")); } catch (e) {}
-// the bar is spaced so each tier gets a quarter
-function barPos(wh) {
-  let prev = 0;
-  for (let i = 0; i < TIERS.length; i++) {
-    if (wh < TIERS[i].wh) return (i + (wh - prev) / (TIERS[i].wh - prev)) / TIERS.length;
-    prev = TIERS[i].wh;
-  }
-  return 1;
-}
-$("ticks").innerHTML = TIERS.map(t => `<span>${t.short}</span>`).join("");
-(function () {
-  const bar = document.querySelector(".tierbar");
-  TIERS.forEach((t, i) => { const k = document.createElement("i"); k.className = "tick"; k.style.left = `calc(${(i + 1) * 25}% - 1px)`; bar.appendChild(k); });
-})();
-const tierOf = wh => { let t = -1; TIERS.forEach((x, i) => { if (wh >= x.wh) t = i; }); return t; };
-const kt = wh => Math.round(wh * 2600);
-const fmtKt = k => k >= 1000 ? (k / 1000).toFixed(k >= 10000 ? 0 : 1) + " MEGATONS" : k + " KILOTONS";
-
-function paintReactor() {
-  const heat = Math.min(1, barPos(WH)), t = tierOf(WH);
-  const img = $("rimg");
-  // cool blue water -> orange-hot core (sepia keeps the real photo's detail, no fake colors)
-  img.style.filter = `brightness(${0.85 + heat * 0.4}) contrast(${1 + heat * 0.25})`;
-  $("rtint").style.opacity = Math.min(0.92, heat * 1.15).toFixed(2);
-  const g = $("rglow");
-  const c1 = heat < 0.4 ? "rgba(90,200,255," : heat < 0.75 ? "rgba(255,190,80," : "rgba(255,70,40,";
-  g.style.background = `radial-gradient(circle, ${c1}${0.18 + heat * 0.32}) 0%, ${c1}0) 40%)`;
-  g.style.setProperty("--pulse", (4 - heat * 3.4).toFixed(2) + "s");
-  const r = $("reactor");
-  r.classList.toggle("hot", heat >= 0.5); r.classList.toggle("crit", heat >= 0.75); r.classList.toggle("shake", heat >= 0.9);
-  $("tabR").classList.toggle("hot", t >= 0);
-  $("rstatus").textContent = t >= 3 ? "BEYOND LIMITS" : heat >= 0.75 ? "CRITICAL" : heat >= 0.5 ? "OVERHEATING" : heat >= 0.25 ? "RUNNING HOT" : W > 0 ? "CHARGING UP" : "STABLE";
-  $("rstatus").style.color = heat >= 0.75 ? "#ff5a4a" : heat >= 0.5 ? "#ffb38a" : heat >= 0.25 ? "#ffcf5a" : "#8ef0d8";
-  $("rwh").textContent = WH.toFixed(WH < 10 ? 2 : 1) + " Wh";
-  $("rtemp").innerHTML = Math.round(280 + heat * heat * 3600 + Math.max(0, WH - 10) * 120) + "&deg;C";
-  $("rfeed").textContent = W > 0 ? "+" + W.toFixed(1) + " W" : "NONE";
-  $("tierfill").style.width = (heat * 100) + "%";
-  document.querySelectorAll("#ticks span").forEach((x, i) => x.classList.toggle("got", i <= t));
-  const push = $("push");
-  push.disabled = t < 0 || melting;
-  if (t < 0) {
-    const need = TIERS[0].wh - WH;
-    push.textContent = W > 0 ? `NEEDS ${need.toFixed(2)} Wh MORE (~${Math.max(1, Math.ceil(need / W * 60))} MIN)` : "PLUG IN TO FEED THE CORE";
-  } else push.textContent = `PUSH IT: ${TIERS[t].name}`;
-  $("rrec").textContent = rec.n ? `Meltdowns: ${rec.n}  ·  Biggest: ${fmtKt(rec.best)}` : "Your real charging feeds the core. Unplugged = nothing goes in.";
-}
-
-// energy flowing up into the core while charging
-const fx = $("rfx"), fg = fx.getContext("2d"); let sparks = [];
-function sizeFx() { const r = fx.getBoundingClientRect(); fx.width = r.width; fx.height = r.height; }
-addEventListener("resize", sizeFx);
-function drawFx(t) {
-  requestAnimationFrame(drawFx);
-  if (document.hidden || !$("reactor").offsetParent || t - (drawFx.l || 0) < 40) return;
-  drawFx.l = t;
-  const w = fx.width, h = fx.height; if (!w) { sizeFx(); return; }
-  fg.clearRect(0, 0, w, h);
-  const cx = w * 0.5, cy = h * 0.61, heat = Math.min(1, barPos(WH));
-  if (W > 0 && sparks.length < 18 + W * 4 && Math.random() < 0.3 + W / 15)
-    sparks.push({ x: Math.random() * w, y: h + 4, k: 0.006 + Math.random() * 0.01 + W / 2500, p: 0 });
-  sparks = sparks.filter(s => s.p < 1);
-  for (const s of sparks) {
-    s.p += s.k;
-    const e = s.p * s.p, x = s.x + (cx - s.x) * e, y = s.y + (cy - s.y) * s.p;
-    fg.globalAlpha = Math.sin(s.p * Math.PI) * 0.9;
-    fg.fillStyle = heat < 0.5 ? "#9fe8ff" : "#ffd27a";
-    fg.beginPath(); fg.arc(x, y, 1.6, 0, 7); fg.fill();
-  }
-  fg.globalAlpha = 1;
-}
-requestAnimationFrame(drawFx);
-
-// ---------- the meltdown ----------
-const sfx = n => { const a = new Audio("game/" + n + ".ogg"); a.volume = 1; return a; };
-const wait = ms => new Promise(r => setTimeout(r, ms));
-$("push").onclick = async () => {
-  const t = tierOf(WH); if (t < 0 || melting) return;
-  melting = true; const tier = TIERS[t], whNow = WH, yieldKt = kt(whNow);
-  const musicWas = !audio.paused; audio.pause();
-  const M = $("melt"), msg = $("mmsg"), vid = $("blast");
-  M.classList.add("show"); $("mred").style.display = "block"; $("mres").classList.remove("show");
-  vid.style.opacity = 0; vid.currentTime = 0;
-  const siren = sfx("siren"), alarm = sfx("alarm"), rumble = sfx("rumble"), boom = sfx("boom");
-  alarm.loop = true; siren.play().catch(() => {}); alarm.play().catch(() => {});
-  document.body.classList.add("quake");
-  const lines = ["SCRAM FAILED", "COOLANT GONE", "CORE " + Math.round(2800 + whNow * 300) + "°C"];
-  for (let i = 0; i < 3; i++) {
-    document.body.style.setProperty("--q", (1 + i) + "px");
-    msg.innerHTML = `<div style="font-size:26px">${lines[i]}</div>`;
-    P.buzz("0,120,80,120"); await wait(1100);
-  }
-  for (let n = 5; n > 0; n--) {
-    document.body.style.setProperty("--q", (3 + (5 - n) * 2) + "px");
-    msg.innerHTML = `<div class="big">${n}</div><div class="small">${tier.name}</div>`;
-    P.buzz("0," + (90 + (5 - n) * 60)); await wait(1000);
-  }
-  // BOOM
-  msg.innerHTML = ""; alarm.pause(); siren.pause(); $("mred").style.display = "none";
-  const fl = $("mflash"); fl.style.transition = "none"; fl.style.opacity = 1;
-  boom.play().catch(() => {}); rumble.play().catch(() => {});
-  P.buzz("0,900,120,700,150,500,200,300");
-  vid.play().catch(() => {}); vid.style.opacity = 1;
-  document.body.style.setProperty("--q", (6 + t * 4) + "px");
-  await wait(120); fl.style.transition = "opacity 1.6s"; fl.style.opacity = 0;
-  // shake fades out
-  const end = performance.now() + tier.secs * 1000;
-  while (performance.now() < end) {
-    const left = (end - performance.now()) / (tier.secs * 1000);
-    document.body.style.setProperty("--q", Math.max(0, (6 + t * 4) * left * left).toFixed(1) + "px");
-    if (left < 0.15) vid.style.opacity = left / 0.15 * 0.55 + 0.45;
-    await wait(200);
-  }
-  document.body.classList.remove("quake");
-  vid.pause();
-  rec.n++; rec.best = Math.max(rec.best, yieldKt);
-  try { localStorage.setItem("reactor", JSON.stringify(rec)); } catch (e) {}
-  $("rtitle").textContent = `${tier.name} #${rec.n}`;
-  $("ryield").textContent = fmtKt(yieldKt);
-  $("rline1").textContent = `Shockwave: ${(Math.cbrt(yieldKt) * 1.9).toFixed(1)} km wide. Your phone fed it ${whNow.toFixed(2)} Wh.`;
-  $("rline2").textContent = yieldKt >= rec.best && rec.n > 1 ? "New biggest blast." : t < 3 ? `Charge to ${TIERS[t + 1].wh} Wh for ${TIERS[t + 1].name}.` : "Max tier. Keep charging past it to grow the blast.";
-  $("mres").classList.add("show");
-  $("rebuild").onclick = () => {
-    rumble.pause(); P.setWh(0); WH = 0; melting = false;
-    M.classList.remove("show"); paintReactor();
-    if (musicWas) play();
-  };
+// ---------- POWER EMPIRE: real watts x multiplier = game watts ----------
+const ICON = {
+  crank: '<circle cx="9" cy="15" r="5"/><path d="M9 15 17.5 6.5"/><circle cx="18.5" cy="5.5" r="1.6"/>',
+  bike: '<circle cx="6" cy="16" r="4"/><circle cx="18" cy="16" r="4"/><path d="M6 16 10 9h5l3 7M10 9l3 7 2-7M9 6h3"/>',
+  solar: '<path d="M5 5h16l-3 10H2z"/><path d="M11.5 5 10 15M3.5 10h16"/><path d="M10 15v5M7 20h6"/>',
+  wind: '<path d="M11.4 10 10.5 21h3l-.9-11"/><circle cx="12" cy="9" r="1.3"/><path d="M12 7.7V2M13.1 9.7l5 3M10.9 9.7l-5 3"/>',
+  dam: '<path d="M2 6h20M5 6l2 14h10l2-14"/><path d="M8.5 11c1-1 2-1 3 0s2 1 3 0M9 15c1-1 2-1 3 0s2 1 3 0"/>',
+  gas: '<path d="M3 20v-8l5 3v-3l5 3V8h4v12z"/><path d="M15 8V4M18 4c0 1.5-1.5 1.5-1.5 3"/>',
+  nuke: '<path d="M6 20c2-6 2-10 1-16h10c-1 6-1 10 1 16z"/><path d="M9 2.5c1-1 2 1 3 0s2 1 3 0"/>',
+  fusion: '<ellipse cx="12" cy="12" rx="10" ry="4.5"/><ellipse cx="12" cy="12" rx="4.5" ry="1.6"/><path d="M12 5v2M12 17v2"/>',
+  orbit: '<rect x="10" y="10" width="4" height="4" rx="1"/><path d="M2 9h6v6H2zM16 9h6v6h-6zM8 12h2M14 12h2M12 10V6"/><circle cx="12" cy="5" r="1"/>',
+  swarm: '<circle cx="12" cy="12" r="3.5"/><ellipse cx="12" cy="12" rx="9.5" ry="4" transform="rotate(-25 12 12)"/><circle cx="4" cy="15.5" r=".9"/><circle cx="20" cy="8.5" r=".9"/><circle cx="16" cy="16" r=".9"/>',
+  sphere: '<circle cx="12" cy="12" r="9.5"/><ellipse cx="12" cy="12" rx="4" ry="9.5"/><path d="M2.5 12h19M4 7h16M4 17h16"/>',
+  hole: '<circle cx="12" cy="12" r="3.2"/><ellipse cx="12" cy="12" rx="10.5" ry="3.2"/><path d="M5 8.5c2-4 12-4 14 0"/>',
+  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  plug: '<path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0zM12 17v5"/>',
 };
+const BLD = [
+  ["Hand Crank", "crank", 40, 1, "#3b3486", "#1d1946"],
+  ["Bike Generator", "bike", 500, 6, "#2f5d8a", "#172c45"],
+  ["Solar Panel", "solar", 6e3, 35, "#1f6f8b", "#103745"],
+  ["Wind Turbine", "wind", 75e3, 200, "#24806b", "#103d33"],
+  ["Hydro Dam", "dam", 9e5, 1200, "#2a6aa8", "#13304d"],
+  ["Gas Power Plant", "gas", 1.1e7, 7500, "#8a5a2f", "#40291a"],
+  ["Nuclear Plant", "nuke", 1.4e8, 45e3, "#5d8a2f", "#2a4016"],
+  ["Fusion Reactor", "fusion", 1.8e9, 2.8e5, "#7a3fb0", "#371c52"],
+  ["Orbital Solar Array", "orbit", 2.3e10, 1.7e6, "#3f5fb0", "#1c2a52"],
+  ["Dyson Swarm", "swarm", 3e11, 1e7, "#b0743f", "#52341c"],
+  ["Dyson Sphere", "sphere", 4e12, 6e7, "#b04f3f", "#521f1c"],
+  ["Black Hole Engine", "hole", 5.5e13, 4e8, "#45405e", "#0d0b1a"],
+].map(([name, icon, cost, mult, c1, c2]) => ({ name, icon, cost, mult, c1, c2 }));
+const LV = [[1, 2, 8, "Tuned"], [10, 2, 60, "Reinforced"], [25, 3, 900, "Overclocked"], [50, 4, 3e4, "Supercharged"], [100, 5, 2e6, "Perfected"]];
+const UPG = [];
+BLD.forEach((b, i) => LV.forEach(([need, x, cm, word], j) =>
+  UPG.push({ id: `b${i}_${j}`, name: `${word} ${b.name}s`, desc: `${b.name}s x${x}`, cost: b.cost * cm, x, bi: i, need, icon: b.icon, c1: b.c1, c2: b.c2 })));
+[["Thicker Wires", 2, 2e3, "plug"], ["Smart Grid", 2, 5e5, "bolt"], ["Superconductors", 3, 2e8, "bolt"], ["Turbo Cable", 3, 5e9, "plug"],
+ ["Quantum Batteries", 5, 1e12, "bolt"], ["Antimatter Cells", 10, 1e15, "bolt"], ["Zero-Point Taps", 25, 1e19, "bolt"],
+ ["Star Lifting", 50, 1e24, "bolt"], ["Reality Overclock", 100, 1e30, "bolt"]].forEach(([name, x, cost, icon], j) =>
+  UPG.push({ id: `g${j}`, name, desc: icon === "plug" ? `Real watts count x${x}` : `Everything x${x}`, cost, x, bi: -1, icon, c1: "#8a6a1f", c2: "#3d2f0e" }));
+
+const SUF = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc", "Ud", "Dd", "Td", "Qad", "Qid"];
+function fmt(n) {
+  if (!isFinite(n)) return "∞";
+  if (n < 1000) return n < 10 ? (Math.round(n * 10) / 10).toString() : Math.floor(n).toString();
+  const e = Math.floor(Math.log10(n) / 3);
+  if (e >= SUF.length) return n.toExponential(2).replace("+", "");
+  const v = n / Math.pow(1000, e);
+  return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v)) + SUF[e];
+}
+
+const Emp = (() => {
+  let G = { e: 0, total: 0, n: BLD.map(() => 0), u: {}, bestW: 0, cc: 0, t: 0 };
+  try { const g = JSON.parse(localStorage.getItem("empire1") || "null"); if (g) { G = Object.assign(G, g); G.n = BLD.map((_, i) => g.n?.[i] || 0); } } catch (e) {}
+  const save = () => { try { localStorage.setItem("empire1", JSON.stringify(G)); } catch (e) {} };
+  let qty = "1", built = "";
+
+  const bMul = i => UPG.reduce((m, u) => u.bi === i && G.u[u.id] ? m * u.x : m, 1);
+  const gMul = () => UPG.reduce((m, u) => u.bi < 0 && G.u[u.id] ? m * u.x : m, 1);
+  const mult = () => (1 + BLD.reduce((s, b, i) => s + G.n[i] * b.mult * bMul(i), 0)) * gMul();
+  const price = (i, k) => BLD[i].cost * Math.pow(1.15, G.n[i]) * (Math.pow(1.15, k) - 1) / 0.15;
+  const maxK = i => Math.max(0, Math.floor(Math.log(G.e * 0.15 / (BLD[i].cost * Math.pow(1.15, G.n[i])) + 1) / Math.log(1.15)));
+  const howMany = i => qty === "max" ? Math.max(1, maxK(i)) : +qty;
+  const visible = i => i === 0 || G.n[i] > 0 || G.n[i - 1] > 0;
+  const upgOpen = u => !G.u[u.id] && (u.bi >= 0 ? G.n[u.bi] >= u.need : G.total >= u.cost / 4);
+
+  function render() {
+    // building cards
+    let h = "";
+    BLD.forEach((b, i) => {
+      if (visible(i)) {
+        h += `<div class="bld" id="bd${i}"><div class="ico" style="--c1:${b.c1};--c2:${b.c2}"><svg viewBox="0 0 24 24">${ICON[b.icon]}</svg></div>
+          <div class="t"><b>${b.name}</b><span id="bs${i}"></span></div><div class="n" id="bn${i}"></div>
+          <button class="buy" id="bb${i}"></button><i class="prog" id="bp${i}"></i></div>`;
+      } else if (visible(i - 1) && i > 0) {
+        h += `<div class="bld locked"><div class="ico"><svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg></div>
+          <div class="t"><b>???</b><span>Build a ${BLD[i - 1].name} to find out</span></div></div>`;
+      }
+    });
+    $("blds").innerHTML = h;
+    BLD.forEach((b, i) => { const x = $("bb" + i); if (x) x.onclick = () => buy(i); });
+    // upgrade cards
+    const open = UPG.filter(upgOpen).sort((a, b) => a.cost - b.cost).slice(0, 8);
+    $("upgs").innerHTML = open.length ? open.map(u => `<button class="upg" id="up_${u.id}">
+      <div class="ico" style="--c1:${u.c1};--c2:${u.c2}"><svg viewBox="0 0 24 24">${ICON[u.icon]}</svg></div>
+      <b>${u.name}</b><span>${u.desc}</span><em>${fmt(u.cost)} J</em></button>`).join("")
+      : `<div class="empty">Build more to unlock upgrades.</div>`;
+    open.forEach(u => $("up_" + u.id).onclick = () => buyUpg(u));
+    const got = Object.keys(G.u).length;
+    $("upgCount").textContent = `${got}/${UPG.length}`;
+    built = key();
+    paint();
+  }
+  const key = () => BLD.map((_, i) => visible(i) ? 1 : 0).join("") + "|" + UPG.filter(upgOpen).map(u => u.id).slice(0, 8).join(",");
+
+  function paint() {
+    const m = mult(), w = W, out = w * m;
+    $("ebank").textContent = fmt(G.e);
+    $("freal").textContent = (w > 0 ? w.toFixed(1) : "0") + " W";
+    $("fmult").textContent = fmt(m) + "x";
+    $("fout").textContent = fmt(out) + " W";
+    $("eflow").classList.toggle("off", !(w > 0));
+    $("ehint").classList.toggle("show", !(w > 0));
+    BLD.forEach((b, i) => {
+      const bb = $("bb" + i); if (!bb) return;
+      const k = howMany(i), c = price(i, k), can = G.e >= c;
+      bb.textContent = `${qty === "1" ? "" : "x" + k + " "}${fmt(c)} J`;
+      bb.disabled = !can;
+      $("bd" + i).classList.toggle("can", can);
+      $("bp" + i).style.width = Math.min(100, G.e / c * 100) + "%";
+      $("bn" + i).textContent = G.n[i] ? "OWNED " + G.n[i] : "";
+      $("bs" + i).textContent = `+${fmt(b.mult * bMul(i) * gMul())}x each`;
+    });
+    UPG.forEach(u => { const el = $("up_" + u.id); if (el) el.classList.toggle("can", G.e >= u.cost); });
+    $("estats").innerHTML = `Total energy made: ${fmt(G.total)} J<br>Buildings: ${G.n.reduce((a, b) => a + b, 0)}  ·  Best real charging: ${G.bestW.toFixed(1)} W`;
+  }
+
+  function buy(i) {
+    const k = howMany(i), c = price(i, k);
+    if (G.e < c) return;
+    G.e -= c; G.n[i] += k; save(); P.buzz("0,14");
+    const card = $("bd" + i);
+    if (card) { const p = document.createElement("i"); p.className = "pop"; p.textContent = "+" + k; card.appendChild(p); setTimeout(() => p.remove(), 900); }
+    render();
+  }
+  function buyUpg(u) {
+    if (G.e < u.cost || G.u[u.id]) return;
+    G.e -= u.cost; G.u[u.id] = 1; save(); P.buzz("0,20,40,20");
+    toast(`${u.name}: ${u.desc}`); render();
+  }
+  document.querySelectorAll("#qty button").forEach(b => b.onclick = () => {
+    qty = b.dataset.q; document.querySelectorAll("#qty button").forEach(x => x.classList.toggle("on", x === b)); paint();
+  });
+
+  // live earning: real watts x multiplier, every 1/4 s
+  let last = Date.now();
+  setInterval(() => {
+    const now = Date.now(), dt = Math.min(1, (now - last) / 1000); last = now;
+    if (W > 0) { const g = W * mult() * dt; G.e += g; G.total += g; }
+    if (key() !== built) render(); else if ($("blds").offsetParent) paint();
+  }, 250);
+  setInterval(save, 3000);
+
+  // charging that happened while the app was closed: read it from the battery's mAh counter
+  function sync() {
+    const now = Date.now();
+    if (W > G.bestW) G.bestW = W;
+    if (S.cc > 0) {
+      if (G.cc > 0 && G.t && now - G.t > 8000 && S.cc > G.cc) {
+        const wh = (S.cc - G.cc) / 1e6 * ((S.volt || 3850) / 1000);
+        const j = wh * 3600 * mult();
+        if (j > 0) {
+          G.e += j; G.total += j;
+          $("wbig").textContent = "+" + fmt(j) + " J";
+          $("wline").textContent = `Your phone charged ${wh.toFixed(2)} Wh while you were away, x${fmt(mult())} multiplier.`;
+          $("welcome").classList.add("show");
+        }
+      }
+      G.cc = S.cc;
+    }
+    G.t = now; save();
+  }
+  $("wok").onclick = () => { $("welcome").classList.remove("show"); $("tabR").click(); };
+  render();
+  return { sync, render };
+})();
+window.Emp = Emp;
+
 
 paintSwitches(); refresh();
 setInterval(refresh, 1500);
