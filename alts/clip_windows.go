@@ -19,6 +19,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"strings"
 	"sync"
@@ -92,6 +93,7 @@ const (
 	timerRead      = 1
 	timerHide      = 2
 	timerPaste     = 3
+	timerWatch     = 4
 	keyeventfKeyUp = 0x0002
 	inputKeyboard  = 1
 	clipW, clipH   = 380, 500 // normal (96 dpi) pixels
@@ -132,12 +134,18 @@ type clipApp struct {
 	prev                                     uintptr // the window you were in when Win+V came
 	keyName                                  string  // "Win+V" or "Ctrl+Alt+V"
 	tellKey                                  bool
+	shownAt                                  time.Time
+	grace                                    time.Duration // how long it may stay up without being the window you use
 	pasteTries                               int
 	fmtPNG, fmtNoWatch, fmtNoHist, fmtIgnore uintptr
 	keep                                     []any
 }
 
 var clip *clipApp
+
+// WebView2 has to stay on one OS thread with its message loop (ALTS does the same in main_windows.go,
+// which isn't part of this app). Without this the Clipboard window stays black.
+func init() { runtime.LockOSThread() }
 
 func main() { runClip() }
 
@@ -559,6 +567,11 @@ func (c *clipApp) show() {
 	}
 
 	// a hotkey from Windows lets this app come to the front
+	c.shownAt, c.grace = time.Now(), 1200*time.Millisecond
+	if c.tellKey {
+		c.grace = 9 * time.Second // the "which key opens it" note: it popped up by itself, give time to read
+	}
+	pSetTimer.Call(c.win, timerWatch, 400, 0)
 	pShowWindow.Call(c.win, swShow)
 	if c.ui != nil {
 		if ctl := c.ui.GetController(); ctl != nil {
@@ -586,6 +599,7 @@ func (c *clipApp) show() {
 
 func (c *clipApp) hide() {
 	pKillTimer.Call(c.win, timerHide)
+	pKillTimer.Call(c.win, timerWatch)
 	pShowWindow.Call(c.win, swHide)
 	if c.ui != nil {
 		if ctl := c.ui.GetController(); ctl != nil {
@@ -812,6 +826,12 @@ func clipProc(h, m, wp, lp uintptr) uintptr {
 		pSetTimer.Call(h, timerRead, 90, 0) // apps put their formats on one by one; read once they're done
 		return 0
 	case wmTimer:
+		if wp == timerWatch { // closes it once you're clearly somewhere else (even if Windows never gave it focus)
+			if fg, _, _ := pGetForegroundWin.Call(); fg != h && time.Since(c.shownAt) > c.grace {
+				c.hide()
+			}
+			return 0
+		}
 		pKillTimer.Call(h, wp)
 		switch wp {
 		case timerRead:
