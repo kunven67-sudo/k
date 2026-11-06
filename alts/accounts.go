@@ -32,6 +32,7 @@ type Settings struct {
 	Last       string    `json:"last"`
 	Place      *Place    `json:"place,omitempty"`
 	MemoryRepo string    `json:"memoryRepo,omitempty"` // saved chats also go to this GitHub repo (owner/name)
+	Look       string    `json:"look,omitempty"`       // Settings > Look
 }
 
 var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$`)

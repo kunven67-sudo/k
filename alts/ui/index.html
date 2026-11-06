@@ -766,9 +766,9 @@ const LOOKS = [["clay", "Clay (normal)", "#131316", "#24242b", "#d97757"], ["mid
   ["forest", "Forest", "#0e1411", "#1c2c23", "#3dbe8b"], ["sunset", "Sunset", "#17100f", "#2e1d1a", "#ff7a59"], ["light", "Light", "#f4f4f6", "#ffffff", "#d97757"]];
 function setLook(k) {
   if (k && k !== "clay") document.documentElement.dataset.theme = k; else delete document.documentElement.dataset.theme;
-  try { localStorage.setItem("alts-look", k || "clay"); } catch (e) {}
+  send({ t: "look", a: k || "clay" }); // ALTS keeps it (this page can't remember things itself)
 }
-try { setLook(localStorage.getItem("alts-look") || "clay"); } catch (e) {}
+let lookSet = false;
 function buildLook(card) {
   card.append(el("h2", "", "Settings"));
   card.append(el("div", "tips", "Look: pick one, it changes right away."));
@@ -873,6 +873,7 @@ function toast(t) {
 window.ALTS = {
   state(s) {
     S = s;
+    if (!lookSet) { lookSet = true; const k = s.look || "clay"; if (k !== "clay") document.documentElement.dataset.theme = k; }
     if (S.wide) waitWide = false;
     else if (modal && !waitWide) modal = null; // ALTS closed the box (after add / delete)
     render();

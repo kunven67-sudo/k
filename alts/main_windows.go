@@ -340,7 +340,8 @@ func (a *App) push() {
 		Repo     string     `json:"repo"`
 		Count    *countInfo `json:"count,omitempty"`
 		FilesNew bool       `json:"filesNew"`
-	}{Accounts: []item{}, Active: a.active, Wide: a.full(), Repo: a.st.MemoryRepo, FilesNew: a.files.New}
+		Look     string     `json:"look"`
+	}{Accounts: []item{}, Active: a.active, Wide: a.full(), Repo: a.st.MemoryRepo, FilesNew: a.files.New, Look: a.st.Look}
 	for _, acc := range a.st.Accounts {
 		it := item{acc.ID, acc.Name, acc.Color, a.views[acc.ID] != nil, a.loading == acc.ID, nil}
 		if u, ok := a.usage[acc.ID]; ok {
@@ -406,6 +407,11 @@ func (a *App) drain() {
 
 func (a *App) do(c cmd) {
 	switch c.T {
+	case "look":
+		if len(c.A) < 20 {
+			a.st.Look = c.A
+			a.save()
+		}
 	case "ready":
 		a.uiReady = true
 		a.title()

@@ -10,6 +10,7 @@ package main
 import (
 	"bytes"
 
+	"encoding/base64"
 	"encoding/json"
 	"image"
 	_ "image/gif"
@@ -276,10 +277,10 @@ func (c *clipApp) startUI() {
 			c2.PutDefaultBackgroundColor(edge.COREWEBVIEW2_COLOR{A: 255, R: 0x16, G: 0x16, B: 0x1a})
 		}
 	}
-	if w3 := w.GetICoreWebView2_3(); w3 != nil {
-		w3.SetVirtualHostNameToFolderMapping("clip.alts", c.dir, 1) // 1 = allow
-	}
-	w.Navigate("https://clip.alts/clip.html")
+	w.Resize()
+	// The page comes straight from inside the app (same way ALTS shows its side list); pictures are sent to it.
+	page, _ := clipUI.ReadFile("ui/clip.html")
+	w.NavigateToString(string(page))
 }
 
 func (c *clipApp) call(fn string, v any) {
@@ -289,16 +290,67 @@ func (c *clipApp) call(fn string, v any) {
 	}
 }
 
-// push sends the whole list to the popup.
+// push sends the whole list to the popup (pictures as data: links, kept in memory once read).
 func (c *clipApp) push() {
-	mine := c.st.Stickers
-	var built []string
-	if es, err := os.ReadDir(filepath.Join(c.dir, "builtin")); err == nil {
-		for _, e := range es {
-			built = append(built, e.Name())
+	type pic struct {
+		File string `json:"file"`
+		Src  string `json:"src"`
+	}
+	type row struct {
+		clipItem
+		Thumb string `json:"thumb,omitempty"`
+	}
+	items := make([]row, 0, len(c.st.Items))
+	for _, it := range c.st.Items {
+		r := row{clipItem: it}
+		if it.Kind == "pic" {
+			r.Thumb = c.dataURL(filepath.Join(c.picDir, strings.TrimSuffix(it.File, ".png")+".thumb.png"))
+		}
+		items = append(items, r)
+	}
+	mine := []pic{}
+	for _, f := range c.st.Stickers {
+		if d := c.dataURL(filepath.Join(c.mineDir, f)); d != "" {
+			mine = append(mine, pic{f, d})
 		}
 	}
-	c.call("load", map[string]any{"items": c.st.Items, "mine": mine, "builtin": built, "start": !c.st.NoStart, "key": c.keyName})
+	c.call("load", map[string]any{"items": items, "mine": mine, "start": !c.st.NoStart, "key": c.keyName})
+}
+
+// assets: the starter stickers + emoji list, once when the popup page is ready.
+func (c *clipApp) assets() {
+	type pic struct {
+		File string `json:"file"`
+		Src  string `json:"src"`
+	}
+	var built []pic
+	if es, err := builtinStickers.ReadDir("ui/stickers"); err == nil {
+		for _, e := range es {
+			if b, err := builtinStickers.ReadFile("ui/stickers/" + e.Name()); err == nil {
+				built = append(built, pic{e.Name(), "data:image/png;base64," + base64.StdEncoding.EncodeToString(b)})
+			}
+		}
+	}
+	em, _ := clipUI.ReadFile("ui/emoji.txt")
+	c.call("assets", map[string]any{"builtin": built, "emoji": string(em)})
+}
+
+var dataCache = map[string]string{}
+
+func (c *clipApp) dataURL(path string) string {
+	if d, ok := dataCache[path]; ok {
+		return d
+	}
+	b, err := os.ReadFile(path)
+	if err != nil || len(b) > 8<<20 {
+		return ""
+	}
+	d := "data:image/png;base64," + base64.StdEncoding.EncodeToString(b)
+	if len(dataCache) > 300 {
+		clear(dataCache)
+	}
+	dataCache[path] = d
+	return d
 }
 
 func (c *clipApp) save() { saveClip(c.json, c.st) }
@@ -338,6 +390,7 @@ func (c *clipApp) do(m clipMsg) {
 	switch m.T {
 	case "ready":
 		c.uiReady = true
+		c.assets()
 		c.push()
 		if c.tellKey {
 			c.show()
@@ -507,6 +560,12 @@ func (c *clipApp) show() {
 
 	// a hotkey from Windows lets this app come to the front
 	pShowWindow.Call(c.win, swShow)
+	if c.ui != nil {
+		if ctl := c.ui.GetController(); ctl != nil {
+			ctl.PutIsVisible(true)
+		}
+		c.ui.Resize()
+	}
 	pBringWindowToTop.Call(c.win)
 	pSetForegroundWindow.Call(c.win)
 	if c.ui != nil {
@@ -528,6 +587,11 @@ func (c *clipApp) show() {
 func (c *clipApp) hide() {
 	pKillTimer.Call(c.win, timerHide)
 	pShowWindow.Call(c.win, swHide)
+	if c.ui != nil {
+		if ctl := c.ui.GetController(); ctl != nil {
+			ctl.PutIsVisible(false) // nothing to draw while hidden
+		}
+	}
 }
 
 // pasteWith puts the thing on the clipboard, goes back to your app and presses Ctrl+V there.

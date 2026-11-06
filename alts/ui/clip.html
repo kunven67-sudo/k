@@ -89,11 +89,7 @@ function stickerLabel(f) { return f.replace(/\.png$/i, '').replace(/_/g, ' '); }
 
 async function loadEmoji() {
   if (emoji) return emoji;
-  if (!emojiReq) emojiReq = fetch('emoji.txt').then(r => r.text()).then(t => {
-    emoji = t.split('\n').filter(Boolean).map(l => { const [e, n, g] = l.split('\t'); return { e, n, g }; });
-    return emoji;
-  }).catch(() => (emoji = []));
-  return emojiReq;
+  return new Promise(res => { emojiReq = res; }); // ALTS sends the list (clip.assets)
 }
 
 function button(txt, title, fn) {
@@ -118,7 +114,7 @@ function draw() {
       for (const it of list) {
         const d = el('div', 'item' + (it.pinned ? ' pinned' : ''));
         if (it.kind === 'pic') {
-          const im = el('img'); im.src = 'pics/' + it.file.replace(/\.png$/, '.thumb.png'); im.alt = '';
+          const im = el('img'); im.src = it.thumb || ''; im.alt = '';
           d.append(im, el('div', 'when', it.w + ' x ' + it.h + ' picture · ' + ago(it.at)));
         } else {
           d.append(el('div', 't', it.text.length > 600 ? it.text.slice(0, 600) + '…' : it.text), el('div', 'when', ago(it.at)));
@@ -137,17 +133,17 @@ function draw() {
     }
   } else if (tab === 'stick') {
     const add = (title, files, mine) => {
-      files = files.filter(f => !q || stickerLabel(f).includes(q));
+      files = files.filter(f => !q || stickerLabel(f.file).includes(q));
       if (!files.length) return;
       L.append(el('div', 'h', title));
       const g = el('div', 'grid');
       for (const f of files) {
         const c = el('div', 'st');
-        c.title = mine ? 'Your sticker' : stickerLabel(f);
-        const im = el('img'); im.src = (mine ? 'stickers/' : 'builtin/') + encodeURIComponent(f); im.alt = '';
+        c.title = mine ? 'Your sticker' : stickerLabel(f.file);
+        const im = el('img'); im.src = f.src; im.alt = '';
         c.append(im);
-        if (mine) { const x = button('✕', 'Remove', () => send({ t: 'unsticker', file: f })); x.className = 'x'; c.append(x); }
-        c.addEventListener('click', () => send({ t: 'sticker', file: f, mine }));
+        if (mine) { const x = button('✕', 'Remove', () => send({ t: 'unsticker', file: f.file })); x.className = 'x'; c.append(x); }
+        c.addEventListener('click', () => send({ t: 'sticker', file: f.file, mine }));
         g.append(c);
         cells.push(c);
       }
@@ -222,7 +218,13 @@ document.addEventListener('keydown', e => {
 });
 
 window.clip = {
-  load(s) { S = Object.assign({ items: [], mine: [], builtin: [], start: true }, s); S.items = S.items || []; S.mine = S.mine || []; S.builtin = S.builtin || []; draw(); if ($('#menu').style.display === 'block') menu(true); },
+  assets(a) { // starter stickers + the emoji list, sent once
+    S.builtin = a.builtin || [];
+    emoji = (a.emoji || '').split('\n').filter(Boolean).map(l => { const [e, n, g] = l.split('\t'); return { e, n, g }; });
+    if (emojiReq) emojiReq(emoji);
+    draw();
+  },
+  load(s) { const b = S.builtin; S = Object.assign({ items: [], mine: [], start: true }, s); S.items = S.items || []; S.mine = S.mine || []; S.builtin = b || []; draw(); if ($('#menu').style.display === 'block') menu(true); },
   shown() { $('#q').value = ''; sel = 0; menu(false); $('#list').scrollTop = 0; draw(); $('#q').focus(); },
   toast,
   stuck(who) { toast(who === '' ? 'Your clipboard works fine right now. Copy something and it shows up here.' : who === '?' ? 'Something is holding the clipboard, but Windows won\'t say what. Restarting the PC clears it.' : who + ' is holding the clipboard open, so copying fails. Close ' + who + ' (or restart it) and copying works again.'); }
