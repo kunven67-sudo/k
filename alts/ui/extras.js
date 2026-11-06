@@ -67,11 +67,8 @@
     return sendNow(c);
   }
 
-  // ---------- the bar: round buttons left of the box + quick buttons above it ----------
+  // ---------- the bar: round buttons left of the chat box (nothing sits over claude.ai's own stuff) ----------
   const side = tag(mk('div', { position: 'fixed', zIndex: '2147483646', display: 'none', flexDirection: 'column', gap: '6px' }));
-  const top = tag(mk('div', { position: 'fixed', zIndex: '2147483646', display: 'none', gap: '6px', flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none' }));
-  const warn = tag(mk('div', { position: 'fixed', zIndex: '2147483646', display: 'none', gap: '8px', alignItems: 'center', background: '#3a2a12', color: '#ffd9a0',
-    border: '1px solid #6b4a1a', borderRadius: '999px', padding: '4px 6px 4px 12px', font: '600 12px ' + FONT }));
   function round(txt, title, fn) {
     const b = tag(hover(mk('button', ROUND, txt), { background: '#2a2a33', color: '#fff' }, { background: '#1f1f25', color: '#d6d6de' }));
     b.title = title;
@@ -79,59 +76,73 @@
     b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); fn(b); });
     return b;
   }
-  function chip(txt, title, fn, menu) {
-    const b = tag(hover(mk('button', BTN, txt), { borderColor: '#5a5a66', color: '#fff' }, { borderColor: '#3a3a44', color: '#d6d6de' }));
-    b.title = title;
-    b.addEventListener('mousedown', e => e.preventDefault());
-    b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); fn(b); });
-    if (menu) b.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); menu(b); });
-    return b;
-  }
-  const laterBtn = round('⏰', 'Send later: saves what you typed. When your limit is back, ALTS pings you and you press Send.', () => later());
+  const laterBtn = round('\u23F0', 'Send later: saves what you typed. When your limit is back, ALTS pings you and you press Send.', () => later());
+  const quickBtn = round('\u26A1', 'Quick buttons: things you say a lot, one click sends them', b => quickToggle(b));
   side.append(
     round('\u{1F600}', 'Emoji + stickers', b => pickerToggle()),
+    quickBtn,
     laterBtn,
-    round('↻', 'Fresh chat: Claude writes a handoff, then a new chat picks it up (saves usage)', () => fresh()));
+    round('\u21BB', 'Fresh chat: Claude writes a handoff, then a new chat picks it up (saves usage)', () => fresh()));
   const badge = tag(mk('div', { position: 'absolute', top: '-4px', right: '-4px', minWidth: '16px', height: '16px', borderRadius: '8px', background: '#d97757', color: '#fff',
     font: '700 10px/16px ' + FONT, textAlign: 'center', padding: '0 4px', display: 'none', boxSizing: 'border-box' }));
   laterBtn.style.position = 'relative';
   laterBtn.append(badge);
 
+  // ---------- quick buttons (the lightning button) ----------
   const DEFAULT_QUICK = ['Fix that: redo your last reply better, no mistakes', 'Keep going', 'Explain that simpler', 'Picture first: show me a picture of it before you build it'];
+  let qmenu = null;
+  function quickToggle(btn) {
+    if (qmenu && qmenu.isConnected) { qmenu.remove(); return; }
+    qmenu = tag(mk('div', { position: 'fixed', zIndex: '2147483647', width: '270px', maxHeight: '380px', overflowY: 'auto', background: '#1b1b20', border: '1px solid #2c2c35',
+      borderRadius: '12px', padding: '6px', boxShadow: '0 14px 44px rgba(0,0,0,.55)', font: '13px ' + FONT, color: '#ececf1', boxSizing: 'border-box' }));
+    drawQuick();
+    R().append(qmenu);
+    const r = btn.getBoundingClientRect(), h = qmenu.getBoundingClientRect().height;
+    Object.assign(qmenu.style, { left: Math.min(innerWidth - 280, r.right + 8) + 'px', top: Math.max(8, Math.min(innerHeight - h - 8, r.bottom - h)) + 'px' });
+  }
   function drawQuick() {
-    top.textContent = '';
+    qmenu.textContent = '';
+    qmenu.append(mk('div', { color: '#9a9aa6', font: '600 11.5px ' + FONT, padding: '4px 8px 6px' }, 'Quick buttons (click = send it)'));
+    const item = (txt, title, fn) => {
+      const b = hover(mk('button', { flex: '1', minWidth: '0', textAlign: 'left', border: '0', background: 'transparent', color: '#ececf1', font: '13px ' + FONT, padding: '7px 8px',
+        borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }, txt), { background: '#2a2a33' }, { background: 'transparent' });
+      b.title = title;
+      b.addEventListener('mousedown', e => e.preventDefault());
+      b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); fn(); });
+      return b;
+    };
     for (const q of store.get('alts-quick', DEFAULT_QUICK)) {
-      const label = q.split(':')[0].slice(0, 28);
-      top.append(chip(label, q + '\n(click = send it, right-click = remove)', () => say(q), () => {
-        if (confirm('Remove the quick button "' + label + '"?')) { store.set('alts-quick', store.get('alts-quick', DEFAULT_QUICK).filter(x => x !== q)); drawQuick(); }
-      }));
+      const row = mk('div', { display: 'flex', alignItems: 'center', gap: '2px' });
+      const x = hover(mk('button', { border: '0', background: 'transparent', color: '#7d7d88', width: '26px', height: '26px', flex: '0 0 26px', borderRadius: '7px', cursor: 'pointer', font: '12px ' + FONT }, '\u2715'),
+        { color: '#ff8b8b', background: '#2a2a33' }, { color: '#7d7d88', background: 'transparent' });
+      x.title = 'Remove this one';
+      x.addEventListener('click', e => { e.stopPropagation(); store.set('alts-quick', store.get('alts-quick', DEFAULT_QUICK).filter(y => y !== q)); drawQuick(); });
+      row.append(item(q.split(':')[0].slice(0, 44), q, () => { qmenu.remove(); say(q); }), x);
+      qmenu.append(row);
     }
-    top.append(chip('+', 'Add a quick button for something you say a lot', () => {
+    qmenu.append(item('+ Add one', 'Add a quick button for something you say a lot', () => {
       const c = composer(), now = c ? boxText(c) : '';
       const t = prompt('What should this button send?', now);
       if (t && t.trim()) { store.set('alts-quick', [...store.get('alts-quick', DEFAULT_QUICK), t.trim().slice(0, 2000)]); drawQuick(); }
     }));
   }
-  drawQuick();
+  document.addEventListener('mousedown', e => { if (qmenu && qmenu.isConnected && !qmenu.contains(e.target) && e.target !== quickBtn) qmenu.remove(); }, true);
 
   let lastPos = '';
   function place() {
     if (!R() || !document.body) return;
-    if (!side.isConnected) { R().append(side, top, warn); lastPos = ''; } // first time, or the page wiped it
+    if (!side.isConnected) { R().append(side); lastPos = ''; } // first time, or the page wiped it
     const c = composer();
     const show = c && document.visibilityState === 'visible' && !document.querySelector('[role="dialog"]');
-    if (!show) { side.style.display = top.style.display = warn.style.display = 'none'; return; }
+    if (!show) { side.style.display = 'none'; return; }
     const r = frame(c).getBoundingClientRect();
-    const pos = [r.left, r.top, r.width].map(Math.round).join();
+    const pos = [r.left, r.top, r.bottom, r.width].map(Math.round).join();
     side.style.display = 'flex';
-    top.style.display = store.get('alts-quick-off', false) ? 'none' : 'flex';
     if (pos === lastPos) return;
     lastPos = pos;
     const leftRoom = r.left > 48;
-    Object.assign(side.style, leftRoom ? { left: (r.left - 40) + 'px', top: Math.max(8, r.bottom - 102) + 'px', flexDirection: 'column' }
-      : { left: (r.left + 4) + 'px', top: Math.max(8, r.top - 72) + 'px', flexDirection: 'row' });
-    Object.assign(top.style, { left: (r.left + (leftRoom ? 0 : 110)) + 'px', top: Math.max(8, r.top - 34) + 'px', maxWidth: (r.width - (leftRoom ? 0 : 110)) + 'px' });
-    Object.assign(warn.style, { left: (r.left) + 'px', top: Math.max(8, r.top - 66) + 'px' });
+    Object.assign(side.style, leftRoom ? { left: (r.left - 40) + 'px', top: Math.max(8, r.bottom - 138) + 'px', flexDirection: 'column' }
+      : { left: (r.left + 4) + 'px', top: Math.max(8, r.top - 38) + 'px', flexDirection: 'row' });
     if (picker && picker.isConnected) placePicker();
   }
   setInterval(place, 400);
@@ -156,7 +167,7 @@
     const c = composer();
     if (!c) return;
     const r = frame(c).getBoundingClientRect();
-    Object.assign(picker.style, { left: Math.max(8, Math.min(innerWidth - 360, r.left)) + 'px', top: Math.max(8, r.top - 446) + 'px' });
+    Object.assign(picker.style, { left: Math.max(8, Math.min(innerWidth - 360, r.left)) + 'px', top: Math.max(8, r.top - 412) + 'px' });
   }
   function pickerToggle() {
     if (picker && picker.isConnected) { picker.remove(); return; }
@@ -276,11 +287,10 @@
   let wasLimited = store.get('alts-was-limited', false);
   addEventListener('alts-usage', e => {
     const u = e.detail, now = limited(u);
-    if (now) {
-      warn.textContent = '';
-      warn.append(mk('span', null, 'Limit hit' + (backAt(u) ? ': back at ' + backAt(u) : '') + '. Type + press ⏰ and ALTS pings you.'));
-      warn.style.display = 'flex';
-    } else if (wasLimited || warn.textContent.startsWith('Limit')) { warn.style.display = 'none'; warn.textContent = ''; }
+    laterBtn.style.boxShadow = now ? '0 0 0 2px #ef5b5b' : '';
+    laterBtn.title = now ? 'Limit hit' + (backAt(u) ? ', back at ' + backAt(u) : '') + '. Type your message, press this, and ALTS pings you when it\'s back.'
+      : 'Send later: saves what you typed. When your limit is back, ALTS pings you and you press Send.';
+    if (now && !wasLimited) toast('Limit hit' + (backAt(u) ? ' (back at ' + backAt(u) + ')' : '') + '. Type your message and press \u23F0: ALTS pings you when it\'s back.');
     if (wasLimited && !now && store.get(LK, []).length) {
       send({ t: 'ping', text: 'Your limit is back! ' + store.get(LK, []).length + ' saved message(s) ready.' });
       try { // a little two-note chime
@@ -330,13 +340,10 @@
     const n = A.lastCount, key = 'alts-longwarn:' + location.pathname;
     if (!n || n.words < 45000 || sessionStorage.getItem(key) || limited(A.lastUsage)) return;
     sessionStorage.setItem(key, '1');
-    warn.textContent = '';
-    const go = mk('button', Object.assign({}, BTN, { background: '#d97757', color: '#fff', border: '0' }), '↻ Fresh chat');
-    go.addEventListener('click', () => { warn.style.display = 'none'; fresh(); });
-    const x = mk('button', Object.assign({}, BTN, { border: '0', background: 'transparent', color: '#ffd9a0' }), '✕');
-    x.addEventListener('click', () => { warn.style.display = 'none'; });
-    warn.append(mk('span', null, 'Long chat (' + Math.round(n.words / 1000) + 'k words): every message costs more usage.'), go, x);
-    warn.style.display = 'flex';
+    const b = box('Long chat');
+    b.say('This chat has ' + Math.round(n.words / 1000) + 'k words: every message now costs a lot more usage.');
+    b.button('\u21BB Fresh chat', true, () => { b.close(); fresh(); });
+    b.button('Not now', false, () => b.close());
   }, 15000);
 
   // ---------- autocorrect while typing (common slips, Ctrl+Z undoes it) ----------
@@ -490,11 +497,44 @@
     if (/base64/i.test(enc) || (v.length > 64 && /^[A-Za-z0-9+/=\s]+$/.test(v))) { try { return b64(v.replace(/\s+/g, '')); } catch (e) {} }
     return new TextEncoder().encode(v);
   }
+  // ALTS writes the file into Downloads itself: the page sends it over in pieces.
+  const pend = {};
+  const mb = n => (n / 1048576).toFixed(n < 1048576 ? 2 : 1) + ' MB';
+  function b64of(u) { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+  async function hand(bytes, name, chipEl) {
+    const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    pend[id] = chipEl;
+    send({ t: 'fsave-start', id, name, size: bytes.length });
+    const CH = 512 * 1024;
+    for (let o = 0; o < bytes.length; o += CH) {
+      send({ t: 'fsave-part', id, b64: b64of(bytes.subarray(o, Math.min(bytes.length, o + CH))) });
+      chipEl.textContent = 'Saving ' + Math.round(Math.min(1, (o + CH) / bytes.length) * 100) + '%';
+      await new Promise(r => setTimeout(r, 0));
+    }
+    send({ t: 'fsave-end', id });
+  }
+  A.fileSaved = r => {
+    const c = r && pend[r.id];
+    if (!c) return;
+    delete pend[r.id];
+    delete c.dataset.busy;
+    if (r.ok) {
+      c.dataset.saved = r.path;
+      c.textContent = '\u2714 Saved (' + mb(r.size) + ') \u00b7 Show';
+      c.style.background = '#2f9e6b';
+      c.title = 'In Downloads: ' + r.path + ' (click = show it in its folder)';
+      setTimeout(() => c.remove(), 25000);
+    } else {
+      c.textContent = '\u2B07 Download';
+      toast('Couldn\'t save it: ' + (r.error || 'unknown') + '. Tell Claude what this says.');
+    }
+  };
   async function download(dpath, name, chipEl) {
     const t = tpl();
     if (!t) { toast('First open any picture in this list once (so ALTS learns how to get files), then press Download again.'); return; }
     const real = realPath(t, dpath);
     chipEl.textContent = 'Downloading...';
+    chipEl.dataset.busy = '1';
     try {
       const init = { method: t.method, credentials: 'include', headers: Object.fromEntries(Object.entries(t.headers || {}).filter(([k]) => !/^(content-length|cookie|host)$/i.test(k))) };
       if (t.body != null && t.method !== 'GET' && t.method !== 'HEAD') init.body = swap(t.body, t.path, real);
@@ -504,16 +544,11 @@
       let bytes;
       if (/json/i.test(ct)) { bytes = pickContent(await r.json(), real); if (!bytes) throw new Error('no file in the answer'); }
       else bytes = new Uint8Array(await r.arrayBuffer());
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
-      a.download = name;
-      a.dataset.alts = '1';
-      document.body.append(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-      chipEl.textContent = 'Saved to Downloads';
-      send({ t: 'filelearn', url: 'downloaded ' + name + ' (' + bytes.length + ' bytes)' });
+      await hand(bytes, name, chipEl);
+      send({ t: 'filelearn', url: 'got ' + name + ' (' + bytes.length + ' bytes), handing it to ALTS' });
     } catch (e) {
-      chipEl.textContent = 'Download';
+      chipEl.textContent = '\u2B07 Download';
+      delete chipEl.dataset.busy;
       send({ t: 'filelearn', url: 'download failed: ' + (e && e.message || e) });
       toast('Couldn\'t download it: ' + (e && e.message || e) + '. Open a picture in the list once more (ALTS re-learns), then try again. If it still fails, tell Claude what this says.');
     }
@@ -535,7 +570,11 @@
     chip.dataset.alts = '1';
     chip.title = 'Save ' + name + ' to your Downloads folder';
     const mine = chip;
-    chip.addEventListener('click', ev => { ev.stopPropagation(); download(dpath, name, mine); });
+    chip.addEventListener('click', ev => {
+      ev.stopPropagation();
+      if (mine.dataset.saved) send({ t: 'fsave-show', path: mine.dataset.saved });
+      else if (!mine.dataset.busy) download(dpath, name, mine);
+    });
     A.R ? A.R().append(chip) : document.documentElement.append(chip);
     setTimeout(() => { if (mine.isConnected && mine.textContent === '⬇ Download') mine.remove(); }, 15000);
   }, true);

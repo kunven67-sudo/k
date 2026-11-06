@@ -785,7 +785,7 @@ function buildLook(card) {
   card.append(g);
   const tips = el("div", "tips");
   ["Win+V: ALTS Clipboard (everything you copied, pins, stickers, emoji). It runs by itself and starts with Windows; its own settings are under the gear in that box.",
-   "In a chat, left of the chat box: emoji + stickers, \u23F0 Send later, \u21BB Fresh chat. Quick buttons sit above the box (right-click one to remove it)."].forEach(t => tips.append(el("div", "", t)));
+   "In a chat, left of the chat box: emoji + stickers, \u26A1 quick buttons, \u23F0 Send later, \u21BB Fresh chat."].forEach(t => tips.append(el("div", "", t)));
   card.append(tips);
   const foot = el("div", "foot");
   const ok = el("button", "primary", "Done");

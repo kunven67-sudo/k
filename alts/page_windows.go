@@ -46,6 +46,11 @@ type pageMsg struct {
 	WR      string  `json:"wr"`
 	Text    string  `json:"text"`
 	Mine    bool    `json:"mine"`
+	ID      string  `json:"id"`   // Files panel saves (panelsave_windows.go)
+	Name    string  `json:"name"` //
+	Size    int64   `json:"size"` //
+	B64     string  `json:"b64"`  //
+	Path    string  `json:"path"` //
 }
 
 type countInfo struct {
@@ -151,6 +156,8 @@ func (a *App) page(id string, m pageMsg) {
 		}
 	case "ping":
 		a.ping(id, m.Text)
+	case "fsave-start", "fsave-part", "fsave-end", "fsave-show":
+		a.panelSave(id, m)
 	case "filelearn": // the Files panel download (extras.js): noted so a broken one can be looked into
 		if len(m.URL) < 600 {
 			a.fileLog("files panel: " + m.URL)
