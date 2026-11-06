@@ -151,6 +151,10 @@ func (a *App) page(id string, m pageMsg) {
 		}
 	case "ping":
 		a.ping(id, m.Text)
+	case "filelearn": // the Files panel download (extras.js): noted so a broken one can be looked into
+		if len(m.URL) < 600 {
+			a.fileLog("files panel: " + m.URL)
+		}
 	}
 }
 

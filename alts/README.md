@@ -56,6 +56,11 @@ say a lot (+ adds one, right-click removes). A warning shows when a chat gets so
 costs a lot more usage. Common typos get fixed as you type (Ctrl+Z undoes it), and misspelled words get
 the red line + right-click fixes. The gear at the bottom of the side list switches ALTS's look.
 
+**Files panel Download** (Claude Code chats): claude.ai's Files panel only shows pictures and text. Click any
+file there (an .exe, .zip...) and ALTS adds a **Download** button. The very first time, open any picture in that
+list once: ALTS watches how claude.ai loads it and then gets any file the same way, into Downloads with no
+Windows warning. What it learned and each download is noted in `files.log`.
+
 ## Claude's files (no "this could harm your PC" warnings)
 
 Windows marks every download as "from the internet". That mark is what makes it warn: Edge's "this
