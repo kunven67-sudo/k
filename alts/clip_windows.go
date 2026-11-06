@@ -152,10 +152,10 @@ func main() { runClip() }
 func runClip() {
 	h, _, err := pCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(u16(`Local\ALTS-clip`))))
 	if h != 0 && err == windows.ERROR_ALREADY_EXISTS {
-		if w, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16(clipClass))), 0); w != 0 {
-			pPostMessageW.Call(w, wmClipShow, 0, 0)
+		// Another ALTS Clipboard is running (an older one, or a stuck one): opening this one replaces it.
+		if !replaceRunning() {
+			return
 		}
-		return
 	}
 	if pSetProcessDpiAwareCtx.Find() == nil {
 		pSetProcessDpiAwareCtx.Call(^uintptr(3))
@@ -867,4 +867,30 @@ func clipProc(h, m, wp, lp uintptr) uintptr {
 	}
 	r, _, _ := pDefWindowProcW.Call(h, m, wp, lp)
 	return r
+}
+
+// replaceRunning ends the ALTS Clipboard that's already running (only that app: found by its own window),
+// so a newer or fixed one can take over. false = couldn't, leave it be.
+func replaceRunning() bool {
+	for i := 0; i < 3; i++ {
+		w, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16(clipClass))), 0)
+		if w == 0 {
+			return true // it's already gone
+		}
+		var pid uint32
+		pGetWindowThreadID.Call(w, uintptr(unsafe.Pointer(&pid)))
+		if pid == 0 || pid == windows.GetCurrentProcessId() {
+			return false
+		}
+		p, err := windows.OpenProcess(windows.PROCESS_TERMINATE|windows.SYNCHRONIZE, false, pid)
+		if err != nil {
+			return false
+		}
+		windows.TerminateProcess(p, 0)
+		windows.WaitForSingleObject(p, 3000)
+		windows.CloseHandle(p)
+		time.Sleep(200 * time.Millisecond)
+	}
+	w, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16(clipClass))), 0)
+	return w == 0
 }

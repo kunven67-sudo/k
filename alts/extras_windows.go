@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows/registry"
@@ -32,8 +33,16 @@ func startClipHelper() {
 	if err != nil {
 		return
 	}
-	clip := filepath.Join(filepath.Dir(exe), "ALTS-Clip.exe")
-	if _, err := os.Stat(clip); err == nil {
+	// the newest one next to ALTS (Edge names a second download "ALTS-Clip (1).exe")
+	clip, newest := "", time.Time{}
+	if m, _ := filepath.Glob(filepath.Join(filepath.Dir(exe), "ALTS-Clip*.exe")); len(m) > 0 {
+		for _, f := range m {
+			if st, err := os.Stat(f); err == nil && st.ModTime().After(newest) {
+				clip, newest = f, st.ModTime()
+			}
+		}
+	}
+	if clip != "" {
 		exec.Command(clip).Start()
 	}
 }
