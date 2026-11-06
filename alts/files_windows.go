@@ -356,6 +356,9 @@ func (a *App) finishDownload(d *download, path string, unmarkErr error) {
 			}
 			a.fileLog("ready, no warning: " + path)
 			a.toast("File from Claude ready. No warning.")
+			if strings.EqualFold(filepath.Ext(path), ".zip") {
+				a.autoUnzip(path, d.from, acct)
+			}
 		})
 	}()
 }
@@ -547,4 +550,36 @@ func showInFolder(path string) {
 	}
 	pShellExecuteW.Call(0, uintptr(unsafe.Pointer(u16("open"))), uintptr(unsafe.Pointer(u16("explorer.exe"))),
 		uintptr(unsafe.Pointer(u16(`/select,"`+path+`"`))), 0, swShowNormal)
+}
+
+// autoUnzip: a zip from Claude with an app (.exe) inside gets unzipped right away (unzip.go).
+func (a *App) autoUnzip(zipPath, from, acct string) {
+	dir := filepath.Dir(zipPath)
+	go func() {
+		exes, err := unzipExe(zipPath, dir)
+		a.post(func() {
+			if err != nil {
+				a.fileLog("unzip " + zipPath + ": " + err.Error())
+				a.toast("Couldn't unzip it by itself: " + err.Error() + ". Right-click it > Extract All.")
+				return
+			}
+			if len(exes) == 0 {
+				return // not an app zip: left alone
+			}
+			for _, p := range exes {
+				hash, size, herr := hashFile(p)
+				if herr != nil {
+					continue
+				}
+				a.files.add(fileRec{ID: newFileID(), Name: filepath.Base(p), Path: p, Size: size, Hash: hash,
+					Added: time.Now().Unix(), From: from, Account: acct})
+			}
+			a.files.New = true
+			a.saveFileList()
+			a.push()
+			a.sendFiles()
+			a.fileLog("unzipped " + zipPath + ": " + strings.Join(exes, ", "))
+			a.toast("Unzipped " + filepath.Base(exes[0]) + " into Downloads. Ready to open, no warning.")
+		})
+	}()
 }
