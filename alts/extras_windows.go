@@ -43,7 +43,7 @@ func startClipHelper() {
 		}
 	}
 	if clip != "" {
-		exec.Command(clip).Start()
+		exec.Command(clip, "--boot").Start() // quiet: it doesn't pop up when ALTS starts it
 	}
 }
 

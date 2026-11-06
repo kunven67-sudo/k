@@ -12,11 +12,13 @@ import (
 
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	"image/png"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -74,6 +76,7 @@ const (
 	wmSysKeyUp   = 0x0105
 	wmClipShow   = wmApp + 10
 	wmClipRun    = wmApp + 11
+	wmClipQuit   = wmApp + 12 // a newer ALTS Clipboard asks this one to close
 
 	vkLWin         = 0x5B
 	vkRWin         = 0x5C
@@ -94,6 +97,7 @@ const (
 	timerHide      = 2
 	timerPaste     = 3
 	timerWatch     = 4
+	timerReady     = 5
 	keyeventfKeyUp = 0x0002
 	inputKeyboard  = 1
 	clipW, clipH   = 380, 500 // normal (96 dpi) pixels
@@ -137,6 +141,7 @@ type clipApp struct {
 	shownAt                                  time.Time
 	grace                                    time.Duration // how long it may stay up without being the window you use
 	pasteTries                               int
+	shownOnce                                bool
 	fmtPNG, fmtNoWatch, fmtNoHist, fmtIgnore uintptr
 	keep                                     []any
 }
@@ -150,22 +155,41 @@ func init() { runtime.LockOSThread() }
 func main() { runClip() }
 
 func runClip() {
+	// --boot = started with Windows (or by ALTS): stay quiet. No --boot = you opened it: it pops up and says so.
+	boot := len(os.Args) > 1 && os.Args[1] == "--boot"
+	root, err := os.UserCacheDir()
+	if err != nil {
+		msgBox("ALTS Clipboard can't find your AppData folder.", mbOK|mbIconError|0x50000)
+		return
+	}
+	dir := filepath.Join(root, "ALTS", "clip")
+	os.MkdirAll(dir, 0o755)
+	startLog(filepath.Join(dir, "clip.log"))
+	exe, _ := os.Executable()
+	clipLog("start: %s (boot=%v, pid %d)", exe, boot, windows.GetCurrentProcessId())
+
 	h, _, err := pCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(u16(`Local\ALTS-clip`))))
 	if h != 0 && err == windows.ERROR_ALREADY_EXISTS {
-		// Another ALTS Clipboard is running (an older one, or a stuck one): opening this one replaces it.
-		if !replaceRunning() {
+		running := runningClipExe()
+		clipLog("another one is running: %q", running)
+		if boot && (running == "" || strings.EqualFold(running, exe)) {
+			clipLog("same app already running, nothing to do")
 			return
 		}
+		// you opened it (or it's a different, older copy): this one takes over
+		if !replaceRunning() {
+			clipLog("couldn't close the running one")
+			msgBox("ALTS Clipboard is already running and wouldn't close.\n\nRestart your PC, then open ALTS-Clip.exe again.", mbOK|mbIconError|0x50000)
+			return
+		}
+		clipLog("closed the old one")
+		time.Sleep(800 * time.Millisecond)
 	}
 	if pSetProcessDpiAwareCtx.Find() == nil {
 		pSetProcessDpiAwareCtx.Call(^uintptr(3))
 	}
 	pCoInitializeEx.Call(0, 2)
-	root, err := os.UserCacheDir()
-	if err != nil {
-		return
-	}
-	c := &clipApp{dir: filepath.Join(root, "ALTS", "clip")}
+	c := &clipApp{dir: dir}
 	clip = c
 	c.picDir = filepath.Join(c.dir, "pics")
 	c.mineDir = filepath.Join(c.dir, "stickers")
@@ -191,6 +215,8 @@ func runClip() {
 	c.win, _, _ = pCreateWindowExW.Call(wsExToolWindow|wsExTopmost, uintptr(unsafe.Pointer(u16(clipClass))), uintptr(unsafe.Pointer(u16("ALTS Clipboard"))),
 		wsPopup|wsClipChildren, 0, 0, clipW, clipH, 0, 0, inst, 0)
 	if c.win == 0 {
+		clipLog("couldn't make the window")
+		msgBox("ALTS Clipboard couldn't open its window. Restart your PC and try again.", mbOK|mbIconError|0x50000)
 		return
 	}
 	darkTitle(c.win)
@@ -201,9 +227,17 @@ func runClip() {
 	} else if r, _, _ := pRegisterHotKey.Call(c.win, 2, modControl|modAlt|modNoRepeat, 'V'); r != 0 {
 		c.keyName = "Ctrl+Alt+V"
 	}
-	c.startUI()
+	clipLog("shortcut: %q", c.keyName)
+	if !c.startUI() {
+		clipLog("WebView2 didn't start")
+		msgBox("ALTS Clipboard couldn't start its window (Microsoft Edge WebView2 didn't start).\n\nTell Claude this message.", mbOK|mbIconError|0x50000)
+		return
+	}
+	clipLog("window made, loading the page")
+	pSetTimer.Call(c.win, timerReady, 20000, 0) // the page has 20 s to show up, else you get told
 
-	if c.st.KeyTold != c.keyName { // say once which key opens it
+	// You opened it yourself (or the shortcut changed): pop up and say which key opens it.
+	if !boot || c.st.KeyTold != c.keyName {
 		c.st.KeyTold = c.keyName
 		c.save()
 		c.tellKey = true // shown once the popup page is ready
@@ -258,20 +292,20 @@ func (c *clipApp) autostart(on bool) {
 		return
 	}
 	if exe, err := os.Executable(); err == nil {
-		k.SetStringValue(runName, `"`+exe+`"`)
+		k.SetStringValue(runName, `"`+exe+`" --boot`)
 	}
 }
 
-func (c *clipApp) startUI() {
+func (c *clipApp) startUI() bool {
 	w := edge.NewChromium()
-	w.DataPath = filepath.Join(c.dir, "webview")
+	w.DataPath = filepath.Join(c.dir, "wv2") // its own browser folder (the first builds' "webview" one can still be in use by a stuck copy)
 	w.MessageCallback = c.onMessage
 	w.AcceleratorKeyCallback = func(vk uint) bool {
 		return vk == vkF5 || vk == vkF12 || (keyDown(vkControl) && strings.ContainsRune("PFRSUOGJ", rune(vk)))
 	}
 	c.keep = append(c.keep, w)
 	if !w.Embed(c.win) {
-		return
+		return false
 	}
 	c.ui = w
 	if s, err := w.GetSettings(); err == nil && s != nil {
@@ -289,6 +323,7 @@ func (c *clipApp) startUI() {
 	// The page comes straight from inside the app (same way ALTS shows its side list); pictures are sent to it.
 	page, _ := clipUI.ReadFile("ui/clip.html")
 	w.NavigateToString(string(page))
+	return true
 }
 
 func (c *clipApp) call(fn string, v any) {
@@ -397,7 +432,11 @@ func (c *clipApp) later(f func()) {
 func (c *clipApp) do(m clipMsg) {
 	switch m.T {
 	case "ready":
+		if !c.uiReady {
+			clipLog("page loaded")
+		}
 		c.uiReady = true
+		pKillTimer.Call(c.win, timerReady)
 		c.assets()
 		c.push()
 		if c.tellKey {
@@ -569,7 +608,7 @@ func (c *clipApp) show() {
 	// a hotkey from Windows lets this app come to the front
 	c.shownAt, c.grace = time.Now(), 1200*time.Millisecond
 	if c.tellKey {
-		c.grace = 9 * time.Second // the "which key opens it" note: it popped up by itself, give time to read
+		c.grace = 15 * time.Second // the "which key opens it" note: give time to read it
 	}
 	pSetTimer.Call(c.win, timerWatch, 400, 0)
 	pShowWindow.Call(c.win, swShow)
@@ -585,14 +624,18 @@ func (c *clipApp) show() {
 		c.ui.Focus()
 	}
 	c.call("shown", nil)
+	if !c.shownOnce {
+		c.shownOnce = true
+		clipLog("shown")
+	}
 	if c.tellKey {
 		c.tellKey = false
 		if c.keyName == "Win+V" {
-			c.call("toast", "ALTS Clipboard is on. Press Win+V anywhere to open it.")
+			c.call("note", "ALTS Clipboard is on. Press Win+V anywhere to open it.")
 		} else if c.keyName != "" {
-			c.call("toast", "Windows keeps Win+V for itself, so ALTS Clipboard opens with Ctrl+Alt+V.")
+			c.call("note", "ALTS Clipboard is on. Windows keeps Win+V for itself, so press Ctrl+Alt+V anywhere to open this.")
 		} else {
-			c.call("toast", "Another app took both Win+V and Ctrl+Alt+V. Close it and restart ALTS Clipboard.")
+			c.call("note", "ALTS Clipboard is on, but another app took both Win+V and Ctrl+Alt+V. Close that app, then open ALTS-Clip.exe again.")
 		}
 	}
 }
@@ -813,6 +856,10 @@ func clipProc(h, m, wp, lp uintptr) uintptr {
 			c.show()
 		}
 		return 0
+	case wmClipQuit:
+		clipLog("asked to close (a newer one is starting)")
+		pDestroyWindow.Call(h)
+		return 0
 	case wmClipRun:
 		clipMu.Lock()
 		q := clipQueue
@@ -842,6 +889,11 @@ func clipProc(h, m, wp, lp uintptr) uintptr {
 			}
 		case timerPaste:
 			c.pressPaste()
+		case timerReady:
+			if !c.uiReady {
+				clipLog("page didn't load in 20 s")
+				msgBox("ALTS Clipboard's window didn't load.\n\nTell Claude, and send a picture of this file:\n"+filepath.Join(c.dir, "clip.log"), mbOK|mbIconError|0x50000)
+			}
 		}
 		return 0
 	case wmActivate:
@@ -869,13 +921,42 @@ func clipProc(h, m, wp, lp uintptr) uintptr {
 	return r
 }
 
-// replaceRunning ends the ALTS Clipboard that's already running (only that app: found by its own window),
-// so a newer or fixed one can take over. false = couldn't, leave it be.
+// runningClipExe is the file the running ALTS Clipboard was started from ("" if unknown).
+func runningClipExe() string {
+	w, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16(clipClass))), 0)
+	if w == 0 {
+		return ""
+	}
+	var pid uint32
+	pGetWindowThreadID.Call(w, uintptr(unsafe.Pointer(&pid)))
+	p, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+	if err != nil {
+		return ""
+	}
+	defer windows.CloseHandle(p)
+	buf := make([]uint16, 1024)
+	n := uint32(len(buf))
+	if windows.QueryFullProcessImageName(p, 0, &buf[0], &n) != nil {
+		return ""
+	}
+	return windows.UTF16ToString(buf[:n])
+}
+
+// replaceRunning closes the ALTS Clipboard that's already running (only that app: found by its own
+// window) so this one can take over. It asks first; one that's frozen (the first builds) gets ended.
+// false = couldn't, leave it be.
 func replaceRunning() bool {
+	find := func() uintptr { w, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16(clipClass))), 0); return w }
+	if w := find(); w != 0 {
+		pPostMessageW.Call(w, wmClipQuit, 0, 0)
+		for i := 0; i < 15 && find() != 0; i++ {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 	for i := 0; i < 3; i++ {
-		w, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16(clipClass))), 0)
+		w := find()
 		if w == 0 {
-			return true // it's already gone
+			return true
 		}
 		var pid uint32
 		pGetWindowThreadID.Call(w, uintptr(unsafe.Pointer(&pid)))
@@ -891,6 +972,28 @@ func replaceRunning() bool {
 		windows.CloseHandle(p)
 		time.Sleep(200 * time.Millisecond)
 	}
-	w, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16(clipClass))), 0)
-	return w == 0
+	return find() == 0
+}
+
+// ---------- the log (MB 0x50000 = on top + to the front for the error boxes) (%LOCALAPPDATA%\ALTS\clip\clip.log): what happened, so a problem can be found ----------
+
+var logFile *os.File
+
+func startLog(path string) {
+	if st, err := os.Stat(path); err == nil && st.Size() > 256<<10 {
+		os.Rename(path, path+".old")
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	logFile = f
+	log.SetOutput(f) // the WebView2 library's own messages land here too
+	log.SetFlags(log.Ldate | log.Ltime)
+}
+
+func clipLog(format string, a ...any) {
+	if logFile != nil {
+		log.Print(fmt.Sprintf(format, a...))
+	}
 }

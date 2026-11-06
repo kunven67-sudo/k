@@ -187,7 +187,7 @@ function setTab(t) {
   $('#list').scrollTop = 0;
   draw();
 }
-function toast(t) { const b = $('#toast'); b.textContent = t; b.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => b.style.display = 'none', 3500); }
+function toast(t, ms) { const b = $('#toast'); b.textContent = t; b.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => b.style.display = 'none', ms || 3500); }
 function menu(on) {
   const m = $('#menu');
   m.style.display = on ? 'block' : 'none';
@@ -227,6 +227,7 @@ window.clip = {
   load(s) { const b = S.builtin; S = Object.assign({ items: [], mine: [], start: true }, s); S.items = S.items || []; S.mine = S.mine || []; S.builtin = b || []; draw(); if ($('#menu').style.display === 'block') menu(true); },
   shown() { $('#q').value = ''; sel = 0; menu(false); $('#list').scrollTop = 0; draw(); $('#q').focus(); },
   toast,
+  note(t) { toast(t, 15000); },
   stuck(who) { toast(who === '' ? 'Your clipboard works fine right now. Copy something and it shows up here.' : who === '?' ? 'Something is holding the clipboard, but Windows won\'t say what. Restarting the PC clears it.' : who + ' is holding the clipboard open, so copying fails. Close ' + who + ' (or restart it) and copying works again.'); }
 };
 send({ t: 'ready' });
