@@ -1,0 +1,1289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Godot Easy Mode</title>
+<style>
+:root{
+  --bg:#14171c; --panel:#1b1f26; --panel2:#222731; --line:#2e3542;
+  --text:#e6e9ef; --dim:#9aa3b2; --accent:#478cbf; --accent2:#6fb1e4;
+  --good:#5fbf77; --warn:#e0b04a; --bad:#e06b6b;
+  --code:#0f1216; --mono:Consolas,"Cascadia Mono","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:15px/1.55 "Segoe UI",system-ui,sans-serif;display:flex}
+a{color:var(--accent2)}
+nav{width:230px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;height:100vh;position:sticky;top:0}
+.brand{padding:18px 18px 14px;border-bottom:1px solid var(--line)}
+.brand b{display:block;font-size:19px;letter-spacing:.5px}
+.brand span{color:var(--dim);font-size:12.5px}
+nav button{all:unset;cursor:pointer;padding:10px 18px;color:var(--dim);border-left:3px solid transparent;font-size:14.5px}
+nav button:hover{color:var(--text);background:var(--panel2)}
+nav button.on{color:var(--text);border-left-color:var(--accent);background:var(--panel2)}
+nav .sub{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#6b7383;padding:16px 18px 4px}
+nav .foot{margin-top:auto;padding:14px 18px;font-size:12px;color:#6b7383;border-top:1px solid var(--line)}
+main{flex:1;min-width:0;overflow-y:auto;height:100vh}
+.page{display:none;max-width:900px;margin:0 auto;padding:30px 34px 80px}
+.page.on{display:block}
+h1{font-size:26px;margin:0 0 6px}
+h2{font-size:19px;margin:30px 0 10px}
+h3{font-size:16px;margin:20px 0 8px}
+.lead{color:var(--dim);margin:0 0 20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin:14px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.grid .card{margin:0}
+.card h3{margin-top:0}
+kbd{font-family:var(--mono);font-size:12.5px;background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+code{font-family:var(--mono);font-size:13.5px;background:var(--panel2);padding:1px 5px;border-radius:4px}
+.tag{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:10px;background:#2a3a4a;color:var(--accent2);margin-right:6px}
+.note{border-left:3px solid var(--warn);background:#2a2618;padding:10px 14px;border-radius:0 6px 6px 0;margin:12px 0}
+.tip{border-left:3px solid var(--good);background:#1a2a1f;padding:10px 14px;border-radius:0 6px 6px 0;margin:12px 0}
+/* node trees */
+.tree{font-family:var(--mono);font-size:13.5px;background:var(--code);border:1px solid var(--line);border-radius:6px;padding:12px 14px;line-height:1.75;white-space:pre;overflow-x:auto}
+.tree .t{color:#7fc29b}
+.tree .n{color:var(--text)}
+.tree .s{color:var(--warn)}
+.tree .c{color:#6b7383}
+/* code */
+.codewrap{position:relative;margin:10px 0}
+pre.code{margin:0;background:var(--code);border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow:auto;max-height:520px;font-family:var(--mono);font-size:13.5px;line-height:1.5;tab-size:4;-moz-tab-size:4;color:#d6dbe4}
+.copy{position:absolute;top:8px;right:8px;background:var(--accent);color:#fff;border:0;border-radius:5px;padding:6px 12px;font:600 13px "Segoe UI",sans-serif;cursor:pointer}
+.copy:hover{background:var(--accent2)}
+.copy.done{background:var(--good)}
+.k{color:#ff7085}.f{color:#57b3ff}.str{color:#ffeca1}.cm{color:#717c8e;font-style:italic}.num{color:#a1ffe0}.ty{color:#8effda}.an{color:#ffb373}
+/* recipe list */
+.recipe{border:1px solid var(--line);border-radius:8px;margin:12px 0;background:var(--panel);overflow:hidden}
+.recipe>summary{list-style:none;cursor:pointer;padding:14px 18px;display:flex;align-items:center;gap:12px}
+.recipe>summary::-webkit-details-marker{display:none}
+.recipe>summary .num1{flex:none;width:28px;height:28px;border-radius:50%;background:var(--panel2);display:grid;place-items:center;font-weight:700;font-size:13px;color:var(--dim)}
+.recipe.done>summary .num1{background:var(--good);color:#0d1a10}
+.recipe>summary b{font-size:16px}
+.recipe>summary small{display:block;color:var(--dim);font-size:13px}
+.recipe>summary .arrow{margin-left:auto;color:var(--dim);transition:transform .15s}
+.recipe[open]>summary .arrow{transform:rotate(90deg)}
+.recipe .body{padding:4px 18px 18px;border-top:1px solid var(--line)}
+.donebox{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--dim);cursor:pointer;user-select:none}
+.donebox input{width:17px;height:17px;accent-color:var(--good)}
+ol.steps{padding-left:22px}ol.steps li{margin:6px 0}
+table{border-collapse:collapse;width:100%}
+td,th{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{color:var(--dim);font-weight:600;font-size:13px}
+.progress{height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;margin:6px 0 2px}
+.progress i{display:block;height:100%;background:var(--good);width:0;transition:width .3s}
+/* fixer */
+#errBox{width:100%;min-height:90px;background:var(--code);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:12px;font:13.5px var(--mono);resize:vertical}
+#errBox:focus,#search:focus{outline:2px solid var(--accent);border-color:transparent}
+.fix{border-left:3px solid var(--bad)}
+.fix .msg{font-family:var(--mono);font-size:13px;color:#f3a3a3;margin-bottom:6px}
+#search{width:100%;background:var(--code);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:14.5px;margin-bottom:6px}
+.empty{color:var(--dim);font-style:italic}
+@media (max-width:760px){
+  body{display:block}
+  nav{width:auto;height:auto;position:static;flex-direction:row;flex-wrap:wrap}
+  nav .brand,nav .sub,nav .foot{display:none}
+  nav button{padding:10px 12px;border-left:0;border-bottom:3px solid transparent}
+  nav button.on{border-bottom-color:var(--accent)}
+  main{height:auto}
+  .page{padding:20px 16px 60px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand"><b>GODOT EASY MODE</b><span>for Godot 4 &middot; zombie game kit</span></div>
+  <div class="sub">Learn</div>
+  <button data-p="start" class="on">Godot in 5 minutes</button>
+  <button data-p="editor">The editor</button>
+  <button data-p="words">Words explained</button>
+  <div class="sub">Make stuff</div>
+  <button data-p="build">Build the zombie game</button>
+  <button data-p="snips">Quick snippets</button>
+  <div class="sub">Help</div>
+  <button data-p="fix">Fix my error</button>
+  <button data-p="keys">Shortcuts</button>
+  <div class="foot">Your progress saves in this browser.</div>
+</nav>
+
+<main>
+
+<!-- ============ START ============ -->
+<section class="page on" id="start">
+  <h1>Godot in 5 minutes</h1>
+  <p class="lead">Everything in Godot is made from 4 ideas. Get these and the rest clicks.</p>
+
+  <div class="grid">
+    <div class="card"><h3>1. Nodes = LEGO pieces</h3>
+      Every piece does ONE job. A <code>Camera3D</code> is your eyes. A <code>MeshInstance3D</code> is something you can see. A <code>CollisionShape3D</code> makes it solid. An <code>AudioStreamPlayer</code> plays a sound.</div>
+    <div class="card"><h3>2. Scenes = stuff built from pieces</h3>
+      Snap nodes together and save them, and that's a scene. Your player is a scene. A zombie is a scene. A level is a scene. You can drop scenes inside other scenes, like putting 20 zombies in a level.</div>
+    <div class="card"><h3>3. Scripts = the brain</h3>
+      A script is code stuck on a node that tells it what to do: "move when I press W", "chase the player", "lose health when shot". Godot's code language is <b>GDScript</b>, and it reads almost like English.</div>
+    <div class="card"><h3>4. Signals = messages</h3>
+      Nodes send messages when stuff happens. A button sends <code>pressed</code>. A zombie can send <code>died</code>. Other nodes listen and react, like the score going up when a zombie dies.</div>
+  </div>
+
+  <h2>What a zombie game looks like inside</h2>
+  <div class="tree"><span class="n">Level</span>            <span class="t">Node3D</span>           <span class="c"># the whole map</span>
+├─ <span class="n">Sun</span>             <span class="t">DirectionalLight3D</span> <span class="c"># light, or it's pitch black</span>
+├─ <span class="n">Sky</span>             <span class="t">WorldEnvironment</span>   <span class="c"># sky color, fog</span>
+├─ <span class="n">Floor</span>           <span class="t">StaticBody3D</span>       <span class="c"># solid ground</span>
+├─ <span class="n">Player</span>          <span class="s">player.tscn</span>        <span class="c"># you</span>
+├─ <span class="n">ZombieSpawner</span>   <span class="s">spawner.tscn</span>       <span class="c"># makes zombies in waves</span>
+└─ <span class="n">HUD</span>             <span class="s">hud.tscn</span>           <span class="c"># health + ammo on screen</span></div>
+
+  <div class="tip"><b>The trick:</b> build every thing as its own scene (player, zombie, gun), test it, then drop it into the level. If something breaks, you know exactly which piece it is.</div>
+
+  <h2>GDScript in 60 seconds</h2>
+  <div class="codewrap"><pre class="code" data-code="gd-basics"></pre></div>
+  <script type="text/plain" id="gd-basics">extends CharacterBody3D        # this script goes on a CharacterBody3D node
+
+@export var speed := 5.0       # @export = shows up in the Inspector so you can change it there
+var health := 100              # a normal variable (a box that holds a value)
+
+func _ready() -> void:         # runs ONE time when the thing appears
+    print("I spawned!")        # shows text in the Output panel at the bottom
+
+func _process(delta: float) -> void:   # runs EVERY frame (like 60 times a second)
+    if health <= 0:
+        queue_free()           # delete this thing from the game
+
+func take_damage(amount: int) -> void: # your own function, call it from anywhere
+    health -= amount</script>
+  <div class="note"><b>Spaces matter.</b> GDScript uses indentation (the space at the start of a line) to know what's inside what. Everything inside a <code>func</code> must be pushed in by one Tab. Most beginner errors are a wrong Tab.</div>
+</section>
+
+<!-- ============ EDITOR ============ -->
+<section class="page" id="editor">
+  <h1>The editor</h1>
+  <p class="lead">What every panel is for. Godot looks scary but there are only 5 parts.</p>
+  <table>
+    <tr><th>Panel</th><th>Where</th><th>What it does</th></tr>
+    <tr><td><b>Scene</b></td><td>top left</td><td>The list of nodes in the scene you have open. Click <kbd>+</kbd> to add a node. Drag nodes onto each other to make them children.</td></tr>
+    <tr><td><b>FileSystem</b></td><td>bottom left</td><td>All your files: scenes (<code>.tscn</code>), scripts (<code>.gd</code>), models, sounds. Drag a model or scene from here into the 3D view to place it.</td></tr>
+    <tr><td><b>Viewport</b></td><td>middle</td><td>The 3D view where you build. The tabs on top switch between <b>2D</b>, <b>3D</b>, <b>Script</b> and <b>AssetLib</b>.</td></tr>
+    <tr><td><b>Inspector</b></td><td>right</td><td>All the settings of the node you clicked: size, color, speed, health. Anything with <code>@export</code> in your script shows up here.</td></tr>
+    <tr><td><b>Output</b></td><td>bottom</td><td>Where <code>print()</code> text and errors show. When something breaks, look here first. Red = error, yellow = warning.</td></tr>
+  </table>
+
+  <h2>Moving around the 3D view</h2>
+  <table>
+    <tr><td><kbd>Right mouse</kbd> + <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Fly around like a game camera (hold right mouse the whole time)</td></tr>
+    <tr><td><kbd>Middle mouse</kbd> drag</td><td>Spin around</td></tr>
+    <tr><td><kbd>Scroll wheel</kbd></td><td>Zoom</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Jump the camera to the thing you clicked</td></tr>
+    <tr><td><kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd></td><td>Move / Rotate / Scale tool (when not holding right mouse)</td></tr>
+    <tr><td><kbd>Q</kbd></td><td>Select tool</td></tr>
+  </table>
+
+  <h2>Starting a new 3D game</h2>
+  <ol class="steps">
+    <li>Open Godot and click <b>Create</b>. Name it, pick a folder, and keep the renderer on <b>Forward+</b>. If your PC lags, switch to <b>Mobile</b>, which is lighter.</li>
+    <li>In the Scene panel, click <b>3D Scene</b>. That makes a <code>Node3D</code>, the root of your level.</li>
+    <li>Press <kbd>Ctrl</kbd>+<kbd>S</kbd> and save it as <code>level_1.tscn</code>.</li>
+    <li>Click the 3 dots at the top of the 3D view and pick <b>Add Sun to Scene</b> and <b>Add Environment to Scene</b>. That's free light and sky.</li>
+    <li>Press <kbd>F6</kbd> to play the scene you have open.</li>
+  </ol>
+  <div class="tip">Getting real 3D models: <b>kenney.nl</b> and <b>quaternius.com</b> have tons of free ones, zombies included. Download the <b>.glb</b> version and drag it into your FileSystem panel.</div>
+</section>
+
+<!-- ============ WORDS ============ -->
+<section class="page" id="words">
+  <h1>Words explained</h1>
+  <p class="lead">Godot words in normal English.</p>
+  <table id="wordTable"></table>
+</section>
+
+<!-- ============ BUILD ============ -->
+<section class="page" id="build">
+  <h1>Build the zombie game</h1>
+  <p class="lead">Go in order. Each step gives you the nodes to make and the code to paste. Tick it off when it works.</p>
+  <div class="progress"><i id="bar"></i></div>
+  <div style="color:var(--dim);font-size:13px" id="barTxt"></div>
+  <div class="note"><b>How to paste code right:</b> make the script, press <kbd>Ctrl</kbd>+<kbd>A</kbd> to select everything Godot put in there, delete it, THEN paste. If you paste under Godot's example code, the Tabs mix up and you get errors.</div>
+  <div id="recipes"></div>
+</section>
+
+<!-- ============ SNIPPETS ============ -->
+<section class="page" id="snips">
+  <h1>Quick snippets</h1>
+  <p class="lead">Small bits of code for things you'll want all the time. Search for what you need.</p>
+  <input id="search" placeholder="Search: sound, wait, spawn, random, rotate, scene...">
+  <div id="snipList"></div>
+</section>
+
+<!-- ============ FIX ============ -->
+<section class="page" id="fix">
+  <h1>Fix my error</h1>
+  <p class="lead">Copy the red error from the Output or Debugger panel and paste it here. You can also describe the problem, like "zombie walks backwards".</p>
+  <textarea id="errBox" placeholder='Paste the error here, e.g.  Invalid access to property or key "position" on a base object of type "null instance".'></textarea>
+  <div id="fixList"></div>
+</section>
+
+<!-- ============ KEYS ============ -->
+<section class="page" id="keys">
+  <h1>Shortcuts</h1>
+  <p class="lead">The ones you'll actually use.</p>
+  <table>
+    <tr><th>Keys</th><th>What it does</th></tr>
+    <tr><td><kbd>F5</kbd></td><td>Play the whole game (starts at the main scene)</td></tr>
+    <tr><td><kbd>F6</kbd></td><td>Play only the scene you have open. Best for testing.</td></tr>
+    <tr><td><kbd>F8</kbd></td><td>Stop the game</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save the scene</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Duplicate the selected node. Great for making 20 gravestones fast.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Add a new node (in the Scene panel)</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td><td>Add a saved scene into this one (instance it)</td></tr>
+    <tr><td><kbd>F2</kbd></td><td>Rename the selected node</td></tr>
+    <tr><td><kbd>Delete</kbd></td><td>Delete the selected node</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>(In a script) turn lines into comments or back</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>(In a script) show autocomplete</td></tr>
+    <tr><td><kbd>Ctrl</kbd> + click a word</td><td>(In a script) open the help page for it</td></tr>
+    <tr><td><kbd>F1</kbd></td><td>Search Godot's built-in help for any node or function</td></tr>
+    <tr><td>Hold <kbd>Ctrl</kbd> while moving</td><td>Snap to the grid while moving things in 3D</td></tr>
+  </table>
+</section>
+
+</main>
+
+<!-- ======================================================================
+     CODE FOR THE RECIPES  (4 spaces are turned into Tabs when copied)
+     ====================================================================== -->
+
+<script type="text/plain" id="c-setup">extends Node
+## SETUP: adds all the controls the other scripts use (WASD, mouse, R, Esc...).
+## Add this as an Autoload named Setup, and you never have to touch the
+## Input Map by hand. Change a key here if you want different controls.
+
+func _enter_tree() -> void:
+    add_key("move_forward", KEY_W)
+    add_key("move_forward", KEY_UP)
+    add_key("move_back", KEY_S)
+    add_key("move_back", KEY_DOWN)
+    add_key("move_left", KEY_A)
+    add_key("move_left", KEY_LEFT)
+    add_key("move_right", KEY_D)
+    add_key("move_right", KEY_RIGHT)
+    add_key("jump", KEY_SPACE)
+    add_key("sprint", KEY_SHIFT)
+    add_key("reload", KEY_R)
+    add_key("pause", KEY_ESCAPE)
+    add_key("pause", KEY_P)
+    add_mouse("shoot", MOUSE_BUTTON_LEFT)
+
+
+func add_key(action: String, key: Key) -> void:
+    if not InputMap.has_action(action):
+        InputMap.add_action(action)
+    var event := InputEventKey.new()
+    event.physical_keycode = key   # "physical" = works on any keyboard layout
+    InputMap.action_add_event(action, event)
+
+
+func add_mouse(action: String, button: MouseButton) -> void:
+    if not InputMap.has_action(action):
+        InputMap.add_action(action)
+    var event := InputEventMouseButton.new()
+    event.button_index = button
+    InputMap.action_add_event(action, event)</script>
+
+<script type="text/plain" id="c-health">extends Node
+class_name Health
+## HEALTH: a little box of hit points. Stick it on ANYTHING that can get hurt
+## (player, zombie, a barrel...). It tells everyone when it changes or hits 0.
+
+signal changed(current: int, maximum: int)   # fires every time health goes up or down
+signal died                                   # fires once, when health hits 0
+
+@export var max_health := 100
+
+var current := 0
+var is_dead := false
+
+
+func _ready() -> void:
+    current = max_health
+
+
+func take_damage(amount: int) -> void:
+    if is_dead:
+        return
+    current = maxi(current - amount, 0)
+    changed.emit(current, max_health)
+    if current == 0:
+        is_dead = true
+        died.emit()
+
+
+func heal(amount: int) -> void:
+    if is_dead:
+        return
+    current = mini(current + amount, max_health)
+    changed.emit(current, max_health)
+
+
+func is_full() -> bool:
+    return current >= max_health</script>
+
+<script type="text/plain" id="c-player">extends CharacterBody3D
+class_name Player
+## PLAYER: first-person walking, looking, jumping and sprinting.
+
+@export var walk_speed := 5.0
+@export var sprint_speed := 8.5
+@export var jump_strength := 4.5
+@export var mouse_sensitivity := 0.002   # bigger = faster turning
+
+@onready var head: Node3D = $Head
+@onready var health: Health = $Health
+
+var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+
+
+func _ready() -> void:
+    add_to_group("player")   # so zombies and pickups can find us
+    Input.mouse_mode = Input.MOUSE_MODE_CAPTURED   # hide + lock the mouse
+    health.died.connect(_on_died)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+    # Turn with the mouse
+    if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+        rotate_y(-event.relative.x * mouse_sensitivity)        # body turns left/right
+        head.rotate_x(-event.relative.y * mouse_sensitivity)   # head looks up/down
+        head.rotation.x = clampf(head.rotation.x, deg_to_rad(-89), deg_to_rad(89))
+    # Clicking the game window locks the mouse again
+    elif event is InputEventMouseButton and event.pressed:
+        if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not get_tree().paused:
+            Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _physics_process(delta: float) -> void:
+    if health.is_dead:
+        return
+
+    # Fall down
+    if not is_on_floor():
+        velocity.y -= gravity * delta
+
+    # Jump
+    if Input.is_action_just_pressed("jump") and is_on_floor():
+        velocity.y = jump_strength
+
+    # Walk (WASD) in the direction we're facing
+    var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+    var direction := (transform.basis * Vector3(input.x, 0, input.y)).normalized()
+    var speed := sprint_speed if Input.is_action_pressed("sprint") else walk_speed
+
+    velocity.x = lerpf(velocity.x, direction.x * speed, 10.0 * delta)
+    velocity.z = lerpf(velocity.z, direction.z * speed, 10.0 * delta)
+
+    move_and_slide()
+
+    # Fell off the map? That counts as dying.
+    if global_position.y < -30:
+        health.take_damage(health.max_health)
+
+
+func _on_died() -> void:
+    # Tip the camera over like we fell, wait, then restart the level
+    var tween := create_tween()
+    tween.tween_property(head, "rotation:z", deg_to_rad(70), 0.6)
+    tween.parallel().tween_property(head, "position:y", 0.3, 0.6)
+    get_tree().create_timer(2.5).timeout.connect(_restart)
+
+
+func _restart() -> void:
+    get_tree().reload_current_scene()</script>
+
+<script type="text/plain" id="c-gun">extends Node3D
+class_name Gun
+## GUN: shoots an invisible laser (a "raycast") from the middle of the screen.
+## Whatever it hits takes damage if it has a take_hit() function.
+
+signal ammo_changed(in_mag: int, spare: int)   # the HUD listens to this
+
+@export var damage := 25
+@export var shots_per_second := 8.0
+@export var automatic := true      # true = hold to spray, false = click every shot
+@export var mag_size := 30
+@export var spare_ammo := 90
+@export var reload_time := 1.5
+@export var max_range := 100.0
+
+var in_mag := 0
+var cooldown := 0.0
+var reload_left := 0.0
+var rest_position := Vector3.ZERO
+
+@onready var camera: Camera3D = get_parent() as Camera3D
+@onready var shoot_sound: AudioStreamPlayer = get_node_or_null("ShootSound")
+
+
+func _ready() -> void:
+    in_mag = mag_size
+    rest_position = position
+    if camera == null:   # gun isn't under a Camera3D? use whatever camera is on
+        camera = get_viewport().get_camera_3d()
+
+
+func _physics_process(delta: float) -> void:
+    cooldown -= delta
+    # Gun slides back to its spot after kicking (and dips down while reloading)
+    var target := rest_position
+    if reload_left > 0.0:
+        target.y -= 0.15
+    position = position.lerp(target, 12.0 * delta)
+
+    if reload_left > 0.0:
+        reload_left -= delta
+        if reload_left <= 0.0:
+            finish_reload()
+        return
+
+    if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+        return   # paused or menu open: don't shoot
+
+    var wants_to_shoot := Input.is_action_pressed("shoot") if automatic else Input.is_action_just_pressed("shoot")
+    if wants_to_shoot and cooldown <= 0.0:
+        shoot()
+    if Input.is_action_just_pressed("reload"):
+        start_reload()
+
+
+func shoot() -> void:
+    if in_mag <= 0:
+        start_reload()
+        return
+    in_mag -= 1
+    cooldown = 1.0 / shots_per_second
+    ammo_changed.emit(in_mag, spare_ammo)
+    position.z += 0.06   # kick back
+    if shoot_sound:
+        shoot_sound.play()
+
+    # Fire the laser from the camera straight forward
+    var from := camera.global_position
+    var to := from - camera.global_transform.basis.z * max_range
+    var query := PhysicsRayQueryParameters3D.create(from, to)
+    var player := get_tree().get_first_node_in_group("player") as CollisionObject3D
+    if player:
+        query.exclude = [player.get_rid()]   # don't shoot ourselves
+    var hit := get_world_3d().direct_space_state.intersect_ray(query)
+    if hit.is_empty():
+        return
+    var thing = hit["collider"]
+    if thing.has_method("take_hit"):
+        thing.take_hit(damage)
+
+
+func start_reload() -> void:
+    if reload_left > 0.0 or in_mag == mag_size or spare_ammo <= 0:
+        return
+    reload_left = reload_time
+
+
+func finish_reload() -> void:
+    var needed := mag_size - in_mag
+    var taken := mini(needed, spare_ammo)
+    in_mag += taken
+    spare_ammo -= taken
+    ammo_changed.emit(in_mag, spare_ammo)
+
+
+func add_ammo(amount: int) -> void:
+    spare_ammo += amount
+    ammo_changed.emit(in_mag, spare_ammo)</script>
+
+<script type="text/plain" id="c-zombie">extends CharacterBody3D
+class_name Zombie
+## ZOMBIE: walks to the player, hits them, takes damage, dies.
+
+signal died
+
+@export var speed := 2.5
+@export var max_health := 100
+@export var damage := 10
+@export var attack_range := 1.6
+@export var attack_cooldown := 1.0
+
+## Animation names from YOUR model. Click the model's AnimationPlayer
+## to see what they're called and type them here. Wrong names are just skipped.
+@export var walk_animation := "walk"
+@export var idle_animation := "idle"
+@export var attack_animation := "attack"
+@export var die_animation := "die"
+
+var health := 0
+var dead := false
+var attack_timer := 0.0
+var path_timer := 0.0
+var player: Node3D
+var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+
+@onready var agent: NavigationAgent3D = get_node_or_null("NavigationAgent3D")
+@onready var anim: AnimationPlayer = find_child("AnimationPlayer", true, false) as AnimationPlayer
+
+
+func _ready() -> void:
+    add_to_group("zombies")
+    health = max_health
+    # Make walk/idle loop forever (imported animations play once by default)
+    if anim:
+        for anim_name in [walk_animation, idle_animation]:
+            if anim.has_animation(anim_name):
+                anim.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
+
+
+func _physics_process(delta: float) -> void:
+    if dead:
+        return
+
+    if not is_on_floor():
+        velocity.y -= gravity * delta
+
+    if player == null or not is_instance_valid(player):
+        player = get_tree().get_first_node_in_group("player")
+        if player == null:
+            return
+
+    var to_player := player.global_position - global_position
+    to_player.y = 0
+    var distance := to_player.length()
+    attack_timer -= delta
+
+    if distance <= attack_range:
+        # Close enough: stop and swing
+        velocity.x = 0
+        velocity.z = 0
+        if attack_timer <= 0.0:
+            attack()
+        elif anim == null or anim.current_animation != attack_animation:
+            play_anim(idle_animation)
+    else:
+        # Walk toward the player (around walls if there's a NavigationRegion3D)
+        var target := player.global_position
+        if agent:
+            path_timer -= delta
+            if path_timer <= 0.0:
+                agent.target_position = player.global_position
+                path_timer = 0.3   # only rethink the path 3 times a second (saves FPS)
+            var next := agent.get_next_path_position()
+            if next.distance_to(global_position) > 0.1:
+                target = next
+        var direction := target - global_position
+        direction.y = 0
+        direction = direction.normalized()
+        velocity.x = direction.x * speed
+        velocity.z = direction.z * speed
+        play_anim(walk_animation)
+
+    if distance > 0.1:
+        look_at(global_position + to_player, Vector3.UP)   # face the player
+
+    move_and_slide()
+
+
+func attack() -> void:
+    attack_timer = attack_cooldown
+    play_anim(attack_animation)
+    var player_health := player.get_node_or_null("Health") as Health
+    if player_health:
+        player_health.take_damage(damage)
+
+
+func take_hit(amount: int) -> void:
+    if dead:
+        return
+    health -= amount
+    if health <= 0:
+        die()
+
+
+func die() -> void:
+    dead = true
+    died.emit()
+    $CollisionShape3D.set_deferred("disabled", true)   # bullets and players go through the body now
+    if anim and anim.has_animation(die_animation):
+        anim.play(die_animation)
+    else:
+        # No death animation? Just tip over.
+        var tween := create_tween()
+        tween.tween_property(self, "rotation:x", -PI / 2, 0.4)
+    get_tree().create_timer(4.0).timeout.connect(queue_free)   # remove the body after 4 seconds
+
+
+func play_anim(anim_name: String) -> void:
+    if anim and anim.has_animation(anim_name) and anim.current_animation != anim_name:
+        anim.play(anim_name, 0.2)   # 0.2 = blend smoothly over 0.2 seconds</script>
+
+<script type="text/plain" id="c-spawner">extends Node3D
+class_name ZombieSpawner
+## SPAWNER: sends zombies in waves. Every wave has more zombies than the last.
+## Zombies appear at the Marker3D children of this node (add as many as you want).
+
+signal wave_started(number: int)
+
+@export var zombie_scene: PackedScene      # drag zombie.tscn in here in the Inspector
+@export var first_wave_size := 5
+@export var more_each_wave := 3
+@export var seconds_between_zombies := 1.0
+@export var break_between_waves := 6.0
+
+var wave := 0
+var left_to_spawn := 0
+var alive := 0
+var timer := 3.0   # little wait before wave 1
+
+
+func _ready() -> void:
+    add_to_group("spawner")   # so the HUD can find us
+    if zombie_scene == null:
+        push_error("ZombieSpawner: drag your zombie scene into 'Zombie Scene' in the Inspector!")
+
+
+func _process(delta: float) -> void:
+    if zombie_scene == null:
+        return
+    timer -= delta
+    if timer > 0.0:
+        return
+
+    if left_to_spawn > 0:
+        spawn_zombie()
+        left_to_spawn -= 1
+        timer = seconds_between_zombies
+    elif alive == 0:
+        start_next_wave()
+
+
+func start_next_wave() -> void:
+    wave += 1
+    left_to_spawn = first_wave_size + more_each_wave * (wave - 1)
+    timer = break_between_waves if wave > 1 else 0.0
+    wave_started.emit(wave)
+
+
+func spawn_zombie() -> void:
+    var spots: Array[Node3D] = []
+    for child in get_children():
+        if child is Marker3D:
+            spots.append(child)
+    var spot: Node3D = self
+    if not spots.is_empty():
+        spot = spots.pick_random()
+
+    var zombie := zombie_scene.instantiate() as Node3D
+    get_parent().add_child(zombie)
+    zombie.global_position = spot.global_position + Vector3(randf_range(-1, 1), 0, randf_range(-1, 1))
+    alive += 1
+    if zombie.has_signal("died"):
+        zombie.connect("died", _on_zombie_died)
+
+
+func _on_zombie_died() -> void:
+    alive -= 1</script>
+
+<script type="text/plain" id="c-pickup">extends Area3D
+## PICKUP: spins in place. Walk into it to get health or ammo.
+
+@export_enum("Health", "Ammo") var kind: int = 0
+@export var amount := 30
+@export var spin_speed := 2.0
+
+
+func _ready() -> void:
+    body_entered.connect(_on_body_entered)
+
+
+func _process(delta: float) -> void:
+    rotate_y(spin_speed * delta)
+
+
+func _on_body_entered(body: Node3D) -> void:
+    if not body.is_in_group("player"):
+        return
+
+    if kind == 0:
+        var health := body.get_node_or_null("Health") as Health
+        if health and not health.is_full():   # don't waste it at full health
+            health.heal(amount)
+            queue_free()
+    else:
+        var gun := body.find_child("Gun", true, false) as Gun
+        if gun:
+            gun.add_ammo(amount)
+            queue_free()</script>
+
+<script type="text/plain" id="c-hud">extends CanvasLayer
+## HUD: shows health, ammo and the wave number on screen.
+
+@onready var health_label: Label = $HealthLabel
+@onready var ammo_label: Label = $AmmoLabel
+@onready var wave_label: Label = $WaveLabel
+
+
+func _ready() -> void:
+    await get_tree().process_frame   # wait one frame so the player and spawner exist
+
+    var player := get_tree().get_first_node_in_group("player")
+    if player:
+        var health := player.get_node_or_null("Health") as Health
+        if health:
+            health.changed.connect(_on_health_changed)
+            _on_health_changed(health.current, health.max_health)
+        var gun := player.find_child("Gun", true, false) as Gun
+        if gun:
+            gun.ammo_changed.connect(_on_ammo_changed)
+            _on_ammo_changed(gun.in_mag, gun.spare_ammo)
+
+    var spawner := get_tree().get_first_node_in_group("spawner")
+    if spawner:
+        spawner.connect("wave_started", _on_wave_started)
+    else:
+        wave_label.text = ""
+
+
+func _on_health_changed(current: int, maximum: int) -> void:
+    health_label.text = "HP  %d / %d" % [current, maximum]
+    health_label.modulate = Color(1, 0.35, 0.35) if current <= maximum * 0.3 else Color.WHITE
+
+
+func _on_ammo_changed(in_mag: int, spare: int) -> void:
+    ammo_label.text = "%d / %d" % [in_mag, spare]
+
+
+func _on_wave_started(number: int) -> void:
+    wave_label.text = "WAVE %d" % number</script>
+
+<script type="text/plain" id="c-pause">extends CanvasLayer
+## PAUSE MENU: Esc stops the game and shows the menu.
+
+@onready var resume_button: Button = $Panel/Buttons/Resume
+@onready var restart_button: Button = $Panel/Buttons/Restart
+@onready var quit_button: Button = $Panel/Buttons/Quit
+
+
+func _ready() -> void:
+    process_mode = Node.PROCESS_MODE_ALWAYS   # keep working while the game is paused
+    visible = false
+    resume_button.pressed.connect(toggle_pause)
+    restart_button.pressed.connect(_on_restart)
+    quit_button.pressed.connect(get_tree().quit)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event.is_action_pressed("pause"):
+        toggle_pause()
+
+
+func toggle_pause() -> void:
+    var pausing := not get_tree().paused
+    get_tree().paused = pausing
+    visible = pausing
+    if pausing:
+        Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+    else:
+        Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _on_restart() -> void:
+    get_tree().paused = false
+    get_tree().reload_current_scene()</script>
+
+<script type="text/plain" id="c-menu">extends Control
+## MAIN MENU: Play button loads your level, Quit closes the game.
+
+@export_file("*.tscn") var level_path := "res://level_1.tscn"
+
+
+func _ready() -> void:
+    Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+    $Buttons/Play.pressed.connect(_on_play)
+    $Buttons/Quit.pressed.connect(get_tree().quit)
+
+
+func _on_play() -> void:
+    get_tree().change_scene_to_file(level_path)</script>
+
+<script>
+/* ---------------- recipes ---------------- */
+const RECIPES = [
+{
+  title:"Controls (do this first)", sub:"One script that sets up WASD, mouse, R, Esc for you",
+  html:`
+  <p>Every script below uses names like <code>"jump"</code> and <code>"shoot"</code>. Godot needs to know which keys those are. This script tells it automatically.</p>
+  <ol class="steps">
+    <li>In the FileSystem panel, right click <code>res://</code>, pick <b>New &gt; Script</b>, and name it <code>setup.gd</code>.</li>
+    <li>Paste the code below into it.</li>
+    <li>Go to <b>Project &gt; Project Settings</b>, open the <b>Globals</b> tab, then <b>Autoload</b> (older Godot: just <b>Autoload</b>). Click the folder icon, pick <code>setup.gd</code>, and click <b>Add</b>.</li>
+  </ol>
+  <p>Now it runs every time the game starts. Controls: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk, <kbd>Shift</kbd> sprint, <kbd>Space</kbd> jump, <kbd>Left click</kbd> shoot, <kbd>R</kbd> reload, <kbd>Esc</kbd> pause.</p>`,
+  code:"c-setup", file:"setup.gd"
+},
+{
+  title:"Health", sub:"A reusable health bar for the player AND zombies",
+  html:`
+  <p>Instead of writing health code twice, make one <b>Health</b> node and stick it on anything. This is called a <i>component</i>, and pro devs do this all the time.</p>
+  <ol class="steps">
+    <li>Make a new script <code>health.gd</code> and paste the code.</li>
+    <li>That's it. Because of <code>class_name Health</code>, you can now find <b>Health</b> in the Add Node list like a normal node.</li>
+  </ol>`,
+  code:"c-health", file:"health.gd"
+},
+{
+  title:"Player", sub:"First-person: walk, look, jump, sprint",
+  html:`
+  <p>Make a new scene. Build this node tree (click <kbd>+</kbd> in the Scene panel to add each one):</p>
+  <div class="tree"><span class="n">Player</span>              <span class="t">CharacterBody3D</span>   <span class="c"># put player.gd on this</span>
+├─ <span class="n">CollisionShape3D</span>  <span class="t">CollisionShape3D</span>  <span class="c"># Shape: New CapsuleShape3D, Position Y = 0.9</span>
+├─ <span class="n">Health</span>            <span class="t">Health</span>            <span class="c"># from the last step</span>
+└─ <span class="n">Head</span>              <span class="t">Node3D</span>            <span class="c"># Position Y = 1.6 (eye height)</span>
+   └─ <span class="n">Camera3D</span>        <span class="t">Camera3D</span>          <span class="c"># tick "Current" in the Inspector</span></div>
+  <ol class="steps">
+    <li>Names must match <b>exactly</b>, capital letters too: <code>Head</code>, <code>Health</code>. The script looks for them by name.</li>
+    <li>Click the <code>Player</code> node, click the scroll icon with the <b>+</b> (Attach Script), save it as <code>player.gd</code>, and paste the code.</li>
+    <li>Save the scene as <code>player.tscn</code>.</li>
+    <li>Open your level and drag <code>player.tscn</code> from the FileSystem into it. Put it a little above the floor.</li>
+  </ol>
+  <div class="note">The floor needs to be solid or you fall forever. The fastest floor: add a <code>CSGBox3D</code>, set its Size to <code>50, 1, 50</code>, and tick <b>Use Collision</b>.</div>`,
+  code:"c-player", file:"player.gd"
+},
+{
+  title:"Gun", sub:"Raycast shooting with ammo and reload",
+  html:`
+  <p>Open <code>player.tscn</code> and add the gun <b>under the Camera3D</b>, so it moves with your view:</p>
+  <div class="tree">└─ <span class="n">Camera3D</span>
+   └─ <span class="n">Gun</span>             <span class="t">Node3D</span>            <span class="c"># put gun.gd on this. Position: 0.25, -0.2, -0.4</span>
+      ├─ <span class="n">Model</span>         <span class="s">your gun .glb</span>     <span class="c"># drag a gun model in, or a small BoxMesh for now</span>
+      └─ <span class="n">ShootSound</span>    <span class="t">AudioStreamPlayer</span> <span class="c"># optional: drag a .ogg/.wav into "Stream"</span></div>
+  <ol class="steps">
+    <li>The node MUST be named <code>Gun</code>, because pickups and the HUD look for that name.</li>
+    <li>If the gun points the wrong way, rotate the <b>Model</b> node, not the Gun node.</li>
+    <li>Click the Gun node to change damage, fire rate, mag size and more in the Inspector.</li>
+  </ol>
+  <div class="tip">Want a shotgun? Duplicate the Gun, set automatic off, shots per second to 1.2 and damage to 90. Easy.</div>`,
+  code:"c-gun", file:"gun.gd"
+},
+{
+  title:"Zombie", sub:"Chases you, attacks, dies when shot",
+  html:`
+  <p>New scene, this tree:</p>
+  <div class="tree"><span class="n">Zombie</span>              <span class="t">CharacterBody3D</span>   <span class="c"># put zombie.gd on this</span>
+├─ <span class="n">CollisionShape3D</span>  <span class="t">CollisionShape3D</span>  <span class="c"># CapsuleShape3D, Position Y = 0.9</span>
+├─ <span class="n">Model</span>             <span class="s">zombie .glb</span>       <span class="c"># drag your zombie model in</span>
+└─ <span class="n">NavigationAgent3D</span> <span class="t">NavigationAgent3D</span> <span class="c"># optional: walks around walls</span></div>
+  <ol class="steps">
+    <li>Save as <code>zombie.tscn</code>.</li>
+    <li><b>If it walks backwards:</b> click Model and set Rotation Y to <code>180</code>. In Godot, "forward" is the blue arrow pointing away from you, and some models face the other way.</li>
+    <li>Animations: click the <b>AnimationPlayer</b> inside your model to see its animation names, then type them into the Zombie's Inspector boxes (Walk Animation and the rest).</li>
+  </ol>
+  <h3>Making zombies walk AROUND walls</h3>
+  <ol class="steps">
+    <li>In your level, add a <code>NavigationRegion3D</code>.</li>
+    <li>Drag your floor and walls <b>onto</b> it so they become its children.</li>
+    <li>Click it, set <b>Navigation Mesh</b> to <b>New NavigationMesh</b>, then click <b>Bake NavigationMesh</b> at the top. A blue-ish area appears. That's where zombies can walk.</li>
+    <li>Re-bake every time you move walls around.</li>
+  </ol>
+  <p>No NavigationRegion3D? Zombies just walk straight at you. That works fine on open maps.</p>`,
+  code:"c-zombie", file:"zombie.gd"
+},
+{
+  title:"Zombie spawner", sub:"Endless waves that get bigger",
+  html:`
+  <div class="tree"><span class="n">ZombieSpawner</span>       <span class="t">Node3D</span>            <span class="c"># put spawner.gd on this</span>
+├─ <span class="n">Spot1</span>             <span class="t">Marker3D</span>          <span class="c"># place these around the map</span>
+├─ <span class="n">Spot2</span>             <span class="t">Marker3D</span>
+└─ <span class="n">Spot3</span>             <span class="t">Marker3D</span></div>
+  <ol class="steps">
+    <li>Put it straight into your level (it doesn't need its own scene).</li>
+    <li>Click ZombieSpawner and drag <code>zombie.tscn</code> from the FileSystem into the <b>Zombie Scene</b> box in the Inspector.</li>
+    <li>Move the Marker3Ds to where zombies should come from, ideally far from where the player starts.</li>
+  </ol>`,
+  code:"c-spawner", file:"spawner.gd"
+},
+{
+  title:"Health + ammo pickups", sub:"Walk into them to grab them",
+  html:`
+  <div class="tree"><span class="n">Pickup</span>              <span class="t">Area3D</span>            <span class="c"># put pickup.gd on this</span>
+├─ <span class="n">CollisionShape3D</span>  <span class="t">CollisionShape3D</span>  <span class="c"># SphereShape3D, radius 0.8</span>
+└─ <span class="n">Model</span>             <span class="s">a .glb or a mesh</span>  <span class="c"># bottle, ammo box, whatever</span></div>
+  <ol class="steps">
+    <li>Save it as <code>pickup.tscn</code> and drop it into your level a bunch of times.</li>
+    <li>Click each one and pick <b>Kind</b>: Health or Ammo. Set <b>Amount</b> to how much it gives.</li>
+  </ol>`,
+  code:"c-pickup", file:"pickup.gd"
+},
+{
+  title:"HUD", sub:"Health, ammo and wave on screen",
+  html:`
+  <div class="tree"><span class="n">HUD</span>                 <span class="t">CanvasLayer</span>       <span class="c"># put hud.gd on this</span>
+├─ <span class="n">HealthLabel</span>       <span class="t">Label</span>             <span class="c"># anchor: bottom left</span>
+├─ <span class="n">AmmoLabel</span>         <span class="t">Label</span>             <span class="c"># anchor: bottom right</span>
+├─ <span class="n">WaveLabel</span>         <span class="t">Label</span>             <span class="c"># anchor: center top</span>
+└─ <span class="n">Crosshair</span>         <span class="t">Label</span>             <span class="c"># Text: +   anchor: center</span></div>
+  <ol class="steps">
+    <li>To place a Label in a corner, click it, then click the green <b>Anchor</b> button above the view and pick the corner.</li>
+    <li>Make the text bigger: Inspector &gt; Theme Overrides &gt; Font Sizes &gt; Font Size, about 32.</li>
+    <li>Save as <code>hud.tscn</code> and drag it into your level.</li>
+  </ol>`,
+  code:"c-hud", file:"hud.gd"
+},
+{
+  title:"Pause menu", sub:"Esc to pause, with Resume / Restart / Quit",
+  html:`
+  <div class="tree"><span class="n">PauseMenu</span>           <span class="t">CanvasLayer</span>       <span class="c"># put pause_menu.gd on this, Layer = 10</span>
+└─ <span class="n">Panel</span>             <span class="t">Panel</span>             <span class="c"># anchor: Full Rect (dark see-through box)</span>
+   └─ <span class="n">Buttons</span>         <span class="t">VBoxContainer</span>     <span class="c"># anchor: center</span>
+      ├─ <span class="n">Resume</span>        <span class="t">Button</span>            <span class="c"># Text: Resume</span>
+      ├─ <span class="n">Restart</span>       <span class="t">Button</span>            <span class="c"># Text: Restart</span>
+      └─ <span class="n">Quit</span>          <span class="t">Button</span>            <span class="c"># Text: Quit</span></div>
+  <p>Save as <code>pause_menu.tscn</code> and drag it into your level.</p>`,
+  code:"c-pause", file:"pause_menu.gd"
+},
+{
+  title:"Main menu", sub:"Title screen with Play and Quit",
+  html:`
+  <div class="tree"><span class="n">MainMenu</span>            <span class="t">Control</span>           <span class="c"># put main_menu.gd on this, anchor: Full Rect</span>
+├─ <span class="n">Title</span>             <span class="t">Label</span>             <span class="c"># your game's name, big font</span>
+└─ <span class="n">Buttons</span>           <span class="t">VBoxContainer</span>
+   ├─ <span class="n">Play</span>            <span class="t">Button</span>
+   └─ <span class="n">Quit</span>            <span class="t">Button</span></div>
+  <ol class="steps">
+    <li>Save as <code>main_menu.tscn</code>.</li>
+    <li>Click MainMenu and pick your level in the <b>Level Path</b> box.</li>
+    <li>Make it the first screen: <b>Project &gt; Project Settings &gt; Application &gt; Run &gt; Main Scene</b> and pick <code>main_menu.tscn</code>. Now <kbd>F5</kbd> starts here.</li>
+  </ol>
+  <div class="tip">Done with all the steps? You've got a real wave shooter. Next ideas: more guns (copy Gun and change the numbers), a fast zombie (copy zombie.tscn and raise speed, lower health), a score that goes up in <code>_on_zombie_died()</code>.</div>`,
+  code:"c-menu", file:"main_menu.gd"
+}
+];
+
+/* ---------------- snippets ---------------- */
+const SNIPS = [
+ {t:"Wait a few seconds", k:"wait delay timer seconds sleep later", c:`await get_tree().create_timer(2.0).timeout   # waits 2 seconds
+print("2 seconds later!")`},
+ {t:"Play a sound", k:"sound audio play noise sfx", c:`# Add an AudioStreamPlayer node named "Boom" and drag a sound into its Stream box
+$Boom.play()
+
+# Different pitch each time so it doesn't sound robotic
+$Boom.pitch_scale = randf_range(0.9, 1.1)
+$Boom.play()`},
+ {t:"Spawn a thing (make a copy of a scene)", k:"spawn create instance instantiate copy clone add", c:`@export var thing_scene: PackedScene   # drag a .tscn into this in the Inspector
+
+func spawn_thing() -> void:
+    var thing := thing_scene.instantiate() as Node3D
+    get_tree().current_scene.add_child(thing)
+    thing.global_position = global_position + Vector3(0, 1, 0)`},
+ {t:"Delete something", k:"delete remove destroy free kill queue_free", c:`queue_free()          # deletes the node this script is on
+$Enemy.queue_free()   # deletes a child called Enemy`},
+ {t:"Random number", k:"random chance rng dice luck", c:`var n := randi_range(1, 6)        # whole number 1 to 6 (a dice)
+var f := randf_range(0.5, 2.0)    # any decimal between 0.5 and 2
+if randf() < 0.25:                # 25% chance
+    print("lucky!")
+var pick = ["red", "green", "blue"].pick_random()   # random item from a list`},
+ {t:"Make something spin", k:"spin rotate turn rotation", c:`func _process(delta: float) -> void:
+    rotate_y(2.0 * delta)   # 2 = speed. Use rotate_x / rotate_z for other ways`},
+ {t:"Move something smoothly (tween)", k:"tween animate smooth move slide fade", c:`var tween := create_tween()
+tween.tween_property(self, "position:y", 3.0, 1.0)   # go up to y=3 in 1 second
+tween.tween_property(self, "position:y", 0.0, 1.0)   # then back down
+
+# Fade out a 2D/UI thing:
+create_tween().tween_property($Label, "modulate:a", 0.0, 0.5)`},
+ {t:"Do something when the player touches it", k:"touch trigger area enter collide overlap zone", c:`# Put this on an Area3D that has a CollisionShape3D child
+func _ready() -> void:
+    body_entered.connect(_on_body_entered)
+
+func _on_body_entered(body: Node3D) -> void:
+    if body.is_in_group("player"):
+        print("player touched me!")`},
+ {t:"Change to another scene / level", k:"scene level change load next menu", c:`get_tree().change_scene_to_file("res://level_2.tscn")
+
+# Restart the current level:
+get_tree().reload_current_scene()`},
+ {t:"Find the player from any script", k:"find player get reference node group", c:`var player := get_tree().get_first_node_in_group("player") as Node3D
+if player:
+    print(player.global_position)`},
+ {t:"Get all zombies", k:"all zombies enemies group count list", c:`var zombies := get_tree().get_nodes_in_group("zombies")
+print("zombies left: ", zombies.size())
+for z in zombies:
+    z.take_hit(1000)   # kill them all (nuke!)`},
+ {t:"Repeat something every X seconds (Timer)", k:"timer repeat every loop interval", c:`func _ready() -> void:
+    var timer := Timer.new()
+    timer.wait_time = 1.5
+    timer.autostart = true
+    add_child(timer)
+    timer.timeout.connect(_on_tick)
+
+func _on_tick() -> void:
+    print("tick")`},
+ {t:"Check a key press", k:"key press input button keyboard", c:`func _process(delta: float) -> void:
+    if Input.is_action_just_pressed("jump"):   # true only the frame you press it
+        print("jumped")
+    if Input.is_action_pressed("sprint"):      # true the whole time you hold it
+        print("running")
+    if Input.is_key_pressed(KEY_G):            # any key, no Input Map needed
+        print("G is held")`},
+ {t:"Distance between two things", k:"distance far close near range", c:`var player := get_tree().get_first_node_in_group("player") as Node3D
+var d := global_position.distance_to(player.global_position)
+if d < 5.0:
+    print("player is close!")`},
+ {t:"Look at something", k:"look face turn toward aim", c:`var player := get_tree().get_first_node_in_group("player") as Node3D
+look_at(player.global_position, Vector3.UP)
+# Only turn left/right (no tilting up/down):
+var p := player.global_position
+p.y = global_position.y
+look_at(p, Vector3.UP)`},
+ {t:"Make your own signal", k:"signal emit event message connect", c:`# In the coin's script:
+signal coin_collected(amount: int)   # at the top of the script
+
+func collect() -> void:
+    coin_collected.emit(10)           # send the message
+
+
+# In another script (like the player), listen for it:
+func _ready() -> void:
+    $Coin.coin_collected.connect(_on_coin)
+
+func _on_coin(amount: int) -> void:
+    print("got ", amount)`},
+ {t:"Save and load (high score)", k:"save load file high score progress", c:`func save_score(score: int) -> void:
+    var cfg := ConfigFile.new()
+    cfg.set_value("game", "best", score)
+    cfg.save("user://save.cfg")
+
+func load_score() -> int:
+    var cfg := ConfigFile.new()
+    if cfg.load("user://save.cfg") != OK:
+        return 0   # no save yet
+    return cfg.get_value("game", "best", 0)`},
+ {t:"Screen shake", k:"shake camera screen hit impact", c:`# Put on the Camera3D
+var shake := 0.0
+
+func add_shake(amount: float) -> void:
+    shake = maxf(shake, amount)
+
+func _process(delta: float) -> void:
+    h_offset = randf_range(-shake, shake)
+    v_offset = randf_range(-shake, shake)
+    shake = move_toward(shake, 0.0, delta * 0.5)`},
+ {t:"Print stuff to see what's happening", k:"print debug log output test", c:`print("health is: ", health)
+print("I'm at ", global_position)
+push_warning("this is yellow in the Output")
+push_error("this is red in the Output")`},
+ {t:"Lock / unlock the mouse", k:"mouse cursor lock capture hide show", c:`Input.mouse_mode = Input.MOUSE_MODE_CAPTURED   # hidden + locked (gameplay)
+Input.mouse_mode = Input.MOUSE_MODE_VISIBLE    # normal mouse (menus)`},
+ {t:"Fullscreen", k:"fullscreen window screen size", c:`DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)`}
+];
+
+/* ---------------- errors ---------------- */
+const FIXES = [
+ {m:'Invalid access to property or key "..." on a base object of type "null instance"  (older: Invalid get index ... on base: null instance)',
+  k:"null instance invalid get index access property base object nil", w:"The script tried to use a node that doesn't exist. Usually <code>$SomeName</code> has the wrong name, or that node isn't where the script thinks it is.",
+  f:"Check the name in the Scene panel matches the code EXACTLY, capital letters too (<code>$Head</code> is not <code>$head</code>). If the node is deeper, use the full path like <code>$Head/Camera3D</code>. Tip: drag a node from the Scene panel into the script and Godot types the right path for you."},
+ {m:'Node not found: "Head" (relative to "/root/...")', k:"node not found relative path get_node", w:"Same idea: there's no node with that name in that spot.", f:"Rename the node to match the code, or fix the path in the code. Remember the path starts from the node the script is ON."},
+ {m:'Identifier "something" not declared in the current scope.', k:"identifier not declared scope", w:"You used a word Godot doesn't know: a typo, a variable you never made, or a class from a script that isn't in the project yet.",
+  f:"Check spelling and capital letters. If it's <code>Health</code>, <code>Gun</code> or <code>Player</code>, make sure that script exists and has its <code>class_name</code> line. Sometimes saving all scripts (<b>File &gt; Save All</b> in the script editor) fixes it."},
+ {m:"Mixed use of tabs and spaces for indentation.", k:"mixed tabs spaces indentation indent", w:"Some lines are pushed in with Tabs and some with spaces, and Godot hates that.", f:"In the script editor, go to <b>Edit &gt; Indentation &gt; Convert Indent to Tabs</b>. Next time, delete everything in a new script before pasting."},
+ {m:'Expected indented block after function declaration. / Unindent doesn\'t match the previous indentation level. / Unexpected "Indent"', k:"expected indented block unindent unexpected indent indentation level", w:"A line is pushed in too much or not enough.", f:"Everything inside a <code>func</code>, <code>if</code> or <code>for</code> must be one Tab further right than that line. Lines at the top (like <code>var</code> and <code>@export</code>) have no Tab at all."},
+ {m:'Invalid call. Nonexistent function "take_hit" in base "..."', k:"invalid call nonexistent function base method", w:"You called a function on a node that doesn't have it. Usually the script isn't attached, or it's on the wrong node.", f:"Click the node and check the Inspector's <b>Script</b> box at the bottom. Make sure the right <code>.gd</code> is on it, and that the function name is spelled the same in both places."},
+ {m:'The InputMap action "jump" doesn\'t exist.', k:"inputmap action doesn't exist input map", w:"The code uses a control name that was never set up.", f:"Do step 1 of <b>Build the zombie game</b> (the Controls autoload), or add it by hand in <b>Project Settings &gt; Input Map</b>."},
+ {m:"Attempt to call function ... in base 'previously freed'.", k:"previously freed deleted instance", w:"The code tried to use something that already got deleted (like a zombie that died).", f:"Before using it, check <code>if is_instance_valid(thing):</code>"},
+ {m:"Can't change this state while flushing queries. Use call_deferred() or set_deferred() to change monitoring state instead.", k:"flushing queries call_deferred set_deferred", w:"You changed physics stuff in the middle of a physics check (like disabling a collision inside body_entered).", f:'Use <code>set_deferred("disabled", true)</code> instead of <code>disabled = true</code>, or <code>call_deferred("add_child", thing)</code>.'},
+ {m:"Script inherits from native type 'CharacterBody3D', so it can't be assigned to an object of type: 'Node3D'", k:"inherits native type can't be assigned object", w:"The script's first line says <code>extends CharacterBody3D</code> but the node is a different type.", f:"Right click the node and pick <b>Change Type</b>, then choose the type the script wants."},
+ {m:"Trying to assign value of type 'X' to a variable of type 'Y'.", k:"trying to assign value type variable", w:"You put the wrong kind of thing in a variable, like text into a number.", f:"Use <code>str(5)</code> to turn a number into text, or <code>int(\"5\")</code> to turn text into a number."},
+ {m:"Parser Error: Expected end of statement after expression, found ...", k:"parser error expected end of statement", w:"A typo on that line: often a missing <code>:</code> at the end of <code>if</code>/<code>func</code>/<code>for</code>, or a missing bracket.", f:"Look at the line number in the error and check for a missing <code>:</code>, <code>)</code> or <code>\"</code>."},
+ {m:"Player falls through the floor", k:"fall through floor ground falling forever no collision", w:"The floor has no collision, so it's just a picture.", f:"For a CSGBox3D, tick <b>Use Collision</b>. For a model, select its MeshInstance3D, then use <b>Mesh &gt; Create Collision Shape</b> at the top of the 3D view and pick <b>Trimesh</b> + <b>Static Body</b>."},
+ {m:"Screen is black / grey when I play", k:"black screen grey nothing see dark camera", w:"There's no camera turned on, or no light.", f:"Make sure the Camera3D has <b>Current</b> ticked. Add light through the 3 dots menu at the top of the 3D view: <b>Add Sun to Scene</b> + <b>Add Environment to Scene</b>."},
+ {m:"Zombie walks backwards / moonwalks", k:"backwards moonwalk wrong way facing zombie model rotate", w:"Your model faces +Z, but Godot's 'forward' is -Z.", f:"Click the zombie's <b>Model</b> child (not the root) and set Rotation Y to <code>180</code>."},
+ {m:"Zombies get stuck on walls", k:"stuck wall navigation path zombies corner", w:"Without navigation they walk in a straight line.", f:"Add a NavigationRegion3D, put the floor and walls inside it, give it a New NavigationMesh and click <b>Bake</b>. Also add a NavigationAgent3D to the zombie scene."},
+ {m:"Mouse doesn't turn the camera", k:"mouse camera look turn not working", w:"The mouse isn't captured, or the Head node is missing or misnamed.", f:"Click inside the game window once. Check the player has a node named exactly <code>Head</code> with the Camera3D inside it."},
+ {m:"Gun doesn't hurt zombies", k:"gun damage shoot not working hit zombie", w:"The laser isn't hitting the zombie's collision, or the zombie has no take_hit function.", f:"Make sure the zombie scene has a CollisionShape3D with a shape set, and zombie.gd is attached to the zombie's root node."},
+ {m:"Game is laggy / low FPS", k:"lag laggy fps slow performance", w:"Too much going on for the graphics card.", f:"<b>Project Settings &gt; Rendering &gt; Renderer</b>: switch to <b>Mobile</b>. Turn off shadows on lights you don't need (Inspector &gt; Shadow &gt; Enabled). Keep fewer zombies alive at once."},
+ {m:"Model is pink / has no colors", k:"pink texture missing colors material", w:"The texture file is missing or in the wrong folder.", f:"Keep the model's texture files (often a <code>Textures</code> folder) right next to the .glb, exactly like they were in the download."}
+];
+
+const WORDS = [
+ ["Node","One LEGO piece that does one job (a camera, a light, a sound...)."],
+ ["Scene","A bunch of nodes saved together as a <code>.tscn</code> file. Player, zombie, level."],
+ ["Instance","A copy of a scene placed somewhere. 10 zombies in a level = 10 instances of zombie.tscn."],
+ ["Root node","The top node of a scene. Everything else is inside it."],
+ ["Child / Parent","A node inside another node is its child. Children move when the parent moves."],
+ ["Script","Code stuck on a node (<code>.gd</code> file)."],
+ ["@export","Makes a variable show up in the Inspector so you can change it without touching code."],
+ ["@onready","Waits until the scene is fully loaded before grabbing a node. Use it for <code>$Something</code>."],
+ ["$Name","Shortcut to grab a child node by its name."],
+ ["func","A function: a named list of instructions you can run."],
+ ["_ready()","Runs once when the node appears in the game."],
+ ["_process(delta)","Runs every frame. Good for visuals and input."],
+ ["_physics_process(delta)","Runs at a steady 60 times a second. Use it for movement and physics."],
+ ["delta","How many seconds since the last frame (like 0.016). Multiply speeds by it so the game runs the same on fast and slow PCs."],
+ ["Signal","A message a node sends when something happens. Other nodes connect to it and react."],
+ ["Group","A label you put on nodes (like \"zombies\") so you can find all of them at once."],
+ ["Autoload","A script that's always running, in every scene. Good for settings, score, controls."],
+ ["Vector3","3 numbers together: x (left/right), y (up/down), z (forward/back)."],
+ ["Transform","Where something is, how it's turned, and how big it is, all in one."],
+ ["CharacterBody3D","A body you move with code, like the player or a zombie. Bumps into walls properly."],
+ ["StaticBody3D","A solid thing that never moves: floors, walls, rocks."],
+ ["RigidBody3D","A thing physics moves for you: barrels you can knock over, falling crates."],
+ ["Area3D","An invisible zone that notices when stuff walks in. Pickups, traps, triggers."],
+ ["CollisionShape3D","The invisible shape that makes something solid. Without it you walk through stuff."],
+ ["Raycast","An invisible laser line. Used for bullets and \"what am I looking at\"."],
+ ["NavigationRegion3D","The map of where AI can walk, so zombies go around walls."],
+ ["CanvasLayer","A layer for 2D stuff drawn on top of the 3D game: HUD, menus."],
+ ["Control","Any UI piece: Button, Label, Panel, ProgressBar..."],
+ ["res://","Your project folder. <code>res://player.tscn</code> = player.tscn in your project."],
+ ["user://","A save folder on the player's PC, for save files and settings."],
+ [".glb / .gltf","The best 3D model format for Godot. Download models as .glb when you can."],
+ ["Inspector","The right panel with all the settings of whatever you clicked."]
+];
+
+/* ---------------- rendering ---------------- */
+const tabsify = s => s.replace(/^((?: {4})+)/gm, m => "\t".repeat(m.length / 4));
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function highlight(src){
+  const KW = /\b(extends|class_name|func|var|const|signal|if|elif|else|for|in|while|return|and|or|not|await|pass|break|continue|true|false|null|self|is|as|match|static|enum)\b/;
+  const out=[]; const re=/(#.*$)|("(?:[^"\\]|\\.)*")|(@\w+)|(\b\d+(?:\.\d+)?\b)|(\b[A-Za-z_]\w*\b)/gm;
+  let last=0, m;
+  while((m=re.exec(src))){
+    out.push(esc(src.slice(last,m.index)));
+    const t=m[0];
+    if(m[1]) out.push('<span class="cm">'+esc(t)+'</span>');
+    else if(m[2]) out.push('<span class="str">'+esc(t)+'</span>');
+    else if(m[3]) out.push('<span class="an">'+esc(t)+'</span>');
+    else if(m[4]) out.push('<span class="num">'+t+'</span>');
+    else if(KW.test(t) && t.match(KW)[0]===t) out.push('<span class="k">'+t+'</span>');
+    else if(/^[A-Z]/.test(t) && !/^[A-Z0-9_]+$/.test(t)) out.push('<span class="ty">'+t+'</span>');
+    else if(src[re.lastIndex]==="(") out.push('<span class="f">'+t+'</span>');
+    else out.push(esc(t));
+    last=re.lastIndex;
+  }
+  out.push(esc(src.slice(last)));
+  return out.join("");
+}
+function codeBlock(src, fileName){
+  const wrap=document.createElement("div"); wrap.className="codewrap";
+  const pre=document.createElement("pre"); pre.className="code";
+  const clean=tabsify(src.replace(/^\n+|\s+$/g,""));
+  pre.innerHTML=highlight(clean);
+  const b=document.createElement("button"); b.className="copy";
+  b.textContent= fileName ? "Copy "+fileName : "Copy";
+  b.onclick=()=>{
+    const done=()=>{b.textContent="Copied!";b.classList.add("done");setTimeout(()=>{b.textContent=fileName?"Copy "+fileName:"Copy";b.classList.remove("done")},1400)};
+    if(navigator.clipboard && window.isSecureContext){navigator.clipboard.writeText(clean).then(done,()=>fallback(clean,done));}
+    else fallback(clean,done);
+  };
+  wrap.append(pre,b); return wrap;
+}
+function fallback(text,done){
+  const t=document.createElement("textarea"); t.value=text; t.style.position="fixed"; t.style.opacity="0";
+  document.body.appendChild(t); t.select(); try{document.execCommand("copy");done();}catch(e){} t.remove();
+}
+function store(k,v){try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){return null}}
+
+// Line up the columns in the node trees
+function alignTrees(root){
+  root.querySelectorAll(".tree:not([data-aligned])").forEach(t=>{
+    const vis=h=>h.replace(/<[^>]+>/g,"").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").length;
+    const rows=t.innerHTML.split("\n").map(l=>{
+      const m=l.match(/^(.*?<span class="n">[^<]*<\/span>)\s*(<span class="[ts]">[^<]*<\/span>)?\s*(<span class="c">.*<\/span>)?\s*$/);
+      return m?{a:m[1],b:m[2]||"",c:m[3]||""}:{raw:l};
+    });
+    const wa=Math.max(...rows.filter(r=>!r.raw).map(r=>vis(r.a)))+2;
+    const wb=Math.max(...rows.filter(r=>!r.raw).map(r=>vis(r.b)))+2;
+    t.innerHTML=rows.map(r=>r.raw!==undefined?r.raw:
+      r.a+" ".repeat(wa-vis(r.a))+r.b+(r.c?" ".repeat(wb-vis(r.b))+r.c:"")).join("\n");
+    t.dataset.aligned="1";
+  });
+}
+alignTrees(document);
+
+// GDScript basics block on the start page
+document.querySelectorAll("pre.code[data-code]").forEach(pre=>{
+  const blk=codeBlock(document.getElementById(pre.dataset.code).textContent);
+  pre.parentNode.replaceWith(blk);
+});
+
+// Recipes
+const recBox=document.getElementById("recipes");
+let doneSet=new Set(JSON.parse(store("gem_done")||"[]"));
+RECIPES.forEach((r,i)=>{
+  const d=document.createElement("details"); d.className="recipe"+(doneSet.has(i)?" done":"");
+  d.innerHTML=`<summary><span class="num1">${i+1}</span><div><b>${r.title}</b><small>${r.sub}</small></div><span class="arrow">&#9656;</span></summary><div class="body">${r.html}<h3>The code (${r.file})</h3></div>`;
+  const body=d.querySelector(".body");
+  body.appendChild(codeBlock(document.getElementById(r.code).textContent, r.file));
+  const lab=document.createElement("label"); lab.className="donebox";
+  lab.innerHTML=`<input type="checkbox" ${doneSet.has(i)?"checked":""}> It works, I'm done with this step`;
+  lab.querySelector("input").onchange=e=>{
+    e.target.checked?doneSet.add(i):doneSet.delete(i);
+    d.classList.toggle("done",e.target.checked);
+    store("gem_done",JSON.stringify([...doneSet])); bar();
+  };
+  body.appendChild(lab);
+  recBox.appendChild(d);
+});
+alignTrees(recBox);
+function bar(){
+  const n=doneSet.size, t=RECIPES.length;
+  document.getElementById("bar").style.width=(n/t*100)+"%";
+  document.getElementById("barTxt").textContent= n===t ? "All done. You built a zombie game." : `${n} of ${t} steps done`;
+}
+bar();
+
+// Snippets
+const snipBox=document.getElementById("snipList");
+const snipEls=SNIPS.map(s=>{
+  const c=document.createElement("div"); c.className="card";
+  c.innerHTML=`<h3>${s.t}</h3>`; c.appendChild(codeBlock(s.c));
+  snipBox.appendChild(c); return {el:c, hay:(s.t+" "+s.k).toLowerCase()};
+});
+const noSnip=document.createElement("p"); noSnip.className="empty"; noSnip.textContent="Nothing found. Try a simpler word."; noSnip.hidden=true; snipBox.appendChild(noSnip);
+document.getElementById("search").addEventListener("input",e=>{
+  const words=e.target.value.toLowerCase().split(/\s+/).filter(Boolean); let shown=0;
+  snipEls.forEach(s=>{const ok=words.every(w=>s.hay.includes(w)); s.el.hidden=!ok; if(ok)shown++;});
+  noSnip.hidden=shown>0;
+});
+
+// Error fixer
+const fixBox=document.getElementById("fixList");
+function renderFixes(list){
+  fixBox.innerHTML="";
+  if(!list.length){fixBox.innerHTML='<p class="empty">No match. Try pasting just the main part of the error, without the file name and line number.</p>';return;}
+  list.forEach(x=>{
+    const c=document.createElement("div"); c.className="card fix";
+    c.innerHTML=`<div class="msg">${esc(x.m)}</div><p><b>What it means:</b> ${x.w}</p><p><b>Fix:</b> ${x.f}</p>`;
+    fixBox.appendChild(c);
+  });
+}
+document.getElementById("errBox").addEventListener("input",e=>{
+  const q=e.target.value.toLowerCase().replace(/[^a-z0-9_ ]+/g," ");
+  const words=q.split(/\s+/).filter(w=>w.length>2);
+  if(!words.length){renderFixes(FIXES);return;}
+  const scored=FIXES.map(x=>{
+    const hay=(x.m+" "+x.k).toLowerCase(); let s=0;
+    words.forEach(w=>{ if(hay.includes(w)) s+= w.length>5?2:1; });
+    return {x,s};
+  }).filter(o=>o.s>=2).sort((a,b)=>b.s-a.s).slice(0,4).map(o=>o.x);
+  renderFixes(scored);
+});
+renderFixes(FIXES);
+
+// Words
+document.getElementById("wordTable").innerHTML=WORDS.map(w=>`<tr><td style="white-space:nowrap"><b>${w[0]}</b></td><td>${w[1]}</td></tr>`).join("");
+
+// Tabs
+const pages=[...document.querySelectorAll(".page")], navBtns=[...document.querySelectorAll("nav button")];
+function show(id){
+  pages.forEach(p=>p.classList.toggle("on",p.id===id));
+  navBtns.forEach(b=>b.classList.toggle("on",b.dataset.p===id));
+  document.querySelector("main").scrollTop=0; window.scrollTo(0,0);
+  store("gem_tab",id);
+}
+navBtns.forEach(b=>b.onclick=()=>show(b.dataset.p));
+const saved=store("gem_tab"); if(saved && document.getElementById(saved)) show(saved);
+</script>
+</body>
+</html>
