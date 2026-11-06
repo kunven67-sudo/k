@@ -1,14 +1,15 @@
-//go:build windows
+//go:build windows && clip
 
 package main
 
-// ALTS Clipboard: "ALTS.exe --clip" runs in the background (starts with Windows) and takes
-// over Win+V: everything you copy (text + pictures), pins, stickers and emoji, then pastes
-// the one you pick into the app you were in.
+// ALTS Clipboard (its own app: ALTS-Clip.exe, built with -tags clip). Runs in the background, starts
+// with Windows, opens with Win+V (asked from Windows the normal way, RegisterHotKey) or Ctrl+Alt+V when
+// Windows keeps Win+V for itself: everything you copy (text + pictures), pins, stickers and emoji, then
+// pastes the one you pick into the app you were in. It never watches the keyboard.
 
 import (
 	"bytes"
-	"embed"
+
 	"encoding/json"
 	"image"
 	_ "image/gif"
@@ -16,9 +17,8 @@ import (
 	"image/png"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
+
 	"strings"
 	"sync"
 	"time"
@@ -28,12 +28,6 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
-
-//go:embed ui/clip.html ui/emoji.txt
-var clipUI embed.FS
-
-//go:embed ui/stickers
-var builtinStickers embed.FS
 
 var (
 	pAddClipListener   = user32.NewProc("AddClipboardFormatListener")
@@ -45,12 +39,10 @@ var (
 	pIsClipFmtAvail    = user32.NewProc("IsClipboardFormatAvailable")
 	pRegisterClipFmt   = user32.NewProc("RegisterClipboardFormatW")
 	pGetOpenClipWindow = user32.NewProc("GetOpenClipboardWindow")
-	pSetWindowsHookExW = user32.NewProc("SetWindowsHookExW")
-	pCallNextHookEx    = user32.NewProc("CallNextHookEx")
 	pSendInput         = user32.NewProc("SendInput")
+	pRegisterHotKey    = user32.NewProc("RegisterHotKey")
 	pGetForegroundWin  = user32.NewProc("GetForegroundWindow")
 	pGetWindowThreadID = user32.NewProc("GetWindowThreadProcessId")
-	pAttachThreadInput = user32.NewProc("AttachThreadInput")
 	pGetGUIThreadInfo  = user32.NewProc("GetGUIThreadInfo")
 	pClientToScreen    = user32.NewProc("ClientToScreen")
 	pGetCursorPos      = user32.NewProc("GetCursorPos")
@@ -60,7 +52,6 @@ var (
 	pKillTimer         = user32.NewProc("KillTimer")
 	pBringWindowToTop  = user32.NewProc("BringWindowToTop")
 	pIsWindow          = user32.NewProc("IsWindow")
-	pGetCurrentThread  = kernel32.NewProc("GetCurrentThreadId")
 	pGlobalAlloc       = kernel32.NewProc("GlobalAlloc")
 	pGlobalLock        = kernel32.NewProc("GlobalLock")
 	pGlobalUnlock      = kernel32.NewProc("GlobalUnlock")
@@ -69,23 +60,26 @@ var (
 )
 
 const (
-	clipClass      = "ALTS.Clip"
-	runKey         = `Software\Microsoft\Windows\CurrentVersion\Run`
-	runName        = "ALTS Clipboard"
-	wmActivate     = 0x0006
-	wmTimer        = 0x0113
-	wmClipUpdate   = 0x031D
-	wmKeyDown      = 0x0100
-	wmKeyUp        = 0x0101
-	wmSysKeyDown   = 0x0104
-	wmSysKeyUp     = 0x0105
-	wmClipShow     = wmApp + 10
-	wmClipRun      = wmApp + 11
-	whKeyboardLL   = 13
-	llkhfInjected  = 0x10
+	clipClass    = "ALTS.Clip"
+	runKey       = `Software\Microsoft\Windows\CurrentVersion\Run`
+	runName      = "ALTS Clipboard"
+	wmActivate   = 0x0006
+	wmTimer      = 0x0113
+	wmClipUpdate = 0x031D
+	wmKeyDown    = 0x0100
+	wmKeyUp      = 0x0101
+	wmSysKeyDown = 0x0104
+	wmSysKeyUp   = 0x0105
+	wmClipShow   = wmApp + 10
+	wmClipRun    = wmApp + 11
+
 	vkLWin         = 0x5B
 	vkRWin         = 0x5C
-	vkMask         = 0xE8 // unassigned key: tapping it stops the Start menu opening when Win comes up
+	wmHotkey       = 0x0312
+	modAlt         = 0x0001
+	modControl     = 0x0002
+	modWin         = 0x0008
+	modNoRepeat    = 0x4000
 	cfUnicodeText  = 13
 	cfDIB          = 8
 	cfDIBV5        = 17
@@ -102,11 +96,6 @@ const (
 	clipW, clipH   = 380, 500 // normal (96 dpi) pixels
 	monitorNearest = 2
 )
-
-type kbdLL struct {
-	Vk, Scan, Flags, Time uint32
-	Extra                 uintptr
-}
 
 type keyInput struct { // INPUT with a KEYBDINPUT inside (40 bytes on 64-bit)
 	Type  uint32
@@ -140,14 +129,16 @@ type clipApp struct {
 	ui                                       *edge.Chromium
 	uiReady                                  bool
 	prev                                     uintptr // the window you were in when Win+V came
-	winDown                                  bool
-	ateV                                     bool
-	pending                                  func() // what to paste after the popup hides
+	keyName                                  string  // "Win+V" or "Ctrl+Alt+V"
+	tellKey                                  bool
+	pasteTries                               int
 	fmtPNG, fmtNoWatch, fmtNoHist, fmtIgnore uintptr
 	keep                                     []any
 }
 
 var clip *clipApp
+
+func main() { runClip() }
 
 func runClip() {
 	h, _, err := pCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(u16(`Local\ALTS-clip`))))
@@ -165,7 +156,7 @@ func runClip() {
 	if err != nil {
 		return
 	}
-	c := &clipApp{dir: filepath.Join(root, appName, "clip")}
+	c := &clipApp{dir: filepath.Join(root, "ALTS", "clip")}
 	clip = c
 	c.picDir = filepath.Join(c.dir, "pics")
 	c.mineDir = filepath.Join(c.dir, "stickers")
@@ -195,21 +186,19 @@ func runClip() {
 	}
 	darkTitle(c.win)
 	pAddClipListener.Call(c.win)
-	hook := windows.NewCallback(llKey)
-	c.keep = append(c.keep, hook)
-	// The Win+V catcher gets its own thread: if it ever waits on slow work, Windows drops it for good.
-	go func() {
-		runtime.LockOSThread()
-		pSetWindowsHookExW.Call(whKeyboardLL, hook, inst, 0)
-		var hm msg
-		for {
-			if r, _, _ := pGetMessageW.Call(uintptr(unsafe.Pointer(&hm)), 0, 0, 0); int32(r) <= 0 {
-				return
-			}
-		}
-	}()
+	// Win+V if Windows lets go of it, else Ctrl+Alt+V. Both asked from Windows the normal way.
+	if r, _, _ := pRegisterHotKey.Call(c.win, 1, modWin|modNoRepeat, 'V'); r != 0 {
+		c.keyName = "Win+V"
+	} else if r, _, _ := pRegisterHotKey.Call(c.win, 2, modControl|modAlt|modNoRepeat, 'V'); r != 0 {
+		c.keyName = "Ctrl+Alt+V"
+	}
 	c.startUI()
 
+	if c.st.KeyTold != c.keyName { // say once which key opens it
+		c.st.KeyTold = c.keyName
+		c.save()
+		c.tellKey = true // shown once the popup page is ready
+	}
 	var m msg
 	for {
 		r, _, _ := pGetMessageW.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0)
@@ -218,16 +207,6 @@ func runClip() {
 		}
 		pTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
 		pDispatchMessageW.Call(uintptr(unsafe.Pointer(&m)))
-	}
-}
-
-// startClipHelper: plain ALTS makes sure the clipboard part is running.
-func startClipHelper() {
-	if w, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16(clipClass))), 0); w != 0 {
-		return
-	}
-	if exe, err := os.Executable(); err == nil {
-		exec.Command(exe, "--clip").Start()
 	}
 }
 
@@ -270,7 +249,7 @@ func (c *clipApp) autostart(on bool) {
 		return
 	}
 	if exe, err := os.Executable(); err == nil {
-		k.SetStringValue(runName, `"`+exe+`" --clip`)
+		k.SetStringValue(runName, `"`+exe+`"`)
 	}
 }
 
@@ -319,7 +298,7 @@ func (c *clipApp) push() {
 			built = append(built, e.Name())
 		}
 	}
-	c.call("load", map[string]any{"items": c.st.Items, "mine": mine, "builtin": built, "start": !c.st.NoStart})
+	c.call("load", map[string]any{"items": c.st.Items, "mine": mine, "builtin": built, "start": !c.st.NoStart, "key": c.keyName})
 }
 
 func (c *clipApp) save() { saveClip(c.json, c.st) }
@@ -360,6 +339,9 @@ func (c *clipApp) do(m clipMsg) {
 	case "ready":
 		c.uiReady = true
 		c.push()
+		if c.tellKey {
+			c.show()
+		}
 	case "hide":
 		c.hide()
 	case "paste":
@@ -466,35 +448,6 @@ func (c *clipApp) whoHoldsIt() string {
 
 // ---------- Win+V ----------
 
-func llKey(code int, wp, lp uintptr) uintptr {
-	c := clip
-	if code == 0 && c != nil {
-		k := (*kbdLL)(unsafe.Pointer(lp))
-		down := wp == wmKeyDown || wp == wmSysKeyDown
-		up := wp == wmKeyUp || wp == wmSysKeyUp
-		if k.Flags&llkhfInjected == 0 {
-			if k.Vk == vkLWin || k.Vk == vkRWin {
-				c.winDown = down || (!up && c.winDown)
-			}
-			if k.Vk == 'V' {
-				if down && (c.winDown || keyDown(vkLWin) || keyDown(vkRWin)) && !keyDown(vkControl) && !keyDown(vkMenu) && !keyDown(vkShift) {
-					if !c.ateV {
-						c.ateV = true
-						pPostMessageW.Call(c.win, wmClipShow, 0, 0)
-					}
-					return 1
-				}
-				if up && c.ateV {
-					c.ateV = false
-					return 1
-				}
-			}
-		}
-	}
-	r, _, _ := pCallNextHookEx.Call(0, uintptr(code), wp, lp)
-	return r
-}
-
 func sendKeys(keys ...keyInput) {
 	if len(keys) > 0 {
 		pSendInput.Call(uintptr(len(keys)), uintptr(unsafe.Pointer(&keys[0])), unsafe.Sizeof(keys[0]))
@@ -515,7 +468,6 @@ func (c *clipApp) show() {
 		return
 	}
 	c.prev = fg
-	sendKeys(key(vkMask, false), key(vkMask, true)) // Start menu stays shut when Win comes up
 
 	// where: next to the text cursor if the app shows one, else next to the mouse
 	var at point
@@ -553,22 +505,24 @@ func (c *clipApp) show() {
 		c.ui.Resize()
 	}
 
-	// Windows only lets the app you're using pick the front window; borrow its input for a moment.
-	me, _, _ := pGetCurrentThread.Call()
-	ft, _, _ := pGetWindowThreadID.Call(fg, 0)
-	if ft != 0 && ft != me {
-		pAttachThreadInput.Call(me, ft, 1)
-	}
+	// a hotkey from Windows lets this app come to the front
 	pShowWindow.Call(c.win, swShow)
 	pBringWindowToTop.Call(c.win)
 	pSetForegroundWindow.Call(c.win)
-	if ft != 0 && ft != me {
-		pAttachThreadInput.Call(me, ft, 0)
-	}
 	if c.ui != nil {
 		c.ui.Focus()
 	}
 	c.call("shown", nil)
+	if c.tellKey {
+		c.tellKey = false
+		if c.keyName == "Win+V" {
+			c.call("toast", "ALTS Clipboard is on. Press Win+V anywhere to open it.")
+		} else if c.keyName != "" {
+			c.call("toast", "Windows keeps Win+V for itself, so ALTS Clipboard opens with Ctrl+Alt+V.")
+		} else {
+			c.call("toast", "Another app took both Win+V and Ctrl+Alt+V. Close it and restart ALTS Clipboard.")
+		}
+	}
 }
 
 func (c *clipApp) hide() {
@@ -588,18 +542,19 @@ func (c *clipApp) pasteWith(set func() bool) {
 			pSetForegroundWindow.Call(c.prev)
 		}
 	}
+	c.pasteTries = 0
 	pSetTimer.Call(c.win, timerPaste, 70, 0)
 }
 
+// pressPaste presses Ctrl+V in your app once you've let go of the shortcut keys (so it's a plain Ctrl+V).
 func (c *clipApp) pressPaste() {
-	var keys []keyInput
-	for _, vk := range []uint16{vkLWin, vkRWin, vkMenu, vkShift} {
-		if keyDown(uintptr(vk)) { // still held from Win+V: let go first so it's a plain Ctrl+V
-			keys = append(keys, key(vkMask, false), key(vkMask, true), key(vk, true))
-		}
+	held := keyDown(vkLWin) || keyDown(vkRWin) || keyDown(vkMenu) || keyDown(vkShift) || keyDown(vkControl)
+	if held && c.pasteTries < 30 {
+		c.pasteTries++
+		pSetTimer.Call(c.win, timerPaste, 40, 0)
+		return
 	}
-	keys = append(keys, key(vkControl, false), key('V', false), key('V', true), key(vkControl, true))
-	sendKeys(keys...)
+	sendKeys(key(vkControl, false), key('V', false), key('V', true), key(vkControl, true))
 }
 
 // ---------- reading + writing the clipboard ----------
@@ -766,6 +721,15 @@ func (c *clipApp) setPicFile(path string) bool {
 func clipProc(h, m, wp, lp uintptr) uintptr {
 	c := clip
 	switch m {
+	case wmHotkey:
+		if c != nil {
+			if fg, _, _ := pGetForegroundWin.Call(); fg == h {
+				c.hide() // the shortcut again closes it
+			} else {
+				c.show()
+			}
+		}
+		return 0
 	case wmClipShow:
 		if c != nil {
 			c.show()

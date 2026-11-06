@@ -32,10 +32,11 @@ each one stays logged in on its own.
   next / previous, `Alt+Left` / `Alt+Right` back / forward, `F5` reload, `Ctrl+Shift+G` copy chat.
 - Links to other websites open in your normal browser.
 
-## ALTS Clipboard (Win+V)
+## ALTS Clipboard (Win+V or Ctrl+Alt+V)
 
-Windows' own clipboard history is replaced by ALTS Clipboard. It runs on its own in the background
-(`ALTS.exe --clip`, starts with Windows, keeps working after ALTS closes) and press **Win+V** anywhere:
+`ALTS-Clip.exe` is its own small app: keep it in the same folder as `ALTS.exe` (ALTS starts it), it
+starts with Windows and keeps working after ALTS closes. It asks Windows for **Win+V** the normal way
+(no keyboard watching); if Windows keeps Win+V for itself it uses **Ctrl+Alt+V** and says so once.
 
 - **Clipboard**: everything you copied, text and pictures, newest first. Click one (or arrow keys + Enter)
   and it pastes right into the app you were in. Star = pin (kept forever), x = delete. Keeps the last 200
@@ -95,6 +96,7 @@ folder per account).
 
 ```
 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H windowsgui -s -w" -o ALTS.exe .
+GOOS=windows GOARCH=amd64 go build -tags clip -trimpath -ldflags "-H windowsgui -s -w" -o ALTS-Clip.exe .
 go test ./...
 ```
 

@@ -42,6 +42,7 @@ type clipStore struct {
 	Items    []clipItem `json:"items"`
 	Stickers []string   `json:"stickers,omitempty"` // their own sticker files (in stickers\), newest first
 	NoStart  bool       `json:"noStart,omitempty"`  // don't start with Windows
+	KeyTold  string     `json:"keyTold,omitempty"`  // which shortcut was last shown
 }
 
 func hashOf(kind string, b []byte) string {

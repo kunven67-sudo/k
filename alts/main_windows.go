@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows && !clip
 
 // ALTS: one window, a list of Claude accounts on the left, each one with its own
 // separate login (its own WebView2 data folder), all staying logged in at once.
@@ -107,10 +107,6 @@ type App struct {
 var app *App
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "--clip" {
-		runClip()
-		return
-	}
 	if pSetProcessDpiAwareCtx.Find() == nil {
 		pSetProcessDpiAwareCtx.Call(^uintptr(3)) // -4 = per monitor v2 (the manifest says so too)
 	}
@@ -176,7 +172,7 @@ func main() {
 	if first != "" {
 		a.open(first)
 	}
-	startClipHelper() // Win+V clipboard (runs on its own, also after ALTS closes)
+	startClipHelper() // ALTS Clipboard (ALTS-Clip.exe next to ALTS.exe, runs on its own)
 
 	var m msg
 	for {

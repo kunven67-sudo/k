@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows && !clip
 
 package main
 
@@ -8,10 +8,35 @@ package main
 import (
 	"encoding/base64"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"unsafe"
+
+	"golang.org/x/sys/windows/registry"
 )
+
+// startClipHelper starts ALTS Clipboard (ALTS-Clip.exe, a separate app next to ALTS.exe) if it isn't running.
+// It also clears the start-with-Windows entry the first 1.5.0 test build left (that one pointed at ALTS.exe).
+func startClipHelper() {
+	if k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.QUERY_VALUE|registry.SET_VALUE); err == nil {
+		if v, _, err := k.GetStringValue("ALTS Clipboard"); err == nil && strings.Contains(v, "--clip") {
+			k.DeleteValue("ALTS Clipboard")
+		}
+		k.Close()
+	}
+	if w, _, _ := pFindWindowW.Call(uintptr(unsafe.Pointer(u16("ALTS.Clip"))), 0); w != 0 {
+		return
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	clip := filepath.Join(filepath.Dir(exe), "ALTS-Clip.exe")
+	if _, err := os.Stat(clip); err == nil {
+		exec.Command(clip).Start()
+	}
+}
 
 var (
 	pMessageBeep   = user32.NewProc("MessageBeep")
@@ -85,16 +110,7 @@ func (a *App) ping(id, text string) {
 	if r, _, _ := pIsIconic.Call(a.main); r != 0 {
 		pShowWindow.Call(a.main, swRestore)
 	}
-	fg, _, _ := pGetForegroundWin.Call()
-	me, _, _ := pGetCurrentThread.Call()
-	ft, _, _ := pGetWindowThreadID.Call(fg, 0)
-	if ft != 0 && ft != me {
-		pAttachThreadInput.Call(me, ft, 1)
-	}
-	pSetForegroundWindow.Call(a.main)
-	if ft != 0 && ft != me {
-		pAttachThreadInput.Call(me, ft, 0)
-	}
+	pSetForegroundWindow.Call(a.main) // if Windows won't bring it up, the flashing taskbar button shows it
 	if id != a.active && a.views[id] != nil {
 		a.show(id)
 	}

@@ -196,7 +196,7 @@ function menu(on) {
   const m = $('#menu');
   m.style.display = on ? 'block' : 'none';
   $('#mStart').textContent = (S.start ? '☑' : '☐') + '  Start with Windows';
-  $('#mNote').textContent = 'Win+V opens this. Pinned stuff stays forever; the rest keeps the last 200.';
+  $('#mNote').textContent = (S.key || 'Win+V') + ' opens this. Pinned stuff stays forever; the rest keeps the last 200.';
 }
 
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
