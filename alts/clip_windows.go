@@ -17,7 +17,6 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	"image/png"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -142,6 +141,8 @@ type clipApp struct {
 	grace                                    time.Duration // how long it may stay up without being the window you use
 	pasteTries                               int
 	shownOnce                                bool
+	memeDir                                  string
+	memes                                    memeIndex
 	fmtPNG, fmtNoWatch, fmtNoHist, fmtIgnore uintptr
 	keep                                     []any
 }
@@ -194,11 +195,13 @@ func runClip() {
 	c.picDir = filepath.Join(c.dir, "pics")
 	c.mineDir = filepath.Join(c.dir, "stickers")
 	c.json = filepath.Join(c.dir, "clip.json")
-	for _, d := range []string{c.picDir, c.mineDir, filepath.Join(c.dir, "builtin")} {
+	for _, d := range []string{c.picDir, c.mineDir} {
 		os.MkdirAll(d, 0o755)
 	}
 	c.writeFiles()
 	c.st = loadClip(c.json)
+	c.memeDir = filepath.Join(c.dir, "memes")
+	c.memes = loadMemes(c.memeDir) // ALTS downloads them (this app never goes online)
 	c.autostart(!c.st.NoStart)
 	c.fmtPNG = clipFormat("PNG")
 	c.fmtNoWatch = clipFormat("ExcludeClipboardContentFromMonitorProcessing")
@@ -258,27 +261,13 @@ func clipFormat(name string) uintptr {
 	return r
 }
 
-// writeFiles puts the popup page, the emoji list and the starter stickers in the clip folder
-// (the popup loads them from there as https://clip.alts/...).
+// writeFiles keeps a copy of the popup page and the emoji list in the clip folder.
 func (c *clipApp) writeFiles() {
 	for _, n := range []string{"clip.html", "emoji.txt"} {
 		if b, err := clipUI.ReadFile("ui/" + n); err == nil {
 			writeFileAtomic(filepath.Join(c.dir, n), b)
 		}
 	}
-	fs.WalkDir(builtinStickers, "ui/stickers", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return nil
-		}
-		out := filepath.Join(c.dir, "builtin", d.Name())
-		if st, e := os.Stat(out); e == nil && st.Size() > 0 {
-			return nil
-		}
-		if b, e := builtinStickers.ReadFile(p); e == nil {
-			os.WriteFile(out, b, 0o644)
-		}
-		return nil
-	})
 }
 
 func (c *clipApp) autostart(on bool) {
@@ -360,22 +349,21 @@ func (c *clipApp) push() {
 	c.call("load", map[string]any{"items": items, "mine": mine, "start": !c.st.NoStart, "key": c.keyName})
 }
 
-// assets: the starter stickers + emoji list, once when the popup page is ready.
+// assets: the meme stickers + emoji list, when the popup page is ready (and when new memes came in).
 func (c *clipApp) assets() {
 	type pic struct {
 		File string `json:"file"`
+		Name string `json:"name"`
 		Src  string `json:"src"`
 	}
-	var built []pic
-	if es, err := builtinStickers.ReadDir("ui/stickers"); err == nil {
-		for _, e := range es {
-			if b, err := builtinStickers.ReadFile("ui/stickers/" + e.Name()); err == nil {
-				built = append(built, pic{e.Name(), "data:image/png;base64," + base64.StdEncoding.EncodeToString(b)})
-			}
+	memes := []pic{}
+	for _, m := range c.memes.Memes {
+		if d := c.dataURL(filepath.Join(c.memeDir, memeThumb(m.File))); d != "" {
+			memes = append(memes, pic{m.File, m.Name, d})
 		}
 	}
 	em, _ := clipUI.ReadFile("ui/emoji.txt")
-	c.call("assets", map[string]any{"builtin": built, "emoji": string(em)})
+	c.call("assets", map[string]any{"memes": memes, "emoji": string(em), "memesLoading": len(memes) == 0})
 }
 
 var dataCache = map[string]string{}
@@ -388,8 +376,12 @@ func (c *clipApp) dataURL(path string) string {
 	if err != nil || len(b) > 8<<20 {
 		return ""
 	}
-	d := "data:image/png;base64," + base64.StdEncoding.EncodeToString(b)
-	if len(dataCache) > 300 {
+	mime := "image/png"
+	if strings.HasSuffix(strings.ToLower(path), ".jpg") {
+		mime = "image/jpeg"
+	}
+	d := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(b)
+	if len(dataCache) > 400 {
 		clear(dataCache)
 	}
 	dataCache[path] = d
@@ -405,6 +397,7 @@ type clipMsg struct {
 	Text string `json:"text"`
 	On   bool   `json:"on"`
 	Mine bool   `json:"mine"`
+	Kind string `json:"kind"` // sticker: "meme" or "mine"
 }
 
 func (c *clipApp) onMessage(s string) {
@@ -460,15 +453,20 @@ func (c *clipApp) do(m clipMsg) {
 			c.pasteWith(func() bool { return c.setText(t) })
 		}
 	case "sticker":
-		name, ok := stickerName(m.File)
-		if !ok {
-			return
+		var p string
+		if m.Kind == "meme" {
+			name, ok := memeFile(m.File)
+			if !ok {
+				return
+			}
+			p = filepath.Join(c.memeDir, name)
+		} else {
+			name, ok := stickerName(m.File)
+			if !ok {
+				return
+			}
+			p = filepath.Join(c.mineDir, name)
 		}
-		dir := filepath.Join(c.dir, "builtin")
-		if m.Mine {
-			dir = c.mineDir
-		}
-		p := filepath.Join(dir, name)
 		c.pasteWith(func() bool { return c.setPicFile(p) })
 	case "pin":
 		if i := c.st.find(m.ID); i >= 0 {
@@ -617,6 +615,10 @@ func (c *clipApp) show() {
 			ctl.PutIsVisible(true)
 		}
 		c.ui.Resize()
+	}
+	if x := loadMemes(c.memeDir); x.Updated != c.memes.Updated { // ALTS got new memes since last time
+		c.memes = x
+		c.assets()
 	}
 	pBringWindowToTop.Call(c.win)
 	pSetForegroundWindow.Call(c.win)

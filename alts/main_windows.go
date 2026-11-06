@@ -173,6 +173,7 @@ func main() {
 		a.open(first)
 	}
 	startClipHelper() // ALTS Clipboard (ALTS-Clip.exe next to ALTS.exe, runs on its own)
+	a.getMemes()      // meme stickers for it + the chat-box picker
 
 	var m msg
 	for {
@@ -466,6 +467,8 @@ func (a *App) do(c cmd) {
 		if opensOutside(c.A) {
 			shellOpen(c.A)
 		}
+	case "getfile":
+		a.downloadLink(c.ID, c.A)
 	case "tool":
 		a.tool(c.A)
 	case "continue":
@@ -853,6 +856,10 @@ func (a *App) onNewWindow(args unsafe.Pointer) {
 	pCoTaskMemFree.Call(uintptr(unsafe.Pointer(p)))
 	if opensOutside(link) {
 		comCall(args, nwArgsPutHandled, 1)
-		a.enqueue(cmd{T: "ext", A: link})
+		if dl, _, _ := githubFile(link); dl != "" {
+			a.enqueue(cmd{T: "getfile", ID: a.active, A: link}) // a file to download: ALTS saves it itself
+		} else {
+			a.enqueue(cmd{T: "ext", A: link})
+		}
 	}
 }

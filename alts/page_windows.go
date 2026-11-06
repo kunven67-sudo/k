@@ -46,6 +46,7 @@ type pageMsg struct {
 	WR      string  `json:"wr"`
 	Text    string  `json:"text"`
 	Mine    bool    `json:"mine"`
+	Kind    string  `json:"kind"`
 	ID      string  `json:"id"`   // Files panel saves (panelsave_windows.go)
 	Name    string  `json:"name"` //
 	Size    int64   `json:"size"` //
@@ -149,15 +150,13 @@ func (a *App) page(id string, m pageMsg) {
 	case "emoji-data":
 		v.c.Eval(jsCall("emojiData", a.emojiData()))
 	case "sticker-get":
-		if b, name := a.stickerBytes(m.File, m.Mine); b != nil {
-			v.c.Eval(jsCall("stickerFile", map[string]string{"name": name, "b64": base64.StdEncoding.EncodeToString(b)}))
+		if b, name, typ := a.stickerBytes(m.File, m.Kind); b != nil {
+			v.c.Eval(jsCall("stickerFile", map[string]string{"name": name, "type": typ, "b64": base64.StdEncoding.EncodeToString(b)}))
 		} else {
 			v.c.Eval(jsCall("stickerFile", nil))
 		}
 	case "ping":
 		a.ping(id, m.Text)
-	case "fsave-start", "fsave-part", "fsave-end", "fsave-show":
-		a.panelSave(id, m)
 	case "filelearn": // the Files panel download (extras.js): noted so a broken one can be looked into
 		if len(m.URL) < 600 {
 			a.fileLog("files panel: " + m.URL)

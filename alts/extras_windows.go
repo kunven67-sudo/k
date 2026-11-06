@@ -47,6 +47,22 @@ func startClipHelper() {
 	}
 }
 
+// getMemes downloads the meme stickers for ALTS Clipboard and the chat-box picker when they're missing or old.
+func (a *App) getMemes() {
+	dir := filepath.Join(a.clipDir(), "memes")
+	if !loadMemes(dir).stale() {
+		return
+	}
+	go func() {
+		x, err := refreshMemes(dir, webGet)
+		if err != nil {
+			a.post(func() { a.fileLog("memes: " + err.Error()) })
+			return
+		}
+		a.post(func() { a.fileLog("memes: " + itoa(len(x.Memes)) + " ready") })
+	}()
+}
+
 var (
 	pMessageBeep   = user32.NewProc("MessageBeep")
 	pFlashWindowEx = user32.NewProc("FlashWindowEx")
@@ -56,50 +72,64 @@ type sticker struct {
 	File  string `json:"file"`
 	Name  string `json:"name"`
 	Thumb string `json:"thumb"`
-	Mine  bool   `json:"mine,omitempty"`
+	Kind  string `json:"kind"` // "meme" or "mine"
 }
 
 func (a *App) clipDir() string { return filepath.Join(a.base, "clip") }
 
 func (a *App) emojiData() map[string]any {
 	em, _ := clipUI.ReadFile("ui/emoji.txt")
-	var list []sticker
+	list := []sticker{}
+	data := func(p string) string {
+		b, err := os.ReadFile(p)
+		if err != nil || len(b) > 8<<20 {
+			return ""
+		}
+		mime := "image/png"
+		if strings.HasSuffix(strings.ToLower(p), ".jpg") {
+			mime = "image/jpeg"
+		}
+		return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(b)
+	}
 	st := loadClip(filepath.Join(a.clipDir(), "clip.json"))
 	for _, f := range st.Stickers {
-		if b, err := os.ReadFile(filepath.Join(a.clipDir(), "stickers", f)); err == nil && len(b) < 8<<20 {
-			list = append(list, sticker{File: f, Name: "mine", Thumb: "data:image/png;base64," + base64.StdEncoding.EncodeToString(b), Mine: true})
+		if d := data(filepath.Join(a.clipDir(), "stickers", f)); d != "" {
+			list = append(list, sticker{File: f, Name: "mine", Thumb: d, Kind: "mine"})
 		}
 	}
-	if es, err := builtinStickers.ReadDir("ui/stickers"); err == nil {
-		for _, e := range es {
-			b, err := builtinStickers.ReadFile("ui/stickers/" + e.Name())
-			if err != nil {
-				continue
-			}
-			name := strings.ReplaceAll(strings.TrimSuffix(e.Name(), ".png"), "_", " ")
-			list = append(list, sticker{File: e.Name(), Name: name, Thumb: "data:image/png;base64," + base64.StdEncoding.EncodeToString(b)})
+	memeDir := filepath.Join(a.clipDir(), "memes")
+	for _, m := range loadMemes(memeDir).Memes { // ALTS Clipboard downloads these
+		if d := data(filepath.Join(memeDir, memeThumb(m.File))); d != "" {
+			list = append(list, sticker{File: m.File, Name: strings.ToLower(m.Name), Thumb: d, Kind: "meme"})
 		}
 	}
 	return map[string]any{"emoji": string(em), "stickers": list}
 }
 
-func (a *App) stickerBytes(file string, mine bool) ([]byte, string) {
-	name, ok := stickerName(file)
-	if !ok {
-		return nil, ""
-	}
-	if mine {
-		b, err := os.ReadFile(filepath.Join(a.clipDir(), "stickers", name))
-		if err != nil {
-			return nil, ""
+// stickerBytes: the picture to attach, its file name and type.
+func (a *App) stickerBytes(file, kind string) ([]byte, string, string) {
+	var p string
+	if kind == "meme" {
+		name, ok := memeFile(file)
+		if !ok {
+			return nil, "", ""
 		}
-		return b, "sticker.png"
+		p = filepath.Join(a.clipDir(), "memes", name)
+	} else {
+		name, ok := stickerName(file)
+		if !ok {
+			return nil, "", ""
+		}
+		p = filepath.Join(a.clipDir(), "stickers", name)
 	}
-	b, err := builtinStickers.ReadFile("ui/stickers/" + name)
+	b, err := os.ReadFile(p)
 	if err != nil {
-		return nil, ""
+		return nil, "", ""
 	}
-	return b, name
+	if strings.HasSuffix(strings.ToLower(p), ".jpg") {
+		return b, "meme.jpg", "image/jpeg"
+	}
+	return b, "sticker.png", "image/png"
 }
 
 type flashInfo struct {

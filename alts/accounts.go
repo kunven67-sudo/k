@@ -33,6 +33,8 @@ type Settings struct {
 	Place      *Place    `json:"place,omitempty"`
 	MemoryRepo string    `json:"memoryRepo,omitempty"` // saved chats also go to this GitHub repo (owner/name)
 	Look       string    `json:"look,omitempty"`       // Settings > Look
+	// GitHub accounts you said are yours: files from download links there open with no Windows warning
+	TrustedGitHub []string `json:"trustedGitHub,omitempty"`
 }
 
 var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$`)

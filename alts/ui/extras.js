@@ -160,7 +160,7 @@
     if (!c || !d || !d.b64) { toast('Couldn\'t load that sticker.'); return; }
     const bin = atob(d.b64), u = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-    const ok = await attach(c, [new File([u], d.name || 'sticker.png', { type: 'image/png' })]);
+    const ok = await attach(c, [new File([u], d.name || 'sticker.png', { type: d.type || 'image/png' })]);
     if (!ok) toast('The sticker didn\'t attach. Try Win+V > Stickers instead.');
   };
   function placePicker() {
@@ -213,20 +213,28 @@
       }
       if (!list.length) grid.append(mk('div', { color: '#9a9aa6', padding: '30px', textAlign: 'center' }, 'Nothing matches.'));
     } else {
-      const row = mk('div', { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px', marginTop: '4px' });
-      for (const s of stickers.filter(s => !q || s.name.includes(q))) {
-        const c = hover(mk('div', { aspectRatio: '1', borderRadius: '9px', background: '#24242b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }),
-          { background: '#2f2f38' }, { background: '#24242b' });
-        const im = mk('img', { width: '80%', height: '80%', objectFit: 'contain', pointerEvents: 'none' });
-        im.src = s.thumb;
-        c.append(im);
-        c.title = s.name + ' (sends it as a picture)';
-        c.addEventListener('mousedown', e => e.preventDefault());
-        c.addEventListener('click', () => send({ t: 'sticker-get', file: s.file, mine: !!s.mine }));
-        row.append(c);
+      const pics = stickers.filter(s => !q || s.name.includes(q));
+      for (const [title, kind, cols] of [['My stickers', 'mine', 4], ['Memes', 'meme', 3]]) {
+        const list = pics.filter(s => s.kind === kind);
+        if (!list.length) continue;
+        grid.append(mk('div', { color: '#9a9aa6', font: '600 11.5px ' + FONT, margin: '8px 2px 4px' }, title));
+        const row = mk('div', { display: 'grid', gridTemplateColumns: 'repeat(' + cols + ',1fr)', gap: '6px' });
+        for (const s of list) {
+          const c = hover(mk('div', { aspectRatio: '1', borderRadius: '9px', background: '#24242b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }),
+            { background: '#2f2f38' }, { background: '#24242b' });
+          const im = mk('img', { width: '92%', height: '92%', objectFit: 'contain', pointerEvents: 'none' });
+          im.src = s.thumb;
+          c.append(im);
+          c.title = (kind === 'meme' ? s.name : 'Your sticker') + ' (sends it as a picture)';
+          c.addEventListener('mousedown', e => e.preventDefault());
+          c.addEventListener('click', () => send({ t: 'sticker-get', file: s.file, kind }));
+          row.append(c);
+        }
+        grid.append(row);
       }
-      grid.append(row);
-      grid.append(mk('div', { color: '#9a9aa6', font: '11.5px ' + FONT, margin: '10px 2px' }, 'Your own stickers: copy any picture, press Win+V, then ☺ on it.'));
+      if (!pics.some(s => s.kind === 'meme') && !q) grid.append(mk('div', { color: '#9a9aa6', padding: '18px 6px', textAlign: 'center' }, 'Memes download the first time ALTS Clipboard runs (needs internet). Press Win+V once, then come back.'));
+      if (!pics.length && q) grid.append(mk('div', { color: '#9a9aa6', padding: '30px', textAlign: 'center' }, 'Nothing matches.'));
+      grid.append(mk('div', { color: '#9a9aa6', font: '11.5px ' + FONT, margin: '10px 2px' }, 'Your own: copy any picture, press Win+V, then \u263a on it.'));
     }
   }
   document.addEventListener('mousedown', e => { if (picker && picker.isConnected && !picker.contains(e.target) && !ours(e.target)) picker.remove(); }, true);
@@ -384,199 +392,4 @@
   setInterval(() => { const c = composer(); if (c && c.getAttribute('spellcheck') !== 'true') c.setAttribute('spellcheck', 'true'); }, 3000);
 
   A.laterList = () => showLater();
-})();
-
-// ---------- Files panel (claude.ai/code): a Download button for files claude.ai can't show (.exe, .zip...) ----------
-// claude.ai's panel only shows pictures + text. ALTS watches how the page loads a file you open there
-// (once), then asks the same way for any file and saves it (through the Safe Lane: no Windows warning).
-(() => {
-  const A = window.__alts;
-  if (location.hostname !== 'claude.ai' || !A || A.filesPanel) return;
-  A.filesPanel = true;
-  const { mk, send, FONT, toast } = A;
-  const TK = 'alts-filetpl';
-  const recent = []; // the page's latest requests
-  const note = r => { recent.push(Object.assign({ t: Date.now() }, r)); if (recent.length > 80) recent.shift(); };
-  const bodyText = b => typeof b === 'string' ? b : (b instanceof URLSearchParams ? b.toString() : null);
-  const headersObj = h => { const o = {}; try { new Headers(h || {}).forEach((v, k) => { o[k] = v; }); } catch (e) {} return o; };
-  const of = window.fetch;
-  window.fetch = function (input, init) {
-    try {
-      const req = input instanceof Request ? input : null;
-      note({ url: String(req ? req.url : input), method: ((init && init.method) || (req && req.method) || 'GET').toUpperCase(),
-        body: bodyText(init && init.body), headers: headersObj((init && init.headers) || (req && req.headers)) });
-    } catch (e) {}
-    return of.apply(this, arguments);
-  };
-  const xo = XMLHttpRequest.prototype.open, xs = XMLHttpRequest.prototype.send, xh = XMLHttpRequest.prototype.setRequestHeader;
-  XMLHttpRequest.prototype.open = function (m, u) { this.__a = { method: String(m).toUpperCase(), url: String(new URL(u, location.href)), headers: {} }; return xo.apply(this, arguments); };
-  XMLHttpRequest.prototype.setRequestHeader = function (k, v) { if (this.__a) this.__a.headers[k.toLowerCase()] = v; return xh.apply(this, arguments); };
-  XMLHttpRequest.prototype.send = function (b) { if (this.__a) note(Object.assign({ body: bodyText(b) }, this.__a)); return xs.apply(this, arguments); };
-
-  const dec = s => { try { return decodeURIComponent(s); } catch (e) { return s; } };
-  // the panel = the box with the "Filter files" search
-  function panel() {
-    const inp = [...document.querySelectorAll('input')].find(i => /filter files/i.test(i.placeholder || '') && i.getClientRects().length);
-    if (!inp) return null;
-    let p = inp.parentElement;
-    for (let i = 0; i < 8 && p && rowsIn(p, inp).length < 2; i++) p = p.parentElement;
-    return p ? { el: p, inp } : null;
-  }
-  // every name in the tree, top to bottom, with how far right it starts (= how deep it is)
-  function rowsIn(p, inp) {
-    const out = [], left = inp.getBoundingClientRect().left - 30;
-    const w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
-    for (let n; (n = w.nextNode());) {
-      const t = n.data.trim();
-      if (!t || t.length > 200 || A.ours(n.parentElement)) continue;
-      const rg = document.createRange(); rg.selectNodeContents(n);
-      const r = rg.getBoundingClientRect();
-      if (!r.width || r.left < left) continue;
-      out.push({ n, t, x: r.left, y: r.top, r });
-    }
-    return out.sort((a, b) => a.y - b.y);
-  }
-  // "claude-memory/send/ALTS.exe" for a row, from the rows above it that sit further left
-  function treePath(rows, i) {
-    const parts = [rows[i].t];
-    let x = rows[i].x;
-    for (let j = i - 1; j >= 0; j--) if (rows[j].x < x - 4) { parts.unshift(rows[j].t); x = rows[j].x; }
-    return parts.join('/');
-  }
-  const tpl = () => { try { return JSON.parse(localStorage.getItem(TK)); } catch (e) { return null; } };
-
-  // learn: right after you open a file, find the request that named it
-  function learn(dpath, name, since) {
-    for (const r of recent.filter(r => r.t >= since - 50)) {
-      for (const [field, text] of [['url', dec(r.url)], ['body', r.body || '']]) {
-        const at = text.indexOf(name);
-        if (at < 0) continue;
-        // the full path as the request wrote it ends with the tree path's tail
-        let start = at;
-        while (start > 0 && !/["'=?&\s]/.test(text[start - 1])) start--;
-        const full = text.slice(start, at + name.length);
-        if (!full.endsWith(dpath.split('/').slice(-2).join('/')) && full !== name && !full.endsWith('/' + name)) continue;
-        const t = { method: r.method, url: r.url, body: r.body, headers: r.headers, path: full, dpath, field };
-        try { localStorage.setItem(TK, JSON.stringify(t)); } catch (e) {}
-        send({ t: 'filelearn', url: r.method + ' ' + r.url.replace(/[?#].*$/, '') + ' (' + field + ')' });
-        return t;
-      }
-    }
-    return null;
-  }
-  // the real path for a tree path, from what was learned
-  function realPath(t, dpath) {
-    const a = t.dpath.split('/'), b = t.path.split('/');
-    let k = 0;
-    while (k < a.length && k < b.length && a[a.length - 1 - k] === b[b.length - 1 - k]) k++;
-    const prefix = b.slice(0, b.length - k).join('/');
-    const tailOld = a.slice(0, a.length - k); // tree folders the real path doesn't spell out
-    let d = dpath.split('/');
-    if (tailOld.length && d.slice(0, tailOld.length).join('/') === tailOld.join('/')) d = d.slice(tailOld.length);
-    return (prefix ? prefix + '/' : '') + d.join('/');
-  }
-  const swap = (s, from, to) => s == null ? s : s.split(from).join(to).split(encodeURIComponent(from)).join(encodeURIComponent(to))
-    .split(encodeURIComponent(from).replace(/%2F/g, '/')).join(encodeURIComponent(to).replace(/%2F/g, '/'));
-  function b64(s) { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
-  function pickContent(j, real) { // the file inside a JSON answer: a content/data field first, else the biggest string
-    let best = null, named = null, enc = '';
-    const walk = (o, d) => {
-      if (d > 6 || !o || typeof o !== 'object') return;
-      for (const [k, v] of Object.entries(o)) {
-        if (typeof v === 'string') {
-          if (/encoding/i.test(k)) { enc = v; continue; }
-          if (v === real || /(^|\/)[^/]*$/.test(v) && v.endsWith(real.split('/').pop()) && v.length < 600) continue; // that's the name, not the file
-          if (/^(content|contents|data|body|bytes|file|text|base64)$/i.test(k) && (!named || v.length > named.length)) named = v;
-          if (!best || v.length > best.length) best = v;
-        } else walk(v, d + 1);
-      }
-    };
-    walk(j, 0);
-    const v = named != null ? named : best;
-    if (v == null) return null;
-    if (/base64/i.test(enc) || (v.length > 64 && /^[A-Za-z0-9+/=\s]+$/.test(v))) { try { return b64(v.replace(/\s+/g, '')); } catch (e) {} }
-    return new TextEncoder().encode(v);
-  }
-  // ALTS writes the file into Downloads itself: the page sends it over in pieces.
-  const pend = {};
-  const mb = n => (n / 1048576).toFixed(n < 1048576 ? 2 : 1) + ' MB';
-  function b64of(u) { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
-  async function hand(bytes, name, chipEl) {
-    const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-    pend[id] = chipEl;
-    send({ t: 'fsave-start', id, name, size: bytes.length });
-    const CH = 512 * 1024;
-    for (let o = 0; o < bytes.length; o += CH) {
-      send({ t: 'fsave-part', id, b64: b64of(bytes.subarray(o, Math.min(bytes.length, o + CH))) });
-      chipEl.textContent = 'Saving ' + Math.round(Math.min(1, (o + CH) / bytes.length) * 100) + '%';
-      await new Promise(r => setTimeout(r, 0));
-    }
-    send({ t: 'fsave-end', id });
-  }
-  A.fileSaved = r => {
-    const c = r && pend[r.id];
-    if (!c) return;
-    delete pend[r.id];
-    delete c.dataset.busy;
-    if (r.ok) {
-      c.dataset.saved = r.path;
-      c.textContent = '\u2714 Saved (' + mb(r.size) + ') \u00b7 Show';
-      c.style.background = '#2f9e6b';
-      c.title = 'In Downloads: ' + r.path + ' (click = show it in its folder)';
-      setTimeout(() => c.remove(), 25000);
-    } else {
-      c.textContent = '\u2B07 Download';
-      toast('Couldn\'t save it: ' + (r.error || 'unknown') + '. Tell Claude what this says.');
-    }
-  };
-  async function download(dpath, name, chipEl) {
-    const t = tpl();
-    if (!t) { toast('First open any picture in this list once (so ALTS learns how to get files), then press Download again.'); return; }
-    const real = realPath(t, dpath);
-    chipEl.textContent = 'Downloading...';
-    chipEl.dataset.busy = '1';
-    try {
-      const init = { method: t.method, credentials: 'include', headers: Object.fromEntries(Object.entries(t.headers || {}).filter(([k]) => !/^(content-length|cookie|host)$/i.test(k))) };
-      if (t.body != null && t.method !== 'GET' && t.method !== 'HEAD') init.body = swap(t.body, t.path, real);
-      const r = await of(swap(t.url, t.path, real), init);
-      if (!r.ok) throw new Error('claude.ai said ' + r.status);
-      const ct = r.headers.get('content-type') || '';
-      let bytes;
-      if (/json/i.test(ct)) { bytes = pickContent(await r.json(), real); if (!bytes) throw new Error('no file in the answer'); }
-      else bytes = new Uint8Array(await r.arrayBuffer());
-      await hand(bytes, name, chipEl);
-      send({ t: 'filelearn', url: 'got ' + name + ' (' + bytes.length + ' bytes), handing it to ALTS' });
-    } catch (e) {
-      chipEl.textContent = '\u2B07 Download';
-      delete chipEl.dataset.busy;
-      send({ t: 'filelearn', url: 'download failed: ' + (e && e.message || e) });
-      toast('Couldn\'t download it: ' + (e && e.message || e) + '. Open a picture in the list once more (ALTS re-learns), then try again. If it still fails, tell Claude what this says.');
-    }
-  }
-  let chip = null;
-  document.addEventListener('click', e => {
-    const p = panel();
-    if (!p || !p.el.contains(e.target) || A.ours(e.target)) return;
-    const rows = rowsIn(p.el, p.inp);
-    const i = rows.findIndex(r => e.clientY >= r.r.top - 6 && e.clientY <= r.r.bottom + 6 && e.clientX >= r.r.left - 40);
-    if (i < 0 || !/\.[A-Za-z0-9]{1,8}$/.test(rows[i].t)) return; // a folder
-    const name = rows[i].t, dpath = treePath(rows, i), since = Date.now();
-    setTimeout(() => learn(dpath, name, since), 2500); // whatever the page asked for when you opened it
-    if (chip) chip.remove();
-    const pr = p.el.getBoundingClientRect(), rr = rows[i].r;
-    chip = mk('button', { position: 'fixed', zIndex: '2147483647', left: Math.min(innerWidth - 150, pr.right - 140) + 'px', top: (rr.top - 4) + 'px',
-      font: '600 12px ' + FONT, padding: '4px 10px', borderRadius: '999px', border: '0', background: '#d97757', color: '#fff', cursor: 'pointer',
-      boxShadow: '0 4px 14px rgba(0,0,0,.35)' }, '⬇ Download');
-    chip.dataset.alts = '1';
-    chip.title = 'Save ' + name + ' to your Downloads folder';
-    const mine = chip;
-    chip.addEventListener('click', ev => {
-      ev.stopPropagation();
-      if (mine.dataset.saved) send({ t: 'fsave-show', path: mine.dataset.saved });
-      else if (!mine.dataset.busy) download(dpath, name, mine);
-    });
-    A.R ? A.R().append(chip) : document.documentElement.append(chip);
-    setTimeout(() => { if (mine.isConnected && mine.textContent === '⬇ Download') mine.remove(); }, 15000);
-  }, true);
-  addEventListener('scroll', () => { if (chip && chip.textContent === '⬇ Download') chip.remove(); }, true);
 })();

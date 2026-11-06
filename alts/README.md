@@ -41,12 +41,13 @@ starts with Windows and keeps working after ALTS closes. It asks Windows for **W
 - **Clipboard**: everything you copied, text and pictures, newest first. Click one (or arrow keys + Enter)
   and it pastes right into the app you were in. Star = pin (kept forever), x = delete. Keeps the last 200
   (40 pictures). Password apps that say "don't keep this" are skipped.
-- **Stickers**: funny 3D stickers (Microsoft's Fluent Emoji 3D, MIT license) that paste as pictures,
-  plus your own: copy any picture, open Win+V, press the smiley on it.
+- **Stickers**: meme pictures (the 100 most popular ones on imgflip.com, which ALTS Clipboard downloads onto
+  your PC the first time and freshens every few days; nothing is shipped inside the app), plus your own: copy any
+  picture, open the Clipboard, press the smiley on it. Click one and it pastes as a picture.
 - **Emoji**: every emoji with search ("skull", "fire"...), recent ones on top.
 - Gear: start with Windows on/off, "Copy not working? Check it" (names the app that's holding the clipboard
   open, which is what breaks copying), clear history, turn it off.
-- Lives in `%LOCALAPPDATA%\ALTS\clip`. `get-stickers.sh` re-downloads the starter stickers + emoji list.
+- Lives in `%LOCALAPPDATA%\ALTS\clip`. `get-emoji.sh` rebuilds the emoji list.
 
 ## In the chat box (1.5.0)
 
@@ -58,11 +59,10 @@ buttons. A note shows when a chat gets so long that every message costs a lot mo
 fixed as you type (Ctrl+Z undoes it), and misspelled words get the red line + right-click fixes. The gear at
 the bottom of the side list switches ALTS's look.
 
-**Files panel Download** (Claude Code chats): claude.ai's Files panel only shows pictures and text. Click any
-file there (an .exe, .zip...) and ALTS adds a **Download** button. The very first time, open any picture in that
-list once: ALTS watches how claude.ai loads it and then gets any file the same way. ALTS writes the file into
-Downloads itself (an .exe handed to the browser part gets blocked), with no Windows warning. What it learned
-and each saved file (with its SHA-256) is noted in `files.log`.
+**Download links**: click a link in a chat to a file on GitHub (an .exe, .zip, .apk... raw, blob or release
+link) and ALTS downloads it into your Downloads folder itself, with a progress note, instead of opening Edge.
+Files from a GitHub account you said is yours (it asks once) open with no Windows warning; from anywhere else
+Windows checks them like any download. A private repo works when the GitHub CLI on this PC is signed in.
 
 ## Claude's files (no "this could harm your PC" warnings)
 
