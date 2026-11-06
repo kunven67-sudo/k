@@ -50,17 +50,19 @@ starts with Windows and keeps working after ALTS closes. It asks Windows for **W
 
 ## In the chat box (1.5.0)
 
-Left of the chat box: **emoji + stickers**, **Send later** (saves what you typed; when your usage limit is
-back ALTS makes a sound, pops up and shows them with a Send button), **Fresh chat** (Claude writes a handoff,
-then a new chat starts that already knows what you were doing). Above it: **quick buttons** for things you
-say a lot (+ adds one, right-click removes). A warning shows when a chat gets so long that every message
-costs a lot more usage. Common typos get fixed as you type (Ctrl+Z undoes it), and misspelled words get
-the red line + right-click fixes. The gear at the bottom of the side list switches ALTS's look.
+Left of the chat box: **emoji + stickers**, **quick buttons** (the lightning button: things you say a lot,
+one click sends them; + adds one, x removes one), **Send later** (saves what you typed; when your usage limit
+is back ALTS makes a sound, pops up and shows them with a Send button), **Fresh chat** (Claude writes a
+handoff, then a new chat starts that already knows what you were doing). Nothing sits over claude.ai's own
+buttons. A note shows when a chat gets so long that every message costs a lot more usage. Common typos get
+fixed as you type (Ctrl+Z undoes it), and misspelled words get the red line + right-click fixes. The gear at
+the bottom of the side list switches ALTS's look.
 
 **Files panel Download** (Claude Code chats): claude.ai's Files panel only shows pictures and text. Click any
 file there (an .exe, .zip...) and ALTS adds a **Download** button. The very first time, open any picture in that
-list once: ALTS watches how claude.ai loads it and then gets any file the same way, into Downloads with no
-Windows warning. What it learned and each download is noted in `files.log`.
+list once: ALTS watches how claude.ai loads it and then gets any file the same way. ALTS writes the file into
+Downloads itself (an .exe handed to the browser part gets blocked), with no Windows warning. What it learned
+and each saved file (with its SHA-256) is noted in `files.log`.
 
 ## Claude's files (no "this could harm your PC" warnings)
 
