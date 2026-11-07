@@ -12,11 +12,15 @@ import kotlin.concurrent.withLock
  * Every viewer gets its own small queue, so one slow TV never holds up the encoder or the other
  * screens. When a queue gets too long (Wi-Fi can't keep up), the frames waiting in it are
  * thrown away and that viewer jumps straight to the next key frame: the picture skips ahead
- * instead of freezing or falling further and further behind.
+ * instead of freezing or falling further and further behind. The queues are kept short on
+ * purpose: anything waiting in them is delay you can see on the TV.
+ *
+ * Freeze ([setFrozen]): the TVs keep the picture they have while the phone carries on. New frames
+ * are made but not sent; on unfreeze every TV continues from a fresh key frame.
  */
 class VideoHub(
-    private val maxQueueFrames: Int = 24,
-    private val maxQueueBytes: Long = 4_000_000,
+    private val maxQueueFrames: Int = 10,
+    private val maxQueueBytes: Long = 2_000_000,
     private val maxGopBytes: Long = 8_000_000,
     private val clock: () -> Long = ::monotonicMs,
 ) {
@@ -30,6 +34,9 @@ class VideoHub(
 
     /** One frame, ready to append. [decodeTime] is in 90 kHz ticks. */
     class FrameMessage(val data: ByteArray, val keyFrame: Boolean, val decodeTime: Long) : Message
+
+    /** The picture was frozen ([frozen] true) or unfrozen. */
+    class FreezeMessage(val frozen: Boolean) : Message
 
     private val lock = ReentrantLock()
     private var format: Format? = null
@@ -62,6 +69,11 @@ class VideoHub(
 
     @Volatile
     var isClosed = false
+        private set
+
+    /** True while the TVs hold the current picture (see [setFrozen]). */
+    @Volatile
+    var isFrozen = false
         private set
 
     @Volatile
@@ -143,9 +155,11 @@ class VideoHub(
             }
             lastDecodeTime = decodeTime
             sequence++
-            val frame = FrameMessage(Mp4.fragment(sequence, decodeTime, lastDuration, isKey, body), isKey, decodeTime)
             framesPublished++
             lastFrameAt = clock()
+            // Frozen: the timeline keeps going (so the TV jumps to "now" on unfreeze), nothing is sent.
+            if (isFrozen) return
+            val frame = FrameMessage(Mp4.fragment(sequence, decodeTime, lastDuration, isKey, body), isKey, decodeTime)
 
             if (isKey) {
                 gop.clear()
@@ -186,21 +200,43 @@ class VideoHub(
                 c.graceBytes = gopBytes
                 c.waitingForKey = false
                 // A long group of frames means a big catch-up burst for the next viewer too: start a fresh one.
-                if (gop.size > FRESH_KEY_AFTER_FRAMES) wantKey = true
+                if (gop.size > FRESH_KEY_AFTER_FRAMES && !isFrozen) wantKey = true
             } else {
-                wantKey = true
+                wantKey = !isFrozen
             }
+            if (isFrozen) c.push(FreezeMessage(true))
         }
         if (wantKey) requestKeyFrame()
         return c
     }
 
-    /** Asks the encoder for a key frame, at most twice a second. */
-    fun requestKeyFrame() {
+    /**
+     * Freeze ([on] true): every TV keeps the picture it has (a new TV gets that same picture) while
+     * the phone carries on. Unfreeze: every TV jumps to the live picture from a fresh key frame.
+     */
+    fun setFrozen(on: Boolean) {
+        lock.withLock {
+            if (isClosed || on == isFrozen) return
+            isFrozen = on
+            if (!on) {
+                // The frames since the freeze were never sent, so the next frame that can be shown
+                // on its own is a key frame. The saved group ends at the frozen picture: start over.
+                gop.clear()
+                gopBytes = 0
+                gopValid = false
+                for (c in clients) c.waitingForKey = true
+            }
+            for (c in clients) if (!c.closed) c.push(FreezeMessage(on))
+        }
+        if (!on) requestKeyFrame(force = true)
+    }
+
+    /** Asks the encoder for a key frame, at most twice a second (unless [force]). */
+    fun requestKeyFrame(force: Boolean = false) {
         val requester = keyFrameRequester ?: return
         lock.withLock {
             val now = clock()
-            if (lastKeyRequestAt != NO_TIME && now - lastKeyRequestAt < KEY_REQUEST_GAP_MS) return
+            if (!force && lastKeyRequestAt != NO_TIME && now - lastKeyRequestAt < KEY_REQUEST_GAP_MS) return
             lastKeyRequestAt = now
         }
         try {

@@ -257,6 +257,35 @@ class StreamServerTest {
     }
 
     @Test
+    fun freezeHoldsTheLastPictureUntilUnfrozen() {
+        val changes = ArrayList<Boolean>()
+        server.onFrozenChange = { synchronized(changes) { changes += it } }
+        hub.setLive(true)
+        hub.publish(byteArrayOf(1), 1, 1)
+        val page = "X-BroCast: 1\r\n"
+        // Only BroCast's own page can freeze: no header, or another site, is refused.
+        assertEquals(403, get("/freeze?on=1").code)
+        assertEquals(403, get("/freeze?on=1", extra = page + "Origin: http://evil.example\r\n").code)
+        assertFalse(server.isFrozen)
+
+        val r = get("/freeze?on=1", extra = page + "Origin: http://127.0.0.1:$port\r\n")
+        assertEquals(200, r.code)
+        assertTrue(r.text.contains("\"frozen\":true"))
+        assertTrue(server.isFrozen)
+        assertTrue(get("/status").text.contains("\"frozen\":true"))
+        hub.publish(byteArrayOf(2), 1, 1)
+        assertContentEquals(byteArrayOf(1), get("/frame.jpg").body, "the TV keeps the frozen picture")
+
+        assertTrue(get("/freeze?on=0", extra = page).text.contains("\"frozen\":false"))
+        assertContentEquals(byteArrayOf(2), get("/frame.jpg").body, "unfreeze shows what happened meanwhile")
+        assertTrue(get("/status").text.contains("\"frozen\":false"))
+        assertEquals(listOf(true, false), synchronized(changes) { changes.toList() })
+
+        pin = PinConfig("4821", "salt")
+        assertEquals(401, get("/freeze?on=1", extra = page).code)
+    }
+
+    @Test
     fun pinProtectsStreamAndLocksOutGuessers() {
         pin = PinConfig("4821", "salt")
         hub.setLive(true)

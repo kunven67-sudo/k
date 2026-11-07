@@ -83,12 +83,7 @@ fun HomeScreen(
     onCopy: (String) -> Unit,
     oldAppInstalled: Boolean = false,
     onRemoveOldApp: () -> Unit = {},
-    translateEnabled: Boolean = false,
-    overlayAllowed: Boolean = false,
-    onTranslateChange: (Boolean) -> Unit = {},
-    onAllowOverlay: () -> Unit = {},
-    voicesEnabled: Boolean = true,
-    onVoicesChange: (Boolean) -> Unit = {},
+    onFreezeChange: (Boolean) -> Unit = {},
 ) {
     Box(
         Modifier
@@ -129,14 +124,9 @@ fun HomeScreen(
                     StartCard(wifiAddresses.isEmpty(), onStart)
                 }
                 ShareStatus.Starting -> StartingCard()
-                is ShareStatus.Live -> LiveCard(status, onStop, onCopy, onFixSoundPermission)
+                is ShareStatus.Live -> LiveCard(status, onStop, onCopy, onFixSoundPermission, onFreezeChange)
             }
 
-            Spacer(Modifier.height(14.dp))
-            TranslateCard(
-                translateEnabled, overlayAllowed, live = status is ShareStatus.Live, onTranslateChange, onAllowOverlay,
-                voicesEnabled, onVoicesChange,
-            )
             Spacer(Modifier.height(14.dp))
             SoundCard(soundEnabled, soundSupported, locked = sharing, onSoundEnabledChange)
             Spacer(Modifier.height(14.dp))
@@ -346,12 +336,18 @@ private fun LiveCard(
     onStop: () -> Unit,
     onCopy: (String) -> Unit,
     onFixSoundPermission: () -> Unit,
+    onFreeze: (Boolean) -> Unit = {},
 ) {
     BroCard(border = BorderStroke(1.5.dp, BroColors.Live.copy(alpha = 0.55f))) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PulsingDot()
             Spacer(Modifier.width(8.dp))
-            Text("LIVE", color = BroColors.Live, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+            Text(
+                if (live.frozen) "LIVE • TV FROZEN" else "LIVE",
+                color = if (live.frozen) BroColors.Ice else BroColors.Live,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.5.sp,
+            )
             Spacer(Modifier.weight(1f))
             Text(
                 if (live.fps > 0) "⚡ ${live.fps} fps" else "😴 screen is still",
@@ -439,15 +435,10 @@ private fun LiveCard(
         Body(
             when {
                 live.video -> "🎬 Sending smooth video"
-                live.translate != null -> "🖼️ Sending pictures (English subtitles are on)"
                 else -> "🖼️ Sending pictures (a screen that can't play the video is watching)"
             },
             size = 13,
         )
-        if (live.translate != null) {
-            Spacer(Modifier.height(4.dp))
-            Body("💬 English subtitles: ${live.translate}", color = BroColors.Good, size = 13)
-        }
         Spacer(Modifier.height(4.dp))
         SoundLine(live.sound, onFixSoundPermission)
         if (live.noPicture) {
@@ -456,6 +447,22 @@ private fun LiveCard(
         }
 
         Spacer(Modifier.height(18.dp))
+        if (live.frozen) {
+            Body(
+                "❄️ The TV is frozen on the picture from when you pressed Freeze. Do whatever you want on " +
+                    "your phone, the TV won't show it. Sound still plays.",
+                color = BroColors.Ice,
+            )
+            Spacer(Modifier.height(10.dp))
+            BigButton("▶  Unfreeze (go live)", Brush.linearGradient(listOf(BroColors.Good, Color(0xFF059669)))) {
+                onFreeze(false)
+            }
+        } else {
+            BigButton("❄  Freeze the TV picture", Brush.linearGradient(listOf(BroColors.Ice, Color(0xFF2B6CB0)))) {
+                onFreeze(true)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         BigButton("■  Stop sharing", Brush.linearGradient(listOf(BroColors.Live, Color(0xFFE11D48))), onStop)
     }
 }
@@ -472,77 +479,6 @@ private fun SoundLine(sound: SoundStatus, onFixPermission: () -> Unit) {
                 Body("🔇 No sound: Android's \"record audio\" permission is off.", color = BroColors.Warn)
             }
             TextButton(onClick = onFixPermission) { Text("Fix it") }
-        }
-    }
-}
-
-@Composable
-private fun TranslateCard(
-    enabled: Boolean,
-    allowed: Boolean,
-    live: Boolean,
-    onEnabledChange: (Boolean) -> Unit,
-    onAllow: () -> Unit,
-    voices: Boolean,
-    onVoicesChange: (Boolean) -> Unit,
-) {
-    BroCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                CardTitle("💬 English subtitles on this phone")
-                Spacer(Modifier.height(4.dp))
-                Body(
-                    "Reads the subtitles of whatever's playing (Spanish, Portuguese, Japanese, Chinese, Korean " +
-                        "and lots more) and puts English right over them.",
-                    size = 14,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Switch(
-                checked = enabled,
-                onCheckedChange = onEnabledChange,
-                colors = SwitchDefaults.colors(checkedTrackColor = BroColors.Primary),
-            )
-        }
-        if (enabled && !allowed) {
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) {
-                    WarnBox("Android needs one OK first: turn on \"Display over other apps\" for BroCast 2.")
-                }
-                TextButton(onClick = onAllow) { Text("Allow") }
-            }
-        } else if (enabled) {
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("🗣️ Say them out loud too", color = BroColors.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Body(
-                        "An English guy or girl voice, picked by how high the voice in the show is (that part uses the " +
-                            "Sound switch below). The show gets a bit quieter while it talks.",
-                        size = 13,
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Switch(
-                    checked = voices,
-                    onCheckedChange = onVoicesChange,
-                    colors = SwitchDefaults.colors(checkedTrackColor = BroColors.Primary),
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Body(
-                "💡 When Android asks what to share, pick \"A single app\" and choose the app you watch on: " +
-                    "the English then sits right on the subtitle. (With the entire screen it goes just above it.)",
-                size = 13,
-            )
-            Spacer(Modifier.height(4.dp))
-            Body(
-                "📥 Each language downloads once (about 30 MB), then it works offline. " +
-                    "While this is on, a TV watching gets pictures instead of video.",
-                size = 13,
-            )
-            if (!live) Body("Turns on when you start sharing ▶️", size = 12)
         }
     }
 }

@@ -83,10 +83,20 @@
   }
   @-webkit-keyframes pulse { 50% { opacity: .25; } }
   @keyframes pulse { 50% { opacity: .25; } }
+  .live.frozen { color: #7CC8FF; }
+  .live.frozen i { background: #7CC8FF; -webkit-animation: none; animation: none; }
   #devName { color: #9AA4BF; margin-right: 18px; }
-  #fsBtn, #soundBtn, #trBtn { font-size: 20px; padding: 12px 24px; }
-  #soundBtn, #trBtn { background: #1C2438; margin-right: 8px; }
+  #fsBtn, #soundBtn, #trBtn, #frzBtn { font-size: 20px; padding: 12px 24px; }
+  #soundBtn, #trBtn, #frzBtn { background: #1C2438; margin-right: 8px; }
   #soundBtn.off { color: #9AA4BF; }
+  #frzBtn.on { background: #2B6CB0; }
+
+  /* Stays up while frozen, so nobody thinks the stream got stuck. */
+  #frozenTag {
+    position: fixed; left: 20px; bottom: 20px; z-index: 2; pointer-events: none;
+    font-size: 18px; font-weight: 800; letter-spacing: 1px; color: #fff; padding: 8px 16px; border-radius: 999px;
+    background: rgba(43, 108, 176, .85);
+  }
 
   #soundHint {
     position: fixed; left: 0; right: 0; top: 104px; z-index: 2; text-align: center; pointer-events: none;
@@ -108,7 +118,8 @@
     .btn { font-size: 21px; padding: 13px 28px; }
     #barInner { font-size: 16px; }
     #devName { display: none; }
-    #fsBtn, #soundBtn, #trBtn { font-size: 16px; padding: 10px 16px; }
+    #fsBtn, #soundBtn, #trBtn, #frzBtn { font-size: 16px; padding: 10px 16px; }
+    #frozenTag { font-size: 15px; padding: 6px 12px; left: 12px; bottom: 12px; }
     #soundHint span { font-size: 17px; padding: 11px 18px; }
   }
 </style>
@@ -160,7 +171,9 @@
 
 <div id="soundHint" style="display:none"><span>Press OK or click anywhere to turn on sound</span></div>
 
-<div id="bar"><div id="barInner"><span class="live"><i></i>LIVE</span><span id="devName"></span><button class="btn" id="soundBtn" type="button" style="display:none">Sound on</button><button class="btn" id="trBtn" type="button" style="display:none" title="Subtitles in other languages to English, with SUBDUB">Translate</button><button class="btn" id="fsBtn" type="button">Full screen</button></div></div>
+<div id="frozenTag" style="display:none">FROZEN &middot; Space or Pause to go live</div>
+
+<div id="bar"><div id="barInner"><span class="live" id="liveTag"><i></i><b id="liveText">LIVE</b></span><span id="devName"></span><button class="btn" id="frzBtn" type="button" title="Freeze the picture here (Space)">Freeze</button><button class="btn" id="soundBtn" type="button" style="display:none">Sound on</button><button class="btn" id="trBtn" type="button" style="display:none" title="Subtitles in other languages to English, with SUBDUB">Translate</button><button class="btn" id="fsBtn" type="button">Full screen</button></div></div>
 
 <noscript><p style="position:fixed;top:40%;width:100%;text-align:center;font-size:24px;z-index:9">This page needs JavaScript turned on.</p></noscript>
 
@@ -173,7 +186,8 @@
   var img = $('screen'), overlay = $('overlay'), waitCard = $('waitCard'), pinCard = $('pinCard'),
       waitMsg = $('waitMsg'), waitHint = $('waitHint'), pinInput = $('pinInput'), pinBtn = $('pinBtn'),
       pinError = $('pinError'), bar = $('bar'), fsBtn = $('fsBtn'), devName = $('devName'), awake = $('awake'),
-      soundBtn = $('soundBtn'), soundHint = $('soundHint'), vid = $('vid'), trBtn = $('trBtn');
+      soundBtn = $('soundBtn'), soundHint = $('soundHint'), vid = $('vid'), trBtn = $('trBtn'),
+      frzBtn = $('frzBtn'), frozenTag = $('frozenTag'), liveTag = $('liveTag'), liveText = $('liveText');
   var docEl = document.documentElement;
   var URLs = window.URL || window.webkitURL;
   var BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -232,6 +246,7 @@
     try {
       x.open('GET', url, true);
       if (opts.blob) x.responseType = 'blob';
+      if (opts.brocast) x.setRequestHeader('X-BroCast', '1');
       x.timeout = opts.timeout || 5000;
       x.onload = function () { finish(x.status); };
       x.onerror = x.ontimeout = x.onabort = function () { finish(0); };
@@ -285,6 +300,8 @@
     }
     if (hiddenTooLong()) { stopStream(); return; }
     soundAvailable = !!s.audio;
+    // (A reply that left before a Freeze press can still be on its way: trust the press for a moment.)
+    if (!freezeBusy && now() - freezeSetAt > 2500) setFrozen(!!s.frozen);
     if (s.width && s.height && (s.width !== frameW || s.height !== frameH)) {
       frameW = s.width; frameH = s.height; fitImage();
     }
@@ -344,6 +361,7 @@
     videoStop();
     img.src = BLANK;            // also closes the MJPEG connection
     img.style.display = 'none';
+    frozenTag.style.display = 'none';
     releaseUrls();
     hideBar();
     if (phase === 'live') phase = '';
@@ -419,7 +437,8 @@
     phase = 'live';
     shown().style.display = 'block';
     overlay.style.display = 'none';
-    document.title = 'BroCast • Live';
+    document.title = frozen ? 'BroCast • Frozen' : 'BroCast • Live';
+    frozenTag.style.display = frozen ? '' : 'none';
     fitImage();
     keepAwake();
     armIdle();
@@ -587,8 +606,27 @@
         toggleFullscreen();
         if (e.preventDefault) e.preventDefault();
       }
+      // Space, P, or a TV remote's play/pause keys: freeze / unfreeze.
+      if (isFreezeKey(e)) {
+        toggleFreeze();
+        if (e.preventDefault) e.preventDefault();
+      }
     }
     poke();
+  }, false);
+
+  // Space, P, or a TV remote's play/pause key.
+  function isFreezeKey(e) {
+    var key = e.key, code = e.keyCode;
+    if (key) {
+      return key === ' ' || key === 'Spacebar' || key === 'p' || key === 'P' || key === 'MediaPlayPause' ||
+        key === 'Pause' || key === 'MediaPause';
+    }
+    return code === 32 || code === 80 || code === 179 || code === 19 || code === 10252;
+  }
+  // Space on a focused button would also press that button when the key comes back up.
+  document.addEventListener('keyup', function (e) {
+    if (phase === 'live' && (e.key === ' ' || e.keyCode === 32) && e.preventDefault) e.preventDefault();
   }, false);
 
   window.addEventListener('resize', fitImage, false);
@@ -618,6 +656,7 @@
   var ms = null, sb = null, vws = null, vUrl = null, vq = [], vqBytes = 0, vCodec = '', vTimer = null;
   var vLastData = 0, vLastMove = 0, vLastTime = -1, vLag = 0.15, vSeekedAt = 0, vPhoneFrames = -1, vPhoneFramesAt = 0;
   var vResets = [], vLastTrim = 0, vWsTries = 0;
+  var frozen = false, freezeBusy = false, freezeSetAt = 0;
   var vstats = window.BroCastVideo = { messages: 0, bytes: 0, appended: 0, resets: 0, reconnects: 0, jumps: 0, lag: 0 };
 
   function videoStart() {
@@ -627,7 +666,7 @@
     videoOpenSource();
     videoConnect();
     clearInterval(vTimer);
-    vTimer = setInterval(videoTick, 250);
+    vTimer = setInterval(videoTick, 100);
   }
 
   function videoStop() {
@@ -685,6 +724,7 @@
         try { m = JSON.parse(e.data); } catch (err) { /* ignore */ }
         if (m && m.type === 'init' && m.codec) vq.push({ init: m });
         if (m && m.type === 'hello') vWsTries = 0;
+        if (m && m.type === 'freeze' && !freezeBusy) setFrozen(!!m.on);
         videoPump();
         return;
       }
@@ -761,18 +801,24 @@
     }
   }
 
-  // Runs 4 times a second: keeps the picture right at the live edge and notices when it's stuck.
+  // How far behind the newest picture the player may run. Anything the player holds is delay you
+  // can see, so it stays tiny: it plays a bit faster to catch up, and jumps if it's way behind.
+  var EDGE = 0.05, CATCH_UP = 0.1, JUMP = 0.5;
+
+  // Runs 10 times a second: keeps the picture right at the live edge and notices when it's stuck.
   function videoTick() {
     if (!streamOn || picture !== 'video') return;
     var t = now(), b = vid.buffered, ct = vid.currentTime;
     if (b && b.length) {
-      var end = b.end(b.length - 1), start = b.start(b.length - 1), inside = false;
-      for (var i = 0; i < b.length; i++) if (ct >= b.start(i) - 0.04 && ct <= b.end(i) + 0.02) inside = true;
+      // Only the newest stretch counts: sitting at the end of an older one means it's waiting at a
+      // gap (frames skipped, or it was frozen) that the player won't cross on its own.
+      var end = b.end(b.length - 1), start = b.start(b.length - 1);
+      var inside = ct >= start - 0.04 && ct <= end + 0.02;
       var lag = end - ct;
-      if (!inside || lag > 1.0) {
-        // In a gap (frames were skipped to catch up) or too far behind: jump to the newest picture.
-        var target = Math.max(start, end - 0.1);
-        if (Math.abs(target - ct) > 0.05 && t - vSeekedAt > 400) {
+      if (!inside || lag > JUMP) {
+        // In a gap (frames were skipped to catch up, or it was frozen) or too far behind: jump to the newest picture.
+        var target = Math.max(start, end - EDGE);
+        if (Math.abs(target - ct) > 0.03 && t - vSeekedAt > 300) {
           vSeekedAt = t;
           vstats.jumps++;
           try { vid.currentTime = target; } catch (e) { /* ignore */ }
@@ -780,12 +826,14 @@
           vLag = lag;
         }
         setRate(1);
-      } else if (lag > 0.4) {
-        setRate(1.15);   // quietly catch up
-      } else if (lag < 0.2) {
+      } else if (lag > 0.25) {
+        setRate(1.25);   // catch up (sped-up video for a moment isn't noticeable)
+      } else if (lag > CATCH_UP) {
+        setRate(1.1);
+      } else if (lag < EDGE + 0.02) {
         setRate(1);
       }
-      vLag = vLag * 0.7 + Math.max(0, Math.min(lag, 1)) * 0.3;
+      vLag = vLag * 0.8 + Math.max(0, Math.min(lag, 1)) * 0.2;
       vstats.lag = Math.round(vLag * 1000);
       if (vid.paused && vid.readyState >= 2) playVideo();
     }
@@ -797,7 +845,7 @@
     // Pictures are arriving but the player hasn't moved for a while: it's stuck, start it over.
     // (Not in a background tab: browsers pause videos there on purpose.)
     if (isHidden()) vLastMove = t;
-    if (b && b.length && b.end(b.length - 1) - ct > 0.5 && t - vLastMove > 2500 && t - vSeekedAt > 1500) {
+    if (!frozen && b && b.length && b.end(b.length - 1) - ct > 0.5 && t - vLastMove > 2500 && t - vSeekedAt > 1500) {
       videoReset('stuck');
       return;
     }
@@ -824,7 +872,7 @@
       vPhoneFrames = s.vframes;
       vPhoneFramesAt = t;
     }
-    var phoneBusy = typeof s.vage === 'number' && s.vage >= 0 && s.vage < 1500;
+    var phoneBusy = typeof s.vage === 'number' && s.vage >= 0 && s.vage < 1500 && !frozen;
     if (phoneBusy && t - vLastData > 2500 && t - vPhoneFramesAt < 2500) videoReconnect('stalled');
   }
 
@@ -876,10 +924,10 @@
   // Sound plays ~0.1 s after it arrives: enough to ride out Wi-Fi hiccups, small enough to match the
   // picture. Video shows up a little later than pictures (the player keeps a small buffer), so the
   // sound waits that much longer to stay in sync with the mouths.
-  var TARGET_LEAD = 0.1, MIN_LEAD = 0.02;
+  var TARGET_LEAD = 0.08, MIN_LEAD = 0.02;
   function soundLead() {
     if (picture !== 'video' || phase !== 'live') return TARGET_LEAD;
-    return Math.max(TARGET_LEAD, Math.min(0.6, vLag + 0.05));
+    return Math.max(TARGET_LEAD, Math.min(0.5, vLag + 0.04));
   }
   var stats = window.BroCastStats = { chunks: 0, played: 0, skipped: 0, lead: 0, peak: 0 };
 
@@ -958,8 +1006,8 @@
     var frames = Math.floor(samples.length / ch);
     if (!frames) return;
     var t = actx.currentTime, lead = playHead - t, want = soundLead();
-    if (lead > want + 0.12) { stats.skipped++; return; }      // way behind the picture: drop a bit to catch up
-    if (lead < MIN_LEAD || lead < want - 0.12) playHead = t + want; // ran dry, or the picture got much slower
+    if (lead > want + 0.1) { stats.skipped++; return; }       // way behind the picture: drop a bit to catch up
+    if (lead < MIN_LEAD || lead < want - 0.1) playHead = t + want;  // ran dry, or the picture got much slower
     // A little off: play 2% faster or slower until it lines up again (too small to hear).
     var speed = lead > want + 0.03 ? 1.02 : lead < want - 0.03 ? 0.98 : 1;
     var buffer = actx.createBuffer(ch, frames, fmt.rate), peak = 0;
@@ -1003,6 +1051,40 @@
     updateSoundUi();
     showBar();
   };
+
+  /*
+   * Freeze: every screen keeps the picture it has while the phone carries on (do private stuff on
+   * the phone, or keep something up while you look for the next thing). Sound keeps playing.
+   * The phone holds the state, so the phone's own Freeze button and this one stay in step.
+   */
+  function setFrozen(on) {
+    var was = frozen;
+    frozen = on;
+    setText(frzBtn, on ? 'Unfreeze' : 'Freeze');
+    frzBtn.className = on ? 'btn on' : 'btn';
+    setText(liveText, on ? 'FROZEN' : 'LIVE');
+    liveTag.className = on ? 'live frozen' : 'live';
+    frozenTag.style.display = on && phase === 'live' ? '' : 'none';
+    if (was !== on) {
+      document.title = on ? 'BroCast • Frozen' : (phase === 'live' ? 'BroCast • Live' : document.title);
+      vLastMove = now();      // the picture standing still now is on purpose
+      if (phase === 'live') showBar();
+    }
+  }
+
+  function toggleFreeze() {
+    if (phase !== 'live' || freezeBusy) return;
+    var want = !frozen;
+    freezeBusy = true;
+    setFrozen(want);          // show it right away; the phone confirms
+    request('/freeze?on=' + (want ? 1 : 0) + '&t=' + now(), { timeout: 4000, brocast: true }, function (code, x) {
+      freezeBusy = false;
+      freezeSetAt = now();
+      var r = code === 200 ? parseJson(x) : null;
+      setFrozen(r ? !!r.frozen : !want);
+    });
+  }
+  frzBtn.onclick = function () { toggleFreeze(); showBar(); };
 
   /*
    * Translate: opens SUBDUB (subtitles in other languages -> English, foreign talking -> English

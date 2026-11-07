@@ -7,6 +7,17 @@ photo per frame. That's about 5-10x less Wi-Fi, so videos and anime don't freeze
 picture ever does get stuck, the TV/PC page notices within a few seconds and reconnects by itself.
 2.0 installs as a separate app ("BroCast 2"); it offers to remove the old one.
 
+**New in 2.1:**
+- **Less delay.** The TV/PC page keeps the picture right at live (it used to drift up to 0.4 s
+  behind before catching up, and 1 s before jumping), the phone holds fewer frames in its send
+  queue, and the phone's encoder hands every frame out the moment it's done. Sound follows.
+- **❄ Freeze.** The TV keeps showing the current picture while you do whatever you want on the
+  phone (sound keeps playing). Freeze from the phone (app or notification) or from the TV/PC page
+  (**Freeze** button, **Space**, **P**, or the remote's **Pause** key). Unfreeze jumps straight
+  back to live.
+- The phone's English subtitles switch is gone: it forced the slow picture mode (the old "BroCast 2
+  lags" bug). The app is now about 1 MB.
+
 ## Install (one time)
 
 1. Get `BroCast.apk` onto your phone (download it on the phone, or copy it over from your PC).
@@ -21,6 +32,8 @@ picture ever does get stuck, the TV/PC page notices within a few seconds and rec
 3. On the TV/PC, open the **web browser** and type the address BroCast shows, like `192.168.1.23:8080`
    - Samsung TV: the **Internet** app · LG: **Web Browser** · Fire TV: **Silk** · PC: any browser
 4. Press **Full screen** (or press **F** / **Enter**) 🍿 That first press/click also turns the sound on: browsers don't allow sound until you click or press something once.
+5. Want to do something private on the phone? Press **❄ Freeze** (in the app, the notification, or
+   the page). The TV holds the picture until you unfreeze.
 
 Stop from the app or from the notification.
 
@@ -43,6 +56,10 @@ piece, sent over a WebSocket (`/video`); the page feeds them to the browser's ow
 bit faster if it falls behind), and has watchdogs: no data while the phone is making frames ->
 reconnect; data but the player stuck -> restart the player; the player failing again and again ->
 pictures instead.
+
+Freeze lives on the phone (`/freeze?on=1`, only from BroCast's own page): frames keep being made but
+aren't sent, a TV that joins gets the frozen picture, and unfreezing asks the encoder for a key frame
+so every TV jumps straight to live.
 
 On the phone, every viewer has its own short queue. A viewer whose Wi-Fi can't keep up skips to
 the next key frame instead of falling behind, and a connection whose writes stay stuck for 10 s is

@@ -16,13 +16,8 @@ android {
         applicationId = "com.brocast.live"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "2.0"
-        // Phones are ARM. The subtitle reader + translator ship native code per chip type, so the
-        // rest is left out (113 MB -> about half). An emulator build: -Pbrocast.abis=x86_64
-        ndk {
-            abiFilters += (findProperty("brocast.abis") as String? ?: "arm64-v8a,armeabi-v7a").split(',')
-        }
+        versionCode = 3
+        versionName = "2.1"
     }
 
     // The release key is private and never goes in the repo: put brocast-release.jks and
@@ -100,14 +95,6 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
-
-    // English subtitles on the phone: Google's on-device text readers + offline translator (ML Kit).
-    implementation("com.google.mlkit:text-recognition:16.0.1")
-    implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
-    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
-    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
-    implementation("com.google.mlkit:translate:17.0.3")
-    implementation("com.google.mlkit:language-id:17.0.6")
 
     // App tests run on a simulated Android (Robolectric) and take UI screenshots (Roborazzi).
     testImplementation("junit:junit:4.13.2")

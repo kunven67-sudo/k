@@ -107,6 +107,49 @@ class VideoHubTest {
     }
 
     @Test
+    fun freezeHoldsThePictureAndUnfreezeGoesLiveFromAKeyFrame() {
+        val keyRequests = AtomicInteger()
+        val hub = VideoHub()
+        hub.keyFrameRequester = { keyRequests.incrementAndGet() }
+        hub.configure(640, 360, annexB(SPS, PPS))
+        val c = hub.openClient()
+        hub.publish(annexB(idr(1)), 0, true)
+        hub.publish(annexB(pFrame(2)), 33_000, false)
+        frames(c)
+
+        hub.setFrozen(true)
+        assertTrue(hub.isFrozen)
+        val note = assertIs<VideoHub.FreezeMessage>(frames(c).single())
+        assertTrue(note.frozen)
+        hub.publish(annexB(pFrame(3)), 66_000, false)
+        hub.publish(annexB(idr(4)), 99_000, true)
+        hub.publish(annexB(pFrame(5)), 132_000, false)
+        assertTrue(frames(c).isEmpty(), "nothing new reaches the TV while frozen")
+        assertEquals(5L, hub.framesPublished, "the phone keeps making frames")
+
+        // A TV that joins now gets the frozen picture, not the live one.
+        val late = hub.openClient()
+        val lateGot = frames(late)
+        assertIs<VideoHub.InitMessage>(lateGot[0])
+        assertEquals(listOf(1, 2), lateGot.filterIsInstance<VideoHub.FrameMessage>().map(::tagOf))
+        assertTrue((lateGot.last() as VideoHub.FreezeMessage).frozen)
+
+        keyRequests.set(0)
+        hub.setFrozen(false)
+        assertEquals(1, keyRequests.get(), "unfreeze asks for a key frame right away")
+        assertFalse((frames(c).single() as VideoHub.FreezeMessage).frozen)
+        hub.publish(annexB(pFrame(6)), 165_000, false) // can't be shown without the frames it skipped
+        hub.publish(annexB(idr(7)), 198_000, true)
+        hub.publish(annexB(pFrame(8)), 231_000, false)
+        for (viewer in listOf(c, late)) {
+            val got = frames(viewer).filterIsInstance<VideoHub.FrameMessage>()
+            assertEquals(listOf(7, 8), got.map(::tagOf))
+            // The timeline kept going, so the TV jumps straight to now.
+            assertEquals(198_000L * 9 / 100, got[0].decodeTime)
+        }
+    }
+
+    @Test
     fun slowViewerSkipsToTheNextKeyFrameInsteadOfFallingBehind() {
         val keyRequests = AtomicInteger()
         var now = 0L
@@ -282,6 +325,7 @@ class Mp4RoundTripTest {
                                 if (m.keyFrame) keys++
                                 out.write(m.data)
                             }
+                            is VideoHub.FreezeMessage -> Unit
                         }
                     }
                     assertEquals(3, keys)

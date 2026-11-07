@@ -51,9 +51,6 @@ class MainActivity : ComponentActivity() {
     private var soundEnabled by mutableStateOf(true)
     private var wifiAddresses by mutableStateOf(listOf<String>())
     private var oldAppInstalled by mutableStateOf(false)
-    private var translateEnabled by mutableStateOf(false)
-    private var voicesEnabled by mutableStateOf(true)
-    private var overlayAllowed by mutableStateOf(false)
 
     private val captureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data
@@ -82,9 +79,6 @@ class MainActivity : ComponentActivity() {
         pinEnabled = settings.pinEnabled
         pin = settings.pin
         soundEnabled = settings.soundEnabled
-        translateEnabled = settings.translateEnabled
-        voicesEnabled = settings.voicesEnabled
-        overlayAllowed = Settings.canDrawOverlays(this)
 
         setContent {
             BroCastTheme {
@@ -124,16 +118,7 @@ class MainActivity : ComponentActivity() {
                     onCopy = ::copyToClipboard,
                     oldAppInstalled = oldAppInstalled,
                     onRemoveOldApp = ::removeOldApp,
-                    translateEnabled = translateEnabled,
-                    overlayAllowed = overlayAllowed,
-                    onTranslateChange = ::changeTranslate,
-                    voicesEnabled = voicesEnabled,
-                    onVoicesChange = {
-                        voicesEnabled = it
-                        settings.voicesEnabled = it
-                        ScreenShareService.setTranslate(this, translateEnabled && overlayAllowed, it)
-                    },
-                    onAllowOverlay = ::openOverlaySettings,
+                    onFreezeChange = { ScreenShareService.setFrozen(this, it) },
                 )
             }
         }
@@ -146,29 +131,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         oldAppInstalled = isInstalled(OLD_PACKAGE)
-        // Back from Android's "display over other apps" page: subtitles start if it's allowed now.
-        overlayAllowed = Settings.canDrawOverlays(this)
-        ScreenShareService.setTranslate(this, translateEnabled && overlayAllowed, voicesEnabled)
-    }
-
-    private fun changeTranslate(on: Boolean) {
-        translateEnabled = on
-        settings.translateEnabled = on
-        if (on && !Settings.canDrawOverlays(this)) openOverlaySettings()
-        ScreenShareService.setTranslate(this, on && Settings.canDrawOverlays(this), voicesEnabled)
-    }
-
-    // Android's own page with the "Allow display over other apps" switch for BroCast.
-    private fun openOverlaySettings() {
-        try {
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", packageName, null)))
-        } catch (e: ActivityNotFoundException) {
-            try {
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-            } catch (e2: ActivityNotFoundException) {
-                Toast.makeText(this, "Settings → Apps → BroCast 2 → Display over other apps", Toast.LENGTH_LONG).show()
-            }
-        }
     }
 
     private fun isInstalled(packageName: String): Boolean = try {

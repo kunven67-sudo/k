@@ -11,8 +11,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
-import android.graphics.Point
-import android.hardware.display.DisplayManager
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.net.wifi.WifiManager
@@ -23,19 +21,15 @@ import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
-import android.view.Display
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
-import com.brocast.app.translate.LiveSubtitles
-import com.brocast.app.translate.SubtitleVoice
 import com.brocast.core.AudioHub
 import com.brocast.core.FrameHub
 import com.brocast.core.PinConfig
 import com.brocast.core.StreamServer
 import com.brocast.core.VideoHub
-import com.brocast.core.VoicePitch
 import java.io.IOException
 
 /**
@@ -56,16 +50,11 @@ class ScreenShareService : Service() {
         val wifiLocks: List<WifiManager.WifiLock>,
         val startedAt: Long,
     ) {
-        /** SUBDUB on the phone, while it's on. Set on the main thread, read by the capture thread. */
-        @Volatile
-        var subtitles: LiveSubtitles? = null
-
-        /** Reads the English out loud, while that's on. */
-        var voice: SubtitleVoice? = null
         var lastFrames = 0L
         var addresses: List<String> = emptyList()
         var ticks = 0
         var notificationText = ""
+        var notificationFrozen = false
     }
 
     private var session: Session? = null
@@ -87,12 +76,13 @@ class ScreenShareService : Service() {
                 val quality = Quality.fromName(intent.getStringExtra(EXTRA_QUALITY))
                 session?.capturer?.setQuality(quality) ?: stopSelf()
             }
-            ACTION_SET_TRANSLATE -> {
+            ACTION_FREEZE -> {
                 val s = session
                 if (s == null) {
                     stopSelf()
                 } else {
-                    setTranslate(s, intent.getBooleanExtra(EXTRA_ON, false), intent.getBooleanExtra(EXTRA_VOICES, true))
+                    s.server.setFrozen(intent.getBooleanExtra(EXTRA_ON, !s.server.isFrozen))
+                    tick()
                 }
             }
             else -> if (session == null) stopSelf()
@@ -186,14 +176,10 @@ class ScreenShareService : Service() {
                 main.post { if (session === newSession) endSession(ShareStatus.Failed(message)) }
             }
         }
-        // Video normally. Pictures while a browser that can't play video is watching, or while
-        // SUBDUB on the phone reads subtitles (it needs the pictures; TVs then get pictures too).
-        val subtitlesOn = { newSession.subtitles }
+        // Video normally. Pictures only while a browser that can't play video is watching.
         val capturer = ScreenCapturer(
             this, projection, hub, video, settings.quality, listener,
-            picturesWanted = { subtitlesOn() != null || server.jpegViewerActive() },
-            subtitleReader = { subtitlesOn()?.let { subs -> subs::offer } },
-            jpegNeeded = { subtitlesOn() == null || server.pictureViewerActive() },
+            picturesWanted = { server.jpegViewerActive() },
         )
         video.keyFrameRequester = capturer::requestKeyFrame
         var audio: AudioCapturer? = null
@@ -215,7 +201,8 @@ class ScreenShareService : Service() {
             SystemClock.elapsedRealtime(),
         )
         session = newSession
-        setTranslate(newSession, settings.translateEnabled, settings.voicesEnabled)
+        // Freeze pressed on a TV/PC: the phone's screen and notification show it right away.
+        server.onFrozenChange = { main.post { if (session === newSession) tick() } }
         capturer.start()
 
         main.removeCallbacks(ticker)
@@ -234,42 +221,9 @@ class ScreenShareService : Service() {
         stopSelf()
     }
 
-    /**
-     * SUBDUB on the phone on or off (it needs "display over other apps" for the English box), and
-     * the English [voices] with it.
-     */
-    private fun setTranslate(s: Session, on: Boolean, voices: Boolean) {
-        if (on && s.subtitles == null && Settings.canDrawOverlays(this)) {
-            s.subtitles = LiveSubtitles(this) { realScreenSize() }
-        } else if (!on) {
-            s.subtitles?.close()
-            s.subtitles = null
-        }
-        val subs = s.subtitles
-        if (subs != null && voices) {
-            val voice = s.voice ?: SubtitleVoice(this).also { s.voice = it }
-            // Guy or girl voice: hear how high the show's voices are (needs the sound capture).
-            val hub = s.audioHub
-            val pitch = if (hub != null) VoicePitch(hub.sampleRate, hub.channels) else null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Our own English is in the captured sound too: don't measure it.
-                s.audio?.tap = pitch?.let { p -> { pcm: ByteArray -> if (voice.speaking) p.clear() else p.feed(pcm) } }
-            }
-            subs.onNewEnglish = { english -> voice.say(english, pitch?.recentPitch()) }
-        } else {
-            subs?.onNewEnglish = null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) s.audio?.tap = null
-            s.voice?.close()
-            s.voice = null
-        }
-    }
-
     private fun teardown(s: Session) {
+        s.server.onFrozenChange = null
         s.capturer.release()
-        s.subtitles?.close()
-        s.subtitles = null
-        s.voice?.close()
-        s.voice = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) s.audio?.release()
         s.server.stop()
         s.hub.close()
@@ -286,7 +240,7 @@ class ScreenShareService : Service() {
 
     private fun tick() {
         val s = session ?: return
-        val frames = s.hub.framesPublished + s.video.framesPublished + s.capturer.framesRead
+        val frames = s.hub.framesPublished + s.video.framesPublished
         val fps = (frames - s.lastFrames).toInt().coerceAtLeast(0)
         s.lastFrames = frames
         if (s.ticks % 3 == 0) s.addresses = NetUtils.lanAddresses()
@@ -304,18 +258,21 @@ class ScreenShareService : Service() {
                 // Sound can die mid-session (e.g. Android's audio system restarts).
                 sound = if (s.sound == SoundStatus.ON && s.audioHub?.isLive != true) SoundStatus.FAILED else s.sound,
                 video = s.capturer.isVideo,
-                translate = s.subtitles?.note,
+                frozen = s.server.isFrozen,
             ),
         )
-        val text = notificationText(s.addresses.firstOrNull(), s.server.port, viewers.count)
-        if (text != s.notificationText) {
+        val frozen = s.server.isFrozen
+        val text = notificationText(s.addresses.firstOrNull(), s.server.port, viewers.count, frozen)
+        if (text != s.notificationText || frozen != s.notificationFrozen) {
             s.notificationText = text
-            updateNotification(text)
+            s.notificationFrozen = frozen
+            updateNotification(text, frozen)
         }
     }
 
-    private fun notificationText(address: String?, port: Int, viewers: Int): String = when {
+    private fun notificationText(address: String?, port: Int, viewers: Int, frozen: Boolean): String = when {
         address == null -> "Connect to Wi-Fi so your TV or PC can find your phone 📶"
+        frozen -> "The TV keeps showing the frozen picture. Tap Unfreeze to go live again."
         viewers == 0 -> "On your TV or PC browser, go to $address:$port"
         viewers == 1 -> "📺 1 screen watching • $address:$port"
         else -> "📺 $viewers screens watching • $address:$port"
@@ -330,14 +287,14 @@ class ScreenShareService : Service() {
         if (withMicrophone && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
         }
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification("Getting ready…"), type)
+        ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification("Getting ready…", frozen = false), type)
         true
     } catch (e: RuntimeException) {
         Log.e(TAG, "startForeground failed", e)
         false
     }
 
-    private fun buildNotification(text: String): Notification {
+    private fun buildNotification(text: String, frozen: Boolean): Notification {
         val manager = getSystemService(NotificationManager::class.java)
         if (manager.getNotificationChannel(CHANNEL_ID) == null) {
             manager.createNotificationChannel(
@@ -358,10 +315,15 @@ class ScreenShareService : Service() {
             Intent(this, ScreenShareService::class.java).setAction(ACTION_STOP),
             flags,
         )
+        val freeze = PendingIntent.getService(
+            this, 2,
+            Intent(this, ScreenShareService::class.java).setAction(ACTION_FREEZE).putExtra(EXTRA_ON, !frozen),
+            flags,
+        )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setColor(0xFF7C5CFF.toInt())
-            .setContentTitle("Sharing your screen 📡")
+            .setContentTitle(if (frozen) "TV picture frozen ❄️" else "Sharing your screen 📡")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setOngoing(true)
@@ -371,19 +333,20 @@ class ScreenShareService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(open)
+            .addAction(0, if (frozen) "▶ Unfreeze" else "❄ Freeze TV", freeze)
             .addAction(0, "■ Stop sharing", stop)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
     }
 
-    private fun updateNotification(text: String) {
+    private fun updateNotification(text: String, frozen: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) {
             return
         }
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text))
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text, frozen))
     }
 
     // ---------------------------------------------------------------- helpers
@@ -415,13 +378,6 @@ class ScreenShareService : Service() {
         }
     }
 
-    @Suppress("DEPRECATION") // getRealSize: simplest way to read the screen size from a Service.
-    private fun realScreenSize(): Point {
-        val p = Point()
-        getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)?.getRealSize(p)
-        return p
-    }
-
     /** "Galaxy S24" style name for the TV page, falling back to the model number. */
     private fun deviceName(): String {
         val name = try {
@@ -440,9 +396,8 @@ class ScreenShareService : Service() {
         private const val ACTION_START = "com.brocast.app.action.START"
         private const val ACTION_STOP = "com.brocast.app.action.STOP"
         private const val ACTION_SET_QUALITY = "com.brocast.app.action.SET_QUALITY"
-        private const val ACTION_SET_TRANSLATE = "com.brocast.app.action.SET_TRANSLATE"
+        private const val ACTION_FREEZE = "com.brocast.app.action.FREEZE"
         private const val EXTRA_ON = "on"
-        private const val EXTRA_VOICES = "voices"
         private const val EXTRA_RESULT_CODE = "result_code"
         private const val EXTRA_DATA = "data"
         private const val EXTRA_QUALITY = "quality"
@@ -484,18 +439,17 @@ class ScreenShareService : Service() {
             }
         }
 
-        /** English subtitles (and [voices]) on the phone on or off, right away if sharing. */
-        fun setTranslate(context: Context, on: Boolean, voices: Boolean) {
+        /** Freeze ([on] true) or unfreeze the picture on every TV/PC watching. Sound keeps going. */
+        fun setFrozen(context: Context, on: Boolean) {
             if (ShareState.status.value !is ShareStatus.Live) return
             try {
                 context.startService(
                     Intent(context, ScreenShareService::class.java)
-                        .setAction(ACTION_SET_TRANSLATE)
-                        .putExtra(EXTRA_ON, on)
-                        .putExtra(EXTRA_VOICES, voices),
+                        .setAction(ACTION_FREEZE)
+                        .putExtra(EXTRA_ON, on),
                 )
             } catch (e: RuntimeException) {
-                Log.w(TAG, "Couldn't switch the subtitles", e)
+                Log.w(TAG, "Couldn't freeze", e)
             }
         }
     }

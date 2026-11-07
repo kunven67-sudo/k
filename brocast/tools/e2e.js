@@ -354,9 +354,12 @@ async function videoTests(browser) {
   mv = await videoMoves(page, 1500);
   ok(mv.moved, 'video time moves: ' + JSON.stringify([mv.a.t, mv.b.t]));
   ok(mv.b.w === 720 && mv.b.h === 1280, `video size ${mv.b.w}x${mv.b.h}`);
+  await sleep(1500); // let it settle at the live edge
   const lags = [];
-  for (let i = 0; i < 12; i++) { await sleep(250); const x = await page.evaluate(vinfo); lags.push(x.end - x.t); }
-  ok(lags.every((l) => l >= -0.05 && l < 0.8), 'stays close to live (buffer ahead, s): ' + lags.map((l) => l.toFixed(2)).join(' '));
+  for (let i = 0; i < 16; i++) { await sleep(250); const x = await page.evaluate(vinfo); lags.push(x.end - x.t); }
+  const avgLag = lags.reduce((a, b) => a + b, 0) / lags.length;
+  ok(lags.every((l) => l >= -0.05 && l < 0.3) && avgLag < 0.15,
+    `stays right at live (avg ${(avgLag * 1000).toFixed(0)} ms held back; each, s): ` + lags.map((l) => l.toFixed(2)).join(' '));
   await page.screenshot({ path: OUT + '/13-video.png' });
   await sleep(4000);
   const vs13 = (await page.evaluate(vinfo)).stats;
@@ -501,7 +504,7 @@ async function videoTests(browser) {
     await sleep(200);
     sync.push(await page.evaluate(() => [window.BroCastStats.lead, window.BroCastVideo.lag / 1000]));
   }
-  ok(sync.every(([lead, lag]) => Math.abs(lead - (Math.max(0.1, lag + 0.05))) < 0.06),
+  ok(sync.every(([lead, lag]) => Math.abs(lead - (Math.max(0.08, lag + 0.04))) < 0.06),
     'sound delay follows the video delay: ' + sync.map(([a, b]) => a.toFixed(2) + '/' + b.toFixed(2)).join(' '));
   const skippedNow = (await page.evaluate(S)).skipped;
   ok(skippedNow - skippedBefore <= 2, `once lined up, no sound gets cut (${skippedNow - skippedBefore} bits skipped; ${skippedBefore} while starting)`);
@@ -539,6 +542,49 @@ async function videoTests(browser) {
   await waitFor(tp, showingVideo, 15000);
   ok(await tp.evaluate(() => document.getElementById('trBtn').style.display === 'none'), 'no Translate button on a TV');
   await tv.close();
+  await stopPhone(phone);
+
+  console.log('24) Freeze: the TV holds the picture, the phone carries on, unfreeze jumps to live');
+  phone = await startPhone(['--video']);
+  ({ ctx, page } = await newTv(browser, phone.url));
+  ok(await waitFor(page, showingVideo, 15000), 'video shows');
+  await sleep(1500);
+  ok(await page.evaluate(() => document.getElementById('frzBtn').textContent === 'Freeze'), 'Freeze button in the bar');
+  // Focus sits on Full screen at the start: Space must freeze, not press that button.
+  await page.keyboard.press('Space');
+  ok(await waitFor(page, () => document.getElementById('liveText').textContent === 'FROZEN' &&
+    document.getElementById('frozenTag').style.display !== 'none', 2000), 'Space freezes: bar says FROZEN, tag shows');
+  ok(await page.evaluate(() => !document.fullscreenElement), 'Space did not toggle full screen');
+  ok(await waitFor(page, async () => (await (await fetch('/status')).json()).frozen === true, 3000), 'phone says frozen');
+  await sleep(800);
+  const f1 = await page.evaluate(videoHash); const fi1 = await page.evaluate(vinfo);
+  await sleep(3000);
+  const f2 = await page.evaluate(videoHash); const fi2 = await page.evaluate(vinfo);
+  ok(f1 === f2, `picture stays put while frozen (${f1} / ${f2})`);
+  ok(fi2.stats.appended - fi1.stats.appended === 0, 'no new video arrives while frozen');
+  ok(fi2.stats.resets === 0 && fi2.stats.reconnects === 0, 'frozen is not mistaken for stuck: ' + JSON.stringify(fi2.stats));
+  // A second TV joining now sees the frozen picture too, and its own button says Unfreeze.
+  const tv2 = await newTv(browser, phone.url);
+  ok(await waitFor(tv2.page, showingVideo, 15000), 'second TV shows the frozen picture');
+  ok(await waitFor(tv2.page, () => document.getElementById('frzBtn').textContent === 'Unfreeze', 3000), 'second TV knows it is frozen');
+  // Unfreeze from the second TV: the first one follows right away (no waiting for its next check).
+  await tv2.page.mouse.move(500, 500);
+  await tv2.page.click('#frzBtn');
+  const t0 = Date.now();
+  ok(await waitFor(page, () => document.getElementById('liveText').textContent === 'LIVE', 1500), `first TV goes live too (${Date.now() - t0} ms)`);
+  ok(await waitFor(page, (h) => { const v = document.getElementById('vid'); const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    const g = c.getContext('2d'); g.drawImage(v, 0, 0, 64, 64); const d = g.getImageData(0, 0, 64, 64).data; let x = 0;
+    for (let i = 0; i < d.length; i++) x = (x * 31 + d[i]) | 0; return x !== h; }, 3000, f2), 'picture moves again after unfreeze');
+  await sleep(1500);
+  const unf = await page.evaluate(vinfo);
+  ok(unf.end - unf.t < 0.3, `back at live, not replaying the frozen part (${(unf.end - unf.t).toFixed(2)} s behind)`);
+  ok((await videoMoves(page, 1000)).moved, 'video plays on');
+  ok(unf.stats.resets === 0, 'no player restarts: ' + JSON.stringify(unf.stats));
+  ok(page.errors.length === 0 && tv2.page.errors.length === 0, 'no JS errors: ' + JSON.stringify(page.errors.concat(tv2.page.errors)));
+  // The freeze address only works for BroCast's own page (another site can't send the header).
+  ok(await page.evaluate(async () => (await fetch('/freeze?on=1')).status === 403), 'freeze needs the page header');
+  await tv2.ctx.close();
+  await ctx.close();
   await stopPhone(phone);
 
   console.log('22) Tab in the background keeps playing (sound keeps going, screen recorders keep working)');

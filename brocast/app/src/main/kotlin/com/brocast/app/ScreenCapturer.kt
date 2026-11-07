@@ -44,12 +44,8 @@ class ScreenCapturer(
     private val video: VideoHub?,
     initialQuality: Quality,
     private val listener: Listener,
-    /** True while pictures are needed: a browser that can only show pictures, or [subtitleReader]. */
+    /** True while pictures are needed: a browser that can only show pictures is watching. */
     private val picturesWanted: () -> Boolean = { false },
-    /** SUBDUB on the phone while it's on: gets the picture-mode frames to read subtitles from. */
-    private val subtitleReader: () -> ((Bitmap) -> Unit)? = { null },
-    /** False while no browser wants JPEG pictures: frames then only go to [subtitleReader]. */
-    private val jpegNeeded: () -> Boolean = { true },
 ) {
     interface Listener {
         /** Android (or the user, from the status bar) ended the capture. Called on the capture thread. */
@@ -73,11 +69,6 @@ class ScreenCapturer(
     /** True while the picture goes out as video. */
     @Volatile
     var isVideo = false
-        private set
-
-    /** Frames that only went to the subtitle reader (no TV wanted pictures). */
-    @Volatile
-    var framesRead = 0L
         private set
 
     // ---- Only touched on the capture thread from here on.
@@ -278,7 +269,7 @@ class ScreenCapturer(
         markSwitch()
     }
 
-    private fun totalFrames() = hub.framesPublished + (video?.framesPublished ?: 0L) + framesRead
+    private fun totalFrames() = hub.framesPublished + (video?.framesPublished ?: 0L)
 
     private fun markSwitch() {
         switchedAt = SystemClock.uptimeMillis()
@@ -293,8 +284,6 @@ class ScreenCapturer(
             rebuild(wanted)
             return
         }
-        // Subtitle reading switched on or off: sharper or normal pictures.
-        if (mode == Mode.PICTURES) applySize()
         // Video mode with TVs watching but no frame for a while: nudge the encoder for a fresh one.
         val v = video
         val enc = encoder
@@ -346,9 +335,7 @@ class ScreenCapturer(
     private fun pictureSize(): Pair<Int, Int> {
         val cw = contentWidth.coerceAtLeast(2)
         val ch = contentHeight.coerceAtLeast(2)
-        // Reading subtitles wants sharp text: at least 1920 on the long side (or the screen's own size).
-        val longSide = if (subtitleReader() != null) max(quality.maxLongSide, 1920) else quality.maxLongSide
-        val scale = min(1.0, longSide.toDouble() / max(cw, ch))
+        val scale = min(1.0, quality.maxLongSide.toDouble() / max(cw, ch))
         val w = ((cw * scale).roundToInt() / 2 * 2).coerceAtLeast(2)
         val h = ((ch * scale).roundToInt() / 2 * 2).coerceAtLeast(2)
         return w to h
@@ -382,26 +369,13 @@ class ScreenCapturer(
         } finally {
             image.close()
         }
-        val toTv = jpegNeeded()
-        val subtitles = subtitleReader()
         if (bmp != null) {
-            if (subtitles != null) {
-                try {
-                    subtitles(bmp)
-                } catch (e: RuntimeException) {
-                    Log.w(TAG, "Subtitle reader failed", e)
-                }
-            }
-            if (!toTv && subtitles != null) framesRead++
-            if (toTv) {
-                jpeg.reset()
-                if (bmp.compress(Bitmap.CompressFormat.JPEG, quality.jpegQuality, jpeg)) {
-                    hub.publish(jpeg.toByteArray(), bmp.width, bmp.height)
-                }
+            jpeg.reset()
+            if (bmp.compress(Bitmap.CompressFormat.JPEG, quality.jpegQuality, jpeg)) {
+                hub.publish(jpeg.toByteArray(), bmp.width, bmp.height)
             }
         }
-        // No TV wants pictures: about 3 a second are plenty for reading subtitles.
-        nextFrameAt = started + if (toTv || subtitles == null) quality.frameIntervalMs else READ_ONLY_INTERVAL_MS
+        nextFrameAt = started + quality.frameIntervalMs
     }
 
     private fun copyToBitmap(image: Image): Bitmap? {
@@ -494,7 +468,6 @@ class ScreenCapturer(
         const val MODE_CHECK_MS = 500L
         const val STALE_VIDEO_MS = 3_000L
         const val NUDGE_AFTER_MS = 1_000L
-        const val READ_ONLY_INTERVAL_MS = 300L
         const val MAX_ENCODER_RESTARTS = 3
     }
 }

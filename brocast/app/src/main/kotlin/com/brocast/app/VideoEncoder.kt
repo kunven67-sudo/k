@@ -230,6 +230,9 @@ class VideoEncoder private constructor(
                         setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, fps.toFloat())
                         setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) // no frame reordering: lowest delay
                     }
+                    // Hand each frame out as soon as it's done, instead of holding a few back to plan
+                    // the bitrate (some chips do that by default, which shows up as delay on the TV).
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) setInteger(MediaFormat.KEY_LATENCY, 1)
                 }
             }
 

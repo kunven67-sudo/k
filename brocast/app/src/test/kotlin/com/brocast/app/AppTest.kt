@@ -128,7 +128,7 @@ class MainActivityTest {
     @Test
     fun pinSwitchShowsPinAndIsLockedWhileLive() {
         compose.onNodeWithText("Your PIN:").assertDoesNotExist()
-        compose.onAllNodes(isToggleable())[2].performScrollTo().performClick()
+        compose.onAllNodes(isToggleable())[1].performScrollTo().performClick()
         assertTrue(ShareSettings(app).pinEnabled)
         val pin = ShareSettings(app).pin
         assertTrue(pin.matches(Regex("\\d{4}")))
@@ -144,7 +144,7 @@ class MainActivityTest {
             ShareState.set(ShareStatus.Live(8080, listOf("192.168.1.23"), 0, emptyList(), 0, newPin, false))
         }
         compose.onNodeWithText("🎲 New PIN").performScrollTo().assertIsNotEnabled()
-        compose.onAllNodes(isToggleable())[2].assertIsNotEnabled()
+        compose.onAllNodes(isToggleable())[1].assertIsNotEnabled()
         // Both the sound and the PIN switch are locked while sharing.
         compose.onAllNodesWithText("Stop sharing to change this.").assertCountEquals(2)
     }
@@ -200,7 +200,7 @@ class MainActivitySoundTest {
     fun soundSwitchIsSavedAndSkipsTheRecordAudioQuestion() {
         compose.onNodeWithText("🔊 Sound on the TV").assertIsDisplayed()
         compose.onNodeWithText("record audio", substring = true).assertExists()
-        compose.onAllNodes(isToggleable())[1].performScrollTo().performClick()
+        compose.onAllNodes(isToggleable())[0].performScrollTo().performClick()
         assertFalse(ShareSettings(app).soundEnabled)
         compose.onNodeWithText("record audio", substring = true).assertDoesNotExist()
 
@@ -237,14 +237,14 @@ class MainActivitySoundTest {
         live(SoundStatus.OFF)
         compose.onNodeWithText("🔇 Sound is off (you can turn it on below, after stopping).").assertExists()
         // Sound switch is locked while sharing.
-        compose.onAllNodes(isToggleable())[1].performScrollTo().assertIsNotEnabled()
+        compose.onAllNodes(isToggleable())[0].performScrollTo().assertIsNotEnabled()
     }
 
     @Test
     @Config(sdk = [28])
     fun oldAndroidExplainsNoSound() {
         compose.onNodeWithText("Needs Android 10 or newer, sorry 😢 The picture still works.").assertExists()
-        compose.onAllNodes(isToggleable())[1].assertIsNotEnabled()
+        compose.onAllNodes(isToggleable())[0].assertIsNotEnabled()
     }
 }
 
@@ -439,57 +439,26 @@ class VersionTwoTest {
     }
 
     @Test
-    fun englishSubtitlesSwitchAsksForTheOverlayPermission() {
-        compose.onNodeWithText("💬 English subtitles on this phone").performScrollTo().assertIsDisplayed()
-        compose.onAllNodes(isToggleable())[0].performScrollTo().performClick()
-        assertTrue(ShareSettings(app).translateEnabled)
-        // Android's "display over other apps" page for this app.
-        val intent = shadowOf(compose.activity).nextStartedActivity
-        assertEquals(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, intent.action)
-        assertEquals("package:${app.packageName}", intent.dataString)
-        compose.onNodeWithText("Allow").performScrollTo().assertIsDisplayed()
-        compose.onRoot().captureRoboImage("build/screenshots/8-subtitles-permission.png")
-
-        // Allowed: back in the app, the tips show instead.
-        org.robolectric.shadows.ShadowSettings.setCanDrawOverlays(true)
-        compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Allow").assertDoesNotExist()
-        compose.onNodeWithText("A single app", substring = true).performScrollTo().assertIsDisplayed()
-        compose.onRoot().captureRoboImage("build/screenshots/9-subtitles-on.png")
-        // English voices: on by default, its own switch right under it.
-        assertTrue(ShareSettings(app).voicesEnabled)
-        compose.onNodeWithText("🗣️ Say them out loud too").performScrollTo().assertIsDisplayed()
-        compose.onAllNodes(isToggleable())[1].performScrollTo().performClick()
-        assertFalse(ShareSettings(app).voicesEnabled)
-        compose.onAllNodes(isToggleable())[0].performScrollTo().performClick()
-        assertFalse(ShareSettings(app).translateEnabled)
-        compose.onNodeWithText("A single app", substring = true).assertDoesNotExist()
-    }
-
-    @Test
-    fun liveCardShowsTheSubtitleLanguage() {
-        compose.runOnUiThread {
-            ShareState.set(
-                ShareStatus.Live(8080, listOf("192.168.1.23"), 0, emptyList(), 6, null, false, video = false, translate = "Spanish → English ✅"),
-            )
+    fun freezeButtonFreezesAndUnfreezesTheTv() {
+        fun live(frozen: Boolean) = compose.runOnUiThread {
+            ShareState.set(ShareStatus.Live(8080, listOf("192.168.1.23"), 1, listOf("192.168.1.5"), 30, null, false, frozen = frozen))
         }
-        compose.onNodeWithText("💬 English subtitles: Spanish → English ✅").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("🖼️ Sending pictures (English subtitles are on)").assertExists()
-    }
+        live(frozen = false)
+        compose.onNodeWithText("LIVE").assertIsDisplayed()
+        compose.onNodeWithText("❄  Freeze the TV picture").performScrollTo().performClick()
+        var sent = shadowOf(app).nextStartedService
+        assertEquals("com.brocast.app.action.FREEZE", sent.action)
+        assertTrue(sent.getBooleanExtra("on", false))
 
-    @Test
-    fun englishVoicesAreToldApartByName() {
-        val genderOf = com.brocast.app.translate.SubtitleVoice.Companion::genderOf
-        assertEquals(true, genderOf("en-us-x-sfg-local"))
-        assertEquals(true, genderOf("en-us-x-tpf-network"))
-        assertEquals(false, genderOf("en-us-x-iom-local"))
-        assertEquals(false, genderOf("en-gb-x-rjs-local"))
-        assertEquals(true, genderOf("en-US-SMTf00"))
-        assertEquals(false, genderOf("en-US-SMTm00"))
-        assertEquals(true, genderOf("English Female"))
-        assertEquals(false, genderOf("English male 2"))
-        assertEquals(null, genderOf("en-us-x-abc-local"))
-        assertEquals(null, genderOf("en-US-language"))
+        live(frozen = true)
+        compose.onNodeWithText("LIVE • TV FROZEN").assertIsDisplayed()
+        compose.onNodeWithText("❄  Freeze the TV picture").assertDoesNotExist()
+        compose.onNodeWithText("▶  Unfreeze (go live)").performScrollTo().assertIsDisplayed()
+        compose.onRoot().captureRoboImage("build/screenshots/8-frozen.png")
+        compose.onNodeWithText("▶  Unfreeze (go live)").performClick()
+        sent = shadowOf(app).nextStartedService
+        assertEquals("com.brocast.app.action.FREEZE", sent.action)
+        assertFalse(sent.getBooleanExtra("on", true))
     }
 
     @Test

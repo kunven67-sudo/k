@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong
  *  - `/frame.jpg`     long-poll for a single newer frame (fallback for browsers that choke on MJPEG)
  *  - `/audio`         WebSocket with the phone's sound as raw PCM (when [audioHub] is given)
  *  - `/status`        small JSON the page polls to know if the phone is sharing
+ *  - `/freeze`        `?on=1` / `?on=0`: the TVs hold the current picture / go live again
  *  - `/auth`          checks the PIN and hands out a cookie
  *
  * One request per connection keeps the code small; the stream connection simply never ends.
@@ -47,6 +48,30 @@ class StreamServer(
     @Volatile
     var port: Int = -1
         private set
+
+    /** True while the TVs hold the current picture. The phone keeps going; sound keeps playing. */
+    @Volatile
+    var isFrozen = false
+        private set
+
+    /** Called (on a server thread) when a TV/PC freezes or unfreezes the picture. */
+    @Volatile
+    var onFrozenChange: ((Boolean) -> Unit)? = null
+
+    /** Freeze or unfreeze the picture on every TV/PC. Safe from any thread. */
+    fun setFrozen(on: Boolean) {
+        synchronized(this) {
+            if (isFrozen == on) return
+            isFrozen = on
+            hub.setFrozen(on)
+            videoHub?.setFrozen(on)
+        }
+        try {
+            onFrozenChange?.invoke(on)
+        } catch (e: RuntimeException) {
+            // The phone's screen will catch up on its next refresh.
+        }
+    }
 
     data class ViewerStats(val count: Int, val addresses: List<String>)
 
@@ -245,6 +270,7 @@ class StreamServer(
             "/", "/index.html" -> send(out, 200, "text/html; charset=utf-8", viewerPage, head, PAGE_HEADERS)
             "/status" -> status(req, out, head)
             "/auth" -> auth(req, ip, out, head)
+            "/freeze" -> if (authorized(req)) freeze(req, out, head) else unauthorized(out, head)
             "/video" -> if (authorized(req)) video(req, ip, socket, out, head) else unauthorized(out, head)
             "/stream.mjpeg" -> if (authorized(req)) stream(req, ip, socket, out, head) else unauthorized(out, head)
             "/frame.jpg" -> if (authorized(req)) singleFrame(req, ip, out, head) else unauthorized(out, head)
@@ -283,7 +309,26 @@ class StreamServer(
             .put("video", if (videoLive) "h264" else "jpeg")
             .put("vframes", if (authorized && vh != null) vh.framesPublished else 0L)
             .put("vage", if (authorized && vh != null && vh.lastFrameAt > 0) now - vh.lastFrameAt else -1L)
+            .put("frozen", authorized && isFrozen)
         send(out, 200, JSON_TYPE, json.bytes(), head)
+    }
+
+    /**
+     * Freeze button on the TV/PC page. Needs the page's own "X-BroCast" header: other websites
+     * can't send that to the phone, so only BroCast's page can freeze it.
+     */
+    private fun freeze(req: HttpRequest, out: OutputStream, head: Boolean) {
+        if (req.header("x-brocast") != "1" || !isSameOrigin(req)) {
+            sendText(out, 403, "Use the Freeze button on the BroCast page.", head)
+            return
+        }
+        if (!head) {
+            when (req.query["on"]) {
+                "1" -> setFrozen(true)
+                "0" -> setFrozen(false)
+            }
+        }
+        send(out, 200, JSON_TYPE, Json().put("frozen", isFrozen).bytes(), head)
     }
 
     private fun auth(req: HttpRequest, ip: String, out: OutputStream, head: Boolean) {
@@ -379,7 +424,9 @@ class StreamServer(
         }
         if (!upgradeToWebSocket(req, out, head)) return
         try {
-            socket.sendBufferSize = 256 * 1024 // ~0.3 s of video: enough to ride out hiccups, small enough to notice a slow TV
+            // Small on purpose: video waiting in here is delay on the TV. A slow TV fills it quickly,
+            // its queue in the hub overflows and it skips ahead to the next key frame instead.
+            socket.sendBufferSize = 128 * 1024
         } catch (e: SocketException) {
             // Not fatal.
         }
@@ -433,6 +480,7 @@ class StreamServer(
                 writeWsFrame(out, WS_BINARY, f.init)
             }
             is VideoHub.FrameMessage -> writeWsFrame(out, WS_BINARY, m.data)
+            is VideoHub.FreezeMessage -> writeWsFrame(out, WS_TEXT, if (m.frozen) FROZEN_NOTE else LIVE_NOTE)
         }
     }
 
@@ -678,6 +726,8 @@ class StreamServer(
         private const val WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
         private val EMPTY = ByteArray(0)
         private val TICK = ascii("""{"type":"tick"}""")
+        private val FROZEN_NOTE = ascii("""{"type":"freeze","on":true}""")
+        private val LIVE_NOTE = ascii("""{"type":"freeze","on":false}""")
         private val RANGE = Regex("""bytes=(\d*)-(\d*)""")
         private val IPV4 = Regex("""\d{1,3}(\.\d{1,3}){3}""")
         private val CLIENT_ID = Regex("""[A-Za-z0-9_-]{1,64}""")
