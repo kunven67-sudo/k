@@ -414,16 +414,26 @@ class VersionTwoTest {
     }
 
     @Test
-    fun offersToRemoveTheOldBroCast() {
+    fun offersToRemoveTheOldBroCasts() {
         compose.onNodeWithText("🧹  Remove the old BroCast").assertDoesNotExist()
-        shadowOf(app.packageManager).installPackage(PackageInfo().apply { packageName = MainActivity.OLD_PACKAGE })
+        // Both old ones on the phone (BroCast 1 and BroCast 2): BroCast 2 goes first, then BroCast 1.
+        for (old in MainActivity.OLD_PACKAGES) shadowOf(app.packageManager).installPackage(PackageInfo().apply { packageName = old })
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("👋 The old BroCast is still on your phone").assertIsDisplayed()
+        compose.onNodeWithText("👋 An old BroCast is still on your phone").assertIsDisplayed()
         compose.onRoot().captureRoboImage("build/screenshots/7-old-app.png")
         compose.onNodeWithText("🧹  Remove the old BroCast").performClick()
-        val intent = shadowOf(app).nextStartedActivity
+        var intent = shadowOf(app).nextStartedActivity
         assertEquals(Intent.ACTION_DELETE, intent.action)
+        assertEquals("package:com.brocast.live", intent.dataString)
+        // Android removed it: the card stays for the other one.
+        shadowOf(app.packageManager).deletePackage("com.brocast.live")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("🧹  Remove the old BroCast").performClick()
+        intent = shadowOf(app).nextStartedActivity
         assertEquals("package:com.brocast.app", intent.dataString)
+        shadowOf(app.packageManager).deletePackage("com.brocast.app")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("🧹  Remove the old BroCast").assertDoesNotExist()
     }
 
     @Test
@@ -439,32 +449,20 @@ class VersionTwoTest {
     }
 
     @Test
-    fun freezeButtonFreezesAndUnfreezesTheTv() {
-        fun live(frozen: Boolean) = compose.runOnUiThread {
-            ShareState.set(ShareStatus.Live(8080, listOf("192.168.1.23"), 1, listOf("192.168.1.5"), 30, null, false, frozen = frozen))
+    fun justSharingNoFreezeButton() {
+        compose.runOnUiThread {
+            ShareState.set(ShareStatus.Live(8080, listOf("192.168.1.23"), 1, listOf("192.168.1.5"), 30, null, false, video = true))
         }
-        live(frozen = false)
         compose.onNodeWithText("LIVE").assertIsDisplayed()
-        compose.onNodeWithText("❄  Freeze the TV picture").performScrollTo().performClick()
-        var sent = shadowOf(app).nextStartedService
-        assertEquals("com.brocast.app.action.FREEZE", sent.action)
-        assertTrue(sent.getBooleanExtra("on", false))
-
-        live(frozen = true)
-        compose.onNodeWithText("LIVE • TV FROZEN").assertIsDisplayed()
+        compose.onNodeWithText("■  Stop sharing").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("❄  Freeze the TV picture").assertDoesNotExist()
-        compose.onNodeWithText("▶  Unfreeze (go live)").performScrollTo().assertIsDisplayed()
-        compose.onRoot().captureRoboImage("build/screenshots/8-frozen.png")
-        compose.onNodeWithText("▶  Unfreeze (go live)").performClick()
-        sent = shadowOf(app).nextStartedService
-        assertEquals("com.brocast.app.action.FREEZE", sent.action)
-        assertFalse(sent.getBooleanExtra("on", true))
+        compose.onRoot().captureRoboImage("build/screenshots/8-live.png")
     }
 
     @Test
     fun newIdAndName() {
-        assertEquals("com.brocast.live", app.packageName)
-        assertEquals("BroCast 2", app.getString(R.string.app_name))
+        assertEquals("com.brocast.three", app.packageName)
+        assertEquals("BroCast 3", app.getString(R.string.app_name))
     }
 
     @Test

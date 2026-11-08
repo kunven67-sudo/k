@@ -40,8 +40,11 @@ class MainActivity : ComponentActivity() {
         @VisibleForTesting
         var autoStart = true
 
-        /** BroCast 1.0. Its signing key is gone, so 2.0 is a separate app and offers to remove it. */
-        const val OLD_PACKAGE = "com.brocast.app"
+        /**
+         * BroCast 1 and BroCast 2. Their signing keys are gone, so 3 is a separate app and offers
+         * to remove them (one at a time: Android asks to confirm each).
+         */
+        val OLD_PACKAGES = listOf("com.brocast.live", "com.brocast.app")
     }
 
     private lateinit var settings: ShareSettings
@@ -118,7 +121,6 @@ class MainActivity : ComponentActivity() {
                     onCopy = ::copyToClipboard,
                     oldAppInstalled = oldAppInstalled,
                     onRemoveOldApp = ::removeOldApp,
-                    onFreezeChange = { ScreenShareService.setFrozen(this, it) },
                 )
             }
         }
@@ -130,7 +132,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        oldAppInstalled = isInstalled(OLD_PACKAGE)
+        oldAppInstalled = OLD_PACKAGES.any(::isInstalled)
     }
 
     private fun isInstalled(packageName: String): Boolean = try {
@@ -147,11 +149,12 @@ class MainActivity : ComponentActivity() {
 
     // Android shows its own "Uninstall this app?" box; the card goes away once it's gone (onResume).
     private fun removeOldApp() {
+        val old = OLD_PACKAGES.firstOrNull(::isInstalled) ?: return
         try {
-            startActivity(Intent(Intent.ACTION_DELETE, Uri.fromParts("package", OLD_PACKAGE, null)))
+            startActivity(Intent(Intent.ACTION_DELETE, Uri.fromParts("package", old, null)))
         } catch (e: ActivityNotFoundException) {
             try {
-                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", OLD_PACKAGE, null)))
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", old, null)))
             } catch (e2: ActivityNotFoundException) {
                 Toast.makeText(this, "Hold the old BroCast icon and pick Uninstall", Toast.LENGTH_LONG).show()
             }

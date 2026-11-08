@@ -32,39 +32,12 @@ class FrameHub {
     var framesPublished = 0L
         private set
 
-    /** True while the TVs hold the current picture: new frames wait in [held] until unfreeze. */
-    @Volatile
-    var isFrozen = false
-        private set
-    private var held: Frame? = null
-
     fun publish(jpeg: ByteArray, width: Int, height: Int) {
         lock.withLock {
             if (isClosed) return
             framesPublished++
-            val frame = Frame(nextSeq++, jpeg, width, height)
-            if (isFrozen) {
-                held = frame
-                return
-            }
-            latest = frame
+            latest = Frame(nextSeq++, jpeg, width, height)
             changed.signalAll()
-        }
-    }
-
-    /**
-     * Freeze ([on] true): viewers keep the picture they have. Unfreeze: the newest frame made in
-     * the meantime goes out right away (a still screen might not make another one for a while).
-     */
-    fun setFrozen(on: Boolean) {
-        lock.withLock {
-            if (isClosed || on == isFrozen) return
-            isFrozen = on
-            if (!on) {
-                held?.let { latest = it }
-                held = null
-                changed.signalAll()
-            }
         }
     }
 

@@ -1,22 +1,27 @@
-# 📡 BroCast 2
+# 📡 BroCast 3
 
-Show your Android phone's screen **with sound** on any TV or PC with a web browser. Same Wi-Fi, no cables, and no app needed on the TV.
+Show your Android phone's screen **with sound** on your TV (web browser) or PC (the BroCast app). Same Wi-Fi, no cables.
 
-**New in 2.0:** the picture goes out as real video (H.264 from the phone's video chip) instead of one
-photo per frame. That's about 5-10x less Wi-Fi, so videos and anime don't freeze anymore. If the
-picture ever does get stuck, the TV/PC page notices within a few seconds and reconnects by itself.
-2.0 installs as a separate app ("BroCast 2"); it offers to remove the old one.
+**New in 3.0: just share, and no more freezing.**
+- **The anime freeze is fixed.** The picture used to stop for a second or two while the sound
+  kept going. Cause: browsers treat a frame that comes more than twice "the last
+  frame's length" late as a break in the video, and throw away everything up to the next full
+  picture (up to 2 s). Phones make frames unevenly (24 fps anime on a 120 Hz screen, dropped
+  frames, a repeated frame after 100 ms of still picture), so that happened all the time. Now every
+  frame starts exactly where the one before ends: the browser never sees a break.
+- **Rides out Wi-Fi hiccups.** The TV page keeps a small cushion (about 0.3 s, bigger by itself on
+  choppy Wi-Fi), and the phone lets frames wait up to 1.2 s instead of 0.3 s before skipping.
+- **Adjusts to your Wi-Fi like YouTube does.** When frames start waiting, the phone uses fewer bits
+  (sharper again once the Wi-Fi keeps up). Constant bitrate, so a busy fight scene doesn't suddenly
+  send 3x the data.
+- **BroCast for PC** (`pc/`): a tiny Windows app (under 1 MB) that finds your phone by itself and
+  plays the video on your graphics card. No browser (Edge eats CPU).
+- Freeze and Translate are gone: it just shares. BroCast 3 is a new app (its old signing keys are
+  gone), so it installs next to BroCast 1/2 and offers to remove them.
 
-**New in 2.1:**
-- **Less delay.** The TV/PC page keeps the picture right at live (it used to drift up to 0.4 s
-  behind before catching up, and 1 s before jumping), the phone holds fewer frames in its send
-  queue, and the phone's encoder hands every frame out the moment it's done. Sound follows.
-- **❄ Freeze.** The TV keeps showing the current picture while you do whatever you want on the
-  phone (sound keeps playing). Freeze from the phone (app or notification) or from the TV/PC page
-  (**Freeze** button, **Space**, **P**, or the remote's **Pause** key). Unfreeze jumps straight
-  back to live.
-- The phone's English subtitles switch is gone: it forced the slow picture mode (the old "BroCast 2
-  lags" bug). The app is now about 1 MB.
+Measured on the test rig (fake phone, anime-style clip with a 1 s fight scene every 5 s, Wi-Fi that
+cuts out for 0.15-0.45 s every 1.5-3.5 s, 40 s): BroCast 2.1 stopped **22 times, 14.3 s frozen**;
+BroCast 3 stops 2-4 times while it learns the Wi-Fi, under 1.3 s in total, never longer than 0.6 s.
 
 ## Install (one time)
 
@@ -27,13 +32,14 @@ picture ever does get stuck, the TV/PC page notices within a few seconds and rec
 ## Use it
 
 1. Phone and TV/PC on the **same Wi-Fi** 📶
-2. Open BroCast → **Start sharing** → allow it (pick **Entire screen** if Android asks).
+2. Open BroCast 3 → **Start sharing** → allow it (pick **Entire screen** if Android asks).
    With sound on, Android also asks to **"record audio"**: allow it. That's Android's name for grabbing the sound apps play; the microphone is never used.
-3. On the TV/PC, open the **web browser** and type the address BroCast shows, like `192.168.1.23:8080`
-   - Samsung TV: the **Internet** app · LG: **Web Browser** · Fire TV: **Silk** · PC: any browser
-4. Press **Full screen** (or press **F** / **Enter**) 🍿 That first press/click also turns the sound on: browsers don't allow sound until you click or press something once.
-5. Want to do something private on the phone? Press **❄ Freeze** (in the app, the notification, or
-   the page). The TV holds the picture until you unfreeze.
+3. **PC:** open **BroCast.exe**. It finds your phone by itself (or press **T** and type the address).
+   **TV:** open the **web browser** and type the address BroCast shows, like `192.168.1.23:8080`
+   - Samsung TV: the **Internet** app · LG: **Web Browser** · Fire TV: **Silk**
+4. Press **Full screen** (or **F** / **Enter**; on the PC also **F11** or double-click) 🍿 On a TV
+   that first press also turns the sound on: browsers don't allow sound until you press something
+   once. **M** mutes on the PC.
 
 Stop from the app or from the notification.
 
@@ -57,13 +63,22 @@ bit faster if it falls behind), and has watchdogs: no data while the phone is ma
 reconnect; data but the player stuck -> restart the player; the player failing again and again ->
 pictures instead.
 
-Freeze lives on the phone (`/freeze?on=1`, only from BroCast's own page): frames keep being made but
-aren't sent, a TV that joins gets the frozen picture, and unfreezing asks the encoder for a key frame
-so every TV jumps straight to live.
+Timeline: every frame's start time is the previous frame's start plus its length (each frame lasts
+as long as the gap before it, kept within 4-100 ms). Players never see a hole, so they never drop
+frames waiting for a key frame.
 
-On the phone, every viewer has its own short queue. A viewer whose Wi-Fi can't keep up skips to
-the next key frame instead of falling behind, and a connection whose writes stay stuck for 10 s is
-closed so the page reconnects.
+On the phone, every viewer has its own queue. Frames may wait up to 1.2 s (Wi-Fi hiccups); the
+longest wait steers the encoder's bitrate (`BitrateGovernor`: down 25% when frames wait 250 ms,
+40% after a skip, back up 15% at a time after 3 s of calm, never below 30% of the picked quality).
+Only a viewer that's still 1.2 s behind skips ahead, and then a key frame is asked for right away.
+A connection whose writes stay stuck for 10 s is closed so the page reconnects.
+
+The PC app (`pc/`, C++ on Windows' own parts only): finds phones by asking every address on its
+local networks for `/status` (8080 first), reads `/video` and `/audio` like the page does, keeps
+the frames compressed in a queue until just before their turn (a cushion that learns your Wi-Fi's
+worst hiccup of the last minute), decodes with Media Foundation on the graphics card (DXVA, falls
+back to the CPU), draws with Direct3D 11 and plays sound with WASAPI, nudging its speed by up to
+2% to stay in step with the picture.
 
 Pictures mode: while a browser that can't play the video is watching (or if the phone's encoder
 doesn't work), the screen goes into JPEGs instead and the page shows them as an MJPEG stream. If a
@@ -77,6 +92,7 @@ Sound comes from Android's playback capture (`AudioPlaybackCapture`, Android 10+
 ```
 core/   web server + TV page (plain Kotlin, tested on a PC)
 app/    the Android app (screen capture, service, UI)
+pc/     BroCast for PC (Windows app) + its tests
 tools/  browser end-to-end tests + Android API checker
 ```
 
@@ -89,6 +105,8 @@ Needs JDK 17+ and the Android SDK (platform 36).
 ./gradlew :core:test :app:testDebugUnitTest :app:lintRelease
 ./gradlew :core:runDevServer --args="--port 8080"   # fake phone: open http://localhost:8080
 ./gradlew :core:writeTestClasspath && node tools/e2e.js   # needs Playwright
+ONLY=choppy node tools/e2e.js          # just the choppy Wi-Fi + anime test
+pc/build.sh && pc/build/pc_test 127.0.0.1:8080   # PC app (MinGW-w64) + its tests against a dev server
 ```
 
 Release signing: put the private key at `app/brocast-release.jks` and its password in

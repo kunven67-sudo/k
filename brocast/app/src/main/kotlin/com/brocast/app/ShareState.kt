@@ -37,8 +37,6 @@ sealed interface ShareStatus {
         val sound: SoundStatus = SoundStatus.OFF,
         /** True when the picture goes out as video (false: picture by picture, for an older TV). */
         val video: Boolean = true,
-        /** True while the TVs hold the current picture (Freeze). */
-        val frozen: Boolean = false,
     ) : ShareStatus
 
     data class Failed(val message: String) : ShareStatus

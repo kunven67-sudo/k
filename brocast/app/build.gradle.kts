@@ -13,11 +13,11 @@ android {
 
     defaultConfig {
         // 2.0 got a new id: 1.0 was signed with a key that's gone, so it can't be updated in place.
-        applicationId = "com.brocast.live"
+        applicationId = "com.brocast.three"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "2.1"
+        versionCode = 4
+        versionName = "3.0"
     }
 
     // The release key is private and never goes in the repo: put brocast-release.jks and

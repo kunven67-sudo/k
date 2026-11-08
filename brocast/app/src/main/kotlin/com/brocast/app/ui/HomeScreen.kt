@@ -83,7 +83,6 @@ fun HomeScreen(
     onCopy: (String) -> Unit,
     oldAppInstalled: Boolean = false,
     onRemoveOldApp: () -> Unit = {},
-    onFreezeChange: (Boolean) -> Unit = {},
 ) {
     Box(
         Modifier
@@ -124,7 +123,7 @@ fun HomeScreen(
                     StartCard(wifiAddresses.isEmpty(), onStart)
                 }
                 ShareStatus.Starting -> StartingCard()
-                is ShareStatus.Live -> LiveCard(status, onStop, onCopy, onFixSoundPermission, onFreezeChange)
+                is ShareStatus.Live -> LiveCard(status, onStop, onCopy, onFixSoundPermission)
             }
 
             Spacer(Modifier.height(14.dp))
@@ -259,11 +258,11 @@ private fun BigButton(text: String, brush: Brush, onClick: () -> Unit) {
 @Composable
 private fun OldAppCard(onRemove: () -> Unit) {
     BroCard(border = BorderStroke(1.dp, BroColors.Cyan.copy(alpha = 0.5f))) {
-        CardTitle("👋 The old BroCast is still on your phone")
+        CardTitle("👋 An old BroCast is still on your phone")
         Spacer(Modifier.height(6.dp))
         Body(
-            "This new one sends real video, so it doesn't freeze on videos anymore. Remove the old one so " +
-                "you don't open it by mistake (Android asks you to confirm).",
+            "BroCast 3 rides out Wi-Fi hiccups instead of freezing. Remove the old one so you don't open it " +
+                "by mistake (Android asks you to confirm; if you have both old ones, tap again for the second).",
         )
         Spacer(Modifier.height(16.dp))
         BigButton("🧹  Remove the old BroCast", BrandGradient, onRemove)
@@ -336,15 +335,14 @@ private fun LiveCard(
     onStop: () -> Unit,
     onCopy: (String) -> Unit,
     onFixSoundPermission: () -> Unit,
-    onFreeze: (Boolean) -> Unit = {},
 ) {
     BroCard(border = BorderStroke(1.5.dp, BroColors.Live.copy(alpha = 0.55f))) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PulsingDot()
             Spacer(Modifier.width(8.dp))
             Text(
-                if (live.frozen) "LIVE • TV FROZEN" else "LIVE",
-                color = if (live.frozen) BroColors.Ice else BroColors.Live,
+                "LIVE",
+                color = BroColors.Live,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 1.5.sp,
             )
@@ -402,7 +400,9 @@ private fun LiveCard(
                 )
             }
             Spacer(Modifier.height(8.dp))
-            Body("💡 Bookmark that page on your TV/PC. Next time, just open the bookmark.", size = 13)
+            Body("💡 Bookmark that page on your TV. Next time, just open the bookmark.", size = 13)
+            Spacer(Modifier.height(4.dp))
+            Body("💻 On your PC, open the BroCast app instead: it finds your phone by itself.", size = 13)
         }
 
         if (live.pin != null) {
@@ -447,22 +447,6 @@ private fun LiveCard(
         }
 
         Spacer(Modifier.height(18.dp))
-        if (live.frozen) {
-            Body(
-                "❄️ The TV is frozen on the picture from when you pressed Freeze. Do whatever you want on " +
-                    "your phone, the TV won't show it. Sound still plays.",
-                color = BroColors.Ice,
-            )
-            Spacer(Modifier.height(10.dp))
-            BigButton("▶  Unfreeze (go live)", Brush.linearGradient(listOf(BroColors.Good, Color(0xFF059669)))) {
-                onFreeze(false)
-            }
-        } else {
-            BigButton("❄  Freeze the TV picture", Brush.linearGradient(listOf(BroColors.Ice, Color(0xFF2B6CB0)))) {
-                onFreeze(true)
-            }
-        }
-        Spacer(Modifier.height(10.dp))
         BigButton("■  Stop sharing", Brush.linearGradient(listOf(BroColors.Live, Color(0xFFE11D48))), onStop)
     }
 }

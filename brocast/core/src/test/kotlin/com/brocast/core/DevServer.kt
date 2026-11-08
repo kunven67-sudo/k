@@ -24,6 +24,8 @@ import javax.imageio.ImageIO
  *   --pause-for S     (default 4)
  *   --source FILE     stream this video file (looped) instead of the test picture (video mode)
  *   --size WxH        picture size (default 720x1280, a portrait phone)
+ *   --bitrate KBPS    cap the video like the phone's encoder does (default: no cap)
+ *   --gop N           a key frame every N frames (default: one a second; the phone does 2 s)
  *
  * By default it sends H.264 video made by ffmpeg (needs ffmpeg on the PATH), and switches to
  * JPEG pictures while a browser that can't play the video is watching, like the real phone.
@@ -43,10 +45,12 @@ fun main(args: Array<String>) {
     val pauseFor = opt("--pause-for")?.toLong() ?: 4L
     val source = opt("--source")
     val size = opt("--size")?.split('x')?.map(String::toInt)
+    val bitrateK = opt("--bitrate")?.toInt()
+    val gop = opt("--gop")?.toInt() ?: fps
 
     val hub = FrameHub()
     val video = VideoHub()
-    val encoder = if (jpegOnly) null else FakeEncoder(video, fps, source)
+    val encoder = if (jpegOnly) null else FakeEncoder(video, fps, source, bitrateK, gop)
     video.keyFrameRequester = { encoder?.keyRequests?.incrementAndGet() }
     val pinConfig = pin?.let { PinConfig(it, "dev-salt") }
     val server = StreamServer(hub, audioHub = audio, videoHub = video, pinConfig = { pinConfig }, deviceName = "Dev Phone")
@@ -153,7 +157,13 @@ private fun render(frameNo: Int, w: Int, h: Int): ByteArray {
  * Stands in for the phone's hardware encoder: ffmpeg makes a moving H.264 test picture in real
  * time, and every frame goes to the [VideoHub]. Changing [size] restarts it, like a rotation.
  */
-private class FakeEncoder(private val hub: VideoHub, private val fps: Int, private val source: String?) {
+private class FakeEncoder(
+    private val hub: VideoHub,
+    private val fps: Int,
+    private val source: String?,
+    private val bitrateK: Int? = null,
+    private val gop: Int = fps,
+) {
     val keyRequests = java.util.concurrent.atomic.AtomicLong()
 
     @Volatile
@@ -181,7 +191,11 @@ private class FakeEncoder(private val hub: VideoHub, private val fps: Int, priva
         val p = ProcessBuilder(
             listOf("ffmpeg", "-hide_banner", "-loglevel", "error") + input + listOf(
             "-an", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-profile:v", "high",
-            "-pix_fmt", "yuv420p", "-g", "$fps", "-bf", "0", "-x264-params", "aud=1:repeat-headers=1",
+            "-pix_fmt", "yuv420p", "-g", "$gop", "-bf", "0", "-x264-params", "aud=1:repeat-headers=1",
+            ) + (
+                // Like a phone encoder: never more than the bitrate, measured over half a second.
+                if (bitrateK != null) listOf("-b:v", "${bitrateK}k", "-maxrate", "${bitrateK}k", "-bufsize", "${bitrateK / 2}k") else emptyList()
+            ) + listOf(
             "-f", "h264", "-",
             ),
         ).redirectError(ProcessBuilder.Redirect.DISCARD).start()

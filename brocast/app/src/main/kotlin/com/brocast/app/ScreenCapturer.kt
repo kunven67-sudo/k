@@ -156,6 +156,7 @@ class ScreenCapturer(
                 val display = displaySize()
                 contentWidth = display.x
                 contentHeight = display.y
+                video?.setMaxBitrate(quality.videoBitrate)
                 val wanted = if (videoBroken || picturesWanted()) Mode.PICTURES else Mode.VIDEO
                 val surface = prepare(wanted) ?: prepare(Mode.PICTURES)
                     ?: throw IllegalStateException("No picture reader")
@@ -182,6 +183,7 @@ class ScreenCapturer(
         handler.post {
             if (released || newQuality == quality) return@post
             quality = newQuality
+            video?.setMaxBitrate(newQuality.videoBitrate)
             rebuild()
         }
     }
@@ -189,6 +191,11 @@ class ScreenCapturer(
     /** A TV joined or fell behind and needs a fresh starting point. Safe from any thread. */
     fun requestKeyFrame() {
         encoder?.requestKeyFrame()
+    }
+
+    /** The Wi-Fi got slower or faster: the video hub asks for a new bitrate. Safe from any thread. */
+    fun setBitrate(bps: Int) {
+        encoder?.setBitrate(bps)
     }
 
     /** Stops everything. Safe to call more than once, from any thread. */
@@ -210,7 +217,8 @@ class ScreenCapturer(
             val hubForVideo = video ?: return null
             val enc = VideoEncoder.create(
                 hubForVideo, contentWidth, contentHeight,
-                quality.videoLongSide, quality.videoBitrate, quality.videoFps,
+                // After a rotation, carry on at the bitrate the Wi-Fi was coping with, not the top one.
+                quality.videoLongSide, hubForVideo.targetBitrate.takeIf { it > 0 } ?: quality.videoBitrate, quality.videoFps,
                 onFailed = { failed -> handler.post { onEncoderFailed(failed) } },
             )
             if (enc == null) {
