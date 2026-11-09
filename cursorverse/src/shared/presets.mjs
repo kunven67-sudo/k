@@ -1,0 +1,51 @@
+// Built-in one-click combos. Users can save their own next to these.
+export const BUILTIN_PRESETS = [
+  {
+    id: 'gaming', name: 'Gaming Mode', emoji: '🎮', builtin: true,
+    cursor: { id: 'rgb-wave', anim: 'none', colorMode: 'original', glow: { enabled: false } },
+    trail: { enabled: true, type: 'electric', color: '#00e5ff', rainbow: false },
+    click: { enabled: true, type: 'shockwave', color: '#ff2bd6', rainbow: false },
+    soundPack: 'mech-blue', track: 'synth-highway',
+    background: { type: 'animated', animated: 'neon-grid' },
+  },
+  {
+    id: 'chill', name: 'Chill Mode', emoji: '😌', builtin: true,
+    cursor: { id: 'sleepy-cloud', anim: 'float', colorMode: 'original' },
+    trail: { enabled: true, type: 'bubbles', color: '#9fd8ff', rainbow: false },
+    click: { enabled: true, type: 'ripple', color: '#9fd8ff', rainbow: false },
+    soundPack: 'mech-creamy', track: 'lofi-rainy',
+    background: { type: 'animated', animated: 'fireflies' },
+  },
+  {
+    id: 'fantasy', name: 'Fantasy Mode', emoji: '🧙', builtin: true,
+    cursor: { id: 'fire-staff', anim: 'none', colorMode: 'original' },
+    trail: { enabled: true, type: 'sparkles', color: '#ffd166', rainbow: false },
+    click: { enabled: true, type: 'stars', color: '#ffd166', rainbow: false },
+    soundPack: 'typewriter', track: 'amb-space',
+    background: { type: 'animated', animated: 'aurora' },
+  },
+  {
+    id: 'retro', name: 'Retro Mode', emoji: '👾', builtin: true,
+    cursor: { id: 'px-sword-diamond', anim: 'none', colorMode: 'original' },
+    trail: { enabled: true, type: 'pixels', color: '#39ff14', rainbow: true },
+    click: { enabled: true, type: 'pixels', color: '#39ff14', rainbow: true },
+    soundPack: 'retro-blip', track: 'chip-quest', theme: 'pixel',
+    background: { type: 'animated', animated: 'pixel-sky' },
+  },
+  {
+    id: 'cute', name: 'Cute Mode', emoji: '🌸', builtin: true,
+    cursor: { id: 'kitty', anim: 'wobble', colorMode: 'original' },
+    trail: { enabled: true, type: 'hearts', color: '#ff7eb6', rainbow: false },
+    click: { enabled: true, type: 'hearts', color: '#ff7eb6', rainbow: false },
+    soundPack: 'bubble', track: 'lofi-coffee',
+    background: { type: 'animated', animated: 'bubbles' },
+  },
+  {
+    id: 'chaos', name: 'Chaos Mode', emoji: '🔥', builtin: true,
+    cursor: { id: 'sword-flame', anim: 'shake', colorMode: 'original' },
+    trail: { enabled: true, type: 'fire', color: '#ff6a00', rainbow: false },
+    click: { enabled: true, type: 'pow', color: '#ff2946', rainbow: false },
+    soundPack: 'quack', track: 'synth-rave',
+    background: { type: 'animated', animated: 'starfield' },
+  },
+];

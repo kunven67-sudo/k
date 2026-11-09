@@ -1,0 +1,65 @@
+{
+  "name": "cursorverse",
+  "productName": "CursorVerse",
+  "version": "1.0.5",
+  "description": "Custom animated cursors, trails, click effects, typing sounds, voice control, music and a browser with backgrounds.",
+  "main": "src/main/main.js",
+  "author": "kunven67-sudo",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "dist": "electron-builder --win portable --x64 --publish never"
+  },
+  "dependencies": {
+    "@ghostery/adblocker-electron": "^2.18.2",
+    "koffi": "^3.3.2",
+    "uiohook-napi": "^1.5.5"
+  },
+  "devDependencies": {
+    "@fontsource/orbitron": "^5.3.0",
+    "@fontsource/press-start-2p": "^5.3.0",
+    "electron": "^44.5.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.kunven67.cursorverse",
+    "productName": "CursorVerse",
+    "copyright": "CursorVerse",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node",
+      "node_modules/@koromix/**",
+      "node_modules/uiohook-napi/**"
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "CursorVerse-${version}-Portable.exe"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kunven67-sudo/k.git"
+  }
+}
