@@ -122,6 +122,7 @@ func main() {
 		return
 	}
 	pCoInitializeEx.Call(0, 2) // single-threaded COM, needed by WebView2
+	googleCrashFix()
 
 	root, err := os.UserCacheDir() // %LOCALAPPDATA%
 	if err != nil {
@@ -567,6 +568,7 @@ func (a *App) openAt(id, link string) {
 		a.safeLane(id, v) // before the first page: files from Claude open with no warning
 		c.Init(pageJS)    // the page helper, in every page from now on (it only works on claude.ai)
 		c.Init(extrasJS)  // chat-box extras: emoji, Send later, quick buttons, Fresh chat, autocorrect
+		c.Init(phoneJS)   // phone sign-in: QR code on Claude's sign-in page (phone_windows.go)
 		c.Resize()
 		c.Navigate(link)
 		a.show(id)

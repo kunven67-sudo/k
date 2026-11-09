@@ -110,11 +110,11 @@ func TestLoadSaveTidyAdopt(t *testing.T) {
 	if o := s.orphans(acc); len(o) != 1 || filepath.Base(o[0]) != "dddd4444" {
 		t.Fatalf("orphans %v", o)
 	}
-	bak := Settings{Accounts: []Account{{ID: "cccc3333", Name: "tropical", Color: "#4f8cff"}}}
+	bak := Settings{Accounts: []Account{{ID: "cccc3333", Name: "Alt", Color: "#4f8cff"}}}
 	if n := s.adopt(acc, &bak); n != 1 {
 		t.Fatalf("adopted %d", n)
 	}
-	if i := s.find("cccc3333"); i < 0 || len(s.Accounts) != 3 || s.Accounts[i].Name != "tropical" || s.find("dddd4444") >= 0 {
+	if i := s.find("cccc3333"); i < 0 || len(s.Accounts) != 3 || s.Accounts[i].Name != "Alt" || s.find("dddd4444") >= 0 {
 		t.Fatalf("adopt %+v", s)
 	}
 

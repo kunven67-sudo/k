@@ -20,6 +20,7 @@ type Account struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Color string `json:"color"`
+	Email string `json:"email,omitempty"` // the Gmail used last for phone sign-in (just the address)
 }
 
 // Place is the saved window spot (normal size + whether it was maximized).
@@ -34,6 +35,7 @@ type Settings struct {
 	Place      *Place    `json:"place,omitempty"`
 	MemoryRepo string    `json:"memoryRepo,omitempty"` // saved chats also go to this GitHub repo (owner/name)
 	Look       string    `json:"look,omitempty"`       // Settings > Look
+	Emails     []string  `json:"emails,omitempty"`     // Gmails used for phone sign-in, newest first (addresses only)
 	// GitHub accounts you said are yours: files from download links there open with no Windows warning
 	TrustedGitHub []string `json:"trustedGitHub,omitempty"`
 }
