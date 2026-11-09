@@ -141,18 +141,18 @@ func main() {
 	app = a
 	a.files = loadFiles(a.filesJSON())
 	st, state := loadSettings(a.cfg)
-	switch state {
-	case fileOK:
-		for _, dir := range st.orphans(accDir) {
-			go removeLater(dir)
-		}
-	case fileBroken:
+	if state == fileBroken {
 		os.Rename(a.cfg, a.cfg+".broken")
-		st.adopt(accDir)
-	case fileMissing:
-		st.adopt(accDir)
 	}
-	if len(st.Accounts) == 0 && state != fileOK {
+	// Login folders are only removed when they carry the deleted mark (Delete clicked twice).
+	// Any other folder that's missing from the list comes back as an account, named from the backup list.
+	for _, dir := range st.orphans(accDir) {
+		go removeLater(dir)
+	}
+	bak, _ := loadSettings(a.cfg + ".bak")
+	st.adopt(accDir, &bak)
+	go emptyTrash(filepath.Join(base, "accounts-trash"))
+	if len(st.Accounts) == 0 {
 		st.add("Main", palette[0])
 	}
 	a.st = st
@@ -653,7 +653,9 @@ func (a *App) deleteAccount(id string) {
 	delete(a.counts, id)
 	delete(a.usage, id)
 	delete(a.pendingCont, id)
-	go removeLater(filepath.Join(a.base, "accounts", id))
+	dir := filepath.Join(a.base, "accounts", id)
+	os.WriteFile(filepath.Join(dir, deletedMark), []byte(time.Now().Format(time.RFC3339)), 0o644)
+	go removeLater(dir)
 	wasActive := a.active == id
 	if wasActive {
 		a.active = ""
@@ -675,18 +677,37 @@ func (a *App) deleteAccount(id string) {
 	a.push()
 }
 
-// removeLater wipes a deleted account's login folder. WebView2 lets go of it a few
-// seconds after its window closes, so keep trying for a while.
+// removeLater moves a deleted account's login folder to accounts-trash (kept 7 days, so a delete
+// by mistake can still be undone). WebView2 lets go of it a few seconds after its window closes,
+// so keep trying for a while. Only folders with the deleted mark are ever touched.
 func removeLater(dir string) {
-	if !validID(filepath.Base(dir)) {
+	if !validID(filepath.Base(dir)) || !isDeleted(dir) {
 		return
 	}
+	trash := filepath.Join(filepath.Dir(filepath.Dir(dir)), "accounts-trash")
+	os.MkdirAll(trash, 0o755)
+	to := filepath.Join(trash, filepath.Base(dir)+"-"+time.Now().Format("20060102-150405"))
 	for try := 0; try < 60; try++ {
-		os.RemoveAll(dir)
+		if os.Rename(dir, to) == nil {
+			return
+		}
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			return
 		}
 		time.Sleep(time.Second)
+	}
+}
+
+// emptyTrash wipes deleted login folders after 7 days.
+func emptyTrash(trash string) {
+	ents, err := os.ReadDir(trash)
+	if err != nil {
+		return
+	}
+	for _, e := range ents {
+		if when, ok := trashedAt(e.Name()); ok && e.IsDir() && time.Since(when) > 7*24*time.Hour {
+			os.RemoveAll(filepath.Join(trash, e.Name()))
+		}
 	}
 }
 

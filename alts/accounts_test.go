@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestCleanName(t *testing.T) {
@@ -103,11 +104,17 @@ func TestLoadSaveTidyAdopt(t *testing.T) {
 	os.MkdirAll(filepath.Join(acc, "aaaa1111"), 0o755)
 	os.MkdirAll(filepath.Join(acc, "cccc3333"), 0o755)
 	os.MkdirAll(filepath.Join(acc, "not-an-id"), 0o755)
-	if o := s.orphans(acc); len(o) != 1 || filepath.Base(o[0]) != "cccc3333" {
+	os.MkdirAll(filepath.Join(acc, "dddd4444"), 0o755)
+	os.WriteFile(filepath.Join(acc, "dddd4444", deletedMark), nil, 0o644)
+	// a folder missing from the list is NOT an orphan (that wiped real logins once); only a marked one is
+	if o := s.orphans(acc); len(o) != 1 || filepath.Base(o[0]) != "dddd4444" {
 		t.Fatalf("orphans %v", o)
 	}
-	s.adopt(acc)
-	if s.find("cccc3333") < 0 || len(s.Accounts) != 3 || len(s.orphans(acc)) != 0 {
+	bak := Settings{Accounts: []Account{{ID: "cccc3333", Name: "tropical", Color: "#4f8cff"}}}
+	if n := s.adopt(acc, &bak); n != 1 {
+		t.Fatalf("adopted %d", n)
+	}
+	if i := s.find("cccc3333"); i < 0 || len(s.Accounts) != 3 || s.Accounts[i].Name != "tropical" || s.find("dddd4444") >= 0 {
 		t.Fatalf("adopt %+v", s)
 	}
 
@@ -145,6 +152,18 @@ func TestOpensOutside(t *testing.T) {
 	for _, u := range outside {
 		if !opensOutside(u) {
 			t.Errorf("%q should open outside", u)
+		}
+	}
+}
+
+func TestTrashedAt(t *testing.T) {
+	now := time.Now()
+	if w, ok := trashedAt("aaaa1111-" + now.Format("20060102-150405")); !ok || now.Sub(w) > 2*time.Second {
+		t.Fatalf("trashedAt %v %v", w, ok)
+	}
+	for _, bad := range []string{"aaaa1111", "x", "aaaa1111-2026", "aaaa1111-20261108-99xx99"} {
+		if _, ok := trashedAt(bad); ok {
+			t.Fatalf("%q should not parse", bad)
 		}
 	}
 }
