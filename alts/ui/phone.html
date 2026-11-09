@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>ALTS sign-in</title>
+<style>
+  :root { --bg:#141417; --card:#1d1d22; --line:#2c2c34; --txt:#ececf1; --dim:#a3a3ae; --acc:#d97757; --ok:#3dbe8b; --bad:#ef5b5b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--txt); font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; padding: 22px 16px 40px; }
+  .brand { font-weight: 800; letter-spacing: .18em; font-size: 13px; color: var(--dim); }
+  h1 { font-size: 24px; margin: 6px 0 4px; }
+  .who { color: var(--dim); margin-bottom: 18px; }
+  .who b { color: var(--txt); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-top: 14px; }
+  .label { font-size: 14px; color: var(--dim); margin-bottom: 8px; }
+  button { font: 600 17px system-ui, sans-serif; border-radius: 12px; border: 1px solid var(--line); background: #26262d; color: var(--txt);
+           padding: 14px 16px; width: 100%; text-align: left; cursor: pointer; margin-top: 8px; touch-action: manipulation; }
+  button.main { background: var(--txt); color: #141417; border-color: var(--txt); text-align: center; }
+  button.link { background: transparent; border: 0; color: var(--dim); text-align: center; font-weight: 500; font-size: 15px; }
+  button:disabled { opacity: .5; }
+  input { width: 100%; font: 20px system-ui, sans-serif; padding: 14px; border-radius: 12px; border: 1px solid var(--line);
+          background: #101013; color: var(--txt); outline: none; }
+  input:focus { border-color: var(--acc); }
+  #code { letter-spacing: .25em; text-align: center; font-size: 26px; }
+  .note { margin-top: 14px; color: var(--dim); min-height: 1.4em; }
+  .note.bad { color: var(--bad); }
+  .done { text-align: center; padding: 30px 10px; }
+  .done .big { font-size: 26px; font-weight: 800; color: var(--ok); }
+  .hide { display: none; }
+  .steps { color: var(--dim); font-size: 15px; margin: 6px 0 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">ALTS</div>
+  <h1>Sign in to Claude</h1>
+  <div class="who">On your PC, account <b id="name">...</b></div>
+
+  <section id="s-email">
+    <div class="card" id="saved-card">
+      <div class="label">Tap your Gmail</div>
+      <div id="saved"></div>
+    </div>
+    <div class="card">
+      <div class="label" id="type-label">Type your Gmail</div>
+      <input id="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name@gmail.com">
+      <button class="main" id="send">Send me a code</button>
+    </div>
+  </section>
+
+  <section id="s-code" class="hide">
+    <div class="card">
+      <div class="label">Claude is emailing a code to <b id="to"></b></div>
+      <ol class="steps">
+        <li>Open Gmail on this phone</li>
+        <li>Open the email from Anthropic / Claude</li>
+        <li>Type the code here (or copy the sign-in link from it and paste it)</li>
+      </ol>
+      <div style="height:12px"></div>
+      <input id="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" placeholder="code">
+      <button class="main" id="go">Sign in on my PC</button>
+      <button class="link" id="back">Use a different Gmail</button>
+    </div>
+  </section>
+
+  <section id="s-done" class="hide">
+    <div class="card done">
+      <div class="big">Signed in</div>
+      <p>Your PC is signed in on <b id="name2"></b>. You can close this page.</p>
+    </div>
+  </section>
+
+  <div class="note" id="note"></div>
+</main>
+<script>
+(() => {
+  const base = location.pathname.replace(/\/+$/, '');
+  const $ = id => document.getElementById(id);
+  let step = '', busy = false, shownSaved = '';
+
+  function show(s) {
+    ['email', 'code', 'done'].forEach(k => $('s-' + k).classList.toggle('hide', k !== s));
+  }
+  function note(t, bad) { $('note').textContent = t || ''; $('note').classList.toggle('bad', !!bad); }
+
+  async function post(what, v) {
+    busy = true;
+    try {
+      const r = await fetch(base + '/' + what, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ v }) });
+      if (!r.ok) { note((await r.text()).trim() || 'That didn’t work. Try again.', true); return false; }
+      return true;
+    } catch (e) { note('Can’t reach your PC. Is the phone on the same Wi-Fi?', true); return false; }
+    finally { busy = false; }
+  }
+
+  async function sendEmail(e) {
+    if (busy) return;
+    note('Sending...');
+    if (await post('email', e)) { $('to').textContent = e; show('code'); step = 'code'; setTimeout(() => $('code').focus(), 50); poll(); }
+  }
+
+  $('send').onclick = () => { const e = $('email').value.trim(); if (!e) { note('Type your Gmail first.', true); return; } sendEmail(e); };
+  $('email').onkeydown = ev => { if (ev.key === 'Enter') $('send').click(); };
+  $('go').onclick = async () => {
+    const c = $('code').value.trim();
+    if (!c) { note('Type the code from the email first.', true); return; }
+    if (busy) return;
+    note('Signing in...');
+    if (await post('code', c)) poll();
+  };
+  $('code').onkeydown = ev => { if (ev.key === 'Enter') $('go').click(); };
+  $('back').onclick = () => { show('email'); step = 'email'; note(''); };
+
+  function savedList(list) {
+    const key = JSON.stringify(list || []);
+    if (key === shownSaved) return;
+    shownSaved = key;
+    const box = $('saved');
+    box.textContent = '';
+    (list || []).forEach(e => {
+      const b = document.createElement('button');
+      b.textContent = e;
+      b.onclick = () => sendEmail(e);
+      box.appendChild(b);
+    });
+    $('saved-card').classList.toggle('hide', !(list && list.length));
+    $('type-label').textContent = list && list.length ? 'Or type another Gmail' : 'Type your Gmail';
+  }
+
+  let timer = 0;
+  async function poll() {
+    clearTimeout(timer);
+    try {
+      const r = await fetch(base + '/state', { cache: 'no-store' });
+      if (r.status === 410 || r.status === 404) { note('This QR code ran out. Scan the new one on your PC.', true); return; }
+      const s = await r.json();
+      $('name').textContent = $('name2').textContent = s.name || 'your account';
+      savedList(s.emails);
+      if (s.step === 'done') { show('done'); note(''); return; }
+      if (!step) { step = s.step === 'email' ? 'email' : 'code'; show(step === 'email' ? 'email' : 'code'); if (s.email) $('to').textContent = s.email; }
+      if (s.note) note(s.note, /couldn|can.t|error|wrong/i.test(s.note));
+    } catch (e) { note('Can’t reach your PC. Is the phone on the same Wi-Fi?', true); }
+    timer = setTimeout(poll, 1500);
+  }
+  poll();
+})();
+</script>
+</body>
+</html>
