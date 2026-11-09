@@ -1,0 +1,9 @@
+ANT WORK 2 - credits for the free assets added in the 2.1 fix-up
+
+VOICES: Microsoft Edge neural voices via edge-tts (Jay = James, Jim = Andrew, Larry = William, Steve = Thomas,
+  seller = Christopher, converter = Steffan, kids = Ana, Bob = Brian, Alex = Sonia)
+SOUNDS
+  Dog bark - "80 CC0 creature SFX" by rubberduck (OpenGameArt) - CC0
+  Shaky breathing - "Heavy breathing 3" by ezwa (Wikimedia Commons) - public domain
+  Crying - "Man Crying" by Iwan 'qubodup' Gabovitch (Wikimedia Commons) - CC BY 3.0
+CODE: three.js r128 - MIT License
