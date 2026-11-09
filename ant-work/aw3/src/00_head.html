@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>ANT WORK 3</title>
+<script src="gs3kit/gs3-console.js"></script>
+<style>
+@font-face{font-family:'Bungee';src:url(assets/fonts/Bungee-400.woff2) format('woff2');font-weight:400;font-display:swap;}
+@font-face{font-family:'Nunito';src:url(assets/fonts/Nunito-600.woff2) format('woff2');font-weight:200 1000;font-display:swap;}
+@font-face{font-family:'Share Tech Mono';src:url(assets/fonts/ShareTechMono-400.woff2) format('woff2');font-weight:400;font-display:swap;}
+:root{
+  --sand:#e0c08a; --sand2:#f0dcb0; --sand-deep:#8a6a3a; --ink:#0b0906;
+  --purple:#b86aff; --purple2:#e0b8ff; --purple-deep:#4a1a7a;
+  --panel:rgba(10,8,6,.78); --panel2:rgba(16,12,8,.92); --line:rgba(255,255,255,.14);
+  --good:#7dff9a; --bad:#ff5a5a; --warn:#ffcc33;
+  --title:'Bungee','Impact','Arial Black',sans-serif;
+  --body:'Nunito','Trebuchet MS',Arial,sans-serif;
+  --mono:'Share Tech Mono','Consolas','Courier New',monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;overflow:hidden;background:#000;color:#fff;font-family:var(--body);overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;height:100%;touch-action:none;}
+#c{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-action:none;outline:none;}
+.hide{display:none!important;}
+button{font-family:var(--body);}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2px;}
+kbd{display:inline-block;min-width:1.6em;text-align:center;background:var(--sand);color:var(--ink);border-radius:6px;padding:1px 7px;font-family:var(--body);font-weight:900;box-shadow:0 2px 0 var(--sand-deep);font-size:.9em;}
+.layer{position:fixed;inset:0;}
+#ui{pointer-events:none;z-index:10;}
+#fade{background:#000;opacity:0;pointer-events:none;z-index:60;transition:opacity .5s;}
+#flash{background:#fff;opacity:0;pointer-events:none;z-index:61;}
+#fxWhite{background:#fff;opacity:0;pointer-events:none;z-index:9;}
+#fxBlack{background:#000;opacity:0;pointer-events:none;z-index:9;}
+#letterbox{pointer-events:none;z-index:9;}
+#letterbox:before,#letterbox:after{content:"";position:absolute;left:0;right:0;height:0;background:#000;transition:height .7s cubic-bezier(.6,0,.2,1);}
+#letterbox:before{top:0;} #letterbox:after{bottom:0;}
+#letterbox.on:before,#letterbox.on:after{height:11vh;}
+/* eyelids: the wake-up blink. --lid = 0 open, 1 shut */
+#lids{pointer-events:none;z-index:62;--lid:0;display:none;}
+#lids.on{display:block;}
+#lids:before,#lids:after{content:"";position:absolute;left:-10%;right:-10%;height:calc(var(--lid)*58%);background:#000;filter:blur(calc(6px + var(--lid)*10px));}
+#lids:before{top:-6%;border-radius:0 0 50% 50%/0 0 100% 100%;}
+#lids:after{bottom:-6%;border-radius:50% 50% 0 0/100% 100% 0 0;}
+#dmg{position:fixed;inset:0;pointer-events:none;z-index:8;opacity:0;background:radial-gradient(ellipse at center,rgba(255,0,0,0) 40%,rgba(200,0,0,.55) 100%);transition:opacity .25s;}
+#blur{position:fixed;inset:0;pointer-events:none;z-index:8;opacity:0;backdrop-filter:blur(0px);-webkit-backdrop-filter:blur(0px);}
+
+/* ---------- loading splash ---------- */
+#splash{z-index:90;background:radial-gradient(ellipse at 50% 45%,#2a2010 0%,#0b0906 60%,#000 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;}
+#splash .logo{font-family:var(--title);font-size:clamp(40px,8vw,96px);color:var(--sand);text-shadow:0 6px 0 #5a4418,0 18px 40px rgba(0,0,0,.8);letter-spacing:.02em;}
+#splash .logo em{font-style:normal;color:var(--purple);display:inline-block;transform:rotate(-6deg);text-shadow:0 6px 0 #3a1060,0 18px 40px rgba(0,0,0,.75);}
+#splash .tap{margin-top:26px;font-weight:900;font-size:18px;letter-spacing:.2em;opacity:.85;animation:pulse 1.6s ease-in-out infinite;}
+#splash .bar{margin-top:22px;width:min(360px,70vw);height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;}
+#splash .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--sand-deep),var(--sand));transition:width .25s;}
+#splash .what{margin-top:10px;font-size:12px;opacity:.55;font-family:var(--mono);letter-spacing:.06em;min-height:1.4em;}
+#splash .hint{margin-top:14px;font-size:13px;opacity:.55;max-width:460px;text-align:center;line-height:1.5;padding:0 16px;}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+#loading{z-index:65;display:none;align-items:flex-end;justify-content:flex-end;pointer-events:none;padding:26px;}
+#loading.show{display:flex;}
+#loading .l{font-family:var(--title);font-size:14px;opacity:.8;display:flex;align-items:center;gap:10px;}
+#loading .l i{display:inline-block;width:18px;height:18px;border:3px solid rgba(224,192,138,.3);border-top-color:var(--sand);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- title + menus (GS3 kit panels) ---------- */
+#title{z-index:40;display:flex;align-items:center;pointer-events:none;}
+#title .inner{margin-left:clamp(20px,7vw,110px);pointer-events:all;max-width:560px;}
+#title .logo{white-space:nowrap;font-family:var(--title);font-size:clamp(46px,7.4vw,108px);line-height:.92;color:var(--sand);text-shadow:0 5px 0 #5a4418,0 14px 40px rgba(0,0,0,.75);animation:logoIn 1s cubic-bezier(.2,1.4,.4,1) both;}
+#title .logo em{font-style:normal;color:var(--purple);display:inline-block;transform:rotate(-6deg);text-shadow:0 5px 0 #3a1060,0 14px 40px rgba(0,0,0,.75);}
+#title .tag{font-family:var(--title);font-size:clamp(13px,1.4vw,18px);opacity:.85;margin:10px 0 26px;letter-spacing:.05em;animation:fadeUp .8s .3s both;}
+#title .gs3-panel{background:transparent;box-shadow:none;border:0;padding:0;max-width:none;}
+#title .gs3-menu{min-width:280px;}
+#title .ver{position:fixed;right:18px;bottom:14px;font-size:12px;opacity:.5;font-family:var(--mono);}
+@keyframes logoIn{from{opacity:0;transform:scale(.6) translateY(-30px)}to{opacity:1;transform:none}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media (max-width:700px){ #title .inner{margin:0 auto;text-align:center;} }
+.gs3-screen.modal{z-index:80;}
+.gs3-panel .note{font-size:12px;opacity:.6;margin:8px 0;line-height:1.4;}
+.gs3-panel .srow{display:flex;justify-content:space-between;align-items:center;gap:14px;}
+.gs3-panel .lab small{display:block;font-weight:600;opacity:.6;font-size:12px;margin-top:1px;}
+.gs3-panel .val{font-family:var(--mono);min-width:44px;text-align:right;opacity:.8;}
+.gs3-panel .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px;}
+.gs3-panel .tab{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:10px;padding:7px 14px;font-weight:900;cursor:pointer;font-size:13px;}
+.gs3-panel .tab.on{background:var(--sand);color:var(--ink);border-color:var(--sand);}
+.gs3-panel .pane{display:none;} .gs3-panel .pane.on{display:block;}
+#setBody{max-height:min(62vh,520px);overflow:auto;padding-right:4px;touch-action:pan-y;}
+.endings{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+.ecard{width:min(300px,86vw);border-radius:16px;overflow:hidden;background:#15100b;border:3px solid rgba(255,255,255,.12);cursor:pointer;transition:transform .2s,border-color .2s;text-align:left;color:#fff;padding:0;}
+.ecard:hover,.ecard:focus-visible,.ecard.gs3-focus{transform:translateY(-6px);border-color:var(--sand);}
+.ecard .pic{height:120px;background:#000 center/cover no-repeat;}
+.ecard .txt{padding:10px 16px 14px;}
+.ecard .from{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;font-weight:900;}
+.ecard h3{font-family:var(--title);font-weight:400;font-size:20px;margin:4px 0 2px;color:var(--sand);}
+.ecard p{margin:0;font-size:13px;line-height:1.45;opacity:.8;}
+.trow{display:flex;gap:12px;align-items:center;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04);margin:6px 0;opacity:.5;}
+.trow.got{opacity:1;background:rgba(224,192,138,.1);box-shadow:inset 0 0 0 1px rgba(224,192,138,.35);}
+.trow .ic{width:28px;height:28px;border-radius:50%;background:#3a2a10;flex:none;}
+.trow.got .ic{background:radial-gradient(circle at 35% 30%,#fff0c0,var(--sand) 45%,var(--sand-deep));}
+.trow b{display:block;font-size:15px;} .trow small{display:block;opacity:.8;font-size:12.5px;}
+#trophyList{max-height:56vh;overflow:auto;padding-right:4px;}
+
+/* ---------- HUD ---------- */
+#hud{transition:opacity .4s;}
+body.nohud #hud{opacity:0;}
+#crosshair{position:absolute;top:50%;left:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 0 0 1px rgba(0,0,0,.35);transition:transform .15s,background .15s,opacity .3s;}
+#crosshair.hot{transform:scale(2.2);background:var(--sand);}
+#crosshair.off{opacity:0;}
+#objective{position:absolute;top:18px;left:50%;transform:translateX(-50%);max-width:min(620px,70vw);display:none;font-weight:800;font-size:14px;text-align:center;letter-spacing:.04em;text-shadow:0 2px 0 #000,0 0 14px rgba(0,0,0,.9);opacity:.9;}
+#objective.show{display:block;animation:objIn .5s cubic-bezier(.2,1.4,.4,1);}
+#objective small{display:block;font-size:10px;letter-spacing:.24em;color:var(--sand);font-weight:900;margin-bottom:1px;}
+@keyframes objIn{from{opacity:0;transform:translate(-50%,-14px)}to{opacity:.9;transform:translate(-50%,0)}}
+#prompt{position:absolute;left:50%;bottom:24%;transform:translateX(-50%);display:none;background:var(--panel);border:1px solid var(--line);border-radius:30px;padding:8px 18px 8px 10px;font-weight:900;font-size:16px;white-space:nowrap;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+#prompt.show{display:block;animation:fadeUp .2s;}
+#prompt kbd{margin-right:9px;}
+#itemHint{position:absolute;right:18px;bottom:18px;display:none;flex-direction:column;align-items:flex-end;gap:6px;font-weight:800;font-size:13px;}
+#itemHint.show{display:flex;}
+#itemHint div{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:5px 12px;}
+#toasts{position:absolute;left:50%;top:38%;width:0;height:0;}
+.toast{position:absolute;left:0;top:0;transform:translateX(-50%);white-space:nowrap;font-family:var(--title);font-size:24px;color:var(--sand);text-shadow:0 3px 0 #000,0 0 20px rgba(0,0,0,.5);animation:toastUp 1.6s ease-out forwards;}
+@keyframes toastUp{0%{opacity:0;transform:translate(-50%,12px) scale(.6)}15%{opacity:1;transform:translate(-50%,0) scale(1.12)}25%{transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-80px)}}
+#fps{position:fixed;left:8px;bottom:6px;z-index:95;font-family:var(--mono);font-size:12px;color:#9f9;text-shadow:0 1px 0 #000;display:none;pointer-events:none;}
+#marker{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:none;flex-direction:column;align-items:center;gap:3px;pointer-events:none;z-index:6;transition:opacity .3s;}
+#marker.show{display:flex;}
+#marker i{display:block;width:12px;height:12px;border:2px solid var(--sand2);transform:rotate(45deg);box-shadow:0 0 12px rgba(224,192,138,.8);background:rgba(224,192,138,.15);animation:mkPulse 1.2s ease-in-out infinite;}
+#marker span{font-family:var(--mono);font-size:12px;color:var(--sand2);text-shadow:0 1px 3px #000,0 0 8px rgba(0,0,0,.8);white-space:nowrap;}
+@keyframes mkPulse{50%{transform:rotate(45deg) scale(1.25);}}
+
+/* ---------- subtitles + choices ---------- */
+#sub{position:fixed;left:50%;bottom:max(6vh,24px);transform:translateX(-50%);width:min(900px,92vw);text-align:center;z-index:12;pointer-events:none;display:none;font-size:clamp(17px,2vw,24px);font-weight:800;line-height:1.4;text-shadow:0 2px 0 #000,0 0 18px rgba(0,0,0,.95);padding:8px 16px;}
+#sub.show{display:block;animation:fadeUp .25s;}
+#sub .who{display:block;font-family:var(--title);font-size:.62em;letter-spacing:.14em;color:var(--sand);margin-bottom:4px;}
+#sub .who.you{color:#8ad0ff;} #sub .who.jay2{color:#8aff9a;} #sub .who.jim{color:var(--sand);} #sub .who.pig{color:#ff9a8a;}
+#sub .nxt{display:inline-block;margin-left:12px;font-size:12px;font-weight:900;background:#000;border:1px solid var(--line);border-radius:12px;padding:3px 10px 3px 6px;opacity:0;transition:opacity .2s;vertical-align:middle;}
+#sub.ready .nxt{opacity:1;animation:pulse 1.2s infinite;}
+body.cine #crosshair,body.indlg #crosshair{opacity:0 !important;}
+#choices{position:fixed;left:50%;bottom:max(3.5vh,18px);transform:translateX(-50%);width:min(680px,92vw);z-index:13;display:none;flex-direction:column;gap:5px;pointer-events:auto;}
+#choices.show{display:flex;animation:fadeUp .3s;}
+#choices .lead{font-family:var(--title);font-size:13px;letter-spacing:.2em;color:var(--sand);text-align:center;opacity:.9;margin-bottom:2px;}
+.choice{position:relative;text-align:left;font:800 clamp(14px,1.45vw,17px)/1.3 var(--body);color:#fff;background:linear-gradient(180deg,rgba(20,15,10,.88),rgba(10,8,5,.92));border:2px solid rgba(255,255,255,.14);border-radius:12px;padding:8px 16px 8px 48px;cursor:pointer;transition:transform .12s,border-color .12s,background .12s;}
+.choice:before{content:attr(data-n);position:absolute;left:12px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:8px;background:var(--sand);color:var(--ink);font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 var(--sand-deep);}
+.choice:hover,.choice:focus-visible,.choice.gs3-focus{transform:translateX(6px);border-color:var(--sand);background:linear-gradient(180deg,rgba(50,38,20,.95),rgba(20,15,8,.95));}
+.choice.fight:before{background:#ff6a5a;box-shadow:0 2px 0 #7a1a10;}
+.choice.fight{border-color:rgba(255,106,90,.4);}
+.choice.used,.choice.used:hover{color:#6a6a6a;background:rgba(10,10,10,.75);border-color:rgba(255,255,255,.06);transform:none;cursor:default;text-decoration:line-through;text-decoration-color:#444;}
+.choice.used:before{background:#444;color:#111;box-shadow:none;}
+.choice.shake{animation:nope .35s;}
+@keyframes nope{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+
+/* ---------- fight HUD ---------- */
+#fight{z-index:11;display:none;pointer-events:none;}
+#fight.show{display:block;}
+#fight .ring{position:absolute;left:50%;top:50%;width:160px;height:160px;margin:-80px 0 0 -80px;}
+#fight .ring svg{width:100%;height:100%;transform:rotate(-90deg);}
+#fight .ring .track{fill:none;stroke:rgba(255,255,255,.12);stroke-width:5;}
+#fight .ring .arc{fill:none;stroke:var(--sand);stroke-width:6;stroke-linecap:round;transition:stroke .1s;}
+#fight .ring .zone{fill:none;stroke:rgba(125,255,154,.55);stroke-width:14;}
+#fight .ring.hit .arc{stroke:var(--good);} #fight .ring.miss .arc{stroke:var(--bad);}
+#fight .word{position:absolute;left:50%;top:calc(50% + 100px);transform:translateX(-50%);font-family:var(--title);font-size:clamp(22px,3vw,34px);color:#fff;text-shadow:0 3px 0 #000,0 0 20px rgba(0,0,0,.8);letter-spacing:.06em;white-space:nowrap;}
+#fight .word.good{color:var(--good);} #fight .word.bad{color:var(--bad);} #fight .word.block{color:#8ad0ff;}
+#fight .hp{position:absolute;top:22px;width:min(34vw,320px);height:10px;background:rgba(0,0,0,.5);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+#fight .hp i{display:block;height:100%;background:linear-gradient(90deg,#ff4a3a,#ffb060);transition:width .25s;}
+#fight .hp.you{left:22px;} #fight .hp.him{right:22px;}
+#fight .hp.him i{background:linear-gradient(90deg,#4aff8a,#b0ffc8);}
+#fight .name{position:absolute;top:36px;font-family:var(--title);font-size:13px;letter-spacing:.14em;opacity:.85;text-shadow:0 2px 0 #000;}
+#fight .name.you{left:22px;} #fight .name.him{right:22px;}
+#fight .hint{position:absolute;left:50%;bottom:12%;transform:translateX(-50%);font-weight:800;font-size:14px;opacity:.75;text-shadow:0 2px 0 #000;white-space:nowrap;}
+
+/* ---------- cards / ending ---------- */
+#card{z-index:55;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;transition:opacity 1s;}
+#card.show{opacity:1;}
+#card .t{font-family:var(--title);font-size:clamp(32px,6vw,76px);color:#fff;text-shadow:0 5px 0 rgba(0,0,0,.6),0 0 60px rgba(0,0,0,.8);text-align:center;letter-spacing:.02em;}
+#card .s{margin-top:8px;font-size:clamp(14px,1.8vw,20px);font-weight:900;letter-spacing:.3em;color:var(--sand);text-shadow:0 2px 0 #000;text-transform:uppercase;text-align:center;}
+#tbc{z-index:70;background:radial-gradient(ellipse at center,#16100a,#000 70%);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;}
+#tbc.show{display:flex;animation:fadeIn 2s;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+#tbc .chap{font-family:var(--title);font-size:clamp(20px,2.6vw,30px);color:var(--sand);letter-spacing:.06em;}
+#tbc .big{font-family:var(--title);font-size:clamp(34px,6.6vw,84px);text-shadow:0 6px 0 #3a2a10;animation:tbcIn 2.2s cubic-bezier(.2,1,.3,1) both .6s;}
+@keyframes tbcIn{from{opacity:0;letter-spacing:.4em;filter:blur(8px)}to{opacity:1;letter-spacing:.02em;filter:none}}
+#tbc .btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:10px;animation:fadeUp .8s 2.4s both;}
+
+/* ---------- touch ---------- */
+#touch{z-index:14;display:none;pointer-events:none;}
+body.touch #touch{display:block;}
+#touch.off{opacity:0;} #touch.off .tb{pointer-events:none;}
+#joy{position:absolute;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.3);opacity:0;transition:opacity .15s;pointer-events:none;}
+#joy.on{opacity:1;} #joy i{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.55);}
+.tb{position:absolute;pointer-events:all;width:66px;height:66px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(15,12,8,.5);color:#fff;font-family:var(--title);font-size:14px;display:flex;align-items:center;justify-content:center;touch-action:none;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);padding:0;}
+.tb.down{transform:scale(.9);background:rgba(224,192,138,.5);} .tb.ready{border-color:var(--sand);box-shadow:0 0 0 5px rgba(224,192,138,.3);}
+#tUse{right:calc(22px + env(safe-area-inset-right));bottom:calc(28px + env(safe-area-inset-bottom));width:86px;height:86px;font-size:17px;}
+#tAct{right:calc(124px + env(safe-area-inset-right));bottom:calc(36px + env(safe-area-inset-bottom));font-size:13px;}
+#tRun{right:calc(206px + env(safe-area-inset-right));bottom:calc(36px + env(safe-area-inset-bottom));width:56px;height:56px;font-size:11px;}
+#tPause{right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));width:46px;height:46px;font-size:14px;}
+body.touch #sub{bottom:calc(110px + env(safe-area-inset-bottom));font-size:clamp(14px,3.8vw,18px);}
+body.touch #choices{bottom:calc(150px + env(safe-area-inset-bottom));}
+body.touch.indlg #touch .tb:not(#tUse):not(#tPause){opacity:0;pointer-events:none;}
+#rotate{z-index:98;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,.9);text-align:center;font-weight:900;font-size:20px;padding:30px;}
+#err{position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#3a0808;color:#ffdede;font:12px/1.5 monospace;padding:10px 14px;max-height:35vh;overflow:auto;white-space:pre-wrap;border-top:3px solid #ff5555;display:none;}
+#errCard{position:fixed;inset:0;z-index:99998;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);padding:20px;}
+#errCard.show{display:flex;}
+#errCard .box{max-width:560px;background:#1c1510;border:2px solid #ff5a5a;border-radius:16px;padding:22px 26px;}
+#errCard h2{font-family:var(--title);font-weight:400;color:#ff8a7a;margin:0 0 8px;font-size:22px;}
+#errCard p{margin:6px 0;line-height:1.5;} #errCard pre{font:11px/1.4 monospace;opacity:.7;white-space:pre-wrap;max-height:30vh;overflow:auto;}
+@media (prefers-reduced-motion:reduce){ *{animation-duration:.01s!important;transition-duration:.01s!important;} }
+</style>
+</head>
+<body>
+<canvas id="c" tabindex="-1"></canvas>
+<div id="letterbox" class="layer"></div>
+<div id="lids" class="layer"></div>
+<div id="dmg"></div>
+<div id="blur"></div>
+<div id="ui" class="layer">
+  <div id="hud" class="layer">
+    <div id="crosshair" class="off"></div>
+    <div id="marker"><i></i><span id="markerTxt"></span><span id="markerDist"></span></div>
+    <div id="objective"><small>OBJECTIVE</small><span id="objText"></span></div>
+    <div id="prompt"></div>
+    <div id="itemHint"></div>
+    <div id="toasts"></div>
+  </div>
+  <div id="fight" class="layer">
+    <div class="hp you"><i id="hpYou" style="width:100%"></i></div><div class="name you">JAY</div>
+    <div class="hp him"><i id="hpHim" style="width:100%"></i></div><div class="name him">JAY 2</div>
+    <div class="ring" id="fightRing"><svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="44"/><circle class="zone" id="fightZone" cx="50" cy="50" r="44" stroke-dasharray="0 276.5"/><circle class="arc" id="fightArc" cx="50" cy="50" r="44" stroke-dasharray="276.5 276.5" stroke-dashoffset="276.5"/></svg></div>
+    <div class="word" id="fightWord"></div>
+    <div class="hint" id="fightHint"></div>
+  </div>
+</div>
+<div id="sub"><span class="who" id="subWho"></span><span id="subTxt"></span><span class="nxt"><kbd id="subKey">E</kbd> next</span></div>
+<div id="choices"><div class="lead" id="choiceLead">SAY SOMETHING</div></div>
+<div id="card" class="layer"><div class="t" id="cardT"></div><div class="s" id="cardS"></div></div>
+<div id="fade" class="layer"></div>
+<div id="flash" class="layer"></div>
+<div id="fxWhite" class="layer"></div><div id="fxBlack" class="layer"></div>
+<div id="loading" class="layer"><div class="l"><i></i><span id="loadTxt">Loading…</span></div></div>
+
+<div id="splash" class="layer">
+  <div class="logo">ANT WORK <em>3</em></div>
+  <div class="bar"><i id="splashBar"></i></div>
+  <div class="what" id="splashWhat">getting ready</div>
+  <div class="tap" id="splashTap">LOADING…</div>
+  <div class="hint">Sound on. Headphones if you have them.</div>
+</div>
+
+<div id="title" class="layer hide"><div class="inner">
+  <div class="logo">ANT WORK <em>3</em></div>
+  <div class="tag" id="titleTag">PART ONE · THE OTHER YOU</div>
+  <div class="gs3-panel"><div class="gs3-menu" id="titleMenu">
+    <button class="gs3-item hide" id="btnContinue">Continue <span class="gs3-value" id="contWhere"></span></button>
+    <button class="gs3-item" id="btnNew">New game</button>
+    <button class="gs3-item" id="btnChapters">Chapters</button>
+    <button class="gs3-item" id="btnTrophies">Trophies <span class="gs3-value" id="trophyCount"></span></button>
+    <button class="gs3-item" id="btnSettings">Settings</button>
+    <button class="gs3-item" id="btnControls">Controls</button>
+  </div></div>
+</div><div class="ver" id="verTxt">Ant Work 3 · v%VERSION%</div></div>
+
+<div id="endingPick" class="gs3-screen modal" hidden><div class="gs3-panel" style="max-width:720px">
+  <h1 class="gs3-title">Which Ant Work 2 ending did you get?</h1>
+  <p class="gs3-sub">Both end in the Dome Sweet Dome on Mars, face to face with the other you. Pick the one you played.</p>
+  <div class="endings">
+    <button class="ecard" id="pickA"><div class="pic" id="picA"></div><div class="txt"><div class="from">You = the Tinyverse Jay</div><h3>THE TINYVERSE</h3><p>You grew back, Jim flew you to Mars, and the other you was already in your house. He's blocky.</p></div></button>
+    <button class="ecard" id="pickB"><div class="pic" id="picB"></div><div class="txt"><div class="from">You = the Mars Shift Jay</div><h3>MARS SHIFT</h3><p>XXX5 turned you into blocks. You walked into your house and a normal-looking you was waiting.</p></div></button>
+  </div>
+  <div class="gs3-row"><button class="gs3-btn" id="endingBack">Back</button></div>
+</div></div>
+
+<div id="chapters" class="gs3-screen modal" hidden><div class="gs3-panel">
+  <h1 class="gs3-title">Chapters</h1>
+  <p class="gs3-sub">Chapters unlock as you play. Jumping to one starts it fresh.</p>
+  <div class="gs3-menu" id="chapterList"></div>
+  <div class="gs3-row"><button class="gs3-btn" id="chaptersBack">Back</button></div>
+</div></div>
+
+<div id="settings" class="gs3-screen modal" hidden><div class="gs3-panel" style="max-width:760px">
+  <h1 class="gs3-title">Settings <span class="val" id="setFpsNow" style="font-size:13px"></span></h1>
+  <div class="tabs" id="setTabs">
+    <button class="tab on" data-p="gfx">Graphics</button>
+    <button class="tab" data-p="adv">Advanced</button>
+    <button class="tab" data-p="aud">Sound</button>
+    <button class="tab" data-p="ctl">Controls</button>
+  </div>
+  <div id="setBody">
+    <div class="pane on" data-p="gfx"><div class="gs3-menu">
+      <button class="gs3-item" data-cycle="preset">Graphics <span class="gs3-value" id="vPreset"></span></button>
+      <div class="note" id="presetNote"></div>
+      <div class="gs3-item">Auto-lower if laggy <button class="gs3-toggle" id="sAuto" aria-label="Auto-lower graphics"></button></div>
+      <div class="gs3-item">Show FPS <button class="gs3-toggle" id="sFps" aria-label="Show FPS"></button></div>
+      <div class="gs3-item">Field of view <span class="val" id="sFovV"></span><input class="gs3-slider" type="range" id="sFov" min="60" max="100" step="1" aria-label="Field of view"></div>
+    </div></div>
+    <div class="pane" data-p="adv"><div class="gs3-menu">
+      <div class="note">Changing anything here switches Graphics to Custom.</div>
+      <div class="gs3-item">Render resolution <span class="val" id="aResV"></span><input class="gs3-slider" type="range" id="aRes" min="0.35" max="2" step="0.05" aria-label="Render resolution"></div>
+      <button class="gs3-item" data-cycle="shadow">Shadows <span class="gs3-value" id="vShadow"></span></button>
+      <div class="gs3-item">Post-processing <button class="gs3-toggle" id="aPost" aria-label="Post-processing"></button></div>
+      <button class="gs3-item" data-cycle="ao">Ambient occlusion <span class="gs3-value" id="vAO"></span></button>
+      <div class="gs3-item">Bloom <button class="gs3-toggle" id="aBloom" aria-label="Bloom"></button></div>
+      <div class="gs3-item">God rays <button class="gs3-toggle" id="aRays" aria-label="God rays"></button></div>
+      <div class="gs3-item">Depth of field <button class="gs3-toggle" id="aDof" aria-label="Depth of field"></button></div>
+      <div class="gs3-item">Motion blur <button class="gs3-toggle" id="aMblur" aria-label="Motion blur"></button></div>
+      <div class="gs3-item">Anti-aliasing <button class="gs3-toggle" id="aAA" aria-label="Anti-aliasing"></button></div>
+      <div class="gs3-item">Film grain <button class="gs3-toggle" id="aGrain" aria-label="Film grain"></button></div>
+      <div class="gs3-item">Lens effects <button class="gs3-toggle" id="aLens" aria-label="Lens effects"></button></div>
+      <button class="gs3-item" data-cycle="detail">World detail <span class="gs3-value" id="vDetail"></span></button>
+      <div class="note">Detail changes apply the next time an area loads.</div>
+    </div></div>
+    <div class="pane" data-p="aud"><div class="gs3-menu">
+      <div class="gs3-item">Master <span class="val" id="sMasterV"></span><input class="gs3-slider" type="range" id="sMaster" min="0" max="1" step="0.05" aria-label="Master volume"></div>
+      <div class="gs3-item">Music <span class="val" id="sMusicV"></span><input class="gs3-slider" type="range" id="sMusic" min="0" max="1" step="0.05" aria-label="Music volume"></div>
+      <div class="gs3-item">Sounds <span class="val" id="sSfxV"></span><input class="gs3-slider" type="range" id="sSfx" min="0" max="1" step="0.05" aria-label="Sound volume"></div>
+      <div class="gs3-item">Voices <span class="val" id="sVoiceV"></span><input class="gs3-slider" type="range" id="sVoice" min="0" max="1" step="0.05" aria-label="Voice volume"></div>
+      <div class="gs3-item">Subtitles <button class="gs3-toggle" id="sSubs" aria-label="Subtitles"></button></div>
+      <button class="gs3-item" data-cycle="textSpeed">Subtitle size <span class="gs3-value" id="vText"></span></button>
+    </div></div>
+    <div class="pane" data-p="ctl"><div class="gs3-menu">
+      <div class="gs3-item">Mouse sensitivity <span class="val" id="sSensV"></span><input class="gs3-slider" type="range" id="sSens" min="0.2" max="3" step="0.05" aria-label="Mouse sensitivity"></div>
+      <div class="gs3-item">Invert Y <button class="gs3-toggle" id="sInv" aria-label="Invert Y"></button></div>
+      <div class="gs3-item">Head bob <button class="gs3-toggle" id="sBob" aria-label="Head bob"></button></div>
+      <div class="gs3-item">Camera shake <button class="gs3-toggle" id="sShake" aria-label="Camera shake"></button></div>
+      <div class="gs3-item">Show HUD <button class="gs3-toggle" id="sHud" aria-label="Show HUD"></button></div>
+      <div id="keysList" style="margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-weight:700;font-size:14px"></div>
+    </div></div>
+  </div>
+  <div class="gs3-row"><button class="gs3-btn" id="setReset">Reset</button><button class="gs3-btn primary" id="setDone">Done</button></div>
+</div></div>
+
+<div id="pause" class="gs3-screen modal" hidden><div class="gs3-panel">
+  <h1 class="gs3-title">Paused</h1>
+  <p class="gs3-sub" id="pauseSub">Ant Work 3</p>
+  <div class="gs3-menu">
+    <button class="gs3-item" id="pResume">Resume</button>
+    <button class="gs3-item" id="pSettings">Settings</button>
+    <button class="gs3-item" id="pTrophies">Trophies</button>
+    <button class="gs3-item" id="pCheckpoint">Restart this part</button>
+    <button class="gs3-item" id="pTitle">Quit to title</button>
+  </div>
+  <div class="note">The game saves by itself at every checkpoint.</div>
+</div></div>
+
+<div id="askOverlay" class="gs3-screen modal" hidden style="z-index:96"><div class="gs3-panel" style="max-width:440px">
+  <h1 class="gs3-title" id="askText" style="font-size:20px">Are you sure?</h1>
+  <div class="gs3-row"><button class="gs3-btn" id="askNo">Cancel</button><button class="gs3-btn primary" id="askYes">Yes</button></div>
+</div></div>
+
+<div id="trophies" class="gs3-screen modal" hidden style="z-index:82"><div class="gs3-panel" style="max-width:600px">
+  <h1 class="gs3-title">Trophies <span class="val" id="trophySum" style="font-size:15px"></span></h1>
+  <div id="trophyList"></div>
+  <div class="gs3-row"><button class="gs3-btn primary" id="trophyClose">Done</button></div>
+</div></div>
+
+<div id="helpOverlay" class="gs3-screen modal" hidden><div class="gs3-panel">
+  <h1 class="gs3-title">Controls</h1>
+  <div id="helpKeys" style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-weight:700"></div>
+  <div class="gs3-row"><button class="gs3-btn primary" id="helpDone">Got it</button></div>
+</div></div>
+
+<div id="tbc" class="layer">
+  <div class="chap" id="tbcChap"></div>
+  <div class="big">TO BE CONTINUED...</div>
+  <div class="note" id="tbcNote" style="font-family:var(--mono);font-size:13px;opacity:.75;letter-spacing:.08em"></div>
+  <div class="btns"><button class="gs3-btn" id="tbcChapters">Chapters</button><button class="gs3-btn primary" id="tbcTitle">Back to title</button></div>
+</div>
+
+<div id="touch" class="layer off">
+  <div id="joy"><i></i></div>
+  <button class="tb" id="tUse">USE</button>
+  <button class="tb" id="tAct">PUNCH</button>
+  <button class="tb" id="tRun">RUN</button>
+  <button class="tb" id="tPause">❚❚</button>
+</div>
+<div id="rotate" class="layer"><p>Turn your device sideways for the best view.</p><small>(tap to dismiss)</small></div>
+<div id="hints" style="position:fixed;left:0;right:0;bottom:0;z-index:85;pointer-events:none"></div>
+<div id="errCard"><div class="box"><h2>Something broke</h2><p id="errCardTxt"></p><pre id="errCardPre"></pre><div class="gs3-row"><button class="gs3-btn primary" onclick="location.reload()">Reload the game</button></div></div></div>
+<div id="err"></div>
+<script>
+/* Safety net: every crash shows up on screen instead of a silent broken button. */
+(function(){
+  var box=document.getElementById('err'), n=0;
+  function show(m){ box.style.display='block'; var d=document.createElement('div'); d.textContent=m; box.appendChild(d); if(++n>12){ box.removeChild(box.firstChild); } }
+  window.__showErr=show;
+  window.__fatal=function(title,detail){ var c=document.getElementById('errCard'); document.getElementById('errCardTxt').textContent=title; document.getElementById('errCardPre').textContent=detail||''; c.classList.add('show'); };
+  window.addEventListener('error',function(e){ show('Error: '+(e.message||e.error)+' ('+(e.filename||'').split('/').pop()+':'+(e.lineno||'')+')'); });
+  window.addEventListener('unhandledrejection',function(e){ var r=e.reason; if(r&&r.__abort) return; show('Error: '+(r&&r.message?r.message:r)); });
+})();
+</script>
