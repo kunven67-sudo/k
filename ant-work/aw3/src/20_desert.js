@@ -99,7 +99,7 @@ defineLevel('desert',{
     const P=DESERT.pyr, BASE=DESERT.base, HGT=DESERT.height;
     // (packed ground round the pyramid comes from the flatter dunes there)
     // ---- the pyramid ----
-    const pyrM=pbrMat('large_sandstone_blocks_01',6.8,{opts:{roughness:1,vertexColors:true},normal:1.4}); pyrM.color=col(0xf2dcb4);
+    const pyrM=pbrMat('large_sandstone_blocks_01',6.8,{opts:{roughness:1,vertexColors:true},normal:1.4}); pyrM.color=col(0xc4b9a6);
     const pyr=mesh(steppedPyramidGeo(BASE,HGT,56,6.8),pyrM,P.x,-.3,P.z); pyr.castShadow=true; pyr.receiveShadow=true; scene.add(pyr); lv.pyramid=pyr;
     // the cap stone, worn and darker
     // the entrance: a stone porch sticking out of the face toward you, with a black doorway

@@ -92,7 +92,7 @@ function _age(c,w,h,seed){
   const rr=RNG(seed);
   // flaked-off paint: lots of chips, big bare patches, cracks
   c.globalCompositeOperation='destination-out';
-  for(let i=0;i<5200;i++){ c.fillStyle='rgba(0,0,0,'+(rr()*.7).toFixed(2)+')'; const s=rr()*6+1; c.fillRect(rr()*w,rr()*h,s,s*(.4+rr())); }
+  for(let i=0;i<9000;i++){ c.fillStyle='rgba(0,0,0,'+(rr()*.6).toFixed(2)+')'; const s=rr()*9+1; c.fillRect(rr()*w,rr()*h,s,s*(.4+rr())); }
   for(let i=0;i<70;i++){ c.fillStyle='rgba(0,0,0,'+(.55+rr()*.45).toFixed(2)+')'; c.beginPath(); const x=rr()*w,y=rr()*h; c.moveTo(x,y); for(let k=0;k<7;k++) c.lineTo(x+(rr()-.5)*90,y+(rr()-.5)*50); c.fill(); }
   c.strokeStyle='rgba(0,0,0,.9)'; for(let i=0;i<18;i++){ c.lineWidth=1+rr()*2.5; let x=rr()*w, y=rr()*h; c.beginPath(); c.moveTo(x,y); for(let j=0;j<10;j++){ x+=(rr()-.5)*70; y+=rr()*34; c.lineTo(x,y); } c.stroke(); }
   // the bottom third worn away by sand blowing in
@@ -100,8 +100,8 @@ function _age(c,w,h,seed){
   c.globalCompositeOperation='source-over';
   // grime and soot (old torches), then a pale film of dust over everything
   for(let i=0;i<45;i++){ c.fillStyle='rgba(30,20,12,'+(rr()*.22).toFixed(2)+')'; c.beginPath(); c.ellipse(rr()*w,rr()*h*.5,rr()*120+30,rr()*40+10,0,0,7); c.fill(); }
-  const g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'rgba(196,170,128,.4)'); g.addColorStop(.2,'rgba(196,170,128,.16)'); g.addColorStop(.7,'rgba(196,170,128,.2)'); g.addColorStop(1,'rgba(200,176,132,.6)'); c.fillStyle=g; c.fillRect(0,0,w,h);
-  for(let i=0;i<110;i++){ c.fillStyle='rgba(196,172,130,'+(rr()*.3).toFixed(2)+')'; c.beginPath(); c.ellipse(rr()*w,rr()*h,rr()*80+10,rr()*16+3,0,0,7); c.fill(); }
+  const g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'rgba(196,170,128,.26)'); g.addColorStop(.2,'rgba(196,170,128,.06)'); g.addColorStop(.7,'rgba(196,170,128,.1)'); g.addColorStop(1,'rgba(200,176,132,.45)'); c.fillStyle=g; c.fillRect(0,0,w,h);
+  for(let i=0;i<90;i++){ c.fillStyle='rgba(196,172,130,'+(rr()*.18).toFixed(2)+')'; c.beginPath(); c.ellipse(rr()*w,rr()*h,rr()*140+20,rr()*30+6,0,0,7); c.fill(); }
 }
 /* the four paintings, each 1024 x 448 (about 6 m x 2.6 m on the wall) */
 const PAINTINGS={
@@ -141,7 +141,13 @@ const PAINTINGS={
   }
 };
 function paintingTexture(name){
-  return canvasTex(1024,448,(c,w,h)=>{ c.clearRect(0,0,w,h); c.globalAlpha=.74; PAINTINGS[name](c,w,h); c.globalAlpha=1; _age(c,w,h,name.length*97+7); });
+  return canvasTex(2048,896,(c,w,h)=>{ c.clearRect(0,0,w,h); c.save(); c.scale(2,2);
+    // pass 1: a dark outline (draw everything a bit fatter in near-black), pass 2: the colours on top
+    const keep=Object.assign({},PAINT); for(const k in PAINT) PAINT[k]='#1e1510';
+    c.globalAlpha=.85; for(const [dx,dy] of [[-1.3,0],[1.3,0],[0,-1.3],[0,1.3],[.9,.9],[-.9,.9],[.9,-.9],[-.9,-.9]]){ c.save(); c.translate(dx,dy); PAINTINGS[name](c,1024,448); c.restore(); }
+    Object.assign(PAINT,keep);
+    c.globalAlpha=.88; PAINTINGS[name](c,1024,448);
+    c.restore(); c.globalAlpha=1; _age(c,w,h,name.length*97+7); });
 }
 /* ---------- bones ---------- */
 function boneMat(){ if(!boneMat.m){ boneMat.m=pbrMat('clay_plaster',.25,{opts:{roughness:.85}}); boneMat.m.color=col(0xe2d4b4); } return boneMat.m; }

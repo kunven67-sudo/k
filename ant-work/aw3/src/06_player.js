@@ -179,7 +179,7 @@ VM.grp.scale.setScalar(.25); camera.add(VM.grp);
 function buildViewModel(){
   const T=charTex();
   const sleeveM=new THREE.MeshPhysicalMaterial({color:col(0x2f4d6e),roughness:.9,map:T.cloth.map,normalMap:T.cloth.normalMap,sheen:col(0x222222)});
-  const skinM=skinify(new THREE.MeshPhysicalMaterial({color:col(0xe2b08c),roughness:.5,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.3,.3),sheen:col(0x442a22)}));
+  const skinM=skinify(new THREE.MeshPhysicalMaterial({color:col(0xc99272),roughness:.55,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.45,.45),sheen:col(0x442a22)}));
   const arm=(side)=>{
     const g=new THREE.Group();
     // the hoodie sleeve, pushed up the forearm (so the watch sits on the bare wrist)
@@ -197,9 +197,9 @@ function buildViewModel(){
   VM.mats={sleeve:sleeveM,skin:skinM,sleeveCol:sleeveM.color.clone(),skinCol:skinM.color.clone()};
   // stitches round the watch wrist (Steve cut that hand off in Ant Work 1; it was sewn back on). Both Jays have them.
   const st=new THREE.Group(); st.position.set(0,0,-.322); L.add(st);
-  const scar=mesh(GC('vmScar',()=>new THREE.TorusGeometry(.0312,.0055,6,28)),mat(0xb0403c,{roughness:.55}),0,0,0,false); st.add(scar);
+  const scar=mesh(GC('vmScar2',()=>new THREE.TorusGeometry(.0306,.0022,6,32)),mat(0xa0605a,{roughness:.6}),0,0,0,false); st.add(scar);
   const thread=mat(0x141010,{roughness:.7});
-  for(let i=0;i<12;i++){ const a=i/12*Math.PI*2; for(const sd of [-1,1]){ const k=box(.003,.003,.02,thread,Math.cos(a)*.0335,Math.sin(a)*.0335,0,false); k.rotation.z=a; k.rotation.y=sd*.7; st.add(k); } }
+  for(let i=0;i<10;i++){ const a=i/10*Math.PI*2; const k=box(.0016,.0016,.011,thread,Math.cos(a)*.0318,Math.sin(a)*.0318,0,false); k.rotation.z=a; st.add(k); }
   VM.stitch=st; st.visible=false;
   // Larry's net catcher, held in the right hand
   const net=new THREE.Group(); net.position.set(0,0,-.36); R.add(net);

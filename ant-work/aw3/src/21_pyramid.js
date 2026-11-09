@@ -106,8 +106,8 @@ defineLevel('pyramid',{
       // each crack's beam falls on a painting
       for(const pt of lv.paintings){ const sd=pt.pos.x>0?1:-1;
         const top=V3(-sd*.6,y+H-.02,pt.pos.z+.8), bot=V3(pt.pos.x-sd*.15,pt.pos.y-.2,pt.pos.z);
-        const sh=lightShaft(top,bot,.1,.55,0xffd9a0,.1); scene.add(sh); lv.shafts.push(sh);
-        const sp=new THREE.SpotLight(col(0xffd6a0),3.2,14,.42,.85,1.3); sp.position.copy(top); sp.target.position.copy(bot); scene.add(sp); scene.add(sp.target);
+        const sh=lightShaft(top,bot,.1,.55,0xffd9a0,.07); scene.add(sh); lv.shafts.push(sh);
+        const sp=new THREE.SpotLight(col(0xffd2a0),1.5,14,.42,.9,1.4); sp.position.copy(top); sp.target.position.copy(bot); scene.add(sp); scene.add(sp.target);
         const crack=mesh(new THREE.PlaneGeometry(.45,.12),new THREE.MeshBasicMaterial({color:col(0xfff0d0).multiplyScalar(2)}),top.x,y+H-.03,top.z,false); crack.rotation.x=Math.PI/2; crack.rotation.z=rand(0,3); scene.add(crack);
         lv.shaftSpots=(lv.shaftSpots||[]).concat([{top,bot}]); }
       const fill=new THREE.PointLight(col(0xc8a070),.55,26,1.6); fill.position.set(0,y+4.2,(z0+z1)/2); scene.add(fill);
@@ -134,8 +134,8 @@ defineLevel('pyramid',{
         c.lineCap='round'; c.lineJoin='round';
         for(let i=0;i<34;i++){ let a=rr()*Math.PI*2, r=62+rr()*26; const w0=1.2+rr()*2.4; c.beginPath(); c.moveTo(Math.cos(a)*r,Math.sin(a)*r);
           for(let j=0;j<7;j++){ a+=(rr()-.5)*.35; r+=8+rr()*20; c.lineTo(Math.cos(a)*r,Math.sin(a)*r); }
-          c.strokeStyle='rgba(150,70,230,.35)'; c.lineWidth=w0*4; c.stroke(); c.strokeStyle='rgba(215,165,255,.75)'; c.lineWidth=w0; c.stroke(); } });
-      const ring=mesh(new THREE.PlaneGeometry(5.2,5.2),new THREE.MeshBasicMaterial({map:ringT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,color:col(0xffffff).multiplyScalar(1.15)}),C.x,C.y+.012,C.z,false); ring.rotation.x=-Math.PI/2; ring.renderOrder=3; scene.add(ring); lv.ring=ring;
+          c.strokeStyle='rgba(130,60,210,.22)'; c.lineWidth=w0*3.2; c.stroke(); c.strokeStyle='rgba(200,150,255,.5)'; c.lineWidth=w0*.7; c.stroke(); } });
+      const ring=mesh(new THREE.PlaneGeometry(5.2,5.2),new THREE.MeshBasicMaterial({map:ringT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,color:col(0xffffff).multiplyScalar(.85)}),C.x,C.y+.012,C.z,false); ring.rotation.x=-Math.PI/2; ring.renderOrder=3; scene.add(ring); lv.ring=ring;
       const under=new THREE.PointLight(col(0xa868ff),2.6,30,1.4); under.position.set(C.x,C.y+.35,C.z); scene.add(under); lv.under=under;
       const far=new THREE.PointLight(col(0x9a5aff),1.3,95,1.0); far.position.set(C.x,C.y+1.6,C.z+3); scene.add(far); lv.farGlow=far;
       // the stone table

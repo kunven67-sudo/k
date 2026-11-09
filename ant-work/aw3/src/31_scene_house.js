@@ -4,7 +4,7 @@
    or one mean line that starts a fight. Then the hum, the light,
    and the wall.
    ================================================================ */
-const HOUSE={a:2.75};
+const HOUSE={a:3.55};
 const MOODS={c_who_r1:'worried',c_who_r2:'worried',c_who_r4:'neutral',c_jim_r1:'neutral',c_jim_r2:'smirk',c_jim_r4:'tired',c_clone_r1:'sad',c_clone_r2:'angry',
   c_blocks_ask_r1:'sad',c_blocks_ask_r2:'tired',c_blocks_ask_r3:'angry',c_blocks_my_r1:'neutral',c_blocks_my_r2:'smirk',c_blocks_my_r4:'sad',
   c_story_tiny_r1:'tired',c_story_tiny_r2:'sad',c_story_mars_r1:'tired',c_story_mars_r2:'sad',c_mean_r1:'angry',c_mean_r3:'angry',c_done_1:'worried',c_done_2:'neutral',
