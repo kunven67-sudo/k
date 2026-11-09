@@ -4,7 +4,7 @@
    you a fat pig-man in armor is eating a leg of meat.
    ================================================================ */
 AMB_DEFS.fire={freq:420,ftype:'lowpass',q:.6,vol:.05,lfo:120,lfoRate:1.3};
-const PIGROOM={you:V3(.8,0,2.6),jay2:V3(-.8,0,2.6),throne:V3(0,0,-4.4),eye:1.18};
+const PIGROOM={you:V3(.8,0,2.2),jay2:V3(-.8,0,2.2),throne:V3(0,0,-2.4),eye:1.18};
 function makeTorch(scene,lv,x,y,z,ry,big){
   const g=new THREE.Group(); g.position.set(x,y,z); g.rotation.y=ry; scene.add(g);
   const iron=pbrMat('rusty_metal_04',.3,{opts:{metalness:.85,roughness:.7}});
@@ -14,9 +14,9 @@ function makeTorch(scene,lv,x,y,z,ry,big){
     for(let i=0;i<3;i++){ const a=i/3*Math.PI*2; const l=cyl(.03,.035,1,iron,Math.cos(a)*.3,.48,Math.sin(a)*.3,8); l.rotation.z=Math.cos(a)*.25; l.rotation.x=-Math.sin(a)*.25; g.add(l); }
     const coals=mesh(new THREE.SphereGeometry(.38,16,6,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:col(0xff5a10).multiplyScalar(2.2)}),0,.86,0,false); coals.scale.y=.2; g.add(coals); }
   const fireAt=big?V3(0,1.05,0):V3(0,.12,.16);
-  const light=new THREE.PointLight(col(0xff8a3c),big?2.6:1.5,big?16:11,1.6); light.position.copy(fireAt); g.add(light);
+  const light=new THREE.PointLight(col(0xff9a50),big?2.2:1.1,big?14:10,1.7); light.position.copy(fireAt); g.add(light);
   if(big&&SETTINGS.shadow>=2){ light.castShadow=true; light.shadow.mapSize.set(512,512); light.shadow.bias=-.004; light.shadow.camera.near=.2; light.shadow.camera.far=16; }
-  const t={g,light,fireAt,big,base:big?2.6:1.5,ph:Math.random()*10};
+  const t={g,light,fireAt,big,base:big?2.2:1.1,ph:Math.random()*10};
   (lv.fires||(lv.fires=[])).push(t); return t;
 }
 defineLevel('pigroom',{
@@ -24,9 +24,9 @@ defineLevel('pigroom',{
   env:{fx:{exposure:1.12,saturation:1.05,contrast:1.12,temp:.12,bloomStrength:.4,bloomThreshold:1.1,aoRadius:.6,vignette:.55,grain:.05},music:null,reverb:.45,surface:'stone',far:120},
   async build(scene,lv){
     scene.background=col(0x050302); scene.fog=new THREE.FogExp2(col(0x0b0604),.035);
-    scene.add(new THREE.HemisphereLight(col(0x6a4a30),col(0x140a06),.12));
+    scene.add(new THREE.HemisphereLight(col(0x5a5560),col(0x140c08),.14));
     const W=12, D=15, H=6.5, zc=-1.5;
-    const brick=(w,h)=>{ const m=pbrMat('castle_brick_07',2.4,{w,h,opts:{roughness:1},normal:1.3}); m.color=col(0xb8a490); return m; };
+    const brick=(w,h)=>{ const m=pbrMat('castle_brick_07',2.4,{w,h,opts:{roughness:1},normal:1.3}); m.color=col(0x8c847a); return m; };
     const fl=texPlane(W,D,'stone_tiles_02',1.6,0,0,zc,{opts:{roughness:.85}}); fl.receiveShadow=true; scene.add(fl);
     for(const [x,z,ry,w] of [[-W/2,zc,Math.PI/2,D],[W/2,zc,-Math.PI/2,D],[0,zc-D/2,0,W],[0,zc+D/2,Math.PI,W]]){ const p=mesh(withAO(new THREE.PlaneGeometry(w,H)),brick(w,H),x,H/2,z,false); p.rotation.y=ry; p.receiveShadow=true; scene.add(p); }
     const ceil=mesh(withAO(new THREE.PlaneGeometry(W,D)),brick(W,D),0,H,zc,false); ceil.rotation.x=Math.PI/2; scene.add(ceil);
@@ -50,7 +50,7 @@ defineLevel('pigroom',{
       c.fillStyle='#5a1410'; c.beginPath(); c.arc(-26,-14,7,0,7); c.arc(26,-14,7,0,7); c.fill(); });
     const ban=mesh(new THREE.PlaneGeometry(1.7,3.4,1,8),new THREE.MeshStandardMaterial({map:banT,roughness:.95,side:THREE.DoubleSide}),0,3.6,zc-D/2+.12,false); scene.add(ban); lv.banner=ban;
     // a side table with the rest of his food
-    const tb=new THREE.Group(); tb.position.set(-2.3,0,-4); tb.rotation.y=.25; scene.add(tb);
+    const tb=new THREE.Group(); tb.position.set(-2.2,0,-2.2); tb.rotation.y=.35; scene.add(tb);
     tb.add(box(1.4,.08,.8,wood,0,.86,0)); for(const [x,z] of [[-.6,-.32],[.6,-.32],[-.6,.32],[.6,.32]]) tb.add(cyl(.05,.05,.84,wood,x,.42,z,8));
     const plat=mesh(new THREE.CylinderGeometry(.34,.3,.04,24),iron,0,.92,0); tb.add(plat);
     for(let i=0;i<3;i++){ const m=makeMeatLeg(); m.scale.setScalar(.8); m.position.set(-.15+i*.15,.98,rand(-.1,.1)); m.rotation.set(Math.PI/2,rand(0,3),rand(-.3,.3)); tb.add(m); }
@@ -67,7 +67,7 @@ defineLevel('pigroom',{
     // torches + the big fire bowl next to him
     makeTorch(scene,lv,-5.9,2.4,-4.5,Math.PI/2,false); makeTorch(scene,lv,5.9,2.4,-4.5,-Math.PI/2,false);
     makeTorch(scene,lv,-5.9,2.4,1.5,Math.PI/2,false); makeTorch(scene,lv,5.9,2.4,1.5,-Math.PI/2,false);
-    lv.brazier=makeTorch(scene,lv,1.9,0,-3.4,0,true);
+    lv.brazier=makeTorch(scene,lv,2.1,0,-1.6,0,true);
     // the two chairs: yours and Jay 2's
     const chairM=pbrMat('rough_wood',.7,{opts:{roughness:.9}}); chairM.color=col(0x6a4a30);
     const makeChair=(p)=>{ const c=new THREE.Group(); c.position.copy(p); scene.add(c);
@@ -75,7 +75,7 @@ defineLevel('pigroom',{
       c.add(box(.62,.95,.07,chairM,0,.98,.28)); for(const sd of [-1,1]){ c.add(box(.08,.06,.56,chairM,sd*.33,.7,-.02)); c.add(cyl(.025,.025,.22,chairM,sd*.33,.58,-.26,8)); }
       return c; };
     lv.chairYou=makeChair(PIGROOM.you); lv.chairJay=makeChair(PIGROOM.jay2);
-    lv.chairYou.rotation.y=Math.PI; lv.chairJay.rotation.y=Math.PI;   // facing the throne (-z)
+    // (a chair's back is at +z, so whoever sits faces -z: the throne)
     // your arms on the armrests, shackled
     lv.armL=makeWorldArm(1); lv.armR=makeWorldArm(-1);
     const Y=PIGROOM.you;

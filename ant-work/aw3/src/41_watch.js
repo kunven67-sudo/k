@@ -41,12 +41,12 @@ function giveWatch(h){
 }
 /* Jay 2 lifts his wrist and looks at it */
 POSES.watch=(t)=>({shL:[-.95,.45,.2],elL:[-1.85,.25,0],hdL:[.25,.6,0],head:[.42,.18,0],spine:[.05,0,0]});
-POSES.guard=(t)=>{ const s=Math.sin(t*3.1)*.06; return {shL:[-1.15+s,.1,.32],elL:[-2.05,.2,0],shR:[-1.2-s,-.1,-.32],elR:[-2.1,-.2,0],hdL:[0,0,0],hdR:[0,0,0],spine:[.12,0,0],head:[.12,0,0],fL:1,fR:1}; };
+POSES.guard=(t)=>{ const s=Math.sin(t*3.1)*.05; return {shL:[-.9+s,-.38,.22],elL:[-2.25,.3,0],shR:[-.92-s,.38,-.22],elR:[-2.25,-.3,0],hdL:[.2,.5,0],hdR:[.2,-.5,0],spine:[.14,0,0],chest:[.05,0,0],head:[.16,0,0],fL:1,fR:1}; };
 POSES.holdHead=(t)=>({shL:[-1.4,.2,.5],elL:[-2.4,.3,0],shR:[-1.4,-.2,-.5],elR:[-2.4,-.3,0],head:[.25,0,0],spine:[.18,0,0]});
 POSES.flinch=(t)=>({shL:[-1.3,.4,.6],elL:[-2.2,.3,0],shR:[-1.3,-.4,-.6],elR:[-2.2,-.3,0],head:[.35,0,0],spine:[.25,0,0]});
 POSES.flail=(t)=>({shL:[-1.8+Math.sin(t*5)*.4,0,.9],elL:[-.6,0,0],shR:[-1.8+Math.cos(t*5)*.4,0,-.9],elR:[-.6,0,0],head:[-.4,0,0],spine:[-.3,0,0],thL:[-.6,0,0],thR:[-.9,0,0],knL:[.8,0,0],knR:[.5,0,0]});
 POSES.lieBack=(t)=>({spine:[-.15,0,0],head:[-.1,0,0],shL:[.2,0,.5],shR:[.2,0,-.5],elL:[-.3,0,0],elR:[-.3,0,0]});
 POSES.chained=(t)=>({thL:[-1.5,0,-.05],thR:[-1.5,0,.05],knL:[1.5,0,0],knR:[1.5,0,0],ftL:[.05,0,0],ftR:[.05,0,0],spine:[-.05,0,0],shL:[-.35,-.15,.12],elL:[-1.15,0,0],shR:[-.35,.15,-.12],elR:[-1.15,0,0],hdL:[0,.9,0],hdR:[0,-.9,0],fL:.5,fR:.5});
 POSES.chainedSleep=(t)=>{ const P=POSES.chained(t); P.head=[.62+Math.sin(t*.9)*.02,.1,.18]; P.spine=[.18,0,0]; return P; };
-POSES.eatFruit=(t)=>({shR:[-1.05,.25,-.15],elR:[-2.25,0,0],hdR:[.2,-1.2,0],head:[.05,0,0],fR:.85});
+POSES.eatFruit=(t)=>({shR:[-.9,.34,-.12],elR:[-2.1,0,0],hdR:[.3,-1.1,0],head:[.12,0,0],fR:.85});
 POSES.holdFruit=(t)=>({shR:[-.85,.1,-.1],elR:[-1.2,0,0],hdR:[0,-1.3,0],head:[.25,0,0],fR:.85});

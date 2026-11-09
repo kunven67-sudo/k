@@ -55,7 +55,7 @@ function makeFruit(seed){
   const g=new THREE.Group();
   const vt=veinTex(seed);
   const m=new THREE.MeshPhysicalMaterial({color:col(0x2a0d3e),emissive:col(0xd8a0ff),emissiveMap:vt,emissiveIntensity:2.2,roughness:.28,clearcoat:.8,clearcoatRoughness:.2,sheen:col(0x8a40c0)});
-  const body=mesh(lathe('fruitPear',[[0,0],[.03,.004],[.052,.022],[.058,.05],[.05,.08],[.034,.104],[.028,.122],[.022,.138],[.012,.148],[0,.152]],22),m,0,0,0); g.add(body);
+  const body=mesh(lathe('fruitPear2',[[0,0],[.036,.004],[.058,.022],[.065,.05],[.06,.078],[.047,.1],[.036,.117],[.031,.132],[.023,.147],[.01,.155],[0,.157]],26),m,0,0,0); g.add(body);
   const stem=mesh(GC('fruitStem',()=>{ const c=new THREE.CylinderGeometry(.004,.006,.035,6); c.translate(0,.0175,0); return c; }),mat(0x2a1a10,{roughness:.9}),0,.148,0); stem.rotation.z=.3; g.add(stem);
   const leaf=mesh(GC('fruitLeaf',()=>{ const s=new THREE.SphereGeometry(.03,10,6); s.scale(1,.12,.45); s.translate(.03,0,0); return s; }),mat(0x2e1a3a,{roughness:.7}),.004,.172,0); leaf.rotation.z=-.4; g.add(leaf);
   g.userData={m,body};
@@ -103,13 +103,14 @@ defineLevel('pyramid',{
         lv.paintings.push({name,obj:p,pos:V3(x,y+1.65,z),seen:false}); }
       // thin beams of sun through cracks in the ceiling
       lv.shafts=[];
-      for(const [x,z,tx,tz] of [[-.6,-49,.6,-51.5],[.8,-58.5,-.4,-60],[-.3,-67,1.2,-66]]){
-        const top=V3(x,y+H-.02,z), bot=V3(tx,y,tz);
-        const sh=lightShaft(top,bot,.12,.5,0xffd9a0,.22); scene.add(sh); lv.shafts.push(sh);
-        const sp=new THREE.SpotLight(col(0xffdcaa),2.4,16,.2,.65,1.6); sp.position.copy(top); sp.target.position.copy(bot); scene.add(sp); scene.add(sp.target);
-        const crack=mesh(new THREE.PlaneGeometry(.5,.16),new THREE.MeshBasicMaterial({color:col(0xfff0d0).multiplyScalar(4)}),x,y+H-.03,z,false); crack.rotation.x=Math.PI/2; crack.rotation.z=rand(0,3); scene.add(crack);
-        const pool=mesh(new THREE.CircleGeometry(.55,24),new THREE.MeshBasicMaterial({color:col(0xffd8a0),transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false}),tx,y+.012,tz,false); pool.rotation.x=-Math.PI/2; pool.scale.set(1,1.4,1); scene.add(pool);
+      // each crack's beam falls on a painting
+      for(const pt of lv.paintings){ const sd=pt.pos.x>0?1:-1;
+        const top=V3(-sd*.6,y+H-.02,pt.pos.z+.8), bot=V3(pt.pos.x-sd*.15,pt.pos.y-.2,pt.pos.z);
+        const sh=lightShaft(top,bot,.1,.55,0xffd9a0,.1); scene.add(sh); lv.shafts.push(sh);
+        const sp=new THREE.SpotLight(col(0xffd6a0),3.2,14,.42,.85,1.3); sp.position.copy(top); sp.target.position.copy(bot); scene.add(sp); scene.add(sp.target);
+        const crack=mesh(new THREE.PlaneGeometry(.45,.12),new THREE.MeshBasicMaterial({color:col(0xfff0d0).multiplyScalar(2)}),top.x,y+H-.03,top.z,false); crack.rotation.x=Math.PI/2; crack.rotation.z=rand(0,3); scene.add(crack);
         lv.shaftSpots=(lv.shaftSpots||[]).concat([{top,bot}]); }
+      const fill=new THREE.PointLight(col(0xc8a070),.55,26,1.6); fill.position.set(0,y+4.2,(z0+z1)/2); scene.add(fill);
     }
     // ---------- C: steps down ----------
     { const y0=-2.4;
@@ -122,21 +123,23 @@ defineLevel('pyramid',{
     }
     // ---------- D: the round room ----------
     { const C=PYR.roomC, R=PYR.roomR, HW=4.6, gap=2*Math.asin(1.35/R);
-      const wm=pbrMat('sandstone_blocks_05',2.2,{w:2*Math.PI*R,h:HW,opts:{roughness:1,side:THREE.BackSide},normal:1.3}); wm.color=col(0xb8a080);
+      const wm=pbrMat('large_sandstone_blocks_01',3.2,{w:2*Math.PI*R,h:HW,opts:{roughness:1,side:THREE.BackSide},normal:1.4}); wm.color=col(0xa8907a);
       const wall=mesh(withAO(new THREE.CylinderGeometry(R,R,HW,48,1,true,gap/2,Math.PI*2-gap)),wm,C.x,C.y+HW/2,C.z,false); wall.receiveShadow=true; scene.add(wall);
-      const dm=pbrMat('sandstone_blocks_05',2.2,{w:2*Math.PI*R,h:8,opts:{roughness:1,side:THREE.BackSide}}); dm.color=col(0xa89070);
+      const dm=pbrMat('large_sandstone_blocks_01',3.2,{w:2*Math.PI*R,h:8,opts:{roughness:1,side:THREE.BackSide}}); dm.color=col(0x8a7866);
       const dome=mesh(withAO(new THREE.SphereGeometry(R,40,14,0,Math.PI*2,0,Math.PI/2)),dm,C.x,C.y+HW,C.z,false); dome.scale.y=.55; scene.add(dome);
       const fl=mesh(withAO(new THREE.CircleGeometry(R,48)),pbrMat('stone_tiles_02',1.6,{w:R*2,h:R*2,opts:{roughness:.9}}),C.x,C.y+.002,C.z,false); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; scene.add(fl);
       // the glow from below: a ring of cracks in the floor round the table, and purple light rising
       const ringT=canvasTex(512,512,(c,w,h)=>{ c.clearRect(0,0,w,h); const rr=RNG(77); c.translate(w/2,h/2);
         const g=c.createRadialGradient(0,0,40,0,0,250); g.addColorStop(0,'rgba(200,120,255,.55)'); g.addColorStop(.45,'rgba(150,70,230,.22)'); g.addColorStop(1,'rgba(90,30,160,0)'); c.fillStyle=g; c.beginPath(); c.arc(0,0,250,0,7); c.fill();
-        c.strokeStyle='rgba(235,200,255,.95)'; c.lineCap='round';
-        for(let i=0;i<26;i++){ let a=rr()*Math.PI*2, r=70+rr()*30; c.lineWidth=2+rr()*3; c.beginPath(); c.moveTo(Math.cos(a)*r,Math.sin(a)*r); for(let j=0;j<6;j++){ a+=(rr()-.5)*.3; r+=14+rr()*22; c.lineTo(Math.cos(a)*r,Math.sin(a)*r); } c.stroke(); } });
-      const ring=mesh(new THREE.PlaneGeometry(5.2,5.2),new THREE.MeshBasicMaterial({map:ringT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,color:col(0xffffff).multiplyScalar(1.6)}),C.x,C.y+.012,C.z,false); ring.rotation.x=-Math.PI/2; ring.renderOrder=3; scene.add(ring); lv.ring=ring;
-      const under=new THREE.PointLight(col(0xb070ff),3.4,34,1.2); under.position.set(C.x,C.y+.35,C.z); scene.add(under); lv.under=under;
+        c.lineCap='round'; c.lineJoin='round';
+        for(let i=0;i<34;i++){ let a=rr()*Math.PI*2, r=62+rr()*26; const w0=1.2+rr()*2.4; c.beginPath(); c.moveTo(Math.cos(a)*r,Math.sin(a)*r);
+          for(let j=0;j<7;j++){ a+=(rr()-.5)*.35; r+=8+rr()*20; c.lineTo(Math.cos(a)*r,Math.sin(a)*r); }
+          c.strokeStyle='rgba(150,70,230,.35)'; c.lineWidth=w0*4; c.stroke(); c.strokeStyle='rgba(215,165,255,.75)'; c.lineWidth=w0; c.stroke(); } });
+      const ring=mesh(new THREE.PlaneGeometry(5.2,5.2),new THREE.MeshBasicMaterial({map:ringT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,color:col(0xffffff).multiplyScalar(1.15)}),C.x,C.y+.012,C.z,false); ring.rotation.x=-Math.PI/2; ring.renderOrder=3; scene.add(ring); lv.ring=ring;
+      const under=new THREE.PointLight(col(0xa868ff),2.6,30,1.4); under.position.set(C.x,C.y+.35,C.z); scene.add(under); lv.under=under;
       const far=new THREE.PointLight(col(0x9a5aff),1.3,95,1.0); far.position.set(C.x,C.y+1.6,C.z+3); scene.add(far); lv.farGlow=far;
       // the stone table
-      const tm=pbrMat('old_sandstone_02',1,{opts:{roughness:1},normal:1.4}); tm.color=col(0xcfb894);
+      const tm=pbrMat('sandstone_cracks',1.1,{opts:{roughness:1},normal:1.6}); tm.color=col(0xd9c4a2);
       const tbl=new THREE.Group(); tbl.position.copy(C); scene.add(tbl); lv.table=tbl;
       tbl.add(mesh(withAO(new THREE.CylinderGeometry(.34,.46,.8,16)),tm,0,.4,0));
       const top=mesh(withAO(new THREE.BoxGeometry(1.5,.14,.95)),tm,0,.87,0); tbl.add(top);
@@ -181,7 +184,7 @@ defineLevel('pyramid',{
     const lv=this;
     // the glow breathes
     const pulse=.85+Math.sin(t*1.7)*.1+Math.sin(t*4.3)*.04;
-    lv.under.intensity=3.4*pulse; lv.farGlow.intensity=1.3*pulse; lv.ring.material.opacity=.85+.15*Math.sin(t*1.7);
+    lv.under.intensity=2.6*pulse; lv.farGlow.intensity=1.3*pulse; lv.ring.material.opacity=.85+.15*Math.sin(t*1.7);
     for(const f of lv.fruits){ if(f.parent===lv.scene) f.userData.m.emissiveIntensity=(lv.fruitGlow||2.2)*pulse; }
     for(const s of lv.shafts) s.userData.u.time.value=t;
     // dust drifting in the sun beams

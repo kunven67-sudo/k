@@ -182,8 +182,10 @@ function buildViewModel(){
   const skinM=skinify(new THREE.MeshPhysicalMaterial({color:col(0xe2b08c),roughness:.5,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.3,.3),sheen:col(0x442a22)}));
   const arm=(side)=>{
     const g=new THREE.Group();
-    const fore=mesh(lathe('vmFore',[[0,-.3],[.042,-.29],[.046,-.2],[.05,-.05],[.052,.2],[0,.25]],16),sleeveM,0,0,0,false); fore.rotation.x=Math.PI/2; g.add(fore);
-    const cuff=mesh(GC('vmCuff',()=>new THREE.TorusGeometry(.044,.012,8,18)),sleeveM,0,0,-.29,false); g.add(cuff);
+    // the hoodie sleeve, pushed up the forearm (so the watch sits on the bare wrist)
+    const fore=mesh(lathe('vmFore2',[[0,-.2],[.05,-.198],[.056,-.182],[.054,-.1],[.052,.05],[.053,.2],[0,.25]],18),sleeveM,0,0,0,false); fore.rotation.x=Math.PI/2; g.add(fore);
+    const cuff=mesh(GC('vmCuff2',()=>new THREE.TorusGeometry(.052,.014,8,22)),sleeveM,0,0,-.188,false); g.add(cuff);
+    const skinFore=mesh(lathe('vmSkinFore',[[0,-.318],[.03,-.314],[.0315,-.3],[.034,-.27],[.04,-.23],[.046,-.19],[0,-.18]],18),skinM,0,0,0,false); skinFore.rotation.x=Math.PI/2; g.add(skinFore);
     const wrist=mesh(GC('vmWrist',()=>new THREE.CylinderGeometry(.029,.031,.06,14)),skinM,0,0,-.31,false); wrist.rotation.x=Math.PI/2; g.add(wrist);
     const handG=new THREE.Group(); handG.position.set(0,0,-.33); handG.rotation.x=Math.PI/2; g.add(handG);
     const H=makeHand(side,skinM); handG.add(H.grp); H.grp.rotation.y=side>0?-.3:.3;
@@ -205,12 +207,15 @@ function buildViewModel(){
   const hoop=mesh(GC('netHoop',()=>new THREE.TorusGeometry(.11,.007,8,32)),mat(0x6dffd8,{roughness:.3,metalness:.3,emissive:col(0x1a6a5a)}),0,.0,-.74,false); hoop.rotation.y=Math.PI/2; net.add(hoop);
   const bag=mesh(GC('netBag',()=>{ const c=new THREE.ConeGeometry(.105,.22,16,4,true); c.rotateZ(Math.PI/2); c.translate(.11,0,0); return c; }),new THREE.MeshBasicMaterial({color:col(0xc8fff0),wireframe:true,transparent:true,opacity:.45}),0,0,-.74,false); net.add(bag);
   net.rotation.set(.35,-.18,0); VM.net=net; net.visible=false;
-  // the watch (Mars): sleek band + glowing holographic face
-  const w=new THREE.Group(); w.position.set(0,.034,-.29); L.add(w);
-  w.add(mesh(GC('wBand',()=>{ const t=new THREE.TorusGeometry(.037,.008,8,24); return t; }),mat(0x1a1c22,{roughness:.4,metalness:.6}),0,-.034,0,false)).children;
-  const face=mesh(roundedBoxGeo(.05,.012,.06,.006),mat(0x303640,{roughness:.2,metalness:.9}),0,0,0,false); w.add(face);
-  const scr=mesh(GC('wScr',()=>new THREE.PlaneGeometry(.04,.05)),new THREE.MeshBasicMaterial({color:col(0x6dffd8).multiplyScalar(2.5),transparent:true,opacity:.9}),0,.0065,0,false); scr.rotation.x=-Math.PI/2; w.add(scr);
-  const holo=mesh(GC('wHolo',()=>new THREE.RingGeometry(.02,.024,32)),new THREE.MeshBasicMaterial({color:col(0x6dffd8).multiplyScalar(3),transparent:true,opacity:.0,side:THREE.DoubleSide,depthWrite:false}),0,.03,0,false); holo.rotation.x=-Math.PI/2; w.add(holo);
+  // the watch: a strap round the bare wrist, the case on top
+  const w=new THREE.Group(); w.position.set(0,0,-.281); L.add(w);
+  const strapM=new THREE.MeshStandardMaterial({color:col(0x16181c),roughness:.62,metalness:.05,side:THREE.DoubleSide});
+  const strap=mesh(GC('wStrap',()=>new THREE.CylinderGeometry(.0338,.0338,.019,32,1,true)),strapM,0,0,0,false); strap.rotation.x=Math.PI/2; w.add(strap);
+  for(const zz of [-.0098,.0098]){ const lip=mesh(GC('wStrapLip',()=>new THREE.TorusGeometry(.0338,.0012,4,32)),strapM,0,0,zz,false); w.add(lip); }
+  const face=mesh(roundedBoxGeo(.041,.011,.047,.006),mat(0x2a2e36,{roughness:.25,metalness:.85}),0,.0375,0,false); w.add(face);
+  const bez=mesh(roundedBoxGeo(.037,.002,.043,.005),mat(0x0c0d10,{roughness:.15,metalness:.3}),0,.0432,0,false); w.add(bez);
+  const scr=mesh(GC('wScr2',()=>new THREE.PlaneGeometry(.033,.039)),new THREE.MeshBasicMaterial({color:col(0x6dffd8).multiplyScalar(2.5)}),0,.0446,0,false); scr.rotation.order='YXZ'; scr.rotation.set(-Math.PI/2,Math.PI/2,0); w.add(scr);
+  const holo=mesh(GC('wHolo',()=>new THREE.RingGeometry(.02,.024,32)),new THREE.MeshBasicMaterial({color:col(0x6dffd8).multiplyScalar(3),transparent:true,opacity:.0,side:THREE.DoubleSide,depthWrite:false}),0,.07,0,false); holo.rotation.x=-Math.PI/2; w.add(holo);
   VM.watch=w; VM.watchScr=scr; VM.watchHolo=holo; w.visible=false;
   // photo camera
   const cam=new THREE.Group();
@@ -268,7 +273,7 @@ function updateViewModel(dt,t){
   if(P.carry){ onL=onR=true; lp=[-.24+swayX,-.4-swayY,-.42]; rp=[.24+swayX,-.4-swayY,-.42]; lr=[.12,.28,1.25]; rr=[.12,-.28,-1.25]; lf=.75; rf=.75; }
   if(P.watchLook>0) onL=true;
   if(P.scale<.5 && !P.carry && !P.item){ onL=onR=true; lp=[-.24+swayX,-.4-swayY+br,-.4]; rp=[.24+swayX,-.4-swayY+br,-.4]; lr=[.2,.3,.9]; rr=[.2,-.3,-.9]; lf=1; rf=1; } // fists up while tiny (bug fighting)
-  if(P.watchLook>0){ const k=smooth(P.watchLook); lp=[lerp(lp[0],-.2,k),lerp(lp[1],-.24,k),lerp(lp[2],-.3,k)]; lr=[lerp(lr[0],.25,k),lerp(lr[1],-1.25,k),lerp(lr[2],-.25,k)]; lf=lerp(lf,.55,k); }
+  if(P.watchLook>0){ const k=smooth(P.watchLook), W=VM.watchPose||{p:[-.3,-.2,-.2],r:[0,0,0]}; lp=[lerp(lp[0],W.p[0],k),lerp(lp[1],W.p[1],k),lerp(lp[2],W.p[2],k)]; lr=[lerp(lr[0],W.r[0],k),lerp(lr[1],W.r[1],k),lerp(lr[2],W.r[2],k)]; lf=lerp(lf,.68,k); }
   // slap (the alarm clock): the watch hand swings down flat
   if(VM.slapT>0){ onL=true; VM.armL=Math.max(VM.armL||0,.9); VM.slapT-=dt; const k=1-VM.slapT/.5; const s=k<.4?k/.4:1-(k-.4)/.6; lp=[lerp(-.34,-.12,s),lerp(-.3,-.46,s),lerp(-.42,-.52,s)]; lr=[lerp(.1,.9,s),-.9+s*.4,-.2]; lf=.05; }
   // punch
@@ -288,13 +293,17 @@ function updateViewModel(dt,t){
   }
   if(VM.reach>0){ onL=onR=true; const k=smooth(Math.min(1,VM.reach)), pull=(VM.pull||0); lp=lp.map((v,j)=>lerp(v,[-.2,-.4+pull*.08,-.56+pull*.14][j],k)); rp=rp.map((v,j)=>lerp(v,[.2,-.4+pull*.08,-.56+pull*.14][j],k)); lr=[lerp(lr[0],-.55,k),lerp(lr[1],.2,k),lerp(lr[2],.4,k)]; rr=[lerp(rr[0],-.55,k),lerp(rr[1],-.2,k),lerp(rr[2],-.4,k)]; lf=rf=lerp(.3,1,pull); }
   if(VM.handsLook>0){ onL=onR=true; const k=smooth(Math.min(1,VM.handsLook)); lp=lp.map((v,j)=>lerp(v,[-.16,-.28,-.5][j],k)); rp=rp.map((v,j)=>lerp(v,[.16,-.28,-.5][j],k)); lr=[lerp(lr[0],1.1,k),lerp(lr[1],.35,k),lerp(lr[2],.9,k)]; rr=[lerp(rr[0],1.1,k),lerp(rr[1],-.35,k),lerp(rr[2],-.9,k)]; lf=rf=.15; }
+  // holding something small in the right hand (the fruit): out in front, then up to the mouth
+  if(VM.holdItem){ onR=true; const k=smooth(clamp(VM.eatK||0,0,1)); rp=[lerp(.16,.05,k),lerp(-.3,-.2,k),lerp(-.5,-.27,k)]; rr=[lerp(1.0,1.25,k),lerp(-.3,-.1,k),lerp(-.8,-1.35,k)]; rf=.8; }
   if(VM.hurtT>0){ VM.hurtT-=dt; }
   // arms only appear when they are doing something (idle hands in the view just look odd)
   VM.armL=damp(VM.armL||0,onL?1:0,12,dt); VM.armR=damp(VM.armR||0,onR?1:0,12,dt); lp[1]-=(1-smooth(VM.armL))*.4; rp[1]-=(1-smooth(VM.armR))*.4; L.visible=VM.armL>.02; R.visible=VM.armR>.02;
   L.position.set(...lp); R.position.set(...rp); L.rotation.set(...lr); R.rotation.set(...rr);
+  // checking the watch: turn the wrist so the screen faces you
+  if(P.watchLook>0&&!P.swim){ const k=smooth(P.watchLook); L.quaternion.slerp(watchQuat(),k); }
   for(const [A,f] of [[L,lf],[R,rf]]){ const H=A.userData.H; for(const fg of H.fingers){ fg.a.rotation.x=-f*1.25; fg.b.rotation.x=-f*1.35; } H.thumb2.rotation.x=-f*.7; }
   // watch glow
-  if(hasWatch){ const g=P.watchGlow||0; VM.watchHolo.material.opacity=g*.9; VM.watchHolo.scale.setScalar(1+g*2+Math.sin(t*10)*.1*g); VM.watchHolo.position.y=.03+g*.02; if(!VM.watchCanvas) VM.watchScr.material.color.copy(col(P.scale<1?0xffb347:0x6dffd8)).multiplyScalar(2.5+g*4+Math.sin(t*3)*.3); }
+  if(hasWatch){ const g=P.watchGlow||0; VM.watchHolo.material.opacity=g*.9; VM.watchHolo.scale.setScalar(1+g*2+Math.sin(t*10)*.1*g); VM.watchHolo.position.y=.07+g*.02; if(!VM.watchCanvas) VM.watchScr.material.color.copy(col(P.scale<1?0xffb347:0x6dffd8)).multiplyScalar(2.5+g*4+Math.sin(t*3)*.3); }
 }
 
 /* blocky arms (after XXX5 turns everything into blocks) */
@@ -320,4 +329,13 @@ function autoWalkVel(P,dt){
   if(d<.35){ A.i++; if(A.i>=A.pts.length){ P.auto=null; A.res&&A.res(); return [0,0]; } return autoWalkVel(P,dt); }
   const sp=A.speed*Math.min(1,d/.6+.4);
   return [dx/d*sp,dz/d*sp];
+}
+
+/* the left forearm pointing across the view with the watch screen facing the camera */
+function watchQuat(){
+  const W=VM.watchAim||{d:[1,.25,-.3],n:[0,.3,1]};
+  const key=W.d.join()+W.n.join(); if(VM._wq&&VM._wqk===key) return VM._wq;
+  const D=V3(...W.d).normalize(), Z=D.clone().negate(), N=V3(...W.n).normalize();
+  const Y=N.addScaledVector(Z,-N.dot(Z)).normalize(), X=new THREE.Vector3().crossVectors(Y,Z);
+  VM._wq=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); VM._wqk=key; return VM._wq;
 }

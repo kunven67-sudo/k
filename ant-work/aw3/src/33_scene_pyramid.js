@@ -93,12 +93,14 @@ SCENES.fruit=async function(cont){
   objective(''); lv.inter.length=0; crosshair(false); PLAYER.ctl.interact=false;
   unlock('fruit');
   // up to your mouth... bite
-  f2.parent.remove(f2); const held=f2.clone(); held.userData.vmScale=1.7; vmCarry(held); PLAYER.carry=true; VM.forceShow=true;
-  const cm=VM.carryMesh; const p0=cm.position.clone();
-  await tweenVal(v=>{ cm.position.set(lerp(p0.x,0,v),lerp(p0.y,-.14,v),lerp(p0.z,-.36,v)); cm.rotation.x=lerp(.3,-.2,v); },0,1,.8);
-  SND.play('bite',{vol:1}); shake(.08); await wait(.3);
-  SND.play('chew_2',{vol:.8}); cm.scale.y*=.82;
-  await tweenVal(v=>{ cm.position.set(0,lerp(-.14,-.3,v),lerp(-.36,-.62,v)); },0,1,.6);
+  f2.parent.remove(f2); const held=f2.clone(); held.traverse(o=>{ if(o.isMesh){ o.renderOrder=10; o.castShadow=false; } });
+  const hg=VM.arms.R.userData.handG; hg.add(held); held.position.set(.005,.07,-.045); held.rotation.set(-.4,0,.2);
+  VM.holdItem=held; VM.eatK=0; VM.forceShow=true;
+  await wait(.5);
+  await tweenVal(v=>{ VM.eatK=v; },0,1,.85);
+  SND.play('bite',{vol:1}); shake(.08); held.scale.set(1,.8,1); await wait(.3);
+  SND.play('chew_2',{vol:.8});
+  await tweenVal(v=>{ VM.eatK=v; },1,.15,.6);
   SND.play('chew_3',{vol:.7}); await wait(.5);
   // something is wrong: colours swim, heart pounds, the hum gets loud
   const hb=loopSnd('heartbeat',{vol:.0001}); hb&&hb.vol(.85,1.2);
@@ -113,7 +115,7 @@ SCENES.fruit=async function(cont){
   J.userData.A.look=null; await collapse(J);
   const f1w=f1.getWorldPosition(new THREE.Vector3()); f1.parent.remove(f1); f1.position.copy(f1w).setY(C.y+.04); lv.scene.add(f1);
   await wait(.6);
-  vmCarry(null); PLAYER.carry=false; VM.forceShow=false;
+  if(VM.holdItem){ VM.holdItem.parent&&VM.holdItem.parent.remove(VM.holdItem); VM.holdItem=null; } VM.forceShow=false;
   PLAYER.lookTo=null; lookAtPoint(headOf(J),.9);
   await say([L('p_fruit_7',{auto:.3})]);
   // then you: the room tips over, everything blurs

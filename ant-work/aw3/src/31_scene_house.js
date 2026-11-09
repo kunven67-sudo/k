@@ -71,7 +71,8 @@ SCENES.house=async function(){
 /* the sound that builds up, like something is about to blow */
 function humStart(){ if(STORY.buildH) return; STORY.buildH=SND.play('hum_build',{vol:.95,fadeIn:1.5}); STORY.humT0=G.time; }
 async function humAndLight(lv,J,AX,youP,j2P,fought){
-  const C=V3(0,1.25,0);
+  const side=V3(Math.cos(HOUSE.a),0,-Math.sin(HOUSE.a));   // across the line between you two
+  const C=side.multiplyScalar(-.85).setY(1.45);
   humStart(); if(!fought) await say([LM('c_done_2')]);
   // the room shakes a little more every second, the lights flicker
   const t0=STORY.humT0;

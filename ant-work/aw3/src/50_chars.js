@@ -77,18 +77,20 @@ function makeWorldArm(side){
   const sleeveM=new THREE.MeshPhysicalMaterial({color:col(0x2f4d6e),roughness:.9,map:T.cloth.map,normalMap:T.cloth.normalMap,sheen:col(0x222222)});
   const skinM=skinify(new THREE.MeshPhysicalMaterial({color:col(0xe2b08c),roughness:.5,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.3,.3),sheen:col(0x442a22)}));
   const g=new THREE.Group();
-  const fore=mesh(lathe('vmFore',[[0,-.3],[.042,-.29],[.046,-.2],[.05,-.05],[.052,.2],[0,.25]],16),sleeveM,0,0,0); fore.rotation.x=Math.PI/2; g.add(fore);
-  g.add(mesh(GC('vmCuff',()=>new THREE.TorusGeometry(.044,.012,8,18)),sleeveM,0,0,-.29));
+  const fore=mesh(lathe('vmFore2',[[0,-.2],[.05,-.198],[.056,-.182],[.054,-.1],[.052,.05],[.053,.2],[0,.25]],18),sleeveM,0,0,0); fore.rotation.x=Math.PI/2; g.add(fore);
+  g.add(mesh(GC('vmCuff2',()=>new THREE.TorusGeometry(.052,.014,8,22)),sleeveM,0,0,-.188));
+  const skinFore=mesh(lathe('vmSkinFore',[[0,-.318],[.03,-.314],[.0315,-.3],[.034,-.27],[.04,-.23],[.046,-.19],[0,-.18]],18),skinM,0,0,0); skinFore.rotation.x=Math.PI/2; g.add(skinFore);
   const wrist=mesh(GC('vmWrist',()=>new THREE.CylinderGeometry(.029,.031,.06,14)),skinM,0,0,-.31); wrist.rotation.x=Math.PI/2; g.add(wrist);
   const handG=new THREE.Group(); handG.position.set(0,0,-.33); handG.rotation.x=Math.PI/2; g.add(handG);
   const H=makeHand(side,skinM); handG.add(H.grp); H.grp.rotation.y=side>0?-.3:.3;
   for(const fg of H.fingers){ fg.a.rotation.x=-.25; fg.b.rotation.x=-.3; }
   g.userData={H,skinM,sleeveM};
   { const el=V3(0,0,.2), sh=V3(side*.24,.5,.55), d=sh.clone().sub(el), L=d.length(); const up=mesh(new THREE.CylinderGeometry(.06,.05,L,14),sleeveM,0,0,0); up.position.copy(el).addScaledVector(d,.5); up.quaternion.setFromUnitVectors(V3(0,1,0),d.normalize()); g.add(up); g.add(mesh(new THREE.SphereGeometry(.055,14,10),sleeveM,el.x,el.y,el.z)); }
-  if(side>0){ const w=new THREE.Group(); w.position.set(0,.034,-.29); g.add(w);
-    w.add(mesh(GC('wBand',()=>new THREE.TorusGeometry(.037,.008,8,24)),mat(0x1a1c22,{roughness:.4,metalness:.6}),0,-.034,0));
-    w.add(mesh(roundedBoxGeo(.05,.012,.06,.006),mat(0x303640,{roughness:.2,metalness:.9}),0,0,0));
-    const scr=mesh(GC('wScrW',()=>new THREE.PlaneGeometry(.04,.05)),new THREE.MeshBasicMaterial({color:col(0x0a1214)}),0,.0065,0,false); scr.rotation.x=-Math.PI/2; w.add(scr);
+  if(side>0){ const w=new THREE.Group(); w.position.set(0,0,-.281); g.add(w);
+    const strapM=new THREE.MeshStandardMaterial({color:col(0x16181c),roughness:.62,side:THREE.DoubleSide});
+    const strap=mesh(GC('wStrap',()=>new THREE.CylinderGeometry(.0338,.0338,.019,32,1,true)),strapM,0,0,0); strap.rotation.x=Math.PI/2; w.add(strap);
+    w.add(mesh(roundedBoxGeo(.041,.011,.047,.006),mat(0x2a2e36,{roughness:.25,metalness:.85}),0,.0375,0));
+    const scr=mesh(GC('wScrW2',()=>new THREE.PlaneGeometry(.033,.039)),new THREE.MeshBasicMaterial({color:col(0x0a1214)}),0,.0436,0,false); scr.rotation.order='YXZ'; scr.rotation.set(-Math.PI/2,Math.PI/2,0); w.add(scr);
     g.userData.watch=w;
     const st=new THREE.Group(); st.position.set(0,0,-.322); g.add(st); st.add(mesh(GC('vmScar',()=>new THREE.TorusGeometry(.0312,.0055,6,28)),mat(0xb0403c,{roughness:.55}),0,0,0)); }
   g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });

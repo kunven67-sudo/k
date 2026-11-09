@@ -27,14 +27,14 @@ function makeMeatLeg(){
 function makePigMan(){
   const T=charTex();
   const root=new THREE.Group(); root.name='Pig';
-  const skin=skinify(new THREE.MeshPhysicalMaterial({color:col(0xe8a19b),roughness:.58,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.5,.5),sheen:col(0x553030)}),[1,.55,.5]);
-  const snoutM=skinify(new THREE.MeshPhysicalMaterial({color:col(0xd98480),roughness:.42,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.8,.8)}),[1,.5,.5]);
+  const skin=skinify(new THREE.MeshPhysicalMaterial({color:col(0xc98f86),roughness:.62,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.5,.5),sheen:col(0x553030)}),[1,.55,.5]);
+  const snoutM=skinify(new THREE.MeshPhysicalMaterial({color:col(0xb8706a),roughness:.38,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.8,.8)}),[1,.5,.5]);
   const dark=new THREE.MeshStandardMaterial({color:col(0x1a0c0a),roughness:.6});
   const eyeM=new THREE.MeshPhysicalMaterial({color:col(0x120806),roughness:.08,clearcoat:1});
   const tuskM=mat(0xe6dcc4,{roughness:.45});
-  const iron=pbrMat('rusty_metal_04',.6,{opts:{metalness:.8,roughness:.7}});
+  const iron=pbrMat('rusty_metal_04',.6,{opts:{metalness:.9,roughness:.5}}); iron.color=col(0xc0b0a0);
   const leather=pbrMat('brown_leather',.5,{opts:{roughness:.75}}); leather.color=col(0x8a6a50);
-  const cloth=new THREE.MeshPhysicalMaterial({color:col(0x5a3a28),roughness:.95,map:T.cloth.map,normalMap:T.cloth.normalMap,sheen:col(0x221510)});
+  const cloth=new THREE.MeshPhysicalMaterial({color:col(0x7a5a40),roughness:.95,map:T.cloth.map,normalMap:T.cloth.normalMap,sheen:col(0x221510)});
   const gold=new THREE.MeshStandardMaterial({color:col(0xb8862e),metalness:1,roughness:.35});
   const add=(p,m)=>{ p.add(m); m.castShadow=true; m.receiveShadow=true; return m; };
   // ---- body ----
@@ -51,30 +51,38 @@ function makePigMan(){
   const belt=add(spine,mesh(new THREE.TorusGeometry(.5,.05,10,32),leather,0,.02,.14)); belt.rotation.x=Math.PI/2; belt.scale.set(1.08,.98,1);
   add(spine,mesh(roundedBoxGeo(.16,.12,.05,.015),gold,0,.02,.66));
   for(const sd of [-1,1]){ const strap=add(chest,mesh(new THREE.BoxGeometry(.07,.62,.03),leather,sd*.2,.12,.37)); strap.rotation.z=sd*.25; strap.rotation.x=-.25; }
-  // ---- head ----
+  // ---- head: a big boar-like pig head, long snout, small mean eyes, tusks ----
   const neck=new THREE.Group(); neck.position.set(0,.47,.04); chest.add(neck);
-  add(neck,mesh(new THREE.CylinderGeometry(.21,.27,.2,18),skin,0,.06,0));
-  const head=new THREE.Group(); head.position.set(0,.26,.04); neck.add(head);
-  const skull=add(head,mesh(new THREE.SphereGeometry(.22,28,20),skin,0,.02,0)); skull.scale.set(1.02,.95,1.12);
-  for(const sd of [-1,1]){ const ch=add(head,sph(.11,skin,sd*.12,-.06,.1,16,12)); ch.scale.multiply(V3(1,.85,1.1)); }
-  const snout=add(head,mesh(new THREE.CylinderGeometry(.088,.1,.17,22),snoutM,0,-.04,.27)); snout.rotation.x=Math.PI/2+.12;
-  const disc=add(head,mesh(new THREE.CylinderGeometry(.09,.09,.02,22),snoutM,0,-.05,.355)); disc.rotation.x=Math.PI/2+.12;
-  for(const sd of [-1,1]){ const n=add(head,mesh(new THREE.SphereGeometry(.022,10,8),dark,sd*.035,-.052,.366)); n.scale.set(.75,1.15,.35); }
-  // eyes: small, deep, mean brows
+  add(neck,mesh(new THREE.CylinderGeometry(.24,.31,.24,20),skin,0,.05,0));
+  const head=new THREE.Group(); head.position.set(0,.25,.06); neck.add(head);
+  const skull=add(head,mesh(new THREE.SphereGeometry(.21,30,22),skin,0,.05,-.06)); skull.scale.set(.92,.86,1.28);
+  // fat cheeks + jowls hanging down
+  for(const sd of [-1,1]){ const ch=add(head,mesh(new THREE.SphereGeometry(.12,18,14),skin,sd*.12,-.05,.06)); ch.scale.set(.95,1.0,1.15);
+    const jw=add(head,mesh(new THREE.SphereGeometry(.1,16,12),skin,sd*.1,-.14,.0)); jw.scale.set(1,.8,1.1); }
+  // the long snout, tapering forward and a little down
+  const muz=new THREE.Group(); muz.position.set(0,-.02,.1); muz.rotation.x=.38; head.add(muz);
+  const mzl=add(muz,mesh(new THREE.CylinderGeometry(.074,.14,.34,24,1,true),skin,0,0,.15)); mzl.rotation.x=Math.PI/2; mzl.scale.set(1,1,.86);
+  const disc=add(muz,mesh(new THREE.CylinderGeometry(.078,.074,.03,24),snoutM,0,0,.32)); disc.rotation.x=Math.PI/2; disc.scale.set(1,1,.82);
+  for(const sd of [-1,1]){ const n=add(muz,mesh(new THREE.SphereGeometry(.016,10,8),dark,sd*.029,-.006,.336)); n.scale.set(.75,1.25,.35); }
+  // wrinkles across the top of the snout
+  for(let i=0;i<3;i++){ const w=add(muz,mesh(new THREE.TorusGeometry(.105-i*.012,.005,6,18,Math.PI*.7),skin,0,.0,.07+i*.05)); w.rotation.z=Math.PI*.15; w.scale.set(1,.9,1); }
+  // eyes: small, deep, under a heavy angry brow
   const eyes=[];
-  for(const sd of [-1,1]){ const sock=add(head,sph(.042,new THREE.MeshStandardMaterial({color:col(0x6a3a36),roughness:.8}),sd*.1,.06,.17,12,10)); sock.scale.multiply(V3(1,.8,.6));
-    const e=add(head,sph(.024,eyeM,sd*.1,.06,.192,12,10)); eyes.push(e);
-    const brow=add(head,mesh(new THREE.BoxGeometry(.1,.025,.05),skin,sd*.1,.1,.18)); brow.rotation.z=sd*.32; brow.rotation.x=.2; }
-  // ears flop forward
+  for(const sd of [-1,1]){ const sock=add(head,mesh(new THREE.SphereGeometry(.03,12,10),new THREE.MeshStandardMaterial({color:col(0x3a1a18),roughness:.9}),sd*.13,.07,.1)); sock.scale.set(.8,.7,.6);
+    const e=add(head,mesh(new THREE.SphereGeometry(.016,12,10),eyeM,sd*.135,.068,.112)); eyes.push(e);
+    const glint=add(head,mesh(new THREE.SphereGeometry(.004,6,6),new THREE.MeshBasicMaterial({color:0xffd8b0}),sd*.134,.073,.126));
+    const brow=add(head,mesh(new THREE.CylinderGeometry(.026,.02,.1,10),skin,sd*.12,.1,.11)); brow.rotation.z=Math.PI/2+sd*.45; brow.rotation.y=sd*.5; }
+  // big ears, pointing out and drooping forward
   const ears=[];
-  for(const sd of [-1,1]){ const ep=new THREE.Group(); ep.position.set(sd*.15,.17,.0); head.add(ep);
-    const ear=add(ep,mesh(new THREE.ConeGeometry(.09,.2,12,1,true),skin,0,.08,0)); ear.scale.set(1,1,.3); ear.material=skin; ear.rotation.x=.2;
-    ep.rotation.set(.9,0,sd*-.5); ears.push(ep); }
-  // lower jaw (chews) with tusks
-  const jaw=new THREE.Group(); jaw.position.set(0,-.1,.12); head.add(jaw);
-  const jm=add(jaw,mesh(new THREE.SphereGeometry(.13,18,12),skin,0,-.02,.07)); jm.scale.set(.9,.42,1.05);
-  add(jaw,mesh(new THREE.BoxGeometry(.12,.012,.05),mat(0x3a0a0a,{roughness:.6}),0,.01,.16));
-  for(const sd of [-1,1]){ const tk=add(jaw,mesh(new THREE.ConeGeometry(.016,.075,8),tuskM,sd*.07,.04,.15)); tk.rotation.z=sd*-.35; tk.rotation.x=-.25; }
+  for(const sd of [-1,1]){ const ep=new THREE.Group(); ep.position.set(sd*.16,.16,-.02); head.add(ep);
+    const ear=add(ep,mesh(new THREE.ConeGeometry(.12,.3,16,1,true),skin,0,.13,0)); ear.scale.set(1,1,.28); ear.material=skin;
+    ep.rotation.set(1.35,0,sd*-.75); ears.push(ep); }
+  // lower jaw (chews) with big curved tusks
+  const jaw=new THREE.Group(); jaw.position.set(0,-.13,.12); head.add(jaw);
+  const jm=add(jaw,mesh(new THREE.SphereGeometry(.13,18,12),skin,0,-.01,.1)); jm.scale.set(.85,.38,1.2);
+  add(jaw,mesh(new THREE.BoxGeometry(.13,.012,.05),mat(0x2a0808,{roughness:.6}),0,.025,.21));
+  for(const sd of [-1,1]){ const tk=new THREE.Group(); tk.position.set(sd*.075,.02,.2); jaw.add(tk);
+    for(let i=0;i<4;i++){ const seg=add(tk,mesh(new THREE.CylinderGeometry(.013-i*.003,.016-i*.003,.035,8),tuskM,sd*i*.008,.03*i,-.004*i*i)); seg.rotation.z=-sd*(.25+i*.18); seg.rotation.x=-.2-i*.12; } }
   // a crude crown (the pig king from the paintings)
   const crown=new THREE.Group(); crown.position.set(0,.2,-.01); head.add(crown);
   add(crown,mesh(new THREE.CylinderGeometry(.17,.19,.07,20,1,true),gold,0,0,0)).material.side=THREE.DoubleSide;
@@ -145,5 +153,5 @@ function animatePigMan(root,dt,t){
   P.neck.rotation.set(P.pitch*.4,P.yaw*.45,0); P.head.rotation.set(P.pitch*.6,P.yaw*.55,0);
   // ears flick now and then
   P.earT=(P.earT||0)-dt; if(P.earT<=0){ P.earT=rand(2,6); P.earK=1; } P.earK=Math.max(0,(P.earK||0)-dt*5);
-  P.ears.forEach((e,i)=>{ e.rotation.x=.9-Math.sin(P.earK*Math.PI)*.4*(i?1:.6); });
+  P.ears.forEach((e,i)=>{ e.rotation.x=1.35-Math.sin(P.earK*Math.PI)*.35*(i?1:.6); });
 }

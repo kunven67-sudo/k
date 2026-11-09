@@ -83,7 +83,7 @@ function cleanUI(){
   for(const id of ['fade','flash','fxWhite','fxBlack']){ const e=$(id); e.style.transition='none'; e.style.opacity=0; }
   camRelease(0); PLAYER.auto=null; PLAYER.lookTo=null; PLAYER.eye=1.64; PLAYER.roll=0; PLAYER.free(); PLAYER.ctl.jump=true;
   PLAYER.hasWatch=true; PLAYER.watchLook=0; PLAYER.watchGlow=0; PLAYER.item=null; PLAYER.stitched=true;
-  VM.forceShow=false; VM.handsLook=0; VM.reach=0; VM.punchT=0; setVM(true); redKnuckles(false); setVMBlocky(false); vmCarry(null); watchMode('time');
+  VM.forceShow=false; VM.handsLook=0; VM.reach=0; VM.punchT=0; if(VM.holdItem){ VM.holdItem.parent&&VM.holdItem.parent.remove(VM.holdItem); VM.holdItem=null; } VM.eatK=0; setVM(true); redKnuckles(false); setVMBlocky(false); vmCarry(null); watchMode('time');
   objective(''); hudVisible(true); crosshair(true);
   if(typeof AMB!=='undefined') setAmbience([]);
   SCENE_TICKS.length=0; CHATQ=Promise.resolve(); for(const k of ['buildH','orb']) STORY[k]=null;

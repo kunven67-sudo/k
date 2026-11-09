@@ -40,7 +40,7 @@ function frame(){
       if(slowChecks>=12 && autoLowered<3){ slowChecks=0; const i=PRESET_ORDER.indexOf(SETTINGS.preset); const idx=i<0?PRESET_ORDER.indexOf('medium'):i; if(idx>0){ autoLowered++; applyPreset(PRESET_ORDER[idx-1]); toast('Graphics lowered to '+PRESETS[SETTINGS.preset].name+' so it runs smooth','#9fe8ff'); } } } }
 }
 /* ---------- everything the game needs, loaded once ---------- */
-const TEX_LIST=['dense_sand','sandy_gravel_02','sandstone_blocks_05','large_sandstone_blocks_01','old_sandstone_02','sandstone_cracks','red_sandstone_pavement','clay_plaster','castle_brick_07','stone_tiles_02','rusty_metal_04','brown_leather','rough_wood'];
+const TEX_LIST=['desert_ripple','desert_sand','dense_sand','sandy_gravel_02','sandstone_blocks_05','large_sandstone_blocks_01','old_sandstone_02','sandstone_cracks','red_sandstone_pavement','clay_plaster','castle_brick_07','stone_tiles_02','rusty_metal_04','brown_leather','rough_wood'];
 const SFX_LIST=[...[1,2,3,4,5,6].flatMap(i=>['step_sand_'+i,'step_stone_'+i]),'sigh_1','sigh_2','breath_heavy','gasp','oof_1','oof_2','static','watch_beep',
   'punch_1','punch_2','punch_3','swing_1','swing_2','block_1','block_2','body_fall','sand_fall','heartbeat','bite','chew_1','chew_2','chew_3',
   'pig_eat_1','pig_eat_2','pig_eat_3','pig_eat_4','stomach','pig_1','pig_2','pig_3','pig_4','pig_5','pig_6','pig_squeal','chain_1','chain_2','chain_3',

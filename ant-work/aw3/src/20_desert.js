@@ -3,72 +3,108 @@
    Real sand (Poly Haven), heat shimmer, sand blowing over the dunes,
    footprints that stay, sun glare when you look up.
    ================================================================ */
-const DESERT={size:1400,pyr:V3(0,0,-178),base:150,height:96};
+const DESERT={size:2400,pyr:V3(0,0,-178),base:150,height:96};
 DESERT.door=V3(0,0,DESERT.pyr.z+DESERT.base/2);          // the entrance, ~103 m from where you land
-function duneHeight(x,z){
-  // long dunes across the wind, ridges + small ripples
-  let h=fbm2(x*.0042+3,z*.0021,4)*9+fbm2(x*.013,z*.011,3)*2.2+Math.sin(x*.9+z*.35+fbm2(x*.05,z*.05,2)*4)*.045;
-  const P=DESERT.pyr;
-  const dp=Math.max(Math.abs(x-P.x),Math.abs(z-P.z));    // square around the pyramid
-  h*=smooth(invLerp(DESERT.base*.5+12,DESERT.base*.5+70,dp));
-  h*=smooth(invLerp(5,22,Math.hypot(x,z)));               // flat where you land
-  // the way you walk: low, gentle dunes so nobody climbs a wall of sand
-  if(z<12&&z>DESERT.door.z-10) h*=.25+.75*smooth(invLerp(6,34,Math.abs(x)));
+/* real dunes: long ridges across the wind, a gentle side and a steep slip face, smaller dunes on top */
+function duneRaw(x,z){
+  const warp=fbm2(x*.0032+11,z*.0032-4,3)*1.6;
+  const u=z*.0058+x*.0011+warp; const f=u-Math.floor(u);
+  const ridge=f<.72?f/.72:(1-f)/.28;                     // windward slope 72%, slip face 28%
+  const A=9+fbm2(x*.0021-7,z*.0021+3,2)*9;                 // dune height 0..~18 m
+  let h=smooth(ridge)*A;
+  h+=fbm2(x*.016+5,z*.016,3)*1.7+fbm2(x*.05,z*.05,2)*.35; // small dunes + lumps
   return h;
 }
-/* a 4-sided pyramid; every face gets its own flat UVs so the stone blocks don't smear */
-function pyramidGeo(base,height,tile){
-  const h2=base/2, pos=[], uv=[], nor=[];
-  const C=[[-h2,-h2],[h2,-h2],[h2,h2],[-h2,h2]];
-  const slant=Math.hypot(height,h2), n=new THREE.Vector3();
-  for(let i=0;i<4;i++){
-    const a=C[i], b=C[(i+1)%4];
-    const mx=(a[0]+b[0])/2, mz=(a[1]+b[1])/2;              // middle of the base edge = the face's outward direction
-    n.set(mx,0,mz).normalize().multiplyScalar(height).setY(h2).normalize();
-    // wind the triangle so its front side faces outward
-    let v0=V3(a[0],0,a[1]), v1=V3(b[0],0,b[1]); const v2=V3(0,height,0);
-    const gn=new THREE.Vector3().crossVectors(v1.clone().sub(v0),v2.clone().sub(v0)); if(gn.x*mx+gn.z*mz<0){ const tmp=v0; v0=v1; v1=tmp; }
-    pos.push(v0.x,0,v0.z, v1.x,0,v1.z, 0,height,0);
-    uv.push(0,0, base/tile,0, base/tile/2,slant/tile);
-    for(let k=0;k<3;k++) nor.push(n.x,n.y,n.z);
+function duneHeight(x,z){
+  let h=duneRaw(x,z);
+  const P=DESERT.pyr;
+  const dp=Math.max(Math.abs(x-P.x),Math.abs(z-P.z));    // flat, packed ground round the pyramid
+  const kp=smooth(invLerp(DESERT.base*.5+10,DESERT.base*.5+80,dp));
+  const kl=.3+.7*smooth(invLerp(6,26,Math.hypot(x,z)));   // calmer where you land
+  // the way you walk: lower dunes, still up and down
+  const kc=(z<14&&z>DESERT.door.z-12)?.38+.62*smooth(invLerp(8,46,Math.abs(x))):1;
+  // wind piles sand up against the pyramid's foot (kept clear in front of the door)
+  const e=dp-DESERT.base*.5; let drift=e>-2&&e<14?2.4*Math.pow(1-clamp(e/14,0,1),1.6):0;
+  if(Math.abs(x)<10&&z>P.z) drift*=smooth(invLerp(5,10,Math.abs(x)));
+  drift*=.7+.3*fbm2(x*.05,z*.05,2);
+  return h*kp*Math.min(kl,kc)+drift;
+}
+/* a pyramid built the real way: courses of stone stepping in, each a little worn and different */
+function steppedPyramidGeo(base,height,n,tile){
+  const pos=[],nor=[],uv=[],cl=[], rr=RNG(5), h=height/n;
+  const quad=(a,b,c,d,nn,uvs,k)=>{ pos.push(...a,...b,...c,...a,...c,...d); for(let i=0;i<6;i++){ nor.push(...nn); cl.push(k,k*.982,k*.94); }
+    uv.push(...uvs[0],...uvs[1],...uvs[2],...uvs[0],...uvs[2],...uvs[3]); };
+  let prev=base/2+.6;
+  for(let i=0;i<n;i++){
+    const s=Math.min(prev-.35,base/2*(1-i/n)+(rr()-.5)*.24), y0=i*h, y1=y0+h; prev=s;
+    const k=.8+rr()*.16+Math.min(1,i/n*1.6)*.1-(i<3?.1*(3-i)/3:0);
+    const T=v=>v/tile, side=(u0,u1)=>[[T(u0),T(y0)],[T(u1),T(y0)],[T(u1),T(y1)],[T(u0),T(y1)]];
+    quad([-s,y0,s],[s,y0,s],[s,y1,s],[-s,y1,s],[0,0,1],side(-s,s),k);
+    quad([s,y0,-s],[-s,y0,-s],[-s,y1,-s],[s,y1,-s],[0,0,-1],side(-s,s),k*.97);
+    quad([s,y0,s],[s,y0,-s],[s,y1,-s],[s,y1,s],[1,0,0],side(-s,s),k*.99);
+    quad([-s,y0,-s],[-s,y0,s],[-s,y1,s],[-s,y1,-s],[-1,0,0],side(-s,s),k*.96);
+    quad([-s,y1,s],[s,y1,s],[s,y1,-s],[-s,y1,-s],[0,1,0],[[T(-s),T(s)],[T(s),T(s)],[T(s),T(-s)],[T(-s),T(-s)]],k*1.04);
   }
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));
-  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setAttribute('uv2',new THREE.Float32BufferAttribute(uv,2));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.setAttribute('uv2',new THREE.Float32BufferAttribute(uv,2)); g.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));
   return g;
+}
+/* a lumpy weathered rock (radius ~0.5) */
+function rockGeo(seed){ const g=new THREE.IcosahedronGeometry(.5,2), p=g.attributes.position, rr=RNG(seed), ox=rr()*50, oz=rr()*50;
+  for(let i=0;i<p.count;i++){ const v=new THREE.Vector3(p.getX(i),p.getY(i),p.getZ(i)); const k=1+fbm2(v.x*2.2+ox,v.z*2.2+v.y*1.7+oz,3)*.35; v.multiplyScalar(k); if(v.y<-.15) v.y=-.15+(v.y+.15)*.3; p.setXYZ(i,v.x,v.y,v.z); }
+  g.computeVertexNormals(); return withAO(g); }
+/* desert sand: real ripple texture, sampled twice at different sizes so it never looks tiled */
+function sandMaterial(SZ){
+  const m=pbrMat('desert_ripple',2.6,{w:SZ,h:SZ,opts:{vertexColors:true,roughness:1},normal:1.25}); m.color=col(0xf6c890);
+  m.onBeforeCompile=sh=>{
+    sh.fragmentShader=sh.fragmentShader
+      .replace('#include <map_fragment>',`
+        vec4 texelColor = texture2D( map, vUv );
+        vec4 texelBig = texture2D( map, vUv*0.137 + vec2(0.31,0.73) );
+        texelColor.rgb = mix( texelColor.rgb, texelBig.rgb, 0.5 );
+        texelColor = mapTexelToLinear( texelColor );
+        diffuseColor *= texelColor;`)
+      .replace('vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;',
+        'vec3 mapN = mix( texture2D( normalMap, vUv ).xyz, texture2D( normalMap, vUv*0.137 + vec2(0.31,0.73) ).xyz, 0.42 ) * 2.0 - 1.0;');
+  };
+  return m;
 }
 defineLevel('desert',{
   title:'The Desert',
-  env:{fx:{exposure:.96,temp:.1,saturation:1.1,contrast:1.12,bloomStrength:.22,bloomThreshold:1.5,aoRadius:.7,vignette:.3,heat:.4,grain:.025},music:null,reverb:.02,surface:'sand',far:2600,speed:2.9},
+  env:{fx:{exposure:.9,temp:.12,saturation:1.12,contrast:1.14,bloomStrength:.22,bloomThreshold:1.5,aoRadius:.7,vignette:.3,heat:.4,grain:.025},music:null,reverb:.02,surface:'sand',far:2600,speed:2.9},
   async build(scene,lv){
-    const sunDir=V3(.22,.9,.3).normalize(); lv.sunDir=sunDir;
-    const sky=makeSky({top:0x1d55c8,mid:0x6fa4e8,horizon:0xe8dcc8,bottom:0xb89a70,sunDir,sunColor:0xfff6e4,sunSize:.99955,sunGlow:1.4,clouds:0,horizonLift:.01});
+    const sunDir=V3(.36,.76,.44).normalize(); lv.sunDir=sunDir;
+    const sky=makeSky({top:0x1648b8,mid:0x5f97e0,horizon:0xe6d6bc,bottom:0xc09a68,sunDir,sunColor:0xfff6e4,sunSize:.99955,sunGlow:1.4,clouds:0,horizonLift:.01});
     scene.add(sky); lv.skyU=sky.userData.u;
     const ex=()=>{}; ex.ground=0xc8a870; lv.envMap=envFromSky(sky,ex);
-    lv.rig=makeRig(scene,{sun:2.75,sunColor:0xfff2dc,hemi:.48,sky:0xa8c8ff,ground:0xb89060,dir:sunDir,span:26,dist:120,far:300,bias:-.0005,normalBias:.03});
+    lv.rig=makeRig(scene,{sun:2.9,sunColor:0xfff0d6,hemi:.3,sky:0x9cbcff,ground:0xc89458,dir:sunDir,span:26,dist:120,far:300,bias:-.0005,normalBias:.03});
     lv.sunWorld=sunDir.clone().multiplyScalar(2400);
-    scene.fog=new THREE.FogExp2(col(0xe8d8bc),.0011); lv.fogBase=.0011;
+    scene.fog=new THREE.FogExp2(col(0xe2cfae),.00085); lv.fogBase=.00085;
     await nextFrame();
     // ---- the dunes ----
-    const S=dq(120,160,220,260,320), SZ=DESERT.size;
+    const S=dq(150,200,260,320,380), SZ=DESERT.size;
     const tg=new THREE.PlaneGeometry(SZ,SZ,S,S); tg.rotateX(-Math.PI/2); const tp=tg.attributes.position, cc=new Float32Array(tp.count*3);
-    for(let i=0;i<tp.count;i++){ const x=tp.getX(i), z=tp.getZ(i); tp.setY(i,duneHeight(x,z));
-      // colour variation kills the tiling: light crests, darker hollows, streaks along the wind
-      const k=.86+fbm2(x*.03+9,z*.03,3)*.22+fbm2(x*.004,z*.08,2)*.1; cc[i*3]=k; cc[i*3+1]=k*.985; cc[i*3+2]=k*.95; }
+    for(let i=0;i<tp.count;i++){ const x=tp.getX(i), z=tp.getZ(i); tp.setY(i,duneHeight(x,z)); }
+    tg.computeVertexNormals(); const tn=tg.attributes.normal;
+    for(let i=0;i<tp.count;i++){ const x=tp.getX(i), z=tp.getZ(i), y=tp.getY(i);
+      const slope=1-tn.getY(i), lit=Math.max(0,tn.getX(i)*.22+tn.getY(i)*.9+tn.getZ(i)*.3);
+      let k=.8+fbm2(x*.03+9,z*.03,3)*.16+fbm2(x*.004,z*.06,2)*.08+clamp(y/18,0,1)*.12-slope*.35+lit*.06;
+      cc[i*3]=k; cc[i*3+1]=k*.94; cc[i*3+2]=k*.84; }
     tg.setAttribute('color',new THREE.BufferAttribute(cc,3)); tg.computeVertexNormals(); withAO(tg);
-    const sandM=pbrMat('dense_sand',3.2,{w:SZ,h:SZ,opts:{vertexColors:true,roughness:1},normal:.9});
+    const sandM=sandMaterial(SZ);
     const ground=mesh(tg,sandM,0,0,0,false); ground.receiveShadow=true; scene.add(ground);
     lv.hf=heightField(SZ,S,duneHeight); lv.ground=(x,z)=>lv.hf.at(x,z);
     lv.surfaceAt=()=>'sand';
     // packed, trampled sand round the pyramid
     const P=DESERT.pyr, BASE=DESERT.base, HGT=DESERT.height;
-    const padR=BASE*.5+40; const padG=withAO(new THREE.PlaneGeometry(padR*2,padR*2)); const pad=mesh(padG,pbrMat('sandy_gravel_02',3,{w:padR*2,h:padR*2,opts:{roughness:1,transparent:true,opacity:.85}}),P.x,.05,P.z,false); pad.rotation.x=-Math.PI/2; pad.receiveShadow=true; scene.add(pad);
+    // (packed ground round the pyramid comes from the flatter dunes there)
     // ---- the pyramid ----
-    const pyrM=pbrMat('large_sandstone_blocks_01',5,{opts:{roughness:1},normal:1.2}); pyrM.color=col(0xe6cfa6);
-    const pyr=mesh(pyramidGeo(BASE,HGT,5),pyrM,P.x,-.4,P.z); pyr.castShadow=true; pyr.receiveShadow=true; scene.add(pyr); lv.pyramid=pyr;
+    const pyrM=pbrMat('large_sandstone_blocks_01',6.8,{opts:{roughness:1,vertexColors:true},normal:1.4}); pyrM.color=col(0xf2dcb4);
+    const pyr=mesh(steppedPyramidGeo(BASE,HGT,56,6.8),pyrM,P.x,-.3,P.z); pyr.castShadow=true; pyr.receiveShadow=true; scene.add(pyr); lv.pyramid=pyr;
     // the cap stone, worn and darker
     // the entrance: a stone porch sticking out of the face toward you, with a black doorway
     const D=DESERT.door, porch=new THREE.Group(); porch.position.set(D.x,0,D.z); scene.add(porch); lv.porch=porch;
-    const stoneM=pbrMat('old_sandstone_02',2.2,{opts:{roughness:1},normal:1.1}); stoneM.color=col(0xe8d2ac);
+    const stoneM=pbrMat('large_sandstone_blocks_01',3,{opts:{roughness:1},normal:1.2}); stoneM.color=col(0xe2cba4);
     const sideM=pbrMat('sandstone_blocks_05',2.4,{opts:{roughness:1}}); sideM.color=col(0xe2caa0);
     const blk=(w,h,d,m,x,y,z)=>{ const b=mesh(withAO(new THREE.BoxGeometry(w,h,d)),m,x,y,z); b.castShadow=b.receiveShadow=true; porch.add(b); return b; };
     blk(2.6,7.2,9,sideM,-3.5,3.6,-1.5); blk(2.6,7.2,9,sideM,3.5,3.6,-1.5);        // the two side walls
@@ -76,11 +112,12 @@ defineLevel('desert',{
     blk(10.6,.5,10,stoneM,0,9.6,-1.5);                                            // a cap
     const dark=new THREE.MeshBasicMaterial({color:0x000000}); const hole=mesh(new THREE.BoxGeometry(4.45,7.2,9.6),dark,0,3.6,-2.2,false); porch.add(hole);
     // a few fallen blocks and half-buried stones around the porch
-    for(const [x,z,s,r] of [[-7.5,4,1.1,.4],[6.8,6.5,.8,1.2],[9,1,1.4,.2],[-10,9,.7,.9],[4,11,.5,2.1]]){ const b=mesh(withAO(new THREE.BoxGeometry(1.6*s,1*s,1.2*s)),stoneM,D.x+x,.25*s,D.z+z); b.rotation.set(rand(-.2,.2),r,rand(-.15,.15)); b.castShadow=b.receiveShadow=true; scene.add(b); colCircle(lv.col,D.x+x,D.z+z,.9*s); }
+    const rockM=pbrMat('sandstone_cracks',1.2,{opts:{roughness:1},normal:1.4}); rockM.color=col(0xe8c89a);
+    for(const [x,z,sc,r] of [[-7.5,4,1.1,.4],[6.8,6.5,.8,1.2],[9,1,1.4,.2],[-10,9,.7,.9],[4,11,.5,2.1],[-14,-2,1.6,1.7],[13,-1,1.2,2.6]]){ const b=mesh(rockGeo(randi(1,999)),rockM,D.x+x,0,D.z+z); b.scale.set(1.5*sc,.8*sc,1.2*sc); b.position.y=lv.ground(D.x+x,D.z+z)+.12*sc; b.rotation.set(rand(-.2,.2),r,rand(-.15,.15)); b.castShadow=b.receiveShadow=true; scene.add(b); colCircle(lv.col,D.x+x,D.z+z,.9*sc); }
     // walls you can't walk through: the pyramid (except the door) and the porch walls
     colBox(lv.col,P.x-BASE/2,P.x+BASE/2,P.z-BASE/2,D.z-6);
     colBox(lv.col,D.x-4.8,D.x-2.2,D.z-6,D.z+3); colBox(lv.col,D.x+2.2,D.x+4.8,D.z-6,D.z+3);
-    lv.col.radius=600; lv.col.cx=0; lv.col.cz=-60;
+    lv.col.radius=1000; lv.col.cx=0; lv.col.cz=-60;
     // ---- Jay 2 (normal now, green hoodie) ----
     lv.jay2=makeJay2(); lv.jay2.userData.level='desert'; lv.jay2.visible=false; scene.add(lv.jay2);
     // ---- footprints ----
@@ -120,7 +157,7 @@ defineLevel('desert',{
     // heat shimmer (stronger toward the horizon), sun glare when you look up at it
     const fw=camera.getWorldDirection(_dfw);
     FX.heat=.32+(1-Math.abs(fw.y))*.4;
-    if(lv.glareOn){ const sd=fw.dot(lv.sunDir); const gl=clamp((sd-.75)/.25,0,1); FX.whiteout=gl*gl*.5; FX.exposure=.96+gl*.45; }
+    if(lv.glareOn){ const sd=fw.dot(lv.sunDir); const gl=clamp((sd-.75)/.25,0,1); FX.whiteout=gl*gl*.5; FX.exposure=.9+gl*.45; }
     // sweat: now and then the view goes soft for a second
     if(lv.sweatOn){ lv.sweatT=(lv.sweatT||0)+dt; const sw=Math.max(0,Math.sin(lv.sweatT*.55))**6*Math.max(0,Math.sin(lv.sweatT*.13)); blurScreen(sw*.32); }
   }

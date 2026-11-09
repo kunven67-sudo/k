@@ -47,7 +47,7 @@ async function runFight(h){
     F.phase='idle'; await wait(rand(.9,1.4)); if(F.stopReq) break;
     // both wind up... slow motion
     const kind=(n===0||n===2||n===3||n===5)?'punch':'block'; n++;
-    F.phase='wind'; SND.play('swing_'+randi(1,2),{vol:.35,rate:.55});
+    F.phase='wind'; SND.play('swing_'+randi(1,2),{vol:.35,rate:.55}); PLAYER.lookTo=null; lookAtPoint(headOf(h).add(V3(0,-.05,0)),.25);
     tweenVal(v=>{ F.anim.wind=v; },0,1,.35); VM.punchT=0;
     SLOWMO.target=.22; FX.desat=.35; await wait(.12); if(F.stopReq) break;
     await fightRing(kind);
@@ -111,7 +111,8 @@ function youGetHit(h,A){
   const F=FIGHT; F.hit++; F.gotHit=true;
   tweenVal(v=>{ A.ext=v; },0,1,.1,easeOut);
   later(.06,()=>{ SND.play('punch_'+randi(1,3),{vol:1,rate:.9}); SND.play('oof_'+randi(1,2),{vol:.8,rate:1.05}); dmgFlash(); shake(.6); PLAYER.fovKick=-6; F.hpYou-=15; fightHP();
-    PLAYER.yaw+=rand(-.12,.12); PLAYER.pitch+=rand(.05,.12); flashWhite(.25,.25); });
+    flashWhite(.25,.25); });
+  later(.55,()=>{ PLAYER.lookTo=null; lookAtPoint(headOf(h).add(V3(0,-.05,0)),.35); });
   later(.45,()=>tweenVal(v=>{ A.ext=v; },1,0,.35));
 }
 /* your knuckles go red after a couple of hits */

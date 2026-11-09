@@ -3,7 +3,7 @@
    figures, bands of glyphs), faded, flaking and dusty. Painted onto a
    transparent layer that sits on the real plaster texture.
    ================================================================ */
-const PAINT={ochre:'#b9772f',red:'#8f3524',black:'#211814',teal:'#3b7c76',white:'#e9dcc2',purple:'#7b3fa8',pink:'#c9837a',gold:'#c49a3a'};
+const PAINT={ochre:'#9c6a36',red:'#7a3424',black:'#2b2119',teal:'#4c6e66',white:'#d6c6a6',purple:'#5e4680',pink:'#a8786a',gold:'#9c823e'};
 function _fig(x,c,base,s,o={}){
   // a person in profile, striding, Egyptian style (head side-on, shoulders front-on)
   const h=70*s, col_=o.color||PAINT.red;
@@ -90,14 +90,18 @@ function _glyphs(c,x,y,w,h,seed){ const rr=RNG(seed); c.save(); c.fillStyle=PAIN
 /* age it: chipped, faded, cracked, dust settled on the bottom and top */
 function _age(c,w,h,seed){
   const rr=RNG(seed);
+  // flaked-off paint: lots of chips, big bare patches, cracks
   c.globalCompositeOperation='destination-out';
-  for(let i=0;i<2600;i++){ c.fillStyle='rgba(0,0,0,'+(rr()*.55).toFixed(2)+')'; const s=rr()*7+1; c.fillRect(rr()*w,rr()*h,s,s*rr()); }
-  for(let i=0;i<40;i++){ c.fillStyle='rgba(0,0,0,'+(.4+rr()*.6).toFixed(2)+')'; c.beginPath(); c.ellipse(rr()*w,rr()*h,rr()*40+6,rr()*18+4,rr()*3,0,7); c.fill(); }   // flaked-off patches
-  c.strokeStyle='rgba(0,0,0,.8)'; c.lineWidth=2; for(let i=0;i<12;i++){ let x=rr()*w, y=rr()*h; c.beginPath(); c.moveTo(x,y); for(let j=0;j<8;j++){ x+=(rr()-.5)*60; y+=rr()*30; c.lineTo(x,y); } c.stroke(); }
+  for(let i=0;i<5200;i++){ c.fillStyle='rgba(0,0,0,'+(rr()*.7).toFixed(2)+')'; const s=rr()*6+1; c.fillRect(rr()*w,rr()*h,s,s*(.4+rr())); }
+  for(let i=0;i<70;i++){ c.fillStyle='rgba(0,0,0,'+(.55+rr()*.45).toFixed(2)+')'; c.beginPath(); const x=rr()*w,y=rr()*h; c.moveTo(x,y); for(let k=0;k<7;k++) c.lineTo(x+(rr()-.5)*90,y+(rr()-.5)*50); c.fill(); }
+  c.strokeStyle='rgba(0,0,0,.9)'; for(let i=0;i<18;i++){ c.lineWidth=1+rr()*2.5; let x=rr()*w, y=rr()*h; c.beginPath(); c.moveTo(x,y); for(let j=0;j<10;j++){ x+=(rr()-.5)*70; y+=rr()*34; c.lineTo(x,y); } c.stroke(); }
+  // the bottom third worn away by sand blowing in
+  const wear=c.createLinearGradient(0,h*.6,0,h); wear.addColorStop(0,'rgba(0,0,0,0)'); wear.addColorStop(1,'rgba(0,0,0,.65)'); c.fillStyle=wear; c.fillRect(0,h*.6,w,h*.4);
   c.globalCompositeOperation='source-over';
-  // dust: a pale film, heavier at the bottom edge
-  const g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'rgba(206,182,140,.35)'); g.addColorStop(.15,'rgba(206,182,140,.08)'); g.addColorStop(.75,'rgba(206,182,140,.1)'); g.addColorStop(1,'rgba(206,182,140,.55)'); c.fillStyle=g; c.fillRect(0,0,w,h);
-  for(let i=0;i<70;i++){ c.fillStyle='rgba(200,176,132,'+(rr()*.25).toFixed(2)+')'; c.beginPath(); c.ellipse(rr()*w,rr()*h,rr()*70+10,rr()*14+3,0,0,7); c.fill(); }
+  // grime and soot (old torches), then a pale film of dust over everything
+  for(let i=0;i<45;i++){ c.fillStyle='rgba(30,20,12,'+(rr()*.22).toFixed(2)+')'; c.beginPath(); c.ellipse(rr()*w,rr()*h*.5,rr()*120+30,rr()*40+10,0,0,7); c.fill(); }
+  const g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'rgba(196,170,128,.4)'); g.addColorStop(.2,'rgba(196,170,128,.16)'); g.addColorStop(.7,'rgba(196,170,128,.2)'); g.addColorStop(1,'rgba(200,176,132,.6)'); c.fillStyle=g; c.fillRect(0,0,w,h);
+  for(let i=0;i<110;i++){ c.fillStyle='rgba(196,172,130,'+(rr()*.3).toFixed(2)+')'; c.beginPath(); c.ellipse(rr()*w,rr()*h,rr()*80+10,rr()*16+3,0,0,7); c.fill(); }
 }
 /* the four paintings, each 1024 x 448 (about 6 m x 2.6 m on the wall) */
 const PAINTINGS={
@@ -137,7 +141,7 @@ const PAINTINGS={
   }
 };
 function paintingTexture(name){
-  return canvasTex(1024,448,(c,w,h)=>{ c.clearRect(0,0,w,h); c.globalAlpha=.92; PAINTINGS[name](c,w,h); c.globalAlpha=1; _age(c,w,h,name.length*97+7); });
+  return canvasTex(1024,448,(c,w,h)=>{ c.clearRect(0,0,w,h); c.globalAlpha=.74; PAINTINGS[name](c,w,h); c.globalAlpha=1; _age(c,w,h,name.length*97+7); });
 }
 /* ---------- bones ---------- */
 function boneMat(){ if(!boneMat.m){ boneMat.m=pbrMat('clay_plaster',.25,{opts:{roughness:.85}}); boneMat.m.color=col(0xe2d4b4); } return boneMat.m; }

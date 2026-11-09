@@ -238,7 +238,8 @@ async function buildLevel(name){
   const scene=new THREE.Scene(); def.scene=scene; def.col=makeCol(); def.inter=[]; def.triggers=[]; def.updaters=[];
   def.soft=new Particles(scene,dq(600,1200,2500,3500,5000),false); def.glow=new Particles(scene,dq(400,800,1500,2500,3500),true);
   BUILDING_LV=def; try{ await def.build(scene,def); } finally{ BUILDING_LV=null; }
-  scene.traverse(o=>{ if(o.isMesh && o.material && o.material.map && o.material.map.anisotropy<MAX_ANISO){ o.material.map.anisotropy=MAX_ANISO; } });
+  // sharp textures at grazing angles (sand, floors): every map gets full anisotropic filtering
+  scene.traverse(o=>{ if(!o.isMesh||!o.material) return; for(const m of (Array.isArray(o.material)?o.material:[o.material])) for(const k of ['map','normalMap','roughnessMap','aoMap','emissiveMap']){ const t=m[k]; if(t&&t.anisotropy<MAX_ANISO){ t.anisotropy=MAX_ANISO; t.needsUpdate=true; } } });
   LEVEL_SCENES.push(scene);
   def.built=true;
   // pre-compile shaders so the first frame in the level doesn't hitch
