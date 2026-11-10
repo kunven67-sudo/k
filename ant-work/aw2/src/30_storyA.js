@@ -218,7 +218,8 @@ async function keypadScene(){
   // Jim climbs down
   await walkTo(jim,[V3(.5,0,-4.2),V3(0,0,-4.55)],1.2); faceYaw(jim,Math.PI);
   setPose(jim,'climb');
-  await tweenVal(k=>{ jim.position.y=-k*3; jim.position.z=-4.55-k*.4; },2.2,easeIn);
+  await tweenVal(k=>{ jim.position.z=-4.55-k*.85; jim.position.y=-k*.25; },.6);                  // onto the ladder, over the hole
+  await tweenVal(k=>{ jim.position.y=-.25-k*2.9; },2.2,easeIn);                                  // straight down the rungs
   jim.visible=false; clearPose(jim,0); jim.position.y=0;
   lv.hatchPassable=true;
   camRelease(.8); letterbox(false);
@@ -227,15 +228,17 @@ async function keypadScene(){
 }
 async function climbDown(){
   const F=F_(); if(F.climbing) return; F.climbing=true; PLAYER.lock(); objective(null);
-  lookAtPoint(V3(0,-1,-5.9),.5); await wait(.5);
-  for(let i=0;i<5;i++){ SFX.ladder(); PLAYER.y-=.35; await wait(.32); }
+  // step ONTO the ladder (you used to sink through the floor wherever you stood) and face the rungs; the view stays on them
+  const p0=PLAYER.pos.clone(), p1=V3(0,0,-5.42);
+  PLAYER.lookTo=null; lookAtPoint(V3(0,-.4,-5.9),.5); await tweenVal(k=>{ PLAYER.pos.lerpVectors(p0,p1,k); },.5);
+  for(let i=0;i<6;i++){ SFX.ladder(); await tweenVal(k=>{ PLAYER.y=-(i+k)*.4; },.3); PLAYER.yaw=0; PLAYER.pitch=-.25; }
   await fade(1,.5);
   startFromCheckpointInner('A3');
 }
 
 /* ================= A3: THE LAB ================= */
 CHECKPOINTS.A3=async()=>{
-  const lv=await enterLevel('lab',{pos:V3(-5.6,0,4.3),yaw:0});
+  const lv=await enterLevel('lab',{pos:V3(-5.6,0,4.95),yaw:Math.PI});
   setCheckpoint('A3'); const F=F_();
   PLAYER.eye=1.64; PLAYER.lock(); crosshair(true);
   const jim=lv.jim; jim.visible=true; jim.position.set(-2.2,0,1.2); jim.rotation.y=Math.PI*.8; jim.userData.A.path=null; setMood(jim,'happy');
@@ -245,9 +248,10 @@ CHECKPOINTS.A3=async()=>{
     addInteract(lv,{pos:V3(0,.3,-1.8),label:'Step onto the platform',reach:1.8,when:()=>F_().labTalked&&!F_().onPlatform,act:()=>runStory(shrinkSequence)});
     addTrigger(lv,{pos:V3(-2.2,0,1.2),r:3.2,once:true,when:()=>!F_().labTalked,fn:()=>runStory(labTalk)});
   }
-  PLAYER.y=2.4; await fade(0,.8);
-  for(let i=0;i<6;i++){ SFX.ladder(); PLAYER.y=Math.max(0,PLAYER.y-.4); await wait(.3); } PLAYER.y=0;
+  PLAYER.y=2.4; PLAYER.yaw=Math.PI; PLAYER.pitch=-.1; await fade(0,.8);     // on the ladder, facing it
+  for(let i=0;i<6;i++){ SFX.ladder(); const y0=PLAYER.y; await tweenVal(k=>{ PLAYER.y=Math.max(0,y0-.4*k); },.3); PLAYER.yaw=Math.PI; } PLAYER.y=0;
   SFX.land('concrete');
+  { const a=PLAYER.pos.clone(), b=V3(-5.6,0,4.3); await tweenVal(k=>PLAYER.pos.lerpVectors(a,b,k),.35); }   // step back off the ladder
   lookAtPoint(V3(-2.2,1.5,1.2),1); await wait(.6);
   bark('Jim','Over here!',jim,1.8); PLAYER.free();
   await walkTo(jim,[V3(-3.9,0,2.9)],1.3); facePoint(jim,PLAYER.pos);

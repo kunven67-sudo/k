@@ -182,8 +182,8 @@ async function growBackInLab(){
 function folkWalkHuman(h,pts){ return walkTo(h,pts,1.3); }
 async function climbUpToStand(){
   const F=F_(); if(!F.climbUp) return; F.climbUp=false; PLAYER.lock(); objective(null); setMarker(null);
-  lookAtPoint(PLAYER.pos.clone().add(V3(0,5,-1)),.5);
-  for(let i=0;i<5;i++){ SFX.ladder(); PLAYER.y+=.4; await wait(.3); }
+  { const Lb=LEVELS.lab, a=PLAYER.pos.clone(), b=V3(Lb.ladderBottom.x,0,Lb.ladderBottom.z+.15); PLAYER.lookTo=null; lookAtPoint(V3(b.x,2.4,b.z+.6),.45); await tweenVal(k=>PLAYER.pos.lerpVectors(a,b,k),.45); }   // onto the ladder, facing it
+  for(let i=0;i<5;i++){ SFX.ladder(); await tweenVal(k=>{ PLAYER.y=(i+k)*.4; },.3); }
   await fade(1,.4);
   // 6) outside: Jim's rocket next to his stand
   const S=await enterLevel('stand',{pos:S_LADDER.clone(),yaw:Math.PI});
