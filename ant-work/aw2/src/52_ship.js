@@ -90,8 +90,17 @@ defineLevel('ship',{
     // your arms, cuffed to the armrests
     lv.armL=makeWorldArm(1); lv.armR=makeWorldArm(-1);
     for(const [a,x] of [[lv.armL,-.34],[lv.armR,.34]]){ a.scale.setScalar(.6); a.position.set(x,.715,1.16); a.rotation.set(0,x>0?-.06:.06,0); scene.add(a); }
-    lv.cuffs=[];
-    for(const x of [-.34,.34]){ const c=new THREE.Group(); c.position.set(x,.7,.98); scene.add(c); c.add(box(.1,.03,.1,cm,0,-.03,0)); const band=mesh(new THREE.TorusGeometry(.035,.012,8,20,Math.PI),mat(0x9aa6a6,{roughness:.25,metalness:1}),0,-.01,0); band.rotation.y=Math.PI/2; c.add(band); c.add(sph(.012,mat(0x444a4a,{metalness:1}),.04,-.01,0,8,6)); c.add(sph(.012,mat(0x444a4a,{metalness:1}),-.04,-.01,0,8,6)); lv.cuffs.push(c); }
+    // the cuffs: steel rings AROUND each wrist, chained to a plate bolted on the armrest
+    lv.cuffs=[]; lv.cuffHome=[];
+    const steel=mat(0xc8d0d4,{roughness:.22,metalness:1}), dark=mat(0x3a4044,{roughness:.4,metalness:1});
+    for(const a of [lv.armL,lv.armR]){ a.updateMatrixWorld(true); const wp=a.localToWorld(V3(0,0,-.3)); lv.cuffHome.push(wp.clone());
+      const c=new THREE.Group(); c.position.copy(wp); c.rotation.y=a.rotation.y; scene.add(c);
+      c.add(mesh(new THREE.TorusGeometry(.03,.0075,10,28),steel,0,0,0,false));                       // the ring, around the wrist
+      c.add(mesh(new THREE.TorusGeometry(.03,.0035,6,28),dark,0,0,.012,false)); c.add(mesh(new THREE.TorusGeometry(.03,.0035,6,28),dark,0,0,-.012,false));
+      const hinge=box(.016,.014,.03,steel,.031,0,0,false); c.add(hinge); const lock=box(.022,.02,.026,dark,-.032,0,0,false); c.add(lock);
+      const plate=box(.075,.01,.075,dark,0,-.052,0,false); c.add(plate); for(const [bx,bz] of [[-.027,-.027],[.027,-.027],[-.027,.027],[.027,.027]]) c.add(cyl(.005,.005,.006,steel,bx,-.046,bz,6));
+      const link=mesh(new THREE.TorusGeometry(.009,.003,6,12),steel,0,-.038,0,false); link.rotation.y=Math.PI/2; c.add(link);
+      lv.cuffs.push(c); }
     // Steve
     lv.steve=makeSteve(); lv.steve.userData.level='ship'; scene.add(lv.steve);
     // the rat, and the metal it's been eating
@@ -125,6 +134,8 @@ defineLevel('ship',{
     const ped=new THREE.Group(); ped.position.copy(BP); scene.add(ped); lv.ped=ped;
     ped.add(cyl(.42,.5,.95,mat(0x2a2e30,{roughness:.3,metalness:.9}),0,.475,0,24)); ped.add(mesh(new THREE.TorusGeometry(.44,.025,8,40),purpleM,0,.9,0,false)).children; ped.children[1].rotation.x=Math.PI/2;
     colCircle(lv.col,BP.x,BP.z,.55,()=>!F_().knocked);
+    { const pt=canvasTex(512,256,(x,w,h)=>{ x.fillStyle='#1a1c1e'; x.fillRect(0,0,w,h); x.strokeStyle='#b86aff'; x.lineWidth=8; x.strokeRect(10,10,w-20,h-20); x.fillStyle='#e0c8ff'; x.textAlign='center'; x.font='bold 54px monospace'; x.fillText('SPECIMEN XXX5',w/2,82); x.font='bold 32px monospace'; x.fillStyle='#c8c8d0'; x.fillText('FOUND UNDER THE SAND',w/2,140); x.fillStyle='#ff6a6a'; x.fillText('DO NOT TOUCH.  DO NOT FEED.',w/2,196); });
+      const pl=mesh(new THREE.PlaneGeometry(.5,.25),new THREE.MeshBasicMaterial({map:pt}),0,.62,.505,false); ped.add(pl); lv.plaque=pl; }
     const blk=new THREE.Mesh(_U1,blockMat('purple',{emissive:col(0x9a3aff),emissiveMap:BLOCKTEX.purple(),emissiveIntensity:.7,roughness:.6})); blk.scale.setScalar(.62); const pivot=new THREE.Group(); pivot.position.set(BP.x,.95,BP.z); scene.add(pivot); pivot.add(blk); blk.position.y=.31; lv.block=blk; lv.blockPivot=pivot;
     lv.blockLight=new THREE.PointLight(col(0xb86aff),1.6,5,2); lv.blockLight.position.set(BP.x,1.6,BP.z); scene.add(lv.blockLight);
     // floating force-field rings around it
@@ -216,9 +227,9 @@ CHECKPOINTS.B9=async()=>{
   hudVisible(true); showCash(false); showCoins(false); objective(null);
   // reset the ship
   const st=lv.steve; st.visible=true; st.position.set(.1,0,-.55); st.rotation.y=0; st.userData.A.look='player'; setMood(st,'evil'); clearPose(st,0);
-  lv.door.open=lv.door.target=0; lv.sideDoor.open=lv.sideDoor.target=0; lv.alex.visible=true; lv.ringing=false; lv.icOn=false; lv.cuffs.forEach((c,i)=>{ c.visible=true; c.position.set(i?.34:-.34,.7,.98); c.rotation.set(0,0,0); });
+  lv.door.open=lv.door.target=0; lv.sideDoor.open=lv.sideDoor.target=0; lv.alex.visible=true; lv.ringing=false; lv.icOn=false; lv.cuffs.forEach((c,i)=>{ c.visible=true; c.position.copy(lv.cuffHome[i]); c.rotation.set(0,(i?lv.armR:lv.armL).rotation.y,0); });
   lv.rat.visible=true; lv.rat.position.set(2.55,0,-2.45); lv.rat.rotation.y=-.6; lv.rat.userData.chew=1;
-  lv.guard=null; F.caught=false; lv.xxxT=0; lv.xxxHits=0;
+  lv.guard=null; F.caught=false; lv.xxxT=0; lv.xxxHits=0; unblockShip(lv);
   lv.block.visible=true; lv.blockPivot.rotation.set(0,0,0); lv.blockPivot.position.set(lv.blockPos.x,.95,lv.blockPos.z); lv.xxx.visible=false; FX.pixel=0;
   for(const e of lv.eatables){ e.o.visible=true; e.o.scale.setScalar(1); e.c.r=Math.abs(e.c.r); }
   FX.blackout=1; fade(0,.2); playMusic('ship',2);
@@ -229,7 +240,7 @@ CHECKPOINTS.B9=async()=>{
   await wait(.5);
   // your hands: cuffed to a metal chair
   lookAtPoint(V3(0,.7,.95),.9); await wait(1.1);
-  for(let i=0;i<2;i++){ SFX.clank(); shake(.12); lv.cuffs.forEach(c=>c.position.y=.71); await wait(.12); lv.cuffs.forEach(c=>c.position.y=.7); await wait(.4); }
+  for(let i=0;i<2;i++){ SFX.clank(); shake(.12); lv.cuffs.forEach((c,j)=>c.position.y=lv.cuffHome[j].y+.012); await wait(.12); lv.cuffs.forEach((c,j)=>c.position.y=lv.cuffHome[j].y); await wait(.4); }
   lookAtPoint(V3(st.position.x,1.62,st.position.z),.7); await wait(.8);
   const S={h:st,who:'Steve'};
   await talk([{who:'You',text:"No, no, no... this can't be happening."},{...S,text:"But it is.",mood:'evil'},{...S,text:"Nice watch, by the way. It led me right to you.",mood:'evil'},{who:'You',text:"Why do you want this? Wh—",auto:.2},{...S,text:"Because...",mood:'sad'}]);
@@ -260,6 +271,7 @@ CHECKPOINTS.B9=async()=>{
     addInteract(lv,{obj:lv.armL,offset:V3(0,.05,-.18),label:'Answer Jim',reach:3,aim:false,when:()=>!!lv.ringing,act:()=>runStory(answerJim)});
     addInteract(lv,{pos:V3(1,1.2,-7.5),label:'Locked door',reach:1.8,when:()=>!!F_().freed&&!F_().knocked,act:()=>{ const F=F_(); if(!F.eaves){ SFX.cantCarry(); bark('You',"It's locked. I can hear Steve and Alex talking in there.",null,3.4); F.eaves=true; unlock('eavesdrop'); return; } F.knocks=(F.knocks||0)+1; SFX.knock&&SFX.knock(); shake(.05); if(F.knocks>=5) runStory(steveWins); }});
     addInteract(lv,{obj:lv.rat,offset:V3(0,.2,0),label:'Call the rat',reach:5,when:()=>!!F_().ratCall&&!F_().freed&&!lv.ratMoving,act:()=>runStory(callRat)});
+    addInteract(lv,{pos:V3(lv.blockPos.x,.62,lv.blockPos.z+.5),label:'Read the sign',reach:2.2,when:()=>!!F_().freed&&!F_().knocked&&!F_().readPlaque,act:()=>{ F_().readPlaque=true; bark('You',"Found under the sand? What sand?",null,3); }});
     addTrigger(lv,{pos:V3(0,0,-15.5),r:3.2,once:true,when:()=>!!F_().freed,fn:()=>{ say("You see a purple block. It says DON'T TOUCH. EXTREMELY DANGEROUS.",4.2); later(4.4,()=>{ if(!F_().knocked) say("But you don't think much of it.",3); }); }});
     addTrigger(lv,{pos:V3(0,0,-19.4),r:1.6,box:[2.6,.8],once:true,when:()=>!!F_().freed&&!F_().knocked,fn:()=>runStory(knockOver)});
     addTrigger(lv,{pos:V3(0,0,-21.5),r:1.1,box:[1.2,.6],once:true,when:()=>!!F_().xxxAwake,fn:()=>runStory(shipEscape)});
@@ -401,6 +413,8 @@ async function knockOver(){
   await tweenVal(k=>{ X.scale.setScalar(lerp(.25,.7,k)); X.position.y=lerp(.5,1.2,k); },1.3);
   // everything starts turning blocky... and then normal. Again and again.
   runStory(async()=>{ while(F_().xxxAwake && LV===lv){ FX.pixel=rand(10,16); SFX.blockGlitch(); shake(.08); await wait(rand(.55,.9)); FX.pixel=0; await wait(rand(.5,1.1)); } FX.pixel=0; });
+  // stuff near it REALLY turns into blocks, spreading out from it
+  runStory(()=>blockWave(lv));
   // it starts eating stuff
   runStory(async()=>{ for(const e of lv.eatables.slice().sort((a,b)=>a.o.position.distanceTo(X.position)-b.o.position.distanceTo(X.position))){ if(!F_().xxxAwake||LV!==lv) break; await eatThing(lv,X,e); await wait(rand(.3,.8)); } });
   await wait(1.6);
@@ -409,6 +423,29 @@ async function knockOver(){
   clearPose(st); walkTo(st,[V3(-2.5,0,-15),V3(-.5,0,-12),V3(0,0,-8)],2.2);
   objective('Get to the exit!'); PLAYER.free();
   later(5,()=>{ if(F_().xxxAwake) lv.xxxChase=true; });   // stay too long and it comes for you
+}
+/* ---------- XXX5's power: round things near it turn into blocks (the wave spreads out from it) ---------- */
+const _bwBox=new THREE.Vector3(), _bwC=new THREE.Vector3(), _bwP=new THREE.Vector3();
+function blockifyMesh(m){
+  if(m.userData.blocked) return false; const g=m.geometry; if(!g) return false;
+  if(!/Cylinder|Sphere|Torus|Cone|Circle|Capsule|Lathe|Tube|Extrude|Ring|Icosahedron|Dodecahedron|Octahedron/.test(g.type)) return false;
+  if(!g.boundingBox) g.computeBoundingBox(); g.boundingBox.getSize(_bwBox); if(Math.max(_bwBox.x,_bwBox.y,_bwBox.z)>3.2) return false;
+  g.boundingBox.getCenter(_bwC);
+  const nb=new THREE.BoxGeometry(Math.max(.03,_bwBox.x),Math.max(.03,_bwBox.y),Math.max(.03,_bwBox.z)); nb.translate(_bwC.x,_bwC.y,_bwC.z);
+  m.userData.origGeo=g; m.geometry=nb; m.userData.blocked=true; return true;
+}
+function unblockShip(lv){ for(const m of lv.blocked||[]){ if(m.userData.origGeo){ m.geometry.dispose(); m.geometry=m.userData.origGeo; } m.userData.blocked=false; } lv.blocked=[]; }
+async function blockWave(lv){
+  const tok=STORY.token, X=lv.xxx; lv.blocked=lv.blocked||[];
+  const skip=new Set([X,camera,lv.steve,lv.alex,lv.rat].filter(Boolean));
+  const list=[]; lv.scene.traverse(o=>{ if(!o.isMesh||o.isInstancedMesh||o.isSkinnedMesh) return; let p=o; while(p){ if(skip.has(p)) return; p=p.parent; } list.push(o); });
+  let R=.5;
+  while(tok===STORY.token && F_().xxxAwake && LV===lv){
+    R+=.55; X.getWorldPosition(_bwC); let n=0;
+    for(const m of list){ if(m.userData.blocked) continue; m.getWorldPosition(_bwP); if(_bwP.distanceTo(_bwC)<R && blockifyMesh(m)){ lv.blocked.push(m); n++; } }
+    if(n){ SFX.blockGlitch(); shake(.04); }
+    await wait(.5);
+  }
 }
 /* ---------- the patrol: after the rat frees you, Steve and Alex take turns walking the ship.
    If one of them SEES you (in front of them, nothing in the way), you're dragged back to the chair. ---------- */

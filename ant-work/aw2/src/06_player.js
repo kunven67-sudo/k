@@ -127,9 +127,37 @@ function fitFov(v){ const a=camera.aspect; if(!(a<1.3)) return v; const t=Math.t
 const CAM={active:false,blend:0,target:0,pos:V3(),quat:new THREE.Quaternion(),fov:70,from:null,tr:null,fn:null,releaseDur:.6,dof:null};
 const _pq=new THREE.Quaternion(), _pp=new THREE.Vector3(), _e=new THREE.Euler(0,0,0,'YXZ'), _m4=new THREE.Matrix4(), _up=V3(0,1,0), _tq=new THREE.Quaternion(), _tp=new THREE.Vector3();
 function lookQuat(from,to,q){ _m4.lookAt(from,to,_up); return q.setFromRotationMatrix(_m4); }
+/* a cutscene camera never films through a house: if something big is between the camera and what it
+   looks at, the camera moves in front of it (o.noClear turns this off for a shot) */
+const _rcCam=new THREE.Raycaster(), _rcDir=new THREE.Vector3(), _rcS=new THREE.Vector3();
+function camBlockers(){
+  if(!LV||!LV.scene) return [];
+  if(LV.__blk && LV.__blkN===LV.scene.children.length) return LV.__blk;
+  const out=[];
+  LV.scene.traverse(o=>{
+    if(!o.isMesh||o.isSkinnedMesh||!o.geometry) return;
+    const m=o.material; if(!m||Array.isArray(m)||m.transparent||m.opacity<1||m.blending!==THREE.NormalBlending||m.depthWrite===false) return;
+    const g=o.geometry; if(!g.boundingSphere) g.computeBoundingSphere(); if(!g.boundingSphere) return;
+    o.getWorldScale(_rcS); if(!o.isInstancedMesh && g.boundingSphere.radius*Math.max(_rcS.x,_rcS.y,_rcS.z)<1.6) return;
+    for(let p=o;p;p=p.parent){ if(p===camera||(p.userData&&p.userData.A)) return; }   // never people, never your hands
+    out.push(o);
+  });
+  LV.__blk=out; LV.__blkN=LV.scene.children.length; return out;
+}
+function clearShot(pos,look){
+  try{
+    _rcDir.copy(pos).sub(look); const D=_rcDir.length(); if(D<2) return pos; _rcDir.divideScalar(D);
+    const blk=camBlockers(); if(!blk.length) return pos;
+    _rcCam.set(look,_rcDir); _rcCam.near=1; _rcCam.far=D;
+    const hit=_rcCam.intersectObjects(blk,false).find(h=>worldVisible(h.object));
+    if(!hit) return pos;
+    return look.clone().addScaledVector(_rcDir,Math.max(1.2,hit.distance-.45));
+  }catch(e){ return pos; }
+}
 /* move the cutscene camera to a shot. dur=0 cuts. returns a promise that resolves when it arrives */
 function camShot(pos,look,o={}){
   CAM.active=true; CAM.target=1; CAM.fn=null;
+  if(!o.noClear && !RENDER.override) pos=clearShot(pos,look);
   const q=lookQuat(pos,look,new THREE.Quaternion());
   if(o.roll){ q.multiply(new THREE.Quaternion().setFromAxisAngle(V3(0,0,1),o.roll)); }
   const dur=o.dur!=null?o.dur:0;
@@ -230,8 +258,15 @@ function setVMSuit(on){ if(!VM.mats) return; VM.suit=on; VM.mats.sleeve.color.co
 /* carried object (rocket piece): pass a mesh, or null */
 function vmCarry(obj){
   if(VM.carryMesh){ VM.grp.remove(VM.carryMesh); VM.carryMesh=null; }
-  if(obj){ const c=obj.clone(); c.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } if(o.isLight) o.visible=false; }); c.position.set(0,-.3,-.72); c.rotation.set(.3,.5,0); c.scale.multiplyScalar((obj.userData.vmScale||1)*.6); VM.grp.add(c); VM.carryMesh=c; }
+  if(obj){ const c=obj.clone(); c.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } if(o.isLight) o.visible=false; });
+    c.position.set(0,0,0); c.rotation.set(.25,.35,0); c.scale.multiplyScalar((obj.userData.vmScale||1)*.6); c.updateMatrixWorld(true);
+    const bb=new THREE.Box3().setFromObject(c), sz=bb.getSize(new THREE.Vector3()), ctr=bb.getCenter(new THREE.Vector3());
+    // wrap it so its middle sits at the wrapper's origin (then it can go right between your palms)
+    const w=new THREE.Group(); c.position.sub(ctr); w.add(c); w.userData.w=Math.max(.05,sz.x); w.userData.h=sz.y; w.userData.s0=1;
+    w.position.set(0,-.36,-.62); VM.grp.add(w); VM.carryMesh=w; }
 }
+
+const _vmHL=new THREE.Vector3(), _vmHR=new THREE.Vector3();
 function updateViewModel(dt,t){
   if(!VM.arms) return;
   const P=PLAYER; VM.t+=dt;
@@ -292,6 +327,13 @@ function updateViewModel(dt,t){
   // arms only appear when they are doing something (idle hands in the view just look odd)
   VM.armL=damp(VM.armL||0,onL?1:0,12,dt); VM.armR=damp(VM.armR||0,onR?1:0,12,dt); lp[1]-=(1-smooth(VM.armL))*.4; rp[1]-=(1-smooth(VM.armR))*.4; L.visible=VM.armL>.02; R.visible=VM.armR>.02;
   L.position.set(...lp); R.position.set(...rp); L.rotation.set(...lr); R.rotation.set(...rr);
+  // carried piece: held BETWEEN your palms (it used to float out in front of your hands), sized to your grip
+  if(VM.carryMesh && P.carry){
+    VM.grp.updateMatrixWorld(true);
+    const hl=L.userData.handG.getWorldPosition(_vmHL), hr=R.userData.handG.getWorldPosition(_vmHR); VM.grp.worldToLocal(hl); VM.grp.worldToLocal(hr);
+    const c=VM.carryMesh, gap=hl.distanceTo(hr), k=clamp(gap*.9/c.userData.w,.35,1.6);
+    c.scale.setScalar(k); c.position.copy(hl).add(hr).multiplyScalar(.5); c.position.z-=.05; c.position.y+=.01;
+  }
   for(const [A,f] of [[L,lf],[R,rf]]){ const H=A.userData.H; for(const fg of H.fingers){ fg.a.rotation.x=-f*1.25; fg.b.rotation.x=-f*1.35; if(fg.c) fg.c.rotation.x=-f*1.0; } H.thumb2.rotation.x=-f*.7; }
   // watch glow
   if(hasWatch){ const g=P.watchGlow||0; VM.watchHolo.material.opacity=g*.9; VM.watchHolo.scale.setScalar(1+g*2+Math.sin(t*10)*.1*g); VM.watchHolo.position.y=.03+g*.02; VM.watchScr.material.color.copy(col(P.scale<1?0xffb347:0x6dffd8)).multiplyScalar(2.5+g*4+Math.sin(t*3)*.3); }

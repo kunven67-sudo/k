@@ -1,7 +1,7 @@
 /* ================================================================
    MARS SHIFT PART 3 — BLOCKY EARTH. The ship blows up, XXX5 goes for
    other planets, and everything on Earth is blocks. Bob. Calling Jim.
-   Then: space (XXX5 has three heads now, and Mars is gone).
+   Then: space (XXX5 has three heads now, and Jupiter is gone).
    ================================================================ */
 function jetHUD(on,k){ const el=$('fuel'); el.classList.toggle('show',!!on); if(on&&k!=null){ el.querySelector('i').style.width=(k*100)+'%'; el.classList.toggle('low',k<.25); } }
 function countHUD(n){ const el=$('count'); if(n==null){ el.classList.remove('show'); return; } el.textContent=n; el.classList.add('show'); }
@@ -112,7 +112,7 @@ function makeBlockPlanet(R=30,o={}){
   const g=new THREE.Group(); const pos=[]; const cols=[];
   for(let x=-R;x<=R;x++) for(let y=-R;y<=R;y++) for(let z=-R;z<=R;z++){ const d=Math.hypot(x,y,z); if(d>R||d<R-1.8) continue;
     const n=Math.sin(x*.21)*Math.cos(z*.17)+Math.sin(y*.19+x*.07)*.8+Math.sin((x+z)*.11)*.5; const lat=Math.abs(y)/R;
-    let c; if(lat>.85) c=0xf4f8ff; else if(n>.35) c=lat>.6?0x8aa870:(n>.9?0x8a6a3a:0x4a9a3a); else c=0x2a5ad8;
+    let c; if(lat>.85) c=0xf4f8ff; else if(n>.35) c=lat>.6?0x8aa870:(n>.9?0x8a6a3a:0x4a9a3a); else c=0x1f4fc4;
     if(o.dead) c=pick([0x3a2a3a,0x5a2a2a,0x8a3a2a,0x2a1a2a]); pos.push(x,y,z); cols.push(c); }
   const im=new THREE.InstancedMesh(_U1,new THREE.MeshStandardMaterial({roughness:.8}),pos.length/3); const ob=new THREE.Object3D(); const cc=new THREE.Color();
   for(let i=0;i<pos.length/3;i++){ ob.position.set(pos[i*3],pos[i*3+1],pos[i*3+2]); ob.updateMatrix(); im.setMatrixAt(i,ob.matrix); cc.set(cols[i]); im.setColorAt(i,cc); }
@@ -124,15 +124,15 @@ defineLevel('xspace',{
   async build(scene,lv){
     scene.background=col(0x000000);
     scene.add(makeStars(dq(4000,6000,9000,12000,16000),4000,{band:true,k:1.6,seed:44}));
-    const sunDir=V3(-.4,.2,-1).normalize();
+    const sunDir=V3(.45,.35,1).normalize();   // the sun is behind you, so you see Earth's lit side (it was backlit = dark + purple edge)
     lv.envMap=makeEnv({top:0x05070c,horizon:0x0a0c14,bottom:0x020204,lights:[{x:sunDir.x*40,y:sunDir.y*40,z:sunDir.z*40,w:5,h:5,c:0xffffff,k:10}]});
-    makeRig(scene,{sun:3,sunColor:0xfff4e6,hemi:.12,sky:0x3a4a6a,ground:0x000000,dir:sunDir,span:200,dist:400,far:900});
+    makeRig(scene,{sun:1.35,sunColor:0xfff4e6,hemi:.18,sky:0x3a4a6a,ground:0x000000,dir:sunDir,span:200,dist:400,far:900});
     scene.add(mesh(new THREE.SphereGeometry(70,24,16),basicGlow(0xfff4e0,40),sunDir.x*3800,sunDir.y*3800,sunDir.z*3800,false));
     lv.earth=makeBlockPlanet(30); lv.earth.position.set(-260,-40,-520); scene.add(lv.earth);
     lv.x3=makeXXX5(3); lv.x3.scale.setScalar(9); lv.x3.position.set(-120,10,-420); scene.add(lv.x3);
-    // where Mars used to be: a few red blocks, drifting
-    lv.bits=[]; const rm=new THREE.MeshStandardMaterial({color:col(0xc86a3a),roughness:.9});
-    for(let i=0;i<70;i++){ const b=box(rand(1,6),rand(1,6),rand(1,6),rm,rand(-60,60),rand(-40,40),rand(-60,60)); b.position.add(V3(420,0,-300)); scene.add(b); lv.bits.push({b,s:V3(rand(-.3,.3),rand(-.3,.3),rand(-.3,.3))}); }
+    // where Jupiter used to be: chunks of its striped clouds, drifting (Mars is fine, your house is there)
+    lv.bits=[]; const jm=[0xd8b088,0xc08a5a,0xe8d8c0,0xa8603a,0xb87a4a].map(c=>new THREE.MeshStandardMaterial({color:col(c),roughness:.9}));
+    for(let i=0;i<110;i++){ const s=rand(2,10); const b=box(s,s*rand(.5,1),s*rand(.6,1.2),pick(jm),rand(-110,110),rand(-55,55),rand(-110,110)); b.position.add(V3(420,0,-300)); scene.add(b); lv.bits.push({b,s:V3(rand(-.3,.3),rand(-.3,.3),rand(-.3,.3))}); }
     lv.rocket=makeRocket(); lv.rocket.rotation.z=-Math.PI/2; scene.add(lv.rocket); setRocketFlame(lv.rocket,1);
     lv.rx=0;
   },
@@ -234,7 +234,7 @@ async function leaveEarth(){
   say("XXX5 has three heads now. And it's bigger. And it's going for Earth.",4.6); await wait(3);
   await talk([{who:'Jim',text:"We have to do something."}]);
   camShot(V3(sp.rx+60,10,20),V3(420,0,-300),{dur:2.4,fov:40}); await wait(2.4);
-  say("Where Mars should be... there's nothing. XXX5 ate it.",4.4); await wait(4.6);
+  say("Where Jupiter should be... there's nothing. XXX5 ate it.",4.4); await wait(4.6);
   await fade(1,.8); camRelease(0); letterbox(false);
   startFromCheckpointInner('B11');
 }

@@ -50,8 +50,9 @@ function setupBigHouse(lv){
   addInteract(lv,{obj:lv.couch,offset:V3(0,.8,0),label:'Couch',reach:2.4,act:()=>bark('You',"Super comfy. It's shaped like a bean.",null,2.6)});
 }
 const PC_PAGES2={
-  home:{text:'<span class="g">⌬ XZL-OS 9001</span>\n\nWELCOME HOME, HUMAN.\nNEW HOUSE: "DOME SWEET DOME"\nHOUSE VALUE: Ѫ 100 (WOW)\n\nWhat would you like to do?',opts:[['Check bank','bank'],['Mars weather','weather'],['Shut down','off']]},
+  home:{text:'<span class="g">⌬ XZL-OS 9001</span>\n\nWELCOME HOME, HUMAN.\nNEW HOUSE: "DOME SWEET DOME"\nHOUSE VALUE: Ѫ 100 (WOW)\n\nWhat would you like to do?',opts:[['Check bank','bank'],['Mars weather','weather'],['Earth news','news'],['Shut down','off']]},
   bank:{text:'<span class="g">ALIEN BANK OF MARS</span>\n\nBALANCE: Ѫ {coins}\n\nYou spent all of it on a house.\nGood choice.',opts:[['Back','home']]},
+  news:{text:'<span class="g">EARTH NEWS</span>\n(from very far away)\n\nA HUGE PYRAMID showed up in an\nEarth desert. Overnight.\nNobody built it.\n\nScientists say: "huh."\n\nAlso: farm pigs are acting weird.',opts:[['Back','home']]},
   weather:{text:'<span class="g">MARS WEATHER</span>\n\nTONIGHT: dusty\nTOMORROW: dusty\n\nChance of bugs: 100%',opts:[['Back','home']]},
   off:{text:'SHUTTING DOWN...\n\n⌬ goodnight, human.',opts:[['Close','close']]}
 };

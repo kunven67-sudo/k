@@ -562,8 +562,9 @@ function setupHouseInteractions(lv){
   addInteract(lv,{obj:lv.clock,offset:V3(0,.15,0),label:'Turn off the alarm',reach:2.6,when:()=>!!F_().alarm,act:()=>runStory(slapAlarm)});
 }
 const PC_PAGES={
-  home:{text:'<span class="g">⌬ XZL-OS 9000</span>\n\nWELCOME HOME, HUMAN.\nNEW OWNER DETECTED: "YOU"\nHOUSE VALUE: Ѫ 50 (VERY GOOD DEAL)\n\nWhat would you like to do?',opts:[['Check bank','bank'],['Mars weather','weather'],['Messages (1)','msg'],['Shut down','off']]},
+  home:{text:'<span class="g">⌬ XZL-OS 9000</span>\n\nWELCOME HOME, HUMAN.\nNEW OWNER DETECTED: "YOU"\nHOUSE VALUE: Ѫ 50 (VERY GOOD DEAL)\n\nWhat would you like to do?',opts:[['Check bank','bank'],['Mars weather','weather'],['Messages (1)','msg'],['Earth news','news'],['Shut down','off']]},
   bank:{text:'<span class="g">ALIEN BANK OF MARS</span>\n\nBALANCE: Ѫ {coins}\nDOLLARS: $0\n\nTip: the alien converter\nturns dollars into alien coins.',opts:[['Back','home']]},
+  news:{text:'<span class="g">EARTH NEWS</span>\n(from very far away)\n\nA HUGE PYRAMID showed up in an\nEarth desert. Overnight.\nNobody built it.\n\nScientists say: "huh."\n\nAlso: farm pigs are acting weird.',opts:[['Back','home']]},
   weather:{text:'<span class="g">MARS WEATHER</span>\n\nTODAY: dusty\nTOMORROW: dusty\nNEXT WEEK: extremely dusty\n\nChance of bugs: 100%',opts:[['Back','home']]},
   msg:{text:'<span class="g">1 NEW MESSAGE</span>\n\nFROM: JIM\n"hey hope the house is good.\n shift tomorrow is 12 to 1 again.\n don\'t be late!!"',opts:[['Back','home']]},
   off:{text:'SHUTTING DOWN...\n\n⌬ goodnight, human.',opts:[['Close','close']]}

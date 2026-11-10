@@ -481,7 +481,9 @@ function animateHuman(h,dt,t){
   R.head[1]+=A.yawCur*.65; R.chest[1]+=A.yawCur*.25; R.head[0]+=A.pitchCur*.8;
   // apply
   for(const j of JOINTS){ const o=J[j]; if(!o) continue; o.rotation.set(R[j][0],R[j][1],R[j][2]); }
-  // fingers
+  // fingers (a hand holding something closes around it)
+  if(h.userData.holdR && h.userData.holdR.children.some(c=>c.visible)) fR=Math.max(fR,.82);
+  if(h.userData.holdL && h.userData.holdL.children.some(c=>c.visible)) fL=Math.max(fL,.82);
   for(const [side,f] of [['L',fL],['R',fR]]){ const H=U.hands[side].H; for(const fg of H.fingers){ fg.a.rotation.x=-f*1.2; fg.b.rotation.x=-f*1.3; if(fg.c) fg.c.rotation.x=-f*.95; } H.thumb2.rotation.x=-f*.6; }
   // --- face: eyes, blinks, brows, mouth ---
   A.saccT-=dt; if(A.saccT<=0){ A.saccT=rand(.25,1.6); A.sacc=[rand(-.12,.12),rand(-.07,.07)]; }

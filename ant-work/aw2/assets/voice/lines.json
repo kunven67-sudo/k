@@ -519,6 +519,11 @@
   "text": "Look for the yellow beams of light!",
   "src": "31_storyB.js"
  },
+ "1e8fa315": {
+  "who": "Jim",
+  "text": "I'm bolting on what we've got. You find the rest.",
+  "src": "31_storyB.js"
+ },
  "70303fd0": {
   "who": "Alien",
   "text": "Bug food? Ew. No thanks.",
@@ -537,6 +542,11 @@
  "e971c10f": {
   "who": "Alien",
   "text": "Still selling bugs? On the MOON?",
+  "src": "31_storyB.js"
+ },
+ "95098471": {
+  "who": "Jim",
+  "text": "Nice! Keep 'em coming!",
   "src": "31_storyB.js"
  },
  "baa850de": {
@@ -567,6 +577,16 @@
  "f3f53bab": {
   "who": "You",
   "text": "I don't have any bug food to cook.",
+  "src": "31_storyB.js"
+ },
+ "fd74fd01": {
+  "who": "Seller",
+  "text": "Still for sale! Come back when you've got the coins.",
+  "src": "31_storyB.js"
+ },
+ "cf4f3083": {
+  "who": "Seller",
+  "text": "Houses don't buy themselves, human.",
   "src": "31_storyB.js"
  },
  "7db9145d": {
@@ -634,6 +654,11 @@
   "text": "Pleasure doing business, human! Here are your keys.",
   "src": "31_storyB.js"
  },
+ "04e8533f": {
+  "who": "You",
+  "text": "Not yet. I wanna check out the house first.",
+  "src": "31_storyB.js"
+ },
  "cdaac53b": {
   "who": "You",
   "text": "An alien table. It's floating. Kind of.",
@@ -647,6 +672,11 @@
  "8c8b2657": {
   "who": "JimTired",
   "text": "Hey... bud. Time for work...",
+  "src": "32_storyB2.js"
+ },
+ "cca8186b": {
+  "who": "JimTired",
+  "text": "Didn't sleep... Up all night... working...",
   "src": "32_storyB2.js"
  },
  "5cf7f6a4": {
@@ -687,6 +717,11 @@
  "dde098a1": {
   "who": "You",
   "text": "How did you find me?",
+  "src": "32_storyB2.js"
+ },
+ "f892a626": {
+  "who": "Steve",
+  "text": "Your new watch. Every time it beeps... it tells me where you are.",
   "src": "32_storyB2.js"
  },
  "fe99659f": {
@@ -829,6 +864,11 @@
   "text": "But it is.",
   "src": "52_ship.js"
  },
+ "5a08b680": {
+  "who": "Steve",
+  "text": "Nice watch, by the way. It led me right to you.",
+  "src": "52_ship.js"
+ },
  "3ed6abcd": {
   "who": "You",
   "text": "Why do you want this? Wh—",
@@ -899,9 +939,19 @@
   "text": "YOU IDIOT! What have you done!",
   "src": "52_ship.js"
  },
+ "4d612315": {
+  "who": "Steve",
+  "text": "Sit. Down. Next time I won't be this nice.",
+  "src": "52_ship.js"
+ },
  "b137ee5e": {
   "who": "You",
   "text": "It's locked. I can hear Steve and Alex talking in there.",
+  "src": "52_ship.js"
+ },
+ "a8be1e26": {
+  "who": "You",
+  "text": "Found under the sand? What sand?",
   "src": "52_ship.js"
  },
  "bad2bdce": {
@@ -912,6 +962,21 @@
  "855646b4": {
   "who": "Steve",
   "text": "Hey!",
+  "src": "52_ship.js"
+ },
+ "e218e9be": {
+  "who": "Steve",
+  "text": "Where do you think you're going?",
+  "src": "52_ship.js"
+ },
+ "7a3aa444": {
+  "who": "Alex",
+  "text": "Steve! The human is loose!",
+  "src": "52_ship.js"
+ },
+ "ec294f91": {
+  "who": "You",
+  "text": "Whoa! It almost ate me!",
   "src": "52_ship.js"
  },
  "a41f31e7": {
@@ -1124,14 +1189,49 @@
   "text": "I'm sorry. It's not working.",
   "src": "56_tiny3.js"
  },
- "8572b807": {
-  "who": "Larry",
-  "text": "Guess you're my roommate now.",
+ "ba659856": {
+  "who": "Jim",
+  "text": "I'm gonna fix this, I promise. But it could take a while.",
   "src": "56_tiny3.js"
  },
- "cf4eed46": {
+ "70751d33": {
+  "who": "Jim",
+  "text": "You can't just float around out there. Find somewhere safe to stay.",
+  "src": "56_tiny3.js"
+ },
+ "f1e23add": {
   "who": "Larry",
-  "text": "Everybody, it's ok! This is my new roommate.",
+  "text": "Hey! I heard all that. Your friend can't make you big again?",
+  "src": "56_tiny3.js"
+ },
+ "b404c56f": {
+  "who": "You",
+  "text": "Nope. I'm stuck like this.",
+  "src": "56_tiny3.js"
+ },
+ "9ebf19c8": {
+  "who": "Larry",
+  "text": "Then you can't stay out here. Stuff out here eats things our size.",
+  "src": "56_tiny3.js"
+ },
+ "b696e981": {
+  "who": "Larry",
+  "text": "You got me those snacks. So come live with me in Mite Town. I've got a spare lint bed.",
+  "src": "56_tiny3.js"
+ },
+ "6de21d56": {
+  "who": "You",
+  "text": "Wait. Really?",
+  "src": "56_tiny3.js"
+ },
+ "78f0f360": {
+  "who": "Larry",
+  "text": "Really. Follow me. Stay close.",
+  "src": "56_tiny3.js"
+ },
+ "b523137c": {
+  "who": "Larry",
+  "text": "It's ok, everybody! This is my friend. He got stuck small, so he's staying with me.",
   "src": "56_tiny3.js"
  },
  "5f94f250": {
