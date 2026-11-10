@@ -28,61 +28,7 @@ const TX={
   diamondPlate:()=>texSet('dplate',256,(x,w,h)=>{ x.fillStyle='#9a9ea4'; x.fillRect(0,0,w,h); for(let j=0;j<8;j++) for(let i=0;i<8;i++){ x.save(); x.translate(i*32+16+(j%2)*16,j*32+16); x.rotate((i+j)%2?.6:-.6); const g=x.createLinearGradient(-10,0,10,0); g.addColorStop(0,'#d8dce0'); g.addColorStop(1,'#6a6e74'); x.fillStyle=g; x.beginPath(); x.ellipse(0,0,11,3,0,0,7); x.fill(); x.restore(); } },{strength:3,rough:(x,w,h)=>{ x.fillStyle='#606060'; x.fillRect(0,0,w,h); }})
 };
 /* ---------- the car ---------- */
-function makeCar(o={}){
-  const opt=Object.assign({paint:0xa8231c,night:false},o);
-  const g=new THREE.Group();
-  const paint=new THREE.MeshPhysicalMaterial({color:col(opt.paint),metalness:.5,roughness:.35,clearcoat:1,clearcoatRoughness:.04});
-  const chrome=mat(0xdddddd,{metalness:1,roughness:.12});
-  const black=mat(0x151515,{roughness:.6});
-  const glass=new THREE.MeshPhysicalMaterial({color:col(0x9ab8c8),metalness:.1,roughness:.03,transparent:true,opacity:.26,clearcoat:1,envMapIntensity:1.2,depthWrite:false});
-  const rubber=mat(0x1a1a1a,{roughness:.85});
-  // body (side profile extruded)
-  const S=new THREE.Shape();
-  const P=[[-2.25,.38],[-2.28,.62],[-2.18,.86],[-1.9,.96],[-1.3,1.0],[1.15,1.0],[1.9,.9],[2.22,.78],[2.28,.55],[2.22,.38]];
-  S.moveTo(P[0][0],P[0][1]); for(const p of P.slice(1)) S.lineTo(p[0],p[1]);
-  const arch=(cx)=>{ S.lineTo(cx+.46,.38); S.absarc(cx,.36,.46,0,Math.PI,false); S.lineTo(cx-.46,.38); };
-  S.lineTo(2.22,.38); arch(1.38); arch(-1.42); S.closePath();
-  const bodyG=new THREE.ExtrudeGeometry(S,{depth:1.62,bevelEnabled:true,bevelThickness:.09,bevelSize:.08,bevelSegments:5,curveSegments:24}); bodyG.translate(0,0,-.81);
-  const body=mesh(bodyG,paint); g.add(body);
-  // cabin / greenhouse
-  const C=new THREE.Shape(); const CP=[[-1.28,1.0],[-.82,1.54],[.42,1.56],[1.12,1.0]]; C.moveTo(CP[0][0],CP[0][1]); for(const p of CP.slice(1)) C.lineTo(p[0],p[1]); C.closePath();
-  const cabG=new THREE.ExtrudeGeometry(C,{depth:1.44,bevelEnabled:true,bevelThickness:.04,bevelSize:.04,bevelSegments:3}); cabG.translate(0,0,-.72);
-  g.add(mesh(cabG,glass,0,0,0,false));
-  // roof panel + pillars
-  const roofS=new THREE.Shape(); roofS.moveTo(-.84,1.53); roofS.lineTo(.44,1.55); roofS.lineTo(.4,1.6); roofS.lineTo(-.8,1.58); roofS.closePath();
-  const roofG=new THREE.ExtrudeGeometry(roofS,{depth:1.46,bevelEnabled:true,bevelThickness:.03,bevelSize:.03,bevelSegments:3}); roofG.translate(0,0,-.73); g.add(mesh(roofG,paint));
-  for(const z of [-.74,.74]){ for(const [x0,y0,x1,y1] of [[-1.28,1.0,-.82,1.55],[1.12,1.0,.42,1.56],[-.2,1.0,-.2,1.56]]){ const len=Math.hypot(x1-x0,y1-y0); const b=box(.07,len,.05,black,(x0+x1)/2,(y0+y1)/2,z); b.rotation.z=-Math.atan2(x1-x0,y1-y0); g.add(b); } }
-  // wheels
-  const wheels=[];
-  for(const [x,z] of [[1.38,.82],[1.38,-.82],[-1.42,.82],[-1.42,-.82]]){
-    const w=new THREE.Group(); w.position.set(x,.36,z); g.add(w);
-    const tire=mesh(GC('tire',()=>{ const t=new THREE.TorusGeometry(.26,.1,14,32); return t; }),rubber); w.add(tire);
-    const tireCore=mesh(GC('tireCore',()=>{ const c=new THREE.CylinderGeometry(.33,.33,.2,32,1,true); c.rotateX(Math.PI/2); return c; }),rubber); w.add(tireCore);
-    const rim=mesh(GC('rim',()=>{ const c=new THREE.CylinderGeometry(.22,.22,.05,24); c.rotateX(Math.PI/2); return c; }),chrome,0,0,z>0?.07:-.07); w.add(rim);
-    for(let i=0;i<5;i++){ const sp=box(.035,.2,.03,chrome,0,0,z>0?.1:-.1); sp.rotation.z=i/5*Math.PI*2; sp.position.set(Math.sin(i/5*Math.PI*2)*.1,Math.cos(i/5*Math.PI*2)*.1,z>0?.1:-.1); w.add(sp); }
-    w.add(mesh(GC('hub',()=>{ const c=new THREE.CylinderGeometry(.05,.05,.06,12); c.rotateX(Math.PI/2); return c; }),chrome,0,0,z>0?.12:-.12));
-    wheels.push(w);
-  }
-  // lights, grille, bumpers, mirrors, handles, plates
-  const headM=emissiveMat(0xfff6dd,opt.night?6:.6,{roughness:.1}), tailM=emissiveMat(0xff2010,opt.night?4:.8,{roughness:.2});
-  for(const z of [-.6,.6]){ g.add(rbox(.12,.14,.34,.04,headM,2.3,.72,z,false)); g.add(rbox(.1,.14,.36,.04,tailM,-2.34,.8,z,false)); g.add(box(.2,.05,.16,chrome,.35,1.0,z*1.47)); }
-  g.add(rbox(.1,.18,.7,.04,black,2.3,.6,0,false));
-  for(let i=0;i<5;i++) g.add(box(.02,.13,.66,chrome,2.35,.6,0,false)).children;
-  g.add(rbox(.18,.18,1.9,.06,black,2.28,.4,0)); g.add(rbox(.18,.18,1.9,.06,black,-2.33,.42,0));
-  g.add(box(.02,.12,.38,mat(0xf0f0e8,{roughness:.5}),-2.43,.58,0,false));
-  for(const z of [-.93,.93]){ const mr=rbox(.18,.1,.08,.03,paint,1.0,1.05,z); g.add(mr); g.add(box(.14,.03,.02,chrome,-.25+.0,.88,z*.99)); g.add(box(.14,.03,.02,chrome,.55,.88,z*.99)); }
-  // interior: seats, steering wheel, dash
-  const seatM=mat(0x2a2a2e,{roughness:.8});
-  for(const z of [-.38,.38]){ g.add(rbox(.5,.14,.48,.05,seatM,-.05,.62,z)); g.add(rbox(.12,.75,.46,.05,seatM,-.38,1.05,z)); }
-  g.add(rbox(1.6,.14,.5,.05,seatM,-1.0,.62,0));
-  g.add(rbox(.35,.2,1.5,.08,mat(0x1c1c20,{roughness:.6}),.9,1.02,0));
-  const steerW=mesh(GC('steer',()=>new THREE.TorusGeometry(.17,.025,8,24)),black,.6,1.14,.38); steerW.rotation.y=Math.PI/2; steerW.rotation.x=-.4; g.add(steerW);
-  const lights=[]; if(opt.night){ for(const z of [-.6,.6]){ const sl=new THREE.SpotLight(col(0xfff2d6),4,40,.45,.5,1.4); sl.position.set(2.35,.72,z); sl.target.position.set(12,-.5,z*3); g.add(sl); g.add(sl.target); lights.push(sl); } }
-  g.userData={wheels,paint,lights,headM,tailM};
-  g.traverse(m=>{ if(m.isMesh && m.material===glass) m.castShadow=false; });
-  return g;
-}
-function spinWheels(car,dist){ for(const w of car.userData.wheels) w.rotation.z-=dist/.36; }
+/* makeCar + spinWheels: see 10b_car.js */
 
 /* ---------- foliage: instanced leaf cards with wind ---------- */
 function leafTex(hue=0){

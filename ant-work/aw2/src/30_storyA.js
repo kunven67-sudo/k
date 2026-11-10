@@ -118,26 +118,18 @@ async function driveToStand(){
   sfxAt(V3(8,1,10.5),()=>SFX.carDoor(),2); lv.jim.visible=false;
   await fade(1,.8);
   SFX.carDoor(); await wait(.4); SFX.engineStart();
-  const D=await enterLevel('drive',{pos:V3(0,1.6,0)});
-  letterbox(true); hudVisible(false);
-  D.driving=true; D.carX=-10; D.speed=12;
-  camFollow(t=>({pos:V3(D.carX+3+t*1.2,1.0,-2-7.2),look:V3(D.carX+.8,1.0,-2)}),42);
+  // it's YOUR car: you drive (first person, hands on the wheel), Jim rides next to you
+  const D=await enterLevel('drive',{pos:V3(-20,0,2),yaw:-Math.PI/2});
+  D.car.position.set(-20,0,2); D.yaw=0; D.vel=0; D.steerA=0; D.lastBase=null; D.arrived=false; D.playerDrive=true;
+  setVM(false); hudVisible(true); letterbox(false);
+  PLAYER.yaw=-Math.PI/2; PLAYER.pitch=-.1; PLAYER.ctl.look=true; PLAYER.ctl.move=false; PLAYER.ctl.interact=false;
   fade(0,1);
-  await wait(3.8);
-  D.jimTalk=true;
-  camFollow(t=>({pos:V3(D.carX+4.6,1.28,-2.05),look:V3(D.carX-.2,1.15,-2)}),38);
-  invalidateMotion();
-  await wait(3.8);
-  D.jimTalk=false;
-  camFollow(t=>({pos:V3(D.carX-16+t*2,10-t*.5,-2+6),look:V3(D.carX+14,0,-2)}),50);
-  invalidateMotion();
-  await wait(3.6);
-  camFollow(t=>({pos:V3(D.carX-6-t*2.5,.55,-1.4),look:V3(D.carX,1,-2)}),40);
-  invalidateMotion();
-  await wait(2.6);
-  await fade(1,.8);
-  letterbox(false); hudVisible(true); camRelease(0);
-  startFromCheckpointInner('A2');
+  objective("Drive to Jim's stand  (W gas, S brake, A / D steer)");
+  await wait(1.2);
+  D.jimTalk=true; bark('Jim',"Your car, so you drive. My stand's at the end of this street.",D.jim,3.6); later(3.6,()=>{ D.jimTalk=false; });
+  runStory(async()=>{
+    await waitUntil(()=>D.car.position.x>120||D.arrived); if(D.arrived) return; D.jimTalk=true; bark('Jim',"Nice car, by the way.",D.jim,2.4); await wait(2.4); D.jimTalk=false;
+    await waitUntil(()=>D.car.position.x>260||D.arrived); if(D.arrived) return; D.jimTalk=true; bark('Jim',"That's it, right up there!",D.jim,2.4); await wait(2.4); D.jimTalk=false; });
 }
 /* jump to a checkpoint mid-story without the title-screen reset */
 function startFromCheckpointInner(cp){ resetStory(); closeDialogNow(); hideSay(); objective(null); WORLD.cp=cp; writeSave({cp}); runStory(()=>CHECKPOINTS[cp]()); }
