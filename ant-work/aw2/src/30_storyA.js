@@ -359,6 +359,23 @@ function clearTinyPath(lv,pts,R,keep=[]){
     B.setFromObject(o); if(B.isEmpty()) continue; const sz=B.getSize(new THREE.Vector3()); if(Math.max(sz.x,sz.y,sz.z)<6) continue;
     if(samples.some(p=>B.distanceToPoint(p)<R)){ o.visible=false; out.push(o); } }
   return out; }
+/* the giant's 'field': things in front of its open mouth get sucked in + eaten; things in its body get pushed out */
+const _gf={a:new THREE.Vector3(),b:new THREE.Vector3(),m:new THREE.Vector3(),f:new THREE.Vector3(),v:new THREE.Vector3(),c:new THREE.Vector3()};
+function giantField(lv,giant,dt,keep){
+  if(!giant.visible) return; const S=giant.scale.x, keepS=new Set(keep);
+  giant.localToWorld(_gf.a.set(0,.95,-4.6)); giant.localToWorld(_gf.b.set(0,1,1.6)); giant.localToWorld(_gf.m.set(0,1,2.1));
+  _gf.f.copy(_gf.b).sub(_gf.a).normalize(); const bodyR=1.15*S, open=lv.giantMouth||0;
+  const ab=_gf.b.clone().sub(_gf.a), L2=ab.lengthSq();
+  const handle=(pos,r,onEat)=>{ // returns true if eaten
+    _gf.v.copy(pos).sub(_gf.m); const d=_gf.v.length();
+    if(open>.25 && d<850 && _gf.v.dot(_gf.f)>d*.35){ pos.addScaledVector(_gf.v.normalize(),-Math.min(d,(120+900*open)*dt*(1+300/(d+40)))); if(pos.distanceTo(_gf.m)<.45*S){ onEat(); return true; } return false; }
+    const t=clamp(_gf.c.copy(pos).sub(_gf.a).dot(ab)/L2,0,1); _gf.c.copy(_gf.a).addScaledVector(ab,t); const dd=pos.distanceTo(_gf.c), R=bodyR+r;
+    if(dd<R){ _gf.v.copy(pos).sub(_gf.c); if(_gf.v.lengthSq()<1e-6) _gf.v.set(0,1,0); pos.copy(_gf.c).addScaledVector(_gf.v.normalize(),R); }
+    return false; };
+  for(const sj of lv.subjects){ const o=sj.obj; if(!o||!o.visible||keepS.has(o)) continue;
+    if(handle(o.position,sj.r||10,()=>{ o.visible=false; sj.hide=true; if(Math.random()<.5) sfxAt(_gf.m,()=>SFX.slurp&&SFX.slurp(),400); })){} }
+  if(lv.bacData) for(const B of lv.bacData){ if(B.eaten) continue; if(handle(B.p,2,()=>{ B.eaten=true; B.p.set(0,-9999,0); })){} B.base.copy(B.p); }
+}
 async function giantScene(){
   const lv=LEVELS.tiny, F=F_(); F.photoPhase=false; PLAYER.lock(); objective(null); itemHints(null); closeDialogNow(); setMarker(null);
   playMusic(null,2); SFX.giantRumble(10); shake(.25);
@@ -377,6 +394,8 @@ async function giantScene(){
   const keepT=[giant,lv.flake,lv.bfFlake,lv.demodex,lv.naeg,lv.larry,lv.larryFlake,...(lv.biofilms||[]),...(lv.snacks||[])];
   const cleared=clearTinyPath(lv,[G0,G1,PLAYER.pos.clone().addScaledVector(f,520).addScaledVector(right,-60).add(V3(0,-250,0)),gPathEnd],360,keepT);
   clearTinyPath(lv,[PLAYER.pos.clone(),A.P.clone()],40,keepT).forEach(o=>cleared.push(o));
+  // while it's here: nothing floats THROUGH its body (gets shoved out), and with its mouth open it SUCKS IN everything in front of it
+  lv.giantField=true; runStory(async()=>{ while(lv.giantField&&LV===lv){ await wait(0); giantField(lv,giant,G.dt||.016,keepT); } });
   await tweenVal(k=>{ FX.exposure=lerp(1.1,.75,k); lv.scene.fog.density=lerp(lv.fogBase,.0022,k); },2.5);
   lookAtPoint(PLAYER.pos.clone().addScaledVector(f,100).add(V3(0,-20,0)),2);
   await wait(1.2);
@@ -398,7 +417,7 @@ async function giantScene(){
   D.position.copy(D0); sfxAt(D0,()=>SFX.squirm(),30);
   camFollow(()=>({pos:PLAYER.pos.clone().add(V3(0,PLAYER.y,0)),look:D.position.clone().lerp(mouth(),.12)}),SETTINGS.fov);
   await tweenVal(k=>{ const p=D0.clone().addScaledVector(right,k*85).addScaledVector(f,k*45); D.position.copy(p); D.lookAt(p.clone().add(right).addScaledVector(f,.5)); },2.8,x=>x);
-  say('It eats a Demodex mite!',3.2);
+  say('It sucks in everything in front of its mouth!',3.2);
   SFX.slurp(); shake(.3);
   camFollow(()=>({pos:PLAYER.pos.clone().add(V3(0,PLAYER.y,0)),look:D.visible?D.position.clone():mouth()}),SETTINGS.fov);
   const Ds=D.position.clone();
@@ -424,7 +443,8 @@ async function giantScene(){
   await tweenVal(k=>{ prev.copy(giant.position); const q=smooth(k);
     if(q<.5) giant.position.lerpVectors(gF,gM,q*2); else giant.position.lerpVectors(gM,gT,(q-.5)*2);
     const dir=giant.position.clone().sub(prev); if(dir.lengthSq()>1e-4) giant.lookAt(giant.position.clone().add(dir)); lv.giantMouth=.15+Math.sin(k*9)*.1; shake(.004); },7,x=>x);
-  giant.visible=false; lv.giantMouth=0;
+  { const away=gT.clone().sub(gM).normalize(), g0=giant.position.clone();   // it swims off into the dark (it used to just vanish)
+    runStory(async()=>{ await tweenVal(k=>{ giant.position.copy(g0).addScaledVector(away,k*k*1900); lv.giantMouth=.1; },6.5,x=>x); giant.visible=false; lv.giantMouth=0; lv.giantField=false; }); }
   await wait(1);
   // peek over the top
   say("You look to see if it's still there...",3.4);

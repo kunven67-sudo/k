@@ -327,7 +327,7 @@ function updateViewModel(dt,t){
   if(VM.hurtT>0){ VM.hurtT-=dt; }
   // whenever you can't walk (cutscenes, even the ones where you can look around) your hands stay down unless the scene asks for them
   //   (they used to float up on their own: tiny fists, swimming, the walk sway...)
-  if(!P.ctl.move && !P.autoSwim && !VM.forceShow && !(VM.handsLook>0) && !(VM.reach>0) && !(VM.slapT>0) && !(VM.punchT>0) && !(VM.waveT>0) && !(VM.chopT>0) && !(P.watchLook>0) && !(VM.photoT>0) && !P.carry){ onL=onR=false; }
+  if(!P.ctl.move && !VM.forceShow && !(VM.handsLook>0) && !(VM.reach>0) && !(VM.slapT>0) && !(VM.punchT>0) && !(VM.waveT>0) && !(VM.chopT>0) && !(P.watchLook>0) && !(VM.photoT>0) && !P.carry){ onL=onR=false; }
   // arms only appear when they are doing something (idle hands in the view just look odd)
   VM.armL=damp(VM.armL||0,onL?1:0,12,dt); VM.armR=damp(VM.armR||0,onR?1:0,12,dt); lp[1]-=(1-smooth(VM.armL))*.4; rp[1]-=(1-smooth(VM.armR))*.4; L.visible=VM.armL>.02; R.visible=VM.armR>.02;
   L.position.set(...lp); R.position.set(...rp); L.rotation.set(...lr); R.rotation.set(...rr);

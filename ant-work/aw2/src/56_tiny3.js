@@ -196,7 +196,7 @@ CHECKPOINTS.A7=async()=>{
   $('visor').classList.add('show'); $('scaleRead').textContent='1 : 10,000,000'; $('photoRead').textContent='PHOTOS: 5';
   PLAYER.lock(); crosshair(true); hudVisible(true); objective(null);
   const L=lv.larry; L.visible=true; L.position.set(55,10,170); L.rotation.y=Math.PI*1.2;
-  lv.tard.visible=false; lv.nervous=true; lv.cheer=false; lv.panic=false;
+  lv.tard.visible=false; lv.tard.scale.setScalar(42); lv.nervous=true; lv.cheer=false; lv.panic=false; if(lv.trapStrands){ for(const r of lv.trapStrands) lv.scene.remove(r); lv.trapStrands=null; }
   for(const m of lv.mites){ m.position.copy(m.userData.home); m.visible=true; }
   lookAtPoint(V3(0,0,0),0);
   FX.blackout=0; await fade(0,1);
@@ -218,6 +218,48 @@ CHECKPOINTS.A7=async()=>{
   await wait(2);
   await tardComes();
 };
+/* keep a point out of a capsule (a body from a to b, radius R) */
+function pushOutCapsule(p,a,b,R){ const ab=b.clone().sub(a), t=clamp(p.clone().sub(a).dot(ab)/ab.lengthSq(),0,1), c=a.clone().addScaledVector(ab,t), d=p.distanceTo(c); if(d<R){ const n=d>1e-4?p.clone().sub(c).divideScalar(d):V3(0,1,0); p.copy(c).addScaledVector(n,R); if(PLAYER.vel.dot(n)<0) PLAYER.vel.addScaledVector(n,-PLAYER.vel.dot(n)); return true; } return false; }
+async function tardChase(lv,T){
+  const tok=STORY.token, center=V3(0,-10,0), trap=lv.trap.position.clone(), S=T.scale.x;
+  const tb=new THREE.Box3().setFromObject(lv.trap), trapR=tb.getSize(new THREE.Vector3()).length()*.32;
+  let state='approach', warnTrap=false;
+  while(true){ await wait(0); if(tok!==STORY.token) return 'stop'; if(DLG.active||G.paused) continue; const dt=Math.min(.05,G.dt||.016);
+    const a=T.localToWorld(V3(0,.95,-4.6)), b=T.localToWorld(V3(0,1,1.4)), m=T.localToWorld(V3(0,1,2.1));
+    pushOutCapsule(PLAYER.pos,a,b,1.2*S+4);                                   // solid, every frame (also while you hold still)
+    const dMouth=m.distanceTo(PLAYER.pos);
+    if(dMouth<.95*S) return await tardFail(lv,T,'you');                         // its mouth got you
+    if(state==='approach'){ const dir=center.clone().sub(T.position); dir.y=0; const d=dir.length();
+      T.position.addScaledVector(dir.normalize(),Math.min(7,d)*dt); T.lookAt(center.x,T.position.y,center.z); lv.tardMouth=.2+Math.sin(G.time*2)*.1;
+      if(dMouth<115){ state='follow'; SFX.giantCall&&SFX.giantCall(); objective('Lead the tardigrade to the big lint tangle'); setMarker(()=>trap.clone().add(V3(0,60,0)),'Lint tangle'); toast('It sees you! Stay away from its mouth!','#ffcc66'); }
+      else if(d<135) return await tardFail(lv,T,'town'); }
+    else { const dir=PLAYER.pos.clone().sub(T.position); dir.y*=.4; const d=dir.length(); T.position.addScaledVector(dir.normalize(),Math.min(9,d*.12)*dt); T.lookAt(PLAYER.pos.x,T.position.y,PLAYER.pos.z); lv.tardMouth=.4+Math.sin(G.time*3)*.25;
+      if(d>280){ state='approach'; objective("Get the tardigrade's attention"); setMarker(()=>T.position.clone().add(V3(0,50,0)),'Tardigrade'); toast("It lost interest! It's going back to town!",'#ff8a6a'); }
+      if(m.distanceTo(trap)<trapR){ if(PLAYER.pos.distanceTo(trap)>trapR*1.05) break; if(!warnTrap){ warnTrap=true; toast('Get OUT of the lint so it closes on IT, not you!','#ffcc66'); } } }
+  }
+  // the lint snaps shut on it RIGHT WHERE IT IS (it used to slide through you into the middle)
+  PLAYER.lock(); setMarker(null); itemHints(null); objective(null); lv.tardWalk=1.3; lv.tardMouth=.8;
+  lookAtPoint(T.position.clone().add(V3(0,30,0)),.8); sfxAt(T.position,()=>SFX.squirm(),200);
+  const lm=new THREE.MeshStandardMaterial({color:col(0xe8e8f0),roughness:.95}); lv.trapStrands=[];
+  for(let i=0;i<16;i++){ const r=mesh(new THREE.TorusGeometry(rand(1.0,1.6)*S,rand(.03,.06)*S,6,48),lm,0,0,0,false); r.rotation.set(rand(0,3),rand(0,3),rand(0,3)); r.position.copy(T.localToWorld(V3(rand(-.4,.4),.95+rand(-.3,.3),rand(-4,1.2)))); r.scale.setScalar(.01); lv.scene.add(r); lv.trapStrands.push(r); }
+  await tweenVal(k=>{ lv.trapStrands.forEach((r,i)=>r.scale.setScalar(clamp(k*1.5-i*.03,.01,1))); },2.2);
+  lv.tardWalk=0; lv.tardMouth=0; const s0=T.scale.x; await tweenVal(k=>{ T.scale.set(s0,s0*(1-k*.35),s0*(1-k*.25)); },1.8);
+  return 'trapped';
+}
+/* it got you / it reached town: show it, then try again from the start of the chase */
+async function tardFail(lv,T,why){
+  PLAYER.lock(); setMarker(null); itemHints(null); objective(null); shake(.8); dmgFlash&&dmgFlash(); SFX.chomp&&SFX.chomp();
+  if(why==='town'){ lookAtPoint(T.position.clone().add(V3(0,40,0)),.6); const m=T.localToWorld(V3(0,1,2.1)); const near=lv.mites.slice().sort((p,q)=>p.position.distanceTo(m)-q.position.distanceTo(m)).slice(0,3);
+    lv.tardMouth=1; await tweenVal(k=>{ for(const x of near) x.position.lerp(m,k*.25); },1.4); for(const x of near) x.visible=false; SFX.gulp&&SFX.gulp(); }
+  await tweenVal(k=>{ FX.blackout=k; },.8);
+  cardShow(why==='town'?'IT ATE THE MITES':'THE TARDIGRADE GOT YOU',why==='town'?'You have to stop it before it reaches Mite Town. Try again':'Stay away from its mouth. Try again'); await wait(2.4); cardHide();
+  for(const x of lv.mites){ x.position.copy(x.userData.home); x.visible=true; }
+  T.scale.setScalar(42); T.position.set(-330,-10,330); T.lookAt(0,-10,0); lv.tardMouth=0; lv.tardWalk=1;
+  PLAYER.pos.set(0,30,90); PLAYER.vel.set(0,0,0); lookAtPoint(T.position.clone().add(V3(0,40,0)),0);
+  await tweenVal(k=>{ FX.blackout=1-k; },.7);
+  objective("Get the tardigrade's attention"); setMarker(()=>T.position.clone().add(V3(0,50,0)),'Tardigrade'); itemHints(['Swim close to its face (not too close!)','Then lead it into the big lint tangle']); PLAYER.free();
+  return await tardChase(lv,T);
+}
 async function tardComes(){
   const lv=LEVELS.mitetown, F=F_(), T=lv.tard; F.tardOn=true; PLAYER.lock(); objective(null);
   sfxAt(V3(0,0,-400),()=>SFX.giantRumble&&SFX.giantRumble(),200); shake(.4);
@@ -227,27 +269,11 @@ async function tardComes(){
   lv.panic=true;
   L_say: { lv.larry.userData.talking=true; await talk([{who:'Larry',voice:'Larry',text:"Oh no. The giant tardigrade! And it looks hungry!"},{who:'Larry',voice:'Larry',text:"It's heading for Mite Town!"}]); lv.larry.userData.talking=false; }
   objective("Get the tardigrade's attention"); setMarker(()=>T.position.clone().add(V3(0,50,0)),'Tardigrade');
-  itemHints(['Swim close to its face','Then lead it to the big lint tangle']);
+  itemHints(['Swim close to its face (not too close!)','Then lead it into the big lint tangle']);
   PLAYER.free(); playMusic('launch',1);
-  // the chase
-  let state='approach', warned=0;
-  const center=V3(0,-10,0), trap=lv.trap.position.clone();
-  while(true){ const dt=G.dt||.016; await wait(0); if(DLG.active) continue;
-    const head=T.position.clone().add(T.getWorldDirection(new THREE.Vector3()).multiplyScalar(60)).add(V3(0,20,0));
-    const dP=head.distanceTo(PLAYER.pos);
-    if(state==='approach'){ const tgt=center; const dir=tgt.clone().sub(T.position); const d=dir.length(); if(d>120) T.position.addScaledVector(dir.normalize(),12*dt); else lv.tardMouth=.5+Math.sin(G.time*3)*.3; T.lookAt(tgt.x,T.position.y,tgt.z);
-      if(dP<90){ state='follow'; SFX.giantCall&&SFX.giantCall(); lv.tardMouth=0; objective('Lead the tardigrade to the big lint tangle'); setMarker(()=>trap.clone().add(V3(0,60,0)),'Lint tangle'); toast('It sees you!','#ffcc66'); } }
-    else if(state==='follow'){ const dir=PLAYER.pos.clone().sub(T.position); dir.y*=.5; const d=dir.length(); T.position.addScaledVector(dir.normalize(),Math.min(14,d*.22)*dt); T.lookAt(PLAYER.pos.x,T.position.y,PLAYER.pos.z);
-      if(dP<30){ SFX.suitHit(); shake(.5); PLAYER.vel.add(PLAYER.pos.clone().sub(head).normalize().multiplyScalar(22)); dmgFlash&&dmgFlash(); }
-      if(d>260){ state='approach'; objective("Get the tardigrade's attention"); setMarker(()=>T.position.clone().add(V3(0,50,0)),'Tardigrade'); toast("It lost interest! It's going back to town!",'#ff8a6a'); warned++; }
-      if(T.position.distanceTo(trap)<110){ break; } }
-  }
-  // it gets tangled in the lint and curls up
-  PLAYER.lock(); setMarker(null); itemHints(null); objective(null);
-  lookAtPoint(T.position.clone().add(V3(0,30,0)),.8);
-  sfxAt(T.position,()=>SFX.squirm(),200); lv.tardWalk=1.3;
-  await tweenVal(k=>{ T.position.lerp(trap.clone().add(V3(0,10,0)),k*.05); },2.5);
-  lv.tardWalk=0; await tweenVal(k=>{ T.scale.set(42,42*(1-k*.4),42*(1-k*.3)); },1.8);
+  // the chase (REBUILT 11-10): solid (you can never go through it), its MOUTH gets you, slower, if you leave it alone it
+  // reaches town and eats mites, and the lint only snaps shut once YOU are out of it (and on IT, where it is)
+  const res=await tardChase(lv,T); if(res!=='trapped') return;
   say("It's stuck in the lint. It curls up and goes to sleep.",4); await wait(4.2);
   unlock('miteHero');
   // back in town: everybody cheers
