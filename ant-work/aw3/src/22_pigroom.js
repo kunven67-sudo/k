@@ -80,14 +80,14 @@ defineLevel('pigroom',{
     lv.armL=makeWorldArm(1); lv.armR=makeWorldArm(-1);
     const Y=PIGROOM.you;
     for(const [a,sd] of [[lv.armL,-1],[lv.armR,1]]){ a.scale.setScalar(.62); a.position.set(Y.x+sd*.33,.745,Y.z-.2); a.rotation.set(0,sd*-.05,0); scene.add(a); }
-    lv.shackles=[]; for(const sd of [-1,1]){ const s=makeShackle(.32,iron); s.position.set(Y.x+sd*.33,.73,Y.z-.36); s.rotation.set(0,0,0); s.children[0].rotation.y=Math.PI/2; scene.add(s); lv.shackles.push(s); }
+    lv.shackles=[]; for(const a of [lv.armL,lv.armR]){ a.updateMatrixWorld(true); const s=wristShackle(iron,.56); s.position.copy(a.localToWorld(V3(0,0,-.29))); s.userData.band.rotation.y=a.rotation.y; scene.add(s); lv.shackles.push(s); }   // around YOUR wrists
     // Jay 2, chained in his chair
     const j=makeJay2(); j.userData.level='pigroom'; j.position.copy(PIGROOM.jay2); j.rotation.y=Math.PI; scene.add(j); lv.jay2=j;
     const A=j.userData.A; A.seated=true; A.idleOff=true;
-    for(const sd of [-1,1]){ const s=makeShackle(.32,iron); s.position.set(PIGROOM.jay2.x+sd*.33,.73,PIGROOM.jay2.z-.36); s.children[0].rotation.y=Math.PI/2; scene.add(s); }
+    lv.jayShackles=[]; for(let i=0;i<2;i++){ const s=wristShackle(iron,.92); scene.add(s); lv.jayShackles.push(s); }   // follow Jay 2's wrists (update)
     // the pig-man on his throne
     const pig=makePigMan(); pig.position.set(T.x,.06,T.z+.1); scene.add(pig); lv.pig=pig;
-    pig.userData.pig.onBite=()=>{ SND.play('pig_eat_'+randi(1,4),{vol:.9,pos:V3(T.x,1.9,T.z+.6),ref:3}); if(Math.random()<.5) later(.15,()=>SND.play('bite',{vol:.5,pos:V3(T.x,1.9,T.z+.6),ref:3,rate:.75})); };
+    pig.userData.pig.onBite=()=>{ pigBiteMeat(pig.userData.pig); SND.play('pig_eat_'+randi(1,4),{vol:.9,pos:V3(T.x,1.9,T.z+.6),ref:3}); if(Math.random()<.5) later(.15,()=>SND.play('bite',{vol:.5,pos:V3(T.x,1.9,T.z+.6),ref:3,rate:.75})); };
     pig.userData.pig.onChew=()=>{ SND.play('chew_'+randi(1,3),{vol:.55,pos:V3(T.x,1.9,T.z+.6),ref:3,rate:.7}); };
     pig.userData.pig.onGrunt=()=>{ if(Math.random()<.75) SND.play('pig_'+randi(1,6),{vol:.95,pos:V3(T.x,1.9,T.z+.5),ref:3.5,rate:rand(.78,.9)}); };
     lv.ground=()=>0; lv.surfaceAt=()=>'stone';
@@ -97,6 +97,7 @@ defineLevel('pigroom',{
   exit(){ setAmbience([]); },
   update(dt,t){
     const lv=this;
+    if(lv.jayShackles&&lv.jay2.visible){ const J=lv.jay2.userData.J; lv.jay2.updateMatrixWorld(true); shackleFollow(lv.jayShackles[0],J.hdL,J.elL); shackleFollow(lv.jayShackles[1],J.hdR,J.elR); }
     // fire: flicker + embers + smoke
     for(const f of lv.fires){ const n=noise1(t*7+f.ph)*.25+noise1(t*17+f.ph*3)*.12; f.light.intensity=f.base*(1+n); 
       f.g.updateMatrixWorld(); const p=f.g.localToWorld(f.fireAt.clone());

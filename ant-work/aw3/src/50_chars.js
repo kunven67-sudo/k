@@ -97,6 +97,17 @@ function makeWorldArm(side){
   return g;
 }
 /* an iron shackle round a wrist, with a short chain down to a ring (world space) */
+/* a shackle that sits AROUND a wrist: the ring runs along the forearm, a short chain hangs to the armrest bolt
+   (old ones were turned sideways = a big hoop standing next to the wrist, "not even on my hands") */
+function wristShackle(ironM,size=.6){
+  const s=makeShackle(.12,ironM), U=s.userData; s.scale.setScalar(size);
+  const hinge=s.children[1]; s.remove(hinge); U.band.add(hinge); U.band.rotation.set(0,0,0);
+  return s;
+}
+const _wsZ=new THREE.Vector3(0,0,1), _wsA=new THREE.Vector3(), _wsB=new THREE.Vector3();
+/* keep a wristShackle on a character's wrist (hd = hand joint, el = elbow joint) */
+function shackleFollow(s,hd,el){ hd.getWorldPosition(_wsA); el.getWorldPosition(_wsB); const d=_wsA.clone().sub(_wsB); const L=d.length(); if(L<1e-4) return; d.divideScalar(L);
+  s.position.copy(_wsA).addScaledVector(d,-.02); s.userData.band.quaternion.setFromUnitVectors(_wsZ,d); }
 function makeShackle(chainLen=.35,ironM){
   ironM=ironM||pbrMat('rusty_metal_04',.3,{opts:{metalness:.85,roughness:.75}});
   const g=new THREE.Group();

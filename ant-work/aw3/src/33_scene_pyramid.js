@@ -78,9 +78,9 @@ SCENES.fruit=async function(cont){
   holdProp(J,f1,'R',V3(0,-.075,.03),new THREE.Euler(0,0,0)); f1.scale.setScalar(1);
   J.userData.A.look='player'; await wait(.9);
   setPose(J,'eatFruit',.35); await wait(.55);
-  SND.play('bite',{vol:.9,pos:headOf(J),ref:2}); await wait(.35);
+  SND.play('bite',{vol:.9,pos:headOf(J),ref:2}); biteFruit(f1,headOf(J)); await wait(.35);
   SND.play('chew_1',{vol:.7,pos:headOf(J),ref:2}); await wait(.6); SND.play('chew_2',{vol:.6,pos:headOf(J),ref:2});
-  setPose(J,'holdFruit',.4); f1.scale.set(1,.82,1);
+  setPose(J,'holdFruit',.4);
   await wait(.7);
   await say([L('p_fruit_5',{mood:'happy'})]);
   // your turn
@@ -98,7 +98,7 @@ SCENES.fruit=async function(cont){
   VM.holdItem=held; VM.eatK=0; VM.forceShow=true;
   await wait(.5);
   await tweenVal(v=>{ VM.eatK=v; },0,1,.85);
-  SND.play('bite',{vol:1}); shake(.08); held.scale.set(1,.8,1); await wait(.3);
+  SND.play('bite',{vol:1}); shake(.08); biteFruit(held,camera.getWorldPosition(new THREE.Vector3())); await wait(.3);
   SND.play('chew_2',{vol:.8});
   await tweenVal(v=>{ VM.eatK=v; },1,.15,.6);
   SND.play('chew_3',{vol:.7}); await wait(.5);

@@ -1,6 +1,6 @@
 {
   "name": "ant-work-2",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "description": "ANT WORK 2 (fixed). Build: node build.js --zip"
 }

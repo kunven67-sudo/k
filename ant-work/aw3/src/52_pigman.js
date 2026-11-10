@@ -22,8 +22,11 @@ function makeMeatLeg(){
   // a bitten edge: a paler torn bit near the top
   const bit=mesh(GC('meatBite',()=>new THREE.SphereGeometry(.05,10,8)),mat(0xc07a50,{roughness:.8}),.07,.27,.05); bit.scale.set(1,.7,.5); g.add(bit);
   g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  g.userData={meat,bit,left:1};
   return g;
 }
+/* every bite takes a chunk off the top of the leg (down to a stub) */
+function pigBiteMeat(P){ const U=P.meat.userData; if(!U||!U.meat) return; U.left=Math.max(.42,U.left-.075); const w=lerp(.86,1,(U.left-.42)/.58); U.meat.scale.set(w,U.left,w); U.bit.position.y=.37*U.left-.07; U.bit.scale.set(1.25,.55,.9); U.bit.position.x=.03; }
 function makePigMan(){
   const T=charTex();
   const root=new THREE.Group(); root.name='Pig';
@@ -113,8 +116,20 @@ function makePigMan(){
   root.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
   return root;
 }
+/* search (once) for the shoulder/elbow angles that put the top of the leg right at his mouth */
+function pigFindReach(root,P){
+  const M=P.meat; if(!M) return {sx:0,sy:0,sz:0,ex:0};
+  const sh=P.R.sh.rotation.clone(), el=P.R.el.rotation.clone(), hd=P.R.hand.rotation.clone(), tip=new THREE.Vector3(), mouth=new THREE.Vector3();
+  P.R.hand.rotation.set(.35,.6,0); let best={sx:0,sy:0,sz:0,ex:0}, bd=1e9;
+  for(let sx=-.6;sx<=.61;sx+=.2) for(let sy=-1;sy<=1.01;sy+=.2) for(let sz=-.8;sz<=.81;sz+=.2) for(let ex=-.6;ex<=.61;ex+=.3){
+    P.R.sh.rotation.set(-1.25+sx,-.25+sy,.38+sz); P.R.el.rotation.set(-2.05+ex,0,-.3); root.updateMatrixWorld(true);
+    M.localToWorld(tip.set(0,.34,0)); P.head.localToWorld(mouth.set(0,-.1,.3)); const d=tip.distanceTo(mouth);
+    if(d<bd){ bd=d; best={sx,sy,sz,ex}; } }
+  P.R.sh.rotation.copy(sh); P.R.el.rotation.copy(el); P.R.hand.rotation.copy(hd); root.updateMatrixWorld(true);
+  return best;
+}
 /* the eating loop: lift the leg, bite, tear, chew, grunt. P.stop = sit still and stare */
-const _pgv=new THREE.Vector3(), _pgw=new THREE.Vector3();
+const _pgv=new THREE.Vector3(), _pgw=new THREE.Vector3(), _pgT=new THREE.Vector3(), _pgM=new THREE.Vector3();
 function animatePigMan(root,dt,t){
   const P=root.userData.pig;
   // breathing: the belly heaves
@@ -135,8 +150,10 @@ function animatePigMan(root,dt,t){
   }
   P.raise=damp(P.raise||0,raise,10,dt); const r=P.raise;
   // right arm: resting on the armrest -> hand at the mouth
-  P.R.sh.rotation.set(lerp(-.35,-1.25,r),lerp(.1,-.25,r),lerp(.12,.38,r));
-  P.R.el.rotation.set(lerp(-1.2,-2.05,r),0,lerp(0,-.3,r));
+  if(P.reach===undefined) P.reach=pigFindReach(root,P);   // once: the arm angles that bring the leg to his mouth
+  const F=P.reach;
+  P.R.sh.rotation.set(lerp(-.35,-1.25+F.sx,r),lerp(.1,-.25+F.sy,r),lerp(.12,.38+F.sz,r));
+  P.R.el.rotation.set(lerp(-1.2,-2.05+F.ex,r),0,lerp(0,-.3,r));
   P.R.hand.rotation.set(lerp(-.1,.35,r),lerp(0,.6,r),0);
   for(const f of P.R.fingers) f.rotation.x=-1.25; P.R.th.rotation.x=-.6;
   // left arm: on the armrest, fingers drumming
@@ -154,4 +171,10 @@ function animatePigMan(root,dt,t){
   // ears flick now and then
   P.earT=(P.earT||0)-dt; if(P.earT<=0){ P.earT=rand(2,6); P.earK=1; } P.earK=Math.max(0,(P.earK||0)-dt*5);
   P.ears.forEach((e,i)=>{ e.rotation.x=1.35-Math.sin(P.earK*Math.PI)*.35*(i?1:.6); });
+  // the leg really goes INTO his mouth when he bites (the arm alone stopped beside his face)
+  { const M=P.meat; if(M){ if(!M.userData.home) M.userData.home=M.position.clone(); M.position.copy(M.userData.home);
+    if(P.raise>.02){ root.updateMatrixWorld(true);
+      const tip=M.localToWorld(_pgT.set(0,.37*(M.userData.left||1)-.03,0)), mouth=P.head.localToWorld(_pgM.set(0,-.1,.3));
+      const hand=M.parent, a=hand.worldToLocal(tip.clone()), b=hand.worldToLocal(mouth.clone());
+      M.position.addScaledVector(b.sub(a),smooth(Math.min(1,P.raise))); } } }
 }

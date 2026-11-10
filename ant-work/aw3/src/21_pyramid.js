@@ -62,6 +62,17 @@ function makeFruit(seed){
   g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=true; } });
   return g;
 }
+/* a real bite out of the fruit: the glowing inside shows, with teeth marks round the edge, on the side that bit it */
+function biteFruit(f,mouthWorld){
+  f.updateMatrixWorld(true);
+  const loc=f.worldToLocal(mouthWorld.clone()); loc.y=0; if(loc.lengthSq()<1e-6) loc.set(0,0,1); loc.normalize();
+  const g=new THREE.Group(); g.position.set(loc.x*.054,.064,loc.z*.054); g.rotation.y=Math.atan2(loc.x,loc.z);
+  const flesh=new THREE.MeshPhysicalMaterial({color:col(0xf6ecff),emissive:col(0xc89aff),emissiveIntensity:1.1,roughness:.6});
+  const p=mesh(new THREE.SphereGeometry(.03,18,12),flesh,0,0,0,false); p.scale.set(1,1.15,.4); g.add(p);
+  const skin=f.userData.m; for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; g.add(mesh(new THREE.SphereGeometry(.0078,8,6),skin,Math.cos(a)*.031,Math.sin(a)*.036,.003,false)); }   // teeth marks
+  g.traverse(o=>{ if(o.isMesh){ o.renderOrder=f.children[0]&&f.children[0].renderOrder||0; } });
+  f.add(g); return g;
+}
 defineLevel('pyramid',{
   title:'The Pyramid',
   env:{fx:{exposure:1.28,saturation:1.0,contrast:1.12,bloomStrength:.55,bloomThreshold:.9,aoRadius:.5,vignette:.5,temp:.02,grain:.05},music:null,reverb:.65,surface:'stone',far:220,speed:2.6},
