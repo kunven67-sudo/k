@@ -46,7 +46,8 @@ CHECKPOINTS.A1=async()=>{
   hudVisible(true); showCash(false);
   if(!lv.interSetup){ lv.interSetup=true;
     addInteract(lv,{obj:lv.door.pivot,offset:V3(.5,1.1,0),label:'Open the door',reach:1.9,when:()=>F_().knocked&&!F_().doorOpened,act:()=>runStory(openFrontDoor)});
-    addInteract(lv,{pos:V3(8,1,10.5),label:'Get in your car',reach:2.2,when:()=>F_().jimAtCar&&!F_().driving,act:()=>runStory(driveToStand)});
+    addInteract(lv,{pos:V3(5.7,1,12.6),label:"Get in Jim's car",reach:2.2,when:()=>F_().jimAtCar&&!F_().driving,act:()=>runStory(driveToStand)});
+    addInteract(lv,{pos:V3(7.6,1,1.1),label:'Your car',reach:2.4,when:()=>F_().follow&&!F_().driving,act:()=>bark('You',"Jim wants to take his car. Mine stays in the garage.",null,2.6)});
     addInteract(lv,{pos:V3(0,1,-5.4),label:'Watch TV',reach:2,aim:true,when:()=>F_().knocked&&!F_().doorOpened,act:()=>bark('You',"Not now. Somebody's at the door.",null,2.4)});
   }
   cardShow('FIVE YEARS LATER','Back home'); await fade(0,2.2); await wait(2.4); cardHide();
@@ -99,11 +100,11 @@ async function openFrontDoor(){
   clearPose(jim);
   F.follow=true; F.nagT=G.time; PLAYER.free(); objective('Follow Jim');
   jim.userData.A.look=null;
-  // Jim heads to the passenger side of your car and waits
+  // Jim walks to the DRIVER side of HIS car (behind it, not through it) and waits for you
   runStory(async()=>{
-    await walkTo(jim,[V3(0,0,6.2),V3(1.2,0,8.4),V3(4.2,0,10),V3(5.85,0,10.6)],1.35);
-    faceYaw(jim,-Math.PI/2); F.jimAtCar=true; objective('Get in your car');
-    later(12,()=>{ if(!F_().driving) bark('Jim','Come on, let\'s take your car!',jim,2.6); });
+    await walkTo(jim,[V3(0,0,6.2),V3(1.2,0,8.4),V3(4.2,0,9.3),V3(8.8,0,9.3),V3(8.75,0,11.9)],1.35);
+    faceYaw(jim,-Math.PI/2); F.jimAtCar=true; objective("Get in Jim's car");
+    later(12,()=>{ if(!F_().driving) bark('Jim','Come on, get in! I\'m driving.',jim,2.6); });
   });
 }
 /* can't go back in the house once you're following Jim */
@@ -114,22 +115,32 @@ on('tick',()=>{
     nagOnce('nagT',2.6,()=>{ const jim=LEVELS.home.jim; facePoint(jim,p); bark('Jim','Hey, are you coming with me or not?',jim,2.4); if(trophyStat('nags')>=3) unlock('nag'); }); }
 });
 async function driveToStand(){
+  // JIM drives HIS car (his hands on the wheel), you ride next to him
   const lv=LEVELS.home, F=F_(); F.driving=true; PLAYER.lock(); objective(null); cardHide(); hideSay();
-  sfxAt(V3(8,1,10.5),()=>SFX.carDoor(),2); lv.jim.visible=false;
+  sfxAt(V3(7,1,12.6),()=>SFX.carDoor(),2); lv.jim.visible=false;
   await fade(1,.8);
   SFX.carDoor(); await wait(.4); SFX.engineStart();
-  // it's YOUR car: you drive (first person, hands on the wheel), Jim rides next to you
-  const D=await enterLevel('drive',{pos:V3(-20,0,2),yaw:-Math.PI/2});
-  D.car.position.set(-20,0,2); D.yaw=0; D.vel=0; D.steerA=0; D.lastBase=null; D.arrived=false; D.playerDrive=true;
-  setVM(false); hudVisible(true); letterbox(false);
-  PLAYER.yaw=-Math.PI/2; PLAYER.pitch=-.1; PLAYER.ctl.look=true; PLAYER.ctl.move=false; PLAYER.ctl.interact=false;
+  const D=await enterLevel('drive',{pos:V3(0,1.6,0)});
+  letterbox(true); hudVisible(false);
+  const Z=D.laneZ=2;
+  D.driving=true; D.carX=-10; D.speed=12;
+  camFollow(t=>({pos:V3(D.carX+3+t*1.2,1.0,Z-7.2),look:V3(D.carX+.8,1.0,Z)}),42);       // from the driver side: Jim driving
   fade(0,1);
-  objective("Drive to Jim's stand  (W gas, S brake, A / D steer)");
-  await wait(1.2);
-  D.jimTalk=true; bark('Jim',"Your car, so you drive. My stand's at the end of this street.",D.jim,3.6); later(3.6,()=>{ D.jimTalk=false; });
-  runStory(async()=>{
-    await waitUntil(()=>D.car.position.x>120||D.arrived); if(D.arrived) return; D.jimTalk=true; bark('Jim',"Nice car, by the way.",D.jim,2.4); await wait(2.4); D.jimTalk=false;
-    await waitUntil(()=>D.car.position.x>260||D.arrived); if(D.arrived) return; D.jimTalk=true; bark('Jim',"That's it, right up there!",D.jim,2.4); await wait(2.4); D.jimTalk=false; });
+  await wait(3.8);
+  D.jimTalk=true; bark('Jim',"My stand's at the end of this street. You're gonna love it.",D.jim,3.6);
+  camFollow(t=>({pos:V3(D.carX+4.6,1.28,Z-.05),look:V3(D.carX-.2,1.15,Z)}),38);          // through the windshield: both of you
+  invalidateMotion();
+  await wait(3.8);
+  D.jimTalk=false;
+  camFollow(t=>({pos:V3(D.carX-16+t*2,10-t*.5,Z+6),look:V3(D.carX+14,0,Z)}),50);          // up high: the street at sunset
+  invalidateMotion();
+  await wait(3.6);
+  camFollow(t=>({pos:V3(D.carX-6-t*2.5,.55,Z+.6),look:V3(D.carX,1,Z)}),40);               // low behind the car
+  invalidateMotion();
+  await wait(2.6);
+  await fade(1,.8);
+  letterbox(false); hudVisible(true); camRelease(0);
+  startFromCheckpointInner('A2');
 }
 /* jump to a checkpoint mid-story without the title-screen reset */
 function startFromCheckpointInner(cp){ resetStory(); closeDialogNow(); hideSay(); objective(null); WORLD.cp=cp; writeSave({cp}); runStory(()=>CHECKPOINTS[cp]()); }
@@ -144,7 +155,7 @@ CHECKPOINTS.A2=async()=>{
   if(!lv.interSetup){ lv.interSetup=true;
     addInteract(lv,{obj:jim,offset:V3(0,1.6,0),label:'Talk to Jim',reach:2.4,when:()=>F_().atStand&&!F_().standTalked,act:()=>runStory(standTalk)});
     addInteract(lv,{pos:V3(0,.5,-5.7),label:'Climb down the ladder',reach:2,when:()=>F_().hatchOpen,act:()=>runStory(climbDown)});
-    addInteract(lv,{pos:V3(-9,1,11.5),label:'Your car',reach:2.4,when:()=>F_().atStand&&!F_().hatchOpen,act:()=>bark('You',"Nope. I already said I'd help him.",null,2.4)});
+    addInteract(lv,{pos:V3(-9,1,11.5),label:"Jim's car",reach:2.4,when:()=>F_().atStand&&!F_().hatchOpen,act:()=>bark('You',"Nope. I already said I'd help him.",null,2.4)});
     addTrigger(lv,{pos:V3(0,0,-4.6),r:4.2,once:false,when:()=>F_().standTalked&&!F_().keypadDone,fn:()=>runStory(keypadScene)});
   }
   await fade(0,1.2);
@@ -294,38 +305,10 @@ async function shrinkSequence(){
   await tweenVal(k=>{ PLAYER.targetScale=PLAYER.scale=lerp(1,.006,easeIn(k)); PLAYER.fovKick=k*25; FX.aberr=.006+k*.01; },3,x=>x);
   FX.glitch=0;
   FX.whiteout=0; await tweenVal(k=>{ FX.whiteout=k; },.6);
-  await mossStage();             // first stop: the moss in Jim's cage (walk to the dew drop, dive in)
   startFromCheckpointInner('A4');
 }
 
 /* ================= A4: THE TINYVERSE ================= */
-/* Jim's eye, as big as a building, looking down at you through the magnifying glass (it blinks) */
-function makeGiantEye(){
-  const g=new THREE.Group();
-  const irisT=canvasTex(512,512,(x,w,h)=>{ x.fillStyle='#f2ece4'; x.fillRect(0,0,w,h); x.translate(w/2,h/2);
-    const R=150; const gg=x.createRadialGradient(0,0,20,0,0,R); gg.addColorStop(0,'#2a1608'); gg.addColorStop(.35,'#6a4a22'); gg.addColorStop(.75,'#4a6a3a'); gg.addColorStop(1,'#1a2a14'); x.fillStyle=gg; x.beginPath(); x.arc(0,0,R,0,7); x.fill();
-    for(let i=0;i<900;i++){ const a=rand(0,6.28), r0=rand(46,60), r1=rand(100,R); x.strokeStyle=`rgba(${rand(120,220)|0},${rand(100,170)|0},${rand(50,90)|0},${rand(.08,.3)})`; x.lineWidth=rand(.5,2); x.beginPath(); x.moveTo(Math.cos(a)*r0,Math.sin(a)*r0); x.lineTo(Math.cos(a+rand(-.05,.05))*r1,Math.sin(a+rand(-.05,.05))*r1); x.stroke(); }
-    x.fillStyle='#050302'; x.beginPath(); x.arc(0,0,52,0,7); x.fill(); x.strokeStyle='rgba(10,8,4,.8)'; x.lineWidth=10; x.beginPath(); x.arc(0,0,R,0,7); x.stroke();
-    for(let i=0;i<40;i++){ x.strokeStyle=`rgba(190,60,50,${rand(.15,.35)})`; x.lineWidth=rand(.6,1.6); x.beginPath(); const a=rand(0,6.28); let r=rand(170,240); x.moveTo(Math.cos(a)*r,Math.sin(a)*r); for(let k=0;k<6;k++){ r+=rand(6,14); const b=a+rand(-.12,.12); x.lineTo(Math.cos(b)*r,Math.sin(b)*r); } x.stroke(); } });
-  const eye=new THREE.Mesh(new THREE.SphereGeometry(1,48,32),new THREE.MeshPhysicalMaterial({map:irisT,roughness:.08,clearcoat:1,clearcoatRoughness:.02}));
-  eye.rotation.y=-Math.PI/2; g.add(eye);   // the sphere's texture centre faces +z
-  const skin=skinify(new THREE.MeshPhysicalMaterial({color:col(0xd8a888),roughness:.6,sheen:col(0x553322)}));
-  const up=new THREE.Mesh(new THREE.SphereGeometry(1.08,40,20,0,Math.PI*2,0,Math.PI/2),skin); const lo=up.clone(); lo.rotation.x=Math.PI; g.add(up); g.add(lo);
-  g.userData={up,lo,eye}; g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=false; } }); return g;
-}
-function setEyeOpen(E,k){ E.userData.up.rotation.x=-k*1.15; E.userData.lo.rotation.x=Math.PI+k*.85; }
-async function jimsEye(lv){
-  PLAYER.lock(); const E=makeGiantEye(); const f=new THREE.Vector3(); camera.getWorldDirection(f); f.y=0; f.normalize();
-  const pos=PLAYER.pos.clone().addScaledVector(f,170).add(V3(0,210,0)); E.position.copy(pos); E.scale.setScalar(95); E.lookAt(PLAYER.pos); lv.scene.add(E); setEyeOpen(E,0);
-  const fog0=lv.scene.fog.density; lv.scene.fog.density=fog0*.45;
-  SFX.giantRumble&&SFX.giantRumble(3); lookAtPoint(pos,2.2); await wait(2.4);
-  await tweenVal(k=>setEyeOpen(E,k),.9); SFX.squish&&SFX.squish();
-  await talk([{who:'Jim',radio:true,text:"Can you see me?! I'm looking at you through the magnifying glass! You're SO small!",auto:1},{who:'You',text:"Jim... your eye is the size of a building.",auto:1}]);
-  for(let i=0;i<2;i++){ await tweenVal(k=>setEyeOpen(E,1-Math.sin(k*Math.PI)),.32); await wait(.5); }
-  await talk([{who:'Jim',radio:true,text:"Ha! Okay okay, I'll go watch on the micro-cam. Have fun!",auto:.8}]);
-  await tweenVal(k=>{ E.position.y=pos.y+k*160; setEyeOpen(E,1-k*.3); lv.scene.fog.density=lerp(fog0*.45,fog0,k); },2.2);
-  lv.scene.remove(E); lv.scene.fog.density=fog0; lookAtPoint(PLAYER.pos.clone().addScaledVector(f,40),1);
-}
 const TINY_LINES={
   bacteria:["Those green glowy ones are bacteria! Probably. I think.","Bacteria! Don't lick them.","Ooh, a whole colony. Nice shot."],
   paramecium:["Whoa, that one's swimming! Look at all the little hairs!","That's a paramecium. I read about those. Once.","It's got a mouth groove! Gross. Cool. Gross."],
@@ -349,12 +332,11 @@ CHECKPOINTS.A4=async()=>{
   await tweenVal(k=>FX.whiteout=1-k,2.2); unlock('shrunk');
   say("Down here you don't walk. You float.",4);
   await wait(2.5);
-  await jimsEye(lv);           // a 'whoa' moment: Jim's giant eye looking at you through the magnifier
   PLAYER.free();
   itemHints([IS_TOUCH?'<kbd>⤒ ⤓</kbd> swim up / down':'<kbd>Space</kbd> / <kbd>C</kbd> swim up / down',IS_TOUCH?'<kbd>👊</kbd> take photo':'<kbd>Click</kbd> / <kbd>Q</kbd> take photo']);
   TOUCH_UI.show({act:true,down:true});
   await wait(4.5);
-  await talk([{who:'Jim',radio:true,text:"Okay, I'm on the micro-cam. What do you see down there?",auto:1.4},{who:'You',text:"Jim... this is insane.",auto:1.2},{who:'Jim',radio:true,text:"Take pictures! Take pictures of everything!",auto:1.4}]);
+  await talk([{who:'Jim',radio:true,text:"Whoa... I can see everything you see! There's a camera on your suit. What is all that?",auto:1.4},{who:'You',text:"Jim... this is insane.",auto:1.2},{who:'Jim',radio:true,text:"Take pictures! Take pictures of everything!",auto:1.4}]);
   objective('Take pictures for Jim: <b>0</b>/2');
   F.photoPhase=true; F.tinyStart=G.time;
   // idle radio chatter + a curious paramecium bumping into you

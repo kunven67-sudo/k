@@ -6,7 +6,7 @@
    hills on the horizon, sunset haze) so it's never an empty void.
    Drive to the end of the street = Jim's stand.
    ================================================================ */
-const DRIVE_END=360;
+const DRIVE_END=360;   // (the first-person "you drive" code below is not used: Jim drives his own car)
 defineLevel('drive',{
   title:'the drive',
   env:{fx:{exposure:1.0,temp:.2,saturation:1.1,contrast:1.08,bloomStrength:.2,bloomThreshold:1.5,mblurStrength:1.0},music:'drive',reverb:.05,amb:[['road',.1],['engine',.05]],far:1400},
@@ -45,12 +45,15 @@ defineLevel('drive',{
     const signT=canvasTex(512,256,(x,w,h)=>{ x.fillStyle='#f4ead0'; x.fillRect(0,0,w,h); x.strokeStyle='#6a3a1a'; x.lineWidth=14; x.strokeRect(7,7,w-14,h-14); x.fillStyle='#8a2a1a'; x.textAlign='center'; x.font='bold 84px Georgia, serif'; x.fillText("JIM'S",w/2,110); x.font='bold 60px Georgia, serif'; x.fillText('STAND  >',w/2,190); });
     const sg=new THREE.Group(); sg.position.set(DRIVE_END-14,0,6.8); sg.rotation.y=-Math.PI/2+.35; scene.add(sg); for(const z of [-.9,.9]) sg.add(cyl(.06,.06,2.6,mat(0x6a4a2a,{roughness:.9}),0,1.3,z,8)); sg.add(mesh(new THREE.PlaneGeometry(2.2,1.1),new THREE.MeshStandardMaterial({map:signT,roughness:.8}),.07,2.2,0)); sg.children[sg.children.length-1].rotation.y=Math.PI/2;
     // your car + Jim
-    lv.car=makeCar({night:true}); scene.add(lv.car);
-    lv.jim=makeJim(); lv.jim.userData.level='drive'; lv.car.add(lv.jim); lv.jim.position.set(-.16,-.17,.38); lv.jim.scale.setScalar(.92); lv.jim.rotation.y=Math.PI/2; lv.jim.userData.A.seated=true; setPose(lv.jim,'ride',0);
-    lv.jim.userData.A.custom=(R,t)=>{ if(lv.jimTalk){ R.shL[0]=-.6+Math.sin(t*3)*.15; R.elL[0]=-1.1; } };
-    lv.you=makeYou(); lv.you.userData.level='drive'; lv.car.add(lv.you); lv.you.position.set(-.16,-.17,-.38); lv.you.scale.setScalar(.92); lv.you.rotation.y=Math.PI/2; lv.you.userData.A.seated=true; setPose(lv.you,'drive',0); lv.you.visible=false;
-    // your own arms on the wheel (seen from your eyes)
-    lv.arms=[makeWorldArm(1),makeWorldArm(-1)]; for(const a of lv.arms){ a.scale.setScalar(.78); lv.car.add(a); }
+    lv.car=makeCar({night:true,paint:0x2a4a8a}); scene.add(lv.car);     // JIM'S car (blue)
+    // Jim in the driver seat: BOTH hands really grip the wheel (and follow it when it turns)
+    lv.jim=makeJim(); lv.jim.userData.level='drive'; lv.car.add(lv.jim); lv.jim.position.set(-.16,-.17,-.38); lv.jim.scale.setScalar(.92); lv.jim.rotation.y=Math.PI/2; lv.jim.userData.A.seated=true; setPose(lv.jim,'drive',0);
+    const gripL=new THREE.Vector3(), gripR=new THREE.Vector3();
+    lv.jim.userData.A.custom=(R,t)=>{ const W=lv.car.userData.wheelOnly; W.updateMatrixWorld(true); gripL.set(0,.1,-.155); W.localToWorld(gripL); gripR.set(0,.1,.155); W.localToWorld(gripR);
+      aimArm(lv.jim,'L',gripL,R,1,.07); aimArm(lv.jim,'R',gripR,R,1,.07); if(lv.jimTalk){ R.head[1]+=.45+Math.sin(t*2)*.08; } };
+    // you in the passenger seat
+    lv.you=makeYou(); lv.you.userData.level='drive'; lv.car.add(lv.you); lv.you.position.set(-.16,-.17,.38); lv.you.scale.setScalar(.92); lv.you.rotation.y=Math.PI/2; lv.you.userData.A.seated=true; setPose(lv.you,'ride',0);
+    lv.arms=[];
     // oncoming traffic
     lv.traffic=[]; for(let i=0;i<4;i++){ const c=makeCar({paint:pick([0x2a4a8a,0xd8d8d8,0x1a1a1c,0x3a6a4a,0xc8a020]),night:true,simple:true}); c.rotation.y=Math.PI; c.position.set(80+i*70,0,-2); const cb=bake(c); cb.userData={wheels:[]}; scene.add(cb); lv.traffic.push({c:cb,sp:rand(9,12)}); }
     lv.carX=0;
@@ -59,7 +62,7 @@ defineLevel('drive',{
   update(dt,t){
     const lv=this;
     if(lv.playerDrive) driveUpdate(lv,dt,t);
-    else if(lv.driving){ const sp=lv.speed||11; lv.carX+=sp*dt; lv.car.position.set(lv.carX,Math.sin(t*9)*.006,-2); spinWheels(lv.car,sp*dt); lv.car.rotation.z=Math.sin(t*1.3)*.004; ambFreq('engine',48+sp*2.2); }
+    else if(lv.driving){ const sp=lv.speed||11; lv.carX+=sp*dt; lv.car.position.set(lv.carX,Math.sin(t*9)*.006,lv.laneZ!=null?lv.laneZ:2); lv.car.userData.wheelOnly.rotation.x=Math.sin(t*.7)*.05; spinWheels(lv.car,sp*dt); lv.car.rotation.z=Math.sin(t*1.3)*.004; ambFreq('engine',48+sp*2.2); }
     for(const T of lv.traffic){ T.c.position.x-=T.sp*dt; spinWheels(T.c,T.sp*dt); const cx=lv.playerDrive?lv.car.position.x:lv.carX; if(T.c.position.x<cx-140) T.c.position.x=cx+rand(160,260); }
     WIND.time.value=t;
   }
@@ -95,7 +98,7 @@ function driveUpdate(lv,dt,t){
   car.userData.wheelOnly.rotation.x=lv.steerA*2.6;
   { const U=car.userData, mph=Math.abs(lv.vel)*2.237; if(U.speedo) U.speedo.rotation.z=-Math.PI*.75-clamp(mph/120,0,1)*Math.PI*1.5; lv.rpm=damp(lv.rpm||.8,.8+(thr?2.2:0)+Math.abs(lv.vel)/21*3.4,4,dt); if(U.tacho) U.tacho.rotation.z=-Math.PI*.75-clamp(lv.rpm/8,0,1)*Math.PI*1.5; }   // real moving needles
   ambFreq('engine',48+Math.abs(lv.vel)*2.6);
-  driveArms(lv);
+  if(lv.arms.length) driveArms(lv);
   // you: sitting in the driver's seat, looking around freely (the view turns with the car)
   car.updateMatrixWorld(true); const seat=car.localToWorld(V3(-.26,0,-.38)); P.pos.copy(seat); P.pos.y=p.y; P.vel.set(0,0,0); P.eye=1.3;
   const base=lv.yaw-Math.PI/2; if(lv.lastBase==null) lv.lastBase=base; P.yaw+=base-lv.lastBase; lv.lastBase=base;

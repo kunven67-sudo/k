@@ -8,4 +8,3 @@ SOUNDS
   Crying - "Male crying and weeping" by jacobmathiassen (Wikimedia Commons) - CC BY 3.0
 CODE: three.js r128 - MIT License
 TEXTURES (real photo scans, Poly Haven, CC0): fabric_leather_02 (seats), jersey_melange (seat fabric), dirty_carpet (car floor) - recoloured darker
-TEXTURES (Poly Haven, CC0): farm_soil (giant moss world ground), mossy_rock (moss leaves), bark_willow (moss stems)

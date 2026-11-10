@@ -185,9 +185,29 @@ defineLevel('home',{
     for(const [x,z,len,ry] of [[-10,4,26,Math.PI/2],[11,4,26,Math.PI/2],[.5,-9,21,0]]){ const f=makeFence(len,fenceM); f.position.set(x,0,z); f.rotation.y=ry; scene.add(f); }
     colBox(col_,-10.2,-9.8,-9,17); colBox(col_,10.8,11.2,-9,17); colBox(col_,-10,11,-9.2,-8.8);
     makeBushes(scene,[{x:-3.8,z:Z1+.7},{x:3.8,z:Z1+.7},{x:-5.6,z:Z1+.4,h:1},{x:-8.5,z:10},{x:9.5,z:12}],{seed:4});
-    // the car in the driveway
-    lv.car=makeCar(); lv.car.position.set(7,0,10.5); lv.car.rotation.y=-Math.PI/2; scene.add(lv.car);
-    colOBB(col_,7,10.5,1.95,4.7,0);
+    // JIM'S car (blue) in the driveway, YOUR car (red) parked in your garage
+    lv.car=makeCar({paint:0x2a4a8a}); lv.car.position.set(7,0,12.6); lv.car.rotation.y=-Math.PI/2; scene.add(lv.car);
+    colOBB(col_,7,12.6,1.95,4.7,0);
+    { const GX0=5.3, GX1=9.9, GZ0=-5.5, GZ1=2.6, GH=2.7, DW0=5.95, DW1=9.25, DH=2.3;
+      const gWall=texMat(sid,2.6,1.2,{opts:{color:col(0xa8c0d0),roughness:.85}}), gIn=mat(0xd8d4cc,{roughness:.95}), gFloor=texMat(TX.concrete(),2,3,{opts:{roughness:1,color:col(0xb8b4ac)}});
+      const W=(x0,x1,z0,z1,y0,y1,m)=>{ const b=box(x1-x0,y1-y0,z1-z0,m,(x0+x1)/2,(y0+y1)/2,(z0+z1)/2); scene.add(b); return b; };
+      W(GX0,GX0+.2,GZ0,GZ1,0,GH,gWall); W(GX1-.2,GX1,GZ0,GZ1,0,GH,gWall); W(GX0,GX1,GZ0,GZ0+.2,0,GH,gWall);           // side + back walls
+      W(GX0,DW0,GZ1-.2,GZ1,0,GH,gWall); W(DW1,GX1,GZ1-.2,GZ1,0,GH,gWall); W(DW0,DW1,GZ1-.2,GZ1,DH,GH,gWall);       // front, with the big door hole
+      W(GX0+.2,GX0+.22,GZ0+.2,GZ1-.2,0,GH-.05,gIn); W(GX1-.22,GX1-.2,GZ0+.2,GZ1-.2,0,GH-.05,gIn);                    // inside paint
+      const fl=mesh(new THREE.PlaneGeometry(GX1-GX0-.4,GZ1-GZ0-.4),gFloor,(GX0+GX1)/2,.012,(GZ0+GZ1)/2); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; scene.add(fl);
+      // roof (a low gable like the house) + the roll-up door rolled up under the ceiling
+      const grs=new THREE.Shape(); grs.moveTo(-.25,0); grs.lineTo((GX1-GX0)/2,.9); grs.lineTo(GX1-GX0+.25,0); grs.closePath();
+      const grg=new THREE.ExtrudeGeometry(grs,{depth:GZ1-GZ0+.5,bevelEnabled:false}); grg.translate(GX0,GH,GZ0-.25); scene.add(mesh(grg,texMat(TX.shingles(),3,2,{opts:{roughness:.9,color:col(0x5a4a44)}})));
+      scene.add(box(GX1-GX0+.3,.12,GZ1-GZ0+.3,trimM,(GX0+GX1)/2,GH+.02,(GZ0+GZ1)/2));
+      scene.add(box(DW1-DW0,.32,.36,mat(0xe8e4dc,{roughness:.6}),(DW0+DW1)/2,DH+.18,GZ1-.45));
+      // a workbench, shelves with boxes, a ceiling light
+      scene.add(box(1.8,.06,.6,mat(0x8a6a48,{roughness:.8}),7.6,.92,GZ0+.55)); for(const x of [6.8,8.4]) scene.add(box(.06,.9,.5,mat(0x5a5a5e,{metalness:.6,roughness:.4}),x,.45,GZ0+.55));
+      for(let i=0;i<3;i++){ scene.add(box(.4,.04,1.6,mat(0x6a6a70,{metalness:.5,roughness:.5}),GX1-.45,.5+i*.6,-2.8)); scene.add(box(.36,.3,.4,mat(pick([0xb89a6a,0xa88a5a,0xc8aa7a]),{roughness:.9}),GX1-.45,.68+i*.6,-2.8+rand(-.5,.5))); }
+      scene.add(box(.8,.04,.16,emissiveMat(0xfff4e0,1.6),7.6,GH-.06,-1.4,false));
+      // YOUR car, nose out
+      lv.myCar=makeCar(); lv.myCar.position.set(7.6,0,-1.3); lv.myCar.rotation.y=-Math.PI/2; scene.add(lv.myCar);
+      colBox(col_,GX0,GX0+.2,GZ0,GZ1); colBox(col_,GX1-.2,GX1,GZ0,GZ1); colBox(col_,GX0,GX1,GZ0,GZ0+.2); colBox(col_,GX0,DW0,GZ1-.2,GZ1); colBox(col_,DW1,GX1,GZ1-.2,GZ1);
+      colOBB(col_,7.6,-1.3,1.95,4.7,0); }
     // streetlights, neighbour houses, trees
     for(let i=-3;i<=3;i++){ const sl=makeStreetlight(.15); sl.position.set(i*22+4,0,19); sl.rotation.y=Math.PI/2; scene.add(sl); colCircle(col_,i*22+4,19,.15); }
     const hp=[[-22,-1,0,0xd8c8a8,0x5a3a2a],[22,-1,0,0xc8d8c0,0x3a3a44],[-16,40,Math.PI,0xe8d0c0,0x4a4a4a],[0,40,Math.PI,0xb8c8d8,0x5a4040],[16,40,Math.PI,0xf0e8d0,0x3a4a3a],[-34,40,Math.PI,0xd0c0d8,0x4a3a3a],[34,40,Math.PI,0xe0d8b8,0x44403a],[-38,-1,0,0xe8e0d0,0x4a4a4a],[38,-1,0,0xd8b8a0,0x3a3030]];

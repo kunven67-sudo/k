@@ -129,7 +129,7 @@ defineLevel('stand',{
     lv.col.bounds=[-30,30,-26,24];
     lv.surfaceAt=(x,z)=>{ if(x>-15&&x<11&&z>4&&z<18) return 'concrete'; if(Math.abs(x)<8&&z>-7&&z<5) return 'concrete'; return 'grass'; };
     // car (arrives), Jim
-    lv.car=makeCar({night:true}); lv.car.position.set(-9,0,11.5); lv.car.rotation.y=0; scene.add(lv.car);
+    lv.car=makeCar({night:true,paint:0x2a4a8a}); lv.car.position.set(-9,0,11.5); lv.car.rotation.y=0; scene.add(lv.car);   // Jim's car
     lv.carCol=colOBB(lv.col,-9,11.5,4.7,1.95,0);
     lv.jim=makeJim(); lv.jim.userData.level='stand'; scene.add(lv.jim);
   },

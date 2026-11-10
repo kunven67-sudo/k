@@ -16,73 +16,34 @@ function wobble(m,amt=.12,speed=1){ const prev=m.onBeforeCompile; m.onBeforeComp
 function wrinkleTex(){ return texSet('wrinkle',512,(x,w,h)=>{ x.fillStyle='#909090'; x.fillRect(0,0,w,h); for(let i=0;i<70;i++){ const y=rand(0,h); x.strokeStyle=`rgba(${Math.random()<.5?40:200},${Math.random()<.5?40:200},${Math.random()<.5?40:200},${rand(.15,.4)})`; x.lineWidth=rand(2,7); x.beginPath(); x.moveTo(0,y); for(let k=0;k<=16;k++) x.lineTo(k*w/16,y+Math.sin(k*1.3+i)*rand(2,8)); x.stroke(); } for(let i=0;i<1500;i++){ x.fillStyle=`rgba(255,255,255,${Math.random()*.12})`; x.beginPath(); x.arc(rand(0,w),rand(0,h),rand(1,4),0,7); x.fill(); } },{strength:3.2}); }
 function fiberTex(){ return texSet('fiber',[256,512],(x,w,h)=>{ x.fillStyle='#b8b0c8'; x.fillRect(0,0,w,h); for(let i=0;i<160;i++){ const xx=rand(0,w); x.strokeStyle=`rgba(${rand(60,220)},${rand(60,200)},${rand(100,230)},${rand(.1,.35)})`; x.lineWidth=rand(1,5); x.beginPath(); x.moveTo(xx,0); for(let y=0;y<=h;y+=32) x.lineTo(xx+Math.sin(y*.02+i)*6,y); x.stroke(); } },{strength:3}); }
 /* the tardigrade (water bear) — the small ones walk the fiber, the giant one ends the chapter */
-/* ---------- the TARDIGRADE, built like the real animal (water bear):
-   one chubby barrel body with 4 soft segments + a blunt head, wrinkled see-through-ish cuticle with the dark gut
-   showing inside, 8 stubby legs (the back pair points BACKWARD like the real one), each foot with curved hook claws,
-   a round mouth ring at the tip of the snout with stylets inside, two tiny dark eye spots. ---------- */
-function tardSkinTex(){ return texSet('tardSkin2',512,(x,w,h)=>{
-    const g=x.createLinearGradient(0,0,0,h); g.addColorStop(0,'#d8c4a4'); g.addColorStop(1,'#c4aa86'); x.fillStyle=g; x.fillRect(0,0,w,h);
-    for(let i=0;i<9000;i++){ const v=rand(-18,18)|0; x.fillStyle=`rgba(${120+v},${96+v},${70+v},${rand(.05,.16)})`; x.fillRect(rand(0,w),rand(0,h),rand(1,3),rand(1,3)); }
-    for(let i=0;i<70;i++){ const y=rand(0,h); x.strokeStyle=`rgba(90,64,40,${rand(.12,.3)})`; x.lineWidth=rand(1,2.5); x.beginPath(); x.moveTo(0,y); for(let X=0;X<=w;X+=16) x.lineTo(X,y+Math.sin(X*.02+i)*rand(2,6)); x.stroke(); }
-  },{strength:3.4,height:(x,w,h)=>{ x.fillStyle='#808080'; x.fillRect(0,0,w,h);
-    // fine transverse folds (the cuticle wrinkles around the body) + little bumps
-    for(let i=0;i<70;i++){ const y=rand(0,h), a=rand(.18,.38); x.strokeStyle=`rgba(0,0,0,${a})`; x.lineWidth=rand(1.5,4); x.beginPath(); x.moveTo(0,y); for(let X=0;X<=w;X+=16) x.lineTo(X,y+Math.sin(X*.02+i)*rand(2,6)); x.stroke(); x.strokeStyle=`rgba(255,255,255,${a*.8})`; x.lineWidth=1.5; x.beginPath(); x.moveTo(0,y+3); for(let X=0;X<=w;X+=16) x.lineTo(X,y+3+Math.sin(X*.02+i)*4); x.stroke(); }
-    for(let i=0;i<1600;i++){ const r=rand(1,3.5); const gg=x.createRadialGradient(0,0,0,0,0,r); const px=rand(0,w),py=rand(0,h); x.save(); x.translate(px,py); gg.addColorStop(0,'rgba(255,255,255,.35)'); gg.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=gg; x.fillRect(-r,-r,r*2,r*2); x.restore(); }
-  }}); }
-function tardBodyGeo(){ return GC('tardBody2',()=>{
-  const P=[[0,-5.0],[.42,-4.92],[.76,-4.65],[.95,-4.15],[.9,-3.62],[1.04,-3.05],[1.08,-2.5],[.99,-1.96],[1.1,-1.4],[1.12,-.88],[1.02,-.34],[1.06,.12],[.98,.5],[.8,.82],[0,.9]];
-  const g=new THREE.LatheGeometry(P.map(p=>new THREE.Vector2(p[0],p[1])),40); g.rotateX(Math.PI/2);
-  const pos=g.attributes.position, C=new Float32Array(pos.count*3);
-  for(let i=0;i<pos.count;i++){ let x=pos.getX(i), y=pos.getY(i), z=pos.getZ(i); if(y<0) y*=.78; else y*=.92; x*=1.06; pos.setXYZ(i,x,y+.98,z);
-    // the gut: a darker brown band you can see through the belly + sides (real ones show their food)
-    const gut=Math.max(0,1-Math.abs(y+.05)/.7)*Math.max(0,1-Math.abs(z+2.1)/2.6); const k=1-gut*.32; C[i*3]=k; C[i*3+1]=k*.94; C[i*3+2]=k*.86; }
-  g.setAttribute('color',new THREE.BufferAttribute(C,3)); g.computeVertexNormals(); return g; }); }
-function tardHeadGeo(){ return GC('tardHead2',()=>{
-  const P=[[0,-.55],[.86,-.5],[.95,-.2],[.9,.15],[.76,.48],[.56,.74],[.38,.9],[.25,.98],[0,1.0]];
-  const g=new THREE.LatheGeometry(P.map(p=>new THREE.Vector2(p[0],p[1])),36); g.rotateX(Math.PI/2);
-  const pos=g.attributes.position; for(let i=0;i<pos.count;i++){ let y=pos.getY(i); if(y<0) y*=.8; else y*=.9; pos.setY(i,y); }
-  g.computeVertexNormals(); return g; }); }
-/* a stubby leg (lobopod): soft cone with 3 folds, from the hip down to the foot */
-function tardLegGeo(){ return GC('tardLeg2',()=>{
-  const P=[[0,.15],[.36,.12],[.38,0],[.33,-.16],[.36,-.3],[.3,-.45],[.32,-.58],[.25,-.72],[.12,-.8],[0,-.82]].reverse();   // bottom to top = normals face out
-  const g=new THREE.LatheGeometry(P.map(p=>new THREE.Vector2(p[0],p[1])),18); g.computeVertexNormals(); return g; }); }
-function tardClawGeo(){ return GC('tardClaw2',()=>{ const c=new THREE.QuadraticBezierCurve3(V3(0,0,0),V3(0,-.22,.05),V3(0,-.26,.26)); return new THREE.TubeGeometry(c,8,.022,6,false); }); }
+/* ---------- the tardigrade (the ORIGINAL look, asked back 11-10) ---------- */
 function makeTardigrade(o={}){
-  const g=new THREE.Group(); const T=tardSkinTex(); const tx=repeatSet(T,7,4);
-  const skin=rimify(new THREE.MeshPhysicalMaterial({color:col(o.color||0xd8c2a8).multiplyScalar(.78),vertexColors:true,roughness:.7,map:tx.map,normalMap:tx.normalMap,normalScale:new THREE.Vector2(2.4,2.4),sheen:col(0x4a3a28),clearcoat:.15,clearcoatRoughness:.7}),0xffe2c0,.28,2.8);
-  const headSkin=skin.clone(); headSkin.vertexColors=false; headSkin.onBeforeCompile=skin.onBeforeCompile;
-  const clawM=new THREE.MeshPhysicalMaterial({color:col(0x5a4630),roughness:.3,clearcoat:.8});
+  const g=new THREE.Group(); const wt=wrinkleTex(); const wr=repeatSet(wt,3,2);
+  const skin=rimify(skinify(new THREE.MeshPhysicalMaterial({color:col(o.color||0xd8c2a8),roughness:.55,map:wr.map,normalMap:wr.normalMap,normalScale:new THREE.Vector2(1.4,1.4),clearcoat:.4,clearcoatRoughness:.4}),[1,.6,.45],.6),0xffd8b0,.5,2.2);
   const body=new THREE.Group(); g.add(body);
-  const trunk=mesh(tardBodyGeo(),skin,0,0,0); body.add(trunk); const segs=[trunk];
-  const head=new THREE.Group(); head.position.set(0,.98,.62); body.add(head);
-  head.add(mesh(tardHeadGeo(),headSkin,0,0,0));
-  // mouth: a ring of lips at the snout tip, dark inside, stylets in the throat
-  const mouth=new THREE.Group(); mouth.position.set(0,-.08,.98); head.add(mouth);
-  const lipM=new THREE.MeshPhysicalMaterial({color:col(0xb89470),roughness:.5,clearcoat:.3});
-  mouth.add(mesh(GC('tdLip2',()=>new THREE.TorusGeometry(.17,.05,10,24)),lipM,0,0,0));
-  mouth.add(mesh(GC('tdHole2',()=>new THREE.CircleGeometry(.15,20)),mat(0x1a0c06,{roughness:.9}),0,0,-.02,false));
-  const stylets=[]; for(let i=0;i<2;i++){ const st=mesh(GC('tdSty2',()=>{ const c=new THREE.ConeGeometry(.02,.45,6); c.rotateX(Math.PI/2); return c; }),mat(0xe8dcc8,{roughness:.3}),(i?1:-1)*.05,0,-.15,false); mouth.add(st); stylets.push(st); }
-  // eye spots: tiny dark pigment cups just behind the snout
-  for(const sd of [-1,1]){ const e=sph(.055,new THREE.MeshPhysicalMaterial({color:col(0x1a0c08),roughness:.25,clearcoat:.6}),sd*.5,.32,.42,10,8,false); e.scale.set(.055,.04,.034); head.add(e); }
-  // legs: 3 pairs underneath, the 4th pair at the back end pointing backward
+  const segs=[];
+  for(let i=0;i<4;i++){ const s=mesh(GC('tdSeg',()=>{ const q=new THREE.SphereGeometry(1,40,28); q.scale(1,.8,1.15); return q; }),skin,0,.95,-i*1.25); s.scale.setScalar(1-i*.06); body.add(s); segs.push(s); }
+  const head=new THREE.Group(); head.position.set(0,1.0,1.05); body.add(head);
+  head.add(mesh(GC('tdHead',()=>{ const q=new THREE.SphereGeometry(.85,36,26); q.scale(1,.9,1.1); return q; }),skin,0,0,0));
+  const mouth=new THREE.Group(); mouth.position.set(0,-.05,.85); head.add(mouth);
+  for(let i=0;i<4;i++){ const r=mesh(GC('tdRing',()=>new THREE.TorusGeometry(.3,.09,12,28)),skin,0,0,i*.08); r.scale.setScalar(1-i*.12); mouth.add(r); }
+  const mouthHole=mesh(GC('tdHole',()=>new THREE.CircleGeometry(.24,24)),mat(0x1a0808,{roughness:.9}),0,0,.05,false); mouth.add(mouthHole);
+  const stylets=[]; for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; const st=mesh(GC('tdSty',()=>{ const c=new THREE.ConeGeometry(.035,.5,6); c.rotateX(Math.PI/2); return c; }),mat(0xe8e0d0,{roughness:.3}),Math.cos(a)*.14,Math.sin(a)*.14,-.1,false); mouth.add(st); stylets.push(st); }
+  for(const sd of [-1,1]){ const e=sph(.08,new THREE.MeshPhysicalMaterial({color:col(0x0a0505),roughness:.1,clearcoat:1}),sd*.42,.38,.55,12,10,false); head.add(e); }
   const legs=[];
-  const LP=[[.82,-.15,-.0],[.86,-.2,-1.25],[.86,-.2,-2.5],[.55,.05,-4.55]];
-  for(let i=0;i<4;i++) for(const sd of [-1,1]){ const lg=new THREE.Group(); const [lx,ly,lz]=LP[i]; lg.position.set(sd*lx,.98+ly-.2,lz); body.add(lg);
-    const leg=mesh(tardLegGeo(),headSkin,0,0,0); lg.add(leg);   // (the body material uses vertex colours, legs have none = they were black)
-    if(i===3){ lg.rotation.x=-1.0; } else { lg.rotation.z=sd*.28; }
-    for(let k=0;k<4;k++){ const cl=mesh(tardClawGeo(),clawM,(k-1.5)*.09,-.76,(k%2)*.04-.02,false); cl.rotation.y=(k-1.5)*.18; lg.add(cl); }
-    lg.userData={sd,i,rx0:lg.rotation.x,rz0:lg.rotation.z}; legs.push(lg); }
+  for(let i=0;i<4;i++) for(const sd of [-1,1]){ const lg=new THREE.Group(); lg.position.set(sd*.72,.55,-i*1.2+.2); body.add(lg);
+    lg.add(mesh(GC('tdLeg',()=>{ const c=new THREE.CylinderGeometry(.28,.34,.8,16); c.translate(0,-.35,0); return c; }),skin,0,0,0));
+    for(let k=0;k<4;k++){ const cl=mesh(GC('tdClaw',()=>{ const c=new THREE.ConeGeometry(.05,.3,6); c.translate(0,-.15,0); return c; }),mat(0x3a2a1a,{roughness:.3,clearcoat:1}),(k-1.5)*.1,-.72,.12,false); cl.rotation.x=.6; lg.add(cl); }
+    lg.userData={sd,i}; legs.push(lg); }
   g.userData={body,head,mouth,stylets,legs,segs,skin,phase:Math.random()*10};
   return g;
 }
 function animateTardigrade(td,t,walk=1,mouthOpen=0){
-  const U=td.userData; const p=t*2.0+U.phase;
-  // the slow, clumsy "bear" walk: legs paddle in a wave front to back, the body rolls a little side to side
-  U.legs.forEach(l=>{ const D=l.userData, ph=p-D.i*1.1+(D.sd>0?Math.PI:0); if(D.i===3){ l.rotation.x=D.rx0+Math.sin(ph)*.25*walk; return; }
-    l.rotation.x=D.rx0+Math.sin(ph)*.42*walk; l.rotation.z=D.rz0+D.sd*Math.max(0,Math.cos(ph))*.18*walk; });
-  U.body.position.y=Math.abs(Math.sin(p))*.05*walk; U.body.rotation.z=Math.sin(p)*.035*walk; U.body.rotation.x=Math.sin(p*2)*.012*walk;
-  U.head.rotation.y=Math.sin(t*.6+U.phase)*.22; U.head.rotation.x=Math.sin(t*.9)*.07-mouthOpen*.1;
-  U.mouth.scale.setScalar(1+mouthOpen*1.4); U.stylets.forEach((s,i)=>{ s.position.z=-.15+mouthOpen*.35+Math.sin(t*6+i)*.02*mouthOpen; });
+  const U=td.userData; const p=t*2.2+U.phase;
+  U.legs.forEach(l=>{ const ph=p+l.userData.i*.9+(l.userData.sd>0?Math.PI:0); l.rotation.x=Math.sin(ph)*.45*walk; l.rotation.z=l.userData.sd*(.15+Math.max(0,Math.cos(ph))*.2*walk); });
+  U.segs.forEach((s,i)=>{ s.position.y=.95+Math.sin(p*2+i)*.04*walk; });
+  U.head.rotation.y=Math.sin(t*.6+U.phase)*.25; U.head.rotation.x=Math.sin(t*.9)*.08;
+  U.mouth.scale.setScalar(1+mouthOpen*.5); U.stylets.forEach((s,i)=>{ s.position.z=-.1+mouthOpen*.3+Math.sin(t*6+i)*.02*mouthOpen; });
 }
 defineLevel('tiny',{
   title:'the tiny-verse',
