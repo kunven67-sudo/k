@@ -151,7 +151,7 @@ defineLevel('mitetown',{
     lv.lamp=new THREE.PointLight(col(0xffd070),2,160,2); lv.lamp.position.set(0,20,0); scene.add(lv.lamp);
     // the giant tardigrade (it comes back later) and the lint tangle you lead it into
     lv.tard=makeTardigrade({color:0xc8b098}); lv.tard.scale.setScalar(42); lv.tard.visible=false; scene.add(lv.tard);
-    lv.trap=makeLint(120,60,[0xe8e8f0,0xc8d0e0,0xf0e0e8]); lv.trap.position.set(-330,-30,-170); lv.trap.scale.setScalar(1.6); scene.add(lv.trap);
+    lv.trap=makeLint(120,60,[0xe8e8f0,0xc8d0e0,0xf0e0e8]); lv.trap.position.set(-60,-60,-470);   /* inside the swim area (it sat half outside the invisible wall = you got pinned in it), away from town */ lv.trap.scale.setScalar(1.6); scene.add(lv.trap);
     solidAuto(lv,lv.tard,{k:.68}); solidAuto(lv,lv.trap,{k:.6});
     lv.snow=makeSnowFor(scene);
     lv.flyBounds=(p,v)=>{ const lim=[[-320,320],[-200,200],[-700,300]]; ['x','y','z'].forEach((k,i)=>{ if(p[k]<lim[i][0]){ p[k]=lim[i][0]; v[k]=Math.abs(v[k])*.3; } if(p[k]>lim[i][1]){ p[k]=lim[i][1]; v[k]=-Math.abs(v[k])*.3; } }); };
@@ -221,11 +221,12 @@ CHECKPOINTS.A7=async()=>{
 /* keep a point out of a capsule (a body from a to b, radius R) */
 function pushOutCapsule(p,a,b,R){ const ab=b.clone().sub(a), t=clamp(p.clone().sub(a).dot(ab)/ab.lengthSq(),0,1), c=a.clone().addScaledVector(ab,t), d=p.distanceTo(c); if(d<R){ const n=d>1e-4?p.clone().sub(c).divideScalar(d):V3(0,1,0); p.copy(c).addScaledVector(n,R); if(PLAYER.vel.dot(n)<0) PLAYER.vel.addScaledVector(n,-PLAYER.vel.dot(n)); return true; } return false; }
 async function tardChase(lv,T){
-  const tok=STORY.token, center=V3(0,-10,0), trap=lv.trap.position.clone(), S=T.scale.x;
-  const tb=new THREE.Box3().setFromObject(lv.trap), trapR=tb.getSize(new THREE.Vector3()).length()*.32;
+  const tok=STORY.token, center=V3(0,-10,0), S=T.scale.x;
+  const tb=new THREE.Box3().setFromObject(lv.trap), tsz=tb.getSize(new THREE.Vector3()), trap=tb.getCenter(new THREE.Vector3()), trapR=Math.max(tsz.x,tsz.z)*.42;
+  const flat=(p)=>Math.hypot(p.x-trap.x,p.z-trap.z);
   let state='approach', warnTrap=false;
   while(true){ await wait(0); if(tok!==STORY.token) return 'stop'; if(DLG.active||G.paused) continue; const dt=Math.min(.05,G.dt||.016);
-    const a=T.localToWorld(V3(0,.95,-4.6)), b=T.localToWorld(V3(0,1,1.4)), m=T.localToWorld(V3(0,1,2.1));
+    T.updateMatrixWorld(true); const a=T.localToWorld(V3(0,.95,-4.6)), b=T.localToWorld(V3(0,1,1.4)), m=T.localToWorld(V3(0,1,2.1));
     pushOutCapsule(PLAYER.pos,a,b,1.2*S+4);                                   // solid, every frame (also while you hold still)
     const dMouth=m.distanceTo(PLAYER.pos);
     if(dMouth<.95*S) return await tardFail(lv,T,'you');                         // its mouth got you
@@ -235,7 +236,7 @@ async function tardChase(lv,T){
       else if(d<135) return await tardFail(lv,T,'town'); }
     else { const dir=PLAYER.pos.clone().sub(T.position); dir.y*=.4; const d=dir.length(); T.position.addScaledVector(dir.normalize(),Math.min(9,d*.12)*dt); T.lookAt(PLAYER.pos.x,T.position.y,PLAYER.pos.z); lv.tardMouth=.4+Math.sin(G.time*3)*.25;
       if(d>280){ state='approach'; objective("Get the tardigrade's attention"); setMarker(()=>T.position.clone().add(V3(0,50,0)),'Tardigrade'); toast("It lost interest! It's going back to town!",'#ff8a6a'); }
-      if(m.distanceTo(trap)<trapR){ if(PLAYER.pos.distanceTo(trap)>trapR*1.05) break; if(!warnTrap){ warnTrap=true; toast('Get OUT of the lint so it closes on IT, not you!','#ffcc66'); } } }
+      if(flat(m)<trapR){ if(flat(PLAYER.pos)>trapR*1.08||PLAYER.pos.y>tb.max.y+70) break; if(!warnTrap){ warnTrap=true; toast('Get OUT of the lint so it closes on IT, not you!','#ffcc66'); } } }
   }
   // the lint snaps shut on it RIGHT WHERE IT IS (it used to slide through you into the middle)
   PLAYER.lock(); setMarker(null); itemHints(null); objective(null); lv.tardWalk=1.3; lv.tardMouth=.8;
