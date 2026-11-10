@@ -495,7 +495,7 @@ async function naegleriaAttack(){
   PLAYER.free(); objective('Take a picture of the Naegleria fowleri'); setMarker(()=>N.position,'Naegleria fowleri');
   itemHints([IS_TOUCH?'<kbd>👊</kbd> take photo':'<kbd>Click</kbd> / <kbd>Q</kbd> take photo']);
 }
-function larrySay(text,cb){ const L=LEVELS.tiny.larry; L.userData.talking=true; runStory(async()=>{ await talk([{who:'Larry',voice:'Larry',text}]); L.userData.talking=false; if(cb) cb(); }); }
+function larrySay(text,cb){ const L=(LV&&LV.larry)||LEVELS.tiny.larry; if(!L){ if(cb) cb(); return; } L.userData.talking=true;   /* the Larry in THIS place (Mite Town has its own Larry; it crashed before) */ runStory(async()=>{ await talk([{who:'Larry',voice:'Larry',text}]); L.userData.talking=false; if(cb) cb(); }); }
 async function larryMeet(){
   const lv=LEVELS.tiny, F=F_(); if(F.larryMet) return; F.larryMet=true; const L=lv.larry;
   PLAYER.lock(); setMarker(null); itemHints(null);
