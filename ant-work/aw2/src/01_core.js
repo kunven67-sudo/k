@@ -52,7 +52,7 @@ const PRESETS={
 const PRESET_ORDER=['toaster','potato','low','medium','high','ultra','insane'];
 const GFX_KEYS=['res','shadow','post','ao','bloom','rays','dof','mblur','aa','grain','lens','detail'];
 const DEFAULT_SETTINGS=Object.assign({preset:'medium',fov:75,bright:1.18,showFps:false,autoLower:true,
-  master:.9,music:.55,sfx:.9,voice:true,textSpeed:1,sens:1,invertY:false,bob:true,shake:true,hud:true,presetLocked:false,funny:false,funnyLevel:3},PRESETS[IS_TOUCH?'medium':'high']);
+  master:.9,music:.55,sfx:.9,voice:true,textSpeed:1,sens:1,invertY:false,bob:true,shake:true,hud:true,presetLocked:false,funny:false,funnyLevel:3},PRESETS.medium);
 const SETTINGS=Object.assign({},DEFAULT_SETTINGS,loadJSON('aw2_settings')||{});
 if(!PRESETS[SETTINGS.preset] && SETTINGS.preset!=='custom') SETTINGS.preset='high';
 function saveSettings(){ saveJSON('aw2_settings',SETTINGS); }

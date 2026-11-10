@@ -198,7 +198,7 @@ async function callJimEarth(){
   const lv=LEVELS.blockearth, F=F_(); if(!F.callJim) return; F.callJim=false; PLAYER.lock(); objective(null);
   PLAYER.watchLook=1; PLAYER.watchGlow=1; SFX.ring(); await wait(1.4); PLAYER.watchGlow=0;
   const J={who:'Jim',radio:true};
-  await talk([{...J,text:"What is happening!?"},{who:'You',text:"I did something."},{...J,text:"People are dying. You know that, right..."},{who:'You',text:"I'm sorry, I—",auto:.2},{...J,text:"It doesn't matter. Whatever you did, it's ok. I will pick you up on my rocket ship. Where are you?"},{who:'You',text:"I'm at Earth."},{...J,text:"Ok. Stay where you are. I'm coming."}]);
+  await talk([{...J,text:"What is happening!?"},{who:'You',text:"I did something."},{...J,text:"People are dying. You know that, right..."},{who:'You',text:"I'm sorry, I—",auto:.2},{...J,text:"It doesn't matter what happened. I'm coming to get you in the rocket. Where are you?"},{who:'You',text:"I'm at Earth."},{...J,text:"Ok. Stay where you are. I'm coming."}]);
   PLAYER.watchLook=0;
   await tweenVal(k=>{ FX.blackout=k; },1); cardShow('1 HOUR LATER',''); await wait(2.6); cardHide();
   // Jim's rocket lands on the road

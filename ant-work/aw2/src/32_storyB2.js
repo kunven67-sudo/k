@@ -51,7 +51,7 @@ async function jimTired(){ setMarker(null);
   await tweenVal(k=>{ PLAYER.pos.lerpVectors(p0,p1,k); },.9);
   const S={h:jim,who:'Jim',voice:'JimTired',mood:'tired'};
   SFX.yawn();
-  await talk([{...S,text:"Hey... bud. Go work and stuff...",pose:'droop'},{...S,text:"An... and kill those..... alien ants and.....",pose:'droop'}]);
+  await talk([{...S,text:"Hey... bud. Time for work...",pose:'droop'},{...S,text:"An... and kill those..... alien ants and.....",pose:'droop'}]);
   // he falls asleep right there on the stand
   jim.userData.A.look=null; jim.userData.A.sleep=true; setMood(jim,'asleep'); setPose(jim,'sleepCounter',1.4);
   await tweenVal(k=>{ jim.position.z=lerp(-5.75,-5.45,k); },1.4);

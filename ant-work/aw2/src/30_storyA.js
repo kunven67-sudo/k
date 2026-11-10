@@ -89,7 +89,7 @@ async function openFrontDoor(){
     {...S,text:"Hey. So... about the shrinking thing.",pose:'talk'},
     {...S,text:"I need your help with my stand. You still work for me, right? Well..."},
     {...S,text:"I need you to shrink super small. Tinier than germs. So tiny that you won't even be able to see me."},
-    {...S,text:"You'll be in the tiny-verse. Where all those creatures and stuff are.",pose:'shrug'},
+    {...S,text:"You'll be in the tinyverse. Where all the germs and creatures live.",pose:'shrug'},
     {who:'You',text:"What? I don't think I want to do that, though."},
     {...S,text:"Come on. I'll even... give you a very good paycheck. Maybe.",pose:'think',mood:'worried'},
     {...S,text:"Okay, how about 500 dollars? Is that good enough?",pose:'shrug',mood:'happy'},
@@ -166,10 +166,10 @@ async function standTalk(){
   const S={h:jim,who:'Jim'};
   await talk([
     {who:'You',text:"Okay, Jim. Where's this shrink thing?"},
-    {...S,text:"Well, um, it's not a watch this time.",pose:'shrug'},
+    {...S,text:"It's not a watch this time.",pose:'shrug'},
     {...S,text:"You have to get in my shrink ray. Yeah. I built a shrink ray.",pose:'talk'},
-    {...S,text:"You're gonna have to go stand on something, and then I'm gonna have to push this button that shrinks you.",pose:'press'},
-    {...S,text:"And also, I'm gonna put a suit on you. And I also have a radio on that suit, so I'll be able to talk to you.",pose:'talk'},
+    {...S,text:"You stand on the platform, and I push the button that shrinks you.",pose:'press'},
+    {...S,text:"You'll wear a suit. It has a radio in it, so I can talk to you the whole time.",pose:'talk'},
     {who:'You',text:"Whoa, slow down. Where even is this shrink ray, anyways?"},
     {...S,text:"Follow me.",pose:'point'}
   ]);
@@ -247,7 +247,7 @@ async function labTalk(){
   const S={h:jim,who:'Jim'};
   await talk([
     {...S,text:"So this is my secret place. Nobody knows my code at all, or anything.",pose:'hips'},
-    {...S,text:"And I do this so nobody, um, destroys my stuff. And my research.",pose:'talk'},
+    {...S,text:"I keep it down here so nobody wrecks my research.",pose:'talk'},
     {...S,text:"So. The reason why I want you to do this is because I'm testing an experiment.",pose:'think'},
     {...S,text:"To see if they would try to attack you. I want you to send pictures of what they would look like.",pose:'talk'},
     {...S,text:"I'm gonna give you a camera.",pose:null}
@@ -271,8 +271,8 @@ async function labTalk(){
   await talk([
     {...S,radio:true,text:"Testing, testing. Can you hear me in there?"},
     {who:'You',text:"Loud and clear."},
-    {...S,radio:true,text:"Okay, now step onto this platform. I'm gonna click this button right here, and you should shrink into this cage that I have.",pose:'point'},
-    {...S,radio:true,text:"I have little things inside of here that I can't even see. Or you can't even see. Because they're super tiny to the naked eye of a human.",pose:'talk'}
+    {...S,radio:true,text:"Okay. Step onto the platform. When I press this button, you'll shrink down into that cage.",pose:'point'},
+    {...S,radio:true,text:"There are things in there too small for anyone to see. Not me. Not you. Not with your eyes, anyway.",pose:'talk'}
   ]);
   clearPose(jim); jim.userData.A.look=null;
   walkTo(jim,[V3(-2.3,0,-.1)],1.2).then(()=>facePoint(jim,V3(0,0,-1.8)));

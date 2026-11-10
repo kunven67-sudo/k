@@ -55,9 +55,9 @@ function animateBlockPerson(p,dt,t){
   const talk=A.talk?Math.sin(t*14)*.06:0;
   let yaw=0; if(A.look==='player'){ const d=camera.position.clone().sub(_hw); yaw=clamp(angDiff(p.rotation.y,Math.atan2(d.x,d.z)),-.9,.9); } else if(A.look&&A.look.isVector3){ const d=A.look.clone().sub(_hw); yaw=clamp(angDiff(p.rotation.y,Math.atan2(d.x,d.z)),-.9,.9); }
   J.headJ.rotation.y=damp(J.headJ.rotation.y,yaw,6,dt); J.headJ.rotation.x=talk+Math.sin(t*1.3+A.phase)*.02;
-  if(A.path){ const P=A.path; const tg=P.pts[P.i]; const dx=tg.x-p.position.x, dz=tg.z-p.position.z, d=Math.hypot(dx,dz), st=P.speed*dt;
+  if(A.path){ const P=A.path; P.t=(P.t||0)+dt; if(P.t>(P.maxT||30)){ const last=P.pts[P.pts.length-1]; p.position.x=last.x; p.position.z=last.z; A.path=null; P.res&&P.res(); return; } const tg=P.pts[P.i]; const dx=tg.x-p.position.x, dz=tg.z-p.position.z, d=Math.hypot(dx,dz), st=P.speed*dt;
     if(d<=st){ p.position.x=tg.x; p.position.z=tg.z; P.i++; if(P.i>=P.pts.length){ A.path=null; P.res&&P.res(); } } else { p.position.x+=dx/d*st; p.position.z+=dz/d*st; p.rotation.y=angLerp(p.rotation.y,Math.atan2(dx,dz),Math.min(1,dt*8));
-      const px=p.position.x-PLAYER.pos.x, pz=p.position.z-PLAYER.pos.z, pd=Math.hypot(px,pz); if(pd<.75&&pd>1e-4){ p.position.x=PLAYER.pos.x+px/pd*.75; p.position.z=PLAYER.pos.z+pz/pd*.75; } } }
+      const px=p.position.x-PLAYER.pos.x, pz=p.position.z-PLAYER.pos.z, pd=Math.hypot(px,pz); if(pd<.75&&pd>1e-4){ P.blockT=(P.blockT||0)+dt; if(P.blockT<1.2){ p.position.x=PLAYER.pos.x+px/pd*.75; p.position.z=PLAYER.pos.z+pz/pd*.75; } } } }
 }
 function folkWalk(p,pts,speed=1.6){ return new Promise(res=>{ p.userData.A.path={pts,i:0,speed,res}; }); }
 function updateFolk(dt,t){ for(const p of FOLK){ if(!p.parent||!p.visible) continue; if(LV&&p.userData.level&&p.userData.level!==LV.name) continue; animateBlockPerson(p,dt,t); } }

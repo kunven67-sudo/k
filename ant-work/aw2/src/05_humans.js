@@ -508,18 +508,22 @@ function walkTo(h,points,speed=1.3,faceEnd=null){
   if(!Array.isArray(points)) points=[points];
   const tok=STORY.token;
   return new Promise(res=>{
-    const A=h.userData.A; A.path={pts:points.map(p=>p.clone()),i:0,speed,faceEnd,res,tok};
+    const A=h.userData.A; let len=0, prev=h.position.clone(); for(const q of points){ len+=Math.hypot(q.x-prev.x,q.z-prev.z); prev=q; }
+    // safety: a walk can never hang the story (blocked, stuck): after twice the time it should take, they arrive anyway
+    A.path={pts:points.map(p=>p.clone()),i:0,speed,faceEnd,res,tok,t:0,maxT:len/Math.max(.1,speed)*2+3,blockT:0};
   });
 }
 function updateNPCPath(h,dt){
   const A=h.userData.A, P=A.path; if(!P) return;
   if(P.tok!==STORY.token){ A.path=null; return; }
+  P.t=(P.t||0)+dt;
+  if(P.maxT&&P.t>P.maxT){ const last=P.pts[P.pts.length-1]; h.position.x=last.x; h.position.z=last.z; A.path=null; if(P.faceEnd!=null) A.faceYaw=P.faceEnd; P.res(); return; }
   const tgt=P.pts[P.i]; const dx=tgt.x-h.position.x, dz=tgt.z-h.position.z, d=Math.hypot(dx,dz);
   const step=P.speed*dt;
   if(d<=step+.001){ h.position.x=tgt.x; h.position.z=tgt.z; P.i++; if(P.i>=P.pts.length){ A.path=null; if(P.faceEnd!=null) A.faceYaw=P.faceEnd; P.res(); return; } return; }
   h.position.x+=dx/d*step; h.position.z+=dz/d*step;
   // don't walk through the player: slide around them
-  { const px=h.position.x-PLAYER.pos.x, pz=h.position.z-PLAYER.pos.z, pd=Math.hypot(px,pz), R=.8*h.scale.x; if(pd<R&&pd>1e-4&&!P.noAvoid){ h.position.x=PLAYER.pos.x+px/pd*R; h.position.z=PLAYER.pos.z+pz/pd*R; } }
+  { const px=h.position.x-PLAYER.pos.x, pz=h.position.z-PLAYER.pos.z, pd=Math.hypot(px,pz), R=.8*h.scale.x; if(pd<R&&pd>1e-4&&!P.noAvoid){ P.blockT=(P.blockT||0)+dt; if(P.blockT>1.2) P.noAvoid=true; else { h.position.x=PLAYER.pos.x+px/pd*R; h.position.z=PLAYER.pos.z+pz/pd*R; } } }
   if(tgt.y!==undefined && P.useY) h.position.y+=(tgt.y-h.position.y)*Math.min(1,step/d);
   const want=Math.atan2(dx,dz); h.rotation.y=angLerp(h.rotation.y,want,Math.min(1,dt*8));
   A.faceYaw=null;

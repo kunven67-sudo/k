@@ -29,11 +29,11 @@ async function moonTalk(){
   jim.userData.A.look='player'; lookAtPoint(V3(jim.position.x,1.65,jim.position.z),.6);
   const S={h:jim,who:'Jim'};
   await talk([
-    {...S,text:"Hi! Um, I'm working on this rocket ship.",pose:'point',mood:'happy'},
+    {...S,text:"Hey! I'm building a rocket ship.",pose:'point',mood:'happy'},
     {...S,text:"As you can see, it's not fully done.",pose:'shrug'},
-    {...S,text:"Nobody up here likes the bug food. Like, nobody. I'm kinda getting broke.",mood:'sad',pose:'talk'},
+    {...S,text:"Nobody up here likes bug food. Nobody. I'm going broke.",mood:'sad',pose:'talk'},
     {...S,text:"So we're gonna fly to a new planet. One that actually likes bug food.",mood:'happy',pose:'talk'},
-    {...S,text:"Can you find some pieces to help me? There's five pieces around the moon.",pose:'point'}
+    {...S,text:"Can you help me find the missing pieces? There are five of them around the moon.",pose:'point'}
   ]);
   clearPose(jim); jim.userData.A.look=null; setMood(jim,'happy');
   PLAYER.free(); objective('Find the rocket pieces: <b>0</b>/5');
@@ -269,7 +269,7 @@ async function talkJimMars(){
   await talk([
     {...S,text:"Okay, now that you have got all the bug food, you can go find a home.",pose:'talk'},
     {...S,text:"I know we lost our home on Earth. I know.",pose:'shrug',mood:'worried'},
-    {...S,text:"But you're gonna have to make some type of home to sleep at. I can't have you sleeping in my home.",pose:'talk',mood:'neutral'},
+    {...S,text:"But you'll need your own place to sleep. You can't keep sleeping at mine.",pose:'talk',mood:'neutral'},
     {...S,text:"I already booked one. As soon as I got on this planet.",pose:'hips',mood:'happy'},
     {...S,text:"Here's your paycheck. Now go get some sleep.",pose:'holdOut'}
   ]);

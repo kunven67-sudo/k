@@ -19,9 +19,9 @@
   "text": "I need you to shrink super small. Tinier than germs. So tiny that you won't even be able to see me.",
   "src": "30_storyA.js"
  },
- "b639fc7a": {
+ "40f01cc7": {
   "who": "Jim",
-  "text": "You'll be in the tiny-verse. Where all those creatures and stuff are.",
+  "text": "You'll be in the tinyverse. Where all the germs and creatures live.",
   "src": "30_storyA.js"
  },
  "4687078a": {
@@ -54,9 +54,9 @@
   "text": "Okay, Jim. Where's this shrink thing?",
   "src": "30_storyA.js"
  },
- "4123a99a": {
+ "e2a1db18": {
   "who": "Jim",
-  "text": "Well, um, it's not a watch this time.",
+  "text": "It's not a watch this time.",
   "src": "30_storyA.js"
  },
  "2a0148db": {
@@ -64,14 +64,14 @@
   "text": "You have to get in my shrink ray. Yeah. I built a shrink ray.",
   "src": "30_storyA.js"
  },
- "a9e99d1e": {
+ "784dd6da": {
   "who": "Jim",
-  "text": "You're gonna have to go stand on something, and then I'm gonna have to push this button that shrinks you.",
+  "text": "You stand on the platform, and I push the button that shrinks you.",
   "src": "30_storyA.js"
  },
- "ba8b63f4": {
+ "4802a7d5": {
   "who": "Jim",
-  "text": "And also, I'm gonna put a suit on you. And I also have a radio on that suit, so I'll be able to talk to you.",
+  "text": "You'll wear a suit. It has a radio in it, so I can talk to you the whole time.",
   "src": "30_storyA.js"
  },
  "8290a3c0": {
@@ -89,9 +89,9 @@
   "text": "So this is my secret place. Nobody knows my code at all, or anything.",
   "src": "30_storyA.js"
  },
- "6e4f2114": {
+ "3ec125cf": {
   "who": "Jim",
-  "text": "And I do this so nobody, um, destroys my stuff. And my research.",
+  "text": "I keep it down here so nobody wrecks my research.",
   "src": "30_storyA.js"
  },
  "b62bd14d": {
@@ -124,14 +124,14 @@
   "text": "Loud and clear.",
   "src": "30_storyA.js"
  },
- "8ee6d218": {
+ "b66966af": {
   "who": "Jim",
-  "text": "Okay, now step onto this platform. I'm gonna click this button right here, and you should shrink into this cage that I have.",
+  "text": "Okay. Step onto the platform. When I press this button, you'll shrink down into that cage.",
   "src": "30_storyA.js"
  },
- "a20aab8c": {
+ "bf132987": {
   "who": "Jim",
-  "text": "I have little things inside of here that I can't even see. Or you can't even see. Because they're super tiny to the naked eye of a human.",
+  "text": "There are things in there too small for anyone to see. Not me. Not you. Not with your eyes, anyway.",
   "src": "30_storyA.js"
  },
  "059a7271": {
@@ -254,9 +254,9 @@
   "text": "Uh... hey. Why is everything swimming away?",
   "src": "30_storyA.js"
  },
- "fd5d8a6c": {
+ "ecee754a": {
   "who": "Jim",
-  "text": "Hi! Um, I'm working on this rocket ship.",
+  "text": "Hey! I'm building a rocket ship.",
   "src": "31_storyB.js"
  },
  "cc6733db": {
@@ -264,9 +264,9 @@
   "text": "As you can see, it's not fully done.",
   "src": "31_storyB.js"
  },
- "6805abbd": {
+ "93b22fba": {
   "who": "Jim",
-  "text": "Nobody up here likes the bug food. Like, nobody. I'm kinda getting broke.",
+  "text": "Nobody up here likes bug food. Nobody. I'm going broke.",
   "src": "31_storyB.js"
  },
  "07bb2697": {
@@ -274,9 +274,9 @@
   "text": "So we're gonna fly to a new planet. One that actually likes bug food.",
   "src": "31_storyB.js"
  },
- "3270ff55": {
+ "bf7712a7": {
   "who": "Jim",
-  "text": "Can you find some pieces to help me? There's five pieces around the moon.",
+  "text": "Can you help me find the missing pieces? There are five of them around the moon.",
   "src": "31_storyB.js"
  },
  "95b9c4a7": {
@@ -329,9 +329,9 @@
   "text": "I know we lost our home on Earth. I know.",
   "src": "31_storyB.js"
  },
- "27ad017a": {
+ "0bcb11fe": {
   "who": "Jim",
-  "text": "But you're gonna have to make some type of home to sleep at. I can't have you sleeping in my home.",
+  "text": "But you'll need your own place to sleep. You can't keep sleeping at mine.",
   "src": "31_storyB.js"
  },
  "6045d0d1": {
@@ -509,9 +509,9 @@
   "text": "Pleasure doing business, human! Here are your keys.",
   "src": "31_storyB.js"
  },
- "8d1e50ce": {
+ "8c8b2657": {
   "who": "JimTired",
-  "text": "Hey... bud. Go work and stuff...",
+  "text": "Hey... bud. Time for work...",
   "src": "32_storyB2.js"
  },
  "5cf7f6a4": {
@@ -759,9 +759,9 @@
   "text": "I'm sorry, I—",
   "src": "53_earth.js"
  },
- "86b30b92": {
+ "fc25cdef": {
   "who": "Jim",
-  "text": "It doesn't matter. Whatever you did, it's ok. I will pick you up on my rocket ship. Where are you?",
+  "text": "It doesn't matter what happened. I'm coming to get you in the rocket. Where are you?",
   "src": "53_earth.js"
  },
  "2d1e6ba1": {
