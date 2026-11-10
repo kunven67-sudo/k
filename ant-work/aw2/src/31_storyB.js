@@ -266,7 +266,7 @@ function setupMarsInteractions(lv){
   addInteract(lv,{obj:lv.cooker,offset:V3(0,1.4,0),label:()=>F_().bugFood>0?'Cook the bug food ('+F_().bugFood+')':'Bug Cooker 3000 (no bug food)',reach:2.4,when:()=>F_().day!==2&&F_().shiftOver&&!F_().cooked&&PLAYER.scale>.5,act:()=>{ if(F_().bugFood>0) runStory(cooking); else bark('You',"I don't have any bug food to cook.",null,2.2); }});
   addInteract(lv,{pos:V3(0,.2,0),label:'Chop the bug',reach:.55,aim:false,when:()=>F_().day!==2&&PLAYER.scale<.5&&!!nearestBug(false,.6,true),act:()=>{ const b=nearestBug(false,.6,true); if(b) chopBug(b); }});
   lv.inter[lv.inter.length-1].posFn=true;
-  for(const h of lv.houses) addInteract(lv,{obj:h.seller,offset:V3(0,1.5,0),label:'Talk',reach:2.6,when:()=>F_().day===2&&h.seller.visible&&!F_().nightfall,act:()=>bark('Seller',HUD.coins>=h.price?pick(["Oh, you've got coins now! Come back tomorrow, I'm closing up for today.","Nice, real alien coins! Tomorrow, human. I'm done for today."]):pick(["Still for sale! Come back when you've got the coins.","Houses don't buy themselves, human."]),h.seller,3.4)});   // it said 'come back when you've got the coins' even AFTER you converted
+  for(const h of lv.houses) addInteract(lv,{obj:h.seller,offset:V3(0,1.5,0),label:'Talk',reach:2.6,when:()=>F_().day===2&&h.seller.visible&&!F_().nightfall,act:()=>{ if(HUD.coins>=h.price) runStory(()=>sellerSellNow(h)); else bark('Seller',`It's ${h.price} alien coins. You've got ${HUD.coins}. Come back when you've got enough.`,h.seller,3.6); }});   // with the REAL numbers (it just said 'come back when you've got the coins')
   for(const h of lv.houses) addInteract(lv,{obj:h.seller,offset:V3(0,1.5,0),label:'Ask about the house',reach:2.6,when:()=>(F_().houseHunt||F_().day3Buy)&&!h.sold,act:()=>runStory(()=>sellerTalk(h))});
   addInteract(lv,{obj:lv.convAlien,offset:V3(0,1.5,0),label:'Talk to the Alien Converter',reach:2.8,when:()=>F_().houseHunt||F_().day2Convert||F_().day3Buy,act:()=>runStory(converterTalk)});
   const mid=lv.houses.find(h=>h.price===100);
@@ -400,6 +400,12 @@ CHECKPOINTS.B3=async()=>{
   hudVisible(true); await fade(0,1);
   objective('Find a house to buy'); PLAYER.free(); laneMarker();
 };
+/* any day: if you have the coins, you can buy it right now (their pick) */
+async function sellerSellNow(h){
+  const s=h.seller, S={h:s,who:'Seller',voice:'Seller'}; PLAYER.lock(); s.userData.A.look='player'; lookAtPoint(V3(s.position.x,s.position.y+1.6,s.position.z),.5);
+  await talk([{...S,text:`${h.price} alien coins, and you've got them? It's yours if you want it!`},{who:'You',text:"Deal!"}]);
+  s.userData.A.look=null; PLAYER.free(); openBuy(h);
+}
 async function sellerTalk(h){
   const F=F_(), s=h.seller, S={h:s,who:'Seller',voice:'Seller'}; PLAYER.lock(); s.userData.A.look='player'; lookAtPoint(V3(s.position.x,s.position.y+1.6,s.position.z),.5);
   const coins=HUD.coins;
@@ -449,6 +455,7 @@ $('convGo').onclick=()=>{
     bark('Converter','There you go. All converted. Pleasure doing business.',LEVELS.mars.convAlien,3);
     F.converted=true; if(HUD.cash<=0) showCash(false);
     if(F.day===2){ F.goHome=true; objective(HUD.cash>0?'Go back home (or convert the rest)':'Go back home'); runStory(marsNightfall); }
+    else if(F.day===3&&F.boughtBig){ const mid=LEVELS.mars.houses.find(q=>q.price===100); objective('Go inside your new house'); setMarker(()=>mid.door.clone().add(V3(0,2,0)),'Your new house','m'); }   // you already bought it on day 2
     else if(F.day===3){ if(HUD.coins>=100){ objective('Buy the Dome Sweet Dome'); const mid=LEVELS.mars.houses.find(h=>h.price===100); setMarker(()=>mid.seller.position.clone().add(V3(0,2.2,0)),'Dome Sweet Dome','m'); } else objective('Convert the rest of your dollars'); }
     else objective(HUD.coins>=50?'Check the other houses for one you can actually buy':'Get more alien coins, then find a house');
     PLAYER.free();
@@ -464,6 +471,7 @@ $('buyNo').onclick=()=>{ closeModal('buyOverlay'); SFX.uiBack(); PLAYER.free(); 
 $('buyYes').onclick=()=>{ const h=BUY_H; if(!h||HUD.coins<h.price) return; closeModal('buyOverlay');
   HUD.coins-=h.price; setCoins(HUD.coins); h.sold=true; SFX.keys(); SFX.cash();
   runStory(()=>alienGoesHome(h.seller,3.4));
+  if(F_().day===2){ F_().boughtBig=true; unlock('bigHouse'); toast('YOU BOUGHT A BIGGER HOUSE!','#6dffd8'); bark('Seller','Pleasure doing business, human! Here are your keys.',h.seller,3); PLAYER.free(); return; }   // bought on day 2: you move in after work tomorrow
   if(F_().day===3){ F_().boughtBig=true; unlock('bigHouse'); toast('YOU BOUGHT A BIGGER HOUSE!','#6dffd8'); bark('Seller','Pleasure doing business, human! Here are your keys.',h.seller,3); objective('Go inside your new house'); setMarker(()=>h.door.clone().add(V3(0,2,0)),'Your new house','m'); PLAYER.free(); return; }
   unlock('house'); F_().boughtHouse=true;
   toast('YOU BOUGHT A HOUSE!','#6dffd8'); bark('Seller','Pleasure doing business, human! Here are your keys.',h.seller,3);
