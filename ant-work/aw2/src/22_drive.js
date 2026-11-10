@@ -31,7 +31,7 @@ defineLevel('drive',{
     lv.parked=[];
     for(let i=0;i<20;i++) for(const sd of [-1,1]){ const x=-40+i*22+r()*6; const h=makeHouse({color:pick(houseCol),roof:pick(roofCol),seed:i*2+(sd>0?1:0),w:rand(8,11),floors:r()<.3?2:1,night:.6}); h.position.set(x,0,sd*17); h.rotation.y=sd>0?Math.PI:0; scene.add(bake(h));
       scene.add(tiledPlane(3,6.6,drivewayM,3,x+5.5,.015,sd*9.7));
-      if(r()<.45){ const pc=makeCar({night:false,paint:pick([0x2a4a8a,0x8a8a8e,0x1a1a1c,0xe8e8e8,0x5a6a3a,0x8a2a2a])}); pc.position.set(x+5.5,0,sd*10.2); pc.rotation.y=sd>0?Math.PI/2:-Math.PI/2; const pb=bake(pc); scene.add(pb); lv.parked.push(pb); } }   // parked cars are baked = a few draw calls each (no lag)
+      if(r()<.45){ const pc=makeCar({night:false,simple:true,paint:pick([0x2a4a8a,0x8a8a8e,0x1a1a1c,0xe8e8e8,0x5a6a3a,0x8a2a2a])}); pc.position.set(x+5.5,0,sd*10.2); pc.rotation.y=sd>0?Math.PI/2:-Math.PI/2; const pb=bake(pc); scene.add(pb); lv.parked.push(pb); } }   // parked cars are baked = a few draw calls each (no lag)
     for(let i=0;i<13;i++) for(const sd of [-1,1]){ const x=-30+i*34+r()*10; const h=makeHouse({color:pick(houseCol),roof:pick(roofCol),seed:100+i*2+(sd>0?1:0),w:rand(8,12),floors:r()<.4?2:1,night:.6}); h.position.set(x,0,sd*44); h.rotation.y=sd>0?Math.PI:0; scene.add(bake(h)); }
     const trees=[]; for(let i=0;i<64;i++){ const sd=r()<.5?-1:1; trees.push({x:-60+i*7.4+r()*4,z:sd*(8.5+r()*3.5),h:rand(6,10)}); }
     for(let i=0;i<90;i++){ const sd=r()<.5?-1:1; trees.push({x:-80+r()*(L+160),z:sd*(26+r()*60),h:rand(7,13)}); }
@@ -52,7 +52,7 @@ defineLevel('drive',{
     // your own arms on the wheel (seen from your eyes)
     lv.arms=[makeWorldArm(1),makeWorldArm(-1)]; for(const a of lv.arms){ a.scale.setScalar(.78); lv.car.add(a); }
     // oncoming traffic
-    lv.traffic=[]; for(let i=0;i<4;i++){ const c=makeCar({paint:pick([0x2a4a8a,0xd8d8d8,0x1a1a1c,0x3a6a4a,0xc8a020]),night:true}); c.rotation.y=Math.PI; c.position.set(80+i*70,0,-2); const cb=bake(c); cb.userData={wheels:[]}; scene.add(cb); lv.traffic.push({c:cb,sp:rand(9,12)}); }
+    lv.traffic=[]; for(let i=0;i<4;i++){ const c=makeCar({paint:pick([0x2a4a8a,0xd8d8d8,0x1a1a1c,0x3a6a4a,0xc8a020]),night:true,simple:true}); c.rotation.y=Math.PI; c.position.set(80+i*70,0,-2); const cb=bake(c); cb.userData={wheels:[]}; scene.add(cb); lv.traffic.push({c:cb,sp:rand(9,12)}); }
     lv.carX=0;
   },
   enter(){ FX.sunWorld=this.sunWorld; FX.rays=.35; FX.raysColor.set(1,.7,.45); },
@@ -93,6 +93,7 @@ function driveUpdate(lv,dt,t){
   car.rotation.set(0,lv.yaw,Math.sin(t*1.3)*.003-lv.steerA*Math.abs(lv.vel)*.0025);
   spinWheels(car,lv.vel*dt); for(const i of [0,1]) car.userData.wheels[i].rotation.y=lv.steerA;
   car.userData.wheelOnly.rotation.x=lv.steerA*2.6;
+  { const U=car.userData, mph=Math.abs(lv.vel)*2.237; if(U.speedo) U.speedo.rotation.z=-Math.PI*.75-clamp(mph/120,0,1)*Math.PI*1.5; lv.rpm=damp(lv.rpm||.8,.8+(thr?2.2:0)+Math.abs(lv.vel)/21*3.4,4,dt); if(U.tacho) U.tacho.rotation.z=-Math.PI*.75-clamp(lv.rpm/8,0,1)*Math.PI*1.5; }   // real moving needles
   ambFreq('engine',48+Math.abs(lv.vel)*2.6);
   driveArms(lv);
   // you: sitting in the driver's seat, looking around freely (the view turns with the car)

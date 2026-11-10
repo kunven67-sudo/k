@@ -90,33 +90,103 @@ function makeCar(o={}){
   g.add(cyl(.035,.035,.14,chrome,-2.3,.33,.5,10)).children; g.children[g.children.length-1].rotation.z=Math.PI/2;
   for(const z of [-1,1]){ const mr=new THREE.Group(); mr.position.set(.98,1.1,z*.86); g.add(mr); mr.add(rbox(.16,.11,.16,.03,paint,0,0,z*.08)); mr.add(box(.01,.08,.12,mat(0x8aa0b0,{metalness:1,roughness:.05}),-.08,0,z*.08,false));
     for(const x of [-.55,.45]) g.add(box(.14,.025,.02,chrome,x,.9,z*.93,false)); }
-  // ---- inside ----
-  g.add(box(2.3,.04,1.56,mat(0x1c1c1e,{roughness:1}),-.15,.5,0,false));   // carpet
-  for(const z of [-.74,.74]) g.add(rbox(1.9,.36,.06,.03,mat(0x2a2a2e,{roughness:.8}),-.2,.8,z,false));   // door panels
-  const seatM=mat(0x2a2a2e,{roughness:.85}), dashM=mat(0x1a1b1f,{roughness:.55}), softM=mat(0x26272c,{roughness:.9});
-  for(const z of [-.38,.38]){ g.add(rbox(.52,.14,.5,.06,seatM,-.12,.6,z)); const bk=rbox(.14,.72,.48,.06,seatM,-.42,1.0,z); bk.rotation.z=.18; g.add(bk); g.add(rbox(.1,.2,.26,.05,seatM,-.5,1.42,z)); }
-  g.add(rbox(.46,.14,1.5,.06,seatM,-.78,.6,0)); g.add(rbox(.14,.46,1.5,.06,seatM,-1.0,.9,0));
-  g.add(rbox(.36,.42,.2,.05,softM,.1,.62,0));   // center console
-  // dashboard: a long rounded shelf under the windshield, a hood over the gauges, a screen, vents
-  g.add(rbox(.5,.22,1.6,.08,dashM,.86,.96,0)); g.add(rbox(.3,.14,1.56,.06,dashM,.72,.84,0));
-  const hood=rbox(.2,.08,.44,.04,dashM,.68,1.1,-.38); g.add(hood);
-  const gaugeM=emissiveMat(0x8ad8ff,opt.night?1.6:.8);
-  for(const dz of [-.1,.1]){ const gg=mesh(GC('carGauge',()=>new THREE.RingGeometry(.045,.055,24)),gaugeM,.585,1.02,-.38+dz,false); gg.rotation.y=-Math.PI/2; g.add(gg);
-    const nd=box(.004,.004,.045,emissiveMat(0xff6a3a,2),.582,1.02,-.38+dz,false); nd.rotation.x=.7; g.add(nd); }
-  const scr=mesh(GC('carScreen',()=>new THREE.PlaneGeometry(.26,.15)),emissiveMat(0x2a6aa8,opt.night?1.2:.6),.62,.98,0,false); scr.rotation.y=-Math.PI/2; scr.rotation.x=0; g.add(scr);
-  for(const z of [-.62,-.16,.16,.62]) g.add(rbox(.02,.05,.12,.01,mat(0x333338,{roughness:.4,metalness:.6}),.61,.9,z,false));
-  // rear-view mirror
-  g.add(box(.02,.06,.02,black,.5,1.45,0,false)); g.add(rbox(.03,.06,.22,.02,black,.5,1.4,0,false)); g.add(box(.005,.045,.2,mat(0x9ab0c0,{metalness:1,roughness:.05}),.485,1.4,0,false));
-  // steering wheel: on YOUR side (left, z=-.38), tilted toward you
-  const steer=new THREE.Group(); steer.position.set(.5,1.08,-.38); steer.rotation.z=.42; g.add(steer);
-  const wheelOnly=new THREE.Group(); steer.add(wheelOnly);   // this one turns
-  const sw=mesh(GC('steer2',()=>{ const t=new THREE.TorusGeometry(.18,.022,10,36); t.rotateY(Math.PI/2); return t; }),mat(0x161616,{roughness:.5}),0,0,0,false); wheelOnly.add(sw);
-  wheelOnly.add(mesh(GC('steerHub',()=>{ const c=new THREE.CylinderGeometry(.055,.06,.05,18); c.rotateZ(Math.PI/2); return c; }),mat(0x202024,{roughness:.4}),0,0,0,false));
-  for(const a of [Math.PI/2,-Math.PI/2,Math.PI]){ const sp=box(.02,.02,.16,mat(0x202024,{roughness:.4}),0,Math.sin(a)*.08,Math.cos(a)*.08,false); sp.rotation.x=a; wheelOnly.add(sp); }
-  steer.add(cyl(.03,.035,.3,dashM,.15,0,0,10)).children; steer.children[steer.children.length-1].rotation.z=Math.PI/2;
+  // ---- inside: a real car interior (see carInterior) ----
+  const IN=opt.simple?carInteriorSimple(g):carInterior(g,opt);   // parked + traffic cars get a cheap inside (no lag)
+  const steer=IN.steer, wheelOnly=IN.wheelOnly;
   const lights=[]; if(opt.night){ for(const z of [-.56,.56]){ const sl=new THREE.SpotLight(col(0xfff2d6),4,40,.45,.5,1.4); sl.position.set(2.3,.74,z); sl.target.position.set(12,-.5,z*3); g.add(sl); g.add(sl.target); lights.push(sl); } }
-  g.userData={wheels,paint,lights,headM,tailM,steer,wheelOnly};
+  g.userData={wheels,paint,lights,headM,tailM,steer,wheelOnly,speedo:IN.speedo,tacho:IN.tacho};
   g.traverse(m=>{ if(m.isMesh && m.material===glass) m.castShadow=false; });
   return g;
 }
 function spinWheels(car,dist){ for(const w of car.userData.wheels) w.rotation.z-=dist/.36; }
+
+/* real photo-scan textures (leather, seat fabric, carpet), loaded from data: URLs baked into the page */
+const _AWTEX={};
+function awTex(name,rx=1,ry=1,srgb=true){ const k=name+rx+'_'+ry; if(_AWTEX[k]) return _AWTEX[k]; if(typeof AW_TEX==='undefined'||!AW_TEX[name]) return null;
+  const t=new THREE.TextureLoader().load(AW_TEX[name]); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(rx,ry); if(srgb) t.encoding=THREE.sRGBEncoding; t.anisotropy=4; return _AWTEX[k]=t; }
+function carTexMat(name,o={}){ return new THREE.MeshStandardMaterial(Object.assign({map:awTex(name,o.rx||1,o.ry||1),normalMap:awTex(name+'N',o.rx||1,o.ry||1,false),roughness:.8,color:0xffffff},o.m||{})); }
+/* a car seat: cushion + backrest with side bolsters, a fabric center, a headrest on two posts, a seat belt */
+function carSeat(leather,fab,chrome,belt){
+  const s=new THREE.Group();
+  s.add(rbox(.52,.12,.5,.05,leather,0,0,0)); s.add(rbox(.38,.03,.36,.02,fab,.0,.07,0,false));
+  for(const z of [-.22,.22]) s.add(rbox(.5,.1,.08,.04,leather,0,.06,z));                       // cushion bolsters
+  const bk=new THREE.Group(); bk.position.set(-.24,.06,0); bk.rotation.z=.2; s.add(bk);
+  bk.add(rbox(.12,.66,.5,.05,leather,0,.33,0)); bk.add(rbox(.03,.5,.34,.02,fab,.06,.32,0,false));
+  for(const z of [-.22,.22]){ const bo=rbox(.14,.56,.08,.04,leather,.03,.3,z); bo.rotation.y=z>0?.25:-.25; bk.add(bo); }   // back bolsters
+  for(const z of [-.07,.07]) bk.add(cyl(.008,.008,.12,chrome,0,.72,z,8));                   // headrest posts
+  bk.add(rbox(.1,.18,.28,.05,leather,0,.83,0));                                              // headrest
+  return s;
+}
+function carInterior(g,opt){
+  const leather=carTexMat('leather',{rx:2,ry:2,m:{roughness:.55}}), fab=carTexMat('seatfab',{rx:3,ry:3,m:{roughness:.95}}), carpet=carTexMat('carpet',{rx:3,ry:2,m:{roughness:1}});
+  const dashM=mat(0x1b1c20,{roughness:.62}), dashSoft=mat(0x2a2b30,{roughness:.85}), trim=mat(0x3a3b40,{roughness:.4,metalness:.5}), chrome=mat(0xc8ccd0,{metalness:1,roughness:.18}), black=mat(0x0e0e10,{roughness:.5});
+  const belt=mat(0x1a1a1c,{roughness:.9});
+  // floor
+  g.add(box(2.3,.04,1.5,carpet,-.15,.5,0,false));
+  // front seats + rear bench
+  for(const z of [-.38,.38]){ const st=carSeat(leather,fab,chrome,belt); st.position.set(-.12,.6,z); g.add(st);
+    // seat belt: from the pillar behind your shoulder, across, to the buckle by the seat
+    const sx=z<0?-1:1, a=V3(-.5,1.22,z+sx*.3), bpt=V3(.02,.72,z-sx*.24), d=bpt.clone().sub(a), Lb=d.length();
+    const bl=box(.005,Lb,.05,belt,(a.x+bpt.x)/2+.1,(a.y+bpt.y)/2,(a.z+bpt.z)/2,false); bl.quaternion.setFromUnitVectors(V3(0,1,0),d.normalize()); g.add(bl);
+    g.add(rbox(.05,.04,.03,.01,chrome,.0,.73,z-sx*.25,false)); g.add(rbox(.06,.08,.04,.02,black,-.02,.66,z-sx*.27,false)); }
+  const rb=new THREE.Group(); rb.position.set(-.8,.6,0); g.add(rb); rb.add(rbox(.48,.12,1.42,.05,leather,0,0,0)); rb.add(rbox(.34,.03,1.2,.02,fab,0,.07,0,false));
+  const rbk=rbox(.12,.5,1.42,.05,leather,-.22,.3,0); rbk.rotation.z=.18; rb.add(rbk); for(const z of [-.45,0,.45]) rb.add(rbox(.08,.16,.26,.04,leather,-.3,.62,z));
+  // center console: shifter (P R N D), cup holders, armrest, handbrake
+  g.add(rbox(.62,.22,.22,.04,dashSoft,.12,.62,0)); g.add(rbox(.3,.1,.22,.04,leather,-.12,.76,0));
+  const gate=box(.14,.005,.06,black,.28,.735,0,false); g.add(gate);
+  const sh=new THREE.Group(); sh.position.set(.27,.74,0); sh.rotation.z=.25; g.add(sh); sh.add(cyl(.01,.012,.1,chrome,0,.05,0,8)); sh.add(rbox(.06,.08,.045,.02,leather,0,.12,0));
+  const prndT=canvasTex(128,32,(x,w,h)=>{ x.fillStyle='#0c0c0e'; x.fillRect(0,0,w,h); x.fillStyle='#d8dde4'; x.font='bold 22px Arial'; x.textAlign='center'; x.fillText('P  R  N  D',w/2,23); });
+  const prnd=mesh(new THREE.PlaneGeometry(.12,.03),new THREE.MeshBasicMaterial({map:prndT}),.34,.737,0,false); prnd.rotation.x=-Math.PI/2; prnd.rotation.z=Math.PI/2; g.add(prnd);
+  for(const x of [.08,.15]) g.add(mesh(GC('cupHole',()=>new THREE.CylinderGeometry(.035,.035,.02,18)),black,x,.735,0,false));
+  const hb=new THREE.Group(); hb.position.set(.0,.74,.0); hb.rotation.z=-.3; g.add(hb); hb.add(rbox(.2,.03,.04,.012,black,-.08,0,0));
+  // dashboard: soft top, a hood over the gauges, glovebox, vents, radio + climate knobs, a center screen
+  g.add(rbox(.5,.2,1.62,.08,dashSoft,.86,.98,0)); g.add(rbox(.26,.2,1.56,.06,dashM,.68,.84,0));
+  g.add(rbox(.2,.08,.46,.04,dashSoft,.68,1.1,-.38));                                            // gauge hood
+  g.add(rbox(.02,.12,.42,.015,trim,.585,.84,.38,false)); g.add(box(.01,.012,.06,chrome,.58,.86,.24,false));   // glovebox + handle
+  // instrument cluster: real dials with moving needles (speedo + rpm)
+  const dialT=(label,max,step)=>canvasTex(256,256,(x,w,h)=>{ x.fillStyle='#050608'; x.fillRect(0,0,w,h); x.translate(128,128); x.strokeStyle='#8ad8ff'; x.lineWidth=4; x.beginPath(); x.arc(0,0,110,Math.PI*.75,Math.PI*2.25); x.stroke();
+    x.fillStyle='#e8eef4'; x.font='bold 20px Arial'; x.textAlign='center'; x.textBaseline='middle';
+    for(let v=0;v<=max;v+=step){ const a=Math.PI*.75+v/max*Math.PI*1.5; x.save(); x.rotate(a); x.fillRect(84,-2,22,4); x.restore(); x.fillText(String(v),Math.cos(a)*64,Math.sin(a)*64); }
+    x.font='bold 16px Arial'; x.fillStyle='#8ad8ff'; x.fillText(label,0,58); });
+  const mkDial=(z,label,max,step)=>{ const d=new THREE.Group(); d.position.set(.588,1.02,-.38+z); d.rotation.y=-Math.PI/2; d.rotation.x=-.25; g.add(d);
+    d.add(mesh(GC('dialFace',()=>new THREE.CircleGeometry(.055,32)),new THREE.MeshBasicMaterial({map:dialT(label,max,step)}),0,0,0,false));
+    d.add(mesh(GC('dialRim',()=>new THREE.TorusGeometry(.056,.004,6,32)),chrome,0,0,.001,false));
+    const nd=new THREE.Group(); nd.position.z=.003; d.add(nd); nd.add(box(.042,.0035,.002,emissiveMat(0xff5a2a,2.5),.02,0,0,false)); nd.rotation.z=-Math.PI*.75; return nd; };
+  const speedo=mkDial(.065,'MPH',120,20), tacho=mkDial(-.065,'x1000',8,1);
+  // center screen (map), vents with slats, radio knobs, hazard button
+  const mapT=canvasTex(256,160,(x,w,h)=>{ x.fillStyle='#1c2430'; x.fillRect(0,0,w,h); x.strokeStyle='#3a4a5c'; x.lineWidth=10; for(let i=0;i<6;i++){ x.beginPath(); x.moveTo(rand(0,w),0); x.lineTo(rand(0,w),h); x.stroke(); } x.strokeStyle='#58a8ff'; x.lineWidth=7; x.beginPath(); x.moveTo(w*.5,h); x.lineTo(w*.5,h*.35); x.lineTo(w*.8,h*.1); x.stroke(); x.fillStyle='#ffffff'; x.beginPath(); x.moveTo(w*.5,h*.62); x.lineTo(w*.46,h*.72); x.lineTo(w*.54,h*.72); x.fill(); x.fillStyle='#c8d8e8'; x.font='bold 16px Arial'; x.fillText("Jim's Stand  0.4 mi",10,22); });
+  const scr=mesh(GC('carScreen2',()=>new THREE.PlaneGeometry(.24,.15)),new THREE.MeshBasicMaterial({map:mapT}),.6,.99,0,false); scr.rotation.y=-Math.PI/2; scr.material.color.setScalar(opt.night?1.1:.8); g.add(scr);
+  g.add(rbox(.02,.17,.27,.012,black,.605,.99,0,false));
+  for(const z of [-.66,-.13,.13,.66]){ const v=new THREE.Group(); v.position.set(.6,.9,z); g.add(v); v.add(rbox(.02,.06,.13,.01,black,0,0,0,false)); for(let i=0;i<4;i++) v.add(box(.022,.006,.12,trim,0,-.022+i*.015,0,false)); }
+  for(const z of [-.08,.08]) g.add(mesh(GC('knob',()=>{ const c=new THREE.CylinderGeometry(.018,.02,.025,20); c.rotateZ(Math.PI/2); return c; }),trim,.59,.86,z,false));
+  g.add(rbox(.015,.025,.04,.006,emissiveMat(0xff2a1a,.8),.595,.9,0,false));
+  // steering column + wheel (your side), turn-signal stalks, an airbag hub with a badge
+  const steer=new THREE.Group(); steer.position.set(.5,1.06,-.38); steer.rotation.z=.42; g.add(steer);
+  const wheelOnly=new THREE.Group(); steer.add(wheelOnly);
+  wheelOnly.add(mesh(GC('steer3',()=>{ const t=new THREE.TorusGeometry(.18,.022,12,40); t.rotateY(Math.PI/2); return t; }),leather,0,0,0,false));
+  wheelOnly.add(mesh(GC('steerHub2',()=>{ const c=new THREE.CylinderGeometry(.07,.075,.06,24); c.rotateZ(Math.PI/2); return c; }),dashM,0,0,0,false));
+  wheelOnly.add(mesh(GC('steerBadge',()=>{ const c=new THREE.CylinderGeometry(.018,.018,.005,16); c.rotateZ(Math.PI/2); return c; }),chrome,-.032,0,0,false));
+  for(const a of [Math.PI/2,-Math.PI/2,Math.PI]){ const sp=box(.03,.025,.16,dashM,0,Math.sin(a)*.09,Math.cos(a)*.09,false); sp.rotation.x=a; wheelOnly.add(sp); }
+  steer.add(cyl(.035,.045,.32,dashM,.17,0,0,12)).children; steer.children[steer.children.length-1].rotation.z=Math.PI/2;
+  for(const z of [-.06,.06]){ const st=box(.012,.012,.11,trim,.1,0,z+(z>0?.05:-.05),false); st.rotation.y=z>0?-.3:.3; steer.add(st); }
+  // pedals
+  for(const [z,w] of [[-.48,.07],[-.36,.1]]){ g.add(box(.012,.16,.012,trim,.62,.66,z,false)); const pd=rbox(.015,.08,w,.006,black,.6,.58,z,false); pd.rotation.z=-.4; g.add(pd); }
+  // sun visors + rear-view mirror + dome light
+  for(const z of [-.38,.38]){ const sv=rbox(.2,.02,.36,.01,mat(0x8e8a84,{roughness:.95}),.32,1.44,z,false); sv.rotation.z=-.15; g.add(sv); }
+  g.add(box(.02,.06,.02,black,.42,1.45,0,false)); g.add(rbox(.03,.07,.24,.02,black,.42,1.4,0,false)); g.add(box(.005,.055,.22,mat(0x9ab0c0,{metalness:1,roughness:.05}),.405,1.4,0,false));
+  g.add(rbox(.08,.015,.14,.006,emissiveMat(0xfff0d0,opt.night?.6:.2),-.3,1.49,0,false));
+  // doors from the inside: armrest, handle, window buttons, speaker
+  for(const z of [-.75,.75]){ const sd=z<0?1:-1;
+    g.add(rbox(1.0,.36,.05,.03,dashSoft,.05,.82,z*.99,false)); g.add(rbox(.32,.05,.1,.02,leather,-.05,.78,z*.96,false));
+    g.add(box(.08,.025,.02,chrome,.28,.92,z*.955,false));
+    for(let i=0;i<2;i++) g.add(box(.025,.01,.03,black,-.1+i*.04,.807,z*.945,false));
+    g.add(mesh(GC('speaker',()=>new THREE.CircleGeometry(.06,20)),mat(0x111114,{roughness:.9}),.1,.66,z*.97,false)).children; g.children[g.children.length-1].rotation.y=sd>0?0:Math.PI; }
+  return {steer,wheelOnly,speedo,tacho};
+}
+function carInteriorSimple(g){
+  const seatM=mat(0x26262a,{roughness:.85}); for(const z of [-.38,.38]){ g.add(rbox(.5,.12,.48,.05,seatM,-.12,.62,z)); const bk=rbox(.12,.66,.46,.05,seatM,-.38,1.0,z); bk.rotation.z=.2; g.add(bk); }
+  g.add(rbox(.5,.2,1.6,.08,mat(0x1b1c20,{roughness:.6}),.86,.98,0));
+  const steer=new THREE.Group(); steer.position.set(.5,1.06,-.38); steer.rotation.z=.42; g.add(steer); const wheelOnly=new THREE.Group(); steer.add(wheelOnly);
+  wheelOnly.add(mesh(GC('steer3s',()=>{ const t=new THREE.TorusGeometry(.18,.022,8,24); t.rotateY(Math.PI/2); return t; }),mat(0x151515,{roughness:.5}),0,0,0,false));
+  return {steer,wheelOnly,speedo:null,tacho:null};
+}

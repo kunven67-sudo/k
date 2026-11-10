@@ -7,3 +7,4 @@ SOUNDS
   Shaky breathing - "Heavy breathing 3" by ezwa (Wikimedia Commons) - public domain
   Crying - "Male crying and weeping" by jacobmathiassen (Wikimedia Commons) - CC BY 3.0
 CODE: three.js r128 - MIT License
+TEXTURES (real photo scans, Poly Haven, CC0): fabric_leather_02 (seats), jersey_melange (seat fabric), dirty_carpet (car floor) - recoloured darker

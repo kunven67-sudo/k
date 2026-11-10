@@ -14,6 +14,9 @@ const linesJson=path.join(__dirname,'assets/voice/lines.json');
 const allLines=fs.existsSync(linesJson)?JSON.parse(fs.readFileSync(linesJson,'utf8')):{};
 const voiceWho={}; for(const id of ids){ if(allLines[id]) voiceWho[id]=allLines[id].who; else console.warn('voice clip with no line in lines.json (left out):',id); }
 let out=head+'<script>\nconst AW2_VERSION='+JSON.stringify(version)+';\nconst AW2_VOICE_WHO='+JSON.stringify(voiceWho)+';\n</script>\n';
+/* real photo textures (assets/tex/*.jpg) go INSIDE the page as data: URLs: a WebGL game opened from a folder can't use image files next to it */
+{ const TD=path.join(__dirname,'assets/tex'); const tex={}; if(fs.existsSync(TD)) for(const f of fs.readdirSync(TD)) if(/\.(jpg|png)$/.test(f)) tex[f.replace(/\.\w+$/,'')]='data:image/'+(f.endsWith('png')?'png':'jpeg')+';base64,'+fs.readFileSync(path.join(TD,f)).toString('base64');
+  out+='<script>\nconst AW_TEX='+JSON.stringify(tex)+';\n</script>\n'; }
 const mods=fs.readdirSync(SRC).filter(f=>/^\d+[a-z]?_.*\.js$/.test(f)).sort();
 const vm=require('vm');
 for(const m of mods){ const code=fs.readFileSync(path.join(SRC,m),'utf8'); try{ new vm.Script(code,{filename:m}); }catch(e){ console.error('SYNTAX ERROR in '+m+': '+e.message+'\n'+(e.stack||'').split('\n').slice(0,3).join('\n')); process.exit(1); }   // never ship a broken file
@@ -23,7 +26,7 @@ fs.rmSync(OUT,{recursive:true,force:true}); fs.mkdirSync(OUT,{recursive:true});
 fs.writeFileSync(path.join(OUT,'index.html'),out);
 const copy=(a,b,skip)=>{ fs.mkdirSync(b,{recursive:true}); for(const f of fs.readdirSync(a)){ if(skip&&skip(f)) continue; const p=path.join(a,f), q=path.join(b,f); if(fs.statSync(p).isDirectory()) copy(p,q,skip); else fs.copyFileSync(p,q); } };
 copy(path.join(__dirname,'lib'),path.join(OUT,'lib'));
-copy(path.join(__dirname,'assets'),path.join(OUT,'assets'),f=>f.endsWith('.json')||f.endsWith('.txt')&&f!=='CREDITS.txt');
+copy(path.join(__dirname,'assets'),path.join(OUT,'assets'),f=>f==='tex'||f.endsWith('.json')||f.endsWith('.txt')&&f!=='CREDITS.txt');
 /* every sound also as a script (assets/js/...) so it loads when the game is opened straight from the folder (file://) */
 { const A=path.join(OUT,'assets'); let n=0; const walk=d=>{ for(const f of fs.readdirSync(d)){ const p=path.join(d,f); if(fs.statSync(p).isDirectory()){ if(f!=='js') walk(p); continue; } if(!/\.(mp3|ogg|wav)$/i.test(f)) continue;
     const rel=path.relative(A,p).split(path.sep).join('/'), q=path.join(A,'js',rel+'.js'); fs.mkdirSync(path.dirname(q),{recursive:true});
