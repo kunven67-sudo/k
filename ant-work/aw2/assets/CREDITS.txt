@@ -8,3 +8,8 @@ SOUNDS
   Crying - "Male crying and weeping" by jacobmathiassen (Wikimedia Commons) - CC BY 3.0
 CODE: three.js r128 - MIT License
 TEXTURES (real photo scans, Poly Haven, CC0): fabric_leather_02 (seats), jersey_melange (seat fabric), dirty_carpet (car floor) - recoloured darker
+MUSIC (all by Kevin MacLeod, incompetech.com, Licensed under Creative Commons: By Attribution 4.0 License, http://creativecommons.org/licenses/by/4.0/):
+  "Ascending the Vale" (title), "Carefree" (home), "Chill Wave" (drive), "Lightless Dawn" (lab), "Floating Cities" (Tinyverse),
+  "Monkeys Spinning Monkeys" (Larry), "Giant Wyrm" (giant tardigrade), "Investigations" (creature hunt), "Echoes of Time v2" (moon/space),
+  "Frost Waltz" (Pluto), "Heroic Age" (launch/flying), "Desert City" (Mars), "Volatile Reaction" (Steve's ship), "Five Armies" (XXX5),
+  "Mechanolith" (blocky Earth), "Heartbreaking" (sad), "Dreamy Flashback" (dreams/flashbacks)

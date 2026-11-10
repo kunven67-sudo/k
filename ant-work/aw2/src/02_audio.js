@@ -333,16 +333,26 @@ const SONGS={
   intro:{bpm:84,chords:['F3 A3 C4 E4','Bb2 D3 F3 A3'],keys:{inst:'pluck',vol:.035,pat:'0.......2.......'},pad:{inst:'pad',vol:.02,cut:800}}
 };
 const MUS={cur:null,name:null,gain:null,step:0,nextT:0,timer:null,duck:1};
-/* real recorded music (OpenGameArt, CC0 / OGA-BY): each song name maps to a track; the old synth songs stay as a fallback */
+/* real music: a DIFFERENT song for each kind of moment (it used to be 8 songs reused everywhere,
+   even the hero song for the scary giant). Kevin MacLeod (incompetech.com), CC BY 4.0 - see CREDITS.txt */
 const MUSIC_TRACKS={
-  title:'mus_home',home:'mus_home',jim:'mus_home',cook:'mus_home',pizza:'mus_home',drive:'mus_home',
-  tiny:'mus_dream',larry:'mus_dream',dream:'mus_dream',
-  moon:'mus_space',pluto:'mus_space',intro:'mus_space',
-  launch:'mus_hero',fly:'mus_hero',giant:'mus_hero',
-  xxx5:'mus_battle',burning:'mus_battle',hunt:'mus_battle',
-  mars:'mus_mars',houses:'mus_mars',alienHome:'mus_mars',
-  ship:'mus_tense',blocky:'mus_tense',
-  sad:'mus_sad'
+  title:'m_title',
+  home:'m_home',jim:'m_home',cook:'m_home',pizza:'m_home',
+  drive:'m_drive',
+  lab:'m_lab',
+  tiny:'m_tiny',
+  larry:'m_larry',
+  giant:'m_giant',
+  hunt:'m_hunt',
+  moon:'m_space',intro:'m_space',
+  pluto:'m_pluto',
+  launch:'m_hero',fly:'m_hero',
+  mars:'m_mars',houses:'m_mars',alienHome:'m_mars',
+  ship:'m_ship',
+  xxx5:'m_battle',burning:'m_battle',
+  blocky:'m_blocky',
+  sad:'m_sad',
+  dream:'m_dream',flash:'m_dream'
 };
 const MUSIC_VOL={mus_home:.5,mus_dream:.6,mus_space:.6,mus_hero:.48,mus_battle:.42,mus_mars:.5,mus_tense:.7,mus_sad:.6};
 function loadMusicFiles(){ const seen=new Set(Object.values(MUSIC_TRACKS)); for(const n of seen) SND.load(n,'assets/music/'+n+'.ogg').then(b=>{ if(b&&MUS.name&&MUSIC_TRACKS[MUS.name]===n&&!MUS.track){ const nm=MUS.name; MUS.name=null; playMusic(nm,2); } }); }
