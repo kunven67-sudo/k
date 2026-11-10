@@ -246,11 +246,13 @@ async function buildLevel(name){
   return def;
 }
 async function enterLevel(name,spawn={},opts={}){
-  const def=LEVELS[name]; if(!def) throw new Error('no level '+name);
+  const def=LEVELS[name]; if(!def) throw new Error('no level '+name); const tok=STORY.token;
   if(!def.built){ $('loading').classList.add('show'); $('loadTxt').textContent='Loading '+(def.title||name)+'…'; await nextFrame(); await nextFrame();
     try{ await buildLevel(name); }
     catch(e){ console.error(e); showFatal('The area "'+(def.title||name)+'" could not be built on this computer.',e); throw e; }
     finally{ $('loading').classList.remove('show'); } }
+  // the story was restarted while this level was loading: the OLD story must not jump into it (it used to pop up over the new scene)
+  if(tok!==STORY.token && !opts.anyStory) return new Promise(()=>{});
   if(LV && LV!==def && LV.exit) try{ LV.exit(); }catch(e){ console.error(e); }
   LV=def;
   const E=def.env||{};

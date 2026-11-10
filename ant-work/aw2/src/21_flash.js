@@ -72,7 +72,7 @@ defineLevel('flash',{
 /* the flashback sequence: 5 memory cuts from the couch, then back */
 const FLASH={active:false};
 async function runFlashbacks(){
-  const F=await buildLevel('flash');
+  const tok=STORY.token; const F=await buildLevel('flash'); if(tok!==STORY.token) return new Promise(()=>{});
   const home=LV; const steve=F.steve, S=steve.userData;
   const V=(x,y,z)=>V3(x,y,z);
   const shots=[

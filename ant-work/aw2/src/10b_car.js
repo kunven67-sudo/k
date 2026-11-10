@@ -30,6 +30,9 @@ function carBodyGeo(){ return GC('carBody2',()=>{
     const H=(yt-yb)/2; let y=(yt+yb)/2+se(sn,n)*H;
     const up=Math.max(0,se(sn,n));                 // sides lean in toward the top
     let z=se(cs,n)*W*(1-.07*up);
+    // open the cabin: between the doors the top sinks to the floor (it was a solid lid = red paint where the seats + dash should be)
+    const cab=smooth(clamp((x+1.3)/.12,0,1))*(1-smooth(clamp((x-.98)/.12,0,1)));
+    if(cab>0 && sn>0){ const keep=smooth(clamp((Math.abs(cs)-.5)/.22,0,1)); y=lerp(y,lerp(.44,y,keep),cab); z*=lerp(1,lerp(.9,1,keep),cab); }
     // wheel arches: the lower sides lift over each wheel
     if(Math.abs(cs)>.35){ for(const [wx] of CAR_WHEELS){ const d=x-wx; if(Math.abs(d)<.5){ const ay=.37+Math.sqrt(.25-d*d)*1.02; if(y<ay) y=ay; } } }
     if(sn<-.6){ for(const [wx] of CAR_WHEELS){ const d=x-wx; if(Math.abs(d)<.5){ const ay=.37+Math.sqrt(.25-d*d)*1.02; if(y<ay) y=ay; } } }
@@ -51,17 +54,18 @@ function carCabinGeo(top){ return GC('carCabin2'+(top?'R':''),()=>carLoft(40,24,
 function makeCar(o={}){
   const opt=Object.assign({paint:0xa8231c,night:false},o);
   const g=new THREE.Group();
-  const paint=new THREE.MeshPhysicalMaterial({color:col(opt.paint),metalness:.55,roughness:.32,clearcoat:1,clearcoatRoughness:.04});
+  const paint=new THREE.MeshPhysicalMaterial({color:col(opt.paint),metalness:.55,roughness:.32,clearcoat:1,clearcoatRoughness:.04,side:THREE.DoubleSide});
+  const paintOut=paint.clone(); paintOut.side=THREE.FrontSide;
   const chrome=mat(0xdddddd,{metalness:1,roughness:.12});
   const black=mat(0x151515,{roughness:.6}), trimBlack=mat(0x0c0c0e,{roughness:.35,metalness:.3});
-  const glass=new THREE.MeshPhysicalMaterial({color:col(0x6a8494),metalness:.1,roughness:.03,transparent:true,opacity:.3,clearcoat:1,envMapIntensity:1.2,depthWrite:false,side:THREE.DoubleSide});
+  const glass=new THREE.MeshPhysicalMaterial({color:col(0x6a8494),side:THREE.DoubleSide,metalness:.1,roughness:.03,transparent:true,opacity:.3,clearcoat:1,envMapIntensity:1.2,depthWrite:false});
   const rubber=mat(0x1a1a1a,{roughness:.85});
   // body + cabin
   g.add(mesh(carBodyGeo(),paint));
   g.add(mesh(carCabinGeo(false),glass,0,0,0,false));
   // roof skin (only the flat middle, the glass shows at the ends)
   const roofG=GC('carRoof2',()=>carLoft(20,16,(u,v)=>{ const x=lerp(-.74,.32,u), th=v*Math.PI, s=Math.cos(th), c=Math.sin(th); const k=Math.pow(c,.35); const y=1.0+k*.515+Math.sin((x+.8)/1.18*Math.PI)*.025*k; return [x,Math.max(1.47,y),s*lerp(.84,.66,k)*(k>.92?1:1.0)]; }));
-  g.add(mesh(roofG,paint));
+  g.add(mesh(roofG,paintOut)); g.add(mesh(roofG,mat(0x8e8a84,{roughness:.95,side:THREE.BackSide}),0,0,0,false));   // roof + grey headliner inside
   // pillars + door seams + window line
   for(const z of [-.79,.79]){ for(const [x0,y0,x1,y1] of [[-1.28,1.02,-.8,1.48],[1.1,1.02,.4,1.48],[-.22,1.02,-.22,1.49]]){ const len=Math.hypot(x1-x0,y1-y0); const b=box(.06,len,.04,trimBlack,(x0+x1)/2,(y0+y1)/2,z*(1-.12*((y0+y1)/2-1.0)/.5)); b.rotation.z=-Math.atan2(x1-x0,y1-y0); g.add(b); }
     g.add(box(2.4,.025,.02,chrome,-.08,1.02,z*1.1)); for(const x of [-.24,.9]) g.add(box(.012,.62,.02,trimBlack,x,.7,z*1.135,false)); }
@@ -87,6 +91,8 @@ function makeCar(o={}){
   for(const z of [-1,1]){ const mr=new THREE.Group(); mr.position.set(.98,1.1,z*.86); g.add(mr); mr.add(rbox(.16,.11,.16,.03,paint,0,0,z*.08)); mr.add(box(.01,.08,.12,mat(0x8aa0b0,{metalness:1,roughness:.05}),-.08,0,z*.08,false));
     for(const x of [-.55,.45]) g.add(box(.14,.025,.02,chrome,x,.9,z*.93,false)); }
   // ---- inside ----
+  g.add(box(2.3,.04,1.56,mat(0x1c1c1e,{roughness:1}),-.15,.5,0,false));   // carpet
+  for(const z of [-.74,.74]) g.add(rbox(1.9,.36,.06,.03,mat(0x2a2a2e,{roughness:.8}),-.2,.8,z,false));   // door panels
   const seatM=mat(0x2a2a2e,{roughness:.85}), dashM=mat(0x1a1b1f,{roughness:.55}), softM=mat(0x26272c,{roughness:.9});
   for(const z of [-.38,.38]){ g.add(rbox(.52,.14,.5,.06,seatM,-.12,.6,z)); const bk=rbox(.14,.72,.48,.06,seatM,-.42,1.0,z); bk.rotation.z=.18; g.add(bk); g.add(rbox(.1,.2,.26,.05,seatM,-.5,1.42,z)); }
   g.add(rbox(.46,.14,1.5,.06,seatM,-.78,.6,0)); g.add(rbox(.14,.46,1.5,.06,seatM,-1.0,.9,0));

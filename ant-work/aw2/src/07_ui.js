@@ -102,7 +102,7 @@ function itemHints(list){ const el=$('itemHint'); if(!list||!list.length){ el.cl
 function crosshair(on){ $('crosshair').classList.toggle('off',!on); }
 function hudVisible(on){ $('hud').style.display=on?'':'none'; }
 /* ---------- screen effects ---------- */
-function fade(to,dur=.6){ const f=$('fade'); f.style.transition='opacity '+dur+'s'; f.style.opacity=to; return new Promise(r=>gTimeout(dur+.03,r)); }
+function fade(to,dur=.6){ const f=$('fade'); f.style.transition='opacity '+dur+'s'; f.style.opacity=to; const tok=STORY.token; return new Promise(r=>gTimeout(dur+.03,()=>{ if(tok===STORY.token) r(); })); }   // an old (restarted) story stops here instead of running on
 function flashWhite(peak=1,dur=.6){ const f=$('flash'); f.style.transition='none'; f.style.opacity=peak; void f.offsetWidth; f.style.transition='opacity '+dur+'s ease-out'; f.style.opacity=0; }
 function letterbox(on){ $('letterbox').classList.toggle('on',on); }
 async function card(t,s='',sec=3){ $('cardT').textContent=t; $('cardS').textContent=s; const c=$('card'); c.classList.add('show'); await wait(sec); c.classList.remove('show'); await wait(1); }
