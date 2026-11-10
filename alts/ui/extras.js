@@ -15,7 +15,9 @@
   };
   const BTN = { font: '600 12px ' + FONT, padding: '4px 10px', borderRadius: '999px', border: '1px solid #3a3a44', background: '#1f1f25e6',
     color: '#d6d6de', cursor: 'pointer', whiteSpace: 'nowrap', lineHeight: '18px' };
-  const ROUND = { width: '30px', height: '30px', borderRadius: '50%', border: '1px solid #3a3a44', background: '#1f1f25', color: '#d6d6de',
+  // ALTS for phone draws its own sticker box and needs finger-sized buttons (phone.js runs before this).
+  const PHONE = !!window.__altsPhone;
+  const ROUND = { width: PHONE ? '38px' : '30px', height: PHONE ? '38px' : '30px', borderRadius: '50%', border: '1px solid #3a3a44', background: '#1f1f25', color: '#d6d6de',
     cursor: 'pointer', font: '16px/1 "Segoe UI Emoji","Segoe UI",sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0' };
   const tag = e => { e.dataset.alts = '1'; return e; };
   const hover = (b, on, off) => { b.addEventListener('mouseenter', () => Object.assign(b.style, on)); b.addEventListener('mouseleave', () => Object.assign(b.style, off)); return b; };
@@ -79,7 +81,8 @@
   const laterBtn = round('\u23F0', 'Send later: saves what you typed. When your limit is back, ALTS pings you and you press Send.', () => later());
   const quickBtn = round('\u26A1', 'Quick buttons: things you say a lot, one click sends them', b => quickToggle(b));
   side.append(
-    round('\u{1F600}', 'Emoji + stickers', b => pickerToggle()),
+    PHONE ? round('\u{1F5BC}\uFE0F', 'Stickers', () => window.__altsPhoneStickers && window.__altsPhoneStickers())
+      : round('\u{1F600}', 'Emoji + stickers', b => pickerToggle()),
     quickBtn,
     laterBtn,
     round('\u21BB', 'Fresh chat: Claude writes a handoff, then a new chat picks it up (saves usage)', () => fresh()));
@@ -140,9 +143,9 @@
     side.style.display = 'flex';
     if (pos === lastPos) return;
     lastPos = pos;
-    const leftRoom = r.left > 48;
+    const leftRoom = r.left > 48 && !PHONE;
     Object.assign(side.style, leftRoom ? { left: (r.left - 40) + 'px', top: Math.max(8, r.bottom - 138) + 'px', flexDirection: 'column' }
-      : { left: (r.left + 4) + 'px', top: Math.max(8, r.top - 38) + 'px', flexDirection: 'row' });
+      : { left: (r.left + 4) + 'px', top: Math.max(8, r.top - (PHONE ? 46 : 38)) + 'px', flexDirection: 'row' });
     if (picker && picker.isConnected) placePicker();
   }
   setInterval(place, 400);

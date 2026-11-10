@@ -86,6 +86,30 @@ Warning" box. ALTS takes that mark off **only** for files that come from Claude 
   connecting GitHub stay inside the account they belong to.
 - Remembers the window size and the last account you used.
 
+## ALTS for phone 2.0 (`android/`)
+
+The PC app on your phone, same look and the same mods (it runs the same `ui/page.js` + `ui/extras.js`):
+
+- **Accounts** like the PC side list, each with its own login (Android WebView profiles). Tap the pill at
+  the top for the ALTS sheet: switch, **+ Add**, hold one to rename/remove. Each account's usage bars stay.
+- **Stickers** (the picture button above the chat box, or the sheet): the 100 most popular meme pictures
+  are built in (work offline, freshened from imgflip every 3 days), plus **your own pics** (+ Your pics),
+  plus **GIPHY search** once you paste a free key in Settings. Star any sticker: favorites sit first and
+  have their own tab. Tap = it goes into the chat as a picture. No emoji tab and no clipboard on purpose
+  (the phone keyboard has those).
+- **Save this chat** (kept inside ALTS, searchable even offline, plus a copy in `Download/ALTS`),
+  **Saved chats** with search, **Continue on** another account, **Send later** (a phone notification when
+  your limit resets), **Fresh chat**, quick buttons, Top/Bottom, message + word counter.
+- Safety: only ALTS's own script on claude.ai can use the app's bridge (a new key every start). Artifacts
+  and other pages can't read your saved chats or touch your accounts.
+- It's a separate app from ALTS 1.x (that one's signing key is gone): install it, sign in, then the sheet
+  offers to remove the old one.
+
+Build: `ANDROID_HOME=... KEYSTORE=... android/build.sh` (no Android Studio; the first run downloads
+androidx.webkit and the meme pack into `android/build-cache/`). Tests: `android/test/StoreTest.java` (the
+logic, on a normal computer with org.json) and `node android/test/phone_ui.js` (the real page code in a
+phone-sized Chromium on a fake claude.ai, every button).
+
 ## Run it
 
 Double-click `ALTS.exe`. Windows 10 or 11. It uses Microsoft Edge WebView2, which is already on
