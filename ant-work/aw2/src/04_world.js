@@ -247,7 +247,7 @@ async function buildLevel(name){
 }
 async function enterLevel(name,spawn={},opts={}){
   const def=LEVELS[name]; if(!def) throw new Error('no level '+name); const tok=STORY.token;
-  if(!def.built){ $('loading').classList.add('show'); $('loadTxt').textContent='Loading '+(def.title||name)+'…'; await nextFrame(); await nextFrame();
+  if(!def.built){ $('loading').classList.add('show'); $('loadTxt').textContent='Loading…';   /* no place names: they spoiled what was coming ('a bad dream', "Steve's ship"...) */ await nextFrame(); await nextFrame();
     try{ await buildLevel(name); }
     catch(e){ console.error(e); showFatal('The area "'+(def.title||name)+'" could not be built on this computer.',e); throw e; }
     finally{ $('loading').classList.remove('show'); } }

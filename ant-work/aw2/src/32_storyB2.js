@@ -115,8 +115,7 @@ CHECKPOINTS.B6=async()=>{
   setEcho(.55); setReverb(.7);
   FX.blackout=1; fade(0,.3); SFX.dreamSwell();
   await tweenVal(k=>{ FX.blackout=1-k; },2.6);
-  say('You have a bad dream.',3); await wait(3.2);
-  say('In the dream, everything echoes.',3.4);
+  await wait(1.2);   // (no 'You have a bad dream' here: it spoiled it. You find out when you wake up: 'Bad dream...')
   PLAYER.free();
   addTrigger(lv,{pos:V3(0,0,-27),r:4.2,once:true,fn:()=>runStory(steveDream)});
 };
