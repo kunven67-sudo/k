@@ -325,11 +325,11 @@ async function sellerTalk(h){
   } else if(h.price===2000){ await talk([{...S,text:"Two thousand alien coins. Final offer."},{who:'You',text:coins>=2000?"...Wow.":"I can't even afford that."}]); }
   else if(h.price===100){
     if(F.day===3&&coins>=100){ await talk([{...S,text:"The Dome Sweet Dome! A hundred alien coins. Deal?"},{who:'You',text:"Deal!"}]); s.userData.A.look=null; PLAYER.free(); openBuy(h); return; }
-    if(F.day===3){ await talk([{...S,text:"A hundred alien coins. You've got "+coins+"."},{who:'You',text:"I need to go to the converter first."}]); }
-    else await talk([{...S,text:coins>=100?"A hundred alien coins! Deal?":"Still a hundred alien coins. You've got "+coins+". Come back when you're richer."},{who:'You',text:coins>=100?"Let me look around first.":"Guess I'll keep looking."}]); }
+    if(F.day===3){ await talk([{...S,text:"A hundred alien coins. You don't have enough yet."},{who:'You',text:"I need to go to the converter first."}]); }
+    else await talk([{...S,text:coins>=100?"A hundred alien coins! Deal?":"Still a hundred alien coins. Come back when you're richer."},{who:'You',text:coins>=100?"Let me look around first.":"Guess I'll keep looking."}]); }
   else if(h.price===50){
     if(coins>=50){ await talk([{...S,text:"Selling this house for fifty alien coins! It's kind of bad. It's not that big..."},{...S,text:"...but it's yours if you want it."}]); s.userData.A.look=null; PLAYER.free(); openBuy(h); return; }
-    await talk([{...S,text:"Fifty alien coins. You've got "+coins+". So... no."},{who:'You',text:"I need more alien coins."}]);
+    await talk([{...S,text:"Fifty alien coins. You don't have enough. So... no."},{who:'You',text:"I need more alien coins."}]);
   }
   s.userData.A.look=null; clearPose(s); PLAYER.free();
 }
@@ -359,7 +359,7 @@ $('convGo').onclick=()=>{
     await wait(1.5);
     HUD.cash-=v; setCash(HUD.cash); HUD.coins+=v; showCoins(true); setCoins(HUD.coins); coinBurst(Math.min(20,6+Math.round(v/5))); SFX.coins();
     toast('+'+v+' ALIEN COINS','#6dffd8');
-    bark('Converter','There you go. '+v+' alien coins. Pleasure doing business.',LEVELS.mars.convAlien,3);
+    bark('Converter','There you go. All converted. Pleasure doing business.',LEVELS.mars.convAlien,3);
     F.converted=true; if(HUD.cash<=0) showCash(false);
     if(F.day===2){ F.goHome=true; objective(HUD.cash>0?'Go back home (or convert the rest)':'Go back home'); }
     else if(F.day===3){ if(HUD.coins>=100){ objective('Buy the Dome Sweet Dome'); const mid=LEVELS.mars.houses.find(h=>h.price===100); setMarker(()=>mid.seller.position.clone().add(V3(0,2.2,0)),'Dome Sweet Dome','m'); } else objective('Convert the rest of your dollars'); }

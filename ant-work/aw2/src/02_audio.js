@@ -420,7 +420,7 @@ const VOICE={speaking:false,token:0,lastEnd:0};
 function voiceClean(t){ return String(t||'').replace(/<[^>]+>/g,'').replace(/\*[^*]*\*/g,'').replace(/[^\x20-\x7E’'—–…]/g,'').replace(/\s+/g,' ').trim(); }
 function voiceKey(t){ const c=voiceClean(t).toLowerCase(); let h=0x811c9dc5; for(let i=0;i<c.length;i++){ h^=c.charCodeAt(i)&255; h=Math.imul(h,0x01000193)>>>0; } return ('0000000'+h.toString(16)).slice(-8); }
 const VCLIP={buf:{},loading:{},cur:null};
-function hasVoiceClip(text){ return typeof AW2_VOICE_IDS!=='undefined' && AW2_VOICE_IDS.has(voiceKey(text)); }
+function hasVoiceClip(text,who){ if(typeof AW2_VOICE_WHO==='undefined') return false; const w=AW2_VOICE_WHO[voiceKey(text)]; return !!w && (who==null || w===who); }
 function loadVoiceClip(key){
   if(VCLIP.buf[key]) return Promise.resolve(VCLIP.buf[key]); if(VCLIP.loading[key]) return VCLIP.loading[key];
   if(!AU.ok) return Promise.resolve(null);
@@ -436,17 +436,27 @@ function playVoiceClip(text,onEnd){
   loadVoiceClip(key).then(b=>{
     if(tok!==VOICE.token){ return; }
     if(!b){ fin(); return; }
-    const src=ACtx.createBufferSource(); src.buffer=b; if(VOICE.echo) src.playbackRate.value=.97;
-    const g=ACtx.createGain(); g.gain.value=1.15; src.connect(g); g.connect(voiceBus); src.onended=fin; src.start(); VCLIP.cur={src,g,tok};
-    setTimeout(fin,(b.duration/(src.playbackRate.value||1))*1000+2500);
+    const g=ACtx.createGain(); g.gain.value=1.15; g.connect(voiceBus);
+    const c={b,g,tok,fin,rate:VOICE.echo?.97:1,off:0,paused:false};
+    VCLIP.cur=c; startClipSrc(c);
+    if(G.paused) pauseVoiceClip();
+    gTimeout(b.duration/c.rate+2.5,fin);           // safety on the game clock: never cuts a line short while paused
   });
   return true;
 }
-function stopVoiceClip(){ const c=VCLIP.cur; VCLIP.cur=null; if(c){ try{ c.g.gain.setTargetAtTime(0,ACtx.currentTime,.02); c.src.stop(ACtx.currentTime+.08); }catch(e){} } }
+function startClipSrc(c){
+  const src=ACtx.createBufferSource(); src.buffer=c.b; src.playbackRate.value=c.rate; src.connect(c.g);
+  src.onended=()=>{ if(!c.paused && c.src===src) c.fin(); };
+  src.start(0,Math.min(c.off,Math.max(0,c.b.duration-.01))); c.src=src; c.t0=ACtx.currentTime;
+}
+/* pause menu: stop the clip where it is and carry on from the same spot after */
+function pauseVoiceClip(){ const c=VCLIP.cur; if(!c||c.paused||!c.src) return; c.off+=(ACtx.currentTime-c.t0)*c.rate; c.paused=true; try{ c.src.onended=null; c.src.stop(); }catch(e){} }
+function resumeVoiceClip(){ const c=VCLIP.cur; if(!c||!c.paused) return; c.paused=false; if(c.off>=c.b.duration-.02){ c.fin(); return; } startClipSrc(c); }
+function stopVoiceClip(){ const c=VCLIP.cur; VCLIP.cur=null; if(c){ c.paused=true; try{ c.g.gain.setTargetAtTime(0,ACtx.currentTime,.02); if(c.src) c.src.stop(ACtx.currentTime+.08); }catch(e){} } }
 function speakLine(who,text,onEnd){
   const prof=VOICE_PROFILES[who]||null;
-  if(prof&&prof.sfx){ if(SETTINGS.voice) prof.sfx(); if(onEnd) setTimeout(onEnd,700); return true; }
-  if(SETTINGS.voice && AU.ok && !SETTINGS.funny && hasVoiceClip(text)) return playVoiceClip(text,onEnd);
+  if(prof&&prof.sfx){ if(SETTINGS.voice) prof.sfx(); if(onEnd) gTimeout(.7,onEnd); return true; }
+  if(SETTINGS.voice && AU.ok && !SETTINGS.funny && hasVoiceClip(text,who)) return playVoiceClip(text,onEnd);
   const clean=text.replace(/<[^>]+>/g,'').replace(/\*[^*]*\*/g,'').replace(/[^\x20-\x7E’'—–…]/g,'').replace(/\s+/g,' ').trim();
   if(!SETTINGS.voice||!HAS_TTS||!prof||!clean){ if(onEnd) onEnd(); return false; }
   if(SETTINGS.funny && typeof speakFunny==='function') return speakFunny(who,text,onEnd);
@@ -457,7 +467,7 @@ function speakLine(who,text,onEnd){
     const fin=()=>{ if(done) return; done=true; if(tok===VOICE.token){ VOICE.speaking=false; VOICE.lastEnd=performance.now(); } if(onEnd) onEnd(); };
     u.onend=fin; u.onerror=fin; u.onboundary=()=>{ VOICE.boundary=performance.now(); };
     speechSynthesis.cancel(); VOICE.speaking=true; speechSynthesis.speak(u);
-    setTimeout(fin,Math.max(2500,clean.length*95)+1500);   // safety: some browsers never fire onend
+    gTimeout((Math.max(2500,clean.length*95)+1500)/1000,fin);   // safety (game clock, so pausing can't cut the line): some browsers never fire onend
     return true;
   }catch(e){ if(onEnd) onEnd(); return false; }
 }

@@ -208,7 +208,7 @@ CHECKPOINTS.B11=async()=>{
   pl.jim.position.set(-8.5,0,5.6); pl.bob.position.set(-10.5,0,7); jeff.position.set(-9,0,9.4);
   lookAtPoint(pl.jim.position.clone().add(V3(0,1.6,0)),0);
   await fade(0,.8);
-  await talk([{h:pl.jim,who:'Jim',text:"Ready?"},{who:'You',text:"Yes."},{h:pl.bob,who:'Bob',text:"Yes."},{h:jeff,who:'Jeff',text:"Bark!"}]);
+  await talk([{h:pl.jim,who:'Jim',text:"Ready?"},{who:'You',text:"Yes."},{h:pl.bob,who:'Bob',text:"Yep. Let's go."},{h:jeff,who:'Jeff',text:"Bark!"}]);
   await wait(.4);
   await fade(1,.8);
   startFromCheckpointInner('B12');

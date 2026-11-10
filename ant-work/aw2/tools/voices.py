@@ -31,7 +31,7 @@ async def one(i, v):
             print('retry', i, str(e)[:80]); await asyncio.sleep(2 + tries * 3)
     return False
 async def main():
-    todo = [(i, v) for i, v in L.items() if v['who'] not in SKIP]
+    todo = [(i, v) for i, v in L.items() if v['who'] not in SKIP and v['who'] in CAST]   # aliens/robots/crowd keep their computer voices
     print('lines:', len(todo)); n = 0; sem = asyncio.Semaphore(5)
     async def run(i, v):
         nonlocal n

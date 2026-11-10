@@ -69,7 +69,13 @@ const G={time:0,dt:0,real:0,paused:false,mode:'boot',frame:0};
 const STORY={token:1};
 const TIMERS=[];
 function later(sec,fn){ const tok=STORY.token; TIMERS.push({t:G.time+sec,fn,tok}); }
+/* gTimeout: like setTimeout but on the game clock, so it freezes while paused.
+   Not tied to the story (a checkpoint reset doesn't drop it) -- for voices, fades and safety timers. */
+const PTIMERS=[];
+function gTimeout(sec,fn){ const e={t:G.time+Math.max(0,sec),fn}; PTIMERS.push(e); return e; }
+function gClear(e){ if(e) e.dead=true; }
 function runTimers(){
+  if(PTIMERS.length){ const due=[]; for(let i=PTIMERS.length-1;i>=0;i--){ if(PTIMERS[i].dead){ PTIMERS.splice(i,1); continue; } if(PTIMERS[i].t<=G.time){ due.push(PTIMERS[i]); PTIMERS.splice(i,1); } } for(const d of due){ try{ d.fn(); }catch(e){ console.error(e); } } }
   if(!TIMERS.length) return;
   const due=[];
   for(let i=TIMERS.length-1;i>=0;i--){ if(TIMERS[i].t<=G.time){ due.push(TIMERS[i]); TIMERS.splice(i,1); } }
@@ -108,29 +114,48 @@ canvasEl.addEventListener('mousedown',e=>{
   if(IS_TOUCH) return;
   if(e.button===0) INPUT.mouseDown=true;
   if(e.button===2) INPUT.rmb=true;
-  if(G.mode==='play' && !INPUT.locked && !INPUT.dragLook) lockPointer();
   emit('mouse',e.button);
 });
+/* any click while playing (game, dialog box, HUD) grabs the mouse again -- not just clicks on the 3D view */
+window.addEventListener('mousedown',e=>{
+  if(IS_TOUCH || G.mode!=='play' || G.paused || INPUT.locked) return;
+  if(typeof MODAL!=='undefined' && MODAL.open) return;
+  const t=e.target; if(t && t.closest && t.closest('button,input,select,label,.modal,#settings,#pause')) return;
+  lockPointer();
+},true);
 window.addEventListener('mouseup',e=>{ if(e.button===0) INPUT.mouseDown=false; if(e.button===2) INPUT.rmb=false; });
 window.addEventListener('mousemove',e=>{
   if(IS_TOUCH) return;
   if(INPUT.locked || (INPUT.dragLook && INPUT.mouseDown)){ INPUT.lookDX+=e.movementX||0; INPUT.lookDY+=e.movementY||0; }
 });
-let lockFailCount=0;
+/* Mouse lock. Old bug: two failed grabs in a row (easy: Chrome refuses a grab for ~1 s after Esc)
+   switched the game to drag-look FOREVER and it never grabbed the mouse again.
+   Now: every click tries again, drag-look is only a stand-in while the mouse is free,
+   and the first real grab turns drag-look back off. */
+let lockFailCount=0, lockEverWorked=false, lastUnlockAt=-1e9, lockRetryT=0;
 function lockPointer(){
-  if(IS_TOUCH || INPUT.dragLook) return;
+  if(IS_TOUCH) return;
   if(document.pointerLockElement===canvasEl) return;
+  if(!canvasEl.requestPointerLock){ enableDragLook(); return; }
   try{
     const p=canvasEl.requestPointerLock();
-    if(p && p.catch) p.catch(()=>{ lockFailCount++; if(lockFailCount>=2) enableDragLook(); });
-  }catch(e){ enableDragLook(); }
+    if(p && p.catch) p.catch(()=>{});            // failures are counted once, in 'pointerlockerror'
+  }catch(e){ lockFailed(); }
 }
-function enableDragLook(){ if(INPUT.dragLook) return; INPUT.dragLook=true; if(typeof toast==='function') toast('Hold the mouse button and drag to look','#9fe8ff'); }
+function lockFailed(){
+  lockFailCount++;
+  if(!lockEverWorked && lockFailCount>=3) enableDragLook();
+  /* refused because it was too soon after Esc: try once more when the wait is over (works in GS3; browsers may still want a click) */
+  const since=performance.now()-lastUnlockAt;
+  if(since<1600){ clearTimeout(lockRetryT); lockRetryT=setTimeout(()=>{ if(G.mode==='play' && !G.paused && !INPUT.locked && !(typeof MODAL!=='undefined' && MODAL.open)) lockPointer(); },1650-since); }
+}
+function enableDragLook(){ if(INPUT.dragLook) return; INPUT.dragLook=true; if(typeof toast==='function') toast('Click the game to grab the mouse (or hold the button and drag to look)','#9fe8ff'); }
 function unlockPointer(){ try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(e){} }
 document.addEventListener('pointerlockchange',()=>{
   const was=INPUT.locked; INPUT.locked=document.pointerLockElement===canvasEl;
-  if(was && !INPUT.locked) emit('unlocked');
+  if(INPUT.locked){ lockFailCount=0; lockEverWorked=true; INPUT.dragLook=false; clearTimeout(lockRetryT); }
+  if(was && !INPUT.locked){ lastUnlockAt=performance.now(); emit('unlocked'); }
 });
-document.addEventListener('pointerlockerror',()=>{ lockFailCount++; if(lockFailCount>=2) enableDragLook(); });
+document.addEventListener('pointerlockerror',lockFailed);
 function consumeLook(){ const dx=INPUT.lookDX, dy=INPUT.lookDY; INPUT.lookDX=0; INPUT.lookDY=0; return [dx,dy]; }
 

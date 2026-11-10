@@ -191,7 +191,7 @@ async function bobTalk(){
   bob.userData.A.look='player'; bob.rotation.y=Math.atan2(PLAYER.pos.x-bob.position.x,PLAYER.pos.z-bob.position.z);
   lookAtPoint(bob.position.clone().add(V3(0,1.55,0)),.6);
   const B={h:bob,who:'Bob'};
-  await talk([{...B,text:"What is going on? Why is everything blocky? Did you do this?"},{who:'You',text:"I'm sorry, Bob. Trust me. I'm calling Jim right now."},{...B,text:"...",auto:1.2},{...B,text:"...Okay."}]);
+  await talk([{...B,text:"What is going on? Why is everything blocky? Did you do this?"},{who:'You',text:"I'm sorry, Bob. Trust me. I'm calling Jim right now."},{...B,text:"...",auto:1.2},{...B,text:"...Okay. I trust you."}]);
   F.callJim=true; objective('Call Jim on your watch'); PLAYER.free();
 }
 async function callJimEarth(){

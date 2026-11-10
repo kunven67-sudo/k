@@ -9,7 +9,11 @@ const cdn=/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/three\.js\
 if(!cdn.test(head)) throw new Error('could not find the three.js CDN block in 00_head.html');
 head=head.replace(cdn,'<script src="lib/three.min.js"></script>\n<script>\nif(!window.THREE){ window.__showErr && window.__showErr("The 3D engine file (lib/three.min.js) is missing. Unzip the whole game folder and try again."); }\n</script>');
 const ids=fs.existsSync(path.join(__dirname,'assets/voice'))?fs.readdirSync(path.join(__dirname,'assets/voice')).filter(f=>/^[0-9a-f]{8}\.mp3$/.test(f)).map(f=>f.slice(0,8)):[];
-let out=head+'<script>\nconst AW2_VERSION='+JSON.stringify(version)+';\nconst AW2_VOICE_IDS=new Set('+JSON.stringify(ids)+');\n</script>\n';
+/* who says each recorded line: a clip only plays for ITS character (Jim saying a line Larry also has stays Jim) */
+const linesJson=path.join(__dirname,'assets/voice/lines.json');
+const allLines=fs.existsSync(linesJson)?JSON.parse(fs.readFileSync(linesJson,'utf8')):{};
+const voiceWho={}; for(const id of ids){ if(allLines[id]) voiceWho[id]=allLines[id].who; else console.warn('voice clip with no line in lines.json (left out):',id); }
+let out=head+'<script>\nconst AW2_VERSION='+JSON.stringify(version)+';\nconst AW2_VOICE_WHO='+JSON.stringify(voiceWho)+';\n</script>\n';
 const mods=fs.readdirSync(SRC).filter(f=>/^\d+[a-z]?_.*\.js$/.test(f)).sort();
 for(const m of mods) out+='<script>\n/* ===== '+m+' ===== */\n'+fs.readFileSync(path.join(SRC,m),'utf8')+'</script>\n';
 out+=fs.readFileSync(path.join(SRC,'99_tail.html'),'utf8');

@@ -199,11 +199,6 @@
   "text": "Ok, you can take your picture.",
   "src": "30_storyA.js"
  },
- "ca9ce9da": {
-  "who": "Larry",
-  "text": "Get me some Paramecium snacks, then we'll talk.",
-  "src": "30_storyA.js"
- },
  "960356de": {
   "who": "You",
   "text": "Not now. Somebody's at the door.",
@@ -244,6 +239,11 @@
   "text": "Over here!",
   "src": "30_storyA.js"
  },
+ "b30cb6df": {
+  "who": "Jim",
+  "text": "Is anything trying to attack you yet? Be honest.",
+  "src": "30_storyA.js"
+ },
  "cf6e176e": {
   "who": "Jim",
   "text": "Hey! Did that thing just bump you?! Is it attacking?! Get a picture!",
@@ -252,6 +252,11 @@
  "e4b94195": {
   "who": "Jim",
   "text": "Uh... hey. Why is everything swimming away?",
+  "src": "30_storyA.js"
+ },
+ "ca9ce9da": {
+  "who": "Larry",
+  "text": "Get me some Paramecium snacks, then we'll talk.",
   "src": "30_storyA.js"
  },
  "ecee754a": {
@@ -409,6 +414,16 @@
   "text": "Two thousand alien coins. Final offer.",
   "src": "31_storyB.js"
  },
+ "54e590a2": {
+  "who": "You",
+  "text": "...Wow.",
+  "src": "31_storyB.js"
+ },
+ "84291026": {
+  "who": "You",
+  "text": "I can't even afford that.",
+  "src": "31_storyB.js"
+ },
  "fb828c08": {
   "who": "Seller",
   "text": "The Dome Sweet Dome! A hundred alien coins. Deal?",
@@ -419,14 +434,34 @@
   "text": "Deal!",
   "src": "31_storyB.js"
  },
- "28217b50": {
+ "6608ff12": {
   "who": "Seller",
-  "text": "A hundred alien coins. You've got",
+  "text": "A hundred alien coins. You don't have enough yet.",
   "src": "31_storyB.js"
  },
  "f980901b": {
   "who": "You",
   "text": "I need to go to the converter first.",
+  "src": "31_storyB.js"
+ },
+ "ff31537f": {
+  "who": "Seller",
+  "text": "A hundred alien coins! Deal?",
+  "src": "31_storyB.js"
+ },
+ "d4933c88": {
+  "who": "Seller",
+  "text": "Still a hundred alien coins. Come back when you're richer.",
+  "src": "31_storyB.js"
+ },
+ "fc48a5ac": {
+  "who": "You",
+  "text": "Let me look around first.",
+  "src": "31_storyB.js"
+ },
+ "1c060dc4": {
+  "who": "You",
+  "text": "Guess I'll keep looking.",
   "src": "31_storyB.js"
  },
  "abbc33e0": {
@@ -439,9 +474,9 @@
   "text": "...but it's yours if you want it.",
   "src": "31_storyB.js"
  },
- "2499323d": {
+ "f073739a": {
   "who": "Seller",
-  "text": "Fifty alien coins. You've got",
+  "text": "Fifty alien coins. You don't have enough. So... no.",
   "src": "31_storyB.js"
  },
  "7aa6b8c6": {
@@ -454,9 +489,54 @@
   "text": "You're out of dollars, friend. Nothing to convert.",
   "src": "31_storyB.js"
  },
+ "cab07d53": {
+  "who": "Converter",
+  "text": "Back again? Welcome to the Alien Currency Converter.",
+  "src": "31_storyB.js"
+ },
+ "2e5e223d": {
+  "who": "Converter",
+  "text": "Welcome to the Alien Currency Converter. One dollar, one alien coin. No refunds.",
+  "src": "31_storyB.js"
+ },
  "7bd54bbd": {
   "who": "Converter",
   "text": "What amount of money do you want to convert?",
+  "src": "31_storyB.js"
+ },
+ "a4e89e47": {
+  "who": "Jim",
+  "text": "Five pieces! They're glowing, you can't miss 'em.",
+  "src": "31_storyB.js"
+ },
+ "433ee781": {
+  "who": "Jim",
+  "text": "You can only carry one at a time, so bring 'em back one by one.",
+  "src": "31_storyB.js"
+ },
+ "03438a1e": {
+  "who": "Jim",
+  "text": "Look for the yellow beams of light!",
+  "src": "31_storyB.js"
+ },
+ "70303fd0": {
+  "who": "Alien",
+  "text": "Bug food? Ew. No thanks.",
+  "src": "31_storyB.js"
+ },
+ "59a4af18": {
+  "who": "Alien",
+  "text": "Oh, it's the bug guy's friend. Hi.",
+  "src": "31_storyB.js"
+ },
+ "3a0fdbc4": {
+  "who": "Alien",
+  "text": "I'd rather eat moon dust.",
+  "src": "31_storyB.js"
+ },
+ "e971c10f": {
+  "who": "Alien",
+  "text": "Still selling bugs? On the MOON?",
   "src": "31_storyB.js"
  },
  "baa850de": {
@@ -489,6 +569,26 @@
   "text": "I don't have any bug food to cook.",
   "src": "31_storyB.js"
  },
+ "7db9145d": {
+  "who": "Robot",
+  "text": "NOM. NOM. ALIEN BUG FOOD: DELICIOUS.",
+  "src": "31_storyB.js"
+ },
+ "eaf3c6e2": {
+  "who": "Robot",
+  "text": "BEEP. THIS IS MY FIFTH BOWL.",
+  "src": "31_storyB.js"
+ },
+ "9b515755": {
+  "who": "Robot",
+  "text": "RATING: TEN OUT OF TEN BOLTS.",
+  "src": "31_storyB.js"
+ },
+ "7dbb4819": {
+  "who": "Robot",
+  "text": "MORE CRUNCH. PLEASE.",
+  "src": "31_storyB.js"
+ },
  "7542dd05": {
   "who": "Seller",
   "text": "Hey! You! You looking for a house?",
@@ -499,14 +599,49 @@
   "text": "No bug food?! Go shrink down and chop at least three bugs, then cook 'em!",
   "src": "31_storyB.js"
  },
- "f44476b2": {
+ "8f036637": {
+  "who": "Jim",
+  "text": "Shift's not over yet! Get shrinking!",
+  "src": "31_storyB.js"
+ },
+ "57f3c1f7": {
+  "who": "Jim",
+  "text": "Twelve to one. You know the drill.",
+  "src": "31_storyB.js"
+ },
+ "a87fd377": {
+  "who": "Jim",
+  "text": "The bugs are by the glowing plants!",
+  "src": "31_storyB.js"
+ },
+ "bda41a17": {
+  "who": "Jim",
+  "text": "Cook all the bug food first! The Bug Cooker 3000's right there.",
+  "src": "31_storyB.js"
+ },
+ "1c7f7164": {
+  "who": "Jim",
+  "text": "No bug food? Shrink down and get some!",
+  "src": "31_storyB.js"
+ },
+ "5439a3e5": {
   "who": "Converter",
-  "text": "There you go.",
+  "text": "There you go. All converted. Pleasure doing business.",
   "src": "31_storyB.js"
  },
  "4e00ab1c": {
   "who": "Seller",
   "text": "Pleasure doing business, human! Here are your keys.",
+  "src": "31_storyB.js"
+ },
+ "cdaac53b": {
+  "who": "You",
+  "text": "An alien table. It's floating. Kind of.",
+  "src": "31_storyB.js"
+ },
+ "9a7218aa": {
+  "who": "You",
+  "text": "The fruit is glowing. I'm not eating that.",
   "src": "31_storyB.js"
  },
  "8c8b2657": {
@@ -629,6 +764,61 @@
   "text": "Super comfy. It's shaped like a bean.",
   "src": "51_bighouse.js"
  },
+ "c1592357": {
+  "who": "You",
+  "text": "Alien cartoons. I don't get them. But they're funny.",
+  "src": "51_bighouse.js"
+ },
+ "2ba77186": {
+  "who": "You",
+  "text": "It's got like a million channels.",
+  "src": "51_bighouse.js"
+ },
+ "c47a651b": {
+  "who": "You",
+  "text": "This TV is bigger than my old house.",
+  "src": "51_bighouse.js"
+ },
+ "9cd0ee0c": {
+  "who": "You",
+  "text": "Alien snacks. And more alien pizza.",
+  "src": "51_bighouse.js"
+ },
+ "982b98cd": {
+  "who": "You",
+  "text": "It's full. And it glows.",
+  "src": "51_bighouse.js"
+ },
+ "9879abe7": {
+  "who": "You",
+  "text": "Alien fish. That one is looking at me.",
+  "src": "51_bighouse.js"
+ },
+ "e8760393": {
+  "who": "You",
+  "text": "They glow in the dark. Cool.",
+  "src": "51_bighouse.js"
+ },
+ "a795a768": {
+  "who": "You",
+  "text": "BEEP BOOP. Game over. Already?",
+  "src": "51_bighouse.js"
+ },
+ "16b3859c": {
+  "who": "You",
+  "text": "High score: ZZXQ. Some alien is really good at this.",
+  "src": "51_bighouse.js"
+ },
+ "11f8d48a": {
+  "who": "You",
+  "text": "A hot tub. On Mars.",
+  "src": "51_bighouse.js"
+ },
+ "a9855bda": {
+  "who": "You",
+  "text": "It's bubbling. It's purple. It's great.",
+  "src": "51_bighouse.js"
+ },
  "7c9bf36c": {
   "who": "You",
   "text": "No, no, no... this can't be happening.",
@@ -714,6 +904,11 @@
   "text": "It's locked. I can hear Steve and Alex talking in there.",
   "src": "52_ship.js"
  },
+ "bad2bdce": {
+  "who": "You",
+  "text": "Psst! Here, rat!",
+  "src": "52_ship.js"
+ },
  "855646b4": {
   "who": "Steve",
   "text": "Hey!",
@@ -729,15 +924,10 @@
   "text": "I'm sorry, Bob. Trust me. I'm calling Jim right now.",
   "src": "53_earth.js"
  },
- "0ac31c19": {
-  "who": "Jim",
-  "text": "...",
-  "src": "55_final.js"
- },
- "633f5291": {
-  "who": "You",
-  "text": "...Okay.",
-  "src": "54_pluto.js"
+ "eef09277": {
+  "who": "Bob",
+  "text": "...Okay. I trust you.",
+  "src": "53_earth.js"
  },
  "494657ad": {
   "who": "Jim",
@@ -819,14 +1009,24 @@
   "text": "All the way inside. It's the only way.",
   "src": "54_pluto.js"
  },
+ "633f5291": {
+  "who": "You",
+  "text": "...Okay.",
+  "src": "54_pluto.js"
+ },
  "74397f91": {
   "who": "Jim",
   "text": "Ready?",
   "src": "54_pluto.js"
  },
  "82a19a1a": {
-  "who": "Bob",
+  "who": "You",
   "text": "Yes.",
+  "src": "54_pluto.js"
+ },
+ "d8e2ac1e": {
+  "who": "Bob",
+  "text": "Yep. Let's go.",
   "src": "54_pluto.js"
  },
  "c2ec1966": {
@@ -907,6 +1107,11 @@
  "033fba10": {
   "who": "Jim",
   "text": "And we beat this.",
+  "src": "55_final.js"
+ },
+ "b5e4f1c1": {
+  "who": "Person",
+  "text": "Help!",
   "src": "55_final.js"
  },
  "2861f7bb": {
@@ -1078,110 +1283,5 @@
   "who": "Larry",
   "text": "Guess I'm big now.",
   "src": "57_extra.js"
- },
- "796a3074": {
-  "who": "Larry",
-  "text": "Those green glowy ones are bacteria! Probably. I think.",
-  "src": "30_storyA.js"
- },
- "66ada068": {
-  "who": "Larry",
-  "text": "Bacteria! Don't lick them.",
-  "src": "30_storyA.js"
- },
- "2856ac8a": {
-  "who": "Larry",
-  "text": "Ooh, a whole colony. Nice shot.",
-  "src": "30_storyA.js"
- },
- "2d21c265": {
-  "who": "Larry",
-  "text": "Whoa, that one's swimming! Look at all the little hairs!",
-  "src": "30_storyA.js"
- },
- "ae47c22d": {
-  "who": "Larry",
-  "text": "That's a paramecium. I read about those. Once.",
-  "src": "30_storyA.js"
- },
- "7e1688da": {
-  "who": "Larry",
-  "text": "It's got a mouth groove! Gross. Cool. Gross.",
-  "src": "30_storyA.js"
- },
- "e61a77ab": {
-  "who": "Larry",
-  "text": "That's so pretty. It's like a glass cookie.",
-  "src": "30_storyA.js"
- },
- "b8426e73": {
-  "who": "Larry",
-  "text": "A diatom! Those are made of glass. For real.",
-  "src": "30_storyA.js"
- },
- "9036686b": {
-  "who": "Larry",
-  "text": "It's a blob! A living blob!",
-  "src": "30_storyA.js"
- },
- "f7d54f5a": {
-  "who": "Larry",
-  "text": "That amoeba is looking at you. I think. Does it have eyes?",
-  "src": "30_storyA.js"
- },
- "b6d4329c": {
-  "who": "Larry",
-  "text": "Is that... pollen? It's huge!",
-  "src": "30_storyA.js"
- },
- "8ad49b34": {
-  "who": "Larry",
-  "text": "Spiky ball! Don't touch the spiky ball.",
-  "src": "30_storyA.js"
- },
- "a2c6bb28": {
-  "who": "Larry",
-  "text": "That's just dust. You're smaller than DUST.",
-  "src": "30_storyA.js"
- },
- "4227565b": {
-  "who": "Larry",
-  "text": "A dust rock. Neat.",
-  "src": "30_storyA.js"
- },
- "e4ba6b70": {
-  "who": "Larry",
-  "text": "Salt crystal! I dropped my fries in there once.",
-  "src": "30_storyA.js"
- },
- "85b777dd": {
-  "who": "Larry",
-  "text": "That's a salt crystal. From my fries. Probably.",
-  "src": "30_storyA.js"
- },
- "86aa330b": {
-  "who": "Larry",
-  "text": "Oh my gosh, a water bear! A tardigrade!",
-  "src": "30_storyA.js"
- },
- "143fbc7e": {
-  "who": "Larry",
-  "text": "It's got eight little legs! Look at it walk!",
-  "src": "30_storyA.js"
- },
- "7a710bb6": {
-  "who": "Larry",
-  "text": "Those little spider things are viruses. Stay away from them.",
-  "src": "30_storyA.js"
- },
- "7cc56f1e": {
-  "who": "Larry",
-  "text": "Uh, I think you just took a picture of nothing.",
-  "src": "30_storyA.js"
- },
- "426cbe37": {
-  "who": "Larry",
-  "text": "Nice... empty picture. Try pointing at something.",
-  "src": "30_storyA.js"
  }
 }

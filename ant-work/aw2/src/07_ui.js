@@ -30,7 +30,9 @@ function showLine(){
   DLG.speaking=true;
   const voiceName=L.voice||L.who;
   if(L.silent){ DLG.tts=true; DLG.speaking=false; DLG.babblePitch=0; return; }
-  const used=speakLine(voiceName,L.text,()=>{ DLG.speaking=false; if(DLG.cur===L && L.h && !DLG.typing) L.h.userData.A.talk=false; if(DLG.cur===L && L.auto!=null) later(L.auto,()=>{ if(DLG.cur===L && DLG.active) advanceDialog(true); }); });
+  const ser=DLG.serial=(DLG.serial||0)+1;
+  /* only THIS line's voice may say "done talking" (a cut-off line's late signal used to end the next line early) */
+  const used=speakLine(voiceName,L.text,()=>{ if(DLG.serial!==ser || DLG.cur!==L) return; DLG.speaking=false; if(L.h && !DLG.typing) L.h.userData.A.talk=false; });
   DLG.tts=used;
   DLG.babbleT=0; DLG.babblePitch=(VOICE_PROFILES[voiceName]||{babble:170}).babble;
 }
@@ -98,7 +100,7 @@ function itemHints(list){ const el=$('itemHint'); if(!list||!list.length){ el.cl
 function crosshair(on){ $('crosshair').classList.toggle('off',!on); }
 function hudVisible(on){ $('hud').style.display=on?'':'none'; }
 /* ---------- screen effects ---------- */
-function fade(to,dur=.6){ const f=$('fade'); f.style.transition='opacity '+dur+'s'; f.style.opacity=to; return new Promise(r=>setTimeout(r,dur*1000+30)); }
+function fade(to,dur=.6){ const f=$('fade'); f.style.transition='opacity '+dur+'s'; f.style.opacity=to; return new Promise(r=>gTimeout(dur+.03,r)); }
 function flashWhite(peak=1,dur=.6){ const f=$('flash'); f.style.transition='none'; f.style.opacity=peak; void f.offsetWidth; f.style.transition='opacity '+dur+'s ease-out'; f.style.opacity=0; }
 function letterbox(on){ $('letterbox').classList.toggle('on',on); }
 async function card(t,s='',sec=3){ $('cardT').textContent=t; $('cardS').textContent=s; const c=$('card'); c.classList.add('show'); await wait(sec); c.classList.remove('show'); await wait(1); }
@@ -124,11 +126,13 @@ function pauseGame(){
   if(G.mode!=='play'||G.paused||MODAL.open) return;
   G.paused=true; unlockPointer(); $('pause').classList.add('show'); duckMusic(.35);
   if(HAS_TTS){ try{ speechSynthesis.pause(); }catch(e){} }
+  pauseVoiceClip();
   if(AU.ok) ambBus.gain.setTargetAtTime(SETTINGS.sfx*.25,ACtx.currentTime,.2);
 }
 function resumeGame(){
   $('pause').classList.remove('show'); G.paused=false; duckMusic(1); applyVolumes();
   if(HAS_TTS){ try{ speechSynthesis.resume(); }catch(e){} }
+  resumeVoiceClip();
   lockPointer(); SFX.uiClick();
 }
 on('unlocked',()=>{ if(G.mode==='play' && !G.paused && !MODAL.open && !$('settings').classList.contains('show')) pauseGame(); });
@@ -217,6 +221,8 @@ on('mouse',b=>{
 });
 function doInteract(){ if(interactCd>0) return; const it=findInteract(); if(it){ interactCd=it.cd!=null?it.cd:.25; hidePrompt(); try{ it.act(it); }catch(e){ console.error(e); __showErr&&__showErr('Error: '+e.message); } } else if(LV&&LV.onUse) LV.onUse(); }
 function updatePrompt(dt){
+  const freeMouse=!IS_TOUCH && G.mode==='play' && !G.paused && !MODAL.open && !INPUT.locked && !INPUT.dragLook && !DLG.active && !CAM.active && document.hasFocus();
+  if(freeMouse!==updatePrompt.hint){ updatePrompt.hint=freeMouse; $('lockHint').classList.toggle('show',freeMouse); }
   document.body.classList.toggle('indlg',DLG.active); document.body.classList.toggle('cine',!!(CAM.active||$('letterbox').classList.contains('on')));
   interactCd-=dt;
   if(G.mode!=='play'||G.paused||DLG.active||MODAL.open||CAM.active||!PLAYER.ctl.interact){ hidePrompt(); $('crosshair').classList.remove('hot'); TOUCH_UI.ready(false); return; }

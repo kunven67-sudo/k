@@ -10,7 +10,8 @@ const PLAYER={
   bobT:0, bobAmt:0, land:0, trauma:0, fovKick:0, sprint:false, stamina:1,
   item:null, carry:null, hp:100, maxHp:100, hpOn:false,
   canInteract(){ return this.ctl.interact && !DLG.active && G.mode==='play' && !CAM.active; },
-  lock(){ this.ctl.move=false; this.ctl.look=false; this.ctl.interact=false; },
+  /* cutscene start: stop dead where you are (you used to keep sliding/drifting into the scene, worst on the Moon) */
+  lock(){ this.ctl.move=false; this.ctl.look=false; this.ctl.interact=false; this.sprint=false; if(this.fly) this.vel.set(0,0,0); else { this.vel.x=0; this.vel.z=0; } },
   free(){ this.ctl.move=true; this.ctl.look=true; this.ctl.interact=true; },
   enterLevel(lv,spawn){
     if(spawn.pos) this.pos.copy(spawn.pos);
