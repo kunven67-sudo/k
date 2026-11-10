@@ -184,11 +184,12 @@ async function keypadScene(){
   const lv=LEVELS.stand, jim=lv.jim, F=F_(); if(F.keypadDone) return; F.keypadDone=true;
   PLAYER.lock(); objective(null); letterbox(true);
   await waitUntil(()=>!jim.userData.A.path,6);
-  jim.position.set(1.95,0,-4.05); facePoint(jim,lv.keypad.position);
+  // Jim stands straight IN FRONT of the keypad, facing it (he used to stand off to the side and reach through it)
+  { const kq=lv.keypad, spot=kq.localToWorld(V3(.16,0,.52)); spot.y=0; if(jim.position.distanceTo(spot)>.3) await walkTo(jim,[spot],1.2); jim.position.copy(spot); facePoint(jim,kq.localToWorld(V3(.16,0,-1))); }
   const kp=lv.keypad; const kpW=kp.localToWorld(V3(0,1.3,0));
   bark('Jim',"Nobody knows this code. Nobody.",jim,2.4);
   await camShot(V3(-1.5,2.1,-1.2),kpW.clone().add(V3(0,-.3,0)),{dur:1.2,fov:48});
-  const closeP=kp.localToWorld(V3(-.05,1.42,.75));
+  const closeP=kp.localToWorld(V3(-.42,1.48,.62));   // from the front-left: the keypad + his hand, not the back of his head
   await camShot(closeP,kp.localToWorld(V3(0,1.3,0)),{dur:1,fov:30,dof:.8,focus:.78,range:.25});
   // Jim REALLY presses each key: his index finger goes to the key, pushes it in, comes back off it
   setPose(jim,'press',.3); const JA=jim.userData.A; JA.pointF='R';
