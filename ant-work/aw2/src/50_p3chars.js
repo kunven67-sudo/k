@@ -180,7 +180,7 @@ function makeXXX5(heads=1){
   for(let i=0;i<nT;i++){ const chain=[]; const base=V3(Math.cos(i/nT*6.28)*(heads>1?2.5:.8),-.4,Math.sin(i/nT*6.28)*(heads>1?2.5:.8)-(heads>1?1:0));
     for(let k=0;k<(heads>1?14:8);k++){ const c=new THREE.Mesh(_U1,skin); const s=(heads>1?1.1:.5)*(1-k/(heads>1?16:10)); c.scale.setScalar(s); core.add(c); chain.push(c); }
     tents.push({base,chain,ph:i*1.3}); }
-  g.userData={core,heads:headObjs,tents,skin,eyeM,phase:0,big:heads>1,head:headObjs[0].H};
+  g.userData={core,heads:headObjs,tents,skin,eyeM,phase:0,big:heads>1,head:headObjs[0].H,noCamBlock:true};
   return g;
 }
 function animateXXX5(x,t,o={}){

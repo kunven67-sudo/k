@@ -109,7 +109,7 @@ function liftPerson(lv,p,dur=4){ p.userData.lifted=true; p.userData.A.path=null;
 
 /* the voxel Earth, seen from space */
 function makeBlockPlanet(R=30,o={}){
-  const g=new THREE.Group(); const pos=[]; const cols=[];
+  const g=new THREE.Group(); g.userData.noCamBlock=true; const pos=[]; const cols=[];
   for(let x=-R;x<=R;x++) for(let y=-R;y<=R;y++) for(let z=-R;z<=R;z++){ const d=Math.hypot(x,y,z); if(d>R||d<R-1.8) continue;
     const n=Math.sin(x*.21)*Math.cos(z*.17)+Math.sin(y*.19+x*.07)*.8+Math.sin((x+z)*.11)*.5; const lat=Math.abs(y)/R;
     let c; if(lat>.85) c=0xf4f8ff; else if(n>.35) c=lat>.6?0x8aa870:(n>.9?0x8a6a3a:0x4a9a3a); else c=0x1f4fc4;
@@ -230,7 +230,7 @@ async function leaveEarth(){
   const sp=await enterLevel('xspace',{pos:V3(0,0,40)}); sp.rx=-40; sp.speed=24;
   camFollow(t=>({pos:V3(sp.rx+14,4,16),look:V3(sp.rx,0,0)}),50);
   await fade(0,.8); await wait(2.5);
-  camShot(V3(sp.rx+30,20,40),sp.x3.position,{dur:2.6,fov:38}); await wait(2.4);
+  camShot(V3(sp.rx+40,40,90),sp.x3.position.clone().lerp(V3(sp.rx,0,0),.25),{dur:2.6,fov:55}); await wait(2.4);   // a WIDE shot: the rocket, XXX5 far away, Earth (it used to slam into XXX5's face)
   say("XXX5 has three heads now. And it's bigger. And it's going for Earth.",4.6); await wait(3);
   await talk([{who:'Jim',text:"We have to do something."}]);
   camShot(V3(sp.rx+60,10,20),V3(420,0,-300),{dur:2.4,fov:40}); await wait(2.4);

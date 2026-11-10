@@ -367,7 +367,7 @@ function setMood(h,mood){ const A=h.userData.A; A.mood=mood;
 }
 /* ---------- poses (absolute joint rotations, blended over the procedural base) ---------- */
 const POSES={
-  talk:(t,h)=>{ const s=Math.sin(t*2.1+h.userData.A.phase), c=Math.cos(t*1.7+h.userData.A.phase); return {shR:[-.35+s*.12,.1,-.18],elR:[-.9+c*.2,0,0],shL:[-.2+c*.08,0,.12],elL:[-.6+s*.15,0,0],hdR:[0,-.5,0]}; },
+  talk:(t,h)=>{ const s=Math.sin(t*2.1+h.userData.A.phase), c=Math.cos(t*1.7+h.userData.A.phase); return {shR:[-.2+s*.08,.1,-.14],elR:[-.65+c*.15,0,0],shL:[-.08+c*.05,0,.1],elL:[-.35+s*.1,0,0],hdR:[0,.9,0]}; },
   point:()=>({shR:[-1.45,.25,-.1],elR:[-.1,0,0],hdR:[0,0,0],fR:.9}),
   pointL:()=>({shL:[-1.45,-.25,.1],elL:[-.1,0,0],fL:.9}),
   wave:(t)=>({shR:[-.3,0,-2.5],elR:[-.2,0,Math.sin(t*9)*.45-.2],hdR:[0,-1.2,0]}),
@@ -407,6 +407,7 @@ const POSES={
 function setPose(h,name,fade=.35){ const A=h.userData.A; if(A.pose===name && A.poseTarget===1) return; if(name){ A.prevPose=A.pose; A.pose=name; A.poseTarget=1; A.poseT=0; } else A.poseTarget=0; A.poseFade=fade; }
 function clearPose(h,fade=.35){ setPose(h,null,fade); }
 const _lk=new THREE.Vector3(), _hw=new THREE.Vector3();
+let HAND_TWIST=-1.35;
 const JOINTS=['hips','spine','chest','head','shL','shR','elL','elR','hdL','hdR','thL','thR','knL','knR','ftL','ftR'];
 const _R={}; for(const j of JOINTS) _R[j]=[0,0,0];
 function animateHuman(h,dt,t){
@@ -421,7 +422,7 @@ function animateHuman(h,dt,t){
   let fL=.35, fR=.35;
   A.breath+=dt*1.4; const br=Math.sin(A.breath);
   // --- base idle ---
-  R.shL[2]=.09+br*.01; R.shR[2]=-.09-br*.01; R.elL[0]=-.18; R.elR[0]=-.18; R.hdL[1]=.1; R.hdR[1]=-.1;
+  R.shL[2]=.09+br*.01; R.shR[2]=-.09-br*.01; R.elL[0]=-.18; R.elR[0]=-.18; R.hdL[1]=HAND_TWIST; R.hdR[1]=-HAND_TWIST;   // palms face the legs (they faced forward = robot hands)
   R.chest[0]=-br*.012;
   if(!A.idleOff){ const sw=Math.sin(t*.45+A.phase); R.hips[2]=sw*.02; R.spine[2]=-sw*.02; R.knL[0]=Math.max(0,sw)*.1; R.knR[0]=Math.max(0,-sw)*.1; R.thL[0]=-Math.max(0,sw)*.05; R.thR[0]=-Math.max(0,-sw)*.05; R.ftL[1]=.1; R.ftR[1]=-.1; }
   // --- walk / run ---
@@ -452,7 +453,7 @@ function animateHuman(h,dt,t){
       if(gg.t>=gg.d){ A.gest=null; A.gestT=rand(5,11); } }
   }
   // --- talking gestures (subtle) ---
-  if(A.talk && !A.pose && wk<.1){ const s=Math.sin(t*2.3+A.phase), c=Math.cos(t*1.6+A.phase*2); R.shR[0]+=-.3+s*.15; R.elR[0]+=-.7+c*.25; R.shR[2]+=-.1; R.shL[0]+=-.12+c*.08; R.elL[0]+=-.35+s*.12; R.head[0]+=Math.sin(t*5.3)*.03; R.head[2]+=Math.sin(t*2.9)*.035; }
+  if(A.talk && !A.pose && wk<.1){ const s=Math.sin(t*2.3+A.phase), c=Math.cos(t*1.6+A.phase*2); R.shR[0]+=-.1+s*.06; R.elR[0]+=-.32+c*.12; R.shL[0]+=-.03+c*.03; R.elL[0]+=-.12+s*.05;   /* small hand moves (arms used to float way up while talking) */ R.head[0]+=Math.sin(t*5.3)*.03; R.head[2]+=Math.sin(t*2.9)*.035; }
   // --- scripted pose layer ---
   A.poseW=damp(A.poseW,A.poseTarget,1/Math.max(.05,A.poseFade)*2.2,dt); A.poseT+=dt;
   if(A.pose && A.poseW>0.001){
@@ -639,8 +640,8 @@ function animateRobot(r,dt,t){
     U.hips.position.y=.9+Math.abs(c)*.025*wk; U.arms.L.sh.rotation.x=s*.4*wk; U.arms.R.sh.rotation.x=-s*.4*wk; }
   else if(U.legs.L){ for(const k of ['L','R']){ U.legs[k].th.rotation.x=damp(U.legs[k].th.rotation.x,0,8,dt); U.legs[k].kn.rotation.x=damp(U.legs[k].kn.rotation.x,0,8,dt); } }
   const eat=A.pose==='eat'; const k=Math.max(0,Math.sin(t*3+A.t));
-  U.arms.R.sh.rotation.x=damp(U.arms.R.sh.rotation.x,eat?-1.2-k*.5:(A.talk?-.5+Math.sin(t*3)*.2:(wk>0.01?U.arms.R.sh.rotation.x:0)),8,dt);
-  U.arms.R.el.rotation.x=damp(U.arms.R.el.rotation.x,eat?-1.2:(A.talk?-.8:-.2),8,dt);
+  U.arms.R.sh.rotation.x=damp(U.arms.R.sh.rotation.x,eat?-1.2-k*.5:(A.talk?-.18+Math.sin(t*3)*.08:(wk>0.01?U.arms.R.sh.rotation.x:0)),8,dt);
+  U.arms.R.el.rotation.x=damp(U.arms.R.el.rotation.x,eat?-1.2:(A.talk?-.45:-.2),8,dt);
   U.arms.L.el.rotation.x=damp(U.arms.L.el.rotation.x,eat?-1.3:-.2,8,dt); if(eat) U.arms.L.sh.rotation.x=damp(U.arms.L.sh.rotation.x,-.8,8,dt);
   U.arms.L.sh.rotation.z=.12; U.arms.R.sh.rotation.z=-.12;
   U.head.rotation.z=Math.sin(t*.7+A.t)*.06+(A.talk?Math.sin(t*6)*.05:0);

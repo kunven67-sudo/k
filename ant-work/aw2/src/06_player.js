@@ -139,7 +139,7 @@ function camBlockers(){
     const m=o.material; if(!m||Array.isArray(m)||m.transparent||m.opacity<1||m.blending!==THREE.NormalBlending||m.depthWrite===false) return;
     const g=o.geometry; if(!g.boundingSphere) g.computeBoundingSphere(); if(!g.boundingSphere) return;
     o.getWorldScale(_rcS); if(!o.isInstancedMesh && g.boundingSphere.radius*Math.max(_rcS.x,_rcS.y,_rcS.z)<1.6) return;
-    for(let p=o;p;p=p.parent){ if(p===camera||(p.userData&&p.userData.A)) return; }   // never people, never your hands
+    for(let p=o;p;p=p.parent){ if(p===camera||(p.userData&&(p.userData.A||p.userData.noCamBlock))) return; }   // never people, never your hands, never the monster you are filming
     out.push(o);
   });
   LV.__blk=out; LV.__blkN=LV.scene.children.length; return out;
@@ -324,6 +324,9 @@ function updateViewModel(dt,t){
   if(VM.reach>0){ onL=onR=true; const k=smooth(Math.min(1,VM.reach)), pull=(VM.pull||0); lp=lp.map((v,j)=>lerp(v,[-.2,-.4+pull*.08,-.56+pull*.14][j],k)); rp=rp.map((v,j)=>lerp(v,[.2,-.4+pull*.08,-.56+pull*.14][j],k)); lr=[lerp(lr[0],-.55,k),lerp(lr[1],.2,k),lerp(lr[2],.4,k)]; rr=[lerp(rr[0],-.55,k),lerp(rr[1],-.2,k),lerp(rr[2],-.4,k)]; lf=rf=lerp(.3,1,pull); }
   if(VM.handsLook>0){ onL=onR=true; const k=smooth(Math.min(1,VM.handsLook)); lp=lp.map((v,j)=>lerp(v,[-.16,-.28,-.5][j],k)); rp=rp.map((v,j)=>lerp(v,[.16,-.28,-.5][j],k)); lr=[lerp(lr[0],1.1,k),lerp(lr[1],.35,k),lerp(lr[2],.9,k)]; rr=[lerp(rr[0],1.1,k),lerp(rr[1],-.35,k),lerp(rr[2],-.9,k)]; lf=rf=.15; }
   if(VM.hurtT>0){ VM.hurtT-=dt; }
+  // in a cutscene (you can't move or look) your hands stay down unless the scene asks for them
+  //   (they used to float up on their own: tiny fists, swimming, the walk sway...)
+  if(!P.ctl.move && !P.ctl.look && !VM.forceShow && !(VM.handsLook>0) && !(VM.reach>0) && !(VM.slapT>0) && !(VM.punchT>0) && !(VM.waveT>0) && !(VM.chopT>0) && !(P.watchLook>0) && !(VM.photoT>0) && !P.carry){ onL=onR=false; }
   // arms only appear when they are doing something (idle hands in the view just look odd)
   VM.armL=damp(VM.armL||0,onL?1:0,12,dt); VM.armR=damp(VM.armR||0,onR?1:0,12,dt); lp[1]-=(1-smooth(VM.armL))*.4; rp[1]-=(1-smooth(VM.armR))*.4; L.visible=VM.armL>.02; R.visible=VM.armR>.02;
   L.position.set(...lp); R.position.set(...rp); L.rotation.set(...lr); R.rotation.set(...rr);
