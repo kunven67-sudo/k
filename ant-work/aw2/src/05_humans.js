@@ -411,19 +411,27 @@ const _lk=new THREE.Vector3(), _hw=new THREE.Vector3();
 let HAND_TWIST=-1.35;
 const JOINTS=['hips','spine','chest','head','shL','shR','elL','elR','hdL','hdR','thL','thR','knL','knR','ftL','ftR'];
 const _R={}; for(const j of JOINTS) _R[j]=[0,0,0];
-/* aim an arm so the INDEX FINGERTIP lands on a world point (2-bone IK: shoulder + elbow).
-   w = how much (0..1) it overrides the current pose. Used for pressing real buttons. */
-const _ik={a:new THREE.Vector3(),b:new THREE.Vector3(),c:new THREE.Vector3(),d:new THREE.Vector3(),q:new THREE.Quaternion()};
-function aimArm(h,side,target,R,w=1,finger=.17){
-  const J=h.userData.J, sh=J['sh'+side], el=J['el'+side], hd=J['hd'+side]; if(!sh||!el||!hd||w<=0) return;
-  sh.getWorldPosition(_ik.a); el.getWorldPosition(_ik.b); hd.getWorldPosition(_ik.c);
-  const sc=h.getWorldScale(_ik.d).x, a=_ik.a.distanceTo(_ik.b), b=_ik.b.distanceTo(_ik.c)+finger*sc;
-  const dW=_ik.d.copy(target).sub(_ik.a); const D=Math.max(.05,Math.min(dW.length(),a+b-.002)); dW.normalize();
-  sh.parent.getWorldQuaternion(_ik.q).invert(); dW.applyQuaternion(_ik.q);
-  const gam=Math.acos(clamp((a*a+b*b-D*D)/(2*a*b),-1,1)), alp=Math.acos(clamp((a*a+D*D-b*b)/(2*a*D),-1,1));
-  const tz=Math.asin(clamp(dW.x,-1,1)), tx=Math.atan2(-dW.z,-dW.y)+alp;
-  const S=R['sh'+side], E=R['el'+side], H=R['hd'+side];
-  S[0]=lerp(S[0],tx,w); S[1]=lerp(S[1],0,w); S[2]=lerp(S[2],tz,w); E[0]=lerp(E[0],-(Math.PI-gam),w); E[1]=lerp(E[1],0,w); E[2]=lerp(E[2],0,w); H[0]=lerp(H[0],0,w); H[2]=lerp(H[2],0,w);
+/* aim an arm so the INDEX FINGERTIP (or the palm, mode 'palm') lands EXACTLY on a world point.
+   Measured, not guessed: each frame it nudges the shoulder + elbow angles and checks where the
+   fingertip really is, keeping whatever gets closer (starts from last frame's answer = smooth).
+   w = how much (0..1) it overrides the current pose. Used for pressing buttons + holding a wheel. */
+const _ik={t:new THREE.Vector3(),v:new THREE.Vector3()};
+function ikTip(h,side,mode){ const U=h.userData, H=U.hands[side].H; if(mode==='palm'){ return U.J['hd'+side].localToWorld(_ik.v.set(0,-.07,.0)); } const fg=H.fingers[0]; return fg.c.localToWorld(_ik.v.set(0,-.024,0)); }
+function aimArm(h,side,target,R,w=1,mode='tip'){
+  if(w<=0) return; if(typeof mode==='number') mode=mode<.1?'palm':'tip';
+  const U=h.userData, J=U.J, A=U.A, sh=J['sh'+side], el=J['el'+side], hd=J['hd'+side]; if(!sh||!el||!hd) return;
+  A.ik=A.ik||{}; const key=side+mode; let P=A.ik[key];
+  if(!P||A.ikReset){ P=A.ik[key]=[-1.1,0,side==='R'?-.1:.1,-.6]; }
+  const apply=()=>{ sh.rotation.set(P[0],P[1],P[2]); el.rotation.set(P[3],0,0); sh.updateMatrixWorld(true); };
+  const err=()=>{ apply(); return ikTip(h,side,mode).distanceTo(target); };
+  // fingers posed like they will be, so the tip we measure is the real one
+  let best=err(), step=.12;
+  for(let it=0;it<14;it++){ let moved=false;
+    for(let k=0;k<4;k++){ for(const d of [step,-step]){ const o=P[k]; P[k]=o+d; if(k===3) P[3]=clamp(P[3],-2.4,0); const e=err(); if(e<best-1e-5){ best=e; moved=true; } else P[k]=o; } }
+    if(!moved) step*=.5; if(step<.004||best<.004) break; }
+  apply();
+  const S=R['sh'+side], E=R['el'+side], Hh=R['hd'+side];
+  S[0]=lerp(S[0],P[0],w); S[1]=lerp(S[1],P[1],w); S[2]=lerp(S[2],P[2],w); E[0]=lerp(E[0],P[3],w); E[1]=lerp(E[1],0,w); E[2]=lerp(E[2],0,w); Hh[0]=lerp(Hh[0],0,w); Hh[2]=lerp(Hh[2],0,w);
 }
 function animateHuman(h,dt,t){
   const U=h.userData, J=U.J, A=U.A;

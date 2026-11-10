@@ -13,6 +13,8 @@ function talk(lines){
     hideSay(); $('dialog').classList.add('show'); showLine();
   });
 }
+/* drop a gesture that a talk line started (not poses the scene set on purpose, like sitting or driving) */
+function dropDlgPose(h,fade=.4){ const A=h.userData&&h.userData.A; if(!A||!A.dlgPose) return; if(A.pose===A.dlgPose) clearPose(h,fade); A.dlgPose=null; }
 function lineSpeaker(L){ return L.name||L.who||''; }
 function showLine(){
   const L=DLG.lines[DLG.i]; DLG.cur=L;
@@ -25,7 +27,9 @@ function showLine(){
   // speaker animation
   for(const h of HUMANS) if(h.userData.A) h.userData.A.talk=false;
   for(const r of ROBOTS) r.userData.A.talk=false;
-  if(L.h){ const A=L.h.userData.A; A.talk=true; if(L.mood) (L.h.userData.robot?(A.happy=L.mood==='happy'):setMood(L.h,L.mood)); if(L.pose!==undefined){ if(L.h.userData.robot) A.pose=L.pose; else if(L.pose) setPose(L.h,L.pose); else clearPose(L.h); } }
+  if(L.h){ const A=L.h.userData.A; A.talk=true; if(L.mood) (L.h.userData.robot?(A.happy=L.mood==='happy'):setMood(L.h,L.mood)); if(L.pose!==undefined){ if(L.h.userData.robot) A.pose=L.pose; else if(L.pose){ setPose(L.h,L.pose); A.dlgPose=L.pose; } else { clearPose(L.h); A.dlgPose=null; } } else if(!L.h.userData.robot) dropDlgPose(L.h,.4); }
+  // a gesture lasts for ITS line only: everyone else in the talk drops theirs (they used to keep pointing/shrugging forever)
+  for(const o of DLG.lines) if(o&&o.h&&o.h!==L.h&&!o.h.userData.robot) dropDlgPose(o.h,.5);
   if(L.radio){ radioLabel(who); $('radio').classList.add('show'); SFX.radioOn(); }
   DLG.speaking=true;
   const voiceName=L.voice||L.who;
@@ -61,7 +65,7 @@ function advanceDialog(auto){
   stopSpeech(); DLG.speaking=false; DLG.autoArmed=false;
   if(!auto) SFX.uiClick();
   DLG.i++;
-  if(DLG.i>=DLG.lines.length){ DLG.active=false; DLG.cur=null; interactCd=.6; $('dialog').classList.remove('show'); const r=DLG.resolve; DLG.resolve=null; if(r) r(); return; }
+  if(DLG.i>=DLG.lines.length){ for(const o of DLG.lines) if(o&&o.h&&!o.h.userData.robot) dropDlgPose(o.h,.5); DLG.active=false; DLG.cur=null; interactCd=.6; $('dialog').classList.remove('show'); const r=DLG.resolve; DLG.resolve=null; if(r) r(); return; }
   showLine();
 }
 function closeDialogNow(){ DLG.active=false; DLG.cur=null; $('dialog').classList.remove('show'); stopSpeech(); $('radio').classList.remove('show'); }

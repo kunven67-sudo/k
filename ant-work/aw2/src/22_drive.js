@@ -50,7 +50,7 @@ defineLevel('drive',{
     lv.jim=makeJim(); lv.jim.userData.level='drive'; lv.car.add(lv.jim); lv.jim.position.set(-.16,-.17,-.38); lv.jim.scale.setScalar(.92); lv.jim.rotation.y=Math.PI/2; lv.jim.userData.A.seated=true; setPose(lv.jim,'drive',0);
     const gripL=new THREE.Vector3(), gripR=new THREE.Vector3();
     lv.jim.userData.A.custom=(R,t)=>{ const W=lv.car.userData.wheelOnly; W.updateMatrixWorld(true); gripL.set(0,.1,-.155); W.localToWorld(gripL); gripR.set(0,.1,.155); W.localToWorld(gripR);
-      aimArm(lv.jim,'L',gripL,R,1,.07); aimArm(lv.jim,'R',gripR,R,1,.07); if(lv.jimTalk){ R.head[1]+=.45+Math.sin(t*2)*.08; } };
+      aimArm(lv.jim,'L',gripL,R,1,'palm'); aimArm(lv.jim,'R',gripR,R,1,'palm'); if(lv.jimTalk){ R.head[1]+=.45+Math.sin(t*2)*.08; } };
     // you in the passenger seat
     lv.you=makeYou(); lv.you.userData.level='drive'; lv.car.add(lv.you); lv.you.position.set(-.16,-.17,.38); lv.you.scale.setScalar(.92); lv.you.rotation.y=Math.PI/2; lv.you.userData.A.seated=true; setPose(lv.you,'ride',0);
     lv.arms=[];

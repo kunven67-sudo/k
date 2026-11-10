@@ -258,7 +258,8 @@ function setVMSuit(on){ if(!VM.mats) return; VM.suit=on; VM.mats.sleeve.color.co
 /* carried object (rocket piece): pass a mesh, or null */
 function vmCarry(obj){
   if(VM.carryMesh){ VM.grp.remove(VM.carryMesh); VM.carryMesh=null; }
-  if(obj){ const c=obj.clone(); c.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } if(o.isLight) o.visible=false; });
+  if(obj){ const c=obj.clone(); c.visible=true;   /* the original was already hidden on the ground = you were holding AIR */
+    c.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } if(o.isLight) o.visible=false; });
     c.position.set(0,0,0); c.rotation.set(.25,.35,0); c.scale.multiplyScalar((obj.userData.vmScale||1)*.6); c.updateMatrixWorld(true);
     const bb=new THREE.Box3().setFromObject(c), sz=bb.getSize(new THREE.Vector3()), ctr=bb.getCenter(new THREE.Vector3());
     // wrap it so its middle sits at the wrapper's origin (then it can go right between your palms)
@@ -324,9 +325,9 @@ function updateViewModel(dt,t){
   if(VM.reach>0){ onL=onR=true; const k=smooth(Math.min(1,VM.reach)), pull=(VM.pull||0); lp=lp.map((v,j)=>lerp(v,[-.2,-.4+pull*.08,-.56+pull*.14][j],k)); rp=rp.map((v,j)=>lerp(v,[.2,-.4+pull*.08,-.56+pull*.14][j],k)); lr=[lerp(lr[0],-.55,k),lerp(lr[1],.2,k),lerp(lr[2],.4,k)]; rr=[lerp(rr[0],-.55,k),lerp(rr[1],-.2,k),lerp(rr[2],-.4,k)]; lf=rf=lerp(.3,1,pull); }
   if(VM.handsLook>0){ onL=onR=true; const k=smooth(Math.min(1,VM.handsLook)); lp=lp.map((v,j)=>lerp(v,[-.16,-.28,-.5][j],k)); rp=rp.map((v,j)=>lerp(v,[.16,-.28,-.5][j],k)); lr=[lerp(lr[0],1.1,k),lerp(lr[1],.35,k),lerp(lr[2],.9,k)]; rr=[lerp(rr[0],1.1,k),lerp(rr[1],-.35,k),lerp(rr[2],-.9,k)]; lf=rf=.15; }
   if(VM.hurtT>0){ VM.hurtT-=dt; }
-  // in a cutscene (you can't move or look) your hands stay down unless the scene asks for them
+  // whenever you can't walk (cutscenes, even the ones where you can look around) your hands stay down unless the scene asks for them
   //   (they used to float up on their own: tiny fists, swimming, the walk sway...)
-  if(!P.ctl.move && !P.ctl.look && !VM.forceShow && !(VM.handsLook>0) && !(VM.reach>0) && !(VM.slapT>0) && !(VM.punchT>0) && !(VM.waveT>0) && !(VM.chopT>0) && !(P.watchLook>0) && !(VM.photoT>0) && !P.carry){ onL=onR=false; }
+  if(!P.ctl.move && !P.autoSwim && !VM.forceShow && !(VM.handsLook>0) && !(VM.reach>0) && !(VM.slapT>0) && !(VM.punchT>0) && !(VM.waveT>0) && !(VM.chopT>0) && !(P.watchLook>0) && !(VM.photoT>0) && !P.carry){ onL=onR=false; }
   // arms only appear when they are doing something (idle hands in the view just look odd)
   VM.armL=damp(VM.armL||0,onL?1:0,12,dt); VM.armR=damp(VM.armR||0,onR?1:0,12,dt); lp[1]-=(1-smooth(VM.armL))*.4; rp[1]-=(1-smooth(VM.armR))*.4; L.visible=VM.armL>.02; R.visible=VM.armR>.02;
   L.position.set(...lp); R.position.set(...rp); L.rotation.set(...lr); R.rotation.set(...rr);
