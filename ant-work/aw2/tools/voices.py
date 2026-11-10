@@ -14,7 +14,7 @@ CAST = {   # who: (voice, rate, pitch)
     'Bob': ('en-US-BrianNeural', '+0%', '-4Hz'),
     'Alex': ('en-GB-SoniaNeural', '-4%', '-6Hz'),
 }
-SKIP = {'Jeff'}   # Jeff is a dog: a real bark plays instead
+SKIP = {'Jeff', 'Jim', 'JimTired'}   # Jeff is a dog (real bark); Jim keeps his original Ant Work 2 voice
 L = json.load(open('assets/voice/lines.json')); st_p = 'assets/voice/_rendered.json'
 state = json.load(open(st_p)) if os.path.exists(st_p) else {}
 proxy = os.environ.get('HTTPS_PROXY')

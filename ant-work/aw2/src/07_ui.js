@@ -47,9 +47,7 @@ function updateDialog(dt){
   }
   if(L.h) L.h.userData.A.talk=DLG.typing||DLG.speaking;
   if(!DLG.typing && performance.now()>DLG.readyAt) $('dialog').classList.add('ready');
-  // voiced lines flow on by themselves like a film (press E / click to skip ahead); Settings can turn this off
-  const autoT=L.auto!=null?L.auto:((SETTINGS.autoTalk!==false&&DLG.tts&&!L.choice)?.6:null);
-  if(!DLG.typing && autoT!=null && !DLG.speaking && !DLG.autoArmed){ DLG.autoArmed=true; later(autoT,()=>{ DLG.autoArmed=false; if(DLG.cur===L && DLG.active) advanceDialog(true); }); }
+  if(!DLG.typing && L.auto!=null && !DLG.speaking && !DLG.autoArmed){ DLG.autoArmed=true; later(L.auto,()=>{ DLG.autoArmed=false; if(DLG.cur===L && DLG.active) advanceDialog(true); }); }
 }
 function typeSlice(html,n){ let out='',c=0,i=0; while(i<html.length&&c<n){ if(html[i]==='<'){ const j=html.indexOf('>',i); out+=html.slice(i,j+1); i=j+1; continue; } out+=html[i]; i++; c++; } const open=(out.match(/<(b|i|span)[^>]*>/g)||[]).length-(out.match(/<\/(b|i|span)>/g)||[]).length; for(let k=0;k<open;k++) out+='</span>'; return out; }
 function advanceDialog(auto){

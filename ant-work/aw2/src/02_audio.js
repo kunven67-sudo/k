@@ -407,7 +407,7 @@ const VOICE_PROFILES={
   Robot:{g:'f',i:0,pitch:1.9,rate:.95,babble:420},
   Steve:{g:'m',i:1,pitch:.55,rate:.9,babble:90},
   Larry:{g:'m',i:5,pitch:1.4,rate:1.04,babble:250},
-  JimTired:{g:'m',i:0,pitch:1.0,rate:.82,babble:170},
+  JimTired:{g:'m',i:0,pitch:1.08,rate:.86,babble:170},
   Kid:{g:'f',i:2,pitch:1.7,rate:1.08,babble:340},
   Bob:{g:'m',i:2,pitch:.95,rate:1.0,babble:160},
   Alex:{g:'f',i:3,pitch:1.1,rate:.98,babble:260},
