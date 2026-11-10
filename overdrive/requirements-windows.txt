@@ -1,0 +1,3 @@
+# Windows build = requirements.txt + Windows-only dependencies (pip on Linux can't see these markers).
+-r requirements.txt
+pywin32==312
