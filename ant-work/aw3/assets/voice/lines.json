@@ -1,0 +1,375 @@
+{
+  "_note": "ANT WORK 3 voice script. id -> {who, text}. Text in [brackets] is a stage direction and is not spoken. Render: python3 tools/voices.py",
+  "ayme": {
+    "who": "Jay",
+    "text": "Are you... me?"
+  },
+  "c_who": {
+    "who": "Jay",
+    "text": "So, uh... who are you? And why do you look like me?"
+  },
+  "c_who_r1": {
+    "who": "Jay2",
+    "text": "I'm Jay. ...And I was about to ask you the same thing."
+  },
+  "c_who_r2": {
+    "who": "Jay2",
+    "text": "Jim brought me here. He said this was my house."
+  },
+  "c_who_r3": {
+    "who": "Jay",
+    "text": "...Jim brought me here too."
+  },
+  "c_who_r4": {
+    "who": "Jay2",
+    "text": "Then one of us has a problem."
+  },
+  "c_jim": {
+    "who": "Jay",
+    "text": "Where's Jim? Your Jim."
+  },
+  "c_jim_r1": {
+    "who": "Jay2",
+    "text": "Outside, by his rocket. He has no idea you exist."
+  },
+  "c_jim_r2": {
+    "who": "Jay2",
+    "text": "Let me guess. Yours has the spiky hair. And the bug stand."
+  },
+  "c_jim_r3": {
+    "who": "Jay",
+    "text": "Yeah."
+  },
+  "c_jim_r4": {
+    "who": "Jay2",
+    "text": "Great. Two Jims. That's exactly what the universe needed."
+  },
+  "c_clone": {
+    "who": "Jay",
+    "text": "Are you a clone? Did Steve do this?"
+  },
+  "c_clone_r1": {
+    "who": "Jay2",
+    "text": "I don't know what I am. I didn't ask for this."
+  },
+  "c_clone_r2": {
+    "who": "Jay2",
+    "text": "And Steve is gone. He has to be. Don't say his name in my house."
+  },
+  "c_clone_r3": {
+    "who": "Jay",
+    "text": "...Fine."
+  },
+  "c_blocks_ask": {
+    "who": "Jay",
+    "text": "Okay. The blocks. Explain."
+  },
+  "c_blocks_ask_r1": {
+    "who": "Jay2",
+    "text": "XXX5 turned the whole Earth into blocks. I was standing on it."
+  },
+  "c_blocks_ask_r2": {
+    "who": "Jay2",
+    "text": "I put a nuke in that thing. It's dead. I'm still like this."
+  },
+  "c_blocks_ask_r3": {
+    "who": "Jay2",
+    "text": "So don't make it weird."
+  },
+  "c_blocks_my": {
+    "who": "Jay",
+    "text": "Don't look at me like that. The blocks aren't my fault."
+  },
+  "c_blocks_my_r1": {
+    "who": "Jay2",
+    "text": "I wasn't going to say anything."
+  },
+  "c_blocks_my_r2": {
+    "who": "Jay2",
+    "text": "...Okay. I was. What happened to you?"
+  },
+  "c_blocks_my_r3": {
+    "who": "Jay",
+    "text": "XXX5. It ate Mars. It almost ate Earth. I put a nuke in it."
+  },
+  "c_blocks_my_r4": {
+    "who": "Jay2",
+    "text": "Then I'm glad you were there. Whoever you are."
+  },
+  "c_story_tiny": {
+    "who": "Jay",
+    "text": "An hour ago I was smaller than a germ. What did your Jim do to you?"
+  },
+  "c_story_tiny_r1": {
+    "who": "Jay2",
+    "text": "The moon. Then Mars. Bug shifts, twelve to one. Then a nuke."
+  },
+  "c_story_tiny_r2": {
+    "who": "Jay2",
+    "text": "I lost a dog. You don't want the rest."
+  },
+  "c_story_tiny_r3": {
+    "who": "Jay",
+    "text": "...Sorry."
+  },
+  "c_story_mars": {
+    "who": "Jay",
+    "text": "An hour ago I put a nuke in a monster. What did your Jim do to you?"
+  },
+  "c_story_mars_r1": {
+    "who": "Jay2",
+    "text": "He shrunk me. Smaller than a germ. I lived in a pile of skin flakes with a dust mite named Larry."
+  },
+  "c_story_mars_r2": {
+    "who": "Jay2",
+    "text": "He was a good roommate."
+  },
+  "c_story_mars_r3": {
+    "who": "Jay",
+    "text": "...Okay. Yours is weirder."
+  },
+  "c_mean": {
+    "who": "Jay",
+    "text": "I don't trust you. Get out of my house."
+  },
+  "c_mean_r1": {
+    "who": "Jay2",
+    "text": "This is my house."
+  },
+  "c_mean_r2": {
+    "who": "Jay",
+    "text": "Then make me leave."
+  },
+  "c_mean_r3": {
+    "who": "Jay2",
+    "text": "...Okay."
+  },
+  "c_done_1": {
+    "who": "Jay2",
+    "text": "Look. I don't know what this is. But standing here isn't fixing it."
+  },
+  "c_done_2": {
+    "who": "Jay2",
+    "text": "We find Jim. Both of them. And we—"
+  },
+  "f_hum_1": {
+    "who": "Jay2",
+    "text": "Wait. Do you hear that?"
+  },
+  "f_hum_2": {
+    "who": "Jay",
+    "text": "...Yeah."
+  },
+  "f_hum_3": {
+    "who": "Jay2",
+    "text": "What is that."
+  },
+  "f_light": {
+    "who": "Jay2",
+    "text": "Get down!"
+  },
+  "d_alive": {
+    "who": "Jay2",
+    "text": "...You alive?"
+  },
+  "d_alive_r": {
+    "who": "Jay",
+    "text": "Yeah."
+  },
+  "d_where": {
+    "who": "Jay2",
+    "text": "Where are we."
+  },
+  "d_notmars": {
+    "who": "Jay2",
+    "text": "This isn't Mars. The sky is blue."
+  },
+  "d_earth": {
+    "who": "Jay",
+    "text": "Earth?"
+  },
+  "d_pyramid": {
+    "who": "Jay2",
+    "text": "Maybe. Then what is that?"
+  },
+  "d_call": {
+    "who": "Jay2",
+    "text": "Call Jim."
+  },
+  "d_call_you": {
+    "who": "Jay",
+    "text": "Jim? Jim, can you hear me?"
+  },
+  "d_call_him": {
+    "who": "Jay2",
+    "text": "Jim. Jim, it's Jay. Come in."
+  },
+  "d_call_dead": {
+    "who": "Jay2",
+    "text": "Nothing. Just static."
+  },
+  "d_notblocky": {
+    "who": "Jay",
+    "text": "You're... not blocky anymore."
+  },
+  "d_notblocky_r": {
+    "who": "Jay2",
+    "text": "I know. I don't know. Let's not think about it yet."
+  },
+  "d_notblocky_me": {
+    "who": "Jay2",
+    "text": "You're not blocky anymore."
+  },
+  "d_notblocky_me_r": {
+    "who": "Jay",
+    "text": "...I don't know what to do with that."
+  },
+  "d_green": {
+    "who": "Jay2",
+    "text": "And my hoodie is green."
+  },
+  "d_green_r": {
+    "who": "Jay",
+    "text": "At least I can tell which one of us is me."
+  },
+  "d_walk_1": {
+    "who": "Jay2",
+    "text": "Stay close. Walk where I walk."
+  },
+  "d_walk_2": {
+    "who": "Jay2",
+    "text": "Last thing I remember is the wall. Then nothing."
+  },
+  "d_walk_3": {
+    "who": "Jay2",
+    "text": "My head hurts. And I'm hungry. Really hungry."
+  },
+  "d_walk_4": {
+    "who": "Jay",
+    "text": "Same."
+  },
+  "d_walk_5": {
+    "who": "Jay2",
+    "text": "Nobody builds a pyramid in the middle of nowhere for nothing. There's something in there."
+  },
+  "d_hungry": {
+    "who": "Jay2",
+    "text": "Well... we're hungry. So let's go, I guess."
+  },
+  "p_feet": {
+    "who": "Jay2",
+    "text": "Watch your feet."
+  },
+  "p_dark": {
+    "who": "Jay",
+    "text": "I can't see anything."
+  },
+  "p_dark_r": {
+    "who": "Jay2",
+    "text": "Follow the light. The purple one, down there."
+  },
+  "p_bones": {
+    "who": "Jay2",
+    "text": "Those are bones."
+  },
+  "p_bones_r": {
+    "who": "Jay",
+    "text": "I see them."
+  },
+  "p_bones_r2": {
+    "who": "Jay2",
+    "text": "Then don't step on them."
+  },
+  "p_moved": {
+    "who": "Jay2",
+    "text": "...Did something just move?"
+  },
+  "p_moved_r": {
+    "who": "Jay",
+    "text": "Keep walking."
+  },
+  "p_walls": {
+    "who": "Jay2",
+    "text": "Hold on. Look at the walls."
+  },
+  "p_walls_2": {
+    "who": "Jay2",
+    "text": "That's people. Tiny ones. Under bugs."
+  },
+  "p_walls_3": {
+    "who": "Jay",
+    "text": "That's us. That's our job."
+  },
+  "p_walls_4": {
+    "who": "Jay2",
+    "text": "And that one."
+  },
+  "p_walls_5": {
+    "who": "Jay2",
+    "text": "A pig. On a throne. Whatever that is, I don't like it."
+  },
+  "p_walls_6": {
+    "who": "Jay",
+    "text": "How old is this place?"
+  },
+  "p_walls_7": {
+    "who": "Jay2",
+    "text": "Older than us. Come on."
+  },
+  "p_glow": {
+    "who": "Jay2",
+    "text": "There. The light."
+  },
+  "p_fruit": {
+    "who": "Jay2",
+    "text": "Fruit."
+  },
+  "p_fruit_r": {
+    "who": "Jay",
+    "text": "Glowing fruit. On a table. In a pyramid."
+  },
+  "p_fruit_2": {
+    "who": "Jay2",
+    "text": "I know how it sounds."
+  },
+  "p_fruit_3": {
+    "who": "Jay2",
+    "text": "One bite. If it's bad, we stop."
+  },
+  "p_fruit_4": {
+    "who": "Jay",
+    "text": "That is not how poison works."
+  },
+  "p_fruit_5": {
+    "who": "Jay2",
+    "text": "...It's sweet."
+  },
+  "p_fruit_6": {
+    "who": "Jay2",
+    "text": "Jay. Something's wrong."
+  },
+  "p_fruit_7": {
+    "who": "Jay",
+    "text": "Jay? ...Jay."
+  },
+  "w_wake_1": {
+    "who": "Jay2",
+    "text": "[whisper] Jay. ...Jay. Don't move."
+  },
+  "w_wake_2": {
+    "who": "Jay",
+    "text": "[whisper] Where are we."
+  },
+  "w_wake_3": {
+    "who": "Jay2",
+    "text": "[whisper] Don't look at it. Don't make a sound."
+  },
+  "w_wake_4": {
+    "who": "Jay",
+    "text": "[whisper] Is that a pig?"
+  },
+  "w_wake_5": {
+    "who": "Jay2",
+    "text": "[whisper] ...Yeah. Now be quiet."
+  }
+}
