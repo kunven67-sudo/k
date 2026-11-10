@@ -59,6 +59,12 @@ buttons. A note shows when a chat gets so long that every message costs a lot mo
 fixed as you type (Ctrl+Z undoes it), and misspelled words get the red line + right-click fixes. The gear at
 the bottom of the side list switches ALTS's look.
 
+**Stickers (1.7.0)**, in the chat-box picker and in Win+V: star any sticker (⭐) and it shows first, in both places.
+**+ Your pics** turns any picture on your PC into a sticker. **GIPHY**: add a free key (the picker's "Add GIPHY key"
+button says how) and searching finds stickers for anything; click one to send it, ⬇ to keep it with your stickers
+(Win+V pastes a kept one as a still picture: the clipboard can't hold a moving one). Kept ones live in
+`%LOCALAPPDATA%\ALTS\clip\giphy`, favorites in `clip\favs.json`. Same features as ALTS for phone 2.0.
+
 **Download links**: click a link in a chat to a file on GitHub (an .exe, .zip, .apk... raw, blob or release
 link) and ALTS downloads it into your Downloads folder itself, with a progress note, instead of opening Edge.
 Files from a GitHub account you said is yours (it asks once) open with no Windows warning; from anywhere else

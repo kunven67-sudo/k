@@ -52,6 +52,7 @@ type pageMsg struct {
 	Size    int64   `json:"size"` //
 	B64     string  `json:"b64"`  //
 	Path    string  `json:"path"` //
+	On      bool    `json:"on"`   // sticker-fav
 }
 
 type countInfo struct {
@@ -157,6 +158,22 @@ func (a *App) page(id string, m pageMsg) {
 		} else {
 			v.c.Eval(jsCall("stickerFile", nil))
 		}
+	case "sticker-fav": // ⭐ in the picker (ALTS Clipboard reads the same favorites)
+		setFav(a.clipDir(), m.Kind, m.File, m.On)
+		v.c.Eval(jsCall("emojiData", a.emojiData()))
+	case "sticker-add": // "+ Your pics"
+		a.addStickerPicture(id)
+	case "giphy-key":
+		a.setGiphyKey(m.Text)
+		v.c.Eval(jsCall("emojiData", a.emojiData()))
+	case "giphy-search":
+		a.giphySearch(id, m.Text)
+	case "giphy-take":
+		a.giphyTake(id, m.ID, m.Name, m.URL, m.Mine)
+	case "giphy-drop":
+		dropGiphy(filepath.Join(a.clipDir(), "giphy"), m.File)
+		setFav(a.clipDir(), "giphy", m.File, false)
+		v.c.Eval(jsCall("emojiData", a.emojiData()))
 	case "ping":
 		a.ping(id, m.Text)
 	case "filelearn": // the Files panel download (extras.js): noted so a broken one can be looked into

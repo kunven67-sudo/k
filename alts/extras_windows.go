@@ -72,7 +72,8 @@ type sticker struct {
 	File  string `json:"file"`
 	Name  string `json:"name"`
 	Thumb string `json:"thumb"`
-	Kind  string `json:"kind"` // "meme" or "mine"
+	Kind  string `json:"kind"` // "meme", "mine" or "giphy"
+	Fav   bool   `json:"fav,omitempty"`
 }
 
 func (a *App) clipDir() string { return filepath.Join(a.base, "clip") }
@@ -91,24 +92,56 @@ func (a *App) emojiData() map[string]any {
 		}
 		return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(b)
 	}
+	favs := loadFavs(a.clipDir())
+	fav := map[string]bool{}
+	for _, k := range favs {
+		fav[k] = true
+	}
 	st := loadClip(filepath.Join(a.clipDir(), "clip.json"))
-	for _, f := range st.Stickers {
-		if d := data(filepath.Join(a.clipDir(), "stickers", f)); d != "" {
-			list = append(list, sticker{File: f, Name: "mine", Thumb: d, Kind: "mine"})
+	mineDir := filepath.Join(a.clipDir(), "stickers")
+	// ALTS Clipboard keeps the list; pictures added here with "+ Your pics" show up before it catches up
+	for _, f := range append(newMine(mineDir, st.Stickers), st.Stickers...) {
+		if d := data(filepath.Join(mineDir, f)); d != "" {
+			list = append(list, sticker{File: f, Name: "mine", Thumb: d, Kind: "mine", Fav: fav[favKey("mine", f)]})
+		}
+	}
+	gDir := filepath.Join(a.clipDir(), "giphy")
+	for _, g := range loadGiphy(gDir).List {
+		thumbFile := filepath.Join(gDir, strings.TrimSuffix(g.File, filepath.Ext(g.File))+".thumb.png")
+		d := data(thumbFile)
+		if d == "" {
+			d = data(filepath.Join(gDir, g.File))
+		}
+		if d != "" {
+			list = append(list, sticker{File: g.File, Name: strings.ToLower(g.Name), Thumb: d, Kind: "giphy", Fav: fav[favKey("giphy", g.File)]})
 		}
 	}
 	memeDir := filepath.Join(a.clipDir(), "memes")
 	for _, m := range loadMemes(memeDir).Memes { // ALTS Clipboard downloads these
 		if d := data(filepath.Join(memeDir, memeThumb(m.File))); d != "" {
-			list = append(list, sticker{File: m.File, Name: strings.ToLower(m.Name), Thumb: d, Kind: "meme"})
+			list = append(list, sticker{File: m.File, Name: strings.ToLower(m.Name), Thumb: d, Kind: "meme", Fav: fav[favKey("meme", m.File)]})
 		}
 	}
-	return map[string]any{"emoji": string(em), "stickers": list}
+	return map[string]any{"emoji": string(em), "stickers": list, "favs": favs, "giphyKey": a.giphyKey() != ""}
 }
 
 // stickerBytes: the picture to attach, its file name and type.
 func (a *App) stickerBytes(file, kind string) ([]byte, string, string) {
 	var p string
+	if kind == "giphy" {
+		name, ok := giphyFile(file)
+		if !ok {
+			return nil, "", ""
+		}
+		b, err := os.ReadFile(filepath.Join(a.clipDir(), "giphy", name))
+		if err != nil {
+			return nil, "", ""
+		}
+		if strings.HasSuffix(name, ".webp") {
+			return b, "sticker.webp", "image/webp"
+		}
+		return b, "sticker.gif", "image/gif"
+	}
 	if kind == "meme" {
 		name, ok := memeFile(file)
 		if !ok {

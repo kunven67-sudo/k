@@ -153,10 +153,20 @@
 
   // ---------- emoji + stickers ----------
   let picker = null, emoji = null, stickers = null, ptab = 'emoji';
+  let giphyOn = false;
+  const giphy = { q: '', busy: false, list: [], error: '', t: 0 };
   A.emojiData = d => {
     emoji = (d.emoji || '').split('\n').filter(Boolean).map(l => { const [e, n, g] = l.split('\t'); return { e, n, g }; });
     stickers = d.stickers || [];
+    giphyOn = !!d.giphyKey;
     if (picker && picker.isConnected) drawPicker();
+  };
+  A.giphyResults = r => {
+    if (!r || r.q !== giphy.q) return;
+    giphy.busy = false;
+    giphy.list = r.list || [];
+    giphy.error = r.error === 'no key' ? 'add a key first' : (r.error || '');
+    if (picker && picker.isConnected && ptab === 'stick') drawPicker();
   };
   A.stickerFile = async d => {
     const c = composer();
@@ -216,28 +226,102 @@
       }
       if (!list.length) grid.append(mk('div', { color: '#9a9aa6', padding: '30px', textAlign: 'center' }, 'Nothing matches.'));
     } else {
-      const pics = stickers.filter(s => !q || s.name.includes(q));
-      for (const [title, kind, cols] of [['My stickers', 'mine', 4], ['Memes', 'meme', 3]]) {
-        const list = pics.filter(s => s.kind === kind);
-        if (!list.length) continue;
+      const small = (txt, title, fn, extra) => {
+        const b = hover(mk('button', Object.assign({ font: '600 11.5px ' + FONT, padding: '5px 9px', borderRadius: '8px', border: '1px solid #2c2c35', background: '#222229', color: '#d6d6de', cursor: 'pointer' }, extra || {}), txt),
+          { background: '#2a2a33' }, { background: (extra && extra.background) || '#222229' });
+        b.title = title;
+        b.addEventListener('mousedown', e => e.preventDefault());
+        b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); fn(); });
+        return b;
+      };
+      const bar = mk('div', { display: 'flex', gap: '6px', flexWrap: 'wrap', margin: '4px 0 2px' });
+      bar.append(small('+ Your pics', 'Pick any picture on this PC: it becomes one of your stickers', () => send({ t: 'sticker-add' })));
+      bar.append(small(giphyOn ? 'GIPHY key ✓' : 'Add GIPHY key', 'GIPHY search finds stickers for anything. The key is free.', () => {
+        const k = prompt('Paste your free GIPHY key.\n\nGet one: go to developers.giphy.com > Create Account > Create an App > pick API > copy the key.\n(Leave empty to remove it.)', '');
+        if (k != null) send({ t: 'giphy-key', text: k.trim() });
+      }));
+      grid.append(bar);
+      const tile = (s, cols) => {
+        const c = hover(mk('div', { position: 'relative', aspectRatio: '1', borderRadius: '9px', background: '#24242b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }),
+          { background: '#2f2f38' }, { background: '#24242b' });
+        const im = mk('img', { width: '92%', height: '92%', objectFit: 'contain', pointerEvents: 'none' });
+        im.src = s.thumb;
+        c.append(im);
+        c.title = (s.kind === 'meme' || s.kind === 'giphy' ? s.name : 'Your sticker') + ' (sends it as a picture)';
+        c.addEventListener('mousedown', e => e.preventDefault());
+        c.addEventListener('click', () => send({ t: 'sticker-get', file: s.file, kind: s.kind }));
+        const star = mk('button', { position: 'absolute', top: '3px', right: '3px', width: '22px', height: '22px', border: '0', borderRadius: '6px', padding: '0',
+          background: 'rgba(20,20,24,.6)', color: s.fav ? '#f5c04f' : '#8d8d98', font: '13px/22px ' + FONT, cursor: 'pointer', opacity: s.fav ? '1' : '0', transition: 'opacity .1s' }, '★');
+        star.title = s.fav ? 'Unstar' : 'Favorite: it shows first, here and in Win+V';
+        star.addEventListener('mousedown', e => e.preventDefault());
+        star.addEventListener('click', e => {
+          e.preventDefault(); e.stopPropagation();
+          s.fav = !s.fav;
+          stickers.forEach(x => { if (x.kind === s.kind && x.file === s.file) x.fav = s.fav; });
+          send({ t: 'sticker-fav', kind: s.kind, file: s.file, on: s.fav });
+          drawPicker();
+        });
+        c.addEventListener('mouseenter', () => { star.style.opacity = '1'; });
+        c.addEventListener('mouseleave', () => { if (!s.fav) star.style.opacity = '0'; });
+        c.append(star);
+        if (s.kind === 'giphy') {
+          const x = mk('button', { position: 'absolute', top: '3px', left: '3px', width: '22px', height: '22px', border: '0', borderRadius: '6px', padding: '0',
+            background: 'rgba(20,20,24,.6)', color: '#ff8b8b', font: '11px/22px ' + FONT, cursor: 'pointer', display: 'none' }, '✕');
+          x.title = 'Remove this kept GIPHY sticker';
+          x.addEventListener('mousedown', e => e.preventDefault());
+          x.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); send({ t: 'giphy-drop', file: s.file }); });
+          c.addEventListener('mouseenter', () => { x.style.display = 'block'; });
+          c.addEventListener('mouseleave', () => { x.style.display = 'none'; });
+          c.append(x);
+        }
+        return c;
+      };
+      const section = (title, list, cols) => {
+        if (!list.length) return;
         grid.append(mk('div', { color: '#9a9aa6', font: '600 11.5px ' + FONT, margin: '8px 2px 4px' }, title));
         const row = mk('div', { display: 'grid', gridTemplateColumns: 'repeat(' + cols + ',1fr)', gap: '6px' });
-        for (const s of list) {
-          const c = hover(mk('div', { aspectRatio: '1', borderRadius: '9px', background: '#24242b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }),
-            { background: '#2f2f38' }, { background: '#24242b' });
-          const im = mk('img', { width: '92%', height: '92%', objectFit: 'contain', pointerEvents: 'none' });
-          im.src = s.thumb;
-          c.append(im);
-          c.title = (kind === 'meme' ? s.name : 'Your sticker') + ' (sends it as a picture)';
-          c.addEventListener('mousedown', e => e.preventDefault());
-          c.addEventListener('click', () => send({ t: 'sticker-get', file: s.file, kind }));
-          row.append(c);
-        }
+        list.forEach(s => row.append(tile(s, cols)));
         grid.append(row);
+      };
+      const pics = stickers.filter(s => !q || s.name.includes(q));
+      section('⭐ Favorites', pics.filter(s => s.fav), 4);
+      section('My stickers', pics.filter(s => s.kind === 'mine' && !s.fav), 4);
+      section('Kept from GIPHY', pics.filter(s => s.kind === 'giphy' && !s.fav), 4);
+      section('Memes', pics.filter(s => s.kind === 'meme' && !s.fav), 3);
+      // GIPHY search under your own, when there's a search and a key
+      if (q && giphyOn) {
+        grid.append(mk('div', { color: '#9a9aa6', font: '600 11.5px ' + FONT, margin: '10px 2px 4px' },
+          giphy.q !== q || giphy.busy ? 'GIPHY: searching...' : giphy.error ? 'GIPHY: ' + giphy.error : giphy.list.length ? 'GIPHY (click = send it, ⬇ = keep it)' : 'GIPHY: nothing for that'));
+        if (giphy.q === q && !giphy.busy) {
+          const row = mk('div', { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px' });
+          for (const g of giphy.list) {
+            const c = hover(mk('div', { position: 'relative', aspectRatio: '1', borderRadius: '9px', background: '#24242b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }),
+              { background: '#2f2f38' }, { background: '#24242b' });
+            const im = mk('img', { width: '92%', height: '92%', objectFit: 'contain', pointerEvents: 'none' });
+            im.src = g.thumb;
+            c.append(im);
+            c.title = g.name + ' (sends it)';
+            c.addEventListener('mousedown', e => e.preventDefault());
+            c.addEventListener('click', () => { toast('Getting the sticker...'); send({ t: 'giphy-take', id: g.id, name: g.name, url: g.url, mine: false }); });
+            const keep = mk('button', { position: 'absolute', top: '3px', right: '3px', width: '22px', height: '22px', border: '0', borderRadius: '6px', padding: '0',
+              background: 'rgba(20,20,24,.6)', color: '#d6d6de', font: '12px/22px ' + FONT, cursor: 'pointer' }, '⬇');
+            keep.title = 'Keep it with your stickers (Win+V too)';
+            keep.addEventListener('mousedown', e => e.preventDefault());
+            keep.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); keep.textContent = '✓'; send({ t: 'giphy-take', id: g.id, name: g.name, url: g.url, mine: true }); });
+            c.append(keep);
+            row.append(c);
+          }
+          grid.append(row);
+        }
+        if (giphy.q !== q && !giphy.busy) {
+          clearTimeout(giphy.t);
+          giphy.t = setTimeout(() => { giphy.q = q; giphy.busy = true; giphy.list = []; giphy.error = ''; send({ t: 'giphy-search', text: q }); }, 450);
+        }
+      } else if (q && !pics.length) {
+        grid.append(mk('div', { color: '#9a9aa6', padding: '20px 6px', textAlign: 'center' }, 'Nothing of yours matches. Add a free GIPHY key (button above) and search finds stickers for anything.'));
       }
       if (!pics.some(s => s.kind === 'meme') && !q) grid.append(mk('div', { color: '#9a9aa6', padding: '18px 6px', textAlign: 'center' }, 'Memes download the first time ALTS Clipboard runs (needs internet). Press Win+V once, then come back.'));
-      if (!pics.length && q) grid.append(mk('div', { color: '#9a9aa6', padding: '30px', textAlign: 'center' }, 'Nothing matches.'));
-      grid.append(mk('div', { color: '#9a9aa6', font: '11.5px ' + FONT, margin: '10px 2px' }, 'Your own: copy any picture, press Win+V, then \u263a on it.'));
+      grid.append(mk('div', { color: '#9a9aa6', font: '11.5px ' + FONT, margin: '10px 2px' }, 'Star any sticker: favorites show first, here and in Win+V.'));
     }
   }
   document.addEventListener('mousedown', e => { if (picker && picker.isConnected && !picker.contains(e.target) && !ours(e.target)) picker.remove(); }, true);

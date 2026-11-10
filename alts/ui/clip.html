@@ -40,6 +40,8 @@ body{display:flex;flex-direction:column;border:1px solid var(--line)}
 .grid.memes .st img{width:94%;height:94%;border-radius:6px}
 .st .x{position:absolute;top:2px;right:2px;border:0;background:#2f2f38;color:var(--dim);width:20px;height:20px;border-radius:6px;font-size:11px;cursor:pointer;display:none}
 .st:hover .x{display:block}
+.st .fav{position:absolute;top:2px;left:2px;border:0;background:#2f2f38;color:var(--dim);width:20px;height:20px;border-radius:6px;font-size:12px;line-height:20px;padding:0;cursor:pointer;display:none}
+.st:hover .fav,.st .fav.on{display:block}.st .fav.on{color:#f5c04f}
 .h{color:var(--dim);font-size:12px;font-weight:600;margin:10px 2px 6px}
 .eg{display:grid;grid-template-columns:repeat(8,1fr);gap:2px}
 .e{font:24px/1 "Segoe UI Emoji","Noto Color Emoji",sans-serif;aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer}
@@ -135,25 +137,37 @@ function draw() {
       }
     }
   } else if (tab === 'stick') {
-    const add = (title, files, mine) => {
+    const favs = S.favs || [];
+    const isFav = (kind, file) => favs.indexOf(kind + ':' + file) >= 0;
+    const tiles = (title, files, cls) => {
       files = files.filter(f => !q || (f.name || stickerLabel(f.file)).toLowerCase().includes(q));
       if (!files.length) return;
       L.append(el('div', 'h', title));
-      const g = el('div', 'grid' + (mine ? '' : ' memes'));
+      const g = el('div', 'grid' + (cls ? ' ' + cls : ''));
       for (const f of files) {
         const c = el('div', 'st');
-        c.title = mine ? 'Your sticker' : f.name;
+        c.title = f.kind === 'mine' ? 'Your sticker' : (f.name || '');
         const im = el('img'); im.src = f.src; im.alt = '';
         c.append(im);
-        if (mine) { const x = button('\u2715', 'Remove', () => send({ t: 'unsticker', file: f.file })); x.className = 'x'; c.append(x); }
-        c.addEventListener('click', () => send({ t: 'sticker', file: f.file, mine, kind: mine ? 'mine' : 'meme' }));
+        const fav = isFav(f.kind, f.file);
+        const star = button('\u2605', fav ? 'Unstar' : 'Favorite: shows first, here and in ALTS', () => send({ t: 'fav', kind: f.kind, file: f.file, on: !fav }));
+        star.className = 'fav' + (fav ? ' on' : '');
+        c.append(star);
+        if (f.kind === 'mine') { const x = button('\u2715', 'Remove', () => send({ t: 'unsticker', file: f.file })); x.className = 'x'; c.append(x); }
+        c.addEventListener('click', () => send({ t: 'sticker', file: f.file, mine: f.kind === 'mine', kind: f.kind }));
         g.append(c);
         cells.push(c);
       }
       L.append(g);
     };
-    add('My stickers', S.mine, true);
-    add('Memes', S.memes, false);
+    const all = S.mine.map(f => Object.assign({ kind: 'mine' }, f))
+      .concat((S.giphy || []).map(f => Object.assign({ kind: 'giphy' }, f)))
+      .concat(S.memes.map(f => Object.assign({ kind: 'meme' }, f)));
+    const order = k => { const i = favs.indexOf(k); return i < 0 ? 1e9 : i; };
+    tiles('\u2B50 Favorites', all.filter(f => isFav(f.kind, f.file)).sort((a, b) => order(a.kind + ':' + a.file) - order(b.kind + ':' + b.file)), '');
+    tiles('My stickers', all.filter(f => f.kind === 'mine' && !isFav(f.kind, f.file)), '');
+    tiles('Kept from GIPHY', all.filter(f => f.kind === 'giphy' && !isFav(f.kind, f.file)), '');
+    tiles('Memes', all.filter(f => f.kind === 'meme' && !isFav(f.kind, f.file)), 'memes');
     if (!S.memes.length && !q) L.append(el('div', 'empty', memesLoading ? 'Getting memes from the internet... (takes a minute the first time)' : 'No memes yet: they download when you\'re online.'));
     if (!S.mine.length && !q) L.append(el('div', 'empty', 'Make your own: copy any picture, then press \u263a on it in Clipboard.'));
     if (!cells.length && q) L.append(el('div', 'empty', 'Nothing matches.'));

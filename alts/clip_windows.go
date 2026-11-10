@@ -340,13 +340,31 @@ func (c *clipApp) push() {
 		}
 		items = append(items, r)
 	}
+	// pictures ALTS's "+ Your pics" put in the stickers folder join the list (newest first)
+	if fresh := newMine(c.mineDir, c.st.Stickers); len(fresh) > 0 {
+		c.st.Stickers = append(fresh, c.st.Stickers...)
+		c.save()
+	}
 	mine := []pic{}
 	for _, f := range c.st.Stickers {
 		if d := c.dataURL(filepath.Join(c.mineDir, f)); d != "" {
 			mine = append(mine, pic{f, d})
 		}
 	}
-	c.call("load", map[string]any{"items": items, "mine": mine, "start": !c.st.NoStart, "key": c.keyName})
+	type gpic struct {
+		File string `json:"file"`
+		Name string `json:"name"`
+		Src  string `json:"src"`
+	}
+	gifs := []gpic{}
+	gDir := filepath.Join(c.dir, "giphy")
+	for _, g := range loadGiphy(gDir).List { // kept in ALTS's sticker picker
+		d := c.dataURL(filepath.Join(gDir, strings.TrimSuffix(g.File, filepath.Ext(g.File))+".thumb.png"))
+		if d != "" {
+			gifs = append(gifs, gpic{g.File, g.Name, d})
+		}
+	}
+	c.call("load", map[string]any{"items": items, "mine": mine, "giphy": gifs, "favs": loadFavs(c.dir), "start": !c.st.NoStart, "key": c.keyName})
 }
 
 // assets: the meme stickers + emoji list, when the popup page is ready (and when new memes came in).
@@ -452,8 +470,20 @@ func (c *clipApp) do(m clipMsg) {
 			t := m.Text
 			c.pasteWith(func() bool { return c.setText(t) })
 		}
+	case "fav": // ⭐ (ALTS's chat-box picker shares these)
+		setFav(c.dir, m.Kind, m.File, m.On)
+		c.push()
 	case "sticker":
 		var p string
+		if m.Kind == "giphy" { // pastes as a still picture (the clipboard can't hold a moving one)
+			name, ok := giphyFile(m.File)
+			if !ok {
+				return
+			}
+			gp := filepath.Join(c.dir, "giphy", name)
+			c.pasteWith(func() bool { return c.setPicFile(gp) })
+			return
+		}
 		if m.Kind == "meme" {
 			name, ok := memeFile(m.File)
 			if !ok {
@@ -620,6 +650,7 @@ func (c *clipApp) show() {
 		c.memes = x
 		c.assets()
 	}
+	c.push() // favorites, kept GIPHY stickers and pictures may have changed in ALTS meanwhile
 	pBringWindowToTop.Call(c.win)
 	pSetForegroundWindow.Call(c.win)
 	if c.ui != nil {
