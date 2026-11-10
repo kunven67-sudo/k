@@ -202,7 +202,7 @@ function updateTinyLife(lv,dt,t){
   for(const s of lv.snacks){ if(!s.visible) continue; const U=s.userData; U.ph+=dt*.45;
     const goal=U.home.clone().add(V3(Math.cos(U.ph)*10,Math.sin(U.ph*1.7)*4,Math.sin(U.ph)*10));
     const away=s.position.clone().sub(PLAYER.pos); const d=away.length();
-    if(d<22){ goal.addScaledVector(away.normalize(),(22-d)*1.4); }
+    if(d<9){ goal.addScaledVector(away.normalize(),(9-d)*.5); }   // they used to run from you at 22 (the net reaches 16) = an annoying chase
     const v=goal.sub(s.position); const L=v.length(); if(L>.01) U.vel.lerp(v.multiplyScalar(Math.min(1,3.6/L)*1.0),Math.min(1,dt*2));
     s.position.addScaledVector(U.vel,dt); if(U.vel.lengthSq()>.01) s.lookAt(s.position.clone().add(U.vel));
     U.cil.rotation.z=Math.sin(t*16+U.ph)*.06; }

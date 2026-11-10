@@ -205,13 +205,16 @@ CHECKPOINTS.A7=async()=>{
   L.userData.talking=true;
   await talk([{who:'Larry',voice:'Larry',text:"It's ok, everybody! This is my friend. He got stuck small, so he's staying with me."},{who:'Larry',voice:'Larry',text:"Come on, I'll show you around. That's the snack market. And those are the lint beds. Super comfy."}]);
   L.userData.talking=false; lv.nervous=false;
-  objective('Look around Mite Town'); PLAYER.free();
+  objective('Check out the snack market and the lint beds'); PLAYER.free();
   if(!lv.setup){ lv.setup=true;
     addInteract(lv,{obj:lv.marketSign,label:'Snack market',reach:90,d3:true,act:()=>{ F_().sawMarket=true; if(trophyStat('market')>=5) unlock('shopper'); bark('You','Paramecium snacks. In bubbles.',null,2.6); }});
     addInteract(lv,{obj:lv.beds[0],offset:V3(0,6,0),label:'Lint bed',reach:60,d3:true,act:()=>{ F_().sawBed=true; bark('You','It IS super comfy.',null,2.6); }});
     addInteract(lv,{obj:lv.larry,offset:V3(0,16,0),label:'Talk to Larry',reach:70,d3:true,when:()=>!F_().tardOn,act:()=>(trophyStat('larryTalk')>=5&&unlock('chatter'),larrySay)(pick(["The market has the best snacks. Trust me.","You can sleep on any lint bed you want.","The other mites will get used to you."]))});
   }
-  await waitUntil(()=>F_().sawMarket&&F_().sawBed,90);
+  // a quick guided look (it used to say 'look around' with nothing to do for up to 90 s)
+  setMarker(()=>lv.marketSign.getWorldPosition(V3()),'Snack market');
+  await waitUntil(()=>F_().sawMarket,14); setMarker(()=>lv.beds[0].getWorldPosition(V3()).add(V3(0,6,0)),'Lint bed');
+  await waitUntil(()=>F_().sawBed,12); setMarker(null);
   await wait(2);
   await tardComes();
 };
@@ -358,7 +361,7 @@ defineLevel('deep',{
       else if(z<=stop){ if(stop===-1410) runStory(()=>rideOff("Hydras ahead! I can't fit through there. Swim through, I'll go around and meet you on the other side!"));
         else { // at the shard: he stops right next to it, you stay on, grab it from here
           if(!F.atShard){ F.atShard=true; bark('Larry',"There it is! Grab it!",null,3); } PLAYER.pos.copy(R.position).add(V3(0,24,34)); PLAYER.vel.set(0,0,0); R.userData.cil.rotation.z=Math.sin(t*6)*.04; animateDustMite(lv.larry,t,dt); } }
-      else { R.position.z-=dt*48; R.position.x=damp(R.position.x,x,2,dt); R.position.y=damp(R.position.y,y,2,dt); R.rotation.set(0,Math.PI,0); PLAYER.pos.copy(R.position).add(V3(0,24,34)); PLAYER.vel.set(0,0,-48); if(Math.random()<dt*20) lv.glow.spawn(R.position.x+rand(-4,4),R.position.y,R.position.z+20,0,0,20,1,.4,1,.9,.4,.6,0,0,1); }
+      else { R.position.z-=dt*80; R.position.x=damp(R.position.x,x,2.6,dt); R.position.y=damp(R.position.y,y,2.6,dt); R.rotation.set(0,Math.PI,0); PLAYER.pos.copy(R.position).add(V3(0,24,34)); PLAYER.vel.set(0,0,-80); if(Math.random()<dt*20) lv.glow.spawn(R.position.x+rand(-4,4),R.position.y,R.position.z+20,0,0,20,1,.4,1,.9,.4,.6,0,0,1); }
       R.userData.cil.rotation.z=Math.sin(t*20)*.08; animateDustMite(lv.larry,t,dt); }
     else if(R.visible){ const fw=new THREE.Vector3(); camera.getWorldDirection(fw); fw.y=0; if(fw.lengthSq()<1e-4) fw.set(0,0,-1); fw.normalize(); const rt=V3(-fw.z,0,fw.x);
       const around=P.z<-1405&&P.z>-2375&&!F.shardTaken;   // the hydra forest + virus cloud: Larry goes around, far out to the side

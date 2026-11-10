@@ -299,6 +299,33 @@ async function shrinkSequence(){
 }
 
 /* ================= A4: THE TINYVERSE ================= */
+/* Jim's eye, as big as a building, looking down at you through the magnifying glass (it blinks) */
+function makeGiantEye(){
+  const g=new THREE.Group();
+  const irisT=canvasTex(512,512,(x,w,h)=>{ x.fillStyle='#f2ece4'; x.fillRect(0,0,w,h); x.translate(w/2,h/2);
+    const R=150; const gg=x.createRadialGradient(0,0,20,0,0,R); gg.addColorStop(0,'#2a1608'); gg.addColorStop(.35,'#6a4a22'); gg.addColorStop(.75,'#4a6a3a'); gg.addColorStop(1,'#1a2a14'); x.fillStyle=gg; x.beginPath(); x.arc(0,0,R,0,7); x.fill();
+    for(let i=0;i<900;i++){ const a=rand(0,6.28), r0=rand(46,60), r1=rand(100,R); x.strokeStyle=`rgba(${rand(120,220)|0},${rand(100,170)|0},${rand(50,90)|0},${rand(.08,.3)})`; x.lineWidth=rand(.5,2); x.beginPath(); x.moveTo(Math.cos(a)*r0,Math.sin(a)*r0); x.lineTo(Math.cos(a+rand(-.05,.05))*r1,Math.sin(a+rand(-.05,.05))*r1); x.stroke(); }
+    x.fillStyle='#050302'; x.beginPath(); x.arc(0,0,52,0,7); x.fill(); x.strokeStyle='rgba(10,8,4,.8)'; x.lineWidth=10; x.beginPath(); x.arc(0,0,R,0,7); x.stroke();
+    for(let i=0;i<40;i++){ x.strokeStyle=`rgba(190,60,50,${rand(.15,.35)})`; x.lineWidth=rand(.6,1.6); x.beginPath(); const a=rand(0,6.28); let r=rand(170,240); x.moveTo(Math.cos(a)*r,Math.sin(a)*r); for(let k=0;k<6;k++){ r+=rand(6,14); const b=a+rand(-.12,.12); x.lineTo(Math.cos(b)*r,Math.sin(b)*r); } x.stroke(); } });
+  const eye=new THREE.Mesh(new THREE.SphereGeometry(1,48,32),new THREE.MeshPhysicalMaterial({map:irisT,roughness:.08,clearcoat:1,clearcoatRoughness:.02}));
+  eye.rotation.y=-Math.PI/2; g.add(eye);   // the sphere's texture centre faces +z
+  const skin=skinify(new THREE.MeshPhysicalMaterial({color:col(0xd8a888),roughness:.6,sheen:col(0x553322)}));
+  const up=new THREE.Mesh(new THREE.SphereGeometry(1.08,40,20,0,Math.PI*2,0,Math.PI/2),skin); const lo=up.clone(); lo.rotation.x=Math.PI; g.add(up); g.add(lo);
+  g.userData={up,lo,eye}; g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=false; } }); return g;
+}
+function setEyeOpen(E,k){ E.userData.up.rotation.x=-k*1.15; E.userData.lo.rotation.x=Math.PI+k*.85; }
+async function jimsEye(lv){
+  PLAYER.lock(); const E=makeGiantEye(); const f=new THREE.Vector3(); camera.getWorldDirection(f); f.y=0; f.normalize();
+  const pos=PLAYER.pos.clone().addScaledVector(f,170).add(V3(0,210,0)); E.position.copy(pos); E.scale.setScalar(95); E.lookAt(PLAYER.pos); lv.scene.add(E); setEyeOpen(E,0);
+  const fog0=lv.scene.fog.density; lv.scene.fog.density=fog0*.45;
+  SFX.giantRumble&&SFX.giantRumble(3); lookAtPoint(pos,2.2); await wait(2.4);
+  await tweenVal(k=>setEyeOpen(E,k),.9); SFX.squish&&SFX.squish();
+  await talk([{who:'Jim',radio:true,text:"Can you see me?! I'm looking at you through the magnifying glass! You're SO small!",auto:1},{who:'You',text:"Jim... your eye is the size of a building.",auto:1}]);
+  for(let i=0;i<2;i++){ await tweenVal(k=>setEyeOpen(E,1-Math.sin(k*Math.PI)),.32); await wait(.5); }
+  await talk([{who:'Jim',radio:true,text:"Ha! Okay okay, I'll go watch on the micro-cam. Have fun!",auto:.8}]);
+  await tweenVal(k=>{ E.position.y=pos.y+k*160; setEyeOpen(E,1-k*.3); lv.scene.fog.density=lerp(fog0*.45,fog0,k); },2.2);
+  lv.scene.remove(E); lv.scene.fog.density=fog0; lookAtPoint(PLAYER.pos.clone().addScaledVector(f,40),1);
+}
 const TINY_LINES={
   bacteria:["Those green glowy ones are bacteria! Probably. I think.","Bacteria! Don't lick them.","Ooh, a whole colony. Nice shot."],
   paramecium:["Whoa, that one's swimming! Look at all the little hairs!","That's a paramecium. I read about those. Once.","It's got a mouth groove! Gross. Cool. Gross."],
@@ -321,25 +348,35 @@ CHECKPOINTS.A4=async()=>{
   FX.whiteout=1; fade(0,.4);
   await tweenVal(k=>FX.whiteout=1-k,2.2); unlock('shrunk');
   say("Down here you don't walk. You float.",4);
-  await wait(2.5); PLAYER.free();
+  await wait(2.5);
+  await jimsEye(lv);           // a 'whoa' moment: Jim's giant eye looking at you through the magnifier
+  PLAYER.free();
   itemHints([IS_TOUCH?'<kbd>⤒ ⤓</kbd> swim up / down':'<kbd>Space</kbd> / <kbd>C</kbd> swim up / down',IS_TOUCH?'<kbd>👊</kbd> take photo':'<kbd>Click</kbd> / <kbd>Q</kbd> take photo']);
   TOUCH_UI.show({act:true,down:true});
   await wait(4.5);
-  await talk([{who:'Jim',radio:true,text:"Whoa... you there? Can you hear me? What do you see down there?",auto:1.4},{who:'You',text:"Jim... this is insane.",auto:1.2},{who:'Jim',radio:true,text:"Take pictures! Take pictures of everything!",auto:1.4}]);
-  objective('Take pictures for Jim: <b>0</b>/3');
+  await talk([{who:'Jim',radio:true,text:"Okay, I'm on the micro-cam. What do you see down there?",auto:1.4},{who:'You',text:"Jim... this is insane.",auto:1.2},{who:'Jim',radio:true,text:"Take pictures! Take pictures of everything!",auto:1.4}]);
+  objective('Take pictures for Jim: <b>0</b>/2');
   F.photoPhase=true; F.tinyStart=G.time;
   // idle radio chatter + a curious paramecium bumping into you
   runStory(async()=>{ const lines=["Is anything trying to attack you yet? Be honest.","I can see you on the monitor! You're a tiny dot.","Don't touch anything slimy.","You're doing great. I think. Are you?"]; let i=0; while(F_().photoPhase){ await wait(rand(16,24)); if(!F_().photoPhase) return; bark('Jim',lines[i++%lines.length],null,3.2,true); } });
   runStory(async()=>{ while(F_().photoPhase){ await wait(.5); const p=lv.paras[0]; if(p.position.distanceTo(PLAYER.pos)<9 && !F_().bumped){ F_().bumped=true; shake(.35); SFX.squish(); PLAYER.vel.add(PLAYER.pos.clone().sub(p.position).normalize().multiplyScalar(6)); bark('Jim','Hey! Did that thing just bump you?! Is it attacking?! Get a picture!',null,3.4,true); } } });
-  runStory(async()=>{ await waitUntil(()=>(F_().photos>=3)||(G.time-F_().tinyStart>100)); if(F_().photoPhase){ await wait(2.2); runStory(giantScene); } });
+  runStory(async()=>{ await waitUntil(()=>(F_().photos>=2)||(G.time-F_().tinyStart>60)); if(F_().photoPhase){ await wait(2.2); runStory(giantScene); } });
 };
 on('photo',subj=>{
   if(!LV||LV.name!=='tiny') return; const F=F_(); if(!F.photoPhase) return;
   F.photos=(F.photos||0)+1; $('photoRead').textContent='PHOTOS: '+F.photos;
   const k=subj?subj.name:'none'; const L=TINY_LINES[k]||TINY_LINES.none;
-  if(F.photos<=3) objective('Take pictures for Jim: <b>'+Math.min(3,F.photos)+'</b>/3',true);
+  if(F.photos<=2) objective('Take pictures for Jim: <b>'+Math.min(2,F.photos)+'</b>/2',true);
   setTimeout(()=>bark('Jim',pick(L),null,3.2,true),700);
 });
+/* hide every big thing near a path (fibers, dust rocks, diatoms...) so a huge creature never swims through them; returns what it hid */
+function clearTinyPath(lv,pts,R,keep=[]){
+  const out=[], B=new THREE.Box3(), skip=new Set([lv.bg,lv.bac,camera,...keep].filter(Boolean));
+  const samples=[]; for(let i=0;i<pts.length-1;i++){ const a=pts[i], b=pts[i+1], n=Math.max(1,Math.ceil(a.distanceTo(b)/40)); for(let k=0;k<=n;k++) samples.push(a.clone().lerp(b,k/n)); }
+  for(const o of lv.scene.children){ if(skip.has(o)||!o.visible||o.isLight||o.isPoints||o.isInstancedMesh) continue; if(!(o.isMesh||o.isGroup)) continue;
+    B.setFromObject(o); if(B.isEmpty()) continue; const sz=B.getSize(new THREE.Vector3()); if(Math.max(sz.x,sz.y,sz.z)<6) continue;
+    if(samples.some(p=>B.distanceToPoint(p)<R)){ o.visible=false; out.push(o); } }
+  return out; }
 async function giantScene(){
   const lv=LEVELS.tiny, F=F_(); F.photoPhase=false; PLAYER.lock(); objective(null); itemHints(null); closeDialogNow(); setMarker(null);
   playMusic(null,2); SFX.giantRumble(10); shake(.25);
@@ -353,6 +390,11 @@ async function giantScene(){
   const G0=PLAYER.pos.clone().addScaledVector(f,1700).add(V3(0,-320,0));
   const G1=PLAYER.pos.clone().addScaledVector(f,760).add(V3(0,-250,0));
   const giant=lv.giant; giant.visible=true; giant.position.copy(G0); giant.lookAt(PLAYER.pos.x,giant.position.y,PLAYER.pos.z);
+  // nothing big may sit in its path (it used to swim THROUGH fibers + rocks): clear the whole route while the water fogs up
+  const gPathEnd=PLAYER.pos.clone().addScaledVector(f,950).addScaledVector(right,1300).add(V3(0,-320,0));
+  const keepT=[giant,lv.flake,lv.bfFlake,lv.demodex,lv.naeg,lv.larry,lv.larryFlake,...(lv.biofilms||[]),...(lv.snacks||[])];
+  const cleared=clearTinyPath(lv,[G0,G1,PLAYER.pos.clone().addScaledVector(f,520).addScaledVector(right,-60).add(V3(0,-250,0)),gPathEnd],360,keepT);
+  clearTinyPath(lv,[PLAYER.pos.clone(),A.P.clone()],40,keepT).forEach(o=>cleared.push(o));
   await tweenVal(k=>{ FX.exposure=lerp(1.1,.75,k); lv.scene.fog.density=lerp(lv.fogBase,.0022,k); },2.5);
   lookAtPoint(PLAYER.pos.clone().addScaledVector(f,100).add(V3(0,-20,0)),2);
   await wait(1.2);
@@ -361,7 +403,7 @@ async function giantScene(){
   // it rises out of the fog toward you
   const headOff=V3(0,1.05,1.9);
   runStory(async()=>{ await tweenVal(k=>{ giant.position.lerpVectors(G0,G1,easeOut(k)); giant.lookAt(PLAYER.pos.x,giant.position.y+60,PLAYER.pos.z); },8); });
-  camFollow(()=>{ const hp=giant.localToWorld(headOff.clone()); return {pos:PLAYER.pos.clone().add(V3(0,PLAYER.y,0)),look:hp}; },SETTINGS.fov);
+  camFollow(()=>{ const hp=giant.localToWorld(headOff.clone()), eye=PLAYER.pos.clone().add(V3(0,PLAYER.y,0)); const d=Math.hypot(hp.x-eye.x,hp.z-eye.z); hp.y=clamp(hp.y,eye.y-d*.55,eye.y+d*.55); return {pos:eye,look:hp}; },SETTINGS.fov);   // pitch kept under ~30 deg
   await wait(3);
   await talk([{who:'Jim',radio:true,text:"Wait... what is that? What IS that?!",auto:1},{who:'Jim',radio:true,text:"It's HUGE! Take a picture! TAKE A PICTURE!",auto:.6}]);
   takePhoto(true,'Tardigrade'); shake(.2);
@@ -410,6 +452,7 @@ async function giantScene(){
   await wait(2.4);
   say("It's gone.",2.8); SFX.sigh(); later(2,()=>unlock('giant'));
   runStory(async()=>{ await tweenVal(k=>{ fm.opacity=lerp(.5,op0,k); },1.5); });
+  for(const o of cleared) o.visible=true;
   lv.fleeing=0; for(const b of lv.bacData) b.flee.set(0,0,0);
   await tweenVal(k=>{ FX.exposure=lerp(.75,1.1,k); lv.scene.fog.density=lerp(.0022,lv.fogBase,k); },2);
   setAmbEvents([['microChirp',4],['whale',11]]);
@@ -506,7 +549,7 @@ async function larryMeet(){
   await talk([{who:'Larry',voice:'Larry',text:"Hi there! You need a picture?"},{who:'Larry',voice:'Larry',text:"Here is a net catcher.",fx:()=>giveNet()},{who:'Larry',voice:'Larry',text:"Get me 5 Paramecium snacks, then we'll talk."}]);
   L.userData.talking=false;
   F.netOn=true; F.snacks=0; for(const s of lv.snacks){ s.visible=true; s.userData.caught=false; }
-  objective('Catch Paramecium snacks for Larry: <b>0</b>/5');
+  objective('Catch Paramecium snacks for Larry: <b>0</b>/3');
   itemHints([IS_TOUCH?'<kbd>USE</kbd> catch with the net':'<kbd>E</kbd> catch with the net',IS_TOUCH?'<kbd>👊</kbd> take photo':'<kbd>Click</kbd> take photo']);
   setMarker(nearestSnack,'Paramecium');
   PLAYER.free();
@@ -518,13 +561,13 @@ function catchSnack(s){
   VM.netT=.42; SFX.netSwing();
   later(.18,()=>{ if(s.userData.caught) return; s.userData.caught=true; s.visible=false; const lv=LEVELS.tiny;
     lv.glow.burst(s.position,{color:0xffe066,count:26,speed:6,size:.6,life:.6,grav:0}); sfxAt(s.position,()=>SFX.netCatch(),20);
-    F.snacks=(F.snacks||0)+1; toast('Caught a Paramecium! '+F.snacks+'/5','#ffe066');
-    if(F.snacks>=5){ F.netOn=false; for(const o of lv.snacks) o.visible=false; objective('Bring the snacks to Larry'); setMarker(()=>lv.larry.position.clone().add(V3(0,16,0)),'Larry'); SFX.objective(); }
-    else objective('Catch Paramecium snacks for Larry: <b>'+F.snacks+'</b>/5'); });
+    F.snacks=(F.snacks||0)+1; toast('Caught a Paramecium! '+F.snacks+'/3','#ffe066');
+    if(F.snacks>=3){ F.netOn=false; for(const o of lv.snacks) o.visible=false; objective('Bring the snacks to Larry'); setMarker(()=>lv.larry.position.clone().add(V3(0,16,0)),'Larry'); SFX.objective(); }
+    else objective('Catch Paramecium snacks for Larry: <b>'+F.snacks+'</b>/3'); });
 }
 async function larryTalk(){
   const lv=LEVELS.tiny, F=F_(), L=lv.larry;
-  if((F.snacks||0)<5){ larrySay("Get me some Paramecium snacks, then we'll talk."); return; }
+  if((F.snacks||0)<3){ larrySay("Get me some Paramecium snacks, then we'll talk."); return; }
   if(F.larryOK){ larrySay("Ok, you can take your picture."); return; }
   PLAYER.lock(); setMarker(null); lookAtPoint(L.position.clone().add(V3(0,15,0)),.6);
   L.userData.talking=true;

@@ -54,15 +54,15 @@ defineLevel('moss',{
     const stemM=new THREE.MeshStandardMaterial({map:awTex('stem',1,6),normalMap:awTex('stemN',1,6,false),color:col(0x8aa868),roughness:.85});
     const leafT=mossLeafTex();
     const leafM=new THREE.MeshStandardMaterial({map:leafT.map,normalMap:leafT.normalMap,alphaTest:.5,side:THREE.DoubleSide,roughness:.6,emissive:col(0x2a5a12),emissiveIntensity:.35});   // a little glow = sun through the leaf
-    const spots=[]; for(let i=0;i<150;i++){ let x=rand(-60,60), z=rand(-90,36); if(Math.abs(x)<6.5&&z>-56&&z<38) continue; if(Math.hypot(x-MOSS_DROP.x,z-MOSS_DROP.z)<10) continue; spots.push([x,z,rand(7,22),rand(-.15,.15),rand(-.15,.15)]); }
+    const spots=[]; for(let i=0;i<dq(50,80,110,150,170);i++){ let x=rand(-60,60), z=rand(-90,36); if(Math.abs(x)<6.5&&z>-56&&z<38) continue; if(Math.hypot(x-MOSS_DROP.x,z-MOSS_DROP.z)<10) continue; spots.push([x,z,rand(7,22),rand(-.15,.15),rand(-.15,.15)]); }
     // a wall of moss on both sides of the path so the way to go is obvious
-    for(let z=34;z>-54;z-=3.2) for(const sd of [-1,1]){ spots.push([sd*rand(7,10),z+rand(-1,1),rand(9,20),rand(-.1,.1),sd*rand(.05,.2)]); }
+    for(let z=34;z>-54;z-=dq(5,4.2,3.6,3.2,3)) for(const sd of [-1,1]){ spots.push([sd*rand(7,10),z+rand(-1,1),rand(9,20),rand(-.1,.1),sd*rand(.05,.2)]); }
     const stems=new THREE.InstancedMesh(GC('mossStem',()=>{ const c=new THREE.CylinderGeometry(.13,.2,1,8,4); c.translate(0,.5,0); return c; }),stemM,spots.length);
-    let leafN=0; for(const s of spots) leafN+=Math.floor(s[2]*3.2);
+    let leafN=0; const LPM=dq(1.6,2.2,2.8,3.2,3.6); for(const s of spots) leafN+=Math.floor(s[2]*LPM);
     const leaves=new THREE.InstancedMesh(GC('mossLeafQ',()=>{ const q=new THREE.PlaneGeometry(.9,1.8); q.translate(0,.9,0); return q; }),leafM,leafN);
     let li=0;
     spots.forEach((s,i)=>{ const [x,z,h,tx,tz]=s; o.position.set(x,0,z); o.rotation.set(tx,rand(0,6),tz); o.scale.set(1,h,1); o.updateMatrix(); stems.setMatrixAt(i,o.matrix);
-      const stemM4=o.matrix.clone(); const n=Math.floor(h*3.2);
+      const stemM4=o.matrix.clone(); const n=Math.floor(h*LPM);
       for(let k=0;k<n;k++){ const u=k/n, y=.08+u*.96, a=k*2.4; const len=lerp(1.3,.55,u);
         const L=new THREE.Object3D(); L.position.set(0,y,0); L.rotation.set(0,a,0); L.updateMatrix();
         const tilt=new THREE.Matrix4().makeRotationX(-lerp(.9,.35,u)), sc=new THREE.Matrix4().makeScale(len,len/h*1,len);
@@ -73,7 +73,7 @@ defineLevel('moss',{
     leaves.count=li; stems.castShadow=true; leaves.castShadow=true; leaves.receiveShadow=true; scene.add(stems); scene.add(leaves);
     lv.leaves=leaves;
     // the giant dew drop (and small ones sitting on leaves)
-    const dropM=new THREE.MeshPhysicalMaterial({color:col(0xeaf6ff),roughness:0,metalness:0,transmission:.92,thickness:6,ior:1.33,transparent:true,opacity:1,clearcoat:1,envMapIntensity:1.6,specularIntensity:1});
+    const dropM=rimify(new THREE.MeshPhysicalMaterial({color:col(0xd8ecff),roughness:0,metalness:.1,transparent:true,opacity:.32,clearcoat:1,clearcoatRoughness:0,envMapIntensity:2.2,depthWrite:false}),0xf0fbff,1.1,2.2);   // glassy water (no refraction pass = no lag on a GT 1030)
     const drop=mesh(GC('dewDrop',()=>{ const q=new THREE.SphereGeometry(1,48,32); const p=q.attributes.position; for(let i=0;i<p.count;i++){ const y=p.getY(i); p.setY(i,y<0?y*.25:y*.82); } q.computeVertexNormals(); return q; }),dropM,MOSS_DROP.x,1.2,MOSS_DROP.z,false); drop.scale.setScalar(7.5); scene.add(drop); lv.drop=drop;
     colCircle(lv.col,MOSS_DROP.x,MOSS_DROP.z,6.2,()=>!lv.diving);
     for(let i=0;i<26;i++){ const d=mesh(GC('dewDrop',()=>null),dropM,rand(-40,40),rand(2,14),rand(-80,30),false); d.scale.setScalar(rand(.3,1.1)); scene.add(d); }
