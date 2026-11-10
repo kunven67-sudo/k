@@ -430,8 +430,16 @@ function aimArm(h,side,target,R,w=1,mode='tip'){
     for(let k=0;k<4;k++){ for(const d of [step,-step]){ const o=P[k]; P[k]=o+d; if(k===3) P[3]=clamp(P[3],-2.4,0); const e=err(); if(e<best-1e-5){ best=e; moved=true; } else P[k]=o; } }
     if(!moved) step*=.5; if(step<.004||best<.004) break; }
   apply();
+  // pressing a button: turn the hand so the PALM FACES DOWN (the back of the hand, where the nails are, points up).
+  // It used to keep the 'standing' twist = the finger came in upside down.
+  let tw=null;
+  if(mode==='tip'){ const fg=U.hands[side].H.fingers[0], nail=fg.c.children[fg.c.children.length-1]; let bestUp=-9;
+    const o=hd.rotation.y; for(let i=-6;i<6;i++){ const c=i*Math.PI/6; hd.rotation.y=c; hd.updateMatrixWorld(true); const up=nail.getWorldPosition(_ik.t).y-fg.c.localToWorld(_ik.v.set(0,-.012,0)).y; if(up>bestUp){ bestUp=up; tw=c; } }
+    hd.rotation.y=A.ikTw!=null?A.ikTw:tw; A.ikTw=lerp(A.ikTw!=null?A.ikTw:tw,tw,.3); hd.rotation.y=A.ikTw; hd.updateMatrixWorld(true);
+    best=err(); step=.05; for(let it=0;it<8;it++){ let moved=false; for(let k=0;k<4;k++){ for(const d of [step,-step]){ const ov=P[k]; P[k]=ov+d; if(k===3) P[3]=clamp(P[3],-2.4,0); const e=err(); if(e<best-1e-5){ best=e; moved=true; } else P[k]=ov; } } if(!moved) step*=.5; if(step<.004) break; }
+    apply(); tw=A.ikTw; }
   const S=R['sh'+side], E=R['el'+side], Hh=R['hd'+side];
-  S[0]=lerp(S[0],P[0],w); S[1]=lerp(S[1],P[1],w); S[2]=lerp(S[2],P[2],w); E[0]=lerp(E[0],P[3],w); E[1]=lerp(E[1],0,w); E[2]=lerp(E[2],0,w); Hh[0]=lerp(Hh[0],0,w); Hh[2]=lerp(Hh[2],0,w);
+  S[0]=lerp(S[0],P[0],w); S[1]=lerp(S[1],P[1],w); S[2]=lerp(S[2],P[2],w); E[0]=lerp(E[0],P[3],w); E[1]=lerp(E[1],0,w); E[2]=lerp(E[2],0,w); Hh[0]=lerp(Hh[0],0,w); Hh[2]=lerp(Hh[2],0,w); if(tw!=null) Hh[1]=lerp(Hh[1],tw,w);
 }
 function animateHuman(h,dt,t){
   const U=h.userData, J=U.J, A=U.A;
