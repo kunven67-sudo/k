@@ -138,11 +138,30 @@ function consumeLook(){ const dx=INPUT.lookDX, dy=INPUT.lookDY; INPUT.lookDX=0; 
 /* ---------------- assets: real textures + sounds, loaded up front with a progress bar ---------------- */
 const ASSETS={tex:{},snd:{},done:0,total:0,onProgress:null};
 const _texLoader=new THREE.TextureLoader();
+/* ---------- loading the game's own files ----------
+   Opened straight from the unzipped folder (file://), Edge won't let a page fetch() its own files, and
+   pictures loaded from files can't be used by WebGL. So every sound + texture also ships as a small
+   script (assets/js/<path>.js) that hands its bytes to __awBytes(); scripts DO load from a folder.
+   (Before this, AW3 played fake fallback sounds and no real textures when opened from the folder.) */
+const BYTES={wait:{}};
+window.__awBytes=function(path,b64){ const w=BYTES.wait[path]; if(!w) return; delete BYTES.wait[path];
+  const s=atob(b64), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); for(const f of w.res) f(u.buffer); };
+function loadBytesScript(path){ return new Promise((res,rej)=>{
+  if(BYTES.wait[path]){ BYTES.wait[path].res.push(res); BYTES.wait[path].rej.push(rej); return; }
+  BYTES.wait[path]={res:[res],rej:[rej]};
+  const el=document.createElement('script'); el.src='assets/js/'+path.replace(/^assets\//,'')+'.js'; el.async=true;
+  el.onload=()=>{ el.remove(); const w=BYTES.wait[path]; if(w){ delete BYTES.wait[path]; for(const f of w.rej) f(new Error('empty '+path)); } };
+  el.onerror=()=>{ el.remove(); const w=BYTES.wait[path]; delete BYTES.wait[path]; if(w) for(const f of w.rej) f(new Error('missing '+path)); };
+  document.head.appendChild(el); }); }
+function loadBytes(path){
+  if(location.protocol==='file:') return loadBytesScript(path);
+  return fetch(path).then(r=>{ if(!r.ok) throw new Error(r.status+' '+path); return r.arrayBuffer(); }).catch(()=>loadBytesScript(path));
+}
 function assetTick(what){ ASSETS.done++; if(ASSETS.onProgress) ASSETS.onProgress(ASSETS.done/Math.max(1,ASSETS.total),what); }
 function loadTexture(name,url,o={}){
   if(ASSETS.tex[name]) return Promise.resolve(ASSETS.tex[name]);
   ASSETS.total++;
-  return new Promise(res=>{ _texLoader.load(url,t=>{ t.encoding=o.linear?THREE.LinearEncoding:THREE.sRGBEncoding; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=o.aniso||4; t.flipY=o.flipY!==false; ASSETS.tex[name]=t; assetTick(name); res(t); },undefined,()=>{ console.warn('texture missing',url); ASSETS.tex[name]=null; assetTick(name); res(null); }); });
+  return new Promise(res=>{ loadBytes(url).then(ab=>URL.createObjectURL(new Blob([ab],{type:/\.png$/i.test(url)?'image/png':'image/jpeg'}))).catch(()=>url).then(src=>_texLoader.load(src,t=>{ t.encoding=o.linear?THREE.LinearEncoding:THREE.sRGBEncoding; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=o.aniso||4; t.flipY=o.flipY!==false; ASSETS.tex[name]=t; assetTick(name); res(t); },undefined,()=>{ console.warn('texture missing',url); ASSETS.tex[name]=null; assetTick(name); res(null); })); });
 }
 /* a Poly Haven style set: <base>_diff / _nor / _rough / _ao (1K jpg) */
 function loadPBR(base,o={}){

@@ -343,7 +343,7 @@ CHECKPOINTS.A4=async()=>{
   // idle radio chatter + a curious paramecium bumping into you
   runStory(async()=>{ const lines=["Is anything trying to attack you yet? Be honest.","I can see you on the monitor! You're a tiny dot.","Don't touch anything slimy.","You're doing great. I think. Are you?"]; let i=0; while(F_().photoPhase){ await wait(rand(16,24)); if(!F_().photoPhase) return; bark('Jim',lines[i++%lines.length],null,3.2,true); } });
   runStory(async()=>{ while(F_().photoPhase){ await wait(.5); const p=lv.paras[0]; if(p.position.distanceTo(PLAYER.pos)<9 && !F_().bumped){ F_().bumped=true; shake(.35); SFX.squish(); PLAYER.vel.add(PLAYER.pos.clone().sub(p.position).normalize().multiplyScalar(6)); bark('Jim','Hey! Did that thing just bump you?! Is it attacking?! Get a picture!',null,3.4,true); } } });
-  runStory(async()=>{ await waitUntil(()=>(F_().photos>=2)||(G.time-F_().tinyStart>60)); if(F_().photoPhase){ await wait(2.2); runStory(giantScene); } });
+  runStory(async()=>{ await waitUntil(()=>F_().photos>=2);   /* only when YOU took the pictures (it used to go on by itself after 60 s) */ if(F_().photoPhase){ await wait(2.2); runStory(giantScene); } });
 };
 on('photo',subj=>{
   if(!LV||LV.name!=='tiny') return; const F=F_(); if(!F.photoPhase) return;

@@ -9,7 +9,7 @@ SCENES.pyramid=async function(){
   const J=lv.jay2; resetActor(J); giveWatch(J); CUR.j2=J;
   lv.inter.length=0; lv.triggers.length=0; lv.trail.length=0; lv.follow=false;
   resetFruits(lv);
-  for(const p of lv.paintings){ p.seen=false; p.lookT=0; }
+  for(const p of lv.paintings){ p.seen=false; p.lookT=0; } F.wallsTalked=false;
   setPlayer(V3(0,0,-2.6),0,0); J.position.set(.75,0,-.9); J.rotation.y=Math.PI; J.userData.A.look=null;
   freeWalk(); PLAYER.ctl.jump=false;
   FX.exposure=.45; lv.expTarget=1.28;
@@ -34,18 +34,20 @@ SCENES.pyramid=async function(){
   SCENE_TICKS.push(dt=>{ const fw=camera.getWorldDirection(new THREE.Vector3()); let all=true;
     for(const p of lv.paintings){ if(!p.seen){ const to=p.pos.clone().sub(camera.position); const d=to.length(); if(d<5.5&&to.normalize().dot(fw)>.9){ p.lookT+=dt; if(p.lookT>1.1) p.seen=true; } } if(!p.seen) all=false; }
     if(all&&!F.paintings){ F.paintings=true; unlock('paintings'); } });
-  await waitUntil(()=>PLAYER.pos.z<-46.5);
-  await CHATQ;
-  // "Hold on. Look at the walls."
-  lookOnly(); lv.follow=false; crosshair(false);
+  // the paintings are OPTIONAL now: walk up to one, look at it and press E to hear Jay 2 about them (or just keep going).
+  // (it used to grab the camera the moment you walked past, even if you ran way ahead = broken scene)
   const bugs=lv.paintings[0], king=lv.paintings[1];
-  walkTo(J,[V3(.3,-2.4,-49.6)],2.2).then(()=>{ facePoint(J,bugs.pos); J.userData.A.look=bugs.pos; });
-  PLAYER.lookTo=null; lookAtPoint(bugs.pos,1.3);
+  const wallsTalk=async()=>{ if(F.wallsTalked) return; F.wallsTalked=true; await CHATQ;
+    lookOnly(); lv.follow=false; crosshair(false);
+    J.userData.A.path=null; const jp=V3(.3,-2.4,-49.6); if(J.position.distanceTo(jp)>.4) await walkTo(J,[jp],3.4);
+    facePoint(J,bugs.pos); J.userData.A.look=bugs.pos;
+    PLAYER.lookTo=null; lookAtPoint(bugs.pos,1.3);
   await say([L('p_walls',{mood:'worried'}),L('p_walls_2',{pose:'point'}),L('p_walls_3'),
     L('p_walls_4',{pose:null,fx:()=>{ J.userData.A.look=king.pos; facePoint(J,king.pos); PLAYER.lookTo=null; lookAtPoint(king.pos,1.4); }}),
     L('p_walls_5',{mood:'angry',pose:'point'}),L('p_walls_6'),L('p_walls_7',{pose:null,mood:'neutral'})]);
-  clearPose(J,.4); J.userData.A.look=null;
-  freeWalk(); PLAYER.ctl.jump=false; lv.follow=true;
+    clearPose(J,.4); J.userData.A.look=null;
+    freeWalk(); PLAYER.ctl.jump=false; lv.follow=true; };
+  for(const p of [bugs,king]) addInteract(lv,{pos:p.pos,label:'Look at the paintings',reach:4.5,when:()=>!F.wallsTalked,act:()=>{ wallsTalk(); }});
   await waitUntil(()=>PLAYER.pos.z<-79);
   J.userData.A.look=PYR.roomC; chat([L('p_glow',{mood:'worried'})]);
   await waitUntil(()=>Math.hypot(PLAYER.pos.x-PYR.roomC.x,PLAYER.pos.z-PYR.roomC.z)<4.4);

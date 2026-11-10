@@ -216,13 +216,14 @@ function pyrFollow(lv,dt){
   const J=lv.jay2, A=J.userData.A, tr=lv.trail; if(!tr.length) return;
   const d=Math.hypot(J.position.x-PLAYER.pos.x,J.position.z-PLAYER.pos.z);
   if(d<2.1){ if(A.path) A.path=null; A.look=A.look||'player'; return; }
-  if(A.path) return;
+  // re-plan every half second while he's behind, so he speeds up when you do (he used to commit to a slow walk and fall behind)
+  if(A.path){ lv.fT=(lv.fT||0)+dt; if(d<3.2||lv.fT<.5) return; lv.fT=0; A.path=null; }
   // the trail point about 1.8 m behind you
   let i=tr.length-1, acc=0; while(i>0&&acc<1.8){ acc+=tr[i].distanceTo(tr[i-1]); i--; }
   // walk from the trail point nearest to him up to that point
   let near=0, nd=1e9; for(let k=0;k<=i;k++){ const dd=(tr[k].x-J.position.x)**2+(tr[k].z-J.position.z)**2; if(dd<nd){ nd=dd; near=k; } }
   const pts=[]; for(let k=near;k<=i;k++) if(k===i||(k-near)%2===0) pts.push(V3(tr[k].x,0,tr[k].z));
   if(!pts.length) return;
-  const speed=d>5?2.9:2.1;
+  const speed=d>6?6.4:d>3.5?(PLAYER.sprint?5.9:3.7):3.1;   // you walk 3.3 + run 5.8: he keeps up (max used to be 2.9)
   walkTo(J,pts,speed); A.look=null;
 }

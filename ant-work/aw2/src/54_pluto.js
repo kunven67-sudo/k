@@ -186,7 +186,7 @@ CHECKPOINTS.B11=async()=>{
   SFX.bark(); await wait(1);
   if(!pl.petSetup){ pl.petSetup=true; addInteract(pl,{obj:jeff,offset:V3(0,.6,0),label:'Pet Jeff',reach:2.4,when:()=>!!F_().canPet,act:()=>{ SFX.bark(); unlock('jeff'); if(trophyStat('pets')>=10) unlock('goodBoy'); jeff.userData.happy=true; VM.slapT=.5; bark('You','Good boy, Jeff.',null,2); F_().petted=true; }}); }
   F.canPet=true; objective('Pet Jeff'); PLAYER.free();
-  await waitUntil(()=>F_().petted,25); await wait(4); F.canPet=false; objective(null); PLAYER.lock(); await wait(1.5);
+  await waitUntil(()=>F_().petted); await wait(4); F.canPet=false; objective(null); PLAYER.lock(); await wait(1.5);
   // back on Earth...
   await fade(1,.8);
   const E=await enterLevel('blockearth',{pos:V3(0,0,30),yaw:0});

@@ -24,6 +24,11 @@ const copyDir = (a, b, filter) => { fs.mkdirSync(b, { recursive: true }); for (c
 copyDir(path.join(root, 'lib'), path.join(dist, 'lib'));
 copyDir(path.join(root, 'gs3kit'), path.join(dist, 'gs3kit'), p => !/demo\.html|README/.test(p));
 copyDir(path.join(root, 'assets'), path.join(dist, 'assets'), p => !/lines\.json$|_disp\.jpg$|\.txt$/.test(p));
+/* every sound + texture also as a script (assets/js/...) so it loads when the game is opened straight from the folder (file://) */
+{ const A=path.join(dist,'assets'); let n=0; const walk=d=>{ for(const f of fs.readdirSync(d)){ const p=path.join(d,f); if(fs.statSync(p).isDirectory()){ if(f!=='js') walk(p); continue; } if(!/\.(mp3|ogg|wav|jpg|jpeg|png)$/i.test(f)) continue;
+    const rel=path.relative(A,p).split(path.sep).join('/'), q=path.join(A,'js',rel+'.js'); fs.mkdirSync(path.dirname(q),{recursive:true});
+    fs.writeFileSync(q,'__awBytes('+JSON.stringify('assets/'+rel)+',"'+fs.readFileSync(p).toString('base64')+'");\n'); fs.rmSync(p); n++; } };
+  walk(A); console.log('files packed for folder play:',n); }
 const size = d => { let n = 0; for (const f of fs.readdirSync(d)) { const p = path.join(d, f); n += fs.statSync(p).isDirectory() ? size(p) : fs.statSync(p).size; } return n; };
 console.log('built dist/index.html', (fs.statSync(path.join(dist, 'index.html')).size / 1024).toFixed(0) + ' KB, dist total', (size(dist) / 1048576).toFixed(1) + ' MB, modules:', mods.length, 'lines:', Object.keys(lines).length);
 if (process.argv.includes('--zip')) {

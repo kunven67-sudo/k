@@ -449,7 +449,7 @@ const SND={buf:{},loading:{},
   load(name,url){
     if(SND.buf[name]||SND.loading[name]) return SND.loading[name]||Promise.resolve(SND.buf[name]);
     ASSETS.total++;
-    const p=fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status+' '+url); return r.arrayBuffer(); }).then(ab=>{ if(!AU.ok) initAudioSilent(); return new Promise((res,rej)=>ACtx.decodeAudioData(ab,res,rej)); })
+    const p=loadBytes(url).then(ab=>{ if(!AU.ok) initAudioSilent(); return new Promise((res,rej)=>ACtx.decodeAudioData(ab,res,rej)); })
       .then(b=>{ SND.buf[name]=b; assetTick(name); return b; }).catch(e=>{ console.warn('sound missing',url,e.message); assetTick(name); return null; });
     SND.loading[name]=p; return p;
   },

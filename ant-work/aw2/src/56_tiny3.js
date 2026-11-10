@@ -213,8 +213,8 @@ CHECKPOINTS.A7=async()=>{
   }
   // a quick guided look (it used to say 'look around' with nothing to do for up to 90 s)
   setMarker(()=>lv.marketSign.getWorldPosition(V3()),'Snack market');
-  await waitUntil(()=>F_().sawMarket,14); setMarker(()=>lv.beds[0].getWorldPosition(V3()).add(V3(0,6,0)),'Lint bed');
-  await waitUntil(()=>F_().sawBed,12); setMarker(null);
+  await waitUntil(()=>F_().sawMarket); setMarker(()=>lv.beds[0].getWorldPosition(V3()).add(V3(0,6,0)),'Lint bed');
+  await waitUntil(()=>F_().sawBed); setMarker(null);
   await wait(2);
   await tardComes();
 };

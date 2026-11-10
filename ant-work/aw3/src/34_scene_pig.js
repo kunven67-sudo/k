@@ -50,7 +50,9 @@ SCENES.pig=async function(){
   await chat([L('w_wake_1',{mood:'worried'}),L('w_wake_2'),L('w_wake_3',{mood:'worried',fx:()=>{ J.userData.A.look=V3(0,1.9,-2.1); }}),L('w_wake_4'),L('w_wake_5',{mood:'angry',fx:()=>{ J.userData.A.look='player'; }})],.45);
   J.userData.A.look=V3(0,1.9,-2.1);
   // a while longer to look around (or until you've had a good look at him)
-  await waitUntil(()=>lookedPig>2.5&&lookedJay>.8,9);
+  objective('Look around');
+  await waitUntil(()=>lookedPig>2.5&&lookedJay>.8);   // you have to actually look (it used to move on by itself after 9 s)
+  objective('');
   await wait(2);
   // he stops chewing... and looks right at you
   pigP.stop=true; pigP.lookSpeed=.7; pigP.look=camera;

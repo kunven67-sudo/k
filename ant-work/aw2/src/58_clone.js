@@ -84,7 +84,7 @@ async function meetClone(path){
   await fade(0,1);
   // walk in yourself; they're looking out the big window
   PLAYER.free();
-  const t0=G.time; await waitUntil(()=>Math.hypot(PLAYER.pos.x-other.position.x,PLAYER.pos.z-other.position.z)<3||G.time-t0>7);
+  const t0=G.time; await waitUntil(()=>Math.hypot(PLAYER.pos.x-other.position.x,PLAYER.pos.z-other.position.z)<3);
   PLAYER.lock(); PLAYER.vel.set(0,0,0);
   // if you just stood at the door, you take a few slow steps in
   { const d=Math.hypot(PLAYER.pos.x-other.position.x,PLAYER.pos.z-other.position.z); if(d>2.3){ const p0=PLAYER.pos.clone(), to=other.position.clone().add(p0.clone().sub(other.position).setY(0).normalize().multiplyScalar(2.1)); lookAtPoint(other.position.clone().add(V3(0,1.5,0)),.8); await tweenVal(k=>{ PLAYER.pos.x=lerp(p0.x,to.x,k); PLAYER.pos.z=lerp(p0.z,to.z,k); },Math.min(3,(d-2.1)*.75),x=>x); } }
