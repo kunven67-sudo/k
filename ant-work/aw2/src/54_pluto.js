@@ -155,7 +155,7 @@ CHECKPOINTS.B11=async()=>{
   
   // outside
   const pl=await enterLevel('pluto',{pos:V3(4.5,0,-1),yaw:Math.PI*.85});
-  pl.jim.visible=true; pl.jim.position.set(-2.6,0,1.8); pl.jim.userData.A.look='player'; pl.bob.visible=true; pl.bob.position.set(-3,0,1); pl.bob.userData.A.look='player'; pl.base.visible=false; pl.jeff.visible=false;
+  pl.jim.visible=true; pl.jim.position.set(-2.6,0,1.8); pl.jim.userData.A.look='player'; pl.bob.visible=true; pl.bob.position.set(-1.5,0,2.8); pl.bob.userData.A.look='player';   // beside + behind Jim, not on the way back from the rings pl.base.visible=false; pl.jeff.visible=false;
   for(const r of pl.rings){ r.done=false; r.g.visible=true; } pl.ringsLeft=-1; pl.fuel=1; pl.jetOn=true; pl.ringsOn=true;
   lookAtPoint(pl.rings[0].g.position,0);
   setMarker(()=>{ const r=pl.rings.find(q=>!q.done); return r?r.g.position:null; },'Ring','m');

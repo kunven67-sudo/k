@@ -89,7 +89,7 @@ async function growFails(){
   await wait(1);
   SFX.grow(); shake(.4); await tweenVal(k=>{ FX.whiteout=Math.sin(k*Math.PI)*.6; },1);
   await wait(1.2);
-  await talk([{who:'Jim',radio:true,text:"I'm sorry. It's not working."}]);
+  await talk([{who:'Jim',radio:true,text:"I'm sorry. It's not working."},{who:'Jim',radio:true,text:"I'm gonna fix this, I promise. But it could take a while."},{who:'Jim',radio:true,text:"You can't just float around out there. Find somewhere safe to stay."}]);
   say("You're stuck like this.",3.6); await wait(3.8);
   await larryRoommate();
 }
@@ -107,7 +107,8 @@ async function larryRoommate(){
   lookAtPoint(to.clone().add(V3(0,8,0)),1);
   await tweenVal(k=>{ L.position.lerpVectors(from,to,k); const d=PLAYER.pos.clone().sub(L.position); L.rotation.y=Math.atan2(d.x,d.z); },2.4);
   L.userData.talking=true;
-  await talk([{who:'Larry',voice:'Larry',text:"Guess you're my roommate now."}]);
+  // why he takes you in: he heard Jim on your radio, it's dangerous out here, and you got him his snacks
+  await talk([{who:'Larry',voice:'Larry',text:"Hey! I heard all that. Your friend can't make you big again?"},{who:'You',text:"Nope. I'm stuck like this."},{who:'Larry',voice:'Larry',text:"Then you can't stay out here. Stuff out here eats things our size."},{who:'Larry',voice:'Larry',text:"You got me those snacks. So come live with me in Mite Town. I've got a spare lint bed."},{who:'You',text:"Wait. Really?"},{who:'Larry',voice:'Larry',text:"Really. Follow me. Stay close."}]);
   L.userData.talking=false;
   objective('Swim with Larry to his flake home'); F.followLarry=true;
   const home=clampHunt(PLAYER.pos.clone().add(V3(-120,-40,-260)));
@@ -202,7 +203,7 @@ CHECKPOINTS.A7=async()=>{
   say('Mite Town. A pile of skin flakes, with a lot of dust mites living on it.',4.4); await wait(4.6);
   say('The mites look nervous.',3); await wait(1.5);
   L.userData.talking=true;
-  await talk([{who:'Larry',voice:'Larry',text:"Everybody, it's ok! This is my new roommate."},{who:'Larry',voice:'Larry',text:"Come on, I'll show you around. That's the snack market. And those are the lint beds. Super comfy."}]);
+  await talk([{who:'Larry',voice:'Larry',text:"It's ok, everybody! This is my friend. He got stuck small, so he's staying with me."},{who:'Larry',voice:'Larry',text:"Come on, I'll show you around. That's the snack market. And those are the lint beds. Super comfy."}]);
   L.userData.talking=false; lv.nervous=false;
   objective('Look around Mite Town'); PLAYER.free();
   if(!lv.setup){ lv.setup=true;

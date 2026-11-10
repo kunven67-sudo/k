@@ -9,6 +9,7 @@ CHECKPOINTS.B8=async()=>{
   if(!lv.interSetup){ lv.interSetup=true; setupMarsInteractions(lv); }
   for(const b of lv.bugs) lv.scene.remove(b); lv.bugs.length=0; F.bugsOn=false;
   for(const h of lv.houses) h.sold=h.price===50;
+  marsSellers(lv);
   if(lv.steve) lv.steve.visible=false;
   const jim=lv.jim; jim.visible=true; jim.userData.A.path=null; jim.userData.A.sleep=false; clearPose(jim,0); setMood(jim,'happy'); jim.position.set(0,.05,-5.75); jim.rotation.y=0; jim.userData.A.faceYaw=0; jim.userData.A.look=null;
   lv.rocket.position.set(22,marsHeight(22,12)+1.1,12); setRocketFlame(lv.rocket,0);

@@ -30,7 +30,7 @@ const FX={
   rays:0, raysColor:new THREE.Vector3(1,.85,.6), sunWorld:null, raysDecay:.965, raysDensity:.9,
   dof:0, dofFocus:4, dofRange:2.5, dofMax:10,
   flashback:0, flashT:0, glitch:0, blackout:0, whiteout:0, desat:0, blurAll:0, heat:0, pixel:0,
-  mblurStrength:1
+  mblurStrength:1, dim:1   // dim: night darkening that works with post-processing ON or OFF (Low quality)
 };
 const FX_BASE={}; for(const k in FX){ const v=FX[k]; FX_BASE[k]=(v&&v.clone)?v.clone():v; }
 function resetFX(o){ for(const k in FX_BASE){ const v=FX_BASE[k]; if(v&&v.clone) FX[k].copy(v); else FX[k]=v; } if(o) Object.assign(FX,o); }
@@ -246,6 +246,7 @@ const _vp=new THREE.Matrix4(), _prevVP=new THREE.Matrix4(), _ivp=new THREE.Matri
 let prevVPValid=false;
 function renderScene(scene,cam){
   const post=PP.enabled&&PP.ok;
+  if(!PP.enabled){ const te=1.05*(SETTINGS.bright||1)*FX.dim; if(renderer.toneMappingExposure!==te) renderer.toneMappingExposure=te; }
   // post-off fallback for the screen-wide fades the post shader normally does
   const wo=post?0:FX.whiteout, bo=post?0:FX.blackout;
   if(wo!==renderScene.wo){ renderScene.wo=wo; $('fxWhite').style.opacity=wo; }
@@ -305,7 +306,7 @@ function renderScene(scene,cam){
   u.tRays.value=useRays?RT.rays.texture:RT.black; u.useRays.value=useRays?1:0; u.raysColor.value.copy(FX.raysColor);
   u.tDof.value=useDof?RT.dof.texture:RT.black; u.useDof.value=useDof?1:0;
   u.useMB.value=useMB?1:0; u.invVP.value.copy(_ivp.copy(_vp).invert()); u.prevVP.value.copy(_prevVP); u.mbStrength.value=FX.mblurStrength*.6;
-  u.exposure.value=FX.exposure*(SETTINGS.bright||1); u.saturation.value=FX.saturation; u.contrast.value=FX.contrast; u.temp.value=FX.temp; u.tint.value.copy(FX.tint); u.lift.value.copy(FX.lift);
+  u.exposure.value=FX.exposure*(SETTINGS.bright||1)*FX.dim; u.saturation.value=FX.saturation; u.contrast.value=FX.contrast; u.temp.value=FX.temp; u.tint.value.copy(FX.tint); u.lift.value.copy(FX.lift);
   u.vignette.value=S.lens?FX.vignette:FX.vignette*.4; u.aberr.value=S.lens?FX.aberr:0; u.grain.value=S.grain?FX.grain:0;
   u.time.value=G.real; u.flashback.value=FX.flashback; u.glitch.value=FX.glitch; u.desat.value=FX.desat; u.whiteout.value=FX.whiteout; u.blackout.value=FX.blackout; u.heat.value=FX.heat; u.pixel.value=FX.pixel*Math.max(1,PP.h/720);
   u.res.value.set(w,h); u.cNear.value=cam.near; u.cFar.value=cam.far;

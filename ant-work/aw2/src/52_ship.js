@@ -111,7 +111,7 @@ defineLevel('ship',{
     const holo=new THREE.Group(); holo.position.set(4.6,1.4,-7.5); scene.add(holo); lv.holoEarth=holo;
     holo.add(sph(.6,new THREE.MeshBasicMaterial({color:col(0x5aff6a),wireframe:true,transparent:true,opacity:.6}),0,0,0,16,12,false)); holo.add(mesh(new THREE.TorusGeometry(.9,.02,6,48),basicGlow(0x5aff6a,2),0,0,0,false));
     holo.add(cyl(.5,.6,.9,trimM,0,-.95,0,16));
-    lv.alex=makeAlien({name:'Alex'}); lv.alex.userData.level='ship'; lv.alex.position.set(5.3,0,-6.4); lv.alex.rotation.y=-2.2; scene.add(lv.alex);
+    lv.alex=makeAlien({name:'Alex'}); lv.alex.userData.A.faceNear=false; lv.alex.userData.level='ship'; lv.alex.position.set(5.3,0,-6.4); lv.alex.rotation.y=-2.2; scene.add(lv.alex);
     for(let z=-5.5;z>-11;z-=2){ const pl=new THREE.PointLight(col(0xa8ffb8),.9,5,2); pl.position.set(0,2.5,z); scene.add(pl); scene.add(box(.6,.03,.2,basicGlow(0xd8ffe0,2),0,2.78,z,false)); }
     // windows: sky and clouds far below (the ship is floating over Earth)
     const skyT=canvasTex(512,256,(x,w,h)=>{ const g=x.createLinearGradient(0,0,0,h); g.addColorStop(0,'#4a8ad8'); g.addColorStop(.6,'#a8d4f4'); g.addColorStop(1,'#e8f4ff'); x.fillStyle=g; x.fillRect(0,0,w,h); for(let i=0;i<40;i++){ x.fillStyle=`rgba(255,255,255,${rand(.5,.9)})`; x.beginPath(); x.ellipse(rand(0,w),rand(h*.55,h),rand(20,60),rand(6,14),0,0,7); x.fill(); } });

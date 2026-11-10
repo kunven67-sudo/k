@@ -379,6 +379,7 @@ const POSES={
   holdBoth:()=>({shL:[-1,0,.12],elL:[-.7,0,0],shR:[-1,0,-.12],elR:[-.7,0,0],hdL:[0,1.2,0],hdR:[0,-1.2,0]}),
   carry:()=>({shL:[-.55,0,.25],elL:[-1.2,.3,0],shR:[-.55,0,-.25],elR:[-1.2,-.3,0]}),
   type:(t)=>({shR:[-.9,.2,-.1],elR:[-.55,0,0],hdR:[-.5,0,0],fR:.6+Math.max(0,Math.sin(t*14))*.3,head:[.25,0,0],spine:[.12,0,0]}),
+  wrench:(t)=>{ const s=Math.sin(t*5.5); return {shR:[-1.25+s*.08,.2,-.12],elR:[-.55,0,0],hdR:[0,s*.9,0],fR:1,shL:[-1.0,-.15,.25],elL:[-.45,0,0],fL:.85,head:[.18,0,0],spine:[.08,0,0]}; },
   press:()=>({shR:[-1.2,.15,-.05],elR:[-.3,0,0],hdR:[-.4,0,0],fR:1,head:[.2,0,0],spine:[.1,0,0]}),
   climb:(t)=>{ const s=Math.sin(t*3.2); return {shL:[-2.6+s*.3,0,.2],elL:[-.5-s*.3,0,0],shR:[-2.6-s*.3,0,-.2],elR:[-.5+s*.3,0,0],thL:[-.9+s*.5,0,0],knL:[1.2-s*.4,0,0],thR:[-.9-s*.5,0,0],knR:[1.2+s*.4,0,0],fL:.8,fR:.8}; },
   sit:()=>({thL:[-1.5,0,-.05],thR:[-1.5,0,.05],knL:[1.5,0,0],knR:[1.5,0,0],ftL:[.05,0,0],ftR:[.05,0,0],spine:[-.08,0,0]}),
@@ -535,7 +536,13 @@ function updateHumans(dt,t){
     if(!h.parent || !h.visible) continue;
     if(LV && h.userData.level && h.userData.level!==LV.name) continue;
     updateNPCPath(h,dt);
-    const A=h.userData.A; if(A.faceYaw!=null && !A.path) h.rotation.y=angLerp(h.rotation.y,A.faceYaw,Math.min(1,dt*5));
+    if(h.userData.snapGround && LV && LV.ground) h.position.y=LV.ground(h.position.x,h.position.z);
+    const A=h.userData.A;
+    if(A.faceNear && !A.path && !A.noTurn && !(A.pose && NO_TURN_POSE.test(A.pose)) && G.mode==='play'){
+      const dx=camera.position.x-h.position.x, dz=camera.position.z-h.position.z, d=Math.hypot(dx,dz);
+      if(A.look==='player' || (d<4.5 && d>.4)) A.faceYaw=Math.atan2(dx,dz);
+    }
+    if(A.faceYaw!=null && !A.path) h.rotation.y=angLerp(h.rotation.y,A.faceYaw,Math.min(1,dt*5));
     animateHuman(h,dt,t);
   }
 }
@@ -546,7 +553,10 @@ function holdProp(h,prop,side='R',pos,rot){ const hold=side==='R'?h.userData.hol
 function makeJim(o={}){ return makeHuman(Object.assign({name:'Jim',voice:'Jim',skin:0xecc0a0,shirt:0xd9a441,pants:0x3a4a6a,shoes:0x6b4a2a,hair:0x7a4a22,hairStyle:'spiky',beard:true,eye:0x3a6a3a,mood:'happy',build:1.04,head:{rx:.076,ry:.104,rz:.094,jaw:.26,nose:1.15,chin:1.1},seed:5,browThick:.004},o)); }
 function makeYou(o={}){ return makeHuman(Object.assign({name:'You',voice:'You',skin:0xe2b08c,shirt:0x2f4d6e,pants:0x2e3440,shoes:0x2a2a2e,hair:0x2a1c12,hairStyle:'short',eye:0x4a3020,sleeves:'long',hood:true,collar:false,stubble:.14,head:{rx:.073,ry:.103,rz:.092,jaw:.3,nose:.95}},o)); }
 function makeSteve(o={}){ return makeHuman(Object.assign({name:'Steve',voice:'Steve',skin:0x5fd648,skinGlow:.09,sss:[.5,1,.45],shirt:0x2a2f28,pants:0x1c211c,shoes:0x111111,hairStyle:'bald',eye:0x101010,sleeves:'long',collar:false,denim:false,build:.95,height:1.05,head:{rx:.072,ry:.108,rz:.095,jaw:.36,nose:.7,chin:1.2,lips:.6},blush:0,lip:0x5a8a4a},o)); }
-function makeAlien(o={}){ const pal=pick([[0x5fb8e8,0x5a2fa0,0xff7af0],[0x6ae0b0,0x1c4a7a,0xffe066],[0xb08ae0,0x2a5a4a,0x7dffe8],[0xe08a6a,0x3a1a5a,0x7dffb0]]); return makeHuman(Object.assign({name:'Alien',voice:'Alien',alien:true,skin:pal[0],shirt:pal[1],pants:0x1a1c30,shoes:0x2a2a4a,accent:pal[2],sleeves:'long',hairStyle:'bald',denim:false,collar:false,build:.92,height:rand(.92,1.05)},o)); }
+function makeAlien(o={}){ const pal=pick([[0x5fb8e8,0x5a2fa0,0xff7af0],[0x6ae0b0,0x1c4a7a,0xffe066],[0xb08ae0,0x2a5a4a,0x7dffe8],[0xe08a6a,0x3a1a5a,0x7dffb0]]); return markAlien(makeHuman(Object.assign({name:'Alien',voice:'Alien',alien:true,skin:pal[0],shirt:pal[1],pants:0x1a1c30,shoes:0x2a2a4a,accent:pal[2],sleeves:'long',hairStyle:'bald',denim:false,collar:false,build:.92,height:rand(.92,1.05)},o))); }
+/* aliens turn their whole body to you when you talk to them or walk up close (they used to stare at their house) */
+function markAlien(h){ h.userData.isAlien=true; h.userData.A.faceNear=true; h.userData.A.autoLook=true; return h; }
+const NO_TURN_POSE=/sit|sleep|lie|drive|climb|dead|chain|ride|droop/i;
 
 /* ---------- robots (Mars) ---------- */
 function robotFaceMat(hue){

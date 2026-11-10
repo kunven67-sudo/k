@@ -43,7 +43,7 @@ function domeDoor(){ const M=LEVELS.mars; const h=M.houses.find(q=>q.price===100
 function quietMars(M){
   const F=F_(); F.day=3; F.paid=true; F.cooked=true; F.boughtBig=false; F.boughtHouse=false; F.goHome=false; F.houseHunt=false; F.day3Buy=false; F.day2Convert=false; F.shiftOver=true;
   for(const b of M.bugs) M.scene.remove(b); M.bugs.length=0; F.bugsOn=false;
-  if(M.steve) M.steve.visible=false;
+  if(M.steve) M.steve.visible=false; marsSellers(M,{dome:true});
   M.jim.visible=false; M.jim.userData.A.path=null; M.jim.userData.A.sleep=false; clearPose(M.jim,0);
   if(!M.cloneSetup){ M.cloneSetup=true; addInteract(M,{pos:domeDoor().clone().add(V3(0,1.1,0)),label:'Go inside',reach:2.6,aim:false,when:()=>!!F_().toClone,act:()=>runStory(()=>meetClone(F_().toClone))}); }
 }

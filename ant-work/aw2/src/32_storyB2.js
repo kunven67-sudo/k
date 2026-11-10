@@ -35,6 +35,7 @@ async function goOutsideDay2(){
   if(!lv.interSetup){ lv.interSetup=true; setupMarsInteractions(lv); }
   const tiny=lv.houses.find(h=>h.price===50); PLAYER.pos.set(tiny.door.x,0,tiny.door.z-2.2); PLAYER.yaw=0;
   for(const h of lv.houses) h.sold=true;
+  marsSellers(lv);
   for(const b of lv.bugs) lv.scene.remove(b); lv.bugs.length=0; F.bugsOn=true; for(let i=0;i<7;i++) spawnMarsBug(lv);
   lv.rocket.position.set(22,marsHeight(22,12)+1.1,12); setRocketFlame(lv.rocket,0);
   const jim=lv.jim; jim.visible=true; jim.userData.A.path=null; jim.position.set(0,.05,-5.75); jim.rotation.y=0; jim.userData.A.faceYaw=0; setMood(jim,'tired'); setPose(jim,'droop',0); jim.userData.A.sleep=false;
@@ -51,7 +52,7 @@ async function jimTired(){ setMarker(null);
   await tweenVal(k=>{ PLAYER.pos.lerpVectors(p0,p1,k); },.9);
   const S={h:jim,who:'Jim',voice:'JimTired',mood:'tired'};
   SFX.yawn();
-  await talk([{...S,text:"Hey... bud. Time for work...",pose:'droop'},{...S,text:"An... and kill those..... alien ants and.....",pose:'droop'}]);
+  await talk([{...S,text:"Hey... bud. Time for work...",pose:'droop'},{...S,text:"Didn't sleep... Up all night... working...",pose:'droop'},{...S,text:"An... and kill those..... alien ants and.....",pose:'droop'}]);
   // he falls asleep right there on the stand
   jim.userData.A.look=null; jim.userData.A.sleep=true; setMood(jim,'asleep'); setPose(jim,'sleepCounter',1.4);
   await tweenVal(k=>{ jim.position.z=lerp(-5.75,-5.45,k); },1.4);
@@ -186,7 +187,7 @@ async function openDoorDay3(){
   sfxAt(PLAYER.pos,()=>SFX.alienDoor(),2); await fade(1,.5);
   const lv=await enterLevel('mars',{pos:V3(30,0,33),yaw:0});
   if(!lv.interSetup){ lv.interSetup=true; setupMarsInteractions(lv); }
-  for(const b of lv.bugs) lv.scene.remove(b); lv.bugs.length=0; F.bugsOn=false;
+  for(const b of lv.bugs) lv.scene.remove(b); lv.bugs.length=0; F.bugsOn=false; marsSellers(lv);
   const tiny=lv.houses.find(h=>h.price===50); const door=tiny.door.clone();
   PLAYER.pos.set(door.x,0,door.z-1.4); PLAYER.yaw=0; PLAYER.pitch=-.02; PLAYER.eye=1.64;
   // Steve, standing in the lane... and Jim, sneaking up behind you

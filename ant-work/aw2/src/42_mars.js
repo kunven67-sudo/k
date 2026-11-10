@@ -20,7 +20,10 @@ function alienHouse(kind){
   if(kind==='big'){ g.add(mesh(new THREE.SphereGeometry(6,40,20,0,Math.PI*2,0,Math.PI/2),shell,0,0,0)); g.add(mesh(new THREE.SphereGeometry(3.6,32,16,0,Math.PI*2,0,Math.PI/2),shell,6.5,0,1)); g.add(cyl(1.2,1.6,11,shell,-4,5.5,-2,24)); g.add(mesh(new THREE.SphereGeometry(2,24,16),new THREE.MeshPhysicalMaterial({color:col(0x9ae8ff),roughness:.05,transparent:true,opacity:.5,clearcoat:1}),-4,11.4,-2)); g.add(mesh(new THREE.TorusGeometry(6.05,.12,8,64),trim,0,.3,0,false)).children; g.children[g.children.length-1].rotation.x=Math.PI/2; for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; g.add(box(.9,.7,.1,win,Math.cos(a)*5.1,2.4,Math.sin(a)*5.1,false)).children; g.children[g.children.length-1].lookAt(0,2.4,0); } g.userData.door=V3(0,0,6.2); g.userData.w=16; g.userData.d=13; }
   else if(kind==='mid'){ g.add(mesh(new THREE.SphereGeometry(4,36,18,0,Math.PI*2,0,Math.PI/2),shell,0,0,0)); g.add(cyl(.8,1,6,shell,2.6,3,-1.5,20)); g.add(mesh(new THREE.ConeGeometry(1.1,1.4,20),trim,2.6,6.7,-1.5)); g.add(mesh(new THREE.TorusGeometry(4.05,.1,8,48),trim,0,.25,0,false)).children; g.children[g.children.length-1].rotation.x=Math.PI/2; for(let i=0;i<4;i++){ const a=i/4*Math.PI*2+.4; g.add(box(.8,.6,.1,win,Math.cos(a)*3.4,1.8,Math.sin(a)*3.4,false)).children; g.children[g.children.length-1].lookAt(0,1.8,0); } g.userData.door=V3(0,0,4.1); g.userData.w=9; g.userData.d=9; }
   else if(kind==='tiny'){ g.add(mesh(new THREE.SphereGeometry(2.2,28,14,0,Math.PI*2,0,Math.PI/2),shell,0,0,0)); const p=box(1,.8,.05,mat(0x7a6a5a,{roughness:.9}),1.2,1.1,1.5); p.rotation.set(.3,.6,.1); g.add(p); g.add(cyl(.12,.12,1.2,mat(0x6a6a6a,{metalness:.7}),-1.1,2.1,.3,8)); g.add(mesh(new THREE.TorusGeometry(2.25,.08,8,40),trim,0,.2,0,false)).children; g.children[g.children.length-1].rotation.x=Math.PI/2; g.add(box(.6,.5,.08,win,-.9,1.2,1.85,false)); g.userData.door=V3(0,0,2.3); g.userData.w=5; g.userData.d=5; }
-  else { g.add(mesh(new THREE.CylinderGeometry(3.4,3.8,3.4,6),shell,0,1.7,0)); g.add(mesh(new THREE.ConeGeometry(4,2.4,6),trim,0,4.6,0)); g.userData.door=V3(0,0,3.3); g.userData.w=8; g.userData.d=8; }
+  else { // hex house (Jim's): a flat wall faces the door side, so the door sits ON the wall
+    const hx=mesh(new THREE.CylinderGeometry(3.4,3.8,3.4,6),shell,0,1.7,0); hx.rotation.y=Math.PI/6; g.add(hx); const cn=mesh(new THREE.ConeGeometry(4,2.4,6),trim,0,4.6,0); cn.rotation.y=Math.PI/6; g.add(cn);
+    for(const sd of [-1,1]){ const a=sd*Math.PI/3, r=3.14; const w=box(.9,.7,.06,win,Math.sin(a)*r,2.05,Math.cos(a)*r,false); w.rotation.y=a; g.add(w); }
+    g.userData.door=V3(0,0,3.45); g.userData.w=8; g.userData.d=8; }
   const doorM=new THREE.MeshPhysicalMaterial({color:col(0x3a2a4a),roughness:.3,clearcoat:1,emissive:col(0x1a0a2a)});
   const dp=g.userData.door; const door=mesh(new THREE.CircleGeometry(kind==='tiny'?.7:1.1,32,0,Math.PI),doorM,dp.x,0,dp.z-.15,false); g.add(door); g.add(mesh(new THREE.RingGeometry(kind==='tiny'?.7:1.1,kind==='tiny'?.8:1.22,32,1,0,Math.PI),trim,dp.x,0,dp.z-.14,false));
   g.userData.doorMesh=door; return g;
@@ -143,7 +146,7 @@ defineLevel('mars',{
       const sign=mesh(new THREE.PlaneGeometry(2.4,1.2),new THREE.MeshBasicMaterial({map:signT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}),p.x+(i%2?2.5:-2.5),marsHeight(p.x,p.z-d/2-1)+2.2,p.z-d/2-1.2,false); scene.add(sign);
       const post=cyl(.05,.05,1.6,mat(0x3a3e44,{metalness:.8}),sign.position.x,sign.position.y-1.4,sign.position.z,8); scene.add(post);
       const seller=makeAlien({skin:[0x6ae0b0,0xe08a6a,0xb08ae0,0x5fb8e8][i],shirt:[0x1c4a7a,0x3a1a5a,0x2a5a4a,0x5a2fa0][i],accent:[0xffe066,0x7dffb0,0x7dffe8,0xff7af0][i]}); seller.userData.level='mars';
-      const sp=V3(p.x+(i%2?-1.6:1.6),0,p.z-d/2-1.6); seller.position.set(sp.x,marsHeight(sp.x,sp.z),sp.z); seller.rotation.y=0; scene.add(seller);
+      const sp=V3(p.x+(i%2?-1.6:1.6),0,p.z-d/2-1.6); seller.userData.home=sp.clone(); seller.userData.snapGround=true; seller.position.set(sp.x,marsHeight(sp.x,sp.z),sp.z); seller.rotation.y=Math.PI; seller.userData.A.faceYaw=Math.PI; scene.add(seller);   // faces the street, not its own house
       g.updateMatrixWorld(true); const doorW=g.localToWorld(g.userData.door.clone());
       return {kind,g,price,name,seller,sign,door:doorW,sold:false};
     });
@@ -163,12 +166,36 @@ defineLevel('mars',{
     lv.walkers=[];
     const wp=[[V3(-8,0,12),V3(14,0,18),V3(20,0,-4),V3(-4,0,-14)],[V3(18,0,8),V3(-10,0,16),V3(-14,0,-6)],[V3(2,0,20),V3(22,0,2),V3(8,0,-16),V3(-12,0,4)]];
     for(let i=0;i<3;i++){ const r=makeRobot({kind:i===1?'hover':'legs',body:pick([0xe8ecf0,0xc8d0d8]),trim:pick([0xff7a45,0x6dffd8]),face:pick([0x6dffd8,0xffcc33])}); r.userData.level='mars'; r.position.copy(wp[i][0]); scene.add(r); lv.walkers.push({r,loop:wp[i],i:0}); }
-    lv.jim=makeJim(); lv.jim.userData.level='mars'; scene.add(lv.jim);
+    lv.jim=makeJim(); lv.jim.userData.level='mars'; lv.jim.userData.snapGround=true; scene.add(lv.jim);
+    lv.convAlien.userData.home=lv.convAlien.position.clone(); lv.convAlien.userData.snapGround=true;
+    // ---------------- Jim's house: he really lives somewhere now (behind the shops) ----------------
+    { const JP=V3(-15,0,-30); const g=alienHouse('extra'); g.position.set(JP.x,marsHeight(JP.x,JP.z),JP.z); scene.add(g); colCircle(lv.col,JP.x,JP.z,3.9);
+      g.updateMatrixWorld(true); lv.jimHouse=g; lv.jimDoor=g.localToWorld(g.userData.door.clone());
+      const signT=holoSignTex([{text:"JIM'S",font:'bold 76px Arial Black, sans-serif',y:.36},{text:'HOUSE',font:'bold 76px Arial Black, sans-serif',y:.74}],'#ffcc33');
+      const sign=mesh(new THREE.PlaneGeometry(1.7,.85),new THREE.MeshBasicMaterial({map:signT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}),lv.jimDoor.x+2.1,lv.jimDoor.y+2.4,lv.jimDoor.z+.1,false); scene.add(sign);
+    }
+    /* night on Mars (aliens go home, Jim works late): the sky, sun and fog slide to night */
+    { const U=lv.skyU, rig=scene.userData.rig;
+      lv.dayCols={top:U.top.value.clone(),mid:U.mid.value.clone(),hor:U.hor.value.clone(),bot:U.bot.value.clone(),fog:scene.fog.color.clone(),sun:rig.sun.color.clone()};
+      lv.nightCols={top:col(0x04050d),mid:col(0x121226),hor:col(0x46302e),bot:col(0x180d0b),fog:col(0x261a1c),sun:col(0x8a9cff)};
+      lv.sunDay=rig.sun.intensity; lv.hemiDay=rig.hemi.intensity; lv.starsDay=U.stars.value;
+      lv.setNight=function(k){ this.night=k; const U=this.skyU, D=this.dayCols, N=this.nightCols, r=this.scene.userData.rig;
+        for(const key of ['top','mid','hor','bot']) U[key].value.copy(D[key]).lerp(N[key],k);
+        U.stars.value=lerp(this.starsDay,1,k); this.scene.fog.color.copy(D.fog).lerp(N.fog,k);
+        r.sun.intensity=lerp(this.sunDay,.42,k); r.sun.color.copy(D.sun).lerp(N.sun,k); r.hemi.intensity=lerp(this.hemiDay,.2,k);
+        FX.dim=lerp(1,.42,k); };   // the sky light (environment map) stays daytime, so darken the whole picture
+    }
     lv.col.radius=190; lv.col.cx=0; lv.col.cz=0;
     // blowing dust
     lv.dustT=0;
   },
-  enter(){ FX.sunWorld=this.sunWorld; FX.rays=.18; FX.raysColor.set(1,.9,.8); },
+  enter(){ FX.sunWorld=this.sunWorld; FX.rays=.18; FX.raysColor.set(1,.9,.8);
+    // every visit starts in the daytime with everybody home; scenes change it after
+    this.setNight(0);
+    for(const h of this.houses){ const s=h.seller, hm=s.userData.home; s.userData.A.path=null; s.visible=true; s.position.set(hm.x,marsHeight(hm.x,hm.z),hm.z); s.rotation.y=Math.PI; s.userData.A.faceYaw=Math.PI; s.userData.A.look=null; }
+    const c=this.convAlien, ch=c.userData.home; c.userData.A.path=null; c.visible=true; c.position.copy(ch);
+    for(const w of this.walkers) w.r.visible=true; for(const r of this.queue) r.visible=true;
+  },
   update(dt,t){
     const lv=this; WIND.time.value=t;
     for(const w of lv.walkers){ const A=w.r.userData.A; if(!A.path && !w.pause){ w.i=(w.i+1)%w.loop.length; walkTo(w.r,[w.loop[w.i]],1.2).then(()=>{ w.pause=true; later(rand(1,3),()=>w.pause=false); }); } w.r.position.y=lv.ground(w.r.position.x,w.r.position.z); }

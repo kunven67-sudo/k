@@ -7,13 +7,13 @@ CHECKPOINTS.B1=async()=>{
   setCheckpoint('B1'); const F=F_();
   PLAYER.eye=1.64; PLAYER.lock(); crosshair(true); setVM(true);
   const jim=lv.jim; jim.visible=true; jim.position.set(0,0,-4.6); jim.rotation.y=0; setMood(jim,'worried'); jim.userData.A.path=null;
-  F.pieces=0; F.installed=0;
+  F.pieces=0; F.installed=0; F.jimWorking=false; lv.jimBusy=false; jim.userData.snapGround=false; clearPose(jim); if(lv.wrench&&lv.wrench.parent) lv.wrench.parent.remove(lv.wrench);
   for(const p of lv.pieces){ p.collected=false; p.installed=false; p.wrap.visible=true; p.wrap.traverse(c=>{ if(c.isLight&&c.userData.k0!=null) c.intensity=c.userData.k0; }); for(const c of p.wrap.children) c.visible=true; }
   for(const k of ROCKET_PARTS){ lv.rocket.userData.parts[k].visible=false; lv.rocket.userData.ghosts[k].visible=true; }
   lv.rocket.position.y=1.5; setRocketFlame(lv.rocket,0);
   if(!lv.interSetup){ lv.interSetup=true;
     addInteract(lv,{obj:jim,offset:V3(0,1.6,0),label:'Talk to Jim',reach:2.6,when:()=>!F_().moonTalked,act:()=>runStory(moonTalk)});
-    addInteract(lv,{obj:jim,offset:V3(0,1.6,0),label:'Talk to Jim',reach:2.6,when:()=>F_().moonTalked&&!F_().rocketDone,act:()=>bark('Jim',pick(["Five pieces! They're glowing, you can't miss 'em.","You can only carry one at a time, so bring 'em back one by one.","Look for the yellow beams of light!"]),jim,3)});
+    addInteract(lv,{obj:jim,offset:V3(0,1.6,0),label:'Talk to Jim',reach:2.6,when:()=>F_().moonTalked&&!F_().rocketDone,act:()=>{ const lvm=LEVELS.moon; if(lvm.jimBusy) return; lvm.jimBusy=true; jim.userData.A.look='player'; facePoint(jim,PLAYER.pos); setPose(jim,'talk'); bark('Jim',pick(["Five pieces! They're glowing, you can't miss 'em.","You can only carry one at a time, so bring 'em back one by one.","Look for the yellow beams of light!","I'm bolting on what we've got. You find the rest."]),jim,3); later(3,()=>{ jim.userData.A.look=null; clearPose(jim); lvm.jimBusy=false; }); }});
     for(const p of lv.pieces) addInteract(lv,{obj:p.wrap,offset:V3(0,.6,0),label:()=>'Grab the '+PART_NAMES[p.key].toLowerCase(),reach:2.4,when:()=>F_().moonTalked&&!p.collected,act:()=>grabPiece(p)});
     addInteract(lv,{pos:V3(lv.rocketPos.x,1.6,lv.rocketPos.z),label:()=>PLAYER.carry?'Put the '+PART_NAMES[PLAYER.carry.key].toLowerCase()+' on the rocket':(F_().rocketDone?'Get on the rocket ship':'Rocket ('+F_().installed+'/5 pieces)'),reach:6.2,aim:false,when:()=>F_().moonTalked&&(!!PLAYER.carry||F_().rocketDone),act:()=>{ if(PLAYER.carry) installPiece(); else if(F_().rocketDone) runStory(launchRocket); }});
     for(const c of lv.colonists) addTrigger(lv,{pos:c.h.position,r:2.2,once:false,when:()=>F_().moonTalked,fn:()=>nagOnce('col'+lv.colonists.indexOf(c),20,()=>bark('Alien',pick(["Bug food? Ew. No thanks.","Oh, it's the bug guy's friend. Hi.","I'd rather eat moon dust.","Still selling bugs? On the MOON?"]),c.h,2.6))});
@@ -39,6 +39,51 @@ async function moonTalk(){
   PLAYER.free(); objective('Find the rocket pieces: <b>0</b>/5');
   itemHints([IS_TOUCH?'<kbd>USE</kbd> grab a piece':'<kbd>E</kbd> grab a piece','You can only carry one at a time','<kbd>'+(IS_TOUCH?'⤒':'Space')+'</kbd> low-gravity jump!']);
   toast('Follow the yellow beams!','#ffcc33');
+  runStory(jimBuildsRocket);
+}
+/* Jim works on the rocket while you hunt for the pieces (he used to just stand at his stand) */
+function makeWrench(){ const g=new THREE.Group(), m=mat(0x9aa0a8,{metalness:.9,roughness:.35}); g.add(box(.025,.2,.012,m,0,0,0,false)); g.add(box(.06,.035,.014,m,0,.105,0,false)); g.add(box(.05,.03,.014,m,0,-.1,0,false)); return g; }
+async function jimBuildsRocket(){
+  const lv=LEVELS.moon, jim=lv.jim, RP=lv.rocketPos, F=F_(), tok=STORY.token;
+  if(F.jimWorking) return; F.jimWorking=true;
+  const alive=()=>tok===STORY.token && LV===lv && !F_().launching;
+  jim.userData.snapGround=true; jim.userData.A.look=null;
+  if(!lv.wrench) lv.wrench=makeWrench();
+  const spots=[V3(RP.x+5.8,0,RP.z-.5),V3(RP.x+4.9,0,RP.z+3.2),V3(RP.x+4.4,0,RP.z-3.9)];
+  // walk over from the stand
+  await walkTo(jim,[V3(-3,0,-1),spots[0]],1.5);
+  if(!alive()) return;
+  holdProp(jim,lv.wrench,'R',V3(0,-.05,.04));
+  let i=0;
+  while(alive() && !F_().rocketDone){
+    const sp=spots[i%spots.length]; i++;
+    if(Math.hypot(jim.position.x-sp.x,jim.position.z-sp.z)>.3){ clearPose(jim); await walkTo(jim,sp,1.2); if(!alive()) return; }
+    facePoint(jim,V3(RP.x,0,RP.z));
+    await waitUntil(()=>!lv.jimBusy,30); if(!alive()) return;
+    setPose(jim,'wrench');
+    const end=G.time+rand(4.5,7);
+    while(alive() && G.time<end && !F_().rocketDone){
+      if(lv.jimBusy){ await waitUntil(()=>!lv.jimBusy,30); if(!alive()) return; setPose(jim,'wrench'); facePoint(jim,V3(RP.x,0,RP.z)); }
+      const hp=jim.userData.holdR.getWorldPosition(new THREE.Vector3());
+      sfxAt(hp,()=>(Math.random()<.7?SFX.clank():SFX.bolt()),3);
+      if(Math.random()<.35) lv.glow.burst(hp.clone().add(V3(0,.1,0)),{color:0xffd080,count:10,speed:3,size:.035,life:.45,grav:-9});
+      await wait(rand(.45,.95));
+    }
+    if(!alive()) return;
+    setPose(jim,'think'); await wait(rand(1.2,2)); 
+  }
+  if(alive()){ clearPose(jim); }
+}
+/* Jim stops working, turns to you and says something about the piece you brought */
+const JIM_PIECE_LINES={nozzle:"The engine nozzle! Now it can actually go somewhere.",tank:"The fuel tank! Can't fly without gas. Rocket gas.",fin:"A tail fin! So it flies straight and not in circles.",nose:"The nose cone! Rockets gotta be pointy.",computer:"The navigation computer! So we don't crash into the sun."};
+function jimReact(key,last){
+  const lv=LEVELS.moon, jim=lv.jim, tok=STORY.token; lv.jimBusy=true;
+  jim.userData.A.look='player'; facePoint(jim,PLAYER.pos); setPose(jim,last?'cheer':(Math.random()<.5?'point':'talk'));
+  runStory(async()=>{
+    if(!last) bark('Jim',JIM_PIECE_LINES[key]||"Nice! Keep 'em coming!",jim,3.4);
+    await wait(last?2.4:3.2); if(tok!==STORY.token) return;
+    jim.userData.A.look=null; clearPose(jim); lv.jimBusy=false;
+  });
 }
 /* hide an object but keep its lights in the scene (turning a light off by hiding it makes every shader recompile = a big lag spike) */
 function hideKeepLights(o){ o.traverse(c=>{ if(c.isLight){ c.userData.k0=c.userData.k0??c.intensity; c.intensity=0; } }); for(const c of o.children) if(!c.isLight) c.visible=false; }
@@ -59,6 +104,7 @@ function installPiece(){
   const wp=part.getWorldPosition(new THREE.Vector3());
   sfxAt(wp,()=>SFX.attach(),3); shake(.12);
   for(let i=0;i<4;i++) later(.2+i*.12,()=>lv.glow.burst(wp,{color:0xffd080,count:18,speed:4,size:.05,life:.5,grav:-9}));
+  jimReact(p.key,F.installed>=5);
   if(F.installed>=5){ F.rocketDone=true; unlock('rocket'); objective('The rocket is fully built! Press '+(IS_TOUCH?'USE':'E')+' to go on the rocket ship'); itemHints(null);
     later(1,()=>{ say('It is now fully built.',3); bark('Jim',"You did it! It's done! Get on, get on!",lv.jim,3); }); SFX.objective(); }
   else objective('Find the rocket pieces: <b>'+F.installed+'</b>/5');
@@ -220,6 +266,7 @@ function setupMarsInteractions(lv){
   addInteract(lv,{obj:lv.cooker,offset:V3(0,1.4,0),label:()=>F_().bugFood>0?'Cook the bug food ('+F_().bugFood+')':'Bug Cooker 3000 (no bug food)',reach:2.4,when:()=>F_().day!==2&&F_().shiftOver&&!F_().cooked&&PLAYER.scale>.5,act:()=>{ if(F_().bugFood>0) runStory(cooking); else bark('You',"I don't have any bug food to cook.",null,2.2); }});
   addInteract(lv,{pos:V3(0,.2,0),label:'Chop the bug',reach:.55,aim:false,when:()=>F_().day!==2&&PLAYER.scale<.5&&!!nearestBug(false,.6,true),act:()=>{ const b=nearestBug(false,.6,true); if(b) chopBug(b); }});
   lv.inter[lv.inter.length-1].posFn=true;
+  for(const h of lv.houses) addInteract(lv,{obj:h.seller,offset:V3(0,1.5,0),label:'Talk',reach:2.6,when:()=>F_().day===2&&h.seller.visible&&!F_().nightfall,act:()=>bark('Seller',pick(["Still for sale! Come back when you've got the coins.","Houses don't buy themselves, human."]),h.seller,3)});
   for(const h of lv.houses) addInteract(lv,{obj:h.seller,offset:V3(0,1.5,0),label:'Ask about the house',reach:2.6,when:()=>(F_().houseHunt||F_().day3Buy)&&!h.sold,act:()=>runStory(()=>sellerTalk(h))});
   addInteract(lv,{obj:lv.convAlien,offset:V3(0,1.5,0),label:'Talk to the Alien Converter',reach:2.8,when:()=>F_().houseHunt||F_().day2Convert||F_().day3Buy,act:()=>runStory(converterTalk)});
   const mid=lv.houses.find(h=>h.price===100);
@@ -294,12 +341,52 @@ $('payClose').onclick=()=>{ closeModal('payOverlay'); SFX.uiClick();
   const F=F_(); HUD.cash=50; setCash(50); showCash(true); SFX.cash();
   if(F.day===2){ F.day2Convert=true; objective('Convert your paycheck into alien coins'); PLAYER.free(); const jim=LEVELS.mars.jim; jim.userData.A.look=null; clearPose(jim); return; }
   setCheckpoint('B3');
-  runStory(async()=>{ const jim=LEVELS.mars.jim; jim.userData.A.look=null; walkTo(jim,[V3(-6,0,-12),V3(-20,0,-30)],1.3).then(()=>{ jim.visible=false; });
+  runStory(async()=>{ const jim=LEVELS.mars.jim; jim.userData.A.look=null; clearPose(jim); runStory(()=>jimGoesHome(LEVELS.mars));
     await wait(.6); objective('Find a house to buy'); say('Objective: find a house to buy. You only have fifty dollars. Which is very broke.',4.4); F_().houseHunt=true; PLAYER.free(); laneMarker(); });
 };
 
 /* point the way to Crater Lane (the houses for sale) until you get there */
 function laneMarker(){ const L=V3(12,3,33); setMarker(()=>L,'Houses for sale','m'); runStory(async()=>{ await waitUntil(()=>Math.hypot(PLAYER.pos.x-L.x,PLAYER.pos.z-L.z)<12||!F_().houseHunt); setMarker(null); }); }
+/* ---------- people on Mars have homes ---------- */
+/* who's out on Crater Lane: a seller leaves once their house is sold; nobody hangs around your old house */
+function marsSellers(lv,o={}){
+  const F=F_();
+  for(const h of lv.houses){
+    let gone=!!o.night;
+    if(h.price===50 && (F.day>=2 || F.boughtHouse)) gone=true;
+    if(h.price===100 && (F.boughtBig || o.dome)) gone=true;
+    h.seller.visible=!gone;
+  }
+  if(o.night) lv.convAlien.visible=false;
+}
+/* an alien walks off down the lane and goes home (after selling, or when it gets dark) */
+async function alienGoesHome(a,delay=0){
+  if(!a||!a.visible) return; const tok=STORY.token;
+  await wait(delay); if(tok!==STORY.token||!a.visible) return;
+  const A=a.userData.A; A.look=null; clearPose(a); A.faceNear=false;
+  await walkTo(a,[V3(a.position.x,0,29),V3(-34,0,29)],1.35);
+  if(tok!==STORY.token) return; a.visible=false; A.faceNear=true;
+}
+/* Jim walks home to his own house, around the stand and the buildings, and goes inside */
+async function jimGoesHome(lv){
+  const jim=lv.jim, d=lv.jimDoor, tok=STORY.token; jim.userData.A.look=null; jim.userData.A.sleep=false;
+  const behind=jim.position.z<-4.5;   // behind the stand counter: go out the side first
+  const path=behind?[V3(3.9,0,-6.3),V3(1,0,-10.5),V3(-7,0,-11.5),V3(-11,0,-17.5)]:[V3(-4.6,0,-1.6),V3(-7,0,-8),V3(-11,0,-17.5)];
+  path.push(V3(d.x,0,d.z+1.2),V3(d.x,0,d.z+.3));
+  // start from the closest point on the route (never walk back to the stand first)
+  let best=0, bd=1e9; path.forEach((q,i)=>{ const dd=Math.hypot(q.x-jim.position.x,q.z-jim.position.z); if(dd<bd){ bd=dd; best=i; } });
+  await walkTo(jim,path.slice(best),1.3);
+  if(tok!==STORY.token) return;
+  sfxAt(d,()=>SFX.alienDoor(),2); jim.visible=false;
+}
+/* day 2 evening: it gets dark, the sellers head home, Jim goes home */
+async function marsNightfall(){
+  const lv=LEVELS.mars, F=F_(); if(F.nightfall||LV!==lv) return; F.nightfall=true;
+  runStory(async()=>{ await tweenVal(k=>lv.setNight(k*.9),7); });
+  await wait(1.2); say("It's getting dark. Everybody on Mars is heading home.",3.8);
+  let dl=.5; for(const h of lv.houses) if(h.seller.visible){ runStory(()=>alienGoesHome(h.seller,dl)); dl+=1.4; }
+  if(lv.jim.visible){ clearPose(lv.jim); setMood(lv.jim,'tired'); runStory(()=>jimGoesHome(lv)); }
+}
 /* ================= B3: HOUSE HUNTING ================= */
 CHECKPOINTS.B3=async()=>{
   const lv=await enterLevel('mars',{pos:V3(2,0,2),yaw:Math.PI});
@@ -361,7 +448,7 @@ $('convGo').onclick=()=>{
     toast('+'+v+' ALIEN COINS','#6dffd8');
     bark('Converter','There you go. All converted. Pleasure doing business.',LEVELS.mars.convAlien,3);
     F.converted=true; if(HUD.cash<=0) showCash(false);
-    if(F.day===2){ F.goHome=true; objective(HUD.cash>0?'Go back home (or convert the rest)':'Go back home'); }
+    if(F.day===2){ F.goHome=true; objective(HUD.cash>0?'Go back home (or convert the rest)':'Go back home'); runStory(marsNightfall); }
     else if(F.day===3){ if(HUD.coins>=100){ objective('Buy the Dome Sweet Dome'); const mid=LEVELS.mars.houses.find(h=>h.price===100); setMarker(()=>mid.seller.position.clone().add(V3(0,2.2,0)),'Dome Sweet Dome','m'); } else objective('Convert the rest of your dollars'); }
     else objective(HUD.coins>=50?'Check the other houses for one you can actually buy':'Get more alien coins, then find a house');
     PLAYER.free();
@@ -376,6 +463,7 @@ let BUY_H=null;
 $('buyNo').onclick=()=>{ closeModal('buyOverlay'); SFX.uiBack(); PLAYER.free(); };
 $('buyYes').onclick=()=>{ const h=BUY_H; if(!h||HUD.coins<h.price) return; closeModal('buyOverlay');
   HUD.coins-=h.price; setCoins(HUD.coins); h.sold=true; SFX.keys(); SFX.cash();
+  runStory(()=>alienGoesHome(h.seller,3.4));
   if(F_().day===3){ F_().boughtBig=true; unlock('bigHouse'); toast('YOU BOUGHT A BIGGER HOUSE!','#6dffd8'); bark('Seller','Pleasure doing business, human! Here are your keys.',h.seller,3); objective('Go inside your new house'); setMarker(()=>h.door.clone().add(V3(0,2,0)),'Your new house','m'); PLAYER.free(); return; }
   unlock('house'); F_().boughtHouse=true;
   toast('YOU BOUGHT A HOUSE!','#6dffd8'); bark('Seller','Pleasure doing business, human! Here are your keys.',h.seller,3);
@@ -454,13 +542,22 @@ CHECKPOINTS.B4=async()=>{
   say("It's pretty big on the inside. But not that big. It's like your old house... but alien.",4.6); await wait(4.8);
   say("Alien table. Alien bed. Alien ceiling, alien floor, alien walls. It's crazy.",4.4); PLAYER.free(); await wait(4.6);
   say("And an alien computer. For only fifty alien coins. But hey, it's alien.",4.2); await wait(3);
-  objective('Check out your new house, then go to sleep');
+  F.tourNeeded=true; F.tour={}; F.tourDone=false;
+  objective('Check out your new house: <b>0</b>/2');
 };
+/* day 1: look at the table and the computer before the bed unlocks */
+function houseTour(k){
+  const F=F_(); if(!F.tourNeeded||F.tourDone) return; F.tour=F.tour||{}; F.tour[k]=true;
+  const n=Object.keys(F.tour).length;
+  if(n>=2){ F.tourDone=true; later(.8,()=>{ objective('Go to sleep'); SFX.objective(); }); }
+  else objective('Check out your new house: <b>'+n+'</b>/2',true);
+}
 function setupHouseInteractions(lv){
   if(lv.interSetup) return; lv.interSetup=true;
-  addInteract(lv,{obj:lv.bed,offset:V3(0,.6,0),label:'Go to sleep',reach:2.4,when:()=>!F_().noSleep&&!F_().alarm,act:()=>runStory(sleepInBed)});
-  addInteract(lv,{obj:lv.pc,offset:V3(0,1.2,0),label:'Use the alien computer',reach:2.2,when:()=>!F_().alarm,act:()=>openAlienPC()});
-  addInteract(lv,{obj:lv.table,offset:V3(0,1,0),label:'Alien table',reach:2.2,when:()=>!F_().alarm,act:()=>bark('You',pick(["An alien table. It's floating. Kind of.","The fruit is glowing. I'm not eating that."]),null,2.6)});
+  const tourLeft=()=>F_().tourNeeded&&!F_().tourDone;
+  addInteract(lv,{obj:lv.bed,offset:V3(0,.6,0),label:()=>tourLeft()?'Bed (look around first)':'Go to sleep',reach:2.4,when:()=>!F_().noSleep&&!F_().alarm,act:()=>{ if(tourLeft()){ bark('You',"Not yet. I wanna check out the house first.",null,2.6); return; } runStory(sleepInBed); }});
+  addInteract(lv,{obj:lv.pc,offset:V3(0,1.2,0),label:'Use the alien computer',reach:2.2,when:()=>!F_().alarm,act:()=>{ houseTour('pc'); openAlienPC(); }});
+  addInteract(lv,{obj:lv.table,offset:V3(0,1,0),label:'Alien table',reach:2.2,when:()=>!F_().alarm,act:()=>houseTour('table')||bark('You',pick(["An alien table. It's floating. Kind of.","The fruit is glowing. I'm not eating that."]),null,2.6)});
   addInteract(lv,{pos:V3(0,1,5.9),label:'Go outside',reach:2.2,aim:false,when:()=>!!F_().canLeave,act:()=>runStory(F_().day===3?openDoorDay3:goOutsideDay2)});
   addInteract(lv,{obj:lv.clock,offset:V3(0,.15,0),label:'Turn off the alarm',reach:2.6,when:()=>!!F_().alarm,act:()=>runStory(slapAlarm)});
 }
