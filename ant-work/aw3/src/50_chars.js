@@ -83,7 +83,7 @@ function makeWorldArm(side){
   const wrist=mesh(GC('vmWrist',()=>new THREE.CylinderGeometry(.029,.031,.06,14)),skinM,0,0,-.31); wrist.rotation.x=Math.PI/2; g.add(wrist);
   const handG=new THREE.Group(); handG.position.set(0,0,-.33); handG.rotation.x=Math.PI/2; g.add(handG);
   const H=makeHand(side,skinM); handG.add(H.grp); H.grp.rotation.y=side>0?-.3:.3;
-  for(const fg of H.fingers){ fg.a.rotation.x=-.25; fg.b.rotation.x=-.3; }
+  for(const fg of H.fingers){ fg.a.rotation.x=-.25; fg.b.rotation.x=-.3; if(fg.c) fg.c.rotation.x=-.25; }
   g.userData={H,skinM,sleeveM};
   { const el=V3(0,0,.2), sh=V3(side*.24,.5,.55), d=sh.clone().sub(el), L=d.length(); const up=mesh(new THREE.CylinderGeometry(.06,.05,L,14),sleeveM,0,0,0); up.position.copy(el).addScaledVector(d,.5); up.quaternion.setFromUnitVectors(V3(0,1,0),d.normalize()); g.add(up); g.add(mesh(new THREE.SphereGeometry(.055,14,10),sleeveM,el.x,el.y,el.z)); }
   if(side>0){ const w=new THREE.Group(); w.position.set(0,0,-.281); g.add(w);

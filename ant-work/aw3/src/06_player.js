@@ -301,7 +301,7 @@ function updateViewModel(dt,t){
   L.position.set(...lp); R.position.set(...rp); L.rotation.set(...lr); R.rotation.set(...rr);
   // checking the watch: turn the wrist so the screen faces you
   if(P.watchLook>0&&!P.swim){ const k=smooth(P.watchLook); L.quaternion.slerp(watchQuat(),k); }
-  for(const [A,f] of [[L,lf],[R,rf]]){ const H=A.userData.H; for(const fg of H.fingers){ fg.a.rotation.x=-f*1.25; fg.b.rotation.x=-f*1.35; } H.thumb2.rotation.x=-f*.7; }
+  for(const [A,f] of [[L,lf],[R,rf]]){ const H=A.userData.H; for(const fg of H.fingers){ fg.a.rotation.x=-f*1.25; fg.b.rotation.x=-f*1.35; if(fg.c) fg.c.rotation.x=-f*1.0; } H.thumb2.rotation.x=-f*.7; }
   // watch glow
   if(hasWatch){ const g=P.watchGlow||0; VM.watchHolo.material.opacity=g*.9; VM.watchHolo.scale.setScalar(1+g*2+Math.sin(t*10)*.1*g); VM.watchHolo.position.y=.07+g*.02; if(!VM.watchCanvas) VM.watchScr.material.color.copy(col(P.scale<1?0xffb347:0x6dffd8)).multiplyScalar(2.5+g*4+Math.sin(t*3)*.3); }
 }

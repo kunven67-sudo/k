@@ -103,7 +103,7 @@ defineLevel('alienhouse',{
     lv.col.radius=R-.6; lv.col.cx=0; lv.col.cz=0;
   },
   enter(){ FX.sunWorld=null; },
-  setNight(on){ this.night=on; for(const w of this.wins) w.material.color.set(on?0x2a2450:0xffffff).multiplyScalar(on?1:1.5); for(const pl of this.pls) pl.intensity=on?.8:1.8; if(this.rig&&this.rig.hemi) this.rig.hemi.intensity=on?.3:.62; },
+  setNight(on){ this.night=on; for(const w of this.wins) w.material.color.set(on?0x2a2450:0xffffff).multiplyScalar(on?1:1.5); for(const pl of this.pls) pl.intensity=on?1.25:1.8; if(this.rig&&this.rig.hemi) this.rig.hemi.intensity=on?.5:.62; },
   update(dt,t){
     for(const p of this.pods){ p.pod.material.emissiveIntensity=2+Math.sin(t*1.5+p.ph)*1.2; p.pod.position.y+=Math.sin(t+p.ph)*.0008; }
     this.floorMat.emissiveIntensity=.35+Math.sin(t*.8)*.15;

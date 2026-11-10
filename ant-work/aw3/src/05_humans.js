@@ -171,27 +171,38 @@ const THIGH_P=[[0,-.455],[.053,-.445],[.06,-.38],[.074,-.2],[.084,-.07],[.08,0],
 const SHIN_P=[[0,-.43],[.035,-.42],[.039,-.34],[.055,-.17],[.057,-.06],[.054,0],[0,.02]];
 function lathe(key,pts,seg=20,zs=1,xs=1){ return GC('lathe'+key+seg+zs+xs,()=>{ const g=new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(p[0],p[1])),seg); if(zs!==1||xs!==1) g.scale(xs,1,zs); g.computeVertexNormals(); return g; }); }
 function scaleP(P,k,kz){ return P.map(p=>[p[0]*k,p[1]]); }
-/* hand with articulated fingers: returns {grp, fingers:[{a,b}], thumb} */
+/* hand with articulated fingers (3 joints each, nails, a real palm with thickness): returns {grp, fingers:[{a,b,c}], thumb, thumb2} */
+function handSeg(parent,len,r0,r1,skinM){
+  const m=mesh(GC('hseg'+len+'_'+r0+'_'+r1,()=>{ const c=new THREE.CylinderGeometry(r0,r1,len,10); c.translate(0,-len/2,0); return c; }),skinM,0,0,0,false); parent.add(m);
+  parent.add(mesh(GC('hjoint'+r0,()=>new THREE.SphereGeometry(r0*1.02,10,8)),skinM,0,0,0,false)); return m;
+}
 function makeHand(side,skinM){
-  const grp=new THREE.Group();
-  grp.add(mesh(roundedBoxGeo(.075,.085,.028,.012),skinM,0,-.045,0));
+  const grp=new THREE.Group(), s=side*-1;
+  const ell=(key,sx,sy,sz,x,y,z)=>{ const m=mesh(GC(key,()=>{ const g=new THREE.SphereGeometry(1,16,12); g.scale(sx,sy,sz); return g; }),skinM,x,y,z,false); grp.add(m); return m; };
+  // palm: thick in the middle and rounded, with the knuckle pads and the thumb muscle
+  grp.add(mesh(roundedBoxGeo(.076,.08,.026,.012),skinM,0,-.045,0));
+  ell('hBack',.038,.041,.012,0,-.047,-.008);
+  ell('hFront',.035,.038,.011,0,-.045,.007);
+  ell('hPads',.037,.013,.012,0,-.081,.002);
+  const th0=ell('hThenar',.017,.026,.015,.022*s,-.032,.009); th0.rotation.z=.45*s;
+  const nailM=new THREE.MeshPhysicalMaterial({color:(skinM.color?skinM.color.clone():col(0xe8b894)).lerp(col(0xffeee6),.45),roughness:.28,clearcoat:.6,clearcoatRoughness:.3});
   const fingers=[];
+  const P=[.043,.048,.045,.036], M=[.026,.03,.028,.022], D=[.021,.023,.022,.018], R=[.0091,.0095,.009,.0079];
   for(let i=0;i<4;i++){
-    const len=[.042,.047,.044,.036][i], zx=(-.027+i*.018)*side*-1;
-    const a=new THREE.Group(); a.position.set(zx,-.088,0); grp.add(a);
-    a.add(mesh(GC('fing1',()=>{ const c=new THREE.CylinderGeometry(.0078,.0085,1,8); c.translate(0,-.5,0); return c; }),skinM,0,0,0,false)); a.children[0].scale.y=len;
-    a.add(mesh(GC('knuck',()=>new THREE.SphereGeometry(.0088,8,6)),skinM,0,0,0,false));
-    const b=new THREE.Group(); b.position.y=-len; a.add(b);
-    b.add(mesh(GC('fing2',()=>{ const c=new THREE.CylinderGeometry(.0066,.0078,1,8); c.translate(0,-.5,0); return c; }),skinM,0,0,0,false)); b.children[0].scale.y=len*.8;
-    b.add(mesh(GC('ftip',()=>new THREE.SphereGeometry(.0068,8,6)),skinM,0,-len*.8,0,false));
-    b.add(mesh(GC('knuck2',()=>new THREE.SphereGeometry(.0079,8,6)),skinM,0,0,0,false));
-    fingers.push({a,b});
+    const r=R[i];
+    const a=new THREE.Group(); a.position.set((-.0283+i*.0189)*s,-.084,.001); a.rotation.z=(i-1.5)*.035*s; grp.add(a);
+    handSeg(a,P[i],r,r*.94,skinM);
+    const b=new THREE.Group(); b.position.y=-P[i]; a.add(b); handSeg(b,M[i],r*.94,r*.87,skinM);
+    const c=new THREE.Group(); c.position.y=-M[i]; b.add(c); handSeg(c,D[i],r*.87,r*.8,skinM);
+    c.add(mesh(GC('htip'+r,()=>new THREE.SphereGeometry(r*.8,10,8)),skinM,0,-D[i],0,false));
+    const nail=mesh(GC('hnail'+i,()=>{ const g=new THREE.SphereGeometry(1,12,8); g.scale(r*.74,D[i]*.36,r*.3); return g; }),nailM,0,-D[i]*.6,-r*.62,false); c.add(nail);
+    fingers.push({a,b,c});
   }
-  const th=new THREE.Group(); th.position.set(.035*side*-1,-.03,.012); th.rotation.z=.6*side*-1; grp.add(th);
-  th.add(mesh(GC('thumb1',()=>{ const c=new THREE.CylinderGeometry(.009,.011,.04,8); c.translate(0,-.02,0); return c; }),skinM,0,0,0,false));
-  const th2=new THREE.Group(); th2.position.y=-.04; th.add(th2);
-  th2.add(mesh(GC('thumb2',()=>{ const c=new THREE.CylinderGeometry(.0075,.009,.032,8); c.translate(0,-.016,0); return c; }),skinM,0,0,0,false));
-  th2.add(mesh(GC('ttip',()=>new THREE.SphereGeometry(.0078,8,6)),skinM,0,-.032,0,false));
+  const th=new THREE.Group(); th.position.set(.034*s,-.028,.013); th.rotation.z=.62*s; th.rotation.y=-.35*s; grp.add(th);
+  handSeg(th,.036,.0108,.0098,skinM);
+  const th2=new THREE.Group(); th2.position.y=-.036; th.add(th2); handSeg(th2,.03,.0098,.0086,skinM);
+  th2.add(mesh(GC('ttip2',()=>new THREE.SphereGeometry(.0086,10,8)),skinM,0,-.03,0,false));
+  const tn=mesh(GC('tnail2',()=>{ const g=new THREE.SphereGeometry(1,12,8); g.scale(.0068,.012,.0032); return g; }),nailM,0,-.019,-.0066,false); th2.add(tn);
   return {grp,fingers,thumb:th,thumb2:th2};
 }
 function shoeGeo(){ return GC('shoe4',()=>{ const parts=[]; const s=new THREE.SphereGeometry(.5,16,10); const a=s.clone(); a.scale(.105,.085,.255); a.translate(0,-.018,.04); parts.push(a); const sole=new THREE.BoxGeometry(.11,.024,.28); sole.translate(0,-.052,.035); parts.push(sole); const toe=new THREE.SphereGeometry(.5,12,8); toe.scale(.1,.05,.1); toe.translate(0,-.035,.14); parts.push(toe); return mergeGeos(parts); }); }
@@ -470,7 +481,7 @@ function animateHuman(h,dt,t){
   // apply
   for(const j of JOINTS){ const o=J[j]; if(!o) continue; o.rotation.set(R[j][0],R[j][1],R[j][2]); }
   // fingers
-  for(const [side,f] of [['L',fL],['R',fR]]){ const H=U.hands[side].H; for(const fg of H.fingers){ fg.a.rotation.x=-f*1.2; fg.b.rotation.x=-f*1.3; } H.thumb2.rotation.x=-f*.6; }
+  for(const [side,f] of [['L',fL],['R',fR]]){ const H=U.hands[side].H; for(const fg of H.fingers){ fg.a.rotation.x=-f*1.2; fg.b.rotation.x=-f*1.3; if(fg.c) fg.c.rotation.x=-f*.95; } H.thumb2.rotation.x=-f*.6; }
   // --- face: eyes, blinks, brows, mouth ---
   A.saccT-=dt; if(A.saccT<=0){ A.saccT=rand(.25,1.6); A.sacc=[rand(-.12,.12),rand(-.07,.07)]; }
   const eyYaw=clamp((lx-A.yawCur)*1.2+A.sacc[0],-.5,.5), eyPitch=clamp((ly-A.pitchCur)+A.sacc[1],-.35,.35);

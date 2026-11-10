@@ -18,7 +18,7 @@ defineLevel('studio',{
 });
 const DEBUG={
   async run(name){
-    $('splash').classList.add('hide'); G.mode='play';
+    $('splash').classList.add('hide'); G.mode='play'; try{ initAudio(); loadSfxFiles(); loadMusicFiles(); }catch(e){}
     if(name==='studio'||name==='face'){
       await enterLevel('studio',{pos:V3(0,0,3),yaw:0});
       PLAYER.lock();

@@ -169,8 +169,11 @@ function makeDog(){
   g.userData={headJ,tail,legs,tongue,phase:Math.random()*10,speed:0,lastPos:new THREE.Vector3(),head:headJ,A:{talk:false,moodK:{}}};
   return g;
 }
-function animateDog(d,dt,t){ const U=d.userData; d.getWorldPosition(_hw); const mv=_hw.distanceTo(U.lastPos); U.lastPos.copy(_hw); U.speed=damp(U.speed,dt>0?Math.min(6,mv/dt):0,8,dt);
-  const w=Math.min(1,U.speed/1.5); U.legs.forEach((l,i)=>{ l.rotation.x=Math.sin(t*14+(i%2?Math.PI:0)+(i>1?1.5:0))*.6*w; });
+function animateDog(d,dt,t){ const U=d.userData; d.getWorldPosition(_hw); const dx=_hw.x-U.lastPos.x, dz=_hw.z-U.lastPos.z, mv=Math.hypot(dx,dz); U.lastPos.copy(_hw); U.speed=damp(U.speed,dt>0?Math.min(6,mv/dt):0,8,dt);
+  // a real trot: steps follow how far he actually moved (front-right with back-left), and he faces where he's going
+  const w=Math.min(1,U.speed/1.1); U.walkPh=(U.walkPh||0)+Math.min(mv,.5)*7.5; const ph=[0,Math.PI,Math.PI,0];
+  U.legs.forEach((l,i)=>{ l.rotation.x=Math.sin(U.walkPh+ph[i])*.55*w; });
+  if(U.speed>.3&&mv>1e-4&&U.autoFace!==false&&!U.stuck) d.rotation.y=angLerp(d.rotation.y,Math.atan2(dx,dz),Math.min(1,dt*7));
   U.tail.rotation.z=Math.sin(t*(U.happy?18:6))*(U.happy?.7:.3); U.headJ.rotation.x=Math.sin(t*2+U.phase)*.05-(U.A.talk?Math.abs(Math.sin(t*16))*.15:0); U.tongue.visible=!U.stuck; }
 
 /* ---------- XXX5: a growing mass of dark purple blocks with glowing eyes ---------- */

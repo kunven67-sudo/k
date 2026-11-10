@@ -5,5 +5,5 @@ VOICES: Microsoft Edge neural voices via edge-tts (Jay = James, Jim = Andrew, La
 SOUNDS
   Dog bark - "80 CC0 creature SFX" by rubberduck (OpenGameArt) - CC0
   Shaky breathing - "Heavy breathing 3" by ezwa (Wikimedia Commons) - public domain
-  Crying - "Man Crying" by Iwan 'qubodup' Gabovitch (Wikimedia Commons) - CC BY 3.0
+  Crying - "Male crying and weeping" by jacobmathiassen (Wikimedia Commons) - CC BY 3.0
 CODE: three.js r128 - MIT License

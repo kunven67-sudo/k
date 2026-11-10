@@ -333,8 +333,30 @@ const SONGS={
   intro:{bpm:84,chords:['F3 A3 C4 E4','Bb2 D3 F3 A3'],keys:{inst:'pluck',vol:.035,pat:'0.......2.......'},pad:{inst:'pad',vol:.02,cut:800}}
 };
 const MUS={cur:null,name:null,gain:null,step:0,nextT:0,timer:null,duck:1};
+/* real recorded music (OpenGameArt, CC0 / OGA-BY): each song name maps to a track; the old synth songs stay as a fallback */
+const MUSIC_TRACKS={
+  title:'mus_home',home:'mus_home',jim:'mus_home',cook:'mus_home',pizza:'mus_home',drive:'mus_home',
+  tiny:'mus_dream',larry:'mus_dream',dream:'mus_dream',
+  moon:'mus_space',pluto:'mus_space',intro:'mus_space',
+  launch:'mus_hero',fly:'mus_hero',giant:'mus_hero',
+  xxx5:'mus_battle',burning:'mus_battle',hunt:'mus_battle',
+  mars:'mus_mars',houses:'mus_mars',alienHome:'mus_mars',
+  ship:'mus_tense',blocky:'mus_tense',
+  sad:'mus_sad'
+};
+const MUSIC_VOL={mus_home:.5,mus_dream:.6,mus_space:.6,mus_hero:.48,mus_battle:.42,mus_mars:.5,mus_tense:.7,mus_sad:.6};
+function loadMusicFiles(){ const seen=new Set(Object.values(MUSIC_TRACKS)); for(const n of seen) SND.load(n,'assets/music/'+n+'.ogg').then(b=>{ if(b&&MUS.name&&MUSIC_TRACKS[MUS.name]===n&&!MUS.track){ const nm=MUS.name; MUS.name=null; playMusic(nm,2); } }); }
 function playMusic(name,fade=1.5){
   if(!AU.ok) return; if(MUS.name===name) return;
+  const tr=MUSIC_TRACKS[name];
+  if(tr&&SND.has(tr)){
+    if(MUS.track===tr&&MUS.gain){ MUS.name=name; return; }   // same track already playing: keep it going
+    stopMusic(fade);
+    const g=ACtx.createGain(); g.gain.setValueAtTime(.0001,ACtx.currentTime); g.gain.linearRampToValueAtTime(MUSIC_VOL[tr]||.55,ACtx.currentTime+fade); g.connect(musicBus);
+    MUS.name=name; MUS.track=tr; MUS.gain=g; MUS.cur=null; MUS.handles=[SND.play(tr,{dest:g,loop:true})];
+    return;
+  }
+
   stopMusic(fade);
   const song=SONGS[name]; if(!song){ MUS.name=null; return; }
   const g=ACtx.createGain(); g.gain.setValueAtTime(.0001,ACtx.currentTime); g.gain.linearRampToValueAtTime(1,ACtx.currentTime+fade); g.connect(musicBus);
@@ -343,6 +365,7 @@ function playMusic(name,fade=1.5){
 }
 function stopMusic(fade=1){
   if(!AU.ok) return;
+  const hs=MUS.handles||[]; MUS.handles=null; MUS.track=null; if(hs.length){ setTimeout(()=>{ for(const h of hs) h&&h.stop(.05); },Math.max(.05,fade)*1000+60); }
   if(MUS.timer){ clearInterval(MUS.timer); MUS.timer=null; }
   if(MUS.gain){ const g=MUS.gain; g.gain.cancelScheduledValues(ACtx.currentTime); g.gain.setValueAtTime(g.gain.value,ACtx.currentTime); g.gain.linearRampToValueAtTime(.0001,ACtx.currentTime+fade); setTimeout(()=>{ try{ g.disconnect(); }catch(e){} },fade*1000+3000); }
   MUS.cur=null; MUS.name=null; MUS.gain=null;

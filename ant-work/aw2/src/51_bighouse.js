@@ -180,7 +180,7 @@ defineLevel('bighouse',{
     lv.col.radius=R-.45; lv.col.cx=0; lv.col.cz=0;
   },
   enter(){ FX.sunWorld=null; this.setNight(false); },
-  setNight(on){ for(const w of this.wins) w.material.color.set(on?0x2a2450:0xffffff).multiplyScalar(on?1:1.5); for(const pl of this.pls) pl.intensity=on?.7:1.7; if(this.rig&&this.rig.hemi) this.rig.hemi.intensity=on?.28:.6; },
+  setNight(on){ for(const w of this.wins) w.material.color.set(on?0x2a2450:0xffffff).multiplyScalar(on?1:1.5); for(const pl of this.pls) pl.intensity=on?1.2:1.7; if(this.rig&&this.rig.hemi) this.rig.hemi.intensity=on?.48:.6; },
   update(dt,t){
     const lv=this;
     lv.floorMat.emissiveIntensity=.32+Math.sin(t*.8)*.12;
