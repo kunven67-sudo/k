@@ -160,6 +160,7 @@ defineLevel('ship',{
     // XXX5 (hidden until you knock the block over)
     lv.xxx=makeXXX5(1); lv.xxx.visible=false; scene.add(lv.xxx);
     lv.col.bounds=[-5.4,5.4,-21.95,3.9];
+    lv.alarmL=new THREE.PointLight(col(0xff2a1a),0,26,2); lv.alarmL.position.set(0,3.6,-15); scene.add(lv.alarmL); lv.alarmL2=new THREE.PointLight(col(0xff2a1a),0,14,2); lv.alarmL2.position.set(0,2.4,-7.5); scene.add(lv.alarmL2);
   },
   enter(){ FX.sunWorld=null; },
   update(dt,t){
@@ -178,6 +179,7 @@ defineLevel('ship',{
     if(!F.knocked) lv.blockLight.intensity=1.4+Math.sin(t*3)*.3; else if(F.xxxAwake) lv.blockLight.intensity=0;
     if(lv.rat.visible) animateRat(lv.rat,t,!!lv.ratMoving);
     if(lv.xxx.visible){ animateXXX5(lv.xxx,t,{rage:true}); }
+    { const a=lv.alarmOn?Math.max(0,Math.sin(t*5))*(lv.boomT<10?5:3.2):0; lv.alarmL.intensity=a; lv.alarmL2.intensity=a*.7; }
     lv.icLight.material.emissiveIntensity=lv.icOn?(Math.sin(t*12)>0?3:0):0;
     if(lv.ringing){ const k=Math.sin(t*14)>0; lv.armL.userData.scr.material.color.set(k?0xffffff:0x6dffd8).multiplyScalar(k?4:2.5); }
   }
@@ -229,7 +231,7 @@ CHECKPOINTS.B9=async()=>{
   const st=lv.steve; st.visible=true; st.position.set(.1,0,-.55); st.rotation.y=0; st.userData.A.look='player'; setMood(st,'evil'); clearPose(st,0);
   lv.door.open=lv.door.target=0; lv.sideDoor.open=lv.sideDoor.target=0; lv.alex.visible=true; lv.ringing=false; lv.icOn=false; lv.cuffs.forEach((c,i)=>{ c.visible=true; c.position.copy(lv.cuffHome[i]); c.rotation.set(0,(i?lv.armR:lv.armL).rotation.y,0); });
   lv.rat.visible=true; lv.rat.position.set(2.55,0,-2.45); lv.rat.rotation.y=-.6; lv.rat.userData.chew=1;
-  lv.guard=null; F.caught=false; lv.xxxT=0; lv.xxxHits=0; unblockShip(lv);
+  lv.guard=null; F.caught=false; lv.xxxT=0; lv.xxxHits=0; unblockShip(lv); lv.alarmOn=false;
   lv.block.visible=true; lv.blockPivot.rotation.set(0,0,0); lv.blockPivot.position.set(lv.blockPos.x,.95,lv.blockPos.z); lv.xxx.visible=false; FX.pixel=0;
   for(const e of lv.eatables){ e.o.visible=true; e.o.scale.setScalar(1); e.c.r=Math.abs(e.c.r); }
   FX.blackout=1; fade(0,.2); playMusic('ship',2);
@@ -411,9 +413,7 @@ async function knockOver(){
   lookAtPoint(V3(bp.x+.4,.3,bp.z),.4);
   SFX.xxxRoar(); shake(.6); lv.block.visible=false; X.visible=true; F.xxxAwake=true; lv.xxxT=0; lv.xxxHits=0; lv.xxxChase=false;
   await tweenVal(k=>{ X.scale.setScalar(lerp(.25,.7,k)); X.position.y=lerp(.5,1.2,k); },1.3);
-  // everything starts turning blocky... and then normal. Again and again.
-  runStory(async()=>{ while(F_().xxxAwake && LV===lv){ FX.pixel=rand(10,16); SFX.blockGlitch(); shake(.08); await wait(rand(.55,.9)); FX.pixel=0; await wait(rand(.5,1.1)); } FX.pixel=0; });
-  // stuff near it REALLY turns into blocks, spreading out from it
+  // the ship REALLY turns into blocks, a wave spreading out from it (no pixel screen)
   runStory(()=>blockWave(lv));
   // it starts eating stuff
   runStory(async()=>{ for(const e of lv.eatables.slice().sort((a,b)=>a.o.position.distanceTo(X.position)-b.o.position.distanceTo(X.position))){ if(!F_().xxxAwake||LV!==lv) break; await eatThing(lv,X,e); await wait(rand(.3,.8)); } });
@@ -423,27 +423,117 @@ async function knockOver(){
   clearPose(st); walkTo(st,[V3(-2.5,0,-15),V3(-.5,0,-12),V3(0,0,-8)],2.2);
   objective('Get to the exit!'); PLAYER.free();
   later(5,()=>{ if(F_().xxxAwake) lv.xxxChase=true; });   // stay too long and it comes for you
+  runStory(()=>shipCountdown(lv));                          // and it's eating the reactor: the ship WILL blow up
 }
-/* ---------- XXX5's power: round things near it turn into blocks (the wave spreads out from it) ---------- */
-const _bwBox=new THREE.Vector3(), _bwC=new THREE.Vector3(), _bwP=new THREE.Vector3();
-function blockifyMesh(m){
-  if(m.userData.blocked) return false; const g=m.geometry; if(!g) return false;
-  if(!/Cylinder|Sphere|Torus|Cone|Circle|Capsule|Lathe|Tube|Extrude|Ring|Icosahedron|Dodecahedron|Octahedron/.test(g.type)) return false;
-  if(!g.boundingBox) g.computeBoundingBox(); g.boundingBox.getSize(_bwBox); if(Math.max(_bwBox.x,_bwBox.y,_bwBox.z)>3.2) return false;
-  g.boundingBox.getCenter(_bwC);
-  const nb=new THREE.BoxGeometry(Math.max(.03,_bwBox.x),Math.max(.03,_bwBox.y),Math.max(.03,_bwBox.z)); nb.translate(_bwC.x,_bwC.y,_bwC.z);
-  m.userData.origGeo=g; m.geometry=nb; m.userData.blocked=true; return true;
+/* XXX5 eats the ship's reactor: red alarm lights, a countdown, and if you're still on board at 0 the ship blows up with you on it */
+const SHIP_BOOM_SECS=45;
+async function shipCountdown(lv){
+  const tok=STORY.token, alive=()=>tok===STORY.token && F_().xxxAwake && LV===lv;
+  lv.boomT=SHIP_BOOM_SECS; await wait(2.5); if(!alive()) return;
+  lv.alarmOn=true; SFX.alarm(); lv.icOn=true; SFX.radioOn&&SFX.radioOn();
+  bark('Steve',"It's eating the reactor! This whole ship is going to blow up! GET OFF MY SHIP!",null,4,true); later(4,()=>{ lv.icOn=false; });
+  objective('Get to the exit before the ship blows up!');
+  let shown=-1, nextAlarm=6;
+  while(alive()){
+    await wait(.25); if(!alive()) break;
+    if(F_().xxxGot || G.paused) continue;
+    lv.boomT-=.25; nextAlarm-=.25;
+    const n=Math.max(0,Math.ceil(lv.boomT));
+    if(n!==shown){ shown=n; countHUD('0:'+String(n).padStart(2,'0')); if(n<=10&&n>0) SFX.countBeep(n<=3); }
+    if(nextAlarm<=0){ nextAlarm=lv.boomT<12?2.5:6; SFX.alarm(); }
+    if(lv.boomT<=0){ await shipBlowsUp(lv); shown=-1; nextAlarm=6; }
+  }
+  countHUD(null); lv.alarmOn=false;
 }
-function unblockShip(lv){ for(const m of lv.blocked||[]){ if(m.userData.origGeo){ m.geometry.dispose(); m.geometry=m.userData.origGeo; } m.userData.blocked=false; } lv.blocked=[]; }
+async function shipBlowsUp(lv){
+  const F=F_(); F.xxxGot=true; PLAYER.lock(); objective(null); countHUD(null); itemHints&&itemHints(null);
+  SFX.shipBoom(); SFX.boom&&SFX.boom(); flashWhite(1,1.4); shake(1.4); dmgFlash();
+  await tweenVal(k=>{ FX.whiteout=1-k; FX.blackout=k; },1.1);
+  cardShow('THE SHIP BLEW UP','You were still on it. Try again'); await wait(2.4); cardHide();
+  await xxxRetry(lv);
+}
+/* back to right after XXX5 woke up (used when it gets you, or when the ship blows up with you on it) */
+async function xxxRetry(lv){
+  const X=lv.xxx, F=F_(), bp=lv.blockPos;
+  X.position.set(bp.x+.55,1.2,bp.z); X.scale.setScalar(.9); lv.xxxT=0; lv.xxxHits=0; lv.xxxChase=false; lv.boomT=SHIP_BOOM_SECS;
+  PLAYER.pos.set(bp.x-1.7,0,bp.z-1.9); PLAYER.vel.set(0,0,0); lookAtPoint(V3(0,1.3,-21.9),0);
+  await tweenVal(k=>{ FX.blackout=1-k; },.7);
+  F.xxxGot=false; lv.xxxHitCd=false; objective('Get to the exit before the ship blows up!'); PLAYER.free();
+  later(4,()=>{ if(F_().xxxAwake) lv.xxxChase=true; });
+}
+/* ---------- XXX5's power: the ship REALLY turns into BLOCKS (real 3D cubes, no pixel anything).
+   A wave spreads out from it: walls become stacks of big blocks with gaps between them, the floor
+   becomes block tiles, the chair / pedestal / lamps / sign get rebuilt out of little cubes (round
+   things become round-ish piles of cubes), and Steve, Alex and the rat become box people.
+   When the wave reaches you, your own hands turn into blocks. ---------- */
+const _bwBox=new THREE.Vector3(), _bwC=new THREE.Vector3(), _bwB3=new THREE.Box3(), _bwS=new THREE.Vector3(), _bwM=new THREE.Matrix4(), _bwM2=new THREE.Matrix4(), _bwP=new THREE.Vector3();
+const VOX={avg:new Map()};
+function voxAvgTex(tex){ if(VOX.avg.has(tex.uuid)) return VOX.avg.get(tex.uuid); let c=new THREE.Color(1,1,1);
+  try{ const cv=document.createElement('canvas'); cv.width=cv.height=4; const x=cv.getContext('2d'); x.drawImage(tex.image,0,0,4,4); const d=x.getImageData(0,0,4,4).data; let r=0,g=0,b=0; for(let i=0;i<64;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; } c=new THREE.Color(r/4080,g/4080,b/4080).convertSRGBToLinear(); }catch(e){}
+  VOX.avg.set(tex.uuid,c); return c; }
+/* the colour a block of this material should be (glow = it lights up, like the green strips) */
+function voxColor(m){ if(Array.isArray(m)) m=m[0]; const c=m&&m.color?m.color.clone():new THREE.Color(.6,.6,.6);
+  if(m&&m.map&&m.map.image) c.multiply(voxAvgTex(m.map));
+  if(m&&m.emissive&&m.emissiveIntensity>.4&&(m.emissive.r+m.emissive.g+m.emissive.b)>.25) return {c:m.emissive.clone().multiplyScalar(Math.min(3,m.emissiveIntensity)),glow:true};
+  if(m&&m.isMeshBasicMaterial) return {c,glow:true};
+  return {c,glow:false}; }
+/* fill a mesh with cubes (in its own space, so a rotated thing stays rotated). Round shapes keep only the cubes inside the shape. */
+function voxelize(m,out){
+  const g=m.geometry; if(!g.boundingBox) g.computeBoundingBox(); const bb=g.boundingBox; bb.getSize(_bwBox); bb.getCenter(_bwC);
+  m.matrixWorld.decompose(_bwP,new THREE.Quaternion(),_bwS);
+  const W=[Math.abs(_bwBox.x*_bwS.x),Math.abs(_bwBox.y*_bwS.y),Math.abs(_bwBox.z*_bwS.z)], big=Math.max(...W);
+  let b=big>3.2?.5:Math.min(.25,Math.max(.05,big/6));
+  const thin=W.map(w=>w<.03);
+  let n=W.map((w,i)=>thin[i]?1:Math.max(1,Math.round(w/b)));
+  while(n[0]*n[1]*n[2]>1500){ b*=1.3; n=W.map((w,i)=>thin[i]?1:Math.max(1,Math.round(w/b))); }
+  const L=[_bwBox.x,_bwBox.y,_bwBox.z], S=[_bwS.x||1,_bwS.y||1,_bwS.z||1];
+  const cell=L.map((l,i)=>thin[i]?.06/Math.abs(S[i]):l/n[i]);
+  const round=/Sphere|Icosahedron|Dodecahedron|Octahedron|Capsule/.test(g.type)?'ball':/Cylinder|Cone|Circle|Lathe|Ring|Torus/.test(g.type)?'tube':null;
+  const {c,glow}=voxColor(m.material); const gap=.9;
+  for(let i=0;i<n[0];i++) for(let j=0;j<n[1];j++) for(let k=0;k<n[2];k++){
+    const u=(i+.5)/n[0]*2-1, v=(j+.5)/n[1]*2-1, w=(k+.5)/n[2]*2-1;
+    if(round==='ball' && u*u+v*v+w*w>1.15) continue;
+    if(round==='tube'){ const flat=thin[2]?(u*u+v*v):(u*u+w*w); if(flat>1.15) continue; if(/Ring|Torus/.test(g.type)){ const fr=thin[2]?(u*u+v*v):(u*u+w*w); if(fr<.35) continue; } }
+    const lx=thin[0]?_bwC.x-cell[0]/2*Math.sign(S[0]):bb.min.x+(i+.5)*cell[0], ly=thin[1]?_bwC.y-cell[1]/2:bb.min.y+(j+.5)*cell[1], lz=thin[2]?_bwC.z-cell[2]/2:bb.min.z+(k+.5)*cell[2];
+    _bwM2.makeScale(cell[0]*(thin[0]?1:gap),cell[1]*(thin[1]?1:gap),cell[2]*(thin[2]?1:gap)); _bwM2.setPosition(lx,ly,lz);
+    const mm=new THREE.Matrix4().multiplyMatrices(m.matrixWorld,_bwM2);
+    const jit=1+(Math.random()-.5)*.16; out.push({m:mm,c:c.clone().multiplyScalar(jit),glow});
+  }
+}
+function voxBuild(lv,list){
+  for(const glow of [false,true]){ const L=list.filter(e=>e.glow===glow); if(!L.length) continue;
+    const matV=glow?new THREE.MeshBasicMaterial({color:0xffffff}):new THREE.MeshStandardMaterial({color:0xffffff,roughness:.8,metalness:.1,envMap:lv.envMap||null,envMapIntensity:.3});
+    const im=new THREE.InstancedMesh(_U1,matV,L.length); L.forEach((e,i)=>{ im.setMatrixAt(i,e.m); im.setColorAt(i,e.c); });
+    im.instanceMatrix.needsUpdate=true; if(im.instanceColor) im.instanceColor.needsUpdate=true; im.castShadow=!glow; im.receiveShadow=true; im.frustumCulled=false;
+    lv.scene.add(im); lv.voxMeshes.push(im); }
+}
+/* moving things (people, the rat, doors, crates it eats): every part becomes a box, same colour, still moves */
+function boxifyMesh(m){ const g=m.geometry; if(g.type==='BoxGeometry'&&!m.userData.origGeo) return;
+  if(!g.boundingBox) g.computeBoundingBox(); g.boundingBox.getSize(_bwBox); g.boundingBox.getCenter(_bwC);
+  const nb=new THREE.BoxGeometry(Math.max(.02,_bwBox.x),Math.max(.02,_bwBox.y),Math.max(.02,_bwBox.z)); nb.translate(_bwC.x,_bwC.y,_bwC.z);
+  m.userData.origGeo=g; m.geometry=nb; }
+function unblockShip(lv){
+  for(const m of lv.blocked||[]){ if(m.userData.origGeo){ m.geometry.dispose(); m.geometry=m.userData.origGeo; m.userData.origGeo=null; } if(m.userData.voxHidden){ m.visible=true; m.userData.voxHidden=false; } m.userData.blocked=false; }
+  for(const im of lv.voxMeshes||[]){ lv.scene.remove(im); im.dispose&&im.dispose(); im.material.dispose(); }
+  lv.blocked=[]; lv.voxMeshes=[]; lv.handsBlocky=false; if(typeof setVMBlocky==='function') setVMBlocky(false); }
 async function blockWave(lv){
-  const tok=STORY.token, X=lv.xxx; lv.blocked=lv.blocked||[];
-  const skip=new Set([X,camera,lv.steve,lv.alex,lv.rat].filter(Boolean));
-  const list=[]; lv.scene.traverse(o=>{ if(!o.isMesh||o.isInstancedMesh||o.isSkinnedMesh) return; let p=o; while(p){ if(skip.has(p)) return; p=p.parent; } list.push(o); });
-  let R=.5;
+  const tok=STORY.token, X=lv.xxx; lv.blocked=lv.blocked||[]; lv.voxMeshes=lv.voxMeshes||[];
+  const skip=new Set([X,camera,lv.blockPivot,...lv.rings].filter(Boolean));
+  const moving=new Set([lv.steve,lv.alex,lv.rat,lv.door.L,lv.door.R,lv.sideDoor.m,lv.armL,lv.armR,lv.holoEarth,...lv.cuffs,...lv.eatables.map(e=>e.o)].filter(Boolean));
+  const list=[]; lv.scene.traverse(o=>{ if(!o.isMesh||o.isInstancedMesh||o.isSkinnedMesh||!o.geometry) return; let p=o, mv=false; while(p){ if(skip.has(p)) return; if(moving.has(p)) mv=true; if(!p.visible) return; p=p.parent; } list.push({o,mv}); });
+  let R=.6;
   while(tok===STORY.token && F_().xxxAwake && LV===lv){
-    R+=.55; X.getWorldPosition(_bwC); let n=0;
-    for(const m of list){ if(m.userData.blocked) continue; m.getWorldPosition(_bwP); if(_bwP.distanceTo(_bwC)<R && blockifyMesh(m)){ lv.blocked.push(m); n++; } }
-    if(n){ SFX.blockGlitch(); shake(.04); }
+    if(!G.paused){
+      R+=.6; X.getWorldPosition(_bwC); const Xc=_bwC.clone(); const add=[]; let n=0;
+      for(const e of list){ const m=e.o; if(m.userData.blocked||!m.visible) continue; const g=m.geometry; if(!g.boundingBox) g.computeBoundingBox(); _bwB3.copy(g.boundingBox).applyMatrix4(m.matrixWorld);
+        if(_bwB3.distanceToPoint(Xc)>=R) continue;
+        m.userData.blocked=true; lv.blocked.push(m); n++;
+        if(e.mv) boxifyMesh(m); else { voxelize(m,add); m.visible=false; m.userData.voxHidden=true; }
+        if(n<12){ _bwB3.getCenter(_bwP); lv.glow.burst(_bwP.clone(),{color:0xc86aff,count:5,speed:1.4,size:.05,life:.6,grav:-4}); } }
+      if(add.length) voxBuild(lv,add);
+      if(n){ sfxAt(Xc,()=>SFX.blockGlitch(),4); shake(.03); }
+      if(!lv.handsBlocky && PLAYER.pos.distanceTo(Xc)<R){ lv.handsBlocky=true; setVMBlocky(true); SFX.blockGlitch(); shake(.12); bark('You',"My hands... they're blocks!",null,2.6); }
+    }
     await wait(.5);
   }
 }
@@ -520,22 +610,18 @@ function xxxHunt(lv,dt){
 }
 async function xxxGrab(lv){
   const X=lv.xxx, F=F_(); lv.xxxHits=(lv.xxxHits||0)+1; lv.xxxHitCd=true;
-  SFX.xxxRoar(); shake(.7); dmgFlash(); FX.pixel=24;
+  SFX.xxxRoar(); shake(.7); dmgFlash();
   if(lv.xxxHits<2){
     // first time: it snaps at you and throws you back
     const away=PLAYER.pos.clone().sub(X.position); away.y=0; away.normalize();
     PLAYER.vel.addScaledVector(away,9); bark('You',"Whoa! It almost ate me!",null,2.4);
-    await wait(.35); FX.pixel=0; await wait(1.2); lv.xxxHitCd=false; return;
+    await wait(1.55); lv.xxxHitCd=false; return;
   }
   // second time: it gets you. Try again from right after it woke up.
   F.xxxGot=true; PLAYER.lock(); objective(null);
-  await tweenVal(k=>{ FX.pixel=24+k*40; FX.blackout=k; },.9);
+  await tweenVal(k=>{ FX.blackout=k; },.9);
   cardShow('XXX5 GOT YOU','Try again'); await wait(2); cardHide();
-  const bp=lv.blockPos; X.position.set(bp.x+.55,1.2,bp.z); X.scale.setScalar(.9); lv.xxxT=0; lv.xxxHits=0; lv.xxxChase=false;
-  PLAYER.pos.set(bp.x-1.7,0,bp.z-1.9); PLAYER.vel.set(0,0,0); lookAtPoint(V3(0,1.3,-21.9),0);
-  FX.pixel=0; await tweenVal(k=>{ FX.blackout=1-k; },.7);
-  F.xxxGot=false; lv.xxxHitCd=false; objective('Get to the exit!'); PLAYER.free();
-  later(4,()=>{ if(F_().xxxAwake) lv.xxxChase=true; });
+  await xxxRetry(lv);
 }
 async function eatThing(lv,X,e){
   const o=e.o; e.c.r=-Math.abs(e.c.r); // no more collision
@@ -547,7 +633,7 @@ async function eatThing(lv,X,e){
 async function shipEscape(){
   const lv=LEVELS.ship, F=F_(); PLAYER.lock(); objective(null);
   SFX.whoosh(1); await tweenVal(k=>{ FX.whiteout=k; },.7);
-  F.xxxAwake=false; FX.pixel=0;
+  F.xxxAwake=false; FX.pixel=0; countHUD(null); lv.alarmOn=false;
   startFromCheckpointInner('B10');
 }
 

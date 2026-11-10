@@ -13,7 +13,9 @@ Object.assign(SFX,{
   blockGlitch:()=>{ for(let i=0;i<6;i++) tone(110+i*55,.05,'square',.04,i*.03,null,sfxBus,.002,['lowpass',2400]); noise(.2,.1,0,2000,'bandpass',sfxBus,3); },
   shipBoom:()=>{ tone(40,3.5,'sine',.9,0,22); noise(4,.9,0,500,'lowpass',sfxBus,.6,BROWN_BUF,80,.01); noise(1.2,.5,0,3000,'bandpass',sfxBus,.5); },
   jet:()=>noise(.2,.1,0,700,'bandpass',D(),.8,null,500,.03),
-  bark:()=>{ const d=D(); tone(520,.12,'sawtooth',.14,0,380,d,.005,['lowpass',1800]); noise(.1,.18,0,1400,'bandpass',d,1.5); tone(560,.1,'sawtooth',.1,.22,400,d,.005,['lowpass',1800]); noise(.08,.14,.22,1400,'bandpass',d,1.5); },
+  bark:()=>{ /* a REAL recorded dog (4 different woofs); the old beep-bark only if the files are missing */
+    const k=['bark1','bark2','bark3','bark4'].filter(n=>SND.has(n)); if(k.length){ SND.play(pick(k),{vol:.9,rate:rand(.94,1.06),dest:D()}); return; }
+    const d=D(); tone(520,.12,'sawtooth',.14,0,380,d,.005,['lowpass',1800]); noise(.1,.18,0,1400,'bandpass',d,1.5); tone(560,.1,'sawtooth',.1,.22,400,d,.005,['lowpass',1800]); noise(.08,.14,.22,1400,'bandpass',d,1.5); },
   whine:()=>{ const d=D(); tone(900,.5,'sine',.06,0,1300,d,.05); tone(1200,.4,'sine',.05,.45,800,d,.05); },
   nukeArm:()=>{ fm(880,.2,2,2,.08); fm(1320,.35,2,2,.08,.22); tone(220,.6,'square',.04,.1,null,sfxBus,.01,['lowpass',900]); },
   scream:()=>{ const d=D(); const f=700+Math.random()*500; tone(f,1.1,'sawtooth',.04,0,f*1.4,d,.05,['bandpass',1400]); noise(1,.04,0,1800,'bandpass',d,2); },
@@ -152,29 +154,7 @@ function makeRat(){
 function animateRat(r,t,moving){ const U=r.userData; U.headJ.rotation.x=U.chew?Math.sin(t*22)*.18:Math.sin(t*2+U.phase)*.08; U.headJ.rotation.y=Math.sin(t*1.3)*.2; U.tail.rotation.y=Math.sin(t*3)*.25;
   U.legs.forEach((l,i)=>{ l.position.y=.035+(moving?Math.max(0,Math.sin(t*20+i*1.6))*.02:0); }); }
 
-/* ---------- Jeff the dog ---------- */
-function makeDog(){
-  const g=new THREE.Group();
-  const fur=new THREE.MeshPhysicalMaterial({color:col(0xc8904a),roughness:.8,sheen:col(0x6a4a2a)}), dark=mat(0x3a2414,{roughness:.7}), nose=mat(0x111111,{roughness:.2}), white=mat(0xf4ece0,{roughness:.8});
-  const body=mesh(GC('dogBody',()=>{ const q=new THREE.SphereGeometry(.2,20,14); q.scale(1,.9,1.9); return q; }),fur,0,.42,0); g.add(body);
-  const chest=mesh(GC('dogChest',()=>{ const q=new THREE.SphereGeometry(.15,16,12); q.scale(1,1.1,.9); return q; }),white,0,.4,.26); g.add(chest);
-  const headJ=new THREE.Group(); headJ.position.set(0,.62,.38); g.add(headJ);
-  headJ.add(mesh(GC('dogHead',()=>{ const q=new THREE.SphereGeometry(.14,20,16); q.scale(1,.95,1.05); return q; }),fur,0,0,0));
-  headJ.add(mesh(GC('dogSnout',()=>{ const q=new THREE.SphereGeometry(.08,16,12); q.scale(.9,.75,1.3); return q; }),white,0,-.04,.14));
-  headJ.add(sph(.03,nose,0,-.01,.24,10,8,false));
-  for(const sd of [-1,1]){ headJ.add(sph(.022,nose,sd*.06,.04,.11,10,8,false)); const ear=mesh(GC('dogEar',()=>{ const q=new THREE.SphereGeometry(.06,12,10); q.scale(.5,1.4,1); q.translate(0,-.07,0); return q; }),dark,sd*.12,.06,-.02); ear.rotation.z=sd*.3; headJ.add(ear); }
-  const tongue=mesh(GC('dogTongue',()=>{ const q=new THREE.SphereGeometry(.03,10,8); q.scale(1,.3,1.5); return q; }),mat(0xe86a7a,{roughness:.4}),0,-.09,.18,false); headJ.add(tongue);
-  const tail=new THREE.Group(); tail.position.set(0,.5,-.36); g.add(tail); tail.add(mesh(GC('dogTail',()=>{ const c=new THREE.ConeGeometry(.04,.3,8); c.translate(0,.15,0); return c; }),fur,0,0,0)); tail.rotation.x=-.7;
-  const legs=[]; for(const [x,z] of [[.1,.24],[-.1,.24],[.1,-.22],[-.1,-.22]]){ const lg=new THREE.Group(); lg.position.set(x,.36,z); g.add(lg); lg.add(mesh(GC('dogLeg',()=>{ const c=new THREE.CylinderGeometry(.045,.04,.34,10); c.translate(0,-.17,0); return c; }),fur,0,0,0)); lg.add(sph(.05,white,0,-.34,.02,10,8)); legs.push(lg); }
-  g.userData={headJ,tail,legs,tongue,phase:Math.random()*10,speed:0,lastPos:new THREE.Vector3(),head:headJ,A:{talk:false,moodK:{}}};
-  return g;
-}
-function animateDog(d,dt,t){ const U=d.userData; d.getWorldPosition(_hw); const dx=_hw.x-U.lastPos.x, dz=_hw.z-U.lastPos.z, mv=Math.hypot(dx,dz); U.lastPos.copy(_hw); U.speed=damp(U.speed,dt>0?Math.min(6,mv/dt):0,8,dt);
-  // a real trot: steps follow how far he actually moved (front-right with back-left), and he faces where he's going
-  const w=Math.min(1,U.speed/1.1); U.walkPh=(U.walkPh||0)+Math.min(mv,.5)*7.5; const ph=[0,Math.PI,Math.PI,0];
-  U.legs.forEach((l,i)=>{ l.rotation.x=Math.sin(U.walkPh+ph[i])*.55*w; });
-  if(U.speed>.3&&mv>1e-4&&U.autoFace!==false&&!U.stuck) d.rotation.y=angLerp(d.rotation.y,Math.atan2(dx,dz),Math.min(1,dt*7));
-  U.tail.rotation.z=Math.sin(t*(U.happy?18:6))*(U.happy?.7:.3); U.headJ.rotation.x=Math.sin(t*2+U.phase)*.05-(U.A.talk?Math.abs(Math.sin(t*16))*.15:0); U.tongue.visible=!U.stuck; }
+/* Jeff the dog: see 50b_dog.js */
 
 /* ---------- XXX5: a growing mass of dark purple blocks with glowing eyes ---------- */
 function makeXXX5(heads=1){

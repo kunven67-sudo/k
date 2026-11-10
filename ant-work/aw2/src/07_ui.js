@@ -26,7 +26,7 @@ function showLine(){
   for(const h of HUMANS) if(h.userData.A) h.userData.A.talk=false;
   for(const r of ROBOTS) r.userData.A.talk=false;
   if(L.h){ const A=L.h.userData.A; A.talk=true; if(L.mood) (L.h.userData.robot?(A.happy=L.mood==='happy'):setMood(L.h,L.mood)); if(L.pose!==undefined){ if(L.h.userData.robot) A.pose=L.pose; else if(L.pose) setPose(L.h,L.pose); else clearPose(L.h); } }
-  if(L.radio){ $('radio').classList.add('show'); SFX.radioOn(); }
+  if(L.radio){ radioLabel(who); $('radio').classList.add('show'); SFX.radioOn(); }
   DLG.speaking=true;
   const voiceName=L.voice||L.who;
   if(L.silent){ DLG.tts=true; DLG.speaking=false; DLG.babblePitch=0; return; }
@@ -68,11 +68,13 @@ function closeDialogNow(){ DLG.active=false; DLG.cur=null; $('dialog').classList
 $('dialog').addEventListener('click',()=>advanceDialog());
 /* short non-blocking line (radio chatter, barks, nags) */
 let barkTimer=null;
+/* the radio badge says WHO is on the radio (it always said JIM, even when Steve was talking) */
+function radioLabel(who){ const sp=$('radio').querySelector('span'); if(sp) sp.textContent=String(who||'Jim').toUpperCase()+' · RADIO'; }
 function bark(who,text,h,sec=3,radio=false){
   text=funnyText(text);
   const c=$('caption'); c.innerHTML=(who?'<b>'+who+(radio?' (radio)':'')+':</b> ':'')+bleepHTML(text); c.classList.remove('show'); void c.offsetWidth; c.classList.add('show');
   clearTimeout(barkTimer); barkTimer=setTimeout(()=>{ c.classList.remove('show'); if(radio) $('radio').classList.remove('show'); },sec*1000);
-  if(radio){ $('radio').classList.add('show'); SFX.radioOn(); }
+  if(radio){ radioLabel(who); $('radio').classList.add('show'); SFX.radioOn(); }
   if(h){ h.userData.A.talk=true; setTimeout(()=>{ if(!DLG.cur||DLG.cur.h!==h) h.userData.A.talk=false; },Math.min(sec,3.5)*1000); }
   if(!speakLine(who,text,null) && AU.ok){ const p=(VOICE_PROFILES[who]||{babble:170}).babble; let n=Math.min(22,Math.round(text.length/4)); const iv=setInterval(()=>{ (funnyOn()?babbleFunny:babble)(p); if(--n<=0) clearInterval(iv); },100); }
 }
@@ -104,8 +106,8 @@ function fade(to,dur=.6){ const f=$('fade'); f.style.transition='opacity '+dur+'
 function flashWhite(peak=1,dur=.6){ const f=$('flash'); f.style.transition='none'; f.style.opacity=peak; void f.offsetWidth; f.style.transition='opacity '+dur+'s ease-out'; f.style.opacity=0; }
 function letterbox(on){ $('letterbox').classList.toggle('on',on); }
 async function card(t,s='',sec=3){ $('cardT').textContent=t; $('cardS').textContent=s; const c=$('card'); c.classList.add('show'); await wait(sec); c.classList.remove('show'); await wait(1); }
-function cardShow(t,s){ $('cardT').textContent=t; $('cardS').textContent=s; $('card').classList.add('show'); }
-function cardHide(){ $('card').classList.remove('show'); }
+function cardShow(t,s){ $('cardT').textContent=t; $('cardS').textContent=s; $('card').classList.add('show'); $('lockHint').style.visibility='hidden'; }
+function cardHide(){ $('card').classList.remove('show'); $('lockHint').style.visibility=''; }
 function dmgFlash(){ const d=$('dmg'); d.style.opacity=1; setTimeout(()=>d.style.opacity=0,200); }
 function coinBurst(n=12){ const b=$('coinBurst'); for(let i=0;i<n;i++){ const c=document.createElement('span'); c.className='acoin'; c.style.setProperty('--dx',(rand(-260,260))+'px'); c.style.setProperty('--dy',(rand(-240,60))+'px'); c.style.animationDelay=(i*.05)+'s'; b.appendChild(c); setTimeout(()=>c.remove(),1600); } }
 

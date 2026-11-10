@@ -424,7 +424,7 @@ function hasVoiceClip(text,who){ if(typeof AW2_VOICE_WHO==='undefined') return f
 function loadVoiceClip(key){
   if(VCLIP.buf[key]) return Promise.resolve(VCLIP.buf[key]); if(VCLIP.loading[key]) return VCLIP.loading[key];
   if(!AU.ok) return Promise.resolve(null);
-  const p=fetch('assets/voice/'+key+'.mp3').then(r=>{ if(!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then(ab=>new Promise((res,rej)=>ACtx.decodeAudioData(ab,res,rej)))
+  const p=loadBytes('assets/voice/'+key+'.mp3').then(ab=>new Promise((res,rej)=>ACtx.decodeAudioData(ab,res,rej)))
     .then(b=>{ VCLIP.buf[key]=b; return b; }).catch(e=>{ console.warn('voice clip missing',key,e.message); VCLIP.buf[key]=null; return null; });
   VCLIP.loading[key]=p; return p;
 }
@@ -484,11 +484,30 @@ function babble(pitch,dest){
 }
 
 
+/* ---------- loading the game's own sound files ----------
+   Opened straight from the unzipped folder (file://), Edge won't let a page fetch() its own files, so
+   every voice, song and sound used to fail silently (= robot voices, fake bark, no music). Now each sound
+   also ships as a small script (assets/js/<path>.js) that hands its bytes to __awBytes(); scripts DO load
+   from a folder. Served over http it still tries the plain file first. */
+const BYTES={wait:{}};
+window.__awBytes=function(path,b64){ const w=BYTES.wait[path]; if(!w) return; delete BYTES.wait[path];
+  const s=atob(b64), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); for(const f of w.res) f(u.buffer); };
+function loadBytesScript(path){ return new Promise((res,rej)=>{
+  if(BYTES.wait[path]){ BYTES.wait[path].res.push(res); BYTES.wait[path].rej.push(rej); return; }
+  BYTES.wait[path]={res:[res],rej:[rej]};
+  const el=document.createElement('script'); el.src='assets/js/'+path.replace(/^assets\//,'')+'.js'; el.async=true;
+  el.onload=()=>{ el.remove(); const w=BYTES.wait[path]; if(w){ delete BYTES.wait[path]; for(const f of w.rej) f(new Error('empty '+path)); } };
+  el.onerror=()=>{ el.remove(); const w=BYTES.wait[path]; delete BYTES.wait[path]; if(w) for(const f of w.rej) f(new Error('missing '+path)); };
+  document.head.appendChild(el); }); }
+function loadBytes(path){
+  if(location.protocol==='file:') return loadBytesScript(path);
+  return fetch(path).then(r=>{ if(!r.ok) throw new Error(r.status+' '+path); return r.arrayBuffer(); }).catch(()=>loadBytesScript(path));
+}
 /* ---------- real recorded sounds (assets/sfx/<name>.ogg) ---------- */
 const SND={buf:{},loading:{},
   has(n){ return !!SND.buf[n]; },
   load(name,url){ if(SND.buf[name]||SND.loading[name]) return SND.loading[name]||Promise.resolve(SND.buf[name]); if(!AU.ok) initAudio();
-    const p=fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status+' '+url); return r.arrayBuffer(); }).then(ab=>new Promise((res,rej)=>ACtx.decodeAudioData(ab,res,rej)))
+    const p=loadBytes(url).then(ab=>new Promise((res,rej)=>ACtx.decodeAudioData(ab,res,rej)))
       .then(b=>{ SND.buf[name]=b; return b; }).catch(e=>{ console.warn('sound missing',url,e.message); return null; });
     SND.loading[name]=p; return p; },
   play(name,o={}){ const b=SND.buf[name]; if(!b||!AU.ok) return null;
@@ -500,5 +519,5 @@ const SND={buf:{},loading:{},
     src.onended=()=>{ h.done=true; try{ g.disconnect(); if(pn) pn.disconnect(); }catch(e){} if(o.onEnd) o.onEnd(); };
     return h; }
 };
-const SFX_FILES=['bark','crying','sob_breath'];
+const SFX_FILES=['bark1','bark2','bark3','bark4','crying','sob_breath'];
 function loadSfxFiles(){ for(const n of SFX_FILES) SND.load(n,'assets/sfx/'+n+'.ogg'); }

@@ -343,7 +343,7 @@ function updateViewModel(dt,t){
 function setVMBlocky(on){
   if(!VM.arms) return; VM.blocky=on;
   if(on && !VM.blockArms){ const hx=h=>'#'+new THREE.Color(h).getHexString();
-    const skin=new THREE.MeshBasicMaterial({map:flatTex(hx(0xd8a880),.97,6)}), shirt=new THREE.MeshBasicMaterial({map:flatTex(hx(0x2f4d6e),.94,12)});
+    const skin=new THREE.MeshBasicMaterial({map:flatTex(hx(0xd8a880),.97,0)}), shirt=new THREE.MeshBasicMaterial({map:flatTex(hx(0x2f4d6e),.94,0)});
     skin.color.setScalar(.85); shirt.color.setScalar(.85);
     VM.blockMats={skin,shirt,skinMap:skin.map,shirtMap:shirt.map};
     VM.blockArms=[]; for(const A of [VM.arms.L,VM.arms.R]){ const g=new THREE.Group(); const sl=new THREE.Mesh(new THREE.BoxGeometry(.11,.11,.56),shirt); g.add(sl); const hd=new THREE.Mesh(new THREE.BoxGeometry(.11,.11,.16),skin); hd.position.z=-.36; g.add(hd); g.traverse(o=>{ if(o.isMesh) o.renderOrder=10; }); A.add(g); VM.blockArms.push(g); } }
