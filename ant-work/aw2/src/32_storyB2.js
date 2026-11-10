@@ -74,9 +74,22 @@ async function snoreLoop(){
     await wait(2.9);
   }
 }
-function shiftObjective2(){ const F=F_(); if(!F.shiftOn) return; objective('Work until 1:00 PM · alien ants knocked out: <b>'+(F.killed||0)+'</b>'); }
+function shiftObjective2(){ const F=F_(); if(!F.shiftOn) return; objective('Knock out the alien ants before 1:00 PM: <b>'+(F.killed||0)+'</b>/'+(F.antsTotal||12)+' · they\'re going for the food! (food: '+(3-(F.foodEaten||0))+'/3)'); }
+/* the ants got the food, or it's 1 PM and they're still out: start the shift over */
+async function day2Fail(why){
+  const F=F_(); if(F.shiftOver) return; F.shiftOver=true; F.shiftOn=false; PLAYER.lock(); itemHints(null); objective(null); SFX.alarm&&SFX.alarm(); shake(.3);
+  if(PLAYER.scale<.5){ await wait(.5); await growBack(); }
+  await fade(1,.6);
+  cardShow(why==='food'?'THE ANTS ATE THE FOOD':"IT'S 1:00 PM",why==='food'?'Stop them before they reach the stand. Start the shift over':'You have to knock them all out before 1:00 PM. Start the shift over'); await wait(2.6); cardHide();
+  PLAYER.pos.set(0,0,-2.35); PLAYER.vel.set(0,0,0); lookAtPoint(V3(-15,0,2),0);
+  await fade(0,.6); startShiftDay2();
+}
 function startShiftDay2(){
-  const F=F_(); F.shiftOn=true; F.shiftOver=false; F.canShrink=true; F.clock=12*60; F.killed=0; F.bitten=0; F.kos=0;
+  const F=F_(), lv=LEVELS.mars; F.shiftOn=true; F.shiftOver=false; F.canShrink=true; F.clock=12*60; F.killed=0; F.bitten=0; F.kos=0;
+  // the nest under the glowing plants: 12 ants come out of it one by one (no more spawn), and they smell the food at Jim's stand.
+  // Every 3rd one is a big soldier: those bite when you're small.
+  for(const b of lv.bugs) lv.scene.remove(b); lv.bugs.length=0; F.bugsOn=false; F.antsTotal=12; F.foodEaten=0;
+  for(let i=0;i<12;i++){ const b=spawnMarsBug(lv,i%3===0); const a=i/12*Math.PI*2, r=1.2+(i%4)*1.3; b.position.x=lv.bugPatch.x+Math.cos(a)*r; b.position.z=lv.bugPatch.z+Math.sin(a)*r; b.userData.bug.toStand=true; b.userData.bug.delay=4+i*3.2; b.userData.bug.wanderT=0; }
   showClock(true,fmtClock(F.clock)); shiftObjective2();
   itemHints([IS_TOUCH?'<kbd>⌚</kbd> shrink / grow':'<kbd>F</kbd> shrink / grow',IS_TOUCH?'<kbd>👊</kbd> punch':'<kbd>Click</kbd> punch','The ants are by the glowing plants']);
   TOUCH_UI.show({act:true,shrink:true});

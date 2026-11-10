@@ -161,8 +161,8 @@ async function launchRocket(){
 
 /* ================= B2: MARS — the shift ================= */
 const BUGS={alive:0};
-function spawnMarsBug(lv){
-  const aggr=Math.random()<.3; const b=makeMarsBug(aggr,randi(1,999)); b.scale.setScalar(.34);
+function spawnMarsBug(lv,kind){
+  const aggr=kind!=null?!!kind:Math.random()<.3; const b=makeMarsBug(aggr,randi(1,999)); b.scale.setScalar(aggr&&kind!=null?.42:.34);   // day 2: soldiers (the biters) are the BIG ones
   const a=rand(0,6.28), r=rand(1,7); const x=lv.bugPatch.x+Math.cos(a)*r, z=lv.bugPatch.z+Math.sin(a)*r;
   b.rotation.y=rand(0,6.28); b.position.set(0,0,0); b.updateMatrixWorld(true); const bb=new THREE.Box3().setFromObject(b); b.userData.bug.yOff=Math.max(0,-bb.min.y)*.85; b.position.set(x,lv.ground(x,z)+b.userData.bug.yOff,z); lv.scene.add(b); lv.bugs.push(b); return b;
 }
@@ -179,6 +179,9 @@ function updateMarsBugs(dt,t){
     let sp=.18;
     const hunt=B.aggr && shrunk && F.shiftOn!==false && d<2.2 && PLAYER.ctl.move;
     if(hunt){ B.heading=angLerp(B.heading,Math.atan2(dx,dz),dt*4); sp=d>.28?.45:0; }
+    else if(B.toStand && F.shiftOn && B.wanderT>B.delay){   // day 2: they smell the food at Jim's stand and walk to it
+      const tx=lv.stand.position.x-b.position.x, tz=lv.stand.position.z+1-b.position.z, td=Math.hypot(tx,tz); B.heading=angLerp(B.heading,Math.atan2(tx,tz),dt*3); sp=.24;
+      if(td<1.2){ B.remove=true; F.foodEaten=(F.foodEaten||0)+1; SFX.bite&&SFX.bite(); toast('An ant got into the food! ('+F.foodEaten+'/3)','#ff8a6a'); shiftObjective2(); if(F.foodEaten>=3) runStory(()=>day2Fail('food')); } }
     else { B.heading+=Math.sin(B.wanderT*.7+i)*dt*1.2; const hx=lv.bugPatch.x-b.position.x, hz=lv.bugPatch.z-b.position.z; if(Math.hypot(hx,hz)>8) B.heading=angLerp(B.heading,Math.atan2(hx,hz),dt*2); if((B.wanderT%6)>4.5) sp=0; }
     if(B.knock){ b.position.x+=B.knock.x*dt; b.position.z+=B.knock.z*dt; B.knock.multiplyScalar(Math.max(0,1-dt*6)); }
     b.position.x+=Math.sin(B.heading)*sp*dt; b.position.z+=Math.cos(B.heading)*sp*dt; b.position.y=lv.ground(b.position.x,b.position.z)+(B.yOff||0);
@@ -290,12 +293,13 @@ function startShift(){
 on('tick',dt=>{
   if(!LV||LV.name!=='mars') return; const F=F_(); if(!F.shiftOn||F.shiftOver) return;
   F.clock+=dt*.8; showClock(true,fmtClock(F.clock));
+  if(F.day===2&&F.antsTotal){ if((F.killed||0)>=F.antsTotal){ runStory(endShift); return; } if(F.clock>=13*60){ F.clock=13*60; runStory(()=>day2Fail('time')); } return; }
   if(F.clock>=13*60){ F.clock=13*60; runStory(endShift); }
 });
 async function endShift(){
   const F=F_(); if(F.shiftOver) return; F.shiftOver=true; F.shiftOn=false; if(!(F.bitten>0)&&(F.kos||0)>0) unlock('untouchable');
-  SFX.alarm(); showClock(true,'1:00 PM');
-  say('<b>1:00 PM</b> — that\'s the end of your shift!',3.4);
+  SFX.alarm(); showClock(true,F.day===2?fmtClock(F.clock):'1:00 PM');
+  say(F.day===2?'All the ants are knocked out. The food is safe!':'<b>1:00 PM</b> — that\'s the end of your shift!',3.4);
   if(PLAYER.scale<.5){ await wait(.8); await growBack(); }
   itemHints(null);
   if(F.day===2){ F.canShrink=false; showClock(false); objective('Wake up Jim'); return; }
@@ -330,9 +334,8 @@ function showPaycheck(){
   let did=[['Showed up and worked 12:00 – 1:00 PM','$20'],['Chopped '+n+' alien bug'+(n===1?'':'s')+' into bug food','$15'],['Cooked all the bug food','$15']];
   let bonuses=[['Chop 12 or more bugs',n>=12,'+$10'],['Cook with zero burnt batches',burnt===0,'+$10'],['Never get bitten by a bug',!(F.bitten>0),'+$5'],['Hit every STIR!',stirMiss===0&&res.length>0,'+$5']];
   if(F.day===2){ const k=F.killed||0; did=[['Showed up and worked 12:00 – 1:00 PM','$25'],['Knocked out '+k+' alien ant'+(k===1?'':'s'),'$25']]; bonuses=[['Knock out 12 or more alien ants',k>=12,'+$10'],['Never get bitten by an ant',!(F.bitten>0),'+$5']]; }
-  $('payDid').innerHTML=did.map(([t,m])=>'<div class="pl"><span><span class="ck">✔</span>'+t+'</span><span class="m">'+m+'</span></div>').join('');
-  const missed=bonuses.filter(b=>!b[1]);
-  $('payMiss').innerHTML=missed.length?missed.map(([t,,m])=>'<div class="pl miss"><span><span class="ck">✘</span>'+t+'</span><span class="m">'+m+'</span></div>').join(''):'<div class="pl"><span>Nothing! You did everything right.</span></div>';
+  $('payDid').innerHTML=did.map(([t])=>'<div class="pl"><span><span class="ck">✔</span>'+t+'</span><span class="m"></span></div>').join('');
+  $('payMiss').innerHTML='<div class="pl"><span>Jim pays the same every day.</span></div>';   // (it listed +$ bonuses that never changed the pay)
   $('payAmt').textContent='$50.00';
   openModal('payOverlay'); SFX.cash();
   MODAL.onEsc=null; MODAL.onKey=code=>{ if(code==='Enter') $('payClose').click(); };
