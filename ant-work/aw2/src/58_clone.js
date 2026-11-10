@@ -165,7 +165,7 @@ async function growBackInLab(){
   labShard(Lb).visible=true; Lb.beam.material.opacity=.5; Lb.charge=.8;
   $('visor').classList.remove('show');
   PLAYER.fly=false; PLAYER.swim=false; PLAYER.item=null; PLAYER.carry=null; vmCarry(null); setVMBlocky(false); setVMSuit(true); setVM(true);
-  PLAYER.pos.set(0,0,-1.8); PLAYER.y=.24; PLAYER.scale=PLAYER.targetScale=.006; lookAtPoint(V3(0,5,-1.8),0);
+  PLAYER.pos.set(0,0,-1.8); PLAYER.y=.24; PLAYER.eye=1.64; PLAYER.roll=0; PLAYER.scale=PLAYER.targetScale=.006; lookAtPoint(V3(0,5,-1.8),0);   // eye height back to normal (it stayed 0 from swimming = you looked tiny after growing)
   SFX.grow(); SFX.shrinkWarp&&SFX.shrinkWarp(); FX.glitch=.3;
   await tweenVal(k=>{ FX.whiteout=1-k; PLAYER.targetScale=PLAYER.scale=lerp(.006,1,easeOut(k)); PLAYER.fovKick=(1-k)*25; },3,x=>x);
   FX.glitch=0; PLAYER.fovKick=0; shake(.4);
