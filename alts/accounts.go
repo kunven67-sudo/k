@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -19,6 +20,7 @@ type Account struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Color string `json:"color"`
+	Email string `json:"email,omitempty"` // the Gmail used last for phone sign-in (just the address)
 }
 
 // Place is the saved window spot (normal size + whether it was maximized).
@@ -33,6 +35,7 @@ type Settings struct {
 	Place      *Place    `json:"place,omitempty"`
 	MemoryRepo string    `json:"memoryRepo,omitempty"` // saved chats also go to this GitHub repo (owner/name)
 	Look       string    `json:"look,omitempty"`       // Settings > Look
+	Emails     []string  `json:"emails,omitempty"`     // Gmails used for phone sign-in, newest first (addresses only)
 	// GitHub accounts you said are yours: files from download links there open with no Windows warning
 	TrustedGitHub []string `json:"trustedGitHub,omitempty"`
 }
@@ -231,12 +234,23 @@ func loadSettings(path string) (Settings, loadState) {
 }
 
 func saveSettings(path string, s Settings) error {
+	if err := writeSettings(path, s); err != nil {
+		return err
+	}
+	if len(s.Accounts) > 0 {
+		writeSettings(path+".bak", s) // the last list that had accounts: names come back from it if the main file ever loses them
+	}
+	return nil
+}
+
+func writeSettings(path string, s Settings) error {
 	b, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		os.Remove(tmp)
 		return err
 	}
 	return os.Rename(tmp, path)
@@ -257,22 +271,53 @@ func accountFolders(dir string) []string {
 	return ids
 }
 
-// adopt brings back accounts whose folder is still on disk but missing from the list
-// (settings file deleted or broken), so nobody gets logged out by accident.
-func (s *Settings) adopt(dir string) {
-	for _, id := range accountFolders(dir) {
-		if s.find(id) < 0 {
-			s.Accounts = append(s.Accounts, Account{ID: id, Name: s.defaultName(), Color: s.nextColor()})
-		}
-	}
+// deletedMark sits in a login folder the person deleted on purpose (two clicks on Delete). Only
+// folders with it are ever removed: a folder that is just missing from the list is kept and comes back.
+const deletedMark = "deleted.mark"
+
+func isDeleted(folder string) bool {
+	_, err := os.Stat(filepath.Join(folder, deletedMark))
+	return err == nil
 }
 
-// orphans are folders of accounts that were deleted (their delete didn't finish last time).
+// adopt brings back every account whose login folder is on disk but missing from the list
+// (settings file deleted, broken, emptied or old), so nobody gets logged out by accident.
+// Names and colors come from the backup list when it knows them.
+func (s *Settings) adopt(dir string, from *Settings) int {
+	n := 0
+	for _, id := range accountFolders(dir) {
+		if s.find(id) >= 0 || isDeleted(filepath.Join(dir, id)) {
+			continue
+		}
+		a := Account{ID: id, Name: s.defaultName(), Color: s.nextColor()}
+		if from != nil {
+			if i := from.find(id); i >= 0 {
+				a.Name, a.Color = from.Accounts[i].Name, from.Accounts[i].Color
+			}
+		}
+		s.Accounts = append(s.Accounts, a)
+		n++
+	}
+	return n
+}
+
+// trashedAt reads when a login folder went to the trash from its name (<id>-20060102-150405).
+// The folder's own date can't be used: moving it keeps the old one.
+func trashedAt(name string) (time.Time, bool) {
+	if len(name) < 16 || name[len(name)-16] != '-' {
+		return time.Time{}, false
+	}
+	t, err := time.ParseInLocation("20060102-150405", name[len(name)-15:], time.Local)
+	return t, err == nil
+}
+
+// orphans are login folders of accounts deleted on purpose whose delete didn't finish last time.
+// A folder without the deleted mark is never an orphan, whatever the list says.
 func (s *Settings) orphans(dir string) []string {
 	var out []string
 	for _, id := range accountFolders(dir) {
-		if s.find(id) < 0 {
-			out = append(out, filepath.Join(dir, id))
+		if f := filepath.Join(dir, id); s.find(id) < 0 && isDeleted(f) {
+			out = append(out, f)
 		}
 	}
 	return out

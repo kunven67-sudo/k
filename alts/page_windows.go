@@ -117,6 +117,8 @@ func (a *App) page(id string, m pageMsg) {
 		return
 	}
 	switch m.T {
+	case "phone-login", "phone-state", "phone-left":
+		a.phonePage(id, m)
 	case "hello":
 		v.noSmartScreen() // see files_windows.go
 		if p := a.pendingCont[id]; p != "" {
