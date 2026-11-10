@@ -15,7 +15,9 @@ const allLines=fs.existsSync(linesJson)?JSON.parse(fs.readFileSync(linesJson,'ut
 const voiceWho={}; for(const id of ids){ if(allLines[id]) voiceWho[id]=allLines[id].who; else console.warn('voice clip with no line in lines.json (left out):',id); }
 let out=head+'<script>\nconst AW2_VERSION='+JSON.stringify(version)+';\nconst AW2_VOICE_WHO='+JSON.stringify(voiceWho)+';\n</script>\n';
 const mods=fs.readdirSync(SRC).filter(f=>/^\d+[a-z]?_.*\.js$/.test(f)).sort();
-for(const m of mods) out+='<script>\n/* ===== '+m+' ===== */\n'+fs.readFileSync(path.join(SRC,m),'utf8')+'</script>\n';
+const vm=require('vm');
+for(const m of mods){ const code=fs.readFileSync(path.join(SRC,m),'utf8'); try{ new vm.Script(code,{filename:m}); }catch(e){ console.error('SYNTAX ERROR in '+m+': '+e.message+'\n'+(e.stack||'').split('\n').slice(0,3).join('\n')); process.exit(1); }   // never ship a broken file
+  out+='<script>\n/* ===== '+m+' ===== */\n'+code+'</script>\n'; }
 out+=fs.readFileSync(path.join(SRC,'99_tail.html'),'utf8');
 fs.rmSync(OUT,{recursive:true,force:true}); fs.mkdirSync(OUT,{recursive:true});
 fs.writeFileSync(path.join(OUT,'index.html'),out);

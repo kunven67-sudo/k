@@ -31,7 +31,7 @@ defineLevel('drive',{
     lv.parked=[];
     for(let i=0;i<20;i++) for(const sd of [-1,1]){ const x=-40+i*22+r()*6; const h=makeHouse({color:pick(houseCol),roof:pick(roofCol),seed:i*2+(sd>0?1:0),w:rand(8,11),floors:r()<.3?2:1,night:.6}); h.position.set(x,0,sd*17); h.rotation.y=sd>0?Math.PI:0; scene.add(bake(h));
       scene.add(tiledPlane(3,6.6,drivewayM,3,x+5.5,.015,sd*9.7));
-      if(r()<.45){ const pc=makeCar({night:false,paint:pick([0x2a4a8a,0x8a8a8e,0x1a1a1c,0xe8e8e8,0x5a6a3a,0x8a2a2a])}); pc.position.set(x+5.5,0,sd*10.2); pc.rotation.y=sd>0?Math.PI/2:-Math.PI/2; const pb=bake(pc); scene.add(pb); lv.parked.push(pb); }   // baked = a few draw calls each (no lag) }
+      if(r()<.45){ const pc=makeCar({night:false,paint:pick([0x2a4a8a,0x8a8a8e,0x1a1a1c,0xe8e8e8,0x5a6a3a,0x8a2a2a])}); pc.position.set(x+5.5,0,sd*10.2); pc.rotation.y=sd>0?Math.PI/2:-Math.PI/2; const pb=bake(pc); scene.add(pb); lv.parked.push(pb); } }   // parked cars are baked = a few draw calls each (no lag)
     for(let i=0;i<13;i++) for(const sd of [-1,1]){ const x=-30+i*34+r()*10; const h=makeHouse({color:pick(houseCol),roof:pick(roofCol),seed:100+i*2+(sd>0?1:0),w:rand(8,12),floors:r()<.4?2:1,night:.6}); h.position.set(x,0,sd*44); h.rotation.y=sd>0?Math.PI:0; scene.add(bake(h)); }
     const trees=[]; for(let i=0;i<64;i++){ const sd=r()<.5?-1:1; trees.push({x:-60+i*7.4+r()*4,z:sd*(8.5+r()*3.5),h:rand(6,10)}); }
     for(let i=0;i<90;i++){ const sd=r()<.5?-1:1; trees.push({x:-80+r()*(L+160),z:sd*(26+r()*60),h:rand(7,13)}); }

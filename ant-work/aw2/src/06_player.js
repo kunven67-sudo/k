@@ -50,7 +50,7 @@ function updatePlayer(dt,t){
   if(!canMove){ ix=0; iz=0; mag=0; }
   P.inMag=mag;
   P.sprint=canMove && mag>.1 && (keys.ShiftLeft||keys.ShiftRight||TOUCH.run);
-  const sp=P.speed*(P.sprint?1.75:1)*(P.scale<1?Math.max(.35,Math.pow(P.scale,.35)):1)*(P.carry?.85:1);
+  const sp=P.speed*(P.sprint?1.75:1)*(P.scale<1?Math.max(.45,Math.pow(P.scale,.35))*1.25:1)*(P.carry?.85:1);   // tiny = 25% faster than before (asked for)
   const sy=Math.sin(P.yaw), cy=Math.cos(P.yaw);
   if(P.fly){
     camera.getWorldDirection(_fw); _rt.set(cy,0,-sy);

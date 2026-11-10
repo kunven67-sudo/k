@@ -179,13 +179,21 @@ async function keypadScene(){
   await camShot(V3(-1.5,2.1,-1.2),kpW.clone().add(V3(0,-.3,0)),{dur:1.2,fov:48});
   const closeP=kp.localToWorld(V3(-.05,1.42,.75));
   await camShot(closeP,kp.localToWorld(V3(0,1.3,0)),{dur:1,fov:30,dof:.8,focus:.78,range:.25});
-  setPose(jim,'type');
+  // Jim REALLY presses each key: his index finger goes to the key, pushes it in, comes back off it
+  setPose(jim,'press',.3); const JA=jim.userData.A; JA.pointF='R';
+  const kpN=V3(0,0,1).applyQuaternion(kp.getWorldQuaternion(new THREE.Quaternion())), tgt=lv.keys['5'].getWorldPosition(V3()).addScaledVector(kpN,.08);
+  let aimW=0, aimT=1; const prevCustom=JA.custom; JA.custom=(R,t,dt,A)=>{ if(prevCustom) prevCustom(R,t,dt,A); aimW=damp(aimW,aimT,7,dt); aimArm(jim,'R',tgt,R,aimW); };
+  await wait(.45);
+  const press=async(k,onDown)=>{ const kw=k.getWorldPosition(V3()), z0=k.position.z;
+    await tweenVal(u=>{ tgt.copy(kw).addScaledVector(kpN,lerp(.06,.004,u)); },.24);
+    k.position.z=z0-.01; onDown(); await wait(.12); k.position.z=z0;
+    await tweenVal(u=>{ tgt.copy(kw).addScaledVector(kpN,lerp(.004,.05,u)); },.16); };
   let code='';
-  for(const d of ['5','6','8','4']){ await wait(.55); code+=d; const k=lv.keys[d]; k.position.z=.045; setTimeout(()=>k.position.z=.055,140); sfxAt(kpW,()=>SFX.keyBeep(+d),1); lv.kpScreen.draw(code,''); }
-  await wait(.6);
-  setPose(jim,'press'); lv.greenBtn.position.z=.05; setTimeout(()=>lv.greenBtn.position.z=.06,200); lv.greenBtn.material.emissiveIntensity=4;
-  sfxAt(kpW,()=>{ SFX.bigButton(); SFX.keyOK(); },1); lv.kpScreen.draw(code,'ok');
-  await wait(.9);
+  for(const d of ['5','6','8','4']) await press(lv.keys[d],()=>{ code+=d; sfxAt(kpW,()=>SFX.keyBeep(+d),1); lv.kpScreen.draw(code,''); });
+  await wait(.25);
+  await press(lv.greenBtn,()=>{ lv.greenBtn.material.emissiveIntensity=4; sfxAt(kpW,()=>{ SFX.bigButton(); SFX.keyOK(); },1); lv.kpScreen.draw(code,'ok'); });
+  aimT=0; await wait(.45); JA.custom=prevCustom||null; JA.pointF=null;
+  await wait(.5);
   clearPose(jim);
   // the hatch opens
   await camShot(V3(-3.2,2.6,-1.6),V3(0,.3,-5.3),{dur:0,fov:50}); FX.dof=0;

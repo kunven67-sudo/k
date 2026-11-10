@@ -411,6 +411,20 @@ const _lk=new THREE.Vector3(), _hw=new THREE.Vector3();
 let HAND_TWIST=-1.35;
 const JOINTS=['hips','spine','chest','head','shL','shR','elL','elR','hdL','hdR','thL','thR','knL','knR','ftL','ftR'];
 const _R={}; for(const j of JOINTS) _R[j]=[0,0,0];
+/* aim an arm so the INDEX FINGERTIP lands on a world point (2-bone IK: shoulder + elbow).
+   w = how much (0..1) it overrides the current pose. Used for pressing real buttons. */
+const _ik={a:new THREE.Vector3(),b:new THREE.Vector3(),c:new THREE.Vector3(),d:new THREE.Vector3(),q:new THREE.Quaternion()};
+function aimArm(h,side,target,R,w=1,finger=.17){
+  const J=h.userData.J, sh=J['sh'+side], el=J['el'+side], hd=J['hd'+side]; if(!sh||!el||!hd||w<=0) return;
+  sh.getWorldPosition(_ik.a); el.getWorldPosition(_ik.b); hd.getWorldPosition(_ik.c);
+  const sc=h.getWorldScale(_ik.d).x, a=_ik.a.distanceTo(_ik.b), b=_ik.b.distanceTo(_ik.c)+finger*sc;
+  const dW=_ik.d.copy(target).sub(_ik.a); const D=Math.max(.05,Math.min(dW.length(),a+b-.002)); dW.normalize();
+  sh.parent.getWorldQuaternion(_ik.q).invert(); dW.applyQuaternion(_ik.q);
+  const gam=Math.acos(clamp((a*a+b*b-D*D)/(2*a*b),-1,1)), alp=Math.acos(clamp((a*a+D*D-b*b)/(2*a*D),-1,1));
+  const tz=Math.asin(clamp(dW.x,-1,1)), tx=Math.atan2(-dW.z,-dW.y)+alp;
+  const S=R['sh'+side], E=R['el'+side], H=R['hd'+side];
+  S[0]=lerp(S[0],tx,w); S[1]=lerp(S[1],0,w); S[2]=lerp(S[2],tz,w); E[0]=lerp(E[0],-(Math.PI-gam),w); E[1]=lerp(E[1],0,w); E[2]=lerp(E[2],0,w); H[0]=lerp(H[0],0,w); H[2]=lerp(H[2],0,w);
+}
 function animateHuman(h,dt,t){
   const U=h.userData, J=U.J, A=U.A;
   if(!h.visible) return;
@@ -487,6 +501,7 @@ function animateHuman(h,dt,t){
   if(h.userData.holdR && h.userData.holdR.children.some(c=>c.visible)) fR=Math.max(fR,.82);
   if(h.userData.holdL && h.userData.holdL.children.some(c=>c.visible)) fL=Math.max(fL,.82);
   for(const [side,f] of [['L',fL],['R',fR]]){ const H=U.hands[side].H; for(const fg of H.fingers){ fg.a.rotation.x=-f*1.2; fg.b.rotation.x=-f*1.3; if(fg.c) fg.c.rotation.x=-f*.95; } H.thumb2.rotation.x=-f*.6; }
+  if(A.pointF){ const fg=U.hands[A.pointF].H.fingers[0]; fg.a.rotation.x=0; fg.b.rotation.x=-.08; if(fg.c) fg.c.rotation.x=-.05; }   // index finger out (pressing buttons)
   // --- face: eyes, blinks, brows, mouth ---
   A.saccT-=dt; if(A.saccT<=0){ A.saccT=rand(.25,1.6); A.sacc=[rand(-.12,.12),rand(-.07,.07)]; }
   const eyYaw=clamp((lx-A.yawCur)*1.2+A.sacc[0],-.5,.5), eyPitch=clamp((ly-A.pitchCur)+A.sacc[1],-.35,.35);
