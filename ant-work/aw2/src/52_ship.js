@@ -154,8 +154,14 @@ defineLevel('ship',{
   update(dt,t){
     const lv=this, F=F_();
     const d=lv.door; d.open=damp(d.open,d.target,5,dt); d.L.position.x=-.4-d.open*.8; d.R.position.x=.4+d.open*.8;
-    if(F.freed && !F.knocked){ const near=Math.hypot(PLAYER.pos.x,PLAYER.pos.z+4)<2.4; const t2=near?1:0; if(t2!==d.target){ d.target=t2; sfxAt(V3(0,1.2,-4),()=>SFX.hydraulic(),2); } }
+    if(F.freed && !F.knocked){ const gd=lv.guard; const near=Math.hypot(PLAYER.pos.x,PLAYER.pos.z+4)<2.4 || (gd&&gd.visible&&Math.hypot(gd.position.x,gd.position.z+4)<2.3); const t2=near?1:0; if(t2!==d.target){ d.target=t2; sfxAt(V3(0,1.2,-4),()=>SFX.hydraulic(),2); } }
     const sd=lv.sideDoor; sd.open=damp(sd.open,sd.target,5,dt); sd.m.position.z=-7.5-sd.open*1.35; if(lv.holoEarth){ lv.holoEarth.rotation.y=t*.5; }
+    if(F.freed && !F.knocked && !F.caught && lv.guard && lv.guard.visible && G.mode==='play' && PLAYER.ctl.move && !DLG.active){
+      const g=lv.guard, dx=PLAYER.pos.x-g.position.x, dz=PLAYER.pos.z-g.position.z, d=Math.hypot(dx,dz)||1;
+      const cosA=(Math.sin(g.rotation.y)*dx+Math.cos(g.rotation.y)*dz)/d;
+      if(d<1.1 || (d<8.5 && cosA>.5 && shipSees(lv,g.position,PLAYER.pos))){ F.caught=true; runStory(()=>shipCaught(g)); }
+    }
+    if(F.xxxAwake && lv.xxx.visible) xxxHunt(lv,dt);
     if(!F.knocked){ lv.block.rotation.y=t*.4; lv.block.position.y=.31+Math.sin(t*1.6)*.02; }
     lv.rings.forEach((r,i)=>{ r.visible=!F.knocked; r.rotation.z=t*(i%2?.8:-.6); r.position.y=1.1+i*.28+Math.sin(t*1.3+i)*.05; });
     if(!F.knocked) lv.blockLight.intensity=1.4+Math.sin(t*3)*.3; else if(F.xxxAwake) lv.blockLight.intensity=0;
@@ -212,6 +218,7 @@ CHECKPOINTS.B9=async()=>{
   const st=lv.steve; st.visible=true; st.position.set(.1,0,-.55); st.rotation.y=0; st.userData.A.look='player'; setMood(st,'evil'); clearPose(st,0);
   lv.door.open=lv.door.target=0; lv.sideDoor.open=lv.sideDoor.target=0; lv.alex.visible=true; lv.ringing=false; lv.icOn=false; lv.cuffs.forEach((c,i)=>{ c.visible=true; c.position.set(i?.34:-.34,.7,.98); c.rotation.set(0,0,0); });
   lv.rat.visible=true; lv.rat.position.set(2.55,0,-2.45); lv.rat.rotation.y=-.6; lv.rat.userData.chew=1;
+  lv.guard=null; F.caught=false; lv.xxxT=0; lv.xxxHits=0;
   lv.block.visible=true; lv.blockPivot.rotation.set(0,0,0); lv.blockPivot.position.set(lv.blockPos.x,.95,lv.blockPos.z); lv.xxx.visible=false; FX.pixel=0;
   for(const e of lv.eatables){ e.o.visible=true; e.o.scale.setScalar(1); e.c.r=Math.abs(e.c.r); }
   FX.blackout=1; fade(0,.2); playMusic('ship',2);
@@ -225,7 +232,7 @@ CHECKPOINTS.B9=async()=>{
   for(let i=0;i<2;i++){ SFX.clank(); shake(.12); lv.cuffs.forEach(c=>c.position.y=.71); await wait(.12); lv.cuffs.forEach(c=>c.position.y=.7); await wait(.4); }
   lookAtPoint(V3(st.position.x,1.62,st.position.z),.7); await wait(.8);
   const S={h:st,who:'Steve'};
-  await talk([{who:'You',text:"No, no, no... this can't be happening."},{...S,text:"But it is.",mood:'evil'},{who:'You',text:"Why do you want this? Wh—",auto:.2},{...S,text:"Because...",mood:'sad'}]);
+  await talk([{who:'You',text:"No, no, no... this can't be happening."},{...S,text:"But it is.",mood:'evil'},{...S,text:"Nice watch, by the way. It led me right to you.",mood:'evil'},{who:'You',text:"Why do you want this? Wh—",auto:.2},{...S,text:"Because...",mood:'sad'}]);
   await steveFlashback();
   await talk([{...S,text:"So that's why I'm going to. And when I do...",mood:'angry'},{...S,text:"Every one of you humans is going to pay.",mood:'evil',pose:'hips'}]);
   // the intercom
@@ -352,10 +359,13 @@ async function ratFree(){
   say('It bites through the metal. You can move!',3.6);
   lv.armL.visible=lv.armR.visible=false; setVM(true); crosshair(true); VM.forceShow=true; PLAYER.watchLook=1; await wait(1.2); PLAYER.watchLook=0; VM.forceShow=false;
   await tweenVal(k=>{ PLAYER.eye=lerp(1.16,1.64,k); PLAYER.pos.z=lerp(1.2,.55,k); PLAYER.pitch=lerp(PLAYER.pitch,0,k); },1);
-  objective('Find a way out'); PLAYER.free();
+  objective("Find a way out. Don't let them see you!"); PLAYER.free();
+  runStory(shipPatrol);
 }
 async function knockOver(){
-  const lv=LEVELS.ship, F=F_(), st=lv.steve; if(F.knocked) return; PLAYER.lock(); objective(null);
+  const lv=LEVELS.ship, F=F_(), st=lv.steve; if(F.knocked||F.caught) return; F.knocked=true; PLAYER.lock(); objective(null);
+  // the patrol stops: Alex goes back to the control room, Steve comes for you
+  lv.guard=null; lv.alex.userData.A.path=null; lv.alex.position.set(5.3,0,-6.4); lv.alex.rotation.y=-2.2; clearPose(lv.alex); lv.alex.userData.A.look=null;
   // the control room door hisses open behind you... footsteps...
   sfxAt(V3(1.3,1.2,-7.5),()=>SFX.hydraulic(),3); lv.sideDoor.target=1; await wait(.6);
   const pp=PLAYER.pos.clone();
@@ -370,7 +380,7 @@ async function knockOver(){
   const bp=lv.blockPos; const to=V3(bp.x-.5,0,bp.z-.45);
   for(let s2=0;s2<2;s2++){ const a=PLAYER.pos.clone(), b=a.clone().lerp(to,s2?1:.5); await tweenVal(k=>{ PLAYER.pos.lerpVectors(a,b,k); PLAYER.roll=Math.sin(k*Math.PI)*(s2?-.1:.1); PLAYER.eye=1.64-Math.sin(k*Math.PI)*.08; },.22); SFX.step('metal',1.3); }
   VM.handsLook=0;
-  SFX.thud(); shake(.4); PLAYER.pitch=-.1; F.knocked=true; unlock('idiot');
+  SFX.thud(); shake(.4); PLAYER.pitch=-.1; unlock('idiot');
   // slow motion: the block rocks on the pedestal... and tips
   letterbox(true); const pv=lv.blockPivot;
   camShot(V3(bp.x+2.2,.9,bp.z+1.8),V3(bp.x,.9,bp.z),{dur:.3,fov:40});
@@ -387,7 +397,7 @@ async function knockOver(){
   playMusic('xxx5',.2);
   const X=lv.xxx; X.position.set(bp.x+.55,.5,bp.z); X.rotation.y=Math.atan2(PLAYER.pos.x-X.position.x,PLAYER.pos.z-X.position.z); X.scale.setScalar(.25);
   lookAtPoint(V3(bp.x+.4,.3,bp.z),.4);
-  SFX.xxxRoar(); shake(.6); lv.block.visible=false; X.visible=true; F.xxxAwake=true;
+  SFX.xxxRoar(); shake(.6); lv.block.visible=false; X.visible=true; F.xxxAwake=true; lv.xxxT=0; lv.xxxHits=0; lv.xxxChase=false;
   await tweenVal(k=>{ X.scale.setScalar(lerp(.25,.7,k)); X.position.y=lerp(.5,1.2,k); },1.3);
   // everything starts turning blocky... and then normal. Again and again.
   runStory(async()=>{ while(F_().xxxAwake && LV===lv){ FX.pixel=rand(10,16); SFX.blockGlitch(); shake(.08); await wait(rand(.55,.9)); FX.pixel=0; await wait(rand(.5,1.1)); } FX.pixel=0; });
@@ -398,6 +408,97 @@ async function knockOver(){
   await talk([{h:st,who:'Steve',text:"YOU IDIOT! What have you done!",mood:'angry',pose:'startle'}]);
   clearPose(st); walkTo(st,[V3(-2.5,0,-15),V3(-.5,0,-12),V3(0,0,-8)],2.2);
   objective('Get to the exit!'); PLAYER.free();
+  later(5,()=>{ if(F_().xxxAwake) lv.xxxChase=true; });   // stay too long and it comes for you
+}
+/* ---------- the patrol: after the rat frees you, Steve and Alex take turns walking the ship.
+   If one of them SEES you (in front of them, nothing in the way), you're dragged back to the chair. ---------- */
+const SHIP_ROUTES={
+  steve:[V3(3.2,0,-7.5),V3(.3,0,-7.5),V3(0,0,-4.9),V3(0,0,-2.3),'look',V3(0,0,-4.9),V3(.3,0,-7.5),V3(3.2,0,-7.5)],
+  alex:[V3(4.6,0,-7.2),V3(.3,0,-7.5),V3(0,0,-11.6),V3(-2.2,0,-13.4),'look',V3(-2,0,-18.4),'look',V3(0,0,-12.5),V3(.3,0,-7.5),V3(5.3,0,-6.4)]
+};
+async function shipPatrol(){
+  const lv=LEVELS.ship, tok=STORY.token; let n=lv.patrolN||0;
+  const alive=()=>tok===STORY.token && LV===lv && F_().freed && !F_().knocked && !F_().caught;
+  const door=o=>{ if(lv.sideDoor.target===o) return; lv.sideDoor.target=o; sfxAt(V3(1.3,1.2,-7.5),()=>SFX.hydraulic(),3); };
+  await wait(6);
+  while(alive()){
+    const name=n%2?'alex':'steve', g=name==='alex'?lv.alex:lv.steve, R=SHIP_ROUTES[name]; n++; lv.patrolN=n;
+    g.visible=true; g.userData.A.look=null; clearPose(g,0); setMood(g,name==='steve'?'angry':'neutral');
+    g.position.copy(R[0]); lv.guard=g;
+    door(1); await wait(.8); if(!alive()) return;
+    for(let i=1;i<R.length;i++){
+      const p=R[i];
+      if(p==='look'){ const y0=g.rotation.y; for(const a of [-1,1,0]){ g.userData.A.faceYaw=y0+a; await wait(1.1); if(!alive()) return; } continue; }
+      if(i===R.length-1) { door(1); await wait(.6); if(!alive()) return; }
+      await walkTo(g,[p],name==='alex'?1.1:1.2);
+      if(!alive()) return;
+      if(i===1) door(0);
+    }
+    door(0); lv.guard=null; if(name==='alex'){ g.rotation.y=-2.2; g.userData.A.faceYaw=-2.2; }
+    await wait(rand(4,7));
+  }
+}
+/* can the guard see you? a straight line with no wall, closed door or crate in the way */
+function shipSees(lv,a,b){
+  const ax=a.x, az=a.z, dx=b.x-a.x, dz=b.z-a.z;
+  for(const B of lv.col.boxes){ if(B.cond && !B.cond()) continue; let t0=0, t1=1, ok=true;
+    for(const [p,d,lo,hi] of [[ax,dx,B.x0,B.x1],[az,dz,B.z0,B.z1]]){ if(Math.abs(d)<1e-9){ if(p<lo||p>hi){ ok=false; break; } } else { let ta=(lo-p)/d, tb=(hi-p)/d; if(ta>tb){ const q=ta; ta=tb; tb=q; } t0=Math.max(t0,ta); t1=Math.min(t1,tb); if(t0>t1){ ok=false; break; } } }
+    if(ok && t1>.02 && t0<.98) return false; }
+  const L2=dx*dx+dz*dz||1;
+  for(const C of lv.col.circles){ if(C.r<=0 || (C.cond && !C.cond())) continue; const t=clamp(((C.x-ax)*dx+(C.z-az)*dz)/L2,0,1); if(t<.05||t>.95) continue; if(Math.hypot(ax+dx*t-C.x,az+dz*t-C.z)<C.r*.85) return false; }
+  return true;
+}
+async function shipCaught(g){
+  const lv=LEVELS.ship, F=F_(), st=lv.steve; PLAYER.lock(); objective(null); itemHints(null);
+  g.userData.A.path=null; g.userData.A.look='player'; facePoint(g,PLAYER.pos); setPose(g,'point',.15);
+  lookAtPoint(g.position.clone().add(V3(0,1.55*g.scale.y,0)),.35); SFX.gasp(); shake(.3); SFX.heartbeat&&SFX.heartbeat(1.2);
+  if(g===st) bark('Steve',"Where do you think you're going?",g,2.6); else bark('Alex',"Steve! The human is loose!",g,2.6);
+  await wait(2.2); await fade(1,.6);
+  // back to the chair
+  clearPose(g,0); g.userData.A.look=null; lv.guard=null;
+  lv.alex.userData.A.path=null; lv.alex.position.set(5.3,0,-6.4); lv.alex.rotation.y=-2.2; lv.alex.userData.A.faceYaw=-2.2;
+  st.userData.A.path=null; st.visible=true; st.position.set(.1,0,-.55); st.rotation.y=0; st.userData.A.faceYaw=0;
+  lv.sideDoor.target=lv.sideDoor.open=0; lv.door.target=lv.door.open=0;
+  PLAYER.pos.set(0,0,1.2); PLAYER.vel.set(0,0,0); PLAYER.eye=1.16; PLAYER.yaw=0; PLAYER.pitch=-.05;
+  lookAtPoint(V3(.1,1.6,-.55),0); st.userData.A.look='player';
+  await fade(0,.6);
+  await talk([{h:st,who:'Steve',text:"Sit. Down. Next time I won't be this nice.",mood:'angry',pose:'point'}]);
+  clearPose(st); st.userData.A.look=null; lv.guard=st;   // (lv.guard opens the door for him; F.caught stops him "seeing" you)
+  await walkTo(st,[V3(0,0,-4.9),V3(.3,0,-7.5)],1.4);
+  lv.sideDoor.target=1; sfxAt(V3(1.3,1.2,-7.5),()=>SFX.hydraulic(),3); await walkTo(st,[V3(3.2,0,-7.5)],1.4);
+  lv.sideDoor.target=0; sfxAt(V3(1.3,1.2,-7.5),()=>SFX.hydraulic(),3); lv.guard=null;
+  await tweenVal(k=>{ PLAYER.eye=lerp(1.16,1.64,k); PLAYER.pos.z=lerp(1.2,.55,k); },.8);
+  F.caught=false; objective("Find a way out. Don't let them see you!"); PLAYER.free();
+  runStory(shipPatrol);
+}
+/* XXX5 doesn't just sit there: it keeps growing, comes for you if you stay, and touching it is a bad idea */
+function xxxHunt(lv,dt){
+  const X=lv.xxx, F=F_(); if(!F.xxxAwake||F.xxxGot||G.paused) return;
+  lv.xxxT=(lv.xxxT||0)+dt;
+  X.scale.setScalar(Math.min(1.6,X.scale.x+dt*.012));
+  const dx=PLAYER.pos.x-X.position.x, dz=PLAYER.pos.z-X.position.z, d=Math.hypot(dx,dz)||1;
+  if(lv.xxxChase && PLAYER.ctl.move){ const sp=.8+Math.min(.6,lv.xxxT*.02); X.position.x+=dx/d*sp*dt; X.position.z+=dz/d*sp*dt; X.rotation.y=Math.atan2(dx,dz); }
+  const reach=.55+X.scale.x*.55;
+  if(d<reach && PLAYER.ctl.move && !lv.xxxHitCd){ runStory(()=>xxxGrab(lv)); }
+}
+async function xxxGrab(lv){
+  const X=lv.xxx, F=F_(); lv.xxxHits=(lv.xxxHits||0)+1; lv.xxxHitCd=true;
+  SFX.xxxRoar(); shake(.7); dmgFlash(); FX.pixel=24;
+  if(lv.xxxHits<2){
+    // first time: it snaps at you and throws you back
+    const away=PLAYER.pos.clone().sub(X.position); away.y=0; away.normalize();
+    PLAYER.vel.addScaledVector(away,9); bark('You',"Whoa! It almost ate me!",null,2.4);
+    await wait(.35); FX.pixel=0; await wait(1.2); lv.xxxHitCd=false; return;
+  }
+  // second time: it gets you. Try again from right after it woke up.
+  F.xxxGot=true; PLAYER.lock(); objective(null);
+  await tweenVal(k=>{ FX.pixel=24+k*40; FX.blackout=k; },.9);
+  cardShow('XXX5 GOT YOU','Try again'); await wait(2); cardHide();
+  const bp=lv.blockPos; X.position.set(bp.x+.55,1.2,bp.z); X.scale.setScalar(.9); lv.xxxT=0; lv.xxxHits=0; lv.xxxChase=false;
+  PLAYER.pos.set(bp.x-1.7,0,bp.z-1.9); PLAYER.vel.set(0,0,0); lookAtPoint(V3(0,1.3,-21.9),0);
+  FX.pixel=0; await tweenVal(k=>{ FX.blackout=1-k; },.7);
+  F.xxxGot=false; lv.xxxHitCd=false; objective('Get to the exit!'); PLAYER.free();
+  later(4,()=>{ if(F_().xxxAwake) lv.xxxChase=true; });
 }
 async function eatThing(lv,X,e){
   const o=e.o; e.c.r=-Math.abs(e.c.r); // no more collision

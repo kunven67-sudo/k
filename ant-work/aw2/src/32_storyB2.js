@@ -125,7 +125,7 @@ async function steveDream(){
   PLAYER.lock(); lookAtPoint(V3(st.position.x,1.72,st.position.z),.8);
   st.userData.A.look='player'; setMood(st,'evil'); SFX.heartbeat(1.2);
   const S={h:st,who:'Steve'};
-  await talk([{...S,text:"Hello, Jay.",mood:'evil'},{...S,text:"I have your watch. And the world will be mine.",mood:'evil'},{who:'You',text:"How did you find me?"}]);
+  await talk([{...S,text:"Hello, Jay.",mood:'evil'},{...S,text:"I have your watch. And the world will be mine.",mood:'evil'},{who:'You',text:"How did you find me?"},{...S,text:"Your new watch. Every time it beeps... it tells me where you are.",mood:'evil'}]);
   // he just crumbles into dust
   unlock('dream');
   SFX.disintegrate(); st.userData.A.talk=false;
