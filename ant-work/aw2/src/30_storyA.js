@@ -294,6 +294,7 @@ async function shrinkSequence(){
   await tweenVal(k=>{ PLAYER.targetScale=PLAYER.scale=lerp(1,.006,easeIn(k)); PLAYER.fovKick=k*25; FX.aberr=.006+k*.01; },3,x=>x);
   FX.glitch=0;
   FX.whiteout=0; await tweenVal(k=>{ FX.whiteout=k; },.6);
+  await mossStage();             // first stop: the moss in Jim's cage (walk to the dew drop, dive in)
   startFromCheckpointInner('A4');
 }
 
