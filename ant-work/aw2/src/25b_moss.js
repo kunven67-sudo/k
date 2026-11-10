@@ -8,6 +8,7 @@
    Real photo textures (Poly Haven CC0): soil, moss, stems.
    ================================================================ */
 const MOSS_DROP=V3(0,0,-46);
+const _mossC=new THREE.Color(), _mossTip=new THREE.Color(1.25,1.2,.6);   // leaf tints: darker at the base, yellow-green tips
 function mossLeafTex(){ return texSet('mossLeaf',[128,256],(x,w,h)=>{
     x.clearRect(0,0,w,h);
     x.save(); x.beginPath(); x.moveTo(w/2,h-4); x.bezierCurveTo(w*.98,h*.72,w*.86,h*.2,w/2,4); x.bezierCurveTo(w*.14,h*.2,w*.02,h*.72,w/2,h-4); x.closePath(); x.clip();
@@ -23,10 +24,10 @@ let MOSS_IMG=null;
 function mossImgReady(){ return new Promise(res=>{ if(MOSS_IMG&&MOSS_IMG.complete) return res(); if(typeof AW_TEX==='undefined'||!AW_TEX.mossPhoto) return res(); MOSS_IMG=new Image(); MOSS_IMG.onload=()=>res(); MOSS_IMG.onerror=()=>res(); MOSS_IMG.src=AW_TEX.mossPhoto; }); }
 /* a springtail: a tiny six-legged hopper with long antennae and a spring under its belly */
 function makeSpringtail(){
-  const g=new THREE.Group(); const m=new THREE.MeshPhysicalMaterial({color:col(0x6a7a8a),roughness:.45,clearcoat:.5,sheen:col(0x8aa0c0)}), dk=mat(0x2a3038,{roughness:.6});
-  const body=mesh(GC('stBody',()=>{ const q=new THREE.CapsuleGeometry?new THREE.SphereGeometry(1,20,14):new THREE.SphereGeometry(1,20,14); q.scale(.55,.5,1.4); return q; }),m,0,.7,0); g.add(body);
-  g.add(sph(.42,m,0,.8,1.25,16,12)); for(const sd of [-1,1]){ g.add(sph(.08,dk,sd*.25,.95,1.55,8,6,false)); const an=cyl(.03,.015,1.6,dk,sd*.2,1.5,2.0,6); an.rotation.x=1.0; an.rotation.z=sd*-.3; g.add(an); }
-  const legs=[]; for(let i=0;i<3;i++) for(const sd of [-1,1]){ const lg=new THREE.Group(); lg.position.set(sd*.4,.55,.6-i*.55); g.add(lg); const l=cyl(.05,.03,.75,dk,0,-.3,0,6); l.rotation.z=sd*.6; lg.add(l); legs.push(lg); }
+  const g=new THREE.Group(); const m=new THREE.MeshPhysicalMaterial({color:col(0x3a4250),roughness:.5,clearcoat:.4,sheen:col(0x7a90b8)}), dk=mat(0x1a1c22,{roughness:.6});
+  const body=mesh(GC('stBody',()=>{ const q=new THREE.SphereGeometry(1,20,14); q.scale(.55,.5,1.4); return q; }),m,0,.7,0); g.add(body);
+  g.add(sph(.42,m,0,.8,1.25,16,12)); for(const sd of [-1,1]){ g.add(sph(.08,dk,sd*.25,.95,1.55,8,6,false)); const an=cyl(.02,.01,1.4,dk,sd*.2,1.4,2.0,6); an.rotation.x=1.0; an.rotation.z=sd*-.3; g.add(an); }
+  const legs=[]; for(let i=0;i<3;i++) for(const sd of [-1,1]){ const lg=new THREE.Group(); lg.position.set(sd*.4,.55,.6-i*.55); g.add(lg); const l=cyl(.035,.02,.7,dk,0,-.3,0,6); l.rotation.z=sd*.6; lg.add(l); legs.push(lg); }
   const fur=new THREE.Group(); fur.position.set(0,.35,-1.1); g.add(fur); const f=cyl(.06,.04,1.2,dk,0,0,.55,6); f.rotation.x=Math.PI/2; fur.add(f);
   g.userData={legs,fur,body}; return g;
 }
@@ -36,7 +37,9 @@ defineLevel('moss',{
   async build(scene,lv){
     await mossImgReady();
     const sunDir=V3(.35,.9,.25).normalize();
-    scene.background=col(0xa8c890); scene.fog=new THREE.FogExp2(col(0x9ab884),.011);   // thick green haze = you feel tiny
+    // a bright hazy 'sky' (Jim's lab lamp glowing through the cage glass) instead of a flat colour
+    const sky=makeSky({top:0xfff2d6,mid:0xdfeccb,horizon:0xb4cc98,bottom:0x6a7a4a,sunDir,sunColor:0xfff0c8,sunSize:.995,sunGlow:2.2,clouds:0});
+    scene.add(sky); lv.skyU=sky.userData.u; scene.fog=new THREE.FogExp2(col(0xbcd2a2),.0095);   // haze = you feel tiny
     lv.envMap=makeEnv({top:0xd8ecc0,horizon:0x8ab070,bottom:0x3a3020,lights:[{x:sunDir.x*30,y:sunDir.y*30,z:sunDir.z*30,w:8,h:8,c:0xfff2d0,k:5}]});
     makeRig(scene,{sun:2.4,sunColor:0xfff0cc,hemi:.55,sky:0xc8e8a8,ground:0x4a3a24,dir:sunDir,span:40,dist:90,far:200});
     lv.sunWorld=sunDir.clone().multiplyScalar(400);
@@ -53,24 +56,24 @@ defineLevel('moss',{
     // moss: tall stems (trees to you) covered in leaves, a clear path down the middle
     const stemM=new THREE.MeshStandardMaterial({map:awTex('stem',1,6),normalMap:awTex('stemN',1,6,false),color:col(0x8aa868),roughness:.85});
     const leafT=mossLeafTex();
-    const leafM=new THREE.MeshStandardMaterial({map:leafT.map,normalMap:leafT.normalMap,alphaTest:.5,side:THREE.DoubleSide,roughness:.6,emissive:col(0x2a5a12),emissiveIntensity:.35});   // a little glow = sun through the leaf
+    const leafM=new THREE.MeshStandardMaterial({map:leafT.map,normalMap:leafT.normalMap,alphaTest:.5,side:THREE.DoubleSide,roughness:.55,emissive:col(0x2a5a12),emissiveIntensity:.3});   // a little glow = sun through the leaf
     const spots=[]; for(let i=0;i<dq(50,80,110,150,170);i++){ let x=rand(-60,60), z=rand(-90,36); if(Math.abs(x)<6.5&&z>-56&&z<38) continue; if(Math.hypot(x-MOSS_DROP.x,z-MOSS_DROP.z)<10) continue; spots.push([x,z,rand(7,22),rand(-.15,.15),rand(-.15,.15)]); }
     // a wall of moss on both sides of the path so the way to go is obvious
     for(let z=34;z>-54;z-=dq(5,4.2,3.6,3.2,3)) for(const sd of [-1,1]){ spots.push([sd*rand(7,10),z+rand(-1,1),rand(9,20),rand(-.1,.1),sd*rand(.05,.2)]); }
     const stems=new THREE.InstancedMesh(GC('mossStem',()=>{ const c=new THREE.CylinderGeometry(.13,.2,1,8,4); c.translate(0,.5,0); return c; }),stemM,spots.length);
-    let leafN=0; const LPM=dq(1.6,2.2,2.8,3.2,3.6); for(const s of spots) leafN+=Math.floor(s[2]*LPM);
+    let leafN=0; const LPM=dq(2.6,3.4,4.2,5,5.6); for(const s of spots) leafN+=Math.floor(s[2]*LPM);
     const leaves=new THREE.InstancedMesh(GC('mossLeafQ',()=>{ const q=new THREE.PlaneGeometry(.9,1.8); q.translate(0,.9,0); return q; }),leafM,leafN);
     let li=0;
     spots.forEach((s,i)=>{ const [x,z,h,tx,tz]=s; o.position.set(x,0,z); o.rotation.set(tx,rand(0,6),tz); o.scale.set(1,h,1); o.updateMatrix(); stems.setMatrixAt(i,o.matrix);
       const stemM4=o.matrix.clone(); const n=Math.floor(h*LPM);
-      for(let k=0;k<n;k++){ const u=k/n, y=.08+u*.96, a=k*2.4; const len=lerp(1.3,.55,u);
+      for(let k=0;k<n;k++){ const u=k/n, y=.06+u*.97, a=k*2.4; const len=lerp(.95,.38,u)*rand(.8,1.15);
         const L=new THREE.Object3D(); L.position.set(0,y,0); L.rotation.set(0,a,0); L.updateMatrix();
         const tilt=new THREE.Matrix4().makeRotationX(-lerp(.9,.35,u)), sc=new THREE.Matrix4().makeScale(len,len/h*1,len);
         // leaf in stem space: unscale the stem's y stretch so leaves keep their shape
         const M=new THREE.Matrix4().multiplyMatrices(stemM4,L.matrix).multiply(new THREE.Matrix4().makeScale(1,1/h,1)).multiply(new THREE.Matrix4().makeTranslation(0,0,.12)).multiply(tilt).multiply(new THREE.Matrix4().makeScale(len,len,len));
-        leaves.setMatrixAt(li++,M); }
+        leaves.setColorAt(li,_mossC.setRGB(1,1,1).multiplyScalar(rand(.7,1.15)).lerp(_mossTip,u*u*.45)); leaves.setMatrixAt(li++,M); }
       if(Math.abs(x)<14) colCircle(lv.col,x,z,.45); });
-    leaves.count=li; stems.castShadow=true; leaves.castShadow=true; leaves.receiveShadow=true; scene.add(stems); scene.add(leaves);
+    leaves.count=li; if(leaves.instanceColor) leaves.instanceColor.needsUpdate=true; stems.castShadow=true; leaves.castShadow=true; leaves.receiveShadow=true; scene.add(stems); scene.add(leaves);
     lv.leaves=leaves;
     // the giant dew drop (and small ones sitting on leaves)
     const dropM=rimify(new THREE.MeshPhysicalMaterial({color:col(0xd8ecff),roughness:0,metalness:.1,transparent:true,opacity:.32,clearcoat:1,clearcoatRoughness:0,envMapIntensity:2.2,depthWrite:false}),0xf0fbff,1.1,2.2);   // glassy water (no refraction pass = no lag on a GT 1030)
