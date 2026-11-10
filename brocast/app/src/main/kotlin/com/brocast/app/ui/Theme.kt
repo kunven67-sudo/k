@@ -19,6 +19,7 @@ object BroColors {
     val Live = Color(0xFFFF4D6D)
     val Good = Color(0xFF34D399)
     val Warn = Color(0xFFFBBF24)
+    val Ice = Color(0xFF7CC8FF)
 }
 
 @Composable

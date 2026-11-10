@@ -100,6 +100,23 @@ class VideoEncoder private constructor(
         }
     }
 
+    /**
+     * A new bitrate, while running: fewer bits when the Wi-Fi can't keep up, more when it can.
+     * Safe from any thread.
+     */
+    fun setBitrate(bps: Int) {
+        handler.post {
+            if (released) return@post
+            try {
+                codec.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, bps) })
+            } catch (e: IllegalStateException) {
+                // Encoder is stopping.
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Encoder refused bitrate $bps", e)
+            }
+        }
+    }
+
     /** Stops the encoder. Switch the screen mirror to another surface first. Safe to call twice. */
     fun release() {
         if (released) return
@@ -170,10 +187,18 @@ class VideoEncoder private constructor(
                 Log.w(TAG, "No video encoder", e)
                 return null
             }
-            val video = try {
-                codec.codecInfo.getCapabilitiesForType(MIME).videoCapabilities
+            val caps = try {
+                codec.codecInfo.getCapabilitiesForType(MIME)
             } catch (e: RuntimeException) {
                 null
+            }
+            val video = caps?.videoCapabilities
+            // Constant bitrate: every frame about the same size, so a busy anime scene doesn't
+            // suddenly send 3x the data over the Wi-Fi (what video calls use too).
+            val cbr = try {
+                caps?.encoderCapabilities?.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR) == true
+            } catch (e: RuntimeException) {
+                false
             }
             if (video != null) {
                 val fits = try {
@@ -194,11 +219,11 @@ class VideoEncoder private constructor(
                 var surface: Surface? = null
                 try {
                     codec.setCallback(encoder.callback, encoder.handler)
-                    codec.configure(format(w, h, rate, fps, extras), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                    codec.configure(format(w, h, rate, fps, extras, cbr), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                     surface = codec.createInputSurface()
                     encoder.surface = surface
                     codec.start()
-                    Log.i(TAG, "Video encoder ${codec.name}: ${w}x$h @ $fps fps, ${rate / 1000} kbps")
+                    Log.i(TAG, "Video encoder ${codec.name}: ${w}x$h @ $fps fps, ${rate / 1000} kbps, cbr=${cbr && extras}")
                     return encoder
                 } catch (e: Exception) {
                     Log.w(TAG, "Encoder refused ${w}x$h @ $fps (extras=$extras)", e)
@@ -215,7 +240,7 @@ class VideoEncoder private constructor(
             return null
         }
 
-        private fun format(w: Int, h: Int, bitrate: Int, fps: Int, extras: Boolean): MediaFormat =
+        private fun format(w: Int, h: Int, bitrate: Int, fps: Int, extras: Boolean, cbr: Boolean): MediaFormat =
             MediaFormat.createVideoFormat(MIME, w, h).apply {
                 setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
                 setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
@@ -225,11 +250,20 @@ class VideoEncoder private constructor(
                 // On a still screen, repeat the last frame now and then, so TVs keep getting pictures.
                 setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000L)
                 if (extras) {
+                    if (cbr) setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
+                    // Say which colors these are (HD video's BT.709), so the TV page and the PC app show
+                    // them exactly right instead of guessing.
+                    setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT709)
+                    setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_SDR_VIDEO)
+                    setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
                     setInteger(MediaFormat.KEY_PRIORITY, 0) // real time
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, fps.toFloat())
                         setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) // no frame reordering: lowest delay
                     }
+                    // Hand each frame out as soon as it's done, instead of holding a few back to plan
+                    // the bitrate (some chips do that by default, which shows up as delay on the TV).
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) setInteger(MediaFormat.KEY_LATENCY, 1)
                 }
             }
 

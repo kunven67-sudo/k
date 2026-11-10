@@ -48,6 +48,7 @@ class StreamServer(
     var port: Int = -1
         private set
 
+
     data class ViewerStats(val count: Int, val addresses: List<String>)
 
     /** [needsJpeg]: an MJPEG viewer that can't play video (keeps the phone sending pictures). */
@@ -283,6 +284,9 @@ class StreamServer(
             .put("video", if (videoLive) "h264" else "jpeg")
             .put("vframes", if (authorized && vh != null) vh.framesPublished else 0L)
             .put("vage", if (authorized && vh != null && vh.lastFrameAt > 0) now - vh.lastFrameAt else -1L)
+            // How hard the Wi-Fi is working: the bitrate the encoder was asked for, and how often a screen had to skip.
+            .put("kbps", if (authorized && vh != null) vh.targetBitrate / 1000 else 0)
+            .put("skips", if (authorized && vh != null) vh.skips else 0L)
         send(out, 200, JSON_TYPE, json.bytes(), head)
     }
 
@@ -379,7 +383,9 @@ class StreamServer(
         }
         if (!upgradeToWebSocket(req, out, head)) return
         try {
-            socket.sendBufferSize = 256 * 1024 // ~0.3 s of video: enough to ride out hiccups, small enough to notice a slow TV
+            // Small on purpose: video waiting in here is delay on the TV. A slow TV fills it quickly,
+            // its queue in the hub overflows and it skips ahead to the next key frame instead.
+            socket.sendBufferSize = 128 * 1024
         } catch (e: SocketException) {
             // Not fatal.
         }

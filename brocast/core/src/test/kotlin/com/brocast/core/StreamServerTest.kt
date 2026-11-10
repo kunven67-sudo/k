@@ -257,6 +257,18 @@ class StreamServerTest {
     }
 
     @Test
+    fun justSharingNoFreeze() {
+        // BroCast 3 just shares: there's no way to freeze the picture anymore.
+        hub.setLive(true)
+        hub.publish(byteArrayOf(1), 1, 1)
+        assertEquals(404, get("/freeze?on=1", extra = "X-BroCast: 1\r\nOrigin: http://127.0.0.1:$port\r\n").code)
+        val status = get("/status").text
+        assertFalse(status.contains("frozen"), status)
+        hub.publish(byteArrayOf(2), 1, 1)
+        assertContentEquals(byteArrayOf(2), get("/frame.jpg").body, "always the newest picture")
+    }
+
+    @Test
     fun pinProtectsStreamAndLocksOutGuessers() {
         pin = PinConfig("4821", "salt")
         hub.setLive(true)

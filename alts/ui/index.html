@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ALTS</title>
+<style>
+:root {
+  --bg: #131316; --panel: #1b1b20; --raise: #24242b; --line: #2a2a32;
+  --text: #ececf1; --dim: #8d8d99; --faint: #5d5d68; --red: #ef5b5b; --clay: #d97757;
+}
+/* looks (Settings > Look) */
+:root[data-theme="midnight"] { --bg: #0b1020; --panel: #121a2e; --raise: #1b2540; --line: #24304d; --dim: #8f9bb8; --faint: #5b6785; --clay: #5b8cff; }
+:root[data-theme="oled"] { --bg: #000; --panel: #0c0c0e; --raise: #18181c; --line: #222226; --dim: #8a8a94; --faint: #55555e; }
+:root[data-theme="neon"] { --bg: #0d0a17; --panel: #160f26; --raise: #22183a; --line: #2f2350; --dim: #a59cc4; --faint: #6a5f8c; --clay: #b46cff; }
+:root[data-theme="forest"] { --bg: #0e1411; --panel: #142019; --raise: #1c2c23; --line: #253a2e; --dim: #8fa89a; --faint: #5a7365; --clay: #3dbe8b; }
+:root[data-theme="sunset"] { --bg: #17100f; --panel: #221614; --raise: #2e1d1a; --line: #3d2722; --dim: #b39a92; --faint: #7a625b; --clay: #ff7a59; }
+:root[data-theme="light"] { --bg: #f4f4f6; --panel: #ffffff; --raise: #e9e9ee; --line: #dcdce3; --text: #18181c; --dim: #5e5e6a; --faint: #8f8f9a; }
+:root[data-theme="light"] .foot .primary, :root[data-theme="light"] #empty button, :root[data-theme="light"] .facts .open { color: #fff; }
+:root[data-theme="light"] .foot .primary:hover, :root[data-theme="light"] .facts .open:hover { background: #33333a; color: #fff; }
+.looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; margin: 6px 0 4px; }
+.look { border: 2px solid var(--line); border-radius: 12px; padding: 8px; text-align: left; transition: transform .1s, border-color .1s; }
+.look:hover { transform: translateY(-2px); }
+.look.on { border-color: var(--clay); }
+.look .sw { height: 46px; border-radius: 8px; display: flex; overflow: hidden; margin-bottom: 6px; }
+.look .sw i { flex: 1; }
+.look .sw i:first-child { flex: 0 0 26%; }
+.look b { font-size: 12px; }
+#look { width: 26px; height: 26px; border-radius: 50%; color: var(--faint); display: grid; place-items: center; }
+#look:hover { background: var(--raise); color: var(--text); }
+#look svg { width: 16px; height: 16px; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+  font: 13px/1.35 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  user-select: none; -webkit-user-select: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid #7aa7ff; outline-offset: 2px; }
+
+/* ---------- side list ---------- */
+#side { position: fixed; left: 0; top: 0; bottom: 0; width: 84px; display: flex; flex-direction: column;
+  align-items: center; border-right: 1px solid var(--line); background: var(--bg); z-index: 2; }
+#logo { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 12px 0 8px; }
+#logo svg { width: 30px; height: 30px; }
+#logo b { font-size: 10.5px; letter-spacing: .22em; padding-left: .22em; font-weight: 700; color: var(--dim); }
+#nav { display: grid; grid-template-columns: 30px 30px; gap: 4px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--line); width: 100%; justify-content: center; }
+#nav + #tools { border-top: 0; }
+#nav button { height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--dim); }
+#nav button:hover { background: var(--raise); color: var(--text); }
+#nav button:active { transform: scale(.92); }
+#nav.off button { opacity: .35; pointer-events: none; }
+#nav svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round; }
+#tools { display: grid; grid-template-columns: 30px 30px; gap: 4px; padding: 10px 0 8px; width: 100%; justify-content: center; }
+#tools button { position: relative; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--dim); }
+#tools button:hover { background: var(--raise); color: var(--text); }
+#tools button:active { transform: scale(.92); }
+#tools.off button:not([data-any]) { opacity: .35; pointer-events: none; }
+#tools svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+#tools .wide { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 11.5px; font-weight: 600; border: 1px solid var(--line); }
+#tools .wide svg { width: 12px; height: 12px; }
+#tools button.on { color: var(--text); }
+#tools button.on::after { content: ""; position: absolute; right: 2px; top: 2px; width: 6px; height: 6px; border-radius: 50%;
+  background: #3dbe8b; box-shadow: 0 0 0 2px var(--bg); }
+#count { width: 100%; padding: 0 4px 9px; border-bottom: 1px solid var(--line); text-align: center; font-size: 10px;
+  line-height: 1.3; color: var(--faint); white-space: pre-line; }
+#count:empty { padding-bottom: 0; }
+.use { display: grid; gap: 2px; width: 46px; }
+.use i { display: block; height: 3px; border-radius: 2px; background: #2a2a32; overflow: hidden; }
+.use i b { display: block; height: 100%; background: var(--clay); }
+.use i.wk b { background: #4f8ef7; }
+
+#list { flex: 1; width: 100%; overflow-y: auto; overflow-x: hidden; padding: 12px 0 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px; }
+#list::-webkit-scrollbar { width: 0; }
+.acct { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center;
+  gap: 4px; cursor: pointer; }
+.acct::before { content: ""; position: absolute; left: 0; top: 23px; width: 4px; height: 0;
+  border-radius: 0 4px 4px 0; background: var(--text); transform: translateY(-50%);
+  transition: height .16s ease; }
+.acct:hover::before { height: 16px; }
+.acct.on::before { height: 36px; }
+.tile { position: relative; width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center;
+  font-weight: 650; font-size: 16px; letter-spacing: .02em; background: var(--c); color: var(--ink);
+  transition: border-radius .16s ease, filter .16s ease, transform .1s ease; }
+.acct:not(.awake) .tile { filter: saturate(.5) brightness(.72); }
+.acct:hover .tile, .acct.on .tile { filter: none; border-radius: 13px; }
+.acct:active .tile { transform: translateY(1px) scale(.97); }
+.acct .nm { max-width: 76px; font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; padding: 0 3px; }
+.acct.on .nm { color: var(--text); }
+.acct .awake-dot { position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; border-radius: 50%;
+  background: #3dbe8b; border: 3px solid var(--bg); display: none; }
+.acct.awake:not(.on) .awake-dot { display: block; }
+.ring { position: absolute; left: 50%; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px;
+  border-radius: 50%; border: 2.5px solid rgba(255,255,255,.3); border-top-color: #fff; display: none;
+  animation: spin .75s linear infinite; }
+.acct.loading .tile { color: transparent; filter: none; }
+.acct.loading .tile::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(0,0,0,.38); }
+.acct.loading .ring { display: block; z-index: 1; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.dots { position: absolute; top: -5px; right: 9px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--raise); border: 1px solid var(--line); display: none; place-items: center; color: var(--text); }
+.dots svg { width: 12px; height: 12px; fill: currentColor; }
+.acct:hover .dots { display: grid; }
+.dots:hover { background: #33333c; }
+
+#foot { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 0 12px;
+  border-top: 1px solid var(--line); }
+#add { width: 46px; height: 46px; border-radius: 16px; border: 1.5px dashed #4a4a55; color: var(--dim);
+  display: grid; place-items: center; transition: border-radius .16s ease, background .16s ease; }
+#add svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+#add:hover { border-style: solid; border-color: var(--dim); color: var(--text); border-radius: 13px; background: var(--raise); }
+#add.hint { animation: hint 2.2s ease-in-out infinite; }
+@keyframes hint { 50% { border-color: var(--clay); color: var(--clay); } }
+#addLbl { font-size: 10.5px; color: var(--dim); margin-top: -4px; }
+#help { width: 26px; height: 26px; border-radius: 50%; color: var(--faint); font-weight: 700; font-size: 12px; }
+#help:hover { background: var(--raise); color: var(--text); }
+
+#toast { position: fixed; left: 6px; bottom: 112px; width: 72px; padding: 7px 6px; border-radius: 9px;
+  background: var(--raise); border: 1px solid var(--line); font-size: 10.5px; text-align: center; z-index: 9;
+  opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none; }
+#toast.show { opacity: 1; transform: none; }
+body.wide #toast { left: calc(50% + 42px); width: auto; max-width: 340px; transform: translate(-50%, 6px);
+  bottom: 24px; padding: 9px 14px; font-size: 12.5px; }
+body.wide #toast.show { transform: translate(-50%, 0); }
+
+/* ---------- the big area (boxes + empty screen) ---------- */
+#stage { position: fixed; left: 84px; top: 0; right: 0; bottom: 0; display: none; place-items: center;
+  background: #0f0f12; padding: 24px; }
+body.wide #stage { display: grid; }
+#stage { overflow-y: auto; place-items: safe center; } /* a tall box scrolls instead of losing its buttons */
+@media (max-width: 200px) { #stage { display: none !important; } }
+.card { width: min(400px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 22px; animation: pop .16s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+.hd { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+.hd .tile { flex: none; }
+h2 { font-size: 17px; font-weight: 650; }
+.sub { color: var(--dim); font-size: 12.5px; margin-top: 2px; }
+.lbl { display: block; color: var(--dim); font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; margin: 14px 0 7px; }
+input { width: 100%; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
+  color: var(--text); font: inherit; font-size: 14px; padding: 0 12px; user-select: text; -webkit-user-select: text; }
+input:focus { border-color: #4a4a58; outline: none; }
+.sw { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw button { width: 28px; height: 28px; border-radius: 9px; background: var(--c); position: relative; }
+.sw button.pick::after { content: ""; position: absolute; inset: -4px; border-radius: 12px; border: 2px solid var(--text); }
+.row { display: flex; gap: 8px; margin-top: 8px; }
+.sw + .row { margin-top: 20px; }
+.row button, .foot button { flex: 1; height: 36px; border-radius: 10px; background: var(--raise);
+  border: 1px solid var(--line); font-weight: 600; font-size: 12.5px; }
+.row button:hover:not(:disabled), .foot .ghost:hover { background: #2e2e36; }
+.row button:disabled { opacity: .4; cursor: default; }
+.row .danger { color: #ff8b8b; }
+.row .danger.armed { background: var(--red); border-color: var(--red); color: #fff; }
+.note { color: var(--faint); font-size: 11.5px; margin-top: 8px; min-height: 30px; }
+.foot { display: flex; gap: 8px; margin-top: 20px; }
+.foot .primary { background: var(--text); color: #141417; border-color: var(--text); }
+.foot .primary:hover { background: #fff; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 9px 14px; margin-top: 4px; align-items: center; }
+kbd { font: 600 11.5px "Segoe UI", system-ui, sans-serif; background: var(--bg); border: 1px solid var(--line);
+  border-bottom-width: 2px; border-radius: 6px; padding: 2px 7px; white-space: nowrap; color: var(--text); }
+.keys span { color: var(--dim); }
+.tips { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--dim);
+  font-size: 12.5px; display: grid; gap: 7px; }
+#empty { text-align: center; max-width: 340px; animation: pop .2s ease-out; }
+#empty svg { width: 64px; height: 64px; margin-bottom: 10px; }
+#empty h2 { font-size: 20px; }
+#empty p { color: var(--dim); margin: 6px 0 18px; }
+#empty button { height: 40px; padding: 0 18px; border-radius: 11px; background: var(--text); color: #141417; font-weight: 650; }
+.card.big { width: min(560px, 100%); }
+.pick { display: grid; gap: 6px; margin-top: 4px; max-height: 50vh; overflow-y: auto; }
+.pickrow { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border-radius: 12px; text-align: left; font-size: 14px; }
+.pickrow:hover, .pickrow:focus-visible { background: var(--raise); }
+.pickrow .tile { width: 36px; height: 36px; border-radius: 12px; font-size: 13px; }
+.results { display: grid; gap: 4px; margin-top: 10px; max-height: 38vh; overflow-y: auto; }
+.hit { width: 100%; text-align: left; padding: 9px 11px; border-radius: 10px; border: 1px solid transparent; }
+.hit:hover, .hit:focus-visible { background: var(--raise); border-color: var(--line); }
+.hit .ht { font-weight: 600; font-size: 13.5px; }
+.hit .hm { color: var(--faint); font-size: 11.5px; margin-top: 1px; }
+.hit .hs { color: var(--dim); font-size: 12.5px; margin-top: 3px; }
+.ghs { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--text); }
+.ghs b { font-weight: 600; }
+.repo { display: flex; justify-content: space-between; width: 100%; padding: 7px 10px; border-radius: 9px; text-align: left; font-size: 13px; }
+.repo:hover, .repo:focus-visible { background: var(--raise); }
+.repo span { color: var(--faint); font-size: 11.5px; }
+.tasks { max-height: 56vh; overflow-y: auto; margin-top: 4px; }
+.tjob { color: var(--dim); font-size: 12.5px; margin: 2px 0 4px; }
+.trow { display: flex; gap: 10px; align-items: flex-start; padding: 6px 2px; font-size: 13px; }
+.trow i { flex: none; width: 12px; height: 12px; margin-top: 4px; border-radius: 50%; border: 2px solid var(--faint); }
+.trow.doing i { border-color: var(--clay); background: var(--clay); animation: pulse 1.6s ease-in-out infinite; }
+.trow.done i { border-color: #3dbe8b; background: #3dbe8b; }
+.trow.done span { color: var(--dim); }
+@keyframes pulse { 50% { opacity: .35; } }
+/* Claude's files */
+.safe { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(61,190,139,.08); border: 1px solid rgba(61,190,139,.22); color: var(--dim); font-size: 12.5px; }
+.safe svg { flex: none; width: 18px; height: 18px; margin-top: 1px; fill: none; stroke: #3dbe8b; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round; }
+.safe b { color: var(--text); font-weight: 600; }
+.files { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin-top: 12px;
+  max-height: min(42vh, max(120px, calc(100vh - 390px)));
+  overflow-y: auto; overflow-x: hidden; }
+.frow { min-width: 0; display: flex; align-items: center; gap: 11px; padding: 7px 8px 7px 9px; border-radius: 12px;
+  border: 1px solid transparent; }
+.frow:hover, .frow:focus-visible { background: var(--raise); border-color: var(--line); outline: none; }
+.frow:not(.gone) { cursor: pointer; }
+.fext { flex: none; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  font-size: 9.5px; font-weight: 700; letter-spacing: .05em; background: #26262d; color: var(--dim); }
+.fext.run { background: rgba(217,119,87,.15); color: #e8906f; }
+.fext.pack { background: rgba(79,142,247,.15); color: #7aa7ff; }
+.fext.page { background: rgba(61,190,139,.14); color: #4fd09d; }
+.fmid { flex: 1; min-width: 0; }
+.fname { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fmeta { display: flex; gap: 6px; align-items: center; color: var(--faint); font-size: 11.5px; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; }
+.fmeta > span { flex: none; }
+.fmeta > span:last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fmeta .tag { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; }
+.fmeta .tag svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.tag.ok { color: #3dbe8b; }
+.tag.changed { color: #f2c14e; }
+.tag.gone { color: var(--faint); }
+.frow.gone .fname, .frow.gone .fext { opacity: .5; }
+.facts { display: flex; gap: 4px; flex: none; }
+.facts button { height: 30px; min-width: 30px; padding: 0 8px; border-radius: 9px; display: grid; place-items: center;
+  color: var(--dim); border: 1px solid var(--line); background: var(--panel); font-size: 12px; font-weight: 600; }
+.facts button:hover { background: #2e2e36; color: var(--text); }
+.facts svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.facts .open { color: #141417; background: var(--text); border-color: var(--text); padding: 0 13px; }
+.facts .open:hover { background: #fff; color: #141417; }
+.facts .del.armed { background: var(--red); border-color: var(--red); color: #fff; padding: 0 10px; }
+.fempty { color: var(--dim); text-align: center; padding: 22px 16px; font-size: 12.5px; border: 1px dashed var(--line); border-radius: 12px; }
+#tools .wide.on::after { right: -2px; top: -2px; }
+</style>
+</head>
+<body>
+<div id="side">
+  <div id="logo" title="ALTS">
+    <svg viewBox="0 0 40 40" aria-hidden="true">
+      <rect x="6" y="10" width="17" height="23" rx="4" transform="rotate(-14 14.5 21.5)" fill="#3c3c46"/>
+      <rect x="11" y="8.5" width="17" height="23" rx="4" transform="rotate(-3 19.5 20)" fill="#70707e"/>
+      <rect x="17" y="6" width="17" height="23" rx="4" transform="rotate(9 25.5 17.5)" fill="#d97757"/>
+    </svg>
+    <b>ALTS</b>
+  </div>
+  <div id="nav" class="off">
+    <button data-nav="back" title="Back (Alt+Left)"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button data-nav="fwd" title="Forward (Alt+Right)"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    <button data-nav="reload" title="Reload (F5)"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4v4.5H15"/></svg></button>
+    <button data-nav="home" title="New chat"><svg viewBox="0 0 24 24"><path d="M12 20h8"/><path d="M15.5 4.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/></svg></button>
+  </div>
+  <div id="tools" class="off">
+    <button data-tool="save" title="Save this chat: a file that looks just like it, with every picture"><svg viewBox="0 0 24 24"><path d="M5 5a1 1 0 0 1 1-1h10l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M8.5 4v4.5h6V4"/><rect x="8" y="13" width="8" height="5" rx="1"/></svg></button>
+    <button data-tool="continue" title="Continue on another account"><svg viewBox="0 0 24 24"><path d="M3 12h11M10 8l4 4-4 4"/><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/></svg></button>
+    <button data-tool="grab" title="Copy this whole chat (Ctrl+Shift+G)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg></button>
+    <button data-tool="chats" data-any title="Saved chats: search them, save all, GitHub"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2"/><path d="M3 7v10a2 2 0 0 0 2 2h6"/><circle cx="16.5" cy="15.5" r="3"/><path d="M18.7 17.7L21 20"/></svg></button>
+    <button data-tool="pins" title="Pins in this chat (select text, then press Pin)"><svg viewBox="0 0 24 24"><path d="M9 4h6l-1 5 3 3H7l3-3z"/><path d="M12 12v8"/></svg></button>
+    <button data-tool="tasks" data-any title="Claude's tasks: what it's doing, what's next, what's done"><svg viewBox="0 0 24 24"><path d="M4 6.5l1.5 1.5L8.5 5"/><path d="M4 12.5l1.5 1.5 3-3"/><path d="M4 18.5h4.5"/><path d="M11.5 6.5H20M11.5 12.5H20M11.5 18.5H20"/></svg></button>
+    <button data-tool="top" title="Jump to the start of the chat"><svg viewBox="0 0 24 24"><path d="M7 12l5-5 5 5M7 18l5-5 5 5"/></svg></button>
+    <button data-tool="bottom" title="Jump to the end of the chat"><svg viewBox="0 0 24 24"><path d="M7 6l5 5 5-5M7 12l5 5 5-5"/></svg></button>
+    <button data-tool="files" data-any class="wide" title="Claude's files: everything Claude sent you, opens with no Windows warning"><svg viewBox="0 0 24 24"><path d="M13.5 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5z"/><path d="M13.5 3.5v5h5"/><path d="M9 14.5l2 2 4-4"/></svg>Files</button>
+  </div>
+  <div id="count"></div>
+  <div id="list"></div>
+  <div id="foot">
+    <button id="add" title="Add an account"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    <div id="addLbl">Add</div>
+    <button id="look" title="Settings: change how ALTS looks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    <button id="help" title="Keys and tips">?</button>
+  </div>
+</div>
+<div id="stage"></div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const PALETTE = ["#d97757","#4f8ef7","#3dbe8b","#9b6bff","#f06aa8","#f2c14e","#2ec4c4","#ef5b5b","#8a8f98","#e8e8ea"];
+const MAXNAME = 24;
+const $ = s => document.querySelector(s);
+const send = m => { try { window.chrome.webview.postMessage(JSON.stringify(m)); } catch (e) {} };
+
+let S = { accounts: [], active: "", wide: false };
+let modal = null;       // { kind: "add" | "edit" | "help", id, name, color }
+let waitWide = false;   // a box was opened and ALTS hasn't made the window wide yet
+
+function initials(name) {
+  const w = name.trim().split(/\s+/).filter(Boolean);
+  if (!w.length) return "?";
+  if (w.length === 1) {
+    const ch = [...w[0]];
+    const tail = ch.length > 1 && /\d/.test(ch[ch.length - 1]) ? ch[ch.length - 1] : "";
+    return (ch[0] + tail).toUpperCase();
+  }
+  return ([...w[0]][0] + [...w[1]][0]).toUpperCase();
+}
+function ink(hex) {
+  const n = parseInt(hex.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#16161a" : "#ffffff";
+}
+function tileStyle(el, color) { el.style.setProperty("--c", color); el.style.setProperty("--ink", ink(color)); }
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function cleanName(s) { return s.replace(/[\u0000-\u001f\u007f]/g, " ").trim().replace(/\s+/g, " ").slice(0, MAXNAME); }
+function defaultName() {
+  for (let n = S.accounts.length + 1; ; n++) {
+    const name = "Account " + n;
+    if (!S.accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) return name;
+  }
+}
+function freeColor() { return PALETTE.find(c => !S.accounts.some(a => a.color === c)) || PALETTE[S.accounts.length % PALETTE.length]; }
+function keyFor(i) { return i < 8 ? "Ctrl+" + (i + 1) : (i === S.accounts.length - 1 ? "Ctrl+9" : ""); }
+
+const DOTS = '<svg viewBox="0 0 12 12"><circle cx="2" cy="6" r="1.4"/><circle cx="6" cy="6" r="1.4"/><circle cx="10" cy="6" r="1.4"/></svg>';
+
+function renderList() {
+  const list = $("#list");
+  list.textContent = "";
+  const current = S.accounts.find(a => a.loading) || S.accounts.find(a => a.id === S.active);
+  S.accounts.forEach((a, i) => {
+    const item = el("div", "acct");
+    item.dataset.id = a.id;
+    if (current && current.id === a.id) item.classList.add("on");
+    if (a.loaded) item.classList.add("awake");
+    if (a.loading) item.classList.add("loading");
+    const k = keyFor(i);
+    item.title = a.name + (k ? "  (" + k + ")" : "") + "\nRight-click to edit";
+    const tile = el("div", "tile", initials(a.name));
+    tileStyle(tile, a.color);
+    tile.append(el("i", "awake-dot"), el("i", "ring"));
+    const dots = el("button", "dots");
+    dots.innerHTML = DOTS;
+    dots.title = "Edit " + a.name;
+    dots.dataset.edit = a.id;
+    item.append(tile, el("div", "nm", a.name), dots);
+    const u = a.usage;
+    if (u && (u.s >= 0 || u.w >= 0)) {
+      const bars = el("div", "use");
+      [["s", u.s], ["wk", u.w]].forEach(([k, v]) => {
+        if (v < 0) return;
+        const i = el("i", k === "wk" ? "wk" : ""), b = el("b");
+        b.style.width = Math.max(2, Math.min(100, v)) + "%";
+        i.append(b);
+        bars.append(i);
+      });
+      item.append(bars);
+      item.title += "\nUsage: " + (u.s >= 0 ? "this session " + Math.round(u.s) + "%" : "") + (u.s >= 0 && u.w >= 0 ? ", " : "") + (u.w >= 0 ? "this week " + Math.round(u.w) + "%" : "");
+    }
+    list.append(item);
+  });
+  const awake = S.accounts.some(a => a.id === S.active && a.loaded);
+  $("#nav").classList.toggle("off", !awake);
+  $("#tools").classList.toggle("off", !awake);
+  const c = S.count;
+  $("#count").textContent = c && awake ? c.msgs.toLocaleString() + " msgs" + (c.more ? "+" : "") + "\n" + short(c.words) + " words" + (c.more ? "+" : "") : "";
+  $("#add").classList.toggle("hint", S.accounts.length === 1);
+  const fb = $('[data-tool="files"]');
+  fb.classList.toggle("on", !!S.filesNew && !(modal && modal.kind === "files"));
+  fb.title = S.filesNew ? "Claude's files: a new file came in" : "Claude's files: everything Claude sent you, opens with no Windows warning";
+}
+
+function short(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : n.toLocaleString(); }
+
+function render() {
+  document.body.classList.toggle("wide", S.wide);
+  renderList();
+  renderStage();
+}
+
+function renderStage() {
+  const st = $("#stage");
+  if (modal) {
+    if (!st.querySelector(".card[data-kind='" + modal.kind + "']")) buildModal();
+    else syncModal();
+    return;
+  }
+  st.textContent = "";
+  if (!S.accounts.length) {
+    const box = el("div");
+    box.id = "empty";
+    box.innerHTML = $("#logo svg").outerHTML;
+    box.append(el("h2", "", "No accounts yet"),
+      el("p", "", "Add one, then log in to Claude. Every account keeps its own login, so you can stay logged in to all of them."));
+    const b = el("button", "", "+  Add account");
+    b.onclick = () => openModal({ kind: "add" });
+    box.append(b);
+    st.append(box);
+  }
+}
+
+function openModal(m) {
+  if (m.kind === "add") { m.name = ""; m.color = freeColor(); }
+  if (m.kind === "edit") {
+    const a = S.accounts.find(x => x.id === m.id);
+    if (!a) return;
+    m.name = a.name; m.color = a.color;
+  }
+  modal = m;
+  waitWide = true;
+  $("#stage").textContent = "";
+  buildModal();
+  send({ t: "wide", on: true });
+}
+
+function closeModal() {
+  if (!modal) return;
+  modal = null;
+  waitWide = false;
+  renderStage();
+  send({ t: "wide", on: false });
+}
+
+function buildModal() {
+  const st = $("#stage");
+  st.textContent = "";
+  const card = el("div", "card");
+  card.dataset.kind = modal.kind;
+  if (modal.kind === "help") { buildHelp(card); st.append(card); return; }
+  if (modal.kind === "look") { card.classList.add("big"); buildLook(card); st.append(card); return; }
+  if (modal.kind === "continue") { buildContinue(card); st.append(card); return; }
+  if (modal.kind === "chats") { card.classList.add("big"); buildChats(card); st.append(card); return; }
+  if (modal.kind === "tasks") { card.classList.add("big"); buildTasks(card); st.append(card); return; }
+  if (modal.kind === "files") { card.classList.add("big"); buildFiles(card); st.append(card); return; }
+
+  const editing = modal.kind === "edit";
+  const hd = el("div", "hd");
+  const pv = el("div", "tile");
+  pv.id = "pv";
+  const t = el("div");
+  t.append(el("h2", "", editing ? "Edit account" : "New account"),
+    el("div", "sub", editing ? "Change its name or color." : "It gets its own separate login. Log in with a different email than your other accounts."));
+  hd.append(pv, t);
+  card.append(hd);
+
+  const lbl = el("label", "lbl", "Name");
+  const inp = el("input");
+  inp.id = "name";
+  inp.maxLength = MAXNAME;
+  inp.placeholder = editing ? "" : defaultName();
+  inp.value = modal.name;
+  inp.spellcheck = false;
+  inp.oninput = () => { modal.name = inp.value; paintPreview(); };
+  lbl.htmlFor = "name";
+  card.append(lbl, inp);
+
+  card.append(el("div", "lbl", "Color"));
+  const sw = el("div", "sw");
+  sw.id = "sw";
+  PALETTE.forEach(c => {
+    const b = el("button");
+    b.style.setProperty("--c", c);
+    b.dataset.color = c;
+    b.title = c;
+    b.onclick = () => { modal.color = c; paintPreview(); };
+    sw.append(b);
+  });
+  card.append(sw);
+
+  if (editing) {
+    const r1 = el("div", "row");
+    const up = el("button", "", "Move up"), down = el("button", "", "Move down");
+    up.id = "up"; down.id = "down";
+    up.onclick = () => send({ t: "move", id: modal.id, dir: -1 });
+    down.onclick = () => send({ t: "move", id: modal.id, dir: 1 });
+    r1.append(up, down);
+    const r2 = el("div", "row");
+    const sleep = el("button", "", "Sleep"), del = el("button", "danger", "Delete");
+    sleep.id = "sleep"; del.id = "del";
+    sleep.onclick = () => { send({ t: "sleep", id: modal.id }); note("Asleep. Its login is kept, it wakes up when you click it."); };
+    let armed = 0;
+    del.onclick = () => {
+      if (!del.classList.contains("armed")) {
+        del.classList.add("armed");
+        del.textContent = "Click again to delete";
+        note("This logs it out of ALTS and wipes its saved login from this PC. Your Claude account itself is NOT deleted.");
+        clearTimeout(armed);
+        armed = setTimeout(() => { del.classList.remove("armed"); del.textContent = "Delete"; note(""); }, 4000);
+        return;
+      }
+      clearTimeout(armed);
+      const id = modal.id;
+      modal = null; waitWide = false;
+      send({ t: "delete", id });
+    };
+    r2.append(sleep, del);
+    const n = el("div", "note");
+    n.id = "note";
+    card.append(r1, r2, n);
+  }
+
+  const foot = el("div", "foot");
+  const cancel = el("button", "ghost", "Cancel"), ok = el("button", "primary", editing ? "Save" : "Create");
+  cancel.onclick = closeModal;
+  ok.onclick = submit;
+  foot.append(cancel, ok);
+  card.append(foot);
+  st.append(card);
+  syncModal();
+  paintPreview();
+  setTimeout(() => { inp.focus(); inp.select(); }, 30);
+}
+
+function buildContinue(card) {
+  card.append(el("h2", "", "Continue on another account"),
+    el("div", "sub", "Saves this chat, opens a new chat on the account you pick and puts the whole old chat in it. Then you press Enter."));
+  const list = el("div", "pick");
+  const others = S.accounts.filter(a => a.id !== S.active);
+  if (!others.length) list.append(el("div", "note", "Add another account first."));
+  others.forEach(a => {
+    const row = el("button", "pickrow");
+    const t = el("div", "tile", initials(a.name));
+    tileStyle(t, a.color);
+    row.append(t, el("span", "", a.name));
+    row.onclick = () => { const id = a.id; modal = null; waitWide = false; renderStage(); send({ t: "wide", on: false }); send({ t: "continue", id }); };
+    list.append(row);
+  });
+  card.append(list);
+  const foot = el("div", "foot");
+  const cancel = el("button", "ghost", "Cancel");
+  cancel.onclick = closeModal;
+  foot.append(cancel);
+  card.append(foot);
+  setTimeout(() => (list.querySelector("button") || cancel).focus(), 30);
+}
+
+function buildChats(card) {
+  card.append(el("h2", "", "Saved chats"), el("div", "sub", "Search every chat you saved, save all your chats at once, or open the folder."));
+  const inp = el("input");
+  inp.id = "q";
+  inp.placeholder = "Search saved chats";
+  inp.spellcheck = false;
+  inp.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); doSearch(); } };
+  const res = el("div", "results");
+  res.id = "results";
+  const r1 = el("div", "row");
+  const all = el("button", "", "Save all chats"), fold = el("button", "", "Open folder");
+  all.title = "Goes through every chat in the list on the left and saves each one";
+  all.onclick = () => { closeModal(); send({ t: "tool", a: "saveall" }); };
+  fold.onclick = () => send({ t: "open-folder" });
+  r1.append(all, fold);
+  const gh = el("div", "tips");
+  gh.id = "gh";
+  card.append(inp, res, r1, gh);
+  paintGh();
+  const foot = el("div", "foot");
+  const ok = el("button", "primary", "Close");
+  ok.onclick = closeModal;
+  foot.append(ok);
+  card.append(foot);
+  setTimeout(() => inp.focus(), 30);
+}
+
+let tasksTimer = 0;
+function buildTasks(card) {
+  card.append(el("h2", "", "Claude's tasks"), el("div", "sub", "What Claude is doing, what's next and what's done. It lives in Claude's memory, so it stays even when a chat stops."));
+  const box = el("div", "tasks");
+  box.id = "tasks";
+  box.append(el("div", "note", "Loading..."));
+  card.append(box);
+  const foot = el("div", "foot");
+  const again = el("button", "ghost", "Refresh"), ok = el("button", "primary", "Close");
+  again.onclick = () => send({ t: "tasks" });
+  ok.onclick = closeModal;
+  foot.append(again, ok);
+  card.append(foot);
+  send({ t: "tasks" });
+  clearInterval(tasksTimer);
+  tasksTimer = setInterval(() => { if (modal && modal.kind === "tasks") send({ t: "tasks" }); else clearInterval(tasksTimer); }, 60000);
+  setTimeout(() => ok.focus(), 30);
+}
+
+// ---------- Claude's files ----------
+let filesList = null, filesNote = "", filesBusy = false;
+const ICON = {
+  shield: '<svg viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.4-3 8-7 9.5-4-1.5-7-5.1-7-9.5V6z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  warn: '<svg viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.5v.1"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M3.5 7A1.5 1.5 0 0 1 5 5.5h4l2 2h8A1.5 1.5 0 0 1 20.5 9v9a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M4.5 7h15M10 4h4M6.5 7l1 12.5h9l1-12.5"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+};
+function svgEl(html) { const s = el("span"); s.innerHTML = html; return s.firstChild; }
+
+function buildFiles(card) {
+  card.append(el("h2", "", "Claude's files"),
+    el("div", "sub", "Everything Claude sent you, downloaded here in ALTS. Double-click one to open it."));
+  const safe = el("div", "safe");
+  safe.append(svgEl(ICON.shield));
+  const st = el("div");
+  st.append(el("b", "", "No \u201cthis could harm your PC\u201d boxes for these."),
+    " Windows knows they came from Claude, so they just open. Files from anywhere else still get checked like normal.");
+  safe.append(st);
+  const box = el("div", "files");
+  box.id = "files";
+  box.append(el("div", "note", "Loading..."));
+  const r1 = el("div", "row");
+  const old = el("button", "", "Fix my old Claude files"), fold = el("button", "", "Open folder");
+  old.id = "fixold";
+  old.title = "Looks in Downloads and on your Desktop for files you got from Claude before, and takes the warning off those too. Nothing else is touched.";
+  old.onclick = () => { if (filesBusy) return; filesBusy = true; filesNote = "Looking through Downloads and your Desktop..."; paintFilesNote(); send({ t: "files-old" }); };
+  fold.onclick = () => send({ t: "files-folder" });
+  r1.append(old, fold);
+  const n = el("div", "note");
+  n.id = "fnote";
+  card.append(safe, box, r1, n);
+  const foot = el("div", "foot");
+  const ok = el("button", "primary", "Close");
+  ok.onclick = closeModal;
+  foot.append(ok);
+  card.append(foot);
+  if (filesList) paintFiles(box);
+  paintFilesNote(card);
+  send({ t: "files" });
+  setTimeout(() => (box.querySelector(".frow:not(.gone)") || ok).focus(), 30);
+}
+
+function paintFilesNote(root = document) {
+  const n = root.querySelector("#fnote");
+  if (n) n.textContent = filesNote;
+  const b = root.querySelector("#fixold");
+  if (b) { b.disabled = filesBusy; b.textContent = filesBusy ? "Looking..." : "Fix my old Claude files"; }
+}
+
+function fileKind(ext) {
+  if (/^(EXE|MSI|BAT|CMD|APK|PS1|VBS|COM|SCR|APPX|MSIX)$/.test(ext)) return "run";
+  if (/^(ZIP|7Z|RAR|TAR|GZ|ISO)$/.test(ext)) return "pack";
+  if (/^(HTML|HTM|PDF|MD|TXT)$/.test(ext)) return "page";
+  return "";
+}
+function fileSize(n) {
+  if (n < 1024) return n + " B";
+  const u = ["KB", "MB", "GB"];
+  let v = n / 1024, i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return (v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)) + " " + u[i];
+}
+function fileWhen(sec) {
+  const d = new Date(sec * 1000), now = new Date();
+  const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(now) - day(d)) / 86400000);
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (diff === 0) return "Today " + time;
+  if (diff === 1) return "Yesterday " + time;
+  return d.toLocaleDateString([], d.getFullYear() === now.getFullYear() ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+}
+
+function paintFiles(box = $("#files")) {
+  if (!box) return;
+  const keep = document.activeElement && document.activeElement.closest && document.activeElement.closest(".frow");
+  const keepId = keep ? keep.dataset.id : "";
+  box.textContent = "";
+  const list = filesList || [];
+  if (!list.length) {
+    box.append(el("div", "fempty", "Nothing here yet. When Claude sends you a file, download it here in ALTS and it shows up in this list, ready to open."));
+    return;
+  }
+  list.forEach(f => {
+    const row = el("div", "frow " + f.state);
+    row.dataset.id = f.id;
+    row.tabIndex = 0;
+    const m = f.name.match(/\.([A-Za-z0-9]{1,5})$/);
+    const ext = m ? m[1].toUpperCase() : "FILE";
+    const badge = el("div", "fext " + fileKind(ext), ext.slice(0, 4));
+    const mid = el("div", "fmid");
+    const nm = el("div", "fname", f.name);
+    nm.title = f.path;
+    const meta = el("div", "fmeta");
+    const tag = el("span", "tag " + f.state);
+    if (f.state === "ok") { tag.append(svgEl(ICON.check), "No warning"); }
+    else if (f.state === "changed") { tag.append(svgEl(ICON.warn), "Changed"); tag.title = "Something changed this file after Claude sent it, so Windows checks it like any other file."; }
+    else { tag.append("Not on your PC anymore"); tag.title = "It was moved or deleted (or Windows Security took it)."; }
+    meta.append(tag);
+    const bits = [];
+    if (f.state !== "gone") bits.push(fileSize(f.size));
+    bits.push(fileWhen(f.added));
+    if (f.account) bits.push(f.account);
+    else if (f.old) bits.push("from before");
+    bits.forEach(b => meta.append(el("span", "", "\u00b7  " + b)));
+    mid.append(nm, meta);
+    const acts = el("div", "facts");
+    if (f.state !== "gone") {
+      const open = el("button", "open", "Open");
+      open.title = "Open it (same as double-clicking it)";
+      open.onclick = e => { e.stopPropagation(); send({ t: "file-open", a: f.id }); };
+      const fold = el("button");
+      fold.append(svgEl(ICON.folder));
+      fold.title = "Show it in its folder";
+      fold.onclick = e => { e.stopPropagation(); send({ t: "file-folder", a: f.id }); };
+      const del = el("button", "del");
+      del.append(svgEl(ICON.trash));
+      del.title = "Delete this file from your PC";
+      let armed = 0;
+      del.onclick = e => {
+        e.stopPropagation();
+        if (!del.classList.contains("armed")) {
+          del.classList.add("armed");
+          del.textContent = "Delete?";
+          clearTimeout(armed);
+          armed = setTimeout(() => { del.classList.remove("armed"); del.textContent = ""; del.append(svgEl(ICON.trash)); }, 3500);
+          return;
+        }
+        clearTimeout(armed);
+        send({ t: "file-delete", a: f.id });
+      };
+      acts.append(open, fold, del);
+    } else {
+      const forget = el("button");
+      forget.append(svgEl(ICON.x));
+      forget.title = "Take it off this list";
+      forget.onclick = e => { e.stopPropagation(); send({ t: "file-forget", a: f.id }); };
+      acts.append(forget);
+    }
+    row.append(badge, mid, acts);
+    row.ondblclick = e => { if (!e.target.closest("button") && f.state !== "gone") send({ t: "file-open", a: f.id }); };
+    row.onkeydown = e => { if (e.key === "Enter" && e.target === row && f.state !== "gone") { e.preventDefault(); e.stopPropagation(); send({ t: "file-open", a: f.id }); } };
+    box.append(row);
+  });
+  if (keepId) { const again = box.querySelector('.frow[data-id="' + keepId + '"]'); if (again) again.focus(); }
+}
+
+function doSearch() {
+  const q = $("#q").value.trim();
+  if (!q) return;
+  const box = $("#results");
+  box.textContent = "";
+  box.append(el("div", "note", "Searching..."));
+  send({ t: "search", a: q });
+}
+
+let ghBusy = false, ghRepos = null, ghError = "";
+function paintGh() {
+  const gh = $("#gh");
+  if (!gh) return;
+  gh.textContent = "";
+  const head = el("div", "ghs"), label = el("span");
+  label.append("Also save to GitHub: ", el("b", "", S.repo || "off"));
+  head.append(label);
+  gh.append(head);
+  if (ghBusy) { gh.append(el("div", "", "Finish the GitHub window that opened, then come back here.")); return; }
+  if (ghError) gh.append(el("div", "", ghError));
+  if (ghRepos) {
+    const pick = el("div", "pick");
+    ghRepos.slice().sort((a, b) => (b.isPrivate - a.isPrivate) || a.nameWithOwner.localeCompare(b.nameWithOwner)).forEach(r => {
+      const b = el("button", "repo");
+      b.append(r.nameWithOwner, el("span", "", r.isPrivate ? "private" : "public"));
+      b.onclick = () => { ghRepos = null; send({ t: "set-repo", a: r.nameWithOwner }); };
+      pick.append(b);
+    });
+    gh.append(el("div", "", "Pick where saved chats go (a private one is best):"), pick);
+    return;
+  }
+  const row = el("div", "row");
+  const set = el("button", "", S.repo ? "Change" : "Set up");
+  set.onclick = () => { ghBusy = true; ghError = ""; paintGh(); send({ t: "gh-setup" }); };
+  row.append(set);
+  if (S.repo) {
+    const off = el("button", "", "Turn off");
+    off.onclick = () => send({ t: "set-repo", a: "" });
+    row.append(off);
+  }
+  gh.append(el("div", "", "Saved chats also go to a GitHub repo of yours, so Claude can read them in new chats."), row);
+}
+
+const LOOKS = [["clay", "Clay (normal)", "#131316", "#24242b", "#d97757"], ["midnight", "Midnight", "#0b1020", "#1b2540", "#5b8cff"],
+  ["oled", "Pure black", "#000000", "#18181c", "#d97757"], ["neon", "Neon", "#0d0a17", "#22183a", "#b46cff"],
+  ["forest", "Forest", "#0e1411", "#1c2c23", "#3dbe8b"], ["sunset", "Sunset", "#17100f", "#2e1d1a", "#ff7a59"], ["light", "Light", "#f4f4f6", "#ffffff", "#d97757"]];
+function setLook(k) {
+  if (k && k !== "clay") document.documentElement.dataset.theme = k; else delete document.documentElement.dataset.theme;
+  send({ t: "look", a: k || "clay" }); // ALTS keeps it (this page can't remember things itself)
+}
+let lookSet = false;
+function buildLook(card) {
+  card.append(el("h2", "", "Settings"));
+  card.append(el("div", "tips", "Look: pick one, it changes right away."));
+  const g = el("div", "looks");
+  const cur = () => document.documentElement.dataset.theme || "clay";
+  LOOKS.forEach(([k, name, bg, raise, acc]) => {
+    const b = el("button", "look" + (cur() === k ? " on" : ""));
+    const sw = el("div", "sw");
+    [bg, raise, acc].forEach(c => { const i = el("i"); i.style.background = c; sw.append(i); });
+    b.append(sw, el("b", "", name));
+    b.onclick = () => { setLook(k); g.querySelectorAll(".look").forEach(x => x.classList.remove("on")); b.classList.add("on"); };
+    g.append(b);
+  });
+  card.append(g);
+  const tips = el("div", "tips");
+  ["Win+V: ALTS Clipboard (everything you copied, pins, stickers, emoji). It runs by itself and starts with Windows; its own settings are under the gear in that box.",
+   "In a chat, left of the chat box: emoji + stickers, \u26A1 quick buttons, \u23F0 Send later, \u21BB Fresh chat."].forEach(t => tips.append(el("div", "", t)));
+  card.append(tips);
+  const foot = el("div", "foot");
+  const ok = el("button", "primary", "Done");
+  ok.onclick = closeModal;
+  foot.append(ok);
+  card.append(foot);
+}
+
+function buildHelp(card) {
+  card.append(el("h2", "", "ALTS keys"));
+  const keys = el("div", "keys");
+  [["Ctrl+1 ... Ctrl+8", "Jump to account 1 to 8"], ["Ctrl+9", "Jump to the last account"],
+   ["Ctrl+Tab", "Next account"], ["Ctrl+Shift+Tab", "Previous account"],
+   ["Alt+Left / Alt+Right", "Back / forward"], ["F5", "Reload"], ["Ctrl+Shift+G", "Copy the whole chat"],
+   ["Right-click", "Edit an account"]]
+    .forEach(([k, v]) => { const kb = el("div"); k.split(" / ").forEach((p, i) => { if (i) kb.append(" "); kb.append(el("kbd", "", p)); }); keys.append(kb, el("span", "", v)); });
+  card.append(keys);
+  const tips = el("div", "tips");
+  ["Every account keeps its own login, so all of them stay logged in at the same time.",
+   "Log in to each one with a different email.",
+   "A green dot means that account is awake in the background. Sleep it (Right-click > Sleep) to free memory.",
+   "Save keeps a chat on your PC, looking just like it, with every picture. Continue saves it and starts a new chat on another account with the old one in it.",
+   "Tasks shows Claude's to-do list. It lives in Claude's memory, so it's still there when a chat stops.",
+   "Files: anything Claude sends you, downloaded here in ALTS, opens with no \u201ccould harm your PC\u201d warning. Files from anywhere else still get checked by Windows.",
+   "Screen pictures, bug reports and voice typing are in LINK (the tray app), never in your messages.",
+   "Pins: select some text in a chat and press Pin. The pin button shows them all.",
+   "If Google login says the browser isn't safe, use Continue with email. It works the same.",
+   "Links to other websites open in your normal browser.",
+   "Win+V opens ALTS Clipboard: everything you copied (text + pictures), pins, stickers and emoji. Click one and it pastes.",
+   "\u23F0 next to the chat box saves a message for when your limit is back. ALTS pings you (sound + it pops up), you press Send.",
+   "\u21BB Fresh chat: Claude writes a handoff, then a new chat starts that knows what you were doing. Long chats use way more usage.",
+   "The gear at the bottom changes how ALTS looks."].forEach(t => tips.append(el("div", "", t)));
+  card.append(tips);
+  const foot = el("div", "foot");
+  const ok = el("button", "primary", "Got it");
+  ok.onclick = closeModal;
+  foot.append(ok);
+  card.append(foot);
+  setTimeout(() => ok.focus(), 30);
+}
+
+function syncModal() {
+  if (!modal || modal.kind !== "edit") return;
+  const i = S.accounts.findIndex(a => a.id === modal.id);
+  if (i < 0) { modal = null; waitWide = false; renderStage(); send({ t: "wide", on: false }); return; }
+  const a = S.accounts[i];
+  $("#up").disabled = i === 0;
+  $("#down").disabled = i === S.accounts.length - 1;
+  const sl = $("#sleep");
+  sl.disabled = !a.loaded || a.id === S.active;
+  sl.title = a.id === S.active ? "Switch to another account first" : (a.loaded ? "Close it to free memory (stays logged in)" : "Already asleep");
+}
+
+function paintPreview() {
+  const pv = $("#pv");
+  if (!pv) return;
+  const name = cleanName(modal.name) || (modal.kind === "add" ? defaultName() : "?");
+  pv.textContent = initials(name);
+  tileStyle(pv, modal.color);
+  document.querySelectorAll("#sw button").forEach(b => b.classList.toggle("pick", b.dataset.color === modal.color));
+}
+
+function submit() {
+  if (!modal || modal.kind === "help") return;
+  const name = cleanName(modal.name);
+  if (modal.kind === "add") {
+    send({ t: "add", name: name || defaultName(), color: modal.color });
+  } else {
+    send({ t: "edit", id: modal.id, name: name || modal.name, color: modal.color });
+  }
+  closeModal();
+}
+
+function note(t) { const n = $("#note"); if (n) n.textContent = t; }
+
+let toastT = 0;
+function toast(t) {
+  const b = $("#toast");
+  b.textContent = t;
+  b.classList.add("show");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => b.classList.remove("show"), 3200);
+}
+
+window.ALTS = {
+  state(s) {
+    S = s;
+    if (!lookSet) { lookSet = true; const k = s.look || "clay"; if (k !== "clay") document.documentElement.dataset.theme = k; }
+    if (S.wide) waitWide = false;
+    else if (modal && !waitWide) modal = null; // ALTS closed the box (after add / delete)
+    render();
+    if (modal && modal.kind === "chats") paintGh();
+  },
+  toast,
+  results(r) {
+    const box = $("#results");
+    if (!box) return;
+    box.textContent = "";
+    if (!r.hits.length) { box.append(el("div", "note", "Nothing found for \u201c" + r.q + "\u201d.")); return; }
+    r.hits.forEach(h => {
+      const b = el("button", "hit");
+      b.append(el("div", "ht", h.title), el("div", "hm", h.account + " \u00b7 " + h.date), el("div", "hs", h.snippet));
+      b.onclick = () => send({ t: "open-saved", a: h.file });
+      box.append(b);
+    });
+  },
+  tasks(r) {
+    const box = $("#tasks");
+    if (!box) return;
+    box.textContent = "";
+    if (r.error) { box.append(el("div", "note", r.error)); return; }
+    const l = r.list;
+    if (l.job) box.append(el("div", "tjob", l.job));
+    [["doing", "Doing now"], ["next", "Next"], ["done", "Done"]].forEach(([k, label]) => {
+      const items = l[k] || [];
+      if (!items.length && k !== "doing") return;
+      box.append(el("div", "lbl", label + (items.length ? " (" + items.length + ")" : "")));
+      if (!items.length) box.append(el("div", "note", "Nothing right now."));
+      items.forEach(t => { const row = el("div", "trow " + k); row.append(el("i"), el("span", "", t)); box.append(row); });
+    });
+    if (l.updated) box.append(el("div", "note", "Updated " + l.updated));
+  },
+  files(r) {
+    filesList = r.files || [];
+    paintFiles();
+  },
+  filesOld(r) {
+    filesBusy = false;
+    filesNote = r.found || r.inside
+      ? "Fixed " + r.found + " old file" + (r.found === 1 ? "" : "s") + " from Claude" + (r.inside ? " (plus " + r.inside + " file" + (r.inside === 1 ? "" : "s") + " that came out of their zips)" : "") + ". They open with no warning now."
+      : "No old files from Claude found in Downloads or on your Desktop.";
+    paintFilesNote();
+  },
+  repos(r) {
+    ghBusy = false;
+    ghError = r.error || "";
+    ghRepos = r.repos || null;
+    paintGh();
+  },
+};
+
+// ---------- clicks and keys ----------
+$("#list").addEventListener("click", e => {
+  const ed = e.target.closest("[data-edit]");
+  if (ed) { e.stopPropagation(); openModal({ kind: "edit", id: ed.dataset.edit }); return; }
+  const item = e.target.closest(".acct");
+  if (!item) return;
+  if (modal) closeModal();
+  send({ t: "select", id: item.dataset.id });
+});
+document.addEventListener("contextmenu", e => {
+  e.preventDefault();
+  const item = e.target.closest(".acct");
+  if (item) openModal({ kind: "edit", id: item.dataset.id });
+});
+$("#nav").addEventListener("click", e => {
+  const b = e.target.closest("[data-nav]");
+  if (b) send({ t: "nav", a: b.dataset.nav });
+});
+$("#tools").addEventListener("click", e => {
+  const b = e.target.closest("[data-tool]");
+  if (!b) return;
+  const t = b.dataset.tool;
+  if (t === "continue") openModal({ kind: "continue" });
+  else if (t === "chats") openModal({ kind: "chats" });
+  else if (t === "tasks") openModal({ kind: "tasks" });
+  else if (t === "files") openModal({ kind: "files" });
+  else if (t === "grab") send({ t: "nav", a: "grab" });
+  else send({ t: "tool", a: t });
+});
+$("#add").onclick = () => openModal({ kind: "add" });
+$("#help").onclick = () => openModal({ kind: "help" });
+$("#look").onclick = () => openModal({ kind: "look" });
+document.addEventListener("keydown", e => {
+  if (!modal) return;
+  if (e.key === "Escape") { e.preventDefault(); closeModal(); }
+  else if (e.key === "Enter" && (modal.kind === "add" || modal.kind === "edit") && !e.target.matches(".ghost, #del")) {
+    // Enter = Save, even right after clicking Move up/down (don't click that button again).
+    e.preventDefault();
+    submit();
+  }
+});
+// A file dropped on the side list must not replace the page.
+["dragover", "drop"].forEach(t => window.addEventListener(t, e => e.preventDefault()));
+
+render();
+send({ t: "ready" });
+</script>
+</body>
+</html>

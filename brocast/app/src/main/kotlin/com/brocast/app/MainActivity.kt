@@ -40,8 +40,11 @@ class MainActivity : ComponentActivity() {
         @VisibleForTesting
         var autoStart = true
 
-        /** BroCast 1.0. Its signing key is gone, so 2.0 is a separate app and offers to remove it. */
-        const val OLD_PACKAGE = "com.brocast.app"
+        /**
+         * BroCast 1 and BroCast 2. Their signing keys are gone, so 3 is a separate app and offers
+         * to remove them (one at a time: Android asks to confirm each).
+         */
+        val OLD_PACKAGES = listOf("com.brocast.live", "com.brocast.app")
     }
 
     private lateinit var settings: ShareSettings
@@ -51,9 +54,6 @@ class MainActivity : ComponentActivity() {
     private var soundEnabled by mutableStateOf(true)
     private var wifiAddresses by mutableStateOf(listOf<String>())
     private var oldAppInstalled by mutableStateOf(false)
-    private var translateEnabled by mutableStateOf(false)
-    private var voicesEnabled by mutableStateOf(true)
-    private var overlayAllowed by mutableStateOf(false)
 
     private val captureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data
@@ -82,9 +82,6 @@ class MainActivity : ComponentActivity() {
         pinEnabled = settings.pinEnabled
         pin = settings.pin
         soundEnabled = settings.soundEnabled
-        translateEnabled = settings.translateEnabled
-        voicesEnabled = settings.voicesEnabled
-        overlayAllowed = Settings.canDrawOverlays(this)
 
         setContent {
             BroCastTheme {
@@ -124,16 +121,6 @@ class MainActivity : ComponentActivity() {
                     onCopy = ::copyToClipboard,
                     oldAppInstalled = oldAppInstalled,
                     onRemoveOldApp = ::removeOldApp,
-                    translateEnabled = translateEnabled,
-                    overlayAllowed = overlayAllowed,
-                    onTranslateChange = ::changeTranslate,
-                    voicesEnabled = voicesEnabled,
-                    onVoicesChange = {
-                        voicesEnabled = it
-                        settings.voicesEnabled = it
-                        ScreenShareService.setTranslate(this, translateEnabled && overlayAllowed, it)
-                    },
-                    onAllowOverlay = ::openOverlaySettings,
                 )
             }
         }
@@ -145,30 +132,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        oldAppInstalled = isInstalled(OLD_PACKAGE)
-        // Back from Android's "display over other apps" page: subtitles start if it's allowed now.
-        overlayAllowed = Settings.canDrawOverlays(this)
-        ScreenShareService.setTranslate(this, translateEnabled && overlayAllowed, voicesEnabled)
-    }
-
-    private fun changeTranslate(on: Boolean) {
-        translateEnabled = on
-        settings.translateEnabled = on
-        if (on && !Settings.canDrawOverlays(this)) openOverlaySettings()
-        ScreenShareService.setTranslate(this, on && Settings.canDrawOverlays(this), voicesEnabled)
-    }
-
-    // Android's own page with the "Allow display over other apps" switch for BroCast.
-    private fun openOverlaySettings() {
-        try {
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", packageName, null)))
-        } catch (e: ActivityNotFoundException) {
-            try {
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-            } catch (e2: ActivityNotFoundException) {
-                Toast.makeText(this, "Settings → Apps → BroCast 2 → Display over other apps", Toast.LENGTH_LONG).show()
-            }
-        }
+        oldAppInstalled = OLD_PACKAGES.any(::isInstalled)
     }
 
     private fun isInstalled(packageName: String): Boolean = try {
@@ -185,11 +149,12 @@ class MainActivity : ComponentActivity() {
 
     // Android shows its own "Uninstall this app?" box; the card goes away once it's gone (onResume).
     private fun removeOldApp() {
+        val old = OLD_PACKAGES.firstOrNull(::isInstalled) ?: return
         try {
-            startActivity(Intent(Intent.ACTION_DELETE, Uri.fromParts("package", OLD_PACKAGE, null)))
+            startActivity(Intent(Intent.ACTION_DELETE, Uri.fromParts("package", old, null)))
         } catch (e: ActivityNotFoundException) {
             try {
-                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", OLD_PACKAGE, null)))
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", old, null)))
             } catch (e2: ActivityNotFoundException) {
                 Toast.makeText(this, "Hold the old BroCast icon and pick Uninstall", Toast.LENGTH_LONG).show()
             }

@@ -35,8 +35,8 @@ class FrameHub {
     fun publish(jpeg: ByteArray, width: Int, height: Int) {
         lock.withLock {
             if (isClosed) return
-            latest = Frame(nextSeq++, jpeg, width, height)
             framesPublished++
+            latest = Frame(nextSeq++, jpeg, width, height)
             changed.signalAll()
         }
     }

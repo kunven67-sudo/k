@@ -83,12 +83,6 @@ fun HomeScreen(
     onCopy: (String) -> Unit,
     oldAppInstalled: Boolean = false,
     onRemoveOldApp: () -> Unit = {},
-    translateEnabled: Boolean = false,
-    overlayAllowed: Boolean = false,
-    onTranslateChange: (Boolean) -> Unit = {},
-    onAllowOverlay: () -> Unit = {},
-    voicesEnabled: Boolean = true,
-    onVoicesChange: (Boolean) -> Unit = {},
 ) {
     Box(
         Modifier
@@ -132,11 +126,6 @@ fun HomeScreen(
                 is ShareStatus.Live -> LiveCard(status, onStop, onCopy, onFixSoundPermission)
             }
 
-            Spacer(Modifier.height(14.dp))
-            TranslateCard(
-                translateEnabled, overlayAllowed, live = status is ShareStatus.Live, onTranslateChange, onAllowOverlay,
-                voicesEnabled, onVoicesChange,
-            )
             Spacer(Modifier.height(14.dp))
             SoundCard(soundEnabled, soundSupported, locked = sharing, onSoundEnabledChange)
             Spacer(Modifier.height(14.dp))
@@ -269,11 +258,11 @@ private fun BigButton(text: String, brush: Brush, onClick: () -> Unit) {
 @Composable
 private fun OldAppCard(onRemove: () -> Unit) {
     BroCard(border = BorderStroke(1.dp, BroColors.Cyan.copy(alpha = 0.5f))) {
-        CardTitle("👋 The old BroCast is still on your phone")
+        CardTitle("👋 An old BroCast is still on your phone")
         Spacer(Modifier.height(6.dp))
         Body(
-            "This new one sends real video, so it doesn't freeze on videos anymore. Remove the old one so " +
-                "you don't open it by mistake (Android asks you to confirm).",
+            "BroCast 3 rides out Wi-Fi hiccups instead of freezing. Remove the old one so you don't open it " +
+                "by mistake (Android asks you to confirm; if you have both old ones, tap again for the second).",
         )
         Spacer(Modifier.height(16.dp))
         BigButton("🧹  Remove the old BroCast", BrandGradient, onRemove)
@@ -351,7 +340,12 @@ private fun LiveCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             PulsingDot()
             Spacer(Modifier.width(8.dp))
-            Text("LIVE", color = BroColors.Live, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+            Text(
+                "LIVE",
+                color = BroColors.Live,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.5.sp,
+            )
             Spacer(Modifier.weight(1f))
             Text(
                 if (live.fps > 0) "⚡ ${live.fps} fps" else "😴 screen is still",
@@ -406,7 +400,9 @@ private fun LiveCard(
                 )
             }
             Spacer(Modifier.height(8.dp))
-            Body("💡 Bookmark that page on your TV/PC. Next time, just open the bookmark.", size = 13)
+            Body("💡 Bookmark that page on your TV. Next time, just open the bookmark.", size = 13)
+            Spacer(Modifier.height(4.dp))
+            Body("💻 On your PC, open the BroCast app instead: it finds your phone by itself.", size = 13)
         }
 
         if (live.pin != null) {
@@ -439,15 +435,10 @@ private fun LiveCard(
         Body(
             when {
                 live.video -> "🎬 Sending smooth video"
-                live.translate != null -> "🖼️ Sending pictures (English subtitles are on)"
                 else -> "🖼️ Sending pictures (a screen that can't play the video is watching)"
             },
             size = 13,
         )
-        if (live.translate != null) {
-            Spacer(Modifier.height(4.dp))
-            Body("💬 English subtitles: ${live.translate}", color = BroColors.Good, size = 13)
-        }
         Spacer(Modifier.height(4.dp))
         SoundLine(live.sound, onFixSoundPermission)
         if (live.noPicture) {
@@ -472,77 +463,6 @@ private fun SoundLine(sound: SoundStatus, onFixPermission: () -> Unit) {
                 Body("🔇 No sound: Android's \"record audio\" permission is off.", color = BroColors.Warn)
             }
             TextButton(onClick = onFixPermission) { Text("Fix it") }
-        }
-    }
-}
-
-@Composable
-private fun TranslateCard(
-    enabled: Boolean,
-    allowed: Boolean,
-    live: Boolean,
-    onEnabledChange: (Boolean) -> Unit,
-    onAllow: () -> Unit,
-    voices: Boolean,
-    onVoicesChange: (Boolean) -> Unit,
-) {
-    BroCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                CardTitle("💬 English subtitles on this phone")
-                Spacer(Modifier.height(4.dp))
-                Body(
-                    "Reads the subtitles of whatever's playing (Spanish, Portuguese, Japanese, Chinese, Korean " +
-                        "and lots more) and puts English right over them.",
-                    size = 14,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Switch(
-                checked = enabled,
-                onCheckedChange = onEnabledChange,
-                colors = SwitchDefaults.colors(checkedTrackColor = BroColors.Primary),
-            )
-        }
-        if (enabled && !allowed) {
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) {
-                    WarnBox("Android needs one OK first: turn on \"Display over other apps\" for BroCast 2.")
-                }
-                TextButton(onClick = onAllow) { Text("Allow") }
-            }
-        } else if (enabled) {
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("🗣️ Say them out loud too", color = BroColors.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Body(
-                        "An English guy or girl voice, picked by how high the voice in the show is (that part uses the " +
-                            "Sound switch below). The show gets a bit quieter while it talks.",
-                        size = 13,
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Switch(
-                    checked = voices,
-                    onCheckedChange = onVoicesChange,
-                    colors = SwitchDefaults.colors(checkedTrackColor = BroColors.Primary),
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Body(
-                "💡 When Android asks what to share, pick \"A single app\" and choose the app you watch on: " +
-                    "the English then sits right on the subtitle. (With the entire screen it goes just above it.)",
-                size = 13,
-            )
-            Spacer(Modifier.height(4.dp))
-            Body(
-                "📥 Each language downloads once (about 30 MB), then it works offline. " +
-                    "While this is on, a TV watching gets pictures instead of video.",
-                size = 13,
-            )
-            if (!live) Body("Turns on when you start sharing ▶️", size = 12)
         }
     }
 }

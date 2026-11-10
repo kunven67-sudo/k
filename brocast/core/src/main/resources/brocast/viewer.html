@@ -65,8 +65,7 @@
   .error { min-height: 32px; margin: 18px 0 0; font-size: 22px; color: #FF7A93; }
 
   #bar {
-    /* At the top: subtitles live at the bottom, and translators reading this tab (SUBDUB) shouldn't
-       mistake the buttons for one. */
+    /* At the top: subtitles live at the bottom. */
     position: fixed; left: 0; right: 0; top: 24px; z-index: 2; text-align: center;
     opacity: 0; -webkit-transition: opacity .35s; transition: opacity .35s; pointer-events: none;
   }
@@ -84,8 +83,8 @@
   @-webkit-keyframes pulse { 50% { opacity: .25; } }
   @keyframes pulse { 50% { opacity: .25; } }
   #devName { color: #9AA4BF; margin-right: 18px; }
-  #fsBtn, #soundBtn, #trBtn { font-size: 20px; padding: 12px 24px; }
-  #soundBtn, #trBtn { background: #1C2438; margin-right: 8px; }
+  #fsBtn, #soundBtn { font-size: 20px; padding: 12px 24px; }
+  #soundBtn { background: #1C2438; margin-right: 8px; }
   #soundBtn.off { color: #9AA4BF; }
 
   #soundHint {
@@ -108,7 +107,7 @@
     .btn { font-size: 21px; padding: 13px 28px; }
     #barInner { font-size: 16px; }
     #devName { display: none; }
-    #fsBtn, #soundBtn, #trBtn { font-size: 16px; padding: 10px 16px; }
+    #fsBtn, #soundBtn { font-size: 16px; padding: 10px 16px; }
     #soundHint span { font-size: 17px; padding: 11px 18px; }
   }
 </style>
@@ -160,7 +159,8 @@
 
 <div id="soundHint" style="display:none"><span>Press OK or click anywhere to turn on sound</span></div>
 
-<div id="bar"><div id="barInner"><span class="live"><i></i>LIVE</span><span id="devName"></span><button class="btn" id="soundBtn" type="button" style="display:none">Sound on</button><button class="btn" id="trBtn" type="button" style="display:none" title="Subtitles in other languages to English, with SUBDUB">Translate</button><button class="btn" id="fsBtn" type="button">Full screen</button></div></div>
+
+<div id="bar"><div id="barInner"><span class="live" id="liveTag"><i></i><b id="liveText">LIVE</b></span><span id="devName"></span><button class="btn" id="soundBtn" type="button" style="display:none">Sound on</button><button class="btn" id="fsBtn" type="button">Full screen</button></div></div>
 
 <noscript><p style="position:fixed;top:40%;width:100%;text-align:center;font-size:24px;z-index:9">This page needs JavaScript turned on.</p></noscript>
 
@@ -173,7 +173,8 @@
   var img = $('screen'), overlay = $('overlay'), waitCard = $('waitCard'), pinCard = $('pinCard'),
       waitMsg = $('waitMsg'), waitHint = $('waitHint'), pinInput = $('pinInput'), pinBtn = $('pinBtn'),
       pinError = $('pinError'), bar = $('bar'), fsBtn = $('fsBtn'), devName = $('devName'), awake = $('awake'),
-      soundBtn = $('soundBtn'), soundHint = $('soundHint'), vid = $('vid'), trBtn = $('trBtn');
+      soundBtn = $('soundBtn'), soundHint = $('soundHint'), vid = $('vid'),
+      liveTag = $('liveTag'), liveText = $('liveText');
   var docEl = document.documentElement;
   var URLs = window.URL || window.webkitURL;
   var BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -232,6 +233,7 @@
     try {
       x.open('GET', url, true);
       if (opts.blob) x.responseType = 'blob';
+      if (opts.brocast) x.setRequestHeader('X-BroCast', '1');
       x.timeout = opts.timeout || 5000;
       x.onload = function () { finish(x.status); };
       x.onerror = x.ontimeout = x.onabort = function () { finish(0); };
@@ -593,8 +595,8 @@
 
   window.addEventListener('resize', fitImage, false);
 
-  // Background tab: keep going (the sound keeps playing, and apps that record this tab, like a
-  // translator, keep getting the picture). Only after a long time hidden does it stop, to save Wi-Fi.
+  // Background tab: keep going (the sound keeps playing, and apps that record this tab keep getting
+  // the picture). Only after a long time hidden does it stop, to save Wi-Fi.
   // Skipped while the page is closing, because the browser is tearing it down anyway.
   var leaving = false, hiddenSince = 0;
   var HIDDEN_LIMIT = 15 * 60 * 1000;
@@ -618,16 +620,17 @@
   var ms = null, sb = null, vws = null, vUrl = null, vq = [], vqBytes = 0, vCodec = '', vTimer = null;
   var vLastData = 0, vLastMove = 0, vLastTime = -1, vLag = 0.15, vSeekedAt = 0, vPhoneFrames = -1, vPhoneFramesAt = 0;
   var vResets = [], vLastTrim = 0, vWsTries = 0;
-  var vstats = window.BroCastVideo = { messages: 0, bytes: 0, appended: 0, resets: 0, reconnects: 0, jumps: 0, lag: 0 };
+  var vLastFrameAt = 0, vStartedAt = 0;
+  var vstats = window.BroCastVideo = { messages: 0, bytes: 0, appended: 0, resets: 0, reconnects: 0, jumps: 0, lag: 0, starved: 0, cushion: 0 };
 
   function videoStart() {
-    vLastData = vLastMove = now();
+    vLastData = vLastMove = vStartedAt = now();
     vLastTime = -1;
     vWsTries = 0;
     videoOpenSource();
     videoConnect();
     clearInterval(vTimer);
-    vTimer = setInterval(videoTick, 250);
+    vTimer = setInterval(videoTick, 100);
   }
 
   function videoStop() {
@@ -689,6 +692,7 @@
         return;
       }
       vstats.bytes += e.data.byteLength;
+      vLastFrameAt = vLastData;
       vq.push(e.data);
       vqBytes += e.data.byteLength;
       // The video player isn't taking anything in: start it over.
@@ -761,18 +765,33 @@
     }
   }
 
-  // Runs 4 times a second: keeps the picture right at the live edge and notices when it's stuck.
+  // How far behind the newest picture the player runs. Wi-Fi delivers in bursts and has short
+  // hiccups all the time, so the player keeps a small cushion (about 0.2 s) instead of riding the
+  // very edge: riding the edge is what made the picture stop for a moment every few seconds while
+  // the sound kept going. The cushion grows by itself when the Wi-Fi is choppy (each time the player
+  // runs out of picture) and shrinks slowly again once it's calm. Sound waits the same amount, so
+  // mouths still match. (A third of a second behind your phone is nothing while you watch.)
+  var CUSHION_MIN = 0.15, CUSHION_MAX = 1.0, CUSHION_START = 0.3, CUSHION_STEP = 0.1, cushion = CUSHION_START;
+  var vStarvedAt = 0, vCalmSince = 0;
+  // Further behind than cushion + this: jump instead of playing faster. Short right after the
+  // start, so a new screen opens close to live instead of speeding through the first seconds.
+  var JUMP_AFTER = 2.0, JUMP_AFTER_START = 0.4, START_MS = 3000;
+
+  // Runs 10 times a second: keeps the picture just behind live and notices when it's stuck.
   function videoTick() {
     if (!streamOn || picture !== 'video') return;
     var t = now(), b = vid.buffered, ct = vid.currentTime;
     if (b && b.length) {
-      var end = b.end(b.length - 1), start = b.start(b.length - 1), inside = false;
-      for (var i = 0; i < b.length; i++) if (ct >= b.start(i) - 0.04 && ct <= b.end(i) + 0.02) inside = true;
+      // Only the newest stretch counts: sitting at the end of an older one means it's waiting at a
+      // gap (frames were skipped) that the player won't cross on its own.
+      var end = b.end(b.length - 1), start = b.start(b.length - 1);
+      var inside = ct >= start - 0.04 && ct <= end + 0.02;
       var lag = end - ct;
-      if (!inside || lag > 1.0) {
-        // In a gap (frames were skipped to catch up) or too far behind: jump to the newest picture.
-        var target = Math.max(start, end - 0.1);
-        if (Math.abs(target - ct) > 0.05 && t - vSeekedAt > 400) {
+      var jumpAfter = t - vStartedAt < START_MS ? JUMP_AFTER_START : JUMP_AFTER;
+      if (!inside || lag > cushion + jumpAfter) {
+        // In a gap or way behind: jump to just behind the newest picture.
+        var target = Math.max(start, end - cushion);
+        if (Math.abs(target - ct) > 0.03 && t - vSeekedAt > 300) {
           vSeekedAt = t;
           vstats.jumps++;
           try { vid.currentTime = target; } catch (e) { /* ignore */ }
@@ -780,13 +799,28 @@
           vLag = lag;
         }
         setRate(1);
-      } else if (lag > 0.4) {
-        setRate(1.15);   // quietly catch up
-      } else if (lag < 0.2) {
-        setRate(1);
+      } else {
+        // Ran out of picture while the phone is sending: that's a visible stop. Keep a bigger
+        // cushion from now on. (On a still screen nothing new comes, which is fine.)
+        if (lag < 0.03 && t - vLastFrameAt < 400 && t - vSeekedAt > 1000) {
+          if (t - vStarvedAt > 1000) {
+            cushion = Math.min(CUSHION_MAX, cushion + CUSHION_STEP);
+            vstats.starved++;
+          }
+          vStarvedAt = t;
+          vCalmSince = t;
+        } else if (!vCalmSince || t - vCalmSince > 20000) {
+          if (vCalmSince) cushion = Math.max(CUSHION_MIN, cushion - 0.02);
+          vCalmSince = t;
+        }
+        if (lag > cushion + 0.5) setRate(1.15);        // sped-up video for a moment isn't noticeable
+        else if (lag > cushion + 0.15) setRate(1.06);
+        else if (lag < cushion * 0.5) setRate(0.97);   // build the cushion back up, too slow to see
+        else if (Math.abs(lag - cushion) < 0.06) setRate(1);
       }
-      vLag = vLag * 0.7 + Math.max(0, Math.min(lag, 1)) * 0.3;
+      vLag = vLag * 0.8 + Math.max(0, Math.min(lag, 1.5)) * 0.2;
       vstats.lag = Math.round(vLag * 1000);
+      vstats.cushion = Math.round(cushion * 1000);
       if (vid.paused && vid.readyState >= 2) playVideo();
     }
     if (ct !== vLastTime) {
@@ -876,10 +910,10 @@
   // Sound plays ~0.1 s after it arrives: enough to ride out Wi-Fi hiccups, small enough to match the
   // picture. Video shows up a little later than pictures (the player keeps a small buffer), so the
   // sound waits that much longer to stay in sync with the mouths.
-  var TARGET_LEAD = 0.1, MIN_LEAD = 0.02;
+  var TARGET_LEAD = 0.08, MIN_LEAD = 0.02;
   function soundLead() {
     if (picture !== 'video' || phase !== 'live') return TARGET_LEAD;
-    return Math.max(TARGET_LEAD, Math.min(0.6, vLag + 0.05));
+    return Math.max(TARGET_LEAD, Math.min(1.0, vLag + 0.04));
   }
   var stats = window.BroCastStats = { chunks: 0, played: 0, skipped: 0, lead: 0, peak: 0 };
 
@@ -958,8 +992,8 @@
     var frames = Math.floor(samples.length / ch);
     if (!frames) return;
     var t = actx.currentTime, lead = playHead - t, want = soundLead();
-    if (lead > want + 0.12) { stats.skipped++; return; }      // way behind the picture: drop a bit to catch up
-    if (lead < MIN_LEAD || lead < want - 0.12) playHead = t + want; // ran dry, or the picture got much slower
+    if (lead > want + 0.1) { stats.skipped++; return; }       // way behind the picture: drop a bit to catch up
+    if (lead < MIN_LEAD || lead < want - 0.1) playHead = t + want;  // ran dry, or the picture got much slower
     // A little off: play 2% faster or slower until it lines up again (too small to hear).
     var speed = lead > want + 0.03 ? 1.02 : lead < want - 0.03 ? 0.98 : 1;
     var buffer = actx.createBuffer(ch, frames, fmt.rate), peak = 0;
@@ -1001,18 +1035,6 @@
       closeSound();
     }
     updateSoundUi();
-    showBar();
-  };
-
-  /*
-   * Translate: opens SUBDUB (subtitles in other languages -> English, foreign talking -> English
-   * voices) ready to pick this tab. SUBDUB needs Edge or Chrome on a computer, so only those get the button.
-   */
-  var SUBDUB_URL = 'https://kunven67-sudo.github.io/k/subdub/?from=brocast';
-  var ua = navigator.userAgent;
-  if (!TV_UA.test(ua) && /(Chrome|Edg)\//.test(ua) && !/Mobile|Android|CrOS/.test(ua)) trBtn.style.display = '';
-  trBtn.onclick = function () {
-    try { window.open(SUBDUB_URL, 'subdub'); } catch (e) { location.href = SUBDUB_URL; }
     showBar();
   };
 

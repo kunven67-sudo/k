@@ -110,7 +110,7 @@ class VideoHubTest {
     fun slowViewerSkipsToTheNextKeyFrameInsteadOfFallingBehind() {
         val keyRequests = AtomicInteger()
         var now = 0L
-        val hub = VideoHub(maxQueueFrames = 5, clock = { now })
+        val hub = VideoHub(maxQueueMs = 500, clock = { now })
         hub.keyFrameRequester = { keyRequests.incrementAndGet() }
         hub.configure(640, 360, annexB(SPS, PPS))
         val fast = hub.openClient()
@@ -121,7 +121,7 @@ class VideoHubTest {
         frames(slow)
         // The slow one stops reading; 10 more frames arrive.
         for (i in 1..10) {
-            now += 1_000 // (key frame requests are limited to two a second)
+            now += 1_000 // the slow viewer's oldest frame waits a whole second each time
             hub.publish(annexB(pFrame(i)), i * 33_000L, false)
             assertEquals(listOf(i), frames(fast).map(::tagOf), "the fast viewer isn't held up")
         }
@@ -135,8 +135,142 @@ class VideoHubTest {
     }
 
     @Test
+    fun shortWifiHiccupsAreRiddenOutNotSkipped() {
+        // Wi-Fi stalls for a few hundred milliseconds all the time. That must not cost a single frame.
+        var now = 0L
+        val hub = VideoHub(clock = { now })
+        hub.configure(640, 360, annexB(SPS, PPS))
+        val c = hub.openClient()
+        hub.publish(annexB(idr(0)), 0, true)
+        frames(c)
+        for (i in 1..30) { // 30 frames (1 s) while the TV's Wi-Fi is stuck
+            now += 33
+            hub.publish(annexB(pFrame(i)), i * 33_000L, false)
+        }
+        assertEquals((1..30).toList(), frames(c).map(::tagOf), "everything still arrives, in order")
+        assertEquals(0L, c.dropped)
+        assertEquals(0L, hub.skips)
+    }
+
+    @Test
+    fun skippingAsksForAKeyFrameRightAwayButDoesNotPileUpRequests() {
+        val keyRequests = AtomicInteger()
+        var now = 0L
+        val hub = VideoHub(maxQueueMs = 300, clock = { now })
+        hub.keyFrameRequester = { keyRequests.incrementAndGet() }
+        hub.configure(640, 360, annexB(SPS, PPS))
+        val c = hub.openClient()
+        hub.publish(annexB(idr(0)), 0, true) // answers the join request
+        frames(c)
+        now = 1_000
+        hub.requestKeyFrame() // some other reason, served right away:
+        hub.publish(annexB(idr(1)), 1_000_000, true)
+        frames(c)
+        keyRequests.set(0)
+        // 100 ms later the viewer falls way behind: it must not wait for the 2 s key frame mark.
+        var t = 1_000_000L
+        for (i in 2..12) {
+            now += 33
+            t += 33_000
+            hub.publish(annexB(pFrame(i)), t, false)
+        }
+        assertEquals(1, keyRequests.get(), "asked once, right away (the last key frame was already used up)")
+        // Still waiting: more frames come, but the request is on its way, so no new ones...
+        for (i in 13..30) {
+            now += 33
+            t += 33_000
+            hub.publish(annexB(pFrame(i)), t, false)
+        }
+        assertEquals(1, keyRequests.get(), "no pile of requests while the first one is on its way")
+        // ...unless the encoder ignored it for a second.
+        now += 1_000
+        t += 33_000
+        hub.publish(annexB(pFrame(31)), t, false)
+        assertEquals(2, keyRequests.get(), "asks again if nothing came for a second")
+        hub.publish(annexB(idr(32)), t + 33_000, true)
+        assertEquals(32, tagOf(frames(c).first()), "goes on from the fresh key frame")
+    }
+
+    @Test
+    fun framesWaitingTurnTheBitrateDownAndACalmWifiTurnsItBackUp() {
+        var now = 0L
+        val hub = VideoHub(clock = { now })
+        val rates = ArrayList<Int>()
+        hub.bitrateListener = { rates += it }
+        hub.setMaxBitrate(6_000_000)
+        assertEquals(6_000_000, hub.targetBitrate)
+        hub.configure(640, 360, annexB(SPS, PPS))
+        val c = hub.openClient()
+        var t = 0L
+        var i = 0
+        fun frame(read: Boolean) {
+            now += 33
+            t += 33_000
+            hub.publish(annexB(if (i % 60 == 0) idr(i) else pFrame(i)), t, i % 60 == 0)
+            i++
+            if (read) frames(c)
+        }
+        repeat(30) { frame(read = true) }
+        assertTrue(rates.isEmpty(), "keeps up: nothing changes")
+        repeat(12) { frame(read = false) } // TV stops reading for ~0.4 s
+        assertEquals(listOf(4_500_000), rates, "turned down once frames waited 250 ms")
+        assertEquals(4_500_000, hub.targetBitrate, "a new encoder (rotation) starts here too")
+        repeat(300) { frame(read = true) } // 10 s of good Wi-Fi
+        assertTrue(rates.size >= 2 && rates.last() > 4_500_000, "turned back up when calm: $rates")
+        assertTrue(rates.all { it <= 6_000_000 }, "never above the picked quality")
+        hub.setMaxBitrate(2_500_000) // picked Saver on the phone
+        assertEquals(2_500_000, hub.targetBitrate)
+    }
+
+    @Test
+    fun slowWifiWithBusyAnimeScenesStopsSkippingOnceTheBitrateAdapts() {
+        // 60 s of a Wi-Fi link that carries 4 Mbit/s, with an encoder picked at 6 Mbit/s that makes
+        // 3x bigger frames for 1 s every 5 s (fight scenes, flashes). Without steering, the TV skips
+        // (the picture stops) again and again; with it, only while it first finds the right level.
+        fun run(steer: Boolean): Long {
+            var now = 0L
+            val hub = VideoHub(clock = { now })
+            var rate = 6_000_000
+            if (steer) {
+                hub.bitrateListener = { rate = it }
+                hub.setMaxBitrate(rate)
+            }
+            hub.configure(640, 360, annexB(SPS, PPS))
+            val c = hub.openClient()
+            val linkBytesPerMs = 4_000_000 / 8 / 1000.0
+            var budget = 0.0
+            var frameNo = 0
+            var nextFrameAt = 0L
+            while (now < 60_000) {
+                if (now >= nextFrameAt) {
+                    val busy = (now / 1000) % 5 == 0L
+                    val size = (rate / 8 / 30 * (if (busy) 3 else 1)).coerceAtLeast(20)
+                    val key = frameNo % 60 == 0
+                    hub.publish(annexB(if (key) idr(frameNo, size) else pFrame(frameNo, size)), now * 1000, key)
+                    frameNo++
+                    nextFrameAt += 33
+                }
+                // The link: sends what's queued as fast as its speed allows (a big frame puts it
+                // in debt for a while, like a real one: nothing else goes out until it's paid off).
+                budget = minOf(budget + linkBytesPerMs, 64_000.0)
+                while (budget >= 0) {
+                    val m = c.next(0) ?: break
+                    if (m is VideoHub.FrameMessage) budget -= m.data.size
+                }
+                now++
+            }
+            return hub.skips
+        }
+        val unsteered = run(steer = false)
+        val steered = run(steer = true)
+        println("SIM skips per minute: old way $unsteered, BroCast 3 $steered")
+        assertTrue(unsteered >= 5, "the old way skips over and over: $unsteered")
+        assertTrue(steered <= 2, "steered: at most a skip or two while it adapts, was $steered (unsteered $unsteered)")
+    }
+
+    @Test
     fun catchUpBurstDoesNotCountAsFallingBehind() {
-        val hub = VideoHub(maxQueueFrames = 5)
+        val hub = VideoHub(maxQueueMs = 500)
         hub.configure(640, 360, annexB(SPS, PPS))
         hub.publish(annexB(idr(0)), 0, true)
         for (i in 1..20) hub.publish(annexB(pFrame(i)), i * 33_000L, false)
@@ -183,17 +317,37 @@ class VideoHubTest {
     }
 
     @Test
-    fun timestampsAlwaysMoveForward() {
+    fun timelineHasNoHolesSoBrowsersNeverThrowFramesAway() {
+        // The anime freeze: a frame more than 2x "the last frame's length" late made the browser
+        // drop everything up to the next key frame. Real phones make frames this unevenly:
+        val captureMs = listOf(
+            5_000.0, 5_033.3, 5_066.7, // steady 30 fps
+            5_166.7, // nothing changed for 100 ms: the encoder repeats the picture
+            5_208.3, 5_250.0, 5_333.3, // 24 fps anime, one dropped frame
+            5_340.0, 5_340.5, 5_341.0, // read in a burst
+            8_341.0, // still screen for 3 s
+            8_374.3,
+            8_300.0, // clock went backwards
+            8_400.0,
+        )
         val hub = VideoHub()
         hub.configure(640, 360, annexB(SPS, PPS))
         val c = hub.openClient()
-        hub.publish(annexB(idr(1)), 5_000_000, true)
-        hub.publish(annexB(pFrame(2)), 5_033_333, false)
-        hub.publish(annexB(pFrame(3)), 5_033_333, false) // same time again
-        hub.publish(annexB(pFrame(4)), 4_000_000, false) // went backwards
-        val times = frames(c).filterIsInstance<VideoHub.FrameMessage>().map { it.decodeTime }
-        assertEquals(0L, times[0], "first frame is time zero")
-        assertEquals(listOf(0L, 2999L, 3000L, 3001L), times, "strictly increasing")
+        captureMs.forEachIndexed { i, ms -> hub.publish(annexB(if (i == 0) idr(i) else pFrame(i)), (ms * 1000).toLong(), i == 0) }
+        val got = frames(c).filterIsInstance<VideoHub.FrameMessage>()
+        assertEquals(captureMs.size, got.size)
+        assertEquals(0L, got[0].decodeTime, "first frame is time zero")
+        for (i in 1 until got.size) {
+            val prev = got[i - 1]
+            assertEquals(prev.decodeTime + prev.duration, got[i].decodeTime, "frame $i starts right where frame ${i - 1} ends")
+        }
+        assertTrue(got.all { it.duration in 360..9_000 }, "every frame 4-100 ms: " + got.map { it.duration })
+        assertTrue(got[1].duration in 2_990..3_005, "a real 33 ms gap is kept: ${got[1].duration}")
+        assertEquals(9_000, got[3].duration, "the 100 ms repeat is kept")
+        assertTrue(got[10].duration in 2_500..4_500, "after a still screen: the usual length, not 3 s: ${got[10].duration}")
+        // And the fMP4 says the same (that's what the browser reads).
+        val trun = got[3].data
+        assertTrue(trun.size > 0)
     }
 
     @Test
@@ -266,7 +420,7 @@ class Mp4RoundTripTest {
                 val sps = first.first { H264.nalType(it) == H264.NAL_SPS }
                 val pps = first.first { H264.nalType(it) == H264.NAL_PPS }
 
-                val hub = VideoHub(maxQueueFrames = 1000, maxQueueBytes = 100_000_000)
+                val hub = VideoHub(maxQueueMs = 600_000, maxQueueBytes = 100_000_000)
                 hub.configure(w, h, annexB(sps, pps))
                 val c = hub.openClient()
                 aus.forEachIndexed { i, au ->
@@ -499,7 +653,7 @@ class VideoServerTest {
     @Test
     fun stuckConnectionGetsClosed() {
         // A TV that vanished without a goodbye: it stops reading, the phone's writes get stuck.
-        val video = VideoHub(maxQueueFrames = 10_000, maxQueueBytes = Long.MAX_VALUE / 4)
+        val video = VideoHub(maxQueueMs = Long.MAX_VALUE / 4, maxQueueBytes = Long.MAX_VALUE / 4)
         val server = StreamServer(FrameHub(), videoHub = video, writeStallMs = 1_500)
         val port = server.start(0)
         try {

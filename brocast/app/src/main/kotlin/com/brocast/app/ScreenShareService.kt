@@ -11,8 +11,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
-import android.graphics.Point
-import android.hardware.display.DisplayManager
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.net.wifi.WifiManager
@@ -23,19 +21,15 @@ import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
-import android.view.Display
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
-import com.brocast.app.translate.LiveSubtitles
-import com.brocast.app.translate.SubtitleVoice
 import com.brocast.core.AudioHub
 import com.brocast.core.FrameHub
 import com.brocast.core.PinConfig
 import com.brocast.core.StreamServer
 import com.brocast.core.VideoHub
-import com.brocast.core.VoicePitch
 import java.io.IOException
 
 /**
@@ -56,12 +50,6 @@ class ScreenShareService : Service() {
         val wifiLocks: List<WifiManager.WifiLock>,
         val startedAt: Long,
     ) {
-        /** SUBDUB on the phone, while it's on. Set on the main thread, read by the capture thread. */
-        @Volatile
-        var subtitles: LiveSubtitles? = null
-
-        /** Reads the English out loud, while that's on. */
-        var voice: SubtitleVoice? = null
         var lastFrames = 0L
         var addresses: List<String> = emptyList()
         var ticks = 0
@@ -86,14 +74,6 @@ class ScreenShareService : Service() {
             ACTION_SET_QUALITY -> {
                 val quality = Quality.fromName(intent.getStringExtra(EXTRA_QUALITY))
                 session?.capturer?.setQuality(quality) ?: stopSelf()
-            }
-            ACTION_SET_TRANSLATE -> {
-                val s = session
-                if (s == null) {
-                    stopSelf()
-                } else {
-                    setTranslate(s, intent.getBooleanExtra(EXTRA_ON, false), intent.getBooleanExtra(EXTRA_VOICES, true))
-                }
             }
             else -> if (session == null) stopSelf()
         }
@@ -186,16 +166,14 @@ class ScreenShareService : Service() {
                 main.post { if (session === newSession) endSession(ShareStatus.Failed(message)) }
             }
         }
-        // Video normally. Pictures while a browser that can't play video is watching, or while
-        // SUBDUB on the phone reads subtitles (it needs the pictures; TVs then get pictures too).
-        val subtitlesOn = { newSession.subtitles }
+        // Video normally. Pictures only while a browser that can't play video is watching.
         val capturer = ScreenCapturer(
             this, projection, hub, video, settings.quality, listener,
-            picturesWanted = { subtitlesOn() != null || server.jpegViewerActive() },
-            subtitleReader = { subtitlesOn()?.let { subs -> subs::offer } },
-            jpegNeeded = { subtitlesOn() == null || server.pictureViewerActive() },
+            picturesWanted = { server.jpegViewerActive() },
         )
         video.keyFrameRequester = capturer::requestKeyFrame
+        // Wi-Fi slower or faster than the video: the hub asks the encoder for fewer or more bits.
+        video.bitrateListener = capturer::setBitrate
         var audio: AudioCapturer? = null
         if (audioHub != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -215,7 +193,6 @@ class ScreenShareService : Service() {
             SystemClock.elapsedRealtime(),
         )
         session = newSession
-        setTranslate(newSession, settings.translateEnabled, settings.voicesEnabled)
         capturer.start()
 
         main.removeCallbacks(ticker)
@@ -234,42 +211,8 @@ class ScreenShareService : Service() {
         stopSelf()
     }
 
-    /**
-     * SUBDUB on the phone on or off (it needs "display over other apps" for the English box), and
-     * the English [voices] with it.
-     */
-    private fun setTranslate(s: Session, on: Boolean, voices: Boolean) {
-        if (on && s.subtitles == null && Settings.canDrawOverlays(this)) {
-            s.subtitles = LiveSubtitles(this) { realScreenSize() }
-        } else if (!on) {
-            s.subtitles?.close()
-            s.subtitles = null
-        }
-        val subs = s.subtitles
-        if (subs != null && voices) {
-            val voice = s.voice ?: SubtitleVoice(this).also { s.voice = it }
-            // Guy or girl voice: hear how high the show's voices are (needs the sound capture).
-            val hub = s.audioHub
-            val pitch = if (hub != null) VoicePitch(hub.sampleRate, hub.channels) else null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Our own English is in the captured sound too: don't measure it.
-                s.audio?.tap = pitch?.let { p -> { pcm: ByteArray -> if (voice.speaking) p.clear() else p.feed(pcm) } }
-            }
-            subs.onNewEnglish = { english -> voice.say(english, pitch?.recentPitch()) }
-        } else {
-            subs?.onNewEnglish = null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) s.audio?.tap = null
-            s.voice?.close()
-            s.voice = null
-        }
-    }
-
     private fun teardown(s: Session) {
         s.capturer.release()
-        s.subtitles?.close()
-        s.subtitles = null
-        s.voice?.close()
-        s.voice = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) s.audio?.release()
         s.server.stop()
         s.hub.close()
@@ -286,7 +229,7 @@ class ScreenShareService : Service() {
 
     private fun tick() {
         val s = session ?: return
-        val frames = s.hub.framesPublished + s.video.framesPublished + s.capturer.framesRead
+        val frames = s.hub.framesPublished + s.video.framesPublished
         val fps = (frames - s.lastFrames).toInt().coerceAtLeast(0)
         s.lastFrames = frames
         if (s.ticks % 3 == 0) s.addresses = NetUtils.lanAddresses()
@@ -304,7 +247,6 @@ class ScreenShareService : Service() {
                 // Sound can die mid-session (e.g. Android's audio system restarts).
                 sound = if (s.sound == SoundStatus.ON && s.audioHub?.isLive != true) SoundStatus.FAILED else s.sound,
                 video = s.capturer.isVideo,
-                translate = s.subtitles?.note,
             ),
         )
         val text = notificationText(s.addresses.firstOrNull(), s.server.port, viewers.count)
@@ -415,13 +357,6 @@ class ScreenShareService : Service() {
         }
     }
 
-    @Suppress("DEPRECATION") // getRealSize: simplest way to read the screen size from a Service.
-    private fun realScreenSize(): Point {
-        val p = Point()
-        getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)?.getRealSize(p)
-        return p
-    }
-
     /** "Galaxy S24" style name for the TV page, falling back to the model number. */
     private fun deviceName(): String {
         val name = try {
@@ -440,9 +375,6 @@ class ScreenShareService : Service() {
         private const val ACTION_START = "com.brocast.app.action.START"
         private const val ACTION_STOP = "com.brocast.app.action.STOP"
         private const val ACTION_SET_QUALITY = "com.brocast.app.action.SET_QUALITY"
-        private const val ACTION_SET_TRANSLATE = "com.brocast.app.action.SET_TRANSLATE"
-        private const val EXTRA_ON = "on"
-        private const val EXTRA_VOICES = "voices"
         private const val EXTRA_RESULT_CODE = "result_code"
         private const val EXTRA_DATA = "data"
         private const val EXTRA_QUALITY = "quality"
@@ -481,21 +413,6 @@ class ScreenShareService : Service() {
                 )
             } catch (e: RuntimeException) {
                 Log.w(TAG, "Couldn't change quality", e)
-            }
-        }
-
-        /** English subtitles (and [voices]) on the phone on or off, right away if sharing. */
-        fun setTranslate(context: Context, on: Boolean, voices: Boolean) {
-            if (ShareState.status.value !is ShareStatus.Live) return
-            try {
-                context.startService(
-                    Intent(context, ScreenShareService::class.java)
-                        .setAction(ACTION_SET_TRANSLATE)
-                        .putExtra(EXTRA_ON, on)
-                        .putExtra(EXTRA_VOICES, voices),
-                )
-            } catch (e: RuntimeException) {
-                Log.w(TAG, "Couldn't switch the subtitles", e)
             }
         }
     }

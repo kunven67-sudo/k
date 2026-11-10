@@ -7,7 +7,8 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'core/build/e2e-shots');
 fs.mkdirSync(OUT, { recursive: true });
-const CP = fs.readFileSync(path.join(ROOT, 'core/build/test-classpath.txt'), 'utf8').trim();
+// E2E_CP: run against another build's classes (to compare an older version on the choppy Wi-Fi test).
+const CP = process.env.E2E_CP || fs.readFileSync(path.join(ROOT, 'core/build/test-classpath.txt'), 'utf8').trim();
 const PORT = 18080;
 
 let failures = 0;
@@ -143,7 +144,8 @@ async function pictureTests(browser) {
   ok(await page.evaluate(() => document.body.className === 'idle'), 'mouse cursor hides when idle');
   await page.keyboard.press('f');
   ok(await waitFor(page, () => !!document.fullscreenElement, 3000), 'pressing F goes full screen');
-  ok(await page.evaluate(() => document.getElementById('fsBtn').textContent === 'Exit full screen'), 'button says Exit full screen');
+  // (The browser says "full screen" a moment before it fires the event that renames the button.)
+  ok(await waitFor(page, () => document.getElementById('fsBtn').textContent === 'Exit full screen', 1000), 'button says Exit full screen');
   await page.keyboard.press('f');
   ok(await waitFor(page, () => !document.fullscreenElement, 3000), 'pressing F again exits full screen');
   await sleep(1500);
@@ -354,9 +356,13 @@ async function videoTests(browser) {
   mv = await videoMoves(page, 1500);
   ok(mv.moved, 'video time moves: ' + JSON.stringify([mv.a.t, mv.b.t]));
   ok(mv.b.w === 720 && mv.b.h === 1280, `video size ${mv.b.w}x${mv.b.h}`);
+  await sleep(1500); // let it settle at the live edge
   const lags = [];
-  for (let i = 0; i < 12; i++) { await sleep(250); const x = await page.evaluate(vinfo); lags.push(x.end - x.t); }
-  ok(lags.every((l) => l >= -0.05 && l < 0.8), 'stays close to live (buffer ahead, s): ' + lags.map((l) => l.toFixed(2)).join(' '));
+  for (let i = 0; i < 16; i++) { await sleep(250); const x = await page.evaluate(vinfo); lags.push(x.end - x.t); }
+  const avgLag = lags.reduce((a, b) => a + b, 0) / lags.length;
+  // A small cushion (about 0.3 s) on purpose: Wi-Fi comes in bursts, and riding the very edge made it stop.
+  ok(lags.every((l) => l >= -0.05 && l < 0.7) && avgLag > 0.1 && avgLag < 0.5,
+    `stays just behind live (avg ${(avgLag * 1000).toFixed(0)} ms held back; each, s): ` + lags.map((l) => l.toFixed(2)).join(' '));
   await page.screenshot({ path: OUT + '/13-video.png' });
   await sleep(4000);
   const vs13 = (await page.evaluate(vinfo)).stats;
@@ -501,7 +507,7 @@ async function videoTests(browser) {
     await sleep(200);
     sync.push(await page.evaluate(() => [window.BroCastStats.lead, window.BroCastVideo.lag / 1000]));
   }
-  ok(sync.every(([lead, lag]) => Math.abs(lead - (Math.max(0.1, lag + 0.05))) < 0.06),
+  ok(sync.every(([lead, lag]) => Math.abs(lead - (Math.max(0.08, lag + 0.04))) < 0.06),
     'sound delay follows the video delay: ' + sync.map(([a, b]) => a.toFixed(2) + '/' + b.toFixed(2)).join(' '));
   const skippedNow = (await page.evaluate(S)).skipped;
   ok(skippedNow - skippedBefore <= 2, `once lined up, no sound gets cut (${skippedNow - skippedBefore} bits skipped; ${skippedBefore} while starting)`);
@@ -519,27 +525,22 @@ async function videoTests(browser) {
   await ctx.close();
   await stopPhone(phone);
 
-  console.log('23) Translate button opens SUBDUB ready for this tab');
+  console.log('23) Just sharing: no Freeze or Translate buttons, Space does nothing');
   phone = await startPhone(['--video']);
   ({ ctx, page } = await newTv(browser, phone.url));
-  await ctx.route('https://kunven67-sudo.github.io/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<title>SUBDUB</title>' }));
   ok(await waitFor(page, showingVideo, 15000), 'video shows');
   await page.mouse.move(600, 600);
-  ok(await page.evaluate(() => document.getElementById('trBtn').style.display !== 'none'), 'Translate button in the bar (PC browser)');
-  const [sub] = await Promise.all([ctx.waitForEvent('page'), page.click('#trBtn')]);
-  ok(sub.url() === 'https://kunven67-sudo.github.io/k/subdub/?from=brocast', 'opens SUBDUB in BroCast mode: ' + sub.url());
-  await page.bringToFront();
-  ok((await videoMoves(page, 1200)).moved, 'video keeps playing');
+  ok(await page.evaluate(() => !document.getElementById('frzBtn') && !document.getElementById('trBtn') &&
+    !document.getElementById('frozenTag')), 'only Sound + Full screen in the bar');
+  await page.keyboard.press('Space');
+  await page.keyboard.press('p');
+  ok((await videoMoves(page, 1500)).moved, 'Space / P (a TV remote\'s pause) do not stop the picture');
+  ok(await page.evaluate(async () => (await fetch('/freeze?on=1')).status === 404), 'the phone has no freeze anymore');
   ok(page.errors.length === 0, 'no JS errors: ' + JSON.stringify(page.errors));
   await ctx.close();
-  // A smart TV doesn't get the button (SUBDUB needs a computer).
-  const tv = await browser.newContext({ userAgent: 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0 TV Safari/537.36' });
-  const tp = await tv.newPage();
-  await tp.goto(phone.url);
-  await waitFor(tp, showingVideo, 15000);
-  ok(await tp.evaluate(() => document.getElementById('trBtn').style.display === 'none'), 'no Translate button on a TV');
-  await tv.close();
   await stopPhone(phone);
+
+  await choppyWifiTest(browser);
 
   console.log('22) Tab in the background keeps playing (sound keeps going, screen recorders keep working)');
   phone = await startPhone(['--video']);
@@ -571,8 +572,112 @@ async function videoTests(browser) {
   await stopPhone(phone);
 }
 
+// A fake Wi-Fi between the phone and the TV: a speed limit plus short cut-outs (what real Wi-Fi does
+// all the time), with backpressure like a real link, so the phone feels it when the TV can't keep up.
+function choppyWifi(targetPort, { kbps, seed }) {
+  const net = require('net');
+  let r = seed;
+  const rand = () => (r = (r * 1103515245 + 12345) % 2147483648) / 2147483648;
+  let pausedUntil = 0, nextCutAt = Date.now() + 2500;
+  const links = new Set();
+  const server = net.createServer((client) => {
+    const up = net.connect(targetPort, '127.0.0.1');
+    const link = { client, up, q: [], bytes: 0, upEnded: false };
+    links.add(link);
+    client.pipe(up); // TV -> phone: untouched
+    up.on('data', (d) => { link.q.push(d); link.bytes += d.length; if (link.bytes > 64 * 1024) up.pause(); });
+    // The phone finished: hand over what's still on its way first, then hang up.
+    up.on('end', () => { link.upEnded = true; });
+    const kill = () => { links.delete(link); client.destroy(); up.destroy(); };
+    client.on('close', kill); client.on('error', kill);
+    up.on('error', () => { link.upEnded = true; });
+  });
+  const perTick = kbps * 1000 / 8 / 200; // every 5 ms
+  const timer = setInterval(() => {
+    const now = Date.now();
+    if (now >= nextCutAt) { pausedUntil = now + 150 + rand() * 300; nextCutAt = now + 1500 + rand() * 2000; }
+    if (now < pausedUntil) return;
+    for (const l of links) {
+      let budget = perTick;
+      while (budget > 0 && l.q.length) {
+        const d = l.q[0];
+        if (d.length <= budget) { l.client.write(d); l.q.shift(); budget -= d.length; l.bytes -= d.length; }
+        else { l.client.write(d.subarray(0, budget)); l.q[0] = d.subarray(budget); l.bytes -= budget; budget = 0; }
+      }
+      if (l.bytes < 32 * 1024) l.up.resume();
+      if (l.upEnded && !l.q.length) { links.delete(l); l.client.end(); }
+    }
+  }, 5);
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({
+    url: 'http://127.0.0.1:' + server.address().port + '/',
+    close: () => { clearInterval(timer); for (const l of links) { l.client.destroy(); l.up.destroy(); } server.close(); },
+  })));
+}
+
+// Anime-looking test video: flat colors and hard edges moving fast, and a 1 s "fight scene" every
+// 5 s (busy picture + flashes), which is what pushes a phone encoder to its limit.
+function animeClip() {
+  const file = path.join(ROOT, 'core/build/e2e-anime.mp4');
+  if (fs.existsSync(file)) return file;
+  const { execFileSync } = require('child_process');
+  execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y',
+    '-f', 'lavfi', '-i', 'color=c=0x1d2b53:s=1280x720:r=30:d=20',
+    '-f', 'lavfi', '-i', 'testsrc2=s=1280x720:r=30:d=20',
+    '-f', 'lavfi', '-i', 'color=c=0xffcc00:s=220x220:r=30:d=20',
+    '-f', 'lavfi', '-i', 'color=c=0xff3355:s=360x140:r=30:d=20',
+    '-filter_complex',
+    "[1:v]hue=H=t*2:s=1.4,noise=alls=35:allf=t[busy];" +
+    "[0:v][2:v]overlay=x='mod(t*900\\,1500)-220':y='250+200*sin(t*6)'[a];" +
+    "[a][3:v]overlay=x='460+420*sin(t*3)':y='mod(t*500\\,860)-140'[calm];" +
+    "[calm][busy]overlay=enable='lt(mod(t\\,5)\\,1)'[v]",
+    '-map', '[v]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-pix_fmt', 'yuv420p', file]);
+  return file;
+}
+
+// The bug from 11-08: on anime, the picture kept stopping for a moment while the sound went on.
+// CHOPPY_REPORT=1 only prints the numbers (to compare with an older build via E2E_CP).
+async function choppyWifiTest(browser) {
+  const report = !!process.env.CHOPPY_REPORT;
+  console.log('24) Choppy Wi-Fi + busy anime-style video: the picture keeps moving');
+  const phone = await startPhone(['--video', '--source', animeClip(), '--size', '1280x720', '--bitrate', '5000', '--gop', '60']);
+  const wifi = await choppyWifi(Number(new URL(phone.url).port), { kbps: 8000, seed: 1108 });
+  const { ctx, page } = await newTv(browser, wifi.url);
+  const shows = await waitFor(page, showingVideo, 20000);
+  if (!report) ok(shows, 'video shows through the choppy Wi-Fi');
+  await sleep(2000);
+  // Count every time the picture stands still for longer than 150 ms (about 5 frames: you see that).
+  await page.evaluate(() => {
+    const st = window.__choppy = { stops: 0, stoppedMs: 0, longest: 0 };
+    const v = document.getElementById('vid');
+    let last = -1, lastMove = performance.now(), stuck = false;
+    setInterval(() => {
+      const t = performance.now();
+      if (v.currentTime !== last) {
+        if (stuck) { const d = t - lastMove; st.stoppedMs += d; st.longest = Math.max(st.longest, d); stuck = false; }
+        last = v.currentTime; lastMove = t;
+      } else if (!stuck && t - lastMove > 150) { stuck = true; st.stops++; }
+    }, 10);
+  });
+  const SECONDS = 40;
+  await sleep(SECONDS * 1000);
+  const res = await page.evaluate(() => Object.assign({}, window.__choppy, { video: Object.assign({}, window.BroCastVideo) }));
+  const status = await page.evaluate(async () => (await fetch('/status')).json());
+  res.phoneSkips = status.skips;
+  console.log('CHOPPY ' + JSON.stringify(res));
+  if (!report) {
+    ok(res.stops <= 6 && res.stoppedMs < 2500, `picture stopped ${res.stops} times in ${SECONDS} s (${Math.round(res.stoppedMs)} ms total, longest ${Math.round(res.longest)} ms)`);
+    ok(res.longest < 700, 'never a long freeze: longest ' + Math.round(res.longest) + ' ms');
+    ok(res.video.resets === 0, 'no player restarts: ' + JSON.stringify(res.video));
+    ok(page.errors.length === 0, 'no JS errors: ' + JSON.stringify(page.errors));
+  }
+  await ctx.close();
+  wifi.close();
+  await stopPhone(phone);
+}
+
 (async () => {
   const browser = await chromium.launch();
+  if (ONLY === 'choppy') { await choppyWifiTest(browser); await browser.close(); process.exit(failures === 0 ? 0 : 1); }
   if (ONLY !== 'video') await pictureTests(browser);
   if (ONLY !== 'pictures') await videoTests(browser);
   await browser.close();
