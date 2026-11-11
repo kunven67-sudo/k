@@ -2,7 +2,7 @@ name: OVERDRIVE Windows check
 
 on:
   push:
-    branches: [ccr-f276b31c-2voktu]
+    branches: [ccr-f276b31c-2voktu, claude/zen-planck-7cohjr]
     paths: ["overdrive/**", ".github/workflows/overdrive-windows.yml"]
   workflow_dispatch:
 
