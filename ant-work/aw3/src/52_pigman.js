@@ -103,13 +103,18 @@ function makePigMan(){
     const th=new THREE.Group(); th.position.set(-sd*.06,-.06,.04); hand.add(th); add(th,mesh(GC('pigThumb',()=>{ const c=new THREE.CylinderGeometry(.02,.018,.07,8); c.translate(0,-.035,0); return c; }),skin,0,0,0)); th.rotation.z=-sd*.7;
     return {sh,el,hand,fingers,th}; };
   const R=arm(-1), L=arm(1);   // facing +z: his right hand is on -x
-  // ---- legs (seated) ----
-  for(const sd of [-1,1]){ const th=add(hips,mesh(new THREE.CylinderGeometry(.17,.15,.55,14),cloth,sd*.23,.02,.3)); th.rotation.x=Math.PI/2;
-    const sh=add(hips,mesh(new THREE.CylinderGeometry(.13,.11,.62,14),cloth,sd*.25,-.33,.58));
-    const boot=add(root,mesh(roundedBoxGeo(.2,.16,.3,.05),iron,sd*.25,.08,.66)); }
+  // ---- legs: jointed (hip -> knee -> ankle) so he can sit, stand up, walk (Part 2) ----
+  const legs=[];
+  for(const sd of [-1,1]){ const hipJ=new THREE.Group(); hipJ.position.set(sd*.23,.02,.05); hips.add(hipJ);
+    const th=add(hipJ,mesh(new THREE.CylinderGeometry(.17,.15,.55,14),cloth,0,-.275,0));
+    const knee=new THREE.Group(); knee.position.set(0,-.55,0); hipJ.add(knee);
+    add(knee,mesh(new THREE.CylinderGeometry(.13,.11,.62,14),cloth,0,-.31,0));
+    const ankle=new THREE.Group(); ankle.position.set(0,-.62,0); knee.add(ankle);
+    add(ankle,mesh(roundedBoxGeo(.2,.16,.3,.05),iron,0,-.04,.07));
+    legs.push({sd,hipJ,knee,ankle}); }
   // the meat, in his right hand
   const meat=makeMeatLeg(); meat.position.set(0,-.13,.05); meat.rotation.set(1.9,0,0); R.hand.add(meat);
-  const P={root,hips,spine,chest,belly,neck,head,jaw,ears,eyes,R,L,meat,
+  const P={root,hips,spine,chest,belly,neck,head,jaw,ears,eyes,R,L,meat,legs,stand:0,walkPh:0,walkK:0,sleep:0,armPose:null,
     eatT:0,phase:'chew',look:null,lookW:0,yaw:0,pitch:0,grunted:0,stop:false,biteN:0,
     onBite:null,onGrunt:null};
   root.userData.pig=P;
@@ -177,4 +182,32 @@ function animatePigMan(root,dt,t){
       const tip=M.localToWorld(_pgT.set(0,.37*(M.userData.left||1)-.03,0)), mouth=P.head.localToWorld(_pgM.set(0,-.1,.3));
       const hand=M.parent, a=hand.worldToLocal(tip.clone()), b=hand.worldToLocal(mouth.clone());
       M.position.addScaledVector(b.sub(a),smooth(Math.min(1,P.raise))); } } }
+  pigBody(root,P,dt,t);
 }
+/* Part 2: legs (sit <-> stand, walk cycle), sleeping slump, and arm poses that win over the eating arms */
+function pigBody(root,P,dt,t){
+  const st=smooth(P.stand), wk=P.walkK*st, ph=P.walkPh;
+  P.hips.position.y=lerp(.72,1.3,st)+Math.abs(Math.sin(ph))*.04*wk;
+  P.hips.rotation.z=Math.sin(ph)*.06*wk; P.spine.rotation.x=lerp(0,.06,st)+.04*wk;
+  for(const L of P.legs){ const s=L.sd<0?0:Math.PI, sw=Math.sin(ph+s);
+    L.hipJ.rotation.x=lerp(-Math.PI/2,0,st)-sw*.42*wk;
+    L.knee.rotation.x=lerp(Math.PI/2,0,st)+Math.max(0,Math.cos(ph+s))*.7*wk;
+    L.ankle.rotation.x=lerp(0,0,st)-Math.max(0,-sw)*.2*wk; }
+  // asleep: head drops onto the chest, mouth a little open, snoring breath
+  if(P.sleep>0){ const k=smooth(P.sleep); P.neck.rotation.x=lerp(P.neck.rotation.x,.55,k); P.head.rotation.x=lerp(P.head.rotation.x,.35,k); P.head.rotation.y*=1-k;
+    P.jaw.rotation.x=lerp(P.jaw.rotation.x,.12+Math.max(0,Math.sin(t*.9))*.08,k);
+    P.belly.scale.multiplyScalar(1+Math.sin(t*.9)*.02*k);
+    for(const e of P.eyes) e.scale.y=lerp(1,.15,k); }
+  else for(const e of P.eyes) e.scale.y=1;
+  if(P.armPose) try{ P.armPose(P,dt,t); }catch(e){ console.error(e); }
+}
+/* walk him (root on the floor) to a point; he turns first, then steps */
+function pigWalkTo(root,to,speed=.9){ const P=root.userData.pig; P.walkTarget={to:to.clone(),speed}; return new Promise(r=>{ P.walkTarget.res=r; }); }
+function pigWalkTick(root,dt){ const P=root.userData.pig, W=P.walkTarget; if(!W){ P.walkK=damp(P.walkK,0,6,dt); return; }
+  const d=V3(W.to.x-root.position.x,0,W.to.z-root.position.z), L=d.length();
+  const want=Math.atan2(d.x,d.z); root.rotation.y+=angDiff(root.rotation.y,want)*Math.min(1,dt*3);
+  if(L<.05){ P.walkTarget=null; W.res&&W.res(); return; }
+  const turned=Math.abs(angDiff(root.rotation.y,want))<.5; P.walkK=damp(P.walkK,turned?1:.3,5,dt);
+  const v=Math.min(L,W.speed*dt*P.walkK); root.position.addScaledVector(d.normalize(),v);
+  P.walkPh+=dt*W.speed*5.2*P.walkK;
+  if(Math.floor(P.walkPh/Math.PI)!==P.lastStep){ P.lastStep=Math.floor(P.walkPh/Math.PI); if(P.onStep) P.onStep(); } }
