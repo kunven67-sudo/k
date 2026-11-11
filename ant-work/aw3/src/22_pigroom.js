@@ -20,11 +20,13 @@ function makeTorch(scene,lv,x,y,z,ry,big){
   (lv.fires||(lv.fires=[])).push(t); return t;
 }
 /* a shock collar: a dark iron band, a little box with a green light */
-function makeCollar(r=.075){ const g=new THREE.Group();
-  g.add(mesh(new THREE.TorusGeometry(r,.012,8,24),new THREE.MeshStandardMaterial({color:col(0x2a2622),metalness:.8,roughness:.45})));
-  const bx=box(.05,.035,.03,new THREE.MeshStandardMaterial({color:col(0x151515),roughness:.5}),0,-r,.0); g.add(bx);
-  const led=sph(.006,new THREE.MeshBasicMaterial({color:col(0x40ff60)}),0,-r-.005,.017,8,6); g.add(led); g.userData.led=led;
-  g.rotation.x=Math.PI/2; return g; }
+function makeCollar(r=.074){ const g=new THREE.Group();
+  const ring=mesh(new THREE.TorusGeometry(r,.016,8,28),new THREE.MeshStandardMaterial({color:col(0x2a2622),metalness:.8,roughness:.45})); ring.rotation.x=Math.PI/2; g.add(ring);
+  g.add(box(.058,.04,.03,new THREE.MeshStandardMaterial({color:col(0x151515),roughness:.5}),0,0,r+.012));
+  const led=sph(.008,new THREE.MeshBasicMaterial({color:col(0x40ff60)}),.014,.005,r+.029,8,6); g.add(led); g.userData.led=led;
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; } }); return g; }
+/* put a collar on a person: around the neck (on the chest joint, so it stays put when the head turns) */
+function collarOn(h){ if(h.userData.collar) return h.userData.collar; const c=makeCollar(); h.userData.J.chest.add(c); c.position.set(0,.59,-.006); h.userData.collar=c; return c; }
 defineLevel('pigroom',{
   title:'???',
   env:{fx:{exposure:1.12,saturation:1.05,contrast:1.12,temp:.12,bloomStrength:.4,bloomThreshold:1.1,aoRadius:.6,vignette:.55,grain:.05},music:null,reverb:.45,surface:'stone',far:120},
@@ -78,7 +80,7 @@ defineLevel('pigroom',{
       for(const sd of [-1,1]) scene.add(box(.35,3.3,.4,st,sd*1.9,1.65,z-.1)); scene.add(box(4.2,.4,.4,st,0,3.3,z-.1)); }
     // Part 2: a big iron cage by the wall (where you wake up after the zap), hidden until then
     const bc=new THREE.Group(); bc.position.set(3.7,0,.6); bc.visible=false; scene.add(bc); lv.bigCage=bc;
-    { const w=2.6,h=2.4; bc.add(box(w+.1,.08,w+.1,iron,0,.04,0)); bc.add(box(w+.1,.08,w+.1,iron,0,h,0));
+    { const w=2.6,h=2.4; for(const [x,z,ww,dd] of [[0,-w/2,w+.1,.06],[0,w/2,w+.1,.06],[-w/2,0,.06,w+.1],[w/2,0,.06,w+.1]]) bc.add(box(ww,.05,dd,iron,x,.025,z)); bc.add(box(w+.1,.08,w+.1,iron,0,h,0));
       for(let i=0;i<=18;i++){ const t=-w/2+i*w/18; for(const [x,z] of [[t,-w/2],[t,w/2],[-w/2,t],[w/2,t]]) bc.add(cyl(.018,.018,h,iron,x,h/2,z,6)); }
       bc.add(box(.3,.22,.1,iron,0,1.2,-w/2-.04)); }
     colBox(lv.col,1.95,5.45,-1.15,2.35,()=>lv.bigCage.visible&&!lv.inBigCage);
@@ -110,6 +112,11 @@ defineLevel('pigroom',{
     pig.userData.pig.onGrunt=()=>{ if(Math.random()<.75) SND.play('pig_'+randi(1,6),{vol:.95,pos:V3(T.x,1.9,T.z+.5),ref:3.5,rate:rand(.78,.9)}); };
     { const L=pig.userData.pig.L; const rm=new THREE.Group(); rm.add(box(.07,.035,.13,new THREE.MeshStandardMaterial({color:col(0x1a1a1a),roughness:.5}),0,0,0));
       rm.add(cyl(.018,.018,.02,new THREE.MeshStandardMaterial({color:col(0xc02018),emissive:col(0x500000),roughness:.4}),0,.025,.02,12)); rm.position.set(0,-.1,.05); rm.visible=false; L.hand.add(rm); lv.remote=rm; }
+    // solid things (in Part 2 you can walk around this room)
+    colBoxC(lv.col,PIGROOM.you.x,PIGROOM.you.z,.66,.62); colBoxC(lv.col,PIGROOM.jay2.x,PIGROOM.jay2.z,.66,.62);
+    colBoxC(lv.col,T.x,T.z-.05,1.75,1.35); colCircle(lv.col,2.1,-1.6,.5); colOBox(lv.col,-2.2,-2.2,1.5,.9,.35);
+    lv.pigCol=colCircle(lv.col,T.x,T.z+.1,.62);
+    colBox(lv.col,-1.85,1.85,zc+D/2-.32,zc+D/2-.08,()=>Math.abs(lv.gate.rotation.y)<.3);
     lv.ground=()=>0; lv.surfaceAt=()=>'stone';
     lv.col.bounds=[-W/2,W/2,zc-D/2,zc+D/2];
   },
@@ -127,7 +134,7 @@ defineLevel('pigroom',{
         if(Math.random()<.25) lv.soft.spawn(p.x,p.y+.3,p.z,rand(-.05,.05),rand(.3,.5),rand(-.05,.05),rand(2,3.5),rand(.08,.15),.12,.1,.09,.18,0,.2,2.5); } }
     // crackles from the big fire
     lv.crk=(lv.crk||0)-dt; if(lv.crk<=0){ lv.crk=rand(.05,.4); const p=lv.brazier.g.position; sfxAt(V3(p.x,1,p.z),()=>{ noise(.025,rand(.03,.09),0,rand(1800,5200),'bandpass',undefined,1.6); },3); }
-    animatePigMan(lv.pig,dt,t);
+    animatePigMan(lv.pig,dt,t); if(lv.pigCol){ lv.pigCol.x=lv.pig.position.x; lv.pigCol.z=lv.pig.position.z; }
     // chained: you can only turn your head so far, and the chains rattle when you strain
     if(lv.chained){ const P=PLAYER; const y0=P.yaw, p0=P.pitch; P.yaw=clamp(angDiff(0,P.yaw),-1.35,1.35); P.pitch=clamp(P.pitch,-1.0,.75);
       const mv=Math.abs(angDiff(lv.prevYaw==null?P.yaw:lv.prevYaw,P.yaw))+Math.abs(P.pitch-(lv.prevPitch==null?P.pitch:lv.prevPitch)); lv.prevYaw=P.yaw; lv.prevPitch=P.pitch;

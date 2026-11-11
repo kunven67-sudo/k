@@ -77,6 +77,7 @@ defineLevel('table',{
     const steel=new THREE.MeshPhysicalMaterial({color:col(0xc8ccd0),metalness:1,roughness:.22});
     const spoon=new THREE.Group(); spoon.position.set(TABLE.plate.x+5.8,.85,TABLE.plate.z+3.6); spoon.rotation.y=-.7; scene.add(spoon);
     spoon.add(ell(1.1,.2,1.6,steel,0,0,0,24)); spoon.add(box(.35,.1,5.4,steel,0,.05,-3.4)); lv.spoon=spoon;
+    colFromObj(lv.col,meat,{k:.75}); colFromObj(lv.col,spoon,{k:.9});
     // the potted rose: a clay pot, a thorny stem going up out of sight, thorns fallen on the table
     const clay=pbrMat('clay_plaster',1.5,{opts:{roughness:.9}}); clay.color=col(0xb0603a);
     const pot=mesh(GC('potGeo',()=>{ const pts=[[0,0],[4.6,0],[5.2,.3],[6.2,7.2],[6.8,7.4],[6.8,8.2],[6.0,8.2],[5.6,7.4],[0,7.4]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,48); g.computeVertexNormals(); return g; }),clay,TABLE.pot.x,0,TABLE.pot.z); scene.add(pot);
@@ -91,12 +92,13 @@ defineLevel('table',{
     const threadM=new THREE.MeshStandardMaterial({color:col(0xe0d4bc),roughness:1});
     lv.threads=[]; for(let i=0;i<7;i++){ const x0=TABLE.napkin.x-7+i*2.1, z0=TABLE.napkin.z-6; const pts=[V3(x0,.15,z0),V3(x0+rand(-.6,.6),.12,z0-1.2),V3(x0+rand(-.8,.8),.1,z0-2.4),V3(x0+rand(-.6,.6),.1,z0-3.4)];
       const th=mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),16,.06,6),threadM); scene.add(th); lv.threads.push(th); }
-    const thimble=new THREE.Group(); thimble.position.set(TABLE.napkin.x-2,0,TABLE.napkin.z-10.5); scene.add(thimble); lv.thimble=thimble;
+    const thimble=new THREE.Group(); thimble.position.set(TABLE.napkin.x-2,0,TABLE.napkin.z-10.5); scene.add(thimble); lv.thimble=thimble; colCircle(lv.col,thimble.position.x,thimble.position.z,1.55);
     thimble.add(mesh(GC('thimGeo',()=>{ const pts=[[0,0],[1.5,0],[1.5,.2],[1.35,2.6],[1.0,3.0],[0,3.1]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,32); g.computeVertexNormals(); return g; }),new THREE.MeshPhysicalMaterial({color:col(0xc0b090),metalness:1,roughness:.35,normalMap:scorpionSkin('thim','#888',2500).nm,normalScale:new THREE.Vector2(.6,.6)}),0,0,0));
     // pebbles spilled from the pot, and a bottle cap next to them (metal = noise)
     const stoneM=pbrMat('sandy_gravel_02',.4,{opts:{roughness:.9}}); stoneM.color=col(0x9a9088);
     lv.pebbles=[]; for(let i=0;i<6;i++){ const pb=ell(rand(.3,.45),rand(.22,.32),rand(.3,.42),stoneM,TABLE.pebbles.x+rand(-2.5,2.5),.24,TABLE.pebbles.z+rand(-2,2),16); pb.rotation.y=rand(0,6); scene.add(pb); lv.pebbles.push(pb); }
-    const cap=new THREE.Group(); cap.position.set(TABLE.pebbles.x+3.6,0,TABLE.pebbles.z+2.4); cap.rotation.z=.08; scene.add(cap); lv.cap=cap;
+    const cap=new THREE.Group(); cap.position.set(TABLE.pebbles.x+3.6,0,TABLE.pebbles.z+2.4); cap.rotation.z=.08; scene.add(cap); lv.cap=cap; colCircle(lv.col,cap.position.x,cap.position.z,2.75);
+    colCircle(lv.col,TABLE.napkin.x+5.5,TABLE.napkin.z+3.5,2.6);   // the folded-up corner of the napkin
     cap.add(mesh(GC('capGeo',()=>{ const g=new THREE.CylinderGeometry(2.6,2.7,.9,24,1,true); return g; }),new THREE.MeshPhysicalMaterial({color:col(0xb8302a),metalness:.9,roughness:.3,side:THREE.DoubleSide}),0,.45,0)); cap.add(cyl(2.6,2.6,.08,new THREE.MeshPhysicalMaterial({color:col(0xc8c0b0),metalness:1,roughness:.3}),0,.88,0,24));
     // the candle: the light at night
     const wax=new THREE.MeshPhysicalMaterial({color:col(0xf0e6d0),roughness:.5,transmission:.15});
@@ -109,7 +111,10 @@ defineLevel('table',{
     for(const c of TABLE.cages) makeTinyCage(scene,lv,c,iron,wood);
     // your stash in the back corner of your cage (what you collected shows up here)
     const yc=cageOf('you'); lv.stash={x:yc.x+1.9,z:yc.z+1.9,items:{}};
-    lv.ground=(x,z)=>{ const a=Math.hypot(x-A.x,z-A.z); return a<R?.35:0; };
+    const plateH=r=>r<5.2?.08:r<6.2?lerp(.08,.35,(r-5.2)):r<7.2?lerp(.35,.75,(r-6.2)):r<7.5?.8:r<8.6?lerp(.8,0,(r-7.5)/1.1):0;
+    const napH=(x,z)=>{ const lx=x-TABLE.napkin.x, ly=-(z-TABLE.napkin.z); if(Math.abs(lx)>8||Math.abs(ly)>6) return 0; let h=.15+Math.abs(noise2(lx*.25,ly*.25))*.35; const dd=Math.hypot(lx-5.5,ly+3.5); if(dd<4.5) h+=Math.cos(dd/4.5*Math.PI/2)*2.6; return h; };
+    lv.ground=(x,z)=>{ const a=Math.hypot(x-A.x,z-A.z); if(a<R) return .35; for(const c of TABLE.cages) if(Math.abs(x-c.x)<CAGE.w/2+.15&&Math.abs(z-c.z)<CAGE.d/2+.15) return .18;
+      const pr=Math.hypot(x-TABLE.plate.x,z-TABLE.plate.z); if(pr<8.6) return plateH(pr); return napH(x,z); };
     lv.surfaceAt=(x,z)=>Math.hypot(x-A.x,z-A.z)<R?'sand':'wood';
     lv.col.bounds=[-TABLE.W/2+.6,TABLE.W/2-.6,-TABLE.D/2+.6,TABLE.D/2-.6];
     lv.time='day';

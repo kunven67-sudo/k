@@ -55,12 +55,12 @@ SCENES.collar=async function(){
   // Jay 2 first
   await pigWalkTo(pig,V3(PIGROOM.jay2.x,0,PIGROOM.jay2.z-1.25),.85); P.look=headOf(J);
   await tweenVal(reach,0,1,.8);
-  const c2=makeCollar(.07); J.userData.J.head.add(c2); c2.position.set(0,-.15,.0); SND.play('chain_3',{vol:.8,pos:headOf(J),ref:2,rate:1.4}); later(.15,()=>SND.play('watch_beep',{vol:.5,pos:headOf(J),ref:2,rate:.8}));
+  collarOn(J); SND.play('chain_3',{vol:.8,pos:headOf(J),ref:2,rate:1.4}); later(.15,()=>SND.play('watch_beep',{vol:.5,pos:headOf(J),ref:2,rate:.8}));
   setMood(J,'scared'); await say(['p2_c2']);
   await tweenVal(reach,1,0,.6);
   // then you
   await pigWalkTo(pig,V3(PIGROOM.you.x,0,PIGROOM.you.z-1.25),.85); P.look=camera; lookAtPoint(V3(PIGROOM.you.x,2.0,PIGROOM.you.z-1),1);
-  await tweenVal(reach,0,1,.8); shake(.25); SND.play('chain_3',{vol:1,rate:1.4}); later(.15,()=>SND.play('watch_beep',{vol:.7,rate:.8})); SND.play('gasp',{vol:.6});
+  await tweenVal(reach,0,1,.8); shake(.25); F.collared=true; SND.play('chain_3',{vol:1,rate:1.4}); later(.15,()=>SND.play('watch_beep',{vol:.7,rate:.8})); SND.play('gasp',{vol:.6});
   await wait(.8); await tweenVal(reach,1,0,.6);
   // the chains come off (he wants you walking, not carried)
   for(const s of [...lv.shackles,...lv.jayShackles]) s.visible=false; SND.play('chain_1',{vol:.9}); later(.3,()=>SND.play('chain_2',{vol:.8,pos:headOf(J),ref:2}));
@@ -89,7 +89,7 @@ SCENES.shrink=async function(){
   if(LV!==lv) await enterLevel('pigroom',{pos:V3(0,0,0)});
   saveCheckpoint('shrink');
   const J=lv.jay2; resetActor(J); giveWatch(J); CUR.j2=J; J.userData.A.seated=false; clearPose(J,0);
-  if(!J.userData.collar){ const c=makeCollar(.07); J.userData.J.head.add(c); c.position.set(0,-.15,0); J.userData.collar=c; }
+  collarOn(J); F.collared=true;
   for(const s of [...lv.shackles,...lv.jayShackles]) s.visible=false; lv.armL.visible=lv.armR.visible=false; lv.chained=false; lv.gate.rotation.y=0;
   const pig=lv.pig, P=pig.userData.pig; pig.position.set(PIGROOM.throne.x,.06,PIGROOM.throne.z+.1); pig.rotation.y=0; P.stand=0; P.armPose=null; P.walkTarget=null; P.stop=false; P.meat.visible=true; lv.remote.visible=true; P.look=null;
   lv.bigCage.visible=true; lv.inBigCage=true;
@@ -107,9 +107,9 @@ SCENES.shrink=async function(){
   SND.play('stomach',{vol:.9}); SND.play('hum_purple',{vol:.6}); blurScreen(.35); shake(.2);
   setPose(J,'flinch',.3); await say(['p2_k4']);
   SND.play('ringing',{vol:.5}); const hum=loopSnd('hum_build',{vol:.6});
-  const k0=1, k1=1/TK, J0=J.position.clone();
+  const k0=1, k1=1/TK, J0=J.position.clone(), P0=PLAYER.pos.clone();
   chat(['p2_k5','p2_k6'],.2);
-  await tweenVal(k=>{ const s=Math.exp(Math.log(k0)+(Math.log(k1)-Math.log(k0))*k); PLAYER.scale=PLAYER.targetScale=s; J.scale.setScalar(s); J.position.set(J0.x,0,J0.z); shake(.03); },0,1,4.5,smooth);
+  await tweenVal(k=>{ const s=Math.exp(Math.log(k0)+(Math.log(k1)-Math.log(k0))*k); PLAYER.scale=PLAYER.targetScale=s; J.scale.setScalar(s); J.position.set(P0.x+(J0.x-P0.x)*s,0,P0.z+(J0.z-P0.z)*s); shake(.03); },0,1,4.5,smooth);   // he stays next to you (shrinks toward you)
   hum&&hum.stop(1); blurScreen(0); clearPose(J,.3);
   await wait(1.5);
   // he heard it. He looks over... and his hand comes down
@@ -123,12 +123,12 @@ SCENES.shrink=async function(){
 function tablePeople(){
   const lv=LEVELS.table;
   if(!lv.jay2){ const mk=(fn,o)=>{ const h=fn(o); h.userData.level='table'; lv.scene.add(h); return h; };
-    lv.jay2=mk(makeJay2,{}); giveWatch(lv.jay2); const c=makeCollar(.07); lv.jay2.userData.J.head.add(c); c.position.set(0,-.15,0);
+    lv.jay2=mk(makeJay2,{}); giveWatch(lv.jay2); collarOn(lv.jay2);
     lv.orrin=mk(makeHuman,{name:'Orrin',voice:'Orrin',skin:0xd8a888,shirt:0x6a5a40,pants:0x3a342a,shoes:0x3a2a1a,hair:0xb8b4ac,hairStyle:'short',beard:true,eye:0x5a6a7a,build:.92,height:.98,stubble:.3,head:{rx:.074,ry:.104,rz:.094,jaw:.28,nose:1.1,chin:1.05},seed:31});
     lv.teo=mk(makeHuman,{name:'Teo',voice:'Teo',skin:0xb98a64,shirt:0x8a3a2a,pants:0x2a3040,shoes:0x2a2a2a,hair:0x1a120c,hairStyle:'spiky',eye:0x3a2a1a,build:.9,height:.97,seed:44});
     lv.bram=mk(makeHuman,{name:'Bram',voice:'Bram',skin:0xe0b090,shirt:0x3a4a3a,pants:0x2a2a2a,shoes:0x1a1a1a,hairStyle:'bald',beard:true,hair:0x5a3a20,eye:0x4a5a3a,build:1.12,height:1.04,seed:52});
-    for(const h of [lv.orrin,lv.teo,lv.bram]){ const c2=makeCollar(.07); h.userData.J.head.add(c2); c2.position.set(0,-.15,0); } }
-  const at=(h,id,dx=0,dz=0)=>{ const c=cageOf(id); resetActor(h); h.visible=true; h.scale.setScalar(1); h.position.set(c.x+dx,0,c.z+dz); faceTo(h,V3(c.x+dx,0,c.z-5)); };
+    for(const h of [lv.orrin,lv.teo,lv.bram]) collarOn(h); }
+  const at=(h,id,dx=0,dz=0)=>{ const c=cageOf(id); resetActor(h); h.visible=true; h.scale.setScalar(1); h.position.set(c.x+dx,.18,c.z+dz); faceTo(h,V3(c.x+dx,0,c.z-5)); };
   at(lv.jay2,'you',1.5,.6); at(lv.orrin,'orrin',1.4,-.4); at(lv.teo,'teo',-1.3,-.3); at(lv.bram,'bram',.6,.9); setPose(lv.bram,'sit',0); lv.bram.userData.A.seated=true;
   CUR.j2=lv.jay2; return lv;
 }
@@ -136,7 +136,7 @@ function youInCage(){ const c=cageOf('you'); setPlayer(V3(c.x-.6,0,c.z-.4),0,-.0
 async function tableStart(id,time){
   const lv=LEVELS.table, fd=$('fade'); fd.style.transition='none'; fd.style.opacity=1;
   if(LV!==lv) await enterLevel('table',{pos:V3(0,0,0)});
-  saveCheckpoint(id); tablePeople(); lv.setTime(time); lv.inter.length=0; NIGHT.on=false; resetNoisy(lv);
+  F.collared=true; saveCheckpoint(id); tablePeople(); lv.setTime(time); lv.inter.length=0; NIGHT.on=false; resetNoisy(lv);
   const P=lv.pig.userData.pig; P.armPose=null; P.look=null; P.stand=0;
   youInCage(); PLAYER.eye=1.64; setVM(true); hudVisible(true); invHUD();
   setAmbience(time==='night'?[]:[['fire',.03]]);
@@ -176,7 +176,7 @@ function resetNoisy(lv){
 }
 /* places he can't see you from his chair */
 function coverSpots(){ const n=TABLE.napkin, cu=TABLE.cup, po=TABLE.pot, ca=TABLE.candle, y=cageOf('you');
-  return [{x:n.x+5.5,z:n.z+3.5,r:3.3},{x:-14,z:-.2,r:2.8},{x:cu.x,z:cu.z+5.6,r:2.8},{x:po.x,z:po.z+8.6,r:3},{x:ca.x,z:ca.z+4.6,r:2.4},{x:y.x,z:y.z,r:2.8}]; }
+  return [{x:n.x+5.5,z:n.z+7.4,r:2.6},{x:-14,z:-.2,r:2.8},{x:cu.x,z:cu.z+5.6,r:2.8},{x:po.x,z:po.z+8.6,r:3},{x:ca.x,z:ca.z+4.6,r:2.4},{x:y.x,z:y.z,r:2.8}]; }
 function tableTick(lv,dt,t){
   if(!NIGHT.on) return;
   const p=PLAYER.pos; NIGHT.hidden=coverSpots().some(c=>Math.hypot(p.x-c.x,p.z-c.z)<c.r);
@@ -236,7 +236,7 @@ SCENES.day2=async function(){
   playMusic('cage',2); PLAYER.lock(); PLAYER.ctl.look=true;
   await dayCard('DAY 2');
   const P=lv.pig.userData.pig; P.stop=true; P.look=V3(cageOf('orrin').x,0,cageOf('orrin').z); SND.play('pig_4',{vol:1,pos:V3(0,44,-40),ref:80,rate:.6});
-  O.position.set(cageOf('orrin').x+2.5,0,cageOf('orrin').z-.5); faceTo(O,PLAYER.pos); O.userData.A.look='player';
+  O.position.set(cageOf('orrin').x+2.5,.18,cageOf('orrin').z-.5); faceTo(O,PLAYER.pos); O.userData.A.look='player';
   await say(['d2_1','d2_2','d2_3']);
   // his hand comes down (black), and Orrin is in the bowl with a thorn
   const fd=$('fade'); fd.style.transition='opacity .4s'; fd.style.opacity=1; SND.play('cage_lock',{vol:1,rate:.7}); await wait(1);
@@ -252,16 +252,40 @@ SCENES.day2=async function(){
   B.walkK=0; setPose(O,'point',.2); SND.play('swing_1',{vol:.8,pos:O.position,ref:10}); await wait(.25); bugHurt(sp); SND.play('bug_hurt',{vol:.9,pos:sp.position,ref:10,rate:.8}); await wait(.5); clearPose(O,.3);
   B.atk='leap'; await tweenVal(v=>{ B.atkK=v; },0,1,.9);
   const from=sp.position.clone(); SND.play('bug_3',{vol:1,pos:from,ref:10,rate:.8});
-  await tweenVal(k=>{ B.air=Math.sin(k*Math.PI); sp.position.lerpVectors(from,V3(O.position.x,.35,O.position.z-1.4),k); sp.position.y=.35+Math.sin(k*Math.PI)*3; },0,1,.55,k=>k);
-  B.air=0; SND.play('scream',{vol:1,pos:O.position,ref:12,rate:.9}); shake(.4); setPose(O,'startle',.1);
-  // look away (Jay 2 can't watch either)
-  setMood(J,'scared'); lookAtPoint(headOf(J),.35); await wait(.4); J.userData.A.look='player';
-  await wait(2.2); O.visible=false; sp.visible=false; B.atk=null; B.atkK=0; stopMusic(2);
-  SND.play('pig_squeal',{vol:1,pos:V3(0,44,-40),ref:80,rate:.75});
-  await wait(1.5); playMusic('sad',3);
+  // it lands right on him: he goes down on his back under it
+  const land=V3(O.position.x,.35,O.position.z-1.0);
+  await tweenVal(k=>{ B.air=Math.sin(k*Math.PI); sp.position.lerpVectors(from,land,k); sp.position.y=.35+Math.sin(k*Math.PI)*3; },0,1,.55,k=>k);
+  B.air=0; B.atk=null; B.atkK=0; shake(.45); SND.play('body_fall',{vol:1,pos:O.position,ref:12,rate:.7}); SND.play('scream',{vol:1,pos:O.position,ref:12,rate:.9});
+  spear.visible=false; collapse(O,1);
+  setMood(J,'scared'); J.userData.A.look=V3(A.x,1,A.z);
+  await wait(.5);
+  // it bites: he fights back, kicks, screams... then he stops moving
+  for(let i=0;i<3;i++){
+    B.atk='bite'; await tweenVal(v=>{ B.atkK=v; },0,1,.35); B.strikeK=1; SND.play('bite',{vol:1,pos:O.position,ref:12,rate:.6}); SND.play('bug_'+randi(1,4),{vol:.9,pos:sp.position,ref:10,rate:.75}); shake(.15);
+    if(i<2){ SND.play(i?'oof_2':'scream',{vol:.9,pos:O.position,ref:12,rate:i?.8:1.05}); setPose(O,i%2?'push':'startle',.15); later(.35,()=>setPose(O,'lieBack',.3)); }
+    await wait(.3); B.strikeK=0; await tweenVal(v=>{ B.atkK=v; },1,0,.4); await wait(.35); }
+  B.atk=null; setPose(O,'dead',.8); SND.play('gasp',{vol:.5,pos:O.position,ref:10,rate:.7}); await wait(1.4);
+  // it turns around and wraps him in silk from its spinnerets
+  const turn0=sp.rotation.y; await tweenVal(v=>{ sp.rotation.y=turn0+v*Math.PI; B.walkK=.6; },0,1,1.2); B.walkK=0;
+  B.atk='web'; B.atkK=1;
+  const silk=new THREE.MeshStandardMaterial({color:col(0xeeeae0),roughness:.85,transparent:true,opacity:.92,map:charTex().cloth.map});
+  O.updateMatrixWorld(true); const body=V3(O.position.x,.6,O.position.z+.6);
+  const cocoon=mesh(GC('cocoonGeo',()=>{ const g=new THREE.SphereGeometry(1,20,14); g.scale(.45,.4,1.15); return g; }),silk,body.x,body.y,body.z); cocoon.scale.setScalar(.01); lv.scene.add(cocoon);
+  const strands=[]; for(let i=0;i<6;i++){ const t=mesh(new THREE.CylinderGeometry(.015,.015,2.4,5),silk,0,0,0); strands.push(t); lv.scene.add(t); }
+  let wrapT=0; const wrapTick=dt=>{ wrapT+=dt; strands.forEach((t,i)=>{ const a=wrapT*6+i; const p=sp.position.clone().add(V3(0,1.2,0)).addScaledVector(V3(Math.sin(sp.rotation.y),0,Math.cos(sp.rotation.y)),-2.2); const q=body.clone().add(V3(Math.cos(a)*.4,Math.sin(a)*.3,Math.sin(a*.7)*.8)); t.position.lerpVectors(p,q,.5); t.lookAt(q); t.rotateX(Math.PI/2); t.scale.y=p.distanceTo(q)/2.4; }); };
+  SCENE_TICKS.push(wrapTick);
+  for(let i=0;i<5;i++) later(i*.6,()=>SND.play('spit',{vol:.6,pos:body,ref:10,rate:rand(.6,.8)}));
+  await tweenVal(v=>{ cocoon.scale.setScalar(Math.max(.01,v)); },0,1,3.2);
+  O.visible=false; SCENE_TICKS.splice(SCENE_TICKS.indexOf(wrapTick),1); for(const t of strands) lv.scene.remove(t); B.atk=null; B.atkK=0;
+  SND.play('pig_squeal',{vol:1,pos:V3(0,44,-40),ref:80,rate:.75}); stopMusic(2);
+  // it drags him away over the rim, into the dark under the table
+  const rim=V3(A.x+Math.sin(sp.rotation.y)*14,.35,A.z+Math.cos(sp.rotation.y)*14);
+  await tweenVal(k=>{ B.walkK=1; const p=sp.position.clone().lerp(rim,k*.06); sp.position.copy(p); cocoon.position.set(p.x-Math.sin(sp.rotation.y)*2.6,.6,p.z-Math.cos(sp.rotation.y)*2.6); },0,1,3.5,k=>k);
+  sp.visible=false; cocoon.visible=false; B.walkK=0;
+  await wait(1); playMusic('sad',3);
   lookAtPoint(V3(A.x,1,A.z),1.2); await wait(1.6);
   await say(['d2_4','d2_5','d2_6']); J.userData.A.look=null;
-  SCENE_TICKS.splice(SCENE_TICKS.indexOf(tk),1); lv.scene.remove(sp);
+  SCENE_TICKS.splice(SCENE_TICKS.indexOf(tk),1); lv.scene.remove(sp); lv.scene.remove(cocoon);
   await wait(1.5);
   runStory(()=>SCENES.night2());
 };
@@ -351,7 +375,7 @@ SCENES.scorpion=async function(){
   ARENA.jay=null;
   // back in the cage, night, the key hidden in the straw
   fd.style.transition='opacity .6s'; fd.style.opacity=1; await wait(1); lv.scene.remove(bug); ARENA.bug=null;
-  lv.setTime('night'); youInCage(); resetActor(J); const c=cageOf('you'); J.position.set(c.x+1.4,0,c.z+.5); faceTo(J,PLAYER.pos);
+  lv.setTime('night'); youInCage(); resetActor(J); const c=cageOf('you'); J.position.set(c.x+1.4,.18,c.z+.5); faceTo(J,PLAYER.pos);
   if(!F.savedJay2){ setPose(J,'sit',0); J.userData.A.seated=true; }
   PLAYER.lock(); PLAYER.ctl.look=true; playMusic('night',2); fd.style.opacity=0; await wait(1);
   J.userData.A.look='player'; await say([F.savedJay2?'d5_e1':'d5_e2','d5_e3']);
@@ -364,3 +388,12 @@ function keyMesh(){ const g=new THREE.Group(); const m=new THREE.MeshPhysicalMat
 /* the table forwards keys + clicks to the arena while you fight */
 LEVELS.table.onKey=code=>arenaKey(code);
 LEVELS.table.onPrimary=()=>ARENA.active?arenaAttack():false;
+
+/* YOUR collar: a real ring around your neck, just under the camera. Look down and you see it (and its green light). */
+const MYCOLLAR={m:null};
+on('tick',()=>{ const want=!!(F.collared&&LV&&(LV.name==='pigroom'||LV.name==='table')&&G.mode==='play');
+  if(!want){ if(MYCOLLAR.m) MYCOLLAR.m.visible=false; return; }
+  if(!MYCOLLAR.m){ MYCOLLAR.m=makeCollar(.068); MYCOLLAR.m.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=5; } }); }
+  const m=MYCOLLAR.m; if(m.parent!==LV.scene) LV.scene.add(m); m.visible=true;
+  const s=PLAYER.scale||1; m.scale.setScalar(s); m.position.copy(camera.position); m.position.y-=.2*s; m.rotation.set(0,PLAYER.yaw+Math.PI,0);
+  m.position.x+=Math.sin(PLAYER.yaw)*.085*s; m.position.z+=Math.cos(PLAYER.yaw)*.085*s; });
