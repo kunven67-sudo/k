@@ -248,9 +248,10 @@ async function buildLevel(name){
 async function enterLevel(name,spawn={},opts={}){
   const def=LEVELS[name]; if(!def) throw new Error('no level '+name); const tok=STORY.token;
   if(!def.built){ $('loading').classList.add('show'); $('loadTxt').textContent='Loading…';   /* no place names: they spoiled what was coming ('a bad dream', "Steve's ship"...) */ await nextFrame(); await nextFrame();
+    const dog=setTimeout(showStuck,30000);
     try{ await buildLevel(name); }
     catch(e){ console.error(e); showFatal('The area "'+(def.title||name)+'" could not be built on this computer.',e); throw e; }
-    finally{ $('loading').classList.remove('show'); } }
+    finally{ clearTimeout(dog); hideStuck(); $('loading').classList.remove('show'); } }
   // the story was restarted while this level was loading: the OLD story must not jump into it (it used to pop up over the new scene)
   if(tok!==STORY.token && !opts.anyStory) return new Promise(()=>{});
   if(LV && LV!==def && LV.exit) try{ LV.exit(); }catch(e){ console.error(e); }
@@ -294,6 +295,20 @@ function onLevelUpdate(fn){ LV_UPDATERS_PENDING.push(fn); }
 const LV_UPDATERS_PENDING=[];
 
 
+/* 11-11 backup (their pick): an area taking over 30 s to load gets a card with Restart from checkpoint,
+   so you never have to close the whole game in GS3. The reload goes straight back to your checkpoint. */
+function showStuck(){
+  if(document.getElementById('stuckCard')) return;
+  const c=document.createElement('div'); c.id='stuckCard';
+  c.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(10,6,4,.9);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font:600 16px/1.5 system-ui,sans-serif';
+  c.innerHTML='<div style="font-size:26px;font-weight:900">Still loading…</div><div style="opacity:.8">This is taking way too long.</div><div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><button>Keep waiting</button><button>Restart from checkpoint</button></div>';
+  const [w,r]=c.querySelectorAll('button'); for(const b of [w,r]) b.style.cssText='font:800 16px system-ui;padding:12px 26px;border-radius:12px;border:0;cursor:pointer';
+  r.style.background='#ffcc33';
+  w.onclick=()=>c.remove();
+  r.onclick=()=>{ try{ sessionStorage.setItem('aw2Resume','1'); }catch(_){} location.reload(); };
+  document.body.appendChild(c); try{ document.exitPointerLock(); }catch(_){}
+}
+function hideStuck(){ const c=document.getElementById('stuckCard'); if(c) c.remove(); }
 /* a big, clear error card (instead of "Loading..." forever) */
 function showFatal(msg,e){
   let c=document.getElementById('fatalCard'); if(!c){ c=document.createElement('div'); c.id='fatalCard';

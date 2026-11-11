@@ -58,7 +58,9 @@ async function boot(){
   if(typeof INTRO!=='undefined') await INTRO.prepare(p=>bar.style.width=(45+p*50)+'%');
   bar.style.width='100%';
   $('splashTap').textContent=IS_TOUCH?'TAP TO START':'CLICK TO START';
-  const go=()=>{ $('splash').removeEventListener('pointerdown',go); window.removeEventListener('keydown',goKey); initAudio(); loadSfxFiles(); loadMusicFiles(); $('splash').style.transition='opacity .6s'; $('splash').style.opacity=0; setTimeout(()=>$('splash').classList.add('hide'),650); INTRO.start(); };
+  const go=()=>{ $('splash').removeEventListener('pointerdown',go); window.removeEventListener('keydown',goKey); initAudio(); loadSfxFiles(); loadMusicFiles(); $('splash').style.transition='opacity .6s'; $('splash').style.opacity=0; setTimeout(()=>$('splash').classList.add('hide'),650);
+    let res=null; try{ res=sessionStorage.getItem('aw2Resume'); sessionStorage.removeItem('aw2Resume'); }catch(_){}
+    const sv=res&&getSave(); if(sv&&sv.cp) startFromCheckpoint(sv.cp); else INTRO.start(); };   // 'Restart from checkpoint' on the stuck-loading card
   const goKey=e=>{ if(e.code==='Enter'||e.code==='Space') go(); };
   $('splash').addEventListener('pointerdown',go); window.addEventListener('keydown',goKey);
 }
