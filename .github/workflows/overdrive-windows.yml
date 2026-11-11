@@ -1,0 +1,66 @@
+name: OVERDRIVE Windows check
+
+on:
+  push:
+    branches: [ccr-f276b31c-2voktu]
+    paths: ["overdrive/**", ".github/workflows/overdrive-windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Build the portable Windows zip
+        working-directory: overdrive
+        run: python build/build_windows.py
+
+      - name: Install Claude Code (official installer)
+        shell: pwsh
+        run: |
+          irm https://claude.ai/install.ps1 | iex
+          & "$env:USERPROFILE\.local\bin\claude.exe" --version
+
+      - name: Self-tests inside the built app (embedded Python, real Claude Code, fake Claude = $0)
+        shell: pwsh
+        working-directory: overdrive/build/dist/OVERDRIVE/app
+        env:
+          OVERDRIVE_HOME: ${{ runner.temp }}\odhome
+        run: |
+          $env:OVERDRIVE_TEST_CLI = "$env:USERPROFILE\.local\bin\claude.exe"
+          ..\python\python.exe -E -s -X utf8 -m overdrive selftest
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Launcher smoke test (OVERDRIVE.exe starts the window server)
+        shell: pwsh
+        working-directory: overdrive/build/dist/OVERDRIVE
+        env:
+          OVERDRIVE_HOME: ${{ runner.temp }}\odhome2
+          OVERDRIVE_NO_WINDOW: "1"
+          OVERDRIVE_PORT: "47100"
+        run: |
+          Start-Process -FilePath .\OVERDRIVE.exe
+          $ok = $false
+          for ($i = 0; $i -lt 40; $i++) {
+            Start-Sleep -Milliseconds 500
+            try { $r = Invoke-RestMethod http://127.0.0.1:47100/api/ping; if ($r.app -eq "OVERDRIVE") { $ok = $true; break } } catch {}
+          }
+          Get-ChildItem "$env:OVERDRIVE_HOME\logs" -ErrorAction SilentlyContinue | Format-Table Name, Length
+          if (Test-Path "$env:OVERDRIVE_HOME\logs\crash-*.txt") { Get-Content "$env:OVERDRIVE_HOME\logs\crash-*.txt"; exit 1 }
+          if (-not $ok) { Write-Error "OVERDRIVE.exe did not start the server"; exit 1 }
+          try { Invoke-RestMethod http://127.0.0.1:47100/api/state; Write-Error "API answered without the key!"; exit 1 } catch { "API correctly refused a request without the key" }
+          Get-Process python -ErrorAction SilentlyContinue | Format-Table Id, ProcessName, MainWindowTitle
+          "Launcher OK"

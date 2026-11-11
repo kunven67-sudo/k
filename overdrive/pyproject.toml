@@ -1,0 +1,9 @@
+[project]
+name = "overdrive"
+version = "0.1.0"
+description = "OVERDRIVE: a personal AI agent with Claude (via Claude Code) as its brain. Stage 1: core engine + safety."
+requires-python = ">=3.11"
+dependencies = ["claude-agent-sdk==0.2.180", "mcp", "anyio", "jsonschema", "starlette", "uvicorn"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

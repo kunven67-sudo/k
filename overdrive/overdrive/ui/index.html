@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OVERDRIVE</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="brand">
+      <img src="/static/logo.svg" alt="" class="mark">
+      <div>
+        <div class="word">OVERDRIVE</div>
+        <div class="sub">Stage 1 <span class="dot">&middot;</span> Core</div>
+      </div>
+    </div>
+    <nav id="nav">
+      <button data-tab="chat" class="on"><span class="ic ic-chat"></span>Chat</button>
+      <button data-tab="status"><span class="ic ic-grid"></span>Status <span id="nav-points" class="pill"></span></button>
+      <button data-tab="logs"><span class="ic ic-log"></span>Logs</button>
+      <button data-tab="tools"><span class="ic ic-tool"></span>Tools</button>
+      <button data-tab="settings"><span class="ic ic-gear"></span>Settings</button>
+    </nav>
+    <div class="side-head"><span>Chats</span><button id="new-chat" class="ghost sm" title="Start a new chat">+ New</button></div>
+    <div id="chats"></div>
+    <div id="brain-box">
+      <div id="brain-line"><span class="led"></span><span id="brain-text">Checking Claude Code...</span></div>
+      <div id="usage-bars"></div>
+    </div>
+  </aside>
+
+  <main id="main">
+    <!-- CHAT -->
+    <section id="tab-chat" class="tab on">
+      <header class="bar">
+        <div class="bar-title" id="chat-title">New chat</div>
+        <div class="bar-right">
+          <span id="chip-model" class="chip"></span>
+          <button id="stop" class="danger hidden" title="Stop the running task now">STOP</button>
+        </div>
+      </header>
+      <div id="needs-you" class="needs hidden"></div>
+      <div id="feed">
+        <div id="empty" class="empty">
+          <img src="/static/logo.svg" alt="" class="big-mark">
+          <h1>What should OVERDRIVE do?</h1>
+          <p>Every task: a plan first, your Yes for anything risky, a checked result at the end.</p>
+          <div class="examples">
+            <button class="ex">What time is it, and what's 17.5% of 2,480?</button>
+            <button class="ex">Make a file called todo.txt with 3 things to do this week</button>
+            <button class="ex">What can you do so far, and what can't you do yet?</button>
+          </div>
+        </div>
+      </div>
+      <form id="composer" autocomplete="off">
+        <textarea id="msg" rows="1" placeholder="Tell OVERDRIVE what to do..." maxlength="20000"></textarea>
+        <button id="send" type="submit" class="primary">Send</button>
+      </form>
+    </section>
+
+    <!-- STATUS -->
+    <section id="tab-status" class="tab">
+      <header class="bar"><div class="bar-title">Status</div>
+        <div class="bar-right">
+          <label class="check"><input type="checkbox" id="st-e2e" checked> Include Claude Code tests <span class="muted">(fake Claude, $0)</span></label>
+          <button id="run-tests" class="primary">Run self-tests</button>
+        </div>
+      </header>
+      <div class="scroll" id="status-body"><div class="loading">Loading...</div></div>
+    </section>
+
+    <!-- LOGS -->
+    <section id="tab-logs" class="tab">
+      <header class="bar"><div class="bar-title">Audit log</div>
+        <div class="bar-right">
+          <select id="log-day"></select>
+          <input id="log-q" placeholder="Search..." size="16">
+          <select id="log-kind">
+            <option value="">All events</option>
+            <option value="task_start,task_end">Tasks</option>
+            <option value="tool_result,approval_asked,card_answered,tool_blocked,tool_input_rejected">Tools + approvals</option>
+            <option value="settings_changed">Settings changes</option>
+            <option value="network,brain_init,brain_retry,brain_error">Brain + network</option>
+            <option value="injection_flagged,loop_detected,limit_hit,stop_pressed">Safety events</option>
+          </select>
+          <button id="log-verify" class="ghost">Verify chain</button>
+        </div>
+      </header>
+      <div id="log-verify-out" class="hidden"></div>
+      <div class="scroll"><table id="log-table" class="tbl"><thead><tr><th>Time</th><th>Event</th><th>Task</th><th>Details</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <!-- TOOLS -->
+    <section id="tab-tools" class="tab">
+      <header class="bar"><div class="bar-title">Tools</div><div class="bar-right muted">Reading tools can be run by hand, even offline.</div></header>
+      <div class="scroll" id="tools-body"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="tab-settings" class="tab">
+      <header class="bar"><div class="bar-title">Settings</div>
+        <div class="bar-right"><span id="set-msg" class="muted"></span><button id="save-settings" class="primary">Save</button></div>
+      </header>
+      <div class="scroll" id="settings-body"></div>
+    </section>
+  </main>
+</div>
+
+<!-- SETUP -->
+<div id="setup" class="overlay hidden">
+  <div class="setup-card">
+    <img src="/static/logo.svg" alt="" class="mark-lg">
+    <h1>Set up OVERDRIVE</h1>
+    <p class="muted">OVERDRIVE thinks with Claude through Claude Code, signed in with your claude.ai account. No API key, no extra money.</p>
+    <div id="setup-steps"></div>
+    <div class="setup-actions">
+      <button id="setup-skip" class="ghost">Use offline tools only</button>
+      <button id="setup-recheck" class="ghost">Check again</button>
+      <button id="setup-go" class="primary" disabled>Start OVERDRIVE</button>
+    </div>
+  </div>
+</div>
+
+<div id="drawer" class="drawer hidden"><div class="drawer-in"><button class="x" id="drawer-x" title="Close">&times;</button><div id="drawer-body"></div></div></div>
+<div id="toasts"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

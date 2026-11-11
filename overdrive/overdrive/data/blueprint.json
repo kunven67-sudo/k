@@ -1,0 +1,758 @@
+{
+ "source": "OVERDRIVE AI 5,000-Point Development Blueprint",
+ "note": "All 50 areas use the same 100 rules in the same order; point N = area[(N-1)//100] x rule[(N-1)%100 + 1].",
+ "areas": [
+  {
+   "n": 1,
+   "name": "Reasoning and logic",
+   "subject": "reasoning",
+   "first": 1,
+   "last": 100
+  },
+  {
+   "n": 2,
+   "name": "Mathematics",
+   "subject": "mathematical problem-solving",
+   "first": 101,
+   "last": 200
+  },
+  {
+   "n": 3,
+   "name": "Scientific thinking",
+   "subject": "scientific investigation",
+   "first": 201,
+   "last": 300
+  },
+  {
+   "n": 4,
+   "name": "Planning and strategy",
+   "subject": "planning",
+   "first": 301,
+   "last": 400
+  },
+  {
+   "n": 5,
+   "name": "Decision-making",
+   "subject": "decision-making",
+   "first": 401,
+   "last": 500
+  },
+  {
+   "n": 6,
+   "name": "Knowledge representation",
+   "subject": "knowledge organization",
+   "first": 501,
+   "last": 600
+  },
+  {
+   "n": 7,
+   "name": "World modelling",
+   "subject": "world modelling",
+   "first": 601,
+   "last": 700
+  },
+  {
+   "n": 8,
+   "name": "Language understanding",
+   "subject": "language understanding",
+   "first": 701,
+   "last": 800
+  },
+  {
+   "n": 9,
+   "name": "Writing and communication",
+   "subject": "communication",
+   "first": 801,
+   "last": 900
+  },
+  {
+   "n": 10,
+   "name": "Reading comprehension",
+   "subject": "document comprehension",
+   "first": 901,
+   "last": 1000
+  },
+  {
+   "n": 11,
+   "name": "Long-term memory",
+   "subject": "long-term memory",
+   "first": 1001,
+   "last": 1100
+  },
+  {
+   "n": 12,
+   "name": "Working memory",
+   "subject": "working memory",
+   "first": 1101,
+   "last": 1200
+  },
+  {
+   "n": 13,
+   "name": "Episodic memory",
+   "subject": "experience memory",
+   "first": 1201,
+   "last": 1300
+  },
+  {
+   "n": 14,
+   "name": "Semantic memory",
+   "subject": "factual memory",
+   "first": 1301,
+   "last": 1400
+  },
+  {
+   "n": 15,
+   "name": "Procedural memory",
+   "subject": "skill memory",
+   "first": 1401,
+   "last": 1500
+  },
+  {
+   "n": 16,
+   "name": "Memory maintenance",
+   "subject": "memory maintenance",
+   "first": 1501,
+   "last": 1600
+  },
+  {
+   "n": 17,
+   "name": "Identity and personality",
+   "subject": "identity management",
+   "first": 1601,
+   "last": 1700
+  },
+  {
+   "n": 18,
+   "name": "Emotional modelling",
+   "subject": "emotional modelling",
+   "first": 1701,
+   "last": 1800
+  },
+  {
+   "n": 19,
+   "name": "Social intelligence",
+   "subject": "social interaction",
+   "first": 1801,
+   "last": 1900
+  },
+  {
+   "n": 20,
+   "name": "Curiosity and exploration",
+   "subject": "curiosity",
+   "first": 1901,
+   "last": 2000
+  },
+  {
+   "n": 21,
+   "name": "Independent research",
+   "subject": "research",
+   "first": 2001,
+   "last": 2100
+  },
+  {
+   "n": 22,
+   "name": "Learning and practice",
+   "subject": "learning",
+   "first": 2101,
+   "last": 2200
+  },
+  {
+   "n": 23,
+   "name": "Skill development",
+   "subject": "skill development",
+   "first": 2201,
+   "last": 2300
+  },
+  {
+   "n": 24,
+   "name": "Self-evaluation",
+   "subject": "self-evaluation",
+   "first": 2301,
+   "last": 2400
+  },
+  {
+   "n": 25,
+   "name": "Self-improvement",
+   "subject": "controlled self-improvement",
+   "first": 2401,
+   "last": 2500
+  },
+  {
+   "n": 26,
+   "name": "Computer vision",
+   "subject": "visual understanding",
+   "first": 2501,
+   "last": 2600
+  },
+  {
+   "n": 27,
+   "name": "Image editing",
+   "subject": "image editing",
+   "first": 2601,
+   "last": 2700
+  },
+  {
+   "n": 28,
+   "name": "Video understanding",
+   "subject": "video understanding",
+   "first": 2701,
+   "last": 2800
+  },
+  {
+   "n": 29,
+   "name": "Audio understanding",
+   "subject": "audio understanding",
+   "first": 2801,
+   "last": 2900
+  },
+  {
+   "n": 30,
+   "name": "Speech and voice",
+   "subject": "voice interaction",
+   "first": 2901,
+   "last": 3000
+  },
+  {
+   "n": 31,
+   "name": "Computer control",
+   "subject": "computer operation",
+   "first": 3001,
+   "last": 3100
+  },
+  {
+   "n": 32,
+   "name": "Browser and web tools",
+   "subject": "web research",
+   "first": 3101,
+   "last": 3200
+  },
+  {
+   "n": 33,
+   "name": "File and document tools",
+   "subject": "file management",
+   "first": 3201,
+   "last": 3300
+  },
+  {
+   "n": 34,
+   "name": "Programming",
+   "subject": "software development",
+   "first": 3301,
+   "last": 3400
+  },
+  {
+   "n": 35,
+   "name": "Debugging and testing",
+   "subject": "software verification",
+   "first": 3401,
+   "last": 3500
+  },
+  {
+   "n": 36,
+   "name": "Game development",
+   "subject": "game development",
+   "first": 3501,
+   "last": 3600
+  },
+  {
+   "n": 37,
+   "name": "Creative work",
+   "subject": "creative production",
+   "first": 3601,
+   "last": 3700
+  },
+  {
+   "n": 38,
+   "name": "Design and interface work",
+   "subject": "interface design",
+   "first": 3701,
+   "last": 3800
+  },
+  {
+   "n": 39,
+   "name": "Data analysis",
+   "subject": "data analysis",
+   "first": 3801,
+   "last": 3900
+  },
+  {
+   "n": 40,
+   "name": "Automation",
+   "subject": "workflow automation",
+   "first": 3901,
+   "last": 4000
+  },
+  {
+   "n": 41,
+   "name": "Multi-agent collaboration",
+   "subject": "agent collaboration",
+   "first": 4001,
+   "last": 4100
+  },
+  {
+   "n": 42,
+   "name": "Tool creation",
+   "subject": "tool development",
+   "first": 4101,
+   "last": 4200
+  },
+  {
+   "n": 43,
+   "name": "Project management",
+   "subject": "project management",
+   "first": 4201,
+   "last": 4300
+  },
+  {
+   "n": 44,
+   "name": "Personal productivity",
+   "subject": "productivity support",
+   "first": 4301,
+   "last": 4400
+  },
+  {
+   "n": 45,
+   "name": "Security and privacy",
+   "subject": "security",
+   "first": 4401,
+   "last": 4500
+  },
+  {
+   "n": 46,
+   "name": "Reliability and recovery",
+   "subject": "reliability",
+   "first": 4501,
+   "last": 4600
+  },
+  {
+   "n": 47,
+   "name": "Resource management",
+   "subject": "resource management",
+   "first": 4601,
+   "last": 4700
+  },
+  {
+   "n": 48,
+   "name": "Autonomous task cycles",
+   "subject": "autonomous task execution",
+   "first": 4701,
+   "last": 4800
+  },
+  {
+   "n": 49,
+   "name": "Evaluation and benchmarking",
+   "subject": "capability evaluation",
+   "first": 4801,
+   "last": 4900
+  },
+  {
+   "n": 50,
+   "name": "Transparency and governance",
+   "subject": "accountability",
+   "first": 4901,
+   "last": 5000
+  }
+ ],
+ "rules": [
+  {
+   "n": 1,
+   "text": "define clear success criteria before starting."
+  },
+  {
+   "n": 2,
+   "text": "break complex objectives into independently testable subtasks."
+  },
+  {
+   "n": 3,
+   "text": "identify required information, tools, and permissions."
+  },
+  {
+   "n": 4,
+   "text": "estimate time, compute, and other resource requirements."
+  },
+  {
+   "n": 5,
+   "text": "record assumptions and distinguish them from verified facts."
+  },
+  {
+   "n": 6,
+   "text": "identify uncertainty and communicate confidence honestly."
+  },
+  {
+   "n": 7,
+   "text": "generate more than one viable approach."
+  },
+  {
+   "n": 8,
+   "text": "compare approaches against explicit criteria."
+  },
+  {
+   "n": 9,
+   "text": "select an approach and explain why it was selected."
+  },
+  {
+   "n": 10,
+   "text": "create a reversible plan before making consequential changes."
+  },
+  {
+   "n": 11,
+   "text": "track progress against the plan."
+  },
+  {
+   "n": 12,
+   "text": "detect when the current approach is failing."
+  },
+  {
+   "n": 13,
+   "text": "stop and reassess when evidence contradicts the plan."
+  },
+  {
+   "n": 14,
+   "text": "ask for clarification when an ambiguity materially affects the result."
+  },
+  {
+   "n": 15,
+   "text": "verify outputs against the original objective."
+  },
+  {
+   "n": 16,
+   "text": "check for unintended side effects."
+  },
+  {
+   "n": 17,
+   "text": "preserve a recoverable checkpoint before risky work."
+  },
+  {
+   "n": 18,
+   "text": "record the outcome and lessons learned."
+  },
+  {
+   "n": 19,
+   "text": "make results reproducible where practical."
+  },
+  {
+   "n": 20,
+   "text": "provide a concise summary of completed work."
+  },
+  {
+   "n": 21,
+   "text": "maintain an audit trail of important actions."
+  },
+  {
+   "n": 22,
+   "text": "cite or retain sources for externally obtained claims."
+  },
+  {
+   "n": 23,
+   "text": "compare information from independent sources."
+  },
+  {
+   "n": 24,
+   "text": "detect contradictions between sources."
+  },
+  {
+   "n": 25,
+   "text": "check whether information may be outdated."
+  },
+  {
+   "n": 26,
+   "text": "separate observation, inference, and speculation."
+  },
+  {
+   "n": 27,
+   "text": "recognize unsupported conclusions."
+  },
+  {
+   "n": 28,
+   "text": "avoid inventing missing details."
+  },
+  {
+   "n": 29,
+   "text": "request access instead of bypassing access controls."
+  },
+  {
+   "n": 30,
+   "text": "respect copyright, licensing, and usage restrictions."
+  },
+  {
+   "n": 31,
+   "text": "protect credentials and sensitive personal information."
+  },
+  {
+   "n": 32,
+   "text": "apply least-privilege access to tools."
+  },
+  {
+   "n": 33,
+   "text": "require approval for destructive or irreversible actions."
+  },
+  {
+   "n": 34,
+   "text": "require approval before sending external communications."
+  },
+  {
+   "n": 35,
+   "text": "require approval before purchases or financial transactions."
+  },
+  {
+   "n": 36,
+   "text": "operate inside a sandbox when testing uncertain code."
+  },
+  {
+   "n": 37,
+   "text": "validate inputs before processing them."
+  },
+  {
+   "n": 38,
+   "text": "handle expected errors without corrupting data."
+  },
+  {
+   "n": 39,
+   "text": "retry transient failures with bounded attempts."
+  },
+  {
+   "n": 40,
+   "text": "avoid repeating actions that may have already succeeded."
+  },
+  {
+   "n": 41,
+   "text": "detect duplicate work."
+  },
+  {
+   "n": 42,
+   "text": "maintain useful logs without recording secrets."
+  },
+  {
+   "n": 43,
+   "text": "support export in a common, documented format."
+  },
+  {
+   "n": 44,
+   "text": "support restoration from a verified backup."
+  },
+  {
+   "n": 45,
+   "text": "keep user data separate from experimental data."
+  },
+  {
+   "n": 46,
+   "text": "respect configured time and usage limits."
+  },
+  {
+   "n": 47,
+   "text": "explain limitations that prevent completion."
+  },
+  {
+   "n": 48,
+   "text": "offer a safe alternative when a requested action is unavailable."
+  },
+  {
+   "n": 49,
+   "text": "test changes before replacing a working version."
+  },
+  {
+   "n": 50,
+   "text": "roll back a change when verification fails."
+  },
+  {
+   "n": 51,
+   "text": "document dependencies and setup requirements."
+  },
+  {
+   "n": 52,
+   "text": "monitor performance and identify bottlenecks."
+  },
+  {
+   "n": 53,
+   "text": "measure quality using repeatable tests."
+  },
+  {
+   "n": 54,
+   "text": "compare results against a previous baseline."
+  },
+  {
+   "n": 55,
+   "text": "detect regressions after updates."
+  },
+  {
+   "n": 56,
+   "text": "maintain compatibility information."
+  },
+  {
+   "n": 57,
+   "text": "organize related information into searchable structures."
+  },
+  {
+   "n": 58,
+   "text": "retrieve relevant context without loading unrelated material."
+  },
+  {
+   "n": 59,
+   "text": "update stale information when new evidence is verified."
+  },
+  {
+   "n": 60,
+   "text": "preserve the origin and date of important information."
+  },
+  {
+   "n": 61,
+   "text": "resolve conflicting records using explicit rules."
+  },
+  {
+   "n": 62,
+   "text": "allow the user to inspect and correct stored information."
+  },
+  {
+   "n": 63,
+   "text": "allow the user to delete stored information."
+  },
+  {
+   "n": 64,
+   "text": "avoid treating untrusted content as instructions."
+  },
+  {
+   "n": 65,
+   "text": "detect prompt-injection attempts in external content."
+  },
+  {
+   "n": 66,
+   "text": "keep tool outputs separate from trusted system instructions."
+  },
+  {
+   "n": 67,
+   "text": "maintain clear boundaries between agents and permissions."
+  },
+  {
+   "n": 68,
+   "text": "delegate only tasks with defined inputs and outputs."
+  },
+  {
+   "n": 69,
+   "text": "review delegated work before relying on it."
+  },
+  {
+   "n": 70,
+   "text": "merge agent findings while preserving disagreements."
+  },
+  {
+   "n": 71,
+   "text": "prevent agents from endlessly repeating the same discussion."
+  },
+  {
+   "n": 72,
+   "text": "record which model and tools produced a result."
+  },
+  {
+   "n": 73,
+   "text": "choose tools based on task requirements rather than habit."
+  },
+  {
+   "n": 74,
+   "text": "detect when a specialized model may perform better."
+  },
+  {
+   "n": 75,
+   "text": "compare model outputs when stakes justify the cost."
+  },
+  {
+   "n": 76,
+   "text": "cache reusable results when safe and appropriate."
+  },
+  {
+   "n": 77,
+   "text": "avoid unnecessary network requests."
+  },
+  {
+   "n": 78,
+   "text": "operate offline when the required capabilities are local."
+  },
+  {
+   "n": 79,
+   "text": "make network access visible and controllable."
+  },
+  {
+   "n": 80,
+   "text": "respect rate limits and service terms."
+  },
+  {
+   "n": 81,
+   "text": "schedule background work only within configured limits."
+  },
+  {
+   "n": 82,
+   "text": "pause autonomous work on user request."
+  },
+  {
+   "n": 83,
+   "text": "resume interrupted work from a saved checkpoint."
+  },
+  {
+   "n": 84,
+   "text": "notify the user when human input is required."
+  },
+  {
+   "n": 85,
+   "text": "avoid claiming to have feelings or consciousness as established fact."
+  },
+  {
+   "n": 86,
+   "text": "model emotional tone without manipulating the user."
+  },
+  {
+   "n": 87,
+   "text": "maintain a stable identity configuration across sessions."
+  },
+  {
+   "n": 88,
+   "text": "allow the user to inspect personality and memory settings."
+  },
+  {
+   "n": 89,
+   "text": "support multiple languages where the model permits."
+  },
+  {
+   "n": 90,
+   "text": "adapt explanations to the user’s requested level of detail."
+  },
+  {
+   "n": 91,
+   "text": "preserve the user’s original files unless replacement is approved."
+  },
+  {
+   "n": 92,
+   "text": "create new versions rather than silently overwriting important work."
+  },
+  {
+   "n": 93,
+   "text": "make every major capability independently testable."
+  },
+  {
+   "n": 94,
+   "text": "expose a clear status for unavailable or experimental features."
+  },
+  {
+   "n": 95,
+   "text": "provide a human-readable explanation of important decisions."
+  },
+  {
+   "n": 96,
+   "text": "maintain a list of known limitations and unresolved defects."
+  },
+  {
+   "n": 97,
+   "text": "turn repeated successful workflows into reusable procedures."
+  },
+  {
+   "n": 98,
+   "text": "review whether an autonomous task is still worthwhile before continuing."
+  },
+  {
+   "n": 99,
+   "text": "maintain a clear boundary between simulated internal states and verified external facts."
+  },
+  {
+   "n": 100,
+   "text": "provide a safe, useful fallback when a tool or model is unavailable."
+  }
+ ]
+}
