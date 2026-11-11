@@ -34,7 +34,7 @@ function makeTinyCage(scene,lv,c,iron,wood){
   // straw/cloth bedding on the floor
   const rag=mesh(GC('ragGeo',()=>{ const p=new THREE.PlaneGeometry(4.2,3.4,16,12); const a=p.attributes.position; for(let k=0;k<a.count;k++) a.setZ(k,Math.abs(noise2(a.getX(k)*.9,a.getY(k)*.9))*.25); p.rotateX(-Math.PI/2); p.computeVertexNormals(); return p; }),lv.ragM,rand(-.3,.3),.19,rand(.2,.8)); rag.rotation.y=rand(-.3,.3); g.add(rag);
   // collision: 4 walls (the back wall of YOUR cage has a gap where the bar is bent; only open when you know about it)
-  const x0=c.x-w/2,x1=c.x+w/2,z0=c.z-d/2,z1=c.z+d/2,t=.12;
+  const x0=c.x-w/2,x1=c.x+w/2,z0=c.z-d/2,z1=c.z+d/2,t=.25;
   colBox(lv.col,x0,x1,z0-t,z0+t); colBox(lv.col,x0-t,x0+t,z0,z1); colBox(lv.col,x1-t,x1+t,z0,z1);
   if(c.id==='you'){ colBox(lv.col,x0,c.x-.55,z1-t,z1+t); colBox(lv.col,c.x+.55,x1,z1-t,z1+t); colBox(lv.col,c.x-.55,c.x+.55,z1-t,z1+t,()=>!F.bentBar); }
   else colBox(lv.col,x0,x1,z1-t,z1+t);
@@ -99,7 +99,7 @@ defineLevel('table',{
     const cap=new THREE.Group(); cap.position.set(TABLE.pebbles.x+3.6,0,TABLE.pebbles.z+2.4); cap.rotation.z=.08; scene.add(cap); lv.cap=cap;
     cap.add(mesh(GC('capGeo',()=>{ const g=new THREE.CylinderGeometry(2.6,2.7,.9,24,1,true); return g; }),new THREE.MeshPhysicalMaterial({color:col(0xb8302a),metalness:.9,roughness:.3,side:THREE.DoubleSide}),0,.45,0)); cap.add(cyl(2.6,2.6,.08,new THREE.MeshPhysicalMaterial({color:col(0xc8c0b0),metalness:1,roughness:.3}),0,.88,0,24));
     // the candle: the light at night
-    const wax=new THREE.MeshPhysicalMaterial({color:col(0xf0e6d0),roughness:.5,transmission:.15,thickness:2});
+    const wax=new THREE.MeshPhysicalMaterial({color:col(0xf0e6d0),roughness:.5,transmission:.15});
     scene.add(cyl(2.6,2.8,12,wax,TABLE.candle.x,6,TABLE.candle.z,28)); colCircle(lv.col,TABLE.candle.x,TABLE.candle.z,3.1);
     const flame=mesh(GC('flameGeo',()=>{ const g=new THREE.SphereGeometry(.6,12,10); g.scale(1,2.2,1); return g; }),new THREE.MeshBasicMaterial({color:col(0xffc070).multiplyScalar(2.5)}),TABLE.candle.x,13.6,TABLE.candle.z,false); scene.add(flame); lv.flame=flame;
     lv.candleL=new THREE.PointLight(col(0xffa860),3.2,95,1.6); lv.candleL.position.set(TABLE.candle.x,15,TABLE.candle.z); scene.add(lv.candleL);
@@ -117,8 +117,8 @@ defineLevel('table',{
   enter(){ FX.sunWorld=null; this.setTime(this.time||'day'); },
   exit(){ setAmbience([]); },
   setTime(t){ const lv=this; lv.time=t; const night=t==='night';
-    lv.rig.sun.intensity=night?.28:1.6; lv.rig.sun.color=col(night?0x8090c0:0xffb070); lv.rig.hemi.intensity=night?.12:.35;
-    lv.candleL.intensity=night?3.4:1.4; lv.scene.fog.density=night?.009:.006;
+    lv.rig.sun.intensity=night?.45:2.5; lv.rig.sun.color=col(night?0x8a9ad0:0xffc890); lv.rig.hemi.intensity=night?.22:.65;
+    lv.candleL.intensity=night?4:1.6; lv.scene.fog.density=night?.009:.006;
     const P=lv.pig.userData.pig; P.sleep=night?1:0; P.stop=night; },
   update(dt,t){
     const lv=this, P=lv.pig.userData.pig;

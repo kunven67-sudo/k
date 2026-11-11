@@ -72,6 +72,10 @@ defineLevel('pigroom',{
     const gate=new THREE.Group(); gate.position.set(-1.8,0,zc+D/2-.2); scene.add(gate); lv.gate=gate; lv.gateZ=zc+D/2-.2;
     for(let i=0;i<9;i++){ const bar=cyl(.03,.03,3.2,iron,.2+i*.4,1.6,0,8); gate.add(bar); }
     gate.add(box(3.6,.12,.1,iron,1.8,3.1,0)); gate.add(box(3.6,.12,.1,iron,1.8,.4,0));
+    // behind the gate: a dark stone passage going out of the room (where the gate leads)
+    { const z=zc+D/2-.02; const hole=mesh(new THREE.PlaneGeometry(3.4,3.0),new THREE.MeshBasicMaterial({color:col(0x020101)}),0,1.5,z,false); hole.rotation.y=Math.PI; scene.add(hole);
+      const st=pbrMat('castle_brick_07',1,{opts:{roughness:1}}); st.color=col(0x6a625a);
+      for(const sd of [-1,1]) scene.add(box(.35,3.3,.4,st,sd*1.9,1.65,z-.1)); scene.add(box(4.2,.4,.4,st,0,3.3,z-.1)); }
     // Part 2: a big iron cage by the wall (where you wake up after the zap), hidden until then
     const bc=new THREE.Group(); bc.position.set(3.7,0,.6); bc.visible=false; scene.add(bc); lv.bigCage=bc;
     { const w=2.6,h=2.4; bc.add(box(w+.1,.08,w+.1,iron,0,.04,0)); bc.add(box(w+.1,.08,w+.1,iron,0,h,0));

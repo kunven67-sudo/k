@@ -16,9 +16,9 @@ const WEAPONS={
 };
 const BUGDEF={
   mantis:{name:'PRAYING MANTIS',hp:100,speed:3.0,keep:2.6,turn:3.2,atks:[
-    {n:'slash',w:.7,reach:3.4,arc:.85,dmg:1,rec:1.0,weight:3},
-    {n:'double',w:.6,reach:3.2,arc:.85,dmg:1,rec:1.2,weight:2,hits:2},
-    {n:'lunge',w:.8,reach:2.8,arc:.9,dmg:1,rec:1.3,weight:2,dash:6.5,min:4.5}]},
+    {n:'slash',w:.85,reach:3.4,arc:.85,dmg:1,rec:1.1,weight:3},
+    {n:'double',w:.75,reach:3.2,arc:.85,dmg:1,rec:1.3,weight:2,hits:2},
+    {n:'lunge',w:.95,reach:2.8,arc:.9,dmg:1,rec:1.4,weight:2,dash:6.5,min:4.5}]},
   spider:{name:'TARANTULA',hp:120,speed:3.5,keep:2.8,turn:3.6,atks:[
     {n:'bite',w:.55,reach:2.9,arc:.75,dmg:1,rec:.95,weight:3},
     {n:'leap',w:.85,aoe:2.6,dmg:1,rec:1.3,weight:2,leap:true,min:4},
@@ -28,7 +28,7 @@ const BUGDEF={
     {n:'sting',w:1.05,aoe:1.8,dmg:2,rec:1.4,weight:2,target:true},
     {n:'sweep',w:.95,aoe:4.6,ring:true,dmg:1,rec:1.2,weight:1,max:4.2}]}
 };
-const ARENA={active:false,paused:false,hp:5,maxHp:5,inv:{},cur:'fists',atkCd:0,dodgeT:0,dodgeCd:0,iframe:0,slowT:0,bug:null,st:null,projs:[],marks:[],loot:[],res:null,jay:null};
+const ARENA={active:false,paused:false,hp:6,maxHp:6,inv:{},cur:'fists',atkCd:0,dodgeT:0,dodgeCd:0,iframe:0,slowT:0,bug:null,st:null,projs:[],marks:[],loot:[],res:null,jay:null};
 /* ---------- your stuff (kept in F so checkpoints save it) ---------- */
 function inv(){ return F.inv||(F.inv={bone:0,thorn:0,thread:0,pebbles:0,bspear:0}); }
 const ITEM_NAMES={bone:'Sharp bone',thorn:'Thorn',thread:'Thread',pebbles:'Pebbles',bspear:'Bone spear'};
@@ -55,9 +55,9 @@ function arenaHUDUpdate(){ if(!$('ahHearts')) return;
 function weaponMesh(k){
   const g=new THREE.Group();
   const boneM=new THREE.MeshStandardMaterial({color:col(0xe6dcc6),roughness:.6}), thornM=new THREE.MeshPhysicalMaterial({color:col(0x8a4a2a),roughness:.4,clearcoat:.5}), thr=new THREE.MeshStandardMaterial({color:col(0xe0d4bc),roughness:1});
-  if(k==='bone'){ const b=makeLongBone(.34,.022); b.rotation.x=Math.PI/2; b.position.z=-.12; g.add(b); const tip=mesh(new THREE.ConeGeometry(.02,.1,6),boneM,0,0,-.33); tip.rotation.x=-Math.PI/2; g.add(tip); }
+  if(k==='bone'){ const b=makeLongBone(.34,.022); b.rotation.x=-Math.PI/2; b.position.z=.1; g.add(b); const tip=mesh(new THREE.ConeGeometry(.02,.1,6),boneM,0,0,-.33); tip.rotation.x=-Math.PI/2; g.add(tip); }
   else if(k==='spear'){ const t=mesh(new THREE.ConeGeometry(.045,1.1,10),thornM,0,0,-.45); t.rotation.x=-Math.PI/2; g.add(t); }
-  else if(k==='bspear'){ const sh=makeLongBone(.8,.024); sh.rotation.x=Math.PI/2; sh.position.z=-.2; g.add(sh); const t=mesh(new THREE.ConeGeometry(.04,.42,10),thornM,0,0,-.78); t.rotation.x=-Math.PI/2; g.add(t);
+  else if(k==='bspear'){ const sh=makeLongBone(.8,.024); sh.rotation.x=-Math.PI/2; sh.position.z=.15; g.add(sh); const t=mesh(new THREE.ConeGeometry(.04,.42,10),thornM,0,0,-.78); t.rotation.x=-Math.PI/2; g.add(t);
     for(let i=0;i<6;i++){ const w=mesh(new THREE.TorusGeometry(.03,.006,5,12),thr,0,0,-.55-i*.012); g.add(w); } }
   else if(k==='rocks'){ g.add(ell(.06,.045,.055,pbrMat('sandy_gravel_02',.2),0,.01,-.02,12)); }
   g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } }); return g;

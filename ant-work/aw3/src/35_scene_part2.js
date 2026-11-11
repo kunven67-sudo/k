@@ -22,14 +22,14 @@ function remember(who='He'){ let el=$('remember'); if(!el){ el=document.createEl
   el.textContent=who+' will remember that.'; el.style.opacity=1; SND.play('watch_beep',{vol:.25,rate:.6}); later(3.2,()=>{ el.style.opacity=0; }); }
 /* a choice with a timer bar (ONLY for serious moments). Runs out = the default */
 async function timedChoice(opts,sec,def){
-  const p=choose(opts,{lead:'DECIDE'});
+  const p=choose(opts.map((o,i)=>Object.assign({},o,{i})),{lead:'DECIDE'});
   const bar=document.createElement('div'); bar.style.cssText='height:6px;margin:10px auto 0;width:100%;max-width:420px;background:rgba(255,255,255,.18);border-radius:4px;overflow:hidden'; const fill=document.createElement('div'); fill.style.cssText='height:100%;width:100%;background:#ffcc33;transition:width linear '+sec+'s'; bar.appendChild(fill); $('choices').appendChild(bar);
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ fill.style.width='0%'; }));
   let done=false; const to=setTimeout(()=>{ if(!done&&CHOICE.active) pickChoice(def); },sec*1000);
-  const r=await p; done=true; clearTimeout(to); bar.remove(); return r;
+  const r=await p; done=true; clearTimeout(to); bar.remove(); return r.i;
 }
 /* talk with choices: each topic once (it goes gray), 'end' leaves */
-async function topicTalk(opts){ for(;;){ const r=await choose(opts.map(o=>({text:L(o.q).text,used:o.used}))); const o=opts[r]; if(o.used&&!o.end) continue;
+async function topicTalk(opts){ for(;;){ const op=await choose(opts.map((o,i)=>({text:L(o.q).text,used:o.used&&!o.end,i}))); const o=opts[op.i];
     o.used=true; await say([o.q,...o.a]); if(o.remember) remember(o.remember); if(o.end) return; } }
 /* the collar zap: white, buzz, shake, you drop */
 async function zapDown(){ PLAYER.lock(); SND.play('zap',{vol:1}); const cr=SND.play('zap_crackle',{vol:.7,loop:true}); flashWhite(.9,.5); shake(1.1); dmgFlash(); blurScreen(.8);
@@ -290,6 +290,7 @@ async function dropInBowl(lv,kind){ const fd=$('fade'); fd.style.transition='opa
   const bug=arenaFight(kind,lv.fightOpts||{}); fd.style.transition='opacity .6s'; fd.style.opacity=0; return bug; }
 async function backToCage(lv,bug){ const fd=$('fade'); fd.style.transition='opacity .6s'; fd.style.opacity=1; await wait(1); if(bug) lv.scene.remove(bug); ARENA.bug=null; youInCage(); PLAYER.lock(); PLAYER.ctl.look=true; invHUD(); await wait(.4); fd.style.opacity=0; await wait(.8); }
 SCENES.mantis=async function(){
+  if(!F.inv) F.inv={bone:0,thorn:0,thread:0,pebbles:4,bspear:1};   // started from the chapter list: what you'd have made by now
   const lv=await tableStart('mantis','day'); const J=lv.jay2; lv.orrin.visible=false; lv.fightOpts={};
   PLAYER.lock(); PLAYER.ctl.look=true; playMusic('cage',2);
   await dayCard('DAY 3');
@@ -300,6 +301,7 @@ SCENES.mantis=async function(){
   runStory(()=>SCENES.spider());
 };
 SCENES.spider=async function(){
+  if(!F.inv) F.inv={bone:0,thorn:0,thread:0,pebbles:4,bspear:1};   // started from the chapter list: what you'd have made by now
   const lv=await tableStart('spider','day'); const J=lv.jay2; lv.orrin.visible=false; lv.fightOpts={};
   PLAYER.lock(); PLAYER.ctl.look=true; playMusic('cage',2);
   await dayCard('DAY 4');
@@ -310,6 +312,7 @@ SCENES.spider=async function(){
   runStory(()=>SCENES.scorpion());
 };
 SCENES.scorpion=async function(){
+  if(!F.inv) F.inv={bone:0,thorn:0,thread:0,pebbles:4,bspear:1};   // started from the chapter list: what you'd have made by now
   const lv=await tableStart('scorpion','day'); const J=lv.jay2, A=TABLE.arena; lv.orrin.visible=false;
   PLAYER.lock(); PLAYER.ctl.look=true; playMusic('cage',2);
   await dayCard('DAY 5');
