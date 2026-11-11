@@ -22,6 +22,11 @@
 
     <queries>
         <package android:name="com.brocast.app" />
+        <!-- "Which app do you watch on?": the apps on the home screen. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
 
     <application

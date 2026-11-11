@@ -68,6 +68,31 @@ class VideoHubTest {
     }
 
     @Test
+    fun tapGetsEveryFrameWithItsSettings() {
+        val hub = VideoHub()
+        val got = ArrayList<VideoHub.TapFrame>()
+        hub.tap = VideoHub.Tap { got += it }
+        hub.publish(annexB(pFrame(1)), 1_000, false) // no settings yet: nothing to decode with
+        hub.configure(1280, 720, annexB(SPS, PPS))
+        hub.publish(annexB(idr(2)), 2_000, true)
+        hub.publish(annexB(SPS, PPS, pFrame(3)), 3_000, false) // repeated settings aren't frame data
+        assertEquals(2, got.size)
+        assertTrue(got[0].keyFrame)
+        assertEquals(1280, got[0].width)
+        assertTrue(got[0].sps.contentEquals(SPS))
+        assertTrue(got[0].pps.contentEquals(PPS))
+        assertEquals(1, got[1].nals.size, "only the picture data")
+        assertEquals(got[0].generation, got[1].generation)
+        assertEquals(3_000, got[1].ptsUs)
+        hub.configure(720, 1280, annexB(SPS2, PPS))
+        hub.publish(annexB(idr(4)), 4_000, true)
+        assertTrue(got[2].generation != got[1].generation, "new settings = new generation")
+        hub.tap = null
+        hub.publish(annexB(pFrame(5)), 5_000, false)
+        assertEquals(3, got.size)
+    }
+
+    @Test
     fun newViewerStartsAtAKeyFrameWithTheInitSegment() {
         val keyRequests = AtomicInteger()
         val hub = VideoHub()

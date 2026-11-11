@@ -23,6 +23,27 @@ class VideoHub(
     /** What the browser needs before any frame: codec name, size and the MP4 "init segment". */
     class Format(val generation: Int, val width: Int, val height: Int, val codec: String, val init: ByteArray)
 
+    /** One frame for a [Tap]: the plain H.264 pieces plus the settings to decode them ([generation] changes with them). */
+    class TapFrame(
+        val generation: Int,
+        val width: Int,
+        val height: Int,
+        val sps: ByteArray,
+        val pps: ByteArray,
+        val nals: List<ByteArray>,
+        val ptsUs: Long,
+        val keyFrame: Boolean,
+    )
+
+    /** Gets every frame as it's published (on the publishing thread: return quickly). */
+    fun interface Tap {
+        fun onFrame(frame: TapFrame)
+    }
+
+    /** Also hands every frame to this (e.g. to read subtitles from the video), or null. */
+    @Volatile
+    var tap: Tap? = null
+
     sealed interface Message
 
     /** Sent before the first frame and whenever the video changes size (e.g. the phone rotated). */
@@ -109,6 +130,8 @@ class VideoHub(
      */
     fun publish(annexB: ByteArray, ptsUs: Long, keyFrame: Boolean) {
         var wantKey = false
+        var forTap: TapFrame? = null
+        val t = tap
         lock.withLock {
             if (isClosed) return
             var newSps: ByteArray? = null
@@ -133,6 +156,11 @@ class VideoHub(
             val fmt = format ?: return
             if (body.isEmpty()) return
             val isKey = keyFrame || body.any { H264.nalType(it) == H264.NAL_IDR }
+            if (t != null) {
+                val s = sps
+                val p = pps
+                if (s != null && p != null) forTap = TapFrame(fmt.generation, width, height, s, p, body, ptsUs, isKey)
+            }
 
             if (basePtsUs == NO_TIME) basePtsUs = ptsUs
             var decodeTime = ((ptsUs - basePtsUs) * 9 / 100).coerceAtLeast(0L)
@@ -164,6 +192,7 @@ class VideoHub(
             }
             for (c in clients) if (offer(c, frame, fmt)) wantKey = true
         }
+        forTap?.let { t?.onFrame(it) }
         if (wantKey) requestKeyFrame()
     }
 

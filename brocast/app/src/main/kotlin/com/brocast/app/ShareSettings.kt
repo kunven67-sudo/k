@@ -48,15 +48,20 @@ class ShareSettings(context: Context) {
         get() = prefs.getBoolean(KEY_SOUND, true)
         set(value) = prefs.edit { putBoolean(KEY_SOUND, value) }
 
-    /** SUBDUB on the phone: cover foreign subtitles with English while sharing. */
+    /** SUBDUB on the phone: cover foreign subtitles with English while sharing (on unless turned off). */
     var translateEnabled: Boolean
-        get() = prefs.getBoolean(KEY_TRANSLATE, false)
+        get() = prefs.getBoolean(KEY_TRANSLATE, true)
         set(value) = prefs.edit { putBoolean(KEY_TRANSLATE, value) }
 
     /** Read the English subtitles out loud too. */
     var voicesEnabled: Boolean
         get() = prefs.getBoolean(KEY_VOICES, true)
         set(value) = prefs.edit { putBoolean(KEY_VOICES, value) }
+
+    /** The app the shows are watched on (package name), opened once sharing starts. */
+    var watchApp: String?
+        get() = prefs.getString(KEY_WATCH_APP, null)
+        set(value) = prefs.edit { putString(KEY_WATCH_APP, value) }
 
     var askedForNotifications: Boolean
         get() = prefs.getBoolean(KEY_ASKED_NOTIFICATIONS, false)
@@ -87,6 +92,7 @@ class ShareSettings(context: Context) {
         const val KEY_SOUND = "sound"
         const val KEY_TRANSLATE = "translate"
         const val KEY_VOICES = "voices"
+        const val KEY_WATCH_APP = "watch_app"
         val OBVIOUS_PINS = setOf("1234", "4321", "0123", "1212", "6969", "1004", "2580", "0852")
     }
 }

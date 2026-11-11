@@ -24,6 +24,8 @@ import javax.imageio.ImageIO
  *   --pause-for S     (default 4)
  *   --source FILE     stream this video file (looped) instead of the test picture (video mode)
  *   --size WxH        picture size (default 720x1280, a portrait phone)
+ *   --subs            English subtitle lines like the phone's reader makes (every 4 s; every third one
+ *                     "already in the picture", every other one a high voice)
  *
  * By default it sends H.264 video made by ffmpeg (needs ffmpeg on the PATH), and switches to
  * JPEG pictures while a browser that can't play the video is watching, like the real phone.
@@ -49,7 +51,23 @@ fun main(args: Array<String>) {
     val encoder = if (jpegOnly) null else FakeEncoder(video, fps, source)
     video.keyFrameRequester = { encoder?.keyRequests?.incrementAndGet() }
     val pinConfig = pin?.let { PinConfig(it, "dev-salt") }
-    val server = StreamServer(hub, audioHub = audio, videoHub = video, pinConfig = { pinConfig }, deviceName = "Dev Phone")
+    val board = if ("--subs" in args) SubtitleBoard() else null
+    val server = StreamServer(
+        hub, audioHub = audio, videoHub = video, pinConfig = { pinConfig }, deviceName = "Dev Phone", subtitles = board,
+    )
+    if (board != null) {
+        Thread({
+            val lines = listOf("Where is my sword? We have to go now!", "I can't believe you came back.", "Tomorrow we train together.")
+            var n = 0
+            while (true) {
+                Thread.sleep(1_000)
+                board.show(lines[n % 3], 0.15f, 0.80f, 0.85f, 0.86f, inPicture = n % 3 == 2, highVoice = n % 2 == 1, speak = true)
+                Thread.sleep(3_000)
+                board.clear()
+                n++
+            }
+        }, "dev-subs").apply { isDaemon = true }.start()
+    }
     val actualPort = server.start(port)
     println("READY http://127.0.0.1:$actualPort/")
     System.out.flush()

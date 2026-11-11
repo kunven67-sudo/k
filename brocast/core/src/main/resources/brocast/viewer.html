@@ -21,6 +21,13 @@
     object-fit: contain; background: #000; -webkit-user-select: none; user-select: none;
   }
 
+  /* The English from the phone, right over the original subtitle. */
+  #en {
+    position: fixed; z-index: 2; display: none; box-sizing: border-box; pointer-events: none;
+    padding: 0.2em 0.6em; border-radius: 10px; background: rgba(12, 12, 18, 0.92); color: #fff;
+    font-weight: 800; line-height: 1.25; text-align: center; white-space: pre-line;
+  }
+
   #overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 3; padding: 24px;
     display: -webkit-box; display: -webkit-flex; display: flex;
@@ -117,6 +124,7 @@
 <video id="awake" muted loop playsinline preload="none" aria-hidden="true"></video>
 <img id="screen" alt="Phone screen">
 <video id="vid" muted playsinline disablepictureinpicture disableremoteplayback aria-label="Phone screen"></video>
+<div id="en" aria-live="polite"></div>
 
 <div id="overlay">
   <div class="card" id="waitCard">
@@ -160,7 +168,7 @@
 
 <div id="soundHint" style="display:none"><span>Press OK or click anywhere to turn on sound</span></div>
 
-<div id="bar"><div id="barInner"><span class="live"><i></i>LIVE</span><span id="devName"></span><button class="btn" id="soundBtn" type="button" style="display:none">Sound on</button><button class="btn" id="trBtn" type="button" style="display:none" title="Subtitles in other languages to English, with SUBDUB">Translate</button><button class="btn" id="fsBtn" type="button">Full screen</button></div></div>
+<div id="bar"><div id="barInner"><span class="live"><i></i>LIVE</span><span id="devName"></span><button class="btn" id="soundBtn" type="button" style="display:none">Sound on</button><button class="btn" id="trBtn" type="button" style="display:none" title="Subtitles in other languages to English, with SUBDUB">Translate</button><button class="btn" id="vcBtn" type="button" style="display:none" title="The English voice">Voice on</button><button class="btn" id="fsBtn" type="button">Full screen</button></div></div>
 
 <noscript><p style="position:fixed;top:40%;width:100%;text-align:center;font-size:24px;z-index:9">This page needs JavaScript turned on.</p></noscript>
 
@@ -274,8 +282,9 @@
     statusFails = 0;
     everConnected = true;
     setText(devName, s.name || '');
-    if (sid !== null && s.sid !== sid) { stopStream(); restarts = []; }
+    if (sid !== null && s.sid !== sid) { stopStream(); restarts = []; subsAfter = -1; }
     sid = s.sid;
+    setSubs(!!s.subs && !!s.live && (!s.pinRequired || !!s.authorized));
 
     if (s.pinRequired && !s.authorized) { stopStream(); showPin(); return; }
     if (!s.live) {
@@ -988,7 +997,17 @@
     setText(soundBtn, soundOn ? 'Sound on' : 'Sound off');
     soundBtn.className = soundOn ? 'btn' : 'btn off';
     soundHint.style.display = usable && soundOn && phase === 'live' && !soundRunning() ? '' : 'none';
-    if (gainNode) gainNode.gain.value = soundOn ? 1 : 0;
+    setGain();
+  }
+
+  // Full sound, a lot quieter while the English voice talks, or none.
+  function setGain() {
+    if (!gainNode) return;
+    var target = soundOn ? (ducked ? 0.3 : 1) : 0;
+    try {
+      if (gainNode.gain.setTargetAtTime && actx) gainNode.gain.setTargetAtTime(target, actx.currentTime, 0.08);
+      else gainNode.gain.value = target;
+    } catch (e) { gainNode.gain.value = target; }
   }
 
   soundBtn.onclick = function () {
@@ -1010,9 +1029,148 @@
    */
   var SUBDUB_URL = 'https://kunven67-sudo.github.io/k/subdub/?from=brocast';
   var ua = navigator.userAgent;
-  if (!TV_UA.test(ua) && /(Chrome|Edg)\//.test(ua) && !/Mobile|Android|CrOS/.test(ua)) trBtn.style.display = '';
+  var trWanted = !TV_UA.test(ua) && /(Chrome|Edg)\//.test(ua) && !/Mobile|Android|CrOS/.test(ua);
+  if (trWanted) trBtn.style.display = '';
   trBtn.onclick = function () {
     try { window.open(SUBDUB_URL, 'subdub'); } catch (e) { location.href = SUBDUB_URL; }
+    showBar();
+  };
+
+  /*
+   * English subtitles from the phone (BroCast reads and translates them there): shown right over
+   * the original, and said out loud with this computer's voices (a guy's or a girl's, from how high
+   * the voice in the show is). The show gets quieter while the English talks.
+   */
+  var enBox = document.getElementById('en');
+  var vcBtn = document.getElementById('vcBtn');
+  // subsAfter -1: "just tell me what's up now" (shown, not said); after that every answer is a new line.
+  var subsOn = false, subsRunning = false, subsAfter = -1, enLine = null;
+  var synth = window.speechSynthesis || null;
+  var voicesOn = readPref('brocast-voices') !== 'off';
+  var girlVoice = null, guyVoice = null, lastHigh = false, talking = 0, ducked = false;
+  var GIRL_RE = /(Jenny|Aria|Ana\b|Michelle|Emma|Ava|Sonia|Libby|Natasha|Clara|Zira|Hazel|Susan|Samantha|Karen|Moira|Tessa|Female)/i;
+  var GUY_RE = /(Guy|Christopher|Eric|Roger|Steffan|Andrew|Brian|Ryan|Thomas|William|Liam|Mark|David|George|James|Daniel|Alex|Fred|Male)/i;
+
+  function setSubs(on) {
+    if (on === subsOn) return;
+    subsOn = on;
+    // The phone does the English now, so SUBDUB's Translate isn't needed.
+    trBtn.style.display = on || !trWanted ? 'none' : '';
+    vcBtn.style.display = on && synth ? '' : 'none';
+    if (on && !subsRunning) pollSubs();
+    if (!on) { enLine = null; placeEnglish(); }
+  }
+
+  function pollSubs() {
+    if (!subsOn) { subsRunning = false; return; }
+    subsRunning = true;
+    var asked = subsAfter;
+    request('/subs?after=' + asked + '&t=' + now(), { timeout: 25000 }, function (code, x) {
+      var j = code === 200 ? parseJson(x) : null;
+      if (j && typeof j.id === 'number') {
+        if (j.id !== asked) {
+          subsAfter = j.id;
+          onEnglish(j, asked !== -1);
+        }
+        setTimeout(pollSubs, 0);
+      } else {
+        setTimeout(pollSubs, 2000);
+      }
+    });
+  }
+
+  function onEnglish(j, fresh) {
+    enLine = j.text ? j : null;
+    placeEnglish();
+    if (fresh && j.speak && j.text) say(j.text, j.high);
+  }
+
+  function placeEnglish() {
+    var j = enLine;
+    var iw = picture === 'video' ? vid.videoWidth : frameW || img.naturalWidth;
+    var ih = picture === 'video' ? vid.videoHeight : frameH || img.naturalHeight;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    // Whole-screen sharing: the English is already in the picture.
+    if (!j || j.inPicture || phase !== 'live' || !iw || !ih || !vw || !vh) { enBox.style.display = 'none'; return; }
+    var scale = Math.min(vw / iw, vh / ih), w = iw * scale, h = ih * scale;
+    var ox = (vw - w) / 2, oy = (vh - h) / 2;
+    var bx = ox + j.l * w, by = oy + j.t * h, bw = (j.r - j.l) * w, bh = (j.b - j.t) * h;
+    setText(enBox, j.text);
+    enBox.style.fontSize = Math.round(Math.max(16, Math.min(h * 0.05, 52))) + 'px';
+    enBox.style.maxWidth = Math.round(w * 0.92) + 'px';
+    enBox.style.minWidth = Math.round(Math.min(bw + 16, w * 0.92)) + 'px';
+    enBox.style.minHeight = Math.round(bh + 8) + 'px';
+    enBox.style.left = '0px';
+    enBox.style.top = '0px';
+    enBox.style.display = 'block';
+    // Centered on the original subtitle (and at least as big, so it's hidden), inside the picture.
+    var ew = enBox.offsetWidth, eh = enBox.offsetHeight;
+    var left = Math.max(ox, Math.min(bx + bw / 2 - ew / 2, ox + w - ew));
+    var top = Math.max(oy, Math.min(by + bh / 2 - eh / 2, oy + h - eh));
+    enBox.style.left = Math.round(left) + 'px';
+    enBox.style.top = Math.round(top) + 'px';
+  }
+  window.addEventListener('resize', placeEnglish, false);
+  vid.addEventListener('resize', placeEnglish, false);
+
+  function pickVoices() {
+    if (!synth) return;
+    var all = [];
+    try { all = synth.getVoices() || []; } catch (e) { /* none */ }
+    var en = all.filter(function (v) { return /^en([-_]|$)/i.test(v.lang || ''); });
+    // The natural-sounding online voices first, US English first.
+    en.sort(function (a, b) {
+      var na = /(Natural|Online|Neural)/.test(a.name) ? 0 : 1, nb = /(Natural|Online|Neural)/.test(b.name) ? 0 : 1;
+      if (na !== nb) return na - nb;
+      return (/US/i.test(a.lang) ? 0 : 1) - (/US/i.test(b.lang) ? 0 : 1);
+    });
+    girlVoice = guyVoice = null;
+    for (var i = 0; i < en.length; i++) {
+      var isGirl = GIRL_RE.test(en[i].name);
+      if (!girlVoice && isGirl) girlVoice = en[i];
+      if (!guyVoice && !isGirl && GUY_RE.test(en[i].name)) guyVoice = en[i];
+    }
+  }
+  if (synth) {
+    pickVoices();
+    if ('onvoiceschanged' in synth) synth.onvoiceschanged = pickVoices;
+  }
+
+  function say(text, high) {
+    if (!synth || !voicesOn) return;
+    if (high === true || high === false) lastHigh = high;
+    var u = new SpeechSynthesisUtterance(text);
+    var v = lastHigh ? girlVoice : guyVoice;
+    if (v) { u.voice = v; u.lang = v.lang; } else {
+      // No voice of that kind here: bend the one there is.
+      u.lang = 'en-US';
+      u.pitch = lastHigh ? 1.35 : 0.75;
+      var other = girlVoice || guyVoice;
+      if (other) u.voice = other;
+    }
+    // Behind already: talk faster. Way behind: skip to the newest line so it follows the show.
+    if (talking >= 2) { try { synth.cancel(); } catch (e) { /* ignore */ } talking = 0; }
+    u.rate = talking > 0 ? 1.25 : 1.05;
+    talking++;
+    u.onend = u.onerror = function () {
+      talking = Math.max(0, talking - 1);
+      if (!talking) { ducked = false; setGain(); }
+    };
+    ducked = true;
+    setGain();
+    try { synth.speak(u); } catch (e) { talking = 0; ducked = false; setGain(); }
+  }
+
+  function updateVoiceUi() {
+    setText(vcBtn, voicesOn ? 'Voice on' : 'Voice off');
+    vcBtn.className = voicesOn ? 'btn' : 'btn off';
+  }
+  updateVoiceUi();
+  vcBtn.onclick = function () {
+    voicesOn = !voicesOn;
+    writePref('brocast-voices', voicesOn ? 'on' : 'off');
+    if (!voicesOn && synth) { try { synth.cancel(); } catch (e) { /* ignore */ } talking = 0; ducked = false; setGain(); }
+    updateVoiceUi();
     showBar();
   };
 

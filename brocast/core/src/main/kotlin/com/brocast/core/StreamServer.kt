@@ -40,6 +40,8 @@ class StreamServer(
     private val maxConnections: Int = 32,
     /** A picture/sound connection whose write is stuck this long is closed (the page reconnects). */
     private val writeStallMs: Long = 10_000L,
+    /** English subtitles from the phone, for the page to show and say (null: none). */
+    private val subtitles: SubtitleBoard? = null,
 ) {
     /** Random per server instance, so the page notices when the phone starts a new session. */
     val sessionId: String = randomHex(6)
@@ -249,6 +251,7 @@ class StreamServer(
             "/stream.mjpeg" -> if (authorized(req)) stream(req, ip, socket, out, head) else unauthorized(out, head)
             "/frame.jpg" -> if (authorized(req)) singleFrame(req, ip, out, head) else unauthorized(out, head)
             "/audio" -> if (authorized(req)) audio(req, ip, socket, out, head) else unauthorized(out, head)
+            "/subs" -> if (authorized(req)) subs(req, out, head) else unauthorized(out, head)
             "/keepawake.mp4" -> sendRanged(out, "video/mp4", keepAwakeVideo, req.header("range"), head)
             "/favicon.ico" -> send(out, 204, null, EMPTY, head)
             else -> sendText(out, 404, "Nothing here, bro.", head)
@@ -283,6 +286,28 @@ class StreamServer(
             .put("video", if (videoLive) "h264" else "jpeg")
             .put("vframes", if (authorized && vh != null) vh.framesPublished else 0L)
             .put("vage", if (authorized && vh != null && vh.lastFrameAt > 0) now - vh.lastFrameAt else -1L)
+            .put("subs", subtitles != null)
+        send(out, 200, JSON_TYPE, json.bytes(), head)
+    }
+
+    // The English subtitle: answers as soon as it differs from the page's ?after= (or after 20 s).
+    private fun subs(req: HttpRequest, out: OutputStream, head: Boolean) {
+        val board = subtitles
+        val line = if (board == null) {
+            SubtitleBoard.Line(0, "")
+        } else {
+            board.awaitAfter(req.query["after"]?.toLongOrNull() ?: -1L, SUBS_WAIT_MS)
+        }
+        val json = Json()
+            .put("id", line.id)
+            .put("text", line.text)
+            .put("l", line.left)
+            .put("t", line.top)
+            .put("r", line.right)
+            .put("b", line.bottom)
+            .put("inPicture", line.inPicture)
+            .put("high", line.highVoice)
+            .put("speak", line.speak)
         send(out, 200, JSON_TYPE, json.bytes(), head)
     }
 
@@ -667,6 +692,7 @@ class StreamServer(
         private const val KEEPALIVE_MS = 2_000L
         private const val POLL_WAIT_MS = 5_000L
         private const val STALL_MS = 5_000L
+        private const val SUBS_WAIT_MS = 20_000L
         private const val VIEWER_TIMEOUT_MS = 6_000L
 
         /** If a listener is more than this many 20 ms chunks behind, it skips ahead. */
@@ -768,6 +794,7 @@ internal class Json {
         when (value) {
             null -> sb.append("null")
             is Boolean, is Int, is Long -> sb.append(value.toString())
+            is Float -> sb.append(if (value.isFinite()) value.toString() else "0")
             else -> quote(value.toString())
         }
         return this
