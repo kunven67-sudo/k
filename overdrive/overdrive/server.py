@@ -89,7 +89,8 @@ class Server:
         self.token = token or secrets.token_urlsafe(24)
         self.port = 0
         self.streams = 0
-        self.last_stream_seen = time.monotonic()
+        # +60 s grace: the first window start (Edge making its profile) can be slow on older PCs.
+        self.last_stream_seen = time.monotonic() + 60
         self.selftest_running = False
         self.should_exit = asyncio.Event()
         self.app = Starlette(routes=self._routes())
