@@ -295,6 +295,9 @@ function updateViewModel(dt,t){
   if(VM.handsLook>0){ onL=onR=true; const k=smooth(Math.min(1,VM.handsLook)); lp=lp.map((v,j)=>lerp(v,[-.16,-.28,-.5][j],k)); rp=rp.map((v,j)=>lerp(v,[.16,-.28,-.5][j],k)); lr=[lerp(lr[0],1.1,k),lerp(lr[1],.35,k),lerp(lr[2],.9,k)]; rr=[lerp(rr[0],1.1,k),lerp(rr[1],-.35,k),lerp(rr[2],-.9,k)]; lf=rf=.15; }
   // holding something small in the right hand (the fruit): out in front, then up to the mouth
   if(VM.holdItem){ onR=true; const k=smooth(clamp(VM.eatK||0,0,1)); rp=[lerp(.16,.05,k),lerp(-.3,-.2,k),lerp(-.5,-.27,k)]; rr=[lerp(1.0,1.25,k),lerp(-.3,-.1,k),lerp(-.8,-1.35,k)]; rf=.8; }
+  // Part 2 arena: a weapon in the right hand; VM.wpnK 0..1 = the thrust / swing
+  if(VM.wpn){ onR=true; const k=VM.wpnK||0, sw=VM.wpnSwing||0; rp=[lerp(.2,.05,k)-sw*.12,lerp(-.33,-.22,k)+sw*.06,lerp(-.48,-.82,k)]; rr=[1.05-k*.25,-.3+sw*.6,-.85]; rf=.95;
+    VM.wpn.position.set(rp[0]-.02,rp[1]+.04,rp[2]-.04); VM.wpn.rotation.set(-.08+k*.05,.08-sw*.9,sw*.3); }
   if(VM.hurtT>0){ VM.hurtT-=dt; }
   // arms only appear when they are doing something (idle hands in the view just look odd)
   VM.armL=damp(VM.armL||0,onL?1:0,12,dt); VM.armR=damp(VM.armR||0,onR?1:0,12,dt); lp[1]-=(1-smooth(VM.armL))*.4; rp[1]-=(1-smooth(VM.armR))*.4; L.visible=VM.armL>.02; R.visible=VM.armR>.02;

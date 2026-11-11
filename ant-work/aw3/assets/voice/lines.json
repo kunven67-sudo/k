@@ -371,5 +371,301 @@
   "w_wake_5": {
     "who": "Jay2",
     "text": "[whisper] ...Yeah. Now be quiet."
+  },
+  "p2_c1": {
+    "who": "Jay2",
+    "text": "[whisper] He's getting up. Jay... he's getting up."
+  },
+  "p2_c2": {
+    "who": "Jay2",
+    "text": "What is that? Get it off me! Get it OFF!"
+  },
+  "p2_c3": {
+    "who": "Jay2",
+    "text": "[whisper] The gate. He left the gate open."
+  },
+  "p2_c4": {
+    "who": "Jay2",
+    "text": "Jay. Run. RUN!"
+  },
+  "p2_c5": {
+    "who": "Jay2",
+    "text": "JAY!"
+  },
+  "p2_k1": {
+    "who": "Jay2",
+    "text": "Hey. You okay? That thing on our necks... one button and we drop."
+  },
+  "p2_k2": {
+    "who": "Jay",
+    "text": "My whole body is still buzzing."
+  },
+  "p2_k3": {
+    "who": "Jay2",
+    "text": "We need a plan. A real one this time."
+  },
+  "p2_k4": {
+    "who": "Jay2",
+    "text": "Wait. Do you feel that? My stomach... the fruit."
+  },
+  "p2_k5": {
+    "who": "Jay",
+    "text": "Everything's getting bigger!"
+  },
+  "p2_k6": {
+    "who": "Jay2",
+    "text": "No. WE'RE getting smaller!"
+  },
+  "d1_1": {
+    "who": "Jay2",
+    "text": "Where... where are we now?"
+  },
+  "d1_2": {
+    "who": "Jay",
+    "text": "On his table. In a cage. And we're not the only ones."
+  },
+  "o_1": {
+    "who": "Orrin",
+    "text": "Easy. Easy. You're not dead. Not yet, anyway."
+  },
+  "o_2": {
+    "who": "Orrin",
+    "text": "Name's Orrin. Orrin Pike. I was an explorer, once."
+  },
+  "o_q1": {
+    "who": "Jay",
+    "text": "How long have you been here?"
+  },
+  "o_a1": {
+    "who": "Orrin",
+    "text": "Three years, give or take. I stopped counting the days. Then I started again. Counting keeps you sane."
+  },
+  "o_q2": {
+    "who": "Jay",
+    "text": "How did you end up here?"
+  },
+  "o_a2": {
+    "who": "Orrin",
+    "text": "Same as you, I bet. A pyramid. A purple glow. A fruit nobody should eat."
+  },
+  "o_a2b": {
+    "who": "Orrin",
+    "text": "I came looking for it. A legend. Turns out the legend eats you back."
+  },
+  "o_q3": {
+    "who": "Jay",
+    "text": "What does he want with us?"
+  },
+  "o_a3": {
+    "who": "Orrin",
+    "text": "A show. Every day he picks one of us for the bowl."
+  },
+  "o_a3b": {
+    "who": "Orrin",
+    "text": "The bugs live under the table. He keeps them hungry."
+  },
+  "o_q4": {
+    "who": "Jay",
+    "text": "Why should I trust you?"
+  },
+  "o_a4": {
+    "who": "Orrin",
+    "text": "You shouldn't. Trust is for people who have time."
+  },
+  "o_q5": {
+    "who": "Jay",
+    "text": "Has anyone ever gotten out?"
+  },
+  "o_a5": {
+    "who": "Orrin",
+    "text": "Not that I've seen. But I've seen plenty try. Ask me again tonight."
+  },
+  "o_bye": {
+    "who": "Jay",
+    "text": "That's enough for now."
+  },
+  "o_bye_r": {
+    "who": "Orrin",
+    "text": "Rest while you can. He eats at noon. He watches after."
+  },
+  "t_1": {
+    "who": "Teo",
+    "text": "Hey! Hey, new guys! You got shrunk too, huh?"
+  },
+  "t_q1": {
+    "who": "Jay",
+    "text": "How do the fights work?"
+  },
+  "t_a1": {
+    "who": "Teo",
+    "text": "He drops you in the bowl with a bug. You win, you live. You lose..."
+  },
+  "t_a1b": {
+    "who": "Teo",
+    "text": "...just win, okay? Just win."
+  },
+  "t_q2": {
+    "who": "Jay",
+    "text": "What's your name?"
+  },
+  "t_a2": {
+    "who": "Teo",
+    "text": "Teo. Nine days here. That's a record for a new guy."
+  },
+  "t_bye": {
+    "who": "Jay",
+    "text": "Hang in there, Teo."
+  },
+  "b_1": {
+    "who": "Bram",
+    "text": "Don't. Don't talk to me. Every new face is gone in a week."
+  },
+  "b_q1": {
+    "who": "Jay",
+    "text": "We're getting out of here."
+  },
+  "b_a1": {
+    "who": "Bram",
+    "text": "Sure you are. Tell that to the bowl."
+  },
+  "b_q2": {
+    "who": "Jay",
+    "text": "What's your name?"
+  },
+  "b_a2": {
+    "who": "Bram",
+    "text": "Bram. Now leave me alone."
+  },
+  "b_q3": {
+    "who": "Jay",
+    "text": "Sorry."
+  },
+  "b_a3": {
+    "who": "Bram",
+    "text": "...Yeah. Me too."
+  },
+  "n1_1": {
+    "who": "Orrin",
+    "text": "[whisper] Psst. New guy. The back of your cage. Two bars are bent."
+  },
+  "n1_2": {
+    "who": "Orrin",
+    "text": "[whisper] I did that, years ago, when that was my cage. Took me a month."
+  },
+  "n1_3": {
+    "who": "Orrin",
+    "text": "[whisper] You want to win in the bowl? You'll need more than fists. A bone from his plate. A thorn from under that plant."
+  },
+  "n1_4": {
+    "who": "Orrin",
+    "text": "[whisper] And don't touch anything metal. He sleeps light."
+  },
+  "n1_5": {
+    "who": "Jay2",
+    "text": "[whisper] I'll keep watch. Go."
+  },
+  "n_wake": {
+    "who": "Jay2",
+    "text": "[whisper] He's waking up! Hide!"
+  },
+  "n_caught": {
+    "who": "Jay2",
+    "text": "You okay? He saw you. We try again. Quieter."
+  },
+  "n_back": {
+    "who": "Jay2",
+    "text": "[whisper] You got it? Good. Get some sleep."
+  },
+  "d2_1": {
+    "who": "Orrin",
+    "text": "Well. Looks like it's my turn."
+  },
+  "d2_2": {
+    "who": "Jay",
+    "text": "Orrin..."
+  },
+  "d2_3": {
+    "who": "Orrin",
+    "text": "Don't. Just watch how it moves. Learn something."
+  },
+  "d2_4": {
+    "who": "Teo",
+    "text": "Three years. He made it three years."
+  },
+  "d2_5": {
+    "who": "Jay2",
+    "text": "Jay. We are NOT dying in that bowl."
+  },
+  "d2_6": {
+    "who": "Bram",
+    "text": "Everybody says that."
+  },
+  "n2_1": {
+    "who": "Jay2",
+    "text": "[whisper] Orrin said bone and thorn. What else do we need?"
+  },
+  "n2_2": {
+    "who": "Jay",
+    "text": "[whisper] Something to tie them together. And rocks. Anything I can throw."
+  },
+  "n2_3": {
+    "who": "Jay2",
+    "text": "[whisper] The napkin has loose threads. And there are pebbles by the pot."
+  },
+  "n2_craft": {
+    "who": "Jay2",
+    "text": "[whisper] Tie the thorn to the bone. Tight."
+  },
+  "d3_1": {
+    "who": "Jay2",
+    "text": "Jay! JAY!"
+  },
+  "d3_2": {
+    "who": "Jay2",
+    "text": "You did it. You actually did it."
+  },
+  "d3_3": {
+    "who": "Teo",
+    "text": "Nobody beats the mantis! Nobody!"
+  },
+  "d4_1": {
+    "who": "Jay",
+    "text": "That's the one that got Orrin."
+  },
+  "d4_2": {
+    "who": "Jay2",
+    "text": "That one was for Orrin."
+  },
+  "d5_1": {
+    "who": "Jay2",
+    "text": "Both of us this time. He wants a show."
+  },
+  "d5_2": {
+    "who": "Jay2",
+    "text": "The key! Jay, his key fell!"
+  },
+  "d5_3": {
+    "who": "Jay2",
+    "text": "Jay! It's got me! Help!"
+  },
+  "d5_s1": {
+    "who": "Jay2",
+    "text": "I got it. I got the key!"
+  },
+  "d5_k1": {
+    "who": "Jay2",
+    "text": "Go... finish it..."
+  },
+  "d5_e1": {
+    "who": "Jay2",
+    "text": "We have the key. Tonight, we go."
+  },
+  "d5_e2": {
+    "who": "Jay2",
+    "text": "I can't feel my leg. But we have the key."
+  },
+  "d5_e3": {
+    "who": "Jay",
+    "text": "Tonight we go."
   }
 }

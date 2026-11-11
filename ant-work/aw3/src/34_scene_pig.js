@@ -69,5 +69,6 @@ SCENES.pig=async function(){
   const s=getSave()||{}; s.done=true; writeSave(s);
   unlock('part1');
   if(AU.ok) applyVolumes();
-  TITLE.show(false);
+  // Part 2 starts right here: same room, he's coming for you
+  runStory(()=>SCENES.collar());
 };

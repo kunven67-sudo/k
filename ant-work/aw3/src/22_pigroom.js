@@ -19,6 +19,12 @@ function makeTorch(scene,lv,x,y,z,ry,big){
   const t={g,light,fireAt,big,base:big?2.2:1.1,ph:Math.random()*10};
   (lv.fires||(lv.fires=[])).push(t); return t;
 }
+/* a shock collar: a dark iron band, a little box with a green light */
+function makeCollar(r=.075){ const g=new THREE.Group();
+  g.add(mesh(new THREE.TorusGeometry(r,.012,8,24),new THREE.MeshStandardMaterial({color:col(0x2a2622),metalness:.8,roughness:.45})));
+  const bx=box(.05,.035,.03,new THREE.MeshStandardMaterial({color:col(0x151515),roughness:.5}),0,-r,.0); g.add(bx);
+  const led=sph(.006,new THREE.MeshBasicMaterial({color:col(0x40ff60)}),0,-r-.005,.017,8,6); g.add(led); g.userData.led=led;
+  g.rotation.x=Math.PI/2; return g; }
 defineLevel('pigroom',{
   title:'???',
   env:{fx:{exposure:1.12,saturation:1.05,contrast:1.12,temp:.12,bloomStrength:.4,bloomThreshold:1.1,aoRadius:.6,vignette:.55,grain:.05},music:null,reverb:.45,surface:'stone',far:120},
@@ -62,8 +68,16 @@ defineLevel('pigroom',{
     // the back door
     const door=new THREE.Group(); door.position.set(0,0,zc-D/2+.05); scene.add(door); door.visible=false;
     // the gate behind you
-    for(let i=0;i<9;i++){ const bar=cyl(.03,.03,3.2,iron,-1.6+i*.4,1.6,zc+D/2-.2,8); scene.add(bar); }
-    scene.add(box(3.6,.12,.1,iron,0,3.1,zc+D/2-.2)); scene.add(box(3.6,.12,.1,iron,0,.4,zc+D/2-.2));
+    // (a group hinged on its left side, so it can swing open in Part 2)
+    const gate=new THREE.Group(); gate.position.set(-1.8,0,zc+D/2-.2); scene.add(gate); lv.gate=gate; lv.gateZ=zc+D/2-.2;
+    for(let i=0;i<9;i++){ const bar=cyl(.03,.03,3.2,iron,.2+i*.4,1.6,0,8); gate.add(bar); }
+    gate.add(box(3.6,.12,.1,iron,1.8,3.1,0)); gate.add(box(3.6,.12,.1,iron,1.8,.4,0));
+    // Part 2: a big iron cage by the wall (where you wake up after the zap), hidden until then
+    const bc=new THREE.Group(); bc.position.set(3.7,0,.6); bc.visible=false; scene.add(bc); lv.bigCage=bc;
+    { const w=2.6,h=2.4; bc.add(box(w+.1,.08,w+.1,iron,0,.04,0)); bc.add(box(w+.1,.08,w+.1,iron,0,h,0));
+      for(let i=0;i<=18;i++){ const t=-w/2+i*w/18; for(const [x,z] of [[t,-w/2],[t,w/2],[-w/2,t],[w/2,t]]) bc.add(cyl(.018,.018,h,iron,x,h/2,z,6)); }
+      bc.add(box(.3,.22,.1,iron,0,1.2,-w/2-.04)); }
+    colBox(lv.col,1.95,5.45,-1.15,2.35,()=>lv.bigCage.visible&&!lv.inBigCage);
     // torches + the big fire bowl next to him
     makeTorch(scene,lv,-5.9,2.4,-4.5,Math.PI/2,false); makeTorch(scene,lv,5.9,2.4,-4.5,-Math.PI/2,false);
     makeTorch(scene,lv,-5.9,2.4,1.5,Math.PI/2,false); makeTorch(scene,lv,5.9,2.4,1.5,-Math.PI/2,false);
@@ -90,6 +104,8 @@ defineLevel('pigroom',{
     pig.userData.pig.onBite=()=>{ pigBiteMeat(pig.userData.pig); SND.play('pig_eat_'+randi(1,4),{vol:.9,pos:V3(T.x,1.9,T.z+.6),ref:3}); if(Math.random()<.5) later(.15,()=>SND.play('bite',{vol:.5,pos:V3(T.x,1.9,T.z+.6),ref:3,rate:.75})); };
     pig.userData.pig.onChew=()=>{ SND.play('chew_'+randi(1,3),{vol:.55,pos:V3(T.x,1.9,T.z+.6),ref:3,rate:.7}); };
     pig.userData.pig.onGrunt=()=>{ if(Math.random()<.75) SND.play('pig_'+randi(1,6),{vol:.95,pos:V3(T.x,1.9,T.z+.5),ref:3.5,rate:rand(.78,.9)}); };
+    { const L=pig.userData.pig.L; const rm=new THREE.Group(); rm.add(box(.07,.035,.13,new THREE.MeshStandardMaterial({color:col(0x1a1a1a),roughness:.5}),0,0,0));
+      rm.add(cyl(.018,.018,.02,new THREE.MeshStandardMaterial({color:col(0xc02018),emissive:col(0x500000),roughness:.4}),0,.025,.02,12)); rm.position.set(0,-.1,.05); rm.visible=false; L.hand.add(rm); lv.remote=rm; }
     lv.ground=()=>0; lv.surfaceAt=()=>'stone';
     lv.col.bounds=[-W/2,W/2,zc-D/2,zc+D/2];
   },

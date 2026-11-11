@@ -41,11 +41,11 @@ function frame(){
 }
 /* ---------- everything the game needs, loaded once ---------- */
 const TEX_LIST=['desert_ripple','desert_sand','dense_sand','sandy_gravel_02','sandstone_blocks_05','large_sandstone_blocks_01','old_sandstone_02','sandstone_cracks','red_sandstone_pavement','clay_plaster','castle_brick_07','stone_tiles_02','rusty_metal_04','brown_leather','rough_wood'];
-const SFX_LIST=[...[1,2,3,4,5,6].flatMap(i=>['step_sand_'+i,'step_stone_'+i]),'sigh_1','sigh_2','breath_heavy','gasp','oof_1','oof_2','static','watch_beep',
+const SFX_LIST=['zap','zap_crackle','snore','bug_1','bug_2','bug_3','bug_4','scream','spit','bug_hurt','metal_1','metal_2','metal_3','cage_lock','blade_1','blade_2','blade_3','stone_1','stone_2','pickup','bug_die','craft',...[1,2,3,4,5,6].flatMap(i=>['step_sand_'+i,'step_stone_'+i]),'sigh_1','sigh_2','breath_heavy','gasp','oof_1','oof_2','static','watch_beep',
   'punch_1','punch_2','punch_3','swing_1','swing_2','block_1','block_2','body_fall','sand_fall','heartbeat','bite','chew_1','chew_2','chew_3',
   'pig_eat_1','pig_eat_2','pig_eat_3','pig_eat_4','stomach','pig_1','pig_2','pig_3','pig_4','pig_5','pig_6','pig_squeal','chain_1','chain_2','chain_3',
   'skitter_1','skitter_2','drips','hum_purple','hum_build','blast','ringing','wind_gust_1','wind_gust_2','wind_loop'];
-const MUSIC_LIST=['mus_title','mus_desert_intro','mus_desert','mus_fight_intro','mus_fight','mus_pyramid','mus_pig'];
+const MUSIC_LIST=['mus_title','mus_desert_intro','mus_desert','mus_fight_intro','mus_fight','mus_pyramid','mus_pig','mus_cage','mus_arena','mus_night','mus_sad','mus_boss'];
 async function preload(progress){
   ASSETS.onProgress=progress;
   const jobs=[];

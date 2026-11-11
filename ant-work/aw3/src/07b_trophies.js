@@ -13,7 +13,11 @@ const TROPHY_DEFS=[
   ['paintings','Art Critic','Look at every painting in the pyramid','silver',true,'The paintings on the walls. All of them.'],
   ['fruit','Bad Idea','Eat the glowing fruit','bronze'],
   ['chained','Oink','Wake up in the pig room','silver'],
-  ['part1','Part One','Finish Part One of Ant Work 3','gold']
+  ['part1','Part One','Finish Part One of Ant Work 3','gold'],
+  ['mantis','Praying For You','Beat the mantis','silver'],
+  ['spiderWin','For Orrin','Beat the tarantula','silver'],
+  ['scorpionWin','Sting Operation','Beat the scorpion','gold'],
+  ['part2','The Key','Get the key out of the bowl','gold']
 ];
 const TROPHY=Object.assign({},loadJSON('aw3_ach')||{});
 const TSTAT=Object.assign({},loadJSON('aw3_ach_stats')||{});

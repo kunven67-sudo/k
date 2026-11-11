@@ -339,7 +339,8 @@ const MUSIC_TRACKS={
   desert:{intro:'mus_desert_intro',loop:'mus_desert',vol:.5},
   fight:{intro:'mus_fight_intro',loop:'mus_fight',vol:.55},
   pyramid:{loop:'mus_pyramid',vol:.75},
-  pig:{loop:'mus_pig',vol:.5}
+  pig:{loop:'mus_pig',vol:.5},
+  cage:{loop:'mus_cage',vol:.45}, arena:{loop:'mus_arena',vol:.5}, night:{loop:'mus_night',vol:.5}, sad:{loop:'mus_sad',vol:.5}, boss:{loop:'mus_boss',vol:.55}
 };
 function playMusic(name,fade=1.5){
   if(!AU.ok) return; if(MUS.name===name) return;
