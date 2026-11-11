@@ -44,7 +44,7 @@ def covers(*rules: int, cli: bool = False, title: str = ""):
 
 
 def load_all() -> dict[str, TestInfo]:
-    for mod in ("core_tests", "e2e_tests"):
+    for mod in ("core_tests", "memory_tests", "e2e_tests"):
         importlib.import_module(f"overdrive.selftests.{mod}")
     return TESTS
 

@@ -29,12 +29,13 @@ class ToolResult:
 class ToolContext:
     """What a tool may use while running. Filled in by the agent."""
 
-    def __init__(self, workspace=None, task=None, settings=None, audit=None, lab=None):
+    def __init__(self, workspace=None, task=None, settings=None, audit=None, lab=None, memory=None):
         self.workspace = workspace
         self.task = task
         self.settings = settings
         self.audit = audit
         self.lab = lab
+        self.memory = memory
 
 
 Handler = Callable[[dict, ToolContext], Awaitable[ToolResult]]

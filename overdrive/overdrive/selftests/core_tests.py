@@ -709,7 +709,8 @@ def test_coverage_map_complete():
     assert sorted(COVERAGE) == list(range(1, 101))
     real = [n for n, c in COVERAGE.items() if c["mode"] == "real"]
     guided = [n for n, c in COVERAGE.items() if c["mode"] == "guided"]
-    assert len(real) == 51 and len(guided) == 11, (len(real), len(guided))
+    # Stage 1 made 51 rules real; Stage 2 added 8 more (44 + 57-63).
+    assert len(real) == 59 and len(guided) == 11, (len(real), len(guided))
     for n in real + guided:
         for t in COVERAGE[n]["tests"]:
             assert t in TESTS, f"rule {n}: test {t} doesn't exist"

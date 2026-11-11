@@ -24,6 +24,8 @@ from .events import EventBus
 from .journal import Entry, Journal
 from .jsonio import atomic_write_json, read_json, utc_now_iso
 from .limits import Usage
+from .memory import Memory
+from .memory_tools import register_memory_tools
 from .paths import Paths, default_home
 from .permissions import Broker, Card, Grants, Risk, decide
 from .prompts import build_system_prompt
@@ -100,8 +102,10 @@ class Overdrive:
         self.usage = Usage(self.paths.data)
         self.workspace = Workspace(self.paths.workspace, self.paths.versions)
         self.task_store = TaskStore(self.paths.tasks)
+        self.memory = Memory(self.paths.data / "memory")
         self.tools = ToolRegistry()
         register_basic_tools(self.tools)
+        register_memory_tools(self.tools)
         self.grants = Grants()
         self.events = EventBus()
         self.broker = Broker(on_change=self._card_changed)
@@ -378,7 +382,7 @@ class Overdrive:
                 note = "cache"
             else:
                 ctx = ToolContext(workspace=self.workspace, task=rec, settings=self.settings, audit=self.audit,
-                                  lab=self.paths.lab)
+                                  lab=self.paths.lab, memory=self.memory)
                 try:
                     res = await asyncio.wait_for(spec.handler(args, ctx), TOOL_TIMEOUT_S)
                 except asyncio.TimeoutError:
@@ -441,7 +445,8 @@ class Overdrive:
         budget = round(float(st.conv.cost_total or 0.0) + float(s.get("task_budget_usd")), 4)
         return ClaudeAgentOptions(
             tools=["AskUserQuestion"], allowed_tools=[], mcp_servers={ToolRegistry.MCP_SERVER: self._sdk_server(st)},
-            strict_mcp_config=True, setting_sources=[], system_prompt=build_system_prompt(s),
+            strict_mcp_config=True, setting_sources=[],
+            system_prompt=build_system_prompt(s, memory_digest=self.memory.digest()),
             permission_mode="default", can_use_tool=self._make_gate(st), model=s.get("model"),
             fallback_model=fallback, effort=s.get("effort"), max_turns=int(s.get("max_steps")),
             max_budget_usd=budget, cwd=str(self.paths.workspace), cli_path=cli, env=env,

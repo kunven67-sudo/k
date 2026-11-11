@@ -278,7 +278,9 @@ def test_e2e_only_overdrive_tools():
         main = [r for r in fake.requests if is_overdrive_main(r)]
         names = {t.get("name") for t in main[0].get("tools", [])}
         allowed = {f"mcp__overdrive__{n}" for n in ("get_time", "calculator", "list_folder", "read_text_file",
-                                                    "write_text_file", "task_plan", "task_report")}
+                                                    "write_text_file", "task_plan", "task_report",
+                                                    "memory_remember", "memory_recall", "memory_list",
+                                                    "memory_update", "memory_archive")}
         extra = {n for n in names - allowed - {"AskUserQuestion"} if n and "Placeholder" not in n}
         assert allowed <= names and not extra, (names, extra)
     turns = [[T("task_plan", **PLAN)], [T("task_report", **report())], [X("hi!")]]

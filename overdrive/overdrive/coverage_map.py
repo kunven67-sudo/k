@@ -78,7 +78,8 @@ COVERAGE: dict[int, dict] = {
            "test_journal_duplicates_and_loops", "test_identical_replace_is_noop"),
     42: _r("The audit log never stores secrets.", "test_audit_redacts"),
     43: _r("Export: one zip of plain JSON/JSONL with a README of the format.", "test_export_zip"),
-    44: _l(2, "Stage 2: verified backups + restore"),
+    44: _r("Memory backup writes a sha256 per row + an overall sha256; restore refuses a tampered file.",
+          "test_memory_backup_and_restore_verify", "test_memory_backup_tamper_rejected"),
     45: _r("Your files, OVERDRIVE's records, old versions and experiments live in separate folders.",
            "test_paths_separate"),
     46: _r("Caps: steps per task, minutes per task, usage per task/day, pause at your Claude usage %.",
@@ -96,7 +97,20 @@ COVERAGE: dict[int, dict] = {
     55: _r("Self-test results are compared with the last run; new failures are flagged as regressions.",
            "test_selftest_regressions"),
     56: _r("Status shows versions: OVERDRIVE, Python, Windows, Claude Code, SDK.", "test_compat_info"),
-    57: _l(2), 58: _l(2), 59: _l(2), 60: _l(2), 61: _l(2), 62: _l(2), 63: _l(2),
+    57: _r("Memory is organized into 5 kinds (fact/experience/instruction/project/relationship) + tags + "
+          "related ids, and indexed with FTS5 so OVERDRIVE can search it.", "test_memory_kinds_and_search"),
+    58: _r("Recall returns only rows that match the query within the chosen kinds, at a bounded limit.",
+          "test_memory_recall_matches", "test_memory_recall_limit_and_kind_filter"),
+    59: _r("memory_update supersedes the stale row with a new active row; the old row is kept with "
+          "status=superseded and superseded_by pointing at the new id.", "test_memory_update_keeps_history"),
+    60: _r("Every row carries provenance + created + updated timestamps; nothing is written without them.",
+          "test_memory_row_has_provenance_and_dates"),
+    61: _r("Writing a new row with the same kind + title as an active one surfaces the clash to the human "
+          "instead of silently overwriting.", "test_memory_contradiction_surfaces"),
+    62: _r("The human can list, search and patch any row through memory_list / memory_recall / memory_update.",
+          "test_memory_list_ordering", "test_memory_update_keeps_history"),
+    63: _r("memory.forget() permanently removes a row (human-only path via the UI; Claude's tools can only "
+          "archive, which keeps the row).", "test_memory_forget_actually_deletes"),
     64: _r("File text reaches Claude inside an untrusted-data box with a random id.", "test_shield_wraps_untrusted",
            "test_e2e_injection_in_file"),
     65: _r("Order-like text in files is detected and flagged to you.", "test_shield_flags_injection",
@@ -137,11 +151,17 @@ COVERAGE: dict[int, dict] = {
     100: _r("If Claude or a tool is unavailable: clear message + what still works.", "test_cli_missing_fallback"),
 }
 
-# Areas that run on the Stage 1 core. A point turns green only for these areas.
+# Areas that run on the Stage 1/2 core. A point turns green only for these areas.
 STARTED_AREAS = {
     1: "Started: goals before work, report + checker after.",
     45: "Started: permission gates, locked risk classes, secret blanking, injection shield.",
     46: "Started: atomic saves, versions, undo, bounded retries, fallbacks.",
     47: "Started: steps/time/usage caps, Claude usage-limit tracking, STOP.",
     50: "Started: audit log with hash chain, honest status page, limitations list.",
+    # Stage 2 memory areas
+    11: "Started: long-term memory store (5 kinds, FTS5, provenance, supersede-not-overwrite).",
+    13: "Started: episodic memory via the 'experience' kind (timestamped events OVERDRIVE did or saw).",
+    14: "Started: semantic memory via the 'fact' kind (verifiable claims with confidence).",
+    15: "Started: procedural memory via the 'instruction' kind (standing orders from the human).",
+    16: "Started: memory maintenance (verified backup + restore, archive, forget, contradictions).",
 }

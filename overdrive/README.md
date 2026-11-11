@@ -1,8 +1,8 @@
-# OVERDRIVE (Stage 1: Core)
+# OVERDRIVE (Stages 1 + 2: Core + Memory)
 
 A personal AI agent for your Windows PC. **The brain is Claude**, reached through Claude Code (Anthropic's official
 app) signed in with your claude.ai account: no API key, no extra money. Stage 1 is the engine + safety system that
-every later part of OVERDRIVE plugs into.
+every later part of OVERDRIVE plugs into; Stage 2 adds long-term memory on top.
 
 ## What Stage 1 does
 
@@ -22,22 +22,34 @@ every later part of OVERDRIVE plugs into.
 Tools in Stage 1: `get_time`, `calculator`, `list_folder`, `read_text_file`, `write_text_file` (+ `task_plan`,
 `task_report`, and Claude asking you questions).
 
+## What Stage 2 adds (Memory)
+
+Five kinds of memory rows, every one with provenance: `fact`, `experience`, `instruction`, `project`, `relationship`.
+Stored in SQLite with FTS5 full-text search under `OVERDRIVE\data\memory\memory.db`. Writes are gated and
+non-destructive: `memory_update` supersedes the old row and keeps it as history. Backups write a sha256 per row + an
+overall sha256; restore refuses a tampered backup. The boot digest (active instructions, open projects, people
+OVERDRIVE knows) is added to the system prompt so the agent carries state between chats.
+
+New tools in Stage 2: `memory_remember`, `memory_recall`, `memory_list`, `memory_update`, `memory_archive`.
+Permanent delete (`forget`) is a human-only path via the UI — Claude's tools can archive but not delete.
+
 ## The blueprint, honestly
 
-The 5,000-point blueprint is 100 rules x 50 areas (same 100 rules in every area). Stage 1 makes **51 rules real**
-(each proven by a self-test), **11 are guided** (Claude is told + the checker looks; never counted), **38 wait** for
-later stages. The core runs 5 areas (Reasoning basics, Security, Reliability, Resource limits, Transparency), so the
-honest count after Stage 1 is **255 / 5,000** points, shown live on the Status page.
+The 5,000-point blueprint is 100 rules x 50 areas (same 100 rules in every area). Stages 1 + 2 make **59 rules real**
+(each proven by a self-test), **11 are guided** (Claude is told + the checker looks; never counted), **30 wait** for
+later stages. The core runs 10 areas (Reasoning basics, Security, Reliability, Resource limits, Transparency, plus
+Long-term / Episodic / Semantic / Procedural memory and Memory maintenance), so the honest count is
+**590 / 5,000** points, shown live on the Status page.
 
-Build order (from the blueprint): 1 Core -> 2 Memory -> 3 PC control + sandbox -> 4 Planning -> 5 Research ->
-6 Agent teams -> 7 Images/audio/video -> 8 Curiosity + schedules -> 9 Personality -> 10 Benchmarks.
+Build order (from the blueprint): 1 Core -> 2 Memory (**done**) -> 3 PC control + sandbox -> 4 Planning -> 5 Research
+-> 6 Agent teams -> 7 Images/audio/video -> 8 Curiosity + schedules -> 9 Personality -> 10 Benchmarks.
 
 ## Run it
 
 - Windows: unzip `OVERDRIVE-windows.zip`, open `OVERDRIVE.exe`, follow Setup. See [SETUP.md](SETUP.md).
 - Dev: `pip install -r requirements.txt`, then `python -m overdrive` (window) or `python -m overdrive selftest`.
 
-Tests: 53 self-tests (`overdrive/selftests/`), including end-to-end runs of the real Claude Code against a fake
+Tests: 69 self-tests (`overdrive/selftests/`), including end-to-end runs of the real Claude Code against a fake
 Claude on 127.0.0.1 ($0). The same tests run from the Status page on your PC. `node build/ui_check.cjs` clicks
 through the whole window in a real browser.
 
