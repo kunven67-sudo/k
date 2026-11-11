@@ -3,8 +3,13 @@
 Turns the foreign voices in a video into English, **in each character's own voice**. Music, sound effects,
 laughs and songs stay untouched. Runs on Google Colab's free GPU, so nothing to install.
 
-**[▶ Open BroDub in Google Colab](https://colab.research.google.com/github/kunven67-sudo/k/blob/ccr-0d8c1680-y4jia9/brodub/BroDub.ipynb)**
-→ press the ▶ button → pick a video → about 20-30 min later the English one downloads.
+**[▶ Open BroDub in Google Colab](https://colab.research.google.com/github/kunven67-sudo/k/blob/claude/upbeat-goodall-8brqg3/brodub/BroDub.ipynb)**
+
+- **Google Drive** (default, best on a phone): press ▶ → tap Allow → put the video in Google Drive > `BroDub` →
+  go use any other app. About 20-30 min later the English one is in `BroDub/English` and your phone pings you.
+  BroDub waits up to an hour for the video to finish uploading, and skips videos that already have an English one.
+- **Pick from this phone/PC**: switch the dropdown, press ▶, pick a video and stay on the tab until it's uploaded.
+  The English one downloads when it's done.
 
 ## What it does
 
