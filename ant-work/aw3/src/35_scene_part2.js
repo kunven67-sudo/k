@@ -128,7 +128,7 @@ function tablePeople(){
     lv.teo=mk(makeHuman,{name:'Teo',voice:'Teo',skin:0xb98a64,shirt:0x8a3a2a,pants:0x2a3040,shoes:0x2a2a2a,hair:0x1a120c,hairStyle:'spiky',eye:0x3a2a1a,build:.9,height:.97,seed:44});
     lv.bram=mk(makeHuman,{name:'Bram',voice:'Bram',skin:0xe0b090,shirt:0x3a4a3a,pants:0x2a2a2a,shoes:0x1a1a1a,hairStyle:'bald',beard:true,hair:0x5a3a20,eye:0x4a5a3a,build:1.12,height:1.04,seed:52});
     for(const h of [lv.orrin,lv.teo,lv.bram]) collarOn(h); }
-  const at=(h,id,dx=0,dz=0)=>{ const c=cageOf(id); resetActor(h); h.visible=true; h.scale.setScalar(1); h.position.set(c.x+dx,.18,c.z+dz); faceTo(h,V3(c.x+dx,0,c.z-5)); };
+  const at=(h,id,dx=0,dz=0)=>{ const c=cageOf(id); resetActor(h); h.visible=true; h.scale.setScalar(1); h.position.set(c.x+dx,CAGE_Y,c.z+dz); faceTo(h,V3(c.x+dx,0,c.z-5)); };
   at(lv.jay2,'you',1.5,.6); at(lv.orrin,'orrin',1.4,-.4); at(lv.teo,'teo',-1.3,-.3); at(lv.bram,'bram',.6,.9); setPose(lv.bram,'sit',0); lv.bram.userData.A.seated=true;
   CUR.j2=lv.jay2; return lv;
 }
@@ -136,7 +136,7 @@ function youInCage(){ const c=cageOf('you'); setPlayer(V3(c.x-.6,0,c.z-.4),0,-.0
 async function tableStart(id,time){
   const lv=LEVELS.table, fd=$('fade'); fd.style.transition='none'; fd.style.opacity=1;
   if(LV!==lv) await enterLevel('table',{pos:V3(0,0,0)});
-  F.collared=true; saveCheckpoint(id); tablePeople(); lv.setTime(time); lv.inter.length=0; NIGHT.on=false; resetNoisy(lv);
+  F.collared=true; saveCheckpoint(id); tablePeople(); closeAllLids(); if(lv.bigArm) lv.bigArm.visible=false; lv.setTime(time); lv.inter.length=0; NIGHT.on=false; resetNoisy(lv);
   const P=lv.pig.userData.pig; P.armPose=null; P.look=null; P.stand=0;
   youInCage(); PLAYER.eye=1.64; setVM(true); hudVisible(true); invHUD();
   setAmbience(time==='night'?[]:[['fire',.03]]);
@@ -177,9 +177,13 @@ function resetNoisy(lv){
 /* places he can't see you from his chair */
 function coverSpots(){ const n=TABLE.napkin, cu=TABLE.cup, po=TABLE.pot, ca=TABLE.candle, y=cageOf('you');
   return [{x:n.x+5.5,z:n.z+7.4,r:2.6},{x:-14,z:-.2,r:2.8},{x:cu.x,z:cu.z+5.6,r:2.8},{x:po.x,z:po.z+8.6,r:3},{x:ca.x,z:ca.z+4.6,r:2.4},{x:y.x,z:y.z,r:2.8}]; }
+const _ray=new THREE.Raycaster();
+function pigSees(lv){ const P=lv.pig.userData.pig; P.head.updateMatrixWorld(true); const eye=P.head.localToWorld(V3(0,.07,.12));
+  const to=camera.position.clone().sub(eye); const d=to.length(); _ray.set(eye,to.normalize()); _ray.near=1; _ray.far=d-.25;
+  return _ray.intersectObjects(lv.occluders,true).length===0; }
 function tableTick(lv,dt,t){
   if(!NIGHT.on) return;
-  const p=PLAYER.pos; NIGHT.hidden=coverSpots().some(c=>Math.hypot(p.x-c.x,p.z-c.z)<c.r);
+  const p=PLAYER.pos; NIGHT.losT=(NIGHT.losT||0)-dt; if(NIGHT.losT<=0){ NIGHT.losT=.12; const yc=cageOf('you'); NIGHT.hidden=(Math.abs(p.x-yc.x)<CAGE.w/2&&Math.abs(p.z-yc.z)<CAGE.d/2)||!pigSees(lv); }
   let el=$('hideHud'); if(!el){ el=document.createElement('div'); el.id='hideHud'; el.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:40;font:800 13px Nunito,system-ui;letter-spacing:.25em;color:#9fe0a0;text-shadow:0 1px 4px #000;pointer-events:none;transition:opacity .3s'; el.textContent='HIDDEN'; document.body.appendChild(el); }
   el.style.opacity=NIGHT.hidden?1:0;
   // knock into anything metal = noise = he wakes up
@@ -223,7 +227,7 @@ SCENES.night1=async function(){
   if(!lv.thornPick){ lv.thornPick=mesh(GC('thornGeo',()=>{ const c=new THREE.ConeGeometry(.35,1.4,8); c.translate(0,.7,0); return c; }),new THREE.MeshPhysicalMaterial({color:col(0x8a4a2a),roughness:.4,clearcoat:.5}),0,0,0); lv.thornPick.rotation.z=Math.PI/2; lv.scene.add(lv.thornPick); }
   lv.thornPick.position.set(TABLE.pot.x-7.2,.35,TABLE.pot.z+3); lv.thornPick.visible=true;
   // the bread roll you can hide behind (by his plate)
-  if(!lv.roll){ lv.roll=ell(5,3.2,4,(()=>{ const m=pbrMat('clay_plaster',1,{opts:{roughness:.85}}); m.color=col(0xc08848); return m; })(),-14,1.4,-5.5,28); lv.scene.add(lv.roll); colCircle(lv.col,-14,-5.5,4.6); }
+  if(!lv.roll){ lv.roll=ell(5,3.2,4,(()=>{ const m=pbrMat('clay_plaster',1,{opts:{roughness:.85}}); m.color=col(0xc08848); return m; })(),TABLE.plate.x-11,1.4,TABLE.plate.z+6,28); lv.scene.add(lv.roll); colCircle(lv.col,TABLE.plate.x-11,TABLE.plate.z+6,4.6); lv.occluders.push(lv.roll); }
   await nightSneak(lv,[{name:'Sharp bone',label:'Get a sharp bone from his plate',item:'bone',pos:lv.boneBit.position,obj:lv.boneBit},{name:'Thorn',label:'Get a thorn from under the plant',item:'thorn',pos:lv.thornPick.position,obj:lv.thornPick}]);
   PLAYER.lock(); await say(['n_back']); lv.inter.length=0; objective('');
   addInteract(lv,{pos:V3(cageOf('you').x+.2,.3,cageOf('you').z+.6),reach:2.4,label:'Sleep',act:()=>{ F.slept=1; }}); F.slept=0; freeWalk(); PLAYER.ctl.jump=false; objective('Sleep on your bedding');
@@ -236,16 +240,18 @@ SCENES.day2=async function(){
   playMusic('cage',2); PLAYER.lock(); PLAYER.ctl.look=true;
   await dayCard('DAY 2');
   const P=lv.pig.userData.pig; P.stop=true; P.look=V3(cageOf('orrin').x,0,cageOf('orrin').z); SND.play('pig_4',{vol:1,pos:V3(0,44,-40),ref:80,rate:.6});
-  O.position.set(cageOf('orrin').x+2.5,.18,cageOf('orrin').z-.5); faceTo(O,PLAYER.pos); O.userData.A.look='player';
+  O.position.set(cageOf('orrin').x+2.5,CAGE_Y,cageOf('orrin').z-.5); faceTo(O,PLAYER.pos); O.userData.A.look='player';
   await say(['d2_1','d2_2','d2_3']);
-  // his hand comes down (black), and Orrin is in the bowl with a thorn
-  const fd=$('fade'); fd.style.transition='opacity .4s'; fd.style.opacity=1; SND.play('cage_lock',{vol:1,rate:.7}); await wait(1);
-  O.position.set(A.x,.35,A.z+5); faceTo(O,V3(A.x,0,A.z)); O.userData.A.look=null;
+  // his hand comes down, opens Orrin's cage, picks him up and drops him in the bowl
+  O.userData.A.look=null; P.stop=true;
+  await pigCarry({who:O,cage:'orrin',to:V3(A.x,0,A.z+1),toY:.35,watch:true});
+  lookAtPoint(V3(A.x,.8,A.z),.8);
+  faceTo(O,V3(A.x,0,A.z));
   const spear=mesh(new THREE.ConeGeometry(.08,2.4,8),new THREE.MeshPhysicalMaterial({color:col(0x8a4a2a),roughness:.4}),0,0,0); spear.rotation.x=Math.PI/2; holdProp(O,spear,'R',V3(0,0,.6));
   const sp=makeBug('spider'); sp.position.set(A.x,.35,A.z-7); lv.scene.add(sp); const B=sp.userData.bug;
   const tk=dt=>{ animateBug(sp,dt,G.time); }; SCENE_TICKS.push(tk);
   P.stop=false; P.look=V3(A.x,0,A.z);
-  lookAtPoint(V3(A.x,1,A.z),0); fd.style.transition='opacity .8s'; fd.style.opacity=0; playMusic('arena',1);
+  playMusic('arena',1);
   // it circles him... he pokes it... it jumps
   const c0=performance.now(); let ang=-Math.PI/2;
   await tweenVal(k=>{ ang=-Math.PI/2+k*1.6; sp.position.set(A.x+Math.cos(ang)*6.5,.35,A.z+Math.sin(ang)*6.5); sp.rotation.y=Math.atan2(O.position.x-sp.position.x,O.position.z-sp.position.z); B.walkK=1; faceTo(O,sp.position); },0,1,4.5,k=>k);
@@ -277,15 +283,23 @@ SCENES.day2=async function(){
   for(let i=0;i<5;i++) later(i*.6,()=>SND.play('spit',{vol:.6,pos:body,ref:10,rate:rand(.6,.8)}));
   await tweenVal(v=>{ cocoon.scale.setScalar(Math.max(.01,v)); },0,1,3.2);
   O.visible=false; SCENE_TICKS.splice(SCENE_TICKS.indexOf(wrapTick),1); for(const t of strands) lv.scene.remove(t); B.atk=null; B.atkK=0;
-  SND.play('pig_squeal',{vol:1,pos:V3(0,44,-40),ref:80,rate:.75}); stopMusic(2);
-  // it drags him away over the rim, into the dark under the table
-  const rim=V3(A.x+Math.sin(sp.rotation.y)*14,.35,A.z+Math.cos(sp.rotation.y)*14);
-  await tweenVal(k=>{ B.walkK=1; const p=sp.position.clone().lerp(rim,k*.06); sp.position.copy(p); cocoon.position.set(p.x-Math.sin(sp.rotation.y)*2.6,.6,p.z-Math.cos(sp.rotation.y)*2.6); },0,1,3.5,k=>k);
-  sp.visible=false; cocoon.visible=false; B.walkK=0;
+  // then it turns back around... and eats him, right there in the silk
+  const t1=sp.rotation.y; await tweenVal(v=>{ sp.rotation.y=t1+v*Math.PI; B.walkK=.5; },0,1,1.0); B.walkK=0;
+  const fwE=V3(Math.sin(sp.rotation.y),0,Math.cos(sp.rotation.y)), eatAt=cocoon.position.clone().addScaledVector(fwE,-2.3); eatAt.y=.35; const s0=sp.position.clone();
+  await tweenVal(k=>{ sp.position.lerpVectors(s0,eatAt,k); B.walkK=.6; },0,1,.8); B.walkK=0;
+  SND.play('pig_squeal',{vol:1,pos:V3(0,44,-40),ref:80,rate:.75}); stopMusic(3);
+  for(let i=0;i<7;i++){ B.atk='bite'; await tweenVal(v=>{ B.atkK=v; },0,1,.25); B.strikeK=1; SND.play('chew_'+randi(1,3),{vol:1,pos:cocoon.position,ref:12,rate:rand(.45,.6)}); if(i%2===0) SND.play('bite',{vol:.9,pos:cocoon.position,ref:12,rate:.5}); shake(.06);
+    const k=1-(i+1)*.11; cocoon.scale.set(Math.max(.25,k),Math.max(.15,k*.9),Math.max(.3,k)); await wait(.3); B.strikeK=0; await tweenVal(v=>{ B.atkK=v; },1,0,.3); await wait(.3); }
+  B.atk=null; B.atkK=0; await wait(1.2);
+  // full, it walks off over the rim into the dark under the table; only scraps of silk are left
+  const rim=V3(A.x+Math.sin(sp.rotation.y+Math.PI)*14,.35,A.z+Math.cos(sp.rotation.y+Math.PI)*14);
+  const t2=sp.rotation.y; await tweenVal(v=>{ sp.rotation.y=t2+v*Math.PI; B.walkK=.5; },0,1,1.0);
+  await tweenVal(k=>{ B.walkK=1; sp.position.lerp(rim,k*.05); },0,1,3.2,k=>k);
+  sp.visible=false; B.walkK=0;
   await wait(1); playMusic('sad',3);
   lookAtPoint(V3(A.x,1,A.z),1.2); await wait(1.6);
   await say(['d2_4','d2_5','d2_6']); J.userData.A.look=null;
-  SCENE_TICKS.splice(SCENE_TICKS.indexOf(tk),1); lv.scene.remove(sp); lv.scene.remove(cocoon);
+  SCENE_TICKS.splice(SCENE_TICKS.indexOf(tk),1); lv.scene.remove(sp); lv.scene.remove(cocoon); closeAllLids();
   await wait(1.5);
   runStory(()=>SCENES.night2());
 };
@@ -299,7 +313,7 @@ SCENES.night2=async function(){
   await say(['n2_1','n2_2','n2_3']); setPose(J,'sit',.5); J.userData.A.seated=true;
   const th=lv.threads[3]; th.visible=true;
   const pebs=lv.pebbles; for(const pb of pebs) pb.visible=true;
-  await nightSneak(lv,[{name:'Thread',label:'Get a loose thread from the napkin',item:'thread',pos:V3(TABLE.napkin.x-7+3*2.1,.3,TABLE.napkin.z-8),obj:th},
+  await nightSneak(lv,[{name:'Thread',label:'Get a loose thread from the napkin',item:'thread',pos:V3(TABLE.napkin.x+10.5,.3,TABLE.napkin.z-5+3*1.6),obj:th},
     {name:'Pebbles',label:'Get pebbles by the pot',item:'pebbles',n:4,pos:V3(TABLE.pebbles.x,.3,TABLE.pebbles.z),obj:null}]);
   for(const pb of pebs.slice(0,4)) pb.visible=false;
   PLAYER.lock(); await say(['n_back','n2_craft']); lv.inter.length=0;
@@ -310,12 +324,22 @@ SCENES.night2=async function(){
   runStory(()=>SCENES.mantis());
 };
 /* ---------- the fights ---------- */
-async function dropInBowl(lv,kind){ const fd=$('fade'); fd.style.transition='opacity .4s'; fd.style.opacity=1; SND.play('cage_lock',{vol:1,rate:.7}); await wait(1.1);
-  const bug=arenaFight(kind,lv.fightOpts||{}); fd.style.transition='opacity .6s'; fd.style.opacity=0; return bug; }
-async function backToCage(lv,bug){ const fd=$('fade'); fd.style.transition='opacity .6s'; fd.style.opacity=1; await wait(1); if(bug) lv.scene.remove(bug); ARENA.bug=null; youInCage(); PLAYER.lock(); PLAYER.ctl.look=true; invHUD(); await wait(.4); fd.style.opacity=0; await wait(.8); }
+async function dropInBowl(lv,kind){ const A=TABLE.arena;
+  await pigCarry({who:'you',cage:'you',to:V3(A.x,0,A.z+7),toY:.35});
+  const opts=Object.assign({},lv.fightOpts||{},{keepPos:true}); const res=await arenaFight(kind,opts);
+  if(!res.won) await diedBackToDay3(lv,res.bug);
+  return res.bug; }
+/* you went down in the bowl: everything starts over from the first fight (Day 3) */
+async function diedBackToDay3(lv,bug){ await wait(.6); cardShow('YOU DIED','Back to Day 3. Every fight again.'); await wait(3); cardHide();
+  if(bug) lv.scene.remove(bug); ARENA.bug=null; PLAYER.roll=0;
+  const s=getSave()||{}; const fl=s.day3Flags||Object.assign({},F,{key:false,savedJay2:undefined});
+  setTimeout(()=>startAt('mantis',fl),0); await new Promise(()=>{}); }
+async function backToCage(lv,bug){ const yc=cageOf('you'); await wait(1.2); if(bug){ lv.scene.remove(bug); } ARENA.bug=null;
+  await pigCarry({who:'you',cage:'you',to:V3(yc.x-.6,0,yc.z-.4),toY:CAGE_Y,into:true}); PLAYER.lock(); PLAYER.ctl.look=true; invHUD(); }
 SCENES.mantis=async function(){
   if(!F.inv) F.inv={bone:0,thorn:0,thread:0,pebbles:4,bspear:1};   // started from the chapter list: what you'd have made by now
-  const lv=await tableStart('mantis','day'); const J=lv.jay2; lv.orrin.visible=false; lv.fightOpts={};
+  F.key=false; delete F.savedJay2;
+  const lv=await tableStart('mantis','day'); { const s=getSave()||{}; s.day3Flags=JSON.parse(JSON.stringify(F)); writeSave(s); } const J=lv.jay2; lv.orrin.visible=false; lv.fightOpts={};
   PLAYER.lock(); PLAYER.ctl.look=true; playMusic('cage',2);
   await dayCard('DAY 3');
   const P=lv.pig.userData.pig; P.stop=true; P.look=camera; SND.play('pig_4',{vol:1,pos:V3(0,44,-40),ref:80,rate:.6}); await wait(1.2);
@@ -369,15 +393,18 @@ SCENES.scorpion=async function(){
   }};
   // both of you in the bowl
   J.userData.A.look=null; const fd=$('fade');
-  const fight=dropInBowl(lv,'scorpion');
-  await wait(1.2); resetActor(J); J.position.set(A.x+5,.35,A.z+5); J.position.y=.35; ARENA.jay=J; J.userData.arenaHold=false;
-  const bug=await fight; unlock('scorpionWin');
+  await pigCarry({who:J,cage:'you',to:V3(A.x+5,0,A.z+5),toY:.35,watch:true});
+  resetActor(J); J.position.y=.35; ARENA.jay=J; J.userData.arenaHold=false;
+  const bug=await dropInBowl(lv,'scorpion'); unlock('scorpionWin');
   ARENA.jay=null;
-  // back in the cage, night, the key hidden in the straw
-  fd.style.transition='opacity .6s'; fd.style.opacity=1; await wait(1); lv.scene.remove(bug); ARENA.bug=null;
-  lv.setTime('night'); youInCage(); resetActor(J); const c=cageOf('you'); J.position.set(c.x+1.4,.18,c.z+.5); faceTo(J,PLAYER.pos);
+  // back in the cage: his hand brings Jay 2, then you. Night, the key hidden in the straw
+  const c=cageOf('you'); await wait(1.2); lv.scene.remove(bug); ARENA.bug=null;
+  if(!F.savedJay2){ resetActor(J); }
+  await pigCarry({who:J,cage:'you',to:V3(c.x+1.4,0,c.z+.5),toY:CAGE_Y,into:true,watch:true}); resetActor(J); J.position.y=CAGE_Y; faceTo(J,V3(c.x-.6,0,c.z-.4));
   if(!F.savedJay2){ setPose(J,'sit',0); J.userData.A.seated=true; }
-  PLAYER.lock(); PLAYER.ctl.look=true; playMusic('night',2); fd.style.opacity=0; await wait(1);
+  await pigCarry({who:'you',cage:'you',to:V3(c.x-.6,0,c.z-.4),toY:CAGE_Y,into:true});
+  fd.style.transition='opacity 1.5s'; fd.style.opacity=1; await wait(1.6); lv.setTime('night'); youInCage();
+  PLAYER.lock(); PLAYER.ctl.look=true; playMusic('night',2); fd.style.opacity=0; await wait(1.5);
   J.userData.A.look='player'; await say([F.savedJay2?'d5_e1':'d5_e2','d5_e3']);
   saveCheckpoint('scorpion'); const s=getSave()||{}; s.part2=true; writeSave(s); unlock('part2');
   await wait(1.5); fd.style.transition='opacity 1.5s'; fd.style.opacity=1; stopMusic(2); await wait(3);
@@ -392,8 +419,61 @@ LEVELS.table.onPrimary=()=>ARENA.active?arenaAttack():false;
 /* YOUR collar: a real ring around your neck, just under the camera. Look down and you see it (and its green light). */
 const MYCOLLAR={m:null};
 on('tick',()=>{ const want=!!(F.collared&&LV&&(LV.name==='pigroom'||LV.name==='table')&&G.mode==='play');
-  if(!want){ if(MYCOLLAR.m) MYCOLLAR.m.visible=false; return; }
+  if(!want||CAM.active){ if(MYCOLLAR.m) MYCOLLAR.m.visible=false; return; }
   if(!MYCOLLAR.m){ MYCOLLAR.m=makeCollar(.068); MYCOLLAR.m.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=5; } }); }
   const m=MYCOLLAR.m; if(m.parent!==LV.scene) LV.scene.add(m); m.visible=true;
   const s=PLAYER.scale||1; m.scale.setScalar(s); m.position.copy(camera.position); m.position.y-=.2*s; m.rotation.set(0,PLAYER.yaw+Math.PI,0);
   m.position.x+=Math.sin(PLAYER.yaw)*.085*s; m.position.z+=Math.cos(PLAYER.yaw)*.085*s; });
+
+/* ---------- HIS HAND: the pig king's real arm (cloned from his model, his size) reaches down, opens the cage,
+   picks someone up between his fingers, carries them over the table and drops them ---------- */
+function makeGiantArm(lv){
+  const P=lv.pig.userData.pig, L=P.L; const hi=L.el.children.indexOf(L.hand), fi=L.fingers.map(f=>L.hand.children.indexOf(f)), ti=L.hand.children.indexOf(L.th);
+  const arm=L.el.clone(true); arm.scale.setScalar(TK); const hand=arm.children[hi];
+  arm.userData={hand,fingers:fi.map(i=>hand.children[i]),thumb:hand.children[ti]};
+  arm.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  // the upper arm too, going up out of sight toward him
+  const up=mesh(new THREE.CylinderGeometry(.13,.12,1.2,16),P.chest.children[0].material,0,.6,0); arm.add(up);
+  arm.visible=false; lv.scene.add(arm); return arm; }
+function armGrip(arm,k){ const U=arm.userData; for(const f of U.fingers) f.rotation.x=lerp(.35,-1.3,k); U.thumb.rotation.x=lerp(.3,-.9,k); }
+const GRIP=V3(0,-.47,.03);   // between his fingertips, in the arm's own units
+function armPlace(arm,gripWorld,lean=.18){ arm.rotation.set(lean,0,0); arm.position.set(0,0,0); arm.updateMatrixWorld(true); const g=arm.localToWorld(GRIP.clone()); arm.position.copy(gripWorld).sub(g); }
+function openLid(id,open){ const c=cageOf(id); if(!c||!c.lid) return Promise.resolve(); SND.play('metal_'+randi(1,3),{vol:.9,pos:V3(c.x,5,c.z),ref:20,rate:.8}); return tweenVal(v=>{ c.lid.rotation.x=v; },c.lid.rotation.x,open?1.9:0,.6); }
+function closeAllLids(){ for(const c of TABLE.cages) if(c.lid) c.lid.rotation.x=0; }
+async function pigCarry(o){
+  const lv=LEVELS.table, P=lv.pig.userData.pig, arm=lv.bigArm||(lv.bigArm=makeGiantArm(lv));
+  const you=o.who==='you', h=you?null:o.who;
+  const from=you?PLAYER.pos.clone():h.position.clone(); from.y=you?(lv.ground(from.x,from.z)):h.position.y;
+  const holdY=1.0;   // his fingers close around your middle
+  const above=(p,y)=>V3(p.x,y,p.z);
+  P.stop=true; P.look=from.clone(); P.lookSpeed=2;
+  if(you){ PLAYER.lock(); PLAYER.ctl.look=true; crosshair(false); }
+  // 1. the cage opens, the hand comes down out of the dark above
+  if(o.cage&&!o.into) await openLid(o.cage,true);
+  arm.visible=true; armGrip(arm,0);
+  if(you) lookAtPoint(V3(from.x,from.y+14,from.z-4),.8);
+  SND.play('pig_4',{vol:1,pos:V3(0,44,-40),ref:80,rate:.6});
+  const g0=above(from,from.y+38), g1=above(from,from.y+holdY);
+  await tweenVal(k=>{ armPlace(arm,g0.clone().lerp(g1,k)); },0,1,1.7,smooth);
+  // 2. his fingers close around you
+  SND.play('body_fall',{vol:.6,pos:g1,ref:10,rate:1.4}); await tweenVal(k=>armGrip(arm,k),0,1,.45); shake(.25);
+  if(you){ SND.play('gasp',{vol:.7}); camFollow(()=>{ arm.updateMatrixWorld(true); const g=arm.localToWorld(GRIP.clone()); return {pos:g.add(V3(0,.35,1.25)),look:CARRY.look}; },72); /* just in front of his fingers: you see the table going by below */ CARRY.look=V3(o.to.x,0,o.to.z); }
+  else { h.userData.A.idleOff=true; arm.attach(h); }
+  // 3. up, over the table, down to where you're going
+  const up0=g1.clone(), up1=above(from,from.y+20), dst=above(o.to,(o.toY||0)+holdY+.8), mid=above(o.to,(o.toY||0)+20);
+  await tweenVal(k=>{ armPlace(arm,up0.clone().lerp(up1,k)); },0,1,1.1,smooth);
+  if(o.into&&o.cage) openLid(o.cage,true);
+  await tweenVal(k=>{ armPlace(arm,up1.clone().lerp(mid,k),.18+Math.sin(k*Math.PI)*.08); },0,1,1.7,smooth);
+  await tweenVal(k=>{ armPlace(arm,mid.clone().lerp(dst,k)); },0,1,1.0,smooth);
+  // 4. he lets go: you drop the last bit
+  await tweenVal(k=>armGrip(arm,1-k),0,1,.35);
+  if(you){ camRelease(0); setPlayer(V3(o.to.x,0,o.to.z),yawTo(o.to,V3(TABLE.arena.x,0,TABLE.arena.z))); const startY=.8+holdY; PLAYER.y=(o.toY||0)+startY; PLAYER.onGround=false; PLAYER.vy=0; }
+  else { lv.scene.attach(h); h.rotation.set(0,h.rotation.y,0); const y0=h.position.y, y1=o.toY||0; await tweenVal(v=>{ h.position.y=v; },y0,y1,.4,easeIn); h.userData.A.idleOff=false; }
+  await wait(.45); SND.play('body_fall',{vol:.9,rate:.9}); if(you){ shake(.35); SND.play('oof_'+randi(1,2),{vol:.7}); if(lv.surfaceAt(o.to.x,o.to.z)==='sand') SND.play('sand_fall',{vol:.6}); }
+  // 5. the hand goes back up into the dark
+  const back=dst.clone(); await tweenVal(k=>{ armPlace(arm,back.clone().lerp(above(o.to,60),k)); },0,1,1.2,easeIn);
+  arm.visible=false; if(o.cage) await openLid(o.cage,false);
+  if(you){ PLAYER.y=Math.max(PLAYER.y,lv.ground(PLAYER.pos.x,PLAYER.pos.z)); crosshair(true); }
+  P.look=null;
+}
+const CARRY={look:V3()};

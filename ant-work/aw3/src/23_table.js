@@ -9,16 +9,21 @@
 const TK=40;   // 1 meter for the pig = 40 of yours
 const TABLE={W:100,D:52,
   cages:[{id:'orrin',x:-40,z:18},{id:'you',x:-31,z:18},{id:'bram',x:-22,z:18},{id:'teo',x:-13,z:18}],
-  arena:V3(8,0,-4), arenaR:12,
-  plate:V3(-22,0,-12), napkin:V3(-40,0,-8), pot:V3(36,0,-14), pebbles:V3(28,0,-5), candle:V3(42,0,16), cup:V3(-4,0,20)};
+  arena:V3(-24,0,0), arenaR:12,   // right in front of the cages: he wants the prisoners to watch
+  plate:V3(8,0,-10), napkin:V3(-38,0,-19), pot:V3(36,0,-14), pebbles:V3(28,0,-5), candle:V3(42,0,16), cup:V3(10,0,20)};
 const CAGE={w:6,d:6,h:4.6,bar:.5};
+/* the cages stand on a thick old book, so the prisoners look down into the sand tray. A wooden ruler leans on it = the way down */
+const BOOK={x0:-46,x1:-6,z0:13,z1:25.8,h:2.6}, RULER={x0:-6,x1:2,z0:16,z1:20};
+const CAGE_Y=BOOK.h+.18;   // the cage floor
 function cageOf(id){ return TABLE.cages.find(c=>c.id===id); }
 function makeTinyCage(scene,lv,c,iron,wood){
-  const g=new THREE.Group(); g.position.set(c.x,0,c.z); scene.add(g); c.g=g;
+  const g=new THREE.Group(); g.position.set(c.x,BOOK.h,c.z); scene.add(g); c.g=g;
   const w=CAGE.w, d=CAGE.d, h=CAGE.h, n=Math.round(w/CAGE.bar);
   g.add(box(w+.3,.18,d+.3,wood,0,.09,0));   // the wooden base
-  g.add(box(w+.2,.16,d+.2,iron,0,h,0));   // the lid frame
-  for(let i=0;i<=n;i++){ const t=-w/2+i*w/n; g.add(box(.08,.08,d,iron,t,h+.05,0)); }
+  // the lid: hinged at the back, so his fingers can reach in from the top
+  const lid=new THREE.Group(); lid.position.set(0,h,d/2); g.add(lid); c.lid=lid;
+  lid.add(box(w+.2,.16,d+.2,iron,0,0,-d/2));
+  for(let i=0;i<=n;i++){ const t=-w/2+i*w/n; lid.add(box(.08,.08,d,iron,t,.05,-d/2)); }
   c.bars=[];
   const bar=(x,z,bent)=>{ const b=cyl(.055,.055,h,iron,x,h/2,z,8); g.add(b); c.bars.push(b); return b; };
   for(let i=0;i<=n;i++){ const t=-w/2+i*w/n;
@@ -44,6 +49,7 @@ defineLevel('table',{
   title:'???',
   env:{fx:{exposure:1.05,saturation:1.05,contrast:1.1,temp:.08,bloomStrength:.35,bloomThreshold:1.1,aoRadius:1.2,vignette:.5,grain:.04},music:null,reverb:.55,surface:'wood',far:900,speed:3.6},
   async build(scene,lv){
+    lv.occluders=[];   // what blocks the pig's view of you at night
     scene.background=col(0x0a0604); scene.fog=new THREE.FogExp2(col(0x0e0806),.006); lv.fogDay=.006;
     lv.rig=makeRig(scene,{sun:1.6,sunColor:0xffb070,hemi:.35,sky:0x6a5a50,ground:0x1a100a,dir:V3(-.35,1,.45),span:46,dist:120,far:260,bias:-.0006,normalBias:.05});
     const iron=pbrMat('rusty_metal_04',.4,{opts:{metalness:.85,roughness:.6}}); iron.color=col(0x9a8a7a);
@@ -64,15 +70,15 @@ defineLevel('table',{
     chair.add(box(1.5,.6,1.15,chairM,0,.3,.05)); chair.add(box(1.6,2.6,.22,chairM,0,1.3,-.55));
     // the arena: a wooden bowl filled with sand, in the middle of the table
     const A=TABLE.arena, R=TABLE.arenaR;
-    const bowl=mesh(GC('bowlGeo',()=>{ const pts=[[R,.0],[R+1.6,.1],[R+1.9,1.6],[R+1.7,4.2],[R+1.2,4.6],[R+.9,4.4],[R+.4,1.0],[R,.35]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,96); g.computeVertexNormals(); return g; }),pbrMat('rough_wood',3,{opts:{roughness:.75}}),A.x,0,A.z); bowl.material.color=col(0x7a5434); bowl.material.side=THREE.DoubleSide; scene.add(bowl);
+    const bowl=mesh(GC('bowlGeo',()=>{ const pts=[[R,.0],[R+1.3,.08],[R+1.6,.95],[R+1.45,1.35],[R+1.0,1.3],[R+.45,.7],[R,.35]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,96); g.computeVertexNormals(); return g; }),pbrMat('rough_wood',3,{opts:{roughness:.75}}),A.x,0,A.z); bowl.material.color=col(0x7a5434); bowl.material.side=THREE.DoubleSide; scene.add(bowl); lv.occluders.push(bowl);
     const sand=mesh(new THREE.CircleGeometry(R+.3,96),pbrMat('dense_sand',3.2,{opts:{roughness:1}}),A.x,.35,A.z); sand.rotation.x=-Math.PI/2; sand.receiveShadow=true; scene.add(sand); lv.sand=sand;
-    colCircle(lv.col,A.x,A.z,R+1.9,()=>!ARENA.active);
+    colCircle(lv.col,A.x,A.z,R+1.6,()=>!ARENA.active);
     // things lying in the sand (you can grab them in a fight): old bones + rocks, and the scratches of old fights
     lv.arenaLoot=[];
     // the pig's plate: white china, a gnawed meat bone, bone splinters
     const china=new THREE.MeshPhysicalMaterial({color:col(0xe9e4da),roughness:.18,clearcoat:.8});
-    const plate=mesh(GC('plateGeo',()=>{ const pts=[[0,.05],[5.2,.08],[6.2,.35],[7.2,.75],[7.5,.8],[7.4,.6],[6.2,.15],[5,0],[0,0]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,64); g.computeVertexNormals(); return g; }),china,TABLE.plate.x,0,TABLE.plate.z); scene.add(plate);
-    const meat=makeMeatLeg(); meat.scale.setScalar(TK*.6); meat.position.set(TABLE.plate.x+1,.9,TABLE.plate.z-1); meat.rotation.set(Math.PI/2,0,.6); scene.add(meat);
+    const plate=mesh(GC('plateGeo',()=>{ const pts=[[0,.05],[5.2,.08],[6.2,.35],[7.2,.75],[7.5,.8],[7.4,.6],[6.2,.15],[5,0],[0,0]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,64); g.computeVertexNormals(); return g; }),china,TABLE.plate.x,0,TABLE.plate.z); scene.add(plate); lv.occluders.push(plate);
+    const meat=makeMeatLeg(); meat.scale.setScalar(TK*.6); meat.position.set(TABLE.plate.x+1,.9,TABLE.plate.z-1); meat.rotation.set(Math.PI/2,0,.6); scene.add(meat); lv.occluders.push(meat);
     // the spoon on the rim: metal = noise
     const steel=new THREE.MeshPhysicalMaterial({color:col(0xc8ccd0),metalness:1,roughness:.22});
     const spoon=new THREE.Group(); spoon.position.set(TABLE.plate.x+5.8,.85,TABLE.plate.z+3.6); spoon.rotation.y=-.7; scene.add(spoon);
@@ -80,7 +86,7 @@ defineLevel('table',{
     colFromObj(lv.col,meat,{k:.75}); colFromObj(lv.col,spoon,{k:.9});
     // the potted rose: a clay pot, a thorny stem going up out of sight, thorns fallen on the table
     const clay=pbrMat('clay_plaster',1.5,{opts:{roughness:.9}}); clay.color=col(0xb0603a);
-    const pot=mesh(GC('potGeo',()=>{ const pts=[[0,0],[4.6,0],[5.2,.3],[6.2,7.2],[6.8,7.4],[6.8,8.2],[6.0,8.2],[5.6,7.4],[0,7.4]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,48); g.computeVertexNormals(); return g; }),clay,TABLE.pot.x,0,TABLE.pot.z); scene.add(pot);
+    const pot=mesh(GC('potGeo',()=>{ const pts=[[0,0],[4.6,0],[5.2,.3],[6.2,7.2],[6.8,7.4],[6.8,8.2],[6.0,8.2],[5.6,7.4],[0,7.4]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,48); g.computeVertexNormals(); return g; }),clay,TABLE.pot.x,0,TABLE.pot.z); scene.add(pot); lv.occluders.push(pot);
     colCircle(lv.col,TABLE.pot.x,TABLE.pot.z,6.6);
     const stemM=new THREE.MeshStandardMaterial({color:col(0x3a5a22),roughness:.7,normalMap:charTex().skinN.normalMap});
     const stem=cyl(.7,.9,60,stemM,TABLE.pot.x+.8,37,TABLE.pot.z+.4,12); scene.add(stem);
@@ -88,32 +94,46 @@ defineLevel('table',{
     for(let i=0;i<10;i++){ const th=mesh(GC('thornGeo',()=>{ const c=new THREE.ConeGeometry(.35,1.4,8); c.translate(0,.7,0); return c; }),thornM,0,0,0); const a=rand(0,6.28); th.position.set(TABLE.pot.x+.8+Math.cos(a)*.75,10+i*4.5,TABLE.pot.z+.4+Math.sin(a)*.75); th.rotation.set(Math.sin(a)*1.2,0,-Math.cos(a)*1.2); scene.add(th); }
     // the napkin: soft cloth with a frayed edge, one corner folded up like a little tent (you can hide under it)
     const cloth=new THREE.MeshPhysicalMaterial({color:col(0xd8cdb8),roughness:.95,map:charTex().cloth.map,sheen:col(0x8a8070)});
-    const nap=mesh(GC('napGeo',()=>{ const p=new THREE.PlaneGeometry(16,12,48,36); const a=p.attributes.position; for(let k=0;k<a.count;k++){ const x=a.getX(k), y=a.getY(k); let z=.15+Math.abs(noise2(x*.25,y*.25))*.35; const cx=x-5.5, cy=y+3.5; const dd=Math.hypot(cx,cy); if(dd<4.5) z+=Math.cos(dd/4.5*Math.PI/2)*2.6; a.setZ(k,z); } p.rotateX(-Math.PI/2); p.computeVertexNormals(); return p; }),cloth,TABLE.napkin.x,0,TABLE.napkin.z); nap.material.side=THREE.DoubleSide; scene.add(nap);
+    const nap=mesh(GC('napGeo',()=>{ const p=new THREE.PlaneGeometry(16,12,48,36); const a=p.attributes.position; for(let k=0;k<a.count;k++){ const x=a.getX(k), y=a.getY(k); let z=.15+Math.abs(noise2(x*.25,y*.25))*.35; const cx=x-5.5, cy=y+3.5; const dd=Math.hypot(cx,cy); if(dd<4.5) z+=Math.cos(dd/4.5*Math.PI/2)*2.6; a.setZ(k,z); } p.rotateX(-Math.PI/2); p.computeVertexNormals(); return p; }),cloth,TABLE.napkin.x,0,TABLE.napkin.z); nap.material.side=THREE.DoubleSide; scene.add(nap); lv.occluders.push(nap);
     const threadM=new THREE.MeshStandardMaterial({color:col(0xe0d4bc),roughness:1});
-    lv.threads=[]; for(let i=0;i<7;i++){ const x0=TABLE.napkin.x-7+i*2.1, z0=TABLE.napkin.z-6; const pts=[V3(x0,.15,z0),V3(x0+rand(-.6,.6),.12,z0-1.2),V3(x0+rand(-.8,.8),.1,z0-2.4),V3(x0+rand(-.6,.6),.1,z0-3.4)];
+    lv.threads=[]; for(let i=0;i<7;i++){ const x0=TABLE.napkin.x+8, z0=TABLE.napkin.z-5+i*1.6; const pts=[V3(x0,.15,z0),V3(x0+1.2,.12,z0+rand(-.6,.6)),V3(x0+2.4,.1,z0+rand(-.8,.8)),V3(x0+3.4,.1,z0+rand(-.6,.6))];
       const th=mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),16,.06,6),threadM); scene.add(th); lv.threads.push(th); }
-    const thimble=new THREE.Group(); thimble.position.set(TABLE.napkin.x-2,0,TABLE.napkin.z-10.5); scene.add(thimble); lv.thimble=thimble; colCircle(lv.col,thimble.position.x,thimble.position.z,1.55);
+    const thimble=new THREE.Group(); thimble.position.set(TABLE.napkin.x+14,0,TABLE.napkin.z+1.5); scene.add(thimble); lv.thimble=thimble; lv.occluders.push(thimble); colCircle(lv.col,thimble.position.x,thimble.position.z,1.55);
     thimble.add(mesh(GC('thimGeo',()=>{ const pts=[[0,0],[1.5,0],[1.5,.2],[1.35,2.6],[1.0,3.0],[0,3.1]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,32); g.computeVertexNormals(); return g; }),new THREE.MeshPhysicalMaterial({color:col(0xc0b090),metalness:1,roughness:.35,normalMap:scorpionSkin('thim','#888',2500).nm,normalScale:new THREE.Vector2(.6,.6)}),0,0,0));
     // pebbles spilled from the pot, and a bottle cap next to them (metal = noise)
-    const stoneM=pbrMat('sandy_gravel_02',.4,{opts:{roughness:.9}}); stoneM.color=col(0x9a9088);
-    lv.pebbles=[]; for(let i=0;i<6;i++){ const pb=ell(rand(.3,.45),rand(.22,.32),rand(.3,.42),stoneM,TABLE.pebbles.x+rand(-2.5,2.5),.24,TABLE.pebbles.z+rand(-2,2),16); pb.rotation.y=rand(0,6); scene.add(pb); lv.pebbles.push(pb); }
-    const cap=new THREE.Group(); cap.position.set(TABLE.pebbles.x+3.6,0,TABLE.pebbles.z+2.4); cap.rotation.z=.08; scene.add(cap); lv.cap=cap; colCircle(lv.col,cap.position.x,cap.position.z,2.75);
+    const stoneM=pbrMat('sandy_gravel_02',.4,{opts:{roughness:.85}}); stoneM.color=col(0xe2dcd2);
+    lv.pebbles=[]; for(let i=0;i<6;i++){ const pb=ell(rand(.55,.75),rand(.4,.55),rand(.5,.7),stoneM,TABLE.pebbles.x+rand(-2.5,2.5),.42,TABLE.pebbles.z+rand(-2,2),18); pb.rotation.y=rand(0,6); scene.add(pb); lv.pebbles.push(pb); }
+    const cap=new THREE.Group(); cap.position.set(TABLE.pebbles.x+3.6,0,TABLE.pebbles.z+2.4); cap.rotation.z=.08; scene.add(cap); lv.cap=cap; lv.occluders.push(cap); colCircle(lv.col,cap.position.x,cap.position.z,2.75);
     colCircle(lv.col,TABLE.napkin.x+5.5,TABLE.napkin.z+3.5,2.6);   // the folded-up corner of the napkin
     cap.add(mesh(GC('capGeo',()=>{ const g=new THREE.CylinderGeometry(2.6,2.7,.9,24,1,true); return g; }),new THREE.MeshPhysicalMaterial({color:col(0xb8302a),metalness:.9,roughness:.3,side:THREE.DoubleSide}),0,.45,0)); cap.add(cyl(2.6,2.6,.08,new THREE.MeshPhysicalMaterial({color:col(0xc8c0b0),metalness:1,roughness:.3}),0,.88,0,24));
     // the candle: the light at night
     const wax=new THREE.MeshPhysicalMaterial({color:col(0xf0e6d0),roughness:.5,transmission:.15});
-    scene.add(cyl(2.6,2.8,12,wax,TABLE.candle.x,6,TABLE.candle.z,28)); colCircle(lv.col,TABLE.candle.x,TABLE.candle.z,3.1);
+    const cnd=cyl(2.6,2.8,12,wax,TABLE.candle.x,6,TABLE.candle.z,28); scene.add(cnd); lv.occluders.push(cnd); colCircle(lv.col,TABLE.candle.x,TABLE.candle.z,3.1);
     const flame=mesh(GC('flameGeo',()=>{ const g=new THREE.SphereGeometry(.6,12,10); g.scale(1,2.2,1); return g; }),new THREE.MeshBasicMaterial({color:col(0xffc070).multiplyScalar(2.5)}),TABLE.candle.x,13.6,TABLE.candle.z,false); scene.add(flame); lv.flame=flame;
     lv.candleL=new THREE.PointLight(col(0xffa860),3.2,95,1.6); lv.candleL.position.set(TABLE.candle.x,15,TABLE.candle.z); scene.add(lv.candleL);
     // a cup (good cover at night)
-    scene.add(cyl(4,3.6,9,china,TABLE.cup.x,4.5,TABLE.cup.z,32)); colCircle(lv.col,TABLE.cup.x,TABLE.cup.z,4.1);
+    const cupM=cyl(4,3.6,9,china,TABLE.cup.x,4.5,TABLE.cup.z,32); scene.add(cupM); lv.occluders.push(cupM); colCircle(lv.col,TABLE.cup.x,TABLE.cup.z,4.1);
+    // the book under the cages: leather cover, cream page edges
+    { const bw=BOOK.x1-BOOK.x0, bd=BOOK.z1-BOOK.z0, cx=(BOOK.x0+BOOK.x1)/2, cz=(BOOK.z0+BOOK.z1)/2;
+      const leather=pbrMat('brown_leather',2.5,{opts:{roughness:.7}}); leather.color=col(0x5a2e1a);
+      const pages=new THREE.MeshStandardMaterial({color:col(0xe8dcc0),roughness:.95,map:canvasTex(64,256,(c,w,h)=>{ c.fillStyle='#e8dcc0'; c.fillRect(0,0,w,h); for(let i=0;i<h;i+=2){ c.fillStyle='rgba(120,100,70,'+rand(.08,.25)+')'; c.fillRect(0,i,w,1); } })});
+      const book=new THREE.Group(); scene.add(book); lv.book=book;
+      book.add(box(bw,.25,bd,leather,cx,BOOK.h-.125,cz)); book.add(box(bw,.25,bd,leather,cx,.125,cz)); book.add(box(bw-.4,BOOK.h-.5,bd-.3,pages,cx+.2,BOOK.h/2,cz));
+      book.add(box(.35,BOOK.h,bd,leather,BOOK.x0+.17,BOOK.h/2,cz));   // the spine
+      lv.occluders.push(book);
+      colBox(lv.col,BOOK.x0,BOOK.x1,BOOK.z0,BOOK.z1,()=>PLAYER.y<1.4);   // a wall when you're down on the table, a floor when you're up on it
+      // the wooden ruler leaning on the book
+      const R=RULER, len=Math.hypot(R.x1-R.x0,BOOK.h); const rm=pbrMat('rough_wood',.6,{opts:{roughness:.7}}); rm.color=col(0xc8a070);
+      const ruler=box(len,.3,R.z1-R.z0,rm,(R.x0+R.x1)/2,BOOK.h/2,(R.z0+R.z1)/2); ruler.rotation.z=-Math.atan2(BOOK.h,R.x1-R.x0); scene.add(ruler);
+      for(let i=1;i<16;i++){ const tick=box(.06,.02,i%5?.6:1.2,new THREE.MeshBasicMaterial({color:0x2a1a0a}),0,0,0,false); const t=i/16; tick.position.set(lerp(R.x0,R.x1,t),lerp(BOOK.h,0,t)+.17,R.z0+.4+(i%5?.3:.6)); tick.rotation.z=ruler.rotation.z; scene.add(tick); } }
     // the row of prisoner cages
     for(const c of TABLE.cages) makeTinyCage(scene,lv,c,iron,wood);
     // your stash in the back corner of your cage (what you collected shows up here)
     const yc=cageOf('you'); lv.stash={x:yc.x+1.9,z:yc.z+1.9,items:{}};
     const plateH=r=>r<5.2?.08:r<6.2?lerp(.08,.35,(r-5.2)):r<7.2?lerp(.35,.75,(r-6.2)):r<7.5?.8:r<8.6?lerp(.8,0,(r-7.5)/1.1):0;
     const napH=(x,z)=>{ const lx=x-TABLE.napkin.x, ly=-(z-TABLE.napkin.z); if(Math.abs(lx)>8||Math.abs(ly)>6) return 0; let h=.15+Math.abs(noise2(lx*.25,ly*.25))*.35; const dd=Math.hypot(lx-5.5,ly+3.5); if(dd<4.5) h+=Math.cos(dd/4.5*Math.PI/2)*2.6; return h; };
-    lv.ground=(x,z)=>{ const a=Math.hypot(x-A.x,z-A.z); if(a<R) return .35; for(const c of TABLE.cages) if(Math.abs(x-c.x)<CAGE.w/2+.15&&Math.abs(z-c.z)<CAGE.d/2+.15) return .18;
+    lv.ground=(x,z)=>{ const a=Math.hypot(x-A.x,z-A.z); if(a<R) return .35; for(const c of TABLE.cages) if(Math.abs(x-c.x)<CAGE.w/2+.15&&Math.abs(z-c.z)<CAGE.d/2+.15) return CAGE_Y;
+      if(x>=BOOK.x0&&x<=BOOK.x1&&z>=BOOK.z0&&z<=BOOK.z1) return BOOK.h; if(x>RULER.x0&&x<=RULER.x1&&z>=RULER.z0&&z<=RULER.z1) return BOOK.h*(RULER.x1-x)/(RULER.x1-RULER.x0);
       const pr=Math.hypot(x-TABLE.plate.x,z-TABLE.plate.z); if(pr<8.6) return plateH(pr); return napH(x,z); };
     lv.surfaceAt=(x,z)=>Math.hypot(x-A.x,z-A.z)<R?'sand':'wood';
     lv.col.bounds=[-TABLE.W/2+.6,TABLE.W/2-.6,-TABLE.D/2+.6,TABLE.D/2-.6];

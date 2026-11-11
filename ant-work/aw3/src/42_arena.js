@@ -11,24 +11,24 @@ const WEAPONS={
   fists:{name:'Fists',reach:1.35,dmg:3,cd:.42,kind:'melee'},
   bone:{name:'Sharp bone',reach:1.8,dmg:7,cd:.36,kind:'melee',swing:true},
   spear:{name:'Thorn spear',reach:3.0,dmg:9,cd:.6,kind:'melee'},
-  bspear:{name:'Bone spear',reach:3.1,dmg:16,cd:.55,kind:'melee'},
+  bspear:{name:'Bone spear',reach:3.1,dmg:13,cd:.6,kind:'melee'},
   rocks:{name:'Rocks',dmg:6,cd:.5,kind:'throw'}
 };
 const BUGDEF={
-  mantis:{name:'PRAYING MANTIS',hp:100,speed:3.0,keep:2.6,turn:3.2,atks:[
-    {n:'slash',w:.85,reach:3.4,arc:.85,dmg:1,rec:1.1,weight:3},
-    {n:'double',w:.75,reach:3.2,arc:.85,dmg:1,rec:1.3,weight:2,hits:2},
-    {n:'lunge',w:.95,reach:2.8,arc:.9,dmg:1,rec:1.4,weight:2,dash:6.5,min:4.5}]},
-  spider:{name:'TARANTULA',hp:120,speed:3.5,keep:2.8,turn:3.6,atks:[
-    {n:'bite',w:.55,reach:2.9,arc:.75,dmg:1,rec:.95,weight:3},
-    {n:'leap',w:.85,aoe:2.6,dmg:1,rec:1.3,weight:2,leap:true,min:4},
-    {n:'web',w:.65,proj:true,rec:.9,weight:2,min:5}]},
-  scorpion:{name:'EMPEROR SCORPION',hp:150,speed:2.3,keep:3.0,turn:2.4,atks:[
-    {n:'pincer',w:.8,reach:3.4,arc:.9,dmg:1,rec:1.15,weight:3},
-    {n:'sting',w:1.05,aoe:1.8,dmg:2,rec:1.4,weight:2,target:true},
-    {n:'sweep',w:.95,aoe:4.6,ring:true,dmg:1,rec:1.2,weight:1,max:4.2}]}
+  mantis:{name:'PRAYING MANTIS',hp:150,speed:3.4,keep:2.4,turn:3.8,atks:[
+    {n:'slash',w:.58,reach:3.5,arc:.9,dmg:1,rec:.75,weight:3},
+    {n:'double',w:.52,reach:3.3,arc:.9,dmg:1,rec:.9,weight:3,hits:2},
+    {n:'lunge',w:.66,reach:2.9,arc:.95,dmg:2,rec:1.0,weight:2,dash:7,min:4.2}]},
+  spider:{name:'TARANTULA',hp:180,speed:4.1,keep:2.6,turn:4.2,atks:[
+    {n:'bite',w:.45,reach:3.0,arc:.8,dmg:1,rec:.75,weight:3},
+    {n:'leap',w:.68,aoe:2.8,dmg:2,rec:1.0,weight:3,leap:true,min:3.5},
+    {n:'web',w:.5,proj:true,rec:.65,weight:2,min:4.5}]},
+  scorpion:{name:'EMPEROR SCORPION',hp:230,speed:2.8,keep:2.8,turn:3.0,atks:[
+    {n:'pincer',w:.55,reach:3.5,arc:.95,dmg:1,rec:.85,weight:3},
+    {n:'sting',w:.85,aoe:1.9,dmg:2,rec:1.1,weight:3,target:true},
+    {n:'sweep',w:.75,aoe:4.8,ring:true,dmg:1,rec:.95,weight:2,max:4.6}]}
 };
-const ARENA={active:false,paused:false,hp:6,maxHp:6,inv:{},cur:'fists',atkCd:0,dodgeT:0,dodgeCd:0,iframe:0,slowT:0,bug:null,st:null,projs:[],marks:[],loot:[],res:null,jay:null};
+const ARENA={active:false,paused:false,hp:5,maxHp:5,inv:{},cur:'fists',atkCd:0,dodgeT:0,dodgeCd:0,iframe:0,slowT:0,bug:null,st:null,projs:[],marks:[],loot:[],res:null,jay:null};
 /* ---------- your stuff (kept in F so checkpoints save it) ---------- */
 function inv(){ return F.inv||(F.inv={bone:0,thorn:0,thread:0,pebbles:0,bspear:0}); }
 const ITEM_NAMES={bone:'Sharp bone',thorn:'Thorn',thread:'Thread',pebbles:'Pebbles',bspear:'Bone spear'};
@@ -82,7 +82,7 @@ async function arenaFight(kind,opts={}){
     for(let i=0;i<4;i++) arenaLoot('rock',V3(A.x+Math.cos(i*1.7+2)*rand(4,9),0,A.z+Math.sin(i*1.7+2)*rand(4,9)));
     const B=bug.userData.bug; B.dead=0; B.atk=null; B.atkK=0; B.strikeK=0; B.air=0; bug.position.set(A.x,.35,A.z-7); bug.rotation.y=0;
     ARENA.st={def,hp:def.hp,phase:'idle',t:0,cd:1.6,atk:null,half:false};
-    setPlayer(V3(A.x,0,A.z+7),0); PLAYER.y=.35; PLAYER.speed=lv.env.speed;
+    if(!opts.keepPos){ setPlayer(V3(A.x,0,A.z+7),0); PLAYER.y=.35; } opts.keepPos=false; PLAYER.speed=lv.env.speed;
     setWeapon(ownedWeapons().includes('bspear')?'bspear':ownedWeapons().includes('spear')?'spear':ownedWeapons().includes('bone')?'bone':'fists');
     arenaHUDUpdate(); };
   reset();
@@ -90,13 +90,13 @@ async function arenaFight(kind,opts={}){
   arenaHUD(true); freeWalk(); PLAYER.ctl.jump=false; crosshair(true);
   const P=lv.pig.userData.pig; P.stop=false; P.look=V3(A.x,0,A.z);
   playMusic(kind==='scorpion'?'boss':'arena',1.2);
-  for(;;){
-    const r=await new Promise(res=>{ ARENA.res=res; });
-    if(r==='win') break;
-    // you lost: down in the sand, then the same fight again
-    ARENA.paused=true; PLAYER.lock(); SND.play('body_fall',{vol:.9}); tweenVal(v=>{ PLAYER.roll=v; },0,.5,.6);
-    await wait(.9); cardShow('YOU WENT DOWN','Get up. Same fight again.'); await wait(2.4); cardHide(); PLAYER.roll=0;
-    reset(); ARENA.paused=false; freeWalk(); PLAYER.ctl.jump=false; }
+  const r=await new Promise(res=>{ ARENA.res=res; });
+  if(r!=='win'){ // you went down: no second try here — the scene sends you back to the first fight (Day 3)
+    ARENA.paused=true; PLAYER.lock(); SND.play('body_fall',{vol:.9}); tweenVal(v=>{ PLAYER.roll=v; },0,.5,.6); stopMusic(1);
+    await wait(1); ARENA.active=false; arenaHUD(false); lv.col.radius=null; if(VM.wpn){ VM.grp.remove(VM.wpn); VM.wpn=null; }
+    for(const p of ARENA.projs) p.m.parent&&p.m.parent.remove(p.m); ARENA.projs=[]; for(const m of ARENA.marks) m.m.parent&&m.m.parent.remove(m.m); ARENA.marks=[];
+    for(const l of ARENA.loot) l.m.parent&&l.m.parent.remove(l.m); ARENA.loot=[];
+    return {won:false,bug}; }
   // won
   ARENA.paused=true; PLAYER.lock();
   await wait(2.2);
@@ -106,7 +106,7 @@ async function arenaFight(kind,opts={}){
   for(const l of ARENA.loot) l.m.parent&&l.m.parent.remove(l.m); ARENA.loot=[];
   // what you carried in keeps being yours (rocks you threw stay in the sand)
   const I=inv(); I.pebbles=Math.min(I.pebbles,ARENA.inv.pebbles);
-  return bug;
+  return {won:true,bug};
 }
 function arenaLoot(kind,pos){ const lv=LEVELS.table;
   const m=kind==='bone'?makeLongBone(1.2,.08):ell(.32,.24,.3,pbrMat('sandy_gravel_02',.4),0,0,0,14);
@@ -158,7 +158,7 @@ function bugTakeHit(dmg){ const st=ARENA.st, bug=ARENA.bug, B=bug.userData.bug; 
     const P=LEVELS.table.pig.userData.pig; later(.8,()=>SND.play('pig_squeal',{vol:1,pos:V3(0,44,-40),ref:80,rate:.75}));
     later(.1,()=>ARENA.res&&ARENA.res('win')); } }
 function youGetHitArena(dmg,from){ if(ARENA.iframe>0||!ARENA.active||ARENA.paused) return;
-  ARENA.hp-=dmg; ARENA.iframe=.8; dmgFlash(); shake(.55); SND.play('oof_'+randi(1,2),{vol:.9}); SND.play('punch_'+randi(1,3),{vol:.6,rate:.7});
+  ARENA.hp-=dmg; ARENA.iframe=.6; dmgFlash(); shake(.55); SND.play('oof_'+randi(1,2),{vol:.9}); SND.play('punch_'+randi(1,3),{vol:.6,rate:.7});
   if(from){ const k=V3(PLAYER.pos.x-from.x,0,PLAYER.pos.z-from.z).normalize(); PLAYER.pos.addScaledVector(k,1.4); }
   arenaHUDUpdate(); if(ARENA.hp<=0) ARENA.res&&ARENA.res('lose'); }
 /* ---------- every frame ---------- */
@@ -220,7 +220,7 @@ function bugAI(dt,t){
     const dur=a.leap?.6:a.dash?.4:(a.hits===2?.55:.3);
     if(st.t>=dur){ st.phase='rec'; st.t=0; B.air=0; } }
   else if(st.phase==='rec'){ B.atkK=damp(B.atkK,0,6,dt); B.strikeK=damp(B.strikeK,0,6,dt);
-    if(st.t>=st.atk.rec){ st.phase='idle'; st.cd=rand(.5,1.2); B.atk=null; } }
+    if(st.t>=st.atk.rec){ st.phase='idle'; st.cd=rand(.25,.7); B.atk=null; } }
   // stay in the bowl, never inside you
   const r=Math.hypot(bug.position.x-A.x,bug.position.z-A.z), lim=TABLE.arenaR-B.r-.3; if(r>lim){ bug.position.x=A.x+(bug.position.x-A.x)/r*lim; bug.position.z=A.z+(bug.position.z-A.z)/r*lim; }
   bug.position.y=st.phase==='strike'&&st.atk.leap?bug.position.y:.35;
