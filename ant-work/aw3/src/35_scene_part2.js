@@ -321,28 +321,32 @@ SCENES.scorpion=async function(){
   // the half-way moment: his key falls in the sand, the scorpion grabs Jay 2
   lv.fightOpts={onHalf:async()=>{
     PLAYER.lock(); PLAYER.ctl.look=true; ARENA.paused=true;
-    const key=keyMesh(); key.position.set(A.x+2,9,A.z+1); lv.scene.add(key);
-    SND.play('pig_squeal',{vol:1,pos:V3(0,44,-40),ref:80,rate:.8}); lookAtPoint(V3(A.x+2,6,A.z+1),.5);
+    // everything happens right in front of you: the spot 5.5 m ahead (toward the middle of the bowl)
+    const toMid=V3(A.x-PLAYER.pos.x,0,A.z-PLAYER.pos.z); if(toMid.lengthSq()<1) toMid.set(0,0,-1); toMid.normalize();
+    const side=V3(-toMid.z,0,toMid.x);
+    const front=PLAYER.pos.clone().addScaledVector(toMid,5.5); front.y=0;
+    const key=keyMesh(); const kp=front.clone().addScaledVector(side,-2.6).addScaledVector(toMid,-1.5); key.position.set(kp.x,9,kp.z); lv.scene.add(key);
+    SND.play('pig_squeal',{vol:1,pos:V3(0,44,-40),ref:80,rate:.8}); lookAtPoint(V3(kp.x,5,kp.z),.5);
     await tweenVal(k=>{ key.position.y=9-k*8.45; key.rotation.z=k*4; },0,1,.9,easeIn); SND.play('sand_fall',{vol:.8,pos:key.position,ref:8}); SND.play('metal_3',{vol:.6,pos:key.position,ref:8,rate:1.4});
     await say(['d5_2']);
     // the scorpion goes for Jay 2 and pins him to the wall
-    const bug=ARENA.bug, B=bug.userData.bug; const pin=V3(A.x-8.5,.35,A.z-3); J.userData.A.custom=true; J.userData.A.path=null; J.position.set(pin.x-1.8,0,pin.z-.4); J.position.y=.35; faceTo(J,bug.position);
-    bug.position.set(pin.x+2.6,.35,pin.z+.3); bug.rotation.y=Math.atan2(J.position.x-bug.position.x,J.position.z-bug.position.z);
+    const bug=ARENA.bug, B=bug.userData.bug; const pin=front.clone().addScaledVector(side,2.2); J.userData.arenaHold=true; J.userData.A.path=null;
+    J.position.set(pin.x,.35,pin.z); bug.position.copy(pin).addScaledVector(toMid,3.6).addScaledVector(side,.6); bug.position.y=.35; bug.rotation.y=Math.atan2(J.position.x-bug.position.x,J.position.z-bug.position.z); faceTo(J,bug.position);
     B.atk='pincer'; B.atkK=1; B.strikeK=.6; setPose(J,'startle',.2); setMood(J,'scared'); lookAtPoint(V3(J.position.x,1.2,J.position.z),.5);
     chat(['d5_3']); await wait(.8);
     const r=await timedChoice([{text:'Save Jay 2'},{text:'Grab the key'}],6,1);
     if(r===0){ F.savedJay2=true; SND.play('blade_2',{vol:1}); bugHurt(bug); B.atk=null; B.atkK=0; B.strikeK=0; clearPose(J,.3);
-      J.position.set(key.position.x-1,.35,key.position.z+1); await wait(.4); key.visible=false; SND.play('pickup',{vol:.8}); await say(['d5_s1']); remember('He'); }
+      J.position.set(key.position.x+.8,.35,key.position.z+.8); await wait(.4); key.visible=false; SND.play('pickup',{vol:.8}); await say(['d5_s1']); remember('He'); }
     else { F.savedJay2=false; lookAtPoint(key.position,.3); key.visible=false; SND.play('pickup',{vol:.8});
       B.atk='sting'; await tweenVal(v=>{ B.atkK=v; },0,1,.5); B.strikeK=1; SND.play('blade_3',{vol:1,rate:.6}); SND.play('scream',{vol:.8,rate:1.15}); lookAtPoint(V3(J.position.x,1.2,J.position.z),.3);
       await collapse(J); await say(['d5_k1']); remember('He'); B.atk=null; B.atkK=0; B.strikeK=0; }
-    F.key=true; ARENA.jay=F.savedJay2?J:null; J.userData.A.custom=!F.savedJay2;
+    F.key=true; ARENA.jay=F.savedJay2?J:null; J.userData.arenaHold=!F.savedJay2;
     lookAtPoint(bug.position.clone().add(V3(0,1,0)),.4); await wait(.5);
   }};
   // both of you in the bowl
   J.userData.A.look=null; const fd=$('fade');
   const fight=dropInBowl(lv,'scorpion');
-  await wait(1.2); resetActor(J); J.position.set(A.x+5,.35,A.z+5); J.position.y=.35; ARENA.jay=J; J.userData.A.custom=false;
+  await wait(1.2); resetActor(J); J.position.set(A.x+5,.35,A.z+5); J.position.y=.35; ARENA.jay=J; J.userData.arenaHold=false;
   const bug=await fight; unlock('scorpionWin');
   ARENA.jay=null;
   // back in the cage, night, the key hidden in the straw

@@ -23,8 +23,8 @@ const BUGDEF={
     {n:'bite',w:.55,reach:2.9,arc:.75,dmg:1,rec:.95,weight:3},
     {n:'leap',w:.85,aoe:2.6,dmg:1,rec:1.3,weight:2,leap:true,min:4},
     {n:'web',w:.65,proj:true,rec:.9,weight:2,min:5}]},
-  scorpion:{name:'EMPEROR SCORPION',hp:170,speed:2.3,keep:3.0,turn:2.4,atks:[
-    {n:'pincer',w:.65,reach:3.6,arc:.9,dmg:1,rec:1.0,weight:3},
+  scorpion:{name:'EMPEROR SCORPION',hp:150,speed:2.3,keep:3.0,turn:2.4,atks:[
+    {n:'pincer',w:.8,reach:3.4,arc:.9,dmg:1,rec:1.15,weight:3},
     {n:'sting',w:1.05,aoe:1.8,dmg:2,rec:1.4,weight:2,target:true},
     {n:'sweep',w:.95,aoe:4.6,ring:true,dmg:1,rec:1.2,weight:1,max:4.2}]}
 };
@@ -57,8 +57,8 @@ function weaponMesh(k){
   const boneM=new THREE.MeshStandardMaterial({color:col(0xe6dcc6),roughness:.6}), thornM=new THREE.MeshPhysicalMaterial({color:col(0x8a4a2a),roughness:.4,clearcoat:.5}), thr=new THREE.MeshStandardMaterial({color:col(0xe0d4bc),roughness:1});
   if(k==='bone'){ const b=makeLongBone(.34,.022); b.rotation.x=-Math.PI/2; b.position.z=.1; g.add(b); const tip=mesh(new THREE.ConeGeometry(.02,.1,6),boneM,0,0,-.33); tip.rotation.x=-Math.PI/2; g.add(tip); }
   else if(k==='spear'){ const t=mesh(new THREE.ConeGeometry(.045,1.1,10),thornM,0,0,-.45); t.rotation.x=-Math.PI/2; g.add(t); }
-  else if(k==='bspear'){ const sh=makeLongBone(.8,.024); sh.rotation.x=-Math.PI/2; sh.position.z=.15; g.add(sh); const t=mesh(new THREE.ConeGeometry(.04,.42,10),thornM,0,0,-.78); t.rotation.x=-Math.PI/2; g.add(t);
-    for(let i=0;i<6;i++){ const w=mesh(new THREE.TorusGeometry(.03,.006,5,12),thr,0,0,-.55-i*.012); g.add(w); } }
+  else if(k==='bspear'){ const sh=makeLongBone(.8,.024); sh.rotation.x=-Math.PI/2; sh.position.z=.05; g.add(sh); const t=mesh(new THREE.ConeGeometry(.04,.42,10),thornM,0,0,-.9); t.rotation.x=-Math.PI/2; g.add(t);
+    for(let i=0;i<6;i++){ const w=mesh(new THREE.TorusGeometry(.03,.006,5,12),thr,0,0,-.66-i*.012); g.add(w); } }
   else if(k==='rocks'){ g.add(ell(.06,.045,.055,pbrMat('sandy_gravel_02',.2),0,.01,-.02,12)); }
   g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } }); return g;
 }
@@ -228,7 +228,7 @@ function bugAI(dt,t){
   if(dd<minD&&dd>1e-3){ PLAYER.pos.x=c2.x+dx/dd*minD; PLAYER.pos.z=c2.z+dz/dd*minD; }
 }
 /* Jay 2 in the arena (day 3): keeps his distance, throws rocks now and then */
-function arenaJayTick(dt,t){ const J=ARENA.jay, bug=ARENA.bug, A=TABLE.arena; if(!J||J.userData.A.custom) return;
+function arenaJayTick(dt,t){ const J=ARENA.jay, bug=ARENA.bug, A=TABLE.arena; if(!J||J.userData.arenaHold) return;
   const away=V3(J.position.x-bug.position.x,0,J.position.z-bug.position.z); if(away.lengthSq()<.01) away.set(1,0,0); away.normalize();
   const goal=V3(A.x,0,A.z).addScaledVector(away,8.5);
   ARENA.jayMove=(ARENA.jayMove||0)-dt; if(ARENA.jayMove<=0){ ARENA.jayMove=1.2; if(Math.hypot(goal.x-J.position.x,goal.z-J.position.z)>1.2) walkTo(J,[goal],2.8); }
