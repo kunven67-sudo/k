@@ -270,7 +270,25 @@ async function enterLevel(name,spawn={},opts={}){
   for(const t of def.triggers) t.inside=false;
   if(def.enter) def.enter(spawn,opts);
   invalidateMotion();
+  freeOtherLevels(def);
   return def;
+}
+/* 11-11 FIX "stuck on Loading after playing a while" (GS3, GT 1030 2 GB): every area you ever visited stayed in
+   graphics memory (~600 MB of textures by the end), so loading the next area ran the card out of memory.
+   Now the areas you LEFT give their textures + shapes back to the card. Nothing is deleted: if you go back,
+   three.js uploads them again by itself. Things the new area also uses are kept. */
+function texOf(o,set){ const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[]; for(const m of ms) for(const k in m){ const t=m[k]; if(t&&t.isTexture) set.add(t); } }
+function freeOtherLevels(cur){
+  try{
+    const keepT=new Set(), keepG=new Set();
+    cur.scene.traverse(o=>{ if(o.geometry) keepG.add(o.geometry); texOf(o,keepT); });
+    if(cur.scene.background&&cur.scene.background.isTexture) keepT.add(cur.scene.background);
+    const freeable=t=>{ const im=t.image; return t.isDataTexture||(im&&(im instanceof HTMLCanvasElement||im instanceof HTMLImageElement||(typeof ImageBitmap!=='undefined'&&im instanceof ImageBitmap))); };
+    for(const s of LEVEL_SCENES){ if(s===cur.scene) continue;
+      const T=new Set(), Gs=new Set(); s.traverse(o=>{ if(o.geometry) Gs.add(o.geometry); texOf(o,T); });
+      for(const t of T) if(!keepT.has(t)&&freeable(t)) t.dispose();
+      for(const g of Gs) if(!keepG.has(g)) g.dispose(); }
+  }catch(e){ console.warn('freeOtherLevels',e); }
 }
 function onLevelUpdate(fn){ LV_UPDATERS_PENDING.push(fn); }
 const LV_UPDATERS_PENDING=[];
