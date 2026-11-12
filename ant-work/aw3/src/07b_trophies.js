@@ -18,7 +18,10 @@ const TROPHY_DEFS=[
   ['spiderWin','For Orrin','Beat the tarantula','silver'],
   ['scorpionWin','Sting Operation','Beat the scorpion','gold'],
   ['part2','The Key','Get the key out of the bowl','gold'],
-  ['escape','Off The Table','Escape the pig king','gold']
+  ['escape','Off The Table','Escape the pig king','gold'],
+  ['twistedOut','Shadow Lost','Get out of the twisted house','gold'],
+  ['twoJays','Two Jays At Work','Break out of the fake world','gold'],
+  ['aw3end','Should We Jump?','Finish Ant Work 3','platinum']
 ];
 const TROPHY=Object.assign({},loadJSON('aw3_ach')||{});
 const TSTAT=Object.assign({},loadJSON('aw3_ach_stats')||{});

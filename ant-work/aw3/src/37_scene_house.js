@@ -54,7 +54,7 @@ function houseTick(lv,dt,t){
   else if(CAT.state==='pounce'){ const k=Math.min(1,CAT.t/.75); const dir=CAT.to.clone().sub(CAT.from); const L=dir.length(); const land=CAT.from.clone().addScaledVector(dir.normalize(),Math.max(0,L-10));
     c.position.lerpVectors(CAT.from,land,k); c.position.y=Math.sin(k*Math.PI)*8;
     if(k>=1){ c.position.y=0; shake(.6); SND.play('body_fall',{vol:1,pos:c.position,ref:40,rate:.6});
-      const hidden=youHiddenFromCat(lv); if(d<14&&!hidden){ CAT.state='eat'; lv.catOn=false; caughtByCat(lv); } else { CAT.state='hunt'; CAT.target=PLAYER.pos.clone(); } } }
+      const hidden=youHiddenFromCat(lv); if(d<14&&!hidden&&PLAYER.y<12){ CAT.state='eat'; lv.catOn=false; caughtByCat(lv); } else { CAT.state='hunt'; CAT.target=PLAYER.pos.clone(); } } }
   else if(CAT.state==='wander'){ if(!CAT.wp||Math.hypot(CAT.wp.x-c.position.x,CAT.wp.z-c.position.z)<5) CAT.wp=V3(rand(-50,190),0,rand(-30,30)); walkTo(CAT.wp,3); if(seen&&d<60){ CAT.state='hunt'; } }
   // stay inside the house
   c.position.x=clamp(c.position.x,HOUSE.x0+14,HOUSE.x1-14); c.position.z=clamp(c.position.z,HOUSE.z0+12,HOUSE.z1-12);
@@ -185,6 +185,6 @@ async function keyRun(lv){
   // the watch blasts: NIVALIS
   const hum=loopSnd('hum_build',{vol:.8}); await tweenVal(v=>{ PLAYER.watchGlow=v; },0,1,1.6); SND.play('blast',{vol:1}); hum&&hum.stop(.2); shake(1);
   const wh=$('fxWhite'); wh.style.transition='opacity .2s'; wh.style.opacity=1; await wait(1.4); PLAYER.watchGlow=0;
-  F.houseDone=1; saveCheckpoint('nivalis'); unlock('house');
+  F.houseDone=1; saveCheckpoint('nivalis'); unlock('twistedOut');
   runStory(()=>SCENES.nivalis());
 }

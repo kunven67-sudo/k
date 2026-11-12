@@ -727,5 +727,321 @@
   "e_c7": {
     "who": "Jay",
     "text": "Everybody hold on to me!"
+  },
+  "h_1": {
+    "who": "Jay2",
+    "text": "Okay... that's NOT the pig room."
+  },
+  "h_3": {
+    "who": "Jay",
+    "text": "Wait. I know this place. This is my house... but it's all wrong. It's huge. And twisted."
+  },
+  "h_2": {
+    "who": "Jay",
+    "text": "That's me. Older. With a family... a normal life. No Jim, no ants. I never had that."
+  },
+  "h_am": {
+    "who": "OldJay",
+    "text": "Hey babe, it's me. Bus broke down, I'll be late. Tell the kids I love 'em. Oh, and lock the cat flap, Shadow keeps sneaking out. Key's in the cookie jar. Love you. Bye."
+  },
+  "h_4": {
+    "who": "Jay",
+    "text": "That was MY voice."
+  },
+  "h_5": {
+    "who": "Jay2",
+    "text": "The cookie jar. The cat flap. That's our way out."
+  },
+  "h_6": {
+    "who": "Jay2",
+    "text": "[whisper] Is that the cat? ...Don't wake it up."
+  },
+  "h_split": {
+    "who": "Jay2",
+    "text": "That hallway is huge. Split up and meet at the counter... or stick together?"
+  },
+  "h_met": {
+    "who": "Jay2",
+    "text": "There you are! Thought the drips got you."
+  },
+  "h_7b": {
+    "who": "Bram",
+    "text": "On three! One... two..."
+  },
+  "h_8": {
+    "who": "Jay2",
+    "text": "PUSH!"
+  },
+  "h_9": {
+    "who": "Jay",
+    "text": "Got the key!"
+  },
+  "h_10": {
+    "who": "Jay2",
+    "text": "Now down to the cat flap. Don't let Shadow see you."
+  },
+  "h_7": {
+    "who": "Teo",
+    "text": "Hey! Kitty! Over here!"
+  },
+  "h_7c": {
+    "who": "Bram",
+    "text": "Oi! Big cat! Come and get me!"
+  },
+  "h_11": {
+    "who": "Jay2",
+    "text": "It's open!"
+  },
+  "h_12": {
+    "who": "Jay",
+    "text": "Wait... the watch. It's glowing again."
+  },
+  "n_1": {
+    "who": "Jay",
+    "text": "My collar... it's gone. The blast fried it."
+  },
+  "n_2": {
+    "who": "Jay2",
+    "text": "Where ARE we? It's freezing!"
+  },
+  "n_3": {
+    "who": "Jay",
+    "text": "This isn't Earth. Look at the sky."
+  },
+  "n_4": {
+    "who": "Jay2",
+    "text": "The ice! Don't stop, keep walking!"
+  },
+  "n_5": {
+    "who": "Jay",
+    "text": "Is that... an ant?"
+  },
+  "n_6": {
+    "who": "Jay2",
+    "text": "That's not an ant. That's a building with legs."
+  },
+  "n_7": {
+    "who": "Jay2",
+    "text": "Lights. Way out there. Somebody lives here."
+  },
+  "n_8": {
+    "who": "Jay",
+    "text": "And those tracks... something drove through here. Let's find shelter first."
+  },
+  "c_1": {
+    "who": "Jay",
+    "text": "Tally marks. Somebody was counting days... a LOT of days."
+  },
+  "c_2": {
+    "who": "Jay",
+    "text": "Oh... oh no."
+  },
+  "c_3": {
+    "who": "Jay2",
+    "text": "He never left this cave."
+  },
+  "c_4": {
+    "who": "Jay",
+    "text": "A knife. A map. And a photo of his family. He was just a guy. Like us."
+  },
+  "c_5": {
+    "who": "Jay2",
+    "text": "Sleep. I'll keep watch."
+  },
+  "c_6": {
+    "who": "Jay",
+    "text": "You sure?"
+  },
+  "c_7": {
+    "who": "Jay2",
+    "text": "I'm a clone, bro. I don't even get tired."
+  },
+  "c_8": {
+    "who": "Jay2",
+    "text": "[yawns] ...I'm good. I'm good..."
+  },
+  "c_9": {
+    "who": "Steve",
+    "text": "Found 'em. Told you the chip works."
+  },
+  "c_10": {
+    "who": "Alex",
+    "text": "Gently, Steve. They're half frozen."
+  },
+  "l_1": {
+    "who": "Steve",
+    "text": "Morning, sunshine. Remember me? My ship. The cuffs."
+  },
+  "l_2": {
+    "who": "Alex",
+    "text": "Don't be scared. You're safe here. It's warmer than that cave."
+  },
+  "l_3": {
+    "who": "Steve",
+    "text": "Wanna know how we found you? That watch. I put a little chip in it back when I had you on my ship."
+  },
+  "l_q1": {
+    "who": "Jay",
+    "text": "Give me back my watch or I swear..."
+  },
+  "l_a1": {
+    "who": "Steve",
+    "text": "Or you'll what? You're strapped in a chair, kid."
+  },
+  "l_a1b": {
+    "who": "Alex",
+    "text": "Steve. Stop."
+  },
+  "l_q2": {
+    "who": "Jay",
+    "text": "How do you even know about the watch? About Jim?"
+  },
+  "l_a2": {
+    "who": "Steve",
+    "text": "Your boss Jim found it. In the sand, by his little stand. He never knew what it was."
+  },
+  "l_a2b": {
+    "who": "Alex",
+    "text": "It's not from your world, Jay. It isn't from ours either."
+  },
+  "l_a2c": {
+    "who": "Steve",
+    "text": "And it picked YOU. Lucky you."
+  },
+  "l_q3": {
+    "who": "Jay",
+    "text": "It's broken. It doesn't even work anymore."
+  },
+  "l_a3": {
+    "who": "Steve",
+    "text": "Nice try. It blasted you across the galaxy last night."
+  },
+  "l_q4": {
+    "who": "Jay",
+    "text": "Please. Just let us go home."
+  },
+  "l_a4": {
+    "who": "Alex",
+    "text": "Home... I'm sorry. Not yet."
+  },
+  "l_4": {
+    "who": "Alex",
+    "text": "We just need to look inside your head. Everything you know about the watch."
+  },
+  "l_5": {
+    "who": "Steve",
+    "text": "Sit back. It'll feel like a nice dream. Your old job, maybe."
+  },
+  "w_1": {
+    "who": "Alex",
+    "text": "Steve, the chair is overheating!"
+  },
+  "w_2": {
+    "who": "Steve",
+    "text": "Then FIX it! I'm not losing that watch!"
+  },
+  "w_3": {
+    "who": "Alex",
+    "text": "I told you it wasn't ready for two!"
+  },
+  "w_4": {
+    "who": "Steve",
+    "text": "Hey! HEY! Put that DOWN!"
+  },
+  "w_5": {
+    "who": "Jay",
+    "text": "Track THIS."
+  },
+  "r_1": {
+    "who": "Jay2",
+    "text": "GO! GO! GO!"
+  },
+  "r_2": {
+    "who": "Steve",
+    "text": "End of the road, kid. Nowhere left to run."
+  },
+  "r_3": {
+    "who": "Steve",
+    "text": "Hand over the watch and nobody falls."
+  },
+  "r_4": {
+    "who": "Jay2",
+    "text": "Should we jump?"
+  },
+  "r_5": {
+    "who": "Jay",
+    "text": "The watch... it's doing it again!"
+  },
+  "fj_1": {
+    "who": "Jim",
+    "text": "Morning, Jay! Ants are bad today. Keep 'em off the food, alright?"
+  },
+  "fj_2": {
+    "who": "Jim",
+    "text": "Morning, Jay! Ants are bad today. Keep 'em off the food, alright? ...Huh. Didn't I say that yesterday?"
+  },
+  "fj_3": {
+    "who": "Jim",
+    "text": "How's your neck? That collar left a mark, huh."
+  },
+  "fj_3b": {
+    "who": "Jay2",
+    "text": "Hey. I'm Jay. New guy."
+  },
+  "fj_3c": {
+    "who": "Jim",
+    "text": "Two Jays at work! Ha! What are the odds?"
+  },
+  "fj_3d": {
+    "who": "Jay2",
+    "text": "Weird... you look really familiar. Have we met?"
+  },
+  "fj_4": {
+    "who": "Jim",
+    "text": "The pig king says hi. ...What? I didn't say anything."
+  },
+  "fj_4b": {
+    "who": "Jim",
+    "text": "Get some rest, Jay. You've got a long run ahead of you. Over the bridge. All the way to the cliff."
+  },
+  "fj_4c": {
+    "who": "Jay2",
+    "text": "Bro. Your wrist keeps buzzing. You don't even have a watch."
+  },
+  "fj_5": {
+    "who": "Jim",
+    "text": "Morning, Jay! Ants are bad today. Keep 'em off the f—"
+  },
+  "fj_5b": {
+    "who": "Jay2",
+    "text": "Jay... I remember. The table. The pig. The ice. None of this is real!"
+  },
+  "fj_5c": {
+    "who": "Jay",
+    "text": "The chair. We're still in the chair. Come on... together!"
+  },
+  "fc_1": {
+    "who": "Cust1",
+    "text": "Hi! One sandwich, please. I'm new in town.",
+    "name": "CUSTOMER"
+  },
+  "fc_2": {
+    "who": "Cust2",
+    "text": "Two lemonades, please.",
+    "name": "CUSTOMER"
+  },
+  "fc_3": {
+    "who": "Cust3",
+    "text": "Do you ever feel like someone's watching you? From... above?",
+    "name": "CUSTOMER"
+  },
+  "fc_4": {
+    "who": "Cust1",
+    "text": "Wake up.",
+    "name": "CUSTOMER"
+  },
+  "f_fail": {
+    "who": "Jim",
+    "text": "Ants got the food! Again, Jay. Do it again."
   }
 }

@@ -264,7 +264,8 @@ const AMB_DEFS={
   spaceDrone:{kind:'osc',osc:'sine',oscFreq:44,freq:300,vol:.08,lfo:1.5,lfoRate:.1}, moonHum:{freq:140,vol:.05},
   rocket:{freq:320,vol:.5,lfo:80,lfoRate:9}, marsWind:{freq:700,ftype:'bandpass',q:.6,vol:.08,lfo:400,lfoRate:.05,buf:null},
   crowd:{freq:900,ftype:'bandpass',q:1.2,vol:.02,lfo:300,lfoRate:.3,buf:null}, pot:{freq:260,vol:.0,lfo:120,lfoRate:4},
-  alienHome:{kind:'osc',osc:'sine',oscFreq:110,freq:400,vol:.02,lfo:2,lfoRate:.2}
+  alienHome:{kind:'osc',osc:'sine',oscFreq:110,freq:400,vol:.02,lfo:2,lfoRate:.2},
+  fire:{freq:900,ftype:'bandpass',q:.7,vol:.06,lfo:600,lfoRate:2.6,buf:null}
 };
 function setAmbience(list,fade=1.2){
   if(!AU.ok) return;

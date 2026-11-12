@@ -45,14 +45,14 @@ SCENES.escape=async function(){
   freeWalk(); PLAYER.ctl.jump=false; NIGHT.on=true; NIGHT.alert=0;
   const unlock=(id,after)=>addInteract(lv,{pos:V3(cageOf(id).x,CAGE_Y,cageOf(id).z-CAGE.d/2),reach:2.4,when:()=>!cageOf(id).doorOpen,label:'Unlock the door with the key',act:async()=>{ const c=cageOf(id);
     SND.play('cage_lock',{vol:.7,rate:1.2}); await wait(.4); c.doorOpen=true; SND.play('metal_1',{vol:.35,rate:1.4}); tweenVal(v=>{ c.door.rotation.y=v; },0,-1.6,.8); after&&after(); }});
-  unlock('you'); objective('Unlock your cage door with the key');
+  unlockDoor('you'); objective('Unlock your cage door with the key');
   await waitUntil(()=>yc.doorOpen);
   J.userData.A.seated=false; clearPose(J,.3);
   // Teo begs. Serious = timer.
   lv.teo.userData.A.look='player'; chat(['e_t1']); await wait(1.2);
   const r=await timedChoice([{text:'Free them'},{text:'Run'}],6,1);
   if(r===0){ F.freed=true; F.teoAlive=true; F.bramAlive=true; objective("Unlock Teo's and Bram's cages");
-    let n=0; unlock('teo',()=>n++); unlock('bram',()=>n++); await waitUntil(()=>n>=2); objective('');
+    let n=0; unlockDoor('teo',()=>n++); unlockDoor('bram',()=>n++); await waitUntil(()=>n>=2); objective('');
     for(const [h,id] of [[lv.teo,'teo'],[lv.bram,'bram']]){ resetActor(h); h.userData.A.seated=false; const c=cageOf(id); h.position.set(c.x,CAGE_Y,c.z-CAGE.d/2-1.2); }
     lv.bram.userData.A.look='player'; await say(['e_f1']); lv.bram.userData.A.look=null; }
   else { F.freed=false; await say(['e_t2']); await wait(1.2); await say(['e_t3']); remember('They'); lv.teo.userData.A.look=null; }
