@@ -1,5 +1,5 @@
 /* ================================================================
-   PART 3 — THE TWISTED HOUSE. Land on the rug. The photos are wrong.
+   PART 3 — THE TWISTED THOUSE. Land on the rug. The photos are wrong.
    The answering machine: an older you ("spare key's in the cookie
    jar, keep the cat flap locked"). Shadow hunts by sight + sound.
    Hallway: split up or stick together; the web shortcut or the long way
@@ -24,7 +24,7 @@ async function houseStart(id,spawn,yaw){
   crewHere(lv).forEach((h,i)=>{ h.visible=true; h.position.set(spawn.x-2-i*1.2,0,spawn.z+(i%2?1.4:-1.4)); });
   setPlayer(spawn,yaw); PLAYER.eye=1.64; setVM(true); hudVisible(true); lv.inter.length=0;
   CAT.state='sleep'; CAT.t=0; CAT.seenT=0; CAT.distractT=0; const c=lv.cat; c.position.copy(CAT.home); c.position.y=4.5+10; c.rotation.y=.4; c.userData.cat.crouch=0; c.userData.cat.walk=0;
-  lv.cat.position.y=0; lv.toyRolled=false; lv.toy.position.copy(HOUSE.toy); lv.toyCol.x=HOUSE.toy.x; lv.toyCol.z=HOUSE.toy.z;
+  lv.cat.position.y=0; lv.toyRolled=false; lv.toy.position.copy(THOUSE.toy); lv.toyCol.x=THOUSE.toy.x; lv.toyCol.z=THOUSE.toy.z;
   setAmbience([['fire',.0]]); return lv;
 }
 /* ---------- Shadow: sees you (line of sight), hears noise, stalks, pounces. Caught = eaten. ---------- */
@@ -57,11 +57,11 @@ function houseTick(lv,dt,t){
       const hidden=youHiddenFromCat(lv); if(d<14&&!hidden&&PLAYER.y<12){ CAT.state='eat'; lv.catOn=false; caughtByCat(lv); } else { CAT.state='hunt'; CAT.target=PLAYER.pos.clone(); } } }
   else if(CAT.state==='wander'){ if(!CAT.wp||Math.hypot(CAT.wp.x-c.position.x,CAT.wp.z-c.position.z)<5) CAT.wp=V3(rand(-50,190),0,rand(-30,30)); walkTo(CAT.wp,3); if(seen&&d<60){ CAT.state='hunt'; } }
   // stay inside the house
-  c.position.x=clamp(c.position.x,HOUSE.x0+14,HOUSE.x1-14); c.position.z=clamp(c.position.z,HOUSE.z0+12,HOUSE.z1-12);
-  if(c.position.x>HOUSE.hall.x0&&c.position.x<HOUSE.hall.x1) c.position.z=clamp(c.position.z,-6,6);
+  c.position.x=clamp(c.position.x,THOUSE.x0+14,THOUSE.x1-14); c.position.z=clamp(c.position.z,THOUSE.z0+12,THOUSE.z1-12);
+  if(c.position.x>THOUSE.hall.x0&&c.position.x<THOUSE.hall.x1) c.position.z=clamp(c.position.z,-6,6);
 }
 /* safe spots: under the couch, under the bed, in a crack behind the TV stand */
-function youHiddenFromCat(lv){ const p=PLAYER.pos, C=HOUSE.couch, B=HOUSE.bed;
+function youHiddenFromCat(lv){ const p=PLAYER.pos, C=THOUSE.couch, B=THOUSE.bed;
   return (Math.abs(p.x-C.x)<C.w/2-2&&Math.abs(p.z-C.z)<C.d/2-2)||(p.x>B.x0+2&&p.x<B.x1-2&&p.z>B.z0+2&&p.z<B.z1-2&&PLAYER.y<3); }
 async function caughtByCat(lv){ PLAYER.lock(); const c=lv.cat; lookAtPoint(c.userData.cat.head.getWorldPosition(V3()),.25); await wait(.35);
   SND.play('pig_squeal',{vol:.6,rate:2}); shake(1); dmgFlash(); await tweenVal(lids,0,1,.35);
@@ -72,22 +72,22 @@ const HAZ={drips:[],sparkT:0};
 function hallTick(lv,dt,t){
   if(!lv.hazOn) return;
   // drips: a shadow on the floor, then a giant drop smashes down
-  for(const x of HOUSE.drips){ let d=HAZ.drips.find(o=>o.x===x); if(!d){ d={x,t:rand(0,2),m:null,sh:null}; HAZ.drips.push(d); }
+  for(const x of THOUSE.drips){ let d=HAZ.drips.find(o=>o.x===x); if(!d){ d={x,t:rand(0,2),m:null,sh:null}; HAZ.drips.push(d); }
     d.t-=dt; if(d.t<=0&&!d.m){ d.z=rand(-10,10); d.m=sph(1.2,new THREE.MeshPhysicalMaterial({color:col(0xb8d8e8),roughness:.05,transmission:.6,transparent:true,opacity:.8}),x,90,d.z,14,12); d.m.scale.set(1,1.5,1); lv.scene.add(d.m);
       d.sh=mesh(new THREE.CircleGeometry(3,24),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.0,depthWrite:false}),x,.3,d.z,false); d.sh.rotation.x=-Math.PI/2; lv.scene.add(d.sh); d.vy=0; d.life=0; }
     if(d.m){ d.life+=dt; d.vy-=60*dt; d.m.position.y+=d.vy*dt; d.sh.material.opacity=Math.min(.5,d.life*.4);
       if(d.m.position.y<=.5){ shake(.25); SND.play('drips',{vol:.9,pos:d.m.position,ref:20,rate:.5}); if(Math.hypot(PLAYER.pos.x-d.x,PLAYER.pos.z-d.z)<3.2&&PLAYER.y<2) houseDeath(lv,'A DROP HIT YOU'); lv.scene.remove(d.m); lv.scene.remove(d.sh); d.m=null; d.t=rand(2,3.4); } } }
   // the fan: wind pushes you toward the far wall while you're in front of it; too close = the blades
-  const f=HOUSE.fan, fx=PLAYER.pos.x-f.x; if(Math.abs(fx)<10&&PLAYER.pos.z>f.z-2) PLAYER.pos.z+=dt*5.5*(1-Math.abs(fx)/10);
+  const f=THOUSE.fan, fx=PLAYER.pos.x-f.x; if(Math.abs(fx)<10&&PLAYER.pos.z>f.z-2) PLAYER.pos.z+=dt*5.5*(1-Math.abs(fx)/10);
   if(Math.hypot(PLAYER.pos.x-f.x,PLAYER.pos.z-f.z)<8.2&&PLAYER.y<26) houseDeath(lv,'THE FAN GOT YOU');
   // the outlet: sparks arc out every few seconds (blue flash + a crack), stay away from the wall then
   HAZ.sparkT-=dt; if(HAZ.sparkT<=0){ HAZ.sparkT=rand(2.4,3.6); lv.sparkL.intensity=6; SND.play('zap',{vol:.7,pos:lv.sparkL.position,ref:20,rate:1.4}); later(.25,()=>{ lv.sparkL.intensity=0; });
-    if(Math.abs(PLAYER.pos.x-HOUSE.outlet.x)<6&&PLAYER.pos.z<-HOUSE.hall.z+6) houseDeath(lv,'ZAPPED'); }
+    if(Math.abs(PLAYER.pos.x-THOUSE.outlet.x)<6&&PLAYER.pos.z<-THOUSE.hall.z+6) houseDeath(lv,'ZAPPED'); }
   // the toy car: bump it and it rolls off clattering (noise = Shadow comes)
-  if(!lv.toyRolled&&Math.hypot(PLAYER.pos.x-HOUSE.toy.x,PLAYER.pos.z-HOUSE.toy.z)<9.2){ lv.toyRolled=true; SND.play('metal_3',{vol:1,pos:lv.toy.position,ref:60,rate:.6}); catNoise(lv,lv.toy.position);
-    tweenVal(k=>{ lv.toy.position.x=HOUSE.toy.x+k*20; lv.toyCol.x=lv.toy.position.x; lv.toy.children.forEach(o=>{ if(o.geometry&&o.geometry.type==='CylinderGeometry') o.rotation.y+=.3; }); },0,1,2.2,easeOut); }
+  if(!lv.toyRolled&&Math.hypot(PLAYER.pos.x-THOUSE.toy.x,PLAYER.pos.z-THOUSE.toy.z)<9.2){ lv.toyRolled=true; SND.play('metal_3',{vol:1,pos:lv.toy.position,ref:60,rate:.6}); catNoise(lv,lv.toy.position);
+    tweenVal(k=>{ lv.toy.position.x=THOUSE.toy.x+k*20; lv.toyCol.x=lv.toy.position.x; lv.toy.children.forEach(o=>{ if(o.geometry&&o.geometry.type==='CylinderGeometry') o.rotation.y+=.3; }); },0,1,2.2,easeOut); }
   // the web: stuck for a moment, and its spider comes down
-  const W=HOUSE.web; if(!lv.webStuck&&PLAYER.pos.x>W.x0&&PLAYER.pos.x<W.x1&&PLAYER.pos.z>W.z0&&PLAYER.y<6){ lv.webStuck=true; webTrap(lv); }
+  const W=THOUSE.web; if(!lv.webStuck&&PLAYER.pos.x>W.x0&&PLAYER.pos.x<W.x1&&PLAYER.pos.z>W.z0&&PLAYER.y<6){ lv.webStuck=true; webTrap(lv); }
 }
 async function webTrap(lv){ PLAYER.lock(); PLAYER.ctl.look=true; toast('Stuck in the web!','#ff8a6a'); SND.play('spit',{vol:.7,rate:.7});
   const sp=lv.webSpider, from=sp.position.clone(), to=V3(PLAYER.pos.x,1.2,PLAYER.pos.z);
@@ -120,7 +120,7 @@ SCENES.twisted=async function(){
   // the cat wakes when you get close / it sees you, or when you make noise
   chat(['h_6']);
   // the hallway: split up or stick together
-  await waitUntil(()=>PLAYER.pos.x>HOUSE.hall.x0-8);
+  await waitUntil(()=>PLAYER.pos.x>THOUSE.hall.x0-8);
   PLAYER.lock(); PLAYER.ctl.look=true; J.userData.A.look='player'; await say(['h_split']);
   const r=await choose([{text:'Split up'},{text:'Stick together'}]);
   F.split=r.text==='Split up'; remember('He'); J.userData.A.look=null;
@@ -134,32 +134,32 @@ async function hallPart(lv){
   if(F.split){ crew.forEach(h=>h.visible=false); }
   lv.hazOn=true; lv.webStuck=false; freeWalk(); PLAYER.ctl.jump=true;
   objective('Get through the hallway to the kitchen (the web corner is shorter, but...)');
-  await waitUntil(()=>PLAYER.pos.x>HOUSE.hall.x1+4);
+  await waitUntil(()=>PLAYER.pos.x>THOUSE.hall.x1+4);
   // the kitchen: cockroaches scatter, the floating things drift up and down
   for(const r of lv.roaches){ r.visible=true; const p0=r.position.clone(); tweenVal(k=>{ r.position.z=p0.z+k*20; r.position.x=p0.x+Math.sin(k*9)*4; animateBug(r,.016,G.time); r.userData.bug.walkK=1; },0,1,1.8).then(()=>r.visible=false); }
   SND.play('skitter_1',{vol:.8});
   objective('Ride the floating things up to the counter');
-  if(F.split){ crew.forEach((h,i)=>{ h.visible=true; resetActor(h); h.position.set(HOUSE.counter.x0+6+i*3,HOUSE.counter.h,HOUSE.counter.z0+8); }); }
-  await waitUntil(()=>PLAYER.y>HOUSE.counter.h-1&&PLAYER.pos.x>HOUSE.counter.x0);
+  if(F.split){ crew.forEach((h,i)=>{ h.visible=true; resetActor(h); h.position.set(THOUSE.counter.x0+6+i*3,THOUSE.counter.h,THOUSE.counter.z0+8); }); }
+  await waitUntil(()=>PLAYER.y>THOUSE.counter.h-1&&PLAYER.pos.x>THOUSE.counter.x0);
   SCENE_TICKS.splice(SCENE_TICKS.indexOf(fol),1);
   // everybody up here to push
-  crew.forEach((h,i)=>{ h.visible=true; resetActor(h); h.position.set(HOUSE.jar.x-9-i*2,HOUSE.counter.h,HOUSE.jar.z-6+i*2); faceTo(h,HOUSE.jar); });
+  crew.forEach((h,i)=>{ h.visible=true; resetActor(h); h.position.set(THOUSE.jar.x-9-i*2,THOUSE.counter.h,THOUSE.jar.z-6+i*2); faceTo(h,THOUSE.jar); });
   if(F.split) await say(['h_met']);
   objective('Push the lid off the cookie jar');
-  await new Promise(res=>addInteract(lv,{pos:V3(HOUSE.jar.x-6,HOUSE.counter.h,HOUSE.jar.z),reach:4,label:'Push the lid (all together)',act:()=>res()}));
+  await new Promise(res=>addInteract(lv,{pos:V3(THOUSE.jar.x-6,THOUSE.counter.h,THOUSE.jar.z),reach:4,label:'Push the lid (all together)',act:()=>res()}));
   PLAYER.lock(); PLAYER.ctl.look=true; crew.forEach(h=>setPose(h,'push',.3)); chat(crew.length>2?['h_7b','h_8']:['h_8']);
   const lid=lv.jarLid; await tweenVal(k=>{ lid.position.x=k*4; lid.rotation.z=-k*.2; },0,1,2.4,easeIn);
   await tweenVal(k=>{ lid.position.x=4+k*12; lid.position.y=11.4-k*48; lid.rotation.z=-.2-k*3; },0,1,1.1,easeIn);
   shake(.8); SND.play('metal_1',{vol:1,rate:.35}); SND.play('body_fall',{vol:1,rate:.5}); crew.forEach(h=>clearPose(h,.3));
-  catNoise(lv,V3(HOUSE.jar.x,0,HOUSE.jar.z)); lv.catOn=true; lv.cat.position.set(170,0,0);
+  catNoise(lv,V3(THOUSE.jar.x,0,THOUSE.jar.z)); lv.catOn=true; lv.cat.position.set(170,0,0);
   lv.key.visible=true; addInteract(lv,{obj:lv.key,reach:5,label:'Take the key',act:()=>{ lv.key.visible=false; F.flapKey=1; SND.play('pickup',{vol:.8}); }});
   freeWalk(); PLAYER.ctl.jump=true; await waitUntil(()=>F.flapKey);
   await say(['h_9','h_10']);
   saveCheckpoint('twistedKey');
   await keyRun(lv);
 }
-SCENES.twistedKey=async function(){ const lv=await houseStart('twistedKey',V3(HOUSE.jar.x-10,0,HOUSE.jar.z-4),-Math.PI/2); houseDying=false; PLAYER.y=HOUSE.counter.h; F.flapKey=1;
-  crewHere(lv).forEach((h,i)=>{ h.position.set(HOUSE.jar.x-12-i*2,HOUSE.counter.h,HOUSE.jar.z-6+i*2); }); lv.jarLid.position.set(16,-36.6,0); await wait(.2); $('fade').style.opacity=0; lv.catOn=true; CAT.state='hunt'; CAT.target=V3(HOUSE.jar.x,0,HOUSE.jar.z); lv.cat.position.set(170,0,0); await keyRun(lv); };
+SCENES.twistedKey=async function(){ const lv=await houseStart('twistedKey',V3(THOUSE.jar.x-10,0,THOUSE.jar.z-4),-Math.PI/2); houseDying=false; PLAYER.y=THOUSE.counter.h; F.flapKey=1;
+  crewHere(lv).forEach((h,i)=>{ h.position.set(THOUSE.jar.x-12-i*2,THOUSE.counter.h,THOUSE.jar.z-6+i*2); }); lv.jarLid.position.set(16,-36.6,0); await wait(.2); $('fade').style.opacity=0; lv.catOn=true; CAT.state='hunt'; CAT.target=V3(THOUSE.jar.x,0,THOUSE.jar.z); lv.cat.position.set(170,0,0); await keyRun(lv); };
 async function keyRun(lv){
   const J=lv.jay2, crew=crewHere(lv); playMusic('boss',1); lv.hazOn=true;
   objective('Jump down onto the bed, slide down the blanket, run to the cat flap!');
@@ -169,19 +169,19 @@ async function keyRun(lv){
   // Teo / Bram can distract Shadow (if they're here)
   for(const h of crew) if(h!==J) addInteract(lv,{obj:h,offset:V3(0,1.5,0),reach:4,when:()=>CAT.distractT<=0&&lv.catOn,label:'Ask '+(h===lv.teo?'Teo':'Bram')+' to distract Shadow',act:()=>{ CAT.distractT=12; CAT.distracter=h; chat([h===lv.teo?'h_7':'h_7c']); h.userData.A.path=null; walkTo(h,[V3(lv.cat.position.x+20,0,lv.cat.position.z+10)],4); SCENE_TICKS.splice(SCENE_TICKS.indexOf(fol),1); later(12,()=>{ SCENE_TICKS.push(fol); }); }});
   // the bed edge -> slide down the blanket automatically when you step off the west edge
-  await waitUntil(()=>PLAYER.y>HOUSE.bed.h-1&&PLAYER.pos.x<HOUSE.bed.x0+3);
+  await waitUntil(()=>PLAYER.y>THOUSE.bed.h-1&&PLAYER.pos.x<THOUSE.bed.x0+3);
   PLAYER.lock(); const z0=PLAYER.pos.z; SND.play('swing_2',{vol:.8,rate:.6});
-  camFollow(t=>{ const k=Math.min(1,t/1.8); return {pos:V3(HOUSE.bed.x0-1.5,lerp(HOUSE.bed.h+1.5,1.6,k*k),z0),look:V3(HOUSE.bed.x0-20,lerp(10,1,k),z0)}; },70); CAM.fnT=0; await wait(1.9); camRelease(0);
-  setPlayer(V3(HOUSE.bed.x0-3,0,z0),Math.PI/2); PLAYER.y=0; freeWalk(); PLAYER.ctl.jump=true;
-  crew.forEach((h,i)=>{ h.userData.A.path=null; h.position.set(HOUSE.bed.x0-4-i*1.4,0,z0+1.5); });
+  camFollow(t=>{ const k=Math.min(1,t/1.8); return {pos:V3(THOUSE.bed.x0-1.5,lerp(THOUSE.bed.h+1.5,1.6,k*k),z0),look:V3(THOUSE.bed.x0-20,lerp(10,1,k),z0)}; },70); CAM.fnT=0; await wait(1.9); camRelease(0);
+  setPlayer(V3(THOUSE.bed.x0-3,0,z0),Math.PI/2); PLAYER.y=0; freeWalk(); PLAYER.ctl.jump=true;
+  crew.forEach((h,i)=>{ h.userData.A.path=null; h.position.set(THOUSE.bed.x0-4-i*1.4,0,z0+1.5); });
   objective('The cat flap! Unlock it with the key');
   await new Promise(res=>addInteract(lv,{obj:lv.flapLock,reach:6,label:'Unlock the cat flap',act:()=>res()}));
   // through the flap... the watch
   lv.catOn=false; lv.hazOn=false; SCENE_TICKS.splice(SCENE_TICKS.indexOf(fol),1); PLAYER.lock(); PLAYER.ctl.look=true; objective('');
   SND.play('cage_lock',{vol:.8,rate:1.3}); await wait(.5); chat(['h_11']);
   await tweenVal(k=>{ lv.flap.rotation.z=k*1.1; },0,1,.9);
-  crew.forEach((h,i)=>{ h.userData.A.path=null; h.position.set(HOUSE.x0+5+i*1.2,0,(i%2?1.2:-1.2)); faceTo(h,V3(HOUSE.x0,0,0)); });
-  lookAtPoint(V3(HOUSE.x0,4,0),.6); await say(['h_12']);
+  crew.forEach((h,i)=>{ h.userData.A.path=null; h.position.set(THOUSE.x0+5+i*1.2,0,(i%2?1.2:-1.2)); faceTo(h,V3(THOUSE.x0,0,0)); });
+  lookAtPoint(V3(THOUSE.x0,4,0),.6); await say(['h_12']);
   // the watch blasts: NIVALIS
   const hum=loopSnd('hum_build',{vol:.8}); await tweenVal(v=>{ PLAYER.watchGlow=v; },0,1,1.6); SND.play('blast',{vol:1}); hum&&hum.stop(.2); shake(1);
   const wh=$('fxWhite'); wh.style.transition='opacity .2s'; wh.style.opacity=1; await wait(1.4); PLAYER.watchGlow=0;

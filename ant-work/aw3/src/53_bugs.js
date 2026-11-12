@@ -215,6 +215,7 @@ function animateBug(root,dt,t){
     L.J.forEach((j,i)=>{ j.rotation.z=L.a0[i]+(i===1?up*.35:i===2?up*.3:0)+(L.palp?Math.sin(t*1.3+L.side)*.08:0); }); }
   const w=B.atkK, s=B.strikeK;
   B.body.position.y=B.baseY+Math.sin(t*2.2)*.02;
+  if(B.kind!=='mantis'&&B.kind!=='spider'&&B.kind!=='scorpion') return;   // small bugs (ants, roaches): legs only
   if(B.kind==='mantis'){
     B.body.rotation.z=Math.sin(t*1.5)*.04; B.thx.rotation.x=.6-w*.3+s*.45;
     if(B.head) B.head.rotation.y=Math.sin(t*.6)*.3*(1-w);

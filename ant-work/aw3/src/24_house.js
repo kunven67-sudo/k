@@ -1,5 +1,5 @@
 /* ================================================================
-   THE TWISTED HOUSE (Part 3) — your Earth house, but from a different
+   THE TWISTED THOUSE (Part 3) — your Earth house, but from a different
    reality, and the blast WARPED it. You're still ant size (x40).
    Living room (rug, couch, TV stand, the answering machine, the fallen
    family photo, the front door with the locked cat flap) -> a hallway
@@ -10,7 +10,7 @@
    drifts up and down like elevators). Shadow the cat lives here.
    ================================================================ */
 const HK=40;
-const HOUSE={x0:-70,x1:330,z0:-50,z1:50, hall:{x0:70,x1:210,z:15}, door:{x:-70,flapZ:0},
+const THOUSE={x0:-70,x1:330,z0:-50,z1:50, hall:{x0:70,x1:210,z:15}, door:{x:-70,flapZ:0},
   machine:V3(26,0,34), photo:V3(-18,0,38), rug:{w:70,d:44},
   couch:{x:0,z:-38,w:90,d:24,legH:4.5}, bed:{x0:212,x1:292,z0:-22,z1:20,h:22,legH:6}, counter:{x0:250,x1:330,z0:24,z1:50,h:36},
   fridge:{x:312,z:-36,w:32,d:28,h:84}, jar:V3(300,36,36),
@@ -22,21 +22,25 @@ function renderPhoto(people,bg,w=256,h=192){
   const cam=new THREE.PerspectiveCamera(32,w/h,.1,20); cam.position.set(0,1.35,3.4); cam.lookAt(0,1.2,0);
   people.forEach((o,i)=>{ const p=makeHuman(o); p.position.set((i-(people.length-1)/2)*.62,0,0); p.rotation.y=(i-(people.length-1)/2)*-.15; p.scale.setScalar(o.s||1); sc.add(p); });
   renderer.setRenderTarget(rt); renderer.render(sc,cam); renderer.setRenderTarget(null);
-  const tex=rt.texture; tex.encoding=THREE.sRGBEncoding; return tex; }
-function frame(texture,w,h,woodM){ const g=new THREE.Group(); g.add(box(w+1.2,h+1.2,.6,woodM,0,0,0)); const pic=mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:texture,roughness:.35}),0,0,.32,false); g.add(pic); return g; }
+  // copy the pixels into a normal canvas texture (render-target textures break when quality settings re-upload textures)
+  const px=new Uint8Array(w*h*4); renderer.readRenderTargetPixels(rt,0,0,w,h,px); rt.dispose();
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const cx=cv.getContext('2d'), id=cx.createImageData(w,h);
+  for(let y=0;y<h;y++) id.data.set(px.subarray((h-1-y)*w*4,(h-y)*w*4),y*w*4);
+  cx.putImageData(id,0,0); const tex=new THREE.CanvasTexture(cv); tex.encoding=THREE.sRGBEncoding; return tex; }
+function picFrame(texture,w,h,woodM){ const g=new THREE.Group(); g.add(box(w+1.2,h+1.2,.6,woodM,0,0,0)); const pic=mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:texture,roughness:.35}),0,0,.32,false); g.add(pic); return g; }
 /* floating, spinning platforms (some drift up and down like elevators) */
 function floater(lv,o){ const g=new THREE.Group(); g.position.copy(o.at); lv.scene.add(g); g.add(o.mesh); const f=Object.assign({g,y0:o.at.y,ph:o.ph||0},o); lv.floaters.push(f); return f; }
 defineLevel('twisted',{
   title:'???',
-  env:{fx:{exposure:1.0,saturation:.82,contrast:1.12,temp:-.08,bloomStrength:.3,bloomThreshold:1.1,aoRadius:1.2,vignette:.55,grain:.05,aberr:.0025},music:null,reverb:.6,surface:'wood',far:900,speed:3.6},
+  env:{fx:{exposure:1.25,saturation:.82,contrast:1.12,temp:-.08,bloomStrength:.3,bloomThreshold:1.1,aoRadius:1.2,vignette:.55,grain:.05,aberr:.0025},music:null,reverb:.6,surface:'wood',far:900,speed:3.6},
   async build(scene,lv){
     lv.occluders=[]; lv.floaters=[]; lv.solids=[];
-    scene.background=col(0x0c0d10); scene.fog=new THREE.FogExp2(col(0x10121a),.0055);
-    lv.rig=makeRig(scene,{sun:1.3,sunColor:0xc8d4ff,hemi:.42,sky:0x8a8aa0,ground:0x2a2420,dir:V3(.35,1,.25),span:90,dist:200,far:420,bias:-.0006,normalBias:.06});
-    const H=HOUSE;
+    scene.background=col(0x0c0d10); scene.fog=new THREE.FogExp2(col(0x3a3a40),.0035);
+    lv.rig=makeRig(scene,{sun:2.3,sunColor:0xffe8c8,hemi:.85,sky:0xb8c0d8,ground:0x6a5440,dir:V3(.35,1,.25),span:90,dist:200,far:420,bias:-.0006,normalBias:.06});
+    const H=THOUSE;
     // the floor: giant floorboards; the walls: a sickly wrong green (this isn't your paint)
-    const fl=texPlane(H.x1-H.x0+200,H.z1-H.z0+200,'rough_wood',3,(H.x0+H.x1)/2,0,0,{opts:{roughness:.75}}); fl.material.color=col(0x8a6a50); scene.add(fl);
-    const wallM=new THREE.MeshStandardMaterial({color:col(0x6a7a62),roughness:.95,map:charTex().cloth.map});
+    const fl=texPlane(H.x1-H.x0+200,H.z1-H.z0+200,'rough_wood',48,(H.x0+H.x1)/2,0,0,{opts:{roughness:.75}}); fl.material.color=col(0xd8b890); scene.add(fl);
+    const wallM=new THREE.MeshStandardMaterial({color:col(0xa8b896),roughness:.95,map:charTex().cloth.map});
     const wall=(x,z,w,ry,h=160,warp=0)=>{ const g=new THREE.PlaneGeometry(w,h,warp?40:1,warp?12:1); if(warp){ const a=g.attributes.position; for(let k=0;k<a.count;k++) a.setZ(k,Math.sin(a.getX(k)*.05+a.getY(k)*.02)*warp); g.computeVertexNormals(); } const m=mesh(g,wallM,x,h/2,z,false); m.rotation.y=ry; m.material.side=THREE.DoubleSide; scene.add(m); return m; };
     wall(0,H.z0-2,140,0); wall(0,H.z1+2,140,Math.PI); wall(H.x0,0,104,Math.PI/2);
     wall((H.hall.x0+H.hall.x1)/2,-H.hall.z,H.hall.x1-H.hall.x0,0,120,4); wall((H.hall.x0+H.hall.x1)/2,H.hall.z,H.hall.x1-H.hall.x0,Math.PI,120,4);   // the stretched, bent hallway
@@ -48,7 +52,7 @@ defineLevel('twisted',{
       for(let i=0;i<6;i++){ c.beginPath(); c.ellipse(w/2,h/2,60+i*30,30+i*16,0,0,7); c.stroke(); } for(let i=0;i<4000;i++){ c.fillStyle='rgba(0,0,0,'+rand(.03,.12)+')'; c.fillRect(Math.random()*w,Math.random()*h,2,2); } })});
     const rug=mesh(new THREE.BoxGeometry(H.rug.w,.25,H.rug.d),rugM,0,.12,0); scene.add(rug);
     const sofaM=new THREE.MeshPhysicalMaterial({color:col(0x3a4a5a),roughness:.95,map:charTex().cloth.map,sheen:col(0x506070)});
-    const woodM=pbrMat('rough_wood',1,{opts:{roughness:.7}}); woodM.color=col(0x4a2e1c);
+    const woodM=pbrMat('rough_wood',30,{opts:{roughness:.7}}); woodM.color=col(0xa8784e);
     const C=H.couch; const couch=new THREE.Group(); couch.position.set(C.x,0,C.z); scene.add(couch);
     couch.add(box(C.w,10,C.d,sofaM,0,C.legH+5,0)); couch.add(box(C.w,22,8,sofaM,0,C.legH+16,-C.d/2+4)); for(const sd of [-1,1]) couch.add(box(10,16,C.d,sofaM,sd*(C.w/2-5),C.legH+13,0));
     for(const [x,z] of [[-C.w/2+4,-C.d/2+3],[C.w/2-4,-C.d/2+3],[-C.w/2+4,C.d/2-3],[C.w/2-4,C.d/2-3]]) couch.add(cyl(1.2,1,C.legH,woodM,x,C.legH/2,z,10));
@@ -62,9 +66,9 @@ defineLevel('twisted',{
     // the photos: strangers on the walls, and a fallen frame: the older you + his family
     const frameM=pbrMat('rough_wood',.5,{opts:{roughness:.6}}); frameM.color=col(0x6a4a2a);
     const strangers=[[{skin:0xd8a888,shirt:0x7a3030,hairStyle:'short',hair:0x3a2a1a},{skin:0xc89070,shirt:0x30507a,hairStyle:'bald',beard:true}],[{skin:0xe0b090,shirt:0x406a40,hairStyle:'spiky',hair:0x8a6a3a,s:.7},{skin:0xa87050,shirt:0x6a5a3a,hairStyle:'short'}]];
-    strangers.forEach((ps,i)=>{ const f=frame(renderPhoto(ps,0x8a8070),26,19,frameM); f.position.set(i?-30:30,70,H.z0-1); f.rotation.z=(i?1:-1)*.08; scene.add(f); });
+    strangers.forEach((ps,i)=>{ const f=picFrame(renderPhoto(ps,0x8a8070),26,19,frameM); f.position.set(i?-30:30,70,H.z0-1); f.rotation.z=(i?1:-1)*.08; scene.add(f); });
     const older={skin:0xe2b08c,shirt:0x3a4a3a,hair:0x9a9a96,hairStyle:'short',beard:true,stubble:.4,head:{rx:.074,ry:.104,rz:.094,jaw:.31,nose:.98}};
-    const fam=frame(renderPhoto([older,{skin:0xd8a888,shirt:0x8a4a6a,hairStyle:'short',hair:0x5a3a20},{skin:0xe2b08c,shirt:0x4a6a9a,hairStyle:'short',hair:0x2a1c12,s:.62}],0x9a8a74),16,12,frameM);
+    const fam=picFrame(renderPhoto([older,{skin:0xd8a888,shirt:0x8a4a6a,hairStyle:'short',hair:0x5a3a20},{skin:0xe2b08c,shirt:0x4a6a9a,hairStyle:'short',hair:0x2a1c12,s:.62}],0x9a8a74),16,12,frameM);
     fam.position.set(H.photo.x,6.6,H.photo.z); fam.rotation.set(-.32,.3,0); scene.add(fam); lv.famPhoto=fam;
     // the front door (west wall) with the cat flap at the bottom, locked
     const door=new THREE.Group(); door.position.set(H.x0+.6,0,0); scene.add(door);
@@ -110,7 +114,7 @@ defineLevel('twisted',{
     fridge.add(box(fr.w,fr.h,fr.d,new THREE.MeshPhysicalMaterial({color:col(0xe8e8e4),roughness:.25,clearcoat:.8}),0,fr.h/2+3,0)); fridge.add(box(1,30,1.5,new THREE.MeshStandardMaterial({color:col(0xa0a0a0),metalness:.8,roughness:.3}),-fr.w/2+2,55,fr.d/2+.8));
     colBox(lv.col,fr.x-fr.w/2,fr.x+fr.w/2,fr.z-fr.d/2,fr.z+fr.d/2); lv.occluders.push(fridge);
     const ct=H.counter; const counter=new THREE.Group(); scene.add(counter);
-    counter.add(box(ct.x1-ct.x0,ct.h-2,ct.z1-ct.z0,woodM,(ct.x0+ct.x1)/2,(ct.h-2)/2,(ct.z0+ct.z1)/2)); counter.add(box(ct.x1-ct.x0+2,2,ct.z1-ct.z0+2,pbrMat('large_sandstone_blocks_01',2,{opts:{roughness:.4}}),(ct.x0+ct.x1)/2,ct.h-1,(ct.z0+ct.z1)/2));
+    counter.add(box(ct.x1-ct.x0,ct.h-2,ct.z1-ct.z0,woodM,(ct.x0+ct.x1)/2,(ct.h-2)/2,(ct.z0+ct.z1)/2)); counter.add(box(ct.x1-ct.x0+2,2,ct.z1-ct.z0+2,pbrMat('large_sandstone_blocks_01',40,{opts:{roughness:.4}}),(ct.x0+ct.x1)/2,ct.h-1,(ct.z0+ct.z1)/2));
     colBox(lv.col,ct.x0,ct.x1,ct.z0,ct.z1,()=>PLAYER.y<ct.h-1.5); lv.occluders.push(counter);
     // the cookie jar on the counter, its heavy lid
     const jarM=new THREE.MeshPhysicalMaterial({color:col(0xd8c8a8),roughness:.3,clearcoat:.8}); const jar=new THREE.Group(); jar.position.copy(H.jar); scene.add(jar); lv.jar=jar;

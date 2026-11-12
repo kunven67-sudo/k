@@ -11,14 +11,14 @@ CHECKPOINTS.push({id:'nivalis',name:'Nivalis',level:'nivalis'},{id:'cave',name:'
 Object.assign(WHO_CLASS,{Steve:'steve',Alex:'alex',OldJay:'you',Jim:'jim'}); Object.assign(WHO_NAME,{Steve:'STEVE',Alex:'ALEX',OldJay:'ANSWERING MACHINE'});
 /* the cold: frost at the edges of the screen, your breath, shivering (until you put the coat on) */
 const COLD={on:false};
-on('tick',dt=>{ let el=$('frost'); if(!el){ el=document.createElement('div'); el.id='frost'; el.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;transition:opacity 1.5s;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(200,225,255,.22) 80%,rgba(230,240,255,.55) 100%)'; document.body.appendChild(el); }
+on('tick',dt=>{ let el=$('frost'); if(!el){ el=document.createElement('div'); el.id='frost'; el.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;transition:opacity 1.5s;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(200,225,255,.08) 82%,rgba(230,240,255,.28) 100%)'; document.body.appendChild(el); }
   const on=COLD.on&&!F.coat&&LV&&LV.name==='nivalis'&&G.mode==='play'; el.style.opacity=on?1:0; if(!on) return;
   if(Math.random()<dt*1.2) shake(.04);
   COLD.br=(COLD.br||0)-dt; if(COLD.br<=0){ COLD.br=rand(2.2,3.2); const p=camera.position.clone().add(camera.getWorldDirection(V3()).multiplyScalar(.5)); if(LV.soft) LV.soft.spawn(p.x,p.y-.15,p.z,rand(-.1,.1),rand(.15,.3),rand(-.1,.1),rand(1.2,1.8),.18,.9,.92,.95,.25,0,.3,1.5); } });
 /* your watch light (a white beam from your wrist) */
 const WLIGHT={s:null};
-function watchLight(on){ if(!WLIGHT.s){ WLIGHT.s=new THREE.SpotLight(col(0xdce8ff),0,40,.5,.5,1.4); WLIGHT.t=new THREE.Object3D(); camera.add(WLIGHT.t); WLIGHT.t.position.set(0,0,-5); WLIGHT.s.target=WLIGHT.t; WLIGHT.s.position.set(-.2,-.25,0); }
-  if(WLIGHT.s.parent!==camera) camera.add(WLIGHT.s); WLIGHT.s.intensity=on?3.2:0; }
+function watchLight(on){ if(!WLIGHT.s){ WLIGHT.s=new THREE.SpotLight(col(0xdce8ff),0,32,.62,.85,1.3); WLIGHT.t=new THREE.Object3D(); camera.add(WLIGHT.t); WLIGHT.t.position.set(0,0,-5); WLIGHT.s.target=WLIGHT.t; WLIGHT.s.position.set(-.2,-.25,0); }
+  if(WLIGHT.s.parent!==camera) camera.add(WLIGHT.s); WLIGHT.s.intensity=on?1.5:0; }
 function nivPeople(lv){ if(!lv.jay2){ const mk=(fn,o)=>{ const h=fn(o); h.userData.level=lv.name; lv.scene.add(h); return h; };
     lv.jay2=mk(makeJay2,{}); giveWatch(lv.jay2);
     lv.teo=mk(makeHuman,{name:'Teo',voice:'Teo',skin:0xb98a64,shirt:0x8a3a2a,pants:0x2a3040,shoes:0x2a2a2a,hair:0x1a120c,hairStyle:'spiky',eye:0x3a2a1a,build:.9,height:.97,seed:44});
@@ -78,6 +78,7 @@ async function cavePart(lv,crew){
   J.userData.A.look='player'; await say(['c_5','c_6','c_7']); J.userData.A.look=null;
   addInteract(lv,{pos:at(1.6,-10.5),reach:2.5,label:'Lie down by the fire',act:()=>{ F.slept=3; }}); objective('Rest by the fire');
   await waitUntil(()=>F.slept===3);
+  objective('');
   // Jay 2 keeps watch... and his head drops
   PLAYER.lock(); PLAYER.ctl.look=true; setPlayer(at(1.6,-10.5),yawTo(at(1.6,-10.5),at(0,-12))); PLAYER.eye=.5;
   lookAtPoint(headOf(J),.6); await say(['c_8']); await wait(2); setPose(J,'droop',1.5); await wait(2);
@@ -109,7 +110,7 @@ SCENES.lab=async function(){
   await say(['l_1','l_2','l_3']);
   // what do you say?
   const opts=[{q:'l_q1',a:['l_a1','l_a1b']},{q:'l_q2',a:['l_a2','l_a2b','l_a2c']},{q:'l_q3',a:['l_a3'],remember:'Steve'},{q:'l_q4',a:['l_a4']}];
-  for(let k=0;k<2;k++){ const op=await choose(opts.map((o,i)=>({text:L(o.q).text,used:o.used,i}))); const o=opts[op.i]; o.used=true; await say([o.q,...o.a]); if(o.remember) remember(o.remember); }
+  for(let k=0;k<2;k++){ const op=await choose(opts.map((o,i)=>({text:L(o.q).text,i})).filter(x=>!opts[x.i].used)); const o=opts[op.i]; o.used=true; await say([o.q,...o.a]); if(o.remember) remember(o.remember); }
   await say(['l_4','l_5']);
   // the chair
   S.userData.A.look=null; setPose(S,'press',.3); SND.play('hum_build',{vol:.6}); lv.chairs.forEach(c=>c.crown.material.emissiveIntensity=3);

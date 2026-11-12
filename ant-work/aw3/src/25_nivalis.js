@@ -13,11 +13,11 @@ function iceTex(){ return bugTex('ice',512,(c,s)=>{ const g=c.createLinearGradie
 const NIV={lake:{x:0,z:-70,r:34}, cave:V3(10,0,-205), ant:V3(-14,-6,-72), town:V3(260,0,-600), start:V3(0,0,40)};
 defineLevel('nivalis',{
   title:'Nivalis',
-  env:{fx:{exposure:1.0,saturation:.8,contrast:1.12,temp:-.22,bloomStrength:.55,bloomThreshold:.9,aoRadius:.6,vignette:.6,grain:.05},music:null,reverb:.25,surface:'snow',far:1400,speed:3.0},
+  env:{fx:{exposure:1.0,saturation:.8,contrast:1.12,temp:-.22,bloomStrength:.55,bloomThreshold:1.1,aoRadius:.6,vignette:.6,grain:.05},music:null,reverb:.25,surface:'snow',far:1400,speed:3.0},
   async build(scene,lv){
     lv.occluders=[];
     scene.background=col(0x04060c); scene.fog=new THREE.FogExp2(col(0x070b14),.012);
-    lv.rig=makeRig(scene,{sun:.18,sunColor:0x8aa0d0,hemi:.12,sky:0x3a4a70,ground:0x0a0c12,dir:V3(-.3,1,.2),span:60,dist:120,far:300});
+    lv.rig=makeRig(scene,{sun:.5,sunColor:0x8aa0d0,hemi:.32,sky:0x3a4a70,ground:0x0a0c12,dir:V3(-.3,1,.2),span:60,dist:120,far:300});
     // stars (a far galaxy: no moon, a strange band of light)
     scene.add(makeStars(5000,900,{}));
     // the ground: rolling snow, a frozen lake in the middle of the way
@@ -57,7 +57,7 @@ defineLevel('nivalis',{
     const cave=new THREE.Group(); cave.position.copy(NIV.cave); scene.add(cave); lv.caveG=cave;
     const inner=mesh(new THREE.SphereGeometry(9,28,18),rockM,0,3,-12); inner.scale.set(1.2,.6,1.4); inner.material.side=THREE.BackSide; cave.add(inner);
     const mouth=mesh(new THREE.CylinderGeometry(3.4,3.6,10,18,1,true),rockM,0,2.6,-1.5); mouth.rotation.x=Math.PI/2; mouth.material.side=THREE.BackSide; cave.add(mouth);
-    lv.caveFloorY=hf.at(NIV.cave.x,NIV.cave.z);
+    lv.caveFloorY=hf.at(NIV.cave.x,NIV.cave.z); { const cl=new THREE.PointLight(col(0x7a9ac0),2.2,44,1.2); cl.position.set(NIV.cave.x,lv.caveFloorY+4.5,NIV.cave.z-9); scene.add(cl); }
     // inside: a wall torch (unlit), the old campfire ring, the sleeping bag (with him inside), tally marks
     const tally=mesh(new THREE.PlaneGeometry(4,2),new THREE.MeshStandardMaterial({transparent:true,roughness:1,map:canvasTex(256,128,(c,w,h)=>{ c.clearRect(0,0,w,h); c.strokeStyle='rgba(240,236,220,.85)'; c.lineWidth=3; for(let i=0;i<46;i++){ const g=Math.floor(i/5), k=i%5, x=10+g*26+k*4, y=14+Math.floor(g/9)*50; if(k<4){ c.beginPath(); c.moveTo(x,y); c.lineTo(x+rand(-1,1),y+34); c.stroke(); } else { c.beginPath(); c.moveTo(x-18,y+28); c.lineTo(x+2,y+6); c.stroke(); } } })}),-7.5,2.6,-12,false); tally.rotation.y=Math.PI/2; cave.add(tally); lv.tally=tally;
     const ring=new THREE.Group(); ring.position.set(0,0,-12); cave.add(ring); for(let i=0;i<9;i++){ const a=i/9*Math.PI*2; ring.add(ell(.35,.25,.3,rockM,Math.cos(a)*1.1,.15,Math.sin(a)*1.1,10)); }
@@ -85,8 +85,8 @@ defineLevel('lab',{
   title:'???',
   env:{fx:{exposure:1.05,saturation:.85,contrast:1.1,temp:-.25,bloomStrength:.5,bloomThreshold:.9,aoRadius:.6,vignette:.5,grain:.04},music:null,reverb:.4,surface:'tile',far:120},
   async build(scene,lv){
-    scene.background=col(0x060a10); scene.fog=new THREE.FogExp2(col(0x0a1220),.03);
-    scene.add(new THREE.HemisphereLight(col(0x6a9ad0),col(0x0a1018),.35));
+    scene.background=col(0x060a10); scene.fog=new THREE.FogExp2(col(0x0a1220),.012);
+    scene.add(new THREE.HemisphereLight(col(0x9ac0e8),col(0x2a3040),.9)); { const top=new THREE.PointLight(col(0xe0f0ff),1.4,30,1.5); top.position.set(0,5.6,0); scene.add(top); }
     const iceM=new THREE.MeshPhysicalMaterial({color:col(0x9ac8e8),roughness:.15,clearcoat:1,transparent:true,opacity:.95});
     const it=iceTex(); const wallM=new THREE.MeshPhysicalMaterial({color:col(0x8ab0d0),map:it.map,normalMap:it.nm,roughness:.2,clearcoat:.8});
     const room=mesh(new THREE.BoxGeometry(16,6,20),wallM,0,3,0); room.material.side=THREE.BackSide; scene.add(room);
@@ -117,11 +117,11 @@ defineLevel('lab',{
 const TOWN={len:420, cliffZ:-420, bridge:{z0:-250,z1:-290}};
 defineLevel('town',{
   title:'???',
-  env:{fx:{exposure:1.05,saturation:.9,contrast:1.12,temp:-.2,bloomStrength:.7,bloomThreshold:.8,aoRadius:.6,vignette:.55,grain:.05},music:null,reverb:.35,surface:'snow',far:900,speed:3.3},
+  env:{fx:{exposure:1.05,saturation:.9,contrast:1.12,temp:-.2,bloomStrength:.7,bloomThreshold:1.0,aoRadius:.6,vignette:.55,grain:.05},music:null,reverb:.35,surface:'snow',far:900,speed:3.3},
   async build(scene,lv){
     lv.occluders=[];
     scene.background=col(0x04060c); scene.fog=new THREE.FogExp2(col(0x0a1018),.008);
-    lv.rig=makeRig(scene,{sun:.25,sunColor:0x8aa0d0,hemi:.18,sky:0x4a5a80,ground:0x0a0c12,dir:V3(.3,1,.2),span:60,dist:120,far:300});
+    lv.rig=makeRig(scene,{sun:.55,sunColor:0x8aa0d0,hemi:.36,sky:0x4a5a80,ground:0x0a0c12,dir:V3(.3,1,.2),span:60,dist:120,far:300});
     scene.add(makeStars(4000,800,{}));
     const sn=snowTex(); sn.map.repeat.set(40,80); sn.nm.repeat.set(40,80);
     const road=mesh(new THREE.PlaneGeometry(60,TOWN.len+20),new THREE.MeshStandardMaterial({color:col(0xdde4ee),map:sn.map,normalMap:sn.nm,roughness:.9}),0,0,-TOWN.len/2+10,false); road.rotation.x=-Math.PI/2; road.receiveShadow=true; scene.add(road);

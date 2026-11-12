@@ -43,7 +43,7 @@ SCENES.escape=async function(){
   J.userData.A.look='player'; await say(['e_1']); J.userData.A.look=null;
   // your cage door: the key
   freeWalk(); PLAYER.ctl.jump=false; NIGHT.on=true; NIGHT.alert=0;
-  const unlock=(id,after)=>addInteract(lv,{pos:V3(cageOf(id).x,CAGE_Y,cageOf(id).z-CAGE.d/2),reach:2.4,when:()=>!cageOf(id).doorOpen,label:'Unlock the door with the key',act:async()=>{ const c=cageOf(id);
+  const unlockDoor=(id,after)=>addInteract(lv,{pos:V3(cageOf(id).x,CAGE_Y,cageOf(id).z-CAGE.d/2),reach:2.4,when:()=>!cageOf(id).doorOpen,label:'Unlock the door with the key',act:async()=>{ const c=cageOf(id);
     SND.play('cage_lock',{vol:.7,rate:1.2}); await wait(.4); c.doorOpen=true; SND.play('metal_1',{vol:.35,rate:1.4}); tweenVal(v=>{ c.door.rotation.y=v; },0,-1.6,.8); after&&after(); }});
   unlockDoor('you'); objective('Unlock your cage door with the key');
   await waitUntil(()=>yc.doorOpen);
@@ -100,7 +100,7 @@ async function chaseRun(lv){
   freeWalk(); PLAYER.ctl.jump=true; objective('RUN to the tablecloth at the far end');
   const crew=[J].concat(F.freed?[lv.teo,lv.bram].filter((h,i)=>i?F.bramAlive!==false:F.teoAlive!==false):[]);
   const follow=followers(crew); SCENE_TICKS.push(follow);
-  CHASE.on=true; CHASE.caught=false; CHASE.slamT=1.6; CHASE.fast=false;
+  CHASE.on=true; CHASE.caught=false; CHASE.slamT=2.2; CHASE.fast=false;
   const slamTick=dt=>{ if(!CHASE.on) return; CHASE.slamT-=dt; if(CHASE.slamT<=0&&!CHASE.busy){ CHASE.slamT=rand(2.0,2.6); handSlam(lv,predict(1.1)); } };
   SCENE_TICKS.push(slamTick);
   // the two "Both moments" (only if you freed them)
@@ -173,7 +173,7 @@ async function tripMoment(lv,T){
 async function floorRun(lv,crew,slamTick,follow){
   const P=lv.pig.userData.pig; P.stand=1; P.look=camera;
   objective('The door! Run for the light under the door (the crack between the stones = safe from his hand)');
-  CHASE.on=true; CHASE.caught=false; CHASE.slamT=1.4; freeWalk(); PLAYER.ctl.jump=true; chat(['e_c5']);
+  CHASE.on=true; CHASE.caught=false; CHASE.slamT=2.6; freeWalk(); PLAYER.ctl.jump=true; chat(['e_c5']);
   await waitUntil(()=>CHASE.caught||PLAYER.pos.x>FLOOR.doorX-22);
   if(CHASE.caught) return chaseCaught(lv,'chase');
   // his hand closes over you
