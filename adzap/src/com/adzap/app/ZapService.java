@@ -182,7 +182,7 @@ public class ZapService extends AccessibilityService {
       @Override protected void onDraw(Canvas c) {
         int w = getWidth(), h = getHeight(), s = Math.min(w, h);
         // same corner XFinder looks in, a bit bigger so the edges of the X button show too
-        int cw = Math.round(Math.max(w * 0.18f, s * 0.3f) * 1.25f), ch = Math.round(Math.max(h * 0.12f, s * 0.22f) * 1.25f);
+        int cw = Math.round(XFinder.regionW(w, s) * 1.25f), ch = Math.round(XFinder.regionH(h, s) * 1.25f);
         c.drawRect(0, 0, w - cw, h, black);
         c.drawRect(w - cw, ch, w, h, black);
         big.setTextSize(s * 0.05f);
@@ -428,7 +428,7 @@ public class ZapService extends AccessibilityService {
   private static int[] findX(Bitmap bm) {
     int w = bm.getWidth(), h = bm.getHeight(), shortSide = Math.min(w, h);
     int step = Math.max(1, shortSide / 540);
-    int gw = w / step, gh = Math.min(h / step, (int) Math.max(h * 0.12f, shortSide * 0.22f) / step + 1);
+    int gw = w / step, gh = Math.min(h / step, XFinder.regionH(h / step, shortSide / step) + 2);
     int[] row = new int[w], g = new int[gw * gh], sat = new int[gw * gh];
     for (int y = 0; y < gh; y++) {
       bm.getPixels(row, 0, w, 0, Math.min(h - 1, y * step), w, 1);
@@ -441,6 +441,7 @@ public class ZapService extends AccessibilityService {
     // an X first; no X = a round grey skip/close button (like the skip-to-end one)
     int[] hit = XFinder.find(g, gw, gh, shortSide / step);
     if (hit == null) hit = XFinder.findBadge(g, sat, gw, gh, shortSide / step);
+    if (hit == null) hit = XFinder.findSkip(g, gw, gh, shortSide / step); // ▷| on its own (even white on white)
     return hit == null ? null : new int[] {hit[0] * step, hit[1] * step};
   }
 }

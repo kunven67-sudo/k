@@ -10,11 +10,75 @@ package com.adzap.app;
 final class XFinder {
   private XFinder() {}
 
+  /** The top-right corner AD ZAP looks in (the black cover leaves it open). */
+  static int regionH(int h, int shortSide) { return Math.min(h, (int) Math.max(h * 0.12f, shortSide * 0.32f)); }
+  static int regionW(int w, int shortSide) { return Math.min(w, (int) Math.max(w * 0.18f, shortSide * 0.3f)); }
+
+  // the skip-to-end symbol, in a box 0..1: an outlined/filled triangle pointing right, then a bar
+  private static final float[][] SKIP_INK = {
+    {0.95f, 0.1f}, {0.95f, 0.3f}, {0.95f, 0.5f}, {0.95f, 0.7f}, {0.95f, 0.9f},
+    {0.04f, 0.15f}, {0.04f, 0.35f}, {0.04f, 0.65f}, {0.04f, 0.85f},
+    {0.257f, 0.188f}, {0.443f, 0.332f}, {0.257f, 0.812f}, {0.443f, 0.668f}, {0.63f, 0.5f}
+  };
+  private static final float[][] SKIP_BG = {
+    {0.80f, 0.5f}, {0.45f, 0.06f}, {0.45f, 0.94f}, {0.72f, 0.15f}, {0.72f, 0.85f},
+    // the gap between triangle and bar is empty top to bottom; nothing just outside the slanted lines
+    {0.80f, 0.15f}, {0.80f, 0.3f}, {0.80f, 0.7f}, {0.80f, 0.85f}, {0.6f, 0.27f}, {0.6f, 0.73f},
+    {0.3f, 0.03f}, {0.3f, 0.97f},
+    {-0.18f, 0.5f}, {1.18f, 0.5f}, {0.5f, -0.18f}, {0.5f, 1.18f}, {0.95f, -0.18f}, {0.95f, 1.18f}
+  };
+
+  /** The skip-to-end symbol (triangle + bar) in the top-right corner, with or without a button around it. */
+  static int[] findSkip(int[] g, int w, int h, int shortSide) {
+    int minS = Math.max(10, shortSide * 22 / 1000), maxS = Math.max(minS + 4, shortSide * 7 / 100);
+    int regionH = regionH(h, shortSide), x0Min = w - regionW(w, shortSide);
+    float best = 0;
+    int[] hit = null;
+    for (int sh = minS; sh <= maxS; sh += Math.max(1, sh / 10)) {
+      for (float ratio : new float[] {1.0f, 1.12f}) {
+        int sw = Math.round(sh * ratio), stride = Math.max(1, sh / 10);
+        for (int y = 2; y + sh < regionH; y += stride) {
+          for (int x = x0Min; x + sw < w - 2; x += stride) {
+            float sc = skipScore(g, w, h, x, y, sw, sh);
+            if (sc > best) { best = sc; hit = new int[] {x + sw / 2, y + sh / 2, sh}; }
+          }
+        }
+      }
+    }
+    return hit;
+  }
+
+  static float skipScore(int[] g, int w, int h, int x0, int y0, int bw, int bh) {
+    // quick no: the bar's middle and the gap next to it must differ
+    int bar = px(g, w, h, x0 + Math.round(0.95f * bw), y0 + bh / 2), gap = px(g, w, h, x0 + Math.round(0.8f * bw), y0 + bh / 2);
+    if (Math.abs(bar - gap) < 60) return 0;
+    int sum = 0;
+    int[] bg = new int[SKIP_BG.length];
+    for (int i = 0; i < bg.length; i++) {
+      bg[i] = px(g, w, h, x0 + Math.round(SKIP_BG[i][0] * bw), y0 + Math.round(SKIP_BG[i][1] * bh));
+      sum += bg[i];
+    }
+    int bgMean = sum / bg.length, off = 0;
+    for (int v : bg) if (Math.abs(v - bgMean) > 26) off++;
+    if (off > 1) return 0;
+    int contrast = Math.abs(bar - bgMean);
+    if (contrast < 70) return 0;
+    int tol = Math.max(40, contrast * 2 / 5);
+    for (int v : bg) if (Math.abs(v - bar) < contrast / 2) return 0;
+    int ok = 0;
+    for (float[] p : SKIP_INK) {
+      int v = near(g, w, h, x0 + Math.round(p[0] * bw), y0 + Math.round(p[1] * bh), bar);
+      if (Math.abs(v - bar) <= tol) ok++;
+    }
+    if (ok < SKIP_INK.length) return 0;
+    return ok * 10f + contrast / 10f;
+  }
+
   /** Right corner first: almost every ad puts its X there. Left corners are skipped on purpose: that's where the speaker button lives. */
   static int[] find(int[] g, int w, int h, int shortSide) {
     int minS = Math.max(12, shortSide * 22 / 1000), maxS = Math.max(minS + 4, shortSide * 8 / 100);
-    int regionH = Math.min(h, (int) Math.max(h * 0.12f, shortSide * 0.22f));
-    int regionW = Math.min(w, (int) Math.max(w * 0.18f, shortSide * 0.3f));
+    int regionH = regionH(h, shortSide);
+    int regionW = regionW(w, shortSide);
     int x0Min = w - regionW;
     float best = 0;
     int[] hit = null;
@@ -75,6 +139,8 @@ final class XFinder {
     }
     int contrast = Math.abs(ink - bgMean);
     if (contrast < (off == 0 ? 55 : 110)) return 0;
+    // faint lines only count when they're pure white or black (real close buttons), not blurry coloured art
+    if (contrast < 90 && ink > 30 && ink < 225) return 0;
     int tol = Math.max(40, contrast * 2 / 5);
     // every background spot must still be clearly not line colour
     for (int v : bg) if (Math.abs(v - ink) < contrast / 2) return 0;
@@ -98,7 +164,7 @@ final class XFinder {
     int m = Math.max(2, s / 6), stops = 0;
     int[][] outs = {{x0 - m, y0 - m}, {x0 + s + m, y0 - m}, {x0 - m, y0 + s + m}, {x0 + s + m, y0 + s + m}};
     for (int[] p : outs) if (Math.abs(px(g, w, h, p[0], p[1]) - ink) > tol) stops++;
-    if (stops < 3) return 0;
+    if (stops < (off == 0 ? 3 : 4)) return 0; // on a busy background, all four line ends must stop
 
     // not a filled shape: halfway between the arms and the lines, near the edge, is background
     int[][] side = {{x0 + s / 2, y0 + 1}, {x0 + s / 2, y0 + s - 1}, {x0 + 1, y0 + s / 2}, {x0 + s - 1, y0 + s / 2}};
@@ -127,8 +193,8 @@ final class XFinder {
    */
   static int[] findBadge(int[] g, int[] sat, int w, int h, int shortSide) {
     int minR = Math.max(8, shortSide * 16 / 1000), maxR = Math.max(minR + 2, shortSide * 50 / 1000);
-    int regionH = Math.min(h, (int) Math.max(h * 0.12f, shortSide * 0.22f));
-    int regionW = Math.min(w, (int) Math.max(w * 0.18f, shortSide * 0.3f));
+    int regionH = regionH(h, shortSide);
+    int regionW = regionW(w, shortSide);
     float best = 0;
     int[] hit = null;
     for (int r = minR; r <= maxR; r += Math.max(1, r / 8)) {
