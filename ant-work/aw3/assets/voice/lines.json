@@ -667,5 +667,65 @@
   "d5_e3": {
     "who": "Jay",
     "text": "Tonight we go."
+  },
+  "n1_6": {
+    "who": "Orrin",
+    "text": "[whisper] And take a splinter off your floor boards. The match he lit his candle with is still smoking down there by the cup. Light it, or you won't see a thing."
+  },
+  "e_1": {
+    "who": "Jay2",
+    "text": "[whisper] Now. While he's asleep."
+  },
+  "e_t1": {
+    "who": "Teo",
+    "text": "[whisper] Hey! You got the key? Get us out too! Please!"
+  },
+  "e_t2": {
+    "who": "Teo",
+    "text": "Please... don't leave us here..."
+  },
+  "e_t3": {
+    "who": "Teo",
+    "text": "...Go. Just go."
+  },
+  "e_f1": {
+    "who": "Bram",
+    "text": "[whisper] ...You came back for us. Thank you."
+  },
+  "e_k1": {
+    "who": "Jay2",
+    "text": "[whisper] Sorry, sorry, my leg..."
+  },
+  "e_k2": {
+    "who": "Jay2",
+    "text": "[whisper] Ah! A thread, I didn't see..."
+  },
+  "e_c1": {
+    "who": "Jay2",
+    "text": "He's up! RUN!"
+  },
+  "e_c2": {
+    "who": "Bram",
+    "text": "Help! I can't move! Get it off me!"
+  },
+  "e_c3": {
+    "who": "Teo",
+    "text": "Wait! Don't leave me!"
+  },
+  "e_c4": {
+    "who": "Jay2",
+    "text": "The tablecloth! Grab it and slide!"
+  },
+  "e_c5": {
+    "who": "Jay2",
+    "text": "The door! Run for the light under the door!"
+  },
+  "e_c6": {
+    "who": "Jay2",
+    "text": "Jay... your watch. It's glowing!"
+  },
+  "e_c7": {
+    "who": "Jay",
+    "text": "Everybody hold on to me!"
   }
 }

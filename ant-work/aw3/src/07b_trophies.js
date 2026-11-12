@@ -17,7 +17,8 @@ const TROPHY_DEFS=[
   ['mantis','Praying For You','Beat the mantis','silver'],
   ['spiderWin','For Orrin','Beat the tarantula','silver'],
   ['scorpionWin','Sting Operation','Beat the scorpion','gold'],
-  ['part2','The Key','Get the key out of the bowl','gold']
+  ['part2','The Key','Get the key out of the bowl','gold'],
+  ['escape','Off The Table','Escape the pig king','gold']
 ];
 const TROPHY=Object.assign({},loadJSON('aw3_ach')||{});
 const TSTAT=Object.assign({},loadJSON('aw3_ach_stats')||{});

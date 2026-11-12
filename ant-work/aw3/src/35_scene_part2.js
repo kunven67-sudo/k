@@ -136,7 +136,7 @@ function youInCage(){ const c=cageOf('you'); setPlayer(V3(c.x-.6,0,c.z-.4),0,-.0
 async function tableStart(id,time){
   const lv=LEVELS.table, fd=$('fade'); fd.style.transition='none'; fd.style.opacity=1;
   if(LV!==lv) await enterLevel('table',{pos:V3(0,0,0)});
-  F.collared=true; saveCheckpoint(id); tablePeople(); closeAllLids(); if(lv.bigArm) lv.bigArm.visible=false; lv.setTime(time); lv.inter.length=0; NIGHT.on=false; resetNoisy(lv);
+  F.collared=true; saveCheckpoint(id); tablePeople(); closeAllLids(); if(lv.bigArm) lv.bigArm.visible=false; torchOn(false); TORCH.back=false; lv.setTime(time); lv.inter.length=0; NIGHT.on=false; resetNoisy(lv);
   const P=lv.pig.userData.pig; P.armPose=null; P.look=null; P.stand=0;
   youInCage(); PLAYER.eye=1.64; setVM(true); hudVisible(true); invHUD();
   setAmbience(time==='night'?[]:[['fire',.03]]);
@@ -183,7 +183,7 @@ function pigSees(lv){ const P=lv.pig.userData.pig; P.head.updateMatrixWorld(true
   return _ray.intersectObjects(lv.occluders,true).length===0; }
 function tableTick(lv,dt,t){
   if(!NIGHT.on) return;
-  const p=PLAYER.pos; NIGHT.losT=(NIGHT.losT||0)-dt; if(NIGHT.losT<=0){ NIGHT.losT=.12; const yc=cageOf('you'); NIGHT.hidden=(Math.abs(p.x-yc.x)<CAGE.w/2&&Math.abs(p.z-yc.z)<CAGE.d/2)||!pigSees(lv); }
+  const p=PLAYER.pos; NIGHT.losT=(NIGHT.losT||0)-dt; if(NIGHT.losT<=0){ NIGHT.losT=.12; const yc=cageOf('you'); NIGHT.hidden=(Math.abs(p.x-yc.x)<CAGE.w/2&&Math.abs(p.z-yc.z)<CAGE.d/2)||(!pigSees(lv)&&!torchGivesYouAway()); }
   let el=$('hideHud'); if(!el){ el=document.createElement('div'); el.id='hideHud'; el.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:40;font:800 13px Nunito,system-ui;letter-spacing:.25em;color:#9fe0a0;text-shadow:0 1px 4px #000;pointer-events:none;transition:opacity .3s'; el.textContent='HIDDEN'; document.body.appendChild(el); }
   el.style.opacity=NIGHT.hidden?1:0;
   // knock into anything metal = noise = he wakes up
@@ -199,7 +199,8 @@ async function nightSneak(lv,goals){
   NIGHT.on=true; NIGHT.alert=0; NIGHT.caught=false;
   const got=()=>goals.every(g=>g.got);
   const objText=()=>goals.filter(g=>!g.got).map(g=>g.label).join(' + ')||'Go back to your cage and sleep';
-  for(const g of goals){ addInteract(lv,{pos:g.pos,reach:2.4,when:()=>!g.got&&NIGHT.alert===0,label:'Take the '+g.name.toLowerCase(),act:()=>{ g.got=true; const I=inv(); I[g.item]=(I[g.item]||0)+(g.n||1); if(g.obj) g.obj.visible=false; SND.play('pickup',{vol:.6}); toast(g.name,'#e0c08a'); invHUD(); objective(objText()); }}); }
+  for(const g of goals){ if(g.objs) for(const o of g.objs) addInteract(lv,{obj:o,reach:3,when:()=>!g.got&&NIGHT.alert===0,label:'Take the '+g.name.toLowerCase(),act:()=>{ g.got=true; const I=inv(); I[g.item]=(I[g.item]||0)+(g.n||1); for(const q of g.objs) q.visible=false; SND.play('pickup',{vol:.6}); toast(g.name,'#e0c08a'); invHUD(); objective(objText()); }});
+    if(g.objs) continue; addInteract(lv,{pos:g.pos,reach:2.4,when:()=>!g.got&&NIGHT.alert===0,label:'Take the '+g.name.toLowerCase(),act:()=>{ g.got=true; const I=inv(); I[g.item]=(I[g.item]||0)+(g.n||1); if(g.obj) g.obj.visible=false; SND.play('pickup',{vol:.6}); toast(g.name,'#e0c08a'); invHUD(); objective(objText()); }}); }
   const yc=cageOf('you');
   for(;;){
     objective(objText()); freeWalk(); PLAYER.ctl.jump=false;
@@ -219,7 +220,7 @@ SCENES.night1=async function(){
   await dayCard('NIGHT 1');
   F.bentBar=true;
   lv.orrin.position.x=cageOf('orrin').x+2.5; faceTo(lv.orrin,PLAYER.pos); lv.orrin.userData.A.look='player';
-  await say(['n1_1','n1_2','n1_3','n1_4','n1_5']); lv.orrin.userData.A.look=null;
+  await say(['n1_1','n1_2','n1_3','n1_4','n1_6','n1_5']); lv.orrin.userData.A.look=null; torchInteracts(lv);
   setPose(J,'sit',.5); J.userData.A.seated=true;
   const pl=TABLE.plate;
   if(!lv.boneBit){ lv.boneBit=makeLongBone(1.3,.09); lv.boneBit.rotation.set(Math.PI/2,0,.4); lv.scene.add(lv.boneBit); }
@@ -310,12 +311,11 @@ SCENES.night2=async function(){
   playMusic('night',2); PLAYER.lock(); PLAYER.ctl.look=true;
   await dayCard('NIGHT 2');
   F.bentBar=true; const I=inv(); if(!I.bone) I.bone=1; if(!I.thorn) I.thorn=1; invHUD();
-  await say(['n2_1','n2_2','n2_3']); setPose(J,'sit',.5); J.userData.A.seated=true;
+  await say(['n2_1','n2_2','n2_3']); setPose(J,'sit',.5); J.userData.A.seated=true; torchInteracts(lv); torchOn(true);
   const th=lv.threads[3]; th.visible=true;
   const pebs=lv.pebbles; for(const pb of pebs) pb.visible=true;
   await nightSneak(lv,[{name:'Thread',label:'Get a loose thread from the napkin',item:'thread',pos:V3(TABLE.napkin.x+10.5,.3,TABLE.napkin.z-5+3*1.6),obj:th},
-    {name:'Pebbles',label:'Get pebbles by the pot',item:'pebbles',n:4,pos:V3(TABLE.pebbles.x,.3,TABLE.pebbles.z),obj:null}]);
-  for(const pb of pebs.slice(0,4)) pb.visible=false;
+    {name:'Pebbles',label:'Get pebbles by the pot',item:'pebbles',n:4,objs:pebs.slice(0,4)}]);
   PLAYER.lock(); await say(['n_back','n2_craft']); lv.inter.length=0;
   const st=lv.stash; addInteract(lv,{pos:V3(st.x,.3,st.z),reach:2.4,when:()=>canCraft(),label:'Make a bone spear (thorn + bone + thread)',act:()=>{ craftSpear(); objective('Sleep on your bedding'); }});
   addInteract(lv,{pos:V3(cageOf('you').x+.2,.3,cageOf('you').z+.6),reach:2.4,when:()=>!canCraft(),label:'Sleep',act:()=>{ F.slept=2; }});
@@ -406,14 +406,13 @@ SCENES.scorpion=async function(){
   fd.style.transition='opacity 1.5s'; fd.style.opacity=1; await wait(1.6); lv.setTime('night'); youInCage();
   PLAYER.lock(); PLAYER.ctl.look=true; playMusic('night',2); fd.style.opacity=0; await wait(1.5);
   J.userData.A.look='player'; await say([F.savedJay2?'d5_e1':'d5_e2','d5_e3']);
-  saveCheckpoint('scorpion'); const s=getSave()||{}; s.part2=true; writeSave(s); unlock('part2');
-  await wait(1.5); fd.style.transition='opacity 1.5s'; fd.style.opacity=1; stopMusic(2); await wait(3);
-  TITLE.show(false);
+  const s=getSave()||{}; s.part2=true; writeSave(s); unlock('part2');
+  await wait(1.2); runStory(()=>SCENES.escape());
 };
 function keyMesh(){ const g=new THREE.Group(); const m=new THREE.MeshPhysicalMaterial({color:col(0xb8963a),metalness:1,roughness:.3});
   g.add(mesh(new THREE.TorusGeometry(.22,.06,8,18),m,0,0,0)); g.add(box(.08,.08,.9,m,0,0,.65)); g.add(box(.08,.22,.08,m,0,-.1,.95)); g.add(box(.08,.16,.08,m,0,-.07,.78)); g.scale.setScalar(.9); return g; }
 /* the table forwards keys + clicks to the arena while you fight */
-LEVELS.table.onKey=code=>arenaKey(code);
+LEVELS.table.onKey=code=>{ if(code==='KeyT'&&TORCH.on&&!ARENA.active){ TORCH.back=!TORCH.back; toast(TORCH.back?'Torch behind you (he can\'t see the fire)':'Torch out front','#e0c08a'); return true; } return arenaKey(code); };
 LEVELS.table.onPrimary=()=>ARENA.active?arenaAttack():false;
 
 /* YOUR collar: a real ring around your neck, just under the camera. Look down and you see it (and its green light). */

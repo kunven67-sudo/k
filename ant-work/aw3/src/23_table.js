@@ -10,7 +10,8 @@ const TK=40;   // 1 meter for the pig = 40 of yours
 const TABLE={W:100,D:52,
   cages:[{id:'orrin',x:-40,z:18},{id:'you',x:-31,z:18},{id:'bram',x:-22,z:18},{id:'teo',x:-13,z:18}],
   arena:V3(-24,0,0), arenaR:12,   // right in front of the cages: he wants the prisoners to watch
-  plate:V3(8,0,-10), napkin:V3(-38,0,-19), pot:V3(36,0,-14), pebbles:V3(28,0,-5), candle:V3(42,0,16), cup:V3(10,0,20)};
+  plate:V3(8,0,-10), napkin:V3(-38,0,-19), pot:V3(36,0,-14), pebbles:V3(28,0,-5), candle:V3(42,0,16), cup:V3(10,0,20), match:V3(8,0,12)};
+const FLOOR={crack0:3,crack1:4.4,doorX:172};
 const CAGE={w:6,d:6,h:4.6,bar:.5};
 /* the cages stand on a thick old book, so the prisoners look down into the sand tray. A wooden ruler leans on it = the way down */
 const BOOK={x0:-46,x1:-6,z0:13,z1:25.8,h:2.6}, RULER={x0:-6,x1:2,z0:16,z1:20};
@@ -27,6 +28,7 @@ function makeTinyCage(scene,lv,c,iron,wood){
   c.bars=[];
   const bar=(x,z,bent)=>{ const b=cyl(.055,.055,h,iron,x,h/2,z,8); g.add(b); c.bars.push(b); return b; };
   for(let i=0;i<=n;i++){ const t=-w/2+i*w/n;
+    if(i===n/2||i===n/2+1){ if(!c.door){ c.door=new THREE.Group(); c.door.position.set(-.5,0,-d/2); g.add(c.door); } const b=cyl(.055,.055,h,iron,t+.5,h/2,0,8); c.door.add(b); continue; }
     bar(t,-d/2); // front (faces the arena)
     if(c.id==='you'&&(i===n/2||i===n/2+1)){ // the bent bar at the back: two bars bowed apart = a gap you can squeeze through
       const b=new THREE.Group(); b.position.set(t,0,d/2); g.add(b);
@@ -35,12 +37,12 @@ function makeTinyCage(scene,lv,c,iron,wood){
     bar(t,d/2); }
   for(let i=1;i<n;i++){ const t=-d/2+i*d/n; bar(-w/2,t); bar(w/2,t); }
   // the door (front, middle) with its lock box
-  g.add(box(.6,.5,.25,iron,0,h*.5,-d/2-.05));
+  c.door.add(box(.6,.5,.25,iron,.75,h*.5,-.05)); c.door.add(box(1.1,.08,.08,iron,.5,h-.1,0)); c.door.add(box(1.1,.08,.08,iron,.5,.25,0));
   // straw/cloth bedding on the floor
   const rag=mesh(GC('ragGeo',()=>{ const p=new THREE.PlaneGeometry(4.2,3.4,16,12); const a=p.attributes.position; for(let k=0;k<a.count;k++) a.setZ(k,Math.abs(noise2(a.getX(k)*.9,a.getY(k)*.9))*.25); p.rotateX(-Math.PI/2); p.computeVertexNormals(); return p; }),lv.ragM,rand(-.3,.3),.19,rand(.2,.8)); rag.rotation.y=rand(-.3,.3); g.add(rag);
   // collision: 4 walls (the back wall of YOUR cage has a gap where the bar is bent; only open when you know about it)
   const x0=c.x-w/2,x1=c.x+w/2,z0=c.z-d/2,z1=c.z+d/2,t=.25;
-  colBox(lv.col,x0,x1,z0-t,z0+t); colBox(lv.col,x0-t,x0+t,z0,z1); colBox(lv.col,x1-t,x1+t,z0,z1);
+  colBox(lv.col,x0,c.x-.55,z0-t,z0+t); colBox(lv.col,c.x+.55,x1,z0-t,z0+t); colBox(lv.col,c.x-.55,c.x+.55,z0-t,z0+t,()=>!c.doorOpen); colBox(lv.col,x0-t,x0+t,z0,z1); colBox(lv.col,x1-t,x1+t,z0,z1);
   if(c.id==='you'){ colBox(lv.col,x0,c.x-.55,z1-t,z1+t); colBox(lv.col,c.x+.55,x1,z1-t,z1+t); colBox(lv.col,c.x-.55,c.x+.55,z1-t,z1+t,()=>!F.bentBar); }
   else colBox(lv.col,x0,x1,z1-t,z1+t);
   return g;
@@ -59,7 +61,18 @@ defineLevel('table',{
     const top=texPlane(TABLE.W,TABLE.D,'rough_wood',2.2,0,0,0,{opts:{roughness:.8}}); top.material.color=col(0x9a7452); scene.add(top);
     for(let i=1;i<4;i++){ const gap=box(TABLE.W,.05,.18,new THREE.MeshStandardMaterial({color:col(0x1a0f08),roughness:1}),0,.01,-TABLE.D/2+i*TABLE.D/4,false); scene.add(gap); }
     const edge=box(TABLE.W,3,TABLE.D,new THREE.MeshStandardMaterial({color:col(0x4a3220),roughness:.9}),0,-1.52,0,false); scene.add(edge);
-    const floor=texPlane(900,900,'stone_tiles_02',22,0,-36,0,{opts:{roughness:.9}}); floor.material.color=col(0x5a5048); scene.add(floor);
+    for(const [z0,z1] of [[-450,FLOOR.crack0],[FLOOR.crack1,450]]){ const fl=texPlane(900,z1-z0,'stone_tiles_02',22,0,-36,(z0+z1)/2,{opts:{roughness:.9}}); fl.material.color=col(0x5a5048); scene.add(fl); }
+    { const dark=new THREE.MeshStandardMaterial({color:col(0x1a1410),roughness:1}); const w=FLOOR.crack1-FLOOR.crack0;
+      scene.add(box(900,.1,w,dark,0,-37.4,(FLOOR.crack0+FLOOR.crack1)/2,false));
+      for(const z of [FLOOR.crack0,FLOOR.crack1]){ const wall=mesh(new THREE.PlaneGeometry(900,1.4),dark,0,-36.7,z,false); wall.rotation.y=z===FLOOR.crack0?0:Math.PI; scene.add(wall); } }
+    { const W=pbrMat('rough_wood',2,{opts:{roughness:.8}}); W.color=col(0x4a2e1a); const br=pbrMat('castle_brick_07',8,{opts:{roughness:1}}); br.color=col(0x6a625a);
+      const wall=mesh(new THREE.PlaneGeometry(600,400),br,FLOOR.doorX+.5,-36+200,0,false); wall.rotation.y=-Math.PI/2; scene.add(wall);
+      scene.add(box(2,78,38,W,FLOOR.doorX,-36+1.6+39,0));
+      const glow=mesh(new THREE.PlaneGeometry(38,1.6),new THREE.MeshBasicMaterial({color:col(0xffd8a0).multiplyScalar(1.6)}),FLOOR.doorX+.9,-36+.8,0,false); glow.rotation.y=-Math.PI/2; scene.add(glow);
+      const dl=new THREE.PointLight(col(0xffc890),2.5,60,1.5); dl.position.set(FLOOR.doorX-3,-35,0); scene.add(dl); }
+    lv.floorRocks=[]; { const crumbM=new THREE.MeshStandardMaterial({color:col(0xb08850),roughness:.95,map:charTex().cloth.map});
+      for(let i=0;i<22;i++){ const x=rand(58,FLOOR.doorX-12), z=rand(-24,24); if(Math.abs(z-(FLOOR.crack0+FLOOR.crack1)/2)<3) continue; const r=rand(.9,2.4);
+        const m=i%3===0?makeLongBone(rand(3,6),rand(.2,.35)):ell(r,r*.7,r*.9,crumbM,0,0,0,14); if(i%3===0){ m.rotation.set(Math.PI/2,0,rand(0,6)); m.position.set(x,-35.7,z); } else m.position.set(x,-36+r*.5,z); scene.add(m); lv.floorRocks.push({x,z,r:i%3===0?1.2:r}); colCircle(lv.col,x,z,i%3===0?1.0:r*.9,()=>lv.floorMode); } }
     // the pig, giant, in his chair at the end of the table
     const pig=makePigMan(); pig.scale.setScalar(TK); pig.position.set(0,-36,-TABLE.D/2-34); scene.add(pig); lv.pig=pig;
     const P=pig.userData.pig; P.onBite=()=>{ pigBiteMeat(P); SND.play('pig_eat_'+randi(1,4),{vol:1,pos:V3(0,44,-34),ref:60}); };
@@ -126,6 +139,16 @@ defineLevel('table',{
       const R=RULER, len=Math.hypot(R.x1-R.x0,BOOK.h); const rm=pbrMat('rough_wood',.6,{opts:{roughness:.7}}); rm.color=col(0xc8a070);
       const ruler=box(len,.3,R.z1-R.z0,rm,(R.x0+R.x1)/2,BOOK.h/2,(R.z0+R.z1)/2); ruler.rotation.z=-Math.atan2(BOOK.h,R.x1-R.x0); scene.add(ruler);
       for(let i=1;i<16;i++){ const tick=box(.06,.02,i%5?.6:1.2,new THREE.MeshBasicMaterial({color:0x2a1a0a}),0,0,0,false); const t=i/16; tick.position.set(lerp(R.x0,R.x1,t),lerp(BOOK.h,0,t)+.17,R.z0+.4+(i%5?.3:.6)); tick.rotation.z=ruler.rotation.z; scene.add(tick); } }
+    { const cl=new THREE.MeshPhysicalMaterial({color:col(0xc8b8a0),roughness:.95,map:charTex().cloth.map,sheen:col(0x8a7a60),side:THREE.DoubleSide});
+      const top=mesh(GC('runTop',()=>{ const p=new THREE.PlaneGeometry(10,16,20,30); const a=p.attributes.position; for(let k=0;k<a.count;k++) a.setZ(k,.04+Math.abs(noise2(a.getX(k)*.3,a.getY(k)*.3))*.12); p.rotateX(-Math.PI/2); p.computeVertexNormals(); return p; }),cl,45,0,0,false); scene.add(top);
+      const drape=mesh(GC('runDrape',()=>{ const p=new THREE.PlaneGeometry(16,36.4,30,60); const a=p.attributes.position; for(let k=0;k<a.count;k++){ const x=a.getX(k), y=a.getY(k); a.setZ(k,Math.sin(x*1.1)*.5*(.4+(18.2-y)/36.4)+(y<-14?(-14-y)*.06:0)); } p.computeVertexNormals(); return p; }),cl,50.3,-36+18.2,0,false); drape.rotation.y=Math.PI/2; scene.add(drape); lv.drape=drape; }
+    { const m=new THREE.Group(); m.position.set(TABLE.match.x,0,TABLE.match.z); m.rotation.y=.4; scene.add(m); lv.match=m;
+      m.add(box(7,.5,.5,new THREE.MeshStandardMaterial({color:col(0xc8a070),roughness:.8}),0,.25,0)); m.add(box(1.3,.5,.5,new THREE.MeshStandardMaterial({color:col(0x1a1008),roughness:.9}),-3.9,.25,0));
+      const ember=sph(.45,new THREE.MeshBasicMaterial({color:col(0xff6a20).multiplyScalar(1.8)}),-4.3,.4,0,10,8); m.add(ember); lv.ember=ember;
+      lv.emberL=new THREE.PointLight(col(0xff7a30),1.6,14,1.6); lv.emberL.position.set(-4.3,1.2,0); m.add(lv.emberL); }
+    { const steel=new THREE.MeshPhysicalMaterial({color:col(0xc8ccd0),metalness:1,roughness:.22}); const sp2=new THREE.Group(); sp2.add(ell(1.1,.2,1.6,steel,0,0,0,24)); sp2.add(box(.35,.1,5.4,steel,0,.05,-3.4));
+      sp2.position.set(TABLE.cup.x-4.2,3.2,TABLE.cup.z-1); sp2.rotation.set(-1.1,0,.15); sp2.visible=false; scene.add(sp2); lv.spoon2=sp2;
+      const thr=mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V3(TABLE.cup.x-10,.1,TABLE.cup.z-5),V3(TABLE.cup.x-7,.1,TABLE.cup.z-4.2),V3(TABLE.cup.x-4,.1,TABLE.cup.z-5.3)]),16,.06,6),new THREE.MeshStandardMaterial({color:col(0xe0d4bc),roughness:1})); thr.visible=false; scene.add(thr); lv.thread2=thr; }
     // the row of prisoner cages
     for(const c of TABLE.cages) makeTinyCage(scene,lv,c,iron,wood);
     // your stash in the back corner of your cage (what you collected shows up here)
@@ -135,8 +158,9 @@ defineLevel('table',{
     lv.ground=(x,z)=>{ const a=Math.hypot(x-A.x,z-A.z); if(a<R) return .35; for(const c of TABLE.cages) if(Math.abs(x-c.x)<CAGE.w/2+.15&&Math.abs(z-c.z)<CAGE.d/2+.15) return CAGE_Y;
       if(x>=BOOK.x0&&x<=BOOK.x1&&z>=BOOK.z0&&z<=BOOK.z1) return BOOK.h; if(x>RULER.x0&&x<=RULER.x1&&z>=RULER.z0&&z<=RULER.z1) return BOOK.h*(RULER.x1-x)/(RULER.x1-RULER.x0);
       const pr=Math.hypot(x-TABLE.plate.x,z-TABLE.plate.z); if(pr<8.6) return plateH(pr); return napH(x,z); };
+    const tableGround=lv.ground; lv.ground=(x,z)=>lv.floorMode?(z>FLOOR.crack0&&z<FLOOR.crack1?-37.3:-36):tableGround(x,z);
     lv.surfaceAt=(x,z)=>Math.hypot(x-A.x,z-A.z)<R?'sand':'wood';
-    lv.col.bounds=[-TABLE.W/2+.6,TABLE.W/2-.6,-TABLE.D/2+.6,TABLE.D/2-.6];
+    lv.tableBounds=[-TABLE.W/2+.6,TABLE.W/2-.6,-TABLE.D/2+.6,TABLE.D/2-.6]; lv.floorBounds=[51,FLOOR.doorX-1,-28,28]; lv.col.bounds=lv.tableBounds;
     lv.time='day';
   },
   enter(){ FX.sunWorld=null; this.setTime(this.time||'day'); },
