@@ -64,7 +64,9 @@ final class Rules {
       case "x": case "×": case "✕": case "✖": case "╳": case "⨯":
       case "\u2717": case "\u2718": case "\u274C":
       case "close": case "skip": case "skip video": case "dismiss": case "close button": case "close dialog":
-      case "no thanks": case "skip button":
+      case "no thanks": case "skip button": case "next": case "next ad": case "skip to next": case "skip to next ad":
+      case "skip to end": case "skip forward": case "continue to app": case "close and continue":
+      case "omitir": case "saltar": case "cerrar": case "siguiente": case "omitir anuncio": case "cerrar anuncio":
         return true;
       default:
         return false;

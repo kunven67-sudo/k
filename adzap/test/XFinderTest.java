@@ -17,10 +17,15 @@ public class XFinderTest {
       int W = im.getWidth(), H = im.getHeight(), shortSide = Math.min(W, H);
       int step = Math.max(1, shortSide / 540);   // same as the phone
       int gw = W / step, gh = (int) Math.max(H * 0.12f, shortSide * 0.22f) / step + 1;
-      int[] g = new int[gw * gh];
-      for (int y = 0; y < gh; y++) for (int x = 0; x < gw; x++) g[y * gw + x] = XFinder.grey(im.getRGB(x * step, Math.min(H - 1, y * step)));
+      int[] g = new int[gw * gh], sat = new int[gw * gh];
+      for (int y = 0; y < gh; y++) for (int x = 0; x < gw; x++) {
+        int c = im.getRGB(x * step, Math.min(H - 1, y * step));
+        g[y * gw + x] = XFinder.grey(c);
+        sat[y * gw + x] = XFinder.sat(c);
+      }
       long t0 = System.nanoTime();
       int[] hit = XFinder.find(g, gw, gh, shortSide / step);
+      if (hit == null) hit = XFinder.findBadge(g, sat, gw, gh, shortSide / step); // same order as the phone
       long ms = (System.nanoTime() - t0) / 1000000;
       String got = hit == null ? "none" : (hit[0] * step) + "," + (hit[1] * step) + " size " + (hit[2] * step);
       boolean pass = none ? hit == null

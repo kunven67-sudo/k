@@ -93,6 +93,9 @@ public class RulesTest {
     is(Rules.decide(ad, false, true, 2640, 1080, 2.75f)[0] == Rules.LEAVE, true, "normal screen -> nothing");
     is(score("Close video", "", null, true, true, 300, 1100, 550, 1180) == Rules.NONE, true, "never Close video");
 
+    is(score("", "Skip to next ad", null, true, true, 2540, 30, 2610, 100) == Rules.WEAK, true, "skip to next in ad");
+    is(score("Next", "", null, false, true, 900, 2000, 1050, 2100) == Rules.NONE, true, "Next outside ads");
+
     System.out.println(fails == 0 ? "ALL PASS" : fails + " FAILED");
     System.exit(fails == 0 ? 0 : 1);
   }

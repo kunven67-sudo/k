@@ -266,7 +266,7 @@ public class ZapService extends AccessibilityService {
     return dispatchGesture(g, null, null);
   }
 
-  /** The ad's X is only a picture: look at the screen itself and find the X shape. */
+  /** The ad's X (or skip) is only a picture: look at the screen itself and find its shape. */
   private void lookForX() {
     long now = SystemClock.uptimeMillis();
     if (Build.VERSION.SDK_INT < 30 || shotBusy || now - lastShot < 800 || now - lastZap < 1200) return;
@@ -320,12 +320,18 @@ public class ZapService extends AccessibilityService {
     int w = bm.getWidth(), h = bm.getHeight(), shortSide = Math.min(w, h);
     int step = Math.max(1, shortSide / 540);
     int gw = w / step, gh = Math.min(h / step, (int) Math.max(h * 0.12f, shortSide * 0.22f) / step + 1);
-    int[] row = new int[w], g = new int[gw * gh];
+    int[] row = new int[w], g = new int[gw * gh], sat = new int[gw * gh];
     for (int y = 0; y < gh; y++) {
       bm.getPixels(row, 0, w, 0, Math.min(h - 1, y * step), w, 1);
-      for (int x = 0; x < gw; x++) g[y * gw + x] = XFinder.grey(row[x * step]);
+      for (int x = 0; x < gw; x++) {
+        int c = row[x * step];
+        g[y * gw + x] = XFinder.grey(c);
+        sat[y * gw + x] = XFinder.sat(c);
+      }
     }
+    // an X first; no X = a round grey skip/close button (like the skip-to-end one)
     int[] hit = XFinder.find(g, gw, gh, shortSide / step);
+    if (hit == null) hit = XFinder.findBadge(g, sat, gw, gh, shortSide / step);
     return hit == null ? null : new int[] {hit[0] * step, hit[1] * step};
   }
 }
