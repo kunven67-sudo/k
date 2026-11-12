@@ -17,7 +17,9 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.CompoundButton;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 
 /** The one screen: is it on, how many ads it zapped, and the buttons to turn it on. */
@@ -48,7 +50,7 @@ public class MainActivity extends Activity {
     title.setTypeface(Typeface.create("sans-serif-black", Typeface.NORMAL));
     title.setLetterSpacing(0.04f);
     col.addView(title);
-    col.addView(text("Taps the X on ads for you. Any app.", 15, DIM), lp(4));
+    col.addView(text("Gets you through ads by itself. Any app.", 15, DIM), lp(4));
 
     LinearLayout card = new LinearLayout(this);
     card.setOrientation(LinearLayout.VERTICAL);
@@ -87,6 +89,12 @@ public class MainActivity extends Activity {
       }
     });
     col.addView(pause, lp(22));
+
+    col.addView(text("WHAT IT DOES", 13, DIM), lp(30));
+    col.addView(toggle("autoWatch", "Press Watch Ad for you", "When an app says \"watch an ad to start watching\""), lp(10));
+    col.addView(toggle("mute", "Mute ads", "Sound comes back by itself when the ad is gone"), lp(10));
+    col.addView(toggle("seeX", "Find X buttons by looking", "For ads whose X is just a picture"), lp(10));
+    col.addView(toggle("closeStore", "Close Play Store pop-ups", "The little install box an ad opens by itself"), lp(10));
 
     ScrollView scroll = new ScrollView(this);
     scroll.setBackgroundColor(BG);
@@ -132,6 +140,29 @@ public class MainActivity extends Activity {
         + "pick Allow restricted settings, then try again.");
     pause.setVisibility(on ? View.VISIBLE : View.GONE);
     pause.setText(paused ? "Start zapping again" : "Pause");
+  }
+
+  /** A row with a switch, saved right away (all start ON). */
+  private View toggle(final String key, String title, String sub) {
+    LinearLayout row = new LinearLayout(this);
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setGravity(Gravity.CENTER_VERTICAL);
+    row.setPadding(dp(16), dp(12), dp(10), dp(12));
+    row.setBackground(round(CARD, 14));
+    LinearLayout words = new LinearLayout(this);
+    words.setOrientation(LinearLayout.VERTICAL);
+    TextView t = text(title, 16, Color.WHITE);
+    t.setTypeface(Typeface.DEFAULT_BOLD);
+    words.addView(t);
+    words.addView(text(sub, 13, DIM));
+    row.addView(words, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+    Switch sw = new Switch(this);
+    sw.setChecked(prefs.getBoolean(key, true));
+    sw.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+      @Override public void onCheckedChanged(CompoundButton b, boolean on) { prefs.edit().putBoolean(key, on).apply(); }
+    });
+    row.addView(sw);
+    return row;
   }
 
   private void open(Intent i) {

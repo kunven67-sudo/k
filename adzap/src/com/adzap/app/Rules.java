@@ -62,8 +62,9 @@ final class Rules {
     if (s.matches(".*\\d.*")) return false; // "Skip in 5" is a countdown, not a button yet
     switch (s) {
       case "x": case "×": case "✕": case "✖": case "╳": case "⨯":
-      case "close": case "skip": case "skip video": case "close video": case "dismiss": case "close button":
-      case "no thanks": case "skip button": case "cancel":
+      case "\u2717": case "\u2718": case "\u274C":
+      case "close": case "skip": case "skip video": case "dismiss": case "close button": case "close dialog":
+      case "no thanks": case "skip button":
         return true;
       default:
         return false;
@@ -91,14 +92,78 @@ final class Rules {
     if (ratio < 0.6f || ratio > 1.65f) return false;
     float cx = (l + r) / 2f, cy = (t + b) / 2f;
     boolean top = cy < sh * 0.2f;
-    boolean side = cx < sw * 0.24f || cx > sw * 0.76f;
-    return top && side;
+    return top && cx > sw * 0.76f; // right only: the top-left button is usually the ad's speaker
   }
 
   /** Something we may tap: never a big area (that would be the ad, and it would open). */
   static boolean smallEnough(int l, int t, int r, int b, int sw, int sh) {
     long area = (long) Math.max(0, r - l) * Math.max(0, b - t);
     return area > 0 && area <= (long) sw * sh / 6;
+  }
+
+  /** "Watch Ad", "Watch an ad", "View ad": the app asking before an ad, not the ad itself. */
+  static boolean watchAd(String s) {
+    return s.length() <= 30 && s.matches("(watch|view|play|see)( an| a| the)? (ad|ads|video ad|advert|advertisement)( now)?");
+  }
+
+  /** The words around a "watch an ad to watch your show" question. */
+  static boolean gateText(String s) {
+    return s.contains("start watching") || s.contains("continue watching") || s.contains("keep watching")
+        || s.contains("ad to watch") || s.contains("ad to start") || s.contains("ad to continue") || s.contains("ad to unlock")
+        || s.contains("to unlock this") || s.contains("to watch this") || s.contains("watch an ad to");
+  }
+
+  /** "Close video? You will lose your reward": closing now would waste the whole ad. */
+  static boolean rewardWarning(String s) {
+    return (s.contains("reward") && (s.contains("lose") || s.contains("won t") || s.contains("will not")
+        || s.contains("not get") || s.contains("forfeit") || s.contains("miss"))) || s.equals("close video");
+  }
+
+  static boolean resume(String s) {
+    return s.equals("resume video") || s.equals("resume") || s.equals("keep watching") || s.equals("back to video")
+        || s.equals("return to video") || s.equals("continue video") || s.equals("resume ad");
+  }
+
+  /** One thing on screen, as AD ZAP sees it. */
+  static final class Node {
+    final String text, desc, id;
+    final boolean clickable;
+    final int l, t, r, b;
+    Node(String text, String desc, String id, boolean clickable, int l, int t, int r, int b) {
+      this.text = text; this.desc = desc; this.id = id; this.clickable = clickable;
+      this.l = l; this.t = t; this.r = r; this.b = b;
+    }
+  }
+
+  static final int TAP_CLOSE = 1, TAP_WATCH = 2, TAP_RESUME = 3, LOOK_FOR_X = 4, LEAVE = 5;
+
+  /** What to do with one window: {action, index of the node to tap (or -1)}. */
+  static int[] decide(java.util.List<Node> nodes, boolean adScreen, boolean autoWatch, int sw, int sh, float density) {
+    boolean warn = false, gate = false;
+    int resumeAt = -1, watchAt = -1;
+    for (int i = 0; i < nodes.size(); i++) {
+      Node n = nodes.get(i);
+      String nt = norm(n.text), nd = norm(n.desc);
+      if (rewardWarning(nt) || rewardWarning(nd)) warn = true;
+      if (gateText(nt) || gateText(nd)) gate = true;
+      if (resumeAt < 0 && (resume(nt) || resume(nd))) resumeAt = i;
+      if (watchAt < 0 && (watchAd(nt) || watchAd(nd))) watchAt = i;
+    }
+    // never throw away a reward: hit Resume
+    if (warn && resumeAt >= 0) return new int[] {TAP_RESUME, resumeAt};
+    // the app asking "watch an ad?": its "Close Ad" button means "no", so never press that
+    if (watchAt >= 0) return gate && autoWatch ? new int[] {TAP_WATCH, watchAt} : new int[] {LEAVE, -1};
+
+    int best = -1, bestScore = NONE;
+    for (int i = 0; i < nodes.size(); i++) {
+      Node n = nodes.get(i);
+      int sc = score(n.text, n.desc, n.id, adScreen, n.clickable, n.l, n.t, n.r, n.b, sw, sh, density);
+      if (sc > bestScore) { best = i; bestScore = sc; }
+    }
+    // an unlabeled corner button is only a guess: let the picture check (real X shape) go first
+    if (bestScore >= WEAK) return new int[] {TAP_CLOSE, best};
+    if (adScreen) return new int[] {LOOK_FOR_X, bestScore == CORNER ? best : -1};
+    return new int[] {LEAVE, -1};
   }
 
   static final int NONE = 0, CORNER = 1, WEAK = 2, STRONG = 3;

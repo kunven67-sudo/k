@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="app_name">AD ZAP</string>
-  <string name="service_desc">Taps the X or Skip on ads by itself, in any app. It only looks for ad close buttons and never reads or saves anything else.</string>
+  <string name="service_desc">Gets you through ads by itself: presses Watch Ad, mutes the ad, taps its X or Skip, and closes the Play Store box it opens. It only looks for ad buttons and never saves or sends anything.</string>
 </resources>
