@@ -1,0 +1,543 @@
+{
+  "_note": "ANT WORK 4 voice script. id -> {who, text}. Text in [brackets] is a stage direction and is not spoken. Render: python3 tools/voices.py",
+  "g_1": {
+    "who": "Moe",
+    "text": "Don't. Move. Not one finger."
+  },
+  "g_again": {
+    "who": "Moe",
+    "text": "Don't. Move. ...You two fell outta the sky?"
+  },
+  "j_grab": {
+    "who": "Jay",
+    "text": "[grabs the gun] Back off!"
+  },
+  "j_hands": {
+    "who": "Jay",
+    "text": "Okay! Okay! Hands up! We're not armed!"
+  },
+  "m_smart": {
+    "who": "Moe",
+    "text": "Smart boy."
+  },
+  "j_talk": {
+    "who": "Jay",
+    "text": "Wait, wait! We fell! We're not from here, we don't even know where here IS!"
+  },
+  "m_laugh": {
+    "who": "Moe",
+    "text": "[laughs] Fell? From where, heaven? Ha! Heaven don't want you either, son."
+  },
+  "j_moeName": {
+    "who": "Jay",
+    "text": "Moe. Put it down. We'll pay for your roof."
+  },
+  "m_howknow": {
+    "who": "Moe",
+    "text": "...Now how in the hell do you know my name?"
+  },
+  "m_job1": {
+    "who": "Moe",
+    "text": "Welcome to Dry Gulch, on Dustreach. And that was MY roof. Twenty gold nuggets."
+  },
+  "m_job1b": {
+    "who": "Moe",
+    "text": "Huh. Fine. Twenty nuggets, and you'll work it off."
+  },
+  "m_job2": {
+    "who": "Moe",
+    "text": "Take this crate of whiskey to Doc Bishop. Get the money Lucky owes me. And tell the Sheriff the Riders are comin' tonight. Then we're square."
+  },
+  "j2_job": {
+    "who": "Jay2",
+    "text": "Errands. We fell through a roof on another planet... and we're doing errands."
+  },
+  "j2_where": {
+    "who": "Jay2",
+    "text": "Dustreach. Never heard of it. Your watch did this again, didn't it."
+  },
+  "j_where": {
+    "who": "Jay",
+    "text": "It always does. Come on. Let's not get shot."
+  },
+  "m_job": {
+    "who": "Moe",
+    "text": "Doc, Lucky, the Sheriff. Then come see me."
+  },
+  "m_paid": {
+    "who": "Moe",
+    "text": "Roof's paid. Here, a little somethin' for your trouble. Now be inside by sundown, you hear?"
+  },
+  "j_riders": {
+    "who": "Jay",
+    "text": "Who are the Hollow Riders?"
+  },
+  "m_riders": {
+    "who": "Moe",
+    "text": "Masked devils. They ride in every sundown and they kill whoever's out in the street. Gideon leads 'em."
+  },
+  "m_riders2": {
+    "who": "Moe",
+    "text": "[laughs] Nobody's ever seen his face. Lock your door, boys."
+  },
+  "j_trap": {
+    "who": "Jay",
+    "text": "What's under that trapdoor behind the bar?"
+  },
+  "m_trap": {
+    "who": "Moe",
+    "text": "Whiskey, son. Just whiskey. Don't you go pokin' around back there."
+  },
+  "j_tellship": {
+    "who": "Jay",
+    "text": "Listen... there's a ship. Buried out past the bones. We're getting off this planet."
+  },
+  "m_tellship": {
+    "who": "Moe",
+    "text": "A ship? [laughs] Well ain't that somethin'. You be careful who you tell, now."
+  },
+  "j_gideon": {
+    "who": "Jay",
+    "text": "I know who you are... Gideon."
+  },
+  "m_gideon": {
+    "who": "Moe",
+    "text": "...Now that was a real dumb thing to say out loud, son."
+  },
+  "m_caught": {
+    "who": "Moe",
+    "text": "Hey! Get your hands off my mirror!"
+  },
+  "j_warn": {
+    "who": "Jay",
+    "text": "Sheriff? Moe says the Riders are coming tonight."
+  },
+  "a_warn": {
+    "who": "Abe",
+    "text": "Every night, son. Every single night. I got six bullets and a bad hip. Be inside by sundown."
+  },
+  "j_gid": {
+    "who": "Jay",
+    "text": "Who is Gideon?"
+  },
+  "a_gid": {
+    "who": "Abe",
+    "text": "If I knew, he'd be swingin' from that water tower. Wears a mask. Laughs like a madman while he shoots."
+  },
+  "a_gid2": {
+    "who": "Abe",
+    "text": "One fella who lived said he saw gold teeth when the bastard laughed."
+  },
+  "j_port": {
+    "who": "Jay",
+    "text": "What about the spaceport?"
+  },
+  "a_port": {
+    "who": "Abe",
+    "text": "Rider country. They guard it day and night. Somethin' in that hangar they want real bad."
+  },
+  "j_moe": {
+    "who": "Jay",
+    "text": "It's Moe. Moe is Gideon."
+  },
+  "a_believe": {
+    "who": "Abe",
+    "text": "...Lord. That's a Rider mask. Moe's poured my whiskey for twenty years. At sundown, I'll be right beside you."
+  },
+  "a_doubt": {
+    "who": "Abe",
+    "text": "Moe? Son, you be real careful sayin' a thing like that without proof."
+  },
+  "a_ship": {
+    "who": "Abe",
+    "text": "A ship. Hm. Wish I could leave with you. Somebody's gotta stay and bury folks."
+  },
+  "a_final": {
+    "who": "Abe",
+    "text": "You boys hold that ship. I got the ones on the left!"
+  },
+  "a_lower": {
+    "who": "Abe",
+    "text": "...Lord forgive me. He said he'd kill my sister. [lowers the gun] Go on. Go."
+  },
+  "j_crate": {
+    "who": "Jay",
+    "text": "Whiskey from Moe."
+  },
+  "d_crate": {
+    "who": "Doc",
+    "text": "Bless you. The only medicine that works on this rock. Here, take some bandages. You'll need 'em."
+  },
+  "j_moeq": {
+    "who": "Jay",
+    "text": "Anything strange about Moe?"
+  },
+  "d_moe": {
+    "who": "Doc",
+    "text": "[hic] Moe? Heh. Moe's got a cellar nobody's ever seen. Locked tight."
+  },
+  "d_moe2": {
+    "who": "Doc",
+    "text": "Keeps the key on a nail. Behind his big mirror. [hic] You didn't hear that from me."
+  },
+  "d_heal": {
+    "who": "Doc",
+    "text": "Hold still. There. Try not to get shot again."
+  },
+  "d_trust": {
+    "who": "Doc",
+    "text": "Your secret's safe with an old drunk. Who'd believe me anyway?"
+  },
+  "j_fix": {
+    "who": "Jay",
+    "text": "If we found a ship... could you fix it?"
+  },
+  "t_ship": {
+    "who": "Tobias",
+    "text": "A ship? If it's real, it needs three things. A power core. A fuel cell. And a nav brain."
+  },
+  "t_ship2": {
+    "who": "Tobias",
+    "text": "The nav I can build. Ten gold. The core's the glowin' rock they dig in the old mine. Fuel... the spaceport. Or whatever Moe gets off that train."
+  },
+  "t_broke": {
+    "who": "Tobias",
+    "text": "Ten gold. I don't work for smiles."
+  },
+  "t_build": {
+    "who": "Tobias",
+    "text": "Come back in two hours."
+  },
+  "t_done": {
+    "who": "Tobias",
+    "text": "Here. Don't drop it. I only got one eye left to build another."
+  },
+  "j_hand": {
+    "who": "Jay",
+    "text": "Your hand...?"
+  },
+  "t_hand": {
+    "who": "Tobias",
+    "text": "Built it myself. The old one got bit off in the mine. Somethin' lives down there. Never saw it. Heard it breathin'. Bring a light."
+  },
+  "j_dyn": {
+    "who": "Jay",
+    "text": "Where would I get dynamite?"
+  },
+  "t_dyn": {
+    "who": "Tobias",
+    "text": "Hank keeps a box in his back room. Lost the key when his brother died. Undertaker's got all the dead man's things."
+  },
+  "t_trust": {
+    "who": "Tobias",
+    "text": "I'll keep my mouth shut. Only thing I do better than fixin'."
+  },
+  "r_1": {
+    "who": "Rook",
+    "text": "You! You look like folks who fell outta the sky! I KNEW it!"
+  },
+  "r_2": {
+    "who": "Rook",
+    "text": "There's a ship, see. Buried south, past the giant bones. Sky-metal! But nobody believes old Rook."
+  },
+  "j_believe": {
+    "who": "Jay",
+    "text": "I believe you. Where's the ship?"
+  },
+  "r_map": {
+    "who": "Rook",
+    "text": "You... you do? Ha! Here. My map. The X is the ship. Don't lose it!"
+  },
+  "j_dig": {
+    "who": "Jay",
+    "text": "Can you help us dig it out?"
+  },
+  "r_dig": {
+    "who": "Rook",
+    "text": "I'll dig till my arms fall off! Give me three hours!"
+  },
+  "r_moe": {
+    "who": "Rook",
+    "text": "Moe? Ha! I always said that man laughs too much."
+  },
+  "h_broke": {
+    "who": "Hank",
+    "text": "No gold, no goods, friend."
+  },
+  "j_back": {
+    "who": "Jay",
+    "text": "What's in the back room?"
+  },
+  "h_back": {
+    "who": "Hank",
+    "text": "Dynamite. And it stays there. Lost the key when my brother died, anyhow."
+  },
+  "h_ship": {
+    "who": "Hank",
+    "text": "A ship, huh? Hope it flies better than my last mule."
+  },
+  "o_1": {
+    "who": "Mort",
+    "text": "Two of you. Same face. I'll need two boxes by morning, I reckon."
+  },
+  "j_key": {
+    "who": "Jay",
+    "text": "Hank's brother had a key in his pocket..."
+  },
+  "o_key": {
+    "who": "Mort",
+    "text": "Everything a dead man owns goes in his box. Help me carry the new coffin, and you can have what's in his pockets."
+  },
+  "o_thanks": {
+    "who": "Mort",
+    "text": "Here. The key. Try not to need one of my boxes."
+  },
+  "o_ship": {
+    "who": "Mort",
+    "text": "Leaving? Good. Nobody leaves Dry Gulch. Except in a box."
+  },
+  "j_debt": {
+    "who": "Jay",
+    "text": "Moe wants his money."
+  },
+  "l_debt": {
+    "who": "Lucky",
+    "text": "Moe always wants his money. Sit down, stranger. Let's talk about it."
+  },
+  "j_threat": {
+    "who": "Jay",
+    "text": "Pay up. Now."
+  },
+  "l_scared": {
+    "who": "Lucky",
+    "text": "Whoa! Easy! Here! Take it! [mutters] You'll regret that."
+  },
+  "j_ace": {
+    "who": "Jay",
+    "text": "There's an ace up your sleeve."
+  },
+  "l_ace": {
+    "who": "Lucky",
+    "text": "...Huh. Sharp eyes. Tell you what. I'll pay Moe myself. Take this key, won it off a train guard. It's cursed anyway."
+  },
+  "j_letgo": {
+    "who": "Jay",
+    "text": "Forget it. Keep it."
+  },
+  "l_thanks": {
+    "who": "Lucky",
+    "text": "Well! A gentleman. Here's a free tip: the noon train carries somethin' for Moe in the caboose safe. Every day."
+  },
+  "l_ship": {
+    "who": "Lucky",
+    "text": "A ship! Well now. Your secret's safe with me, partner. [grins]"
+  },
+  "l_moe": {
+    "who": "Lucky",
+    "text": "Moe? Ha! Well, well. Interesting."
+  },
+  "j_safe": {
+    "who": "Jay",
+    "text": "Is anywhere safe at night?"
+  },
+  "p_safe": {
+    "who": "Amos",
+    "text": "The bell tower. The Riders don't climb. God's house... and a good ladder."
+  },
+  "p_ship": {
+    "who": "Amos",
+    "text": "Bless you, child. I'll pray for your journey. [quietly] And I'll tell no one."
+  },
+  "p_moe": {
+    "who": "Amos",
+    "text": "Moe? ...I'll pray on that. Keep it to yourself, child."
+  },
+  "n_room": {
+    "who": "Ned",
+    "text": "Room's up the stairs. Lock the door. Don't open it for nobody."
+  },
+  "s_1": {
+    "who": "Surv",
+    "text": "We left Dry Gulch. Better the storms than the Riders."
+  },
+  "s_2": {
+    "who": "Surv",
+    "text": "Every night they come. Every night somebody's gone. Nobody remembers it's always the same."
+  },
+  "s_bones": {
+    "who": "Surv",
+    "text": "Somethin' big died out there before the town was born. Old Rook says it crashed. He's crazy. ...Probably."
+  },
+  "j2_here": {
+    "who": "Jay2",
+    "text": "They're here! Jay, get down!"
+  },
+  "g_laugh": {
+    "who": "Gideon",
+    "text": "Ha ha ha ha HA! Come out, come out, little strangers!"
+  },
+  "g_hurt": {
+    "who": "Gideon",
+    "text": "AGH! You little...!"
+  },
+  "j_masks": {
+    "who": "Jay",
+    "text": "Masks. Hollow Rider masks. A whole wall of them."
+  },
+  "j2_masks": {
+    "who": "Jay2",
+    "text": "Moe. Moe is Gideon."
+  },
+  "j_bobnews": {
+    "who": "Jay",
+    "text": "Bob... no. Not again."
+  },
+  "b_1": {
+    "who": "Bob",
+    "text": "Huh? Who's there?"
+  },
+  "b_2": {
+    "who": "Bob",
+    "text": "Jay?! JAY! And... TWO Jays?! What are you doing on Dustreach?!"
+  },
+  "j_bob": {
+    "who": "Jay",
+    "text": "Bob?! You disappeared! We thought you were gone forever!"
+  },
+  "b_3": {
+    "who": "Bob",
+    "text": "Gone? I've been stuck on this rock for years, digging glow rock for Moe. Every day. Same tunnels."
+  },
+  "j2_bob": {
+    "who": "Jay2",
+    "text": "He doesn't know about the loop. He thinks he's never seen us here before."
+  },
+  "b_4": {
+    "who": "Bob",
+    "text": "Loop? What loop? Man, you guys never change."
+  },
+  "b_again": {
+    "who": "Bob",
+    "text": "Jay?! Two Jays?! What... wait. Have we done this before?"
+  },
+  "j_glow": {
+    "who": "Jay",
+    "text": "The glowing rock?"
+  },
+  "b_core": {
+    "who": "Bob",
+    "text": "The big one's past the cave-in. Deep down. Moe wants it bad."
+  },
+  "b_core2": {
+    "who": "Bob",
+    "text": "Nobody's been past those rocks in years. You'd need dynamite. And a lantern. Trust me. Bring a lantern."
+  },
+  "j_bobship": {
+    "who": "Jay",
+    "text": "Come with us, Bob. There's a ship. We're getting off this planet."
+  },
+  "b_ship": {
+    "who": "Bob",
+    "text": "A way off this rock? I'm in. I'll hide out with that crazy old prospector till you're ready."
+  },
+  "j2_final1": {
+    "who": "Jay2",
+    "text": "Here they come! All of them!"
+  },
+  "gp_gideon": {
+    "who": "Gideon",
+    "text": "Step away from the ship, boys. Or this one gets a new hole in his head."
+  },
+  "gp_lucky": {
+    "who": "Lucky",
+    "text": "Sorry, partner. Gideon pays better than Moe. Step away from that ship."
+  },
+  "gp_abe": {
+    "who": "Abe",
+    "text": "Don't. Don't make me do this, son. Step away from the ship."
+  },
+  "gp_amos": {
+    "who": "Amos",
+    "text": "Forgive me, child. Gideon said he'd burn my church. Step away."
+  },
+  "j2_gp": {
+    "who": "Jay2",
+    "text": "Jay... don't do anything stupid."
+  },
+  "j_watch": {
+    "who": "Jay",
+    "text": "Okay! Okay. Take the watch. Just let him go."
+  },
+  "gp_watch": {
+    "who": "Gideon",
+    "text": "The watch? Ha! Thank you kindly."
+  },
+  "j_talkdown": {
+    "who": "Jay",
+    "text": "You don't have to do this. Put it down."
+  },
+  "gp_no": {
+    "who": "Gideon",
+    "text": "Talkin' time's over."
+  },
+  "g_final": {
+    "who": "Gideon",
+    "text": "Well, well. Two little strangers, and a ship that shouldn't exist."
+  },
+  "b_down": {
+    "who": "Bob",
+    "text": "JAY! GET DOWN!"
+  },
+  "j_bob1": {
+    "who": "Jay",
+    "text": "BOB! No, no, no..."
+  },
+  "b_last1": {
+    "who": "Bob",
+    "text": "Heh... told you... bring a lantern..."
+  },
+  "b_last2": {
+    "who": "Bob",
+    "text": "Get off this rock, Jay. Both of you. For me."
+  },
+  "j_bob2": {
+    "who": "Jay",
+    "text": "...I'm sorry, Bob."
+  },
+  "j2_close": {
+    "who": "Jay2",
+    "text": "That was too close!"
+  },
+  "m_reveal1": {
+    "who": "Moe",
+    "text": "[laughs] Surprised, boys? Who'd you think paid for that roof?"
+  },
+  "j_moe1": {
+    "who": "Jay",
+    "text": "...Moe."
+  },
+  "m_reveal2": {
+    "who": "Moe",
+    "text": "Every night, this town begs me for whiskey. Every night, I take what I want. And now I'll take your ship."
+  },
+  "m_duel": {
+    "who": "Moe",
+    "text": "Let's do this proper. On three."
+  },
+  "j2_go": {
+    "who": "Jay2",
+    "text": "It's over. Jay. Let's go home."
+  },
+  "j_go": {
+    "who": "Jay",
+    "text": "Get in. Now."
+  },
+  "j2_watch": {
+    "who": "Jay2",
+    "text": "Jay... your watch. What is it doing?"
+  },
+  "j_watch2": {
+    "who": "Jay",
+    "text": "I don't know! It's... it's breaking everything!"
+  }
+}

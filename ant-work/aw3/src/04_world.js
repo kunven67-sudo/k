@@ -239,6 +239,8 @@ async function buildLevel(name){
   def.soft=new Particles(scene,dq(600,1200,2500,3500,5000),false); def.glow=new Particles(scene,dq(400,800,1500,2500,3500),true);
   BUILDING_LV=def; try{ await def.build(scene,def); } finally{ BUILDING_LV=null; }
   // sharp textures at grazing angles (sand, floors): every map gets full anisotropic filtering
+  // an AO map with no second UV set samples one corner (often black) = the whole surface goes dark in ambient light: give it the normal UVs
+  scene.traverse(o=>{ if(!o.isMesh||!o.material||!o.geometry) return; const g=o.geometry; if(g.attributes&&g.attributes.uv&&!g.attributes.uv2&&[].concat(o.material).some(m=>m&&m.aoMap)) g.setAttribute('uv2',g.attributes.uv); });
   scene.traverse(o=>{ if(!o.isMesh||!o.material) return; for(const m of (Array.isArray(o.material)?o.material:[o.material])) for(const k of ['map','normalMap','roughnessMap','aoMap','emissiveMap']){ const t=m[k]; if(t&&t.anisotropy<MAX_ANISO){ t.anisotropy=MAX_ANISO; t.needsUpdate=true; } } });
   LEVEL_SCENES.push(scene);
   def.built=true;

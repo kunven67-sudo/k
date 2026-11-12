@@ -1,0 +1,36 @@
+ANT WORK 3 - credits for the free assets used in this game
+
+TEXTURES (Poly Haven, CC0 - polyhaven.com)
+  dense_sand, sandy_gravel_02, sandstone_blocks_05, large_sandstone_blocks_01, old_sandstone_02,
+  sandstone_cracks, red_sandstone_pavement, clay_plaster, castle_brick_07, stone_tiles_02,
+  rusty_metal_04, brown_leather, rough_wood
+
+MUSIC (Part 2) - Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0
+  "Five Armies", "Clash Defiant", "Dark Walk", "Ossuary 6 - Air", "Crusade"
+
+MUSIC (OpenGameArt.org)
+  "Desert calmness and fighting (orchestral)" - Dizzy Crow - CC0
+  "Dark Cavern Ambient" - Paul Wortmann - CC0
+  "Creepy" - TokyoGeisha - CC0
+  "Egyptian meditation music" - brandon75689 - OGA-BY 3.0
+
+SOUNDS
+  Footsteps on sand and stone - Fantozzi (OpenGameArt) - CC0
+  "Hm and sigh", "Heavy breathing 3" - ezwa (Wikimedia Commons) - public domain
+  "Heartbeat speedsup" - Bob Smaude (Wikimedia Commons) - CC BY 4.0
+  Static - OpenGameArt - CC0
+  "37 hits/punches", "Dripping water loop" - Independent.nu (OpenGameArt) - CC0
+  "10 Impact/Shield Blocks", "7 Eating Crunches" - StarNinjas (OpenGameArt) - CC0
+  "Swishes Sound Pack" - artisticdude (OpenGameArt) - CC0
+  "12 wet towel hitting/falling/punching floor sounds" - qubodup (OpenGameArt) - CC0
+  "80 CC0 RPG SFX", "80 CC0 creature SFX" - rubberduck (OpenGameArt) - CC0
+  "Pig SFX Pack" - Vinrax (OpenGameArt) - CC-BY 3.0
+  "Farm animals" (Mudchute pigs) - Secretlondon (OpenGameArt) - CC-BY-SA 3.0
+  "Electricity game sound pack" (OpenGameArt) - CC0
+  Wind gusts, the hum, the blast and the ringing were made for this game.
+
+FONTS (SIL Open Font License 1.1)
+  Bungee - David Jonathan Ross; Nunito - Vernon Adams; Share Tech Mono - Carrois Apostrophe
+
+CODE
+  three.js r128 - MIT License
