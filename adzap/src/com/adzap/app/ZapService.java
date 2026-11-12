@@ -2,9 +2,14 @@ package com.adzap.app;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.hardware.HardwareBuffer;
@@ -15,18 +20,23 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.Display;
+import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 
 import java.util.ArrayDeque;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Watches the screen: presses Watch Ad, mutes the ad, taps its X, and shuts the Play Store pop-up it opens. */
+/** Watches the screen: presses Watch Ad, hides + mutes the ad, taps its X, and shuts the Play Store pop-up it opens. */
 public class ZapService extends AccessibilityService {
   static volatile boolean running;
 
@@ -42,6 +52,9 @@ public class ZapService extends AccessibilityService {
   private String lastZapKey = "";
   private int sw, sh;
   private float density;
+  private final HashMap<String, Boolean> activities = new HashMap<>();
+  private volatile String lastLogged = "";
+  private View cover;
 
   private final Runnable scanTask = new Runnable() {
     @Override public void run() { queued = false; scan(); }
@@ -51,8 +64,8 @@ public class ZapService extends AccessibilityService {
     @Override public void run() {
       if (!adScreen || !running) return;
       scan();
-      // never leave the phone muted by mistake if an ad somehow never ends
-      if (SystemClock.uptimeMillis() - adStart > 5 * 60_000) mute(false);
+      // never leave the phone muted or covered if an ad somehow never ends
+      if (SystemClock.uptimeMillis() - adStart > 150_000) { log("Ad took over 2.5 min: stopped hiding it"); setAd(false); return; }
       handler.postDelayed(this, 500);
     }
   };
@@ -72,6 +85,7 @@ public class ZapService extends AccessibilityService {
     running = false;
     handler.removeCallbacksAndMessages(null);
     mute(false);
+    hideCover();
     worker.shutdownNow();
     super.onDestroy();
   }
@@ -94,11 +108,14 @@ public class ZapService extends AccessibilityService {
       if (want && !ours && on("mute") && !audio.isStreamMute(AudioManager.STREAM_MUSIC)) {
         audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0);
         prefs.edit().putBoolean("mutedByUs", true).apply();
+        log("Muted the ad");
       } else if (!want && ours) {
         audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0);
         prefs.edit().putBoolean("mutedByUs", false).apply();
       }
-    } catch (RuntimeException ignored) {}
+    } catch (RuntimeException e) {
+      log("Couldn't change the sound: " + e.getClass().getSimpleName());
+    }
   }
 
   private void setAd(boolean ad) {
@@ -110,16 +127,96 @@ public class ZapService extends AccessibilityService {
       adStart = now;
       readScreen();
       mute(true);
+      showCover();
       handler.postDelayed(adPoll, 300);
     } else {
       adEnd = now;
       mute(false);
+      hideCover();
+      log("Ad over");
     }
+  }
+
+  /** Is this a real app screen (an activity)? Pop-ups and parts inside an ad are not. */
+  private boolean isActivity(String pkg, String cls) {
+    String k = pkg + "/" + cls;
+    Boolean b = activities.get(k);
+    if (b == null) {
+      try { getPackageManager().getActivityInfo(new ComponentName(pkg, cls), 0); b = true; }
+      catch (Exception e) { b = false; }
+      activities.put(k, b);
+    }
+    return b;
+  }
+
+  /** A short list of what happened (newest first), shown in the app so ads that get through can be fixed. */
+  void log(String s) {
+    if (prefs == null || s.equals(lastLogged)) return;
+    lastLogged = s;
+    String line = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date()) + "  " + s;
+    String[] old = prefs.getString("log", "").split("\n");
+    StringBuilder b = new StringBuilder(line);
+    for (int i = 0; i < old.length && i < 39; i++) if (!old[i].isEmpty()) b.append('\n').append(old[i]);
+    prefs.edit().putString("log", b.toString()).apply();
+  }
+
+  private static String shortName(String cls) {
+    int a = cls.lastIndexOf('.'), b2 = a > 0 ? cls.lastIndexOf('.', a - 1) : -1;
+    return b2 >= 0 ? cls.substring(b2 + 1) : cls;
+  }
+
+  /**
+   * Black cover over the whole ad so you never see it. The top-right corner stays open: that's where the X is,
+   * and AD ZAP has to see it. Touches go straight through (it never blocks a tap).
+   */
+  private void showCover() {
+    if (cover != null || !on("hideAds")) return;
+    WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+    cover = new View(this) {
+      final Paint black = new Paint(), big = new Paint(Paint.ANTI_ALIAS_FLAG), small = new Paint(Paint.ANTI_ALIAS_FLAG);
+      {
+        black.setColor(Color.BLACK);
+        big.setColor(0xFF8A8F9C); big.setTextAlign(Paint.Align.CENTER); big.setFakeBoldText(true);
+        small.setColor(0xFF5C6170); small.setTextAlign(Paint.Align.CENTER);
+      }
+      @Override protected void onDraw(Canvas c) {
+        int w = getWidth(), h = getHeight(), s = Math.min(w, h);
+        // same corner XFinder looks in, a bit bigger so the edges of the X button show too
+        int cw = Math.round(Math.max(w * 0.18f, s * 0.3f) * 1.25f), ch = Math.round(Math.max(h * 0.12f, s * 0.22f) * 1.25f);
+        c.drawRect(0, 0, w - cw, h, black);
+        c.drawRect(w - cw, ch, w, h, black);
+        big.setTextSize(s * 0.05f);
+        small.setTextSize(s * 0.03f);
+        c.drawText("Ad hidden", w / 2f, h / 2f, big);
+        c.drawText("AD ZAP closes it as soon as it can", w / 2f, h / 2f + s * 0.06f, small);
+      }
+    };
+    WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+        WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+        PixelFormat.TRANSLUCENT);
+    if (Build.VERSION.SDK_INT >= 28) lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+    try {
+      wm.addView(cover, lp);
+      log("Hid the ad");
+    } catch (RuntimeException e) {
+      cover = null;
+      log("Couldn't hide the ad: " + e.getClass().getSimpleName());
+    }
+  }
+
+  private void hideCover() {
+    if (cover == null) return;
+    try { ((WindowManager) getSystemService(Context.WINDOW_SERVICE)).removeView(cover); } catch (RuntimeException ignored) {}
+    cover = null;
   }
 
   @Override public void onAccessibilityEvent(AccessibilityEvent e) {
     if (prefs == null) return;
     if (prefs.getBoolean("paused", false)) { setAd(false); return; }
+    if (cover != null && !on("hideAds")) hideCover();
     String pkg = e.getPackageName() == null ? "" : e.getPackageName().toString();
     long now = SystemClock.uptimeMillis();
 
@@ -130,6 +227,7 @@ public class ZapService extends AccessibilityService {
         lastBack = now;
         handler.postDelayed(back, 350);
         count();
+        log("Closed the Play Store box");
       }
       return;
     }
@@ -137,8 +235,15 @@ public class ZapService extends AccessibilityService {
 
     if (e.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
       String cls = e.getClassName() == null ? "" : e.getClassName().toString();
-      if (Rules.isAdClass(cls)) setAd(true);
-      else if (Rules.looksLikeScreen(cls) || !pkg.equals(lastPkg)) setAd(false);
+      boolean screen = isActivity(pkg, cls);
+      if (screen || Rules.isAdClass(cls)) log("Screen: " + shortName(cls));
+      if (Rules.isAdClass(cls)) {
+        if (!adScreen) log("AD STARTED");
+        setAd(true);
+      } else if (screen || !pkg.equals(lastPkg)) {
+        // only a real app screen (or another app) ends the ad, not a pop-up or a part inside the ad
+        setAd(false);
+      }
       lastPkg = pkg;
     }
     queueScan();
@@ -201,9 +306,10 @@ public class ZapService extends AccessibilityService {
     switch (d[0]) {
       case Rules.TAP_WATCH:
         if (now - lastWatch < 4000) return true;
-        if (press(infos.get(d[1]))) lastWatch = now;
+        if (press(infos.get(d[1]))) { lastWatch = now; log("Pressed Watch Ad"); }
         return true;
       case Rules.TAP_RESUME:
+        log("Pressed Resume (kept your reward)");
         return press(infos.get(d[1]));
       case Rules.TAP_CLOSE:
         return zap(infos.get(d[1]), pkg);
@@ -254,6 +360,7 @@ public class ZapService extends AccessibilityService {
     lastZap = now;
     lastZapKey = key;
     count();
+    log("Tapped \"" + (str(node.getText()) + str(node.getContentDescription())).trim() + "\"");
     return true;
   }
 
@@ -289,7 +396,8 @@ public class ZapService extends AccessibilityService {
                 soft.recycle();
               }
             }
-          } catch (RuntimeException ignored) {
+          } catch (RuntimeException ex) {
+            log("Couldn't read the screen: " + ex.getClass().getSimpleName());
           } finally {
             hb.close();
           }
@@ -298,16 +406,17 @@ public class ZapService extends AccessibilityService {
           handler.post(new Runnable() {
             @Override public void run() {
               shotBusy = false;
-              if (h == null || !adScreen) return;
+              if (h == null) { log("Looked for X: none yet"); return; }
+              if (!adScreen) return;
               long t = SystemClock.uptimeMillis();
               String key = "x" + Math.round(fx) + "," + Math.round(fy);
               if (key.equals(lastZapKey) && t - lastZap < 2000) return;
-              if (tap(fx, fy)) { lastZap = t; lastZapKey = key; count(); }
+              if (tap(fx, fy)) { lastZap = t; lastZapKey = key; count(); log("Tapped the X/skip picture at " + Math.round(fx) + "," + Math.round(fy)); }
             }
           });
         }
-        @Override public void onFailure(int code) {
-          handler.post(new Runnable() { @Override public void run() { shotBusy = false; } });
+        @Override public void onFailure(final int code) {
+          handler.post(new Runnable() { @Override public void run() { shotBusy = false; log("Screen look failed (code " + code + ")"); } });
         }
       });
     } catch (RuntimeException e) {

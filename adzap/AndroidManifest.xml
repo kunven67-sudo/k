@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.adzap.app">
+  <!-- to tell a real app screen (ad over) from a pop-up inside the ad -->
+  <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
   <application android:label="@string/app_name" android:icon="@mipmap/ic_launcher"
       android:allowBackup="false" android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
     <activity android:name=".MainActivity" android:exported="true">

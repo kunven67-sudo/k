@@ -12,7 +12,9 @@ final class Rules {
     "com.applovin", "com.facebook.ads", "com.ironsource", "com.vungle", "com.mbridge", "com.bytedance.sdk.openadsdk",
     "com.pangle", "com.inmobi", "com.chartboost", "com.adcolony", "com.fyber", "com.my.target", "com.yandex.mobile.ads",
     "com.startapp", "com.smaato", "com.amazon.device.ads", "com.tapjoy", "com.digitalturbine", "com.mintegral",
-    "interstitial", "rewardedvideo", "fullscreenad", "adunitactivity"
+    "interstitial", "rewardedvideo", "fullscreenad", "adunitactivity",
+    // inside an open ad, Google's parts have scrambled names like com.google.android.gms.internal.ads.zzcfo
+    "gms.internal.ads", "ads.internal", "admob", ".ads."
   };
 
   /** Apps AD ZAP never touches. */

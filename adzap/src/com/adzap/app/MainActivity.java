@@ -28,7 +28,7 @@ public class MainActivity extends Activity {
 
   private final Handler handler = new Handler(Looper.getMainLooper());
   private SharedPreferences prefs;
-  private TextView status, count, help;
+  private TextView status, count, help, log;
   private Button turnOn, restricted, pause;
 
   private final Runnable tick = new Runnable() {
@@ -91,10 +91,32 @@ public class MainActivity extends Activity {
     col.addView(pause, lp(22));
 
     col.addView(text("WHAT IT DOES", 13, DIM), lp(30));
+    col.addView(toggle("hideAds", "Hide ads", "Black screen over every full-screen ad, so you never see what's in it"), lp(10));
     col.addView(toggle("autoWatch", "Press Watch Ad for you", "When an app says \"watch an ad to start watching\""), lp(10));
     col.addView(toggle("mute", "Mute ads", "Sound comes back by itself when the ad is gone"), lp(10));
     col.addView(toggle("seeX", "Find X buttons by looking", "For ads whose X is just a picture"), lp(10));
     col.addView(toggle("closeStore", "Close Play Store pop-ups", "The little install box an ad opens by itself"), lp(10));
+
+    col.addView(text("FEWER WEIRD ADS", 13, DIM), lp(30));
+    col.addView(text("Tell Google to stop showing dating / AI girlfriend type ads (Sensitive > Dating > See fewer).", 13, DIM), lp(4));
+    Button center = button("Open Google ad settings", 0xFF2A2D38);
+    center.setOnClickListener(new View.OnClickListener() {
+      @Override public void onClick(View v) { open(new Intent(Intent.ACTION_VIEW, Uri.parse("https://myadcenter.google.com/controls"))); }
+    });
+    col.addView(center, lp(10));
+    Button adId = button("Delete my ad ID (starts fresh)", 0xFF2A2D38);
+    adId.setOnClickListener(new View.OnClickListener() {
+      @Override public void onClick(View v) { open(new Intent("com.google.android.gms.settings.ADS_PRIVACY")); }
+    });
+    col.addView(adId, lp(10));
+
+    col.addView(text("WHAT AD ZAP SAW", 13, DIM), lp(30));
+    col.addView(text("An ad got past it? Screenshot this and send it to Claude.", 13, DIM), lp(4));
+    log = text("", 12, 0xFFC9CDD6);
+    log.setTypeface(Typeface.MONOSPACE);
+    log.setPadding(dp(14), dp(12), dp(14), dp(12));
+    log.setBackground(round(CARD, 14));
+    col.addView(log, lp(10));
 
     ScrollView scroll = new ScrollView(this);
     scroll.setBackgroundColor(BG);
@@ -131,6 +153,8 @@ public class MainActivity extends Activity {
       status.setTextColor(GREEN);
     }
     count.setText(n == 1 ? "1 ad zapped" : n + " ads zapped");
+    String seen = prefs.getString("log", "");
+    log.setText(seen.isEmpty() ? "Nothing yet. Open an app with ads." : seen);
     turnOn.setVisibility(on ? View.GONE : View.VISIBLE);
     restricted.setVisibility(on ? View.GONE : View.VISIBLE);
     help.setVisibility(on ? View.GONE : View.VISIBLE);

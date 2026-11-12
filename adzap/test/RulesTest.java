@@ -16,6 +16,8 @@ public class RulesTest {
     is(Rules.isAdClass("com.unity3d.services.ads.adunit.AdUnitActivity"), true, "Unity");
     is(Rules.isAdClass("com.applovin.adview.AppLovinFullscreenActivity"), true, "AppLovin");
     is(Rules.isAdClass("com.example.anime.PlayerActivity"), false, "anime player is not an ad");
+    is(Rules.isAdClass("com.google.android.gms.internal.ads.zzcfo"), true, "Google's scrambled ad parts");
+    is(Rules.isAdClass("com.example.anime.DownloadsActivity"), false, "'downloads' is not an ad");
     is(Rules.isAdClass("com.example.anime.LoadingActivity"), false, "'loading' is not 'ad'");
     is(Rules.looksLikeScreen("android.widget.FrameLayout"), false, "frame is not a screen");
     is(Rules.looksLikeScreen("com.example.anime.MainActivity"), true, "activity is a screen");

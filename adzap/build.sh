@@ -14,7 +14,7 @@ java -cp build/test com.adzap.app.RulesTest
 
 "$BT/aapt2" compile --dir res -o build/res.zip
 "$BT/aapt2" link -o build/base.apk -I "$JAR" --manifest AndroidManifest.xml --java build/gen \
-  --min-sdk-version 26 --target-sdk-version 34 --version-code "${VERSION_CODE:-3}" --version-name "${VERSION_NAME:-1.2.0}" build/res.zip
+  --min-sdk-version 26 --target-sdk-version 34 --version-code "${VERSION_CODE:-4}" --version-name "${VERSION_NAME:-1.3.0}" build/res.zip
 javac -nowarn -Xlint:-options --release 8 -classpath "$JAR" -d build/classes $(find build/gen src -name '*.java')
 (cd build/classes && jar cf ../classes.jar .)
 "$BT/d8" --lib "$JAR" --min-api 26 --output build/dex build/classes.jar
