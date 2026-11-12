@@ -5,12 +5,13 @@
 const TROPHY_DEFS=[
   ['vacation','Do Not Disturb','Find Jim on vacation','bronze'],
   ['looked','You Looked','Look at the thing in the box','silver',1],
-  ['end_home','Home','Give the watch back','gold'],
-  ['end_wander','Wanderers','Keep the watch','gold'],
-  ['end_blank','Blank','Break the watch','gold',1],
-  ['end_rewrite','Rewrite','Ask for everything to be fixed','gold'],
-  ['end_other','The Other You','Someone stays behind','gold',1],
-  ['allEndings','Beyond','Find all 5 endings','platinum']
+  ['end_work','Back To Work','???','gold',1],
+  ['end_fire','The Fire','???','gold',1],
+  ['end_sheriff','The New Sheriff','???','gold',1],
+  ['end_watched','Watched','???','gold',1],
+  ['end_keepers','The Keepers','???','gold',1],
+  ['allEndings','Five','Find all 5 endings','platinum'],
+  ['end_unmade','Unmade','???','platinum',1]
 ];
 const TROPHY=Object.assign({},loadJSON('aw5_ach')||{});
 const TSTAT=Object.assign({},loadJSON('aw5_ach_stats')||{});

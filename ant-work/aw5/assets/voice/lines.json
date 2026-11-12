@@ -168,84 +168,132 @@
     "who": "God",
     "text": "...A GUY?"
   },
-  "g5_6": {
-    "who": "God",
-    "text": "Choose your next words carefully, little one. You have so few of them left."
-  },
-  "x_b3": {
-    "who": "Jay2",
-    "text": "JAY! Put him down! PUT HIM DOWN!"
-  },
-  "x_e_home": {
+  "x_glow": {
     "who": "Jay",
-    "text": "[choking] Take it... take it back..."
+    "text": "[whisper] ...He's glowing. The same color as the watch."
   },
-  "g5_home": {
-    "who": "God",
-    "text": "Wise. Go home, little ones. Forget the boxes."
+  "x_promise": {
+    "who": "Jay",
+    "text": "We'll come home, Jim. I promise."
   },
-  "x_home1": {
+  "x_jim5": {
     "who": "Jim",
-    "text": "There you two are! Where have you BEEN? The ants ate half the stand!"
+    "text": "...Yeah, yeah. Bring snacks."
   },
-  "x_home2": {
+  "x_grave": {
     "who": "Jay",
-    "text": "...You wouldn't believe us, Jim."
+    "text": "[quietly] I'm sorry, Bob."
   },
-  "x_e_keep": {
-    "who": "Jay",
-    "text": "[choking] No... it's mine now."
-  },
-  "g5_keep": {
-    "who": "God",
-    "text": "[laughs] Then keep it. And wander. Every reality, forever. You will never find home again."
-  },
-  "x_e_break": {
-    "who": "Jay",
-    "text": "[choking] Then NOBODY gets it!"
-  },
-  "g5_break": {
-    "who": "God",
-    "text": "NO! What have you..."
-  },
-  "x_e_fix": {
-    "who": "Jay",
-    "text": "[choking] Fix it. All of it. Bring Bob back."
-  },
-  "g5_fix": {
-    "who": "God",
-    "text": "Everything has a price. Bob lives. But someone must keep my boxes."
-  },
-  "g5_fix2": {
-    "who": "God",
-    "text": "You, little ones. Forever."
-  },
-  "x_e_alex": {
-    "who": "Alex",
-    "text": "Take me instead. I know what you are. Let them go."
-  },
-  "g5_alex": {
-    "who": "God",
-    "text": "...Interesting. Very well."
-  },
-  "x_alexbye": {
-    "who": "Alex",
-    "text": "Go, Jay. Steve... look after them."
-  },
-  "x_e_j2": {
+  "x_ch1": {
     "who": "Jay2",
-    "text": "Take ME. I'm the clone. I'm the extra one. Let him go home."
+    "text": "[choking] Jay... I can't... breathe..."
   },
-  "g5_j2": {
-    "who": "God",
-    "text": "A copy who chooses. I did not make that. ...Very well."
-  },
-  "x_j2bye": {
-    "who": "Jay2",
-    "text": "Hey. Tell Jim I said hi. And... thanks for coming back for me. Every time."
-  },
-  "x_j2bye2": {
+  "x_letgo": {
     "who": "Jay",
-    "text": "Jay... no..."
+    "text": "LET HIM GO!"
+  },
+  "g5_t1": {
+    "who": "God",
+    "text": "You too, then."
+  },
+  "g5_t2": {
+    "who": "God",
+    "text": "Let me show you what your little watch has done."
+  },
+  "x_r_w1": {
+    "who": "Jim",
+    "text": "...Jay? Did you just fall out of the SKY?"
+  },
+  "x_r_w2": {
+    "who": "Jay2",
+    "text": "[groans] ...Did we... win?"
+  },
+  "x_r_w3": {
+    "who": "Jim",
+    "text": "Win what? Ants are bad today. Get to work. Both of you."
+  },
+  "x_r_f1": {
+    "who": "Jay2",
+    "text": "Took you long enough. Come sit. The fire's warm."
+  },
+  "x_r_f2": {
+    "who": "Jay",
+    "text": "The watch... it's gone."
+  },
+  "x_r_f3": {
+    "who": "Jay2",
+    "text": "Good. Grab a rock. Let's start counting days."
+  },
+  "x_r_s1": {
+    "who": "Bob",
+    "text": "JAY?! You fell outta the sky AGAIN?"
+  },
+  "x_r_s2": {
+    "who": "Jay",
+    "text": "Bob... you're alive."
+  },
+  "x_r_s3": {
+    "who": "Bob",
+    "text": "Course I'm alive! The Riders are gone, Moe's gone... and this town needs a sheriff."
+  },
+  "x_r_s4": {
+    "who": "Jay2",
+    "text": "...Sheriff Jay. Oh no."
+  },
+  "x_r_k1": {
+    "who": "Alex",
+    "text": "We caught you. Barely."
+  },
+  "x_r_k2": {
+    "who": "God",
+    "text": "The little ones who asked what it was. Then keep it. Keep ALL of it."
+  },
+  "x_r_k3": {
+    "who": "Steve",
+    "text": "Great. Now we're janitors. For a god."
+  },
+  "x_r_k4": {
+    "who": "Jay2",
+    "text": "Jay... I think we're the keepers of the boxes now."
+  },
+  "x_r_t1": {
+    "who": "Jay",
+    "text": "...Jay? JAY?! Where are you?"
+  },
+  "x_r_t2": {
+    "who": "Jay",
+    "text": "[whisper] It's... looking at me."
+  },
+  "x_u1": {
+    "who": "Jay",
+    "text": "The gears. I found every one of them."
+  },
+  "g5_u1": {
+    "who": "God",
+    "text": "You found what I lost. Every piece. Do you understand what happens when it is whole?"
+  },
+  "x_u2": {
+    "who": "Jay",
+    "text": "Everything the watch made... gets unmade."
+  },
+  "x_u3": {
+    "who": "Jay2",
+    "text": "The watch made me. ...It made you too, didn't it."
+  },
+  "x_u4": {
+    "who": "Jay",
+    "text": "Yeah. Look at your hands."
+  },
+  "x_u5": {
+    "who": "Jay2",
+    "text": "...Was it worth it? All of it?"
+  },
+  "x_u6": {
+    "who": "Jay",
+    "text": "Every second. The ants. The pig. The ice. Bob. You."
+  },
+  "x_u7": {
+    "who": "Jay2",
+    "text": "Heh. Tell the next guy to bring a lantern."
   }
 }

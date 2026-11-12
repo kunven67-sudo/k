@@ -8,7 +8,7 @@ import edge_tts
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VDIR=os.path.join(ROOT,'assets','voice')
 LINES=json.load(open(os.path.join(VDIR,'lines.json'),encoding='utf-8'))
-VOICES={'Jay':('en-PH-JamesNeural','+0%','+0Hz'),'Jay2':('en-PH-JamesNeural','+0%','+0Hz'),'Jim':('en-US-AndrewNeural','-8%','-6Hz'),'God':('en-US-AndrewNeural','-24%','-28Hz'),'Steve':('en-US-ChristopherNeural','-4%','-8Hz'),'Alex':('en-GB-RyanNeural','-10%','-4Hz')}
+VOICES={'Jay':('en-PH-JamesNeural','+0%','+0Hz'),'Jay2':('en-PH-JamesNeural','+0%','+0Hz'),'Jim':('en-US-AndrewNeural','-8%','-6Hz'),'God':('en-US-AndrewNeural','-24%','-28Hz'),'Steve':('en-US-ChristopherNeural','-4%','-8Hz'),'Alex':('en-GB-RyanNeural','-10%','-4Hz'),'Bob':('en-US-BrianNeural','+0%','-4Hz')}
 state_path=os.path.join(VDIR,'_rendered.json')
 state=json.load(open(state_path)) if os.path.exists(state_path) else {}
 def spoken(t):

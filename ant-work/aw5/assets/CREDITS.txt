@@ -1,0 +1,10 @@
+ANT WORK 5 - BEYOND - credits for the free assets used in this game
+
+TEXTURES (Poly Haven, CC0 - polyhaven.com): desert_sand, stone_tiles_02, rough_wood, brown_planks_03, dry_ground_01, cliff_side
+
+MUSIC
+  Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 (from Ant Work 3)
+  OpenGameArt.org tracks from Ant Work 3 (see its credits)
+
+SOUNDS: the Ant Work 3 + 4 sound sets (OpenGameArt, CC0 / CC-BY - see those games' credits).
+VOICES: Microsoft neural voices (edge-tts). The god's voice = Jim's voice, layered (tools/god_voice.sh).

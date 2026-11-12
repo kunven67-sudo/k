@@ -41,7 +41,7 @@ function frame(){
 }
 /* ---------- everything the game needs, loaded once ---------- */
 const TEX_LIST=['brown_planks_03','cliff_side','desert_sand','dry_ground_01','rough_wood','stone_tiles_02'];
-const SFX_LIST=['bell_01','blast','body_fall','breath_heavy','door_creak','gasp','glass_break','heartbeat','hum_build','hum_purple','metal_1','metal_2','metal_3','oof_1','oof_2','pickup','ringing','sand_fall','sigh_1','sigh_2','static','step_sand_1','step_sand_2','step_sand_3','step_sand_4','step_sand_5','step_sand_6','step_stone_1','step_stone_2','step_stone_3','step_stone_4','step_stone_5','step_stone_6','stone_1','stone_2','swing_1','swing_2','watch_beep','wind_gust_1','wind_gust_2','wind_loop'];
+const SFX_LIST=['bell_01','blast','body_fall','breath_heavy','door_creak','drips','gasp','glass_break','heartbeat','hum_build','hum_purple','metal_1','metal_2','metal_3','oof_1','oof_2','pickup','ringing','sand_fall','sigh_1','sigh_2','static','step_sand_1','step_sand_2','step_sand_3','step_sand_4','step_sand_5','step_sand_6','step_stone_1','step_stone_2','step_stone_3','step_stone_4','step_stone_5','step_stone_6','stone_1','stone_2','swing_1','swing_2','switch_01','watch_beep','wind_gust_1','wind_gust_2','wind_loop'];
 const MUSIC_LIST=['mus_boss','mus_night','mus_pyramid','mus_sad','mus_title'];
 async function preload(progress){
   ASSETS.onProgress=progress;
@@ -62,7 +62,7 @@ async function boot(){
   initAudioSilent();
   await preload((k,name)=>{ bar.style.width=(k*88)+'%'; what.textContent=name.replace(/_/g,' ').replace(/^voice\//,'voice: '); });
   // build every place now, so the game never stops on a loading screen later
-  const order=[['mash','something broken'],['white','something white']];
+  const order=[['mash','something broken'],['white','something white'],['thrown','something in between']];
   for(let i=0;i<order.length;i++){ what.textContent='building '+order[i][1]; bar.style.width=(88+i*3)+'%'; await nextFrame(); await buildLevel(order[i][0]); }
   bar.style.width='100%'; what.textContent='';
   if(q.get('debug')){ await DEBUG.run(q.get('debug')); return; }
