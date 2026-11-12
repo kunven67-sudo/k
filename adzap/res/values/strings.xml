@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="app_name">AD ZAP</string>
+  <string name="service_desc">Taps the X or Skip on ads by itself, in any app. It only looks for ad close buttons and never reads or saves anything else.</string>
+</resources>
