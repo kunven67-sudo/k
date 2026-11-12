@@ -60,3 +60,8 @@ function mineTick(lv,dt,t){ if(G.mode!=='play'||LOOP.dying) return; const z=PLAY
   const P=MINE.pit; if(PLAYER.pos.x>P.x0&&PLAYER.pos.x<P.x1&&PLAYER.pos.z>P.z0&&PLAYER.pos.z<P.z1) loopDie('fell');
 }
 on('boom',at=>{ const lv=LEVELS.mine; if(LV!==lv||F.rocksBlown) return; if(at.distanceTo(MINE.rockfall)<8){ F.rocksBlown=1; lv.rocks.visible=false; SND.play('stone_2',{vol:1,rate:.5}); toast('The cave-in is open','#e8c27a'); } });
+/* carrying a lantern = warm light around you (in the mine, and outside at night) */
+const LANTERN={L:null};
+on('tick',dt=>{ if(!LANTERN.L){ LANTERN.L=new THREE.PointLight(col(0xffb060),0,14,1.5); LANTERN.L.position.set(.25,-.35,-.3); camera.add(LANTERN.L); }
+  const has=typeof hasItem==='function'&&hasItem('lantern'); const want=!has||!LV?0:LV.name==='mine'?1.8:(LV.name==='dust'&&DAY.k<.35?1.2:0);
+  LANTERN.L.intensity=damp(LANTERN.L.intensity,want*(1+Math.sin(G.time*13)*.04),6,dt); });

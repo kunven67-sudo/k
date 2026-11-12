@@ -9,8 +9,8 @@ ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VDIR=os.path.join(ROOT,'assets','voice')
 LINES=json.load(open(os.path.join(VDIR,'lines.json'),encoding='utf-8'))
 VOICES={'Jay':('en-PH-JamesNeural','+0%','+0Hz'),'Jay2':('en-PH-JamesNeural','+0%','+0Hz'),'Moe':('en-US-GuyNeural','-4%','-8Hz'),'Gideon':('en-US-GuyNeural','+6%','-2Hz'),
- 'Abe':('en-US-AndrewNeural','-14%','-16Hz'),'Doc':('en-GB-RyanNeural','-6%','-4Hz'),'Tobias':('en-US-TonyNeural','-10%','-12Hz'),'Rook':('en-US-EricNeural','+4%','+4Hz'),
- 'Hank':('en-US-SteffanNeural','-4%','-6Hz'),'Mort':('en-US-ChristopherNeural','-18%','-20Hz'),'Lucky':('en-US-JasonNeural','+6%','+0Hz'),'Amos':('en-US-RogerNeural','-8%','-6Hz'),
+ 'Abe':('en-US-AndrewNeural','-14%','-16Hz'),'Doc':('en-GB-RyanNeural','-6%','-4Hz'),'Tobias':('en-GB-ThomasNeural','-12%','-14Hz'),'Rook':('en-US-EricNeural','+4%','+4Hz'),
+ 'Hank':('en-US-SteffanNeural','-4%','-6Hz'),'Mort':('en-US-ChristopherNeural','-18%','-20Hz'),'Lucky':('en-IE-ConnorNeural','+6%','+0Hz'),'Amos':('en-US-RogerNeural','-8%','-6Hz'),
  'Ned':('en-CA-LiamNeural','-4%','-6Hz'),'Bob':('en-US-BrianNeural','+0%','-4Hz'),'Rider':('en-US-ChristopherNeural','+0%','-10Hz'),'Surv':('en-AU-WilliamNeural','-8%','-6Hz')}
 state_path=os.path.join(VDIR,'_rendered.json')
 state=json.load(open(state_path)) if os.path.exists(state_path) else {}
