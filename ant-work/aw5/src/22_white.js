@@ -5,14 +5,14 @@
    time, and one thing a human should not see. BEYOND them: the god.
    ================================================================ */
 const WHITE={boxes:[{id:'desert',p:V3(-30,4,-40)},{id:'nivalis',p:V3(30,10,-55)},{id:'gulch',p:V3(-42,18,-95)},{id:'beach',p:V3(36,-6,-100)},{id:'time',p:V3(0,26,-130)},{id:'thing',p:V3(-10,-14,-150)}],door:V3(0,4,-185),god:V3(0,30,-640),beyondAt:V3(0,0,-520)};
-function glassBox(s){ const g=new THREE.Group(); const gm=new THREE.MeshPhysicalMaterial({color:col(0xffffff),roughness:.02,metalness:0,transmission:.92,thickness:.4,transparent:true,opacity:.35,clearcoat:1,side:THREE.DoubleSide,depthWrite:false});
-  g.add(mesh(new THREE.BoxGeometry(s,s,s),gm,0,0,0,false)); const em=new THREE.MeshBasicMaterial({color:col(0xc8d8e8)}); const e=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s,s,s)),new THREE.LineBasicMaterial({color:col(0x8aa0b8)})); g.add(e); return g; }
+function glassBox(s){ const g=new THREE.Group(); const gm=new THREE.MeshPhysicalMaterial({color:col(0xffffff),roughness:.02,metalness:0,transmission:.85,thickness:.4,transparent:true,opacity:.42,clearcoat:1,side:THREE.DoubleSide,depthWrite:false});
+  g.add(mesh(new THREE.BoxGeometry(s,s,s),gm,0,0,0,false)); const em=new THREE.MeshBasicMaterial({color:col(0xc8d8e8)}); const e=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s,s,s)),new THREE.LineBasicMaterial({color:col(0x3a4a60)})); g.add(e); return g; }
 defineLevel('white',{
   title:'???',
-  env:{fx:{exposure:1.0,saturation:1.0,contrast:1.05,temp:0,bloomStrength:.5,bloomThreshold:.95,aoRadius:.5,vignette:.25,grain:.03},music:null,reverb:.9,surface:'stone',far:1600,speed:5,fly:true},
+  env:{fx:{exposure:.9,saturation:1.05,contrast:1.1,temp:0,bloomStrength:.5,bloomThreshold:.95,aoRadius:.5,vignette:.25,grain:.03},music:null,reverb:.9,surface:'stone',far:1600,speed:5,fly:true},
   async build(scene,lv){ lv.occluders=[];
     scene.background=col(0xf2f2f4); scene.fog=new THREE.FogExp2(col(0xf2f2f4),.0028); lv.fogW=.0028;
-    scene.add(new THREE.HemisphereLight(col(0xffffff),col(0xd8d8e0),1.1)); const d=new THREE.DirectionalLight(col(0xffffff),1.2); d.position.set(.3,1,.4); scene.add(d);
+    scene.add(new THREE.HemisphereLight(col(0xffffff),col(0xc8c8d0),.75)); const d=new THREE.DirectionalLight(col(0xffffff),.9); d.position.set(.3,1,.4); scene.add(d);
     lv.boxes={};
     for(const B of WHITE.boxes){ const S=B.id==='beach'?11:8; const g=glassBox(S); g.position.copy(B.p); scene.add(g); lv.boxes[B.id]=g; g.userData.S=S; const inner=new THREE.Group(); inner.position.y=-S/2+.05; g.add(inner);
       const floor=(m)=>{ const f=mesh(new THREE.PlaneGeometry(S-.1,S-.1),m,0,0,0,false); f.rotation.x=-Math.PI/2; inner.add(f); };
@@ -23,7 +23,7 @@ defineLevel('white',{
         const um=new THREE.Group(); um.position.set(1.4,0,1); um.add(cyl(.04,.04,2.4,mat(0xeeeeee),0,1.2,0,8)); const top=mesh(new THREE.ConeGeometry(1.4,.5,12),new THREE.MeshStandardMaterial({color:col(0xe84a3a),roughness:.8,side:THREE.DoubleSide}),0,2.3,0); um.add(top); inner.add(um);
         const chair=new THREE.Group(); chair.position.set(.6,0,1.2); chair.add(box(.7,.08,1.4,mat(0x2a7ab8),0,.35,0)); const back=box(.7,.08,.8,mat(0x2a7ab8),0,.7,.65); back.rotation.x=-1.0; chair.add(back); inner.add(chair);
         const jim=makeJim({}); jim.userData.level='white'; jim.position.set(.6,.25,1.0); jim.rotation.y=Math.PI; inner.add(jim); setPose(jim,'sit',0); jim.userData.A.seated=true; lv.jim=jim;
-        const sun=new THREE.PointLight(col(0xfff0d0),2.4,14,1.4); sun.position.set(0,4.5,0); inner.add(sun); inner.add(box(.4,.3,.3,mat(0x3a7ae0),-.2,.15,1.6)); }
+        const sun=new THREE.PointLight(col(0xfff0d0),1.2,14,1.4); sun.position.set(0,4.5,0); inner.add(sun); inner.add(box(.4,.3,.3,mat(0x3a7ae0),-.2,.15,1.6)); }
       else if(B.id==='time'){ const m=new THREE.MeshBasicMaterial({color:col(0x05050c),side:THREE.BackSide}); g.add(mesh(new THREE.BoxGeometry(S-.15,S-.15,S-.15),m,0,0,0,false)); const st=makeStars(600,3.5); g.add(st); lv.timeRings=[]; for(let i=0;i<3;i++){ const r=mesh(new THREE.TorusGeometry(1.2+i*.8,.05,8,64),new THREE.MeshBasicMaterial({color:col([0xffd060,0x80c0ff,0xff80d0][i])}),0,0,0,false); g.add(r); lv.timeRings.push(r); for(let k=0;k<12;k++){ const tk=box(.06,.25,.06,new THREE.MeshBasicMaterial({color:col(0xffffff)}),Math.cos(k/12*Math.PI*2)*(1.2+i*.8),Math.sin(k/12*Math.PI*2)*(1.2+i*.8),0,false); r.add(tk); } } }
       else if(B.id==='thing'){ const m=new THREE.MeshBasicMaterial({color:col(0x000000),side:THREE.BackSide}); g.add(mesh(new THREE.BoxGeometry(S-.15,S-.15,S-.15),m,0,0,0,false)); const eye=new THREE.Group(); g.add(eye); lv.eye=eye;
         eye.add(mesh(new THREE.SphereGeometry(1.6,32,24),new THREE.MeshPhysicalMaterial({color:col(0xf0e8e0),roughness:.3,clearcoat:1}),0,0,0,false)); const iris=mesh(new THREE.CircleGeometry(.7,32),new THREE.MeshBasicMaterial({color:col(0x6a0a8a)}),0,0,1.61,false); eye.add(iris); eye.add(mesh(new THREE.CircleGeometry(.32,32),new THREE.MeshBasicMaterial({color:col(0x000000)}),0,0,1.62,false));
@@ -36,7 +36,7 @@ defineLevel('white',{
     for(let i=0;i<6;i++){ const r=mesh(new THREE.TorusGeometry(28+i*9,.6+i*.2,10,120),new THREE.MeshBasicMaterial({color:col(0xffe8b0),transparent:true,opacity:.75}),0,0,0,false); r.rotation.set(rand(0,3),rand(0,3),0); G.add(r); lv.godRings.push(r);
       for(let k=0;k<6;k++){ const a=k/6*Math.PI*2; const e=new THREE.Group(); e.position.set(Math.cos(a)*(28+i*9),Math.sin(a)*(28+i*9),0); e.add(mesh(new THREE.SphereGeometry(1.4,16,12),new THREE.MeshBasicMaterial({color:col(0xffffff)}),0,0,0,false)); e.add(mesh(new THREE.CircleGeometry(.6,20),new THREE.MeshBasicMaterial({color:col(0x2a1a0a)}),0,0,1.41,false)); r.add(e); } }
     lv.godL=new THREE.PointLight(col(0xffd890),0,600,1); lv.godL.position.copy(WHITE.god); scene.add(lv.godL);
-    lv.ground=()=>-9999; lv.col.bounds=[-400,400,-900,200];
+    lv.ground=()=>0; lv.col.bounds=[-400,400,-900,200];
     lv.flyBounds=(p,v)=>{ if(p.y<-60){ p.y=-60; v.y=Math.max(0,v.y); } if(p.y>120){ p.y=120; v.y=Math.min(0,v.y); } };
   },
   enter(){ setAmbience([['spaceDrone',.04]]); },

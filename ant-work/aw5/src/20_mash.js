@@ -6,11 +6,11 @@
    RED = it rewinds you. And the falling rocks are stuck in a loop...
    press T (your watch) to FREEZE time and climb them to the tear.
    ================================================================ */
-const MASH={rocks:{x:0,z:-150,n:13}, tear:V3(0,13.2,-174), lab:{z:-80}, rewinds:[[-6,-112],[5,-118],[-2,-126],[8,-104],[-9,-124]]};
+const MASH={rocks:{x:0,z:-149,n:16}, tear:V3(0,13.2,-174), lab:{z:-80}, rewinds:[[-6,-112],[5,-118],[-2,-126],[8,-104],[-9,-124]]};
 function iceTex5(){ return canvasTex(512,512,(c,w,h)=>{ c.fillStyle='#bcd8ec'; c.fillRect(0,0,w,h); for(let i=0;i<70;i++){ c.strokeStyle='rgba(255,255,255,'+(Math.random()*.5)+')'; c.lineWidth=Math.random()*2; c.beginPath(); const x=Math.random()*w,y=Math.random()*h; c.moveTo(x,y); c.lineTo(x+rand(-120,120),y+rand(-120,120)); c.stroke(); } },[6,6]); }
 defineLevel('mash',{
   title:'???',
-  env:{fx:{exposure:1.1,saturation:1.05,contrast:1.1,temp:0,bloomStrength:.55,bloomThreshold:.9,aoRadius:.6,vignette:.45,grain:.05,aberr:.004},music:null,reverb:.5,surface:'sand',far:900,speed:3.4},
+  env:{fx:{exposure:1.1,saturation:1.05,contrast:1.1,temp:0,bloomStrength:.55,bloomThreshold:.9,aoRadius:.6,vignette:.45,grain:.05,aberr:.004},music:null,reverb:.5,surface:'sand',far:900,speed:3.4,jump:6},
   async build(scene,lv){ lv.occluders=[]; lv.glitchers=[];
     // the sky: split (a day half and a night half)
     const sky=new THREE.Mesh(new THREE.SphereGeometry(800,32,16),new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{t:{value:0}},
@@ -46,7 +46,7 @@ defineLevel('mash',{
     lv.console=box(3,1.2,1,new THREE.MeshPhysicalMaterial({color:col(0x2a3040),metalness:.6,roughness:.4,emissive:col(0x2a6aff),emissiveIntensity:.5}),0,.6,-96); scene.add(lv.console); colBoxC(lv.col,0,-96,3,1);
     // the stuck rocks (a time loop) on the way up the cliff, and the tear
     const R=MASH.rocks, rockM=pbrMat('cliff_side',2,{w:3,h:3}); rockM.color=col(0x9a8a7a); lv.rocks=[];
-    for(let i=0;i<R.n;i++){ const r=mesh(new THREE.DodecahedronGeometry(1.15,1),rockM,R.x+Math.sin(i*1.3)*2.2,0,R.z-i*1.7); r.scale.set(1.1,.55,1.1); r.castShadow=true; scene.add(r); lv.rocks.push({o:r,base:.9+i*1.0,ph:i*.7}); }
+    for(let i=0;i<R.n;i++){ const r=mesh(new THREE.DodecahedronGeometry(1.15,1),rockM,R.x+Math.sin(i*1.3)*1.2,0,R.z-i*1.65); r.scale.set(1.1,.55,1.1); r.castShadow=true; scene.add(r); lv.rocks.push({o:r,base:.7+i*.8,ph:i*.7}); }
     const cliff=box(60,13,8,rockM,0,6.5,-178); scene.add(cliff); colBox(lv.col,-30,30,-182,-174.6);
     lv.tear=mesh(new THREE.PlaneGeometry(2.4,4,10,14),new THREE.MeshBasicMaterial({color:col(0xffffff),side:THREE.DoubleSide}),MASH.tear.x,MASH.tear.y+1.6,MASH.tear.z+1); scene.add(lv.tear);
     { const a=lv.tear.geometry.attributes.position; for(let i=0;i<a.count;i++) a.setX(i,a.getX(i)*(.35+Math.abs(Math.sin(a.getY(i)*2.2))*.8)); }

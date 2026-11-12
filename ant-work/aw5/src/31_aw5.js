@@ -13,15 +13,15 @@ function timeFreeze(){ if(TIMEP.cd>0||!F.canFreeze) return; TIMEP.cd=.5; TIMEP.f
 /* ---------- the mash: rocks in a loop, rewind spots, glitches, Steve + Alex scanning ---------- */
 const SNEAK={on:false,seenT:0,ang:0};
 function mashTick(lv,dt,t){ TIMEP.cd=Math.max(0,TIMEP.cd-dt);
-  if(!TIMEP.frozen) for(const r of lv.rocks){ r.t=(r.t||0)+dt; r.o.position.y=r.base+Math.sin(r.t*1.7+r.ph)*1.3; r.o.rotation.y+=dt*.8; }
+  if(!TIMEP.frozen) for(const r of lv.rocks){ r.t=(r.t||0)+dt; r.o.position.y=r.base+Math.sin(r.t*1.7+r.ph)*.25; r.o.rotation.y+=dt*.8; }
   // history for the rewind spots
   TIMEP.histT-=dt; if(TIMEP.histT<=0){ TIMEP.histT=.25; TIMEP.hist.push({p:PLAYER.pos.clone(),y:PLAYER.y,yaw:PLAYER.yaw}); if(TIMEP.hist.length>20) TIMEP.hist.shift(); }
   if(G.mode==='play'&&!DLG.active){ for(const R of lv.rew){ R.o.material.opacity=.18+Math.sin(t*5+R.x)*.06; if(Math.hypot(PLAYER.pos.x-R.x,PLAYER.pos.z-R.z)<2.2&&!TIMEP.rewinding){ rewindPlayer(); break; } } }
   // glitches
   lv.gT=(lv.gT||3)-dt; if(lv.gT<=0&&!TIMEP.frozen){ lv.gT=rand(2.5,6); const g=pick(lv.glitchers); const p0=g.position.clone(); g.position.add(V3(rand(-3,3),rand(-2,2),rand(-3,3))); later(.15,()=>g.position.copy(p0)); FX.aberr=.03; later(.12,()=>FX.aberr=.004); SND.play('static',{vol:.15,rate:rand(.8,1.3)}); }
   // Steve's scanner
-  if(SNEAK.on&&G.mode==='play'&&!DLG.active&&!TIMEP.frozen){ SNEAK.ang+=dt*.6; const S=lv.steve; const yaw=Math.sin(SNEAK.ang)*.9; S.rotation.y=Math.PI+yaw; lv.scan.rotation.y=yaw;
-    const to=V3(PLAYER.pos.x-S.position.x,0,PLAYER.pos.z-S.position.z), d=to.length(); const fwd=V3(Math.sin(Math.PI+yaw),0,Math.cos(Math.PI+yaw)); const ang=Math.acos(clamp(to.normalize().dot(fwd),-1,1));
+  if(SNEAK.on&&G.mode==='play'&&!DLG.active&&!TIMEP.frozen){ SNEAK.ang+=dt*.6; const S=lv.steve; const yaw=Math.sin(SNEAK.ang)*.9; S.rotation.y=yaw; lv.scan.rotation.y=yaw;
+    const to=V3(PLAYER.pos.x-S.position.x,0,PLAYER.pos.z-S.position.z), d=to.length(); const fwd=V3(Math.sin(yaw),0,Math.cos(yaw)); const ang=Math.acos(clamp(to.normalize().dot(fwd),-1,1));
     let seen=d<26&&ang<.38; if(seen){ const rc=new THREE.Raycaster(S.position.clone().add(V3(0,1.5,0)),camera.position.clone().sub(S.position.clone().add(V3(0,1.5,0))).normalize(),0,d); seen=rc.intersectObjects(lv.occluders,false).length===0; }
     SNEAK.seenT=seen?SNEAK.seenT+dt:Math.max(0,SNEAK.seenT-dt*.5); if(seen&&SNEAK.seenT>.25&&!SNEAK.warned){ SNEAK.warned=1; SND.play('watch_beep',{vol:.6,rate:.6}); }
     if(SNEAK.seenT>1.1){ SNEAK.on=false; F.caught=1; runStory(()=>labTalk(true)); } }
@@ -44,8 +44,8 @@ SCENES.mash=async function(){ const lv=LEVELS.mash, fd=$('fade'); if(LV!==lv) aw
   await waitUntil(()=>PLAYER.pos.z<-55); runStory(()=>SCENES.lab()); };
 SCENES.lab=async function(){ const lv=LEVELS.mash; if(LV!==lv){ await enterLevel('mash',{pos:V3(0,0,-50)}); setPlayer(V3(0,0,-50),Math.PI); } saveCheckpoint('lab'); const J=jay2_5(lv);
   if(!lv.steve){ const S=makeSteve({}); S.userData.level='mash'; lv.scene.add(S); lv.steve=S; const A=makeAlien({name:'Alex',voice:'Alex'}); A.userData.level='mash'; lv.scene.add(A); lv.alex=A;
-    lv.scan=new THREE.Group(); const cone=mesh(new THREE.ConeGeometry(9,26,24,1,true),new THREE.MeshBasicMaterial({color:col(0x7ac8ff),transparent:true,opacity:.07,depthWrite:false,side:THREE.DoubleSide}),0,1.5,-13,false); cone.rotation.x=Math.PI/2; lv.scan.add(cone); lv.scene.add(lv.scan); }
-  const S=lv.steve, A=lv.alex; resetActor(S); resetActor(A); S.position.set(0,0,-94); S.rotation.y=Math.PI; A.position.set(2.2,0,-97); faceTo(A,lv.console.position); setPose(A,'type',.3); lv.scan.position.set(0,0,-94);
+    lv.scan=new THREE.Group(); const cone=mesh(new THREE.ConeGeometry(9,26,24,1,true),new THREE.MeshBasicMaterial({color:col(0x7ac8ff),transparent:true,opacity:.07,depthWrite:false,side:THREE.DoubleSide}),0,1.5,13,false); cone.rotation.x=-Math.PI/2; lv.scan.add(cone); lv.scene.add(lv.scan); }
+  const S=lv.steve, A=lv.alex; resetActor(S); resetActor(A); S.position.set(0,0,-94); S.rotation.y=0; A.position.set(2.2,0,-97); faceTo(A,lv.console.position); setPose(A,'type',.3); lv.scan.position.set(0,0,-94);
   PLAYER.lock(); PLAYER.ctl.look=true; lookAtPoint(headOf(S),.8); J.userData.A.look='player'; await say(['x_lab1','x_lab2']);
   freeWalk(); PLAYER.ctl.jump=true; objective('Sneak past Steve + Alex (stay out of the blue light, use the cover)'); SNEAK.on=true; SNEAK.seenT=0; SNEAK.warned=0;
   await waitUntil(()=>PLAYER.pos.z<-100||F.caught); if(F.caught) return; SNEAK.on=false; F.snuck=1;
@@ -64,7 +64,7 @@ SCENES.cliff=async function(){ const lv=LEVELS.mash; if(LV!==lv){ await enterLev
   freeWalk(); PLAYER.ctl.jump=true; objective('Get up to the tear (freeze the rocks with T, then climb)');
   await waitUntil(()=>PLAYER.pos.distanceTo(V3(MASH.tear.x,0,MASH.tear.z))<4&&PLAYER.y>10); if(TIMEP.frozen) timeFreeze(); F.canFreeze=0;
   PLAYER.lock(); SND.play('blast',{vol:.8}); const wh=$('fxWhite'); wh.style.transition='opacity .8s'; wh.style.opacity=1; await wait(1.2); runStory(()=>SCENES.white()); };
-SCENES.white=async function(){ const lv=LEVELS.white, wh=$('fxWhite'); if(LV!==lv) await enterLevel('white',{pos:V3(0,6,10)}); saveCheckpoint('white'); setPlayer(V3(0,6,10),Math.PI); PLAYER.pos.y=6;
+SCENES.white=async function(){ const lv=LEVELS.white, wh=$('fxWhite'); if(LV!==lv) await enterLevel('white',{pos:V3(0,6,10)}); saveCheckpoint('white'); setPlayer(V3(0,6,10),Math.PI); PLAYER.pos.y=6; objective('');
   const J=jay2_5(lv); J.userData.level='white'; J.position.set(2,5.4,10); setPose(J,'droop',0); wh.style.transition='opacity 2s'; wh.style.opacity=0; playMusic('sad',3); F.seen=F.seen||{};
   PLAYER.lock(); PLAYER.ctl.look=true; await wait(1.5); await say(['x_w_1','x_w_2','x_w_3']); clearPose(J,.5);
   toast('There\'s no ground here. FLY: WASD, Space = up, C = down','#cfd8e8'); freeWalk(); objective('Look into the glass boxes');
