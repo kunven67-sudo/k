@@ -1,0 +1,251 @@
+{
+  "_note": "ANT WORK 5 voice script. id -> {who, text}. [brackets] = not spoken. Render: python3 tools/voices.py",
+  "x_1": {
+    "who": "Jay2",
+    "text": "Jay... are we dead? Is this what dead is?"
+  },
+  "x_2": {
+    "who": "Jay",
+    "text": "No. I think... the watch broke something. Look at the sky."
+  },
+  "x_3": {
+    "who": "Jay2",
+    "text": "Half of it is night. Half of it is day. That's not a thing!"
+  },
+  "x_4": {
+    "who": "Jay",
+    "text": "That's the saloon. From Dustreach. And that's... the pig king's spoon?"
+  },
+  "x_5": {
+    "who": "Jay2",
+    "text": "Every place we've ever been. Stitched together wrong."
+  },
+  "x_lab1": {
+    "who": "Jay2",
+    "text": "[whisper] Jay. That's Steve. And Alex. Their lab got sucked in too."
+  },
+  "x_lab2": {
+    "who": "Jay",
+    "text": "[whisper] Stay out of that blue light. Use the boxes."
+  },
+  "x_s1": {
+    "who": "Steve",
+    "text": "FREEZE! ...Oh, it's YOU. Of course it's you!"
+  },
+  "x_s1b": {
+    "who": "Steve",
+    "text": "YOU! You did this! You and that stupid watch!"
+  },
+  "x_s2": {
+    "who": "Alex",
+    "text": "Steve. Look around. Shouting won't fix any of it."
+  },
+  "x_w1": {
+    "who": "Jay",
+    "text": "What IS this watch? Really?"
+  },
+  "x_a1": {
+    "who": "Alex",
+    "text": "It isn't from any reality. Not yours, not ours. It's from outside."
+  },
+  "x_a2": {
+    "who": "Alex",
+    "text": "Beyond. Something made it. And that something will want it back."
+  },
+  "x_join": {
+    "who": "Jay",
+    "text": "Come with us. Nobody gets out of here alone."
+  },
+  "x_s3": {
+    "who": "Steve",
+    "text": "...Fine. But if this goes wrong, I'm blaming you."
+  },
+  "x_a3": {
+    "who": "Alex",
+    "text": "We'll come. Somebody has to be the adult."
+  },
+  "x_away": {
+    "who": "Jay",
+    "text": "Stay away from us. Both of you."
+  },
+  "x_s4": {
+    "who": "Steve",
+    "text": "Ha! Go on, then. Let's see how far you get without us."
+  },
+  "x_c1": {
+    "who": "Jay2",
+    "text": "The tear. Up on that cliff. That's the way out, I can feel it."
+  },
+  "x_c2": {
+    "who": "Jay",
+    "text": "Those rocks are stuck in a loop... the watch. Maybe I can stop time."
+  },
+  "x_w_1": {
+    "who": "Jay2",
+    "text": "...White. Just... white. Forever."
+  },
+  "x_w_2": {
+    "who": "Jay",
+    "text": "There's no floor. We're floating. Jay, we're FLYING."
+  },
+  "x_w_3": {
+    "who": "Jay2",
+    "text": "Look. Boxes. Glass boxes. And there's... places, inside them."
+  },
+  "x_desert": {
+    "who": "Jay",
+    "text": "The desert. Jim's stand. That's where it all started."
+  },
+  "x_niv": {
+    "who": "Jay2",
+    "text": "Nivalis. I can still feel how cold that cave was."
+  },
+  "x_gulch": {
+    "who": "Jay",
+    "text": "Dry Gulch. And that's... a grave."
+  },
+  "x_gulch2": {
+    "who": "Jay2",
+    "text": "It says Bob. ...I'm sorry, Jay."
+  },
+  "x_time": {
+    "who": "Jay2",
+    "text": "That's not a place. That's time. All of it, spinning."
+  },
+  "x_thing1": {
+    "who": "Jay2",
+    "text": "DON'T LOOK AT IT! Jay, don't look at it!"
+  },
+  "x_thing2": {
+    "who": "Jay",
+    "text": "I... I can't stop looking. It's looking BACK."
+  },
+  "x_jim1": {
+    "who": "Jim",
+    "text": "Ahh, this is the life. No ants. No stand. Just me and the..."
+  },
+  "x_jim2": {
+    "who": "Jim",
+    "text": "...Jay? Is that you? And... another you? In the SKY?"
+  },
+  "x_jim3": {
+    "who": "Jay",
+    "text": "Jim?! You're on vacation?!"
+  },
+  "x_jim4": {
+    "who": "Jim",
+    "text": "Man. I need a better vacation. Go away. Both of you."
+  },
+  "x_door": {
+    "who": "Jay2",
+    "text": "A door. Out here, in nothing. Something wants us to go in."
+  },
+  "g5_1": {
+    "who": "God",
+    "text": "Little ones. You carry something that belongs to me."
+  },
+  "x_b1": {
+    "who": "Jay",
+    "text": "Who... what ARE you?"
+  },
+  "g5_2": {
+    "who": "God",
+    "text": "I am what is outside your sky. I made every box you passed. Every reality."
+  },
+  "g5_3": {
+    "who": "God",
+    "text": "And I made that. The watch. A small thing. It slipped through my fingers... and fell into one of my worlds."
+  },
+  "g5_4": {
+    "who": "God",
+    "text": "Your Jim found it in the sand. And it chose you."
+  },
+  "x_b2": {
+    "who": "Jay2",
+    "text": "Wait. So you're just... a guy who lost his watch?"
+  },
+  "g5_5": {
+    "who": "God",
+    "text": "...A GUY?"
+  },
+  "g5_6": {
+    "who": "God",
+    "text": "Choose your next words carefully, little one. You have so few of them left."
+  },
+  "x_b3": {
+    "who": "Jay2",
+    "text": "JAY! Put him down! PUT HIM DOWN!"
+  },
+  "x_e_home": {
+    "who": "Jay",
+    "text": "[choking] Take it... take it back..."
+  },
+  "g5_home": {
+    "who": "God",
+    "text": "Wise. Go home, little ones. Forget the boxes."
+  },
+  "x_home1": {
+    "who": "Jim",
+    "text": "There you two are! Where have you BEEN? The ants ate half the stand!"
+  },
+  "x_home2": {
+    "who": "Jay",
+    "text": "...You wouldn't believe us, Jim."
+  },
+  "x_e_keep": {
+    "who": "Jay",
+    "text": "[choking] No... it's mine now."
+  },
+  "g5_keep": {
+    "who": "God",
+    "text": "[laughs] Then keep it. And wander. Every reality, forever. You will never find home again."
+  },
+  "x_e_break": {
+    "who": "Jay",
+    "text": "[choking] Then NOBODY gets it!"
+  },
+  "g5_break": {
+    "who": "God",
+    "text": "NO! What have you..."
+  },
+  "x_e_fix": {
+    "who": "Jay",
+    "text": "[choking] Fix it. All of it. Bring Bob back."
+  },
+  "g5_fix": {
+    "who": "God",
+    "text": "Everything has a price. Bob lives. But someone must keep my boxes."
+  },
+  "g5_fix2": {
+    "who": "God",
+    "text": "You, little ones. Forever."
+  },
+  "x_e_alex": {
+    "who": "Alex",
+    "text": "Take me instead. I know what you are. Let them go."
+  },
+  "g5_alex": {
+    "who": "God",
+    "text": "...Interesting. Very well."
+  },
+  "x_alexbye": {
+    "who": "Alex",
+    "text": "Go, Jay. Steve... look after them."
+  },
+  "x_e_j2": {
+    "who": "Jay2",
+    "text": "Take ME. I'm the clone. I'm the extra one. Let him go home."
+  },
+  "g5_j2": {
+    "who": "God",
+    "text": "A copy who chooses. I did not make that. ...Very well."
+  },
+  "x_j2bye": {
+    "who": "Jay2",
+    "text": "Hey. Tell Jim I said hi. And... thanks for coming back for me. Every time."
+  },
+  "x_j2bye2": {
+    "who": "Jay",
+    "text": "Jay... no..."
+  }
+}
