@@ -131,11 +131,11 @@ SCENES.wake=async function(){
   clearPose(J,.3); J.userData.A.seated=false; J.position.y=0;
   PLAYER.eye=1.64; freeWalk(); PLAYER.ctl.jump=false;
   objective('Grab your watch off their table while they argue');
-  await new Promise(res=>addInteract(lv,{obj:lv.watchOnTable,reach:2.2,label:'Grab your watch',act:()=>res()}));
+  await new Promise(res=>addInteract(lv,{obj:lv.watchOnTable,reach:2.2,label:'Grab your watch',once:true,act:()=>res()}));
   lv.watchOnTable.visible=false; SND.play('pickup',{vol:.8}); PLAYER.hasWatch=true;
   // the chip they bragged about: dig it out
   objective('Dig the tracker chip out of the watch');
-  await new Promise(res=>addInteract(lv,{pos:V3(2,0,0),reach:20,label:F.knife?'Dig the chip out (his knife)':'Pry the chip out with your nails',act:()=>res()}));
+  await new Promise(res=>addInteract(lv,{pos:V3(2,0,0),reach:20,label:F.knife?'Dig the chip out (his knife)':'Pry the chip out with your nails',once:true,act:()=>res()}));
   PLAYER.lock(); PLAYER.ctl.look=true; PLAYER.watchLook=1; SND.play('craft',{vol:.8,rate:1.6}); await wait(1.2); SND.play('metal_3',{vol:.5,rate:2}); PLAYER.watchLook=0; F.chipOut=1; toast('Chip out. They can\'t track you anymore.','#9fe0a0');
   S.userData.A.look='player'; A.userData.A.look='player'; await say(['w_4','w_5']);
   SCENE_TICKS.splice(SCENE_TICKS.indexOf(sm),1); alarm&&alarm.stop(.5);

@@ -180,6 +180,7 @@ function pbrMat(base,tile,o={}){
   const maps=pbrMaps(base,tile,o); const m=new (o.physical?THREE.MeshPhysicalMaterial:THREE.MeshStandardMaterial)(Object.assign({roughness:1,metalness:0},maps,o.opts||{}));
   if(maps.normalMap) m.normalScale=new THREE.Vector2(o.normal||1,o.normal||1);
   if(o.color!=null) m.color=col(o.color);
+  if(!o.w&&!o.h&&!o.repeat) m.userData.tile=tile;   // box() sizes the repeat to the box
   return m;
 }
 /* geometry needs uv2 for aoMap */

@@ -81,7 +81,7 @@ function updatePlayer(dt,t){
     if(lv.onMove) lv.onMove(P.pos);
     // ground + jumping
     const gy=lv.ground?lv.ground(P.pos.x,P.pos.z):0;
-    if(P.onGround){ P.y=damp(P.y,gy,20,dt); if(gy<P.y-.35){ P.onGround=false; P.vy=0; } }
+    if(P.onGround){ if(gy<P.y-.35){ P.onGround=false; P.vy=0; } else P.y=damp(P.y,gy,20,dt); }   /* walk off a ledge = really fall (was: half the drop in one frame) */
     else { P.vy-=P.gravity*dt; P.y+=P.vy*dt; if(P.y<=gy){ const impact=-P.vy; P.y=gy; P.vy=0; P.onGround=true; if(impact>2){ P.land=Math.min(.12,impact*.012)*P.scale; SFX.land(lv.surfaceAt?lv.surfaceAt(P.pos.x,P.pos.z):lv.env.surface,P.scale<1?.3:1); if(lv.onLand) lv.onLand(impact); } } }
     const hs=Math.hypot(P.vel.x,P.vel.z); P.moving=hs>.3;
     P.roll=damp(P.roll,-ix*.012,6,dt);

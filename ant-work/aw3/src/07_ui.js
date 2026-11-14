@@ -225,7 +225,7 @@ on('mouse',b=>{
   if(!INPUT.locked && !INPUT.dragLook) return;
   if(b===0){ if(typeof FIGHT!=='undefined'&&FIGHT.active){ FIGHT.onPunch(); return; } if(LV&&LV.onPrimary&&LV.onPrimary()===true) return; emit('primary'); }
 });
-function doInteract(){ if(interactCd>0) return; const it=findInteract(); if(it){ interactCd=it.cd!=null?it.cd:.25; hidePrompt(); try{ it.act(it); }catch(e){ console.error(e); __showErr&&__showErr('Error: '+e.message); } } else if(LV&&LV.onUse) LV.onUse(); }
+function doInteract(){ if(interactCd>0) return; const it=findInteract(); if(it){ interactCd=it.cd!=null?it.cd:.25; hidePrompt(); if(it.once){ const i=LV.inter.indexOf(it); if(i>=0) LV.inter.splice(i,1); } try{ it.act(it); }catch(e){ console.error(e); __showErr&&__showErr('Error: '+e.message); } } else if(LV&&LV.onUse) LV.onUse(); }
 function updatePrompt(dt){
   document.body.classList.toggle('indlg',DLG.active||CHOICE.active); document.body.classList.toggle('cine',!!(CAM.active||$('letterbox').classList.contains('on')));
   interactCd-=dt;

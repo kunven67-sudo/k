@@ -405,7 +405,12 @@ const GEOCACHE={};
 function GC(key,fn){ if(!GEOCACHE[key]) GEOCACHE[key]=fn(); return GEOCACHE[key]; }
 function mesh(geo,m,x=0,y=0,z=0,shadow=true){ const o=new THREE.Mesh(geo,m); o.position.set(x,y,z); if(shadow){ o.castShadow=true; o.receiveShadow=true; } return o; }
 const UBOX=new THREE.BoxGeometry(1,1,1), UCYL=new THREE.CylinderGeometry(.5,.5,1,24), USPH=new THREE.SphereGeometry(.5,24,16);
-function box(w,h,d,m,x=0,y=0,z=0,shadow=true){ const o=mesh(UBOX,m,x,y,z,shadow); o.scale.set(w,h,d); return o; }
+const _boxMats=new Map();
+function sizedMat(m,w,h,d){ const t=m.userData&&m.userData.tile; if(!t||!m.map) return m; const u=Math.max(w,d)/t, v=h/t; if(u<1.6&&v<1.6) return m;
+  const key=m.uuid+'|'+Math.round(u*2)+'|'+Math.round(v*2); let c=_boxMats.get(key); if(c) return c; c=m.clone();
+  for(const k of ['map','normalMap','roughnessMap','aoMap']) if(m[k]){ c[k]=m[k].clone(); c[k].needsUpdate=true; c[k].repeat.set(Math.max(1,Math.round(u*2)/2),Math.max(1,Math.round(v*2)/2)); }
+  _boxMats.set(key,c); return c; }
+function box(w,h,d,m,x=0,y=0,z=0,shadow=true){ const o=mesh(UBOX,sizedMat(m,w,h,d),x,y,z,shadow); o.scale.set(w,h,d); return o; }
 function cyl(rt,rb,h,m,x=0,y=0,z=0,seg=24,shadow=true){ return mesh(GC('cyl'+rt+'_'+rb+'_'+h+'_'+seg,()=>new THREE.CylinderGeometry(rt,rb,h,seg)),m,x,y,z,shadow); }
 function sph(r,m,x=0,y=0,z=0,ws=24,hs=16,shadow=true){ const o=mesh(GC('sph'+ws+'_'+hs,()=>new THREE.SphereGeometry(1,ws,hs)),m,x,y,z,shadow); o.scale.setScalar(r); return o; }
 /* rounded box: a subdivided box whose corners are pushed onto spheres */

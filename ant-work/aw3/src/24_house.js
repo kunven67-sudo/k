@@ -38,10 +38,12 @@ defineLevel('twisted',{
     scene.background=col(0x0c0d10); scene.fog=new THREE.FogExp2(col(0x3a3a40),.0035);
     lv.rig=makeRig(scene,{sun:2.3,sunColor:0xffe8c8,hemi:.85,sky:0xb8c0d8,ground:0x6a5440,dir:V3(.35,1,.25),span:90,dist:200,far:420,bias:-.0006,normalBias:.06});
     const H=THOUSE;
+    // ceiling lamps (a house has lights on): living room, hallway, kitchen/bedroom
+    for(const [x,z,i] of [[0,0,2.2],[140,0,1.4],[270,0,2.0]]){ const L=new THREE.PointLight(col(0xffe2b8),i,420,1.1); L.position.set(x,150,z); scene.add(L); const bulb=mesh(new THREE.SphereGeometry(4,16,10),new THREE.MeshBasicMaterial({color:col(0xfff0d0)}),x,156,z,false); scene.add(bulb); }
     // the floor: giant floorboards; the walls: a sickly wrong green (this isn't your paint)
     const fl=texPlane(H.x1-H.x0+200,H.z1-H.z0+200,'rough_wood',48,(H.x0+H.x1)/2,0,0,{opts:{roughness:.75}}); fl.material.color=col(0xd8b890); scene.add(fl);
     const wallM=new THREE.MeshStandardMaterial({color:col(0xa8b896),roughness:.95,map:charTex().cloth.map});
-    const wall=(x,z,w,ry,h=160,warp=0)=>{ const g=new THREE.PlaneGeometry(w,h,warp?40:1,warp?12:1); if(warp){ const a=g.attributes.position; for(let k=0;k<a.count;k++) a.setZ(k,Math.sin(a.getX(k)*.05+a.getY(k)*.02)*warp); g.computeVertexNormals(); } const m=mesh(g,wallM,x,h/2,z,false); m.rotation.y=ry; m.material.side=THREE.DoubleSide; scene.add(m); return m; };
+    const wall=(x,z,w,ry,h=160,warp=0)=>{ const g=new THREE.PlaneGeometry(w,h,warp?40:1,warp?12:1); if(warp){ const a=g.attributes.position; for(let k=0;k<a.count;k++) a.setZ(k,Math.sin(a.getX(k)*.05+a.getY(k)*.02)*warp); g.computeVertexNormals(); } const m=mesh(g,wallM,x,h/2,z,false); m.rotation.y=ry; m.material.side=THREE.DoubleSide; scene.add(m); if(Math.abs(Math.sin(ry))<.5) colBox(lv.col,x-w/2,x+w/2,z-.6,z+.6); else colBox(lv.col,x-.6,x+.6,z-w/2,z+w/2); return m; };
     wall(0,H.z0-2,140,0); wall(0,H.z1+2,140,Math.PI); wall(H.x0,0,104,Math.PI/2);
     wall((H.hall.x0+H.hall.x1)/2,-H.hall.z,H.hall.x1-H.hall.x0,0,120,4); wall((H.hall.x0+H.hall.x1)/2,H.hall.z,H.hall.x1-H.hall.x0,Math.PI,120,4);   // the stretched, bent hallway
     wall(H.x1,0,104,-Math.PI/2); wall(270,H.z0-2,120,0); wall(270,H.z1+2,120,Math.PI);
@@ -120,13 +122,13 @@ defineLevel('twisted',{
     const jarM=new THREE.MeshPhysicalMaterial({color:col(0xd8c8a8),roughness:.3,clearcoat:.8}); const jar=new THREE.Group(); jar.position.copy(H.jar); scene.add(jar); lv.jar=jar;
     jar.add(mesh(GC('jarGeo',()=>{ const pts=[[0,0],[6,0],[7,2],[7.2,9],[6,11],[5,11.4]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,32); g.computeVertexNormals(); return g; }),jarM));
     const lid=new THREE.Group(); lid.position.y=11.4; jar.add(lid); lid.add(cyl(5.6,5.6,1.2,jarM,0,.6,0,32)); lid.add(sph(1.6,jarM,0,1.8,0,14,10)); lv.jarLid=lid;
-    colCircle(lv.col,H.jar.x,H.jar.z,7.3,()=>PLAYER.y>ct.h-2);
+    colCircle(lv.col,H.jar.x,H.jar.z,7.3,()=>PLAYER.y>ct.h-2&&!lv.jarTipped); colBox(lv.col,H.jar.x-1,H.jar.x+11.6,H.jar.z-7.3,H.jar.z+7.3,()=>PLAYER.y>ct.h-2&&lv.jarTipped);
     lv.key=new THREE.Group(); const kM=new THREE.MeshPhysicalMaterial({color:col(0xc8a850),metalness:1,roughness:.3}); lv.key.add(mesh(new THREE.TorusGeometry(.5,.15,8,16),kM)); lv.key.add(box(.25,.25,2.4,kM,0,0,1.6)); lv.key.add(box(.25,.6,.25,kM,0,-.3,2.6)); lv.key.position.set(H.jar.x,ct.h+2,H.jar.z); lv.key.rotation.x=Math.PI/2; lv.key.visible=false; scene.add(lv.key);
     // floating things, slowly spinning: three of them drift up and down by the counter = the way up
     const bookM=new THREE.MeshStandardMaterial({color:col(0x4a2a5a),roughness:.8}), chairM=woodM, plateM=new THREE.MeshPhysicalMaterial({color:col(0xe9e4da),roughness:.2,clearcoat:.8});
-    floater(lv,{mesh:box(9,1.6,7,bookM,0,0,0),at:V3(258,0,12),r:3.6,top:.8,lift:[0,13],period:9});
-    floater(lv,{mesh:box(9,1.4,9,chairM,0,0,0),at:V3(268,12,20),r:4,top:.7,lift:[12,25],period:10,ph:.5});
-    floater(lv,{mesh:cyl(5,4.6,.8,plateM,0,0,0,24),at:V3(276,24,26),r:4.6,top:.4,lift:[24,36.4],period:11,ph:.2});
+    floater(lv,{mesh:box(9,1.6,7,bookM,0,0,0),at:V3(226,0,45),r:3.6,top:.8,lift:[0,13],period:8});
+    floater(lv,{mesh:box(9,1.4,9,chairM,0,0,0),at:V3(235,12,40),r:4,top:.7,lift:[12,25],period:8,ph:.5});
+    floater(lv,{mesh:cyl(5,4.6,.8,plateM,0,0,0,24),at:V3(245,24,44),r:4.6,top:.4,lift:[24,36.4],period:8,ph:0});
     // just floating around (no way up): spinning in the living room + hall
     for(const [x,y,z,m] of [[-40,30,-10,box(14,2,10,bookM,0,0,0)],[40,24,10,cyl(5,5,1,plateM,0,0,0,24)],[100,40,0,box(10,10,10,chairM,0,0,0)],[190,28,-4,box(12,2,9,bookM,0,0,0)]]) floater(lv,{mesh:m,at:V3(x,y,z),r:0,decor:true});
     // cockroaches under the fridge
@@ -144,7 +146,7 @@ defineLevel('twisted',{
   enter(){ FX.sunWorld=null; },
   exit(){ setAmbience([]); },
   update(dt,t){ const lv=this;
-    for(const f of lv.floaters){ f.g.rotation.y+=dt*(f.decor?.15:.08); if(f.lift){ const k=.5-.5*Math.cos((t/f.period+f.ph)*Math.PI*2); f.g.position.y=lerp(f.lift[0],f.lift[1],k); } else if(f.decor){ f.g.position.y=f.y0+Math.sin(t*.4+f.at.x)*1.5; f.g.rotation.x+=dt*.05; } }
+    for(const f of lv.floaters){ f.g.rotation.y+=dt*(f.decor?.15:.08); if(f.lift){ const k=clamp((.5-.5*Math.cos((t/f.period+f.ph)*Math.PI*2))*1.4-.2,0,1); /* rests ~2 s at the top + bottom */ f.g.position.y=lerp(f.lift[0],f.lift[1],k); } else if(f.decor){ f.g.position.y=f.y0+Math.sin(t*.4+f.at.x)*1.5; f.g.rotation.x+=dt*.05; } }
     if(lv.fanBlades) lv.fanBlades.rotation.z+=dt*14;
     if(lv.amLight) lv.amLight.material.emissiveIntensity=Math.sin(t*4)>0?1.8:.1;
     for(const a of lv.ants){ a.t=(a.t+dt*.02)%1; const x=165+a.t*40, z=Math.sin(a.t*12)*10-2; a.o.position.set(x,0,z); a.o.rotation.y=Math.PI/2+Math.cos(a.t*12)*.6; animateBug(a.o,dt,t); a.o.userData.bug.walkK=1; }
