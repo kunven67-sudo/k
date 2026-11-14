@@ -61,6 +61,7 @@ final class Boost {
             Settings.System.putInt(cr, Settings.System.SCREEN_OFF_TIMEOUT, SLEEP_MS);
         }
         e.putInt("pct", pct).putBoolean("dim", dim).putBoolean("on", true).apply();
+        Unlock.apply(c); // BIG UNLOCK extras (only does something after the one-time PC setup)
         return kill ? killBackground(c) : 0;
     }
 
@@ -83,6 +84,7 @@ final class Boost {
                 if (v >= 0) try { Settings.System.putInt(cr, k, v); } catch (Exception ignored) { }
             }
         }
+        Unlock.restore(c);
         p.edit().putBoolean("on", false).putBoolean("saved", false).putBoolean("byClaude", false).apply();
     }
 

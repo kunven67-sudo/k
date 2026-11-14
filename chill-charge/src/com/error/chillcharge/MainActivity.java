@@ -155,6 +155,18 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean gamePut(String json) { return Game.put(MainActivity.this, json); }
 
+        /** Big unlock setup: step 1 (tap Build number 7 times) and step 2 (USB debugging) screens. */
+        @JavascriptInterface
+        public void openDevSetup(int step) {
+            runOnUiThread(() -> {
+                try {
+                    startActivity(new Intent(step == 1 ? Settings.ACTION_DEVICE_INFO_SETTINGS : Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
+                } catch (Exception e) {
+                    startActivity(new Intent(Settings.ACTION_SETTINGS));
+                }
+            });
+        }
+
         @JavascriptInterface
         public String kvGet(String name) { return Kv.get(MainActivity.this, name); }
 

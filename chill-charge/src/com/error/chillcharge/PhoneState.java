@@ -51,6 +51,11 @@ final class PhoneState {
                 + ",\"adminOk\":" + admin
                 + ",\"hasClaude\":" + (c.getPackageManager().getLaunchIntentForPackage(ClaudeService.CLAUDE) != null)
                 + ",\"link\":" + LinkService.running
+                + ",\"unlock\":" + Unlock.ok(c)
+                + ",\"unlockDid\":" + org.json.JSONObject.quote(Unlock.did(c))
+                + ",\"devOn\":" + Unlock.devOn(c)
+                + ",\"adbOn\":" + Unlock.adbOn(c)
+                + ",\"hz\":" + Math.round(Unlock.hz(c))
                 + ",\"linkUrl\":\"" + LinkService.url(c) + "\""
                 + "}";
     }

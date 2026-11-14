@@ -281,9 +281,13 @@ body.saving .glow, body.saving #flow, body.saving .flowbar i { animation: none !
   <div class="did phoneonly" id="did"></div>
 
   <div class="pcnote pconly" id="pcscreen"></div>
-  <details class="extras phoneonly">
+  <details class="extras phoneonly" id="extras">
     <summary>EXTRAS</summary>
     <div class="panel">
+      <div class="row" id="unlockRow">
+        <div class="t"><b>Big unlock</b><span id="unlockTxt"></span></div>
+        <button class="mini" id="unlockBtn">OPEN</button>
+      </div>
       <div class="row" id="linkRow">
         <div class="t"><b>PC link</b><span id="linkTxt">Watch + play on your PC (same Wi-Fi). Then lock your phone</span></div>
         <div class="sw" id="swLink"></div>
@@ -383,7 +387,9 @@ const P = window.Phone || (PCMODE ? new Proxy({ state: () => phoneCache }, { get
     state: () => JSON.stringify({ level: Math.floor(lvl), scale: 100, plugged, status: plugged ? 2 : 3, temp: 341, volt: 4120,
       current: plugged ? 2350000 : -400000, left: plugged ? (100 - lvl) * 52000 : -1, saver, canWrite, boost, bright: 120, sdk: 33,
       w: plugged ? 9.7 : 0, measured: true, use: plugged ? -1 : 1.9, cc: Math.round(lvl * 45000), wh, claudeMode: claude, usageOk: usage, adminOk: admin, hasClaude: true, screen: true,
-      link, linkUrl: "http://192.168.1.23:8080/?k=4821" }),
+      link, linkUrl: "http://192.168.1.23:8080/?k=4821", unlock: !!window.__unlock, unlockDid: window.__unlock ? "screen 60 Hz · Battery Saver on · quicker animations · background Wi-Fi scanning off · background Bluetooth scanning off · location off" : "",
+      devOn: true, adbOn: false, hz: window.__unlock && boost ? 60 : 120 }),
+    openDevSetup: () => {},
     addWh: d => (wh += d), setWh: v => { wh = v; }, lockNow: () => { admin = true; }, windowDim: () => {}, buzz: () => {},
     askUsage: () => { usage = true; }, claudeMode: on => { claude = on; },
     report: t => "CHILL CHARGE PHONE CHECK\nPhone: Test Phone\n" + (t ? "Charger test: " + t + "\n" : ""), sendReport: () => {},
@@ -461,6 +467,11 @@ function refresh() {
     : S.claudeMode && !S.usageOk ? "Turn on Usage access for Chill Charge, then come back"
     : S.claudeMode ? "On: music + saving run while Claude is open"
     : "While Claude is open: music + saving keep going";
+  const ub = $("unlockBtn");
+  if (S.unlock) { $("unlockTxt").textContent = "ON. SAVE POWER now also does 60 Hz, Battery Saver, location off, less background scanning. You can turn USB debugging off again."; ub.style.display = "none"; }
+  else if (!S.devOn) { $("unlockTxt").textContent = "Step 1 of 3: on the next screen tap \"Build number\" 7 times (it says you're a developer)."; ub.style.display = ""; ub.dataset.step = 1; }
+  else if (!S.adbOn) { $("unlockTxt").textContent = "Step 2 of 3: on the next screen turn on \"USB debugging\"."; ub.style.display = ""; ub.dataset.step = 2; }
+  else { $("unlockTxt").textContent = "Step 3 of 3: plug the phone into your PC with a data cable, press Yes in LINK, then tap Allow on the phone."; ub.style.display = "none"; }
   $("swLink").classList.toggle("on", !!S.link);
   $("linkTxt").textContent = S.link ? (S.linkUrl ? "On your PC open: " + S.linkUrl : "Connect to Wi-Fi first")
     : "Watch + play on your PC (same Wi-Fi). Then lock your phone";
@@ -473,7 +484,8 @@ function refresh() {
   go.textContent = S.boost ? "SAVING POWER · TAP TO STOP" : "SAVE POWER";
   $("did").innerHTML = S.boost
     ? "Doing: brightness 20% · screen sleeps after 15 s · auto-rotate off · touch vibration + sounds off · app animations off"
-      + (S.saver ? "" : '<br><a id="saverLink">+ Turn on Battery Saver too (Android only lets you do that one) &rsaquo;</a>')
+      + (S.unlock && S.unlockDid ? " · " + S.unlockDid + (S.hz ? ` (screen now ${S.hz} Hz)` : "") : "")
+      + (S.saver || S.unlock ? "" : '<br><a id="saverLink">+ Turn on Battery Saver too (Android only lets you do that one) &rsaquo;</a>')
     : "One tap: charges faster when plugged in, lasts longer when unplugged. Tap again to undo.";
 }
 
@@ -560,6 +572,7 @@ document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
 });
 
 // ---------- more tricks ----------
+$("unlockBtn").onclick = () => P.openDevSetup(+$("unlockBtn").dataset.step || 1);
 $("linkRow").onclick = () => {
   const on = !S.link; P.link(on);
   setTimeout(() => { refresh(); if (on && S.linkUrl) { P.copy(S.linkUrl); toast("PC link on. Address copied: " + S.linkUrl + "  Type it into Edge on your PC, then lock your phone."); } }, 900);
