@@ -103,7 +103,7 @@ SCENES.lab=async function(){
   resetActor(J); J.position.set(-2,.45,1.1); J.rotation.y=Math.PI; setPose(J,'sit',0); J.userData.A.seated=true;
   resetActor(S); S.position.set(1,0,-2.2); faceTo(S,V3(2,1,1)); resetActor(A); A.position.set(-.6,0,-2.6); faceTo(A,V3(0,1,1));
   lv.watchOnTable.visible=true; lv.alarmL.intensity=0;
-  setPlayer(V3(2,0,1.1),Math.PI); PLAYER.eye=1.2; PLAYER.lock(); PLAYER.ctl.look=true; setVM(false);
+  setPlayer(V3(2,0,1.0),0); PLAYER.eye=1.2; PLAYER.lock(); PLAYER.ctl.look=true; setVM(false);
   lids(1); blurScreen(.8); fd.style.opacity=0; await wait(.5); await tweenVal(lids,1,.3,1); await tweenVal(lids,.3,.8,.3); await tweenVal(lids,.8,0,1); tweenVal(blurScreen,.8,0,2);
   playMusic('pig',3);
   S.userData.A.look='player'; A.userData.A.look='player';
@@ -123,7 +123,7 @@ SCENES.wake=async function(){
   if(LV!==lv) await enterLevel('lab',{pos:V3(2,0,1)}); saveCheckpoint('wake'); labPeople(lv); const S=lv.steve, A=lv.alex, J=lv.jay2;
   resetActor(J); J.position.set(-2,.45,1.1); J.rotation.y=Math.PI; setPose(J,'sit',0); J.userData.A.seated=true;
   resetActor(S); S.position.set(5.8,0,-6); faceTo(S,V3(4,0,-8)); resetActor(A); A.position.set(3.6,0,-7.2); faceTo(A,S.position);
-  setPlayer(V3(2,0,1.1),Math.PI); PLAYER.eye=1.2; PLAYER.lock(); PLAYER.ctl.look=true; setVM(true);
+  setPlayer(V3(2,0,1.0),0); PLAYER.eye=1.2; PLAYER.lock(); PLAYER.ctl.look=true; setVM(true);
   // smoke + alarms, the chairs sparking
   const alarm=loopSnd('static',{vol:.5,rate:.5}); lv.alarmL.intensity=4; const sm=dt=>{ lv.alarmL.intensity=Math.sin(G.time*8)>0?5:.5; if(Math.random()<dt*14) lv.soft.spawn(rand(-3,3),1.6,rand(0,2),rand(-.3,.3),rand(.6,1.2),rand(-.3,.3),rand(2,4),rand(.3,.7),.35,.37,.4,.5,0,.6,2.5); if(Math.random()<dt*3){ SND.play('zap_crackle',{vol:.3,rate:rand(.8,1.4)}); } }; SCENE_TICKS.push(sm);
   fd.style.opacity=0; await tweenVal(lids,1,0,.8); SND.play('gasp',{vol:.8}); playMusic('boss',.5);
@@ -135,7 +135,7 @@ SCENES.wake=async function(){
   lv.watchOnTable.visible=false; SND.play('pickup',{vol:.8}); PLAYER.hasWatch=true;
   // the chip they bragged about: dig it out
   objective('Dig the tracker chip out of the watch');
-  await new Promise(res=>addInteract(lv,{pos:V3(2,0,0),reach:20,label:F.knife?'Dig the chip out (his knife)':'Pry the chip out with your nails',once:true,act:()=>res()}));
+  await new Promise(res=>addInteract(lv,{pos:V3(2,0,0),reach:20,aim:false,label:F.knife?'Dig the chip out (his knife)':'Pry the chip out with your nails',once:true,act:()=>res()}));
   PLAYER.lock(); PLAYER.ctl.look=true; PLAYER.watchLook=1; SND.play('craft',{vol:.8,rate:1.6}); await wait(1.2); SND.play('metal_3',{vol:.5,rate:2}); PLAYER.watchLook=0; F.chipOut=1; toast('Chip out. They can\'t track you anymore.','#9fe0a0');
   S.userData.A.look='player'; A.userData.A.look='player'; await say(['w_4','w_5']);
   SCENE_TICKS.splice(SCENE_TICKS.indexOf(sm),1); alarm&&alarm.stop(.5);

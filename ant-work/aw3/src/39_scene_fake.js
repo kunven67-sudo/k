@@ -87,7 +87,7 @@ async function customer(lv,i,ids,repeat){ const c=lv.cust[i%lv.cust.length]; c.v
   c.userData.A.look=null; await walkTo(c,[V3(4,0,6),V3(14,0,9)],1.4); c.visible=false; }
 async function fakeDay(lv,day){
   FAKE.day=day; const J=lv.jay2, Jim=lv.jim, fd=$('fade');
-  setPlayer(V3(0,0,1.4),0); PLAYER.eye=1.64; await dayCard('DAY '+day); fd.style.opacity=0; playMusic('desert',2);
+  setPlayer(V3(0,0,1.4),0); PLAYER.eye=1.64; await dayCard('DAY '+day); lids(0); blurScreen(0);   /* eyes OPEN (they stayed shut after the chair) */ fd.style.opacity=0; playMusic('desert',2);
   Jim.userData.A.look='player'; await say(['fj_'+day]); Jim.userData.A.look=null;
   if(day===3){ J.visible=true; resetActor(J); J.position.set(-10,0,8); await walkTo(J,[V3(1.6,0,1.6)],1.4); faceTo(J,PLAYER.pos); J.userData.A.look='player'; Jim.userData.A.look='player'; await say(['fj_3b','fj_3c','fj_3d']); J.userData.A.look=null; Jim.userData.A.look=null; }
   if(day>3){ J.visible=true; resetActor(J); J.position.set(1.6,0,1.6); faceTo(J,V3(0,1,0)); }
@@ -102,7 +102,7 @@ SCENES.fake1=async function(){ const lv=LEVELS.stand, fd=$('fade'); fd.style.tra
 SCENES.fake3=async function(){ const lv=LEVELS.stand, fd=$('fade'); fd.style.transition='none'; fd.style.opacity=1; if(LV!==lv) await enterLevel('stand',{pos:V3(0,0,1.4)}); saveCheckpoint('fake3'); fakePeople(lv); setVM(true); PLAYER.hasWatch=false; await fakeDay(lv,3); await fakeDay(lv,4); saveCheckpoint('fake5'); await fakeLast(lv); };
 SCENES.fake5=async function(){ const lv=LEVELS.stand, fd=$('fade'); fd.style.transition='none'; fd.style.opacity=1; if(LV!==lv) await enterLevel('stand',{pos:V3(0,0,1.4)}); saveCheckpoint('fake5'); fakePeople(lv); setVM(true); PLAYER.hasWatch=false; await fakeLast(lv); };
 async function fakeLast(lv){
-  FAKE.day=5; const J=lv.jay2, Jim=lv.jim, fd=$('fade'); setPlayer(V3(0,0,1.4),0); await dayCard('DAY 5'); fd.style.opacity=0; playMusic('desert',2);
+  FAKE.day=5; const J=lv.jay2, Jim=lv.jim, fd=$('fade'); setPlayer(V3(0,0,1.4),0); await dayCard('DAY 5'); lids(0); blurScreen(0); fd.style.opacity=0; playMusic('desert',2);
   J.visible=true; resetActor(J); J.position.set(1.6,0,1.6);
   FAKE.on=true; FAKE.ants=[]; // the world is breaking
   Jim.userData.A.look='player'; await say(['fj_5']); SND.play('static',{vol:.6}); Jim.userData.A.look=null; Jim.userData.A.idleOff=true;   // frozen mid-sentence

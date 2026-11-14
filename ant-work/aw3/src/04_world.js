@@ -260,6 +260,10 @@ async function enterLevel(name,spawn={},opts={}){
   camera.near=E.near||.05; camera.far=E.far||1500; camera.updateProjectionMatrix();
   resetFX(E.fx);
   if(E.fog) def.scene.fog=new THREE.FogExp2(col(E.fog[0]),E.fog[1]);
+  if(!def.envMap&&!def.noEnv){ /* auto reflections from the level's own sky/ground light (metal was rendering black, PBR looked flat) */
+    let top=0x8090a0, bot=0x302820, k=.45; def.scene.traverse(o=>{ if(o.isHemisphereLight){ top=o.color.getHex(); bot=o.groundColor.getHex(); k=clamp(.22+o.intensity*.32,.2,.75); } });
+    const bgc=def.scene.background&&def.scene.background.isColor?def.scene.background:(def.scene.fog?def.scene.fog.color:null); const hor=bgc?bgc.clone().lerp(col(top),.35).getHex():0x707880;
+    try{ def.envMap=makeEnv({top,horizon:hor,bottom:bot,intensity:k,blur:.06}); }catch(e){ console.error(e); def.noEnv=true; } }
   if(def.envMap) def.scene.environment=def.envMap;
   if(E.bg!=null) def.scene.background=col(E.bg);
   setReverb(E.reverb!=null?E.reverb:.2);
