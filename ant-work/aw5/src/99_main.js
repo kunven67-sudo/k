@@ -3,6 +3,7 @@
    bar, then the title on top of the desert.
    ================================================================ */
 const TIMESCALE=+(new URLSearchParams(location.search).get('speed')||1);
+const SLOWTEST=+(new URLSearchParams(location.search).get('slow')||1);   // testing only: ?slow=0.2 runs the game clock slower
 let lastT=performance.now(), fpsAcc=0, fpsN=0, fpsShown=0, slowChecks=0, autoLowered=0;
 const _focus=new THREE.Vector3();
 function frame(){
@@ -10,7 +11,7 @@ function frame(){
   const nowT=performance.now(); const raw=Math.min(.25,(nowT-lastT)/1000); lastT=nowT;
   if(!G.paused) SLOWMO.k=damp(SLOWMO.k,SLOWMO.target,SLOWMO.target<1?9:4,raw);
   const slow=SLOWMO.k;   // slow motion (the fight, the blast)
-  const dt=(TIMESCALE>1?Math.min(raw*TIMESCALE,.2):Math.min(raw,1/20))*slow;
+  const dt=(TIMESCALE>1?Math.min(raw*TIMESCALE,.2):Math.min(raw,1/20))*slow*SLOWTEST;
   G.real+=raw; G.frame++;
   try{
     if(!G.paused){ G.time+=dt; G.dt=dt; runTimers(); updateTweens(dt); }

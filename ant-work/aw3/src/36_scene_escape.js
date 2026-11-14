@@ -128,7 +128,7 @@ async function chaseRun(lv){
 function predict(sec){ const v=PLAYER.vel||V3(); return V3(PLAYER.pos.x+(v.x||0)*sec*.8,0,PLAYER.pos.z+(v.z||0)*sec*.8); }
 /* his hand comes down: a shadow first, then SLAM */
 async function handSlam(lv,at){
-  if(CHASE.busy) return; CHASE.busy=true;
+  if(CHASE.busy) return; CHASE.busy=true; CHASE.slamAt=at.clone();
   const arm=lv.bigArm||(lv.bigArm=makeGiantArm(lv)); arm.visible=true; armGrip(arm,.25);
   const gy=lv.floorMode?-36:lv.ground(at.x,at.z), warn=CHASE.fast?.55:1.05;
   const sh=mesh(new THREE.CircleGeometry(3.4,32),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0,depthWrite:false}),at.x,gy+.06,at.z,false); sh.rotation.x=-Math.PI/2; lv.scene.add(sh);
@@ -159,18 +159,18 @@ async function pinnedMoment(lv,B){
   arm.visible=true; armGrip(arm,.6); armPlace(arm,V3(B.position.x,B.position.y+1.3,B.position.z),.05); shake(.6); SND.play('body_fall',{vol:1,rate:.5});
   lookAtPoint(B.position.clone().add(V3(0,.5,0)),.3); chat(['e_c2']);
   const r=await timedChoice([{text:'Pull Bram free'},{text:'Keep running'}],5,1);
-  if(r===0){ SND.play('oof_1',{vol:.8}); await wait(.6); B.userData.down=false; clearPose(B,.3); F.bramAlive=true; remember('He'); CHASE.fast=true; }
+  if(r===0){ SND.play('oof_1',{vol:.8}); await wait(.6); B.userData.down=false; clearPose(B,.3); F.bramAlive=true; remember('He'); }
   else { F.bramAlive=false; await tweenVal(k=>{ armPlace(arm,V3(B.position.x,B.position.y+1.3+k*30,B.position.z),.05); B.position.y+=k*.8; },0,1,1.2); B.visible=false; remember('He'); }
-  arm.visible=false; CHASE.on=true; CHASE.slamT=.8; freeWalk(); PLAYER.ctl.jump=true;
+  arm.visible=false; CHASE.on=true; CHASE.slamT=2.4; freeWalk(); PLAYER.ctl.jump=true;
 }
 /* Teo trips and falls behind. Go back for him or leave him */
 async function tripMoment(lv,T){
   CHASE.on=false; T.userData.A.path=null; T.position.set(PLAYER.pos.x-6,lv.ground(PLAYER.pos.x-6,PLAYER.pos.z),PLAYER.pos.z-1); setPose(T,'lieBack',.15); T.userData.down=true;
   lookAtPoint(T.position.clone().add(V3(0,.5,0)),.3); chat(['e_c3']);
   const r=await timedChoice([{text:'Go back for Teo'},{text:'Leave him'}],5,1);
-  if(r===0){ F.teoAlive=true; await wait(.5); T.userData.down=false; clearPose(T,.3); CHASE.fast=true; remember('He'); }
+  if(r===0){ F.teoAlive=true; await wait(.5); T.userData.down=false; clearPose(T,.3); remember('He'); }
   else { F.teoAlive=false; remember('He'); CHASE.on=true; await handSlam(lv,T.position.clone()); T.visible=false; }
-  CHASE.on=true; CHASE.slamT=.6; freeWalk(); PLAYER.ctl.jump=true;
+  CHASE.on=true; CHASE.slamT=2.4; freeWalk(); PLAYER.ctl.jump=true;
 }
 /* ---------- the floor: run for the door ---------- */
 async function floorRun(lv,crew,slamTick,follow){

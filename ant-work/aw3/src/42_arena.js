@@ -15,20 +15,20 @@ const WEAPONS={
   rocks:{name:'Rocks',dmg:6,cd:.5,kind:'throw'}
 };
 const BUGDEF={
-  mantis:{name:'PRAYING MANTIS',hp:150,speed:3.4,keep:2.4,turn:3.8,atks:[
-    {n:'slash',w:.58,reach:3.5,arc:.9,dmg:1,rec:.75,weight:3},
-    {n:'double',w:.52,reach:3.3,arc:.9,dmg:1,rec:.9,weight:3,hits:2},
-    {n:'lunge',w:.66,reach:2.9,arc:.95,dmg:2,rec:1.0,weight:2,dash:7,min:4.2}]},
-  spider:{name:'TARANTULA',hp:180,speed:4.1,keep:2.6,turn:4.2,atks:[
-    {n:'bite',w:.45,reach:3.0,arc:.8,dmg:1,rec:.75,weight:3},
-    {n:'leap',w:.68,aoe:2.8,dmg:2,rec:1.0,weight:3,leap:true,min:3.5},
+  mantis:{name:'PRAYING MANTIS',hp:115,speed:3.4,keep:2.4,turn:3.8,atks:[
+    {n:'slash',w:.72,reach:3.5,arc:.9,dmg:1,rec:.75,weight:3},
+    {n:'double',w:.66,reach:3.3,arc:.9,dmg:1,rec:.9,weight:3,hits:2},
+    {n:'lunge',w:.8,reach:2.9,arc:.95,dmg:2,rec:1.0,weight:2,dash:7,min:4.2}]},
+  spider:{name:'TARANTULA',hp:130,speed:4.1,keep:2.6,turn:4.2,atks:[
+    {n:'bite',w:.6,reach:3.0,arc:.8,dmg:1,rec:.75,weight:3},
+    {n:'leap',w:.8,aoe:2.8,dmg:1,rec:1.0,weight:3,leap:true,min:3.5},
     {n:'web',w:.5,proj:true,rec:.65,weight:2,min:4.5}]},
-  scorpion:{name:'EMPEROR SCORPION',hp:230,speed:2.8,keep:2.8,turn:3.0,atks:[
+  scorpion:{name:'EMPEROR SCORPION',hp:190,speed:2.8,keep:2.8,turn:3.0,atks:[
     {n:'pincer',w:.55,reach:3.5,arc:.95,dmg:1,rec:.85,weight:3},
-    {n:'sting',w:.85,aoe:1.9,dmg:2,rec:1.1,weight:3,target:true},
+    {n:'sting',w:.95,aoe:1.9,dmg:2,rec:1.1,weight:3,target:true},
     {n:'sweep',w:.75,aoe:4.8,ring:true,dmg:1,rec:.95,weight:2,max:4.6}]}
 };
-const ARENA={active:false,paused:false,hp:5,maxHp:5,inv:{},cur:'fists',atkCd:0,dodgeT:0,dodgeCd:0,iframe:0,slowT:0,bug:null,st:null,projs:[],marks:[],loot:[],res:null,jay:null};
+const ARENA={active:false,paused:false,hp:6,maxHp:6,inv:{},cur:'fists',atkCd:0,dodgeT:0,dodgeCd:0,iframe:0,slowT:0,bug:null,st:null,projs:[],marks:[],loot:[],res:null,jay:null};
 /* ---------- your stuff (kept in F so checkpoints save it) ---------- */
 function inv(){ return F.inv||(F.inv={bone:0,thorn:0,thread:0,pebbles:0,bspear:0}); }
 const ITEM_NAMES={bone:'Sharp bone',thorn:'Thorn',thread:'Thread',pebbles:'Pebbles',bspear:'Bone spear'};
