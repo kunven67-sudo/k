@@ -141,6 +141,15 @@ SCENES.wake=async function(){
   SCENE_TICKS.splice(SCENE_TICKS.indexOf(sm),1); alarm&&alarm.stop(.5);
   saveCheckpoint('run'); runStory(()=>SCENES.run());
 };
+/* a snow sled: painted hood, windshield, seat, handlebar, rubber track, two skis, a headlight that lights the snow */
+function makeSnowmobile(c){ const g=new THREE.Group(); const paint=new THREE.MeshPhysicalMaterial({color:col(c),metalness:.35,roughness:.32,clearcoat:1,clearcoatRoughness:.12}); const black=new THREE.MeshStandardMaterial({color:col(0x121315),roughness:.9}); const chrome=new THREE.MeshStandardMaterial({color:col(0xb8bcc2),metalness:1,roughness:.22});
+  g.add(box(.92,.34,1.7,paint,0,.46,-.55)); g.add(box(.7,.3,1.62,black,0,.2,-.62)); const hood=sph(1,paint,0,.6,.5,24,14); hood.scale.set(.5,.34,.92); g.add(hood);
+  const ws=box(.8,.42,.03,new THREE.MeshPhysicalMaterial({color:col(0x9ab0c4),roughness:.05,transparent:true,opacity:.35,clearcoat:1}),0,1.0,.22); ws.rotation.x=-.55; g.add(ws);
+  g.add(box(.48,.17,1.0,black,0,.72,-.6)); const hb=cyl(.022,.022,.92,chrome,0,1.02,.02,8); hb.rotation.z=Math.PI/2; g.add(hb);
+  for(const sd of [-1,1]){ g.add(box(.14,.04,1.5,black,sd*.46,.05,.72)); const tip=box(.14,.04,.3,black,sd*.46,.12,1.5); tip.rotation.x=-.6; g.add(tip); g.add(cyl(.03,.03,.46,chrome,sd*.46,.28,.75,8)); }
+  g.add(mesh(new THREE.CircleGeometry(.11,16),new THREE.MeshBasicMaterial({color:col(0xfff4dc)}),0,.66,1.39,false));
+  const L=new THREE.SpotLight(col(0xfff2d8),7,70,.42,.5,1.3); L.position.set(0,.7,1.4); L.target.position.set(0,0,14); g.add(L,L.target);
+  g.traverse(o=>{ if(o.isMesh) o.castShadow=true; }); return g; }
 /* ---------- the town: run. Guards (aliens + robots), people at windows, gates slam, the bridge breaks. The cliff. ---------- */
 const RUN={on:false,guards:[]};
 SCENES.run=async function(){
@@ -157,13 +166,14 @@ SCENES.run=async function(){
   const fol=followers([J]); SCENE_TICKS.push(fol);
   RUN.on=true; RUN.caught=false;
   const chase=dt=>{ if(!RUN.on) return; const p=PLAYER.pos; const sp=3.0+Math.min(1.4,(6-p.z)*.004);
-    for(const g of [S,A].concat(RUN.guards)){ const d=V3(p.x-g.position.x,0,p.z-g.position.z); const L=d.length(); if(L<1.3) RUN.caught=true; if(L>1){ g.position.addScaledVector(d.normalize(),sp*(g===S||g===A?1:1.05)*dt); g.rotation.y=Math.atan2(d.x,d.z); if(g.userData.A) g.userData.A.walk=1; } }
+    for(const g of [S,A].concat(RUN.guards)){ const d=V3(p.x-g.position.x,0,p.z-g.position.z); const L=d.length(); if(L<1.3) RUN.caught=true; if(lv.bridgeGone&&g.position.z>TOWN.bridge.z0-1){ g.position.z=Math.max(g.position.z,TOWN.bridge.z0+1.2); if(g.userData.A) g.userData.A.walk=0; continue; }   /* the bridge is gone: they're stuck on the other side */
+      if(L>1){ g.position.addScaledVector(d.normalize(),sp*(g===S||g===A?1:1.05)*dt); g.rotation.y=Math.atan2(d.x,d.z); if(g.userData.A) g.userData.A.walk=1; } }
     // traps: the gates slam down behind you
     for(const gt of lv.gates) if(!gt.shut&&p.z<gt.z-3){ gt.shut=true; SND.play('metal_1',{vol:1,pos:gt.m.position,ref:30,rate:.5}); tweenVal(v=>{ gt.m.position.y=v; },14,3.5,.4,easeIn); for(const g of RUN.guards) if(g.position.z>gt.z) g.position.z+=0; }
     // people come to their windows
     for(const w of lv.windows) if(!w.lit&&Math.abs(w.house.position.z-p.z)<20){ w.lit=true; w.m.material=w.m.material.clone(); w.m.material.color=col(0xfff0c0); }
     // the bridge breaks right after you cross
-    if(!lv.bridgeGone&&p.z<TOWN.bridge.z1-2){ lv.bridgeGone=true; SND.play('block_1',{vol:1,rate:.3}); shake(.6); tweenVal(v=>{ lv.bridge.position.y=v; lv.bridge.rotation.z=(v+.45)*.01; },-.45,-120,2,easeIn); for(const g of RUN.guards){ g.position.z=Math.max(g.position.z,TOWN.bridge.z0+4); } }
+    if(!lv.bridgeGone&&p.z<TOWN.bridge.z1-2){ lv.bridgeGone=true; SND.play('block_1',{vol:1,rate:.3}); shake(.6); tweenVal(v=>{ lv.bridge.position.y=v; lv.bridge.rotation.z=(v+.45)*.01; },-.45,-120,2,easeIn); for(const g of [S,A].concat(RUN.guards)){ g.position.z=Math.max(g.position.z,TOWN.bridge.z0+4); } }
   };
   SCENE_TICKS.push(chase);
   await waitUntil(()=>RUN.caught||PLAYER.pos.z<TOWN.cliffZ+6);
@@ -172,8 +182,16 @@ SCENES.run=async function(){
   RUN.on=false; SCENE_TICKS.splice(SCENE_TICKS.indexOf(chase),1); SCENE_TICKS.splice(SCENE_TICKS.indexOf(fol),1);
   PLAYER.lock(); PLAYER.ctl.look=true; objective(''); stopMusic(2);
   lookAtPoint(V3(0,-200,TOWN.cliffZ-300),1); SND.play('wind_gust_1',{vol:1}); await wait(1.6);
-  J.userData.A.path=null; J.position.set(-1.4,0,TOWN.cliffZ+6.5); S.position.set(-1,0,TOWN.cliffZ+16); A.position.set(1.5,0,TOWN.cliffZ+17); faceTo(S,PLAYER.pos); faceTo(A,PLAYER.pos);
-  for(const g of RUN.guards){ g.position.set(rand(-8,8),0,TOWN.cliffZ+rand(20,26)); faceTo(g,PLAYER.pos); }
+  J.userData.A.path=null; J.position.set(-1.4,0,TOWN.cliffZ+6.5);
+  // engines: Steve + Alex come around on snow sleds (the tracks in the snow were theirs) and cut you off at the edge
+  const eng=loopSnd('engine',{vol:.9,rate:.95}); const sleds=[makeSnowmobile(0x1c2a38),makeSnowmobile(0x3a4a5e)]; sleds.forEach(s=>{ s.userData.level='town'; lv.scene.add(s); }); lv.sleds=sleds;
+  const from=[V3(-80,0,TOWN.cliffZ+46),V3(80,0,TOWN.cliffZ+50)], to=[V3(-2.6,0,TOWN.cliffZ+16.5),V3(3.4,0,TOWN.cliffZ+18)];
+  [S,A].forEach(h=>{ resetActor(h); setPose(h,'sit',0); h.userData.A.seated=true; });
+  lookAtPoint(V3(0,1.2,TOWN.cliffZ+22),.9);
+  await tweenVal(k=>{ sleds.forEach((s,i)=>{ const p=from[i].clone().lerp(to[i],k); s.position.copy(p); s.rotation.y=Math.atan2(to[i].x-from[i].x,to[i].z-from[i].z)+k*k*(i?-1.1:1.1); }); [S,A].forEach((h,i)=>{ h.position.copy(sleds[i].position).add(V3(0,.42,-.35).applyAxisAngle(V3(0,1,0),sleds[i].rotation.y)); h.rotation.y=sleds[i].rotation.y; }); },0,1,2.6,easeOut);
+  shake(.25); SND.play('sand_fall',{vol:.6,rate:.8}); later(.6,()=>eng&&eng.stop(1.5));
+  [S,A].forEach((h,i)=>{ clearPose(h,.3); h.userData.A.seated=false; h.position.copy(sleds[i].position).add(V3(i?1.1:-1.1,0,-.6)); h.position.y=0; faceTo(h,PLAYER.pos); });
+  await wait(.5);
   lookAtPoint(headOf(S),.8); S.userData.A.look='player'; await say(['r_2','r_3']);
   lookAtPoint(headOf(J),.5); J.userData.A.look='player'; await say(['r_4']);
   // the watch decides for you
