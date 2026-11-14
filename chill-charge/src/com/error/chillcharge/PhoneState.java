@@ -38,6 +38,7 @@ final class PhoneState {
                 + ",\"left\":" + left
                 + ",\"w\":" + Boost.watts(c)
                 + ",\"measured\":" + (Boost.counterWatts(c) >= 0)
+                + ",\"use\":" + Boost.usingW(c)
                 + ",\"cc\":" + Boost.counter(c)
                 + ",\"saver\":" + pm.isPowerSaveMode()
                 + ",\"screen\":" + pm.isInteractive()

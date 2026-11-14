@@ -35,10 +35,10 @@ public class WatchService extends Service {
 
         Notification n = new Notification.Builder(this, "boost")
                 .setSmallIcon(R.drawable.ic_note)
-                .setContentTitle("Boost is on")
-                .setContentText("Unplug and your screen goes back to normal")
+                .setContentTitle("Power saving is on")
+                .setContentText("Charges faster + lasts longer. Tap Turn off to go back to normal")
                 .setContentIntent(open)
-                .addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, "Stop boost", stop).build())
+                .addAction(new Notification.Action.Builder((android.graphics.drawable.Icon) null, "Turn off", stop).build())
                 .setOngoing(true)
                 .build();
 
@@ -48,14 +48,7 @@ public class WatchService extends Service {
             startForeground(1, n);
         }
 
-        if (unplug == null) {
-            unplug = new Unplug();
-            registerReceiver(unplug, new IntentFilter(Intent.ACTION_POWER_DISCONNECTED));
-        }
-        if (!Boost.isCharging(this)) { // already unplugged before we got here
-            Boost.turnOff(this);
-            stopSelf();
-        }
+        // saving now stays on when you unplug too (it makes the battery last longer). Turn it off from the app or here.
         return START_NOT_STICKY;
     }
 

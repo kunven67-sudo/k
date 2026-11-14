@@ -1,0 +1,100 @@
+/* ---------- game menu ---------- */
+.gpick { margin-top: 14px; }
+.gwatt { padding: 16px; border-radius: 20px; margin-bottom: 10px; background: linear-gradient(160deg, #1b1745, #0f0d26); border: 1px solid rgba(142,240,216,.25); }
+.gwatt span { display: block; font-size: 10.5px; letter-spacing: .24em; color: var(--dim); }
+.gwatt b { display: block; font-size: 34px; font-weight: 700; color: var(--mint); margin-top: 2px; }
+.gwatt em { font-style: normal; font-size: 12px; color: var(--dim); }
+.gcard { width: 100%; display: flex; gap: 14px; align-items: center; text-align: left; padding: 14px; margin-bottom: 8px; border-radius: 18px;
+  background: var(--card); border: 1px solid var(--line); font: inherit; color: var(--ink); }
+.gcard:active { transform: scale(.985); }
+.gcard .ico { width: 56px; height: 56px; border-radius: 16px; }
+.gcard .ico svg { width: 30px; height: 30px; }
+.gcard .t { flex: 1; min-width: 0; }
+.gcard b { display: block; font-size: 16px; font-weight: 600; }
+.gcard span { display: block; font-size: 12px; color: var(--dim); margin-top: 3px; }
+.gcard em { display: block; font-style: normal; font-size: 11.5px; color: var(--mint); margin-top: 6px; }
+.gview { display: none; margin-top: 12px; }
+.gview.show { display: block; }
+.gback { font: inherit; font-size: 11px; letter-spacing: .2em; color: var(--dim); background: none; border: 0; padding: 6px 2px 10px; }
+.game { display: none; } .game.show { display: block; }
+.badge { font-size: 12px; color: var(--dim); margin: 10px 2px 0; line-height: 1.5; }
+.badge b { color: var(--mint); font-weight: 600; }
+.gtitle { display: flex; justify-content: space-between; align-items: baseline; margin: 2px 2px 10px; }
+.gtitle h2 { margin: 0; font-size: 20px; letter-spacing: .06em; }
+.gtitle span { font-size: 12px; color: var(--dim); }
+.money { font-size: 14px; font-weight: 700; color: #ffd27a; font-variant-numeric: tabular-nums; }
+.bigbtn { width: 100%; height: 58px; margin-top: 12px; border: 0; border-radius: 16px; font: inherit; font-size: 15px; font-weight: 700; letter-spacing: .2em;
+  color: #0a0918; background: linear-gradient(100deg, var(--mint), #b6a4ff); }
+.bigbtn:disabled { background: #221f40; color: #6e679a; }
+.shop .bld .buy { margin-top: 0; }
+.pips { display: flex; gap: 3px; margin-top: 6px; }
+.pips i { width: 10px; height: 4px; border-radius: 2px; background: #2a2650; }
+.pips i.on { background: var(--mint); }
+.toggle { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 10px 12px; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--line); font-size: 13px; }
+
+/* ---------- robot arena ---------- */
+.arena { position: relative; height: 270px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line);
+  background: radial-gradient(120% 70% at 50% 110%, #2a2366 0%, #120f2c 55%, #0a0918 100%); }
+.arena::after { content: ""; position: absolute; left: -10%; right: -10%; bottom: 0; height: 70px;
+  background: repeating-linear-gradient(90deg, rgba(142,240,216,.12) 0 2px, transparent 2px 40px), linear-gradient(to top, #1c1846, transparent);
+  transform: perspective(200px) rotateX(55deg); transform-origin: bottom; }
+.fighter { position: absolute; bottom: 34px; z-index: 2; transition: transform .12s; }
+.fighter svg { display: block; }
+#rbMe { left: 6%; } #rbBoss { right: 5%; }
+.fighter.lunge-r { transform: translateX(34px); } .fighter.lunge-l { transform: translateX(-34px); }
+.fighter.hit { animation: hitf .25s; }
+@keyframes hitf { 30% { filter: brightness(3) saturate(0); transform: translateX(6px); } 60% { transform: translateX(-4px); } }
+.fighter.dead { transition: transform .8s, opacity .8s; transform: translateY(30px) rotate(-12deg); opacity: .15; }
+.hpbars { position: absolute; left: 12px; right: 12px; top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; z-index: 3; }
+.hpb span { display: flex; justify-content: space-between; font-size: 10.5px; letter-spacing: .1em; color: #cfc9f2; margin-bottom: 4px; }
+.hpb .bar { height: 8px; border-radius: 8px; background: rgba(255,255,255,.1); overflow: hidden; }
+.hpb .bar i { display: block; height: 100%; width: 100%; border-radius: 8px; transition: width .25s; }
+#hpMe i { background: linear-gradient(90deg, #5ee0b8, #8ef0d8); } #hpBoss i { background: linear-gradient(90deg, #ff6a3d, #ff2d55); }
+.meter { position: absolute; left: 12px; bottom: 10px; width: 40%; height: 6px; border-radius: 6px; background: rgba(255,255,255,.08); z-index: 3; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: #c5b3ff; }
+.dmg { position: absolute; z-index: 4; font-weight: 700; font-size: 18px; pointer-events: none; animation: dmgup .9s ease-out forwards; text-shadow: 0 2px 8px #000; }
+.dmg.crit { font-size: 26px; color: #ffd27a; } .dmg.me { color: #ff8a8a; }
+@keyframes dmgup { to { transform: translateY(-46px); opacity: 0; } }
+.beam { position: absolute; z-index: 3; height: 18px; left: 26%; right: 18%; bottom: 112px; border-radius: 18px; transform-origin: left;
+  background: linear-gradient(90deg, #fff, #c5b3ff 30%, #8ef0d8); box-shadow: 0 0 30px #c5b3ff, 0 0 60px #8ef0d8; animation: beam .7s ease-out forwards; }
+@keyframes beam { 0% { transform: scaleX(0); opacity: 1; } 40% { transform: scaleX(1); } 100% { transform: scaleX(1); opacity: 0; } }
+.banner { position: absolute; inset: 0; z-index: 5; display: none; place-items: center; text-align: center; background: rgba(5,4,14,.55); }
+.banner.show { display: grid; }
+.banner b { display: block; font-size: 30px; letter-spacing: .14em; }
+.banner span { display: block; margin-top: 6px; font-size: 14px; color: #ffd27a; }
+.bossname { position: absolute; right: 14px; bottom: 12px; z-index: 3; font-size: 11px; letter-spacing: .18em; color: #ffb38a; }
+
+/* ---------- race ---------- */
+.track { position: relative; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: #15132e; padding: 8px 0; }
+.lane { position: relative; height: 38px; border-bottom: 1px dashed rgba(255,255,255,.09); }
+.lane:last-child { border-bottom: 0; }
+.lane.me { background: rgba(142,240,216,.06); }
+.lane .car { position: absolute; top: 5px; left: 0; width: 58px; height: 28px; will-change: transform; }
+.lane .nm { position: absolute; left: 8px; top: 12px; font-size: 9.5px; letter-spacing: .14em; color: rgba(255,255,255,.28); }
+.finish { position: absolute; top: 0; bottom: 0; right: 10px; width: 8px; z-index: 1;
+  background: repeating-linear-gradient(0deg, #fff 0 6px, #111 6px 12px); opacity: .6; }
+.speedo { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+.speedo .stat b { font-size: 22px; }
+.nitro { height: 6px; border-radius: 6px; background: rgba(255,255,255,.08); margin-top: 8px; overflow: hidden; }
+.nitro i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #59c8ff, #c5b3ff); }
+.nitro.fire i { background: linear-gradient(90deg, #ffcf5a, #ff6a3d); }
+.count { position: absolute; inset: 0; display: none; place-items: center; z-index: 3; font-size: 64px; font-weight: 700; background: rgba(5,4,14,.45); }
+.count.show { display: grid; }
+.results { margin-top: 10px; padding: 12px 14px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); font-size: 13px; display: none; }
+.results.show { display: block; }
+.results div { display: flex; justify-content: space-between; padding: 4px 0; color: #cfc9f2; }
+.results div.me { color: var(--mint); font-weight: 700; }
+.leagues { display: flex; gap: 6px; overflow-x: auto; margin-top: 10px; padding-bottom: 2px; }
+.leagues button { flex: none; font: inherit; font-size: 11px; letter-spacing: .12em; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--card); color: var(--dim); }
+.leagues button.on { background: #2a2650; color: var(--ink); border-color: rgba(142,240,216,.4); }
+.leagues button:disabled { opacity: .35; }
+
+/* ---------- planet ---------- */
+.space { position: relative; border-radius: 22px; overflow: hidden; border: 1px solid var(--line);
+  background: radial-gradient(100% 80% at 50% 50%, #0c0b22, #04040c); }
+#plCanvas { display: block; width: 100%; height: auto; }
+.plstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.plstats .stat b { font-size: 16px; }
+.req { color: #ffb38a !important; }

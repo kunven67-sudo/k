@@ -127,11 +127,6 @@ public class MainActivity extends Activity {
         super.onResume();
         ClaudeService.appVisible = true;
         web.onResume();
-        // boost was on but the phone got unplugged while we were closed: put things back
-        if (Boost.isOn(this) && !Boost.isCharging(this)) {
-            Boost.turnOff(this);
-            stopService(new Intent(this, WatchService.class));
-        }
         web.evaluateJavascript("window.appResume&&appResume()", null);
     }
 
@@ -159,6 +154,12 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean gamePut(String json) { return Game.put(MainActivity.this, json); }
+
+        @JavascriptInterface
+        public String kvGet(String name) { return Kv.get(MainActivity.this, name); }
+
+        @JavascriptInterface
+        public void kvSet(String name, String json) { Kv.set(MainActivity.this, name, json); }
 
         @JavascriptInterface
         public void link(boolean on) {

@@ -126,13 +126,19 @@ public class LinkService extends Service {
                         return MiniHttp.Res.text(ok ? 200 : 409, json, ok ? Game.get(this) : "{\"conflict\":true}");
                     }
                     return MiniHttp.Res.text(200, json, Game.credit(this));
+                case "/api/kv":
+                    String name = q.get("name");
+                    if (name == null) return null;
+                    if ("POST".equals(method)) { Kv.set(this, name, new String(body, StandardCharsets.UTF_8)); return MiniHttp.Res.text(200, json, "{}"); }
+                    return MiniHttp.Res.text(200, json, Kv.get(this, name));
                 default: return null;
             }
         }
         String f = path.equals("/") ? "index.html" : path.substring(1);
         if (f.contains("..")) return null;
         String type = f.endsWith(".html") ? "text/html; charset=utf-8" : f.endsWith(".ogg") ? "audio/ogg"
-                : f.endsWith(".ttf") ? "font/ttf" : f.endsWith(".js") ? "application/javascript" : "application/octet-stream";
+                : f.endsWith(".ttf") ? "font/ttf" : f.endsWith(".js") ? "application/javascript"
+                : f.endsWith(".css") ? "text/css; charset=utf-8" : "application/octet-stream";
         MiniHttp.Res r = new MiniHttp.Res();
         r.type = type;
         try (AssetFileDescriptor fd = getAssets().openFd(f)) { r.len = fd.getLength(); } catch (Exception compressed) { r.len = -1; }

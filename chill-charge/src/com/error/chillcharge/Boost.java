@@ -16,7 +16,10 @@ import android.provider.Settings;
 final class Boost {
     private Boost() {}
 
-    static final int SLEEP_MS = 15000; // screen turns off after 15 s of not touching it
+    static final int SLEEP_MS = 15000;
+    /** Small extra savers the one button also turns off: auto-rotate sensor, touch vibration, touch sounds. */
+    static final String[] EXTRA = {Settings.System.ACCELEROMETER_ROTATION, Settings.System.HAPTIC_FEEDBACK_ENABLED,
+            Settings.System.SOUND_EFFECTS_ENABLED}; // screen turns off after 15 s of not touching it
 
     static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences("boost", Context.MODE_PRIVATE);
@@ -46,7 +49,11 @@ final class Boost {
                 e.putInt("oldMode", Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, 0));
                 e.putInt("oldBright", Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS, 128));
                 e.putInt("oldSleep", Settings.System.getInt(cr, Settings.System.SCREEN_OFF_TIMEOUT, 30000));
+                for (String k : EXTRA) e.putInt("old_" + k, Settings.System.getInt(cr, k, -1));
                 e.putBoolean("saved", true);
+            }
+            for (String k : EXTRA) {
+                try { Settings.System.putInt(cr, k, 0); } catch (Exception ignored) { } // some phones block one of these
             }
             Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE,
                     Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
@@ -71,6 +78,10 @@ final class Boost {
             Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, p.getInt("oldBright", 128));
             Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, p.getInt("oldMode", 0));
             Settings.System.putInt(cr, Settings.System.SCREEN_OFF_TIMEOUT, p.getInt("oldSleep", 30000));
+            for (String k : EXTRA) {
+                int v = p.getInt("old_" + k, -1);
+                if (v >= 0) try { Settings.System.putInt(cr, k, v); } catch (Exception ignored) { }
+            }
         }
         p.edit().putBoolean("on", false).putBoolean("saved", false).putBoolean("byClaude", false).apply();
     }
@@ -88,9 +99,11 @@ final class Boost {
         return cur * b.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) / 1e9;
     }
 
-    // charge counter samples: {time ms, uAh}
+    // charge counter samples: {time ms, uAh, plugged 0/1}
     private static final java.util.ArrayDeque<long[]> samples = new java.util.ArrayDeque<>();
-    private static final long WINDOW_MS = 90000, MIN_SPAN_MS = 25000;
+    private static final long WINDOW_MS = 360000, MIN_SPAN_MS = 15000, HOLD_MS = 180000;
+    private static double lastRate = Double.NaN;
+    private static long lastRateT = 0;
 
     /** Battery's mAh counter right now in uAh (-1 = phone doesn't have one). */
     static long counter(Context c) {
@@ -99,28 +112,58 @@ final class Boost {
         return (v == Integer.MIN_VALUE || v <= 0) ? -1 : v;
     }
 
-    /** Real power filling the battery, measured from how fast its mAh counter goes up. -1 = not enough data yet. */
-    static synchronized double counterWatts(Context c) {
+    /**
+     * Real power in (+) or out (-) of the battery, from how fast its mAh counter moves. NaN = not known yet.
+     * Phones only update that counter in steps (every few seconds on some, every 30+ s on Motorola), so we measure
+     * between the moments it CHANGED, never across a flat stretch (that was the "0 W while charging" bug), and keep
+     * showing the last good number for a while when it hasn't moved yet.
+     */
+    static synchronized double rateW(Context c) {
         Intent b = c.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-        if (b == null || b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) == 0) { samples.clear(); return -1; }
+        if (b == null) return Double.NaN;
+        long plug = b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0 ? 1 : 0;
         long cc = counter(c);
-        if (cc < 0) return -1;
+        if (cc < 0) return Double.NaN;
         long now = android.os.SystemClock.elapsedRealtime();
-        if (samples.isEmpty() || now - samples.peekLast()[0] >= 2000) samples.addLast(new long[]{now, cc});
+        long[] last = samples.peekLast();
+        // plugged/unplugged changed, or we were asleep a long time: start fresh
+        if (last != null && (last[2] != plug || now - last[0] > 60000)) { samples.clear(); lastRate = Double.NaN; last = null; }
+        if (last == null || now - last[0] >= 1000) samples.addLast(new long[]{now, cc, plug});
         while (samples.size() > 2 && now - samples.peekFirst()[0] > WINDOW_MS) samples.pollFirst();
-        long[] a = samples.peekFirst(), z = samples.peekLast();
-        long span = z[0] - a[0];
-        if (span < MIN_SPAN_MS) return -1;
-        long d = z[1] - a[1];
-        if (d < 0) { samples.clear(); return -1; } // went down = not really charging, start over
-        double amps = (d / 1e6) / (span / 3.6e6);
-        return amps * b.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) / 1000.0;
+        // the moments the counter changed
+        long[] first = null, end = null; long prev = Long.MIN_VALUE; int changes = 0;
+        for (long[] s2 : samples) {
+            if (prev != Long.MIN_VALUE && s2[1] != prev) { if (first == null) first = s2; end = s2; changes++; }
+            prev = s2[1];
+        }
+        double volt = b.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 3850) / 1000.0;
+        if (changes >= 2 && end[0] - first[0] >= MIN_SPAN_MS) {
+            double amps = ((end[1] - first[1]) / 1e6) / ((end[0] - first[0]) / 3.6e6);
+            lastRate = amps * volt;
+            lastRateT = now;
+        }
+        if (!Double.isNaN(lastRate) && now - lastRateT < HOLD_MS) return lastRate;
+        return Double.NaN;
     }
 
-    /** Best guess of watts going into the battery: the mAh counter once it has 25 s of data, else the sensor. */
+    /** -1 while we don't know yet (kept for the phone check). */
+    static double counterWatts(Context c) {
+        double r = rateW(c);
+        return Double.isNaN(r) ? -1 : Math.max(0, r);
+    }
+
+    /** Watts going INTO the battery: the mAh counter when known, else the sensor. */
     static double watts(Context c) {
-        double w = counterWatts(c);
-        return w >= 0 ? w : sensorWatts(c);
+        if (!isCharging(c)) return 0;
+        double r = rateW(c);
+        return Double.isNaN(r) ? sensorWatts(c) : Math.max(0, r);
+    }
+
+    /** Watts the phone is USING from its battery while unplugged (-1 = not known yet). */
+    static double usingW(Context c) {
+        if (isCharging(c)) return -1;
+        double r = rateW(c);
+        return Double.isNaN(r) ? -1 : Math.max(0, -r);
     }
 
     /** Reactor energy (Wh your charging fed into it). */

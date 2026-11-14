@@ -222,6 +222,18 @@ body.pc .pconly { display: block; }
   body.pc [data-tab] { display: block !important; }
   body.pc .toast, body.pc .pin { max-width: 600px; }
 }
+
+.meas { font-size: 13px; color: var(--dim); font-weight: 500; }
+#saverStat { cursor: pointer; }
+#go { margin-top: 14px; height: 72px; font-size: 18px; }
+.did { margin: 10px 4px 0; font-size: 12px; color: var(--dim); line-height: 1.6; text-align: center; }
+.did a { color: var(--warm); text-decoration: none; }
+.extras { margin-top: 18px; }
+.extras summary { list-style: none; cursor: pointer; font-size: 11px; letter-spacing: .24em; color: var(--dim); padding: 8px 4px; }
+.extras summary::after { content: " +"; }
+.extras[open] summary::after { content: " -"; }
+.allow { margin-top: 14px; }
+body.saving .glow, body.saving #flow, body.saving .flowbar i { animation: none !important; }
 </style>
 </head>
 <body>
@@ -232,7 +244,7 @@ body.pc .pconly { display: block; }
     <div class="chip" id="plug">NOT PLUGGED IN</div>
   </header>
 
-  <div class="tabs"><button class="on" data-go="charge">CHARGE</button><button data-go="empire" id="tabR">EMPIRE</button></div>
+  <div class="tabs"><button class="on" data-go="charge">CHARGE</button><button data-go="games" id="tabR">GAMES</button></div>
   <section data-tab="charge" class="show">
 
   <div class="ringwrap" id="ring">
@@ -256,67 +268,46 @@ body.pc .pconly { display: block; }
   </div>
 
   <div class="stats">
-    <div class="stat"><i>POWER IN</i><b id="watts">--</b></div>
+    <div class="stat"><i id="wLbl">POWER IN</i><b id="watts">--</b></div>
     <div class="stat"><i>HEAT</i><b id="temp">--</b></div>
-    <div class="stat"><i>SAVER</i><b id="saver">--</b></div>
+    <div class="stat" id="saverStat"><i>BATTERY SAVER</i><b id="saver">--</b></div>
   </div>
 
-  <div class="panel phoneonly">
-    <div class="row">
-      <div class="t"><b>Battery saver</b><span id="saverTxt">Android only lets you flip this one yourself</span></div>
-      <button class="mini" id="saverBtn">TURN ON</button>
-    </div>
-    <div class="row" data-k="kill">
-      <div class="t"><b>Close background apps</b><span id="killTxt">Stops apps you're not using</span></div>
-      <div class="sw on" id="swKill"></div>
-    </div>
-    <div class="row" data-k="dim">
-      <div class="t"><b>Dim screen + sleep fast</b><span>Screen turns off after 15 s of no touching</span></div>
-      <div class="sw on" id="swDim"></div>
-    </div>
-    <div class="slide" id="slideRow">
-      <span>DIM</span><input type="range" id="bright" min="3" max="60" value="20"><span id="brightVal">20%</span>
-    </div>
-    <div class="allow" id="allow">
-      <p>One time: let Chill Charge change your brightness. Turn on <b>Allow</b> on the next screen, then come back.</p>
-      <button class="mini" id="allowBtn">ALLOW</button>
-    </div>
-    <button id="go" disabled>PLUG IN FIRST</button>
+  <div class="allow phoneonly" id="allow">
+    <p>One time: let Chill Charge change your screen settings. Turn on <b>Allow</b> on the next screen, then come back.</p>
+    <button class="mini" id="allowBtn">ALLOW</button>
   </div>
-
-  <p class="tip phoneonly" id="tip"></p>
+  <button id="go" class="phoneonly">SAVE POWER</button>
+  <div class="did phoneonly" id="did"></div>
 
   <div class="pcnote pconly" id="pcscreen"></div>
-  <div class="head2 phoneonly">MORE TRICKS</div>
-  <div class="panel phoneonly">
-    <div class="row" id="linkRow">
-      <div class="t"><b>PC link</b><span id="linkTxt">Watch + play on your PC (same Wi-Fi). Then lock your phone</span></div>
-      <div class="sw" id="swLink"></div>
+  <details class="extras phoneonly">
+    <summary>EXTRAS</summary>
+    <div class="panel">
+      <div class="row" id="linkRow">
+        <div class="t"><b>PC link</b><span id="linkTxt">Watch + play on your PC (same Wi-Fi). Then lock your phone</span></div>
+        <div class="sw" id="swLink"></div>
+      </div>
+      <div class="row" id="claudeRow">
+        <div class="t"><b>Claude mode</b><span id="claudeTxt">While Claude is open: music + saving keep going</span></div>
+        <div class="sw" id="swClaude"></div>
+      </div>
+      <div class="row">
+        <div class="t"><b>Send phone info to Error</b><span>Copies your phone + charging info and opens Claude. Just paste</span></div>
+        <button class="mini" id="sendBtn">SEND</button>
+      </div>
     </div>
-    <div class="row">
-      <div class="t"><b>Lock screen now</b><span>Screen off = the fastest charging there is</span></div>
-      <button class="mini" id="lockBtn">LOCK</button>
-    </div>
-    <div class="row">
-      <div class="t"><b>Black mode</b><span>Pure black screen, darkest it goes. Double tap to leave</span></div>
-      <button class="mini" id="blackBtn">GO</button>
-    </div>
-    <div class="row">
-      <div class="t"><b>Charger test</b><span id="testTxt">40 s test: is your charger or cable weak?</span></div>
-      <button class="mini" id="testBtn">TEST</button>
-    </div>
-    <div class="row" id="claudeRow">
-      <div class="t"><b>Claude mode</b><span id="claudeTxt">While Claude is open: music + boost keep going</span></div>
-      <div class="sw" id="swClaude"></div>
-    </div>
-    <div class="row">
-      <div class="t"><b>Send phone info to Error</b><span>Copies your model + charger info and opens Claude. Just paste</span></div>
-      <button class="mini" id="sendBtn">SEND</button>
-    </div>
-  </div>
+  </details>
   </section>
 
-  <section data-tab="empire">
+  <section data-tab="games">
+    <div class="gpick" id="gpick"></div>
+    <div class="gview" id="gview">
+      <button class="gback" id="gback">&lsaquo; ALL GAMES</button>
+      <div class="game" id="g-robot"></div>
+      <div class="game" id="g-race"></div>
+      <div class="game" id="g-planet"></div>
+      <div class="game" id="g-empire">
     <div class="hero">
       <div class="lbl">ENERGY</div>
       <div class="bank"><span id="ebank">0</span><small>J</small></div>
@@ -341,6 +332,8 @@ body.pc .pconly { display: block; }
     <div class="ebar"><div class="head2">RESEARCH</div><div class="head2">ONE AT A TIME</div></div>
     <div class="rgrid" id="research"></div>
     <div class="estats" id="estats"></div>
+      </div>
+    </div>
   </section>
 
 </main>
@@ -352,18 +345,7 @@ body.pc .pconly { display: block; }
   <p id="wline"></p>
   <button id="wok">COLLECT</button>
 </div></div>
-<div class="layer" id="black"><div class="ghost" id="ghost"></div></div>
-<div class="layer" id="test"><div class="box">
-  <p id="testHead">Testing your charger. Keep it plugged in and don't touch the phone.</p>
-  <div class="n" id="testN">20</div>
-  <p id="testLive"></p>
-  <div class="verdict" id="testVerdict"></div>
-  <p id="testWhy"></p>
-  <div id="testBtns" style="display:none">
-    <button id="testSend" style="background:#8ef0d8;color:#0a0918">SEND RESULT TO ERROR</button>
-    <button id="testClose" style="background:#221f40;color:#f1eeff">CLOSE</button>
-  </div>
-</div></div>
+
 
 <div class="toast" id="toast"></div>
 
@@ -396,11 +378,11 @@ if (PCMODE) {
 const P = window.Phone || (PCMODE ? new Proxy({ state: () => phoneCache }, { get: (o, k) => o[k] || (() => 0) }) : (() => {
   let boost = false, lvl = 37, saver = false, canWrite = false, plugged = 1, wh = 0, claude = false, usage = false, admin = false, link = false;
   setInterval(() => { if (plugged && lvl < 100) lvl += 0.05; }, 1000);
-  window.__fake = { set plugged(v) { plugged = v; if (!v) boost = false; }, set canWrite(v) { canWrite = v; }, set wh(v) { wh = v; } };
+  window.__fake = { set plugged(v) { plugged = v; }, set canWrite(v) { canWrite = v; }, set wh(v) { wh = v; } };
   return {
     state: () => JSON.stringify({ level: Math.floor(lvl), scale: 100, plugged, status: plugged ? 2 : 3, temp: 341, volt: 4120,
       current: plugged ? 2350000 : -400000, left: plugged ? (100 - lvl) * 52000 : -1, saver, canWrite, boost, bright: 120, sdk: 33,
-      w: plugged ? 9.7 : 0, measured: true, cc: Math.round(lvl * 45000), wh, claudeMode: claude, usageOk: usage, adminOk: admin, hasClaude: true, screen: true,
+      w: plugged ? 9.7 : 0, measured: true, use: plugged ? -1 : 1.9, cc: Math.round(lvl * 45000), wh, claudeMode: claude, usageOk: usage, adminOk: admin, hasClaude: true, screen: true,
       link, linkUrl: "http://192.168.1.23:8080/?k=4821" }),
     addWh: d => (wh += d), setWh: v => { wh = v; }, lockNow: () => { admin = true; }, windowDim: () => {}, buzz: () => {},
     askUsage: () => { usage = true; }, claudeMode: on => { claude = on; },
@@ -412,28 +394,8 @@ const P = window.Phone || (PCMODE ? new Proxy({ state: () => phoneCache }, { get
 })());
 
 const $ = id => document.getElementById(id);
-const opts = { kill: true, dim: true };
-try { Object.assign(opts, JSON.parse(localStorage.getItem("opts") || "{}")); } catch (e) {}
-try { const b = localStorage.getItem("bright"); if (b) $("bright").value = b; } catch (e) {}
 let S = {}, W = 0;
 
-function paintSwitches() {
-  $("swKill").classList.toggle("on", opts.kill);
-  $("swDim").classList.toggle("on", opts.dim);
-  $("slideRow").style.display = opts.dim ? "flex" : "none";
-  $("brightVal").textContent = $("bright").value + "%";
-}
-document.querySelectorAll(".row[data-k]").forEach(r => r.addEventListener("click", () => {
-  const k = r.dataset.k; opts[k] = !opts[k];
-  try { localStorage.setItem("opts", JSON.stringify(opts)); } catch (e) {}
-  paintSwitches(); refresh();
-}));
-$("bright").addEventListener("input", () => {
-  $("brightVal").textContent = $("bright").value + "%";
-  try { localStorage.setItem("bright", $("bright").value); } catch (e) {}
-  P.brightness(+$("bright").value);
-});
-$("saverBtn").onclick = () => P.openSaver();
 $("allowBtn").onclick = () => P.askWrite();
 
 function toast(msg) {
@@ -441,22 +403,21 @@ function toast(msg) {
   clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 4200);
 }
 
+$("saverStat").onclick = () => { if (!PCMODE) P.openSaver(); };
 $("go").addEventListener("click", e => {
   const b = $("go"), r = b.getBoundingClientRect(), s = document.createElement("i");
   s.className = "rip"; s.style.cssText = `left:${e.clientX - r.left - 20}px;top:${e.clientY - r.top - 20}px;width:40px;height:40px`;
   b.appendChild(s); setTimeout(() => s.remove(), 800);
-  if (S.boost) { P.stop(); toast("Boost off. Brightness and sleep time are back to how they were."); refresh(); return; }
-  const dim = opts.dim && S.canWrite;
-  const n = P.boost(+$("bright").value, dim, opts.kill);
-  const bits = [];
-  if (dim) bits.push(`brightness ${$("bright").value}%, sleeps after 15 s`);
-  if (opts.kill) bits.push(n < 0 ? "background apps: Android already freezes them" : `closed ${n} background apps`);
-  if (!S.saver) bits.push("tap TURN ON for battery saver");
-  toast("Boost on. " + (bits.join(" · ") || "Nothing picked") + ".");
+  if (S.boost) { P.stop(); toast("Power saving off. Everything is back to how it was."); refresh(); return; }
+  if (!S.canWrite) { P.askWrite(); toast("Turn on Allow, then come back and tap SAVE POWER again."); return; }
+  P.boost(20, true, false);
+  toast("Power saving on. Charges faster and lasts longer.");
   $("ring").animate([{ transform: "scale(1)" }, { transform: "scale(1.05)" }, { transform: "scale(1)" }], { duration: 700, easing: "ease-out" });
   refresh();
 });
+$("did").onclick = e => { if (e.target.id === "saverLink") P.openSaver(); };
 
+function fmtHM(h) { const m = Math.round(h * 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; }
 function fmtLeft(ms) {
   const m = Math.round(ms / 60000);
   if (m < 1) return "almost full";
@@ -476,16 +437,14 @@ function refresh() {
   $("plug").textContent = charging ? (plugNames[S.plugged] || "PLUGGED IN") : "NOT PLUGGED IN";
   $("plug").classList.toggle("on", charging);
 
-  $("sub").textContent = !charging ? "plug in your charger" : full ? "full, you can unplug"
-    : S.left > 0 ? fmtLeft(S.left) : "charging";
-
-  // power going in = current x voltage (phones report current in uA or mA, so guess which)
-  let w = 0;
-  if (typeof S.w === "number") w = charging ? Math.max(0, S.w) : 0;
-  else { let cur = Math.abs(S.current || 0); if (cur > 0 && cur < 20000) cur *= 1000; w = charging ? cur * (S.volt || 0) / 1e9 : 0; }
-  $("watts").textContent = charging && w > 0.2 ? w.toFixed(1) + " W" : "--";
-  $("watts").title = S.measured ? "measured" : "";
-  const now = performance.now(), dt = Math.min(10, (now - (refresh.t || now)) / 1000); refresh.t = now;
+  // real watts from the battery's mAh counter (takes ~1 min to measure, then keeps the last good number)
+  const w = charging ? Math.max(0, +S.w || 0) : 0;
+  const battWh = S.cc > 0 ? S.cc / 1e6 * ((S.volt || 3850) / 1000) : 0;
+  $("sub").textContent = !charging ? (S.use > 0.05 && battWh ? `~${fmtHM(battWh / S.use)} left` : "on battery")
+    : full ? "full, you can unplug" : S.left > 0 ? fmtLeft(S.left) : "charging";
+  $("wLbl").textContent = charging ? "POWER IN" : "USING";
+  $("watts").innerHTML = charging ? (S.measured ? w.toFixed(1) + " W" : '<span class="meas">measuring</span>')
+    : (S.use >= 0 ? S.use.toFixed(1) + " W" : '<span class="meas">measuring</span>');
   W = charging ? w : 0;
   if (window.Emp) Emp.sync();
 
@@ -495,18 +454,13 @@ function refresh() {
 
   $("saver").textContent = S.saver ? "ON" : "OFF";
   $("saver").className = S.saver ? "good" : "";
-  $("saverBtn").textContent = S.saver ? "ON" : "TURN ON";
-  $("saverBtn").classList.toggle("ok", S.saver);
-  $("saverTxt").textContent = S.saver ? "On. Background stuff is slowed down" : "Android only lets you flip this one yourself";
-  $("killTxt").textContent = S.sdk >= 34 ? "Your Android freezes them by itself" : "Stops apps you're not using";
-
-  $("allow").classList.toggle("show", opts.dim && !S.canWrite);
+  $("allow").classList.toggle("show", !S.canWrite);
+  document.body.classList.toggle("saving", !!S.boost);
   $("swClaude").classList.toggle("on", !!S.claudeMode);
   $("claudeTxt").textContent = !S.hasClaude ? "Claude app not found on this phone"
     : S.claudeMode && !S.usageOk ? "Turn on Usage access for Chill Charge, then come back"
-    : S.claudeMode ? "On: music + boost run while Claude is open"
-    : "While Claude is open: music + boost keep going";
-  $("lockBtn").textContent = S.adminOk ? "LOCK" : "SET UP";
+    : S.claudeMode ? "On: music + saving run while Claude is open"
+    : "While Claude is open: music + saving keep going";
   $("swLink").classList.toggle("on", !!S.link);
   $("linkTxt").textContent = S.link ? (S.linkUrl ? "On your PC open: " + S.linkUrl : "Connect to Wi-Fi first")
     : "Watch + play on your PC (same Wi-Fi). Then lock your phone";
@@ -516,30 +470,12 @@ function refresh() {
 
   const go = $("go");
   go.classList.toggle("on", !!S.boost);
-  go.disabled = !S.boost && !charging;
-  go.textContent = S.boost ? "BOOST ON · TAP TO STOP" : charging ? "BOOST" : "PLUG IN FIRST";
-
-  if (S.temp && t >= 40) setTip(`<b>Your phone is hot (${t.toFixed(0)}°C).</b> Heat makes it charge slower on purpose. Take the case off and keep it out of the sun.`, true);
+  go.textContent = S.boost ? "SAVING POWER · TAP TO STOP" : "SAVE POWER";
+  $("did").innerHTML = S.boost
+    ? "Doing: brightness 20% · screen sleeps after 15 s · auto-rotate off · touch vibration + sounds off · app animations off"
+      + (S.saver ? "" : '<br><a id="saverLink">+ Turn on Battery Saver too (Android only lets you do that one) &rsaquo;</a>')
+    : "One tap: charges faster when plugged in, lasts longer when unplugged. Tap again to undo.";
 }
-
-// ---------- tips (real stuff that makes charging faster) ----------
-const tips = [
-  "<b>Screen off = fastest.</b> The screen eats the most power. If you can, pause the anime for a bit.",
-  "<b>Wall plug beats a PC/USB port.</b> A USB port on a PC only gives around 2.5 to 4.5 W.",
-  "<b>Use the cable that came with it.</b> Cheap cables can block fast charging.",
-  "<b>Take the case off</b> if it gets warm. Hot phones charge slower on purpose.",
-  "<b>Airplane mode</b> is the biggest saver, but your Wi-Fi turns off too unless you turn it back on.",
-  "<b>Charging slows down near 80%.</b> That's normal, it protects the battery.",
-];
-let tipI = Math.floor(Math.random() * tips.length), tipLock = false;
-function setTip(html, lock) {
-  if (tipLock && !lock) return;
-  tipLock = !!lock;
-  const el = $("tip"); el.style.opacity = 0;
-  setTimeout(() => { el.innerHTML = html; el.style.opacity = 1; }, 450);
-}
-setInterval(() => { tipLock = false; setTip(tips[tipI++ % tips.length]); }, 9000);
-setTip(tips[tipI++ % tips.length]);
 
 // ---------- music ----------
 const tracks = [
@@ -590,7 +526,7 @@ size(); addEventListener("resize", size);
 let last = 0;
 function frame(t) {
   requestAnimationFrame(frame);
-  if (document.hidden || t - last < 40) return; // ~25 fps max
+  if (document.hidden || t - last < 40 || document.body.classList.contains("saving")) return; // ~25 fps max, none while saving
   last = t;
   dg.clearRect(0, 0, innerWidth, innerHeight);
   for (const m of motes) {
@@ -624,74 +560,18 @@ document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
 });
 
 // ---------- more tricks ----------
-$("lockBtn").onclick = () => P.lockNow();
 $("linkRow").onclick = () => {
   const on = !S.link; P.link(on);
   setTimeout(() => { refresh(); if (on && S.linkUrl) { P.copy(S.linkUrl); toast("PC link on. Address copied: " + S.linkUrl + "  Type it into Edge on your PC, then lock your phone."); } }, 900);
 };
 let testResult = "";
-try { testResult = localStorage.getItem("testResult") || ""; } catch (e) {}
-if (testResult) $("testTxt").textContent = "Last test: " + testResult;
 $("sendBtn").onclick = () => { P.sendReport(P.report(testResult)); toast("Copied. In our Claude chat: hold the message box, tap Paste, send."); };
 $("swClaude").parentElement.onclick = () => {
   if (!S.hasClaude) { toast("Can't find the Claude app on this phone."); return; }
   const on = !S.claudeMode;
   if (on && !S.usageOk) { toast("Find Chill Charge in the list and turn on Usage access, then come back."); P.askUsage(); }
-  P.claudeMode(on, +$("bright").value); setTimeout(refresh, 300);
+  P.claudeMode(on, 20); setTimeout(refresh, 300);
 };
-
-// black mode: double tap to leave
-let ghostT = 0;
-$("blackBtn").onclick = () => {
-  $("black").classList.add("show"); P.windowDim(true); moveGhost(); ghostT = setInterval(moveGhost, 20000);
-};
-function moveGhost() {
-  const g = $("ghost"); g.textContent = `${$("pct").textContent}%  ${$("watts").textContent}`;
-  g.style.left = (10 + Math.random() * (innerWidth - 140)) + "px"; g.style.top = (40 + Math.random() * (innerHeight - 100)) + "px";
-}
-$("black").addEventListener("pointerup", () => {
-  const now = Date.now();
-  if (now - (moveGhost.tap || 0) < 450) { $("black").classList.remove("show"); P.windowDim(false); clearInterval(ghostT); }
-  moveGhost.tap = now;
-});
-
-// charger test: 20 s with the screen as dark as possible, measure the real power going in
-$("testBtn").onclick = () => {
-  if (!S.plugged) { toast("Plug your charger in first."); return; }
-  const L = $("test"); L.classList.add("show"); P.windowDim(true);
-  $("testBtns").style.display = "none"; $("testVerdict").textContent = ""; $("testWhy").textContent = "";
-  $("testHead").textContent = "Testing your charger for 40 s. Keep it plugged in and don't touch the phone.";
-  let n = 40; const got = []; const cc0 = S.cc, t0 = Date.now();
-  $("testN").textContent = n;
-  const iv = setInterval(() => {
-    refresh(); if (W > 0) got.push(W);
-    $("testLive").textContent = W > 0 ? `${W.toFixed(1)} W going in` : "";
-    if (!S.plugged) { clearInterval(iv); P.windowDim(false); L.classList.remove("show"); toast("Test stopped: charger got unplugged."); return; }
-    if (--n > 0) { $("testN").textContent = n; return; }
-    clearInterval(iv); P.windowDim(false);
-    got.sort((a, b) => a - b);
-    let peak = got.length ? got[Math.floor(got.length * 0.5)] : 0;
-    // most exact: how much the battery's mAh counter went up during the test
-    if (cc0 > 0 && S.cc > cc0) peak = (S.cc - cc0) / 1e6 / ((Date.now() - t0) / 3.6e6) * (S.volt || 3900) / 1000;
-    const kind = { 1: "wall charger", 2: "USB port", 4: "wireless" }[S.plugged] || "charger";
-    let v, why;
-    if (peak < 3) { v = "WEAK"; why = "That's like a PC USB port or an old 5 W charger. A good wall charger + cable can be 3 to 8 times faster."; }
-    else if (peak < 8) { v = "SLOW"; why = "Normal old-style charger. A fast charger made for your phone would be a lot quicker."; }
-    else if (peak < 15) { v = "GOOD"; why = "Decent fast charging. Keep the phone cool and the screen off to keep it this high."; }
-    else { v = "FAST"; why = "Your charger is strong. If it still feels slow, it's heat or the screen eating the power."; }
-    testResult = `${peak.toFixed(1)} W on ${kind} = ${v}`;
-    try { localStorage.setItem("testResult", testResult); } catch (e) {}
-    $("testTxt").textContent = "Last test: " + testResult;
-    $("testHead").textContent = "Done";
-    $("testN").textContent = peak.toFixed(1) + " W";
-    $("testLive").textContent = "";
-    $("testVerdict").textContent = "Your charger: " + v;
-    $("testWhy").textContent = why;
-    $("testBtns").style.display = "block";
-  }, 1000);
-};
-$("testClose").onclick = () => $("test").classList.remove("show");
-$("testSend").onclick = () => { $("test").classList.remove("show"); $("sendBtn").onclick(); };
 
 // ---------- POWER EMPIRE: real watts x multiplier = game watts ----------
 const ICON = {
@@ -961,17 +841,22 @@ const Emp = (() => {
     if (need) await change(() => {});
     if (key() !== built) render();
   }
-  $("wok").onclick = () => { $("welcome").classList.remove("show"); $("tabR").click(); };
+  $("wok").onclick = () => { $("welcome").classList.remove("show"); $("tabR").click(); openGame("empire"); };
   setInterval(() => { if (key() !== built) render(); else paint(); }, 250);
   render();
-  return { sync, render };
+  return { sync, render, status: () => `Energy ${fmt(shown())} J · ${fmt(mult())}x` };
 })();
 window.Emp = Emp;
 
 
 
-paintSwitches(); refresh();
+refresh();
 setInterval(refresh, 1500);
 </script>
+<link rel="stylesheet" href="games/games.css">
+<script src="games/core.js"></script>
+<script src="games/robot.js"></script>
+<script src="games/race.js"></script>
+<script src="games/planet.js"></script>
 </body>
 </html>
