@@ -21,25 +21,38 @@ defineLevel('nivalis',{
     // stars (a far galaxy: no moon, a strange band of light)
     scene.add(makeStars(5000,900,{}));
     // the ground: rolling snow, a frozen lake in the middle of the way
-    const hf=heightField(900,180,(x,z)=>{ const L=Math.hypot(x-NIV.lake.x,z-NIV.lake.z); let h=fbm2(x*.008,z*.008)*14+fbm2(x*.03,z*.03)*2; h*=smooth(clamp((L-NIV.lake.r)/40,0,1)); if(L<NIV.lake.r) h=-.4;
+    const hb=(x,z)=>{ const L=Math.hypot(x-NIV.lake.x,z-NIV.lake.z); let h=fbm2(x*.008,z*.008)*14+fbm2(x*.03,z*.03)*2; h*=smooth(clamp((L-NIV.lake.r)/40,0,1)); if(L<NIV.lake.r) h=-.4;
       const dc=Math.hypot(x-NIV.cave.x,z-(NIV.cave.z-30)); h+=Math.max(0,40-dc)*1.4;   // the rock hill with the cave
       const dp=Math.abs(x-lerp(0,NIV.cave.x,clamp(-(z-40)/245,0,1))); h*=lerp(.25,1,smooth(clamp(dp/20,0,1)));   // a calmer path
-      return h; });
+      return h; };
+    const mouthH=hb(NIV.cave.x,NIV.cave.z);
+    const hf=heightField(900,180,(x,z)=>{ let h=hb(x,z); const lx=x-NIV.cave.x, lz=z-NIV.cave.z; if(Math.abs(lx)<15&&lz<2&&lz>-34) h=Math.min(h,mouthH-.25-smooth(clamp((-lz)/6,0,1))*.6); return h; });   /* the cave is hollow (the hill used to fill it with snow) */
     lv.hf=hf;
-    const g=new THREE.PlaneGeometry(900,900,180,180); g.rotateX(-Math.PI/2); const a=g.attributes.position; for(let i=0;i<a.count;i++) a.setY(i,hf.at(a.getX(i),a.getZ(i))); g.computeVertexNormals();
+    const g=new THREE.PlaneGeometry(900,900,180,180); g.rotateX(-Math.PI/2); const a=g.attributes.position; for(let i=0;i<a.count;i++){ const x=a.getX(i), z=a.getZ(i); const L=Math.hypot(x-NIV.lake.x,z-NIV.lake.z); a.setY(i,L<NIV.lake.r?-.4-21*smooth(clamp((NIV.lake.r-1-L)/16,0,1)):hf.at(x,z)); } g.computeVertexNormals();   /* the lake is DEEP under the ice (you see down into it) */
     const sn=snowTex(); sn.map.repeat.set(60,60); sn.nm.repeat.set(60,60);
     const snow=mesh(g,new THREE.MeshStandardMaterial({color:col(0xe8eef8),map:sn.map,normalMap:sn.nm,normalScale:new THREE.Vector2(.8,.8),roughness:.85}),0,0,0); snow.receiveShadow=true; scene.add(snow);
     const it=iceTex(); it.map.repeat.set(3,3); it.nm.repeat.set(3,3);
-    const ice=mesh(new THREE.CircleGeometry(NIV.lake.r+2,64),new THREE.MeshPhysicalMaterial({color:col(0x9ac8e8),map:it.map,normalMap:it.nm,roughness:.08,clearcoat:1,transparent:true,opacity:.92}),NIV.lake.x,-.35,NIV.lake.z,false); ice.rotation.x=-Math.PI/2; scene.add(ice); lv.ice=ice;
+    const ice=mesh(new THREE.CircleGeometry(NIV.lake.r+2,64),new THREE.MeshPhysicalMaterial({color:col(0xa8d4f0),map:it.map,normalMap:it.nm,roughness:.16,clearcoat:1,emissive:col(0x10283e),emissiveIntensity:.6,transparent:true,opacity:.72,depthWrite:false}),NIV.lake.x,-.35,NIV.lake.z,false); ice.rotation.x=-Math.PI/2; scene.add(ice); lv.ice=ice;
     // the giant ant frozen under the ice, staring up
-    const ga=makeAnt(); ga.scale.setScalar(16); ga.position.copy(NIV.ant); ga.rotation.set(.15,.8,.1); scene.add(ga); lv.giantAnt=ga;
-    const iceBlock=mesh(new THREE.BoxGeometry(60,16,60),new THREE.MeshPhysicalMaterial({color:col(0x6a9ac0),roughness:.2,transparent:true,opacity:.35}),NIV.ant.x,-9,NIV.ant.z,false); scene.add(iceBlock);
+    const ga=makeAnt(); ga.scale.setScalar(9); ga.position.copy(NIV.ant); ga.rotation.set(-.12,.8,.06); scene.add(ga); lv.giantAnt=ga; ga.updateMatrixWorld(true); { const bb=new THREE.Box3().setFromObject(ga); ga.position.y-=bb.max.y+1.4; }   /* all of it frozen UNDER the ice */
+    { const gl=new THREE.PointLight(col(0x7ac8ff),1.8,40,1.3); gl.position.set(NIV.ant.x+4,-7,NIV.ant.z+6); scene.add(gl); }
+    const iceBlock=mesh(new THREE.BoxGeometry(60,16,60),new THREE.MeshPhysicalMaterial({color:col(0x2a6a9a),emissive:col(0x0a2a44),roughness:.2,transparent:true,opacity:.42,depthWrite:false,side:THREE.BackSide}),NIV.ant.x,-9,NIV.ant.z,false); scene.add(iceBlock);
     // the cracks that spread when you cross (hidden until then)
     const crk=[]; for(let i=0;i<14;i++){ const pts=[]; let x=NIV.lake.x+rand(-6,6), z=NIV.lake.z+rand(-4,4); for(let k=0;k<6;k++){ pts.push(V3(x,-.3,z)); x+=rand(-6,6); z+=rand(-6,6); }
       const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xe8f6ff,transparent:true,opacity:0})); scene.add(l); crk.push(l); } lv.cracks=crk;
     // tracks of a snow vehicle: two long dents running toward the far lights
-    const trM=new THREE.MeshStandardMaterial({color:col(0xa8b8cc),roughness:1});
-    for(let i=0;i<70;i++){ const t=i/70, x=lerp(-30,NIV.town.x*.25,t), z=lerp(10,-180,t)+Math.sin(t*6)*8; for(const sd of [-1,1]){ const d=box(1.2,.08,2.6,trM,x+sd*1.6,hf.at(x+sd*1.6,z)+.03,z,false); d.rotation.y=Math.atan2(NIV.town.x*.25+30,-190); scene.add(d); } }
+    { const trT=canvasTex(64,256,(c,w,h)=>{ c.clearRect(0,0,w,h); const gr=c.createLinearGradient(0,0,w,0); gr.addColorStop(0,'rgba(60,80,110,0)'); gr.addColorStop(.18,'rgba(60,80,110,.55)'); gr.addColorStop(.82,'rgba(60,80,110,.55)'); gr.addColorStop(1,'rgba(60,80,110,0)'); c.fillStyle=gr; c.fillRect(0,0,w,h);
+        for(let y=0;y<h;y+=16){ c.strokeStyle='rgba(30,40,60,.5)'; c.lineWidth=4; c.beginPath(); c.moveTo(10,y); c.lineTo(w/2,y+7); c.lineTo(w-10,y); c.stroke(); c.strokeStyle='rgba(235,242,255,.35)'; c.lineWidth=2; c.beginPath(); c.moveTo(10,y+4); c.lineTo(w/2,y+11); c.lineTo(w-10,y+4); c.stroke(); }
+        for(let i=0;i<300;i++){ c.fillStyle='rgba(255,255,255,'+Math.random()*.25+')'; c.fillRect(Math.random()*w,Math.random()*h,2,2); } },[1,1]);
+      trT.wrapS=trT.wrapT=THREE.RepeatWrapping;
+      const trM=new THREE.MeshStandardMaterial({color:col(0xc8d4e4),map:trT,transparent:true,depthWrite:false,roughness:1,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+      const ctr=[]; for(let i=0;i<=160;i++){ const t=i/160; ctr.push(V3(lerp(-30,NIV.town.x*.25,t),0,lerp(10,-180,t)+Math.sin(t*6)*8)); }
+      for(const sd of [-1.6,1.6]){ const n=ctr.length, pos=new Float32Array(n*6), uv=new Float32Array(n*4), nr=new Float32Array(n*6), idx=[]; let L=0;
+        for(let i=0;i<n;i++){ const o=ctr[Math.max(0,i-1)], q=ctr[Math.min(n-1,i+1)], dx=q.x-o.x, dz=q.z-o.z, l=Math.hypot(dx,dz)||1, px=-dz/l, pz=dx/l; if(i) L+=ctr[i].distanceTo(ctr[i-1]);
+          for(let e=0;e<2;e++){ const off=sd+(e?.6:-.6), x=ctr[i].x+px*off, z=ctr[i].z+pz*off, k=i*2+e; pos.set([x,hf.at(x,z)+.04,z],k*3); nr.set([0,1,0],k*3); uv.set([e,L/2.4],k*2); }
+          if(i<n-1){ const a=i*2; idx.push(a,a+1,a+2,a+1,a+3,a+2); } }
+        const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.BufferAttribute(nr,3)); g.setAttribute('uv',new THREE.BufferAttribute(uv,2)); g.setIndex(idx);
+        const m=new THREE.Mesh(g,trM); m.receiveShadow=true; m.renderOrder=1; m.material.side=THREE.DoubleSide; scene.add(m); } }
     // glowing ice-cream bushes: icy shrubs with soft glowing scoops (pastel, they light the snow)
     lv.bushes=[]; const cols=[0xffb0d8,0xb0f0ff,0xfff0a0,0xc8b0ff,0xa0ffc8];
     for(let i=0;i<34;i++){ const t=i/34; const x=lerp(-20,NIV.cave.x+20,t)+rand(-30,30), z=lerp(30,NIV.cave.z+30,t)+rand(-10,10); if(Math.hypot(x-NIV.lake.x,z-NIV.lake.z)<NIV.lake.r+4) continue;
@@ -57,13 +70,10 @@ defineLevel('nivalis',{
     const cave=new THREE.Group(); cave.position.copy(NIV.cave); scene.add(cave); lv.caveG=cave;
     const inner=mesh(new THREE.SphereGeometry(9,28,18),rockM,0,3,-12); inner.scale.set(1.2,.6,1.4); inner.material.side=THREE.BackSide; cave.add(inner);
     const mouth=mesh(new THREE.CylinderGeometry(3.4,3.6,10,18,1,true),rockM,0,2.6,-1.5); mouth.rotation.x=Math.PI/2; mouth.material.side=THREE.BackSide; cave.add(mouth);
-    lv.caveFloorY=hf.at(NIV.cave.x,NIV.cave.z); { const cl=new THREE.PointLight(col(0x7a9ac0),2.2,44,1.2); cl.position.set(NIV.cave.x,lv.caveFloorY+4.5,NIV.cave.z-9); scene.add(cl); }
+    lv.caveFloorY=hf.at(NIV.cave.x,NIV.cave.z); cave.position.y=lv.caveFloorY; { const fm=pbrMat('sandstone_cracks',2,{opts:{roughness:1}}); fm.color=col(0x7a7c84); const fl=mesh(new THREE.CircleGeometry(10,40),fm,NIV.cave.x,lv.caveFloorY+.04,NIV.cave.z-12.5,false); fl.rotation.x=-Math.PI/2; fl.scale.set(1.15,1.35,1); fl.receiveShadow=true; scene.add(fl); }   /* a rock floor in the cave */ { const cl=new THREE.PointLight(col(0x8aa8d0),3.6,44,1.1); cl.position.set(NIV.cave.x,lv.caveFloorY+4.5,NIV.cave.z-9); scene.add(cl); }
     // inside: a wall torch (unlit), the old campfire ring, the sleeping bag (with him inside), tally marks
     const tally=mesh(new THREE.PlaneGeometry(4,2),new THREE.MeshStandardMaterial({transparent:true,roughness:1,map:canvasTex(256,128,(c,w,h)=>{ c.clearRect(0,0,w,h); c.strokeStyle='rgba(240,236,220,.85)'; c.lineWidth=3; for(let i=0;i<46;i++){ const g=Math.floor(i/5), k=i%5, x=10+g*26+k*4, y=14+Math.floor(g/9)*50; if(k<4){ c.beginPath(); c.moveTo(x,y); c.lineTo(x+rand(-1,1),y+34); c.stroke(); } else { c.beginPath(); c.moveTo(x-18,y+28); c.lineTo(x+2,y+6); c.stroke(); } } })}),-7.5,2.6,-12,false); tally.rotation.y=Math.PI/2; cave.add(tally); lv.tally=tally;
-    const ring=new THREE.Group(); ring.position.set(0,0,-12); cave.add(ring); for(let i=0;i<9;i++){ const a=i/9*Math.PI*2; ring.add(ell(.35,.25,.3,rockM,Math.cos(a)*1.1,.15,Math.sin(a)*1.1,10)); }
-    const wood=new THREE.MeshStandardMaterial({color:col(0x3a2a1a),roughness:.9}); for(let i=0;i<4;i++){ const w=cyl(.08,.1,1.4,wood,0,.25,0,6); w.rotation.set(Math.PI/2,i*.8,0); ring.add(w); }
-    lv.fire=ring; lv.fireL=new THREE.PointLight(col(0xff9040),0,22,1.6); lv.fireL.position.set(0,1.2,0); ring.add(lv.fireL);
-    const flame=mesh(GC('cfFlame',()=>{ const g=new THREE.ConeGeometry(.5,1.4,10); g.translate(0,.7,0); return g; }),new THREE.MeshBasicMaterial({color:col(0xffa040).multiplyScalar(2),transparent:true,opacity:.9}),0,.2,0,false); flame.visible=false; ring.add(flame); lv.flame=flame;
+    const cf=makeCampfire(rockM); cf.g.position.set(0,0,-12); cave.add(cf.g); lv.fire=cf.g; lv.fireL=cf.light; lv.flame=cf.flame; lv.campfire=cf; const wood=new THREE.MeshStandardMaterial({color:col(0x3a2a1a),roughness:.9});   /* stones, logs, flame sprites, embers */
     const bagM=new THREE.MeshPhysicalMaterial({color:col(0x4a5a3a),roughness:.85,map:charTex().cloth.map,sheen:col(0x6a7a5a)});
     const bag=ell(.55,.3,1.1,bagM,3.2,.3,-14,18); bag.rotation.y=.3; cave.add(bag); lv.bag=bag;
     const bones=new THREE.Group(); bones.position.set(3.2,.15,-14); bones.visible=false; cave.add(bones); lv.bones=bones;
@@ -77,7 +87,7 @@ defineLevel('nivalis',{
   },
   enter(){ FX.sunWorld=null; setAmbience([['wind',.08]]); },
   exit(){ setAmbience([]); },
-  update(dt,t){ const lv=this; if(lv.flame&&lv.flame.visible){ lv.flame.scale.set(1+noise1(t*9)*.15,1+noise1(t*7)*.25,1); lv.fireL.intensity=3.2*(1+noise1(t*11)*.15); }
+  update(dt,t){ const lv=this; if(lv.campfire) lv.campfire.update(dt,t);
     if(typeof nivTick==='function') nivTick(lv,dt,t); }
 });
 /* ---------- Steve + Alex's ICE LAB: blue lights, frost on the machines, two chairs ---------- */
