@@ -296,7 +296,11 @@ function updateViewModel(dt,t){
   // holding something small in the right hand (the fruit): out in front, then up to the mouth
   if(VM.holdItem){ onR=true; const k=smooth(clamp(VM.eatK||0,0,1)); rp=[lerp(.16,.05,k),lerp(-.3,-.2,k),lerp(-.5,-.27,k)]; rr=[lerp(1.0,1.25,k),lerp(-.3,-.1,k),lerp(-.8,-1.35,k)]; rf=.8; }
   // Part 2 arena: a weapon in the right hand; VM.wpnK 0..1 = the thrust / swing
-  if(VM.wpn){ onR=true; const k=VM.wpnK||0, sw=VM.wpnSwing||0; rp=[lerp(.2,.05,k)-sw*.12,lerp(-.33,-.22,k)+sw*.06,lerp(-.48,-.82,k)]; rr=[1.05-k*.25,-.3+sw*.6,-.85]; rf=.95;
+  // the splinter torch: held in the fist, stick pointing up + forward
+  if(VM.wpn&&typeof TORCH!=='undefined'&&VM.wpn===TORCH.g){ onR=true; rp=[.2,-.27,-.16]; rr=[.42,.08,0]; rf=1;
+    const hx=rp[0]+Math.sin(rr[1])*-.33*Math.cos(rr[0]), hy=rp[1]+Math.sin(rr[0])*.33, hz=rp[2]-Math.cos(rr[0])*.33*Math.cos(rr[1]);
+    VM.wpn.position.set(hx-.035,hy-.01,hz+.12); VM.wpn.rotation.set(.75,0,0); }
+  else if(VM.wpn){ onR=true; const k=VM.wpnK||0, sw=VM.wpnSwing||0; rp=[lerp(.2,.05,k)-sw*.12,lerp(-.33,-.22,k)+sw*.06,lerp(-.48,-.82,k)]; rr=[1.05-k*.25,-.3+sw*.6,-.85]; rf=.95;
     VM.wpn.position.set(rp[0]-.02,rp[1]+.04,rp[2]-.04); VM.wpn.rotation.set(-.08+k*.05,.08-sw*.9,sw*.3); }
   if(VM.hurtT>0){ VM.hurtT-=dt; }
   // arms only appear when they are doing something (idle hands in the view just look odd)

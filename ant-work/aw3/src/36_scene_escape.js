@@ -14,19 +14,22 @@ function torchMesh(){ const g=new THREE.Group();
   const fl=mesh(GC('torchFlame',()=>{ const s=new THREE.SphereGeometry(.035,10,8); s.scale(1,1.8,1); return s; }),new THREE.MeshBasicMaterial({color:col(0xffa040).multiplyScalar(2.2)}),0,.05,-.33,false); g.add(fl); g.userData.flame=fl;
   g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } }); return g; }
 function torchOn(on){
-  if(!TORCH.light){ TORCH.light=new THREE.PointLight(col(0xffa055),0,16,2); }
+  if(!TORCH.light){ TORCH.light=new THREE.PointLight(col(0xffa055),0,18,1.15); }
   if(on&&F.torchLit){ if(!TORCH.g) TORCH.g=torchMesh(); if(TORCH.light.parent!==camera) camera.add(TORCH.light); TORCH.light.position.set(.25,-.2,-.6);
     if(!ARENA.active){ if(VM.wpn&&VM.wpn!==TORCH.g) VM.grp.remove(VM.wpn); VM.wpn=TORCH.g; if(TORCH.g.parent!==VM.grp) VM.grp.add(TORCH.g); } TORCH.on=true; }
   else { TORCH.on=false; TORCH.light.intensity=0; if(VM.wpn===TORCH.g){ VM.grp.remove(TORCH.g); VM.wpn=null; } }
 }
 on('tick',dt=>{ if(!TORCH.on||!TORCH.light) return; const t=G.time; const f=1+noise1(t*9)*.18+noise1(t*23)*.08;
-  TORCH.light.intensity=(TORCH.back?.45:2.6)*f; if(TORCH.g){ TORCH.g.visible=!TORCH.back; const fl=TORCH.g.userData.flame; fl.scale.set(1+noise1(t*13)*.15,1+noise1(t*11+2)*.25,1); }
+  TORCH.light.intensity=(TORCH.back?.7:4.2)*f; if(TORCH.g){ TORCH.g.visible=!TORCH.back; const fl=TORCH.g.userData.flame; fl.scale.set(1+noise1(t*13)*.15,1+noise1(t*11+2)*.25,1); }
   if(TORCH.back) TORCH.light.position.set(.2,-.5,.5); else TORCH.light.position.set(.25,-.2,-.6); });
 /* the pig sees a torch held out front, even behind cover. Hold it behind you (T) to hide. */
 function torchGivesYouAway(){ return TORCH.on&&!TORCH.back; }
 /* splinter + match: available every night */
 function torchInteracts(lv){
   const yc=cageOf('you');
+  // Orrin passes you a splinter he lit off the candle ember: you have light from the start of every night
+  if(!F.torchLit){ F.splinter=1; F.torchLit=1; torchOn(true); later(1.5,()=>toast('Orrin slid you a lit splinter. Press T to hide the flame behind you when he looks','#e0c08a')); }
+  else torchOn(true);
   addInteract(lv,{pos:V3(yc.x+1.6,CAGE_Y,yc.z+1.6),reach:2.2,when:()=>!F.splinter,label:'Pull a splinter off the floor board',act:()=>{ F.splinter=1; SND.play('craft',{vol:.8,rate:1.4}); toast('Splinter: light it on the match by the cup','#e0c08a'); }});
   addInteract(lv,{obj:lv.match,offset:V3(-4.3*Math.cos(.4),.5,4.3*Math.sin(.4)),reach:3.5,when:()=>F.splinter&&!F.torchLit,label:'Light your splinter on the match',act:()=>{ F.torchLit=1; SND.play('spit',{vol:.4,rate:1.8}); torchOn(true); toast('Torch lit. T = hold it behind you (he can see the fire)','#ffcc66'); }});
 }

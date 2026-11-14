@@ -49,10 +49,10 @@ function makeTinyCage(scene,lv,c,iron,wood){
 }
 defineLevel('table',{
   title:'???',
-  env:{fx:{exposure:1.05,saturation:1.05,contrast:1.1,temp:.08,bloomStrength:.35,bloomThreshold:1.1,aoRadius:1.2,vignette:.5,grain:.04},music:null,reverb:.55,surface:'wood',far:900,speed:3.6},
+  env:{fx:{exposure:1.2,saturation:1.05,contrast:1.08,temp:.08,bloomStrength:.35,bloomThreshold:1.1,aoRadius:1.2,vignette:.4,grain:.04},music:null,reverb:.55,surface:'wood',far:900,speed:3.6},
   async build(scene,lv){
     lv.occluders=[];   // what blocks the pig's view of you at night
-    scene.background=col(0x0a0604); scene.fog=new THREE.FogExp2(col(0x0e0806),.006); lv.fogDay=.006;
+    scene.background=col(0x2a1a12); scene.fog=new THREE.FogExp2(col(0x2a1a12),.006); lv.fogDay=.006;
     lv.rig=makeRig(scene,{sun:1.6,sunColor:0xffb070,hemi:.35,sky:0x6a5a50,ground:0x1a100a,dir:V3(-.35,1,.45),span:46,dist:120,far:260,bias:-.0006,normalBias:.05});
     const iron=pbrMat('rusty_metal_04',.4,{opts:{metalness:.85,roughness:.6}}); iron.color=col(0x9a8a7a);
     const wood=pbrMat('rough_wood',1.2,{opts:{roughness:.85}}); wood.color=col(0x8a6a4a);
@@ -166,7 +166,7 @@ defineLevel('table',{
   enter(){ FX.sunWorld=null; this.setTime(this.time||'day'); },
   exit(){ setAmbience([]); },
   setTime(t){ const lv=this; lv.time=t; const night=t==='night';
-    lv.rig.sun.intensity=night?.45:2.5; lv.rig.sun.color=col(night?0x8a9ad0:0xffc890); lv.rig.hemi.intensity=night?.22:.65;
+    lv.rig.sun.intensity=night?.45:2.5; lv.rig.sun.color=col(night?0x8a9ad0:0xffc890); lv.rig.hemi.intensity=night?.34:1.15; lv.rig.hemi.color.set(night?0x4a5070:0xb0a090); lv.rig.hemi.groundColor.set(night?0x140c08:0x5a4030);
     lv.candleL.intensity=night?4:1.6; lv.scene.fog.density=night?.009:.006;
     const P=lv.pig.userData.pig; P.sleep=night?1:0; P.stop=night; },
   update(dt,t){
@@ -177,3 +177,7 @@ defineLevel('table',{
     if(typeof tableTick==='function') tableTick(lv,dt,t);
   }
 });
+/* a soft light around you on the table (cages + the pig's shadow made it too dark to see who you're talking to) */
+const TFILL={L:null};
+on('tick',dt=>{ if(!TFILL.L){ TFILL.L=new THREE.PointLight(col(0xffd8b0),0,10,1.6); TFILL.L.position.set(0,.6,0); camera.add(TFILL.L); }
+  const want=LV&&LV.name==='table'?(LV.time==='night'?.5:1.1):0; TFILL.L.intensity=damp(TFILL.L.intensity,want,4,dt); });

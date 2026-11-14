@@ -209,6 +209,21 @@ function shoeGeo(){ return GC('shoe4',()=>{ const parts=[]; const s=new THREE.Sp
 
 /* ---------- the builder ---------- */
 function makeHuman(o={}){
+  // VARIETY: anyone not hand-designed gets their own face, body, height, skin, eyes + hair (from their seed/name)
+  if(!o.head&&!o.alien){ let h=o.seed!=null?o.seed*7919:0; if(o.seed==null) for(const c of String(o.name||'x')+(HUMANS.length)) h=(h*31+c.charCodeAt(0))>>>0; const v=RNG(h+12345); const pk=a=>a[Math.floor(v()*a.length)];
+    const add={};
+    if(!o.head) add.head={rx:.066+v()*.015,ry:.095+v()*.016,rz:.085+v()*.014,jaw:.16+v()*.32,nose:.75+v()*.65,chin:.8+v()*.5,cheek:.6+v()*.9,flat:.6+v()*.9};
+    if(o.height==null) add.height=.9+v()*.18; if(o.build==null) add.build=.86+v()*.42;
+    if(o.skin==null) add.skin=pk([0xf2d0b8,0xe8b894,0xd8a07a,0xc08060,0xa06a48,0x8a5a3a,0x6a4028,0x4a2c1c]);
+    if(o.eye==null) add.eye=pk([0x4a3020,0x2a1a10,0x3a6a8a,0x4a7a4a,0x6a5030,0x5a6a7a]);
+    if(o.hair==null) add.hair=pk([0x14100c,0x2a1a10,0x4a2e1a,0x6a4a2a,0x9a7a4a,0xc8a060,0x8a2a14,0x8a8a88,0xd8d8d0]);
+    if(o.hairStyle==null) add.hairStyle=pk(['short','short','buzz','long','curly','spiky','bald']);
+    if(o.beard==null&&!o.alien) add.beard=v()<.3;
+    if(o.stubble==null) add.stubble=v()*.25;
+    if(o.browThick==null) add.browThick=.0024+v()*.0022;
+    if(o.shirt==null) add.shirt=pk([0x3b6ea5,0x8a2a2a,0x2a5a3a,0xc8b898,0x4a4a4a,0x6a4a8a,0xd8a040,0x2a2a3a,0xe0e0d8]);
+    if(o.pants==null) add.pants=pk([0x3a4a6a,0x2a2a2a,0x5a4a3a,0x3a3a30,0x6a6a6a]);
+    o=Object.assign(add,o); }
   const T=charTex();
   const opt=Object.assign({skin:0xe8b894,shirt:0x3b6ea5,pants:0x3a4a6a,shoes:0x2a2522,hair:0x3b2a1a,hairStyle:'short',beard:false,eye:0x4a3020,
     build:1,height:1,name:'?',voice:'Jim',sleeves:'short',alien:false,accent:0x7dffe8,denim:true,head:{},collar:true,apron:null,hood:false},o);
@@ -307,7 +322,8 @@ function makeHuman(o={}){
     const HL=[[0,.46],[.75,.36],[1.25,.14],[1.7,.02],[2.3,-.22],[Math.PI,-.42]];
     const hairline=a=>{ a=Math.abs(a); for(let i=1;i<HL.length;i++){ if(a<=HL[i][0]){ const k=(a-HL[i-1][0])/(HL[i][0]-HL[i-1][0]); return lerp(HL[i-1][1],HL[i][1],smooth(k)); } } return HL[HL.length-1][1]; };
     const hairMask=d=>{ const a=Math.atan2(d.x,d.z); let k=smooth((d.y-hairline(a))/.07); const ear=Math.abs(d.x)>.8&&d.y>-.3&&d.y<.18&&d.z>-.35&&d.z<.2; if(ear) k*=smooth((d.y-.18)/.05); return clamp(k,0,1); };
-    const cap=mesh(shellGeo(HP,'cap'+opt.hairStyle,hairMask,opt.hairStyle==='spiky'?.011:.008,.0025),hairM,0,.11,0,true); headJ.add(cap);
+    const cap=mesh(shellGeo(HP,'cap'+opt.hairStyle,hairMask,({spiky:.011,buzz:.0032,curly:.016,long:.011}[opt.hairStyle]||.008),opt.hairStyle==='curly'?.008:.0025),hairM,0,.11,0,true); headJ.add(cap);
+    if(opt.hairStyle==='long'){ const dr=mesh(GC('hairLong',()=>{ const g=new THREE.SphereGeometry(1,20,14); g.scale(.088,.15,.06); g.translate(0,-.05,-.05); return g; }),hairM,0,.06,-.012,true); headJ.add(dr); }
     if(opt.hairStyle==='spiky'){
       const r=RNG(opt.seed||11);
       for(let i=0;i<46;i++){

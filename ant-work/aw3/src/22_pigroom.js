@@ -32,7 +32,7 @@ defineLevel('pigroom',{
   env:{fx:{exposure:1.12,saturation:1.05,contrast:1.12,temp:.12,bloomStrength:.4,bloomThreshold:1.1,aoRadius:.6,vignette:.55,grain:.05},music:null,reverb:.45,surface:'stone',far:120},
   async build(scene,lv){
     scene.background=col(0x050302); scene.fog=new THREE.FogExp2(col(0x0b0604),.035);
-    scene.add(new THREE.HemisphereLight(col(0x5a5560),col(0x140c08),.14));
+    scene.add(new THREE.HemisphereLight(col(0x7a7080),col(0x2a1a10),.42));
     const W=12, D=15, H=6.5, zc=-1.5;
     const brick=(w,h)=>{ const m=pbrMat('castle_brick_07',2.4,{w,h,opts:{roughness:1},normal:1.3}); m.color=col(0x8c847a); return m; };
     const fl=texPlane(W,D,'stone_tiles_02',1.6,0,0,zc,{opts:{roughness:.85}}); fl.receiveShadow=true; scene.add(fl);
@@ -72,6 +72,7 @@ defineLevel('pigroom',{
     // the gate behind you
     // (a group hinged on its left side, so it can swing open in Part 2)
     const gate=new THREE.Group(); gate.position.set(-1.8,0,zc+D/2-.2); scene.add(gate); lv.gate=gate; lv.gateZ=zc+D/2-.2;
+    { const gl=new THREE.PointLight(col(0xffa860),1.8,9,1.6); gl.position.set(0,2.8,zc+D/2-1.2); scene.add(gl); const tb=new THREE.Group(); tb.position.set(2.3,2.2,zc+D/2-.35); tb.add(cyl(.04,.05,.5,mat(0x3a2a1a),0,0,0,8)); const fl=mesh(new THREE.ConeGeometry(.07,.22,8),new THREE.MeshBasicMaterial({color:col(0xffb050)}),0,.33,0); tb.add(fl); scene.add(tb); }   // a torch by the gate so you can SEE where to run
     for(let i=0;i<9;i++){ const bar=cyl(.03,.03,3.2,iron,.2+i*.4,1.6,0,8); gate.add(bar); }
     gate.add(box(3.6,.12,.1,iron,1.8,3.1,0)); gate.add(box(3.6,.12,.1,iron,1.8,.4,0));
     // behind the gate: a dark stone passage going out of the room (where the gate leads)

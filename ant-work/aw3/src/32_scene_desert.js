@@ -82,13 +82,15 @@ SCENES.desert=async function(){
 /* the long walk: about 45 seconds, you can only look around */
 async function walkToPyramid(lv,J){
   const D=DESERT.door;
-  lookOnly(); crosshair(false); letterbox(true);
+  freeWalk(); PLAYER.ctl.jump=true; crosshair(true); letterbox(false); objective('Walk to the pyramid');
   playMusic('desert',2.5); lv.sweatOn=true;
   const path=[V3(.4,0,-14),V3(-1.6,0,-36),V3(.8,0,-62),V3(0,0,D.z+9)];
   const jpath=path.map((p,i)=>p.clone().add(V3(1.35,0,i===path.length-1?.6:.25)));
   J.userData.A.look=null;
   const speed=2.15;
-  const arrive=Promise.all([autoWalk(path,speed),walkTo(J,jpath,speed*1.01)]);
+  // you walk it yourself; Jay 2 walks next to you (keeps up, waits if you stop)
+  const jt=dt=>{ const d=Math.hypot(J.position.x-PLAYER.pos.x,J.position.z-PLAYER.pos.z); if(d>2.6&&!J.userData.A.path){ walkTo(J,[PLAYER.pos.clone().add(V3(1.4,0,1.2))],d>6?3.6:2.3); } if(d<1.8) J.userData.A.path=null; }; SCENE_TICKS.push(jt);
+  const arrive=waitUntil(()=>PLAYER.pos.z<D.z+11&&Math.abs(PLAYER.pos.x)<12).then(()=>{ SCENE_TICKS.splice(SCENE_TICKS.indexOf(jt),1); objective(''); PLAYER.lock(); PLAYER.ctl.look=true; });
   (async()=>{
     await wait(3); J.userData.A.look='player'; await chat(['d_walk_1']); J.userData.A.look=null;
     await wait(7); await chat(['d_walk_2']);

@@ -190,8 +190,8 @@ function tableTick(lv,dt,t){
   if(NIGHT.alert===0&&PLAYER.ctl.move) for(const n of lv.noisy){ if(!n.done&&n.hit(p)){ n.done=true; n.fall(); later(.3,()=>{ SND.play('metal_'+randi(1,3),{vol:1,pos:n.o.position,ref:30,rate:.6}); later(.25,()=>SND.play('metal_'+randi(1,3),{vol:.8,pos:n.o.position,ref:30,rate:.5})); pigWakes(lv,n.o.position); }); break; } }
   if(NIGHT.alert===1){ NIGHT.alertT-=dt; if(NIGHT.alertT<=0){ NIGHT.alert=2; if(NIGHT.hidden){ pigSleeps(lv); } else { NIGHT.caught=true; } } }
 }
-function pigWakes(lv,at){ const P=lv.pig.userData.pig; NIGHT.alert=1; NIGHT.alertT=3.6; tweenVal(v=>{ P.sleep=v; },1,0,.7); P.look=at.clone(); P.lookSpeed=1.5; P.lookW=0;
-  SND.play('pig_4',{vol:1,pos:V3(0,44,-40),ref:80,rate:.6}); chat(['n_wake']); toast('He heard that! HIDE!','#ff8a6a');
+function pigWakes(lv,at){ const P=lv.pig.userData.pig; NIGHT.alert=1; NIGHT.alertT=3.6; SND.play('heartbeat',{vol:.7}); tweenVal(v=>{ P.sleep=v; },1,0,.7); P.look=at.clone(); P.lookSpeed=1.5; P.lookW=0;
+  SND.play('pig_4',{vol:1,pos:V3(0,44,-40),ref:80,rate:.6}); chat(['n_wake']); toast('He heard that! HIDE behind something + press T (torch behind you)!','#ff8a6a');
   later(1.6,()=>{ if(NIGHT.alert===1) P.look=V3(PLAYER.pos.x+rand(-6,6),0,PLAYER.pos.z+rand(-4,4)); }); }
 function pigSleeps(lv){ const P=lv.pig.userData.pig; SND.play('pig_1',{vol:.8,pos:V3(0,44,-40),ref:80,rate:.55}); later(1.2,()=>{ P.look=null; tweenVal(v=>{ P.sleep=v; },0,1,1.5); NIGHT.alert=0; }); }
 async function nightSneak(lv,goals){
