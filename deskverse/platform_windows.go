@@ -158,7 +158,7 @@ func (p *winPlatform) Windhawk() (*Windhawk, WHStatus) {
 	}
 	sub := rk[strings.IndexByte(rk, '\\')+1:]
 	st.OK = true
-	return &Windhawk{AppData: appData, Version: ver, Reg: winReg{root: rootKey, base: sub + `\Engine\Mods`}, ModsURL: "https://mods.windhawk.net/mods/"}, st
+	return &Windhawk{AppData: appData, Compiler: expandIniPath(root, ini["compilerpath"]), Version: ver, Reg: winReg{root: rootKey, base: sub + `\Engine\Mods`}, ModsURL: "https://mods.windhawk.net/mods/"}, st
 }
 
 func procRunning(name string) bool {

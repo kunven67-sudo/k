@@ -116,9 +116,21 @@ func TestInstallLikeWindhawk(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "userprofile.json"), []byte(`{"id":"x","mods":{"test-mod":{"version":"1.0","latestVersion":"1.2.3"}}}`), 0o644)
 	reg := &memReg{}
-	w := &Windhawk{AppData: dir, Version: "1.7.3", Reg: reg, ModsURL: s.URL + "/mods/"}
+	comp := t.TempDir()
+	for _, tg := range []string{"i686-w64-mingw32", "x86_64-w64-mingw32"} {
+		os.MkdirAll(filepath.Join(comp, tg, "bin"), 0o755)
+		for _, f := range []string{"libc++.dll", "libunwind.dll", "windhawk-mod-shim.dll"} {
+			os.WriteFile(filepath.Join(comp, tg, "bin", f), []byte(tg+f), 0o644)
+		}
+	}
+	w := &Windhawk{AppData: dir, Compiler: comp, Version: "1.7.3", Reg: reg, ModsURL: s.URL + "/mods/"}
 	if err := w.Install("test-mod", nil); err != nil {
 		t.Fatal(err)
+	}
+	for _, c := range [][3]string{{"64", "libc++.whl", "x86_64-w64-mingw32libc++.dll"}, {"32", "libunwind.whl", "i686-w64-mingw32libunwind.dll"}, {"64", "windhawk-mod-shim.dll", "x86_64-w64-mingw32windhawk-mod-shim.dll"}} {
+		if b, _ := os.ReadFile(filepath.Join(dir, "Engine", "Mods", c[0], c[1])); string(b) != c[2] {
+			t.Errorf("lib %s/%s = %q", c[0], c[1], b)
+		}
 	}
 	lib, _ := reg.GetString("test-mod", "LibraryFileName")
 	if !strings.HasPrefix(lib, "test-mod_1.2.3_") || !strings.HasSuffix(lib, ".dll") {
@@ -127,8 +139,8 @@ func TestInstallLikeWindhawk(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(dir, "Engine", "Mods", "64", lib)); string(b) != "MZfake-dll" {
 		t.Fatal("dll not written")
 	}
-	if _, err := os.Stat(filepath.Join(dir, "Engine", "Mods", "32")); err == nil {
-		t.Fatal("32-bit folder made for an x86-64 mod")
+	if m, _ := filepath.Glob(filepath.Join(dir, "Engine", "Mods", "32", "test-mod_*")); len(m) != 0 {
+		t.Fatal("32-bit dll made for an x86-64 mod")
 	}
 	if src, _ := os.ReadFile(filepath.Join(dir, "ModsSource", "test-mod.wh.cpp")); strings.Contains(string(src), "\r") || !strings.Contains(string(src), "@id") {
 		t.Fatal("source not saved right")
@@ -175,7 +187,7 @@ func TestInstallLikeWindhawk(t *testing.T) {
 	if w.Setting("test-mod", "theme") != "Bubbles" {
 		t.Error("reinstall wiped the theme")
 	}
-	ents, _ := os.ReadDir(filepath.Join(dir, "Engine", "Mods", "64"))
+	ents, _ := filepath.Glob(filepath.Join(dir, "Engine", "Mods", "64", "test-mod_*.dll"))
 	if len(ents) != 1 {
 		t.Errorf("%d dlls left, want 1", len(ents))
 	}

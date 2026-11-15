@@ -33,7 +33,8 @@ type Reg interface {
 }
 
 type Windhawk struct {
-	AppData string // e.g. C:\ProgramData\Windhawk
+	AppData  string // e.g. C:\ProgramData\Windhawk
+	Compiler string // e.g. C:\Program Files\Windhawk\Compiler (has the libs mods need)
 	Version string // installed Windhawk version, e.g. "1.7.3"
 	Reg     Reg
 	ModsURL string // https://mods.windhawk.net/mods/
@@ -367,6 +368,9 @@ func (w *Windhawk) Install(id string, say func(string)) error {
 		data[f] = b
 	}
 	say("Installing " + id)
+	if err := w.CopyLibs(); err != nil {
+		return err
+	}
 	for _, f := range folders {
 		dir := filepath.Join(w.AppData, "Engine", "Mods", f)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -425,6 +429,47 @@ func (w *Windhawk) Install(id string, say func(string)) error {
 	}
 	w.deleteOld(id, folders, dll)
 	w.profileVersion(id, meta.Version)
+	return nil
+}
+
+// CopyLibs puts libc++.whl, libunwind.whl and windhawk-mod-shim.dll next to the mods, like
+// Windhawk's own UI does each time it opens. Ready-made mod DLLs import them; without them no
+// mod loads (a silent install never opens the UI, so nothing else copies them).
+func (w *Windhawk) CopyLibs() error {
+	if w.Compiler == "" {
+		return nil
+	}
+	for target, folder := range map[string]string{"i686-w64-mingw32": "32", "x86_64-w64-mingw32": "64"} {
+		dst := filepath.Join(w.AppData, "Engine", "Mods", folder)
+		if err := os.MkdirAll(dst, 0o755); err != nil {
+			return err
+		}
+		for _, f := range [][2]string{{"libc++.dll", "libc++.whl"}, {"libunwind.dll", "libunwind.whl"}, {"windhawk-mod-shim.dll", "windhawk-mod-shim.dll"}} {
+			src := filepath.Join(w.Compiler, target, "bin", f[0])
+			si, err := os.Stat(src)
+			if err != nil {
+				if f[0] == "windhawk-mod-shim.dll" {
+					continue // older Windhawk has no shim
+				}
+				return fmt.Errorf("Windhawk is missing %s, reinstall it", f[0])
+			}
+			to := filepath.Join(dst, f[1])
+			if di, err := os.Stat(to); err == nil && di.ModTime().Equal(si.ModTime()) {
+				continue
+			}
+			b, err := os.ReadFile(src)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(to, b, 0o644); err != nil {
+				if _, e2 := os.Stat(to); e2 == nil {
+					continue // in use by a running app = it's there already
+				}
+				return err
+			}
+			os.Chtimes(to, si.ModTime(), si.ModTime())
+		}
+	}
 	return nil
 }
 

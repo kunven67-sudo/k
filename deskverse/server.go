@@ -130,6 +130,9 @@ func (a *App) wh() (*Windhawk, error) {
 
 func (a *App) ensure(w *Windhawk, id string) error {
 	if w.State(id).Installed {
+		if err := w.CopyLibs(); err != nil {
+			return err
+		}
 		return w.SetEnabled(id, true)
 	}
 	return w.Install(id, a.say)
