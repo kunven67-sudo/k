@@ -89,7 +89,7 @@ function hurtPlayer(dmg,by){ if(LOOP.dying) return; INV.hp-=dmg; dmgFlash(); sha
 function throwDynamite(){ if(!takeItem('dynamite')) return; INV.cool=1; const from=camera.getWorldPosition(V3()), d=camera.getWorldDirection(V3());
   const g=gunMesh('dynamite'); g.position.copy(from).addScaledVector(d,.5); LV.scene.add(g); const v=d.clone().multiplyScalar(13).add(V3(0,4,0)); let t=0; SND.play('swing_1',{vol:.6});
   const fl=new THREE.PointLight(col(0xffa040),1.5,4,2); g.add(fl);
-  const tk=dt=>{ t+=dt; if(t<3){ v.y-=13*dt; g.position.addScaledVector(v,dt); const gy=LV.ground(g.position.x,g.position.z)+.05; if(g.position.y<gy){ g.position.y=gy; v.multiplyScalar(.35); v.y=Math.abs(v.y)*.3; } g.rotation.x+=dt*6; fl.intensity=1+Math.random(); return; }
+  const tk=dt=>{ t+=dt; if(t<3){ v.y-=13*dt; g.position.addScaledVector(v,dt); if(LV.col){ const q=g.position.clone(); resolveCol(LV.col,q,.18); if(Math.hypot(q.x-g.position.x,q.z-g.position.z)>1e-4){ g.position.x=q.x; g.position.z=q.z; v.x*=-.12; v.z*=-.12; SND.play('stone_1',{vol:.3,pos:g.position,ref:6,rate:1.6}); } }   /* hits walls + the cave-in (it used to fly through) */ const gy=LV.ground(g.position.x,g.position.z)+.05; if(g.position.y<gy){ g.position.y=gy; v.multiplyScalar(.35); v.y=Math.abs(v.y)*.3; } g.rotation.x+=dt*6; fl.intensity=1+Math.random(); return; }
     SCENE_TICKS.splice(SCENE_TICKS.indexOf(tk),1); LV.scene.remove(g); explode(g.position.clone()); };
   SCENE_TICKS.push(tk); invHud(); }
 function explode(at,r=6){ SND.play('explode',{vol:1,pos:at,ref:40}); flashWhite(.4,.1); const dd=Math.hypot(PLAYER.pos.x-at.x,PLAYER.pos.z-at.z); shake(clamp(1.4-dd/30,.1,1.4));

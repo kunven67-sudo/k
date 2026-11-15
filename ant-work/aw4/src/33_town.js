@@ -34,7 +34,7 @@ async function talkTo(id,topicsFn){ const h=NPC[id]; PLAYER.lock(); PLAYER.ctl.l
   freeWalk(); PLAYER.ctl.jump=true; }
 function said(k){ return !!F['t_'+k]; }
 /* telling a secret: who you tell decides who betrays you */
-function tell(id,what){ LOOP.told[id]=what; saveLoop(); F.told=F.told||{}; F.told[id]=what; if(!NPC_DEF[id].trust) F.betrayer=F.betrayer||id; }
+function tell(id,what){ LOOP.told[id]=what; saveLoop(); F.told=F.told||{}; F.told[id]=what; if(NPC_DEF[id]&&!NPC_DEF[id].trust) F.betrayer=F.betrayer||id; }   /* Bob (mine) isn't a town NPC: telling him crashed the game */
 /* ---------- the topics ---------- */
 const TOPICS={
   moe:()=>[

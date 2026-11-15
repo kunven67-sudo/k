@@ -12,17 +12,26 @@ defineLevel('mine',{
     scene.add(new THREE.HemisphereLight(col(0x3a3028),col(0x050403),.18));
     const rock=pbrMat('cliff_side',3,{w:6,h:6,opts:{roughness:.95}}); rock.color=col(0x8a7058); const tw=pbrMat('rough_wood',1,{opts:{roughness:.9}}); tw.color=col(0x6a4a30);
     const floorM=pbrMat('dry_ground_rocks',3,{w:4,h:4,opts:{roughness:1}}); floorM.color=col(0x7a6a58);
-    const tunnel=(x0,z0,x1,z1,w=4,h=3.4)=>{ const L=Math.hypot(x1-x0,z1-z0), a=Math.atan2(x1-x0,z1-z0), cx=(x0+x1)/2, cz=(z0+z1)/2; const g=new THREE.Group(); g.position.set(cx,0,cz); g.rotation.y=a; scene.add(g);
+    /* the tunnels. Where one tunnel meets another, its wall, timber post and collision are left out = a real opening
+       (before: the main tunnel's wall ran straight across the side tunnel = Bob + the gold were walled off) */
+    const TUN=[[0,4,0,-70,4,3.4],[0,-48,MINE.gallery.x,MINE.gallery.z,3.6,3.4],[0,-70,0,-100,4.4,4],[MINE.gallery.x,-40,MINE.gallery.x,-58,6,4]];
+    const tg=T=>{ const [x0,z0,x1,z1,w,h]=T; return {w,h,L:Math.hypot(x1-x0,z1-z0),a:Math.atan2(x1-x0,z1-z0),cx:(x0+x1)/2,cz:(z0+z1)/2}; };
+    const inTunnel=(x,z,skip,m=.05)=>TUN.some((T,i)=>{ if(i===skip) return false; const q=tg(T), dx=x-q.cx, dz=z-q.cz, ca=Math.cos(q.a), sa=Math.sin(q.a); return Math.abs(ca*dx-sa*dz)<q.w/2-m&&Math.abs(sa*dx+ca*dz)<q.L/2+m; }); lv.inTunnel=inTunnel;
+    const wallM=pbrMat('cliff_side',3,{w:1.6,h:3.6,opts:{roughness:.95}}); wallM.color=col(0x8a7058);
+    const tunnel=i=>{ const {w,h,L,a,cx,cz}=tg(TUN[i]), ca=Math.cos(a), sa=Math.sin(a), W=(lx,lz)=>[cx+ca*lx+sa*lz,cz-sa*lx+ca*lz]; const g=new THREE.Group(); g.position.set(cx,0,cz); g.rotation.y=a;
       const fl=mesh(new THREE.PlaneGeometry(w,L),pbrMat('dry_ground_rocks',3,{w,h:L,opts:{roughness:1}}),0,0,0,false); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; fl.material.color=col(0x7a6a58); g.add(fl);
-      for(const sd of [-1,1]){ const wl=mesh(new THREE.PlaneGeometry(L,h,Math.ceil(L/1.5),3),pbrMat('cliff_side',3,{w:L,h,opts:{roughness:.95}}),sd*w/2,h/2,0); wl.rotation.y=-sd*Math.PI/2; const p=wl.geometry.attributes.position; for(let i=0;i<p.count;i++) p.setZ(i,rand(-.25,.25)); wl.geometry.computeVertexNormals(); wl.material.color=col(0x8a7058); g.add(wl); lv.occluders.push(wl); }
+      const n=Math.ceil(L/1.6), sl=L/n;
+      for(const sd of [-1,1]) for(let k=0;k<n;k++){ const mid=-L/2+(k+.5)*sl, [wx,wz]=W(sd*w/2,mid); if(inTunnel(wx,wz,i)) continue;
+        const pg=new THREE.PlaneGeometry(sl,h,2,3), pp=pg.attributes.position; for(let v=0;v<pp.count;v++) if(Math.abs(pp.getX(v))<sl/2-.01) pp.setZ(v,rand(-.25,.25)); pg.computeVertexNormals();
+        const wl=mesh(pg,wallM,sd*w/2,h/2,mid); wl.rotation.y=-sd*Math.PI/2; g.add(wl); lv.occluders.push(wl); }
       const cl=mesh(new THREE.PlaneGeometry(w,L),rock,0,h,0,false); cl.rotation.x=Math.PI/2; g.add(cl);
-      for(let z=-L/2+1;z<L/2;z+=4){ g.add(box(.25,h,.25,tw,-w/2+.2,h/2,z)); g.add(box(.25,h,.25,tw,w/2-.2,h/2,z)); g.add(box(w,.28,.28,tw,0,h-.15,z)); }
-      // collision: two side walls
-      const ca=Math.cos(a), sa=Math.sin(a); for(let s=-L/2;s<=L/2;s+=.8) for(const sd of [-1,1]){ const lx=sd*(w/2+.2), lz=s; colCircle(lv.col,cx+ca*lx+sa*lz,cz-sa*lx+ca*lz,.45); } };
-    tunnel(0,4,0,-70); tunnel(0,-48,MINE.gallery.x,MINE.gallery.z,3.6); tunnel(0,-70,0,-100,4.4,4); tunnel(MINE.gallery.x,-40,MINE.gallery.x,-58,6,4);
+      for(let z=-L/2+1;z<L/2;z+=4){ for(const sd of [-1,1]){ const [px,pz]=W(sd*(w/2-.2),z); if(!inTunnel(px,pz,i)) g.add(box(.25,h,.25,tw,sd*(w/2-.2),h/2,z)); } g.add(box(w,.28,.28,tw,0,h-.15,z)); }
+      scene.add(bake(g));   /* one mesh per material per tunnel */
+      for(let s=-L/2;s<=L/2;s+=.8) for(const sd of [-1,1]){ const [qx,qz]=W(sd*(w/2+.2),s); if(!inTunnel(qx,qz,i)) colCircle(lv.col,qx,qz,.45); } };
+    for(let i=0;i<TUN.length;i++) tunnel(i);
     // the deep chamber + the core
     const ch=mesh(new THREE.SphereGeometry(9,24,16,0,Math.PI*2,0,Math.PI/2),rock,0,0,MINE.core.z,false); ch.material=rock.clone(); ch.material.side=THREE.BackSide; ch.scale.y=.6; scene.add(ch);
-    for(let a=0;a<Math.PI*2;a+=.25) colCircle(lv.col,Math.cos(a)*9,MINE.core.z+Math.sin(a)*9,.6);
+    for(let a=0;a<Math.PI*2;a+=.25){ const x=Math.cos(a)*9, z=MINE.core.z+Math.sin(a)*9; if(!inTunnel(x,z,-1,-.4)) colCircle(lv.col,x,z,.6); }   /* the tunnel comes in: no wall there */
     lv.core=new THREE.Group(); lv.core.position.copy(MINE.core).add(V3(0,1,0)); const cm=new THREE.MeshPhysicalMaterial({color:col(0x4ac8ff),emissive:col(0x2a8aff),emissiveIntensity:2.2,roughness:.2,transmission:.3,thickness:.5});
     lv.core.add(mesh(new THREE.OctahedronGeometry(.55,1),cm,0,0,0)); for(let i=0;i<6;i++){ const s=mesh(new THREE.OctahedronGeometry(.18,0),cm,Math.cos(i)*.7,rand(-.3,.4),Math.sin(i)*.7); lv.core.add(s); } scene.add(lv.core);
     lv.coreL=new THREE.PointLight(col(0x4aa8ff),3,14,1.6); lv.coreL.position.copy(lv.core.position); scene.add(lv.coreL);
@@ -36,7 +45,7 @@ defineLevel('mine',{
     for(const z of [-12,-56]){ const cart=new THREE.Group(); cart.position.set(0,0,z); cart.add(box(1.2,.8,1.8,rm,0,.75,0)); for(const [x,zz] of [[-.5,-.6],[.5,-.6],[-.5,.6],[.5,.6]]){ const w=cyl(.22,.22,.1,rm,x,.25,zz,12); w.rotation.z=Math.PI/2; cart.add(w); } scene.add(cart); colCircle(lv.col,0,z,1); }
     lv.lamps=[]; for(const p of [V3(0,2.8,-6),V3(0,2.8,-40),MINE.gallery.clone().add(V3(0,2.6,-4))]){ const L=new THREE.PointLight(col(0xffa860),1.6,16,1.6); L.position.copy(p); scene.add(L); lv.lamps.push(L); scene.add(prop('Lantern_01',p.x,p.y-.4,p.z,0,1)); }
     // the tripwire (glints in lantern light) + the pit
-    lv.wire=mesh(new THREE.CylinderGeometry(.006,.006,4,4),new THREE.MeshPhysicalMaterial({color:col(0xc8c0b0),metalness:1,roughness:.2}),0,.25,MINE.wire.z); lv.wire.rotation.z=Math.PI/2; scene.add(lv.wire);
+    lv.wire=mesh(new THREE.CylinderGeometry(.012,.012,4,6),new THREE.MeshPhysicalMaterial({color:col(0xd8d0c0),metalness:1,roughness:.15,emissive:col(0x3a3020)}),0,.25,MINE.wire.z); lv.wire.rotation.z=Math.PI/2; scene.add(lv.wire);
     const P=MINE.pit; const pit=mesh(new THREE.PlaneGeometry(P.x1-P.x0,P.z1-P.z0),mat(0x000000),(P.x0+P.x1)/2,.02,(P.z0+P.z1)/2,false); pit.rotation.x=-Math.PI/2; scene.add(pit);
     // daylight at the entrance
     const sun=new THREE.SpotLight(col(0xffe0b0),3,30,.6,.6,1); sun.position.set(0,3,8); sun.target.position.set(0,0,-6); scene.add(sun,sun.target);
