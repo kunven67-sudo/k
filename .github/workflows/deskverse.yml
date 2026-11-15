@@ -26,6 +26,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
+          Get-Content 'C:\Program Files\Windhawk\windhawk.ini'
           reg query HKLM\SOFTWARE\Windhawk\Engine\Mods /s | Select-Object -First 80
           Get-ChildItem C:\ProgramData\Windhawk\Engine\Mods -Recurse | Select-Object FullName, Length | Format-Table -AutoSize | Out-String -Width 250
           Get-Process windhawk -ErrorAction SilentlyContinue | Select-Object Id, Path

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf16"
 )
 
 // DV_MODS_DIR = a windhawk-mods/mods checkout, DV_JSREF = node script with Windhawk's own parser.
@@ -234,5 +235,24 @@ func TestAPIGuards(t *testing.T) {
 	}
 	if _, err := a.do("mod", req{ID: "not-in-catalog", On: true}); err == nil {
 		t.Error("unknown mod allowed")
+	}
+}
+
+func TestIniUTF16(t *testing.T) {
+	text := "[Storage]\r\nPortable=0\r\nAppDataPath=%ProgramData%\\Windhawk\r\nRegistryKey=HKEY_LOCAL_MACHINE\\SOFTWARE\\Windhawk\r\n"
+	u := utf16.Encode([]rune(text))
+	b := []byte{0xFF, 0xFE}
+	for _, c := range u {
+		b = append(b, byte(c), byte(c>>8))
+	}
+	p := filepath.Join(t.TempDir(), "windhawk.ini")
+	os.WriteFile(p, b, 0o644)
+	got := readIni(p)["storage"]
+	if got["registrykey"] != `HKEY_LOCAL_MACHINE\SOFTWARE\Windhawk` || got["appdatapath"] != `%ProgramData%\Windhawk` || got["portable"] != "0" {
+		t.Fatalf("%q", got)
+	}
+	os.WriteFile(p, []byte(text), 0o644)
+	if readIni(p)["storage"]["registrykey"] != `HKEY_LOCAL_MACHINE\SOFTWARE\Windhawk` {
+		t.Fatal("utf8 ini")
 	}
 }

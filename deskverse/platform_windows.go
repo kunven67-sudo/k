@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -90,34 +89,6 @@ func (r winReg) SetDWORD(key, name string, v uint32) error {
 
 type winPlatform struct{ base string } // %LOCALAPPDATA%\DeskVerse
 
-func readIni(p string) map[string]map[string]string {
-	out := map[string]map[string]string{}
-	f, err := os.Open(p)
-	if err != nil {
-		return out
-	}
-	defer f.Close()
-	sec := ""
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		l := strings.TrimSpace(strings.TrimPrefix(sc.Text(), "\uFEFF"))
-		if l == "" || l[0] == ';' || l[0] == '#' {
-			continue
-		}
-		if l[0] == '[' && strings.HasSuffix(l, "]") {
-			sec = strings.ToLower(l[1 : len(l)-1])
-			continue
-		}
-		if i := strings.IndexByte(l, '='); i > 0 {
-			if out[sec] == nil {
-				out[sec] = map[string]string{}
-			}
-			out[sec][strings.ToLower(strings.TrimSpace(l[:i]))] = strings.TrimSpace(l[i+1:])
-		}
-	}
-	return out
-}
-
 func whUninstallKey() (string, string) { // install dir, version
 	for _, view := range []uint32{registry.WOW64_64KEY, registry.WOW64_32KEY} {
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Windhawk`, registry.QUERY_VALUE|view)
@@ -182,7 +153,7 @@ func (p *winPlatform) Windhawk() (*Windhawk, WHStatus) {
 	case strings.HasPrefix(rk, `HKEY_CURRENT_USER\`), strings.HasPrefix(rk, `HKCU\`):
 		rootKey = registry.CURRENT_USER
 	default:
-		st.Why = "Couldn't read Windhawk's settings (windhawk.ini). Open Windhawk once, then try again."
+		st.Why = "Couldn't read Windhawk's settings (windhawk.ini RegistryKey=" + rk + "). Reinstall Windhawk, then try again."
 		return nil, st
 	}
 	sub := rk[strings.IndexByte(rk, '\\')+1:]
