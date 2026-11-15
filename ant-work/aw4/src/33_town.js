@@ -38,7 +38,7 @@ function tell(id,what){ LOOP.told[id]=what; saveLoop(); F.told=F.told||{}; F.tol
 /* ---------- the topics ---------- */
 const TOPICS={
   moe:()=>[
-    {text:'About the roof...',when:()=>!F.roofPaid,say:['m_job'],act:()=>{ if(F.errCrate&&F.errLucky&&F.errAbe){ F.roofPaid=1; return say(['m_paid']).then(()=>{ giveGold(5); giveAmmo('bullets',6); objective(''); }); } }},
+    {text:'About the roof...',when:()=>!F.roofPaid,say:['m_job'],act:()=>{ if(F.errCrate&&F.errLucky&&F.errAbe){ F.roofPaid=1; return say(['m_paid']).then(()=>{ giveGold(5); giveAmmo('bullets',6); objective(knows('ship')?'Find a way off Dustreach. Be inside or hidden by sundown (7 PM).':'Find a way off Dustreach: talk to everyone in town (old Rook out front knows things). Inside or hidden by 7 PM.'); }); } }},
     {text:'Who are the Hollow Riders?',when:()=>!said('mr'),once:'mr',say:['j_riders','m_riders','m_riders2']},
     {text:"What's under that trapdoor?",when:()=>!said('mc'),once:'mc',say:['j_trap','m_trap'],act:()=>{ F.moeSus=(F.moeSus||0)+1; }},
     {text:'Tell him about the buried ship',when:()=>knows('ship')&&!F.told?.moe,say:['j_tellship','m_tellship'],act:()=>{ tell('moe','ship'); F.moeKnowsShip=1; }},
@@ -100,7 +100,7 @@ const TOPICS={
     {text:'Trade: 2 bandages for 2 gold',when:()=>INV.gold>=2,act:()=>{ giveGold(-2); giveItem('bandage',2); }}]};
 function buy(id,cost,n=1){ if(INV.gold<cost) return say(['h_broke']); if(giveItem(id,n)){ giveGold(-cost); if(ITEMS[id].gun){ const s=INV.slots.find(s=>s&&s.id===id); s.loaded=ITEMS[id].mag; invHud(); } } }
 function buyAmmo(k,n,cost){ if(INV.gold<cost) return say(['h_broke']); giveGold(-cost); giveAmmo(k,n); }
-function errandCheck(){ if(F.errCrate&&F.errLucky&&F.errAbe&&!F.roofPaid) objective('Go back to Moe (the roof is paid)'); }
+function errandCheck(){ if(F.roofPaid) return; const left=[!F.errCrate&&'whiskey to Doc Bishop',!F.errLucky&&'collect Lucky\'s debt',!F.errAbe&&'warn Sheriff Abe'].filter(Boolean); objective(left.length?'Work off the roof: '+left.join(' · '):'Go back to Moe (the roof is paid)'); }   /* done errands drop off the list */
 async function timeSkip(h){ const fd=$('fade'); fd.style.transition='opacity .6s'; fd.style.opacity=1; await wait(.7); DAY.hour+=h; await wait(.4); fd.style.opacity=0; }
 function rookGoDig(){ const h=NPC.rook; walkTo(h,[V3(0,0,-20),V3(0,0,120),DUST.ship.clone().add(V3(-10,0,-8))],1.6); later(30,()=>{ if(!h.userData.dead){ h.position.copy(DUST.ship.clone().add(V3(-10,0,-8))); setPose(h,'dig',.4); } }); }
 /* ---------- locked doors: every key fits ONE door ---------- */

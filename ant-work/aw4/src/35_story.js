@@ -29,7 +29,7 @@ SCENES.landing=async function(){ const lv=LEVELS.dust, fd=$('fade');
   const J=jay2(); resetActor(J); J.visible=true; J.userData.hp=160; J.userData.dead=false; J.userData.hold=0;
   clockShow(false); invShow(false); hudVisible(true); setVM(true); dayLight(lv); playMusic('piano',.5); setPose(NPC.moe,'hips',0);
   const hole=lv.roofHole, tbl=lv.crashTable.position; PLAYER.lock();
-  fd.style.transition='none'; fd.style.opacity=0; SND.play('wind_gust_1',{vol:.9});
+  fd.style.transition='none'; fd.style.opacity=0; { const wh=$('fxWhite'); wh.style.transition='opacity 1.4s'; wh.style.opacity=0; const fb=$('fxBlack'); fb.style.transition='none'; fb.style.opacity=0; }   /* the return's white fades into the sky (it used to stay = white screen all loop) */ SND.play('wind_gust_1',{vol:.9});
   camFollow(t=>{ const k=Math.min(1,t/2.3); return {pos:V3(hole.x+(1-k)*5,lerp(70,2.6,k*k*k),hole.z+(1-k)*4),look:V3(hole.x,0,hole.z+.01),fov:80}; },80); CAM.fnT=0;
   await wait(2.25); SND.play('wood_crash',{vol:1}); SND.play('glass_break',{vol:.8}); SND.play('body_fall',{vol:1}); stopMusic(.05); shake(1.2); flashWhite(.6,.15);
   for(let i=0;i<40;i++) lv.soft.spawn(hole.x+rand(-1,1),rand(1,7),hole.z+rand(-1,1),rand(-2,2),rand(-3,1),rand(-2,2),rand(1,2.5),rand(.08,.2),.5,.36,.22,.9,0,.6,1.5);
