@@ -35,3 +35,12 @@ jobs:
           "explorer running: $([bool]$ex)"
           if ($ex) { $ex | ForEach-Object { $_.Modules } | Where-Object { $_.ModuleName -match 'windhawk|styler' } | Select-Object ModuleName | Format-Table | Out-String }
           Get-Content "$env:LOCALAPPDATA\DeskVerse\windows-animations-before.json" -ErrorAction SilentlyContinue
+      - name: Are the mods really loaded into apps?
+        if: always()
+        shell: pwsh
+        run: |
+          Start-Process notepad.exe
+          Start-Sleep 10
+          $hits = Get-Process | ForEach-Object { $n = $_.ProcessName; try { $_.Modules | Where-Object { $_.ModuleName -match 'classic-min-max|minimize-animation|taskbar-styler|start-menu-styler' } | ForEach-Object { "$n -> $($_.ModuleName)" } } catch {} } | Sort-Object -Unique
+          $hits
+          if (-not ($hits -match 'classic-min-max')) { "classic-min-max not loaded anywhere"; exit 1 }
