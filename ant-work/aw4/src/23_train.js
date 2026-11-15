@@ -37,7 +37,7 @@ function trainTick(dt){ if(!TRAIN.g||LV!==LEVELS.dust) return; const R=DUST.rail
   if(TRAIN.stopped>0){ TRAIN.stopped-=dt; TRAIN.speed=damp(TRAIN.speed,0,1.2,dt); if(TRAIN.stopped<=0) TRAIN.stopped=0; }
   else if(TRAIN.stopT>0){ TRAIN.stopT-=dt; TRAIN.speed=0; }
   else { if(nearSt){ TRAIN.stopT=30; TRAIN.lastStop=Math.sign(TRAIN.dir)*Math.round(DAY.hour); SND.play('bell_01',{vol:.6,pos:g.position,ref:40}); } TRAIN.speed=damp(TRAIN.speed,TRAIN.max,.6,dt); }
-  g.position.z+=TRAIN.dir*TRAIN.speed*dt; if(g.position.z<R.z0+40){ TRAIN.dir=1; TRAIN.stopT=20; } if(g.position.z>R.z1-10){ TRAIN.dir=-1; TRAIN.stopT=20; }
+  g.position.z+=TRAIN.dir*TRAIN.speed*dt; if(TRAIN.dir<0&&g.position.z<R.z0+40){ TRAIN.dir=1; TRAIN.stopT=20; } if(TRAIN.dir>0&&g.position.z>R.z1-10){ TRAIN.dir=-1; TRAIN.stopT=20; }   /* turn around ONCE (it re-triggered every frame = stuck at the end forever) */
   g.rotation.y=TRAIN.dir>0?Math.PI:0;
   g.position.y=LEVELS.dust.railY?LEVELS.dust.railY(g.position.z)*0:0;
   if(TRAIN.speed>1&&Math.random()<dt*14){ const p=TRAIN.loco.localToWorld(V3(0,4.6,-.8)); LV.soft.spawn(p.x,p.y,p.z,rand(-.4,.4),rand(1.5,3),rand(-.4,.4),rand(2,4),rand(.6,1.2),.32,.3,.28,.55,0,.5,3); }
