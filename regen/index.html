@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REGEN</title>
+<script src="gs3kit/gs3-console.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0d; color: #eef1f4; font-family: 'Inter', 'Segoe UI', sans-serif; user-select: none; }
+  canvas#view { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #cross { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: rgba(255,255,255,.9); box-shadow: 0 0 2px #000; }
+  #cross.hit { width: 10px; height: 10px; margin: -5px 0 0 -5px; background: transparent; border: 2px solid #ff4b3e; }
+  #bodyhud { position: absolute; left: 22px; bottom: 22px; display: flex; gap: 14px; align-items: flex-end; text-shadow: 0 1px 2px #000; }
+  #bodyhud svg { width: 70px; height: 128px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)); }
+  #bodyhud .part { fill: rgba(235,240,245,.82); transition: fill .2s; }
+  #bodyhud .part.cut { fill: rgba(200,20,20,.35); stroke: #ff3b30; stroke-width: 1.5; stroke-dasharray: 3 2; }
+  #bodyhud .part.grow { fill: #ff9f43; }
+  #regentext { font-size: 13px; letter-spacing: .12em; font-weight: 700; color: #ff9f43; min-height: 18px; }
+  #limbs { font-size: 12px; opacity: .85; line-height: 1.5; }
+  #weap { position: absolute; right: 24px; bottom: 22px; text-align: right; text-shadow: 0 1px 2px #000; }
+  #weap .name { font-size: 20px; font-weight: 700; }
+  #weap .slots { margin-top: 6px; display: flex; gap: 4px; justify-content: flex-end; }
+  #weap .slots span { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.18); }
+  #weap .slots span.on { background: rgba(255,255,255,.85); color: #111; }
+  #hint { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); font-size: 14px; background: rgba(0,0,0,.5); padding: 4px 10px; border-radius: 6px; display: none; }
+  #keys { position: absolute; left: 22px; top: 18px; font-size: 12px; opacity: .75; text-shadow: 0 1px 2px #000; line-height: 1.6; }
+  #toast { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); font-size: 15px; font-weight: 600; background: rgba(0,0,0,.55); padding: 6px 14px; border-radius: 6px; opacity: 0; transition: opacity .3s; }
+  #hurt { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(140,0,0,.55) 100%); opacity: 0; }
+  #fps { position: absolute; right: 10px; top: 8px; font-size: 11px; opacity: .5; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #0b0c0d; z-index: 50; }
+  #loading h1 { font-size: 64px; letter-spacing: .3em; margin: 0; font-weight: 800; }
+  #loading .bar { width: 320px; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
+  #loading .bar div { height: 100%; width: 0; background: #e8ecef; transition: width .2s; }
+  #loading .tip { font-size: 13px; opacity: .6; }
+  #start { display: none; }
+  /* spawn menu */
+  #spawn .gs3-panel { width: min(1100px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
+  #spawn .tabs { display: flex; gap: 6px; margin: 10px 0 12px; flex-wrap: wrap; }
+  #spawn .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; overflow-y: auto; padding: 4px; }
+  #spawn .tile { position: relative; border-radius: 10px; overflow: hidden; cursor: pointer; background: rgba(255,255,255,.06); border: 2px solid transparent; }
+  #spawn .tile img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #5d6670; }
+  #spawn .tile div { font-size: 13px; padding: 6px 8px; font-weight: 600; }
+  #spawn .tile:hover, #spawn .tile.gs3-focus, #spawn .tile:focus { border-color: currentColor; }
+  #spawn .opts { display: flex; gap: 14px; align-items: center; margin-top: 12px; flex-wrap: wrap; font-size: 14px; }
+  .credits { font-size: 12px; line-height: 1.55; max-height: 60vh; overflow-y: auto; white-space: pre-wrap; opacity: .85; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="hud">
+  <div id="cross"></div>
+  <div id="hurt"></div>
+  <div id="keys">WASD move · Shift run · Space jump · Q spawn menu · V camera · E pick up · G drop · 1-9 weapons · Esc menu</div>
+  <div id="toast"></div>
+  <div id="hint"></div>
+  <div id="bodyhud">
+    <svg viewBox="0 0 70 128">
+      <circle class="part" cx="35" cy="12" r="10"/>
+      <rect class="part" x="24" y="24" width="22" height="40" rx="6"/>
+      <rect id="p-lArm" class="part" x="47" y="26" width="9" height="40" rx="4"/>
+      <rect id="p-rArm" class="part" x="14" y="26" width="9" height="40" rx="4"/>
+      <rect id="p-lLeg" class="part" x="36" y="66" width="10" height="58" rx="4"/>
+      <rect id="p-rLeg" class="part" x="24" y="66" width="10" height="58" rx="4"/>
+    </svg>
+    <div><div id="regentext"></div><div id="limbs"></div></div>
+  </div>
+  <div id="weap"><div class="name"></div><div class="slots"></div></div>
+  <div id="fps"></div>
+</div>
+
+<div id="loading"><h1>REGEN</h1><div class="bar"><div></div></div><div class="tip">Loading real models...</div>
+  <button id="start" class="gs3-btn primary">Play</button></div>
+
+<div id="spawn" class="gs3-screen" hidden>
+  <div class="gs3-panel">
+    <div class="gs3-title">Spawn</div>
+    <div class="tabs"></div>
+    <div class="grid"></div>
+    <div class="opts">
+      <span>Creatures:</span>
+      <div class="gs3-row" id="moods">
+        <button class="gs3-btn primary" data-mood="hunt">Hunt me</button>
+        <button class="gs3-btn" data-mood="calm">Calm</button>
+        <button class="gs3-btn" data-mood="brawl">Fight each other</button>
+      </div>
+      <button class="gs3-btn" id="clearC">Remove creatures</button>
+      <button class="gs3-btn" id="clearI">Remove stuff</button>
+      <button class="gs3-btn" id="clearB">Clean up limbs + blood</button>
+    </div>
+  </div>
+</div>
+
+<div id="pause" class="gs3-screen" hidden>
+  <div class="gs3-panel" style="width:min(520px,92vw)">
+    <div class="gs3-title">REGEN</div>
+    <div class="gs3-sub">Paused</div>
+    <div class="gs3-menu" id="pmenu">
+      <div class="gs3-item" data-act="resume">Resume</div>
+      <div class="gs3-item" data-act="spawn">Spawn menu</div>
+      <div class="gs3-item" data-act="settings">Settings</div>
+      <div class="gs3-item" data-act="credits">Credits</div>
+      <div class="gs3-item" data-act="quit">Quit</div>
+    </div>
+  </div>
+</div>
+
+<div id="settings" class="gs3-screen" hidden>
+  <div class="gs3-panel" style="width:min(560px,92vw)">
+    <div class="gs3-title">Settings</div>
+    <div class="gs3-menu">
+      <div class="gs3-item" data-set="quality">Graphics <span class="gs3-value"></span></div>
+      <div class="gs3-item" data-set="blood">Blood <span class="gs3-value"></span></div>
+      <div class="gs3-item" data-set="regen">Regen speed <span class="gs3-value"></span></div>
+      <div class="gs3-item" data-set="view">Camera <span class="gs3-value"></span></div>
+      <div class="gs3-item">Mouse speed <input class="gs3-slider" id="sens" type="range" min="0.2" max="3" step="0.05"></div>
+      <div class="gs3-item">Field of view <input class="gs3-slider" id="fov" type="range" min="60" max="100" step="1"></div>
+      <div class="gs3-item">Volume <input class="gs3-slider" id="vol" type="range" min="0" max="1" step="0.02"></div>
+      <div class="gs3-item" data-set="invert">Invert look up/down <span class="gs3-value"></span></div>
+    </div>
+    <div class="gs3-row"><button class="gs3-btn primary" data-act="back">Back</button></div>
+  </div>
+</div>
+
+<div id="credits" class="gs3-screen" hidden>
+  <div class="gs3-panel" style="width:min(700px,94vw)">
+    <div class="gs3-title">Credits</div>
+    <div class="credits" id="credtext"></div>
+    <div class="gs3-row"><button class="gs3-btn primary" data-act="back">Back</button></div>
+  </div>
+</div>
+
+<script type="module" src="game.js"></script>
+</body>
+</html>
