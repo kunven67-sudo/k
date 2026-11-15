@@ -72,16 +72,16 @@ SCENES.white=async function(){ const lv=LEVELS.white, wh=$('fxWhite'); if(LV!==l
   toast('There\'s no ground here. FLY: WASD, Space = up, C = down','#cfd8e8'); freeWalk(); objective('Look into the glass boxes');
   makeGears(lv);
   for(const B of WHITE.boxes){ const g=lv.boxes[B.id]; addInteract(lv,{obj:g,reach:g.userData.S*.9,label:'Look inside',when:()=>!F.seen[B.id],act:()=>lookBox(B.id)}); }
-  await waitUntil(()=>['desert','nivalis','gulch','beach','time','thing'].filter(k=>F.seen[k]).length>=4&&F.seen.beach);
+  await waitUntil(()=>['desert','nivalis','gulch','beach','time','thing'].filter(k=>F.seen[k]).length>=4&&F.seen.beach&&!lv.looking); if(CAM.active) camRelease(0);   /* wait till the box view is done (the camera got stuck) */
   objective('The door'); PLAYER.lock(); PLAYER.ctl.look=true; lookAtPoint(WHITE.door,1); SND.play('hum_purple',{vol:.8}); await tweenVal(v=>lv.door.material.opacity=v,0,1,2); await say(['x_door']); freeWalk();
   await waitUntil(()=>PLAYER.pos.distanceTo(WHITE.door)<4.5); runStory(()=>SCENES.beyond()); };
-async function lookBox(id){ const lv=LEVELS.white, g=lv.boxes[id]; F.seen[id]=1; if(!F.firstBox) F.firstBox=id; PLAYER.lock(); PLAYER.ctl.look=true;
+async function lookBox(id){ const lv=LEVELS.white, g=lv.boxes[id]; lv.looking=1; F.seen[id]=1; if(!F.firstBox) F.firstBox=id; PLAYER.lock(); PLAYER.ctl.look=true;
   const from=camera.position.clone(); camFollow(t=>{ const k=Math.min(1,t/1.2); return {pos:from.clone().lerp(g.position.clone().add(V3(0,0,g.userData.S*.75)),smooth(k)),look:g.position.clone().add(V3(0,-1,0)),fov:60}; },60); CAM.fnT=0; await wait(1.3);
   if(id==='thing'){ let k=0; const tk=dt=>{ k+=dt; FX.aberr=.02+k*.02; shake(.05+k*.03); blurScreen(Math.min(.6,k*.3)); }; SCENE_TICKS.push(tk); SND.play('static',{vol:.8,rate:.4}); await say(['x_thing1','x_thing2']); SCENE_TICKS.splice(SCENE_TICKS.indexOf(tk),1); FX.aberr=.004; blurScreen(0); unlock('looked'); }
   else if(id==='beach'){ const J=lv.jim; J.userData.A.look=camera; await say(['x_jim1','x_jim2','x_jim3','x_jim4']); unlock('vacation'); const r=await choose([{text:'Wave at him'},{text:'"We\'ll come home, Jim. I promise."'},{text:'Look away'}]); if(r.text.startsWith('"We')){ F.jimPromise=1; await say(['x_promise','x_jim5']); } }
   else await say({desert:['x_desert'],nivalis:['x_niv'],gulch:['x_gulch','x_gulch2'],time:['x_time']}[id]);
   if(id==='gulch'&&!lv.graveI){ lv.graveI=1; addInteract(lv,{obj:g,reach:g.userData.S*.75,label:'Touch the glass',when:()=>F.seen.gulch&&!F.bobRespect,act:()=>{ F.bobRespect=1; SND.play('bell_01',{vol:.3,rate:.6}); chat(['x_grave']); }}); }
-  camRelease(.6); await wait(.6); freeWalk(); }
+  camRelease(.6); await wait(.6); freeWalk(); lv.looking=0; }
 /* ---------- the gears: one hidden on each reality box (never mentioned anywhere) ---------- */
 function gearMesh(){ const g=new THREE.Group(); const m=new THREE.MeshPhysicalMaterial({color:col(0xe8c060),metalness:1,roughness:.25,emissive:col(0x6a4a10),emissiveIntensity:.8});
   g.add(mesh(new THREE.TorusGeometry(.13,.035,8,24),m,0,0,0,false)); for(let i=0;i<8;i++){ const t=box(.05,.05,.05,m,Math.cos(i/8*Math.PI*2)*.17,Math.sin(i/8*Math.PI*2)*.17,0,false); g.add(t); } { const hub=mesh(new THREE.CylinderGeometry(.04,.04,.06,10),m,0,0,0,false); hub.rotation.x=Math.PI/2; g.add(hub); } return g; }
