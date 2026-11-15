@@ -26,6 +26,7 @@ function insideB(x,z,pad=0){ for(const b of BLD){ const r=bRect(b); if(x>r.x0+pa
 function signTex(txt,w=512,h=96){ return canvasTex(w,h,(c,W,H)=>{ c.fillStyle='#d9c49a'; c.fillRect(0,0,W,H); for(let i=0;i<40;i++){ c.fillStyle='rgba(90,60,30,'+(Math.random()*.12)+')'; c.fillRect(0,Math.random()*H,W,1+Math.random()*2); }
   c.strokeStyle='#4a2e18'; c.lineWidth=6; c.strokeRect(5,5,W-10,H-10); c.fillStyle='#3a1e0e'; c.font='bold '+Math.min(64,Math.floor(W*1.5/Math.max(6,txt.length)))+'px Georgia'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(txt,W/2,H/2+3); }); }
 defineLevel('dust',{
+  hdri:['dry_cracked_lake',.5],   /* real sky light */
   title:'Dry Gulch',
   env:{fx:{exposure:1.08,saturation:1.0,contrast:1.08,temp:.12,bloomStrength:.3,bloomThreshold:1.1,aoRadius:.6,vignette:.35,grain:.035},music:null,reverb:.15,surface:'sand',far:1700,speed:3.4},
   async build(scene,lv){

@@ -470,3 +470,8 @@ function makeEnv(o){
   return rt.texture;
 }
 
+
+/* real skies (Poly Haven CC0 HDRIs, toned down to 8-bit): light + reflections for a level. k = how strong */
+function hdriEnv(name,k=1){ const key='env_'+name+'_'+k; if(TEXCACHE[key]) return TEXCACHE[key]; const src=ASSETS.tex&&ASSETS.tex['hdri_'+name]; if(!src||!src.image) return null;
+  const c=document.createElement('canvas'); c.width=src.image.width; c.height=src.image.height; const x=c.getContext('2d'); x.filter='brightness('+k+')'; x.drawImage(src.image,0,0);
+  const t=new THREE.CanvasTexture(c); t.mapping=THREE.EquirectangularReflectionMapping; t.encoding=THREE.sRGBEncoding; const rt=pmrem.fromEquirectangular(t); t.dispose(); TEXCACHE[key]=rt.texture; return rt.texture; }

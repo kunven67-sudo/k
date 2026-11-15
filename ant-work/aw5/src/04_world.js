@@ -260,6 +260,7 @@ async function enterLevel(name,spawn={},opts={}){
   camera.near=E.near||.05; camera.far=E.far||1500; camera.updateProjectionMatrix();
   resetFX(E.fx);
   if(E.fog) def.scene.fog=new THREE.FogExp2(col(E.fog[0]),E.fog[1]);
+  if(!def.envMap&&def.hdri&&typeof hdriEnv==='function'){ const e=hdriEnv(def.hdri[0],def.hdri[1]); if(e) def.envMap=e; }   /* a real sky for this place */
   if(!def.envMap&&!def.noEnv){ /* auto reflections from the level's own sky/ground light (metal was rendering black, PBR looked flat) */
     let top=0x8090a0, bot=0x302820, k=.45; def.scene.traverse(o=>{ if(o.isHemisphereLight){ top=o.color.getHex(); bot=o.groundColor.getHex(); k=clamp(.22+o.intensity*.32,.2,.75); } });
     const bgc=def.scene.background&&def.scene.background.isColor?def.scene.background:(def.scene.fog?def.scene.fog.color:null); const hor=bgc?bgc.clone().lerp(col(top),.35).getHex():0x707880;

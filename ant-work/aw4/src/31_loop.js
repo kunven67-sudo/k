@@ -27,6 +27,7 @@ function dayLight(lv){
   lv.rig.hemi.intensity=.26+.85*k; lv.rig.hemi.color.set(0x3a4a70).lerp(_c3.set(0xb8d0f0),k); lv.rig.hemi.groundColor.set(0x1a1820).lerp(_c3.set(0xc8a070),k);
   lv.scene.fog.color.set(0x0a0e1a).lerp(_c3.set(0xd8c8a8),k).lerp(_c3.set(0xd08050),warm*.5);
   lv.stars.visible=k<.25;
+  { const want=k<.3?'night':'day'; if(lv.envMode!==want&&typeof hdriEnv==='function'){ const e=want==='day'?hdriEnv('dry_cracked_lake',.5):hdriEnv('rogland_clear_night',.18); if(e){ lv.envMode=want; lv.scene.environment=e; } } }   /* the real sky light follows day/night */
   const lampOn=k<.45; for(const L of lv.lampL||[]) L.intensity=lampOn?1.6:0;
   if(lv.saloonL) lv.saloonL.intensity=1.2+(lampOn?.8:0);
   FX.exposure=1.08+(1-k)*.3;

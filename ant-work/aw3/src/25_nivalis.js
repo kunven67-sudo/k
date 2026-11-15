@@ -12,6 +12,7 @@ function iceTex(){ return bugTex('ice',512,(c,s)=>{ const g=c.createLinearGradie
   (c,s)=>{ c.fillStyle='#808080'; c.fillRect(0,0,s,s); c.strokeStyle='#fff'; for(let i=0;i<60;i++){ c.lineWidth=rand(.5,2); c.beginPath(); let x=Math.random()*s,y=Math.random()*s; c.moveTo(x,y); for(let k=0;k<5;k++){ x+=rand(-40,40); y+=rand(-40,40); c.lineTo(x,y); } c.stroke(); } },1.2,[1,1]); }
 const NIV={lake:{x:0,z:-70,r:34}, cave:V3(10,0,-205), ant:V3(-14,-6,-72), town:V3(260,0,-600), start:V3(0,0,40)};
 defineLevel('nivalis',{
+  hdri:['snowy_field',.12],   /* real sky light */
   title:'Nivalis',
   env:{fx:{exposure:1.0,saturation:.8,contrast:1.12,temp:-.22,bloomStrength:.55,bloomThreshold:1.1,aoRadius:.6,vignette:.6,grain:.05},music:null,reverb:.25,surface:'snow',far:1400,speed:3.0},
   async build(scene,lv){

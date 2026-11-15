@@ -9,6 +9,7 @@
 CHECKPOINTS.push({id:'fake1',name:'Day 1?',level:'stand'},{id:'fake3',name:'Day 3?',level:'stand'},{id:'fake5',name:'Day 5?',level:'stand'});
 const STAND={table:V3(0,0,0), food:V3(0,1.02,0), w:3.2, d:1.4};
 defineLevel('stand',{
+  hdri:['noon_grass',.5],   /* real sky light */
   title:"Jim's stand",
   env:{fx:{exposure:1.12,saturation:1.15,contrast:1.04,temp:.06,bloomStrength:.25,bloomThreshold:1.2,aoRadius:.5,vignette:.3},music:null,reverb:.1,surface:'grass',far:600,speed:3.3},
   async build(scene,lv){

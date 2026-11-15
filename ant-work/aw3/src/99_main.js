@@ -41,6 +41,7 @@ function frame(){
       if(slowChecks>=12 && autoLowered<3){ slowChecks=0; const i=PRESET_ORDER.indexOf(SETTINGS.preset); const idx=i<0?PRESET_ORDER.indexOf('medium'):i; if(idx>0){ autoLowered++; applyPreset(PRESET_ORDER[idx-1]); toast('Graphics lowered to '+PRESETS[SETTINGS.preset].name+' so it runs smooth','#9fe8ff'); } } } }
 }
 /* ---------- everything the game needs, loaded once ---------- */
+const HDRI_LIST=['dry_cracked_lake','rogland_clear_night','noon_grass','snowy_field'];
 const TEX_LIST=['desert_ripple','desert_sand','dense_sand','sandy_gravel_02','sandstone_blocks_05','large_sandstone_blocks_01','old_sandstone_02','sandstone_cracks','red_sandstone_pavement','clay_plaster','castle_brick_07','stone_tiles_02','rusty_metal_04','brown_leather','rough_wood','cotton_jersey','denim_fabric','stretch_poplin','caban'];
 const SFX_LIST=['engine','zap','zap_crackle','snore','bug_1','bug_2','bug_3','bug_4','scream','spit','bug_hurt','metal_1','metal_2','metal_3','cage_lock','blade_1','blade_2','blade_3','stone_1','stone_2','pickup','bug_die','craft',...[1,2,3,4,5,6].flatMap(i=>['step_sand_'+i,'step_stone_'+i]),'sigh_1','sigh_2','breath_heavy','gasp','oof_1','oof_2','static','watch_beep',
   'punch_1','punch_2','punch_3','swing_1','swing_2','block_1','block_2','body_fall','sand_fall','heartbeat','bite','chew_1','chew_2','chew_3',
@@ -51,6 +52,7 @@ async function preload(progress){
   ASSETS.onProgress=progress;
   const jobs=[];
   for(const t of TEX_LIST) jobs.push(loadPBR(t));
+  for(const h of HDRI_LIST) jobs.push(loadTexture('hdri_'+h,'assets/tex/hdri_'+h+'.jpg'));
   for(const s of SFX_LIST) jobs.push(SND.load(s,'assets/sfx/'+s+'.ogg'));
   for(const m of MUSIC_LIST) jobs.push(SND.load(m,'assets/music/'+m+'.ogg'));
   for(const id in LINES) if(id[0]!=='_') jobs.push(SND.load('voice/'+id,'assets/voice/'+id+'.mp3'));
