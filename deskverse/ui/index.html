@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeskVerse</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<aside class="rail">
+  <div class="brand">Desk<b>Verse</b></div>
+  <nav id="nav">
+    <button data-sec="taskbar" class="on"><span>Taskbar</span><i id="n-taskbar"></i></button>
+    <button data-sec="start"><span>Start menu</span><i id="n-start"></i></button>
+    <button data-sec="anim"><span>Animations</span><i id="n-anim"></i></button>
+    <button data-sec="fun"><span>Fun stuff</span><i id="n-fun"></i></button>
+  </nav>
+  <div class="now" id="now"></div>
+  <div class="rail-bottom">
+    <button class="ghost" id="reset">Back to normal</button>
+    <button class="ghost" id="openwh">Fine-tune in Windhawk</button>
+    <div class="ver" id="ver"></div>
+  </div>
+</aside>
+<main>
+  <header class="top">
+    <div>
+      <h1 id="title">Taskbar</h1>
+      <p id="sub"></p>
+    </div>
+    <div class="top-right">
+      <input id="q" type="search" placeholder="Search looks" autocomplete="off" spellcheck="false">
+      <span class="chip" id="whchip"></span>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden>
+    <div>
+      <b>One-time setup: Windhawk</b>
+      <span>DeskVerse switches your taskbar, Start menu and animations through Windhawk, a free tool made for this. Pick any look and it installs by itself (about 12 MB, once).</span>
+    </div>
+    <button class="primary" id="getwh">Get Windhawk now</button>
+  </div>
+  <section id="grid" class="grid"></section>
+  <p class="credit" id="credit"></p>
+</main>
+<div class="toast" id="toast" role="status"></div>
+<div class="modal" id="modal" hidden>
+  <div class="box">
+    <h2>Back to normal?</h2>
+    <p>Turns off every taskbar look, Start menu look and animation from DeskVerse, and puts your Windows animations back how they were before.</p>
+    <div class="row"><button class="ghost" id="m-no">Cancel</button><button class="primary" id="m-yes">Back to normal</button></div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

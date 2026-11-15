@@ -1,0 +1,119 @@
+[
+{
+"id": "macos-minimize-animation",
+"sec": "anim",
+"name": "Genie minimize",
+"desc": "Windows shrink into the taskbar like a Mac when you minimize them, and stretch back out when you open them.",
+"group": "minimize",
+"img": "img/mod/macos-minimize-animation.webp",
+"by": "Abdullah Masood"
+},
+{
+"id": "classic-min-max-animations",
+"sec": "anim",
+"name": "Classic minimize",
+"desc": "The old-school Windows title bar that flies down to the taskbar when you minimize.",
+"group": "minimize",
+"img": "img/mod/classic-min-max-animations.webp",
+"by": "aubymori"
+},
+{
+"id": "mobile-open-animation",
+"sec": "anim",
+"name": "Zoom open",
+"desc": "Apps zoom open from where you clicked, like on a phone.",
+"group": "",
+"img": null,
+"by": "Nico6719"
+},
+{
+"id": "menu-tooltip-slide-animation",
+"sec": "anim",
+"name": "Sliding menus",
+"desc": "Right-click menus and tooltips slide into view.",
+"group": "",
+"img": "img/mod/menu-tooltip-slide-animation.webp",
+"by": "aubymori"
+},
+{
+"id": "file-explorer-content-animation",
+"sec": "anim",
+"name": "Folder slide-in",
+"desc": "Folders slide and fade in when you open them in File Explorer.",
+"group": "",
+"img": "img/mod/file-explorer-content-animation.webp",
+"by": "crazyboyybs"
+},
+{
+"id": "smooth-scroll-win32",
+"sec": "anim",
+"name": "Smooth scrolling",
+"desc": "File Explorer scrolls smooth instead of jumping in steps.",
+"group": "",
+"img": "img/mod/smooth-scroll-win32.webp",
+"by": "crazyboyybs"
+},
+{
+"id": "desktop-marquee-fade",
+"sec": "anim",
+"name": "Selection fade",
+"desc": "The blue box you drag on the desktop fades out instead of vanishing.",
+"group": "",
+"img": "img/mod/desktop-marquee-fade.webp",
+"by": "angel_lov"
+},
+{
+"id": "osd-custom-pill",
+"sec": "anim",
+"name": "Volume pill",
+"desc": "The volume and brightness pop-up turns into an animated pill.",
+"group": "",
+"img": "img/mod/osd-custom-pill.webp",
+"by": "yelloxygene"
+},
+{
+"id": "neko-cat",
+"sec": "fun",
+"name": "Desktop cat",
+"desc": "A little cat runs around your screen and chases your mouse.",
+"group": "",
+"img": "img/mod/neko-cat.webp",
+"by": "ciizerr"
+},
+{
+"id": "mouse-trail",
+"sec": "fun",
+"name": "Mouse trail",
+"desc": "Your mouse leaves a glowing trail behind it.",
+"group": "",
+"img": "img/mod/mouse-trail.webp",
+"by": "MCheng404"
+},
+{
+"id": "cursor-idle-fade",
+"sec": "fun",
+"name": "Cursor fade",
+"desc": "Your mouse fades out when you stop moving it and pops back the second you move.",
+"group": "",
+"img": "img/mod/cursor-idle-fade.webp",
+"by": "Nuzza"
+},
+{
+"id": "parallax-wallpaper",
+"sec": "fun",
+"name": "3D wallpaper",
+"desc": "Your wallpaper moves a little with your mouse, like it has depth.",
+"group": "",
+"img": "img/mod/parallax-wallpaper.webp",
+"by": "HaVeN80"
+},
+{
+"id": "acrylic-color-glows",
+"sec": "fun",
+"name": "Color glows",
+"desc": "Animated light glows behind see-through windows.",
+"group": "",
+"img": "img/mod/acrylic-color-glows.webp",
+"by": "HaVeN80"
+}
+]

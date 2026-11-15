@@ -1,0 +1,644 @@
+{
+"taskbar": [
+{
+"v": "TranslucentTaskbar",
+"label": "TranslucentTaskbar",
+"img": "img/tb/translucenttaskbar.jpg",
+"w": 819,
+"h": 96
+},
+{
+"v": "DockLike",
+"label": "DockLike",
+"img": "img/tb/docklike.jpg",
+"w": 1100,
+"h": 137
+},
+{
+"v": "SimplyTransparent",
+"label": "SimplyTransparent",
+"img": "img/tb/simplytransparent.jpg",
+"w": 996,
+"h": 66
+},
+{
+"v": "Squircle",
+"label": "Squircle",
+"img": "img/tb/squircle.jpg",
+"w": 915,
+"h": 50
+},
+{
+"v": "Matter",
+"label": "Matter",
+"img": "img/tb/matter.jpg",
+"w": 1100,
+"h": 119
+},
+{
+"v": "WinXP",
+"label": "WinXP",
+"img": "img/tb/winxp.jpg",
+"w": 693,
+"h": 520
+},
+{
+"v": "WinXP_variant_Zune",
+"label": "WinXP (Zune)",
+"img": "img/tb/winxp-variant-zune.jpg",
+"w": 693,
+"h": 520
+},
+{
+"v": "Bubbles",
+"label": "Bubbles",
+"img": "img/tb/bubbles.jpg",
+"w": 1024,
+"h": 96
+},
+{
+"v": "RosePine",
+"label": "RosePine",
+"img": "img/tb/rosepine.jpg",
+"w": 1100,
+"h": 72
+},
+{
+"v": "WinVista",
+"label": "WinVista",
+"img": "img/tb/winvista.jpg",
+"w": 656,
+"h": 32
+},
+{
+"v": "CleanSlate",
+"label": "CleanSlate",
+"img": "img/tb/cleanslate.jpg",
+"w": 1100,
+"h": 158
+},
+{
+"v": "Lucent",
+"label": "Lucent (Accented Bar)",
+"img": "img/tb/lucent.jpg",
+"w": 1100,
+"h": 76
+},
+{
+"v": "Lucent_variant_Light",
+"label": "Lucent (Light Bar)",
+"img": "img/tb/lucent-variant-light.jpg",
+"w": 1100,
+"h": 76
+},
+{
+"v": "SunValley",
+"label": "SunValley",
+"img": "img/tb/sunvalley.jpg",
+"w": 1100,
+"h": 42
+},
+{
+"v": "21996Taskbar",
+"label": "SunValley (Legacy)",
+"img": "img/tb/21996taskbar.jpg",
+"w": 1100,
+"h": 65
+},
+{
+"v": "BottomDensy",
+"label": "BottomDensy",
+"img": "img/tb/bottomdensy.jpg",
+"w": 818,
+"h": 48
+},
+{
+"v": "BottomDensy_variant_NoInd",
+"label": "BottomDensy (NoInd)",
+"img": "img/tb/bottomdensy-variant-noind.jpg",
+"w": 818,
+"h": 48
+},
+{
+"v": "TaskbarXII",
+"label": "TaskbarXII",
+"img": "img/tb/taskbarxii.jpg",
+"w": 1022,
+"h": 234
+},
+{
+"v": "xdark",
+"label": "xdark",
+"img": "img/tb/xdark.jpg",
+"w": 1100,
+"h": 71
+},
+{
+"v": "Windows7",
+"label": "Windows7",
+"img": "img/tb/windows7.jpg",
+"w": 1100,
+"h": 52
+},
+{
+"v": "Aeris",
+"label": "Aeris",
+"img": "img/tb/aeris.jpg",
+"w": 1100,
+"h": 150
+},
+{
+"v": "Plasma",
+"label": "Plasma",
+"img": "img/tb/plasma.jpg",
+"w": 1024,
+"h": 49
+},
+{
+"v": "WindowGlass",
+"label": "WindowGlass",
+"img": "img/tb/windowglass.jpg",
+"w": 800,
+"h": 65
+},
+{
+"v": "WindowGlass_variant_Split",
+"label": "WindowGlass (Split)",
+"img": "img/tb/windowglass-variant-split.jpg",
+"w": 1100,
+"h": 43
+},
+{
+"v": "WindowGlass_variant_FullLength",
+"label": "WindowGlass (Full-Length)",
+"img": "img/tb/windowglass-variant-fulllength.jpg",
+"w": 800,
+"h": 65
+},
+{
+"v": "Surface",
+"label": "Surface",
+"img": "img/tb/surface.jpg",
+"w": 1100,
+"h": 71
+},
+{
+"v": "Oversimplified&Accentuated",
+"label": "Oversimplified&Accentuated",
+"img": "img/tb/oversimplified-accentuated.jpg",
+"w": 1100,
+"h": 102
+},
+{
+"v": "Luminosity_variant_Dock",
+"label": "Luminosity (Dock)",
+"img": "img/tb/luminosity-variant-dock.jpg",
+"w": 1100,
+"h": 36
+},
+{
+"v": "Luminosity_variant_Classic",
+"label": "Luminosity (Classic)",
+"img": "img/tb/luminosity-variant-classic.jpg",
+"w": 1100,
+"h": 72
+},
+{
+"v": "Luminosity_variant_Compact",
+"label": "Luminosity (Compact)",
+"img": "img/tb/luminosity-variant-compact.jpg",
+"w": 1100,
+"h": 26
+},
+{
+"v": "LayerMicaUI",
+"label": "LayerMicaUI",
+"img": "img/tb/layermicaui.jpg",
+"w": 1100,
+"h": 212
+},
+{
+"v": "Fluid",
+"label": "Fluid",
+"img": "img/tb/fluid.jpg",
+"w": 1100,
+"h": 69
+},
+{
+"v": "TintedGlass",
+"label": "TintedGlass",
+"img": "img/tb/tintedglass.jpg",
+"w": 1100,
+"h": 65
+},
+{
+"v": "TaskbarToStatusbar",
+"label": "TaskbarToStatusbar",
+"img": "img/tb/taskbartostatusbar.jpg",
+"w": 1100,
+"h": 191
+},
+{
+"v": "UltraWideFriendly",
+"label": "UltraWideFriendly",
+"img": "img/tb/ultrawidefriendly.jpg",
+"w": 967,
+"h": 160
+},
+{
+"v": "LiquidGlass2",
+"label": "LiquidGlass",
+"img": "img/tb/liquidglass2.jpg",
+"w": 1100,
+"h": 81
+},
+{
+"v": "LiquidGlass",
+"label": "LiquidGlass (Legacy)",
+"img": "img/tb/liquidglass.jpg",
+"w": 1100,
+"h": 72
+},
+{
+"v": "LiquidGlass_variant_Alternate",
+"label": "LiquidGlass (Legacy - Alternate)",
+"img": "img/tb/liquidglass-variant-alternate.jpg",
+"w": 1100,
+"h": 72
+},
+{
+"v": "Borderless",
+"label": "Borderless",
+"img": "img/tb/borderless.jpg",
+"w": 1014,
+"h": 90
+},
+{
+"v": "Command_Center",
+"label": "Command Center",
+"img": "img/tb/command-center.jpg",
+"w": 1100,
+"h": 41
+},
+{
+"v": "FluentGlass",
+"label": "FluentGlass",
+"img": "img/tb/fluentglass.jpg",
+"w": 1100,
+"h": 70
+},
+{
+"v": "OS26_Liquid_Glass_variant_ClearMacDock",
+"label": "OS26 Liquid Glass (Clear MacDock)",
+"img": "img/tb/os26-liquid-glass-variant-clearmacdock.jpg",
+"w": 1100,
+"h": 157
+},
+{
+"v": "OS26_Liquid_Glass_variant_ClearMacDockCompact",
+"label": "OS26 Liquid Glass (Clear MacDock Compact)",
+"img": "img/tb/os26-liquid-glass-variant-clearmacdockcompact.jpg",
+"w": 1100,
+"h": 44
+},
+{
+"v": "OS26_Liquid_Glass_variant_ClearTaskbar",
+"label": "OS26 Liquid Glass (Clear Taskbar)",
+"img": "img/tb/os26-liquid-glass-variant-cleartaskbar.jpg",
+"w": 1100,
+"h": 49
+},
+{
+"v": "OS26_Liquid_Glass_variant_DarkMacDock",
+"label": "OS26 Liquid Glass (Dark MacDock)",
+"img": "img/tb/os26-liquid-glass-variant-darkmacdock.jpg",
+"w": 1100,
+"h": 163
+},
+{
+"v": "OS26_Liquid_Glass_variant_DarkMacDockCompact",
+"label": "OS26 Liquid Glass (Dark MacDock Compact)",
+"img": "img/tb/os26-liquid-glass-variant-darkmacdockcompact.jpg",
+"w": 1100,
+"h": 47
+},
+{
+"v": "OS26_Liquid_Glass_variant_DarkTaskbar",
+"label": "OS26 Liquid Glass (Dark Taskbar)",
+"img": "img/tb/os26-liquid-glass-variant-darktaskbar.jpg",
+"w": 1100,
+"h": 47
+},
+{
+"v": "FrostyGlass",
+"label": "FrostyGlass",
+"img": "img/tb/frostyglass.jpg",
+"w": 1100,
+"h": 115
+},
+{
+"v": "FrostedAcrylic",
+"label": "FrostedAcrylic",
+"img": "img/tb/frostedacrylic.jpg",
+"w": 1100,
+"h": 41
+},
+{
+"v": "Pills",
+"label": "Pills",
+"img": "img/tb/pills.jpg",
+"w": 1100,
+"h": 46
+},
+{
+"v": "Blob",
+"label": "Blob",
+"img": "img/tb/blob.jpg",
+"w": 875,
+"h": 36
+},
+{
+"v": "Minecraft_Hotbar",
+"label": "Minecraft Hotbar",
+"img": "img/tb/minecraft-hotbar.jpg",
+"w": 1100,
+"h": 198
+},
+{
+"v": "One_UI_8_5_variant_Dock",
+"label": "One UI 8.5 (Dock)",
+"img": "img/tb/one-ui-8-5-variant-dock.jpg",
+"w": 1100,
+"h": 174
+},
+{
+"v": "One_UI_8_5_variant_Taskbar",
+"label": "One UI 8.5 (Taskbar)",
+"img": "img/tb/one-ui-8-5-variant-taskbar.jpg",
+"w": 1100,
+"h": 136
+}
+],
+"start": [
+{
+"v": "TranslucentStartMenu",
+"label": "TranslucentStartMenu",
+"img": "img/sm/translucentstartmenu.jpg",
+"w": 720,
+"h": 647
+},
+{
+"v": "NoRecommendedSection",
+"label": "NoRecommendedSection",
+"img": "img/sm/norecommendedsection.jpg",
+"w": 720,
+"h": 655
+},
+{
+"v": "SideBySide",
+"label": "SideBySide",
+"img": "img/sm/sidebyside.jpg",
+"w": 720,
+"h": 655
+},
+{
+"v": "SideBySide2",
+"label": "SideBySide2",
+"img": "img/sm/sidebyside2.jpg",
+"w": 720,
+"h": 655
+},
+{
+"v": "SideBySideMinimal",
+"label": "SideBySideMinimal",
+"img": "img/sm/sidebysideminimal.jpg",
+"w": 720,
+"h": 655
+},
+{
+"v": "Down Aero",
+"label": "Down Aero",
+"img": "img/sm/down-aero.jpg",
+"w": 709,
+"h": 720
+},
+{
+"v": "Windows10",
+"label": "Windows10",
+"img": "img/sm/windows10.jpg",
+"w": 720,
+"h": 500
+},
+{
+"v": "Windows10_variant_Minimal",
+"label": "Windows10 (Minimal)",
+"img": "img/sm/windows10-variant-minimal.jpg",
+"w": 380,
+"h": 720
+},
+{
+"v": "Windows11_Metro10",
+"label": "Windows11_Metro10",
+"img": "img/sm/windows11-metro10.jpg",
+"w": 667,
+"h": 685
+},
+{
+"v": "Fluent2Inspired",
+"label": "Fluent2Inspired",
+"img": "img/sm/fluent2inspired.jpg",
+"w": 643,
+"h": 720
+},
+{
+"v": "RosePine",
+"label": "RosePine",
+"img": "img/sm/rosepine.jpg",
+"w": 584,
+"h": 670
+},
+{
+"v": "Windows11_Metro10Minimal",
+"label": "Windows11_Metro10Minimal",
+"img": "img/sm/windows11-metro10minimal.jpg",
+"w": 477,
+"h": 680
+},
+{
+"v": "Everblush",
+"label": "Everblush",
+"img": "img/sm/everblush.jpg",
+"w": 635,
+"h": 720
+},
+{
+"v": "SunValley",
+"label": "SunValley",
+"img": "img/sm/sunvalley.jpg",
+"w": 615,
+"h": 720
+},
+{
+"v": "21996",
+"label": "SunValley (Legacy)",
+"img": "img/sm/21996.jpg",
+"w": 665,
+"h": 720
+},
+{
+"v": "UniMenu",
+"label": "UniMenu",
+"img": "img/sm/unimenu.jpg",
+"w": 720,
+"h": 720
+},
+{
+"v": "LegacyFluent",
+"label": "LegacyFluent",
+"img": "img/sm/legacyfluent.jpg",
+"w": 639,
+"h": 720
+},
+{
+"v": "OnlySearch",
+"label": "OnlySearch",
+"img": "img/sm/onlysearch.jpg",
+"w": 720,
+"h": 264
+},
+{
+"v": "OnlySearch_variant_Minimal",
+"label": "OnlySearch (Minimal)",
+"img": "img/sm/onlysearch-variant-minimal.jpg",
+"w": 720,
+"h": 264
+},
+{
+"v": "WindowGlass",
+"label": "WindowGlass",
+"img": "img/sm/windowglass.jpg",
+"w": 621,
+"h": 720
+},
+{
+"v": "Fluid",
+"label": "Fluid",
+"img": "img/sm/fluid.jpg",
+"w": 698,
+"h": 720
+},
+{
+"v": "Oversimplified&Accentuated",
+"label": "Oversimplified&Accentuated",
+"img": "img/sm/oversimplified-accentuated.jpg",
+"w": 598,
+"h": 720
+},
+{
+"v": "LiquidGlass2",
+"label": "LiquidGlass",
+"img": "img/sm/liquidglass2.jpg",
+"w": 718,
+"h": 720
+},
+{
+"v": "LiquidGlass",
+"label": "LiquidGlass (Legacy)",
+"img": "img/sm/liquidglass.jpg",
+"w": 720,
+"h": 557
+},
+{
+"v": "Windows10X",
+"label": "Windows10X",
+"img": "img/sm/windows10x.jpg",
+"w": 720,
+"h": 646
+},
+{
+"v": "TintedGlass",
+"label": "TintedGlass",
+"img": "img/sm/tintedglass.jpg",
+"w": 605,
+"h": 720
+},
+{
+"v": "LayerMicaUI",
+"label": "LayerMicaUI",
+"img": "img/sm/layermicaui.jpg",
+"w": 720,
+"h": 417
+},
+{
+"v": "Borderless",
+"label": "Borderless",
+"img": "img/sm/borderless.jpg",
+"w": 720,
+"h": 355
+},
+{
+"v": "Command Center",
+"label": "Command Center",
+"img": "img/sm/command-center.jpg",
+"w": 694,
+"h": 720
+},
+{
+"v": "FullScreen",
+"label": "FullScreen",
+"img": "img/sm/fullscreen.jpg",
+"w": 660,
+"h": 660
+},
+{
+"v": "FrostyGlass",
+"label": "FrostyGlass",
+"img": "img/sm/frostyglass.jpg",
+"w": 720,
+"h": 720
+},
+{
+"v": "FlyoutStartMenu",
+"label": "FlyoutStartMenu",
+"img": "img/sm/flyoutstartmenu.jpg",
+"w": 609,
+"h": 224
+},
+{
+"v": "OS26 Tahoe App Launcher_variant_DarkCenter",
+"label": "OS26 Tahoe App Launcher (Dark, Center)",
+"img": "img/sm/os26-tahoe-app-launcher-variant-darkcenter.jpg",
+"w": 720,
+"h": 531
+},
+{
+"v": "OS26 Tahoe App Launcher_variant_DarkBottom",
+"label": "OS26 Tahoe App Launcher (Dark, Bottom)",
+"img": "img/sm/os26-tahoe-app-launcher-variant-darkbottom.jpg",
+"w": 720,
+"h": 531
+},
+{
+"v": "OS26 Tahoe App Launcher_variant_ClearCenter",
+"label": "OS26 Tahoe App Launcher (Clear, Center)",
+"img": "img/sm/os26-tahoe-app-launcher-variant-clearcenter.jpg",
+"w": 720,
+"h": 531
+},
+{
+"v": "OS26 Tahoe App Launcher_variant_ClearBottom",
+"label": "OS26 Tahoe App Launcher (Clear, Bottom)",
+"img": "img/sm/os26-tahoe-app-launcher-variant-clearbottom.jpg",
+"w": 720,
+"h": 531
+},
+{
+"v": "Raycast",
+"label": "Raycast",
+"img": "img/sm/raycast.jpg",
+"w": 720,
+"h": 429
+}
+],
+"mods": []
+}

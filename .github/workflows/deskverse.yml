@@ -1,0 +1,36 @@
+name: deskverse
+on:
+  push:
+    paths: ['deskverse/**', '.github/workflows/deskverse.yml']
+  workflow_dispatch:
+jobs:
+  windows-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24' }
+      - name: Build
+        working-directory: deskverse
+        run: go build -trimpath -ldflags "-H windowsgui -s -w" -o DeskVerse.exe .
+      - name: Real run (installs Windhawk, switches looks, animations)
+        working-directory: deskverse
+        shell: pwsh
+        env: { DV_NORESET: '1' }
+        run: |
+          $p = Start-Process .\DeskVerse.exe -ArgumentList '-selftest', "$pwd\selftest.json" -Wait -PassThru
+          Get-Content selftest.json
+          "exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+      - name: Check what Windhawk sees
+        if: always()
+        shell: pwsh
+        run: |
+          reg query HKLM\SOFTWARE\Windhawk\Engine\Mods /s | Select-Object -First 80
+          Get-ChildItem C:\ProgramData\Windhawk\Engine\Mods -Recurse | Select-Object FullName, Length | Format-Table -AutoSize | Out-String -Width 250
+          Get-Process windhawk -ErrorAction SilentlyContinue | Select-Object Id, Path
+          Start-Sleep 15
+          $ex = Get-Process explorer -ErrorAction SilentlyContinue
+          "explorer running: $([bool]$ex)"
+          if ($ex) { $ex | ForEach-Object { $_.Modules } | Where-Object { $_.ModuleName -match 'windhawk|styler' } | Select-Object ModuleName | Format-Table | Out-String }
+          Get-Content "$env:LOCALAPPDATA\DeskVerse\windows-animations-before.json" -ErrorAction SilentlyContinue

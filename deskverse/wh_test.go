@@ -1,0 +1,238 @@
+//go:build !windows
+
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// DV_MODS_DIR = a windhawk-mods/mods checkout, DV_JSREF = node script with Windhawk's own parser.
+func TestSettingsMatchWindhawk(t *testing.T) {
+	dir, ref := os.Getenv("DV_MODS_DIR"), os.Getenv("DV_JSREF")
+	if dir == "" || ref == "" {
+		t.Skip("set DV_MODS_DIR and DV_JSREF")
+	}
+	all, _ := filepath.Glob(filepath.Join(dir, "*.wh.cpp"))
+	checked := 0
+	for _, f := range all {
+		out, err := exec.Command("node", ref, f).Output()
+		if err != nil {
+			continue // Windhawk itself can't parse it either
+		}
+		var want map[string]any
+		json.Unmarshal(out, &want)
+		src, _ := os.ReadFile(f)
+		got, err := InitialSettings(string(src))
+		if err != nil {
+			t.Errorf("%s: %v", filepath.Base(f), err)
+			continue
+		}
+		if len(got) != len(want) {
+			t.Errorf("%s: %d keys, Windhawk has %d", filepath.Base(f), len(got), len(want))
+			continue
+		}
+		for k, w := range want {
+			g, ok := got[k]
+			if !ok {
+				t.Errorf("%s: missing %s", filepath.Base(f), k)
+				continue
+			}
+			switch wv := w.(type) {
+			case float64:
+				gi, isI := g.(int64)
+				if !isI || uint32(gi) != uint32(wv) {
+					t.Errorf("%s: %s = %v, Windhawk %v", filepath.Base(f), k, g, wv)
+				}
+			case string:
+				if g != wv {
+					t.Errorf("%s: %s = %q, Windhawk %q", filepath.Base(f), k, g, wv)
+				}
+			}
+		}
+		checked++
+	}
+	t.Logf("settings match Windhawk for %d of %d mods", checked, len(all))
+	if checked < 50 {
+		t.Fatalf("only %d mods checked", checked)
+	}
+}
+
+const fakeMod = `// ==WindhawkMod==
+// @id              test-mod
+// @name            Test mod
+// @name:fr         Mod de test
+// @version         1.2.3
+// @include         explorer.exe
+// @include         notepad.exe
+// @architecture    x86-64
+// ==/WindhawkMod==
+
+// ==WindhawkModSettings==
+/*
+- theme: ""
+  $options:
+  - "": None
+  - Bubbles: Bubbles
+- speed: 250
+- on: true
+- list:
+  - - target: a
+    - styles: [x, y]
+*/
+// ==/WindhawkModSettings==
+int x;
+`
+
+func modServer(t *testing.T) (*httptest.Server, *int) {
+	hits := 0
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		switch r.URL.Path {
+		case "/mods/test-mod.wh.cpp":
+			fmt.Fprint(w, strings.ReplaceAll(fakeMod, "\n", "\r\n"))
+		case "/mods/test-mod/versions.json":
+			fmt.Fprint(w, `[{"version":"1.2.3","minWindhawkVersion":"1.5"}]`)
+		case "/mods/test-mod/1.2.3_64.dll":
+			w.Write([]byte("MZfake-dll"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(s.Close)
+	return s, &hits
+}
+
+func TestInstallLikeWindhawk(t *testing.T) {
+	s, _ := modServer(t)
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "userprofile.json"), []byte(`{"id":"x","mods":{"test-mod":{"version":"1.0","latestVersion":"1.2.3"}}}`), 0o644)
+	reg := &memReg{}
+	w := &Windhawk{AppData: dir, Version: "1.7.3", Reg: reg, ModsURL: s.URL + "/mods/"}
+	if err := w.Install("test-mod", nil); err != nil {
+		t.Fatal(err)
+	}
+	lib, _ := reg.GetString("test-mod", "LibraryFileName")
+	if !strings.HasPrefix(lib, "test-mod_1.2.3_") || !strings.HasSuffix(lib, ".dll") {
+		t.Fatalf("lib %q", lib)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "Engine", "Mods", "64", lib)); string(b) != "MZfake-dll" {
+		t.Fatal("dll not written")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Engine", "Mods", "32")); err == nil {
+		t.Fatal("32-bit folder made for an x86-64 mod")
+	}
+	if src, _ := os.ReadFile(filepath.Join(dir, "ModsSource", "test-mod.wh.cpp")); strings.Contains(string(src), "\r") || !strings.Contains(string(src), "@id") {
+		t.Fatal("source not saved right")
+	}
+	for k, want := range map[string]string{"Include": "explorer.exe|notepad.exe", "Exclude": "", "Architecture": "x86-64", "Version": "1.2.3"} {
+		if v, _ := reg.GetString("test-mod", k); v != want {
+			t.Errorf("%s = %q want %q", k, v, want)
+		}
+	}
+	if d, ok := reg.GetDWORD("test-mod", "Disabled"); !ok || d != 0 {
+		t.Error("not enabled")
+	}
+	if v, _ := reg.GetDWORD(`test-mod\Settings`, "speed"); v != 250 {
+		t.Error("speed", v)
+	}
+	if v, _ := reg.GetDWORD(`test-mod\Settings`, "on"); v != 1 {
+		t.Error("bool setting", v)
+	}
+	if v, _ := reg.GetString(`test-mod\Settings`, "list[0].styles[1]"); v != "y" {
+		t.Error("nested", v)
+	}
+	sct, ok := reg.GetDWORD("test-mod", "SettingsChangeTime")
+	if !ok || sct == 0 {
+		t.Error("no SettingsChangeTime")
+	}
+	var prof map[string]map[string]map[string]any
+	b, _ := os.ReadFile(filepath.Join(dir, "userprofile.json"))
+	json.Unmarshal(b, &prof)
+	if prof["mods"]["test-mod"]["version"] != "1.2.3" || prof["mods"]["test-mod"]["latestVersion"] != nil {
+		t.Error("userprofile", string(b))
+	}
+
+	// pick a theme, then reinstall: theme stays, old dll removed, time goes up
+	if err := w.SetSetting("test-mod", "theme", "Bubbles"); err != nil {
+		t.Fatal(err)
+	}
+	sct2, _ := reg.GetDWORD("test-mod", "SettingsChangeTime")
+	if sct2 <= sct {
+		t.Error("SettingsChangeTime didn't go up")
+	}
+	if err := w.Install("test-mod", nil); err != nil {
+		t.Fatal(err)
+	}
+	if w.Setting("test-mod", "theme") != "Bubbles" {
+		t.Error("reinstall wiped the theme")
+	}
+	ents, _ := os.ReadDir(filepath.Join(dir, "Engine", "Mods", "64"))
+	if len(ents) != 1 {
+		t.Errorf("%d dlls left, want 1", len(ents))
+	}
+	if err := w.SetEnabled("test-mod", false); err != nil || w.State("test-mod").Enabled {
+		t.Error("disable failed")
+	}
+	if st := w.State("test-mod"); !st.Installed || st.Version != "1.2.3" {
+		t.Error("state", st)
+	}
+
+	// too-old Windhawk is refused
+	w.Version = "1.4"
+	if err := w.Install("test-mod", nil); err == nil || !strings.Contains(err.Error(), "needs Windhawk 1.5") {
+		t.Error("old windhawk not refused:", err)
+	}
+}
+
+func TestMeta(t *testing.T) {
+	m, err := ParseMeta(fakeMod)
+	if err != nil || m.ID != "test-mod" || m.Name != "Test mod" || len(m.Include) != 2 {
+		t.Fatal(m, err)
+	}
+	if f, _ := ArchFolders(nil); strings.Join(f, ",") != "32,64" {
+		t.Error(f)
+	}
+	if f, _ := ArchFolders([]string{"x86-64"}); strings.Join(f, ",") != "64" {
+		t.Error(f)
+	}
+	if !versionLess("1.4", "1.5") || versionLess("1.7.3", "1.7") || !versionLess("1.7.3", "2.0") {
+		t.Error("versionLess")
+	}
+}
+
+func TestAPIGuards(t *testing.T) {
+	a := NewApp(&fakePlatform{reg: &memReg{}, dir: t.TempDir()})
+	url, err := a.Serve()
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := strings.SplitN(url, "/#", 2)[0]
+	r, _ := http.Post(base+"/api/status", "application/json", strings.NewReader("{}"))
+	if r.StatusCode != 403 {
+		t.Error("no token allowed:", r.StatusCode)
+	}
+	q, _ := http.NewRequest("POST", base+"/api/status", strings.NewReader("{}"))
+	q.Header.Set("X-DV", a.token)
+	r, _ = http.DefaultClient.Do(q)
+	if r.StatusCode != 200 {
+		t.Error("token refused:", r.StatusCode)
+	}
+	q, _ = http.NewRequest("POST", base+"/api/status", strings.NewReader("{}"))
+	q.Header.Set("X-DV", a.token)
+	q.Host = "evil.example:80"
+	r, _ = http.DefaultClient.Do(q)
+	if r.StatusCode != 403 {
+		t.Error("wrong host allowed:", r.StatusCode)
+	}
+	if _, err := a.do("mod", req{ID: "not-in-catalog", On: true}); err == nil {
+		t.Error("unknown mod allowed")
+	}
+}
