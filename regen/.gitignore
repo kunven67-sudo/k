@@ -1,2 +1,5 @@
 node_modules
 tests/*.bundle.js
+tools/launcher/site
+REGEN.exe
+dist

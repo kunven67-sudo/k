@@ -149,7 +149,7 @@ export class Player {
   frame() {
     // chest-centered frame that follows where you look
     const o = this.B.Spine2.getWorldPosition(new THREE.Vector3());
-    const fw = this.lookDir(new THREE.Vector3()), rt = this.right(new THREE.Vector3()), up = new THREE.Vector3().crossVectors(rt, fw).multiplyScalar(-1).normalize();
+    const fw = this.lookDir(new THREE.Vector3()), rt = this.right(new THREE.Vector3()), up = new THREE.Vector3().crossVectors(rt, fw).normalize();
     if (this.view === 'first') { this.eye(o); o.y -= 0.32; }
     return { o, fw, rt, up };
   }
@@ -162,10 +162,10 @@ export class Player {
       const kind = w.def.kind;
       if (kind === 'gun' || kind === 'rifle') {
         const rifle = kind === 'rifle';
-        grip = this.view === 'first' ? P(0.12, rifle ? -0.06 : -0.08, rifle ? 0.3 : 0.38) : P(0.14, 0.02, rifle ? 0.3 : 0.4);
-        if (this.aim > 0.5 && this.view === 'first') grip = P(0, -0.05, rifle ? 0.28 : 0.36);
+        grip = this.view === 'first' ? P(rifle ? 0.1 : 0.12, rifle ? 0.2 : 0.18, rifle ? 0.24 : 0.38) : P(0.14, 0.02, rifle ? 0.3 : 0.4);
+        if (this.aim > 0.5 && this.view === 'first') grip = P(rifle ? 0.06 : 0.02, rifle ? 0.1 : 0.2, rifle ? 0.3 : 0.4);
         dir = F.fw.clone(); edge = F.up.clone();
-        if (this.canUseLeft()) leftT = rifle ? grip.clone().addScaledVector(F.fw, 0.38).addScaledVector(F.rt, -0.03).addScaledVector(F.up, -0.02) : grip.clone().addScaledVector(F.rt, -0.04).addScaledVector(F.up, -0.03);
+        if (this.canUseLeft() && this.view !== 'first') leftT = rifle ? grip.clone().addScaledVector(F.fw, 0.27).addScaledVector(F.rt, -0.05).addScaledVector(F.up, -0.02) : grip.clone().addScaledVector(F.rt, -0.04).addScaledVector(F.up, -0.03);
       } else if (kind === 'throw') {
         const t = this.throwT; // 0 idle, >0 throwing
         const back = t > 0 ? Math.sin(Math.min(1, t / 0.35) * Math.PI) : 0;
@@ -182,7 +182,7 @@ export class Player {
           [-0.18 * side, -0.12, 0.5, [-0.75 * side, -0.05, 0.6]],
           [0.22, -0.1, 0.32, [0.1, 0.9, 0.35]],
         ];
-        if (this.view === 'first') { keys[0] = keys[3] = [0.2, -0.16, 0.5, [-0.25, 0.6, 0.75]]; }
+        if (this.view === 'first') { keys[0] = keys[3] = [0.19, 0.15, 0.42, [-0.3, 0.55, 0.8]]; }
         let a, b2, u;
         if (s <= 0) { a = b2 = keys[0]; u = 0; } else if (s < 0.35) { a = keys[0]; b2 = keys[1]; u = s / 0.35; } else if (s < 0.6) { a = keys[1]; b2 = keys[2]; u = (s - 0.35) / 0.25; } else { a = keys[2]; b2 = keys[3]; u = (s - 0.6) / 0.4; }
         u = u * u * (3 - 2 * u);

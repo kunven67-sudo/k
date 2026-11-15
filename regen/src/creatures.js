@@ -237,7 +237,7 @@ export class Creature {
   legs(dt) {
     const def = this.def, sp = this.state === 'attack' ? Math.abs(this.speed) : this.speed;
     if (sp < 0.05) { this.gaitAmp = Math.max(0, (this.gaitAmp || 0) - dt * 3); } else this.gaitAmp = Math.min(1, (this.gaitAmp || 0) + dt * 3);
-    if (this.gaitAmp <= 0) return;
+    if (this.gaitAmp <= 0) return this.plant();
     this.phase += dt * sp / def.gaitStride * Math.PI * 2;
     this.root.updateMatrixWorld(true);
     const right = _v.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw)); // creature's right in world
@@ -254,7 +254,15 @@ export class Creature {
       turn(knee, (front ? 1 : -1) * lift * amp * 1.4);
       if (foot) turn(foot, (front ? -1 : 1) * lift * amp * 0.8);
     }
-    this.inner.position.y = -this.type.box.min.y * this.type.scale + Math.abs(Math.sin(this.phase * 2)) * 0.02 * this.half.y * this.gaitAmp;
+    this.plant();
+  }
+  // stand on the feet (not on a hanging tail): lowest foot sits just above the ground
+  plant() {
+    this.root.updateMatrixWorld(true);
+    let low = Infinity; for (const [, , foot] of this.gait) if (foot) low = Math.min(low, foot.getWorldPosition(_v).y);
+    if (low === Infinity) return;
+    const want = 0.06 * this.type.scale / this.type.scale * Math.max(1, this.half.y * 0.08);
+    this.inner.position.y += (want - (low - this.pos.y)) * (this.planted ? 0.5 : 1); this.planted = true;
   }
   deadTick(dt) {
     this.deadT += dt;

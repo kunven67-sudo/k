@@ -102,10 +102,11 @@ const menuOpen = () => !$('#spawn').hidden || !$('#pause').hidden || !$('#settin
 function lock() { if (!menuOpen() && running) { const p = canvas.requestPointerLock && canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } }
 canvas.addEventListener('click', () => { audio.resume(); lock(); });
 document.addEventListener('pointerlockchange', () => {
-  if (document.pointerLockElement === canvas) { paused = false; return; }
+  if (document.pointerLockElement === canvas) { paused = false; lockedAt = performance.now(); mdx = mdy = 0; return; }
   if (running && !menuOpen()) openPause();
 });
-addEventListener('mousemove', e => { if (document.pointerLockElement === canvas) { mdx += e.movementX; mdy += e.movementY; } });
+let lockedAt = 0;
+addEventListener('mousemove', e => { if (document.pointerLockElement === canvas && performance.now() - lockedAt > 120 && Math.abs(e.movementX) < 400 && Math.abs(e.movementY) < 400) { mdx += e.movementX; mdy += e.movementY; } });
 addEventListener('mousedown', e => { if (document.pointerLockElement !== canvas) return; if (e.button === 0) { lmb = true; lmbClick = true; } if (e.button === 2) rmb = true; });
 addEventListener('mouseup', e => { if (e.button === 0) lmb = false; if (e.button === 2) rmb = false; });
 addEventListener('contextmenu', e => e.preventDefault());
