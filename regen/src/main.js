@@ -53,7 +53,7 @@ const W = { scene, physics, fx, audio, creatures: [], items: [], player: null, s
 window.REGEN = W; // for tests
 const ctypes = new CreatureTypes(loader), itypes = new ItemTypes(loader);
 
-let player, inv = [], cur = -1, mood = 'hunt', running = false, paused = true;
+let slowT = 0, player, inv = [], cur = -1, mood = 'hunt', running = false, paused = true;
 async function boot() {
   const env = await buildWorld(scene, renderer, loader, physics, S.quality === 'low' ? 'low' : 'high');
   W.sun = env.sun;
@@ -63,6 +63,7 @@ async function boot() {
   W.player = player; player.view = S.view; player.body.regenRate = S.regen;
   player.group.position.set(0, 0, 0); player.radius = 0.35;
   player.onFall = v => { const n = v > 20 ? 2 : 1; for (const k of (Math.random() < 0.5 ? ['lLeg', 'rLeg'] : ['rLeg', 'lLeg']).slice(0, n)) player.body.sever(k, 'lower', new THREE.Vector3(0, -1, 0)); toast('Bad landing'); };
+  player.body.onSever = () => { slowT = 0.5; hurtFlash = 1; };
   player.body.onRegrown = k => { trophy('regen1'); toast(LIMBS[k].name[0].toUpperCase() + LIMBS[k].name.slice(1) + ' grew back'); };
   fx.bloodAmount = S.blood === 'off' ? 0 : S.blood === 'some' ? 0.4 : 1;
   applyQuality();
@@ -356,6 +357,7 @@ buildSpawn();
 for (const b of document.querySelectorAll('#moods button')) b.onclick = () => { mood = b.dataset.mood; for (const x of document.querySelectorAll('#moods button')) x.classList.toggle('primary', x === b); };
 $('#clearC').onclick = () => { for (const c of W.creatures) c.remove(); W.creatures = []; };
 $('#clearI').onclick = () => { for (const it of W.items) if (!it.held) it.remove(); W.items = W.items.filter(i => i.held); };
+$('#newSuit').onclick = () => { player.body.newSuit(); toast('Fresh suit on'); };
 $('#clearB').onclick = () => { player.body.clearPieces(); fx.poolMesh.count = 0; fx.poolIdx = 0; };
 $('#pmenu').onclick = e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
@@ -418,7 +420,8 @@ let fpsT = 0, fpsN = 0, lowT = 0, highT = 0;
 function frame() {
   requestAnimationFrame(frame);
   if (!W.ready) return;
-  const dt = Math.min(0.05, clock.getDelta());
+  const realDt = Math.min(0.05, clock.getDelta());
+  let dt = realDt; if (slowT > 0) { slowT -= realDt; dt *= 0.28; } // slow motion when a limb comes off
   if (running && !paused) {
     const sens = 0.0022 * S.sens * (player.aim && player.weapon && player.weapon.def.zoom ? 0.4 : 1);
     const input = {

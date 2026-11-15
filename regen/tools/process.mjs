@@ -24,15 +24,16 @@ const M = {
   zombie: ['zombie/scene.gltf', 1024, { attack: 'Attack1.001', idle: 'Idle', walk: 'Walk1' }],
   fossil: ['fossil/scene.gltf', 1024, null],
   anims: ['soldier.glb', 256, null],
-  player: ['humans/remy.glb', 2048, null],
+  player: ['swatop/scene.gltf', 1024, null, true], // S.W.A.T. Operator (CC-BY), built-in rifle removed
 };
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 fs.mkdirSync(out, { recursive: true });
-for (const [name, [src, size, keep]] of Object.entries(M)) {
+for (const [name, [src, size, keep, dropStatic]] of Object.entries(M)) {
   if (only.length && !only.includes(name)) continue;
   const doc = await io.read(path.join(raw, src));
   const root = doc.getRoot();
+  if (dropStatic) for (const n of root.listNodes()) if (n.getMesh() && !n.getSkin()) n.setMesh(null);
   if (keep) {
     for (const a of root.listAnimations()) {
       const base = a.getName().split('|').pop();

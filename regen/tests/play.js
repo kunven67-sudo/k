@@ -7,27 +7,43 @@ async function run() {
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
   const pg = await b.newPage({ viewport: only === 'hero' ? { width: 1600, height: 900 } : { width: 1280, height: 720 } });
   const errs = []; pg.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.type() + ': ' + m.text().slice(0, 200)); }); pg.on('pageerror', e => errs.push('PAGEERR ' + e.message));
-  await pg.goto(`http://127.0.0.1:${srv.address().port}/index.html${only === 'hero' ? '' : '?test'}`);
+  await pg.goto(`http://127.0.0.1:${srv.address().port}/index.html${(only === 'hero' || only === 'side') && !process.env.FAST ? '' : '?test'}`);
   await pg.waitForFunction('window.REGEN && window.REGEN.ready', null, { timeout: 300000 });
   await pg.click('#start'); await pg.waitForTimeout(300); await pg.evaluate('REGEN.player.pitch = 0; REGEN.player.yaw = 0;');
   const wait = ms => pg.waitForTimeout(ms);
-  const shot = async n => { await pg.screenshot({ path: path.join(out, n + '.png') }); console.log('shot', n); };
+  const shot = async n => { await pg.screenshot({ path: path.join(out, n + '.png'), timeout: 180000 }); console.log('fps', await pg.evaluate("document.querySelector('#fps').textContent")); console.log('shot', n); };
   const ev = s => pg.evaluate(s);
+  if (only === 'front') {
+    await pg.keyboard.press('KeyV'); await ev("REGEN.player.camDist = 2.2; REGEN.player.pitch = -0.1; REGEN.player.yaw = 2.6; REGEN.player.holder.rotation.y = Math.PI * 0.85");
+    await wait(800); await shot('fr0-idle');
+    await ev("REGEN.debug.cut('lArm','upper')");
+    await pg.waitForFunction("REGEN.player.body.limbs.lArm.state === 'grow' && REGEN.player.body.limbs.lArm.t > 1.5", null, { timeout: 400000, polling: 50 });
+    await ev("REGEN.player.body.regenRate = 0"); await wait(900); await shot('fr1-meat'); await ev("REGEN.player.body.regenRate = 1");
+    await pg.waitForFunction("REGEN.player.body.limbs.lArm.state === 'ok'", null, { timeout: 400000, polling: 100 }); await wait(800); await shot('fr2-torn');
+    await b.close(); srv.close(); return;
+  }
+  if (only === 'side') {
+    await pg.keyboard.press('KeyV'); await ev("REGEN.player.camDist = 1.7; REGEN.player.pitch = -0.1; REGEN.player.yaw = 2.6; REGEN.player.holder.rotation.y = -1.35");
+    await ev("REGEN.debug.cut('lArm','upper')"); await wait(400); await shot('s0-cut');
+    for (const [t, n] of [[0.55, 's1-bone'], [1.45, 's2-meat'], [2.35, 's3-skin']]) {
+      await pg.waitForFunction(`REGEN.player.body.limbs.lArm.state === 'grow' && REGEN.player.body.limbs.lArm.t > ${t}`, null, { timeout: 400000, polling: 50 });
+      await ev("REGEN.player.body.regenRate = 0"); await wait(900); await shot(n); await ev("REGEN.player.body.regenRate = 1");
+    }
+    await pg.waitForFunction("REGEN.player.body.limbs.lArm.state === 'ok'", null, { timeout: 400000, polling: 100 }); await wait(800); await shot('s4-torn');
+    console.log(errs.filter(e => !e.includes('404')).slice(0, 10).join('\n')); await b.close(); srv.close(); return;
+  }
   if (only === 'hero') {
     await pg.evaluate("document.querySelector('#moods [data-mood=calm]').click()");
-    await pg.keyboard.press('KeyV'); await ev("REGEN.player.camDist = 2.6; REGEN.player.pitch = -0.05; REGEN.player.yaw = 0.5");
+    await pg.keyboard.press('KeyV'); await ev("REGEN.player.camDist = 1.9; REGEN.player.pitch = -0.08; REGEN.player.yaw = 0.5");
     await ev("REGEN.debug.spawn('trex')"); await wait(4000);
     await ev("(() => { const c = REGEN.creatures[0]; c.pos.set(-4, 0, 22); c.yaw = 2.3; c.state = 'roar'; c.stateT = 999; c.speed = 0; c.play('roar'); })()");
-    await ev("REGEN.debug.cut('lArm','upper'); REGEN.player.yaw = 0.35");
-    await pg.waitForFunction("REGEN.player.body.limbs.lArm.state === 'grow' && REGEN.player.body.limbs.lArm.t > 1.35", null, { timeout: 300000, polling: 200 });
-    await ev("REGEN.player.body.regenRate = 0"); await wait(1500); await shot('hero1-regrow');
-    await ev("REGEN.player.body.regenRate = 1; REGEN.debug.cut('rLeg','upper')");
-    await pg.waitForFunction("REGEN.player.body.limbs.rLeg.state === 'grow' && REGEN.player.body.limbs.rLeg.t > 0.55", null, { timeout: 300000, polling: 200 });
-    await ev("REGEN.player.body.regenRate = 0; REGEN.player.camDist = 2.2; REGEN.player.yaw = -0.6; REGEN.player.pitch = -0.25"); await wait(1500); await shot('hero2-bone');
-    await ev("REGEN.player.body.regenRate = 1"); await pg.keyboard.press('KeyV');
-    await ev("REGEN.debug.giveWeapon('rifle')"); await ev("REGEN.debug.spawn('bear')"); await wait(3000);
-    await ev("(() => { const c = REGEN.creatures[1]; c.pos.set(1, 0, 9); c.yaw = Math.PI; c.state='roar'; c.stateT=999; c.speed=0; const P = REGEN.player; P.yaw = Math.atan2(1 - P.pos.x, 9 - P.pos.z); P.pitch = -0.05; })()");
-    await ev("REGEN.debug.aim(true)"); await wait(2500); await shot('hero3-rifle');
+    await ev("REGEN.debug.cut('lArm','upper'); REGEN.player.yaw = 2.6");
+    await pg.waitForFunction("REGEN.player.body.limbs.lArm.state === 'grow' && REGEN.player.body.limbs.lArm.t > 1.45", null, { timeout: 300000, polling: 100 });
+    await ev("REGEN.player.body.regenRate = 0"); await wait(1200); await shot('hero1-regrow');
+    await ev("REGEN.player.body.regenRate = 1; REGEN.debug.cut('rLeg','lower')");
+    await pg.waitForFunction("REGEN.player.body.limbs.rLeg.state === 'ok' && REGEN.player.body.limbs.lArm.state === 'ok'", null, { timeout: 400000, polling: 200 });
+    await ev("REGEN.player.yaw = 2.9; REGEN.player.camDist = 2.4; REGEN.player.pitch = -0.2"); await wait(1500); await shot('hero2-torn');
+    await pg.keyboard.press('KeyV'); await ev("REGEN.player.yaw = 0; REGEN.player.pitch = -0.1"); await wait(1500); await shot('hero3-fp');
     console.log(errs.filter(e => !e.includes('404')).slice(0, 10).join('\n')); await b.close(); srv.close(); return;
   }
   if (only === 'fight') {

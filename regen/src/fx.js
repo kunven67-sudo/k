@@ -65,6 +65,7 @@ export class FX {
     const l = this.lights.find(l => !l.visible) || this.lights[0];
     l.position.copy(p); l.color.set(color); l.intensity = power; l.visible = true; l.userData = { life, max: life, power };
   }
+  steam(p) { this.sprite(this.smoke, p, 0.18 + Math.random() * 0.12, 1.1, { add: false, color: 0xe2dad2, rise: 0.45, grow: 1.6, opacity: 0.32 }); }
   muzzle(p) { this.sprite(this.glow, p, 0.35, 0.06); this.light(p, 30, 0.06); }
   dust(p) { this.sprite(this.smoke, p, 0.4, 0.8, { add: false, color: 0x8a7f6c, rise: 0.4, grow: 0.8, opacity: 0.7 }); }
   explosion(p) {
