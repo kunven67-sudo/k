@@ -42,7 +42,7 @@ SCENES.landing=async function(){ const lv=LEVELS.dust, fd=$('fade');
   PLAYER.ctl.look=true; lookAtPoint(headOf(NPC.moe),.5); SND.play('switch_01',{vol:.8}); later(.3,()=>SND.play('switch_01',{vol:.6,rate:1.2}));
   await say([LOOP.n?'g_again':'g_1']);
   const opts=['Raise your hands','Talk','Grab the gun on the table','Run for the door']; if(LOOP.n>0) opts.push('"Moe. Put it down. We\'ll pay for your roof."');
-  const r=await timedChoice(opts.map(t=>({text:t})),6,2);
+  const r=await timedChoice(opts.map(t=>({text:t})),6,0);   /* too slow = you raise your hands (it used to grab the gun = shot dead) */
   if(r===2){ await say(['j_grab']); SND.play('gun_shotgun',{vol:1}); SND.play('gun_revolver',{vol:1}); return loopDie('shot'); }
   if(r===3){ PLAYER.eye=1.64; PLAYER.y=0; SND.play('gun_revolver',{vol:1}); return loopDie('shot'); }
   PLAYER.y=.15; PLAYER.eye=1.64; clearPose(J,.6); J.position.set(tbl.x+1.4,.15,tbl.z-1.4);

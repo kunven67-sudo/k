@@ -33,6 +33,7 @@ function updatePlayer(dt,t){
   const [dx,dy]=consumeLook();
   if(P.ctl.look && G.mode==='play' && !CAM.active){
     const k=.0022*SETTINGS.sens*(P.scale<.5?.8:1);
+    if(P.lookTo&&(Math.abs(dx)+Math.abs(dy)+Math.abs(TOUCH.lookDX)+Math.abs(TOUCH.lookDY)>2)) P.lookTo=null;   /* you move the mouse = the auto-turn stops (it used to fight your aim) */
     P.yaw-=dx*k; P.pitch-=dy*k*(SETTINGS.invertY?-1:1);
     P.yaw-=TOUCH.lookDX*.006*SETTINGS.sens; P.pitch-=TOUCH.lookDY*.006*SETTINGS.sens;
     P.pitch=clamp(P.pitch,-1.45,1.45);

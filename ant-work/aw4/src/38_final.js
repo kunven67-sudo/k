@@ -31,7 +31,7 @@ SCENES.final=async function(){ const lv=LEVELS.dust, fd=$('fade'), port=F.place=
   if(pick_===2){ await say(['j_watch','gp_watch']); SND.play('gun_revolver',{vol:1}); setPose(J,'dead',.2); return loopDie('jay2'); }
   if(pick_===1){ await say(['j_talkdown']); if(holderId==='abe'){ await say(['a_lower']); clearPose(H,.5); } else { await say(['gp_no']); SND.play('gun_revolver',{vol:1}); setPose(J,'dead',.2); learn('noTalk_'+holderId,'Talking won\'t work on '+holderId); return loopDie('jay2'); } }
   else { // the shot: slow motion, you aim
-    freeWalk(); PLAYER.ctl.move=false; SLOWMO.target=.22; toast('AIM... (click to shoot)','#ffd27a'); let shot=null; const hp0=H.userData.hp;
+    freeWalk(); PLAYER.ctl.move=false; PLAYER.lookTo=null; SLOWMO.target=.22; toast('AIM... (click to shoot)','#ffd27a'); let shot=null; const hp0=H.userData.hp;
     H.userData.onHit=(by,d)=>{ shot=d; }; const t1=G.real; await waitUntil(()=>shot!==null||G.real-t1>5);
     SLOWMO.target=1; H.userData.onHit=null;
     if(shot===null){ SND.play('gun_revolver',{vol:1}); setPose(J,'dead',.2); return loopDie('jay2'); }
@@ -51,7 +51,7 @@ SCENES.final=async function(){ const lv=LEVELS.dust, fd=$('fade'), port=F.place=
   laughGlintOn(G_); await say(['m_reveal1','j_moe1','m_reveal2']); learn('moeGideon');
   // the duel
   await say(['m_duel']); for(const n of ['3','2','1']){ toast(n,'#ffd27a'); SND.play('bell_01',{vol:.4,rate:1.4}); await wait(.9); }
-  toast('DRAW!','#ff8a6a'); freeWalk(); PLAYER.ctl.move=false; selectSlot(INV.slots.findIndex(s=>s&&s.id==='revolver')); const cur=curItem(); if(cur) cur.loaded=Math.max(cur.loaded,1); SLOWMO.target=.35;
+  toast('DRAW!','#ff8a6a'); PLAYER.lookTo=null; freeWalk(); PLAYER.ctl.move=false; selectSlot(INV.slots.findIndex(s=>s&&s.id==='revolver')); const cur=curItem(); if(cur) cur.loaded=Math.max(cur.loaded,1); SLOWMO.target=.35;
   let won=false; G_.userData.dead=false; G_.userData.hp=60; G_.userData.onDie=()=>{ won=true; }; const t2=G.real; await waitUntil(()=>won||G.real-t2>2.6); SLOWMO.target=1;
   if(!won){ SND.play('gun_shotgun',{vol:1}); return loopDie('shot'); }
   unlock('duel'); stopMusic(1); await wait(1.2); lootBody(G_.userData.loot||{gold:10});
