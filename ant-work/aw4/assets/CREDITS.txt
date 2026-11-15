@@ -29,3 +29,6 @@ SOUNDS (OpenGameArt.org)
   The RETURN sound was made for this game. Settings > Audio lets you use your own file instead.
 
 VOICES: Microsoft neural voices (edge-tts).
+
+People: MakeHuman base mesh, skeleton, weights + male/muscle/weight shapes (CC0, makehumancommunity.org). Faces, clothes, hair made on top of it for this game.
+Fabric: cotton_jersey, denim_fabric, stretch_poplin, caban, brown_leather (Poly Haven, CC0).
