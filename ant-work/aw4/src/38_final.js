@@ -6,13 +6,13 @@
    ================================================================ */
 function armNPC(h,kind='revolver'){ const U=h.userData; if(U.gunM) return; const g=gunMesh(kind); g.scale.setScalar(1.05); g.rotation.set(-Math.PI/2,0,0); g.position.set(0,-.06,.04); U.J.hdR.add(g); U.gunM=g; }
 SCENES.final=async function(){ const lv=LEVELS.dust, fd=$('fade'), port=F.place==='port'; DAY.running=false; NIGHT4.on=true; clearRiders(); if(RIDE.on) dismount(); objective('');
-  const at=port?DUST.hangar.clone().add(V3(0,0,18)):DUST.ship.clone().add(V3(-4,0,-22)); if(!port&&!F.shipDug) digOut();
+  const at=port?DUST.hangar.clone().add(V3(0,0,18)):DUST.ship.clone().add(V3(0,0,12.5));   /* behind the ship (the riders come from town) */ if(!port&&!F.shipDug) digOut();
   fd.style.transition='opacity .8s'; fd.style.opacity=1; await wait(.9); DAY.hour=19.1; dayLight(lv);
-  setPlayer(at,Math.PI); PLAYER.y=lv.ground(at.x,at.z); const J=CUR.j2; J.visible=true; J.userData.hold=0; resetActor(J); J.position.copy(at).add(V3(1.6,0,.5)); J.position.y=lv.ground(J.position.x,J.position.z);
+  setPlayer(at,port?Math.PI:0); PLAYER.y=lv.ground(at.x,at.z); const J=CUR.j2; J.visible=true; J.userData.hold=0; resetActor(J); J.position.copy(at).add(V3(1.6,0,.5)); J.position.y=lv.ground(J.position.x,J.position.z);
   if(!hasItem('revolver')){ INV.slots[INV.slots.indexOf(null)>=0?INV.slots.indexOf(null):5]={id:'revolver',n:1,loaded:6}; } giveAmmo('bullets',12);
   fd.style.opacity=0; playMusic('fight',1); chat(['j2_final1']);
   // the wave
-  const ring=[]; for(let i=0;i<6;i++){ const a=i/6*Math.PI*2+.3; const h=makeRider({acc:.55}); h.position.set(at.x+Math.cos(a)*55,0,at.z+Math.sin(a)*55); h.position.y=lv.ground(h.position.x,h.position.z); armNPC(h); ring.push(h); }
+  const ring=[], aT=Math.atan2(-at.z,-at.x); for(let i=0;i<6;i++){ const a=aT+(i/5-.5)*.75;   /* they ride in from the town side: the ship is your cover */ const h=makeRider({acc:.55}); h.position.set(at.x+Math.cos(a)*55,0,at.z+Math.sin(a)*55); h.position.y=lv.ground(h.position.x,h.position.z); armNPC(h); ring.push(h); }
   if(F.abeAlly){ const A=NPC.abe; A.visible=true; A.userData.dead=false; A.position.copy(at).add(V3(-3,0,4)); armNPC(A); chat(['a_final']); const abeT=dt=>{ if(A.userData.dead) return; A.userData.shT=(A.userData.shT||2)-dt; if(A.userData.shT<=0){ A.userData.shT=rand(1.5,2.5); const tg=ring.find(h=>!h.userData.dead&&h.position.distanceTo(A.position)<60); if(tg){ faceTo(A,tg.position); setPose(A,'aim',.2); SND.play('gun_revolver2',{vol:.8,pos:A.position,ref:25}); if(Math.random()<.45) applyHit({person:tg,head:false,point:tg.position.clone().add(V3(0,1.3,0))},70,'abe'); } } }; SCENE_TICKS.push(abeT); }
   selectSlot(INV.slots.findIndex(s=>s&&s.id==='revolver'));
   objective('Hold them off!'); freeWalk(); PLAYER.ctl.jump=true;

@@ -154,7 +154,7 @@ defineLevel('dust',{
       for(let i=0;i<9;i++){ const rib=mesh(new THREE.TorusGeometry(9-Math.abs(i-4)*1.1,.45,8,26,Math.PI*.95),bm,B.x+(i-4)*3,0,B.z); rib.rotation.set(0,Math.PI/2,rand(-.05,.05)); scene.add(rib); }
       { const sp=mesh(new THREE.CylinderGeometry(.7,.6,30,10),bm,B.x,.7,B.z); sp.rotation.z=Math.PI/2; scene.add(sp); }
       const skull=new THREE.Group(); skull.position.set(B.x+18,0,B.z+4); skull.add(ell(4,3,5,bm,0,2.4,0)); skull.add(ell(1.2,1,1.2,mat(0x1a1410),1.6,3,3.6)); skull.add(ell(1.2,1,1.2,mat(0x1a1410),-1.6,3,3.6)); scene.add(skull); colCircle(lv.col,B.x+18,B.z+4,4.5);
-      const S=DUST.ship; lv.bship=makeOldShip(1.1); lv.bship.position.set(S.x,-4.2,S.z); lv.bship.rotation.set(.12,-.6,.08); scene.add(lv.bship); lv.bshipY=-4.2;
+      const S=DUST.ship; lv.bship=makeOldShip(1.1); lv.bship.position.set(S.x,-4.2,S.z); lv.bship.rotation.set(.12,-.6,.08); scene.add(lv.bship); lv.bshipY=-4.2; lv.bship.traverse(o=>{ if(o.isMesh) lv.occluders.push(o); });   /* the ship is cover (bullets + sight) */
       lv.sandMound=mesh(new THREE.SphereGeometry(1,24,12,0,Math.PI*2,0,Math.PI/2),pbrMat('desert_sand',4,{w:30,h:30}),S.x,-.4,S.z); lv.sandMound.scale.set(16,3.4,12); scene.add(lv.sandMound);
       colCircle(lv.col,S.x,S.z,9,()=>!F.shipDug); }
     /* ---- the survivors' camp ---- */

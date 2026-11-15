@@ -145,8 +145,8 @@ function outdoors(p){ const b=insideB(p.x,p.z); if(!b) return p.clone(); return 
 function riderShoot(h,who){ const U=h.userData, R=U.rider; const hand=U.J.hdR.getWorldPosition(V3()); SND.play('gun_revolver2',{vol:.9,pos:hand,ref:25,rate:rand(.9,1.08)}); muzzleFlash(hand);
   if(who==='jay2'){ const J2=CUR.j2; J2.userData.hp=(J2.userData.hp==null?160:J2.userData.hp)-(Math.random()<.35?55:0); if(J2.userData.hp<=0){ killPerson(J2,'rider'); loopDie('jay2'); } return; }
   const d=Math.hypot(h.position.x-PLAYER.pos.x,h.position.z-PLAYER.pos.z), moving=PLAYER.vel&&Math.hypot(PLAYER.vel.x,PLAYER.vel.z)>2;
-  const p=clamp(R.acc-d/95-(moving?.22:0)-(PLAYER.crouch?.1:0),.08,.8);
-  if(Math.random()<p) hurtPlayer(rand(48,62),'shot'); else { SND.play('hit_01',{vol:.4,rate:rand(1.6,2.2)}); LV.soft.spawn(PLAYER.pos.x+rand(-1,1),.2,PLAYER.pos.z+rand(-1,1),0,1,0,.5,.2,.7,.6,.5,.6,0,.3,1.2); } }
+  const p=clamp(R.acc-d/95-(moving?.22:0)-(PLAYER.crouch?.1:0),d>40?.03:.08,.8);   /* a revolver past 40 m almost never hits */
+  if(Math.random()<p) hurtPlayer(rand(30,38),"shot"); else { SND.play('hit_01',{vol:.4,rate:rand(1.6,2.2)}); LV.soft.spawn(PLAYER.pos.x+rand(-1,1),.2,PLAYER.pos.z+rand(-1,1),0,1,0,.5,.2,.7,.6,.5,.6,0,.3,1.2); } }
 on('tick',dt=>{ if(NIGHT4.riders.length) riderTick(dt); if(NIGHT4.hidden&&NIGHT4.hidePos&&PLAYER.pos.distanceTo(NIGHT4.hidePos)>1.2){ NIGHT4.hidden=null; toast('You left your hiding spot','#ff9a7a'); } });
 on('gunshot',e=>{ for(const h of NIGHT4.riders){ const R=h.userData.rider; if(h.userData.dead) continue; if(h.position.distanceTo(e.at)<e.r&&R.state!=='attack'){ R.state='search'; R.t=0; walkTo(h,[outdoors(e.at)],2.8); } } });
 function clearRiders(){ for(const h of NIGHT4.riders){ h.parent&&h.parent.remove(h); const i=HUMANS.indexOf(h); if(i>=0) HUMANS.splice(i,1); } NIGHT4.riders=[]; }
