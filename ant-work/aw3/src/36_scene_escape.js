@@ -12,7 +12,7 @@ const TORCH={g:null,light:null,back:false};
 function torchMesh(){ const g=new THREE.Group();
   g.add(mesh(new THREE.CylinderGeometry(.012,.016,.42,6),new THREE.MeshStandardMaterial({color:col(0x8a6a44),roughness:.9}),0,.0,-.12).rotateX(Math.PI/2));
   const fl=mesh(GC('torchFlame',()=>{ const s=new THREE.SphereGeometry(.035,10,8); s.scale(1,1.8,1); return s; }),new THREE.MeshBasicMaterial({color:col(0xffa040).multiplyScalar(2.2)}),0,.05,-.33,false); g.add(fl); g.userData.flame=fl;
-  g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } }); return g; }
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } }); g.userData.grip=V3(0,0,.03); g.userData.gripRoll=1.2; return g; }
 function torchOn(on){
   if(!TORCH.light){ TORCH.light=new THREE.PointLight(col(0xffa055),0,18,1.15); }
   if(on&&F.torchLit){ if(!TORCH.g) TORCH.g=torchMesh(); if(TORCH.light.parent!==camera) camera.add(TORCH.light); TORCH.light.position.set(.25,-.2,-.6);

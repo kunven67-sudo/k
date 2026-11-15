@@ -231,4 +231,20 @@ function mhHandsOn(H,side,skinM){
   H.mh={sm,drive}; MH_HANDS.push(H); }
 function mhThumbRest(side){ return new THREE.Quaternion().setFromEuler(new THREE.Euler(.7,0,side>0?-.5:.5)); }   /* relaxed thumb, tucked toward the index */
 function mhRestOf(o){ const g=o&&o.children.find(c=>c.isGroup&&!c.position.lengthSq()); return g?g.quaternion:null; }
-function mhHandsSync(){ for(const H of MH_HANDS){ if(!H.mh.sm.parent||!H.mh.sm.visible) continue; for(const d of H.mh.drive){ d[0].quaternion.copy(d[2]).multiply(d[1].quaternion); if(d[3]) d[0].quaternion.multiply(d[3]); } } }
+function mhHandsSync(){ for(const H of MH_HANDS){ if(!H.mh.sm.parent||!H.mh.sm.visible) continue; for(const d of H.mh.drive){ d[0].quaternion.copy(d[2]).multiply(d[1].quaternion); if(d[3]) d[0].quaternion.multiply(d[3]); } } vmGripSnap(); }
+/* FIRST-PERSON: real hands + whatever you hold sits IN the palm (its handle snaps to the palm each frame).
+   item.userData.grip = the handle point on the item (local); item.userData.gripRoll = how far the hand turns (thumb up for guns). */
+const _gp=new THREE.Vector3(), _gq=new THREE.Vector3(), _gn=new THREE.Vector3();
+function vmPalmPoint(H,out){ const B=H.mh.sm.skeleton.bones; H.grp.updateMatrixWorld(true);
+  out.set(0,0,0); let k=0; for(const b of B){ if(/f[LR][0-3]a$/.test(b.name||'')){ b.getWorldPosition(_gq); out.add(_gq); k++; } }
+  if(!k) return null; out.multiplyScalar(1/k); B[0].getWorldPosition(_gq); out.lerp(_gq,.42);    // between the wrist and the knuckles
+  _gn.set(0,0,1).transformDirection(H.grp.matrixWorld); out.addScaledVector(_gn,.022); return out; }   // a bit off the palm, where a handle sits
+function vmGripSnap(){
+  if(typeof VM==='undefined'||!VM.arms) return;
+  for(const [s,sd] of [['R',-1],['L',1]]){ const A=VM.arms[s], H=A&&A.userData.H; if(!H||!H.mh||!A.visible) continue;
+    const item=s==='R'?(VM.gun||VM.wpn):VM.wpnL; const grip=item&&item.visible&&item.userData.grip;
+    const roll=grip&&item.userData.gripRoll!=null?item.userData.gripRoll*(-sd):(sd>0?-.3:.3);
+    H.grp.rotation.y=damp(H.grp.rotation.y,roll,14,1/60);
+    if(!grip||!vmPalmPoint(H,_gp)) continue;
+    item.updateMatrixWorld(true); _gq.copy(grip).applyMatrix4(item.matrixWorld);   // where the handle is now
+    const p=item.parent; p.worldToLocal(_gp); p.worldToLocal(_gq); item.position.add(_gp.sub(_gq)); } }   // move it so the handle is in the palm

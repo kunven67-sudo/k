@@ -69,13 +69,13 @@ function gunMesh(kind){ const M=gunMats(), g=new THREE.Group(); g.userData.kind=
     const grip=mesh(GC('rvG',()=>new THREE.BoxGeometry(.024,.085,.034)),M.wood,0,-.045,.04); grip.rotation.x=-.32; g.add(grip);
     const ham=mesh(GC('rvH',()=>new THREE.BoxGeometry(.008,.02,.014)),M.steel,0,.026,.035); ham.rotation.x=-.4; g.add(ham); g.userData.hammer=ham;
     const tg=mesh(GC('rvT',()=>new THREE.TorusGeometry(.014,.0025,6,14,Math.PI)),M.brass,0,-.022,.012); tg.rotation.set(0,Math.PI/2,Math.PI); g.add(tg);
-    g.userData.muzzle=V3(0,.012,-.18); }
+    g.userData.muzzle=V3(0,.012,-.18); g.userData.grip=V3(0,-.042,.04); g.userData.gripRoll=1.2; }
   else if(kind==='shotgun'){
     for(const x of [-.011,.011]){ const b=mesh(GC('sgB',()=>new THREE.CylinderGeometry(.011,.011,.5,12)),M.steel,x,.012,-.28); b.rotation.x=Math.PI/2; g.add(b); }
     g.add(mesh(GC('sgR',()=>new THREE.BoxGeometry(.05,.04,.1)),M.dark,0,.0,-.0));
     const fore=mesh(GC('sgFo',()=>new THREE.BoxGeometry(.04,.03,.18)),M.wood,0,-.012,-.14); g.add(fore);
     const stock=mesh(GC('sgS',()=>new THREE.BoxGeometry(.042,.07,.3)),M.wood,0,-.04,.18); stock.rotation.x=.18; g.add(stock);
-    g.userData.muzzle=V3(0,.012,-.54); }
+    g.userData.muzzle=V3(0,.012,-.54); g.userData.grip=V3(0,-.03,.12); g.userData.gripRoll=1.0; }
   else if(kind==='rifle'){
     const src=MODELS['bolt_action_rifle_7_62']; if(src){ const r=src.clone(true); const b=new THREE.Box3().setFromObject(r), s=b.getSize(V3()); const L=Math.max(s.x,s.z); r.scale.setScalar(1.05/L); if(s.x>s.z) r.rotation.y=Math.PI/2; g.add(r); }
     else { const b=mesh(GC('rfB',()=>new THREE.CylinderGeometry(.008,.009,.7,10)),M.steel,0,.02,-.3); b.rotation.x=Math.PI/2; g.add(b); g.add(mesh(GC('rfS',()=>new THREE.BoxGeometry(.04,.06,.6)),M.wood,0,-.01,.1)); }

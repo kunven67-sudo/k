@@ -60,7 +60,7 @@ function weaponMesh(k){
   else if(k==='bspear'){ const sh=makeLongBone(.8,.024); sh.rotation.x=-Math.PI/2; sh.position.z=.05; g.add(sh); const t=mesh(new THREE.ConeGeometry(.04,.42,10),thornM,0,0,-.9); t.rotation.x=-Math.PI/2; g.add(t);
     for(let i=0;i<6;i++){ const w=mesh(new THREE.TorusGeometry(.03,.006,5,12),thr,0,0,-.66-i*.012); g.add(w); } }
   else if(k==='rocks'){ g.add(ell(.06,.045,.055,pbrMat('sandy_gravel_02',.2),0,.01,-.02,12)); }
-  g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } }); return g;
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.renderOrder=10; } }); g.userData.grip={bone:V3(0,0,.13),spear:V3(0,0,.02),bspear:V3(0,0,.02)}[k]||null; g.userData.gripRoll=1.1; return g;
 }
 function setWeapon(k){ if(!ownedWeapons().includes(k)) return; ARENA.cur=k; if(VM.wpn){ VM.grp.remove(VM.wpn); VM.wpn=null; }
   if(k!=='fists'){ VM.wpn=weaponMesh(k); VM.grp.add(VM.wpn); } VM.wpnK=0; VM.wpnSwing=0; arenaHUDUpdate(); SND.play('pickup',{vol:.35,rate:1.3}); }

@@ -189,7 +189,6 @@ function buildViewModel(){
     const skinFore=mesh(lathe('vmSkinFore',[[0,-.318],[.03,-.314],[.0315,-.3],[.034,-.27],[.04,-.23],[.046,-.19],[0,-.18]],18),skinM,0,0,0,false); skinFore.rotation.x=Math.PI/2; g.add(skinFore);
     const wrist=mesh(GC('vmWrist',()=>new THREE.CylinderGeometry(.029,.031,.06,14)),skinM,0,0,-.31,false); wrist.rotation.x=Math.PI/2; g.add(wrist);
     const handG=new THREE.Group(); handG.position.set(0,0,-.33); handG.rotation.x=Math.PI/2; g.add(handG);
-    skinM.userData.noMHHand=true;   /* first-person hands: real ones come with their own grip fitting */
     const H=makeHand(side,skinM); handG.add(H.grp); H.grp.rotation.y=side>0?-.3:.3;
     g.userData={H,handG};
     return g;
