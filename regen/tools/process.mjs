@@ -24,7 +24,9 @@ const M = {
   zombie: ['zombie/scene.gltf', 1024, { attack: 'Attack1.001', idle: 'Idle', walk: 'Walk1' }],
   fossil: ['fossil/scene.gltf', 1024, null],
   anims: ['soldier.glb', 256, null],
-  player: ['swatop/scene.gltf', 1024, null, true], // S.W.A.T. Operator (CC-BY), built-in rifle removed
+  player: ['humans/leonard.glb', 2048, null], // Leonard (Adobe Mixamo)
+  boxer: ['boxer/scene.gltf', 2048, null],
+  mike: ['mike/scene.gltf', 2048, null], // S.W.A.T. Operator (CC-BY), built-in rifle removed
 };
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });

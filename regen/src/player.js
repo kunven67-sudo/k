@@ -41,7 +41,7 @@ export class Player {
     this.group = new THREE.Group(); ctx.scene.add(this.group);
     const model = gltf.scene;
     const h = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).y;
-    model.scale.setScalar(1.86 / h); model.updateMatrixWorld(true);
+    model.scale.setScalar(1.8 / h); model.updateMatrixWorld(true);
     const clips = retargetClips(animGltf.animations, animGltf.scene, model, 'mixamorig:Hips'); // before turning him
     model.rotation.y = Math.PI; // the moves face -Z: turn so you face +Z
     this.holder = new THREE.Group(); this.holder.add(model); this.group.add(this.holder);

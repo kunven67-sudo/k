@@ -124,7 +124,7 @@ export class RegenBody {
     this.uniforms.uUnit.value = 1 / this.meshes[0].getWorldScale(new THREE.Vector3()).x;
     for (const m of this.meshes) {
       const mats = Array.isArray(m.material) ? m.material : [m.material];
-      const nm = mats.map(x => { const kind = /pouch|lambert1/i.test(x.name) ? 'acc' : /boot|helmet|night|mask|face|eye/i.test(x.name) ? 'keep' : 'cloth'; const r = regenMaterial(x, this.uniforms, kind); this.origMats.set(r, x); return r; });
+      const nm = mats.map(x => { const kind = /pouch|lambert1/i.test(x.name) ? 'acc' : /boot|helmet|night|mask|face|eye|hair/i.test(x.name) ? 'keep' : 'cloth'; const r = regenMaterial(x, this.uniforms, kind); this.origMats.set(r, x); return r; });
       m.material = Array.isArray(m.material) ? nm : nm[0];
     }
     // limb state: 'ok' | 'cut' | 'grow'
