@@ -27,7 +27,7 @@ function frame(){
         updateAmbEvents(dt);
         if(typeof FIGHT!=='undefined'&&FIGHT.active) FIGHT.update(raw,dt);
       }
-      updateCamera(dt,t); updateViewModel(dt,t);
+      updateCamera(dt,t); updateViewModel(dt,t); if(typeof mhHandsSync==='function') mhHandsSync();
       const rig=LV.scene.userData.rig; if(rig){ _focus.copy(camera.position); if(LV.shadowFocus) LV.shadowFocus(_focus); updateRig(rig,_focus); }
       if(LV.skyU) LV.skyU.time.value=G.real;
       updatePrompt(dt);

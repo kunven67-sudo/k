@@ -164,10 +164,10 @@ function mhAttach(g){
   const geo=mhGeometry(opt,mats);
   const sm=new THREE.SkinnedMesh(geo,mats); sm.name='mhBody'; sm.add(bones.root); sm.bind(new THREE.Skeleton(list)); sm.castShadow=true; sm.receiveShadow=true; sm.frustumCulled=false; g.add(sm);
   // who drives which bone: [bone, rig joint, inverse of the joint's rest rotation]
-  const drive=[], add=(bn,o)=>{ if(o&&bones[bn]) drive.push([bones[bn],o,o.quaternion.clone().invert()]); };
+  const drive=[], add=(bn,o,ex)=>{ if(o&&bones[bn]) drive.push([bones[bn],o,o.quaternion.clone().invert(),ex||null]); };
   add('hips',J.hips); add('spine',J.spine); add('chest',J.chest); add('head',J.head); add('jaw',J.jaw);
   for(const s of ['L','R']){ for(const k of ['sh','el','hd','th','kn','ft']) add(k+s,J[k+s]);
-    const H=U.hands&&U.hands[s]&&U.hands[s].H; if(H){ H.fingers.forEach((f,i)=>{ add('f'+s+i+'a',f.a); add('f'+s+i+'b',f.b); add('f'+s+i+'c',f.c); }); add('t'+s+'0',H.thumb); add('t'+s+'1',H.thumb2); } }
+    const H=U.hands&&U.hands[s]&&U.hands[s].H; if(H){ H.fingers.forEach((f,i)=>{ add('f'+s+i+'a',f.a,mhRestOf(f.a)); add('f'+s+i+'b',f.b,mhRestOf(f.b)); add('f'+s+i+'c',f.c,mhRestOf(f.c)); }); add('t'+s+'0',H.thumb,mhThumbRest(s==='L'?1:-1)); add('t'+s+'1',H.thumb2); } }
   U.mh={sm,bones,drive}; U.mats.mhMats=mats;
 }
 function mhMats(U){ const opt=U.opt; const M=U.mats, sk=m=>{ const c=m.clone(); c.skinning=true; return c; };
@@ -190,4 +190,45 @@ function mhRebuild(g){ const U=g.userData, M=U.mh; if(!M) return; const old=M.sm
 /* where a point of the base body sits relative to one of its bones (to pin hats, badges, mustaches on) */
 function mhRel(p,bone){ const v=mhData().piv[bone]; return new THREE.Vector3(p[0]-v[0],p[1]-v[1],p[2]-v[2]); }
 function mhChestFront(x,y){ const D=mhData(); let best=null; for(let i=0;i<D.n;i++){ if(D.part[i]!==2) continue; const px=D.pos[i*3], py=D.pos[i*3+1]; if(Math.abs(px-x)>.012||Math.abs(py-y)>.012) continue; if(!best||D.pos[i*3+2]>best[2]) best=[px,py,D.pos[i*3+2]]; } return best||[x,y,.12]; }
-function mhSync(h){ const M=h.userData.mh; if(!M) return; for(const d of M.drive) d[0].quaternion.copy(d[2]).multiply(d[1].quaternion); }
+function mhSync(h){ const M=h.userData.mh; if(!M) return; for(const d of M.drive){ d[0].quaternion.copy(d[2]).multiply(d[1].quaternion); if(d[3]) d[0].quaternion.multiply(d[3]); } }
+
+/* ---------- HANDS v3: just the HANDS of the base body, on any code-built arm (Jay 2's old model, your first-person arms).
+   The palm is turned to face where the rig curls its fingers; the rig's finger joints (+ their relaxed rest curl) drive the bones. ---------- */
+const MH_HANDS=[];
+function mhHandMesh(side,mat,qy){
+  const D=mhData(), part=D.part, piv=D.piv, idx=D.idx, r=D.ranges.body;
+  const names=['hd'+side]; for(let i=0;i<4;i++) for(const c of 'abc') names.push('f'+side+i+c); names.push('t'+side+'0','t'+side+'1');
+  const loc={}; names.forEach((b,i)=>loc[D.bi[b]]=i);
+  const o=piv['hd'+side], wy=o[1], sx=side==='L'?1:-1;
+  const keep=i=>(part[i]===7||(part[i]===6&&D.pos[i*3+1]<wy+.03))&&D.pos[i*3]*sx>0;
+  const q=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),qy), v=new THREE.Vector3();
+  const map=new Map(), pos=[], nrm=[], sj=[], sw=[], out=[];
+  for(let k=r[0];k<r[0]+r[1];k+=3){ const a=idx[k],b=idx[k+1],c=idx[k+2]; if(!keep(a)||!keep(b)||!keep(c)) continue;
+    for(const i of [a,b,c]){ if(!map.has(i)){ map.set(i,pos.length/3);
+        v.set(D.pos[i*3]-o[0],D.pos[i*3+1]-o[1],D.pos[i*3+2]-o[2]).applyQuaternion(q); pos.push(v.x,v.y,v.z);
+        v.set(D.nrm[i*3],D.nrm[i*3+1],D.nrm[i*3+2]).applyQuaternion(q); nrm.push(v.x,v.y,v.z);
+        for(let t=0;t<4;t++){ const L=loc[D.sj[i*4+t]]; sj.push(L!=null?L:0); sw.push(D.sw[i*4+t]); } }
+      out.push(map.get(i)); } }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.Float32BufferAttribute(nrm,3));
+  g.setAttribute('skinIndex',new THREE.BufferAttribute(new Uint8Array(sj),4)); g.setAttribute('skinWeight',new THREE.BufferAttribute(new Uint8Array(sw),4,true)); g.setIndex(out); g.computeBoundingSphere();
+  const par=b=>{ if(b[0]==='h') return null; if(b[0]==='t') return b.endsWith('0')?'hd'+side:'t'+side+'0'; const c=b[3]; return c==='a'?'hd'+side:b.slice(0,3)+(c==='b'?'a':'b'); };
+  const bones={}, list=[];
+  for(const b of names){ const bo=new THREE.Bone(); const p=par(b), pp=p?piv[p]:o, me=piv[b]; bo.position.set(me[0]-pp[0],me[1]-pp[1],me[2]-pp[2]).applyQuaternion(q); if(!p) bo.position.set(0,0,0); bones[b]=bo; list.push(bo); if(p) bones[p].add(bo); }
+  const m=mat.clone(); m.skinning=true; if(mat.onBeforeCompile&&mat.customProgramCacheKey&&typeof skinify==='function') skinify(m);
+  const sm=new THREE.SkinnedMesh(g,m); sm.add(bones['hd'+side]); sm.bind(new THREE.Skeleton(list)); sm.castShadow=true; sm.frustumCulled=false; sm.name='mhHand';
+  return {sm,bones};
+}
+/* put real hands on a code-built hand (H from makeHand) */
+function mhHandsOn(H,side,skinM){
+  if(typeof MHBODY==='undefined'||!H||H.mh) return; const sd=side>0?'L':'R';
+  const qy=side>0?Math.PI/2:-Math.PI/2;
+  const {sm,bones}=mhHandMesh(sd,skinM,qy);
+  H.grp.traverse(o=>{ if(o.isMesh) o.visible=false; }); H.grp.add(sm);
+  const drive=[]; const add=(bn,o,extra)=>{ if(o&&bones[bn]) drive.push([bones[bn],o,o.quaternion.clone().invert(),extra||null]); };
+  H.fingers.forEach((f,i)=>{ const ex=k=>{ const g=f[k]&&f[k].children.find(c=>c.isGroup&&!c.position.lengthSq()); return g?g.quaternion:null; };
+    add('f'+sd+i+'a',f.a,ex('a')); add('f'+sd+i+'b',f.b,ex('b')); add('f'+sd+i+'c',f.c,ex('c')); });
+  add('t'+sd+'0',H.thumb,mhThumbRest(side)); add('t'+sd+'1',H.thumb2);
+  H.mh={sm,drive}; MH_HANDS.push(H); }
+function mhThumbRest(side){ return new THREE.Quaternion().setFromEuler(new THREE.Euler(.7,0,side>0?-.5:.5)); }   /* relaxed thumb, tucked toward the index */
+function mhRestOf(o){ const g=o&&o.children.find(c=>c.isGroup&&!c.position.lengthSq()); return g?g.quaternion:null; }
+function mhHandsSync(){ for(const H of MH_HANDS){ if(!H.mh.sm.parent||!H.mh.sm.visible) continue; for(const d of H.mh.drive){ d[0].quaternion.copy(d[2]).multiply(d[1].quaternion); if(d[3]) d[0].quaternion.multiply(d[3]); } } }

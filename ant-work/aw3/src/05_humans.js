@@ -174,39 +174,59 @@ const THIGH_P=[[0,-.455],[.053,-.445],[.06,-.38],[.074,-.2],[.084,-.07],[.08,0],
 const SHIN_P=[[0,-.43],[.035,-.42],[.039,-.34],[.055,-.17],[.057,-.06],[.054,0],[0,.02]];
 function lathe(key,pts,seg=20,zs=1,xs=1){ return GC('lathe'+key+seg+zs+xs,()=>{ const g=new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(p[0],p[1])),seg); if(zs!==1||xs!==1) g.scale(xs,1,zs); g.computeVertexNormals(); return g; }); }
 function scaleP(P,k,kz){ return P.map(p=>[p[0]*k,p[1]]); }
-/* hand with articulated fingers (3 joints each, nails, a real palm with thickness): returns {grp, fingers:[{a,b,c}], thumb, thumb2} */
-function handSeg(parent,len,r0,r1,skinM){
-  const m=mesh(GC('hseg'+len+'_'+r0+'_'+r1,()=>{ const c=new THREE.CylinderGeometry(r0,r1,len,10); c.translate(0,-len/2,0); return c; }),skinM,0,0,0,false); parent.add(m);
-  parent.add(mesh(GC('hjoint'+r0,()=>new THREE.SphereGeometry(r0*1.02,10,8)),skinM,0,0,0,false)); return m;
-}
+/* HAND v2 (made in code, no scans): a real palm (narrow at the wrist, wide at the knuckles, thenar + hypothenar pads,
+   knuckle bumps on the back), tapered fingers with joint bulges, flat glossy nails, a thumb that sits in front of the palm,
+   a relaxed natural curl underneath the animation's curl, and skin colour that varies (redder knuckles + tips, paler palm).
+   returns {grp, fingers:[{a,b,c}], thumb, thumb2} like before (poses + the new bodies drive the same joints) */
+function handVC(g,fn){ const p=g.attributes.position, c=new Float32Array(p.count*3); for(let i=0;i<p.count;i++){ const k=fn(p.getX(i),p.getY(i),p.getZ(i)); c[i*3]=k[0]; c[i*3+1]=k[1]; c[i*3+2]=k[2]; } g.setAttribute('color',new THREE.BufferAttribute(c,3)); return g; }
+function fingerSegGeo(len,r0,r1,tip){ return GC('fseg2_'+len+'_'+r0+'_'+r1+'_'+(tip?1:0),()=>{
+  const pts=[], N=10; for(let i=0;i<=N;i++){ const t=i/N, y=-t*len; let r=lerp(r0,r1,t)*(1+.06*Math.exp(-Math.pow((t-.92)/.08,2))+.05*Math.exp(-Math.pow(t/.1,2)));
+    if(tip&&t>.62){ const u=(t-.62)/.38; r*=Math.sqrt(Math.max(0,1-u*u*.96)); } pts.push(new THREE.Vector2(Math.max(r,.0004),y)); }
+  if(!tip){ pts.unshift(new THREE.Vector2(.0004,r0*.7)); pts.splice(1,0,new THREE.Vector2(r0*.75,r0*.45)); pts.push(new THREE.Vector2(r1*.6,-len-r1*.55),new THREE.Vector2(.0004,-len-r1*.75)); }
+  else { pts.unshift(new THREE.Vector2(.0004,r0*.7)); pts.splice(1,0,new THREE.Vector2(r0*.75,r0*.45)); pts.push(new THREE.Vector2(.0004,-len-.001)); }
+  const g=new THREE.LatheGeometry(pts,14); g.scale(1,1,.86); g.translate(0,0,.0008);   /* a bit flatter front-to-back, like a real finger */
+  g.computeVertexNormals();
+  return handVC(g,(x,y,z)=>{ const t=-y/len; const red=(tip?Math.max(0,t-.55)*1.1:0)+Math.exp(-Math.pow((t-1)/.12,2))*.35*(z<0?1:.4); return [1-red*.04,1-red*.13,1-red*.13]; }); }); }
+function palmGeo(s){ return GC('palm2_'+s,()=>{
+  const g=new THREE.SphereGeometry(1,28,18), p=g.attributes.position;
+  for(let i=0;i<p.count;i++){ const sx=p.getX(i), sy=p.getY(i), sz=p.getZ(i);
+    const y=-.044+sy*.044, t=clamp(-y/.088,0,1);
+    const hw=lerp(.028,.0415,smooth(clamp(t*1.25,0,1)));                          // narrow wrist -> wide knuckles
+    let x=sx*hw; const edge=Math.abs(sx);
+    let z=sz*(.0135-.0045*edge*edge)*(sz<0?.92:1);                                 // thicker middle, thin edges; back a bit flatter
+    if(sz>0){ const th=Math.exp(-(Math.pow((x*s-.017)/.014,2)+Math.pow((y+.03)/.022,2)));   // thenar (thumb muscle), on the thumb side
+      const hy=Math.exp(-(Math.pow((x*s+.022)/.012,2)+Math.pow((y+.045)/.028,2)));            // hypothenar (pinky side)
+      const kp=Math.exp(-Math.pow((y+.08)/.008,2))*(1-.3*edge);                                 // the pads under the knuckles
+      const hol=Math.exp(-(Math.pow(x/.016,2)+Math.pow((y+.052)/.016,2)));                      // the hollow of the palm
+      z+=th*.007+hy*.0038+kp*.0028-hol*.0026; }
+    else { for(let k=0;k<4;k++){ const kx=(-.0283+k*.0189)*s; z-=Math.exp(-(Math.pow((x-kx)/.0075,2)+Math.pow((y+.083)/.008,2)))*.0035; }   // knuckle bumps
+      z-=Math.exp(-Math.pow((y+.04)/.03,2))*.0012; }
+    p.setXYZ(i,x,y,z); }
+  g.computeVertexNormals();
+  return handVC(g,(x,y,z)=>{ const knuck=z<0?Math.exp(-Math.pow((y+.083)/.01,2))*.6:0, palm=z>0?.35:0; return [1+palm*.03-knuck*.03,1+palm*.025-knuck*.12,1+palm*.02-knuck*.12]; }); }); }
 function makeHand(side,skinM){
   const grp=new THREE.Group(), s=side*-1;
-  const ell=(key,sx,sy,sz,x,y,z)=>{ const m=mesh(GC(key,()=>{ const g=new THREE.SphereGeometry(1,16,12); g.scale(sx,sy,sz); return g; }),skinM,x,y,z,false); grp.add(m); return m; };
-  // palm: thick in the middle and rounded, with the knuckle pads and the thumb muscle
-  grp.add(mesh(roundedBoxGeo(.076,.08,.026,.012),skinM,0,-.045,0));
-  ell('hBack',.038,.041,.012,0,-.047,-.008);
-  ell('hFront',.035,.038,.011,0,-.045,.007);
-  ell('hPads',.037,.013,.012,0,-.081,.002);
-  const th0=ell('hThenar',.017,.026,.015,.022*s,-.032,.009); th0.rotation.z=.45*s;
-  const nailM=new THREE.MeshPhysicalMaterial({color:(skinM.color?skinM.color.clone():col(0xe8b894)).lerp(col(0xffeee6),.45),roughness:.28,clearcoat:.6,clearcoatRoughness:.3});
+  const handM=skinM.clone(); handM.vertexColors=true; if(skinM.onBeforeCompile&&skinM.customProgramCacheKey) skinify(handM);
+  grp.add(mesh(palmGeo(s),handM,0,0,0));
+  const nailM=new THREE.MeshPhysicalMaterial({color:(skinM.color?skinM.color.clone():col(0xe8b894)).lerp(col(0xf6d8d0),.55),roughness:.22,clearcoat:.8,clearcoatRoughness:.15});
+  const nail=(parent,r,len,y)=>{ const n=mesh(GC('nail2_'+r+'_'+len,()=>{ const g=new THREE.SphereGeometry(1,14,10,0,Math.PI*2,0,Math.PI/2); g.scale(r*.8,.0011,len*.36); g.rotateX(-Math.PI/2); g.rotateX(.12); return g; }),nailM,0,y,-r*.8,false); parent.add(n); return n; };
   const fingers=[];
-  const P=[.043,.048,.045,.036], M=[.026,.03,.028,.022], D=[.021,.023,.022,.018], R=[.0091,.0095,.009,.0079];
-  for(let i=0;i<4;i++){
-    const r=R[i];
-    const a=new THREE.Group(); a.position.set((-.0283+i*.0189)*s,-.084,.001); a.rotation.z=(i-1.5)*.035*s; grp.add(a);
-    handSeg(a,P[i],r,r*.94,skinM);
-    const b=new THREE.Group(); b.position.y=-P[i]; a.add(b); handSeg(b,M[i],r*.94,r*.87,skinM);
-    const c=new THREE.Group(); c.position.y=-M[i]; b.add(c); handSeg(c,D[i],r*.87,r*.8,skinM);
-    c.add(mesh(GC('htip'+r,()=>new THREE.SphereGeometry(r*.8,10,8)),skinM,0,-D[i],0,false));
-    const nail=mesh(GC('hnail'+i,()=>{ const g=new THREE.SphereGeometry(1,12,8); g.scale(r*.74,D[i]*.36,r*.3); return g; }),nailM,0,-D[i]*.6,-r*.62,false); c.add(nail);
-    fingers.push({a,b,c});
-  }
-  const th=new THREE.Group(); th.position.set(.034*s,-.028,.013); th.rotation.z=.62*s; th.rotation.y=-.35*s; grp.add(th);
-  handSeg(th,.036,.0108,.0098,skinM);
-  const th2=new THREE.Group(); th2.position.y=-.036; th.add(th2); handSeg(th2,.03,.0098,.0086,skinM);
-  th2.add(mesh(GC('ttip2',()=>new THREE.SphereGeometry(.0086,10,8)),skinM,0,-.03,0,false));
-  const tn=mesh(GC('tnail2',()=>{ const g=new THREE.SphereGeometry(1,12,8); g.scale(.0068,.012,.0032); return g; }),nailM,0,-.019,-.0066,false); th2.add(tn);
-  return {grp,fingers,thumb:th,thumb2:th2};
+  const P=[.044,.049,.046,.037], M=[.026,.03,.028,.022], D=[.021,.023,.022,.019], R=[.0092,.0097,.0091,.008];
+  const REST=[[.16,.22,.12],[.2,.28,.14],[.26,.34,.16],[.32,.4,.2]];   // relaxed curl: more toward the pinky
+  for(let i=0;i<4;i++){ const r=R[i], rest=REST[i];
+    const a=new THREE.Group(); a.position.set((-.0283+i*.0189)*s,-.084,.001); a.rotation.z=(i-1.5)*.03*s; grp.add(a);
+    const ar=new THREE.Group(); ar.rotation.x=-rest[0]; a.add(ar); ar.add(mesh(fingerSegGeo(P[i],r,r*.9,false),handM,0,0,0));
+    const b=new THREE.Group(); b.position.y=-P[i]; ar.add(b); const br=new THREE.Group(); br.rotation.x=-rest[1]; b.add(br); br.add(mesh(fingerSegGeo(M[i],r*.9,r*.84,false),handM,0,0,0));
+    const c=new THREE.Group(); c.position.y=-M[i]; br.add(c); const cr=new THREE.Group(); cr.rotation.x=-rest[2]; c.add(cr); cr.add(mesh(fingerSegGeo(D[i],r*.84,r*.78,true),handM,0,0,0));
+    nail(cr,r*.84,D[i],-D[i]*.62);
+    fingers.push({a,b,c}); }
+  // thumb: from the side of the palm, sitting in FRONT of the palm (not sticking out sideways)
+  const th=new THREE.Group(); th.position.set(.031*s,-.026,.012); th.rotation.set(-.35,-.5*s,.34*s); grp.add(th);
+  th.add(mesh(fingerSegGeo(.038,.0118,.0104,false),handM,0,0,0));
+  const th2=new THREE.Group(); th2.position.y=-.038; th.add(th2); const t2r=new THREE.Group(); t2r.rotation.x=-.18; th2.add(t2r);
+  t2r.add(mesh(fingerSegGeo(.031,.0104,.009,true),handM,0,0,0)); nail(t2r,.0098,.03,-.019);
+  const H={grp,fingers,thumb:th,thumb2:th2}; if(!(skinM.userData&&(skinM.userData.alienHand||skinM.userData.noMHHand))&&typeof mhHandsOn==='function') mhHandsOn(H,side,skinM);   /* real hands */
+  return H;
 }
 function shoeGeo(){ return GC('shoe4',()=>{ const parts=[]; const s=new THREE.SphereGeometry(.5,16,10); const a=s.clone(); a.scale(.105,.085,.255); a.translate(0,-.018,.04); parts.push(a); const sole=new THREE.BoxGeometry(.11,.024,.28); sole.translate(0,-.052,.035); parts.push(sole); const toe=new THREE.SphereGeometry(.5,12,8); toe.scale(.1,.05,.1); toe.translate(0,-.035,.14); parts.push(toe); return mergeGeos(parts); }); }
 
