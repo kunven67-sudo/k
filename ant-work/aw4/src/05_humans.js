@@ -23,7 +23,10 @@ function charTex(){
   const denim=texSet('denim',256,(x,w,h)=>{ x.fillStyle='#d8dde6'; x.fillRect(0,0,w,h); for(let j=0;j<h;j+=2){ for(let i=0;i<w;i+=2){ if(((i+j)/2)%3===0){ x.fillStyle='rgba(20,30,60,.22)'; x.fillRect(i,j,2,2); } } } for(let i=0;i<220;i++){ x.fillStyle=`rgba(255,255,255,${Math.random()*.12})`; x.fillRect(Math.random()*w,Math.random()*h,1,6+Math.random()*10); } },{strength:1.6});
   const hair=texSet('hairT2',[256,256],(x,w,h)=>{ x.fillStyle='#8a8a8a'; x.fillRect(0,0,w,h); for(let i=0;i<2600;i++){ const v=Math.random()<.5?200:50; x.strokeStyle=`rgba(${v},${v},${v},${.06+Math.random()*.1})`; x.lineWidth=.5+Math.random()*.6; const px=Math.random()*w, py=Math.random()*h-40; x.beginPath(); x.moveTo(px,py); x.bezierCurveTo(px+rand(-3,3),py+30,px+rand(-3,3),py+60,px+rand(-2,2),py+90); x.stroke(); } },{strength:1.1});
   const rubber=texSet('rubber',128,(x,w,h)=>{ speckle(x,w,h,'#c8c8c8',['#bbb','#d4d4d4'],3000,1); },{strength:.8});
-  TEXCACHE._char={skinN,cloth,denim,hair,rubber}; return TEXCACHE._char;
+  /* REAL fabric (Poly Haven CC0, made neutral grey so the shirt/pants colour tints it): cotton tee + denim. The canvas ones are only the fallback. */
+  const RT=(b,rx,ry)=>{ const T=ASSETS.tex||{}; if(!T[b+'_diff']) return null; const o={}; for(const [k,s] of [['map','_diff'],['normalMap','_nor'],['roughnessMap','_rough']]){ const t=T[b+s]; if(t){ const c=t.clone(); c.needsUpdate=true; c.wrapS=c.wrapT=THREE.RepeatWrapping; c.repeat.set(rx,ry); o[k]=c; } } return o; };
+  const rc=RT('cotton_jersey',6,5), rd=RT('denim_fabric',5,6); if(rc) Object.assign(cloth,rc); if(rd) Object.assign(denim,rd);
+  TEXCACHE._char={skinN,cloth,denim,hair,rubber,coat:RT('caban',4,4),leather:RT('brown_leather',2,2),poplin:RT('stretch_poplin',6,5)}; return TEXCACHE._char;
 }
 /* ---------- head sculpting (direction-space features on a sphere) ---------- */
 const _hd=new THREE.Vector3();
@@ -229,8 +232,8 @@ function makeHuman(o={}){
     build:1,height:1,name:'?',voice:'Jim',sleeves:'short',alien:false,accent:0x7dffe8,denim:true,head:{},collar:true,apron:null,hood:false},o);
   const g=new THREE.Group(); g.name=opt.name;
   const skinM=skinify(new THREE.MeshPhysicalMaterial({color:col(opt.skin),roughness:opt.alien?.35:.52,normalMap:T.skinN.normalMap,normalScale:new THREE.Vector2(.35,.35),clearcoat:opt.alien?.3:0,clearcoatRoughness:.4,emissive:col(opt.skin),emissiveIntensity:opt.skinGlow||0}),opt.sss||(opt.alien?[.4,.8,1]:[1,.66,.56]));
-  const shirtM=opt.alien?new THREE.MeshPhysicalMaterial({color:col(opt.shirt),roughness:.35,metalness:.4,clearcoat:.6,clearcoatRoughness:.2}):new THREE.MeshPhysicalMaterial({color:col(opt.shirt),roughness:.88,map:T.cloth.map,normalMap:T.cloth.normalMap,normalScale:new THREE.Vector2(.6,.6),sheen:col(0x222222)});
-  const pantsM=opt.alien?new THREE.MeshPhysicalMaterial({color:col(opt.pants),roughness:.4,metalness:.3,clearcoat:.4}):new THREE.MeshPhysicalMaterial({color:col(opt.pants),roughness:.9,map:opt.denim?T.denim.map:T.cloth.map,normalMap:opt.denim?T.denim.normalMap:T.cloth.normalMap,normalScale:new THREE.Vector2(.8,.8),sheen:col(0x1a1a1a)});
+  const shirtM=opt.alien?new THREE.MeshPhysicalMaterial({color:col(opt.shirt),roughness:.35,metalness:.4,clearcoat:.6,clearcoatRoughness:.2}):new THREE.MeshPhysicalMaterial({color:col(opt.shirt),roughness:.88,map:T.cloth.map,normalMap:T.cloth.normalMap,roughnessMap:T.cloth.roughnessMap||null,normalScale:new THREE.Vector2(.9,.9),sheen:col(0x222222)});
+  const pantsM=opt.alien?new THREE.MeshPhysicalMaterial({color:col(opt.pants),roughness:.4,metalness:.3,clearcoat:.4}):new THREE.MeshPhysicalMaterial({color:col(opt.pants),roughness:.9,map:opt.denim?T.denim.map:T.cloth.map,normalMap:opt.denim?T.denim.normalMap:T.cloth.normalMap,roughnessMap:(opt.denim?T.denim.roughnessMap:T.cloth.roughnessMap)||null,normalScale:new THREE.Vector2(1,1),sheen:col(0x1a1a1a)});
   const shoeM=new THREE.MeshStandardMaterial({color:col(opt.shoes),roughness:.55,normalMap:T.rubber.normalMap});
   const soleM=mat(0xe8e4dc,{roughness:.8});
   const hrep=repeatSet(T.hair,5,3); const hairM=new THREE.MeshPhysicalMaterial({color:col(opt.hair),roughness:.5,map:hrep.map,normalMap:hrep.normalMap,normalScale:new THREE.Vector2(.7,.7),sheen:col(shadeHex(opt.hair,.7))});
@@ -371,6 +374,7 @@ function makeHuman(o={}){
     A:{walkPhase:Math.random()*6,speed:0,lastPos:new THREE.Vector3(),pose:null,poseW:0,poseTarget:0,poseT:0,poseFade:.35,
       look:null,lookW:0,autoLook:true,yawCur:0,pitchCur:0,sacc:[0,0],saccT:0,blinkT:rand(1,4),blink:0,mood:'neutral',moodK:{smile:0,frown:0,brow:0,browTilt:0,lid:0},
       talk:false,talkT:0,mouth:0,mouthTarget:0,breath:Math.random()*6,gestT:rand(3,8),gest:null,seated:false,dead:false,custom:null,idleOff:false,faceYaw:null,phase:Math.random()*10}};
+  if(!opt.alien&&!opt.noMH&&typeof mhAttach==='function') mhAttach(g);   /* PEOPLE v2: the MakeHuman body */
   g.scale.setScalar(opt.height);
   g.traverse(m=>{ if(m.isMesh){ m.castShadow=m.castShadow!==false; } });
   HUMANS.push(g);
@@ -452,8 +456,8 @@ function animateHuman(h,dt,t){
     W('shL',0,s*lerp(.35,.7,run)); W('shR',0,-s*lerp(.35,.7,run));
     W('elL',0,-.25-Math.max(0,-s)*.4-run*.9); W('elR',0,-.25-Math.max(0,s)*.4-run*.9);
     W('spine',1,-s*.07); W('hips',1,s*.08); W('spine',0,.04+run*.12); W('hips',2,-c*.025);
-    J.hips.position.y=.92+(Math.abs(Math.cos(A.walkPhase))*.022-.012)*wk*(1+run);
-  } else J.hips.position.y=damp(J.hips.position.y,A.seated?.92:.92,8,dt);
+    J.hips.position.y=(U.hipY||.92)+(Math.abs(Math.cos(A.walkPhase))*.022-.012)*wk*(1+run);
+  } else J.hips.position.y=damp(J.hips.position.y,U.hipY||.92,8,dt);
   // --- idle gestures ---
   if(!A.pose && wk<.1 && !A.talk && !A.idleOff){
     if(!A.gest){ A.gestT-=dt; if(A.gestT<=0){ A.gest={n:pick(['scratch','shift','look','stretch','hips','watch']),t:0,d:rand(2,3.5)}; } }
@@ -552,7 +556,7 @@ function updateHumans(dt,t){
     if(LV && h.userData.level && h.userData.level!==LV.name) continue;
     updateNPCPath(h,dt);
     const A=h.userData.A; if(A.faceYaw!=null && !A.path) h.rotation.y=angLerp(h.rotation.y,A.faceYaw,Math.min(1,dt*5));
-    animateHuman(h,dt,t);
+    animateHuman(h,dt,t); if(h.userData.mh) mhSync(h);
   }
 }
 /* attach a prop to a hand */

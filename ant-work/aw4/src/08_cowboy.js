@@ -28,6 +28,18 @@ function hatMesh(hex=0x5a3a22,wide=1){ const g=new THREE.Group(); const m=cowMat
   return g; }
 function cowboy(h,o={}){
   const J=h.userData.J, U=h.userData; U.cow=o;
+  if(U.mh){ /* PEOPLE v2: the outfit is made ON the new body (fitted jacket/vest layers), the extras are pinned to its bones */
+    const B=U.mh.bones, lm=mhData().lm;
+    if(o.hat!==false){ const hat=hatMesh(o.hatCol||0x5a3a22,o.wide||1); hat.position.copy(mhRel([0,lm.skullTop[1]-.036,lm.skullTop[2]-.035],'head')); hat.rotation.x=-.1; hat.scale.setScalar(1.08); B.head.add(hat); U.hat=hat; }
+    if(o.mask){ const m=mesh(lathe('bandana',[[0,-.06],[.075,-.05],[.092,.0],[.094,.04],[0,.05]],20,1.1),cowMat('mask'+o.mask,o.mask,{side:THREE.DoubleSide}),0,0,0); m.position.copy(mhRel([0,lm.noseTip[1]-.03,lm.headC[2]+.01],'head')); m.scale.set(.86,1,.98); B.head.add(m); U.mask=m; }
+    if(o.star){ const f=mhChestFront(.085,1.37); const st=mesh(GC('badge',()=>new THREE.CylinderGeometry(.022,.022,.006,5)),mat(0xd8b850,{metalness:1,roughness:.25}),0,0,0); st.position.copy(mhRel([f[0],f[1],f[2]+(o.coat?.03:.018)],'chest')); st.rotation.x=Math.PI/2; B.chest.add(st); }
+    if(o.mustache){ const m=mat(o.mustache,{roughness:.8}); for(const sd of [-1,1]){ const p=mesh(GC('stache',()=>new THREE.CylinderGeometry(.008,.004,.05,6)),m,0,0,0); p.position.copy(mhRel([sd*.019,lm.mouth[1]+.012,lm.mouth[2]+.004],'head')); p.rotation.z=sd*1.25; B.head.add(p); } }
+    if(o.goldTooth){ const t=mesh(GC('gtooth',()=>new THREE.BoxGeometry(.008,.009,.004)),new THREE.MeshPhysicalMaterial({color:col(0xffd040),metalness:1,roughness:.15,emissive:col(0x3a2a00)}),0,0,0); t.position.copy(mhRel([.009,lm.mouth[1]-.001,lm.mouth[2]-.006],'jaw')); B.jaw.add(t); }
+    if(o.eyepatch){ const e=lm.eyeL; const p=mesh(GC('patch',()=>new THREE.CircleGeometry(.02,14)),mat(0x111111,{roughness:.7}),0,0,0); p.position.copy(mhRel([e[0],e[1],e[2]+.014],'head')); B.head.add(p); }
+    if(o.gun&&J.hips){ const hol=mesh(GC('holster',()=>new THREE.BoxGeometry(.05,.17,.09)),mat(0x4a2a16,{roughness:.6}),.19,-.1,.0); J.hips.add(hol); const r=gunMesh('revolver'); r.scale.setScalar(.9); r.rotation.set(Math.PI/2,0,0); r.position.set(.19,-.03,.0); J.hips.add(r); U.holsterGun=r; }
+    let re=false; if(o.coat){ U.opt.coat=o.coat; re=true; } if(o.vest){ U.opt.vest=o.vest; re=true; } if(o.metalHand){ U.opt.metalHandR=true; re=true; }
+    if(re) mhRebuild(h);
+    return h; }
   if(o.hat!==false){ const hat=hatMesh(o.hatCol||0x5a3a22,o.wide||1); hat.position.set(0,.17,-.005); hat.rotation.x=-.08; J.head.add(hat); U.hat=hat; }
   if(o.mask){ const m=mesh(lathe('bandana',[[0,-.06],[.075,-.05],[.092,.0],[.094,.04],[0,.05]],20,1.1),cowMat('mask'+o.mask,o.mask,{side:THREE.DoubleSide}),0,.0,.03); m.scale.set(1,1,1.05); J.head.add(m); U.mask=m;
     const tri=mesh(GC('bandTri',()=>{ const s=new THREE.Shape(); s.moveTo(-.07,0); s.lineTo(.07,0); s.lineTo(0,-.09); s.lineTo(-.07,0); return new THREE.ShapeGeometry(s); }),cowMat('mask'+o.mask,o.mask),0,-.05,.088); J.head.add(tri); }

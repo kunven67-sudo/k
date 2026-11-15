@@ -67,7 +67,7 @@ on('tick',()=>{ updateFolk(G.dt||.016,G.time); });
 const JAY_LOOK={skin:0xe2b08c,hair:0x2a1c12,eye:0x4a3020,pants:0x2e3440,shoes:0x2a2a2e,hood:true,collar:false,sleeves:'long',stubble:.14,head:{rx:.073,ry:.103,rz:.092,jaw:.3,nose:.95}};
 function makeJay(o={}){ return makeHuman(Object.assign({name:'Jay',voice:'Jay',shirt:0x2f4d6e},JAY_LOOK,o)); }
 /* Jay 2 after the teleport: same face, green hoodie so you can tell who's who */
-function makeJay2(o={}){ return makeHuman(Object.assign({name:'Jay 2',voice:'Jay2',shirt:0x2e8b57},JAY_LOOK,o)); }
+function makeJay2(o={}){ return makeHuman(Object.assign({name:'Jay 2',voice:'Jay2',shirt:0x2e8b57},JAY_LOOK,{oldHead:true,head:Object.assign({},JAY_LOOK.head,{jaw:.34,nose:1.03,chin:1.07,rx:.0745})},o)); }   /* his old face (a little different from Jay's) on the new body */
 /* Jay 2 at the start: still blocky from XXX5 (the Mars Shift Jay) */
 function makeBlockJay(o={}){ return makeBlockPerson(Object.assign({name:'Jay 2',voice:'Jay2',skin:0xe2b08c,shirt:0x2f4d6e,pants:0x2e3440,hair:0x2a1c12,shoes:0x2a2a2e},o)); }
 

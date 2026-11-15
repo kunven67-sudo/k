@@ -41,7 +41,7 @@ function frame(){
       if(slowChecks>=12 && autoLowered<3){ slowChecks=0; const i=PRESET_ORDER.indexOf(SETTINGS.preset); const idx=i<0?PRESET_ORDER.indexOf('medium'):i; if(idx>0){ autoLowered++; applyPreset(PRESET_ORDER[idx-1]); toast('Graphics lowered to '+PRESETS[SETTINGS.preset].name+' so it runs smooth','#9fe8ff'); } } } }
 }
 /* ---------- everything the game needs, loaded once ---------- */
-const TEX_LIST=['brown_planks_03','cliff_side','desert_sand','dry_ground_01','rough_wood','stone_tiles_02'];
+const TEX_LIST=['brown_planks_03','cliff_side','desert_sand','dry_ground_01','rough_wood','stone_tiles_02','cotton_jersey','denim_fabric','stretch_poplin','caban','brown_leather'];
 const SFX_LIST=['bell_01','blast','body_fall','breath_heavy','door_creak','drips','gasp','glass_break','heartbeat','hum_build','hum_purple','metal_1','metal_2','metal_3','oof_1','oof_2','pickup','ringing','sand_fall','sigh_1','sigh_2','static','step_sand_1','step_sand_2','step_sand_3','step_sand_4','step_sand_5','step_sand_6','step_stone_1','step_stone_2','step_stone_3','step_stone_4','step_stone_5','step_stone_6','stone_1','stone_2','swing_1','swing_2','switch_01','watch_beep','wind_gust_1','wind_gust_2','wind_loop'];
 const MUSIC_LIST=['mus_boss','mus_night','mus_pyramid','mus_sad','mus_title'];
 async function preload(progress){
