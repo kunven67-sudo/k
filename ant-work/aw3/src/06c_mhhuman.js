@@ -47,10 +47,19 @@ function mhGeometry(opt,mats){
   bump(lm.chin,.019,0,-chin*.012,chin*.008);
   bump(lm.mouth,.014,0,0,(R()-.5)*.004-flat*.003);
   { const hs=1+((hd.ry!=null?hd.ry:.103)/.103-1)*.6, c=lm.headC; for(let i=0;i<n;i++){ if(part[i]!==0) continue; for(let k=0;k<3;k++) P[i*3+k]=c[k]+(P[i*3+k]-c[k])*hs; } }
+  // ---- men: flatten what's left of the base body's chest (Jay 2 + anyone not built) ----
+  if(!opt.female&&D.brw){ const fl=opt.flatChest!=null?opt.flatChest:.7; for(let i=0;i<n;i++){ const w=Math.min(1,D.brw[i]/170); if(w>0){ P[i*3+2]-=(w*w*.03+w*.006)*fl; P[i*3+1]+=w*.004*fl; } } }
   // ---- build: MakeHuman's own muscle + weight shapes (the body is already a man: its male shape is baked in) ----
   { const bw=opt.build||1, mus=opt.muscle!=null?opt.muscle:Math.max(0,Math.min(.8,(R()-.25)*.9+(bw<1?.15:0))), wgt=Math.max(0,Math.min(2.4,(bw-1)*6.5));   /* MakeHuman's max-weight shape is mild: big guys go past it */
     const ap=(I,Dq,k)=>{ if(!I||!k) return; for(let j=0;j<I.length;j++){ const v=I[j]; P[v*3]+=Dq[j*3]/8000*k; P[v*3+1]+=Dq[j*3+1]/8000*k; P[v*3+2]+=Dq[j*3+2]/8000*k; } };
     ap(D.musI,D.musD,mus); ap(D.wgtI,D.wgtD,wgt); }
+  /* under the shirt nobody sees skin: smooth the torso there (no nipples, navel or ab lines pushing the fabric out) */
+  if(D.oid&&!opt.shirtless){ const wY=piv.hips[1]+.07, inT=i=>(part[i]===2||part[i]===3)&&P[i*3+1]>wY&&P[i*3+1]<1.385;
+    const grp_=new Map(); for(let i=0;i<n;i++){ if(!inT(i)) continue; const o=D.oid[i]; if(!grp_.has(o)) grp_.set(o,[]); grp_.get(o).push(i); }
+    const nb=new Map(), r=D.ranges.body, ix=D.idx;
+    for(let k=r[0];k<r[0]+r[1];k+=3){ for(let q=0;q<3;q++){ const a=ix[k+q], b=ix[k+(q+1)%3]; const oa=D.oid[a], ob=D.oid[b]; if(grp_.has(oa)){ if(!nb.has(oa)) nb.set(oa,new Map()); nb.get(oa).set(ob,b); } if(grp_.has(ob)){ if(!nb.has(ob)) nb.set(ob,new Map()); nb.get(ob).set(oa,a); } } }
+    for(let it=0;it<14;it++){ const upd=[]; for(const [o,vs] of grp_){ const m=nb.get(o); if(!m||!m.size) continue; let x=0,y=0,z=0; for(const v of m.values()){ x+=P[v*3]; y+=P[v*3+1]; z+=P[v*3+2]; } const k=m.size, v0=vs[0]; upd.push([vs,P[v0*3]*.4+x/k*.6,P[v0*3+1]*.4+y/k*.6,P[v0*3+2]*.4+z/k*.6]); }
+      for(const [vs,x,y,z] of upd) for(const v of vs){ P[v*3]=x; P[v*3+1]=y; P[v*3+2]=z; } } }
   /* fresh smooth normals for THIS body shape (seam copies share one normal via the original vertex id) */
   let N=D.nrm;
   if(D.oid){ const NA=new Float32Array(65536*3), r=D.ranges.body, ix=D.idx; const va=new THREE.Vector3(), vb=new THREE.Vector3(), vc=new THREE.Vector3();
@@ -85,11 +94,15 @@ function mhGeometry(opt,mats){
     { const start=layBase+nl-map.size, cnt=map.size, nb=new Map(); const loc=v=>v-start;
       for(let k=0;k<out.length;k+=3){ for(let q=0;q<3;q++){ const a=loc(out[k+q]), b=loc(out[k+(q+1)%3]); if(!nb.has(a)) nb.set(a,new Set()); if(!nb.has(b)) nb.set(b,new Set()); nb.get(a).add(b); nb.get(b).add(a); } }
       const base=start*3-layBase*3, pos=lay.pos, cp=lay.cut.length-cnt;
-      for(let it=0;it<(name==='shoes'?1:name==='coat'?7:4);it++){ const tmp=new Float32Array(cnt*3);
+      const ITER=name==='shoes'?1:name==='pants'?6:22, minOff=inf*.75;
+      for(let it=0;it<ITER;it++){ const tmp=new Float32Array(cnt*3);
         for(let v=0;v<cnt;v++){ const ns=nb.get(v); const o=base+v*3; if(!ns||lay.cut[cp+v]<.004){ tmp[v*3]=pos[o]; tmp[v*3+1]=pos[o+1]; tmp[v*3+2]=pos[o+2]; continue; }
           let x=0,y=0,z=0; for(const u of ns){ const q=base+u*3; x+=pos[q]; y+=pos[q+1]; z+=pos[q+2]; } const k=ns.size;
           tmp[v*3]=pos[o]*.5+x/k*.5; tmp[v*3+1]=pos[o+1]*.5+y/k*.5; tmp[v*3+2]=pos[o+2]*.5+z/k*.5; }
-        for(let v=0;v<cnt;v++){ const o=base+v*3; pos[o]=tmp[v*3]; pos[o+1]=tmp[v*3+1]; pos[o+2]=tmp[v*3+2]; } } }
+        for(let v=0;v<cnt;v++){ const o=base+v*3; pos[o]=tmp[v*3]; pos[o+1]=tmp[v*3+1]; pos[o+2]=tmp[v*3+2];
+          /* fabric spans over dips (navel, ab lines, the gap between pecs) but never sinks into the body */
+          const sv=lay.src[start-layBase+v], nx_=N[sv*3], ny_=N[sv*3+1], nz_=N[sv*3+2]; const d=(pos[o]-P[sv*3])*nx_+(pos[o+1]-P[sv*3+1])*ny_+(pos[o+2]-P[sv*3+2])*nz_;
+          if(d<minOff){ const k=minOff-d; pos[o]+=nx_*k; pos[o+1]+=ny_*k; pos[o+2]+=nz_*k; } } } }
     /* lighting normals from the garment's own (smoothed) shape, seam copies averaged */
     { const start=layBase+nl-map.size, cnt=map.size, base=(start-layBase)*3, pos=lay.pos, acc=new Map(), va=new THREE.Vector3(), vb=new THREE.Vector3(), vc=new THREE.Vector3();
       const key=v=>D.oid?D.oid[lay.src[v-layBase]]:v;
