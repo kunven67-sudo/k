@@ -421,18 +421,21 @@ export async function createDevice(canvas, opt = {}) {
   function vfdLayout() {
     vs.clearRect(0, 0, vfdSmall.width, ROWS);
     vs.fillStyle = '#fff'; vs.textBaseline = 'alphabetic';
-    vs.font = 'bold 19px Arial, sans-serif';
+    let fa = 19;
+    vs.font = `bold ${fa}px Arial, sans-serif`;
+    while (vs.measureText(vfdText.a.toUpperCase()).width > COLS - 6 && fa > 11) { fa--; vs.font = `bold ${fa}px Arial, sans-serif`; }
+    vfdFA = fa;
     vs.fillText(vfdText.a.toUpperCase(), 0, 21);
     vs.font = '12px Arial, sans-serif';
     vfdBWidth = Math.ceil(vs.measureText(vfdText.b).width) + 40;
     vs.fillText(vfdText.b, 0, 42);
     vfdDirty = true;
   }
-  let vfdBits = null, vfdAW = 0;
+  let vfdBits = null, vfdAW = 0, vfdFA = 19;
   function vfdDraw() {
     if (vfdDirty) {
       vfdBits = vs.getImageData(0, 0, vfdSmall.width, ROWS).data;
-      vs.font = 'bold 19px Arial, sans-serif';
+      vs.font = `bold ${vfdFA}px Arial, sans-serif`;
       vfdAW = Math.ceil(vs.measureText(vfdText.a.toUpperCase()).width);
       vfdDirty = false;
     }
@@ -714,7 +717,7 @@ export async function createDevice(canvas, opt = {}) {
   function frame(now) {
     if (!running) return;
     requestAnimationFrame(frame);
-    if (document.hidden) { last = now; return; }
+    if (document.hidden || !canvas.offsetParent || canvas.clientWidth < 10) { last = now; return; } // not on screen: don't render
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     const t = now / 1000;
@@ -760,8 +763,8 @@ export async function createDevice(canvas, opt = {}) {
     buttons.testIn.target = st.testIn ? blinkFast : 0;
     for (const b of Object.values(buttons)) {
       b.lit += (b.target - b.lit) * Math.min(1, dt * 14);
-      b.mat.emissiveIntensity = 0.03 + b.lit * 1.05;
-      b.mat.color.setScalar(0.33 + b.lit * 0.5);
+      b.mat.emissiveIntensity = 0.03 + b.lit * 0.5;
+      b.mat.color.setScalar(0.33 + b.lit * 0.32);
       b.press = Math.max(0, b.press - dt * 7);
       b.cap.position.z = 0.04 - Math.sin(Math.min(1, b.press) * Math.PI) * 0.014;
     }

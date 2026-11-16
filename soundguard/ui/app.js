@@ -84,7 +84,7 @@ function render() {
   if (S.mode === 'setup') return renderSetup();
   if (VIEW === 'popup') return renderPopup();
   const st = S.status || { level: 'ok', title: '', sub: '' };
-  document.body.className = 'lvl-' + st.level + (VIEW === 'popup' ? ' view-popup' : '');
+  document.body.className = 'lvl-' + st.level + (VIEW === 'popup' ? ' view-popup' : '') + (has3d ? ' has3d' : '');
   $('ver').textContent = 'v' + S.version + (S.mode === 'demo' ? ' preview' : '');
   if (st.title !== lastTitle) {
     const h = $('title'); h.textContent = st.title; h.classList.remove('swap'); void h.offsetWidth; h.classList.add('swap');
@@ -506,12 +506,12 @@ function meters(t) {
 }
 
 // ---------- 3D studio unit ----------
-let dev3d = null;
+let dev3d = null, has3d = false;
 async function boot3D(canvasId, wrapId, demo) {
   if (!window.SGDevice || VIEW !== 'main') return;
   const wrap = $(wrapId);
   wrap.hidden = false;
-  if (!demo) document.body.classList.add('has3d');
+  if (!demo) { has3d = true; document.body.classList.add('has3d'); }
   else $('setupRadar').hidden = true;
   try {
     const d = await SGDevice.createDevice($(canvasId), { base: 'assets/' });
@@ -519,7 +519,8 @@ async function boot3D(canvasId, wrapId, demo) {
     wrap.classList.add('on');
     d.on.sound = (n) => sfx(n, n === 'tick' ? 0.35 : 0.6);
     if (demo) {
-      d.setState({ level: 'ok', title: 'SOUNDGUARD', sub: 'Press TURN ON below to start guarding your headphones and mic.', auto: false, plugged: true, outDev: { volume: 0.6, muted: false }, inDev: { volume: 0.8, muted: false } });
+      const up = S && S.setup && S.setup.update;
+      d.setState({ level: 'ok', title: up ? 'UPDATE READY' : 'SOUNDGUARD', sub: up ? 'Press UPDATE SOUNDGUARD below to get version ' + S.version + '.' : 'Press TURN ON below to start guarding your headphones and mic.', auto: false, plugged: true, outDev: { volume: 0.6, muted: false }, inDev: { volume: 0.8, muted: false } });
       let t = 0;
       setInterval(() => { t += 0.05; d.setLevels(0.2 + 0.18 * Math.abs(Math.sin(t * 2.1) * Math.cos(t * 0.7)), 0.03 + 0.12 * Math.max(0, Math.sin(t * 1.3))); }, 50);
       return;
@@ -540,6 +541,7 @@ async function boot3D(canvasId, wrapId, demo) {
   } catch (e) {
     console.error('3D off:', e);
     wrap.hidden = true;
+    has3d = false;
     document.body.classList.remove('has3d');
     if (demo) $('setupRadar').hidden = false;
   }

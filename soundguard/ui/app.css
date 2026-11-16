@@ -409,8 +409,8 @@ body.has3d .chips { margin-bottom: 2px; }
 }
 .alert.bad { background: var(--screws), linear-gradient(180deg, rgba(58, 22, 22, .92), rgba(30, 12, 12, .95)), url(assets/metal_col.jpg) center / 520px; }
 .alert .a-txt { font-size: 13.5px; }
-.alert .a-txt b { font-family: var(--label); font-weight: 400; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; display: block; margin-bottom: 3px; color: #ffe6b0; }
-.alert.bad .a-txt b { color: #ffc0bb; }
+.alert .a-txt b:first-child { font-family: var(--label); font-weight: 400; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; display: block; margin-bottom: 3px; color: #ffe6b0; }
+.alert.bad .a-txt b:first-child { color: #ffc0bb; }
 .alert .a-ic { font-size: 0; width: 22px; height: 22px; flex: none; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6d6, #ffb73a 40%, #8a4a00 75%); box-shadow: 0 0 0 3px #c9ced3, 0 0 0 4px #4b5056, 0 0 16px #ffa21e; animation: blink 1.2s infinite; }
 .alert.bad .a-ic { background: radial-gradient(circle at 35% 30%, #ffe3e0, #ff4b40 40%, #7a0b05 75%); box-shadow: 0 0 0 3px #c9ced3, 0 0 0 4px #4b5056, 0 0 16px #ff3a30; }
 
@@ -457,4 +457,7 @@ body.has3d .chips { margin-bottom: 2px; }
 .pop-brand b { font-weight: 400; }
 .pop-text h2 { font-family: var(--label); font-weight: 400; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; margin: 6px 0 6px; }
 .pop-btns { padding: 10px 22px 18px; }
-.pop-btns .btn { height: 32px; font-size: 9.5px; }
+.pop-btns { gap: 7px; }
+.pop-btns .btn { height: 32px; font-size: 9px; letter-spacing: .08em; padding: 0 10px; }
+.pop-btns .btn svg { font-size: 13px; }
+.forever, .settings { margin: 0 auto; }
