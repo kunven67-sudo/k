@@ -1,0 +1,9 @@
+All assets are CC0 (public domain) or OFL:
+- Brushed metal: ambientCG Metal012 (CC0) https://ambientcg.com/a/Metal012
+- Circular brushed aluminum (knobs): ambientCG Metal051A (CC0) https://ambientcg.com/a/Metal051A
+- Paper (meter faces): ambientCG Paper005 (CC0) https://ambientcg.com/a/Paper005
+- Studio light: Poly Haven "Studio Small 09" HDRI (CC0) https://polyhaven.com/a/studio_small_09
+- Clicks: LaSonotheque / BigSoundBank (CC0): 0026 Electric switch, 0540 Old switch, 0613 Pen click,
+  0808 Oven controllers, 0795 Large ratchet, 2191 relay
+- Font: Michroma by Vernon Adams (SIL Open Font License) https://fonts.google.com/specimen/Michroma
+- three.js (MIT) bundled into device.js
