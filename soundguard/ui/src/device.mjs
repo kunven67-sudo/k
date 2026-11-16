@@ -763,8 +763,8 @@ export async function createDevice(canvas, opt = {}) {
     buttons.testIn.target = st.testIn ? blinkFast : 0;
     for (const b of Object.values(buttons)) {
       b.lit += (b.target - b.lit) * Math.min(1, dt * 14);
-      b.mat.emissiveIntensity = 0.03 + b.lit * 0.5;
-      b.mat.color.setScalar(0.33 + b.lit * 0.32);
+      b.mat.emissiveIntensity = 0.03 + b.lit * 0.3;
+      b.mat.color.setScalar(0.33 + b.lit * 0.2);
       b.press = Math.max(0, b.press - dt * 7);
       b.cap.position.z = 0.04 - Math.sin(Math.min(1, b.press) * Math.PI) * 0.014;
     }
