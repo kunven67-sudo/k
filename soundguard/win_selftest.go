@@ -281,6 +281,10 @@ func micSelftest(args []string) int {
 	}
 	var r micResult
 	b := newWinBackend()
+	if b.micBlocked() {
+		b.FixMicPrivacy()
+		time.Sleep(time.Second)
+	}
 	s, err := b.Snapshot()
 	switch {
 	case err != nil:

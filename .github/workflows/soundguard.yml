@@ -59,14 +59,13 @@ jobs:
         if: always()
         shell: pwsh
         run: Get-Content "$env:LOCALAPPDATA\SoundGuard\debug.log" -Tail 200 -ErrorAction SilentlyContinue
-      - name: Window pictures
+      - name: Window pictures (artifact)
         if: always()
-        working-directory: soundguard
-        shell: pwsh
-        run: |
-          foreach ($n in 'window-main','window-popup') {
-            if (Test-Path "$n.b64") { "=====BEGIN $n====="; Get-Content "$n.b64" -Raw; "=====END $n=====" } else { "no $n picture" }
-          }
+        uses: actions/upload-artifact@v4
+        with:
+          name: window-pictures
+          path: soundguard/*.b64
+          if-no-files-found: ignore
       - name: Defender scan
         if: always()
         continue-on-error: true
@@ -76,3 +75,14 @@ jobs:
           Get-MpComputerStatus | Select-Object AMServiceEnabled, AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion | Format-List | Out-String
           & "$env:ProgramFiles\Windows Defender\MpCmdRun.exe" -Scan -ScanType 3 -File "$pwd\SoundGuard.exe" -DisableRemediation
           "scan exit: $LASTEXITCODE (0 = clean, 2 = threat)"
+      - name: Summary
+        if: always()
+        working-directory: soundguard
+        shell: pwsh
+        run: |
+          if (Test-Path selftest.json) {
+            $j = Get-Content selftest.json -Raw | ConvertFrom-Json
+            foreach ($s in $j.steps) { "{0,-34} {1,-5} must={2} err={3}" -f $s.name, $s.ok, $s.must, $s.err }
+            $m = $j.steps | Where-Object name -like 'mic test*'
+            if ($m) { "mic test info: " + ($m.info | ConvertTo-Json -Depth 6 -Compress) }
+          }
