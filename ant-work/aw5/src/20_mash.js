@@ -42,7 +42,7 @@ defineLevel('mash',{
     for(let i=0;i<18;i++){ const nm=floaters[i%floaters.length]; const c=MODELS[nm]?fitProp(nm,rand(1.2,3.6)):box(rand(1,4),rand(1,4),rand(1,4),[W,iceM,spoonM][i%3],0,0,0); c.position.set(rand(-60,60),rand(8,40),rand(-220,20)); c.rotation.set(rand(0,6),rand(0,6),rand(0,6)); c.userData.spin=V3(rand(-.3,.3),rand(-.3,.3),rand(-.3,.3)); scene.add(c); lv.glitchers.push(c); }   /* real things torn out of real places */
     // Steve + Alex's ice lab (a chunk of it), the cover crates, their console
     /* a chunk of their ice lab: blue plated walls with steel pillars + a top rail, hanging lamps, real crates/carts/racks as cover, a real desk with a live screen */
-    const labM=pbrMat('blue_metal_plate',2,{opts:{roughness:.55,metalness:.6}}); labM.color=col(0xb8c8d8);
+    const labM=pbrMat('blue_metal_plate',2,{opts:{roughness:.6,metalness:.15}}); labM.color=col(0xd8e4f0);
     const steel=new THREE.MeshPhysicalMaterial({color:col(0x6a727c),metalness:1,roughness:.35,clearcoat:.3});
     const frost=new THREE.MeshPhysicalMaterial({color:col(0xe8f4ff),roughness:.15,transmission:.3,transparent:true,opacity:.55,clearcoat:1});
     for(const [x,z,w,d] of [[-14,-80,.6,22],[14,-80,.6,22]]){ const o=box(w,6,d,labM,x,3,z); scene.add(o); lv.occluders.push(o); colBoxC(lv.col,x,z,w,d);
@@ -51,11 +51,22 @@ defineLevel('mash',{
       for(let k=0;k<5;k++){ const ic=mesh(new THREE.ConeGeometry(rand(.06,.16),rand(.4,1.2),6),frost,x+(x<0?.42:-.42),5.7-rand(0,.3),z+rand(-10,10)); ic.rotation.x=Math.PI; scene.add(ic); } }   // icicles off the rail
     for(const z of [-72,-86]){ const lamp=fitProp('hanging_industrial_lamp',1.1); lamp.position.set(0,5.4,z); scene.add(lamp); const L=new THREE.PointLight(col(0xd8ecff),1.6,18,1.6); L.position.set(0,4.9,z); scene.add(L); }
     const coverM=['old_military_crate','metal_tool_chest','industrial_storage_cart','portable_generator','worn_metal_rack','barrel_03'];
-    lv.cover=[]; [[-8,-70],[-3,-76],[6,-72],[-6,-86],[3,-90],[9,-84]].forEach(([x,z],i)=>{ const hit=box(2.2,1.6,2.2,labM,x,.8,z); hit.visible=false; scene.add(hit); lv.occluders.push(hit); colBoxC(lv.col,x,z,2.2,2.2); lv.cover.push(hit);
-      const pr=fitProp(coverM[i],2.2,1.65); pr.position.set(x,0,z); pr.rotation.y=rand(-.4,.4)+(i%2?Math.PI/2:0); scene.add(pr); });
-    lv.console=fitProp('metal_office_desk',3.0,1.2); lv.console.position.set(0,0,-96); scene.add(lv.console); colBoxC(lv.col,0,-96,3,1);
-    { const scr=mesh(new THREE.PlaneGeometry(1.1,.62),new THREE.MeshBasicMaterial({map:canvasTex(512,288,(c,w,h)=>{ c.fillStyle='#04121e'; c.fillRect(0,0,w,h); c.strokeStyle='#3ac8ff'; c.lineWidth=2; for(let k=0;k<5;k++){ c.beginPath(); for(let x=0;x<w;x+=6){ const y=h*(.2+k*.15)+Math.sin(x*.05+k*2)*10*Math.random(); x?c.lineTo(x,y):c.moveTo(x,y); } c.stroke(); } c.fillStyle='#7ae8ff'; c.font='bold 22px monospace'; c.fillText('TRACK: WATCH  ▮ SIGNAL LOST',14,30); c.fillText('REALITY INDEX  0.42',14,270); })}),0,1.25,-95.8,false); scene.add(scr);
-      const sl=fitProp('portable_searchlight',1.1); sl.position.set(-1.6,0,-95); sl.rotation.y=Math.PI; scene.add(sl); }
+    lv.cover=[]; [[-8,-70],[-3,-76],[6,-72],[-6,-86],[3,-90],[9,-84]].forEach(([x,z],i)=>{
+      /* real props at their REAL size (Poly Haven measures them in metres) */
+      const pr=new THREE.Group(), put=(n,px,py,pz,ry)=>{ const q=new THREE.Group(), m=prop(n); const bb=new THREE.Box3().setFromObject(m); m.position.y=-bb.min.y; q.add(m); q.position.set(px,py,pz); q.rotation.y=ry||0; pr.add(q); return q; };
+      const crates=(px,pz,n,ry)=>{ for(let k=0;k<n;k++) put('wooden_crate_02',px+rand(-.03,.03),k*.46,pz,(ry||0)+rand(-.08,.08)); };
+      if(i===0){ crates(-.3,0,3); crates(.3,0,2,.05); crates(-.3,-1.2,2); }
+      else if(i===1){ put('metal_office_desk',0,0,0); put('metal_tool_chest',-.45,.79,0,.2); put('metal_jerrycan'in MODELS?'metal_jerrycan':'barrel_03',.6,.79,.1); }
+      else if(i===2){ put('industrial_storage_cart',0,0,0); put('old_military_crate',0,1.38,0,.1); }
+      else if(i===3){ crates(0,0,2); put('portable_generator',0,.92,.2,.5); }
+      else if(i===4){ put('worn_metal_rack',-.47,0,0); put('worn_metal_rack',.47,0,0,.04); }
+      else { put('barrel_03',-.34,0,0); put('barrel_03',.33,0,.08); put('barrel_03',0,0,-.6); crates(.2,.75,3,1.5708); }
+      pr.position.set(x,0,z); pr.rotation.y=rand(-.3,.3)+(i%2?Math.PI/2:0); scene.add(pr); pr.updateMatrixWorld(true);
+      const b=new THREE.Box3().setFromObject(pr), sz=b.getSize(new THREE.Vector3()), c=b.getCenter(new THREE.Vector3());
+      const hit=box(sz.x,sz.y,sz.z,labM,c.x,sz.y/2,c.z); hit.visible=false; scene.add(hit); lv.occluders.push(hit); colBoxC(lv.col,c.x,c.z,sz.x,sz.z); lv.cover.push(hit); });   /* hit box = the real prop */
+    lv.console=prop('metal_office_desk'); lv.console.position.set(0,0,-96); scene.add(lv.console); colBoxC(lv.col,0,-96,2.05,1);
+    { const scr=mesh(new THREE.PlaneGeometry(1.1,.62),new THREE.MeshBasicMaterial({map:canvasTex(512,288,(c,w,h)=>{ c.fillStyle='#04121e'; c.fillRect(0,0,w,h); c.strokeStyle='#3ac8ff'; c.lineWidth=2; for(let k=0;k<5;k++){ c.beginPath(); for(let x=0;x<w;x+=6){ const y=h*(.2+k*.15)+Math.sin(x*.05+k*2)*10*Math.random(); x?c.lineTo(x,y):c.moveTo(x,y); } c.stroke(); } c.fillStyle='#7ae8ff'; c.font='bold 22px monospace'; c.fillText('TRACK: WATCH  ▮ SIGNAL LOST',14,30); c.fillText('REALITY INDEX  0.42',14,270); })}),0,1.12,-96.2,false); scene.add(scr);
+      const sl=fitProp('portable_searchlight',.55); sl.position.set(-.7,.79,-95.9); sl.rotation.y=Math.PI; scene.add(sl); }
     // the stuck rocks (a time loop) on the way up the cliff, and the tear
     const R=MASH.rocks, rockM=pbrMat('cliff_side',2,{w:3,h:3}); rockM.color=col(0x9a8a7a); lv.rocks=[];
     for(let i=0;i<R.n;i++){ const r=mesh(new THREE.DodecahedronGeometry(1.15,1),rockM,R.x+Math.sin(i*1.3)*1.2,0,R.z-i*1.65); r.scale.set(1.1,.55,1.1); r.castShadow=true; scene.add(r); lv.rocks.push({o:r,base:.7+i*.8,ph:i*.7}); }
