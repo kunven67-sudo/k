@@ -13,7 +13,7 @@ from typing import Any
 
 from .jsonio import atomic_write_json, read_json
 
-RISKS = ("read", "write", "destructive", "external", "money")
+RISKS = ("read", "web", "write", "run", "destructive", "external", "money")
 POLICIES = ("auto", "ask", "block")
 LOCKED_RISKS = {"destructive": ("ask", "block"), "external": ("ask", "block"), "money": ("ask", "block")}
 
@@ -38,7 +38,9 @@ DEFAULTS: dict[str, Any] = {
     "double_check": True,
     "approval_timeout_min": 10,
     "cli_path": "",
-    "permissions": {"read": "auto", "write": "ask", "destructive": "ask", "external": "ask", "money": "block"},
+    "permissions": {"read": "auto", "web": "auto", "write": "auto", "run": "auto", "destructive": "ask",
+                    "external": "ask", "money": "block"},
+    "model_switch": "ask",
 }
 
 _SCHEMA: dict[str, tuple] = {
@@ -56,6 +58,7 @@ _SCHEMA: dict[str, tuple] = {
     "double_check": (bool, None, "Second check by a fresh Claude"),
     "approval_timeout_min": (int, lambda v: 1 <= v <= 120, "Auto-No after (minutes)"),
     "cli_path": (str, lambda v: len(v) < 500, "Claude Code path"),
+    "model_switch": (str, lambda v: v in ("ask", "auto"), "Model switching"),
 }
 
 

@@ -18,7 +18,15 @@ function start(port, ...extra) {
     const onData = (d) => {
       buf += d.toString();
       const m = buf.match(/URL (\S+)/);
-      if (m) { clearTimeout(t); setTimeout(() => resolve([p, m[1]]), 600); }
+      if (m && !p.ready) {
+        p.ready = true;
+        clearTimeout(t);
+        const base = m[1].split("#")[0].replace(/\/$/, "");
+        const until = Date.now() + 30000;
+        const poll = () => fetch(base + "/api/ping").then((r) => (r.ok ? resolve([p, m[1]]) : Promise.reject()))
+          .catch(() => (Date.now() > until ? reject(new Error("demo server never answered: " + buf)) : setTimeout(poll, 250)));
+        poll();
+      }
     };
     p.stdout.on("data", onData);
     p.stderr.on("data", (d) => { buf += d.toString(); });
@@ -64,15 +72,18 @@ function start(port, ...extra) {
     assert((await page.innerText("#feed")).includes("434"), "calculator answer missing");
     await shot(page, "02-time-task.png");
 
-    // task 2: needs your Yes
+    // task 2: Chat mode plans it, then asks "Ready to build?"; Yes switches to Build mode and it builds
+    assert((await page.innerText("#mode")).includes("Chat"), "new chats should start in Chat mode");
     await page.fill("#msg", "Make a file called todo.txt with 3 things to do this week");
     await page.keyboard.press("Enter");
     await page.waitForSelector(".card", { timeout: 90000 });
     await page.waitForSelector("#needs-you:not(.hidden)");
     await page.locator(".card").scrollIntoViewIfNeeded();
+    assert((await page.innerText(".card")).includes("Ready to build?"), "build card missing");
     await shot(page, "03-approval.png");
     await page.click(".card [data-yes]");
-    await page.waitForFunction(() => document.querySelectorAll(".turn .badge.done").length >= 2, null, { timeout: 120000 });
+    await page.waitForFunction(() => document.querySelectorAll(".turn .badge.done").length >= 3, null, { timeout: 120000 });
+    await page.waitForFunction(() => document.querySelector("#mode").textContent.includes("Build"), null, { timeout: 10000 });
     await page.click(".turn:last-child details.checks summary");
     await page.locator(".turn:last-child").scrollIntoViewIfNeeded();
     await sleep(400);
@@ -89,7 +100,9 @@ function start(port, ...extra) {
     await page.waitForSelector(".hero", { timeout: 20000 });
     await page.click("#run-tests");
     await page.waitForSelector("#run-tests:not([disabled])", { timeout: 300000 });
-    await page.waitForSelector(".toast >> text=Self-tests done", { timeout: 30000 });
+    await page.waitForSelector(".toast >> text=/Self-tests (done|crashed)/", { timeout: 300000 });
+    const tt = await page.innerText(".toast");
+    assert(tt.includes("Self-tests done") && tt.includes(" 0 failed"), "self-tests in the window: " + tt);
     await sleep(1200);
     const hero = await page.innerText(".hero .num");
     assert(!hero.startsWith("0 "), "no green points after self-tests: " + hero);

@@ -61,6 +61,7 @@ class TaskRecord:
     flags: list[str] = field(default_factory=list)
     undo: list[dict] | None = None
     rerun_of: str | None = None
+    mode: str = "build"          # "chat" or "build" (older tasks were all build-style)
 
     def public(self) -> dict:
         return asdict(self)
@@ -137,6 +138,14 @@ def check_task(rec: TaskRecord, workspace: Workspace, run: dict) -> tuple[str, s
             return "blocked", run["error"], checks
         return "failed", run["error"], checks
     add("Run", True, "Claude finished normally.")
+
+    if rec.mode == "chat" and not rec.changes:
+        # Chat mode: talking, explaining, lists, looking things up. No plan/report needed.
+        if rec.final_text.strip() or run.get("build_go"):
+            add("Answer", True, "Answered in Chat mode." if rec.final_text.strip() else "Switched to Build mode.")
+            return "done", "Chat answer." if not run.get("build_go") else "Going to Build mode.", checks
+        add("Answer", False, "Claude ended without saying anything.")
+        return "failed", "No answer came back.", checks
 
     plan, report = rec.plan, rec.report
     reasons: list[str] = []

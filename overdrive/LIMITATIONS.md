@@ -1,12 +1,43 @@
-# Known limitations (Stage 2)
+# Known limitations (Piece 1: the brain)
 
-Honest list. Stages 1 + 2 are shipped: the core engine, the safety system, and long-term memory.
+Honest list. Built so far: the core engine, the safety system, long-term memory (old Stages 1 + 2), and
+**Piece 1: the brain is basically Claude now** (Claude Code's own tools, behind OVERDRIVE's gate).
+Coming next: Piece 2 (ChatGPT-style helping: lists, no rushing, real pictures), Piece 3 (all the extra
+features: learn + bug hunt while idle, mic + voice, live view, tutorial, accounts, done-folder, internet light,
+memory "saves + tells you"), Piece 4 (looks, animations, backgrounds).
 
-## What it can't do yet
-- No web browsing, no running programs, no screen/mouse/keyboard control, no images/audio/video.
-- No planning engine yet beyond "plan first, report last" (Stage 4), no agent teams (Stage 6), no schedules (Stage 8).
-- File tools: text files only, only inside `OVERDRIVE\workspace`, 5 MB read / 1,000,000 characters write.
-- One task at a time.
+## Piece 1: what it can do now
+- **Chat mode** (new chats start here): talk, explain, make lists, search the web, open web pages, read
+  workspace files. It can't make or change files or run commands in Chat mode.
+- **Build mode**: write and edit files, run commands (to run and test what it makes), search the web.
+  It switches when you click **Yes** on its "Ready to build?" card (it shows the plan, the steps and the
+  model + effort it wants), or when you click the **Chat mode / Build mode** switch next to the message box.
+- **Model for the job**: the "Ready to build?" card can switch the chat to a better model + effort
+  (Settings -> "Switching model for a big job": *Show it, I click OK* or *Switch by itself*).
+
+## Piece 1: safety rules
+- Every Claude Code tool call goes through OVERDRIVE's gate and your permission policy
+  (Settings -> Permissions: auto / ask / block for each kind).
+- New kinds: **Run programs** (default auto) and **Look things up online** (default auto).
+  **Write / edit in workspace** is now auto by default because every change is versioned first (Undo works).
+- Always asks, even on auto: anything **outside** the OVERDRIVE workspace folder (no Undo there), and
+  commands that look dangerous (deleting files, formatting, shutdown, registry, admin rights, installing
+  software, downloading-and-running code, git push, closing other programs, scheduled jobs, firewall /
+  security settings).
+- The danger check reads the command text. It can't see inside a script file the command runs, so a
+  program Claude wrote itself could still do something bad when run. Set **Run programs** to *ask* if you
+  want to see every command first.
+- Undo covers files changed inside the workspace (Claude Code's tools and OVERDRIVE's own). It can't undo
+  what a command did (for example files a program created or deleted on its own).
+- Memory changes still always ask (Piece 3 adds "saves + tells you" with Undo, and "personal = always asks").
+
+## Piece 1: not yet
+- No screen / mouse / keyboard control, no screenshots of a running game yet (it can test with code and
+  read image files, but can't watch a game window).
+- No AI-made pictures (waits for the RTX 3050), no voice, no mic, no idle learning or bug hunt yet.
+- One task at a time. A model change applies from the next task.
+- After a Chat/Build switch, Claude Code keeps the chat's first instructions, so OVERDRIVE puts the new
+  mode's rules in front of your message (you won't see that note, Claude does).
 
 ## Long-term memory (Stage 2)
 - Five kinds of rows: fact, experience, instruction, project, relationship. Each row carries provenance,

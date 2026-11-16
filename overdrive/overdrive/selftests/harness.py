@@ -192,7 +192,7 @@ def report(status: str = "done", met: bool = True, evidence: str = "tool result 
 # ---------------------------------------------------------------------------
 # running OVERDRIVE end to end
 # ---------------------------------------------------------------------------
-def make_agent(root: Path, fake: FakeClaude, double_check: bool = False, **settings: Any):
+def make_agent(root: Path, fake: FakeClaude, double_check: bool = False, mode: str = "build", **settings: Any):
     from ..agent import Overdrive
     cfg = root / "claude-config"
     cfg.mkdir(parents=True, exist_ok=True)
@@ -201,7 +201,10 @@ def make_agent(root: Path, fake: FakeClaude, double_check: bool = False, **setti
     if not double_check:
         env["OVERDRIVE_TEST_NO_DOUBLE_CHECK"] = "1"
     od = Overdrive(home=root / "home", test_env=env)
+    # Older tests were written for "every write asks"; they keep that unless a test says otherwise.
+    settings.setdefault("permissions", {"write": "ask", "run": "ask"})
     od.settings.update({"cli_path": selftest.CLI or "", "max_minutes": 3, **settings}, by="test")
+    od.default_mode = mode
     return od
 
 
@@ -243,3 +246,32 @@ def with_fake(script, fn):
         fake.close()
         import shutil
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def B(name: str, **inp: Any) -> dict:
+    """A tool_use block for one of Claude Code's OWN tools (Write, Edit, Bash, Read...)."""
+    return {"type": "tool_use", "name": name, "input": inp}
+
+
+def run_until_idle(od, text: str, answer: Callable[[Any], tuple] | None = None, timeout: float = 150,
+                   settle: float = 2.0, conversation: str | None = None) -> list:
+    """Send one message, then wait until NO task has run for `settle` seconds (so an automatic
+    Build-mode follow-up task is waited for too). Returns the finished task records, oldest first."""
+    async def main():
+        loop = asyncio.get_running_loop()
+        od.events.bind_loop(loop)
+        first = await od.send(text, conversation)
+        conv_id = first.conversation
+        deadline = time.monotonic() + timeout
+        quiet = 0.0
+        while quiet < settle:
+            if time.monotonic() > deadline:
+                await od.stop()
+                raise AssertionError("tasks took too long")
+            for card in od.broker.open_cards():
+                st, ans, note = (answer(card) if answer else ("no", None, "test default: no"))
+                od.answer_card(card.id, st, ans, note)
+            quiet = quiet + 0.05 if od.current is None else 0.0
+            await asyncio.sleep(0.05)
+        return [od.task_store.load(t) for t in od.conversations[conv_id].tasks]
+    return asyncio.run(main())

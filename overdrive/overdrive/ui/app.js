@@ -5,7 +5,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const WORDS = { running: "Working", done: "Done", partly: "Partly done", failed: "Failed", blocked: "Blocked" };
-const RISK = { internal: "Bookkeeping", read: "Read", write: "Write (new)", destructive: "Change / replace", external: "Send off PC", money: "Spend money", invalid: "Bad inputs" };
+const RISK = { internal: "Bookkeeping", read: "Read", web: "Look things up online", write: "Write / edit in workspace", run: "Run programs", destructive: "Change / replace", external: "Send off PC", money: "Spend money", invalid: "Bad inputs" };
 const EFFORT = { low: "Low (fast, light)", medium: "Medium (normal)", high: "High (thinks more)", xhigh: "Extra high", max: "Max (slowest, heaviest)" };
 
 const S = {
@@ -139,6 +139,14 @@ function handle(ev) {
   if (ev.seq) S.seq = Math.max(S.seq, ev.seq);
   switch (ev.type) {
     case "task": upsertTask(ev.task); break;
+    case "conversation": {
+      const list = S.state.conversations || [];
+      const c = list.find((x) => x.id === ev.conversation.id);
+      if (c) Object.assign(c, ev.conversation); else list.unshift(ev.conversation);
+      renderMode();
+      try { renderModelChip(); } catch (e) { /* not ready yet */ }
+      break;
+    }
     case "delta": {
       S.live.set(ev.task, (S.live.get(ev.task) || "") + ev.text);
       const el = $(`#live-${ev.task}`);
@@ -174,10 +182,14 @@ function renderChats() {
 
 async function openConversation(id, quiet) {
   S.conv = id;
+  renderMode();
+  try { renderModelChip(); } catch (e) { /* not ready yet */ }
   try {
     const d = await api(`/api/conversation/${encodeURIComponent(id)}`);
     S.tasks = new Map(d.tasks.map((t) => [t.id, t]));
     $("#chat-title").textContent = d.conversation.title || "Chat";
+    const known = (S.state.conversations || []).find((x) => x.id === id);
+    if (known) Object.assign(known, d.conversation);
   } catch (e) {
     if (!quiet) toast(e.message, "bad");
     S.tasks = new Map();
@@ -191,6 +203,8 @@ function newChat() {
   S.conv = null;
   S.tasks = new Map();
   $("#chat-title").textContent = "New chat";
+  S.nextMode = null;
+  renderMode();
   renderChats();
   renderFeed();
   $("#msg").focus();
@@ -318,14 +332,27 @@ function cardNode(c) {
       }).join("\n")}</div>`;
     } else if (p.preview !== undefined) {
       prev = `<div class="prev">${esc(p.preview || "(empty file)")}</div>`;
+    } else if (p.plan !== undefined) {
+      // "Ready to build?": the plan, the steps, and the model + effort it wants
+      prev = `<div class="build-plan"><div>${esc(p.plan)}</div>
+        ${(p.steps || []).length ? `<ol>${p.steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}
+        <div class="muted">Model: <b>${esc(p.model || "")}</b>${p.now && p.now !== p.model ? ` (now: ${esc(p.now)})` : ""}</div>
+        ${p.note ? `<div class="muted">${esc(p.note)}</div>` : ""}</div>`;
+    } else if (p.command !== undefined) {
+      prev = `${p.what ? `<div class="muted">${esc(p.what)}</div>` : ""}<div class="prev mono">${esc(p.command)}</div>`;
+    } else if (p.edits) {
+      prev = `<div class="prev">${p.edits.map((e) => `<span class="del">- ${esc(e.old)}</span>\n<span class="add">+ ${esc(e.new)}</span>`).join("\n\n")}</div>`;
+    } else if (p.url || p.query) {
+      prev = `<div class="prev mono">${esc(p.url || p.query)}</div>`;
     } else if (p.inputs) {
       prev = `<div class="prev">${esc(JSON.stringify(p.inputs, null, 2))}</div>`;
     }
+    const why = p.why ? `<div class="why"><b>Why it asks:</b> ${esc(p.why)}</div>` : "";
     const what = p.path ? `<span class="chip mono">${esc(p.path)}</span><span class="chip">${p.lines ?? "?"} lines</span>` : "";
     el.innerHTML = `<h4>${esc(c.title)}</h4>
       <div class="meta"><span class="risk ${esc(c.risk)}">${esc(b.risk_label || RISK[c.risk] || c.risk)}</span>${what}${b.network ? `<span class="chip">uses internet</span>` : ""}</div>
       ${b.reason ? `<div class="why"><b>Claude's reason:</b> ${esc(b.reason)}</div>` : ""}
-      ${prev}
+      ${why}${prev}
       ${p.reversible ? `<div class="muted">Can it be undone? ${esc(p.reversible)}</div>` : ""}
       <div class="card-actions"><button class="ok" data-yes>Yes, do it</button><button data-no>No</button>
         <input data-note placeholder="Optional note for Claude (why No, or what to change)" maxlength="500">
@@ -435,7 +462,8 @@ async function send(text) {
   if (S.setup && !S.setup.ready) { $("#setup").classList.remove("hidden"); renderSetup(); return; }
   $("#send").disabled = true;
   try {
-    const d = await api("/api/send", { text, conversation: S.conv });
+    const d = await api("/api/send", { text, conversation: S.conv, mode: S.conv ? undefined : (S.nextMode || "chat") });
+    S.nextMode = null;
     $("#msg").value = "";
     autoGrow();
     if (S.conv !== d.task.conversation) { S.conv = d.task.conversation; S.tasks = new Map(); renderFeed(); }
@@ -494,7 +522,8 @@ function applyWidths(root) { $$("[data-w]", root).forEach((el) => { el.style.wid
 function renderModelChip() {
   const s = S.state && S.state.settings;
   if (!s) return;
-  $("#chip-model").textContent = `${s.model} · effort ${s.effort}`;
+  const cv = S.conv && ((S.state.conversations || []).find((x) => x.id === S.conv) || {});
+  $("#chip-model").textContent = `${(cv && cv.model) || s.model} · effort ${(cv && cv.effort) || s.effort}`;
 }
 
 /* ---------------------------------------------------------------- setup */
@@ -576,7 +605,7 @@ function renderStatus() {
       <div><div class="stack">${seg(t.green, "g-green")}${seg(t.red, "g-red")}${seg(t.untested, "g-untested")}${seg(t.guided, "g-guided")}${seg(t.not_started, "g-off")}</div>
       <div class="legend"><span class="lg-green">${t.green} proven</span><span class="lg-red">${t.red} failing</span><span class="lg-untested">${t.untested} not tested yet</span>
       <span class="lg-guided">${t.guided} guided (never counted)</span><span class="lg-off">${t.not_started.toLocaleString()} not built yet</span></div>
-      <div class="muted" style="margin-top:8px;font-size:12.5px">The blueprint = 100 rules &times; 50 areas. Stage 1 makes <b>${rs.real}</b> rules real (${rs.green} proven right now), <b>${rs.guided}</b> guided, <b>${rs.later}</b> wait for later stages.
+      <div class="muted" style="margin-top:8px;font-size:12.5px">The blueprint = 100 rules &times; 50 areas. Built so far makes <b>${rs.real}</b> rules real (${rs.green} proven right now), <b>${rs.guided}</b> guided, <b>${rs.later}</b> wait for later stages.
       A point turns green only if its area runs on the core <i>and</i> the tests for that rule passed here.</div></div></div>
     <h2>Self-tests ${st.when ? `<span class="muted" style="font-weight:400;font-size:12.5px">last run ${esc(new Date(st.when).toLocaleString())}: ${st.passed} passed, ${st.failed} failed, ${st.skipped} skipped${(st.regressions || []).length ? `, <b style="color:var(--bad)">new failures: ${st.regressions.map(esc).join(", ")}</b>` : ""}</span>` : ""}</h2>
     <div class="box"><div class="tests" id="tests-list">${testsHtml}</div></div>
@@ -612,7 +641,7 @@ function showArea(n) {
       return `<div class="mono">${esc(t)}: ${s}</div>`;
     }).join("") || "<div>No test (later stage).</div>";
     $("#rule-detail").innerHTML = `<div><b style="color:var(--text)">Point ${pt}:</b> The ${esc(subject)} system must ${esc(r.text)}</div>
-      <div style="margin-top:8px"><b style="color:var(--text)">${r.mode === "real" ? "Built in Stage 1" : r.mode === "guided" ? "Guided (never counted)" : "Later: " + esc(r.stage_name)}</b> &middot; ${esc(r.how)}</div>
+      <div style="margin-top:8px"><b style="color:var(--text)">${r.mode === "real" ? "Built" : r.mode === "guided" ? "Guided (never counted)" : "Later: " + esc(r.stage_name)}</b> &middot; ${esc(r.how)}</div>
       <div style="margin-top:8px">${a.started ? "" : "This area isn't built yet, so this point stays grey even if the core rule works.<br>"}${tests}</div>`;
   }));
   $("#drawer").classList.remove("hidden");
@@ -733,7 +762,7 @@ function renderSettings() {
   const fbOpts = opt("", "None (tell me instead)", s.fallback_model) + Object.entries(models).map(([k, v]) => opt(k, v, s.fallback_model)).join("");
   const num = (k, step, min, max) => `<input type="number" data-k="${k}" value="${s[k]}" step="${step}" min="${min}" max="${max}">`;
   const locked = { destructive: 1, external: 1, money: 1 };
-  const permRows = ["read", "write", "destructive", "external", "money"].map((r) => `<div class="perm"><span>${esc(RISK[r])}</span>
+  const permRows = ["read", "web", "write", "run", "destructive", "external", "money"].map((r) => `<div class="perm"><span>${esc(RISK[r])}</span>
     ${["auto", "ask", "block"].map((p) => `<label><input type="radio" name="perm-${r}" value="${p}" ${s.permissions[r] === p ? "checked" : ""} ${locked[r] && p === "auto" ? "disabled" : ""}> ${p}</label>`).join("")}
     <span class="lock">${locked[r] ? "locked: can never be auto" : ""}</span></div>`).join("");
   $("#settings-body").innerHTML = `
@@ -741,6 +770,7 @@ function renderSettings() {
       <div class="row2"><label>Model</label><select data-k="model">${modelOpts}</select></div>
       <div class="row2"><label>Backup model if Claude is busy</label><select data-k="fallback_model">${fbOpts}</select></div>
       <div class="row2"><label>Thinking effort</label><select data-k="effort">${Object.entries(EFFORT).map(([k, v]) => opt(k, v, s.effort)).join("")}</select></div>
+      <div class="row2"><label>Switching model for a big job</label><select data-k="model_switch">${opt("ask", "Show it, I click OK", s.model_switch)}${opt("auto", "Switch by itself (and tell me)", s.model_switch)}</select></div>
       <div class="row2"><label>Explanations</label><select data-k="detail">${opt("simple", "Simple (short, easy words)", s.detail)}${opt("normal", "Normal", s.detail)}${opt("deep", "Deep (more detail)", s.detail)}</select></div>
     </div>
     <div class="st-sec"><h3>Limits</h3>
@@ -789,7 +819,7 @@ async function saveSettings() {
     if (JSON.stringify(v) !== JSON.stringify(s[k])) changes[k] = v;
   });
   const perms = {};
-  for (const r of ["read", "write", "destructive", "external", "money"]) {
+  for (const r of ["read", "web", "write", "run", "destructive", "external", "money"]) {
     const sel = $(`input[name="perm-${r}"]:checked`);
     if (sel && sel.value !== s.permissions[r]) perms[r] = sel.value;
   }
@@ -830,6 +860,8 @@ function bindUI() {
   $$("#nav button").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
   $("#new-chat").addEventListener("click", newChat);
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); send($("#msg").value); });
+  $("#mode").addEventListener("click", toggleMode);
+  renderMode();
   $("#msg").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send($("#msg").value); } });
   $("#msg").addEventListener("input", autoGrow);
   $("#stop").addEventListener("click", stop);
@@ -856,3 +888,31 @@ function bindUI() {
 }
 
 boot();
+
+// ---- Chat mode / Build mode (Piece 1) ----
+function currentMode() {
+  if (!S.conv) return S.nextMode || "chat";
+  const c = ((S.state && S.state.conversations) || []).find((x) => x.id === S.conv);
+  return (c && c.mode) || "chat";
+}
+function renderMode() {
+  const b = document.getElementById("mode");
+  if (!b) return;
+  const m = currentMode();
+  b.textContent = m === "build" ? "Build mode" : "Chat mode";
+  b.className = "mode-pill " + m;
+  b.title = m === "build"
+    ? "Build mode: it makes things, runs them and tests them. Click to go back to Chat mode."
+    : "Chat mode: talk, lists, look things up. It asks you before it builds anything. Click for Build mode.";
+}
+async function toggleMode() {
+  const next = currentMode() === "build" ? "chat" : "build";
+  if (!S.conv) { S.nextMode = next; renderMode(); return; }
+  try {
+    const r = await api("/api/mode", { conversation: S.conv, mode: next });
+    const c = (S.state.conversations || []).find((x) => x.id === S.conv);
+    if (c) Object.assign(c, r.conversation);
+    renderMode();
+    toast(next === "build" ? "Build mode on: it can make, run and test things now." : "Chat mode on: talk first, it asks before building.", "ok");
+  } catch (e) { toast(e.message, "bad"); }
+}

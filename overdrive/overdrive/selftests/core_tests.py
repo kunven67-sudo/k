@@ -177,7 +177,8 @@ def test_permission_decisions():
     with TempDir() as tmp:
         s = Settings(tmp)
         pol = s.get("permissions")
-        assert decide(pol, Risk.READ) == "auto" and decide(pol, Risk.WRITE) == "ask"
+        assert decide(pol, Risk.READ) == "auto" and decide(pol, Risk.WRITE) == "auto"
+        assert decide(pol, Risk.RUN) == "auto" and decide(pol, Risk.WEB) == "auto"
         assert decide(pol, Risk.DESTRUCTIVE) == "ask" and decide(pol, Risk.EXTERNAL) == "ask"
         assert decide(pol, Risk.MONEY) == "block" and decide(pol, Risk.INTERNAL) == "auto"
         for risk in ("destructive", "external", "money"):
@@ -603,7 +604,7 @@ def test_docs_present():
     text = setup.read_text(encoding="utf-8")
     for dep in ("Claude Code", "claude-agent-sdk", "Python", "Edge"):
         assert dep in text, f"SETUP.md must mention {dep}"
-    assert "Stage 1" in lim.read_text(encoding="utf-8")
+    assert "Piece 1" in lim.read_text(encoding="utf-8")
 
 
 @covers(56, title="Status shows exact versions")

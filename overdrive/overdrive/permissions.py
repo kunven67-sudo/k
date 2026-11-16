@@ -21,7 +21,9 @@ from .jsonio import canonical_json, utc_now_iso
 class Risk(str, Enum):
     INTERNAL = "internal"        # OVERDRIVE's own bookkeeping (plan/report). Always allowed.
     READ = "read"                # looks at things inside its allowed folder
-    WRITE = "write"              # makes something new
+    WRITE = "write"              # makes something new (or changes a workspace file; versioned, Undo works)
+    RUN = "run"                  # runs a command / program on your PC (to run and test what it makes)
+    WEB = "web"                  # looks things up on the web (search, open a page)
     DESTRUCTIVE = "destructive"  # changes, replaces or removes something that exists
     EXTERNAL = "external"        # sends anything off your PC
     MONEY = "money"              # buys or pays for something
@@ -31,14 +33,16 @@ class Risk(str, Enum):
         return {
             "internal": "OVERDRIVE bookkeeping",
             "read": "Read",
-            "write": "Write (new)",
+            "write": "Write / edit in workspace",
+            "run": "Run programs",
+            "web": "Look things up online",
             "destructive": "Change / replace / delete",
             "external": "Send off your PC",
             "money": "Spend money",
         }[self.value]
 
 
-ORDER = [Risk.INTERNAL, Risk.READ, Risk.WRITE, Risk.DESTRUCTIVE, Risk.EXTERNAL, Risk.MONEY]
+ORDER = [Risk.INTERNAL, Risk.READ, Risk.WEB, Risk.WRITE, Risk.RUN, Risk.DESTRUCTIVE, Risk.EXTERNAL, Risk.MONEY]
 
 
 def decide(policy: dict[str, str], risk: Risk) -> str:

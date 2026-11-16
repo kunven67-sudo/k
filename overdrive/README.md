@@ -1,4 +1,9 @@
-# OVERDRIVE (Stages 1 + 2: Core + Memory)
+# OVERDRIVE (Piece 1: the brain is basically Claude)
+
+Piece 1 adds Claude Code's own tools (write, edit, run, web) behind OVERDRIVE's gate, plus Chat mode / Build mode
+and the "Ready to build?" card. See LIMITATIONS.md for exactly what it can and can't do.
+
+## Before Piece 1
 
 A personal AI agent for your Windows PC. **The brain is Claude**, reached through Claude Code (Anthropic's official
 app) signed in with your claude.ai account: no API key, no extra money. Stage 1 is the engine + safety system that

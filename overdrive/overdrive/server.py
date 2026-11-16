@@ -118,7 +118,7 @@ class Server:
             ("/api/state", self.state, ["GET"]), ("/api/setup", self.setup, ["GET", "POST"]),
             ("/api/setup/install", self.install, ["POST"]), ("/api/setup/signin", self.signin, ["POST"]),
             ("/api/conversation/{cid}", self.conversation, ["GET"]), ("/api/new_chat", self.new_chat, ["POST"]),
-            ("/api/send", self.send, ["POST"]), ("/api/stop", self.stop, ["POST"]), ("/api/card", self.card, ["POST"]),
+            ("/api/send", self.send, ["POST"]), ("/api/stop", self.stop, ["POST"]), ("/api/mode", self.mode, ["POST"]), ("/api/card", self.card, ["POST"]),
             ("/api/events", self.events, ["GET"]), ("/api/status", self.status, ["GET"]),
             ("/api/selftest", self.selftest, ["POST"]), ("/api/logs", self.logs, ["GET"]),
             ("/api/logs/verify", self.logs_verify, ["GET"]), ("/api/settings", self.settings, ["POST"]),
@@ -198,12 +198,21 @@ class Server:
     async def send(self, request: Request) -> Response:
         body = await self._json(request)
         try:
-            rec = await self.od.send(str(body.get("text", "")), body.get("conversation") or None)
+            rec = await self.od.send(str(body.get("text", "")), body.get("conversation") or None,
+                                     mode=body.get("mode") if body.get("mode") in ("chat", "build") else None)
         except Busy as e:
             return JSONResponse({"error": str(e)}, 409)
         except ValueError as e:
             return JSONResponse({"error": str(e)}, 400)
         return JSONResponse({"task": rec.public()})
+
+    async def mode(self, request: Request) -> Response:
+        body = await self._json(request)
+        try:
+            conv = self.od.set_mode(str(body.get("conversation") or ""), str(body.get("mode") or ""))
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse({"conversation": conv})
 
     async def stop(self, request: Request) -> Response:
         return JSONResponse({"stopped": await self.od.stop()})

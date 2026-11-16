@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import VERSION, brain, shield
+from . import VERSION, brain, builtin, shield
 from .audit import AuditLog
 from .basic_tools import register_basic_tools
 from .events import EventBus
@@ -28,7 +28,7 @@ from .memory import Memory
 from .memory_tools import register_memory_tools
 from .paths import Paths, default_home
 from .permissions import Broker, Card, Grants, Risk, decide
-from .prompts import build_system_prompt
+from .prompts import build_system_prompt, mode_switch_note
 from .settings import Settings
 from .store import Workspace
 from .tasks import TaskRecord, TaskStore, check_task, merge_double_check, new_task_id, summarize_args
@@ -37,7 +37,7 @@ from .tools import ToolContext, ToolRegistry, ToolResult, ToolSpec
 try:  # The Agent SDK is needed for the brain, not for offline tools / tests of the core.
     from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, CLINotFoundError,
                                   PermissionResultAllow, PermissionResultDeny, RateLimitEvent, ResultMessage,
-                                  StreamEvent, SystemMessage, TextBlock, ToolUseBlock, UserMessage,
+                                  StreamEvent, SystemMessage, TextBlock, ToolResultBlock, ToolUseBlock, UserMessage,
                                   create_sdk_mcp_server, tool)
     from claude_agent_sdk import __version__ as SDK_VERSION
 except Exception as _e:  # pragma: no cover
@@ -64,6 +64,10 @@ class Conversation:
     session_id: str = ""
     cost_total: float = 0.0
     tasks: list[str] = field(default_factory=list)
+    mode: str = "chat"          # "chat" (talk, look things up, plan) or "build" (makes, runs and tests things)
+    session_mode: str = ""      # the mode the Claude Code session started in (its instructions keep that mode)
+    model: str = ""             # per-chat model/effort picked for a big job ("" = use Settings)
+    effort: str = ""
 
 
 @dataclass
@@ -84,6 +88,10 @@ class RunState:
     error_kind: str = ""
     error_text: str = ""
     retries: list[dict] = field(default_factory=list)
+    builtin_pending: dict[str, list[dict]] = field(default_factory=dict)  # allowed Claude Code calls waiting for a result
+    tool_use_ids: dict[str, tuple[str, dict]] = field(default_factory=dict)
+    file_changes: dict[str, dict] = field(default_factory=dict)          # workspace file -> change record (Undo)
+    build_go: dict | None = None                                          # start_build said Yes: continue in Build mode
 
     def final_text(self) -> str:
         if not self.texts:
@@ -106,12 +114,15 @@ class Overdrive:
         self.tools = ToolRegistry()
         register_basic_tools(self.tools)
         register_memory_tools(self.tools)
+        self.tools.add(START_BUILD_SPEC)
         self.grants = Grants()
         self.events = EventBus()
         self.broker = Broker(on_change=self._card_changed)
         self.test_env = test_env
         self.current: RunState | None = None
         self._run_task_handle: asyncio.Task | None = None
+        self._go_build_handle: asyncio.Task | None = None
+        self.default_mode = "chat"     # new chats start in Chat mode (talk first, build on Yes)
         self._setup_cache: tuple[float, dict] | None = None
         self._conv_path = self.paths.data / "conversations.json"
         self.conversations: dict[str, Conversation] = {}
@@ -138,7 +149,8 @@ class Overdrive:
         atomic_write_json(self._conv_path, [c.__dict__ for c in self.conversations.values()])
 
     def new_conversation(self, title: str = "New chat") -> Conversation:
-        conv = Conversation(id="c" + secrets.token_hex(5), title=title[:80], created=utc_now_iso())
+        conv = Conversation(id="c" + secrets.token_hex(5), title=title[:80], created=utc_now_iso(),
+                            mode=self.default_mode)
         self.conversations[conv.id] = conv
         self._save_conversations()
         return conv
@@ -180,7 +192,7 @@ class Overdrive:
     def busy(self) -> bool:
         return self.current is not None
 
-    async def send(self, text: str, conversation_id: str | None = None) -> TaskRecord:
+    async def send(self, text: str, conversation_id: str | None = None, mode: str | None = None) -> TaskRecord:
         text = (text or "").strip()
         if not text:
             raise ValueError("empty message")
@@ -188,12 +200,20 @@ class Overdrive:
             raise ValueError("message is too long (20,000 characters max)")
         if self.current is not None:
             raise Busy("OVERDRIVE is still working on the last task. Wait for it, or press STOP.")
-        conv = self.conversations.get(conversation_id or "") or self.new_conversation(text[:60])
+        conv = self.conversations.get(conversation_id or "")
+        if conv is None:
+            conv = self.new_conversation(text[:60])
+            if mode in ("chat", "build"):
+                conv.mode = mode
         if conv.title == "New chat":
             conv.title = text[:60]
         rec = TaskRecord(id=new_task_id(), conversation=conv.id, request=text)
+        rec.mode = conv.mode if conv.mode in ("chat", "build") else "chat"
         rec.settings = {k: self.settings.get(k) for k in ("model", "fallback_model", "effort", "detail", "max_steps",
                                                           "max_minutes", "task_budget_usd", "double_check")}
+        rec.settings["model"] = conv.model or rec.settings["model"]
+        rec.settings["effort"] = conv.effort or rec.settings["effort"]
+        rec.settings["mode"] = rec.mode
         conv.tasks.append(rec.id)
         self._save_conversations()
         st = RunState(rec=rec, conv=conv)
@@ -248,6 +268,8 @@ class Overdrive:
             return PermissionResultDeny(message="The human pressed STOP.", interrupt=True)
         if name == "AskUserQuestion":
             return await self._ask_question(st, inp, timeout)
+        if builtin.is_builtin(name):
+            return await self._gate_builtin(st, name, inp, timeout)
         spec = self.tools.from_mcp_name(name)
         if spec is None:
             st.journal.add(name, inp, "unknown", "blocked", "not an OVERDRIVE tool")
@@ -262,7 +284,17 @@ class Overdrive:
                 return await self._stuck(st, spec, inp)
             return PermissionResultDeny(message="OVERDRIVE rejected these inputs: " + "; ".join(problems)
                                         + ". Fix them and try again.")
-        if spec.name != "task_plan" and rec.plan is None:
+        if spec.name == "start_build":
+            return await self._gate_start_build(st, inp, timeout)
+        if rec.mode == "chat" and not spec.name.startswith("memory_") and \
+                spec.risk_for(inp) not in (Risk.INTERNAL, Risk.READ):
+            st.journal.add(spec.name, inp, "unknown", "blocked", "not allowed in chat mode")
+            self._note_refused(st, spec.name, spec.title, "unknown", "blocked", "Not allowed in Chat mode", inp)
+            if st.journal.stuck(spec.name, inp):
+                return await self._stuck(st, spec, inp)
+            return PermissionResultDeny(message="You're in Chat mode, so you can't make or change files. If the human "
+                                                "wants something made, plan it with them, then call start_build.")
+        if rec.mode == "build" and spec.name not in ("task_plan", "start_build") and rec.plan is None:
             st.journal.add(spec.name, inp, "internal", "blocked", "no plan yet")
             self._note_refused(st, spec.name, spec.title, "internal", "blocked", "Blocked: plan first", inp)
             if st.journal.stuck(spec.name, inp):
@@ -283,6 +315,8 @@ class Overdrive:
         policy = decide(s.get("permissions"), risk)
         if spec.status == "experimental" and risk not in READ_RISKS and policy == "auto":
             policy = "ask"
+        if spec.name.startswith("memory_") and risk not in READ_RISKS and policy == "auto":
+            policy = "ask"   # memory changes always ask for now (Piece 3 adds "saves + tells you" with Undo)
         decision = "auto"
         if policy == "block":
             st.journal.add(spec.name, inp, risk.value, "blocked", "policy")
@@ -325,7 +359,226 @@ class Overdrive:
         self.task_store.save(st.rec)
         self._emit_task(st.rec)
 
-    async def _stuck(self, st: RunState, spec: ToolSpec, inp: dict) -> Any:
+    # ------------------------------------------------------------------ Claude Code's own tools (Piece 1)
+    async def _gate_builtin(self, st: RunState, name: str, inp: dict, timeout: float) -> Any:
+        rec, s = st.rec, self.settings
+        root = self.paths.workspace
+        allowed = builtin.BUILD_TOOLS if rec.mode == "build" else builtin.CHAT_TOOLS
+        v = builtin.classify(name, inp, root)
+        title = v.title if v else name
+        stub = _Named(name, title)
+        if v is None or name not in allowed:
+            st.journal.add(name, inp, "unknown", "blocked", f"not allowed in {rec.mode} mode")
+            self.audit.write("tool_blocked", {"tool": name, "why": f"not allowed in {rec.mode} mode"}, task=rec.id)
+            self._note_refused(st, name, title, "unknown", "blocked", f"Not allowed in {rec.mode.title()} mode", inp)
+            if st.journal.stuck(name, inp):
+                return await self._stuck(st, stub, inp)
+            if rec.mode == "chat":
+                return PermissionResultDeny(message="You're in Chat mode, so you can't make or change files or run "
+                                                    "commands. If the human wants something made, plan it with them, "
+                                                    "then call start_build to ask for Build mode.")
+            return PermissionResultDeny(message=f"OVERDRIVE doesn't allow the '{name}' tool.")
+        if v.needs_network and not s.get("network"):
+            st.journal.add(name, inp, v.risk.value, "blocked", "network off")
+            self._note_refused(st, name, title, v.risk.value, "blocked", "Network is off", inp)
+            return PermissionResultDeny(message="Network is turned off in OVERDRIVE's settings. Tell the human.")
+        if rec.mode == "build" and rec.plan is None and v.risk not in (Risk.INTERNAL, Risk.READ, Risk.WEB):
+            st.journal.add(name, inp, "internal", "blocked", "no plan yet")
+            self._note_refused(st, name, title, "internal", "blocked", "Blocked: plan first", inp)
+            if st.journal.stuck(name, inp):
+                return await self._stuck(st, stub, inp)
+            return PermissionResultDeny(message="Call task_plan first: every build task starts with a plan "
+                                                "(goal + checkable success criteria).")
+        if st.journal.stuck(name, inp):
+            return await self._stuck(st, stub, inp)
+        policy = decide(s.get("permissions"), v.risk)
+        if v.force_ask and policy == "auto":
+            policy = "ask"
+        decision = "auto"
+        if policy == "block":
+            st.journal.add(name, inp, v.risk.value, "blocked", "policy")
+            self._note_refused(st, name, title, v.risk.value, "blocked",
+                               f"Blocked by your permission policy ({v.risk.label})", inp)
+            self.audit.write("tool_blocked", {"tool": name, "risk": v.risk.value, "why": "permission policy"},
+                             task=rec.id)
+            return PermissionResultDeny(message=f"OVERDRIVE's permission policy blocks '{v.risk.label}' actions. "
+                                                "Don't try another way; tell the human what you wanted to do and why.")
+        if policy == "ask":
+            body = {"tool": name, "tool_title": title, "risk": v.risk.value, "risk_label": v.risk.label,
+                    "reason": str(inp.get("description", ""))[:300], "preview": builtin.preview(name, inp, v, root),
+                    "network": v.needs_network}
+            self.audit.write("approval_asked", {"tool": name, "risk": v.risk.value, "inputs": inp}, task=rec.id)
+            card = await self.broker.ask("approval", f"OVERDRIVE wants to: {title}", body, rec.id, v.risk.value,
+                                         timeout)
+            decision = card.status
+            if decision != "yes":
+                st.journal.add(name, inp, v.risk.value, decision, card.note)
+                self._note_refused(st, name, title, v.risk.value, decision,
+                                   {"no": "You said No", "timeout": "No answer in time"}.get(decision, "Stopped")
+                                   + (f': "{card.note}"' if card.note else ""), inp)
+                if decision == "stopped":
+                    return PermissionResultDeny(message="The human pressed STOP.", interrupt=True)
+                why = {"no": "The human said No", "timeout": "Nobody answered in time (counts as No)"}.get(decision,
+                                                                                                          decision)
+                if card.note:
+                    why += f'. Their note: "{card.note}"'
+                return PermissionResultDeny(message=f"{why}. Do not retry this or try another way; continue without "
+                                                    "it and explain in your report.")
+        if name in builtin.EDIT_TOOLS and v.inside and v.path is not None:
+            try:
+                self._remember_file_change(st, v.path)
+            except OSError as e:
+                st.journal.add(name, inp, v.risk.value, "blocked", f"couldn't save the old version: {e}")
+                return PermissionResultDeny(message=f"OVERDRIVE couldn't save the old version first ({e}), so it "
+                                                    "refused the change. Tell the human.")
+        entry = st.journal.add(name, inp, v.risk.value, decision)
+        call = {"ts": utc_now_iso(), "tool": name, "title": title, "risk": v.risk.value, "decision": decision,
+                "ok": None, "ms": 0, "note": "", "args": summarize_args(inp), "summary": "running..."}
+        rec.calls.append(call)
+        st.builtin_pending.setdefault(_key(name, inp), []).append({"entry": entry, "call": call,
+                                                                   "t0": time.monotonic()})
+        self.audit.write("tool_allowed", {"tool": name, "risk": v.risk.value, "decision": decision,
+                                          "inputs": summarize_args(inp, 2000)}, task=rec.id)
+        self.task_store.save(rec)
+        self._emit_task(rec)
+        return PermissionResultAllow()
+
+    async def _gate_start_build(self, st: RunState, inp: dict, timeout: float) -> Any:
+        """Chat first, asks before Build: the human sees the plan + model/effort, and only Yes starts building."""
+        rec, conv, s = st.rec, st.conv, self.settings
+        model = str(inp.get("model") or "")
+        effort = str(inp.get("effort") or "")
+        cur_model, cur_effort = conv.model or s.get("model"), conv.effort or s.get("effort")
+        auto_model = s.get("model_switch") == "auto"
+        if rec.mode == "build":
+            if (not model or model == cur_model) and (not effort or effort == cur_effort):
+                return PermissionResultDeny(message="You're already in Build mode with that model and effort. "
+                                                    "Just keep building.")
+            if auto_model:
+                conv.model, conv.effort = model or conv.model, effort or conv.effort
+                self._save_conversations()
+                self.audit.write("model_switched", {"model": model, "effort": effort, "by": "auto setting"},
+                                 task=rec.id)
+                rec.flags.append(f"Switched to {model or cur_model} + {effort or cur_effort} for the next step "
+                                 "(your setting: switch by itself).")
+                st.journal.add("start_build", inp, "internal", "auto")
+                self.grants.issue("start_build", inp)
+                st.pending.setdefault(_key("start_build", inp), []).append(st.journal.entries[-1])
+                return PermissionResultAllow()
+        title = "Ready to build?" if rec.mode == "chat" else "Switch model for this job?"
+        body = {"tool": "start_build", "tool_title": "Start building" if rec.mode == "chat" else "Switch model",
+                "risk": "write", "risk_label": "Build mode", "reason": str(inp.get("why_model", ""))[:400],
+                "preview": {"plan": str(inp.get("plan", ""))[:3000],
+                            "steps": [str(x)[:300] for x in (inp.get("steps") or [])[:20]],
+                            "model": f"{model or cur_model} + {effort or cur_effort} effort",
+                            "now": f"{cur_model} + {cur_effort} effort",
+                            "note": ("Yes = start building with this model." if not auto_model else
+                                     "Yes = start building (the model switches by itself, your setting).")},
+                "network": False}
+        self.audit.write("approval_asked", {"tool": "start_build", "inputs": inp}, task=rec.id)
+        card = await self.broker.ask("approval", title, body, rec.id, "write", timeout)
+        if card.status != "yes":
+            st.journal.add("start_build", inp, "internal", card.status, card.note)
+            if card.status == "stopped":
+                return PermissionResultDeny(message="The human pressed STOP.", interrupt=True)
+            why = "The human said not yet" if card.status == "no" else "Nobody answered in time"
+            if card.note:
+                why += f'. Their note: "{card.note}"'
+            return PermissionResultDeny(message=f"{why}. Stay in Chat mode. Ask what they want to change, and "
+                                                "don't build anything.")
+        if model:
+            conv.model = model
+        if effort:
+            conv.effort = effort
+        if rec.mode == "chat":
+            conv.mode = "build"
+            st.build_go = {"plan": str(inp.get("plan", ""))[:3000]}
+        self._save_conversations()
+        self.events.publish("conversation", conversation=dict(conv.__dict__))
+        self.audit.write("build_go", {"model": conv.model, "effort": conv.effort, "mode": conv.mode}, task=rec.id)
+        st.journal.add("start_build", inp, "internal", "yes")
+        st.pending.setdefault(_key("start_build", inp), []).append(st.journal.entries[-1])
+        self.grants.issue("start_build", inp)
+        return PermissionResultAllow()
+
+    async def _go_build(self, conv_id: str) -> None:
+        await asyncio.sleep(0.3)
+        try:
+            await self.send(GO_TEXT, conv_id)
+        except Exception as e:  # e.g. a new message got there first
+            self.audit.write("build_go_failed", {"error": repr(e)})
+
+    def set_mode(self, conv_id: str, mode: str) -> dict:
+        """The human flips Chat/Build for a chat (the switch next to the message box)."""
+        if mode not in ("chat", "build"):
+            raise ValueError("mode must be chat or build")
+        conv = self.conversations.get(conv_id)
+        if conv is None:
+            raise ValueError("no such chat")
+        old, conv.mode = conv.mode, mode
+        self._save_conversations()
+        self.audit.write("mode_changed", {"conversation": conv_id, "old": old, "new": mode, "by": "you"})
+        self.events.publish("conversation", conversation=dict(conv.__dict__))
+        return conv.__dict__
+
+    def _remember_file_change(self, st: RunState, path: Path) -> None:
+        """Before Claude Code changes a workspace file: keep the old version (once per task), so Undo works."""
+        rel = self.workspace.rel(path)
+        if rel in st.file_changes:
+            return
+        if path.is_file():
+            snap = self.workspace._snapshot(path, "before Claude Code edit", st.rec.id)
+            st.file_changes[rel] = {"op": "replaced", "path": rel, "snapshot": snap,
+                                    "old_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        else:
+            st.file_changes[rel] = {"op": "created", "path": rel}
+
+    def _finalize_file_changes(self, st: RunState) -> None:
+        """After the run: record what each touched workspace file looks like now (Undo checks this)."""
+        for rel, ch in st.file_changes.items():
+            path = self.workspace.root / rel
+            if not path.is_file():
+                continue                       # never made (refused or failed): nothing to undo
+            data = path.read_bytes()
+            sha = hashlib.sha256(data).hexdigest()
+            if ch["op"] == "replaced" and sha == ch.get("old_sha256"):
+                continue                       # ended up unchanged
+            done = dict(ch, sha256=sha, bytes=len(data), by="Claude Code")
+            st.rec.changes.append(done)
+            st.journal.changes.append(done)
+        st.file_changes.clear()
+
+    def _builtin_result(self, st: RunState, tool_use_id: str, is_error: bool, content: Any) -> None:
+        hit = st.tool_use_ids.pop(tool_use_id, None)
+        if hit is None:
+            return
+        name, inp = hit
+        if not builtin.is_builtin(name):
+            return
+        text = content if isinstance(content, str) else " ".join(
+            str(c.get("text", "")) for c in (content or []) if isinstance(c, dict))
+        queue = st.builtin_pending.get(_key(name, inp)) or []
+        if queue:
+            item = queue.pop(0)
+            entry, call = item["entry"], item["call"]
+        else:   # Claude Code allowed it by itself (a read inside the workspace): still show it
+            v = builtin.classify(name, inp, self.paths.workspace)
+            risk = v.risk.value if v else "read"
+            entry = st.journal.add(name, inp, risk, "auto")
+            call = {"ts": utc_now_iso(), "tool": name, "title": builtin.TITLES.get(name, name), "risk": risk,
+                    "decision": "auto", "ok": None, "ms": 0, "note": "", "args": summarize_args(inp), "summary": ""}
+            st.rec.calls.append(call)
+            item = {"t0": time.monotonic()}
+        summary = (("Error: " if is_error else "") + text.strip())[:300]
+        # A command or edit that errors is normal while building (a failing test, a retry); it isn't a refused
+        # action, so the journal counts it as run. The task page still shows it as an error.
+        st.journal.finish(entry, ok=True, summary=summary, side_effect=False)
+        call["ok"], call["summary"] = (not is_error), summary or "done"
+        call["ms"] = int((time.monotonic() - item["t0"]) * 1000)
+        self.task_store.save(st.rec)
+        self._emit_task(st.rec)
+
+    async def _stuck(self, st: RunState, spec: Any, inp: dict) -> Any:
         st.limit = (f"Stopped: Claude kept trying '{spec.title}' after it was refused "
                     f"({st.journal.refusals(spec.name, inp)} times). That's a loop.")
         self.audit.write("loop_detected", {"tool": spec.name}, task=st.rec.id)
@@ -443,12 +696,17 @@ class Overdrive:
         if fallback == s.get("model"):
             fallback = None
         budget = round(float(st.conv.cost_total or 0.0) + float(s.get("task_budget_usd")), 4)
+        mode = st.rec.mode
+        model = st.conv.model or s.get("model")
+        if fallback == model:
+            fallback = None
         return ClaudeAgentOptions(
-            tools=["AskUserQuestion"], allowed_tools=[], mcp_servers={ToolRegistry.MCP_SERVER: self._sdk_server(st)},
+            tools=list(builtin.BUILD_TOOLS if mode == "build" else builtin.CHAT_TOOLS), allowed_tools=[],
+            mcp_servers={ToolRegistry.MCP_SERVER: self._sdk_server(st)},
             strict_mcp_config=True, setting_sources=[],
-            system_prompt=build_system_prompt(s, memory_digest=self.memory.digest()),
-            permission_mode="default", can_use_tool=self._make_gate(st), model=s.get("model"),
-            fallback_model=fallback, effort=s.get("effort"), max_turns=int(s.get("max_steps")),
+            system_prompt=build_system_prompt(s, memory_digest=self.memory.digest(), mode=mode),
+            permission_mode="default", can_use_tool=self._make_gate(st), model=model,
+            fallback_model=fallback, effort=st.conv.effort or s.get("effort"), max_turns=int(s.get("max_steps")),
             max_budget_usd=budget, cwd=str(self.paths.workspace), cli_path=cli, env=env,
             include_partial_messages=True, resume=st.conv.session_id or None,
             stderr=lambda line: st.stderr.append(line[:500]) if len(st.stderr) < 200 else None,
@@ -504,10 +762,16 @@ class Overdrive:
                     st.texts.append((st.tool_uses_seen, b.text))
                 elif isinstance(b, ToolUseBlock):
                     st.tool_uses_seen += 1
+                    if builtin.is_builtin(b.name):
+                        st.tool_use_ids[b.id] = (b.name, b.input if isinstance(b.input, dict) else {})
             if msg.error:
                 st.error_kind = {"authentication_failed": "auth", "rate_limit": "rate_limit",
                                  "billing_error": "billing"}.get(msg.error, st.error_kind or "error")
                 st.error_text = brain.FRIENDLY.get(st.error_kind, "Claude returned an error.")
+        elif isinstance(msg, UserMessage) and isinstance(msg.content, list):
+            for b in msg.content:
+                if isinstance(b, ToolResultBlock):
+                    self._builtin_result(st, b.tool_use_id, bool(b.is_error), b.content)
         elif isinstance(msg, RateLimitEvent):
             info = dict(msg.rate_limit_info.raw or {})
             info.update({"status": msg.rate_limit_info.status, "utilization": msg.rate_limit_info.utilization,
@@ -582,13 +846,22 @@ class Overdrive:
             st.client = client
             if st.stopped:
                 return
-            await client.query(rec.request)
+            if not st.conv.session_id:
+                st.conv.session_mode = rec.mode       # a fresh session: its instructions are in this mode
+            query = rec.request
+            if st.conv.session_id and st.conv.session_mode and st.conv.session_mode != rec.mode:
+                query = mode_switch_note(rec.mode) + rec.request
+            await client.query(query)
             async for msg in client.receive_response():
                 self._on_message(st, msg)
         st.client = None
 
     async def _finish(self, st: RunState) -> TaskRecord:
         rec, res = st.rec, st.result
+        try:
+            self._finalize_file_changes(st)
+        except OSError as e:
+            rec.flags.append(f"Couldn't record some file changes for Undo: {e}")
         try:
             run: dict[str, Any] = {"stopped": st.stopped, "limit": st.limit}
             if res is not None:
@@ -616,6 +889,7 @@ class Overdrive:
             if st.error_kind:
                 run["error"], run["error_kind"] = st.error_text, st.error_kind
             rec.final_text = st.final_text()
+            run["build_go"] = bool(st.build_go)
             run["failures"] = [f"{e.tool} ({'not run: ' + e.decision if e.ok is None else 'failed'}"
                                f"{': ' + e.reason if e.reason else ''})" for e in st.journal.failures()]
             status, reason, checks = check_task(rec, self.workspace, run)
@@ -650,6 +924,8 @@ class Overdrive:
         self.current = None
         self._emit_task(rec)
         self.events.publish("usage", usage=self.usage.public())
+        if st.build_go and not st.stopped and not st.error_kind and not st.limit:
+            self._go_build_handle = asyncio.create_task(self._go_build(st.conv.id))
         return rec
 
     def test_env_skip_double_check(self) -> bool:
@@ -777,3 +1053,37 @@ versions/index.jsonl      list of saved old file versions (the files themselves 
 
 Secrets were blanked out before anything was written.
 """
+
+
+class _Named:
+    """Just enough of a ToolSpec (name + title) for the loop guard on Claude Code's own tools."""
+    def __init__(self, name: str, title: str):
+        self.name, self.title = name, title
+
+
+GO_TEXT = ("GO. I said Yes: Build mode is on. Build it now, following the plan we made "
+           "(task_plan first, then make it, run it, test it, fix it, then task_report).")
+
+
+async def _h_start_build(args: dict, ctx: ToolContext) -> ToolResult:
+    return ToolResult(text="The human said YES. If you were in Chat mode: end your turn now with one short line; "
+                           "OVERDRIVE restarts you in Build mode right away with all your building tools. "
+                           "If you were already building: the new model starts with the next task.")
+
+
+START_BUILD_SPEC = ToolSpec(
+    name="start_build", title="Ask to start building",
+    description=("Chat mode only has look-only tools. When the human wants something made (a game, an app, a "
+                 "file, code), first talk it through and plan it with them, then call this: it shows the human "
+                 "your plan, the steps, and which model + effort fits the job, and asks them to click Yes. Only "
+                 "Yes switches to Build mode. In Build mode, call it to suggest a different model for a big job."),
+    schema={"type": "object", "properties": {
+        "plan": {"type": "string", "minLength": 1, "maxLength": 3000, "description": "What you'll build, in plain words."},
+        "steps": {"type": "array", "maxItems": 20, "items": {"type": "string", "maxLength": 300}},
+        "model": {"type": "string", "enum": ["opus", "sonnet", "haiku", "fable"],
+                  "description": "Best model for this job (opus = big builds, sonnet = medium, fable = hardest bugs)."},
+        "effort": {"type": "string", "enum": ["low", "medium", "high", "xhigh", "max"]},
+        "why_model": {"type": "string", "maxLength": 400, "description": "One line: why this model + effort."}},
+        "required": ["plan"], "additionalProperties": False},
+    risk=Risk.INTERNAL, handler=_h_start_build, selftest="test_e2e_start_build",
+    limitations=["A model change applies from the next task (Claude Code can't switch models mid-run)."])

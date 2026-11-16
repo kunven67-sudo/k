@@ -272,19 +272,32 @@ def test_e2e_injection_in_file():
 
 @covers(32, cli=True, title="Claude only gets OVERDRIVE's tools (plus questions)")
 def test_e2e_only_overdrive_tools():
-    def go(tmp, fake):
-        od = make_agent(tmp, fake)
-        run_task(od, "hi")
-        main = [r for r in fake.requests if is_overdrive_main(r)]
-        names = {t.get("name") for t in main[0].get("tools", [])}
-        allowed = {f"mcp__overdrive__{n}" for n in ("get_time", "calculator", "list_folder", "read_text_file",
-                                                    "write_text_file", "task_plan", "task_report",
-                                                    "memory_remember", "memory_recall", "memory_list",
-                                                    "memory_update", "memory_archive")}
-        extra = {n for n in names - allowed - {"AskUserQuestion"} if n and "Placeholder" not in n}
-        assert allowed <= names and not extra, (names, extra)
-    turns = [[T("task_plan", **PLAN)], [T("task_report", **report())], [X("hi!")]]
-    with_fake(turns_script(turns), go)
+    from ..builtin import BUILD_TOOLS, CHAT_TOOLS
+    ours = {f"mcp__overdrive__{n}" for n in ("get_time", "calculator", "list_folder", "read_text_file",
+                                             "write_text_file", "task_plan", "task_report", "memory_remember",
+                                             "memory_recall", "memory_list", "memory_update", "memory_archive",
+                                             "start_build")}
+
+    def names_for(mode):
+        seen = {}
+
+        def go(tmp, fake):
+            od = make_agent(tmp, fake, mode=mode)
+            run_task(od, "hi")
+            main = [r for r in fake.requests if is_overdrive_main(r)]
+            seen["names"] = {t.get("name") for t in main[0].get("tools", [])}
+        turns = [[T("task_plan", **PLAN)], [T("task_report", **report())], [X("hi!")]]
+        with_fake(turns_script(turns), go)
+        return seen["names"]
+
+    build = names_for("build")
+    extra = {n for n in build - ours - set(BUILD_TOOLS) if n and "Placeholder" not in n}
+    assert ours <= build and not extra, (build, extra)
+    assert {"Write", "Edit", "Read"} <= build and ({"Bash", "PowerShell"} & build), build
+    chat = names_for("chat")
+    extra = {n for n in chat - ours - set(CHAT_TOOLS) if n and "Placeholder" not in n}
+    assert not extra, (chat, extra)
+    assert not ({"Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "PowerShell"} & chat), chat
 
 
 @covers(79, cli=True, title="Network switch off = Claude isn't contacted")

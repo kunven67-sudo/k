@@ -8,6 +8,7 @@ The fake Claude's answers are scripted here; real use talks to the real Claude.
 from __future__ import annotations
 
 import argparse
+import json
 import asyncio
 import os
 import sys
@@ -41,6 +42,20 @@ def script(req: dict, fake: FakeClaude):
         return [X("ok")]
     ask = human_text(req).lower()
     i = turn_index(req)
+    everything = json.dumps(req.get("messages", [])).lower()
+    building = "MODE: BUILD" in system_text(req) or "mode: build" in everything
+    if "todo" in ask and not building:
+        # Chat mode: plan it with you, then ask "Ready to build?" (Piece 1)
+        steps = [
+            [X("Easy one. Here's the plan:"),
+             T("start_build", plan="Make todo.txt in your workspace with 3 things to do this week.",
+               steps=["Pick 3 simple example tasks", "Save them as todo.txt", "Check the file has exactly 3 items"],
+               model="sonnet", effort="medium", why_model="Small job: Sonnet + medium is plenty and saves usage.")],
+            [X("Building it now.")],
+        ]
+        return steps[i] if i < len(steps) else [X("Done.")]
+    if building and "todo" in everything:
+        ask = "todo"
     if "time" in ask:
         steps = [
             [X("Let me plan this."), T("task_plan", goal="Tell the current time and work out 17.5% of 2,480",
