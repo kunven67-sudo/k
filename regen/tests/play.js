@@ -13,6 +13,13 @@ async function run() {
   const wait = ms => pg.waitForTimeout(ms);
   const shot = async n => { await pg.screenshot({ path: path.join(out, n + '.png'), timeout: 180000 }); console.log('fps', await pg.evaluate("document.querySelector('#fps').textContent")); console.log('shot', n); };
   const ev = s => pg.evaluate(s);
+  if (only === 'stand') {
+    await pg.keyboard.press('KeyV'); await ev("REGEN.player.camDist = 3; REGEN.player.pitch = -0.12"); await wait(1500); await shot('st1-behind');
+    await ev("REGEN.player.holder.rotation.y = Math.PI * 0.6"); await wait(1200); await shot('st2-side');
+    await ev("REGEN.player.holder.rotation.y = 0; REGEN.debug.cut('rArm','lower')"); await wait(2500); await shot('st3-drop');
+    console.log(JSON.stringify(await ev("({w: REGEN.player.weapon && REGEN.player.weapon.key, inv: REGEN.debug.inv.map(i=>i.key), ground: REGEN.items.filter(i=>!i.held).map(i=>i.key+'@'+i.obj.position.y.toFixed(2))})")));
+    console.log(errs.filter(e => !e.includes('404')).slice(0, 10).join('\n')); await b.close(); srv.close(); return;
+  }
   if (only === 'front') {
     await pg.keyboard.press('KeyV'); await ev("REGEN.player.camDist = 2.2; REGEN.player.pitch = -0.1; REGEN.player.yaw = 2.6; REGEN.player.holder.rotation.y = Math.PI * 0.85");
     await wait(800); await shot('fr0-idle');

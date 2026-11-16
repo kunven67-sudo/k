@@ -63,7 +63,12 @@ async function boot() {
   W.player = player; player.view = S.view; player.body.regenRate = S.regen;
   player.group.position.set(0, 0, 0); player.radius = 0.35;
   player.onFall = v => { const n = v > 20 ? 2 : 1; for (const k of (Math.random() < 0.5 ? ['lLeg', 'rLeg'] : ['rLeg', 'lLeg']).slice(0, n)) player.body.sever(k, 'lower', new THREE.Vector3(0, -1, 0)); toast('Bad landing'); };
-  player.body.onSever = () => { slowT = 0.5; hurtFlash = 1; };
+  player.body.onSever = k => {
+    slowT = 0.5; hurtFlash = 1;
+    // the hand that held it is gone: the weapon falls on the ground, pick it up again with E
+    const it = k === 'rArm' ? player.weapon : k === 'lArm' ? player.shield : null;
+    if (it) { const i = inv.indexOf(it); if (i >= 0) inv.splice(i, 1); it.drop(it.obj.position.clone(), player.vel.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, 1.5, (Math.random() - 0.5) * 2))); W.items.includes(it) || W.items.push(it); equip(-1); }
+  };
   player.body.onRegrown = k => { trophy('regen1'); toast(LIMBS[k].name[0].toUpperCase() + LIMBS[k].name.slice(1) + ' grew back'); };
   fx.bloodAmount = S.blood === 'off' ? 0 : S.blood === 'some' ? 0.4 : 1;
   applyQuality();
@@ -132,7 +137,7 @@ async function giveWeapon(key) {
   inv.push(it); W.items.push(it); equip(inv.length - 1); return it;
 }
 function equip(i) {
-  cur = i; const it = inv[i];
+  cur = i; const it = i >= 0 ? inv[i] : null;
   for (const x of inv) if (x !== it) x.hide();
   player.weapon = it && it.def.kind !== 'shield' ? it : null;
   player.shield = it && it.def.kind === 'shield' ? it : null;

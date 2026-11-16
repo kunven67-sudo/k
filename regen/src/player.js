@@ -2,7 +2,7 @@
 // hands that grab and swing weapons (two-bone IK), and what happens when you get hurt.
 import * as THREE from 'three';
 import { RegenBody, LIMBS } from './body.js';
-import { retargetClips } from './retarget.js';
+import { retargetClips, pinRoot } from './retarget.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
@@ -50,6 +50,23 @@ export class Player {
     this.body = new RegenBody({ scene: model }, layers, ctx);
     this.mixer = new THREE.AnimationMixer(model);
     this.acts = {};
+    // stand with the character's own idle (the borrowed one made him crouch)
+    const own = gltf.animations && gltf.animations[0];
+    if (own) {
+      const c = own.clone(); c.name = 'Idle';
+      // his own clip faces the other way than the borrowed walk/run: turn its hips 180 degrees
+      const hips = Object.values(model.getObjectsByProperty ? model.getObjectsByProperty('isBone', true) : []).find(b => /Hips/.test(b.name));
+      if (hips) {
+        hips.parent.updateWorldMatrix(true, false);
+        const P = hips.parent.getWorldQuaternion(new THREE.Quaternion()), R = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+        const Rp = P.clone().invert().multiply(R).multiply(P), q = new THREE.Quaternion(), v = new THREE.Vector3();
+        for (const t of c.tracks) {
+          if (!t.name.startsWith(hips.name + '.')) continue;
+          if (t.name.endsWith('.quaternion')) for (let i = 0; i < t.values.length; i += 4) q.fromArray(t.values, i).premultiply(Rp).toArray(t.values, i);
+          if (t.name.endsWith('.position')) for (let i = 0; i < t.values.length; i += 3) v.fromArray(t.values, i).applyQuaternion(Rp).toArray(t.values, i);
+        }
+      }
+      pinRoot(c, model); const i = clips.findIndex(x => x.name === 'Idle'); if (i >= 0) clips[i] = c; else clips.push(c); }
     for (const c of clips) { const a = this.mixer.clipAction(c); a.play(); a.weight = 0; this.acts[c.name] = a; }
     this.acts.Idle.weight = 1;
     this.B = this.body.bones;
@@ -177,10 +194,10 @@ export class Player {
         const s = this.swing > 0 ? 1 - this.swing / w.def.swing : 0; // 0..1 through the swing
         const side = this.swingDir;
         const keys = [ // [x, y, z, blade dir (in frame), edge]
-          [0.22, -0.1, 0.32, [0.1, 0.9, 0.35]],
+          [0.24, -0.3, 0.4, [0.06, 0.5, 0.86]],
           [0.3 * side, 0.32, 0.05, [0.35 * side, 0.55, -0.7]],
           [-0.18 * side, -0.12, 0.5, [-0.75 * side, -0.05, 0.6]],
-          [0.22, -0.1, 0.32, [0.1, 0.9, 0.35]],
+          [0.24, -0.3, 0.4, [0.06, 0.5, 0.86]],
         ];
         if (this.view === 'first') { keys[0] = keys[3] = [0.19, 0.15, 0.42, [-0.3, 0.55, 0.8]]; }
         let a, b2, u;
