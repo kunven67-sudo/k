@@ -346,13 +346,21 @@ func TestAutoFixOff(t *testing.T) {
 func TestServiceOff(t *testing.T) {
 	r := newRig(t)
 	r.f.Set(func(f *FakePC) { f.S.SvcRunning = false })
-	r.run(1)
+	r.run(30) // right after logon the service may still be starting: wait
+	r.mustNot("Turned it back on")
+	r.run(20)
 	r.must("The Windows sound service was off. Turned it back on.")
 }
 
 func TestStuckSnapshots(t *testing.T) {
 	r := newRig(t)
-	r.run(2)
+	r.f.Set(func(f *FakePC) { f.StuckSnap = true })
+	r.run(20) // just started: no alarms
+	if r.f.Restarts != 0 {
+		t.Fatal("alarm right after start")
+	}
+	r.f.Set(func(f *FakePC) { f.StuckSnap = false })
+	r.run(40)
 	r.f.Set(func(f *FakePC) { f.StuckSnap = true })
 	r.run(3)
 	if r.f.Restarts != 1 {

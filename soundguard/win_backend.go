@@ -59,10 +59,12 @@ type winBackend struct {
 	privAt   time.Time
 	privBad  bool
 	resetCOM int32
+	wm       *comWorker // live meters for the open window (never blocks the guardian)
+	resetMtr int32
 }
 
 func newWinBackend() *winBackend {
-	b := &winBackend{w: newComWorker(), canDef: -1}
+	b := &winBackend{w: newComWorker(), wm: newComWorker(), canDef: -1}
 	return b
 }
 
@@ -165,6 +167,7 @@ func (b *winBackend) RestartAudio() error {
 	b.mic.Stop()
 	err := restartService("Audiosrv")
 	atomic.StoreInt32(&b.resetCOM, 1)
+	atomic.StoreInt32(&b.resetMtr, 1)
 	return err
 }
 
@@ -243,8 +246,22 @@ func (b *winBackend) RecordTest(inID, outID string, secs float64, level func(flo
 }
 
 func (b *winBackend) LivePeaks(outID, inID string, mic bool) (float64, float64) {
+	oc := make(chan float64, 1)
+	select {
+	case b.wm.jobs <- func(a *audio) {
+		if atomic.CompareAndSwapInt32(&b.resetMtr, 1, 0) {
+			a.reset()
+		}
+		oc <- a.peak(outID)
+	}:
+	default: // meter thread busy (or stuck): skip this frame
+		oc <- 0
+	}
 	var o float64
-	b.run(time.Second, func(a *audio) error { o = a.peak(outID); return nil })
+	select {
+	case o = <-oc:
+	case <-time.After(300 * time.Millisecond):
+	}
 	var i float64
 	if mic {
 		i = b.mic.want(inID)

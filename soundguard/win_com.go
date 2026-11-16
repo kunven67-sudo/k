@@ -140,9 +140,9 @@ func withCOM(f func()) {
 
 // PROPVARIANT (24 bytes on x64).
 type propVariant struct {
-	vt       uint16
+	vt         uint16
 	r1, r2, r3 uint16
-	val      [2]uint64
+	val        [2]uint64
 }
 
 func (p *propVariant) clear() { procPropVariantClear.Call(uintptr(unsafe.Pointer(p))) }

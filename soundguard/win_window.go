@@ -31,12 +31,12 @@ var (
 )
 
 const (
-	classMain  = "SoundGuardWindow"
-	classPopup = "SoundGuardPopup"
-	wmSize     = 0x0005
-	wmActivate = 0x0006
-	wmMove     = 0x0003
-	wmGetMinMax = 0x0024
+	classMain          = "SoundGuardWindow"
+	classPopup         = "SoundGuardPopup"
+	wmSize             = 0x0005
+	wmActivate         = 0x0006
+	wmMove             = 0x0003
+	wmGetMinMax        = 0x0024
 	wsOverlappedWindow = 0x00CF0000
 	wsPopup            = 0x80000000
 	wsClipChildren     = 0x02000000
@@ -48,12 +48,12 @@ const (
 type rect struct{ L, T, R, B int32 }
 
 type winHost struct {
-	hwnd   uintptr
-	wv     *edge.Chromium
-	minW   int32
-	minH   int32
-	popup  bool
-	shown  bool
+	hwnd  uintptr
+	wv    *edge.Chromium
+	minW  int32
+	minH  int32
+	popup bool
+	shown bool
 }
 
 var theHost *winHost

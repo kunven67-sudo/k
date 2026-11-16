@@ -277,6 +277,7 @@ func (t *tray) run() {
 	r, _, _ := procRegisterWindowMsg.Call(uintptr(unsafe.Pointer(tc)))
 	t.created = uint32(r)
 	t.add()
+	t.apply() // notifications that came in before the icon existed
 	close(t.ready)
 	var m msgT
 	for {

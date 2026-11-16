@@ -168,6 +168,10 @@ func selftest(args []string) int {
 
 	// mic test (record 2 s while a tone plays into the virtual cable)
 	if in != nil && in.State == "active" {
+		blocked := b.micBlocked()
+		ferr := b.FixMicPrivacy()
+		b.privAt = time.Time{}
+		R.add("mic privacy fix", false, ferr == nil && !b.micBlocked(), map[string]bool{"wasBlocked": blocked}, ferr)
 		tone2 := exec.Command(selfPath(), "-playtone", "4")
 		tone2.Start()
 		time.Sleep(300 * time.Millisecond)
@@ -288,6 +292,7 @@ var (
 	procGetDIBits           = gdi32.NewProc("GetDIBits")
 	procDeleteObject        = gdi32.NewProc("DeleteObject")
 	procDeleteDC            = gdi32.NewProc("DeleteDC")
+	procBitBlt              = gdi32.NewProc("BitBlt")
 )
 
 // windowTest opens a window child process, waits until the page asked for state, saves a picture.
@@ -353,13 +358,16 @@ func capture(hw uintptr) string {
 	bmp, _, _ := procCreateCompatibleBmp.Call(sdc, uintptr(w), uintptr(h))
 	defer procDeleteObject.Call(bmp)
 	old, _, _ := procSelectObject.Call(mdc, bmp)
-	procPrintWindow.Call(hw, mdc, 2 /*PW_RENDERFULLCONTENT*/)
+	// copy from the screen (WebView2 draws with DirectComposition; PrintWindow only got the background)
+	procSetForegroundWindow.Call(hw)
+	time.Sleep(400 * time.Millisecond)
+	procBitBlt.Call(mdc, 0, 0, uintptr(w), uintptr(h), sdc, uintptr(r.L), uintptr(r.T), 0x00CC0020|0x40000000 /*SRCCOPY|CAPTUREBLT*/)
 	procSelectObject.Call(mdc, old)
 	type bih struct {
-		Size                         uint32
-		W, H                         int32
-		Planes, Bits                 uint16
-		Compression, SizeImage       uint32
+		Size                          uint32
+		W, H                          int32
+		Planes, Bits                  uint16
+		Compression, SizeImage        uint32
 		XPels, YPels, Used, Important int32
 	}
 	hdr := bih{W: int32(w), H: -int32(h), Planes: 1, Bits: 32}

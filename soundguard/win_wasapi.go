@@ -24,12 +24,12 @@ var (
 )
 
 type mixFmt struct {
-	rate     int
-	ch       int
-	bits     int // container bits per sample
-	isFloat  bool
-	block    int
-	raw      uintptr // CoTaskMem WAVEFORMATEX* (pass to Initialize)
+	rate    int
+	ch      int
+	bits    int // container bits per sample
+	isFloat bool
+	block   int
+	raw     uintptr // CoTaskMem WAVEFORMATEX* (pass to Initialize)
 }
 
 func readMixFormat(ac com) (*mixFmt, error) {
@@ -127,10 +127,10 @@ func (f *mixFmt) get(buf []byte, i int) float32 {
 }
 
 type stream struct {
-	ac    com
-	svc   com // render or capture client
-	clock com
-	f     *mixFmt
+	ac     com
+	svc    com // render or capture client
+	clock  com
+	f      *mixFmt
 	frames uint32
 }
 

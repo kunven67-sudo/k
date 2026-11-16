@@ -227,7 +227,7 @@ func (f *FakePC) DriverSearch() ([]DriverUpdate, error) {
 }
 
 func (f *FakePC) DriverInstall(id string) (bool, error) { return true, nil }
-func (f *FakePC) OpenSoundSettings() error             { return nil }
+func (f *FakePC) OpenSoundSettings() error              { return nil }
 
 // ---- test helpers ----
 

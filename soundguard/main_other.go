@@ -28,7 +28,10 @@ func main() {
 			return map[string]any{}
 		}
 		srv.Extra = map[string]func(Req) (any, error){
-			"install": func(Req) (any, error) { time.Sleep(time.Second); return nil, errors.New("(preview) this would ask Windows for permission") },
+			"install": func(Req) (any, error) {
+				time.Sleep(time.Second)
+				return nil, errors.New("(preview) this would ask Windows for permission")
+			},
 		}
 		url, err := srv.Start(*port)
 		if err != nil {

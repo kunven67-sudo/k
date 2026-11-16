@@ -248,8 +248,10 @@ func copyFile(src, dst string) error {
 	return err
 }
 
-// killOthers ends every other SoundGuard.exe (old version / guardian) so files can be replaced.
+// killOthers ends every other SoundGuard.exe running FROM PROGRAM FILES (old guardian + its
+// windows) so files can be replaced. Never the copy that started the install.
 func killOthers() {
+	dir := installDir()
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return
@@ -262,10 +264,17 @@ func killOthers() {
 		if pe.ProcessID == me || !strings.EqualFold(windows.UTF16ToString(pe.ExeFile[:]), "SoundGuard.exe") {
 			continue
 		}
-		h, err := windows.OpenProcess(windows.PROCESS_TERMINATE|windows.SYNCHRONIZE, false, pe.ProcessID)
+		h, err := windows.OpenProcess(windows.PROCESS_TERMINATE|windows.SYNCHRONIZE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pe.ProcessID)
 		if err != nil {
 			continue
 		}
+		buf := make([]uint16, 1024)
+		n := uint32(len(buf))
+		if windows.QueryFullProcessImageName(h, 0, &buf[0], &n) != nil || !samePath(filepath.Dir(windows.UTF16ToString(buf[:n])), dir) {
+			windows.CloseHandle(h)
+			continue
+		}
+		logf("ending old SoundGuard pid %d", pe.ProcessID)
 		windows.TerminateProcess(h, 0)
 		windows.WaitForSingleObject(h, 3000)
 		windows.CloseHandle(h)
@@ -317,9 +326,9 @@ func makeShortcut(lnk, target, desc string) error {
 			t, _ := windows.UTF16PtrFromString(target)
 			d, _ := windows.UTF16PtrFromString(desc)
 			wd, _ := windows.UTF16PtrFromString(filepath.Dir(target))
-			sl.call(20, uintptr(unsafe.Pointer(t)))  // SetPath
-			sl.call(7, uintptr(unsafe.Pointer(d)))   // SetDescription
-			sl.call(9, uintptr(unsafe.Pointer(wd)))  // SetWorkingDirectory
+			sl.call(20, uintptr(unsafe.Pointer(t)))    // SetPath
+			sl.call(7, uintptr(unsafe.Pointer(d)))     // SetDescription
+			sl.call(9, uintptr(unsafe.Pointer(wd)))    // SetWorkingDirectory
 			sl.call(17, uintptr(unsafe.Pointer(t)), 0) // SetIconLocation
 			pf, e := sl.QI(&iidIPersistFile)
 			if e != nil {
@@ -389,18 +398,17 @@ func uninstall() error {
 		return errors.New("needs admin")
 	}
 	logf("uninstall")
-	hidden(exec.Command("schtasks.exe", "/End", "/TN", taskName)).Run()
-	killOthers()
+	killOthers() // (not "schtasks /End": when the guardian removes itself that would kill it halfway)
 	out, err := hidden(exec.Command("schtasks.exe", "/Delete", "/TN", taskName, "/F")).CombinedOutput()
 	if err != nil && taskExists() {
 		return fmt.Errorf("couldn't remove the task: %s", strings.TrimSpace(string(out)))
 	}
 	os.Remove(shortcutPath())
 	registry.DeleteKey(registry.LOCAL_MACHINE, uninstallKey)
-	// the running exe can't delete itself: a hidden cmd waits 3 s then removes the folder
+	// the running exe can't delete itself: a hidden cmd waits 5 s then removes the folder
 	dir := installDir()
 	if samePath(filepath.Dir(selfPath()), dir) {
-		cmd := exec.Command("cmd.exe", "/c", "ping -n 4 127.0.0.1 >nul & rmdir /s /q \""+dir+"\"")
+		cmd := exec.Command("cmd.exe", "/c", "ping -n 6 127.0.0.1 >nul & rmdir /s /q \""+dir+"\"")
 		hidden(cmd).Start()
 	} else {
 		os.RemoveAll(dir)

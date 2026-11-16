@@ -284,6 +284,7 @@ type Guardian struct {
 	micSince   time.Time
 	micWarned  bool
 	lastTickAt time.Time
+	firstTick  time.Time // Windows may still be starting its sound stuff right after logon
 
 	// shared with the web server (under mu)
 	mu          sync.Mutex
@@ -425,6 +426,9 @@ func (g *Guardian) Do(f func()) {
 func (g *Guardian) Tick() {
 	now := g.now()
 	g.lastTickAt = now
+	if g.firstTick.IsZero() {
+		g.firstTick = now
+	}
 	g.LiveIdle()
 	s, err := g.b.Snapshot()
 	if err != nil {
@@ -444,9 +448,9 @@ func (g *Guardian) Tick() {
 	set := g.settings()
 	auto := set.AutoFix
 
-	// 0. Windows Audio service off -> turn it on
+	// 0. Windows Audio service off -> turn it on (not in the first 45 s: right after logon it may still be starting)
 	if !s.SvcRunning {
-		if auto && now.Sub(g.svcAt) > time.Minute {
+		if auto && now.Sub(g.svcAt) > time.Minute && now.Sub(g.firstTick) >= 45*time.Second {
 			g.svcAt = now
 			if err := g.b.RestartAudio(); err == nil {
 				g.event("fix", "The Windows sound service was off. Turned it back on.")
@@ -845,12 +849,15 @@ func (g *Guardian) maybePopup(now time.Time) {
 
 // snapFail: Windows audio didn't answer.
 func (g *Guardian) snapFail(err error, now time.Time) {
+	if now.Sub(g.firstTick) < 45*time.Second {
+		return // just started (logon): Windows audio may not be up yet
+	}
+	if !g.svcAt.IsZero() && now.Sub(g.svcAt) < 25*time.Second {
+		return // we just restarted the service on purpose (errors are normal for a few seconds)
+	}
 	if !errors.Is(err, ErrStuck) {
 		g.warnOnce("snap", "warn", "Couldn't read your sound devices: "+err.Error())
 		return
-	}
-	if !g.svcAt.IsZero() && now.Sub(g.svcAt) < 25*time.Second {
-		return // we just restarted the service on purpose
 	}
 	g.stuckN++
 	if g.stuckN == 3 {

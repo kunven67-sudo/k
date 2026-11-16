@@ -39,11 +39,11 @@ var (
 		mustGUID("{568B9108-44BF-40B4-9006-86AFE5B5A620}"), // IPolicyConfigVista
 	}
 
-	pkeyDeviceDesc          = propKey{mustGUID("{A45C254E-DF1C-4EFD-8020-67D146A850E0}"), 2}
-	pkeyFriendlyName        = propKey{mustGUID("{A45C254E-DF1C-4EFD-8020-67D146A850E0}"), 14}
-	pkeyInterfaceFriendly   = propKey{mustGUID("{026E516E-B814-414B-83CD-856D6FEF4822}"), 2}
-	pkeyFormFactor          = propKey{mustGUID("{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E}"), 0}
-	sgEventContext          = mustGUID("{5E0D6A8B-9C1F-4E2B-8A7D-50A11D6A2B01}") // marks volume changes made by SOUNDGUARD
+	pkeyDeviceDesc        = propKey{mustGUID("{A45C254E-DF1C-4EFD-8020-67D146A850E0}"), 2}
+	pkeyFriendlyName      = propKey{mustGUID("{A45C254E-DF1C-4EFD-8020-67D146A850E0}"), 14}
+	pkeyInterfaceFriendly = propKey{mustGUID("{026E516E-B814-414B-83CD-856D6FEF4822}"), 2}
+	pkeyFormFactor        = propKey{mustGUID("{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E}"), 0}
+	sgEventContext        = mustGUID("{5E0D6A8B-9C1F-4E2B-8A7D-50A11D6A2B01}") // marks volume changes made by SOUNDGUARD
 )
 
 const (
