@@ -84,7 +84,8 @@ function render() {
   if (S.mode === 'setup') return renderSetup();
   if (VIEW === 'popup') return renderPopup();
   const st = S.status || { level: 'ok', title: '', sub: '' };
-  document.body.className = 'lvl-' + st.level + (VIEW === 'popup' ? ' view-popup' : '') + (has3d ? ' has3d' : '');
+  document.body.className = 'lvl-' + st.level + (VIEW === 'popup' ? ' view-popup' : '') + (has3d ? ' has3d' : '') + (has3d && dev3d && dev3d.setInfo && S.settings.look !== 'mix' ? ' look-rack' : '');
+  if ($('lookSel') && document.activeElement !== $('lookSel')) $('lookSel').value = (S.settings && S.settings.look) || 'rack';
   $('ver').textContent = 'v' + S.version + (S.mode === 'demo' ? ' preview' : '');
   if (st.title !== lastTitle) {
     const h = $('title'); h.textContent = st.title; h.classList.remove('swap'); void h.offsetWidth; h.classList.add('swap');
@@ -509,12 +510,16 @@ function meters(t) {
 let dev3d = null, has3d = false;
 async function boot3D(canvasId, wrapId, demo) {
   if (!window.SGDevice || VIEW !== 'main') return;
+  const look = (S && S.settings && S.settings.look) || 'rack';
+  if (!demo && look === 'simple') return;
+  const lower = !demo && look === 'rack';
+  if (lower) document.body.classList.add('look-rack');
   const wrap = $(wrapId);
   wrap.hidden = false;
   if (!demo) { has3d = true; document.body.classList.add('has3d'); }
   else $('setupRadar').hidden = true;
   try {
-    const d = await SGDevice.createDevice($(canvasId), { base: 'assets/' });
+    const d = await SGDevice.createDevice($(canvasId), { base: 'assets/', lower });
     dev3d = d;
     wrap.classList.add('on');
     d.on.sound = (n) => sfx(n, n === 'tick' ? 0.35 : 0.6);
@@ -549,6 +554,11 @@ async function boot3D(canvasId, wrapId, demo) {
 function feed3D(st) {
   if (!dev3d || !S || S.mode === 'setup') return;
   const plugged = S.out ? (S.out.jackKnown ? S.out.jackIn : true) : false;
+  if (dev3d.setInfo) {
+    const ev = (S.events || []).slice().reverse().map((e) => ({ t: fmtTime(e.t), kind: e.kind, text: e.text }));
+    const k = JSON.stringify([S.out && S.out.name, S.in && S.in.name, ev.length && ev[0].t + ev[0].text, S.micMissing]);
+    if (k !== feed3D.k) { feed3D.k = k; dev3d.setInfo({ outName: $('outName').textContent, outSub: $('outAdapter').textContent, inName: $('inName').textContent, inSub: $('inAdapter').textContent, events: ev }); }
+  }
   dev3d.setState({
     level: st.level, title: st.title, sub: st.sub, auto: !!(S.settings && S.settings.autoFix),
     fixing: !!(S.fixing || S.outFrozen), micMissing: !!S.micMissing, needRestart: !!S.needRestart, plugged,
@@ -588,6 +598,7 @@ document.addEventListener('change', (e) => {
   if (e.target.matches('input[type=checkbox]')) sfx(e.target.checked ? 'sw_on' : 'sw_off', 0.6);
 });
 
+$('lookSel').addEventListener('change', async (e) => { await act('look', { id: e.target.value }); location.reload(); });
 // ---------- go ----------
 if (VIEW === 'popup') { document.body.className = 'view-popup'; }
 setTab('home');

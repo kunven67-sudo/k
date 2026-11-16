@@ -6,7 +6,7 @@
     "#4": {"0000": ["tray-bad.png"]}
   },
   "RT_MANIFEST": {"#1": {"0409": {
-    "identity": {"name": "SoundGuard", "version": "1.1.0.0"},
+    "identity": {"name": "SoundGuard", "version": "1.2.0.0"},
     "description": "SOUNDGUARD - keeps your headphones and mic working",
     "minimum-os": "win10",
     "execution-level": "as invoker",
@@ -17,7 +17,7 @@
     "long-path-aware": true, "printer-driver-isolation": false, "gdi-scaling": false,
     "segment-heap": false, "use-common-controls-v6": true}}},
   "RT_VERSION": {"#1": {"0000": {
-    "fixed": {"file_version": "1.1.0.0", "product_version": "1.1.0.0"},
-    "info": {"0409": {"CompanyName": "SOUNDGUARD", "FileDescription": "SOUNDGUARD - keeps your headphones and mic working", "FileVersion": "1.1.0", "ProductName": "SOUNDGUARD",
-      "ProductVersion": "1.1.0", "OriginalFilename": "SoundGuard.exe", "InternalName": "SoundGuard", "LegalCopyright": "MIT License"}}}}}
+    "fixed": {"file_version": "1.2.0.0", "product_version": "1.2.0.0"},
+    "info": {"0409": {"CompanyName": "SOUNDGUARD", "FileDescription": "SOUNDGUARD - keeps your headphones and mic working", "FileVersion": "1.2.0", "ProductName": "SOUNDGUARD",
+      "ProductVersion": "1.2.0", "OriginalFilename": "SoundGuard.exe", "InternalName": "SoundGuard", "LegalCopyright": "MIT License"}}}}}
 }

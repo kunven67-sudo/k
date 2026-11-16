@@ -197,6 +197,15 @@ func (s *Server) do(q Req) (any, error) {
 		g.Do(func() { g.HeardAnswer(on) })
 	case "testMic":
 		g.Do(g.StartMicTest)
+	case "look":
+		if q.ID != "rack" && q.ID != "mix" && q.ID != "simple" {
+			return nil, errors.New("bad look")
+		}
+		g.mu.Lock()
+		g.set.Look = q.ID
+		g.saveLocked()
+		g.mu.Unlock()
+		g.Do(func() {})
 	case "setting":
 		g.SetSetting(q.ID, q.On)
 		g.Do(func() {})

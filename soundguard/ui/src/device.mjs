@@ -39,6 +39,7 @@ const NEEDLE_A = 0.86; // rad each side
 
 export async function createDevice(canvas, opt = {}) {
   const base = opt.base || 'assets/';
+  const api0 = { on: {} };
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -568,6 +569,50 @@ export async function createDevice(canvas, opt = {}) {
   document.fonts && document.fonts.ready.then(() => drawSilk());
 
   // ---------- build the unit ----------
+  // ---------- lower unit: big info screen (devices + what I did) ----------
+  const LH = opt.lower ? 1.12 : 0, LY = -(H / 2 + 0.07 + LH / 2);
+  let info = null;
+  if (opt.lower) {
+    const lp = add(new THREE.Mesh(new RoundedBoxGeometry(W, LH, D, 5, 0.035), M.panel), 0, LY, -D / 2);
+    lp.castShadow = true;
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) screw(sx * (W / 2 - 0.11), LY + sy * (LH / 2 - 0.13));
+    const SW2 = 2400, SH2 = Math.round(2400 * (LH - 0.24) / (W - 0.5));
+    info = canvasTex(SW2, SH2, () => {});
+    const sg = new THREE.Group(); sg.position.set(0, LY, 0); root.add(sg);
+    add(new THREE.Mesh(new THREE.PlaneGeometry(W - 0.5, LH - 0.24), new THREE.MeshStandardMaterial({ color: 0x000000, emissiveMap: info.t, emissive: new THREE.Color(0xffffff), emissiveIntensity: 0.9, roughness: 0.6 })), 0, 0, 0.004, sg, false);
+    add(bezel(W - 0.5, LH - 0.24, 0.02, 0.035, 0.045, M.blackAnod), 0, 0, 0, sg);
+    add(new THREE.Mesh(new THREE.PlaneGeometry(W - 0.48, LH - 0.22), M.vfdGlass), 0, 0, 0.047, sg, false);
+  }
+  api0.setInfo = (d) => {
+    if (!info) return;
+    const x = info.ctx, cw = info.c.width, ch = info.c.height;
+    x.fillStyle = '#020a08'; x.fillRect(0, 0, cw, ch);
+    x.shadowColor = 'rgba(80,255,210,0.55)'; x.shadowBlur = 6;
+    const col = (c) => { x.fillStyle = c; };
+    x.textBaseline = 'top';
+    const L = 60;
+    x.font = `400 26px ${LABEL}`; col('#2c6e60');
+    x.fillText('YOU HEAR', L, 40); x.fillText('YOUR MIC', L, 250); x.fillText('WHAT I DID', 900, 40);
+    x.font = '600 54px Consolas, monospace'; col('#86ffe0');
+    x.fillText(d.outName || '-', L, 80); x.fillText(d.inName || '-', L, 290);
+    x.font = '32px Consolas, monospace'; col('#4fb8a0');
+    x.fillText(d.outSub || '', L, 150); x.fillText(d.inSub || '', L, 360);
+    x.strokeStyle = '#12302a'; x.lineWidth = 3; x.beginPath(); x.moveTo(840, 30); x.lineTo(840, ch - 30); x.stroke();
+    let y = 86;
+    for (const e of (d.events || []).slice(0, 12)) {
+      x.font = '28px Consolas, monospace'; col('#2c6e60'); x.fillText(e.t, 900, y);
+      col(e.kind === 'bad' ? '#ff7a70' : e.kind === 'warn' ? '#ffc060' : '#86ffe0');
+      x.font = '30px Consolas, monospace';
+      const words = e.text.split(' '); let line = '', lines = [];
+      for (const w of words) { if (x.measureText(line + w).width > cw - 1170) { lines.push(line); line = ''; } line += w + ' '; }
+      lines.push(line);
+      for (const l of lines.slice(0, 2)) { x.fillText(l, 1120, y); y += 38; }
+      y += 12;
+      if (y > ch - 60) break;
+    }
+    x.shadowBlur = 0;
+    info.t.needsUpdate = true;
+  };
   const meters = { out: makeMeter(-1.42, 0.22, 'HEADPHONES'), in: makeMeter(1.42, 0.22, 'MICROPHONE') };
   meters.out.g.position.x = -1.38; meters.in.g.position.x = 1.38;
   const ladders = { out: makeLadder(-0.8, 0.22), in: makeLadder(0.8, 0.22) };
@@ -600,7 +645,7 @@ export async function createDevice(canvas, opt = {}) {
     bloom.setSize(w, h);
     camera.aspect = w / h;
     const fitW = (W * 1.07) / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / camera.aspect;
-    const fitH = (H * 1.2) / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const fitH = ((H + (LH ? LH + 0.07 : 0)) * 1.12) / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     camera.userData.dist = Math.max(fitW, fitH);
     camera.updateProjectionMatrix();
   }
@@ -629,7 +674,7 @@ export async function createDevice(canvas, opt = {}) {
     const h = ray.intersectObjects(hits(), false)[0];
     return h ? who(h.object) : null;
   };
-  const api = { on: {} };
+  const api = api0;
   const fire = (name, ...a) => { try { api.on[name] && api.on[name](...a); } catch (e) { console.error(e); } };
   let dragging = null, lastY = 0, lastX = 0, enabled = { out: true, in: true };
   canvas.addEventListener('pointermove', (e) => {
@@ -725,8 +770,8 @@ export async function createDevice(canvas, opt = {}) {
     mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 3);
     mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 3);
     const dist = camera.userData.dist || 6;
-    camera.position.set(mouse.x * 0.35, 0.18 - mouse.y * 0.22, dist);
-    camera.lookAt(0, 0, 0);
+    camera.position.set(mouse.x * 0.35, (LH ? LY / 2 + 0.25 : 0) + 0.18 - mouse.y * 0.22, dist);
+    camera.lookAt(0, LH ? LY / 2 + 0.25 : 0, 0);
     // needles: spring with a little overshoot (real VU ballistics are ~300 ms)
     for (const k of ['out', 'in']) {
       const m = meters[k];

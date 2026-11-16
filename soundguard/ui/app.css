@@ -461,3 +461,9 @@ body.has3d .chips { margin-bottom: 2px; }
 .pop-btns .btn { height: 32px; font-size: 9px; letter-spacing: .08em; padding: 0 10px; }
 .pop-btns .btn svg { font-size: 13px; }
 .forever, .settings { margin: 0 auto; }
+
+body.look-rack .cards { display: none; }
+body.look-rack .rack { height: calc(100vh - 58px); margin-bottom: 0; }
+body.look-rack #page-home { overflow: hidden; padding-bottom: 0; }
+body.look-rack .alert { position: absolute; left: 24px; right: 24px; bottom: 16px; z-index: 3; margin: 0; }
+.look-sel { font-family: var(--label); font-size: 11px; letter-spacing: .1em; color: var(--vfd); background: #020a08; border: 1px solid #0d221d; border-radius: 6px; padding: 8px 10px; box-shadow: inset 0 2px 6px #000; }
