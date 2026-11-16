@@ -35,6 +35,32 @@ def human_text(req: dict) -> str:
     return ""
 
 
+FAKE_LIBRARY = None
+V8_ANSWER = """A V8 is 8 cylinders in two rows of 4, set in a **V shape** over one crankshaft. Here's how it makes power:
+
+## The 4 strokes (every cylinder does this)
+1. **Intake:** the piston goes down and pulls in air + fuel
+2. **Compression:** the piston goes up and squeezes it
+3. **Power:** the spark plug fires, the blast pushes the piston down
+   - this is the only stroke that makes power
+   - with 8 cylinders, one fires every 90 degrees, so it's smooth
+4. **Exhaust:** the piston goes up and pushes the burnt gas out
+
+## V8 vs the engines you see most
+
+| Engine | Cylinders | Feels like | Found in |
+|---|:-:|---|---|
+| Inline-4 | 4 | buzzy, saves gas | most small cars |
+| V6 | 6 | smooth, middle | family cars, SUVs |
+| V8 | 8 | deep rumble, lots of torque | muscle cars, trucks |
+
+That "rumble" sound comes from the **cross-plane crankshaft**: the firing order isn't evenly split between the two sides.
+
+**My ideas:**
+- For a realistic racing game: record each engine type separately so they sound different
+- I can show a cutaway picture of the crankshaft next if you want to see the inside"""
+
+
 def script(req: dict, fake: FakeClaude):
     if "check other AI work" in system_text(req):
         return [X('{"status": "done", "reason": "The journal shows todo.txt was created with 3 items, matching the goal."}')]
@@ -44,6 +70,13 @@ def script(req: dict, fake: FakeClaude):
     i = turn_index(req)
     everything = json.dumps(req.get("messages", [])).lower()
     building = "MODE: BUILD" in system_text(req) or "mode: build" in everything
+    if "engine" in ask and not building:
+        # Chat mode, Piece 2: real pictures + a ChatGPT-style answer (lists, a table, its own ideas)
+        steps = [
+            [T("show_pictures", search="V8 engine", count=4, caption="Real V8 engines")],
+            [X(V8_ANSWER)],
+        ]
+        return steps[i] if i < len(steps) else [X("Done.")]
     if "todo" in ask and not building:
         # Chat mode: plan it with you, then ask "Ready to build?" (Piece 1)
         steps = [
@@ -113,7 +146,13 @@ async def main() -> None:
     ap.add_argument("--port", default="47999")
     ap.add_argument("--no-cli", action="store_true")
     ap.add_argument("--home", default="")
+    ap.add_argument("--real-pictures", action="store_true", help="use the real picture libraries (needs internet)")
     a = ap.parse_args()
+    if not a.real_pictures:      # a fake picture library on 127.0.0.1 (tests never touch the internet)
+        from overdrive.selftests.piece2_tests import fake_library
+        global FAKE_LIBRARY
+        FAKE_LIBRARY = fake_library()           # keep a reference: if it's garbage-collected, it closes
+        FAKE_LIBRARY.__enter__()
     os.environ["OVERDRIVE_PORT"] = a.port
     os.environ["OVERDRIVE_NO_WINDOW"] = "1"
     from overdrive.agent import Overdrive

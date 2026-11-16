@@ -41,38 +41,113 @@ function toast(text, kind = "", ms = 5200) {
   setTimeout(() => t.remove(), ms);
 }
 
-/* ---------------------------------------------------------------- tiny markdown (safe: escape first) */
-function md(text) {
-  const parts = String(text || "").split(/```/);
-  let out = "";
-  parts.forEach((part, i) => {
-    if (i % 2 === 1) {
-      const code = part.replace(/^[a-zA-Z0-9_+-]*\n/, "");
-      out += `<pre><code>${esc(code.replace(/\n$/, ""))}</code></pre>`;
-      return;
-    }
-    const lines = esc(part).split("\n");
-    let list = null, para = [];
-    const flush = () => { if (para.length) { out += `<p>${inline(para.join("<br>"))}</p>`; para = []; } };
-    const close = () => { if (list) { out += `</${list}>`; list = null; } };
-    for (const line of lines) {
-      const ul = line.match(/^\s*[-*•]\s+(.*)$/), ol = line.match(/^\s*\d+[.)]\s+(.*)$/), h = line.match(/^#{1,4}\s+(.*)$/);
-      if (ul || ol) {
-        flush();
-        const want = ul ? "ul" : "ol";
-        if (list !== want) { close(); out += `<${want}>`; list = want; }
-        out += `<li>${inline((ul || ol)[1])}</li>`;
-      } else if (h) { flush(); close(); out += `<h3>${inline(h[1])}</h3>`; }
-      else if (!line.trim()) { flush(); close(); }
-      else { close(); para.push(line); }
-    }
-    flush(); close();
-  });
-  return out;
+/* ---------------------------------------------------------------- answers (md.js: safe markdown + copy pieces) */
+function md(text) { return OD_MD.render(text, { pieces: false }).html; }
+const PIECES = new Map();          // task id -> the pieces its numbered copy buttons copy
+const numbersOn = () => !S.state || !S.state.settings || S.state.settings.copy_numbers !== false;
+function answerHtml(t) {
+  const on = numbersOn();
+  const r = OD_MD.render(t.final_text, { pieces: on });
+  PIECES.set(t.id, r.pieces);
+  return `<div class="answer${on ? " numbered" : ""}" data-answer="${esc(t.id)}">${r.html}</div>`;
 }
-function inline(s) {
-  return s.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
-    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, "$1 <span class=\"muted\">($2)</span>");
+function piecesOf(id) {
+  if (!PIECES.has(id)) { const t = S.tasks.get(id); PIECES.set(id, t ? OD_MD.render(t.final_text, { pieces: true }).pieces : []); }
+  return PIECES.get(id);
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* older window: fall back */ }
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+function flashPieces(id, nums) {
+  const box = $(`[data-answer="${CSS.escape(id)}"]`);
+  if (!box) return;
+  for (const n of nums) {
+    const el = $(`[data-pc="${n}"]`, box);
+    if (!el) continue;
+    el.classList.remove("copied"); void el.offsetWidth; el.classList.add("copied");
+    setTimeout(() => el.classList.remove("copied"), 1300);
+  }
+}
+async function copyPieces(id, nums) {
+  const pieces = piecesOf(id);
+  const text = nums.map((n) => (pieces[n - 1] || {}).text || "").filter(Boolean).join("\n\n");
+  if (!text) return false;
+  const ok = await copyText(text);
+  if (ok) flashPieces(id, nums); else toast("Windows didn't let OVERDRIVE use the clipboard. Try again.", "bad");
+  return ok;
+}
+function lastAnswer() {
+  const done = Array.from(S.tasks.values()).filter((t) => t.status !== "running" && (t.final_text || "").trim());
+  done.sort((a, b) => a.created.localeCompare(b.created));
+  return done[done.length - 1] || null;
+}
+const listWords = (nums) => (nums.length === 1 ? `piece ${nums[0]}` : `pieces ${nums.slice(0, -1).join(", ")} and ${nums[nums.length - 1]}`);
+// "copy 1 and 2" / "copy 2-4" / "copy all" / "copy code": copies from the last answer, never goes to Claude (no usage).
+async function copyCommand(text) {
+  if (!/^\s*copy\b/i.test(text)) return false;
+  const last = lastAnswer();
+  if (!last) return false;
+  const pieces = piecesOf(last.id);
+  const r = OD_MD.parseCopy(text, pieces);
+  if (!r) return false;
+  if (!r.idx.length) { toast(`The last answer has no ${r.missing.join(", ")} (it has ${pieces.length} piece${pieces.length === 1 ? "" : "s"}).`, "warn", 7000); return true; }
+  if (await copyPieces(last.id, r.idx)) {
+    const miss = r.missing.length ? ` There's no ${r.missing.join(", ")} (it has ${pieces.length}).` : "";
+    toast(`Copied ${listWords(r.idx)}. No usage used.${miss}`, miss ? "warn" : "ok", 6000);
+    $("#msg").value = ""; autoGrow();
+  }
+  return true;
+}
+
+/* ---------------------------------------------------------------- pictures + the big picture view */
+const picUrl = (p) => `/pic/${encodeURIComponent(p.file)}?k=${encodeURIComponent(S.token)}`;
+function picsHtml(t) {
+  const pics = (t.pictures || []).filter((p) => p && p.file);
+  if (!pics.length) return "";
+  const caps = [...new Set(pics.map((p) => p.caption).filter(Boolean))];
+  return `<div class="pics-wrap">${caps.length ? `<div class="pics-cap">${esc(caps.join(" / "))}</div>` : ""}<div class="pics n${Math.min(pics.length, 4)}">${pics.map((p, i) =>
+    `<figure class="pic" data-pic="${esc(t.id)}" data-i="${i}" tabindex="0" title="${esc(p.title)}"><img src="${picUrl(p)}" alt="${esc(p.title)}" loading="lazy"><figcaption>${esc(p.title)}</figcaption></figure>`).join("")}</div></div>`;
+}
+const LB = { pics: [], i: 0 };
+function openPicture(taskId, i) {
+  const t = S.tasks.get(taskId);
+  LB.pics = ((t && t.pictures) || []).filter((p) => p && p.file);
+  if (!LB.pics.length) return;
+  LB.i = Math.max(0, Math.min(LB.pics.length - 1, i));
+  showPicture();
+  $("#lightbox").classList.remove("hidden");
+}
+function showPicture() {
+  const p = LB.pics[LB.i];
+  $("#lb-img").src = picUrl(p);
+  $("#lb-img").alt = p.title || "";
+  const who = p.creator ? ` by ${esc(p.creator)}` : "";
+  const src = p.page && /^https:\/\//.test(p.page) ? ` &middot; <a href="${esc(p.page)}" target="_blank" rel="noopener noreferrer">Source page</a>` : "";
+  $("#lb-cap").innerHTML = `<b>${esc(p.title)}</b>${who}<span class="muted"> &middot; ${esc(p.license || "")} &middot; ${esc(p.source || "")}</span>${src}` +
+    ` &middot; <a href="${picUrl(p)}" download="${esc((p.title || "picture").replace(/[^\w .-]+/g, "").slice(0, 60) || "picture")}.${esc(p.file.split(".").pop())}">Save picture</a>` +
+    `<span class="muted"> &middot; ${LB.i + 1} / ${LB.pics.length}</span>`;
+  $("#lb-prev").classList.toggle("hidden", LB.pics.length < 2);
+  $("#lb-next").classList.toggle("hidden", LB.pics.length < 2);
+}
+function stepPicture(d) { if (LB.pics.length > 1) { LB.i = (LB.i + d + LB.pics.length) % LB.pics.length; showPicture(); } }
+const closePicture = () => { $("#lightbox").classList.add("hidden"); $("#lb-img").removeAttribute("src"); };
+
+/* live answers: rendered as they stream in (at most ~12 times a second) */
+const liveTimers = new Map();
+function paintLive(id) {
+  if (liveTimers.has(id)) return;
+  liveTimers.set(id, setTimeout(() => {
+    liveTimers.delete(id);
+    const el = $(`#live-${id}`);
+    if (el) { el.innerHTML = md(S.live.get(id) || ""); autoScroll(); }
+  }, 80));
 }
 const ago = (iso) => { if (!iso) return ""; const d = new Date(iso); return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const money = (v) => (v == null ? "" : v < 0.01 ? "under $0.01" : `$${v.toFixed(2)}`);
@@ -149,8 +224,7 @@ function handle(ev) {
     }
     case "delta": {
       S.live.set(ev.task, (S.live.get(ev.task) || "") + ev.text);
-      const el = $(`#live-${ev.task}`);
-      if (el) { el.textContent = S.live.get(ev.task); autoScroll(); }
+      paintLive(ev.task);
       break;
     }
     case "card_open": S.cards.set(ev.card.id, ev.card); renderCards(); break;
@@ -166,18 +240,85 @@ function handle(ev) {
 }
 
 /* ---------------------------------------------------------------- chats */
+const PENCIL = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M11.3 2.3l2.4 2.4-8 8-3.1.7.7-3.1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+const BIN = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+function chatRow(c, snippet) {
+  const row = document.createElement("div");
+  row.className = "chat-row" + (c.id === S.conv ? " on" : "");
+  row.dataset.chat = c.id;
+  row.innerHTML = `<button class="chat-item" title="${esc(c.title)}">${esc(c.title || "Chat")}${snippet ? `<span class="snip">${esc(snippet)}</span>` : ""}</button>
+    <span class="chat-acts"><button class="ic-btn" data-ren title="Rename">${PENCIL}</button><button class="ic-btn" data-del title="Delete">${BIN}</button></span>`;
+  $(".chat-item", row).addEventListener("click", () => { switchTab("chat"); openConversation(c.id); });
+  $("[data-ren]", row).addEventListener("click", (e) => { e.stopPropagation(); renameChat(c.id); });
+  $("[data-del]", row).addEventListener("click", (e) => { e.stopPropagation(); deleteChat(c.id); });
+  return row;
+}
 function renderChats() {
+  if (S.chatHits) return renderChatHits();
   const box = $("#chats");
   const convs = (S.state && S.state.conversations) || [];
   box.innerHTML = convs.length ? "" : `<div class="muted" style="padding:6px 10px;font-size:12.5px">No chats yet</div>`;
-  for (const c of convs) {
-    const b = document.createElement("button");
-    b.className = "chat-item" + (c.id === S.conv ? " on" : "");
-    b.textContent = c.title || "Chat";
-    b.title = c.title;
-    b.addEventListener("click", () => { switchTab("chat"); openConversation(c.id); });
-    box.appendChild(b);
-  }
+  for (const c of convs) box.appendChild(chatRow(c));
+}
+function renderChatHits() {
+  const box = $("#chats");
+  box.innerHTML = S.chatHits.length ? "" : `<div class="muted" style="padding:6px 10px;font-size:12.5px">Nothing found</div>`;
+  for (const h of S.chatHits) box.appendChild(chatRow(h, h.snippet));
+}
+let chatQTimer = null;
+function searchChats() {
+  clearTimeout(chatQTimer);
+  const q = $("#chat-q").value.trim();
+  if (!q) { S.chatHits = null; renderChats(); return; }
+  const low = q.toLowerCase();                             // names first, right away; then what was said, from the PC
+  S.chatHits = ((S.state && S.state.conversations) || []).filter((c) => (c.title || "").toLowerCase().includes(low)).map((c) => ({ id: c.id, title: c.title }));
+  renderChatHits();
+  chatQTimer = setTimeout(async () => {
+    try {
+      const d = await api(`/api/chat/search?q=${encodeURIComponent(q)}`);
+      if ($("#chat-q").value.trim() === q) { S.chatHits = d.hits; renderChatHits(); }
+    } catch (e) { /* keep the name matches */ }
+  }, 250);
+}
+function renameChat(id) {
+  const c = ((S.state && S.state.conversations) || []).find((x) => x.id === id);
+  let row = $(`.chat-row[data-chat="${CSS.escape(id)}"]`);
+  if (c && !row && S.chatHits) { $("#chat-q").value = ""; S.chatHits = null; renderChats(); row = $(`.chat-row[data-chat="${CSS.escape(id)}"]`); }
+  if (!c || !row) return;
+  const inp = document.createElement("input");
+  inp.className = "chat-rename"; inp.value = c.title || ""; inp.maxLength = 80;
+  row.replaceChildren(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const finish = async (save) => {
+    if (done) return;
+    done = true;
+    const title = inp.value.trim();
+    if (save && title && title !== c.title) {
+      try {
+        const r = await api("/api/chat/rename", { conversation: id, title });
+        Object.assign(c, r.conversation);
+        (S.chatHits || []).forEach((h) => { if (h.id === id) h.title = c.title; });
+        if (S.conv === id) $("#chat-title").textContent = c.title;
+        toast("Renamed.", "ok", 2000);
+      } catch (e) { toast(e.message, "bad"); }
+    }
+    renderChats();
+  };
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); finish(true); } if (e.key === "Escape") { e.stopPropagation(); finish(false); } });
+  inp.addEventListener("blur", () => finish(true));
+}
+async function deleteChat(id) {
+  const c = ((S.state && S.state.conversations) || []).find((x) => x.id === id);
+  if (!c) return;
+  if (!confirm(`Delete the chat "${c.title}"?\n\nIts messages are removed for good. Files it made stay in the workspace, and the log keeps a record.`)) return;
+  try {
+    await api("/api/chat/delete", { conversation: id });
+    S.state.conversations = S.state.conversations.filter((x) => x.id !== id);
+    if (S.chatHits) S.chatHits = S.chatHits.filter((x) => x.id !== id);
+    if (S.conv === id) newChat(); else renderChats();
+    toast("Chat deleted.", "ok", 2500);
+  } catch (e) { toast(e.message, "bad"); }
 }
 
 async function openConversation(id, quiet) {
@@ -278,7 +419,7 @@ function stepsList(t) {
     const tag = c.decision === "yes" ? `<span class="tag yes">you said Yes</span>` : (c.decision === "no" ? `<span class="tag no">you said No</span>` :
       c.decision === "timeout" ? `<span class="tag no">no answer</span>` : c.decision === "blocked" ? `<span class="tag no">blocked</span>` :
       c.decision === "invalid" ? `<span class="tag no">bad inputs</span>` : "");
-    const what = c.args && c.args.path ? ` <span class="mono">${esc(c.args.path)}</span>` : c.args && c.args.expression ? ` <span class="mono">${esc(c.args.expression)}</span>` : "";
+    const what = c.args && c.args.search ? ` <span class="mono">${esc(c.args.search)}</span>` : c.args && c.args.path ? ` <span class="mono">${esc(c.args.path)}</span>` : c.args && c.args.expression ? ` <span class="mono">${esc(c.args.expression)}</span>` : "";
     return `<div class="step">${icon}<div>${esc(c.title || c.tool)}${what}${tag}${c.ok === null ? ` <span class="muted">${esc(c.summary)}</span>` : ""}</div><span>${c.ms ? c.ms + " ms" : ""}</span></div>`;
   }).join("")}</div>`;
 }
@@ -292,8 +433,8 @@ function turnNode(t) {
     ? `<span class="spin"></span><span class="badge running">Working</span><span class="od-reason">${t.plan ? "Following its plan" : "Planning"}...</span>`
     : `<span class="badge ${esc(t.status)}">${esc(WORDS[t.status] || t.status)}</span><span class="od-reason">${esc(t.status_reason)}</span>`;
   const answer = running
-    ? `<div class="live answer" id="live-${t.id}">${esc(S.live.get(t.id) || "")}</div>`
-    : (t.final_text ? `<div class="answer">${md(t.final_text)}</div>` : "");
+    ? `<div class="answer live-md" id="live-${t.id}">${md(S.live.get(t.id) || "")}</div>`
+    : (t.final_text ? answerHtml(t) : "");
   const changes = (t.changes || []).length ? `<div class="changes">Changed: ${t.changes.map((c) =>
     `<span class="f">${esc(c.path)}</span> <span class="muted">(${c.op === "created" ? "new" : "replaced, old copy saved"})</span>`).join(", ")}
     ${!running && !t.undo ? `<button class="ghost sm" data-undo="${t.id}">Undo these changes</button>` : ""}</div>` : "";
@@ -310,9 +451,10 @@ function turnNode(t) {
   if (t.duration_ms) bits.push(`${(t.duration_ms / 1000).toFixed(1)} s`);
   if (t.cost_usd != null) bits.push(`${about(t.cost_usd)} API-equivalent`);
   const foot = running ? "" : `<div class="foot">${bits.map((b) => `<span>${b}</span>`).join("")}
-      <button class="ghost" data-details="${t.id}">Details</button>${t.status !== "done" ? `<button class="ghost" data-rerun="${t.id}">Try again</button>` : ""}</div>`;
-  wrap.innerHTML = `<div class="me"><div>${esc(t.request)}</div></div>
-    <div class="od"><div class="od-head">${head}</div>${critList(t)}${stepsList(t)}${answer}${err}${changes}${undone}${flagHtml}${checks}
+      ${t.final_text ? `<button class="ghost" data-copyall="${t.id}" title="Copy the whole answer">Copy</button>` : ""}<button class="ghost" data-details="${t.id}">Details</button><button class="ghost" data-rerun="${t.id}" title="Send the same message again">${t.status !== "done" ? "Try again" : "Ask again"}</button></div>`;
+  const mine = t.request.startsWith("GO. I said Yes") ? "" : `<div class="me-acts"><button class="ghost xs" data-edit="${t.id}" title="Put this message back in the box to change it">Edit</button><button class="ghost xs" data-copyreq="${t.id}">Copy</button></div>`;
+  wrap.innerHTML = `<div class="me"><div>${esc(t.request)}</div></div>${mine}
+    <div class="od"><div class="od-head">${head}</div>${critList(t)}${stepsList(t)}${picsHtml(t)}${answer}${err}${changes}${undone}${flagHtml}${checks}
       <div class="cards-slot" data-task="${t.id}"></div>${foot}</div>`;
   return wrap;
 }
@@ -459,6 +601,7 @@ function beep() {
 async function send(text) {
   text = (text || "").trim();
   if (!text) return;
+  if (await copyCommand(text)) return;
   if (S.setup && !S.setup.ready) { $("#setup").classList.remove("hidden"); renderSetup(); return; }
   $("#send").disabled = true;
   try {
@@ -765,7 +908,20 @@ function renderSettings() {
   const permRows = ["read", "web", "write", "run", "destructive", "external", "money"].map((r) => `<div class="perm"><span>${esc(RISK[r])}</span>
     ${["auto", "ask", "block"].map((p) => `<label><input type="radio" name="perm-${r}" value="${p}" ${s.permissions[r] === p ? "checked" : ""} ${locked[r] && p === "auto" ? "disabled" : ""}> ${p}</label>`).join("")}
     <span class="lock">${locked[r] ? "locked: can never be auto" : ""}</span></div>`).join("");
+  const sw = (k, label) => `<label class="switch"><input type="checkbox" data-k="${k}" ${s[k] !== false ? "checked" : ""}> ${esc(label)}</label>`;
+  const picOpts = [["real", "Real pictures (free open photo libraries)"], ["both", "Both (real now, AI-made later)"],
+    ["ai", "AI-made only (needs the RTX 3050, not built yet)"], ["off", "Off"]].map(([v, l]) => opt(v, l, s.pictures)).join("");
   $("#settings-body").innerHTML = `
+    <div class="set-search"><input id="set-q" type="search" placeholder="Search settings (e.g. pictures, copy, model, usage)..." value="${esc(S.setQ || "")}" autocomplete="off" spellcheck="false"></div>
+    <div class="st-sec"><h3>Talking (ChatGPT mode)</h3>
+      <div class="row2"><label>Talk like ChatGPT</label>${sw("chat_style", "lists, tables, no rushing to build")}</div>
+      <div class="hint row2"><span></span><span class="hint">In Chat mode it digs into your idea, gives options with its own pick, and never pushes "ready to build?". Off = plain answers.</span></div>
+      <div class="row2"><label>Pictures</label><select data-k="pictures">${picOpts}</select></div>
+      <div class="hint row2"><span></span><span class="hint">It shows pictures of what it's talking about, right in the chat. Real ones come from Openverse + Wikimedia Commons (free, with the source and license). Click a picture to see it big.</span></div>
+      <div class="row2"><label>Its own ideas</label>${sw("own_ideas", "\u201cMy ideas:\u201d after plans, option lists and builds")}</div>
+      <div class="row2"><label>Copy buttons on answers</label>${sw("copy_numbers", "number + copy button on every piece")}</div>
+      <div class="hint row2"><span></span><span class="hint">Every paragraph, list item, table and code block gets a number. Click it to copy, or type \u201ccopy 1 and 2\u201d, \u201ccopy 2-4\u201d, \u201ccopy code\u201d or \u201ccopy all\u201d in the message box (that never uses usage).</span></div>
+    </div>
     <div class="st-sec"><h3>Brain (Claude)</h3>
       <div class="row2"><label>Model</label><select data-k="model">${modelOpts}</select></div>
       <div class="row2"><label>Backup model if Claude is busy</label><select data-k="fallback_model">${fbOpts}</select></div>
@@ -795,6 +951,8 @@ function renderSettings() {
       <div class="btns"><button class="ghost" data-open="workspace">Open workspace</button><button class="ghost" data-open="versions">Old versions</button>
         <button class="ghost" data-open="logs">Logs folder</button><button class="ghost" id="export">Export everything (zip)</button>
         <button class="danger" id="quit">Quit OVERDRIVE</button></div></div>`;
+  $("#set-q").addEventListener("input", (e) => { S.setQ = e.target.value; filterSettings(); });
+  filterSettings();
   $("#set-check").addEventListener("click", () => checkSetup(true));
   $("#set-setup").addEventListener("click", () => { $("#setup").classList.remove("hidden"); renderSetup(); });
   $$("[data-open]").forEach((b) => b.addEventListener("click", async () => { try { await api("/api/open", { what: b.dataset.open }); } catch (e) { toast(e.message, "bad"); } }));
@@ -807,6 +965,25 @@ function renderSettings() {
     try { await api("/api/quit", {}); } catch (e) { /* closing */ }
     document.body.innerHTML = `<div class="empty"><h1>OVERDRIVE is closed</h1><p>You can close this window.</p></div>`;
   });
+}
+
+/* settings search: hides rows that don't match (a hint row stays with the row above it) */
+function filterSettings() {
+  const q = (S.setQ || "").trim().toLowerCase();
+  for (const sec of $$("#settings-body .st-sec")) {
+    const head = ($("h3", sec) || {}).textContent || "";
+    const secHit = !!q && head.toLowerCase().includes(q);
+    let shown = 0, lastShown = false;
+    for (const row of $$(":scope > .row2, :scope > .perm, :scope > .btns, :scope > .muted", sec)) {
+      const isHint = row.classList.contains("hint");
+      const hit = !q || secHit || (isHint ? lastShown : row.textContent.toLowerCase().includes(q) ||
+        $$("option", row).some((o) => o.textContent.toLowerCase().includes(q)));
+      row.classList.toggle("hidden", !hit);
+      if (!isHint) lastShown = hit;
+      if (hit) shown++;
+    }
+    sec.classList.toggle("hidden", !!q && !shown);
+  }
 }
 
 async function saveSettings() {
@@ -833,6 +1010,7 @@ async function saveSettings() {
     toast("Saved: " + list, "ok", 7000);
     renderModelChip();
     renderSettings();
+    if ("copy_numbers" in r.changed) { PIECES.clear(); renderFeed(); }
   } catch (e) { toast(e.message, "bad", 9000); }
 }
 
@@ -871,7 +1049,24 @@ function bindUI() {
     if (u) undoTask(u.dataset.undo);
     if (d) showDetails(d.dataset.details);
     if (r) { const t = S.tasks.get(r.dataset.rerun); if (t) send(t.request); }
+    const cp = e.target.closest("[data-copy]");
+    if (cp) { const box = cp.closest("[data-answer]"); const n = Number(cp.dataset.copy); if (box) copyPieces(box.dataset.answer, [n]).then((ok) => ok && toast(`Copied piece ${n}.`, "ok", 2200)); }
+    const ca = e.target.closest("[data-copyall]");
+    if (ca) { const t = S.tasks.get(ca.dataset.copyall); if (t) copyText(t.final_text).then((ok) => toast(ok ? "Copied the whole answer." : "Couldn't copy.", ok ? "ok" : "bad", 2200)); }
+    const cr = e.target.closest("[data-copyreq]");
+    if (cr) { const t = S.tasks.get(cr.dataset.copyreq); if (t) copyText(t.request).then((ok) => ok && toast("Copied your message.", "ok", 2200)); }
+    const ed = e.target.closest("[data-edit]");
+    if (ed) { const t = S.tasks.get(ed.dataset.edit); if (t) { $("#msg").value = t.request; autoGrow(); $("#msg").focus(); toast("Change it and press Send. It goes as a new message.", "", 4000); } }
+    const pic = e.target.closest("[data-pic]");
+    if (pic) openPicture(pic.dataset.pic, Number(pic.dataset.i));
   });
+  $("#feed").addEventListener("keydown", (e) => { const pic = e.target.closest && e.target.closest("[data-pic]"); if (pic && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openPicture(pic.dataset.pic, Number(pic.dataset.i)); } });
+  $("#lb-x").addEventListener("click", closePicture);
+  $("#lb-prev").addEventListener("click", () => stepPicture(-1));
+  $("#lb-next").addEventListener("click", () => stepPicture(1));
+  $("#lightbox").addEventListener("click", (e) => { if (e.target.id === "lightbox") closePicture(); });
+  $("#chat-q").addEventListener("input", searchChats);
+  $("#chat-title").addEventListener("dblclick", () => { if (S.conv) renameChat(S.conv); });
   $("#run-tests").addEventListener("click", runTests);
   $("#log-verify").addEventListener("click", verifyLogs);
   $("#log-day").addEventListener("change", loadLogs);
@@ -884,7 +1079,12 @@ function bindUI() {
   $("#setup-recheck").addEventListener("click", () => checkSetup(true));
   $("#setup-skip").addEventListener("click", () => { S.offlineOK = true; $("#setup").classList.add("hidden"); switchTab("tools"); });
   $("#setup-go").addEventListener("click", () => $("#setup").classList.add("hidden"));
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("#drawer").classList.add("hidden"); });
+  document.addEventListener("keydown", (e) => {
+    const lb = !$("#lightbox").classList.contains("hidden");
+    if (e.key === "Escape") { if (lb) closePicture(); else $("#drawer").classList.add("hidden"); }
+    if (lb && e.key === "ArrowLeft") stepPicture(-1);
+    if (lb && e.key === "ArrowRight") stepPicture(1);
+  });
 }
 
 boot();

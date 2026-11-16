@@ -62,6 +62,7 @@ class TaskRecord:
     undo: list[dict] | None = None
     rerun_of: str | None = None
     mode: str = "build"          # "chat" or "build" (older tasks were all build-style)
+    pictures: list[dict] = field(default_factory=list)   # Piece 2: pictures shown with this answer
 
     def public(self) -> dict:
         return asdict(self)
@@ -86,6 +87,15 @@ class TaskStore:
             return TaskRecord(**known)
         except TypeError:
             return None
+
+    def delete(self, task_id: str) -> bool:
+        if not re.fullmatch(r"t\d{8}-\d{6}-[0-9a-f]{4}", task_id or ""):
+            return False
+        try:
+            (self.dir / f"{task_id}.json").unlink()
+            return True
+        except FileNotFoundError:
+            return False
 
     def list(self, conversation: str | None = None, limit: int = 200) -> list[TaskRecord]:
         out = []

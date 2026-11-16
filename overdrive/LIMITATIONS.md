@@ -1,10 +1,44 @@
-# Known limitations (Piece 1: the brain)
+# Known limitations (Piece 2: ChatGPT mode)
 
-Honest list. Built so far: the core engine, the safety system, long-term memory (old Stages 1 + 2), and
-**Piece 1: the brain is basically Claude now** (Claude Code's own tools, behind OVERDRIVE's gate).
-Coming next: Piece 2 (ChatGPT-style helping: lists, no rushing, real pictures), Piece 3 (all the extra
-features: learn + bug hunt while idle, mic + voice, live view, tutorial, accounts, done-folder, internet light,
-memory "saves + tells you"), Piece 4 (looks, animations, backgrounds).
+Honest list. Built so far: the core engine, the safety system, long-term memory (old Stages 1 + 2),
+**Piece 1: the brain is basically Claude** (Claude Code's own tools, behind OVERDRIVE's gate) and
+**Piece 2: ChatGPT mode** (lists, tables, real pictures, no rushing, copy pieces, chat rename/delete/search).
+Coming next: Piece 3 (all the extra features: learn + bug hunt while idle, mic + voice, live view, tutorial,
+accounts, done-folder, internet light, memory "saves + tells you", import your memory, schedules), Piece 4
+(looks, animations, backgrounds).
+
+## Piece 2: what it can do now
+- **Talk like ChatGPT** (Settings, on by default): in Chat mode it answers with clear numbered lists, small
+  tables, bold key words and headings, digs into your idea, gives options with its own pick, and never pushes
+  "ready to build?". It only offers to build when you clearly say you want it made.
+- **Pictures** (Settings: Real / Both / AI-made / Off): it shows real pictures of what it's talking about,
+  right under its answer (2-6 per answer), with the title, who made it, the license and the source page.
+  Click one to see it big (arrow keys = next, Esc = close, "Save picture" = download). It can also show a
+  picture file from the workspace (for example a screenshot of a game it made).
+- **Copy pieces**: every paragraph, list item, table and code block has a number + copy button. Or type
+  `copy 1 and 2`, `copy 2-4`, `copy code`, `copy table`, `copy last` or `copy all` in the message box: it
+  copies from the last answer and is never sent to Claude (no usage). "Copy" under every answer copies all of it.
+- **Its own ideas** (Settings, on): after plans, option lists and builds it ends with "My ideas:".
+- **Chats**: search box (finds chat names AND what was said in them), rename (pencil, or double-click the
+  title), delete (bin). **Edit** under your message puts it back in the box to change and resend.
+- **Settings search**: type "pictures", "copy", "usage"... and only those settings show.
+
+## Piece 2: limits (honest)
+- **AI-made pictures aren't built yet.** They need a picture model running on a real graphics card (the RTX
+  3050 plan). Picking "AI-made only" makes OVERDRIVE say so instead of faking it; "Both" shows real ones for now.
+- Real pictures come from **Openverse** and **Wikimedia Commons** (free, open licenses, no account). Great for
+  real things (engines, animals, places, art styles); weak for brand-new products, memes, or exact screenshots
+  of other games. Openverse has a daily limit for apps without an account; when it's hit (or a library is
+  down), OVERDRIVE uses the other one. Some licenses ask for credit if you publish the picture: the credit is shown with it.
+- Pictures are saved once in `OVERDRIVE\data\pictures` (so old chats still show them offline). Only real
+  JPEG/PNG/GIF/WebP files are kept; SVG and anything else is refused. There's no auto-clean of that folder yet.
+- Edit + resend sends a **new** message; it doesn't rewrite the old part of the chat like ChatGPT's branches
+  (Claude Code can't fork a chat's history from inside OVERDRIVE yet).
+- Deleting a chat removes its messages and task records for good. Files it made stay in the workspace, and
+  the audit log keeps a record that the chat existed (the log can never be edited).
+- Talk-style switches reach an ongoing chat on your next message (OVERDRIVE adds a short note, because Claude
+  Code keeps a chat's first instructions).
+- Not built yet: mic / voice, uploading your own pictures into the chat, picture editing, tutorial (Piece 3).
 
 ## Piece 1: what it can do now
 - **Chat mode** (new chats start here): talk, explain, make lists, search the web, open web pages, read

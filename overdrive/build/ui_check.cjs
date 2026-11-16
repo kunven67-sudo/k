@@ -46,6 +46,8 @@ function start(port, ...extra) {
   try {
     browser = await chromium.launch();
     const ctx = await browser.newContext({ viewport: { width: 1320, height: 880 }, deviceScaleFactor: scale });
+    await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: url.split("#")[0].replace(/\/$/, "") });
+    const clip = (page) => page.evaluate(() => navigator.clipboard.readText());
     ctx.on("page", (p) => {
       p.on("console", (m) => { if (m.type() === "error") errors.push(`console: ${m.text()}`); });
       p.on("pageerror", (e) => errors.push(`page error: ${e.message}`));
@@ -66,9 +68,51 @@ function start(port, ...extra) {
     await page.waitForSelector("#brain-text:has-text('signed in')", { timeout: 20000 });
     await shot(page, "01-start.png");
 
-    // task 1: tools only, no approvals
+    // Piece 2: Chat mode, ChatGPT style: real pictures + lists + a table, every piece numbered with a copy button
     await page.click(".ex >> nth=0");
     await page.waitForSelector(".turn .badge.done", { timeout: 90000 });
+    await page.waitForSelector(".pics .pic img", { timeout: 15000 });
+    await page.waitForFunction(() => [...document.querySelectorAll(".pics .pic img")].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 15000 });
+    const nPics = await page.locator(".pics .pic").count();
+    assert(nPics === 3, "pictures shown: " + nPics);
+    assert(await page.locator(".answer.numbered table").count() === 1, "table missing");
+    const nPieces = await page.locator(".answer.numbered .pc-copy").count();
+    assert(nPieces === 10, "pieces: " + nPieces);
+    assert((await page.innerText(".answer h3 >> nth=0")).includes("4 strokes"), "heading missing");
+    await shot(page, "02a-pictures-answer.png");
+    await page.hover(".answer [data-pc='3']");
+    await page.click(".answer [data-pc='3'] > .pc-copy");
+    await page.waitForSelector(".toast >> text=Copied piece 3", { timeout: 5000 });
+    let c = await clip(page);
+    assert(c.startsWith("Compression: the piston goes up"), "copy piece 3: " + c);
+    const turnsBefore = await page.locator(".turn").count();
+    await page.fill("#msg", "copy 4 and 6");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".toast >> text=Copied pieces 4 and 6. No usage used.", { timeout: 5000 });
+    c = await clip(page);
+    assert(c.startsWith("Power: the spark plug fires") && c.includes("  - this is the only stroke") && c.includes("V8\t8\tdeep rumble"), "copy 4 and 6: " + c);
+    assert(await page.locator(".turn").count() === turnsBefore && (await page.inputValue("#msg")) === "", "copy command must not be sent");
+    await page.fill("#msg", "copy code");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".toast >> text=has no code", { timeout: 5000 });
+    await page.fill("#msg", "");
+    await page.click(".pics .pic >> nth=1");
+    await page.waitForSelector("#lightbox:not(.hidden)");
+    assert((await page.innerText("#lb-cap")).includes("2 / 3"), "lightbox counter");
+    await page.keyboard.press("ArrowRight");
+    assert((await page.innerText("#lb-cap")).includes("3 / 3") && (await page.innerText("#lb-cap")).includes("CC BY-SA 4.0"), "lightbox next");
+    await shot(page, "02b-picture-big.png");
+    await page.keyboard.press("Escape");
+    assert(await page.isHidden("#lightbox"), "lightbox should close on Esc");
+    await page.hover(".turn >> nth=0");
+    await page.click(".turn >> nth=0 >> [data-edit]");
+    assert((await page.inputValue("#msg")).startsWith("How does a V8"), "edit puts the message back");
+    await page.fill("#msg", "");
+
+    // task 1: tools only, no approvals
+    await page.fill("#msg", "What time is it, and what's 17.5% of 2,480?");
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => document.querySelectorAll(".turn .badge.done").length >= 2, null, { timeout: 90000 });
     assert((await page.innerText("#feed")).includes("434"), "calculator answer missing");
     await shot(page, "02-time-task.png");
 
@@ -82,7 +126,7 @@ function start(port, ...extra) {
     assert((await page.innerText(".card")).includes("Ready to build?"), "build card missing");
     await shot(page, "03-approval.png");
     await page.click(".card [data-yes]");
-    await page.waitForFunction(() => document.querySelectorAll(".turn .badge.done").length >= 3, null, { timeout: 120000 });
+    await page.waitForFunction(() => document.querySelectorAll(".turn .badge.done").length >= 4, null, { timeout: 120000 });
     await page.waitForFunction(() => document.querySelector("#mode").textContent.includes("Build"), null, { timeout: 10000 });
     await page.click(".turn:last-child details.checks summary");
     await page.locator(".turn:last-child").scrollIntoViewIfNeeded();
@@ -134,6 +178,35 @@ function start(port, ...extra) {
     await page.waitForSelector(".toast >> text=max_steps", { timeout: 10000 });
     assert(await page.isDisabled("input[name=perm-destructive][value=auto]"), "locked class must be disabled");
     await shot(page, "09-settings.png");
+
+    // Piece 2 settings: search finds the switches; copy buttons can be turned off
+    await page.fill("#set-q", "pictures");
+    await sleep(150);
+    assert(await page.isVisible("[data-k=pictures]") && await page.isHidden("[data-k=max_steps]"), "settings search");
+    await shot(page, "10-settings-search.png");
+    await page.fill("#set-q", "");
+    await page.uncheck("[data-k=copy_numbers]");
+    await page.click("#save-settings");
+    await page.waitForSelector(".toast >> text=copy_numbers", { timeout: 10000 });
+    await page.click("#nav [data-tab=chat]");
+    assert(await page.locator(".pc-copy").count() === 0, "copy buttons should be off");
+
+    // chats: search by what was said, rename, delete
+    await page.fill("#chat-q", "crankshaft");
+    await page.waitForSelector("#chats .snip", { timeout: 5000 });
+    assert((await page.innerText("#chats")).toLowerCase().includes("crankshaft"), "search by answer text");
+    await page.fill("#chat-q", "");
+    await page.hover("#chats .chat-row >> nth=0");
+    await page.click("#chats .chat-row >> nth=0 >> [data-ren]");
+    await page.fill(".chat-rename", "Engines + todo");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector("#chats .chat-item >> text=Engines + todo", { timeout: 5000 });
+    assert((await page.innerText("#chat-title")) === "Engines + todo", "title follows rename");
+    await shot(page, "11-chats.png");
+    await page.hover("#chats .chat-row >> nth=0");
+    await page.click("#chats .chat-row >> nth=0 >> [data-del]");
+    await page.waitForSelector("#chats >> text=No chats yet", { timeout: 5000 });
+    assert(await page.isVisible("#empty"), "deleted chat leaves an empty feed");
   } catch (e) {
     errors.push(String(e && e.stack || e));
   } finally {

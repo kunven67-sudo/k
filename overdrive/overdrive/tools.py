@@ -29,8 +29,9 @@ class ToolResult:
 class ToolContext:
     """What a tool may use while running. Filled in by the agent."""
 
-    def __init__(self, workspace=None, task=None, settings=None, audit=None, lab=None, memory=None):
+    def __init__(self, workspace=None, task=None, settings=None, audit=None, lab=None, memory=None, pictures=None):
         self.workspace = workspace
+        self.pictures = pictures       # Piece 2: OVERDRIVE's picture folder (pictures.PictureStore)
         self.task = task
         self.settings = settings
         self.audit = audit

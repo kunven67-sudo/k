@@ -86,19 +86,57 @@ Don't install software or delete files without a clear reason (OVERDRIVE asks th
 get_time, calculator, and the memory tools."""
 
 
+CHAT_STYLE = """TALK STYLE (the human turned on "Talk like ChatGPT"):
+- Make answers easy to read and easy to copy: one short opening line, then clear numbered lists, a small \
+table when comparing things, **bold** for the key words, short headings (##) only for long answers. \
+One idea per line or list item: the window numbers every paragraph, list item, table and code block and \
+gives each a copy button, and the human can type "copy 2 and 3".
+- Don't rush and don't push. Talking it through IS the job. Never ask "ready to build?", never say \
+"say go", and don't offer start_build unless the human clearly says they want it made now. When they \
+describe an idea, dig into how it works, give options with your own pick and the reason.
+- Real opinions, honest about limits. No filler, no repeating the question back."""
+
+PICTURES_RULE = """- Pictures: when seeing something helps (a real thing, place, animal, machine, art or game style, how \
+something looks), call show_pictures ONCE per answer with a short plain search (2-4 words) and 2-6 \
+pictures; the human sees them under your answer. For a game you're making, show its screenshot file. \
+No pictures for code, math or small talk."""
+
+OWN_IDEAS = """- Your own ideas: after a plan, a list of options, or a finished build, end with a short "**My ideas:**" \
+list (1-3 of your own ideas that would make it better, each one line). Not after small talk or quick answers."""
+
+
+def mode_block(mode: str, settings=None) -> str:
+    """The MODE part of the instructions: Chat/Build rules + the talk-style switches from Settings."""
+    get = (lambda k, d=None: settings.get(k)) if settings is not None else (lambda k, d=None: d)
+    block = CHAT_MODE if mode == "chat" else BUILD_MODE
+    extra = []
+    if mode == "chat" and get("chat_style", True):
+        extra.append(CHAT_STYLE)
+    if get("pictures", "real") != "off":
+        extra.append(PICTURES_RULE if extra else "TALK STYLE:\n" + PICTURES_RULE)
+    if get("own_ideas", True):
+        extra.append(OWN_IDEAS if extra else "TALK STYLE:\n" + OWN_IDEAS)
+    return block + ("\n\n" + "\n".join(extra) if extra else "")
+
+
+def rules_hash(block: str) -> str:
+    import hashlib
+    return hashlib.sha256(block.encode("utf-8")).hexdigest()[:16]
+
+
 def build_system_prompt(settings, memory_digest: str = "", mode: str = "build") -> str:
     digest = memory_digest.strip()
     digest_block = ("\n\n" + digest) if digest else ""
     return SYSTEM_PROMPT.format(
-        mode_block=CHAT_MODE if mode == "chat" else BUILD_MODE,
+        mode_block=mode_block(mode, settings),
         detail=DETAIL.get(settings.get("detail"), DETAIL["normal"]),
         memory_digest=digest_block,
     )
 
 
-def mode_switch_note(mode: str) -> str:
+def mode_switch_note(mode: str, settings=None) -> str:
     """Claude Code keeps a chat's first instructions when it continues the chat, so after a Chat/Build
-    switch OVERDRIVE puts the current mode's rules in front of the human's message."""
-    block = CHAT_MODE if mode == "chat" else BUILD_MODE
-    return ("[OVERDRIVE: the mode changed since this chat started. These rules replace the MODE part of your "
-            "instructions from now on:]\n" + block + "\n[End of OVERDRIVE note. The human's message:]\n")
+    switch (or a talk-style switch in Settings) OVERDRIVE puts the current rules in front of the human's message."""
+    return ("[OVERDRIVE: the mode or talk-style settings changed since this chat started. These rules replace the "
+            "MODE and TALK STYLE parts of your instructions from now on:]\n" + mode_block(mode, settings)
+            + "\n[End of OVERDRIVE note. The human's message:]\n")

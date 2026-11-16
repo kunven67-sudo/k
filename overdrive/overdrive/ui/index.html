@@ -14,7 +14,7 @@
       <img src="/static/logo.svg" alt="" class="mark">
       <div>
         <div class="word">OVERDRIVE</div>
-        <div class="sub">Piece 1 <span class="dot">&middot;</span> Brain</div>
+        <div class="sub">Piece 2 <span class="dot">&middot;</span> ChatGPT mode</div>
       </div>
     </div>
     <nav id="nav">
@@ -25,6 +25,7 @@
       <button data-tab="settings"><span class="ic ic-gear"></span>Settings</button>
     </nav>
     <div class="side-head"><span>Chats</span><button id="new-chat" class="ghost sm" title="Start a new chat">+ New</button></div>
+    <div class="chat-search"><input id="chat-q" type="search" placeholder="Search chats..." autocomplete="off" spellcheck="false"></div>
     <div id="chats"></div>
     <div id="brain-box">
       <div id="brain-line"><span class="led"></span><span id="brain-text">Checking Claude Code...</span></div>
@@ -47,11 +48,11 @@
         <div id="empty" class="empty">
           <img src="/static/logo.svg" alt="" class="big-mark">
           <h1>What should OVERDRIVE do?</h1>
-          <p>Every task: a plan first, your Yes for anything risky, a checked result at the end.</p>
+          <p>Talk first: lists, tables and real pictures. It only builds when you say Yes.</p>
           <div class="examples">
-            <button class="ex">What time is it, and what's 17.5% of 2,480?</button>
-            <button class="ex">Make a file called todo.txt with 3 things to do this week</button>
-            <button class="ex">What can you do so far, and what can't you do yet?</button>
+            <button class="ex">How does a V8 engine work? Show me pictures</button>
+            <button class="ex">Compare 3 graphics cards under $300 for my PC in a table</button>
+            <button class="ex">Let's plan a realistic racing game. Just talk, don't build yet</button>
           </div>
         </div>
       </div>
@@ -126,7 +127,14 @@
 </div>
 
 <div id="drawer" class="drawer hidden"><div class="drawer-in"><button class="x" id="drawer-x" title="Close">&times;</button><div id="drawer-body"></div></div></div>
+<div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Picture">
+  <button class="lb-x" id="lb-x" title="Close (Esc)">&times;</button>
+  <button class="lb-nav lb-prev" id="lb-prev" title="Previous (Left arrow)">&#8249;</button>
+  <figure class="lb-fig"><img id="lb-img" alt=""><figcaption id="lb-cap"></figcaption></figure>
+  <button class="lb-nav lb-next" id="lb-next" title="Next (Right arrow)">&#8250;</button>
+</div>
 <div id="toasts"></div>
+<script src="/static/md.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

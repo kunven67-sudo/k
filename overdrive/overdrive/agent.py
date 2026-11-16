@@ -28,7 +28,8 @@ from .memory import Memory
 from .memory_tools import register_memory_tools
 from .paths import Paths, default_home
 from .permissions import Broker, Card, Grants, Risk, decide
-from .prompts import build_system_prompt, mode_switch_note
+from .pictures import SHOW_PICTURES_SPEC, PictureStore
+from .prompts import build_system_prompt, mode_block, mode_switch_note, rules_hash
 from .settings import Settings
 from .store import Workspace
 from .tasks import TaskRecord, TaskStore, check_task, merge_double_check, new_task_id, summarize_args
@@ -66,6 +67,7 @@ class Conversation:
     tasks: list[str] = field(default_factory=list)
     mode: str = "chat"          # "chat" (talk, look things up, plan) or "build" (makes, runs and tests things)
     session_mode: str = ""      # the mode the Claude Code session started in (its instructions keep that mode)
+    session_rules: str = ""     # fingerprint of the mode + talk-style rules the session started with (Piece 2)
     model: str = ""             # per-chat model/effort picked for a big job ("" = use Settings)
     effort: str = ""
 
@@ -115,6 +117,8 @@ class Overdrive:
         register_basic_tools(self.tools)
         register_memory_tools(self.tools)
         self.tools.add(START_BUILD_SPEC)
+        self.pictures = PictureStore(self.paths.pictures)
+        self.tools.add(SHOW_PICTURES_SPEC)
         self.grants = Grants()
         self.events = EventBus()
         self.broker = Broker(on_change=self._card_changed)
@@ -287,7 +291,7 @@ class Overdrive:
         if spec.name == "start_build":
             return await self._gate_start_build(st, inp, timeout)
         if rec.mode == "chat" and not spec.name.startswith("memory_") and \
-                spec.risk_for(inp) not in (Risk.INTERNAL, Risk.READ):
+                spec.risk_for(inp) not in (Risk.INTERNAL, Risk.READ, Risk.WEB):   # look-only (web = pictures)
             st.journal.add(spec.name, inp, "unknown", "blocked", "not allowed in chat mode")
             self._note_refused(st, spec.name, spec.title, "unknown", "blocked", "Not allowed in Chat mode", inp)
             if st.journal.stuck(spec.name, inp):
@@ -521,6 +525,67 @@ class Overdrive:
         self.events.publish("conversation", conversation=dict(conv.__dict__))
         return conv.__dict__
 
+    # ------------------------------------------------------------------ chat list (Piece 2: rename, delete, search)
+    def rename_conversation(self, conv_id: str, title: str) -> dict:
+        conv = self.conversations.get(conv_id)
+        if conv is None:
+            raise ValueError("no such chat")
+        title = " ".join(str(title or "").split())[:80]
+        if not title:
+            raise ValueError("the name can't be empty")
+        old, conv.title = conv.title, title
+        self._save_conversations()
+        self.audit.write("chat_renamed", {"conversation": conv_id, "old": old, "new": title, "by": "you"})
+        self.events.publish("conversation", conversation=dict(conv.__dict__))
+        return conv.__dict__
+
+    def delete_conversation(self, conv_id: str) -> dict:
+        """Delete a chat and its task records. The audit log keeps its history (it's append-only)."""
+        conv = self.conversations.get(conv_id)
+        if conv is None:
+            raise ValueError("no such chat")
+        if self.current is not None and self.current.conv.id == conv_id:
+            raise Busy("This chat is still working. Press STOP first.")
+        removed = 0
+        for tid in list(conv.tasks):
+            if self.task_store.delete(tid):
+                removed += 1
+        del self.conversations[conv_id]
+        self._save_conversations()
+        self.audit.write("chat_deleted", {"conversation": conv_id, "title": conv.title, "tasks": removed, "by": "you"})
+        return {"deleted": conv_id, "tasks": removed}
+
+    def search_conversations(self, query: str, limit: int = 30) -> list[dict]:
+        """Find chats by name or by what was said in them (your messages + OVERDRIVE's answers)."""
+        words = [w for w in str(query or "").lower().split() if w][:8]
+        if not words:
+            return []
+        hits = []
+        for conv in sorted(self.conversations.values(), key=lambda c: c.created, reverse=True):
+            title = conv.title.lower()
+            snippet, score = "", 0
+            if all(w in title for w in words):
+                score = 2
+            for tid in reversed(conv.tasks):
+                rec = self.task_store.load(tid)
+                if rec is None:
+                    continue
+                for text in (rec.request, rec.final_text):
+                    low = (text or "").lower()
+                    if all(w in low for w in words):
+                        i = low.find(words[0])
+                        snippet = " ".join(text[max(0, i - 50): i + 110].split())
+                        score = max(score, 1)
+                        break
+                if snippet:
+                    break
+            if score:
+                hits.append({"id": conv.id, "title": conv.title, "snippet": snippet, "score": score})
+            if len(hits) >= limit:
+                break
+        hits.sort(key=lambda h: -h["score"])
+        return hits
+
     def _remember_file_change(self, st: RunState, path: Path) -> None:
         """Before Claude Code changes a workspace file: keep the old version (once per task), so Undo works."""
         rel = self.workspace.rel(path)
@@ -635,7 +700,7 @@ class Overdrive:
                 note = "cache"
             else:
                 ctx = ToolContext(workspace=self.workspace, task=rec, settings=self.settings, audit=self.audit,
-                                  lab=self.paths.lab, memory=self.memory)
+                                  lab=self.paths.lab, memory=self.memory, pictures=self.pictures)
                 try:
                     res = await asyncio.wait_for(spec.handler(args, ctx), TOOL_TIMEOUT_S)
                 except asyncio.TimeoutError:
@@ -657,6 +722,9 @@ class Overdrive:
         st.journal.finish(entry, ok=not res.is_error, summary=res.text, changes=res.changes, side_effect=side_effect)
         if res.changes:
             rec.changes.extend(c for c in res.changes if c.get("op") not in (None, "unchanged"))
+        if res.data and isinstance(res.data.get("pictures"), list) and res.data["pictures"]:
+            rec.pictures.extend(res.data["pictures"][:8])
+            del rec.pictures[:-24]                      # at most 24 pictures per answer
         if spec.name == "task_plan" and not res.is_error:
             rec.plan = dict(args)
         if spec.name == "task_report" and not res.is_error:
@@ -846,11 +914,15 @@ class Overdrive:
             st.client = client
             if st.stopped:
                 return
+            rules = rules_hash(mode_block(rec.mode, self.settings))
             if not st.conv.session_id:
                 st.conv.session_mode = rec.mode       # a fresh session: its instructions are in this mode
+                st.conv.session_rules = rules
             query = rec.request
-            if st.conv.session_id and st.conv.session_mode and st.conv.session_mode != rec.mode:
-                query = mode_switch_note(rec.mode) + rec.request
+            if st.conv.session_id and ((st.conv.session_mode and st.conv.session_mode != rec.mode)
+                                       or st.conv.session_rules != rules):
+                # Claude Code keeps a chat's FIRST instructions: after a mode or talk-style switch, say the new ones.
+                query = mode_switch_note(rec.mode, self.settings) + rec.request
             await client.query(query)
             async for msg in client.receive_response():
                 self._on_message(st, msg)
@@ -986,7 +1058,8 @@ class Overdrive:
         problems = self.tools.validate(name, args)
         if problems:
             return {"ok": False, "text": "Inputs rejected: " + "; ".join(problems)}
-        ctx = ToolContext(workspace=self.workspace, settings=self.settings, audit=self.audit, lab=self.paths.lab)
+        ctx = ToolContext(workspace=self.workspace, settings=self.settings, audit=self.audit, lab=self.paths.lab,
+                          memory=self.memory, pictures=self.pictures)
         try:
             res = await asyncio.wait_for(spec.handler(args, ctx), TOOL_TIMEOUT_S)
         except Exception as e:

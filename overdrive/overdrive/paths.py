@@ -44,11 +44,16 @@ class Paths:
         return self.home / "lab"
 
     @property
+    def pictures(self) -> Path:
+        """Pictures shown in chats (downloaded once, kept so old chats still show them offline)."""
+        return self.home / "data" / "pictures"
+
+    @property
     def exports(self) -> Path:
         return self.home / "exports"
 
     def ensure(self) -> "Paths":
-        for p in (self.data, self.tasks, self.logs, self.workspace, self.versions, self.lab, self.exports):
+        for p in (self.data, self.tasks, self.pictures, self.logs, self.workspace, self.versions, self.lab, self.exports):
             p.mkdir(parents=True, exist_ok=True)
         return self
 

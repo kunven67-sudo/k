@@ -1,7 +1,17 @@
-# OVERDRIVE (Piece 1: the brain is basically Claude)
+# OVERDRIVE (Piece 2: ChatGPT mode)
+
+Piece 2 makes talking to it feel like ChatGPT: clear lists and tables, **real pictures** of what it's talking
+about (Openverse + Wikimedia Commons, free, with credits), no rushing to build, numbered **copy buttons** on
+every piece of an answer (or type `copy 1 and 2`), its own ideas after plans, chat search / rename / delete,
+and a search box in Settings. Every one of these is a switch in Settings. See LIMITATIONS.md for the honest list.
+
+New in Piece 2: `pictures.py` (the `show_pictures` tool + OVERDRIVE's own picture folder), `ui/md.js` (safe
+markdown split into copy pieces), `selftests/piece2_tests.py` (7 tests, a fake picture library on 127.0.0.1).
+
+## Piece 1
 
 Piece 1 adds Claude Code's own tools (write, edit, run, web) behind OVERDRIVE's gate, plus Chat mode / Build mode
-and the "Ready to build?" card. See LIMITATIONS.md for exactly what it can and can't do.
+and the "Ready to build?" card.
 
 ## Before Piece 1
 
@@ -54,7 +64,7 @@ Build order (from the blueprint): 1 Core -> 2 Memory (**done**) -> 3 PC control 
 - Windows: unzip `OVERDRIVE-windows.zip`, open `OVERDRIVE.exe`, follow Setup. See [SETUP.md](SETUP.md).
 - Dev: `pip install -r requirements.txt`, then `python -m overdrive` (window) or `python -m overdrive selftest`.
 
-Tests: 69 self-tests (`overdrive/selftests/`), including end-to-end runs of the real Claude Code against a fake
+Tests: 86 self-tests (`overdrive/selftests/`), including end-to-end runs of the real Claude Code against a fake
 Claude on 127.0.0.1 ($0). The same tests run from the Status page on your PC. `node build/ui_check.cjs` clicks
 through the whole window in a real browser.
 

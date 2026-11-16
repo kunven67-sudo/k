@@ -33,7 +33,7 @@ from .jsonio import atomic_write_json, read_json
 from .settings import MODELS, SettingsError
 
 UI = Path(__file__).resolve().parent / "ui"
-STATIC = {"app.js": "text/javascript", "app.css": "text/css", "logo.svg": "image/svg+xml",
+STATIC = {"app.js": "text/javascript", "md.js": "text/javascript", "app.css": "text/css", "logo.svg": "image/svg+xml",
           "favicon.svg": "image/svg+xml"}
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
        "font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
@@ -113,7 +113,8 @@ class Server:
         }
 
     def _routes(self) -> list[Route]:
-        r = [Route("/", self.index), Route("/static/{name}", self.static), Route("/api/ping", self.ping)]
+        r = [Route("/", self.index), Route("/static/{name}", self.static), Route("/api/ping", self.ping),
+             Route("/pic/{name}", self.picture)]
         for path, fn, methods in (
             ("/api/state", self.state, ["GET"]), ("/api/setup", self.setup, ["GET", "POST"]),
             ("/api/setup/install", self.install, ["POST"]), ("/api/setup/signin", self.signin, ["POST"]),
@@ -123,7 +124,9 @@ class Server:
             ("/api/selftest", self.selftest, ["POST"]), ("/api/logs", self.logs, ["GET"]),
             ("/api/logs/verify", self.logs_verify, ["GET"]), ("/api/settings", self.settings, ["POST"]),
             ("/api/tools/run", self.tool_run, ["POST"]), ("/api/undo", self.undo, ["POST"]),
-            ("/api/export", self.export, ["POST"]), ("/api/open", self.open, ["POST"]), ("/api/quit", self.quit, ["POST"]),
+            ("/api/export", self.export, ["POST"]),
+            ("/api/chat/rename", self.chat_rename, ["POST"]), ("/api/chat/delete", self.chat_delete, ["POST"]),
+            ("/api/chat/search", self.chat_search, ["GET"]), ("/api/open", self.open, ["POST"]), ("/api/quit", self.quit, ["POST"]),
         ):
             r.append(Route(path, fn, methods=methods))
         return r
@@ -147,6 +150,19 @@ class Server:
         if name not in STATIC:
             return PlainTextResponse("not found", 404)
         return FileResponse(UI / name, media_type=STATIC[name], headers={"Cache-Control": "no-store"})
+
+    async def picture(self, request: Request) -> Response:
+        """A picture shown in a chat. <img> can't send the key header, so the key comes as ?k=."""
+        key = request.query_params.get("k", "")
+        if not hmac.compare_digest(key.encode(), self.token.encode()):
+            return PlainTextResponse("Missing or wrong OVERDRIVE key.", 401)
+        name = request.path_params["name"]
+        path = self.od.pictures.path(name)
+        if path is None:
+            return PlainTextResponse("not found", 404)
+        from .pictures import MIME
+        return FileResponse(path, media_type=MIME[name.rsplit(".", 1)[1]],
+                            headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff"})
 
     async def ping(self, request: Request) -> Response:
         return JSONResponse({"ok": True, "app": "OVERDRIVE", "version": VERSION})
@@ -337,6 +353,28 @@ class Server:
             return JSONResponse(self.od.undo_task(str(body.get("task"))))
         except (ValueError, Busy) as e:
             return JSONResponse({"error": str(e)}, 400)
+
+    async def chat_rename(self, request: Request) -> Response:
+        body = await self._json(request)
+        try:
+            conv = self.od.rename_conversation(str(body.get("conversation") or ""), str(body.get("title") or ""))
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse({"conversation": conv})
+
+    async def chat_delete(self, request: Request) -> Response:
+        body = await self._json(request)
+        try:
+            res = self.od.delete_conversation(str(body.get("conversation") or ""))
+        except Busy as e:
+            return JSONResponse({"error": str(e)}, 409)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse(res)
+
+    async def chat_search(self, request: Request) -> Response:
+        q = request.query_params.get("q", "")[:200]
+        return JSONResponse({"hits": await asyncio.to_thread(self.od.search_conversations, q)})
 
     async def export(self, request: Request) -> Response:
         path = await asyncio.to_thread(self.od.export_zip)

@@ -41,6 +41,11 @@ DEFAULTS: dict[str, Any] = {
     "permissions": {"read": "auto", "web": "auto", "write": "auto", "run": "auto", "destructive": "ask",
                     "external": "ask", "money": "block"},
     "model_switch": "ask",
+    # Piece 2 (ChatGPT mode): each one can be switched on/off in Settings
+    "chat_style": True,          # talk like ChatGPT: lists, tables, no rushing to build
+    "pictures": "real",          # real / ai / both / off
+    "own_ideas": True,           # "My ideas:" after plans and builds
+    "copy_numbers": True,        # numbered copy buttons on every answer piece (window only)
 }
 
 _SCHEMA: dict[str, tuple] = {
@@ -59,6 +64,10 @@ _SCHEMA: dict[str, tuple] = {
     "approval_timeout_min": (int, lambda v: 1 <= v <= 120, "Auto-No after (minutes)"),
     "cli_path": (str, lambda v: len(v) < 500, "Claude Code path"),
     "model_switch": (str, lambda v: v in ("ask", "auto"), "Model switching"),
+    "chat_style": (bool, None, "Talk like ChatGPT"),
+    "pictures": (str, lambda v: v in ("real", "ai", "both", "off"), "Pictures"),
+    "own_ideas": (bool, None, "Its own ideas"),
+    "copy_numbers": (bool, None, "Copy buttons on answers"),
 }
 
 
