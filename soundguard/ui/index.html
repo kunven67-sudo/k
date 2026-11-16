@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SoundGuard</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="st-ok">
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.5 4 5.6v6.1c0 4.9 3.4 8.6 8 9.8 4.6-1.2 8-4.9 8-9.8V5.6L12 2.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1v-9.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-log" viewBox="0 0 24 24"><path d="M12 7v5l3 2M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4.5 4.5 0 0 0-5.9 5.9L3.5 17.5a2.1 2.1 0 0 0 3 3l5.3-5.3a4.5 4.5 0 0 0 5.9-5.9l-2.8 2.8-2.6-.4-.4-2.6 2.8-2.8Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l2-1.6-2-3.4-2.4.9a7.6 7.6 0 0 0-2.6-1.5L14 2.4h-4l-.4 2.5A7.6 7.6 0 0 0 7 6.4l-2.4-.9-2 3.4 2 1.6a7.7 7.7 0 0 0 0 3l-2 1.6 2 3.4 2.4-.9a7.6 7.6 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 2.6-1.5l2.4.9 2-3.4-2-1.6Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-phones" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3" y="14" width="4.5" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-vol" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4v-5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4v-5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m16 9.5 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-ok" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5L8 5.5Z" fill="currentColor"/></symbol>
+    <symbol id="i-usb" viewBox="0 0 24 24"><path d="M12 3v14M12 3 9.5 6M12 3l2.5 3M12 12l-4-2.5V7M12 14l4-2.5V9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="19" r="2" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="6.8" y="5.5" width="2.4" height="2.4" fill="currentColor"/><circle cx="16" cy="8" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 2.5V6M15 2.5V6M9 18v3.5M15 18v3.5M2.5 9H6M2.5 15H6M18 9h3.5M18 15h3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2.5 5 13.5h6l-1 8 8-11h-6l1-8Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><svg><use href="#i-shield"/></svg><span class="brand-wave"></span></div>
+    <nav>
+      <button class="nav on" data-p="home"><svg><use href="#i-home"/></svg><span>Home</span></button>
+      <button class="nav" data-p="log"><svg><use href="#i-log"/></svg><span>Activity</span><i class="dot hidden" id="logDot"></i></button>
+      <button class="nav" data-p="perm"><svg><use href="#i-wrench"/></svg><span>Fix for good</span></button>
+      <button class="nav" data-p="set"><svg><use href="#i-gear"/></svg><span>Settings</span></button>
+    </nav>
+    <div class="ver" id="ver">v1.0.0</div>
+  </aside>
+
+  <main>
+    <header class="top">
+      <div class="word">SOUND<b>GUARD</b></div>
+      <div class="pill" id="guardPill"><i class="led"></i><span id="guardTxt">Guarding</span></div>
+      <div class="grow"></div>
+      <button class="btn ghost" id="fixNow"><svg><use href="#i-bolt"/></svg>Fix everything now</button>
+    </header>
+
+    <section class="page show" id="p-home">
+      <div class="alert hidden" id="alertBox">
+        <div class="alert-ico"><svg><use href="#i-chip"/></svg></div>
+        <div class="alert-txt"><b id="alertTitle"></b><span id="alertText"></span></div>
+        <button class="btn bad" id="alertRestart">Restart PC now</button>
+        <button class="btn ghost" id="alertLater">Later</button>
+      </div>
+
+      <div class="hero">
+        <div class="ring-wrap">
+          <svg class="ring" id="ring" viewBox="0 0 300 300">
+            <circle class="orbit o1" cx="150" cy="150" r="104"/>
+            <circle class="orbit o2" cx="150" cy="150" r="92"/>
+            <g id="segs"></g>
+          </svg>
+          <div class="pulse"></div>
+          <div class="core">
+            <svg viewBox="0 0 24 24" class="core-shield"><use href="#i-shield"/></svg>
+            <svg viewBox="0 0 24 24" class="core-mark" id="coreMark"><path id="markPath" d="m8 12.3 2.8 2.8L16.2 9.6"/></svg>
+          </div>
+        </div>
+        <div class="hero-txt">
+          <div class="eyebrow">Status</div>
+          <h1 id="headline">Starting…</h1>
+          <p id="sub">Checking your headphones and mic.</p>
+          <div class="stats">
+            <div class="stat"><b id="sFix">0</b><span id="sFixL">fixes today</span></div>
+            <div class="stat"><b id="sEngine">–</b><span>sound engine</span></div>
+            <div class="stat"><b id="sUp">–</b><span>guarding for</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cards">
+        <article class="card" id="cOut">
+          <header>
+            <div class="cico"><svg><use href="#i-phones"/></svg></div>
+            <div class="ctitle"><h2>Headphones</h2><small id="oName">–</small></div>
+            <span class="chip" id="oJack">–</span>
+          </header>
+          <div class="meter">
+            <canvas id="oWave"></canvas>
+            <div class="leds" id="oLeds"></div>
+          </div>
+          <div class="vrow">
+            <button class="ibtn" id="oMute" title="Mute"><svg><use href="#i-vol"/></svg></button>
+            <input type="range" min="0" max="100" id="oVol">
+            <b class="vnum" id="oVolT">–</b>
+          </div>
+          <ul class="checks" id="oChecks"></ul>
+          <div class="test">
+            <button class="btn main" id="testBtn"><svg><use href="#i-play"/></svg>Play test sound</button>
+            <div class="lr"><span id="tL">L</span><span id="tR">R</span></div>
+          </div>
+          <div class="heard hidden" id="heard">
+            <span>Did you hear it in both ears?</span>
+            <button class="btn small" data-h="both">Yes, both</button>
+            <button class="btn small" data-h="one">Only one</button>
+            <button class="btn small" data-h="none">Nothing</button>
+          </div>
+          <p class="tmsg" id="testMsg"></p>
+          <div class="playing">
+            <h3>Playing right now</h3>
+            <ul id="sessions"><li class="empty">Nothing is making sound</li></ul>
+          </div>
+        </article>
+
+        <article class="card" id="cIn">
+          <header>
+            <div class="cico"><svg><use href="#i-mic"/></svg></div>
+            <div class="ctitle"><h2>Mic</h2><small id="iName">–</small></div>
+            <span class="chip" id="iJack">–</span>
+          </header>
+          <div class="meter">
+            <canvas id="iWave"></canvas>
+            <div class="leds" id="iLeds"></div>
+          </div>
+          <div class="verdict" id="iVerdict"><i></i><span>Say something to test your mic</span></div>
+          <div class="vrow">
+            <button class="ibtn" id="iMute" title="Mute"><svg><use href="#i-mic"/></svg></button>
+            <input type="range" min="0" max="100" id="iVol">
+            <b class="vnum" id="iVolT">–</b>
+          </div>
+          <ul class="checks" id="iChecks"></ul>
+          <p class="hint">Your mic level shows live only while this window is open.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="page" id="p-log">
+      <h1 class="ph">Activity</h1>
+      <p class="pdesc">Everything SoundGuard saw and fixed, newest first.</p>
+      <ul class="timeline" id="timeline"></ul>
+    </section>
+
+    <section class="page" id="p-perm">
+      <h1 class="ph">Fix for good</h1>
+      <p class="pdesc">SoundGuard fixes things live. These are the permanent fixes.</p>
+      <div class="pgrid">
+        <article class="card pcard">
+          <header><div class="cico"><svg><use href="#i-chip"/></svg></div><div class="ctitle"><h2>Your sound driver</h2><small id="drvName">–</small></div></header>
+          <p id="drvTxt"></p>
+          <ul class="checks" id="drvChecks"></ul>
+        </article>
+        <article class="card pcard hot">
+          <header><div class="cico"><svg><use href="#i-usb"/></svg></div><div class="ctitle"><h2>USB headset adapter</h2><small>The real permanent fix, about $10</small></div><span class="chip" id="usbChip">Not plugged in</span></header>
+          <p>It plugs into a USB port and has its own sound chip, so your headphones and mic skip the old Realtek chip completely. Plug it in and SoundGuard switches sound and mic to it by itself.</p>
+          <ol class="steps">
+            <li>Search <b>"USB to 3.5mm headset adapter"</b>.</li>
+            <li>Headphones with <b>1 plug</b> (mic on the same plug): get one with a single <b>headset (TRRS)</b> hole.</li>
+            <li>Headphones with <b>2 plugs</b> (green + pink): get one with <b>2 holes</b>.</li>
+            <li>Plug it into a <b>back</b> USB port on the PC, plug your headphones into it. Done.</li>
+          </ol>
+        </article>
+        <article class="card pcard">
+          <header><div class="cico"><svg><use href="#i-shield"/></svg></div><div class="ctitle"><h2>What I do by myself</h2><small>Live fixes, no restarts</small></div></header>
+          <ul class="does">
+            <li>Unmute your headphones and mic when something mutes them</li>
+            <li>Put volume back when it drops to 0, and keep your mic at your level</li>
+            <li>Keep your headphones and mic as the device for games, apps and Discord calls</li>
+            <li>Turn them back on if Windows turns them off</li>
+            <li>Start Windows Audio if it stops, and restart it (2 second blip) if sound gets stuck</li>
+            <li>Allow the mic again if Windows privacy blocks it</li>
+            <li>If the driver itself is stuck: tell you to restart <b>when you're done</b>. I never restart your PC or touch your games.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="page" id="p-set">
+      <h1 class="ph">Settings</h1>
+      <div class="sgrid">
+        <div class="card sc">
+          <h3>Auto fixes</h3>
+          <label class="tog"><input type="checkbox" data-s="fixOut"><i></i><span>Fix my headphones by myself</span></label>
+          <label class="tog"><input type="checkbox" data-s="fixIn"><i></i><span>Fix my mic by myself</span></label>
+          <label class="tog"><input type="checkbox" data-s="keepDefault"><i></i><span>Keep my headphones + mic as the one games, apps and Discord use</span></label>
+          <label class="tog"><input type="checkbox" data-s="popups"><i></i><span>Pop-up when I fix something</span></label>
+          <label class="tog"><input type="checkbox" id="startup"><i></i><span>Start with Windows</span></label>
+          <div class="srow"><span>Keep my mic at</span><input type="range" min="30" max="100" id="micLevel"><b id="micLevelT">100%</b></div>
+        </div>
+        <div class="card sc">
+          <h3>Which devices</h3>
+          <div class="srow col"><span>Headphones</span><select id="pickOut"></select></div>
+          <div class="srow col"><span>Mic</span><select id="pickIn"></select></div>
+          <p class="hint">Auto picks a USB headset first, then your headphone jack.</p>
+        </div>
+        <div class="card sc">
+          <h3>Tools</h3>
+          <button class="btn ghost wide" id="pauseBtn">Pause fixes for 1 hour</button>
+          <button class="btn ghost wide" id="restartAudio">Restart Windows Audio (2 second blip)</button>
+          <button class="btn ghost wide danger" id="removeBtn">Remove SoundGuard</button>
+          <p class="hint" id="rights"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal hidden" id="modal">
+  <div class="mbox">
+    <h3 id="mTitle"></h3>
+    <p id="mText"></p>
+    <div class="mbtns"><button class="btn ghost" id="mNo">Cancel</button><button class="btn bad" id="mYes">Yes</button></div>
+  </div>
+</div>
+<div class="toast hidden" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

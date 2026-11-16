@@ -1,0 +1,65 @@
+name: soundguard
+on:
+  push:
+    paths: ['soundguard/**', '.github/workflows/soundguard.yml']
+  workflow_dispatch:
+jobs:
+  windows-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24' }
+      - name: Virtual sound card (so there is real Windows audio to test)
+        uses: LABSN/sound-ci-helpers@v1
+      - name: Build
+        working-directory: soundguard
+        run: go build -trimpath -ldflags "-H windowsgui -s -w" -o SoundGuard.exe .
+      - name: Sound devices Windows sees
+        shell: pwsh
+        run: |
+          Get-Service Audiosrv, AudioEndpointBuilder | Format-Table -AutoSize | Out-String
+          Get-PnpDevice -Class AudioEndpoint -ErrorAction SilentlyContinue | Format-Table Status, FriendlyName -AutoSize | Out-String -Width 200
+      - name: Real test (mute/volume/default fixes, engine check, test sound, web page)
+        working-directory: soundguard
+        shell: pwsh
+        run: |
+          $p = Start-Process .\SoundGuard.exe -ArgumentList '-selftest', "$pwd\selftest.json" -Wait -PassThru
+          Get-Content selftest.json
+          "exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+      - name: Install like a double-click, open the window, then remove
+        working-directory: soundguard
+        shell: pwsh
+        run: |
+          $p = Start-Process .\SoundGuard.exe -ArgumentList '-install', '-noshow', '-quiet' -Wait -PassThru
+          "install exit: $($p.ExitCode)"
+          schtasks /Query /TN SoundGuard /V /FO LIST | Select-String 'TaskName|Status|Run As User|Task To Run|Logon Mode'
+          $exe = 'C:\Program Files\SoundGuard\SoundGuard.exe'
+          "installed exe: $(Test-Path $exe)"
+          (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\SoundGuard').DisplayVersion
+          "shortcut: $(Test-Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\SoundGuard.lnk")"
+          Start-Process .\SoundGuard.exe
+          Start-Sleep 15
+          $procs = Get-Process SoundGuard -ErrorAction SilentlyContinue
+          "SoundGuard processes: $($procs.Count)"
+          $procs | Select-Object Id, Path, MainWindowTitle | Format-Table -AutoSize | Out-String -Width 200
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$pwd\window.png")
+          Get-Content "$env:LOCALAPPDATA\SoundGuard\soundguard.log" -ErrorAction SilentlyContinue
+          $ok = ($procs.Count -ge 2) -and ($procs | Where-Object { $_.MainWindowTitle -eq 'SoundGuard' })
+          $u = Start-Process $exe -ArgumentList '-uninstall', '-quiet' -Wait -PassThru
+          Start-Sleep 8
+          "after remove: task=$((schtasks /Query /TN SoundGuard 2>$null) -ne $null) exe=$(Test-Path $exe) running=$((Get-Process SoundGuard -ErrorAction SilentlyContinue).Count)"
+          if (-not $ok) { "window did not open"; exit 1 }
+          if (Test-Path $exe) { "not removed"; exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soundguard-test
+          path: |
+            soundguard/selftest.json
+            soundguard/window.png
