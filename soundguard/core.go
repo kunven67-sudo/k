@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const appVersion = "1.0.0"
+const appVersion = "1.1.0"
 
 // ErrStuck = Windows audio didn't answer in time (hung driver / service).
 var ErrStuck = errors.New("windows audio is not answering")
@@ -192,10 +192,11 @@ type Settings struct {
 	PlugSwitch  bool `json:"plugSwitch"`  // plug headphones in = sound + calls go to them
 	MicReminder bool `json:"micReminder"` // "push the plug all the way in" reminder
 	LiveMic     bool `json:"liveMic"`     // show the live mic level while the window is open
+	UISounds    bool `json:"uiSounds"`    // real click sounds in the window
 }
 
 func defaultSettings() Settings {
-	return Settings{AutoFix: true, PlugSwitch: true, MicReminder: true, LiveMic: true}
+	return Settings{AutoFix: true, PlugSwitch: true, MicReminder: true, LiveMic: true, UISounds: true}
 }
 
 // ---------- published state (what the window shows) ----------
@@ -1033,6 +1034,8 @@ func (g *Guardian) SetSetting(k string, v bool) {
 		g.set.MicReminder = v
 	case "liveMic":
 		g.set.LiveMic = v
+	case "uiSounds":
+		g.set.UISounds = v
 	}
 	g.saveLocked()
 	g.mu.Unlock()

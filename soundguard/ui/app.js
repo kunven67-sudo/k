@@ -54,6 +54,7 @@ function loop() { poll(); setTimeout(loop, Date.now() < fastUntil ? 300 : 1000);
 async function livePoll() {
   if (VIEW === 'main' && S && S.mode !== 'setup' && !document.hidden) {
     try { const r = await api('live'); live.out = r.out; live.in = r.in; } catch (e) {}
+    if (dev3d) dev3d.setLevels(live.out, S.micTest && S.micTest.running && S.micTest.phase === 'record' ? Math.max(S.micTest.level || 0, live.in) : live.in);
   }
   setTimeout(livePoll, 66);
 }
@@ -95,12 +96,13 @@ function render() {
   $('watchPill').classList.toggle('off', !auto);
   $('watchTxt').textContent = auto ? 'Auto-fix on' : 'Auto-fix off';
   renderAlert();
+  feed3D(st);
   renderOut();
   renderIn();
   renderEvents();
   renderForever();
   renderSettings();
-  if (!ready) { ready = true; document.body.classList.remove('booting'); post('ready'); }
+  if (!ready) { ready = true; document.body.classList.remove('booting'); post('ready'); boot3D('dev3d', 'rack'); }
 }
 
 function renderAlert() {
@@ -236,7 +238,7 @@ function renderEvents() {
   $('events')._k = key;
   const newest = ev[0] ? ev[0].t : 0;
   $('events').innerHTML = ev.map((e) => `<li class="${esc(e.kind)}${e.t > evSeen && evSeen ? ' fresh' : ''}"><div class="t">${esc(fmtTime(e.t))}</div><div class="x">${esc(e.text)}</div></li>`).join('');
-  if (ev[0] && evSeen && ev[0].t > evSeen && (ev[0].kind === 'fix' || ev[0].kind === 'good')) radar.blip(ev[0].kind);
+  if (ev[0] && evSeen && ev[0].t > evSeen && (ev[0].kind === 'fix' || ev[0].kind === 'good')) { radar.blip(ev[0].kind); sfx('relay', 0.55); }
   evSeen = Math.max(evSeen, newest) || 1;
   $('eventsEmpty').hidden = ev.length > 0;
   $('logCount').textContent = ev.length ? ev.length + (ev.length === 1 ? ' thing' : ' things') : '';
@@ -360,7 +362,7 @@ function renderSetup() {
     $('setupTitle').textContent = `Update SOUNDGUARD from v${s.running} to v${S.version}.`;
     if (!$('installBtn')._busy) $('installTxt').textContent = 'Update SOUNDGUARD';
   }
-  if (!ready) { ready = true; post('ready'); }
+  if (!ready) { ready = true; post('ready'); boot3D('dev3d2', 'setupRack', true); }
 }
 $('installBtn').addEventListener('click', async () => {
   const b = $('installBtn'); b._busy = true; b.disabled = true; b.classList.add('spin');
@@ -502,6 +504,87 @@ function meters(t) {
     m.el.classList.toggle('dead', !S[k]);
   }
 }
+
+// ---------- 3D studio unit ----------
+let dev3d = null;
+async function boot3D(canvasId, wrapId, demo) {
+  if (!window.SGDevice || VIEW !== 'main') return;
+  const wrap = $(wrapId);
+  wrap.hidden = false;
+  if (!demo) document.body.classList.add('has3d');
+  else $('setupRadar').hidden = true;
+  try {
+    const d = await SGDevice.createDevice($(canvasId), { base: 'assets/' });
+    dev3d = d;
+    wrap.classList.add('on');
+    d.on.sound = (n) => sfx(n, n === 'tick' ? 0.35 : 0.6);
+    if (demo) {
+      d.setState({ level: 'ok', title: 'SOUNDGUARD', sub: 'Press TURN ON below to start guarding your headphones and mic.', auto: false, plugged: true, outDev: { volume: 0.6, muted: false }, inDev: { volume: 0.8, muted: false } });
+      let t = 0;
+      setInterval(() => { t += 0.05; d.setLevels(0.2 + 0.18 * Math.abs(Math.sin(t * 2.1) * Math.cos(t * 0.7)), 0.03 + 0.12 * Math.max(0, Math.sin(t * 1.3))); }, 50);
+      return;
+    }
+    d.on.volume = (k, v, final) => {
+      const dv = S && S[k];
+      if (!dv) return;
+      $(k + 'VolNum').textContent = Math.round(v * 100) + '%';
+      if (final) act('volume', { id: dv.id, v });
+    };
+    d.on.mute = (k, m) => { const dv = S && S[k]; if (dv) act('mute', { id: dv.id, on: m }); };
+    d.on.press = (n) => {
+      if (n === 'fix') act('fix');
+      else if (n === 'testOut' && S && S.out && !(S.soundTest || {}).running) act('testSound');
+      else if (n === 'testIn' && S && S.in && !(S.micTest || {}).running) act('testMic');
+    };
+    if (S) feed3D(S.status || {});
+  } catch (e) {
+    console.error('3D off:', e);
+    wrap.hidden = true;
+    document.body.classList.remove('has3d');
+    if (demo) $('setupRadar').hidden = false;
+  }
+}
+function feed3D(st) {
+  if (!dev3d || !S || S.mode === 'setup') return;
+  const plugged = S.out ? (S.out.jackKnown ? S.out.jackIn : true) : false;
+  dev3d.setState({
+    level: st.level, title: st.title, sub: st.sub, auto: !!(S.settings && S.settings.autoFix),
+    fixing: !!(S.fixing || S.outFrozen), micMissing: !!S.micMissing, needRestart: !!S.needRestart, plugged,
+    testOut: !!(S.soundTest && S.soundTest.running), testIn: !!(S.micTest && S.micTest.running),
+    outDev: S.out, inDev: S.in,
+  });
+}
+
+// ---------- real clicks (CC0 recordings, only while this window is open) ----------
+const SFX = { ctx: null, buf: {} };
+function sfxInit() {
+  if (SFX.ctx) return;
+  try { SFX.ctx = new AudioContext(); } catch (e) { return; }
+  for (const n of ['sw_on', 'sw_off', 'sw_big', 'btn_down', 'btn_up', 'knob', 'tick', 'relay']) {
+    fetch('assets/snd/' + n + '.mp3').then((r) => r.arrayBuffer()).then((b) => SFX.ctx.decodeAudioData(b)).then((a) => { SFX.buf[n] = a; }).catch(() => {});
+  }
+}
+document.addEventListener('pointerdown', sfxInit, { capture: true });
+function sfx(n, vol = 0.6) {
+  if (!SFX.ctx || !SFX.buf[n] || (S && S.settings && S.settings.uiSounds === false)) return;
+  try {
+    if (SFX.ctx.state === 'suspended') SFX.ctx.resume();
+    const s = SFX.ctx.createBufferSource();
+    s.buffer = SFX.buf[n];
+    s.playbackRate.value = 0.95 + Math.random() * 0.1;
+    const g = SFX.ctx.createGain();
+    g.gain.value = vol;
+    s.connect(g).connect(SFX.ctx.destination);
+    s.start();
+  } catch (e) {}
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (b && !b.disabled) sfx('btn_down', 0.45);
+});
+document.addEventListener('change', (e) => {
+  if (e.target.matches('input[type=checkbox]')) sfx(e.target.checked ? 'sw_on' : 'sw_off', 0.6);
+});
 
 // ---------- go ----------
 if (VIEW === 'popup') { document.body.className = 'view-popup'; }

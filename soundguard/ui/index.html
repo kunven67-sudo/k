@@ -43,6 +43,10 @@
   </header>
 
   <main class="page" id="page-home">
+    <section class="rack" id="rack" hidden>
+      <canvas id="dev3d"></canvas>
+      <div class="rack-boot" id="rackBoot"><i></i>POWERING UP</div>
+    </section>
     <section class="hero" id="hero">
       <div class="radar-wrap">
         <canvas id="radar" width="340" height="340"></canvas>
@@ -56,9 +60,9 @@
           <button class="btn big primary" id="fixBtn"><svg><use href="#i-bolt"/></svg><span>Fix now</span></button>
           <div class="watch-pill" id="watchPill"><span class="pulse"></span><span id="watchTxt">Auto-fix on</span></div>
         </div>
-        <div class="alert" id="alert" hidden></div>
       </div>
     </section>
+    <div class="alert" id="alert" hidden></div>
 
     <section class="cards">
       <article class="card dev" id="cardOut">
@@ -158,6 +162,7 @@
         <label class="row"><div><b>Plug in headphones = use them</b><span>Sound and calls move to them when you plug them in</span></div><input type="checkbox" class="sw" data-set="plugSwitch"></label>
         <label class="row"><div><b>Mic re-plug reminder</b><span>Pop a notification when your mic isn't detected</span></div><input type="checkbox" class="sw" data-set="micReminder"></label>
         <label class="row"><div><b>Live mic level in this window</b><span>Uses your mic only while this window is open</span></div><input type="checkbox" class="sw" data-set="liveMic"></label>
+        <label class="row"><div><b>Clicky sounds</b><span>Real switch and button clicks while this window is open</span></div><input type="checkbox" class="sw" data-set="uiSounds"></label>
         <label class="row" id="rowStartup"><div><b>Start with Windows</b><span>Runs in the background, nobody has to open it</span></div><input type="checkbox" class="sw" id="swStartup"></label>
       </article>
       <article class="card wide">
@@ -180,7 +185,8 @@
 <!-- ===================== FIRST RUN ===================== -->
 <div id="setup" class="setup" hidden>
   <div class="setup-inner">
-    <div class="radar-wrap small"><canvas id="radar2" width="300" height="300"></canvas><div class="radar-core"><svg><use href="#i-shield"/></svg></div></div>
+    <div class="setup-rack" id="setupRack" hidden><canvas id="dev3d2"></canvas></div>
+    <div class="radar-wrap small" id="setupRadar"><canvas id="radar2" width="300" height="300"></canvas><div class="radar-core"><svg><use href="#i-shield"/></svg></div></div>
     <div class="setup-text">
       <div class="word big">SOUND<b>GUARD</b></div>
       <h1 id="setupTitle">Keeps your headphones and mic working.</h1>
@@ -214,6 +220,7 @@
   </div>
 </div>
 
+<script src="device.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

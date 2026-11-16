@@ -2,3 +2,4 @@ SoundGuard.exe
 selftest.json
 *.b64
 sg-test-data/
+ui/devtest.*
