@@ -164,6 +164,12 @@ func runWindow(kind, url, dataDir string) int {
 	if !h.popup {
 		procShowWindow.Call(h.hwnd, 5) // SW_SHOW: dark window right away, page fades in
 		procSetForegroundWindow.Call(h.hwnd)
+	} else {
+		// visible from the start (WebView2 doesn't paint into a window that was hidden when it started),
+		// but never activated: whatever you're typing/playing keeps the focus
+		h.shown = true
+		procShowWindow.Call(h.hwnd, 4) // SW_SHOWNOACTIVATE
+		procSetWindowPos.Call(h.hwnd, ^uintptr(0) /*HWND_TOPMOST*/, 0, 0, 0, 0, 0x0001|0x0002|0x0010 /*NOSIZE|NOMOVE|NOACTIVATE*/)
 	}
 
 	wv := edge.NewChromium()

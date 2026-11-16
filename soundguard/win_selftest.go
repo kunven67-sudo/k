@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -176,9 +177,23 @@ func selftest(args []string) int {
 		tone2.Start()
 		time.Sleep(300 * time.Millisecond)
 		levels := 0
-		mt := b.RecordTest(in.ID, out.ID, 2, func(l float64) { levels++ })
+		mt := b.RecordTest(in.ID, out.ID, 2, func(l float64) {
+			if l >= 0 {
+				levels++
+			}
+		})
 		tone2.Wait()
-		R.add("mic test records + plays back", true, mt.Error == "" && levels >= 10 && mt.Played, map[string]any{"result": mt, "levelCalls": levels}, nil)
+		info := map[string]any{"result": mt, "levelCalls": levels}
+		ok := mt.Error == "" && levels >= 10 && mt.Played && mt.Peak > 0.05
+		if mt.Blocked { // this test runs in a hidden Windows session (no mics there): run it on the desktop instead
+			ir, ierr := interactiveMicTest(outDir)
+			info["desktop"] = ir
+			if ierr != nil {
+				info["desktopErr"] = ierr.Error()
+			}
+			ok = ir != nil && ir.Err == "" && ir.Test.Error == "" && ir.Levels >= 10 && ir.Test.Played && ir.Test.Peak > 0.05 && ir.Live > 0.01
+		}
+		R.add("mic test records + plays back", true, ok, info, nil)
 		// live mic level
 		for i := 0; i < 12; i++ {
 			b.LivePeaks(out.ID, in.ID, true)
@@ -250,6 +265,77 @@ func selftest(args []string) int {
 		R.add("windows update driver search", false, err == nil, found, err)
 	}
 	return R.fail()
+}
+
+type micResult struct {
+	Test   MicTest `json:"test"`
+	Levels int     `json:"levels"`
+	Live   float64 `json:"live"`
+	Err    string  `json:"err"`
+}
+
+// micSelftest = SoundGuard.exe -mictest out.json (run on the desktop by a task)
+func micSelftest(args []string) int {
+	if len(args) == 0 {
+		return 2
+	}
+	var r micResult
+	b := newWinBackend()
+	s, err := b.Snapshot()
+	switch {
+	case err != nil:
+		r.Err = err.Error()
+	case s.DefIn == "":
+		r.Err = "no mic"
+	default:
+		tone := exec.Command(selfPath(), "-playtone", "4")
+		tone.Start()
+		time.Sleep(300 * time.Millisecond)
+		r.Test = b.RecordTest(s.DefIn, s.DefOut, 2, func(l float64) {
+			if l >= 0 {
+				r.Levels++
+			}
+		})
+		tone.Wait()
+		tone2 := exec.Command(selfPath(), "-playtone", "3")
+		tone2.Start()
+		time.Sleep(300 * time.Millisecond)
+		for i := 0; i < 22; i++ {
+			if _, li := b.LivePeaks(s.DefOut, s.DefIn, true); li > r.Live {
+				r.Live = li
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		b.StopLive()
+		tone2.Wait()
+	}
+	j, _ := json.Marshal(r)
+	os.WriteFile(args[0], j, 0o644)
+	return 0
+}
+
+func interactiveMicTest(outDir string) (*micResult, error) {
+	res := filepath.Join(outDir, "mictest.json")
+	os.Remove(res)
+	tr := `"` + selfPath() + `" -mictest "` + res + `"`
+	if out, err := hidden(exec.Command("schtasks.exe", "/Create", "/TN", "SoundGuardMicTest", "/TR", tr, "/SC", "ONCE", "/ST", "23:59", "/RL", "HIGHEST", "/IT", "/F")).CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("create: %v %s", err, strings.TrimSpace(string(out)))
+	}
+	defer hidden(exec.Command("schtasks.exe", "/Delete", "/TN", "SoundGuardMicTest", "/F")).Run()
+	if out, err := hidden(exec.Command("schtasks.exe", "/Run", "/TN", "SoundGuardMicTest")).CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("run: %v %s", err, strings.TrimSpace(string(out)))
+	}
+	for i := 0; i < 80; i++ {
+		time.Sleep(500 * time.Millisecond)
+		if b, err := os.ReadFile(res); err == nil && len(b) > 0 {
+			var r micResult
+			if err := json.Unmarshal(b, &r); err != nil {
+				return nil, err
+			}
+			return &r, nil
+		}
+	}
+	return nil, errors.New("no result in 40 s")
 }
 
 func (r *stRun) fail() int {

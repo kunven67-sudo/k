@@ -45,6 +45,8 @@ func main() {
 	switch mode {
 	case "-selftest":
 		os.Exit(selftest(args[1:]))
+	case "-mictest":
+		os.Exit(micSelftest(args[1:]))
 	case "-playtone":
 		secs := 4.0
 		if len(args) > 1 {
