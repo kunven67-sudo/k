@@ -42,13 +42,14 @@ function frame(){
 }
 /* ---------- everything the game needs, loaded once ---------- */
 const HDRI_LIST=['dry_cracked_lake','rogland_clear_night','noon_grass','snowy_field'];
-const TEX_LIST=['brown_planks_03','cliff_side','desert_sand','dry_ground_01','rough_wood','stone_tiles_02','cotton_jersey','denim_fabric','stretch_poplin','caban','brown_leather'];
+const TEX_LIST=['brown_planks_03','cliff_side','desert_sand','dry_ground_01','rough_wood','stone_tiles_02','cotton_jersey','denim_fabric','stretch_poplin','caban','brown_leather','blue_metal_plate','metal_grate_rusty'];
 const SFX_LIST=['bell_01','blast','body_fall','breath_heavy','door_creak','drips','gasp','glass_break','heartbeat','hum_build','hum_purple','metal_1','metal_2','metal_3','oof_1','oof_2','pickup','ringing','sand_fall','sigh_1','sigh_2','static','step_sand_1','step_sand_2','step_sand_3','step_sand_4','step_sand_5','step_sand_6','step_stone_1','step_stone_2','step_stone_3','step_stone_4','step_stone_5','step_stone_6','stone_1','stone_2','swing_1','swing_2','switch_01','watch_beep','wind_gust_1','wind_gust_2','wind_loop'];
 const MUSIC_LIST=['mus_boss','mus_night','mus_pyramid','mus_sad','mus_title'];
 async function preload(progress){
   ASSETS.onProgress=progress;
   const jobs=[];
   for(const t of TEX_LIST) jobs.push(loadPBR(t));
+  for(const n of MODEL_LIST) jobs.push(loadModel(n));
   for(const h of HDRI_LIST) jobs.push(loadTexture('hdri_'+h,'assets/tex/hdri_'+h+'.jpg'));
   for(const s of SFX_LIST) jobs.push(SND.load(s,'assets/sfx/'+s+'.ogg'));
   for(const m of MUSIC_LIST) jobs.push(SND.load(m,'assets/music/'+m+'.ogg'));

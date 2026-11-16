@@ -11,6 +11,7 @@ const lines = JSON.parse(fs.readFileSync(path.join(root, 'assets/voice/lines.jso
 const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 let out = head.replace('%VERSION%', version);
 out += '<script src="lib/three.min.js"></script>\n';
+out += '<script src="lib/GLTFLoader.js"></script>\n';
 out += '<script>if(!window.THREE){ window.__showErr && window.__showErr("The 3D engine file (lib/three.min.js) is missing from the game folder. Put the whole folder back together and try again."); }</script>\n';
 out += '<script>\nconst GAME_VERSION=' + JSON.stringify(version) + ';\nconst LINES=' + JSON.stringify(lines) + ';\n</script>\n';
 for (const m of mods) {
