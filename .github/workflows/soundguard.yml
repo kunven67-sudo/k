@@ -1,0 +1,78 @@
+name: soundguard
+on:
+  push:
+    paths: ['soundguard/**', '.github/workflows/soundguard.yml']
+  workflow_dispatch:
+jobs:
+  windows-test:
+    runs-on: windows-2025
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24', cache-dependency-path: soundguard/go.sum }
+      - name: Brain tests
+        working-directory: soundguard
+        run: go test ./...
+      - name: Build
+        working-directory: soundguard
+        run: go build -trimpath -ldflags "-H windowsgui" -o SoundGuard.exe .
+      - name: Virtual sound card (speakers)
+        uses: LABSN/sound-ci-helpers@v1
+      - name: Virtual cable (mic + speakers)
+        continue-on-error: true
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip -OutFile vbc.zip
+          Expand-Archive vbc.zip -DestinationPath vbc
+          Get-ChildItem vbc | Select-Object Name | Format-Table | Out-String
+          $f = Get-ChildItem vbc -Filter *.cat | Where-Object Name -match '64' | Select-Object -First 1
+          $sig = Get-AuthenticodeSignature $f.FullName
+          if ($sig.SignerCertificate) {
+            Export-Certificate -Cert $sig.SignerCertificate -FilePath vbc.cer | Out-Null
+            Import-Certificate -FilePath vbc.cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher | Out-Null
+            "trusted: $($sig.SignerCertificate.Subject)"
+          }
+          $p = Start-Process vbc\VBCABLE_Setup_x64.exe -ArgumentList '-i','-h' -PassThru
+          if (-not $p.WaitForExit(240000)) { "setup still running, killing"; $p.Kill() }
+          Start-Sleep 10
+      - name: Sound devices Windows sees
+        shell: pwsh
+        run: |
+          Get-PnpDevice -Class AudioEndpoint -ErrorAction SilentlyContinue | Select-Object Status, FriendlyName | Format-Table -AutoSize | Out-String -Width 200
+          Get-Service Audiosrv, AudioEndpointBuilder | Format-Table -AutoSize | Out-String
+          [System.Environment]::OSVersion.Version
+      - name: Real Windows test (sound, guardian, windows, install)
+        working-directory: soundguard
+        shell: pwsh
+        run: |
+          $p = Start-Process .\SoundGuard.exe -ArgumentList '-selftest', "$pwd\selftest.json" -Wait -PassThru
+          $j = Get-Content selftest.json -Raw | ConvertFrom-Json
+          foreach ($s in $j.steps) { "{0,-34} {1,-5} must={2} err={3}" -f $s.name, $s.ok, $s.must, $s.err }
+          "exit code: $($p.ExitCode)"
+          "---- full json ----"
+          Get-Content selftest.json
+          if ($p.ExitCode -ne 0) { exit 1 }
+      - name: Debug log
+        if: always()
+        shell: pwsh
+        run: Get-Content "$env:LOCALAPPDATA\SoundGuard\debug.log" -Tail 200 -ErrorAction SilentlyContinue
+      - name: Window pictures
+        if: always()
+        working-directory: soundguard
+        shell: pwsh
+        run: |
+          foreach ($n in 'window-main','window-popup') {
+            if (Test-Path "$n.b64") { "=====BEGIN $n====="; Get-Content "$n.b64" -Raw; "=====END $n=====" } else { "no $n picture" }
+          }
+      - name: Defender scan
+        if: always()
+        continue-on-error: true
+        working-directory: soundguard
+        shell: pwsh
+        run: |
+          Get-MpComputerStatus | Select-Object AMServiceEnabled, AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion | Format-List | Out-String
+          & "$env:ProgramFiles\Windows Defender\MpCmdRun.exe" -Scan -ScanType 3 -File "$pwd\SoundGuard.exe" -DisableRemediation
+          "scan exit: $LASTEXITCODE (0 = clean, 2 = threat)"

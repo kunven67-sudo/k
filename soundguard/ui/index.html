@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOUNDGUARD</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="booting">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.2 4 5.3v6.1c0 5 3.4 9.3 8 10.4 4.6-1.1 8-5.4 8-10.4V5.3L12 2.2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.2 12.4v-1.2M10.7 14.6V9M13.3 15.6V8M15.8 13.4v-3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-hp" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3.2" y="13.5" width="4.6" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="16.2" y="13.5" width="4.6" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5L8 5.5Z" fill="currentColor"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.2 2.8 5.5 13.4h5.6l-1 7.8 7.7-10.6h-5.6l1-7.8Z" fill="currentColor"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.4 4.3L19 7.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5 2.8 19.5h18.4L12 3.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1.15" fill="currentColor"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 11v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7.8" r="1.15" fill="currentColor"/></symbol>
+    <symbol id="i-restart" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M19.6 3.8v4.6H15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-tv" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="12.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 20.5h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-usb" viewBox="0 0 24 24"><path d="M12 2.8v15.4M12 2.8l-2.4 3h4.8l-2.4-3ZM12 13.6l-4.4-2.8V8.4M12 11.4l4.4-2.6V6.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="19.6" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="15.4" y="4.4" width="2" height="2.2" fill="currentColor"/><circle cx="7.6" cy="7.4" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9.5 2.8v3M14.5 2.8v3M9.5 18.2v3M14.5 18.2v3M2.8 9.5h3M2.8 14.5h3M18.2 9.5h3M18.2 14.5h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<!-- ===================== MAIN APP ===================== -->
+<div id="app" class="app">
+  <header class="top">
+    <div class="brand">
+      <svg class="brand-ic"><use href="#i-shield"/></svg>
+      <span class="word">SOUND<b>GUARD</b></span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="home" class="on">Home</button>
+      <button data-tab="forever">Fix it for good</button>
+      <button data-tab="settings">Settings</button>
+      <span class="tab-ink" id="tabInk"></span>
+    </nav>
+    <div class="ver" id="ver">v1.0.0</div>
+  </header>
+
+  <main class="page" id="page-home">
+    <section class="hero" id="hero">
+      <div class="radar-wrap">
+        <canvas id="radar" width="340" height="340"></canvas>
+        <div class="radar-core"><svg><use href="#i-shield" id="coreIcon"/></svg></div>
+      </div>
+      <div class="hero-text">
+        <div class="kicker"><span class="dot"></span><span id="kicker">WATCHING</span></div>
+        <h1 id="title">Starting up</h1>
+        <p id="sub">Looking at your sound devices...</p>
+        <div class="hero-btns">
+          <button class="btn big primary" id="fixBtn"><svg><use href="#i-bolt"/></svg><span>Fix now</span></button>
+          <div class="watch-pill" id="watchPill"><span class="pulse"></span><span id="watchTxt">Auto-fix on</span></div>
+        </div>
+        <div class="alert" id="alert" hidden></div>
+      </div>
+    </section>
+
+    <section class="cards">
+      <article class="card dev" id="cardOut">
+        <header>
+          <div class="dev-ic out"><svg><use href="#i-hp"/></svg></div>
+          <div class="dev-name"><span class="lbl">YOU HEAR</span><h2 id="outName">-</h2><span class="adapter" id="outAdapter"></span></div>
+          <button class="ghost tiny" id="outPick" title="Pick another device">Change</button>
+        </header>
+        <div class="chips" id="outChips"></div>
+        <div class="meter" id="outMeter"></div>
+        <div class="vol">
+          <button class="mute-btn" id="outMute" title="Mute"></button>
+          <input type="range" min="0" max="100" step="1" id="outVol" aria-label="Headphone volume">
+          <span class="vol-num" id="outVolNum">-</span>
+        </div>
+        <div class="test" id="soundTestBox">
+          <button class="btn" id="soundTestBtn"><svg><use href="#i-play"/></svg><span>Play test sound</span></button>
+          <div class="test-res" id="soundTestRes"></div>
+        </div>
+      </article>
+
+      <article class="card dev" id="cardIn">
+        <header>
+          <div class="dev-ic in"><svg><use href="#i-mic"/></svg></div>
+          <div class="dev-name"><span class="lbl">YOUR MIC</span><h2 id="inName">-</h2><span class="adapter" id="inAdapter"></span></div>
+          <button class="ghost tiny" id="inPick" title="Pick another mic">Change</button>
+        </header>
+        <div class="chips" id="inChips"></div>
+        <div class="meter mic" id="inMeter"></div>
+        <div class="vol">
+          <button class="mute-btn" id="inMute" title="Mute"></button>
+          <input type="range" min="0" max="100" step="1" id="inVol" aria-label="Mic volume">
+          <span class="vol-num" id="inVolNum">-</span>
+        </div>
+        <div class="test" id="micTestBox">
+          <button class="btn" id="micTestBtn"><svg><use href="#i-mic"/></svg><span>Test my mic</span></button>
+          <div class="test-res" id="micTestRes"></div>
+        </div>
+      </article>
+
+      <article class="card log">
+        <header class="log-head"><h3>What I did</h3><span class="log-count" id="logCount"></span></header>
+        <ol class="events" id="events"></ol>
+        <div class="empty" id="eventsEmpty">Nothing yet. When something breaks, I fix it and it shows up here.</div>
+      </article>
+    </section>
+  </main>
+
+  <main class="page" id="page-forever" hidden>
+    <div class="forever">
+      <article class="card wide">
+        <div class="fc-head"><div class="dev-ic"><svg><use href="#i-chip"/></svg></div><div><span class="lbl">YOUR SOUND DRIVER</span><h2 id="drvName">-</h2></div></div>
+        <div class="drv-grid">
+          <div><span class="k">Version</span><span class="v mono" id="drvVer">-</span></div>
+          <div><span class="k">Made</span><span class="v mono" id="drvDate">-</span></div>
+          <div><span class="k">From</span><span class="v" id="drvProv">-</span></div>
+        </div>
+        <p class="note" id="drvDell"></p>
+        <div class="drv-check">
+          <button class="btn primary" id="drvBtn"><svg><use href="#i-restart"/></svg><span>Ask Windows Update for a newer driver</span></button>
+          <div class="drv-res" id="drvRes"></div>
+        </div>
+      </article>
+
+      <article class="card wide accent">
+        <div class="fc-head"><div class="dev-ic usb"><svg><use href="#i-usb"/></svg></div><div><span class="lbl">THE REAL PERMANENT FIX</span><h2>A USB headset adapter, about $10</h2></div></div>
+        <p>It's its own little sound card. Your headphones plug into it, it plugs into a USB port, and the old Realtek driver isn't used at all, so the freezing and the "mic not detected" stuff stop.</p>
+        <ul class="ticks">
+          <li><svg><use href="#i-check"/></svg><span>What to get: a <b>USB to 3.5mm headset adapter with mic</b> (one hole for a 4-ring headset plug, or two holes: green + pink).</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Plug it into a <b>back</b> USB port on the PC.</span></li>
+          <li><svg><use href="#i-check"/></svg><span>SOUNDGUARD sees it and switches your sound and mic to it by itself.</span></li>
+        </ul>
+        <div class="usb-state" id="usbState"></div>
+      </article>
+
+      <article class="card wide">
+        <div class="fc-head"><div class="dev-ic"><svg><use href="#i-shield"/></svg></div><div><span class="lbl">WHAT I DO BY MYSELF</span><h2>Live fixes, no restarts</h2></div></div>
+        <ul class="ticks two">
+          <li><svg><use href="#i-check"/></svg><span>Unmute your sound or mic if something muted it</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Turn volume back up if it hit zero</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Plug in headphones = sound + calls go to them</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Calls going to the TV? Moved to your headphones</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Stereo Mix picked as mic? Switched to your real mic</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Mic not detected? I tell you to re-plug it</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Sound frozen? I restart the sound service (2 sec blip)</span></li>
+          <li><svg><use href="#i-check"/></svg><span>Driver stuck for real? I ask you to restart when you're done. Never by myself.</span></li>
+        </ul>
+      </article>
+    </div>
+  </main>
+
+  <main class="page" id="page-settings" hidden>
+    <div class="settings">
+      <article class="card wide">
+        <h3 class="sec">Fixing</h3>
+        <label class="row"><div><b>Fix things by myself</b><span>Unmute, volume, frozen sound, wrong device</span></div><input type="checkbox" class="sw" data-set="autoFix"></label>
+        <label class="row"><div><b>Plug in headphones = use them</b><span>Sound and calls move to them when you plug them in</span></div><input type="checkbox" class="sw" data-set="plugSwitch"></label>
+        <label class="row"><div><b>Mic re-plug reminder</b><span>Pop a notification when your mic isn't detected</span></div><input type="checkbox" class="sw" data-set="micReminder"></label>
+        <label class="row"><div><b>Live mic level in this window</b><span>Uses your mic only while this window is open</span></div><input type="checkbox" class="sw" data-set="liveMic"></label>
+        <label class="row" id="rowStartup"><div><b>Start with Windows</b><span>Runs in the background, nobody has to open it</span></div><input type="checkbox" class="sw" id="swStartup"></label>
+      </article>
+      <article class="card wide">
+        <h3 class="sec">Tools</h3>
+        <div class="tool-btns">
+          <button class="btn" id="openSound"><svg><use href="#i-gear"/></svg><span>Open Windows sound settings</span></button>
+          <button class="btn" id="clearLog"><svg><use href="#i-x"/></svg><span>Clear "What I did"</span></button>
+          <button class="btn danger" id="uninstall"><svg><use href="#i-x"/></svg><span>Remove SOUNDGUARD</span></button>
+        </div>
+        <p class="note mono" id="aboutLine"></p>
+      </article>
+    </div>
+  </main>
+
+  <div class="picker" id="picker" hidden><div class="picker-box"><h4 id="pickerTitle">Pick a device</h4><div id="pickerList"></div><button class="ghost" id="pickerClose">Cancel</button></div></div>
+  <div class="confirm" id="confirm" hidden><div class="confirm-box"><h4 id="confirmTitle"></h4><p id="confirmText"></p><div class="confirm-btns"><button class="btn" id="confirmNo">Cancel</button><button class="btn danger" id="confirmYes">Yes</button></div></div></div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<!-- ===================== FIRST RUN ===================== -->
+<div id="setup" class="setup" hidden>
+  <div class="setup-inner">
+    <div class="radar-wrap small"><canvas id="radar2" width="300" height="300"></canvas><div class="radar-core"><svg><use href="#i-shield"/></svg></div></div>
+    <div class="setup-text">
+      <div class="word big">SOUND<b>GUARD</b></div>
+      <h1 id="setupTitle">Keeps your headphones and mic working.</h1>
+      <ul class="ticks">
+        <li><svg><use href="#i-check"/></svg><span>Runs by itself when Windows starts. Nobody has to open it.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Fixes muted sound, mic, wrong device and frozen sound live.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Never restarts your PC or touches your games.</span></li>
+      </ul>
+      <button class="btn big primary" id="installBtn"><svg><use href="#i-shield"/></svg><span id="installTxt">Turn on SOUNDGUARD</span></button>
+      <p class="note" id="setupNote">Windows will ask "Do you want to allow this app to make changes?" Press <b>Yes</b>. It needs that once, to fix sound by itself.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== RESTART POPUP ===================== -->
+<div id="popup" class="popup" hidden>
+  <div class="pop-bar"></div>
+  <div class="pop-body">
+    <div class="pop-ic"><svg><use href="#i-restart"/></svg></div>
+    <div class="pop-text">
+      <div class="pop-brand">SOUND<b>GUARD</b></div>
+      <h2>Your sound driver is stuck</h2>
+      <p>Only a PC restart fixes this one. Do it when you're done playing. Nothing restarts by itself.</p>
+    </div>
+    <button class="pop-x" id="popX" title="Later"><svg><use href="#i-x"/></svg></button>
+  </div>
+  <div class="pop-btns">
+    <button class="btn danger" id="popRestart"><svg><use href="#i-restart"/></svg><span>Restart now</span></button>
+    <button class="btn" id="popLater"><span>Later</span></button>
+    <button class="btn ghost" id="popTV" hidden><svg><use href="#i-tv"/></svg><span>Use TV sound for now</span></button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
