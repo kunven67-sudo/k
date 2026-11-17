@@ -143,8 +143,9 @@ P3.bind = function () {
   $("#live-x").addEventListener("click", () => P3.toggleLive(false));
   $("#live-body").addEventListener("click", (e) => { if (e.target.closest("[data-livepic]") && P3.live.task) { LB.pics = (P3.live.task.pictures || []).filter((x) => x && x.file); LB.i = LB.pics.length - 1; if (LB.pics.length) { showPicture(); $("#lightbox").classList.remove("hidden"); } } });
   $("#drawer-body").addEventListener("click", P3.mindClick);
-  $("#btw-toggle").addEventListener("click", () => { if ($("#btw").classList.contains("hidden")) P3.openBtw(true); else { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); } });
-  $("#btw-x").addEventListener("click", () => { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); });
+  const closeBtw = () => { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); $("#tab-chat").classList.remove("btw-open"); };
+  $("#btw-toggle").addEventListener("click", () => { if ($("#btw").classList.contains("hidden")) P3.openBtw(true); else closeBtw(); });
+  $("#btw-x").addEventListener("click", closeBtw);
   $("#btw-form").addEventListener("submit", (e) => { e.preventDefault(); P3.askBtw($("#btw-q").value); });
   document.addEventListener("keydown", (e) => { if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "b") { e.preventDefault(); P3.openBtw(true); } });
   window.addEventListener("resize", () => { if (P3.tourAt >= 0) P3.paintTour(); });
@@ -977,7 +978,7 @@ P3.tourClick = async function (e) {
 
 /* ================================================================ Part 5: the "by the way" box */
 P3.btw = { items: [] };
-P3.openBtw = function (focus) { $("#btw").classList.remove("hidden"); $("#btw-toggle").classList.add("on"); if (focus) $("#btw-q").focus(); P3.paintBtw(); };
+P3.openBtw = function (focus) { $("#btw").classList.remove("hidden"); $("#btw-toggle").classList.add("on"); $("#tab-chat").classList.add("btw-open"); if (focus) $("#btw-q").focus(); P3.paintBtw(); };
 P3.paintBtw = function () {
   const list = $("#btw-list");
   list.innerHTML = P3.btw.items.length ? P3.btw.items.map((i) => `<div class="btw-item ${esc(i.status)}"><div class="btw-q">${esc(i.q)}</div>

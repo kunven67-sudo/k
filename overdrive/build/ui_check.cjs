@@ -49,7 +49,12 @@ function start(port, ...extra) {
   const base = 41000 + Math.floor(Math.random() * 8000) * 2;     // fresh ports every run (old ones may be cooling down)
   const [srv, url] = await start(base);
   const [srv2, url2] = await start(base + 1, "--no-cli");
-  const shot = (page, name) => page.screenshot({ path: path.join(out, name) });
+  // screenshots without the pop-up messages in the way (they're checked separately)
+  const shot = async (page, name) => {
+    await page.evaluate(() => { const t = document.getElementById("toasts"); if (t) t.style.visibility = "hidden"; });
+    await page.screenshot({ path: path.join(out, name) });
+    await page.evaluate(() => { const t = document.getElementById("toasts"); if (t) t.style.visibility = ""; });
+  };
   const assert = (cond, msg) => { if (!cond) throw new Error("ASSERT: " + msg); };
   let browser;
   try {
