@@ -118,6 +118,7 @@ class Server:
             "jobs": len([j for j in od.schedule.jobs if j.get("enabled")]),
             "tour_done": bool(od.settings.get("tour_done")),
             "btw": od.btw.public(),
+            "interrupted": list(od.interrupted),
             "memory_counts": od.memory.counts(),
         }
 
@@ -140,7 +141,8 @@ class Server:
             ("/api/queue", self.queue_action, ["POST"]),
             ("/api/accounts", self.accounts_page, ["GET"]), ("/api/accounts/action", self.accounts_action, ["POST"]),
             ("/api/schedule", self.schedule_page, ["GET"]), ("/api/schedule/action", self.schedule_action, ["POST"]),
-            ("/api/chat/done", self.chat_done, ["POST"]), ("/api/btw", self.btw_ask, ["POST"]),
+            ("/api/chat/done", self.chat_done, ["POST"]), ("/api/upload", self.upload, ["POST"]),
+            ("/api/edit", self.edit, ["POST"]), ("/api/interrupted", self.interrupted, ["POST"]), ("/api/btw", self.btw_ask, ["POST"]),
             ("/api/away", self.away_page, ["GET"]), ("/api/away/action", self.away_action, ["POST"]),
             ("/api/memory", self.memory_page, ["GET"]), ("/api/memory/edit", self.memory_edit, ["POST"]),
             ("/api/memory/set", self.memory_set, ["POST"]), ("/api/memory/forget", self.memory_forget, ["POST"]),
@@ -232,8 +234,10 @@ class Server:
     async def send(self, request: Request) -> Response:
         body = await self._json(request)
         try:
+            att = [str(a) for a in body.get("attachments") or [] if isinstance(a, str)][:6]
             rec = await self.od.send(str(body.get("text", "")), body.get("conversation") or None,
-                                     mode=body.get("mode") if body.get("mode") in ("chat", "build") else None)
+                                     mode=body.get("mode") if body.get("mode") in ("chat", "build") else None,
+                                     attachments=att)
         except Busy as e:
             if body.get("queue"):
                 try:
@@ -336,6 +340,49 @@ class Server:
         od.audit.write("schedule_" + act, {"id": b.get("id"), "job": job, "by": "you"})
         od.events.publish("schedule", jobs=od.schedule.jobs)
         return JSONResponse(res)
+
+    async def upload(self, request: Request) -> Response:
+        """A picture you drop, paste or attach in the chat. Saved in OVERDRIVE's picture folder (checked: real
+        JPEG/PNG/GIF/WebP only), sent to Claude with your message so it can look at it."""
+        import base64
+        b = await self._json(request)
+        data = str(b.get("data") or "")
+        if "," in data[:100]:
+            data = data.split(",", 1)[1]
+        try:
+            raw = base64.b64decode(data, validate=True)
+        except Exception:
+            return JSONResponse({"error": "That file didn't come through right."}, 400)
+        if len(raw) > 15 * 1024 * 1024:
+            return JSONResponse({"error": "That picture is too big (15 MB max)."}, 400)
+        from .pictures import PictureError
+        try:
+            name = self.od.pictures.put(raw)
+        except PictureError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        self.od.audit.write("picture_uploaded", {"file": name, "bytes": len(raw)})
+        return JSONResponse({"file": name})
+
+    async def edit(self, request: Request) -> Response:
+        b = await self._json(request)
+        att = [str(a) for a in b.get("attachments") or [] if isinstance(a, str)][:6]
+        try:
+            rec = await self.od.edit_message(str(b.get("task") or ""), str(b.get("text") or ""), att)
+        except (ValueError, Busy) as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse({"task": rec.public()})
+
+    async def interrupted(self, request: Request) -> Response:
+        b = await self._json(request)
+        tid = str(b.get("task") or "")
+        if b.get("action") == "leave":
+            self.od.interrupted = [x for x in self.od.interrupted if x["task"] != tid]
+            return JSONResponse({"ok": True})
+        try:
+            rec = await self.od.keep_going(tid)
+        except (ValueError, Busy) as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse({"task": rec.public()})
 
     async def btw_ask(self, request: Request) -> Response:
         b = await self._json(request)
@@ -755,6 +802,17 @@ async def serve(od: Overdrive, open_ui: bool = True) -> None:
     away_task = asyncio.create_task(od.away.run())
     net_task = asyncio.create_task(od.net.run())
     sched_task = asyncio.create_task(od.run_schedule())
+
+    async def auto_resume() -> None:
+        # power-cut proof: give you 25 seconds to say "leave it", then keep going by itself
+        await asyncio.sleep(25)
+        if od.settings.get("auto_resume") and od.interrupted and od.current is None:
+            try:
+                await od.keep_going(od.interrupted[0]["task"])
+            except Exception as e:
+                od.audit.write("auto_resume_failed", {"error": repr(e)[:300]})
+    resume_task = asyncio.create_task(auto_resume())
+    od.pictures.cleanup(int(od.settings.get("pictures_keep_days")), int(od.settings.get("pictures_max_mb")))
     try:
         await server.should_exit.wait()
     finally:
@@ -762,6 +820,7 @@ async def serve(od: Overdrive, open_ui: bool = True) -> None:
         away_task.cancel()
         net_task.cancel()
         sched_task.cancel()
+        resume_task.cancel()
         if od.busy():
             await od.stop()
         userver.should_exit = True

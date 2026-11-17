@@ -113,8 +113,9 @@ function start(port, ...extra) {
     assert(await page.isHidden("#lightbox"), "lightbox should close on Esc");
     await page.hover(".turn >> nth=0");
     await page.click(".turn >> nth=0 >> [data-edit]");
-    assert((await page.inputValue("#msg")).startsWith("How does a V8"), "edit puts the message back");
-    await page.fill("#msg", "");
+    assert((await page.inputValue(".edit-box")).startsWith("How does a V8"), "edit opens the message to change it");
+    await page.click("[data-editx]");
+    await page.waitForSelector(".edit-box", { state: "detached", timeout: 3000 });
 
     // task 1: tools only, no approvals
     await page.fill("#msg", "What time is it, and what's 17.5% of 2,480?");
@@ -429,6 +430,80 @@ function start(port, ...extra) {
     await page.waitForSelector(".tour-card.center >> text=Got any questions", { timeout: 3000 });
     await page.click("#tour-end");
     assert(await page.isHidden("#tour"), "tour closed");
+
+    // ---- Piece 3, part 5: by the way, pictures, Quick read, idea buttons, real Edit, power cut, looks, names
+    await page.click("#nav [data-tab=chat]");
+    await page.click("#new-chat");
+    await page.fill("#msg", "tell me a story");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".turn .badge.running", { timeout: 10000 });
+    await page.keyboard.press("Control+b");
+    await page.fill("#btw-q", "what does a gearbox do?");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".btw-a >> text=sweet spot", { timeout: 20000 });
+    assert(await page.isVisible(".turn .badge.running"), "the main job is still running while the side answer came");
+    assert(!(await page.innerText("#feed")).includes("sweet spot"), "side answer is not in the main chat");
+    await shot(page, "22-by-the-way.png");
+    await page.click("#btw-x");
+    await page.waitForSelector(".turn .badge.done", { timeout: 30000 });
+
+    await page.click("#new-chat");
+    const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGP4z8DAwMDAxMDAAAAPBAEBlnRQ3QAAAABJRU5ErkJggg==", "base64");
+    await page.setInputFiles("#attach-file", { name: "red.png", mimeType: "image/png", buffer: PNG });
+    await page.waitForSelector("#att-tray .att img", { timeout: 5000 });
+    await page.fill("#msg", "what is in this picture?");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".me .me-pic img", { timeout: 10000 });
+    await page.waitForSelector(".answer >> text=red square", { timeout: 20000 });
+    assert(await page.isHidden("#att-tray"), "tray empties after sending");
+    await page.waitForSelector("#chats .chat-item >> text=Quick Chat", { timeout: 20000 });     // smart name
+
+    await page.fill("#msg", "how does a gearbox work?");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".answer .quick-read", { timeout: 20000 });
+    await page.waitForSelector(".idea-go", { timeout: 5000 });
+    assert((await page.$$(".idea-go")).length === 2, "a Do this one button per idea");
+    await shot(page, "23-quick-read-ideas.png");
+    const editTurns = (await page.$$(".turn")).length;
+    await page.click(".turn:last-child .me-acts [data-edit]");
+    await page.fill(".edit-box", "how does a gearbox work in a race car?");
+    await page.click("[data-editgo]");
+    await page.waitForFunction((n) => document.querySelectorAll(".turn").length === n && document.querySelector(".turn:last-child .edited-tag"), editTurns, { timeout: 20000 });
+    assert(!(await page.innerText("#feed")).includes("how does a gearbox work?"), "the old message went away");
+    await page.waitForSelector(".turn:last-child .badge.done", { timeout: 20000 });
+    await page.click(".turn:last-child .idea-go >> nth=0");
+    await page.waitForSelector(".turn .me >> text=Let's do your idea: Add a real H-pattern shifter", { timeout: 10000 });
+    await page.waitForSelector(".turn:last-child .badge:not(.running)", { timeout: 20000 });
+
+    await page.evaluate(() => P3.interrupted([{ task: "t20261117-090000-beef", conversation: "c0", request: "build the night map for the racer", mode: "build" }]));
+    await page.waitForSelector(".banner >> text=I was in the middle of something", { timeout: 3000 });
+    await page.click("[data-resume-leave]");
+    await page.waitForSelector(".banner:has-text('I was in the middle')", { state: "detached", timeout: 3000 });
+
+    await page.fill("#msg", "half-typed message");
+    await page.waitForTimeout(900);
+    await page.reload();
+    await page.waitForSelector("#brain-text:has-text('signed in')", { timeout: 20000 });
+    assert((await page.inputValue("#msg")) === "half-typed message", "the draft survived a reload");
+    await page.fill("#msg", "");
+    await page.waitForTimeout(800);
+
+    await page.click("#nav [data-tab=settings]");
+    await page.selectOption("[data-k=theme]", "light");
+    await page.click("[data-accent='#3b82f6']");
+    await page.selectOption("[data-k=font]", "verdana");
+    await page.click("#save-settings");
+    await page.waitForSelector("#set-msg:has-text('Saved')", { timeout: 5000 });
+    assert((await page.evaluate(() => document.documentElement.dataset.theme)) === "light", "white theme");
+    assert((await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())) === "#3b82f6", "accent color");
+    await page.click("#nav [data-tab=chat]");
+    await shot(page, "24-white-theme.png");
+    await page.click("#nav [data-tab=settings]");
+    await page.selectOption("[data-k=theme]", "dark");
+    await page.click("[data-accent='#ff6a2b']");
+    await page.selectOption("[data-k=font]", "default");
+    await page.click("#save-settings");
+    await page.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5000 });
   } catch (e) {
     errors.push(String(e && e.stack || e));
   } finally {

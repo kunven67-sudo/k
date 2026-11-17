@@ -65,6 +65,9 @@ class TaskRecord:
     pictures: list[dict] = field(default_factory=list)   # Piece 2: pictures shown with this answer
     memory_changes: list[dict] = field(default_factory=list)   # Piece 3: "Saved to memory" + Undo
     background: bool = False     # Piece 3: it started this by itself (learning while you're away)
+    attachments: list[str] = field(default_factory=list)   # Piece 3: your pictures sent with this message
+    end_uuid: str = ""           # Piece 3: Claude Code's id of the last answer (the real Edit rewinds to it)
+    rewound: bool = False        # Piece 3: put away by an Edit (kept in history, hidden in the chat)
 
     def public(self) -> dict:
         return asdict(self)

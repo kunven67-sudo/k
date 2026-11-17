@@ -75,6 +75,8 @@ class Conversation:
     account: str = ""           # Piece 3: the Claude account its saved history lives on
     done: bool = False          # Piece 3: moved to the Done folder
     updated: str = ""           # Piece 3: last message (old chats can move to Done)
+    auto_title: bool = False    # the name is still just the first words (a smart name comes after the 1st answer)
+    rewind_at: str = ""         # real Edit: next run continues from this point of the chat (Claude Code message id)
 
 
 @dataclass
@@ -140,6 +142,7 @@ class Overdrive:
         self.conversations: dict[str, Conversation] = {}
         self._load_conversations()
         self.startup_notes: list[str] = []      # shown once in the window (e.g. "I read your memory pack")
+        self.interrupted: list[dict] = []       # "I was in the middle of X" after a power cut
         self.queue: list[dict] = []             # Piece 3: messages you sent (typed or said) while it was busy
         self._queue_paused = False              # STOP pauses the queue until you send again
         self.away = Away(self)
@@ -225,7 +228,7 @@ class Overdrive:
         return self.current is not None and self.current.rec.background
 
     async def send(self, text: str, conversation_id: str | None = None, mode: str | None = None,
-                   background: bool = False) -> TaskRecord:
+                   background: bool = False, attachments: list[str] | None = None) -> TaskRecord:
         text = (text or "").strip()
         if not text:
             raise ValueError("empty message")
@@ -241,14 +244,18 @@ class Overdrive:
                 await asyncio.sleep(0.1)
         if self.current is not None:
             raise Busy("OVERDRIVE is still working on the last task. Wait for it, or press STOP.")
+        pics = [a for a in (attachments or []) if self.pictures.path(a) is not None][:6]
         conv = self.conversations.get(conversation_id or "")
         if conv is None:
-            conv = self.new_conversation(text[:60])
+            conv = self.new_conversation(_first_words(text))
+            conv.auto_title = not background
             if mode in ("chat", "build"):
                 conv.mode = mode
         if conv.title == "New chat":
-            conv.title = text[:60]
+            conv.title = _first_words(text)
+            conv.auto_title = not background
         rec = TaskRecord(id=new_task_id(), conversation=conv.id, request=text, background=background)
+        rec.attachments = pics
         rec.mode = conv.mode if conv.mode in ("chat", "build") else "chat"
         rec.settings = {k: self.settings.get(k) for k in ("model", "fallback_model", "effort", "detail", "max_steps",
                                                           "max_minutes", "task_budget_usd", "double_check")}
@@ -522,6 +529,114 @@ class Overdrive:
             ran.append(rec.id)
             break                                 # one job at a time; the next one goes on the next tick
         return ran
+
+    # ------------------------------------------------------------------ pictures you drop into the chat (Piece 3)
+    def _with_pictures(self, text: str, names: list[str]):
+        import base64
+        from .pictures import MIME
+        blocks: list[dict] = []
+        for n in names:
+            path = self.pictures.path(n)
+            if path is None:
+                continue
+            blocks.append({"type": "image", "source": {"type": "base64", "media_type": MIME[n.rsplit(".", 1)[1]],
+                                                       "data": base64.b64encode(path.read_bytes()).decode()}})
+        blocks.append({"type": "text", "text": text})
+
+        async def gen():
+            yield {"type": "user", "message": {"role": "user", "content": blocks}, "parent_tool_use_id": None}
+        return gen()
+
+    # ------------------------------------------------------------------ smart chat names (Piece 3)
+    async def _smart_name(self, conv_id: str, request: str, answer: str) -> None:
+        from .btw import quick_claude
+        try:
+            text = await quick_claude(self, "You name chats. Reply with ONLY a short name for this chat: 2 to 5 words, "
+                                            "plain words, no quotes, no emojis, no period. Capitalize Like A Title.",
+                                      f"First message:\n{request[:1500]}\n\nAnswer:\n{answer[:1500]}", model="haiku")
+        except Exception as e:
+            self.audit.write("chat_name_failed", {"error": repr(e)[:300]})
+            return
+        name = " ".join(text.replace('"', "").replace("*", "").split())[:60].strip(" .")
+        conv = self.conversations.get(conv_id)
+        if not name or conv is None or conv.auto_title:
+            return
+        if conv.title != _first_words(request):
+            return                                   # you renamed it meanwhile: yours wins
+        conv.title = name
+        self._save_conversations()
+        self.audit.write("chat_named", {"conversation": conv_id, "name": name})
+        self.events.publish("conversation", conversation=dict(conv.__dict__))
+
+    # ------------------------------------------------------------------ real Edit: rewind the chat (Piece 3)
+    async def edit_message(self, task_id: str, text: str, attachments: list[str] | None = None) -> TaskRecord:
+        """Like ChatGPT's edit: the chat goes back to just before that message (everything after it is put
+        away, kept in history), and the changed message is sent from there. Claude forgets the old branch."""
+        rec = self.task_store.load(task_id)
+        if rec is None:
+            raise ValueError("no such message")
+        conv = self.conversations.get(rec.conversation)
+        if conv is None or task_id not in conv.tasks:
+            raise ValueError("that message isn't in a chat anymore")
+        if self.current is not None and not self.current.rec.background:
+            raise Busy("Wait until it's done (or press STOP), then edit.")
+        visible = [t for t in conv.tasks if not (self.task_store.load(t) or rec).rewound]
+        i = visible.index(task_id) if task_id in visible else -1
+        if i < 0:
+            raise ValueError("that message was already edited")
+        before = None
+        for t in reversed(visible[:i]):
+            r = self.task_store.load(t)
+            if r and r.end_uuid:
+                before = r
+                break
+        for t in visible[i:]:
+            r = self.task_store.load(t)
+            if r:
+                r.rewound = True
+                self.task_store.save(r)
+                self._emit_task(r)
+        if before is None:
+            conv.session_id, conv.cost_total, conv.rewind_at = "", 0.0, ""   # edited the first message: fresh chat
+        else:
+            conv.rewind_at = before.end_uuid
+        self._save_conversations()
+        self.audit.write("message_edited", {"conversation": conv.id, "from_task": task_id, "rewind_to": conv.rewind_at})
+        new = await self.send(text, conv.id, attachments=attachments)
+        new.rerun_of = task_id
+        self.task_store.save(new)
+        return new
+
+    # ------------------------------------------------------------------ power-cut proof (Piece 3)
+    def recover_interrupted(self) -> list[dict]:
+        """At start: tasks that were 'running' when OVERDRIVE (or the PC) went off. They're marked, and you get
+        "I was in the middle of X" with Keep going."""
+        out = []
+        for rec in self.task_store.list(limit=40):
+            if rec.status != "running":
+                continue
+            rec.status = "failed"
+            rec.status_reason = "OVERDRIVE or the PC turned off in the middle of this (power cut?)."
+            rec.finished = utc_now_iso()
+            rec.flags.append("Interrupted: OVERDRIVE was shut down while this was running.")
+            self.task_store.save(rec)
+            self.audit.write("task_interrupted", {"request": rec.request[:500]}, task=rec.id)
+            if not rec.background:
+                out.append({"task": rec.id, "conversation": rec.conversation, "request": rec.request[:300],
+                            "mode": rec.mode})
+        self.interrupted = out[:1]                     # the newest one is the one to pick up
+        return out
+
+    async def keep_going(self, task_id: str) -> TaskRecord:
+        item = next((x for x in self.interrupted if x["task"] == task_id), None)
+        if item is None:
+            raise ValueError("nothing to pick up")
+        self.interrupted = [x for x in self.interrupted if x["task"] != task_id]
+        rec = self.task_store.load(task_id)
+        text = ("Keep going. OVERDRIVE was shut down in the middle of my last message (power cut or the PC turned "
+                "off). Check what you already did (the files, your plan), then pick up where you left off. "
+                f"My message was: {rec.request if rec else item['request']}")
+        return await self.send(text, item["conversation"])
 
     # ------------------------------------------------------------------ done folder for chats (Piece 3)
     def set_chat_done(self, conv_id: str, done: bool) -> dict:
@@ -977,6 +1092,8 @@ class Overdrive:
             fallback_model=fallback, effort=st.conv.effort or s.get("effort"), max_turns=int(s.get("max_steps")),
             max_budget_usd=budget, cwd=str(self.paths.workspace), cli_path=cli, env=env,
             include_partial_messages=True, resume=st.conv.session_id or None,
+            resume_session_at=(st.conv.rewind_at or None) if st.conv.session_id else None,
+            fork_session=bool(st.conv.rewind_at and st.conv.session_id),
             stderr=lambda line: st.stderr.append(line[:500]) if len(st.stderr) < 200 else None,
         )
 
@@ -1025,6 +1142,8 @@ class Overdrive:
                 self.events.publish("status", task=rec.id,
                                     text=f"Claude hiccup ({d.get('error')}), retrying {d.get('attempt')}/{d.get('max_retries')}...")
         elif isinstance(msg, AssistantMessage):
+            if getattr(msg, "uuid", None):
+                rec.end_uuid = str(msg.uuid)
             for b in msg.content:
                 if isinstance(b, TextBlock) and b.text.strip():
                     st.texts.append((st.tool_uses_seen, b.text))
@@ -1133,7 +1252,10 @@ class Overdrive:
                                        or st.conv.session_rules != rules):
                 # Claude Code keeps a chat's FIRST instructions: after a mode or talk-style switch, say the new ones.
                 query = mode_switch_note(rec.mode, self.settings) + rec.request
-            await client.query(query)
+            if rec.attachments:
+                await client.query(self._with_pictures(query, rec.attachments))
+            else:
+                await client.query(query)
             async for msg in client.receive_response():
                 self._on_message(st, msg)
         st.client = None
@@ -1212,6 +1334,13 @@ class Overdrive:
             fh = self.usage.rate_limits.get("five_hour") or {}
             self.events.publish("limit_hit", account=self.accounts.active, others=self.accounts.names(),
                                 resets_at=fh.get("resets_at"), text=st.limit or st.error_text)
+        if res is not None and st.conv.rewind_at:
+            st.conv.rewind_at = ""
+            self._save_conversations()
+        if st.conv.auto_title and not rec.background and not st.error_kind and rec.final_text:
+            st.conv.auto_title = False
+            if self.settings.get("chat_names") == "smart":
+                asyncio.create_task(self._smart_name(st.conv.id, rec.request, rec.final_text))
         if st.build_go and not st.stopped and not st.error_kind and not st.limit:
             self._go_build_handle = asyncio.create_task(self._go_build(st.conv.id))
         if st.stopped:
@@ -1440,6 +1569,15 @@ class Overdrive:
         out.write_bytes(buf.getvalue())
         self.audit.write("export", {"file": out.name, "bytes": out.stat().st_size})
         return out
+
+
+def _first_words(text: str, limit: int = 48) -> str:
+    """A placeholder name from the first words (the smart name replaces it after the first answer)."""
+    t = " ".join(str(text or "").split())
+    if len(t) <= limit:
+        return t or "New chat"
+    cut = t[:limit].rsplit(" ", 1)[0]
+    return (cut or t[:limit]) + "..."
 
 
 def _key(tool_name: str, args: dict) -> str:

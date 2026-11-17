@@ -142,7 +142,7 @@ def test_talk_style_prompt():
         s.update({"pictures": "off"})
         chat2 = mode_block("chat", s)
         assert "show_pictures" not in chat2 and "TALK STYLE" in chat2 and rules_hash(chat2) != h1
-        s.update({"chat_style": False, "own_ideas": False})
+        s.update({"chat_style": False, "own_ideas": False, "quick_read": False})
         chat3 = mode_block("chat", s)
         assert "TALK STYLE" not in chat3 and "My ideas" not in chat3 and "MODE: CHAT" in chat3
 

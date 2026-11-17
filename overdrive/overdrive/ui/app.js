@@ -221,6 +221,7 @@ function handle(ev) {
       const oldTitle = c && c.title;
       if (c) Object.assign(c, ev.conversation); else list.unshift(ev.conversation);
       if (!c || oldTitle !== ev.conversation.title) renderChats();
+      if (ev.conversation.id === S.conv) $("#chat-title").textContent = ev.conversation.title || "Chat";
       renderMode();
       try { renderModelChip(); } catch (e) { /* not ready yet */ }
       break;
@@ -338,6 +339,7 @@ async function deleteChat(id) {
 }
 
 async function openConversation(id, quiet) {
+  if (id !== S.conv) { P3.saveDraft(); P3.draftFor = undefined; }
   S.conv = id;
   renderMode();
   try { renderModelChip(); } catch (e) { /* not ready yet */ }
@@ -353,11 +355,14 @@ async function openConversation(id, quiet) {
   }
   renderChats();
   renderFeed();
+  if (P3.draftFor === undefined) { $("#msg").value = ""; P3.loadDraft(); autoGrow(); }
 }
 
 function newChat() {
-  if (S.state && S.state.current) { toast("Wait until the running task is finished (or press STOP).", "warn"); return; }
+  if (S.state && S.state.current && !S.state.current.background) { toast("Wait until the running task is finished (or press STOP).", "warn"); return; }
+  P3.saveDraft();
   S.conv = null;
+  $("#msg").value = ""; P3.loadDraft();
   S.tasks = new Map();
   $("#chat-title").textContent = "New chat";
   S.nextMode = null;
@@ -376,6 +381,7 @@ function isStale(t) {
 
 function upsertTask(t) {
   if (isStale(t)) return;
+  if (t.rewound) { S.tasks.delete(t.id); const n = $(`#turn-${t.id}`); if (n) n.remove(); return; }
   if (t.status === "running") {
     S.state.current = t;
     if (!S.conv || S.conv === t.conversation) S.conv = t.conversation;
@@ -403,7 +409,7 @@ function upsertTask(t) {
 function renderFeed() {
   const feed = $("#feed");
   $$(".turn", feed).forEach((n) => n.remove());
-  const tasks = Array.from(S.tasks.values()).sort((a, b) => a.created.localeCompare(b.created));
+  const tasks = Array.from(S.tasks.values()).filter((t) => !t.rewound).sort((a, b) => a.created.localeCompare(b.created));
   $("#empty").classList.toggle("hidden", tasks.length > 0);
   for (const t of tasks) feed.appendChild(turnNode(t));
   renderCards();
@@ -472,10 +478,11 @@ function turnNode(t) {
   const mine = t.request.startsWith("GO. I said Yes") ? "" : `<div class="me-acts"><button class="ghost xs" data-edit="${t.id}" title="Put this message back in the box to change it">Edit</button><button class="ghost xs" data-copyreq="${t.id}">Copy</button></div>`;
   const meBubble = t.background
     ? `<div class="me-auto"><details><summary>It started this by itself while you were away (learning, capped by your setting)</summary><pre>${esc(t.request)}</pre></details></div>`
-    : `<div class="me"><div>${esc(t.request)}</div></div>${mine}`;
+    : `<div class="me">${P3.meExtras(t)}<div>${esc(t.request)}</div></div>${mine}`;
   wrap.innerHTML = `${meBubble}
     <div class="od"><div class="od-head">${head}</div>${critList(t)}${stepsList(t)}${picsHtml(t)}${answer}${P3.turnExtras(t)}${err}${changes}${undone}${flagHtml}${checks}
       <div class="cards-slot" data-task="${t.id}"></div>${foot}</div>`;
+  P3.decorate(wrap, t);
   return wrap;
 }
 
@@ -629,11 +636,13 @@ async function send(text, source) {
   $("#send").disabled = true;
   try {
     // queue: if it's still working, the message waits and goes in right after (Piece 3)
-    const d = await api("/api/send", { text, conversation: S.conv, mode: S.conv ? undefined : (S.nextMode || "chat"), queue: true, source: source || "typed" });
+    const att = source === "voice" ? [] : P3.takeAttachments();
+    const d = await api("/api/send", { text, conversation: S.conv, mode: S.conv ? undefined : (S.nextMode || "chat"), queue: true, source: source || "typed", attachments: att });
     S.nextMode = null;
-    if (source !== "voice") { $("#msg").value = ""; autoGrow(); }
+    if (source !== "voice") { $("#msg").value = ""; autoGrow(); P3.clearDraft(); }
     if (d.queued) { P3.queued(d.queued); $("#send").disabled = false; return; }
     if (S.conv !== d.task.conversation) { S.conv = d.task.conversation; S.tasks = new Map(); renderFeed(); }
+    P3.draftFor = S.conv;            // a new chat got its id: the box now belongs to it
     $("#chat-title").textContent = (S.state.conversations.find((c) => c.id === S.conv) || {}).title || d.task.request.slice(0, 60);
     upsertTask(d.task);
   } catch (e) { toast(e.message, "bad"); }
@@ -1020,6 +1029,7 @@ async function saveSettings() {
     let v = el.type === "checkbox" ? el.checked : el.value;
     if (el.type === "number") v = k.endsWith("_usd") ? Number(v) : parseInt(v, 10);
     if (el.type === "range") v = Number(v);
+    if (el.tagName === "SELECT" && typeof s[k] === "number") v = Number(v);
     if (JSON.stringify(v) !== JSON.stringify(s[k])) changes[k] = v;
   });
   const perms = {};
@@ -1038,6 +1048,7 @@ async function saveSettings() {
     renderModelChip();
     renderSettings();
     if ("copy_numbers" in r.changed) { PIECES.clear(); renderFeed(); }
+    P3.applyLooks(r.settings);
   } catch (e) { toast(e.message, "bad", 9000); }
 }
 
@@ -1083,7 +1094,7 @@ function bindUI() {
     const cr = e.target.closest("[data-copyreq]");
     if (cr) { const t = S.tasks.get(cr.dataset.copyreq); if (t) copyText(t.request).then((ok) => ok && toast("Copied your message.", "ok", 2200)); }
     const ed = e.target.closest("[data-edit]");
-    if (ed) { const t = S.tasks.get(ed.dataset.edit); if (t) { $("#msg").value = t.request; autoGrow(); $("#msg").focus(); toast("Change it and press Send. It goes as a new message.", "", 4000); } }
+    if (ed) P3.startEdit(ed.dataset.edit);
     const pic = e.target.closest("[data-pic]");
     if (pic) openPicture(pic.dataset.pic, Number(pic.dataset.i));
     P3.feedClick(e);

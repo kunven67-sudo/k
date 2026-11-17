@@ -66,6 +66,15 @@ DEFAULTS: dict[str, Any] = {
     "auto_done_days": 14,
     "tour_done": False,          # the first-start tour was shown
     "btw_model": "sonnet",       # the quick model for "by the way" side questions
+    "chat_names": "smart",       # smart = a short real name after the first answer; first_words = old way
+    "quick_read": True,          # long answers start with a one-line "Quick read:"
+    "auto_resume": True,         # after a power cut: keep going by itself (after a short countdown)
+    "theme": "dark",             # dark / light
+    "font": "default",
+    "text_size": 100,            # percent
+    "accent": "#ff6a2b",
+    "pictures_keep_days": 0,     # chat pictures: delete after N days (0 = keep forever)
+    "pictures_max_mb": 1000,     # ...or when the folder gets bigger than this (oldest go first)
 }
 
 _SCHEMA: dict[str, tuple] = {
@@ -106,7 +115,18 @@ _SCHEMA: dict[str, tuple] = {
     "auto_done_days": (int, lambda v: 3 <= v <= 365, "Not touched for (days)"),
     "tour_done": (bool, None, "Tour shown"),
     "btw_model": (str, lambda v: v in ("haiku", "sonnet", "opus"), "By the way model"),
+    "chat_names": (str, lambda v: v in ("smart", "first_words"), "Chat names"),
+    "quick_read": (bool, None, "Quick read line"),
+    "auto_resume": (bool, None, "Keep going after a power cut"),
+    "theme": (str, lambda v: v in ("dark", "light"), "Theme"),
+    "font": (str, lambda v: v in FONTS, "Font"),
+    "text_size": (int, lambda v: 80 <= v <= 140, "Text size"),
+    "accent": (str, lambda v: bool(__import__("re").fullmatch(r"#[0-9a-fA-F]{6}", v)), "Accent color"),
+    "pictures_keep_days": (int, lambda v: v in (0, 7, 30, 90, 365), "Keep chat pictures"),
+    "pictures_max_mb": (int, lambda v: 50 <= v <= 20000, "Picture folder limit"),
 }
+
+FONTS = ("default", "bahnschrift", "verdana", "georgia", "cascadia", "trebuchet")
 
 
 class SettingsError(ValueError):

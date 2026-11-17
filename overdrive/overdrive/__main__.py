@@ -39,6 +39,7 @@ def _run_app() -> int:
     from .agent import Overdrive
     od = Overdrive(home=home)
     od.auto_import_packs()
+    od.recover_interrupted()
     asyncio.run(serve(od, open_ui=not os.environ.get("OVERDRIVE_NO_WINDOW") and not background))
     return 0
 

@@ -13,6 +13,9 @@ P3.state = function (st) {
   P3.paintAwayChip(st.away);
   P3.paintNet(st.net);
   P3.btw.items = st.btw || [];
+  P3.applyLooks(st.settings);
+  P3.interrupted(st.interrupted);
+  P3.loadDraft();
   P3.paintAccount(st.accounts);
   $("#nav-jobs").textContent = st.jobs ? String(st.jobs) : "";
   if (!st.tour_done && !P3.toured) { P3.toured = true; setTimeout(() => { if ($("#setup").classList.contains("hidden")) P3.startTour(); }, 900); }
@@ -75,6 +78,9 @@ P3.feedClick = function (e) {
 };
 
 P3.settingsHtml = function (s, opt, sw, num) {
+  return P3.looksHtml(s, opt) + P3.settingsHtml2(s, opt, sw, num);
+};
+P3.settingsHtml2 = function (s, opt, sw, num) {
   const voices = P3.voices().slice().sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
   const vOpts = opt("", "Best natural voice (automatic)", s.voice_name) + voices.map((v) => opt(v.name, `${v.name} (${v.lang})`, s.voice_name)).join("");
   const range = (k, min, max, step) => `<span class="range"><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${s[k]}"><b data-rv="${k}">${Number(s[k]).toFixed(2)}x</b></span>`;
@@ -122,6 +128,7 @@ P3.bind = function () {
   $("#net-light").addEventListener("click", () => { const n = P3.net.last; toast(!n ? "Checking the internet..." : n.online ? "The internet is working." : "No internet right now. Claude can't think until it's back.", n && n.online === false ? "warn" : "ok", 4000); });
   $("#drawer-body").addEventListener("click", P3.accountsClick);
   $("#tour").addEventListener("click", P3.tourClick);
+  P3.bind5b();
   $("#btw-toggle").addEventListener("click", () => { if ($("#btw").classList.contains("hidden")) P3.openBtw(true); else { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); } });
   $("#btw-x").addEventListener("click", () => { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); });
   $("#btw-form").addEventListener("submit", (e) => { e.preventDefault(); P3.askBtw($("#btw-q").value); });
@@ -977,4 +984,193 @@ P3.askBtw = async function (q) {
   P3.openBtw(false);
   try { const r = await api("/api/btw", { text: q }); P3.btwItem(r.item); $("#btw-q").value = ""; }
   catch (e) { toast(e.message, "warn"); }
+};
+
+
+/* ================================================================ Part 5b: pictures, real Edit, quick read, idea buttons,
+   "I was in the middle of X", drafts, looks */
+P3.att = [];
+P3.takeAttachments = function () { const a = P3.att.slice(); P3.att = []; P3.paintAtt(); return a; };
+P3.paintAtt = function () {
+  const tray = $("#att-tray");
+  tray.classList.toggle("hidden", !P3.att.length);
+  tray.innerHTML = P3.att.map((f, i) => `<span class="att"><img src="${picUrl({ file: f })}" alt=""><button type="button" data-attx="${i}" title="Remove">&times;</button></span>`).join("") +
+    (P3.att.length ? `<span class="muted att-note">${P3.att.length} picture${P3.att.length === 1 ? "" : "s"} go with your next message</span>` : "");
+};
+P3.addFiles = async function (files) {
+  for (const f of Array.from(files || [])) {
+    if (!/^image\/(png|jpeg|gif|webp)$/.test(f.type)) { toast(`${f.name || "That file"} isn't a picture OVERDRIVE can send (PNG, JPG, GIF or WebP).`, "warn"); continue; }
+    if (f.size > 15 * 1024 * 1024) { toast(`${f.name} is too big (15 MB max).`, "warn"); continue; }
+    if (P3.att.length >= 6) { toast("6 pictures max per message.", "warn"); break; }
+    const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+    try { const d = await api("/api/upload", { data }); if (!P3.att.includes(d.file)) P3.att.push(d.file); }
+    catch (e) { toast(e.message, "bad"); }
+  }
+  P3.paintAtt();
+  $("#msg").focus();
+};
+P3.meExtras = function (t) {
+  const pics = (t.attachments || []).map((f, i) => `<figure class="pic me-pic" data-mepic="${esc(t.id)}" data-i="${i}"><img src="${picUrl({ file: f })}" alt="your picture" loading="lazy" onerror="this.parentNode.classList.add('gone')"></figure>`).join("");
+  return (pics ? `<div class="me-pics">${pics}</div>` : "") + (t.rerun_of ? `<span class="edited-tag">edited</span>` : "");
+};
+P3.startEdit = function (id) {
+  const t = S.tasks.get(id);
+  const turn = $(`#turn-${id}`);
+  if (!t || !turn) return;
+  if (S.state && S.state.current && !S.state.current.background) { toast("Wait until it's done (or press STOP), then edit.", "warn"); return; }
+  const me = $(".me", turn);
+  me.classList.add("editing");
+  me.innerHTML = `<textarea class="edit-box" rows="3" maxlength="20000"></textarea>
+    <div class="edit-acts"><span class="muted">Everything after this message goes away and it answers this new version.</span><button class="ghost sm" data-editx>Cancel</button><button class="primary sm" data-editgo>Send</button></div>`;
+  const box = $(".edit-box", me);
+  box.value = t.request; box.focus(); box.setSelectionRange(box.value.length, box.value.length);
+  const cancel = () => { const n = turnNode(t); turn.replaceWith(n); };
+  const go = async () => {
+    const text = box.value.trim();
+    if (!text) return;
+    if (text === t.request) { cancel(); return; }
+    try {
+      const r = await api("/api/edit", { task: id, text, attachments: t.attachments || [] });
+      for (const [k, v] of S.tasks) if (v.created >= t.created && k !== r.task.id) { S.tasks.delete(k); const n = $(`#turn-${k}`); if (n) n.remove(); }
+      upsertTask(r.task);
+    } catch (e) { toast(e.message, "bad"); }
+  };
+  $("[data-editx]", me).addEventListener("click", cancel);
+  $("[data-editgo]", me).addEventListener("click", go);
+  box.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go(); } if (e.key === "Escape") cancel(); });
+};
+/* Quick read line + buttons on its own ideas */
+P3.decorate = function (wrap, t) {
+  const ans = $(".answer[data-answer]", wrap);
+  if (!ans || t.status === "running") return;
+  const first = $("p, .pc", ans);
+  if (first && /^\s*(\d+\s*)?Quick read:/i.test(first.textContent)) first.classList.add("quick-read");
+  const heads = $$("p, h2, h3, .pc", ans).filter((el) => /^\s*(\d+\s*)?My ideas:?\s*$/i.test(el.textContent.replace(/[*]/g, "")));
+  for (const h of heads) {
+    let list = h.nextElementSibling;
+    while (list && !/^(UL|OL)$/.test(list.tagName) && !$("ul, ol", list)) list = list.nextElementSibling;
+    if (!list) continue;
+    const ul = /^(UL|OL)$/.test(list.tagName) ? list : $("ul, ol", list);
+    $$(":scope > li", ul).forEach((li, i) => {
+      if ($(".idea-go", li)) return;
+      const b = document.createElement("button");
+      b.className = "ghost xs idea-go"; b.textContent = "Do this one"; b.dataset.idea = li.textContent.replace(/\s+/g, " ").trim();
+      li.appendChild(b);
+    });
+    h.classList.add("ideas-head");
+  }
+};
+P3.ideaClick = function (e) {
+  const b = e.target.closest(".idea-go");
+  if (!b) return false;
+  e.stopPropagation();
+  send(`Let's do your idea: ${b.dataset.idea.replace(/Do this one$/, "").trim()}`);
+  return true;
+};
+/* "I was in the middle of X" after a power cut */
+P3.interrupted = function (list) {
+  const it = (list || [])[0];
+  if (!it) return;
+  const auto = S.state.settings.auto_resume;
+  P3.banner("resume", `<span class="bn-ic"></span><div><b>I was in the middle of something</b> when OVERDRIVE or the PC turned off:
+    <div class="muted">“${esc(it.request.slice(0, 160))}”${auto ? ` &middot; keeping going by itself in <span id="resume-count">25</span> s` : ""}</div></div>
+    <button class="primary sm" data-resume="${esc(it.task)}">Keep going</button><button class="ghost sm" data-resume-leave="${esc(it.task)}">Leave it</button>`, "away");
+  if (auto) {
+    let n = 25;
+    clearInterval(P3._rc);
+    P3._rc = setInterval(() => { n--; const el = $("#resume-count"); if (el) el.textContent = String(Math.max(0, n)); if (n <= 0 || !P3.banners.has("resume")) { clearInterval(P3._rc); P3.banners.delete("resume"); P3.paintBanners(); } }, 1000);
+  }
+};
+P3.resumeClick = async function (e) {
+  const k = e.target.closest("[data-resume]"), l = e.target.closest("[data-resume-leave]");
+  if (!k && !l) return false;
+  clearInterval(P3._rc);
+  P3.banners.delete("resume"); P3.paintBanners();
+  try {
+    if (k) { const r = await api("/api/interrupted", { task: k.dataset.resume }); await openConversation(r.task.conversation); upsertTask(r.task); }
+    else await api("/api/interrupted", { task: l.dataset.resumeLeave, action: "leave" });
+  } catch (err) { toast(err.message, "warn"); }
+  return true;
+};
+/* drafts: what you were typing survives a crash or power cut (kept on this PC only) */
+P3.draftKey = (c) => "od_draft_" + (c || "new");
+P3.draftFor = undefined;          // which chat the text in the box belongs to (undefined = not loaded yet: never save over a draft)
+P3.saveDraft = function () {
+  if (P3.draftFor === undefined) return;
+  try { const v = $("#msg").value; if (v) localStorage.setItem(P3.draftKey(P3.draftFor), v); else localStorage.removeItem(P3.draftKey(P3.draftFor)); } catch (e) { /* storage off */ }
+};
+P3.clearDraft = function () { try { localStorage.removeItem(P3.draftKey(P3.draftFor)); localStorage.removeItem(P3.draftKey(S.conv)); } catch (e) { /* storage off */ } };
+P3.loadDraft = function () {
+  P3.draftFor = S.conv || null;
+  try { const v = localStorage.getItem(P3.draftKey(P3.draftFor)); if (v && !$("#msg").value) { $("#msg").value = v; autoGrow(); } } catch (e) { /* storage off */ }
+};
+/* looks: black or white, font, text size, accent color */
+P3.FONTS = { default: ["Default", "\"Segoe UI\", system-ui, sans-serif"], bahnschrift: ["Bahnschrift (techy)", "Bahnschrift, \"Segoe UI\", sans-serif"],
+  verdana: ["Verdana (wide, easy to read)", "Verdana, \"Segoe UI\", sans-serif"], trebuchet: ["Trebuchet (round)", "\"Trebuchet MS\", \"Segoe UI\", sans-serif"],
+  georgia: ["Georgia (classic)", "Georgia, \"Times New Roman\", serif"], cascadia: ["Cascadia (code look)", "\"Cascadia Code\", Consolas, monospace"] };
+P3.ACCENTS = [["#ff6a2b", "Orange"], ["#3b82f6", "Blue"], ["#a855f7", "Purple"], ["#22c55e", "Green"], ["#ef4444", "Red"], ["#ec4899", "Pink"], ["#eab308", "Gold"], ["#14b8a6", "Teal"]];
+P3.applyLooks = function (s) {
+  if (!s) return;
+  const r = document.documentElement;
+  r.dataset.theme = s.theme === "light" ? "light" : "dark";
+  r.style.setProperty("--font", (P3.FONTS[s.font] || P3.FONTS.default)[1]);
+  document.body.style.zoom = String((Number(s.text_size) || 100) / 100);
+  const a = /^#[0-9a-f]{6}$/i.test(s.accent || "") ? s.accent : "#ff6a2b";
+  const n = parseInt(a.slice(1), 16), rr = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  const mix = (c) => Math.round(c + (255 - c) * 0.3);
+  r.style.setProperty("--accent", a);
+  r.style.setProperty("--accent2", `rgb(${mix(rr)}, ${mix(g)}, ${mix(b)})`);
+  r.style.setProperty("--accent-rgb", `${rr}, ${g}, ${b}`);
+  r.style.setProperty("--accent-bg", `rgba(${rr}, ${g}, ${b}, .14)`);
+};
+P3.looksHtml = function (s, opt) {
+  return `<div class="st-sec"><h3>Looks</h3>
+    <div class="row2"><label>Background</label><select data-k="theme">${opt("dark", "Black (dark)", s.theme)}${opt("light", "White (light)", s.theme)}</select></div>
+    <div class="row2"><label>Font</label><select data-k="font">${Object.entries(P3.FONTS).map(([k, v]) => opt(k, v[0], s.font)).join("")}</select></div>
+    <div class="row2"><label>Text size</label><span class="range"><input type="range" data-k="text_size" min="80" max="140" step="5" value="${s.text_size}"><b data-rv-pct="text_size">${s.text_size}%</b></span></div>
+    <div class="row2"><label>Accent color</label><span class="swatches">${P3.ACCENTS.map(([c, n]) => `<button type="button" class="sw${s.accent.toLowerCase() === c ? " on" : ""}" data-accent="${c}" title="${n}" style="--c:${c}"></button>`).join("")}
+      <input type="color" data-k="accent" value="${esc(s.accent)}" title="Any color"></span></div>
+    <div class="hint row2"><span></span><span class="hint">Changes show right away; press Save to keep them. Moving backgrounds come in the next piece.</span></div>
+  </div>
+  <div class="st-sec"><h3>Chats</h3>
+    <div class="row2"><label>Chat names</label><select data-k="chat_names">${opt("smart", "A short real name after the first answer", s.chat_names)}${opt("first_words", "The first words of my message", s.chat_names)}</select></div>
+    <div class="row2"><label>Quick read line</label><label class="switch"><input type="checkbox" data-k="quick_read" ${s.quick_read ? "checked" : ""}> long answers start with a one-line summary</label></div>
+    <div class="row2"><label>After a power cut</label><label class="switch"><input type="checkbox" data-k="auto_resume" ${s.auto_resume ? "checked" : ""}> keep going by itself (25 seconds to say Leave it)</label></div>
+    <div class="row2"><label>Chat pictures</label><span class="inl"><select data-k="pictures_keep_days">${[[0, "Keep forever"], [7, "Delete after 7 days"], [30, "Delete after 30 days"], [90, "Delete after 90 days"], [365, "Delete after a year"]].map(([v, l]) => `<option value="${v}" ${Number(s.pictures_keep_days) === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <select data-k="pictures_max_mb">${[[200, "or over 200 MB"], [500, "or over 500 MB"], [1000, "or over 1 GB"], [5000, "or over 5 GB"]].map(([v, l]) => `<option value="${v}" ${Number(s.pictures_max_mb) === v ? "selected" : ""}>${l}</option>`).join("")}</select></span></div>
+    <div class="hint row2"><span></span><span class="hint">Old chat pictures get deleted after that time, or the oldest ones when the folder gets too big. Checked each time OVERDRIVE starts.</span></div>
+  </div>`;
+};
+P3.bind5b = function () {
+  $("#attach").addEventListener("click", () => $("#attach-file").click());
+  $("#attach-file").addEventListener("change", (e) => { P3.addFiles(e.target.files); e.target.value = ""; });
+  $("#att-tray").addEventListener("click", (e) => { const x = e.target.closest("[data-attx]"); if (x) { P3.att.splice(Number(x.dataset.attx), 1); P3.paintAtt(); } });
+  $("#msg").addEventListener("paste", (e) => { const files = Array.from((e.clipboardData || {}).files || []).filter((f) => f.type.startsWith("image/")); if (files.length) { e.preventDefault(); P3.addFiles(files); } });
+  const chat = $("#tab-chat");
+  chat.addEventListener("dragover", (e) => { if (Array.from(e.dataTransfer.types || []).includes("Files")) { e.preventDefault(); chat.classList.add("dropping"); } });
+  chat.addEventListener("dragleave", (e) => { if (e.target === chat || !chat.contains(e.relatedTarget)) chat.classList.remove("dropping"); });
+  chat.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) { e.preventDefault(); chat.classList.remove("dropping"); P3.addFiles(e.dataTransfer.files); } });
+  $("#feed").addEventListener("click", (e) => {
+    P3.ideaClick(e);
+    const mp = e.target.closest("[data-mepic]");
+    if (mp) { const t = S.tasks.get(mp.dataset.mepic); if (t) { LB.pics = (t.attachments || []).map((f) => ({ file: f, title: "Your picture" })); LB.i = Number(mp.dataset.i); showPicture(); $("#lightbox").classList.remove("hidden"); } }
+  }, true);
+  $("#banners").addEventListener("click", P3.resumeClick, true);
+  let dt = null;
+  $("#msg").addEventListener("input", () => { clearTimeout(dt); dt = setTimeout(P3.saveDraft, 600); });
+  $("#settings-body").addEventListener("input", (e) => {
+    const k = e.target.dataset && e.target.dataset.k;
+    if (!k || !["theme", "font", "text_size", "accent"].includes(k)) return;
+    const preview = Object.assign({}, S.state.settings, { [k]: k === "text_size" ? Number(e.target.value) : e.target.value });
+    P3.applyLooks(preview);
+    const b = $(`[data-rv-pct="${k}"]`); if (b) b.textContent = e.target.value + "%";
+  });
+  $("#settings-body").addEventListener("change", (e) => { const k = e.target.dataset && e.target.dataset.k; if (k === "theme" || k === "font") { const v = Object.assign({}, S.state.settings, { [k]: e.target.value }); P3.applyLooks(v); } });
+  $("#settings-body").addEventListener("click", (e) => {
+    const sw = e.target.closest("[data-accent]");
+    if (!sw) return;
+    $("[data-k=accent]").value = sw.dataset.accent;
+    $$(".sw").forEach((x) => x.classList.toggle("on", x === sw));
+    P3.applyLooks(Object.assign({}, S.state.settings, { accent: sw.dataset.accent }));
+  });
 };

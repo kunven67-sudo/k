@@ -85,3 +85,22 @@ class SideBox:
 
     def public(self) -> list[dict]:
         return [dict(i) for i in self.items[-20:]]
+
+
+async def quick_claude(od: Any, system: str, prompt: str, model: str = "haiku") -> str:
+    """One small Claude run with no tools (chat names and the like)."""
+    from .agent import AssistantMessage, ClaudeAgentOptions, ClaudeSDKClient, TextBlock
+    setup = await od.check_setup()
+    if not setup.get("ready") or not od.settings.get("network"):
+        raise RuntimeError("Claude isn't reachable right now")
+    env = {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", **od.accounts.env(), **(od.test_env or {})}
+    options = ClaudeAgentOptions(tools=[], allowed_tools=[], setting_sources=[], strict_mcp_config=True,
+                                 system_prompt=system, model=model, effort="low", max_turns=1,
+                                 cwd=str(od.paths.workspace), cli_path=setup["cli"], env=env)
+    text = ""
+    async with ClaudeSDKClient(options=options) as client:
+        await client.query(prompt)
+        async for msg in client.receive_response():
+            if isinstance(msg, AssistantMessage):
+                text += "".join(b.text for b in msg.content if isinstance(b, TextBlock))
+    return text.strip()

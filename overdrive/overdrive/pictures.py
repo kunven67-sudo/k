@@ -163,6 +163,28 @@ class PictureStore:
                 tmp.unlink(missing_ok=True)
         return name
 
+    def cleanup(self, keep_days: int, max_mb: int) -> dict:
+        """Picture clean-up: delete chat pictures older than keep_days (0 = keep forever), then the oldest ones
+        while the folder is bigger than max_mb. Old chats then show "picture cleaned up"."""
+        import time as _t
+        files = sorted((p for p in self.dir.glob("*") if p.is_file() and NAME_RE.match(p.name)),
+                       key=lambda p: p.stat().st_mtime)
+        removed = 0
+        if keep_days:
+            cut = _t.time() - keep_days * 86400
+            for p in list(files):
+                if p.stat().st_mtime < cut:
+                    p.unlink(missing_ok=True)
+                    files.remove(p)
+                    removed += 1
+        total = sum(p.stat().st_size for p in files)
+        while files and total > max_mb * 1024 * 1024:
+            p = files.pop(0)
+            total -= p.stat().st_size
+            p.unlink(missing_ok=True)
+            removed += 1
+        return {"removed": removed, "left": len(files), "bytes": total}
+
     def path(self, name: str) -> Path | None:
         if not NAME_RE.match(name or ""):
             return None

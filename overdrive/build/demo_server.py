@@ -31,7 +31,7 @@ def human_text(req: dict) -> str:
             return c
         texts = [x.get("text", "") for x in c if isinstance(x, dict) and x.get("type") == "text"]
         if texts and not any(isinstance(x, dict) and x.get("type") == "tool_result" for x in c):
-            return texts[-1]
+            return " ".join(texts)
     return ""
 
 
@@ -85,6 +85,8 @@ DEMO_PROJECTS = {
 
 
 def script(req: dict, fake: FakeClaude):
+    if "You name chats" in system_text(req):
+        return [X("Quick Chat")]
     if "check other AI work" in system_text(req):
         return [X('{"status": "done", "reason": "The journal shows todo.txt was created with 3 items, matching the goal."}')]
     if not is_overdrive_main(req):
@@ -93,6 +95,16 @@ def script(req: dict, fake: FakeClaude):
     i = turn_index(req)
     everything = json.dumps(req.get("messages", [])).lower()
     building = "MODE: BUILD" in system_text(req) or "mode: build" in everything
+    if "by the way" in system_text(req):
+        return [X("A gearbox swaps gears so the engine stays in its sweet spot. Your main job keeps going.")]
+    if "in this picture" in ask and not building:
+        return [X("I see a small **red square**. Want me to use it as a texture?")] if i == 0 else [X("Done.")]
+    if "gearbox" in ask and not building:
+        return [X("**Quick read:** a gearbox keeps the engine at the right speed while the wheels go faster or slower.\n\n"
+                  "A car engine only makes good power in a narrow speed range, so the gearbox changes the ratio:\n\n"
+                  "1. **Low gears** for pulling away and climbing\n2. **High gears** for cruising\n"
+                  "3. **The clutch** disconnects the engine while you shift\n\n**My ideas:**\n"
+                  "- Add a real H-pattern shifter to the racing game\n- Make the gear whine louder in low gears")] if i == 0 else [X("Done.")]
     if "learn time" in everything:
         steps = [
             [T("memory_remember", kind="fact", title="Real car sounds: record engine, intake and exhaust apart",
@@ -242,7 +254,8 @@ async def main() -> None:
     od.net.check = lambda: net_file.read_text().strip() != "0"
     from overdrive.net import Net
     od.net.run = lambda: Net.run(od.net, every=0.5)
-    od.settings.update({"tour_done": True}, by="demo")
+    od.settings.update({"tour_done": True, "auto_resume": False}, by="demo")
+    # (the power-cut banner is tested by calling it directly from the browser check)
     from overdrive.away import Away
     od.away.run = lambda: Away.run(od.away, every=1.0)
     if a.no_cli:

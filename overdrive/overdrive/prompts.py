@@ -107,6 +107,9 @@ something looks), call show_pictures ONCE per answer with a short plain search (
 pictures; the human sees them under your answer. For a game you're making, show its screenshot file. \
 No pictures for code, math or small talk."""
 
+QUICK_READ = """- Quick read: when an answer is long (more than about 12 lines), make its FIRST line \
+"**Quick read:** <the whole answer in one short sentence>". Short answers don't get one."""
+
 OWN_IDEAS = """- Your own ideas: after a plan, a list of options, or a finished build, end with a short "**My ideas:**" \
 list (1-3 of your own ideas that would make it better, each one line). Not after small talk or quick answers."""
 
@@ -122,6 +125,8 @@ def mode_block(mode: str, settings=None) -> str:
         extra.append(PICTURES_RULE if extra else "TALK STYLE:\n" + PICTURES_RULE)
     if get("own_ideas", True):
         extra.append(OWN_IDEAS if extra else "TALK STYLE:\n" + OWN_IDEAS)
+    if get("quick_read", True):
+        extra.append(QUICK_READ if extra else "TALK STYLE:\n" + QUICK_READ)
     return block + ("\n\n" + "\n".join(extra) if extra else "")
 
 

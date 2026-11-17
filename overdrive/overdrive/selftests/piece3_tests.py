@@ -704,3 +704,154 @@ def test_e2e_by_the_way():
                 pass
         asyncio.run(main())
     with_fake(lambda r, f: [X("ok")], go)
+
+
+# ================================================================ Part 5b
+def _user_texts(req) -> str:
+    return json_text(req)
+
+
+@covers(59, cli=True, title="Real Edit: the chat rewinds to before that message, and Claude forgets the old branch")
+def test_e2e_real_edit():
+    import asyncio
+    seen = []
+
+    def go(tmp, fake):
+        od = make_agent(tmp, fake, mode="chat")
+
+        def script(req, f):
+            if not is_overdrive_main(req):
+                return [X("Car Colors")]
+            seen.append(_user_texts(req))
+            return [X(f"ok {len(seen)}")]
+        fake.script = script
+        r1 = run_task(od, "my car is RED-ALPHA")
+        conv = r1.conversation
+        r2 = run_task(od, "my bike is GREEN-BRAVO", conversation=conv)
+        r3 = run_task(od, "what colors did I say?", conversation=conv)
+        assert od.task_store.load(r1.id).end_uuid, "rewind point recorded"
+
+        async def edit(task, text):
+            od.events.bind_loop(asyncio.get_running_loop())
+            new = await od.edit_message(task, text)
+            while od.current is not None:
+                await asyncio.sleep(0.1)
+            return od.task_store.load(new.id)
+        new = asyncio.run(edit(r2.id, "my bike is BLUE-CHARLIE"))
+        assert new.status == "done", (new.status, new.status_reason)
+        last = seen[-1]
+        assert "RED-ALPHA" in last and "BLUE-CHARLIE" in last, last[-600:]
+        assert "GREEN-BRAVO" not in last and "what colors" not in last, "the old branch must be forgotten"
+        assert od.task_store.load(r2.id).rewound and od.task_store.load(r3.id).rewound
+        assert not od.task_store.load(r1.id).rewound and new.rerun_of == r2.id
+        assert od.conversations[conv].rewind_at == ""                  # used once
+        new2 = asyncio.run(edit(r1.id, "my car is GOLD-DELTA"))     # editing the very first message = fresh chat
+        assert "GOLD-DELTA" in seen[-1] and "RED-ALPHA" not in seen[-1] and "BLUE-CHARLIE" not in seen[-1]
+        assert new2.status == "done"
+    with_fake(lambda r, f: [X("ok")], go)
+
+
+@covers(37, cli=True, title="Pictures you drop in the chat reach Claude as real pictures it can look at")
+def test_e2e_dropped_pictures():
+    from .piece2_tests import png
+    got = {}
+
+    def go(tmp, fake):
+        od = make_agent(tmp, fake, mode="chat")
+
+        def script(req, f):
+            if not is_overdrive_main(req):
+                return [X("Red Square")]
+            users = [m for m in req.get("messages", []) if m.get("role") == "user"]
+            got["content"] = users[-1].get("content")
+            return [X("It's a small red square.")]
+        fake.script = script
+        name = od.pictures.put(png(255, 0, 0))
+        import asyncio
+
+        async def main():
+            od.events.bind_loop(asyncio.get_running_loop())
+            rec = await od.send("what is in this picture?", attachments=[name, "../evil.png", "nope.jpg"])
+            while od.current is not None:
+                await asyncio.sleep(0.1)
+            return od.task_store.load(rec.id)
+        rec = asyncio.run(main())
+        assert rec.status == "done" and rec.attachments == [name], rec.attachments
+        content = got["content"]
+        assert isinstance(content, list), content
+        kinds = [b.get("type") for b in content]
+        assert "image" in kinds and "text" in kinds, kinds
+        img = next(b for b in content if b.get("type") == "image")
+        assert img["source"]["media_type"] == "image/png" and len(img["source"]["data"]) > 20
+    with_fake(lambda r, f: [X("ok")], go)
+
+
+@covers(5, cli=True, title="Chats get a short real name after the first answer (not your whole first message)")
+def test_e2e_smart_chat_names():
+    import asyncio
+
+    def go(tmp, fake):
+        od = make_agent(tmp, fake, mode="chat")
+
+        def script(req, f):
+            if "You name chats" in system_text(req):
+                return [X('"Fruit Talk."')]
+            if not is_overdrive_main(req):
+                return [X("ok")]
+            return [X("Fruits are great. Mangoes are the best one, honestly.")]
+        fake.script = script
+        long_msg = "I like fruits, especially mangoes and also bananas and I was wondering which one is the healthiest overall"
+
+        async def main():
+            od.events.bind_loop(asyncio.get_running_loop())
+            rec = await od.send(long_msg)
+            conv = od.conversations[rec.conversation]
+            assert conv.title.endswith("...") and len(conv.title) <= 52, conv.title  # placeholder, cut on a word
+            for _ in range(300):
+                if conv.title == "Fruit Talk" and od.current is None:
+                    break
+                await asyncio.sleep(0.1)
+            assert conv.title == "Fruit Talk", conv.title
+            await od.send("and apples?", conv.id)
+            while od.current is not None:
+                await asyncio.sleep(0.1)
+            await asyncio.sleep(0.5)
+            assert conv.title == "Fruit Talk"                                       # named once
+        asyncio.run(main())
+    with_fake(lambda r, f: [X("ok")], go)
+
+
+@covers(44, title="Power cut: a task that was running when it shut down gets 'I was in the middle of X'")
+def test_power_cut_recovery():
+    from ..agent import Overdrive
+    from ..tasks import TaskRecord
+    with TempDir() as tmp:
+        od = Overdrive(home=tmp / "home", test_env={"X": "1"})
+        conv = od.new_conversation("racer")
+        rec = TaskRecord(id="t20261117-101010-abcd", conversation=conv.id, request="build the night map")
+        od.task_store.save(rec)                                         # status "running", then the power went out
+        od2 = Overdrive(home=tmp / "home", test_env={"X": "1"})
+        found = od2.recover_interrupted()
+        assert found and found[0]["request"] == "build the night map" and od2.interrupted
+        again = od2.task_store.load(rec.id)
+        assert again.status == "failed" and "turned off" in again.status_reason
+        assert Overdrive(home=tmp / "home", test_env={"X": "1"}).recover_interrupted() == []   # only once
+
+
+@covers(43, title="Picture clean-up: old pictures and an over-full folder get trimmed, oldest first")
+def test_picture_cleanup():
+    import os
+    import time as _t
+    from ..pictures import PictureStore
+    from .piece2_tests import png
+    with TempDir() as tmp:
+        ps = PictureStore(tmp)
+        names = [ps.put(png(i, 0, 0)) for i in range(5)]
+        old = _t.time() - 40 * 86400
+        os.utime(ps.path(names[0]), (old, old))
+        r = ps.cleanup(30, 1000)
+        assert r["removed"] == 1 and ps.path(names[0]) is None
+        size = sum((tmp / n).stat().st_size for n in names[1:])
+        r2 = ps.cleanup(0, 0) if False else ps.cleanup(0, 50)
+        assert r2["removed"] == 0
+        assert ps.cleanup(0, 1000)["left"] == 4 and size > 0
